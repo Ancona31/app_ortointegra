@@ -10,6 +10,7 @@ import { APPOINTMENT_SELECT, eventoParaGoogle, puntasParaGoogle, componerAsisten
          type ClinicaEnCita, type PacienteEnCita } from '@/lib/appointments'
 import { correoDelMedico } from '@/lib/medicoCorreo'
 import { TZ_CLINICA, desplazarFecha, fechaHoraLocalAInstante, renderEnTZ } from '@/lib/dates'
+import { comprobarTopeDuracion } from '@/lib/agenda/topeDuracion'
 
 /* Una fecha-solo `YYYY-MM-DD` QUE ADEMÁS EXISTE EN EL CALENDARIO: la forma no
    basta, porque `2026-02-30` la pasa y el motor la DESBORDA al 2 de marzo en vez
@@ -259,6 +260,33 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
         { error: 'rango_invalido', message: 'El fin de la cita tiene que ir después del inicio.' },
         { status: 400 }
       )
+    }
+
+    /* ── EL TECHO DE DURACIÓN, SOBRE LOS VALORES EFECTIVOS ───────────────────
+       Mismo motivo que en el POST —un año mal tecleado en el campo de fin deja
+       una fila cruzando toda la agenda— y misma pareja de topes, que viven en
+       `@/lib/agenda/topeDuracion`.
+
+       EFECTIVOS Y NO LO QUE TRAE EL CUERPO, por lo mismo que la comprobación de
+       orden de aquí arriba: en un PUT cada punta viaja por su cuenta, así que un
+       cuerpo que sólo mande `end_time` se compara contra el inicio que ya está
+       en la fila. Y el tope que aplica sale de `pacienteEfectivo`, no de
+       `existing.paciente_id`: un PUT puede estar colgándole un paciente a un
+       evento —lo que lo convierte en cita y le baja el tope de golpe— o
+       quitándoselo.
+
+       ⚠️ ESTO NO CUBRE LAS FILAS DE TODO EL DÍA QUE ESTE PUT ESTÉ RECOMPONIENDO,
+       EXACTAMENTE IGUAL QUE LA COMPROBACIÓN DE ORDEN DE ARRIBA Y POR LA MISMA
+       RAZÓN: sus dos puntas se componen más abajo, en el bloque de `all_day`,
+       así que aquí `updates` todavía no las tiene y lo que se mide es lo que la
+       fila YA tenía —que pasa, porque ya estaba guardada—. El caso nuevo lo
+       comprueba una segunda llamada dentro de aquel bloque, sobre las puntas
+       recién compuestas. Son dos sitios y no uno a propósito; unificarlos exige
+       mover la composición, que es lo que aquel bloque explica que no se puede
+       hacer sin conocer antes el huso efectivo. */
+    const errorDeTope = comprobarTopeDuracion(inicioEfectivo, finEfectivo, Boolean(pacienteEfectivo))
+    if (errorDeTope) {
+      return NextResponse.json(errorDeTope, { status: 400 })
     }
 
     /* La pinta del evento genérico (§12.14). Mismo criterio que el resto: sólo
@@ -524,8 +552,28 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
       }
       const hastaExclusivo = desplazarFecha(hasta, { dias: 1 })
       fechasDelEvento = { desde, hastaExclusivo }
-      updates.start_time = fechaHoraLocalAInstante(desde, '00:00', tz)
-      updates.end_time   = fechaHoraLocalAInstante(hastaExclusivo, '00:00', tz)
+      /* Las dos puntas van a una constante antes de entrar en `updates`, y no es
+         estilo: `updates` está tipado como bolsa de `unknown` y leerlas de ahí
+         para medirlas obligaría a un `as`, que esta casa no usa para callar al
+         compilador. Desde la constante salen tipadas y se usan dos veces —la
+         escritura y la medición— sin recomponer nada. */
+      const inicioNuevo = fechaHoraLocalAInstante(desde, '00:00', tz)
+      const finNuevo    = fechaHoraLocalAInstante(hastaExclusivo, '00:00', tz)
+      updates.start_time = inicioNuevo
+      updates.end_time   = finNuevo
+
+      /* El techo de duración sobre las puntas RECIÉN COMPUESTAS. La llamada de
+         más arriba no pudo verlas —no existían— y midió las que la fila ya
+         tenía; ésta mide las que este PUT va a guardar.
+         `false` y no `pacienteEfectivo` porque a esta rama sólo se llega con
+         `all_day === true`, y unas líneas antes se rechazó ya la combinación de
+         todo el día con paciente: aquí no puede haber uno. Escribirlo literal
+         deja dicho cuál de los dos topes aplica sin tener que reconstruir esa
+         cadena de razonamiento. */
+      const errorDeTopeTodoElDia = comprobarTopeDuracion(inicioNuevo, finNuevo, false)
+      if (errorDeTopeTodoElDia) {
+        return NextResponse.json(errorDeTopeTodoElDia, { status: 400 })
+      }
     }
 
     // RLS filtra por clinica_id

@@ -10,6 +10,7 @@ import { APPOINTMENT_SELECT, eventoParaGoogle, puntasParaGoogle, componerAsisten
          type ClinicaEnCita, type PacienteEnCita } from '@/lib/appointments'
 import { correoDelMedico } from '@/lib/medicoCorreo'
 import { TZ_CLINICA, desplazarFecha, fechaHoraLocalAInstante } from '@/lib/dates'
+import { comprobarTopeDuracion } from '@/lib/agenda/topeDuracion'
 import { logger } from '@/lib/logger'
 
 /* Una fecha-solo `YYYY-MM-DD`, que es lo que manda el modal para un evento de
@@ -416,6 +417,31 @@ export async function POST(req: NextRequest) {
     const finFila = finExclusivo !== null
       ? fechaHoraLocalAInstante(finExclusivo, '00:00', consultorio.timezone)
       : end_time
+
+    /* ── EL TECHO DE DURACIÓN ────────────────────────────────────────────────
+       Sólo comprobaba que el fin fuera después del inicio, y con eso un dedazo
+       en el AÑO de la fecha de fin —los `<input type="date">` dejan escribir
+       cualquier año— crea una fila que se solapa con todas las semanas de la
+       agenda para siempre. No revienta nada: se pinta, y por eso nadie la ve.
+       Los dos topes y su porqué están en `@/lib/agenda/topeDuracion`.
+
+       ⚠️ VA AQUÍ, DESPUÉS DE COMPONER LAS PUNTAS, Y NO ARRIBA CON LA
+       COMPROBACIÓN DE ORDEN. Es a propósito y es lo que hace que UNA sola
+       llamada cubra las dos ramas: en un alta de todo el día `start_time` y
+       `end_time` NO VIENEN en el cuerpo —el cliente manda `all_day_desde` /
+       `all_day_hasta`— y las puntas reales no existen hasta estas dos líneas de
+       aquí arriba. Comprobarlo antes obligaría a dos ramas y a duplicar el
+       convenio del fin exclusivo, que es justo lo que el módulo evita.
+       Se mide LO QUE SE VA A GUARDAR, que es la única definición que no se
+       puede desincronizar.
+
+       ⚠️ NO SUSTITUYE A LA COMPROBACIÓN DE ORDEN de más arriba, la acompaña:
+       aquélla sigue siendo la que rechaza un rango invertido, y tiene que ir
+       delante porque ésta da por bueno cualquier rango negativo. */
+    const errorDeTope = comprobarTopeDuracion(inicioFila, finFila, Boolean(paciente_id))
+    if (errorDeTope) {
+      return NextResponse.json(errorDeTope, { status: 400 })
+    }
 
     // RLS filtra por clinica_id
     const { data: apt, error } = await supabase
