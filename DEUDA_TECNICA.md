@@ -3848,6 +3848,103 @@ terminar es la nota de cierre de esa entrada, arriba.
 
 ---
 
+### PERF-DT-4 — Las funciones de seguridad dentro de un `OR` podrían evaluarse una vez POR FILA, y nadie lo ha comprobado
+
+**Estado:** 🟡 abierta — **es una AFIRMACIÓN SIN VERIFICAR, no un hallazgo** ·
+**Archivos:** las policies de
+`supabase/migrations/20260530_etapa5h_paso3_policies_appointments.sql:86-93` y las
+de otras ocho migraciones (ver «El alcance»); los helpers, en
+`supabase/migrations/20260522_etapa5c_helpers_rls.sql:57-142`
+**Detectado:** lo señaló un análisis externo. Salió de la rama de calendario al
+cerrarse, se evaluó en la rama de rendimiento y se dejó fuera a propósito por
+tocar RLS. Registrado aquí el 2026-09-07.
+
+> ### ⚠️ LO PRIMERO QUE HAY QUE HACER CON ESTA ENTRADA ES COMPROBARLA, NO
+> ### ARREGLARLA. NADIE HA CORRIDO UN `EXPLAIN ANALYZE`.
+>
+> Lo que sigue es un patrón conocido de Postgres aplicado a una forma que
+> nuestras policies sí tienen. **No es una medición de nuestras policies.** Puede
+> perfectamente que el planificador ya lo esté resolviendo bien y que aquí no
+> haya nada que arreglar. Escribir la migración antes que la medición sería tocar
+> RLS a ciegas, que es la peor forma de tocar RLS.
+
+**La afirmación**
+
+Que esas funciones podrían estar evaluándose **una vez por cada fila** examinada,
+en lugar de una vez por consulta. Si es cierta, no cambia ningún resultado ni
+abre ninguna puerta: sólo cambia cuándo empieza a doler. Con evaluación por
+consulta el coste es constante y se nota a las 200.000 filas; con evaluación por
+fila crece con la tabla y se nota a las 10.000.
+
+**El patrón conocido, para que quien lo tome no parta de cero**
+
+En Postgres, una función llamada **directamente** dentro del predicado de una
+policy se evalúa por fila. Envuelta en un subselect —`(SELECT public.fn())`— el
+planificador la puede subir a un **InitPlan** y ejecutarla una sola vez para toda
+la consulta. Dentro de un `OR` el margen del planificador es menor que dentro de
+un `AND`, que es justo la forma que tienen las nuestras:
+
+```sql
+USING (
+  (
+    appointments.medico_id = auth.uid()
+    OR public.soy_admin_de_clinica()
+    OR public.get_my_role() = 'secretaria'
+  )
+  AND appointments.clinica_id = public.get_clinica_id()
+)
+```
+
+El arreglo, si la medición lo confirma, sería **envolverlas y nada más**: mismo
+predicado, mismo veredicto, ninguna tabla tocada y ningún permiso movido.
+
+**El alcance**
+
+`OR public.<función>()` aparece **31 veces repartidas en nueve archivos de
+migración**: `20260427_b1_01_clinicas_rls`, `20260524_etapa5e_bd1_policies_pacientes`,
+`20260524_etapa5e_bd2_policies_paciente_medico`, `20260530_etapa5f_paso3_policies_consultas`,
+`20260530_etapa5h_paso3_policies_appointments`, `20260531_etapa5i_paso3_policies_addendums_mediciones`,
+`20260602_etapa5j_paso2_policies_profiles_invitaciones`, `20260615_consultorios_03_rls`
+y `20260616_consultorios_06_rls_select_owner_only`.
+
+**Eso son apariciones en archivos, NO policies vivas**, y la diferencia importa
+antes de dimensionar nada: unas migraciones reemplazan policies de otras, así que
+el número de policies realmente vigentes con esta forma está **sin contar**.
+Contarlo es parte de la verificación, no un preliminar que se pueda saltar.
+
+**La trampa de la verificación, que es lo que hace que esto no sea un `EXPLAIN`
+y ya está**
+
+`appointments` tiene **154 filas** hoy (leído en producción el 2026-09-07). Con
+ese tamaño el planificador va a elegir recorrido secuencial haga lo que haga con
+las funciones, así que **un `EXPLAIN ANALYZE` contra la base actual puede salir
+inconcluyente y parecer que no hay problema**. Comprobarlo de verdad exige un
+conjunto de datos realista —del orden de las decenas de miles de filas— y
+comparar las dos formas del predicado sobre él. Quien mida contra producción tal
+como está hoy y concluya «no pasa nada» habrá medido el tamaño de la tabla, no la
+forma de la policy.
+
+**Por qué no se toca de paso, y por qué no se tocó en la tanda de latencia**
+
+Porque es RLS. Es la barrera que separa los datos clínicos de una clínica de los
+de otra, y un cambio en el predicado —aunque sea uno que se cree
+semánticamente neutro— no entra por el camino de una optimización de
+rendimiento. **Va con su propia auditoría, por un agente que corra dentro del
+repo**, con el pre-vuelo y el veredicto en las dos direcciones que pide
+`supabase/AUDITORIA-MIGRACIONES.md`. Ése es el motivo de que la rama de
+rendimiento lo dejara fuera teniéndolo delante, y no un descuido.
+
+**Familia.** Con **ACL-DT-1** y **ISO-DT-1** comparte la propiedad que las hace
+peligrosas de tratar deprisa: son cosas que se dieron por ciertas sin
+comprobarlas nunca, y en las tres el remedio **empieza por una medición o una
+consulta de sólo lectura, no por SQL**. Con **PERF-DT-1** y **PERF-DT-3**
+comparte el origen —la tanda de latencia— y una lección que ya se pagó allí: en
+PERF-DT-1 se creía que los layouts anidados hacían cuatro llamadas a Auth y cinco
+a Postgres, se midió, y eran una y tres. **Aquí todavía no se ha hecho esa
+medición.**
+
+---
+
 ### DEP-DT-3 — `SecretariaDashboard.tsx` es código muerto
 
 **Estado:** 🟡 abierta, menor · **Archivo:**
