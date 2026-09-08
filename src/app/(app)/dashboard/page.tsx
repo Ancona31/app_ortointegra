@@ -154,12 +154,31 @@ export default function DashboardPage() {
 
     const supabase = createClient()
 
+    /* ⚠️ LA MISMA GUARDA QUE `fetchCitas`, Y PUESTA DE ANTEMANO: HOY ESTE EFECTO
+       CORRE UNA SOLA VEZ POR CARGA, ASÍ QUE NO PUEDE FALLAR TODAVÍA.
+       Sus dependencias son `profile` y `loadingProfile`, que se asientan juntas
+       y no vuelven a cambiar; con un solo disparo no hay dos peticiones que
+       puedan cruzarse. Está aquí porque el día que alguien le dé un motivo para
+       repetirse —un filtro, el selector de consultorio, un botón de recargar—
+       vuelve exactamente la trampa que se cerró en el efecto de las citas: la
+       respuesta TARDÍA pisa a la de la última petición pedida. Con esto, quien
+       añada esa dependencia no tiene que acordarse de nada.
+       Se lee igual que abajo a propósito: bandera apagada en la limpieza del
+       efecto, comprobada antes de cada `setState`. No hay un segundo mecanismo
+       ni una abstracción compartida — son dos usos, y duplicar sale más barato
+       que abstraer. */
+    let vigente = true
+
     // Total de expedientes — fetch remoto con fallback al mirror
     supabase
       .from('pacientes')
       .select('id', { count: 'exact', head: true })
       .neq('activo', false)
-      .then(({ count }: { count: number | null }) => setTotalPacientes(count ?? 0))
+      .then(({ count }: { count: number | null }) => {
+        // Petición vieja adelantada por otra más nueva: no escribe nada.
+        if (!vigente) return
+        setTotalPacientes(count ?? 0)
+      })
       .catch(() => {
         // silent — el fallback al mirror abajo resuelve el contador
       })
@@ -173,6 +192,8 @@ export default function DashboardPage() {
       .order('created_at', { ascending: false })
       .limit(30)
       .then(({ data }: { data: { paciente_id: string; created_at: string; motivo_consulta: string | null; pacientes: { nombre: string; apellidos: string; activo?: boolean } | { nombre: string; apellidos: string; activo?: boolean }[] }[] | null }) => {
+        // Petición vieja adelantada por otra más nueva: no escribe nada.
+        if (!vigente) return
         if (!data) return
         const seen = new Set<string>()
         const unique: Reciente[] = []
@@ -198,6 +219,7 @@ export default function DashboardPage() {
         // silent — si el fetch falla, recientes queda vacío y no se renderiza
       })
 
+    return () => { vigente = false }
   }, [profile, loadingProfile])
 
   /* ── LAS PRÓXIMAS CITAS VAN EN SU PROPIO EFECTO, Y ÉSA ES LA MITAD DEL
