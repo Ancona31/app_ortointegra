@@ -54,17 +54,27 @@ export function useClinica() {
     subtitulo:       clinica?.subtitulo        ?? null,
     logoUrl:         clinica?.logo_url         ?? null,
     isOfflineData:   !data?.clinica && !!fallback,
-    /* ⚠️ AÑADIDO PARA SEPARAR «TODAVÍA NO SÉ» DE «FALLÓ», QUE ES LO QUE
-       `clinica: null` NO PUEDE DECIR: vale null en los dos casos.
+    /* ⚠️ AÑADIDO PARA DESATASCAR EL «TODAVÍA NO SÉ», QUE ES LO QUE
+       `clinica: null` NO PUEDE DECIR: vale null mientras carga Y cuando falló.
        A quien solo pinta la marca le da igual —cae a los colores por defecto de
-       arriba y ya—, pero quien tome una DECISIÓN con estos datos necesita la
-       diferencia: sin ella, esperar a que resuelva es esperar para siempre si
-       el agregado devolvió 500. Es el mismo defecto que se corrigió en el modal
-       de horario, y la misma lección: un estado de fallo indistinguible de uno
-       legítimo acaba en un dato inventado tratado como real.
+       arriba y ya—, pero quien tome una DECISIÓN con estos datos necesita saber
+       cuándo dejar de esperar: sin esto, esperar a que resuelva es esperar para
+       siempre si el agregado devolvió 500. Es el mismo defecto que se corrigió
+       en el modal de horario, y la misma lección: un estado de fallo
+       indistinguible de uno legítimo acaba en un dato inventado tratado como
+       real.
        Es el `error` de SWR tal cual, el mismo que ya se usaba arriba para
        decidir el respaldo sin conexión. `undefined` mientras no haya fallo.
-       ⚠️ NO ES «no hay clínica»: para eso el agregado responde 403 y ESO
+
+       ⚠️ ÚSALO EN UN «O», NUNCA A SOLAS. `error` NO es el discriminador entre
+       «no sé» y «falló»: SWR CONSERVA `data` cuando falla una REVALIDACIÓN
+       posterior, así que `error` definido y una `clinica` perfectamente buena
+       conviven —y `isOfflineData` sigue en `false`, porque `data` existe—.
+       Escribir `if (error) → no me fío de clinica` tira datos válidos por un
+       fallo que ya pasó. La forma correcta es la que usa el dashboard:
+       `clinica !== null || error !== undefined` para decidir que ESTO YA
+       RESOLVIÓ, y leer `clinica` aparte.
+       ⚠️ Y NO ES «no hay clínica»: para eso el agregado responde 403 y ESO
        también llega aquí como error (ver `esErrorDeSesion` en configApp.ts). */
     error: error as ErrorConfig | undefined,
   }

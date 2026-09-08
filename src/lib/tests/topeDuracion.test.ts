@@ -75,14 +75,35 @@ describe('evento genérico sin paciente — tope de un año', () => {
     expect(comprobarTopeDuracion(INICIO, masDias(18), SIN_PACIENTE)).toBeNull()
   })
 
-  /* ⚠️ ÉSTE ES EL CASO QUE OBLIGA A QUE EL TOPE SEAN 366 DÍAS Y NO 365.
-     `end_time` de una fila de todo el día es la medianoche del día SIGUIENTE al
-     último incluido, así que un evento que CUBRE 365 días mide 366 de punta a
-     punta. Con el tope en 365 este caso legítimo se rechazaría, que es
-     exactamente lo que no puede pasar. */
-  it('UN EVENTO DE TODO EL DÍA DE 365 DÍAS PASA, pese a medir 366 por el fin exclusivo', () => {
-    const cubre365 = masDias(TOPE_EVENTO_DIAS + 1)
-    expect(comprobarTopeDuracion(INICIO, cubre365, SIN_PACIENTE)).toBeNull()
+  /* El fin exclusivo NO añade ningún día: N días cubiertos son N de punta a
+     punta (`20260826_agenda_all_day.sql:539`: un solo día del 19 → 19T00:00 ..
+     20T00:00 = 24 h). Así que 366 de punta a punta son 366 cubiertos, o sea un
+     año bisiesto entero, y caen JUSTO en el tope. */
+  it('EL TOPE EXACTO: 366 días de punta a punta pasan — la regla es «más de», no «desde»', () => {
+    const topeClavado = masDias(TOPE_EVENTO_DIAS + 1)
+    expect(comprobarTopeDuracion(INICIO, topeClavado, SIN_PACIENTE)).toBeNull()
+  })
+
+  /* ⚠️ ÉSTE ES EL ÚNICO CASO QUE OBLIGA A QUE EL TOPE SEAN 366 DÍAS Y NO 365.
+     Si alguien «corrige» `TOPE_EVENTO_DIAS` a 365 razonando que el fin
+     exclusivo no añade nada —no lo añade—, este test se pone rojo, y ésa es
+     toda su razón de existir.
+     Un evento de todo el día que CUBRE 365 días desde el 2026-03-09 en
+     America/Tijuana empieza a medianoche en PDT (UTC−7) y termina a medianoche
+     en PST (UTC−8), porque el horario de verano de 2027 arranca el 14 de marzo,
+     cinco días después del fin. Mide 365 días Y UNA HORA, y es un año legítimo
+     que TIENE que pasar; el día de holgura del tope existe para esa hora.
+     Las puntas van como los instantes UTC que SON esas dos medianoches de
+     Tijuana, para no depender de la zona de quien corra el test (ver la
+     cabecera de este archivo). La resta de arriba comprueba que siguen siendo
+     esas medianoches y no dos instantes cualesquiera. */
+  it('EL CAMBIO DE HORARIO: cubrir 365 días en America/Tijuana mide 365 d + 1 h y PASA', () => {
+    const inicioTijuana = '2026-03-09T07:00:00Z' // 2026-03-09 00:00 PDT
+    const finTijuana    = '2027-03-09T08:00:00Z' // 2027-03-09 00:00 PST, fin exclusivo
+    const span = new Date(finTijuana).getTime() - new Date(inicioTijuana).getTime()
+    expect(span).toBe(365 * 24 * 3_600_000 + 3_600_000)
+
+    expect(comprobarTopeDuracion(inicioTijuana, finTijuana, SIN_PACIENTE)).toBeNull()
   })
 
   it('JUSTO POR DEBAJO: 365 días de punta a punta pasan', () => {

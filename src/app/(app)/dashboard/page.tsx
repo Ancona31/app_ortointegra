@@ -224,6 +224,27 @@ export default function DashboardPage() {
 
     const supabase = createClient()
 
+    /* ⚠️ ESTE EFECTO PUEDE CORRER DOS VECES, Y GANA LA ÚLTIMA PETICIÓN LANZADA,
+       NO LA ÚLTIMA EN RESPONDER.
+       En el camino normal corre UNA vez: `clinicaTipo` y `configResuelta` salen
+       los dos de `clinica` y cambian a la vez. Pero hay dos caminos en los que
+       existe un render intermedio con `configResuelta` cierto y `clinicaTipo`
+       todavía null, y ahí corre dos veces:
+         a) un 500 pasajero de `/api/me/config` —`errorConfig` resuelve el
+            efecto— que SWR reintenta y acierta después;
+         b) un `cache_clinica` cifrado escrito antes de este despliegue, que no
+            tiene `tipo`; el fallback resuelve, y la columna llega cuando el
+            agregado responde de verdad.
+       EL DOBLE DISPARO SE ACEPTA: son dos caminos de fallo, la segunda consulta
+       es la buena y la tarjeta acaba correcta. Lo que NO se acepta es que
+       decida la carrera: la de `limit(1)` puede responder después de la de
+       `limit(4)` y dejar a un administrador viendo UNA cita cuando le tocan
+       cuatro. Esta bandera, apagada en la limpieza del efecto, hace que sólo
+       escriba estado la petición del último render — es «gana la última
+       lanzada» y no «la última en responder». Si algún día se quita el doble
+       disparo, ESTO SE QUEDA: cualquier re-render que relance vale igual. */
+    let vigente = true
+
     async function fetchCitas() {
       try {
         if (!profile?.clinica_id) return
@@ -267,17 +288,23 @@ export default function DashboardPage() {
           .order('start_time', { ascending: true })
           .limit(isClinicaAdmin ? 4 : 1)
 
+        // Petición vieja adelantada por otra más nueva: no escribe nada.
+        if (!vigente) return
         setProximasCitas((data as ProximaCita[] | null) ?? [])
       } catch {
         // Red caída o query fallida → citas vacío, el resto del dashboard renderiza
+        if (!vigente) return
         setProximasCitas([])
       } finally {
-        // SIEMPRE apagar el skeleton de carga, sin importar el path
-        setLoadingCitas(false)
+        // SIEMPRE apagar el skeleton de carga, sin importar el path — salvo si
+        // esta petición ya quedó obsoleta: ahí manda la que va detrás.
+        if (vigente) setLoadingCitas(false)
       }
     }
 
     void fetchCitas()
+
+    return () => { vigente = false }
   }, [profile, loadingProfile, clinicaTipo, configResuelta])
 
   if (loadingProfile) return <DashboardSkeleton />
@@ -522,6 +549,12 @@ export default function DashboardPage() {
         <div className="animate-slide-up pb-6" style={{ animationDelay: '180ms' }}>
           <div className="flex items-center justify-between mb-3">
             <p className="text-[11px] font-semibold text-[#86868b] uppercase tracking-widest">Consultas recientes</p>
+            {/* CON precarga, y NO es un olvido de la poda de esta pantalla:
+                apunta a `/expediente`, la MISMA url que la tarjeta
+                «Expediente» de ACCESOS, que conserva la suya a propósito. Next
+                deduplica por url, así que apagar ésta no quitaría ni una
+                petición — sólo dejaría el enlace peor que su vecino. Se apaga
+                con aquélla o no se apaga. */}
             <Link href="/expediente" className="text-[11px] text-[#1e5fa8] hover:underline">
               Ver todos →
             </Link>
@@ -547,6 +580,19 @@ export default function DashboardPage() {
                       las 23 precargas de la página, y arrancan justo cuando el
                       dashboard todavía está pidiendo sus propios datos.
                       Se pulsa como mucho uno.
+
+                      EL AHORRO REAL ES MENOR QUE ESA CUENTA, y queda dicho para
+                      que nadie lo apunte más alto: la tarjeta de próxima cita
+                      tiene su propio «Ver expediente» a `/expediente/{id}` CON
+                      precarga, y Next deduplica por url. Si el paciente de la
+                      cita sale además en esta lista —que es el caso frecuente,
+                      porque acaba de ser atendido—, sus DOS enlaces de
+                      expediente de aquí no ahorran nada: la precarga la pide
+                      igual la tarjeta, y de su fila sólo se ahorran «Receta» y
+                      «Nota». Es exactamente el razonamiento que el `<Link>` de
+                      la flecha aplica DENTRO de la fila, aplicado ahora ENTRE
+                      tarjetas. Para los demás pacientes de la lista el ahorro
+                      sí es entero.
 
                       LO QUE NO CAMBIA: los enlaces navegan exactamente igual.
                       Lo único que se pierde es la transición instantánea; al

@@ -25,22 +25,36 @@
  * verdad, ESE es el momento de decidir si se les exime, y el sitio para hacerlo
  * es el llamador, no este módulo.
  *
- * ── EL CONVENIO DE FIN EXCLUSIVO, QUE ES LO QUE HACE QUE EL AÑO SEAN 366 ────
+ * ── EL CONVENIO DE FIN EXCLUSIVO NO AÑADE NINGÚN DÍA ───────────────────────
  * `appointments.end_time` de una fila `all_day` es la medianoche del día
  * SIGUIENTE al último incluido (ver el `COMMENT ON COLUMN` de
- * `20260826_agenda_all_day.sql:538`). Un evento de UN SOLO DÍA mide 24 h
- * exactas, y uno que cubre 365 días mide 366 días de punta a punta.
+ * `20260826_agenda_all_day.sql:539`), y el propio convenio da ahí el ejemplo:
+ * un evento de UN SOLO día —el 19— va de 19T00:00 a 20T00:00, o sea 24 h, o sea
+ * UN día. La cuenta general es la misma: N días CUBIERTOS son N días de punta a
+ * punta, no N+1. Aquí no hay ningún día de desfase que compensar; quien busque
+ * uno para explicar el 366 no lo va a encontrar, porque no existe.
  *
- * Por eso `TOPE_EVENTO_MS` son 366 días y no 365: con 365 se rechazaría un
- * evento de un año completo por el desfase del día exclusivo, que es
- * precisamente el caso legítimo que el tope tiene que dejar pasar.
+ * ── ¿POR QUÉ EL TOPE SON 366 DÍAS Y NO 365? POR EL CAMBIO DE HORARIO ───────
+ * Porque esto resta INSTANTES, y un día civil no siempre son 24 h. Medido: un
+ * evento de todo el día que CUBRE 365 días desde el 2026-03-09 en
+ * America/Tijuana mide 365 días Y UNA HORA, porque empieza a medianoche en PDT
+ * (UTC−7) y termina a medianoche en PST (UTC−8) —el verano de 2027 arranca
+ * cinco días después del fin—. Con el tope en 365 días clavados, ese año
+ * perfectamente legítimo se rechazaría por una hora. El día de holgura existe
+ * para absorber esa hora: POR ESO NO SE BAJA A 365.
+ * Baja California es hoy la única parte de México que cambia la hora —el resto
+ * del país no lo hace desde 2022—; basta con una zona para que importe.
+ * Lo fija el test «EL CAMBIO DE HORARIO» de
+ * `src/lib/tests/topeDuracion.test.ts`: baja la constante a 365 y se pone rojo.
  *
- * ⚠️ EL BORDE QUE ESTO DEJA FUERA, DICHO EN VOZ ALTA: un evento de todo el día
- * que cubra un AÑO BISIESTO entero son 366 días cubiertos, o sea 367 de punta a
- * punta, y ESTE TOPE LO RECHAZA. Es un día de más sobre lo pedido —«un año»— y
- * se deja así a propósito en vez de subirlo a 367: el rechazo es visible y con
- * mensaje, mientras que cada día de holgura es un dedazo de año que se cuela.
- * Si algún día molesta, se sube aquí y en ningún otro sitio.
+ * ⚠️ EL BORDE, DICHO EN VOZ ALTA: un evento de todo el día que cubra un AÑO
+ * BISIESTO entero son 366 días cubiertos, o sea 366 de punta a punta —el tope
+ * EXACTO— y PASA, porque la regla es «más de» y no «desde». Lo que ya no cabe
+ * es ese mismo año bisiesto cuando además gana la hora del cambio de horario:
+ * 366 días y una hora, y se rechaza. Se deja así a propósito en vez de subir a
+ * 367: el rechazo es visible y con mensaje, mientras que cada día de holgura es
+ * un dedazo de año que se cuela. Si algún día molesta, se sube aquí y en ningún
+ * otro sitio.
  *
  * ⚠️ Y LO QUE ESTE TOPE NO ATRAPA, para que nadie lo crea más fuerte de lo que
  * es: un dedazo de UN año EXACTO en un evento genérico (2026 → 2027) da 365
@@ -58,7 +72,7 @@
 /** Horas máximas de una cita con paciente. */
 export const TOPE_CITA_HORAS = 10
 
-/** Días que un evento genérico puede CUBRIR. El fin exclusivo suma uno más. */
+/** Días que un evento genérico puede CUBRIR. El tope real lleva un día encima. */
 export const TOPE_EVENTO_DIAS = 365
 
 const UNA_HORA_MS = 3_600_000
@@ -66,7 +80,8 @@ const UN_DIA_MS = 24 * UNA_HORA_MS
 
 export const TOPE_CITA_MS = TOPE_CITA_HORAS * UNA_HORA_MS
 
-/** Los 365 días cubiertos MÁS el día del fin exclusivo. Ver la cabecera. */
+/** Los 365 días cubiertos MÁS un día de holgura, que NO es el fin exclusivo
+    —ese no añade nada— sino la hora que suma el cambio de horario. Cabecera. */
 export const TOPE_EVENTO_MS = (TOPE_EVENTO_DIAS + 1) * UN_DIA_MS
 
 /**
