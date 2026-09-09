@@ -9,11 +9,6 @@ import Link from 'next/link'
 import { formatDistanceToNow, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { createClient } from '@/lib/supabase/client'
-import { canManageClinica } from '@/lib/permissions'
-import { formatCitaHora } from './utils'
-import { StatusChip } from './StatusChip'
-import { useConsultorios } from '@/hooks/useConsultorios'
-import { useClinica } from '@/hooks/useClinica'
 import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
 import { useMenuMovil } from '@/contexts/MenuMovilContext'
 /* El «+ Nueva consulta» de la cabecera. Vive en `components/launcher/` porque
@@ -21,6 +16,7 @@ import { useMenuMovil } from '@/contexts/MenuMovilContext'
    Es la ÚNICA pieza de la app que hace lo que pide la adenda §1: elegir
    paciente (o crearlo) y entrar a la nota SIN exigir cita previa. */
 import ConsultaRapidaModal from '@/components/launcher/ConsultaRapidaModal'
+import ProximasCitas from '@/components/dashboard/ProximasCitas'
 import BuscadorPaciente, { ALTO_CONTROL } from '@/components/dashboard/BuscadorPaciente'
 
 /* ─── Helpers ─────────────────────────────────────────────── */
@@ -40,17 +36,6 @@ type Reciente = {
   apellidos: string
   created_at: string
   motivo_consulta: string
-}
-
-type ProximaCita = {
-  id: string
-  title: string
-  start_time: string
-  status: string
-  paciente_id: string | null
-  consultorio_id: string | null
-  pacientes: { nombre: string; apellidos: string } | null
-  medico: { id: string; titulo: string | null; apellido_paterno: string | null } | null
 }
 
 /* ─── Config ──────────────────────────────────────────────── */
@@ -124,39 +109,12 @@ const AVATAR_COLORS = [
 
 export default function DashboardPage() {
   const { profile, loading: loadingProfile } = useProfile()
-  const { consultorios } = useConsultorios()
-  const { cambiarActivo, consultorioActivo } = useConsultorioActivo()
+  const { consultorioActivo } = useConsultorioActivo()
   const { abrir: abrirMenu } = useMenuMovil()
   const [modalConsulta, setModalConsulta] = useState(false)
   const [recientes,      setRecientes]      = useState<Reciente[]>([])
   const [totalPacientes, setTotalPacientes] = useState<number | null>(null)
-  const [proximasCitas,  setProximasCitas]  = useState<ProximaCita[]>([])
-  const [loadingCitas,   setLoadingCitas]   = useState(true)
 
-  /* ── EL TIPO DE CLÍNICA SALE DEL AGREGADO, NO DE UNA CONSULTA PROPIA ──────
-     Aquí hubo un `clinicas?select=tipo` dentro de `fetchCitas`, y su problema
-     no era pedir de más sino ENCADENAR: la consulta de `appointments` de abajo
-     no arrancaba hasta que ésa respondía. Medido en producción (2026-09-07),
-     eran 539 ms de espera pura al final de la cascada, justo antes de que el
-     dashboard quedara completo. Y pedía UNA columna de la fila de `clinicas`
-     que `/api/me/config` ya trae entera; sólo faltaba nombrarla en su `select`.
-     El agregado además resuelve ANTES que aquella consulta en todas las trazas
-     medidas (frío 3.911 ms contra 4.438; caliente 647 contra 897).
-
-     ⚠️ `null` SIGNIFICA «NO LO SÉ», Y NO SE COACCIONA A UN VALOR REAL.
-     `clinicas.tipo` es `NOT NULL` en la base, así que toda fila trae valor: si
-     aquí falta, es que no hay fila —el agregado no ha resuelto, ha fallado, o
-     `clinica` viene del cache cifrado escrito antes de que esta columna
-     existiera—. Escribir `?? 'clinica'` o `?? 'independiente'` convertiría esas
-     tres cosas en una afirmación. No lo hagas. */
-  const { clinica, error: errorConfig } = useClinica()
-  const clinicaTipo: 'clinica' | 'independiente' | null = clinica?.tipo ?? null
-
-  /* Resuelto = ya sé la respuesta, sea cual sea; incluye el fallo. Sin esta
-     segunda mitad, un 500 del agregado dejaría la tarjeta de citas en esqueleto
-     PARA SIEMPRE, que es justo lo que el `finally` de `fetchCitas` existe para
-     impedir. `errorConfig` lo expone `useClinica`; ver la nota que hay allí. */
-  const configResuelta = clinica !== null || errorConfig !== undefined
 
   useEffect(() => {
     if (loadingProfile || profile?.role === 'secretaria') return
@@ -231,113 +189,6 @@ export default function DashboardPage() {
     return () => { vigente = false }
   }, [profile, loadingProfile])
 
-  /* ── LAS PRÓXIMAS CITAS VAN EN SU PROPIO EFECTO, Y ÉSA ES LA MITAD DEL
-       ARREGLO ────────────────────────────────────────────────────────────────
-     Esto vivía dentro del efecto de arriba, detrás del `clinicas?select=tipo`
-     que se ha eliminado, así que no arrancaba hasta que aquél respondía.
-     Separarlo es lo que la desencadena: ahora sale en cuanto hay perfil Y el
-     agregado ha resuelto, o sea a la vez que `pacientes` y `consultas`, no
-     después.
-     ⚠️ TIENE QUE SER UN EFECTO APARTE. Si se dejara arriba con `clinicaTipo` en
-     las dependencias, el efecto ENTERO se repetiría al llegar el agregado y
-     volverían a pedirse el contador de expedientes y las consultas recientes.
-     Wrap completo en try/catch/finally para garantizar que `loadingCitas`
-     siempre termine en false. */
-  useEffect(() => {
-    if (loadingProfile || profile?.role === 'secretaria') return
-
-    /* ⚠️ ESPERA A QUE EL AGREGADO RESUELVA, PERO NO A QUE TENGA ÉXITO.
-       `configResuelta` es cierto también cuando el agregado falló; ahí
-       `clinicaTipo` es null y abajo se resuelve hacia `limit(1)`. Si esto
-       exigiera datos buenos, un 500 dejaría la tarjeta en esqueleto para
-       siempre — el fallo que el `finally` de abajo existe para impedir. */
-    if (!configResuelta) return
-
-    const supabase = createClient()
-
-    /* ⚠️ ESTE EFECTO PUEDE CORRER DOS VECES, Y GANA LA ÚLTIMA PETICIÓN LANZADA,
-       NO LA ÚLTIMA EN RESPONDER.
-       En el camino normal corre UNA vez: `clinicaTipo` y `configResuelta` salen
-       los dos de `clinica` y cambian a la vez. Pero hay dos caminos en los que
-       existe un render intermedio con `configResuelta` cierto y `clinicaTipo`
-       todavía null, y ahí corre dos veces:
-         a) un 500 pasajero de `/api/me/config` —`errorConfig` resuelve el
-            efecto— que SWR reintenta y acierta después;
-         b) un `cache_clinica` cifrado escrito antes de este despliegue, que no
-            tiene `tipo`; el fallback resuelve, y la columna llega cuando el
-            agregado responde de verdad.
-       EL DOBLE DISPARO SE ACEPTA: son dos caminos de fallo, la segunda consulta
-       es la buena y la tarjeta acaba correcta. Lo que NO se acepta es que
-       decida la carrera: la de `limit(1)` puede responder después de la de
-       `limit(4)` y dejar a un administrador viendo UNA cita cuando le tocan
-       cuatro. Esta bandera, apagada en la limpieza del efecto, hace que sólo
-       escriba estado la petición del último render — es «gana la última
-       lanzada» y no «la última en responder». Si algún día se quita el doble
-       disparo, ESTO SE QUEDA: cualquier re-render que relance vale igual. */
-    let vigente = true
-
-    async function fetchCitas() {
-      try {
-        if (!profile?.clinica_id) return
-
-        /* ⚠️ TIPO DESCONOCIDO ⇒ NO ES ADMIN DE CLÍNICA. NO ES UN DESCUIDO.
-           `clinicaTipo` es `null` cuando el agregado falló o vino del cache
-           viejo, y aquí eso se resuelve hacia `limit(1)` y tarjeta simple: se
-           enseña de MENOS, nunca de más. Lo contrario —suponer `'clinica'`—
-           pediría cuatro citas y pintaría la tarjeta de lista a quien quizá no
-           lo es.
-
-           ⚠️ Y ESTO CONSERVA EL COMPORTAMIENTO QUE YA HABÍA, aunque el código
-           viejo pareciera decir otra cosa. Su fallback era `?? 'independiente'`,
-           que es EL CONTRARIO DEL DEFAULT DE LA BASE (`'clinica'`,
-           `supabase/baseline/02_tables.sql:154`). Parece un descuido y es
-           deliberado: falla hacia el lado seguro. NO LO «ARREGLES» PARA
-           ALINEARLO CON LA BASE — alinearlo daría cuatro citas a quien no las
-           debe ver cuando la consulta falla, que es exactamente el caso que
-           este fallback cubre. */
-        const isClinicaAdmin = canManageClinica(profile) && clinicaTipo === 'clinica'
-
-        /* SÓLO CITAS DE PACIENTE, NUNCA EVENTOS GENÉRICOS. Es la misma regla
-           que `esEventoGenerico` (agenda/page.tsx:392) —la fila sin paciente es
-           un evento (§12.14)— pero aplicada en la consulta y no al pintar, que
-           es donde de verdad recorta: si se filtrara abajo, «Vacaciones IMSS»
-           seguiría gastando uno de los cuatro sitios de la lista.
-           Por eso NO se importa el helper: no hay predicado que compartir,
-           sólo un `.not()` que la base entiende.
-
-           SÓLO LAS DEL MÉDICO QUE MIRA, también cuando es administrador de la
-           clínica. Su dashboard es su resumen; la clínica entera está en
-           /agenda, que es donde `appointments_select` sí se lo permite. */
-        const { data } = await supabase
-          .from('appointments')
-          .select('id, title, start_time, status, paciente_id, consultorio_id, pacientes(nombre, apellidos), medico:profiles!appointments_medico_id_fkey(id, titulo, apellido_paterno)')
-          .eq('clinica_id', profile!.clinica_id!)
-          .eq('medico_id', profile!.id)
-          .not('paciente_id', 'is', null)
-          .gt('start_time', new Date().toISOString())
-          .in('status', ['scheduled', 'confirmed'])
-          .order('start_time', { ascending: true })
-          .limit(isClinicaAdmin ? 4 : 1)
-
-        // Petición vieja adelantada por otra más nueva: no escribe nada.
-        if (!vigente) return
-        setProximasCitas((data as ProximaCita[] | null) ?? [])
-      } catch {
-        // Red caída o query fallida → citas vacío, el resto del dashboard renderiza
-        if (!vigente) return
-        setProximasCitas([])
-      } finally {
-        // SIEMPRE apagar el skeleton de carga, sin importar el path — salvo si
-        // esta petición ya quedó obsoleta: ahí manda la que va detrás.
-        if (vigente) setLoadingCitas(false)
-      }
-    }
-
-    void fetchCitas()
-
-    return () => { vigente = false }
-  }, [profile, loadingProfile, clinicaTipo, configResuelta])
-
   /* ⚠️ ESTA DECLARACIÓN VA ANTES DE LOS GUARDAS, y no es orden estético: el
      esqueleto de la línea de abajo la recibe como prop, y un `const` no se
      eleva. Bajarla otra vez rompe la carga con un error de zona muerta. */
@@ -358,15 +209,6 @@ export default function DashboardPage() {
   /* Sin perfil —error de carga— el saludo cae a la fórmula neutra y el avatar
      al glifo genérico; la ceja de consultorio simplemente no se pinta. */
   const iniciales = `${profile?.nombres?.[0] ?? ''}${profile?.apellido_paterno?.[0] ?? ''}`.toUpperCase()
-
-  const isClinicaAdmin = canManageClinica(profile) && clinicaTipo === 'clinica'
-  const proximaCita    = proximasCitas[0] ?? null
-
-  const iniciarConsulta = (cita: ProximaCita) => {
-    if (!cita.consultorio_id) return
-    const consultorio = consultorios.find(c => c.id === cita.consultorio_id)
-    if (consultorio) cambiarActivo(consultorio)
-  }
 
   return (
     <div className="max-w-[1044px] mx-auto pt-2 pb-6">
@@ -480,133 +322,8 @@ export default function DashboardPage() {
       {/* ── Banda 1 · Próximas citas (flexible) · columna fija ── */}
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px] gap-[var(--sp-5)] mt-[var(--sp-gap-band)] animate-slide-up" style={{ animationDelay: '60ms' }}>
 
-        {/* ── Tarjeta izquierda: Próxima(s) cita(s) — 3 columnas ── */}
-        {isClinicaAdmin ? (
-          /* Lista para admin de clínica */
-          <div className="bg-white border border-[#1e5fa8]/20 rounded-2xl shadow-sm shadow-[#1e5fa8]/5 ring-1 ring-[#1e5fa8]/10 overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-3 bg-gradient-to-r from-[#1a3a5c] to-[#1e5fa8] rounded-t-2xl">
-              <div className="flex items-center gap-2">
-                <CalendarDays size={13} className="text-white/70" />
-                <p className="text-[11px] font-semibold text-white uppercase tracking-widest">Próximas citas</p>
-              </div>
-              <Link href="/agenda" className="text-[10px] text-white/70 hover:text-white hover:underline">Ver agenda →</Link>
-            </div>
-            {loadingCitas ? (
-              <div className="px-5 py-4 space-y-3">
-                {[1,2].map(i => <div key={i} className="h-12 bg-slate-100 rounded-xl animate-pulse" />)}
-              </div>
-            ) : proximasCitas.length > 0 ? (
-              proximasCitas.map(cita => (
-                <div key={cita.id} className="flex gap-3 px-5 py-3 border-b border-slate-50 last:border-0">
-                  <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <User size={17} className="text-[#1e5fa8]" />
-                  </div>
-                  <div className="flex-1 min-w-0 space-y-1">
-                    <div className="flex items-center justify-between gap-2">
-                      {/* La caída al `title` que documentaba este comentario ERA
-                          para el evento genérico de §12.14 («Vacaciones IMSS»),
-                          y se retiró con él: la consulta filtra `paciente_id`
-                          no nulo, así que toda fila que llega trae paciente. Se
-                          deja puesta como red por si el join de `pacientes`
-                          viniera vacío — lo único que aún puede dejar el
-                          renglón mudo. */}
-                      <p className="text-sm font-semibold text-[#1d1d1f]">
-                        {cita.pacientes ? `${cita.pacientes.nombre} ${cita.pacientes.apellidos}` : cita.title}
-                      </p>
-                      <StatusChip status={cita.status} />
-                    </div>
-                    {/* SIN «· Dr. X». Lo tapaba `!soloMisCitas` y se va con el
-                        checkbox, pero se va HACIA OCULTO, no hacia visible: por
-                        D2 estas cuatro filas son ya todas del médico que mira,
-                        así que su propio nombre repetido cuatro veces en su
-                        propio resumen no distingue a nadie. Sigue puesto en el
-                        panel de la secretaria, que es donde sí distingue. */}
-                    <div className="flex items-center gap-2 text-[11px] text-[#86868b]">
-                      <span>{formatCitaHora(cita.start_time)}</span>
-                    </div>
-                    {cita.paciente_id && (
-                      <div className="flex items-center gap-1.5 pt-0.5">
-                        {/* Redundante por construcción desde D2 —la consulta ya
-                            pide `medico_id` = éste— y se deja a propósito: es
-                            barato, y es lo único que impediría ofrecer «iniciar
-                            consulta» sobre la cita de otro si algún día se
-                            ensanchara la consulta de arriba. */}
-                        {cita.medico?.id === profile?.id && (
-                          <Link
-                            href={`/expediente/${cita.paciente_id}/nueva-nota?cita=${cita.id}`}
-                            onClick={() => iniciarConsulta(cita)}
-                            className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold text-white bg-[#1e5fa8] hover:bg-[#1a3a5c] transition-colors">
-                            <Stethoscope size={10} /> Iniciar consulta
-                          </Link>
-                        )}
-                        <Link href={`/expediente/${cita.paciente_id}`}
-                          className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold text-[#1e5fa8] bg-blue-50 hover:bg-blue-100 transition-colors">
-                          <FolderOpen size={10} /> Expediente
-                        </Link>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))
-            ) : (
-              <p className="text-sm text-[#86868b] px-5 py-6 text-center">No hay citas agendadas</p>
-            )}
-          </div>
-        ) : (
-          /* Tarjeta simple para médico o admin independiente */
-          <div className="bg-white border border-[#1e5fa8]/20 rounded-2xl shadow-sm shadow-[#1e5fa8]/5 ring-1 ring-[#1e5fa8]/10 flex flex-col overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-3 bg-gradient-to-r from-[#1a3a5c] to-[#1e5fa8] rounded-t-2xl">
-              <div className="flex items-center gap-2">
-                <CalendarDays size={13} className="text-white/70" />
-                <p className="text-[11px] font-semibold text-white uppercase tracking-widest">Próxima cita</p>
-              </div>
-              <Link href="/agenda" className="text-[10px] text-white/70 hover:text-white hover:underline">Ver agenda →</Link>
-            </div>
-            <div className="px-5 py-4 sm:px-6 flex-1 flex flex-col gap-3">
-            {loadingCitas ? (
-              <div className="h-12 bg-slate-100 rounded-xl animate-pulse" />
-            ) : proximaCita ? (
-              <div className="flex gap-3">
-                <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center flex-shrink-0">
-                  <User size={22} className="text-[#1e5fa8]" />
-                </div>
-                <div className="flex-1 min-w-0 space-y-1.5">
-                  <div>
-                    {/* Mismo motivo que en la lista de arriba: sin paciente es
-                        un evento genérico y el nombre sale del título libre. */}
-                    <p className="font-semibold text-[17px] text-[#1d1d1f] leading-snug">
-                      {proximaCita.pacientes ? `${proximaCita.pacientes.nombre} ${proximaCita.pacientes.apellidos}` : proximaCita.title}
-                    </p>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <p className="text-xs text-[#86868b]">{formatCitaHora(proximaCita.start_time)}</p>
-                      <StatusChip status={proximaCita.status} />
-                    </div>
-                  </div>
-                  {proximaCita.paciente_id && (
-                    <div className="flex items-center gap-2">
-                      <Link
-                        href={`/expediente/${proximaCita.paciente_id}/nueva-nota?cita=${proximaCita.id}`}
-                        onClick={() => iniciarConsulta(proximaCita)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold text-white bg-[#1e5fa8] hover:bg-[#1a3a5c] transition-colors"
-                      >
-                        <Stethoscope size={11} /> Iniciar consulta
-                      </Link>
-                      <Link
-                        href={`/expediente/${proximaCita.paciente_id}`}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold text-[#1e5fa8] bg-blue-50 hover:bg-blue-100 transition-colors"
-                      >
-                        <FolderOpen size={11} /> Ver expediente
-                      </Link>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <p className="text-sm text-[#86868b]">No hay citas agendadas</p>
-            )}
-            </div>
-          </div>
-        )}
+        {/* ── Región 2 · Próximas citas ─────────────────────── */}
+        <ProximasCitas />
 
         {/* ── Tarjeta derecha: Buscar / Nuevo paciente — 2 columnas ── */}
         <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#1a3a5c] to-[#1e5fa8] text-white shadow-[0_4px_24px_rgba(30,95,168,0.3)] hover:shadow-[0_8px_32px_rgba(30,95,168,0.4)] transition-all duration-200 flex flex-col">

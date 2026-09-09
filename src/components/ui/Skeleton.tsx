@@ -1,5 +1,6 @@
 import { Menu } from 'lucide-react'
 import BuscadorPaciente, { ALTO_CONTROL } from '@/components/dashboard/BuscadorPaciente'
+import { ProximasCitasCargando } from '@/components/dashboard/ProximasCitas'
 
 /** Bloque shimmer genérico */
 export function Skeleton({ className }: { className?: string }) {
@@ -114,7 +115,9 @@ export function DashboardSkeleton({ onBuscar, onAbrirMenu }: {
 
       {/* ── Banda 1 · flexible + fija ───────────────────────── */}
       <div className="mt-[var(--sp-gap-band)] grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px] gap-[var(--sp-5)]">
-        <Skeleton className="h-[148px] rounded-2xl" />
+        {/* La misma card de carga que pinta la región cuando ya está montada:
+            los cuatro renglones en hueso miden lo que van a medir de verdad. */}
+        <ProximasCitasCargando />
         <Skeleton className="h-[148px] rounded-2xl" />
       </div>
 
