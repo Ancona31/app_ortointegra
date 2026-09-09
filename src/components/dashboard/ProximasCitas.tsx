@@ -76,7 +76,12 @@ const PUNTO_LEYENDA = 'w-2 h-2 shrink-0 rounded-[var(--sp-r-pill)]'
    contenido secundario: preferimos dos renglones a un recorte. */
 function Leyenda() {
   return (
-    <div className="flex flex-wrap items-center gap-x-[var(--sp-3-5)] gap-y-[var(--sp-1-5)] px-[var(--sp-pad-row-x)] pb-[var(--sp-3-5)]">
+    /* ⚠️ FUERA POR DEBAJO DE `lg`. Las cinco entradas miden 444 px y la
+       columna estrecha no llega: envolvían a dos líneas y ocupaban más alto del
+       que aporta una leyenda. El chip de estado de cada renglón se queda, así
+       que el color sigue teniendo dónde leerse; lo que se pierde es la clave, y
+       en un teléfono eso cuesta menos que dos renglones de cromo. */
+    <div className="hidden lg:flex flex-wrap items-center gap-x-[var(--sp-3-5)] gap-y-[var(--sp-1-5)] px-[var(--sp-pad-row-x)] pb-[var(--sp-3-5)]">
       <span className={ENTRADA_LEYENDA}>
         <span className={PUNTO_LEYENDA} style={{ background: 'var(--ag-status-scheduled-dot)' }} />
         Agendada

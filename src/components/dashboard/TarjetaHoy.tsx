@@ -72,11 +72,13 @@ function calcularDia(): { diaSemana: string; numero: string; mesAno: string; sem
       const fecha = desplazarFecha(lunes, { dias: k })
       return {
         fecha,
-        /* Dos letras (`EEEEEE`: lu, ma, mi, ju, vi, sá, do) y no la inicial de
-           una sola que pedía el anexo. En español la inicial deja DOS «m»
-           seguidas —martes y miércoles—, que en una tira de siete columnas se
-           lee como un defecto. Las dos letras salen del mismo locale. */
-        inicial: renderEnTZ(mediodia(fecha), 'EEEEEE', tz),
+        /* La inicial única (`EEEEE`: l, m, m, j, v, s, d), en mayúscula por CSS.
+           ⚠️ QUE MARTES Y MIÉRCOLES COMPARTAN «M» —y sábado y domingo la «S»— NO
+           ES UN DEFECTO QUE ARREGLAR. Es lo que hace cualquier calendario: la
+           POSICIÓN en la tira desambigua, porque las siete columnas van siempre
+           en el mismo orden desde el lunes. Hubo una versión con dos letras
+           (`EEEEEE`: lu, ma, mi…) y se retiró a propósito. */
+        inicial: renderEnTZ(mediodia(fecha), 'EEEEE', tz),
         numero: renderEnTZ(mediodia(fecha), 'd', tz),
         esHoy: fecha === hoy,
       }
@@ -86,10 +88,12 @@ function calcularDia(): { diaSemana: string; numero: string; mesAno: string; sem
 
 function Banda() {
   return (
-    <div className="h-[26px] flex items-end justify-center gap-[30px] pb-[5px]" style={{ background: 'var(--cp)' }}>
-      <span className="w-2 h-3 rounded-[var(--sp-r-pill)]" style={{ background: COLOR_ARGOLLA }} />
-      <span className="w-2 h-3 rounded-[var(--sp-r-pill)]" style={{ background: COLOR_ARGOLLA }} />
-      <span className="w-2 h-3 rounded-[var(--sp-r-pill)]" style={{ background: COLOR_ARGOLLA }} />
+    /* Se queda arriba en los dos tamaños, pero más baja en móvil: ahí la
+       tarjeta es apaisada y una banda de 26 px le comía alto sin aportar. */
+    <div className="h-[18px] lg:h-[26px] flex items-end justify-center gap-[22px] lg:gap-[30px] pb-[3px] lg:pb-[5px]" style={{ background: 'var(--cp)' }}>
+      <span className="w-2 h-2 lg:h-3 rounded-[var(--sp-r-pill)]" style={{ background: COLOR_ARGOLLA }} />
+      <span className="w-2 h-2 lg:h-3 rounded-[var(--sp-r-pill)]" style={{ background: COLOR_ARGOLLA }} />
+      <span className="w-2 h-2 lg:h-3 rounded-[var(--sp-r-pill)]" style={{ background: COLOR_ARGOLLA }} />
     </div>
   )
 }
@@ -101,7 +105,14 @@ function Chasis({ children }: { children: React.ReactNode }) {
       style={{ boxShadow: 'var(--sp-shadow-raised)' }}
     >
       <Banda />
-      <div className="flex flex-col items-center gap-[var(--sp-1-5)] pt-[var(--sp-3)] px-[var(--sp-4-5)] pb-[var(--sp-3-5)]">
+      {/* ⚠️ APAISADA EN MÓVIL, VERTICAL EN `lg`. En una columna estrecha la
+          tarjeta vertical medía casi el alto de la pantalla; en horizontal el
+          medallón y los textos van a la izquierda y la tira con el botón a la
+          derecha. Los dos bloques que llegan como `children` traen `lg:contents`
+          para disolverse a partir de `lg`, de modo que allí los seis elementos
+          vuelven a ser hijos directos de esta columna y el escritorio queda
+          exactamente como estaba. */}
+      <div className="flex items-center gap-[var(--sp-4)] pt-[var(--sp-3)] px-[var(--sp-4-5)] pb-[var(--sp-3-5)] lg:flex-col lg:gap-[var(--sp-1-5)]">
         {children}
       </div>
     </section>
@@ -137,21 +148,28 @@ function BotonAgenda() {
 export function TarjetaHoyCargando() {
   return (
     <Chasis>
-      <div className="skeleton h-2.5 w-14 rounded-md" />
-      <div className="skeleton h-3.5 w-24 rounded-md" />
-      <div className={`skeleton ${MEDALLON} rounded-full my-[var(--sp-1)]`} />
-      <div className="skeleton h-3 w-32 rounded-md" />
-      <div className="w-full border-t border-dashed border-[color:var(--sp-line-card)] mt-[var(--sp-2-5)] pt-[var(--sp-2-5)]">
-        <div className="grid grid-cols-7 gap-[2px]">
-          {[1, 2, 3, 4, 5, 6, 7].map(i => (
-            <div key={i} className="flex flex-col items-center gap-[3px]">
-              <div className="skeleton h-2 w-4 rounded-sm" />
-              <div className="skeleton w-[27px] h-[27px] rounded-full" />
-            </div>
-          ))}
-        </div>
+      {/* Los mismos dos bloques que la tarjeta real, para que el paso de la
+          carga al dato no reacomode nada. Ver la nota del `Chasis`. */}
+      <div className="flex min-w-0 flex-1 flex-col items-center gap-[var(--sp-1-5)] lg:contents">
+        <div className="skeleton h-2.5 w-14 rounded-md" />
+        <div className="skeleton h-3.5 w-24 rounded-md" />
+        <div className={`skeleton ${MEDALLON} rounded-full my-[var(--sp-1)]`} />
+        <div className="skeleton h-3 w-32 max-w-full rounded-md" />
       </div>
-      <BotonAgenda />
+
+      <div className="flex shrink-0 flex-col gap-[var(--sp-2-5)] lg:contents">
+        <div className="w-full lg:border-t lg:border-dashed lg:border-[color:var(--sp-line-card)] lg:mt-[var(--sp-2-5)] lg:pt-[var(--sp-2-5)]">
+          <div className="grid grid-cols-7 gap-[2px] [--pastilla:22px] lg:[--pastilla:27px]">
+            {[1, 2, 3, 4, 5, 6, 7].map(i => (
+              <div key={i} className="flex flex-col items-center gap-[3px]">
+                <div className="skeleton h-2 w-4 rounded-sm" />
+                <div className="skeleton w-[var(--pastilla)] h-[var(--pastilla)] shrink-0 rounded-full" />
+              </div>
+            ))}
+          </div>
+        </div>
+        <BotonAgenda />
+      </div>
     </Chasis>
   )
 }
@@ -225,10 +243,18 @@ export default function TarjetaHoy() {
     return () => { vigente = false }
   }, [medicoId])
 
+  /* Un solo sitio donde se compone el texto del conteo: lo pintan la pastilla
+     de móvil y el renglón del mes de escritorio. */
+  const textoConteo = conteo
+    ? `${conteo.citas} ${conteo.citas === 1 ? 'cita' : 'citas'} · ${conteo.eventos} ${conteo.eventos === 1 ? 'evento' : 'eventos'}`
+    : ''
+
   if (loadingProfile || !dia) return <TarjetaHoyCargando />
 
   return (
     <Chasis>
+      {/* Bloque izquierdo en móvil: identidad del día. */}
+      <div className="flex min-w-0 flex-1 flex-col items-center gap-[var(--sp-1-5)] lg:contents">
       <p className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-[var(--sp-ink-350)]">Hoy es</p>
 
       <p className="text-[length:var(--sp-fs-btn-sm)] font-bold capitalize text-[var(--sp-primary)]">{dia.diaSemana}</p>
@@ -243,19 +269,33 @@ export default function TarjetaHoy() {
         </span>
       </div>
 
+      {/* ⚠️ EL CONTEO SE PINTA EN DOS SITIOS, UNO POR TAMAÑO, y el texto sale de
+          una sola variable para que no puedan divergir. En `lg` va en este mismo
+          renglón, detrás del mes; en móvil ese renglón envolvía a dos líneas, así
+          que allí sube como pastilla sobre la tira —columna derecha— y aquí abajo
+          queda el mes y año solos. Es la disposición del mockup móvil. */}
       <p className="text-center text-[length:var(--sp-fs-meta)] font-bold capitalize text-[var(--sp-ink-700)]">
         {dia.mesAno}
         {conteo && (
-          <>
+          <span className="hidden lg:inline">
             <span className="text-[var(--sp-ink-250)]"> · </span>
-            <span className="text-[var(--sp-primary)] normal-case tabular-nums">
-              {conteo.citas} {conteo.citas === 1 ? 'cita' : 'citas'} · {conteo.eventos} {conteo.eventos === 1 ? 'evento' : 'eventos'}
-            </span>
-          </>
+            <span className="text-[var(--sp-primary)] normal-case tabular-nums">{textoConteo}</span>
+          </span>
         )}
       </p>
+      </div>
 
-      {/* ── Tira de la semana ────────────────────────────────────────────────
+      {/* Bloque derecho en móvil: tira y botón. */}
+      <div className="flex shrink-0 flex-col gap-[var(--sp-2-5)] lg:contents">
+
+      {/* Pastilla de conteo, sólo móvil: fondo de acento suave sobre la tira. */}
+      {conteo && (
+        <span className="lg:hidden self-start max-w-full truncate rounded-[var(--sp-r-pill)] bg-[var(--sp-primary-bg-soft)] px-[10px] py-[3px] text-[length:var(--sp-fs-legal)] font-bold tabular-nums text-[var(--sp-primary)]">
+          {textoConteo}
+        </span>
+      )}
+
+      {/* ── Tira de la semana ─────────────────────────────────────
           ⚠️ SIN PUNTOS Y SIN LEYENDA, y no es que falten: el spec pedía tres
           indicadores por día —citas, eventos y Google— y esa parte quedó
           derogada. Su único propósito es situar el día de hoy. No le añadas
@@ -266,38 +306,44 @@ export default function TarjetaHoy() {
           posicionada en ese día y la agenda no acepta parámetro de fecha; el
           enlace profundo llega en el bloque 6. Un `<span>` que no navega es
           honesto; un enlace que ignora el día no lo es. */}
-      <div className="w-full border-t border-dashed border-[color:var(--sp-line-card)] mt-[var(--sp-2-5)] pt-[var(--sp-2-5)]">
-        <div className="grid grid-cols-7 gap-[2px]">
+      {/* El separador punteado sólo tiene sentido en la pila vertical; en
+          apaisado la tira ya está separada por la propia columna. */}
+      <div className="w-full lg:border-t lg:border-dashed lg:border-[color:var(--sp-line-card)] lg:mt-[var(--sp-2-5)] lg:pt-[var(--sp-2-5)]">
+          {/* ⚠️ EL DISCO MIDE FIJO Y SE DIMENSIONA DESDE EL NÚMERO, no al revés,
+            y NO usa porcentajes. Las dos versiones anteriores lo ataban a
+            `width: 100%` dentro de esta columna, y la columna es `flex-col
+            items-center`: su ancho es el de su contenido, o sea el de la letra
+            de arriba. Un porcentaje del ancho del hermano es una definición
+            circular, y se resolvía al ancho de la letra — por eso al pasar de
+            dos letras a una el disco encogió todavía más y recortaba el dígito.
+            Con `--pastilla` fijo (22 en móvil, 27 en `lg`, contra un número de
+            12,5) el disco no depende de nadie.
+
+            Y sin `justify-items-center`: con él la celda encogía a su contenido
+            y volvía a meter al hermano en la ecuación. */}
+        <div className="grid grid-cols-7 gap-[2px] [--pastilla:22px] lg:[--pastilla:27px]">
           {dia.semana.map(d => (
             <div key={d.fecha} className="flex flex-col items-center gap-[3px]">
               <span className="text-[10px] font-bold uppercase tracking-[0.06em] text-[var(--sp-ink-350)]">{d.inicial}</span>
-              {d.esHoy ? (
-                /* La pastilla de hoy toma el relleno y la tinta de
-                   `.sp-chip--selected`, por el mismo motivo que el botón: es el
-                   acento relleno con blanco encima, y ese blanco vive dentro de
-                   la clase. La geometría, en `style`, que gana a la clase. */
-                <span
-                  className="sp-chip sp-chip--selected tabular-nums"
-                  /* `justifyContent` NO sobra: `.sp-chip` centra en vertical
-                     pero no en horizontal —da por hecho un chip con texto y
-                     relleno lateral—, y aquí el contenido es un número dentro
-                     de un círculo de 27 px. Sin esto, los días de una cifra se
-                     pegan al borde izquierdo. */
-                  style={{ width: '27px', height: '27px', minHeight: '27px', padding: 0, justifyContent: 'center', borderRadius: 'var(--sp-r-pill)', fontSize: '12.5px', fontWeight: 'var(--sp-fw-bold)', cursor: 'default' }}
-                >
-                  {d.numero}
-                </span>
-              ) : (
-                <span className="w-[27px] h-[27px] flex items-center justify-center text-[12.5px] text-[var(--sp-ink-600)] tabular-nums">
-                  {d.numero}
-                </span>
-              )}
+              {/* Las dos ramas comparten CLASE DE GEOMETRÍA y sólo difieren en la
+                  piel: el disco de hoy va relleno de acento con tinta clara —los
+                  dos de token, sin heredar nada de `.sp-chip`—, y el resto es el
+                  mismo cuadrado sin fondo. */}
+              <span
+                className="w-[var(--pastilla)] h-[var(--pastilla)] shrink-0 flex items-center justify-center rounded-[var(--sp-r-pill)] text-[12.5px] tabular-nums"
+                style={d.esHoy
+                  ? { background: 'var(--sp-primary)', color: 'var(--sp-on-primary)', fontWeight: 'var(--sp-fw-bold)' }
+                  : { color: 'var(--sp-ink-600)' }}
+              >
+                {d.numero}
+              </span>
             </div>
           ))}
         </div>
       </div>
 
       <BotonAgenda />
+      </div>
     </Chasis>
   )
 }

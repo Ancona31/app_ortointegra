@@ -20,6 +20,13 @@
   --sp-primary-bg-faint:   color-mix(in srgb, var(--cs, #1e5fa8) 5%, #fff);   /* fondo de fila informativa / paso completado */
   --sp-primary-border:     color-mix(in srgb, var(--cs, #1e5fa8) 18%, #fff);  /* borde de bloque destacado */
   --sp-primary-track:      color-mix(in srgb, var(--cs, #1e5fa8) 22%, #fff);  /* track del spinner y anillo inactivo */
+  /* TINTA SOBRE EL ACENTO RELLENO. El sistema la tenía escrita a mano dentro de
+     `.sp-btn--primary`, `.sp-chip--selected` y `.sp-doc-segmented__opt`, y por
+     eso no había forma de pintar blanco sobre acento sin importar una de esas
+     clases y pelearse con su geometría. Nombrada, se puede usar en cualquier
+     forma —un disco de 22 px, por ejemplo— sin arrastrar un chip entero.
+     No cambia en oscuro: `--sp-primary` sigue siendo el acento del médico. */
+  --sp-on-primary:         #ffffff;
   --sp-primary-focus:      color-mix(in srgb, var(--cs, #1e5fa8) 8%, transparent); /* halo de foco (4px spread) */
   --sp-primary-text:       var(--sp-primary);  /* marca-como-tinta; en dark se aclara */
 

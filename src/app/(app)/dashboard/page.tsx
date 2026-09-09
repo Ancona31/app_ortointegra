@@ -177,11 +177,24 @@ export default function DashboardPage() {
           El sobrante tiene que ser aire de la retícula, no hueco enmarcado. */}
       <div className="grid grid-cols-1 items-start lg:grid-cols-[minmax(0,1fr)_300px] gap-[var(--sp-5)] mt-[var(--sp-gap-band)] animate-slide-up" style={{ animationDelay: '60ms' }}>
 
+        {/* ⚠️ EL ORDEN DEL DOM ES EL DE ESCRITORIO, Y MÓVIL LO INVIERTE CON
+            `order`. En una columna, el calendario va PEGADO A LA CABECERA y las
+            próximas citas debajo; en `lg` vuelve la retícula de dos columnas con
+            las citas a la izquierda. Se hace con `order` y no reordenando el
+            marcado porque el orden de lectura de escritorio —citas primero— es
+            también el orden de tabulación que queremos allí.
+            Los envoltorios existen sólo para colgar el `order`: la retícula
+            sigue teniendo EXACTAMENTE DOS HIJOS, que es criterio de la adenda. */}
+
         {/* ── Región 2 · Próximas citas ─────────────────────── */}
-        <ProximasCitas />
+        <div className="order-2 lg:order-1">
+          <ProximasCitas />
+        </div>
 
         {/* ── Región 3 · Calendario «Hoy es» ────────────────── */}
-        <TarjetaHoy />
+        <div className="order-1 lg:order-2">
+          <TarjetaHoy />
+        </div>
 
       </div>
 
@@ -205,7 +218,14 @@ export default function DashboardPage() {
             No es una tarjeta con marco: es una columna de contenido, y el
             filete vertical de la adenda §4 es su borde izquierdo, con 24 px a
             cada lado. */}
-        <div className="lg:border-l lg:border-[color:var(--sp-line-card)] lg:pl-[var(--sp-pad-rule)]">
+        {/* ⚠️ EL FILETE CAMBIA DE LADO CON EL TAMAÑO. En `lg` es el borde
+            IZQUIERDO de esta columna —el filete vertical de la adenda §4, con
+            24 px a cada lado—. Apiladas en móvil no hay costado que separar y
+            las dos secciones se pegaban, así que ahí pasa a ser el borde
+            SUPERIOR, el mismo filete de 1 px que separa las bandas, con los
+            14 px de relleno que pide el spec para móvil. Es uno o el otro,
+            nunca los dos: de ahí los `lg:border-t-0 lg:pt-0`. */}
+        <div className="border-t border-[color:var(--sp-line-card)] pt-[var(--sp-3-5)] lg:border-t-0 lg:pt-0 lg:border-l lg:pl-[var(--sp-pad-rule)]">
           <DocumentosRecientes />
         </div>
       </div>

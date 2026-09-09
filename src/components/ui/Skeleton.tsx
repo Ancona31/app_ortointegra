@@ -134,7 +134,7 @@ export function DashboardSkeleton({ onBuscar, onAbrirMenu }: {
           <AtendidosCargando />
         </div>
 
-        <div className="lg:border-l lg:border-[color:var(--sp-line-card)] lg:pl-[var(--sp-pad-rule)]">
+        <div className="border-t border-[color:var(--sp-line-card)] pt-[var(--sp-3-5)] lg:border-t-0 lg:pt-0 lg:border-l lg:pl-[var(--sp-pad-rule)]">
           <DocumentosCargando />
         </div>
       </div>
