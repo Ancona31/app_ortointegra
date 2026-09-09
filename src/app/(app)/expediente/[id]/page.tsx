@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef, Suspense } from 'react'
-import dynamic from 'next/dynamic'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useProfile } from '@/hooks/useProfile'
@@ -16,37 +15,11 @@ import PestanasExpediente, {
 } from '@/components/expediente/PestanasExpediente'
 import LineaTiempoClinica from '@/components/expediente/LineaTiempoClinica'
 import PanelConsultas from '@/components/expediente/PanelConsultas'
+import PanelDocumentos from '@/components/expediente/PanelDocumentos'
 import FichaClinica, { type ProximaCita } from '@/components/expediente/FichaClinica'
 import PanelLaboratorios from '@/components/labs/PanelLaboratorios'
-import ModalConsultas from '@/components/expediente/ModalConsultas'
-import ModalDocumentos from '@/components/expediente/ModalDocumentos'
-
-// Diferido A PROPÓSITO. NO lo vuelvas a importar estáticamente: arrastra TipTap,
-// ProseMirror y DOMPurify a la carga inicial del expediente, para un modal que
-// arranca cerrado (`docSeleccionado` empieza en `null`) y que solo se abre al
-// hacer clic en un documento. `ssr: false` es válido aquí porque esta página es
-// un Client Component.
-const ModalVisorDocumento = dynamic(
-  () => import('@/components/expediente/ModalVisorDocumento'),
-  { ssr: false }
-)
-
 /** Límite de registros por query */
 const QUERY_LIMIT = 50
-
-/** Lo que enseña una pestaña cuyo contenido llega en un bloque posterior. */
-function PendienteDeBloque({ nombre }: { nombre: string }) {
-  return (
-    <div className="flex flex-col items-center gap-[var(--sp-2-5)] rounded-[14px] border border-dashed border-[color:var(--sp-line-card)] px-[var(--sp-pad-row-x)] py-[var(--sp-10)]">
-      <p className="text-center text-[length:var(--sp-fs-body-sm)] text-[var(--sp-ink-500)]">
-        {nombre} se muda a esta pestaña en el bloque siguiente.
-      </p>
-      <p className="text-center text-[length:var(--sp-fs-hint)] text-[var(--sp-ink-350)]">
-        Mientras tanto se abre como hasta ahora, sin cambios.
-      </p>
-    </div>
-  )
-}
 
 function ExpedientePacienteContent() {
   const { id } = useParams<{ id: string }>()
@@ -55,9 +28,6 @@ function ExpedientePacienteContent() {
   useAuditAccess('pacientes', id) // NOM-024: registrar acceso al expediente
 
   // ── Estados UI ──
-  const [docSeleccionado, setDocSeleccionado] = useState<Documento | null>(null)
-  const [mostrarModalConsultas, setMostrarModalConsultas] = useState(false)
-  const [mostrarModalDocumentos, setMostrarModalDocumentos] = useState(false)
   const [mostrarEliminarPaciente, setMostrarEliminarPaciente] = useState(false)
   const [eliminandoPaciente, setEliminandoPaciente] = useState(false)
   const [errorEliminar, setErrorEliminar] = useState('')
@@ -82,6 +52,10 @@ function ExpedientePacienteContent() {
      cosa del panel, que es quien las tiene — un id que no corresponda a ninguna
      cae a la más reciente y no es un error. */
   const consultaDeUrl = searchParams.get('consulta')
+  /* Mismo mecanismo para el documento abierto: enlace compartible y superviviente
+     a una recarga. El panel valida contra lo cargado; un id que no corresponda
+     cae al primero listable. */
+  const documentoDeUrl = searchParams.get('documento')
 
   const cambiarPestana = useCallback((clave: ClavePestana, consultaId?: string) => {
     const url = new URL(window.location.href)
@@ -92,6 +66,7 @@ function ExpedientePacienteContent() {
        Documentos arrastraría el id de una nota que allí no abre nada. */
     if (consultaId) url.searchParams.set('consulta', consultaId)
     else if (clave !== 'consultas') url.searchParams.delete('consulta')
+    if (clave !== 'documentos') url.searchParams.delete('documento')
     window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`)
   }, [])
 
@@ -99,6 +74,13 @@ function ExpedientePacienteContent() {
   const fijarConsulta = useCallback((consultaId: string) => {
     const url = new URL(window.location.href)
     url.searchParams.set('consulta', consultaId)
+    window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`)
+  }, [])
+
+  /** Lo mismo para el documento abierto. */
+  const fijarDocumento = useCallback((documentoId: string) => {
+    const url = new URL(window.location.href)
+    url.searchParams.set('documento', documentoId)
     window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`)
   }, [])
 
@@ -146,18 +128,6 @@ function ExpedientePacienteContent() {
   }, [id])
 
   useEffect(() => { void cargarActividad() }, [cargarActividad])
-
-  // Refetch helper for child actions (delete doc)
-  const fetchDocumentos = useCallback(async () => {
-    const supabase = createClient()
-    const { data } = await supabase
-      .from('documentos')
-      .select('*')
-      .eq('paciente_id', id)
-      .order('created_at', { ascending: false })
-      .limit(QUERY_LIMIT)
-    setDocumentos((data ?? []) as Documento[])
-  }, [id])
 
   useEffect(() => {
     let cancelled = false
@@ -209,13 +179,6 @@ function ExpedientePacienteContent() {
     return () => { cancelled = true }
   }, [id])
 
-  async function eliminarDocumento(docId: string) {
-    const res = await fetch(`/api/documentos/${docId}`, { method: 'DELETE' })
-    if (res.ok) {
-      await fetchDocumentos()
-    }
-  }
-
   async function eliminarPaciente() {
     setEliminandoPaciente(true)
     setErrorEliminar('')
@@ -242,42 +205,14 @@ function ExpedientePacienteContent() {
   return (
     <div className="max-w-[960px] mx-auto animate-slide-up">
 
-      {/* ── Modal visor de documento ── */}
-      {docSeleccionado && (
-        <ModalVisorDocumento doc={docSeleccionado} onClose={() => setDocSeleccionado(null)} pacienteEmail={paciente?.email} />
-      )}
-
-      {/* ── Modal lista de consultas ── */}
-      <ModalConsultas
-        open={mostrarModalConsultas}
-        onClose={() => setMostrarModalConsultas(false)}
-        consultas={consultas}
-        pacienteId={id}
-      />
-
-      {/* ── Modal lista de documentos ──
-          Montado SOLO cuando está abierto. Cerrado no pintaba nada, pero sus
-          hooks sí corrían: useMedicoInfo dispara /api/me/perfil-medico y, en
-          su onSuccess, un PBKDF2 de secureStorage más syncDoctorProfile con
-          dos descargas de imágenes y una escritura síncrona a localStorage.
-          Todo eso para un modal que la mayoría de las visitas no abre.
-          La apertura se ve igual: ModalShell ya devolvía null cerrado y sus
-          animaciones (animate-fade-in / animate-modal-enter) arrancan con el
-          montaje, que ahora ocurre en el mismo render en que open pasa a true.
-          No hay animación de salida que se pierda al desmontar. */}
-      {mostrarModalDocumentos && (
-        <ModalDocumentos
-          open
-          onClose={() => setMostrarModalDocumentos(false)}
-          documentos={documentos}
-          pacienteId={id}
-          onVerDocumento={(doc) => {
-            setMostrarModalDocumentos(false)
-            setDocSeleccionado(doc)
-          }}
-          onEliminarDocumento={eliminarDocumento}
-        />
-      )}
+      {/* ⚠️ AQUÍ VIVÍAN TRES MODALES Y YA NO EXISTE NINGUNO. `ModalConsultas`,
+         `ModalDocumentos` y `ModalVisorDocumento` quedaron sin consumidor al
+         mudarse su contenido a las pestañas: las consultas en el bloque 3, los
+         documentos y su visor en el 4. Los ARCHIVOS siguen en disco a la espera
+         de que Ángel revise el bloque; si ves esta nota y ya los revisó, lo que
+         toca es borrarlos, no volver a montarlos.
+         El único diálogo que se conserva es el de eliminar paciente, de aquí
+         abajo: es una acción sobre el expediente entero, no sobre una pestaña. */}
 
       {/* ── Modal eliminar paciente — macOS alert dialog ── */}
       {mostrarEliminarPaciente && (
@@ -414,7 +349,20 @@ function ExpedientePacienteContent() {
             onSeleccionarConsulta={fijarConsulta}
           />
         )}
-        {pestana === 'documentos' && <PendienteDeBloque nombre="Documentos" />}
+        {pestana === 'documentos' && (
+          <PanelDocumentos
+            paciente={paciente}
+            documentos={documentos}
+            totalDocumentos={conteos.documentos}
+            cargandoActividad={estadoActividad === 'cargando'}
+            errorActividad={estadoActividad === 'error'}
+            onReintentarActividad={() => { void cargarActividad() }}
+            onRecargarDocumentos={() => { void cargarActividad() }}
+            documentoSolicitadoId={documentoDeUrl}
+            onSeleccionarDocumento={fijarDocumento}
+            onIrAArchivos={() => cambiarPestana('mediciones')}
+          />
+        )}
         {pestana === 'mediciones' && <PanelLaboratorios paciente={paciente} />}
       </div>
 
