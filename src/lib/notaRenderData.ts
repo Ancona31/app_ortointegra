@@ -125,7 +125,19 @@ export interface AddendumInput {
 export interface AddendumRender {
   parseado: NotaParseada
   medicoNombre: string
+  /** Fecha larga del impreso: "22 de julio de 2026 · 10:33 a.m.". */
   fechaFormateada: string
+  /**
+   * El instante crudo, tal cual llega de la base.
+   *
+   * ⚠️ CONVIVE CON `fechaFormateada` Y NO LA SUSTITUYE: el impreso pide la
+   * fecha larga y la pantalla pide `03/08/2026 14:15`, que son dos formatos
+   * distintos del mismo dato. Formatear el segundo aquí obligaría a este módulo
+   * a saber de vistas; devolver el instante deja que cada render elija. `null`
+   * si el addendum no trae fecha o no es una fecha real —el mismo criterio con
+   * el que `fechaFormateada` cae a cadena vacía.
+   */
+  creadoEn: string | null
 }
 
 export interface NotaRenderData {
@@ -268,6 +280,7 @@ function construirAddendums(addendums?: AddendumInput[]): AddendumRender[] {
     // Fecha + hora en la zona de la clínica: "22 de julio de 2026 · 10:33 a.m.".
     // Ausente o corrupta → '' (la plantilla ya tolera el addendum sin fecha).
     fechaFormateada: formatearFechaAddendum(a.created_at),
+    creadoEn: a.created_at ?? null,
   }))
 }
 

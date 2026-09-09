@@ -128,7 +128,7 @@ function Marca({ color, ultimo, hueco = false }: { color: string; ultimo: boolea
 
 function ContenidoConsulta({ consulta, onIrAPestana }: {
   consulta: Consulta
-  onIrAPestana: (clave: ClavePestana) => void
+  onIrAPestana: (clave: ClavePestana, consultaId?: string) => void
 }) {
   const plan = consulta.plan_tratamiento?.trim()
   return (
@@ -144,7 +144,12 @@ function ContenidoConsulta({ consulta, onIrAPestana }: {
       )}
       <button
         type="button"
-        onClick={() => onIrAPestana('consultas')}
+        /* ⚠️ PASA EL ID, NO SÓLO LA PESTAÑA. Antes sólo cambiaba de pestaña y
+           el panel abría la más reciente, así que «Leer nota» sobre una consulta
+           de hace un año abría otra. El id viaja por la url —`?consulta=`, el
+           mismo mecanismo que `?tab`—, así que el destino es compartible y
+           sobrevive a una recarga. */
+        onClick={() => onIrAPestana('consultas', consulta.id)}
         className="mt-[var(--sp-2)] text-[length:var(--sp-fs-hint)] font-semibold text-[var(--sp-primary)] hover:underline"
       >
         Leer nota
@@ -289,7 +294,8 @@ export default function LineaTiempoClinica({
   cargandoActividad: boolean
   errorActividad: boolean
   onReintentarActividad: () => void
-  onIrAPestana: (clave: ClavePestana) => void
+  /** El segundo argumento abre una nota concreta; sin él, sólo cambia de pestaña. */
+  onIrAPestana: (clave: ClavePestana, consultaId?: string) => void
 }) {
   const [filtro, setFiltro] = useState<Filtro>('todo')
   const { mediciones, isLoading: cargandoMediciones, error: errorMediciones, mutate } =
@@ -318,7 +324,44 @@ export default function LineaTiempoClinica({
   }
 
   return (
-    <section className="rounded-[var(--sp-r-card)] border border-[color:var(--sp-line-card)] bg-[var(--sp-surface)] px-[22px] py-[var(--sp-5)]">
+    /* ⚠️ ALTO TOPE Y DESPLAZAMIENTO PROPIO EN LOS DOS TAMAÑOS. Con un paciente
+       de mucha actividad la lista es interminable y hacía crecer la página
+       entera; ahora se recorre dentro de la card, igual que la ficha de al lado.
+
+       ⚠️⚠️ EL TOPE DE MÓVIL ES UNA EXCEPCIÓN DELIBERADA A «SCROLL INTERNO SÓLO
+       EN ESCRITORIO», Y NO UN DESCUIDO QUE HAYA QUE CORREGIR. Esa regla vale
+       para el resto de la vista —la ficha clínica, sin ir más lejos, sigue
+       fluyendo en móvil— y existe porque una caja con scroll dentro de una
+       página con scroll atrapa el gesto del dedo. Aquí ese coste se acepta a
+       cambio de algo peor: sin tope, un expediente con cincuenta hitos
+       convierte la pestaña entera en un desplazamiento sin fondo, y la ficha
+       que va debajo deja de ser alcanzable en la práctica. El atrapamiento es
+       además acotado: al llegar al final de la lista el navegador encadena el
+       desplazamiento a la página. DECISIÓN TOMADA A PROPÓSITO; si vas a
+       revertirla, que sea con ese caso en la mano, no por la regla general.
+
+       Los dos valores:
+       · 640 px en escritorio — EL MISMO tope de la ficha, y ése es el punto:
+         las dos columnas de la banda 1 tienen que cortar a la misma altura o la
+         banda queda despareja. Es además el que el anexo §10 da al historial de
+         Consultas y el que usa el visor de nota, así que todas las columnas
+         desplazables del expediente miden lo mismo.
+       · 440 px en móvil — caben unos cuatro hitos más la banda, y ocupa cerca
+         del 60 % de un viewport de 390×844. Deja ver el borde de lo que sigue,
+         que es lo que avisa de que la pestaña continúa. No se iguala al de
+         escritorio porque 640 px se comería la pantalla entera. */
+    <section className="flex max-h-[440px] flex-col overflow-hidden rounded-[var(--sp-r-card)] border border-[color:var(--sp-line-card)] bg-[var(--sp-surface)] lg:max-h-[640px]">
+      {/* ── Banda fija ───────────────────────────────────────────────────
+          ⚠️ NO ES `sticky`, Y ES MEJOR QUE SERLO. Va FUERA del contenedor que
+          desplaza —`shrink-0` en una columna flex— así que el texto no puede
+          pasar por debajo ni hace falta pelearse con la opacidad ni con el
+          apilamiento: la banda es una franja opaca de la card y punto. Es el
+          mismo mecanismo que sostiene la cabecera de la ficha. El filete y la
+          sombra al pie son lo que anuncia que la lista sigue por debajo.
+          ⚠️ EL RELLENO SE REPARTE ENTRE BANDA Y LISTA. Estaba en la `section`,
+          y ahí el relleno inferior habría quedado FUERA del área que desplaza:
+          el último hito tocaría el borde de la card. */}
+      <div className="shrink-0 border-b border-[color:var(--sp-line-divider)] bg-[var(--sp-surface)] px-[22px] py-[var(--sp-4)] shadow-[var(--sp-shadow-flat)]">
       <div className="flex flex-wrap items-center justify-between gap-[var(--sp-3)]">
         <h2 className="text-[length:var(--sp-fs-vitals)] font-bold text-[var(--sp-ink-800)]">
           Actividad clínica
@@ -349,7 +392,10 @@ export default function LineaTiempoClinica({
         </div>
       </div>
 
-      <div className="mt-[var(--sp-4)]">
+      </div>
+
+      {/* ── Lista de hitos: lo único que se desplaza ───────────────────── */}
+      <div className="min-h-0 flex-1 overflow-y-auto px-[22px] py-[var(--sp-4)]">
         {error ? (
           <AvisoColumna
             icono={RotateCw}

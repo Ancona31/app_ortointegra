@@ -15,6 +15,7 @@ import PestanasExpediente, {
   esPestanaValida, PESTANA_POR_DEFECTO, type ClavePestana,
 } from '@/components/expediente/PestanasExpediente'
 import LineaTiempoClinica from '@/components/expediente/LineaTiempoClinica'
+import PanelConsultas from '@/components/expediente/PanelConsultas'
 import FichaClinica, { type ProximaCita } from '@/components/expediente/FichaClinica'
 import PanelLaboratorios from '@/components/labs/PanelLaboratorios'
 import ModalConsultas from '@/components/expediente/ModalConsultas'
@@ -75,10 +76,29 @@ function ExpedientePacienteContent() {
   const tabDeUrl = searchParams.get('tab')
   const pestana: ClavePestana = esPestanaValida(tabDeUrl) ? tabDeUrl : PESTANA_POR_DEFECTO
 
-  const cambiarPestana = useCallback((clave: ClavePestana) => {
+  /* La nota abierta viaja en la MISMA url que la pestaña, con el mismo
+     mecanismo: así «Leer nota» del Resumen es un enlace compartible y sobrevive
+     a una recarga. Aquí sólo se lee; validarlo contra las consultas cargadas es
+     cosa del panel, que es quien las tiene — un id que no corresponda a ninguna
+     cae a la más reciente y no es un error. */
+  const consultaDeUrl = searchParams.get('consulta')
+
+  const cambiarPestana = useCallback((clave: ClavePestana, consultaId?: string) => {
     const url = new URL(window.location.href)
     if (clave === PESTANA_POR_DEFECTO) url.searchParams.delete('tab')
     else url.searchParams.set('tab', clave)
+    /* ⚠️ `consulta` SOLO SIGNIFICA ALGO EN LA PESTAÑA CONSULTAS, así que al
+       irse a cualquier otra se limpia. Si no, un enlace copiado desde
+       Documentos arrastraría el id de una nota que allí no abre nada. */
+    if (consultaId) url.searchParams.set('consulta', consultaId)
+    else if (clave !== 'consultas') url.searchParams.delete('consulta')
+    window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`)
+  }, [])
+
+  /** Cambiar de nota DENTRO de la pestaña, sin tocar la pestaña. */
+  const fijarConsulta = useCallback((consultaId: string) => {
+    const url = new URL(window.location.href)
+    url.searchParams.set('consulta', consultaId)
     window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`)
   }, [])
 
@@ -382,7 +402,18 @@ function ExpedientePacienteContent() {
           </div>
         )}
 
-        {pestana === 'consultas' && <PendienteDeBloque nombre="Consultas" />}
+        {pestana === 'consultas' && (
+          <PanelConsultas
+            paciente={paciente}
+            consultas={consultas}
+            totalConsultas={conteos.consultas}
+            cargandoActividad={estadoActividad === 'cargando'}
+            errorActividad={estadoActividad === 'error'}
+            onReintentarActividad={() => { void cargarActividad() }}
+            consultaSolicitadaId={consultaDeUrl}
+            onSeleccionarConsulta={fijarConsulta}
+          />
+        )}
         {pestana === 'documentos' && <PendienteDeBloque nombre="Documentos" />}
         {pestana === 'mediciones' && <PanelLaboratorios paciente={paciente} />}
       </div>
