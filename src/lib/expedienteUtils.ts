@@ -66,6 +66,22 @@ export function ultimaConsultaFecha(consultas: Consulta[]): string | null {
 }
 
 /**
+ * La misma fecha en compacto: "8 sep 26".
+ *
+ * Existe porque la ficha clínica del Resumen la pinta en una columna de 330 px
+ * y "8 de septiembre 2026" no cabe: salía recortada a "8 de septie…", que es
+ * peor que no ponerla. Comparte el huso del DISPOSITIVO y el mismo criterio de
+ * ordenación que la versión larga —las dos nombran la MISMA consulta— y por eso
+ * vive aquí al lado y no en el componente: si una cambia de fuente de verdad,
+ * la otra tiene que enterarse.
+ */
+export function ultimaConsultaFechaCompacta(consultas: Consulta[]): string | null {
+  if (!consultas.length) return null
+  const ordenadas = [...consultas].sort((a, b) => b.fecha.localeCompare(a.fecha))
+  return renderEnTZ(ordenadas[0].fecha, 'd MMM yy', tzDispositivo())
+}
+
+/**
  * Etiqueta relativa futura de una CITA: "Hoy", "Mañana", "En 3 días",
  * "Vencida". Huso del DISPOSITIVO.
  *

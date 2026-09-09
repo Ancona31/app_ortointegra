@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect, useCallback, Suspense } from 'react'
+import { useState, useEffect, useCallback, useRef, Suspense } from 'react'
 import dynamic from 'next/dynamic'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useProfile } from '@/hooks/useProfile'
 import { useAuditAccess } from '@/hooks/useAudit'
@@ -10,9 +10,13 @@ import { Paciente, Consulta, Documento } from '@/types'
 import Portal from '@/components/ui/Portal'
 import { Trash2, AlertTriangle, Loader2 } from 'lucide-react'
 
-import HeroExpediente from '@/components/expediente/HeroExpediente'
-import ExpedienteCardsGrid, { type ProximaCita } from '@/components/expediente/ExpedienteCardsGrid'
-import AccesosRapidos from '@/components/expediente/AccesosRapidos'
+import CabeceraPaciente from '@/components/expediente/CabeceraPaciente'
+import PestanasExpediente, {
+  esPestanaValida, PESTANA_POR_DEFECTO, type ClavePestana,
+} from '@/components/expediente/PestanasExpediente'
+import LineaTiempoClinica from '@/components/expediente/LineaTiempoClinica'
+import FichaClinica, { type ProximaCita } from '@/components/expediente/FichaClinica'
+import PanelLaboratorios from '@/components/labs/PanelLaboratorios'
 import ModalConsultas from '@/components/expediente/ModalConsultas'
 import ModalDocumentos from '@/components/expediente/ModalDocumentos'
 
@@ -29,6 +33,20 @@ const ModalVisorDocumento = dynamic(
 /** Límite de registros por query */
 const QUERY_LIMIT = 50
 
+/** Lo que enseña una pestaña cuyo contenido llega en un bloque posterior. */
+function PendienteDeBloque({ nombre }: { nombre: string }) {
+  return (
+    <div className="flex flex-col items-center gap-[var(--sp-2-5)] rounded-[14px] border border-dashed border-[color:var(--sp-line-card)] px-[var(--sp-pad-row-x)] py-[var(--sp-10)]">
+      <p className="text-center text-[length:var(--sp-fs-body-sm)] text-[var(--sp-ink-500)]">
+        {nombre} se muda a esta pestaña en el bloque siguiente.
+      </p>
+      <p className="text-center text-[length:var(--sp-fs-hint)] text-[var(--sp-ink-350)]">
+        Mientras tanto se abre como hasta ahora, sin cambios.
+      </p>
+    </div>
+  )
+}
+
 function ExpedientePacienteContent() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
@@ -44,11 +62,70 @@ function ExpedientePacienteContent() {
   const [errorEliminar, setErrorEliminar] = useState('')
 
   // ── Data fetching: direct Supabase queries ──
+  /* ⚠️ LA PESTAÑA ACTIVA SALE DE LA URL Y VUELVE A ELLA, para que sobreviva a
+     una recarga y se pueda enlazar. Se lee con `useSearchParams`, y al cambiar
+     se reescribe con `history.replaceState` en vez de `router.replace`: éste
+     pediría el árbol RSC de la ruta entera cada vez que el médico toca una
+     pestaña, y aquí no hay nada que volver a pedir al servidor —el cambio es
+     puramente de cliente—. `replaceState` además no añade entrada de
+     historial, así que el botón de atrás sigue llevando al listado y no
+     recorre las pestañas visitadas.
+     Un `?tab=` que no exista cae a Resumen en vez de dejar la pantalla vacía. */
+  const searchParams = useSearchParams()
+  const tabDeUrl = searchParams.get('tab')
+  const pestana: ClavePestana = esPestanaValida(tabDeUrl) ? tabDeUrl : PESTANA_POR_DEFECTO
+
+  const cambiarPestana = useCallback((clave: ClavePestana) => {
+    const url = new URL(window.location.href)
+    if (clave === PESTANA_POR_DEFECTO) url.searchParams.delete('tab')
+    else url.searchParams.set('tab', clave)
+    window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`)
+  }, [])
+
+  /* Los tres conteos reales de la barra. `undefined` mientras no resuelven: la
+     insignia no se dibuja, en vez de anunciar un cero que sería una
+     afirmación. La cuarta pestaña no lleva conteo — contar analitos DISTINTOS
+     no es un `count` barato y ningún índice lo cubre. */
+  const [conteos, setConteos] = useState<Partial<Record<ClavePestana, number>>>({})
+
   const [paciente, setPaciente] = useState<Paciente | null>(null)
   const [consultas, setConsultas] = useState<Consulta[]>([])
   const [documentos, setDocumentos] = useState<Documento[]>([])
   const [loadingPaciente, setLoadingPaciente] = useState(true)
   const [proximaCita, setProximaCita] = useState<ProximaCita | null>(null)
+
+  /* ⚠️ CONSULTAS Y DOCUMENTOS COMPARTEN UN SOLO ESTADO, y no es pereza: las dos
+     columnas del Resumen los leen juntos —la línea de tiempo los funde en una
+     cronología y la ficha saca de las consultas el diagnóstico activo—, así que
+     media carga no es un estado que ninguna de las dos sepa pintar. Un fallo en
+     cualquiera de los dos deja el bloque entero en error, con reintento. */
+  const [estadoActividad, setEstadoActividad] = useState<'cargando' | 'listo' | 'error'>('cargando')
+  const peticionActividad = useRef(0)
+
+  const cargarActividad = useCallback(async () => {
+    const mia = ++peticionActividad.current
+    setEstadoActividad('cargando')
+    const supabase = createClient()
+    try {
+      const [c, d] = await Promise.all([
+        supabase.from('consultas').select('*').eq('paciente_id', id)
+          .order('fecha', { ascending: false }).limit(QUERY_LIMIT),
+        supabase.from('documentos').select('*').eq('paciente_id', id)
+          .order('created_at', { ascending: false }).limit(QUERY_LIMIT),
+      ])
+      // Una respuesta de una petición ya sustituida no pisa a la vigente.
+      if (mia !== peticionActividad.current) return
+      if (c.error || d.error) throw c.error ?? d.error
+      setConsultas((c.data ?? []) as Consulta[])
+      setDocumentos((d.data ?? []) as Documento[])
+      setEstadoActividad('listo')
+    } catch {
+      if (mia !== peticionActividad.current) return
+      setEstadoActividad('error')
+    }
+  }, [id])
+
+  useEffect(() => { void cargarActividad() }, [cargarActividad])
 
   // Refetch helper for child actions (delete doc)
   const fetchDocumentos = useCallback(async () => {
@@ -74,27 +151,27 @@ function ExpedientePacienteContent() {
         setLoadingPaciente(false)
       })
 
-    // Consultas
-    supabase
-      .from('consultas')
-      .select('*')
-      .eq('paciente_id', id)
-      .order('fecha', { ascending: false })
-      .limit(QUERY_LIMIT)
-      .then((res: { data: Consulta[] | null }) => {
-        if (!cancelled) setConsultas((res.data ?? []) as Consulta[])
-      })
+    // Consultas y documentos: los trae `cargarActividad`, que además
+    // sostiene el estado de carga/error y el reintento de las dos columnas.
 
-    // Documentos
-    supabase
-      .from('documentos')
-      .select('*')
-      .eq('paciente_id', id)
-      .order('created_at', { ascending: false })
-      .limit(QUERY_LIMIT)
-      .then((res: { data: Documento[] | null }) => {
-        if (!cancelled) setDocumentos((res.data ?? []) as Documento[])
+    /* ⚠️ LOS TRES CONTEOS SON REALES, y no `consultas.length`. Las dos listas
+       de arriba vienen acotadas a 50, así que su longitud MIENTE en cuanto un
+       paciente pasa de ese número — y una insignia de pestaña que dice «50»
+       para siempre es peor que ninguna. `head: true` no trae filas: sólo el
+       total, y los dos van por índice de `paciente_id`.
+       El de mediciones cuenta FILAS, no analitos distintos, y por eso NO
+       alimenta ninguna insignia: la cuarta pestaña se quedó sin conteo
+       precisamente porque el número que el spec pide —analitos rastreados— es
+       un `count(DISTINCT …)` sobre dos columnas que ningún índice cubre. */
+    Promise.all([
+      supabase.from('consultas').select('id', { count: 'exact', head: true }).eq('paciente_id', id),
+      supabase.from('documentos').select('id', { count: 'exact', head: true }).eq('paciente_id', id),
+    ])
+      .then(([c, d]: { count: number | null }[]) => {
+        if (cancelled) return
+        setConteos({ consultas: c.count ?? 0, documentos: d.count ?? 0 })
       })
+      .catch(() => { /* sin conteo, la insignia no se dibuja */ })
 
     // Próxima cita del paciente (solo scheduled/confirmed futuras)
     supabase
@@ -143,7 +220,7 @@ function ExpedientePacienteContent() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-4 animate-slide-up">
+    <div className="max-w-[960px] mx-auto animate-slide-up">
 
       {/* ── Modal visor de documento ── */}
       {docSeleccionado && (
@@ -251,41 +328,77 @@ function ExpedientePacienteContent() {
         </Portal>
       )}
 
-      {/* Tarjeta del paciente */}
-      <HeroExpediente
+      {/* ── Región 1 · Cabecera del paciente, persistente en las cuatro
+             pestañas ────────────────────────────────────────────────────── */}
+      <CabeceraPaciente
         paciente={paciente}
-        consultas={consultas}
         isDoctor={isDoctor}
         onEditar={() => router.push(`/expediente/${id}/editar`)}
+        onNuevoDocumento={() => router.push(`/expediente/${id}/documentos`)}
       />
 
-      {/* Grid de cards — Fase 4 */}
-      <ExpedienteCardsGrid
-        paciente={paciente}
-        consultas={consultas}
-        proximaCita={proximaCita}
-        isDoctor={isDoctor}
-      />
+      {/* ── Región 2 · Barra de pestañas ─────────────────────────────────── */}
+      <PestanasExpediente activa={pestana} conteos={conteos} onCambiar={cambiarPestana} />
 
-      {/* Acciones rápidas — solo médico */}
-      {isDoctor && (
-        <>
-          <AccesosRapidos
-            pacienteId={id}
-            onAbrirConsultas={() => setMostrarModalConsultas(true)}
-            onAbrirDocumentos={() => setMostrarModalDocumentos(true)}
-          />
-
-          {/* Eliminar (Exportar ahora vive dentro del Hero) */}
-          <div className="flex justify-end">
-            <button
-              onClick={() => setMostrarEliminarPaciente(true)}
-              className="flex items-center gap-1.5 text-[11px] text-[#86868b] hover:text-red-500 transition-colors"
-            >
-              <Trash2 size={12} /> Eliminar paciente
-            </button>
+      {/* ── Cuerpo de la pestaña activa ───────────────────────────────────
+          ⚠️ EL CONTENIDO ES EL DE HOY, MUDADO DE SITIO. Este bloque construye
+          el chasis; el rediseño de cada pestaña llega después. Por eso el
+          Resumen conserva la parrilla de tarjetas y las dos de «Estado», y
+          Consultas y Documentos anuncian lo que falta en vez de fingirlo. */}
+      <div className="mt-[var(--sp-gap-band)]">
+        {pestana === 'resumen' && (
+          /* ⚠️ LOS TRES HIJOS SON DOS COMPONENTES. `FichaClinica` entra al grid
+             como `display: contents` por debajo de `lg`, así que aporta DOS
+             hijos —diagnóstico+alergias y el resto— y la línea de tiempo se
+             cuela entre ellos con `order`, que es el orden móvil del §3.2. En
+             `lg` la ficha vuelve a ser una card entera y las dos columnas se
+             colocan a mano (`col-start`), sin depender del orden del código.
+             `items-start` es lo que impide que una columna estire su altura
+             para igualar a la otra. */
+          <div className="grid grid-cols-1 gap-[var(--sp-gap-band)] lg:grid-cols-[minmax(0,1fr)_330px] lg:items-start">
+            <FichaClinica
+              paciente={paciente}
+              consultas={consultas}
+              totalConsultas={conteos.consultas}
+              proximaCita={proximaCita}
+              cargandoActividad={estadoActividad === 'cargando'}
+              errorActividad={estadoActividad === 'error'}
+              onReintentarActividad={() => { void cargarActividad() }}
+              onIrAPestana={cambiarPestana}
+            />
+            <div className="order-2 min-w-0 lg:order-none lg:col-start-1 lg:row-start-1">
+              <LineaTiempoClinica
+                pacienteId={id}
+                sexo={paciente.sexo}
+                isDoctor={isDoctor}
+                consultas={consultas}
+                documentos={documentos}
+                cargandoActividad={estadoActividad === 'cargando'}
+                errorActividad={estadoActividad === 'error'}
+                onReintentarActividad={() => { void cargarActividad() }}
+                onIrAPestana={cambiarPestana}
+              />
+            </div>
           </div>
-        </>
+        )}
+
+        {pestana === 'consultas' && <PendienteDeBloque nombre="Consultas" />}
+        {pestana === 'documentos' && <PendienteDeBloque nombre="Documentos" />}
+        {pestana === 'mediciones' && <PanelLaboratorios paciente={paciente} />}
+      </div>
+
+      {/* Eliminar paciente. Fuera de las pestañas: es una acción sobre el
+          expediente entero, no sobre ninguna de sus secciones. */}
+      {isDoctor && (
+        <div className="mt-[var(--sp-gap-band)] flex justify-end">
+          <button
+            type="button"
+            onClick={() => setMostrarEliminarPaciente(true)}
+            className="flex items-center gap-[var(--sp-1-5)] text-[length:var(--sp-fs-legal)] text-[var(--sp-ink-350)] transition-colors hover:text-[var(--sp-danger)]"
+          >
+            <Trash2 size={12} /> Eliminar paciente
+          </button>
+        </div>
       )}
 
     </div>

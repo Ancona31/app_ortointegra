@@ -76,6 +76,17 @@
   --sp-danger-bg:          #fdf2f2;
   --sp-danger-border:      #f3c9c9;
 
+  /* Banda de alergias de la ficha clínica del expediente.
+     ⚠️ NO SE DECLARA EN EL BLOQUE OSCURO, Y ESA ES SU RAZÓN DE EXISTIR. El §5
+     del spec la nombra «la única pieza que no baja de intensidad, porque su
+     función es alarmar». `--sp-danger` no sirve: en oscuro pasa a #f87171 —un
+     rojo claro— y el blanco encima cae a 2.6:1, o sea la banda se apaga justo
+     donde más tiene que gritar. Este par se queda fijo en los dos temas:
+     blanco sobre #c0392b mide 5.9:1, por encima del 4.5:1 que el §7 exige
+     expresamente para esta banda. Si alguna vez lo tematizas, vuelve a medir. */
+  --sp-alergia-bg:         #c0392b;
+  --sp-alergia-ink:        #ffffff;
+
   /* ---------------------------------------------------------------------
      2.b COLOR — TIPO DE DOCUMENTO (GUIA_FORMULARIOS_04 §3)
      ---------------------------------------------------------------------
@@ -98,6 +109,24 @@
   --sp-doc-escrito:        #155e75;  /* cyan-800    */
   --sp-doc-consentimiento: #3730a3;  /* indigo-800  */
   --sp-doc-honorarios:     #c2410c;  /* orange-700  */
+
+  /* ---------------------------------------------------------------------
+     2.c COLOR — HITO DE MEDICIÓN (línea de tiempo del expediente)
+     ---------------------------------------------------------------------
+     ⚠️ FUERA DE LA FAMILIA `--sp-doc-*` A PROPÓSITO, y por eso no se llama
+     `--sp-doc-medicion`. En la línea de tiempo del Resumen conviven tres
+     clases de hito y sólo una es un documento; darle a la medición uno de los
+     ocho colores de formato la haría leer como un noveno tipo de documento,
+     que es justo la confusión que la línea de tiempo tiene que evitar.
+     Fucsia-800 es el hueco real que dejan los ocho: queda a 25° del violeta de
+     `imagen` y a 55° del rosa de `internamiento`, con 10 puntos de L* de
+     separación respecto del primero. Los 25° son el punto más ajustado y está
+     aceptado por el mismo motivo que el archivo ya admite para `--sp-primary`:
+     la distinción la dan el rótulo («Medición») y el icono, no el tono.
+     NO lo cambies a verde, ámbar ni rojo: esos tres ya significan «en rango»,
+     «a vigilar» y «fuera de rango» sobre el valor del propio hito, y el punto
+     del hito los toma prestados cuando la medición está fuera de rango. */
+  --sp-hito-medicion:      #86198f;  /* fuchsia-800 */
 
   /* ---------------------------------------------------------------------
      2.c COLOR — AVATAR DE PACIENTE
@@ -306,6 +335,19 @@
   --sp-fs-legal:     11px;  /* microcopy legal en footer, label de tile */
   --sp-fs-tile:    10.5px;  /* label de tile de vital */
 
+  /* Rediseño del expediente (bloque 2). DOS ROLES QUE LA ESCALA NO TENÍA, y
+     no dos alias de escalones existentes: el §4 del spec los declara como
+     niveles propios, así que se nombran por lo que pintan y no por su tamaño.
+     El de display COINCIDE EN VALOR con --sp-fs-btn-sm (15px) y eso no es un
+     descuido: el archivo ya empareja valores con roles distintos —body-sm y
+     chip son 14, question y body-lg son 16—. Un número destacado no es un
+     botón; si mañana la ficha sube su valor a 17, no arrastra a los botones.
+     NO TIENEN CONTRAPARTE EN OSCURO: en esta hoja el bloque oscuro redefine
+     color, nunca tamaño. Lo que sí la tiene es el color del hito de medición,
+     en §2.c bis. */
+  --sp-fs-patient:    25px;  /* nombre del paciente (título de la pantalla) */
+  --sp-fs-display-sm: 15px;  /* valor numérico destacado: IMC, valor de analito */
+
   --sp-lh-tight:   1.2;   /* títulos ≥26px */
   --sp-lh-title:   1.3;   /* títulos 16–20px */
   --sp-lh-snug:    1.45;  /* valores de campo, listas */
@@ -484,6 +526,12 @@ html.dark {
   --sp-doc-escrito:        #96b7c1;
   --sp-doc-consentimiento: #a5a2d6;
   --sp-doc-honorarios:     #e4aa92;
+
+  /* — HITO DE MEDICIÓN — mismo 45 % contra blanco que la familia de arriba,
+       para que el punto de la línea de tiempo baje de intensidad igual que los
+       chips de documento que tiene al lado. Literal por el mismo motivo que
+       ellos: `color-mix` sobre su propio token sería una referencia cíclica. */
+  --sp-hito-medicion:      #c998cd;
 
   /* — SEMÁFORO DE VITALES — espejo oscuro. Aquí sí converge con la semántica
        genérica: los hexes de la card solo divergen en la paleta clara. */
