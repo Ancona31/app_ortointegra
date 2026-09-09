@@ -181,6 +181,11 @@
   --sp-gap-tiles:          12px;   /* entre tiles de vitales */
   --sp-gap-label:           6px;   /* label → control */
   --sp-gap-title-sub:       4px;   /* título → subtítulo */
+  /* Rediseño del dashboard (bloque 1). Nombres nuevos sobre escalones que YA
+     existen arriba: no estrenan ningún valor. */
+  --sp-gap-band:  var(--sp-6-5);   /* 26px · entre bandas del cuerpo */
+  --sp-pad-rule:  var(--sp-6);     /* 24px · a cada lado del filete vertical */
+  --sp-pad-row-x: var(--sp-3-5);   /* 14px · relleno horizontal de renglón de lista */
 
   /* ---------------------------------------------------------------------
      6. SOMBRAS — 6 niveles, uno por rol

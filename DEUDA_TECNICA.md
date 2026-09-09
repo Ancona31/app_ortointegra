@@ -3663,6 +3663,71 @@ creyéndolo libre: el evento está a la vista en la banda.
 
 ---
 
+### AG-DT-12 — La hora tecleada se compone en el huso de QUIEN AGENDA, no en el del consultorio
+
+**Estado:** 🟡 abierta, latente · **Archivo:**
+`src/app/(app)/agenda/page.tsx:1064` (`componerIso`), consumida en
+`:1145,1177,1638,1657,1678,1700,1732-1734,1769`
+**Detectado:** 2026-09-08, revisando cómo se compone la hora al crear.
+**Impacto hoy: nulo.** Todos los consultorios están en el mismo huso. Se vuelve
+real con una secretaria remota o un consultorio en otro estado.
+
+**El caso concreto**
+
+```ts
+function componerIso(fecha: string, hora: string) { return new Date(`${fecha}T${hora}`).toISOString() }
+```
+
+Sin sufijo de zona, así que el motor interpreta la cadena en la zona del
+**navegador de quien agenda**. El consultorio elegido en el modal no interviene,
+pese a que `consultorios.timezone` existe y su valor se congela en la propia fila
+como `appointments.consultorio_timezone`.
+
+Consecuencia: la hora tecleada no es la hora del consultorio. Una secretaria en
+Sonora que teclea 09:00 para el consultorio de Umán deja la cita a **las 10:00
+hora de Umán**.
+
+**Y no hay ninguna señal en el momento de agendar.** El único aviso es la
+insignia `tzDiff` (`page.tsx:3763-3775`), que compara la hora del consultorio con
+la del navegador y sólo se pinta en las vistas **Semana y Día**. No existe en la
+vista Mes, ni en el modal donde se teclea la hora, ni en el renglón del
+dashboard. El aviso llega después de guardar, y sólo si el que agendó vuelve a
+mirar en la vista correcta.
+
+**Contraste interno, en el mismo dominio**
+
+Los eventos de **todo el día** sí se componen con el huso del consultorio, y en
+el servidor: `src/app/api/appointments/route.ts:387-393`. El cliente manda el DÍA
+—que no tiene huso— precisamente porque `componerIso` no sabe componer esa
+medianoche; está escrito en `page.tsx:1358-1364` y en `:1761-1766`. La asimetría
+es deliberada y está comentada, pero deja **las citas con hora fuera de esa
+garantía**: son el único camino de escritura donde el instante se compone en el
+cliente.
+
+**Lo que NO es**
+
+**No confundir con LA REGLA de `src/lib/dates.ts:10`.** Que las horas de citas se
+**pinten** en el huso del dispositivo de quien mira es una decisión tomada a
+propósito tras el bug de Sonora, y **no está en discusión**. Lo que se registra
+aquí es otra cosa: cómo se **compone** la hora al crear. Leer y escribir no
+tienen por qué compartir convenio, y ahí está el hueco.
+
+**No pide cambio de esquema.** `consultorios.timezone` es `text NOT NULL`
+(`20260615_consultorios_01_table.sql:30`) y el snapshot
+`appointments.consultorio_timezone` ya se congela al crear la fila
+(`20260615_consultorios_04_snapshot.sql`). El dato está; nadie lo consulta para
+esto.
+
+**Familia.** Con **AG-DT-3** comparte tema y NO causa: aquélla es de convenio de
+**lectura** del `all_day`; ésta es de composición de la hora de una cita normal.
+Con **TZ-DT-1** y **TZ-DT-2** comparte forma y va en dirección contraria: allá se
+usa `TZ_CLINICA` donde correspondía el huso del dispositivo; aquí se usa el del
+dispositivo donde correspondería el del consultorio. Antes de tocar cualquier
+literal de zona horaria, léase la advertencia sobre los tres
+`America/Mexico_City` deliberados, al final de TZ-DT-1.
+
+---
+
 ## Latencia de `/agenda` — investigación y tanda de arreglos (2026-08-31)
 
 Origen: una traza de Sentry en producción con `/agenda` en 4,11 s. La causa raíz

@@ -1,3 +1,6 @@
+import { Menu } from 'lucide-react'
+import BuscadorPaciente, { ALTO_CONTROL } from '@/components/dashboard/BuscadorPaciente'
+
 /** Bloque shimmer genérico */
 export function Skeleton({ className }: { className?: string }) {
   return <div className={`skeleton${className ? ' ' + className : ''}`} />
@@ -30,37 +33,116 @@ export function PatientListSkeleton({ rows = 8 }: { rows?: number }) {
   )
 }
 
-/** Cards del dashboard */
-export function DashboardSkeleton() {
+/**
+ * El dashboard mientras `useProfile` resuelve.
+ *
+ * ⚠️ ESTO NO ES «UNA CAJA GRIS CUALQUIERA»: ES EL LAYOUT DE `/dashboard`
+ * REPETIDO EN HUESO, y tiene que seguir siéndolo. Réplica de los bloques 1 y 2
+ * del rediseño (`src/app/(app)/dashboard/page.tsx`): cabecera de dos filas con
+ * su filete de cierre, banda 1 de dos columnas, filete a todo el ancho y banda 2
+ * de dos columnas con su filete vertical. Si allí cambian el ancho máximo, la
+ * retícula o el ritmo, cámbialos aquí: lo que se ve al terminar la carga es un
+ * salto, y el salto no avisa.
+ *
+ * ⚠️ LA BÚSQUEDA Y EL HAMBURGUESA VAN DE VERDAD, NO EN HUESO. Ninguno de los dos
+ * depende del perfil, así que no hay motivo para inutilizarlos justo cuando la
+ * pantalla está tardando. Por eso este componente recibe los dos manejadores en
+ * vez de fabricarlos: el disparo del Ctrl+K sintético vive en un solo sitio, en
+ * la página, y aquí sólo se enchufa.
+ *
+ * ⚠️ Y LOS TRES BOTONES SÍ VAN EN HUESO, A PROPÓSITO. Cuál se pinta depende del
+ * rol, y durante la carga el rol se desconoce: `useProfile` mantiene
+ * `profile === null` hasta que resuelve, sin estado intermedio. Pintarlos aquí
+ * sería enseñarle a una secretaria la cabecera del médico durante un fotograma,
+ * que es justo lo que el guarda de rol de la página existe para impedir.
+ * No los «rellenes» porque parezcan vacíos.
+ *
+ * ⚠️ `dash-barra-movil` TIENE QUE ESTAR TAMBIÉN AQUÍ. Es el asidero de las dos
+ * reglas de `globals.css` que esconden el hamburguesa flotante del `Sidebar` y
+ * recortan el relleno superior que el layout reserva para él. Sin la clase en
+ * este esqueleto, durante la carga reaparecen los dos —el flotante y el de la
+ * barra— y el contenido baja 48 px de golpe al terminar.
+ */
+export function DashboardSkeleton({ onBuscar, onAbrirMenu }: {
+  onBuscar: () => void
+  onAbrirMenu: () => void
+}) {
   return (
-    <div className="max-w-3xl mx-auto space-y-8 py-2">
-      {/* Saludo */}
-      <div className="space-y-2">
-        <Skeleton className="h-3 w-40" />
-        <Skeleton className="h-8 w-72" />
-      </div>
-      {/* CTAs */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <Skeleton className="h-24 rounded-2xl" />
-        <Skeleton className="h-24 rounded-2xl" />
-      </div>
-      {/* Módulos */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        {[1,2,3].map(i => <Skeleton key={i} className="h-20 rounded-2xl" />)}
-      </div>
-      {/* Recientes */}
-      <div className="space-y-2">
-        <Skeleton className="h-3 w-32" />
-        {[1,2,3,4].map(i => (
-          <div key={i} className="flex items-center gap-3 p-3 bg-white rounded-xl border border-slate-100">
-            <Skeleton className="w-9 h-9 rounded-xl flex-shrink-0" />
-            <div className="space-y-1.5 flex-1">
-              <Skeleton className="h-3 w-40" />
-              <Skeleton className="h-2.5 w-56" />
-            </div>
-            <Skeleton className="h-2.5 w-16" />
+    <div className="max-w-[1044px] mx-auto pt-2 pb-6">
+
+      {/* ── Región 1 · Cabecera ─────────────────────────────── */}
+      <div className="pb-[var(--sp-5-5)] border-b border-[color:var(--sp-line-card)]">
+
+        <div className="dash-barra-movil lg:hidden flex items-center gap-[var(--sp-3)] mb-[var(--sp-gap-block)]">
+          <button
+            type="button"
+            onClick={onAbrirMenu}
+            aria-label="Abrir menú"
+            className="w-11 h-11 shrink-0 flex items-center justify-center rounded-[var(--sp-r-icon-md)] bg-[var(--sp-surface-muted)] text-[var(--sp-ink-700)]"
+          >
+            <Menu size={20} />
+          </button>
+          <p className="flex-1 min-w-0 truncate text-[length:var(--sp-fs-vitals)] font-bold text-[var(--sp-ink-800)]">
+            Dashboard
+          </p>
+          {/* El avatar sale de las iniciales del perfil: en hueso. */}
+          <Skeleton className="w-10 h-10 rounded-full shrink-0" />
+        </div>
+
+        {/* Fila 1 · identidad. Consultorio activo y saludo salen los dos del
+            perfil, así que los dos esperan. */}
+        <Skeleton className="h-3.5 w-44 max-w-full" />
+        <Skeleton className="mt-[var(--sp-gap-title-sub)] h-8 w-72 max-w-full" />
+
+        {/* Fila 2 · acción. Misma retícula que la real para que nada se mueva
+            al resolver: búsqueda flexible y, a su derecha, el grupo que no
+            encoge. */}
+        <div className="mt-[var(--sp-gap-block)] flex flex-col gap-[var(--sp-gap-item)] lg:flex-row lg:flex-wrap lg:items-center">
+
+          <BuscadorPaciente onAbrir={onBuscar} />
+
+          {/* Los anchos son los de los tres botones reales medidos a 15 px, y
+              el orden es el suyo: en móvil el primario cruza las dos columnas y
+              debajo van los otros dos; en `lg`, fila. */}
+          <div className="order-2 grid grid-cols-2 gap-[var(--sp-gap-item)] lg:flex lg:shrink-0 lg:items-center">
+            <Skeleton className={`${ALTO_CONTROL} col-span-2 order-1 lg:order-3 lg:w-[208px] rounded-[var(--sp-r-btn)]`} />
+            <Skeleton className={`${ALTO_CONTROL} order-2 lg:order-2 lg:w-[197px] rounded-[var(--sp-r-btn)]`} />
+            <Skeleton className={`${ALTO_CONTROL} order-3 lg:order-1 lg:w-[169px] rounded-[var(--sp-r-btn)]`} />
           </div>
-        ))}
+        </div>
+      </div>
+
+      {/* ── Banda 1 · flexible + fija ───────────────────────── */}
+      <div className="mt-[var(--sp-gap-band)] grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px] gap-[var(--sp-5)]">
+        <Skeleton className="h-[148px] rounded-2xl" />
+        <Skeleton className="h-[148px] rounded-2xl" />
+      </div>
+
+      {/* Filete a todo el ancho del área de contenido. */}
+      <div className="mt-[var(--sp-gap-band)] border-t border-[color:var(--sp-line-card)]" />
+
+      {/* ── Banda 2 · flexible + fija, con el filete vertical ─ */}
+      <div className="mt-[var(--sp-gap-band)] grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px] gap-[var(--sp-gap-band)] lg:gap-0">
+
+        <div className="lg:pr-[var(--sp-pad-rule)]">
+          {/* Los encabezados de las dos columnas miden 32 px y arrancan a la
+              misma altura, igual que en la real. */}
+          <div className="flex h-8 items-center">
+            <Skeleton className="h-3 w-36" />
+          </div>
+          <div className="mt-[var(--sp-gap-tiles)] space-y-[var(--sp-2)]">
+            {[1, 2, 3, 4, 5].map(i => <Skeleton key={i} className="h-[57px] rounded-xl" />)}
+          </div>
+        </div>
+
+        <div className="lg:border-l lg:border-[color:var(--sp-line-card)] lg:pl-[var(--sp-pad-rule)]">
+          <div className="flex h-8 items-center">
+            <Skeleton className="h-3 w-24" />
+          </div>
+          <div className="mt-[var(--sp-gap-tiles)] grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-2 gap-[var(--sp-gap-tiles)]">
+            {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-[118px] rounded-2xl" />)}
+          </div>
+        </div>
       </div>
     </div>
   )

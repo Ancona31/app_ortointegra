@@ -1873,6 +1873,36 @@ main > div:has(.agenda-fc) .agenda-raiz {
    que saber — sólo se monta en móvil. */
 body:has(.ag-banda-movil) .menu-flotante { display: none; }
 
+/* ── Cabecera móvil del dashboard (bloque 2 del rediseño) ──────────────────
+   Mismo mecanismo que la banda de la agenda de aquí arriba, y por el mismo
+   motivo: `/dashboard` estrena su propia barra superior en móvil, con su
+   hamburguesa dentro, y los dos abren el MISMO menú (`MenuMovilContext`). El
+   asidero es `.dash-barra-movil`, en `src/app/(app)/dashboard/page.tsx`.
+
+   ⚠️ AQUÍ TAMPOCO VA MEDIA QUERY, por el argumento largo de la regla de la
+   agenda: si no casa, quedan DOS hamburguesas; si la condición no llega a
+   tiempo, quedan CERO. A diferencia de la banda de la agenda, esta barra SÍ
+   está siempre en el DOM y se esconde con `lg:hidden`, así que este selector
+   también casa en escritorio — donde es inocuo: `.menu-flotante` ya es
+   `lg:hidden` por su cuenta. */
+body:has(.dash-barra-movil) .menu-flotante { display: none; }
+
+/* Y el hueco que deja el botón al irse. El layout de `(app)` reserva 64 px de
+   relleno superior en móvil EXACTAMENTE para que el hamburguesa flotante no se
+   coma el contenido (ver la nota larga de `(app)/layout.tsx`). Sin ese botón
+   son 64 px de blanco por encima de la barra, así que aquí bajan a los mismos
+   16 px que tenía el botón de `top-4`. El área segura se SUMA, igual que allí.
+
+   ⚠️ ÉSTA SÍ LLEVA MEDIA QUERY, y no contradice al aviso de arriba: el fallo
+   apunta al otro lado. Si no casara, se queda el relleno original del layout
+   —feo, nunca roto—, mientras que sin la media query se pisaría el `lg:pt-8`
+   de las demás anchuras. El corte es el `lg` de Tailwind (1024 px). */
+@media (max-width: 1023px) {
+  main > div:has(.dash-barra-movil) {
+    padding-top: calc(1rem + env(safe-area-inset-top, 0px));
+  }
+}
+
 .ag-banda-movil-fila,
 .ag-banda-movil-filtros { display: flex; align-items: center; gap: 8px; }
 
