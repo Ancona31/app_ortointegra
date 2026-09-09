@@ -3,12 +3,13 @@
 import { useState, useMemo } from 'react'
 import { useSWRConfig } from 'swr'
 import { Activity, Plus } from 'lucide-react'
-import { parseISO, subMonths, subYears } from 'date-fns'
+import { parseISO, format } from 'date-fns'
+import { es } from 'date-fns/locale'
 import ModalAgregarMedicion from '@/components/labs/ModalAgregarMedicion'
-import DropdownSelectorAnalito from '@/components/labs/DropdownSelectorAnalito'
+import ListaAnalitos from '@/components/labs/ListaAnalitos'
 import AnalitoDetailHeader from '@/components/labs/AnalitoDetailHeader'
 import TablaMediciones from '@/components/labs/TablaMediciones'
-import FiltroTemporal, { type RangoTemporal } from '@/components/labs/FiltroTemporal'
+import FiltroMediciones, { recortar, type LimiteMediciones } from '@/components/labs/FiltroMediciones'
 import GraficaAnalito from '@/components/labs/GraficaAnalito'
 import LeyendaBandas from '@/components/labs/LeyendaBandas'
 import { useAnalitosRastreados } from '@/hooks/useAnalitosRastreados'
@@ -16,8 +17,6 @@ import { useMedicionesAnalito } from '@/hooks/useMedicionesAnalito'
 import { useCatalogoAnalitos } from '@/hooks/useCatalogoAnalitos'
 import { useToast } from '@/components/ui/Toast'
 import type { Sexo } from '@/lib/labs/utils'
-
-const IOS_EASING = 'cubic-bezier(0.32, 0.72, 0, 1)'
 
 type Props = {
   pacienteId: string
@@ -27,7 +26,7 @@ type Props = {
 export default function SeccionMedicionesLabs({ pacienteId, sexoPaciente }: Props) {
   const [modalOpen, setModalOpen] = useState(false)
   const [claveUsuario, setClaveUsuario] = useState<string | null>(null)
-  const [rangoTemporal, setRangoTemporal] = useState<RangoTemporal>('todo')
+  const [limite, setLimite] = useState<LimiteMediciones>('todas')
   const [claveSnapshot, setClaveSnapshot] = useState<string | null>(null)
   const { mutate } = useSWRConfig()
   const toast = useToast()
@@ -48,11 +47,11 @@ export default function SeccionMedicionesLabs({ pacienteId, sexoPaciente }: Prop
     return ordenados[0]?.clave ?? null
   }, [analitos, claveUsuario])
 
-  // Reset del filtro temporal al cambiar de analito — pattern render-time sync
+  // Reset del filtro al cambiar de analito — pattern render-time sync
   // (en lugar de useEffect) para evitar cascading renders.
   if (claveSnapshot !== claveSeleccionada) {
     setClaveSnapshot(claveSeleccionada)
-    setRangoTemporal('todo')
+    setLimite('todas')
   }
 
   const analitoSeleccionado = useMemo(
@@ -73,39 +72,14 @@ export default function SeccionMedicionesLabs({ pacienteId, sexoPaciente }: Prop
     claveSeleccionada,
   )
 
-  const contadoresPorRango = useMemo<Record<RangoTemporal, number>>(() => {
-    const now = new Date()
-    const cutoffs = {
-      '1m': subMonths(now, 1),
-      '3m': subMonths(now, 3),
-      '6m': subMonths(now, 6),
-      '1a': subYears(now, 1),
-      '5a': subYears(now, 5),
-    }
-    const countFrom = (cutoff: Date) =>
-      mediciones.filter(m => parseISO(m.medido_en) >= cutoff).length
-    return {
-      '1m': countFrom(cutoffs['1m']),
-      '3m': countFrom(cutoffs['3m']),
-      '6m': countFrom(cutoffs['6m']),
-      '1a': countFrom(cutoffs['1a']),
-      '5a': countFrom(cutoffs['5a']),
-      'todo': mediciones.length,
-    }
-  }, [mediciones])
-
-  const medicionesFiltradas = useMemo(() => {
-    if (rangoTemporal === 'todo') return mediciones
-    const now = new Date()
-    const cutoff = {
-      '1m': subMonths(now, 1),
-      '3m': subMonths(now, 3),
-      '6m': subMonths(now, 6),
-      '1a': subYears(now, 1),
-      '5a': subYears(now, 5),
-    }[rangoTemporal]
-    return mediciones.filter(m => parseISO(m.medido_en) >= cutoff)
-  }, [mediciones, rangoTemporal])
+  /* ⚠️ EL RECORTE ES POR NÚMERO, NO POR FECHA. Aquí vivía un cálculo de
+     ventanas temporales con `subMonths`/`subYears` y un contador por rango; se
+     retiró entero con el filtro que lo pedía. `mediciones` llega ordenada de
+     más reciente a más antigua, así que «las últimas N» son las N primeras. */
+  const medicionesFiltradas = useMemo(
+    () => recortar(mediciones, limite),
+    [mediciones, limite],
+  )
 
   function invalidarTodo() {
     mutate(['stats-labs', pacienteId])
@@ -127,96 +101,119 @@ export default function SeccionMedicionesLabs({ pacienteId, sexoPaciente }: Prop
 
   const hayAnalitos = analitos.length > 0
 
+  /* La fecha de la última medición sale del propio conjunto, nunca escrita a
+     mano: `analitos` ya trae el `ultimoMedidoEn` de cada uno. */
+  const ultimaMedicion = useMemo(() => {
+    if (analitos.length === 0) return null
+    const iso = [...analitos].sort((a, b) => b.ultimoMedidoEn.localeCompare(a.ultimoMedidoEn))[0].ultimoMedidoEn
+    try { return format(parseISO(iso), 'd MMM yyyy', { locale: es }) } catch { return null }
+  }, [analitos])
+
   return (
     <section>
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="text-[15px] font-semibold text-slate-900">
+      {/* Encabezado propio de la sección, con el conteo y la fecha derivados. */}
+      <div className="mb-[var(--sp-3-5)] flex flex-wrap items-baseline justify-between gap-[var(--sp-2-5)]">
+        <h2 className="text-[length:var(--sp-fs-vitals)] font-bold text-[var(--sp-ink-800)]">
           Mediciones longitudinales
         </h2>
-        <button
-          type="button"
-          onClick={() => setModalOpen(true)}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-[13px] font-medium text-slate-700 hover:border-slate-300 hover:text-slate-900 hover:shadow-sm active:scale-[0.98] transition-all duration-200"
-          style={{ transitionTimingFunction: IOS_EASING }}
-        >
-          <Plus size={14} /> Agregar medición
-        </button>
+        {hayAnalitos && (
+          <p className="text-[length:var(--sp-fs-hint)] text-[var(--sp-ink-350)]">
+            {analitos.length} {analitos.length === 1 ? 'analito' : 'analitos'}
+            {ultimaMedicion && <> · última medición {ultimaMedicion}</>}
+          </p>
+        )}
       </div>
 
       {analitosLoading && !hayAnalitos ? (
-        <div className="bg-white border border-slate-200 rounded-2xl p-[18px]">
-          <div className="flex items-center justify-center py-8 text-[12px] text-slate-400">
-            Cargando mediciones…
-          </div>
+        <div className="rounded-[var(--sp-r-card)] border border-[color:var(--sp-line-card)] bg-[var(--sp-surface)] p-[var(--sp-4-5)]">
+          <div className="skeleton h-[220px] rounded-[10px]" />
         </div>
       ) : !hayAnalitos ? (
-        <div className="bg-white border border-slate-200 rounded-2xl p-[18px]">
-          <div className="flex flex-col items-center text-center py-8">
-            <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 mb-3">
-              <Activity size={18} />
-            </div>
-            <p className="text-[13px] font-medium text-slate-700">
-              Sin mediciones registradas.
-            </p>
-            <p className="text-[12px] text-slate-500 mt-1">
-              Agrega tu primer dato para comenzar el seguimiento.
-            </p>
-          </div>
+        <div className="flex flex-col items-center gap-[var(--sp-2-5)] rounded-[var(--sp-r-card)] border border-dashed border-[color:var(--sp-line-card)] px-[var(--sp-4)] py-[var(--sp-10)]">
+          <Activity size={20} className="text-[var(--sp-ink-150)]" />
+          <p className="text-center text-[length:var(--sp-fs-body-sm)] text-[var(--sp-ink-500)]">
+            Sin mediciones registradas. Agrega el primer dato para empezar el seguimiento.
+          </p>
+          <button type="button" onClick={() => setModalOpen(true)} className="sp-btn sp-btn--compact">
+            <Plus size={14} /> Medición
+          </button>
         </div>
       ) : (
-        <div className="space-y-3">
-          <DropdownSelectorAnalito
+        /* Lista permanente + detalle. En escritorio en paralelo; por debajo, la
+           lista arriba y el detalle debajo, que es el orden del §6.2. */
+        <div className="flex flex-col gap-[var(--sp-4)] lg:flex-row lg:items-start">
+          <ListaAnalitos
             analitos={analitos}
-            value={analitoSeleccionado}
-            onChange={a => setClaveUsuario(a.clave)}
+            catalogo={catalogo}
+            sexoPaciente={sexoPaciente}
+            claveSeleccionada={claveSeleccionada}
+            onSeleccionar={setClaveUsuario}
+            onAgregar={() => setModalOpen(true)}
           />
 
-          {analitoSeleccionado && mediciones.length > 0 && (
-            <AnalitoDetailHeader
-              analito={analitoSeleccionado}
-              analitoCatalogo={analitoCatalogo}
-              mediciones={mediciones}
-            />
-          )}
-
-          {analitoSeleccionado && mediciones.length > 0 && (
-            <FiltroTemporal
-              rango={rangoTemporal}
-              contadores={contadoresPorRango}
-              onChange={setRangoTemporal}
-            />
-          )}
-
-          {analitoSeleccionado && (
-            medicionesLoading && mediciones.length === 0 ? (
-              <div className="bg-white border border-slate-200 rounded-2xl p-4 text-[12px] text-slate-400 text-center">
-                Cargando…
-              </div>
-            ) : mediciones.length > 0 ? (
-              <>
-                <GraficaAnalito
-                  analito={analitoSeleccionado}
-                  analitoCatalogo={analitoCatalogo}
-                  mediciones={medicionesFiltradas}
-                  sexoPaciente={sexoPaciente}
-                  onResetFiltro={() => setRangoTemporal('todo')}
-                />
-                <LeyendaBandas
-                  analito={analitoSeleccionado}
-                  analitoCatalogo={analitoCatalogo}
-                  sexoPaciente={sexoPaciente}
-                />
-                {medicionesFiltradas.length > 0 && (
-                  <TablaMediciones
-                    mediciones={medicionesFiltradas}
-                    analito={analitoSeleccionado}
-                    analitoCatalogo={analitoCatalogo}
-                    onDelete={handleDelete}
+          {/* ⚠️ UNA SOLA CARD PARA TODO EL DETALLE, Y DENTRO NO HAY MÁS CAJAS.
+              Antes eran cuatro apiladas —cabecera, gráfica, leyenda y tabla—,
+              cada una con su borde: el diseño anterior recolocado. Cada
+              contenedor extra convierte la lectura en un formulario, que es el
+              mismo principio que ya gobierna los dos visores.
+              Las zonas se separan con espacio y, como mucho, un filete de 1 px;
+              las piezas de dentro perdieron su marco y NO deben recuperarlo. */}
+          <div className="min-w-0 flex-1 rounded-[var(--sp-r-card)] border border-[color:var(--sp-line-card)] bg-[var(--sp-surface)] px-[var(--sp-5)] py-[var(--sp-4-5)]">
+            {analitoSeleccionado && mediciones.length > 0 && (
+              <AnalitoDetailHeader
+                analito={analitoSeleccionado}
+                analitoCatalogo={analitoCatalogo}
+                mediciones={mediciones}
+                sexoPaciente={sexoPaciente}
+                filtro={
+                  <FiltroMediciones
+                    limite={limite}
+                    total={mediciones.length}
+                    onChange={setLimite}
                   />
-                )}
-              </>
-            ) : null
-          )}
+                }
+              />
+            )}
+
+            {analitoSeleccionado && (
+              medicionesLoading && mediciones.length === 0 ? (
+                <div className="skeleton mt-[var(--sp-4)] h-[200px] rounded-[10px]" />
+              ) : mediciones.length > 0 ? (
+                <>
+                  <div className="mt-[var(--sp-4)]">
+                    <GraficaAnalito
+                      analito={analitoSeleccionado}
+                      analitoCatalogo={analitoCatalogo}
+                      mediciones={medicionesFiltradas}
+                      sexoPaciente={sexoPaciente}
+                      onResetFiltro={() => setLimite('todas')}
+                    />
+                  </div>
+
+                  <div className="mt-[var(--sp-3-5)]">
+                    <LeyendaBandas
+                      analito={analitoSeleccionado}
+                      analitoCatalogo={analitoCatalogo}
+                      sexoPaciente={sexoPaciente}
+                    />
+                  </div>
+
+                  {medicionesFiltradas.length > 0 && (
+                    /* El único filete de la card: separa la lectura de la
+                       gráfica del registro tabulado. */
+                    <div className="mt-[var(--sp-4)] border-t border-[color:var(--sp-line-divider)] pt-[var(--sp-2)]">
+                      <TablaMediciones
+                        mediciones={medicionesFiltradas}
+                        analito={analitoSeleccionado}
+                        analitoCatalogo={analitoCatalogo}
+                        onDelete={handleDelete}
+                      />
+                    </div>
+                  )}
+                </>
+              ) : null
+            )}
+          </div>
         </div>
       )}
 

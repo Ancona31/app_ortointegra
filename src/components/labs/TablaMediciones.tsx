@@ -100,18 +100,20 @@ export default function TablaMediciones({ mediciones, analito, analitoCatalogo, 
   )
 
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+    /* Sin marco ni fondo de encabezado: la tabla es la última zona de la card
+       del detalle, y sus filas se separan con filetes de 1 px. */
+    <div>
       <div className="overflow-x-auto">
         <table className="w-full text-[12px]">
           <thead>
-            <tr className="border-b border-slate-100 bg-slate-50/50">
-              <th className="px-4 py-2.5 text-left font-semibold text-slate-500 uppercase text-[10px] tracking-wider">
+            <tr className="border-b border-[color:var(--sp-line-divider)]">
+              <th className="px-[var(--sp-3)] py-[var(--sp-2-5)] text-left text-[length:var(--sp-fs-legal)] font-bold uppercase tracking-[var(--sp-ls-label)] text-[var(--sp-ink-350)]">
                 Fecha y hora
               </th>
-              <th className="px-4 py-2.5 text-right font-semibold text-slate-500 uppercase text-[10px] tracking-wider">
+              <th className="px-[var(--sp-3)] py-[var(--sp-2-5)] text-right text-[length:var(--sp-fs-legal)] font-bold uppercase tracking-[var(--sp-ls-label)] text-[var(--sp-ink-350)]">
                 Valor
               </th>
-              <th className="px-4 py-2.5 text-left font-semibold text-slate-500 uppercase text-[10px] tracking-wider">
+              <th className="px-[var(--sp-3)] py-[var(--sp-2-5)] text-left text-[length:var(--sp-fs-legal)] font-bold uppercase tracking-[var(--sp-ls-label)] text-[var(--sp-ink-350)]">
                 Notas
               </th>
               <th className="w-12 px-2 py-2.5" />
@@ -127,7 +129,7 @@ export default function TablaMediciones({ mediciones, analito, analitoCatalogo, 
               return (
                 <tr
                   key={m.id}
-                  className="border-b border-slate-50 last:border-b-0 hover:bg-slate-50/50 transition-colors"
+                  className="border-b border-[color:var(--sp-line-divider)] transition-colors last:border-b-0 hover:bg-[var(--sp-surface-muted)]"
                 >
                   <td className="px-4 py-2.5 text-slate-700 whitespace-nowrap">
                     {mismaFecha ? (

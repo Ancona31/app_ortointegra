@@ -10,6 +10,7 @@ import { TIPOS_DOCUMENTO, type TipoDocumento } from '@/components/documentos/Sel
 import { useAnalitosRastreados, type MedicionResuelta } from '@/hooks/useAnalitosRastreados'
 import { statusOf, type Sexo } from '@/lib/labs/utils'
 import { AvisoColumna } from '@/components/dashboard/piezasBanda2'
+import SelectorSegmentado from '@/components/ui/SelectorSegmentado'
 import type { ClavePestana } from './PestanasExpediente'
 
 /**
@@ -367,31 +368,13 @@ export default function LineaTiempoClinica({
           Actividad clínica
         </h2>
         {/* Filtra en cliente sobre lo ya cargado: no vuelve a consultar. */}
-        <div
-          role="group"
-          aria-label="Filtrar actividad por tipo"
-          className="inline-flex rounded-[var(--sp-r-pill)] bg-[var(--sp-surface-muted)] p-[3px]"
-        >
-          {FILTROS.map(f => {
-            const activo = f.clave === filtro
-            return (
-              <button
-                key={f.clave}
-                type="button"
-                aria-pressed={activo}
-                onClick={() => setFiltro(f.clave)}
-                className="rounded-[var(--sp-r-pill)] px-[12px] py-[6px] text-[12.5px] transition-colors"
-                style={activo
-                  ? { background: 'var(--sp-surface)', color: 'var(--sp-ink-800)', fontWeight: 'var(--sp-fw-bold)', boxShadow: 'var(--sp-shadow-flat)' }
-                  : { color: 'var(--sp-ink-500)', fontWeight: 'var(--sp-fw-semi)' }}
-              >
-                {f.rotulo}
-              </button>
-            )
-          })}
-        </div>
+        <SelectorSegmentado
+          opciones={FILTROS.map(f => ({ valor: f.clave, rotulo: f.rotulo }))}
+          valor={filtro}
+          onChange={setFiltro}
+          etiqueta="Filtrar actividad por tipo"
+        />
       </div>
-
       </div>
 
       {/* ── Lista de hitos: lo único que se desplaza ───────────────────── */}

@@ -18,6 +18,16 @@ export interface AnalitoRastreado {
   ultimoValor: number
   ultimoMedidoEn: string
   cantidadMediciones: number
+  /**
+   * El valor de la medición ANTERIOR, o `null` si solo hay una.
+   *
+   * ⚠️ NO CUESTA NI UNA PETICIÓN MÁS. `fetchMediciones` ya trae TODAS las filas
+   * del paciente ordenadas por `medido_en` descendente y `agrupar` las conserva
+   * en ese orden dentro de cada grupo: la anterior es, literalmente, la segunda
+   * del array. Es lo que necesita la lista de analitos para pintar la variación
+   * sin pedir la serie de cada uno por separado.
+   */
+  valorAnterior: number | null
 }
 
 /**
@@ -166,6 +176,7 @@ function agrupar(rows: MedicionRow[], catalogo: AnalitoCatalogo[]): AnalitoRastr
       ultimoValor: Number(ultimo.valor),
       ultimoMedidoEn: ultimo.medido_en,
       cantidadMediciones: ordenadas.length,
+      valorAnterior: ordenadas.length > 1 ? Number(ordenadas[1].valor) : null,
     })
   }
 

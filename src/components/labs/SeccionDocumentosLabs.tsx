@@ -1,22 +1,40 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useSWRConfig } from 'swr'
-import { FileText, Plus, AlertTriangle } from 'lucide-react'
+import { AlertTriangle, UploadCloud } from 'lucide-react'
 import ModalShell from '@/components/ui/ModalShell'
 import ModalSubirDocumento from '@/components/labs/ModalSubirDocumento'
 import ModalPreviewDocumento from '@/components/labs/ModalPreviewDocumento'
 import CardDocumento from '@/components/labs/CardDocumento'
+import SelectorSegmentado from '@/components/ui/SelectorSegmentado'
 import { useProfile } from '@/hooks/useProfile'
 import { useDocumentosLabs } from '@/hooks/useDocumentosLabs'
 import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/components/ui/Toast'
 import type { Documento } from '@/types'
 
-const IOS_EASING = 'cubic-bezier(0.32, 0.72, 0, 1)'
-
 type Props = {
   pacienteId: string
+}
+
+/* Filtro por formato, resuelto en cliente sobre lo ya cargado: son los tres
+   grupos que `CardDocumento` ya distingue por `mime_type`. */
+type Formato = 'todos' | 'imagen' | 'pdf' | 'dicom'
+
+const FORMATOS: readonly { clave: Formato; rotulo: string }[] = [
+  { clave: 'todos', rotulo: 'Todos' },
+  { clave: 'imagen', rotulo: 'Imágenes' },
+  { clave: 'pdf', rotulo: 'PDF' },
+  { clave: 'dicom', rotulo: 'DICOM' },
+] as const
+
+function formatoDe(mime: string | null | undefined): Exclude<Formato, 'todos'> | 'otro' {
+  if (!mime) return 'otro'
+  if (mime.startsWith('image/')) return 'imagen'
+  if (mime === 'application/pdf') return 'pdf'
+  if (mime === 'application/dicom') return 'dicom'
+  return 'otro'
 }
 
 export default function SeccionDocumentosLabs({ pacienteId }: Props) {
@@ -30,6 +48,9 @@ export default function SeccionDocumentosLabs({ pacienteId }: Props) {
   const [docDelete, setDocDelete] = useState<Documento | null>(null)
   const [eliminando, setEliminando] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [formato, setFormato] = useState<Formato>('todos')
+  const [arrastrando, setArrastrando] = useState(false)
+  const [soltados, setSoltados] = useState<File[]>([])
 
   const clinicaId = profile?.clinica_id ?? null
   const userId = profile?.id ?? null
@@ -77,100 +98,140 @@ export default function SeccionDocumentosLabs({ pacienteId }: Props) {
     setDeleteError(null)
   }
 
+  const visibles = useMemo(
+    () => (formato === 'todos' ? documentos : documentos.filter(d => formatoDe(d.mime_type) === formato)),
+    [documentos, formato],
+  )
+
   const hay = documentos.length > 0
   const cargando = docsLoading && !hay
 
   const deleteFooter = (
-    <div className="flex items-center justify-end gap-2 px-5 py-3">
-      <button
-        type="button"
-        onClick={cerrarDelete}
-        disabled={eliminando}
-        className="px-3.5 py-2 text-[13px] font-medium text-slate-700 hover:text-slate-900 transition-colors disabled:opacity-50"
-      >
+    <div className="flex items-center justify-end gap-[var(--sp-2)] px-[var(--sp-5)] py-[var(--sp-3)]">
+      <button type="button" onClick={cerrarDelete} disabled={eliminando} className="sp-btn sp-btn--secondary">
         Cancelar
       </button>
+      {/* La destructiva, en menor peso visual que cancelar. */}
       <button
         type="button"
         onClick={confirmarDelete}
         disabled={eliminando}
-        className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-red-600 text-white rounded-xl text-[13px] font-medium hover:bg-red-700 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-        style={{ transitionTimingFunction: IOS_EASING }}
+        className="sp-btn"
+        style={{ background: 'transparent', color: 'var(--sp-danger)', fontSize: 'var(--sp-fs-btn-sm)', padding: '13px 20px' }}
       >
         {eliminando ? 'Eliminando…' : 'Eliminar'}
       </button>
     </div>
   )
 
+  /**
+   * ⚠️ LA ZONA DE ARRASTRE SUSTITUYE AL BOTÓN SUELTO DEL ENCABEZADO, y por eso
+   * allí arriba ya no hay ninguno: dos entradas a lo mismo en la misma pantalla
+   * son una de más. Es el último tile de la retícula, con borde discontinuo.
+   *
+   * ⚠️ Y SOLTAR AQUÍ SÍ HACE ALGO. El texto promete arrastrar, así que los
+   * archivos soltados viajan al modal por `archivosIniciales` y éste abre con
+   * ellos dentro; sin eso, la promesa sería falsa y habría que volver a
+   * elegirlos. Pulsar abre el mismo modal vacío.
+   */
+  function alSoltar(e: React.DragEvent<HTMLButtonElement>) {
+    e.preventDefault()
+    setArrastrando(false)
+    if (sinClinica) return
+    const files = Array.from(e.dataTransfer.files ?? [])
+    if (files.length === 0) return
+    setSoltados(files)
+    setModalSubir(true)
+  }
+
+  const zonaArrastre = (
+    <button
+      type="button"
+      onClick={() => { setSoltados([]); setModalSubir(true) }}
+      onDragOver={e => { e.preventDefault(); if (!sinClinica) setArrastrando(true) }}
+      onDragLeave={() => setArrastrando(false)}
+      onDrop={alSoltar}
+      disabled={sinClinica}
+      title={sinClinica ? 'Configura tu clínica antes de subir archivos' : undefined}
+      className="flex min-h-[186px] flex-col items-center justify-center gap-[var(--sp-2)] rounded-[14px] border border-dashed px-[var(--sp-3)] text-center transition-colors disabled:opacity-50"
+      style={arrastrando
+        ? { borderColor: 'var(--sp-primary)', background: 'var(--sp-primary-bg-faint)' }
+        : { borderColor: 'var(--sp-line-dash)', background: 'var(--sp-surface)' }}
+    >
+      <UploadCloud size={26} className="text-[var(--sp-ink-150)]" />
+      <span className="text-[12.5px] leading-snug text-[var(--sp-ink-500)]">
+        Arrastra archivos aquí o haz clic para subir
+      </span>
+    </button>
+  )
+
   return (
     <section>
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="text-[15px] font-semibold text-slate-900">
-          Documentos clínicos
-        </h2>
-        <button
-          type="button"
-          onClick={() => setModalSubir(true)}
-          disabled={sinClinica}
-          title={sinClinica ? 'Configura tu clínica antes de subir documentos' : undefined}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-[13px] font-medium text-slate-700 hover:border-slate-300 hover:text-slate-900 hover:shadow-sm active:scale-[0.98] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-          style={{ transitionTimingFunction: IOS_EASING }}
-        >
-          <Plus size={14} /> Subir documento
-        </button>
+      {/* Encabezado: título, conteo y filtro por formato. La acción de subir
+          va aquí y no en una cabecera aparte — `HeroLabs` se retiró con sus dos
+          botones muertos y sus conteos vuelven repartidos por sección. */}
+      <div className="mb-[var(--sp-3-5)] flex flex-wrap items-center justify-between gap-[var(--sp-2-5)]">
+        <div className="flex flex-wrap items-baseline gap-[var(--sp-2-5)]">
+          <h2 className="text-[length:var(--sp-fs-vitals)] font-bold text-[var(--sp-ink-800)]">
+            Archivos clínicos
+          </h2>
+          {hay && (
+            <p className="text-[length:var(--sp-fs-hint)] text-[var(--sp-ink-350)]">
+              {documentos.length} {documentos.length === 1 ? 'archivo' : 'archivos'}
+            </p>
+          )}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-[var(--sp-2-5)]">
+          {hay && (
+            <SelectorSegmentado
+              opciones={FORMATOS.map(f => ({ valor: f.clave, rotulo: f.rotulo }))}
+              valor={formato}
+              onChange={setFormato}
+              etiqueta="Filtrar archivos por formato"
+            />
+          )}
+        </div>
       </div>
 
       {cargando ? (
-        <div className="bg-white border border-slate-200 rounded-2xl p-[18px]">
-          <div className="flex items-center justify-center py-8 text-[12px] text-slate-400">
-            Cargando documentos…
-          </div>
+        <div className="grid grid-cols-2 gap-[var(--sp-2-5)] lg:grid-cols-3">
+          {[1, 2, 3].map(i => <div key={i} className="skeleton h-[92px] rounded-[14px]" />)}
         </div>
       ) : !hay ? (
-        <div className="bg-white border border-slate-200 rounded-2xl p-[18px]">
-          <div className="flex flex-col items-center text-center py-8">
-            <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 mb-3">
-              <FileText size={18} />
-            </div>
-            <p className="text-[13px] font-medium text-slate-700">
-              Sin documentos clínicos.
-            </p>
-            <p className="text-[12px] text-slate-500 mt-1">
-              Sube resultados de laboratorio o estudios de imagen.
-            </p>
+        /* Sin archivos, SOLO la zona de arrastre: es lo que pide el §6.1 y
+           además es la única acción que cabe hacer aquí. */
+        <div className="flex flex-col gap-[var(--sp-2-5)]">
+          <p className="text-[length:var(--sp-fs-body-sm)] text-[var(--sp-ink-500)]">
+            Sin archivos clínicos. Sube resultados de laboratorio o estudios de imagen.
+          </p>
+          <div className="max-w-[280px]">{zonaArrastre}</div>
+        </div>
+      ) : visibles.length === 0 ? (
+        <p className="rounded-[var(--sp-r-card)] border border-dashed border-[color:var(--sp-line-card)] px-[var(--sp-4)] py-[var(--sp-7)] text-center text-[length:var(--sp-fs-body-sm)] text-[var(--sp-ink-500)]">
+          Sin archivos de este formato.
+        </p>
+      ) : (
+        /* ⚠️ ALTO TOPE Y DESPLAZAMIENTO EN LOS DOS ANCHOS, igual que la lista de
+           analitos y que la línea de tiempo del Resumen: una galería de treinta
+           estudios empuja las mediciones fuera de alcance. */
+        <div className="max-h-[420px] overflow-y-auto lg:max-h-[560px]">
+          {/* Retícula de relleno automático: dos columnas en móvil, las que
+              quepan a partir de 178 px de ancho mínimo en adelante. */}
+          <div className="grid grid-cols-2 gap-[var(--sp-3-5)] lg:grid-cols-[repeat(auto-fill,minmax(178px,1fr))]">
+            {visibles.map(d => (
+              <CardDocumento key={d.id} documento={d} onClick={() => setDocPreview(d)} onDelete={() => setDocDelete(d)} />
+            ))}
+            {zonaArrastre}
           </div>
         </div>
-      ) : (
-        <>
-          <div className="hidden md:grid grid-cols-2 lg:grid-cols-3 gap-2.5">
-            {documentos.map(d => (
-              <CardDocumento
-                key={d.id}
-                documento={d}
-                onClick={() => setDocPreview(d)}
-                onDelete={() => setDocDelete(d)}
-                layout="grid"
-              />
-            ))}
-          </div>
-          <div className="md:hidden flex flex-col gap-2">
-            {documentos.map(d => (
-              <CardDocumento
-                key={d.id}
-                documento={d}
-                onClick={() => setDocPreview(d)}
-                onDelete={() => setDocDelete(d)}
-                layout="list"
-              />
-            ))}
-          </div>
-        </>
       )}
 
       {modalSubir && clinicaId && userId && (
         <ModalSubirDocumento
           open
-          onClose={() => setModalSubir(false)}
+          archivosIniciales={soltados}
+          onClose={() => { setModalSubir(false); setSoltados([]) }}
           pacienteId={pacienteId}
           clinicaId={clinicaId}
           userId={userId}
@@ -184,24 +245,24 @@ export default function SeccionDocumentosLabs({ pacienteId }: Props) {
         <ModalShell
           open
           onClose={cerrarDelete}
-          title="Eliminar documento"
+          title="Eliminar archivo"
           subtitle={docDelete.nombre_original ?? undefined}
           icon={<AlertTriangle size={16} />}
-          iconBg="bg-red-50 text-red-600"
+          iconBg="bg-[var(--sp-danger-bg)] text-[var(--sp-danger)]"
           maxWidth="max-w-sm"
           footer={deleteFooter}
           elevated
         >
-          <div className="px-5 py-4 space-y-3">
-            <p className="text-[13px] text-slate-700 leading-relaxed">
+          <div className="flex flex-col gap-[var(--sp-2-5)] px-[var(--sp-5)] py-[var(--sp-4)]">
+            <p className="text-[length:var(--sp-fs-body-sm)] leading-relaxed text-[var(--sp-ink-700)]">
               ¿Seguro que quieres eliminar{' '}
-              <span className="font-semibold">{docDelete.nombre_original ?? 'este documento'}</span>?
+              <span className="font-semibold">{docDelete.nombre_original ?? 'este archivo'}</span>?
             </p>
-            <p className="text-[12px] text-slate-500">Esta acción no se puede deshacer.</p>
+            <p className="text-[length:var(--sp-fs-hint)] text-[var(--sp-ink-500)]">Esta acción no se puede deshacer.</p>
             {deleteError && (
-              <div className="px-3 py-2 bg-red-50 border border-red-200 rounded-xl text-[12px] text-red-700">
+              <p className="rounded-[var(--sp-r-field-sm)] border border-[color:var(--sp-danger-border)] bg-[var(--sp-danger-bg)] px-[var(--sp-3)] py-[var(--sp-2)] text-[length:var(--sp-fs-hint)] text-[var(--sp-danger)]">
                 {deleteError}
-              </div>
+              </p>
             )}
           </div>
         </ModalShell>

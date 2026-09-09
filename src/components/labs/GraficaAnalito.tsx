@@ -97,9 +97,9 @@ export default function GraficaAnalito({
 
   if (chartData.length === 0) {
     return (
-      <div className="bg-white border border-slate-200 rounded-2xl p-6">
-        <div className="flex flex-col items-center text-center py-6">
-          <p className="text-[13px] font-medium text-slate-700 mb-1">
+      <div className="py-[var(--sp-6)]">
+        <div className="flex flex-col items-center text-center">
+          <p className="text-[length:var(--sp-fs-hint)] font-semibold text-[var(--sp-ink-700)] mb-1">
             No hay mediciones en este rango
           </p>
           <p className="text-[12px] text-slate-500 mb-3">
@@ -123,7 +123,8 @@ export default function GraficaAnalito({
   const bandas = buildBandas(analitoCatalogo, rango, yMin, yMax)
 
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl p-4">
+    /* Sin marco: la gráfica se dibuja directamente sobre la card del detalle. */
+    <div>
       <div className="w-full" style={{ height: 240 }}>
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={chartData} margin={{ top: 10, right: 12, left: 0, bottom: 0 }}>
@@ -165,15 +166,19 @@ export default function GraficaAnalito({
                   sexoPaciente,
                 )
                 return (
-                  <div className="bg-white border border-slate-200 rounded-xl px-3 py-2 shadow-lg">
-                    <div className="text-[10px] text-slate-500 uppercase tracking-wider">
+                  /* ⚠️ ÉSTE SÍ CONSERVA SU SUPERFICIE, y no contradice a la card
+                     única: es un tooltip que FLOTA sobre la gráfica, no una zona
+                     del detalle. Sin fondo propio se leería encima de la línea y
+                     de las bandas. */
+                  <div className="rounded-[var(--sp-r-card-inner)] border border-[color:var(--sp-line-card)] bg-[var(--sp-surface)] px-[var(--sp-3)] py-[var(--sp-2)] shadow-[var(--sp-shadow-raised)]">
+                    <div className="text-[length:var(--sp-fs-legal)] uppercase tracking-[var(--sp-ls-label)] text-[var(--sp-ink-350)]">
                       {formatFechaLarga(datum.medido_en)}
                     </div>
-                    <div className="text-[13px] font-semibold text-slate-900 tabular-nums mt-0.5">
+                    <div className="mt-[2px] text-[length:var(--sp-fs-hint)] font-bold tabular-nums text-[var(--sp-ink-800)]">
                       {formatValor(datum.valor, precision)}
-                      <span className="text-slate-500 font-normal ml-1">{analito.unidad}</span>
+                      <span className="ml-[var(--sp-1)] font-normal text-[var(--sp-ink-500)]">{analito.unidad}</span>
                     </div>
-                    <div className="text-[11px] text-slate-500 mt-0.5">{statusText}</div>
+                    <div className="mt-[2px] text-[length:var(--sp-fs-legal)] text-[var(--sp-ink-500)]">{statusText}</div>
                   </div>
                 )
               }}

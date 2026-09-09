@@ -12,12 +12,19 @@ interface Props {
 
 type Kind = 'ok' | 'warn' | 'bad'
 
-function Pill({ kind, label }: { kind: Kind; label: string }) {
+/**
+ * ⚠️ PUNTO Y TEXTO, SIN PASTILLA. Llevaba fondo y borde propios, o sea una
+ * cajita por rango dentro de la card del detalle. La leyenda explica los colores
+ * de la gráfica que tiene justo encima: un punto del mismo color y su rótulo
+ * bastan, y así no compite con lo que describe.
+ */
+function Entrada({ kind, label }: { kind: Kind; label: string }) {
   const { fill } = BAND_COLORS[kind]
   return (
-    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] text-slate-700 bg-slate-50 border border-slate-100">
+    <span className="inline-flex items-center gap-[var(--sp-1-5)] text-[length:var(--sp-fs-hint)] text-[var(--sp-ink-600)]">
       <span
-        className="w-2.5 h-2.5 rounded-sm flex-shrink-0"
+        aria-hidden
+        className="h-[9px] w-[9px] shrink-0 rounded-[var(--sp-r-pill)]"
         style={{ background: fill }}
       />
       {label}
@@ -28,18 +35,18 @@ function Pill({ kind, label }: { kind: Kind; label: string }) {
 export default function LeyendaBandas({ analito, analitoCatalogo, sexoPaciente }: Props) {
   if (!analitoCatalogo || analitoCatalogo.bands_type === 'none') {
     return (
-      <div className="text-[11px] text-slate-500 px-1">
+      <p className="text-[length:var(--sp-fs-hint)] text-[var(--sp-ink-350)]">
         Este analito no tiene rangos de referencia definidos.
-      </div>
+      </p>
     )
   }
 
   const rango = getRangoEffective(analitoCatalogo, sexoPaciente)
   if (!rango) {
     return (
-      <div className="text-[11px] text-slate-500 px-1">
+      <p className="text-[length:var(--sp-fs-hint)] text-[var(--sp-ink-350)]">
         Este analito no tiene rangos de referencia definidos.
-      </div>
+      </p>
     )
   }
 
@@ -107,21 +114,21 @@ export default function LeyendaBandas({ analito, analitoCatalogo, sexoPaciente }
 
   if (pills.length === 0) {
     return (
-      <div className="text-[11px] text-slate-500 px-1">
+      <p className="text-[length:var(--sp-fs-hint)] text-[var(--sp-ink-350)]">
         Este analito no tiene rangos de referencia definidos.
-      </div>
+      </p>
     )
   }
 
   return (
-    <div className="space-y-1.5 px-1">
-      <div className="flex flex-wrap gap-1.5">
+    <div className="flex flex-col gap-[var(--sp-1-5)]">
+      <div className="flex flex-wrap gap-x-[var(--sp-4)] gap-y-[var(--sp-1-5)]">
         {pills.map((p, i) => (
-          <Pill key={i} kind={p.kind} label={p.label} />
+          <Entrada key={i} kind={p.kind} label={p.label} />
         ))}
       </div>
       {usingOverride && (
-        <p className="text-[10px] text-slate-400">
+        <p className="text-[length:var(--sp-fs-legal)] text-[var(--sp-ink-350)]">
           Rangos ajustados para paciente {sexoPaciente === 'M' ? 'masculino' : 'femenino'}
         </p>
       )}
