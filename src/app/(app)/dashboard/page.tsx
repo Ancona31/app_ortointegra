@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useProfile } from '@/hooks/useProfile'
 import AsistenteDashboard from './AsistenteDashboard'
 import { DashboardSkeleton } from '@/components/ui/Skeleton'
-import { FileText, Stethoscope, Monitor, Search, ArrowRight, UserPlus, Pill, ClipboardList, CalendarDays, FolderOpen, User, Menu, Plus } from 'lucide-react'
+import { FileText, Stethoscope, Monitor, ArrowRight, Pill, ClipboardList, CalendarDays, FolderOpen, User, Menu, Plus } from 'lucide-react'
 import Link from 'next/link'
 import { formatDistanceToNow, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -17,6 +17,7 @@ import { useMenuMovil } from '@/contexts/MenuMovilContext'
    paciente (o crearlo) y entrar a la nota SIN exigir cita previa. */
 import ConsultaRapidaModal from '@/components/launcher/ConsultaRapidaModal'
 import ProximasCitas from '@/components/dashboard/ProximasCitas'
+import TarjetaHoy from '@/components/dashboard/TarjetaHoy'
 import BuscadorPaciente, { ALTO_CONTROL } from '@/components/dashboard/BuscadorPaciente'
 
 /* ─── Helpers ─────────────────────────────────────────────── */
@@ -320,49 +321,18 @@ export default function DashboardPage() {
       <ConsultaRapidaModal open={modalConsulta} onClose={() => setModalConsulta(false)} />
 
       {/* ── Banda 1 · Próximas citas (flexible) · columna fija ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px] gap-[var(--sp-5)] mt-[var(--sp-gap-band)] animate-slide-up" style={{ animationDelay: '60ms' }}>
+      {/* ⚠️ `items-start`: LAS DOS COLUMNAS SE ALINEAN ARRIBA Y NINGUNA SE
+          ESTIRA. Por defecto una retícula estira sus hijos al alto de la fila,
+          así que con una sola cita la card de la izquierda crecía hasta igualar
+          al calendario y dejaba un blanco grande DENTRO de una caja con borde.
+          El sobrante tiene que ser aire de la retícula, no hueco enmarcado. */}
+      <div className="grid grid-cols-1 items-start lg:grid-cols-[minmax(0,1fr)_300px] gap-[var(--sp-5)] mt-[var(--sp-gap-band)] animate-slide-up" style={{ animationDelay: '60ms' }}>
 
         {/* ── Región 2 · Próximas citas ─────────────────────── */}
         <ProximasCitas />
 
-        {/* ── Tarjeta derecha: Buscar / Nuevo paciente — 2 columnas ── */}
-        <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#1a3a5c] to-[#1e5fa8] text-white shadow-[0_4px_24px_rgba(30,95,168,0.3)] hover:shadow-[0_8px_32px_rgba(30,95,168,0.4)] transition-all duration-200 flex flex-col">
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-in-out" />
-          {/* Buscar */}
-          <button
-            onClick={abrirBusqueda}
-            className="relative flex-1 w-full flex items-center gap-3 px-5 py-4 border-b border-white/10 hover:bg-white/15 active:bg-white/20 transition-colors text-left"
-          >
-            <div className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center flex-shrink-0">
-              <Search size={16} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-semibold text-[14px] leading-tight">Buscar paciente</p>
-              <p className="text-white/60 text-[11px] mt-0.5">Iniciar consulta</p>
-            </div>
-            <kbd className="hidden sm:inline font-mono text-[10px] bg-white/10 border border-white/20 px-2 py-0.5 rounded-md text-white/70 flex-shrink-0">
-              Ctrl K
-            </kbd>
-          </button>
-          {/* Nuevo */}
-          {/* `data-onboard="nuevo-paciente"` YA NO ESTÁ AQUÍ: se mudó al botón
-              «+ Nuevo paciente» de la cabecera (bloque 2). No lo devuelvas —
-              `OnboardingGuide` resuelve por `querySelector`, o sea por el
-              primer nodo del DOM, y dos marcas dejarían el paso apuntando a
-              una tarjeta que además es provisional. */}
-          <Link
-            href="/pacientes/nuevo"
-            className="relative flex-1 flex items-center gap-3 px-5 py-4 hover:bg-white/15 active:bg-white/20 transition-colors"
-          >
-            <div className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center flex-shrink-0">
-              <UserPlus size={16} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-semibold text-[14px] leading-tight">Nuevo paciente</p>
-              <p className="text-white/60 text-[11px] mt-0.5">Crear expediente</p>
-            </div>
-          </Link>
-        </div>
+        {/* ── Región 3 · Calendario «Hoy es» ────────────────── */}
+        <TarjetaHoy />
 
       </div>
 

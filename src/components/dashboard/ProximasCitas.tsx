@@ -263,6 +263,15 @@ export default function ProximasCitas() {
     new Date(c.start_time).getTime() <= ahora && ahora < new Date(c.end_time).getTime()
   )?.id ?? null
 
+  /* ⚠️ EL PIE SÓLO SE PINTA CUANDO DE VERDAD SABEMOS QUE NO HAY MÁS, y por eso
+     la condición mira `citas` y no `visibles`. Si la consulta devolvió el
+     colchón completo, hay más citas detrás aunque el vencimiento haya dejado
+     menos de cuatro a la vista: decir ahí «no hay más» sería mentir con un
+     enlace al lado que lo desmiente. Sólo cuando volvieron MENOS de las que se
+     pidieron hemos visto el final de la lista. */
+  const listaCompleta = citas.length < LIMITE_CONSULTA
+  const mostrarPie = listaCompleta && visibles.length > 0 && visibles.length < FILAS_VISIBLES
+
   const iniciarConsulta = (cita: Cita) => {
     if (!cita.consultorio_id) return
     const consultorio = consultorios.find(c => c.id === cita.consultorio_id)
@@ -404,6 +413,20 @@ export default function ProximasCitas() {
           </div>
         )
       })}
+
+      {/* Pie informativo, NO un estado vacío: el vacío es el bloque centrado de
+          arriba y sólo sale cuando no hay ninguna cita. Esto es una nota al pie
+          de una lista que sí tiene contenido, en tipografía secundaria, para
+          que el hueco de las filas que faltan se lea como «no hay más» y no
+          como «se cortó la carga». */}
+      {mostrarPie && (
+        <p className="flex flex-wrap items-center gap-x-[var(--sp-1-5)] px-[var(--sp-pad-row-x)] py-[var(--sp-2-5)] border-t border-[color:var(--sp-line-card)] text-[length:var(--sp-fs-hint)] text-[var(--sp-ink-500)]">
+          No hay más citas próximas.
+          <Link href="/agenda" prefetch={false} className="font-semibold text-[var(--sp-primary)] hover:underline">
+            Ver agenda →
+          </Link>
+        </p>
+      )}
     </Chasis>
   )
 }
