@@ -93,6 +93,66 @@
   --sp-doc-honorarios:     #c2410c;  /* orange-700  */
 
   /* ---------------------------------------------------------------------
+     2.c COLOR — AVATAR DE PACIENTE
+     ---------------------------------------------------------------------
+     Cinco pares para rotar el avatar de iniciales y que dos pacientes seguidos
+     no se confundan de un vistazo. Sustituyen a la constante `AVATAR_COLORS`
+     que vivía en `dashboard/page.tsx` con clases de Tailwind (`bg-violet-100
+     text-violet-700`), o sea la última paleta de la pantalla fuera de esta hoja.
+
+     NO SIGNIFICAN NADA. A diferencia de `--sp-doc-*` o de `--ag-status-*`, el
+     color no nombra un estado ni un formato: es sólo separación visual, y por
+     eso el par que le toca a cada paciente sale de un hash de su id y no de una
+     propiedad clínica. Si alguna vez alguien quiere leerlos como categoría, la
+     respuesta es que no hay categoría que leer.
+
+     ⚠️ NO LOS ACLARES «PARA QUE PEGUEN MÁS CON LA APP». La primera versión de
+     esta familia eran cinco tintes al nivel 100 de Tailwind —L* 92-96, croma
+     10-23— y no separaban: el peor par medía ΔE2000 8.7, o sea indistinguible a
+     36 px, y de los diez pares cuatro estaban por debajo de 18. Con cuatro
+     avatares en pantalla eso son 2,4 pares confundibles de media.
+     El barrido del espacio de color dio el techo: con esa sobriedad el máximo
+     alcanzable es ΔE 18.7. Para pasar de 20 hace falta recorrido de L* (72-90,
+     no 92-93) y croma hasta 38. Estos valores son ese mínimo, no un capricho.
+
+     Medidos: ΔE2000 mínimo entre los cinco fondos 24.7 en claro y 23.2 en
+     oscuro; contraste tinta/fondo 4.54-5.34:1 en claro y 4.63-6.05:1 en oscuro,
+     los diez por encima de 4.5.
+
+     ⚠️ LA TINTA DE LA GLICINA ES VIOLETA Y NO AZUL, Y ESO NO SE «CORRIGE».
+     Con tinta de su mismo tono caía a ΔE 3 del navy `--cp`: el navy de Spinus
+     dentro de un círculo, que es justo el choque que había que evitar. Soltarle
+     el tono la deja a ΔE 16, que es el punto más ajustado de la familia y está
+     aceptado a propósito: es una tinta pequeña dentro de un disco claro, no una
+     superficie, y empujarla más lejos costaría contraste.
+     Y el azul no se puede quitar del juego: excluyendo la franja 232-292°
+     entera no existe ningún conjunto de cinco que pase de ΔE 21.
+
+     Contra los colores de cita: el fondo más cercano a un chip de estado está a
+     ΔE 17 y ninguna tinta baja de ΔE 23 respecto de su punto. El acento del
+     médico (--sp-primary) es un selector libre y PUEDE coincidir con cualquiera
+     de estos: no importa, porque el avatar no compite con él — nunca están el
+     uno junto al otro dentro del mismo control. */
+  --sp-avatar-1-bg:  #d8a780;  --sp-avatar-1-ink:  #5a3514;  /* ocre     */
+  --sp-avatar-2-bg:  #e0e89e;  --sp-avatar-2-ink:  #52600b;  /* lima     */
+  --sp-avatar-3-bg:  #62e5df;  --sp-avatar-3-ink:  #0b6652;  /* turquesa */
+  --sp-avatar-4-bg:  #92b0f4;  --sp-avatar-4-ink:  #4e2785;  /* glicina  */
+  --sp-avatar-5-bg:  #e3b4cd;  --sp-avatar-5-ink:  #812960;  /* rosa     */
+  /* Los cinco de relleno: sus tonos son los puntos medios de los huecos que
+     dejaban los cinco de arriba (32, 88, 152, 220 y 304°), a los mismos niveles
+     de L* y croma. Con diez, la separación angular baja de ~72 a ~36° y el ΔE
+     mínimo de la familia cae de 24.7 a 12.2: es el precio de tener el doble de
+     colores, y se acepta porque lo que importa no es que los diez se distingan
+     entre sí, sino que los CUATRO que una región pinta a la vez lo hagan. En la
+     peor ventana de cuatro consecutivos el mínimo es 14.3 en claro y 15.5 en
+     oscuro. */
+  --sp-avatar-6-bg:  #f8afa5;  --sp-avatar-6-ink:  #662c27;  /* salmón   */
+  --sp-avatar-7-bg:  #dbbe7a;  --sp-avatar-7-ink:  #4b3c0d;  /* mostaza  */
+  --sp-avatar-8-bg:  #87d19f;  --sp-avatar-8-ink:  #0e4727;  /* jade     */
+  --sp-avatar-9-bg:  #abedfd;  --sp-avatar-9-ink:  #006659;  /* celeste  */
+  --sp-avatar-10-bg: #bba6ea;  --sp-avatar-10-ink: #4d335f;  /* lavanda  */
+
+  /* ---------------------------------------------------------------------
      3. COLOR — NEUTRALES (escala única, rol fijo por token)
      --------------------------------------------------------------------- */
   --sp-ink-900:            #14345c;  /* títulos de nivel documento (H1 de lienzo) */
@@ -380,6 +440,29 @@ html.dark {
   --sp-danger-ink:       #fca5a5;                   /* TP:218 */
   --sp-danger-bg:        rgba(239,68,68,.14);       /* TP:194 */
   --sp-danger-border:    rgba(239,68,68,.25);       /* TP:210 */
+
+  /* — AVATAR — la relación se invierte: el fondo baja a L* 24-36 y la tinta sube
+       a 76-88, los mismos cinco tonos que en claro.
+
+       ⚠️ SON OPACOS, Y NO EL VELO DE BAJA OPACIDAD QUE USAN LAS FAMILIAS DE
+       ESTADO AQUÍ AL LADO. Con un `rgba` el color resultante depende de la
+       superficie que haya detrás, y estos cinco tienen que cumplir DOS medidas
+       a la vez —ΔE2000 > 20 entre ellos y 4.5:1 contra su tinta—: compuestos
+       sobre un fondo variable ninguna de las dos queda garantizada. Opacos, las
+       dos son exactas. Si mueves --sp-surface, esto no se entera, que es
+       precisamente lo que se busca.
+
+       Medidos aquí: ΔE mínimo entre fondos 23.2; contraste 4.63-6.05:1. */
+  --sp-avatar-1-bg:  #774b23;  --sp-avatar-1-ink:  #fac093;  /* ocre     */
+  --sp-avatar-2-bg:  #343d02;  --sp-avatar-2-ink:  #b7c26b;  /* lima     */
+  --sp-avatar-3-bg:  #2a5d5a;  --sp-avatar-3-ink:  #96d8d4;  /* turquesa */
+  --sp-avatar-4-bg:  #0c396c;  --sp-avatar-4-ink:  #a1bbf9;  /* glicina  */
+  --sp-avatar-5-bg:  #673752;  --sp-avatar-5-ink:  #ddaec7;  /* rosa     */
+  --sp-avatar-6-bg:  #652420;  --sp-avatar-6-ink:  #e5afa7;  /* salmón   */
+  --sp-avatar-7-bg:  #51452b;  --sp-avatar-7-ink:  #ccba93;  /* mostaza  */
+  --sp-avatar-8-bg:  #233f2c;  --sp-avatar-8-ink:  #9cc5a8;  /* jade     */
+  --sp-avatar-9-bg:  #003f4a;  --sp-avatar-9-ink:  #84c6d5;  /* celeste  */
+  --sp-avatar-10-bg: #4c4068;  --sp-avatar-10-ink: #c2b5dd;  /* lavanda  */
 
   /* — TIPO DE DOCUMENTO — el mismo 45 % contra blanco que usa
        --sp-primary-text. Literales y no color-mix sobre el token claro:

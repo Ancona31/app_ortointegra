@@ -2,6 +2,8 @@ import { Menu } from 'lucide-react'
 import BuscadorPaciente, { ALTO_CONTROL } from '@/components/dashboard/BuscadorPaciente'
 import { ProximasCitasCargando } from '@/components/dashboard/ProximasCitas'
 import { TarjetaHoyCargando } from '@/components/dashboard/TarjetaHoy'
+import { AtendidosCargando } from '@/components/dashboard/AtendidosRecientemente'
+import { DocumentosCargando } from '@/components/dashboard/DocumentosRecientes'
 
 /** Bloque shimmer genérico */
 export function Skeleton({ className }: { className?: string }) {
@@ -129,23 +131,11 @@ export function DashboardSkeleton({ onBuscar, onAbrirMenu }: {
       <div className="mt-[var(--sp-gap-band)] grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px] gap-[var(--sp-gap-band)] lg:gap-0">
 
         <div className="lg:pr-[var(--sp-pad-rule)]">
-          {/* Los encabezados de las dos columnas miden 32 px y arrancan a la
-              misma altura, igual que en la real. */}
-          <div className="flex h-8 items-center">
-            <Skeleton className="h-3 w-36" />
-          </div>
-          <div className="mt-[var(--sp-gap-tiles)] space-y-[var(--sp-2)]">
-            {[1, 2, 3, 4, 5].map(i => <Skeleton key={i} className="h-[57px] rounded-xl" />)}
-          </div>
+          <AtendidosCargando />
         </div>
 
         <div className="lg:border-l lg:border-[color:var(--sp-line-card)] lg:pl-[var(--sp-pad-rule)]">
-          <div className="flex h-8 items-center">
-            <Skeleton className="h-3 w-24" />
-          </div>
-          <div className="mt-[var(--sp-gap-tiles)] grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-2 gap-[var(--sp-gap-tiles)]">
-            {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-[118px] rounded-2xl" />)}
-          </div>
+          <DocumentosCargando />
         </div>
       </div>
     </div>

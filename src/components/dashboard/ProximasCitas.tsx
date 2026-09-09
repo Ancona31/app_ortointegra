@@ -9,6 +9,7 @@ import { useConsultorios } from '@/hooks/useConsultorios'
 import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
 import { partesCitaHora } from '@/app/(app)/dashboard/utils'
 import { StatusChip } from '@/app/(app)/dashboard/StatusChip'
+import { PALETA_AVATAR, ARRANQUE_AVATAR } from './paletaAvatar'
 
 /* ⚠️ SE PIDEN 6 Y SE PINTAN 4, Y LA ASIMETRÍA ES DELIBERADA — no la «arregles»
    igualando los números. El temporizador de abajo retira filas vencidas SIN
@@ -311,7 +312,7 @@ export default function ProximasCitas() {
   return (
     <Chasis>
       <Leyenda />
-      {visibles.map(cita => {
+      {visibles.map((cita, i) => {
         const enCurso = cita.id === idEnCurso
         const { dia, hora } = partesCitaHora(cita.start_time)
         const nombre = cita.pacientes
@@ -327,6 +328,9 @@ export default function ProximasCitas() {
         const iniciales = (cita.pacientes
           ? `${cita.pacientes.nombre[0] ?? ''}${cita.pacientes.apellidos[0] ?? ''}`
           : nombre.trim()[0] ?? '?').toUpperCase()
+        /* Por índice del renglón: las cuatro filas visibles salen de
+           cuatro pares distintos. Ver la nota de `AtendidosRecientemente`. */
+        const color = PALETA_AVATAR[(ARRANQUE_AVATAR.proximasCitas + i) % PALETA_AVATAR.length]
 
         /* ⚠️ LA PRECARGA SÓLO LA LLEVA LA FILA EN CURSO, Y COMO MUCHO HAY UNA.
            Cada `<Link>` con precarga cuesta 2 peticiones RSC y 2 lambdas por
@@ -356,7 +360,10 @@ export default function ProximasCitas() {
               </p>
             </div>
 
-            <div className="w-[34px] h-[34px] shrink-0 flex items-center justify-center rounded-[var(--sp-r-pill)] bg-[var(--sp-primary-bg)] text-[var(--sp-primary-ink)] text-[length:var(--sp-fs-legal)] font-extrabold">
+            <div
+              className="w-[34px] h-[34px] shrink-0 flex items-center justify-center rounded-[var(--sp-r-pill)] text-[length:var(--sp-fs-legal)] font-extrabold"
+              style={{ background: color.bg, color: color.ink }}
+            >
               {iniciales}
             </div>
 
