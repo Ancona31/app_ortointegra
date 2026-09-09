@@ -2,14 +2,13 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
-import { CalendarDays, Stethoscope, RotateCw } from 'lucide-react'
+import { CalendarDays, RotateCw } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useProfile } from '@/hooks/useProfile'
-import { useConsultorios } from '@/hooks/useConsultorios'
-import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
 import { partesCitaHora } from '@/app/(app)/dashboard/utils'
 import { StatusChip } from '@/app/(app)/dashboard/StatusChip'
 import { PALETA_AVATAR, ARRANQUE_AVATAR } from './paletaAvatar'
+import { componerNombreMedicoCompleto } from '@/lib/nombreMedico'
 
 /* ⚠️ SE PIDEN 6 Y SE PINTAN 4, Y LA ASIMETRÍA ES DELIBERADA — no la «arregles»
    igualando los números. El temporizador de abajo retira filas vencidas SIN
@@ -34,17 +33,22 @@ type Cita = {
   paciente_id: string | null
   consultorio_id: string | null
   pacientes: { nombre: string; apellidos: string } | null
+  /* Sólo llega cuando `medicoId` es null, o sea cuando la lista es de toda la
+     clínica: ahí el nombre del paciente no dice de quién es la cita. */
+  medico?: { id: string; titulo: string | null; nombres: string | null; apellido_paterno: string | null; apellido_materno: string | null } | null
 }
 
 /** El alto exacto del renglón, compartido con su esqueleto para que no salte. */
 const ALTO_FILA = 'min-h-[57px]'
 
-/* La geometría de las dos acciones del renglón, en un solo sitio: la comparten
-   el tratamiento primario y el de contorno, que por lo demás no comparten ni
-   una clase. Es lo que garantiza que las cuatro filas midan lo mismo aunque una
-   de ellas esté realzada. Las medidas son las de la adenda §2.1: alto 34,
-   relleno lateral 11, texto 12.5. */
-const GEOMETRIA_ACCION = {
+/* La geometría de las acciones del renglón, en un solo sitio.
+   ⚠️ SE EXPORTA PORQUE LAS ACCIONES LAS PINTAN LOS LLAMADORES, y es lo que
+   garantiza que las cuatro filas midan lo mismo — en las dos vistas y aunque
+   una de ellas esté realzada. Si un llamador se inventa su propio alto, la
+   uniformidad de la lista se rompe sin que nada avise.
+   Las medidas son las de la adenda §2.1: alto 34, relleno lateral 11, texto
+   12.5. */
+export const GEOMETRIA_ACCION = {
   minHeight: '34px',
   height: '34px',
   padding: '0 11px',
@@ -162,10 +166,33 @@ export function ProximasCitasCargando() {
   return <Chasis><FilasEsqueleto /></Chasis>
 }
 
-export default function ProximasCitas() {
+/**
+ * ⚠️ ESTE COMPONENTE NO CONOCE NINGUNA URL CLÍNICA, Y NO DEBE VOLVER A
+ * CONOCERLA. Las acciones del renglón las pinta QUIEN LO LLAMA, con el prop
+ * `acciones`. Es lo que hace estructuralmente cierto que la vista de la
+ * secretaria no tenga expediente ni nota: no están apagados por una bandera —
+ * es que no existen en este archivo. Un `grep` de `expediente` aquí debe dar
+ * cero. Si algún día vuelves a meter los botones dentro con un
+ * `variante === 'medico'`, esa garantía se pierde entera.
+ */
+export default function ProximasCitas({ medicoId, acciones }: {
+  /* `null` = todas las citas de la clínica (vista de la secretaria). Un id =
+     sólo las de ese médico. Cuando es `null` la consulta trae además el médico
+     de cada fila y el renglón lo pinta: sin filtro, el nombre del paciente no
+     dice a quién pasa. Las dos cosas van juntas a propósito. */
+  medicoId: string | null
+  /* El grupo de acciones del renglón, que pinta el llamador.
+     ⚠️ RECIBE `enCurso` PORQUE DE ÉL DEPENDEN DOS REGLAS DE ESTA REGIÓN, y las
+     dos hay que respetarlas desde fuera:
+       · el tratamiento PRIMARIO es sólo de la fila en curso; el resto va de
+         contorno;
+       · la PRECARGA también: `prefetch={enCurso ? undefined : false}`. Cuatro
+         filas por dos enlaces serían ocho precargas donde antes había dos, y
+         eso revierte entero el ahorro medido de `fcb2169`.
+     Usa `GEOMETRIA_ACCION` para el tamaño; ver su nota. */
+  acciones: (cita: Cita, enCurso: boolean) => React.ReactNode
+}) {
   const { profile, loading: loadingProfile } = useProfile()
-  const { consultorios } = useConsultorios()
-  const { cambiarActivo } = useConsultorioActivo()
 
   const [citas, setCitas] = useState<Cita[]>([])
   const [cargando, setCargando] = useState(true)
@@ -178,7 +205,7 @@ export default function ProximasCitas() {
   const [ahora, setAhora] = useState(() => Date.now())
 
   const clinicaId = profile?.clinica_id ?? null
-  const medicoId = profile?.id ?? null
+  const conMedico = medicoId === null
 
   /* Gana la última petición LANZADA, no la última en responder. Mismo criterio
      que tenía el efecto en la página, con contador en vez de bandera porque
@@ -187,7 +214,7 @@ export default function ProximasCitas() {
   const peticionRef = useRef(0)
 
   const cargar = useCallback(async () => {
-    if (!clinicaId || !medicoId) return
+    if (!clinicaId) return
     const mia = ++peticionRef.current
     setError(false)
     try {
@@ -211,11 +238,12 @@ export default function ProximasCitas() {
          ⚠️ Y EL ORDEN LLEVA DESEMPATE. Con sólo `start_time`, dos citas a la
          misma hora salen en orden arbitrario y el temporizador puede
          reordenarlas solas entre dos tics. `created_at` y luego `id` lo fijan. */
-      const { data, error: errConsulta } = await supabase
+      let consulta = supabase
         .from('appointments')
-        .select('id, title, start_time, end_time, created_at, status, paciente_id, consultorio_id, pacientes(nombre, apellidos)')
+        .select(conMedico
+          ? 'id, title, start_time, end_time, created_at, status, paciente_id, consultorio_id, pacientes(nombre, apellidos), medico:profiles!appointments_medico_id_fkey(id, titulo, nombres, apellido_paterno, apellido_materno)'
+          : 'id, title, start_time, end_time, created_at, status, paciente_id, consultorio_id, pacientes(nombre, apellidos)')
         .eq('clinica_id', clinicaId)
-        .eq('medico_id', medicoId)
         .not('paciente_id', 'is', null)
         .gt('end_time', new Date().toISOString())
         .in('status', ['scheduled', 'confirmed'])
@@ -223,6 +251,11 @@ export default function ProximasCitas() {
         .order('created_at', { ascending: true })
         .order('id', { ascending: true })
         .limit(LIMITE_CONSULTA)
+      /* El filtro por médico es lo ÚNICO que separa las dos vistas en la
+         consulta. Sin él manda la RLS, que ya recorta a la clínica de quien
+         mira; con él, el dashboard del médico sigue siendo su resumen. */
+      if (medicoId !== null) consulta = consulta.eq('medico_id', medicoId)
+      const { data, error: errConsulta } = await consulta
 
       if (mia !== peticionRef.current) return
       if (errConsulta) throw errConsulta
@@ -236,7 +269,7 @@ export default function ProximasCitas() {
     } finally {
       if (mia === peticionRef.current) setCargando(false)
     }
-  }, [clinicaId, medicoId])
+  }, [clinicaId, medicoId, conMedico])
 
   useEffect(() => { void cargar() }, [cargar])
 
@@ -277,12 +310,6 @@ export default function ProximasCitas() {
      pidieron hemos visto el final de la lista. */
   const listaCompleta = citas.length < LIMITE_CONSULTA
   const mostrarPie = listaCompleta && visibles.length > 0 && visibles.length < FILAS_VISIBLES
-
-  const iniciarConsulta = (cita: Cita) => {
-    if (!cita.consultorio_id) return
-    const consultorio = consultorios.find(c => c.id === cita.consultorio_id)
-    if (consultorio) cambiarActivo(consultorio)
-  }
 
   if (loadingProfile || cargando) return <ProximasCitasCargando />
 
@@ -345,7 +372,6 @@ export default function ProximasCitas() {
            está en curso no precarga ninguna: es el estado normal casi todo el
            día, y el destino se pide al pulsar con el esqueleto de
            `(app)/loading.tsx` de por medio. */
-        const precarga = enCurso ? undefined : false
 
         return (
           <div
@@ -374,6 +400,13 @@ export default function ProximasCitas() {
 
             <div className="flex-1 min-w-0 xl:min-w-[150px]">
               <p className="truncate text-[length:var(--sp-fs-body-sm)] font-bold text-[var(--sp-ink-800)]">{nombre}</p>
+              {/* Sólo en la vista sin filtro de médico. Trunca con elipsis, como
+                  todo texto secundario de esta pantalla. */}
+              {cita.medico && (
+                <p className="truncate text-[length:var(--sp-fs-legal)] text-[var(--sp-ink-500)]">
+                  {componerNombreMedicoCompleto(cita.medico)}
+                </p>
+              )}
               {/* Bajo `xl` el chip pasa aquí, debajo del nombre: en la columna
                   estrecha no cabe en el renglón sin partirlo en dos líneas. */}
               <div className="xl:hidden mt-0.5"><StatusChip status={cita.status} /></div>
@@ -382,45 +415,7 @@ export default function ProximasCitas() {
             <div className="hidden xl:flex shrink-0"><StatusChip status={cita.status} /></div>
 
             <div className="ml-auto flex items-center gap-[var(--sp-1-5)] shrink-0">
-              <Link
-                href={`/expediente/${cita.paciente_id}/nueva-nota?cita=${cita.id}`}
-                onClick={() => iniciarConsulta(cita)}
-                prefetch={precarga}
-                /* ⚠️ EL REALCE SE PIDE PRESTADO A `.sp-btn--primary` EN VEZ DE
-                   ESCRIBIR EL COLOR. Es la única forma de que la tinta sobre el
-                   acento —un blanco que el sistema fija en `spinus-tokens.css` y
-                   que no existe como token suelto— entre aquí sin cablear un
-                   `#fff` en esta región. La geometría va en `style` porque un
-                   estilo en línea gana a cualquier clase: `.sp-btn` impone
-                   `min-height: var(--sp-tap)` (44 px) y aquí el renglón mide 34.
-                   Los dos tratamientos comparten `GEOMETRIA_ACCION`, así que
-                   miden lo mismo pase lo que pase con el realce. */
-                className={enCurso
-                  ? 'sp-btn sp-btn--primary whitespace-nowrap'
-                  : 'inline-flex items-center justify-center whitespace-nowrap border font-bold transition-colors'}
-                style={enCurso
-                  ? GEOMETRIA_ACCION
-                  : { ...GEOMETRIA_ACCION, background: 'var(--sp-surface)', color: 'var(--sp-primary)', borderColor: 'var(--sp-primary-border)' }}
-              >
-                <span className="xl:hidden">Iniciar</span>
-                <span className="hidden xl:inline">Iniciar consulta</span>
-              </Link>
-
-              {/* Expediente, sólo icono. `Stethoscope` es el glifo que la app ya
-                  usa para «expediente» en el menú lateral y en los módulos.
-                  ⚠️ SE CAE POR DEBAJO DE 380 px DE VIEWPORT, y es la regla de
-                  degradación de la adenda, no una preferencia: por debajo de ahí
-                  el renglón no cabe en una línea con las dos acciones, y lo que
-                  se protege es la línea única. */}
-              <Link
-                href={`/expediente/${cita.paciente_id}`}
-                prefetch={precarga}
-                aria-label={`Abrir expediente de ${nombre}`}
-                title="Expediente"
-                className="hidden min-[380px]:inline-flex items-center justify-center w-[34px] h-[34px] shrink-0 rounded-[var(--sp-r-btn-sm)] border border-[color:var(--sp-line-input)] bg-[var(--sp-surface)] text-[var(--sp-ink-500)] transition-colors hover:bg-[var(--sp-surface-muted)] hover:text-[var(--sp-ink-700)]"
-              >
-                <Stethoscope size={16} />
-              </Link>
+              {acciones(cita, enCurso)}
             </div>
           </div>
         )

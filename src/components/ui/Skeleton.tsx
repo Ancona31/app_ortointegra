@@ -2,8 +2,6 @@ import { Menu } from 'lucide-react'
 import BuscadorPaciente, { ALTO_CONTROL } from '@/components/dashboard/BuscadorPaciente'
 import { ProximasCitasCargando } from '@/components/dashboard/ProximasCitas'
 import { TarjetaHoyCargando } from '@/components/dashboard/TarjetaHoy'
-import { AtendidosCargando } from '@/components/dashboard/AtendidosRecientemente'
-import { DocumentosCargando } from '@/components/dashboard/DocumentosRecientes'
 
 /** Bloque shimmer genérico */
 export function Skeleton({ className }: { className?: string }) {
@@ -130,12 +128,31 @@ export function DashboardSkeleton({ onBuscar, onAbrirMenu }: {
       {/* ── Banda 2 · flexible + fija, con el filete vertical ─ */}
       <div className="mt-[var(--sp-gap-band)] grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px] gap-[var(--sp-gap-band)] lg:gap-0">
 
+        {/* ⚠️ LA BANDA 2 VA SIN UNA SOLA PALABRA, Y ÉSE ES TODO EL PUNTO.
+            Aquí se montaban `AtendidosCargando` y `DocumentosCargando`, que
+            escriben «Atendidos recientemente» y «Documentos»: dos rótulos que
+            SÓLO existen en la pantalla del médico. Este esqueleto se pinta
+            ANTES de saber el rol —`useProfile` aún no ha resuelto—, así que una
+            secretaria veía un fotograma con la palabra «Documentos», que es
+            justo lo que su rol no tiene.
+            Lo que se conserva es la GEOMETRÍA, que sí es común a las dos
+            pantallas: dos columnas, el filete que cambia de lado con el tamaño,
+            y el encabezado de 32 px. Lo que se retira es el texto.
+            No vuelvas a importar aquí los esqueletos de una región concreta:
+            traen sus rótulos con ellos. */}
         <div className="lg:pr-[var(--sp-pad-rule)]">
-          <AtendidosCargando />
+          <div className="flex h-8 items-center"><Skeleton className="h-3 w-44 max-w-full" /></div>
+          <div className="mt-[var(--sp-gap-tiles)] grid grid-cols-2 gap-[var(--sp-gap-tiles)]">
+            {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-[106px] rounded-[14px]" />)}
+          </div>
         </div>
 
         <div className="border-t border-[color:var(--sp-line-card)] pt-[var(--sp-3-5)] lg:border-t-0 lg:pt-0 lg:border-l lg:pl-[var(--sp-pad-rule)]">
-          <DocumentosCargando />
+          <div className="flex h-8 items-center"><Skeleton className="h-3 w-28 max-w-full" /></div>
+          {/* Un solo bloque, del alto de la columna MÁS CORTA de las dos
+              pantallas. Al resolver, esta columna crece o se queda; crecer se
+              nota menos que encoger. */}
+          <div className="mt-[var(--sp-gap-tiles)]"><Skeleton className="h-[132px] rounded-[14px]" /></div>
         </div>
       </div>
     </div>

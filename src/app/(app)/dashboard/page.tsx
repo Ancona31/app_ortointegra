@@ -4,8 +4,9 @@ import { useState } from 'react'
 import { useProfile } from '@/hooks/useProfile'
 import AsistenteDashboard from './AsistenteDashboard'
 import { DashboardSkeleton } from '@/components/ui/Skeleton'
-import { FolderOpen, User, Menu, Plus } from 'lucide-react'
+import { FolderOpen, User, Menu, Plus, Stethoscope } from 'lucide-react'
 import Link from 'next/link'
+import { useConsultorios } from '@/hooks/useConsultorios'
 import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
 import { useMenuMovil } from '@/contexts/MenuMovilContext'
 /* El «+ Nueva consulta» de la cabecera. Vive en `components/launcher/` porque
@@ -13,7 +14,7 @@ import { useMenuMovil } from '@/contexts/MenuMovilContext'
    Es la ÚNICA pieza de la app que hace lo que pide la adenda §1: elegir
    paciente (o crearlo) y entrar a la nota SIN exigir cita previa. */
 import ConsultaRapidaModal from '@/components/launcher/ConsultaRapidaModal'
-import ProximasCitas from '@/components/dashboard/ProximasCitas'
+import ProximasCitas, { GEOMETRIA_ACCION } from '@/components/dashboard/ProximasCitas'
 import TarjetaHoy from '@/components/dashboard/TarjetaHoy'
 import AtendidosRecientemente from '@/components/dashboard/AtendidosRecientemente'
 import DocumentosRecientes from '@/components/dashboard/DocumentosRecientes'
@@ -36,7 +37,8 @@ function saludo() {
 
 export default function DashboardPage() {
   const { profile, loading: loadingProfile } = useProfile()
-  const { consultorioActivo } = useConsultorioActivo()
+  const { consultorios } = useConsultorios()
+  const { consultorioActivo, cambiarActivo } = useConsultorioActivo()
   const { abrir: abrirMenu } = useMenuMovil()
   const [modalConsulta, setModalConsulta] = useState(false)
 
@@ -188,12 +190,63 @@ export default function DashboardPage() {
 
         {/* ── Región 2 · Próximas citas ─────────────────────── */}
         <div className="order-2 lg:order-1">
-          <ProximasCitas />
+          {/* ⚠️ LAS DOS ACCIONES CLÍNICAS DEL RENGLÓN VIVEN AQUÍ, no dentro de
+              `ProximasCitas`. Ese componente lo comparte la vista de la
+              secretaria, donde expediente y nota están PROHIBIDOS por el rol, y
+              tenerlas fuera es lo que lo hace cierto por estructura en vez de
+              por una bandera. No las muevas de vuelta.
+              La precarga y el tratamiento primario siguen la regla de la
+              región: sólo la fila en curso. */}
+          <ProximasCitas
+            medicoId={profile?.id ?? null}
+            acciones={(cita, enCurso) => {
+              const precarga = enCurso ? undefined : false
+              return (
+                <>
+                  <Link
+                    href={`/expediente/${cita.paciente_id}/nueva-nota?cita=${cita.id}`}
+                    onClick={() => {
+                      /* Deja activo el consultorio de la cita antes de entrar a
+                         la nota, para que el documento salga con el membrete
+                         que toca. */
+                      if (!cita.consultorio_id) return
+                      const c = consultorios.find(x => x.id === cita.consultorio_id)
+                      if (c) cambiarActivo(c)
+                    }}
+                    prefetch={precarga}
+                    className={enCurso
+                      ? 'sp-btn sp-btn--primary whitespace-nowrap'
+                      : 'inline-flex items-center justify-center whitespace-nowrap border font-bold transition-colors'}
+                    style={enCurso
+                      ? GEOMETRIA_ACCION
+                      : { ...GEOMETRIA_ACCION, background: 'var(--sp-surface)', color: 'var(--sp-primary)', borderColor: 'var(--sp-primary-border)' }}
+                  >
+                    <span className="xl:hidden">Iniciar</span>
+                    <span className="hidden xl:inline">Iniciar consulta</span>
+                  </Link>
+
+                  {/* Expediente, sólo icono. `Stethoscope` es el glifo que la app
+                      ya usa para «expediente». Se cae por debajo de 380 px de
+                      viewport: es la regla de degradación de la adenda, y lo que
+                      protege es que el renglón quepa en una línea. */}
+                  <Link
+                    href={`/expediente/${cita.paciente_id}`}
+                    prefetch={precarga}
+                    aria-label="Abrir expediente"
+                    title="Expediente"
+                    className="hidden min-[380px]:inline-flex items-center justify-center w-[34px] h-[34px] shrink-0 rounded-[var(--sp-r-btn-sm)] border border-[color:var(--sp-line-input)] bg-[var(--sp-surface)] text-[var(--sp-ink-500)] transition-colors hover:bg-[var(--sp-surface-muted)] hover:text-[var(--sp-ink-700)]"
+                  >
+                    <Stethoscope size={16} />
+                  </Link>
+                </>
+              )
+            }}
+          />
         </div>
 
         {/* ── Región 3 · Calendario «Hoy es» ────────────────── */}
         <div className="order-1 lg:order-2">
-          <TarjetaHoy />
+          <TarjetaHoy medicoId={profile?.id ?? null} />
         </div>
 
       </div>

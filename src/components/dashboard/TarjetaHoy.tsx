@@ -174,7 +174,15 @@ export function TarjetaHoyCargando() {
   )
 }
 
-export default function TarjetaHoy() {
+export default function TarjetaHoy({ medicoId }: {
+  /* A quién cuenta la tarjeta. Un id = sólo las de ese médico (dashboard del
+     médico). `null` = las de toda la clínica, que es lo que necesita la
+     secretaria: ella no tiene citas propias.
+     Es un prop y no `profile.id` leído aquí dentro justamente para que el
+     llamador tenga que decidirlo: leerlo por su cuenta daba por hecho que quien
+     mira es el dueño de las citas, y para la secretaria eso es falso. */
+  medicoId: string | null
+}) {
   const { profile, loading: loadingProfile } = useProfile()
 
   const esCliente = useSyncExternalStore(SIN_SUSCRIPCION, EN_CLIENTE, EN_SERVIDOR)
@@ -182,10 +190,10 @@ export default function TarjetaHoy() {
 
   const [conteo, setConteo] = useState<Conteo | null>(null)
 
-  const medicoId = profile?.id ?? null
+  const clinicaId = profile?.clinica_id ?? null
 
   useEffect(() => {
-    if (!medicoId) return
+    if (!clinicaId) return
     let vigente = true
     const supabase = createClient()
 
@@ -216,13 +224,18 @@ export default function TarjetaHoy() {
     const inicioHoy = fechaHoraLocalAInstante(hoyEnTZ(tz), '00:00', tz)
     const inicioManana = fechaHoraLocalAInstante(desplazarFecha(hoyEnTZ(tz), { dias: 1 }), '00:00', tz)
 
-    const base = () => supabase
-      .from('appointments')
-      .select('id', { count: 'exact', head: true })
-      .eq('medico_id', medicoId)
-      .in('status', ['scheduled', 'confirmed'])
-      .gte('start_time', inicioHoy)
-      .lt('start_time', inicioManana)
+    const base = () => {
+      const q = supabase
+        .from('appointments')
+        .select('id', { count: 'exact', head: true })
+        .eq('clinica_id', clinicaId)
+        .in('status', ['scheduled', 'confirmed'])
+        .gte('start_time', inicioHoy)
+        .lt('start_time', inicioManana)
+      /* El filtro por médico es lo único que separa las dos vistas. Sin él
+         cuenta la clínica entera, que es lo que la secretaria necesita. */
+      return medicoId === null ? q : q.eq('medico_id', medicoId)
+    }
 
     Promise.all([
       base().not('paciente_id', 'is', null),
@@ -241,7 +254,7 @@ export default function TarjetaHoy() {
       })
 
     return () => { vigente = false }
-  }, [medicoId])
+  }, [clinicaId, medicoId])
 
   /* Un solo sitio donde se compone el texto del conteo: lo pintan la pastilla
      de móvil y el renglón del mes de escritorio. */

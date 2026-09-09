@@ -1,229 +1,166 @@
 'use client'
 
-import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { UserPlus, Users, ChevronRight, CalendarDays, CalendarPlus, User } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
+import { Menu, Plus, User, CalendarPlus } from 'lucide-react'
 import { useProfile } from '@/hooks/useProfile'
-import { Paciente } from '@/types'
-import { format, parseISO } from 'date-fns'
-import { calcularEdad } from '@/lib/patientUtils'
-import { es } from 'date-fns/locale'
-import { StatusChip } from './StatusChip'
-import { formatCitaHora } from './utils'
-import { componerNombreMedicoCompleto } from '@/lib/nombreMedico'
+import { useClinica } from '@/hooks/useClinica'
+import { useMenuMovil } from '@/contexts/MenuMovilContext'
+import BuscadorPaciente, { ALTO_CONTROL } from '@/components/dashboard/BuscadorPaciente'
+import ProximasCitas, { GEOMETRIA_ACCION } from '@/components/dashboard/ProximasCitas'
+import TarjetaHoy from '@/components/dashboard/TarjetaHoy'
+import UltimosPacientes from '@/components/dashboard/UltimosPacientes'
+import HoyEnConsultorio from '@/components/dashboard/HoyEnConsultorio'
 
-type ProximaCita = {
-  id: string
-  title: string
-  start_time: string
-  status: string
-  paciente_id: string | null
-  pacientes: { nombre: string; apellidos: string } | null
-  medico: { id: string; titulo: string | null; nombres: string | null; apellido_paterno: string | null; apellido_materno: string | null } | null
+function saludo() {
+  const h = new Date().getHours()
+  if (h < 12) return 'Buenos días'
+  if (h < 19) return 'Buenas tardes'
+  return 'Buenas noches'
 }
 
-type Medico = { id: string; titulo: string | null; nombres: string | null; apellido_paterno: string | null; apellido_materno: string | null }
-
+/**
+ * El inicio del rol asistente médico/a.
+ *
+ * Misma retícula, densidad y piezas que la del médico —dos bandas separadas por
+ * un filete, columna flexible y columna fija— con el ALCANCE RECORTADO DEL ROL.
+ *
+ * ⚠️ NADA CLÍNICO ES ALCANZABLE DESDE AQUÍ, Y ES UNA FRONTERA, NO UN DESCUIDO.
+ * No hay expediente, ni notas, ni documentos, ni «iniciar consulta»; el renglón
+ * de una cita no enseña diagnóstico ni motivo, y la única acción sobre un
+ * paciente es «Agendar». Las acciones del renglón las pinta ESTE archivo —
+ * `ProximasCitas` no conoce ninguna url clínica—, así que la garantía es
+ * estructural: para romperla habría que escribir la url aquí a mano.
+ */
 export default function AsistenteDashboard() {
   const { profile } = useProfile()
-  const [recientes,     setRecientes]     = useState<Paciente[]>([])
-  const [proximasCitas, setProximasCitas] = useState<ProximaCita[]>([])
-  const [medicos,       setMedicos]       = useState<Medico[]>([])
-  const [filtroMedico,  setFiltroMedico]  = useState<string>('todos')
-  const [loadingCitas,  setLoadingCitas]  = useState(true)
+  const { clinica, nombreDisplay } = useClinica()
+  const { abrir: abrirMenu } = useMenuMovil()
+  const primerNombre = profile?.nombres ? profile.nombres.split(' ')[0] : ''
+  const iniciales = `${profile?.nombres?.[0] ?? ''}${profile?.apellido_paterno?.[0] ?? ''}`.toUpperCase()
 
-  const hoy = format(new Date(), "EEEE d 'de' MMMM 'de' yyyy", { locale: es })
+  /* ⚠️ EL RESPALDO ES `clinicas.nombre`, NO EL NOMBRE DEL USUARIO. La versión
+     anterior componía aquí un nombre de médico a mano —con un literal escrito
+     en el archivo— y para una secretaria eso da cadena vacía: ella no es la
+     médica del consultorio. Se prefiere el nombre de marca (`nombre_display`)
+     cuando existe, y si no el legal (`clinicas.nombre`); si tampoco hay, la
+     ceja no se pinta en vez de dejar un hueco. El dato es de SÓLO LECTURA para
+     este rol: su edición vive en Mi perfil, restringida al administrador. */
+  const nombreClinica = nombreDisplay ?? clinica?.nombre ?? ''
 
-  useEffect(() => {
-    const supabase = createClient()
-    supabase.from('pacientes')
-      .select('*')
-      .neq('activo', false)
-      .order('created_at', { ascending: false })
-      .limit(5)
-      .then(({ data }: { data: Paciente[] | null }) => setRecientes(data || []))
-  }, [])
-
-  useEffect(() => {
-    if (!profile?.clinica_id) return
-    const supabase = createClient()
-
-    async function fetchCitas() {
-      // Médicos de la clínica
-      const { data: medicosData } = await supabase
-        .from('profiles')
-        .select('id, titulo, nombres, apellido_paterno, apellido_materno')
-        .eq('clinica_id', profile!.clinica_id!)
-        .eq('role', 'medico')
-        .order('apellido_paterno')
-      setMedicos((medicosData as Medico[]) ?? [])
-
-      /* Próximas citas de TODOS los médicos de la clínica: la secretaria las
-         necesita todas, y por eso aquí NO va el `medico_id` que sí lleva el
-         panel del médico. Lo que sí comparte es el filtro de evento genérico
-         (§12.14): «Vacaciones IMSS» estorba igual en los dos.
-
-         ⚠️ PIDE 8 Y PINTA 4, Y ESA ASIMETRÍA ES DELIBERADA — no la "arregles"
-         igualando los números como sí se hizo en el panel del médico. El
-         `<select>` de abajo filtra por médico EN CLIENTE, sobre lo ya traído:
-         si la consulta pidiera 4 y las 4 próximas fueran del mismo médico,
-         elegir a cualquier otro diría «No hay citas agendadas» teniéndolas.
-         El colchón de 8 es lo que le da de dónde filtrar. */
-      const { data: citasData } = await supabase
-        .from('appointments')
-        .select('id, title, start_time, status, paciente_id, pacientes(nombre, apellidos), medico:profiles!appointments_medico_id_fkey(id, titulo, nombres, apellido_paterno, apellido_materno)')
-        .eq('clinica_id', profile!.clinica_id!)
-        .not('paciente_id', 'is', null)
-        .gt('start_time', new Date().toISOString())
-        .in('status', ['scheduled', 'confirmed'])
-        .order('start_time', { ascending: true })
-        .limit(8)
-      setProximasCitas((citasData as any) ?? [])
-      setLoadingCitas(false)
-    }
-
-    fetchCitas()
-  }, [profile])
-
-  const displayCitas = filtroMedico === 'todos'
-    ? proximasCitas
-    : proximasCitas.filter(c => c.medico?.id === filtroMedico)
+  const abrirBusqueda = () =>
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }))
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="max-w-[1044px] mx-auto pt-2 pb-6">
 
-      {/* Saludo */}
-      <div className="bg-gradient-to-br from-[#1a3a5c] to-[#1e5fa8] rounded-2xl px-6 py-6 text-white">
-        <p className="text-xs font-semibold uppercase tracking-widest opacity-70 mb-1">Bienvenida</p>
-        <p className="text-xl font-bold mb-1 capitalize">{hoy}</p>
-        <p className="text-sm opacity-75">Consultorio Dr. Angel M. Ancona Pérez</p>
+      {/* ── Región 2 · Cabecera de acción ────────────────────── */}
+      <div className="animate-slide-up pb-[var(--sp-5-5)] border-b border-[color:var(--sp-line-card)]" style={{ animationDelay: '0ms' }}>
+
+        {/* Misma barra móvil que la del médico, con el mismo asidero: las dos
+            reglas de `globals.css` esconden el hamburguesa flotante y recortan
+            el relleno que el layout le reserva. */}
+        <div className="dash-barra-movil lg:hidden flex items-center gap-[var(--sp-3)] mb-[var(--sp-gap-block)]">
+          <button
+            type="button"
+            onClick={abrirMenu}
+            aria-label="Abrir menú"
+            className="w-11 h-11 shrink-0 flex items-center justify-center rounded-[var(--sp-r-icon-md)] bg-[var(--sp-surface-muted)] text-[var(--sp-ink-700)]"
+          >
+            <Menu size={20} />
+          </button>
+          <p className="flex-1 min-w-0 truncate text-[length:var(--sp-fs-vitals)] font-bold text-[var(--sp-ink-800)]">
+            Dashboard
+          </p>
+          <div className="w-10 h-10 shrink-0 flex items-center justify-center rounded-[var(--sp-r-pill)] bg-[var(--sp-primary-bg)] text-[var(--sp-primary-ink)] text-[length:var(--sp-fs-label-sm)] font-extrabold">
+            {iniciales || <User size={18} />}
+          </div>
+        </div>
+
+        {/* Fila 1 · identidad. Encabeza el NOMBRE DE LA CLÍNICA, que es lo que
+            el spec muda aquí desde la barra lateral. */}
+        {nombreClinica && <p className="sp-label truncate">{nombreClinica}</p>}
+        <h1 className="mt-[var(--sp-gap-title-sub)] text-[length:var(--sp-fs-page)] font-extrabold tracking-tight leading-tight text-[var(--sp-ink-900)]">
+          {saludo()}{primerNombre ? `, ${primerNombre}` : ''}
+        </h1>
+
+        {/* Fila 2 · acción. DOS botones, no tres: el rol no crea documentos ni
+            consultas. El primario es «Agendar cita», que es la acción más
+            frecuente del puesto. */}
+        <div className="mt-[var(--sp-gap-block)] flex flex-col gap-[var(--sp-gap-item)] lg:flex-row lg:flex-wrap lg:items-center">
+          <BuscadorPaciente onAbrir={abrirBusqueda} />
+
+          <div className="order-2 grid grid-cols-2 gap-[var(--sp-gap-item)] lg:flex lg:shrink-0 lg:items-center">
+            <Link
+              href="/agenda"
+              prefetch={false}
+              className={`${ALTO_CONTROL} sp-btn sp-btn--primary col-span-2 order-1 whitespace-nowrap lg:order-2`}
+            >
+              <CalendarPlus size={17} /> Agendar cita
+            </Link>
+
+            <Link
+              href="/pacientes/nuevo"
+              /* `data-onboard` NO va aquí: vive en el botón del dashboard del
+                 médico y `OnboardingGuide` resuelve por `querySelector`, o sea
+                 por el primer nodo del DOM. Dos marcas romperían aquel paso. */
+              prefetch={false}
+              className={`${ALTO_CONTROL} order-2 col-span-2 inline-flex items-center justify-center gap-[var(--sp-gap-item)] whitespace-nowrap rounded-[var(--sp-r-btn)] px-6 border border-[color:var(--sp-primary-border)] bg-[var(--sp-surface)] text-[length:var(--sp-fs-btn-sm)] font-semibold text-[var(--sp-primary)] transition-colors hover:bg-[var(--sp-primary-bg-faint)] lg:order-1 lg:col-span-1`}
+            >
+              <Plus size={17} /> Nuevo paciente
+            </Link>
+          </div>
+        </div>
       </div>
 
-      {/* Próximas citas */}
-      <div className="bg-white border border-slate-100 rounded-2xl shadow-sm overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-3 bg-gradient-to-r from-[#1a3a5c] to-[#1e5fa8] rounded-t-2xl">
-          <div className="flex items-center gap-2">
-            <CalendarDays size={13} className="text-white/70" />
-            <p className="text-[11px] font-semibold text-white uppercase tracking-widest">Próximas citas</p>
-          </div>
-          <div className="flex items-center gap-3">
-            {medicos.length > 1 && (
-              <select
-                value={filtroMedico}
-                onChange={e => setFiltroMedico(e.target.value)}
-                className="text-xs text-white border border-white/30 rounded-lg px-2 py-1 bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/30"
+      {/* ── Banda 1 ──────────────────────────────────────────── */}
+      <div className="grid grid-cols-1 items-start lg:grid-cols-[minmax(0,1fr)_300px] gap-[var(--sp-5)] mt-[var(--sp-gap-band)] animate-slide-up" style={{ animationDelay: '60ms' }}>
+
+        <div className="order-2 lg:order-1">
+          {/* ⚠️ `medicoId={null}` = TODAS LAS CITAS DE LA CLÍNICA, y con ello el
+              renglón enseña de quién es cada una. La secretaria no tiene citas
+              propias, así que filtrar por ella no tendría sentido.
+              ⚠️ Y LA ÚNICA ACCIÓN ES «VER CITA», que navega a la agenda SIN
+              parámetros: el detalle por url se descartó porque el modal espera
+              la fila entera. No añadas aquí expediente ni nota. */}
+          <ProximasCitas
+            medicoId={null}
+            acciones={(cita, enCurso) => (
+              <Link
+                href="/agenda"
+                prefetch={enCurso ? undefined : false}
+                aria-label={`Ver la cita de ${cita.pacientes ? `${cita.pacientes.nombre} ${cita.pacientes.apellidos}` : cita.title} en la agenda`}
+                className={enCurso
+                  ? 'sp-btn sp-btn--primary whitespace-nowrap'
+                  : 'inline-flex items-center justify-center whitespace-nowrap border font-bold transition-colors'}
+                style={enCurso
+                  ? GEOMETRIA_ACCION
+                  : { ...GEOMETRIA_ACCION, background: 'var(--sp-surface)', color: 'var(--sp-primary)', borderColor: 'var(--sp-primary-border)' }}
               >
-                <option value="todos" className="text-[#1d1d1f]">Todos los médicos</option>
-                {medicos.map(m => (
-                  <option key={m.id} value={m.id} className="text-[#1d1d1f]">{componerNombreMedicoCompleto(m)}</option>
-                ))}
-              </select>
+                <span className="xl:hidden">Ver</span>
+                <span className="hidden xl:inline">Ver cita</span>
+              </Link>
             )}
-            <Link href="/agenda" className="text-[10px] text-white/70 hover:text-white hover:underline">Ver agenda →</Link>
-          </div>
+          />
         </div>
 
-        {loadingCitas ? (
-          <div className="px-5 py-4 space-y-3">
-            {[1, 2, 3].map(i => <div key={i} className="h-10 bg-slate-100 rounded-xl animate-pulse" />)}
-          </div>
-        ) : displayCitas.length > 0 ? (
-          displayCitas.slice(0, 4).map(cita => (
-            <div key={cita.id} className="flex gap-3 px-5 py-3 border-b border-slate-50 last:border-0">
-              <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center flex-shrink-0 mt-0.5">
-                <User size={17} className="text-[#1e5fa8]" />
-              </div>
-              <div className="flex-1 min-w-0 space-y-1">
-                <div className="flex items-center justify-between gap-2">
-                  {/* La caída al `title` era para el evento genérico de
-                      §12.14, que la consulta ya no trae. Se deja como red por
-                      si el join de `pacientes` viniera vacío. Mismo criterio
-                      que la dashboard del médico. */}
-                  <p className="text-sm font-semibold text-[#1d1d1f]">
-                    {cita.pacientes ? `${cita.pacientes.nombre} ${cita.pacientes.apellidos}` : cita.title}
-                  </p>
-                  <StatusChip status={cita.status} />
-                </div>
-                <div className="flex items-center gap-2 text-[11px] text-[#86868b]">
-                  <span>{formatCitaHora(cita.start_time)}</span>
-                  {cita.medico && (
-                    <span>· {componerNombreMedicoCompleto(cita.medico)}</span>
-                  )}
-                </div>
-              </div>
-            </div>
-          ))
-        ) : (
-          <p className="text-sm text-[#86868b] px-5 py-5 text-center">No hay citas agendadas</p>
-        )}
+        <div className="order-1 lg:order-2">
+          {/* Sin médico: el conteo es de la clínica entera. */}
+          <TarjetaHoy medicoId={null} />
+        </div>
       </div>
 
-      {/* Acción principal */}
-      <Link href="/pacientes/nuevo"
-        className="flex items-center justify-between p-6 bg-white rounded-2xl border-2 border-[#1e5fa8] hover:bg-blue-50 transition-all group shadow-sm">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-[#1e5fa8] rounded-xl flex items-center justify-center">
-            <UserPlus size={24} className="text-white" />
-          </div>
-          <div>
-            <p className="font-bold text-[#1a3a5c] text-lg">Registrar nuevo paciente</p>
-            <p className="text-slate-500 text-sm">Datos básicos de ingreso</p>
-          </div>
-        </div>
-        <ChevronRight size={20} className="text-[#1e5fa8] group-hover:translate-x-1 transition-transform" />
-      </Link>
+      <div className="mt-[var(--sp-gap-band)] border-t border-[color:var(--sp-line-card)]" />
 
-      {/* Agendar nueva cita */}
-      <Link href="/agenda"
-        className="flex items-center justify-between p-6 bg-white rounded-2xl border-2 border-[#1e5fa8] hover:bg-blue-50 transition-all group shadow-sm">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-[#1e5fa8] rounded-xl flex items-center justify-center">
-            <CalendarPlus size={24} className="text-white" />
-          </div>
-          <div>
-            <p className="font-bold text-[#1a3a5c] text-lg">Agendar nueva cita</p>
-            <p className="text-slate-500 text-sm">Abrir la agenda de la clínica</p>
-          </div>
+      {/* ── Banda 2 · exactamente dos hijos ──────────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px] gap-[var(--sp-gap-band)] lg:gap-0 mt-[var(--sp-gap-band)]">
+        <div className="lg:pr-[var(--sp-pad-rule)]">
+          <UltimosPacientes />
         </div>
-        <ChevronRight size={20} className="text-[#1e5fa8] group-hover:translate-x-1 transition-transform" />
-      </Link>
 
-      {/* Pacientes recientes */}
-      {recientes.length > 0 && (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
-            <Users size={15} className="text-slate-500" />
-            <h2 className="font-semibold text-slate-700 text-sm">Últimos pacientes registrados</h2>
-          </div>
-          <div className="divide-y divide-slate-100">
-            {recientes.map(p => {
-              const edad = p.fecha_nacimiento
-                ? calcularEdad(p.fecha_nacimiento)
-                : null
-              return (
-                <div key={p.id} className="flex items-center justify-between px-5 py-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-violet-100 flex items-center justify-center text-violet-700 font-semibold text-xs">
-                      {p.nombre.charAt(0)}{p.apellidos.charAt(0)}
-                    </div>
-                    <div>
-                      <p className="font-medium text-slate-800 text-sm">{p.nombre} {p.apellidos}</p>
-                      <p className="text-xs text-slate-400">
-                        {edad !== null ? `${edad.textoElegante} · ` : ''}
-                        {p.created_at ? format(parseISO(p.created_at), "d MMM yyyy", { locale: es }) : ''}
-                      </p>
-                    </div>
-                  </div>
-                  <span className="text-xs text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full font-medium">
-                    Registrado
-                  </span>
-                </div>
-              )
-            })}
-          </div>
+        <div className="border-t border-[color:var(--sp-line-card)] pt-[var(--sp-3-5)] lg:border-t-0 lg:pt-0 lg:border-l lg:pl-[var(--sp-pad-rule)]">
+          <HoyEnConsultorio />
         </div>
-      )}
+      </div>
     </div>
   )
 }
