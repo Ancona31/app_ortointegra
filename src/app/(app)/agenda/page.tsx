@@ -210,8 +210,15 @@ type ModalState =
      los dos días iguales.
      Es fecha-sola (`YYYY-MM-DD`) y es el ÚLTIMO DÍA INCLUIDO, no el fin
      exclusivo: el mismo formato y el mismo significado que el campo del modal
-     donde acaba. Sólo lo pone el gesto sobre la BANDA. */
-  | { mode: 'create'; fecha: string; hora: string | null; tipo: TipoFila; todoElDia: TodoElDiaInicial; fechaFin?: string }
+     donde acaba. Sólo lo pone el gesto sobre la BANDA.
+
+     ⚠️ `paciente` LO PONE UNA SOLA RUTA DE APERTURA: el enlace profundo
+     `/agenda?cita=nueva&paciente=<uuid>`, que llega desde fuera con el paciente
+     ya decidido. Ninguno de los gestos sobre la rejilla lo aporta —ahí se elige
+     dentro del modal— y por eso es opcional. No lo conviertas en obligatorio ni
+     lo siembres con `null` desde los demás `setModal`: `undefined` significa
+     «esta ruta no trae paciente», que no es lo mismo que «se eligió ninguno». */
+  | { mode: 'create'; fecha: string; hora: string | null; tipo: TipoFila; todoElDia: TodoElDiaInicial; fechaFin?: string; paciente?: PacienteBusqueda }
   | { mode: 'edit';   appointment: Appointment }
 
 /**
@@ -1519,10 +1526,17 @@ function AppointmentModal({
   const [todoElDia, setTodoElDia] = useState(todoElDiaInicial)
   const [notes,       setNotes]       = useState(apt?.notes ?? '')
   const [status,      setStatus]      = useState<Status>(apt?.status ?? 'scheduled')
+  /* Dos siembras, una por modo. En EDICIÓN sale de la fila; en ALTA sale de
+     `modal.paciente`, que sólo trae el enlace profundo y en los demás casos es
+     `undefined` → `null`, o sea el buscador en blanco de siempre.
+     Va en el valor inicial del `useState` y no en un efecto a propósito: el
+     modal se remonta por `key` al cambiar de tipo (ver la nota de la `key` en
+     `AgendaPage`), y sembrar aquí es lo que hace que ese remonte vuelva a poner
+     el paciente en vez de perderlo. */
   const [paciente,    setPaciente]    = useState<PacienteBusqueda | null>(
     apt?.pacientes
       ? { id: apt.pacientes.id, nombre: apt.pacientes.nombre, apellidos: apt.pacientes.apellidos, telefono: apt.pacientes.telefono ?? null }
-      : null
+      : (modal.mode === 'create' ? modal.paciente ?? null : null)
   )
   /* El título libre del evento genérico (§12.14). Va a `appointments.title`, la
      columna que ya existía y ya era NOT NULL — para esto no hizo falta ninguna
@@ -5566,6 +5580,79 @@ export default function AgendaPage() {
   const { profile, isDoctor, loading: cargandoPerfil } = useProfile()
   const toast = useToast()
   const { state: subState, openBloqueoModal } = useSubscriptionGate()
+
+  /* ── ENLACE PROFUNDO: `/agenda?cita=nueva&paciente=<uuid>` ──────────────────
+     La ÚNICA cosa que esta pantalla aprende de fuera. Abre el modal de alta que
+     ya existe, con el paciente puesto; no rediseña nada ni añade estado nuevo
+     más allá del campo opcional de `ModalState`.
+
+     ⚠️ CORRE UNA SOLA VEZ POR CARGA, Y DE AHÍ EL REF. El efecto declara sus
+     dependencias de verdad —`toast`, `subState`, `openBloqueoModal`—, así que
+     React puede volver a llamarlo cuando el gate de suscripción resuelva; sin
+     el ref eso dispararía una segunda consulta y, peor, podría reabrir el modal
+     que el usuario acaba de cerrar. La bandera se levanta ANTES de la consulta,
+     no en su respuesta.
+
+     ⚠️ SE LEE DE `window.location` Y NO DE `useSearchParams()`. Ese hook ata la
+     página al renderizado dinámico y obliga a un `<Suspense>`; aquí el
+     parámetro se consume UNA vez al montar, que es justo lo que un efecto de
+     cliente hace sin coste. La misma razón para retirarlo con
+     `history.replaceState` en vez de `router.replace`: éste pediría el árbol
+     RSC de la ruta entera, y esta pantalla lleva media docena de comentarios
+     sobre no pagar viajes de red que no hacen falta.
+
+     ⚠️ EL PARÁMETRO SE RETIRA EN TODOS LOS CAMINOS, también cuando el paciente
+     no aparece. Si sólo se limpiara al abrir, cerrar el modal y refrescar lo
+     reabriría —que es lo que el bloque pide evitar—, y en el camino de fallo
+     repetiría el aviso en cada recarga.
+
+     La FECHA Y LA HORA son las de ahora, exactamente como el botón «+ Nueva
+     cita» de la banda: el enlace trae el paciente, no un momento, y esta ruta
+     es el atajo de «pulsar el botón y elegir a ese paciente». */
+  const enlaceProfundoRef = useRef(false)
+  useEffect(() => {
+    if (enlaceProfundoRef.current) return
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('cita') !== 'nueva') return
+    enlaceProfundoRef.current = true
+
+    const limpiarUrl = () => {
+      const url = new URL(window.location.href)
+      url.searchParams.delete('cita')
+      url.searchParams.delete('paciente')
+      window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`)
+    }
+
+    const pacienteId = params.get('paciente')
+    if (!pacienteId) { limpiarUrl(); return }
+
+    /* Mismo patrón de consulta por id que `useCalculadoraContextual.ts`: `.single()`
+       devuelve `data: null` cuando no hay fila, así que el uuid inventado y el
+       recortado por RLS caen los dos en la misma rama y no hay estado ambiguo. */
+    const supabase = createClient()
+    supabase
+      .from('pacientes')
+      .select('id, nombre, apellidos, telefono')
+      .eq('id', pacienteId)
+      .single()
+      .then((res: { data: PacienteBusqueda | null }) => {
+        limpiarUrl()
+        if (!res.data) {
+          toast.info('No se encontró ese paciente. Abre la cita y elígelo a mano.')
+          return
+        }
+        /* El mismo portero que el botón «+ Nueva cita»: sin esto, una clínica
+           bloqueada abriría el modal por url y se estrellaría al guardar contra
+           la RLS, con el error crudo de BILL-DT-3 en vez del aviso bueno. */
+        if (subState.isBlocked) { openBloqueoModal(); return }
+        const { fecha, hora } = partirFechaHora(new Date().toISOString())
+        setModal({ mode: 'create', fecha, hora, tipo: 'cita', todoElDia: 'no', paciente: res.data })
+      })
+      .catch(() => {
+        limpiarUrl()
+        toast.info('No se pudo cargar ese paciente. Abre la cita y elígelo a mano.')
+      })
+  }, [toast, subState, openBloqueoModal])
 
   const isMedicoSinAdmin = profile?.role === 'medico' && !profile?.es_admin_de_clinica
   const isMedicoConAdmin = profile?.role === 'medico' && profile?.es_admin_de_clinica === true
