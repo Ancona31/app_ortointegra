@@ -80,32 +80,14 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
+    /* ⚠️ EL `suppressHydrationWarning` ES DEL TEMA, aunque aquí no se vea quién
+       lo toca. `ScriptTema` —que montan `(app)` y `(launcher)`, no este layout—
+       le añade la clase `dark` al <html> mientras el documento se analiza, o sea
+       antes de hidratar, y sin la supresión React avisa de discrepancia en cada
+       carga de esas rutas. Es el único atributo del documento que cambia, así
+       que la supresión no tapa nada más. */
     <html lang="es" className="h-full" suppressHydrationWarning>
       <head>
-        {/* ⚠️⚠️ ESTE SCRIPT VA PRIMERO Y ES BLOQUEANTE A PROPÓSITO. Es lo único
-            que impide el destello: `ThemeProvider` escribe la clase `dark` en
-            un `useEffect`, o sea DESPUÉS del primer pintado, así que cada carga
-            de cada página se veía primero en claro y luego saltaba a oscuro.
-            Leyendo `localStorage` aquí, el `<html>` ya llega marcado al primer
-            pintado y no hay salto.
-            ⚠️ NO LO MUEVAS AL FINAL DEL <head> NI LO PASES A next/script. Un
-            `strategy` diferido lo ejecuta después del pintado y el destello
-            vuelve; tiene que ser un <script> en línea y el primero del <head>.
-            ⚠️ `classList.add` Y NO `className =`: el <html> ya lleva `h-full`,
-            y asignar la clase entera lo borraría.
-            ⚠️ EL `suppressHydrationWarning` DE ARRIBA VA CON ESTO. El servidor
-            renderiza el <html> sin `dark` y este script se la añade antes de
-            hidratar; sin la supresión, React avisa de discrepancia en cada
-            carga. Es el único atributo del documento que cambia, así que la
-            supresión no tapa nada más.
-            ⚠️ EL `try` NO SOBRA: `localStorage` lanza en modo privado de algunos
-            navegadores y con cookies de terceros bloqueadas. Si lanza, la app
-            arranca en claro, que es el estado por defecto. */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `try{if(localStorage.getItem('theme')==='dark')document.documentElement.classList.add('dark')}catch(e){}`,
-          }}
-        />
         {/* ⚠️ `theme-color` YA NO ESTÁ AQUÍ: se mudó al export `viewport` de
             arriba. No lo repongas — dos etiquetas del mismo nombre y gana la
             que no queremos. */}

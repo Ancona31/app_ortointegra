@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { SWRConfig } from 'swr'
 import { createClient } from '@/lib/supabase/server'
 import Sidebar from '@/components/layout/Sidebar'
+import ScriptTema from '@/components/layout/ScriptTema'
 import { ThemeProvider } from '@/components/layout/ThemeProvider'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { ToastProvider } from '@/components/ui/Toast'
@@ -97,6 +98,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
        ⚠ `revalidateOnFocus` se queda ENCENDIDO a proposito. Es una aplicacion
        clinica: un dato rancio despues de cambiar de pestana es peor que una
        peticion de mas. El throttle da el beneficio sin ese riesgo. */
+    <>
+    <ScriptTema />
     <SWRConfig value={{ keepPreviousData: true, focusThrottleInterval: 300_000 }}>
     <AuthProvider>
       <ToastProvider>
@@ -190,5 +193,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       </ToastProvider>
     </AuthProvider>
     </SWRConfig>
+    </>
   )
 }

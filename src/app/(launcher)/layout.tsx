@@ -1,4 +1,5 @@
 import { ToastProvider } from '@/components/ui/Toast'
+import ScriptTema from '@/components/layout/ScriptTema'
 import { TemaLauncherProvider } from '@/components/launcher/TemaLauncher'
 import { createClient } from '@/lib/supabase/server'
 import { getSubscriptionState } from '@/lib/subscription'
@@ -15,6 +16,8 @@ export default async function LauncherLayout({ children }: { children: React.Rea
   const subscriptionState = await getSubscriptionState(supabase)
 
   return (
+    <>
+    <ScriptTema />
     <ToastProvider>
       <TemaLauncherProvider>
         <SubscriptionGateProvider initialState={subscriptionState}>
@@ -38,5 +41,6 @@ export default async function LauncherLayout({ children }: { children: React.Rea
         </SubscriptionGateProvider>
       </TemaLauncherProvider>
     </ToastProvider>
+    </>
   )
 }
