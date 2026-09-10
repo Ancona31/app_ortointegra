@@ -135,7 +135,7 @@ export default function CarrilDocumentos({
       value={filtro}
       onChange={e => onFiltrar(e.target.value as TipoDocumentoBD | 'todos')}
       aria-label="Filtrar documentos por tipo"
-      className="h-[36px] w-full rounded-[var(--sp-r-field-sm)] border border-[color:var(--sp-line-input)] bg-[var(--sp-surface)] px-[var(--sp-2)] text-[length:var(--sp-fs-hint)] text-[var(--sp-ink-700)]"
+      className="h-[36px] w-full rounded-[var(--sp-r-field-sm)] border border-[color:var(--sp-line-control)] bg-[var(--sp-surface)] px-[var(--sp-2)] text-[length:var(--sp-fs-hint)] text-[var(--sp-ink-700)]"
     >
       {opciones.map(o => (
         <option key={o.valor} value={o.valor}>{o.rotulo} ({o.n})</option>

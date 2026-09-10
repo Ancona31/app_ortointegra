@@ -54,7 +54,7 @@ export function ChipAccion({ href, icono: Icono, texto }: {
          carga del dashboard, se pulse o no (medido en producción). Son
          exactamente los que apagó `fcb2169`; encender uno revierte esa medida. */
       prefetch={false}
-      className="inline-flex items-center gap-[var(--sp-1-5)] rounded-[var(--sp-r-btn-sm)] border border-[color:var(--sp-line-input)] bg-[var(--sp-surface)] px-[10px] py-[5px] text-[length:var(--sp-fs-legal)] font-semibold text-[var(--sp-ink-600)] transition-colors hover:bg-[var(--sp-surface-muted)] hover:text-[var(--sp-primary-text)]"
+      className="inline-flex items-center gap-[var(--sp-1-5)] rounded-[var(--sp-r-btn-sm)] border border-[color:var(--sp-line-control)] bg-[var(--sp-surface)] px-[10px] py-[5px] text-[length:var(--sp-fs-legal)] font-semibold text-[var(--sp-ink-600)] transition-colors hover:bg-[var(--sp-surface-muted)] hover:text-[var(--sp-primary-text)]"
     >
       <Icono size={13} /> {texto}
     </Link>
@@ -81,7 +81,7 @@ export function AvisoColumna({ icono: Icono, mensaje, onReintentar, enlace }: {
         <button
           type="button"
           onClick={onReintentar}
-          className="inline-flex items-center gap-[var(--sp-2)] min-h-[var(--sp-tap)] px-5 rounded-[var(--sp-r-btn)] border border-[color:var(--sp-line-input)] bg-[var(--sp-surface)] text-[length:var(--sp-fs-btn-sm)] font-semibold text-[var(--sp-ink-700)] transition-colors hover:bg-[var(--sp-surface-muted)]"
+          className="inline-flex items-center gap-[var(--sp-2)] min-h-[var(--sp-tap)] px-5 rounded-[var(--sp-r-btn)] border border-[color:var(--sp-line-control)] bg-[var(--sp-surface)] text-[length:var(--sp-fs-btn-sm)] font-semibold text-[var(--sp-ink-700)] transition-colors hover:bg-[var(--sp-surface-muted)]"
         >
           Reintentar
         </button>

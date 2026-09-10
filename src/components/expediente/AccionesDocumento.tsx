@@ -62,7 +62,7 @@ const ALTO = 'h-[32px]'
 const CUADRADO = `${ALTO} w-[32px] shrink-0 inline-flex items-center justify-center rounded-[var(--sp-r-btn-sm)] border transition-colors`
 const CON_ROTULO = `${ALTO} shrink-0 inline-flex items-center gap-[var(--sp-1-5)] rounded-[var(--sp-r-btn-sm)] border px-[12px] text-[length:var(--sp-fs-hint)] font-semibold transition-colors`
 
-const NEUTRO = { borderColor: 'var(--sp-line-input)', background: 'var(--sp-surface)', color: 'var(--sp-ink-700)' }
+const NEUTRO = { borderColor: 'var(--sp-line-control)', background: 'var(--sp-surface)', color: 'var(--sp-ink-700)' }
 const ACENTO = { borderColor: 'var(--sp-primary-border)', background: 'var(--sp-surface)', color: 'var(--sp-primary-text)' }
 /* Inactivo: tinta terciaria sobre la misma superficie y contorno atenuado. El
    §13 exige que un control inactivo se pueda leer — de ahí `ink-350` y no un

@@ -1150,7 +1150,7 @@ export default function PerfilPage() {
                                  no mueve la retícula. */
                               style={activa
                                 ? { border: 'var(--sp-bw-accent) solid var(--sp-primary)', background: 'var(--sp-primary-bg-soft)' }
-                                : { border: 'var(--sp-bw-hair) solid var(--sp-line-input)', background: 'var(--sp-surface)' }}
+                                : { border: 'var(--sp-bw-hair) solid var(--sp-line-control)', background: 'var(--sp-surface)' }}
                             >
                               <span className="flex shrink-0 gap-[3px]">
                                 <MuestraColor color={pa.primario} />
@@ -1173,7 +1173,7 @@ export default function PerfilPage() {
                         <Campo key={clave} etiqueta={etiqueta}>
                           <div
                             className="flex min-h-[var(--sp-tap)] items-center gap-[var(--sp-2)] rounded-[var(--sp-r-field)] bg-[var(--sp-surface-sunken)] px-[13px]"
-                            style={{ border: 'var(--sp-bw-hair) solid var(--sp-line-input)' }}
+                            style={{ border: 'var(--sp-bw-hair) solid var(--sp-line-control)' }}
                           >
                             <input
                               type="color"

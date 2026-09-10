@@ -31,7 +31,7 @@ export default function BuscadorPaciente({ onAbrir }: { onAbrir: () => void }) {
     <button
       type="button"
       onClick={onAbrir}
-      className={`${ALTO_CONTROL} order-1 flex items-center gap-[var(--sp-3)] px-4 text-left rounded-[var(--sp-r-btn)] border-[1.5px] border-[color:var(--sp-line-input)] bg-[var(--sp-surface)] transition-colors hover:border-[color:var(--sp-primary)] lg:flex-1 lg:min-w-[240px]`}
+      className={`${ALTO_CONTROL} order-1 flex items-center gap-[var(--sp-3)] px-4 text-left rounded-[var(--sp-r-btn)] border-[1.5px] border-[color:var(--sp-line-control)] bg-[var(--sp-surface)] transition-colors hover:border-[color:var(--sp-primary)] lg:flex-1 lg:min-w-[240px]`}
     >
       <Search size={17} className="shrink-0 text-[var(--sp-ink-350)]" />
       <span className="flex-1 min-w-0 truncate text-[length:var(--sp-fs-btn-sm)] text-[var(--sp-ink-300)]">
