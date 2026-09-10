@@ -398,7 +398,7 @@ export default function Sidebar() {
       >
         {/* Logo + nombre */}
         <div className="flex flex-col items-center gap-2.5 px-5 py-5 border-b border-white/10">
-          <div className="w-14 h-14 bg-white rounded-full flex items-center justify-center overflow-hidden shadow-lg flex-shrink-0">
+          <div className="w-14 h-14 bg-[var(--ag-navy-logo-bg)] rounded-full flex items-center justify-center overflow-hidden shadow-lg flex-shrink-0">
             {/* 112 = 2× los 56 px del círculo, para pantallas de alta densidad.
                 Las dos ramas pasan por next/image: el host de Supabase Storage
                 está declarado en `remotePatterns` de next.config.ts. */}

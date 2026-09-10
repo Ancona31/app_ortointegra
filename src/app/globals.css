@@ -146,6 +146,25 @@
      exactamente lo que el menú tenía escrito en línea (`text-[var(--cp)]`), así
      que en claro no cambia nada. */
   --ag-navy-ink-activo: var(--cp, #1a3a5c);
+  /* EL DISCO QUE HAY DETRÁS DEL LOGO. Blanco en los DOS temas, y por eso no
+     tiene contraparte en el bloque `html.dark`: no es un olvido.
+     ⚠️ EXISTE SÓLO PARA ESQUIVAR UNA REGLA, y sin ese dato no se entiende por
+     qué un token para pintar blanco. El disco era un `.bg-white`, y
+     `ThemeProvider` barre esa clase en toda la app con
+     `html.dark .bg-white { background-color: #1E1E1E !important }`
+     (`layout/ThemeProvider.tsx:117`): en oscuro el aro salía gris oscuro. Una
+     clase arbitraria como `bg-[var(--ag-navy-logo-bg)]` no casa con `.bg-white`,
+     así que la hoja no la toca. NO LO DEVUELVAS A `bg-white`.
+     ⚠️ Y ES BLANCO A PROPÓSITO, no por inercia: el logo de la clínica lo sube
+     ella, y muchos son oscuros sobre fondo transparente. El disco es la placa
+     que garantiza que se vea, igual en los dos temas — si siguiera al tema, un
+     logo oscuro desaparecería en oscuro, que es justo cuando más hace falta.
+     ⚠️ NO ES EL TOKEN DE «PAPEL» QUE `perfil/piezasDatos.tsx` PIDE en su nota, y
+     no los unifiques sin mirar los dos. Aquel representa una HOJA IMPRESA y éste
+     es una placa detrás de un logo: coinciden en el valor por casualidad, no en
+     el motivo. Si algún día se crea el de papel, ahí hay dos candidatos y esta
+     nota es el aviso de que son dos roles, no uno. */
+  --ag-navy-logo-bg:    #ffffff;
   /* ⚠️ NO LO «UNIFIQUES» CON EL ROJO DE «CANCELADA» (--ag-status-cancelled-dot,
      hoy #c0392b). Se parecen y la línea cruza por encima de las tarjetas, pero
      dicen cosas distintas: una es la hora actual, la otra el estado de una cita.
