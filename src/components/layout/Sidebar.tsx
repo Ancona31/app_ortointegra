@@ -16,6 +16,10 @@ import { useMenuMovil } from '@/contexts/MenuMovilContext'
 import { useRouter } from 'next/navigation'
 import { useProfile, clearProfileCache } from '@/hooks/useProfile'
 import ConsultorioActivoSelector from '@/components/sidebar/ConsultorioActivoSelector'
+import ConsultaRapidaModal from '@/components/launcher/ConsultaRapidaModal'
+/* Sólo el tipo: `import type` se borra al compilar, así que la tabla de los
+   ocho formatos no entra en el bundle del menú. */
+import type { TipoDocumento } from '@/components/documentos/SelectorTipoDocumento'
 import { canManageClinica } from '@/lib/permissions'
 import { componerNombreMedicoCompleto } from '@/lib/nombreMedico'
 import { useClinica } from '@/hooks/useClinica'
@@ -27,13 +31,31 @@ import { mutate } from 'swr'
 
 // Fase 8.2: hrefs que abren features de pago. Si la suscripción está
 // bloqueada, el click muestra el BloqueoFeatureModal en vez de navegar.
-// Cubre los 8 documentos del navDoctor y "Nuevo paciente" del navSecretaria.
-const BLOCKED_LINK_PREFIXES = ['/documentos?tipo=']
+// Cubre "Nuevo paciente" del navSecretaria.
+//
+// ⚠️ AQUÍ ESTUVO `BLOCKED_LINK_PREFIXES = ['/documentos?tipo=']`, Y NO SE HA
+// PERDIDO EL BLOQUEO DE LOS OCHO DOCUMENTOS: se mudó al `kind: 'doc'` de abajo.
+// Esas entradas dejaron de tener href al pasar a abrir el buscador de paciente,
+// así que un prefijo de url ya no podía reconocerlas. Todo `doc` es de pago por
+// definición, que es más difícil de romper que casar una cadena.
 const BLOCKED_EXACT = new Set(['/pacientes/nuevo'])
 
 function isBlockedHref(href: string): boolean {
-  if (BLOCKED_EXACT.has(href)) return true
-  return BLOCKED_LINK_PREFIXES.some((p) => href.startsWith(p))
+  return BLOCKED_EXACT.has(href)
+}
+
+/**
+ * El paciente que el médico tiene abierto ahora mismo, leído de la ruta.
+ *
+ * Se exige la forma de uuid y no «lo que haya después de /expediente/» porque
+ * ese hueco también lo ocupan rutas que no son un paciente; con un segmento
+ * cualquiera se navegaría a un expediente inexistente en vez de caer al
+ * buscador, que es la degradación correcta.
+ */
+const RUTA_PACIENTE = /^\/expediente\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:\/|$)/i
+
+function pacienteDeLaRuta(pathname: string): string | null {
+  return RUTA_PACIENTE.exec(pathname)?.[1] ?? null
 }
 
 /* ─── Tipos ───────────────────────────────────────────────── */
@@ -84,22 +106,43 @@ type NavGroup = {
   label: string
   icon: React.ElementType
   matchPaths?: string[]   // rutas que activan el grupo aunque no sean hijas directas
-  children: NavLeaf[]
+  children: (NavLeaf | NavDoc)[]
+}
+
+/**
+ * Entrada del menú que NO es un destino: abre el buscador de paciente y, con el
+ * paciente elegido, entra a su formulario. No lleva href porque la url no existe
+ * hasta que hay paciente — es la misma forma que «Nueva consulta» del dashboard.
+ */
+type NavDoc = {
+  kind: 'doc'
+  tipo: TipoDocumento
+  label: string
+  icon: React.ElementType
 }
 
 type NavSection = NavLeaf | NavGroup | { kind: 'divider' }
 
 /* ─── Estructura de navegación ────────────────────────────── */
 
-const DOCS_CHILDREN: NavLeaf[] = [
-  { kind: 'leaf', href: '/documentos?tipo=receta',        label: 'Receta médica',          icon: Pill },
-  { kind: 'leaf', href: '/documentos?tipo=lab',           label: 'Solicitud de laboratorio', icon: FlaskConical },
-  { kind: 'leaf', href: '/documentos?tipo=imagen',        label: 'Solicitud de imagenología', icon: ScanLine },
-  { kind: 'leaf', href: '/documentos?tipo=suplementacion',label: 'Plan de suplementación', icon: ClipboardList },
-  { kind: 'leaf', href: '/documentos?tipo=internamiento', label: 'Internamiento',           icon: BedDouble },
-  { kind: 'leaf', href: '/documentos?tipo=escrito',       label: 'Escrito médico',          icon: PenLine },
-  { kind: 'leaf', href: '/documentos?tipo=consentimiento',label: 'Consentimiento',          icon: ShieldCheck },
-  { kind: 'leaf', href: '/documentos?tipo=honorarios',    label: 'Honorarios / Cotización', icon: Receipt },
+/* ⚠️ LOS OCHO DEJARON DE SER ENLACES A `/documentos?tipo=…`, y el cambio es el
+   ítem 1 del pulido de flujo. Antes llevaban a una pantalla intermedia donde
+   había que elegir paciente; ahora abren el mismo buscador que «Nueva consulta»
+   y entran a `/expediente/[id]/documentos?tipo=…`, que es la ruta que registra
+   el acceso en `audit_log` y que hereda el guarda de rol de su layout padre.
+   Con un paciente ya abierto se saltan el buscador — ver `abrirDocumento`.
+
+   La `key` es el tipo y no una url: es lo único que los distingue, y es
+   exactamente lo que viaja en la query del destino. */
+const DOCS_CHILDREN: NavDoc[] = [
+  { kind: 'doc', tipo: 'receta',         label: 'Receta médica',             icon: Pill },
+  { kind: 'doc', tipo: 'lab',            label: 'Solicitud de laboratorio',  icon: FlaskConical },
+  { kind: 'doc', tipo: 'imagen',         label: 'Solicitud de imagenología', icon: ScanLine },
+  { kind: 'doc', tipo: 'suplementacion', label: 'Plan de suplementación',    icon: ClipboardList },
+  { kind: 'doc', tipo: 'internamiento',  label: 'Internamiento',             icon: BedDouble },
+  { kind: 'doc', tipo: 'escrito',        label: 'Escrito médico',            icon: PenLine },
+  { kind: 'doc', tipo: 'consentimiento', label: 'Consentimiento',            icon: ShieldCheck },
+  { kind: 'doc', tipo: 'honorarios',     label: 'Honorarios / Cotización',   icon: Receipt },
 ]
 
 function navDoctor(isAdmin: boolean): NavSection[] {
@@ -174,7 +217,11 @@ function leafIsActive(href: string, pathname: string) {
 
 function groupHasActiveChild(group: NavGroup, pathname: string) {
   if (group.matchPaths?.some(p => pathname.startsWith(p))) return true
-  return group.children.some(c => leafIsActive(c.href, pathname))
+  /* Los `doc` no cuentan: son acciones, no sitios, así que nunca son «donde
+     estás». Con uno abierto quien resalta es el grupo Pacientes, porque el
+     destino vive bajo `/expediente/[id]/` — igual que hoy al entrar a los
+     documentos de un paciente desde su tarjeta del dashboard. */
+  return group.children.some(c => c.kind === 'leaf' && leafIsActive(c.href, pathname))
 }
 
 
@@ -201,6 +248,29 @@ export default function Sidebar() {
   const { state: subState, openBloqueoModal } = useSubscriptionGate()
 
   const isAdmin = canManageClinica(profile)
+
+  /* El formato que espera paciente. No-nulo = buscador abierto; un solo estado
+     porque el modal no tiene nada que enseñar sin formato. Se guarda la entrada
+     ENTERA y no sólo su `tipo` porque el buscador enseña también su rótulo. */
+  const [docPendiente, setDocPendiente] = useState<NavDoc | null>(null)
+
+  /**
+   * Un formato del menú, pulsado.
+   *
+   * ⚠️ CON UN PACIENTE YA ABIERTO NO SE PREGUNTA POR ÉL. Pedirle que busque a
+   * quien tiene delante en la pantalla sería peor que la pantalla intermedia
+   * que esto viene a quitar, así que dentro de `/expediente/[id]/…` el menú
+   * navega directo. Fuera, abre el buscador.
+   */
+  function abrirDocumento(doc: NavDoc) {
+    close()
+    const abierto = pacienteDeLaRuta(pathname)
+    if (abierto) {
+      router.push(`/expediente/${abierto}/documentos?tipo=${doc.tipo}`)
+      return
+    }
+    setDocPendiente(doc)
+  }
 
   const sections: NavSection[] =
     profile?.role === 'secretaria'
@@ -498,6 +568,36 @@ hasActive && !isOpen
 {isOpen && (
                     <div className="mt-0.5 ml-3 pl-3 border-l border-white/10 space-y-0.5">
                       {section.children.map(child => {
+                        /* Misma pinta que un enlace y distinto elemento: un
+                           `doc` abre el buscador de paciente, así que es un
+                           botón. La clase inactiva se comparte para que la
+                           columna no se vea de dos maneras. */
+                        const claseHijo = 'flex items-center gap-2 px-2.5 py-2 rounded-lg text-[12px] font-medium transition-all duration-150'
+                        const claseInactiva = 'text-[var(--ag-navy-ink-dim)] hover:bg-white/10 hover:text-white'
+
+                        if (child.kind === 'doc') {
+                          return (
+                            <button
+                              key={child.tipo}
+                              type="button"
+                              onClick={() => {
+                                /* Todo formato es de pago: sin suscripción, el
+                                   menú enseña el bloqueo y no busca a nadie. */
+                                if (subState.isBlocked) {
+                                  close()
+                                  openBloqueoModal()
+                                  return
+                                }
+                                abrirDocumento(child)
+                              }}
+                              className={`w-full text-left ${claseHijo} ${claseInactiva}`}
+                            >
+                              <child.icon size={13} className="opacity-60" />
+                              {child.label}
+                            </button>
+                          )
+                        }
+
                         const childActive = leafIsActive(child.href, pathname)
                         const childBlocked = subState.isBlocked && isBlockedHref(child.href)
                         return (
@@ -509,8 +609,8 @@ hasActive && !isOpen
                                 openBloqueoModal()
                               }
                             }}
-                            className={`flex items-center gap-2 px-2.5 py-2 rounded-lg text-[12px] font-medium transition-all duration-150 ${
-                              childActive ? 'bg-white text-[var(--ag-navy-ink-activo)] shadow-sm' : 'text-[var(--ag-navy-ink-dim)] hover:bg-white/10 hover:text-white'
+                            className={`${claseHijo} ${
+                              childActive ? 'bg-white text-[var(--ag-navy-ink-activo)] shadow-sm' : claseInactiva
                             }`}
                           >
                             <child.icon size={13} className={childActive ? 'opacity-100' : 'opacity-60'} />
@@ -581,6 +681,24 @@ hasActive && !isOpen
           </Link>
         </div>
       </aside>
+
+      {/* Buscador de paciente de los ocho formatos.
+          ⚠️ VA FUERA DEL `<aside>`, y no es colocación estética: el aside es
+          `fixed w-64 overflow-y-auto`, o sea que recortaría por ambos lados un
+          hijo que se pinta a pantalla completa. Aquí es hermano suyo, con el
+          `z-[9998]` propio del modal por encima del `z-40` del menú y del
+          `z-50` del hamburguesa.
+          Cerrado devuelve `null`, así que en las veinte páginas donde nadie lo
+          abre no cuesta un nodo. */}
+      <ConsultaRapidaModal
+        open={docPendiente !== null}
+        onClose={() => setDocPendiente(null)}
+        /* `docPendiente` no puede ser null aquí: esta función sólo se llama con
+           el modal abierto, y abierto es justamente `docPendiente !== null`. */
+        destino={id => `/expediente/${id}/documentos?tipo=${docPendiente?.tipo}`}
+        titulo={docPendiente?.label}
+        rotuloCrear="Crear y continuar"
+      />
     </>
   )
 }

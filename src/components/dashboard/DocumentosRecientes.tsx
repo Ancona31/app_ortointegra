@@ -68,12 +68,19 @@ type Doc = {
  * el envoltorio no hay pelea. En móvil el envoltorio queda en `display: none`,
  * y un hijo así no participa del `flex` de la lista: no deja hueco suelto.
  */
-function BotonNuevo() {
+function BotonNuevo({ onNuevo }: { onNuevo: () => void }) {
   return (
     <div className="hidden lg:block">
-      <Link
-        href="/documentos"
-        prefetch={false}
+      {/* ⚠️ DEJÓ DE SER UN ENLACE (pulido de flujo, ítem 1). Iba a `/documentos`,
+          la pantalla intermedia donde había que elegir paciente; ahora abre el
+          buscador de paciente que vive en el dashboard —el mismo componente que
+          «Nueva consulta»— y entra a `/expediente/[id]/documentos`.
+          El manejador VIENE DE FUERA y el modal no se monta aquí: el gemelo
+          móvil de la cabecera abre ESE MISMO, así que el estado tiene que vivir
+          en el padre común de los dos. */}
+      <button
+        type="button"
+        onClick={onNuevo}
         /* El relleno y la tinta salen de `.sp-btn--primary`; la geometría va en
            `style`, que gana a la clase, porque `.sp-btn` impone 44 px de alto.
            Mismo recurso que el resto del rediseño: es la única forma de que el
@@ -82,24 +89,29 @@ function BotonNuevo() {
         style={{ minHeight: '44px', height: '44px', padding: '0 16px', borderRadius: 'var(--sp-r-btn)', fontSize: 'var(--sp-fs-body-sm)' }}
       >
         <FilePlus2 size={16} /> Nuevo documento
-      </Link>
+      </button>
     </div>
   )
 }
 
-export function DocumentosCargando() {
+interface Props {
+  /** Abre el buscador de paciente de «Nuevo documento», que monta el dashboard. */
+  onNuevoDocumento: () => void
+}
+
+export function DocumentosCargando({ onNuevoDocumento }: Props) {
   return (
     <div>
       <EncabezadoColumna titulo="Documentos recientes" />
       <div className="mt-[var(--sp-gap-tiles)] flex flex-col gap-[var(--sp-gap-tiles)]">
-        <BotonNuevo />
+        <BotonNuevo onNuevo={onNuevoDocumento} />
         {[1, 2, 3].map(i => <div key={i} className="skeleton h-[62px] rounded-[14px]" />)}
       </div>
     </div>
   )
 }
 
-export default function DocumentosRecientes() {
+export default function DocumentosRecientes({ onNuevoDocumento }: Props) {
   const { profile, loading: loadingProfile } = useProfile()
   const [docs, setDocs] = useState<Doc[]>([])
   const [cargando, setCargando] = useState(true)
@@ -146,12 +158,12 @@ export default function DocumentosRecientes() {
      paciente vive dentro de su expediente. */
   const encabezado = <EncabezadoColumna titulo="Documentos recientes" />
 
-  if (loadingProfile || cargando) return <DocumentosCargando />
+  if (loadingProfile || cargando) return <DocumentosCargando onNuevoDocumento={onNuevoDocumento} />
 
   if (error) return (
     <div>
       {encabezado}
-      <div className="mt-[var(--sp-gap-tiles)]"><BotonNuevo /></div>
+      <div className="mt-[var(--sp-gap-tiles)]"><BotonNuevo onNuevo={onNuevoDocumento} /></div>
       <AvisoColumna icono={RotateCw} mensaje="No se pudieron cargar los documentos." onReintentar={() => { setCargando(true); void cargar() }} />
     </div>
   )
@@ -160,7 +172,7 @@ export default function DocumentosRecientes() {
     <div>
       {encabezado}
       <div className="mt-[var(--sp-gap-tiles)] flex flex-col gap-[var(--sp-gap-tiles)]">
-        <BotonNuevo />
+        <BotonNuevo onNuevo={onNuevoDocumento} />
 
         {docs.length === 0 ? (
           <p className="rounded-[14px] border border-dashed border-[color:var(--sp-line-card)] px-[var(--sp-pad-row-x)] py-[var(--sp-5)] text-center text-[length:var(--sp-fs-body-sm)] text-[var(--sp-ink-500)]">

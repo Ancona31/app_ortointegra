@@ -41,6 +41,11 @@ export default function DashboardPage() {
   const { consultorioActivo, cambiarActivo } = useConsultorioActivo()
   const { abrir: abrirMenu } = useMenuMovil()
   const [modalConsulta, setModalConsulta] = useState(false)
+  /* El buscador de «Nuevo documento», que es el MISMO componente con otro
+     destino. Estado aparte y no uno compartido con tres valores: los dos
+     botones son independientes y así ninguno puede heredar el destino del
+     otro por un reset olvidado. */
+  const [modalDocumento, setModalDocumento] = useState(false)
 
 
   /* ⚠️ ESTA DECLARACIÓN VA ANTES DE LOS GUARDAS, y no es orden estético: el
@@ -149,15 +154,19 @@ export default function DashboardPage() {
                 pinta: allí el botón de la columna sigue siendo el que vale.
                 El rótulo va entero, sin abreviar. A 360 px la fila mide 328 y
                 el botón pide 197-228 según la fuente de sistema, así que sobra;
-                en media columna (159) NO cabía, y de ahí la fila propia. */}
-            <Link
-              href="/documentos"
-              /* Sin precarga, misma cuenta que el resto de la región. */
-              prefetch={false}
+                en media columna (159) NO cabía, y de ahí la fila propia.
+                ⚠️ DEJÓ DE SER UN ENLACE (pulido de flujo, ítem 1). Antes iba a
+                `/documentos`, la pantalla intermedia donde había que elegir
+                paciente; ahora abre el mismo buscador que «Nueva consulta» y
+                entra al expediente del elegido. Sin `?tipo=`: el formato se
+                elige ya dentro, sobre las ocho tarjetas. */}
+            <button
+              type="button"
+              onClick={() => setModalDocumento(true)}
               className={`${ALTO_CONTROL} col-span-2 order-2 inline-flex items-center justify-center gap-[var(--sp-gap-item)] whitespace-nowrap rounded-[var(--sp-r-btn)] px-6 border border-[color:var(--sp-primary-border)] bg-[var(--sp-surface)] text-[length:var(--sp-fs-btn-sm)] font-semibold text-[var(--sp-primary-text)] transition-colors hover:bg-[var(--sp-primary-bg-faint)] lg:hidden`}
             >
               <FilePlus2 size={17} /> Nuevo documento
-            </Link>
+            </button>
 
             {/* + Nuevo paciente — contorno de acento. No lleva `.sp-btn`
                 porque ésa declara `border: none` y se comería el contorno. */}
@@ -198,6 +207,18 @@ export default function DashboardPage() {
           porque se pinta en `position: fixed` y devuelve `null` cerrado: no
           entra en el flujo de ninguna banda. */}
       <ConsultaRapidaModal open={modalConsulta} onClose={() => setModalConsulta(false)} />
+
+      {/* El gemelo de documentos. Mismo componente, mismo sitio y misma razón
+          —`position: fixed`, `null` cerrado—; lo único que cambia es a dónde
+          entra el paciente elegido. Lo abren los DOS botones de la pareja: el
+          de la cabecera en móvil y el de la columna de Documentos en `lg`. */}
+      <ConsultaRapidaModal
+        open={modalDocumento}
+        onClose={() => setModalDocumento(false)}
+        destino={id => `/expediente/${id}/documentos`}
+        titulo="Nuevo documento"
+        rotuloCrear="Crear y continuar"
+      />
 
       {/* ── Banda 1 · Próximas citas (flexible) · columna fija ── */}
       {/* ⚠️ `items-start`: LAS DOS COLUMNAS SE ALINEAN ARRIBA Y NINGUNA SE
@@ -307,7 +328,7 @@ export default function DashboardPage() {
             14 px de relleno que pide el spec para móvil. Es uno o el otro,
             nunca los dos: de ahí los `lg:border-t-0 lg:pt-0`. */}
         <div className="border-t border-[color:var(--sp-line-card)] pt-[var(--sp-3-5)] lg:border-t-0 lg:pt-0 lg:border-l lg:pl-[var(--sp-pad-rule)]">
-          <DocumentosRecientes />
+          <DocumentosRecientes onNuevoDocumento={() => setModalDocumento(true)} />
         </div>
       </div>
 

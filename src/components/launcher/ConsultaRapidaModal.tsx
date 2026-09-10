@@ -23,12 +23,50 @@ function parsearNombre(q: string) {
   return { nombre: partes[0], apellidos: partes.slice(1).join(' ') }
 }
 
+/** A dónde entra el paciente elegido. El default es la consulta, que es el
+ *  flujo con el que nació este modal. */
+const A_NUEVA_NOTA = (id: string) => `/expediente/${id}/nueva-nota`
+
 interface Props {
   open: boolean
   onClose: () => void
+  /**
+   * Ruta a la que se navega con el paciente ya resuelto — se elija de la lista,
+   * se acabe de crear o se vincule un duplicado. Los CUATRO caminos de salida
+   * pasan por aquí; si añades un quinto, hazlo pasar también.
+   *
+   * ⚠️ NO ES UNA URL SINO UNA FUNCIÓN, y el motivo es que el id no existe
+   * todavía cuando el host monta el modal: en el alta rápida lo devuelve
+   * `POST /api/pacientes` a mitad del flujo.
+   *
+   * Omitirla deja el comportamiento original intacto: «Nueva consulta» no pasa
+   * nada y sigue entrando a la nota.
+   */
+  destino?: (id: string) => string
+  /** Rótulo del botón que cierra el alta rápida. El default nombra la consulta. */
+  rotuloCrear?: string
+  /**
+   * Qué se está creando, dicho durante la búsqueda.
+   *
+   * ⚠️ EXISTE PARA QUE NO SE REPITA UN DEFECTO CONOCIDO. En la pantalla que este
+   * flujo sustituye, quien entraba por «Receta médica» del menú pasaba el paso
+   * de elegir paciente sin ninguna señal de que la receta seguía elegida, y
+   * acababa dudando si tendría que volver a decirlo. El tipo viaja: lo que
+   * faltaba era enseñarlo.
+   *
+   * Omitirla no pinta nada — «Nueva consulta» entra por el botón que ya lo
+   * dice, así que no necesita repetirlo.
+   */
+  titulo?: string
 }
 
-export default function ConsultaRapidaModal({ open, onClose }: Props) {
+export default function ConsultaRapidaModal({
+  open,
+  onClose,
+  destino = A_NUEVA_NOTA,
+  rotuloCrear = 'Crear e iniciar consulta',
+  titulo,
+}: Props) {
   const router = useRouter()
   const { profile } = useProfile()
   const esMedicoInvitado = profile?.role === 'medico' && profile?.es_admin_de_clinica !== true
@@ -114,7 +152,7 @@ export default function ConsultaRapidaModal({ open, onClose }: Props) {
 
   function navegar(id: string) {
     onClose()
-    router.push(`/expediente/${id}/nueva-nota`)
+    router.push(destino(id))
   }
 
   function abrirCrear() {
@@ -166,8 +204,7 @@ export default function ConsultaRapidaModal({ open, onClose }: Props) {
         return
       }
       if (data.id) {
-        onClose()
-        router.push(`/expediente/${data.id as string}/nueva-nota`)
+        navegar(data.id as string)
       }
     } catch {
       setFormError('Error de conexión. Intenta de nuevo.')
@@ -191,9 +228,8 @@ export default function ConsultaRapidaModal({ open, onClose }: Props) {
         setVinculando(false)
         return
       }
-      // Éxito: mismo flujo que la creación normal → iniciar nota del paciente existente
-      onClose()
-      router.push(`/expediente/${duplicateWarning.id}/nueva-nota`)
+      // Éxito: mismo flujo que la creación normal → entrar con el paciente existente
+      navegar(duplicateWarning.id)
     } catch {
       setVincularError('No se pudo conectar con el servidor. Verifica tu conexión e intenta de nuevo.')
       setVinculando(false)
@@ -221,7 +257,20 @@ export default function ConsultaRapidaModal({ open, onClose }: Props) {
 
         {!modoCrear && (
           <>
-            <div className="flex items-center gap-3 px-4 py-3.5 border-b border-slate-100">
+            {/* ⚠️ AQUÍ VAN CLASES `slate` Y NO TOKENS `--sp-*`, Y ES LO CORRECTO
+                EN ESTE ARCHIVO. El panel de arriba es `bg-white` cableado, o sea
+                que NO se oscurece con el tema; los tokens de tinta sí —
+                `--sp-ink-500` pasa a `rgba(255,255,255,.50)` en `html.dark`
+                (`spinus-tokens.css:503`)— y este rótulo quedaría blanco sobre
+                blanco. Mientras el contenedor no esté en el sistema, su
+                contenido tampoco puede estarlo: mezclarlos es lo que rompe.
+                Cuando se migre el modal entero, esta línea entra con él. */}
+            {titulo && (
+              <p className="px-4 pt-3.5 text-[11px] font-semibold uppercase tracking-widest text-slate-400">
+                {titulo}
+              </p>
+            )}
+            <div className={`flex items-center gap-3 px-4 border-b border-slate-100 ${titulo ? 'pt-1.5 pb-3.5' : 'py-3.5'}`}>
               {loading
                 ? <Loader2 size={18} className="text-slate-400 animate-spin flex-shrink-0" />
                 : <Search size={18} className="text-slate-400 flex-shrink-0" />
@@ -363,10 +412,7 @@ export default function ConsultaRapidaModal({ open, onClose }: Props) {
                     {duplicateWarning.existingPatientIsMine ? (
                       <button
                         type="button"
-                        onClick={() => {
-                          onClose()
-                          router.push(`/expediente/${duplicateWarning.id}/nueva-nota`)
-                        }}
+                        onClick={() => navegar(duplicateWarning.id)}
                         className="w-full px-2 py-1.5 text-[11px] font-semibold text-white bg-[#1e5fa8] rounded-lg hover:bg-[#1a3a5c] transition-colors"
                       >
                         Ir a su expediente
@@ -477,7 +523,7 @@ export default function ConsultaRapidaModal({ open, onClose }: Props) {
                 {creando
                   ? <Loader2 size={14} className="animate-spin shrink-0" />
                   : <UserPlus size={14} className="shrink-0" />}
-                <span className="truncate">{creando ? 'Creando...' : 'Crear e iniciar consulta'}</span>
+                <span className="truncate">{creando ? 'Creando...' : rotuloCrear}</span>
               </button>
             </div>
           </form>
