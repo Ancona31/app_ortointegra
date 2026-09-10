@@ -17,6 +17,7 @@ import {
   CabeceraCard, MuestraColor, ResumenConsultorios, EstadoGoogleCalendar, VistaPreviaEncabezado,
 } from '@/components/perfil/piezasDatos'
 import ModalShell from '@/components/ui/ModalShell'
+import Portal from '@/components/ui/Portal'
 import { useToast } from '@/components/ui/Toast'
 import EspecialidadSelector from '@/components/ui/EspecialidadSelector'
 import { validarCedula } from '@/lib/validaciones'
@@ -94,6 +95,14 @@ function huellaDatos(f: FormData, esp: string[]): string {
     esp.filter(Boolean).join(' · '),
   ])
 }
+
+/**
+ * El `<form>` de la pantalla. La barra de guardado se saca del árbol con un
+ * portal (ver su comentario), así que su botón de enviar ya no es descendiente
+ * del formulario y lo alcanza por `form={ID_FORM}`, que es lo que HTML tiene
+ * para exactamente esto.
+ */
+const ID_FORM = 'perfil-form'
 
 /** La ceja y el título. Sale dos veces —pantalla y estado de error— y son
  *  cuatro líneas: se comparte para que no diverjan, no por ahorrar. */
@@ -543,6 +552,10 @@ export default function PerfilPage() {
   }, [base, form, especialidades, nombreClinica, apariencia, logoFile, isAdmin])
 
   const hayCambios = seccionesSucias.length > 0
+  /* Pulsable de verdad: hay algo que guardar Y no hay un guardado en curso. Es
+     lo que decide el aspecto del botón, para que «inhabilitado» y «secundario»
+     sean siempre el mismo estado. */
+  const puedeGuardar = hayCambios && !guardando && !subiendoLogo
 
   /* «A, B y C», no «A y B y C». Hasta el bloque 2 las secciones eran dos y el
      `join(' y ')` bastaba; con el nombre de la clínica ya son tres. */
@@ -800,13 +813,22 @@ export default function PerfilPage() {
        una vez descontado el menú lateral y el relleno del layout. Es la misma
        medida del expediente rediseñado, no la del mockup (1180) ni la del
        dashboard (1044). */
-    <div className="max-w-[960px] mx-auto animate-slide-up">
+    /* ⚠️ EL RELLENO INFERIOR LE HACE SITIO A LA BARRA, Y HACE FALTA EN LOS DOS
+       ANCHOS: la barra está fuera del flujo (`fixed`) y flota sobre el
+       contenido, así que sin esto taparía la última card al llegar al final.
+       Los números son altos MEDIDOS de la barra más aire: 96 en escritorio (una
+       fila de 72 más los 16 que la separan del borde) y 148 en móvil (140 con
+       las dos líneas de mensaje y los botones de 48), y ahí encima el área
+       segura, porque a sangre la barra llega al borde físico.
+       Sólo cuando hay cambios: sin ellos la barra está fuera de pantalla y esto
+       sería una franja en blanco. */
+    <div className={`max-w-[960px] mx-auto animate-slide-up ${hayCambios ? 'pb-[96px] max-sm:pb-[calc(148px+env(safe-area-inset-bottom,0px))]' : ''}`}>
 
       <CabeceraPerfil />
 
       <PestanasPerfil activa={pestana} onCambiar={cambiarPestana} />
 
-      <form onSubmit={handleSubmit}>
+      <form id={ID_FORM} onSubmit={handleSubmit}>
 
         {/* ⚠️ `items-start` ES LO QUE HACE POSIBLE EL `sticky` DE LA COLUMNA.
             Sin él la celda se estira a la altura de la fila, la columna mide
@@ -827,9 +849,18 @@ export default function PerfilPage() {
             contenedor YA ocupa todo lo disponible (1280 − 256 del menú lateral
             − 64 del relleno de `(app)/layout.tsx` = 960). Todo lo que gane el
             cuerpo tiene que salir de esta columna, y esta columna no da más. */}
-        <div className="mt-[var(--sp-gap-band)] grid grid-cols-1 items-start gap-[var(--sp-5-5)] lg:grid-cols-[310px_minmax(0,1fr)]">
+        {/* ⚠️ LA SEGUNDA COLUMNA SÓLO EXISTE EN DATOS. La tarjeta de identidad
+            es el contexto de los datos que se editan al lado —el nombre, las
+            cédulas, la firma y los colores que se están tocando—; en
+            Consultorios y en Google Calendar no acompaña a nada, y en móvil,
+            donde se apila encima, obligaba a pasarla de largo para llegar al
+            contenido de esas dos pestañas.
+            Al desaparecer la columna, la rejilla se queda en `grid-cols-1` y
+            esas dos pestañas ocupan los 960 px enteros en vez de 628. */}
+        <div className={`mt-[var(--sp-gap-band)] grid grid-cols-1 items-start gap-[var(--sp-5-5)] ${pestana === 'datos' ? 'lg:grid-cols-[310px_minmax(0,1fr)]' : ''}`}>
 
           {/* ── Región 2 · columna fija ── */}
+          {pestana === 'datos' && (
           <aside className="lg:sticky lg:top-[var(--sp-6)]">
             <TarjetaIdentidad
               nombre={componerNombreMedicoCompleto(form)}
@@ -843,6 +874,7 @@ export default function PerfilPage() {
               nombrePaleta={nombrePaleta}
             />
           </aside>
+          )}
 
           {/* ── Cuerpo de la pestaña activa ── */}
           <div className="min-w-0 flex flex-col gap-[var(--sp-gap-block)]">
@@ -1220,94 +1252,92 @@ export default function PerfilPage() {
           </div>
         </div>
 
-        {/* ── Región 6 · Barra de guardado ────────────────────────────────
-            Pieza FLOTANTE sobre el contenido, no un pie pegado al borde: card
-            redondeada, elevada por sombra y separada del fondo de la ventana.
+      </form>
 
-            ⚠️ AQUÍ VIVÍA `.sp-doc-actions` Y SE RETIRÓ A PROPÓSITO — NO LA
-            DEVUELVAS. Esa clase es la barra a sangre de los OCHO formularios
-            de documento: filete superior, esquinas rectas, relleno horizontal
-            cero y `bottom: 0`. Es correcta allí, donde la barra cierra el
-            formulario de lado a lado. Aquí cortaba la página en seco. Y NO se
-            podía redondear en la hoja: cambiarla habría movido los ocho
-            formularios, que no son de este encargo.
+      {/* ── Región 6 · Barra de guardado ────────────────────────────────
+          ⚠️ VA EN UN PORTAL, Y NO ES POR GUSTO: SIN ÉL, `position: fixed` NO
+          SE FIJA A LA VENTANA. El contenedor de esta pantalla lleva
+          `animate-slide-up`, que en `globals.css:866` es
+          `animation: … both` MÁS `will-change: transform, opacity`. Cualquiera
+          de las dos cosas basta para convertir ese div en BLOQUE CONTENEDOR de
+          todo `position: fixed` que cuelgue debajo: la barra se anclaba al
+          contenedor y se iba con el scroll, tapando lo que pasaba por debajo.
+          Es la MISMA trampa que `globals.css:933-937` ya documenta para
+          `.animate-page-enter`, que se arregló cambiando su `both` por
+          `backwards`. Aquí no se toca la hoja compartida —`animate-slide-up` la
+          usa media app— sino que la barra se saca del árbol.
+          ⚠️ POR ESO EL BOTÓN LLEVA `form={ID_FORM}`: al portarse a `body` deja
+          de ser descendiente del `<form>` y sin ese atributo el envío no
+          dispara nada.
 
-            ⚠️ EL ÁREA SEGURA SE CONSERVA, PERO CAMBIA DE SITIO. En
-            `.sp-doc-actions` iba en el `padding-bottom` porque la barra tocaba
-            el borde físico; aquí la barra flota, así que el inset va en el
-            `bottom` del `sticky` y la levanta por encima de la barra de
-            gestos. El `, 0px` de respaldo NO ES ADORNO: sin él, en un motor
-            sin `env()` el `calc()` entero es inválido y la declaración se
-            descarta completa — la barra perdería también sus 16 px de
-            separación. Es la misma trampa que documenta la hoja.
+          ⚠️ LA ANIMACIÓN ES SÓLO `transform`. Entra deslizándose y sale igual,
+          en los DOS anchos: ya no hay `hidden`, la barra vive siempre montada y
+          se aparta con `translate-y-full`, que la saca entera de la ventana. Es
+          lo que permite animar la salida —un `display:none` no se anima— y de
+          paso no toca layout. `motion-reduce` la apaga.
 
-            ⚠️ NO LE PONGAS ANCHO PROPIO: hereda los 960 px del contenedor de
-            la pantalla, que es justo lo que la mantiene acotada al contenido y
-            no al ancho de la ventana.
+          ⚠️ LOS 1024 px DEL ENVOLTORIO NO SON UN MÁXIMO CAPRICHOSO: son los 960
+          del contenido MÁS el `lg:px-8` del layout, y con `lg:left-64`
+          —los 256 del menú— hacen que la barra caiga exactamente sobre la
+          columna de contenido a cualquier ancho de ventana. */}
+      <Portal>
+        <div
+          aria-hidden={!hayCambios}
+          className={`fixed inset-x-0 bottom-0 z-30 transition-transform duration-[var(--sp-dur-base)] ease-[var(--sp-ease-out)] motion-reduce:transition-none lg:left-64 ${hayCambios ? 'translate-y-0' : 'pointer-events-none translate-y-full'}`}
+        >
+          <div className="mx-auto w-full max-w-[1024px] px-4 pb-[var(--sp-4)] max-sm:px-0 max-sm:pb-0 lg:px-8">
+            <div className="flex items-center gap-[var(--sp-gap-item)] rounded-[var(--sp-r-card)] border border-[color:var(--sp-line-card)] bg-[var(--sp-surface)] px-[var(--sp-5)] py-[var(--sp-3-5)] shadow-[var(--sp-shadow-raised)] max-sm:flex-col max-sm:items-stretch max-sm:rounded-none max-sm:border-x-0 max-sm:border-b-0 max-sm:px-[var(--sp-4)] max-sm:pb-[calc(var(--sp-3-5)+env(safe-area-inset-bottom,0px))]">
 
-            ⚠️ EL FILETE DE CARD SE QUEDA, Y NO ES EL FILETE QUE SE QUITÓ. El
-            que cortaba la página era el `border-top` a sangre de la barra
-            plana; éste es el contorno de card que llevan todas las demás
-            (`.sp-card`). Hace falta porque EN OSCURO NO HAY SOMBRA:
-            `--sp-shadow-raised` vale `none` bajo `html.dark` —Material cambia
-            sombra por elevación de color— y la barra quedaría a `#1e1e1e`
-            flotando sobre cards del mismo `#1e1e1e`, o sea invisible. El
-            bloque oscuro SÍ redefine `--sp-line-card` (12 % de blanco), así
-            que el contorno es lo único que la separa ahí. En claro es la
-            misma línea sutil que el resto de cards. No lo quites «porque ya
-            hay sombra»: en oscuro no la hay.
+              <div className="min-w-0 flex-1">
+                <p className="text-[length:var(--sp-fs-meta)] font-semibold text-[var(--sp-ink-700)]">
+                  {hayCambios
+                    ? `Tienes cambios sin guardar en ${listaSecciones}.`
+                    : 'Sin cambios pendientes.'}
+                </p>
+                {/* La advertencia sólo aparece cuando «Descartar» está vivo, que es
+                    cuando puede engañar. La firma se guarda al capturarla, así que
+                    descartar no la deshace — decirlo aquí es más barato que el
+                    soporte de quien creyó que sí. */}
+                {hayCambios && (
+                  <p className="sp-hint mt-[2px]">
+                    La firma se guarda sola al capturarla: «Descartar» no la revierte.
+                  </p>
+                )}
+              </div>
 
-            ⚠️ LOS BOTONES SIGUEN EN UN ENVOLTORIO. Ya no es por la regla
-            `> .sp-btn--primary { flex: 1 }` de la hoja, que aquí ya no aplica,
-            sino por el reparto: el mensaje se queda con el hueco (`flex-1`) y
-            los dos botones viajan juntos a la derecha. */}
-        <div className="sticky z-[1] bottom-[calc(var(--sp-4)+env(safe-area-inset-bottom,0px))] mt-[var(--sp-gap-band)] flex items-center gap-[var(--sp-gap-item)] rounded-[var(--sp-r-card)] border border-[color:var(--sp-line-card)] bg-[var(--sp-surface)] px-[var(--sp-5)] py-[var(--sp-3-5)] shadow-[var(--sp-shadow-raised)] max-sm:flex-col max-sm:items-stretch">
+              <div className="shrink-0 flex items-center gap-[var(--sp-gap-item)] max-sm:grid max-sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={descartarCambios}
+                  disabled={!puedeGuardar}
+                  className="sp-btn sp-btn--secondary max-sm:min-h-[var(--sp-ctrl-h-mobile)] disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Descartar
+                </button>
+                {/* ⚠️ PRIMARIO CUANDO SE PUEDE PULSAR, SECUNDARIO CUANDO NO — y la
+                    condición es `puedeGuardar`, NO `hayCambios`. Con `hayCambios` el
+                    botón se quedaba en primario mientras guardaba, que es cuando
+                    además está `disabled`, y ahí caía en `.sp-btn--primary:disabled`:
+                    texto blanco sobre un gris azulado que no llega al 4.5:1. Atado a
+                    `puedeGuardar`, el inhabilitado es SIEMPRE el secundario
+                    —superficie neutra con tinta secundaria—, que es lo que el spec
+                    pide para que siga leyéndose. */}
+                <button
+                  type="submit"
+                  form={ID_FORM}
+                  disabled={!puedeGuardar}
+                  className={`sp-btn ${puedeGuardar ? 'sp-btn--primary' : 'sp-btn--secondary'} max-sm:min-h-[var(--sp-ctrl-h-mobile)] disabled:cursor-not-allowed`}
+                >
+                  {guardando || subiendoLogo
+                    ? <><Loader2 size={15} className="animate-spin" /> {subiendoLogo ? 'Subiendo logo...' : 'Guardando...'}</>
+                    : <><Save size={15} /> Guardar</>}
+                </button>
+              </div>
 
-          <div className="min-w-0 flex-1">
-            <p className="text-[length:var(--sp-fs-meta)] font-semibold text-[var(--sp-ink-700)]">
-              {hayCambios
-                ? `Tienes cambios sin guardar en ${listaSecciones}.`
-                : 'Sin cambios pendientes.'}
-            </p>
-            {/* La advertencia sólo aparece cuando «Descartar» está vivo, que es
-                cuando puede engañar. La firma se guarda al capturarla, así que
-                descartar no la deshace — decirlo aquí es más barato que el
-                soporte de quien creyó que sí. */}
-            {hayCambios && (
-              <p className="sp-hint mt-[2px]">
-                La firma se guarda sola al capturarla: «Descartar» no la revierte.
-              </p>
-            )}
-          </div>
-
-          <div className="shrink-0 flex items-center gap-[var(--sp-gap-item)] max-sm:grid max-sm:grid-cols-2">
-            <button
-              type="button"
-              onClick={descartarCambios}
-              disabled={!hayCambios || guardando || subiendoLogo}
-              className="sp-btn sp-btn--secondary max-sm:min-h-[var(--sp-ctrl-h-mobile)] disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              Descartar
-            </button>
-            {/* ⚠️ INHABILITADO = SECUNDARIO, NO PRIMARIO APAGADO. El spec pide
-                que el estado inhabilitado siga siendo legible, y
-                `.sp-btn--primary:disabled` pinta texto blanco sobre un gris
-                azulado claro que no llega al 4.5:1. El secundario es
-                superficie neutra con texto secundario: justo lo que el spec
-                describe, y ya está en el sistema. */}
-            <button
-              type="submit"
-              disabled={!hayCambios || guardando || subiendoLogo}
-              className={`sp-btn ${hayCambios ? 'sp-btn--primary' : 'sp-btn--secondary'} max-sm:min-h-[var(--sp-ctrl-h-mobile)] disabled:cursor-not-allowed`}
-            >
-              {guardando || subiendoLogo
-                ? <><Loader2 size={15} className="animate-spin" /> {subiendoLogo ? 'Subiendo logo...' : 'Guardando...'}</>
-                : <><Save size={15} /> Guardar cambios</>}
-            </button>
+            </div>
           </div>
         </div>
-
-      </form>
+      </Portal>
 
       {/* Modales F3-5b */}
       <AddConsultorioModal

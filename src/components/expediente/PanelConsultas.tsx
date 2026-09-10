@@ -8,6 +8,7 @@ import { buildNotaRenderData, type AddendumInput } from '@/lib/notaRenderData'
 import { generarPdf } from '@/lib/mobileShare'
 import { generateDocFileName } from '@/lib/patientUtils'
 import { useProfile } from '@/hooks/useProfile'
+import { useAuditAccess } from '@/hooks/useAudit'
 import { AvisoColumna } from '@/components/dashboard/piezasBanda2'
 import CarrilConsultas from './CarrilConsultas'
 import VisorNota from './VisorNota'
@@ -108,6 +109,20 @@ export default function PanelConsultas({
   }, [consultas, consultaSolicitadaId])
 
   const seleccionada = consulta?.id ?? null
+
+  /* ⚠️ NOM-024: LEER EL CUERPO DE UNA NOTA ES UN ACCESO Y SE REGISTRA. Este
+     panel es un SEGUNDO camino de lectura hacia el mismo dato que
+     `/expediente/[id]/consulta/[consultaId]`, que sí lo registra con esta misma
+     llamada. Aquella ruta sigue intacta; lo que faltaba era esto, así que
+     navegar por el carril leía notas sin dejar rastro.
+     Va sobre la nota SELECCIONADA, no sobre la lista: el carril enseña
+     encabezados, y lo que se audita es el cuerpo que se despliega al lado.
+     `useAuditAccess` guarda la última clave registrada, no un booleano, así que
+     cambiar de nota dentro del panel produce una entrada nueva —una por nota,
+     igual que la ruta— y a la vez no duplica si se vuelve a la misma.
+     `?? undefined` porque el hook ignora el id ausente; sin notas no hay acceso
+     que registrar. */
+  useAuditAccess('consultas', seleccionada ?? undefined)
 
   /* Perfil vivo, UNA vez para toda la pestaña: la firma y los colores del PDF
      no tienen snapshot en `consultas` y se resuelven contra el perfil actual.

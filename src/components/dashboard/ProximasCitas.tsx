@@ -175,6 +175,23 @@ export function ProximasCitasCargando() {
  * cero. Si algún día vuelves a meter los botones dentro con un
  * `variante === 'medico'`, esa garantía se pierde entera.
  */
+/**
+ * ⚠️ NO HAY FILTRO DE MÉDICO, Y NO ES UN OLVIDO: SE DECIDIÓ NO PONERLO.
+ *
+ * El spec del dashboard de la secretaria pide un selector para filtrar estas
+ * citas por médico. Se descartó por dos razones, y las dos siguen vigentes:
+ *
+ *   · En la vista de la secretaria (`medicoId === null`) CADA RENGLÓN YA DICE
+ *     de qué médico es la cita — se pinta abajo, junto al consultorio. Un
+ *     filtro sobre cuatro filas que ya vienen etiquetadas añade un control que
+ *     hay que aprender para esconder información que cabía entera.
+ *   · Para filtrar de verdad está LA AGENDA, que es la pantalla de la jornada
+ *     completa y ya tiene su selector de médico. Este panel es un vistazo a lo
+ *     que viene ahora, no una herramienta de consulta.
+ *
+ * Si vuelves aquí desde el spec creyendo que falta algo, esto es lo que falta:
+ * nada. Añadirlo es una decisión de producto, no la corrección de un defecto.
+ */
 export default function ProximasCitas({ medicoId, acciones }: {
   /* `null` = todas las citas de la clínica (vista de la secretaria). Un id =
      sólo las de ese médico. Cuando es `null` la consulta trae además el médico
