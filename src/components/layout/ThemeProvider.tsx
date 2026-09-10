@@ -188,6 +188,17 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     html.dark .prose h1, html.dark .prose h2,
     html.dark .prose h3, html.dark .prose h4 { color: #93c5fd !important; }
 
+    /* ATENCION: ESTA HOJA TIENE UNA SEGUNDA MITAD, Y VIVE EN app/globals.css
+       (busca «AMPLIACION DE LA HOJA DE TRADUCCION»). Alli estan el escalon 100
+       de cada color, la tinta de los escalones 700-900, las variantes de estado
+       (disabled:, hover:, focus:) y la familia gray. Estan alla y no aqui
+       porque no dependen de --cp / --cs y asi no se reconstruyen en cada
+       render. Antes de anadir una regla, mira si le toca a este archivo o al
+       otro — y NO la dupliques: este <style> se inserta despues, asi que a
+       igualdad de peso gana el y la copia de alla quedaria muerta.
+       ATENCION 2: este comentario NO puede llevar comillas invertidas. Todo el
+       bloque es un template literal de JS y una comilla invertida lo cierra. */
+
     /* ── Badges de color — usar tint suave, no bloques sólidos oscuros ── */
     html.dark .bg-blue-50    { background-color: rgba(59,130,246,0.14)  !important; }
     html.dark .bg-emerald-50 { background-color: rgba(16,185,129,0.14)  !important; }
