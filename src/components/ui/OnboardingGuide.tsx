@@ -595,7 +595,7 @@ export default function OnboardingGuide() {
             : 'opacity-0 translate-y-4 scale-95'
         }`}
       >
-        <div className="w-[360px] bg-white/95 backdrop-blur-xl rounded-2xl shadow-[0_8px_40px_rgba(0,0,0,0.12)] border border-slate-200/60 overflow-hidden">
+        <div className="w-[360px] bg-[var(--sp-surface-glass)] backdrop-blur-xl rounded-2xl shadow-[0_8px_40px_rgba(0,0,0,0.12)] border border-slate-200/60 overflow-hidden">
 
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-[#1a3a5c] to-[#1e5fa8]">
