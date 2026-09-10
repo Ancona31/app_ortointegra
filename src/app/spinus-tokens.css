@@ -223,6 +223,27 @@
   --sp-ink-150:            #b7c2cf;  /* ícono de estado vacío */
   --sp-ink-100:            #c3ccd8;  /* chevron inerte, borde punteado */
 
+  /* EL CONTORNO DE UN CONTROL — botones de contorno y campos, y SÓLO ellos.
+     ⚠️ EXISTE PORQUE 1.4.11 PIDE 3:1 PARA EL CONTORNO DE UN COMPONENTE Y EL
+     RESTO DE LA FAMILIA NO LLEGA. `--sp-line-input` mide 1.36:1 sobre blanco y
+     `--sp-line-soft` 1.23:1; a esas cifras un botón de contorno no anuncia que
+     lo es, y el borde es lo único que tiene para anunciarse — no hay relleno.
+     ⚠️ NO SUBAS `--sp-line-input` NI `--sp-line-soft` EN SU LUGAR, que era la
+     salida obvia. Los comparten roles donde un borde fuerte significa otra cosa:
+     el aro del paso PENDIENTE (`.sp-step__dot`), el borde de una acción
+     DESHABILITADA (`AccionesDocumento.tsx`) y el filete de una cita
+     (`.sp-ed-prose blockquote`). En los tres, reforzarlos no es ruido: es decir
+     lo contrario de lo que dicen.
+     ⚠️ SE MUEVE EN LOS DOS TEMAS, y eso es deliberado. Los bordes de hoy miden
+     casi lo mismo en claro (1.36) que en oscuro (1.44): el modo oscuro estaba
+     copiando fielmente al claro, así que esto NO era un defecto de la traducción
+     a oscuro. Subirlo sólo ahí habría dejado los controles más marcados en
+     oscuro que en claro, que es la divergencia entre temas que el sistema
+     prohíbe.
+     Del hue y la saturación de la familia (H 214 · S 33) sólo se mueve la
+     claridad. Medido contra las cuatro superficies: 3.38 sobre card, 3.29 sobre
+     hundida, 3.00 sobre sección y 3.17 sobre el fondo de la app. */
+  --sp-line-control:       #6f8eb6;  /* CONTORNO DE CONTROL: botón de contorno y campo */
   --sp-line-strong:        #cbd5e1;  /* borde de checkbox */
   --sp-line-dash:          #b9c4d2;  /* borde punteado (slot diferido, underline de link) */
   --sp-line-input:         #d5deea;  /* BORDE DE CONTROL: input, textarea, botón secundario */
@@ -457,6 +478,12 @@ html.dark {
   --sp-ink-100:  rgba(255,255,255,.28);        /* TP:142 — colapso */
 
   /* — LÍNEAS — */
+  /* Ver la nota larga de la variante clara. En `rgba` y no en un gris opaco por
+     lo mismo que el resto de la familia: así funciona igual sobre las cuatro
+     superficies sin necesitar cuatro valores. Medido: 3.22:1 sobre la card,
+     3.18 sobre la hundida, 3.07 sobre la de sección y 3.21 sobre el fondo de la
+     app — el peor caso es la de sección, que es la más clara. */
+  --sp-line-control: rgba(255,255,255,.35);
   --sp-line-divider: rgba(255,255,255,.08);    /* TP:125,128 */
   --sp-line-soft:    rgba(255,255,255,.08);    /* TP:125 */
   --sp-line-card:    rgba(255,255,255,.12);    /* TP:124 */
@@ -792,7 +819,7 @@ a:hover { color: var(--sp-primary-active); }
 
 .sp-btn--secondary {
   background: var(--sp-surface); color: var(--sp-ink-500);
-  border: var(--sp-bw-hair) solid var(--sp-line-input);
+  border: var(--sp-bw-hair) solid var(--sp-line-control);
   font-weight: var(--sp-fw-semi); font-size: var(--sp-fs-btn-sm); padding: 13px 24px;
 }
 .sp-btn--secondary:hover { background: var(--sp-surface-muted); color: var(--sp-ink-700); }
@@ -800,10 +827,10 @@ a:hover { color: var(--sp-primary-active); }
 /* Terciario: rejilla de acciones post-guardado */
 .sp-btn--tertiary {
   background: var(--sp-surface); color: var(--sp-ink-700);
-  border: var(--sp-bw-hair) solid var(--sp-line-soft);
+  border: var(--sp-bw-hair) solid var(--sp-line-control);
   font-weight: var(--sp-fw-semi); font-size: var(--sp-fs-body-sm); padding: 13px;
 }
-.sp-btn--tertiary:hover { border-color: var(--sp-line-input); background: var(--sp-surface-sunken); }
+.sp-btn--tertiary:hover { border-color: var(--sp-line-control); background: var(--sp-surface-sunken); }
 
 /* Compacto: acción inline dentro de una card interna ("Editar", "Regenerar") */
 /* ⚠️ LA TINTA VA EN `--sp-primary-text` Y NO EN `--sp-primary`. Éste es un botón
@@ -814,7 +841,7 @@ a:hover { color: var(--sp-primary-active); }
    valen lo mismo, así que ahí no cambia nada. */
 .sp-btn--compact {
   background: var(--sp-surface); color: var(--sp-primary-text);
-  border: var(--sp-bw-hair) solid var(--sp-line-input);
+  border: var(--sp-bw-hair) solid var(--sp-line-control);
   font-weight: var(--sp-fw-semi); font-size: var(--sp-fs-meta);
   padding: 7px 13px; border-radius: var(--sp-r-btn-xs); min-height: 34px;
 }
@@ -942,7 +969,7 @@ a:hover { color: var(--sp-primary-active); }
 .sp-input, .sp-textarea {
   width: 100%; box-sizing: border-box;
   background: var(--sp-surface-sunken);
-  border: var(--sp-bw-hair) solid var(--sp-line-input);
+  border: var(--sp-bw-hair) solid var(--sp-line-control);
   border-radius: var(--sp-r-field);
   padding: 11px 13px;
   font-family: inherit; font-size: var(--sp-fs-body); line-height: var(--sp-lh-snug);
@@ -1804,7 +1831,7 @@ input[type="date"].sp-input {
 /* Botón del menú. Separado del grupo de formato con `margin-left: auto` para
    no pulsarlo al ir a por las listas, y con borde para leerse como otra cosa.
    En nivel 3 no se renderiza: las nueve están en la barra. */
-.sp-ed-more { margin-left: auto; border: var(--sp-bw-hair) solid var(--sp-line-input); }
+.sp-ed-more { margin-left: auto; border: var(--sp-bw-hair) solid var(--sp-line-control); }
 @container docform (min-width: 760px) { .sp-ed-more { display: none; } }
 
 /* El reparto de §3.3, en dos pares de clases:
