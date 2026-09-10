@@ -85,11 +85,11 @@
      dos veces: el acento de un control no es el color del estado «confirmada»,
      y la próxima rotación de la paleta de estado se lo llevaría por delante. */
   --ag-brand-legible: var(--ag-brand-secondary);
-  /* ⚠️ EL NAVY DE LA BANDA MÓVIL, Y ES LA FÓRMULA DEL MENÚ LATERAL, NO UN VALOR
-     NUEVO. Está copiada de `Sidebar.tsx:248` para que las dos superficies de
-     cromo de la app —el menú y la banda de la agenda— salgan del MISMO azul del
-     usuario y no puedan divergir. Que viva aquí como token y no en línea es lo
-     que hace que se pueda comprobar de un vistazo que son la misma.
+  /* ⚠️ EL NAVY DE LA BANDA MÓVIL, Y TAMBIÉN EL DEL MENÚ LATERAL. Éste es el
+     único sitio donde vive la fórmula: `Sidebar.tsx` la tenía escrita en línea
+     —duplicada— y desde el respaldo de `@supports` consume este token, para que
+     las dos superficies de cromo de la app —el menú y la banda de la agenda—
+     salgan del MISMO azul del usuario y no puedan divergir.
      ⚠️ NO ES `--ag-brand-primary`. Ése es `--cp` a pelo (#1a3a5c por defecto);
      esto es ese mismo tono bajado al 20 % de luminosidad, que es lo que el menú
      enseña de verdad.
@@ -99,7 +99,26 @@
      ella, o sea que tampoco dependen del tema.
      ⚠️ Y NO SE TOCAN `--sp-nav-from/mid/to` de `spinus-tokens.css`: están
      comentados con un «No usar: el sidebar se tematiza en Sidebar.tsx». */
-  --ag-navy: hsl(from var(--cp, #1a3a5c) h s 20%);
+  /* ⚠️⚠️ ESTE LITERAL ES EL RESPALDO, NO EL VALOR. El valor de verdad es la
+     fórmula, y vive en el `@supports` de más abajo (busca «--ag-navy» otra vez
+     en este archivo). Aquí abajo va el hex al que esa fórmula resuelve CON LA
+     MARCA POR DEFECTO —el mismo #163250 que `layout.tsx:44` declara como
+     `themeColor`—, para que un navegador sin sintaxis de color relativa pinte
+     el navy de fábrica en vez de no pintar nada.
+     ⚠️ SIN ESTA LÍNEA EL FALLO ES MUDO Y GRANDE: `--ag-navy` es una custom
+     property, así que un navegador sin soporte NO descarta la declaración —la
+     guarda tal cual— y el fallo salta al sustituir, dejando `background:
+     var(--ag-navy)` inválido en tiempo de valor calculado. Eso computa a
+     `unset`, o sea `transparent`: se quedaban sin fondo la franja del sistema
+     (`body::before`), la banda móvil de la agenda, su esqueleto de carga y el
+     menú lateral entero. Y NO se puede arreglar declarando el hex y la fórmula
+     seguidos: la sustitución inválida no vuelve a la declaración anterior de la
+     cascada. Por eso hace falta el `@supports`.
+     ⚠️ EN UN NAVEGADOR VIEJO UNA CLÍNICA CON MARCA PROPIA VE EL NAVY DE
+     FÁBRICA, no el suyo. Es deliberado: un literal no puede seguir a `--cp`.
+     Ese navegador ya no puede tener Tailwind 4 entero, así que la ventana real
+     es Chrome/Edge 111-118. */
+  --ag-navy: #163250;
   /* ⚠️ NO LO «UNIFIQUES» CON EL ROJO DE «CANCELADA» (--ag-status-cancelled-dot,
      hoy #c0392b). Se parecen y la línea cruza por encima de las tarjetas, pero
      dicen cosas distintas: una es la hora actual, la otra el estado de una cita.
@@ -738,6 +757,27 @@
 @supports (background: color-mix(in srgb, #000 4%, #fff)) {
   :root {
     --lp-wash: color-mix(in srgb, var(--lp-accent) 4%, #fff);
+  }
+}
+
+/* Par del respaldo de --ag-navy, y la MISMA historia de orden que el de arriba:
+   fuera de `:root` porque un @supports no puede vivir dentro de una regla, y
+   DESPUÉS porque las dos declaraciones pesan igual (0,1,0) y desempata el orden
+   de fuente. Si esto subiera por encima del `:root`, el literal lo pisaría y la
+   marca de la clínica dejaría de aplicarse en TODOS los navegadores.
+
+   La prueba de `@supports` va con `hsl()` y no con `oklch()` a propósito: lo que
+   hay que detectar es exactamente la función que se usa abajo. Un navegador que
+   soporte una y no la otra —no conozco ninguno, pero el listón es gratis— caería
+   al respaldo, que es lo correcto.
+
+   Sin aritmética sobre canales: `h` y `s` se reenvían intactos y la claridad es
+   un literal. Los defectos de «soporte parcial» de Chrome 119-130 y Safari
+   16.4-17.6 son de unidades dentro de `calc()` sobre canales, así que no tocan a
+   esta fórmula. */
+@supports (color: hsl(from red h s l)) {
+  :root {
+    --ag-navy: hsl(from var(--cp, #1a3a5c) h s 20%);
   }
 }
 

@@ -373,9 +373,21 @@ export default function Sidebar() {
           ⚠️ SE APAGA EN `lg`: en escritorio no hay áreas seguras que valgan y
           los `env()` ya devuelven 0, pero dejarlo explícito evita que un futuro
           navegador de escritorio con insets meta relleno donde no toca. */}
+      {/* ⚠️ EL FONDO SALE DEL TOKEN Y YA NO DE LA FÓRMULA EN LÍNEA, Y ES UN
+          ARREGLO, NO UN REFACTOR. Aquí estuvo escrito
+          `hsl(from var(--cp, #1a3a5c) h s 20%)` a pelo, sin respaldo: en un
+          navegador sin sintaxis de color relativa esa declaración se descarta al
+          parsear, y como el `className` de abajo NO trae ninguna clase de fondo,
+          el menú se quedaba TRANSPARENTE con su texto blanco encima de la
+          página. `--ag-navy` resuelve a esa misma fórmula y trae el respaldo
+          literal en `globals.css`, así que un navegador viejo pinta el navy de
+          fábrica en vez de nada.
+          ⚠️ NO LO DEVUELVAS A LA FÓRMULA EN LÍNEA. Además del respaldo, el token
+          es lo que impide que el menú y la banda móvil de la agenda diverjan:
+          eran dos copias de la misma cuenta y ahora es una sola. */}
       <aside
         style={{
-          background: 'hsl(from var(--cp, #1a3a5c) h s 20%)',
+          background: 'var(--ag-navy)',
         }}
         className={`
           fixed inset-y-0 left-0 w-64 text-white z-40 flex flex-col
