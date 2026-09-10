@@ -7,16 +7,74 @@ type ThemeCtx = { dark: boolean; toggle: () => void }
 const Ctx = createContext<ThemeCtx>({ dark: false, toggle: () => {} })
 export const useTheme = () => useContext(Ctx)
 
+/* LA BARRA DEL NAVEGADOR, SINCRONIZADA CON EL TEMA QUE EL MEDICO ELIGIO.
+ *
+ * ATENCION: EL <meta name="theme-color"> DE layout.tsx NO PUEDE HACER ESTO SOLO,
+ * y por eso existe esta funcion. Aquel declara dos entradas con
+ * `prefers-color-scheme`, que es la preferencia del SISTEMA; el tema de la app
+ * lo decide la clase `dark` que leemos de localStorage. Un medico con el sistema
+ * en claro y la app en oscuro veia la barra del navegador en el navy claro
+ * mientras la pagina estaba en el oscuro. Reescribiendo el `content` de LAS DOS
+ * entradas con el mismo valor, la que gane dice lo correcto sea cual sea la
+ * preferencia del sistema.
+ *
+ * Y DE PASO LA BARRA PASA A SEGUIR A LA MARCA DE LA CLINICA, que el <meta>
+ * tampoco podia: el navegador lo lee antes de que exista CSS. Aqui si hay CSS,
+ * asi que el color sale de --ag-navy resuelto de verdad.
+ *
+ * POR QUE HACE FALTA EL LIENZO: --ag-navy resuelve a `color(srgb ...)` o a
+ * `oklch(...)` —usa sintaxis de color relativa—, y `theme-color` quiere un color
+ * que el navegador acepte en un atributo. El lienzo lo normaliza a hex.
+ * El centinela magenta detecta que el lienzo NO supo parsear el color: si eso
+ * pasa, `fillStyle` se queda como estaba y salimos sin tocar nada, que es mejor
+ * que pintar la barra de negro.
+ */
+function sincronizarBarraDelNavegador(): void {
+  try {
+    const metas = document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')
+    if (metas.length === 0) return
+
+    const sonda = document.createElement('div')
+    sonda.style.cssText = 'position:absolute;width:0;height:0;visibility:hidden;background:var(--ag-navy)'
+    document.body.appendChild(sonda)
+    const pintado = getComputedStyle(sonda).backgroundColor
+    sonda.remove()
+
+    const lienzo = document.createElement('canvas')
+    lienzo.width = lienzo.height = 1
+    const ctx = lienzo.getContext('2d')
+    if (!ctx) return
+    const CENTINELA = '#ff00ff'
+    ctx.fillStyle = CENTINELA
+    ctx.fillStyle = pintado
+    if (ctx.fillStyle === CENTINELA) return
+    ctx.fillRect(0, 0, 1, 1)
+    const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data
+    const hex = '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join('')
+
+    metas.forEach(m => { m.content = hex })
+  } catch {}
+}
+
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const { colorPrimario, colorSecundario } = useClinica()
   const [dark, setDark] = useState(false)
 
+  /* ATENCION: LA CLASE `dark` YA LA PUSO EL SCRIPT DEL <head> DE layout.tsx, y
+     este efecto NO es quien quita el destello. Lo que hace es poner el estado de
+     React de acuerdo con el DOM —el interruptor del menu lo lee— y sincronizar
+     la barra del navegador. El classList.add es idempotente y se queda como red
+     por si alguien retira aquel script.
+     `colorPrimario` esta en las dependencias porque llega por SWR: en el primer
+     render todavia es el de fabrica, y sin esto la barra se quedaria con el navy
+     por defecto hasta la siguiente recarga. */
   useEffect(() => {
     try {
       const saved = localStorage.getItem('theme')
       if (saved === 'dark') { setDark(true); document.documentElement.classList.add('dark') }
     } catch {}
-  }, [])
+    sincronizarBarraDelNavegador()
+  }, [colorPrimario])
 
   const toggle = useCallback(() => {
     setDark(prev => {
@@ -25,6 +83,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         localStorage.setItem('theme', next ? 'dark' : 'light')
         document.documentElement.classList.toggle('dark', next)
       } catch {}
+      /* Despues de mover la clase, no antes: la sonda lee --ag-navy del tema que
+         acaba de quedar activo. */
+      sincronizarBarraDelNavegador()
       return next
     })
   }, [])

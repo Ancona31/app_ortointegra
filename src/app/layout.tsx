@@ -42,14 +42,15 @@ export const viewport: Viewport = {
      eso dejó de valer. Los dos valores son los que `--ag-navy` resuelve con la
      marca de fábrica en cada tema: #163250 en claro y #2f4f73 en oscuro.
 
-     ⚠️⚠️ ESTO SIGUE A `prefers-color-scheme`, PERO LA APP NO. El tema lo decide
-     la clase `dark` que `ThemeProvider` escribe en <html> leyendo
-     `localStorage`, y un `<meta>` no puede consultar eso: el navegador lo lee
-     antes de que exista JavaScript. O sea que un médico con el sistema en claro
-     y la app en oscuro verá la barra del navegador en el navy CLARO mientras la
-     página está en el oscuro. Es una divergencia conocida y sin arreglo posible
-     desde aquí — la salida sería que `ThemeProvider` reescribiera la etiqueta
-     al alternar, que es otro cambio y toca un componente.
+     ⚠️⚠️ ESTOS DOS VALORES SON SÓLO LA PRIMERA APROXIMACIÓN. En cuanto hay
+     JavaScript, `ThemeProvider` reescribe el `content` de LAS DOS entradas con
+     el navy del tema que el médico eligió de verdad —y resuelto desde
+     `--ag-navy`, así que además sigue a la marca de la clínica—. Ver
+     `sincronizarBarraDelNavegador` en `layout/ThemeProvider.tsx`.
+     Lo de aquí es lo que se ve en el instante antes de que ese código corra, y
+     por eso conserva el `media`: sin nada mejor, la preferencia del sistema es
+     la mejor conjetura. NO LAS UNIFIQUES EN UNA SOLA sin `media` creyendo que
+     ahora sobran: durante ese instante volvería el destello de la barra.
      Dónde se nota: Chrome de Android y la barra de direcciones. En la app
      instalada de iOS NO, porque allí la barra es `black-translucent` y lo que
      se ve es el píxel de `body::before`, que sí sale de `--ag-navy` y sí sigue
