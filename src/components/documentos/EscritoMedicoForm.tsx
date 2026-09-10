@@ -4,7 +4,8 @@ import { useMedicoInfo } from '@/hooks/useMedicoInfo'
 import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
 
 import { useEffect, useRef, useState } from 'react'
-import { AlertTriangle, Printer } from 'lucide-react'
+import { AlertTriangle } from 'lucide-react'
+import PieAccionesDocumento from '@/components/documentos/PieAccionesDocumento'
 import { flushSync } from 'react-dom'
 import { generarPdf, VERSION_DE_EMISION, versionQueEmite } from '@/lib/mobileShare'
 import { useToast } from '@/components/ui/Toast'
@@ -526,19 +527,12 @@ export default function EscritoMedicoForm({ pacienteInicial = '', pacienteId, of
 
       {/* «Guardar como plantilla» va aquí y no arriba: se guarda cuando el
           formulario YA está lleno, así que su sitio es junto al de imprimir. */}
-      <div className="sp-doc-actions">
-        {plantillas.botonGuardar}
-        <button type="button" onClick={imprimir} disabled={imprimiendo || perfilPendiente}
-          className="sp-btn sp-btn--primary">
-          {imprimiendo ? <><span className="sp-spinner" /> Generando PDF…</>
-            : perfilPendiente ? <><span className="sp-spinner" /> Cargando tu perfil…</>
-            : <>
-                <Printer size={17} />
-                <span className="sp-doc-long">Imprimir escrito médico</span>
-                <span className="sp-doc-short">Imprimir</span>
-              </>}
-        </button>
-      </div>
+      <PieAccionesDocumento
+        botonGuardar={plantillas.botonGuardar}
+        onImprimir={imprimir}
+        imprimiendo={imprimiendo}
+        perfilPendiente={perfilPendiente}
+      />
 
       </div>
 

@@ -231,10 +231,22 @@ export function usePlantillasDocumento(op: OpcionesPlantillas): PiezasPlantillas
         }}
         disabled={vacioParaGuardar}
         title={vacio ? 'Llena el formulario para poder guardarlo como plantilla.' : undefined}
-        className="sp-btn sp-btn--secondary"
-        style={{ flex: '0 0 auto', whiteSpace: 'nowrap' }}
+        /* ⚠️ EL REPARTO SALIÓ DEL `style` INLINE A `.sp-tpl-guardar`, Y NO ES
+           COSMÉTICA: un estilo en línea gana a CUALQUIER hoja, así que con
+           `flex: 0 0 auto` escrito aquí la barra del consentimiento no podía
+           repartir este botón a media fila. Las declaraciones son las mismas
+           —`flex: 0 0 auto` y `white-space: nowrap`—, sólo que ahora se pueden
+           sobrescribir desde donde se conoce la fila. */
+        className="sp-btn sp-btn--secondary sp-tpl-guardar"
       >
-        <Save size={17} /> Guardar como plantilla
+        <Save size={17} />
+        {/* ⚠️ EL RÓTULO SE ACORTA SÓLO DENTRO DE `.sp-doc-actions`, y de ahí que
+            las clases lleven ese prefijo: la regla está scopada a la barra. En
+            el Consentimiento este mismo botón vive arriba, junto al selector y
+            solo en su renglón, donde hay sitio de sobra y sigue diciéndolo
+            entero. Ver `spinus-tokens.css`, sección de la barra de acciones. */}
+        <span className="sp-doc-actions__long">Guardar como plantilla</span>
+        <span className="sp-doc-actions__short">Plantilla</span>
       </button>
     ),
     panel: panelAbierto ? (
@@ -352,8 +364,14 @@ function CardSelector(p: PropsSelector) {
                 className="sp-btn sp-btn--compact sp-tpl-manage"
               >
                 <Settings2 />
-                <span className="sp-doc-long">Gestionar</span>
-                <span className="sp-doc-short">Gestionar plantillas</span>
+                {/* ⚠️ ESTE PAR ESTUVO INVERTIDO: `sp-doc-long` llevaba
+                    «Gestionar» y `sp-doc-short` llevaba «Gestionar plantillas»,
+                    o sea que la pantalla estrecha —que es la que conmuta a
+                    `short`— enseñaba el rótulo LARGO, y la ancha el corto,
+                    justo del revés. Las clases dicen qué ancho las enciende,
+                    no cuánto mide el texto que envuelven. */}
+                <span className="sp-doc-long">Gestionar plantillas</span>
+                <span className="sp-doc-short">Gestionar</span>
               </button>
             </div>
           )}

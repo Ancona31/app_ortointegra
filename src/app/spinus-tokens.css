@@ -1527,9 +1527,160 @@ input[type="date"].sp-input {
   display: flex; align-items: center; gap: var(--sp-gap-item);
 }
 .sp-doc-actions > .sp-btn--primary { flex: 1; min-height: var(--sp-ctrl-h-desktop); }
+
+/* ⚠️ AL FINAL DEL SCROLL LA BARRA NO TAPA NADA, Y NO HACE FALTA NINGÚN RELLENO
+   QUE LO EVITE: es `sticky`, o sea que sigue EN FLUJO y ocupa su sitio detrás
+   del último campo. Un `fixed` sí habría exigido reservarle el alto abajo. Se
+   comprobó midiendo, en los siete anchos: el último campo termina por encima.
+
+   LO QUE SÍ HAY QUE RESERVAR es lo que el navegador usa al LLEVAR UN CAMPO A LA
+   VISTA —tabular al último, o el teclado del móvil—, porque «a la vista» para
+   él es el scroller entero, barra incluida, y el campo acaba debajo. Eso no se
+   arregla con relleno sino con `scroll-padding`, que es justo para esto.
+
+   El `:has()` acota la regla a las pantallas que llevan barra y deja intactas
+   las otras veinte del layout; es el mismo recurso, y por el mismo motivo, que
+   `main > div:has(.agenda-fc)` en `globals.css`.
+
+   150px NO es un alto medido de la barra sino su techo con margen: mide 77 en
+   renglón único y 135 en dos, y no hay forma de que el CSS lea la altura de un
+   descendiente. Pasarse aquí no cuesta nada —sólo adelanta un poco el punto al
+   que salta el campo—; quedarse corto lo deja tapado. */
+main:has(.sp-doc-actions) { scroll-padding-bottom: 150px; }
+/* Reparto de `.sp-tpl-guardar`, que estuvo en un `style` inline de
+   `PlantillasDocumento` y desde aquí sí se puede sobrescribir. */
+.sp-tpl-guardar { flex: 0 0 auto; white-space: nowrap; }
+/* ⚠️ EL `:not()` DEJA FUERA A LA BARRA DE DOS FILAS A PROPÓSITO. Sus hijos no
+   son botones sino los dos renglones, así que `column-reverse` los pondría del
+   revés —decidir arriba, guardar abajo— y el `width: 100%` sobra porque ya se
+   estiran. Esa barra se ordena sola, más abajo. */
 @container docform (max-width: 379px) {
-  .sp-doc-actions { flex-direction: column-reverse; }
-  .sp-doc-actions > * { width: 100%; }
+  .sp-doc-actions:not(.sp-doc-actions--filas) { flex-direction: column-reverse; }
+  .sp-doc-actions:not(.sp-doc-actions--filas) > * { width: 100%; }
+}
+
+/* Rótulos que se acortan cuando la FILA aprieta.
+ *
+ * ⚠️ NO SON `.sp-doc-long` / `.sp-doc-short`, aunque se le parezcan. Aquélla
+ * conmuta a 379px y sirve a los botones de CABECERA («Agregar estudio») y al
+ * selector de plantillas; ésta conmuta mucho antes y sólo dentro de la barra.
+ * Tener dos umbrales no es un descuido: son dos sitios con dos aprietos
+ * distintos, y unificarlos vaciaría de texto los botones de cabecera en anchos
+ * donde les sobra.
+ *
+ * POR QUÉ 767 Y NO EL UMBRAL DEL APILADO. La barra sólo se apila por debajo de
+ * 380px de contenedor, y ahí cada botón ocupa el ancho entero: los rótulos
+ * largos caben. El problema estaba JUSTO ENCIMA, entre 380 y ~700, donde la
+ * fila vuelve a ser horizontal y el contenido ya no cabe — un iPhone Pro Max
+ * deja el contenedor en ~398px y caía de lleno ahí, mientras que uno de 390 se
+ * apilaba y se veía bien. De ahí que el defecto se reprodujera en un teléfono
+ * sí y en el de al lado no.
+ *
+ * Las cuentas, con los tokens de `.sp-btn--secondary` (15px, padding 13/24) y
+ * `.sp-btn--primary` (15.5px, padding 13/26), icono de 17 y `--sp-gap-item`:
+ *   · dos botones, rótulos largos ....... ≈401px  (no cabe a 380)
+ *   · dos botones, secundario corto ..... ≈299px  (cabe con holgura)
+ *   · tres botones del consentimiento,
+ *     rótulos largos .................... ≈671px
+ *   · los mismos tres, cortos ........... ≈368px
+ *
+ * ⚠️ SON DOS UMBRALES PORQUE SON DOS APRIETOS, y juntarlos en uno estropea el
+ * otro lado: con el 767 del consentimiento aplicado a todas, la barra de dos
+ * botones diría «Plantilla» en una tablet de 788px donde el rótulo entero cabe
+ * con 380px de sobra. Cada barra se acorta cuando le toca a ella.
+ * Los dos van por encima de lo que piden las cuentas —479 sobre 401, 767 sobre
+ * 671— porque la anchura de un texto depende de la fuente del sistema, que no
+ * controlamos, y quedarse corto aquí es volver a partir el rótulo en dos.
+ */
+.sp-doc-actions__short { display: none; }
+
+/* ⚠️ LOS DOS LLEVAN SUELO DE 380 Y NO SÓLO TECHO, Y ES LO QUE HACE FALTA. Por
+   debajo de 380 la barra ya no es una fila: es una columna con cada botón al
+   ancho completo (la regla de arriba), y ahí el rótulo entero cabe de sobra.
+   Acortarlo también allí sería quitar texto sin ninguna razón, justo en la
+   pantalla más pequeña, que es donde más ayuda leerlo completo. El acortado
+   pertenece a la banda en que los botones COMPARTEN renglón, ni antes ni
+   después. */
+
+/* Barra normal: dos botones. */
+@container docform (min-width: 380px) and (max-width: 479px) {
+  .sp-doc-actions .sp-doc-actions__long  { display: none; }
+  .sp-doc-actions .sp-doc-actions__short { display: inline; }
+}
+
+/* ── Barra del consentimiento: CUATRO acciones ──────────────────────────
+ *
+ * Ancho: un renglón, los cuatro, en el orden del marcado y con el primario
+ * estirándose. Estrecho: la barra ENVUELVE en dos renglones de dos, y las
+ * `order` de abajo deciden las parejas.
+ *
+ * ⚠️ AQUÍ ESTUVO UN SISTEMA DE ENVOLTORIOS CON `display: contents`, y se
+ * sustituyó entero. Un envoltorio ata cada botón a su renglón para siempre, y
+ * la disposición pedida empareja distinto según el ancho —«Plantilla» va con
+ * «Firmar» y «Sin firma» con «Borrador», que no son consecutivos en el orden de
+ * escritorio—. Con `flex-wrap` el renglón es un resultado del ancho, no una
+ * caja, y `order` puede recomponer las parejas sin tocar el marcado.
+ *
+ * LAS CUENTAS, con los tokens de siempre (secundario 15px con padding 13/24,
+ * primario 15,5px con 13/26, icono 17-18 y `--sp-gap-item`):
+ *
+ *   RENGLÓN ÚNICO, los cuatro, con «Plantilla» corto ......... ≈833px
+ *     · Guardar borrador ....... 165   · Plantilla ................ 145
+ *     · Imprimir sin firma ..... 203   · Iniciar firmado elec. .... 290
+ *     · tres huecos ............. 30
+ *
+ *   ⚠️ SON 36px MÁS QUE ANTES DE ESTE PASO, y de ahí que el umbral suba de 840
+ *   a 896: «Guardar borrador» dejó de ser `--ghost` (padding 13/6, sin borde) y
+ *   pasó a `--secondary` (13/24) para que se lea como botón, y esos 36px se
+ *   comieron la holgura que 840 le daba. 896 es el contenedor MÁS ANCHO de la
+ *   app —`max-w-4xl` en escritorio—, así que el renglón único queda para cuando
+ *   de verdad cabe, con 63px de sobra, y por debajo se envuelve.
+ *
+ *   DOS RENGLONES, a mitades y con los cuatro rótulos cortos, contra 159 de
+ *   media fila a 328px de contenedor (un teléfono de 360):
+ *     · Borrador 108   · Plantilla 112   · Sin firma 115   · Firmar 104
+ *   El más ancho de los cuatro pide 115 y la mitad da 159: sobran 44.
+ */
+
+/* Renglón único: el reparto de siempre. */
+.sp-doc-actions--filas > .sp-btn { flex: 0 0 auto; white-space: nowrap; }
+.sp-doc-actions--filas > .sp-btn--primary { flex: 1; min-height: var(--sp-ctrl-h-desktop); }
+
+/* «Guardar como plantilla» va corto en esta barra a TODOS los anchos: con su
+   rótulo entero el renglón único pediría ≈935 y el contenedor más ancho mide
+   896. Es el único de los cuatro cuyo rótulo largo no dice nada que no diga ya
+   su icono. */
+.sp-doc-actions--filas > .sp-tpl-guardar .sp-doc-actions__long  { display: none; }
+.sp-doc-actions--filas > .sp-tpl-guardar .sp-doc-actions__short { display: inline; }
+
+@container docform (max-width: 895px) {
+  /* Envolver, no apilar: `wrap` deja que dos quepan por renglón y que el corte
+     lo decida el ancho. El hueco entre renglones es el mismo `gap` de la barra,
+     así que no hay un número nuevo que mantener. */
+  .sp-doc-actions--filas { flex-wrap: wrap; align-items: stretch; }
+
+  /* Dos por renglón, exactos: dos veces `50% - gap/2` más el `gap` dan el 100%.
+     `min-width: 0` para que un rótulo largo no infle su mitad y empuje al otro
+     a un renglón propio. */
+  .sp-doc-actions--filas > .sp-btn {
+    flex: 1 1 calc(50% - (var(--sp-gap-item) / 2));
+    min-width: 0;
+    padding-left: 12px; padding-right: 12px;
+  }
+
+  /* Los cuatro rótulos, cortos. */
+  .sp-doc-actions--filas > .sp-btn .sp-doc-actions__long  { display: none; }
+  .sp-doc-actions--filas > .sp-btn .sp-doc-actions__short { display: inline; }
+
+  /* ⚠️ LAS PAREJAS. El orden del marcado es el de escritorio —borrador,
+     plantilla, sin firma, firmar— y aquí se recompone: arriba lo que abre
+     camino (guardar la plantilla y firmar), abajo las dos salidas sin firma.
+     Sin esto, envolver daría [borrador|plantilla] y [sin firma|firmar], que es
+     el emparejamiento del paso anterior. */
+  .sp-doc-actions--filas > .sp-tpl-guardar      { order: 1; }
+  .sp-doc-actions--filas > .sp-doc-act-firmar   { order: 2; }
+  .sp-doc-actions--filas > .sp-doc-act-sinfirma { order: 3; }
+  .sp-doc-actions--filas > .sp-doc-act-borrador { order: 4; }
 }
 
 /* Bloque de estudio (imagenología). Contenedor PROPIO: la rejilla interior se

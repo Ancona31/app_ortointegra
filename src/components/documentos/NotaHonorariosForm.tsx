@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { AlertTriangle, EyeOff, Plus, Printer, Receipt, Trash2 } from 'lucide-react'
+import { AlertTriangle, EyeOff, Plus, Receipt, Trash2 } from 'lucide-react'
+import PieAccionesDocumento from '@/components/documentos/PieAccionesDocumento'
 import { flushSync } from 'react-dom'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -301,7 +302,6 @@ export default function NotaHonorariosForm({
 
   // ─── Derivados ─────────────────────────────────────────────────────────────
   const esCotizacion  = tipoDoc === 'cotizacion'
-  const nombreCorto   = esCotizacion ? 'cotización' : 'recibo'
   const lineasValidas = lineas.filter(esEmitible)
   const total         = roundCurrency(lineasValidas.reduce((s, l) => s + l.precio, 0))
   const subtotales    = subtotalesDe(lineas)
@@ -1029,19 +1029,12 @@ export default function NotaHonorariosForm({
 
       {/* «Guardar como plantilla» va aquí y no arriba: se guarda cuando el
           formulario YA está lleno, así que su sitio es junto al de imprimir. */}
-      <div className="sp-doc-actions">
-        {plantillas.botonGuardar}
-        <button type="button" onClick={imprimir} disabled={imprimiendo || perfilPendiente}
-          className="sp-btn sp-btn--primary">
-          {imprimiendo ? <><span className="sp-spinner" /> Generando PDF…</>
-            : perfilPendiente ? <><span className="sp-spinner" /> Cargando tu perfil…</>
-            : <>
-                <Printer size={17} />
-                <span className="sp-doc-long">Imprimir {nombreCorto}</span>
-                <span className="sp-doc-short">Imprimir</span>
-              </>}
-        </button>
-      </div>
+      <PieAccionesDocumento
+        botonGuardar={plantillas.botonGuardar}
+        onImprimir={imprimir}
+        imprimiendo={imprimiendo}
+        perfilPendiente={perfilPendiente}
+      />
 
       </div>
 
