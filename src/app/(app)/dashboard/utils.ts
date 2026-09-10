@@ -25,6 +25,42 @@ export function partesCitaHora(start_time: string): { dia: string; hora: string 
 }
 
 /**
+ * La fecha de la cita para la COLUMNA ESTRECHA del renglón de próximas citas:
+ * "Hoy", o la numérica compacta "20/09/26" para cualquier otro día.
+ *
+ * ⚠️ EXISTE PORQUE EL DÍA EN PALABRA NO CABE, y está medido: la columna mide
+ * 52 px y «MAÑANA» pide 49-58 según la fuente de sistema, así que salía
+ * «MAÑA…» casi siempre. La numérica pide 43-54 sin el espaciado de letra, que
+ * es lo que la mete dentro. Sólo la consume la variante móvil de ese renglón;
+ * en escritorio se sigue pintando `partesCitaHora`.
+ *
+ * ⚠️ NO LA UNIFIQUES CON `partesCitaHora` NI LA CONVIERTAS EN UN FORMATO SUYO.
+ * La salida de aquélla está fijada carácter por carácter por
+ * `lib/tests/husoCitas.test.ts` y la consume `formatCitaHora`, que alimenta
+ * otras dos pantallas. Son dos rótulos con dos anchos disponibles distintos.
+ *
+ * ⚠️ Y NO TIENE BUCKET DE «MAÑANA», que no es un olvido: el spec pide fecha
+ * numérica para todo lo que no sea hoy, mañana incluido.
+ *
+ * Devuelve `numerica` además del texto para que el renglón no tenga que
+ * adivinarlo comparando con la cadena «Hoy». Lo usa para dos cosas que sólo
+ * valen en un caso y no en el otro: el espaciado de letra, que es la convención
+ * de los rótulos en mayúsculas y no de las cifras, y `tabular-nums`.
+ *
+ * El huso es el del DISPOSITIVO, igual que arriba — ver LA REGLA en la
+ * cabecera de `@/lib/dates`. Es la misma corrección de Sonora: darle el huso a
+ * la fecha y no al bucket de hoy produciría "20/09/26" para una cita que en
+ * Sonora es de hoy.
+ *
+ * ⚠️  Llama a `tzDispositivo()`: sólo desde componentes de cliente.
+ */
+export function fechaCitaCompacta(start_time: string): { texto: string; numerica: boolean } {
+  const tz = tzDispositivo()
+  if (renderEnTZ(start_time, 'yyyy-MM-dd', tz) === hoyEnTZ(tz)) return { texto: 'Hoy', numerica: false }
+  return { texto: renderEnTZ(start_time, 'dd/MM/yy', tz), numerica: true }
+}
+
+/**
  * La misma hora, en una sola cadena: "Hoy · 09:00".
  *
  * ⚠️ SE COMPONE DE `partesCitaHora` Y NO AL REVÉS, y no es indiferente: el

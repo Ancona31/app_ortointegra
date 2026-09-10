@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { CalendarDays, RotateCw } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useProfile } from '@/hooks/useProfile'
-import { partesCitaHora } from '@/app/(app)/dashboard/utils'
+import { partesCitaHora, fechaCitaCompacta } from '@/app/(app)/dashboard/utils'
 import { StatusChip } from '@/app/(app)/dashboard/StatusChip'
 import { PALETA_AVATAR, ARRANQUE_AVATAR } from './paletaAvatar'
 import { componerNombreMedicoCompleto } from '@/lib/nombreMedico'
@@ -134,16 +134,26 @@ function Chasis({ children }: { children: React.ReactNode }) {
           el mockup resuelve en dos. Va a la derecha del título, y el enlace al
           extremo. `items-baseline` los asienta sobre la misma línea base pese a
           medir 18, 13.5 y 13.5 px; el `leading` explícito fija el alto de la
-          fila en 24 px, que es lo que hace comparable el antes y el después. */}
+          fila en 24 px, que es lo que hace comparable el antes y el después.
+          ⚠️ EN MÓVIL SON DOS, NO TRES: el de apoyo no cabe. Medido en la card
+          real a 360 px —298 px de interior—, título y enlace ya piden 204-251
+          según la fuente, así que al secundario le quedaban 47-94 px para 41
+          caracteres y salía siempre cortado a la segunda palabra. Cortado no
+          dice nada, así que en vez de encogerlo se retira; en `lg` sobra ancho
+          y sigue entero. */}
       <div className="flex items-baseline gap-[var(--sp-2-5)] px-[var(--sp-pad-row-x)] pt-[var(--sp-4)] pb-[var(--sp-3-5)]">
         <h2 className="shrink-0 text-[length:var(--sp-fs-vitals)] leading-[24px] font-bold text-[var(--sp-ink-800)]">Próximas citas</h2>
-        <p className="flex-1 min-w-0 truncate text-[length:var(--sp-fs-meta)] leading-[24px] text-[var(--sp-ink-500)]">Las más cercanas. El resto, en la agenda.</p>
+        <p className="hidden flex-1 min-w-0 truncate text-[length:var(--sp-fs-meta)] leading-[24px] text-[var(--sp-ink-500)] lg:block">Las más cercanas. El resto, en la agenda.</p>
         <Link
           href="/agenda"
           /* Sin precarga: la regla de precarga de esta región deja encendida
              sólo la fila en curso. Ver el comentario del renglón. */
           prefetch={false}
-          className="shrink-0 whitespace-nowrap text-[length:var(--sp-fs-meta)] leading-[24px] font-semibold text-[var(--sp-primary-text)] hover:underline"
+          /* `ml-auto` es lo que manda el enlace al extremo cuando el secundario
+             no está: sin él, con el `flex-1` fuera de juego, título y enlace se
+             quedaban pegados a la izquierda. En `lg` vuelve a cero y el reparto
+             lo hace otra vez el `flex-1` del secundario, como antes. */
+          className="ml-auto shrink-0 whitespace-nowrap text-[length:var(--sp-fs-meta)] leading-[24px] font-semibold text-[var(--sp-primary-text)] hover:underline lg:ml-0"
         >
           Ver agenda →
         </Link>
@@ -364,6 +374,9 @@ export default function ProximasCitas({ medicoId, acciones }: {
       {visibles.map((cita, i) => {
         const enCurso = cita.id === idEnCurso
         const { dia, hora } = partesCitaHora(cita.start_time)
+        /* La variante de móvil de la primera línea. Ver el porqué en la propia
+           `fechaCitaCompacta` y en el marcado de la columna, abajo. */
+        const fechaCompacta = fechaCitaCompacta(cita.start_time)
         const nombre = cita.pacientes
           ? `${cita.pacientes.nombre} ${cita.pacientes.apellidos}`
           : cita.title
@@ -399,7 +412,41 @@ export default function ProximasCitas({ medicoId, acciones }: {
             {/* Fecha y hora, dos líneas. La hora de la fila en curso va en
                 acento; el chip conserva su color de estado y no compite. */}
             <div className="w-[52px] xl:w-[60px] shrink-0">
-              <p className="truncate text-[length:var(--sp-fs-legal)] font-bold uppercase tracking-[0.04em] text-[var(--sp-ink-350)]">{dia}</p>
+              {/* ⚠️ DOS VARIANTES DE LA MISMA LÍNEA, Y EN `lg` NO CAMBIA NADA:
+                  el segundo `<span>` es el rótulo de siempre, con su espaciado
+                  de letra intacto. En móvil el día en palabra NO CABE —la
+                  columna mide 52 px y «MAÑANA» pide 49-58 según la fuente de
+                  sistema—, así que ahí va «HOY» o la fecha numérica.
+                  ⚠️ EL ESPACIADO DE LETRA SE FUE A LOS SPANS Y NO SE QUEDÓ EN
+                  EL `<p>` a propósito: son los 3.5 px que hacen que la fecha
+                  numérica entre (43-54 sin él, 46-57 con él). Espaciar cifras
+                  tampoco es lo que ese 0.04em vino a hacer —es la convención de
+                  los rótulos en mayúsculas—, así que lo pierde la fecha y lo
+                  conserva «HOY», que cabe de sobra (24-27). Por eso el
+                  tratamiento va por VARIANTE y no por ancho, y por eso
+                  `fechaCitaCompacta` dice si el rótulo es numérico en vez de
+                  dejar que esto lo deduzca comparando con «Hoy». La numérica
+                  se lleva además `tabular-nums`: iguala el ancho de todas las
+                  fechas y las alinea con la hora de abajo, que ya lo llevaba.
+                  ⚠️ Y EL RECORTE SE QUEDÓ EN `lg:truncate`, O SEA SÓLO EN
+                  ESCRITORIO. Allí el rótulo es de largo variable —«MIÉ 3 SEP»,
+                  «MAR 30 SEP»— y la elipsis es su red. En móvil son «HOY» o
+                  OCHO CARACTERES CLAVADOS, así que no hay nada de largo
+                  desconocido de lo que protegerse y la elipsis sólo puede
+                  hacer daño: la fecha pide 43-54 px de 52, y en la fuente más
+                  ancha del muestreo (DejaVu Sans, 53.9) `truncate` cambiaba los
+                  1.9 px que sobran por «20/09/2…», que es perder el año. Sin
+                  él sangra esos 2 px en el hueco de 10 que ya separa la
+                  columna del avatar: invisible, y la caja no se mueve porque el
+                  `w-[52px] shrink-0` no depende del contenido. El
+                  `whitespace-nowrap` de la base SÍ hace falta —sin él la fecha
+                  partiría por las barras—. */}
+              <p className="whitespace-nowrap text-[length:var(--sp-fs-legal)] font-bold uppercase text-[var(--sp-ink-350)] lg:truncate">
+                <span className={`lg:hidden ${fechaCompacta.numerica ? 'tabular-nums' : 'tracking-[0.04em]'}`}>
+                  {fechaCompacta.texto}
+                </span>
+                <span className="hidden tracking-[0.04em] lg:inline">{dia}</span>
+              </p>
               <p
                 className="truncate text-[length:var(--sp-fs-meta)] font-extrabold tabular-nums"
                 style={{ color: enCurso ? 'var(--sp-primary-text)' : 'var(--sp-ink-800)' }}
