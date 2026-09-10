@@ -13,7 +13,7 @@ import Image from 'next/image'
 import ConsultaRapidaModal from '@/components/launcher/ConsultaRapidaModal'
 import OnboardingModal from '@/components/onboarding/OnboardingModal'
 import ParticleCanvas from '@/components/launcher/ParticleCanvas'
-import { useTheme } from '@/components/launcher/ThemeContext'
+import { useTemaLauncher } from '@/components/launcher/TemaLauncher'
 import { useMedicoInfo } from '@/hooks/useMedicoInfo'
 import { useClinica } from '@/hooks/useClinica'
 import { useProfile } from '@/hooks/useProfile'
@@ -69,7 +69,7 @@ function fechaCompleta(): string {
 
 export default function InicioPage() {
   const router = useRouter()
-  const { dark } = useTheme()
+  const { dark } = useTemaLauncher()
   const { state: subState, openBloqueoModal } = useSubscriptionGate()
   const { profile } = useProfile()
   const [estado, setEstado] = useState<EstadoPerfil | null>(null)

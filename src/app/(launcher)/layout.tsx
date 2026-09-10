@@ -1,5 +1,5 @@
 import { ToastProvider } from '@/components/ui/Toast'
-import { ThemeProvider } from '@/components/launcher/ThemeContext'
+import { TemaLauncherProvider } from '@/components/launcher/TemaLauncher'
 import { createClient } from '@/lib/supabase/server'
 import { getSubscriptionState } from '@/lib/subscription'
 import { SubscriptionGateProvider } from '@/components/billing/SubscriptionGateProvider'
@@ -16,7 +16,7 @@ export default async function LauncherLayout({ children }: { children: React.Rea
 
   return (
     <ToastProvider>
-      <ThemeProvider>
+      <TemaLauncherProvider>
         <SubscriptionGateProvider initialState={subscriptionState}>
           {/* ⚠️ EL ENVOLTORIO ES DEL ÁREA SEGURA, y es el mismo que ya lleva
               este banner en `(app)/layout.tsx:76`. Aquí no lo tenía: el banner
@@ -36,7 +36,7 @@ export default async function LauncherLayout({ children }: { children: React.Rea
           </div>
           {children}
         </SubscriptionGateProvider>
-      </ThemeProvider>
+      </TemaLauncherProvider>
     </ToastProvider>
   )
 }
