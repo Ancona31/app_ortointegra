@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { Download, Send, RotateCw, Trash2, Pencil, Loader2, MoreHorizontal } from 'lucide-react'
+import { Download, Send, RotateCw, Share2, Trash2, Pencil, Loader2, MoreHorizontal } from 'lucide-react'
 
 /**
  * Las acciones del visor de documentos. Aplica el §6.0 del
@@ -40,8 +40,24 @@ export interface Accion {
   ocupada?: boolean
 }
 
+/**
+ * Compartir con la hoja del sistema. Es una `Accion` con un añadido: el archivo
+ * no está en memoria —el PDF vive en Storage— y `navigator.share` no admite un
+ * `await` por delante, así que hay que traerlo ANTES del clic.
+ */
+export interface AccionCompartir extends Accion {
+  /**
+   * Empieza a traer el PDF. Se llama con las señales que PRECEDEN al clic: el
+   * puntero entrando, el foco del teclado y la apertura del menú en móvil. Es
+   * idempotente — se puede llamar de sobra sin coste.
+   */
+  onPreparar: () => void
+}
+
 export interface AccionesProps {
   descarga: { estado: EstadoDescarga; href: string | null; onReintentar: () => void }
+  /** `onClick: null` cuando el navegador no comparte archivos: no se dibuja. */
+  compartir: AccionCompartir
   enviar: Accion
   regenerar: Accion
   eliminar: Accion & { rotulo: string }
@@ -51,6 +67,7 @@ export interface AccionesProps {
 
 const ROTULO = {
   descargar: 'Descargar PDF',
+  compartir: 'Compartir',
   enviar: 'Enviar al paciente',
   regenerar: 'Regenerar PDF',
   editar: 'Seguir editándolo',
@@ -70,11 +87,21 @@ const ACENTO = { borderColor: 'var(--sp-primary-border)', background: 'var(--sp-
 const INACTIVO = { borderColor: 'var(--sp-line-soft)', background: 'var(--sp-surface)', color: 'var(--sp-ink-350)' }
 const DESTRUCTIVO = { borderColor: 'var(--sp-danger-border)', background: 'var(--sp-surface)', color: 'var(--sp-danger)' }
 
-function BotonIcono({ rotulo, icono: Icono, accion, estilo }: {
+function BotonIcono({ rotulo, icono: Icono, accion, estilo, onPreparar }: {
   rotulo: string
   icono: typeof Download
   accion: Accion
   estilo: React.CSSProperties
+  /**
+   * Trabajo que hay que adelantar al clic. Va en las tres señales que lo
+   * preceden —puntero, foco y `pointerdown`— y NO en `onClick`: para cuando el
+   * clic llega ya es tarde para esperar a una descarga.
+   *
+   * `pointerdown` es la red de seguridad del teclado táctil y del clic sin
+   * hover; llega unos milisegundos antes que el clic, que no bastan para la
+   * descarga, pero dejan el trabajo empezado para el segundo intento.
+   */
+  onPreparar?: () => void
 }) {
   if (!accion.onClick) return null
   const bloqueada = !!accion.bloqueo
@@ -83,6 +110,9 @@ function BotonIcono({ rotulo, icono: Icono, accion, estilo }: {
     <button
       type="button"
       onClick={bloqueada || accion.ocupada ? undefined : accion.onClick}
+      onPointerEnter={onPreparar}
+      onPointerDown={onPreparar}
+      onFocus={onPreparar}
       disabled={bloqueada || accion.ocupada}
       title={titulo}
       aria-label={titulo}
@@ -96,7 +126,13 @@ function BotonIcono({ rotulo, icono: Icono, accion, estilo }: {
 
 /* ── Menú de desbordamiento (solo móvil) ────────────────────────────────── */
 
-function Menu({ acciones }: { acciones: { rotulo: string; icono: typeof Download; accion: Accion; destructiva?: boolean }[] }) {
+function Menu({ acciones, onAbrir }: {
+  acciones: { rotulo: string; icono: typeof Download; accion: Accion; destructiva?: boolean }[]
+  /** Abrir el menú es el gesto que PRECEDE a elegir una de sus acciones, así que
+   *  es el momento de adelantar lo que alguna necesite tener listo. En móvil es
+   *  el equivalente al hover que aquí no existe. */
+  onAbrir?: () => void
+}) {
   const [abierto, setAbierto] = useState(false)
   const caja = useRef<HTMLDivElement>(null)
 
@@ -116,7 +152,7 @@ function Menu({ acciones }: { acciones: { rotulo: string; icono: typeof Download
     <div ref={caja} className="relative shrink-0">
       <button
         type="button"
-        onClick={() => setAbierto(v => !v)}
+        onClick={() => { if (!abierto) onAbrir?.(); setAbierto(v => !v) }}
         aria-expanded={abierto}
         aria-label="Más acciones"
         className={CUADRADO}
@@ -165,7 +201,7 @@ function Menu({ acciones }: { acciones: { rotulo: string; icono: typeof Download
 /* ── Componente ─────────────────────────────────────────────────────────── */
 
 export default function AccionesDocumento(p: AccionesProps) {
-  const { descarga, enviar, regenerar, eliminar, seguirEditando } = p
+  const { descarga, compartir, enviar, regenerar, eliminar, seguirEditando } = p
 
   /* El principal es «Seguir editándolo» cuando existe; si no, la descarga. Solo
      uno de los dos lleva rótulo. */
@@ -231,6 +267,7 @@ export default function AccionesDocumento(p: AccionesProps) {
      bloque de cabecera hacia abajo, nunca la fila de controles. */
   const avisos = [
     descarga.estado === 'fallido' ? `${ROTULO.descargar} · ${descargaBloqueada}` : '',
+    compartir.onClick && compartir.bloqueo ? `${ROTULO.compartir} · ${compartir.bloqueo}` : '',
     enviar.onClick && enviar.bloqueo ? `${ROTULO.enviar} · ${enviar.bloqueo}` : '',
     regenerar.onClick && regenerar.bloqueo ? `${ROTULO.regenerar} · ${regenerar.bloqueo}` : '',
   ].filter(Boolean)
@@ -252,18 +289,33 @@ export default function AccionesDocumento(p: AccionesProps) {
 
         {botonDescarga(!editandoEsPrincipal)}
 
-        {/* Los tres restantes: visibles en escritorio, dentro del menú en móvil. */}
+        {/* Los restantes: visibles en escritorio, dentro del menú en móvil.
+            ⚠️ COMPARTIR AÑADE UN CUARTO CUADRADO A LA FILA, y el §6.0 fijaba
+            «un botón con rótulo más TRES cuadrados». El invariante que protege
+            ese punto es que el ancho no cambie ENTRE ESTADOS del mismo
+            documento, para que la cabecera no salte al resolverse la firma —y
+            eso se conserva: la presencia de compartir la decide el NAVEGADOR,
+            una vez, no el documento ni su estado. Donde no hay hoja de
+            compartir —todo escritorio Linux y Firefox— la fila sigue midiendo
+            exactamente lo que medía.
+            Sin rótulo, como los demás cuadrados: el único con rótulo sigue
+            siendo uno, que es la otra mitad de aquel punto. */}
         <div className="hidden items-center gap-[var(--sp-2)] lg:flex">
+          <BotonIcono rotulo={ROTULO.compartir} icono={Share2} accion={compartir} estilo={NEUTRO} onPreparar={compartir.onPreparar} />
           <BotonIcono rotulo={ROTULO.enviar} icono={Send} accion={enviar} estilo={NEUTRO} />
           <BotonIcono rotulo={ROTULO.regenerar} icono={RotateCw} accion={regenerar} estilo={NEUTRO} />
           <BotonIcono rotulo={eliminar.rotulo} icono={Trash2} accion={eliminar} estilo={DESTRUCTIVO} />
         </div>
         <div className="lg:hidden">
-          <Menu acciones={[
-            { rotulo: ROTULO.enviar, icono: Send, accion: enviar },
-            { rotulo: ROTULO.regenerar, icono: RotateCw, accion: regenerar },
-            { rotulo: eliminar.rotulo, icono: Trash2, accion: eliminar, destructiva: true },
-          ]} />
+          <Menu
+            onAbrir={compartir.onPreparar}
+            acciones={[
+              { rotulo: ROTULO.compartir, icono: Share2, accion: compartir },
+              { rotulo: ROTULO.enviar, icono: Send, accion: enviar },
+              { rotulo: ROTULO.regenerar, icono: RotateCw, accion: regenerar },
+              { rotulo: eliminar.rotulo, icono: Trash2, accion: eliminar, destructiva: true },
+            ]}
+          />
         </div>
       </div>
 
