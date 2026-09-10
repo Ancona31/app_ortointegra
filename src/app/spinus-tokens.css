@@ -458,20 +458,16 @@ html.dark {
      de color relativa. Si cambias uno, mira el otro sitio.
      El resto —hover, active y los tintes con alfa— NO están duplicados allí y
      son el valor vigente en los dos casos. */
-  /* ⚠️⚠️ HOY ESTE HOVER ES CASI UN NO-OP CON LA MARCA POR DEFECTO, Y ES UN
-     PENDIENTE ABIERTO, NO UN DESCUIDO. Desde que `--sp-primary` sube a
-     L 0.55 en OKLCH, el reposo (#3373bd, L 0.551) y este hover (#3972b2,
-     L 0.544) quedan a 0.007 de claridad: el hover deja de verse. Pasa igual en
-     «Pizarra oscuro» y NO pasa en las otras cuatro paletas.
-     La razón de que no se arregle aquí es que NINGUNA de las dos direcciones
-     cumple los dos listones a la vez (§3.4): aclarar a L 0.61 deja el blanco
-     del rótulo en 3.60:1 —bajo AA— y oscurecer a L 0.50 deja el botón en
-     2.43:1 contra la card, o sea sin contorno. Es una decisión de producto
-     pendiente, con los números medidos en §3.4. No la resuelvas a ojo.
-     ⚠️ Y OJO CON EL COMENTARIO DE ABAJO, que ya no dice toda la verdad: medía
-     contra `var(--cp)` CRUDO, que es un salto. Con la fórmula OKLCH la caída
-     es a 2.43:1, no a 1.07:1, así que «oscurecer» ya no está descartado por
-     ese argumento. */
+  /* ⚠️⚠️ ESTOS DOS TAMBIÉN SON RESPALDO: el valor vigente OSCURECE, y vive en
+     el `@supports` del final. Lo de aquí —que ACLARA— es lo que ve un navegador
+     sin sintaxis de color relativa, y ahí sigue siendo lo correcto, porque en
+     ese navegador el reposo se queda también en su respaldo (`--cs` crudo, más
+     oscuro que estos dos). Los dos juegos son coherentes cada uno consigo
+     mismo; lo que NO se puede es mezclarlos. Si tocas uno, mira el otro sitio.
+     ⚠️ EL COMENTARIO DE ABAJO ES DE ESTE RESPALDO Y SÓLO DE ÉL. Su argumento
+     —«con var(--cp) el botón cae a 1.07–1.76:1»— medía contra `--cp` CRUDO, que
+     es un salto de golpe, no un escalón; no vale para descartar oscurecer con
+     la fórmula, donde la caída es a 2.66:1. Ver la nota del `@supports`. */
   --sp-primary-hover:    color-mix(in srgb, var(--cs, #1e5fa8) 88%, #fff);
       /* INVERTIDO respecto a claro: en dark el hover ACLARA. Con var(--cp) el
          botón cae a 1.07–1.76:1 contra la card y desaparece. */
@@ -666,6 +662,35 @@ html.dark {
        no da más — es techo físico, no pérdida de la fórmula. */
     --sp-primary-text: oklch(from var(--cs, #1e5fa8) 0.70 c h);
     --sp-primary-ink:  oklch(from var(--cs, #1e5fa8) 0.70 c h);
+
+    /* HOVER Y ACTIVE DEL RELLENO — OSCURECEN, y es la decisión del PO tras
+       medir las dos direcciones. Ninguna cumple los dos listones: aclarar deja
+       el blanco del rótulo en 3.60:1 (bajo AA) y oscurecer deja el botón sin
+       contorno contra la card. Cede la FORMA y no la INFORMACIÓN — durante el
+       hover el cursor ya está encima del botón, así que saber dónde está no
+       depende del contorno; leer el rótulo sí.
+
+       ⚠️ ES LO CONTRARIO DE LO QUE HACE EL RESPALDO de `html.dark`, y no es una
+       incoherencia: allí el reposo es `--cs` crudo (más oscuro que L 0.55), así
+       que aclarar es lo que separa. Aquí el reposo ya está aclarado y el hueco
+       está abajo. Cada juego es coherente consigo mismo. No los cruces.
+
+       EL ESCALÓN ES 0.06 DE CLARIDAD Y ESTÁ ELEGIDO MIDIENDO, no a ojo. El
+       listón es ΔE2000 ≥ 5.31, que es el salto de «Morado» en el respaldo — el
+       más pequeño de los que HOY se ven como hover. Con 0.06: reposo→hover
+       6.15-7.13 y hover→active 5.70-6.36 en las seis paletas. Con 0.05 el
+       primer escalón cae a 5.17 en «Rojo burdeos» y «Café cálido», por debajo
+       del listón; por eso no es 0.05.
+       ⚠️ MÍDELO EN «SPINUS», que es la de fábrica y la más apretada: es la que
+       tenía el hover invisible (ΔE 1.19) que motivó todo esto.
+
+       Blanco encima, las seis: reposo 4.59-5.51 · hover 5.98-7.18 · active
+       7.79-9.28. Los tres por encima de 4.5, que era la condición.
+       Contra la card, lo que cede: hover 2.32-2.79 · active 1.80-2.14. Por
+       debajo del 3:1 de 1.4.11 a sabiendas. El `active` añade además
+       `translateY(1px)`, o sea que no depende sólo del color. */
+    --sp-primary-hover:  oklch(from var(--cs, #1e5fa8) 0.49 c h);
+    --sp-primary-active: oklch(from var(--cs, #1e5fa8) 0.43 c h);
   }
 }
 
