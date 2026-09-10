@@ -2545,3 +2545,38 @@ input[type="date"].sp-input {
 .sp-idfoto-cropper .reactEasyCrop_CropAreaGrid::after {
   border-color: rgba(255, 255, 255, 0.75);
 }
+
+
+/* ============================================================================
+   20. GRÁFICA DE ANALITOS — el SVG de Recharts, vestido con tokens
+   ----------------------------------------------------------------------------
+   Rejilla, ejes, rótulos y cursor estaban cableados en claro dentro del
+   componente (`#e2e8f0`, `#94a3b8`, `#cbd5e1`), así que en tema oscuro la
+   rejilla quedaba clarísima sobre el fondo y los rótulos casi blancos.
+
+   ⚠️ VA EN CSS Y NO EN LAS PROPS DEL COMPONENTE, y esa es la parte que hay que
+   saber antes de «simplificarlo» devolviéndolo al JSX. Recharts pasa `stroke` y
+   `fill` como ATRIBUTOS DE PRESENTACIÓN del SVG, y un atributo de presentación
+   NO resuelve `var()`: `stroke="var(--sp-line-soft)"` no pinta nada. La
+   propiedad CSS del mismo nombre sí lo resuelve, y además cualquier CSS de autor
+   gana a un atributo de presentación, así que estas cuatro reglas mandan.
+   Donde el componente SÍ puede usar `var()` es en su prop `style`, que Recharts
+   vuelca como CSS en línea: por eso el trazo de la línea y el halo de los puntos
+   se resuelven allí y no aquí.
+
+   ⚠️ LOS CUATRO VALORES NO SON NUEVOS. Son exactamente los hex que el componente
+   tenía escritos, que resultaron ser tokens que ya existían: `#e2e8f0` es
+   `--sp-line-soft`, `#94a3b8` es `--sp-ink-250` y `#cbd5e1` es
+   `--sp-line-strong`. En tema claro no cambia ni un píxel; lo único que se gana
+   es la contraparte oscura.
+
+   ⚠️ LAS BANDAS DEL SEMÁFORO NO ESTÁN AQUÍ y no se tocan: son `<rect>` con
+   `fillOpacity`, salen de `BAND_COLORS` en `lib/labs/utils.ts` y funcionan en
+   los dos temas porque un color saturado al 12-15 % sobrevive sobre cualquier
+   fondo. Estas reglas sólo alcanzan a `line` y a los rótulos.
+   ========================================================================== */
+.sp-grafica .recharts-cartesian-grid line { stroke: var(--sp-line-soft); }
+.sp-grafica .recharts-cartesian-axis-line,
+.sp-grafica .recharts-cartesian-axis-tick-line { stroke: var(--sp-line-soft); }
+.sp-grafica .recharts-cartesian-axis-tick-value { fill: var(--sp-ink-250); }
+.sp-grafica .recharts-tooltip-cursor { stroke: var(--sp-line-strong); }

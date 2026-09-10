@@ -123,23 +123,25 @@ export default function GraficaAnalito({
   const bandas = buildBandas(analitoCatalogo, rango, yMin, yMax)
 
   return (
-    /* Sin marco: la gráfica se dibuja directamente sobre la card del detalle. */
-    <div>
+    /* Sin marco: la gráfica se dibuja directamente sobre la card del detalle.
+       ⚠️ `sp-grafica` NO PINTA NADA POR SÍ SOLA: es el asidero de las cuatro
+       reglas que visten el SVG de Recharts en `spinus-tokens.css` (§20). Sin
+       ella, rejilla, ejes, rótulos y cursor caen a los grises por defecto de la
+       librería. No la quites al reordenar clases. */
+    <div className="sp-grafica">
       <div className="w-full" style={{ height: 240 }}>
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={chartData} margin={{ top: 10, right: 12, left: 0, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+            <CartesianGrid strokeDasharray="3 3" vertical={false} />
             <XAxis
               dataKey="medido_en"
-              tick={{ fill: '#94a3b8', fontSize: 11 }}
-              stroke="#e2e8f0"
+              tick={{ fontSize: 11 }}
               tickFormatter={formatFechaChart}
               minTickGap={24}
             />
             <YAxis
               domain={[yMin, yMax]}
-              tick={{ fill: '#94a3b8', fontSize: 11 }}
-              stroke="#e2e8f0"
+              tick={{ fontSize: 11 }}
               width={44}
               tickFormatter={(v: number) => formatValor(v, precision)}
             />
@@ -182,7 +184,7 @@ export default function GraficaAnalito({
                   </div>
                 )
               }}
-              cursor={{ stroke: '#cbd5e1', strokeWidth: 1, strokeDasharray: '3 3' }}
+              cursor={{ strokeWidth: 1, strokeDasharray: '3 3' }}
             />
             <Line
               type="monotone"
@@ -192,15 +194,19 @@ export default function GraficaAnalito({
               strokeWidth={2.5}
               dot={{
                 r: 4,
-                stroke: '#ffffff',
                 strokeWidth: 2,
-                style: { fill: 'var(--cp)' },
+                /* El halo va en el `style` y no como atributo: `var()` no se
+                   resuelve en un atributo de presentación de SVG, sí en CSS en
+                   línea. Es el mismo truco que ya usaba el trazo de la línea. */
+                style: { fill: 'var(--cp)', stroke: 'var(--sp-surface)' },
               }}
               activeDot={{
                 r: 6,
-                stroke: '#ffffff',
                 strokeWidth: 2,
-                style: { fill: 'var(--cp)' },
+                /* El halo va en el `style` y no como atributo: `var()` no se
+                   resuelve en un atributo de presentación de SVG, sí en CSS en
+                   línea. Es el mismo truco que ya usaba el trazo de la línea. */
+                style: { fill: 'var(--cp)', stroke: 'var(--sp-surface)' },
               }}
               isAnimationActive
               animationDuration={400}
