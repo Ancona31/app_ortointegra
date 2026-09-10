@@ -461,7 +461,7 @@ export default function Sidebar() {
                 <Link key={section.href} href={section.href} onClick={close}
                   prefetch={section.sinPrefetch ? false : undefined}
                   className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all duration-150 ${
-                    active ? 'bg-white text-[var(--cp)] shadow-sm' : 'text-[var(--ag-navy-ink)] hover:bg-white/10 hover:text-white'
+                    active ? 'bg-white text-[var(--ag-navy-ink-activo)] shadow-sm' : 'text-[var(--ag-navy-ink)] hover:bg-white/10 hover:text-white'
                   }`}
                 >
                   <section.icon size={16} className={active ? 'opacity-100' : 'opacity-70'} />
@@ -510,7 +510,7 @@ hasActive && !isOpen
                               }
                             }}
                             className={`flex items-center gap-2 px-2.5 py-2 rounded-lg text-[12px] font-medium transition-all duration-150 ${
-                              childActive ? 'bg-white text-[var(--cp)] shadow-sm' : 'text-[var(--ag-navy-ink-dim)] hover:bg-white/10 hover:text-white'
+                              childActive ? 'bg-white text-[var(--ag-navy-ink-activo)] shadow-sm' : 'text-[var(--ag-navy-ink-dim)] hover:bg-white/10 hover:text-white'
                             }`}
                           >
                             <child.icon size={13} className={childActive ? 'opacity-100' : 'opacity-60'} />

@@ -140,6 +140,12 @@
   --ag-navy-ink-dim:    rgba(255,255,255,.50);  /* sub-ítem y botones del pie */
   --ag-navy-ink-strong: rgba(255,255,255,.80);  /* cabecera de grupo abierto */
   --ag-navy-ink-soft:   rgba(255,255,255,.40);  /* subtítulo del médico */
+  /* LA TINTA DEL ÍTEM ACTIVO. Es la única de la familia que NO es un blanco
+     translúcido, y por eso no se llama como sus hermanas: en claro la píldora
+     del activo es blanca y la tinta es el azul de la marca. Aquí vale
+     exactamente lo que el menú tenía escrito en línea (`text-[var(--cp)]`), así
+     que en claro no cambia nada. */
+  --ag-navy-ink-activo: var(--cp, #1a3a5c);
   /* ⚠️ NO LO «UNIFIQUES» CON EL ROJO DE «CANCELADA» (--ag-status-cancelled-dot,
      hoy #c0392b). Se parecen y la línea cruza por encima de las tarjetas, pero
      dicen cosas distintas: una es la hora actual, la otra el estado de una cita.
@@ -5387,6 +5393,26 @@ html.dark {
   --ag-navy-ink-dim:    rgba(255,255,255,.65);
   --ag-navy-ink-strong: rgba(255,255,255,.88);
   --ag-navy-ink-soft:   rgba(255,255,255,.52);
+  /* ⚠️⚠️ AQUÍ LA TINTA DEL ACTIVO SE INVIERTE, y es el arreglo de un defecto que
+     llevaba tiempo escondido. La píldora del activo es un `.bg-white`, y
+     `ThemeProvider` repinta esa clase a #1E1E1E con `!important`
+     (`layout/ThemeProvider.tsx:117`): en oscuro la píldora NO es blanca, es
+     gris oscura. Con la tinta en `--cp` —azul marino— eso daba 1.43:1, o sea
+     texto ilegible en el ítem que dice dónde estás.
+     ⚠️ NO SE ARREGLA DEVOLVIENDO LA PÍLDORA A BLANCO: se decidió que la píldora
+     se queda gris y lo que cambia es la tinta. Si algún día la píldora vuelve a
+     ser clara en oscuro, ESTE VALOR HAY QUE VOLVER A DARLE LA VUELTA.
+     ⚠️ EL FONDO CONTRA EL QUE SE MIDE ES #1E1E1E, NO EL NAVY DEL MENÚ, al revés
+     que sus cuatro hermanas. Por eso NO se cuelga de `--ag-navy-ink-strong`
+     aunque hoy compartan el 88 %: aquella está calibrada contra el navy (6.98:1)
+     y ésta contra la píldora (13.11:1). Son dos superficies distintas y atarlas
+     sería un enganche accidental de los que este archivo ya ha deshecho varias
+     veces.
+     El 88 % lo hace la tinta más fuerte del menú —que es lo que le toca al
+     estado seleccionado— sin llegar al blanco puro, que está reservado al
+     `hover` de los inactivos. Coincide además con el 87 % de `--sp-ink-900`,
+     que es lo que la app usa como texto principal sobre una superficie oscura. */
+  --ag-navy-ink-activo: rgba(255,255,255,.88);
 }
 
 /* Par del respaldo de --ag-navy en oscuro. Mismo orden y mismo motivo que el de
