@@ -396,7 +396,6 @@ export default function ConsentimientoInformadoForm({
   const esDenegacion = tipoDoc === 'denegacion'
   /** El `documentos.tipo` emitido. De él sale el prefijo del folio: CI o DEN. */
   const tipoTabla = esDenegacion ? 'denegacion_consentimiento' : 'consentimiento_informado'
-  const nombreCorto = esDenegacion ? 'denegación' : 'consentimiento'
 
   const vacio = isFormEmpty({
     paciente, pacienteInicial, edad, edadInicial, diagnostico, diagnosticoInicial,
@@ -1291,14 +1290,6 @@ export default function ConsentimientoInformadoForm({
 
       {plantillas.selector}
 
-      {/* «Guardar como plantilla» sube aquí, junto al selector (spec 05 §1):
-          abajo hay ya tres botones y un cuarto en la misma fila es un tablero. */}
-      {plantillas.botonGuardar && (
-        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-          {plantillas.botonGuardar}
-        </div>
-      )}
-
       <section className="sp-card sp-doc-card">
         {/* El segmentado vive en la cabecera de la primera card, como en
             Honorarios: una card entera para dos botones sería una card de más,
@@ -1578,7 +1569,10 @@ export default function ConsentimientoInformadoForm({
 
       {/* Orden del DOM = orden en fila desde 380px (§1). En XS `.sp-doc-actions`
           es `column-reverse`, así que el primario queda arriba sin más. */}
-      <div className="sp-doc-actions">
+      {/* `--filas` sólo con las cuatro acciones: es quien las envuelve en dos
+          renglones por debajo de 896px de contenedor y quien acorta ahí los
+          rótulos. La denegación es de un botón y sigue con la barra de siempre. */}
+      <div className={`sp-doc-actions${esDenegacion ? '' : ' sp-doc-actions--filas'}`}>
         {esDenegacion ? (
           /* La denegación no tiene borrador ni firmado: se emite en el momento.
              Su barra es la de siempre. */
@@ -1586,36 +1580,71 @@ export default function ConsentimientoInformadoForm({
             className="sp-btn sp-btn--primary">
             {imprimiendo ? <><span className="sp-spinner" /> Generando PDF…</>
               : perfilPendiente ? <><span className="sp-spinner" /> Cargando tu perfil…</>
-              : <>
-                  <Printer size={17} />
-                  <span className="sp-doc-long">Imprimir {nombreCorto}</span>
-                  <span className="sp-doc-short">Imprimir</span>
-                </>}
+              : <><Printer size={17} /> Imprimir</>}
           </button>
         ) : (
           <>
+            {/* ⚠️ LOS CUATRO SON HIJOS DIRECTOS DE LA BARRA, SIN ENVOLTORIOS, y
+                el orden del marcado es el de ESCRITORIO: borrador, plantilla,
+                sin firma y firmar, con el primario al final. En estrecho la
+                barra envuelve en dos renglones y son las `order` de la hoja las
+                que emparejan «Plantilla» con «Firmar» arriba y «Sin firma» con
+                «Borrador» abajo.
+
+                ⚠️ AQUÍ HUBO DOS `<div>` DE FILA CON `display: contents`, y se
+                fueron a propósito. Un envoltorio ata cada botón a su renglón,
+                así que no había forma de que las parejas cambiaran entre
+                anchos —que es justo lo que pide esta disposición—. Con
+                `flex-wrap` y `order` el emparejamiento es una propiedad del
+                ancho, no de la estructura. De paso desaparece el
+                `display: contents`, que era el único mecanismo nuevo del ítem 3
+                que no pude descartar del todo como causa del despegue.
+
+                ⚠️ NINGUNO LLEVA `style` INLINE CON `flex`: un estilo en línea
+                gana a cualquier hoja y dejaría a la fila estrecha sin poder
+                repartirlos. El reparto vive entero en la hoja. */}
             <button type="button" onClick={guardarBorrador}
               disabled={guardandoBorrador || imprimiendo || vacio}
               title={vacio ? 'Escribe algo antes de guardarlo como borrador.' : undefined}
-              className="sp-btn sp-btn--ghost" style={{ flex: '0 0 auto' }}>
-              {guardandoBorrador ? <><span className="sp-spinner" /> Guardando…</> : 'Guardar borrador'}
+              /* ⚠️ `--secondary` Y NO `--ghost`, QUE ES LO QUE ERA. El ghost va
+                 sin fondo y SIN BORDE (`spinus-tokens.css`, `.sp-btn--ghost`),
+                 así que entre tres botones con contorno éste se leía como texto
+                 suelto y no parecía pulsable. Es una de las cuatro acciones del
+                 pie, no un «Cancelar» de diálogo. */
+              className="sp-btn sp-btn--secondary sp-doc-act-borrador">
+              {guardandoBorrador ? <><span className="sp-spinner" /> Guardando…</> : <>
+                <span className="sp-doc-actions__long">Guardar borrador</span>
+                <span className="sp-doc-actions__short">Borrador</span>
+              </>}
             </button>
+
+            {plantillas.botonGuardar}
+
             <button type="button" onClick={imprimir}
               disabled={imprimiendo || guardandoBorrador || perfilPendiente}
-              className="sp-btn sp-btn--secondary"
-              style={{ flex: '0 0 auto', whiteSpace: 'nowrap' }}>
+              className="sp-btn sp-btn--secondary sp-doc-act-sinfirma">
               {imprimiendo ? <><span className="sp-spinner" /> Generando PDF…</>
                 : perfilPendiente ? <><span className="sp-spinner" /> Cargando tu perfil…</>
-                : <><Printer size={17} /> Imprimir sin firma</>}
+                : <>
+                    <Printer size={17} />
+                    <span className="sp-doc-actions__long">Imprimir sin firma</span>
+                    <span className="sp-doc-actions__short">Sin firma</span>
+                  </>}
             </button>
+
             {/* No se apaga por faltantes, igual que el de imprimir: un botón
                 gris no enseña qué falta, el banner sí. Al pulsar con faltantes
                 no abre el firmado y lleva al primero. */}
             <button type="button" onClick={iniciarFirmado}
               disabled={imprimiendo || guardandoBorrador || perfilPendiente}
-              className="sp-btn sp-btn--primary">
+              className="sp-btn sp-btn--primary sp-doc-act-firmar">
               <PenLine size={18} />
-              {borradorId ? 'Continuar firmado' : 'Iniciar firmado electrónico'}
+              <span className="sp-doc-actions__long">
+                {borradorId ? 'Continuar firmado' : 'Iniciar firmado electrónico'}
+              </span>
+              <span className="sp-doc-actions__short">
+                {borradorId ? 'Continuar' : 'Firmar'}
+              </span>
             </button>
           </>
         )}
