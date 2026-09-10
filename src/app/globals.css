@@ -6002,3 +6002,58 @@ html.dark .text-gray-600                    { color: rgba(255,255,255,.60) !impo
 html.dark .text-gray-700                    { color: rgba(255,255,255,.75) !important; }
 html.dark .text-gray-900                    { color: rgba(255,255,255,.87) !important; }
 html.dark .border-gray-200                  { border-color: rgba(255,255,255,.12) !important; }
+
+/* ── 9 · LOS RESTOS DEL BARRIDO COMPLETO ──
+   El barrido de las quince pantallas de mas transito dejo fuera lo que solo
+   aparece en el resto de la app. Esto lo cierra: la familia `purple`, que no
+   estaba en las doce; los bordes en los escalones 100 y 200 de las familias que
+   ThemeProvider no cubria; y las variantes con opacidad, que en Tailwind son
+   otra clase (`bg-blue-50/50` no es `bg-blue-50`). */
+html.dark .bg-purple-100 { background-color: rgba(168,85,247,.22) !important; }
+html.dark .text-purple-500, html.dark .text-purple-600 { color: #c084fc !important; }
+html.dark .text-purple-700, html.dark .text-purple-800, html.dark .text-purple-900 { color: #d8b4fe !important; }
+html.dark .border-purple-300, html.dark .border-purple-400 { border-color: rgba(168,85,247,.40) !important; }
+html.dark .border-green-100, html.dark .border-green-200 { border-color: rgba(34,197,94,.25) !important; }
+html.dark .border-orange-100, html.dark .border-orange-200 { border-color: rgba(249,115,22,.25) !important; }
+html.dark .border-rose-100, html.dark .border-rose-200 { border-color: rgba(244,63,94,.25) !important; }
+html.dark .border-violet-100, html.dark .border-violet-200 { border-color: rgba(139,92,246,.25) !important; }
+html.dark .border-indigo-100, html.dark .border-indigo-200 { border-color: rgba(99,102,241,.25) !important; }
+html.dark .border-teal-100, html.dark .border-teal-200 { border-color: rgba(20,184,166,.25) !important; }
+html.dark .border-sky-100, html.dark .border-sky-200 { border-color: rgba(14,165,233,.25) !important; }
+html.dark .border-cyan-100, html.dark .border-cyan-200 { border-color: rgba(6,182,212,.25) !important; }
+html.dark .border-purple-100, html.dark .border-purple-200 { border-color: rgba(168,85,247,.25) !important; }
+
+/* Variantes con opacidad de los tintes y de las superficies neutras. */
+html.dark .bg-blue-50\/50, html.dark .bg-blue-50\/40, html.dark .bg-blue-50\/30 { background-color: rgba(59,130,246,.10) !important; }
+html.dark .border-blue-100\/50, html.dark .border-blue-200\/60 { border-color: rgba(59,130,246,.20) !important; }
+html.dark .bg-emerald-50\/50, html.dark .bg-emerald-50\/40, html.dark .bg-emerald-50\/30 { background-color: rgba(16,185,129,.10) !important; }
+html.dark .border-emerald-100\/50, html.dark .border-emerald-200\/60 { border-color: rgba(16,185,129,.20) !important; }
+html.dark .bg-green-50\/50, html.dark .bg-green-50\/40, html.dark .bg-green-50\/30 { background-color: rgba(34,197,94,.10) !important; }
+html.dark .border-green-100\/50, html.dark .border-green-200\/60 { border-color: rgba(34,197,94,.20) !important; }
+html.dark .bg-amber-50\/50, html.dark .bg-amber-50\/40, html.dark .bg-amber-50\/30 { background-color: rgba(245,158,11,.10) !important; }
+html.dark .border-amber-100\/50, html.dark .border-amber-200\/60 { border-color: rgba(245,158,11,.20) !important; }
+html.dark .bg-orange-50\/50, html.dark .bg-orange-50\/40, html.dark .bg-orange-50\/30 { background-color: rgba(249,115,22,.10) !important; }
+html.dark .border-orange-100\/50, html.dark .border-orange-200\/60 { border-color: rgba(249,115,22,.20) !important; }
+html.dark .bg-red-50\/50, html.dark .bg-red-50\/40, html.dark .bg-red-50\/30 { background-color: rgba(239,68,68,.10) !important; }
+html.dark .border-red-100\/50, html.dark .border-red-200\/60 { border-color: rgba(239,68,68,.20) !important; }
+html.dark .bg-rose-50\/50, html.dark .bg-rose-50\/40, html.dark .bg-rose-50\/30 { background-color: rgba(244,63,94,.10) !important; }
+html.dark .border-rose-100\/50, html.dark .border-rose-200\/60 { border-color: rgba(244,63,94,.20) !important; }
+html.dark .bg-violet-50\/50, html.dark .bg-violet-50\/40, html.dark .bg-violet-50\/30 { background-color: rgba(139,92,246,.10) !important; }
+html.dark .border-violet-100\/50, html.dark .border-violet-200\/60 { border-color: rgba(139,92,246,.20) !important; }
+html.dark .bg-indigo-50\/50, html.dark .bg-indigo-50\/40, html.dark .bg-indigo-50\/30 { background-color: rgba(99,102,241,.10) !important; }
+html.dark .border-indigo-100\/50, html.dark .border-indigo-200\/60 { border-color: rgba(99,102,241,.20) !important; }
+html.dark .bg-teal-50\/50, html.dark .bg-teal-50\/40, html.dark .bg-teal-50\/30 { background-color: rgba(20,184,166,.10) !important; }
+html.dark .border-teal-100\/50, html.dark .border-teal-200\/60 { border-color: rgba(20,184,166,.20) !important; }
+html.dark .bg-sky-50\/50, html.dark .bg-sky-50\/40, html.dark .bg-sky-50\/30 { background-color: rgba(14,165,233,.10) !important; }
+html.dark .border-sky-100\/50, html.dark .border-sky-200\/60 { border-color: rgba(14,165,233,.20) !important; }
+html.dark .bg-cyan-50\/50, html.dark .bg-cyan-50\/40, html.dark .bg-cyan-50\/30 { background-color: rgba(6,182,212,.10) !important; }
+html.dark .border-cyan-100\/50, html.dark .border-cyan-200\/60 { border-color: rgba(6,182,212,.20) !important; }
+html.dark .bg-purple-50\/50, html.dark .bg-purple-50\/40, html.dark .bg-purple-50\/30 { background-color: rgba(168,85,247,.10) !important; }
+html.dark .border-purple-100\/50, html.dark .border-purple-200\/60 { border-color: rgba(168,85,247,.20) !important; }
+html.dark .bg-slate-50\/60 { background-color: #242424 !important; }
+html.dark .hover\:bg-slate-50\/60:hover { background-color: #2C2C2C !important; }
+html.dark .hover\:border-slate-400:hover { border-color: rgba(255,255,255,.16) !important; }
+html.dark .bg-slate-300              { background-color: #444444 !important; }
+html.dark .border-slate-200\/70      { border-color: rgba(255,255,255,.12) !important; }
+html.dark .bg-purple-50              { background-color: rgba(168,85,247,.14) !important; }
+html.dark .bg-amber-50\/60           { background-color: rgba(245,158,11,.10) !important; }
