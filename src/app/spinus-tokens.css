@@ -29,6 +29,24 @@
   --sp-on-primary:         #ffffff;
   --sp-primary-focus:      color-mix(in srgb, var(--cs, #1e5fa8) 8%, transparent); /* halo de foco (4px spread) */
   --sp-primary-text:       var(--sp-primary);  /* marca-como-tinta; en dark se aclara */
+  /* LA CIFRA QUE CIERRA UN DOCUMENTO — «Total cotizado» y «Saldo pendiente» del
+     bloque de cierre de honorarios, que es lo que el paciente lee primero y lo
+     único de aquí que se IMPRIME.
+     ⚠️ EXISTE PORQUE ES LA ÚNICA PIEZA QUE NO SIGUE A `--sp-primary-text`. Los
+     dos son marca-como-tinta, pero éste se queda en el NAVY en claro, que es lo
+     que la hoja impresa ha enseñado siempre; `--sp-primary-text` vale `--cs` ahí
+     —el azul brillante— y cambiarle el color a un documento firmado no es un
+     retoque de tema. En oscuro sí convergen: no hay hoja impresa que respetar y
+     el navy sobre la card daría 1.5:1.
+     ⚠️ AQUÍ ESTUVO `--sp-primary-hover`, y no vuelvas a él. Ese token es el
+     hover del RELLENO del botón primario —lleva tinta blanca encima—; en claro
+     resuelve al mismo navy por casualidad, y en cuanto pasó a oscurecer en tema
+     oscuro se llevó esta cifra a 2.66:1. La coincidencia en claro es justo lo
+     que hizo que el préstamo pasara desapercibido durante meses.
+     ⚠️ NO SE LLAMA `--sp-doc-*` A PROPÓSITO, por lo mismo que `--sp-hito-medicion`
+     tampoco: esa familia son los ocho colores de FORMATO, y un noveno miembro se
+     leería como un noveno tipo de documento. Esto no es un formato, es un rol. */
+  --sp-cifra-cierre:       var(--cp, #1a3a5c);
 
   /* Marca / cromo de app */
   /* No usar: el sidebar se tematiza en Sidebar.tsx:223. Evita segunda fuente de verdad. */
@@ -475,6 +493,13 @@ html.dark {
   --sp-primary-text:     color-mix(in srgb, var(--cs, #1e5fa8) 45%, #fff);
       /* TP:146-149 (#60a5fa=6.56:1). El 45% da 7.85–9.51:1 en las 6 paletas. */
   --sp-primary-ink:      color-mix(in srgb, var(--cs, #1e5fa8) 45%, #fff);  /* TP:215-216 */
+  /* En oscuro la cifra de cierre SÍ converge con la tinta de marca: aquí no hay
+     hoja impresa que respetar y el navy de la variante clara daría 1.5:1 sobre
+     la card. Va por `var()` y no repitiendo la fórmula, así que sigue sola a
+     `--sp-primary-text` —incluida su redeclaración en el `@supports` del final,
+     porque la sustitución se resuelve en el elemento, no aquí—. Si algún día
+     esta línea deja de ser un `var()`, se rompe ese enganche. */
+  --sp-cifra-cierre:     var(--sp-primary-text);
   --sp-primary-bg:       color-mix(in srgb, var(--cs, #1e5fa8) 14%, transparent); /* TP:192-202 */
   --sp-primary-bg-soft:  color-mix(in srgb, var(--cs, #1e5fa8) 10%, transparent);
   --sp-primary-bg-faint: color-mix(in srgb, var(--cs, #1e5fa8)  7%, transparent);
@@ -1590,17 +1615,21 @@ input[type="date"].sp-input {
    desde que oscurece en tema oscuro dejaba este enlace en 2.66:1 sobre la card.
    Esto es tinta, así que su token es el de tinta. En oscuro el hover ahora
    ACLARA: 3.44:1 en reposo → 6.23:1 al pasar por encima.
-   ⚠️ EN TEMA CLARO ESTE HOVER NO PINTA NADA, y hay que saberlo: `--sp-primary-text`
-   es un alias de `--sp-primary` en claro —sólo divergen en oscuro—, o sea que
-   coincide con el color de reposo de la línea de arriba. El cursor sigue siendo
-   `pointer` (lo pone `.sp-btn`), pero la señal de color se pierde. Si hace falta
-   reponerla, la salida es una que NO dependa del tema —un subrayado en hover—,
-   no volver a `--sp-primary-hover`.
+   ⚠️⚠️ EL SUBRAYADO ES LA SEÑAL DE VERDAD, Y NO ES ADORNO: EN TEMA CLARO EL
+   COLOR NO CAMBIA. `--sp-primary-text` es un alias de `--sp-primary` en claro
+   —sólo divergen en oscuro—, así que ahí coincide exactamente con el color de
+   reposo de la línea de arriba y el hover sería invisible sin él. Es la razón de
+   que la señal se ponga en algo que NO depende del tema. Si lo quitas, el hover
+   desaparece en claro y nadie lo notará hasta que alguien lo reporte.
    ⚠️ Y EL REPOSO DE ARRIBA SIGUE EN 3.44:1 EN OSCURO, por debajo de AA: usa
    `--sp-primary`, que es el token de RELLENO. Es el mismo defecto que tienen
    `.sp-btn--compact` y los botones de contorno, y se arregla en su tanda, no
    aquí. */
-.sp-tpl-deshacer:hover { color: var(--sp-primary-text); }
+.sp-tpl-deshacer:hover {
+  color: var(--sp-primary-text);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
 
 /* ── Panel de gestión ──────────────────────────────────────────────────── */
 /* Sin `position: sticky` en la cabecera: con scroll de página sube con el
@@ -2061,20 +2090,17 @@ input[type="date"].sp-input {
 /* La fila que cierra el documento: la que el paciente lee primero. */
 .sp-doc-cierrefila--final { border-top: var(--sp-bw-hair) solid var(--sp-line-divider); }
 .sp-doc-cierrefila--final .sp-doc-cierrelabel { font-size: var(--sp-fs-body); color: var(--sp-ink-700); }
-/* ⚠️ LA CIFRA VA EN `--sp-primary-text`, EL TOKEN DE TINTA, y aquí estuvo
-   `--sp-primary-hover` — que no es un color estático sino el hover del RELLENO
-   del botón primario, tomado prestado sólo por salir un tono más fuerte. Prestar
-   ese token salió caro en cuanto el hover pasó a oscurecer: esta cifra, que es
-   la que el paciente lee, caía a 2.66:1 sobre la card en tema oscuro. Con el
-   token correcto sube a 6.23:1.
-   ⚠️ EN TEMA CLARO ESTO SÍ CAMBIA DE COLOR, a sabiendas: el préstamo la pintaba
-   con `--cp` (el navy, 11.6:1 sobre blanco) y ahora sale en `--cs` (el azul de
-   marca, 6.5:1). Los dos pasan de sobra —a 20 px en negrita el listón es 3:1—,
-   y el azul es el que el resto del bloque ya usa como tinta de marca. Si algún
-   día se quiere el navy de vuelta, NO se hace volviendo a `--sp-primary-hover`:
-   eso reabre exactamente este defecto. */
+/* ⚠️ LA CIFRA TIENE TOKEN PROPIO, `--sp-cifra-cierre`, y las dos alternativas
+   obvias están descartadas por escrito junto a su declaración:
+   NO `--sp-primary-hover` —que es lo que había: el hover del RELLENO del botón
+   primario, tomado prestado por salir un tono más fuerte; en cuanto ese hover
+   pasó a oscurecer se llevó esta cifra a 2.66:1 sobre la card—, y tampoco
+   `--sp-primary-text` a secas, que arregla el oscuro pero en claro cambia el
+   navy por el azul de marca, y esto es una hoja que se imprime y que el paciente
+   lee. El token propio deja el navy en claro y la tinta aclarada en oscuro.
+   Claro 11.60:1 sobre blanco · oscuro 6.23:1 sobre la card. */
 .sp-doc-cierrefila--final .sp-doc-cierrecifra {
-  font-size: 20px; font-weight: var(--sp-fw-black); color: var(--sp-primary-text);
+  font-size: 20px; font-weight: var(--sp-fw-black); color: var(--sp-cifra-cierre);
 }
 /* El único número editable del bloque. */
 .sp-doc-anticipo { flex: 0 0 170px; width: 170px; }
