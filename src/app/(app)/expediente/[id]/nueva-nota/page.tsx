@@ -1882,28 +1882,28 @@ export default function NuevaNotaPage() {
                 oculto={panelPlantillas}
               >
                 {docInline === 'receta' && (
-                  <RecetaFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={formatDiagnosticosInline(form.diagnosticos)} pacienteId={id} medicamentosIniciales={medicamentosParaReceta} onVacioChange={setFormVacio} onPanelPlantillasChange={setPanelPlantillas} />
+                  <RecetaFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={formatDiagnosticosInline(form.diagnosticos)} pacienteId={id} medicamentosIniciales={medicamentosParaReceta} onVacioChange={setFormVacio} onCerrarTrasEmitir={() => setDocInline(null)} onPanelPlantillasChange={setPanelPlantillas} />
                 )}
                 {docInline === 'lab' && (
-                  <SolicitudLabFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={formatDiagnosticosInline(form.diagnosticos)} pacienteId={id} onVacioChange={setFormVacio} onPanelPlantillasChange={setPanelPlantillas} />
+                  <SolicitudLabFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={formatDiagnosticosInline(form.diagnosticos)} pacienteId={id} onVacioChange={setFormVacio} onCerrarTrasEmitir={() => setDocInline(null)} onPanelPlantillasChange={setPanelPlantillas} />
                 )}
                 {docInline === 'imagen' && (
-                  <SolicitudImagenFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={formatDiagnosticosInline(form.diagnosticos)} pacienteId={id} onVacioChange={setFormVacio} onPanelPlantillasChange={setPanelPlantillas} />
+                  <SolicitudImagenFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={formatDiagnosticosInline(form.diagnosticos)} pacienteId={id} onVacioChange={setFormVacio} onCerrarTrasEmitir={() => setDocInline(null)} onPanelPlantillasChange={setPanelPlantillas} />
                 )}
                 {docInline === 'suplementacion' && (
-                  <PlanSupFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={formatDiagnosticosInline(form.diagnosticos)} pacienteId={id} onVacioChange={setFormVacio} onPanelPlantillasChange={setPanelPlantillas} />
+                  <PlanSupFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={formatDiagnosticosInline(form.diagnosticos)} pacienteId={id} onVacioChange={setFormVacio} onCerrarTrasEmitir={() => setDocInline(null)} onPanelPlantillasChange={setPanelPlantillas} />
                 )}
                 {docInline === 'internamiento' && (
-                  <InternamientoFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={formatDiagnosticosInline(form.diagnosticos)} pacienteId={id} onVacioChange={setFormVacio} onPanelPlantillasChange={setPanelPlantillas} />
+                  <InternamientoFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={formatDiagnosticosInline(form.diagnosticos)} pacienteId={id} onVacioChange={setFormVacio} onCerrarTrasEmitir={() => setDocInline(null)} onPanelPlantillasChange={setPanelPlantillas} />
                 )}
                 {docInline === 'escrito' && (
-                  <EscritoFormDynamic pacienteInicial={nombrePaciente} pacienteId={id} onVacioChange={setFormVacio} onPanelPlantillasChange={setPanelPlantillas} />
+                  <EscritoFormDynamic pacienteInicial={nombrePaciente} pacienteId={id} onVacioChange={setFormVacio} onCerrarTrasEmitir={() => setDocInline(null)} onPanelPlantillasChange={setPanelPlantillas} />
                 )}
                 {docInline === 'consentimiento' && (
-                  <ConsentimientoFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={formatDiagnosticosInline(form.diagnosticos)} edadInicial={edadInicial} pacienteId={id} onVacioChange={setFormVacio} onPanelPlantillasChange={setPanelPlantillas} />
+                  <ConsentimientoFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={formatDiagnosticosInline(form.diagnosticos)} edadInicial={edadInicial} pacienteId={id} onVacioChange={setFormVacio} onCerrarTrasEmitir={() => setDocInline(null)} onPanelPlantillasChange={setPanelPlantillas} />
                 )}
                 {docInline === 'honorarios' && (
-                  <HonorariosFormDynamic pacienteInicial={nombrePaciente} pacienteId={id} onVacioChange={setFormVacio} onPanelPlantillasChange={setPanelPlantillas} />
+                  <HonorariosFormDynamic pacienteInicial={nombrePaciente} pacienteId={id} onVacioChange={setFormVacio} onCerrarTrasEmitir={() => setDocInline(null)} onPanelPlantillasChange={setPanelPlantillas} />
                 )}
               </SelectorTipoDocumento>
             </div>

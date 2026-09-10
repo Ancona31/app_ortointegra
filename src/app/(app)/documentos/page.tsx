@@ -218,18 +218,18 @@ function DocumentosContent() {
                 <RecetaForm
                   pacienteInicial={`${pacienteSeleccionado.nombre} ${pacienteSeleccionado.apellidos}`}
                   pacienteId={pacienteSeleccionado.id}
-                  onVacioChange={setFormVacio}
+                  onVacioChange={setFormVacio} onCerrarTrasEmitir={() => setTipo(null)}
                   onPanelPlantillasChange={setPanelPlantillas}
                 />
               )}
-              {tipo === 'lab' && <SolicitudLabForm pacienteInicial={`${pacienteSeleccionado.nombre} ${pacienteSeleccionado.apellidos}`} pacienteId={pacienteSeleccionado.id} onVacioChange={setFormVacio} onPanelPlantillasChange={setPanelPlantillas} />}
-              {tipo === 'imagen' && <SolicitudImagenForm pacienteInicial={`${pacienteSeleccionado.nombre} ${pacienteSeleccionado.apellidos}`} pacienteId={pacienteSeleccionado.id} onVacioChange={setFormVacio} onPanelPlantillasChange={setPanelPlantillas} />}
-              {tipo === 'suplementacion' && <PlanSuplementacionForm pacienteInicial={`${pacienteSeleccionado.nombre} ${pacienteSeleccionado.apellidos}`} pacienteId={pacienteSeleccionado.id} onVacioChange={setFormVacio} onPanelPlantillasChange={setPanelPlantillas} />}
+              {tipo === 'lab' && <SolicitudLabForm pacienteInicial={`${pacienteSeleccionado.nombre} ${pacienteSeleccionado.apellidos}`} pacienteId={pacienteSeleccionado.id} onVacioChange={setFormVacio} onCerrarTrasEmitir={() => setTipo(null)} onPanelPlantillasChange={setPanelPlantillas} />}
+              {tipo === 'imagen' && <SolicitudImagenForm pacienteInicial={`${pacienteSeleccionado.nombre} ${pacienteSeleccionado.apellidos}`} pacienteId={pacienteSeleccionado.id} onVacioChange={setFormVacio} onCerrarTrasEmitir={() => setTipo(null)} onPanelPlantillasChange={setPanelPlantillas} />}
+              {tipo === 'suplementacion' && <PlanSuplementacionForm pacienteInicial={`${pacienteSeleccionado.nombre} ${pacienteSeleccionado.apellidos}`} pacienteId={pacienteSeleccionado.id} onVacioChange={setFormVacio} onCerrarTrasEmitir={() => setTipo(null)} onPanelPlantillasChange={setPanelPlantillas} />}
               {tipo === 'internamiento' && (
                 <SolicitudInternamientoForm
                   pacienteInicial={`${pacienteSeleccionado.nombre} ${pacienteSeleccionado.apellidos}`}
                   pacienteId={pacienteSeleccionado.id}
-                  onVacioChange={setFormVacio}
+                  onVacioChange={setFormVacio} onCerrarTrasEmitir={() => setTipo(null)}
                   onPanelPlantillasChange={setPanelPlantillas}
                 />
               )}
@@ -237,7 +237,7 @@ function DocumentosContent() {
                 <EscritoMedicoForm
                   pacienteInicial={`${pacienteSeleccionado.nombre} ${pacienteSeleccionado.apellidos}`}
                   pacienteId={pacienteSeleccionado.id}
-                  onVacioChange={setFormVacio}
+                  onVacioChange={setFormVacio} onCerrarTrasEmitir={() => setTipo(null)}
                   onPanelPlantillasChange={setPanelPlantillas}
                 />
               )}
@@ -248,7 +248,7 @@ function DocumentosContent() {
                     ? calcularEdad(pacienteSeleccionado.fecha_nacimiento).textoElegante
                     : ''}
                   pacienteId={pacienteSeleccionado.id}
-                  onVacioChange={setFormVacio}
+                  onVacioChange={setFormVacio} onCerrarTrasEmitir={() => setTipo(null)}
                   onPanelPlantillasChange={setPanelPlantillas}
                 />
               )}
@@ -256,7 +256,7 @@ function DocumentosContent() {
                 <NotaHonorariosForm
                   pacienteInicial={`${pacienteSeleccionado.nombre} ${pacienteSeleccionado.apellidos}`}
                   pacienteId={pacienteSeleccionado.id}
-                  onVacioChange={setFormVacio}
+                  onVacioChange={setFormVacio} onCerrarTrasEmitir={() => setTipo(null)}
                   onPanelPlantillasChange={setPanelPlantillas}
                 />
               )}

@@ -140,14 +140,14 @@ function DocumentosPacienteContent() {
           conDatos={!formVacio}
           oculto={panelPlantillas}
         >
-          {tab === 'receta' && <RecetaForm pacienteInicial={nombreCompleto} diagnosticoInicial={diagnosticoInicial} pacienteId={id} onVacioChange={setFormVacio} onPanelPlantillasChange={setPanelPlantillas} />}
-          {tab === 'lab' && <SolicitudLabForm pacienteInicial={nombreCompleto} diagnosticoInicial={diagnosticoInicial} pacienteId={id} onVacioChange={setFormVacio} onPanelPlantillasChange={setPanelPlantillas} />}
-          {tab === 'imagen' && <SolicitudImagenForm pacienteInicial={nombreCompleto} diagnosticoInicial={diagnosticoInicial} pacienteId={id} onVacioChange={setFormVacio} onPanelPlantillasChange={setPanelPlantillas} />}
-          {tab === 'suplementacion' && <PlanSuplementacionForm pacienteInicial={nombreCompleto} diagnosticoInicial={diagnosticoInicial} pacienteId={id} onVacioChange={setFormVacio} onPanelPlantillasChange={setPanelPlantillas} />}
-          {tab === 'internamiento' && <SolicitudInternamientoForm pacienteInicial={nombreCompleto} diagnosticoInicial={diagnosticoInicial} pacienteId={id} onVacioChange={setFormVacio} onPanelPlantillasChange={setPanelPlantillas} />}
-          {tab === 'escrito' && <EscritoMedicoForm pacienteInicial={nombreCompleto} pacienteId={id} onVacioChange={setFormVacio} onPanelPlantillasChange={setPanelPlantillas} />}
-          {tab === 'consentimiento' && <ConsentimientoInformadoForm pacienteInicial={nombreCompleto} diagnosticoInicial={diagnosticoInicial} edadInicial={edadInicial} pacienteId={id} borradorId={borradorId} onVacioChange={setFormVacio} onPanelPlantillasChange={setPanelPlantillas} />}
-          {tab === 'honorarios' && <NotaHonorariosForm pacienteInicial={nombreCompleto} pacienteId={id} onVacioChange={setFormVacio} onPanelPlantillasChange={setPanelPlantillas} />}
+          {tab === 'receta' && <RecetaForm pacienteInicial={nombreCompleto} diagnosticoInicial={diagnosticoInicial} pacienteId={id} onVacioChange={setFormVacio} onCerrarTrasEmitir={() => setTab(null)} onPanelPlantillasChange={setPanelPlantillas} />}
+          {tab === 'lab' && <SolicitudLabForm pacienteInicial={nombreCompleto} diagnosticoInicial={diagnosticoInicial} pacienteId={id} onVacioChange={setFormVacio} onCerrarTrasEmitir={() => setTab(null)} onPanelPlantillasChange={setPanelPlantillas} />}
+          {tab === 'imagen' && <SolicitudImagenForm pacienteInicial={nombreCompleto} diagnosticoInicial={diagnosticoInicial} pacienteId={id} onVacioChange={setFormVacio} onCerrarTrasEmitir={() => setTab(null)} onPanelPlantillasChange={setPanelPlantillas} />}
+          {tab === 'suplementacion' && <PlanSuplementacionForm pacienteInicial={nombreCompleto} diagnosticoInicial={diagnosticoInicial} pacienteId={id} onVacioChange={setFormVacio} onCerrarTrasEmitir={() => setTab(null)} onPanelPlantillasChange={setPanelPlantillas} />}
+          {tab === 'internamiento' && <SolicitudInternamientoForm pacienteInicial={nombreCompleto} diagnosticoInicial={diagnosticoInicial} pacienteId={id} onVacioChange={setFormVacio} onCerrarTrasEmitir={() => setTab(null)} onPanelPlantillasChange={setPanelPlantillas} />}
+          {tab === 'escrito' && <EscritoMedicoForm pacienteInicial={nombreCompleto} pacienteId={id} onVacioChange={setFormVacio} onCerrarTrasEmitir={() => setTab(null)} onPanelPlantillasChange={setPanelPlantillas} />}
+          {tab === 'consentimiento' && <ConsentimientoInformadoForm pacienteInicial={nombreCompleto} diagnosticoInicial={diagnosticoInicial} edadInicial={edadInicial} pacienteId={id} borradorId={borradorId} onVacioChange={setFormVacio} onCerrarTrasEmitir={() => setTab(null)} onPanelPlantillasChange={setPanelPlantillas} />}
+          {tab === 'honorarios' && <NotaHonorariosForm pacienteInicial={nombreCompleto} pacienteId={id} onVacioChange={setFormVacio} onCerrarTrasEmitir={() => setTab(null)} onPanelPlantillasChange={setPanelPlantillas} />}
         </SelectorTipoDocumento>
       </div>
     </div>

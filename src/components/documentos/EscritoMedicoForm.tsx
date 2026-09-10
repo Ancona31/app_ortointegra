@@ -108,6 +108,23 @@ interface Props {
   /** Reporta al host si el formulario sigue vacío (guía 04 §6.1 y §6.2). */
   onVacioChange?: (vacio: boolean) => void
   /**
+   * El modal de «documento generado» se cerró — o sea, el documento ya salió y
+   * el médico terminó con él.
+   *
+   * Existe para que el HOST pueda replegar su selector y volver a la rejilla de
+   * los ocho tipos: el formulario no puede hacerlo solo porque no es dueño del
+   * `value` del selector, y a estas alturas seguir enseñando la receta recién
+   * emitida no ayuda a nadie.
+   *
+   * ⚠️ SE DISPARA AL CERRAR EL MODAL Y NO AL EMITIR, y la diferencia importa:
+   * este mismo componente RENDERIZA ese modal, así que soltar la señal al
+   * emitir haría que el host lo desmontara con el PDF todavía en pantalla.
+   *
+   * Opcional: el búnker y cualquier montaje sin selector lo omiten y no pasa
+   * nada.
+   */
+  onCerrarTrasEmitir?: () => void
+  /**
    * El panel de plantillas sustituye al formulario en su mismo espacio, y
    * mientras está abierto el selector de tipo del host se oculta (spec 02 §3.1):
    * elegir otro tipo desde ahí tiraría el formulario sobre el que el panel
@@ -116,7 +133,7 @@ interface Props {
   onPanelPlantillasChange?: (abierto: boolean) => void
 }
 
-export default function EscritoMedicoForm({ pacienteInicial = '', pacienteId, offlineMode, onOfflineSave, onVacioChange, onPanelPlantillasChange }: Props) {
+export default function EscritoMedicoForm({ pacienteInicial = '', pacienteId, offlineMode, onOfflineSave, onVacioChange, onCerrarTrasEmitir, onPanelPlantillasChange }: Props) {
   const { medicoInfo: onlineMedicoInfo, isLoading: cargandoPerfil } = useMedicoInfo()
   const { consultorioActivo } = useConsultorioActivo()
 
@@ -556,7 +573,11 @@ export default function EscritoMedicoForm({ pacienteInicial = '', pacienteId, of
 
       <ModalDocumentoGenerado
         open={docGenerado !== null}
-        onClose={() => setDocGenerado(null)}
+        /* Cerrar el modal es el final del documento: se suelta la señal para
+           que el host repliegue su selector. `setDocGenerado(null)` primero,
+           para que el modal se desmonte por su cuenta y no de rebote al
+           desmontarse este formulario entero. */
+        onClose={() => { setDocGenerado(null); onCerrarTrasEmitir?.() }}
         blob={docGenerado?.blob ?? null}
         titulo="Escrito médico generado"
         guardadoEnExpediente={docGenerado?.guardado ?? false}
