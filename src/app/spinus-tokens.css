@@ -513,25 +513,56 @@ html.dark {
   --sp-avatar-9-bg:  #003f4a;  --sp-avatar-9-ink:  #84c6d5;  /* celeste  */
   --sp-avatar-10-bg: #4c4068;  --sp-avatar-10-ink: #c2b5dd;  /* lavanda  */
 
-  /* — TIPO DE DOCUMENTO — el mismo 45 % contra blanco que usa
-       --sp-primary-text. Literales y no color-mix sobre el token claro:
-       redeclarar --sp-doc-X en función de var(--sp-doc-X) es una referencia
-       cíclica y la propiedad quedaría inválida (guaranteed-invalid), no
-       heredada. Los valores son los de GUIA_FORMULARIOS_04 §3. */
-  --sp-doc-receta:         #99afed;
-  --sp-doc-laboratorio:    #8ec2b3;
-  --sp-doc-imagen:         #c4a6f7;
-  --sp-doc-suplementacion: #cea993;
-  --sp-doc-internamiento:  #e294a7;
-  --sp-doc-escrito:        #96b7c1;
-  --sp-doc-consentimiento: #a5a2d6;
-  --sp-doc-honorarios:     #e4aa92;
+  /* — TIPO DE DOCUMENTO — `MODO_OSCURO_APP.md` §4. Literales y no color-mix
+       sobre el token claro: redeclarar --sp-doc-X en función de var(--sp-doc-X)
+       es una referencia cíclica y la propiedad quedaría inválida
+       (guaranteed-invalid), no heredada.
 
-  /* — HITO DE MEDICIÓN — mismo 45 % contra blanco que la familia de arriba,
-       para que el punto de la línea de tiempo baje de intensidad igual que los
-       chips de documento que tiene al lado. Literal por el mismo motivo que
-       ellos: `color-mix` sobre su propio token sería una referencia cíclica. */
-  --sp-hito-medicion:      #c998cd;
+       ⚠️ ESTOS NUEVE VALORES SUSTITUYEN AL «45 % CONTRA BLANCO» QUE HABÍA AQUÍ,
+       y no es un retoque de gusto. Aquella fórmula optimizó CONTRASTE sin poner
+       ningún límite al croma, y el resultado pasaba AA con holgura mientras el
+       color desaparecía: `laboratorio` caía de croma 0.105 a 0.059 y `escrito`
+       de 0.077 a 0.039 —grises con un tinte—, o sea que la identidad del formato
+       dejaba de comunicar justo donde el color es todo lo que hay. El listón que
+       faltaba, y que estos nueve cumplen, es CROMA ≥ 0.12 en OKLCH (§2.2).
+
+       ⚠️ NO SON EL NIVEL 400 DE TAILWIND A SECAS, aunque salgan de él. Se toman
+       el tono y el croma del 400 y se ajusta la CLARIDAD dentro de la banda
+       L 0.68-0.78 de OKLCH, porque tres de los ocho formatos viven en el arco
+       azul→violeta y dos en el verde→cian: en oscuro esos arcos se comprimen y
+       no hay tono que ganar, así que la única palanca que separa las parejas es
+       la claridad. Dejarlos los nueve en el 400 hace fallar tres parejas, y
+       mover sólo `consentimiento` NO basta —queda atrapado entre el suelo de
+       croma y el listón de contraste—. Está medido en §5; no lo re-descubras.
+
+       ⚠️ EL PAR MÁS APRETADO ES `receta` CONTRA `consentimiento`: 19.7° de tono
+       y 1.40 de razón de luminancia, o sea EXACTAMENTE en el listón y sin
+       holgura. Quien toque cualquiera de los dos vuelve a medir ese par primero.
+
+       Croma / contraste sobre --sp-surface (#1e1e1e) de cada uno, al lado. */
+  --sp-doc-receta:         #4899fb;  /* C 0.165 · 5.74:1 */
+  --sp-doc-laboratorio:    #00b781;  /* C 0.148 · 6.42:1 */
+  --sp-doc-imagen:         #a17efe;  /* C 0.183 · 5.50:1 */
+  --sp-doc-suplementacion: #e7ad00;  /* C 0.160 · 8.24:1 */
+  --sp-doc-internamiento:  #fd5d79;  /* C 0.195 · 5.57:1 */
+  --sp-doc-escrito:        #00cee9;  /* C 0.136 · 8.74:1 */
+  /* ⚠️ C 0.121, A UNA MILÉSIMA DEL SUELO, y no es holgura: es el que más se
+     mueve para resolver el arco azul-violeta y a L 0.765 el índigo ya no da más
+     croma. Sostiene DOS parejas (con `receta` y con `imagen`). */
+  --sp-doc-consentimiento: #9fabff;  /* C 0.121 · 7.73:1 */
+  /* ⚠️ ES #ee7d00 Y NO #fe8600. El segundo es más vivo y choca con
+     `suplementacion` (13.3° / 1.23: empata en los DOS ejes, que es justo lo que
+     la regla prohíbe). No lo «mejores» subiéndolo. */
+  --sp-doc-honorarios:     #ee7d00;  /* C 0.173 · 6.01:1 */
+
+  /* — HITO DE MEDICIÓN — mismo criterio que la familia de arriba, para que el
+       punto de la línea de tiempo baje de intensidad igual que los chips de
+       documento que tiene al lado. Literal por el mismo motivo que ellos:
+       `color-mix` sobre su propio token sería una referencia cíclica.
+       ⚠️ FUERA DEL @supports, IGUAL QUE LOS OCHO DE ARRIBA: son hexes, no
+       dependen de la sintaxis de color relativa y gatearlos sólo serviría para
+       dejar el lavado puesto en un navegador viejo sin ninguna razón. */
+  --sp-hito-medicion:      #e360f7;  /* C 0.239 · 5.78:1 */
 
   /* — SEMÁFORO DE VITALES — espejo oscuro. Aquí sí converge con la semántica
        genérica: los hexes de la card solo divergen en la paleta clara. */
