@@ -2564,11 +2564,21 @@ input[type="date"].sp-input {
    vuelca como CSS en línea: por eso el trazo de la línea y el halo de los puntos
    se resuelven allí y no aquí.
 
-   ⚠️ LOS CUATRO VALORES NO SON NUEVOS. Son exactamente los hex que el componente
+   ⚠️ TRES DE LOS CUATRO VALORES NO SON NUEVOS. Son los hex que el componente
    tenía escritos, que resultaron ser tokens que ya existían: `#e2e8f0` es
-   `--sp-line-soft`, `#94a3b8` es `--sp-ink-250` y `#cbd5e1` es
-   `--sp-line-strong`. En tema claro no cambia ni un píxel; lo único que se gana
-   es la contraparte oscura.
+   `--sp-line-soft` y `#cbd5e1` es `--sp-line-strong`. Para esos tres, en tema
+   claro no cambia ni un píxel; lo único que se gana es la contraparte oscura.
+
+   ⚠️⚠️ EL CUARTO SÍ CAMBIA, Y EN LOS DOS TEMAS: LOS RÓTULOS DE EJE. Iban en
+   `#94a3b8` —que es `--sp-ink-250`— y eso da 2.56:1 sobre la card en claro y
+   3.57:1 en oscuro. Son texto de 11 px, o sea que su listón es el 4.5:1 de AA y
+   NO lo pasaban en ninguno de los dos. Estaban por debajo desde antes del modo
+   oscuro; heredar el defecto con paridad habría sido conservarlo.
+   `--sp-ink-500` es el token MÁS CLARO de la escala que pasa 4.5 en los dos
+   temas (5.45 en claro, 5.09 en oscuro); el siguiente hacia abajo, `--sp-ink-350`,
+   se queda en 2.90. Por eso es éste y no uno más suave.
+   El precio es que en claro los rótulos se ven bastante más oscuros: ΔE2000
+   20.6 respecto al gris de antes. Es un cambio deliberado, no una deriva.
 
    ⚠️ LAS BANDAS DEL SEMÁFORO NO ESTÁN AQUÍ y no se tocan: son `<rect>` con
    `fillOpacity`, salen de `BAND_COLORS` en `lib/labs/utils.ts` y funcionan en
@@ -2578,5 +2588,5 @@ input[type="date"].sp-input {
 .sp-grafica .recharts-cartesian-grid line { stroke: var(--sp-line-soft); }
 .sp-grafica .recharts-cartesian-axis-line,
 .sp-grafica .recharts-cartesian-axis-tick-line { stroke: var(--sp-line-soft); }
-.sp-grafica .recharts-cartesian-axis-tick-value { fill: var(--sp-ink-250); }
+.sp-grafica .recharts-cartesian-axis-tick-value { fill: var(--sp-ink-500); }
 .sp-grafica .recharts-tooltip-cursor { stroke: var(--sp-line-strong); }
