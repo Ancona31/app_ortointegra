@@ -47,6 +47,18 @@
      tampoco: esa familia son los ocho colores de FORMATO, y un noveno miembro se
      leería como un noveno tipo de documento. Esto no es un formato, es un rol. */
   --sp-cifra-cierre:       var(--cp, #1a3a5c);
+  /* LOS DOS EXTREMOS DEL DEGRADADO DE MARCA — cabeceras de card, botones de
+     recompensa y medallones de icono.
+     ⚠️ EXISTEN PORQUE ESOS DEGRADADOS ESTABAN CONGELADOS EN DOS SENTIDOS. Iban
+     escritos `from-[#1a3a5c] to-[#1e5fa8]`, o sea: (a) no seguían al color que
+     el médico elige en su perfil —una clínica con paleta verde tenía cabeceras
+     azules— y (b) no cambiaban con el tema, así que en oscuro el bloque quedaba
+     a 1.5:1 contra la card y dejaba de leerse como bloque.
+     ⚠️ CON LA MARCA DE FÁBRICA, EN CLARO, ESTOS DOS VALEN EXACTAMENTE LOS DOS
+     HEX QUE HABÍA. El cambio en claro sólo se ve en una clínica con paleta
+     propia, que es justo lo que se venía a arreglar. */
+  --sp-brand-grad-from:    var(--cp, #1a3a5c);
+  --sp-brand-grad-to:      var(--cs, #1e5fa8);
 
   /* Marca / cromo de app */
   /* No usar: el sidebar se tematiza en Sidebar.tsx:223. Evita segunda fuente de verdad. */
@@ -542,6 +554,14 @@ html.dark {
      porque la sustitución se resuelve en el elemento, no aquí—. Si algún día
      esta línea deja de ser un `var()`, se rompe ese enganche. */
   --sp-cifra-cierre:     var(--sp-primary-text);
+  /* El degradado de marca en oscuro. Literales de respaldo; la fórmula está en
+     el `@supports` del final. Las dos claridades NO son valores nuevos: 0.42 es
+     la del cromo de marca (`--ag-navy`) y 0.55 la del relleno de marca
+     (`--sp-primary`), o sea que el degradado va del tono del menú al del botón
+     primario. Contra la card: 1.97:1 el extremo oscuro y 3.44:1 el claro, así
+     que el bloque se lee como bloque. */
+  --sp-brand-grad-from:  #2f4f73;
+  --sp-brand-grad-to:    #3373bd;
   --sp-primary-bg:       color-mix(in srgb, var(--cs, #1e5fa8) 14%, transparent); /* TP:192-202 */
   --sp-primary-bg-soft:  color-mix(in srgb, var(--cs, #1e5fa8) 10%, transparent);
   --sp-primary-bg-faint: color-mix(in srgb, var(--cs, #1e5fa8)  7%, transparent);
@@ -758,6 +778,11 @@ html.dark {
        `translateY(1px)`, o sea que no depende sólo del color. */
     --sp-primary-hover:  oklch(from var(--cs, #1e5fa8) 0.49 c h);
     --sp-primary-active: oklch(from var(--cs, #1e5fa8) 0.43 c h);
+
+    /* El degradado de marca, con las dos claridades ya establecidas: la del
+       cromo para el extremo oscuro y la del relleno para el claro. */
+    --sp-brand-grad-from: oklch(from var(--cp, #1a3a5c) 0.42 c h);
+    --sp-brand-grad-to:   oklch(from var(--cs, #1e5fa8) 0.55 c h);
   }
 }
 

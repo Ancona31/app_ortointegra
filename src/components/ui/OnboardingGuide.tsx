@@ -562,7 +562,7 @@ export default function OnboardingGuide() {
         <div className="fixed bottom-[calc(1.5rem+env(safe-area-inset-bottom,0px))] right-6 z-[10002]">
           <button
             onClick={handleBubbleClick}
-            className="relative w-12 h-12 bg-gradient-to-br from-[#1a3a5c] to-[#1e5fa8] rounded-full flex items-center justify-center hover:scale-110 active:scale-95 transition-transform duration-200"
+            className="relative w-12 h-12 bg-gradient-to-br from-[var(--sp-brand-grad-from)] to-[var(--sp-brand-grad-to)] rounded-full flex items-center justify-center hover:scale-110 active:scale-95 transition-transform duration-200"
             style={{ animation: 'ledPulse 2s ease-in-out infinite' }}
             title="Abrir asistente"
           >
@@ -598,7 +598,7 @@ export default function OnboardingGuide() {
         <div className="w-[360px] bg-[var(--sp-surface-glass)] backdrop-blur-xl rounded-2xl shadow-[0_8px_40px_rgba(0,0,0,0.12)] border border-slate-200/60 overflow-hidden">
 
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-[#1a3a5c] to-[#1e5fa8]">
+          <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-[var(--sp-brand-grad-from)] to-[var(--sp-brand-grad-to)]">
             <div className="flex items-center gap-2">
               <Sparkles size={14} className="text-white/80" />
               <span className="text-xs font-semibold text-white">
@@ -636,7 +636,7 @@ export default function OnboardingGuide() {
           {/* Content */}
           <div className="p-4">
             <div className="flex gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#1a3a5c]/10 to-[#1e5fa8]/10 flex items-center justify-center flex-shrink-0">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[var(--sp-brand-grad-from)]/10 to-[var(--sp-brand-grad-to)]/10 flex items-center justify-center flex-shrink-0">
                 {showWelcome
                   ? <Sparkles size={18} className="text-[#1e5fa8]" />
                   : <MessageCircle size={18} className="text-[#1e5fa8]" />

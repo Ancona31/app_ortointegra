@@ -27,7 +27,7 @@ export default function SecretariaDashboard() {
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       {/* Saludo */}
-      <div className="bg-gradient-to-br from-[#1a3a5c] to-[#1e5fa8] rounded-2xl px-6 py-6 text-white">
+      <div className="bg-gradient-to-br from-[var(--sp-brand-grad-from)] to-[var(--sp-brand-grad-to)] rounded-2xl px-6 py-6 text-white">
         <p className="text-xs font-semibold uppercase tracking-widest opacity-70 mb-1">Bienvenida</p>
         <p className="text-xl font-bold mb-1 capitalize">{hoy}</p>
         <p className="text-sm opacity-75">Consultorio Dr. Angel M. Ancona Pérez</p>

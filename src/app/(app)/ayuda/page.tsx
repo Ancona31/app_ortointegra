@@ -157,7 +157,7 @@ export default function AyudaPage() {
       {/* Header */}
       <div>
         <div className="flex items-center gap-3 mb-2">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#1a3a5c] to-[#1e5fa8] flex items-center justify-center">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[var(--sp-brand-grad-from)] to-[var(--sp-brand-grad-to)] flex items-center justify-center">
             <HelpCircle className="w-5 h-5 text-white" />
           </div>
           <div>
@@ -186,7 +186,7 @@ export default function AyudaPage() {
               <ol className="space-y-2">
                 {g.steps.map((step, i) => (
                   <li key={i} className="flex items-start gap-2.5">
-                    <span className="w-5 h-5 rounded-md bg-gradient-to-br from-[#1a3a5c] to-[#1e5fa8] flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <span className="w-5 h-5 rounded-md bg-gradient-to-br from-[var(--sp-brand-grad-from)] to-[var(--sp-brand-grad-to)] flex items-center justify-center flex-shrink-0 mt-0.5">
                       <span className="text-[10px] font-bold text-white">{i + 1}</span>
                     </span>
                     <span className="text-[13px] text-slate-600 leading-relaxed">{step}</span>
@@ -204,7 +204,7 @@ export default function AyudaPage() {
           localStorage.removeItem('spinus_onboarding')
           window.location.reload()
         }}
-        className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-[#1a3a5c] to-[#1e5fa8] text-white rounded-xl text-sm font-semibold shadow-[0_4px_24px_rgba(30,95,168,0.3)] hover:shadow-[0_8px_32px_rgba(30,95,168,0.4)] hover:-translate-y-0.5 active:scale-[0.97] transition-all duration-200"
+        className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-[var(--sp-brand-grad-from)] to-[var(--sp-brand-grad-to)] text-white rounded-xl text-sm font-semibold shadow-[0_4px_24px_rgba(30,95,168,0.3)] hover:shadow-[0_8px_32px_rgba(30,95,168,0.4)] hover:-translate-y-0.5 active:scale-[0.97] transition-all duration-200"
       >
         <ArrowRight size={15} className="rotate-180" />
         Volver a ver el tutorial paso a paso
@@ -277,7 +277,7 @@ export default function AyudaPage() {
 
       {/* Contacto */}
       <section>
-        <div className="bg-gradient-to-r from-[#1a3a5c] to-[#1e5fa8] rounded-2xl p-8 text-center relative overflow-hidden">
+        <div className="bg-gradient-to-r from-[var(--sp-brand-grad-from)] to-[var(--sp-brand-grad-to)] rounded-2xl p-8 text-center relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-transparent pointer-events-none" />
           <h2 className="relative text-lg font-bold text-white">¿No encontraste lo que buscabas?</h2>
           <p className="relative mt-2 text-sm text-white/70">
