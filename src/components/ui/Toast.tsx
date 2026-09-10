@@ -37,17 +37,34 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     warning: (msg: string) => add(msg, 'warning'),
   }), [add])
 
+  /* ⚠️ TOKENS SEMÁNTICOS Y NO ESCALONES DE TAILWIND, y el porqué importa porque
+     esto es el aviso de éxito y de error de TODA la app.
+     Aquí estuvo `text-emerald-800` y sus tres hermanos. La hoja de traducción de
+     `ThemeProvider` repinta el FONDO de un `bg-*-50` a un tinte al 14 % en
+     oscuro, pero NO toca el escalón 800 del texto: quedaba tinta oscura sobre
+     relleno oscuro, entre 1.83:1 y 2.08:1 — o sea que el aviso más importante de
+     la app era ilegible justo en el tema en el que más se mira.
+     El criterio es el de la agenda para color con significado: en oscuro, TINTA
+     CLARA sobre RELLENO TENUE; nunca tinta oscura sobre relleno claro. Los
+     tokens `--sp-*` ya lo hacen —oscurecen en claro y aclaran en oscuro—, así
+     que no hace falta inventar nada, sólo dejar de escribir el escalón a mano.
+     ⚠️ EN CLARO LA TINTA BAJA UN POCO, y es el precio: los `--sp-*-strong` son
+     algo más claros que el escalón 800 de Tailwind (4.67-6.88:1 frente a
+     6.84-8.01). Los cuatro siguen por encima del 4.5 que pide AA a 14 px, y a
+     cambio el toast queda alineado con los banners del resto del sistema. */
   const styles: Record<ToastType, string> = {
-    success: 'bg-emerald-50 border-emerald-200 text-emerald-800',
-    error:   'bg-red-50 border-red-200 text-red-800',
-    info:    'bg-blue-50 border-blue-200 text-blue-800',
-    warning: 'bg-amber-50 border-amber-200 text-amber-800',
+    success: 'bg-[var(--sp-success-bg)] border-[color:var(--sp-success-border)] text-[var(--sp-success-strong)]',
+    error:   'bg-[var(--sp-danger-bg)] border-[color:var(--sp-danger-border)] text-[var(--sp-danger-strong)]',
+    info:    'bg-[var(--sp-primary-bg)] border-[color:var(--sp-primary-border)] text-[var(--sp-primary-text)]',
+    warning: 'bg-[var(--sp-warn-bg)] border-[color:var(--sp-warn-border)] text-[var(--sp-warn)]',
   }
+  /* El glifo es GRÁFICO, no texto: su listón es 3:1, y por eso puede ir en el
+     tono del punto de estado en vez de en la tinta. */
   const icons: Record<ToastType, React.ReactNode> = {
-    success: <CheckCircle    size={16} className="text-emerald-500 flex-shrink-0" />,
-    error:   <XCircle        size={16} className="text-red-500 flex-shrink-0" />,
-    info:    <Info           size={16} className="text-blue-500 flex-shrink-0" />,
-    warning: <AlertTriangle  size={16} className="text-amber-500 flex-shrink-0" />,
+    success: <CheckCircle    size={16} className="text-[var(--sp-success-dot)] flex-shrink-0" />,
+    error:   <XCircle        size={16} className="text-[var(--sp-danger)] flex-shrink-0" />,
+    info:    <Info           size={16} className="text-[var(--sp-primary-text)] flex-shrink-0" />,
+    warning: <AlertTriangle  size={16} className="text-[var(--sp-warn-dot)] flex-shrink-0" />,
   }
 
   return (
