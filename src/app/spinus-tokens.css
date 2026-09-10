@@ -870,7 +870,20 @@ a:hover { color: var(--sp-primary-active); }
   border: var(--sp-bw-hair) solid var(--sp-line-control);
   font-weight: var(--sp-fw-semi); font-size: var(--sp-fs-body-sm); padding: 13px;
 }
-.sp-btn--tertiary:hover { border-color: var(--sp-line-control); background: var(--sp-surface-sunken); }
+/* ⚠️ EL HOVER CAMBIA FONDO Y TINTA, NO EL BORDE, y es una consecuencia de que el
+   contorno subiera a `--sp-line-control`. Antes el reposo iba en
+   `--sp-line-soft` y el hover en `--sp-line-input`, o sea que el hover era un
+   ESCALON DE BORDE; desde que el reposo usa el token de contorno de control
+   —el mas fuerte de la familia de lineas— no queda escalon por encima, y el
+   hover se habia quedado repitiendo el mismo borde: invisible.
+   Se resuelve con el mismo patron que ya usa `.sp-btn--secondary:hover`, que es
+   fondo hundido mas tinta un escalon mas oscura. Medido: la superficie da
+   ΔE2000 3.88 en claro y 4.42 en oscuro, y la tinta 10.61 y 6.34 — juntos, muy
+   por encima del ΔE 5.31 que se fijo como liston del hover del primario.
+   ⚠️ NO LE DEVUELVAS UN BORDE PROPIO sin crear antes un token para el: el unico
+   mas fuerte que `--sp-line-control` no existe, y `--sp-line-strong` es MAS
+   DEBIL (1.48:1 en claro) pese al nombre. */
+.sp-btn--tertiary:hover { background: var(--sp-surface-muted); color: var(--sp-ink-800); }
 
 /* Compacto: acción inline dentro de una card interna ("Editar", "Regenerar") */
 /* ⚠️ LA TINTA VA EN `--sp-primary-text` Y NO EN `--sp-primary`. Éste es un botón
