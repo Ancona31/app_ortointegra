@@ -186,6 +186,55 @@ comentario que justifica esa elección —«con `var(--cp)` el botón cae a 1.07
 contra `--cp` crudo, que es un salto, no un escalón. Con `oklch(… 0.50 c h)` la caída es a
 2.43:1, no a 1.07: **el argumento de aquel comentario ya no aplica a esta fórmula.**
 
+
+### 3.5 El degradado de marca
+
+```css
+:root      { --sp-brand-grad-from: var(--cp);                        --sp-brand-grad-to: var(--cs); }
+html.dark  { --sp-brand-grad-from: oklch(from var(--cp) 0.42 c h);   --sp-brand-grad-to: oklch(from var(--cs) 0.55 c h); }
+```
+
+Viste las cabeceras de card, los botones de recompensa y los medallones de icono. Existe
+porque esos degradados iban escritos `from-[#1a3a5c] to-[#1e5fa8]`, congelados en dos
+sentidos: no seguían al color que el médico elige —una clínica con paleta verde tenía
+cabeceras azules— y no cambiaban con el tema, así que en oscuro el bloque quedaba a 1.5:1
+contra la card y dejaba de leerse como bloque.
+
+**Las dos claridades no son valores nuevos: son las dos que este documento ya fija.** `0.42`
+es la del cromo de marca (`--ag-navy`, el menú y la franja) y `0.55` la del relleno de marca
+(`--sp-primary`, §3.1). O sea que el degradado va **del tono del menú al del botón primario**,
+que son los dos extremos que la app ya usa para «marca como superficie». Inventar un tercer
+par de claridades para esto habría sido añadir una escala paralela sin necesidad.
+
+En claro los dos extremos son `--cp` y `--cs` **a pelo**, sin fórmula: con la marca de
+fábrica eso son exactamente los dos hex que estaban escritos, así que el tema claro no se
+mueve para quien no ha cambiado su paleta.
+
+| | Contra la card (oscuro) | Blanco encima (mín. de las 6) |
+|---|---|---|
+| Extremo oscuro `0.42` | 1.84 – 2.02 | 8.25 |
+| Extremo claro `0.55` | 3.03 – 3.63 | **4.59** |
+
+> ### ⚠️ EN CLARO, «VERDE MÉDICO» DEJA EL BLANCO EN 3.74:1
+>
+> El listón lo pone el **blanco encima**, no la separación contra la card: estos bloques
+> siempre llevan rótulo blanco. En oscuro el mínimo de las seis paletas es 4.59:1 y pasa. En
+> claro **no**: el extremo `--cs` de «Verde médico» (`#0d9488`) deja el blanco en **3.74:1**,
+> por debajo del 4.5 de AA. Le siguen «Rojo burdeos» 4.83 y «Café cálido» 5.02.
+>
+> No es un defecto de la traducción a oscuro: es el precio de que el degradado **siga a la
+> marca**. Antes estaba congelado en el azul de fábrica y el blanco daba 6.45:1 siempre, a
+> costa de pintar a todas las clínicas del color de otra.
+>
+> **Queda abierto**, y hay dos salidas: aceptar el 3.74 y anotarlo, o acotar el extremo claro
+> con `oklch(from var(--cs) min(l, 0.52) c h)`. Ese tope está medido: **no toca a «Spinus» ni
+> a «Pizarra oscuro»** —sus `l` son 0.485 y 0.446, ya por debajo—, mueve las otras cuatro, y
+> el mínimo de las seis sube de **3.74 a 5.23**. El precio es que en claro cambia el color de
+> cuatro paletas, así que no es un retoque silencioso.
+>
+> ⚠️ Si se aplica, hay que volver a medir **las seis**, no sólo la que falla: el tope actúa
+> sobre cualquier `--cs` más claro que él, incluidos los que hoy pasan de sobra.
+
 ---
 
 ## 4 Las nueve familias fijas
