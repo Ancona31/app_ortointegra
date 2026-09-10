@@ -451,8 +451,27 @@ html.dark {
                                                /* TP:205-212 patrón borde de marca */
 
   /* — MARCA —
-     El FILL no se toca: ThemeProvider tampoco altera ningún .bg-[#…] de marca
-     en dark. Solo la marca-como-TINTA se aclara (TP:146-149). */
+     ⚠️⚠️ ESTE BLOQUE ES HOY EL RESPALDO, NO EL VALOR VIGENTE, para tres de sus
+     tokens. `--sp-primary`, `--sp-primary-text` y `--sp-primary-ink` los
+     redeclara el `@supports` del final del archivo con la fórmula OKLCH de
+     `MODO_OSCURO_APP.md` §3; lo de aquí es lo que ve un navegador sin sintaxis
+     de color relativa. Si cambias uno, mira el otro sitio.
+     El resto —hover, active y los tintes con alfa— NO están duplicados allí y
+     son el valor vigente en los dos casos. */
+  /* ⚠️⚠️ HOY ESTE HOVER ES CASI UN NO-OP CON LA MARCA POR DEFECTO, Y ES UN
+     PENDIENTE ABIERTO, NO UN DESCUIDO. Desde que `--sp-primary` sube a
+     L 0.55 en OKLCH, el reposo (#3373bd, L 0.551) y este hover (#3972b2,
+     L 0.544) quedan a 0.007 de claridad: el hover deja de verse. Pasa igual en
+     «Pizarra oscuro» y NO pasa en las otras cuatro paletas.
+     La razón de que no se arregle aquí es que NINGUNA de las dos direcciones
+     cumple los dos listones a la vez (§3.4): aclarar a L 0.61 deja el blanco
+     del rótulo en 3.60:1 —bajo AA— y oscurecer a L 0.50 deja el botón en
+     2.43:1 contra la card, o sea sin contorno. Es una decisión de producto
+     pendiente, con los números medidos en §3.4. No la resuelvas a ojo.
+     ⚠️ Y OJO CON EL COMENTARIO DE ABAJO, que ya no dice toda la verdad: medía
+     contra `var(--cp)` CRUDO, que es un salto. Con la fórmula OKLCH la caída
+     es a 2.43:1, no a 1.07:1, así que «oscurecer» ya no está descartado por
+     ese argumento. */
   --sp-primary-hover:    color-mix(in srgb, var(--cs, #1e5fa8) 88%, #fff);
       /* INVERTIDO respecto a claro: en dark el hover ACLARA. Con var(--cp) el
          botón cae a 1.07–1.76:1 contra la card y desaparece. */
@@ -580,6 +599,74 @@ html.dark {
   --sp-primary-shadow-press: none;                      /* TP:173 */
   --sp-shadow-modal:         0 20px 40px rgba(0,0,0,.8);/* TP:175-177 */
   --sp-shadow-frame:         0 20px 40px rgba(0,0,0,.8);/* TP:175-177 */
+}
+
+
+/* ============================================================================
+   MODO OSCURO · LA MARCA — `MODO_OSCURO_APP.md` §3
+   ----------------------------------------------------------------------------
+   `--cs` es un `<input type="color">`: no se puede tabular, así que estos tres
+   salen de una fórmula. La operación es SUBIR LA CLARIDAD SIN TOCAR EL CROMA,
+   que es exactamente lo que `color-mix(…, #fff)` no sabe hacer — mezclar contra
+   blanco lava, y ese lavado es el defecto que esta tanda viene a quitar. Con
+   `--cs` de fábrica la tinta pasa de croma 0.057 a 0.133.
+
+   ⚠️ NO LO REESCRIBAS EN `hsl(from … h s L%)`, aunque el proyecto ya use esa
+   variante para `--ag-navy` y parezca la obvia. La `L` de HSL no sigue a la
+   luminancia entre tonos distintos: la ventana útil del relleno va de L 26-28 %
+   en «Verde médico» a L 59-63 % en «Morado», o sea que NO EXISTE una `L` de HSL
+   que sirva a las seis paletas. La de OKLCH sí, porque es claridad perceptual.
+
+   ⚠️ POR QUÉ ESTO VA EN UN `@supports` Y LAS NUEVE FAMILIAS DE ARRIBA NO: esto
+   depende de la sintaxis de color relativa y aquello son hexes. Un navegador sin
+   soporte se queda con el bloque `html.dark` de arriba —o sea, con lo que la app
+   pinta hoy—, y NO con un elemento sin color: `--sp-primary` y compañía son
+   custom properties, así que la declaración no se descarta al parsear, se guarda,
+   y el fallo saltaría al sustituir dejando la propiedad que la consume inválida
+   en tiempo de valor calculado. Eso computa a `unset`: la tinta heredaría y el
+   relleno saldría transparente. El `@supports` es lo que impide llegar ahí, y
+   NO se puede sustituir por declarar el respaldo y la fórmula seguidos — una
+   sustitución inválida no vuelve a la declaración anterior de la cascada.
+
+   ⚠️ EL BLOQUE VA DESPUÉS DEL `html.dark`, Y NO ES COLOCACIÓN CASUAL. Los dos
+   selectores pesan lo mismo (0,1,1) —`@supports` no añade especificidad—, así
+   que desempata el orden de fuente. Si esto subiera por encima, el respaldo lo
+   pisaría y la fórmula no se aplicaría en NINGÚN navegador.
+   Y va FUERA de `@layer components`: lo capado pierde contra lo no capado, así
+   que dentro de la capa esto perdería contra el `html.dark` de arriba.
+
+   ⚠️ SIN ARITMÉTICA SOBRE CANALES, y conviene saber que es a propósito. `c` y
+   `h` se reenvían intactos y la claridad es un literal. Los defectos de «soporte
+   parcial» de Chrome 119-130 y Safari 16.4-17.6 son de unidades dentro de
+   `calc()` sobre canales (Chromium serializaba `l` en 0-100), así que no tocan a
+   estas tres. Si alguien mete un `calc(l …)` aquí, reabre ese problema.
+
+   ⚠️ LA VENTANA DEL RELLENO ES DE 0.008 Y NO ES HOLGURA. Las seis paletas piden
+   ≥3:1 del botón contra la card y ≥4.5:1 del blanco encima, y la intersección de
+   sus ventanas es [0.547, 0.555]. El 0.55 cabe justo. Se cierra entera si
+   `--sp-on-primary` deja de ser blanco puro, si el listón del relleno sube de
+   3:1, o si al selector de `/perfil` se le añade una paleta más cromática que
+   «Morado». Si eso pasa, la salida NO es forzar la `L`: es partir el token.
+
+   ⚠️ EL HEX QUE EL MÉDICO ELIGE NO ES EL QUE SE PINTA EN OSCURO, y es
+   deliberado: la agenda ya tomó esta decisión para su ámbito (su azul sube de
+   #1e5fa8 a #2f6fed, «el único token de marca que cambia de hex entre modos»).
+   `--sp-primary` no tenía contraparte oscura y por eso valía #1e5fa8 sobre
+   #1e1e1e: 2.59:1, con el botón hundido en la card y los rótulos que lo usan
+   como tinta por debajo de AA.
+   ========================================================================== */
+@supports (color: oklch(from red l c h)) {
+  html.dark {
+    /* RELLENO. Las seis paletas: 3.03-3.63:1 contra la card, 4.59-5.51:1 del
+       blanco encima. Croma intacto salvo «Verde médico», que pierde 0.007 por
+       gamut. */
+    --sp-primary:      oklch(from var(--cs, #1e5fa8) 0.55 c h);
+    /* TINTA. Las seis: 5.73-6.52:1 contra la card. «Morado» y «Rojo burdeos»
+       pierden croma (0.247→0.173, 0.215→0.191) porque a L 0.70 el gamut sRGB ya
+       no da más — es techo físico, no pérdida de la fórmula. */
+    --sp-primary-text: oklch(from var(--cs, #1e5fa8) 0.70 c h);
+    --sp-primary-ink:  oklch(from var(--cs, #1e5fa8) 0.70 c h);
+  }
 }
 
 
