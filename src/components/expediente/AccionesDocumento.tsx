@@ -163,7 +163,11 @@ function Menu({ acciones, onAbrir }: {
       {abierto && (
         <div
           role="menu"
-          className="absolute right-0 top-[calc(100%+4px)] z-20 w-[240px] overflow-hidden rounded-[var(--sp-r-card-inner)] border border-[color:var(--sp-line-card)] bg-[var(--sp-surface)] shadow-[var(--sp-shadow-raised)]"
+          /* `max-w` como red: el panel se ancla al borde derecho de la fila y
+             240 px caben incluso en la tarjeta de un teléfono de 320, pero un
+             ancho fijo no debería depender de esa cuenta. Si algún día la
+             tarjeta fuera más angosta, el panel encoge en vez de salirse. */
+          className="absolute right-0 top-[calc(100%+4px)] z-20 w-[240px] max-w-[calc(100vw-2.5rem)] overflow-hidden rounded-[var(--sp-r-card-inner)] border border-[color:var(--sp-line-card)] bg-[var(--sp-surface)] shadow-[var(--sp-shadow-raised)]"
         >
           {vivas.map(({ rotulo, icono: Icono, accion, destructiva }) => {
             const bloqueada = !!accion.bloqueo

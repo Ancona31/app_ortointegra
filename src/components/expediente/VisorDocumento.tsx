@@ -79,10 +79,17 @@ export default function VisorDocumento({ doc, acciones, onIrAArchivos }: {
   const urgente = contenido.urgente === true
 
   return (
-    <div
-      ref={caja}
-      className="max-h-[560px] overflow-y-auto overflow-x-hidden rounded-[var(--sp-r-card)] border border-[color:var(--sp-line-card)] bg-[var(--sp-surface)] shadow-[var(--sp-shadow-flat)] lg:max-h-[640px]"
-    >
+    /* ⚠️ EL SCROLL VIVE EN EL CUERPO, NO EN LA TARJETA, Y ESO ES LO QUE IMPIDE
+       QUE EL MENÚ DE ACCIONES SE CORTE. Aquí estaban `max-h` y `overflow-y-auto`,
+       o sea que la tarjeta ERA el contenedor de scroll — y un contenedor de
+       scroll recorta a sus descendientes en posición absoluta, que es lo que le
+       pasaba al desplegable de «⋯»: se salía por el borde y se veía a medias.
+       No bastaba con quitar `overflow-x-hidden`: en cuanto un eje deja de ser
+       `visible`, el otro pasa a `auto` por su cuenta y sigue recortando. La
+       única salida es que el scroll no esté aquí.
+       Con la cabecera FUERA del scroller ya no hace falta que sea `sticky`: no
+       hay nada que la pueda desplazar. */
+    <div className="flex flex-col overflow-visible rounded-[var(--sp-r-card)] border border-[color:var(--sp-line-card)] bg-[var(--sp-surface)] shadow-[var(--sp-shadow-flat)]">
       {/* ── Cabecera fija y OPACA, EN DOS LÍNEAS ─────────────────────────
           Superficie sólida, por encima del contenido en apilamiento, esquinas
           al ras y sombra mínima al pie. Una cabecera fija translúcida deja ver
@@ -101,13 +108,29 @@ export default function VisorDocumento({ doc, acciones, onIrAArchivos }: {
           mismo fragmento con `w-full` y `order-last`— cae sola a un tercer
           renglón a ancho completo. Así el aviso hace crecer el BLOQUE de
           cabecera hacia abajo y nunca la fila de controles. */}
-      <div className="sticky top-0 z-10 flex flex-col gap-[var(--sp-2)] border-b border-[color:var(--sp-line-divider)] bg-[var(--sp-surface)] px-[var(--sp-4)] py-[var(--sp-3-5)] shadow-[var(--sp-shadow-flat)] lg:px-[26px]">
+      <div className="relative z-10 flex flex-col gap-[var(--sp-2)] border-b border-[color:var(--sp-line-divider)] bg-[var(--sp-surface)] px-[var(--sp-4)] py-[var(--sp-3-5)] shadow-[var(--sp-shadow-flat)] lg:px-[26px]">
         <h2 className="text-[length:var(--sp-fs-vitals)] font-extrabold leading-tight text-[var(--sp-ink-800)]">
           {titulo}
         </h2>
 
         <div className="flex flex-wrap items-center justify-between gap-x-[var(--sp-2-5)] gap-y-[var(--sp-2)]">
-          <div className="flex min-w-0 flex-wrap items-center gap-x-[var(--sp-2-5)] gap-y-[var(--sp-1-5)]">
+          {/* ⚠️ `flex-1` NO ES DECORACIÓN: ES LO QUE MANTIENE LOS BOTONES A LA
+              DERECHA. Aquí había `min-w-0` a secas, o sea `flex: 0 1 auto`, y
+              con eso el tamaño con el que este grupo ENTRA EN EL REPARTO es su
+              ancho de contenido — el `min-width: 0` solo le deja encoger DESPUÉS,
+              cuando la línea ya está formada. Así que en cuanto fecha + folio
+              medían lo suficiente, la fila decidía envolver, las acciones caían
+              solas a un segundo renglón y `justify-between` las dejaba a la
+              IZQUIERDA. Desde ahí el desplegable de «⋯», que se ancla a
+              `right-0`, se abría hacia fuera de la tarjeta.
+              `flex-1` es `flex: 1 1 0%`: este grupo entra al reparto midiendo
+              CERO, así que nunca provoca la envoltura, se queda el espacio que
+              sobre y su propio `flex-wrap` reparte fecha, folio y chips en dos
+              renglones cuando hace falta. Cede el texto, no los botones — que es
+              la regla, y aguanta cualquier metadato que se añada.
+              La línea de aviso de `AccionesDocumento` sigue cayendo a su propio
+              renglón: llega con `w-full`, que no cabe junto a nada. */}
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-[var(--sp-2-5)] gap-y-[var(--sp-1-5)]">
             <p className="text-[length:var(--sp-fs-hint)] text-[var(--sp-ink-500)]">{fechaCorta(doc.created_at)}</p>
             {/* Sin folio no se dibuja NADA: ni rótulo, ni guion, ni «sin folio».
                 En escrito médico y en internamiento es lo normal, no una carencia. */}
@@ -125,7 +148,14 @@ export default function VisorDocumento({ doc, acciones, onIrAArchivos }: {
         </div>
       </div>
 
-      <div className="px-[var(--sp-4)] py-[var(--sp-4)] lg:px-[26px] lg:py-[var(--sp-5)]">
+      {/* El cuerpo es ahora el scroller. `rounded-b` porque la tarjeta ya no
+          recorta: sin él, el contenido largo pasaría por encima de la esquina
+          redondeada de abajo. Un contenedor de scroll sí recorta lo SUYO, así
+          que su propio radio basta. */}
+      <div
+        ref={caja}
+        className="max-h-[470px] overflow-y-auto overflow-x-hidden rounded-b-[var(--sp-r-card)] px-[var(--sp-4)] py-[var(--sp-4)] lg:max-h-[550px] lg:px-[26px] lg:py-[var(--sp-5)]"
+      >
         {/* La tabla de importes es la excepción de anchura del §2 y por eso esa
             familia no se acota: el texto corrido nunca se pasa de la medida,
             pero una tabla de tres columnas en 620 px se estrangula. */}
