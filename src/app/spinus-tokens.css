@@ -523,13 +523,17 @@ html.dark {
                                                /* TP:205-212 patrón borde de marca */
 
   /* — MARCA —
-     ⚠️⚠️ ESTE BLOQUE ES HOY EL RESPALDO, NO EL VALOR VIGENTE, para tres de sus
+     ⚠️⚠️ ESTE BLOQUE ES HOY EL RESPALDO, NO EL VALOR VIGENTE, para cinco de sus
      tokens. `--sp-primary`, `--sp-primary-text` y `--sp-primary-ink` los
      redeclara el `@supports` del final del archivo con la fórmula OKLCH de
      `MODO_OSCURO_APP.md` §3; lo de aquí es lo que ve un navegador sin sintaxis
      de color relativa. Si cambias uno, mira el otro sitio.
-     El resto —hover, active y los tintes con alfa— NO están duplicados allí y
-     son el valor vigente en los dos casos. */
+     ⚠️ Y TAMBIÉN `--sp-primary-hover` Y `--sp-primary-active`, que están
+     duplicados allí desde que el hover pasa a OSCURECER — aquí decía que no lo
+     estaban y era falso; ver su propia nota, dos líneas más abajo.
+     Los que NO están duplicados, y por tanto son el valor vigente en los dos
+     casos, son los tintes con alfa: `--sp-primary-bg`, `-bg-soft`, `-bg-faint`,
+     `-border`, `-track` y `-focus`. */
   /* ⚠️⚠️ ESTOS DOS TAMBIÉN SON RESPALDO: el valor vigente OSCURECE, y vive en
      el `@supports` del final. Lo de aquí —que ACLARA— es lo que ve un navegador
      sin sintaxis de color relativa, y ahí sigue siendo lo correcto, porque en

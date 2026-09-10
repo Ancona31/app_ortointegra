@@ -153,19 +153,32 @@ Consecuencia que hay que asumir: el hex que el médico elige en `/perfil` **no e
 pinta en oscuro**. La vista previa de esa pantalla ya enseña el color sobre claro y sobre
 oscuro (`perfil/page.tsx:1050`), así que el sitio donde explicarlo existe.
 
-### 3.4 Hover y active — **ningún valor cumple los dos listones**
+### 3.4 Hover y active — **decidido: oscurecen**
 
-Con el relleno pinchado en `L 0.55` no queda margen en ninguna dirección:
+```css
+--sp-primary-hover:  oklch(from var(--cs) 0.49 c h);
+--sp-primary-active: oklch(from var(--cs) 0.43 c h);
+```
+
+**Ninguna de las dos direcciones cumple los dos listones**, así que se eligió cuál cede:
 
 | Dirección | Blanco encima (mín. de las 6) | Contra la card (mín. de las 6) |
 |---|---|---|
 | Aclarar, `L 0.61` | **3.60** ✗ | 3.96 ✓ |
 | Oscurecer, `L 0.50` | 5.74 ✓ | **2.43** ✗ |
 
-Aclarar rompe el rótulo del botón; oscurecer rompe su contorno. **No se fuerza ninguna de las
-dos: hay que decidir cuál cede.** Dato para decidir: el rótulo se lee todo el rato y el
-contorno importa sobre todo *antes* de llegar al botón — en hover el puntero ya está encima.
-Apunta a oscurecer, pero es decisión de producto y aquí sólo queda registrada.
+Cede la **forma** y no la **información**: aclarar rompe la legibilidad del rótulo blanco;
+oscurecer rompe el contorno del botón contra la card, y eso es tolerable porque durante el
+hover el cursor ya está encima y el usuario sabe dónde está.
+
+**El escalón es 0.06 y sale de medir.** El listón es ΔE2000 ≥ 5.31, que es el salto de
+«Morado» en el esquema anterior — el más pequeño de los que ya se leían como hover. Con 0.06:
+reposo→hover 6.15-7.13 y hover→active 5.70-6.36 en las seis paletas. Con 0.05 el primer
+escalón cae a 5.17 en «Rojo burdeos» y «Café cálido», por debajo del listón.
+
+Blanco encima, las seis: reposo 4.59-5.51 · hover 5.98-7.18 · active 7.79-9.28. Contra la
+card, lo que cede: hover 2.32-2.79 · active 1.80-2.14. El `active` añade además
+`translateY(1px)`, o sea que no depende sólo del color.
 
 ⚠️ Lo que sí queda descartado con número es el token de hoy, que **aclara con
 `color-mix(--cs 88 %, #fff)`**: aclarar sin límite es la dirección que rompe el rótulo. Y el
@@ -221,6 +234,24 @@ Misma regla que la agenda: **ninguna pareja puede empatar a la vez en tono y en 
 umbral, calibrado contra los ocho casos que `MODO_OSCURO_AGENDA.md` §3 y §4 dan por aceptados
 y rechazados: **Δ tono ≥ 30° (HSL) O razón de luminancia ≥ 1.40.** Basta uno de los dos.
 
+> ### ⚠️ LA «RAZÓN DE LUMINANCIA» DE ESTA SECCIÓN **NO** ES EL CONTRASTE DE WCAG
+>
+> Son dos fórmulas distintas y se parecen lo bastante como para confundirlas:
+>
+> | | Fórmula | Dónde se usa |
+> |---|---|---|
+> | Razón de luminancia | `Y_alta / Y_baja` | **sólo aquí, en §5**, para separar dos colores entre sí |
+> | Contraste WCAG | `(Y_alta + 0.05) / (Y_baja + 0.05)` | en §2.1, §3.2 y §4, contra el fondo |
+>
+> El `+ 0.05` de WCAG modela el reflejo ambiental de la pantalla y **comprime los valores
+> bajos**. En el peor par de la tabla de abajo —`receta` contra `consentimiento`— la razón de
+> luminancia da **1.40** y el contraste WCAG **1.35**: quien mida con la fórmula equivocada
+> creerá que ese par incumple, y lo «arreglará» moviendo un valor que estaba bien.
+>
+> El umbral 1.40 **sólo tiene sentido con la primera**. No lo compares nunca con un 3:1 ni con
+> un 4.5:1, que son cifras de la segunda y de otro problema: aquellas miden si algo *se lee*
+> sobre su fondo, ésta si dos cosas *se distinguen* entre sí.
+
 Los nueve valores de §4: **cero pares fallan.** Los cinco más apretados:
 
 | Par | Δ tono | Razón de luminancia | Resuelve por |
@@ -272,15 +303,17 @@ que nadie aplique esta regla hacia atrás.
   cuando se toque ese bloque.
 - **`--sp-on-primary` (`#ffffff`).** Es la referencia contra la que se calibra el relleno en
   §3.2. Moverlo invalida esa tabla entera.
-- **El cromo de marca** — menú lateral, franja del sistema, banda móvil de la agenda,
-  `themeColor`. Sale de `--ag-navy` y hoy es idéntico en los dos temas por decisión anotada
-  en tres sitios. **Que el menú se funda con el fondo oscuro (1.43:1 contra `#121212`) es un
-  problema real, pero no es un problema de color de token:** se decide aparte y no lo cubre
-  este criterio.
 - **`--lp-*`.** Su razón de existir es ser inmunes a `html.dark`. No se tocan.
 - **`/super-admin`.** Oscuro fijo por diseño (`bg-slate-950`), fuera del sistema de temas.
 
 **Ya resuelto, no se re-deriva:**
+
+- **El cromo de marca** — menú lateral, franja del sistema, banda móvil de la agenda y
+  `themeColor`. Aquí decía que era idéntico en los dos temas y que su 1.43:1 contra `#121212`
+  «se decide aparte»; **se decidió y está hecho**. `--ag-navy` se aclara en oscuro con
+  `oklch(from var(--cp) 0.42 c h)` y las cuatro superficies salen del mismo token, así que no
+  pueden divergir. Separación medida: 2.22:1 contra la página y 1.97:1 contra la card, en las
+  seis paletas. La tinta del menú subió con él (`--ag-navy-ink*`). No lo re-abras.
 
 - **Todos los `--ag-*`.** 82 contrapartes medidas y en producción.
 - **`--sp-avatar-*`.** Diez pares opacos con ΔE2000 ≥ 23.2 y contraste 4.63–6.05:1 medidos.
@@ -296,10 +329,24 @@ sustitución de color, nunca un rediseño.**
 
 ## 7 Dependencia técnica y cómo se midió
 
-Las fórmulas de §3 usan **sintaxis de color relativa** (`oklch(from …)`). El proyecto ya la
-tiene en producción en su variante HSL (`--ag-navy` en `globals.css`, fondo del menú en
-`Sidebar.tsx:378`), así que la familia ya es dependencia asumida. **Confirmar el soporte de
-la variante `oklch(from …)` en los navegadores objetivo antes de implementar.**
+Las fórmulas de §3 usan **sintaxis de color relativa** (`oklch(from …)`). **Confirmado y en
+producción** — aquí decía «confirmar antes de implementar» y ya se hizo:
+
+- Soporte completo desde **Chrome/Edge 131 · Safari 18.0 · Firefox 133**. Los tramos que
+  caniuse marca «parcial» (Chrome 119-130, Safari 16.4-17.6) lo son por **unidades dentro de
+  `calc()` sobre canales**; ninguna fórmula de este documento hace aritmética sobre canales,
+  así que no les afecta.
+- **La brecha real es Chrome/Edge 111-118**, y sólo ésa: por debajo de Chrome 111, Safari 16.4
+  o Firefox 128 la app ya no funciona de todos modos, porque ése es el suelo de Tailwind 4.
+  Esa ventana pesa muy por debajo del 1 % y no aparece desglosada en StatCounter.
+- **Todas las fórmulas van dentro de un `@supports`**, con el valor anterior como respaldo
+  fuera del bloque. Un navegador sin soporte ve exactamente lo que la app pintaba antes.
+  ⚠️ El `@supports` no es opcional ni sustituible por declarar respaldo y fórmula seguidos:
+  estos tokens son custom properties, así que un navegador sin soporte **no descarta** la
+  declaración —la guarda— y el fallo salta al sustituir, dejando la propiedad que la consume
+  inválida en tiempo de valor calculado. Eso computa a `unset`: la tinta heredaría y el
+  relleno saldría transparente. Y una sustitución inválida **no vuelve** a la declaración
+  anterior de la cascada.
 
 Contraste: WCAG 2.x sobre luminancia relativa, contra `#1E1E1E`. Croma y claridad: OKLCH.
 Δ tono y razón de luminancia de §5: HSL y luminancia relativa — las mismas dos métricas de
