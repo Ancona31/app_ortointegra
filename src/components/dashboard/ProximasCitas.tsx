@@ -373,10 +373,15 @@ export default function ProximasCitas({ medicoId, acciones }: {
       <Leyenda />
       {visibles.map((cita, i) => {
         const enCurso = cita.id === idEnCurso
-        const { dia, hora } = partesCitaHora(cita.start_time)
-        /* La variante de móvil de la primera línea. Ver el porqué en la propia
-           `fechaCitaCompacta` y en el marcado de la columna, abajo. */
-        const fechaCompacta = fechaCitaCompacta(cita.start_time)
+        /* ⚠️ DE AQUÍ SÓLO SE USA LA HORA, Y EL `dia` SE TIRA A PROPÓSITO. La
+           primera línea de la columna la pone `fechaCitaCompacta`; ver por qué
+           en el marcado, abajo. Y aun así la hora se sigue pidiendo AQUÍ y no
+           en la otra: `partesCitaHora` es la única implementación del huso
+           para la hora de una cita —lo dice su propia cabecera— y calcularla
+           por segunda vez en la función compacta es exactamente cómo se
+           volvería a perder la corrección de Sonora en uno de los dos sitios. */
+        const { hora } = partesCitaHora(cita.start_time)
+        const fecha = fechaCitaCompacta(cita.start_time)
         const nombre = cita.pacientes
           ? `${cita.pacientes.nombre} ${cita.pacientes.apellidos}`
           : cita.title
@@ -412,40 +417,37 @@ export default function ProximasCitas({ medicoId, acciones }: {
             {/* Fecha y hora, dos líneas. La hora de la fila en curso va en
                 acento; el chip conserva su color de estado y no compite. */}
             <div className="w-[52px] xl:w-[60px] shrink-0">
-              {/* ⚠️ DOS VARIANTES DE LA MISMA LÍNEA, Y EN `lg` NO CAMBIA NADA:
-                  el segundo `<span>` es el rótulo de siempre, con su espaciado
-                  de letra intacto. En móvil el día en palabra NO CABE —la
-                  columna mide 52 px y «MAÑANA» pide 49-58 según la fuente de
-                  sistema—, así que ahí va «HOY» o la fecha numérica.
-                  ⚠️ EL ESPACIADO DE LETRA SE FUE A LOS SPANS Y NO SE QUEDÓ EN
-                  EL `<p>` a propósito: son los 3.5 px que hacen que la fecha
-                  numérica entre (43-54 sin él, 46-57 con él). Espaciar cifras
-                  tampoco es lo que ese 0.04em vino a hacer —es la convención de
-                  los rótulos en mayúsculas—, así que lo pierde la fecha y lo
-                  conserva «HOY», que cabe de sobra (24-27). Por eso el
-                  tratamiento va por VARIANTE y no por ancho, y por eso
-                  `fechaCitaCompacta` dice si el rótulo es numérico en vez de
-                  dejar que esto lo deduzca comparando con «Hoy». La numérica
-                  se lleva además `tabular-nums`: iguala el ancho de todas las
-                  fechas y las alinea con la hora de abajo, que ya lo llevaba.
-                  ⚠️ Y EL RECORTE SE QUEDÓ EN `lg:truncate`, O SEA SÓLO EN
-                  ESCRITORIO. Allí el rótulo es de largo variable —«MIÉ 3 SEP»,
-                  «MAR 30 SEP»— y la elipsis es su red. En móvil son «HOY» o
-                  OCHO CARACTERES CLAVADOS, así que no hay nada de largo
-                  desconocido de lo que protegerse y la elipsis sólo puede
-                  hacer daño: la fecha pide 43-54 px de 52, y en la fuente más
-                  ancha del muestreo (DejaVu Sans, 53.9) `truncate` cambiaba los
-                  1.9 px que sobran por «20/09/2…», que es perder el año. Sin
-                  él sangra esos 2 px en el hueco de 10 que ya separa la
-                  columna del avatar: invisible, y la caja no se mueve porque el
+              {/* ⚠️ «HOY» O FECHA NUMÉRICA, EN LOS DOS ANCHOS. Aquí vivía el día
+                  en palabra y NO CABÍA EN NINGUNO DE LOS DOS: la columna mide
+                  52 px (60 en `xl`) y «MAÑANA» pide 49-58 según la fuente de
+                  sistema, «MIÉ 3 SEP» 53-65. Se abreviaba —«MAÑA…»— en móvil y
+                  también en `lg`. La numérica pide 43-54 y entra.
+                  ⚠️ NO LO PARTAS OTRA VEZ POR ANCHO. Hubo una versión con dos
+                  `<span>` y `lg:hidden`/`lg:inline` para conservar el rótulo
+                  viejo en escritorio; se unificó a propósito, porque las dos
+                  vistas tienen el mismo ancho de columna y el mismo problema, y
+                  porque deben decir lo mismo.
+                  ⚠️ EL ESPACIADO DE LETRA ES DE «HOY» Y NO DE LA FECHA. Ese
+                  0.04em es la convención de los rótulos en mayúsculas, no de
+                  las cifras, y además son los 3.5 px que meten la numérica
+                  dentro (43-54 sin él, 46-57 con él). De ahí que el tratamiento
+                  vaya por VARIANTE, y que `fechaCitaCompacta` devuelva
+                  `numerica` en vez de dejar que esto lo deduzca comparando con
+                  la cadena «Hoy». La numérica se lleva `tabular-nums`: iguala
+                  el ancho de todas las fechas y las alinea con la hora de
+                  abajo, que ya lo llevaba.
+                  ⚠️ Y NO LLEVA RECORTE, QUE ES DELIBERADO. La elipsis era la
+                  red del rótulo viejo, que era de largo desconocido; estos son
+                  «HOY» u OCHO CARACTERES CLAVADOS. Con `truncate`, la fuente
+                  más ancha del muestreo (DejaVu Sans, 53.9 de 52) cambiaba los
+                  1.9 px que sobran por «20/09/2…», o sea perder el año. Sin él
+                  sangra esos 2 px en el hueco de 10 que ya separa la columna
+                  del avatar: invisible, y la caja no se mueve porque el
                   `w-[52px] shrink-0` no depende del contenido. El
-                  `whitespace-nowrap` de la base SÍ hace falta —sin él la fecha
-                  partiría por las barras—. */}
-              <p className="whitespace-nowrap text-[length:var(--sp-fs-legal)] font-bold uppercase text-[var(--sp-ink-350)] lg:truncate">
-                <span className={`lg:hidden ${fechaCompacta.numerica ? 'tabular-nums' : 'tracking-[0.04em]'}`}>
-                  {fechaCompacta.texto}
-                </span>
-                <span className="hidden tracking-[0.04em] lg:inline">{dia}</span>
+                  `whitespace-nowrap` SÍ hace falta —sin él la fecha partiría
+                  por las barras—. */}
+              <p className={`whitespace-nowrap text-[length:var(--sp-fs-legal)] font-bold uppercase text-[var(--sp-ink-350)] ${fecha.numerica ? 'tabular-nums' : 'tracking-[0.04em]'}`}>
+                {fecha.texto}
               </p>
               <p
                 className="truncate text-[length:var(--sp-fs-meta)] font-extrabold tabular-nums"

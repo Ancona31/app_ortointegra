@@ -16,7 +16,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from 'vitest'
-import { formatCitaHora } from '@/app/(app)/dashboard/utils'
+import { formatCitaHora, fechaCitaCompacta } from '@/app/(app)/dashboard/utils'
 import {
   ultimaConsultaLabel,
   ultimaConsultaFecha,
@@ -36,6 +36,15 @@ const CITA_9_SONORA = '2026-08-20T16:00:00Z'
 
 /** 23:00 del día 20 en Hermosillo, pero 00:00 del día 21 en el Centro. */
 const CITA_23_SONORA = '2026-08-21T06:00:00Z'
+
+/**
+ * El mismo cruce de medianoche pero cinco días más allá, así que NO es hoy en
+ * ninguno de los dos husos: 23:00 del día 25 en Hermosillo, 00:00 del 26 en el
+ * Centro. Sirve para lo que `CITA_23_SONORA` no puede probar — que la fecha
+ * NUMÉRICA también se calcula en huso del dispositivo, y no sólo el bucket de
+ * hoy, que es la otra mitad exacta del bug de agosto.
+ */
+const CITA_23_SONORA_LEJANA = '2026-08-26T06:00:00Z'
 
 function conHuso(tz: string): void {
   process.env.TZ = tz
@@ -82,6 +91,57 @@ describe('formatCitaHora — la hora es la del dispositivo', () => {
 
   it('la misma cita SÍ es de mañana para quien mira desde el Centro', () => {
     conHuso('America/Mexico_City')
+    expect(formatCitaHora(CITA_23_SONORA)).toBe('Mañana · 00:00')
+  })
+})
+
+/**
+ * La columna estrecha del renglón de próximas citas. Es un formateador NUEVO
+ * —no un formato de `partesCitaHora`—, así que la corrección de husos hay que
+ * fijarla otra vez aquí: tiene su propia lectura del huso y su propio bucket de
+ * hoy, y podría perderla sin que ninguno de los casos de arriba se pusiera en
+ * rojo.
+ */
+describe('fechaCitaCompacta — «HOY» o fecha numérica, en huso del dispositivo', () => {
+  it('el bucket de hoy va en huso del dispositivo, no en el de la clínica', () => {
+    // La mitad del bug de agosto: con el día en Centro esta cita no sería de
+    // hoy y saldría con fecha numérica en vez de «Hoy».
+    conHuso('America/Hermosillo')
+    expect(fechaCitaCompacta(CITA_23_SONORA)).toEqual({ texto: 'Hoy', numerica: false })
+  })
+
+  it('la misma cita, desde el Centro, es otro día y sale numérica', () => {
+    conHuso('America/Mexico_City')
+    expect(fechaCitaCompacta(CITA_23_SONORA)).toEqual({ texto: '21/08/26', numerica: true })
+  })
+
+  it('la fecha numérica TAMBIÉN se calcula en huso del dispositivo', () => {
+    // La otra mitad del bug: aquí no es hoy en ninguno de los dos husos, así
+    // que lo único que puede discrepar son las cifras. Un día de diferencia.
+    conHuso('America/Hermosillo')
+    expect(fechaCitaCompacta(CITA_23_SONORA_LEJANA).texto).toBe('25/08/26')
+    conHuso('America/Mexico_City')
+    expect(fechaCitaCompacta(CITA_23_SONORA_LEJANA).texto).toBe('26/08/26')
+  })
+
+  it('NO tiene bucket de «Mañana»: mañana sale numérico', () => {
+    // No es un olvido, es el spec. Si alguien añade el bucket, esto se cae.
+    conHuso('America/Mexico_City')
+    expect(fechaCitaCompacta(CITA_23_SONORA)).toEqual({ texto: '21/08/26', numerica: true })
+    expect(formatCitaHora(CITA_23_SONORA)).toBe('Mañana · 00:00')
+  })
+
+  it('el formato es dd/MM/yy, sin nombre de día ni de mes', () => {
+    conHuso('America/Hermosillo')
+    expect(fechaCitaCompacta(CITA_23_SONORA_LEJANA).texto).toMatch(/^\d{2}\/\d{2}\/\d{2}$/)
+  })
+
+  it('no le pisa el rótulo a `partesCitaHora`, que sigue en palabra', () => {
+    // Las dos conviven y dicen cosas distintas del mismo instante: la compacta
+    // alimenta la columna estrecha, la otra sigue alimentando `formatCitaHora`
+    // en otras dos pantallas. Unificarlas rompe una de las dos.
+    conHuso('America/Mexico_City')
+    expect(fechaCitaCompacta(CITA_23_SONORA).texto).toBe('21/08/26')
     expect(formatCitaHora(CITA_23_SONORA)).toBe('Mañana · 00:00')
   })
 })

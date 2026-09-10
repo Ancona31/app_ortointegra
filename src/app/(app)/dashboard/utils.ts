@@ -29,10 +29,14 @@ export function partesCitaHora(start_time: string): { dia: string; hora: string 
  * "Hoy", o la numérica compacta "20/09/26" para cualquier otro día.
  *
  * ⚠️ EXISTE PORQUE EL DÍA EN PALABRA NO CABE, y está medido: la columna mide
- * 52 px y «MAÑANA» pide 49-58 según la fuente de sistema, así que salía
- * «MAÑA…» casi siempre. La numérica pide 43-54 sin el espaciado de letra, que
- * es lo que la mete dentro. Sólo la consume la variante móvil de ese renglón;
- * en escritorio se sigue pintando `partesCitaHora`.
+ * 52 px —60 en `xl`— y «MAÑANA» pide 49-58 según la fuente de sistema, así que
+ * salía «MAÑA…» casi siempre. La numérica pide 43-54 sin el espaciado de letra,
+ * que es lo que la mete dentro.
+ *
+ * LA CONSUMEN LOS DOS ANCHOS. Nació sólo para móvil y se unificó enseguida: el
+ * ancho de la columna es el mismo en escritorio, el rótulo se abreviaba igual,
+ * y las dos vistas tienen que decir lo mismo. Si vuelves a bifurcar el renglón
+ * por ancho para esa columna, estás deshaciendo esto.
  *
  * ⚠️ NO LA UNIFIQUES CON `partesCitaHora` NI LA CONVIERTAS EN UN FORMATO SUYO.
  * La salida de aquélla está fijada carácter por carácter por
