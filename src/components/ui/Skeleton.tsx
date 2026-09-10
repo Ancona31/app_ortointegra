@@ -161,23 +161,41 @@ export function DashboardSkeleton({ onBuscar, onAbrirMenu }: {
 
 /** Formulario de perfil */
 export function PerfilSkeleton() {
+  /* Calca la forma real de Mi perfil tras el rediseño: contenedor de 960 px,
+     ceja y título, barra de pestañas, y las DOS columnas —la fija de 310 px y
+     el cuerpo—. La versión anterior era de una sola columna a 512 px, así que
+     la pantalla daba un salto de ancho al terminar de cargar. */
   return (
-    <div className="max-w-lg mx-auto space-y-5">
-      <div className="space-y-1">
+    <div className="max-w-[960px] mx-auto">
+      <div className="mb-[var(--sp-gap-block)] space-y-1">
         <Skeleton className="h-2.5 w-16" />
-        <Skeleton className="h-7 w-28" />
+        <Skeleton className="h-8 w-40" />
       </div>
-      {[1, 2, 3].map(i => (
-        <div key={i} className="bg-white rounded-2xl border border-slate-200 p-5 space-y-3">
-          <Skeleton className="h-2.5 w-36" />
-          <div className="grid grid-cols-2 gap-3">
-            <Skeleton className="h-10 rounded-xl" />
-            <Skeleton className="h-10 rounded-xl" />
-          </div>
-          <Skeleton className="h-10 rounded-xl" />
+
+      <div className="flex gap-[var(--sp-4)] pb-[var(--sp-3)]">
+        <Skeleton className="h-4 w-16" />
+        <Skeleton className="h-4 w-24" />
+        <Skeleton className="h-4 w-28" />
+      </div>
+
+      <div className="mt-[var(--sp-gap-band)] grid grid-cols-1 items-start gap-[var(--sp-5-5)] lg:grid-cols-[310px_minmax(0,1fr)]">
+        <div className="space-y-[var(--sp-gap-block)]">
+          <Skeleton className="h-64 rounded-[var(--sp-r-card)]" />
+          <Skeleton className="h-24 rounded-[var(--sp-r-card)]" />
         </div>
-      ))}
-      <Skeleton className="h-12 rounded-2xl" />
+        <div className="min-w-0 space-y-[var(--sp-gap-block)]">
+          {[1, 2].map(i => (
+            <div key={i} className="bg-white rounded-2xl border border-slate-200 p-5 space-y-3">
+              <Skeleton className="h-2.5 w-36" />
+              <div className="grid grid-cols-2 gap-3">
+                <Skeleton className="h-10 rounded-xl" />
+                <Skeleton className="h-10 rounded-xl" />
+              </div>
+              <Skeleton className="h-10 rounded-xl" />
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   )
 }
