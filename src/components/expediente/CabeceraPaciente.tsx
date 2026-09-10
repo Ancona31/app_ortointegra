@@ -159,7 +159,7 @@ export default function CabeceraPaciente({ paciente, isDoctor, onEditar, onNuevo
                  así que se compone a mano, pero SÓLO con tokens. El tamaño es
                  `--sp-fs-btn-sm`, el mismo de los dos secundarios de al lado
                  —antes era `--sp-fs-body-sm` y se leía un punto más pequeño. */
-              className="order-2 col-span-2 lg:order-none inline-flex items-center justify-center gap-[var(--sp-gap-item)] whitespace-nowrap border border-[color:var(--sp-primary-border)] bg-[var(--sp-surface)] text-[length:var(--sp-fs-btn-sm)] font-semibold text-[var(--sp-primary)] transition-colors hover:bg-[var(--sp-primary-bg-faint)]"
+              className="order-2 col-span-2 lg:order-none inline-flex items-center justify-center gap-[var(--sp-gap-item)] whitespace-nowrap border border-[color:var(--sp-primary-border)] bg-[var(--sp-surface)] text-[length:var(--sp-fs-btn-sm)] font-semibold text-[var(--sp-primary-text)] transition-colors hover:bg-[var(--sp-primary-bg-faint)]"
             >
               <FilePlus2 size={15} /> Nuevo documento
             </button>

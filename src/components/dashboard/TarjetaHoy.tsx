@@ -270,7 +270,7 @@ export default function TarjetaHoy({ medicoId }: {
       <div className="flex min-w-0 flex-1 flex-col items-center gap-[var(--sp-1-5)] lg:contents">
       <p className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-[var(--sp-ink-350)]">Hoy es</p>
 
-      <p className="text-[length:var(--sp-fs-btn-sm)] font-bold capitalize text-[var(--sp-primary)]">{dia.diaSemana}</p>
+      <p className="text-[length:var(--sp-fs-btn-sm)] font-bold capitalize text-[var(--sp-primary-text)]">{dia.diaSemana}</p>
 
       {/* El número más grande de la pantalla: ningún otro texto compite con él. */}
       <div
@@ -292,7 +292,7 @@ export default function TarjetaHoy({ medicoId }: {
         {conteo && (
           <span className="hidden lg:inline">
             <span className="text-[var(--sp-ink-250)]"> · </span>
-            <span className="text-[var(--sp-primary)] normal-case tabular-nums">{textoConteo}</span>
+            <span className="text-[var(--sp-primary-text)] normal-case tabular-nums">{textoConteo}</span>
           </span>
         )}
       </p>
@@ -303,7 +303,7 @@ export default function TarjetaHoy({ medicoId }: {
 
       {/* Pastilla de conteo, sólo móvil: fondo de acento suave sobre la tira. */}
       {conteo && (
-        <span className="lg:hidden self-start max-w-full truncate rounded-[var(--sp-r-pill)] bg-[var(--sp-primary-bg-soft)] px-[10px] py-[3px] text-[length:var(--sp-fs-legal)] font-bold tabular-nums text-[var(--sp-primary)]">
+        <span className="lg:hidden self-start max-w-full truncate rounded-[var(--sp-r-pill)] bg-[var(--sp-primary-bg-soft)] px-[10px] py-[3px] text-[length:var(--sp-fs-legal)] font-bold tabular-nums text-[var(--sp-primary-text)]">
           {textoConteo}
         </span>
       )}

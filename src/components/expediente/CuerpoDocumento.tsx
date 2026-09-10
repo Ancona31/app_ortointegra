@@ -599,7 +599,7 @@ function SinVisor({ doc, onIrAArchivos }: { doc: Documento; onIrAArchivos: () =>
           <button
             type="button"
             onClick={onIrAArchivos}
-            className="text-[length:var(--sp-fs-hint)] font-semibold text-[var(--sp-primary)] hover:underline"
+            className="text-[length:var(--sp-fs-hint)] font-semibold text-[var(--sp-primary-text)] hover:underline"
           >
             Ir a Mediciones y archivos
           </button>

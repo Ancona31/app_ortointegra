@@ -143,7 +143,7 @@ function Chasis({ children }: { children: React.ReactNode }) {
           /* Sin precarga: la regla de precarga de esta región deja encendida
              sólo la fila en curso. Ver el comentario del renglón. */
           prefetch={false}
-          className="shrink-0 whitespace-nowrap text-[length:var(--sp-fs-meta)] leading-[24px] font-semibold text-[var(--sp-primary)] hover:underline"
+          className="shrink-0 whitespace-nowrap text-[length:var(--sp-fs-meta)] leading-[24px] font-semibold text-[var(--sp-primary-text)] hover:underline"
         >
           Ver agenda →
         </Link>
@@ -351,7 +351,7 @@ export default function ProximasCitas({ medicoId, acciones }: {
       <div className="flex flex-col items-center gap-[var(--sp-3)] px-[var(--sp-pad-row-x)] py-[var(--sp-8)] border-t border-[color:var(--sp-line-card)]">
         <CalendarDays size={22} className="text-[var(--sp-ink-150)]" />
         <p className="text-[length:var(--sp-fs-body-sm)] text-[var(--sp-ink-500)] text-center">No hay citas agendadas.</p>
-        <Link href="/agenda" prefetch={false} className="text-[length:var(--sp-fs-meta)] font-semibold text-[var(--sp-primary)] hover:underline">
+        <Link href="/agenda" prefetch={false} className="text-[length:var(--sp-fs-meta)] font-semibold text-[var(--sp-primary-text)] hover:underline">
           Abrir agenda →
         </Link>
       </div>
@@ -402,7 +402,7 @@ export default function ProximasCitas({ medicoId, acciones }: {
               <p className="truncate text-[length:var(--sp-fs-legal)] font-bold uppercase tracking-[0.04em] text-[var(--sp-ink-350)]">{dia}</p>
               <p
                 className="truncate text-[length:var(--sp-fs-meta)] font-extrabold tabular-nums"
-                style={{ color: enCurso ? 'var(--sp-primary)' : 'var(--sp-ink-800)' }}
+                style={{ color: enCurso ? 'var(--sp-primary-text)' : 'var(--sp-ink-800)' }}
               >
                 {hora}
               </p>
@@ -446,7 +446,7 @@ export default function ProximasCitas({ medicoId, acciones }: {
       {mostrarPie && (
         <p className="flex flex-wrap items-center gap-x-[var(--sp-1-5)] px-[var(--sp-pad-row-x)] py-[var(--sp-2-5)] border-t border-[color:var(--sp-line-card)] text-[length:var(--sp-fs-hint)] text-[var(--sp-ink-500)]">
           No hay más citas próximas.
-          <Link href="/agenda" prefetch={false} className="font-semibold text-[var(--sp-primary)] hover:underline">
+          <Link href="/agenda" prefetch={false} className="font-semibold text-[var(--sp-primary-text)] hover:underline">
             Ver agenda →
           </Link>
         </p>

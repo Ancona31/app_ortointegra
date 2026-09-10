@@ -756,7 +756,7 @@ a:hover { color: var(--sp-primary-active); }
 .sp-title-sec    { font-size: var(--sp-fs-body);    font-weight: var(--sp-fw-bold);  color: var(--sp-ink-800); }
 .sp-label        { font-size: var(--sp-fs-label);   font-weight: var(--sp-fw-bold); letter-spacing: var(--sp-ls-label); color: var(--sp-ink-350); text-transform: uppercase; }
 .sp-label-field  { font-size: var(--sp-fs-label-sm);font-weight: var(--sp-fw-bold); letter-spacing: var(--sp-ls-label); color: var(--sp-ink-800); text-transform: uppercase; }
-.sp-label-eyebrow{ font-size: var(--sp-fs-label-sm);font-weight: var(--sp-fw-bold); letter-spacing: var(--sp-ls-label-w); color: var(--sp-primary); text-transform: uppercase; }
+.sp-label-eyebrow{ font-size: var(--sp-fs-label-sm);font-weight: var(--sp-fw-bold); letter-spacing: var(--sp-ls-label-w); color: var(--sp-primary-text); text-transform: uppercase; }
 .sp-body         { font-size: var(--sp-fs-body);    line-height: var(--sp-lh-snug);  color: var(--sp-ink-700); }
 .sp-note         { font-size: var(--sp-fs-body);    line-height: var(--sp-lh-note);  color: var(--sp-ink-700); }
 .sp-secondary    { font-size: var(--sp-fs-body-sm); line-height: var(--sp-lh-body);  color: var(--sp-ink-500); }
@@ -1686,7 +1686,7 @@ input[type="date"].sp-input {
 }
 .sp-tpl-accion svg { width: 18px; height: 18px; }
 .sp-tpl-accion__label { display: none; font-size: 12px; color: var(--sp-ink-500); }
-.sp-tpl-accion:hover:not(:disabled) { color: var(--sp-primary); background: var(--sp-primary-bg); }
+.sp-tpl-accion:hover:not(:disabled) { color: var(--sp-primary-text); background: var(--sp-primary-bg); }
 .sp-tpl-accion--danger:hover:not(:disabled) { color: var(--sp-danger); background: var(--sp-danger-bg); }
 .sp-tpl-accion:disabled { opacity: .4; cursor: not-allowed; }
 

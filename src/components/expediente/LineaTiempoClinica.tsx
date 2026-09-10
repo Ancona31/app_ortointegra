@@ -151,7 +151,7 @@ function ContenidoConsulta({ consulta, onIrAPestana }: {
            mismo mecanismo que `?tab`—, así que el destino es compartible y
            sobrevive a una recarga. */
         onClick={() => onIrAPestana('consultas', consulta.id)}
-        className="mt-[var(--sp-2)] text-[length:var(--sp-fs-hint)] font-semibold text-[var(--sp-primary)] hover:underline"
+        className="mt-[var(--sp-2)] text-[length:var(--sp-fs-hint)] font-semibold text-[var(--sp-primary-text)] hover:underline"
       >
         Leer nota
       </button>
@@ -180,7 +180,7 @@ function ContenidoDocumento({ documento, onIrAPestana }: {
         <button
           type="button"
           onClick={() => onIrAPestana('documentos')}
-          className="text-[length:var(--sp-fs-hint)] font-semibold text-[var(--sp-primary)] hover:underline"
+          className="text-[length:var(--sp-fs-hint)] font-semibold text-[var(--sp-primary-text)] hover:underline"
         >
           Ver
         </button>
@@ -220,7 +220,7 @@ function ContenidoMedicion({ medicion, sexo, onIrAPestana }: {
         <button
           type="button"
           onClick={() => onIrAPestana('mediciones')}
-          className="text-[length:var(--sp-fs-hint)] font-semibold text-[var(--sp-primary)] hover:underline"
+          className="text-[length:var(--sp-fs-hint)] font-semibold text-[var(--sp-primary-text)] hover:underline"
         >
           Ver
         </button>

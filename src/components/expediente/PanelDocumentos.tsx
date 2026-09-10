@@ -313,7 +313,7 @@ export default function PanelDocumentos({
         {aviso && (
           <p className="mt-[var(--sp-2-5)] flex items-start justify-between gap-[var(--sp-3)] rounded-[var(--sp-r-field-sm)] bg-[var(--sp-surface-muted)] px-[var(--sp-3)] py-[var(--sp-2)] text-[length:var(--sp-fs-hint)] text-[var(--sp-ink-700)]">
             {aviso}
-            <button type="button" onClick={cerrarAviso} className="shrink-0 font-semibold text-[var(--sp-primary)]">Cerrar</button>
+            <button type="button" onClick={cerrarAviso} className="shrink-0 font-semibold text-[var(--sp-primary-text)]">Cerrar</button>
           </p>
         )}
       </div>

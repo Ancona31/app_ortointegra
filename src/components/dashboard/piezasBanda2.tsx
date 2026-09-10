@@ -30,7 +30,7 @@ export function EncabezadoColumna({ titulo, enlace }: {
           href={enlace.href}
           /* Sin precarga, como todo enlace nuevo del rediseño. */
           prefetch={false}
-          className="shrink-0 whitespace-nowrap text-[length:var(--sp-fs-meta)] font-semibold text-[var(--sp-primary)] hover:underline"
+          className="shrink-0 whitespace-nowrap text-[length:var(--sp-fs-meta)] font-semibold text-[var(--sp-primary-text)] hover:underline"
         >
           {enlace.texto}
         </Link>
@@ -54,7 +54,7 @@ export function ChipAccion({ href, icono: Icono, texto }: {
          carga del dashboard, se pulse o no (medido en producción). Son
          exactamente los que apagó `fcb2169`; encender uno revierte esa medida. */
       prefetch={false}
-      className="inline-flex items-center gap-[var(--sp-1-5)] rounded-[var(--sp-r-btn-sm)] border border-[color:var(--sp-line-input)] bg-[var(--sp-surface)] px-[10px] py-[5px] text-[length:var(--sp-fs-legal)] font-semibold text-[var(--sp-ink-600)] transition-colors hover:bg-[var(--sp-surface-muted)] hover:text-[var(--sp-primary)]"
+      className="inline-flex items-center gap-[var(--sp-1-5)] rounded-[var(--sp-r-btn-sm)] border border-[color:var(--sp-line-input)] bg-[var(--sp-surface)] px-[10px] py-[5px] text-[length:var(--sp-fs-legal)] font-semibold text-[var(--sp-ink-600)] transition-colors hover:bg-[var(--sp-surface-muted)] hover:text-[var(--sp-primary-text)]"
     >
       <Icono size={13} /> {texto}
     </Link>
@@ -87,7 +87,7 @@ export function AvisoColumna({ icono: Icono, mensaje, onReintentar, enlace }: {
         </button>
       )}
       {enlace && (
-        <Link href={enlace.href} prefetch={false} className="text-[length:var(--sp-fs-meta)] font-semibold text-[var(--sp-primary)] hover:underline">
+        <Link href={enlace.href} prefetch={false} className="text-[length:var(--sp-fs-meta)] font-semibold text-[var(--sp-primary-text)] hover:underline">
           {enlace.texto}
         </Link>
       )}

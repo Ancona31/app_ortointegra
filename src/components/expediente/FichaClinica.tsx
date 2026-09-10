@@ -133,7 +133,7 @@ function Capturar({ href, texto }: { href: string; texto: string }) {
     <Link
       href={href}
       prefetch={false}
-      className="flex items-center justify-center rounded-[12px] border border-dashed border-[color:var(--sp-line-dash)] px-[var(--sp-3)] py-[var(--sp-4)] text-[length:var(--sp-fs-hint)] font-semibold text-[var(--sp-primary)] transition-colors hover:bg-[var(--sp-primary-bg-faint)]"
+      className="flex items-center justify-center rounded-[12px] border border-dashed border-[color:var(--sp-line-dash)] px-[var(--sp-3)] py-[var(--sp-4)] text-[length:var(--sp-fs-hint)] font-semibold text-[var(--sp-primary-text)] transition-colors hover:bg-[var(--sp-primary-bg-faint)]"
     >
       {texto}
     </Link>
@@ -207,7 +207,7 @@ function RenglonImc({ valor, clasificacion }: {
       <span className="flex items-center gap-[4px] text-[10.5px] font-bold uppercase tracking-[var(--sp-ls-label)] text-[var(--sp-ink-350)]">
         IMC
         <span
-          className="inline-flex text-[var(--sp-primary)]"
+          className="inline-flex text-[var(--sp-primary-text)]"
           title="Se calcula a partir del peso y la talla; no se captura."
         >
           <Calculator size={11} aria-label="Campo calculado" />
@@ -343,7 +343,7 @@ export default function FichaClinica({
               <RenglonDato rotulo="Próxima cita">
                 {proximaCita
                   ? formatFechaRelativaFutura(proximaCita.start_time)
-                  : <Link href="/agenda" prefetch={false} className="text-[var(--sp-primary)] hover:underline">Agendar</Link>}
+                  : <Link href="/agenda" prefetch={false} className="text-[var(--sp-primary-text)] hover:underline">Agendar</Link>}
               </RenglonDato>
             </div>
           </div>
@@ -434,7 +434,7 @@ export default function FichaClinica({
               <button
                 type="button"
                 onClick={() => onIrAPestana('mediciones')}
-                className="shrink-0 whitespace-nowrap text-[length:var(--sp-fs-hint)] font-semibold text-[var(--sp-primary)] hover:underline"
+                className="shrink-0 whitespace-nowrap text-[length:var(--sp-fs-hint)] font-semibold text-[var(--sp-primary-text)] hover:underline"
               >
                 Ver {analitos.length} analitos
               </button>

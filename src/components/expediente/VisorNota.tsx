@@ -122,7 +122,7 @@ export default function VisorNota({
             <Link
               href={hrefNotaCompleta}
               prefetch={false}
-              className="text-[length:var(--sp-fs-hint)] font-semibold text-[var(--sp-primary)] hover:underline"
+              className="text-[length:var(--sp-fs-hint)] font-semibold text-[var(--sp-primary-text)] hover:underline"
             >
               Abrir nota completa
             </Link>
@@ -136,7 +136,7 @@ export default function VisorNota({
               <Link
                 href={hrefNotaCompleta}
                 prefetch={false}
-                className="inline-flex items-center gap-[var(--sp-1-5)] text-[length:var(--sp-fs-hint)] font-semibold text-[var(--sp-primary)] hover:underline"
+                className="inline-flex items-center gap-[var(--sp-1-5)] text-[length:var(--sp-fs-hint)] font-semibold text-[var(--sp-primary-text)] hover:underline"
               >
                 <MessageSquarePlus size={13} /> Añadir nota aclaratoria
               </Link>

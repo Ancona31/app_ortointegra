@@ -136,7 +136,7 @@ function Seccion({ seccion, indice, primera }: {
   return (
     <section className={separacion}>
       <div className="flex items-baseline gap-[var(--sp-2)]">
-        <span className="text-[length:var(--sp-fs-body-sm)] font-extrabold tabular-nums text-[var(--sp-primary)]">
+        <span className="text-[length:var(--sp-fs-body-sm)] font-extrabold tabular-nums text-[var(--sp-primary-text)]">
           {numeroDe(indice)}
         </span>
         <h3 className="text-[length:var(--sp-fs-body-sm)] font-extrabold text-[var(--sp-ink-800)]">

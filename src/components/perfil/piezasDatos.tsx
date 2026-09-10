@@ -127,7 +127,7 @@ export function ResumenConsultorios({ consultorios, cargando }: {
       ) : total === 0 ? (
         <p className="sp-secondary">
           No tienes consultorios activos.{' '}
-          <Link href={HREF_CONSULTORIOS} prefetch={false} className="font-semibold text-[var(--sp-primary)] hover:underline">
+          <Link href={HREF_CONSULTORIOS} prefetch={false} className="font-semibold text-[var(--sp-primary-text)] hover:underline">
             Agrega el primero
           </Link>
           .
@@ -165,7 +165,7 @@ export function ResumenConsultorios({ consultorios, cargando }: {
       )}
 
       {restantes > 0 && (
-        <Link href={HREF_CONSULTORIOS} prefetch={false} className="text-[length:var(--sp-fs-meta)] font-semibold text-[var(--sp-primary)] hover:underline">
+        <Link href={HREF_CONSULTORIOS} prefetch={false} className="text-[length:var(--sp-fs-meta)] font-semibold text-[var(--sp-primary-text)] hover:underline">
           Ver {restantes} consultorio{restantes > 1 ? 's' : ''} más
         </Link>
       )}
@@ -198,7 +198,7 @@ export function EstadoGoogleCalendar({ esAdmin, estado }: {
 
       <div className="shrink-0 flex items-center gap-[var(--sp-3)]">
         <ChipEstado esAdmin={esAdmin} estado={estado} />
-        <Link href={HREF_GOOGLE} prefetch={false} className="text-[length:var(--sp-fs-meta)] font-semibold text-[var(--sp-primary)] hover:underline max-sm:hidden">
+        <Link href={HREF_GOOGLE} prefetch={false} className="text-[length:var(--sp-fs-meta)] font-semibold text-[var(--sp-primary-text)] hover:underline max-sm:hidden">
           Abrir
         </Link>
       </div>
