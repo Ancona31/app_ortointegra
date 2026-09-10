@@ -1585,7 +1585,22 @@ input[type="date"].sp-input {
   min-height: 0; padding: 0; flex: 0 0 auto;
   color: var(--sp-primary); font-size: var(--sp-fs-meta);
 }
-.sp-tpl-deshacer:hover { color: var(--sp-primary-hover); }
+/* ⚠️ `--sp-primary-text` Y NO `--sp-primary-hover`, aunque esto SEA un hover.
+   `--sp-primary-hover` es el hover del RELLENO —lleva tinta blanca encima— y
+   desde que oscurece en tema oscuro dejaba este enlace en 2.66:1 sobre la card.
+   Esto es tinta, así que su token es el de tinta. En oscuro el hover ahora
+   ACLARA: 3.44:1 en reposo → 6.23:1 al pasar por encima.
+   ⚠️ EN TEMA CLARO ESTE HOVER NO PINTA NADA, y hay que saberlo: `--sp-primary-text`
+   es un alias de `--sp-primary` en claro —sólo divergen en oscuro—, o sea que
+   coincide con el color de reposo de la línea de arriba. El cursor sigue siendo
+   `pointer` (lo pone `.sp-btn`), pero la señal de color se pierde. Si hace falta
+   reponerla, la salida es una que NO dependa del tema —un subrayado en hover—,
+   no volver a `--sp-primary-hover`.
+   ⚠️ Y EL REPOSO DE ARRIBA SIGUE EN 3.44:1 EN OSCURO, por debajo de AA: usa
+   `--sp-primary`, que es el token de RELLENO. Es el mismo defecto que tienen
+   `.sp-btn--compact` y los botones de contorno, y se arregla en su tanda, no
+   aquí. */
+.sp-tpl-deshacer:hover { color: var(--sp-primary-text); }
 
 /* ── Panel de gestión ──────────────────────────────────────────────────── */
 /* Sin `position: sticky` en la cabecera: con scroll de página sube con el
@@ -2046,8 +2061,20 @@ input[type="date"].sp-input {
 /* La fila que cierra el documento: la que el paciente lee primero. */
 .sp-doc-cierrefila--final { border-top: var(--sp-bw-hair) solid var(--sp-line-divider); }
 .sp-doc-cierrefila--final .sp-doc-cierrelabel { font-size: var(--sp-fs-body); color: var(--sp-ink-700); }
+/* ⚠️ LA CIFRA VA EN `--sp-primary-text`, EL TOKEN DE TINTA, y aquí estuvo
+   `--sp-primary-hover` — que no es un color estático sino el hover del RELLENO
+   del botón primario, tomado prestado sólo por salir un tono más fuerte. Prestar
+   ese token salió caro en cuanto el hover pasó a oscurecer: esta cifra, que es
+   la que el paciente lee, caía a 2.66:1 sobre la card en tema oscuro. Con el
+   token correcto sube a 6.23:1.
+   ⚠️ EN TEMA CLARO ESTO SÍ CAMBIA DE COLOR, a sabiendas: el préstamo la pintaba
+   con `--cp` (el navy, 11.6:1 sobre blanco) y ahora sale en `--cs` (el azul de
+   marca, 6.5:1). Los dos pasan de sobra —a 20 px en negrita el listón es 3:1—,
+   y el azul es el que el resto del bloque ya usa como tinta de marca. Si algún
+   día se quiere el navy de vuelta, NO se hace volviendo a `--sp-primary-hover`:
+   eso reabre exactamente este defecto. */
 .sp-doc-cierrefila--final .sp-doc-cierrecifra {
-  font-size: 20px; font-weight: var(--sp-fw-black); color: var(--sp-primary-hover);
+  font-size: 20px; font-weight: var(--sp-fw-black); color: var(--sp-primary-text);
 }
 /* El único número editable del bloque. */
 .sp-doc-anticipo { flex: 0 0 170px; width: 170px; }
