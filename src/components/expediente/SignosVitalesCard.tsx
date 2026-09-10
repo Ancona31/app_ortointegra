@@ -50,11 +50,25 @@ const ESTADO_LABEL: Record<EstadoVital, string> = {
   fuera: 'Fuera de rango',
 }
 
-/** `label` se usa en md+; `short` (etiqueta corta con la unidad integrada) en <768px. */
+/** `label` se usa en md+; `short` (etiqueta corta con la unidad integrada) en <768px.
+ *
+ * ⚠️ LOS TRES PRIMEROS `label` SON ABREVIATURAS Y NO CABEN DE OTRA FORMA. Eran
+ * «FREC. CARDÍACA», «FREC. RESP.» y «TEMPERATURA», y `.sv-label` lleva
+ * `text-overflow: ellipsis`: en la rejilla de cinco columnas se leían
+ * «FREC. CAR…» y «TEMPERA…», que informan menos que la abreviatura entera. Una
+ * celda de 1fr da ~76px de rótulo a 768px de ancho, y «TEMPERATURA» pide ~95.
+ *
+ * El nombre completo NO se pierde: viaja en `aria`, que es lo que lee un lector
+ * de pantalla, y la unidad sigue debajo en `.sv-unit`. `PA` y `SpO₂` no se
+ * tocan porque nunca se truncaron —la primera tiene 1.9fr y la segunda ya era
+ * corta—.
+ *
+ * `short` se queda como está: por debajo de 768 la celda es aún más angosta y
+ * esos rótulos ya venían resueltos para ese ancho, con la unidad integrada. */
 const SINGLES = [
-  { key: 'fc', label: 'FREC. CARDÍACA', short: 'FC · lpm', unit: 'lpm', aria: 'Frecuencia cardíaca', inputMode: 'numeric' },
-  { key: 'fr', label: 'FREC. RESP.', short: 'FR · rpm', unit: 'rpm', aria: 'Frecuencia respiratoria', inputMode: 'numeric' },
-  { key: 'temp', label: 'TEMPERATURA', short: 'T · °C', unit: '°C', aria: 'Temperatura', inputMode: 'decimal', step: '0.1' },
+  { key: 'fc', label: 'FC', short: 'FC · lpm', unit: 'lpm', aria: 'Frecuencia cardíaca', inputMode: 'numeric' },
+  { key: 'fr', label: 'FR', short: 'FR · rpm', unit: 'rpm', aria: 'Frecuencia respiratoria', inputMode: 'numeric' },
+  { key: 'temp', label: 'Temp.', short: 'T · °C', unit: '°C', aria: 'Temperatura', inputMode: 'decimal', step: '0.1' },
   { key: 'spo2', label: 'SpO₂', short: 'SpO₂ · %', unit: '%', aria: 'Saturación de oxígeno', inputMode: 'numeric' },
 ] as const
 

@@ -18,10 +18,19 @@ import { logAccess, logAudit, type AuditAccion } from '@/lib/audit'
 /** Acciones que el cliente puede pedir por nombre. Cerrada a propósito. */
 const ACCIONES_PERMITIDAS: Record<string, AuditAccion> = {
   exportar_expediente: 'exportar_expediente',
+  /* Las dos salidas del modal de documento generado que NO pasan por el
+     servidor. El envío por correo no está aquí y no debe estarlo: lo audita su
+     propia ruta, que además conoce el destinatario. Estas dos ocurren enteras
+     en el navegador —hoja de compartir del sistema o descarga— así que el
+     cliente es el único que puede avisar de que pasaron. */
+  compartir_documento: 'compartir_documento',
+  descargar_documento: 'descargar_documento',
 }
 
 const DESCRIPCION: Record<string, string> = {
   exportar_expediente: 'Exportación del expediente completo a PDF',
+  compartir_documento: 'Documento compartido con la hoja del sistema (destino no observable)',
+  descargar_documento: 'Documento descargado al dispositivo',
 }
 
 export async function POST(req: NextRequest) {

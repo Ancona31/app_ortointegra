@@ -313,7 +313,22 @@ export default function NotaHonorariosForm({
     lineas, notas, paciente, pacienteInicial,
     formaPago, divisa, vigenciaDias, anticipo, aseguradora,
   )
-  useEffect(() => { onVacioChange?.(vacio) }, [vacio, onVacioChange])
+  /* El documento de este formulario ya salió. Se reinicia solo: cambiar de tipo
+     desmonta el formulario entero. */
+  const [emitido, setEmitido] = useState(false)
+
+  /* ⚠️ SE REPORTA `vacio || emitido`, Y EL SEGUNDO TÉRMINO NO SOBRA (misma nota
+     en los ocho formularios). `vacio` dice si el formulario TIENE CONTENIDO;
+     quien escucha por aquí pregunta otra cosa: si queda algo POR ENTREGAR.
+     Mientras fueron lo mismo nadie lo notó, pero emitir no vacía los campos, así
+     que después de imprimir seguía saltando el diálogo de descartar al cambiar
+     de tipo, y en la nota el aviso de «y sin imprimir» sobre un documento recién
+     impreso. Los cuatro que escuchan: `(app)/documentos/page.tsx`,
+     `expediente/[id]/documentos/page.tsx` y dos en `nueva-nota/page.tsx`.
+     ⚠️ «Guardar como plantilla» NO se ve afectado: recibe `vacio` a secas por
+     otro canal (`usePlantillasDocumento({ vacio })`). Tras emitir sigue siendo
+     legítimo guardar como plantilla lo que se acaba de escribir. */
+  useEffect(() => { onVacioChange?.(vacio || emitido) }, [vacio, emitido, onVacioChange])
 
   // ── Plantillas (spec 02) ────────────────────────────────────────
   // Se guarda TODO menos los datos del paciente. Aquí eso deja fuera al
@@ -660,7 +675,7 @@ export default function NotaHonorariosForm({
       setImprimiendo(false)
       // También cuando la persistencia falló: el PDF existe y con el paciente
       // enfrente lo urgente es poder imprimirlo.
-      if (pdfBlob && !offlineMode) setDocGenerado({ blob: pdfBlob, guardado, documentoId: filaId })
+      if (pdfBlob && !offlineMode) { setDocGenerado({ blob: pdfBlob, guardado, documentoId: filaId }); setEmitido(true) }
     }
   }
 

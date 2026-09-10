@@ -28,6 +28,23 @@ export type AuditAccion =
   | 'exportar_expediente'
   | 'enviar_documento'
   | 'enviar_documento_denegado'
+  /* El documento sale de la app por una vía que NO es el correo: la hoja de
+     compartir del sistema, o una descarga directa donde esa hoja no existe.
+     Son dos acciones y no una porque el rastro es distinto: la primera entrega
+     el archivo a otra aplicación del aparato y la segunda lo deja en el disco.
+
+     ⚠️ NINGUNA DE LAS DOS REGISTRA DESTINO, y no es un olvido: no lo hay que
+     registrar. Quien comparte elige la aplicación y el contacto DENTRO de la
+     hoja del sistema, que no devuelve nada de eso a la página — es una decisión
+     de privacidad del navegador, no una carencia de esta app. Justamente por
+     eso interesa dejar constancia de que el documento salió: es la única marca
+     que va a quedar. `registro_id` lleva el id del documento, que basta para
+     saber QUÉ salió, CUÁNDO y de la mano de QUIÉN.
+
+     `audit_log.accion` es `text` sin CHECK, así que estas dos líneas no
+     necesitan migración. */
+  | 'compartir_documento'
+  | 'descargar_documento'
   /* Escritura del correo en la ficha desde el modal de envío, y solo cuando la
      ficha NO tenía ninguno — sustituir uno existente está prohibido en
      `/api/pacientes/[id]/correo`. Acción propia y no un `editar_paciente`

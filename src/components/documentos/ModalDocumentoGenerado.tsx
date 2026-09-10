@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import { AlertTriangle, Check, Eye, Loader2, Mail, MessageCircle } from 'lucide-react'
+import { AlertTriangle, Check, Download, Eye, Loader2, Mail, Share2 } from 'lucide-react'
 import ModalShell from '@/components/ui/ModalShell'
 
 /**
@@ -78,12 +78,12 @@ interface Props {
  * al servidor con el id del documento, así que ningún formulario tiene que
  * conocer la ficha del paciente para que esto funcione.
  *
- *   listo       → el estado de partida y también el de después de resolver: si
- *                 hay correo en la ficha se ve cuál y el botón manda; si aún no
- *                 se ha preguntado (`resuelto` en falso) el botón pregunta
- *   consultando → el GET que dice qué hay en la ficha, disparado por el BOTÓN y
- *                 nunca por abrirse el modal
- *   pidiendo    → no hay correo, o el médico eligió otro: se teclea aquí mismo
+ *   consultando → el estado de PARTIDA: el GET que dice qué hay en la ficha, que
+ *                 sale en cuanto el modal se abre
+ *   listo       → resuelto y con correo en la ficha: se ve cuál y el botón manda
+ *                 en un solo toque
+ *   pidiendo    → no hay correo en la ficha —y entonces se entra aquí solo, al
+ *                 abrir—, o el médico eligió otro: se teclea aquí mismo
  *   confirmando → la dirección tecleada, grande, para leerla letra por letra
  *   enviando / enviado / error
  */
@@ -98,13 +98,6 @@ export default function ModalDocumentoGenerado({
   documentoId = null,
 }: Props) {
   const [paso, setPaso] = useState<Paso>('listo')
-  /**
-   * Si ya se preguntó al servidor. Hace falta además de `correoFicha` porque
-   * `null` es ambiguo: puede ser «todavía no lo he preguntado» o «lo pregunté y
-   * la ficha no tiene». Sin esta bandera, el botón no sabría si le toca
-   * resolver o abrir la captura.
-   */
-  const [resuelto, setResuelto] = useState(false)
   const [correoFicha, setCorreoFicha] = useState<string | null>(null)
   const [pacienteId, setPacienteId] = useState<string | null>(null)
   const [escrito, setEscrito] = useState('')
@@ -126,8 +119,12 @@ export default function ModalDocumentoGenerado({
   const [aperturaVista, setAperturaVista] = useState(open)
   if (open !== aperturaVista) {
     setAperturaVista(open)
-    setPaso('listo')
-    setResuelto(false)
+    /* Arranca CONSULTANDO cuando hay fila que enviar: el efecto de abajo sale a
+       preguntar el destinatario en cuanto se abre. Se fija aquí y no en el
+       efecto para que éste no llame a `setState` de forma síncrona en su cuerpo
+       —el lint del proyecto lo rechaza (`react-hooks/set-state-in-effect`)— y
+       para que el primer render ya salga con el estado que le toca. */
+    setPaso(open && documentoId !== null ? 'consultando' : 'listo')
     setCorreoFicha(null)
     setPacienteId(null)
     setEscrito('')
@@ -143,24 +140,28 @@ export default function ModalDocumentoGenerado({
    * la ficha del paciente, y los nueve puntos de montaje siguen pasando un dato
    * y no dos.
    *
-   * ⚠️⚠️ SE LLAMA AL PULSAR «ENVIAR POR CORREO», NUNCA AL ABRIRSE EL MODAL.
+   * ⚠️⚠️ SE LLAMA AL ABRIRSE EL MODAL, Y ESTO ESTUVO AL REVÉS. Aquí decía «al
+   * pulsar Enviar por correo, NUNCA al abrirse», con dos motivos: no desplegar
+   * el campo en la cara de quien solo quería mirar el PDF, y no gastar una
+   * petición por documento emitido cuando el correo se manda en pocos casos.
    *
-   * Estuvo en un efecto atado a `open` y fue un error en dos frentes. El visible:
-   * el modal se abre al terminar de imprimir CUALQUIER documento, así que
-   * desplegaba el campo del correo en la cara de quien solo quería mirar el PDF y
-   * cerrar. El invisible, y peor: una petición por cada documento emitido, se
-   * fuera a enviar o no. El correo se manda en pocos casos, así que la inmensa
-   * mayoría de esas peticiones no servían para nada — y cada una lee la ficha del
-   * paciente, que es dato personal, sin que nadie lo haya pedido.
+   * El primer motivo se cayó solo: resolver aquí no despliega ningún campo, solo
+   * escribe una línea de texto que dice a dónde iría. Lo que sí costaba era el
+   * precio de la duda — el botón decía «Enviar por correo» y no enviaba, sino
+   * que preguntaba, y hacían falta DOS toques para una acción.
    *
-   * Si alguien vuelve a moverla a un efecto, vuelven las dos cosas.
+   * El segundo es real y se paga a sabiendas: una petición por documento
+   * emitido, se envíe o no. Se acota a lo que ya era: la ruta es la misma, solo
+   * la lee quien acaba de emitir un documento de ESE paciente —o sea, quien ya
+   * tiene su expediente abierto delante— y devuelve un correo, no la ficha.
+   * Lo que se compra es que el botón haga lo que su rótulo promete.
    */
   async function resolverDestinatario(): Promise<void> {
-    /* Reentrada cerrada: el botón ya se deshabilita mientras consulta, pero un
-       doble toque rápido puede colarse entre el clic y el repintado. */
-    if (documentoId === null || paso === 'consultando') return
-    setPaso('consultando')
-    setErrorEnvio('')
+    if (documentoId === null) return
+    /* ⚠️ NI UN `setState` ANTES DEL PRIMER `await`. Esta función la arranca un
+       efecto, y todo lo que corra de forma síncrona en él cuenta como cuerpo del
+       efecto para `react-hooks/set-state-in-effect`. El estado de partida
+       —`consultando`— lo deja puesto el reajuste de apertura de arriba. */
     try {
       const res = await fetch(
         `/api/email/enviar-documento?documentoId=${encodeURIComponent(documentoId)}`,
@@ -170,14 +171,12 @@ export default function ModalDocumentoGenerado({
         setErrorEnvio(typeof datos.error === 'string'
           ? datos.error
           : 'No se pudo comprobar el correo del paciente.')
-        /* `resuelto` se queda en falso: el botón vuelve a intentarlo. */
         setPaso('error')
         return
       }
       const ficha = typeof datos.correoFicha === 'string' ? datos.correoFicha : null
       setCorreoFicha(ficha)
       setPacienteId(typeof datos.pacienteId === 'string' ? datos.pacienteId : null)
-      setResuelto(true)
       /* Sin correo en la ficha se entra DIRECTO a pedirlo: es el caso común
          —la mayoría de las fichas no lo tienen— y un paso intermedio que solo
          diga «no hay correo» sobra. Con correo, se enseña cuál antes de mandar
@@ -188,6 +187,15 @@ export default function ModalDocumentoGenerado({
       setPaso('error')
     }
   }
+
+  /* Resolver el destinatario al abrir. `documentoId` en las dependencias y no
+     solo `open`: los formularios montan este modal con la fila ya escrita, pero
+     si algún día llegara después, la consulta se haría igual en cuanto llegue. */
+  useEffect(() => {
+    if (!open || documentoId === null) return
+    void resolverDestinatario()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, documentoId])
 
   /**
    * ⚠️ AL SERVIDOR SOLO VIAJA EL ID. Ni el blob que este modal tiene en memoria,
@@ -257,6 +265,136 @@ export default function ModalDocumentoGenerado({
       setGuardando(false)
       setOfrecerGuardar(false)
     }
+  }
+
+  const [compartiendo, setCompartiendo] = useState(false)
+  const [avisoCompartir, setAvisoCompartir] = useState('')
+
+  /**
+   * Deja constancia de que el documento salió de la app.
+   *
+   * A diferencia del correo —que audita el SERVIDOR dentro de su propia ruta,
+   * con destinatario y folio— aquí no hay destino que registrar: lo elige el
+   * usuario en la hoja del sistema y el navegador no lo cuenta. Justamente por
+   * eso interesa registrar que salió.
+   *
+   * Va por `/api/audit`, que ya existía para esto y valida la sesión en el
+   * servidor; el cliente solo puede pedir acciones de su lista cerrada.
+   * Fire-and-forget: el documento ya se compartió y un fallo de registro no se
+   * le cuenta al médico, que no puede hacer nada al respecto.
+   */
+  function auditar(accion: 'compartir_documento' | 'descargar_documento'): void {
+    if (documentoId === null) return
+    void fetch('/api/audit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tabla: 'documentos', registroId: documentoId, accion }),
+    }).catch(() => {})
+  }
+
+  /** Nombre del archivo, para compartir y para descargar. `titulo` ya nombra el
+   *  documento; se memoriza para que el `File` de abajo no se reconstruya en
+   *  cada render y la detección no cambie de respuesta sola. */
+  const nombreArchivo = useMemo(() => {
+    const base = titulo.trim().toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+    return `${base || 'documento'}.pdf`
+  }, [titulo])
+
+  /**
+   * El PDF como `File`, listo desde que hay blob.
+   *
+   * ⚠️ SE CONSTRUYE EN EL RENDER Y NO EN EL HANDLER, Y ES LO QUE HACE POSIBLE LA
+   * DETECCIÓN DE ABAJO. `canShare` solo dice la verdad si se le enseña el
+   * archivo REAL, así que hasta que el `File` no existe no se puede saber si
+   * este navegador lo aceptaría — y esa respuesta hace falta al PINTAR, para
+   * elegir entre «Compartir» y «Descargar».
+   *
+   * No cuesta lo que parece: `new File([blob], …)` envuelve el blob, no copia
+   * sus bytes.
+   */
+  const archivo = useMemo(
+    () => (blob ? new File([blob], nombreArchivo, { type: 'application/pdf' }) : null),
+    [blob, nombreArchivo],
+  )
+
+  /**
+   * Si este navegador puede compartir ESTE archivo con la hoja del sistema.
+   *
+   * ⚠️ SE PREGUNTA CON EL ARCHIVO, Y NO BASTA CON QUE `share` EXISTA. Aquí se
+   * miraba solo que las dos funciones estuvieran definidas, y eso deja fuera el
+   * caso que más duele: navegadores donde `share` existe pero RECHAZA archivos
+   * —Chrome de escritorio en varias configuraciones—. Ahí el botón decía
+   * «Compartir», el médico lo pulsaba y se encontraba un aviso en vez de su
+   * documento, sin ninguna vía alterna a mano. Con la pregunta hecha al pintar,
+   * ese navegador enseña «Descargar» desde el principio.
+   *
+   * Y es EL MISMO objeto que se comparte después, no una copia equivalente: lo
+   * que se probó es exactamente lo que se manda.
+   *
+   * Se calcula en el render y no en un efecto: un efecto que llame a `setState`
+   * lo rechaza el lint del proyecto y además pintaría un fotograma con el botón
+   * equivocado. Los ocho formularios montan este modal con `ssr: false`, así que
+   * no hay render de servidor con el que desincronizarse; aun así el `typeof` de
+   * guarda va, porque `navigator` no existe en Node y una importación futura sin
+   * `ssr: false` reventaría en el render en vez de degradar.
+   */
+  const puedeCompartir = useMemo(
+    () => archivo !== null
+      && typeof navigator !== 'undefined'
+      && typeof navigator.share === 'function'
+      && typeof navigator.canShare === 'function'
+      && navigator.canShare({ files: [archivo] }),
+    [archivo],
+  )
+
+  /**
+   * ⚠️ `navigator.share` ES LA PRIMERA INSTRUCCIÓN TRAS LA GUARDA, Y ESE ORDEN NO
+   * ES ESTÉTICO. La llamada exige activación transitoria del gesto: cualquier
+   * `await` por delante la consume y el navegador rechaza con `NotAllowedError`
+   * sin que nada explique por qué. El `File` ya viene hecho del render —no hay
+   * nada que construir ni que volver a pedir— y los `setState` van DESPUÉS de
+   * capturar la promesa, para que ni un cambio futuro pueda colar una espera en
+   * medio. La auditoría va más atrás todavía, en el `then`.
+   *
+   * Exige además contexto seguro: en `localhost` y en producción (https) lo
+   * hay; por http plano `navigator.share` ni siquiera está definido, así que
+   * ese caso ya cayó en la rama de descarga al detectar.
+   *
+   * Sin comprobación de `canShare` aquí: la hizo `puedeCompartir` sobre ESTE
+   * mismo archivo, y si hubiera dicho que no, este botón no se habría pintado.
+   */
+  function compartir(): void {
+    if (!archivo || compartiendo) return
+    const compartido = navigator.share({ files: [archivo], title: titulo })
+    setAvisoCompartir('')
+    setCompartiendo(true)
+    compartido
+      /* ⚠️ LA AUDITORÍA VA AQUÍ Y EN NINGÚN OTRO SITIO. `share` solo resuelve
+         cuando el documento se entregó de verdad a otra aplicación; registrarlo
+         antes de llamar, o en el `finally`, escribiría en el `audit_log` un
+         compartir que no ocurrió — y un registro que miente es peor que no
+         tenerlo. */
+      .then(() => auditar('compartir_documento'))
+      .catch((e: unknown) => {
+        /* ⚠️ CANCELAR NO ES UN FALLO. Cerrar la hoja del sistema sin elegir
+           rechaza con `AbortError`, y es una decisión del médico, no un error:
+           ni aviso, ni caída a descarga, ni entrada en el `audit_log`. Los demás
+           motivos sí se cuentan.
+
+           El nombre se lee de la propiedad y no con `instanceof Error`: quien
+           rechaza es un `DOMException`, que en Safari antiguo NO heredaba de
+           `Error` — allí `instanceof` daba falso, el nombre salía vacío y una
+           cancelación se pintaba como fallo. */
+        const nombre = typeof e === 'object' && e !== null && 'name' in e
+          ? String((e as { name: unknown }).name)
+          : ''
+        if (nombre !== 'AbortError') {
+          setAvisoCompartir('No se pudo compartir el documento.')
+        }
+      })
+      .finally(() => setCompartiendo(false))
   }
 
   /** Suficiente para atajar el dedo torcido; la validación de verdad es el servidor. */
@@ -383,7 +521,7 @@ export default function ModalDocumentoGenerado({
               disabled={!escritoValido}
               className="sp-btn sp-btn--primary"
             >
-              Continuar
+              Enviar por correo
             </button>
             <button
               type="button"
@@ -525,30 +663,33 @@ export default function ModalDocumentoGenerado({
       <div className="mt-2 pt-3 border-t border-[var(--sp-line-divider)] space-y-2.5">
         {panelDestinatario()}
 
-        {/* Durante la captura y la confirmación la rejilla se retira: el panel
-            trae sus propios botones y un segundo «Enviar por correo» al lado
-            haría dudar de cuál manda. */}
-        {!enFlujoDeCaptura && (
-          /* WhatsApp sigue diferido; el correo ya envía. Ambos mandan el ARCHIVO
-             — por eso el mensaje y el adjunto viven en `lib/documentos/`, fuera
-             de la ruta de correo: cuando WhatsApp entre, reusa los dos.
+        {/* Durante la captura y la confirmación se retira el botón de CORREO —el
+            panel trae el suyo y dos rótulos iguales harían dudar de cuál manda—
+            pero «Compartir» se queda: no compite con nada y, sin correo en la
+            ficha, el modal abre ya con la captura desplegada, así que esconder
+            la rejilla entera lo dejaría inalcanzable. */}
+        {/* Las dos salidas del documento que no son «Visualizar». El correo manda
+            el PDF GUARDADO —lo resuelve el servidor por id— y compartir manda el
+            que este modal tiene en memoria, que es el mismo archivo.
 
-             A OPACIDAD PLENA, igual que el botón de Google en /login: lo
-             deshabilitado se comunica con el estado del control, el relleno y el
-             cursor — nunca apagando el texto, porque entonces el médico no puede
-             leer QUÉ es lo que todavía no puede usar.
-             justifyContent en línea y no `justify-between`: globals.css importa
-             tailwindcss ANTES que spinus-tokens.css, así que el
-             `justify-content:center` de .sp-btn le gana a la utilidad. */
-          <div className="sp-grid-actions">
+            A OPACIDAD PLENA cuando alguno esté apagado, igual que el botón de
+            Google en /login: lo deshabilitado se comunica con el estado del
+            control, el relleno y el cursor — nunca apagando el texto, porque
+            entonces el médico no puede leer QUÉ es lo que no puede usar. */}
+        <div className="sp-grid-actions">
+            {!enFlujoDeCaptura && (
             <button
               type="button"
-              /* El primer toque RESUELVE el destinatario; a partir de ahí manda
-                 o abre la captura. Es lo que mantiene la consulta fuera de la
-                 apertura del modal: ver `resolverDestinatario`. */
+              /* ⚠️ ENVÍA. No pregunta, no despliega: el destinatario ya está
+                 resuelto y a la vista desde que se abrió el modal, así que un
+                 toque en un botón que dice «Enviar por correo» tiene que
+                 enviar. Aquí hubo un primer toque que solo resolvía, y eran dos
+                 toques para una acción.
+                 Sin correo en la ficha no se llega a pulsar esto: el modal ya
+                 abrió con la captura desplegada. La rama queda por si la
+                 consulta falló y no se sabe qué hay. */
               onClick={() => {
-                if (!resuelto) void resolverDestinatario()
-                else if (correoFicha !== null) void enviarPorCorreo(null)
+                if (correoFicha !== null) void enviarPorCorreo(null)
                 else { setEscrito(''); setErrorEnvio(''); setPaso('pidiendo') }
               }}
               disabled={sinDocumento || paso === 'consultando' || paso === 'enviando' || paso === 'enviado'}
@@ -566,7 +707,7 @@ export default function ModalDocumentoGenerado({
                   ? <Loader2 size={17} className="animate-spin" />
                   : paso === 'enviado' ? <Check size={17} /> : <Mail size={17} />}
                 {paso === 'consultando'
-                  ? 'Comprobando…'
+                  ? 'Comprobando correo…'
                   : paso === 'enviando'
                     ? 'Enviando…'
                     : paso === 'enviado' ? 'Enviado' : 'Enviar por correo'}
@@ -577,20 +718,53 @@ export default function ModalDocumentoGenerado({
                 <span className="sp-badge sp-badge--deferred">No quedó en el expediente</span>
               )}
             </button>
+            )}
 
-            <button
-              type="button"
-              disabled
-              aria-disabled="true"
-              className="sp-btn sp-btn--tertiary cursor-not-allowed"
-              style={{ flexDirection: 'column', gap: '7px' }}
-            >
-              <span className="inline-flex items-center gap-2">
-                <MessageCircle size={17} /> WhatsApp
-              </span>
-              <span className="sp-badge sp-badge--deferred">Próximamente</span>
-            </button>
-          </div>
+            {/* ⚠️ AQUÍ ESTUVO EL BOTÓN DE WHATSAPP CON SU «PRÓXIMAMENTE», que
+                esperaba a una integración con su API. Lo sustituye la hoja de
+                compartir del sistema, que en un teléfono lista WhatsApp entre
+                las opciones y de paso Signal, Telegram, AirDrop o lo que el
+                médico tenga — sin integrar ninguna.
+
+                DOS BOTONES Y NO UNO CON DOS COMPORTAMIENTOS: el rótulo dice
+                exactamente lo que va a pasar. Donde no hay hoja de compartir
+                —Firefox de escritorio es el caso vivo— se descarga el PDF, que
+                es lo que ese usuario haría después de todas formas. Esconderlo
+                dejaría un hueco en la rejilla y una acción menos sin explicar.
+                El `gridColumn` cubre el caso en que es el único de la fila. */}
+            {puedeCompartir ? (
+              <button
+                type="button"
+                onClick={compartir}
+                disabled={!archivo || compartiendo}
+                aria-busy={compartiendo}
+                className="sp-btn sp-btn--tertiary"
+                style={{ gridColumn: enFlujoDeCaptura ? '1 / -1' : undefined }}
+              >
+                {compartiendo ? <Loader2 size={17} className="animate-spin" /> : <Share2 size={17} />}
+                {compartiendo ? 'Compartiendo…' : 'Compartir'}
+              </button>
+            ) : (
+              /* ⚠️ UN ANCLA CON `download`, NO UN BOTÓN CON `onClick`: entre el
+                 toque y la descarga no puede quedar ninguna asincronía, igual
+                 que en «Visualizar». El `href` ya está resuelto desde el primer
+                 render (ver `pdfUrl`). Y va como HERMANO del botón de correo,
+                 nunca dentro de él: un ancla dentro de un `button` es marcado
+                 inválido y el navegador la desanida por su cuenta. */
+              <a
+                href={pdfUrl ?? undefined}
+                download={nombreArchivo}
+                onClick={() => auditar('descargar_documento')}
+                className="sp-btn sp-btn--tertiary"
+                style={{ gridColumn: enFlujoDeCaptura ? '1 / -1' : undefined }}
+              >
+                <Download size={17} /> Descargar
+              </a>
+            )}
+        </div>
+
+        {avisoCompartir !== '' && (
+          <p className="sp-hint text-center" aria-live="polite">{avisoCompartir}</p>
         )}
 
         {errorEnvio !== '' && (
