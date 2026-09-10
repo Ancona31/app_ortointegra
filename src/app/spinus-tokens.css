@@ -806,8 +806,14 @@ a:hover { color: var(--sp-primary-active); }
 .sp-btn--tertiary:hover { border-color: var(--sp-line-input); background: var(--sp-surface-sunken); }
 
 /* Compacto: acción inline dentro de una card interna ("Editar", "Regenerar") */
+/* ⚠️ LA TINTA VA EN `--sp-primary-text` Y NO EN `--sp-primary`. Éste es un botón
+   de CONTORNO: su marca es tinta sobre la superficie, no relleno con blanco
+   encima, y `--sp-primary` está calibrado para lo segundo. Con él, en tema
+   oscuro las seis paletas quedaban entre 3.03 y 3.63:1 —por debajo de AA para
+   texto—; con el token de tinta van de 5.73 a 6.52:1. En claro los dos tokens
+   valen lo mismo, así que ahí no cambia nada. */
 .sp-btn--compact {
-  background: var(--sp-surface); color: var(--sp-primary);
+  background: var(--sp-surface); color: var(--sp-primary-text);
   border: var(--sp-bw-hair) solid var(--sp-line-input);
   font-weight: var(--sp-fw-semi); font-size: var(--sp-fs-meta);
   padding: 7px 13px; border-radius: var(--sp-r-btn-xs); min-height: 34px;
@@ -1608,7 +1614,11 @@ input[type="date"].sp-input {
 .sp-tpl-aviso > span { flex: 1; }
 .sp-tpl-deshacer {
   min-height: 0; padding: 0; flex: 0 0 auto;
-  color: var(--sp-primary); font-size: var(--sp-fs-meta);
+  /* Tinta, no relleno: ver la nota de `.sp-btn--compact`. En oscuro pasa de
+     3.44:1 a 6.23:1; en claro no cambia. Su `:hover` de abajo ya usa este mismo
+     token, así que los dos estados se distinguen SÓLO por el subrayado — que es
+     justamente el motivo de que el subrayado esté ahí. */
+  color: var(--sp-primary-text); font-size: var(--sp-fs-meta);
 }
 /* ⚠️ `--sp-primary-text` Y NO `--sp-primary-hover`, aunque esto SEA un hover.
    `--sp-primary-hover` es el hover del RELLENO —lleva tinta blanca encima— y

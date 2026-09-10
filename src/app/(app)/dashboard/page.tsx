@@ -143,7 +143,7 @@ export default function DashboardPage() {
                  2 peticiones RSC y 2 lambdas por carga del dashboard, se pulse
                  o no. El razonamiento largo está en la lista de recientes. */
               prefetch={false}
-              className={`${ALTO_CONTROL} order-2 inline-flex items-center justify-center gap-[var(--sp-gap-item)] whitespace-nowrap rounded-[var(--sp-r-btn)] px-6 border border-[color:var(--sp-primary-border)] bg-[var(--sp-surface)] text-[length:var(--sp-fs-btn-sm)] font-semibold text-[var(--sp-primary)] transition-colors hover:bg-[var(--sp-primary-bg-faint)] lg:order-2`}
+              className={`${ALTO_CONTROL} order-2 inline-flex items-center justify-center gap-[var(--sp-gap-item)] whitespace-nowrap rounded-[var(--sp-r-btn)] px-6 border border-[color:var(--sp-primary-border)] bg-[var(--sp-surface)] text-[length:var(--sp-fs-btn-sm)] font-semibold text-[var(--sp-primary-text)] transition-colors hover:bg-[var(--sp-primary-bg-faint)] lg:order-2`}
             >
               <Plus size={17} /> Nuevo paciente
             </Link>
@@ -219,7 +219,7 @@ export default function DashboardPage() {
                       : 'inline-flex items-center justify-center whitespace-nowrap border font-bold transition-colors'}
                     style={enCurso
                       ? GEOMETRIA_ACCION
-                      : { ...GEOMETRIA_ACCION, background: 'var(--sp-surface)', color: 'var(--sp-primary)', borderColor: 'var(--sp-primary-border)' }}
+                      : { ...GEOMETRIA_ACCION, background: 'var(--sp-surface)', color: 'var(--sp-primary-text)', borderColor: 'var(--sp-primary-border)' }}
                   >
                     <span className="xl:hidden">Iniciar</span>
                     <span className="hidden xl:inline">Iniciar consulta</span>
