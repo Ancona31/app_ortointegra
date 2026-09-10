@@ -415,7 +415,7 @@ export default function Sidebar() {
             <p className="font-semibold text-sm leading-tight">
               {nombreDisplay ?? (componerNombreMedicoCompleto(profile ?? {}) || '')}
             </p>
-            <p className="text-[11px] opacity-40 mt-0.5 leading-tight">
+            <p className="text-[11px] text-[var(--ag-navy-ink-soft)] mt-0.5 leading-tight">
               {profile?.role === 'secretaria'
                 ? 'Asistente Médico/a'
                 : subtitulo ?? profile?.especialidad ?? ''}
@@ -461,7 +461,7 @@ export default function Sidebar() {
                 <Link key={section.href} href={section.href} onClick={close}
                   prefetch={section.sinPrefetch ? false : undefined}
                   className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all duration-150 ${
-                    active ? 'bg-white text-[var(--cp)] shadow-sm' : 'text-white/55 hover:bg-white/10 hover:text-white'
+                    active ? 'bg-white text-[var(--cp)] shadow-sm' : 'text-[var(--ag-navy-ink)] hover:bg-white/10 hover:text-white'
                   }`}
                 >
                   <section.icon size={16} className={active ? 'opacity-100' : 'opacity-70'} />
@@ -484,8 +484,8 @@ onClick={() => toggleGroup(section.key)}
 hasActive && !isOpen
                           ? 'text-white bg-white/10'
                           : isOpen
-                            ? 'text-white/80'
-                            : 'text-white/55 hover:bg-white/10 hover:text-white'
+                            ? 'text-[var(--ag-navy-ink-strong)]'
+                            : 'text-[var(--ag-navy-ink)] hover:bg-white/10 hover:text-white'
                     }`}
                   >
                     <section.icon size={16} className={hasActive ? 'opacity-100' : 'opacity-70'} />
@@ -510,7 +510,7 @@ hasActive && !isOpen
                               }
                             }}
                             className={`flex items-center gap-2 px-2.5 py-2 rounded-lg text-[12px] font-medium transition-all duration-150 ${
-                              childActive ? 'bg-white text-[var(--cp)] shadow-sm' : 'text-white/50 hover:bg-white/10 hover:text-white'
+                              childActive ? 'bg-white text-[var(--cp)] shadow-sm' : 'text-[var(--ag-navy-ink-dim)] hover:bg-white/10 hover:text-white'
                             }`}
                           >
                             <child.icon size={13} className={childActive ? 'opacity-100' : 'opacity-60'} />
@@ -531,12 +531,12 @@ hasActive && !isOpen
         {/* Footer */}
         <div className="px-3 py-3 border-t border-white/10 space-y-0.5">
           <button onClick={toggle}
-            className="w-full flex items-center gap-2.5 px-3 py-2.5 text-[13px] text-white/50 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-150">
+            className="w-full flex items-center gap-2.5 px-3 py-2.5 text-[13px] text-[var(--ag-navy-ink-dim)] hover:text-white hover:bg-white/10 rounded-xl transition-all duration-150">
             {dark ? <Sun size={14} /> : <Moon size={14} />}
             {dark ? 'Modo claro' : 'Modo oscuro'}
           </button>
           <button onClick={handleLogout}
-            className="w-full flex items-center gap-2.5 px-3 py-2.5 text-[13px] text-white/50 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-150">
+            className="w-full flex items-center gap-2.5 px-3 py-2.5 text-[13px] text-[var(--ag-navy-ink-dim)] hover:text-white hover:bg-white/10 rounded-xl transition-all duration-150">
             <LogOut size={14} />
             Cerrar sesión
           </button>
@@ -576,7 +576,7 @@ hasActive && !isOpen
               comentario. Que dos sitios digan lo contrario sobre la misma regla es
               lo que de verdad se arregla aquí. */}
           <Link href="/privacidad" target="_blank" rel="noopener noreferrer" prefetch={false}
-            className="block text-center text-[10px] text-white/40 hover:text-white/70 transition-colors pt-2">
+            className="block text-center text-[10px] text-[var(--ag-navy-ink-soft)] hover:text-white/70 transition-colors pt-2">
             Aviso de Privacidad
           </Link>
         </div>

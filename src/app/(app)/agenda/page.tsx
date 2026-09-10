@@ -3935,9 +3935,14 @@ function CabeceraDiaLista({ date, esHoy, conAnio }: {
    Sustituye al encabezado blanco de escritorio por debajo de `ANCHO_MOVIL`, y
    sólo ahí: el de escritorio no se toca por dentro, se envuelve.
 
-   ⚠️ EL COLOR SALE DE LA FÓRMULA DEL MENÚ LATERAL, no de un valor copiado. Es
-   `hsl(from var(--cp) h s 20%)`, la misma que `Sidebar.tsx:248`, y va como token
-   `--ag-navy` en globals.css para que las dos superficies no puedan divergir.
+   ⚠️ EL COLOR SALE DEL TOKEN `--ag-navy` DE globals.css, el mismo que pintan el
+   menú lateral y la franja del sistema, para que las tres superficies de cromo
+   no puedan divergir. Aquí estuvo escrita la fórmula
+   —`hsl(from var(--cp) h s 20%)`, «la misma que Sidebar.tsx:248»— y ya no vale
+   por dos motivos: el menú dejó de tenerla en línea y la consume del token, y
+   el token TIENE DOS FÓRMULAS, una por tema (en oscuro se aclara con OKLCH para
+   separarse de la página). Esta banda hereda las dos sin saberlo, que es
+   justamente lo que se buscaba.
    ⚠️ PLANA, SIN DEGRADADO. El mockup dibuja un `linear-gradient` y AFIRMA que es
    «el mismo del sidebar de escritorio»; eso es falso hoy —el sidebar es plano— y
    un degradado que el original no tiene SEPARA las dos superficies en vez de

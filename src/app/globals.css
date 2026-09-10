@@ -93,10 +93,20 @@
      ⚠️ NO ES `--ag-brand-primary`. Ése es `--cp` a pelo (#1a3a5c por defecto);
      esto es ese mismo tono bajado al 20 % de luminosidad, que es lo que el menú
      enseña de verdad.
-     ⚠️ NO SE REDECLARA EN OSCURO, y es correcto: el cromo de marca no cambia con
-     el tema —el menú lateral tampoco cambia—, así que la banda se ve igual en
-     los dos modos. Los controles de dentro van en blancos translúcidos sobre
-     ella, o sea que tampoco dependen del tema.
+     ⚠️⚠️ SÍ SE REDECLARA EN OSCURO, Y AQUÍ ESTUVO ESCRITO LO CONTRARIO. Decía
+     que el cromo de marca no cambia con el tema y que la banda se ve igual en
+     los dos modos. Dejó de valer: en oscuro este navy quedaba a 1.43:1 de la
+     página y a 1.28:1 de las cards, o sea que no se leía como una superficie
+     aparte sino como una mancha más — y encima era el elemento MÁS CLARO de la
+     pantalla, así que el cromo pesaba más que el contenido.
+     La contraparte oscura vive en el `html.dark` de este mismo archivo y en su
+     `@supports`. En CLARO no se ha tocado nada: ahí el cromo ya funcionaba.
+     ⚠️ NO SE PUEDE ARREGLAR OSCURECIÉNDOLO, aunque sea lo que la intuición pide
+     para que el menú «pese menos». Sobre `--sp-app-bg` (#121212) no hay
+     recorrido hacia abajo: el negro puro contra esa página da 1.12:1. La
+     separación sólo existe hacia arriba, y lo que impide que el menú pese
+     demasiado no es su claridad sino su CROMA — es navy contra cards grises
+     neutras, o sea otro material, no un gris más brillante.
      ⚠️ Y NO SE TOCAN `--sp-nav-from/mid/to` de `spinus-tokens.css`: están
      comentados con un «No usar: el sidebar se tematiza en Sidebar.tsx». */
   /* ⚠️⚠️ ESTE LITERAL ES EL RESPALDO, NO EL VALOR. El valor de verdad es la
@@ -119,6 +129,17 @@
      Ese navegador ya no puede tener Tailwind 4 entero, así que la ventana real
      es Chrome/Edge 111-118. */
   --ag-navy: #163250;
+  /* LA TINTA DE LOS ÍTEMS DEL CROMO. Son blancos translúcidos, igual que antes
+     —esto NO es un cambio de mecanismo, es el mismo blanco con alfa que el menú
+     ya usaba— pero nombrados, para poder subirlos en oscuro sin tocar el claro.
+     ⚠️ ESTOS CUATRO VALORES SON EXACTAMENTE LOS QUE EL MENÚ TENÍA EN LÍNEA
+     (`text-white/55`, `/50`, `/80` y `opacity-40`), así que en tema claro no
+     cambia ni un píxel. La contraparte oscura sube porque el cromo se aclara y
+     un blanco al 55 % sobre él caería a 3.8:1. */
+  --ag-navy-ink:        rgba(255,255,255,.55);  /* ítem inactivo */
+  --ag-navy-ink-dim:    rgba(255,255,255,.50);  /* sub-ítem y botones del pie */
+  --ag-navy-ink-strong: rgba(255,255,255,.80);  /* cabecera de grupo abierto */
+  --ag-navy-ink-soft:   rgba(255,255,255,.40);  /* subtítulo del médico */
   /* ⚠️ NO LO «UNIFIQUES» CON EL ROJO DE «CANCELADA» (--ag-status-cancelled-dot,
      hoy #c0392b). Se parecen y la línea cruza por encima de las tarjetas, pero
      dicen cosas distintas: una es la hora actual, la otra el estado de una cita.
@@ -814,9 +835,11 @@ body {
    —se lee antes de que exista CSS— y por eso lleva el valor por defecto: los dos
    dicen lo mismo para la marca de fábrica y sólo éste sigue al usuario.
 
-   ⚠️ NO SE REDECLARA EN OSCURO Y ES CORRECTO: `--ag-navy` tampoco: el cromo de
-   marca no cambia con el tema. Las dos paletas ven la misma franja, igual que
-   ven el mismo menú lateral.
+   ⚠️ SIGUE A `--ag-navy`, QUE SÍ SE REDECLARA EN OSCURO. Aquí estuvo escrito lo
+   contrario —«el cromo de marca no cambia con el tema»— y dejó de valer: la
+   franja, el menú y la banda de la agenda se aclaran juntos en oscuro para
+   separarse de la página. Que las tres salgan del mismo token es lo que hace
+   que no puedan divergir; esta regla no necesita saber nada más.
 
    ⚠️ NO OCUPA SITIO EN EL FLUJO. Es `fixed`, así que NO empuja nada y NO puede
    duplicar el espacio de nadie. Quien reserva el hueco es el relleno de cada
@@ -5339,6 +5362,48 @@ html.dark {
      «agendada» vuelve a ser azul, seguirá sin ser un motivo para atarlas. */
   --ag-patient-card-bg: rgba(47, 111, 237, .12);      /* ◆ azul de la familia, 12 % */
   --ag-patient-card-border: rgba(91, 140, 255, .36);  /* ◆ el mismo azul aclarado, 36 % */
+
+  /* ── EL CROMO DE MARCA EN OSCURO (menú, franja del sistema, banda móvil) ──
+     El literal es el RESPALDO; la fórmula está en el `@supports` de aquí abajo.
+     Es el valor al que esa fórmula resuelve con la marca de fábrica, igual que
+     el #163250 de la variante clara.
+     ⚠️ EL CROMO SE ACLARA EN OSCURO, y es lo contrario de lo que hace en claro.
+     No es una deriva: en claro el menú es la superficie más OSCURA y se recorta
+     contra una página casi blanca (12.3:1); en oscuro la página es casi negra y
+     hacia abajo NO HAY RECORRIDO —negro puro contra #121212 da 1.12:1—, así que
+     la única separación posible es hacia arriba. Lo que evita que el menú pese
+     más que el contenido no es su claridad sino su CROMA: navy contra cards
+     grises neutras se lee como otro material, no como un gris más brillante.
+     Medido en las seis paletas del selector: 1.84-2.02:1 contra la card
+     (#1e1e1e) y 2.07-2.27:1 contra la página (#121212). Las cards se separan de
+     la página a 1.12:1, o sea que el cromo queda muy por encima de lo que ya
+     basta para leerse como superficie aparte. */
+  --ag-navy: #2f4f73;
+  /* La tinta sube porque el fondo se aclara: al 55 % caería a 3.8:1. Con estos
+     cuatro, el peor caso de las seis paletas es 5.00 · 4.54 · 6.82 · 3.49 — los
+     cuatro POR ENCIMA de lo que la misma tinta da hoy en tema claro (3.91 ·
+     3.51 · 6.37 · 2.80). */
+  --ag-navy-ink:        rgba(255,255,255,.70);
+  --ag-navy-ink-dim:    rgba(255,255,255,.65);
+  --ag-navy-ink-strong: rgba(255,255,255,.88);
+  --ag-navy-ink-soft:   rgba(255,255,255,.52);
+}
+
+/* Par del respaldo de --ag-navy en oscuro. Mismo orden y mismo motivo que el de
+   la variante clara: fuera de la regla, y DESPUÉS, porque los dos selectores
+   pesan igual (0,1,1) y desempata el orden de fuente.
+   ⚠️ SIN ARITMÉTICA SOBRE CANALES: `c` y `h` se reenvían intactos y la claridad
+   es un literal, así que los defectos de «soporte parcial» de Chrome 119-130 y
+   Safari 16.4-17.6 —que son de unidades dentro de `calc()`— no la tocan.
+   ⚠️ Y ES `oklch` Y NO `hsl`, al revés que la variante clara. La `L` de HSL no
+   sigue a la luminancia entre tonos: con ella las seis paletas quedaban
+   desparramadas entre 1.08:1 y 1.86:1 contra la card —«Morado» invisible y
+   «Café cálido» casi el doble de separado que las demás—. En OKLCH las seis
+   convergen en 1.84-2.02. Esa consistencia es la mitad del arreglo. */
+@supports (color: oklch(from red l c h)) {
+  html.dark {
+    --ag-navy: oklch(from var(--cp, #1a3a5c) 0.42 c h);
+  }
 }
 
 /* ── PARTE B — FullCalendar: vars nativas --fc-* en dark. Se definen en el

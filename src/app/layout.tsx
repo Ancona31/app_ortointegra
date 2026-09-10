@@ -37,11 +37,27 @@ export const viewport: Viewport = {
      direcciones del navegador, donde no hay clínica que valga porque se lee
      antes de saber quién entra.
 
-     ⚠️ UNO SOLO Y SIN `media`, a propósito. El cromo de marca NO cambia con el
-     tema —el menú lateral no cambia, y `--ag-navy` no se redeclara en oscuro—,
-     así que una segunda entrada para `prefers-color-scheme: dark` diría
-     exactamente lo mismo. Si algún día el navy sí se tematiza, aquí van dos. */
-  themeColor: '#163250',
+     ⚠️ SON DOS DESDE QUE EL NAVY SE TEMATIZA. Aquí decía «uno solo y sin
+     `media`, a propósito», porque el cromo de marca no cambiaba con el tema;
+     eso dejó de valer. Los dos valores son los que `--ag-navy` resuelve con la
+     marca de fábrica en cada tema: #163250 en claro y #2f4f73 en oscuro.
+
+     ⚠️⚠️ ESTO SIGUE A `prefers-color-scheme`, PERO LA APP NO. El tema lo decide
+     la clase `dark` que `ThemeProvider` escribe en <html> leyendo
+     `localStorage`, y un `<meta>` no puede consultar eso: el navegador lo lee
+     antes de que exista JavaScript. O sea que un médico con el sistema en claro
+     y la app en oscuro verá la barra del navegador en el navy CLARO mientras la
+     página está en el oscuro. Es una divergencia conocida y sin arreglo posible
+     desde aquí — la salida sería que `ThemeProvider` reescribiera la etiqueta
+     al alternar, que es otro cambio y toca un componente.
+     Dónde se nota: Chrome de Android y la barra de direcciones. En la app
+     instalada de iOS NO, porque allí la barra es `black-translucent` y lo que
+     se ve es el píxel de `body::before`, que sí sale de `--ag-navy` y sí sigue
+     al tema y a la marca. */
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#163250' },
+    { media: '(prefers-color-scheme: dark)',  color: '#2f4f73' },
+  ],
   /* ── DIBUJARSE BAJO LAS ÁREAS DEL SISTEMA ───────────────────────────────
      ⚠️ ESTA LÍNEA ES LA QUE ENCIENDE TODOS LOS `env(safe-area-inset-*)` DE LA
      APLICACIÓN. Sin ella valen CERO en todas partes, y con ella empiezan a
