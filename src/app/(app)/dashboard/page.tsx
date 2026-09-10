@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useProfile } from '@/hooks/useProfile'
 import AsistenteDashboard from './AsistenteDashboard'
 import { DashboardSkeleton } from '@/components/ui/Skeleton'
-import { FolderOpen, User, Menu, Plus, Stethoscope } from 'lucide-react'
+import { FolderOpen, User, Menu, Plus, Stethoscope, FilePlus2 } from 'lucide-react'
 import Link from 'next/link'
 import { useConsultorios } from '@/hooks/useConsultorios'
 import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
@@ -110,15 +110,20 @@ export default function DashboardPage() {
             dos nodos y `OnboardingGuide` resuelve por `querySelector`, o sea
             por el PRIMERO que encuentre. El orden lo dan las utilidades
             `order-*`; el marcado es uno.
-            En `lg` el grupo de tres botones es `shrink-0`, así que si no cabe
-            baja de línea ENTERO y conserva su orden, en vez de descolgarse de
-            uno en uno. */}
+            En `lg` el grupo es `shrink-0`, así que si no cabe baja de línea
+            ENTERO y conserva su orden, en vez de descolgarse de uno en uno.
+            ⚠️ EN MÓVIL SON CUATRO BOTONES Y EN ESCRITORIO TRES: «+ Nuevo
+            documento» es el único que trae `lg:hidden`, porque en `lg` ese
+            botón sigue viviendo arriba de la columna de Documentos, que es
+            donde estaba. Es la ÚNICA asimetría del bloque, y no la hereda
+            `data-onboard`: ese atributo sigue en un solo nodo. */}
         <div className="mt-[var(--sp-gap-block)] flex flex-col gap-[var(--sp-gap-item)] lg:flex-row lg:flex-wrap lg:items-center">
 
           <BuscadorPaciente onAbrir={abrirBusqueda} />
 
-          {/* Los tres botones. En móvil, retícula de dos columnas con el
-              primario cruzándolas; en `lg`, fila que no encoge. */}
+          {/* Los botones. En móvil, retícula de dos columnas donde las dos
+              primeras filas cruzan las dos columnas y el par queda en la
+              tercera; en `lg`, fila de tres que no encoge. */}
           <div className="order-2 grid grid-cols-2 gap-[var(--sp-gap-item)] lg:flex lg:shrink-0 lg:items-center">
 
             {/* + Nueva consulta — primario. `.sp-btn--primary` trae del sistema
@@ -130,6 +135,29 @@ export default function DashboardPage() {
             >
               <Plus size={17} /> Nueva consulta
             </button>
+
+            {/* + Nuevo documento — SÓLO MÓVIL, fila propia a ancho completo.
+                ⚠️ NO ES UN SEGUNDO PRIMARIO. Ocupa las dos columnas y mide lo
+                mismo que «Nueva consulta» —eso lo pidió el diseño—, pero lleva
+                el contorno de acento de «Nuevo paciente», no el relleno: en
+                esta cabecera el relleno macizo es de UNO y sirve para señalar
+                cuál es la acción principal. Dos rellenos seguidos dejan la
+                pantalla sin jerarquía.
+                Está aquí y no al final de la columna de Documentos porque
+                apiladas en móvil esa columna cae al pie de la página, a dos
+                pantallas de las demás acciones de creación. En `lg` no se
+                pinta: allí el botón de la columna sigue siendo el que vale.
+                El rótulo va entero, sin abreviar. A 360 px la fila mide 328 y
+                el botón pide 197-228 según la fuente de sistema, así que sobra;
+                en media columna (159) NO cabía, y de ahí la fila propia. */}
+            <Link
+              href="/documentos"
+              /* Sin precarga, misma cuenta que el resto de la región. */
+              prefetch={false}
+              className={`${ALTO_CONTROL} col-span-2 order-2 inline-flex items-center justify-center gap-[var(--sp-gap-item)] whitespace-nowrap rounded-[var(--sp-r-btn)] px-6 border border-[color:var(--sp-primary-border)] bg-[var(--sp-surface)] text-[length:var(--sp-fs-btn-sm)] font-semibold text-[var(--sp-primary-text)] transition-colors hover:bg-[var(--sp-primary-bg-faint)] lg:hidden`}
+            >
+              <FilePlus2 size={17} /> Nuevo documento
+            </Link>
 
             {/* + Nuevo paciente — contorno de acento. No lleva `.sp-btn`
                 porque ésa declara `border: none` y se comería el contorno. */}
@@ -143,7 +171,7 @@ export default function DashboardPage() {
                  2 peticiones RSC y 2 lambdas por carga del dashboard, se pulse
                  o no. El razonamiento largo está en la lista de recientes. */
               prefetch={false}
-              className={`${ALTO_CONTROL} order-2 inline-flex items-center justify-center gap-[var(--sp-gap-item)] whitespace-nowrap rounded-[var(--sp-r-btn)] px-6 border border-[color:var(--sp-primary-border)] bg-[var(--sp-surface)] text-[length:var(--sp-fs-btn-sm)] font-semibold text-[var(--sp-primary-text)] transition-colors hover:bg-[var(--sp-primary-bg-faint)] lg:order-2`}
+              className={`${ALTO_CONTROL} order-3 inline-flex items-center justify-center gap-[var(--sp-gap-item)] whitespace-nowrap rounded-[var(--sp-r-btn)] px-6 border border-[color:var(--sp-primary-border)] bg-[var(--sp-surface)] text-[length:var(--sp-fs-btn-sm)] font-semibold text-[var(--sp-primary-text)] transition-colors hover:bg-[var(--sp-primary-bg-faint)] lg:order-2`}
             >
               <Plus size={17} /> Nuevo paciente
             </Link>
@@ -157,7 +185,7 @@ export default function DashboardPage() {
                  por url— se fue con la columna de Módulos. Ya no queda ningún
                  otro enlace encendido a `/expediente` en esta pantalla. */
               prefetch={false}
-              className={`${ALTO_CONTROL} sp-btn sp-btn--secondary order-3 whitespace-nowrap lg:order-1`}
+              className={`${ALTO_CONTROL} sp-btn sp-btn--secondary order-4 whitespace-nowrap lg:order-1`}
             >
               <FolderOpen size={17} /> Expedientes
             </Link>

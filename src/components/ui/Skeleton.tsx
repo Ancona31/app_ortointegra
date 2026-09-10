@@ -103,13 +103,23 @@ export function DashboardSkeleton({ onBuscar, onAbrirMenu }: {
 
           <BuscadorPaciente onAbrir={onBuscar} />
 
-          {/* Los anchos son los de los tres botones reales medidos a 15 px, y
-              el orden es el suyo: en móvil el primario cruza las dos columnas y
-              debajo van los otros dos; en `lg`, fila. */}
+          {/* Los anchos son los de los botones reales medidos a 15 px, y el
+              orden es el suyo: en móvil el primario cruza las dos columnas, el
+              de documento cruza la fila siguiente y debajo van los otros dos;
+              en `lg`, fila.
+              ⚠️ EL SEGUNDO HUESO LLEVA `lg:hidden`, Y ES LO QUE HACE QUE ESTO
+              CUADRE: la cabecera real tiene CUATRO botones en móvil y TRES en
+              `lg` —«+ Nuevo documento» sólo se pinta apilado, porque en `lg`
+              vive arriba de la columna de Documentos—. Con tres huesos el
+              esqueleto medía 106 px y la cabecera resuelta 164: la página
+              entera daba un salto de 58 px al terminar de cargar el perfil,
+              que es justo lo que esta retícula existe para evitar. Si el botón
+              vuelve a la columna, este hueso se va con él. */}
           <div className="order-2 grid grid-cols-2 gap-[var(--sp-gap-item)] lg:flex lg:shrink-0 lg:items-center">
             <Skeleton className={`${ALTO_CONTROL} col-span-2 order-1 lg:order-3 lg:w-[208px] rounded-[var(--sp-r-btn)]`} />
-            <Skeleton className={`${ALTO_CONTROL} order-2 lg:order-2 lg:w-[197px] rounded-[var(--sp-r-btn)]`} />
-            <Skeleton className={`${ALTO_CONTROL} order-3 lg:order-1 lg:w-[169px] rounded-[var(--sp-r-btn)]`} />
+            <Skeleton className={`${ALTO_CONTROL} col-span-2 order-2 rounded-[var(--sp-r-btn)] lg:hidden`} />
+            <Skeleton className={`${ALTO_CONTROL} order-3 lg:order-2 lg:w-[197px] rounded-[var(--sp-r-btn)]`} />
+            <Skeleton className={`${ALTO_CONTROL} order-4 lg:order-1 lg:w-[169px] rounded-[var(--sp-r-btn)]`} />
           </div>
         </div>
       </div>
@@ -130,11 +140,11 @@ export function DashboardSkeleton({ onBuscar, onAbrirMenu }: {
 
         {/* ⚠️ LA BANDA 2 VA SIN UNA SOLA PALABRA, Y ÉSE ES TODO EL PUNTO.
             Aquí se montaban `AtendidosCargando` y `DocumentosCargando`, que
-            escriben «Atendidos recientemente» y «Documentos»: dos rótulos que
-            SÓLO existen en la pantalla del médico. Este esqueleto se pinta
-            ANTES de saber el rol —`useProfile` aún no ha resuelto—, así que una
-            secretaria veía un fotograma con la palabra «Documentos», que es
-            justo lo que su rol no tiene.
+            escriben «Atendidos recientemente» y «Documentos recientes»: dos
+            rótulos que SÓLO existen en la pantalla del médico. Este esqueleto
+            se pinta ANTES de saber el rol —`useProfile` aún no ha resuelto—,
+            así que una secretaria veía un fotograma con la palabra
+            «Documentos», que es justo lo que su rol no tiene.
             Lo que se conserva es la GEOMETRÍA, que sí es común a las dos
             pantallas: dos columnas, el filete que cambia de lado con el tamaño,
             y el encabezado de 32 px. Lo que se retira es el texto.

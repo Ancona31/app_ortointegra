@@ -52,27 +52,45 @@ type Doc = {
   pacientes: { nombre: string; apellidos: string } | { nombre: string; apellidos: string }[] | null
 }
 
+/**
+ * El «+ Nuevo documento» de la cabecera de esta columna.
+ *
+ * ⚠️ SÓLO SE PINTA EN `lg`, Y NO ES UNA DEGRADACIÓN: en móvil las dos columnas
+ * de la banda se apilan y ésta cae al PIE de la página, a dos pantallas de la
+ * cabecera, que es donde viven las demás acciones de creación. Así que en móvil
+ * este botón no se esconde, se MUDA: hay uno gemelo a ancho completo en la
+ * cabecera del dashboard (`(app)/dashboard/page.tsx`, marcado `lg:hidden`), y
+ * los dos son el único par de la pantalla. Si tocas uno, mira el otro.
+ *
+ * El `lg:block` va en un envoltorio y no en el propio enlace a propósito:
+ * `.sp-btn` declara `display: inline-flex` con la misma especificidad que la
+ * utilidad `hidden`, así que quién gana lo decidiría el orden de la hoja. Con
+ * el envoltorio no hay pelea. En móvil el envoltorio queda en `display: none`,
+ * y un hijo así no participa del `flex` de la lista: no deja hueco suelto.
+ */
 function BotonNuevo() {
   return (
-    <Link
-      href="/documentos"
-      prefetch={false}
-      /* El relleno y la tinta salen de `.sp-btn--primary`; la geometría va en
-         `style`, que gana a la clase, porque `.sp-btn` impone 44 px de alto.
-         Mismo recurso que el resto del rediseño: es la única forma de que el
-         blanco sobre acento entre sin cablear un hex. */
-      className="sp-btn sp-btn--primary w-full"
-      style={{ minHeight: '44px', height: '44px', padding: '0 16px', borderRadius: 'var(--sp-r-btn)', fontSize: 'var(--sp-fs-body-sm)' }}
-    >
-      <FilePlus2 size={16} /> Nuevo documento
-    </Link>
+    <div className="hidden lg:block">
+      <Link
+        href="/documentos"
+        prefetch={false}
+        /* El relleno y la tinta salen de `.sp-btn--primary`; la geometría va en
+           `style`, que gana a la clase, porque `.sp-btn` impone 44 px de alto.
+           Mismo recurso que el resto del rediseño: es la única forma de que el
+           blanco sobre acento entre sin cablear un hex. */
+        className="sp-btn sp-btn--primary w-full"
+        style={{ minHeight: '44px', height: '44px', padding: '0 16px', borderRadius: 'var(--sp-r-btn)', fontSize: 'var(--sp-fs-body-sm)' }}
+      >
+        <FilePlus2 size={16} /> Nuevo documento
+      </Link>
+    </div>
   )
 }
 
 export function DocumentosCargando() {
   return (
     <div>
-      <EncabezadoColumna titulo="Documentos" />
+      <EncabezadoColumna titulo="Documentos recientes" />
       <div className="mt-[var(--sp-gap-tiles)] flex flex-col gap-[var(--sp-gap-tiles)]">
         <BotonNuevo />
         {[1, 2, 3].map(i => <div key={i} className="skeleton h-[62px] rounded-[14px]" />)}
@@ -126,7 +144,7 @@ export default function DocumentosRecientes() {
      tipo con el formulario dentro—, así que apuntarlo ahí mandaría al médico a
      crear uno nuevo cuando lo que pidió fue ver los que ya tiene. El listado por
      paciente vive dentro de su expediente. */
-  const encabezado = <EncabezadoColumna titulo="Documentos" />
+  const encabezado = <EncabezadoColumna titulo="Documentos recientes" />
 
   if (loadingProfile || cargando) return <DocumentosCargando />
 
