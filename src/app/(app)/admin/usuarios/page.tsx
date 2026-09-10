@@ -141,7 +141,7 @@ export default function AdminUsuariosPage() {
       {showForm && (
       <Portal>
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
-          <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-sm flex flex-col max-h-[90vh] animate-slide-up">
+          <div className="bg-[var(--sp-surface-glass)] backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-sm flex flex-col max-h-[90vh] animate-slide-up">
             <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-slate-100 flex-shrink-0">
               <h2 className="text-base font-semibold text-[#1d1d1f]">Nuevo usuario</h2>
               <button onClick={() => setShowForm(false)}
@@ -250,7 +250,7 @@ export default function AdminUsuariosPage() {
       {confirmDelete && (
       <Portal>
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
-          <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-xs overflow-hidden animate-slide-up">
+          <div className="bg-[var(--sp-surface-glass)] backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-xs overflow-hidden animate-slide-up">
             <div className="px-6 pt-6 pb-4 text-center">
               <div className="w-12 h-12 rounded-full mx-auto mb-3 flex items-center justify-center" style={{ backgroundColor: '#FEF2F2' }}>
                 <AlertTriangle size={22} style={{ color: '#EF5350' }} />

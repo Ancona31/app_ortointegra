@@ -231,38 +231,38 @@ function ExpedientePacienteContent() {
             ⚠️ EL 16 DE DISEÑO NO SE TOCA: se suma. Donde el sistema no se
             superpone, `env()` vale 0 y esto es el `p-4` de siempre. */}
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 max-sm:pb-[calc(1rem+env(safe-area-inset-bottom,0px))] bg-black/40 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-slide-up">
+          <div className="bg-[var(--sp-surface-glass)] backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-slide-up">
             {/* Icon + title */}
             <div className="px-6 pt-6 pb-4 text-center">
-              <div className="w-12 h-12 rounded-full mx-auto mb-3 flex items-center justify-center" style={{ backgroundColor: '#FEF2F2' }}>
-                <AlertTriangle size={22} style={{ color: '#EF5350' }} />
+              <div className="w-12 h-12 rounded-full mx-auto mb-3 flex items-center justify-center" style={{ backgroundColor: 'var(--sp-danger-bg)' }}>
+                <AlertTriangle size={22} style={{ color: 'var(--sp-danger)' }} />
               </div>
-              <h2 className="text-base font-semibold text-[#1d1d1f]">Eliminar expediente</h2>
-              <p className="text-sm text-[#86868b] mt-1">
+              <h2 className="text-base font-semibold text-[var(--sp-ink-800)]">Eliminar expediente</h2>
+              <p className="text-sm text-[var(--sp-ink-350)] mt-1">
                 {paciente?.nombre} {paciente?.apellidos}
               </p>
             </div>
 
             {/* Divider */}
-            <div className="border-t border-slate-100 mx-4" />
+            <div className="border-t border-[color:var(--sp-line-divider)] mx-4" />
 
             {/* Body */}
             <div className="px-6 py-4 text-center">
-              <p className="text-[13px] text-[#3d3d3f] leading-relaxed">
+              <p className="text-[13px] text-[var(--sp-ink-700)] leading-relaxed">
                 Se eliminarán <span className="font-semibold">permanentemente</span> todas las notas, laboratorios, documentos y datos personales del paciente.
               </p>
-              <p className="text-[12px] text-[#86868b] mt-2">Esta acción no se puede deshacer.</p>
+              <p className="text-[12px] text-[var(--sp-ink-350)] mt-2">Esta acción no se puede deshacer.</p>
               {errorEliminar && (
-                <p className="text-xs text-red-500 mt-3 bg-red-50 px-3 py-2 rounded-lg">{errorEliminar}</p>
+                <p className="text-xs text-[var(--sp-danger)] mt-3 bg-[var(--sp-danger-bg)] px-3 py-2 rounded-lg">{errorEliminar}</p>
               )}
             </div>
 
             {/* Buttons — macOS order: destructive on right */}
-            <div className="border-t border-slate-100 grid grid-cols-2">
+            <div className="border-t border-[color:var(--sp-line-divider)] grid grid-cols-2">
               <button
                 onClick={() => { setMostrarEliminarPaciente(false); setErrorEliminar('') }}
                 disabled={eliminandoPaciente}
-                className="px-4 py-3.5 text-sm font-medium text-[#1e5fa8] hover:bg-slate-50 transition-colors disabled:opacity-40 border-r border-slate-100"
+                className="px-4 py-3.5 text-sm font-medium text-[var(--sp-primary-text)] hover:bg-[var(--sp-surface-sunken)] transition-colors disabled:opacity-40 border-r border-[color:var(--sp-line-divider)]"
               >
                 Cancelar
               </button>
@@ -270,7 +270,7 @@ function ExpedientePacienteContent() {
                 onClick={eliminarPaciente}
                 disabled={eliminandoPaciente}
                 className="px-4 py-3.5 text-sm font-semibold transition-colors disabled:opacity-40 flex items-center justify-center gap-1.5"
-                style={{ color: '#EF5350' }}
+                style={{ color: 'var(--sp-danger)' }}
               >
                 {eliminandoPaciente
                   ? <><Loader2 size={14} className="animate-spin" /> Eliminando...</>

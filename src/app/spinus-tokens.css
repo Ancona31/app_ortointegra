@@ -255,6 +255,20 @@
   --sp-line-capture:       color-mix(in srgb, var(--cs, #1e5fa8) 20%, #fff);  /* borde de la Card Captura (protagonista) */
 
   --sp-surface:            #ffffff;  /* superficie de card y modal */
+  /* EL PANEL DE UN MODAL LEGACY — translúcido y con desenfoque detrás.
+     ⚠️ EXISTE PARA ESQUIVAR UN AGUJERO DE LA HOJA DE TRADUCCIÓN, y sin ese dato
+     no se entiende por qué hay dos tokens de superficie de modal. Estos paneles
+     se escribían `bg-white/95`, y la regla de `ThemeProvider` que repinta las
+     superficies en oscuro sólo casa con `.bg-white` EXACTO
+     (`layout/ThemeProvider.tsx:117`): la variante con opacidad se le escapaba,
+     así que una veintena de modales abrían en BLANCO sobre el tema oscuro.
+     ⚠️ ES TRANSLÚCIDO A PROPÓSITO. Lo fácil habría sido mandarlos a
+     `--sp-surface`, pero eso les quita el `backdrop-blur` —que sin fondo
+     translúcido no desenfoca nada— y les cambia el aspecto en tema CLARO, donde
+     hoy funcionan. El modal del sistema de diseño (`spinusGeometry`) sí es
+     opaco y usa `--sp-surface`: son dos lenguajes que conviven, y este token es
+     el del viejo. */
+  --sp-surface-glass:      rgba(255,255,255,.95);
   --sp-surface-sunken:     #fbfcfe;  /* fondo de input/textarea y card interna */
   --sp-surface-muted:      #eef2f7;  /* fondo de sección/chip neutro/nota al pie */
   --sp-surface-empty:      #f1f4f8;  /* fondo de ícono en estado vacío */
@@ -455,6 +469,7 @@ html.dark {
   /* — SUPERFICIES (elevación Material) — */
   --sp-app-bg:           #121212;              /* TP:110,114 */
   --sp-surface:          #1e1e1e;              /* TP:117  .bg-white (dp1) */
+  --sp-surface-glass:    rgba(30,30,30,.95);   /* = --sp-surface al 95 % */
   --sp-surface-sunken:   #242424;              /* TP:118,160  input/textarea */
   --sp-surface-muted:    #2c2c2c;              /* TP:119,169 (dp4) */
   --sp-surface-empty:    #242424;              /* TP:118 */
