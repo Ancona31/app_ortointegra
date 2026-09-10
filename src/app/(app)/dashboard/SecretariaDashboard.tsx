@@ -35,9 +35,9 @@ export default function SecretariaDashboard() {
 
       {/* Acción principal */}
       <Link href="/pacientes/nuevo"
-        className="flex items-center justify-between p-6 bg-white rounded-2xl border-2 border-[#1e5fa8] hover:bg-blue-50 transition-all group shadow-sm">
+        className="flex items-center justify-between p-6 bg-white rounded-2xl border-2 border-[color:var(--sp-primary)] hover:bg-blue-50 transition-all group shadow-sm">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-[#1e5fa8] rounded-xl flex items-center justify-center">
+          <div className="w-12 h-12 bg-[var(--sp-primary)] rounded-xl flex items-center justify-center">
             <UserPlus size={24} className="text-white" />
           </div>
           <div>
