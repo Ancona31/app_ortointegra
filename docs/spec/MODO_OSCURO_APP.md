@@ -190,8 +190,10 @@ contra `--cp` crudo, que es un salto, no un escalón. Con `oklch(… 0.50 c h)` 
 ### 3.5 El degradado de marca
 
 ```css
-:root      { --sp-brand-grad-from: var(--cp);                        --sp-brand-grad-to: var(--cs); }
-html.dark  { --sp-brand-grad-from: oklch(from var(--cp) 0.42 c h);   --sp-brand-grad-to: oklch(from var(--cs) 0.55 c h); }
+:root      { --sp-brand-grad-from: var(--cp);
+             --sp-brand-grad-to:   oklch(from var(--cs) min(l, 0.52) c h); }
+html.dark  { --sp-brand-grad-from: oklch(from var(--cp) 0.42 c h);
+             --sp-brand-grad-to:   oklch(from var(--cs) 0.55 c h); }
 ```
 
 Viste las cabeceras de card, los botones de recompensa y los medallones de icono. Existe
@@ -215,25 +217,40 @@ mueve para quien no ha cambiado su paleta.
 | Extremo oscuro `0.42` | 1.84 – 2.02 | 8.25 |
 | Extremo claro `0.55` | 3.03 – 3.63 | **4.59** |
 
-> ### ⚠️ EN CLARO, «VERDE MÉDICO» DEJA EL BLANCO EN 3.74:1
+> ### ⚠️ EL EXTREMO CLARO LLEVA TOPE, Y ES POR EL RÓTULO BLANCO
 >
-> El listón lo pone el **blanco encima**, no la separación contra la card: estos bloques
-> siempre llevan rótulo blanco. En oscuro el mínimo de las seis paletas es 4.59:1 y pasa. En
-> claro **no**: el extremo `--cs` de «Verde médico» (`#0d9488`) deja el blanco en **3.74:1**,
-> por debajo del 4.5 de AA. Le siguen «Rojo burdeos» 4.83 y «Café cálido» 5.02.
+> **El listón de estos bloques lo pone el blanco encima, no la separación contra la card:**
+> siempre llevan rótulo blanco. En oscuro la claridad ya está pinchada en `0.55` y el mínimo
+> de las seis paletas es 4.59:1, así que ahí no hace falta nada. En claro, con `--cs` a pelo,
+> el extremo de «Verde médico» (`#0d9488`) dejaba el blanco en **3.74:1**, por debajo de AA.
 >
-> No es un defecto de la traducción a oscuro: es el precio de que el degradado **siga a la
-> marca**. Antes estaba congelado en el azul de fábrica y el blanco daba 6.45:1 siempre, a
-> costa de pintar a todas las clínicas del color de otra.
+> El tope `min(l, 0.52)` lo resuelve: **el mínimo de las seis sube de 3.74 a 5.23:1.**
 >
-> **Queda abierto**, y hay dos salidas: aceptar el 3.74 y anotarlo, o acotar el extremo claro
-> con `oklch(from var(--cs) min(l, 0.52) c h)`. Ese tope está medido: **no toca a «Spinus» ni
-> a «Pizarra oscuro»** —sus `l` son 0.485 y 0.446, ya por debajo—, mueve las otras cuatro, y
-> el mínimo de las seis sube de **3.74 a 5.23**. El precio es que en claro cambia el color de
-> cuatro paletas, así que no es un retoque silencioso.
+> | Paleta | `--cs` | Blanco antes | Blanco con tope | ¿la toca? |
+> |---|---|---|---|---|
+> | Spinus (defecto) | `#1e5fa8` | 6.45 | **6.45** | no — su `l` es 0.485 |
+> | Pizarra oscuro | `#475569` | 7.58 | **7.58** | no — su `l` es 0.446 |
+> | Verde médico | `#0d9488` | **3.74** | **5.23** | sí |
+> | Rojo burdeos | `#dc2626` | 4.83 | **6.16** | sí |
+> | Café cálido | `#b45309` | 5.02 | **5.83** | sí |
+> | Morado | `#7c3aed` | 5.70 | **6.29** | sí |
 >
-> ⚠️ Si se aplica, hay que volver a medir **las seis**, no sólo la que falla: el tope actúa
-> sobre cualquier `--cs` más claro que él, incluidos los que hoy pasan de sobra.
+> **Con la marca de fábrica el tema claro no se mueve ni un píxel**, y no es una estimación:
+> el ida y vuelta por OKLCH devuelve `#1e5fa8` exacto. Cuatro paletas pierden un punto de
+> claridad y siguen siendo su color; a cambio el rótulo se lee en las seis. Un texto a 3.74:1
+> en una cabecera no se lee.
+>
+> ⚠️⚠️ **ES LA ÚNICA FÓRMULA DEL SISTEMA QUE HACE ARITMÉTICA SOBRE UN CANAL**, y eso rompe la
+> premisa de §7. Chromium anterior a la 121 resuelve la `l` de `oklch()` en escala 0-100 en
+> vez de 0-1, así que allí `min(l, 0.52)` da siempre `0.52` y las seis paletas quedan
+> pinchadas en esa claridad en vez de sólo las cuatro que lo necesitan. **Está medido y la
+> degradación es benigna:** el mínimo de blanco encima sigue siendo 5.23:1 —el fallo da MÁS
+> contraste, nunca menos— y lo único que cambia es que «Spinus» y «Pizarra» se aclaran un
+> punto. La ventana afectada es Chrome 119-120.
+>
+> ⚠️ **No copies este `min()` a otro token dando por hecho que es inocuo.** Aquí lo es porque
+> el peor caso mejora el contraste. En un token donde el fallo lo empeorase, habría que
+> resolverlo de otra forma.
 
 ---
 

@@ -58,6 +58,13 @@
      HEX QUE HABÍA. El cambio en claro sólo se ve en una clínica con paleta
      propia, que es justo lo que se venía a arreglar. */
   --sp-brand-grad-from:    var(--cp, #1a3a5c);
+  /* ⚠️ ESTE VALOR ES EL RESPALDO. El vigente lleva un TOPE DE CLARIDAD y vive en
+     el `@supports` de más abajo (§3.5 del spec): estos bloques llevan siempre
+     rótulo BLANCO, y con `--cs` a pelo el extremo claro de «Verde médico»
+     (#0d9488) dejaba el blanco en 3.74:1, por debajo de AA. El tope sube el
+     mínimo de las seis paletas a 5.23:1.
+     Un navegador sin sintaxis de color relativa se queda aquí, o sea con el
+     3.74 de antes: es el mismo trato que el resto de los tokens con fórmula. */
   --sp-brand-grad-to:      var(--cs, #1e5fa8);
 
   /* Marca / cromo de app */
@@ -784,9 +791,30 @@ html.dark {
     --sp-primary-active: oklch(from var(--cs, #1e5fa8) 0.43 c h);
 
     /* El degradado de marca, con las dos claridades ya establecidas: la del
-       cromo para el extremo oscuro y la del relleno para el claro. */
+       cromo para el extremo oscuro y la del relleno para el claro.
+       Aquí NO hace falta tope: la claridad ya está pinchada en 0.55 y el mínimo
+       de blanco encima de las seis paletas es 4.59:1. */
     --sp-brand-grad-from: oklch(from var(--cp, #1a3a5c) 0.42 c h);
     --sp-brand-grad-to:   oklch(from var(--cs, #1e5fa8) 0.55 c h);
+  }
+
+  /* EL TOPE DE CLARIDAD DEL EXTREMO CLARO, EN TEMA CLARO. Ver §3.5 del spec.
+     ⚠️ VA EN `:root` Y DENTRO DE ESTE MISMO `@supports`, y el orden respecto al
+     bloque `html.dark` de arriba da igual: `:root` pesa (0,1,0) y `html.dark`
+     (0,1,1), así que en oscuro gana aquél sin depender de quién va antes.
+     ⚠️ ES LA ÚNICA FÓRMULA DE TODO EL SISTEMA QUE HACE ARITMÉTICA SOBRE UN
+     CANAL, y eso tiene consecuencia. Chromium anterior a la 121 resolvía la `l`
+     de `oklch()` en escala 0-100 en vez de 0-1, así que allí `min(l, 0.52)` da
+     siempre 0.52 y las seis paletas quedan pinchadas en esa claridad en vez de
+     sólo las cuatro que lo necesitan. Es una degradación benigna y está medida:
+     el mínimo de blanco encima sigue siendo 5.23:1 —el fallo da MÁS contraste,
+     nunca menos— y lo único que cambia es el tono de «Spinus» y «Pizarra», que
+     se aclaran un punto. La ventana afectada es Chrome 119-120.
+     ⚠️ NO COPIES ESTE `min()` A OTRO TOKEN dando por hecho que es inocuo. Aquí
+     lo es porque el peor caso mejora el contraste; en un token donde el fallo
+     lo empeorara, habría que resolverlo de otra forma. */
+  :root {
+    --sp-brand-grad-to: oklch(from var(--cs, #1e5fa8) min(l, 0.52) c h);
   }
 }
 
