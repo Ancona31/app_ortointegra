@@ -117,7 +117,16 @@ export default function CarrilDocumentos({
 
   const visibles = filtro === 'todos' ? documentos : documentos.filter(d => d.tipo === filtro)
   const indice = visibles.findIndex(d => d.id === activoId)
-  const activo = indice >= 0 ? visibles[indice] : null
+  /* ⚠️ EL ABIERTO SE BUSCA EN LA LISTA COMPLETA CUANDO EL FILTRO LO EXCLUYE, y
+     no es un detalle: aquí decía `indice >= 0 ? visibles[indice] : null`, o sea
+     que al filtrar por un tipo distinto del documento abierto `activo` caía a
+     `null` y con él DESAPARECÍA EL CONTROL DE MÓVIL de abajo — que es la única
+     puerta a la lista y al selector de filtro, porque los dos viven dentro de
+     él. Camino real: abrir la lista, filtrar por otro tipo, «Volver al
+     documento», y quedarse sin forma de volver a abrirla.
+     El visor sigue enseñando ese documento —el filtro filtra la LISTA, no lo
+     que se está leyendo—, así que su control tiene que seguir ahí. */
+  const activo = indice >= 0 ? visibles[indice] : (documentos.find(d => d.id === activoId) ?? null)
 
   /* El selector presenta «Todos los tipos» más los ocho del catálogo EN SU
      ORDEN FIJO, cada uno con su conteo, y los conteos salen de lo cargado. */
@@ -182,7 +191,9 @@ export default function CarrilDocumentos({
         >
           <span className="min-w-0 flex-1">
             <span className="block text-[10.5px] font-bold uppercase tracking-[var(--sp-ls-label)] text-[var(--sp-ink-350)]">
-              Documento {indice + 1} de {visibles.length}
+              {/* Con el abierto fuera del filtro no hay posición que contar, y
+                  `indice + 1` habría escrito «Documento 0 de 87». */}
+              {indice >= 0 ? `Documento ${indice + 1} de ${visibles.length}` : 'Fuera del filtro actual'}
             </span>
             <span className="mt-[2px] flex items-center gap-[var(--sp-1-5)]">
               <ChipTipo tipo={activo.tipo} />

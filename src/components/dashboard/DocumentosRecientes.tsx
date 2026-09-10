@@ -187,7 +187,25 @@ export default function DocumentosRecientes({ onNuevoDocumento }: Props) {
           return (
             <Link
               key={doc.id}
-              href={doc.paciente_id ? `/expediente/${doc.paciente_id}` : '/documentos'}
+              /* ⚠️ LLEVA A ESTE DOCUMENTO, NO SOLO AL EXPEDIENTE. Aquí iba
+                 `/expediente/{id}` a secas, así que el expediente abría en
+                 Resumen y el médico tenía que cambiar de pestaña y luego buscar
+                 el documento entre las decenas que puede haber.
+                 Los dos parámetros ya existían y esta columna era la única que
+                 no los usaba: `tab` lo lee `expediente/[id]/page.tsx:47` y
+                 `documento` su línea 58, que lo pasa al panel como
+                 `documentoSolicitadoId`. Van en la URL —y no en un estado— para
+                 que recargar y el botón de atrás funcionen, que es el criterio
+                 de toda esta rama.
+                 ⚠️ EL PARÁMETRO SE LLAMA `documento` Y NO `doc`: `doc` ya
+                 significa otra cosa en `/expediente/[id]/documentos?doc=`, que
+                 es el borrador que retoma el FORMULARIO. Son dos pantallas
+                 distintas y conviene que no se parezcan.
+                 Sin `paciente_id` no hay expediente al que ir y se mantiene el
+                 destino de antes. */
+              href={doc.paciente_id
+                ? `/expediente/${doc.paciente_id}?tab=documentos&documento=${doc.id}`
+                : '/documentos'}
               /* Sin precarga: misma cuenta que los doce de la columna vecina. */
               prefetch={false}
               /* Cada documento SÍ es una tarjeta individual con borde sutil; la
