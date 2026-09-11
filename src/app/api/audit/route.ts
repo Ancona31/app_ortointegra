@@ -84,13 +84,38 @@ export async function POST(req: NextRequest) {
    * las haría fallar en silencio y perderíamos registros de acceso que hoy sí se
    * escriben. Ese desajuste es anterior y se anota aparte.
    */
+  /**
+   * ⚠️ TRES DESENLACES, NO DOS, Y LA DIFERENCIA ES LO QUE HACE QUE ESTE REGISTRO
+   * SIRVA DE PRUEBA. Aquí se descartaba el `error` de la consulta, así que
+   * `fila === null` significaba a la vez «no es tuya» y «no se pudo comprobar»
+   * —un segundo malo de red, una caída de Supabase— y los dos acababan en 404.
+   * El cliente se lo traga: es fire-and-forget. O sea que un PDF con datos
+   * clínicos podía salir de la app sin dejar la ÚNICA marca que iba a existir de
+   * esa salida, y sin que nadie se enterara.
+   *
+   * Para un `audit_log` exigible la completitud pesa tanto como la integridad,
+   * así que sólo se rechaza cuando consta que la fila NO es visible. Si la
+   * comprobación no pudo hacerse, se escribe igual y se dice en la descripción,
+   * que es una constancia honesta: quien audite ve el asiento y ve que su
+   * propiedad no se verificó.
+   */
+  let propiedadSinVerificar = false
   if (accion) {
-    const { data: fila } = await supabase
+    const { data: fila, error: errorFila } = await supabase
       .from(tabla as string)
       .select('id')
       .eq('id', registroId)
       .maybeSingle()
-    if (!fila) {
+
+    /* `22P02` es «invalid input syntax»: el `registroId` no es un uuid. No es un
+       fallo transitorio sino una petición mal formada, y no puede corresponder a
+       ningún registro real — se rechaza en vez de dejar basura. */
+    if ((errorFila as { code?: string } | null)?.code === '22P02') {
+      return NextResponse.json({ error: 'registroId inválido' }, { status: 400 })
+    }
+    if (errorFila) {
+      propiedadSinVerificar = true
+    } else if (!fila) {
       return NextResponse.json({ error: 'Registro no encontrado' }, { status: 404 })
     }
   }
@@ -103,7 +128,9 @@ export async function POST(req: NextRequest) {
       tabla,
       registroId,
       ip,
-      descripcion: DESCRIPCION[accion],
+      descripcion: propiedadSinVerificar
+        ? `${DESCRIPCION[accion]} · propiedad del registro NO verificada (fallo al comprobarla)`
+        : DESCRIPCION[accion],
     })
   } else {
     logAccess(user.id, tabla, registroId, ip)
