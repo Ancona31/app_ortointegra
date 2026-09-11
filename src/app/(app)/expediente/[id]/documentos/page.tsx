@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, Suspense } from 'react'
+import { useState, useEffect, useCallback, Suspense } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useAuditAccess } from '@/hooks/useAudit'
@@ -80,7 +80,19 @@ function DocumentosPacienteContent() {
      de una entrada durante el render, y hace falta porque `PageTransition`
      lleva `key={pathname}`: navegar de `?tipo=receta` a `?tipo=lab` NO
      remonta esta página, sólo cambia la query. Sin esto, el segundo enlace del
-     menú no haría nada. */
+     menú no haría nada.
+
+     ⚠️⚠️ Y EL ENLACE VIAJA EN LOS DOS SENTIDOS, QUE ES LO QUE AQUÍ FALTABA.
+     `?tipo=` se leía como estado pero NINGÚN cambio de `tab` volvía a
+     escribirlo, así que los dos se separaban en cuanto el médico hacía algo:
+     emitir y cerrar el modal dejaba `tab` en null con la url todavía diciendo
+     `?tipo=receta`. Y desde ahí el menú quedaba MUERTO — pulsar «Receta médica»
+     empujaba a la MISMA url, `tipoUrl` no cambiaba, la comparación de abajo no
+     disparaba y no pasaba nada. Dos recetas seguidas, que es el caso más
+     frecuente que hay.
+     La raíz no era la comparación: era tratar la url como fuente de verdad de
+     ida y no de vuelta. Ahora todo cambio de tipo pasa por `irATipo`, que
+     escribe las dos cosas, y url y pantalla no pueden discrepar. */
   const tipoUrl = tipoDeUrl(searchParams.get('tipo'))
   const [tab, setTab] = useState<TipoDocumento | null>(tipoUrl)
   const [tipoUrlPrevio, setTipoUrlPrevio] = useState(tipoUrl)
@@ -90,6 +102,26 @@ function DocumentosPacienteContent() {
        se descarta el formulario que el médico ya tiene abierto. */
     if (tipoUrl) setTab(tipoUrl)
   }
+
+  /**
+   * Cambia el tipo abierto Y lo refleja en la url. Único camino: la rejilla y el
+   * cierre del modal pasan los dos por aquí.
+   *
+   * ⚠️ `history.replaceState` Y NO `router.replace`, por lo mismo que la ficha
+   * del paciente (`expediente/[id]/page.tsx:38`): el cambio es puramente de
+   * cliente y `router.replace` pediría el árbol RSC de la ruta entera cada vez.
+   * Desde Next 14.1 el App Router observa `pushState`/`replaceState` nativos, así
+   * que `useSearchParams` se entera y la comparación de arriba ve el cambio.
+   * Y no añade entrada de historial: el botón de atrás sigue saliendo de la
+   * pantalla en vez de recorrer los ocho formatos que se hayan mirado.
+   */
+  const irATipo = useCallback((t: TipoDocumento | null) => {
+    setTab(t)
+    const url = new URL(window.location.href)
+    if (t) url.searchParams.set('tipo', t)
+    else url.searchParams.delete('tipo')
+    window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`)
+  }, [])
   // Los ocho reportan predicado: los siete del sistema de plantillas
   // —Receta, Laboratorio, Imagen, Suplementación, Escrito, Internamiento,
   // Consentimiento— más Honorarios.
@@ -136,18 +168,18 @@ function DocumentosPacienteContent() {
       <div className="sp-doc-host">
         <SelectorTipoDocumento
           value={tab}
-          onChange={t => { setFormVacio(true); setPanelPlantillas(false); setTab(t) }}
+          onChange={t => { setFormVacio(true); setPanelPlantillas(false); irATipo(t) }}
           conDatos={!formVacio}
           oculto={panelPlantillas}
         >
-          {tab === 'receta' && <RecetaForm pacienteInicial={nombreCompleto} diagnosticoInicial={diagnosticoInicial} pacienteId={id} onVacioChange={setFormVacio} onCerrarTrasEmitir={() => setTab(null)} onPanelPlantillasChange={setPanelPlantillas} />}
-          {tab === 'lab' && <SolicitudLabForm pacienteInicial={nombreCompleto} diagnosticoInicial={diagnosticoInicial} pacienteId={id} onVacioChange={setFormVacio} onCerrarTrasEmitir={() => setTab(null)} onPanelPlantillasChange={setPanelPlantillas} />}
-          {tab === 'imagen' && <SolicitudImagenForm pacienteInicial={nombreCompleto} diagnosticoInicial={diagnosticoInicial} pacienteId={id} onVacioChange={setFormVacio} onCerrarTrasEmitir={() => setTab(null)} onPanelPlantillasChange={setPanelPlantillas} />}
-          {tab === 'suplementacion' && <PlanSuplementacionForm pacienteInicial={nombreCompleto} diagnosticoInicial={diagnosticoInicial} pacienteId={id} onVacioChange={setFormVacio} onCerrarTrasEmitir={() => setTab(null)} onPanelPlantillasChange={setPanelPlantillas} />}
-          {tab === 'internamiento' && <SolicitudInternamientoForm pacienteInicial={nombreCompleto} diagnosticoInicial={diagnosticoInicial} pacienteId={id} onVacioChange={setFormVacio} onCerrarTrasEmitir={() => setTab(null)} onPanelPlantillasChange={setPanelPlantillas} />}
-          {tab === 'escrito' && <EscritoMedicoForm pacienteInicial={nombreCompleto} pacienteId={id} onVacioChange={setFormVacio} onCerrarTrasEmitir={() => setTab(null)} onPanelPlantillasChange={setPanelPlantillas} />}
-          {tab === 'consentimiento' && <ConsentimientoInformadoForm pacienteInicial={nombreCompleto} diagnosticoInicial={diagnosticoInicial} edadInicial={edadInicial} pacienteId={id} borradorId={borradorId} onVacioChange={setFormVacio} onCerrarTrasEmitir={() => setTab(null)} onPanelPlantillasChange={setPanelPlantillas} />}
-          {tab === 'honorarios' && <NotaHonorariosForm pacienteInicial={nombreCompleto} pacienteId={id} onVacioChange={setFormVacio} onCerrarTrasEmitir={() => setTab(null)} onPanelPlantillasChange={setPanelPlantillas} />}
+          {tab === 'receta' && <RecetaForm pacienteInicial={nombreCompleto} diagnosticoInicial={diagnosticoInicial} pacienteId={id} onVacioChange={setFormVacio} onCerrarTrasEmitir={() => irATipo(null)} onPanelPlantillasChange={setPanelPlantillas} />}
+          {tab === 'lab' && <SolicitudLabForm pacienteInicial={nombreCompleto} diagnosticoInicial={diagnosticoInicial} pacienteId={id} onVacioChange={setFormVacio} onCerrarTrasEmitir={() => irATipo(null)} onPanelPlantillasChange={setPanelPlantillas} />}
+          {tab === 'imagen' && <SolicitudImagenForm pacienteInicial={nombreCompleto} diagnosticoInicial={diagnosticoInicial} pacienteId={id} onVacioChange={setFormVacio} onCerrarTrasEmitir={() => irATipo(null)} onPanelPlantillasChange={setPanelPlantillas} />}
+          {tab === 'suplementacion' && <PlanSuplementacionForm pacienteInicial={nombreCompleto} diagnosticoInicial={diagnosticoInicial} pacienteId={id} onVacioChange={setFormVacio} onCerrarTrasEmitir={() => irATipo(null)} onPanelPlantillasChange={setPanelPlantillas} />}
+          {tab === 'internamiento' && <SolicitudInternamientoForm pacienteInicial={nombreCompleto} diagnosticoInicial={diagnosticoInicial} pacienteId={id} onVacioChange={setFormVacio} onCerrarTrasEmitir={() => irATipo(null)} onPanelPlantillasChange={setPanelPlantillas} />}
+          {tab === 'escrito' && <EscritoMedicoForm pacienteInicial={nombreCompleto} pacienteId={id} onVacioChange={setFormVacio} onCerrarTrasEmitir={() => irATipo(null)} onPanelPlantillasChange={setPanelPlantillas} />}
+          {tab === 'consentimiento' && <ConsentimientoInformadoForm pacienteInicial={nombreCompleto} diagnosticoInicial={diagnosticoInicial} edadInicial={edadInicial} pacienteId={id} borradorId={borradorId} onVacioChange={setFormVacio} onCerrarTrasEmitir={() => irATipo(null)} onPanelPlantillasChange={setPanelPlantillas} />}
+          {tab === 'honorarios' && <NotaHonorariosForm pacienteInicial={nombreCompleto} pacienteId={id} onVacioChange={setFormVacio} onCerrarTrasEmitir={() => irATipo(null)} onPanelPlantillasChange={setPanelPlantillas} />}
         </SelectorTipoDocumento>
       </div>
     </div>

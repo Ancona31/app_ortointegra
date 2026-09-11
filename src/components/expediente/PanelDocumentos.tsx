@@ -423,7 +423,19 @@ export default function PanelDocumentos({
               compartir: {
                 onClick: puedeCompartir ? () => compartir() : null,
                 bloqueo: bloqueoCompartir,
-                ocupada: preparandoCompartir,
+                /* ⚠️ LA VENTANA DE FIRMA CUENTA COMO «OCUPADA», Y AQUÍ NO
+                   CONTABA. `bloqueoCompartir` cubría «sin archivo» y «firma
+                   fallida», pero no el segundo que tarda la firma en resolver:
+                   ahí el botón quedaba VIVO, `prepararCompartir` salía por su
+                   guarda de url y `compartir()` se iba sin hacer nada. Ni
+                   descarga, ni spinner —`preparandoCompartir` seguía en
+                   falso—, ni aviso. El médico tocaba y no pasaba nada.
+                   Va como `ocupada` y no como `bloqueo` a propósito: es
+                   transitorio y se resuelve solo, así que corresponde el
+                   spinner del control y no una línea de motivo en el pie, que
+                   aparecería y desaparecería sola. Mismo criterio que el botón
+                   de descarga con su estado «preparando». */
+                ocupada: preparandoCompartir || (hayArchivo && estadoFirma === 'preparando'),
                 onPreparar: prepararCompartir,
               },
               enviar: { onClick: () => void enviar(), bloqueo: bloqueoEnviar, ocupada: enviando },
