@@ -15,6 +15,16 @@
  * funciones que leen y escriben SU estado plantillable. El nombre de la
  * plantilla NUNCA entra ahí: es etiqueta privada del médico y no viaja al
  * formato.
+ *
+ * ⚠️ DOS PREGUNTAS, NO UNA. `vacio` responde «¿hay algo escrito en el
+ * formulario?» y gobierna «Vaciar formulario». Guardar y Sobrescribir responden
+ * a otra —«¿hay algo escrito que la plantilla vaya a guardar?»— y la calcula
+ * este hook con `leer()`, no el formulario. La diferencia es el defecto que se
+ * corrigió: el médico llenaba campos NO plantillables —los testigos y las
+ * autorizaciones del consentimiento, el seguro de honorarios—, `vacio` se
+ * apagaba, el botón se encendía, y la fila iba a la base con el contenido vacío
+ * mientras el toast decía «Plantilla guardada». Ver `PROPUESTA_DISENO_DOCUMENTOS.md`
+ * §1.d, que declara la enmienda.
  */
 
 import {
@@ -55,7 +65,14 @@ const OPCION_VACIAR = '__vaciar__'
 
 export interface OpcionesPlantillas {
   tipo: TipoPlantilla
-  /** Predicado único de «formulario vacío» del formulario. Sin segunda versión. */
+  /**
+   * «¿Hay algo escrito en el formulario?». Sin segunda versión: es el mismo
+   * predicado que el host usa para su aviso de «se perderá lo escrito».
+   *
+   * Gobierna «Vaciar formulario» y NADA MÁS. Guardar y Sobrescribir NO lo
+   * miran: preguntan por el contenido plantillable, que sale de `leer()` y se
+   * calcula aquí dentro. Ver el docblock de cabecera.
+   */
   vacio: boolean
   /** Estado plantillable del formulario, con `_v` en la raíz. */
   leer: () => ContenidoPlantilla
@@ -111,6 +128,30 @@ export function usePlantillasDocumento(op: OpcionesPlantillas): PiezasPlantillas
   const scrollRef = useRef<{ el: HTMLElement; top: number } | null>(null)
   /** Huella del formulario en el momento de aplicar. Retira el aviso al editar. */
   const huellaRef = useRef<string | null>(null)
+  /**
+   * Huella de `leer()` con el formulario VACÍO, o sea el contenido que una
+   * plantilla de este formato no debería guardar nunca.
+   *
+   * No se puede calcular: el único modo de obtenerlo sería aplicar
+   * `CONTENIDO_VACIO` y leer, y eso borraría lo que el médico está escribiendo.
+   * Se OBSERVA: mientras el formulario se declara vacío, lo que `leer()`
+   * devuelve ES ese contenido, por construcción de los ocho predicados —todos
+   * exigen que las claves plantillables estén en su valor inicial—. La huella
+   * se refresca en cada render vacío, y eso cubre el estado que aún no está
+   * listo en el primer render (el editor de Escrito Médico nace `null` y
+   * `leer()` devuelve `doc: null` hasta que TipTap lo monta).
+   *
+   * La primera huella se toma pase lo que pase, aunque el formulario nazca con
+   * contenido —retomar un borrador—: sin ella, `conContenido` se quedaría en
+   * false y apagaría Guardar para siempre.
+   */
+  const huellaVaciaRef = useRef<string | null>(null)
+  /**
+   * «¿Hay algo escrito que la plantilla vaya a guardar?». Es estado y no un
+   * valor de render porque su respuesta vive entre renders, en la huella de
+   * arriba; escribir un ref durante el render sería mentirle al compilador.
+   */
+  const [conContenido, setConContenido] = useState(false)
 
   const cargar = useCallback(async (): Promise<void> => {
     if (desactivado) return
@@ -131,14 +172,25 @@ export function usePlantillasDocumento(op: OpcionesPlantillas): PiezasPlantillas
   useEffect(() => { void cargar() }, [cargar])
 
   // Sin lista de dependencias a propósito: corre tras CADA render, que es
-  // exactamente la granularidad del criterio —«al primer cambio manual en
-  // cualquier campo»—. Comparar la huella evita cablear el aviso a los treinta
-  // manejadores de cambio del formulario. No encadena actualizaciones: el único
-  // setState que hace apaga la condición que lo dispara.
+  // exactamente la granularidad de los dos criterios que vigila —«al primer
+  // cambio manual en cualquier campo» para el aviso, y «¿lo de ahora sigue
+  // siendo el vacío?» para el gateo—. Comparar huellas evita cablear las dos
+  // cosas a los treinta manejadores de cambio del formulario. No encadena
+  // actualizaciones: los dos setState que hace apagan la condición que los
+  // dispara, y `setConContenido` con el mismo valor ni siquiera re-renderiza.
+  //
+  // `leer()` se llama una vez y la huella se reparte: en Escrito Médico eso es
+  // un `editor.getJSON()`, y llamarlo dos veces por render no lo vale.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (!aviso) return
+    // En el búnker no se monta nada de esto, y `leer()` no es gratis.
+    if (desactivado) return
     const huella = JSON.stringify(leer())
+
+    if (vacio || huellaVaciaRef.current === null) huellaVaciaRef.current = huella
+    setConContenido(huella !== huellaVaciaRef.current)
+
+    if (!aviso) return
     if (huellaRef.current === null) { huellaRef.current = huella; return }
     if (huellaRef.current !== huella) setAviso(null)
   })
@@ -203,7 +255,13 @@ export function usePlantillasDocumento(op: OpcionesPlantillas): PiezasPlantillas
   }
 
   const etiqueta = ETIQUETA_TIPO[tipo]
-  const vacioParaGuardar = desactivado || errorCarga || vacio
+  /**
+   * Lo que apaga Guardar y Sobrescribir. NO es `vacio`: ver el docblock de
+   * cabecera. El error de carga entra porque sin lista no se sabe si la número
+   * once cabe, y `desactivado` porque en el búnker no hay ni sesión.
+   */
+  const sinContenido = !conContenido
+  const guardarApagado = desactivado || errorCarga || sinContenido
 
   return {
     panelAbierto,
@@ -229,8 +287,10 @@ export function usePlantillasDocumento(op: OpcionesPlantillas): PiezasPlantillas
           origenRef.current = e.currentTarget
           setDialogo(lista.length >= TOPE_PLANTILLAS ? 'tope' : 'guardar')
         }}
-        disabled={vacioParaGuardar}
-        title={vacio ? 'Llena el formulario para poder guardarlo como plantilla.' : undefined}
+        disabled={guardarApagado}
+        title={sinContenido && !desactivado && !errorCarga
+          ? 'Llena algún campo de los que la plantilla guarda para poder guardarla.'
+          : undefined}
         /* ⚠️ EL REPARTO SALIÓ DEL `style` INLINE A `.sp-tpl-guardar`, Y NO ES
            COSMÉTICA: un estilo en línea gana a CUALQUIER hoja, así que con
            `flex: 0 0 auto` escrito aquí la barra del consentimiento no podía
@@ -255,7 +315,7 @@ export function usePlantillasDocumento(op: OpcionesPlantillas): PiezasPlantillas
         lista={lista}
         cargando={cargando}
         errorCarga={errorCarga}
-        vacio={vacio}
+        sinContenido={sinContenido}
         leer={leer}
         onRecargar={cargar}
         onVolver={() => setPanelAbierto(false)}
@@ -505,7 +565,8 @@ interface PropsPanel {
   lista: PlantillaDocumento[]
   cargando: boolean
   errorCarga: boolean
-  vacio: boolean
+  /** Apaga Sobrescribir: no es «formulario vacío», es «plantilla vacía» (§1.d). */
+  sinContenido: boolean
   leer: () => ContenidoPlantilla
   onRecargar: () => Promise<void>
   onVolver: () => void
@@ -605,9 +666,9 @@ function PanelPlantillas(p: PropsPanel) {
 
       {/* Global y no por fila: con diez filas apagadas, diez tooltips dicen lo
           mismo diez veces. */}
-      {p.vacio && n > 0 && !p.cargando && (
+      {p.sinContenido && n > 0 && !p.cargando && (
         <p className="sp-banner sp-banner--info" style={{ marginBottom: 'var(--sp-2-5)' }}>
-          El formulario está vacío: no hay nada con lo que sobrescribir.
+          El formulario no tiene nada que una plantilla guarde: no hay con qué sobrescribir.
         </p>
       )}
 
@@ -642,7 +703,7 @@ function PanelPlantillas(p: PropsPanel) {
               <FilaPlantilla
                 plantilla={t}
                 ocupada={ocupada === t.id}
-                sobrescribirApagado={p.vacio}
+                sobrescribirApagado={p.sinContenido}
                 editando={editando?.id === t.id ? editando.valor : null}
                 duplicado={editando?.id === t.id && colisionDeNombre(p.lista, editando.valor, t.id) !== null}
                 onEditar={valor => setEditando({ id: t.id, valor })}

@@ -133,7 +133,8 @@ exclusiones, idéntica en los 8 y aplicada por una lista de claves, no por omisi
 
 **Excluir siempre:** `paciente`, `pacienteId`, `diagnostico`, `diagnosticoPrincipal`,
 `diagnosticosSecundarios`, `edad`, `expediente`, `sexo`, `fecha`, `folio`, `peso`,
-`idPaciente`, `familiar`, `idFamiliar`, `representante`, `idRepresentante`.
+`idPaciente`, `familiar`, `idFamiliar`, `representante`, `idRepresentante`, `seguro`
+(con su número de póliza), `autorizaTransfusion`, `usoFotos`.
 
 | tipo_documento | Se guarda |
 |---|---|
@@ -141,10 +142,10 @@ exclusiones, idéntica en los 8 y aplicada por una lista de claves, no por omisi
 | `laboratorio` | `estudios[]`, `notas` |
 | `imagen` | `estudios[]` (tipo, región, proyecciones, indicación), `urgente` |
 | `suplementacion` | `seleccionados[]`, `dosisPersonalizada{}`, `justificacion{}`, `notas`, `citaControl` |
-| `honorarios` | `tipoDoc`, `seguro{}`, `conceptos[]`, `formaPago`, `divisa`, `notas` |
+| `honorarios` | `tipoDoc`, `lineas[]` (concepto, origen, precio), `formaPago`, `divisa`, `vigenciaDias`, `notas` |
 | `internamiento` | `tipoIngreso`, `dias`, `asa`, `hospital`, `urgente`, `procedimiento`, `requerimientos[]`, `justificacion`, `instruccionesPaciente`, `indicacionesPiso` |
 | `escrito` | `asunto`, `cuerpo` (HTML de TipTap) |
-| `consentimiento` | `lugar`, `procedimiento`, `anestesiologo`, `testigo1`, `testigo2`, `autorizaTransfusion`, `usoFotos`, `hojaDenegacion`, las 7 secciones |
+| `consentimiento` | `lugar`, `procedimiento`, `testigo1`, `testigo2`, las 7 secciones |
 
 **Decisiones dentro de esa lista, declaradas:**
 
@@ -153,9 +154,35 @@ exclusiones, idéntica en los 8 y aplicada por una lista de claves, no por omisi
 - **`hospital` (internamiento) SÍ se guarda.** Es del médico, no del paciente. Es el
   campo con más valor plantillable del formulario.
 - **`peso` se excluye.** Es del paciente aunque lo teclee el médico.
-- **`autorizaTransfusion` SÍ se guarda** aunque sea una decisión del paciente: es la
-  postura por defecto del procedimiento, y el médico la revisa siempre (C-05 la vuelve
-  obligatoria, §3.A.6).
+- **`seguro{}` (honorarios) NO se guarda. ENMIENDA:** la tabla lo mandaba y el código no
+  lo hace, y el código tiene razón. El bloque de seguro lleva el **número de póliza**, que
+  es dato del paciente aunque lo teclee el médico y aunque viaje junto a la aseguradora.
+  Cae por la misma regla que `peso`. Lo plantillable de una cotización con seguro es lo
+  que ya se guarda —tipo, conceptos con su origen, divisa, forma de pago y vigencia—.
+
+- **`autorizaTransfusion` y `autorizaFotos` (consentimiento) NO se guardan. ENMIENDA:**
+  la lista de arriba mandaba guardar la primera, y es un error del que conviene dejar
+  escrito el porqué, porque la petición de meterlas vuelve. **Son decisiones del paciente,
+  no posturas por defecto del procedimiento:** una plantilla que llegue con «Sí autoriza
+  transfusión» marcado haría que un documento legal afirmara algo que el paciente no dijo,
+  y el médico que imprime sin repasar esa fila ni se entera. Que la transfusión sea
+  obligatoria para emitir (C-05) no lo arregla: la validación comprueba que HAY respuesta,
+  no que sea la del paciente. La misma razón deja fuera `usoFotos`.
+
+- **`testigo1` y `testigo2` (consentimiento) SÍ se guardan. ENMIENDA:** estuvieron fuera
+  por simetría con las autorizaciones, y la simetría era falsa. Los testigos no deciden
+  nada: son personal de la clínica, casi siempre el mismo par, y teclearlos en cada
+  consentimiento es exactamente el trabajo repetido que la plantilla existe para quitar.
+  Son el campo más reutilizable de los que quedaban fuera. **`familiar` sigue fuera**, que
+  ese sí es del paciente.
+
+- **`anestesiologo` y `hojaDenegacion` no existen.** Se retiran de la tabla: el primero
+  nunca llegó a ser un campo del formulario, y la denegación dejó de ser una casilla del
+  consentimiento para ser un documento propio, elegido en `tipoDoc`. **`tipoDoc` tampoco
+  viaja en el contenido del consentimiento** —al revés que en honorarios, donde una
+  plantilla de cotización lo es entera—: las dos variantes comparten lo único plantillable
+  que hay, así que el tipo se queda como lo que es, la decisión de qué documento se está
+  emitiendo ahora. Consecuencia declarada: **no existen plantillas de denegación.**
 - **`escrito.cuerpo` guarda HTML**, no texto plano. Sanitizar al aplicar con el mismo
   sanitizador que ya usa TipTap al pegar. **NO DEFINIDO:** cuál es. Falta: nombre del
   sanitizador en uso en `EscritoMedicoForm`.
@@ -307,8 +334,9 @@ XS:        [ ═══ Imprimir Receta ═════════════�
 Orden en XS: **el primario arriba**. Es el gesto de cada consulta; el otro es ocasional.
 
 Estado del botón secundario:
-- **Deshabilitado** si el formulario está vacío según §1.d (misma condición exacta que
-  "Sobrescribir" del panel). `title` / `aria-describedby`: `Llena el formulario para poder guardarlo como plantilla.`
+- **Deshabilitado** si no hay contenido que la plantilla vaya a guardar —la **pregunta 2**
+  de §1.d, no «¿está vacío el formulario?»— (misma condición exacta que "Sobrescribir" del
+  panel). `title` / `aria-describedby`: `Llena algún campo de los que la plantilla guarda para poder guardarla.`
 - **Habilitado** en cualquier otro caso, **incluso con 10 plantillas.** Con 10 no se
   bloquea: se pulsa y aparece el diálogo de tope (abajo). Un botón gris sin explicación
   es el defecto G-05, no la solución.
@@ -442,13 +470,14 @@ de acción secundaria (✕, editar, borrar)".
 alto con **icono + etiqueta** (12px, `--sp-ink-500`): `Renombrar` · `Sobrescribir` ·
 `Eliminar`. Con 326px de ancho útil caben (≈98px por celda).
 
-### Sobrescribir — apagado cuando el formulario está vacío
+### Sobrescribir — apagado cuando no hay contenido que guardar
 
-Condición idéntica a la de §1.b (definida en §1.d). Cuando está apagada:
+Condición idéntica a la de §1.b, y es la **pregunta 2** de §1.d —«¿hay algo escrito que la
+plantilla vaya a guardar?»—, no «¿está vacío el formulario?». Cuando está apagada:
 
 - `opacity: .4`, `cursor: not-allowed`, `disabled`, sin hover.
 - Encima de la lista, **una sola vez**, no por fila, un `.sp-banner--info`:
-  `El formulario está vacío: no hay nada con lo que sobrescribir.`
+  `El formulario no tiene nada que una plantilla guarde: no hay con qué sobrescribir.`
 - Esta es la razón de que la banda de aviso sea global y no un tooltip por fila: con 10
   filas apagadas, 10 tooltips dicen lo mismo 10 veces.
 
@@ -504,9 +533,44 @@ fila, y editarla en su sitio conserva el contexto de la lista.
 
 ## 1.d · Definición de "formulario vacío"
 
-Un solo predicado, `esFormularioVacio()`, usado por **tres** consumidores: el botón de
-§1.b, la acción Sobrescribir de §1.c, y nada más. Definirlo dos veces es garantizar que
-diverjan.
+> ### ⚠️ ENMIENDA — SON DOS PREGUNTAS, NO UNA
+>
+> Esta sección definía **un** predicado para **todos** sus consumidores. La regla era
+> buena mientras todos preguntaran lo mismo, y resultó que no. Hay dos preguntas:
+>
+> 1. **«¿Hay algo escrito en el formulario?»** — la de abajo, `isFormEmpty()`. La
+>    contesta cada formulario, mira **todo** su estado, y gobierna **«Vaciar formulario»**
+>    (§1.a) y el aviso de «se perderá lo escrito» del selector de tipo del host.
+> 2. **«¿Hay algo escrito que la plantilla vaya a guardar?»** — la contesta el hook
+>    `usePlantillasDocumento` comparando `leer()` contra el contenido del formulario
+>    vacío, y gobierna **«Guardar como plantilla»** (§1.b) y **Sobrescribir** (§1.c),
+>    incluido el banner global que apaga la lista entera.
+>
+> **Por qué no pueden ser la misma.** El contenido de la plantilla es un
+> **subconjunto** del estado del formulario: §1.0.2 deja fuera los datos del paciente y,
+> en el consentimiento, también las dos autorizaciones. Un formulario donde solo se han
+> llenado campos excluidos —los testigos y el familiar antes de esta enmienda, el seguro
+> de honorarios— **no está vacío y su plantilla sí lo está**. Con un predicado único el
+> botón se encendía, se guardaba, y la fila iba a la base con el contenido vacío mientras
+> el toast decía «Plantilla guardada». Ese era el defecto.
+>
+> **Cómo se obtiene el vacío sin borrar nada.** No se calcula: el único modo sería
+> aplicar `CONTENIDO_VACIO` y leer, y eso pisaría lo que el médico escribe. Se **observa**:
+> mientras el formulario se declara vacío por la pregunta 1, lo que `leer()` devuelve ES
+> el contenido vacío de ese formato, por construcción del predicado —exige que las claves
+> plantillables estén en su valor inicial—. El hook guarda esa huella y la refresca en
+> cada render vacío. La primera se toma pase lo que pase, para que un formulario que nace
+> con contenido —un borrador retomado— no deje Guardar apagado para siempre.
+>
+> **Consecuencia declarada, y es la buscada:** «Vaciar formulario» puede estar encendido
+> con Guardar apagado. Es correcto: hay algo que vaciar —campos de paciente— y no hay
+> nada que guardar.
+>
+> Lo que sigue define la pregunta 1. La 2 no se escribe por formulario: vive entera en
+> el hook y ninguno de los ocho la implementa.
+
+Un solo predicado, `esFormularioVacio()`, para el consumidor que pregunta por el
+formulario entero. Definirlo dos veces es garantizar que diverjan.
 
 **Ya existe una versión de esto:** `isFormEmpty(lineas, paciente, notas, pacienteInicial)`
 en `NotaHonorariosForm.tsx:57-66`. Lo que sigue la generaliza a los 8; no se escribe desde

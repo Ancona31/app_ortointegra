@@ -359,6 +359,23 @@ export default function ConsentimientoInformadoForm({
   const [familiar, setFamiliar]           = useState('')
   const [testigo1, setTestigo1]           = useState('')
   const [testigo2, setTestigo2]           = useState('')
+  /**
+   * «Las siete secciones que hay ahora llegaron de una plantilla, no de este
+   * teclado». Existe solo para la franja de conservado de la denegación: allí
+   * las secciones NO se pintan, así que sin esto la franja acusaba al médico de
+   * haber editado textos que no ha visto nunca.
+   *
+   * No hay plantillas de denegación —`tipoDoc` no viaja en el contenido—, pero
+   * una plantilla de consentimiento sí se puede aplicar estando en denegación,
+   * y es justo el caso que lo dispara.
+   *
+   * Límite conocido y aceptado: «Deshacer» del selector vuelve a pasar por
+   * `aplicar`, así que deshacer sobre secciones tecleadas las deja marcadas como
+   * venidas de plantilla. Afecta al rótulo de una franja informativa y a nada
+   * más; distinguirlo exigiría un segundo argumento en `aplicar` y tocar los ocho
+   * formularios.
+   */
+  const [seccionesDePlantilla, setSeccionesDePlantilla] = useState(false)
   const [autorizaTransfusion, setAutorizaTransfusion] = useState<'si' | 'no' | null>(null)
   const [autorizaFotos, setAutorizaFotos] = useState(false)
   /**
@@ -444,13 +461,21 @@ export default function ConsentimientoInformadoForm({
   // ── Plantillas (spec 02) ────────────────────────────────────────
   // Se guarda TODO menos los datos del paciente, y aquí eso deja fuera más de lo
   // habitual: además de paciente, edad, diagnóstico y fecha, quedan fuera el
-  // familiar, los dos testigos y LAS DOS AUTORIZACIONES. Las autorizaciones no
-  // se omiten por descuido ni por simetría: son decisiones del paciente (§2), y
-  // una plantilla que llegue con «Sí autoriza transfusión» marcado afirmaría en
-  // un documento legal algo que el paciente no dijo.
+  // familiar y LAS DOS AUTORIZACIONES.
+  //
+  // ⚠️ LAS AUTORIZACIONES NO SE OMITEN POR DESCUIDO NI POR SIMETRÍA: son
+  // decisiones del paciente (§2), y una plantilla que llegue con «Sí autoriza
+  // transfusión» marcado afirmaría en un documento legal algo que el paciente no
+  // dijo. Ese es el motivo entero, y no se ha movido: si alguna vez se propone
+  // meterlas «para que la plantilla quede completa», esta es la respuesta.
+  //
+  // LOS DOS TESTIGOS SÍ ENTRAN, y ahí sí cambió el criterio. No son una decisión
+  // del paciente: son personal de la clínica, casi siempre el mismo, y teclearlos
+  // en cada consentimiento es exactamente el trabajo repetido que una plantilla
+  // existe para quitar. El familiar se queda fuera porque es del paciente.
   //
   // Consecuencia buscada: ni aplicar una plantilla ni «Vaciar formulario» tocan
-  // ninguno de esos siete. Es exactamente lo que promete el aviso del selector
+  // el familiar ni las autorizaciones. Es lo que promete el aviso del selector
   // —«los datos del paciente no cambiaron»—, y hace que Deshacer los devuelva
   // intactos porque nunca se movieron.
   const plantillas = usePlantillasDocumento({
@@ -466,7 +491,7 @@ export default function ConsentimientoInformadoForm({
     // misma plantilla con las secciones sin usar, así que el tipo se queda como
     // lo que es: la decisión de qué documento estoy emitiendo ahora.
     leer: () => ({
-      _v: 1, lugar, procedimiento,
+      _v: 1, lugar, procedimiento, testigo1, testigo2,
       secciones: { ...secciones },
     }),
     aplicar: (c: ContenidoPlantilla) => {
@@ -477,10 +502,13 @@ export default function ConsentimientoInformadoForm({
       // inicial.
       setLugar(typeof c.lugar === 'string' ? c.lugar : '')
       setProcedimiento(typeof c.procedimiento === 'string' ? c.procedimiento : '')
+      setTestigo1(typeof c.testigo1 === 'string' ? c.testigo1 : '')
+      setTestigo2(typeof c.testigo2 === 'string' ? c.testigo2 : '')
       // Las plantillas guardadas antes de este pase traen `imprimirDenegacion`.
       // La clave se ignora y no rompe nada: la casilla que la escribía ya no
       // existe, y la denegación es ahora un documento propio.
       setSecciones(leerSecciones(c.secciones))
+      setSeccionesDePlantilla(true)
     },
   })
 
@@ -493,6 +521,9 @@ export default function ConsentimientoInformadoForm({
 
   function updateSeccion(key: SeccionKey, val: string): void {
     setSecciones(s => ({ ...s, [key]: val }))
+    // Único sitio donde una sección se escribe a mano. A partir de aquí lo que
+    // haya en ellas ya es del médico, lo hubiera traído o no una plantilla.
+    setSeccionesDePlantilla(false)
   }
 
   // ── Borrador · carga (§9.2) ─────────────────────────────────────
@@ -517,6 +548,8 @@ export default function ConsentimientoInformadoForm({
     setAutorizaFotos(c.autorizaFotos === true)
     setPacienteNoPuedeFirmar(c.pacienteNoPuedeFirmar === true)
     setSecciones(leerSecciones(c.secciones))
+    // Un borrador es lo que este médico dejó escrito, no una plantilla.
+    setSeccionesDePlantilla(false)
     setBorradorId(fila.id)
     setBorradorFecha(fila.created_at)
     setBorradorPrevio(null)
@@ -633,7 +666,13 @@ export default function ConsentimientoInformadoForm({
   if (esDenegacion) {
     const editadas = SECCIONES_ORDEN.filter(k => secciones[k] !== SECCIONES_DEFAULT[k]).length
     if (editadas > 0) {
-      conservado.push(editadas === 1 ? '1 sección clínica editada' : `${editadas} secciones clínicas editadas`)
+      // De dónde salieron, y no solo cuántas son: en denegación las siete no se
+      // pintan, así que «editadas» a secas le atribuye al médico un texto que ni
+      // ve ni ha escrito cuando lo trajo una plantilla.
+      const cuantas = editadas === 1 ? '1 sección clínica' : `${editadas} secciones clínicas`
+      conservado.push(seccionesDePlantilla
+        ? `${cuantas} de una plantilla aplicada`
+        : `${cuantas} editada${editadas === 1 ? '' : 's'}`)
     }
     if (autorizaTransfusion !== null) {
       conservado.push(`transfusión (${autorizaTransfusion === 'si' ? 'Sí' : 'No'})`)
