@@ -70,6 +70,19 @@ interface Props {
    * El modal de «documento generado» se cerró — o sea, el documento ya salió y
    * el médico terminó con él.
    *
+   * ⚠️⚠️ ESTO ES LO ÚNICO QUE IMPIDE EDITAR UN DOCUMENTO YA EMITIDO, y quien
+   * venga a quitarlo tiene que saberlo. El host responde deseleccionando el
+   * tipo, y eso DESMONTA este formulario. Esa es toda la garantía: entre emitir
+   * y desmontar no hay ventana editable —el modal tapa el formulario, atrapa el
+   * foco (`ModalShell:153-176`) y bloquea el scroll—, así que cuando el
+   * formulario vuelve a existir es uno nuevo y vacío.
+   *
+   * Aquí hubo una segunda red —una huella del contenido al emitir, comparada
+   * con la de cada render, que devolvía el diálogo de descarte si el médico
+   * seguía escribiendo— y se retiró: con el desmontaje no llegaba a dispararse
+   * nunca. Si algún día el host deja de desmontar, ese caso se reabre y esa red
+   * hay que reponerla.
+   *
    * Existe para que el HOST pueda replegar su selector y volver a la rejilla de
    * los ocho tipos: el formulario no puede hacerlo solo porque no es dueño del
    * `value` del selector, y a estas alturas seguir enseñando la receta recién
@@ -146,38 +159,15 @@ export default function SolicitudLabForm({ pacienteInicial = '', diagnosticoInic
   const formRef = useRef<HTMLDivElement>(null)
   const pacienteRef = useRef<HTMLInputElement>(null)
 
-  const contenido = [estudios, notas, paciente, pacienteInicial, diagnostico, diagnosticoInicial] as const
-  const vacio = isFormEmpty(...contenido)
-  const huella = JSON.stringify(contenido)
-  /**
-   * La huella del contenido EN EL MOMENTO DE EMITIR, o `null` si no se ha
-   * emitido nada. `emitido` se deriva comparándola con la de ahora.
-   *
-   * ⚠️ ERA UN BOOLEANO Y NO BASTABA. Con una bandera, seguir escribiendo
-   * DESPUÉS de emitir —añadir un medicamento, corregir la posología— dejaba esas
-   * ediciones sin la red que las protegía: cambiar de tipo o concluir la
-   * consulta se las llevaba en silencio, sin el diálogo. No era un aviso de más
-   * que no salía; era la red retirada justo cuando había contenido nuevo sin
-   * imprimir.
-   * Comparando huellas, editar vuelve a poner `emitido` en falso y la
-   * protección reaparece sola. Y deshacer la edición hasta volver al contenido
-   * emitido la retira otra vez, que también es correcto: no hay nada que perder.
-   */
-  const [huellaEmitida, setHuellaEmitida] = useState<string | null>(null)
-  const emitido = huellaEmitida !== null && huellaEmitida === huella
+  /* Lo que decide «¿está vacío?». La tupla se extiende sobre `isFormEmpty`, así
+     que el compilador impide que diverja de su firma.
+     ⚠️ SE LLAMA `paraVacio` Y NO `contenido`: `imprimir()` declara su propio
+     `contenido` con lo que se manda a imprimir, y dos nombres iguales en dos
+     ámbitos anidados es una trampa de lectura. */
+  const paraVacio = [estudios, notas, paciente, pacienteInicial, diagnostico, diagnosticoInicial] as const
+  const vacio = isFormEmpty(...paraVacio)
 
-  /* ⚠️ SE REPORTA `vacio || emitido`, Y EL SEGUNDO TÉRMINO NO SOBRA (misma nota
-     en los ocho formularios). `vacio` dice si el formulario TIENE CONTENIDO;
-     quien escucha por aquí pregunta otra cosa: si queda algo POR ENTREGAR.
-     Mientras fueron lo mismo nadie lo notó, pero emitir no vacía los campos, así
-     que después de imprimir seguía saltando el diálogo de descartar al cambiar
-     de tipo, y en la nota el aviso de «y sin imprimir» sobre un documento recién
-     impreso. Los cuatro que escuchan: `(app)/documentos/page.tsx`,
-     `expediente/[id]/documentos/page.tsx` y dos en `nueva-nota/page.tsx`.
-     ⚠️ «Guardar como plantilla» NO se ve afectado: recibe `vacio` a secas por
-     otro canal (`usePlantillasDocumento({ vacio })`). Tras emitir sigue siendo
-     legítimo guardar como plantilla lo que se acaba de escribir. */
-  useEffect(() => { onVacioChange?.(vacio || emitido) }, [vacio, emitido, onVacioChange])
+  useEffect(() => { onVacioChange?.(vacio) }, [vacio, onVacioChange])
 
   // ── Plantillas (spec 02) ────────────────────────────────────────
   // Se guarda TODO menos los datos del paciente. Aquí eso deja fuera paciente,
@@ -430,7 +420,7 @@ export default function SolicitudLabForm({ pacienteInicial = '', diagnosticoInic
       setImprimiendo(false)
       // También cuando la persistencia falló: el PDF existe y con el paciente
       // enfrente lo urgente es poder imprimirlo.
-      if (pdfBlob && !offlineMode) { setDocGenerado({ blob: pdfBlob, guardado, documentoId: filaId }); setHuellaEmitida(huella) }
+      if (pdfBlob && !offlineMode) { setDocGenerado({ blob: pdfBlob, guardado, documentoId: filaId }) }
     }
   }
 

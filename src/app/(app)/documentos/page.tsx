@@ -214,6 +214,13 @@ function DocumentosContent() {
               conDatos={!formVacio}
               oculto={panelPlantillas}
             >
+              {/* ⚠️ DESELECCIONAR EL TIPO DESMONTA EL FORMULARIO, Y ESO NO ES UN
+                  EFECTO SECUNDARIO: ES LA GARANTÍA. Es lo único que impide editar un
+                  documento ya emitido —entre emitir y desmontar el modal tapa el
+                  formulario y atrapa el foco—, así que cuando vuelve a existir es
+                  uno nuevo y vacío. Los formularios tuvieron una segunda red por
+                  dentro (una huella del contenido al emitir) y se retiró por
+                  inalcanzable; si esto deja de desmontar, hay que reponerla. */}
               {tipo === 'receta' && (
                 <RecetaForm
                   pacienteInicial={`${pacienteSeleccionado.nombre} ${pacienteSeleccionado.apellidos}`}

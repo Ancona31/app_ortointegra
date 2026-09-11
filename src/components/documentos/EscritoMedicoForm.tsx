@@ -111,6 +111,19 @@ interface Props {
    * El modal de «documento generado» se cerró — o sea, el documento ya salió y
    * el médico terminó con él.
    *
+   * ⚠️⚠️ ESTO ES LO ÚNICO QUE IMPIDE EDITAR UN DOCUMENTO YA EMITIDO, y quien
+   * venga a quitarlo tiene que saberlo. El host responde deseleccionando el
+   * tipo, y eso DESMONTA este formulario. Esa es toda la garantía: entre emitir
+   * y desmontar no hay ventana editable —el modal tapa el formulario, atrapa el
+   * foco (`ModalShell:153-176`) y bloquea el scroll—, así que cuando el
+   * formulario vuelve a existir es uno nuevo y vacío.
+   *
+   * Aquí hubo una segunda red —una huella del contenido al emitir, comparada
+   * con la de cada render, que devolvía el diálogo de descarte si el médico
+   * seguía escribiendo— y se retiró: con el desmontaje no llegaba a dispararse
+   * nunca. Si algún día el host deja de desmontar, ese caso se reabre y esa red
+   * hay que reponerla.
+   *
    * Existe para que el HOST pueda replegar su selector y volver a la rejilla de
    * los ocho tipos: el formulario no puede hacerlo solo porque no es dueño del
    * `value` del selector, y a estas alturas seguir enseñando la receta recién
@@ -203,43 +216,15 @@ export default function EscritoMedicoForm({ pacienteInicial = '', pacienteId, of
   const bloques = editor?.state.doc.childCount ?? 0
   const tituloPie = pieEnganchado ? asunto : piePropio
 
-  const contenido = [isEmpty, asunto, piePropio, pieEnganchado, paciente, pacienteInicial] as const
-  const vacio = isFormEmpty(...contenido)
-  const huella = JSON.stringify(contenido)
-  /**
-   * Lo emitido: la huella de los campos MÁS el documento del editor.
-   *
-   * ⚠️ ESTE FORMULARIO NECESITA UN SEGUNDO TÉRMINO Y LOS OTROS SIETE NO. Su
-   * predicado de vacío reduce el cuerpo a `isEmpty`, un booleano, así que una
-   * huella hecha sólo con lo que recibe `isFormEmpty` no vería reescribir el
-   * texto: se pasaría de «emitido» todo el rato mientras el médico reescribe el
-   * escrito entero. Es el único de los ocho donde la cobertura de `vacio` se
-   * queda corta para esto.
-   *
-   * ⚠️ SE COMPARA LA REFERENCIA DEL DOCUMENTO, NO SU CONTENIDO, y es exacto además
-   * de gratis: el `doc` de ProseMirror es INMUTABLE y cada transacción produce
-   * uno nuevo, así que `!==` responde «hubo edición» sin serializar nada. Un
-   * `getJSON()` en cada render costaría de verdad en un escrito largo.
-   * `useEditor` re-renderiza en cada transacción, que es lo que hace que esta
-   * comparación se reevalúe — lo mismo de lo que ya viven `isEmpty` y el conteo
-   * de bloques de más abajo.
-   */
-  const docActual = editor?.state.doc ?? null
-  const [emitidoEn, setEmitidoEn] = useState<{ huella: string; doc: unknown } | null>(null)
-  const emitido = emitidoEn !== null && emitidoEn.huella === huella && emitidoEn.doc === docActual
+  /* Lo que decide «¿está vacío?». La tupla se extiende sobre `isFormEmpty`, así
+     que el compilador impide que diverja de su firma.
+     ⚠️ SE LLAMA `paraVacio` Y NO `contenido`: `imprimir()` declara su propio
+     `contenido` con lo que se manda a imprimir, y dos nombres iguales en dos
+     ámbitos anidados es una trampa de lectura. */
+  const paraVacio = [isEmpty, asunto, piePropio, pieEnganchado, paciente, pacienteInicial] as const
+  const vacio = isFormEmpty(...paraVacio)
 
-  /* ⚠️ SE REPORTA `vacio || emitido`, Y EL SEGUNDO TÉRMINO NO SOBRA (misma nota
-     en los ocho formularios). `vacio` dice si el formulario TIENE CONTENIDO;
-     quien escucha por aquí pregunta otra cosa: si queda algo POR ENTREGAR.
-     Mientras fueron lo mismo nadie lo notó, pero emitir no vacía los campos, así
-     que después de imprimir seguía saltando el diálogo de descartar al cambiar
-     de tipo, y en la nota el aviso de «y sin imprimir» sobre un documento recién
-     impreso. Los cuatro que escuchan: `(app)/documentos/page.tsx`,
-     `expediente/[id]/documentos/page.tsx` y dos en `nueva-nota/page.tsx`.
-     ⚠️ «Guardar como plantilla» NO se ve afectado: recibe `vacio` a secas por
-     otro canal (`usePlantillasDocumento({ vacio })`). Tras emitir sigue siendo
-     legítimo guardar como plantilla lo que se acaba de escribir. */
-  useEffect(() => { onVacioChange?.(vacio || emitido) }, [vacio, emitido, onVacioChange])
+  useEffect(() => { onVacioChange?.(vacio) }, [vacio, onVacioChange])
 
   // ── Plantillas (spec 02) ────────────────────────────────────────
   // Se guarda TODO menos los datos del paciente: aquí eso deja fuera paciente y
@@ -468,7 +453,7 @@ export default function EscritoMedicoForm({ pacienteInicial = '', pacienteId, of
       setImprimiendo(false)
       // También cuando la persistencia falló: el PDF existe y con el paciente
       // enfrente lo urgente es poder imprimirlo.
-      if (pdfBlob && !offlineMode) { setDocGenerado({ blob: pdfBlob, guardado, documentoId: filaId }); setEmitidoEn({ huella, doc: docActual }) }
+      if (pdfBlob && !offlineMode) { setDocGenerado({ blob: pdfBlob, guardado, documentoId: filaId }) }
     }
   }
 
