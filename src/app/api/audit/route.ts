@@ -55,6 +55,46 @@ export async function POST(req: NextRequest) {
 
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
 
+  /**
+   * ⚠️ LA FILA TIENE QUE SER VISIBLE PARA QUIEN LA FIRMA, y esto no estaba.
+   * Se validaba la sesión, la tabla y la acción, pero NO que el `registroId`
+   * fuera suyo: cualquier médico autenticado podía escribir
+   * `compartir_documento` sobre el uuid de un documento de otra clínica. No hay
+   * fuga —aquí no se lee nada— pero ensucia con constancias falsas un registro
+   * que la NOM-024 exige como prueba, y ahí la integridad pesa tanto como la
+   * presencia.
+   *
+   * ⚠️ SE COMPRUEBA CON EL CLIENTE DE SESIÓN Y NO CON UNA REGLA ESCRITA AQUÍ:
+   * la consulta pasa por la RLS, que es la que ya sabe qué ve cada médico según
+   * clínica y rol. Una condición copiada a mano en esta ruta sería una segunda
+   * definición de lo mismo, y de las dos sólo una se mantendría.
+   *
+   * ⚠️ NO SE REUSA `documentoDelMedico` de `/api/email/enviar-documento`, y
+   * conviene saber por qué: aquel exige además AUTORÍA y rechaza borradores,
+   * que son reglas de ENVIAR y no de mirar. Con ellas, un colega de la misma
+   * clínica que descarga un documento que no emitió —cosa que la interfaz
+   * permite— no quedaría registrado. Y `exportar_expediente` ni siquiera opera
+   * sobre `documentos`. Lo que hace falta aquí es más débil y más general: que
+   * el registro sea tuyo de ver.
+   *
+   * ⚠️ SÓLO PARA LAS ACCIONES CON NOMBRE. El camino de `logAccess` —el de
+   * `useAuditAccess`— se queda sin validar A PROPÓSITO: dos de sus llamadas
+   * pasan el id del PACIENTE bajo otra tabla (`documentos/page.tsx:64` y
+   * `nueva-nota/page.tsx:198`, donde la nota aún no existe), así que validarlas
+   * las haría fallar en silencio y perderíamos registros de acceso que hoy sí se
+   * escriben. Ese desajuste es anterior y se anota aparte.
+   */
+  if (accion) {
+    const { data: fila } = await supabase
+      .from(tabla as string)
+      .select('id')
+      .eq('id', registroId)
+      .maybeSingle()
+    if (!fila) {
+      return NextResponse.json({ error: 'Registro no encontrado' }, { status: 404 })
+    }
+  }
+
   // fire-and-forget — no bloquea la respuesta
   if (accion) {
     logAudit({

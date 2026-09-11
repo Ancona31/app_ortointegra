@@ -236,10 +236,25 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
   const formRef = useRef<HTMLDivElement>(null)
   const pacienteRef = useRef<HTMLInputElement>(null)
 
-  const vacio = isFormEmpty(medicamentos, recomendaciones, paciente, pacienteInicial, diagnostico, diagnosticoInicial)
-  /* El documento de este formulario ya salió. Se reinicia solo: cambiar de tipo
-     desmonta el formulario entero. */
-  const [emitido, setEmitido] = useState(false)
+  const contenido = [medicamentos, recomendaciones, paciente, pacienteInicial, diagnostico, diagnosticoInicial] as const
+  const vacio = isFormEmpty(...contenido)
+  const huella = JSON.stringify(contenido)
+  /**
+   * La huella del contenido EN EL MOMENTO DE EMITIR, o `null` si no se ha
+   * emitido nada. `emitido` se deriva comparándola con la de ahora.
+   *
+   * ⚠️ ERA UN BOOLEANO Y NO BASTABA. Con una bandera, seguir escribiendo
+   * DESPUÉS de emitir —añadir un medicamento, corregir la posología— dejaba esas
+   * ediciones sin la red que las protegía: cambiar de tipo o concluir la
+   * consulta se las llevaba en silencio, sin el diálogo. No era un aviso de más
+   * que no salía; era la red retirada justo cuando había contenido nuevo sin
+   * imprimir.
+   * Comparando huellas, editar vuelve a poner `emitido` en falso y la
+   * protección reaparece sola. Y deshacer la edición hasta volver al contenido
+   * emitido la retira otra vez, que también es correcto: no hay nada que perder.
+   */
+  const [huellaEmitida, setHuellaEmitida] = useState<string | null>(null)
+  const emitido = huellaEmitida !== null && huellaEmitida === huella
 
   /* ⚠️ SE REPORTA `vacio || emitido`, Y EL SEGUNDO TÉRMINO NO SOBRA (misma nota
      en los ocho formularios). `vacio` dice si el formulario TIENE CONTENIDO;
@@ -610,7 +625,7 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
       setImprimiendo(false)
       // También cuando la persistencia falló: el PDF existe y con el paciente
       // enfrente lo urgente es poder imprimirlo.
-      if (pdfBlob && !offlineMode) { setDocGenerado({ blob: pdfBlob, guardado, documentoId: filaId }); setEmitido(true) }
+      if (pdfBlob && !offlineMode) { setDocGenerado({ blob: pdfBlob, guardado, documentoId: filaId }); setHuellaEmitida(huella) }
     }
   }
 

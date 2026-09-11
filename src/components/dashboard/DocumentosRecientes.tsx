@@ -197,10 +197,18 @@ export default function DocumentosRecientes({ onNuevoDocumento }: Props) {
                  `documentoSolicitadoId`. Van en la URL —y no en un estado— para
                  que recargar y el botón de atrás funcionen, que es el criterio
                  de toda esta rama.
-                 ⚠️ EL PARÁMETRO SE LLAMA `documento` Y NO `doc`: `doc` ya
-                 significa otra cosa en `/expediente/[id]/documentos?doc=`, que
-                 es el borrador que retoma el FORMULARIO. Son dos pantallas
-                 distintas y conviene que no se parezcan.
+                 ⚠️ EL PARÁMETRO SE LLAMA `documento` Y NO `doc`, y el motivo
+                 de arriba estaba MAL CONTADO: decía que `doc` es «el borrador
+                 que retoma el formulario», como si fuera un mecanismo vivo. No
+                 lo es. `PanelDocumentos.tsx:450` navega con `&doc=…` pero la
+                 página destino lee `borrador`
+                 (`expediente/[id]/documentos/page.tsx:154`), así que «Seguir
+                 editándolo» sobre un consentimiento en borrador abre el
+                 formulario EN BLANCO. Es un defecto anterior a esta rama y
+                 sigue abierto: no se arregla aquí, se deja señalado.
+                 El nombre `documento` se mantiene igual —es el que la ficha ya
+                 lee— y además no colisiona con ese `doc` averiado, sea cual sea
+                 el nombre con el que acabe arreglándose.
                  Sin `paciente_id` no hay expediente al que ir y se mantiene el
                  destino de antes. */
               href={doc.paciente_id

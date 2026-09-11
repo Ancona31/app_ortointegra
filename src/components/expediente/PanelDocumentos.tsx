@@ -191,6 +191,22 @@ export default function PanelDocumentos({
    * rechazaría con `NotAllowedError` sin explicar nada. Por eso el archivo llega
    * hecho de `prepararCompartir` y aquí no queda ni una espera.
    */
+  /**
+   * Deja constancia de que el documento salió de la app por una vía que el
+   * servidor no ve. `keepalive` para que la petición sobreviva si el gesto
+   * arrastra una navegación o el médico cierra la pestaña enseguida — es el caso
+   * de la descarga. Fire-and-forget: nada de lo que aquí falle debe estorbar al
+   * documento, que ya salió.
+   */
+  const auditarSalida = useCallback((accion: 'compartir_documento' | 'descargar_documento', docId: string) => {
+    void fetch('/api/audit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tabla: 'documentos', registroId: docId, accion }),
+      keepalive: true,
+    }).catch(() => {})
+  }, [])
+
   function compartir(): void {
     const archivo = archivoCompartir
     const id = doc?.id
@@ -207,13 +223,7 @@ export default function PanelDocumentos({
       /* ⚠️ SOLO CUANDO RESUELVE. `share` resuelve cuando el documento se entregó
          de verdad a otra aplicación; registrar antes de llamar, o en el
          `finally`, escribiría un compartir que no ocurrió. */
-      .then(() => {
-        void fetch('/api/audit', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tabla: 'documentos', registroId: id, accion: 'compartir_documento' }),
-        }).catch(() => {})
-      })
+      .then(() => auditarSalida('compartir_documento', id))
       .catch((e: unknown) => {
         /* ⚠️ CANCELAR NO ES UN FALLO: cerrar la hoja sin elegir rechaza con
            `AbortError` y es una decisión, no un error. El nombre se lee de la
@@ -415,6 +425,7 @@ export default function PanelDocumentos({
                 estado: hayArchivo ? estadoFirma : 'fallido',
                 href: firmadas[doc.id] ?? null,
                 onReintentar: () => setIntentoFirma(n => n + 1),
+                onDescargar: () => { if (doc) auditarSalida('descargar_documento', doc.id) },
               },
               /* `onClick: null` sin soporte → no se dibuja, ni en escritorio ni en
                  el menú. Es la diferencia deliberada con el modal de documento

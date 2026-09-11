@@ -55,7 +55,14 @@ export interface AccionCompartir extends Accion {
 }
 
 export interface AccionesProps {
-  descarga: { estado: EstadoDescarga; href: string | null; onReintentar: () => void }
+  descarga: {
+    estado: EstadoDescarga
+    href: string | null
+    onReintentar: () => void
+    /** Se llama al pulsar la descarga, para dejar constancia de que el documento
+     *  salió. No debe bloquear nada: el ancla navega igual. */
+    onDescargar: () => void
+  }
   /** `onClick: null` cuando el navegador no comparte archivos: no se dibuja. */
   compartir: AccionCompartir
   enviar: Accion
@@ -239,6 +246,16 @@ export default function AccionesDocumento(p: AccionesProps) {
       return (
         <a
           href={descarga.href}
+          /* ⚠️ LA CONSTANCIA VA EN `onClick` Y NO PUEDE CONVERTIRSE EN UN `await`.
+             Aquí no se auditaba nada, y era el agujero grande del registro: éste
+             es el botón por el que el médico descarga a diario desde el
+             expediente, mientras que el único sitio que sí auditaba —el repuesto
+             del modal de documento generado— sólo se pinta donde NO hay hoja de
+             compartir, o sea nunca en un teléfono. El `audit_log` recogía
+             Firefox de escritorio y se perdía lo demás.
+             El handler sólo dispara la petición y devuelve; la navegación del
+             ancla sigue su curso en el mismo gesto. */
+          onClick={descarga.onDescargar}
           title={titulo}
           aria-label={titulo}
           className={conRotulo ? CON_ROTULO : CUADRADO}

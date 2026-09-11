@@ -203,10 +203,30 @@ export default function EscritoMedicoForm({ pacienteInicial = '', pacienteId, of
   const bloques = editor?.state.doc.childCount ?? 0
   const tituloPie = pieEnganchado ? asunto : piePropio
 
-  const vacio = isFormEmpty(isEmpty, asunto, piePropio, pieEnganchado, paciente, pacienteInicial)
-  /* El documento de este formulario ya salió. Se reinicia solo: cambiar de tipo
-     desmonta el formulario entero. */
-  const [emitido, setEmitido] = useState(false)
+  const contenido = [isEmpty, asunto, piePropio, pieEnganchado, paciente, pacienteInicial] as const
+  const vacio = isFormEmpty(...contenido)
+  const huella = JSON.stringify(contenido)
+  /**
+   * Lo emitido: la huella de los campos MÁS el documento del editor.
+   *
+   * ⚠️ ESTE FORMULARIO NECESITA UN SEGUNDO TÉRMINO Y LOS OTROS SIETE NO. Su
+   * predicado de vacío reduce el cuerpo a `isEmpty`, un booleano, así que una
+   * huella hecha sólo con lo que recibe `isFormEmpty` no vería reescribir el
+   * texto: se pasaría de «emitido» todo el rato mientras el médico reescribe el
+   * escrito entero. Es el único de los ocho donde la cobertura de `vacio` se
+   * queda corta para esto.
+   *
+   * ⚠️ SE COMPARA LA REFERENCIA DEL DOCUMENTO, NO SU CONTENIDO, y es exacto además
+   * de gratis: el `doc` de ProseMirror es INMUTABLE y cada transacción produce
+   * uno nuevo, así que `!==` responde «hubo edición» sin serializar nada. Un
+   * `getJSON()` en cada render costaría de verdad en un escrito largo.
+   * `useEditor` re-renderiza en cada transacción, que es lo que hace que esta
+   * comparación se reevalúe — lo mismo de lo que ya viven `isEmpty` y el conteo
+   * de bloques de más abajo.
+   */
+  const docActual = editor?.state.doc ?? null
+  const [emitidoEn, setEmitidoEn] = useState<{ huella: string; doc: unknown } | null>(null)
+  const emitido = emitidoEn !== null && emitidoEn.huella === huella && emitidoEn.doc === docActual
 
   /* ⚠️ SE REPORTA `vacio || emitido`, Y EL SEGUNDO TÉRMINO NO SOBRA (misma nota
      en los ocho formularios). `vacio` dice si el formulario TIENE CONTENIDO;
@@ -448,7 +468,7 @@ export default function EscritoMedicoForm({ pacienteInicial = '', pacienteId, of
       setImprimiendo(false)
       // También cuando la persistencia falló: el PDF existe y con el paciente
       // enfrente lo urgente es poder imprimirlo.
-      if (pdfBlob && !offlineMode) { setDocGenerado({ blob: pdfBlob, guardado, documentoId: filaId }); setEmitido(true) }
+      if (pdfBlob && !offlineMode) { setDocGenerado({ blob: pdfBlob, guardado, documentoId: filaId }); setEmitidoEn({ huella, doc: docActual }) }
     }
   }
 
