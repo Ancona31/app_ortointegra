@@ -129,9 +129,22 @@ function DocumentosPacienteContent() {
   // El panel de plantillas sustituye al formulario y oculta el selector de tipo.
   const [panelPlantillas, setPanelPlantillas] = useState(false)
 
+  /**
+   * ⚠️ `fichaResuelta` NO ES `paciente !== null`, Y LA DIFERENCIA ES EL ARREGLO.
+   * Distingue «todavía no ha contestado» de «contestó y no hay ficha». Sin ella,
+   * un fallo de red dejaría el formulario sin montar para siempre; con ella se
+   * monta igual y el médico teclea el nombre, que es para lo que está el campo.
+   * El `catch` existe por lo mismo: sin él una caída de red deja la promesa sin
+   * resolver y la pantalla esperando.
+   */
+  const [fichaResuelta, setFichaResuelta] = useState(false)
+
   useEffect(() => {
     const supabase = createClient()
-    supabase.from('pacientes').select('id, nombre, apellidos, fecha_nacimiento, sexo, numero_expediente').eq('id', id).single().then((res: { data: Paciente | null }) => setPaciente(res.data))
+    supabase.from('pacientes').select('id, nombre, apellidos, fecha_nacimiento, sexo, numero_expediente').eq('id', id).single()
+      .then((res: { data: Paciente | null }) => setPaciente(res.data))
+      .catch(() => {})
+      .finally(() => setFichaResuelta(true))
   }, [id])
 
   const nombreCompleto = paciente ? `${paciente.nombre} ${paciente.apellidos}` : ''
@@ -172,6 +185,25 @@ function DocumentosPacienteContent() {
           conDatos={!formVacio}
           oculto={panelPlantillas}
         >
+          {/* ⚠️ EL FORMULARIO NO SE MONTA HASTA QUE LA FICHA HA CONTESTADO, y no
+              es una precaución: es el arreglo del nombre vacío.
+              Los ocho formularios toman el nombre del paciente con
+              `useState(pacienteInicial)`, o sea UNA VEZ, en su montaje — es
+              correcto, el campo es editable y `pacienteInicial` es un valor
+              inicial, no un valor controlado. Lo que estaba mal era montarlos
+              antes de tener ese valor: al entrar por `?tipo=receta` el `tab`
+              queda puesto en el PRIMER render y el formulario nacía con
+              `pacienteInicial=''`, porque la consulta de la ficha tarda un
+              viaje de red. Cuando el nombre llegaba, el `useState` ya no
+              escuchaba.
+              Por eso no pasaba viniendo de «Nuevo documento»: allí se llega sin
+              `?tipo=`, se ve la rejilla, y para cuando el médico elige formato
+              la ficha lleva rato resuelta. La misma carrera, ganada por azar.
+              Esto afecta a TODO lo que sale de la ficha, no solo al nombre: la
+              edad del consentimiento (`edadInicial`) venía igual de vacía.
+              Es además el contrato que la pantalla hermana `(app)/documentos`
+              siempre cumplió, montando el formulario solo con paciente elegido. */}
+          {!fichaResuelta ? <FormLoader /> : <>
           {tab === 'receta' && <RecetaForm pacienteInicial={nombreCompleto} diagnosticoInicial={diagnosticoInicial} pacienteId={id} onVacioChange={setFormVacio} onCerrarTrasEmitir={() => irATipo(null)} onPanelPlantillasChange={setPanelPlantillas} />}
           {tab === 'lab' && <SolicitudLabForm pacienteInicial={nombreCompleto} diagnosticoInicial={diagnosticoInicial} pacienteId={id} onVacioChange={setFormVacio} onCerrarTrasEmitir={() => irATipo(null)} onPanelPlantillasChange={setPanelPlantillas} />}
           {tab === 'imagen' && <SolicitudImagenForm pacienteInicial={nombreCompleto} diagnosticoInicial={diagnosticoInicial} pacienteId={id} onVacioChange={setFormVacio} onCerrarTrasEmitir={() => irATipo(null)} onPanelPlantillasChange={setPanelPlantillas} />}
@@ -180,6 +212,7 @@ function DocumentosPacienteContent() {
           {tab === 'escrito' && <EscritoMedicoForm pacienteInicial={nombreCompleto} pacienteId={id} onVacioChange={setFormVacio} onCerrarTrasEmitir={() => irATipo(null)} onPanelPlantillasChange={setPanelPlantillas} />}
           {tab === 'consentimiento' && <ConsentimientoInformadoForm pacienteInicial={nombreCompleto} diagnosticoInicial={diagnosticoInicial} edadInicial={edadInicial} pacienteId={id} borradorId={borradorId} onVacioChange={setFormVacio} onCerrarTrasEmitir={() => irATipo(null)} onPanelPlantillasChange={setPanelPlantillas} />}
           {tab === 'honorarios' && <NotaHonorariosForm pacienteInicial={nombreCompleto} pacienteId={id} onVacioChange={setFormVacio} onCerrarTrasEmitir={() => irATipo(null)} onPanelPlantillasChange={setPanelPlantillas} />}
+          </>}
         </SelectorTipoDocumento>
       </div>
     </div>
