@@ -81,3 +81,6 @@ design/
 SECURITY_*.md
 CLAUDE-SECURITY-*/
 MAPA_AUDITORIA.md
+
+# Temporales del CLI de Supabase
+supabase/.temp/
