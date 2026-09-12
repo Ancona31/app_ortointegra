@@ -80,3 +80,4 @@ design/
 # Reportes de seguridad — repo publico, NO subir
 SECURITY_*.md
 CLAUDE-SECURITY-*/
+MAPA_AUDITORIA.md
