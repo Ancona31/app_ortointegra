@@ -14,7 +14,7 @@ export function useMedicoInfo() {
     '/api/me/perfil-medico',
     fetcher,
     {
-      revalidateOnFocus: true,
+      // revalidateOnFocus se hereda del <SWRConfig> de (app), ya con throttle.
       dedupingInterval: 300_000,
       onSuccess: (d) => {
         // Cachear en secureStorage como respaldo offline

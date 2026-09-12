@@ -12,6 +12,44 @@ import type { PdfMedicoData, PdfColors, PdfConsultorioData } from './PdfStyles'
 /*  Tipos                                                              */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Una firma electrónica ya capturada, tal como se imprime.
+ * `GUIA_FORMULARIOS_05` §8.2. La compone el formulario a partir de las filas
+ * que acaba de escribir en `public.firmas_documento`.
+ */
+export interface FirmaImpresa {
+  /** `paciente` · `familiar` · `testigo_1` · `testigo_2` · `medico`. */
+  rol: string
+  /**
+   * Data-URL PNG del trazo, ya recortado a la caja de la tinta.
+   * NULL en el médico: su rúbrica sale del perfil, no se captura en el momento.
+   */
+  trazo: string | null
+  /** ISO del sello del dispositivo — el momento real del trazo. */
+  firmadoEn: string
+}
+
+/**
+ * Una identificación de la hoja de anexo — GUIA_FORMULARIOS_05 §6.
+ *
+ * Una por firmante QUE FIRMÓ, tenga foto o no: quien firmó sin ella lleva su
+ * recuadro con la leyenda de que no se capturó, que es un dato del expediente y
+ * no un hueco. El médico no entra: el anexo reproduce la identificación de quien
+ * consiente, no la de quien informa.
+ */
+export interface IdentificacionImpresa {
+  /** El rol, ya redactado: `Paciente`, `Testigo 1`. */
+  rol: string
+  nombre: string
+  /**
+   * Data-URL de la foto, ya traída del bucket cerrado por quien llama. Ausente
+   * cuando se siguió sin foto —o cuando traerla falló, que tampoco bloquea—.
+   */
+  foto?: string
+  /** El campo «Identificación» del formulario, si lo lleva. */
+  identificacion?: string
+}
+
 export interface ConsentimientoData {
   paciente: string
   lugar: string
@@ -39,8 +77,71 @@ export interface ConsentimientoData {
     riesgosEspecificos: string
     alternativas: string
   }
-  imprimirDenegacion?: boolean
+  /**
+   * Emite SOLO la hoja de denegación, sin las tres del consentimiento.
+   *
+   * ⚠ PUENTE, NO SOLUCIÓN DEFINITIVA. La denegación es un formato v2
+   * (`GUIA_FORM_DENEGACION.md`), pero v2 entero sigue detrás de un interruptor
+   * apagado: ningún formato v2 se usa en producción y cablearlo exige meter
+   * versión en la firma de `generarPdf`, que toca sus 12 call sites (ver la
+   * nota larga de `buildClientElement` en `src/lib/mobileShare.ts`). Sin este
+   * atajo la denegación no se podría imprimir hasta ese paso posterior.
+   * Cuando v2 se cablee, la denegación entra por la misma puerta que los otros
+   * ocho y esta bandera se retira con su hoja.
+   *
+   * Sustituyó a `imprimirDenegacion`, que ANEXABA la denegación al
+   * consentimiento. Es una bandera y no dos a propósito: los dos documentos son
+   * excluyentes, no acumulables. Si el paciente deniega, no se imprimen las
+   * siete hojas que explican y otorgan lo que acaba de rechazar.
+   */
+  soloDenegacion?: boolean
   folio?: string
+  /**
+   * Las firmas electrónicas del documento sellado. Ausente o vacío en un
+   * consentimiento que se imprime para firmarse a mano, que es como salen los
+   * `emitido_firma_manual`: entonces las celdas quedan en blanco, igual que
+   * antes de que existiera el firmado.
+   */
+  firmas?: FirmaImpresa[]
+  /** ISO del acto de sellar, que es el que reúne todas las firmas. */
+  selladoEn?: string
+  /** SHA-256 hexadecimal del contenido en el momento de firmar. */
+  huella?: string
+  /**
+   * Cuántos firmantes pidió el flujo. NO son cuatro fijos: solo se pide firma a
+   * quien tiene nombre escrito, así que un consentimiento sin testigos prevé
+   * dos. Sin este dato la línea de cierre diría «4 previstos» donde solo se
+   * pidieron dos, e inventaría dos ausencias que nunca existieron.
+   */
+  previstos?: number
+  /**
+   * Las identificaciones de la hoja de anexo. **La hoja solo se imprime si al
+   * menos una trae fotografía**: sin ninguna, el documento cierra en las firmas
+   * y no se añade una hoja entera de recuadros vacíos.
+   */
+  identificaciones?: IdentificacionImpresa[]
+}
+
+/**
+ * Lo que la denegación necesita, y nada más. Sin las secciones clínicas, que no
+ * aparecen en el documento.
+ *
+ * El diagnóstico SÍ está, y no en el riel —que no lo lleva (§4)— sino dentro de
+ * la declaración: una revocación puede acabar en sede legal, y ahí importa no
+ * solo qué procedimiento se rechazó sino de qué se estaba tratando al paciente.
+ * Es opcional porque en denegación no es campo obligatorio; ver cómo se compone
+ * la frase sin él más abajo.
+ */
+export type DenegacionData = Pick<
+  ConsentimientoData,
+  'paciente' | 'lugar' | 'fecha' | 'edad' | 'procedimiento' | 'familiar' | 'folio'
+> & { diagnostico?: string }
+
+export interface DenegacionProps {
+  medico: PdfMedicoData | null
+  data: DenegacionData
+  logoUrl?: string
+  consultorio?: PdfConsultorioData
 }
 
 export interface ConsentimientoProps {
@@ -50,8 +151,62 @@ export interface ConsentimientoProps {
   consultorio?: PdfConsultorioData
 }
 
+/* ------------------------------------------------------------------ */
+/*  Anexo · identificación de firmantes                                */
+/* ------------------------------------------------------------------ */
+
+/**
+ * ⚠ TRABAJO CON FECHA DE CADUCIDAD CONOCIDA, Y ESTÁ DECIDIDO ASÍ.
+ *
+ * La hoja de anexo ya existe, mejor medida y con su propio sistema tipográfico,
+ * en el formato v2: `src/lib/pdf/v2/formatos/ConsentimientoInformado.tsx`
+ * (`IdentificacionAnexo`, `RecuadroAnexo`, la constante `ANEXO`). Lo que sigue
+ * es una RÉPLICA de su geometría en este renderer, no un diseño nuevo.
+ *
+ * Se replicó porque v1 es el que emite hoy: `mobileShare.ts` manda
+ * `consentimiento_informado` aquí, y v2 entero sigue detrás del interruptor
+ * apagado que describe la nota de `soloDenegacion` —ninguno de sus formatos se
+ * usa en producción—. Sin esta hoja, la captura de fotos del Paso 5.8 subiría
+ * identificaciones que no salen en ningún papel.
+ *
+ * **Cuando v2 se cablee, esta sección se va con el resto del archivo**, igual
+ * que la hoja de denegación y por el mismo motivo. No la mejores: mejora la del
+ * v2, que es la que sobrevive.
+ */
+const ANEXO = {
+  /** La caja de fotografía, en puntos. Proporción 1,583 — la de una credencial. */
+  ancho: 228,
+  alto: 144,
+  /** Medianil entre las dos columnas. 228 + 30 + 228 = 486 de los 512 de contenido. */
+  medianil: 30,
+  /** Aire entre filas de la retícula. */
+  aireFilas: 20,
+} as const
+
+const ANEXO_ROTULO = 'Anexo · Identificación de firmantes'
+const ANEXO_ENTRADILLA =
+  'Reproducción de la identificación oficial del paciente y de las personas que firman el consentimiento.'
+/** La leyenda de quien firmó y no anexó identificación. Textual del v2. */
+const ANEXO_SIN_FOTO =
+  'No se capturó fotografía de la identificación de este firmante.'
+
+/** Parte las identificaciones en filas de dos, que es la retícula. */
+function enParejas(items: IdentificacionImpresa[]): IdentificacionImpresa[][] {
+  const filas: IdentificacionImpresa[][] = []
+  items.forEach((item, i) => {
+    if (i % 2 === 0) filas.push([item])
+    else filas[filas.length - 1].push(item)
+  })
+  return filas
+}
+
 const SECCION_LABELS: Array<{ key: string; num: string; titulo: string }> = [
-  { key: 'preoperatorio', num: '1', titulo: 'Preoperatorio' },
+  // ⚠ `key` es la clave del jsonb guardado y NO se renombra: de ella sale el
+  // texto de los documentos ya emitidos (`data.secciones[sec.key]`). Cambiarla
+  // imprimiría la sección 1 en blanco al regenerar un consentimiento viejo.
+  // El rótulo dejó de decir «Preoperatorio» porque presuponía quirófano, y el
+  // consentimiento cubre también procedimientos invasivos que no son cirugía.
+  { key: 'preoperatorio', num: '1', titulo: 'Evaluación y decisión terapéutica' },
   { key: 'beneficios', num: '2', titulo: 'Beneficios esperados' },
   { key: 'anestesia', num: '3', titulo: 'Anestesia' },
   { key: 'descripcion', num: '4', titulo: 'Descripción del procedimiento' },
@@ -75,6 +230,19 @@ function nl2p(text: string, style: Style): ReactElement[] {
     ))
 }
 
+/**
+ * `dd/mm/aaaa hh:mm:ss` — el formato de los sellos impresos (§8.2).
+ * Local a este archivo y sin date-fns: los renderers de PDF no importan nada
+ * del árbol de la aplicación más allá de sus propios estilos.
+ */
+function selloLegible(iso: string): string {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()}`
+    + ` ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
+}
+
 interface FirmaBoxProps {
   label: string
   nombre?: string
@@ -82,9 +250,17 @@ interface FirmaBoxProps {
   idLabel?: string
   idVal?: string
   colors: PdfColors
+  /**
+   * La rúbrica, en los 48 pt libres sobre la línea. `objectFit: contain` y no
+   * un ancho fijo: el trazo llega ya recortado a su tinta, así que ocupa lo que
+   * ocupa —como en papel— y solo se le impide desbordar la celda.
+   */
+  trazo?: string | null
+  /** El pie de sello, bajo la calidad del firmante y a 2 pt de ella. */
+  sello?: string
 }
 
-function FirmaBox({ label, nombre, sublabel, idLabel, idVal, colors }: FirmaBoxProps) {
+function FirmaBox({ label, nombre, sublabel, idLabel, idVal, colors, trazo, sello }: FirmaBoxProps) {
   const fb = StyleSheet.create({
     wrap: {
       width: '48%',
@@ -92,6 +268,17 @@ function FirmaBox({ label, nombre, sublabel, idLabel, idVal, colors }: FirmaBoxP
     },
     space: {
       height: 48,
+      justifyContent: 'flex-end',
+    },
+    trazo: {
+      width: '100%',
+      height: 48,
+      objectFit: 'contain',
+    },
+    sello: {
+      fontSize: 7,
+      color: '#666',
+      marginTop: 2,
     },
     line: {
       borderTopWidth: 1,
@@ -125,7 +312,11 @@ function FirmaBox({ label, nombre, sublabel, idLabel, idVal, colors }: FirmaBoxP
 
   return (
     <View style={fb.wrap}>
-      <View style={fb.space} />
+      <View style={fb.space}>
+        {/* eslint-disable-next-line jsx-a11y/alt-text -- el <Image> de
+            @react-pdf/renderer no acepta alt: no es una imagen del DOM. */}
+        {trazo ? <Image style={fb.trazo} src={trazo} /> : null}
+      </View>
       <View style={fb.line}>
         <Text style={fb.label}>{label}</Text>
         {nombre ? <Text style={fb.nombre}>{nombre}</Text> : null}
@@ -135,6 +326,7 @@ function FirmaBox({ label, nombre, sublabel, idLabel, idVal, colors }: FirmaBoxP
             {idLabel}: {idVal}
           </Text>
         ) : null}
+        {sello ? <Text style={fb.sello}>{sello}</Text> : null}
       </View>
     </View>
   )
@@ -237,6 +429,32 @@ function CompactHeader({ medico, colors, logoUrl, paciente, procedimiento }: Com
 
 export function renderConsentimiento(props: ConsentimientoProps) {
   return <ConsentimientoInformadoPdf {...props} />
+}
+
+/** Las siete secciones que la denegación no lleva. Ver `soloDenegacion`. */
+const SIN_SECCIONES: ConsentimientoData['secciones'] = {
+  preoperatorio: '', beneficios: '', anestesia: '', descripcion: '',
+  riesgosComunes: '', riesgosEspecificos: '', alternativas: '',
+}
+
+/**
+ * La denegación como documento de una hoja. Ver la nota de `soloDenegacion`:
+ * es el puente hasta que se cablee v2.
+ */
+export function renderDenegacion(props: DenegacionProps) {
+  return (
+    <ConsentimientoInformadoPdf
+      medico={props.medico}
+      logoUrl={props.logoUrl}
+      consultorio={props.consultorio}
+      data={{
+        ...props.data,
+        diagnostico: props.data.diagnostico ?? '',
+        secciones: SIN_SECCIONES,
+        soloDenegacion: true,
+      }}
+    />
+  )
 }
 
 export default function ConsentimientoInformadoPdf({
@@ -461,6 +679,17 @@ export default function ConsentimientoInformadoPdf({
       justifyContent: 'space-between',
       marginTop: 10,
     },
+    /* Cierre de la hoja firmada (§8.2), sobre filete gris */
+    cierreBox: {
+      borderTopWidth: 1,
+      borderTopColor: '#d1d5db',
+      paddingTop: 5,
+    },
+    cierreText: {
+      fontSize: 7,
+      color: '#666',
+      lineHeight: 1.5,
+    },
     /* Denegacion */
     denegBox: {
       borderWidth: 1,
@@ -492,6 +721,79 @@ export default function ConsentimientoInformadoPdf({
       lineHeight: 1.7,
       marginBottom: 6,
     },
+    /* Anexo · identificación de firmantes. Réplica del v2: ver la nota de ANEXO. */
+    anexoEntradilla: {
+      fontSize: 8,
+      color: '#666',
+      lineHeight: 1.5,
+      marginBottom: 4,
+    },
+    anexoFila: {
+      flexDirection: 'row',
+      marginTop: ANEXO.aireFilas,
+    },
+    anexoCelda: { width: ANEXO.ancho },
+    anexoCeldaSiguiente: { marginLeft: ANEXO.medianil },
+    anexoNumero: {
+      fontSize: 8,
+      fontWeight: 700,
+      color: colors.cs,
+      marginRight: 6,
+    },
+    anexoRol: {
+      fontSize: 8,
+      fontWeight: 700,
+      color: colors.cp,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+    },
+    anexoNombre: {
+      fontSize: 9,
+      color: '#1a1a1a',
+      marginTop: 1,
+    },
+    /* El filete de acento que abre la caja. Es su borde superior: dibujar los
+       dos daría una línea doble donde el v2 tiene una. */
+    anexoFilete: {
+      height: 2,
+      backgroundColor: colors.cp,
+      marginTop: 5,
+    },
+    anexoCaja: {
+      height: ANEXO.alto,
+      borderLeftWidth: 1,
+      borderRightWidth: 1,
+      borderBottomWidth: 1,
+      borderColor: '#d1d5db',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    anexoConFoto: { backgroundColor: '#f8fafc' },
+    anexoSinFoto: { paddingHorizontal: 24 },
+    /* La foto no se estira: conserva su proporción dentro de la caja —el
+       recortador ya la entrega en la proporción exacta, así que la llena—.
+
+       ⚠ LAS ESQUINAS REDONDEADAS VAN AQUÍ, EN LA COMPOSICIÓN, Y NO EN LA
+       IMAGEN. La foto se guarda en JPEG, que no tiene transparencia: redondear
+       el archivo obligaría a PNG, y medido sobre contenido fotográfico a
+       1400 px el PNG pesa de 23 a 43 veces más (5,8–6,7 MB contra 135–287 KB) —
+       con alfa llega a 7,5 MB, que ni siquiera entra en el tope de 5 MB del
+       bucket—. El render de @react-pdf recorta la propia Image por su
+       borderRadius, así que el redondeo cuesta cero bytes. Detrás asoma el
+       fondo de la caja, como una credencial real sobre su lámina. El recortador
+       enseña el mismo radio en pantalla (`MARCO_ESTILO`). */
+    anexoFoto: { width: '100%', height: '100%', objectFit: 'contain', borderRadius: 6 },
+    anexoLeyenda: {
+      fontSize: 7.5,
+      color: '#999',
+      textAlign: 'center',
+      lineHeight: 1.5,
+    },
+    anexoPie: {
+      fontSize: 7.5,
+      color: '#666',
+      marginTop: 4,
+    },
   })
 
   /* ---------- Render section block ---------- */
@@ -510,6 +812,19 @@ export default function ConsentimientoInformadoPdf({
     )
   }
 
+  /* ---------- Firmas electrónicas, si el documento está sellado ---------- */
+  // Índice por rol. Vacío en un documento que se imprime para firmarse a mano,
+  // y entonces todo lo de abajo se resuelve a null: la lámina sale como antes.
+  const porRol = new Map((data.firmas ?? []).map(f => [f.rol, f]))
+  const sellado = data.selladoEn !== undefined && porRol.size > 0
+
+  function pieDe(rol: string): string | undefined {
+    const f = porRol.get(rol)
+    if (!f) return undefined
+    const cuando = selloLegible(f.firmadoEn)
+    return cuando === '' ? undefined : `Firmado ${cuando}`
+  }
+
   /* ---------- Signatures grid ---------- */
   function FirmasBlock() {
     return (
@@ -520,6 +835,8 @@ export default function ConsentimientoInformadoPdf({
           idLabel="Identificación"
           idVal={data?.idPaciente}
           colors={colors}
+          trazo={porRol.get('paciente')?.trazo}
+          sello={pieDe('paciente')}
         />
         <FirmaBox
           label="Médico Tratante"
@@ -528,6 +845,11 @@ export default function ConsentimientoInformadoPdf({
           idLabel="Céd. Prof."
           idVal={cedProf}
           colors={colors}
+          // El médico no firma en el flujo: su rúbrica sale del perfil, y solo
+          // se estampa cuando el documento se selló —en uno impreso para
+          // firmarse a mano, la celda se queda para la pluma—.
+          trazo={sellado ? medico?.firma_url ?? null : null}
+          sello={pieDe('medico')}
         />
         <FirmaBox
           label={data?.representante ? 'Representante Legal' : 'Familiar / Responsable'}
@@ -535,7 +857,11 @@ export default function ConsentimientoInformadoPdf({
           idLabel="Identificación"
           idVal={data?.idRepresentante ?? data?.idFamiliar}
           colors={colors}
+          trazo={porRol.get('familiar')?.trazo}
+          sello={pieDe('familiar')}
         />
+        {/* El anestesiólogo no entra en el flujo de firmado: su celda se queda
+            siempre para la pluma. */}
         <FirmaBox
           label="Anestesiólogo"
           nombre={data?.anestesiologo}
@@ -545,15 +871,96 @@ export default function ConsentimientoInformadoPdf({
           label="Testigo 1"
           nombre={data?.testigo1}
           colors={colors}
+          trazo={porRol.get('testigo_1')?.trazo}
+          sello={pieDe('testigo_1')}
         />
         <FirmaBox
           label="Testigo 2"
           nombre={data?.testigo2}
           colors={colors}
+          trazo={porRol.get('testigo_2')?.trazo}
+          sello={pieDe('testigo_2')}
         />
       </View>
     )
   }
+
+  /* ---------- Anexo · identificación de firmantes (§6) ---------- */
+  // La hoja SOLO existe si al menos una identificación trae fotografía: sin
+  // ninguna, el documento cierra en las firmas y no se añade una hoja entera de
+  // recuadros vacíos. Réplica de la decisión de producto 5 del formato v2.
+  const identificaciones = data.identificaciones ?? []
+  const hayAnexo = identificaciones.some(i => (i.foto ?? '') !== '')
+
+  /**
+   * Un recuadro. Con foto o sin ella, el rol y el nombre se imprimen igual.
+   *
+   * Una función que devuelve un ELEMENTO, no un componente declarado dentro del
+   * render: los dos que sí lo son en este archivo —`SeccionBlock` y
+   * `FirmasBlock`— ya arrastran el aviso del linter, y no se le suma un tercero.
+   */
+  function recuadroAnexo(id: IdentificacionImpresa, numero: number): ReactElement {
+    const foto = id.foto ?? ''
+    return (
+      <View wrap={false}>
+        <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+          <Text style={s.anexoNumero}>{String(numero).padStart(2, '0')}</Text>
+          <View>
+            <Text style={s.anexoRol}>{id.rol.toUpperCase()}</Text>
+            <Text style={s.anexoNombre}>{id.nombre}</Text>
+          </View>
+        </View>
+        <View style={s.anexoFilete} />
+        <View style={[s.anexoCaja, foto ? s.anexoConFoto : s.anexoSinFoto]}>
+          {foto ? (
+            /* eslint-disable-next-line jsx-a11y/alt-text -- el <Image> de
+               @react-pdf/renderer no acepta alt: no es una imagen del DOM. */
+            <Image style={s.anexoFoto} src={foto} />
+          ) : (
+            <Text style={s.anexoLeyenda}>{ANEXO_SIN_FOTO}</Text>
+          )}
+        </View>
+        {id.identificacion ? (
+          <Text style={s.anexoPie}>{id.identificacion}</Text>
+        ) : null}
+      </View>
+    )
+  }
+
+  /* ---------- Cierre de la hoja firmada (§8.2) ---------- */
+  // Los del flujo; el médico no se cuenta ahí porque no se le pregunta: su
+  // rúbrica se estampa siempre.
+  const DEL_FLUJO = ['paciente', 'familiar', 'testigo_1', 'testigo_2']
+  const firmaron = DEL_FLUJO.filter(r => porRol.has(r)).length
+  // Sin el dato, el suelo honesto es «tantos previstos como firmaron»: nunca
+  // inventa una ausencia.
+  const previstos = data.previstos ?? firmaron
+
+  // Un elemento y NO un componente declarado dentro del render: los dos de este
+  // archivo que sí lo son ya arrastran ese aviso del linter y no se le suma un
+  // tercero.
+  const huellaCompleta = data.huella ?? ''
+  const cierreSellado = !sellado ? null : (
+    <View style={s.cierreBox}>
+      {/* El singular importa: el mínimo real es UN firmante —un consentimiento
+          que firma solo el paciente, sin familiar ni testigos, es válido— y
+          «1 firmantes previstos» en un documento legal se lee como un descuido. */}
+      <Text style={s.cierreText}>
+        Documento sellado el {selloLegible(data.selladoEn ?? '')} · {previstos}{' '}
+        {previstos === 1 ? 'firmante previsto' : 'firmantes previstos'}, {firmaron}{' '}
+        {firmaron === 1 ? 'firmó' : 'firmaron'}, {previstos - firmaron}{' '}
+        {previstos - firmaron === 1 ? 'no firmó' : 'no firmaron'}
+      </Text>
+      {huellaCompleta ? (
+        <Text style={s.cierreText}>
+          {/* Abreviada como en la lámina: los cuatro primeros y los cuatro últimos. */}
+          Huella SHA-256 · {huellaCompleta.length > 8
+            ? `${huellaCompleta.slice(0, 4)}…${huellaCompleta.slice(-4)}`
+            : huellaCompleta} · verificable en el expediente electrónico
+        </Text>
+      ) : null}
+    </View>
+  )
 
   /* ---------- Cédulas string ---------- */
   const credsStr = [
@@ -571,6 +978,12 @@ export default function ConsentimientoInformadoPdf({
         : 'NO autorizo la transfusión de sangre o hemoderivados, asumiendo los riesgos que esto implica.'
       : null
 
+  /* ---------- Diagnóstico de la declaración de denegación ---------- */
+  // No es obligatorio en denegación —exigirlo bloquearía un rechazo por no
+  // haber redactado antes lo que el paciente acaba de rechazar—, así que la
+  // frase se compone SIN el inciso cuando falta, y no con un hueco ni un guion.
+  const dxDenegacion = data.diagnostico?.trim() ?? ''
+
   const fotosLine = data.autorizaFotos
     ? 'Autorizo la toma de fotografías clínicas con fines de documentación médica y seguimiento del tratamiento.'
     : null
@@ -581,6 +994,9 @@ export default function ConsentimientoInformadoPdf({
 
   return (
     <Document>
+      {/* Las tres hojas del consentimiento NO se emiten cuando el documento es
+          la denegación: es un documento que SUSTITUYE, no que se anexa. */}
+      {!data.soloDenegacion && (<>
       {/* =================== PAGE 1 =================== */}
       <Page size="LETTER" style={s.page}>
         {/* Header fixed */}
@@ -774,10 +1190,53 @@ export default function ConsentimientoInformadoPdf({
 
           {/* Firmas */}
           <FirmasBlock />
+          {cierreSellado}
       </Page>
 
-      {/* =================== PAGE 4 (optional) =================== */}
-      {data.imprimirDenegacion ? (
+      {/* ============ ANEXO — hoja condicional (§6) ============
+          Solo si al menos una identificación trae fotografía. Un consentimiento
+          en el que nadie anexó identificación cierra en las firmas. */}
+      {hayAnexo ? (
+        <Page size="LETTER" style={s.page}>
+          <View fixed style={s.headerFixed}>
+            <BarraTop colors={colors} />
+            <View style={s.headerInner}>
+              <PdfHeader
+                medico={medico}
+                colors={colors}
+                logoUrl={logoUrl}
+                folio={data.folio}
+                fecha={data.fecha}
+                compact
+                consultorio={consultorio}
+              />
+            </View>
+          </View>
+          <View fixed style={s.footerFixed}>
+            <BarraBottom colors={colors} medico={medico} consultorio={consultorio} />
+          </View>
+
+          <PdfWatermark logoUrl={logoUrl} />
+
+            <Text style={s.contLabel}>{ANEXO_ROTULO}</Text>
+            <Text style={s.anexoEntradilla}>{ANEXO_ENTRADILLA}</Text>
+
+            {enParejas(identificaciones).map((fila, indiceFila) => (
+              <View key={fila[0].rol} style={s.anexoFila}>
+                {fila.map((id, columna) => (
+                  <View key={id.rol}
+                    style={columna === 0 ? s.anexoCelda : [s.anexoCelda, s.anexoCeldaSiguiente]}>
+                    {recuadroAnexo(id, indiceFila * 2 + columna + 1)}
+                  </View>
+                ))}
+              </View>
+            ))}
+        </Page>
+      ) : null}
+      </>)}
+
+      {/* ============ DENEGACIÓN — hoja única y excluyente ============ */}
+      {data.soloDenegacion ? (
         <Page size="LETTER" style={s.page}>
           <View fixed style={s.headerFixed}>
             <BarraTop colors={colors} />
@@ -808,16 +1267,26 @@ export default function ConsentimientoInformadoPdf({
                 </Text>
               </View>
               <View style={s.denegBody}>
+                {/* La cadena literal de GUIA_FORM_DENEGACION §5, con el inciso
+                    del diagnóstico. Los cuatro datos destacados llevan el mismo
+                    tratamiento —`declBold`—: el diagnóstico con otro peso se
+                    leería como un dato de otra clase dentro de la misma frase. */}
                 <Text style={s.denegText}>
-                  Yo, <Text style={s.declBold}>{data?.paciente ?? 'Pte. no identificado'}</Text>, declaro que he sido
-                  informado(a) de manera clara y completa sobre el procedimiento:{' '}
-                  <Text style={s.declBold}>{data?.procedimiento ?? ''}</Text>, sus riesgos, beneficios
-                  y alternativas por el/la Dr(a).{' '}
+                  Yo, <Text style={s.declBold}>{data?.paciente ?? 'Pte. no identificado'}</Text>
+                  {dxDenegacion !== '' ? (
+                    <>, con diagnóstico de <Text style={s.declBold}>{dxDenegacion}</Text></>
+                  ) : null}
+                  , declaro que he sido informado de manera clara y completa sobre el
+                  procedimiento <Text style={s.declBold}>{data?.procedimiento ?? ''}</Text>,
+                  sus riesgos, beneficios y alternativas, por el{' '}
                   <Text style={s.declBold}>{nombre}</Text>.
                 </Text>
+                {/* Sin versalitas ni barra: las versalitas dentro del texto
+                    corrido no existen en el sistema y la barra no es un recurso
+                    declarado. El énfasis lo lleva el título del documento. */}
                 <Text style={s.denegText}>
                   No obstante, en pleno uso de mis facultades y de forma libre y voluntaria,
-                  manifiesto mi decisión de NO autorizar / REVOCAR la autorización
+                  manifiesto mi decisión de no autorizar o revocar la autorización
                   previamente otorgada para la realización del procedimiento descrito,
                   asumiendo las consecuencias que de ello puedan derivarse, las cuales me han
                   sido explicadas.

@@ -43,7 +43,7 @@ export interface TempPatient {
 export interface TempDocument {
   id: string
   temp_patient_id: string
-  tipo: 'receta' | 'nota_medica' | 'solicitud_lab' | 'solicitud_imagen' | 'plan_suplementacion' | 'nota_honorarios' | 'escrito_medico' | 'consentimiento_informado' | 'solicitud_internamiento'
+  tipo: 'receta' | 'nota_medica' | 'solicitud_lab' | 'solicitud_imagen' | 'plan_suplementacion' | 'nota_honorarios' | 'escrito_medico' | 'consentimiento_informado' | 'denegacion_consentimiento' | 'solicitud_internamiento'
   contenido: Record<string, unknown>
   created_at: string
   medico_id: string

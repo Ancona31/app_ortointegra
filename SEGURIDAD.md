@@ -121,11 +121,7 @@ El sistema implementa dos capas de rate limiting:
 | `/api/labs-extract` | 15 solicitudes / 24 horas |
 | `/api/nota-medica` | 20 solicitudes / 24 horas |
 
-**Por IP** (endpoint público):
-
-| Endpoint | Límite |
-|---|---|
-| `/api/r/[folio]` (verificación pública de recetas) | 30 solicitudes / hora |
+**Por IP** (endpoint público): ninguno vigente. `/api/r/[folio]` tenía 30 solicitudes/hora y se eliminó — publicaba el contenido completo de la receta con privilegios de servicio. La verificación pública vive hoy solo en la página `/r/[folio]`, que no lee `contenido` clínico. El ayudante `checkIpRateLimit` de `src/lib/rateLimit.ts` sigue disponible para el próximo endpoint público que lo necesite.
 
 Los conteos se persisten en Supabase para ser efectivos en entornos serverless con múltiples instancias.
 

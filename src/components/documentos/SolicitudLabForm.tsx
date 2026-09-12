@@ -2,19 +2,32 @@
 import { generateDocFileName } from '@/lib/patientUtils'
 import { useMedicoInfo } from '@/hooks/useMedicoInfo'
 import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
-import { generarPdf } from '@/lib/mobileShare'
+import { generarPdf, VERSION_DE_EMISION, versionQueEmite } from '@/lib/mobileShare'
 import { useToast } from '@/components/ui/Toast'
+import ModalDocumentoGenerado from '@/components/documentos/ModalDocumentoGenerado'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
-import { Plus, Trash2, Printer, Loader2 } from 'lucide-react'
+import { Plus, Trash2, AlertTriangle, FlaskConical } from 'lucide-react'
+import PieAccionesDocumento from '@/components/documentos/PieAccionesDocumento'
 import { flushSync } from 'react-dom'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
-import AutocompleteEstudio from '@/components/AutocompleteEstudio'
+import Link from 'next/link'
+import ComboEscribible from '@/components/documentos/ComboEscribible'
+import { usePlantillasDocumento, type ContenidoPlantilla } from '@/components/documentos/PlantillasDocumento'
+import { ESTUDIOS_LAB } from '@/lib/estudiosLab'
+import { folioImpreso } from '@/lib/documentos/folio'
 import { createClient } from '@/lib/supabase/client'
-import { hoyEnTZ } from '@/lib/dates'
+import { hoyEnTZ, desplazarFecha, TZ_CLINICA } from '@/lib/dates'
+import { enfocarYAcercar } from '@/lib/scrollDoc'
 
+/**
+ * Diez cadenas fijas, sin identificador ni versión: la comparación con la lista
+ * es de texto exacto. Si una cambia, las plantillas guardadas dejan de encender
+ * ese chip pero el estudio sigue en la lista — ni el panel ni el formulario
+ * pueden asumir que un estudio guardado tiene chip. Consecuencia declarada.
+ */
 const ESTUDIOS_PRESET = [
   'Biometría Hemática',
   'Glucosa',
@@ -26,7 +39,24 @@ const ESTUDIOS_PRESET = [
   'Perfil Tiroideo Completo',
   'Urocultivo',
   'Cultivo de Secreción',
-]
+] as const
+
+const FECHA_MIN = '1900-01-01'
+
+/**
+ * Predicado único de «formulario vacío». Mismo criterio que Honorarios: los
+ * campos que llegan prellenados de la ficha NO cuentan como escritos hasta que
+ * se editan, porque llegaron solos.
+ */
+function isFormEmpty(
+  estudios: string[], notas: string,
+  paciente: string, pacienteInicial: string,
+  diagnostico: string, diagnosticoInicial: string,
+): boolean {
+  const pacienteIntacto = paciente.trim() === '' || paciente.trim() === pacienteInicial.trim()
+  const dxIntacto = diagnostico.trim() === '' || diagnostico.trim() === diagnosticoInicial.trim()
+  return pacienteIntacto && dxIntacto && notas.trim() === '' && estudios.every(e => e.trim() === '')
+}
 
 interface Props {
   pacienteInicial?: string
@@ -34,10 +64,49 @@ interface Props {
   pacienteId?: string
   offlineMode?: boolean
   onOfflineSave?: () => void
+  /** Reporta al host si el formulario sigue vacío (guía 04 §6.1 y §6.2). */
+  onVacioChange?: (vacio: boolean) => void
+  /**
+   * El modal de «documento generado» se cerró — o sea, el documento ya salió y
+   * el médico terminó con él.
+   *
+   * ⚠️⚠️ ESTO ES LO ÚNICO QUE IMPIDE EDITAR UN DOCUMENTO YA EMITIDO, y quien
+   * venga a quitarlo tiene que saberlo. El host responde deseleccionando el
+   * tipo, y eso DESMONTA este formulario. Esa es toda la garantía: entre emitir
+   * y desmontar no hay ventana editable —el modal tapa el formulario, atrapa el
+   * foco (`ModalShell:153-176`) y bloquea el scroll—, así que cuando el
+   * formulario vuelve a existir es uno nuevo y vacío.
+   *
+   * Aquí hubo una segunda red —una huella del contenido al emitir, comparada
+   * con la de cada render, que devolvía el diálogo de descarte si el médico
+   * seguía escribiendo— y se retiró: con el desmontaje no llegaba a dispararse
+   * nunca. Si algún día el host deja de desmontar, ese caso se reabre y esa red
+   * hay que reponerla.
+   *
+   * Existe para que el HOST pueda replegar su selector y volver a la rejilla de
+   * los ocho tipos: el formulario no puede hacerlo solo porque no es dueño del
+   * `value` del selector, y a estas alturas seguir enseñando la receta recién
+   * emitida no ayuda a nadie.
+   *
+   * ⚠️ SE DISPARA AL CERRAR EL MODAL Y NO AL EMITIR, y la diferencia importa:
+   * este mismo componente RENDERIZA ese modal, así que soltar la señal al
+   * emitir haría que el host lo desmontara con el PDF todavía en pantalla.
+   *
+   * Opcional: el búnker y cualquier montaje sin selector lo omiten y no pasa
+   * nada.
+   */
+  onCerrarTrasEmitir?: () => void
+  /**
+   * El panel de plantillas sustituye al formulario en su mismo espacio, y
+   * mientras está abierto el selector de tipo del host se oculta (spec 02 §3.1):
+   * elegir otro tipo desde ahí tiraría el formulario sobre el que el panel
+   * opera.
+   */
+  onPanelPlantillasChange?: (abierto: boolean) => void
 }
 
-export default function SolicitudLabForm({ pacienteInicial = '', diagnosticoInicial = '', pacienteId, offlineMode, onOfflineSave }: Props) {
-  const { medicoInfo: onlineMedicoInfo } = useMedicoInfo()
+export default function SolicitudLabForm({ pacienteInicial = '', diagnosticoInicial = '', pacienteId, offlineMode, onOfflineSave, onVacioChange, onCerrarTrasEmitir, onPanelPlantillasChange }: Props) {
+  const { medicoInfo: onlineMedicoInfo, isLoading: cargandoPerfil } = useMedicoInfo()
   const { consultorioActivo } = useConsultorioActivo()
 
   // In offline mode, read doctor profile from localStorage (pre-fetched with Base64 assets)
@@ -63,24 +132,113 @@ export default function SolicitudLabForm({ pacienteInicial = '', diagnosticoInic
     firma_url: offlineProfile.firma_base64,
     clinica_nombre: offlineProfile.clinica_nombre,
   } : onlineMedicoInfo
+
+  // Imprimir antes de que resuelva el perfil produce un PDF con el encabezado
+  // vacío: sin nombre, sin cédulas, sin domicilio. Solo bloquea mientras carga;
+  // si resuelve sin datos el botón se habilita igual.
+  const perfilPendiente = cargandoPerfil && !medicoInfo
   const toast = useToast()
   const [paciente, setPaciente] = useState(pacienteInicial)
-  const [fecha, setFecha] = useState(hoyEnTZ())
+  // `TZ_CLINICA` explícito, no el huso del dispositivo: este inicializador de
+  // `useState` corre TAMBIÉN en la pasada de SSR, donde `tzDispositivo()`
+  // devolvería UTC de Vercel y el cliente lo corregiría al hidratar — fecha
+  // parpadeante en un formulario que emite un documento legal. Y la fecha del
+  // documento es de la clínica de todos modos (LA REGLA, en `@/lib/dates`).
+  const [fecha, setFecha] = useState(hoyEnTZ(TZ_CLINICA))
   const [diagnostico, setDiagnostico] = useState(diagnosticoInicial)
   const [estudios, setEstudios] = useState<string[]>([''])
   const [notas, setNotas] = useState('')
   const [errorGuardado, setErrorGuardado] = useState('')
   const [imprimiendo, setImprimiendo] = useState(false)
+  const [docGenerado, setDocGenerado] = useState<{ blob: Blob; guardado: boolean; documentoId: string | null } | null>(null)
+  // El banner de faltantes NO existe hasta el primer intento de imprimir: un
+  // formulario recién abierto no acusa de nada. Después permanece y se
+  // actualiza en vivo.
+  const [intentado, setIntentado] = useState(false)
+
+  const formRef = useRef<HTMLDivElement>(null)
+  const pacienteRef = useRef<HTMLInputElement>(null)
+
+  /* Lo que decide «¿está vacío?». La tupla se extiende sobre `isFormEmpty`, así
+     que el compilador impide que diverja de su firma.
+     ⚠️ SE LLAMA `paraVacio` Y NO `contenido`: `imprimir()` declara su propio
+     `contenido` con lo que se manda a imprimir, y dos nombres iguales en dos
+     ámbitos anidados es una trampa de lectura. */
+  const paraVacio = [estudios, notas, paciente, pacienteInicial, diagnostico, diagnosticoInicial] as const
+  const vacio = isFormEmpty(...paraVacio)
+
+  useEffect(() => { onVacioChange?.(vacio) }, [vacio, onVacioChange])
+
+  // ── Plantillas (spec 02) ────────────────────────────────────────
+  // Se guarda TODO menos los datos del paciente. Aquí eso deja fuera paciente,
+  // diagnóstico y fecha: los tres son suyos aunque los teclee el médico, y una
+  // plantilla con la fecha congelada es un defecto.
+  const plantillas = usePlantillasDocumento({
+    tipo: 'solicitud_lab',
+    vacio,
+    // El búnker no tiene red ni sesión de Supabase: el sistema no se monta.
+    desactivado: !!offlineMode,
+    onPanelChange: onPanelPlantillasChange,
+    leer: () => ({ _v: 1, estudios: estudios.filter(e => e.trim() !== ''), notas }),
+    aplicar: (c: ContenidoPlantilla) => {
+      // Solo las claves que existen HOY en el formulario, y comprobando el tipo
+      // de cada una: el jsonb pudo guardarse con otra versión del formulario.
+      // Los dos `else` NO son defensa de sobra: «Vaciar formulario» aplica un
+      // contenido sin ninguna clave, así que es justo lo que repone el estado
+      // inicial. El paciente y el diagnóstico no se tocan aquí, y por eso
+      // sobreviven al vaciado.
+      const guardados = Array.isArray(c.estudios)
+        ? c.estudios.filter((e): e is string => typeof e === 'string' && e.trim() !== '')
+        : []
+      setEstudios(guardados.length > 0 ? guardados : [''])
+      setNotas(typeof c.notas === 'string' ? c.notas : '')
+    },
+  })
+
+  // G-10: foco al primer campo editable vacío al montar. preventScroll para no
+  // arrastrar la página hasta él. En móvil esto abre el teclado en cada montaje.
+  useEffect(() => {
+    const primero = formRef.current?.querySelector<HTMLElement>('input:not([type="date"]), textarea')
+    if (primero instanceof HTMLInputElement && !primero.value) primero.focus({ preventScroll: true })
+  }, [])
 
   function addEstudio() { setEstudios([...estudios, '']) }
   function removeEstudio(i: number) { setEstudios(estudios.filter((_, idx) => idx !== i)) }
   function updateEstudio(i: number, val: string) { setEstudios(estudios.map((e, idx) => idx === i ? val : e)) }
-  function togglePreset(e: string) {
-    if (estudios.includes(e)) setEstudios(estudios.filter(s => s !== e))
-    else setEstudios([...estudios.filter(s => s !== ''), e])
+
+  // L-01: una sola fuente de verdad. El chip no guarda estado — lo inserta o lo
+  // retira de `estudios`, y su encendido se deriva de ahí. Dos arrays divergen
+  // siempre.
+  function togglePreset(preset: string) {
+    if (estudios.includes(preset)) setEstudios(estudios.filter(e => e !== preset))
+    else setEstudios([...estudios.filter(e => e.trim() !== ''), preset])
+  }
+
+  // ── Validación (§3.8) ───────────────────────────────────────────
+  const faltantes: { clave: string; nombre: string }[] = []
+  if (!paciente.trim()) faltantes.push({ clave: 'paciente', nombre: 'Paciente' })
+  if (estudios.every(e => e.trim() === '')) faltantes.push({ clave: 'estudios', nombre: 'Estudios' })
+
+  function textoFaltantes(): string {
+    const n = faltantes.length
+    const cabeza = faltantes.slice(0, 3).map(f => f.nombre).join(' · ')
+    const resto = n > 3 ? ` y ${n - 3} más` : ''
+    return `${n === 1 ? 'Falta 1 campo' : `Faltan ${n} campos`}: ${cabeza}${resto}`
+  }
+
+  function irA(clave: string) {
+    if (clave === 'paciente') { enfocarYAcercar(pacienteRef.current); return }
+    enfocarYAcercar(formRef.current?.querySelector<HTMLElement>('#laboratorio-estudio-0') ?? null)
   }
 
   async function imprimir() {
+    // El primario nunca está gris por faltantes: un botón apagado no enseña qué
+    // falta, el banner sí. Al pulsar con faltantes no emite y lleva al primero.
+    if (faltantes.length > 0) {
+      setIntentado(true)
+      irA(faltantes[0].clave)
+      return
+    }
     flushSync(() => { setErrorGuardado(''); setImprimiendo(true) })
 
     // 1. Feedback instantáneo
@@ -98,11 +256,62 @@ export default function SolicitudLabForm({ pacienteInicial = '', diagnosticoInic
       fecha,
     }
 
-    // Flags de tracking para diferenciar errores
-    let pdfGenerated = false
+    // El blob y el desenlace de la persistencia se leen en el finally para
+    // montar el modal posterior a la generación. Ver ModalDocumentoGenerado.
+    let pdfBlob: Blob | null = null
+    let guardado = false
+    let filaId: string | null = null
+    let folio: string | null = null
 
     try {
-      // 3. PDF PRIMERO — si falla, abortamos antes de persistir
+      // ── 3 · LA FILA PRIMERO, porque de ella sale el folio ─────────────
+      //    Invierte el orden que este formulario tenía —PDF, subida, fila—. El
+      //    trigger asigna el folio en el INSERT, así que el número solo existe
+      //    DESPUÉS de escribir y renderizar antes imprimía un papel sin él: un
+      //    número que no está en el papel no sirve para que nadie te cite el
+      //    documento por teléfono. Es el orden que ya seguían el consentimiento
+      //    y la denegación (`20260812_documentos_estado.sql`, trampa 2).
+      //
+      //    Va con el cliente de SESIÓN del médico, nunca con privilegios de
+      //    servicio: el trigger exenta por completo a quien no trae JWT y la
+      //    fila quedaría emitida con folio nulo para siempre.
+      //
+      //    Precio de la inversión, aceptado: si el render falla, la fila ya
+      //    existe y el folio ya se consumió. No queda huérfana —aparece en la
+      //    lista con su botón de regenerar— y el mensaje de error lo dice con el
+      //    folio delante.
+      const supabase = offlineMode ? null : createClient()
+      if (supabase) {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) throw new Error('No autenticado')
+
+        const insertPayload: Record<string, unknown> = {
+          tipo: 'solicitud_lab',
+          contenido,
+          client_id: clientId,
+          subido_por: user.id,
+          // CON QUÉ CHASIS SALE EL PAPEL. La fila nace emitida, así que la
+          // versión se fija aquí y a partir de este INSERT es inmutable
+          // (`20260813_formato_version_inmutable.sql`). Tiene que ser el mismo
+          // número que recibe `generarPdf` más abajo.
+          formato_version: VERSION_DE_EMISION,
+        }
+        if (pacienteId) insertPayload.paciente_id = pacienteId
+
+        const { data, error } = await supabase
+          .from('documentos')
+          .insert(insertPayload)
+          .select('id, folio')
+          .single()
+        if (error) throw error
+        filaId = data.id
+        folio = data.folio
+        // La fila está en el expediente. Aunque el PDF falle después, el
+        // documento es recuperable desde la lista con su botón de regenerar.
+        guardado = true
+      }
+
+      // ── 4 · El PDF, ya con el número que la base acaba de asignar ─────
       const fechaFormat = format(new Date(fecha + 'T12:00:00'), "dd 'de' MMMM 'de' yyyy", { locale: es })
 
       const medicoData = medicoInfo ? {
@@ -114,6 +323,9 @@ export default function SolicitudLabForm({ pacienteInicial = '', diagnosticoInic
         especialidad: medicoInfo.especialidad,
         cedula_profesional: medicoInfo.cedula_profesional,
         cedula_especialidad: medicoInfo.cedula_especialidad,
+        // El membrete de v2 la exige por normativa (I.3.7) y sin ella el
+        // renglón sale sin universidad, en silencio.
+        universidad: medicoInfo.universidad ?? null,
         color_primario: medicoInfo.color_primario,
         color_secundario: medicoInfo.color_secundario,
         direccion_consultorio: medicoInfo.direccion_consultorio,
@@ -129,7 +341,7 @@ export default function SolicitudLabForm({ pacienteInicial = '', diagnosticoInic
         telefono: consultorioActivo.telefono,
       } : undefined
 
-      const { storagePath } = await generarPdf({
+      const { blob, storagePath } = await generarPdf({
         tipo: 'solicitud_lab',
         pacienteId,
         medico: medicoData,
@@ -139,15 +351,23 @@ export default function SolicitudLabForm({ pacienteInicial = '', diagnosticoInic
           diagnostico,
           estudios: estudios.filter(Boolean),
           notas: notas || undefined,
+          // En el búnker offline no hay fila ni base, así que llega undefined y
+          // el papel sale sin número, igual que hasta ahora.
+          folio: folioImpreso('solicitud_lab', folio),
         },
         logoUrl,
         filename: generateDocFileName(paciente, 'Solicitud_Laboratorio'),
         consultorio: consultorioData,
+        // El mismo número que acaba de escribirse en la fila. Ver `versionQueEmite`.
+        formatoVersion: versionQueEmite(offlineMode),
+        // El búnker offline queda intacto: sigue entregando el PDF él mismo y
+        // no monta el modal — onOfflineSave desmonta el formulario al guardar.
+        entregar: !!offlineMode,
       })
 
-      pdfGenerated = true
+      pdfBlob = blob
 
-      // 4. Persistencia
+      // ── 5 · La ruta del archivo, sobre la fila que ya existe ──────────
       if (offlineMode) {
         const { addDocument } = await import('@/lib/offline/db')
         const { getOfflineIdentity } = await import('@/lib/offline/identity')
@@ -163,103 +383,217 @@ export default function SolicitudLabForm({ pacienteInicial = '', diagnosticoInic
         toast.success('Solicitud de laboratorio guardada en bunker offline')
         onOfflineSave?.()
       } else {
-        const supabase = createClient()
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) throw new Error('No autenticado')
-
-        const insertPayload: Record<string, unknown> = {
-          tipo: 'solicitud_lab',
-          contenido,
-          client_id: clientId,
-          pdf_url: storagePath,
-          subido_por: user.id,
+        if (storagePath && filaId && supabase) {
+          // Este UPDATE no toca ni el estado ni el folio, así que el trigger lo
+          // deja pasar. No es fatal si falla: la fila está y el PDF se entrega
+          // igual; lo que se pierde es la descarga desde la lista, que el botón
+          // de regenerar repone.
+          const { error } = await supabase
+            .from('documentos')
+            .update({ pdf_url: storagePath })
+            .eq('id', filaId)
+          if (error) console.error('[SolicitudLabForm] update pdf_url:', error.message)
         }
-        if (pacienteId) insertPayload.paciente_id = pacienteId
-
-        const { error } = await supabase.from('documentos').insert(insertPayload)
-        if (error) throw error
-
-        toast.success('Solicitud guardada')
+        toast.success(folio
+          ? `Solicitud de laboratorio guardada · ${folio}`
+          : 'Solicitud de laboratorio guardada')
       }
     } catch (err) {
-      if (!pdfGenerated) {
-        toast.error('No se pudo generar el PDF. Intenta de nuevo.')
-        setErrorGuardado('No se pudo generar el PDF. Intenta de nuevo.')
+      // Tres desenlaces, y el del medio es nuevo: con la fila escrita antes que
+      // el PDF, un fallo de render deja un documento emitido y un folio
+      // consumido. Decirlo con el número delante es lo que permite encontrarlo
+      // en la lista y recuperar el PDF desde ahí.
+      let msg: string
+      if (offlineMode) {
+        msg = 'No se pudo generar el PDF. Intenta de nuevo.'
+      } else if (filaId === null) {
+        msg = 'No se pudo guardar la solicitud, así que no se generó el PDF. Intenta de nuevo.'
       } else {
-        toast.error('Solicitud generada pero no se pudo guardar. Revisa errores de sincronización.')
-        setErrorGuardado('Error al guardar la solicitud.')
+        msg = `La solicitud quedó registrada${folio ? ` con folio ${folio}` : ''}, pero no se pudo `
+          + 'generar el PDF. Búscala en la lista de documentos del paciente y recupérala desde ahí.'
       }
+      toast.error(msg)
+      setErrorGuardado(msg)
       // eslint-disable-next-line no-console
       console.error('[SolicitudLabForm] imprimir falló:', err)
     } finally {
       setImprimiendo(false)
+      // También cuando la persistencia falló: el PDF existe y con el paciente
+      // enfrente lo urgente es poder imprimirlo.
+      if (pdfBlob && !offlineMode) { setDocGenerado({ blob: pdfBlob, guardado, documentoId: filaId }) }
     }
   }
 
+  const senalar = (clave: string) => intentado && faltantes.some(f => f.clave === clave)
+  const conNumeral = estudios.length >= 2
+
   return (
-    <div className="space-y-5">
-      <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-        <h2 className="font-semibold text-slate-700 text-sm mb-4">Datos del paciente</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div><label className="text-xs font-medium text-slate-500 block mb-1">Fecha</label>
-            <input type="date" value={fecha} onChange={e => setFecha(e.target.value)} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" /></div>
-          <div><label className="text-xs font-medium text-slate-500 block mb-1">Paciente <span className="text-red-400">*</span></label>
-            <input type="text" value={paciente} onChange={e => setPaciente(e.target.value)} placeholder="Nombre completo" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" /></div>
-          <div><label className="text-xs font-medium text-slate-500 block mb-1">Diagnóstico</label>
-            <input type="text" value={diagnostico} onChange={e => setDiagnostico(e.target.value)} placeholder="Dx de envío" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" /></div>
-        </div>
-      </div>
+    <div ref={formRef} className="sp-doc-form">
+      {/* El árbol del formulario NO se desmonta cuando el panel de plantillas
+          está abierto: se apaga con display:none y el panel se monta como
+          hermano, en el mismo contenedor de scroll (spec 02 §3.1). */}
+      <div className="sp-doc-formbody" style={plantillas.panelAbierto ? { display: 'none' } : undefined}>
 
-      {/* Preset rápido */}
-      <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-        <h2 className="font-semibold text-slate-700 text-sm mb-3">Estudios frecuentes</h2>
-        <div className="flex flex-wrap gap-2">
-          {ESTUDIOS_PRESET.map(e => (
-            <button key={e} onClick={() => togglePreset(e)}
-              className={`text-xs px-3 py-1.5 rounded-full border transition-all ${estudios.includes(e) ? 'bg-[#1e5fa8] text-white border-[#1e5fa8]' : 'bg-slate-50 text-slate-600 border-slate-200 hover:border-[#1e5fa8]'}`}>
-              {e}
-            </button>
-          ))}
-        </div>
-      </div>
+      {plantillas.selector}
 
-      {/* Lista manual */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
-        <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 rounded-t-xl flex items-center justify-between">
-          <h2 className="font-semibold text-slate-700 text-sm">Estudios solicitados</h2>
-          <button onClick={addEstudio} className="flex items-center gap-1 text-xs text-[#1e5fa8] hover:text-[#1a3a5c] font-medium"><Plus size={14} /> Agregar</button>
+      <section className="sp-card sp-doc-card">
+        <div className="sp-doc-cardhead">
+          <h2 className="sp-label">Datos del paciente</h2>
         </div>
-        <div className="p-4 space-y-2">
-          {estudios.map((e, i) => (
-            <div key={i} className="flex items-center gap-2">
-              <span className="text-slate-400 text-sm w-5">{i + 1}.</span>
-              <AutocompleteEstudio
-                value={e}
-                onChange={val => updateEstudio(i, val)}
-                index={i}
-              />
-              {estudios.length > 1 && <button onClick={() => removeEstudio(i)} className="text-red-400 hover:text-red-600"><Trash2 size={14} /></button>}
+        <div className="sp-doc-cardbody">
+          <div className="sp-doc-grid" data-cols="3">
+            <div className="sp-doc-field">
+              <label htmlFor="laboratorio-fecha" className="sp-label-field">Fecha</label>
+              <input id="laboratorio-fecha" type="date" value={fecha}
+                min={FECHA_MIN} max={desplazarFecha(hoyEnTZ(TZ_CLINICA), { anios: 1 })}
+                onChange={e => setFecha(e.target.value)} className="sp-input" />
             </div>
-          ))}
+            <div className="sp-doc-field">
+              <label htmlFor="laboratorio-paciente" className="sp-label-field">
+                Paciente <span aria-hidden="true" style={{ color: 'var(--sp-danger)' }}>*</span>
+                <span className="sr-only">obligatorio</span>
+              </label>
+              <input ref={pacienteRef} id="laboratorio-paciente" type="text" value={paciente}
+                onChange={e => setPaciente(e.target.value)} placeholder="Nombre completo"
+                aria-invalid={senalar('paciente') || undefined}
+                className={`sp-input ${senalar('paciente') ? 'sp-doc-invalid' : ''}`} />
+            </div>
+            <div className="sp-doc-field">
+              <label htmlFor="laboratorio-diagnostico" className="sp-label-field">Diagnóstico</label>
+              <input id="laboratorio-diagnostico" type="text" value={diagnostico}
+                onChange={e => setDiagnostico(e.target.value)} placeholder="Dx de envío" className="sp-input" />
+            </div>
+          </div>
         </div>
-      </div>
+      </section>
 
-      <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-        <label className="text-sm font-semibold text-slate-700 block mb-2">Indicaciones / Notas</label>
-        <textarea value={notas} onChange={e => setNotas(e.target.value)} placeholder="Indicaciones especiales, ayuno requerido..." rows={2}
-          className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
-      </div>
-
-      {errorGuardado && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
-          {errorGuardado}
+      <section className="sp-card sp-doc-card">
+        <div className="sp-doc-cardhead">
+          <h2 className="sp-label">Estudios frecuentes</h2>
         </div>
+        <div className="sp-doc-cardbody">
+          <div className="sp-doc-chips">
+            {ESTUDIOS_PRESET.map(preset => (
+              <button key={preset} type="button" onClick={() => togglePreset(preset)}
+                aria-pressed={estudios.includes(preset)} className="sp-chip">
+                {preset}
+              </button>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="sp-card sp-doc-card">
+        <div className="sp-doc-cardhead">
+          <div className="sp-icobox sp-icobox--sm"><FlaskConical /></div>
+          <h2 className="sp-label">Estudios solicitados</h2>
+          <button type="button" onClick={addEstudio} aria-label="Agregar"
+            className="sp-btn sp-btn--compact sp-doc-add">
+            <Plus size={17} /><span className="sp-doc-long">Agregar</span>
+          </button>
+        </div>
+        <div className="sp-doc-cardbody">
+          {estudios.length === 0 ? (
+            <div className="sp-doc-empty">
+              <div className="sp-icobox sp-icobox--sm"><FlaskConical /></div>
+              <p className="sp-hint">Sin estudios. Usa «Agregar».</p>
+            </div>
+          ) : (
+            <div className={estudios.length >= 4 ? 'sp-doc-list--long' : undefined}>
+              {estudios.map((estudio, i) => (
+                <div key={i} className="sp-doc-listrow">
+                  {conNumeral && <span className="sp-label sp-doc-listnum">{i + 1}.</span>}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <ComboEscribible
+                      id={`laboratorio-estudio-${i}`}
+                      value={estudio}
+                      onChange={val => updateEstudio(i, val)}
+                      sugerencias={ESTUDIOS_LAB}
+                      minCaracteres={2}
+                      placeholder="Nombre del estudio"
+                      pie="Ninguno encaja: escribe el nombre y se usa tal cual."
+                      invalido={senalar('estudios')}
+                      claseExtra={senalar('estudios') ? 'sp-doc-invalid' : ''}
+                    />
+                  </div>
+                  <button type="button" onClick={() => removeEstudio(i)} disabled={estudios.length === 1}
+                    aria-label={estudio.trim() ? `Eliminar ${estudio.trim()}` : `Eliminar estudio ${i + 1}`}
+                    className="sp-doc-iconbtn">
+                    <Trash2 />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
+      <section className="sp-card sp-doc-card">
+        <div className="sp-doc-cardhead">
+          <h2 className="sp-label">Indicaciones / Notas</h2>
+        </div>
+        <div className="sp-doc-cardbody">
+          <label htmlFor="laboratorio-notas" className="sr-only">Indicaciones / Notas</label>
+          <textarea id="laboratorio-notas" value={notas} onChange={e => setNotas(e.target.value)}
+            placeholder="Indicaciones especiales, ayuno requerido…" className="sp-textarea" />
+        </div>
+      </section>
+
+      {errorGuardado && <p className="sp-banner sp-banner--danger">{errorGuardado}</p>}
+
+      {!cargandoPerfil && !medicoInfo && (
+        <p className="sp-banner sp-banner--warn">
+          <AlertTriangle size={17} />
+          <span style={{ flex: 1 }}>Completa tu perfil para que el documento salga con tu encabezado.</span>
+          <Link href="/perfil" className="sp-link-alt">Ir a mi perfil</Link>
+        </p>
       )}
 
-      <button onClick={imprimir} disabled={!paciente || estudios.filter(Boolean).length === 0 || imprimiendo}
-        className="doc-print-btn w-full flex items-center justify-center gap-2 py-3 bg-[#1a3a5c] text-white rounded-xl font-medium hover:bg-[#0f2540] transition-colors disabled:opacity-50">
-        {imprimiendo ? <><Loader2 size={18} className="animate-spin" /> Generando PDF...</> : <><Printer size={18} /> Imprimir Solicitud</>}
-      </button>
+      {intentado && faltantes.length > 0 && (
+        <p className="sp-banner sp-banner--warn" aria-live="polite">
+          <AlertTriangle size={17} />
+          <span>
+            {textoFaltantes().split(':')[0]}:{' '}
+            {faltantes.slice(0, 3).map((f, i) => (
+              <span key={f.clave}>
+                {i > 0 && ' · '}
+                <button type="button" onClick={() => irA(f.clave)}
+                  className="sp-link-alt" style={{ color: 'var(--sp-warn-strong)' }}>
+                  {f.nombre}
+                </button>
+              </span>
+            ))}
+            {faltantes.length > 3 && ` y ${faltantes.length - 3} más`}
+          </span>
+        </p>
+      )}
+
+      {/* «Guardar como plantilla» va aquí y no arriba: se guarda cuando el
+          formulario YA está lleno, así que su sitio es junto al de imprimir. */}
+      <PieAccionesDocumento
+        botonGuardar={plantillas.botonGuardar}
+        onImprimir={imprimir}
+        imprimiendo={imprimiendo}
+        perfilPendiente={perfilPendiente}
+      />
+
+      </div>
+
+      {plantillas.panel}
+      {plantillas.dialogos}
+
+      <ModalDocumentoGenerado
+        open={docGenerado !== null}
+        /* Cerrar el modal es el final del documento: se suelta la señal para
+           que el host repliegue su selector. `setDocGenerado(null)` primero,
+           para que el modal se desmonte por su cuenta y no de rebote al
+           desmontarse este formulario entero. */
+        onClose={() => { setDocGenerado(null); onCerrarTrasEmitir?.() }}
+        blob={docGenerado?.blob ?? null}
+        titulo="Solicitud de laboratorio generada"
+        guardadoEnExpediente={docGenerado?.guardado ?? false}
+        documentoId={docGenerado?.documentoId ?? null}
+      />
     </div>
   )
 }

@@ -6,6 +6,21 @@
 
 ---
 
+## 📌 PENDIENTES PRIORITARIOS
+
+> **Pendiente prioritario:** auditoría de aislamiento entre clínicas. Cada
+> `createAdminClient()` esquiva la RLS; toda consulta ahí debe filtrar por
+> `clinica_id`. Detalles y casos ya encontrados en `DEUDA_TECNICA.md`.
+
+Mientras esa línea siga aquí, cualquier código nuevo que use
+`createAdminClient()` tiene que filtrar por `clinica_id` explícitamente, aunque
+parezca que no hace falta.
+
+> **Ninguna migración se aplica sin pasar antes por
+> `supabase/AUDITORIA-MIGRACIONES.md`.**
+
+---
+
 ## 🔴 PROTOCOLOS DE INTERACCIÓN — LEER PRIMERO, NO NEGOCIABLES
 
 Estos protocolos existen porque el proyecto ha sufrido regresiones severas por código inyectado fuera de scope, eliminaciones sin verificar dependencias, y "soluciones mágicas" complejas que aumentaron la fragilidad. Su violación causa retrabajo de días.
@@ -224,6 +239,14 @@ para procedimiento de actualización.
 
 * Componentes React: functional components con hooks, nunca class components
 * Nombra archivos de componentes en PascalCase, utilidades en camelCase
+* **NUNCA dos archivos cuyos nombres solo se distingan por la mayúscula**, ni
+  siquiera con extensión distinta. `ParserBloques.tsx` + `parserBloques.ts` es
+  válido en Linux y **no compila en macOS ni en Windows**, donde el filesystem no
+  distingue mayúsculas: el bundler prueba `.ts` antes que `.tsx` y el componente
+  entra como `undefined`, sin error propio. Ojo con la regla de arriba: aplicar
+  PascalCase al componente y camelCase a su utilidad hermana produce exactamente
+  ese par. Dale al segundo un nombre distinto, no solo otra caja
+  (`analizadorBloques.ts`). Ocurrió el 2026-08-07 — `DEUDA_TECNICA.md` DEP-DT-2
 * Un componente por archivo
 * Extrae lógica compleja a custom hooks en `src/hooks/` **solo cuando se use en >1 lugar**
 * Extrae utilidades reutilizables a `src/lib/` **solo cuando se use en >1 lugar**
@@ -231,6 +254,25 @@ para procedimiento de actualización.
 * Maneja errores con try/catch en toda llamada async, nunca dejes promesas sin catch
 * Usa el logger de `src/lib/logger.ts` en lugar de `console.log`
 * Imports absolutos con `@/` en lugar de rutas relativas largas
+
+### Nombres de rama
+
+Toda rama nueva lleva el prefijo `feature/` seguido de un nombre descriptivo
+en kebab-case, sin excepción por tipo de trabajo: también las de arreglo,
+refactor o documentación. Ejemplos vigentes: `feature/fase1-navegacion`,
+`feature/documentos-v2`, `feature/rediseno-landing`.
+
+Quedan en el repo unas pocas ramas anteriores a esta regla que no la siguen
+(`fix/perfil-telefono-huerfano`, `respaldo-main-mac`, y en remoto
+`dicom-viewer` y `multiconsultorio`). Son historia, no precedente: no se
+renombran, pero tampoco se imitan.
+
+### Integración de ramas — no se usan pull requests
+
+Las ramas se integran con `git merge` sobre `main` desde local (fast-forward)
+y se empujan con `git push`. **Nada de `gh pr create` ni de flujos de PR:** no
+propongas abrir un PR, no lo ofrezcas como paso siguiente y no lo ejecutes.
+Cuando una rama esté lista, lo que sigue es el merge local.
 
 ---
 
@@ -335,6 +377,7 @@ Tu primer mensaje en cada sesión debe ser:
 
 - **CALCULADORAS_ROADMAP.md** — Sistema de 200 calculadoras clínicas. Leer ANTES de trabajar en calculadoras.
 - **RESUMEN_DASHBOARD.md** — Dashboard del paciente en /expediente/[id]/estado. Leer ANTES de trabajar en esa página.
+- **DOCUMENTOS_RANURAS_MUERTAS.md** — ✅ **Cerrado.** Las siete ranuras de v2 sin productor se retiraron de los formatos, así que ya no hay nada que vigilar al cablear ni al encender `usa_documentos_v2`. Lo que queda vivo dentro es su **§2**: tres decisiones que parecen huecos y no lo son —el folio de Internamiento, el tipo y número del anexo, y las tres celdas de riel pendientes de cable—. Leerlo solo si algo de eso parece un defecto que arreglar. También registra un defecto de chasis abierto (§3): react-pdf comprime las filas de una hoja que se pasa por poco.
 
 ---
 
@@ -342,7 +385,7 @@ Tu primer mensaje en cada sesión debe ser:
 
 Lista de bugs/limitaciones aceptadas conscientemente. No corregir sin plan explícito — cada ítem tiene contexto que justifica dejarlo.
 
-1. **`regenerarYSubirPdf` muta `doc.pdf_url` local sin re-render.** En `src/components/expediente/ModalDocumentos.tsx` (migrado desde el antiguo `TabDocumentos` en Fase 6). Al regenerar un PDF, el botón de descarga no aparece hasta refetch manual. Arreglar con `setState` inmutable que reemplace el documento en la lista, no mutando el objeto por referencia.
+1. ~~**`regenerarYSubirPdf` muta `doc.pdf_url` local sin re-render.**~~ ✅ **Resuelto** (rediseño del expediente, 2026-09-09). El defecto vivía en `ModalDocumentos.tsx:345` (`doc.pdf_url = storagePath`, marcado allí como bug conocido) y **no migró**: se cerró al reescribir ese camino. Su sustituto, `regenerar()` en `src/components/expediente/PanelDocumentos.tsx:163-168`, escribe `pdf_url` en la base y llama a `onRecargarDocumentos()` —cableado a `cargarActividad()` en `expediente/[id]/page.tsx:360`—, así que la url nueva **llega por props desde un refetch** en vez de mutarse por referencia, y el botón de descarga reaparece solo. `ModalDocumentos.tsx` se borró al quedar sin consumidores.
 2. **`ModalShell` sin focus trap.** Deuda de accesibilidad. El Tab puede escapar del modal. Agregar trap cuando tengamos auditoría a11y formal.
 3. **Modales de Consultas y Documentos sin paginación.** Límite hard de 50 registros heredado de `QUERY_LIMIT` en `page.tsx`. Si un paciente tiene >50 consultas/documentos, los restantes no se ven en el modal. Agregar scroll virtual o buscador interno en fase futura.
 4. ~~**`TabGraficas.tsx` vive temporalmente en disco como archivo utilitario.**~~ ✅ Resuelto (sub-fase 0 del rediseño de labs, 2026-04-21). Archivo eliminado; `normalizarKey` y `ParamGrafica` inlined en `src/hooks/useLaboratoriosNormalizados.ts`.
@@ -498,6 +541,30 @@ Hardening conocido pero no aplicado todavía. Cada ítem tiene fix planeado y mo
 - Roles permitidos: `super_admin` + `admin` (admin de clínica puede ejecutar ARCO para pacientes de su clínica; super_admin global puede para cualquier clínica).
 - Respuesta denegada: `403 Forbidden` con JSON `{ error: "forbidden" }`.
 - Audit log: sí registrar intentos denegados.
+
+---
+
+### QR-01 — ✅ Cerrado: `/api/r/[folio]` eliminado
+
+`src/app/api/r/[folio]/route.ts` se borró entero. Devolvía el `contenido` COMPLETO de la receta —nombre del paciente, diagnóstico y medicamentos con su posología— en JSON, con `createAdminClient()`, así que la RLS no aplicaba: cualquier médico autenticado, de cualquier clínica, leía la receta de cualquier otro con `curl` y el folio. No lo llamaba nadie; era el resto de cuando `/r/[folio]` era un visor de la receta.
+
+**⚠️ NO CONFUNDIR CON `pathname.startsWith('/r/')` DE `src/middleware.ts:61`, QUE SE QUEDA.** Esa línea mantiene pública la **página** `/r/[folio]`, que es el destino del QR impreso; no cubría a la ruta API, porque `/api/r/…` no empieza por `/r/`. Retirarla creyéndola resto de esto rompería la verificación entera.
+
+Comprobado al borrar: cero consumidores en el código (el QR de la receta apunta a `/r/{folio}`, la página, en `RecetaForm.tsx:432`), y ninguna otra ruta sirve contenido de documentos con cliente de servicio — las cuatro que leen `documentos` (`/api/documentos/[id]`, `/api/me/estadisticas`, `/api/me/stats`, `/api/paciente/[id]/exportar`) usan el cliente de sesión, así que la RLS filtra. `/api/documentos/[id]/identificacion` sí usa cliente de servicio, pero comprueba `subido_por = user.id` antes y valida el prefijo de la ruta.
+
+---
+
+### QR-02 — `/demo/receta` enseña medicamentos que la página real ya no enseña
+
+**Archivo afectado:** `src/app/demo/receta/page.tsx`.
+
+**Problema:** la demo se escribió como la referencia de política —fue la primera en aplicar la minimización— y hoy va por detrás: compone la lista de medicamentos prescritos, que `/r/[folio]` retiró. Su cabecera todavía dice que la minimización sigue abierta «PARA LA PÁGINA REAL», y es al revés.
+
+Los datos son ficticios, así que **no hay fuga**: es una promesa de producto que ya no corresponde a lo que el producto hace. Quien escanee el QR de una receta de verdad verá menos que en la demostración.
+
+Al arreglarlo, la demo hereda además lo que la real estrenó y ella no tiene: el enlace al registro de cédulas con sus botones de copiar.
+
+**Cuándo atacar:** después de fusionar `feature/documentos-v2`.
 
 ---
 

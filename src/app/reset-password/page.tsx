@@ -56,8 +56,18 @@ function ResetPasswordContent() {
     }
   }
 
+  /* ⚠️ EL RELLENO DE ARRIBA LLEVA EL ÁREA SEGURA SUMADA, no sustituida.
+     Centrar protege sólo mientras el contenido CABE: en cuanto desborda
+     —formulario largo, teclado abierto, tipografía grande— el contenedor crece
+     y la tarjeta se alinea arriba. Con `viewport-fit=cover` ese borde es el
+     FÍSICO, y la franja navy de `globals.css` (`body::before`) es OPACA y mide
+     lo que la muesca (47-59 px), así que se comía la cabecera.
+     Esta pantalla no tenía relleno vertical de diseño, así que el área segura
+     es aquí todo el valor.
+     En escritorio y en una pestaña normal el `env()` vale 0 y esto queda
+     exactamente como estaba. */
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#f0f4f8] px-4">
+    <div className="min-h-screen flex items-center justify-center bg-[#f0f4f8] px-4 pt-[env(safe-area-inset-top,0px)]">
       <div className="w-full max-w-sm">
         <div className="flex flex-col items-center mb-8">
           <h1 className="text-2xl font-bold text-[#1a3a5c]">Spinus®</h1>

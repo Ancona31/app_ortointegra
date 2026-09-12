@@ -79,3 +79,25 @@ export function canManageClinica(p: RoleCheck): boolean {
 export function isMedicoInvitado(p: RoleCheck): boolean {
   return p?.role === 'medico' && p?.es_admin_de_clinica !== true
 }
+
+/**
+ * True si el usuario ve la agenda COMPLETA de su clínica, no sólo lo suyo.
+ *
+ * Espeja la capacidad que `appointments_select` ya concede en la base
+ * (20260530_etapa5h_paso3_policies_appointments.sql:81-93): administrador de
+ * clínica o secretaria leen todas las citas de la clínica; el médico invitado,
+ * sólo las de `medico_id = auth.uid()`.
+ *
+ * LISTA BLANCA A PROPÓSITO — NO se implementa como `!isMedicoInvitado(p)`.
+ * Un rol futuro tiene que caer en false por construcción, que es el fallo
+ * seguro: recibir vacío. La negación haría lo contrario y le abriría el
+ * calendario de la clínica entera sin que nadie lo hubiera decidido.
+ *
+ * Habla de la CAPACIDAD, no de la conexión de Google: que un médico invitado
+ * resuelva la conexión de su clínica es cierto (la policy de
+ * `clinica_conexiones_google` filtra por clínica, no por usuario), así que el
+ * vacío no puede derivarse de "no tiene conexión que resolver".
+ */
+export function canVerAgendaCompleta(p: RoleCheck): boolean {
+  return canManageClinica(p) || isSecretaria(p)
+}

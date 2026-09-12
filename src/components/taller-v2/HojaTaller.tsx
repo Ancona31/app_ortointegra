@@ -1,0 +1,1325 @@
+/**
+ * ⚠️ ANDAMIAJE TEMPORAL — SE BORRA AL CERRAR LA FASE 1.
+ *
+ * Hoja de prueba del taller de componentes v2. No es un formato del sistema, no
+ * se emite, no se guarda y ningún médico la ve nunca. Existe para poder mirar
+ * cada componente del chasis en un PDF real antes de que exista el formato que
+ * lo consume — sin esto, los veinte componentes de I.2 se construirían a ciegas
+ * hasta el Paso 4.
+ *
+ * Cuando la Fase 1 cierre, se borra la carpeta `src/components/taller-v2/`
+ * completa y la ruta `src/app/super-admin/dashboard/taller-v2/`. Nada del chasis
+ * depende de este archivo: la dependencia va en un solo sentido.
+ *
+ * REGLAS QUE ESTE ARCHIVO RESPETA
+ * - No importa nada de `src/lib/pdf/` (v1). El chasis v2 no comparte código con
+ *   el renderer viejo, y el taller tampoco.
+ * - No lee ni escribe base de datos ni Storage. El médico es ficticio y vive
+ *   en `TallerV2.tsx`.
+ * - Ninguna posición sale de un literal: todas vienen de `tokens.ts`.
+ */
+
+import {
+  Document,
+  Page,
+  View,
+  Text,
+  StyleSheet,
+  pdf,
+  type DocumentProps,
+} from '@react-pdf/renderer'
+import type { ReactElement } from 'react'
+import PanelCircular from '@/lib/pdf/v2/PanelCircular'
+import Membrete, { type MedicoMembrete } from '@/lib/pdf/v2/Membrete'
+import TituloDocumento from '@/lib/pdf/v2/TituloDocumento'
+import BloquePaciente from '@/lib/pdf/v2/BloquePaciente'
+import Campo from '@/lib/pdf/v2/Campo'
+import RielDatos from '@/lib/pdf/v2/RielDatos'
+import BloqueNegativo from '@/lib/pdf/v2/BloqueNegativo'
+import BloqueDestacado from '@/lib/pdf/v2/BloqueDestacado'
+import ContadorLista from '@/lib/pdf/v2/ContadorLista'
+import ParserBloques from '@/lib/pdf/v2/ParserBloques'
+import EntradaNumerada from '@/lib/pdf/v2/EntradaNumerada'
+import EncabezadoSeccion from '@/lib/pdf/v2/EncabezadoSeccion'
+import AperturaSeccion from '@/lib/pdf/v2/AperturaSeccion'
+import PieDocumento from '@/lib/pdf/v2/PieDocumento'
+import BloqueFirmas, { type Firma } from '@/lib/pdf/v2/BloqueFirmas'
+import MotorFlujo from '@/lib/pdf/v2/MotorFlujo'
+import { registrarFuentesV2 } from '@/lib/pdf/v2/fonts'
+import {
+  CAJA,
+  ESPACIO,
+  MARGEN,
+  PAPEL,
+  TINTA,
+  ZONA_SEGURA,
+  estiloTipografico,
+  resolverAcento,
+  type AcentoResuelto,
+} from '@/lib/pdf/v2/tokens'
+
+/** El médico ficticio del taller. Definido en `TallerV2.tsx`. */
+export interface MedicoFicticio {
+  readonly nombre: string
+  readonly iniciales: string
+  readonly especialidad: string
+  readonly cedulaProfesional: string
+  readonly cedulaEspecialidad: string
+  readonly universidad: string
+  readonly domicilio: string
+  readonly telefono: string
+  /** Ráster ya normalizado, como lo entregaría el ingest del perfil. */
+  readonly logo: string
+}
+
+/**
+ * ANDAMIAJE, NO CHASIS. Las guías son del taller y se van con él, así que sus
+ * grosores y colores viven aquí y no en `tokens.ts`: no son tokens del sistema y
+ * no deben ascender a serlo. Lo que sí sale de tokens es cada POSICIÓN — que es
+ * justamente lo que las guías sirven para comprobar.
+ */
+const GUIA = {
+  grosor: 0.5,
+  /** Rosa apenas visible: el borde de lo que ninguna impresora garantiza. */
+  zonaSegura: '#E8C9C9',
+  /** Azul apenas visible: la caja de texto donde vive el contenido. */
+  caja: '#C6D6E6',
+} as const
+
+const estilos = StyleSheet.create({
+  pagina: {
+    backgroundColor: TINTA.papel,
+  },
+  /**
+   * Página en FLUJO, no en posición absoluta como el resto del taller. Hace falta
+   * para 2.L y 2.M: el bloque de firmas va detrás del contenido y la banda de pie
+   * se ancla al papel, así que la comprobación de que no se solapan solo tiene
+   * sentido con el contenido fluyendo de verdad.
+   *
+   * El `paddingBottom: margen.inferior` **es la garantía de la regla 4 de 2.L**:
+   * reserva los 36 + 16 + 16 pt donde vive la banda. Sin él, el contenido llegaría
+   * hasta el borde y el pie se le montaría encima — el bug §8.1.
+   */
+  paginaFlujo: {
+    backgroundColor: TINTA.papel,
+    paddingTop: MARGEN.superior,
+    paddingLeft: MARGEN.izquierdo,
+    paddingRight: MARGEN.derecho,
+    paddingBottom: MARGEN.inferior,
+  },
+  guiaZonaSegura: {
+    position: 'absolute',
+    left: ZONA_SEGURA,
+    top: ZONA_SEGURA,
+    width: PAPEL.ancho - ZONA_SEGURA * 2,
+    height: PAPEL.alto - ZONA_SEGURA * 2,
+    borderWidth: GUIA.grosor,
+    borderColor: GUIA.zonaSegura,
+    borderStyle: 'dashed',
+  },
+  guiaCaja: {
+    position: 'absolute',
+    left: MARGEN.izquierdo,
+    top: MARGEN.superior,
+    width: CAJA.ancho,
+    height: CAJA.alto,
+    borderWidth: GUIA.grosor,
+    borderColor: GUIA.caja,
+  },
+  contenido: {
+    position: 'absolute',
+    left: MARGEN.izquierdo,
+    top: MARGEN.superior,
+    width: CAJA.ancho,
+  },
+  fila: {
+    flexDirection: 'row',
+  },
+  celda: {
+    marginRight: ESPACIO[24],
+    alignItems: 'center',
+  },
+  // El rol trae familia, cuerpo, interlineado, peso, tracking y color ya en las
+  // unidades de react-pdf. Aquí solo se añade lo que es del taller.
+  rotulo: {
+    ...estiloTipografico('etiqueta'),
+    marginTop: ESPACIO[8],
+  },
+  nota: {
+    ...estiloTipografico('titulo.subtitulo'),
+    marginTop: ESPACIO[32],
+  },
+  /** Separación entre muestras de componentes distintos. Es del taller. */
+  seccion: {
+    marginTop: ESPACIO[48],
+  },
+  muestra: {
+    marginTop: ESPACIO[32],
+  },
+  /**
+   * Marca de arranque: dónde empezaría el bloque siguiente. Sirve para medir el
+   * hueco que deja cada variante de 2.C. Andamiaje del taller, no chasis.
+   */
+  marcaArranque: {
+    width: '100%',
+    height: GUIA.grosor,
+    backgroundColor: GUIA.caja,
+  },
+  /**
+   * Fila de campos de 2.E. La separación va en el CONTENEDOR y por `gap`, que es
+   * la regla 4 de la ficha: un margen en el propio campo sobreviviría al colapso
+   * y dejaría justo el hueco que el colapso existe para no dejar. Un campo que
+   * devuelve `null` no monta nodo, así que tampoco consume su `gap`.
+   */
+  filaCampos: {
+    flexDirection: 'row',
+    gap: ESPACIO[24],
+  },
+  /**
+   * Fila para poner dos bloques de 2.H uno junto a otro. `alignItems` arriba para
+   * que la comparación sea de ANCHO y no de posición vertical, que es lo que la
+   * verificación visible de la ficha manda mirar.
+   */
+  filaBloques: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: ESPACIO[24],
+  },
+  /** Separación entre las muestras apiladas de 2.I. Es del taller. */
+  destacado: {
+    marginTop: ESPACIO[24],
+  },
+})
+
+/**
+ * Rótulo de cada muestra. Va en `etiqueta`, que es versalita: mayúsculas con
+ * tracking, no versalitas reales de la fuente (I.1.4).
+ */
+function Rotulo({ children }: { children: string }): ReactElement {
+  return <Text style={estilos.rotulo}>{children.toUpperCase()}</Text>
+}
+
+/**
+ * Compone las líneas de cédula que el membrete imprime.
+ *
+ * La redacción es DEL TALLER, no del spec: 2.B declara «una línea por cédula»
+ * pero no cómo se rotula cada una, así que el componente no lo inventa y quien
+ * llama lo decide. Estas dos cadenas son las que usa hoy v1 en `PdfHeader.tsx`.
+ */
+/** Una muestra de 2.J con su rótulo. Andamiaje del taller. */
+function MuestraParser({
+  rotulo,
+  texto,
+  marca,
+}: {
+  rotulo: string
+  texto: string
+  marca: 'raya' | 'numero'
+}): ReactElement {
+  return (
+    <View style={estilos.seccion}>
+      <Rotulo>{rotulo}</Rotulo>
+      <View style={estilos.muestra}>
+        <ParserBloques texto={texto} marca={marca} />
+        {/* Marca de arranque: con la cadena vacía tiene que quedar pegada al
+            rótulo, sin banda vacía entre los dos. */}
+        <View style={estilos.marcaArranque} />
+      </View>
+    </View>
+  )
+}
+
+function medicoMembrete(medico: MedicoFicticio): MedicoMembrete {
+  return {
+    nombre: medico.nombre,
+    especialidad: medico.especialidad,
+    universidad: medico.universidad,
+    cedulas: [
+      `Céd. Prof. ${medico.cedulaProfesional}`,
+      `Céd. Esp. ${medico.cedulaEspecialidad}`,
+    ],
+  }
+}
+
+/**
+ * Paciente de prueba del taller. INVENTADO, como el médico. No sale de la base y
+ * no hay ninguna ruta desde este archivo hasta ella.
+ *
+ * Vive aquí y no en `TallerV2.tsx` porque no lleva ningún control en la barra
+ * lateral: las cuatro muestras de 2.D se distinguen por qué campos se le pasan al
+ * componente, no por lo que valgan.
+ */
+const PACIENTE_FICTICIO = {
+  paciente: 'María Fernanda Ruiz Ortega',
+  edad: '54 años',
+  sexo: 'Femenino',
+  expediente: 'EXP-004821',
+  diagnostico: 'Gonartrosis bilateral grado III',
+  fecha: '4 ago 2026',
+  hora: '11:40',
+} as const
+
+/** Cadena para comparar familias: la misma palabra en las dos celdas vecinas. */
+const CADENA_COMPARACION = 'Gonartrosis bilateral'
+
+/**
+ * Celdas sueltas para mirar 2.F sin pasar por 2.D. Los anchos son enteros de
+ * `riel.celda` y suman 12 por fila, que es la regla 1 de la ficha.
+ */
+const CELDAS_2F = {
+  fila1: [
+    { clave: 'servicio', etiqueta: 'Servicio', valor: 'Ortopedia', columnas: 5 },
+    { clave: 'turno', etiqueta: 'Turno', valor: 'Matutino', columnas: 4 },
+    { clave: 'cama', etiqueta: 'Cama', valor: '204-B', columnas: 3 },
+  ],
+  fila2: [
+    { clave: 'ayuno', etiqueta: 'Ayuno', valor: '8 horas', columnas: 6 },
+    { clave: 'traslado', etiqueta: 'Traslado', valor: 'Camilla', columnas: 6 },
+  ],
+} as const
+
+/**
+ * Texto real para las tres variantes de 2.I. INVENTADO como el resto del taller,
+ * pero con la longitud y el registro que tendría el pasaje real de cada formato:
+ * un bloque destacado con dos palabras dentro no demuestra nada sobre la sangría.
+ */
+const TEXTO_2I = {
+  /** Recomendaciones de una Receta (II.3). */
+  alarma:
+    'Tome el medicamento con alimentos y complete la caja aunque los síntomas cedan antes. Si aparece erupción en la piel, hinchazón de labios o dificultad para respirar, suspenda y acuda a urgencias.',
+  /**
+   * Instrucciones al paciente de un Internamiento (II.6). Van NUMERADAS, y por
+   * eso este texto trae encabezado y viñetas: es lo que 2.J convierte en lista.
+   */
+  instrucciones: [
+    'El día del ingreso:',
+    '- Preséntese en admisión a las 06:00 h con identificación oficial.',
+    '- Ayuno absoluto de ocho horas antes del ingreso.',
+    '- Traiga los estudios de laboratorio y las radiografías recientes.',
+  ].join('\n'),
+  /** Seguimiento de un Plan de Suplementación (II.4). */
+  cita: 'Reevaluación en ocho semanas con biometría hemática y perfil de hierro. Suspenda la suplementación y avise por el canal habitual si aparece intolerancia digestiva.',
+} as const
+
+/**
+ * Los siete casos de la batería de 2.J, con el texto que los provoca. Son los
+ * mismos que prueba `src/lib/tests/parserBloques.test.ts`: aquí se ven, allí se
+ * comprueban. El caso 2 va primero, como en la ficha y como en el archivo de
+ * pruebas.
+ */
+const CASOS_2J: readonly { readonly rotulo: string; readonly texto: string; readonly marca: 'raya' | 'numero' }[] = [
+  {
+    rotulo: 'caso 2 · prosa sin viñetas y sin items debajo',
+    texto:
+      'El paciente ingresa por dolor lumbar de tres semanas.\nSe solicita valoración por rehabilitación.',
+    marca: 'raya',
+  },
+  {
+    rotulo: 'caso 1 · encabezado + dos items',
+    texto: 'Indicaciones generales:\n- Dieta blanda\n- Signos vitales cada ocho horas',
+    marca: 'raya',
+  },
+  {
+    rotulo: 'caso 3 · viñetas antes del primer encabezado',
+    texto:
+      '- Dieta blanda\n- Reposo relativo\nIndicaciones al egreso:\n- Deambulación asistida con andadera',
+    marca: 'raya',
+  },
+  {
+    rotulo: 'caso 4 · un solo item, que no se numera',
+    texto: '- Ayuno absoluto de ocho horas',
+    marca: 'numero',
+  },
+  {
+    rotulo: 'caso 5 · item con dos puntos en medio',
+    texto: '- Ayuno: ocho horas antes del ingreso\n- Traslado: en camilla desde urgencias',
+    marca: 'raya',
+  },
+  {
+    rotulo: 'caso 6 · cadena vacia, que colapsa entera',
+    texto: '',
+    marca: 'raya',
+  },
+  {
+    rotulo: 'caso 7 · dos bloques con contador corrido',
+    texto: [
+      'Antes del ingreso:',
+      '- Ayuno de ocho horas',
+      '- Traer estudios recientes',
+      '',
+      'El día del procedimiento:',
+      '- Presentarse a las 06:00 h',
+      '- Acudir acompañado',
+    ].join('\n'),
+    marca: 'numero',
+  },
+]
+
+/**
+ * Tres medicamentos con las cinco ranuras ocupadas, como los compondría una
+ * Receta (II.3 §4): el ancla lleva comercial y presentación al mismo peso, el
+ * secundario la denominación genérica, la marca la vía y la nota la indicación.
+ * INVENTADOS, como todo lo del taller.
+ */
+const ENTRADAS_2G = [
+  {
+    ancla: 'Amoxil · Cápsulas 500 mg, caja con 12',
+    secundario: 'Amoxicilina',
+    marca: 'oral',
+    nota: 'Una cápsula cada ocho horas durante siete días, con alimentos.',
+  },
+  {
+    ancla: 'Ketorolaco Pisa · Solución inyectable 30 mg/ml',
+    secundario: 'Ketorolaco trometamina',
+    marca: 'intramuscular',
+    nota: 'Una ampolleta cada doce horas por razón necesaria, máximo dos días.',
+  },
+  {
+    ancla: 'Nexium · Tabletas 20 mg, caja con 14',
+    secundario: 'Esomeprazol',
+    marca: 'oral',
+    nota: 'Una tableta en ayunas mientras dure el antiinflamatorio.',
+  },
+] as const
+
+/**
+ * Secciones de un Consentimiento, para 2.P. Texto INVENTADO con la longitud que
+ * tendría el real: un párrafo de dos líneas no demuestra nada sobre la bandera
+ * izquierda, que es lo que hay que mirar aquí.
+ */
+const SECCIONES_2P = [
+  {
+    titulo: 'Descripción del procedimiento',
+    texto:
+      'Se le practicará una artroscopia de rodilla derecha bajo anestesia regional. El procedimiento consiste en introducir una cámara y dos instrumentos a través de incisiones de menos de un centímetro para revisar la articulación por dentro, recortar la porción de menisco lesionada y lavar la cavidad. La intervención dura entre cuarenta y sesenta minutos y no requiere transfusión en condiciones normales. El ingreso es el mismo día y el alta se prevé a las pocas horas, salvo complicación.',
+  },
+  {
+    titulo: 'Riesgos específicos',
+    texto:
+      'Toda intervención tiene riesgos. Los más frecuentes en este procedimiento son la inflamación y el derrame articular durante las primeras semanas, la rigidez temporal y el dolor en las incisiones. Con menor frecuencia pueden presentarse infección de la articulación, trombosis venosa profunda de la pierna intervenida, lesión de un vaso o de un nervio de la zona, y persistencia de las molestias que motivaron la cirugía. En un porcentaje pequeño de casos puede ser necesaria una segunda intervención.',
+  },
+  {
+    titulo: 'Alternativas y consecuencias de no tratarse',
+    texto:
+      'La alternativa al procedimiento es el tratamiento conservador con rehabilitación, analgésicos e infiltraciones, que en algunos pacientes reduce las molestias sin necesidad de cirugía. De no tratarse, la lesión meniscal puede mantener el dolor y los bloqueos de la rodilla, limitar la marcha y acelerar el desgaste del cartílago vecino. Usted puede revocar este consentimiento en cualquier momento antes del procedimiento, sin que ello afecte a la atención que reciba.',
+  },
+] as const
+
+/**
+ * Las mismas tres secciones repetidas, para que la muestra de 2.M desborde a dos
+ * hojas de verdad. Tres no bastan: caben en una y entonces la paginación diría
+ * siempre «1 de 1», que es la cifra que no demuestra nada.
+ */
+const SECCIONES_2M = [...SECCIONES_2P, ...SECCIONES_2P] as const
+
+/**
+ * CUATRO secciones, para la muestra de la regla 1 de 2.N. El número no es
+ * decorativo y no se toca sin volver a medir: con tres, el contenido y el cierre
+ * caben en una hoja y la regla no se ejercita; con cinco, el contenido desborda y
+ * la hoja 2 llega con texto encima de la firma, que tampoco es el caso. Con
+ * cuatro el contenido termina a media hoja y en lo que queda NO cabe el umbral,
+ * que es el único caso que no se fabrica por accidente.
+ */
+const SECCIONES_2N = [...SECCIONES_2P, SECCIONES_2P[0]] as const
+
+/** NUEVE secciones: tres hojas, que es lo mínimo para ver los dos avisos de lista. */
+const SECCIONES_2N_LISTA = [...SECCIONES_2M, ...SECCIONES_2P] as const
+
+/**
+ * Las tres últimas líneas del contenido para la muestra de 2.N: lo que baja con
+ * la firma cuando el umbral no cabe (regla 1). INVENTADO, como el resto del
+ * taller, y medido para ocupar tres líneas de texto corrido sobre la caja de 486
+ * pt — que es lo que hace que el cierre mida exactamente el umbral.
+ */
+/**
+ * Los datos que 2.N pasa a 2.V para componer el encabezado de cada hoja. Es lo único
+ * que un formato declara del encabezado: **datos, nunca composición**.
+ */
+function encabezado2N(medico: MedicoFicticio, acento: AcentoResuelto) {
+  return {
+    medico: medicoMembrete(medico),
+    consultorio: { domicilio: medico.domicilio, telefono: `Tel. ${medico.telefono}` },
+    panel: { variante: 'logo', acento, logo: medico.logo } as const,
+    acento,
+    titulo: 'Hoja de taller',
+    paciente: { paciente: 'Paciente de prueba', expediente: 'EXP-000000' },
+    folio: 'TAL-2026-0001',
+  }
+}
+
+const ARRASTRE_2N =
+  'Con lo anterior se cierra la valoración del episodio y se da por terminada la nota. ' +
+  'El paciente queda citado para revisión en ocho semanas y se le entregan por escrito los ' +
+  'datos de alarma por los que debe volver antes de esa fecha.'
+
+/** Los firmantes de un Consentimiento, para 2.L. Inventados. */
+const FIRMAS_2L: readonly Firma[] = [
+  {
+    rol: 'Paciente',
+    nombre: 'María Fernanda Ruiz Ortega',
+    credenciales: ['Paciente'],
+  },
+  {
+    rol: 'Familiar responsable',
+    nombre: 'Jorge Ruiz Medina',
+    credenciales: ['Hermano'],
+  },
+  // Los dos testigos van SIN nombre a propósito: por NOM-004 la firma permanece
+  // y su renglón queda para llenarse a mano. Es lo que hay que comprobar.
+  { rol: 'Testigo 1' },
+  { rol: 'Testigo 2' },
+]
+
+/** El texto de la verificación visible de 2.J, tal como lo pide la ficha. */
+const VERIFICACION_2J = [
+  'El paciente ingresa por dolor lumbar de tres semanas de evolución.',
+  'Se solicita valoración por el servicio de rehabilitación en las primeras 24 horas.',
+  'Indicaciones de ingreso a piso:',
+  '- Dieta blanda, tolerando vía oral',
+  '- Signos vitales cada ocho horas',
+  '- Deambulación asistida a partir del segundo día',
+].join('\n')
+
+function HojaTaller({
+  medico,
+  acento,
+}: {
+  medico: MedicoFicticio
+  acento: AcentoResuelto
+}): ReactElement {
+  return (
+    <Document title="Taller de componentes v2">
+      <Page size={[PAPEL.ancho, PAPEL.alto]} style={estilos.pagina}>
+        <View style={estilos.guiaZonaSegura} fixed />
+        <View style={estilos.guiaCaja} fixed />
+
+        <View style={estilos.contenido}>
+          <View style={estilos.fila}>
+            <View style={estilos.celda}>
+              <PanelCircular variante="logo" acento={acento} logo={medico.logo} />
+              <Rotulo>logo</Rotulo>
+            </View>
+
+            <View style={estilos.celda}>
+              <PanelCircular
+                variante="monograma"
+                acento={acento}
+                iniciales={medico.iniciales}
+              />
+              <Rotulo>monograma</Rotulo>
+            </View>
+
+            <View style={estilos.celda}>
+              <PanelCircular variante="oculto" />
+              <Rotulo>oculto</Rotulo>
+            </View>
+          </View>
+
+          <Text style={estilos.nota}>
+            2.A · PanelCircular. La variante «oculto» no reserva sitio: su rótulo
+            queda pegado al borde superior de la caja porque no hay panel encima
+            que lo baje. El monograma es el único texto que cambia de tono con el
+            acento, y lo hace en «acento.tinta» derivado, que I.1.8 admite.
+          </Text>
+
+          <View style={estilos.seccion}>
+            <Rotulo>2.B membrete · completo</Rotulo>
+            <View style={estilos.muestra}>
+              <Membrete
+                variante="completo"
+                acento={acento}
+                medico={medicoMembrete(medico)}
+                consultorio={{
+                  domicilio: medico.domicilio,
+                  telefono: medico.telefono,
+                }}
+                panel={{ variante: 'logo', acento, logo: medico.logo }}
+              />
+            </View>
+          </View>
+
+          <View style={estilos.seccion}>
+            <Rotulo>2.B membrete · continuacion</Rotulo>
+            <View style={estilos.muestra}>
+              <Membrete
+                variante="continuacion"
+                acento={acento}
+                medico={medicoMembrete(medico)}
+              />
+            </View>
+          </View>
+
+          <Text style={estilos.nota}>
+            2.B · Membrete, cerrado por 2.O · FileteGruesoFino. El segmento grueso
+            del filete mide 96 pt y es el único sitio del sistema donde el acento
+            va como barra sólida; el resto de la línea es negro y no cambia con el
+            acento. La variante «continuacion» imprime nombre y cédula principal,
+            sin panel y sin riel de consultorio.
+          </Text>
+        </View>
+      </Page>
+
+      <Page size={[PAPEL.ancho, PAPEL.alto]} style={estilos.pagina}>
+        <View style={estilos.guiaZonaSegura} fixed />
+        <View style={estilos.guiaCaja} fixed />
+
+        <View style={estilos.contenido}>
+          <Rotulo>2.C titulo · fijo, con subtitulo</Rotulo>
+          <View style={estilos.muestra}>
+            <TituloDocumento
+              variante="fijo"
+              acento={acento}
+              titulo="Solicitud de laboratorio"
+              subtitulo="Estudios de laboratorio clínico"
+            />
+          </View>
+
+          <Rotulo>2.C titulo · variable largo, con fecha</Rotulo>
+          <View style={estilos.muestra}>
+            <TituloDocumento
+              variante="variable"
+              acento={acento}
+              titulo="Constancia de atención médica y recomendaciones laborales"
+              fecha="4 ago 2026"
+            />
+          </View>
+
+          <Text style={estilos.nota}>
+            2.C · TituloDocumento. El título se guarda en capitalización de oración
+            y se compone en mayúsculas aquí, no en la base (regla 1 del preámbulo de
+            II). El variable rompe a dos líneas y la fecha se queda en la PRIMERA,
+            nunca en la segunda ni centrada entre las dos.
+          </Text>
+        </View>
+      </Page>
+
+      <Page size={[PAPEL.ancho, PAPEL.alto]} style={estilos.pagina}>
+        <View style={estilos.guiaZonaSegura} fixed />
+        <View style={estilos.guiaCaja} fixed />
+
+        <View style={estilos.contenido}>
+          <View>
+            <Rotulo>fijo · membrete → titulo → arranque</Rotulo>
+            <View style={estilos.muestra}>
+              <Membrete
+                variante="continuacion"
+                acento={acento}
+                medico={medicoMembrete(medico)}
+              />
+              <TituloDocumento
+                variante="fijo"
+                acento={acento}
+                titulo="Solicitud de laboratorio"
+              />
+              <View style={estilos.marcaArranque} />
+            </View>
+          </View>
+
+          <View style={estilos.seccion}>
+            <Rotulo>ausente · membrete → titulo → arranque</Rotulo>
+            <View style={estilos.muestra}>
+              <Membrete
+                variante="continuacion"
+                acento={acento}
+                medico={medicoMembrete(medico)}
+              />
+              <TituloDocumento variante="ausente" />
+              <View style={estilos.marcaArranque} />
+            </View>
+          </View>
+
+          <Text style={estilos.nota}>
+            Las dos muestras de arriba son el mismo membrete con las dos variantes
+            del título. La línea azul marca dónde arrancaría el bloque siguiente:
+            la diferencia entre las dos es exactamente el bloque del título más su
+            filete, sin banda vacía residual. En «ausente» el filete del membrete
+            hace doble trabajo.
+          </Text>
+        </View>
+      </Page>
+
+      <Page size={[PAPEL.ancho, PAPEL.alto]} style={estilos.pagina}>
+        <View style={estilos.guiaZonaSegura} fixed />
+        <View style={estilos.guiaCaja} fixed />
+
+        <View style={estilos.contenido}>
+          <Rotulo>2.D paciente · completo, las siete celdas</Rotulo>
+          <View style={estilos.muestra}>
+            <BloquePaciente variante="completo" {...PACIENTE_FICTICIO} />
+          </View>
+
+          <View style={estilos.seccion}>
+            <Rotulo>2.D paciente · como llega hoy, sin sexo ni expediente ni hora</Rotulo>
+            <View style={estilos.muestra}>
+              <BloquePaciente
+                variante="completo"
+                paciente={PACIENTE_FICTICIO.paciente}
+                edad={PACIENTE_FICTICIO.edad}
+                diagnostico={PACIENTE_FICTICIO.diagnostico}
+                fecha={PACIENTE_FICTICIO.fecha}
+              />
+            </View>
+          </View>
+
+          <View style={estilos.seccion}>
+            <Rotulo>2.D paciente · reducido, hojas de continuacion</Rotulo>
+            <View style={estilos.muestra}>
+              <BloquePaciente
+                variante="reducido"
+                paciente={PACIENTE_FICTICIO.paciente}
+                expediente={PACIENTE_FICTICIO.expediente}
+              />
+            </View>
+          </View>
+
+          <View style={estilos.seccion}>
+            <Rotulo>2.D paciente · comparacion de familia</Rotulo>
+            <View style={estilos.muestra}>
+              {/* La misma cadena en dos celdas vecinas de la fila inferior:
+                  diagnóstico en la humanista, fecha en la neo-grotesca. */}
+              <BloquePaciente
+                variante="completo"
+                paciente={PACIENTE_FICTICIO.paciente}
+                diagnostico={CADENA_COMPARACION}
+                fecha={CADENA_COMPARACION}
+              />
+            </View>
+          </View>
+
+          <Text style={estilos.nota}>
+            2.D · BloquePaciente. Es UN riel de siete celdas en dos filas, no dos
+            rieles: sus anchos salen de «riel.celda» (40.5 pt), que es la segunda
+            retícula de I.1.3, no de «reticula.columna». En la segunda muestra las
+            tres celdas ausentes desaparecen y las restantes se ensanchan hasta
+            ocupar el riel completo, sin dejar hueco. En la cuarta, las dos celdas
+            vecinas llevan la misma palabra: la de diagnóstico va en IBM Plex Sans
+            11 / 16, única excepción de familia del riel, y la de fecha en la
+            neo-grotesca del rol «dato».
+          </Text>
+        </View>
+      </Page>
+
+      <Page size={[PAPEL.ancho, PAPEL.alto]} style={estilos.pagina}>
+        <View style={estilos.guiaZonaSegura} fixed />
+        <View style={estilos.guiaCaja} fixed />
+
+        <View style={estilos.contenido}>
+          <Rotulo>2.E campo · los tres estados, uno junto a otro</Rotulo>
+          <View style={[estilos.muestra, estilos.filaCampos]}>
+            <Campo etiqueta="Genérico" valor="Amoxicilina" requerido />
+            <Campo etiqueta="Nombre comercial" requerido />
+            {/* Este tercero no se ve: colapsa entero. Está aquí para que se
+                compruebe que entre el segundo y el borde no queda nada. */}
+            <Campo etiqueta="Proyecciones" requerido={false} />
+          </View>
+          <View style={estilos.marcaArranque} />
+
+          <View style={estilos.seccion}>
+            <Rotulo>2.E campo · tres campos, el del medio opcional vacio</Rotulo>
+            <View style={[estilos.muestra, estilos.filaCampos]}>
+              <Campo etiqueta="Genérico" valor="Amoxicilina" requerido />
+              <Campo etiqueta="Presentación" requerido={false} />
+              <Campo etiqueta="Vía" valor="Oral" requerido />
+            </View>
+          </View>
+
+          <View style={estilos.seccion}>
+            <Rotulo>2.E campo · la misma fila sin el campo del medio</Rotulo>
+            <View style={[estilos.muestra, estilos.filaCampos]}>
+              <Campo etiqueta="Genérico" valor="Amoxicilina" requerido />
+              <Campo etiqueta="Vía" valor="Oral" requerido />
+            </View>
+          </View>
+
+          <Text style={estilos.nota}>
+            2.E · Campo. Las dos filas de abajo tienen que ser IDÉNTICAS: la
+            primera lleva tres campos con el del medio en «vacío opcional» y la
+            segunda solo los dos que quedan. Si el colapso dejara aire, «Vía»
+            estaría más a la derecha en la primera. La separación entre campos es
+            del contenedor, no del campo: por eso un campo que colapsa tampoco se
+            lleva su separación. Arriba, los dos estados con tinta: la diferencia
+            entre «con valor» y «vacío requerido» vive entera bajo el rótulo, y el
+            segundo mide 4 pt más porque el espacio de escritura es más alto que un
+            renglón de texto. No lleva ninguna leyenda de error: el rótulo y la
+            línea ya dicen qué falta y dónde se escribe.
+          </Text>
+        </View>
+      </Page>
+
+      <Page size={[PAPEL.ancho, PAPEL.alto]} style={estilos.pagina}>
+        <View style={estilos.guiaZonaSegura} fixed />
+        <View style={estilos.guiaCaja} fixed />
+
+        <View style={estilos.contenido}>
+          <Rotulo>2.F riel · variante celdas, dos filas</Rotulo>
+          <View style={estilos.muestra}>
+            <RielDatos
+              variante="celdas"
+              filas={[CELDAS_2F.fila1, CELDAS_2F.fila2]}
+            />
+          </View>
+
+          <View style={estilos.seccion}>
+            <Rotulo>2.F riel · variante una linea</Rotulo>
+            <View style={estilos.muestra}>
+              <RielDatos variante="unaLinea" celdas={CELDAS_2F.fila1} />
+            </View>
+          </View>
+
+          <View style={estilos.seccion}>
+            <Rotulo>2.F riel · celdas, con la del medio colapsada</Rotulo>
+            <View style={estilos.muestra}>
+              <RielDatos
+                variante="celdas"
+                filas={[
+                  [
+                    CELDAS_2F.fila1[0],
+                    { ...CELDAS_2F.fila1[1], valor: undefined },
+                    CELDAS_2F.fila1[2],
+                  ],
+                  CELDAS_2F.fila2,
+                ]}
+              />
+            </View>
+          </View>
+
+          <View style={estilos.seccion}>
+            <Rotulo>2.D sobre 2.F · el riel del paciente, sin cambios</Rotulo>
+            <View style={estilos.muestra}>
+              <BloquePaciente variante="completo" {...PACIENTE_FICTICIO} />
+            </View>
+          </View>
+
+          <Text style={estilos.nota}>
+            2.F · RielDatos. Las dos primeras muestras son la misma fila con las
+            dos variantes de composición: arriba dentro de un riel de dos filas,
+            debajo como riel de una sola. En la tercera, «Turno» no trae dato:
+            desaparece y «Servicio» y «Cama» se ensanchan hasta llenar el riel, sin
+            dejar hueco ni regla suelta. La cuarta es 2.D compuesto ya sobre 2.F —
+            sus reglas verticales caen en 202.5, 283.5 y 364.5 pt, que son 5, 2, 2
+            y 3 columnas de «riel.celda», exactamente donde caían cuando 2.D
+            componía su propio riel.
+          </Text>
+        </View>
+      </Page>
+
+      <Page size={[PAPEL.ancho, PAPEL.alto]} style={estilos.pagina}>
+        <View style={estilos.guiaZonaSegura} fixed />
+        <View style={estilos.guiaCaja} fixed />
+
+        <View style={estilos.contenido}>
+          <Rotulo>2.H negativo · via corta y via larga, una junto a otra</Rotulo>
+          <View style={[estilos.muestra, estilos.filaBloques]}>
+            <BloqueNegativo variante="via" via="oral" />
+            <BloqueNegativo variante="via" via="intramuscular" />
+          </View>
+
+          <View style={estilos.seccion}>
+            <Rotulo>2.H negativo · via acentuada, para el gate de I.3.1</Rotulo>
+            <View style={estilos.muestra}>
+              <BloqueNegativo variante="via" via="transdérmica" />
+            </View>
+          </View>
+
+          <View style={estilos.seccion}>
+            <Rotulo>2.H negativo · badge urgente y su repeticion reducida</Rotulo>
+            <View style={[estilos.muestra, estilos.filaBloques]}>
+              <BloqueNegativo variante="urgente" />
+              <BloqueNegativo variante="urgenteReducido" />
+            </View>
+          </View>
+
+          <Text style={estilos.nota}>
+            2.H · BloqueNegativo. Los dos bloques de arriba tienen que medir
+            ANCHOS CLARAMENTE DISTINTOS y las dos palabras leerse enteras: el
+            ancho es la variable, el cuerpo no. Si midieran lo mismo, alguien puso
+            un ancho fijo y la palabra larga está comprimida o cortada. Ninguna se
+            abrevia y ninguna lleva elipsis. El badge reducido de la última
+            muestra imprime la misma palabra al mismo cuerpo: lo único que pierde
+            es aire lateral, de 8 pt a 4 pt por lado.
+          </Text>
+        </View>
+      </Page>
+
+      <Page size={[PAPEL.ancho, PAPEL.alto]} style={estilos.pagina}>
+        <View style={estilos.guiaZonaSegura} fixed />
+        <View style={estilos.guiaCaja} fixed />
+
+        <View style={estilos.contenido}>
+          <Rotulo>2.I destacado · alarma, filete superior e izquierdo</Rotulo>
+          <View style={estilos.muestra}>
+            <BloqueDestacado variante="alarma" texto={TEXTO_2I.alarma} />
+          </View>
+
+          <View style={estilos.destacado}>
+            <Rotulo>2.I destacado · instrucciones, solo izquierdo</Rotulo>
+            <View style={estilos.muestra}>
+              <BloqueDestacado
+                variante="instrucciones"
+                texto={TEXTO_2I.instrucciones}
+              />
+            </View>
+          </View>
+
+          <View style={estilos.destacado}>
+            <Rotulo>2.I destacado · cita, solo izquierdo</Rotulo>
+            <View style={estilos.muestra}>
+              <BloqueDestacado variante="cita" texto={TEXTO_2I.cita} />
+            </View>
+          </View>
+
+          <Text style={estilos.nota}>
+            2.I · BloqueDestacado. Ninguna de las tres lleva trama ni fondo detrás
+            del texto: solo filete. La jerarquía la carga el grosor —3, 2 y 1.6
+            pt—, que es lo único que sobrevive intacto a una fotocopia, y el de
+            alarma se ve claramente más grueso que el de cita. La alarma es la
+            única con filete superior, y su texto va en «alarma.cuerpo», un punto
+            por encima del texto corrido de las otras dos. Las tres componen ya a
+            través de 2.J: la de «instrucciones» sale NUMERADA porque ahí la
+            secuencia significa algo, y las otras dos entran como prosa y salen
+            como prosa — que es la degradación segura del parser, no una excepción
+            de este componente.
+          </Text>
+        </View>
+      </Page>
+
+      <Page size={[PAPEL.ancho, PAPEL.alto]} style={estilos.pagina}>
+        <View style={estilos.guiaZonaSegura} fixed />
+        <View style={estilos.guiaCaja} fixed />
+
+        <View style={estilos.contenido}>
+          <Rotulo>2.K contador · hoja intermedia</Rotulo>
+          <View style={estilos.muestra}>
+            <ContadorLista forma="intermedia" items="estudios" hoja={1} hojas={2} total={9} />
+          </View>
+
+          <View style={estilos.seccion}>
+            <Rotulo>2.K contador · hoja final</Rotulo>
+            <View style={estilos.muestra}>
+              <ContadorLista forma="final" items="estudios" total={9} />
+            </View>
+          </View>
+
+          <Text style={estilos.nota}>
+            2.K · ContadorLista. Las dos formas dicen cosas distintas y se
+            distinguen a simple vista: la intermedia sitúa la hoja dentro del
+            documento, la final da el total. Si la hoja 1 mostrara solo el total,
+            estaría contando el documento y no la hoja, y quien la recibe suelta no
+            podría saber que le falta la 2. El sustantivo —aquí ESTUDIOS, de la
+            Solicitud de Laboratorio— lo declara el formato en la Sección II; el
+            componente no lo conoce. Va en «pie» en versalita, pero en
+            «tinta.secundaria» y no en «tinta.papel»: vive en el área de contenido,
+            no sobre la banda de acento.
+          </Text>
+        </View>
+      </Page>
+
+      <Page size={[PAPEL.ancho, PAPEL.alto]} style={estilos.pagina}>
+        <View style={estilos.guiaZonaSegura} fixed />
+        <View style={estilos.guiaCaja} fixed />
+
+        <View style={estilos.contenido}>
+          <Rotulo>2.J parser · la verificacion visible de la ficha</Rotulo>
+          <View style={estilos.muestra}>
+            <ParserBloques texto={VERIFICACION_2J} marca="raya" />
+          </View>
+
+          <Text style={estilos.nota}>
+            2.J · ParserBloques. Los DOS PRIMEROS RENGLONES salen en minúsculas,
+            en humanista, sin raya y sin número: son prosa sin viñetas y sin ítems
+            debajo. Si salieran en versalita, no hay lookahead — y ese es el bug
+            que ya apareció una vez, en el mockup de Internamiento. El tercer
+            renglón sí sale en versalita, y no por llevar dos puntos sino porque
+            debajo tiene viñetas. La raya cuelga en el riel y el texto sangra una
+            columna exacta: 23.25 + 9 = 32.25 pt.
+          </Text>
+        </View>
+      </Page>
+
+      <Page size={[PAPEL.ancho, PAPEL.alto]} style={estilos.pagina}>
+        <View style={estilos.guiaZonaSegura} fixed />
+        <View style={estilos.guiaCaja} fixed />
+
+        <View style={estilos.contenido}>
+          <Rotulo>2.G entrada · tres, con las cinco ranuras ocupadas</Rotulo>
+          <View style={estilos.muestra}>
+            {ENTRADAS_2G.map((entrada, indice) => (
+              <EntradaNumerada
+                key={entrada.secundario}
+                numero={indice + 1}
+                primera={indice === 0}
+                ancla={entrada.ancla}
+                secundario={entrada.secundario}
+                marca={entrada.marca}
+                nota={entrada.nota}
+                acento={acento}
+                // La pareja de la Receta y la Suplementación: fila normal y nota
+                // apilada bajo el ancla. La otra —`compacta` + `columna`— es la
+                // tabla de Laboratorio y se ve en su propia hoja de taller.
+                calibracion="normal"
+                disposicion="apilada"
+              />
+            ))}
+            {/* No debe haber regla entre esta línea y la última entrada. */}
+            <View style={estilos.marcaArranque} />
+          </View>
+
+          <View style={estilos.seccion}>
+            <Rotulo>2.G entrada · solo el ancla, las demas ranuras colapsan</Rotulo>
+            <View style={estilos.muestra}>
+              <EntradaNumerada
+                numero={1}
+                primera
+                ancla="Paracetamol · Tabletas 500 mg, caja con 10"
+                acento={acento}
+                calibracion="normal"
+                disposicion="apilada"
+              />
+              <View style={estilos.marcaArranque} />
+            </View>
+          </View>
+
+          <Text style={estilos.nota}>
+            2.G · EntradaNumerada. Los números salen 01, 02 y 03 en el riel
+            izquierdo, alineados entre sí y en acento derivado. La denominación
+            genérica —el renglón bajo el ancla— se lee TAN NEGRA como el nombre
+            comercial: más chica, no más gris. Es el único campo obligatorio por
+            normativa y no puede componerse como dato de segunda. La regla entre
+            entradas NO está centrada: 5 pt por debajo de ella hasta la entrada
+            que abre y 7 pt por encima hasta la que cierra, así que se lee como
+            apertura de la siguiente. No hay regla antes de la primera ni después
+            de la última — la línea azul lo comprueba. En la muestra de abajo, una
+            entrada con solo el ancla: el número sigue siendo 01 aunque sea la
+            única, que es lo que la distingue de 2.J, donde un solo ítem no se
+            numera.
+          </Text>
+        </View>
+      </Page>
+
+      <Page size={[PAPEL.ancho, PAPEL.alto]} style={estilos.pagina}>
+        <View style={estilos.guiaZonaSegura} fixed />
+        <View style={estilos.guiaCaja} fixed />
+
+        <View style={estilos.contenido}>
+          {CASOS_2J.slice(0, 4).map((caso) => (
+            <MuestraParser
+              key={caso.rotulo}
+              rotulo={caso.rotulo}
+              texto={caso.texto}
+              marca={caso.marca}
+            />
+          ))}
+
+          <Text style={estilos.nota}>
+            Los cuatro primeros casos de la batería, en el mismo orden en que se
+            prueban. El 2 va primero. En el 4, el ítem único se compone como
+            párrafo y NO lleva número, aunque la muestra pida numeración: una lista
+            de uno no es una lista. Distíngase de 2.G, donde una sola entrada sí
+            lleva su «01».
+          </Text>
+        </View>
+      </Page>
+
+      <Page size={[PAPEL.ancho, PAPEL.alto]} style={estilos.pagina}>
+        <View style={estilos.guiaZonaSegura} fixed />
+        <View style={estilos.guiaCaja} fixed />
+
+        <View style={estilos.contenido}>
+          {CASOS_2J.slice(4).map((caso) => (
+            <MuestraParser
+              key={caso.rotulo}
+              rotulo={caso.rotulo}
+              texto={caso.texto}
+              marca={caso.marca}
+            />
+          ))}
+
+          <Text style={estilos.nota}>
+            Los tres restantes. En el 5, los dos puntos van dentro de un ítem y no
+            lo ascienden a encabezado: el tipo lo decide la viñeta y el lookahead,
+            nunca la puntuación. En el 6 la línea azul queda pegada al rótulo — la
+            cadena vacía no monta ningún nodo, así que no deja hueco. En el 7 la
+            numeración corre entre los dos bloques: 1, 2, 3, 4, sin repetir el 1 al
+            abrir el segundo.
+          </Text>
+        </View>
+      </Page>
+
+      <Page size={[PAPEL.ancho, PAPEL.alto]} style={estilos.pagina}>
+        <View style={estilos.guiaZonaSegura} fixed />
+        <View style={estilos.guiaCaja} fixed />
+
+        <View style={estilos.contenido}>
+          <Rotulo>2.P seccion · tres secciones seguidas</Rotulo>
+          <View style={estilos.muestra}>
+            {SECCIONES_2P.map((seccion, indice) => (
+              <EncabezadoSeccion
+                key={seccion.titulo}
+                numero={indice + 1}
+                titulo={seccion.titulo}
+                texto={seccion.texto}
+                primera={indice === 0}
+                acento={acento}
+              />
+            ))}
+          </View>
+
+          <Text style={estilos.nota}>
+            2.P · EncabezadoSeccion. El borde DERECHO de los párrafos tiene que
+            quedar desigual: si está alineado, quedó justificado y hay palabras
+            partidas con guion — el espécimen lo tiene así y queda superado por
+            I.3.2. El número es de sección y va SIN cero a la izquierda: el 01 es
+            de 2.G y es de un ítem, no de una sección. Entre secciones hay
+            «transicion.entreSecciones», que mide lo mismo que «espacio.24» y no es
+            el mismo token.
+          </Text>
+        </View>
+      </Page>
+
+      <Page size={[PAPEL.ancho, PAPEL.alto]} style={estilos.pagina}>
+        <View style={estilos.guiaZonaSegura} fixed />
+        <View style={estilos.guiaCaja} fixed />
+
+        <View style={estilos.contenido}>
+          <Rotulo>2.Q apertura · comparada con el filete del membrete</Rotulo>
+          <View style={estilos.muestra}>
+            <Membrete
+              variante="continuacion"
+              acento={acento}
+              medico={medicoMembrete(medico)}
+            />
+          </View>
+
+          <View style={estilos.seccion}>
+            {/*
+              El rótulo es el TÍTULO de la sección; `SECCIÓN 2 DE 2` va encima, como
+              antetítulo, compuesto de los dos números. Volvió aquí desde la cabecera de la
+              hoja cuando la sección dejó de empezar en una hoja de número fijo. Ver la prop
+              `de` de 2.Q.
+            */}
+            <AperturaSeccion
+              numero={2}
+              de={2}
+              rotulo="Indicaciones de ingreso a piso"
+              lector="Para personal de enfermería y médico residente"
+              acento={acento}
+            />
+          </View>
+
+          <View style={estilos.seccion}>
+            <EncabezadoSeccion
+              numero={1}
+              titulo="Indicaciones de ingreso a piso"
+              texto="Se anotan a continuación las indicaciones de ingreso. La sección la leen enfermería y el residente de guardia, no el paciente."
+              primera
+              acento={acento}
+            />
+          </View>
+
+          <Text style={estilos.nota}>
+            2.Q · AperturaSeccion. Los tres filetes de esta hoja, de arriba abajo:
+            el del membrete, el de apertura y el de una sección normal. El de
+            apertura tiene que verse claramente más grueso que cualquier otro,
+            INCLUIDO el del membrete: es el más grueso del sistema y su uso está
+            limitado a este componente. La cabecera dice SECCIÓN 2 DE 2 y la
+            compone el componente a partir de dos números — «continuación» no cabe
+            porque no hay por dónde escribirla.
+          </Text>
+        </View>
+      </Page>
+
+      {/*
+        2.M · variante `completo`, en un documento que DESBORDA A DOS HOJAS.
+
+        El desbordamiento no es decorativo: la paginación se compone con la
+        función de render del renderer y esa función **solo corre sobre hojas de
+        verdad**. Con una muestra de una hoja, la zona 2 diría siempre «1 de 1» y
+        el defecto que tuvo este componente —zona vacía, sin error— no se vería
+        aquí sino en el Paso 4, con un formato encima. Por eso esta página va en
+        FLUJO y con contenido de sobra: son las seis secciones, no las tres.
+
+        Las cifras salen de `subPage*`, que cuenta las hojas de ESTA página, no
+        las del taller entero: por eso dice «1 de 2» y «2 de 2» y no «18 de 19».
+      */}
+      <Page size={[PAPEL.ancho, PAPEL.alto]} style={estilos.paginaFlujo}>
+        <View style={estilos.guiaZonaSegura} fixed />
+        <View style={estilos.guiaCaja} fixed />
+
+        <Rotulo>2.L + 2.M · pie completo, documento de dos hojas</Rotulo>
+        <View style={estilos.muestra}>
+          {SECCIONES_2M.map((seccion, indice) => (
+            <EncabezadoSeccion
+              key={`${seccion.titulo}-${indice}`}
+              numero={indice + 1}
+              titulo={seccion.titulo}
+              texto={seccion.texto}
+              primera={indice === 0}
+              acento={acento}
+            />
+          ))}
+        </View>
+
+        <View style={estilos.seccion}>
+          <BloqueFirmas
+            variante="simple"
+            firmas={[
+              {
+                rol: 'Firma y sello del médico',
+                nombre: medico.nombre,
+                credenciales: [
+                  `Céd. Prof. ${medico.cedulaProfesional}`,
+                  `Céd. Esp. ${medico.cedulaEspecialidad}`,
+                ],
+              },
+            ]}
+          />
+        </View>
+
+        <PieDocumento variante="completo" folio="RX-2026-0042" acento={acento} />
+      </Page>
+
+      <Page size={[PAPEL.ancho, PAPEL.alto]} style={estilos.paginaFlujo}>
+        <View style={estilos.guiaZonaSegura} fixed />
+        <View style={estilos.guiaCaja} fixed />
+
+        <Rotulo>2.L + 2.M · pie sin folio, la variante de cinco formatos</Rotulo>
+        <View style={estilos.muestra}>
+          {SECCIONES_2P.map((seccion, indice) => (
+            <EncabezadoSeccion
+              key={seccion.titulo}
+              numero={indice + 1}
+              titulo={seccion.titulo}
+              texto={seccion.texto}
+              primera={indice === 0}
+              acento={acento}
+            />
+          ))}
+        </View>
+
+        <View style={estilos.seccion}>
+          <BloqueFirmas variante="reticula" firmas={FIRMAS_2L} />
+        </View>
+
+        <PieDocumento
+          variante="sinFolio"
+          acento={acento}
+        />
+      </Page>
+
+      {/*
+        2.N · EL CASO DE LA REGLA 1, que es el único que no se fabrica por accidente.
+
+        Tres secciones dejan el contenido terminado A MEDIA HOJA, y en lo que
+        queda no cabe `umbral.firma`. Lo que hay que mirar, en este orden:
+
+        1. La hoja 1 cierra con CONTINÚA EN LA HOJA 2 a la izquierda y SIN FIRMA
+           NO ES VÁLIDO a la derecha, y NO trae ni el arrastre ni la firma.
+        2. La hoja 2 trae las TRES ÚLTIMAS LÍNEAS del contenido y debajo la firma.
+           La firma sola sería el defecto que esta regla existe para evitar.
+        3. Medir con una regla el cuerpo del texto en las dos hojas: es el mismo.
+           Si en la primera fuera más chico, el motor comprimió (I.3.4).
+        4. El aviso NO sale en la hoja 2. En la última no continúa nada.
+        5. La hoja 2 abre con el encabezado de CONTINUACIÓN: membrete solo con el
+           nombre, título con su rótulo y el riel reducido con el paciente. Taparse
+           la hoja 1 con la mano: la 2 tiene que identificar al paciente sola.
+      */}
+      <Page size={[PAPEL.ancho, PAPEL.alto]} style={estilos.paginaFlujo}>
+        <View style={estilos.guiaZonaSegura} fixed />
+        <View style={estilos.guiaCaja} fixed />
+
+        <MotorFlujo
+          encabezado={encabezado2N(medico, acento)}
+          arrastre={ARRASTRE_2N}
+          firmas={
+            <BloqueFirmas
+              variante="simple"
+              firmas={[
+                {
+                  rol: 'Firma y sello del médico',
+                  nombre: medico.nombre,
+                  credenciales: [
+                    `Céd. Prof. ${medico.cedulaProfesional}`,
+                    `Céd. Esp. ${medico.cedulaEspecialidad}`,
+                  ],
+                },
+              ]}
+            />
+          }
+        >
+          <Rotulo>2.N · contenido a media hoja, la firma no cabe</Rotulo>
+          <View style={estilos.muestra}>
+            {SECCIONES_2N.map((seccion, indice) => (
+              <EncabezadoSeccion
+                key={`${seccion.titulo}-${indice}`}
+                numero={indice + 1}
+                titulo={seccion.titulo}
+                texto={seccion.texto}
+                primera={indice === 0}
+                acento={acento}
+              />
+            ))}
+          </View>
+        </MotorFlujo>
+      </Page>
+
+      {/*
+        2.N · el contador por hoja, sobre un documento que desborda a tres.
+
+        Cada hoja lleva SU contador, y cae solo en el sitio correcto: detrás del
+        contenido de esa hoja. Las hojas que no cierran lo llevan en forma
+        `intermedia` —ESTUDIOS · HOJA 1 DE 3 · TOTAL n— y la última en `final`.
+
+        La cifra de «cuántos ítems van en ESTA hoja» no aparece por ningún lado, y no
+        es un olvido: el renderer no reporta qué cayó en cada hoja. Ver 2.K.
+      */}
+      <Page size={[PAPEL.ancho, PAPEL.alto]} style={estilos.paginaFlujo}>
+        <View style={estilos.guiaZonaSegura} fixed />
+        <View style={estilos.guiaCaja} fixed />
+
+        <MotorFlujo
+          encabezado={encabezado2N(medico, acento)}
+          contador={{ items: 'estudios', total: SECCIONES_2N_LISTA.length }}
+          arrastre={ARRASTRE_2N}
+          firmas={
+            <BloqueFirmas
+              variante="simple"
+              firmas={[
+                {
+                  rol: 'Firma y sello del médico',
+                  nombre: medico.nombre,
+                  credenciales: [`Céd. Prof. ${medico.cedulaProfesional}`],
+                },
+              ]}
+            />
+          }
+        >
+          <Rotulo>2.N · los dos avisos de lista, y ninguno en la última hoja</Rotulo>
+          <View style={estilos.muestra}>
+            {SECCIONES_2N_LISTA.map((seccion, indice) => (
+              <EncabezadoSeccion
+                key={`${seccion.titulo}-${indice}`}
+                numero={indice + 1}
+                titulo={seccion.titulo}
+                texto={seccion.texto}
+                primera={indice === 0}
+                acento={acento}
+              />
+            ))}
+          </View>
+        </MotorFlujo>
+      </Page>
+    </Document>
+  )
+}
+
+/** Genera el blob del PDF del taller. Se llama desde el cliente. */
+export async function generarPdfTaller(
+  medico: MedicoFicticio,
+  acentoHex: string,
+): Promise<Blob> {
+  registrarFuentesV2()
+  const elemento: ReactElement<DocumentProps> = (
+    <HojaTaller medico={medico} acento={resolverAcento(acentoHex)} />
+  )
+  return pdf(elemento).toBlob()
+}

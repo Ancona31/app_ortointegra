@@ -1,20 +1,24 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useProfile } from '@/hooks/useProfile'
 import AsistenteDashboard from './AsistenteDashboard'
 import { DashboardSkeleton } from '@/components/ui/Skeleton'
-import { FileText, Stethoscope, Monitor, Search, ArrowRight, UserPlus, Pill, ClipboardList, CalendarDays, FolderOpen, User } from 'lucide-react'
+import { FolderOpen, User, Menu, Plus, Stethoscope, FilePlus2 } from 'lucide-react'
 import Link from 'next/link'
-import { format, formatDistanceToNow, parseISO } from 'date-fns'
-import { es } from 'date-fns/locale'
-import { createClient } from '@/lib/supabase/client'
-import { canManageClinica } from '@/lib/permissions'
-import { formatCitaHora } from './utils'
-import { StatusChip } from './StatusChip'
 import { useConsultorios } from '@/hooks/useConsultorios'
 import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
-import { componerNombreMedicoCorto } from '@/lib/nombreMedico'
+import { useMenuMovil } from '@/contexts/MenuMovilContext'
+/* El «+ Nueva consulta» de la cabecera. Vive en `components/launcher/` porque
+   nació en `(launcher)/inicio`; aquí sólo se importa —esa página no se toca—.
+   Es la ÚNICA pieza de la app que hace lo que pide la adenda §1: elegir
+   paciente (o crearlo) y entrar a la nota SIN exigir cita previa. */
+import ConsultaRapidaModal from '@/components/launcher/ConsultaRapidaModal'
+import ProximasCitas, { GEOMETRIA_ACCION } from '@/components/dashboard/ProximasCitas'
+import TarjetaHoy from '@/components/dashboard/TarjetaHoy'
+import AtendidosRecientemente from '@/components/dashboard/AtendidosRecientemente'
+import DocumentosRecientes from '@/components/dashboard/DocumentosRecientes'
+import BuscadorPaciente, { ALTO_CONTROL } from '@/components/dashboard/BuscadorPaciente'
 
 /* ─── Helpers ─────────────────────────────────────────────── */
 
@@ -27,466 +31,306 @@ function saludo() {
 
 /* ─── Tipos ───────────────────────────────────────────────── */
 
-type Reciente = {
-  paciente_id: string
-  nombre: string
-  apellidos: string
-  created_at: string
-  motivo_consulta: string
-}
-
-type ProximaCita = {
-  id: string
-  title: string
-  start_time: string
-  status: string
-  paciente_id: string | null
-  consultorio_id: string | null
-  pacientes: { nombre: string; apellidos: string } | null
-  medico: { id: string; titulo: string | null; apellido_paterno: string | null } | null
-}
-
 /* ─── Config ──────────────────────────────────────────────── */
-
-const ACCESOS = [
-  {
-    href: '/expediente',
-    icon: Stethoscope,
-    label: 'Expediente',
-    desc: 'Historial clínico',
-    gradient: 'from-violet-500 to-violet-600',
-    ring: 'group-hover:ring-violet-200',
-  },
-  {
-    href: '/agenda',
-    icon: CalendarDays,
-    label: 'Agenda',
-    desc: 'Citas y horarios',
-    gradient: 'from-blue-500 to-blue-600',
-    ring: 'group-hover:ring-blue-200',
-  },
-  {
-    href: '/documentos',
-    icon: FileText,
-    label: 'Documentos',
-    desc: 'Recetas y solicitudes',
-    gradient: 'from-amber-500 to-amber-600',
-    ring: 'group-hover:ring-amber-200',
-  },
-  {
-    href: '/dicom',
-    icon: Monitor,
-    label: 'DICOM',
-    desc: 'Visor de imagen médica',
-    gradient: 'from-teal-500 to-teal-600',
-    ring: 'group-hover:ring-teal-200',
-  },
-]
-
-const AVATAR_COLORS = [
-  'bg-violet-100 text-violet-700',
-  'bg-teal-100 text-teal-700',
-  'bg-amber-100 text-amber-700',
-  'bg-rose-100 text-rose-700',
-  'bg-blue-100 text-blue-700',
-]
 
 /* ─── Componente ──────────────────────────────────────────── */
 
 export default function DashboardPage() {
   const { profile, loading: loadingProfile } = useProfile()
   const { consultorios } = useConsultorios()
-  const { cambiarActivo } = useConsultorioActivo()
-  const [recientes,      setRecientes]      = useState<Reciente[]>([])
-  const [totalPacientes, setTotalPacientes] = useState<number | null>(null)
-  const [proximasCitas,  setProximasCitas]  = useState<ProximaCita[]>([])
-  const [clinicaTipo,    setClinicaTipo]    = useState<string>('independiente')
-  const [soloMisCitas,   setSoloMisCitas]   = useState(false)
-  const [loadingCitas,   setLoadingCitas]   = useState(true)
-
-  useEffect(() => {
-    if (loadingProfile || profile?.role === 'secretaria') return
-
-    const supabase = createClient()
-
-    // Total de expedientes — fetch remoto con fallback al mirror
-    supabase
-      .from('pacientes')
-      .select('id', { count: 'exact', head: true })
-      .neq('activo', false)
-      .then(({ count }: { count: number | null }) => setTotalPacientes(count ?? 0))
-      .catch(() => {
-        // silent — el fallback al mirror abajo resuelve el contador
-      })
+  const { consultorioActivo, cambiarActivo } = useConsultorioActivo()
+  const { abrir: abrirMenu } = useMenuMovil()
+  const [modalConsulta, setModalConsulta] = useState(false)
+  /* El buscador de «Nuevo documento», que es el MISMO componente con otro
+     destino. Estado aparte y no uno compartido con tres valores: los dos
+     botones son independientes y así ninguno puede heredar el destino del
+     otro por un reset olvidado. */
+  const [modalDocumento, setModalDocumento] = useState(false)
 
 
-
-    // Pacientes recientes — catch silencioso
-    supabase
-      .from('consultas')
-      .select('paciente_id, created_at, motivo_consulta, pacientes!inner(nombre, apellidos, activo)')
-      .order('created_at', { ascending: false })
-      .limit(30)
-      .then(({ data }: { data: { paciente_id: string; created_at: string; motivo_consulta: string | null; pacientes: { nombre: string; apellidos: string; activo?: boolean } | { nombre: string; apellidos: string; activo?: boolean }[] }[] | null }) => {
-        if (!data) return
-        const seen = new Set<string>()
-        const unique: Reciente[] = []
-        for (const c of data) {
-          // Filtrar pacientes con soft delete
-          const pac = (Array.isArray(c.pacientes) ? c.pacientes[0] : c.pacientes) as { nombre: string; apellidos: string; activo?: boolean } | null
-          if (pac?.activo === false) continue
-
-          if (!seen.has(c.paciente_id) && unique.length < 5) {
-            seen.add(c.paciente_id)
-            unique.push({
-              paciente_id: c.paciente_id,
-              nombre: pac?.nombre ?? '',
-              apellidos: pac?.apellidos ?? '',
-              created_at: c.created_at,
-              motivo_consulta: c.motivo_consulta ?? '',
-            })
-          }
-        }
-        setRecientes(unique)
-      })
-      .catch(() => {
-        // silent — si el fetch falla, recientes queda vacío y no se renderiza
-      })
-
-    // Próximas citas + clinica.tipo — wrap completo en try/catch/finally
-    // para garantizar que loadingCitas siempre termine en false.
-    async function fetchCitas() {
-      try {
-        if (!profile?.clinica_id) return
-
-        const { data: clinicaData } = await supabase
-          .from('clinicas')
-          .select('tipo')
-          .eq('id', profile.clinica_id)
-          .single()
-
-        const tipo = clinicaData?.tipo ?? 'independiente'
-        setClinicaTipo(tipo)
-
-        const isClinicaAdmin = canManageClinica(profile) && tipo === 'clinica'
-
-        let q = supabase
-          .from('appointments')
-          .select('id, title, start_time, status, paciente_id, consultorio_id, pacientes(nombre, apellidos), medico:profiles!appointments_medico_id_fkey(id, titulo, apellido_paterno)')
-          .eq('clinica_id', profile!.clinica_id!)
-          .gt('start_time', new Date().toISOString())
-          .in('status', ['scheduled', 'confirmed'])
-          .order('start_time', { ascending: true })
-          .limit(isClinicaAdmin ? 8 : 1) as any
-
-        if (!isClinicaAdmin) {
-          q = q.eq('medico_id', profile!.id)
-        }
-
-        const { data } = await q
-        setProximasCitas((data as ProximaCita[]) ?? [])
-      } catch {
-        // Red caída o query fallida → citas vacío, el resto del dashboard renderiza
-        setProximasCitas([])
-      } finally {
-        // SIEMPRE apagar el skeleton de carga, sin importar el path
-        setLoadingCitas(false)
-      }
-    }
-
-    void fetchCitas()
-  }, [profile, loadingProfile])
-
-  if (loadingProfile) return <DashboardSkeleton />
-  if (profile?.role === 'secretaria') return <AsistenteDashboard />
-
-  const primerNombre = profile?.nombres ? profile.nombres.split(' ')[0] : ''
-  const hoy    = format(new Date(), "EEEE, d 'de' MMMM", { locale: es })
-
+  /* ⚠️ ESTA DECLARACIÓN VA ANTES DE LOS GUARDAS, y no es orden estético: el
+     esqueleto de la línea de abajo la recibe como prop, y un `const` no se
+     eleva. Bajarla otra vez rompe la carga con un error de zona muerta. */
   const abrirBusqueda = () =>
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }))
 
-  const isClinicaAdmin = canManageClinica(profile) && clinicaTipo === 'clinica'
-  const displayCitas   = soloMisCitas
-    ? proximasCitas.filter(c => c.medico?.id === profile?.id)
-    : proximasCitas
-  const proximaCita    = proximasCitas[0] ?? null
+  /* El esqueleto lleva búsqueda y hamburguesa VIVOS: ninguno de los dos depende
+     del perfil, y son lo primero que se toca en esta pantalla. Los manejadores
+     se le pasan en vez de que los fabrique, para que el Ctrl+K sintético siga
+     definido en un solo sitio. El guarda de rol de la línea siguiente no se
+     mueve: durante la carga el rol se desconoce, así que el esqueleto deja los
+     tres botones en hueso y una secretaria no ve ni un fotograma de esta
+     cabecera. */
+  if (loadingProfile) return <DashboardSkeleton onBuscar={abrirBusqueda} onAbrirMenu={abrirMenu} />
+  if (profile?.role === 'secretaria') return <AsistenteDashboard />
 
-  const iniciarConsulta = (cita: ProximaCita) => {
-    if (!cita.consultorio_id) return
-    const consultorio = consultorios.find(c => c.id === cita.consultorio_id)
-    if (consultorio) cambiarActivo(consultorio)
-  }
+  const primerNombre = profile?.nombres ? profile.nombres.split(' ')[0] : ''
+  /* Sin perfil —error de carga— el saludo cae a la fórmula neutra y el avatar
+     al glifo genérico; la ceja de consultorio simplemente no se pinta. */
+  const iniciales = `${profile?.nombres?.[0] ?? ''}${profile?.apellido_paterno?.[0] ?? ''}`.toUpperCase()
 
   return (
-    <div className="max-w-3xl mx-auto space-y-8 py-2">
+    <div className="max-w-[1044px] mx-auto pt-2 pb-6">
 
-      {/* ── Saludo ───────────────────────────────────────────── */}
-      <div className="animate-slide-up" style={{ animationDelay: '0ms' }}>
-        <p className="text-sm text-[#86868b] capitalize mb-1">{hoy}</p>
-        <h1 className="text-[28px] font-bold tracking-tight text-[#1d1d1f] leading-tight">
+      {/* ── Región 1 · Cabecera de acción (adenda §1) ─────────── */}
+      <div className="animate-slide-up pb-[var(--sp-5-5)] border-b border-[color:var(--sp-line-card)]" style={{ animationDelay: '0ms' }}>
+
+        {/* ── Barra superior, SÓLO móvil ──────────────────────────
+            ⚠️ `dash-barra-movil` NO PINTA NADA: es el asidero de dos reglas de
+            `globals.css` —esconde el hamburguesa flotante del `Sidebar` para
+            que no salgan dos, y recorta el `pt-16` que el layout reserva
+            justamente para ese botón—. Mismo mecanismo, y mismo motivo, que
+            `.ag-banda-movil` en la agenda. No la quites al reordenar clases.
+            El hamburguesa de aquí y el flotante abren el MISMO menú
+            (`MenuMovilContext`), así que esconder uno no deja a nadie sin
+            acceso. */}
+        <div className="dash-barra-movil lg:hidden flex items-center gap-[var(--sp-3)] mb-[var(--sp-gap-block)]">
+          <button
+            type="button"
+            onClick={abrirMenu}
+            aria-label="Abrir menú"
+            className="w-11 h-11 shrink-0 flex items-center justify-center rounded-[var(--sp-r-icon-md)] bg-[var(--sp-surface-muted)] text-[var(--sp-ink-700)]"
+          >
+            <Menu size={20} />
+          </button>
+          <p className="flex-1 min-w-0 truncate text-[length:var(--sp-fs-vitals)] font-bold text-[var(--sp-ink-800)]">
+            Dashboard
+          </p>
+          <div className="w-10 h-10 shrink-0 flex items-center justify-center rounded-[var(--sp-r-pill)] bg-[var(--sp-primary-bg)] text-[var(--sp-primary-ink)] text-[length:var(--sp-fs-label-sm)] font-extrabold">
+            {iniciales || <User size={18} />}
+          </div>
+        </div>
+
+        {/* ── Fila 1 · identidad ──────────────────────────────── */}
+        {consultorioActivo && (
+          <p className="sp-label truncate">{consultorioActivo.nombre_corto || consultorioActivo.nombre}</p>
+        )}
+        <h1 className="mt-[var(--sp-gap-title-sub)] text-[length:var(--sp-fs-page)] font-extrabold tracking-tight leading-tight text-[var(--sp-ink-900)]">
           {saludo()}{primerNombre ? `, ${primerNombre}` : ''}
         </h1>
-      </div>
 
-      {/* ── Dos CTAs principales ─────────────────────────────── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 animate-slide-up" style={{ animationDelay: '60ms' }}>
+        {/* ── Fila 2 · acción ─────────────────────────────────────
+            ⚠️ UN SOLO JUEGO DE CONTROLES PARA LOS DOS TAMAÑOS, y es a
+            propósito: duplicar el bloque para móvil pondría `data-onboard` en
+            dos nodos y `OnboardingGuide` resuelve por `querySelector`, o sea
+            por el PRIMERO que encuentre. El orden lo dan las utilidades
+            `order-*`; el marcado es uno.
+            En `lg` el grupo es `shrink-0`, así que si no cabe baja de línea
+            ENTERO y conserva su orden, en vez de descolgarse de uno en uno.
+            ⚠️ EN MÓVIL SON CUATRO BOTONES Y EN ESCRITORIO TRES: «+ Nuevo
+            documento» es el único que trae `lg:hidden`, porque en `lg` ese
+            botón sigue viviendo arriba de la columna de Documentos, que es
+            donde estaba. Es la ÚNICA asimetría del bloque, y no la hereda
+            `data-onboard`: ese atributo sigue en un solo nodo. */}
+        <div className="mt-[var(--sp-gap-block)] flex flex-col gap-[var(--sp-gap-item)] lg:flex-row lg:flex-wrap lg:items-center">
 
-        {/* ── Tarjeta izquierda: Próxima(s) cita(s) — 3 columnas ── */}
-        {isClinicaAdmin ? (
-          /* Lista para admin de clínica */
-          <div className="sm:col-span-1 bg-white border border-[#1e5fa8]/20 rounded-2xl shadow-sm shadow-[#1e5fa8]/5 ring-1 ring-[#1e5fa8]/10 overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-3 bg-gradient-to-r from-[#1a3a5c] to-[#1e5fa8] rounded-t-2xl">
-              <div className="flex items-center gap-2">
-                <CalendarDays size={13} className="text-white/70" />
-                <p className="text-[11px] font-semibold text-white uppercase tracking-widest">Próximas citas</p>
-              </div>
-              <div className="flex items-center gap-3">
-                <label className="flex items-center gap-1.5 text-[11px] text-white/70 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={soloMisCitas}
-                    onChange={e => setSoloMisCitas(e.target.checked)}
-                    className="rounded border-white/30 bg-white/10 text-white focus:ring-white/30"
-                  />
-                  Solo mías
-                </label>
-                <Link href="/agenda" className="text-[10px] text-white/70 hover:text-white hover:underline">Ver agenda →</Link>
-              </div>
-            </div>
-            {loadingCitas ? (
-              <div className="px-5 py-4 space-y-3">
-                {[1,2].map(i => <div key={i} className="h-12 bg-slate-100 rounded-xl animate-pulse" />)}
-              </div>
-            ) : displayCitas.length > 0 ? (
-              displayCitas.slice(0, 4).map(cita => (
-                <div key={cita.id} className="flex gap-3 px-5 py-3 border-b border-slate-50 last:border-0">
-                  <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <User size={17} className="text-[#1e5fa8]" />
-                  </div>
-                  <div className="flex-1 min-w-0 space-y-1">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-sm font-semibold text-[#1d1d1f]">
-                        {cita.pacientes?.nombre} {cita.pacientes?.apellidos}
-                      </p>
-                      <StatusChip status={cita.status} />
-                    </div>
-                    <div className="flex items-center gap-2 text-[11px] text-[#86868b]">
-                      <span>{formatCitaHora(cita.start_time)}</span>
-                      {!soloMisCitas && cita.medico && (
-                        <span>· {componerNombreMedicoCorto(cita.medico)}</span>
-                      )}
-                    </div>
-                    {cita.paciente_id && (
-                      <div className="flex items-center gap-1.5 pt-0.5">
-                        {cita.medico?.id === profile?.id && (
-                          <Link
-                            href={`/expediente/${cita.paciente_id}/nueva-nota`}
-                            onClick={() => iniciarConsulta(cita)}
-                            className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold text-white bg-[#1e5fa8] hover:bg-[#1a3a5c] transition-colors">
-                            <Stethoscope size={10} /> Iniciar consulta
-                          </Link>
-                        )}
-                        <Link href={`/expediente/${cita.paciente_id}`}
-                          className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold text-[#1e5fa8] bg-blue-50 hover:bg-blue-100 transition-colors">
-                          <FolderOpen size={10} /> Expediente
-                        </Link>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))
-            ) : (
-              <p className="text-sm text-[#86868b] px-5 py-6 text-center">No hay citas agendadas</p>
-            )}
-          </div>
-        ) : (
-          /* Tarjeta simple para médico o admin independiente */
-          <div className="sm:col-span-1 bg-white border border-[#1e5fa8]/20 rounded-2xl shadow-sm shadow-[#1e5fa8]/5 ring-1 ring-[#1e5fa8]/10 flex flex-col overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-3 bg-gradient-to-r from-[#1a3a5c] to-[#1e5fa8] rounded-t-2xl">
-              <div className="flex items-center gap-2">
-                <CalendarDays size={13} className="text-white/70" />
-                <p className="text-[11px] font-semibold text-white uppercase tracking-widest">Próxima cita</p>
-              </div>
-              <Link href="/agenda" className="text-[10px] text-white/70 hover:text-white hover:underline">Ver agenda →</Link>
-            </div>
-            <div className="px-5 py-4 sm:px-6 flex-1 flex flex-col gap-3">
-            {loadingCitas ? (
-              <div className="h-12 bg-slate-100 rounded-xl animate-pulse" />
-            ) : proximaCita ? (
-              <div className="flex gap-3">
-                <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center flex-shrink-0">
-                  <User size={22} className="text-[#1e5fa8]" />
-                </div>
-                <div className="flex-1 min-w-0 space-y-1.5">
-                  <div>
-                    <p className="font-semibold text-[17px] text-[#1d1d1f] leading-snug">
-                      {proximaCita.pacientes?.nombre} {proximaCita.pacientes?.apellidos}
-                    </p>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <p className="text-xs text-[#86868b]">{formatCitaHora(proximaCita.start_time)}</p>
-                      <StatusChip status={proximaCita.status} />
-                    </div>
-                  </div>
-                  {proximaCita.paciente_id && (
-                    <div className="flex items-center gap-2">
-                      <Link
-                        href={`/expediente/${proximaCita.paciente_id}/nueva-nota`}
-                        onClick={() => iniciarConsulta(proximaCita)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold text-white bg-[#1e5fa8] hover:bg-[#1a3a5c] transition-colors"
-                      >
-                        <Stethoscope size={11} /> Iniciar consulta
-                      </Link>
-                      <Link
-                        href={`/expediente/${proximaCita.paciente_id}`}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold text-[#1e5fa8] bg-blue-50 hover:bg-blue-100 transition-colors"
-                      >
-                        <FolderOpen size={11} /> Ver expediente
-                      </Link>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <p className="text-sm text-[#86868b]">No hay citas agendadas</p>
-            )}
-            </div>
-          </div>
-        )}
+          <BuscadorPaciente onAbrir={abrirBusqueda} />
 
-        {/* ── Tarjeta derecha: Buscar / Nuevo paciente — 2 columnas ── */}
-        <div className="sm:col-span-1 group relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#1a3a5c] to-[#1e5fa8] text-white shadow-[0_4px_24px_rgba(30,95,168,0.3)] hover:shadow-[0_8px_32px_rgba(30,95,168,0.4)] transition-all duration-200 flex flex-col">
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-in-out" />
-          {/* Buscar */}
-          <button
-            onClick={abrirBusqueda}
-            className="relative flex-1 w-full flex items-center gap-3 px-5 py-4 border-b border-white/10 hover:bg-white/15 active:bg-white/20 transition-colors text-left"
-          >
-            <div className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center flex-shrink-0">
-              <Search size={16} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-semibold text-[14px] leading-tight">Buscar paciente</p>
-              <p className="text-white/60 text-[11px] mt-0.5">Iniciar consulta</p>
-            </div>
-            <kbd className="hidden sm:inline font-mono text-[10px] bg-white/10 border border-white/20 px-2 py-0.5 rounded-md text-white/70 flex-shrink-0">
-              Ctrl K
-            </kbd>
-          </button>
-          {/* Nuevo */}
-          <Link
-            href="/pacientes/nuevo"
-            data-onboard="nuevo-paciente"
-            className="relative flex-1 flex items-center gap-3 px-5 py-4 hover:bg-white/15 active:bg-white/20 transition-colors"
-          >
-            <div className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center flex-shrink-0">
-              <UserPlus size={16} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-semibold text-[14px] leading-tight">Nuevo paciente</p>
-              <p className="text-white/60 text-[11px] mt-0.5">Crear expediente</p>
-            </div>
-          </Link>
-        </div>
+          {/* Los botones. En móvil, retícula de dos columnas donde las dos
+              primeras filas cruzan las dos columnas y el par queda en la
+              tercera; en `lg`, fila de tres que no encoge. */}
+          <div className="order-2 grid grid-cols-2 gap-[var(--sp-gap-item)] lg:flex lg:shrink-0 lg:items-center">
 
-      </div>
-
-      {/* ── Módulos ───────────────────────────────────────────── */}
-      <div className="animate-slide-up" style={{ animationDelay: '120ms' }}>
-        <p className="text-[11px] font-semibold text-[#86868b] uppercase tracking-widest mb-3">Módulos</p>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {ACCESOS.map(({ href, icon: Icon, label, desc, gradient, ring }) => (
-            <Link
-              key={href}
-              href={href}
-              className={`group bg-white rounded-2xl border border-slate-100 p-5 shadow-sm
-                hover:shadow-[0_4px_20px_rgba(30,95,168,0.15)] hover:border-[#1e5fa8]/20 hover:-translate-y-1
-                active:scale-[0.97]
-                transition-all duration-200
-                ring-2 ring-transparent ${ring}`}
+            {/* + Nueva consulta — primario. `.sp-btn--primary` trae del sistema
+                el fondo, la tinta y la sombra: aquí no hay ningún color. */}
+            <button
+              type="button"
+              onClick={() => setModalConsulta(true)}
+              className={`${ALTO_CONTROL} sp-btn sp-btn--primary col-span-2 order-1 whitespace-nowrap lg:order-3`}
             >
-              <div className="flex items-start justify-between mb-4">
-                <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${gradient} flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform duration-200`}>
-                  <Icon size={17} className="text-white" />
-                </div>
-                {href === '/expediente' && totalPacientes !== null && (
-                  <span className="text-[11px] font-bold tabular-nums text-[#1e5fa8] bg-blue-50 px-2 py-0.5 rounded-full">
-                    {totalPacientes}
-                  </span>
-                )}
-              </div>
-              <p className="font-semibold text-sm text-[#1d1d1f]">{label}</p>
-              <p className="text-[11px] text-[#86868b] mt-0.5 leading-tight">{desc}</p>
+              <Plus size={17} /> Nueva consulta
+            </button>
+
+            {/* + Nuevo documento — SÓLO MÓVIL, fila propia a ancho completo.
+                ⚠️ NO ES UN SEGUNDO PRIMARIO. Ocupa las dos columnas y mide lo
+                mismo que «Nueva consulta» —eso lo pidió el diseño—, pero lleva
+                el contorno de acento de «Nuevo paciente», no el relleno: en
+                esta cabecera el relleno macizo es de UNO y sirve para señalar
+                cuál es la acción principal. Dos rellenos seguidos dejan la
+                pantalla sin jerarquía.
+                Está aquí y no al final de la columna de Documentos porque
+                apiladas en móvil esa columna cae al pie de la página, a dos
+                pantallas de las demás acciones de creación. En `lg` no se
+                pinta: allí el botón de la columna sigue siendo el que vale.
+                El rótulo va entero, sin abreviar. A 360 px la fila mide 328 y
+                el botón pide 197-228 según la fuente de sistema, así que sobra;
+                en media columna (159) NO cabía, y de ahí la fila propia.
+                ⚠️ DEJÓ DE SER UN ENLACE (pulido de flujo, ítem 1). Antes iba a
+                `/documentos`, la pantalla intermedia donde había que elegir
+                paciente; ahora abre el mismo buscador que «Nueva consulta» y
+                entra al expediente del elegido. Sin `?tipo=`: el formato se
+                elige ya dentro, sobre las ocho tarjetas. */}
+            <button
+              type="button"
+              onClick={() => setModalDocumento(true)}
+              className={`${ALTO_CONTROL} col-span-2 order-2 inline-flex items-center justify-center gap-[var(--sp-gap-item)] whitespace-nowrap rounded-[var(--sp-r-btn)] px-6 border border-[color:var(--sp-primary-border)] bg-[var(--sp-surface)] text-[length:var(--sp-fs-btn-sm)] font-semibold text-[var(--sp-primary-text)] transition-colors hover:bg-[var(--sp-primary-bg-faint)] lg:hidden`}
+            >
+              <FilePlus2 size={17} /> Nuevo documento
+            </button>
+
+            {/* + Nuevo paciente — contorno de acento. No lleva `.sp-btn`
+                porque ésa declara `border: none` y se comería el contorno. */}
+            <Link
+              href="/pacientes/nuevo"
+              /* ⚠️ NO LO QUITES NI LO MUEVAS A OTRO NODO. `OnboardingGuide` lo
+                 busca por `[data-onboard="nuevo-paciente"]` para señalar este
+                 paso de la guía; sin él el paso queda mudo. */
+              data-onboard="nuevo-paciente"
+              /* Sin precarga, como el resto de enlaces nuevos de esta región:
+                 2 peticiones RSC y 2 lambdas por carga del dashboard, se pulse
+                 o no. El razonamiento largo está en la lista de recientes. */
+              prefetch={false}
+              className={`${ALTO_CONTROL} order-3 inline-flex items-center justify-center gap-[var(--sp-gap-item)] whitespace-nowrap rounded-[var(--sp-r-btn)] px-6 border border-[color:var(--sp-primary-border)] bg-[var(--sp-surface)] text-[length:var(--sp-fs-btn-sm)] font-semibold text-[var(--sp-primary-text)] transition-colors hover:bg-[var(--sp-primary-bg-faint)] lg:order-2`}
+            >
+              <Plus size={17} /> Nuevo paciente
             </Link>
-          ))}
+
+            {/* Expedientes — contorno neutro, el visor global. */}
+            <Link
+              href="/expediente"
+              /* Sin precarga, y desde el bloque 5 el ahorro ES real: la
+                 salvedad que había aquí —que la tarjeta «Expediente» de
+                 `ACCESOS` conservaba la suya a la misma url, y Next deduplica
+                 por url— se fue con la columna de Módulos. Ya no queda ningún
+                 otro enlace encendido a `/expediente` en esta pantalla. */
+              prefetch={false}
+              className={`${ALTO_CONTROL} sp-btn sp-btn--secondary order-4 whitespace-nowrap lg:order-1`}
+            >
+              <FolderOpen size={17} /> Expedientes
+            </Link>
+
+          </div>
         </div>
       </div>
 
-      {/* ── Pacientes recientes ───────────────────────────────── */}
-      {recientes.length > 0 && (
-        <div className="animate-slide-up pb-6" style={{ animationDelay: '180ms' }}>
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-[11px] font-semibold text-[#86868b] uppercase tracking-widest">Consultas recientes</p>
-            <Link href="/expediente" className="text-[11px] text-[#1e5fa8] hover:underline">
-              Ver todos →
-            </Link>
-          </div>
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-            {recientes.map((p, i) => {
-              const initials = `${p.nombre[0] ?? ''}${p.apellidos[0] ?? ''}`.toUpperCase()
+      {/* Cuelga de «+ Nueva consulta» de la cabecera. Va fuera del bloque
+          porque se pinta en `position: fixed` y devuelve `null` cerrado: no
+          entra en el flujo de ninguna banda. */}
+      <ConsultaRapidaModal open={modalConsulta} onClose={() => setModalConsulta(false)} />
+
+      {/* El gemelo de documentos. Mismo componente, mismo sitio y misma razón
+          —`position: fixed`, `null` cerrado—; lo único que cambia es a dónde
+          entra el paciente elegido. Lo abren los DOS botones de la pareja: el
+          de la cabecera en móvil y el de la columna de Documentos en `lg`. */}
+      <ConsultaRapidaModal
+        open={modalDocumento}
+        onClose={() => setModalDocumento(false)}
+        destino={id => `/expediente/${id}/documentos`}
+        titulo="Nuevo documento"
+        rotuloCrear="Crear y continuar"
+      />
+
+      {/* ── Banda 1 · Próximas citas (flexible) · columna fija ── */}
+      {/* ⚠️ `items-start`: LAS DOS COLUMNAS SE ALINEAN ARRIBA Y NINGUNA SE
+          ESTIRA. Por defecto una retícula estira sus hijos al alto de la fila,
+          así que con una sola cita la card de la izquierda crecía hasta igualar
+          al calendario y dejaba un blanco grande DENTRO de una caja con borde.
+          El sobrante tiene que ser aire de la retícula, no hueco enmarcado. */}
+      <div className="grid grid-cols-1 items-start lg:grid-cols-[minmax(0,1fr)_300px] gap-[var(--sp-5)] mt-[var(--sp-gap-band)] animate-slide-up" style={{ animationDelay: '60ms' }}>
+
+        {/* ⚠️ EL ORDEN DEL DOM ES EL DE ESCRITORIO, Y MÓVIL LO INVIERTE CON
+            `order`. En una columna, el calendario va PEGADO A LA CABECERA y las
+            próximas citas debajo; en `lg` vuelve la retícula de dos columnas con
+            las citas a la izquierda. Se hace con `order` y no reordenando el
+            marcado porque el orden de lectura de escritorio —citas primero— es
+            también el orden de tabulación que queremos allí.
+            Los envoltorios existen sólo para colgar el `order`: la retícula
+            sigue teniendo EXACTAMENTE DOS HIJOS, que es criterio de la adenda. */}
+
+        {/* ── Región 2 · Próximas citas ─────────────────────── */}
+        <div className="order-2 lg:order-1">
+          {/* ⚠️ LAS DOS ACCIONES CLÍNICAS DEL RENGLÓN VIVEN AQUÍ, no dentro de
+              `ProximasCitas`. Ese componente lo comparte la vista de la
+              secretaria, donde expediente y nota están PROHIBIDOS por el rol, y
+              tenerlas fuera es lo que lo hace cierto por estructura en vez de
+              por una bandera. No las muevas de vuelta.
+              La precarga y el tratamiento primario siguen la regla de la
+              región: sólo la fila en curso. */}
+          <ProximasCitas
+            medicoId={profile?.id ?? null}
+            acciones={(cita, enCurso) => {
+              const precarga = enCurso ? undefined : false
               return (
-                <div
-                  key={p.paciente_id}
-                  className={`flex items-center gap-3 px-4 py-3 group hover:bg-blue-50/50 transition-colors ${i < recientes.length - 1 ? 'border-b border-slate-50' : ''}`}
-                >
+                <>
                   <Link
-                    href={`/expediente/${p.paciente_id}`}
-                    className="flex items-center gap-3 flex-1 min-w-0 hover:opacity-80 transition-opacity"
+                    href={`/expediente/${cita.paciente_id}/nueva-nota?cita=${cita.id}`}
+                    onClick={() => {
+                      /* Deja activo el consultorio de la cita antes de entrar a
+                         la nota, para que el documento salga con el membrete
+                         que toca. */
+                      if (!cita.consultorio_id) return
+                      const c = consultorios.find(x => x.id === cita.consultorio_id)
+                      if (c) cambiarActivo(c)
+                    }}
+                    prefetch={precarga}
+                    className={enCurso
+                      ? 'sp-btn sp-btn--primary whitespace-nowrap'
+                      : 'inline-flex items-center justify-center whitespace-nowrap border font-bold transition-colors'}
+                    style={enCurso
+                      ? GEOMETRIA_ACCION
+                      : { ...GEOMETRIA_ACCION, background: 'var(--sp-surface)', color: 'var(--sp-primary-text)', borderColor: 'var(--sp-primary-border)' }}
                   >
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${AVATAR_COLORS[i % AVATAR_COLORS.length]}`}>
-                      {initials}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-[#1d1d1f] truncate">
-                        {p.nombre} {p.apellidos}
-                      </p>
-                      <p className="text-[11px] text-[#86868b] truncate">
-                        Última atención: {formatDistanceToNow(parseISO(p.created_at), { locale: es, addSuffix: true })}
-                        {p.motivo_consulta && ` · ${p.motivo_consulta}`}
-                      </p>
-                    </div>
+                    <span className="xl:hidden">Iniciar</span>
+                    <span className="hidden xl:inline">Iniciar consulta</span>
                   </Link>
 
-                  <div className="flex items-center gap-1 flex-shrink-0 flex items-center gap-1">
-                    <Link
-                      href={`/expediente/${p.paciente_id}/documentos?tipo=receta`}
-                      title="Receta express"
-                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium text-violet-600 bg-violet-50 hover:bg-violet-100 transition-colors"
-                    >
-                      <Pill size={12} />
-                      Receta
-                    </Link>
-                    <Link
-                      href={`/expediente/${p.paciente_id}?tab=consultas`}
-                      title="Última nota"
-                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium text-teal-600 bg-teal-50 hover:bg-teal-100 transition-colors"
-                    >
-                      <ClipboardList size={12} />
-                      Nota
-                    </Link>
-                    <Link
-                      href={`/expediente/${p.paciente_id}`}
-                      className="p-1.5 rounded-lg text-slate-300 hover:text-slate-500 hover:bg-slate-100 transition-colors"
-                    >
-                      <ArrowRight size={13} />
-                    </Link>
-                  </div>
-                </div>
+                  {/* Expediente, sólo icono. `Stethoscope` es el glifo que la app
+                      ya usa para «expediente». Se cae por debajo de 380 px de
+                      viewport: es la regla de degradación de la adenda, y lo que
+                      protege es que el renglón quepa en una línea. */}
+                  <Link
+                    href={`/expediente/${cita.paciente_id}`}
+                    prefetch={precarga}
+                    aria-label="Abrir expediente"
+                    title="Expediente"
+                    className="hidden min-[380px]:inline-flex items-center justify-center w-[34px] h-[34px] shrink-0 rounded-[var(--sp-r-btn-sm)] border border-[color:var(--sp-line-control)] bg-[var(--sp-surface)] text-[var(--sp-ink-500)] transition-colors hover:bg-[var(--sp-surface-muted)] hover:text-[var(--sp-ink-700)]"
+                  >
+                    <Stethoscope size={16} />
+                  </Link>
+                </>
               )
-            })}
-          </div>
+            }}
+          />
         </div>
-      )}
+
+        {/* ── Región 3 · Calendario «Hoy es» ────────────────── */}
+        <div className="order-1 lg:order-2">
+          <TarjetaHoy medicoId={profile?.id ?? null} />
+        </div>
+
+      </div>
+
+      {/* Filete horizontal a TODO el ancho del área de contenido, no sólo
+          a la columna izquierda (adenda §3). */}
+      <div className="mt-[var(--sp-gap-band)] border-t border-[color:var(--sp-line-card)]" />
+
+      {/* ── Banda 2 · Atendidos (flexible) · Documentos (fija) ── */}
+      {/* ⚠️ EXACTAMENTE DOS HIJOS, y es criterio de aceptación de la adenda §3.
+          Cada columna se pinta SIEMPRE: sus estados de carga, vacío y error
+          viven dentro del componente, nunca como un guarda que la borre de la
+          retícula. Un `&&` aquí fuera dejaría la banda con un solo hijo en
+          cuenta nueva y descolgaría el filete vertical. */}
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px] gap-[var(--sp-gap-band)] lg:gap-0 mt-[var(--sp-gap-band)]">
+        {/* ── Región 5 · Atendidos recientemente ──────────────── */}
+        <div className="lg:pr-[var(--sp-pad-rule)]">
+          <AtendidosRecientemente />
+        </div>
+
+        {/* ── Región 4 · Documentos ──────────────────────────────
+            No es una tarjeta con marco: es una columna de contenido, y el
+            filete vertical de la adenda §4 es su borde izquierdo, con 24 px a
+            cada lado. */}
+        {/* ⚠️ EL FILETE CAMBIA DE LADO CON EL TAMAÑO. En `lg` es el borde
+            IZQUIERDO de esta columna —el filete vertical de la adenda §4, con
+            24 px a cada lado—. Apiladas en móvil no hay costado que separar y
+            las dos secciones se pegaban, así que ahí pasa a ser el borde
+            SUPERIOR, el mismo filete de 1 px que separa las bandas, con los
+            14 px de relleno que pide el spec para móvil. Es uno o el otro,
+            nunca los dos: de ahí los `lg:border-t-0 lg:pt-0`. */}
+        <div className="border-t border-[color:var(--sp-line-card)] pt-[var(--sp-3-5)] lg:border-t-0 lg:pt-0 lg:border-l lg:pl-[var(--sp-pad-rule)]">
+          <DocumentosRecientes onNuevoDocumento={() => setModalDocumento(true)} />
+        </div>
+      </div>
 
     </div>
   )

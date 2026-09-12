@@ -1,0 +1,796 @@
+'use client'
+
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { AlertTriangle, Check, Minus, X } from 'lucide-react'
+import ModalShell from '@/components/ui/ModalShell'
+import Portal from '@/components/ui/Portal'
+import CapturaIdentificacion from '@/components/documentos/CapturaIdentificacion'
+import {
+  ANCHO_BITMAP,
+  GROSOR_TRAZO,
+  TINTA_FIRMA,
+  altoBitmap,
+  exportarFirma,
+  segmentoSuavizado,
+  type Punto,
+} from '@/lib/documentos/firmaTrazo'
+
+/**
+ * Captura de firmas del consentimiento — GUIA_FORMULARIOS_05 §2 a §7.
+ *
+ * ── DÓNDE VIVE ──────────────────────────────────────────────────────────────
+ * Un modo a PANTALLA COMPLETA dentro de la misma ruta (§2). No es ruta nueva:
+ * obligaría a traspasar un formulario que puede no estar guardado. Y no es
+ * modal flotante: un modal invita a cerrarse tocando fuera, y con el
+ * dispositivo en manos del paciente eso es perder firmas.
+ *
+ * Tapar el resto de la aplicación es una FUNCIÓN, no un efecto colateral: es el
+ * único momento del sistema en que el dispositivo cambia de manos, y el
+ * paciente no debe poder llegar al expediente ni al listado.
+ *
+ * ── LO QUE ESTE COMPONENTE NO HACE ──────────────────────────────────────────
+ * No escribe en la BASE. Reúne los desenlaces y entrega las firmas capturadas a
+ * `onSellar`; el orden de las tres operaciones —firmas, sellado, PDF— lo impone
+ * el formulario, que es quien conoce la fila.
+ *
+ * ── LO QUE SÍ ESCRIBE, Y POR QUÉ AQUÍ ───────────────────────────────────────
+ * La foto de identificación (§6) SÍ se sube desde aquí, dentro de
+ * `CapturaIdentificacion`, y eso es deliberado: la fila de la firma es inmutable
+ * y lleva la ruta dentro, así que la foto tiene que existir ANTES de que la fila
+ * se inserte. Insertar primero y fallar la subida dejaría una ruta muerta que ya
+ * no se puede corregir. Lo impone `20260813_firmas_documento.sql`, junto a
+ * `firmas_documento_identificacion_check`.
+ *
+ * La pregunta llega DESPUÉS de confirmar la firma y solo a quien firmó: quien no
+ * firmó no está, así que no hay identificación que capturar.
+ */
+
+/** Los cuatro del flujo. El médico no entra: su rúbrica sale del perfil (§4). */
+export type RolFirmante = 'paciente' | 'familiar' | 'testigo_1' | 'testigo_2'
+
+export interface FirmaCapturada {
+  rol: RolFirmante
+  /** Data-URL PNG ya recortado a la tinta. */
+  trazo: string
+  /** ISO del sello del DISPOSITIVO: el momento real del trazo. */
+  firmadoEn: string
+  /**
+   * Ruta de la foto dentro del bucket cerrado `identificaciones`, o `null` si se
+   * siguió sin foto. Va tal cual a `firmas_documento.identificacion_path`, que
+   * admite NULL: la foto nunca bloquea, así que su ausencia es un desenlace
+   * normal y no un fallo.
+   */
+  identificacionPath: string | null
+}
+
+/**
+ * Cómo se resolvió un paso. Solo hay dos desenlaces, y el segundo es del
+ * paciente y de nadie más: quien no iba a firmar no llegó a entrar al flujo.
+ */
+type Desenlace =
+  | { tipo: 'firmo'; trazo: string; firmadoEn: string; identificacionPath: string | null }
+  | { tipo: 'no_pudo' }
+
+interface Paso {
+  rol: RolFirmante
+  /** Bajo la línea del lienzo, en mayúsculas (§5.1). */
+  etiqueta: string
+  titulo: string
+}
+
+/** El catálogo de los cuatro posibles. Cuáles entran de verdad lo decide `firmantesDe`. */
+const PASOS: readonly Paso[] = [
+  { rol: 'paciente', etiqueta: 'PACIENTE', titulo: 'Paciente' },
+  { rol: 'familiar', etiqueta: 'FAMILIAR RESPONSABLE', titulo: 'Familiar o responsable' },
+  { rol: 'testigo_1', etiqueta: 'TESTIGO 1', titulo: 'Testigo 1' },
+  { rol: 'testigo_2', etiqueta: 'TESTIGO 2', titulo: 'Testigo 2' },
+]
+
+/**
+ * Quiénes firman de verdad: SOLO los que tienen nombre escrito.
+ *
+ * Una firma sin nombre no acredita a nadie, y el papel acabaría con un trazo que
+ * no se puede atribuir. Por eso no llenar el nombre ES la forma de omitir a un
+ * testigo, y por eso este componente ya no tiene botón de omitir: dos maneras de
+ * decir lo mismo es una de más.
+ *
+ * ⚠ EL PACIENTE ENTRA SIEMPRE, tenga nombre o no. Su ausencia del papel no es
+ * «no está» sino «no pudo firmar», que es un hecho distinto y se registra con su
+ * casilla. En la práctica su nombre nunca está vacío —es campo obligatorio del
+ * formulario y sin él no se abre el firmado— pero la regla se declara aquí en
+ * vez de descansar en una validación que vive en otro archivo.
+ *
+ * ⚠ Y EL FAMILIAR TAMPOCO PUEDE FALTAR HOY, aunque este filtro no lo diga: su
+ * nombre es obligatorio en el formulario —`faltantes` lo exige sin condición— y
+ * `iniciarFirmado` no abre el modo con faltantes. Consecuencia directa: **su
+ * firma es obligatoria en todo consentimiento**. Si algún día se quiere poder
+ * emitir sin firma del familiar, lo que hay que soltar es esa obligatoriedad del
+ * NOMBRE en el formulario; en cuanto el nombre pueda ir vacío, el familiar
+ * desaparece del flujo solo, igual que un testigo, y aquí no hay que tocar nada.
+ */
+function firmantesDe(nombres: Record<RolFirmante, string>): Paso[] {
+  return PASOS.filter(p => p.rol === 'paciente' || nombres[p.rol].trim() !== '')
+}
+
+interface Props {
+  /**
+   * Los nombres escritos en el formulario. Deciden QUIÉNES firman, no solo cómo
+   * se encabeza cada paso: ver `firmantesDe`.
+   *
+   * No cambian mientras el modo está abierto —el formulario queda congelado
+   * detrás con `display:none`—, así que la lista de firmantes se calcula en cada
+   * render sin riesgo de que el flujo cambie de longitud a media firma.
+   */
+  nombres: Record<RolFirmante, string>
+  /**
+   * El borrador que se está firmando. Solo lo usa la captura de la foto: es el
+   * documento al que cuelga en el bucket, y el que la ruta de servidor comprueba
+   * que sea del médico y siga en `borrador`.
+   */
+  documentoId: string
+  /**
+   * Se DECLARA en el formulario, no aquí (ver la casilla allí). Llega como dato
+   * y este componente no vuelve a preguntarlo: marcarla hace obligatorio el
+   * nombre del familiar, y ese nombre hay que reclamarlo antes de entrar, no
+   * con el paciente y el dispositivo delante.
+   */
+  pacienteNoPuedeFirmar: boolean
+  onSalir: () => void
+  /**
+   * `previstos` es cuántos firmantes pidió el flujo, no cuántos firmaron: es lo
+   * que el papel imprime en su línea de cierre, y no se puede deducir de las
+   * firmas capturadas.
+   */
+  onSellar: (firmas: FirmaCapturada[], previstos: number) => void
+  sellando: boolean
+  /** Mensaje del formulario cuando alguna de las tres operaciones falló. */
+  errorSellado: string
+}
+
+export default function FirmadoConsentimiento({
+  nombres, documentoId, pacienteNoPuedeFirmar, onSalir, onSellar, sellando, errorSellado,
+}: Props) {
+  const [paso, setPaso] = useState(0)
+  const [desenlaces, setDesenlaces] = useState<Partial<Record<RolFirmante, Desenlace>>>({})
+  const [tieneTrazo, setTieneTrazo] = useState(false)
+  const [limpiarSenal, setLimpiarSenal] = useState(0)
+  const [errorTrazo, setErrorTrazo] = useState('')
+  const [confirmarSellado, setConfirmarSellado] = useState(false)
+  const [confirmarSalida, setConfirmarSalida] = useState(false)
+  /**
+   * La firma que ya se confirmó y está esperando la respuesta sobre su foto
+   * (§6.1). Mientras vive, el lienzo deja el sitio a la captura: el trazo ya no
+   * se toca y volver a enseñarlo invitaría a rehacerlo cuando el paso siguiente
+   * es otro. Se resuelve —con foto o sin ella— en `resolver`.
+   */
+  const [pendienteFoto, setPendienteFoto] =
+    useState<{ rol: RolFirmante; trazo: string; firmadoEn: string } | null>(null)
+
+  const lienzoRef = useRef<HTMLCanvasElement>(null)
+  /**
+   * LAS MUESTRAS DEL PUNTERO, un array por gesto. De aquí sale lo que se
+   * imprime: `exportarFirma` las REDIBUJA en el espacio canónico en vez de
+   * reescalar el mapa de bits, que es lo que hace que el grosor impreso deje de
+   * depender del aparato (ver la cabecera de `firmaTrazo.ts`).
+   *
+   * ⚠ SON TRANSITORIAS Y NO CONTRADICEN §5.5. Lo que se GUARDA sigue siendo una
+   * imagen: estos puntos viven en memoria mientras dura la captura y mueren con
+   * el paso. La decisión de §5.5 es sobre qué se almacena y con qué se coteja,
+   * no sobre cómo se rasteriza.
+   *
+   * Vive en el padre y no en `LienzoFirma` porque es `confirmarFirma` quien las
+   * necesita. Se vacían en los tres sitios donde el lienzo se vacía: al
+   * resolver un paso, al rehacer una firma y al pulsar «Borrar y repetir».
+   */
+  const trazosRef = useRef<Punto[][]>([])
+
+  /** Los que de verdad firman este documento, y por tanto los pasos del flujo. */
+  const firmantes = firmantesDe(nombres)
+
+  const enResumen = paso >= firmantes.length
+  const actual = enResumen ? null : firmantes[paso]
+  // La pendiente de foto cuenta: es un trazo ya capturado que se perdería al
+  // salir, aunque su paso todavía no esté resuelto.
+  const hayFirmas = pendienteFoto !== null
+    || Object.values(desenlaces).some(d => d.tipo === 'firmo')
+  /** El lienzo se APAGA —no se borra— cuando este paso es el de un paciente que no puede firmar. */
+  const apagado = actual?.rol === 'paciente' && pacienteNoPuedeFirmar
+
+  /** La X y `Escape` son lo mismo: salir con firmas capturadas pide confirmación. */
+  const intentarSalir = useCallback((): void => {
+    if (sellando) return
+    if (hayFirmas) setConfirmarSalida(true)
+    else onSalir()
+  }, [sellando, hayFirmas, onSalir])
+
+  useEffect(() => {
+    const alTeclear = (e: KeyboardEvent) => { if (e.key === 'Escape') intentarSalir() }
+    window.addEventListener('keydown', alTeclear)
+    // El modo tapa la pantalla entera: el scroll de detrás no debe seguir vivo.
+    const previo = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      window.removeEventListener('keydown', alTeclear)
+      document.body.style.overflow = previo
+    }
+  }, [intentarSalir])
+
+  /** Guarda el desenlace y salta al siguiente paso sin resolver, o al resumen. */
+  function resolver(rol: RolFirmante, desenlace: Desenlace): void {
+    const siguientes = { ...desenlaces, [rol]: desenlace }
+    setDesenlaces(siguientes)
+    setErrorTrazo('')
+    setTieneTrazo(false)
+    setPendienteFoto(null)
+    trazosRef.current = []
+    const pendiente = firmantes.findIndex(p => siguientes[p.rol] === undefined)
+    setPaso(pendiente === -1 ? firmantes.length : pendiente)
+  }
+
+  /**
+   * Confirmar NO resuelve el paso todavía: deja la firma en `pendienteFoto` y
+   * abre la pregunta de §6.1. El paso se resuelve cuando la captura responde,
+   * con ruta o con `null` —«sin foto» es una respuesta, no una cancelación—.
+   *
+   * El paciente que no puede firmar es la excepción: no hay firma, así que no
+   * hay a quién preguntarle por su identificación.
+   */
+  function confirmarFirma(): void {
+    if (!actual) return
+    if (apagado) { resolver(actual.rol, { tipo: 'no_pudo' }); return }
+    // Desde las MUESTRAS, no desde el lienzo: lo que se imprime se redibuja en
+    // el espacio canónico. El lienzo solo fue lo que el paciente vio.
+    const res = exportarFirma(trazosRef.current)
+    if (!res.ok) {
+      setErrorTrazo(res.motivo === 'presupuesto'
+        ? 'La firma pesa demasiado para guardarse. Bórrala y hazla con menos trazos.'
+        : 'El lienzo está vacío: no hay ningún trazo que guardar.')
+      return
+    }
+    setErrorTrazo('')
+    setPendienteFoto({ rol: actual.rol, trazo: res.trazo, firmadoEn: new Date().toISOString() })
+  }
+
+  /** Vuelve a ese firmante SIN deshacer los demás (§7.1). */
+  function rehacer(rol: RolFirmante): void {
+    const { [rol]: _quitado, ...resto } = desenlaces
+    void _quitado
+    setDesenlaces(resto)
+    setTieneTrazo(false)
+    setErrorTrazo('')
+    setPendienteFoto(null)
+    trazosRef.current = []
+    setPaso(firmantes.findIndex(p => p.rol === rol))
+  }
+
+  function sellar(): void {
+    setConfirmarSellado(false)
+    const firmas: FirmaCapturada[] = []
+    for (const p of firmantes) {
+      const d = desenlaces[p.rol]
+      if (d?.tipo === 'firmo') {
+        firmas.push({
+          rol: p.rol, trazo: d.trazo, firmadoEn: d.firmadoEn,
+          identificacionPath: d.identificacionPath,
+        })
+      }
+    }
+    onSellar(firmas, firmantes.length)
+  }
+
+  const resueltos = firmantes.filter(p => desenlaces[p.rol] !== undefined).length
+
+  return (
+    /**
+     * ⚠ EL PORTAL NO SOBRA. NO LO QUITES.
+     *
+     * El formulario vive dentro de `.sp-doc-form`, que lleva
+     * `container-type: inline-size` para sus consultas de contenedor. Eso
+     * arrastra CONTENCIÓN DE DISPOSICIÓN, y un elemento con contención de
+     * disposición se convierte en MARCO DE REFERENCIA de sus descendientes
+     * `position: fixed`: el `inset: 0` de `.sp-firma-modo` deja de medirse
+     * contra el viewport y pasa a medirse contra la caja del formulario.
+     *
+     * Sin el portal ocurrían las dos cosas a la vez, y son la misma:
+     *
+     *  · El modo NO tapaba la barra lateral. No por apilamiento —el z-index
+     *    nunca llegó a competir con nada— sino porque el modo quedaba
+     *    confinado a la columna del formulario, que empieza a la derecha de la
+     *    barra, así que geométricamente no la alcanzaba.
+     *  · El área de captura no se veía. Con el cuerpo del formulario en
+     *    `display:none`, a `.sp-doc-form` no le quedaba NINGÚN hijo en flujo
+     *    —el panel de plantillas es null cerrado y los modales salen por este
+     *    mismo portal—, así que su altura de contenido era 0. Contra una caja
+     *    de 0, `top:0; bottom:0` da un modo de 0 de alto, y `.sp-firma-cuerpo`
+     *    —`flex: 1 1 0%` con `overflow-y: auto`— se quedaba en 0 y recortaba el
+     *    lienzo entero. La cabecera y el progreso son `flex: 0 0 auto` y por eso
+     *    seguían viéndose, desbordando.
+     *
+     * Colgando del `<body>`, `fixed` vuelve a resolverse contra el viewport.
+     * Los tokens `--sp-*` viven en `:root`, así que no se pierde ninguno.
+     */
+    <Portal>
+      <div className="sp-firma-modo sp-push-forward" role="dialog" aria-modal="true"
+        aria-label="Firmado electrónico">
+
+        {/* ── Cabecera (§3.1) ───────────────────────────────────────── */}
+        <header className="sp-firma-head">
+          <button type="button" onClick={intentarSalir} disabled={sellando}
+            className="sp-firma-salir" aria-label="Salir del firmado">
+            <X size={20} />
+          </button>
+          <h2 className="sp-title-card sp-firma-titulo">
+            {enResumen ? 'Revisión antes de sellar' : 'Firmado electrónico'}
+          </h2>
+          <span className="sp-badge">
+            <span className="sp-firma-long">
+              {enResumen
+                ? `${resueltos} de ${firmantes.length} resueltos`
+                : `Firmante ${paso + 1} de ${firmantes.length}`}
+            </span>
+            <span className="sp-firma-short">
+              {enResumen ? `${resueltos}/${firmantes.length}` : `${paso + 1}/${firmantes.length}`}
+            </span>
+          </span>
+        </header>
+
+        {/* ── Progreso (§3.2) ───────────────────────────────────────────
+            UN SEGMENTO POR FIRMANTE REAL, no cuatro fijos: los cuatro fijos
+            existían cuando se podía omitir dentro del flujo —omitir resolvía un
+            paso sin eliminarlo, y un progreso que encogía a media firma habría
+            mentido sobre cuánto quedaba—. Ahora quiénes firman se decide ANTES
+            de entrar, con los nombres, así que la cuenta ya no puede cambiar a
+            mitad de camino: enseñar cuatro cuando solo se piden dos sería la
+            mentira contraria. */}
+        <div className="sp-progress sp-firma-progress">
+          <span className="sp-progress__label">FIRMANTES</span>
+          <div className="sp-progress__track">
+            {firmantes.map((p, i) => (
+              <span key={p.rol}
+                className={`sp-progress__seg ${i <= paso ? 'sp-progress__seg--done' : ''}`} />
+            ))}
+          </div>
+        </div>
+
+        <div className="sp-firma-cuerpo">
+          {actual !== null ? (
+            <>
+              {/* El rol y el nombre, a la vista: el paciente coge el dispositivo
+                  sin ningún contexto de lo que está pasando. */}
+              <div className="sp-firma-quien">
+                <p className="sp-label">Firma de</p>
+                <p className="sp-firma-nombre">{nombres[actual.rol].trim() || actual.titulo}</p>
+                <p className="sp-hint">{actual.titulo}</p>
+              </div>
+
+              {/* §6 · Con la firma ya confirmada, el lienzo deja el sitio a la
+                  pregunta de la foto. El trazo no se vuelve a enseñar: ya no se
+                  toca, y verlo invitaría a rehacerlo cuando lo que toca es
+                  responder si se anexa la identificación. */}
+              {pendienteFoto !== null ? (
+                <CapturaIdentificacion
+                  key={pendienteFoto.rol}
+                  documentoId={documentoId}
+                  rol={pendienteFoto.rol}
+                  onListo={path => resolver(pendienteFoto.rol, {
+                    tipo: 'firmo',
+                    trazo: pendienteFoto.trazo,
+                    firmadoEn: pendienteFoto.firmadoEn,
+                    identificacionPath: path,
+                  })}
+                />
+              ) : (<>
+                <LienzoFirma
+                  key={actual.rol}
+                  lienzoRef={lienzoRef}
+                  trazosRef={trazosRef}
+                  etiqueta={actual.etiqueta}
+                  apagado={apagado}
+                  hayTinta={tieneTrazo}
+                  limpiarSenal={limpiarSenal}
+                  onTinta={() => { setTieneTrazo(true); setErrorTrazo('') }}
+                />
+
+                {/* §5.3 · El lienzo se apaga en vez de ocultarse: se ve que dejó de
+                    aplicar. Aquí estuvo la casilla que lo apagaba; ahora se declara
+                    en el formulario, que es donde puede exigir a tiempo el nombre
+                    del familiar. Este paso solo lo hace constar. */}
+                {apagado && (
+                  <p className="sp-banner sp-banner--warn">
+                    <AlertTriangle size={17} />
+                    <span>
+                      Declaraste que el paciente no puede firmar. Firma en su lugar el familiar
+                      responsable, que es quien consiente. Si el paciente sí puede firmar, sal y
+                      desmarca la casilla en el formulario.
+                    </span>
+                  </p>
+                )}
+
+                {errorTrazo && <p className="sp-banner sp-banner--danger">{errorTrazo}</p>}
+
+                {/* §5.2 · borrar limpia el lienzo entero: no hay deshacer parcial de
+                    trazos, que en una firma no significa nada. */}
+                <div className="sp-firma-acciones">
+                  <button type="button" disabled={!tieneTrazo || apagado}
+                    onClick={() => {
+                      setLimpiarSenal(n => n + 1)
+                      setTieneTrazo(false)
+                      setErrorTrazo('')
+                      trazosRef.current = []
+                    }}
+                    className="sp-btn sp-btn--secondary"
+                    style={{ flex: '0 0 auto', whiteSpace: 'nowrap' }}>
+                    Borrar y repetir
+                  </button>
+                  <button type="button" disabled={!tieneTrazo && !apagado}
+                    onClick={confirmarFirma} className="sp-btn sp-btn--primary" style={{ flex: 1 }}>
+                    {apagado ? 'Continuar sin firma del paciente' : 'Confirmar firma'}
+                  </button>
+                </div>
+
+                {/* Aquí vivía «Omitir este firmante» (§5.4). Se retiró: quien no
+                    tiene nombre no entra al flujo, así que dejar el nombre vacío ya
+                    es la forma de omitir a un testigo, y dos maneras de decir lo
+                    mismo es una de más. El paciente nunca lo tuvo: su ausencia se
+                    declara con la casilla, que dice algo distinto. */}
+              </>)}
+            </>
+          ) : (
+            <>
+              <p className="sp-hint">Revisa antes de imprimir. Puedes rehacer cualquier firma.</p>
+
+              <div className="sp-firma-resumen">
+                {firmantes.map(p => (
+                  <FilaResumen key={p.rol} titulo={p.titulo} nombre={nombres[p.rol]}
+                    desenlace={desenlaces[p.rol]} deshabilitado={sellando}
+                    onRehacer={() => rehacer(p.rol)} />
+                ))}
+              </div>
+
+              {errorSellado && <p className="sp-banner sp-banner--danger">{errorSellado}</p>}
+
+              <button type="button" onClick={() => setConfirmarSellado(true)} disabled={sellando}
+                className="sp-btn sp-btn--primary sp-btn--primary-block">
+                {sellando
+                  ? <><span className="sp-spinner" /> Sellando…</>
+                  : 'Imprimir consentimiento'}
+              </button>
+            </>
+          )}
+        </div>
+
+        {/* §7.2 · el punto de no retorno */}
+        {/* `elevated` sube el modal a z-60: el modo entero vive en z-55 para
+            taparle el paso al botón de menú del Sidebar, que es z-50. */}
+        <ModalShell open={confirmarSellado} onClose={() => setConfirmarSellado(false)} elevated
+          spinusGeometry="decide" title="¿Sellar y firmar el consentimiento?"
+          footer={
+            <div className="flex items-center gap-2 p-4 md:px-6">
+              <button type="button" onClick={() => setConfirmarSellado(false)}
+                className="sp-btn sp-btn--ghost">Revisar otra vez</button>
+              <div className="flex-1" />
+              {/* El primario dice SELLAR, que es el acto; imprimir es lo que
+                  ocurre después. Un botón que dijera imprimir no comunicaría un
+                  punto de no retorno. */}
+              <button type="button" onClick={sellar} className="sp-btn sp-btn--primary">
+                Sellar e imprimir
+              </button>
+            </div>
+          }>
+          <div className="p-4 md:p-6">
+            <p className="sp-banner sp-banner--danger">
+              <AlertTriangle size={17} />
+              <span>
+                Al sellar, el documento queda firmado, se guarda en el expediente y se registra
+                su huella. Después ya no se puede editar: ni el texto, ni las firmas, ni las
+                fotos. Si algo está mal, corrígelo ahora.
+              </span>
+            </p>
+          </div>
+        </ModalShell>
+
+        <ModalShell open={confirmarSalida} onClose={() => setConfirmarSalida(false)} elevated
+          spinusGeometry="decide" title="¿Salir del firmado?"
+          footer={
+            <div className="flex items-center gap-2 p-4 md:px-6">
+              <button type="button" onClick={onSalir} className="sp-btn sp-btn--ghost">
+                Salir y perder las firmas
+              </button>
+              <div className="flex-1" />
+              <button type="button" onClick={() => setConfirmarSalida(false)}
+                className="sp-btn sp-btn--primary">Seguir firmando</button>
+            </div>
+          }>
+          <div className="p-4 md:p-6">
+            <p className="sp-body">
+              Ya hay firmas capturadas y todavía no se han guardado. Si sales ahora se pierden
+              y habrá que volver a pedirlas.
+            </p>
+          </div>
+        </ModalShell>
+      </div>
+    </Portal>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/*  El lienzo                                                          */
+/* ------------------------------------------------------------------ */
+
+/** Un punto YA en coordenadas del mapa de bits, nunca de pantalla. */
+/**
+ * De coordenadas de ventana a coordenadas del mapa de bits de CAPTURA: las del
+ * puntero multiplicadas por `1024 ÷ ancho_css` (§5.5.2). El espacio canónico de
+ * impresión es otro y lo resuelve `exportarFirma`.
+ *
+ * Recibe el rectángulo en vez de leerlo: quien la llama procesa varias muestras
+ * de un mismo evento y `getBoundingClientRect` fuerza recálculo de disposición
+ * en cada llamada.
+ */
+function aBitmap(c: HTMLCanvasElement, caja: DOMRect, clientX: number, clientY: number): Punto {
+  return {
+    x: (clientX - caja.left) * (c.width / caja.width),
+    y: (clientY - caja.top) * (c.height / caja.height),
+  }
+}
+
+interface LienzoProps {
+  lienzoRef: React.RefObject<HTMLCanvasElement | null>
+  /** Donde se acumulan las muestras. Ver su declaración en el padre. */
+  trazosRef: React.RefObject<Punto[][]>
+  etiqueta: string
+  /** «No puede firmar»: el lienzo se APAGA, no se borra — se ve que dejó de aplicar. */
+  apagado: boolean
+  /**
+   * Si hay tinta. Vive ARRIBA y no aquí: el padre ya lo necesita para encender
+   * sus dos botones, y duplicarlo obligaría a sincronizar los dos con un
+   * `setState` dentro de un efecto —cascada de renders que el linter rechaza,
+   * con razón—.
+   */
+  hayTinta: boolean
+  limpiarSenal: number
+  onTinta: () => void
+}
+
+function LienzoFirma({
+  lienzoRef, trazosRef, etiqueta, apagado, hayTinta, limpiarSenal, onTinta,
+}: LienzoProps) {
+  const [avisoGirar, setAvisoGirar] = useState(false)
+  const dibujando = useRef(false)
+  /**
+   * Los DOS puntos que sostienen la continuidad del trazo: el último del
+   * puntero y el último punto MEDIO. Ver `trazar`.
+   */
+  const ultimo = useRef<Punto | null>(null)
+  const medio = useRef<Punto | null>(null)
+  /** El gesto en curso. Al levantar el lápiz se archiva en `trazosRef`. */
+  const gesto = useRef<Punto[]>([])
+  const observador = useRef<ResizeObserver | null>(null)
+  /** Espejo de `hayTinta`: el observador no ve el estado de React. */
+  const hayTintaRef = useRef(hayTinta)
+  useEffect(() => { hayTintaRef.current = hayTinta }, [hayTinta])
+
+  /**
+   * Fija el mapa de bits a 1024 px de ancho y reajusta el contexto, que se
+   * reinicia entero al asignar `width`. El lienzo se estira por CSS a su caja;
+   * el mapa de bits no se entera.
+   */
+  const preparar = useCallback((): void => {
+    const c = lienzoRef.current
+    if (!c) return
+    const caja = c.getBoundingClientRect()
+    if (caja.width === 0) return
+    c.width = ANCHO_BITMAP
+    c.height = altoBitmap(caja.width, caja.height)
+    const ctx = c.getContext('2d')
+    if (!ctx) return
+    // `GROSOR_TRAZO` gobierna SOLO lo que se ve en pantalla. El grosor impreso
+    // es `GROSOR_CANONICO` y lo aplica `exportarFirma` al redibujar.
+    ctx.lineWidth = GROSOR_TRAZO
+    ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
+    ctx.strokeStyle = TINTA_FIRMA
+  }, [lienzoRef])
+
+  /**
+   * ⚠ EL DIMENSIONADO VA EN UN `ref` DE FUNCIÓN Y EN UN `ResizeObserver`, NO EN
+   * UN EFECTO DE MONTAJE. NO LO DEVUELVAS A UN `useEffect`.
+   *
+   * Un `<canvas>` sin atributos `width`/`height` nace con un mapa de bits de
+   * 300×150 mientras el CSS lo estira a su caja. Si el dimensionado no llega a
+   * ejecutarse —o se ejecuta cuando el elemento todavía no tiene caja, y
+   * entonces no vuelve a intentarlo nunca—, el factor de escala queda en
+   * 300 ÷ ancho_css y **la tinta aterriza a un tercio de donde está el dedo**.
+   * Es un fallo silencioso: no hay error, solo un trazo que no sigue al cursor.
+   *
+   * El observador cierra esa clase entera de fallos: se dispara al empezar a
+   * observar —así que prepara en cuanto el nodo TIENE caja, no cuando React
+   * cree que la tiene— y otra vez cada vez que la caja cambia. De paso sustituye
+   * a los oyentes de `resize` y `orientationchange`, que solo cubrían el cambio
+   * de tamaño del viewport y no el del propio elemento.
+   *
+   * `preparar` es estable —depende solo de un objeto ref—, y eso importa: si
+   * este callback cambiara en cada render, React lo llamaría con `null` y con el
+   * nodo continuamente, y cada vuelta borraría el lienzo A MEDIA FIRMA.
+   */
+  const montarLienzo = useCallback((nodo: HTMLCanvasElement | null): void => {
+    lienzoRef.current = nodo
+    observador.current?.disconnect()
+    observador.current = null
+    if (nodo === null) return
+    // Asignar `width` no cambia la caja CSS del elemento, así que preparar
+    // dentro del observador no puede realimentarlo.
+    const ro = new ResizeObserver(() => { if (!hayTintaRef.current) preparar() })
+    ro.observe(nodo)
+    observador.current = ro
+  }, [lienzoRef, preparar])
+
+  // Al limpiar: `width` se reasigna, que es la forma de vaciar un canvas sin
+  // dejar rastro en el alfa —y `clearRect` bastaría, pero `preparar` ya deja el
+  // contexto listo—.
+  useEffect(() => {
+    if (limpiarSenal === 0) return
+    preparar()
+  }, [limpiarSenal, preparar])
+
+  /**
+   * §5.6 · El aviso de girar NO BLOQUEA: el área está activa detrás y se puede
+   * firmar igual. Un aviso que impide firmar convierte una molestia en una
+   * firma perdida. En tablet no aparece nunca.
+   */
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 767px) and (orientation: portrait)')
+    const mirar = () => setAvisoGirar(mq.matches)
+    mirar()
+    mq.addEventListener('change', mirar)
+    return () => mq.removeEventListener('change', mirar)
+  }, [])
+
+  /**
+   * Un segmento en el lienzo EN VIVO, y de paso la muestra al gesto.
+   *
+   * La curva la dibuja `segmentoSuavizado`, que vive en `firmaTrazo.ts` porque
+   * `exportarFirma` usa exactamente la misma al redibujar en el canónico: si
+   * cada uno tuviera su copia, lo que el paciente ve y lo que se imprime
+   * podrían dejar de ser la misma curva.
+   */
+  function trazar(ctx: CanvasRenderingContext2D, p: Punto): void {
+    const anterior = ultimo.current
+    const medioAnterior = medio.current
+    if (!anterior || !medioAnterior) return
+    medio.current = segmentoSuavizado(ctx, anterior, medioAnterior, p)
+    ultimo.current = p
+    gesto.current.push(p)
+  }
+
+  function iniciar(e: React.PointerEvent<HTMLCanvasElement>): void {
+    if (apagado) return
+    const c = lienzoRef.current
+    const ctx = c?.getContext('2d')
+    if (!c || !ctx) return
+    e.currentTarget.setPointerCapture(e.pointerId)
+    const p = aBitmap(c, c.getBoundingClientRect(), e.clientX, e.clientY)
+    dibujando.current = true
+    ultimo.current = p
+    medio.current = p
+    gesto.current = [p]
+    // Un toque sin arrastre también deja tinta: sin esto, un punto sobre la i
+    // no se dibujaría.
+    ctx.beginPath()
+    ctx.moveTo(p.x, p.y)
+    ctx.lineTo(p.x, p.y)
+    ctx.stroke()
+    if (!hayTinta) onTinta()
+  }
+
+  function seguir(e: React.PointerEvent<HTMLCanvasElement>): void {
+    if (!dibujando.current) return
+    const c = lienzoRef.current
+    const ctx = c?.getContext('2d')
+    if (!c || !ctx) return
+    // UNA sola lectura del rectángulo por evento, no una por muestra:
+    // `getBoundingClientRect` fuerza recálculo de disposición, y abajo pueden
+    // salir decenas de puntos de un mismo evento.
+    const caja = c.getBoundingClientRect()
+    // ⚠ LOS EVENTOS FUSIONADOS SON LA FIRMA DE VERDAD. El navegador entrega un
+    // `pointermove` por cuadro, pero el digitalizador muestrea mucho más rápido
+    // y guarda dentro las muestras intermedias. Leer solo el evento es tirarlas:
+    // quedan rectas entre cuadro y cuadro en vez de una curva.
+    const nativo = e.nativeEvent
+    const fusionados = typeof nativo.getCoalescedEvents === 'function'
+      ? nativo.getCoalescedEvents()
+      : []
+    const muestras = fusionados.length > 0 ? fusionados : [nativo]
+    for (const m of muestras) trazar(ctx, aBitmap(c, caja, m.clientX, m.clientY))
+  }
+
+  function terminar(): void {
+    if (dibujando.current) {
+      // La cola: del último medio al último punto real. Sin esto la firma
+      // termina media muestra antes de donde se levantó el dedo.
+      const ctx = lienzoRef.current?.getContext('2d')
+      if (ctx && ultimo.current && medio.current) {
+        ctx.beginPath()
+        ctx.moveTo(medio.current.x, medio.current.y)
+        ctx.lineTo(ultimo.current.x, ultimo.current.y)
+        ctx.stroke()
+      }
+      // El gesto se archiva al levantar el lápiz, no antes: es la unidad que
+      // `exportarFirma` redibuja, y partirlo dejaría uniones donde no las hay.
+      if (gesto.current.length > 0) trazosRef.current.push(gesto.current)
+    }
+    gesto.current = []
+    dibujando.current = false
+    ultimo.current = null
+    medio.current = null
+  }
+
+  return (
+    <div className="sp-firma-lienzo-wrap">
+      {avisoGirar && (
+        <p className="sp-hint sp-firma-girar">
+          Gira el dispositivo para tener más espacio. Puedes firmar así igualmente.
+        </p>
+      )}
+      <div className="sp-firma-lienzo" style={apagado ? { opacity: 0.45 } : undefined}>
+        {/* ⚠ `touchAction` VA EN LÍNEA Y NO EN EL CSS, Y NO ES DESCUIDO.
+            `globals.css` declara `* { touch-action: manipulation }` FUERA de
+            toda `@layer`, y lo no encapado gana a cualquier regla dentro de
+            `@layer components` por mucha especificidad que tenga. Ahí vivía
+            `.sp-firma-canvas { touch-action: none }`, que por eso no hacía
+            nada: en móvil el arrastre se lo llevaba el desplazamiento de la
+            página y la firma se cortaba a la mitad. En línea gana siempre. */}
+        <canvas ref={montarLienzo} className="sp-firma-canvas"
+          style={{ touchAction: 'none' }}
+          onPointerDown={iniciar} onPointerMove={seguir}
+          onPointerUp={terminar} onPointerCancel={terminar} />
+        {!hayTinta && !apagado && (
+          <p className="sp-firma-placeholder">Firma aquí con el dedo</p>
+        )}
+        <span className="sp-firma-linea" aria-hidden="true" />
+        <span className="sp-firma-rol">{etiqueta}</span>
+      </div>
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/*  Una fila del resumen                                               */
+/* ------------------------------------------------------------------ */
+
+interface FilaProps {
+  titulo: string
+  nombre: string
+  desenlace: Desenlace | undefined
+  deshabilitado: boolean
+  onRehacer: () => void
+}
+
+function FilaResumen({ titulo, nombre, desenlace, deshabilitado, onRehacer }: FilaProps) {
+  // Sin `Omitido`: ya no es un desenlace posible. Quien se omite no aparece en
+  // esta lista porque nunca entró al flujo.
+  const firmo = desenlace?.tipo === 'firmo'
+  // Los tres estados de §7.1. `sin foto` no es un reproche: la foto es cotejo y
+  // se ofreció, así que su ausencia es un dato del expediente y se enseña.
+  const estado = desenlace === undefined ? 'Pendiente'
+    : desenlace.tipo === 'firmo'
+      ? desenlace.identificacionPath !== null
+        ? 'Firmó · con foto de identificación'
+        : 'Firmó · sin foto'
+    : 'No pudo firmar'
+
+  return (
+    <div className="sp-row sp-firma-fila">
+      <span className={`sp-icobox sp-icobox--sm ${firmo ? 'sp-icobox--success' : 'sp-firma-ico-vacio'}`}>
+        {firmo ? <Check aria-hidden="true" /> : <Minus aria-hidden="true" />}
+      </span>
+      <span className="sp-firma-fila-txt">
+        {/* Sin nombre capturado se muestra solo el rol (§7.1). */}
+        <span className="sp-firma-fila-nombre">{nombre.trim() || titulo}</span>
+        <span className="sp-hint">{estado}</span>
+      </span>
+      <button type="button" onClick={onRehacer} disabled={deshabilitado}
+        className="sp-btn sp-btn--compact">Rehacer</button>
+    </div>
+  )
+}

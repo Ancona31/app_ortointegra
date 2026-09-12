@@ -11,7 +11,7 @@ import { ZONAS_MEXICO, CHIPS_RAPIDOS } from '@/lib/consultorios/zonas-mexico'
 
 export default function PrimerConsultorioModal() {
   const { isDoctor } = useProfile()
-  const { consultorios, isLoading, mutate } = useConsultorios()
+  const { consultorios, lecturaConfirmada, mutate } = useConsultorios()
   const { state } = useSubscriptionGate()
   const toast = useToast()
 
@@ -22,8 +22,18 @@ export default function PrimerConsultorioModal() {
   const [timezone, setTimezone] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
+  /* ⚠ ESTE MODAL ESCRIBE (POST /api/consultorios) Y ES BLOQUEANTE: no se cierra
+     con Escape ni tiene botón de cerrar. No puede dispararse por AUSENCIA DE
+     EVIDENCIA — solo ante una lectura afirmativa de cero consultorios.
+     `lecturaConfirmada` sustituye al viejo `isLoading`, que era la única barrera
+     y no distinguía «todavía no sé» de «ya no sé»: bastaba con que algo vaciara
+     la caché de `/api/me/config` —el logout lo hacía en cada cierre de sesión—
+     para que el hook quedara en `consultorios: []` con `isLoading: false` y este
+     modal saliera encima de un médico que sí tiene consultorios. Con el agregado
+     mintiendo (200 con `[]` ante un fallo de base de datos) el POST además
+     pasaba, y le creaba un consultorio de más. */
   if (!isDoctor) return null
-  if (isLoading) return null
+  if (!lecturaConfirmada) return null
   if (consultorios.length > 0) return null
   if (state.isBlocked) return null
 
@@ -71,6 +81,11 @@ export default function PrimerConsultorioModal() {
         { revalidate: false }
       )
       toast.success('Consultorio creado. Puedes agregar más desde tu perfil → Mis consultorios.')
+      // El camino de éxito normalmente desmonta este modal (la guarda de
+      // `consultorios.length > 0` de arriba), pero si el `mutate` no dejara la
+      // lista poblada, sin esto el botón se quedaba en «Guardando…» para
+      // siempre y el modal —que es bloqueante— dejaba al médico encerrado.
+      setSubmitting(false)
     } catch {
       toast.error('Error de red. Verifica tu conexión.')
       setSubmitting(false)

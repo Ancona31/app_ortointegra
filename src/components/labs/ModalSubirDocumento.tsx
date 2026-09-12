@@ -40,6 +40,16 @@ interface Props {
   clinicaId: string
   userId: string
   onSuccess: () => void
+  /**
+   * Archivos que ya venían soltados sobre la galería, para que el modal abra
+   * con ellos dentro en vez de pedirlos otra vez.
+   *
+   * ⚠️ SE SIEMBRAN UNA SOLA VEZ, AL MONTAR. El modal se monta cuando se abre y
+   * se desmonta al cerrarse (`{modalSubir && …}` en la sección), así que no hace
+   * falta sincronizar nada: si se reabre con otra tanda, es otro montaje. Meterlo
+   * en un efecto con dependencias volvería a añadirlos en cada render.
+   */
+  archivosIniciales?: File[]
 }
 
 function iconoPorMime(mime: string) {
@@ -92,6 +102,7 @@ export default function ModalSubirDocumento({
   clinicaId,
   userId,
   onSuccess,
+  archivosIniciales,
 }: Props) {
   const [archivos, setArchivos] = useState<ArchivoPendiente[]>([])
   const [dragActive, setDragActive] = useState(false)
@@ -99,7 +110,13 @@ export default function ModalSubirDocumento({
   const [progresoIdx, setProgresoIdx] = useState(0)
   const [resultados, setResultados] = useState<Resultado[] | null>(null)
   const [errorGlobal, setErrorGlobal] = useState<string | null>(null)
+  const [sembrado, setSembrado] = useState(false)
   const inputRef = useRef<HTMLInputElement | null>(null)
+
+  if (!sembrado) {
+    setSembrado(true)
+    if (archivosIniciales && archivosIniciales.length > 0) agregarArchivos(archivosIniciales)
+  }
 
   const puedeSubir = useMemo(
     () => archivos.length > 0 && !subiendo && !resultados,

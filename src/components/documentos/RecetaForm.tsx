@@ -1,131 +1,114 @@
 'use client'
 
 import { generateDocFileName, calcularEdad } from '@/lib/patientUtils'
-import { useState, useEffect, useCallback } from 'react'
-import { Plus, Trash2, Printer, Loader2 } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Plus, Trash2, AlertTriangle, Pill } from 'lucide-react'
+import PieAccionesDocumento from '@/components/documentos/PieAccionesDocumento'
 import { flushSync } from 'react-dom'
 import QRCode from 'qrcode'
-import { Medicamento, MedicoInfo } from '@/types'
+import Link from 'next/link'
+import { format } from 'date-fns'
+import { es } from 'date-fns/locale'
+import type { Medicamento } from '@/types'
 import { useMedicoInfo } from '@/hooks/useMedicoInfo'
 import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
 import { useProfile } from '@/hooks/useProfile'
-import { format } from 'date-fns'
-import { es } from 'date-fns/locale'
 import { createClient } from '@/lib/supabase/client'
-import { generarPdf } from '@/lib/mobileShare'
-import { hoyEnTZ } from '@/lib/dates'
-import AutocompleteMedicamento from '@/components/AutocompleteMedicamento'
-import { MedicamentoDB } from '@/data/medicamentos'
+import { folioImpreso } from '@/lib/documentos/folio'
+import { generarPdf, VERSION_DE_EMISION, versionQueEmite } from '@/lib/mobileShare'
+import { hoyEnTZ, desplazarFecha, TZ_CLINICA } from '@/lib/dates'
+import { enfocarYAcercar } from '@/lib/scrollDoc'
+import { MEDICAMENTOS, type MedicamentoDB } from '@/data/medicamentos'
+import ComboEscribible from '@/components/documentos/ComboEscribible'
+import { usePlantillasDocumento, type ContenidoPlantilla } from '@/components/documentos/PlantillasDocumento'
 import { useToast } from '@/components/ui/Toast'
+import ModalDocumentoGenerado from '@/components/documentos/ModalDocumentoGenerado'
 
 type MedicamentoConVia = Medicamento & { via_administracion?: string }
 
 const VIAS = ['Oral', 'Tópica', 'Intramuscular', 'Intravenosa', 'Subcutánea', 'Sublingual', 'Oftálmica', 'Ótica', 'Nasal', 'Inhalatoria', 'Rectal', 'Transdérmica']
 
-const RECOMENDACIONES_PREDETERMINADAS: { label: string; texto: string }[] = [
-  {
-    label: '🦒 Columna Cervical (Cuello)',
-    texto: `Postura: Mantenga la mirada al frente al usar el celular o computadora; evite flexionar el cuello por tiempo prolongado.
+const FECHA_MIN = '1900-01-01'
 
-Descanso: Use una almohada cervical o una que mantenga su cabeza alineada con la columna.
+const MED_VACIO: MedicamentoConVia = {
+  nombre_comercial: '', presentacion: '', dosis: '',
+  principio_activo: '', indicacion: '', via_administracion: 'Oral',
+}
 
-Calor local: Aplique compresas húmedas-calientes por 15-20 min para relajar la musculatura.
+/**
+ * Etiqueta → fila del catálogo, para el desplegable del nombre comercial.
+ *
+ * El nombre comercial NO identifica una fila: «Keral» son dos —tabletas de
+ * 25 mg y solución inyectable— y hay dos docenas de casos iguales. Por eso la
+ * etiqueta lleva la presentación. Y lleva el principio activo porque
+ * `ComboEscribible` filtra por el texto de la etiqueta, y buscar por
+ * denominación genérica —«diclofenaco»— es media búsqueda real del médico.
+ *
+ * El `Map` dedupe por construcción: si dos filas produjeran la misma etiqueta,
+ * colapsan en una y ninguna clave se repite. Es lo que necesita la lista, que
+ * usa la cadena como `key`.
+ */
+const CATALOGO = new Map<string, MedicamentoDB>(
+  MEDICAMENTOS.map(m => [`${m.nombre_comercial} · ${m.presentacion} · ${m.principio_activo}`, m]),
+)
+const ETIQUETAS_CATALOGO = [...CATALOGO.keys()]
 
-🚨 Datos de Alarma: Pérdida de fuerza en manos, sensación de "toques eléctricos" hacia los brazos o dificultad para abotonarse la camisa.`,
-  },
-  {
-    label: '🎒 Columna Dorsal (Espalda Media)',
-    texto: `Carga: Evite cargar mochilas o bolsas pesadas sobre un solo hombro.
+/** Pista por bloque. Vive fuera del medicamento para no viajar al PDF ni al jsonb. */
+type Pista = { dosisSugerida: string; principioDelCatalogo: boolean }
+const PISTA_VACIA: Pista = { dosisSugerida: '', principioDelCatalogo: false }
 
-Movilidad: Realice ejercicios de extensión torácica y respiraciones profundas varias veces al día.
+/**
+ * Alguno de los cuatro campos de texto tiene contenido. La vía NO cuenta:
+ * llega con «Oral» puesta y un bloque intacto no es un bloque escrito.
+ */
+function conTexto(m: MedicamentoConVia): boolean {
+  return !!(m.nombre_comercial.trim() || m.presentacion?.trim()
+    || m.principio_activo?.trim() || m.indicacion.trim())
+}
 
-Ergonomía: Asegúrese de que su silla tenga un soporte adecuado en la zona media de la espalda.
+/** Los dos obligatorios del formato: comercial y denominación genérica (§4). */
+function estaCompleto(m: MedicamentoConVia): boolean {
+  return !!(m.nombre_comercial.trim() && m.principio_activo?.trim())
+}
 
-🚨 Datos de Alarma: Dolor opresivo que impide la respiración profunda o dolor que se corre hacia las costillas (tipo cinturón).`,
-  },
-  {
-    label: '🧘 Columna Lumbar (Espalda Baja)',
-    texto: `Higiene de Columna: Al levantarse de la cama, hágalo de lado apoyando los brazos. No se doble de cintura para recoger objetos; flexione las rodillas.
+/**
+ * Lee un medicamento guardado en jsonb, campo a campo y desconfiando de todo:
+ * el contenido pudo escribirse con otra versión del formulario.
+ */
+function leerMedicamento(bruto: unknown): MedicamentoConVia | null {
+  if (typeof bruto !== 'object' || bruto === null) return null
+  const fila = bruto as Record<string, unknown>
+  const texto = (v: unknown): string => (typeof v === 'string' ? v : '')
+  const m: MedicamentoConVia = {
+    nombre_comercial: texto(fila.nombre_comercial),
+    presentacion: texto(fila.presentacion),
+    dosis: texto(fila.dosis),
+    principio_activo: texto(fila.principio_activo),
+    indicacion: texto(fila.indicacion),
+    via_administracion: texto(fila.via_administracion) || 'Oral',
+  }
+  return conTexto(m) ? m : null
+}
 
-Peso: Mantenga su peso ideal para reducir la carga mecánica sobre los discos intervertebrales.
-
-Asientos: Evite sillones muy blandos o permanecer sentado más de 50 minutos seguidos.
-
-🚨 Datos de Alarma: Adormecimiento en la zona genital (silla de montar), pérdida de control de esfínteres o "pie caído" (tropiezos constantes).`,
-  },
-  {
-    label: '⚾ Hombro y Codo',
-    texto: `Reposo relativo: Evite levantar el brazo por encima del nivel de la cabeza o cargar objetos pesados con el brazo estirado.
-
-Crioterapia: Aplique hielo envuelto en una toalla por 15 min después de realizar actividades físicas.
-
-Movimiento: Realice ejercicios pendulares (deje colgar el brazo y haga círculos suaves) si su médico lo autorizó.
-
-🚨 Datos de Alarma: Imposibilidad total para elevar el brazo o deformidad evidente ("signo del Popeye").`,
-  },
-  {
-    label: '🖐️ Muñeca y Mano',
-    texto: `Férulas: Si se le indicó férula, úsela especialmente durante la noche para evitar posturas viciosas.
-
-Pausas: Si trabaja en computadora, realice estiramientos de flexores y extensores cada hora.
-
-Edema: Mantenga la mano elevada por encima del nivel del corazón si presenta mucha inflamación.
-
-🚨 Datos de Alarma: Dedos morados/fríos o pérdida total de la sensibilidad (anestesia) en las yemas.`,
-  },
-  {
-    label: '🦵 Rodilla',
-    texto: `Impacto: Evite saltar, correr en superficies duras o subir/bajar escaleras innecesariamente.
-
-Calzado: Use zapatos con buena amortiguación; evite tacones altos o sandalias totalmente planas.
-
-Control de carga: No permanezca de pie por periodos prolongados.
-
-🚨 Datos de Alarma: Rodilla "trabada" (incapacidad para estirar o doblar), aumento de temperatura local intensa o sensación de inestabilidad ("se le va la rodilla").`,
-  },
-  {
-    label: '🦶 Tobillo y Pie',
-    texto: `Elevación: Mantenga el pie elevado con dos almohadas al estar sentado o acostado.
-
-Vendaje: Si usa vendaje elástico, asegúrese de que no esté demasiado apretado; debe poder introducir un dedo bajo la venda.
-
-Apoyo: Respete el tiempo de "no apoyo" si se le indicó el uso de muletas o andadera.
-
-🚨 Datos de Alarma: Hinchazón excesiva de la pantorrilla con dolor al tocarla (posible coágulo) o cambios de coloración en los dedos.`,
-  },
-  {
-    label: '📍 Fisioterapia y Rehabilitación',
-    texto: `Asistencia: Cumplir con un ciclo inicial de 10 sesiones para asegurar resultados.
-
-Frecuencia: Se sugiere acudir de 2 a 3 veces por semana según la disponibilidad.
-
-Objetivos: Enfoque en higiene de columna, fortalecimiento de core y estiramientos analíticos.
-
-Modalidades: Aplicación de medios físicos, electrotermoterapia y terapia manual.
-
-Restricciones: Evitar cargar objetos pesados (>5 kg) y movimientos de rotación brusca.
-
-Seguimiento: Al concluir las sesiones, solicitar reporte de evolución para su revaloración en consulta.
-
-💡 Nota importante: La constancia en su rehabilitación es la clave para una recuperación exitosa y para prevenir futuras lesiones. ¡Su esfuerzo hoy es su movilidad mañana!`,
-  },
-  {
-    label: '✂️ Cuidados de la Herida Quirúrgica (Postoperados)',
-    texto: `Limpieza: Lave la herida solo con agua y jabón neutro durante el baño diario. Seque con toques suaves usando una gasa estéril o toalla limpia exclusiva.
-
-Exposición: Mantenga la herida cubierta con una gasa seca a menos que su cirujano indique dejarla al aire.
-
-Prohibido: No aplique alcohol, agua oxigenada, pomadas, cremas, remedios caseros o "chochitos" sobre la incisión.
-
-Actividad: Evite esfuerzos físicos que puedan "estirar" la cicatriz y causar que se abra (dehiscencia).
-
-🚨 Datos de Alarma en la Herida:
-• Salida de líquido amarillento, espeso o con mal olor (pus).
-• Enrojecimiento que se extiende más allá de los bordes de la herida.
-• Fiebre mayor a 38°C persistente.
-• Apertura de los puntos de sutura.`,
-  },
-]
+/**
+ * Predicado único de «formulario vacío». Mismo criterio que Laboratorio: los
+ * campos que llegan prellenados de la ficha —paciente y diagnóstico— NO cuentan
+ * como escritos hasta que se editan, porque llegaron solos. La fecha tampoco:
+ * es dato de paciente y nunca entra en la plantilla.
+ *
+ * Los medicamentos SÍ cuentan aunque lleguen por `medicamentosIniciales`: no
+ * son contexto del paciente sino el contenido del documento, y una receta que
+ * llega con tres fármacos de la nota no es un formulario vacío.
+ */
+function isFormEmpty(
+  medicamentos: MedicamentoConVia[], recomendaciones: string,
+  paciente: string, pacienteInicial: string,
+  diagnostico: string, diagnosticoInicial: string,
+): boolean {
+  const pacienteIntacto = paciente.trim() === '' || paciente.trim() === pacienteInicial.trim()
+  const dxIntacto = diagnostico.trim() === '' || diagnostico.trim() === diagnosticoInicial.trim()
+  return pacienteIntacto && dxIntacto && recomendaciones.trim() === '' && !medicamentos.some(conTexto)
+}
 
 interface Props {
   pacienteInicial?: string
@@ -134,10 +117,49 @@ interface Props {
   medicamentosIniciales?: MedicamentoConVia[]
   offlineMode?: boolean
   onOfflineSave?: () => void
+  /** Reporta al host si el formulario sigue vacío (guía 04 §6.1 y §6.2). */
+  onVacioChange?: (vacio: boolean) => void
+  /**
+   * El modal de «documento generado» se cerró — o sea, el documento ya salió y
+   * el médico terminó con él.
+   *
+   * ⚠️⚠️ ESTO ES LO ÚNICO QUE IMPIDE EDITAR UN DOCUMENTO YA EMITIDO, y quien
+   * venga a quitarlo tiene que saberlo. El host responde deseleccionando el
+   * tipo, y eso DESMONTA este formulario. Esa es toda la garantía: entre emitir
+   * y desmontar no hay ventana editable —el modal tapa el formulario, atrapa el
+   * foco (`ModalShell:153-176`) y bloquea el scroll—, así que cuando el
+   * formulario vuelve a existir es uno nuevo y vacío.
+   *
+   * Aquí hubo una segunda red —una huella del contenido al emitir, comparada
+   * con la de cada render, que devolvía el diálogo de descarte si el médico
+   * seguía escribiendo— y se retiró: con el desmontaje no llegaba a dispararse
+   * nunca. Si algún día el host deja de desmontar, ese caso se reabre y esa red
+   * hay que reponerla.
+   *
+   * Existe para que el HOST pueda replegar su selector y volver a la rejilla de
+   * los ocho tipos: el formulario no puede hacerlo solo porque no es dueño del
+   * `value` del selector, y a estas alturas seguir enseñando la receta recién
+   * emitida no ayuda a nadie.
+   *
+   * ⚠️ SE DISPARA AL CERRAR EL MODAL Y NO AL EMITIR, y la diferencia importa:
+   * este mismo componente RENDERIZA ese modal, así que soltar la señal al
+   * emitir haría que el host lo desmontara con el PDF todavía en pantalla.
+   *
+   * Opcional: el búnker y cualquier montaje sin selector lo omiten y no pasa
+   * nada.
+   */
+  onCerrarTrasEmitir?: () => void
+  /**
+   * El panel de plantillas sustituye al formulario en su mismo espacio, y
+   * mientras está abierto el selector de tipo del host se oculta (spec 02 §3.1):
+   * elegir otro tipo desde ahí tiraría el formulario sobre el que el panel
+   * opera.
+   */
+  onPanelPlantillasChange?: (abierto: boolean) => void
 }
 
-export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = '', pacienteId, medicamentosIniciales, offlineMode, onOfflineSave }: Props) {
-  const { medicoInfo: onlineMedicoInfo } = useMedicoInfo()
+export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = '', pacienteId, medicamentosIniciales, offlineMode, onOfflineSave, onVacioChange, onCerrarTrasEmitir, onPanelPlantillasChange }: Props) {
+  const { medicoInfo: onlineMedicoInfo, isLoading: cargandoPerfil } = useMedicoInfo()
   const { consultorioActivo } = useConsultorioActivo()
 
   // In offline mode, read doctor profile from localStorage (pre-fetched with Base64 assets)
@@ -163,6 +185,11 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
     firma_url: offlineProfile.firma_base64,
     clinica_nombre: offlineProfile.clinica_nombre,
   } : onlineMedicoInfo
+
+  // Imprimir antes de que resuelva el perfil produce un PDF con el encabezado
+  // vacío: sin nombre, sin cédulas, sin domicilio. Solo bloquea mientras carga;
+  // si resuelve sin datos el botón se habilita igual.
+  const perfilPendiente = cargandoPerfil && !medicoInfo
   const { isSuperAdmin } = useProfile()
   const toast = useToast()
   const [paciente, setPaciente] = useState(pacienteInicial)
@@ -200,55 +227,172 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
 
   const medInicial: MedicamentoConVia[] = medicamentosIniciales && medicamentosIniciales.length > 0
     ? medicamentosIniciales
-    : [{ nombre_comercial: '', presentacion: '', dosis: '', principio_activo: '', indicacion: '', via_administracion: 'Oral' }]
+    : [{ ...MED_VACIO }]
 
-  const [fecha, setFecha] = useState(hoyEnTZ())
+  // `TZ_CLINICA` explícito, no el huso del dispositivo: este inicializador de
+  // `useState` corre TAMBIÉN en la pasada de SSR, donde `tzDispositivo()`
+  // devolvería UTC de Vercel y el cliente lo corregiría al hidratar — fecha
+  // parpadeante en un formulario que emite un documento legal. Y la fecha del
+  // documento es de la clínica de todos modos (LA REGLA, en `@/lib/dates`).
+  const [fecha, setFecha] = useState(hoyEnTZ(TZ_CLINICA))
   const [medicamentos, setMedicamentos] = useState<MedicamentoConVia[]>(medInicial)
-  const [sugerenciasDosis, setSugerenciasDosis] = useState<string[]>(medInicial.map(() => ''))
+  const [pistas, setPistas] = useState<Pista[]>(medInicial.map(() => ({ ...PISTA_VACIA })))
   const [recomendaciones, setRecomendaciones] = useState('')
   const [errorGuardado, setErrorGuardado] = useState('')
   const [imprimiendo, setImprimiendo] = useState(false)
+  const [docGenerado, setDocGenerado] = useState<{ blob: Blob; guardado: boolean; documentoId: string | null } | null>(null)
+  // El banner de faltantes NO existe hasta el primer intento de imprimir: un
+  // formulario recién abierto no acusa de nada. Después permanece y se
+  // actualiza en vivo.
+  const [intentado, setIntentado] = useState(false)
 
-  function addMed() {
-    setMedicamentos([...medicamentos, { nombre_comercial: '', presentacion: '', dosis: '', principio_activo: '', indicacion: '', via_administracion: 'Oral' }])
-    setSugerenciasDosis(prev => [...prev, ''])
+  const formRef = useRef<HTMLDivElement>(null)
+  const pacienteRef = useRef<HTMLInputElement>(null)
+
+  /* Lo que decide «¿está vacío?». La tupla se extiende sobre `isFormEmpty`, así
+     que el compilador impide que diverja de su firma.
+     ⚠️ SE LLAMA `paraVacio` Y NO `contenido`: `imprimir()` declara su propio
+     `contenido` con lo que se manda a imprimir, y dos nombres iguales en dos
+     ámbitos anidados es una trampa de lectura. */
+  const paraVacio = [medicamentos, recomendaciones, paciente, pacienteInicial, diagnostico, diagnosticoInicial] as const
+  const vacio = isFormEmpty(...paraVacio)
+
+  useEffect(() => { onVacioChange?.(vacio) }, [vacio, onVacioChange])
+
+  // ── Plantillas (spec 02) ────────────────────────────────────────
+  // Se guarda TODO menos los datos del paciente. Aquí eso deja fuera paciente,
+  // diagnóstico y fecha: los tres son suyos aunque los teclee el médico, y una
+  // plantilla con la fecha congelada es un defecto.
+  const plantillas = usePlantillasDocumento({
+    tipo: 'receta',
+    vacio,
+    // El búnker no tiene red ni sesión de Supabase: el sistema no se monta.
+    desactivado: !!offlineMode,
+    onPanelChange: onPanelPlantillasChange,
+    leer: () => ({ _v: 1, medicamentos: medicamentos.filter(conTexto), recomendaciones }),
+    aplicar: (c: ContenidoPlantilla) => {
+      // Solo las claves que existen HOY en el formulario, campo a campo. Los
+      // dos valores de repuesto NO son defensa de sobra: «Vaciar formulario»
+      // aplica un contenido sin ninguna clave, así que es justo lo que repone
+      // el estado inicial. El paciente y el diagnóstico no se tocan aquí, y por
+      // eso sobreviven al vaciado.
+      const guardados = Array.isArray(c.medicamentos)
+        ? c.medicamentos.map(leerMedicamento).filter((m): m is MedicamentoConVia => m !== null)
+        : []
+      const filas = guardados.length > 0 ? guardados : [{ ...MED_VACIO }]
+      setMedicamentos(filas)
+      // Las pistas son del catálogo, no del jsonb: una plantilla aplicada no
+      // trae sugerencia de posología ni presume de dónde salió el principio.
+      setPistas(filas.map(() => ({ ...PISTA_VACIA })))
+      setRecomendaciones(typeof c.recomendaciones === 'string' ? c.recomendaciones : '')
+    },
+  })
+
+  // G-10: foco al primer campo editable vacío al montar. preventScroll para no
+  // arrastrar la página hasta él. En móvil esto abre el teclado en cada montaje.
+  useEffect(() => {
+    const primero = formRef.current?.querySelector<HTMLElement>('input:not([type="date"]), textarea')
+    if (primero instanceof HTMLInputElement && !primero.value) primero.focus({ preventScroll: true })
+  }, [])
+
+  function addMed(i: number) {
+    setMedicamentos(prev => [...prev.slice(0, i + 1), { ...MED_VACIO }, ...prev.slice(i + 1)])
+    setPistas(prev => [...prev.slice(0, i + 1), { ...PISTA_VACIA }, ...prev.slice(i + 1)])
   }
 
   function removeMed(i: number) {
-    setMedicamentos(medicamentos.filter((_, idx) => idx !== i))
-    setSugerenciasDosis(prev => prev.filter((_, idx) => idx !== i))
+    setMedicamentos(prev => prev.filter((_, idx) => idx !== i))
+    setPistas(prev => prev.filter((_, idx) => idx !== i))
   }
 
-  function updateMed(i: number, field: keyof Medicamento, val: string) {
-    setMedicamentos(medicamentos.map((m, idx) => idx === i ? { ...m, [field]: val } : m))
+  function updateMed(i: number, campo: keyof MedicamentoConVia, val: string) {
+    setMedicamentos(prev => prev.map((m, idx) => idx === i ? { ...m, [campo]: val } : m))
+    // Escribir el principio activo a mano retira el sello del catálogo: la
+    // pista dejaría de describir lo que hay en el campo.
+    if (campo === 'principio_activo') {
+      setPistas(prev => prev.map((p, idx) => idx === i ? { ...p, principioDelCatalogo: false } : p))
+    }
   }
 
-  function autocompletarMed(i: number, med: MedicamentoDB) {
-    setMedicamentos(medicamentos.map((m, idx) => idx === i ? {
+  /**
+   * Elegir del desplegable escribe la etiqueta compuesta; aquí se cambia por la
+   * fila real antes de que llegue al estado, así que el campo nunca muestra la
+   * etiqueta. Si lo escrito no es una etiqueta del catálogo, es texto libre.
+   */
+  function alEscribirNombre(i: number, val: string) {
+    const med = CATALOGO.get(val)
+    if (!med) { updateMed(i, 'nombre_comercial', val); return }
+    setMedicamentos(prev => prev.map((m, idx) => idx === i ? {
       ...m,
       nombre_comercial: med.nombre_comercial,
       presentacion: med.presentacion,
       principio_activo: med.principio_activo,
     } : m))
-    setSugerenciasDosis(prev => prev.map((s, idx) => idx === i ? med.dosis_sugerida : s))
+    setPistas(prev => prev.map((p, idx) => idx === i
+      ? { dosisSugerida: med.dosis_sugerida, principioDelCatalogo: true }
+      : p))
+  }
+
+  // ── Validación (§3.8) ───────────────────────────────────────────
+  // El bloque de referencia es el primero con algo escrito, o el primero a
+  // secas: nombrar «Nombre comercial» sin decir de qué bloque solo tiene
+  // sentido si el banner lleva luego hasta él.
+  const hayCompleto = medicamentos.some(estaCompleto)
+  const iRef = Math.max(0, medicamentos.findIndex(conTexto))
+
+  const faltantes: { clave: string; nombre: string }[] = []
+  if (!paciente.trim()) faltantes.push({ clave: 'receta-paciente', nombre: 'Paciente' })
+  if (!hayCompleto) {
+    if (!medicamentos[iRef]?.nombre_comercial.trim()) {
+      faltantes.push({ clave: `receta-nombre-${iRef}`, nombre: 'Nombre comercial' })
+    }
+    if (!medicamentos[iRef]?.principio_activo?.trim()) {
+      faltantes.push({ clave: `receta-principio-${iRef}`, nombre: 'Principio activo' })
+    }
+  }
+
+  function irA(clave: string) {
+    if (clave === 'receta-paciente') { enfocarYAcercar(pacienteRef.current); return }
+    enfocarYAcercar(formRef.current?.querySelector<HTMLElement>(`#${clave}`) ?? null)
   }
 
   async function imprimir() {
+    // El primario nunca está gris por faltantes: un botón apagado no enseña qué
+    // falta, el banner sí. Al pulsar con faltantes no emite y lleva al primero.
+    if (faltantes.length > 0) {
+      setIntentado(true)
+      irA(faltantes[0].clave)
+      return
+    }
     flushSync(() => { setErrorGuardado(''); setImprimiendo(true) })
 
     // 1. Feedback instantáneo — el usuario ve progreso en <50ms
     toast.info('Generando receta...')
 
-    // 2. Construcción de identidad — el folio sirve DOBLE propósito:
-    //    - Identificador público del documento (QR de verificación)
-    //    - clientId para idempotencia (idempotencia garantizada por el
-    //      índice único parcial en la tabla documentos)
-    const folio = `R-${crypto.randomUUID().replace(/-/g, '').slice(0, 12)}`
+    // 2 · Identidad — UUID puro, y SOLO para la idempotencia del índice único
+    //     parcial de `documentos`.
+    //
+    //     ⚠ **AQUÍ VIVÍA EL `R-a3f9…` QUE LA RECETA IMPRIMÍA**, y con él la
+    //     mitad del QR roto: se generaba en el navegador, se guardaba en
+    //     `contenido.folio` y era lo que el código codificaba — pero `/r/[folio]`
+    //     solo resuelve folios de la serie, así que ningún papel verificaba. El
+    //     número que va al papel y al QR es ahora el `RX-…` que la base asigna
+    //     al insertar; ver `folioImpreso()`.
+    //
+    //     Que la clave `folio` desaparezca de `contenido` NO es cosmético: es lo
+    //     que permite que el botón de regenerar distinga una receta vieja —que
+    //     la conserva y tiene que volver a imprimirla— de una nueva, que cae a
+    //     la columna. Ver el `??` de `ModalDocumentos.tsx`. Si alguien la
+    //     repone, las recetas nuevas empiezan a regenerarse con un número que su
+    //     papel no lleva.
+    const clientId = crypto.randomUUID()
+    // Un bloque a medias no llega ni al PDF ni al expediente, y ya no puede
+    // desaparecer en silencio: imprimir con uno incompleto es imposible.
+    const medsData = medicamentos.filter(estaCompleto)
     const contenido = {
-      folio,
       paciente,
       diagnostico,
-      medicamentos,
+      medicamentos: medsData,
       recomendaciones,
       fecha,
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
@@ -261,20 +405,83 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
       color_secundario: medicoInfo?.color_secundario || '#1e5fa8',
     }
 
-    // Flags de tracking para diferenciar errores de PDF vs persistencia
-    let pdfGenerated = false
+    // El blob y el desenlace de la persistencia se leen en el finally para
+    // montar el modal posterior a la generación. Ver ModalDocumentoGenerado.
+    let pdfBlob: Blob | null = null
+    let guardado = false
+    let filaId: string | null = null
+    let folioSerie: string | null = null
 
     try {
-      // 3. PDF PRIMERO — si falla, abortamos antes de escribir nada.
-      //    Evita orphan records donde el outbox tiene una receta que el
-      //    médico nunca vio porque el PDF nunca se generó.
-      const verificacionUrl = `${window.location.origin}/r/${folio}`
+      // ── 3 · LA FILA PRIMERO ───────────────────────────────────────────
+      //    Invierte el orden que este formulario tenía —PDF, subida, fila—,
+      //    como los otros seis, para que la fila exista antes de renderizar.
+      //
+      //    ⚠ **ESTE ORDEN ES AHORA UNA DEPENDENCIA DURA Y NO UNA MEJORA.** El
+      //    folio de serie no existe hasta que la fila entra: lo pone un trigger
+      //    BEFORE INSERT. Renderizar antes imprimiría el papel sin número y —lo
+      //    que importa— el QR sin nada que codificar. Si alguien vuelve a poner
+      //    el PDF por delante, la verificación se apaga en silencio.
+      //
+      //    Va con el cliente de SESIÓN del médico, nunca con privilegios de
+      //    servicio: el trigger exenta por completo a quien no trae JWT.
+      const supabase = offlineMode ? null : createClient()
+      if (supabase) {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) throw new Error('No autenticado')
+
+        const insertPayload: Record<string, unknown> = {
+          tipo: 'receta',
+          contenido,
+          client_id: clientId,
+          subido_por: user.id,
+          // CON QUÉ CHASIS SALE EL PAPEL. La fila nace emitida, así que la
+          // versión se fija aquí y a partir de este INSERT es inmutable
+          // (`20260813_formato_version_inmutable.sql`). Tiene que ser el mismo
+          // número que recibe `generarPdf` más abajo.
+          formato_version: VERSION_DE_EMISION,
+        }
+        if (pacienteId) insertPayload.paciente_id = pacienteId
+
+        const { data, error } = await supabase
+          .from('documentos')
+          .insert(insertPayload)
+          .select('id, folio')
+          .single()
+        if (error) throw error
+        filaId = data.id
+        folioSerie = data.folio
+        // La fila está en el expediente. Aunque el PDF falle después, la receta
+        // es recuperable desde la lista con su botón de regenerar — y el QR ya
+        // resuelve, porque lo que busca esa página es la fila, no el PDF.
+        guardado = true
+      }
+
+      // ── 4 · El PDF, ya con el número que la base acaba de asignar ─────
+      //
+      //    EL QR SE COMPONE SOBRE `folioPapel`, QUE ES EL FOLIO DEVUELTO POR EL
+      //    INSERT — nunca sobre uno anterior, porque antes del INSERT no hay
+      //    ninguno. Los dos salen del mismo sitio a propósito: el código y el
+      //    renglón impreso tienen que ser el mismo número o el papel vuelve a
+      //    tener dos.
+      //
+      //    En el búnker offline no hay fila, así que no hay folio: el papel sale
+      //    sin número Y SIN QR, igual que los otros seis salen sin número. Un QR
+      //    sin folio que codificar solo puede llevar a «No pudimos verificar
+      //    este documento», y un código muerto impreso en un papel es peor que
+      //    ningún código.
+      const folioPapel = folioImpreso('receta', folioSerie)
+      const verificacionUrl = folioPapel !== undefined
+        ? `${window.location.origin}/r/${folioPapel}`
+        : null
       const [qrDataUrl, blogQrDataUrl] = await Promise.all([
-        QRCode.toDataURL(verificacionUrl, {
-          width: 96,
-          margin: 1,
-          color: { dark: '#1a3a5c', light: '#ffffff' },
-        }),
+        verificacionUrl !== null
+          ? QRCode.toDataURL(verificacionUrl, {
+              width: 96,
+              margin: 1,
+              color: { dark: '#1a3a5c', light: '#ffffff' },
+            })
+          : Promise.resolve(''),
         isSuperAdmin
           ? QRCode.toDataURL('https://dranconacolumna.com/articulos.html', {
               width: 64,
@@ -285,7 +492,6 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
       ])
 
       const fechaFormat = format(new Date(fecha + 'T12:00:00'), "dd 'de' MMMM 'de' yyyy", { locale: es })
-      const medsData = medicamentos.filter(m => m.nombre_comercial)
 
       const doctorNombre = medicoInfo?.nombre || 'Médico'
       const doctorEspecialidad = medicoInfo?.especialidad || ''
@@ -311,7 +517,7 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
         telefono: consultorioActivo.telefono,
       } : undefined
 
-      const { storagePath } = await generarPdf({
+      const { blob, storagePath } = await generarPdf({
         tipo: 'receta',
         pacienteId,
         medico: {
@@ -323,6 +529,10 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
           especialidad: doctorEspecialidad,
           cedula_profesional: cedProf,
           cedula_especialidad: cedEsp,
+          // También aquí, y no solo dentro de `data`: el membrete de v2 la lee
+          // del médico, como las cédulas, y `data.universidad` es la ranura que
+          // v1 usa para el mismo dato. Las dos apuntan al mismo perfil.
+          universidad: medicoInfo?.universidad ?? null,
           color_primario: cp,
           color_secundario: cs,
           direccion_consultorio: direccion,
@@ -335,21 +545,26 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
           diagnostico,
           edad: edadPaciente != null ? `${edadPaciente} años` : undefined,
           sexo: sexoPaciente || undefined,
-          folio,
+          folio: folioPapel,
           medicamentos: medsData,
           recomendaciones: recomendaciones || undefined,
-          qrDataUrl,
+          qrDataUrl: qrDataUrl || undefined,
           blogQrDataUrl: blogQrDataUrl || undefined,
           universidad: medicoInfo?.universidad || undefined,
         },
         logoUrl,
         filename: generateDocFileName(paciente, 'Receta'),
         consultorio: consultorioData,
+        // El mismo número que acaba de escribirse en la fila. Ver `versionQueEmite`.
+        formatoVersion: versionQueEmite(offlineMode),
+        // El búnker offline queda intacto: sigue entregando el PDF él mismo y
+        // no monta el modal — onOfflineSave desmonta el formulario al guardar.
+        entregar: !!offlineMode,
       })
 
-      pdfGenerated = true
+      pdfBlob = blob
 
-      // 4. Persistencia
+      // ── 5 · La ruta del archivo, sobre la fila que ya existe ──────────
       if (offlineMode) {
         const { addDocument } = await import('@/lib/offline/db')
         const { getOfflineIdentity } = await import('@/lib/offline/identity')
@@ -365,187 +580,259 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
         toast.success('Receta guardada en bunker offline')
         onOfflineSave?.()
       } else {
-        const supabase = createClient()
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) throw new Error('No autenticado')
-
-        const insertPayload: Record<string, unknown> = {
-          tipo: 'receta',
-          contenido,
-          client_id: folio,
-          pdf_url: storagePath,
-          subido_por: user.id,
+        if (storagePath && filaId && supabase) {
+          // Este UPDATE no toca ni el estado ni el folio, así que el trigger lo
+          // deja pasar. No es fatal si falla: la fila está y el PDF se entrega
+          // igual; lo que se pierde es la descarga desde la lista, que el botón
+          // de regenerar repone.
+          const { error } = await supabase
+            .from('documentos')
+            .update({ pdf_url: storagePath })
+            .eq('id', filaId)
+          if (error) console.error('[RecetaForm] update pdf_url:', error.message)
         }
-        if (pacienteId) insertPayload.paciente_id = pacienteId
-
-        const { error } = await supabase.from('documentos').insert(insertPayload)
-        if (error) throw error
-
-        toast.success('Receta guardada')
+        // El folio del toast es el mismo que el del papel y el del QR: desde
+        // este cambio la receta tiene UN número, y es el de la serie.
+        toast.success(folioSerie ? `Receta guardada · ${folioSerie}` : 'Receta guardada')
       }
     } catch (err) {
-      if (!pdfGenerated) {
-        // El error ocurrió antes/durante el PDF → ningún orphan record
-        toast.error('No se pudo generar el PDF. Intenta de nuevo.')
-        setErrorGuardado('No se pudo generar el PDF. Intenta de nuevo.')
+      // Tres desenlaces, y el del medio es nuevo: con la fila escrita antes que
+      // el PDF, un fallo de render deja una receta emitida y un folio consumido.
+      let msg: string
+      if (offlineMode) {
+        msg = 'No se pudo generar el PDF. Intenta de nuevo.'
+      } else if (filaId === null) {
+        msg = 'No se pudo guardar la receta, así que no se generó el PDF. Intenta de nuevo.'
       } else {
-        // PDF OK pero persistencia fallida
-        toast.error('Receta generada pero no se pudo guardar. Revisa errores de sincronización.')
-        setErrorGuardado('Error al guardar la receta.')
+        msg = `La receta quedó registrada${folioSerie ? ` con folio ${folioSerie}` : ''}, pero no se `
+          + 'pudo generar el PDF. Búscala en la lista de documentos del paciente y recupérala desde ahí.'
       }
+      toast.error(msg)
+      setErrorGuardado(msg)
       // eslint-disable-next-line no-console
       console.error('[RecetaForm] imprimir falló:', err)
     } finally {
       setImprimiendo(false)
+      // También cuando la persistencia falló: el PDF existe y con el paciente
+      // enfrente lo urgente es poder imprimirlo.
+      if (pdfBlob && !offlineMode) { setDocGenerado({ blob: pdfBlob, guardado, documentoId: filaId }) }
     }
   }
 
-  return (
-    <div className="space-y-5">
-      {/* Datos básicos */}
-      <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-        <h2 className="font-semibold text-slate-700 text-sm mb-4">Datos del paciente</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div>
-            <label className="text-xs font-medium text-slate-500 block mb-1">Fecha</label>
-            <input type="date" value={fecha} onChange={e => setFecha(e.target.value)}
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-slate-500 block mb-1">Nombre del paciente <span className="text-red-400">*</span></label>
-            <input type="text" value={paciente} onChange={e => setPaciente(e.target.value)} placeholder="Nombre completo"
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-slate-500 block mb-1">Diagnóstico</label>
-            <input type="text" value={diagnostico} onChange={e => setDiagnostico(e.target.value)} placeholder="Diagnóstico principal"
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
-          </div>
-        </div>
-      </div>
+  const senalar = (clave: string) => intentado && faltantes.some(f => f.clave === clave)
 
-      {/* Medicamentos */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="px-5 py-3 bg-slate-50 border-b border-slate-100">
-          <h2 className="font-semibold text-slate-700 text-sm">Medicamentos</h2>
+  return (
+    <div ref={formRef} className="sp-doc-form">
+      {/* El árbol del formulario NO se desmonta cuando el panel de plantillas
+          está abierto: se apaga con display:none y el panel se monta como
+          hermano, en el mismo contenedor de scroll (spec 02 §3.1). */}
+      <div className="sp-doc-formbody" style={plantillas.panelAbierto ? { display: 'none' } : undefined}>
+
+      {plantillas.selector}
+
+      <section className="sp-card sp-doc-card">
+        <div className="sp-doc-cardhead">
+          <h2 className="sp-label">Datos del paciente</h2>
         </div>
-        <div className="divide-y divide-slate-100">
+        <div className="sp-doc-cardbody">
+          <div className="sp-doc-grid" data-cols="3">
+            <div className="sp-doc-field">
+              <label htmlFor="receta-fecha" className="sp-label-field">Fecha</label>
+              <input id="receta-fecha" type="date" value={fecha}
+                min={FECHA_MIN} max={desplazarFecha(hoyEnTZ(TZ_CLINICA), { anios: 1 })}
+                onChange={e => setFecha(e.target.value)} className="sp-input" />
+            </div>
+            <div className="sp-doc-field">
+              <label htmlFor="receta-paciente" className="sp-label-field">
+                Paciente <span aria-hidden="true" style={{ color: 'var(--sp-danger)' }}>*</span>
+                <span className="sr-only">obligatorio</span>
+              </label>
+              <input ref={pacienteRef} id="receta-paciente" type="text" value={paciente}
+                onChange={e => setPaciente(e.target.value)} placeholder="Nombre completo"
+                aria-invalid={senalar('receta-paciente') || undefined}
+                className={`sp-input ${senalar('receta-paciente') ? 'sp-doc-invalid' : ''}`} />
+              {pacienteInicial && <p className="sp-hint">De la ficha · editable</p>}
+            </div>
+            <div className="sp-doc-field">
+              <label htmlFor="receta-diagnostico" className="sp-label-field">Diagnóstico</label>
+              <input id="receta-diagnostico" type="text" value={diagnostico}
+                onChange={e => setDiagnostico(e.target.value)} placeholder="Diagnóstico principal"
+                className="sp-input" />
+              {diagnosticoInicial && <p className="sp-hint">Del diagnóstico de la consulta</p>}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="sp-card sp-doc-card">
+        {/* La cabecera se queda solo con su etiqueta: «Agregar medicamento» va
+            al pie de CADA bloque (§2.2). Con cuatro fármacos, un botón único al
+            final obliga a bajar hasta abajo y volver a subir. */}
+        <div className="sp-doc-cardhead">
+          <div className="sp-icobox sp-icobox--sm"><Pill /></div>
+          <h2 className="sp-label">Medicamentos</h2>
+        </div>
+        <div className="sp-doc-cardbody">
           {medicamentos.map((med, i) => (
-            <div key={i} className="p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-slate-400">MEDICAMENTO {i + 1}</span>
-                {medicamentos.length > 1 && (
-                  <button onClick={() => removeMed(i)} className="text-red-400 hover:text-red-600">
-                    <Trash2 size={14} />
-                  </button>
-                )}
+            <div key={i} className="sp-doc-medblock">
+              <div className="sp-doc-medhead">
+                <span className="sp-label">Medicamento {i + 1}</span>
+                <button type="button" onClick={() => removeMed(i)} disabled={medicamentos.length === 1}
+                  aria-label={med.nombre_comercial.trim()
+                    ? `Eliminar ${med.nombre_comercial.trim()}`
+                    : `Eliminar medicamento ${i + 1}`}
+                  className="sp-doc-iconbtn">
+                  <Trash2 />
+                </button>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                <div className="sm:col-span-2">
-                  <label className="text-xs text-slate-500 block mb-1">Nombre comercial</label>
-                  <AutocompleteMedicamento
+
+              <div className="sp-doc-grid" data-cols="3">
+                <div className="sp-doc-field sp-doc-span-2">
+                  <label htmlFor={`receta-nombre-${i}`} className="sp-label-field">
+                    Nombre comercial <span aria-hidden="true" style={{ color: 'var(--sp-danger)' }}>*</span>
+                    <span className="sr-only">obligatorio</span>
+                  </label>
+                  <ComboEscribible
+                    id={`receta-nombre-${i}`}
                     value={med.nombre_comercial}
-                    onChange={val => updateMed(i, 'nombre_comercial', val)}
-                    onSelect={m => autocompletarMed(i, m)}
-                    placeholder="VOLTAREN"
+                    onChange={val => alEscribirNombre(i, val)}
+                    sugerencias={ETIQUETAS_CATALOGO}
+                    minCaracteres={2}
+                    placeholder="Ej: Voltaren"
+                    pie="Ninguno encaja: escribe el nombre y se usa tal cual."
+                    invalido={senalar(`receta-nombre-${i}`)}
+                    claseExtra={senalar(`receta-nombre-${i}`) ? 'sp-doc-invalid' : ''}
                   />
                 </div>
-                <div>
-                  <label className="text-xs text-slate-500 block mb-1">Presentación</label>
-                  <input type="text" value={med.presentacion || ''} onChange={e => updateMed(i, 'presentacion', e.target.value)}
-                    placeholder="Tabletas 50 mg" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
+
+                <div className="sp-doc-field">
+                  <label htmlFor={`receta-presentacion-${i}`} className="sp-label-field">Presentación</label>
+                  <input id={`receta-presentacion-${i}`} type="text" value={med.presentacion ?? ''}
+                    onChange={e => updateMed(i, 'presentacion', e.target.value)}
+                    placeholder="Tabletas 50 mg" className="sp-input" />
                 </div>
-                <div>
-                  <label className="text-xs text-slate-500 block mb-1">Vía de administración</label>
-                  <select value={(med as MedicamentoConVia).via_administracion || 'Oral'} onChange={e => updateMed(i, 'via_administracion' as any, e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30">
+
+                <div className="sp-doc-field">
+                  <label htmlFor={`receta-via-${i}`} className="sp-label-field">Vía de administración</label>
+                  <select id={`receta-via-${i}`} value={med.via_administracion || 'Oral'}
+                    onChange={e => updateMed(i, 'via_administracion', e.target.value)}
+                    className="sp-input">
                     {VIAS.map(v => <option key={v} value={v}>{v}</option>)}
                   </select>
                 </div>
-                <div className="col-span-2 sm:col-span-3">
-                  <label className="text-xs text-slate-500 block mb-1">Principio activo</label>
-                  <input type="text" value={med.principio_activo || ''} onChange={e => updateMed(i, 'principio_activo', e.target.value)}
-                    placeholder="Diclofenaco sódico" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
+
+                {/* Se queda como campo EDITABLE y no como texto informativo: es
+                    la denominación genérica que exige el formato, y el catálogo
+                    no la trae siempre. Como texto, los fármacos fuera de
+                    catálogo perderían el dato exigible (§4). */}
+                <div className="sp-doc-field sp-doc-span-2">
+                  <label htmlFor={`receta-principio-${i}`} className="sp-label-field">
+                    Principio activo <span aria-hidden="true" style={{ color: 'var(--sp-danger)' }}>*</span>
+                    <span className="sr-only">obligatorio</span>
+                  </label>
+                  <input id={`receta-principio-${i}`} type="text" value={med.principio_activo ?? ''}
+                    onChange={e => updateMed(i, 'principio_activo', e.target.value)}
+                    placeholder="Diclofenaco sódico"
+                    aria-invalid={senalar(`receta-principio-${i}`) || undefined}
+                    className={`sp-input ${senalar(`receta-principio-${i}`) ? 'sp-doc-invalid' : ''}`} />
+                  {pistas[i]?.principioDelCatalogo && <p className="sp-hint">Del catálogo · editable</p>}
                 </div>
-                <div className="col-span-2 sm:col-span-3">
-                  <label className="text-xs text-slate-500 block mb-1">Indicaciones de administración</label>
-                  <textarea value={med.indicacion} onChange={e => updateMed(i, 'indicacion', e.target.value)}
+
+                <div className="sp-doc-field sp-doc-span-all">
+                  <label htmlFor={`receta-indicacion-${i}`} className="sp-label-field">Indicaciones</label>
+                  <textarea id={`receta-indicacion-${i}`} value={med.indicacion}
+                    onChange={e => updateMed(i, 'indicacion', e.target.value)}
                     placeholder="Tomar 1 tableta cada 8 hrs con alimentos por 7 días"
-                    rows={2} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
-                  {sugerenciasDosis[i] && (
-                    <p className="mt-1 text-xs text-slate-400 flex items-start gap-1">
-                      <span className="font-medium text-slate-500">Sugerencia:</span> {sugerenciasDosis[i]}
-                    </p>
+                    className="sp-textarea" />
+                  {pistas[i]?.dosisSugerida && (
+                    <p className="sp-hint">Sugerencia del catálogo: {pistas[i].dosisSugerida}</p>
                   )}
                 </div>
               </div>
+
+              <div className="sp-doc-medfoot">
+                <button type="button" onClick={() => addMed(i)}
+                  className="sp-btn sp-btn--compact">
+                  <Plus size={17} /> Agregar medicamento
+                </button>
+              </div>
             </div>
           ))}
-          {/* Botón al pie del último medicamento */}
-          <div className="px-4 py-3">
-            <button onClick={addMed}
-              className="flex items-center gap-1.5 text-xs font-medium text-[#1e5fa8] hover:text-[#1a3a5c] transition-colors">
-              <Plus size={14} /> Agregar medicamento
-            </button>
-          </div>
         </div>
-      </div>
+      </section>
 
-      {/* Recomendaciones */}
-      <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-3">
-        <div className="flex items-center justify-between">
-          <label className="text-sm font-semibold text-slate-700">Recomendaciones / Notas</label>
-          {recomendaciones && (
-            <button
-              onClick={() => setRecomendaciones('')}
-              className="text-xs text-slate-400 hover:text-red-500 transition-colors"
-            >
-              Limpiar
-            </button>
-          )}
+      {/* El selector de recomendaciones predeterminadas se eliminó entero, con
+          sus nueve bloques y sus emoji (R-05): insertaba acumulando y no había
+          forma de quitar un bloque. Lo que resolvía —repetir el mismo texto— lo
+          cubren las plantillas, que además guardan los medicamentos. */}
+      <section className="sp-card sp-doc-card">
+        <div className="sp-doc-cardhead">
+          <h2 className="sp-label">Recomendaciones</h2>
         </div>
-        <select
-          defaultValue=""
-          onChange={e => {
-            if (!e.target.value) return
-            const rec = RECOMENDACIONES_PREDETERMINADAS.find(r => r.label === e.target.value)
-            if (rec) {
-              const bloque = `${rec.label}\n${rec.texto}`
-              setRecomendaciones(prev => prev ? prev + '\n\n' + bloque : bloque)
-            }
-            e.target.value = ''
-          }}
-          className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 bg-slate-50"
-        >
-          <option value="">＋ Insertar recomendaciones predeterminadas...</option>
-          {RECOMENDACIONES_PREDETERMINADAS.map(r => (
-            <option key={r.label} value={r.label}>{r.label}</option>
-          ))}
-        </select>
-        <textarea
-          value={recomendaciones}
-          onChange={e => setRecomendaciones(e.target.value)}
-          placeholder="Selecciona un segmento arriba o escribe tus propias recomendaciones..."
-          rows={6}
-          className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm resize-y focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30"
-        />
-      </div>
+        <div className="sp-doc-cardbody">
+          <label htmlFor="receta-recomendaciones" className="sr-only">Recomendaciones</label>
+          <textarea id="receta-recomendaciones" value={recomendaciones}
+            onChange={e => setRecomendaciones(e.target.value)}
+            placeholder="Indicaciones generales, cuidados, datos de alarma…"
+            className="sp-textarea" />
+        </div>
+      </section>
 
-      {errorGuardado && (
-        <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
-          {errorGuardado}
+      {errorGuardado && <p className="sp-banner sp-banner--danger">{errorGuardado}</p>}
+
+      {!cargandoPerfil && !medicoInfo && (
+        <p className="sp-banner sp-banner--warn">
+          <AlertTriangle size={17} />
+          <span style={{ flex: 1 }}>Completa tu perfil para que el documento salga con tu encabezado.</span>
+          <Link href="/perfil" className="sp-link-alt">Ir a mi perfil</Link>
         </p>
       )}
 
-      <button
-        onClick={imprimir}
-        disabled={!paciente || imprimiendo}
-        className="doc-print-btn w-full flex items-center justify-center gap-2 py-3 bg-[#1a3a5c] text-white rounded-xl font-medium hover:bg-[#0f2540] transition-colors disabled:opacity-50"
-      >
-        {imprimiendo
-          ? <><Loader2 size={18} className="animate-spin" /> Generando PDF...</>
-          : <><Printer size={18} /> Imprimir Receta</>}
-      </button>
+      {intentado && faltantes.length > 0 && (
+        <p className="sp-banner sp-banner--warn" aria-live="polite">
+          <AlertTriangle size={17} />
+          <span>
+            {faltantes.length === 1 ? 'Falta 1 campo' : `Faltan ${faltantes.length} campos`}:{' '}
+            {faltantes.slice(0, 3).map((f, i) => (
+              <span key={f.clave}>
+                {i > 0 && ' · '}
+                <button type="button" onClick={() => irA(f.clave)}
+                  className="sp-link-alt" style={{ color: 'var(--sp-warn-strong)' }}>
+                  {f.nombre}
+                </button>
+              </span>
+            ))}
+            {faltantes.length > 3 && ` y ${faltantes.length - 3} más`}
+          </span>
+        </p>
+      )}
+
+      {/* «Guardar como plantilla» va aquí y no arriba: se guarda cuando el
+          formulario YA está lleno, así que su sitio es junto al de imprimir. */}
+      <PieAccionesDocumento
+        botonGuardar={plantillas.botonGuardar}
+        onImprimir={imprimir}
+        imprimiendo={imprimiendo}
+        perfilPendiente={perfilPendiente}
+      />
+
+      </div>
+
+      {plantillas.panel}
+      {plantillas.dialogos}
+
+      <ModalDocumentoGenerado
+        open={docGenerado !== null}
+        /* Cerrar el modal es el final del documento: se suelta la señal para
+           que el host repliegue su selector. `setDocGenerado(null)` primero,
+           para que el modal se desmonte por su cuenta y no de rebote al
+           desmontarse este formulario entero. */
+        onClose={() => { setDocGenerado(null); onCerrarTrasEmitir?.() }}
+        blob={docGenerado?.blob ?? null}
+        titulo="Receta generada"
+        guardadoEnExpediente={docGenerado?.guardado ?? false}
+        documentoId={docGenerado?.documentoId ?? null}
+      />
     </div>
   )
 }

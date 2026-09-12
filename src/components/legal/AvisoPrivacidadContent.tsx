@@ -99,8 +99,8 @@ const TERCEROS: Array<{ name: string; data: string; protection: string; status?:
   },
   {
     name: 'Google LLC (Calendar)',
-    data: 'Sincronización opcional de citas. Solo recibe iniciales del paciente y horario; nunca el nombre completo, diagnóstico ni datos clínicos.',
-    protection: 'OAuth 2.0 con tokens cifrados (AES-256-GCM) en reposo. Anonimización aplicada antes del envío.',
+    data: 'Sincronización opcional de citas. Recibe el nombre del paciente y el horario de la cita; nunca diagnóstico, motivo de consulta, notas ni ningún otro dato clínico.',
+    protection: 'OAuth 2.0 con tokens cifrados (AES-256-GCM) en reposo. Minimización aplicada antes del envío: el evento se crea en un calendario propio de la plataforma y su contenido se limita al nombre del paciente y el horario.',
     status: 'activa',
   },
   {
@@ -284,7 +284,8 @@ export default function AvisoPrivacidadContent() {
                   </li>
                   <li>
                     Sincronización opcional de la agenda médica con Google Calendar, transmitiendo
-                    únicamente iniciales del paciente y hora de la cita.
+                    únicamente el nombre del paciente y el horario de la cita. No se transmite
+                    diagnóstico, motivo de consulta, notas ni ningún otro dato clínico.
                   </li>
                   <li>
                     Envío de documentos médicos al correo del paciente cuando el profesional lo

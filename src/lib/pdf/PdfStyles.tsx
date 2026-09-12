@@ -55,6 +55,22 @@ export interface PdfMedicoData {
   especialidad?: string
   cedula_profesional?: string
   cedula_especialidad?: string
+  /**
+   * UNIVERSIDAD EMISORA DE LA CÉDULA — `profiles.universidad`.
+   *
+   * ⚠ **ESTABA EN EL PERFIL Y NO EN ESTE TIPO, Y ESO BLOQUEABA EL CABLEADO DE v2.**
+   * `MedicoMembrete` de `v2/Membrete.tsx` la declara REQUERIDA, porque el membrete de la
+   * receta la exige por normativa (`DOCUMENTOS_HANDOFF.md` §6). Sin ella aquí, cada uno de
+   * los nueve adaptadores tendría que sacarla de `data` —donde hoy viaja solo en la receta,
+   * `RecetaForm.tsx:435`— y los otros ocho emitirían el membrete sin universidad.
+   *
+   * Opcional en el tipo y no requerida, a propósito: `PdfMedicoData` son datos de
+   * impresión y hay perfiles incompletos en producción. **Quien debe bloquear la emisión es
+   * la validación del formulario, no el compilador** — es el defecto de producto que
+   * `DOCUMENTOS_HANDOFF.md` §7.3 declara nivel 1 y que sigue abierto: hoy un médico con
+   * perfil incompleto emite recetas sin universidad y en silencio.
+   */
+  universidad?: string | null
   logo_url?: string | null
   /** URL firmada (1h) de la firma autógrafa en PNG transparente */
   firma_url?: string | null

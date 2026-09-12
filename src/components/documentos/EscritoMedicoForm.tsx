@@ -3,31 +3,37 @@ import { generateDocFileName } from '@/lib/patientUtils'
 import { useMedicoInfo } from '@/hooks/useMedicoInfo'
 import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
 
-import { useState } from 'react'
-import {
-  Printer, Loader2, Bold, Italic, Underline,
-  AlignLeft, AlignCenter, AlignRight, AlignJustify,
-  List, ListOrdered, Minus, RemoveFormatting,
-} from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { AlertTriangle } from 'lucide-react'
+import PieAccionesDocumento from '@/components/documentos/PieAccionesDocumento'
 import { flushSync } from 'react-dom'
-import { generarPdf } from '@/lib/mobileShare'
+import { generarPdf, VERSION_DE_EMISION, versionQueEmite } from '@/lib/mobileShare'
 import { useToast } from '@/components/ui/Toast'
+import ModalDocumentoGenerado from '@/components/documentos/ModalDocumentoGenerado'
+import EditorEscrito from '@/components/documentos/EditorEscrito'
+import { usePlantillasDocumento, type ContenidoPlantilla } from '@/components/documentos/PlantillasDocumento'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { hoyEnTZ } from '@/lib/dates'
+import { hoyEnTZ, desplazarFecha, TZ_CLINICA } from '@/lib/dates'
+import { enfocarYAcercar } from '@/lib/scrollDoc'
 import DOMPurify from 'dompurify'
 import { decodificarNbsp } from '@/lib/textUtils'
 
-import { useEditor, EditorContent } from '@tiptap/react'
-import { generateHTML } from '@tiptap/core'
+import { useEditor } from '@tiptap/react'
+import { generateHTML, type JSONContent } from '@tiptap/core'
 import { editorExtensions } from '@/lib/documentos/editorExtensions'
+
+const FECHA_MIN = '1900-01-01'
 
 // Sanitización con DOMPurify — cubre SVG scripts, iframes, event handlers
 // y todos los vectores de XSS conocidos.
+// `blockquote` entra en la lista con el control de cita (§5): sin él, DOMPurify
+// desenvolvía la etiqueta y la cita llegaba al campo `cuerpo` como párrafo raso.
 function sanitizeEditorHtml(html: string): string {
   return DOMPurify.sanitize(html, {
-    ALLOWED_TAGS: ['p', 'br', 'b', 'strong', 'i', 'em', 'u', 'h2', 'h3', 'div', 'span', 'hr', 'ul', 'ol', 'li'],
+    ALLOWED_TAGS: ['p', 'br', 'b', 'strong', 'i', 'em', 'u', 'h2', 'h3', 'div', 'span', 'hr', 'ul', 'ol', 'li', 'blockquote'],
     ALLOWED_ATTR: ['style', 'class'],
     FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form', 'input', 'link'],
     FORBID_ATTR: ['onerror', 'onclick', 'onload', 'onmouseover', 'onfocus'],
@@ -67,22 +73,81 @@ function postProcesarParaParserLegacy(html: string): string {
   return out
 }
 
+/**
+ * Documento guardado en una plantilla. Llega de `jsonb` y pudo escribirse con
+ * otra versión del formulario, así que se comprueba antes de dárselo al editor.
+ */
+function leerDoc(bruto: unknown): JSONContent | null {
+  if (typeof bruto !== 'object' || bruto === null) return null
+  const d = bruto as Record<string, unknown>
+  return d.type === 'doc' && Array.isArray(d.content) ? (d as JSONContent) : null
+}
+
+/**
+ * Predicado único de «formulario vacío». Mismo criterio que Laboratorio: lo que
+ * llega prellenado de la ficha NO cuenta como escrito hasta que se edita.
+ *
+ * La fecha no entra —llega sola— y el título del pie tampoco mientras siga
+ * enganchado al título: enganchado no tiene valor propio, copia.
+ */
+function isFormEmpty(
+  cuerpoVacio: boolean, asunto: string,
+  piePropio: string, pieEnganchado: boolean,
+  paciente: string, pacienteInicial: string,
+): boolean {
+  const pacienteIntacto = paciente.trim() === '' || paciente.trim() === pacienteInicial.trim()
+  const pieIntacto = pieEnganchado || piePropio.trim() === ''
+  return pacienteIntacto && asunto.trim() === '' && pieIntacto && cuerpoVacio
+}
+
 interface Props {
   pacienteInicial?: string
   pacienteId?: string
   offlineMode?: boolean
   onOfflineSave?: () => void
+  /** Reporta al host si el formulario sigue vacío (guía 04 §6.1 y §6.2). */
+  onVacioChange?: (vacio: boolean) => void
+  /**
+   * El modal de «documento generado» se cerró — o sea, el documento ya salió y
+   * el médico terminó con él.
+   *
+   * ⚠️⚠️ ESTO ES LO ÚNICO QUE IMPIDE EDITAR UN DOCUMENTO YA EMITIDO, y quien
+   * venga a quitarlo tiene que saberlo. El host responde deseleccionando el
+   * tipo, y eso DESMONTA este formulario. Esa es toda la garantía: entre emitir
+   * y desmontar no hay ventana editable —el modal tapa el formulario, atrapa el
+   * foco (`ModalShell:153-176`) y bloquea el scroll—, así que cuando el
+   * formulario vuelve a existir es uno nuevo y vacío.
+   *
+   * Aquí hubo una segunda red —una huella del contenido al emitir, comparada
+   * con la de cada render, que devolvía el diálogo de descarte si el médico
+   * seguía escribiendo— y se retiró: con el desmontaje no llegaba a dispararse
+   * nunca. Si algún día el host deja de desmontar, ese caso se reabre y esa red
+   * hay que reponerla.
+   *
+   * Existe para que el HOST pueda replegar su selector y volver a la rejilla de
+   * los ocho tipos: el formulario no puede hacerlo solo porque no es dueño del
+   * `value` del selector, y a estas alturas seguir enseñando la receta recién
+   * emitida no ayuda a nadie.
+   *
+   * ⚠️ SE DISPARA AL CERRAR EL MODAL Y NO AL EMITIR, y la diferencia importa:
+   * este mismo componente RENDERIZA ese modal, así que soltar la señal al
+   * emitir haría que el host lo desmontara con el PDF todavía en pantalla.
+   *
+   * Opcional: el búnker y cualquier montaje sin selector lo omiten y no pasa
+   * nada.
+   */
+  onCerrarTrasEmitir?: () => void
+  /**
+   * El panel de plantillas sustituye al formulario en su mismo espacio, y
+   * mientras está abierto el selector de tipo del host se oculta (spec 02 §3.1):
+   * elegir otro tipo desde ahí tiraría el formulario sobre el que el panel
+   * opera.
+   */
+  onPanelPlantillasChange?: (abierto: boolean) => void
 }
 
-const TAMANOS = [
-  { label: 'Normal',           value: 'p'  },
-  { label: 'Título principal', value: 'h1' },
-  { label: 'Título',           value: 'h2' },
-  { label: 'Subtítulo',        value: 'h3' },
-] as const
-
-export default function EscritoMedicoForm({ pacienteInicial = '', pacienteId, offlineMode, onOfflineSave }: Props) {
-  const { medicoInfo: onlineMedicoInfo } = useMedicoInfo()
+export default function EscritoMedicoForm({ pacienteInicial = '', pacienteId, offlineMode, onOfflineSave, onVacioChange, onCerrarTrasEmitir, onPanelPlantillasChange }: Props) {
+  const { medicoInfo: onlineMedicoInfo, isLoading: cargandoPerfil } = useMedicoInfo()
   const { consultorioActivo } = useConsultorioActivo()
 
   // En offline mode, leer perfil del médico de localStorage (pre-fetched
@@ -110,43 +175,120 @@ export default function EscritoMedicoForm({ pacienteInicial = '', pacienteId, of
     clinica_nombre: offlineProfile.clinica_nombre,
   } : onlineMedicoInfo
 
+  // Imprimir antes de que resuelva el perfil produce un PDF con el encabezado
+  // vacío: sin nombre, sin cédulas, sin domicilio. Solo bloquea mientras carga;
+  // si resuelve sin datos el botón se habilita igual.
+  const perfilPendiente = cargandoPerfil && !medicoInfo
+
   const toast = useToast()
   const [paciente, setPaciente]       = useState(pacienteInicial)
-  const [fecha, setFecha]             = useState(hoyEnTZ())
+  // `TZ_CLINICA` explícito, no el huso del dispositivo: este inicializador de
+  // `useState` corre TAMBIÉN en la pasada de SSR, donde `tzDispositivo()`
+  // devolvería UTC de Vercel y el cliente lo corregiría al hidratar — fecha
+  // parpadeante en un formulario que emite un documento legal. Y la fecha del
+  // documento es de la clínica de todos modos (LA REGLA, en `@/lib/dates`).
+  const [fecha, setFecha]             = useState(hoyEnTZ(TZ_CLINICA))
   const [asunto, setAsunto]           = useState('')
+  // El pie NO es un truncado del título: recortar por caracteres produce
+  // «Constancia de atención médica y valoración ortopé…», que no identifica
+  // nada. Es un segundo campo que copia al título mientras nadie lo toque, y en
+  // cuanto se edita se desengancha. Dos estados y no uno: el valor mostrado se
+  // deriva de ellos, así que no pueden desincronizarse.
+  const [piePropio, setPiePropio]         = useState('')
+  const [pieEnganchado, setPieEnganchado] = useState(true)
   const [imprimiendo, setImprimiendo] = useState(false)
   const [errorGuardado, setErrorGuardado] = useState('')
+  const [docGenerado, setDocGenerado] = useState<{ blob: Blob; guardado: boolean; documentoId: string | null } | null>(null)
+  // El banner de faltantes NO existe hasta el primer intento de imprimir: un
+  // formulario recién abierto no acusa de nada. Después permanece y se
+  // actualiza en vivo.
+  const [intentado, setIntentado] = useState(false)
+
+  const formRef = useRef<HTMLDivElement>(null)
 
   const editor = useEditor({
     extensions: editorExtensions,
     immediatelyRender: false,
-    editorProps: {
-      attributes: {
-        class: 'min-h-[380px] p-5 text-sm leading-relaxed focus:outline-none escrito-editor-prose',
-      },
-    },
+    editorProps: { attributes: { class: 'sp-ed-prose' } },
   })
 
   const isEmpty = editor?.isEmpty ?? true
+  const bloques = editor?.state.doc.childCount ?? 0
+  const tituloPie = pieEnganchado ? asunto : piePropio
 
-  function setBlockType(value: string) {
-    if (!editor) return
-    if (value === 'p')       editor.chain().focus().setParagraph().run()
-    else if (value === 'h1') editor.chain().focus().setHeading({ level: 1 }).run()
-    else if (value === 'h2') editor.chain().focus().setHeading({ level: 2 }).run()
-    else if (value === 'h3') editor.chain().focus().setHeading({ level: 3 }).run()
+  /* Lo que decide «¿está vacío?». La tupla se extiende sobre `isFormEmpty`, así
+     que el compilador impide que diverja de su firma.
+     ⚠️ SE LLAMA `paraVacio` Y NO `contenido`: `imprimir()` declara su propio
+     `contenido` con lo que se manda a imprimir, y dos nombres iguales en dos
+     ámbitos anidados es una trampa de lectura. */
+  const paraVacio = [isEmpty, asunto, piePropio, pieEnganchado, paciente, pacienteInicial] as const
+  const vacio = isFormEmpty(...paraVacio)
+
+  useEffect(() => { onVacioChange?.(vacio) }, [vacio, onVacioChange])
+
+  // ── Plantillas (spec 02) ────────────────────────────────────────
+  // Se guarda TODO menos los datos del paciente: aquí eso deja fuera paciente y
+  // fecha. El título, el título del pie y el cuerpo SÍ entran — en este formato
+  // la plantilla es justamente el escrito anterior, que es de lo que casi
+  // siempre se parte.
+  //
+  // El cuerpo se guarda como JSON de ProseMirror y no como HTML, y eso cierra
+  // el NO DEFINIDO del sanitizador de la guía §8: no hay HTML que sanear al
+  // aplicar, porque lo que filtra es el esquema del editor. El sanitizador que
+  // sigue en uso, para el campo `cuerpo` del documento emitido, es DOMPurify.
+  const plantillas = usePlantillasDocumento({
+    tipo: 'escrito_medico',
+    vacio,
+    // El búnker no tiene red ni sesión de Supabase: el sistema no se monta.
+    desactivado: !!offlineMode,
+    onPanelChange: onPanelPlantillasChange,
+    leer: () => ({ _v: 1, asunto, piePropio, pieEnganchado, doc: editor?.getJSON() ?? null }),
+    aplicar: (c: ContenidoPlantilla) => {
+      // Solo las claves que existen HOY, y comprobando el tipo de cada una. Los
+      // `else` NO son defensa de sobra: «Vaciar formulario» aplica un contenido
+      // sin ninguna clave, así que son justo lo que repone el estado inicial. El
+      // paciente y la fecha no se tocan aquí, y por eso sobreviven al vaciado.
+      setAsunto(typeof c.asunto === 'string' ? c.asunto : '')
+      setPiePropio(typeof c.piePropio === 'string' ? c.piePropio : '')
+      setPieEnganchado(typeof c.pieEnganchado === 'boolean' ? c.pieEnganchado : true)
+      const doc = leerDoc(c.doc)
+      try {
+        if (doc) editor?.commands.setContent(doc, false)
+        else editor?.commands.clearContent()
+      } catch (err) {
+        editor?.commands.clearContent()
+        toast.error('El cuerpo de esa plantilla no se pudo abrir. El resto sí se aplicó.')
+        console.error('[EscritoMedicoForm] setContent falló:', err)
+      }
+    },
+  })
+
+  // G-10: foco al primer campo editable vacío al montar. preventScroll para no
+  // arrastrar la página hasta él. En móvil esto abre el teclado en cada montaje.
+  useEffect(() => {
+    const primero = formRef.current?.querySelector<HTMLElement>('input:not([type="date"]), textarea')
+    if (primero instanceof HTMLInputElement && !primero.value) primero.focus({ preventScroll: true })
+  }, [])
+
+  function editarPie(valor: string): void {
+    setPieEnganchado(false)
+    setPiePropio(valor)
   }
 
-  function currentBlockValue(): string {
-    if (!editor) return 'p'
-    if (editor.isActive('heading', { level: 1 })) return 'h1'
-    if (editor.isActive('heading', { level: 2 })) return 'h2'
-    if (editor.isActive('heading', { level: 3 })) return 'h3'
-    return 'p'
+  /** Vuelve a engancharlo. El valor propio se descarta: reengancharse es eso. */
+  function reengancharPie(): void {
+    setPieEnganchado(true)
+    setPiePropio('')
   }
 
   async function imprimir() {
-    if (!editor || editor.isEmpty) return
+    // El primario nunca está gris por faltantes: un botón apagado no enseña qué
+    // falta, el banner sí. Al pulsar con el cuerpo vacío no emite y lleva a él.
+    if (!editor || editor.isEmpty) {
+      setIntentado(true)
+      enfocarYAcercar(formRef.current?.querySelector<HTMLElement>('.sp-ed-prose') ?? null)
+      return
+    }
 
     const docJson      = editor.getJSON()
     const htmlBruto    = generateHTML(docJson, editorExtensions)
@@ -155,6 +297,7 @@ export default function EscritoMedicoForm({ pacienteInicial = '', pacienteId, of
     if (!cuerpoSanitizado.trim()) return
 
     const asuntoLimpio = decodificarNbsp(asunto)
+    const pieLimpio    = decodificarNbsp(tituloPie)
 
     flushSync(() => { setErrorGuardado(''); setImprimiendo(true) })
     toast.info('Generando escrito médico...')
@@ -164,14 +307,57 @@ export default function EscritoMedicoForm({ pacienteInicial = '', pacienteId, of
       paciente,
       fecha,
       asunto: asuntoLimpio,
+      tituloPie: pieLimpio,
       doc: { schema: 'tiptap-doc-v1' as const, content: docJson },
       cuerpo: cuerpoSanitizado,
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     }
 
-    let pdfGenerated = false
+    // El blob y el desenlace de la persistencia se leen en el finally para
+    // montar el modal posterior a la generación. Ver ModalDocumentoGenerado.
+    let pdfBlob: Blob | null = null
+    let guardado = false
+    let filaId: string | null = null
 
     try {
+      // ── LA FILA PRIMERO ───────────────────────────────────────────────
+      //    Invierte el orden que este formulario tenía —PDF, subida, fila—,
+      //    como los otros seis. **Aquí no hay folio que ganar y se invierte
+      //    igual**: el escrito médico es el único formato sin clase de folio —el
+      //    generador no lo contempla y su columna queda NULL, porque no son
+      //    documentos seriados—. Lo que se gana es un solo orden en los siete
+      //    formularios: quien lea el siguiente no tiene que averiguar cuál de
+      //    los dos sigue este.
+      const supabase = offlineMode ? null : createClient()
+      if (supabase) {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) throw new Error('No autenticado')
+
+        const insertPayload: Record<string, unknown> = {
+          tipo: 'escrito_medico',
+          contenido: docContenido,
+          client_id: clientId,
+          subido_por: user.id,
+          // CON QUÉ CHASIS SALE EL PAPEL. La fila nace emitida, así que la
+          // versión se fija aquí y a partir de este INSERT es inmutable
+          // (`20260813_formato_version_inmutable.sql`). Tiene que ser el mismo
+          // número que recibe `generarPdf` más abajo.
+          formato_version: VERSION_DE_EMISION,
+        }
+        if (pacienteId) insertPayload.paciente_id = pacienteId
+
+        const { data, error } = await supabase
+          .from('documentos')
+          .insert(insertPayload)
+          .select('id')
+          .single()
+        if (error) throw error
+        filaId = data.id
+        // La fila está en el expediente. Aunque el PDF falle después, el
+        // documento es recuperable desde la lista con su botón de regenerar.
+        guardado = true
+      }
+
       const medicoData = medicoInfo ? {
         nombre: medicoInfo.nombre,
         titulo: medicoInfo.titulo ?? null,
@@ -181,6 +367,9 @@ export default function EscritoMedicoForm({ pacienteInicial = '', pacienteId, of
         especialidad: medicoInfo.especialidad,
         cedula_profesional: medicoInfo.cedula_profesional,
         cedula_especialidad: medicoInfo.cedula_especialidad,
+        // El membrete de v2 la exige por normativa (I.3.7) y sin ella el
+        // renglón sale sin universidad, en silencio.
+        universidad: medicoInfo.universidad ?? null,
         color_primario: medicoInfo.color_primario,
         color_secundario: medicoInfo.color_secundario,
         direccion_consultorio: medicoInfo.direccion_consultorio,
@@ -197,18 +386,26 @@ export default function EscritoMedicoForm({ pacienteInicial = '', pacienteId, of
         telefono: consultorioActivo.telefono,
       } : undefined
 
-      const { storagePath } = await generarPdf({
+      const { blob, storagePath } = await generarPdf({
         tipo: 'escrito_medico',
         pacienteId,
         medico: medicoData,
-        data: { paciente, fecha: fechaFmt, asunto: asuntoLimpio, cuerpo: cuerpoSanitizado, doc: { schema: 'tiptap-doc-v1' as const, content: docJson } },
+        // `tituloPie` viaja ya: el renderizador v1 lo ignora y el formato v2 lo
+        // compone. Ver la nota del pie en el informe del paso.
+        data: { paciente, fecha: fechaFmt, asunto: asuntoLimpio, tituloPie: pieLimpio, cuerpo: cuerpoSanitizado, doc: { schema: 'tiptap-doc-v1' as const, content: docJson } },
         logoUrl,
         filename: generateDocFileName(paciente, 'Escrito_Medico'),
         consultorio: consultorioData,
+        // El mismo número que acaba de escribirse en la fila. Ver `versionQueEmite`.
+        formatoVersion: versionQueEmite(offlineMode),
+        // El búnker offline queda intacto: sigue entregando el PDF él mismo y
+        // no monta el modal — onOfflineSave desmonta el formulario al guardar.
+        entregar: !!offlineMode,
       })
 
-      pdfGenerated = true
+      pdfBlob = blob
 
+      // La ruta del archivo, sobre la fila que ya existe.
       if (offlineMode) {
         const { addDocument } = await import('@/lib/offline/db')
         const { getOfflineIdentity } = await import('@/lib/offline/identity')
@@ -224,171 +421,173 @@ export default function EscritoMedicoForm({ pacienteInicial = '', pacienteId, of
         toast.success('Escrito medico guardado en bunker offline')
         onOfflineSave?.()
       } else {
-        const supabase = createClient()
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) throw new Error('No autenticado')
-
-        const insertPayload: Record<string, unknown> = {
-          tipo: 'escrito_medico',
-          contenido: docContenido,
-          client_id: clientId,
-          pdf_url: storagePath,
-          subido_por: user.id,
+        if (storagePath && filaId && supabase) {
+          // Este UPDATE no toca ni el estado ni el folio, así que el trigger lo
+          // deja pasar. No es fatal si falla: la fila está y el PDF se entrega
+          // igual; lo que se pierde es la descarga desde la lista, que el botón
+          // de regenerar repone.
+          const { error } = await supabase
+            .from('documentos')
+            .update({ pdf_url: storagePath })
+            .eq('id', filaId)
+          if (error) console.error('[EscritoMedicoForm] update pdf_url:', error.message)
         }
-        if (pacienteId) insertPayload.paciente_id = pacienteId
-
-        const { error } = await supabase.from('documentos').insert(insertPayload)
-        if (error) throw error
-
         toast.success('Escrito guardado')
       }
     } catch (err) {
-      if (!pdfGenerated) {
-        toast.error('No se pudo generar el PDF. Intenta de nuevo.')
-        setErrorGuardado('No se pudo generar el PDF. Intenta de nuevo.')
+      // Tres desenlaces, como en los otros seis, y sin folio que citar en el del
+      // medio: este formato no lo tiene.
+      let msg: string
+      if (offlineMode) {
+        msg = 'No se pudo generar el PDF. Intenta de nuevo.'
+      } else if (filaId === null) {
+        msg = 'No se pudo guardar el escrito, así que no se generó el PDF. Intenta de nuevo.'
       } else {
-        toast.error('Escrito generado pero no se pudo guardar. Revisa errores de sincronización.')
-        setErrorGuardado('Error al guardar el escrito.')
+        msg = 'El escrito quedó registrado, pero no se pudo generar el PDF. Búscalo en la lista de '
+          + 'documentos del paciente y recupéralo desde ahí.'
       }
-      // eslint-disable-next-line no-console
+      toast.error(msg)
+      setErrorGuardado(msg)
       console.error('[EscritoMedicoForm] imprimir falló:', err)
     } finally {
       setImprimiendo(false)
+      // También cuando la persistencia falló: el PDF existe y con el paciente
+      // enfrente lo urgente es poder imprimirlo.
+      if (pdfBlob && !offlineMode) { setDocGenerado({ blob: pdfBlob, guardado, documentoId: filaId }) }
     }
   }
 
-  const inputCls = 'w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]'
-  const tbBtn = 'p-1.5 rounded text-slate-500 hover:bg-slate-200 hover:text-slate-800 transition-colors'
-  const tbBtnActive = 'p-1.5 rounded bg-slate-200 text-slate-800'
-  const btnCls = (active: boolean) => active ? tbBtnActive : tbBtn
-
   return (
-    <div className="space-y-5">
+    <div ref={formRef} className="sp-doc-form">
+      {/* El árbol del formulario NO se desmonta cuando el panel de plantillas
+          está abierto: se apaga con display:none y el panel se monta como
+          hermano, en el mismo contenedor de scroll (spec 02 §3.1). Aquí importa
+          el doble: desmontarlo tiraría la instancia de TipTap y con ella el
+          texto que el médico lleve escrito. */}
+      <div className="sp-doc-formbody" style={plantillas.panelAbierto ? { display: 'none' } : undefined}>
 
-      {/* Estilo del placeholder + restauración de estilos default tras
-          preflight de Tailwind 4 (que resetea ul/ol/h1-h6).
-          Scopeado a .escrito-editor-prose — no afecta resto de la app. */}
-      <style>{`
-        .escrito-editor-prose p.is-editor-empty:first-child::before {
-          content: attr(data-placeholder);
-          float: left;
-          color: rgb(203 213 225);
-          pointer-events: none;
-          height: 0;
-        }
-        .escrito-editor-prose ul {
-          list-style-type: disc;
-          padding-left: 1.5em;
-        }
-        .escrito-editor-prose ol {
-          list-style-type: decimal;
-          padding-left: 1.5em;
-        }
-        .escrito-editor-prose h1 {
-          font-size: 1.5em;
-          font-weight: 700;
-          line-height: 1.3;
-          margin: 0.6em 0 0.3em;
-        }
-        .escrito-editor-prose h2 {
-          font-size: 1.25em;
-          font-weight: 700;
-          line-height: 1.3;
-          margin: 0.5em 0 0.3em;
-        }
-        .escrito-editor-prose h3 {
-          font-size: 1.1em;
-          font-weight: 700;
-          line-height: 1.3;
-          margin: 0.4em 0 0.2em;
-        }
-        .escrito-editor-prose hr {
-          border: 0;
-          border-top: 1px solid rgb(203 213 225);
-          margin: 0.75em 0;
-        }
-      `}</style>
+      {plantillas.selector}
 
-      {/* Datos del documento */}
-      <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-        <h2 className="font-semibold text-slate-700 text-sm mb-4">Datos del documento</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div>
-            <label className="text-xs font-medium text-slate-500 block mb-1">Fecha</label>
-            <input type="date" value={fecha} onChange={e => setFecha(e.target.value)} className={inputCls} />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-slate-500 block mb-1">Paciente (opcional)</label>
-            <input type="text" value={paciente} onChange={e => setPaciente(e.target.value)} placeholder="Nombre completo" className={inputCls} />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-slate-500 block mb-1">Asunto / Tipo de documento</label>
-            <input type="text" value={asunto} onChange={e => setAsunto(e.target.value)} placeholder="Ej: Certificado Médico, Constancia de Salud..." className={inputCls} />
+      <section className="sp-card sp-doc-card">
+        <div className="sp-doc-cardhead">
+          <h2 className="sp-label">Datos del documento</h2>
+        </div>
+        <div className="sp-doc-cardbody">
+          {/* Dos columnas y no tres: los dos títulos necesitan la fila entera,
+              y con tres la primera fila quedaría con una celda coja. */}
+          <div className="sp-doc-grid" data-cols="2">
+            <div className="sp-doc-field">
+              <label htmlFor="escrito-fecha" className="sp-label-field">Fecha</label>
+              <input id="escrito-fecha" type="date" value={fecha}
+                min={FECHA_MIN} max={desplazarFecha(hoyEnTZ(TZ_CLINICA), { anios: 1 })}
+                onChange={e => setFecha(e.target.value)} className="sp-input" />
+            </div>
+
+            {/* Único junto a Honorarios que puede emitirse sin paciente, y aquí
+                sí tiene sentido: una carta de recomendación o un resumen para un
+                colega no siempre son de un paciente del sistema. */}
+            <div className="sp-doc-field">
+              <label htmlFor="escrito-paciente" className="sp-label-field">
+                Paciente <span className="sp-hint">opcional</span>
+              </label>
+              <input id="escrito-paciente" type="text" value={paciente}
+                onChange={e => setPaciente(e.target.value)} placeholder="Sin paciente"
+                className="sp-input" />
+              {!paciente.trim() && <p className="sp-hint">Se puede emitir sin paciente</p>}
+            </div>
+
+            {/* Es `asunto` renombrado y no un campo nuevo: se cambia la etiqueta
+                y se conserva la clave en `contenido`, así que los documentos ya
+                emitidos siguen leyéndose. Sin asterisco y sin validación —
+                vacío es un caso legítimo. */}
+            <div className="sp-doc-field sp-doc-span-all">
+              <label htmlFor="escrito-titulo" className="sp-label-field">Título del documento</label>
+              <input id="escrito-titulo" type="text" value={asunto}
+                onChange={e => setAsunto(e.target.value)} placeholder="Sin título"
+                className="sp-input" />
+              <p className="sp-hint">
+                {asunto.trim() === ''
+                  ? 'Sin título, el documento arranca con el cuerpo bajo el filete del membrete.'
+                  : 'Encabeza el documento. Puede quedar vacío.'}
+              </p>
+            </div>
+
+            <div className="sp-doc-field sp-doc-span-all">
+              <label htmlFor="escrito-pie" className="sp-label-field">Título del pie</label>
+              <div className="sp-ed-pie">
+                <input id="escrito-pie" type="text" value={tituloPie}
+                  onChange={e => editarPie(e.target.value)} placeholder="Sin título"
+                  className="sp-input" />
+                {!pieEnganchado && (
+                  <button type="button" onClick={reengancharPie} className="sp-link-alt">
+                    Usar el título
+                  </button>
+                )}
+              </div>
+              <p className="sp-hint">
+                Se imprime en el pie de cada página. Por defecto copia el título;
+                en cuanto lo editas, deja de seguirlo.
+              </p>
+            </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* Editor */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-
-        {/* Barra de herramientas */}
-        <div className="flex items-center gap-0.5 px-3 py-2 border-b border-slate-100 bg-slate-50 flex-wrap gap-y-1">
-
-          <select
-            onChange={e => setBlockType(e.target.value)}
-            value={currentBlockValue()}
-            className="text-xs border border-slate-200 rounded px-2 py-1 mr-1 text-slate-600 bg-white focus:outline-none focus:ring-1 focus:ring-[#1e5fa8]/30"
-          >
-            {TAMANOS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-          </select>
-
-          <div className="w-px h-5 bg-slate-200 mx-1" />
-
-          <button onMouseDown={e => { e.preventDefault(); editor?.chain().focus().toggleBold().run() }}      title="Negrita (Ctrl+B)"   className={btnCls(!!editor?.isActive('bold'))}><Bold      size={14} /></button>
-          <button onMouseDown={e => { e.preventDefault(); editor?.chain().focus().toggleItalic().run() }}    title="Itálica (Ctrl+I)"   className={btnCls(!!editor?.isActive('italic'))}><Italic    size={14} /></button>
-          <button onMouseDown={e => { e.preventDefault(); editor?.chain().focus().toggleUnderline().run() }} title="Subrayado (Ctrl+U)" className={btnCls(!!editor?.isActive('underline'))}><Underline size={14} /></button>
-
-          <div className="w-px h-5 bg-slate-200 mx-1" />
-
-          <button onMouseDown={e => { e.preventDefault(); editor?.chain().focus().toggleBulletList().run() }}  title="Lista con viñetas" className={btnCls(!!editor?.isActive('bulletList'))}><List         size={14} /></button>
-          <button onMouseDown={e => { e.preventDefault(); editor?.chain().focus().toggleOrderedList().run() }} title="Lista numerada"    className={btnCls(!!editor?.isActive('orderedList'))}><ListOrdered size={14} /></button>
-
-          <div className="w-px h-5 bg-slate-200 mx-1" />
-
-          <button onMouseDown={e => { e.preventDefault(); editor?.chain().focus().setTextAlign('left').run() }}    title="Izquierda"   className={btnCls(!!editor?.isActive({ textAlign: 'left' }))}><AlignLeft    size={14} /></button>
-          <button onMouseDown={e => { e.preventDefault(); editor?.chain().focus().setTextAlign('center').run() }}  title="Centrado"    className={btnCls(!!editor?.isActive({ textAlign: 'center' }))}><AlignCenter  size={14} /></button>
-          <button onMouseDown={e => { e.preventDefault(); editor?.chain().focus().setTextAlign('right').run() }}   title="Derecha"     className={btnCls(!!editor?.isActive({ textAlign: 'right' }))}><AlignRight   size={14} /></button>
-          <button onMouseDown={e => { e.preventDefault(); editor?.chain().focus().setTextAlign('justify').run() }} title="Justificado" className={btnCls(!!editor?.isActive({ textAlign: 'justify' }))}><AlignJustify size={14} /></button>
-
-          <div className="w-px h-5 bg-slate-200 mx-1" />
-
-          <button onMouseDown={e => { e.preventDefault(); editor?.chain().focus().setHorizontalRule().run() }}                  title="Línea separadora" className={tbBtn}><Minus            size={14} /></button>
-          <button onMouseDown={e => { e.preventDefault(); editor?.chain().focus().clearNodes().unsetAllMarks().run() }}         title="Limpiar formato"  className={tbBtn}><RemoveFormatting size={14} /></button>
+      <section className="sp-card sp-doc-card">
+        <div className="sp-doc-cardhead">
+          <h2 className="sp-label">Cuerpo del escrito</h2>
+          {/* Sirve sobre todo tras aplicar una plantilla: dice de un vistazo
+              cuánto trajo. Mismo recuento que el predicado de vacío. */}
+          <span className="sp-badge" style={{ marginLeft: 'auto' }}>
+            {isEmpty ? 'Vacío' : `${bloques} ${bloques === 1 ? 'bloque' : 'bloques'}`}
+          </span>
         </div>
+        <EditorEscrito editor={editor} />
+      </section>
 
-        {/* Área de escritura */}
-        <EditorContent
-          editor={editor}
-          style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontSize: '10.5pt' }}
-        />
-      </div>
+      {errorGuardado && <p className="sp-banner sp-banner--danger">{errorGuardado}</p>}
 
-      {errorGuardado && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
-          {errorGuardado}
-        </div>
+      {!cargandoPerfil && !medicoInfo && (
+        <p className="sp-banner sp-banner--warn">
+          <AlertTriangle size={17} />
+          <span style={{ flex: 1 }}>Completa tu perfil para que el documento salga con tu encabezado.</span>
+          <Link href="/perfil" className="sp-link-alt">Ir a mi perfil</Link>
+        </p>
       )}
 
-      <button
-        onClick={imprimir}
-        disabled={isEmpty || imprimiendo}
-        className="doc-print-btn w-full flex items-center justify-center gap-2 py-3 bg-[#1a3a5c] text-white rounded-xl font-medium hover:bg-[#0f2540] transition-colors disabled:opacity-50"
-      >
-        {imprimiendo
-          ? <><Loader2 size={18} className="animate-spin" /> Generando PDF...</>
-          : <><Printer size={18} /> Imprimir Escrito Médico</>
-        }
-      </button>
+      {intentado && isEmpty && (
+        <p className="sp-banner sp-banner--warn" aria-live="polite">
+          <AlertTriangle size={17} />
+          <span>Falta el cuerpo del escrito. Es el único campo obligatorio.</span>
+        </p>
+      )}
+
+      {/* «Guardar como plantilla» va aquí y no arriba: se guarda cuando el
+          formulario YA está lleno, así que su sitio es junto al de imprimir. */}
+      <PieAccionesDocumento
+        botonGuardar={plantillas.botonGuardar}
+        onImprimir={imprimir}
+        imprimiendo={imprimiendo}
+        perfilPendiente={perfilPendiente}
+      />
+
+      </div>
+
+      {plantillas.panel}
+      {plantillas.dialogos}
+
+      <ModalDocumentoGenerado
+        open={docGenerado !== null}
+        /* Cerrar el modal es el final del documento: se suelta la señal para
+           que el host repliegue su selector. `setDocGenerado(null)` primero,
+           para que el modal se desmonte por su cuenta y no de rebote al
+           desmontarse este formulario entero. */
+        onClose={() => { setDocGenerado(null); onCerrarTrasEmitir?.() }}
+        blob={docGenerado?.blob ?? null}
+        titulo="Escrito médico generado"
+        guardadoEnExpediente={docGenerado?.guardado ?? false}
+        documentoId={docGenerado?.documentoId ?? null}
+      />
     </div>
   )
 }

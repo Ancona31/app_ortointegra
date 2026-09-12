@@ -163,7 +163,13 @@ const PAGE_CONTEXTS: PageContext[] = [
       {
         id: 'agenda-cita',
         title: 'Crear una cita',
-        message: 'Haz clic en "Nueva cita" o directamente en cualquier horario del calendario para agendar una consulta. Selecciona un paciente y listo.',
+        /* ⚠️ EL BOTÓN SE LLAMA «Agendar», NO «Nueva cita». Decía lo segundo hasta
+           el 2026-08-25, cuando el header se retiró a una sola línea: se quitó el
+           botón «Nuevo evento» —el conmutador del modal ya hacía su trabajo— y el
+           que quedó pasó a llamarse «Agendar», porque abre las dos cosas y
+           «Nueva cita» ya no describía lo que abre.
+           `highlight` NO cambia: apunta al `data-onboard`, no al texto. */
+        message: 'Haz clic en "Agendar" o directamente en cualquier horario del calendario. El modal abre en "Cita": selecciona al paciente y listo. Arriba del modal puedes cambiar a "Evento" para bloqueos, cirugías o reuniones.',
         highlight: 'nueva-cita',
       },
       {
@@ -544,10 +550,19 @@ export default function OnboardingGuide() {
   if (phase === 'bubble') {
     return (
       <Portal>
-        <div className="fixed bottom-6 right-6 z-[10002]">
+        {/* ⚠️ EL `bottom` LLEVA LA BARRA DE GESTOS SUMADA (bloque 6 · paso 10).
+            Con `viewport-fit=cover` los 24 px de `bottom-6` se miden desde el
+            borde FÍSICO, y la barra de gestos mide ~34: el tercio inferior de
+            esta burbuja de 48 px caía dentro de la zona del sistema, donde el
+            toque se lo lleva el gesto de volver al inicio y no el botón.
+            El 24 de diseño no se toca: se suma. Va aquí Y en la tarjeta de más
+            abajo — son dos elementos distintos con el mismo anclaje, y si sólo
+            se corrige uno la burbuja y la tarjeta dejan de estar a la misma
+            altura al alternar entre ellas. */}
+        <div className="fixed bottom-[calc(1.5rem+env(safe-area-inset-bottom,0px))] right-6 z-[10002]">
           <button
             onClick={handleBubbleClick}
-            className="relative w-12 h-12 bg-gradient-to-br from-[#1a3a5c] to-[#1e5fa8] rounded-full flex items-center justify-center hover:scale-110 active:scale-95 transition-transform duration-200"
+            className="relative w-12 h-12 bg-gradient-to-br from-[var(--sp-brand-grad-from)] to-[var(--sp-brand-grad-to)] rounded-full flex items-center justify-center hover:scale-110 active:scale-95 transition-transform duration-200"
             style={{ animation: 'ledPulse 2s ease-in-out infinite' }}
             title="Abrir asistente"
           >
@@ -572,16 +587,18 @@ export default function OnboardingGuide() {
 
       {/* Main card */}
       <div
-        className={`fixed bottom-6 right-6 z-[10002] transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] ${
+        /* El mismo anclaje que la burbuja, con la misma área segura sumada.
+           Ver la nota de allí: si cambias uno, cambia el otro. */
+        className={`fixed bottom-[calc(1.5rem+env(safe-area-inset-bottom,0px))] right-6 z-[10002] transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] ${
           entering
             ? 'opacity-100 translate-y-0 scale-100'
             : 'opacity-0 translate-y-4 scale-95'
         }`}
       >
-        <div className="w-[360px] bg-white/95 backdrop-blur-xl rounded-2xl shadow-[0_8px_40px_rgba(0,0,0,0.12)] border border-slate-200/60 overflow-hidden">
+        <div className="w-[360px] bg-[var(--sp-surface-glass)] backdrop-blur-xl rounded-2xl shadow-[0_8px_40px_rgba(0,0,0,0.12)] border border-slate-200/60 overflow-hidden">
 
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-[#1a3a5c] to-[#1e5fa8]">
+          <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-[var(--sp-brand-grad-from)] to-[var(--sp-brand-grad-to)]">
             <div className="flex items-center gap-2">
               <Sparkles size={14} className="text-white/80" />
               <span className="text-xs font-semibold text-white">
@@ -619,7 +636,7 @@ export default function OnboardingGuide() {
           {/* Content */}
           <div className="p-4">
             <div className="flex gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#1a3a5c]/10 to-[#1e5fa8]/10 flex items-center justify-center flex-shrink-0">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[var(--sp-brand-grad-from)]/10 to-[var(--sp-brand-grad-to)]/10 flex items-center justify-center flex-shrink-0">
                 {showWelcome
                   ? <Sparkles size={18} className="text-[#1e5fa8]" />
                   : <MessageCircle size={18} className="text-[#1e5fa8]" />

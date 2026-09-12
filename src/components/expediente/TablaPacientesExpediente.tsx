@@ -1,8 +1,9 @@
 'use client'
 
+import Link from 'next/link'
 import { ChevronsUpDown, ChevronUp, ChevronDown } from 'lucide-react'
 import { calcularEdad } from '@/lib/patientUtils'
-import { renderEnTZ } from '@/lib/dates'
+import { renderEnTZ, TZ_CLINICA } from '@/lib/dates'
 import { ListaChipsMedicos } from '@/components/expediente/ChipMedico'
 import { KebabAccionesPaciente } from '@/components/expediente/KebabAccionesPaciente'
 import type { PacienteExpediente, OrdenColumna, OrdenDireccion } from '@/lib/expediente/fetchPacientes'
@@ -20,6 +21,13 @@ interface Props {
   orden: OrdenColumna
   direccion: OrdenDireccion
   onOrden: (col: OrdenColumna) => void
+  /**
+   * Falso para la secretaria (y mientras el profile carga). Gobierna el kebab
+   * Y el enlace de la fila al expediente, porque son el mismo permiso: el
+   * layout de /expediente/[id] expulsa al rol 'secretaria' de todo el subárbol,
+   * así que una fila-enlace la llevaría a un redirect. Si algún día dejan de
+   * coincidir, sepáralos en dos props en vez de reutilizar éste.
+   */
   mostrarAcciones: boolean
 }
 
@@ -92,9 +100,34 @@ export function TablaPacientesExpediente({ pacientes, orden, direccion, onOrden,
                       {p.nombre.charAt(0)}{p.apellidos.charAt(0)}
                     </div>
                     <div className="min-w-0">
-                      <p className="text-sm font-semibold text-[#1d1d1f] truncate">
-                        {p.nombre} {p.apellidos}
-                      </p>
+                      {/* Este enlace cubre SOLO el nombre, y no debe volver a
+                          estirarse sobre la fila. Se intentó con un ::after
+                          `absolute inset-0` anclado al <tr>, y no funciona en ningún
+                          motor: ni Blink ni WebKit crean bloque contenedor para una
+                          fila de tabla (WebKit tampoco con `border-collapse:
+                          separate`, que en Blink sí bastaba). Sin ese anclaje el
+                          overlay sube hasta `div.max-w-6xl` de /expediente y se
+                          estira sobre la pantalla entera: el buscador, los filtros y
+                          los encabezados de orden dejan de responder, y cualquier
+                          clic navega al último paciente de la lista, porque los N
+                          overlays se apilan y gana el último del DOM. Reintroducirlo
+                          reabre ese bug. Lo que se buscaba —que Next precargue el
+                          expediente— lo da el <Link> por sí solo; lo único que se
+                          pierde es el clic en toda la fila. La tarjeta de la vista
+                          móvil sí puede estirar el suyo: allí el ancla es un
+                          <div class="relative"> normal, que es CSS estándar. */}
+                      {mostrarAcciones ? (
+                        <Link
+                          href={`/expediente/${p.id}`}
+                          className="block text-sm font-semibold text-[#1d1d1f] truncate rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1e5fa8]"
+                        >
+                          {p.nombre} {p.apellidos}
+                        </Link>
+                      ) : (
+                        <p className="text-sm font-semibold text-[#1d1d1f] truncate">
+                          {p.nombre} {p.apellidos}
+                        </p>
+                      )}
                       <p className="text-[11px] text-[#86868b] mt-0.5">{sexoLabel}</p>
                     </div>
                   </div>
@@ -106,13 +139,18 @@ export function TablaPacientesExpediente({ pacientes, orden, direccion, onOrden,
                   {p.numero_expediente || '—'}
                 </td>
                 <td className="px-4 py-3.5 text-sm text-[#3d3d3f] whitespace-nowrap">
-                  {p.created_at ? renderEnTZ(p.created_at, 'd MMM yyyy') : '—'}
+                  {/* `TZ_CLINICA`, no el huso del dispositivo: el ingreso es un dato
+                      de expediente —hermano de la fecha de apertura de la hoja
+                      frontal—, no una hora de cita. Ver LA REGLA en `@/lib/dates`. */}
+                  {p.created_at ? renderEnTZ(p.created_at, 'd MMM yyyy', TZ_CLINICA) : '—'}
                 </td>
                 <td className="px-4 py-3.5">
                   <ListaChipsMedicos medicos={p.medicos} />
                 </td>
                 {mostrarAcciones && (
-                  <td className="px-4 py-3.5">
+                  /* `relative z-10` levanta esta celda sobre la capa del enlace:
+                     sin esto el clic en el kebab navegaría al expediente. */
+                  <td className="relative z-10 px-4 py-3.5">
                     <KebabAccionesPaciente pacienteId={p.id} />
                   </td>
                 )}

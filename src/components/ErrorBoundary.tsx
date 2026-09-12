@@ -42,6 +42,38 @@ export class ErrorBoundary extends Component<Props, State> {
             >
               Reintentar
             </button>
+            {/* ⚠️⚠️ LA SEGUNDA SALIDA NO ES UN ADORNO: SIN ELLA ESTA TARJETA ES
+                UN CALLEJÓN. «Reintentar» sólo vuelve a montar el mismo subárbol,
+                así que ante un fallo DETERMINISTA —el caso corriente: datos que
+                rompen un cálculo, un efecto que lanza siempre— vuelve a fallar
+                sin decir nada nuevo, y no hay tercer botón.
+
+                Y no basta con el menú lateral: este boundary envuelve sólo a
+                `{children}` en `(app)/layout.tsx`, así que el `Sidebar`
+                sobrevive, pero en un TELÉFONO el menú está fuera de pantalla y
+                sólo se abre con su botón flotante. En la agenda ese botón
+                depende de que exista la banda azul, que en una página caída no
+                existe. Sin este enlace, el usuario se queda en la URL rota sin
+                forma de salir que no sea escribir otra a mano.
+
+                ⚠️ ES UN `<a>` Y NO UN `<Link>`, A PROPÓSITO. `Link` navega del
+                lado del cliente y REUTILIZA el árbol de React que acaba de
+                romperse, con sus contextos y sus cachés de SWR tal como quedaron;
+                si la causa vive ahí, el destino puede heredarla. Un `<a>` es una
+                carga de documento entera: tira el árbol y empieza de cero, que es
+                justo lo que hace falta después de un error que no se entiende.
+                Por eso tampoco lleva `router.push`.
+
+                `/inicio` es el destino porque es la casa del usuario logueado y
+                el único sitio al que se puede mandar a cualquiera: este boundary
+                tiene UN solo montaje —`(app)/layout.tsx:126`— y todo lo que cuelga
+                de él es sesión iniciada. Si algún día se monta en otro sitio, esto
+                pasa a ser una prop antes que una constante. */}
+            <p className="mt-4">
+              <a href="/inicio" className="text-sm text-slate-500 underline underline-offset-2 hover:text-slate-700 transition-colors">
+                Volver al inicio
+              </a>
+            </p>
           </div>
         </div>
       )

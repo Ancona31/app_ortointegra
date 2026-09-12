@@ -20,8 +20,52 @@
   --sp-primary-bg-faint:   color-mix(in srgb, var(--cs, #1e5fa8) 5%, #fff);   /* fondo de fila informativa / paso completado */
   --sp-primary-border:     color-mix(in srgb, var(--cs, #1e5fa8) 18%, #fff);  /* borde de bloque destacado */
   --sp-primary-track:      color-mix(in srgb, var(--cs, #1e5fa8) 22%, #fff);  /* track del spinner y anillo inactivo */
+  /* TINTA SOBRE EL ACENTO RELLENO. El sistema la tenía escrita a mano dentro de
+     `.sp-btn--primary`, `.sp-chip--selected` y `.sp-doc-segmented__opt`, y por
+     eso no había forma de pintar blanco sobre acento sin importar una de esas
+     clases y pelearse con su geometría. Nombrada, se puede usar en cualquier
+     forma —un disco de 22 px, por ejemplo— sin arrastrar un chip entero.
+     No cambia en oscuro: `--sp-primary` sigue siendo el acento del médico. */
+  --sp-on-primary:         #ffffff;
   --sp-primary-focus:      color-mix(in srgb, var(--cs, #1e5fa8) 8%, transparent); /* halo de foco (4px spread) */
   --sp-primary-text:       var(--sp-primary);  /* marca-como-tinta; en dark se aclara */
+  /* LA CIFRA QUE CIERRA UN DOCUMENTO — «Total cotizado» y «Saldo pendiente» del
+     bloque de cierre de honorarios, que es lo que el paciente lee primero y lo
+     único de aquí que se IMPRIME.
+     ⚠️ EXISTE PORQUE ES LA ÚNICA PIEZA QUE NO SIGUE A `--sp-primary-text`. Los
+     dos son marca-como-tinta, pero éste se queda en el NAVY en claro, que es lo
+     que la hoja impresa ha enseñado siempre; `--sp-primary-text` vale `--cs` ahí
+     —el azul brillante— y cambiarle el color a un documento firmado no es un
+     retoque de tema. En oscuro sí convergen: no hay hoja impresa que respetar y
+     el navy sobre la card daría 1.5:1.
+     ⚠️ AQUÍ ESTUVO `--sp-primary-hover`, y no vuelvas a él. Ese token es el
+     hover del RELLENO del botón primario —lleva tinta blanca encima—; en claro
+     resuelve al mismo navy por casualidad, y en cuanto pasó a oscurecer en tema
+     oscuro se llevó esta cifra a 2.66:1. La coincidencia en claro es justo lo
+     que hizo que el préstamo pasara desapercibido durante meses.
+     ⚠️ NO SE LLAMA `--sp-doc-*` A PROPÓSITO, por lo mismo que `--sp-hito-medicion`
+     tampoco: esa familia son los ocho colores de FORMATO, y un noveno miembro se
+     leería como un noveno tipo de documento. Esto no es un formato, es un rol. */
+  --sp-cifra-cierre:       var(--cp, #1a3a5c);
+  /* LOS DOS EXTREMOS DEL DEGRADADO DE MARCA — cabeceras de card, botones de
+     recompensa y medallones de icono.
+     ⚠️ EXISTEN PORQUE ESOS DEGRADADOS ESTABAN CONGELADOS EN DOS SENTIDOS. Iban
+     escritos `from-[#1a3a5c] to-[#1e5fa8]`, o sea: (a) no seguían al color que
+     el médico elige en su perfil —una clínica con paleta verde tenía cabeceras
+     azules— y (b) no cambiaban con el tema, así que en oscuro el bloque quedaba
+     a 1.5:1 contra la card y dejaba de leerse como bloque.
+     ⚠️ CON LA MARCA DE FÁBRICA, EN CLARO, ESTOS DOS VALEN EXACTAMENTE LOS DOS
+     HEX QUE HABÍA. El cambio en claro sólo se ve en una clínica con paleta
+     propia, que es justo lo que se venía a arreglar. */
+  --sp-brand-grad-from:    var(--cp, #1a3a5c);
+  /* ⚠️ ESTE VALOR ES EL RESPALDO. El vigente lleva un TOPE DE CLARIDAD y vive en
+     el `@supports` de más abajo (§3.5 del spec): estos bloques llevan siempre
+     rótulo BLANCO, y con `--cs` a pelo el extremo claro de «Verde médico»
+     (#0d9488) dejaba el blanco en 3.74:1, por debajo de AA. El tope sube el
+     mínimo de las seis paletas a 5.23:1.
+     Un navegador sin sintaxis de color relativa se queda aquí, o sea con el
+     3.74 de antes: es el mismo trato que el resto de los tokens con fórmula. */
+  --sp-brand-grad-to:      var(--cs, #1e5fa8);
 
   /* Marca / cromo de app */
   /* No usar: el sidebar se tematiza en Sidebar.tsx:223. Evita segunda fuente de verdad. */
@@ -69,6 +113,118 @@
   --sp-danger-bg:          #fdf2f2;
   --sp-danger-border:      #f3c9c9;
 
+  /* Banda de alergias de la ficha clínica del expediente.
+     ⚠️ NO SE DECLARA EN EL BLOQUE OSCURO, Y ESA ES SU RAZÓN DE EXISTIR. El §5
+     del spec la nombra «la única pieza que no baja de intensidad, porque su
+     función es alarmar». `--sp-danger` no sirve: en oscuro pasa a #f87171 —un
+     rojo claro— y el blanco encima cae a 2.6:1, o sea la banda se apaga justo
+     donde más tiene que gritar. Este par se queda fijo en los dos temas:
+     blanco sobre #c0392b mide 5.9:1, por encima del 4.5:1 que el §7 exige
+     expresamente para esta banda. Si alguna vez lo tematizas, vuelve a medir. */
+  --sp-alergia-bg:         #c0392b;
+  --sp-alergia-ink:        #ffffff;
+
+  /* ---------------------------------------------------------------------
+     2.b COLOR — TIPO DE DOCUMENTO (GUIA_FORMULARIOS_04 §3)
+     ---------------------------------------------------------------------
+     Identidad permanente de cada uno de los 8 formatos. Se usan SOLO en el
+     selector de tipo (tarjeta y línea plegada). Nunca en el PDF, ni en un
+     botón, ni en un borde de card, ni en el foco: eso es del acento del
+     médico (--sp-primary), que es un selector libre y PUEDE coincidir con
+     cualquiera de estos hex sin que se confundan — la distinción la dan el
+     icono y la etiqueta, no el color.
+     Los cuatro valores que NO son la elección obvia lo son por separación
+     en deuteranopia y en L*: escrito es cyan-800 y no teal-700 (con emerald
+     era el mismo tile dos veces), imagen violet-600 e indigo-800 en
+     consentimiento (violeta e índigo colapsan a azul), y suplementación
+     amber-800 porque amber-700 ES exactamente --sp-warn. */
+  --sp-doc-receta:         #1d4ed8;  /* blue-700    */
+  --sp-doc-laboratorio:    #047857;  /* emerald-700 */
+  --sp-doc-imagen:         #7c3aed;  /* violet-600  */
+  --sp-doc-suplementacion: #92400e;  /* amber-800   */
+  --sp-doc-internamiento:  #be123c;  /* rose-700    */
+  --sp-doc-escrito:        #155e75;  /* cyan-800    */
+  --sp-doc-consentimiento: #3730a3;  /* indigo-800  */
+  --sp-doc-honorarios:     #c2410c;  /* orange-700  */
+
+  /* ---------------------------------------------------------------------
+     2.c COLOR — HITO DE MEDICIÓN (línea de tiempo del expediente)
+     ---------------------------------------------------------------------
+     ⚠️ FUERA DE LA FAMILIA `--sp-doc-*` A PROPÓSITO, y por eso no se llama
+     `--sp-doc-medicion`. En la línea de tiempo del Resumen conviven tres
+     clases de hito y sólo una es un documento; darle a la medición uno de los
+     ocho colores de formato la haría leer como un noveno tipo de documento,
+     que es justo la confusión que la línea de tiempo tiene que evitar.
+     Fucsia-800 es el hueco real que dejan los ocho: queda a 25° del violeta de
+     `imagen` y a 55° del rosa de `internamiento`, con 10 puntos de L* de
+     separación respecto del primero. Los 25° son el punto más ajustado y está
+     aceptado por el mismo motivo que el archivo ya admite para `--sp-primary`:
+     la distinción la dan el rótulo («Medición») y el icono, no el tono.
+     NO lo cambies a verde, ámbar ni rojo: esos tres ya significan «en rango»,
+     «a vigilar» y «fuera de rango» sobre el valor del propio hito, y el punto
+     del hito los toma prestados cuando la medición está fuera de rango. */
+  --sp-hito-medicion:      #86198f;  /* fuchsia-800 */
+
+  /* ---------------------------------------------------------------------
+     2.c COLOR — AVATAR DE PACIENTE
+     ---------------------------------------------------------------------
+     Cinco pares para rotar el avatar de iniciales y que dos pacientes seguidos
+     no se confundan de un vistazo. Sustituyen a la constante `AVATAR_COLORS`
+     que vivía en `dashboard/page.tsx` con clases de Tailwind (`bg-violet-100
+     text-violet-700`), o sea la última paleta de la pantalla fuera de esta hoja.
+
+     NO SIGNIFICAN NADA. A diferencia de `--sp-doc-*` o de `--ag-status-*`, el
+     color no nombra un estado ni un formato: es sólo separación visual, y por
+     eso el par que le toca a cada paciente sale de un hash de su id y no de una
+     propiedad clínica. Si alguna vez alguien quiere leerlos como categoría, la
+     respuesta es que no hay categoría que leer.
+
+     ⚠️ NO LOS ACLARES «PARA QUE PEGUEN MÁS CON LA APP». La primera versión de
+     esta familia eran cinco tintes al nivel 100 de Tailwind —L* 92-96, croma
+     10-23— y no separaban: el peor par medía ΔE2000 8.7, o sea indistinguible a
+     36 px, y de los diez pares cuatro estaban por debajo de 18. Con cuatro
+     avatares en pantalla eso son 2,4 pares confundibles de media.
+     El barrido del espacio de color dio el techo: con esa sobriedad el máximo
+     alcanzable es ΔE 18.7. Para pasar de 20 hace falta recorrido de L* (72-90,
+     no 92-93) y croma hasta 38. Estos valores son ese mínimo, no un capricho.
+
+     Medidos: ΔE2000 mínimo entre los cinco fondos 24.7 en claro y 23.2 en
+     oscuro; contraste tinta/fondo 4.54-5.34:1 en claro y 4.63-6.05:1 en oscuro,
+     los diez por encima de 4.5.
+
+     ⚠️ LA TINTA DE LA GLICINA ES VIOLETA Y NO AZUL, Y ESO NO SE «CORRIGE».
+     Con tinta de su mismo tono caía a ΔE 3 del navy `--cp`: el navy de Spinus
+     dentro de un círculo, que es justo el choque que había que evitar. Soltarle
+     el tono la deja a ΔE 16, que es el punto más ajustado de la familia y está
+     aceptado a propósito: es una tinta pequeña dentro de un disco claro, no una
+     superficie, y empujarla más lejos costaría contraste.
+     Y el azul no se puede quitar del juego: excluyendo la franja 232-292°
+     entera no existe ningún conjunto de cinco que pase de ΔE 21.
+
+     Contra los colores de cita: el fondo más cercano a un chip de estado está a
+     ΔE 17 y ninguna tinta baja de ΔE 23 respecto de su punto. El acento del
+     médico (--sp-primary) es un selector libre y PUEDE coincidir con cualquiera
+     de estos: no importa, porque el avatar no compite con él — nunca están el
+     uno junto al otro dentro del mismo control. */
+  --sp-avatar-1-bg:  #d8a780;  --sp-avatar-1-ink:  #5a3514;  /* ocre     */
+  --sp-avatar-2-bg:  #e0e89e;  --sp-avatar-2-ink:  #52600b;  /* lima     */
+  --sp-avatar-3-bg:  #62e5df;  --sp-avatar-3-ink:  #0b6652;  /* turquesa */
+  --sp-avatar-4-bg:  #92b0f4;  --sp-avatar-4-ink:  #4e2785;  /* glicina  */
+  --sp-avatar-5-bg:  #e3b4cd;  --sp-avatar-5-ink:  #812960;  /* rosa     */
+  /* Los cinco de relleno: sus tonos son los puntos medios de los huecos que
+     dejaban los cinco de arriba (32, 88, 152, 220 y 304°), a los mismos niveles
+     de L* y croma. Con diez, la separación angular baja de ~72 a ~36° y el ΔE
+     mínimo de la familia cae de 24.7 a 12.2: es el precio de tener el doble de
+     colores, y se acepta porque lo que importa no es que los diez se distingan
+     entre sí, sino que los CUATRO que una región pinta a la vez lo hagan. En la
+     peor ventana de cuatro consecutivos el mínimo es 14.3 en claro y 15.5 en
+     oscuro. */
+  --sp-avatar-6-bg:  #f8afa5;  --sp-avatar-6-ink:  #662c27;  /* salmón   */
+  --sp-avatar-7-bg:  #dbbe7a;  --sp-avatar-7-ink:  #4b3c0d;  /* mostaza  */
+  --sp-avatar-8-bg:  #87d19f;  --sp-avatar-8-ink:  #0e4727;  /* jade     */
+  --sp-avatar-9-bg:  #abedfd;  --sp-avatar-9-ink:  #006659;  /* celeste  */
+  --sp-avatar-10-bg: #bba6ea;  --sp-avatar-10-ink: #4d335f;  /* lavanda  */
+
   /* ---------------------------------------------------------------------
      3. COLOR — NEUTRALES (escala única, rol fijo por token)
      --------------------------------------------------------------------- */
@@ -86,6 +242,27 @@
   --sp-ink-150:            #b7c2cf;  /* ícono de estado vacío */
   --sp-ink-100:            #c3ccd8;  /* chevron inerte, borde punteado */
 
+  /* EL CONTORNO DE UN CONTROL — botones de contorno y campos, y SÓLO ellos.
+     ⚠️ EXISTE PORQUE 1.4.11 PIDE 3:1 PARA EL CONTORNO DE UN COMPONENTE Y EL
+     RESTO DE LA FAMILIA NO LLEGA. `--sp-line-input` mide 1.36:1 sobre blanco y
+     `--sp-line-soft` 1.23:1; a esas cifras un botón de contorno no anuncia que
+     lo es, y el borde es lo único que tiene para anunciarse — no hay relleno.
+     ⚠️ NO SUBAS `--sp-line-input` NI `--sp-line-soft` EN SU LUGAR, que era la
+     salida obvia. Los comparten roles donde un borde fuerte significa otra cosa:
+     el aro del paso PENDIENTE (`.sp-step__dot`), el borde de una acción
+     DESHABILITADA (`AccionesDocumento.tsx`) y el filete de una cita
+     (`.sp-ed-prose blockquote`). En los tres, reforzarlos no es ruido: es decir
+     lo contrario de lo que dicen.
+     ⚠️ SE MUEVE EN LOS DOS TEMAS, y eso es deliberado. Los bordes de hoy miden
+     casi lo mismo en claro (1.36) que en oscuro (1.44): el modo oscuro estaba
+     copiando fielmente al claro, así que esto NO era un defecto de la traducción
+     a oscuro. Subirlo sólo ahí habría dejado los controles más marcados en
+     oscuro que en claro, que es la divergencia entre temas que el sistema
+     prohíbe.
+     Del hue y la saturación de la familia (H 214 · S 33) sólo se mueve la
+     claridad. Medido contra las cuatro superficies: 3.38 sobre card, 3.29 sobre
+     hundida, 3.00 sobre sección y 3.17 sobre el fondo de la app. */
+  --sp-line-control:       #6f8eb6;  /* CONTORNO DE CONTROL: botón de contorno y campo */
   --sp-line-strong:        #cbd5e1;  /* borde de checkbox */
   --sp-line-dash:          #b9c4d2;  /* borde punteado (slot diferido, underline de link) */
   --sp-line-input:         #d5deea;  /* BORDE DE CONTROL: input, textarea, botón secundario */
@@ -97,6 +274,20 @@
   --sp-line-capture:       color-mix(in srgb, var(--cs, #1e5fa8) 20%, #fff);  /* borde de la Card Captura (protagonista) */
 
   --sp-surface:            #ffffff;  /* superficie de card y modal */
+  /* EL PANEL DE UN MODAL LEGACY — translúcido y con desenfoque detrás.
+     ⚠️ EXISTE PARA ESQUIVAR UN AGUJERO DE LA HOJA DE TRADUCCIÓN, y sin ese dato
+     no se entiende por qué hay dos tokens de superficie de modal. Estos paneles
+     se escribían `bg-white/95`, y la regla de `ThemeProvider` que repinta las
+     superficies en oscuro sólo casa con `.bg-white` EXACTO
+     (`layout/ThemeProvider.tsx:117`): la variante con opacidad se le escapaba,
+     así que una veintena de modales abrían en BLANCO sobre el tema oscuro.
+     ⚠️ ES TRANSLÚCIDO A PROPÓSITO. Lo fácil habría sido mandarlos a
+     `--sp-surface`, pero eso les quita el `backdrop-blur` —que sin fondo
+     translúcido no desenfoca nada— y les cambia el aspecto en tema CLARO, donde
+     hoy funcionan. El modal del sistema de diseño (`spinusGeometry`) sí es
+     opaco y usa `--sp-surface`: son dos lenguajes que conviven, y este token es
+     el del viejo. */
+  --sp-surface-glass:      rgba(255,255,255,.95);
   --sp-surface-sunken:     #fbfcfe;  /* fondo de input/textarea y card interna */
   --sp-surface-muted:      #eef2f7;  /* fondo de sección/chip neutro/nota al pie */
   --sp-surface-empty:      #f1f4f8;  /* fondo de ícono en estado vacío */
@@ -109,22 +300,29 @@
 
   /* ---------------------------------------------------------------------
      4. RADIOS — dos familias: CONTENEDOR y CONTROL
-     --------------------------------------------------------------------- */
-  --sp-r-modal:            20px;  /* modal, frame de viewport */
-  --sp-r-card:             16px;  /* card contenedora (vitales, captura, contexto) */
-  --sp-r-icon-lg:          15px;  /* contenedor de ícono 56px (confirmación) */
-  --sp-r-input:            14px;  /* textarea grande de captura */
-  --sp-r-cta:              14px;  /* botón primario full-width en móvil */
-  --sp-r-card-inner:       13px;  /* card interna (bloque de nota, filas de acción) */
-  --sp-r-btn:              12px;  /* botón (desktop), tile de vital, badge grande */
-  --sp-r-field:            12px;  /* input/textarea estándar, banner */
-  --sp-r-icon-md:          11px;  /* contenedor de ícono 38–44px */
-  --sp-r-field-sm:         11px;  /* fila de diagnóstico, input compacto */
-  --sp-r-btn-sm:           10px;  /* botón compacto, ícono-botón 34px */
-  --sp-r-btn-xs:            9px;  /* botón inline dentro de card interna */
-  --sp-r-note:              8px;  /* bloque de texto embebido */
+     ---------------------------------------------------------------------
+     Cambio de sistema 2026-08-09 (Anexo de radios, común a las guías 01 y 04):
+     LOS CONTENEDORES NO BAJAN; los CONTROLES bajan un escalón cada uno. La
+     jerarquía de la escala no se altera — lo que cambia es la diferencia entre
+     la curva del contenedor y la del control, que pasa de 4 px a 6 px, y es lo
+     que se lee como más limpio.
+     Suelo de la familia de control: 8 px. Por debajo entra en el terreno de
+     --sp-r-note, que es para texto embebido, no para controles. */
+  --sp-r-modal:            20px;  /* modal, frame de viewport                    · sin cambio */
+  --sp-r-card:             16px;  /* card contenedora (vitales, captura, tipo)   · sin cambio */
+  --sp-r-icon-lg:          15px;  /* contenedor de ícono 56px (confirmación)     · sin cambio */
+  --sp-r-card-inner:       13px;  /* card interna (bloque de nota, acciones)     · sin cambio */
+  --sp-r-input:            12px;  /* textarea grande de captura                  · 14 → 12 */
+  --sp-r-cta:              12px;  /* primario a ancho completo                   · 14 → 12 */
+  --sp-r-icon-md:          11px;  /* contenedor de ícono 38–44px                 · sin cambio */
+  --sp-r-btn:              10px;  /* botón, tile de vital, badge grande          · 12 → 10 */
+  --sp-r-field:            10px;  /* input, select, textarea, banner             · 12 → 10 */
+  --sp-r-field-sm:          9px;  /* fila e input compactos                      · 11 →  9 */
+  --sp-r-btn-xs:            9px;  /* botón inline dentro de card interna         · sin cambio */
+  --sp-r-btn-sm:            8px;  /* botón compacto e ícono-botón                ·  10 →  8 */
+  --sp-r-note:              8px;  /* bloque de texto embebido                    · sin cambio */
   --sp-r-checkbox:          6px;
-  --sp-r-pill:            999px;  /* chip, badge, pill, punto */
+  --sp-r-pill:            999px;  /* chip, badge, pill, punto — es una FORMA, no un radio */
 
   /* ---------------------------------------------------------------------
      5. ESPACIADO — base 4px (múltiplos exactos usados)
@@ -151,6 +349,11 @@
   --sp-gap-tiles:          12px;   /* entre tiles de vitales */
   --sp-gap-label:           6px;   /* label → control */
   --sp-gap-title-sub:       4px;   /* título → subtítulo */
+  /* Rediseño del dashboard (bloque 1). Nombres nuevos sobre escalones que YA
+     existen arriba: no estrenan ningún valor. */
+  --sp-gap-band:  var(--sp-6-5);   /* 26px · entre bandas del cuerpo */
+  --sp-pad-rule:  var(--sp-6);     /* 24px · a cada lado del filete vertical */
+  --sp-pad-row-x: var(--sp-3-5);   /* 14px · relleno horizontal de renglón de lista */
 
   /* ---------------------------------------------------------------------
      6. SOMBRAS — 6 niveles, uno por rol
@@ -203,6 +406,19 @@
   --sp-fs-badge:     12px;
   --sp-fs-legal:     11px;  /* microcopy legal en footer, label de tile */
   --sp-fs-tile:    10.5px;  /* label de tile de vital */
+
+  /* Rediseño del expediente (bloque 2). DOS ROLES QUE LA ESCALA NO TENÍA, y
+     no dos alias de escalones existentes: el §4 del spec los declara como
+     niveles propios, así que se nombran por lo que pintan y no por su tamaño.
+     El de display COINCIDE EN VALOR con --sp-fs-btn-sm (15px) y eso no es un
+     descuido: el archivo ya empareja valores con roles distintos —body-sm y
+     chip son 14, question y body-lg son 16—. Un número destacado no es un
+     botón; si mañana la ficha sube su valor a 17, no arrastra a los botones.
+     NO TIENEN CONTRAPARTE EN OSCURO: en esta hoja el bloque oscuro redefine
+     color, nunca tamaño. Lo que sí la tiene es el color del hito de medición,
+     en §2.c bis. */
+  --sp-fs-patient:    25px;  /* nombre del paciente (título de la pantalla) */
+  --sp-fs-display-sm: 15px;  /* valor numérico destacado: IMC, valor de analito */
 
   --sp-lh-tight:   1.2;   /* títulos ≥26px */
   --sp-lh-title:   1.3;   /* títulos 16–20px */
@@ -272,6 +488,7 @@ html.dark {
   /* — SUPERFICIES (elevación Material) — */
   --sp-app-bg:           #121212;              /* TP:110,114 */
   --sp-surface:          #1e1e1e;              /* TP:117  .bg-white (dp1) */
+  --sp-surface-glass:    rgba(30,30,30,.95);   /* = --sp-surface al 95 % */
   --sp-surface-sunken:   #242424;              /* TP:118,160  input/textarea */
   --sp-surface-muted:    #2c2c2c;              /* TP:119,169 (dp4) */
   --sp-surface-empty:    #242424;              /* TP:118 */
@@ -295,6 +512,12 @@ html.dark {
   --sp-ink-100:  rgba(255,255,255,.28);        /* TP:142 — colapso */
 
   /* — LÍNEAS — */
+  /* Ver la nota larga de la variante clara. En `rgba` y no en un gris opaco por
+     lo mismo que el resto de la familia: así funciona igual sobre las cuatro
+     superficies sin necesitar cuatro valores. Medido: 3.22:1 sobre la card,
+     3.18 sobre la hundida, 3.07 sobre la de sección y 3.21 sobre el fondo de la
+     app — el peor caso es la de sección, que es la más clara. */
+  --sp-line-control: rgba(255,255,255,.35);
   --sp-line-divider: rgba(255,255,255,.08);    /* TP:125,128 */
   --sp-line-soft:    rgba(255,255,255,.08);    /* TP:125 */
   --sp-line-card:    rgba(255,255,255,.12);    /* TP:124 */
@@ -307,8 +530,27 @@ html.dark {
                                                /* TP:205-212 patrón borde de marca */
 
   /* — MARCA —
-     El FILL no se toca: ThemeProvider tampoco altera ningún .bg-[#…] de marca
-     en dark. Solo la marca-como-TINTA se aclara (TP:146-149). */
+     ⚠️⚠️ ESTE BLOQUE ES HOY EL RESPALDO, NO EL VALOR VIGENTE, para cinco de sus
+     tokens. `--sp-primary`, `--sp-primary-text` y `--sp-primary-ink` los
+     redeclara el `@supports` del final del archivo con la fórmula OKLCH de
+     `MODO_OSCURO_APP.md` §3; lo de aquí es lo que ve un navegador sin sintaxis
+     de color relativa. Si cambias uno, mira el otro sitio.
+     ⚠️ Y TAMBIÉN `--sp-primary-hover` Y `--sp-primary-active`, que están
+     duplicados allí desde que el hover pasa a OSCURECER — aquí decía que no lo
+     estaban y era falso; ver su propia nota, dos líneas más abajo.
+     Los que NO están duplicados, y por tanto son el valor vigente en los dos
+     casos, son los tintes con alfa: `--sp-primary-bg`, `-bg-soft`, `-bg-faint`,
+     `-border`, `-track` y `-focus`. */
+  /* ⚠️⚠️ ESTOS DOS TAMBIÉN SON RESPALDO: el valor vigente OSCURECE, y vive en
+     el `@supports` del final. Lo de aquí —que ACLARA— es lo que ve un navegador
+     sin sintaxis de color relativa, y ahí sigue siendo lo correcto, porque en
+     ese navegador el reposo se queda también en su respaldo (`--cs` crudo, más
+     oscuro que estos dos). Los dos juegos son coherentes cada uno consigo
+     mismo; lo que NO se puede es mezclarlos. Si tocas uno, mira el otro sitio.
+     ⚠️ EL COMENTARIO DE ABAJO ES DE ESTE RESPALDO Y SÓLO DE ÉL. Su argumento
+     —«con var(--cp) el botón cae a 1.07–1.76:1»— medía contra `--cp` CRUDO, que
+     es un salto de golpe, no un escalón; no vale para descartar oscurecer con
+     la fórmula, donde la caída es a 2.66:1. Ver la nota del `@supports`. */
   --sp-primary-hover:    color-mix(in srgb, var(--cs, #1e5fa8) 88%, #fff);
       /* INVERTIDO respecto a claro: en dark el hover ACLARA. Con var(--cp) el
          botón cae a 1.07–1.76:1 contra la card y desaparece. */
@@ -316,6 +558,21 @@ html.dark {
   --sp-primary-text:     color-mix(in srgb, var(--cs, #1e5fa8) 45%, #fff);
       /* TP:146-149 (#60a5fa=6.56:1). El 45% da 7.85–9.51:1 en las 6 paletas. */
   --sp-primary-ink:      color-mix(in srgb, var(--cs, #1e5fa8) 45%, #fff);  /* TP:215-216 */
+  /* En oscuro la cifra de cierre SÍ converge con la tinta de marca: aquí no hay
+     hoja impresa que respetar y el navy de la variante clara daría 1.5:1 sobre
+     la card. Va por `var()` y no repitiendo la fórmula, así que sigue sola a
+     `--sp-primary-text` —incluida su redeclaración en el `@supports` del final,
+     porque la sustitución se resuelve en el elemento, no aquí—. Si algún día
+     esta línea deja de ser un `var()`, se rompe ese enganche. */
+  --sp-cifra-cierre:     var(--sp-primary-text);
+  /* El degradado de marca en oscuro. Literales de respaldo; la fórmula está en
+     el `@supports` del final. Las dos claridades NO son valores nuevos: 0.42 es
+     la del cromo de marca (`--ag-navy`) y 0.55 la del relleno de marca
+     (`--sp-primary`), o sea que el degradado va del tono del menú al del botón
+     primario. Contra la card: 1.97:1 el extremo oscuro y 3.44:1 el claro, así
+     que el bloque se lee como bloque. */
+  --sp-brand-grad-from:  #2f4f73;
+  --sp-brand-grad-to:    #3373bd;
   --sp-primary-bg:       color-mix(in srgb, var(--cs, #1e5fa8) 14%, transparent); /* TP:192-202 */
   --sp-primary-bg-soft:  color-mix(in srgb, var(--cs, #1e5fa8) 10%, transparent);
   --sp-primary-bg-faint: color-mix(in srgb, var(--cs, #1e5fa8)  7%, transparent);
@@ -346,6 +603,80 @@ html.dark {
   --sp-danger-bg:        rgba(239,68,68,.14);       /* TP:194 */
   --sp-danger-border:    rgba(239,68,68,.25);       /* TP:210 */
 
+  /* — AVATAR — la relación se invierte: el fondo baja a L* 24-36 y la tinta sube
+       a 76-88, los mismos cinco tonos que en claro.
+
+       ⚠️ SON OPACOS, Y NO EL VELO DE BAJA OPACIDAD QUE USAN LAS FAMILIAS DE
+       ESTADO AQUÍ AL LADO. Con un `rgba` el color resultante depende de la
+       superficie que haya detrás, y estos cinco tienen que cumplir DOS medidas
+       a la vez —ΔE2000 > 20 entre ellos y 4.5:1 contra su tinta—: compuestos
+       sobre un fondo variable ninguna de las dos queda garantizada. Opacos, las
+       dos son exactas. Si mueves --sp-surface, esto no se entera, que es
+       precisamente lo que se busca.
+
+       Medidos aquí: ΔE mínimo entre fondos 23.2; contraste 4.63-6.05:1. */
+  --sp-avatar-1-bg:  #774b23;  --sp-avatar-1-ink:  #fac093;  /* ocre     */
+  --sp-avatar-2-bg:  #343d02;  --sp-avatar-2-ink:  #b7c26b;  /* lima     */
+  --sp-avatar-3-bg:  #2a5d5a;  --sp-avatar-3-ink:  #96d8d4;  /* turquesa */
+  --sp-avatar-4-bg:  #0c396c;  --sp-avatar-4-ink:  #a1bbf9;  /* glicina  */
+  --sp-avatar-5-bg:  #673752;  --sp-avatar-5-ink:  #ddaec7;  /* rosa     */
+  --sp-avatar-6-bg:  #652420;  --sp-avatar-6-ink:  #e5afa7;  /* salmón   */
+  --sp-avatar-7-bg:  #51452b;  --sp-avatar-7-ink:  #ccba93;  /* mostaza  */
+  --sp-avatar-8-bg:  #233f2c;  --sp-avatar-8-ink:  #9cc5a8;  /* jade     */
+  --sp-avatar-9-bg:  #003f4a;  --sp-avatar-9-ink:  #84c6d5;  /* celeste  */
+  --sp-avatar-10-bg: #4c4068;  --sp-avatar-10-ink: #c2b5dd;  /* lavanda  */
+
+  /* — TIPO DE DOCUMENTO — `MODO_OSCURO_APP.md` §4. Literales y no color-mix
+       sobre el token claro: redeclarar --sp-doc-X en función de var(--sp-doc-X)
+       es una referencia cíclica y la propiedad quedaría inválida
+       (guaranteed-invalid), no heredada.
+
+       ⚠️ ESTOS NUEVE VALORES SUSTITUYEN AL «45 % CONTRA BLANCO» QUE HABÍA AQUÍ,
+       y no es un retoque de gusto. Aquella fórmula optimizó CONTRASTE sin poner
+       ningún límite al croma, y el resultado pasaba AA con holgura mientras el
+       color desaparecía: `laboratorio` caía de croma 0.105 a 0.059 y `escrito`
+       de 0.077 a 0.039 —grises con un tinte—, o sea que la identidad del formato
+       dejaba de comunicar justo donde el color es todo lo que hay. El listón que
+       faltaba, y que estos nueve cumplen, es CROMA ≥ 0.12 en OKLCH (§2.2).
+
+       ⚠️ NO SON EL NIVEL 400 DE TAILWIND A SECAS, aunque salgan de él. Se toman
+       el tono y el croma del 400 y se ajusta la CLARIDAD dentro de la banda
+       L 0.68-0.78 de OKLCH, porque tres de los ocho formatos viven en el arco
+       azul→violeta y dos en el verde→cian: en oscuro esos arcos se comprimen y
+       no hay tono que ganar, así que la única palanca que separa las parejas es
+       la claridad. Dejarlos los nueve en el 400 hace fallar tres parejas, y
+       mover sólo `consentimiento` NO basta —queda atrapado entre el suelo de
+       croma y el listón de contraste—. Está medido en §5; no lo re-descubras.
+
+       ⚠️ EL PAR MÁS APRETADO ES `receta` CONTRA `consentimiento`: 19.7° de tono
+       y 1.40 de razón de luminancia, o sea EXACTAMENTE en el listón y sin
+       holgura. Quien toque cualquiera de los dos vuelve a medir ese par primero.
+
+       Croma / contraste sobre --sp-surface (#1e1e1e) de cada uno, al lado. */
+  --sp-doc-receta:         #4899fb;  /* C 0.165 · 5.74:1 */
+  --sp-doc-laboratorio:    #00b781;  /* C 0.148 · 6.42:1 */
+  --sp-doc-imagen:         #a17efe;  /* C 0.183 · 5.50:1 */
+  --sp-doc-suplementacion: #e7ad00;  /* C 0.160 · 8.24:1 */
+  --sp-doc-internamiento:  #fd5d79;  /* C 0.195 · 5.57:1 */
+  --sp-doc-escrito:        #00cee9;  /* C 0.136 · 8.74:1 */
+  /* ⚠️ C 0.121, A UNA MILÉSIMA DEL SUELO, y no es holgura: es el que más se
+     mueve para resolver el arco azul-violeta y a L 0.765 el índigo ya no da más
+     croma. Sostiene DOS parejas (con `receta` y con `imagen`). */
+  --sp-doc-consentimiento: #9fabff;  /* C 0.121 · 7.73:1 */
+  /* ⚠️ ES #ee7d00 Y NO #fe8600. El segundo es más vivo y choca con
+     `suplementacion` (13.3° / 1.23: empata en los DOS ejes, que es justo lo que
+     la regla prohíbe). No lo «mejores» subiéndolo. */
+  --sp-doc-honorarios:     #ee7d00;  /* C 0.173 · 6.01:1 */
+
+  /* — HITO DE MEDICIÓN — mismo criterio que la familia de arriba, para que el
+       punto de la línea de tiempo baje de intensidad igual que los chips de
+       documento que tiene al lado. Literal por el mismo motivo que ellos:
+       `color-mix` sobre su propio token sería una referencia cíclica.
+       ⚠️ FUERA DEL @supports, IGUAL QUE LOS OCHO DE ARRIBA: son hexes, no
+       dependen de la sintaxis de color relativa y gatearlos sólo serviría para
+       dejar el lavado puesto en un navegador viejo sin ninguna razón. */
+  --sp-hito-medicion:      #e360f7;  /* C 0.239 · 5.78:1 */
+
   /* — SEMÁFORO DE VITALES — espejo oscuro. Aquí sí converge con la semántica
        genérica: los hexes de la card solo divergen en la paleta clara. */
   --sp-vital-ok:         #34d399;  --sp-vital-ok-accent:    #34d399;  /* = --sp-success */
@@ -362,6 +693,129 @@ html.dark {
   --sp-primary-shadow-press: none;                      /* TP:173 */
   --sp-shadow-modal:         0 20px 40px rgba(0,0,0,.8);/* TP:175-177 */
   --sp-shadow-frame:         0 20px 40px rgba(0,0,0,.8);/* TP:175-177 */
+}
+
+
+/* ============================================================================
+   MODO OSCURO · LA MARCA — `MODO_OSCURO_APP.md` §3
+   ----------------------------------------------------------------------------
+   `--cs` es un `<input type="color">`: no se puede tabular, así que estos tres
+   salen de una fórmula. La operación es SUBIR LA CLARIDAD SIN TOCAR EL CROMA,
+   que es exactamente lo que `color-mix(…, #fff)` no sabe hacer — mezclar contra
+   blanco lava, y ese lavado es el defecto que esta tanda viene a quitar. Con
+   `--cs` de fábrica la tinta pasa de croma 0.057 a 0.133.
+
+   ⚠️ NO LO REESCRIBAS EN `hsl(from … h s L%)`, aunque el proyecto ya use esa
+   variante para `--ag-navy` y parezca la obvia. La `L` de HSL no sigue a la
+   luminancia entre tonos distintos: la ventana útil del relleno va de L 26-28 %
+   en «Verde médico» a L 59-63 % en «Morado», o sea que NO EXISTE una `L` de HSL
+   que sirva a las seis paletas. La de OKLCH sí, porque es claridad perceptual.
+
+   ⚠️ POR QUÉ ESTO VA EN UN `@supports` Y LAS NUEVE FAMILIAS DE ARRIBA NO: esto
+   depende de la sintaxis de color relativa y aquello son hexes. Un navegador sin
+   soporte se queda con el bloque `html.dark` de arriba —o sea, con lo que la app
+   pinta hoy—, y NO con un elemento sin color: `--sp-primary` y compañía son
+   custom properties, así que la declaración no se descarta al parsear, se guarda,
+   y el fallo saltaría al sustituir dejando la propiedad que la consume inválida
+   en tiempo de valor calculado. Eso computa a `unset`: la tinta heredaría y el
+   relleno saldría transparente. El `@supports` es lo que impide llegar ahí, y
+   NO se puede sustituir por declarar el respaldo y la fórmula seguidos — una
+   sustitución inválida no vuelve a la declaración anterior de la cascada.
+
+   ⚠️ EL BLOQUE VA DESPUÉS DEL `html.dark`, Y NO ES COLOCACIÓN CASUAL. Los dos
+   selectores pesan lo mismo (0,1,1) —`@supports` no añade especificidad—, así
+   que desempata el orden de fuente. Si esto subiera por encima, el respaldo lo
+   pisaría y la fórmula no se aplicaría en NINGÚN navegador.
+   Y va FUERA de `@layer components`: lo capado pierde contra lo no capado, así
+   que dentro de la capa esto perdería contra el `html.dark` de arriba.
+
+   ⚠️ SIN ARITMÉTICA SOBRE CANALES, y conviene saber que es a propósito. `c` y
+   `h` se reenvían intactos y la claridad es un literal. Los defectos de «soporte
+   parcial» de Chrome 119-130 y Safari 16.4-17.6 son de unidades dentro de
+   `calc()` sobre canales (Chromium serializaba `l` en 0-100), así que no tocan a
+   estas tres. Si alguien mete un `calc(l …)` aquí, reabre ese problema.
+
+   ⚠️ LA VENTANA DEL RELLENO ES DE 0.008 Y NO ES HOLGURA. Las seis paletas piden
+   ≥3:1 del botón contra la card y ≥4.5:1 del blanco encima, y la intersección de
+   sus ventanas es [0.547, 0.555]. El 0.55 cabe justo. Se cierra entera si
+   `--sp-on-primary` deja de ser blanco puro, si el listón del relleno sube de
+   3:1, o si al selector de `/perfil` se le añade una paleta más cromática que
+   «Morado». Si eso pasa, la salida NO es forzar la `L`: es partir el token.
+
+   ⚠️ EL HEX QUE EL MÉDICO ELIGE NO ES EL QUE SE PINTA EN OSCURO, y es
+   deliberado: la agenda ya tomó esta decisión para su ámbito (su azul sube de
+   #1e5fa8 a #2f6fed, «el único token de marca que cambia de hex entre modos»).
+   `--sp-primary` no tenía contraparte oscura y por eso valía #1e5fa8 sobre
+   #1e1e1e: 2.59:1, con el botón hundido en la card y los rótulos que lo usan
+   como tinta por debajo de AA.
+   ========================================================================== */
+@supports (color: oklch(from red l c h)) {
+  html.dark {
+    /* RELLENO. Las seis paletas: 3.03-3.63:1 contra la card, 4.59-5.51:1 del
+       blanco encima. Croma intacto salvo «Verde médico», que pierde 0.007 por
+       gamut. */
+    --sp-primary:      oklch(from var(--cs, #1e5fa8) 0.55 c h);
+    /* TINTA. Las seis: 5.73-6.52:1 contra la card. «Morado» y «Rojo burdeos»
+       pierden croma (0.247→0.173, 0.215→0.191) porque a L 0.70 el gamut sRGB ya
+       no da más — es techo físico, no pérdida de la fórmula. */
+    --sp-primary-text: oklch(from var(--cs, #1e5fa8) 0.70 c h);
+    --sp-primary-ink:  oklch(from var(--cs, #1e5fa8) 0.70 c h);
+
+    /* HOVER Y ACTIVE DEL RELLENO — OSCURECEN, y es la decisión del PO tras
+       medir las dos direcciones. Ninguna cumple los dos listones: aclarar deja
+       el blanco del rótulo en 3.60:1 (bajo AA) y oscurecer deja el botón sin
+       contorno contra la card. Cede la FORMA y no la INFORMACIÓN — durante el
+       hover el cursor ya está encima del botón, así que saber dónde está no
+       depende del contorno; leer el rótulo sí.
+
+       ⚠️ ES LO CONTRARIO DE LO QUE HACE EL RESPALDO de `html.dark`, y no es una
+       incoherencia: allí el reposo es `--cs` crudo (más oscuro que L 0.55), así
+       que aclarar es lo que separa. Aquí el reposo ya está aclarado y el hueco
+       está abajo. Cada juego es coherente consigo mismo. No los cruces.
+
+       EL ESCALÓN ES 0.06 DE CLARIDAD Y ESTÁ ELEGIDO MIDIENDO, no a ojo. El
+       listón es ΔE2000 ≥ 5.31, que es el salto de «Morado» en el respaldo — el
+       más pequeño de los que HOY se ven como hover. Con 0.06: reposo→hover
+       6.15-7.13 y hover→active 5.70-6.36 en las seis paletas. Con 0.05 el
+       primer escalón cae a 5.17 en «Rojo burdeos» y «Café cálido», por debajo
+       del listón; por eso no es 0.05.
+       ⚠️ MÍDELO EN «SPINUS», que es la de fábrica y la más apretada: es la que
+       tenía el hover invisible (ΔE 1.19) que motivó todo esto.
+
+       Blanco encima, las seis: reposo 4.59-5.51 · hover 5.98-7.18 · active
+       7.79-9.28. Los tres por encima de 4.5, que era la condición.
+       Contra la card, lo que cede: hover 2.32-2.79 · active 1.80-2.14. Por
+       debajo del 3:1 de 1.4.11 a sabiendas. El `active` añade además
+       `translateY(1px)`, o sea que no depende sólo del color. */
+    --sp-primary-hover:  oklch(from var(--cs, #1e5fa8) 0.49 c h);
+    --sp-primary-active: oklch(from var(--cs, #1e5fa8) 0.43 c h);
+
+    /* El degradado de marca, con las dos claridades ya establecidas: la del
+       cromo para el extremo oscuro y la del relleno para el claro.
+       Aquí NO hace falta tope: la claridad ya está pinchada en 0.55 y el mínimo
+       de blanco encima de las seis paletas es 4.59:1. */
+    --sp-brand-grad-from: oklch(from var(--cp, #1a3a5c) 0.42 c h);
+    --sp-brand-grad-to:   oklch(from var(--cs, #1e5fa8) 0.55 c h);
+  }
+
+  /* EL TOPE DE CLARIDAD DEL EXTREMO CLARO, EN TEMA CLARO. Ver §3.5 del spec.
+     ⚠️ VA EN `:root` Y DENTRO DE ESTE MISMO `@supports`, y el orden respecto al
+     bloque `html.dark` de arriba da igual: `:root` pesa (0,1,0) y `html.dark`
+     (0,1,1), así que en oscuro gana aquél sin depender de quién va antes.
+     ⚠️ ES LA ÚNICA FÓRMULA DE TODO EL SISTEMA QUE HACE ARITMÉTICA SOBRE UN
+     CANAL, y eso tiene consecuencia. Chromium anterior a la 121 resolvía la `l`
+     de `oklch()` en escala 0-100 en vez de 0-1, así que allí `min(l, 0.52)` da
+     siempre 0.52 y las seis paletas quedan pinchadas en esa claridad en vez de
+     sólo las cuatro que lo necesitan. Es una degradación benigna y está medida:
+     el mínimo de blanco encima sigue siendo 5.23:1 —el fallo da MÁS contraste,
+     nunca menos— y lo único que cambia es el tono de «Spinus» y «Pizarra», que
+     se aclaran un punto. La ventana afectada es Chrome 119-120.
+     ⚠️ NO COPIES ESTE `min()` A OTRO TOKEN dando por hecho que es inocuo. Aquí
+     lo es porque el peor caso mejora el contraste; en un token donde el fallo
+     lo empeorara, habría que resolverlo de otra forma. */
+  :root {
+    --sp-brand-grad-to: oklch(from var(--cs, #1e5fa8) min(l, 0.52) c h);
+  }
 }
 
 
@@ -401,7 +855,7 @@ a:hover { color: var(--sp-primary-active); }
 .sp-title-sec    { font-size: var(--sp-fs-body);    font-weight: var(--sp-fw-bold);  color: var(--sp-ink-800); }
 .sp-label        { font-size: var(--sp-fs-label);   font-weight: var(--sp-fw-bold); letter-spacing: var(--sp-ls-label); color: var(--sp-ink-350); text-transform: uppercase; }
 .sp-label-field  { font-size: var(--sp-fs-label-sm);font-weight: var(--sp-fw-bold); letter-spacing: var(--sp-ls-label); color: var(--sp-ink-800); text-transform: uppercase; }
-.sp-label-eyebrow{ font-size: var(--sp-fs-label-sm);font-weight: var(--sp-fw-bold); letter-spacing: var(--sp-ls-label-w); color: var(--sp-primary); text-transform: uppercase; }
+.sp-label-eyebrow{ font-size: var(--sp-fs-label-sm);font-weight: var(--sp-fw-bold); letter-spacing: var(--sp-ls-label-w); color: var(--sp-primary-text); text-transform: uppercase; }
 .sp-body         { font-size: var(--sp-fs-body);    line-height: var(--sp-lh-snug);  color: var(--sp-ink-700); }
 .sp-note         { font-size: var(--sp-fs-body);    line-height: var(--sp-lh-note);  color: var(--sp-ink-700); }
 .sp-secondary    { font-size: var(--sp-fs-body-sm); line-height: var(--sp-lh-body);  color: var(--sp-ink-500); }
@@ -437,7 +891,7 @@ a:hover { color: var(--sp-primary-active); }
 
 .sp-btn--secondary {
   background: var(--sp-surface); color: var(--sp-ink-500);
-  border: var(--sp-bw-hair) solid var(--sp-line-input);
+  border: var(--sp-bw-hair) solid var(--sp-line-control);
   font-weight: var(--sp-fw-semi); font-size: var(--sp-fs-btn-sm); padding: 13px 24px;
 }
 .sp-btn--secondary:hover { background: var(--sp-surface-muted); color: var(--sp-ink-700); }
@@ -445,15 +899,34 @@ a:hover { color: var(--sp-primary-active); }
 /* Terciario: rejilla de acciones post-guardado */
 .sp-btn--tertiary {
   background: var(--sp-surface); color: var(--sp-ink-700);
-  border: var(--sp-bw-hair) solid var(--sp-line-soft);
+  border: var(--sp-bw-hair) solid var(--sp-line-control);
   font-weight: var(--sp-fw-semi); font-size: var(--sp-fs-body-sm); padding: 13px;
 }
-.sp-btn--tertiary:hover { border-color: var(--sp-line-input); background: var(--sp-surface-sunken); }
+/* ⚠️ EL HOVER CAMBIA FONDO Y TINTA, NO EL BORDE, y es una consecuencia de que el
+   contorno subiera a `--sp-line-control`. Antes el reposo iba en
+   `--sp-line-soft` y el hover en `--sp-line-input`, o sea que el hover era un
+   ESCALON DE BORDE; desde que el reposo usa el token de contorno de control
+   —el mas fuerte de la familia de lineas— no queda escalon por encima, y el
+   hover se habia quedado repitiendo el mismo borde: invisible.
+   Se resuelve con el mismo patron que ya usa `.sp-btn--secondary:hover`, que es
+   fondo hundido mas tinta un escalon mas oscura. Medido: la superficie da
+   ΔE2000 3.88 en claro y 4.42 en oscuro, y la tinta 10.61 y 6.34 — juntos, muy
+   por encima del ΔE 5.31 que se fijo como liston del hover del primario.
+   ⚠️ NO LE DEVUELVAS UN BORDE PROPIO sin crear antes un token para el: el unico
+   mas fuerte que `--sp-line-control` no existe, y `--sp-line-strong` es MAS
+   DEBIL (1.48:1 en claro) pese al nombre. */
+.sp-btn--tertiary:hover { background: var(--sp-surface-muted); color: var(--sp-ink-800); }
 
 /* Compacto: acción inline dentro de una card interna ("Editar", "Regenerar") */
+/* ⚠️ LA TINTA VA EN `--sp-primary-text` Y NO EN `--sp-primary`. Éste es un botón
+   de CONTORNO: su marca es tinta sobre la superficie, no relleno con blanco
+   encima, y `--sp-primary` está calibrado para lo segundo. Con él, en tema
+   oscuro las seis paletas quedaban entre 3.03 y 3.63:1 —por debajo de AA para
+   texto—; con el token de tinta van de 5.73 a 6.52:1. En claro los dos tokens
+   valen lo mismo, así que ahí no cambia nada. */
 .sp-btn--compact {
-  background: var(--sp-surface); color: var(--sp-primary);
-  border: var(--sp-bw-hair) solid var(--sp-line-input);
+  background: var(--sp-surface); color: var(--sp-primary-text);
+  border: var(--sp-bw-hair) solid var(--sp-line-control);
   font-weight: var(--sp-fw-semi); font-size: var(--sp-fs-meta);
   padding: 7px 13px; border-radius: var(--sp-r-btn-xs); min-height: 34px;
 }
@@ -581,7 +1054,7 @@ a:hover { color: var(--sp-primary-active); }
 .sp-input, .sp-textarea {
   width: 100%; box-sizing: border-box;
   background: var(--sp-surface-sunken);
-  border: var(--sp-bw-hair) solid var(--sp-line-input);
+  border: var(--sp-bw-hair) solid var(--sp-line-control);
   border-radius: var(--sp-r-field);
   padding: 11px 13px;
   font-family: inherit; font-size: var(--sp-fs-body); line-height: var(--sp-lh-snug);
@@ -601,6 +1074,35 @@ a:hover { color: var(--sp-primary-active); }
   min-height: 210px; border-radius: var(--sp-r-input);
   padding: 16px 18px 54px;       /* 54px inferior reserva el slot de voz */
   font-size: 15px; line-height: 1.6;
+}
+
+/* Campo de fecha nativo, y SOLO él. En Safari iOS/iPadOS el widget nativo
+   impone su propio ancho y el `width: 100%` de arriba no lo baja de ahí. La
+   pista de `.sp-doc-grid` es `minmax(0, 1fr)` y NO crece, así que el input
+   desborda su propia celda y se pinta ENCIMA de la de al lado — en el
+   consentimiento, encima de «Lugar».
+
+   El defecto está en los OCHO formularios de documento, porque los ocho visten
+   su fecha con esta clase; solo se ve donde la celda es más estrecha:
+   Suplementación y Honorarios/cotización a 187-201px de pista, los seis de tres
+   columnas a 210-262px en iPad, y Escrito médico a 365px, que es el único que
+   se salva. En escritorio no se ve porque ahí sí se respeta el `width`. Era la
+   V-02 de DOCUMENTOS_AUDITORIA_FORMULARIOS.md, predicha y nunca corregida: el
+   refactor a consultas de contenedor arregló el disparo por viewport, no el
+   ancho del control.
+
+   ⚠ EL SELECTOR NO PUEDE SER `.sp-input` A SECAS. Esa misma clase viste los
+   `<select>` de los formularios (SolicitudInternamientoForm.tsx:474) y quitarles
+   la apariencia nativa les BORRA LA FLECHA del desplegable, sin sustituto: no
+   hay `background-image` de reemplazo en esta hoja. Acotado a type="date".
+
+   `min-width: 0` acompaña al reset y no sobra: es el otro suelo del mismo
+   problema —el mínimo intrínseco del control— y sin él el reset se queda a
+   medias en los motores que sí acotan por ahí. */
+input[type="date"].sp-input {
+  -webkit-appearance: none;
+  appearance: none;
+  min-width: 0;
 }
 
 
@@ -753,11 +1255,1128 @@ a:hover { color: var(--sp-primary-active); }
 /* --- 16. CHECKBOX ------------------------------------------------------ */
 .sp-check { display: flex; align-items: center; gap: 11px; cursor: pointer; min-height: var(--sp-tap); }
 .sp-check__box {
+  display: flex; align-items: center; justify-content: center;
   width: 22px; height: 22px; flex: 0 0 22px; border-radius: var(--sp-r-checkbox);
   border: var(--sp-bw-accent) solid var(--sp-line-strong); background: var(--sp-surface);
 }
 .sp-check input:checked + .sp-check__box { background: var(--sp-primary); border-color: var(--sp-primary); }
+/* La palomita se monta siempre y se revela al marcar: aparecer y desaparecer
+   del DOM haría saltar la caja de 22px durante el reflow. */
+.sp-check__box svg { width: 14px; height: 14px; color: #fff; opacity: 0; }
+.sp-check input:checked + .sp-check__box svg { opacity: 1; }
+.sp-check input:focus-visible + .sp-check__box { box-shadow: var(--sp-focus-ring); }
 .sp-check__label { font-size: var(--sp-fs-body); color: var(--sp-ink-700); }
+
+
+/* --- 17. SELECTOR DE TIPO DE DOCUMENTO (GUIA_FORMULARIOS_04) ------------ */
+
+/* Envoltorio de selector + formulario. Establece el contexto de consulta de
+   contenedor: TODA la disposición de aquí abajo mide el CONTENEDOR, no el
+   viewport. Es la causa raíz de §0.3 de la auditoría — los breakpoints de
+   Tailwind se disparaban por viewport dentro de un panel que no había
+   crecido, y por eso los campos se reordenaban al girar el iPad.
+   `docform` es el mismo nombre que usará el envoltorio de cada formulario
+   (guía 03 §3.C.2); anidados, gana el más cercano, que es lo correcto. */
+.sp-doc-host {
+  container-type: inline-size;
+  container-name: docform;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-gap-block);            /* 18px */
+}
+
+/* Un solo umbral: 4 columnas desde 600px de contenedor, 2 por debajo. Ocho se
+   divide en 4 y en 2, así que ninguna fila queda coja en ningún ancho. */
+.sp-doc-typecards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sp-2-5);                  /* 10px */
+}
+
+/* minmax(0,1fr) y no 1fr: impide que el ancho mínimo intrínseco de la
+   etiqueta infle la pista y desborde la fila. */
+.sp-doc-typecard {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: var(--sp-2-5);
+  min-height: 92px;                    /* 104px en 4 columnas */
+  padding: 14px 10px;
+  border-radius: var(--sp-r-card);     /* 16px */
+  background: var(--sp-surface);
+  border: var(--sp-bw-hair) solid var(--sp-line-card);
+  box-shadow: var(--sp-shadow-flat);
+  color: var(--sp-ink-700);
+  font-size: 13px;                     /* 14px en 4 columnas */
+  font-weight: var(--sp-fw-semi);
+  line-height: 1.25;
+  text-align: center;
+  transition: background var(--sp-dur-micro) var(--sp-ease-out),
+              border-color var(--sp-dur-micro) var(--sp-ease-out);
+}
+
+/* El icono lleva el color del tipo AL 100 % EN LOS CUATRO ESTADOS. La
+   selección se comunica con peso, fondo y filete — nunca con la aparición
+   del color: si solo apareciera al seleccionar, cuando lo ves ya llegaste. */
+.sp-doc-typecard > svg { width: 22px; height: 22px; flex-shrink: 0; color: var(--doc-color); }
+
+/* Máximo 2 líneas: la tarjeta las admite, así que «Honorarios / Cotización»
+   NO se acorta en móvil. */
+.sp-doc-typecard__label {
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+/* @media (hover: hover): en táctil el hover se queda pegado tras el toque y
+   una tarjeta no seleccionada se leería como si lo estuviera. */
+@media (hover: hover) {
+  .sp-doc-typecard:hover {
+    background: color-mix(in srgb, var(--doc-color) 6%, var(--sp-surface));
+    border-color: color-mix(in srgb, var(--doc-color) 30%, var(--sp-surface));
+    color: var(--sp-ink-800);
+  }
+}
+
+/* Ninguna superficie del tipo es relleno sólido: máximo un lavado al 12 %
+   con filete de 1.5px. El acento del médico sí se pinta en sólido. Es lo que
+   impide confundir una tarjeta con un control de la app aunque los dos hex
+   coincidan.
+   Se mezcla contra --sp-surface y no contra #fff (spec §9): en claro es el
+   mismo #ffffff y en oscuro mezcla contra la superficie, que es lo que la
+   spec dejaba como NO DEFINIDO. */
+.sp-doc-typecard[aria-selected="true"] {
+  background: color-mix(in srgb, var(--doc-color) 12%, var(--sp-surface));
+  border: var(--sp-bw-accent) solid var(--doc-color);
+  color: color-mix(in srgb, var(--doc-color) 40%, var(--sp-ink-700));
+  font-weight: var(--sp-fw-bold);
+}
+
+.sp-doc-typecard:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--doc-color) 18%, transparent);
+}
+
+/* Línea plegada: 52px en vez de 398 en móvil (346 devueltos) y de 220 en el
+   resto. Toma el vestido del estado seleccionado. */
+.sp-doc-typecollapsed {
+  display: flex; align-items: center; gap: var(--sp-3);
+  width: 100%;
+  min-height: 52px;
+  padding: 0 14px;
+  border-radius: var(--sp-r-card);
+  background: color-mix(in srgb, var(--doc-color) 12%, var(--sp-surface));
+  border: var(--sp-bw-accent) solid var(--doc-color);
+  color: color-mix(in srgb, var(--doc-color) 40%, var(--sp-ink-700));
+  text-align: left;
+}
+.sp-doc-typecollapsed > svg { width: 22px; height: 22px; flex-shrink: 0; color: var(--doc-color); }
+.sp-doc-typecollapsed:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--doc-color) 18%, transparent);
+}
+.sp-doc-typecollapsed__eyebrow {
+  display: block;
+  font-size: var(--sp-fs-legal); font-weight: var(--sp-fw-bold);
+  letter-spacing: var(--sp-ls-label-w); text-transform: uppercase;
+  color: var(--sp-ink-350);
+}
+.sp-doc-typecollapsed__name {
+  display: block;
+  font-size: var(--sp-fs-body); font-weight: var(--sp-fw-bold);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.sp-doc-typecollapsed__cta {
+  margin-left: auto; display: flex; align-items: center; gap: var(--sp-1-5);
+  font-size: var(--sp-fs-meta); font-weight: var(--sp-fw-semi);
+  color: var(--sp-ink-500); flex-shrink: 0;
+}
+.sp-doc-typecollapsed__cta > svg { width: 18px; height: 18px; color: var(--sp-ink-icon); }
+
+@container docform (min-width: 600px) {
+  .sp-doc-typecards { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--sp-gap-tiles); }
+  .sp-doc-typecard  { min-height: 104px; padding: 18px 12px; font-size: var(--sp-fs-body-sm); }
+  .sp-doc-typecard > svg { width: 24px; height: 24px; }
+}
+
+/* Sin soporte de consultas de contenedor (iPadOS ≤15): quedan las 2 columnas
+   de la regla base. Correcto siempre, subóptimo en pantallas grandes — el
+   fallback seguro, igual que en guía 03 §3.C.4. */
+
+
+/* --- 18. FORMULARIOS DE DOCUMENTO (GUIA_FORMULARIOS_01 §1 y §3) --------- */
+
+/* Envoltorio de cada formulario. Vuelve a declarar `docform` porque el
+   contenedor que importa es el del FORMULARIO, no el de la página: anidado
+   dentro de .sp-doc-host gana el más cercano, que es este. Así los tres
+   montajes lo obtienen gratis. */
+.sp-doc-form {
+  container-type: inline-size;
+  container-name: docform;
+  display: flex; flex-direction: column;
+  gap: var(--sp-gap-block);            /* 18px */
+}
+
+/* Primitivas de rejilla. data-cols = el MÁXIMO al que puede llegar; los
+   escalones intermedios los pone la consulta de contenedor.
+   minmax(0,1fr) y nunca 1fr: es lo que impide que el ancho mínimo intrínseco
+   de un <input> (≈175px) infle la pista y desborde la fila. */
+.sp-doc-grid { display: grid; gap: var(--sp-4); grid-template-columns: 1fr; }
+@container docform (min-width: 380px) {
+  .sp-doc-grid[data-cols="2"],
+  .sp-doc-grid[data-cols="3"],
+  .sp-doc-grid[data-cols="4"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@container docform (min-width: 600px) {
+  .sp-doc-grid[data-cols="3"],
+  .sp-doc-grid[data-cols="4"] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@container docform (min-width: 840px) {
+  .sp-doc-grid[data-cols="4"] { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+.sp-doc-span-2   { grid-column: span 2; }
+.sp-doc-span-all { grid-column: 1 / -1; }
+@container docform (max-width: 379px) { .sp-doc-span-2 { grid-column: auto; } }
+
+/* Campo: etiqueta sobre control, 6px. min-width:0 para que el campo pueda
+   encogerse dentro de su pista de rejilla. */
+.sp-doc-field { display: flex; flex-direction: column; gap: var(--sp-gap-label); min-width: 0; }
+
+/* Card con cabecera a sangre: el padding se lo queda el cuerpo. Un solo
+   lenguaje de cabecera (auditoría §4.3: eran cuatro) y SIN franja gris. */
+.sp-doc-card { padding: 0; }
+.sp-doc-cardhead {
+  display: flex; align-items: center; gap: var(--sp-3);
+  padding: 0 20px; min-height: 56px;
+  border-bottom: var(--sp-bw-hair) solid var(--sp-line-divider);
+}
+.sp-doc-cardbody { padding: var(--sp-pad-card); }   /* 18px 20px */
+.sp-doc-chips { display: flex; flex-wrap: wrap; gap: var(--sp-gap-item); }
+
+/* Acción de cabecera. En XS pierde el texto y queda como 44×44: el aria-label
+   viaja siempre, así que no se pierde el nombre. */
+.sp-doc-add { margin-left: auto; }
+@container docform (max-width: 379px) {
+  .sp-doc-add { width: var(--sp-tap); height: var(--sp-tap); min-height: var(--sp-tap); padding: 0; }
+  .sp-doc-add .sp-doc-long { display: none; }
+}
+
+/* Etiqueta larga del primario, que en XS no cabe */
+.sp-doc-short { display: none; }
+@container docform (max-width: 379px) {
+  .sp-doc-long  { display: none; }
+  .sp-doc-short { display: inline; }
+}
+
+/* Fila de lista. Con ≥4 filas gana un filete: por debajo, 12px de aire basta. */
+.sp-doc-listrow { display: flex; align-items: center; gap: var(--sp-2-5); }
+.sp-doc-listrow + .sp-doc-listrow { margin-top: var(--sp-3); }
+.sp-doc-list--long .sp-doc-listrow + .sp-doc-listrow {
+  border-top: var(--sp-bw-hair) solid var(--sp-line-divider);
+  padding-top: var(--sp-3);
+}
+.sp-doc-listnum { flex: 0 0 20px; }
+
+/* Ícono-botón: 44×44 SIEMPRE, con el glifo a 18. El área táctil no se negocia
+   ni siquiera cuando el icono es pequeño (L-02 / I-01). Visible y disabled con
+   un solo ítem: ocultarlo mueve la interfaz entera al añadir el segundo. */
+.sp-doc-iconbtn {
+  display: inline-flex; align-items: center; justify-content: center;
+  flex: 0 0 var(--sp-tap); width: var(--sp-tap); height: var(--sp-tap);
+  border: none; background: none; cursor: pointer;
+  border-radius: var(--sp-r-btn-sm);   /* 8 */
+  color: var(--sp-ink-icon);
+  transition: background var(--sp-dur-micro) var(--sp-ease-out),
+              color var(--sp-dur-micro) var(--sp-ease-out);
+}
+.sp-doc-iconbtn:hover:not(:disabled) { color: var(--sp-danger); background: var(--sp-danger-bg); }
+.sp-doc-iconbtn:disabled { opacity: .4; cursor: not-allowed; }
+.sp-doc-iconbtn svg { width: 18px; height: 18px; }
+
+.sp-doc-empty {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: var(--sp-2); min-height: 96px; text-align: center;
+}
+.sp-doc-empty .sp-icobox { background: var(--sp-surface-empty); color: var(--sp-ink-150); }
+
+/* Campo señalado. Dos colores porque son dos cosas distintas: falta un
+   obligatorio (warn, §3.8) o el par tipo+región está a medias (danger, §2.4).
+   :focus gana por especificidad, que es lo que se quiere: al entrar a
+   corregirlo, el campo se lee como activo y no como roto. */
+.sp-doc-invalid       { border-color: var(--sp-warn);   border-width: var(--sp-bw-accent); }
+.sp-doc-invalid--pair { border-color: var(--sp-danger); border-width: var(--sp-bw-accent); }
+
+/* Barra de acciones. SIN los márgenes negativos de la spec: ahí son los del
+   padding de .sp-card, y esta barra es hermana de las cards, no hija — los
+   negativos la sacarían 20px del contenedor por cada lado.
+   La sombra no tiene token; es el único literal de la hoja. */
+.sp-doc-actions {
+  position: sticky; bottom: 0; z-index: 1;
+  /* ⚠️ EL `, 0px` NO ES ADORNO: SIN ÉL SE CAE EL `padding` ENTERO, no sólo el
+     inset. Era el único `env(safe-area-inset-*)` del repositorio escrito sin
+     valor de respaldo (los otros catorce lo llevan). En un motor sin `env()`
+     el `calc()` es inválido, y una declaración inválida se descarta COMPLETA:
+     esta barra se quedaba sin sus 14 px de arriba y de abajo también. Hoy no
+     muerde en ningún navegador vivo; ponerlo es gratis y quita la trampa.
+     El inset sí hace falta aquí y NO lo duplica el contenedor de `(app)`: esta
+     barra es `sticky bottom: 0`, así que mientras se rellena el formulario se
+     ancla al borde físico de la pantalla, por debajo del relleno del layout.
+     Ver el `pb-[calc(1.5rem+env(...))]` de `(app)/layout.tsx`, que cubre otro
+     estado —el final del scroll— y no éste. */
+  padding: 14px 0 calc(14px + env(safe-area-inset-bottom, 0px));
+  background: var(--sp-surface);
+  border-top: var(--sp-bw-hair) solid var(--sp-line-divider);
+  box-shadow: 0 -8px 20px rgba(16, 42, 73, .05);
+  display: flex; align-items: center; gap: var(--sp-gap-item);
+}
+.sp-doc-actions > .sp-btn--primary { flex: 1; min-height: var(--sp-ctrl-h-desktop); }
+
+/* ⚠️ AL FINAL DEL SCROLL LA BARRA NO TAPA NADA, Y NO HACE FALTA NINGÚN RELLENO
+   QUE LO EVITE: es `sticky`, o sea que sigue EN FLUJO y ocupa su sitio detrás
+   del último campo. Un `fixed` sí habría exigido reservarle el alto abajo. Se
+   comprobó midiendo, en los siete anchos: el último campo termina por encima.
+
+   LO QUE SÍ HAY QUE RESERVAR es lo que el navegador usa al LLEVAR UN CAMPO A LA
+   VISTA —tabular al último, o el teclado del móvil—, porque «a la vista» para
+   él es el scroller entero, barra incluida, y el campo acaba debajo. Eso no se
+   arregla con relleno sino con `scroll-padding`, que es justo para esto.
+
+   El `:has()` acota la regla a las pantallas que llevan barra y deja intactas
+   las otras veinte del layout; es el mismo recurso, y por el mismo motivo, que
+   `main > div:has(.agenda-fc)` en `globals.css`.
+
+   150px NO es un alto medido de la barra sino su techo con margen: mide 77 en
+   renglón único y 135 en dos, y no hay forma de que el CSS lea la altura de un
+   descendiente. Pasarse aquí no cuesta nada —sólo adelanta un poco el punto al
+   que salta el campo—; quedarse corto lo deja tapado. */
+main:has(.sp-doc-actions) { scroll-padding-bottom: 150px; }
+/* Reparto de `.sp-tpl-guardar`, que estuvo en un `style` inline de
+   `PlantillasDocumento` y desde aquí sí se puede sobrescribir. */
+.sp-tpl-guardar { flex: 0 0 auto; white-space: nowrap; }
+/* ⚠️ EL `:not()` DEJA FUERA A LA BARRA DE DOS FILAS A PROPÓSITO. Sus hijos no
+   son botones sino los dos renglones, así que `column-reverse` los pondría del
+   revés —decidir arriba, guardar abajo— y el `width: 100%` sobra porque ya se
+   estiran. Esa barra se ordena sola, más abajo. */
+@container docform (max-width: 379px) {
+  .sp-doc-actions:not(.sp-doc-actions--filas) { flex-direction: column-reverse; }
+  .sp-doc-actions:not(.sp-doc-actions--filas) > * { width: 100%; }
+}
+
+/* Rótulos que se acortan cuando la FILA aprieta.
+ *
+ * ⚠️ NO SON `.sp-doc-long` / `.sp-doc-short`, aunque se le parezcan. Aquélla
+ * conmuta a 379px y sirve a los botones de CABECERA («Agregar estudio») y al
+ * selector de plantillas; ésta conmuta mucho antes y sólo dentro de la barra.
+ * Tener dos umbrales no es un descuido: son dos sitios con dos aprietos
+ * distintos, y unificarlos vaciaría de texto los botones de cabecera en anchos
+ * donde les sobra.
+ *
+ * POR QUÉ 767 Y NO EL UMBRAL DEL APILADO. La barra sólo se apila por debajo de
+ * 380px de contenedor, y ahí cada botón ocupa el ancho entero: los rótulos
+ * largos caben. El problema estaba JUSTO ENCIMA, entre 380 y ~700, donde la
+ * fila vuelve a ser horizontal y el contenido ya no cabe — un iPhone Pro Max
+ * deja el contenedor en ~398px y caía de lleno ahí, mientras que uno de 390 se
+ * apilaba y se veía bien. De ahí que el defecto se reprodujera en un teléfono
+ * sí y en el de al lado no.
+ *
+ * Las cuentas, con los tokens de `.sp-btn--secondary` (15px, padding 13/24) y
+ * `.sp-btn--primary` (15.5px, padding 13/26), icono de 17 y `--sp-gap-item`:
+ *   · dos botones, rótulos largos ....... ≈401px  (no cabe a 380)
+ *   · dos botones, secundario corto ..... ≈299px  (cabe con holgura)
+ *   · tres botones del consentimiento,
+ *     rótulos largos .................... ≈671px
+ *   · los mismos tres, cortos ........... ≈368px
+ *
+ * ⚠️ SON DOS UMBRALES PORQUE SON DOS APRIETOS, y juntarlos en uno estropea el
+ * otro lado: con el 767 del consentimiento aplicado a todas, la barra de dos
+ * botones diría «Plantilla» en una tablet de 788px donde el rótulo entero cabe
+ * con 380px de sobra. Cada barra se acorta cuando le toca a ella.
+ * Los dos van por encima de lo que piden las cuentas —479 sobre 401, 767 sobre
+ * 671— porque la anchura de un texto depende de la fuente del sistema, que no
+ * controlamos, y quedarse corto aquí es volver a partir el rótulo en dos.
+ */
+.sp-doc-actions__short { display: none; }
+
+/* ⚠️ LOS DOS LLEVAN SUELO DE 380 Y NO SÓLO TECHO, Y ES LO QUE HACE FALTA. Por
+   debajo de 380 la barra ya no es una fila: es una columna con cada botón al
+   ancho completo (la regla de arriba), y ahí el rótulo entero cabe de sobra.
+   Acortarlo también allí sería quitar texto sin ninguna razón, justo en la
+   pantalla más pequeña, que es donde más ayuda leerlo completo. El acortado
+   pertenece a la banda en que los botones COMPARTEN renglón, ni antes ni
+   después. */
+
+/* Barra normal: dos botones. */
+@container docform (min-width: 380px) and (max-width: 479px) {
+  .sp-doc-actions .sp-doc-actions__long  { display: none; }
+  .sp-doc-actions .sp-doc-actions__short { display: inline; }
+}
+
+/* ── Barra del consentimiento: CUATRO acciones ──────────────────────────
+ *
+ * Ancho: un renglón, los cuatro, en el orden del marcado y con el primario
+ * estirándose. Estrecho: la barra ENVUELVE en dos renglones de dos, y las
+ * `order` de abajo deciden las parejas.
+ *
+ * ⚠️ AQUÍ ESTUVO UN SISTEMA DE ENVOLTORIOS CON `display: contents`, y se
+ * sustituyó entero. Un envoltorio ata cada botón a su renglón para siempre, y
+ * la disposición pedida empareja distinto según el ancho —«Plantilla» va con
+ * «Firmar» y «Sin firma» con «Borrador», que no son consecutivos en el orden de
+ * escritorio—. Con `flex-wrap` el renglón es un resultado del ancho, no una
+ * caja, y `order` puede recomponer las parejas sin tocar el marcado.
+ *
+ * LAS CUENTAS, con los tokens de siempre (secundario 15px con padding 13/24,
+ * primario 15,5px con 13/26, icono 17-18 y `--sp-gap-item`):
+ *
+ *   RENGLÓN ÚNICO, los cuatro, con «Plantilla» corto ......... ≈833px
+ *     · Guardar borrador ....... 165   · Plantilla ................ 145
+ *     · Imprimir sin firma ..... 203   · Iniciar firmado elec. .... 290
+ *     · tres huecos ............. 30
+ *
+ *   ⚠️ SON 36px MÁS QUE ANTES DE ESTE PASO, y de ahí que el umbral suba de 840
+ *   a 896: «Guardar borrador» dejó de ser `--ghost` (padding 13/6, sin borde) y
+ *   pasó a `--secondary` (13/24) para que se lea como botón, y esos 36px se
+ *   comieron la holgura que 840 le daba. 896 es el contenedor MÁS ANCHO de la
+ *   app —`max-w-4xl` en escritorio—, así que el renglón único queda para cuando
+ *   de verdad cabe, con 63px de sobra, y por debajo se envuelve.
+ *
+ *   DOS RENGLONES, a mitades y con los cuatro rótulos cortos, contra 159 de
+ *   media fila a 328px de contenedor (un teléfono de 360):
+ *     · Borrador 108   · Plantilla 112   · Sin firma 115   · Firmar 104
+ *   El más ancho de los cuatro pide 115 y la mitad da 159: sobran 44.
+ */
+
+/* Renglón único: el reparto de siempre. */
+.sp-doc-actions--filas > .sp-btn { flex: 0 0 auto; white-space: nowrap; }
+.sp-doc-actions--filas > .sp-btn--primary { flex: 1; min-height: var(--sp-ctrl-h-desktop); }
+
+/* «Guardar como plantilla» va corto en esta barra a TODOS los anchos: con su
+   rótulo entero el renglón único pediría ≈935 y el contenedor más ancho mide
+   896. Es el único de los cuatro cuyo rótulo largo no dice nada que no diga ya
+   su icono. */
+.sp-doc-actions--filas > .sp-tpl-guardar .sp-doc-actions__long  { display: none; }
+.sp-doc-actions--filas > .sp-tpl-guardar .sp-doc-actions__short { display: inline; }
+
+@container docform (max-width: 895px) {
+  /* Envolver, no apilar: `wrap` deja que dos quepan por renglón y que el corte
+     lo decida el ancho. El hueco entre renglones es el mismo `gap` de la barra,
+     así que no hay un número nuevo que mantener. */
+  .sp-doc-actions--filas { flex-wrap: wrap; align-items: stretch; }
+
+  /* Dos por renglón, exactos: dos veces `50% - gap/2` más el `gap` dan el 100%.
+     `min-width: 0` para que un rótulo largo no infle su mitad y empuje al otro
+     a un renglón propio. */
+  .sp-doc-actions--filas > .sp-btn {
+    flex: 1 1 calc(50% - (var(--sp-gap-item) / 2));
+    min-width: 0;
+    padding-left: 12px; padding-right: 12px;
+  }
+
+  /* Los cuatro rótulos, cortos. */
+  .sp-doc-actions--filas > .sp-btn .sp-doc-actions__long  { display: none; }
+  .sp-doc-actions--filas > .sp-btn .sp-doc-actions__short { display: inline; }
+
+  /* ⚠️ LAS PAREJAS. El orden del marcado es el de escritorio —borrador,
+     plantilla, sin firma, firmar— y aquí se recompone: arriba lo que abre
+     camino (guardar la plantilla y firmar), abajo las dos salidas sin firma.
+     Sin esto, envolver daría [borrador|plantilla] y [sin firma|firmar], que es
+     el emparejamiento del paso anterior. */
+  .sp-doc-actions--filas > .sp-tpl-guardar      { order: 1; }
+  .sp-doc-actions--filas > .sp-doc-act-firmar   { order: 2; }
+  .sp-doc-actions--filas > .sp-doc-act-sinfirma { order: 3; }
+  .sp-doc-actions--filas > .sp-doc-act-borrador { order: 4; }
+}
+
+/* Bloque de estudio (imagenología). Contenedor PROPIO: la rejilla interior se
+   mide contra el interior del bloque, no contra el formulario. */
+.sp-doc-studyblock {
+  container-type: inline-size;
+  container-name: docstudy;
+  border: var(--sp-bw-hair) solid var(--sp-line-card);
+  border-radius: var(--sp-r-card-inner);   /* 13 */
+  background: var(--sp-surface);
+  padding: 14px;
+}
+.sp-doc-studyblock + .sp-doc-studyblock { margin-top: var(--sp-3); }
+.sp-doc-studyblock--invalid { border-color: var(--sp-danger-border); background: var(--sp-danger-bg); }
+.sp-doc-studyhead { display: flex; align-items: center; gap: var(--sp-2); min-height: var(--sp-tap); }
+.sp-doc-studychip { display: none; }
+
+/* Tres trazados, ninguno reparte medias columnas (I-02 · I-03). */
+.sp-doc-studygrid { display: grid; gap: 14px; grid-template-columns: 1fr; }
+@container docstudy (min-width: 520px) {
+  .sp-doc-studygrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .sp-doc-studychip {
+    display: inline-block; max-width: 220px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+}
+@container docstudy (min-width: 760px) {
+  .sp-doc-studygrid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .sp-doc-studygrid > [data-span="2"] { grid-column: span 2; }
+  .sp-doc-studygrid > [data-span="3"] { grid-column: span 3; }
+}
+
+/* Desplegable escribible — patrón de referencia del sistema (imagen §2.2).
+   Portal a body y position:fixed: dentro del flujo, el menú quedaba recortado
+   por el scroller de la card (L-03). */
+.sp-doc-combo { position: relative; min-width: 0; }
+.sp-doc-combo > .sp-input { padding-right: 32px; }
+.sp-doc-combo > svg {
+  position: absolute; right: 11px; top: 50%; transform: translateY(-50%);
+  width: 15px; height: 15px; color: var(--sp-ink-icon); pointer-events: none;
+}
+.sp-doc-menu {
+  position: fixed; z-index: 55;
+  display: flex; flex-direction: column; overflow: hidden;
+  background: var(--sp-surface);
+  border: var(--sp-bw-hair) solid var(--sp-line-card);
+  border-radius: 12px;                  /* --sp-r-field + 2 */
+  box-shadow: 0 12px 28px rgba(16, 42, 73, .14);
+}
+/* 4 filas de 44px. Ocho sugerencias abiertas de golpe tapan el formulario. */
+.sp-doc-menu__list { max-height: 176px; overflow-y: auto; margin: 0; padding: 0; list-style: none; }
+/* nowrap + elipsis: sin esto una sugerencia larga («Test de Supresión con
+   Dexametasona (2 mg × 2 días)», 50 caracteres) envuelve a dos líneas, la fila
+   deja de medir 44px y el tope de «4 filas = 176px» pasa a mostrar 3 y pico.
+   El nombre completo queda en el `title` del elemento. */
+.sp-doc-menu__item {
+  display: flex; align-items: center; min-height: var(--sp-tap);
+  padding: 0 14px; cursor: pointer;
+  font-size: var(--sp-fs-body-sm); color: var(--sp-ink-700);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.sp-doc-menu__item[aria-selected="true"] {
+  background: var(--sp-primary-bg-faint); color: var(--sp-ink-900); font-weight: var(--sp-fw-semi);
+}
+.sp-doc-menu__foot {
+  padding: 9px 14px;
+  font-size: var(--sp-fs-hint); color: var(--sp-ink-350);
+  background: var(--sp-surface-sunken);
+  border-top: var(--sp-bw-hair) solid var(--sp-line-divider);
+}
+
+/* Cuerpo del formulario: los bloques que el panel de plantillas sustituye. Es
+   un envoltorio y no el propio .sp-doc-form porque el panel es HERMANO suyo
+   —el árbol del formulario no se desmonta, se apaga con display:none (spec 02
+   §3.1)—, y sin repetir aquí la columna las cards perderían sus 18px de aire.
+   NO vuelve a declarar `container`: el contenedor que miden las cards sigue
+   siendo el del formulario. */
+.sp-doc-formbody { display: flex; flex-direction: column; gap: var(--sp-gap-block); }
+
+/* ── Receta · bloque de medicamento (GUIA_FORM_RECETA §2) ────────────────
+   Como el bloque de estudio pero con radio de control (9) y SIN contenedor
+   propio: la rejilla interior es la primitiva `.sp-doc-grid[data-cols="3"]`,
+   que mide `docform`. Receta no tiene trazado de 4 —cinco campos en tres
+   columnas dan tres filas exactas—, así que un segundo contexto de medida no
+   distinguiría ningún caso. */
+.sp-doc-medblock {
+  border: var(--sp-bw-hair) solid var(--sp-line-card);
+  border-radius: var(--sp-r-field-sm);   /* 9 */
+  background: var(--sp-surface);
+  padding: 14px;
+}
+.sp-doc-medblock + .sp-doc-medblock { margin-top: var(--sp-3); }
+.sp-doc-medhead { display: flex; align-items: center; gap: var(--sp-2); min-height: var(--sp-tap); }
+.sp-doc-medhead > .sp-label { font-size: 11.5px; }
+.sp-doc-medhead > .sp-doc-iconbtn { margin-left: auto; }
+
+/* «Agregar medicamento» al pie de CADA bloque y no al final de la lista: con
+   tres o cuatro fármacos, un botón único obliga a bajar hasta abajo y volver a
+   subir (§2.2). */
+.sp-doc-medfoot { margin-top: 14px; }
+@container docform (max-width: 379px) {
+  .sp-doc-medfoot > .sp-btn { width: 100%; }
+}
+
+/* ── Suplementación · tarjetas (GUIA_FORM_SUPLEMENTACION §2) ─────────────
+   Columna única en los CUATRO anchos: cada tarjeta tiene alto distinto según su
+   beneficio, y en dos columnas la vecina nunca empieza donde la vista la busca
+   (§2.2). `align-items:start` para que abrir una no estire a ninguna otra. */
+.sp-doc-supgrid {
+  display: grid; grid-template-columns: 1fr;
+  gap: var(--sp-2-5); align-items: start;
+}
+.sp-doc-supcard {
+  display: flex; flex-direction: column; gap: var(--sp-2);
+  /* `relative` no es decorativo: la casilla es `sr-only`, o sea `absolute`, y
+     es el destino al que el banner de faltantes desplaza. Sin bloque contenedor
+     aquí, su rectángulo lo fija un ancestro cualquiera y el desplazamiento
+     aterriza en otro sitio. */
+  position: relative;
+  padding: 14px; cursor: pointer;
+  background: var(--sp-surface);
+  border: var(--sp-bw-hair) solid var(--sp-line-soft);
+  border-radius: var(--sp-r-card-inner);   /* 13 = --sp-r-field-sm + 4 */
+  transition: background var(--sp-dur-micro) var(--sp-ease-out),
+              border-color var(--sp-dur-micro) var(--sp-ease-out);
+}
+.sp-doc-supcard--on {
+  background: var(--sp-primary-bg-faint);
+  border-color: var(--sp-primary); border-width: var(--sp-bw-accent);
+}
+/* Solo la primera, y solo tras el primer intento: es la que el banner nombra. */
+.sp-doc-supcard--invalid { border-color: var(--sp-warn); border-width: var(--sp-bw-accent); }
+
+/* Cabecera: casilla + nombre + dosis de referencia. Es una etiqueta real, así
+   que el teclado la alcanza sin ARIA inventada; el resto de la tarjeta añade
+   superficie al mismo gesto. `flex-start` porque el nombre puede envolver. */
+.sp-doc-suphead { align-items: flex-start; }
+.sp-doc-suphead > .sp-check__box { margin-top: 1px; }
+.sp-doc-supname { font-size: var(--sp-fs-body); font-weight: var(--sp-fw-bold); color: var(--sp-ink-900); }
+.sp-doc-supref  { display: block; margin-top: 2px; font-size: 12.5px; color: var(--sp-ink-350); }
+
+/* El beneficio clínico es la referencia con la que el médico elige: se acota a
+   tres líneas, no se esconde (S-02). */
+.sp-doc-supbenefit { font-size: 13px; line-height: var(--sp-lh-body); color: var(--sp-ink-500); }
+.sp-doc-supbenefit--clamp {
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden;
+}
+/* Sin resetear el borde: `.sp-link-alt` vive de su subrayado punteado, que es
+   un `border-bottom`, y el preflight ya deja el botón sin borde ni fondo. */
+.sp-doc-supmore { align-self: flex-start; min-height: 32px; padding: 0; }
+
+/* Campos que aparecen al seleccionar. Dosis y marca a la par; la nota debajo. */
+.sp-doc-supfields { display: grid; grid-template-columns: 1fr; gap: var(--sp-3); }
+@container docform (min-width: 600px) {
+  .sp-doc-supfields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .sp-doc-supfields > [data-span="2"] { grid-column: span 2; }
+}
+
+/* Notas y control: dos columnas SOLO desde 600px de contenedor (§4). El trazado
+   de `data-cols="2"` abre a 380, y ahí un textarea junto a un input miden 182px
+   cada uno. */
+.sp-doc-supnotas { display: grid; grid-template-columns: 1fr; gap: var(--sp-4); }
+@container docform (min-width: 600px) {
+  .sp-doc-supnotas { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+
+/* --- 19. PLANTILLAS DE DOCUMENTO (GUIA_FORMULARIOS_02) ------------------ */
+
+/* Fila de control del selector: select + «Gestionar». En XS el botón pasa
+   debajo a ancho completo (corrige H-03). */
+.sp-tpl-row { display: grid; grid-template-columns: 1fr auto; gap: var(--sp-gap-item); }
+@container docform (max-width: 379px) {
+  .sp-tpl-row { grid-template-columns: 1fr; gap: var(--sp-2); }
+  .sp-tpl-row > .sp-btn { width: 100%; }
+}
+/* El compacto sube a 44px: es un control de fila, no una acción inline. */
+.sp-tpl-manage { min-height: var(--sp-tap); white-space: nowrap; }
+.sp-tpl-manage svg { width: 17px; height: 17px; }
+
+/* Bloque de 44px mientras carga. Sin shimmer: por debajo de 200ms un skeleton
+   parpadea más de lo que informa. */
+.sp-tpl-skeleton {
+  min-height: var(--sp-tap); border-radius: var(--sp-r-field);
+  background: var(--sp-surface-muted);
+}
+
+/* Estado vacío: la card no se oculta, cambia de contenido. */
+.sp-tpl-empty { display: flex; align-items: flex-start; gap: var(--sp-3); }
+
+/* Aviso de plantilla aplicada. No se autodescarta: si desapareciera solo, quien
+   miró a otro lado pierde el único acuse de que se le reemplazó el formulario. */
+.sp-tpl-aviso { margin-top: 10px; }
+.sp-tpl-aviso > span { flex: 1; }
+.sp-tpl-deshacer {
+  min-height: 0; padding: 0; flex: 0 0 auto;
+  /* Tinta, no relleno: ver la nota de `.sp-btn--compact`. En oscuro pasa de
+     3.44:1 a 6.23:1; en claro no cambia. Su `:hover` de abajo ya usa este mismo
+     token, así que los dos estados se distinguen SÓLO por el subrayado — que es
+     justamente el motivo de que el subrayado esté ahí. */
+  color: var(--sp-primary-text); font-size: var(--sp-fs-meta);
+}
+/* ⚠️ `--sp-primary-text` Y NO `--sp-primary-hover`, aunque esto SEA un hover.
+   `--sp-primary-hover` es el hover del RELLENO —lleva tinta blanca encima— y
+   desde que oscurece en tema oscuro dejaba este enlace en 2.66:1 sobre la card.
+   Esto es tinta, así que su token es el de tinta. En oscuro el hover ahora
+   ACLARA: 3.44:1 en reposo → 6.23:1 al pasar por encima.
+   ⚠️⚠️ EL SUBRAYADO ES LA SEÑAL DE VERDAD, Y NO ES ADORNO: EN TEMA CLARO EL
+   COLOR NO CAMBIA. `--sp-primary-text` es un alias de `--sp-primary` en claro
+   —sólo divergen en oscuro—, así que ahí coincide exactamente con el color de
+   reposo de la línea de arriba y el hover sería invisible sin él. Es la razón de
+   que la señal se ponga en algo que NO depende del tema. Si lo quitas, el hover
+   desaparece en claro y nadie lo notará hasta que alguien lo reporte.
+   ⚠️ Y EL REPOSO DE ARRIBA SIGUE EN 3.44:1 EN OSCURO, por debajo de AA: usa
+   `--sp-primary`, que es el token de RELLENO. Es el mismo defecto que tienen
+   `.sp-btn--compact` y los botones de contorno, y se arregla en su tanda, no
+   aquí. */
+.sp-tpl-deshacer:hover {
+  color: var(--sp-primary-text);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* ── Panel de gestión ──────────────────────────────────────────────────── */
+/* Sin `position: sticky` en la cabecera: con scroll de página sube con el
+   contenido. La tenía porque el overlay que desapareció solo daba 605px. */
+.sp-tpl-panelhead {
+  display: flex; align-items: center; gap: var(--sp-3);
+  min-height: 56px;
+  border-bottom: var(--sp-bw-hair) solid var(--sp-line-divider);
+  margin-bottom: var(--sp-gap-section);
+}
+.sp-tpl-back {
+  display: inline-flex; align-items: center; justify-content: center;
+  flex: 0 0 var(--sp-tap); width: var(--sp-tap); height: var(--sp-tap);
+  border: none; background: none; cursor: pointer;
+  border-radius: var(--sp-r-btn-sm); color: var(--sp-ink-500);
+  transition: background var(--sp-dur-micro) var(--sp-ease-out);
+}
+.sp-tpl-back:hover { background: var(--sp-surface-muted); }
+.sp-tpl-back svg { width: 20px; height: 20px; }
+.sp-tpl-panelhead > .sp-badge { margin-left: auto; }
+@container docform (max-width: 379px) {
+  .sp-tpl-panelhead > .sp-title-card { font-size: var(--sp-fs-vitals); }
+}
+
+.sp-tpl-list { display: flex; flex-direction: column; gap: var(--sp-2-5); }
+.sp-tpl-item { min-height: 68px; gap: var(--sp-3); }
+.sp-tpl-nombre { min-width: 0; flex: 1; }
+.sp-tpl-nombre > .sp-title-sec {
+  display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.sp-tpl-nombre > .sp-hint { margin-top: 2px; }
+.sp-tpl-acciones { display: flex; gap: var(--sp-1); flex: 0 0 auto; }
+.sp-tpl-accion {
+  display: inline-flex; align-items: center; justify-content: center;
+  gap: var(--sp-1-5);
+  flex: 0 0 var(--sp-tap); width: var(--sp-tap); height: var(--sp-tap);
+  border: none; background: none; cursor: pointer;
+  border-radius: var(--sp-r-btn-sm);
+  /* Los TRES grises en reposo: el rojo permanente en una lista de 3–4 filas es
+     ruido. El color llega en el hover. */
+  color: var(--sp-ink-icon);
+  transition: background var(--sp-dur-micro) var(--sp-ease-out),
+              color var(--sp-dur-micro) var(--sp-ease-out);
+}
+.sp-tpl-accion svg { width: 18px; height: 18px; }
+.sp-tpl-accion__label { display: none; font-size: 12px; color: var(--sp-ink-500); }
+.sp-tpl-accion:hover:not(:disabled) { color: var(--sp-primary-text); background: var(--sp-primary-bg); }
+.sp-tpl-accion--danger:hover:not(:disabled) { color: var(--sp-danger); background: var(--sp-danger-bg); }
+.sp-tpl-accion:disabled { opacity: .4; cursor: not-allowed; }
+
+/* Fila en operación: se apaga entera y el icono pulsado pasa a spinner. */
+.sp-tpl-item--ocupada { opacity: .55; pointer-events: none; }
+
+/* Renombrar EN SITIO: la fila se convierte en input + ✕ + Guardar. La fila pasa
+   a columna porque el aviso de duplicado va DEBAJO del campo, no a su lado. */
+.sp-tpl-item--editando { flex-direction: column; align-items: stretch; gap: var(--sp-1-5); }
+.sp-tpl-rename { display: flex; align-items: center; gap: var(--sp-2); width: 100%; }
+.sp-tpl-rename > .sp-input { flex: 1; min-width: 0; }
+.sp-tpl-rename > .sp-btn { min-height: var(--sp-tap); flex: 0 0 auto; }
+
+/* Filas fantasma mientras carga. Sin animación, igual que el selector. */
+.sp-tpl-ghost { height: 68px; border-radius: var(--sp-r-field-sm); background: var(--sp-surface-muted); }
+
+/* Estado vacío del panel. */
+.sp-tpl-panelempty {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: var(--sp-3); min-height: 240px; text-align: center;
+}
+.sp-tpl-panelempty .sp-icobox { background: var(--sp-surface-empty); color: var(--sp-ink-150); }
+.sp-tpl-panelempty .sp-hint { max-width: 320px; }
+
+/* Dos plantas por debajo de 380px: nombre y fecha arriba, las tres acciones
+   abajo repartidas. A 318px de contenido cada celda queda en ≈98px, así que la
+   etiqueta cabe junto al icono. */
+@container docform (max-width: 379px) {
+  .sp-tpl-item { flex-direction: column; align-items: stretch; min-height: 104px; gap: var(--sp-2); }
+  .sp-tpl-acciones { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--sp-2); }
+  .sp-tpl-accion { width: auto; flex: 1 1 auto; }
+  .sp-tpl-accion__label { display: inline; }
+}
+
+/* Badge de urgente: el rojo se reserva a ESTO. Hoy la etiqueta entera de la
+   casilla iba en rojo y competía con los errores del formulario. */
+.sp-badge--danger {
+  background: var(--sp-danger-bg); color: var(--sp-danger);
+  font-size: 11.5px; font-weight: var(--sp-fw-black);
+}
+
+
+/* --- 20. EDITOR DEL ESCRITO MÉDICO (GUIA_FORM_ESCRITO_MEDICO §2.2 y §3) -- */
+
+/* Sección propia y no un apartado de la 18: el editor es de UN formulario de
+   los ocho. Los demás no tienen cuerpo de texto enriquecido y no heredan nada
+   de aquí. */
+
+/* Fila del título del pie: campo + enlace de reenganche (§2.2). El enlace es
+   `flex: 0 0 auto` y el campo se queda con todo lo que sobre. */
+.sp-ed-pie { display: flex; align-items: center; gap: var(--sp-2-5); }
+.sp-ed-pie > .sp-input     { flex: 1; min-width: 0; }
+.sp-ed-pie > .sp-link-alt  { flex: 0 0 auto; }
+
+/* ── Barra de herramientas (§3.3 y §3.4) ────────────────────────────────── */
+/* `position: relative` porque es el ancla de los tres menús, que cuelgan de su
+   borde inferior. Van DENTRO de la barra y no de la card: colgados de la card
+   aparecerían al pie del área de escritura.
+   `flex-wrap: nowrap` es la regla entera: la barra nunca pasa de una fila, y
+   lo que no cabe baja al menú. El reparto lo decide el CONTENEDOR y no el
+   viewport, así que sale igual en el iPad vertical que en una ventana
+   estrecha de escritorio.
+   La card NO lleva `overflow: hidden` — recortaría los menús. */
+.sp-ed-bar {
+  position: relative;
+  display: flex; align-items: center; flex-wrap: nowrap;
+  gap: var(--sp-1-5);                        /* 6 — niveles 1 y 2 */
+  padding: 8px 12px;
+  background: var(--sp-surface-sunken);
+  border-bottom: var(--sp-bw-hair) solid var(--sp-line-divider);
+}
+@container docform (min-width: 760px) {
+  .sp-ed-bar { gap: var(--sp-2); }           /* 8 — nivel 3, las nueve caben */
+}
+
+/* Objetivo de 44×44 con glifo de 18. Hoy eran 26 px reales, trece veces
+   (E-02). El área táctil no se negocia. */
+.sp-ed-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  flex: 0 0 var(--sp-tap); width: var(--sp-tap); height: var(--sp-tap);
+  border: none; background: none; cursor: pointer;
+  border-radius: var(--sp-r-btn-sm);         /* 8 */
+  color: var(--sp-ink-700);
+  transition: background var(--sp-dur-micro) var(--sp-ease-out),
+              color var(--sp-dur-micro) var(--sp-ease-out);
+}
+.sp-ed-btn:hover { background: var(--sp-surface-muted); }
+.sp-ed-btn svg { width: 18px; height: 18px; }
+/* Estado por FONDO y no solo por color de glifo: a 18 px la diferencia de
+   tinta sola no se lee. `aria-expanded` entra aquí para que el control que
+   tiene su menú abierto se vea encendido mientras dura. */
+.sp-ed-btn[aria-pressed="true"],
+.sp-ed-btn[aria-expanded="true"] {
+  background: var(--sp-primary-bg-faint); color: var(--sp-ink-900);
+}
+
+/* Control de bloque, nivel 1: 52×44 con el glifo del bloque actual + chevron.
+   Sustituye al `<select>` porque a 332 px de barra útil no hay sitio para los
+   128 px del desplegable. */
+.sp-ed-block { flex: 0 0 52px; width: 52px; gap: 1px; }
+.sp-ed-block > svg:last-child { width: 13px; height: 13px; color: var(--sp-ink-icon); }
+
+/* Control de bloque, niveles 2 y 3: `<select>` nativo — en el iPad abre la
+   rueda del sistema. Sube a 44 px de alto vía `.sp-input`: era el control más
+   pequeño de los ocho formularios (E-05). */
+.sp-ed-select { display: none; flex: 0 0 128px; width: 128px; }
+@container docform (min-width: 520px) {
+  .sp-ed-block  { display: none; }
+  .sp-ed-select { display: block; }
+}
+@container docform (min-width: 760px) {
+  .sp-ed-select { flex-basis: 150px; width: 150px; }
+}
+
+/* Botón del menú. Separado del grupo de formato con `margin-left: auto` para
+   no pulsarlo al ir a por las listas, y con borde para leerse como otra cosa.
+   En nivel 3 no se renderiza: las nueve están en la barra. */
+.sp-ed-more { margin-left: auto; border: var(--sp-bw-hair) solid var(--sp-line-control); }
+@container docform (min-width: 760px) { .sp-ed-more { display: none; } }
+
+/* El reparto de §3.3, en dos pares de clases:
+     .sp-ed-n2 / .sp-ed-n3 — el control EN LA BARRA desde 520 / desde 760
+     .sp-ed-m2 / .sp-ed-m3 — la fila EN EL MENÚ, hasta 520 / hasta 760
+   Cada control se escribe dos veces en el árbol y el contenedor apaga una. Es
+   la única forma de repartir por consulta de contenedor sin medir con JS, que
+   es justo lo que el sistema evita en todas las demás rejillas. `display:none`
+   los saca también del orden de tabulación: no hay objetivos fantasma. */
+.sp-ed-n2, .sp-ed-n3 { display: none; }
+@container docform (min-width: 520px) {
+  .sp-ed-n2 { display: inline-flex; }
+  .sp-ed-m2 { display: none; }
+}
+@container docform (min-width: 760px) {
+  .sp-ed-n3 { display: inline-flex; }
+  .sp-ed-m3 { display: none; }
+}
+
+/* ── Menús de la barra (§3.4) ───────────────────────────────────────────── */
+.sp-ed-menu {
+  position: absolute; top: calc(100% + 8px); right: 0; z-index: 5;
+  min-width: 212px; padding: var(--sp-1);
+  background: var(--sp-surface);
+  border: var(--sp-bw-hair) solid var(--sp-line-card);
+  border-radius: 12px;
+  box-shadow: 0 12px 28px rgba(16, 42, 73, .14);
+}
+/* El de bloque cuelga del extremo izquierdo: su control es el primero. */
+.sp-ed-menu--left { right: auto; left: 0; }
+
+/* Fila de 44 px con icono de 20 y NOMBRE ESCRITO: en un menú no hay que
+   adivinar qué hace un glifo. */
+.sp-ed-row {
+  display: flex; align-items: center; gap: var(--sp-2-5);
+  width: 100%; min-height: var(--sp-tap);
+  padding: 0 12px; border: none; background: none; cursor: pointer;
+  border-radius: var(--sp-r-btn-sm);
+  font-family: inherit; font-size: var(--sp-fs-body-sm);
+  color: var(--sp-ink-700); text-align: left;
+}
+.sp-ed-row:hover { background: var(--sp-surface-muted); }
+.sp-ed-row > svg { flex: 0 0 20px; width: 20px; height: 20px; }
+.sp-ed-row[aria-checked="true"] {
+  background: var(--sp-primary-bg-faint); color: var(--sp-ink-900);
+  font-weight: var(--sp-fw-semi);
+}
+/* Marca de la derecha: chevron de «abre otra hoja» o palomita de «es esta». */
+.sp-ed-row__cue { margin-left: auto; flex: 0 0 auto; color: var(--sp-ink-icon); display: flex; }
+.sp-ed-row__cue svg { width: 16px; height: 16px; }
+/* Cabecera de la segunda hoja del menú (alineación), con su flecha de vuelta. */
+.sp-ed-menuhead {
+  display: flex; align-items: center; gap: var(--sp-2);
+  min-height: var(--sp-tap); padding: 0 12px 0 4px;
+  border-bottom: var(--sp-bw-hair) solid var(--sp-line-divider);
+  margin-bottom: var(--sp-1);
+}
+
+/* ── Área de escritura (§3.5) ───────────────────────────────────────────── */
+/* 240 px hasta 760 de contenedor y 320 desde ahí, en vez del `min-h-[380px]`
+   fijo de antes: 380 ahogaba el editor justo donde menos alto útil hay.
+   Crece con el contenido y NO abre scroll propio — el scroll es el del
+   formulario. */
+.sp-ed-prose {
+  padding: 18px 20px;
+  /* 15/1.7 son de la guía §3.5. `--sp-lh-body` (1.55) es interlínea de texto
+     denso; esto es prosa de lectura sostenida y necesita el aire. */
+  font-size: 15px; line-height: 1.7;
+  color: var(--sp-ink-700);
+  min-height: 240px; outline: none;
+}
+@container docform (min-width: 760px) { .sp-ed-prose { min-height: 320px; } }
+
+/* Estilos del contenido. Antes los inyectaba un `<style>` en cada montaje
+   (E-04): dos escritos abiertos se pisaban las reglas entre sí. Aquí viven
+   una sola vez y el preflight de Tailwind 4 —que resetea ul/ol/h1-h6— queda
+   respondido en el mismo sitio. */
+.sp-ed-prose p          { margin: 8px 0; }
+.sp-ed-prose h1,
+.sp-ed-prose h2         { font-size: 19px; margin: 18px 0 6px; }
+.sp-ed-prose h3         { font-size: 17px; margin: 14px 0 5px; }
+.sp-ed-prose h1,
+.sp-ed-prose h2,
+.sp-ed-prose h3         { font-weight: var(--sp-fw-black); line-height: var(--sp-lh-title);
+                          color: var(--sp-ink-900); }
+.sp-ed-prose ul         { list-style: disc;    padding-left: 24px; margin: 8px 0; }
+.sp-ed-prose ol         { list-style: decimal; padding-left: 24px; margin: 8px 0; }
+.sp-ed-prose li         { margin: 2px 0; }
+.sp-ed-prose li > p     { margin: 0; }
+.sp-ed-prose blockquote {
+  border-left: 3px solid var(--sp-line-input); padding-left: 16px; margin: 10px 0;
+  font-style: italic; color: var(--sp-ink-500);
+}
+.sp-ed-prose hr         { border: 0; border-top: var(--sp-bw-hair) solid var(--sp-line-card);
+                          margin: 14px 0; }
+.sp-ed-prose > :first-child { margin-top: 0; }
+.sp-ed-prose > :last-child  { margin-bottom: 0; }
+
+/* Marcador de posición del párrafo vacío (extensión Placeholder de TipTap). */
+.sp-ed-prose p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left; height: 0; pointer-events: none;
+  color: var(--sp-ink-200);
+}
+
+
+/* --- 21. HONORARIOS / COTIZACIÓN (GUIA_FORM_HONORARIOS §2, §4) ---------- */
+
+/* Los dos documentos son UN formulario con variantes declaradas, así que aquí
+   no hay dos juegos de clases: hay un juego con `data-tipo` en el contenedor.
+   Un segundo juego sería la copia del archivo en dos que I.3.5 prohíbe, hecha
+   en CSS. */
+
+/* Cabecera de «Datos del documento»: además del rótulo lleva el segmentado de
+   tipo (§2). Envuelve porque desde 600px el segmentado mide 264 fijos y por
+   debajo baja a una SEGUNDA LÍNEA DE LA MISMA CABECERA, no a una card propia:
+   la card «Tipo de documento» se retira. */
+.sp-doc-honohead { flex-wrap: wrap; row-gap: var(--sp-2); padding-top: 9px; padding-bottom: 9px; }
+
+.sp-doc-segmented {
+  display: flex; gap: 4px;
+  padding: 4px; border-radius: 12px;
+  background: var(--sp-surface-sunken);
+}
+.sp-doc-segmented--tipo { flex: 1 0 100%; }
+@container docform (min-width: 600px) {
+  .sp-doc-segmented--tipo { flex: 0 0 264px; margin-left: auto; }
+}
+.sp-doc-segmented__opt {
+  flex: 1; min-height: 38px; padding: 0 10px;
+  border: none; background: none; cursor: pointer;
+  border-radius: var(--sp-r-btn-sm);          /* 8 = 12 del riel − 4 de padding */
+  font-family: inherit; font-size: var(--sp-fs-body-sm); font-weight: var(--sp-fw-semi);
+  color: var(--sp-ink-500);
+  transition: background var(--sp-dur-micro) var(--sp-ease-out),
+              color var(--sp-dur-micro) var(--sp-ease-out);
+}
+.sp-doc-segmented__opt:hover { color: var(--sp-ink-800); }
+.sp-doc-segmented__opt[aria-pressed="true"] { background: var(--sp-primary); color: #fff; }
+/* Como CAMPO (divisa) el control entero mide 44 y no 46: la altura de control
+   del sistema manda sobre los 38 px que el segmentado usa dentro de una
+   cabecera de 56. */
+.sp-doc-segmented--field .sp-doc-segmented__opt { min-height: 36px; }
+
+/* Datos de la cotización: son CUATRO campos. A 788 de contenedor, cuatro
+   columnas dejarían el folio en 165px, así que el tramo MD va a dos y la cuarta
+   abre a 840 (§0). No es `data-cols="4"`: esa primitiva abre a tres en 600. */
+.sp-doc-honodatos { display: grid; gap: var(--sp-4); grid-template-columns: 1fr; }
+@container docform (min-width: 380px) {
+  .sp-doc-honodatos { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@container docform (min-width: 840px) {
+  .sp-doc-honodatos { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+/* Folio: lo asigna la base al insertar (§4.1), así que en pantalla no puede
+   mostrar número antes de emitir. Se lee como lo que es —un hueco reservado—,
+   no como un campo que el médico se dejó vacío. */
+.sp-doc-folio { background: var(--sp-surface-muted); color: var(--sp-ink-350); cursor: not-allowed; }
+
+/* Conmutador del seguro (§4.5). El RIEL mide 44×26 con perilla de 20, pero el
+   botón es 44×44: el piso táctil del sistema no admite excepciones (spec 01
+   §1) y un riel de 26 px de alto no es un objetivo de dedo. */
+.sp-doc-switch {
+  display: inline-flex; align-items: center; justify-content: center;
+  flex: 0 0 var(--sp-tap); width: var(--sp-tap); height: var(--sp-tap);
+  margin-left: auto; padding: 0; border: none; background: none; cursor: pointer;
+}
+.sp-doc-switch__track {
+  position: relative; width: 44px; height: 26px;
+  border-radius: var(--sp-r-pill); background: var(--sp-line-strong);
+  transition: background var(--sp-dur-micro) var(--sp-ease-out);
+}
+.sp-doc-switch[aria-checked="true"] .sp-doc-switch__track { background: var(--sp-primary); }
+.sp-doc-switch__knob {
+  position: absolute; top: 3px; left: 3px; width: 20px; height: 20px;
+  border-radius: var(--sp-r-pill); background: var(--sp-surface);
+  box-shadow: 0 1px 2px rgba(16, 42, 73, .28);
+  transition: transform var(--sp-dur-micro) var(--sp-ease-out);
+}
+.sp-doc-switch[aria-checked="true"] .sp-doc-switch__knob { transform: translateX(18px); }
+
+/* ── Rejilla de conceptos — tres trazados (§4.2) ─────────────────────────
+   El umbral es de CONTENEDOR y no de viewport: el mismo formulario vive en
+   tres montajes. El trazado de partida es el APILADO, que es el peor caso
+   (390 de viewport) y el que cierra H-02: `grid-cols-[1fr_140px_36px]` fijo
+   dejaba el concepto en 94 px ahí.
+   Apilada, cada fila es una minitarjeta y cada celda lleva su etiqueta; en una
+   línea, la cabecera de columnas se renderiza una vez y las etiquetas de celda
+   desaparecen. Las dos cosas viven en el DOM siempre y las conmuta el CSS: el
+   umbral es de contenedor y ningún cálculo en JS lo acertaría. */
+.sp-doc-honofilas { display: flex; flex-direction: column; gap: var(--sp-2-5); }
+.sp-doc-honofila {
+  display: grid; gap: var(--sp-2-5);
+  grid-template-columns: minmax(0, 1fr) 40px;
+  grid-template-areas: "c d" "o o" "p p";
+  padding: 12px;
+  border: var(--sp-bw-hair) solid var(--sp-line-card);
+  border-radius: var(--sp-r-card-inner);      /* 13 */
+  background: var(--sp-surface);
+}
+.sp-doc-honofilas[data-tipo="honorarios"] .sp-doc-honofila { grid-template-areas: "c d" "p p"; }
+.sp-doc-honofila > [data-cell="c"] { grid-area: c; min-width: 0; }
+.sp-doc-honofila > [data-cell="o"] { grid-area: o; min-width: 0; }
+.sp-doc-honofila > [data-cell="p"] { grid-area: p; min-width: 0; }
+/* Apilada, la papelera comparte fila con el rótulo del concepto y su campo:
+   se alinea con el CAMPO, que es sobre lo que actúa. */
+.sp-doc-honofila > [data-cell="d"] { grid-area: d; align-self: end; }
+/* Etiqueta por celda. En los trazados de una línea se esconde A LA VISTA pero
+   NO se retira del árbol —`display:none` la quitaría de los dos—: la cabecera
+   de columnas es `aria-hidden`, así que sin esto el campo se quedaría sin
+   nombre justo en el trazado donde su rótulo está lejos. */
+.sp-doc-honocell-label { display: block; margin-bottom: var(--sp-gap-label); }
+/* La cabecera de columnas solo existe en los trazados de una línea. */
+.sp-doc-honocols { display: none; }
+.sp-doc-honocols > [data-cell="p"] { text-align: right; }
+
+@container docform (min-width: 520px) {
+  /* Recibo: concepto + precio + papelera, en una línea. */
+  .sp-doc-honofilas[data-tipo="honorarios"] { gap: var(--sp-3); }
+  .sp-doc-honofilas[data-tipo="honorarios"] .sp-doc-honofila {
+    grid-template-columns: minmax(0, 1fr) 150px 40px;
+    grid-template-areas: "c p d";
+    align-items: center;
+    padding: 0; border: none; background: none;
+  }
+  .sp-doc-honofilas[data-tipo="honorarios"] .sp-doc-honofila > [data-cell="d"] { align-self: center; }
+  .sp-doc-honofilas[data-tipo="honorarios"] .sp-doc-honocols { display: grid; }
+  .sp-doc-honofilas[data-tipo="honorarios"] .sp-doc-honocell-label {
+    position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+    overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0;
+  }
+
+  /* Cotización: el origen todavía no cabe en la línea y baja entero. */
+  .sp-doc-honofilas[data-tipo="cotizacion"] .sp-doc-honofila {
+    grid-template-columns: minmax(0, 1fr) 150px 40px;
+    grid-template-areas: "c p d" "o o o";
+  }
+}
+@container docform (min-width: 760px) {
+  .sp-doc-honofilas[data-tipo="cotizacion"] { gap: var(--sp-3); }
+  .sp-doc-honofilas[data-tipo="cotizacion"] .sp-doc-honofila {
+    grid-template-columns: minmax(0, 1fr) 168px 150px 40px;
+    grid-template-areas: "c o p d";
+    align-items: center;
+    padding: 0; border: none; background: none;
+  }
+  .sp-doc-honofilas[data-tipo="cotizacion"] .sp-doc-honofila > [data-cell="d"] { align-self: center; }
+  .sp-doc-honofilas[data-tipo="cotizacion"] .sp-doc-honocols { display: grid; }
+  .sp-doc-honofilas[data-tipo="cotizacion"] .sp-doc-honocell-label {
+    position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+    overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0;
+  }
+}
+
+/* La papelera de la fila mide 40 de ancho y 44 de alto: los 44 son el piso
+   táctil y los 40 son la columna que la rejilla le reserva. */
+.sp-doc-honofila .sp-doc-iconbtn { flex: 0 0 40px; width: 40px; }
+
+/* Precio: el prefijo SIGUE A LA DIVISA. Cifra a la derecha y tabular para que
+   las columnas de importes se lean como una columna. */
+.sp-doc-precio { position: relative; }
+.sp-doc-precio > .sp-input {
+  padding-left: 28px; text-align: right; font-variant-numeric: tabular-nums;
+}
+/* «US$» no cabe en los 28 px que le bastan a «$». */
+.sp-doc-precio[data-divisa="USD"] > .sp-input { padding-left: 38px; }
+.sp-doc-precio__sim {
+  position: absolute; left: 11px; top: 50%; transform: translateY(-50%);
+  font-size: var(--sp-fs-body-sm); color: var(--sp-ink-350); pointer-events: none;
+}
+
+/* ── Bloque de cierre (§4.4) ─────────────────────────────────────────────
+   SIEMPRE visible, también con total en cero: renderizarlo solo con `total > 0`
+   es lo que hoy lo hace aparecer y desaparecer mientras se teclea. */
+.sp-doc-cierre {
+  margin-top: var(--sp-4);
+  border-top: var(--sp-bw-hair) solid var(--sp-line-divider);
+}
+.sp-doc-cierrefila {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--sp-3); min-height: var(--sp-tap);
+}
+.sp-doc-cierrelabel {
+  min-width: 0; font-size: var(--sp-fs-body-sm); font-weight: var(--sp-fw-semi);
+  color: var(--sp-ink-500);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.sp-doc-cierrecifra {
+  font-size: var(--sp-fs-body); font-weight: var(--sp-fw-bold);
+  color: var(--sp-ink-800); font-variant-numeric: tabular-nums;
+}
+/* La fila que cierra el documento: la que el paciente lee primero. */
+.sp-doc-cierrefila--final { border-top: var(--sp-bw-hair) solid var(--sp-line-divider); }
+.sp-doc-cierrefila--final .sp-doc-cierrelabel { font-size: var(--sp-fs-body); color: var(--sp-ink-700); }
+/* ⚠️ LA CIFRA TIENE TOKEN PROPIO, `--sp-cifra-cierre`, y las dos alternativas
+   obvias están descartadas por escrito junto a su declaración:
+   NO `--sp-primary-hover` —que es lo que había: el hover del RELLENO del botón
+   primario, tomado prestado por salir un tono más fuerte; en cuanto ese hover
+   pasó a oscurecer se llevó esta cifra a 2.66:1 sobre la card—, y tampoco
+   `--sp-primary-text` a secas, que arregla el oscuro pero en claro cambia el
+   navy por el azul de marca, y esto es una hoja que se imprime y que el paciente
+   lee. El token propio deja el navy en claro y la tinta aclarada en oscuro.
+   Claro 11.60:1 sobre blanco · oscuro 6.23:1 sobre la card. */
+.sp-doc-cierrefila--final .sp-doc-cierrecifra {
+  font-size: 20px; font-weight: var(--sp-fw-black); color: var(--sp-cifra-cierre);
+}
+/* El único número editable del bloque. */
+.sp-doc-anticipo { flex: 0 0 170px; width: 170px; }
 
 
 /* ============================================================================
@@ -784,4 +2403,411 @@ a:hover { color: var(--sp-primary-active); }
 }
 */
 
+
+/* --- 22. SECCIÓN PLEGABLE E INDICACIONES DE PISO ------------------------- */
+/* (GUIA_FORM_INTERNAMIENTO §3 y §4 · mecánica de la propuesta §3.A.3)
+
+   Va DENTRO de @layer components, delante del cierre, y no detrás del archivo:
+   fuera de la capa estas reglas ganarían a las utilidades de Tailwind, que es
+   justo el reparto que la spec 01 §1 fija al revés.
+
+   Sección propia y no un apartado de la 18: la 18 es el vocabulario común de
+   los ocho formularios y esto lo estrena uno. Se numera 22 y no 21 porque
+   Honorarios ocupó la 21 mientras esto se escribía, en paralelo y en el mismo
+   archivo. `.sp-section` nace ya con dos
+   consumidores —GUIA_FORM_CONSENTIMIENTO §3 la nombra para sus siete
+   secciones—; el control de dos niveles es de internamiento y de nadie más. */
+
+/* ── Card plegable ─────────────────────────────────────────────────────────
+   El <h2> NO puede vivir dentro del <button> —contenido de flujo dentro de
+   contenido de frase—, así que lo envuelve: el encabezado da la semántica y el
+   botón es lo pulsable, que es lo que `aria-expanded` necesita debajo. */
+.sp-section__title { margin: 0; font: inherit; }
+.sp-section__head {
+  width: 100%; text-align: left; cursor: pointer;
+  background: none; color: inherit;
+  border: 0; border-bottom: var(--sp-bw-hair) solid var(--sp-line-divider);
+}
+/* Plegada mide 58px: 56 de cabecera + 2 de bordes de la card. El filete
+   inferior se va porque ya no separa de nada. */
+.sp-section__head[aria-expanded="false"] { border-bottom: 0; }
+.sp-section__head:focus-visible { outline: none; box-shadow: var(--sp-focus-ring); }
+.sp-section__chev {
+  margin-left: auto; flex: 0 0 auto;
+  width: 18px; height: 18px; color: var(--sp-ink-icon);
+  transition: transform var(--sp-dur-micro) var(--sp-ease-out);
+}
+.sp-section__head[aria-expanded="true"] .sp-section__chev { transform: rotate(180deg); }
+/* El bloque global de `globals.css` solo neutraliza las clases `animate-*`. */
+@media (prefers-reduced-motion: reduce) { .sp-section__chev { transition: none; } }
+/* En XS el título se lleva la primera línea y el resumen cae debajo con el
+   chevron: los tres en fila dejan el título en cuatro renglones —«Indicaciones
+   de ingreso a piso» mide 255 de los 276 útiles y el badge otros 154—. Las dos
+   líneas suman 46 y caben en los 56 de la cabecera, así que plegada sigue
+   midiendo 58. */
+@container docform (max-width: 379px) { .sp-section__head { flex-wrap: wrap; } }
+
+/* ── Control de dos niveles: grupos y renglones (§3) ──────────────────────── */
+.sp-doc-piso { display: flex; flex-direction: column; gap: var(--sp-3-5); }
+
+/* Chip que abre la fila de grupo propio. Es una ACCIÓN, no un grupo: nunca
+   lleva `aria-pressed`, así que nunca se enciende. */
+.sp-doc-chipadd svg { width: 16px; height: 16px; }
+
+.sp-doc-grupos { display: flex; flex-direction: column; gap: var(--sp-3); }
+.sp-doc-grupo {
+  border: var(--sp-bw-hair) solid var(--sp-line-card);
+  border-radius: var(--sp-r-field-sm);
+  padding: 14px;
+}
+.sp-doc-grupohead { display: flex; align-items: center; gap: var(--sp-2); min-height: var(--sp-tap); }
+/* Los dos con `flex: 0 0 auto`: el que cede ancho a 316 es el nombre, que
+   admite dos líneas — la papelera encogida deja de ser un objetivo de 44. */
+.sp-doc-grupohead > .sp-doc-iconbtn { margin-left: auto; flex: 0 0 auto; }
+/* El recuento es lo que hace que plegar resuma en vez de esconder (§3.4). */
+.sp-doc-grupocount {
+  flex: 0 0 auto;
+  font-size: var(--sp-fs-hint); color: var(--sp-ink-350); white-space: nowrap;
+}
+/* La cabecera ya trae sus 44px de alto; el primer renglón solo necesita aire. */
+.sp-doc-grupohead + .sp-doc-listrow { margin-top: var(--sp-2); }
+.sp-doc-grupofoot { margin-top: 14px; }
+
+/* Zona de arranque: 96px punteados que dicen qué hacer y quién pone los
+   guiones. Sin ella, cuatro chips apagados no explican nada. */
+.sp-doc-dashzone {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 96px; padding: var(--sp-3) var(--sp-4);
+  border: var(--sp-bw-hair) dashed var(--sp-line-dash);
+  border-radius: var(--sp-r-field-sm);
+  text-align: center;
+}
+
+/* Fila de grupo propio: campo + ✕ + Añadir. En XS el campo se lleva la primera
+   línea entera y los dos botones caen debajo. */
+.sp-doc-nuevogrupo { display: flex; align-items: center; gap: var(--sp-2); }
+.sp-doc-nuevogrupo > .sp-input { flex: 1; min-width: 0; }
+.sp-doc-nuevogrupo > .sp-btn { flex: 0 0 auto; min-height: var(--sp-tap); white-space: nowrap; }
+@container docform (max-width: 379px) {
+  .sp-doc-nuevogrupo { flex-wrap: wrap; }
+  .sp-doc-nuevogrupo > .sp-input { flex: 1 0 100%; }
+}
+
+
+/* --- 23. CONSENTIMIENTO INFORMADO (GUIA_FORM_CONSENTIMIENTO §2) ---------- */
+/* Va al final y DENTRO de @layer components, por lo mismo que la 22: fuera de
+   la capa estas reglas ganarían a las utilidades de Tailwind.
+
+   Sección corta a propósito. Las siete secciones de texto son `.sp-section` de
+   la 22, las once celdas de identificación son `.sp-doc-grid[data-cols="3"]` de
+   la 18, el segmentado de transfusión es `.sp-doc-segmented--field` de la 21 y
+   la casilla de fotografías es `.sp-check` de la 16 —22×22, radio 6, borde de
+   1.5 y contenedor de 44, que es exactamente lo que pide §2—. Aquí solo queda
+   lo que ningún otro formato necesitaba. */
+
+/* Reserva de dos renglones en la etiqueta, y SOLO en multicolumna (§7).
+   «Familiar responsable o representante legal» ocupa dos líneas a 238px de
+   campo, y sin la reserva las otras dos columnas de su fila arrancan 17px más
+   arriba. En una sola columna no hay con qué desalinearse y la reserva sería
+   aire de más, así que el umbral es el mismo al que la rejilla abre a dos. */
+@container docform (min-width: 380px) {
+  .sp-doc-consent-id .sp-label-field { min-height: 34px; }
+}
+
+/* Fila 4: el divisor y las dos autorizaciones. Van bajo filete porque NO son
+   datos de identificación sino decisiones del paciente (§2).
+   Reparte por su cuenta y no con las columnas de la rejilla: en el tramo de dos
+   columnas el segmentado caería en una pista de 166px y sus dos botones en 77
+   cada uno, por debajo de lo cómodo. Abre a dos en el mismo umbral en que la
+   rejilla abre a tres, donde la pista ya mide 272. */
+.sp-doc-consent-auth {
+  grid-column: 1 / -1;
+  display: grid; grid-template-columns: 1fr; gap: var(--sp-4);
+  margin-top: var(--sp-4); padding-top: var(--sp-4);
+  border-top: var(--sp-bw-hair) solid var(--sp-line-divider);
+}
+@container docform (min-width: 600px) {
+  .sp-doc-consent-auth { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* El texto de la casilla envuelve a dos y tres renglones según el ancho, así
+   que la caja se ancla a la primera línea en vez de centrarse contra el bloque
+   entero. El contenedor conserva sus 44px de alto mínimo. */
+.sp-doc-consent-fotos { align-items: flex-start; }
+
+/* «El paciente no puede firmar», bajo el campo del familiar. Vive ahí y no con
+   las autorizaciones porque marcarla cambia la regla del control que tiene
+   encima: vuelve obligatorio el nombre del familiar, que pasa a ser quien
+   consiente. Un poco de aire para que no se pegue al input. */
+.sp-doc-consent-nofirma { margin-top: var(--sp-1-5); }
+
+
+/* --- 24. DENEGACIÓN O REVOCACIÓN (GUIA_FORM_DENEGACION §1) --------------- */
+/* Va al final y DENTRO de @layer components, por lo mismo que la 22 y la 23.
+
+   Sección de una regla, y es lo que debe ser: la denegación comparte
+   formulario con el consentimiento, así que hereda su CSS entero. Lo único
+   propio es dónde vive el conmutador, y el conmutador mismo es el
+   `.sp-doc-segmented--tipo` de la 21 sin un solo cambio — el mismo control que
+   elige entre recibo y cotización, que es exactamente lo que promete la guía.
+   Nada que plegar necesita CSS: las siete secciones y las autorizaciones
+   dejan de montarse, no se ocultan. */
+
+/* La cabecera de «Datos de identificación» lleva icono + rótulo + segmentado.
+   Envuelve por la misma razón que `.sp-doc-honohead`, y no reusa esa clase
+   porque su nombre dice honorarios: por debajo de 600 el segmentado mide el
+   ancho entero y baja a una SEGUNDA LÍNEA DE LA MISMA CABECERA, no a una card
+   propia. El icono y el rótulo se quedan arriba, juntos. */
+.sp-doc-consent-head { flex-wrap: wrap; row-gap: var(--sp-2); padding-top: 9px; padding-bottom: 9px; }
+
+
+/* --- 25. FIRMADO ELECTRÓNICO (GUIA_FORMULARIOS_05 §3 y §5) --------------- */
+/* Va al final y DENTRO de @layer components, por lo mismo que la 22, 23 y 24.
+
+   No usa @container, y ahora es verdad: el modo se monta por `Portal` y cuelga
+   del <body>, así que no hay ningún contenedor `docform` sobre él y sus dos
+   anchos se resuelven con @media, contra el viewport. */
+
+/* El modo tapa la pantalla ENTERA, y eso es una función (§2): es el único
+   momento del sistema en que el dispositivo cambia de manos, y el paciente no
+   debe poder llegar al expediente ni al listado.
+
+   ⚠ ESTO SOLO FUNCIONA PORQUE EL COMPONENTE SE MONTA POR `Portal`, colgando del
+   <body>. `.sp-doc-form`, donde vive el formulario, lleva
+   `container-type: inline-size` para sus consultas de contenedor; eso arrastra
+   contención de disposición, y un elemento con contención de disposición se
+   convierte en MARCO DE REFERENCIA de sus descendientes `position: fixed`. Sin
+   el portal, este `inset: 0` no se mide contra el viewport sino contra la caja
+   del formulario, y el modo se queda dentro de su columna —y con altura 0, que
+   es lo que recortaba el lienzo entero—. La explicación larga está en el
+   componente, junto al `<Portal>`.
+
+   z-index 55 y no 40: el botón de menú del Sidebar en móvil es `z-50` y
+   quedaría ENCIMA del modo, que es exactamente la puerta al expediente que este
+   modo existe para cerrar. Ojo con leer este número como la causa de nada:
+   mientras el modo estuvo dentro del formulario NUNCA llegó a competir con la
+   barra —no es que se pintara por debajo, es que no la alcanzaba—. El nivel solo
+   significa algo desde que el modo cuelga del <body>. Los dos ModalShell de
+   dentro pasan `elevated` y suben a 60, así que siguen apilándose sobre él. */
+.sp-firma-modo {
+  position: fixed; inset: 0; z-index: 55;
+  display: flex; flex-direction: column;
+  background: var(--sp-surface);
+}
+
+/* §3.1 · cabecera de 56 px */
+.sp-firma-head {
+  flex: 0 0 auto; display: flex; align-items: center; gap: var(--sp-2);
+  height: 56px; padding: 0 var(--sp-3);
+  border-bottom: var(--sp-bw-hair) solid var(--sp-line-divider);
+}
+.sp-firma-salir {
+  display: flex; align-items: center; justify-content: center; flex: 0 0 auto;
+  width: var(--sp-tap); height: var(--sp-tap);
+  border-radius: var(--sp-r-btn-sm); color: var(--sp-ink-500);
+}
+.sp-firma-salir:disabled { opacity: .4; cursor: not-allowed; }
+/* El título se trunca antes que el badge: con el contador largo a 358 px no
+   caben los dos, y el que informa de dónde estamos es el contador. */
+.sp-firma-titulo { flex: 1; min-width: 0; font-size: 18px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sp-firma-long  { display: none; }
+.sp-firma-short { display: inline; }
+@media (min-width: 380px) {
+  .sp-firma-titulo { font-size: var(--sp-fs-card); }
+  .sp-firma-long  { display: inline; }
+  .sp-firma-short { display: none; }
+}
+
+.sp-firma-progress { flex: 0 0 auto; padding: var(--sp-3); }
+
+.sp-firma-cuerpo {
+  flex: 1; min-height: 0; overflow-y: auto;
+  display: flex; flex-direction: column; gap: var(--sp-4);
+  padding: 0 var(--sp-3) var(--sp-4);
+}
+
+/* El rol y el nombre de quien firma, a la vista: el paciente coge el
+   dispositivo sin ningún contexto de lo que está pasando. */
+.sp-firma-quien { display: flex; flex-direction: column; gap: 2px; }
+.sp-firma-nombre {
+  font-size: var(--sp-fs-card); font-weight: var(--sp-fw-black);
+  line-height: var(--sp-lh-title); color: var(--sp-ink-800);
+}
+
+.sp-firma-lienzo-wrap { display: flex; flex-direction: column; gap: var(--sp-gap-label); }
+.sp-firma-girar { color: var(--sp-ink-350); }
+
+/* §5.1 · el lienzo.
+
+   El FONDO es literal y no `--sp-surface-sunken`, por lo mismo que la tinta es
+   literal en el componente: este mapa de bits ES el que se imprime, así que lo
+   que se ve al firmar tiene que ser lo que sale en el papel, en los dos temas.
+   Con el token, en modo oscuro se firmaría claro sobre oscuro y se imprimiría
+   claro sobre blanco. */
+/* `flex: 0 0 auto` y no el encogimiento por defecto: el lienzo es un elemento
+   flexible dentro de una columna flexible, así que en una pantalla baja
+   —teléfono en horizontal— se comprimiría por debajo de sus 240 px antes de que
+   el cuerpo decidiera desplazarse. El área de firma no encoge: se desplaza. */
+.sp-firma-lienzo {
+  position: relative; flex: 0 0 auto; height: 240px;
+  background: #fbfcfe;
+  border: var(--sp-bw-hair) solid var(--sp-line-input);
+  border-radius: var(--sp-r-input);
+  overflow: hidden;
+}
+@media (min-width: 380px) { .sp-firma-lienzo { height: 280px; } }
+
+/* ⚠ AQUÍ NO HAY `touch-action`, Y ES A PROPÓSITO. Es lo que impide que el gesto
+   de firmar se lo lleve el desplazamiento de la página, así que tiene que
+   ganar SIEMPRE — y desde aquí no puede: `globals.css` declara
+   `* { touch-action: manipulation }` fuera de toda `@layer`, y lo no encapado
+   gana a todo lo que viva dentro de `@layer components`, sin que la
+   especificidad cuente. Vive en línea, sobre el propio <canvas>. */
+.sp-firma-canvas {
+  display: block; width: 100%; height: 100%;
+  cursor: crosshair;
+}
+.sp-firma-placeholder {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  pointer-events: none; user-select: none;
+  font-size: var(--sp-fs-body); color: var(--sp-ink-200);
+}
+.sp-firma-linea {
+  position: absolute; left: 20px; right: 20px; bottom: 34px;
+  border-top: var(--sp-bw-hair) dashed var(--sp-line-dash);
+}
+.sp-firma-rol {
+  position: absolute; left: 0; right: 0; bottom: 12px; text-align: center;
+  pointer-events: none; user-select: none;
+  font-size: var(--sp-fs-legal); font-weight: var(--sp-fw-bold);
+  letter-spacing: var(--sp-ls-label-w); color: var(--sp-ink-300);
+  text-transform: uppercase;
+}
+
+/* §5.2 · en XS los dos a ancho completo y el primario arriba */
+.sp-firma-acciones { display: flex; align-items: center; gap: var(--sp-2-5); }
+.sp-firma-acciones > .sp-btn { min-height: var(--sp-ctrl-h-desktop); }
+@media (max-width: 379px) {
+  .sp-firma-acciones { flex-direction: column-reverse; }
+  .sp-firma-acciones > * { width: 100%; }
+}
+
+/* §7.1 · una fila por firmante */
+.sp-firma-resumen { display: flex; flex-direction: column; gap: var(--sp-2-5); }
+.sp-firma-fila { gap: var(--sp-3); justify-content: flex-start; }
+.sp-firma-fila-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.sp-firma-fila-nombre {
+  font-size: var(--sp-fs-body); font-weight: var(--sp-fw-bold); color: var(--sp-ink-800);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.sp-firma-ico-vacio { background: var(--sp-surface-muted); color: var(--sp-ink-icon); }
+
+/* ═══ §6 · la foto de identificación — captura nativa y recorte ═══════════
+   Vive dentro del cuerpo del modo de firmado y sustituye al lienzo mientras
+   dura. La captura la hace la aplicación de cámara del SISTEMA (campo de
+   archivo con `capture`), así que aquí no hay visor ni marco en vivo: el cromo
+   es la pregunta, el recortador y sus controles. Todo esto es cromo: la foto NO
+   BLOQUEA en ninguna rama, así que ninguna de estas cajas puede quedarse sin
+   salida. */
+.sp-idfoto { display: flex; flex-direction: column; gap: var(--sp-3); }
+
+/* §6.1 · la pregunta. `Sin foto` es una respuesta, no una cancelación, y por eso
+   es un botón del mismo peso que los demás y no una X. */
+.sp-idfoto-card { display: flex; align-items: flex-start; gap: var(--sp-3); padding: var(--sp-3); }
+.sp-idfoto-card-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--sp-3); }
+
+.sp-idfoto-controles { display: flex; align-items: center; gap: var(--sp-2-5); flex-wrap: wrap; }
+.sp-idfoto-controles > .sp-btn { min-height: var(--sp-ctrl-h-desktop); }
+
+/* El recortador (react-easy-crop llena esta caja con `position: absolute`, así
+   que necesita un contenedor posicionado y con tamaño propio). El fondo oscuro
+   no es estética: deja de competir con la credencial, que es lo único que hay
+   que ver.
+
+   ⚠ EL CONTENEDOR LLEVA LA MISMA PROPORCIÓN QUE EL RECTÁNGULO DE RECORTE
+   —228 × 144, la de la caja del anexo—, Y NO ES CASUAL: la librería calcula su
+   rectángulo como el mayor que cabe con esa proporción, así que con el
+   contenedor igual de proporcionado el marco LO LLENA ENTERO. El marco es lo
+   que decide el encuadre y tiene que dominar la pantalla; con un contenedor de
+   otra proporción —hubo uno de 4:3— el marco flotaba más pequeño dentro, con
+   bandas muertas de bisel alrededor.
+
+   El ancho toma todo lo que quepa dejando sitio a los controles: 100 % del
+   cuerpo, o lo que 60vh de alto permitan con esta proporción, lo que sea menor.
+   La prop `aspect` del componente lleva el mismo número desde `PROPORCION`
+   (`identificacionFoto.ts`): si la caja del anexo cambia, cambian los dos. */
+.sp-idfoto-cropper {
+  position: relative;
+  aspect-ratio: 228 / 144;
+  width: min(100%, calc(60vh * 1.5833));
+  margin-inline: auto;
+  background: var(--sp-bezel); border-radius: 10px; overflow: hidden;
+}
+
+.sp-idfoto-pie { text-align: center; color: var(--sp-ink-350); }
+
+@media (max-width: 379px) {
+  .sp-idfoto-card { flex-direction: column; }
+  .sp-idfoto-controles > .sp-btn { width: 100%; }
+}
+
 } /* fin @layer components */
+
+/* ⚠ FUERA DE @layer A PROPÓSITO — NO LO METAS DENTRO. La hoja de react-easy-crop
+   se inyecta sin capa en <head>, y lo no encapado gana a cualquier regla de
+   @layer components sin que la especificidad cuente (la misma lección que
+   touch-action, documentada arriba). Aquí las dos hojas quedan en la misma
+   condición de origen y decide la especificidad: dos clases contra una, gana
+   esto. El marco del rectángulo va aparte, en línea (`MARCO_ESTILO` del
+   componente); esto solo sube el contraste de la retícula de tercios, cuyas
+   líneas son pseudo-elementos y no admiten estilo en línea. */
+.sp-idfoto-cropper .reactEasyCrop_CropAreaGrid::before,
+.sp-idfoto-cropper .reactEasyCrop_CropAreaGrid::after {
+  border-color: rgba(255, 255, 255, 0.75);
+}
+
+
+/* ============================================================================
+   20. GRÁFICA DE ANALITOS — el SVG de Recharts, vestido con tokens
+   ----------------------------------------------------------------------------
+   Rejilla, ejes, rótulos y cursor estaban cableados en claro dentro del
+   componente (`#e2e8f0`, `#94a3b8`, `#cbd5e1`), así que en tema oscuro la
+   rejilla quedaba clarísima sobre el fondo y los rótulos casi blancos.
+
+   ⚠️ VA EN CSS Y NO EN LAS PROPS DEL COMPONENTE, y esa es la parte que hay que
+   saber antes de «simplificarlo» devolviéndolo al JSX. Recharts pasa `stroke` y
+   `fill` como ATRIBUTOS DE PRESENTACIÓN del SVG, y un atributo de presentación
+   NO resuelve `var()`: `stroke="var(--sp-line-soft)"` no pinta nada. La
+   propiedad CSS del mismo nombre sí lo resuelve, y además cualquier CSS de autor
+   gana a un atributo de presentación, así que estas cuatro reglas mandan.
+   Donde el componente SÍ puede usar `var()` es en su prop `style`, que Recharts
+   vuelca como CSS en línea: por eso el trazo de la línea y el halo de los puntos
+   se resuelven allí y no aquí.
+
+   ⚠️ TRES DE LOS CUATRO VALORES NO SON NUEVOS. Son los hex que el componente
+   tenía escritos, que resultaron ser tokens que ya existían: `#e2e8f0` es
+   `--sp-line-soft` y `#cbd5e1` es `--sp-line-strong`. Para esos tres, en tema
+   claro no cambia ni un píxel; lo único que se gana es la contraparte oscura.
+
+   ⚠️⚠️ EL CUARTO SÍ CAMBIA, Y EN LOS DOS TEMAS: LOS RÓTULOS DE EJE. Iban en
+   `#94a3b8` —que es `--sp-ink-250`— y eso da 2.56:1 sobre la card en claro y
+   3.57:1 en oscuro. Son texto de 11 px, o sea que su listón es el 4.5:1 de AA y
+   NO lo pasaban en ninguno de los dos. Estaban por debajo desde antes del modo
+   oscuro; heredar el defecto con paridad habría sido conservarlo.
+   `--sp-ink-500` es el token MÁS CLARO de la escala que pasa 4.5 en los dos
+   temas (5.45 en claro, 5.09 en oscuro); el siguiente hacia abajo, `--sp-ink-350`,
+   se queda en 2.90. Por eso es éste y no uno más suave.
+   El precio es que en claro los rótulos se ven bastante más oscuros: ΔE2000
+   20.6 respecto al gris de antes. Es un cambio deliberado, no una deriva.
+
+   ⚠️ LAS BANDAS DEL SEMÁFORO NO ESTÁN AQUÍ y no se tocan: son `<rect>` con
+   `fillOpacity`, salen de `BAND_COLORS` en `lib/labs/utils.ts` y funcionan en
+   los dos temas porque un color saturado al 12-15 % sobrevive sobre cualquier
+   fondo. Estas reglas sólo alcanzan a `line` y a los rótulos.
+   ========================================================================== */
+.sp-grafica .recharts-cartesian-grid line { stroke: var(--sp-line-soft); }
+.sp-grafica .recharts-cartesian-axis-line,
+.sp-grafica .recharts-cartesian-axis-tick-line { stroke: var(--sp-line-soft); }
+.sp-grafica .recharts-cartesian-axis-tick-value { fill: var(--sp-ink-500); }
+.sp-grafica .recharts-tooltip-cursor { stroke: var(--sp-line-strong); }

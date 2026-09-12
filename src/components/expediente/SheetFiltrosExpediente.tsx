@@ -259,7 +259,16 @@ export function SheetFiltrosExpediente({
             </div>
           </div>
 
-          <div className="px-5 py-4 border-t border-slate-100 flex-shrink-0">
+          {/* ⚠️ EL RELLENO DE ABAJO LLEVA LA BARRA DE GESTOS SUMADA (bloque 6 ·
+              paso 10). Esta hoja va anclada al borde inferior de la pantalla, y
+              desde que el viewport es `viewport-fit=cover` ese borde es el
+              FÍSICO: «Ver resultados» —el único botón que la cierra aplicando
+              los filtros— quedaba a medias bajo la barra de gestos.
+              El 1rem de `py-4` no se toca: se suma. Donde el sistema no se
+              superpone, `env()` vale 0 y esto es el `py-4` de siempre.
+              ⚠️ ARRIBA NO HACE FALTA: la hoja mide como mucho `85vh` desde
+              abajo, así que su borde superior nunca llega a la muesca. */}
+          <div className="px-5 py-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] border-t border-slate-100 flex-shrink-0">
             <button
               type="button"
               onClick={verResultados}

@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { paciente_id, consultorio_id } = body
+    const { paciente_id, consultorio_id, appointment_id } = body
     if (!paciente_id) return NextResponse.json({ error: 'paciente_id requerido' }, { status: 400 })
 
     // Fase 2.6: consultorio_id es obligatorio para nuevas consultas (multiconsultorio).
@@ -184,6 +184,42 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    /* ── ¿DE QUÉ CITA SALIÓ ESTA CONSULTA? (plan §12.13) ────────────────────
+       El id llega por el `?cita=` del enlace de «Iniciar consulta» y viaja en
+       el cuerpo. Se resuelve AQUÍ, antes del INSERT, porque la columna entra en
+       la misma escritura.
+
+       ⚠️ NINGÚN FALLO DE ESTE BLOQUE PUEDE IMPEDIR QUE SE GUARDE LA NOTA. Es la
+       decisión de §12.13 llevada a su sitio: bloquear la atención de un paciente
+       por un vínculo que no cuadra es peor que una cita con el estado
+       desactualizado. Un id malformado, una cita de otra clínica, una cita de
+       OTRO paciente o una que no existe caen todas al mismo sitio —se ignora el
+       vínculo, se guarda la nota, queda la línea de log— y no a un 400 que
+       dejaría al médico sin poder guardar lo que acaba de escribir.
+
+       LA COMPROBACIÓN DEL PACIENTE NO ES CEREMONIA. Sin ella, un id manipulado
+       en la barra de direcciones marcaría como atendida cualquier otra cita
+       visible para quien escribe. La RLS de `appointments_select` ya acota
+       clínica y médico —por eso basta con el cliente de sesión, sin admin—,
+       pero no sabe nada del paciente de esta consulta. */
+    const UUID_CITA = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    let citaVinculada: string | null = null
+    if (typeof appointment_id === 'string' && appointment_id !== '') {
+      if (!UUID_CITA.test(appointment_id)) {
+        console.error('[POST /api/consultas] appointment_id con formato inválido; se guarda la nota sin vincular')
+      } else {
+        const { data: cita } = await supabase
+          .from('appointments')
+          .select('id')
+          .eq('id', appointment_id)
+          .eq('clinica_id', profile.clinica_id)
+          .eq('paciente_id', paciente_id)
+          .maybeSingle()
+        if (cita) citaVinculada = cita.id
+        else console.error('[POST /api/consultas] la cita no existe, no es de esta clínica o es de otro paciente; se guarda la nota sin vincular')
+      }
+    }
+
     const { data: clinica } = await supabase
       .from('clinicas')
       .select('logo_url')
@@ -220,9 +256,62 @@ export async function POST(req: NextRequest) {
       consultorio_direccion:     consultorio.direccion,
       consultorio_telefono:      consultorio.telefono,
       consultorio_timezone:      consultorio.timezone,
+      // De qué cita salió. NULL cuando el paciente llegó sin agendar, que es un
+      // caso corriente y no una carencia.
+      appointment_id:            citaVinculada,
     }).select().single()
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+    /* ── MARCAR LA CITA COMO ATENDIDA (plan §12.13) ─────────────────────────
+       Va DESPUÉS del INSERT y a propósito: si la nota no se guardó, no hay
+       nada que atestiguar.
+
+       ── POR QUÉ AQUÍ Y NO EN EL BOTÓN ────────────────────────────────────
+       §12.13 decía que lo escribiera «Iniciar consulta» al pulsarlo. No se
+       puede: los tres botones son enlaces de navegación, así que una petición
+       disparada en el clic compite con la navegación y el navegador puede
+       abortarla — «el estado no se guarda» sería el caso normal, no el raro. Y
+       el «se reintenta» que aquel texto prometía no tenía dónde vivir.
+       Aquí no hay petición que abortar, no hace falta reintento, y da igual
+       desde cuál de los tres botones se haya llegado. Efecto secundario y
+       buscado: quien pulsa y se arrepiente sin escribir nada NO deja la cita
+       marcada.
+
+       ── LA IDEMPOTENCIA SALE DEL `WHERE`, NO DE UNA LECTURA PREVIA ────────
+       El `.in(...)` es a la vez la transición permitida y la idempotencia. Una
+       segunda consulta sobre la misma cita no casa ninguna fila y no hace nada.
+       Sin leer antes de escribir no hay carrera entre las dos cosas.
+
+       ── 'cancelled' Y 'no_show' NO SE TOCAN, Y ES DELIBERADO ──────────────
+       Machacarlos borraría una afirmación que alguien hizo a propósito. Y en
+       'cancelled' hay una segunda razón: su evento de Google lleva el prefijo
+       «CANCELADA — » en el título, así que la base diría «atendida» mientras el
+       calendario del paciente sigue diciendo lo contrario. Si el caso ocurre de
+       verdad, se corrige a mano en el modal, que es donde se afirmó.
+
+       ── CERO FILAS NO ES UN ERROR, Y UN FALLO TAMPOCO ABORTA NADA ─────────
+       La nota ya está guardada y es lo que importa. Como mucho, la línea de log.
+
+       ── COSTE ACEPTADO: GOOGLE NO SE ENTERA ──────────────────────────────
+       Esto no pasa por `PUT /api/appointments/[id]`, así que el evento conserva
+       su color y no recibe el colorId de 'attended'. Replicarlo aquí metería un
+       `events.get` + `events.patch` en el camino crítico de guardar una nota
+       clínica, a cambio de un matiz de color en un evento que ya pasó. El
+       colorId sí funciona cuando alguien marca el estado a mano desde el modal.
+
+       `clinica_id` explícito aunque el cliente sea el de sesión y la RLS ya
+       acote: deja la barrera escrita para quien mañana cambie el cliente. */
+    if (citaVinculada) {
+      const { error: errCita } = await supabase
+        .from('appointments')
+        .update({ status: 'attended', updated_at: new Date().toISOString() })
+        .eq('id', citaVinculada)
+        .eq('clinica_id', profile.clinica_id)
+        .in('status', ['scheduled', 'confirmed'])
+      if (errCita) console.error('[POST /api/consultas] no se pudo marcar la cita como atendida:', errCita.message)
+    }
+
     return NextResponse.json({ consulta })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Error interno'

@@ -673,6 +673,22 @@ inherentemente best-effort.
 
 **Acción pendiente (proyecto aparte, NO bloquea billing):** correr `npm audit` (sin fix) para inventariar las 8 vulnerabilidades altas, determinar cuáles afectan runtime de producción vs. dev/build únicamente, y decidir mitigaciones caso por caso. Sesión dedicada, fuera del proyecto de cierre de fugas de billing Stripe.
 
+### DEP-DT-2 — Dos módulos que solo se distinguían por la mayúscula (RESUELTO)
+
+**Detectado:** 2026-08-07, al empezar el Paso 4.1 del sistema de documentos v2 desde un Mac. **Introducido:** Paso 2, al construir 2.J.
+
+**Síntoma:** `npm run build` y `tsc --noEmit` fallaban en HEAD limpio, sin ningún cambio local. El build además avisaba por su cuenta: *«There are multiple modules with names that only differ in casing.»* En tiempo de render, `ParserBloques` entraba como `undefined` y react-pdf lanzaba *«Element type is invalid»* señalando a `EntradaNumerada`, que es quien lo consume — el error apuntaba al consumidor, no a la causa.
+
+**Causa raíz:** `src/lib/pdf/v2/parserBloques.ts` (el analizador) y `src/lib/pdf/v2/ParserBloques.tsx` (el componente 2.J) solo se distinguían por la mayúscula inicial. En Linux son dos archivos y todo resuelve; en un filesystem case-insensitive —macOS, Windows— son el mismo nombre, y tanto webpack como vite prueban `.ts` antes que `.tsx`: `import ParserBloques from './ParserBloques'` traía el analizador, que no tiene default export.
+
+**Por qué no se vio antes:** el entorno oficial es WSL/Ubuntu y Vercel deploya en Linux, así que **compilaba en los dos sitios donde se miraba**. Es un defecto que solo aparece al cambiar de máquina.
+
+**Fix aplicado:** `parserBloques.ts` → `analizadorBloques.ts`, que es como su propia cabecera ya lo llamaba («el analizador de 2.J»). Dos imports actualizados: `ParserBloques.tsx` y `parserBloques.test.ts`. Ninguna línea de lógica cambió. Tras el renombrado: `tsc` 0 errores, build completo, 195/195 pruebas.
+
+**Regla permanente,** para que no vuelva: está en `CLAUDE.md` § *Estilo de código*, junto a la convención que lo produjo — PascalCase para el componente y camelCase para su utilidad hermana generan el par colisionante sin que nadie lo busque.
+
+**Pendiente menor, no bloqueante:** el archivo de pruebas sigue llamándose `parserBloques.test.ts` y prueba el analizador. No colisiona con nada, así que se deja; renómbrese a `analizadorBloques.test.ts` la próxima vez que se toque.
+
 ---
 
 ## Billing — Cierre de fugas Stripe
@@ -2782,6 +2798,1418 @@ control» de `globals.css`.
   `disabled`. El ref suelto no sirve de nada mientras el atributo siga puesto.
   Conviene tenerlo escrito porque invita a diagnosticar mal: quien vea el
   botón muerto pensará que falló el cerrojo, y el cerrojo funcionó.
+
+---
+
+## Documentos — modal posterior a la generación
+
+### DOC-DT-1 — `NotaHonorariosForm` mantiene un Portal propio para ganarle a un z-index que ya no existe
+- **Estado:** 🔴 abierta
+- **Detectada:** 2026-08-06, al investigar el `z-[9999]` del overlay de
+  documentos de `nueva-nota/page.tsx` antes del modal posterior a la generación.
+- **Archivo afectado:** `src/components/documentos/NotaHonorariosForm.tsx:783-786`
+  (el bloque `{modalConfirm && (<Portal>…)}`).
+- **Descripción:** el modal de confirmación de ese formulario no usa
+  `ModalShell`: monta su propio `<Portal>`, su propio backdrop
+  (`bg-black/40 backdrop-blur-sm`) y su propia animación, todo dentro de un
+  contenedor `fixed inset-0 z-[10000]`. El 10000 no es un valor de diseño: es
+  exactamente uno más que el `z-[9999]` que tenía el overlay de documentos de
+  `nueva-nota`, dentro del cual este formulario se monta. Era la única forma de
+  que la confirmación se viera por encima del formulario que la dispara.
+- **Qué cambió:** el 2026-08-06 ese overlay bajó a `z-50` (commit del arreglo de
+  z-index; ver el comentario largo en `nueva-nota/page.tsx:1852`). Con el overlay
+  en la capa base de `ModalShell`, **el `z-[10000]` dejó de tener razón de ser**:
+  `<ModalShell elevated>` (`z-[60]`) ya basta para apilarse sobre él.
+- **Fix pendiente:** migrar `modalConfirm` a `<ModalShell elevated>` y borrar el
+  Portal, el backdrop y el manejo de cierre propios. Deja de duplicar el
+  scroll-lock, el Escape y la geometría que `ModalShell` ya resuelve, y elimina
+  el último `z-[10000]` suelto del codebase fuera de `OnboardingGuide`.
+- **No se hizo en el momento de detectarlo** para no mezclar un refactor de ese
+  formulario con el arreglo de z-index ni con el modal posterior a la generación.
+  Ninguno de los dos lo necesita: `z-[10000]` sigue estando por encima de todo.
+- **Cuándo atacar:** sin urgencia (no hay defecto visible). Cuando se vuelva a
+  tocar `NotaHonorariosForm` por cualquier otro motivo.
+
+---
+
+## Firmado del consentimiento — geometría del trazo
+
+### FIR-DT-1 — La rúbrica del médico topa el ancho en 400 px: el mismo defecto de grosor, esperando
+- **Estado:** 🔴 abierta (latente: hoy no se manifiesta)
+- **Detectada:** 2026-08-12, al normalizar el trazo de la firma capturada. La
+  rúbrica del médico se usó como patrón de referencia para fijar el grosor
+  impreso, y al mirar cómo se produce apareció esto.
+- **Archivo afectado:** `src/components/perfil/FirmaCaptura.tsx:66`
+  (`const scale = Math.min(400 / cropW, 200 / cropH, 1)`).
+- **Descripción:** `FirmaBox` coloca las firmas con `objectFit: contain` en una
+  celda de 245,76 × 48 pt, y el recorte a la tinta deja esa colocación
+  **limitada por el alto**. De ahí sale, exacta:
+
+  ```
+  dpi impresos = 1,5 × (alto de la imagen en píxeles)
+  grosor       = trazo_px ÷ dpi
+  ```
+
+  Para que el grosor impreso no dependa de cada firma, la imagen tiene que
+  llegar al PDF con **200 px de alto** — que es la celda a 300 dpi. La rúbrica
+  del médico se normaliza con un `contain` en **400 × 200**, y ese 400 es el
+  problema: **una rúbrica más ancha que 2 : 1 la limita el ANCHO**, sale con
+  menos de 200 px de alto y se imprime a menos de 300 dpi, con el trazo
+  proporcionalmente más grueso.
+
+  Ejemplo: una rúbrica de proporción 3,2 : 1 saldría 400 × 125 → 187 dpi → el
+  trazo imprime un 60 % más grueso que el de una rúbrica cuadrada.
+- **Por qué hoy no se ve:** la rúbrica actual mide **349 × 200** — proporción
+  1,745, por debajo del 2 : 1, así que el tope del ancho no llega a morder y sale
+  a 200 px de alto exactos. Es la única razón por la que ha funcionado, y por la
+  que sirvió de patrón fiable para calibrar el resto.
+- **Fix pendiente:** subir el tope del ancho de 400 a **1024** — la celda
+  completa a 300 dpi—, de modo que el `contain` quede en `1024 × 200` y el alto
+  mande salvo en rúbricas de más de 5,12 : 1, donde el ancho también da 300 dpi.
+  Es el mismo espacio canónico que ya usa `firmaTrazo.ts`. Una línea.
+- **Ojo con el efecto colateral:** la rúbrica se usa en los NUEVE formatos, no
+  solo en el consentimiento. Subir el tope hace que rúbricas anchas se guarden
+  con más píxeles, lo que cambia su tamaño impreso en cualquier formato cuya
+  celda tenga otra geometría. Hay que revisar los demás antes de tocarlo.
+- **Cuándo atacar:** sin urgencia mientras ninguna cuenta suba una rúbrica de más
+  de 2 : 1. En cuanto alguna lo haga, se manifiesta sin aviso. Buen momento: la
+  próxima vez que se toque `FirmaCaptura.tsx` o la geometría de firmas de v2.
+- **Contexto largo:** `GUIA_FORMULARIOS_05_FIRMADO_CONSENTIMIENTO.md` §5.5.2 a
+  §5.5.5, reescritas el 2026-08-12 con la medición que destapó el defecto
+  equivalente en la firma capturada.
+
+---
+
+## Aislamiento entre clínicas — auditoría pendiente
+
+### ISO-DT-1 — Auditoría de aislamiento entre clínicas: `createAdminClient()`, índices únicos y buckets
+- **Estado:** 🔴 abierta (PRIORIDAD ALTA)
+- **Detectada:** 2026-08-16, al cerrar los defectos de la agenda y la
+  integración con Google Calendar. No es un hallazgo teórico: los tres casos de
+  abajo aparecieron uno tras otro en el mismo trabajo.
+- **Archivos afectados:** todos los que llaman a `createAdminClient()` (por
+  enumerar en el paso 1), más las restricciones e índices únicos del esquema y
+  las policies de los buckets de Storage.
+- **Riesgo:** fuga de datos entre clínicas por código que esquiva la RLS.
+
+  La RLS protege las tablas, pero `createAdminClient()` la desactiva por
+  completo. Cada sitio que lo usa es una zona sin frontera donde un filtro por
+  `clinica_id` olvidado se convierte en una fuga entre inquilinos. La superficie
+  crece con cada trabajo en segundo plano que agregamos.
+- **Casos ya encontrados y corregidos**, que muestran que no es teórico:
+  - `desvincularCitas` en `src/lib/gcal.ts` — sin `clinica_id` en el filtro, la
+    rama de `medico_id IS NULL` habría desvinculado citas huérfanas de **todas**
+    las clínicas, porque esa función corre con cliente admin.
+  - El índice único sobre `google_event_id` nació global. Un evento de Google
+    compartido entre dos clínicas habría hecho fallar la inserción de una por
+    culpa de la otra. Corregido a `(clinica_id, google_event_id)`.
+  - El `mutate('/api/me/clinica', null)` del cierre de sesión apuntaba a una
+    clave que dejó de existir: la marca de la clínica anterior sobrevivía al
+    cambio de cuenta en la misma máquina.
+- **Segunda familia del mismo riesgo:** cualquier restricción o índice único que
+  no lleve `clinica_id` acopla inquilinos entre sí. Hay que revisarlos todos.
+- **La auditoría pendiente:**
+  1. Enumerar todos los sitios que llaman a `createAdminClient()` y verificar
+     que cada consulta filtra por `clinica_id`.
+  2. Revisar todas las restricciones e índices únicos y confirmar que los que
+     deberían ser por clínica lo sean.
+  3. Revisar las policies de los buckets de Storage, que son superficie aparte
+     de la RLS de las tablas.
+- **Por qué es prioridad alta:** es la única familia de fallo que expone datos
+  de una clínica a otra. Todo lo demás en este archivo degrada la experiencia;
+  esto rompe la confianza del producto.
+- **Cuándo atacar:** sesión dedicada, propia. No se resuelve de paso dentro de
+  otro trabajo.
+
+---
+
+## Migraciones — reconciliación de cabeceras
+
+### MIG-DT-1 — Nueve de doce cabeceras dicen «PENDIENTE DE APLICAR» estando aplicadas
+- **Estado:** 🟠 abierta. Registrada el 2026-08-17; **no se corrige en el commit
+  que la registra**, y la razón está en «Cómo se corrige».
+- **Archivos afectados:** los doce que hoy devuelve
+  `grep -l "PENDIENTE DE APLICAR" supabase/migrations/*.sql`.
+- **Qué pasa:** el rótulo está en la **primera línea del archivo**, es lo primero
+  que ve cualquiera que lo abra, y en la mayoría de los casos es falso. Quien lo
+  lee en frío concluye que el cambio no está en producción cuando lleva días
+  vigente, y decide sobre esa base: reaplicarlo, o construir encima de un
+  esquema que cree que no existe.
+- **Causa, que no es descuido:** cambió el flujo de trabajo y nadie lo declaró.
+  Hasta julio el archivo se commiteaba **después** de aplicar —por eso los de la
+  etapa 5 llevan `-- Aplicado a producción: 2026-05-30` y era cierto al
+  escribirse; por eso también sólo dos archivos de todo el repo se han
+  modificado tras su primer commit—. Desde agosto, con el flujo de planear
+  primero, el archivo se commitea **antes** de aplicar: el rótulo nace cierto y
+  **no hay ningún paso posterior que vuelva a mirarlo**.
+- **Ya se intentó arreglar desde el archivo siguiente y no funcionó:**
+  `20260813_formato_version_inmutable.sql:13-15` deja escrito que la cabecera de
+  `20260804_documentos_formato_version.sql` «sigue diciendo PENDIENTE DE APLICAR
+  y es falsa. Igual que ocurrió con las de folio». Eso se escribió el 13 de
+  agosto; el 17 el rótulo sigue ahí y se le han sumado tres archivos más. Quien
+  abre el archivo viejo no está leyendo el nuevo.
+- **Prevención, ya aplicada:** `supabase/AUDITORIA-MIGRACIONES.md` §7 convierte
+  actualizar la línea `-- ESTADO:` en el último paso de aplicar una migración, y
+  fija la frontera de qué se puede editar en un archivo ya aplicado. Eso detiene
+  la hemorragia; no repara lo ya escrito.
+- **Cómo se corrige, y por qué no ahora:** deduciendo cuáles están aplicadas se
+  cambia una mentira por otra. La reconciliación se hace **comprobando contra la
+  base qué objetos de cada migración existen** —tablas, columnas, índices,
+  policies, funciones— y escribiendo la fecha real, o `pendiente` si de verdad
+  lo está. Es un trabajo de una sesión propia, con la base delante.
+- **Punto de partida para esa sesión** — lo que hoy consta y lo que no:
+
+  | Archivo | Qué consta |
+  |---|---|
+  | `20260804_documentos_formato_version.sql` | aplicada (`20260813_formato_version_inmutable.sql:13`) |
+  | `20260807_folio_01_esquema_y_generador.sql` | aplicada («las de folio», misma cita) |
+  | `20260811_folio_03_denegacion.sql` | aplicada (misma cita) |
+  | `20260812_documentos_estado.sql` | aplicada (`20260813_firmas_documento.sql:81`) |
+  | `20260815_gcal_calendario_propio_a_esquema.sql` | aplicada el 2026-08-15 |
+  | `20260815_gcal_calendario_propio_b_datos.sql` | aplicada el 2026-08-15 |
+  | `20260817_gcal_conexion_clinica_a_esquema.sql` | aplicada el 2026-08-17 — **ya corregida**, ver su cabecera |
+  | `20260804_profiles_flag_documentos_v2.sql` | sin verificar |
+  | `20260810_plantillas_documento.sql` | sin verificar |
+  | `20260813_firmas_documento.sql` | sin verificar |
+  | `20260813_formato_version_inmutable.sql` | sin verificar |
+  | `20260817_gcal_conexion_clinica_b_retiro.sql` | **pendiente de verdad**: se aplica después del deploy y de un periodo de reposo |
+
+  Siete con evidencia documental, cuatro sin verificar y uno correcto. La cuenta
+  de nueve falsas es la estimación de trabajo, no un hecho comprobado: cuál de
+  los cuatro está aplicado es justo lo que hay que ir a mirar.
+- **Riesgo si se deja:** bajo por sí solo, alto como multiplicador. Ninguna de
+  estas líneas rompe nada al ejecutarse —no se ejecutan—, pero son la primera
+  fuente de contexto de cualquiera que trabaje sobre el esquema, y hoy esa
+  fuente miente más veces de las que acierta.
+
+---
+
+## Permisos — superficie de ejecución de las funciones de `public`
+
+### ACL-DT-1 — Funciones de `public` ejecutables por `anon` sin quererlo: un caso confirmado y un alcance sin medir
+- **Estado:** 🟠 abierta. Registrada el 2026-08-17 al auditar el puente de secretos de Google (hallazgo H12 de esa auditoría).
+- **Archivo con el caso confirmado:** `supabase/migrations/20260615_consultorios_05_marcar_default_rpc.sql:115`.
+- **Alcance real:** sin medir. Ver «La consulta que falta».
+
+- **El caso.** Esa migración hace
+  `REVOKE EXECUTE ON FUNCTION public.marcar_consultorio_default(uuid) FROM PUBLIC;`
+  y después `GRANT EXECUTE … TO authenticated`. No revoca de `anon` ni de
+  `authenticated`, así que **`marcar_consultorio_default` es hoy ejecutable por
+  `anon`**. Lo llamativo es que la propia migración lo sabía: su comentario de
+  `:112-114` dice que «en Supabase, anon/authenticated/service_role mantienen
+  EXECUTE por configuración del proyecto independiente del REVOKE FROM PUBLIC»,
+  y aun así se quedó con el patrón que no lo quita.
+
+- **No es una fuga, y conviene decirlo con precisión para no inflar la
+  prioridad.** La función está protegida por dentro: resuelve el médico con
+  `auth.uid()`, que sin sesión es NULL, y entonces no encuentra fila y no hace
+  nada. Lo que hay es **superficie que no debería existir**: un endpoint RPC
+  alcanzable sin sesión cuya única defensa es su propio cuerpo. El día que
+  alguien edite ese cuerpo y quite el filtro, no hay una segunda barrera.
+
+- **Y esto es un patrón, no un caso.** Verificado contra producción: el
+  `pg_default_acl` de `public` para objetos de tipo `f` es
+  `{postgres=X, anon=X, authenticated=X, service_role=X}`. Es decir, **toda
+  función creada en `public` nace ejecutable por `anon` y por `authenticated`**,
+  por concesión directa a esos roles y no vía `PUBLIC` — por eso
+  `REVOKE … FROM PUBLIC` no la quita. Cualquier migración que haya creado una
+  función en `public` y sólo haya revocado de `PUBLIC` tiene el mismo agujero.
+
+- **El patrón correcto**, y ya hay precedente en el repo:
+
+  ```sql
+  REVOKE ALL ON FUNCTION public.<nombre>(<tipos>) FROM PUBLIC, anon, authenticated;
+  GRANT EXECUTE ON FUNCTION public.<nombre>(<tipos>) TO <el rol que la necesite>;
+  ```
+
+  Las dos sentencias van siempre juntas y en ese orden. Aplicado así en
+  `20260818_gcal_puente_secretos.sql` §4 para las tres funciones del puente, y
+  en `20260807_folio_01_esquema_y_generador.sql:612-613` para `generar_folio`.
+
+- **La consulta que falta, y es de sólo lectura.** Contesta cuántas funciones de
+  `public` están hoy ejecutables por `anon` o `authenticated`. Correr en el SQL
+  Editor; no cambia nada:
+
+  ```sql
+  SELECT n.nspname || '.' || p.proname
+           || '(' || pg_get_function_identity_arguments(p.oid) || ')'   AS funcion,
+         p.prosecdef                                                    AS security_definer,
+         pg_get_userbyid(p.proowner)                                    AS dueno,
+         has_function_privilege('anon',          p.oid, 'EXECUTE')      AS anon,
+         has_function_privilege('authenticated', p.oid, 'EXECUTE')      AS authenticated
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+   WHERE n.nspname = 'public'
+     AND p.prokind = 'f'
+     -- Las funciones de trigger no son invocables ni por SQL normal ni por
+     -- PostgREST: cuentan como ruido y taparían lo que importa.
+     AND p.prorettype <> 'trigger'::regtype
+     AND (has_function_privilege('anon',          p.oid, 'EXECUTE')
+       OR has_function_privilege('authenticated', p.oid, 'EXECUTE'))
+   ORDER BY has_function_privilege('anon', p.oid, 'EXECUTE') DESC,
+            p.prosecdef DESC,
+            p.proname;
+  ```
+
+- **Cómo se lee el resultado, porque contar no basta.** Tener `EXECUTE` no es
+  un defecto por sí solo: hay funciones que `authenticated` **debe** poder
+  ejecutar —los RPC de la aplicación— y helpers que las policies invocan. El
+  triaje es por columnas:
+  - **`anon = true`: debería salir vacío o casi.** Cada fila es un endpoint
+    alcanzable sin sesión. Empezar por aquí.
+  - **`anon = true` y `security_definer = true` a la vez: es el extremo
+    afilado.** La función corre con los privilegios de su dueño y la puede
+    llamar cualquiera sin autenticarse.
+  - **`authenticated = true`:** revisar una por una contra la lista de RPC que
+    la aplicación llama de verdad. Lo que no esté en esa lista sobra.
+
+- **Por qué no se resuelve aquí ni en la rama de Google Calendar.** El arreglo
+  es una migración de `REVOKE`/`GRANT` sobre N funciones, y no se puede escribir
+  hasta saber cuáles y cuáles de ellas alguien llama legítimamente. Revocar a
+  ciegas rompe RPC en producción. Primero la consulta, después la lista, después
+  la migración — con su veredicto afirmando el resultado en las dos direcciones,
+  como pide la dimensión 15 de `supabase/AUDITORIA-MIGRACIONES.md`.
+
+- **Familia.** Es la misma que **MIG-DT-1** (reconciliación de cabeceras de
+  migración) y que **ISO-DT-1** (auditoría de aislamiento entre clínicas):
+  cosas que se dieron por ciertas sin comprobar nunca la dirección permisiva. En
+  las tres se comprobó que lo cerrado estaba cerrado y no que lo abierto
+  estuviera abierto —o al revés—, y en las tres el remedio empieza por una
+  consulta de sólo lectura contra producción antes de escribir una línea de SQL.
+  Si algún día se agrupan en una sola sesión de saneamiento, van juntas.
+
+---
+
+## Auditoría — durabilidad de las escrituras en `audit_log`
+
+### LOG-DT-1 — `logAudit` sin `await`: el registro se pierde a veces, y en silencio
+- **Estado:** 🔴 abierta. Registrada el 2026-08-21 al construir la ruta de
+  invitación de citas (Rama 1, conexión de Google por clínica). **Es un hallazgo
+  de CUMPLIMIENTO, no de higiene de código** — ver «Por qué es cumplimiento».
+- **Prioridad:** alta. No bloqueante de lanzamiento como RG-01, pero por encima
+  de cualquier entrada de estilo o de UI de este documento.
+- **Función implicada:** `src/lib/audit.ts:100-114`.
+- **Alcance:** 15 llamadas sin esperar, de las cuales **8 tocan datos personales**
+  y 4 más son de autenticación. Lista completa abajo.
+
+- **Qué pasa.** `logAudit` es `async` y hace `await` sobre el `insert` en
+  `audit_log` dentro de un `try/catch` que se traga el error. Ese `catch`
+  garantiza que la función **nunca lance**; no garantiza que **termine**.
+
+  Cuando se la llama sin `await`, la promesa del `insert` sigue viva en el
+  momento en que la ruta devuelve la respuesta. En Vercel la función puede
+  congelarse o reclamarse en cuanto la respuesta se vacía, y el trabajo que no
+  pasa por `after()` no tiene ninguna garantía de completarse.
+
+- **⚠️ El modo de fallo es el peor posible, y es lo que hace que esto no se haya
+  detectado antes.** Congelar no es instantáneo, así que el `insert` **casi
+  siempre llega**. Se pierde de vez en cuando, sin excepción, sin log y sin
+  ningún síntoma del lado del usuario. Nadie sospecha del hueco porque el
+  registro está ahí el 99% de las veces que alguien va a mirarlo.
+
+  **Precisión honesta sobre lo verificado:** el mecanismo es comportamiento
+  documentado de la plataforma, no una pérdida observada en este repositorio. Y
+  no se puede observar por construcción — la única forma de medirlo sería
+  comparar operaciones ejecutadas contra entradas escritas, que es justo lo que
+  el `audit_log` debería poder contestar y aquí no puede.
+
+- **No hay convención de repo a la que apelar.** 16 llamadas la esperan y 15 no.
+  Y el reparto es exactamente el contrario del que convendría: las que **sí**
+  esperan están concentradas en `super-admin` registrando **LECTURAS** de
+  paneles; las que **no** esperan incluyen las **ESCRITURAS y los accesos sobre
+  datos personales**.
+
+- **Las ocho que importan** (todas verificadas el 2026-08-21):
+  - `src/app/api/email/enviar-documento/route.ts:246` — `enviar_documento_denegado`
+  - `src/app/api/email/enviar-documento/route.ts:280` — `enviar_documento_denegado`
+  - `src/app/api/email/enviar-documento/route.ts:350` — `enviar_documento`
+  - `src/app/api/pacientes/[id]/correo/route.ts:142` — `actualizar_paciente_correo`
+  - `src/app/api/paciente/[id]/exportar/route.ts:140` — `arco_acceso` · **ver el bloque de abajo**
+  - `src/app/api/pacientes/[id]/vincular/route.ts:73` — `vincular_medico`
+  - `src/app/api/admin/paciente/[id]/rectificar/route.ts:75` — `arco_rectificacion`
+  - `src/app/api/admin/paciente/[id]/anonimizar/route.ts:78` — `arco_cancelacion`
+
+  Del mismo tipo pero de autenticación: `src/app/api/auth/rate-limit/route.ts:41`,
+  `:54`, `:72`, y `src/app/api/auth/audit-login/route.ts:31`.
+
+- **⚠️⚠️ EL CASO ARCO, Y VA APARTE PORQUE ESTÁ EXACTAMENTE DEL REVÉS.**
+  En `src/app/api/paciente/[id]/exportar/route.ts` conviven las dos formas:
+
+  | Línea | Acción | ¿Espera? |
+  |---|---|---|
+  | `:73` | `arco_intento_denegado` | **SÍ** |
+  | `:140` | `arco_acceso` | **NO** |
+
+  O sea: **el intento RECHAZADO queda registrado con garantía, y la entrega
+  efectiva del expediente completo no.** Ante una reclamación por derechos ARCO
+  lo que se aporta es el `audit_log`: hay garantía de poder probar a quién se le
+  **negó** el acceso, y no la hay de probar a quién se le **entregaron** los
+  datos. Es al revés de lo que hace falta demostrar.
+
+  **Y no es un descuido: es una decisión razonada en la dirección equivocada.**
+  El comentario de `:68-71` explica el `await` del denegado diciendo que «aquí no
+  hay nada que entregar al usuario, así que no hay prisa que justifique perder el
+  evento». El razonamiento es correcto y su recíproco es el defecto: en el camino
+  que **sí** entrega, se aceptó perder el evento a cambio de prisa — y ése es
+  precisamente el evento que hay que conservar.
+
+- **Por qué es cumplimiento y no higiene.** Los datos de salud son datos
+  personales sensibles bajo la LFPDPPP vigente (DOF 20/03/2025, reformada
+  14/11/2025), y **las multas se duplican tratándose de datos sensibles**
+  (`CLAUDE.md`). El `audit_log` no es telemetría: es el medio de prueba. Una
+  bitácora que a veces no se escribe es peor que no tenerla, porque se confía en
+  ella para afirmar lo que no puede sostener. Toca además el bloqueante de RG-01
+  «Audit log incompleto (existe, falta cobertura total de eventos)»: el hueco no
+  es sólo de eventos que no se registran, también de eventos que se intentan
+  registrar y no se sabe si quedaron.
+
+- **Fix propuesto.** Poner `await` en esas llamadas. Trivial de escribir —una
+  palabra por sitio, y `logAudit` no lanza, así que esperarla no introduce
+  ninguna rama de fallo nueva—, pero **cada una hay que mirarla por separado**
+  para comprobar que el viaje extra a Supabase no cambia de forma perceptible el
+  tiempo de respuesta de su ruta. Donde sí lo cambie, la alternativa es `after()`,
+  que es la herramienta que la plataforma ofrece justo para esto y que el repo ya
+  usa en `/api/appointments`.
+
+- **NO SE ARREGLA EN LA RAMA DE GOOGLE.** Toca ocho rutas que no tienen nada que
+  ver con el calendario, y mezclarlo con la conexión por clínica haría irrevertible
+  por separado un cambio que afecta a cumplimiento. Sesión propia.
+
+- **La ruta nueva ya nació con `await`** y por eso NO está en la lista de arriba:
+  `src/app/api/appointments/[id]/invitacion/route.ts:483` espera su
+  `enviar_invitacion_cita`, con el porqué escrito al lado para que nadie lo
+  «simplifique» al alinearlo con sus hermanas.
+
+- **Familia.** Es el mismo agujero que **LP-DT-21** (el audit del export de
+  expediente es fire-and-forget) visto desde el otro lado: aquél es del CLIENTE
+  —`ExportarExpedienteButton.tsx` llamando a `/api/audit` con `.catch(() => {})`—
+  y éste del SERVIDOR. **Y se componen:** `src/app/api/audit/route.ts:51`, que es
+  el destino de aquella llamada, tampoco espera su `logAudit`. Una exportación
+  desde el botón atraviesa por tanto dos tramos sin garantía seguidos. Si se
+  abren en la misma sesión, van juntas.
+
+- **Condición de cierre:** que toda escritura o acceso sobre datos personales
+  tenga su entrada en `audit_log` garantizada antes de que la ruta responda —por
+  `await` o por `after()`—, y que el reparto restante entre esperadas y no
+  esperadas sea una decisión escrita en cada sitio, no un accidente.
+
+---
+
+### LOG-DT-2 — la creación AUTOMÁTICA del calendario de Google no queda registrada
+
+- **Estado:** 🟡 abierta, menor. Registrada el 2026-09-01 al cerrar el commit 5
+  de la rama de Google (el registro de auditoría de las operaciones de
+  conexión). **Es un hueco conocido y aceptado, no un descuido.**
+- **Prioridad:** baja. Por debajo de LOG-DT-1 y de AG-DT-10, sus dos hermanas de
+  familia.
+- **Archivos implicados:** `src/lib/gcal.ts` — `conCalendarioSpinus` y
+  `crearCalendarioSpinus`.
+
+**Qué queda fuera.** El commit 5 registra los cuatro actos sobre la conexión:
+`gcal_conexion_alta`, `gcal_conexion_baja`, `gcal_calendario_recreado` y
+`gcal_conexion_revocada`. Los dos del calendario cubren los caminos que alguien
+**pide**: el del callback al conectar y el del botón de recrear de /perfil.
+
+**Falta el tercero, que es automático.** Cuando `calendar_id` está en null,
+`conCalendarioSpinus` crea el calendario solo, en la primera operación que lo
+necesite. Se llega ahí por dos vías reales: una conexión cuyo calendario falló
+al crearse en el callback, y un 404 porque el médico lo borró desde Google. Ese
+camino **cambia a qué calendario escribe la clínica** —los eventos del anterior
+quedan huérfanos— y hoy no deja entrada en `audit_log`.
+
+**Por qué no se atacó en el mismo commit, y no es pereza:**
+
+- Obliga a tocar `src/lib/gcal.ts`, un quinto archivo fuera del alcance
+  aprobado, y el commit ya tocaba cinco.
+- **Corre a veces dentro de `after()`**, o sea después de responder. Un
+  `await logAudit` ahí no tiene el mismo argumento de coste que en las cuatro
+  entradas del commit 5 (las cuatro cuelgan de un clic o de un redirect), y
+  decidir eso pide mirar los caminos de `after()` uno por uno.
+- Está en la frontera que el plan §8 dibujó a propósito entre «actos sobre la
+  conexión» (se registran) y «tráfico de citas» (no, o el `audit_log` se
+  convierte en un log de red). Esta creación es rara y consecuente, así que cae
+  del lado de los actos — pero se llega a ella desde el tráfico.
+
+**El enganche ya existe y es limpio:** `crearCalendarioSpinus` recibe
+`opciones.actorId` (`gcal.ts:327`), así que hay actor a mano sin cablear nada
+nuevo. La acción `gcal_calendario_recreado` sirve tal cual; lo que cambiaría es
+el `origen` de la descripción, `'sistema'` en vez del actor que pulsa.
+
+**Familia.** Va con **LOG-DT-1** (`logAudit` sin `await`) y con **AG-DT-10**
+(`appointments` sin trigger de auditoría): lagunas del rastro, no del
+calendario. Cuando se ataque, se ataca con ellas.
+
+---
+
+## Agenda — rediseño
+
+### AG-DT-1 — `mobileOpen` del Sidebar no se resetea al cruzar el breakpoint
+
+**Estado:** 🔴 abierta · **Archivo:** `src/components/layout/Sidebar.tsx:145`
+**Detectado:** 2026-08-25, de paso, midiendo el header de la agenda a 1024 px.
+**Alcance:** las 21 páginas de `(app)/layout.tsx`, no la agenda. Por eso NO se
+tocó en la rama `feature/rediseno-agenda`: el arreglo es de una línea, pero cae
+en el layout compartido de toda la app y merece su propia sesión y su propio QA.
+
+**El caso concreto**
+
+`mobileOpen` es estado local sin ninguna suscripción al ancho de la ventana. La
+única forma de apagarlo es `close()`, que cuelga del backdrop y del botón
+hamburguesa, y los dos son `lg:hidden`. Entonces:
+
+1. El usuario estrecha la ventana por debajo de 1024 —o abre las herramientas de
+   desarrollador acopladas al lado, que es la vía más frecuente y no parece un
+   redimensionado.
+2. Abre la barra lateral con la hamburguesa: `mobileOpen = true`.
+3. Vuelve a ensanchar por encima de 1024.
+
+A partir de ahí el estado queda encendido y **no hay ningún camino que lo apague
+mientras la ventana siga ancha**, porque sus dos únicos disparadores están
+ocultos por `lg:hidden`. Falta el `useEffect` con `matchMedia('(min-width:1024px)')`
+que llame a `close()` al cruzar hacia arriba.
+
+**⚠️ CORRECCIÓN AL PARTE ORIGINAL: HOY ESO NO SE VE, Y CONVIENE SABER POR QUÉ**
+
+El síntoma con el que se reportó era «la barra se queda encima del contenido sin
+forma de cerrarla». **No se reproduce con las clases actuales**, y quien vaya a
+arreglar esto debe saberlo para no ir a buscar un fallo visual que no está:
+
+- El `<aside>` es `${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`
+  (`Sidebar.tsx:253`). **Las dos ramas dan `translate-x-0` de `lg` en adelante**,
+  así que el estado rancio no mueve la barra ni un píxel.
+- El backdrop (`Sidebar.tsx:242`) es `lg:hidden`: no llega a pintarse, y por
+  tanto no hay nada tapando el contenido ni interceptando clics.
+- `<main>` es `lg:ml-64` (`(app)/layout.tsx:59`), o sea que en ancho la barra
+  tiene su propio carril y no se superpone a nada.
+
+Lo que queda es **estado rancio sin síntoma en el ancho**, con dos consecuencias
+reales aunque menores:
+
+- Al volver a estrechar, la barra aparece ABIERTA sola, sin que nadie la haya
+  pedido. Es molesto, pero se cierra: ahí la hamburguesa y el backdrop vuelven a
+  existir.
+- El icono de la hamburguesa está en `X` en vez de en `≡` la primera vez que
+  reaparece (`Sidebar.tsx:237`), o sea que anuncia «cerrar» sobre una barra que
+  el usuario ve por primera vez.
+
+**Por qué se anota igualmente:** el arreglo correcto es el mismo en los dos
+diagnósticos, y la ausencia de síntoma depende de que esas tres clases sigan
+exactamente como están. El día que la barra pase a `lg:static`, o que el backdrop
+pierda su `lg:hidden`, el bug se vuelve el bloqueo que se reportó — y entonces se
+descubre en producción y no aquí.
+
+---
+
+### AG-DT-2 — `.ag-tarjeta-hora` recorta el rango en multi-médico a 1280 px
+
+**Estado:** 🔴 abierta · **Archivo:** `src/app/globals.css:1870`
+(`.agenda-fc .ag-tarjeta-hora`)
+**Detectado:** 2026-08-25, en la auditoría del rediseño de la agenda.
+**Alcance:** NO se tocó en `feature/rediseno-agenda`. Es **preexistente** y es un
+problema **de ancho**, no de la escalera de alto que esa rama vino a arreglar:
+con los umbrales de tier anteriores los tres tiers de 30, 45 y 60 min salían
+idénticos en este caso, así que el rediseño no lo introdujo ni lo movió.
+
+**El caso concreto**
+
+Con más de un médico en la agenda, la tarjeta monta además
+`.ag-tarjeta-chip` con las iniciales. En vista Semana a 1280 px de viewport y
+con la barra lateral puesta, la columna de día mide **124 px**; descontados el
+relleno de `.ag-tarjeta` (9+9), el borde (1 + 3,5 del izquierdo engrosado), los
+márgenes de `.fc-timegrid-event` y `.fc-timegrid-col-events`, y el ancho del
+chip con su hueco, a `.ag-tarjeta-hora` le quedan **70 px** de los **75** que
+pide el rango («10:30 – 11:00», `tabular-nums` a 10,5 px/600). La regla lleva
+`overflow: hidden; text-overflow: ellipsis`, así que **no desborda: recorta en
+horizontal** y la hora de fin se queda a medias o en puntos suspensivos.
+
+**Por qué no se arregla de paso:** la salida obvia —caer a
+`.ag-tarjeta-hora-inicio`, la hora sola, como ya hace el tier `tiny`— es una
+decisión de producto (en multi-médico se pierde la hora de fin de un vistazo) y
+depende de una condición que hoy no existe en el CSS: «hay chip». El tier no
+sirve para expresarla, porque es de alto y esto es de ancho. Hay al menos tres
+caminos —una clase `--con-chip` desde el JS, un `@container` sobre la columna, o
+bajar el chip a la segunda fila cuando la columna es estrecha— y elegir pide su
+propia sesión.
+
+**Dónde vive lo relacionado:** la nota de LAS DOS HORAS en `globals.css:1881` ya
+documenta el mismo choque para el tier `tiny` sin chip, y es donde hay que
+enganchar la solución.
+
+---
+
+### AG-DT-3 — El all-day se lee en el huso del DISPOSITIVO, así que se corre un día
+
+**Estado:** 🔴 abierta · **Archivos:** `src/lib/dates.ts:10`,
+`supabase/migrations/20260826_agenda_all_day.sql` (el `COMMENT ON COLUMN`)
+**Detectado:** 2026-08-26, en la auditoría de la migración de `all_day`.
+**Alcance:** es el precio de guardar un rango de FECHAS en dos `timestamptz`.
+No lo introduce la columna: lo hace visible.
+
+**El caso concreto**
+
+`all_day` fija que `start_time` es medianoche del primer día «en la zona del
+consultorio». Pero la regla de lectura de este producto es la contraria, y está
+escrita: `src/lib/dates.ts:10` dice **«Las horas de CITAS se pintan en el huso
+del DISPOSITIVO de quien mira»**, y el huso del consultorio sólo se señala
+aparte, con un aviso. `consultorio_timezone` NO se usa para resolver la hora
+principal de nada.
+
+Vacaciones creadas en Cancún (`America/Cancun`, UTC-5) el 19 de agosto: se
+guarda `2026-08-19T05:00:00Z`. La secretaria las mira desde Mérida
+(`America/Merida`, UTC-6) y su dispositivo resuelve ese instante como
+**2026-08-18T23:00**, o sea el día 18. FullCalendar va con `timeZone: 'local'`,
+así que **la barra se pinta un día antes**. Con `renderEnTZ` pasa lo mismo en
+cualquier lector que no sea la agenda.
+
+**Por qué la mitigación que se escribió primero era falsa:** el encabezado de la
+migración decía que la deriva es aceptable «porque la cita guarda su zona». La
+guarda, sí, pero **nadie la lee** para esto. Guardar un dato que ningún lector
+consulta no mitiga nada.
+
+**Las dos salidas, y ninguna es un parche de lectura:** o el convenio de
+ESCRITURA se fija a un huso único y explícito para los `all_day` —y entonces
+`dates.ts` necesita una excepción escrita, como ya la tienen los documentos
+clínicos con `TZ_CLINICA`—, o se migra a columnas `date`, que es lo honesto
+para un rango de fechas. Elegir pide su propia sesión; lo que no vale es
+descubrirlo depurando.
+
+---
+
+### AG-DT-4 — `aplicarAppointmentAlEvento` no puede propagar `all_day`: no hay `setAllDay` en su bucle
+
+**Estado:** 🔴 abierta · **Archivo:** `src/app/(app)/agenda/page.tsx:3033`
+**Detectado:** 2026-08-26, misma auditoría.
+
+**El caso concreto**
+
+La función re-hidrata el evento pintado con la fila que devolvió el servidor.
+Hace `setStart` y `setEnd` explícitos y luego **fusiona `extendedProps` clave por
+clave**. `allDay` **no es un `extendedProp`**: es una propiedad de primer nivel
+de `EventApi`, y se cambia con `setAllDay(bool)`, que ahí no se llama.
+
+Consecuencia: la secretaria convierte una cita en bloqueo de todo el día desde
+su equipo; al médico le llega el eco por Realtime —`appointments` está publicada
+(`20260816`) con `REPLICA IDENTITY` default, así que `all_day` sí viaja en el
+payload—, la fusión escribe `extendedProps.all_day = true` y **el evento se
+queda en la rejilla horaria**, con su `start`/`end` ya movidos a medianoche. O
+sea: una barra de 24 horas atravesando la columna, y la ventana vertical de la
+rejilla abierta a las 24 h por `tramoDeEvento`. No falla nada; sólo está mal
+hasta el siguiente refetch.
+
+**El mismo agujero afecta al alta optimista**, que pasa por `buildEventInput`
+(`page.tsx:2996`) y hoy tampoco emite `allDay`.
+
+---
+
+### AG-DT-5 — La sincronización a Google manda `dateTime` siempre, y el ancla de hora mete una línea falsa en el correo al paciente
+
+**Estado:** 🔴 abierta · **Archivos:** `src/app/api/appointments/route.ts:386`,
+`src/app/api/appointments/[id]/route.ts:525`, `src/lib/appointments.ts:89-100`
+**Detectado:** 2026-08-26, misma auditoría.
+
+**El caso concreto, que son dos**
+
+**(a) El evento vuelve convertido en cita con hora.** Las dos rutas componen
+siempre `start: { dateTime: start_time, timeZone: tzCita }`. Para un evento de
+día completo la API de Google exige `{ date: 'YYYY-MM-DD' }`. Mandando
+`dateTime` **no falla**: Google acepta un evento con hora de 00:00 a 00:00 del
+día siguiente. El médico ve en su calendario una barra de 24 h atravesando la
+rejilla en vez de un evento de día completo. Y da la vuelta entera: `gcalSource`
+lo relee, `allDay: !e.start?.dateTime` sale **`false`**
+(`agenda/page.tsx:2936`), y regresa a la agenda como cita con hora. Es el
+recorrido que más se parece a «funciona» sin funcionar.
+
+**(b) El correo al paciente afirma una hora que no existe.** `anclaDeHora`
+(`appointments.ts:89`) se llama sin condición en `:249` y compone
+`«Hora de la cita: 12:00 a.m., hora del Sureste»` a partir de la medianoche del
+`all_day`. Esa línea va dentro del `description` del evento de Google, que es lo
+que le llega al paciente invitado. **Un bloqueo de vacaciones no tiene hora, y el
+correo dice que es a medianoche.** El comentario de `:247` es explícito en que
+el ancla va también en las citas sin paciente ligado «porque habla de la hora»;
+con `all_day` esa premisa deja de sostenerse.
+
+---
+
+### AG-DT-6 — `GET /api/appointments` filtra sólo por `start_time`: un evento de varios días desaparece al navegar
+
+**Estado:** 🔴 abierta · **Archivo:** `src/app/api/appointments/route.ts:46-47`
+**Detectado:** 2026-08-26, misma auditoría.
+**Alcance:** **preexistente.** Ya hoy pierde una cita con hora que cruce la
+medianoche del borde. `all_day` sólo lo vuelve frecuente, porque un evento de
+varios días es su caso normal.
+
+**El caso concreto**
+
+```ts
+if (from) query = query.gte('start_time', from)
+if (to)   query = query.lte('start_time', to)
+```
+
+Filtra por el INICIO. Unas vacaciones del 10 al 25 de agosto **desaparecen de la
+agenda al navegar a la semana del 17**: su `start_time` cae fuera del `from`, y
+`rangoQuePedir` ensancha a semanas completas, no a meses.
+
+**El arreglo ya está resuelto en el otro lado de la casa** —
+`src/app/api/google/events/route.ts:302-311` explica el problema y filtra por
+solape— **pero no se copia tal cual.** Aquel usa `.lte('start_time', timeMax)` y
+`.gte('end_time', timeMin)`, y con fin EXCLUSIVO eso es un off-by-one: un evento
+que termina justo en `timeMin` no solapa la ventana y aun así entraría. El
+predicado correcto es semiabierto, el mismo que `ventanaRejilla.ts:286` ya usa:
+
+```
+start_time <  to    → .lt('start_time', to)
+end_time   >  from  → .gt('end_time',  from)
+```
+
+O sea que arreglar esto **también corrige el patrón de `google/events`**, no lo
+imita.
+
+---
+
+### AG-DT-7 — Las cuatro consultas de «próximas citas» pierden el all-day de hoy
+
+**Estado:** 🔴 abierta · **Archivos:** `src/app/(app)/dashboard/page.tsx:177`,
+`src/app/(app)/dashboard/AsistenteDashboard.tsx:67`,
+`src/app/(launcher)/inicio/page.tsx:120-121`,
+`src/app/(app)/expediente/[id]/page.tsx:105`
+**Detectado:** 2026-08-26, misma auditoría.
+
+**El caso concreto**
+
+Las cuatro filtran por `start_time` contra «ahora» o contra el borde de un día,
+suponiendo que toda cita tiene hora. Un evento de todo el día empieza a las
+00:00, así que **su `start_time` está en el pasado durante casi todo el día que
+ocupa**.
+
+- `dashboard/page.tsx:177` y `AsistenteDashboard.tsx:67` → `.gt('start_time',
+  ahora)`: el bloqueo de todo el día **de hoy** no sale en «próximas citas».
+- `inicio/page.tsx:120-121` → `.gte(inicioHoy).lt(inicioManana)`: las vacaciones
+  de hoy sí entran; **las que empezaron ayer y siguen corriendo, no**.
+- `expediente/[id]/page.tsx:105` → mismo sesgo. Es el menos probable: unas
+  vacaciones no llevan paciente.
+
+**Ninguna revienta; las cuatro mienten por omisión**, que es lo que las hace
+difíciles de ver. Decidir si un all-day debe aparecer en «próximas citas» es de
+producto y va antes del arreglo.
+
+---
+
+### AG-DT-8 — Arrastrar o redimensionar en la banda de todo el día escribe una cita corrupta, sin deshacer
+
+**Estado:** 🟡 **abierta, con tapón puesto** · **Archivos:**
+`src/app/(app)/agenda/page.tsx:3487` (`esGestoDeTodoElDia`, la guarda), `:3494`
+(`handleEventDrop`), `:3558` (`handleEventResize`)
+**Detectado:** 2026-08-26, misma auditoría.
+**Depende de:** ~~que se encienda `allDaySlot`~~. **Ya está encendido** (bloque 5,
+2026-08-26): la banda se monta y el gesto es alcanzable. La descripción de abajo
+pasó de hipotética a real.
+
+> ### ⚠️ EL RIESGO DE CORRUPCIÓN ESTÁ TAPADO; LA FUNCIONALIDAD NO EXISTE
+>
+> El mismo bloque 5 que armó este defecto le puso la guarda. `esGestoDeTodoElDia`
+> corre en los dos manejadores **antes** de leer `start`/`end` y antes de
+> cualquier aviso de fuera de horario: si `arg.event.allDay` es `true`, revierte,
+> avisa con «Todavía no se pueden crear citas de todo el día.» y sale sin tocar
+> el servidor. Ninguna fila corrupta llega a la base.
+>
+> **Por qué la ficha NO se cierra:** la guarda no da la funcionalidad, sólo la
+> niega. Una cita de todo el día es legítima —la banda ya sabe pintarla— y lo que
+> falta es el camino de ESCRITURA de `appointments.all_day`, que es el **bloque
+> 5B**. Hasta entonces, arrastrar a la banda no hace nada útil.
+>
+> **Qué se sustituye en 5B:** la guarda entera, por el manejo real —componer la
+> medianoche en la zona del consultorio y mandar `all_day: true`—. **No se borra
+> y ya**: quitarla sin poner el camino de escritura devuelve exactamente el
+> defecto que esta ficha describe.
+>
+> **Y ojo con el CHECK, que aquí no protege:**
+> `appointments_all_day_medianoche_check` sólo exige medianoche y huso cuando
+> `all_day` es `true`. Sin la guarda, la columna se quedaría en `false` —nadie la
+> escribe todavía— y la base aceptaría sin protestar una cita CON HORA de 24
+> horas que empieza a medianoche. La barrera es de código, no de base.
+
+**El caso concreto**
+
+Con la banda encendida, el plugin de interacción registra sus hits y una cita se
+puede arrastrar de la rejilla a la banda sin haber pedido nada. La mutación llega
+con `standardProps.allDay = true`, y `applyMutationToEventInstance`
+(`@fullcalendar/core/internal-common.js:3807-3811`) hace `forceAllDay` →
+`computeAlignedDayRange`. Con `allDayMaintainDuration` en su default `false`
+(`:1523`), **la duración no se conserva**: una cita de 09:00–10:00 queda 00:00 →
+00:00 del día siguiente.
+
+Sin guarda, `handleEventDrop` mandaría ese rango al `PUT` con `all_day` sin
+tocar. **La base guardaría una cita de 24 horas que empieza a medianoche**, y al
+recargar volvería como cita con hora que abre la ventana de la rejilla a las
+24 h (`tramoDeEvento`, `ventanaRejilla.ts:250-253`). Es justo lo que
+`esGestoDeTodoElDia` corta desde el bloque 5.
+
+**El aviso que saltaría no protege, confunde,** y por eso la guarda va DELANTE de
+él: `avisoFueraDeHorario` compara la medianoche y dice *«Vas a mover la cita a
+las 00:00, y esta clínica atiende de 09:00 a 19:00»*. Describe un cambio de HORA
+cuando lo que ocurre es un cambio de TIPO. Quien lea eso y pulse «sí» no ha
+consentido lo que va a pasar.
+
+`handleEventResize` tiene el gesto hermano —estirar la barra a días adyacentes
+manda un rango en días por el camino escrito para horas— y lleva la misma guarda
+en la misma posición.
+
+**Lo relacionado, que sí está bien y no hay que tocar:** `handleDateClick:3386`
+ya decide por `arg.allDay` y no por la vista, así que el clic en la banda abre el
+alta sin hora y con `avisoDiaCerrado`. Fue la decisión correcta y aguanta. Lo que
+sí se pierde es `arg.end` en `handleSelect:3443`: arrastrar de lunes a miércoles
+sobre la banda dice el rango y la línea lo descarta. **Ese hueco sigue abierto:**
+la guarda de arriba cubre el arrastre de un evento YA EXISTENTE, no la selección
+de un rango vacío, que es otro camino y va también al bloque 5B.
+
+---
+
+### AG-DT-9 — `calcDuration` devuelve 1440 para un all-day y el modal lo enseña como duración
+
+**Estado:** 🟡 abierta, menor · **Archivo:**
+`src/app/(app)/agenda/page.tsx:616`, consumido en `:848`
+**Detectado:** 2026-08-26, misma auditoría.
+
+**El caso concreto**
+
+`calcDuration` resta los dos instantes y divide entre 60 000. Para un all-day de
+un solo día —00:00 a 00:00 del día siguiente, fin exclusivo— son **1440
+minutos**, y ese número alimenta `initialDuration` del modal (`:848`). Abrir unas
+vacaciones para editarlas enseña «1440 min» en el selector de duración.
+
+No corrompe nada por sí solo —es un valor derivado, no persistido— pero es la
+puerta por la que un guardado inocente reescribe `end_time` desde una duración
+que el formulario nunca debió ofrecer. El interruptor de «Todo el día» del
+bloque del modal tiene que apagar ese campo, no sólo rellenarlo.
+
+---
+
+### AG-DT-10 — `appointments` no tiene trigger de auditoría, y es la única tabla clínica sin él
+
+**Estado:** 🔴 abierta · **Archivo:** `supabase/baseline/06_triggers.sql`
+**Detectado:** 2026-08-26, misma auditoría (hallazgo lateral: no lo introduce
+`all_day`).
+
+**El caso concreto**
+
+`06_triggers.sql` lista doce triggers y **ninguno es de `appointments`**; ninguna
+migración posterior crea uno. `pacientes`, `consultas`, `documentos`,
+`addendums` y `mediciones_analitos` sí tienen su `audit_*`. Comprobado: cero
+coincidencias de `audit_appointments` en todo `supabase/`.
+
+O sea que **quién movió, canceló o borró una cita no queda registrado en
+`audit_log`**. Y una agenda es un dato de salud: dice que un paciente concreto
+tenía consulta un día concreto.
+
+**Choca con dos reglas escritas de `CLAUDE.md`:** «Todo cambio en datos sensibles
+DEBE registrarse en `audit_log`» y «NUNCA quites el audit log de ninguna
+acción». La segunda habla de quitar; aquí nunca se puso.
+
+**Familia.** Es de la misma clase que **LOG-DT-1** (`logAudit` sin `await`) y que
+el bloque de **CUMPLIMIENTO REGULATORIO** de la cabecera de este archivo:
+lagunas del rastro de auditoría, no de la agenda. Se anota aquí porque salió
+mirando la agenda; cuando se ataque, se ataca con esa familia y no con el
+rediseño.
+
+---
+
+### AG-DT-11 — `contarVisibles` filtra por el INSTANTE DE INICIO, así que un evento de varios días no entra en el subtítulo
+
+**Estado:** 🟡 abierta, menor · **Archivo:**
+`src/app/(app)/agenda/page.tsx:2511` (la reja del rango, dentro de
+`contarVisibles`)
+**Detectado:** 2026-08-26, auditoría del bloque 5 (hallazgo **M4** del auditor).
+
+> ### ⚠️ NO ES REGRESIÓN DEL BLOQUE 5. EL BLOQUE LO EXTIENDE, NO LO INTRODUCE.
+>
+> La reja es **preexistente** y Mes ya tenía exactamente el mismo sesgo desde que
+> el subtítulo existe: allí los `allDay` siempre se contaron y siempre se
+> contaron así. Lo que cambia es el ALCANCE — hasta ahora, en Semana y Día no se
+> notaba porque los `allDay` ni se pintaban (`allDaySlot` apagado) ni se contaban
+> (la reja `sinAllDay`, retirada en este bloque). Con la banda montada, el caso
+> pasa a ocurrir en las dos vistas donde un evento de varios días es lo NORMAL.
+>
+> Quien lo arregle: no lo trates como algo que rompió el bloque 5, ni lo busques
+> en el diff de la banda. La línea lleva ahí desde antes.
+
+**El caso concreto**
+
+```ts
+if (activo && (inicio < activo.activeStart || inicio >= activo.activeEnd)) continue
+```
+
+Compara el **inicio** contra la ventana activa. Unas vacaciones del 10 al 25 de
+agosto tienen su `start` el día 10; al mirar la semana del 17, ese instante cae
+antes de `activeStart` y la reja las descarta. **La barra se pinta —FullCalendar
+recorta el segmento a la ventana y lo dibuja— pero el subtítulo no la cuenta.**
+El médico ve una banda con un evento encima de un subtítulo que dice cero.
+
+Es el mismo error de forma que **AG-DT-6**, y conviene leerlos juntos: allí es el
+`GET` el que filtra por inicio y pierde la fila entera; aquí es el conteo el que
+filtra por inicio y pierde el renglón del subtítulo. **El predicado correcto es
+el mismo en los dos sitios** —solape semiabierto, `start < to && end > from`, el
+que `ventanaRejilla.ts:286` ya usa— y por eso los dos se arreglan con la misma
+idea, aunque en capas distintas.
+
+**Lo que hace falta antes de tocarlo:** `EventoParaConteo` (`page.tsx:2453`) hoy
+sólo lleva `start` y `extendedProps`. Para comparar por solape necesita también
+`end`, que `EventApi` ya trae y que `EventoParaVentana` ya declara. Es un campo,
+no una refactorización.
+
+**Por qué queda en menor y no en 🔴:** no corrompe nada, no pierde ningún dato y
+no impide ninguna operación. Miente en un renglón de texto, y miente por defecto
+—cuenta de menos, nunca de más—, así que nadie va a agendar sobre un hueco
+creyéndolo libre: el evento está a la vista en la banda.
+
+---
+
+### AG-DT-12 — La hora tecleada se compone en el huso de QUIEN AGENDA, no en el del consultorio
+
+**Estado:** 🟡 abierta, latente · **Archivo:**
+`src/app/(app)/agenda/page.tsx:1064` (`componerIso`), consumida en
+`:1145,1177,1638,1657,1678,1700,1732-1734,1769`
+**Detectado:** 2026-09-08, revisando cómo se compone la hora al crear.
+**Impacto hoy: nulo.** Todos los consultorios están en el mismo huso. Se vuelve
+real con una secretaria remota o un consultorio en otro estado.
+
+**El caso concreto**
+
+```ts
+function componerIso(fecha: string, hora: string) { return new Date(`${fecha}T${hora}`).toISOString() }
+```
+
+Sin sufijo de zona, así que el motor interpreta la cadena en la zona del
+**navegador de quien agenda**. El consultorio elegido en el modal no interviene,
+pese a que `consultorios.timezone` existe y su valor se congela en la propia fila
+como `appointments.consultorio_timezone`.
+
+Consecuencia: la hora tecleada no es la hora del consultorio. Una secretaria en
+Sonora que teclea 09:00 para el consultorio de Umán deja la cita a **las 10:00
+hora de Umán**.
+
+**Y no hay ninguna señal en el momento de agendar.** El único aviso es la
+insignia `tzDiff` (`page.tsx:3763-3775`), que compara la hora del consultorio con
+la del navegador y sólo se pinta en las vistas **Semana y Día**. No existe en la
+vista Mes, ni en el modal donde se teclea la hora, ni en el renglón del
+dashboard. El aviso llega después de guardar, y sólo si el que agendó vuelve a
+mirar en la vista correcta.
+
+**Contraste interno, en el mismo dominio**
+
+Los eventos de **todo el día** sí se componen con el huso del consultorio, y en
+el servidor: `src/app/api/appointments/route.ts:387-393`. El cliente manda el DÍA
+—que no tiene huso— precisamente porque `componerIso` no sabe componer esa
+medianoche; está escrito en `page.tsx:1358-1364` y en `:1761-1766`. La asimetría
+es deliberada y está comentada, pero deja **las citas con hora fuera de esa
+garantía**: son el único camino de escritura donde el instante se compone en el
+cliente.
+
+**Lo que NO es**
+
+**No confundir con LA REGLA de `src/lib/dates.ts:10`.** Que las horas de citas se
+**pinten** en el huso del dispositivo de quien mira es una decisión tomada a
+propósito tras el bug de Sonora, y **no está en discusión**. Lo que se registra
+aquí es otra cosa: cómo se **compone** la hora al crear. Leer y escribir no
+tienen por qué compartir convenio, y ahí está el hueco.
+
+**No pide cambio de esquema.** `consultorios.timezone` es `text NOT NULL`
+(`20260615_consultorios_01_table.sql:30`) y el snapshot
+`appointments.consultorio_timezone` ya se congela al crear la fila
+(`20260615_consultorios_04_snapshot.sql`). El dato está; nadie lo consulta para
+esto.
+
+**Familia.** Con **AG-DT-3** comparte tema y NO causa: aquélla es de convenio de
+**lectura** del `all_day`; ésta es de composición de la hora de una cita normal.
+Con **TZ-DT-1** y **TZ-DT-2** comparte forma y va en dirección contraria: allá se
+usa `TZ_CLINICA` donde correspondía el huso del dispositivo; aquí se usa el del
+dispositivo donde correspondería el del consultorio. Antes de tocar cualquier
+literal de zona horaria, léase la advertencia sobre los tres
+`America/Mexico_City` deliberados, al final de TZ-DT-1.
+
+---
+
+## Latencia de `/agenda` — investigación y tanda de arreglos (2026-08-31)
+
+Origen: una traza de Sentry en producción con `/agenda` en 4,11 s. La causa raíz
+resultó ser que **casi toda petición del dominio pagaba un viaje de red al
+servidor de Auth de Supabase** desde el middleware: 1.656 peticiones a Auth
+contra 117 a Postgres en 24 h. Lo que sigue son los cabos que la tanda dejó
+abiertos a propósito.
+
+### PERF-DT-1 — La desduplicación de `profiles` depende de que dos `select` sean idénticos, y se rompe en silencio
+
+**Estado:** 🟡 abierta, menor · **Archivos:**
+`src/lib/subscription.ts:128` y `src/app/(app)/layout.tsx:37` (las dos listas que
+deben coincidir) · `src/app/(app)/expediente/[id]/layout.tsx:40` (el caso vivo)
+**Detectado:** 2026-08-31, midiendo el commit B2 de la tanda de latencia.
+
+**El mecanismo**
+
+Next desduplica los `fetch` idénticos dentro de un mismo render (Request
+Memoization del App Router) y la clave es **la URL**. Supabase mete el `select`
+en la URL:
+
+```
+/rest/v1/profiles?select=role%2Cclinica_id%2Ces_admin_de_clinica&id=eq.…
+```
+
+Así que los cuatro layouts que se componen en una navegación comparten UN viaje a
+`profiles` **si y sólo si piden exactamente las mismas columnas**. Hoy coinciden,
+pero por accidente: coinciden desde que el commit «no repetir el perfil ya
+resuelto» unificó la lista a tres columnas. Añadir una columna en un sitio y no
+en el otro —o reordenarlas— restaura el viaje doble sin error de compilación, sin
+test que falle y sin nada visible.
+
+**El caso vivo, medido**
+
+`expediente/[id]/layout.tsx:40` todavía pide `select('role')` a secas. Por eso,
+instrumentando `fetch` en el servidor:
+
+```
+/documentos                   → 3 viajes a Supabase
+/expediente/[id]              → 4   ← el cuarto es este profiles con otro select
+/expediente/[id]/nueva-nota   → 4
+```
+
+**Por qué no se resolvió**
+
+Se escribió el arreglo estructural —un resolvedor de sesión compartido con
+`cache()` de React, del que bebieran los nueve layouts— y **se descartó tras
+medirlo**: eran diez archivos, dos de ellos guardas de acceso al expediente
+clínico, a cambio de UNA consulta. La corrección de la premisa importa y conviene
+tenerla escrita: se creía que los layouts anidados hacían 4 llamadas a Auth y 5 a
+Postgres por render, y la medición mostró 1 y 3 — Next ya desduplicaba lo demás.
+
+**Si alguien lo retoma:** el arreglo barato es alinear el `select` de
+`expediente/[id]/layout.tsx` con los otros dos (un viaje menos en todo el
+subárbol `/expediente/[id]/**`, un archivo). El caro es el resolvedor
+compartido, y no compensa por rendimiento — sólo por robustez.
+
+---
+
+### PERF-DT-2 — Los dos guardas de `/expediente` dejan pasar cuando la consulta de `profiles` falla
+
+**Estado:** 🟢 resuelta (2026-09-01) — commit `f505ce2` · **Archivos:**
+`src/app/(app)/expediente/[id]/layout.tsx` (el que decide por rol) y
+`src/app/(app)/expediente/layout.tsx` (el que sólo exige sesión)
+**Detectado:** 2026-08-31, al mapear la equivalencia de los guardas para el
+commit B2 de la tanda de latencia.
+
+**El caso (como estaba)**
+
+```ts
+const { data: profile } = await supabase.from('profiles').select('role')…
+if (profile?.role === 'secretaria') redirect('/expediente')
+```
+
+Si la consulta falla —error de red, RLS, la base caída un instante—, `profile` es
+`null`, `profile?.role` da `undefined`, la comparación es falsa y **la secretaria
+entra al expediente clínico**. El guarda está orientado al lado permisivo: ante la
+duda, abre.
+
+**Lo que NO es**
+
+No es una regresión ni viene de la tanda de latencia; lleva ahí desde que el
+guarda existe. Se dejó **exactamente igual** al revisar B2, a propósito: aquello
+era una optimización y no podía cambiar quién entra.
+
+Tampoco es una fuga de datos por sí solo. La protección PRIMARIA de lo clínico es
+la RLS de las tablas, que excluye a la secretaria en lectura y escritura, y sigue
+en pie pase lo que pase con este guarda. Lo que se pierde es la capa de
+navegación: la secretaria aterrizaría en una pantalla de detalle vacía o rota en
+vez de ser desviada.
+
+**El arreglo (el que se pedía)**
+
+Invertir la orientación: bloquear cuando el rol NO consta, en vez de dejar pasar.
+Decidirlo para los dos guardas a la vez, y mirando qué hace el resto de la app
+cuando `profiles` no responde — si toda la app falla abierta, cambiar sólo esto
+crea una inconsistencia peor que el defecto. **Merece su propio commit**, no ir
+escondido dentro de otro cambio.
+
+**Cierre (2026-09-01) — commit `f505ce2`, en su propio commit como se pedía**
+
+El guarda del detalle destructura ahora `error` —antes se tiraba al suelo, y ésa
+era la avería entera— y bloquea sobre `error || !profile?.role`. El deny sobre
+`secretaria` se queda intacto: **este commit cambió el camino de FALLO, no la
+política**. Se descartó a propósito sustituirlo por una lista blanca de roles
+permitidos, que dejaría fuera en silencio a cualquier rol que se añada al `CHECK`
+de la tabla.
+
+Es seguro bloquear ahí porque un rol ausente no puede ser un perfil a medias:
+`profiles.role` es `text NOT NULL DEFAULT 'medico'`
+(`supabase/baseline/02_tables.sql:406`) y la RLS deja a cualquiera leer su propia
+fila (`profiles_select_own`, `07_rls_policies.sql:561`). Si no consta, lo que hay
+es un fallo, no un usuario legítimo.
+
+No se redirige. Las dos salidas obvias mienten —`/login` finge que la sesión se
+cayó cuando el `getUser()` acaba de pasar, y `/expediente` es literalmente lo que
+recibe la secretaria, así que el médico vería su clic evaporarse—, de modo que el
+layout **devuelve un panel de bloqueo en lugar de `children`**: cerrado de verdad
+y honesto sobre lo que pasó. Tampoco se hace `throw`: no hay un solo `error.tsx`
+en `src/app`.
+
+**El guarda de la lista no necesitaba cambio** y por eso no lo tuvo: no consulta
+`profiles`, así que no hay consulta que pueda fallar. Sólo se le añadió el
+comentario que deja escrito el reparto —uno exige sesión, el otro decide por rol—
+para que no haya que deducirlo. Eso es lo que significaba «decidirlo para los dos
+a la vez».
+
+Verificado: `npm run build`, `npx tsc --noEmit` y 575/575 tests en verde.
+
+> ### ⚠️ LOS OTROS CUATRO SITIOS CON ESTE MISMO PATRÓN SIGUEN FALLANDO ABIERTOS,
+> ### Y ESO ES DELIBERADO. NO LOS "ARREGLES" POR SIMETRÍA.
+>
+> Son `(app)/layout.tsx` (el desvío de `super_admin`),
+> `(launcher)/inicio/layout.tsx` (PERF-DT-3), el FAIL_OPEN documentado de
+> `lib/subscription.ts`, y los checks de cliente de `dashboard/page.tsx` y
+> `estadisticas/page.tsx`. Los cinco comparten la forma `profile?.role === …`,
+> pero **ninguno de esos cuatro custodia datos clínicos**: fallan hacia
+> `/inicio`, hacia el dashboard o hacia un banner de suscripción, o sea hacia
+> sitios donde no hay nada que proteger. Cerrarlos convertiría un fallo
+> transitorio de red en gente legítima expulsada de su propia app, a cambio de
+> nada.
+>
+> La regla del proyecto **NO es «todos los guardas fallan igual»**. Es **«los
+> guardas de datos clínicos fallan cerrados»**. La asimetría que ves al comparar
+> `expediente/[id]/layout.tsx` con los otros cuatro no es una migración a medio
+> hacer: es la regla aplicada. Si algún día aparece un guarda nuevo, la pregunta
+> no es a cuál de los dos grupos se parece más, sino si lo que hay detrás es
+> clínico.
+>
+> (Esta nota está repetida dentro de `expediente/[id]/layout.tsx`, junto al
+> código. Si se mueve una, se mueve la otra.)
+
+---
+
+### PERF-DT-3 — `(launcher)/inicio/layout.tsx` repite el `getUser()` de su layout padre
+
+**Estado:** 🟡 abierta, menor · **Archivo:**
+`src/app/(launcher)/inicio/layout.tsx:16`
+**Detectado:** 2026-08-31, revisando los layouts anidados de la tanda de
+latencia.
+
+Cuelga de `(launcher)/layout.tsx`, que ya resuelve el estado de suscripción —y
+con él la sesión— en el mismo render, y aun así hace su propio
+`auth.getUser()` más un `select('role')` para desviar a la secretaria a
+`/dashboard` (`:25`). Es el mismo patrón que el de los layouts de `(app)`.
+
+**Coste real: probablemente cero hoy**, por lo que explica PERF-DT-1: el
+`getUser()` es una petición idéntica a la del padre y Next la desduplica. El
+`select('role')` sí es una URL distinta de la de tres columnas, así que ése
+probablemente sí cuesta un viaje — **no está medido**, a diferencia del caso de
+`/expediente/[id]`, que sí lo está.
+
+Quedó fuera de la tanda por alcance: no estaba entre los archivos autorizados. Si
+se toca, va con PERF-DT-1, que es el mismo problema.
+
+**⚠️ ESTO ES DE RENDIMIENTO, NO DE ORIENTACIÓN DEL FALLO.** Su `select('role')`
+también deja pasar cuando la consulta falla —es letra por letra el patrón que
+cerró PERF-DT-2— y **así se queda a propósito**: aquí el fallo abre hacia
+`/inicio`, que no es clínico, y cerrarlo sólo cambiaría un desvío de cortesía por
+un médico expulsado de su propia casa en cada hipo de red. Si alguien viene a
+«terminar lo de PERF-DT-2», el sitio donde se explica por qué no hay nada que
+terminar es la nota de cierre de esa entrada, arriba.
+
+---
+
+### PERF-DT-4 — Las funciones de seguridad dentro de un `OR` podrían evaluarse una vez POR FILA, y nadie lo ha comprobado
+
+**Estado:** 🟡 abierta — **es una AFIRMACIÓN SIN VERIFICAR, no un hallazgo** ·
+**Archivos:** las policies de
+`supabase/migrations/20260530_etapa5h_paso3_policies_appointments.sql:86-93` y las
+de otras ocho migraciones (ver «El alcance»); los helpers, en
+`supabase/migrations/20260522_etapa5c_helpers_rls.sql:57-142`
+**Detectado:** lo señaló un análisis externo. Salió de la rama de calendario al
+cerrarse, se evaluó en la rama de rendimiento y se dejó fuera a propósito por
+tocar RLS. Registrado aquí el 2026-09-07.
+
+> ### ⚠️ LO PRIMERO QUE HAY QUE HACER CON ESTA ENTRADA ES COMPROBARLA, NO
+> ### ARREGLARLA. NADIE HA CORRIDO UN `EXPLAIN ANALYZE`.
+>
+> Lo que sigue es un patrón conocido de Postgres aplicado a una forma que
+> nuestras policies sí tienen. **No es una medición de nuestras policies.** Puede
+> perfectamente que el planificador ya lo esté resolviendo bien y que aquí no
+> haya nada que arreglar. Escribir la migración antes que la medición sería tocar
+> RLS a ciegas, que es la peor forma de tocar RLS.
+
+**La afirmación**
+
+Que esas funciones podrían estar evaluándose **una vez por cada fila** examinada,
+en lugar de una vez por consulta. Si es cierta, no cambia ningún resultado ni
+abre ninguna puerta: sólo cambia cuándo empieza a doler. Con evaluación por
+consulta el coste es constante y se nota a las 200.000 filas; con evaluación por
+fila crece con la tabla y se nota a las 10.000.
+
+**El patrón conocido, para que quien lo tome no parta de cero**
+
+En Postgres, una función llamada **directamente** dentro del predicado de una
+policy se evalúa por fila. Envuelta en un subselect —`(SELECT public.fn())`— el
+planificador la puede subir a un **InitPlan** y ejecutarla una sola vez para toda
+la consulta. Dentro de un `OR` el margen del planificador es menor que dentro de
+un `AND`, que es justo la forma que tienen las nuestras:
+
+```sql
+USING (
+  (
+    appointments.medico_id = auth.uid()
+    OR public.soy_admin_de_clinica()
+    OR public.get_my_role() = 'secretaria'
+  )
+  AND appointments.clinica_id = public.get_clinica_id()
+)
+```
+
+El arreglo, si la medición lo confirma, sería **envolverlas y nada más**: mismo
+predicado, mismo veredicto, ninguna tabla tocada y ningún permiso movido.
+
+**El alcance**
+
+`OR public.<función>()` aparece **31 veces repartidas en nueve archivos de
+migración**: `20260427_b1_01_clinicas_rls`, `20260524_etapa5e_bd1_policies_pacientes`,
+`20260524_etapa5e_bd2_policies_paciente_medico`, `20260530_etapa5f_paso3_policies_consultas`,
+`20260530_etapa5h_paso3_policies_appointments`, `20260531_etapa5i_paso3_policies_addendums_mediciones`,
+`20260602_etapa5j_paso2_policies_profiles_invitaciones`, `20260615_consultorios_03_rls`
+y `20260616_consultorios_06_rls_select_owner_only`.
+
+**Eso son apariciones en archivos, NO policies vivas**, y la diferencia importa
+antes de dimensionar nada: unas migraciones reemplazan policies de otras, así que
+el número de policies realmente vigentes con esta forma está **sin contar**.
+Contarlo es parte de la verificación, no un preliminar que se pueda saltar.
+
+**La trampa de la verificación, que es lo que hace que esto no sea un `EXPLAIN`
+y ya está**
+
+`appointments` tiene **154 filas** hoy (leído en producción el 2026-09-07). Con
+ese tamaño el planificador va a elegir recorrido secuencial haga lo que haga con
+las funciones, así que **un `EXPLAIN ANALYZE` contra la base actual puede salir
+inconcluyente y parecer que no hay problema**. Comprobarlo de verdad exige un
+conjunto de datos realista —del orden de las decenas de miles de filas— y
+comparar las dos formas del predicado sobre él. Quien mida contra producción tal
+como está hoy y concluya «no pasa nada» habrá medido el tamaño de la tabla, no la
+forma de la policy.
+
+**Por qué no se toca de paso, y por qué no se tocó en la tanda de latencia**
+
+Porque es RLS. Es la barrera que separa los datos clínicos de una clínica de los
+de otra, y un cambio en el predicado —aunque sea uno que se cree
+semánticamente neutro— no entra por el camino de una optimización de
+rendimiento. **Va con su propia auditoría, por un agente que corra dentro del
+repo**, con el pre-vuelo y el veredicto en las dos direcciones que pide
+`supabase/AUDITORIA-MIGRACIONES.md`. Ése es el motivo de que la rama de
+rendimiento lo dejara fuera teniéndolo delante, y no un descuido.
+
+**Familia.** Con **ACL-DT-1** y **ISO-DT-1** comparte la propiedad que las hace
+peligrosas de tratar deprisa: son cosas que se dieron por ciertas sin
+comprobarlas nunca, y en las tres el remedio **empieza por una medición o una
+consulta de sólo lectura, no por SQL**. Con **PERF-DT-1** y **PERF-DT-3**
+comparte el origen —la tanda de latencia— y una lección que ya se pagó allí: en
+PERF-DT-1 se creía que los layouts anidados hacían cuatro llamadas a Auth y cinco
+a Postgres, se midió, y eran una y tres. **Aquí todavía no se ha hecho esa
+medición.**
+
+---
+
+### DEP-DT-3 — `SecretariaDashboard.tsx` es código muerto
+
+**Estado:** 🟡 abierta, menor · **Archivo:**
+`src/app/(app)/dashboard/SecretariaDashboard.tsx` (88 líneas)
+**Detectado:** 2026-09-01, en la Fase 1 del ajuste del panel «Próximas citas».
+
+**Nadie lo importa.** `grep -rn "SecretariaDashboard" src` sólo da la línea
+donde el propio archivo se declara. Quien atiende a `role='secretaria'` es
+`AsistenteDashboard.tsx`, y lo hace desde `dashboard/page.tsx:201`.
+
+Es una versión anterior del panel de la secretaria: saludo, botón de nuevo
+paciente y últimos pacientes registrados. **No tiene panel de citas**, así que
+ninguna de las reglas de esta tanda (sólo citas, tope de cuatro) le aplica ni
+le aplicaría.
+
+**No se borró en esta tanda a propósito:** el encargo era el panel de citas y
+`SecretariaDashboard` no lo tiene, así que borrarlo habría sido aprovechar el
+viaje para otra cosa. Se deja anotado para que la próxima limpieza no tenga que
+volver a averiguar si está vivo. Al retirarlo, comprobar antes que sigue sin
+importadores — es una comprobación de un comando, no una suposición.
+
+---
+
+### UI-DT-1 — «Eventos de hoy» no cabe en la fila de actividad de `/inicio`
+
+**Estado:** 🟡 abierta, es DISEÑO y no defecto · **Archivo:**
+`src/app/(launcher)/inicio/page.tsx:382-395` (la *quick activity row*)
+**Detectado:** 2026-09-01, cerrando el ajuste del panel «Próximas citas».
+
+**Esto NO es un pendiente de corrección: el defecto ya está cerrado.** El
+contador «Hoy tienes N citas» mezclaba en un solo número las citas, los eventos
+genéricos (§12.14) y las canceladas. Hoy cuenta sólo citas de paciente, no
+canceladas y del médico que mira. **Lo que quedó fuera es enseñar los eventos
+genéricos APARTE, con su propio número** — se decidió excluirlos sin más.
+
+**Por qué se paró.** La fila es `flex items-center gap-6` **sin `flex-wrap`**,
+con dos elementos y un divisor de `w-px`. Un tercero es el mismo patrón
+repetido, pero esa fila no envuelve: en móvil se desborda. Elegir cómo no
+desbordar es diseño de una tarjeta que Angel no ha decidido, y por eso no se
+tocó el layout.
+
+**Las dos salidas identificadas**, si se retoma en la rama de diseño:
+
+1. `flex-wrap` en la fila — el tercer elemento baja de línea en pantallas
+   estrechas. Cambia el alto de la tarjeta en móvil.
+2. Esconder el tercero por debajo de `sm` — la fila nunca crece, pero el dato de
+   eventos no existe justo en el tamaño donde más se consulta.
+
+El marcado del elemento y el estado `eventosHoy` que haría falta están en el
+hilo de esa sesión; el filtro que lo alimentaría es el inverso del que ya está
+puesto (`paciente_id is null` en vez de `not null`).
+
+---
+
+## Husos horarios — los dos apaños que quedaron sin cablear
+
+Origen: el inventario de husos del 2026-09-07, hecho sobre `feature/rendimiento-cierre`
+para averiguar si Spinus tenía un defecto de multi-tenant por zona horaria. **No lo
+tiene.** El defecto real existió, se corrigió en agosto de 2026 y lo que sigue son los
+dos únicos sitios que aquel trabajo dejó anotados en el código y sin arreglar.
+
+Las dos entradas viven hoy como comentarios largos dentro de sus propios archivos, y el
+comentario sólo lo lee quien ya abrió el archivo. Eso es lo que esta sección corrige.
+
+### TZ-DT-1 — La medición de laboratorio se guarda con el huso del Centro, no con el de quien la teclea
+
+**Estado:** 🟡 abierta, menor · **Archivo:**
+`src/app/api/labs/mediciones/route.ts:95`
+**Detectado:** commit B de husos, agosto de 2026. Anotado en el propio archivo
+(`:81-94`) y registrado aquí el 2026-09-07.
+**Impacto:** una hora, y sólo fuera del Centro.
+
+**El caso concreto**
+
+`input.fecha` e `input.hora` son **hora de pared**: el médico tecleó «las 9:00» en
+`ModalAgregarMedicion`. El huso que corresponde para convertirlas a instante es el de
+**su dispositivo**, y la línea usa `TZ_CLINICA`:
+
+```ts
+const medidoEn = fechaHoraLocalAInstante(input.fecha, input.hora, TZ_CLINICA)
+```
+
+En Sonora (`America/Hermosillo`, UTC-7 todo el año) la medición queda guardada una hora
+tarde. En el Centro coincide, que es exactamente por lo que esto puede vivir años sin
+que nadie lo reporte.
+
+**Lo que NO es**
+
+**No es el bug de husos de agosto de 2026.** Aquél era otra cosa: `hoyEnTZ`,
+`fechaHoraLocalAInstante` y `renderEnTZ` llevaban `TZ_CLINICA` como **valor por
+defecto**, así que todo llamador que omitía el huso obtenía hora del Centro en silencio,
+con código que parecía consciente del huso y no lo era. Se corrigió quitando el default
+y auditando los ~20 llamadores uno por uno; la red que impide la regresión no es un test,
+es `tsc` (ver la cabecera de `src/lib/dates.ts:21-46`). Esta línea es lo contrario de
+aquello: el huso está escrito, se ve, y por eso se puede discutir.
+
+**No pide cambio de esquema.** El dato de zona ya existe y ya se lee en producción:
+`consultorios.timezone` es `text NOT NULL`
+(`supabase/migrations/20260615_consultorios_01_table.sql:30`), y los snapshots inmutables
+`appointments.consultorio_timezone` y `consultas.consultorio_timezone` se congelan al
+crear la fila (`20260615_consultorios_04_snapshot.sql`). No falta ninguna columna.
+
+**Por qué no se cableó, y sigue siendo la razón**
+
+El huso no viaja por el cable. Haría falta un campo nuevo en **las tres variantes** de
+`CrearMedicionSchema`, mandarlo desde el modal y validarlo aquí contra
+`Intl.supportedValuesOf('timeZone')`. Cinco archivos y una validación nueva, para un dato
+que no es una hora de cita. **Lo caro no es el huso: es propagarlo desde el cliente hasta
+el esquema de validación.**
+
+**Familia.** Va con **TZ-DT-2**, que es el mismo apaño en otro sitio y con el mismo
+motivo; si se ataca uno, se atacan los dos, porque la pieza que hay que construir —mandar
+el huso del dispositivo desde el cliente y validarlo en el servidor— es la misma. Con
+**AG-DT-3** comparte tema y no causa: aquélla es de convenio de escritura del `all_day`.
+
+> ### ⚠️ LOS TRES `America/Mexico_City` QUE QUEDAN EN CÓDIGO DE PRODUCCIÓN SON
+> ### DELIBERADOS. NO SON DEUDA Y NO HAY QUE «LIMPIARLOS».
+>
+> Esta advertencia está aquí porque el inventario del 2026-09-07 empezó dando por hecho
+> que esos tres literales eran el defecto, y no lo son. Quien venga detrás los va a ver
+> y va a pensar lo mismo.
+>
+> - **`src/lib/dates.ts:69` — `TZ_CLINICA`.** Es la política de producto de que un
+>   **documento clínico lleva la fecha de la clínica** y no cambia según quién lo abra.
+>   Está escrita en LA REGLA de la cabecera del módulo (`dates.ts:10-18`) y la aplican
+>   los ocho formularios de documentos, `notaRenderData.ts:65` y `hojaFrontalData.ts:155`.
+>   Cambiarla es una decisión de producto, no una corrección.
+> - **`src/lib/gcal.ts:43` — `GCAL_TIMEZONE`.** Tiene **un solo consumidor**,
+>   `crearCalendarioSpinus` (`gcal.ts:369`), y ahí sólo fija la zona de visualización de
+>   la **cuadrícula** del calendario que Spinus crea en la cuenta de Google del médico.
+>   **Cada cita ya viaja con el huso de su consultorio** desde
+>   `appointments.consultorio_timezone` (`api/appointments/route.ts:516` y
+>   `api/appointments/[id]/route.ts:657,783`). El calendario se crea una vez por clínica
+>   y una clínica puede tener consultorios en husos distintos, así que no hay zona mejor
+>   que elegir: tomar la del primer consultorio sería igual de arbitrario, con la
+>   desventaja de **parecer** una decisión informada. El propio archivo lo explica en
+>   `gcal.ts:352-368`. Hasta agosto de 2026 esta constante sí etiquetaba los eventos, y
+>   por eso las invitaciones de una cita en Hermosillo decían «hora estándar central»;
+>   **ese defecto ya está cerrado.**
+> - **`src/app/r/[folio]/page.tsx:258`.** Es la **rama de respaldo** de `fechaDeEmision`:
+>   formatea `created_at` de la fila sólo cuando el documento no trae fecha ISO dentro de
+>   `contenido`. El camino normal (`:254-256`) es agnóstico de huso a propósito. Además
+>   esa página no muestra ninguna cita —verifica un **documento**, y `documentos` no tiene
+>   columnas de snapshot de consultorio—, así que le aplica la política de documento
+>   clínico del primer punto.
+>
+> La regla corta, para no repetir la investigación: **`TZ_CLINICA` en un documento
+> clínico es correcto; en una hora de cita sería el defecto.** Lo que hay que auditar no
+> es el literal, es qué clase de dato tiene delante.
+
+---
+
+### TZ-DT-2 — Los bordes del filtro de fechas del expediente se calculan en el Centro
+
+**Estado:** 🟡 abierta, menor · **Archivo:**
+`src/app/api/expediente/listar/route.ts:97,104`
+**Detectado:** commit B de husos, agosto de 2026. Anotado en el propio archivo
+(`:79-94`) y registrado aquí el 2026-09-07.
+**Impacto:** una hora en los dos extremos de la ventana, y sólo fuera del Centro.
+
+**El caso concreto**
+
+`desde` y `hasta` son fechas-solo que el médico eligió en el sheet de filtros, así que
+los bordes de la ventana —«el día 1 entero», «hasta acabar el día 15»— son los de **su
+dispositivo**. Las dos conversiones usan `TZ_CLINICA`:
+
+```ts
+p_fecha_desde = fechaHoraLocalAInstante(desdeRaw, '00:00', TZ_CLINICA)
+p_fecha_hasta = fechaHoraLocalAInstante(desplazarFecha(hastaRaw, { dias: 1 }), '00:00', TZ_CLINICA)
+```
+
+En Sonora la ventana sale corrida una hora por los dos extremos, y **un paciente creado
+en la última hora del día cae fuera del filtro**. No hay error, no hay hueco visible: el
+paciente simplemente no está en la lista.
+
+**Lo que NO es**
+
+**No es el bug de husos de agosto de 2026** — ver la explicación en TZ-DT-1: aquél fue el
+valor por defecto de `hoyEnTZ`, `fechaHoraLocalAInstante` y `renderEnTZ` en
+`src/lib/dates.ts`, y se cerró quitándolo y auditando sus llamadores.
+
+**No pide cambio de esquema.** `consultorios.timezone` ya existe y los snapshots de
+`appointments` y `consultas` también; ver TZ-DT-1 para las referencias exactas. Lo que
+falta no es una columna.
+
+**Por qué no se cableó**
+
+Igual que TZ-DT-1: el huso no viaja por el cable. Haría falta un campo nuevo en
+`ParamsListaExpediente`, mandarlo desde `fetchPacientes.ts` y validarlo aquí contra
+`Intl.supportedValuesOf('timeZone')`.
+
+**Y aquí la validación no es opcional, que es lo que lo hace peor que en TZ-DT-1.** Las
+dos conversiones van envueltas en `try/catch` que caen a `null`, así que un IANA sin
+validar **no revienta: apaga el filtro entero en silencio**. Un filtro que deja de
+filtrar sin decirlo es peor defecto que la hora corrida que se venía a arreglar.
+
+**Familia.** Va con **TZ-DT-1**: mismo apaño, mismo motivo y misma pieza pendiente. La
+advertencia sobre los tres `America/Mexico_City` deliberados que quedan en producción
+—`dates.ts:69`, `gcal.ts:43` y `r/[folio]/page.tsx:258`— está al final de TZ-DT-1 y
+**aplica igual a esta entrada**: léela antes de tocar ningún literal de zona horaria.
 
 ---
 

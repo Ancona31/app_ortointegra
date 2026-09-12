@@ -120,6 +120,11 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
           .select('paciente_id, tipo')
           .in('paciente_id', chunk)
           .eq('tipo', 'consentimiento_informado')
+          // Un borrador NO es un consentimiento: es un formulario a medias, sin
+          // folio y sin firma de nadie. Contarlo haría que este panel informara
+          // como consentido a un paciente que no ha consentido nada — de los
+          // tres consumidores del estado, este es el que más daño hace.
+          .neq('estado', 'borrador')
         if (docRes.error) throw new Error(docRes.error.message)
         documentosConConsentimiento.push(...((docRes.data ?? []) as DocumentoRow[]))
       }

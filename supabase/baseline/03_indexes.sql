@@ -27,6 +27,13 @@ CREATE INDEX IF NOT EXISTS idx_appointments_clinica
   ON public.appointments USING btree (clinica_id);
 CREATE INDEX IF NOT EXISTS idx_appointments_gcal_sync
   ON public.appointments USING btree (gcal_sync_status) WHERE (gcal_sync_status = 'pending'::text);
+-- Una cita por evento de Google, con ámbito de clínica: los ids de evento son
+-- únicos por calendario, no entre calendarios (un evento copiado conserva el
+-- id). clinica_id y no medico_id porque medico_id es nullable y en un índice
+-- único los NULL son distintos entre sí.
+CREATE UNIQUE INDEX IF NOT EXISTS appointments_clinica_google_event_id_uniq
+  ON public.appointments (clinica_id, google_event_id)
+  WHERE google_event_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_appointments_medico
   ON public.appointments USING btree (medico_id);
 CREATE INDEX IF NOT EXISTS idx_appointments_paciente

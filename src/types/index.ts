@@ -1,3 +1,5 @@
+import type { IconoEvento, ColorEvento } from '@/lib/appointments'
+
 // ─── Detección de duplicados ──────────────────────────────────────────────────
 export interface DuplicatePatientResponse {
   error: 'DUPLICATE_PATIENT'
@@ -99,6 +101,11 @@ export interface Consulta {
   consultorio_direccion?: string | null
   consultorio_telefono?: string | null
   consultorio_timezone?: string | null
+  /* La cita de la que salió esta consulta (plan §12.13). NULL = no vino de
+     ninguna cita agendada, o la cita se borró después (la FK es
+     ON DELETE SET NULL: el dato clínico sobrevive, el vínculo no). Se escribe
+     una sola vez, en el INSERT. */
+  appointment_id?: string | null
 }
 
 /**
@@ -117,12 +124,25 @@ export interface Appointment {
   title: string
   start_time: string
   end_time: string
-  status: 'scheduled' | 'confirmed' | 'cancelled' | 'no_show'
+  /* Días enteros en vez de horas. CONVENIO DE FECHAS, no romperlo: `start_time`
+     es medianoche del primer día y `end_time` medianoche del día SIGUIENTE al
+     último —fin EXCLUSIVO—, ambas en `consultorio_timezone` y no en el huso de
+     quien mira. Lo impone `appointments_all_day_medianoche_check`, que además
+     obliga a que la fila lleve su zona. Lo escribe el servidor: el modal manda
+     dos fechas y las rutas componen la medianoche. */
+  all_day: boolean
+  /* 'attended': la cita se atendió. Lo escribe el servidor al crear la nota
+     clínica que salió de ella (plan §12.13), y también se puede poner a mano
+     desde el modal de la agenda. La transición permitida es
+     'scheduled'|'confirmed' → 'attended'; 'cancelled' y 'no_show' no se tocan. */
+  status: 'scheduled' | 'confirmed' | 'cancelled' | 'no_show' | 'attended'
   notes: string | null
   google_event_id: string | null
   whatsapp_sent_at?: string | null
   whatsapp_reminder_sent_at?: string | null
-  gcal_sync_status: 'synced' | 'pending' | 'failed'
+  // 'unbound': la cita tuvo evento en Google y el vínculo se perdió sin vuelta
+  // atrás (el médico borró el calendario). La cita se conserva; el evento no.
+  gcal_sync_status: 'synced' | 'pending' | 'failed' | 'unbound'
   medico_id: string | null
   // Identificador de idempotencia del outbox-engine offline. La feature
   // del outbox fue eliminada en abril 2026 (ver CLAUDE.md), pero la columna
@@ -138,6 +158,11 @@ export interface Appointment {
   consultorio_direccion?: string | null
   consultorio_telefono?: string | null
   consultorio_timezone?: string | null
+  /* La pinta del evento genérico sin paciente (plan §12.14). Listas cerradas
+     en `@/lib/appointments` y con CHECK en la base. Una cita normal no lleva
+     ninguna de las dos: NULL es lo normal aquí, no la excepción. */
+  icono?: IconoEvento | null
+  color?: ColorEvento | null
 }
 
 /**
@@ -204,6 +229,20 @@ export interface MedicoInfo {
   direccion_consultorio: string
   telefono_consultorio: string
   clinica_nombre?: string
+  /**
+   * ⚠ **NUNCA SE USÓ, Y YA NO VA A USARSE.** Nació como interruptor por médico
+   * del despliegue de documentos v2; el encendido acabó siendo para todos a la
+   * vez, tras probar los nueve documentos en la rama.
+   *
+   * Su migración —`20260804_profiles_flag_documentos_v2.sql`— **se queda sin
+   * aplicar**, así que la columna no existe en producción y `/api/medico` no la
+   * selecciona. El interruptor de verdad es `VERSION_DE_EMISION`, en
+   * `src/lib/mobileShare.ts`, y es una constante: ver su nota para el porqué.
+   *
+   * No lo leas desde ningún sitio. Está aquí para que quien lo encuentre en la
+   * migración sepa que no es un cable suelto.
+   */
+  usa_documentos_v2?: boolean
 }
 
 // ─── Documentos ───────────────────────────────────────────────────────────────
@@ -217,6 +256,12 @@ export type TipoDocumento =
   | 'escrito_medico'
   | 'nota_honorarios'
   | 'consentimiento_informado'
+  // Documento INDEPENDIENTE que se emite EN LUGAR del consentimiento, no como
+  // hoja suya: si el paciente deniega, no se imprimen las siete hojas que
+  // explican y otorgan lo que acaba de rechazar. Tipo propio y no
+  // discriminador dentro de `contenido` —al revés que Honorarios/Cotización—
+  // porque los dos actos son opuestos y confundirlos en una lista sí hace daño.
+  | 'denegacion_consentimiento'
   | 'resultado_laboratorio'
   | 'estudio_imagen'
   // Legacy (documentos existentes en DB antes del rename)
@@ -230,6 +275,45 @@ export interface Documento {
   tipo: TipoDocumento
   contenido: DocumentoContenido
   pdf_url?: string
+  /**
+   * Chasis de diseño con el que se emitió el documento (1 = v1, 2 = v2).
+   * Columna en DB: NOT NULL DEFAULT 1. Opcional aquí porque la migración
+   * `20260804_documentos_formato_version.sql` todavía no está aplicada, así que
+   * a runtime llega `undefined`. Es la señal que usa el guard de regeneración
+   * en ModalDocumentos.tsx: si no se puede establecer la versión, no se
+   * regenera.
+   */
+  formato_version?: 1 | 2
+  /**
+   * Estado del documento — hoy solo lo mueve el consentimiento informado
+   * (`20260812_documentos_estado.sql`). `borrador` es trabajo sin terminar: no
+   * tiene folio, no tiene PDF y solo lo ve su autor. Los otros dos son
+   * TERMINALES: de ellos no se vuelve, ni se pasa de uno al otro.
+   *
+   * Opcional aquí, como `formato_version`: la columna es `NOT NULL DEFAULT
+   * 'emitido_firma_manual'`, así que quien no la pida en el `select` la recibe
+   * `undefined` y debe tratarse como emitida.
+   */
+  estado?: 'borrador' | 'emitido_firma_manual' | 'firmado'
+  /**
+   * FOLIO DE LA SERIE, columna propia y escrita por la base
+   * (`20260807_folio_01_esquema_y_generador.sql`). El cliente no lo propone: el
+   * trigger lo rechaza.
+   *
+   * `null` en tres casos legítimos y en ninguno más: un borrador —lo recibe al
+   * salir de ese estado—, un formato sin clase de folio —`escrito_medico`— y
+   * las filas anteriores al generador.
+   *
+   * **ES TAMBIÉN EL FOLIO QUE IMPRIME LA RECETA, y el que codifica su QR de
+   * verificación.** Lo fue desde agosto de 2026: antes imprimía un `R-…` propio
+   * que el navegador generaba y que guardaba en `contenido.folio`, y que
+   * `/r/[folio]` no resuelve. Las recetas de entonces conservan esa clave y se
+   * regeneran con ella.
+   *
+   * Qué formatos imprimen esta columna lo decide `folioImpreso()` en
+   * `src/lib/documentos/folio.ts`, que es el único sitio donde está escrito.
+   */
+  folio?: string | null
   // Metadata de uploads clínicos (sub-fase 6A). NULL en documentos generados por la app.
   storage_bucket?: string | null
   storage_path?: string | null

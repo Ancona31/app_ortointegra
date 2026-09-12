@@ -11,6 +11,13 @@
  * Usado en:
  * - PrimerConsultorioModal (F3-4, onboarding bloqueante)
  * - EditConsultorioModal (F3-5, edición desde perfil)
+ *
+ * MÓDULO NEUTRO — sin `'use client'` y sin dependencias de React. Lo consumen
+ * tanto componentes de cliente (la agenda) como código de servidor (el ancla de
+ * hora local que Spinus escribe en la descripción del evento de Google). Que
+ * siga neutro no es casualidad: `regionDeTimezone` vivía dentro de
+ * `agenda/page.tsx`, que es `'use client'`, y desde ahí no se podía importar en
+ * un route handler sin arrastrar el árbol de cliente al servidor.
  */
 
 export type ZonaConsultorio = {
@@ -55,3 +62,24 @@ export const ZONAS_MEXICO: ZonaConsultorio[] = [
   // UTC-5
   { value: 'America/Cancun',          label: 'Quintana Roo — Cancún, Playa, Tulum (UTC-5)' },
 ]
+
+/**
+ * Nombre legible de una zona horaria para enseñárselo a una persona: la REGIÓN,
+ * no la ciudad. `America/Hermosillo` → "Sonora", `America/Mexico_City` →
+ * "Centro". El estado le dice más a un paciente que el nombre IANA, y más que
+ * la capital de la zona.
+ *
+ * Vivía en `agenda/page.tsx` (F3-6e, badge de huso del consultorio) y se movió
+ * aquí al necesitarlo también el servidor. Mismo comportamiento, mismo
+ * resultado para las mismas entradas: la agenda ahora lo importa de aquí.
+ *
+ * Una zona fuera de `ZONAS_MEXICO` —un consultorio dado de alta antes de la
+ * lista, o un IANA de fuera de México— cae al identificador crudo. Es feo pero
+ * es cierto, que es lo que importa cuando el texto va dentro de una invitación.
+ */
+export function regionDeTimezone(tz: string | null): string {
+  if (!tz) return ''
+  const zona = ZONAS_MEXICO.find(z => z.value === tz)
+  if (!zona) return tz  // fallback al IANA crudo
+  return zona.label.split('—')[0].trim()  // em-dash U+2014
+}

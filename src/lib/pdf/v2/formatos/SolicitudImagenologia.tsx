@@ -1,0 +1,311 @@
+/**
+ * Sistema de documentos v2 — formato II.2 · **Solicitud de Imagenología**.
+ *
+ * FUENTE DE VERDAD: **las coordenadas medidas de `Solicitud de Imagen.dc.html`**,
+ * la lámina aprobada (versión `v1785856069259788`), con `SPEC_DISENO_PARTE_B.md`
+ * B.2 como segunda lectura del mismo archivo. **No la Sección II.2 del spec de
+ * implementación**, que en cuatro puntos dice otra cosa — están listados abajo.
+ *
+ * ESTE ARCHIVO NO DECIDE NADA DE GEOMETRÍA
+ *
+ * Igual que II.1: ni un solo número con unidad fuera de un token. Lo que este
+ * formato sí declara es **qué lámina fija cada componente** (`lamina`), que es la
+ * forma que tomó la conciliación cuando resultó que dos hojas aprobadas componen
+ * la misma pieza con cifras distintas. Ver `Lamina` en la capa de tokens.
+ *
+ * EL PRESUPUESTO DEL ENCABEZADO, SUMADO Y NO DECLARADO
+ *
+ * La lámina mide 232.88 pt de encabezado desde el margen de 54, y eso NO es una
+ * constante que copiar: es la suma de sus bloques, y uno de ellos sobra.
+ *
+ *     fila superior del membrete   59      (la fija el panel)
+ *     aire                          8
+ *     filete principal              2.5
+ *     aire                          6
+ *     banda de dirección           24      ← DOS renglones de 12
+ *     espaciador de cierre         12      ← 2.B, no un aire de este formato
+ *     bloque de título             25      (lo fija el riel derecho de 190)
+ *     aire                          6
+ *     filete del título             2.5
+ *     aire                         10
+ *     riel de identificación       63.87   (0.75 + 30 + 32.375 + 0.75)
+ *     aire                         14
+ *                                 ──────
+ *                                 232.87
+ *
+ * ⚠ **El encabezado compuesto mide 229.87 y no 232.87, y los 3 pt son el panel.**
+ * La lámina es HTML y suma los dos anillos de 1.5 pt por fuera del diámetro de 56;
+ * Yoga los mide por dentro (2.A), así que su fila superior mide 56 y no 59. Es la
+ * única cota que este formato no puede cerrar: el panel es geometría COMPARTIDA por
+ * los ocho (A.6) y subirlo a 59 mueve Laboratorio, que ya está conciliado.
+ * Reportado, no resuelto.
+ *
+ * ⚠ **Los 12 pt del espaciador NO se declaran aquí abajo, y no es un olvido.** Una
+ * lectura anterior los contó dos veces: la extracción los vio como un tercer
+ * renglón vacío de la banda de dirección y la tabla de espaciados los vio como un
+ * aire «dirección → título». Son la misma pieza, cierra el membrete y por tanto
+ * vive en 2.B. Este formato no separa el membrete del título: lo hace el membrete.
+ *
+ * LO QUE LA LÁMINA CONTRADICE DE II.2, Y GANA LA LÁMINA
+ *
+ * a. **SÍ lleva folio**, en el riel derecho del bloque de título y en la banda de
+ *    pie, con prefijo `I-`. II.2 §1 decía «Folio: no» y pie `sin folio`. Es la
+ *    misma reversión que ya se aplicó en 4.1 y por la misma prueba.
+ * b. **La entrada es APILADA**, con los cuatro datos uno bajo otro. Es lo contrario
+ *    de la tabla de tres columnas de Laboratorio, aunque II.2 llame a los dos
+ *    formatos «gemelos».
+ * c. **El badge vive DENTRO del bloque de título**, no como bloque hermano entre
+ *    título y riel: cuelga del título a 4 pt y por encima del filete.
+ * d. **El riel lleva 5 celdas, no 7**: el diagnóstico ocupa la fila entera y la
+ *    fecha no está en el riel — va como `Emisión` en el riel derecho de arriba.
+ *
+ * TRES COSAS QUE ESTE FORMATO NO MONTA, Y POR QUÉ
+ *
+ * a. **`MotorFlujo` (2.N).** Igual que II.1: su prop `arrastre` pide las tres
+ *    últimas líneas de PROSA que bajan con la firma, y este formato termina en
+ *    lista y contador. Con él, el aviso de continuación de la lámina —«CONTINÚA EN
+ *    LA HOJA 2 · ESTUDIOS 04 A 06»— tampoco se compone. Queda abierto (anexo A,
+ *    P4-4), y con él la fila compartida que II.2 §3 daba por cerrada en 4.2.
+ * b. **La hoja de continuación.** Membrete reducido, línea de paciente de una sola
+ *    línea, badge reducido a la derecha de ella, cabecera `Estudios · continuación`
+ *    y contador en forma `intermedia` están medidos y NO se componen: react-pdf
+ *    reparte un `Page` en hojas, pero el encabezado de la hoja 2 no puede diferir
+ *    del de la 1 sin montarlo con `fixed` + `render`, que es trabajo de 2.N. Si la
+ *    lista desborda, la hoja 2 sale sin encabezado propio — el mismo hueco que
+ *    tiene hoy Laboratorio.
+ * c. **El rótulo `Notas para el servicio de imagen`.** La lámina lo compone en
+ *    Archivo 9 / 13, que no es ningún rol de I.1.4, y las notas entran por 2.J como
+ *    una cadena: el rótulo viaja dentro del texto y sale en `etiqueta`, 7 / 11. Es
+ *    el mismo hueco que `Observaciones del laboratorio` en 4.1.
+ *
+ * Sin `'use client'`: módulo neutro, como el resto de v2.
+ */
+
+import { Page, StyleSheet } from '@react-pdf/renderer'
+import type { ReactElement } from 'react'
+import type { ConsultorioMembrete, MedicoMembrete } from '../Membrete'
+import type { PanelCircularProps } from '../PanelCircular'
+import type { ValoresPaciente } from '../BloquePaciente'
+import EntradaNumerada from '../EntradaNumerada'
+import MotorFlujo from '../MotorFlujo'
+import BloqueFirmas, { type Firma } from '../BloqueFirmas'
+import PieDocumento from '../PieDocumento'
+import { ESPACIO, MARGEN, PAPEL, TINTA, type AcentoResuelto } from '../tokens'
+
+/** Las cuatro cadenas que este formato declara, textuales de la lámina. */
+const TITULO = 'Solicitud de imagenología'
+/** `<ÍTEMS>` de 2.K, regla 1, y el sustantivo de la cabecera de la lista. */
+const ITEMS = 'estudios'
+const CABECERA_LISTA = 'Estudios'
+/**
+ * Rótulo colgado de la ranura `nota` de cada entrada. Existe para distinguir la
+ * indicación DEL ESTUDIO del diagnóstico DEL DOCUMENTO, que va una sola vez en el
+ * riel (II.2 §5).
+ */
+const ROTULO_INDICACION = 'Indicación'
+/** `CONCILIA D14` — la misma cadena en Receta y en las dos solicitudes. */
+const ROTULO_FIRMA = 'Firma y sello del médico'
+
+/**
+ * SEPARACIÓN ENTRE BLOQUES DE PRIMER NIVEL, medida en la lámina aprobada.
+ *
+ * Mismo criterio que en 4.1: I.1.7 no nombra ninguna de estas parejas, así que
+ * gobierna la ESCALA y el formato declara qué miembro usa (§0). Ninguna es literal.
+ *
+ *   riel → cabecera       **14 pt**   → `espacio.14`
+ *   cierre → contador      **5 pt**   → `espacio.5`
+ *   contador → firma      **26 pt**   → `espacio.26`
+ *
+ * ⚠ **ERAN CUATRO Y SON TRES.** `contador → notas` (16) desapareció con el bloque de
+ * notas al servicio de imagen: nadie lo alimentaba —el `contenido` del formulario no
+ * tiene esa clave— y el documento no lo echaba en falta. La cadena no deja hueco donde
+ * estaba: el contador enlaza con la firma con los mismos 26 pt que ya componía cuando
+ * las notas no venían, que era SIEMPRE.
+ *
+ * `espacio.14` y `espacio.26` se añadieron a I.1.7 para poder escribirlas.
+ *
+ * **Faltan dos parejas y las dos faltan porque ya están declaradas en el chasis**,
+ * cada una en el componente que cierra: membrete → título es el espaciador de 2.B
+ * y título → riel es `transicion.tituloRiel`, que 2.C aporta por abajo en 10 pt
+ * para esta lámina. Sumar aquí cualquiera de las dos la contaría dos veces.
+ */
+const SEPARACION_RIEL_LISTA = ESPACIO[14]
+const SEPARACION_CONTADOR_FIRMA = ESPACIO[26]
+
+/**
+ * Un estudio de la lista. Las TRES ranuras que II.2 §4 ocupa —`ancla`,
+ * `secundario` y `nota`— más el par que compone el ancla.
+ *
+ * `tipo` y `region` entran por separado y no ya concatenados porque el par lo
+ * exige el formulario —los dos bloquean emisión, en par— y el separador es
+ * redacción del formato, no dato. Ver `anclaDe()`.
+ */
+export interface EstudioSolicitado {
+  /** Radiografía, Resonancia magnética, Tomografía computarizada… */
+  readonly tipo: string
+  /** Región anatómica. Bloquea emisión en par con `tipo` (II.2 §2). */
+  readonly region: string
+  /** Ranura `secundario`. Colapsa sola si no viene. */
+  readonly proyecciones?: string
+  /** Ranura `nota`. Colapsa sola si no viene, con su rótulo. */
+  readonly indicacion?: string
+}
+
+export interface SolicitudImagenologiaProps {
+  readonly medico: MedicoMembrete
+  /** Consultorio activo, leído por quien construye el documento (I.3.6, P2-3). */
+  readonly consultorio: ConsultorioMembrete
+  readonly panel: PanelCircularProps
+  readonly acento: AcentoResuelto
+  /**
+   * Los datos del riel. Este formato usa CINCO de las siete celdas de 2.D:
+   * `fecha` y `hora` no viven aquí — la lámina las compone arriba, juntas, en la
+   * celda `Emisión` del riel derecho del bloque de título.
+   */
+  readonly paciente: ValoresPaciente
+  /** `estudios[]` bloquea emisión en el formulario: al menos uno. */
+  readonly estudios: readonly EstudioSolicitado[]
+  /**
+   * Fecha y hora de emisión, YA compuestas: la lámina imprime `4 ago 2026 · 11:05`.
+   * Colapsa si no viene.
+   */
+  readonly emision?: string
+  /** Badge del documento, no del estudio (II.2 §5). Sin él, sin badge. */
+  readonly urgente?: boolean
+  /*
+    ── AQUÍ NO HAY `notas`, Y NO ES UN OLVIDO ────────────────────────────────
+
+    Este formato llevó un bloque de notas al servicio de imagen, con la sintaxis de
+    viñetas de 2.J, y **no se compuso en ninguna solicitud emitida**: `SolicitudImagenForm`
+    no tiene ese campo y su `contenido` son cinco claves —paciente, diagnóstico, estudios,
+    urgente y fecha— sin ninguna que lo alimente.
+
+    No hacía falta. Lo que el servicio de imagen necesita saber de cada estudio va en la
+    ranura `nota` de su entrada —`indicacion`, que SÍ se captura y sí se guarda—, y ahí es
+    donde se lee: junto al estudio al que se refiere, no en un bloque al pie que obliga a
+    volver arriba para saber de cuál habla.
+
+    Retirado con las otras seis ranuras sin productor. No lo repongas sin un campo detrás.
+  */
+  /** Folio del documento, ya generado. Prefijo `I-` en la lámina. */
+  readonly folio: string
+  /** Trazo capturado del médico (2.L regla 5). */
+  readonly rubrica?: string
+}
+
+const estilos = StyleSheet.create({
+  hoja: {
+    backgroundColor: TINTA.papel,
+    paddingTop: MARGEN.superior,
+    paddingLeft: MARGEN.izquierdo,
+    paddingRight: MARGEN.derecho,
+    // Regla 4 de 2.L: reserva los 36 + 16 + 16 pt donde vive la banda de 2.M. Sin
+    // él vuelve el bug §8.1 y no hay nada que lo detenga (anexo A, P2-27).
+    paddingBottom: MARGEN.inferior,
+  },
+})
+
+/**
+ * El ancla de la entrada: `tipo · region`, con la raya del sistema y un espacio a
+ * cada lado. La concatenación vive aquí y no en 2.G porque el separador es
+ * redacción de ESTE formato — 2.G no sabe que sus dos datos son un tipo y una
+ * región.
+ */
+function anclaDe(estudio: EstudioSolicitado): string {
+  return `${estudio.tipo} · ${estudio.region}`
+}
+
+/**
+ * La firma del médico tratante, que es la única del formato.
+ *
+ * Los renglones bajo la línea salen de I.1.9 y son los mismos que el membrete
+ * imprime arriba: se toman de `MedicoMembrete` en vez de pedirlos otra vez, que es
+ * como se emiten hoy recetas con dos juegos de cédulas distintos.
+ */
+function firmaDelMedico(medico: MedicoMembrete, rubrica?: string): Firma {
+  return {
+    rol: ROTULO_FIRMA,
+    nombre: medico.nombre,
+    credenciales: medico.cedulas,
+    rubrica,
+  }
+}
+
+/** II.2 · Solicitud de Imagenología. */
+export default function SolicitudImagenologia({
+  medico,
+  consultorio,
+  panel,
+  acento,
+  paciente,
+  estudios,
+  emision,
+  urgente,
+  folio,
+  rubrica,
+}: SolicitudImagenologiaProps): ReactElement {
+  // Anotado y no aseverado: 2.L pide una tupla de una firma y la anotación se la
+  // da sin `as`, que este proyecto prohíbe para acallar un tipo.
+  const firmas: readonly [Firma] = [firmaDelMedico(medico, rubrica)]
+
+  return (
+    <Page size={[PAPEL.ancho, PAPEL.alto]} style={estilos.hoja}>
+      {/*
+        EL ENCABEZADO ENTRA COMO DATOS y lo compone 2.V desde 2.N, en sus dos
+        variantes. Este archivo ya no monta membrete, título, riel ni cabecera: si
+        volviera a hacerlo, volvería la hoja 2 sin nombre de paciente.
+
+        El badge tampoco: entra como el booleano que II.2 §2 declara y el chasis lo
+        reduce solo en las hojas de continuación (2.H `urgenteReducido`).
+      */}
+      <MotorFlujo
+        encabezado={{
+          medico,
+          consultorio,
+          panel,
+          acento,
+          lamina: 'imagenologia',
+          titulo: TITULO,
+          paciente,
+          emision,
+          folio,
+          urgente,
+          lista: { titulo: CABECERA_LISTA },
+          aireLista: SEPARACION_RIEL_LISTA,
+        }}
+        contador={{ items: ITEMS, total: estudios.length, lamina: 'imagenologia' }}
+        aireFirma={SEPARACION_CONTADOR_FIRMA}
+        firmas={<BloqueFirmas variante="simple" lamina="imagenologia" firmas={firmas} />}
+      >
+        {/*
+          LA LISTA APILADA. Sin `CierreEntradas`: en esta calibración cada entrada
+          lleva su regla debajo, incluida la última, y esa regla ES el cierre de la
+          lista. Ver `entradaEstudio` en 2.G.
+        */}
+        {estudios.map((estudio, indice) => (
+          <EntradaNumerada
+            // El índice ES la identidad: dos estudios pueden pedir la misma región
+            // y lo único que los distingue es su orden en la solicitud.
+            key={indice}
+            numero={indice + 1}
+            primera={indice === 0}
+            ancla={anclaDe(estudio)}
+            secundario={estudio.proyecciones}
+            nota={estudio.indicacion}
+            rotuloNota={ROTULO_INDICACION}
+            acento={acento}
+            calibracion="estudio"
+            disposicion="apilada"
+          />
+        ))}
+      </MotorFlujo>
+
+      {/*
+        Variante `completo`: folio · paginación · leyenda. La lámina compone las tres
+        zonas y emite con prefijo `I-`; II.2 §1 decía `sinFolio`. Misma reversión que
+        en 4.1 y por la misma prueba.
+      */}
+      <PieDocumento variante="completo" folio={folio} acento={acento} />
+    </Page>
+  )
+}

@@ -5,7 +5,14 @@ import { t } from './PdfStyles'
 import type { PdfMedicoData, PdfConsultorioData } from './PdfStyles'
 import { derivarPaletaNota, type PaletaNota } from './paletaNota'
 import type { NotaRenderData } from '@/lib/notaRenderData'
-import type { SeccionNota, BloqueNota, SpanTexto, TipoSeccion } from '@/lib/notaParser'
+import type { SeccionNota, BloqueNota } from '@/lib/notaParser'
+/* ⚠️ LOS METADATOS DE SECCIÓN YA NO VIVEN AQUÍ. Estaban en este archivo cuando
+   el impreso era su único consumidor; desde que el visor de pantalla pinta las
+   mismas secciones, la numeración posicional tiene que salir del mismo sitio o
+   la misma nota se numera distinto en pantalla y en papel. */
+import {
+  SUBTITULO_SECCION, ordenarSecciones, tituloDe, numeroDe, fusionarEncabezadoItem,
+} from '@/lib/notaSecciones'
 import type { SignosVitales } from '@/types'
 
 /* ------------------------------------------------------------------ */
@@ -226,64 +233,9 @@ type EstilosNota = ReturnType<typeof crearEstilos>
 /*  Metadatos de secciones                                             */
 /* ------------------------------------------------------------------ */
 
-const ORDEN_CANONICO: TipoSeccion[] = [
-  'subjetivo', 'objetivo', 'auxiliares_dx', 'analisis', 'diagnostico', 'plan', 'pronostico',
-]
-
-const TITULO_SECCION: Record<TipoSeccion, string> = {
-  subjetivo: 'SUBJETIVO',
-  objetivo: 'OBJETIVO',
-  auxiliares_dx: 'AUXILIARES DX',
-  analisis: 'ANÁLISIS',
-  diagnostico: 'DIAGNÓSTICO',
-  plan: 'PLAN',
-  pronostico: 'PRONÓSTICO',
-  desconocida: 'NOTA',
-}
-
-const SUBTITULO_SECCION: Record<TipoSeccion, string> = {
-  subjetivo: 'Motivo y síntomas',
-  objetivo: 'Exploración física',
-  auxiliares_dx: 'Estudios',
-  analisis: 'Impresión dx',
-  diagnostico: 'Diagnóstico',
-  plan: 'Tratamiento',
-  pronostico: 'Evolución esperada',
-  desconocida: '',
-}
-
 /* ------------------------------------------------------------------ */
 /*  Helpers de render                                                  */
 /* ------------------------------------------------------------------ */
-
-/** Un span vacío/de espacio termina en ":". Detecta sub-encabezados tipo "Farmacológico:". */
-function terminaEnDosPuntos(bloque: BloqueNota): boolean {
-  const ultimo = bloque.spans[bloque.spans.length - 1]
-  return bloque.tipo === 'parrafo' && !!ultimo && ultimo.texto.trimEnd().endsWith(':')
-}
-
-/**
- * Presentación (no altera parseNota): un párrafo que termina en ":" seguido de
- * EXACTAMENTE UN item (antes del siguiente párrafo/fin) se fusiona en un solo
- * párrafo — spans del encabezado + espacio + spans del item, sin guion. Con 2+
- * items consecutivos se conserva la lista.
- */
-function fusionarEncabezadoItem(bloques: BloqueNota[]): BloqueNota[] {
-  const out: BloqueNota[] = []
-  for (let i = 0; i < bloques.length; i++) {
-    const actual = bloques[i]
-    const sig = bloques[i + 1]
-    const sigSig = bloques[i + 2]
-    if (terminaEnDosPuntos(actual) && sig?.tipo === 'item' && sigSig?.tipo !== 'item') {
-      const espacio: SpanTexto = { texto: ' ', bold: false }
-      out.push({ tipo: 'parrafo', spans: [...actual.spans, espacio, ...sig.spans] })
-      i++ // consume el item fusionado
-      continue
-    }
-    out.push(actual)
-  }
-  return out
-}
 
 /** Renderiza los bloques (párrafos e ítems) de una nota, con spans en negrita. */
 function renderBloques(
@@ -312,20 +264,6 @@ function renderBloques(
       </Text>
     )
   })
-}
-
-/** Ordena las secciones renderizables: conocidas en orden canónico, luego desconocidas. */
-function ordenarSecciones(secciones: SeccionNota[]): SeccionNota[] {
-  const conBloques = secciones.filter((sec) => sec.bloques.length > 0)
-  const conocidas = ORDEN_CANONICO.flatMap((tipo) => conBloques.filter((sec) => sec.tipo === tipo))
-  const desconocidas = conBloques.filter((sec) => sec.tipo === 'desconocida')
-  return [...conocidas, ...desconocidas]
-}
-
-/** Título de una sección desconocida: usa su título original en mayúsculas o "NOTA". */
-function tituloDe(sec: SeccionNota): string {
-  if (sec.tipo !== 'desconocida') return TITULO_SECCION[sec.tipo]
-  return sec.titulo.trim() ? sec.titulo.trim().toUpperCase() : 'NOTA'
 }
 
 /* ------------------------------------------------------------------ */
@@ -550,7 +488,7 @@ export function PaginaNota({ data, logoUrl, paleta, contexto }: PaginaNotaProps)
         {secciones.map((sec, i) => (
           <SeccionItem
             key={`${sec.tipo}-${i}`}
-            numero={String(i + 1).padStart(2, '0')}
+            numero={numeroDe(i)}
             seccion={sec}
             primera={i === 0}
             s={s}

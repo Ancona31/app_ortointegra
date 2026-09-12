@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useState, useCallback, useRef } from 'react'
+import { createContext, useContext, useState, useCallback, useMemo, useRef } from 'react'
 import { CheckCircle, XCircle, Info, AlertTriangle, X } from 'lucide-react'
 
 type ToastType = 'success' | 'error' | 'info' | 'warning'
@@ -28,13 +28,28 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
   const dismiss = (id: number) => setToasts(prev => prev.filter(t => t.id !== id))
 
-  const toast: ToastFn = {
-    success: (msg) => add(msg, 'success'),
-    error:   (msg) => add(msg, 'error'),
-    info:    (msg) => add(msg, 'info'),
-    warning: (msg) => add(msg, 'warning'),
-  }
+  // Memoizado: sin esto el objeto cambia de identidad en cada toast que entra
+  // o sale, y re-renderiza todo el arbol bajo el provider.
+  const toast: ToastFn = useMemo(() => ({
+    success: (msg: string) => add(msg, 'success'),
+    error:   (msg: string) => add(msg, 'error'),
+    info:    (msg: string) => add(msg, 'info'),
+    warning: (msg: string) => add(msg, 'warning'),
+  }), [add])
 
+  /* ⚠️⚠️ ESTAS CLASES SON DE TAILWIND A PROPÓSITO, Y NO SE PASAN A TOKENS
+     `--sp-*`. Se probó y se revirtió, así que conviene saber por qué antes de
+     repetirlo: con `--sp-primary-*` el aviso de «info» tomaba el COLOR DE MARCA
+     de la clínica, y en una paleta verde «info» y «éxito» salían los dos verdes.
+     Un aviso de sistema no puede depender del color que el médico eligió.
+     ⚠️ Y EL DEFECTO DE OSCURO YA NO ESTÁ AQUÍ: se arregló en la hoja de
+     traducción. El escalón 800 del texto no se repintaba —quedaba tinta oscura
+     sobre relleno oscuro, 1.83-2.08:1— y ahora `html.dark .text-*-700/800/900`
+     lo lleva al nivel 300 de la familia (ver la ampliación en `globals.css`).
+     El fondo y el borde ya los cubría `ThemeProvider`. Resultado: en claro esto
+     es exactamente lo de siempre y en oscuro da 8.62-10.25:1.
+     ⚠️ SI ALGÚN DÍA HACE FALTA TOCAR EL COLOR DE UN AVISO, se toca la hoja, no
+     este archivo. */
   const styles: Record<ToastType, string> = {
     success: 'bg-emerald-50 border-emerald-200 text-emerald-800',
     error:   'bg-red-50 border-red-200 text-red-800',
@@ -51,7 +66,16 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   return (
     <ToastContext.Provider value={toast}>
       {children}
-      <div className="fixed bottom-5 right-5 z-[9999] flex flex-col gap-2 pointer-events-none">
+      {/* ⚠️ EL `bottom` LLEVA LA BARRA DE GESTOS SUMADA (bloque 6 · paso 10).
+          Con `viewport-fit=cover` los 20 px de `bottom-5` se miden desde el
+          borde FÍSICO de la pantalla y la barra de gestos mide ~34, así que el
+          aviso salía por debajo de ella. El 20 de diseño no se toca: se suma, y
+          donde el sistema no se superpone `env()` vale 0.
+          ⚠️ ES EL MENOS GRAVE DE LA TANDA y aun así se arregla: el aviso es
+          `pointer-events-none` y se va solo, o sea que nadie se queda sin poder
+          pulsar nada — pero es donde la app dice «guardado» o «falló», y medio
+          tapado por el indicador del sistema se lee mal justo cuando importa. */}
+      <div className="fixed bottom-[calc(1.25rem+env(safe-area-inset-bottom,0px))] right-5 z-[9999] flex flex-col gap-2 pointer-events-none">
         {toasts.map(t => (
           <div
             key={t.id}

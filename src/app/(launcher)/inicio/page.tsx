@@ -13,12 +13,12 @@ import Image from 'next/image'
 import ConsultaRapidaModal from '@/components/launcher/ConsultaRapidaModal'
 import OnboardingModal from '@/components/onboarding/OnboardingModal'
 import ParticleCanvas from '@/components/launcher/ParticleCanvas'
-import { useTheme } from '@/components/launcher/ThemeContext'
+import { useTemaLauncher } from '@/components/launcher/TemaLauncher'
 import { useMedicoInfo } from '@/hooks/useMedicoInfo'
 import { useClinica } from '@/hooks/useClinica'
 import { useProfile } from '@/hooks/useProfile'
 import { useSubscriptionGate } from '@/components/billing/SubscriptionGateProvider'
-import { hoyEnTZ, desplazarFecha, fechaHoraLocalAInstante } from '@/lib/dates'
+import { hoyEnTZ, desplazarFecha, fechaHoraLocalAInstante, tzDispositivo } from '@/lib/dates'
 
 type GridMode = 'sin_pacientes' | 'nuevo' | 'activo'
 
@@ -69,7 +69,7 @@ function fechaCompleta(): string {
 
 export default function InicioPage() {
   const router = useRouter()
-  const { dark } = useTheme()
+  const { dark } = useTemaLauncher()
   const { state: subState, openBloqueoModal } = useSubscriptionGate()
   const { profile } = useProfile()
   const [estado, setEstado] = useState<EstadoPerfil | null>(null)
@@ -97,14 +97,50 @@ export default function InicioPage() {
         .catch(() => {})
         .finally(() => setLoading(false))
 
-      // Fetch quick stats
-      const inicioHoy = fechaHoraLocalAInstante(hoyEnTZ(), '00:00')
-      const inicioManana = fechaHoraLocalAInstante(desplazarFecha(hoyEnTZ(), { dias: 1 }), '00:00')
-      const inicioSemana = fechaHoraLocalAInstante(desplazarFecha(hoyEnTZ(), { dias: -7 }), '00:00')
+      // Fetch quick stats.
+      //
+      // Ventanas calculadas en el huso del DISPOSITIVO, no en el de la clínica
+      // (ver LA REGLA en la cabecera de `@/lib/dates`). Antes heredaban el
+      // default `TZ_CLINICA`: en el Centro coincide, pero en Sonora una cita de
+      // las 23:00 caía fuera de la ventana y no se contaba como de hoy.
+      //
+      // `inicioSemana` cuenta consultas, no citas, pero comparte ventana y
+      // criterio con las otras dos: dejarla en Centro sería incoherente.
+      //
+      // Todo esto vive dentro del `useEffect`, o sea sólo en cliente, que es lo
+      // que `tzDispositivo()` exige.
+      const tz = tzDispositivo()
+      const inicioHoy = fechaHoraLocalAInstante(hoyEnTZ(tz), '00:00', tz)
+      const inicioManana = fechaHoraLocalAInstante(desplazarFecha(hoyEnTZ(tz), { dias: 1 }), '00:00', tz)
+      const inicioSemana = fechaHoraLocalAInstante(desplazarFecha(hoyEnTZ(tz), { dias: -7 }), '00:00', tz)
 
+      /* «Hoy tienes N citas» — y que los tres filtros digan justo eso.
+         La ventana ya era correcta: de las 00:00 de hoy a las 00:00 de mañana.
+         Lo que contaba de más eran las otras dos:
+
+         · CANCELADAS. Sin filtro de status entraban las `cancelled`, así que
+           una mañana que se vaciaba por cancelaciones seguía anunciando el
+           mismo número. Misma lista que los paneles del dashboard.
+         · EVENTOS GENÉRICOS (§12.14). «Vacaciones IMSS» no es una cita y
+           sumaba una. Mismo `paciente_id not null` que los paneles.
+
+         · LAS DE OTROS MÉDICOS. Sin `medico_id` esto contaba la clínica entera
+           para el ADMINISTRADOR, que es el único a quien la RLS se la enseña,
+           y su panel de `/dashboard` sólo le enseña las suyas: dos cifras en la
+           misma pantalla contando cosas distintas. Va por `user.id` —no por
+           `profile`— porque es el que ya trajo el `getUser()` de arriba, así
+           que no hay carrera con `useProfile`. Para el médico invitado es un
+           no-op: `appointments_select` ya le recortaba a las suyas.
+
+         AQUÍ NO LLEGA LA SECRETARIA, y por eso el filtro no la deja en cero:
+         `inicio/layout.tsx:25` la desvía a /dashboard en el servidor antes de
+         que esto renderice. El launcher es sólo para médicos. */
       supabase
         .from('appointments')
         .select('id', { count: 'exact', head: true })
+        .eq('medico_id', user.id)
+        .not('paciente_id', 'is', null)
+        .in('status', ['scheduled', 'confirmed'])
         .gte('start_time', inicioHoy)
         .lt('start_time', inicioManana)
         .then((res: { count: number | null }) => setCitasHoy(res.count ?? 0))
@@ -165,8 +201,20 @@ export default function InicioPage() {
       <ParticleCanvas dark={dark} />
 
       <div className="min-h-screen flex flex-col relative" style={{ zIndex: 1 }}>
-        {/* Top bar */}
-        <div className="flex items-center justify-between px-6 pt-6 pb-2">
+        {/* Top bar.
+            ⚠️ EL RELLENO DE ARRIBA LLEVA EL ÁREA SEGURA SUMADA, no sustituida.
+            Ésta es la pantalla de arranque de la app instalada (`start_url:
+            '/inicio'` en el manifiesto) y con `viewport-fit=cover` los 24 px de
+            `pt-6` se medían desde el borde FÍSICO. La franja navy de
+            `globals.css` (`body::before`) es OPACA y mide lo que la muesca —47
+            a 59 px—, así que se comía media altura del logo y de los enlaces de
+            la derecha; y como esa franja lleva `pointer-events: none`, los
+            enlaces a /pricing y /perfil seguían respondiendo al toque sin
+            verse. Un control invisible que responde es peor que uno desplazado.
+            Los 24 de diseño no se tocan: se suman. En escritorio y en una
+            pestaña normal el `env()` vale 0 y esto es exactamente el `pt-6` de
+            siempre. */}
+        <div className="flex items-center justify-between px-6 pt-[calc(1.5rem+env(safe-area-inset-top,0px))] pb-2">
           <div className="flex items-center gap-2">
             <Image
               src="/logo-spinus.png"

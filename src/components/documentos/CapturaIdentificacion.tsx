@@ -1,0 +1,383 @@
+'use client'
+
+import { useCallback, useEffect, useRef, useState } from 'react'
+import Cropper, { type Area, type MediaSize, type Point, type Size } from 'react-easy-crop'
+import { Camera, Images, RotateCw } from 'lucide-react'
+import {
+  ANCHO_MINIMO_NITIDO,
+  PROPORCION,
+  cargarImagen,
+  medidasRotadas,
+  prepararFoto,
+  zoomMinimoEntera,
+} from '@/lib/documentos/identificacionFoto'
+
+/**
+ * Foto de identificación de un firmante — GUIA_FORMULARIOS_05 §6, con la
+ * actualización de captura nativa (2026-08-12, anotada en la guía).
+ *
+ * Llega DESPUÉS de confirmar la firma, nunca antes, y solo a quien firmó:
+ * quien no firmó no está, así que no hay identificación que capturar.
+ *
+ * ── CAPTURA NATIVA, NO getUserMedia. NO VUELVAS A getUserMedia ──────────────
+ * La primera versión de esta pantalla montaba un visor con `getUserMedia`,
+ * marco guía en vivo y selector de cámaras. En iPad y Android `getUserMedia`
+ * rechazaba con `NotAllowedError` SIN llegar a enseñar el diálogo de permiso,
+ * a través de cinco intentos de corrección de la política de permisos. La
+ * sustituyó esto, auditado y verificado en dispositivo (paso 0):
+ *
+ *   · «Tomar foto» — campo de archivo con `capture="environment"`: abre la
+ *     aplicación de cámara del SISTEMA, que no pasa por `getUserMedia` ni por
+ *     `Permissions-Policy` — el permiso lo administra el sistema operativo a
+ *     su propia app de cámara, no el navegador a esta página. Verificado: no
+ *     deja copia en la galería del dispositivo (iOS y Android probados).
+ *   · «Elegir archivo» — el mismo campo SIN `capture`: selector de fotos.
+ *     Son dos entradas y no una porque `capture` fuerza la cámara y suprime la
+ *     galería del selector nativo, y la guía declara que subir desde galería
+ *     es aceptable (§6.3): la foto es cotejo, no prueba de presencia.
+ *   · El recorte vive DESPUÉS, sobre la imagen quieta, con la proporción de la
+ *     caja del anexo. Lo que se sube es SOLO lo de dentro del rectángulo: la
+ *     mesa y los dedos no salen del dispositivo.
+ *
+ * Consecuencia aceptada y anotada en la guía: la cámara en vivo de ESCRITORIO
+ * se pierde —`capture` se ignora ahí y los dos botones abren el selector—. Una
+ * cámara web apuntando a la mesa nunca fue buen instrumento para una
+ * credencial.
+ *
+ * ── ⚠ LA FOTO NO BLOQUEA EN NINGUNA DE SUS RAMAS ────────────────────────────
+ * Ni si la rechaza, ni si cancela la cámara del sistema, ni si el archivo no se
+ * puede leer, ni si la subida falla. TODAS desembocan en `onListo` —con ruta o
+ * con `null`, que es «sin foto» y es una respuesta válida—. Si añades una rama
+ * nueva, tiene que terminar en `onListo`: una que se quede quieta deja el
+ * firmado parado con el dispositivo en manos del paciente.
+ *
+ * ── EL ORDEN, QUE LO IMPONE LA MIGRACIÓN ────────────────────────────────────
+ * La foto se sube AQUÍ y la fila de la firma se inserta después, al sellar: la
+ * fila es inmutable y lleva la ruta dentro, así que insertarla primero y fallar
+ * la subida dejaría una ruta muerta imposible de corregir. Está escrito en
+ * `20260813_firmas_documento.sql`, junto a
+ * `firmas_documento_identificacion_check`.
+ */
+
+type Fase = 'pregunta' | 'recortar' | 'subiendo'
+
+/**
+ * El marco del recortador, EN LÍNEA y no en la hoja de estilos, porque no puede
+ * ser de otra forma: react-easy-crop inyecta su hoja SIN capa en `<head>`, y lo
+ * no encapado gana a cualquier regla de `@layer components` sin que la
+ * especificidad cuente —la misma lección que `touch-action`, documentada en
+ * `spinus-tokens.css`—. El estilo en línea gana siempre.
+ *
+ * ── EL CONTRASTE ES DOBLE LÍNEA, Y LAS DOS HACEN FALTA ──────────────────────
+ * Una línea blanca desaparece sobre una credencial clara y una oscura sobre una
+ * mesa oscura. Blanco por dentro (border) + azul marino por fuera (outline):
+ * una de las dos contrasta siempre, sea lo que sea lo que haya debajo.
+ *
+ * `color` no es texto: es el color del velo exterior — la librería lo dibuja
+ * con `box-shadow: 0 0 0 9999em currentColor`.
+ *
+ * El radio anticipa las esquinas redondeadas con que la foto se imprime en el
+ * anexo (v1 del PDF): lo que el médico ve al ajustar es la forma final.
+ */
+const MARCO_ESTILO: React.CSSProperties = {
+  border: '2px solid rgba(255, 255, 255, 0.95)',
+  outline: '2px solid rgba(26, 58, 92, 0.9)',
+  borderRadius: 10,
+  color: 'rgba(15, 30, 48, 0.55)',
+}
+
+interface Props {
+  /** El borrador al que cuelga la foto. La ruta sale `{documentoId}/{rol}.jpg`. */
+  documentoId: string
+  /** `paciente` · `familiar` · `testigo_1` · `testigo_2`. El médico no entra. */
+  rol: string
+  /**
+   * La ruta dentro del bucket, o `null` si se sigue sin foto. La recoge el modo
+   * de firmado y viaja hasta `firmas_documento.identificacion_path`.
+   */
+  onListo: (path: string | null) => void
+}
+
+export default function CapturaIdentificacion({ documentoId, rol, onListo }: Props) {
+  const [fase, setFase] = useState<Fase>('pregunta')
+  const [aviso, setAviso] = useState('')
+  /** La imagen elegida, ya decodificada, con su object-URL para el recortador. */
+  const [fuente, setFuente] = useState<{ url: string; img: HTMLImageElement } | null>(null)
+
+  // El estado del recortador. `areaPixels` es el rectángulo EN PÍXELES DE LA
+  // FUENTE que react-easy-crop entrega en onCropComplete: exactamente el
+  // `Recorte` que `prepararFoto` acepta, con otros nombres de campo.
+  const [crop, setCrop] = useState<Point>({ x: 0, y: 0 })
+  const [zoom, setZoom] = useState(1)
+  /**
+   * Rotación en pasos de 90°, solo desde el botón. `onRotationChange` NO se
+   * pasa a propósito: con él la librería habilita el giro por gesto de dos
+   * dedos, que produce ángulos libres — y `matrizDeRecorte` solo garantiza los
+   * múltiplos de 90, que además son lo que una credencial torcida necesita.
+   */
+  const [rotacion, setRotacion] = useState(0)
+  const [areaPixels, setAreaPixels] = useState<Area | null>(null)
+
+  /**
+   * Las medidas que la librería reporta de sí misma: la imagen como se pinta y
+   * el rectángulo de recorte. Viven en refs —no se renderiza nada con ellas—
+   * y las consume `limitarPosicion`.
+   */
+  const mediaRef = useRef<MediaSize | null>(null)
+  const cropSizeRef = useRef<Size | null>(null)
+
+  const inputCamaraRef = useRef<HTMLInputElement>(null)
+  const inputArchivoRef = useRef<HTMLInputElement>(null)
+  /**
+   * Espejo del object-URL para la limpieza de desmontaje, que corre UNA vez y
+   * no ve el estado. Sin revocarlo, cada foto descartada queda retenida
+   * mientras el modo de firmado siga abierto.
+   */
+  const urlRef = useRef<string | null>(null)
+
+  useEffect(() => () => {
+    if (urlRef.current) URL.revokeObjectURL(urlRef.current)
+  }, [])
+
+  /** Suelta la imagen actual y revoca su URL. */
+  const soltarFuente = useCallback((): void => {
+    if (urlRef.current) URL.revokeObjectURL(urlRef.current)
+    urlRef.current = null
+    setFuente(null)
+    setAreaPixels(null)
+  }, [])
+
+  /**
+   * El archivo elegido —da igual por cuál de las dos entradas— pasa al
+   * recortador. Si el navegador no lo sabe decodificar, aviso y se sigue en la
+   * pregunta: no bloquea.
+   */
+  async function elegir(archivo: File | undefined): Promise<void> {
+    if (!archivo) return
+    setAviso('')
+    try {
+      const img = await cargarImagen(archivo)
+      soltarFuente()
+      // `cargarImagen` revoca su URL interna; para el recortador hace falta una
+      // viva mientras dure la fase, así que se crea otra sobre el mismo archivo.
+      const url = URL.createObjectURL(archivo)
+      urlRef.current = url
+      setFuente({ url, img })
+      setCrop({ x: 0, y: 0 })
+      setZoom(1)
+      setRotacion(0)
+      setFase('recortar')
+    } catch {
+      setAviso('No se pudo leer esa imagen. Elige otro archivo o sigue sin foto.')
+    }
+  }
+
+  /** Recorta a lo que encierra el rectángulo, reduce y sube. Si falla, sin foto. */
+  async function confirmar(): Promise<void> {
+    if (!fuente || !areaPixels) return
+    setFase('subiendo')
+    try {
+      // La rotación viaja hasta el recorte final: `croppedAreaPixels` viene en
+      // el espacio girado y la matriz de `prepararFoto` lo deshace. Sin ese
+      // tercer argumento, el médico ajustaría una cosa y se imprimiría otra.
+      const blob = await prepararFoto(fuente.img, {
+        x: areaPixels.x,
+        y: areaPixels.y,
+        ancho: areaPixels.width,
+        alto: areaPixels.height,
+      }, rotacion)
+      if (!blob) throw new Error('SIN_BLOB')
+
+      const cuerpo = new FormData()
+      cuerpo.append('foto', blob, `${rol}.jpg`)
+      cuerpo.append('rol', rol)
+      const res = await fetch(`/api/documentos/${documentoId}/identificacion`, {
+        method: 'POST', body: cuerpo,
+      })
+      if (!res.ok) throw new Error(`POST ${res.status}`)
+      const { path } = (await res.json()) as { path?: string }
+      onListo(path ?? null)
+    } catch (err) {
+      console.error('[CapturaIdentificacion] confirmar falló:', err)
+      onListo(null)
+    }
+  }
+
+  /**
+   * §6 punto 3 · el recorte corto se avisa EN PANTALLA, no se descubre en el
+   * papel. `prepararFoto` no escala hacia arriba —correcto: inventar píxeles no
+   * mejora una credencial— así que un recorte por debajo del mínimo sale tal
+   * cual y se imprime menos nítido. Es aviso y no bloqueo, como todo aquí.
+   *
+   * Sigue midiendo con el zoom mínimo desbloqueado: al alejar, `areaPixels`
+   * crece —cubre más fuente— así que el aviso se dispara al acercar y, sobre
+   * todo, con una fuente pequeña: una foto de galería de pocos píxeles avisa
+   * incluso alejada del todo, que es justo cuando más hace falta.
+   */
+  const corto = areaPixels !== null && areaPixels.width < ANCHO_MINIMO_NITIDO
+
+  /**
+   * Hasta dónde se puede ALEJAR: el zoom en que la imagen entera cabe en el
+   * rectángulo, y ni un paso más. Es la salida elegida al defecto de la
+   * credencial cortada — `objectFit: cover` con el mínimo de 1 impedía bajar de
+   * «imagen cubriendo el rectángulo», así que una credencial mayor que el marco
+   * no entraba completa. Por debajo de 1 aparecen bandas sin imagen en un eje:
+   * el tope evita las evitables y `prepararFoto` pinta de blanco las demás.
+   */
+  const zoomMinimo = fuente
+    ? zoomMinimoEntera(fuente.img.naturalWidth, fuente.img.naturalHeight, rotacion)
+    : 1
+
+  /**
+   * ⚠ EL CLAMP DE POSICIÓN ES NUESTRO PORQUE `restrictPosition` MIENTE AQUÍ.
+   * Con la prop activada, cuando la imagen no cubre el rectángulo la librería
+   * RECORTA `croppedAreaPixels` a los límites de la imagen y reconstruye el
+   * rectángulo desde el eje amputado — devuelve una región que no es la que el
+   * médico ve, que es exactamente el defecto que ya tuvo esta pantalla con el
+   * marco de adorno. Desactivada, los píxeles salen fieles (con las bandas
+   * incluidas), pero la imagen queda libre para sacarse del marco de un
+   * arrastre. Esto repone solo la parte buena: la misma fórmula de la librería
+   * (`restrictPositionCoord`, con su valor absoluto), que deja deslizar una
+   * imagen menor que el rectángulo dentro de él sin poder escapársele.
+   */
+  const limitarPosicion = useCallback((p: Point, zoomActual: number): Point => {
+    const media = mediaRef.current
+    const cropSize = cropSizeRef.current
+    if (!media || !cropSize) return p
+    const girada = medidasRotadas(media.width, media.height, rotacion)
+    const topeX = Math.abs((girada.ancho * zoomActual) / 2 - cropSize.width / 2)
+    const topeY = Math.abs((girada.alto * zoomActual) / 2 - cropSize.height / 2)
+    return {
+      x: Math.min(Math.max(p.x, -topeX), topeX),
+      y: Math.min(Math.max(p.y, -topeY), topeY),
+    }
+  }, [rotacion])
+
+  // Durante el pellizco, la librería avisa de la posición ANTES que del zoom,
+  // así que el clamp de `onCropChange` corre con el zoom del render anterior.
+  // Este efecto reajusta la posición cuando el zoom (o el giro) se asienta.
+  useEffect(() => {
+    setCrop(c => limitarPosicion(c, zoom))
+  }, [zoom, limitarPosicion])
+
+  return (
+    <div className="sp-idfoto">
+      {aviso && <p className="sp-banner sp-banner--warn">{aviso}</p>}
+
+      {/* Las dos entradas al mismo campo. Ocultas: los botones visibles de abajo
+          las disparan. El `value` se vacía tras leerlo para que repetir con el
+          MISMO archivo vuelva a disparar el `change`. */}
+      <input ref={inputCamaraRef} type="file" accept="image/jpeg,image/png"
+        capture="environment" hidden
+        onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; void elegir(f) }} />
+      <input ref={inputArchivoRef} type="file" accept="image/jpeg,image/png" hidden
+        onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; void elegir(f) }} />
+
+      {fase === 'pregunta' && (
+        <div className="sp-card sp-idfoto-card">
+          <span className="sp-icobox"><Camera aria-hidden="true" /></span>
+          <div className="sp-idfoto-card-txt">
+            <p className="sp-body">
+              Firma capturada. ¿Se anexa una foto de la identificación?
+            </p>
+            <div className="sp-idfoto-controles">
+              {/* `Sin foto` es una RESPUESTA, no una cancelación: por eso es un
+                  botón del mismo peso y no una X. */}
+              <button type="button" className="sp-btn sp-btn--secondary"
+                onClick={() => onListo(null)}>
+                Sin foto
+              </button>
+              <button type="button" className="sp-btn sp-btn--primary"
+                onClick={() => inputCamaraRef.current?.click()}>
+                <Camera size={18} aria-hidden="true" /> Tomar foto
+              </button>
+              <button type="button" className="sp-btn sp-btn--ghost"
+                onClick={() => inputArchivoRef.current?.click()}>
+                <Images size={18} aria-hidden="true" /> Elegir archivo
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {(fase === 'recortar' || fase === 'subiendo') && fuente && (
+        <>
+          {/* El recortador. La proporción es la de la caja del anexo y es FIJA:
+              lo que encierra el rectángulo es lo que se imprime, sin más
+              recortes después. Arrastrar mueve, pellizco o rueda acercan, Girar
+              endereza en pasos de 90°.
+
+              El contenedor lleva LA MISMA proporción que el rectángulo (CSS de
+              `.sp-idfoto-cropper`), así que el marco lo llena entero: es lo que
+              decide el encuadre y domina la pantalla. `cover` garantiza que la
+              imagen siempre cubra el rectángulo — sin bandas vacías que
+              acabarían impresas como bordes negros. */}
+          <div className="sp-idfoto-cropper">
+            <Cropper
+              image={fuente.url}
+              crop={crop}
+              zoom={zoom}
+              rotation={rotacion}
+              aspect={PROPORCION}
+              objectFit="cover"
+              minZoom={zoomMinimo}
+              // Apagada a propósito y sustituida por `limitarPosicion`: con la
+              // imagen sin cubrir el rectángulo, la prop devuelve unos
+              // `croppedAreaPixels` recortados a la imagen — otra región que la
+              // que se ve. La explicación entera, sobre el callback.
+              restrictPosition={false}
+              style={{ cropAreaStyle: MARCO_ESTILO }}
+              setMediaSize={m => { mediaRef.current = m }}
+              setCropSize={s => { cropSizeRef.current = s }}
+              onCropChange={p => setCrop(limitarPosicion(p, zoom))}
+              onZoomChange={setZoom}
+              onCropComplete={(_area, pixeles) => setAreaPixels(pixeles)}
+            />
+          </div>
+          <p className="sp-hint sp-idfoto-pie">
+            Ajusta la identificación al rectángulo. Solo se guarda lo de dentro.
+          </p>
+
+          {corto && (
+            <p className="sp-banner sp-banner--warn">
+              El recorte queda por debajo de la resolución recomendada para imprimirse
+              nítido. Acerca menos la imagen, o toma la foto desde más cerca.
+            </p>
+          )}
+
+          <div className="sp-idfoto-controles">
+            <button type="button" className="sp-btn sp-btn--secondary"
+              disabled={fase === 'subiendo'}
+              onClick={() => { soltarFuente(); setAviso(''); setFase('pregunta') }}>
+              Volver
+            </button>
+            {/* Foto en vertical con la credencial apaisada: sin esto, la única
+                salida era repetir la foto. Siempre horario: al cuarto toque se
+                da la vuelta completa, y para deshacer un toque bastan tres.
+                Girar recentra y reajusta el zoom al mínimo del nuevo giro: el
+                mínimo depende de qué lado queda a lo ancho, así que el zoom
+                vigente puede quedar por debajo del tope recién calculado. */}
+            <button type="button" className="sp-btn sp-btn--secondary"
+              disabled={fase === 'subiendo'}
+              onClick={() => {
+                const nueva = (rotacion + 90) % 360
+                setRotacion(nueva)
+                setCrop({ x: 0, y: 0 })
+                setZoom(z => Math.max(z,
+                  zoomMinimoEntera(fuente.img.naturalWidth, fuente.img.naturalHeight, nueva)))
+              }}>
+              <RotateCw size={17} aria-hidden="true" /> Girar
+            </button>
+            <button type="button" className="sp-btn sp-btn--primary" style={{ flex: 1 }}
+              disabled={fase === 'subiendo' || areaPixels === null}
+              onClick={() => void confirmar()}>
+              {fase === 'subiendo'
+                ? <><span className="sp-spinner" /> Guardando…</>
+                : 'Usar esta foto'}
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}

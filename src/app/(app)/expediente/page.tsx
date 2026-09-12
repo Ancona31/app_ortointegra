@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Plus, Search, Stethoscope, ArrowUp, ArrowDown, ListFilter } from 'lucide-react'
 import Link from 'next/link'
 import { calcularEdad } from '@/lib/patientUtils'
-import { renderEnTZ } from '@/lib/dates'
+import { renderEnTZ, TZ_CLINICA } from '@/lib/dates'
 import { KebabAccionesPaciente } from '@/components/expediente/KebabAccionesPaciente'
 import { useSubscriptionGate } from '@/components/billing/SubscriptionGateProvider'
 import { fetchPacientesExpediente, type PacienteExpediente, type OrdenColumna, type OrdenDireccion, type MedicoOpcion } from '@/lib/expediente/fetchPacientes'
@@ -381,23 +381,36 @@ export default function ExpedientePage() {
               const avatarColor = AVATAR_COLORS[i % AVATAR_COLORS.length]
               const sexoLabel = p.sexo === 'M' ? 'Masculino' : p.sexo === 'F' ? 'Femenino' : 'Otro'
               return (
-                <div key={p.id} className="bg-white rounded-2xl border border-slate-200/80 shadow-sm px-5 py-4">
+                <div key={p.id} className="relative bg-white rounded-2xl border border-slate-200/80 shadow-sm px-5 py-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-3.5 min-w-0 flex-1">
                       <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xs font-bold flex-shrink-0 ${avatarColor}`}>
                         {p.nombre.charAt(0)}{p.apellidos.charAt(0)}
                       </div>
                       <div className="min-w-0">
-                        <p className="text-sm font-semibold text-[#1d1d1f] truncate">
-                          {p.nombre} {p.apellidos}
-                        </p>
+                        {/* Mismo enlace-que-cubre-la-tarjeta que en la tabla:
+                            el ::after se estira sobre la card (de ahí su
+                            `relative`) para que Next precargue el expediente. */}
+                        {mostrarAcciones ? (
+                          <Link
+                            href={`/expediente/${p.id}`}
+                            className="block text-sm font-semibold text-[#1d1d1f] truncate rounded after:absolute after:inset-0 after:content-[''] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1e5fa8]"
+                          >
+                            {p.nombre} {p.apellidos}
+                          </Link>
+                        ) : (
+                          <p className="text-sm font-semibold text-[#1d1d1f] truncate">
+                            {p.nombre} {p.apellidos}
+                          </p>
+                        )}
                         <p className="text-[11px] text-[#86868b] mt-0.5">
                           {edad !== null ? `${edad.textoElegante} · ` : ''}{sexoLabel}
                         </p>
                       </div>
                     </div>
                     {mostrarAcciones && (
-                      <div className="flex-shrink-0">
+                      /* Sobre la capa del enlace: el kebab no debe navegar. */
+                      <div className="relative z-10 flex-shrink-0">
                         <KebabAccionesPaciente pacienteId={p.id} />
                       </div>
                     )}
@@ -414,7 +427,11 @@ export default function ExpedientePage() {
                     </div>
                     <div className="flex items-baseline gap-2 text-[12px]">
                       <span className="text-[#86868b] w-20 flex-shrink-0">Ingreso</span>
-                      <span className="text-[#3d3d3f] font-medium">{p.created_at ? renderEnTZ(p.created_at, 'd MMM yyyy') : '—'}</span>
+                      {/* `TZ_CLINICA`, no el huso del dispositivo: el ingreso es un
+                          dato de expediente —hermano de la fecha de apertura de la
+                          hoja frontal—, no una hora de cita. Ver LA REGLA en
+                          `@/lib/dates`. */}
+                      <span className="text-[#3d3d3f] font-medium">{p.created_at ? renderEnTZ(p.created_at, 'd MMM yyyy', TZ_CLINICA) : '—'}</span>
                     </div>
                   </div>
                 </div>

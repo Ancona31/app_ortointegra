@@ -5,6 +5,7 @@ import { checkRateLimit } from '@/lib/rateLimit'
 import { sanitizePromptInput, sanitizeNumber } from '@/lib/sanitize'
 import { anonimizarTexto, anonimizarHistorial } from '@/lib/anonimizar'
 import { notaIAResponseSchema, medicamentosExtraccionSchema, type NotaIAResponse, type NotaIAContenido, type MedicamentoIA, type MedicamentosExtraccion } from '@/lib/notaIA/schema'
+import { parseNota, type TipoSeccion } from '@/lib/notaParser'
 import { logger } from '@/lib/logger'
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! })
@@ -105,8 +106,14 @@ COHERENCIA: el diagnóstico de la narrativa y el de "diagnosticos" deben ser el 
 
 PRESENTACIÓN DE LA NOTA (formato markdown — NUNCA altera el contenido):
 El contenido clínico y las reglas de arriba SIEMPRE mandan. El formato es solo presentación: no agrega, omite ni reinterpreta información. Aplica markdown así:
-- Encabezados de sección: escribe SIEMPRE las 4 secciones como **[SUBJETIVO]:**, **[OBJETIVO]:**, **[ANÁLISIS]:**, **[PLAN]:** (con dobles asteriscos y corchetes, exactamente así). No uses ## ni otro formato de encabezado.
-- Etiquetas de campo en negrita: cada subcampo inicia con su etiqueta en negrita y dos puntos. Ej.: **Motivo de consulta:**, **Padecimiento actual:**, **Antecedentes relevantes:**, **Exploración física:**, **Estudios de gabinete:**, **Impresión diagnóstica:**, **Juicio clínico:**, **Diagnóstico diferencial:**, **Tratamiento farmacológico:**, **Medidas no farmacológicas:**, **Estudios solicitados:**, **Educación al paciente:**, **Signos de alarma:**, **Seguimiento:**. Cada sub-encabezado inicia SIEMPRE en su propia línea (precedido de un salto de línea): NUNCA lo continúes en la misma línea del texto anterior ni fusiones dos subcampos en una sola línea.
+- Encabezados de sección (OBLIGATORIOS, LOS 4, SIEMPRE): la narrativa lleva exactamente cuatro encabezados de sección, uno por sección, cada uno solo en su propia línea: **[SUBJETIVO]:**, **[OBJETIVO]:**, **[ANÁLISIS]:**, **[PLAN]:** (con dobles asteriscos y corchetes, exactamente así). No uses ## ni otro formato de encabezado. Ninguna sección puede quedar sin su encabezado, aunque su contenido sea breve.
+- JERARQUÍA DE DOS NIVELES (la regla que más se incumple): los encabezados de sección y las etiquetas de campo son niveles DISTINTOS y NO se sustituyen entre sí. Las etiquetas de campo van SIEMPRE DENTRO de su sección, en las líneas de abajo, NUNCA en lugar del encabezado de sección. Abrir una sección directamente con **Motivo de consulta:** en vez de **[SUBJETIVO]:** es un ERROR DE FORMATO. Estructura correcta:
+  **[SUBJETIVO]:**
+  **Motivo de consulta:** ...
+  **Padecimiento actual:** ...
+  **[OBJETIVO]:**
+  **Exploración física:** ...
+- Etiquetas de campo en negrita: cada subcampo inicia con su etiqueta en negrita y dos puntos, DEBAJO del encabezado de la sección a la que pertenece. Ej.: **Motivo de consulta:**, **Padecimiento actual:**, **Antecedentes relevantes:**, **Exploración física:**, **Estudios de gabinete:**, **Impresión diagnóstica:**, **Juicio clínico:**, **Diagnóstico diferencial:**, **Tratamiento farmacológico:**, **Medidas no farmacológicas:**, **Estudios solicitados:**, **Educación al paciente:**, **Signos de alarma:**, **Seguimiento:**. Cada sub-encabezado inicia SIEMPRE en su propia línea (precedido de un salto de línea): NUNCA lo continúes en la misma línea del texto anterior ni fusiones dos subcampos en una sola línea.
 - Datos clave en negrita dentro del texto: diagnósticos con su código (ej. **M75.1 — Síndrome del manguito rotador DERECHO**), medicamentos con dosis (ej. **Celecoxib 200mg**), signos semiológicos relevantes (ej. **Neer positivo**, **Lasègue negativo**) y valores clave (ej. **4/5**, **90°**). Usa la negrita con criterio, solo en lo que el médico busca de un vistazo — nunca en frases enteras.
 - Viñetas EXCLUSIVAMENTE con guion y espacio "- " (ej. "- Reposo relativo"). PROHIBIDO usar el asterisco "*" como marca de viñeta. Usa viñetas para listas de elementos discretos: impresión diagnóstica cuando hay varios diagnósticos, diagnósticos diferenciales (cada uno en su viñeta, con el nombre en negrita), pruebas semiológicas cuando son varias, y en el [PLAN]: tratamiento farmacológico (un fármaco por viñeta), medidas no farmacológicas, estudios solicitados y signos de alarma.
 - Prosa (sin viñetas) para el padecimiento actual y el juicio clínico: son narrativa y razonamiento, se leen mejor corridos.
@@ -156,6 +163,30 @@ const evaluarRespuesta = (
   return { ok: true, parsed }
 }
 
+// Las 4 secciones que el PDF necesita para pintar la nota en orden SOAP. La
+// tercera ranura es TOLERANTE a propósito: NotaEvolucionPdf tiene 'analisis' y
+// 'diagnostico' en su ORDEN_CANONICO y renderiza bien cualquiera de los dos, así
+// que una narrativa con [DIAGNÓSTICO] en vez de [ANÁLISIS] NO es un defecto y no
+// debe quemar un reintento.
+const SECCIONES_REQUERIDAS: ReadonlyArray<{ etiqueta: string; tipos: readonly TipoSeccion[] }> = [
+  { etiqueta: 'SUBJETIVO', tipos: ['subjetivo'] },
+  { etiqueta: 'OBJETIVO', tipos: ['objetivo'] },
+  { etiqueta: 'ANÁLISIS', tipos: ['analisis', 'diagnostico'] },
+  { etiqueta: 'PLAN', tipos: ['plan'] },
+] as const
+
+// Valida la narrativa con el MISMO parser que consume el PDF, no con un regex
+// paralelo: lo que se acepta aquí es exactamente lo que el render sabe pintar.
+// Exige sección presente Y con contenido — `ordenarSecciones` del PDF descarta
+// las de `bloques` vacíos, y una sección vacía descuadra la nota igual.
+const narrativaTieneSecciones = (narrativa: string): { ok: boolean; faltantes: string[] } => {
+  const conBloques = parseNota(narrativa).secciones.filter((sec) => sec.bloques.length > 0)
+  const faltantes = SECCIONES_REQUERIDAS
+    .filter((req) => !conBloques.some((sec) => req.tipos.includes(sec.tipo)))
+    .map((req) => req.etiqueta)
+  return { ok: faltantes.length === 0, faltantes }
+}
+
 // Reintenta el MISMO turno (mismo historial + mensaje) hasta MAX_INTENTOS si la
 // respuesta es defectuosa. Cada intento reconstruye el chat desde cero (no acumula
 // turnos). Devuelve la nota válida, o null si todos los intentos fallaron.
@@ -179,6 +210,30 @@ const generarNotaConReintentos = async (
     const response = await chat.sendMessage({ message: mensaje })
     const resultado = evaluarRespuesta(response.candidates?.[0]?.finishReason, response.text)
     if (resultado.ok) {
+      // Formato de la narrativa: SOLO aplica a la nota final. En 'faltan_datos'
+      // no hay narrativa que validar (es la entrevista) y se acepta sin tocar.
+      if (resultado.parsed.status === 'completa' && resultado.parsed.nota) {
+        const formato = narrativaTieneSecciones(resultado.parsed.nota.narrativa)
+        if (!formato.ok && intento < MAX_INTENTOS) {
+          logger.warn('NOTA-IA-FORMATO', JSON.stringify({
+            evento: 'reintento',
+            intento,
+            faltantes: formato.faltantes,
+          }))
+          continue
+        }
+        if (!formato.ok) {
+          // DEGRADACIÓN (último intento): la nota va descuadrada pero es
+          // clínicamente completa. Rechazarla dejaría al médico con un 502 y sin
+          // nota, que es peor que un PDF mal ordenado. Silenciosa por decisión
+          // de producto; este log es la ÚNICA señal de que ocurrió.
+          logger.warn('NOTA-IA-FORMATO', JSON.stringify({
+            evento: 'degradada',
+            intento,
+            faltantes: formato.faltantes,
+          }))
+        }
+      }
       // warn (no info) a propósito: logger.info es dev-only; warn es visible en
       // producción. Telemetría sin PII, solo conteos de tokens del usageMetadata.
       logger.warn('NOTA-IA-USAGE', JSON.stringify({

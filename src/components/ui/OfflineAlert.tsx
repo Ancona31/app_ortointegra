@@ -45,7 +45,7 @@ export default function OfflineAlert() {
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-[modalEnter_0.22s_cubic-bezier(0.32,0.72,0,1)]">
+      <div className="bg-[var(--sp-surface-glass)] backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-[modalEnter_0.22s_cubic-bezier(0.32,0.72,0,1)]">
         <div className="px-6 pt-8 pb-4 text-center">
           <div className="w-16 h-16 bg-amber-100 rounded-full mx-auto mb-4 flex items-center justify-center">
             <WifiOff size={28} className="text-amber-600" />

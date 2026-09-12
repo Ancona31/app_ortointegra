@@ -39,7 +39,7 @@ const ACCIONES_ACTIVO: AccionItem[] = [
   { href: '/expediente', label: 'Expedientes', desc: 'Buscar y consultar', icon: Stethoscope, color: 'bg-slate-700' },
   { href: '/documentos?tipo=receta', label: 'Receta médica', desc: 'Generar documento', icon: Pill, color: 'bg-slate-600' },
   { href: '/documentos?tipo=lab', label: 'Laboratorio', desc: 'Solicitud de estudios', icon: FlaskConical, color: 'bg-slate-600' },
-  { href: '/documentos?tipo=imagen', label: 'Imagen', desc: 'Solicitud de imagen', icon: ScanLine, color: 'bg-slate-600' },
+  { href: '/documentos?tipo=imagen', label: 'Imagenología', desc: 'Solicitud de estudios de imagen', icon: ScanLine, color: 'bg-slate-600' },
   { href: '/documentos?tipo=suplementacion', label: 'Suplementación', desc: 'Plan nutricional', icon: ClipboardList, color: 'bg-slate-500' },
   { href: '/documentos?tipo=internamiento', label: 'Internamiento', desc: 'Solicitud hospitalaria', icon: BedDouble, color: 'bg-slate-500' },
   { href: '/documentos?tipo=escrito', label: 'Escrito médico', desc: 'Documento libre', icon: PenLine, color: 'bg-slate-500' },

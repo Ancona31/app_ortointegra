@@ -6,12 +6,32 @@
  * render (PDF, visor, formulario) consume tal cual. La única lógica es la
  * cascada de fuentes (snapshot inmutable de la consulta → médico vivo → '')
  * y el formateo de fechas en la zona de la clínica.
+ *
+ * ─── LA ZONA DE LA CLÍNICA AQUÍ ES DELIBERADA. NO LA "ARREGLES". ───────
+ *
+ * `renderEnTZ` se llama con `TZ_CLINICA` a propósito. Esto NO es el bug de
+ * husos de agosto de 2026, aunque se le parezca: aquel era de horas de
+ * CITAS, que se pintan en el huso del DISPOSITIVO de quien mira (ver LA
+ * REGLA en la cabecera de `@/lib/dates`).
+ *
+ * Hasta agosto de 2026 el huso se OMITÍA y la zona de la clínica llegaba
+ * sola, por el valor por defecto de `renderEnTZ`. Ese default se quitó: la
+ * decisión no ha cambiado, sólo dejó de ser tácita. Que el huso esté
+ * escrito aquí no es un descuido de quien auditó los llamadores; es el
+ * resultado de la auditoría.
+ *
+ * Un DOCUMENTO CLÍNICO es la excepción, y por eso vive aquí. Lleva fecha
+ * fija de la clínica y NO puede cambiar según quién lo abra: una nota es
+ * inmutable y su fecha forma parte del expediente. Si el huso dependiera
+ * del lector, el mismo PDF saldría fechado distinto para el médico que lo
+ * firmó y para el perito que lo revisa. Decisión de producto, tomada a
+ * propósito.
  */
 
 import type { Consulta, Paciente, MedicoInfo, Diagnostico, SignosVitales } from '@/types'
 import { parseNota, type NotaParseada } from '@/lib/notaParser'
 import { calcularEdad, type EdadPaciente } from '@/lib/patientUtils'
-import { renderEnTZ } from '@/lib/dates'
+import { renderEnTZ, TZ_CLINICA } from '@/lib/dates'
 import { componerNombreMedicoCompleto } from '@/lib/nombreMedico'
 import { decodificarEntidadesHTML } from '@/lib/textUtils'
 
@@ -42,7 +62,7 @@ function renderFechaSegura(instante: Instante, formato: string): string | null {
   const parsed = instante instanceof Date ? instante : new Date(instante)
   if (Number.isNaN(parsed.getTime())) return null
   try {
-    return renderEnTZ(instante, formato)
+    return renderEnTZ(instante, formato, TZ_CLINICA)
   } catch {
     return null
   }
@@ -105,7 +125,19 @@ export interface AddendumInput {
 export interface AddendumRender {
   parseado: NotaParseada
   medicoNombre: string
+  /** Fecha larga del impreso: "22 de julio de 2026 · 10:33 a.m.". */
   fechaFormateada: string
+  /**
+   * El instante crudo, tal cual llega de la base.
+   *
+   * ⚠️ CONVIVE CON `fechaFormateada` Y NO LA SUSTITUYE: el impreso pide la
+   * fecha larga y la pantalla pide `03/08/2026 14:15`, que son dos formatos
+   * distintos del mismo dato. Formatear el segundo aquí obligaría a este módulo
+   * a saber de vistas; devolver el instante deja que cada render elija. `null`
+   * si el addendum no trae fecha o no es una fecha real —el mismo criterio con
+   * el que `fechaFormateada` cae a cadena vacía.
+   */
+  creadoEn: string | null
 }
 
 export interface NotaRenderData {
@@ -248,6 +280,7 @@ function construirAddendums(addendums?: AddendumInput[]): AddendumRender[] {
     // Fecha + hora en la zona de la clínica: "22 de julio de 2026 · 10:33 a.m.".
     // Ausente o corrupta → '' (la plantilla ya tolera el addendum sin fecha).
     fechaFormateada: formatearFechaAddendum(a.created_at),
+    creadoEn: a.created_at ?? null,
   }))
 }
 

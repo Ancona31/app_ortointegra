@@ -102,7 +102,11 @@ export async function POST(req: NextRequest, ctx: RouteContext<'/api/paciente/[i
         .select('*, analito:analitos_catalogo(*)')
         .eq('paciente_id', id)
         .order('medido_en', { ascending: false }),
-      supabase.from('documentos').select('*').eq('paciente_id', id).order('created_at', { ascending: false }),
+      // Los borradores quedan fuera: el derecho de acceso es a lo que consta en
+      // el expediente, y un borrador no consta —no se emitió, no se entregó y
+      // no tiene folio—. Exportarlo entregaría como documento del paciente algo
+      // que todavía es trabajo del médico sin terminar.
+      supabase.from('documentos').select('*').eq('paciente_id', id).neq('estado', 'borrador').order('created_at', { ascending: false }),
       supabase.from('addendums').select('*').order('created_at', { ascending: true }),
     ])
 

@@ -1,0 +1,723 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   /r/[folio] — SISTEMA VISUAL DE LA VERIFICACIÓN PÚBLICA
+   ═══════════════════════════════════════════════════════════════════════════
+
+   ⚠️⚠️ TODO SE MIDE POR CONTENEDOR, NUNCA POR VIEWPORT.
+
+   Aquí no hay una sola `@media (min-width: …)`. El único elemento que declara
+   `container-type` es `.vf-root`, y las cuatro composiciones cuelgan de
+   `@container vf (…)`. La razón es que el viewport miente: esta página se
+   incrusta en visores de QR, en webviews de mensajería y en pestañas partidas,
+   donde el ancho del viewport y el ancho real de la columna no coinciden. Medir
+   por viewport es la causa raíz de defectos que ya se arreglaron en el
+   proyecto. **Si añades un umbral, va como `@container`.**
+
+   LOS CUATRO ANCHOS
+     · < 360      los pares de medicamento caen a una columna y el nombre
+                  comercial baja a 16 px
+     · 360–599    la composición base: una columna, todo apilado
+     · 600–839    folio/fecha y las dos cédulas pasan a dos columnas
+     · ≥ 840      la columna se cierra en 820 y la entrada de medicamento se
+                  abre en tres zonas
+
+   ⚠️ «MÓVIL» Y «ESCRITORIO» NO SON DOS UMBRALES SINO DOS FINALES. Las medidas
+   se dan como «móvil / escritorio», y cuál de los cuatro anchos hace el cambio
+   lo decide la lista de arriba: los DOS CAMBIOS DE COLUMNA —folio/fecha y
+   cédulas— entran en 600, y todo lo demás (tipografías, rellenos, el bloque del
+   registro, las tres zonas) entra en 840. No unifiques los dos umbrales: 600 es
+   «ya caben dos columnas» y 840 es «ya es una página de escritorio».
+
+   ⚠️ EL ACENTO DEL CONSULTORIO NO ENTRA AQUÍ. Ni un color de esta hoja sale de
+   `contenido`. El cromo es de Spinus a propósito: un acento libre podría caer
+   cerca del verde de «verificado» o del rojo de «alterado», que aquí son
+   semánticos y no decorativos. Ver la cabecera de `page.tsx`.
+
+   ⚠️ SOLO SE ANIMAN `transform` Y `opacity`, y solo la entrada de la
+   declaración. El símbolo de la marca NO se dibuja ni se anima. */
+
+/* ── Raíz y columna ──────────────────────────────────────────────────────── */
+
+.vf-root {
+  /* El ÚNICO contenedor de consulta de la página. Todo lo demás lo mide. */
+  container-type: inline-size;
+  container-name: vf;
+  min-height: 100vh;
+  background: #f5f8fc;
+}
+
+.vf-col {
+  max-width: 820px;
+  margin-inline: auto;
+  padding: 18px 16px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+@container vf (min-width: 600px) {
+  .vf-col { padding-inline: 24px; gap: 18px; }
+}
+
+@container vf (min-width: 840px) {
+  .vf-col { padding: 40px 32px 56px; }
+}
+
+/* ── Barra de marca ──────────────────────────────────────────────────────── */
+
+.vf-marca {
+  background: #ffffff;
+  border-bottom: 1px solid #eef1f6;
+}
+
+.vf-marca__in {
+  max-width: 820px;
+  margin-inline: auto;
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* El símbolo YA TRAE SU PROPIO DISCO dibujado. Sin `border-radius`, sin
+   `overflow:hidden` y sin sombra: recortarlo le comería el anillo. */
+.vf-marca__simbolo {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.vf-marca__nombre {
+  font-size: 16px;
+  font-weight: 800;
+  color: #14345c;
+  letter-spacing: -0.01em;
+}
+
+.vf-marca__rol {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #8a99ac;
+  text-align: right;
+}
+
+/* Las dos redacciones se componen siempre y el ancho elige. Cambiar el texto
+   desde JS obligaría a hidratar la página entera, que es un Server Component. */
+.vf-marca__rol--ancho { display: none; }
+
+@container vf (min-width: 840px) {
+  .vf-marca__in { padding: 16px 32px; gap: 9px; }
+  .vf-marca__simbolo { width: 26px; height: 26px; }
+  .vf-marca__nombre { font-size: 17px; }
+  .vf-marca__rol--corto { display: none; }
+  .vf-marca__rol--ancho { display: inline; }
+}
+
+/* ── Declaración ─────────────────────────────────────────────────────────── */
+
+.vf-decl {
+  background: #ffffff;
+  border: 1px solid #cfe6d6;
+  border-radius: 16px;
+  box-shadow: 0 6px 22px rgba(15, 122, 82, 0.10);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  animation: vf-entrada var(--sp-dur-base) var(--sp-ease-out) both;
+}
+
+/* Viñeta, no protagonista: sin relleno y sin disco detrás. */
+.vf-decl__icono {
+  width: 20px;
+  height: 20px;
+  color: #16a34a;
+  flex-shrink: 0;
+}
+
+.vf-decl__col { display: flex; flex-direction: column; gap: 12px; }
+
+.vf-decl__ante {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #0f7a52;
+}
+
+.vf-decl__frase {
+  font-size: 27px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  color: #173156;
+}
+
+.vf-decl__cuerpo {
+  font-size: 14px;
+  line-height: 1.55;
+  color: #5a6b81;
+  max-width: 60ch;
+}
+
+@container vf (min-width: 840px) {
+  .vf-decl {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 18px;
+    padding: 26px 28px;
+  }
+  .vf-decl__icono { width: 26px; height: 26px; }
+  .vf-decl__col { gap: 8px; }
+  .vf-decl__frase { font-size: 30px; }
+  .vf-decl__cuerpo { font-size: 15px; }
+}
+
+/* El desenlace negativo hereda la caja y suelta el verde: no hay nada
+   verificado que anunciar. */
+.vf-decl--nulo {
+  border-color: #e6ebf2;
+  box-shadow: 0 1px 2px rgba(16, 42, 73, 0.04);
+}
+.vf-decl--nulo .vf-decl__icono { color: #8a99ac; }
+.vf-decl--nulo .vf-decl__ante { color: #8a99ac; }
+
+@keyframes vf-entrada {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* ── Folio y fecha ───────────────────────────────────────────────────────── */
+
+.vf-datos {
+  background: #ffffff;
+  border: 1px solid #e6ebf2;
+  border-radius: 16px;
+  box-shadow: 0 1px 2px rgba(16, 42, 73, 0.04);
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+.vf-dato + .vf-dato {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid #eef1f6;
+}
+
+.vf-dato__et {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #173156;
+}
+
+/* Seleccionable ENTERO: un toque largo se lleva el folio completo aunque el
+   portapapeles esté vetado. Mismo criterio en cédulas y en los valores del
+   medicamento. */
+.vf-dato__folio {
+  margin-top: 4px;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: #14345c;
+  font-variant-numeric: tabular-nums;
+  user-select: all;
+  overflow-wrap: anywhere;
+}
+
+.vf-dato__pista {
+  margin-top: 4px;
+  font-size: 12.5px;
+  color: #9aa7b6;
+}
+
+.vf-dato__fecha {
+  margin-top: 4px;
+  font-size: 14.5px;
+  font-weight: 400;
+  color: #3b4a5c;
+}
+
+@container vf (min-width: 600px) {
+  /* La tarjeta única se deshace en dos, y cada dato se lleva su propia caja. */
+  .vf-datos {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+    background: none;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    padding: 0;
+  }
+  .vf-dato {
+    background: #ffffff;
+    border: 1px solid #e6ebf2;
+    border-radius: 16px;
+    box-shadow: 0 1px 2px rgba(16, 42, 73, 0.04);
+    padding: 18px 20px;
+    min-width: 0;
+  }
+  .vf-dato + .vf-dato { margin-top: 0; padding-top: 18px; border-top: 0; }
+  .vf-dato__fecha { font-size: 22px; font-weight: 800; color: #14345c; }
+}
+
+/* ── Médico — la única tarjeta con acento ────────────────────────────────── */
+
+.vf-medico {
+  background: #ffffff;
+  border: 1.5px solid #d7e2ef;
+  border-radius: 16px;
+  box-shadow: 0 6px 22px rgba(30, 95, 168, 0.09);
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.vf-medico__id { display: flex; flex-direction: column; gap: 6px; }
+
+/* El único antetítulo azul de la página. */
+.vf-medico__ante {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #1e5fa8;
+}
+
+.vf-medico__nombre {
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.3;
+  color: #173156;
+}
+
+.vf-medico__esp {
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.45;
+  color: #5a6b81;
+}
+
+@container vf (min-width: 840px) {
+  .vf-medico { padding: 26px 28px; gap: 18px; }
+  .vf-medico__nombre { font-size: 24px; }
+  .vf-medico__esp { font-size: 15px; }
+}
+
+/* ── Cédulas ─────────────────────────────────────────────────────────────── */
+
+/* Dos cajas de idéntico tratamiento: entre la cédula profesional y la de
+   especialidad NO hay jerarquía, y marcar una como principal induciría a
+   comprobar solo esa. */
+.vf-ceds { display: flex; flex-direction: column; gap: 10px; }
+
+.vf-ced {
+  background: #fbfcfe;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 12px 14px;
+  min-width: 0;
+}
+
+.vf-ced__et {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #8a99ac;
+}
+
+.vf-ced__fila {
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.vf-ced__num {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: #14345c;
+  font-variant-numeric: tabular-nums;
+  user-select: all;
+  overflow-wrap: anywhere;
+}
+
+@container vf (min-width: 600px) {
+  .vf-ceds { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+}
+
+@container vf (min-width: 840px) {
+  .vf-ced { padding: 14px 16px; }
+  .vf-ced__num { font-size: 18px; }
+}
+
+/* ── Botón copiar ────────────────────────────────────────────────────────── */
+
+.vf-copiar {
+  position: relative;
+  flex-shrink: 0;
+  min-height: 34px;
+  padding: 7px 13px;
+  border-radius: 9px;
+  border: 1px solid #d5deea;
+  background: #ffffff;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #1e5fa8;
+  cursor: pointer;
+  transition: background var(--sp-dur-micro) var(--sp-ease-out),
+              border-color var(--sp-dur-micro) var(--sp-ease-out);
+}
+
+.vf-copiar:hover { background: #e4ecf5; border-color: #cedcec; }
+.vf-copiar:focus-visible { outline: 2px solid #1e5fa8; outline-offset: 2px; }
+
+/* La caja mide 34 porque así se pidió, pero el DEDO necesita 44. El área
+   sensible se estira con un pseudo-elemento en vez de engordar la caja: así el
+   objetivo táctil cumple sin que el botón crezca. */
+.vf-copiar::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 44px;
+  transform: translateY(-50%);
+}
+
+/* ── Enlace al registro ──────────────────────────────────────────────────── */
+
+.vf-registro {
+  background: #f4f7fb;
+  border: 1px solid #d7e2ef;
+  border-radius: 13px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.vf-registro__lead {
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: #3b4a5c;
+}
+
+.vf-registro__boton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  min-height: 48px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: #1e5fa8;
+  color: #ffffff;
+  font-size: 15.5px;
+  font-weight: 700;
+  text-decoration: none;
+  box-shadow: 0 8px 18px rgba(30, 95, 168, 0.28);
+  transition: background var(--sp-dur-micro) var(--sp-ease-out);
+}
+
+.vf-registro__boton:hover { background: #1a3a5c; }
+.vf-registro__boton:focus-visible { outline: 2px solid #14345c; outline-offset: 2px; }
+.vf-registro__icono { width: 17px; height: 17px; flex-shrink: 0; }
+
+/* EL DOMINIO SE IMPRIME, no se insinúa. Nunca como `title`: un título emergente
+   no existe en pantalla táctil, que es donde se escanea un QR. Existen sitios
+   que imitan al registro oficial, así que el host va a la vista ANTES de
+   pulsar. */
+.vf-registro__host {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: #5a6b81;
+  overflow-wrap: anywhere;
+}
+
+.vf-registro__candado { width: 13px; height: 13px; color: #0f7a52; flex-shrink: 0; }
+.vf-registro__gob { color: #0f7a52; font-weight: 700; }
+
+.vf-registro__nota {
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: #8a99ac;
+}
+
+.vf-registro__rotulo--corto { display: none; }
+
+/* EL DOMINIO VA BAJO EL BOTÓN EN APILADO Y SOBRE ÉL EN HORIZONTAL, con un solo
+   orden de DOM. Los dos envoltorios se disuelven con `display: contents` y las
+   cuatro piezas se ordenan con `order` —lead, botón, host, nota—; arriba, cada
+   envoltorio vuelve a ser caja y el de la acción se invierte con
+   `column-reverse`, que sube el host por encima del botón sin mover el DOM. */
+.vf-registro__texto,
+.vf-registro__accion { display: contents; }
+
+.vf-registro__lead  { order: 1; }
+.vf-registro__boton { order: 2; }
+.vf-registro__host  { order: 3; }
+.vf-registro__nota  { order: 4; }
+
+@container vf (min-width: 840px) {
+  /* Horizontal, con el botón insertado y el dominio JUSTO ENCIMA de él. */
+  .vf-registro {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    padding: 18px 20px;
+  }
+  .vf-registro__texto { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .vf-registro__accion {
+    display: flex;
+    flex-direction: column-reverse;
+    align-items: flex-end;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  .vf-registro__boton { padding: 13px 26px; }
+  .vf-registro__rotulo--largo { display: none; }
+  .vf-registro__rotulo--corto { display: inline; }
+}
+
+/* ── Medicamentos ────────────────────────────────────────────────────────── */
+
+.vf-meds {
+  background: #ffffff;
+  border: 1px solid #e6ebf2;
+  border-radius: 16px;
+  box-shadow: 0 1px 2px rgba(16, 42, 73, 0.04);
+  padding: 20px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.vf-meds__cab { display: flex; flex-direction: column; gap: 6px; }
+
+.vf-meds__fila {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.vf-meds__et {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #173156;
+}
+
+.vf-meds__contador {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #8a99ac;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.vf-meds__aviso { font-size: 12.5px; line-height: 1.55; color: #9aa7b6; }
+.vf-meds__alerta { color: #8c2f2f; font-weight: 700; }
+
+.vf-meds__lista { display: flex; flex-direction: column; gap: 10px; }
+.vf-meds__nota { font-size: 12.5px; line-height: 1.55; color: #9aa7b6; }
+
+@container vf (min-width: 840px) {
+  .vf-meds { padding: 24px 28px; gap: 14px; }
+}
+
+/* ── Entrada de medicamento ──────────────────────────────────────────────── */
+
+.vf-med {
+  background: #fbfcfe;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 14px;
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  column-gap: 12px;
+  row-gap: 10px;
+}
+
+.vf-med__ord {
+  grid-column: 1;
+  grid-row: 1;
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  background: #e4ecf5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 800;
+  color: #1e5fa8;
+  font-variant-numeric: tabular-nums;
+}
+
+.vf-med__id     { grid-column: 2; min-width: 0; }
+.vf-med__pares  { grid-column: 2; min-width: 0; }
+.vf-med__ind    { grid-column: 2; min-width: 0; }
+
+.vf-med__nombre {
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 1.25;
+  color: #173156;
+  overflow-wrap: anywhere;
+}
+
+.vf-med__activo {
+  margin-top: 3px;
+  font-size: 13.5px;
+  color: #8a99ac;
+  overflow-wrap: anywhere;
+}
+
+.vf-med__activo b { color: #3b4a5c; font-weight: 700; }
+
+/* ⚠ ALINEADA POR ABAJO. Cuando «Presentación» ocupa dos renglones y «Vía» uno,
+   `end` deja «Oral» y «Tabletas 120 mg» compartiendo línea base; con `start` se
+   descuelgan y el par deja de leerse como un par. */
+.vf-med__pares {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: end;
+  gap: 9px;
+}
+
+.vf-med__campo { min-width: 0; }
+
+.vf-med__et {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #9aa7b6;
+}
+
+.vf-med__valor {
+  display: block;
+  font-size: 14.5px;
+  font-weight: 700;
+  color: #14345c;
+  font-variant-numeric: tabular-nums;
+  user-select: all;
+  overflow-wrap: anywhere;
+}
+
+.vf-med__valor--via { font-weight: 600; }
+
+.vf-med__ind {
+  background: #f4f7fb;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 11px 13px;
+}
+
+/* `pre-line` respeta los saltos que escribió el médico, y NO hay recorte de
+   líneas: las indicaciones son la parte que más se altera en el papel. */
+.vf-med__ind p {
+  margin-top: 4px;
+  font-size: 14.5px;
+  font-weight: 600;
+  line-height: 1.5;
+  color: #14345c;
+  white-space: pre-line;
+  user-select: all;
+  overflow-wrap: anywhere;
+}
+
+@container vf (max-width: 359.98px) {
+  .vf-med__pares { grid-template-columns: minmax(0, 1fr); }
+  .vf-med__nombre { font-size: 16px; }
+}
+
+@container vf (min-width: 840px) {
+  /* Tres zonas: identidad 200, pares 170, indicaciones el resto. */
+  .vf-med {
+    grid-template-columns: 22px 200px 170px minmax(0, 1fr);
+    column-gap: 16px;
+    align-items: start;
+    padding: 16px;
+  }
+  .vf-med__id    { grid-column: 2; grid-row: 1; }
+  .vf-med__pares { grid-column: 3; grid-row: 1; grid-template-columns: minmax(0, 1fr); }
+  .vf-med__ind   { grid-column: 4; grid-row: 1; }
+}
+
+/* ── Caja de texto corriente ─────────────────────────────────────────────── */
+
+/* La usa el desenlace negativo, que no tiene datos que encuadrar. Misma caja
+   neutra que folio/fecha para que los dos desenlaces pesen igual. */
+.vf-caja {
+  background: #ffffff;
+  border: 1px solid #e6ebf2;
+  border-radius: 16px;
+  box-shadow: 0 1px 2px rgba(16, 42, 73, 0.04);
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.vf-caja p { font-size: 13.5px; line-height: 1.55; color: #5a6b81; }
+.vf-caja b { font-weight: 700; color: #14345c; }
+.vf-caja__menor { font-size: 12.5px !important; color: #9aa7b6 !important; }
+
+@container vf (min-width: 840px) {
+  .vf-caja { padding: 22px 24px; }
+}
+
+/* ── Pie ─────────────────────────────────────────────────────────────────── */
+
+.vf-pie {
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+}
+
+.vf-pie__texto {
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: #8a99ac;
+  max-width: 62ch;
+}
+
+.vf-pie__enlace {
+  font-size: 13px;
+  font-weight: 600;
+  color: #5a6b81;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.vf-pie__enlace:hover { color: #14345c; }
+.vf-pie__marca { font-size: 12px; color: #a9b5c4; }
+
+/* ── Movimiento reducido ─────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .vf-decl { animation: none; }
+  .vf-copiar,
+  .vf-registro__boton { transition: none; }
+}

@@ -1,27 +1,43 @@
 import { NextRequest, NextResponse, after } from 'next/server'
+import type { calendar_v3 } from 'googleapis'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { google } from 'googleapis'
-import { decrypt, encrypt } from '@/lib/encrypt'
+import { conCalendarioSpinus, registrarFalloGCal } from '@/lib/gcal'
+import { resolverConexionClinica } from '@/lib/gcalConexion'
+import { canManageClinica } from '@/lib/permissions'
+import { APPOINTMENT_SELECT, eventoParaGoogle, puntasParaGoogle, componerAsistentes, INTERRUPTORES_INVITADOS,
+         ICONOS_EVENTO, COLORES_EVENTO, pintaValida,
+         type ClinicaEnCita, type PacienteEnCita } from '@/lib/appointments'
+import { correoDelMedico } from '@/lib/medicoCorreo'
+import { TZ_CLINICA, desplazarFecha, fechaHoraLocalAInstante } from '@/lib/dates'
+import { comprobarTopeDuracion } from '@/lib/agenda/topeDuracion'
+import { logger } from '@/lib/logger'
 
-// PRIVACIDAD — LFPDPPP Art. 9: los datos de salud son sensibles.
-// Google Calendar es un servicio externo — NUNCA enviar nombres de
-// pacientes ni datos clínicos. Solo "Cita médica" + iniciales como máximo.
-function gcalSummary(title: string): string {
-  // Extraer iniciales si el título parece un nombre (2+ palabras capitalizadas)
-  const words = title.trim().split(/\s+/)
-  if (words.length >= 2 && words.every(w => /^[A-ZÁÉÍÓÚÑ]/.test(w))) {
-    const iniciales = words.map(w => w[0]).join('').toUpperCase()
-    return `Cita médica (${iniciales})`
-  }
-  return 'Cita médica'
+/* Una fecha-solo `YYYY-MM-DD`, que es lo que manda el modal para un evento de
+   todo el día. NO acepta un instante ISO: si llegara uno, `AT TIME ZONE` de la
+   base lo pondría en una hora que no es medianoche y el CHECK lo rechazaría con
+   un 23514 sin explicación. Mejor un 400 que diga qué pasa. */
+const FECHA_SOLA = /^\d{4}-\d{2}-\d{2}$/
+
+/**
+ * La forma NO basta: `2026-02-30` la pasa y no existe.
+ *
+ * ⚠️ Y NO SE DETECTA CON `Number.isNaN`, QUE ES LA TRAMPA. El motor no rechaza
+ * un día fuera de rango, lo DESBORDA: `new Date('2026-02-30T00:00:00Z')` da el
+ * 2 de marzo tan tranquilo (comprobado en el Node de este repo; `2026-04-31` da
+ * el 1 de mayo). Sólo el mes fuera de 1..12 sale como `Invalid Date`.
+ * Por eso la comprobación es un IDA Y VUELTA: si el día existía, `toISOString`
+ * devuelve el mismo texto con el que se entró; si desbordó, otro.
+ *
+ * Sin esto, `2026-02-30` llegaba viva hasta `fechaHoraLocalAInstante` o
+ * `desplazarFecha`, que sí lanzan, y el `catch` del route la convertía en un
+ * 500 — justo el error mudo que el comentario de arriba dice querer evitar.
+ */
+function esFechaDeCalendario(valor: string): boolean {
+  if (!FECHA_SOLA.test(valor)) return false
+  const instante = new Date(`${valor}T00:00:00Z`)
+  return !Number.isNaN(instante.getTime()) && instante.toISOString().startsWith(valor)
 }
-
-const oauth2Client = new google.auth.OAuth2(
-  process.env.GOOGLE_CLIENT_ID,
-  process.env.GOOGLE_CLIENT_SECRET,
-  process.env.GOOGLE_REDIRECT_URI
-)
 
 async function getProfile(supabase: Awaited<ReturnType<typeof createClient>>) {
   const { data: { user } } = await supabase.auth.getUser()
@@ -47,21 +63,93 @@ export async function GET(req: NextRequest) {
     const medicoFilter = req.nextUrl.searchParams.get('medico_id')
 
     // RLS filtra por clinica_id
+    /* El `count: 'exact'` NO es una métrica: es la guarda del truncado, y su
+       porqué entero está abajo, junto al `incompleta` que lo consume. */
     let query = supabase
       .from('appointments')
-      .select('*, pacientes(id, nombre, apellidos, telefono), medico:profiles!appointments_medico_id_fkey(id, titulo, nombres, apellido_paterno, apellido_materno)')
+      .select(APPOINTMENT_SELECT, { count: 'exact' })
       .eq('clinica_id', profile.clinica_id)
       .order('start_time', { ascending: true })
 
     if (medicoFilter) query = query.eq('medico_id', medicoFilter)
 
-    if (from) query = query.gte('start_time', from)
-    if (to)   query = query.lte('start_time', to)
+    /* ⚠️⚠️ LA VENTANA SE COMPARA POR SOLAPE, NO POR `start_time` DENTRO DEL RANGO,
+       Y ESTO ES UNA CORRECCIÓN, NO UN AFINADO. Filtrando por el inicio —que es lo
+       que había— una fila que EMPEZÓ ANTES de `from` y sigue viva dentro de la
+       ventana no se devolvía, así que un evento de VARIOS DÍAS desaparecía de
+       todas las semanas menos la que lo inicia. Un congreso de lunes a lunes se
+       veía la primera semana y no la segunda, sin error y sin hueco: simplemente
+       no estaba.
 
-    const { data, error } = await query
+       No lo tapaba `rangoQuePedir`: ése encaja la petición a semanas naturales, y
+       en vista Semana el borde ya ES el lunes, o sea margen cero.
+
+       ES EL MISMO CRITERIO QUE /api/google/events, donde está argumentado desde
+       el principio: «filtrar las citas sólo por su inicio dejaría fuera del
+       conjunto a la que empezó antes de `timeMin` y termina dentro». Allí el
+       síntoma era otro —una cita sin restar, que salía duplicada como evento
+       crudo— pero la causa es la misma y la cura también. Hasta ahora las dos
+       rutas leían la misma tabla con dos reglas distintas.
+
+       ⚠️ POR QUÉ EL CORTE DE ARRIBA ES ESTRICTO Y EL DE ABAJO NO. `to` es un fin
+       EXCLUSIVO —lo manda FullCalendar y lo ensancha `rangoQuePedir`—, así que una
+       cita que empieza justo en `to` cae FUERA de la ventana por definición: con
+       `lte` se traía una fila que la vista no llega a pintar. Con `lt` no.
+       Abajo se queda inclusivo a propósito: `end_time = from` también está fuera,
+       pero en `appointments` NO existe un CHECK incondicional de
+       `end_time > start_time` (sólo lo hay para las filas de todo el día), así que
+       pueden quedar filas heredadas de duración cero; con un `gt` estricto una de
+       ellas apoyada en el borde desaparecería. Esta consulta es la RED GRUESA: se
+       permite una fila de más, que no cuesta nada. El corte fino lo hacen el
+       propio FullCalendar al pintar y `contarVisibles` en el cliente, que sí
+       aplica el solape estricto — ver su nota, que es la otra mitad de esto.
+
+       ⚠️ LAS DOS PUNTAS SON OBLIGATORIAS Y VAN EN EL MISMO SENTIDO: `start_time`
+       contra el FIN de la ventana y `end_time` contra su INICIO. Cruzadas, o con
+       las dos contra `start_time`, se vuelve al fallo. */
+    if (to)   query = query.lt('start_time', to)
+    if (from) query = query.gte('end_time', from)
+
+    const { data, error, count } = await query
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-    return NextResponse.json({ appointments: data })
+    const filas = data ?? []
+
+    /* ⚠️⚠️ `incompleta` ES LO ÚNICO QUE SEPARA «no hay citas» DE «no llegaron
+       las citas», Y NO SE PUEDE DEDUCIR DESDE EL CLIENTE.
+
+       El techo de filas del proveedor es DURO y GLOBAL —mil por respuesta—: no
+       se sube desde la consulta y, al alcanzarlo, la respuesta llega RECORTADA
+       sin error, sin cabecera de aviso y con un array perfectamente válido.
+
+       ⚠️ Y LA FORMA DEL RECORTE ES LA PEOR POSIBLE, POR EL `.order()` DE
+       ARRIBA. Se queda con las mil PRIMERAS por fecha, así que un mes cargado
+       vuelve con las dos primeras semanas llenas y el resto EN BLANCO. No hay
+       error que pintar, no hay hueco que se vea, y la banda de vacío tampoco
+       sale porque el conteo no es cero. Parecen semanas libres de verdad, y
+       encima de una de ellas se puede agendar encima de una cita que existe.
+
+       ⚠️ NO LO "ARREGLES" CON UN `.limit()`. Un límite propio no supera el
+       techo: sólo lo baja. La vía es saber CUÁNTAS había, no pedir menos.
+
+       `count: 'exact'` viene del `Content-Range` y cuenta las filas que CUMPLEN
+       el filtro, no las que caben en la respuesta. Si sobran, faltan.
+
+       El `count === null` cuenta como incompleta A PROPÓSITO: sin conteo no se
+       puede afirmar que la traída esté entera, y entre avisar de más y callarse
+       de menos, este defecto se diagnostica tarde precisamente por lo segundo.
+       El coste de equivocarse hacia aquí es una banda visible que alguien
+       reporta el primer día; el de equivocarse hacia el otro lado es la agenda
+       en blanco de arriba. */
+    const incompleta = count === null || count > filas.length
+    if (incompleta) {
+      logger.warn(
+        'agenda',
+        `traída de citas incompleta: la clínica ${profile.clinica_id} tiene ${count ?? 'un conteo que no llegó'} citas en [${from ?? 'sin from'}, ${to ?? 'sin to'}] y llegaron ${filas.length}`,
+      )
+    }
+
+    return NextResponse.json({ appointments: filas, incompleta })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Error interno'
     return NextResponse.json({ error: message }, { status: 500 })
@@ -98,10 +186,99 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { title, start_time, end_time, paciente_id, notes, medico_id, consultorio_id } = body
+    const { title, start_time, end_time, all_day, all_day_desde, all_day_hasta,
+            paciente_id, notes, medico_id, consultorio_id, client_id, icono, color } = body
 
-    if (!title || !start_time || !end_time) {
+    /* ── LAS DOS PUNTAS, SEGÚN SI LA FILA ES DE TODO EL DÍA ──────────────────
+       Un evento de todo el día NO manda instantes: manda dos FECHAS, y la
+       medianoche se compone más abajo con la zona del consultorio. El cliente no
+       puede componerla —lo haría con el reloj del navegador y la fila violaría
+       `appointments_all_day_medianoche_check` desde cualquier huso que no sea el
+       del consultorio—, así que manda el DÍA, que no tiene huso.
+
+       `all_day_hasta` es el ÚLTIMO DÍA INCLUIDO, tal como se ve en el modal. El
+       paso a fin exclusivo se da abajo, en un solo sitio. */
+    const esTodoElDia = all_day === true
+    const fechaDesde  = typeof all_day_desde === 'string' ? all_day_desde : ''
+    const fechaHasta  = typeof all_day_hasta === 'string' ? all_day_hasta : ''
+
+    if (!title || (esTodoElDia ? (!fechaDesde || !fechaHasta) : (!start_time || !end_time))) {
       return NextResponse.json({ error: 'Faltan campos requeridos' }, { status: 400 })
+    }
+
+    /* EL FIN DESPUÉS DEL INICIO, COMPROBADO AQUÍ Y NO POR LA BASE. No hay
+       `CHECK (end_time > start_time)` incondicional en `appointments`, y el que
+       sí existe sólo mira las filas de todo el día y contesta un 23514 que sube
+       al cliente como «no se pudo guardar la cita».
+
+       Son DOS comprobaciones y no una, y cada una tiene su mensaje: que las
+       fechas EXISTAN y que estén en orden. Juntarlas obligaría a un texto que
+       valiera para las dos, o sea que no dijera cuál falló.
+
+       ⚠️ EL MISMO DÍA ES VÁLIDO EN TODO EL DÍA —un evento de una sola jornada—,
+       así que la regla es `>=` y el mensaje dice «no puede ir antes», no «tiene
+       que ir después». Con hora es al revés: `>` estricto, porque una cita que
+       empieza y termina en el mismo instante no es una cita. */
+    if (esTodoElDia && (!esFechaDeCalendario(fechaDesde) || !esFechaDeCalendario(fechaHasta))) {
+      return NextResponse.json(
+        { error: 'fecha_invalida', message: 'Las fechas del evento no existen en el calendario. Se espera un día real, en formato AAAA-MM-DD.' },
+        { status: 400 }
+      )
+    }
+    const rangoValido = esTodoElDia
+      ? fechaHasta >= fechaDesde
+      : new Date(end_time) > new Date(start_time)
+    if (!rangoValido) {
+      return NextResponse.json(
+        {
+          error: 'rango_invalido',
+          message: esTodoElDia
+            ? 'El último día del evento no puede ir antes del primero.'
+            : 'El fin de la cita tiene que ir después del inicio.',
+        },
+        { status: 400 }
+      )
+    }
+
+    /* ── TODO EL DÍA Y PACIENTE NO PUEDEN IR JUNTOS ──────────────────────────
+       Es decisión de producto, no una limitación técnica: «todo el día» sólo
+       existe para EVENTOS, y una cita siempre lleva hora. La interfaz ya lo
+       impone —el conmutador «Cita» del modal se deshabilita en cuanto el
+       interruptor está encendido, y el gesto sobre la banda lo deja bloqueado—,
+       así que este `if` NO se dispara en el uso normal.
+
+       ESTÁ AQUÍ PORQUE LA BASE NO LO SABE. `appointments_all_day_medianoche_check`
+       mira las puntas y el huso, y no dice nada de `paciente_id`: una fila con
+       las dos cosas entraría tan contenta. Y NO ROMPERÍA NADA HOY, que es lo
+       peor que se puede decir de una fila incoherente — nadie la vería hasta que
+       algo empezara a depender de la regla. Un cuerpo fabricado a mano, o un
+       error futuro en otra parte del código, bastan para crearla.
+       Segundo cerrojo, entonces, del mismo estilo que el gate de rol de más
+       abajo: la interfaz esconde el camino, esto lo cierra. */
+    if (esTodoElDia && paciente_id) {
+      return NextResponse.json(
+        { error: 'todo_el_dia_con_paciente', message: 'Un evento de todo el día no puede ser una cita: una cita siempre lleva hora.' },
+        { status: 400 }
+      )
+    }
+
+    /* ── LA PINTA DEL EVENTO GENÉRICO (§12.14) ──────────────────────────────
+       `paciente_id` sigue siendo opcional aquí, que es lo que hace posible el
+       evento genérico: una fila de `appointments` SIN paciente, con `title`
+       como texto libre. Eso ya estaba; lo nuevo son estas dos columnas.
+
+       SE VALIDA AUNQUE LA BASE TENGA SU CHECK, y no es duplicar por gusto: un
+       23514 sube al cliente como «no se pudo guardar la cita» y nada más. El
+       CHECK es la barrera que no se puede saltar por PostgREST; esto es el
+       mensaje que se entiende. `undefined` de `pintaValida` significa valor
+       inaceptable, `null` significa sin pinta — dos cosas distintas. */
+    const iconoValidado = pintaValida(icono, ICONOS_EVENTO)
+    const colorValidado = pintaValida(color, COLORES_EVENTO)
+    if (iconoValidado === undefined || colorValidado === undefined) {
+      return NextResponse.json(
+        { error: 'pinta_invalida', message: 'El icono o el color del evento no están en la lista permitida.' },
+        { status: 400 }
+      )
     }
 
     // Fase 2.6: consultorio_id es obligatorio para nuevas citas (multiconsultorio).
@@ -119,6 +296,24 @@ export async function POST(req: NextRequest) {
         { error: 'consultorio_invalido', message: 'consultorio_id no tiene formato UUID válido.' },
         { status: 400 }
       )
+    }
+
+    // `client_id` — clave de idempotencia del alta, una por escritura (la
+    // genera el cliente). Hace dos cosas a la vez:
+    //   · el índice único `idx_appointments_client_id` convierte un doble
+    //     clic, un reintento del navegador o una reconexión a media petición
+    //     en la MISMA cita, no en dos (ver el manejo del 23505 más abajo);
+    //   · viaja en el payload de Realtime, así que la pestaña que escribió
+    //     reconoce su propio eco y no lo vuelve a aplicar.
+    // Opcional a propósito: las citas que entran por otros caminos (o por un
+    // cliente viejo) siguen funcionando sin ella.
+    if (client_id !== undefined && client_id !== null) {
+      if (typeof client_id !== 'string' || !UUID_REGEX.test(client_id)) {
+        return NextResponse.json(
+          { error: 'client_id_invalido', message: 'client_id no tiene formato UUID válido.' },
+          { status: 400 }
+        )
+      }
     }
 
     // 5.H Paso 1: Determinar medico_id según rol (D-5.H-3).
@@ -190,6 +385,64 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    /* ── LA MEDIANOCHE SE COMPONE AQUÍ, Y SÓLO AQUÍ ─────────────────────────
+       Con `consultorio.timezone`, que acaba de cargarse arriba y es la ÚNICA
+       zona con la que esta fila tiene sentido: el mismo instante es un día
+       distinto según el huso, y el que manda es el del consultorio (es lo que
+       comprueba `appointments_all_day_medianoche_check` leyendo
+       `consultorio_timezone` de la propia fila).
+
+       ⚠️ EL `+1 DÍA` ES EL PASO A FIN EXCLUSIVO, y es el único del servidor. El
+       modal enseña el ÚLTIMO DÍA INCLUIDO —un evento del 19 dice «19» en los dos
+       campos— y la columna guarda `19T00:00 .. 20T00:00`. La vuelta la hace
+       `fechasDeTodoElDia` en el cliente, también una sola vez. */
+    if (esTodoElDia && !consultorio.timezone) {
+      return NextResponse.json(
+        { error: 'consultorio_sin_huso', message: 'El consultorio no tiene zona horaria, y un evento de todo el día no se puede guardar sin ella.' },
+        { status: 400 }
+      )
+    }
+    /* EL FIN EXCLUSIVO, EN FECHA-SOLA Y EN SU PROPIA CONSTANTE. Estaba escrito
+       dentro de la expresion de abajo, y sacarlo no es cosmetica: esta MISMA
+       cadena es la que Google quiere en `end.date` (su `end` tambien es
+       exclusivo), y con el `desplazarFecha` enterrado en el `fechaHoraLocalAInstante`
+       la unica forma de llegar a ella desde el `after()` habria sido volver a
+       sumar el dia — un CUARTO `+1` del convenio, que es exactamente lo que no
+       puede haber. Ahora la fecha se compone una vez y la usan los dos: la fila
+       (convertida a instante) y el evento (tal cual). */
+    const finExclusivo = esTodoElDia ? desplazarFecha(fechaHasta, { dias: 1 }) : null
+    const inicioFila = esTodoElDia
+      ? fechaHoraLocalAInstante(fechaDesde, '00:00', consultorio.timezone)
+      : start_time
+    const finFila = finExclusivo !== null
+      ? fechaHoraLocalAInstante(finExclusivo, '00:00', consultorio.timezone)
+      : end_time
+
+    /* ── EL TECHO DE DURACIÓN ────────────────────────────────────────────────
+       Sólo comprobaba que el fin fuera después del inicio, y con eso un dedazo
+       en el AÑO de la fecha de fin —los `<input type="date">` dejan escribir
+       cualquier año— crea una fila que se solapa con todas las semanas de la
+       agenda para siempre. No revienta nada: se pinta, y por eso nadie la ve.
+       Los dos topes y su porqué están en `@/lib/agenda/topeDuracion`.
+
+       ⚠️ VA AQUÍ, DESPUÉS DE COMPONER LAS PUNTAS, Y NO ARRIBA CON LA
+       COMPROBACIÓN DE ORDEN. Es a propósito y es lo que hace que UNA sola
+       llamada cubra las dos ramas: en un alta de todo el día `start_time` y
+       `end_time` NO VIENEN en el cuerpo —el cliente manda `all_day_desde` /
+       `all_day_hasta`— y las puntas reales no existen hasta estas dos líneas de
+       aquí arriba. Comprobarlo antes obligaría a dos ramas y a duplicar el
+       convenio del fin exclusivo, que es justo lo que el módulo evita.
+       Se mide LO QUE SE VA A GUARDAR, que es la única definición que no se
+       puede desincronizar.
+
+       ⚠️ NO SUSTITUYE A LA COMPROBACIÓN DE ORDEN de más arriba, la acompaña:
+       aquélla sigue siendo la que rechaza un rango invertido, y tiene que ir
+       delante porque ésta da por bueno cualquier rango negativo. */
+    const errorDeTope = comprobarTopeDuracion(inicioFila, finFila, Boolean(paciente_id))
+    if (errorDeTope) {
+      return NextResponse.json(errorDeTope, { status: 400 })
+    }
+
     // RLS filtra por clinica_id
     const { data: apt, error } = await supabase
       .from('appointments')
@@ -198,12 +451,18 @@ export async function POST(req: NextRequest) {
         created_by:      profile.userId,
         paciente_id:     paciente_id || null,
         title,
-        start_time,
-        end_time,
+        start_time:      inicioFila,
+        end_time:        finFila,
+        all_day:         esTodoElDia,
         notes:           notes || null,
         status:          'scheduled',
         medico_id:        finalMedicoId,
         gcal_sync_status: 'pending',
+        client_id:        client_id ?? null,
+        // Pinta del evento genérico. NULL en una cita normal, que es el caso
+        // corriente y no una carencia.
+        icono:            iconoValidado,
+        color:            colorValidado,
         // Snapshot inmutable del consultorio (Fase 2.6).
         consultorio_id:            consultorio.id,
         consultorio_nombre:        consultorio.nombre,
@@ -212,73 +471,247 @@ export async function POST(req: NextRequest) {
         consultorio_telefono:      consultorio.telefono,
         consultorio_timezone:      consultorio.timezone,
       })
-      .select()
+      .select(APPOINTMENT_SELECT)
       .single()
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) {
+      // 23505 = unique_violation. Con `client_id` en juego, casi siempre es el
+      // índice único `idx_appointments_client_id`: alguien reintentó un alta
+      // que YA ENTRÓ. La respuesta correcta no es un error —la cita existe y
+      // el cliente sólo quiere saber cuál es—, sino devolverla con la misma
+      // forma que si acabara de crearse. Sin esto, la idempotencia cambiaría
+      // un duplicado por un 500, que no es mejor.
+      //
+      // No se decide leyendo el mensaje del índice, sino releyendo por
+      // `client_id`: si aparece una cita, el choque fue ése; si no aparece
+      // (otro índice, o la fila es de otra clínica y la RLS no la deja ver),
+      // el error se propaga tal cual.
+      //
+      // Y se devuelve ANTES del after() de Google a propósito: el alta
+      // original ya creó su evento. Reintentar aquí crearía el duplicado en
+      // el calendario del médico que este bloque existe para evitar.
+      if (error.code === '23505' && client_id) {
+        const { data: yaExiste } = await supabase
+          .from('appointments')
+          .select(APPOINTMENT_SELECT)
+          .eq('client_id', client_id)
+          .eq('clinica_id', profile.clinica_id)
+          .maybeSingle()
+        if (yaExiste) {
+          return NextResponse.json({ appointment: yaExiste, gcalSync: 'skipped' })
+        }
+      }
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
 
-    // Google Calendar sync en background — necesita admin porque after() no tiene contexto de cookies
+    // Google Calendar sync en background con el cliente admin.
+    //
+    // NO es por las cookies: `after()` conserva el contexto de la petición y la
+    // RLS funciona ahí con normalidad (comprobado en producción el 2026-08-16).
+    // El cliente admin está aquí porque los tokens de la conexión sólo se
+    // alcanzan por el puente, que exige service role.
+    //
+    // LO QUE ARREGLA ESTE COMMIT: antes se le buscaba token a QUIEN EJECUTA la
+    // acción. La secretaria no tenía fila, no se encontraba nada, y sus citas
+    // no llegaban a Google en silencio. Ahora la conexión se resuelve por
+    // CLÍNICA y quién agende deja de importar.
+    //
+    // LAS TRES COSAS SE CAPTURAN ANTES DE RESPONDER, con el cliente de sesión,
+    // y viajan por closure (plan §1): dentro de `after()` no se resuelve nada.
+    const conexion = await resolverConexionClinica(supabase, profile.clinica_id)
+    // Modo estricto para quien no administra: si el calendario de la clínica no
+    // existe todavía, la secretaria NO lo crea —eso escribiría en la cuenta de
+    // Google del administrador— y la cita queda 'pending' hasta que él entre.
+    const puedeReparar = canManageClinica(profile)
     const admin = createAdminClient()
-    after(async () => {
-      let gcal_sync_status: 'synced' | 'pending' | 'failed' = 'pending'
-      let google_event_id: string | null = null
+    // El titulo del evento sale del paciente ligado; si la cita no tiene
+    // paciente, del titulo libre de la cita.
+    const pacienteCita: PacienteEnCita = apt.pacientes ?? null
+    const clinicaCita:  ClinicaEnCita  = apt.clinicas  ?? null
+    // EL HUSO DEL EVENTO ES EL DEL CONSULTORIO, NO EL DEL CENTRO. Antes se
+    // etiquetaba con una constante fija (Ciudad de Mexico), asi que la
+    // invitacion de una cita en Hermosillo decia "hora estandar central". El
+    // INSTANTE siempre viajo bien —`start_time` va en UTC y Google lo respeta—,
+    // o sea que esto nunca movio ninguna cita de sitio: lo que estaba mal era la
+    // ETIQUETA, y con ella el texto que lee el paciente.
+    //
+    // Sale del snapshot que la fila acaba de congelar: si el consultorio cambia
+    // de huso manana, esta cita conserva el suyo. En el alta nunca es null
+    // —`consultorios.timezone` es NOT NULL y el consultorio es obligatorio—,
+    // pero el respaldo va igual, por simetria con el PUT, donde SI puede serlo.
+    const tzCita: string = apt.consultorio_timezone ?? TZ_CLINICA
+    // Sin conexión de clínica no se programa NADA. Antes se entraba igual y se
+    // salía con `gcal_sync_status = 'synced'` y sin evento —una mentira
+    // benigna—; marcarlo 'failed' en su lugar llenaría de citas fallidas la
+    // agenda de una clínica que simplemente no usa Google. No hay nada que
+    // sincronizar, así que la columna se queda como está y la respuesta ya
+    // dice 'disconnected'.
+    if (conexion) {
+      after(async () => {
+        let gcal_sync_status: 'synced' | 'pending' | 'failed' = 'pending'
+        let google_event_id: string | null = null
+        let calendarIdUsado: string | null = null
 
-      try {
-        const { data: tokenData } = await admin
-          .from('google_tokens')
-          .select('*')
-          .eq('user_id', profile.userId)
-          .single()
+        try {
+          // La descripción lleva un formato fijo (clínica y paciente) y NADA
+          // clínico: ni notes, ni motivo de consulta, ni diagnóstico.
+          // El estado en el alta es siempre 'scheduled' (se escribe arriba, en
+          // el insert de la fila), así que aquí nunca sale el prefijo de
+          // cancelación — va igualmente porque el título tiene un solo autor.
+          /* `null` APAGA EL ANCLA DE HORA, y es lo que toca en un evento de
+             todo el dia: su `start_time` es medianoche, asi que el ancla salia
+             diciendo «Hora de la cita: 12:00 a.m.» sobre algo que no tiene
+             hora. Ver el aviso de `eventoParaGoogle`. */
+          const instanteParaAncla = esTodoElDia ? null : apt.start_time
+          const { summary, description, reminders } = eventoParaGoogle(pacienteCita, clinicaCita, title, instanteParaAncla, tzCita, 'scheduled')
 
-        if (tokenData) {
-          const bgOauth = new google.auth.OAuth2(
-            process.env.GOOGLE_CLIENT_ID,
-            process.env.GOOGLE_CLIENT_SECRET,
-            process.env.GOOGLE_REDIRECT_URI
+          /* LAS DOS PUNTAS SALEN DE LO QUE SE GUARDO, NO DEL CUERPO DE LA
+             PETICION, y aqui estaba el fallo gordo: estas dos lineas leian
+             `start_time` / `end_time` del body, que en un alta de todo el dia
+             NO VIENEN —el cliente manda `all_day_desde` / `all_day_hasta`—, asi
+             que a Google le llegaba `{ dateTime: undefined }` y el evento no se
+             creaba. La cita quedaba en `failed` sin que nadie supiera por que.
+
+             Con hora se pasan los instantes; en todo el dia, las dos fechas:
+             `fechaDesde` tal como llego y `finExclusivo`, la misma cadena con la
+             que se compuso la fila. Sin `+1` nuevo y sin volver a instantes.
+
+             `limpiarLaOtraForma: false` porque en un alta no hay nada previo que
+             borrar; el `patch` del PUT si lo necesita. */
+          const puntas = puntasParaGoogle(
+            /* Se discrimina por `finExclusivo` y no por `esTodoElDia` aunque
+               digan lo mismo por construccion (se compone justo de eso): asi el
+               compilador ve que en esta rama la fecha NO es null, y no hace
+               falta inventarse un respaldo que taparia el fallo si algun dia
+               dejaran de decir lo mismo. */
+            finExclusivo !== null
+              ? { todoElDia: true,  inicio: fechaDesde, fin: finExclusivo, timezone: tzCita }
+              : { todoElDia: false, inicio: inicioFila, fin: finFila,      timezone: tzCita },
+            { limpiarLaOtraForma: false },
           )
-          bgOauth.setCredentials({
-            access_token:  decrypt(tokenData.access_token),
-            refresh_token: decrypt(tokenData.refresh_token),
-            expiry_date:   tokenData.expires_at,
-          })
-          if (tokenData.expires_at && Date.now() > tokenData.expires_at) {
-            const { credentials } = await bgOauth.refreshAccessToken()
-            await admin.from('google_tokens').update({
-              access_token: credentials.access_token ? encrypt(credentials.access_token) : null,
-              expires_at:   credentials.expiry_date ?? null,
-            }).eq('user_id', profile.userId)
-            bgOauth.setCredentials(credentials)
+
+          /* ── EL MÉDICO ENTRA AQUÍ, EN EL MISMO `insert` ────────────────────
+             Si tiene la cita asignada, tiene que tenerla en su calendario: no
+             es una elección de nadie y por eso no pasa por el botón de
+             invitación ni por su ruta.
+
+             UNA LLAMADA Y NO DOS. Añadirlo después con un `patch` costaría un
+             viaje más y, con `sendUpdates: 'all'`, un segundo correo de «evento
+             actualizado» pisándole la invitación que acababa de recibir.
+
+             Si el correo no se resuelve, el evento se crea IGUAL y sin
+             asistentes: una cita sin invitación es peor que una cita sin
+             evento, y ya existe `gcal_sync_status` para lo segundo. Queda la
+             línea de log y el botón de invitación para arreglarlo a mano.
+
+             `finalMedicoId` nunca es null en el alta: la ruta lo exige y lo
+             valida contra la clínica más arriba. */
+          let asistentes: calendar_v3.Schema$EventAttendee[] = []
+          const correoMedico = await correoDelMedico(admin, finalMedicoId, profile.clinica_id)
+          if (correoMedico.ok) {
+            asistentes = componerAsistentes([], {
+              medicoActual:     correoMedico.correo,
+              medicoSaliente:   null,
+              pacienteSaliente: null,
+              nuevos:           [],
+            })
+          } else {
+            registrarFalloGCal(
+              { operacion: `events.insert (alta de cita, médico sin invitar: ${correoMedico.motivo})`, userId: profile.userId, conexionId: conexion.id },
+              new Error('no se pudo resolver el correo del médico asignado'),
+            )
           }
 
-          const calendar = google.calendar({ version: 'v3', auth: bgOauth })
-          const { data: gEvent } = await calendar.events.insert({
-            calendarId:  'primary',
-            requestBody: {
-              summary: gcalSummary(title),
-              // NO enviar notes/descripción a Google — puede contener datos clínicos
-              start: { dateTime: start_time, timeZone: 'America/Mexico_City' },
-              end:   { dateTime: end_time,   timeZone: 'America/Mexico_City' },
-            },
-          })
-          google_event_id  = gEvent.id ?? null
-          gcal_sync_status = 'synced'
-        } else {
-          gcal_sync_status = 'synced'
+          const creado = await conCalendarioSpinus(conexion, admin, (calendar, calendarId) => {
+            calendarIdUsado = calendarId
+            return calendar.events.insert({
+              calendarId,
+              /* Que Google le mande el correo, y no sólo le deje el evento en la
+                 agenda. Al médico que ES dueño de la cuenta conectada no le llega
+                 nada de todos modos —Google no notifica al organizador de su
+                 propio evento, §12.17—, así que esto sólo alcanza al médico
+                 invitado con su propia cuenta, que es justo quien no tiene otra
+                 vía de enterarse. Sin esto, que el evento le aparezca depende de
+                 un ajuste de SU cuenta que nosotros no controlamos. */
+              sendUpdates: 'all',
+              requestBody: {
+                summary,
+                description,
+                attendees: asistentes,
+                ...INTERRUPTORES_INVITADOS,
+                // Sólo al crear: si el médico le cambia el recordatorio a mano en
+                // Google, ninguna edición posterior desde Spinus se lo reimpone.
+                reminders,
+                ...puntas,
+              },
+            })
+          }, { puedeReparar, actorId: profile.userId })
+          // EL 'synced' DEJA DE SER OPTIMISTA (H4). Antes se marcaba sincronizada
+          // toda cita que no hubiera lanzado, incluidas las que salieron sin id
+          // de evento: `creado` en null porque el modo estricto se negó a crear
+          // el calendario, o porque Google contestó sin `id`. Esas citas se
+          // quedaban en 'synced' sin nada en Google y nadie volvía a mirarlas.
+          google_event_id  = creado?.data.id ?? null
+          if (google_event_id) {
+            gcal_sync_status = 'synced'
+          } else {
+            gcal_sync_status = 'failed'
+            registrarFalloGCal(
+              { operacion: 'events.insert (alta de cita, sin id de evento)', userId: profile.userId, conexionId: conexion.id, calendarId: calendarIdUsado },
+              new Error(creado === null
+                ? 'no se resolvió calendario de clínica (¿modo estricto?)'
+                : 'Google respondió sin id de evento'),
+            )
+          }
+        } catch (gcalErr) {
+          // Corre dentro de after(): nadie ve el fallo del lado del cliente y la
+          // cita se queda en 'failed' sin más pista que esta línea.
+          registrarFalloGCal(
+            { operacion: 'events.insert (alta de cita)', userId: profile.userId, conexionId: conexion.id, calendarId: calendarIdUsado },
+            gcalErr,
+          )
+          gcal_sync_status = 'failed'
         }
-      } catch (gcalErr) {
-        console.error('[GCal] Error de sincronización en background')
-        gcal_sync_status = 'failed'
-      }
 
-      await admin
-        .from('appointments')
-        .update({ google_event_id, gcal_sync_status })
-        .eq('id', apt.id)
-    })
+        // `clinica_id` no es decorativo aunque `id` sea la clave primaria: con el
+        // cliente admin la RLS no acota nada. Mismo criterio que el `after()` del
+        // PUT en appointments/[id]/route.ts.
+        //
+        // `gcal_calendar_id` se estampa aquí y es la razón de que la rama
+        // siguiente pueda arreglar el ámbito de `desvincularCitas`: sin saber en
+        // qué calendario vive cada evento, el barrido no puede dejar de acotar
+        // por `medico_id` (plan §0.7).
+        const { error: errEstado } = await admin
+          .from('appointments')
+          .update({ google_event_id, gcal_sync_status, gcal_calendar_id: calendarIdUsado })
+          .eq('id', apt.id)
+          .eq('clinica_id', profile.clinica_id)
+        if (errEstado) {
+          registrarFalloGCal(
+            { operacion: 'appointments.update(gcal_sync_status)', userId: profile.userId, conexionId: conexion.id, calendarId: calendarIdUsado },
+            errEstado,
+          )
+        }
+      })
+    }
 
+    // La escritura a Google corre en el after() de arriba, o sea DESPUÉS de
+    // responder: aquí nunca se puede decir "sincronizado". Lo que sí se puede
+    // decir es si hay con qué sincronizar, y son dos cosas muy distintas de
+    // cara al médico: 'pending' es el caso normal y no pide nada de él;
+    // 'disconnected' sí, alguien tiene que ir a conectar Google.
+    //
+    // El veredicto sale de la conexión YA RESUELTA arriba, sin una segunda
+    // consulta, y la pregunta es por CLÍNICA: antes miraba si quien agendaba
+    // tenía fila propia, así que a la secretaria le contestaba 'disconnected'
+    // con la clínica perfectamente conectada.
+    //
+    // El `calendar_id` no entra en la cuenta a propósito: si falta y quien
+    // agenda administra la clínica, `conCalendarioSpinus` lo crea en el mismo
+    // after().
     return NextResponse.json({
       appointment: apt,
-      gcalSynced:  false,
+      gcalSync:    conexion ? 'pending' : 'disconnected',
     })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Error interno'

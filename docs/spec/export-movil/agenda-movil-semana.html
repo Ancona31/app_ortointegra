@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Tinta la status bar del sistema con el navy del header. Ver §9.4 del spec. -->
+<meta name="theme-color" content="#123a63">
+<title>Agenda Spinus · Móvil · Vista Semana (listWeek)</title>
+<style>
+/* ═══════════════════════════════════════════════════════════════════════════
+   X
+   y
+
+   Autónomo: sin hojas externas, sin fuentes remotas, sin scripts, sin imágenes
+   externas. Todos los valores están RESUELTOS a su literal; el nombre del token
+   de Spinus va en el comentario de al lado.
+
+   Modelo de datos (extendedProps de FullCalendar):
+     tipo   ∈ 'cita' | 'evento' | 'bloqueo' | 'gcal'
+     estado ∈ 'agendada' | 'confirmada' | 'atendida' | 'cancelada' | 'nopresento'
+              — SOLO existe cuando tipo === 'cita'; en el resto va null.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+*, *::before, *::after { box-sizing: border-box }
+
+/* ── Lienzo del mockup. NO va a producción: en el producto el .frame es el
+      viewport completo del teléfono. ───────────────────────────────────────── */
+body {
+  margin: 0;
+  padding: 40px 20px;
+  display: flex;
+  justify-content: center;
+  background: #e9edf3;                       /* --sp-canvas-bg */
+  font-family: system-ui, -apple-system, sans-serif;  /* --sp-font */
+  font-variant-numeric: tabular-nums;        /* toda hora y todo conteo */
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Marco del teléfono: 390 × 844 = iPhone 14/15 en puntos CSS ───────────── */
+.frame {
+  width: 390px;
+  height: 844px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #f5f8fc;                       /* --sp-app-bg */
+  border: 1px solid #dbe3ee;                 /* --sp-line-frame */
+  border-radius: 38px;
+  box-shadow: 0 30px 80px rgba(16,42,73,.16);/* --sp-shadow-frame */
+}
+
+/* ── Status bar simulada. NO va a producción. ─────────────────────────────── */
+.statusbar {
+  flex: none;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;                           /* --sp-6 */
+  background: #123a63;                       /* --ag-navy-1 */
+  color: #fff;
+  font-size: 13.5px;                         /* --sp-fs-meta */
+  font-weight: 600;                          /* --sp-fw-semi */
+}
+
+/* ═══ BANDA AZUL SUPERIOR ═══════════════════════════════════════════════════
+   Trabajo nuevo: hoy el header móvil es blanco. El gradiente es EL MISMO del
+   sidebar de escritorio (Sidebar.tsx) para que móvil y escritorio compartan
+   cromo. En producción añadir:
+     padding-top: calc(env(safe-area-inset-top) + 6px)
+   y el <meta name="viewport" content="...,viewport-fit=cover"> para que la
+   banda continúe bajo la status bar sin costura.
+   Con headerToolbar:false, los chips llaman a changeView() y las flechas a
+   prev()/next(). ─────────────────────────────────────────────────────────── */
+.appbar {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;                                 /* --sp-3 */
+  padding: 6px 16px 14px;                    /* --sp-1-5 --sp-4 --sp-3-5 */
+  background: linear-gradient(180deg, #123a63 0%, #16456f 100%);
+  color: #fff;
+}
+.appbar__row { display: flex; align-items: center; gap: 12px }
+
+/* Controles sobre navy: translúcidos, NUNCA blanco sólido — competirían
+   visualmente con «Nueva cita». */
+.ctrl {
+  flex: none;
+  width: 44px;                               /* --sp-tap: mínimo táctil */
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 10px;                       /* --sp-r-btn */
+  background: rgba(255,255,255,.14);
+  color: #fff;
+  font-family: inherit;
+  font-size: 17px;
+  cursor: pointer;
+}
+.ctrl--outlined { border: 1px solid rgba(255,255,255,.24) }
+
+.appbar__title { display: flex; flex-direction: column; gap: 1px }
+.appbar__title b { font-size: 19px; font-weight: 700 }   /* --sp-fw-bold */
+.appbar__title span {
+  font-size: 12.5px;                          /* --sp-fs-hint */
+  color: #a9c4de;                             /* --ag-navy-tx · 5.9:1 sobre navy */
+}
+
+/* ── Conmutador de vista: pista oscura, pestaña activa BLANCA ─────────────── */
+.viewswitch {
+  display: flex;
+  gap: 4px;                                  /* --sp-1 */
+  padding: 4px;
+  background: rgba(0,0,0,.22);
+  border-radius: 10px;                       /* --sp-r-field */
+}
+.viewswitch button {
+  flex: 1;
+  min-height: 44px;                          /* --sp-tap */
+  border: 0;
+  border-radius: 8px;                        /* --sp-r-btn-sm */
+  background: transparent;
+  color: #c6dbef;
+  font-family: inherit;
+  font-size: 15px;                           /* --sp-fs-btn-sm */
+  font-weight: 600;
+  cursor: pointer;
+}
+.viewswitch button[aria-pressed="true"] {
+  background: #fff;
+  color: #173156;                            /* --sp-ink-800 */
+  font-weight: 700;
+}
+
+/* ── Filtro de médico + engrane de Horario. SÍ van en la banda: la app ya los
+      tiene en móvil. No moverlos al menú ☰. ──────────────────────────────── */
+.filterrow { display: flex; align-items: center; gap: 8px }  /* --sp-2 */
+.filterrow label { flex: 1; min-width: 0; display: flex }
+.filterrow select {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 12px;                           /* --sp-3 */
+  border: 1px solid rgba(255,255,255,.24);
+  border-radius: 10px;
+  background: rgba(255,255,255,.14);
+  color: #fff;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 500;                          /* --sp-fw-medium */
+  cursor: pointer;
+}
+/* Obligatorio: sin este color las <option> quedan blanco sobre blanco en el
+   desplegable nativo de Android. Bug real, no un detalle. */
+.filterrow select option { color: #173156; background: #fff }
+
+/* ── Navegación de fecha ──────────────────────────────────────────────────── */
+.datenav { display: flex; align-items: center; gap: 8px }
+.datenav__label { flex: 1; text-align: center; font-size: 15.5px; font-weight: 600 }
+
+/* ── Etiqueta accesible fuera de pantalla ─────────────────────────────────── */
+.sr-only {
+  position: absolute; width: 1px; height: 1px;
+  overflow: hidden; clip-path: inset(50%);
+}
+
+/* ═══ ÁREA DE SCROLL ════════════════════════════════════════════════════════
+   Es el contenedor de scroll de las cabeceras pegajosas. La barra de scroll se
+   oculta a propósito (el diseño no la muestra); el scroll sigue funcionando. */
+.scroll {
+  flex: 1;
+  min-height: 0;                             /* obligatorio: sin esto el hijo
+                                                no encoge y el flex desborda */
+  overflow-y: auto;
+  background: #fff;                          /* --sp-surface */
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;                     /* Firefox */
+  -ms-overflow-style: none;                  /* Edge legacy */
+}
+.scroll::-webkit-scrollbar { display: none } /* WebKit / Blink */
+
+/* ═══ FILAS DE LISTA (listDay / listWeek) ═══════════════════════════════════
+   Equivalen a .fc-list-event. min-height 44px = mínimo táctil. ───────────── */
+.row {
+  display: flex;
+  gap: 12px;                                 /* --sp-3 */
+  min-height: 44px;                          /* --sp-tap */
+  padding: 10px 16px;                        /* --sp-2-5 --sp-4 */
+  align-items: center;
+  border-bottom: 1px solid #eef1f6;          /* --sp-line-divider */
+  text-decoration: none;
+  color: inherit;
+  background: #fff;
+}
+.row:hover { background: #f5f8fc }           /* --ag-primary-bg-faint */
+
+/* Variante de 3 líneas: hora+duración / nombre / motivo / píldora.
+   Solo en listDay, donde hay alto para el detalle. */
+.row--detail { align-items: flex-start; padding: 14px 16px }  /* --sp-3-5 */
+
+/* ── Columna de hora: 52px fijos y tabular-nums para que las horas se alineen
+      en vertical y no tiemblen al navegar entre días. ───────────────────── */
+.row__time {
+  flex: none;
+  width: 52px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-size: 14px;                           /* --sp-fs-body-sm */
+  font-weight: 700;
+  color: #173156;                            /* --sp-ink-800 */
+}
+.row__time small { font-size: 11px; font-weight: 400; color: #6b7b8f }  /* --sp-fs-legal / --sp-ink-400 */
+/* Los eventos allDay muestran «todo el día» en vez de una hora. FullCalendar
+   SÍ los renderiza en las vistas de lista, al inicio del grupo de su día. */
+.row__time--allday { font-size: 11px; font-weight: 600; color: #5a6b81 }  /* --sp-ink-500 */
+
+/* ── Marca de tipo/estado ─────────────────────────────────────────────────
+   Equivale a .fc-list-event-dot dentro de .fc-list-event-graphic.
+   REDONDO  = cita (el color codifica el estado)
+   CUADRADO = evento propio o de Google (no llevan estado)
+   La FORMA es la señal que sobrevive a la ceguera al color. ─────────────── */
+.dot { flex: none; width: 11px; height: 11px; border-radius: 50% }
+.row:not(.row--detail) .dot { margin-top: 0 }
+.row--detail .dot { margin-top: 5px }
+
+.dot--agendada   { background: #d97706 }     /* --sp-warn-strong */
+.dot--confirmada { background: #1e5fa8 }     /* --sp-primary */
+.dot--atendida   { background: #16a34a }     /* --sp-success */
+.dot--cancelada  { background: #c0392b }     /* --sp-danger */
+.dot--nopresento { background: #6b7b8f }     /* --sp-ink-400 */
+
+/* Evento propio: cuadrado con barra izquierda en su color. El color lo elige
+   el usuario entre 6 (indigo, magenta, carmin, oliva, bronce, grafito) y en
+   producción llega como --ev-color desde eventDidMount. */
+.dot--evento {
+  border-radius: 3px;
+  background: #e9eaec;                       /* grafito al 8% */
+  border: 1px solid #1f2937;                 /* --ag-ev-grafito */
+  border-left-width: 3px;
+}
+/* Guardia y otros eventos en índigo */
+.dot--indigo { border-radius: 3px; background: #ebeaf5; border: 1px solid #3730a3; border-left-width: 3px }
+
+/* ── Icono de evento con máscara ──────────────────────────────────────────
+   UN solo archivo SVG sirve para los 6 colores: la forma va en mask-image y
+   el color en background. El prefijo -webkit- es OBLIGATORIO (Safari/iOS).
+   Aquí el SVG va como data URI para que el archivo sea autónomo; en producción
+   es url(/icons/cirugia.svg). ──────────────────────────────────────────── */
+.icoslot {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  margin-top: 1px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;                        /* --sp-r-btn-sm */
+  background: #e9eaec;                       /* tinte del color del evento */
+  border: 1px solid #bcbfc4;
+}
+.ico {
+  width: 21px;
+  height: 21px;
+  background: #1f2937;                       /* = --ev-color */
+  -webkit-mask: url("data:image/svg+xml,%3Csvg%20width%3D%2248%22%20height%3D%2248%22%20viewBox%3D%220%200%2048%2048%22%20fill%3D%22none%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cpath%20fill-rule%3D%22evenodd%22%20clip-rule%3D%22evenodd%22%20d%3D%22M40%208H8V40H40V8ZM8%206C6.89543%206%206%206.89543%206%208V40C6%2041.1046%206.89543%2042%208%2042H40C41.1046%2042%2042%2041.1046%2042%2040V8C42%206.89543%2041.1046%206%2040%206H8Z%22%20fill%3D%22%23000%22%3E%3C%2Fpath%3E%3Cpath%20fill-rule%3D%22evenodd%22%20clip-rule%3D%22evenodd%22%20d%3D%22M10%2034H20V36H10V34Z%22%20fill%3D%22%23000%22%3E%3C%2Fpath%3E%3Cpath%20fill-rule%3D%22evenodd%22%20clip-rule%3D%22evenodd%22%20d%3D%22M28%2034H32V36H28V34Z%22%20fill%3D%22%23000%22%3E%3C%2Fpath%3E%3Cpath%20fill-rule%3D%22evenodd%22%20clip-rule%3D%22evenodd%22%20d%3D%22M22%2034H26V36H22V34Z%22%20fill%3D%22%23000%22%3E%3C%2Fpath%3E%3Cpath%20fill-rule%3D%22evenodd%22%20clip-rule%3D%22evenodd%22%20d%3D%22M34%2034H38V36H34V34Z%22%20fill%3D%22%23000%22%3E%3C%2Fpath%3E%3Cpath%20fill-rule%3D%22evenodd%22%20clip-rule%3D%22evenodd%22%20d%3D%22M16.8284%2028H21.5516C22.5979%2028%2023.6026%2027.59%2024.3501%2026.858L28%2023.2842V22.8284C28%2021.7676%2028.4214%2020.7501%2029.1716%2020L30.8607%2018.3109L28.2548%2016.5736L16.8284%2028ZM12%2030L28%2014L34%2018L30.5858%2021.4142C30.2107%2021.7893%2030%2022.298%2030%2022.8284V23.2842C30%2023.8219%2029.7835%2024.337%2029.3993%2024.7132L25.7494%2028.2871C24.628%2029.3851%2023.1211%2030%2021.5516%2030H12Z%22%20fill%3D%22%23000%22%3E%3C%2Fpath%3E%3Cpath%20fill-rule%3D%22evenodd%22%20clip-rule%3D%22evenodd%22%20d%3D%22M26.7071%2021.2929C27.0976%2021.6834%2027.0976%2022.3166%2026.7071%2022.7071L23.7071%2025.7071C23.3166%2026.0976%2022.6834%2026.0976%2022.2929%2025.7071C21.9024%2025.3166%2021.9024%2024.6834%2022.2929%2024.2929L25.2929%2021.2929C25.6834%2020.9024%2026.3166%2020.9024%2026.7071%2021.2929Z%22%20fill%3D%22%23000%22%3E%3C%2Fpath%3E%3Cpath%20fill-rule%3D%22evenodd%22%20clip-rule%3D%22evenodd%22%20d%3D%22M36.7071%208.1075L29.1075%2015.7071L27.6933%2014.2929L35.2929%206.69328L36.7071%208.1075Z%22%20fill%3D%22%23000%22%3E%3C%2Fpath%3E%3Cpath%20fill-rule%3D%22evenodd%22%20clip-rule%3D%22evenodd%22%20d%3D%22M38.2071%2012.3925C38.5976%2012.783%2038.5976%2013.4162%2038.2071%2013.8067L32.7071%2019.3067L31.2929%2017.8925L36.7929%2012.3925C37.1834%2012.002%2037.8166%2012.002%2038.2071%2012.3925Z%22%20fill%3D%22%23000%22%3E%3C%2Fpath%3E%3C%2Fsvg%3E") center / contain no-repeat;
+          mask: url("data:image/svg+xml,%3Csvg%20width%3D%2248%22%20height%3D%2248%22%20viewBox%3D%220%200%2048%2048%22%20fill%3D%22none%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cpath%20fill-rule%3D%22evenodd%22%20clip-rule%3D%22evenodd%22%20d%3D%22M40%208H8V40H40V8ZM8%206C6.89543%206%206%206.89543%206%208V40C6%2041.1046%206.89543%2042%208%2042H40C41.1046%2042%2042%2041.1046%2042%2040V8C42%206.89543%2041.1046%206%2040%206H8Z%22%20fill%3D%22%23000%22%3E%3C%2Fpath%3E%3Cpath%20fill-rule%3D%22evenodd%22%20clip-rule%3D%22evenodd%22%20d%3D%22M10%2034H20V36H10V34Z%22%20fill%3D%22%23000%22%3E%3C%2Fpath%3E%3Cpath%20fill-rule%3D%22evenodd%22%20clip-rule%3D%22evenodd%22%20d%3D%22M28%2034H32V36H28V34Z%22%20fill%3D%22%23000%22%3E%3C%2Fpath%3E%3Cpath%20fill-rule%3D%22evenodd%22%20clip-rule%3D%22evenodd%22%20d%3D%22M22%2034H26V36H22V34Z%22%20fill%3D%22%23000%22%3E%3C%2Fpath%3E%3Cpath%20fill-rule%3D%22evenodd%22%20clip-rule%3D%22evenodd%22%20d%3D%22M34%2034H38V36H34V34Z%22%20fill%3D%22%23000%22%3E%3C%2Fpath%3E%3Cpath%20fill-rule%3D%22evenodd%22%20clip-rule%3D%22evenodd%22%20d%3D%22M16.8284%2028H21.5516C22.5979%2028%2023.6026%2027.59%2024.3501%2026.858L28%2023.2842V22.8284C28%2021.7676%2028.4214%2020.7501%2029.1716%2020L30.8607%2018.3109L28.2548%2016.5736L16.8284%2028ZM12%2030L28%2014L34%2018L30.5858%2021.4142C30.2107%2021.7893%2030%2022.298%2030%2022.8284V23.2842C30%2023.8219%2029.7835%2024.337%2029.3993%2024.7132L25.7494%2028.2871C24.628%2029.3851%2023.1211%2030%2021.5516%2030H12Z%22%20fill%3D%22%23000%22%3E%3C%2Fpath%3E%3Cpath%20fill-rule%3D%22evenodd%22%20clip-rule%3D%22evenodd%22%20d%3D%22M26.7071%2021.2929C27.0976%2021.6834%2027.0976%2022.3166%2026.7071%2022.7071L23.7071%2025.7071C23.3166%2026.0976%2022.6834%2026.0976%2022.2929%2025.7071C21.9024%2025.3166%2021.9024%2024.6834%2022.2929%2024.2929L25.2929%2021.2929C25.6834%2020.9024%2026.3166%2020.9024%2026.7071%2021.2929Z%22%20fill%3D%22%23000%22%3E%3C%2Fpath%3E%3Cpath%20fill-rule%3D%22evenodd%22%20clip-rule%3D%22evenodd%22%20d%3D%22M36.7071%208.1075L29.1075%2015.7071L27.6933%2014.2929L35.2929%206.69328L36.7071%208.1075Z%22%20fill%3D%22%23000%22%3E%3C%2Fpath%3E%3Cpath%20fill-rule%3D%22evenodd%22%20clip-rule%3D%22evenodd%22%20d%3D%22M38.2071%2012.3925C38.5976%2012.783%2038.5976%2013.4162%2038.2071%2013.8067L32.7071%2019.3067L31.2929%2017.8925L36.7929%2012.3925C37.1834%2012.002%2037.8166%2012.002%2038.2071%2012.3925Z%22%20fill%3D%22%23000%22%3E%3C%2Fpath%3E%3C%2Fsvg%3E") center / contain no-repeat;
+}
+.ico--sm { width: 13px; height: 13px }
+
+/* ── Cuerpo de la fila ────────────────────────────────────────────────────── */
+.row__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px }
+.row__name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #173156;                            /* --sp-ink-800 en los 5 estados:
+                                                el estado NUNCA se codifica en
+                                                la legibilidad del nombre */
+  text-decoration: none;
+}
+.row--compact .row__name {
+  flex: 1; min-width: 0;
+  font-size: 15.5px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+/* Cancelada lleva tachado. «No asistió» NO: la cita sí ocurrió en la agenda,
+   el paciente no llegó. Son cosas distintas y se ven distintas. */
+.row__name--cancelada { color: #5a6b81; text-decoration: line-through }
+.row__meta { font-size: 13.5px; color: #5a6b81 }   /* --sp-fs-meta / --sp-ink-500 */
+.row__chev { flex: none; font-size: 16px; color: #c3ccd8 }  /* --sp-ink-100, inerte */
+
+/* ── Píldora de estado ────────────────────────────────────────────────────
+   Fondo OPACO a propósito: es lo que garantiza AA sin depender del tinte.
+   El texto la nombra, así que el estado se lee sin color. ───────────────── */
+.pill {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;                         /* --sp-2-5 */
+  border-radius: 999px;                      /* --sp-r-pill */
+  font-size: 12px;                           /* --sp-fs-badge */
+  font-weight: 600;
+}
+.pill--agendada   { background: #fef6e7; border: 1px solid #f4dfae; color: #b45309 }
+.pill--confirmada { background: #eaf1f9; border: 1px solid #c7dcef; color: #1e5fa8 }
+.pill--atendida   { background: #e9f7ef; border: 1px solid #cfe6d6; color: #0f7a52 }
+.pill--cancelada  { background: #fdf2f2; border: 1px solid #f3c9c9; color: #c0392b }
+.pill--nopresento { background: #f4f6f8; border: 1px solid #dfe5ec; color: #5a6b81 }
+.pill--gcal       { background: #f4effd; border: 1px solid #d8c9f7; color: #7c3aed }
+
+/* ═══ CABECERA DE DÍA PEGAJOSA ══════════════════════════════════════════════
+   Equivale a .fc-list-day > .fc-list-day-cushion.
+
+   EL RELEVO ES NATIVO, SIN JAVASCRIPT. Todas las cabeceras son hermanas
+   dentro del MISMO contenedor de scroll (.scroll) y todas llevan
+   position:sticky; top:0. El comportamiento resultante:
+
+     1. La cabecera del día se pega arriba mientras se recorren sus filas.
+     2. Al llegar la cabecera del día siguiente, ésta la EMPUJA fuera de la
+        vista y ocupa su lugar. Un elemento sticky no puede salir del área de
+        su padre, y como cada cabecera y sus filas comparten padre (.scroll),
+        el relevo lo produce el flujo normal del documento.
+
+   Requisitos que hay que respetar o el sticky deja de funcionar:
+     · el ancestro de scroll no puede tener overflow:hidden
+     · ninguna cabecera puede estar envuelta en un contenedor propio, o se
+       quedaría atrapada en él (por eso cabeceras y filas son hermanas)
+     · el fondo tiene que ser OPACO, o las filas se ven por debajo
+   ═══════════════════════════════════════════════════════════════════════════ */
+.dayhead {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;                         /* --sp-2 --sp-4 */
+  background: #eef2f7;                       /* --sp-surface-muted · OPACO */
+  border-top: 1px solid #d5deea;             /* --sp-line-input */
+  border-bottom: 1px solid #d5deea;
+}
+.dayhead a {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1e5fa8;                            /* --sp-primary */
+  text-decoration: none;
+}
+.dayhead span {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #5a6b81;                            /* --sp-ink-500 */
+}
+/* Las cabeceras de las vistas de lista NO tienen hook de contenido en
+   FullCalendar: solo listDayFormat y listDaySideFormat. Por eso no llevan
+   conteo de citas — solo fecha a la izquierda y día de la semana a la derecha. */
+
+/* ═══ BARRA INFERIOR FIJA ═══════════════════════════════════════════════════
+   «Nueva cita» NO va en la banda azul: barra propia, ancho completo, 56px.
+   En producción: padding-bottom: calc(26px + env(safe-area-inset-bottom)). */
+.bottombar {
+  flex: none;
+  padding: 12px 16px 26px;                   /* --sp-3 --sp-4 --sp-6-5 */
+  background: #fff;
+  border-top: 1px solid #e6ebf2;             /* --sp-line-card */
+}
+.cta {
+  width: 100%;
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 12px;                       /* --sp-r-cta */
+  background: #1e5fa8;                       /* --sp-primary */
+  color: #fff;
+  font-family: inherit;
+  font-size: 17px;                           /* --sp-fs-btn */
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 8px 18px rgba(30,95,168,.28);/* --sp-shadow-btn-m */
+}
+.cta:hover { background: #1a3a5c }           /* --sp-primary-hover */
+
+/* ── Foco: 3px y no 2 — sobre tarjetas de color un anillo fino se pierde ─── */
+:focus-visible { outline: 3px solid #1B5FA8; outline-offset: 2px; border-radius: 6px }
+</style>
+</head>
+<body>
+
+<div class="frame">
+  <div class="statusbar" aria-hidden="true"><span>11:20</span><span style="letter-spacing:2px">▪▪▮</span></div>
+
+  <!-- ═══ BANDA AZUL ═══ -->
+  <header class="appbar">
+    <div class="appbar__row">
+      <button type="button" class="ctrl" aria-label="Abrir menú">☰</button>
+      <span class="appbar__title"><b>Agenda</b><span>Umán · 15 citas</span></span>
+    </div>
+
+    <div class="viewswitch" role="group" aria-label="Cambiar vista">
+      <button type="button">Día</button>
+      <button type="button" aria-pressed="true">Semana</button>
+      <button type="button">Mes</button>
+    </div>
+
+    <div class="filterrow">
+      <label>
+        <span class="sr-only">Filtrar por médico</span>
+        <select>
+          <option>Todos los médicos</option>
+          <option>Dr. Ángel M. Ancona</option>
+        </select>
+      </label>
+      <button type="button" class="ctrl ctrl--outlined" aria-label="Configurar horario">⚙</button>
+    </div>
+
+    <div class="datenav">
+      <button type="button" class="ctrl" aria-label="Semana anterior">‹</button>
+      <span class="datenav__label">17 – 22 de agosto</span>
+      <button type="button" class="ctrl" aria-label="Semana siguiente">›</button>
+    </div>
+  </header>
+
+  <!-- ═══ listWeek ═══
+       Los días SIN citas simplemente no se dibujan: es la forma más agresiva
+       de compactar y la trae FullCalendar de fábrica.
+       Las cabeceras son hermanas de las filas dentro de .scroll — ver el
+       comentario de .dayhead en el CSS para la mecánica del relevo. -->
+  <div class="scroll">
+      <!-- Cabecera pegajosa: hermana de sus filas, no las envuelve. -->
+      <div class="dayhead">
+        <a href="#">17 de agosto</a>
+        <span>lunes</span>
+      </div>
+
+      <a class="row row--compact" href="#">
+        <span class="row__time">09:00</span>
+        <span class="dot dot--atendida" aria-hidden="true"></span>
+        <span class="row__name">Marisol Zamora</span>
+        <span class="row__chev" aria-hidden="true">›</span>
+      </a>
+
+      <a class="row row--compact" href="#">
+        <span class="row__time">11:00</span>
+        <span class="dot dot--agendada" aria-hidden="true"></span>
+        <span class="row__name">Jorge Loría</span>
+        <span class="row__chev" aria-hidden="true">›</span>
+      </a>
+
+      <a class="row row--compact" href="#">
+        <span class="row__time">12:30</span>
+        <span class="dot dot--confirmada" aria-hidden="true"></span>
+        <span class="row__name">Elena Tuz</span>
+        <span class="row__chev" aria-hidden="true">›</span>
+      </a>
+
+      <a class="row row--compact" href="#">
+        <span class="row__time">16:00</span>
+        <span class="dot dot--agendada" aria-hidden="true"></span>
+        <span class="row__name">Ana Cauich</span>
+        <span class="row__chev" aria-hidden="true">›</span>
+      </a>
+
+      <a class="row row--compact" href="#">
+        <span class="row__time">17:30</span>
+        <span class="dot dot--confirmada" aria-hidden="true"></span>
+        <span class="row__name">Manuel Poot</span>
+        <span class="row__chev" aria-hidden="true">›</span>
+      </a>
+
+      <!-- Cabecera pegajosa: hermana de sus filas, no las envuelve. -->
+      <div class="dayhead">
+        <a href="#">18 de agosto</a>
+        <span>martes</span>
+      </div>
+
+      <a class="row row--compact" href="#">
+        <span class="row__time row__time--allday">todo el día</span>
+        <span class="dot dot--indigo" aria-hidden="true"></span>
+        <span class="row__name">Guardia hospitalaria</span>
+        <span class="row__chev" aria-hidden="true">›</span>
+      </a>
+
+      <a class="row row--compact" href="#">
+        <span class="row__time">08:00</span>
+        <span class="dot dot--atendida" aria-hidden="true"></span>
+        <span class="row__name">Luis Pech</span>
+        <span class="row__chev" aria-hidden="true">›</span>
+      </a>
+
+      <a class="row row--compact" href="#">
+        <span class="row__time">10:00</span>
+        <span class="dot dot--cancelada" aria-hidden="true"></span>
+        <span class="row__name row__name--cancelada">Rosa Ek Chan</span>
+        <span class="row__chev" aria-hidden="true">›</span>
+      </a>
+
+      <!-- evento propio: punto cuadrado + icono en el título -->
+      <a class="row row--compact" href="#">
+        <span class="row__time">12:00</span>
+        <span class="dot dot--evento" aria-hidden="true"></span>
+        <span class="row__name"><span class="ico ico--sm" aria-hidden="true" style="display:inline-block; vertical-align:-.15em"></span> Cirugía · bloque quirúrgico</span>
+        <span class="row__chev" aria-hidden="true">›</span>
+      </a>
+
+      <a class="row row--compact" href="#">
+        <span class="row__time">15:30</span>
+        <span class="dot dot--confirmada" aria-hidden="true"></span>
+        <span class="row__name">Sofía Canto</span>
+        <span class="row__chev" aria-hidden="true">›</span>
+      </a>
+
+      <a class="row row--compact" href="#">
+        <span class="row__time">18:00</span>
+        <span class="dot dot--nopresento" aria-hidden="true"></span>
+        <span class="row__name">Diego Chi</span>
+        <span class="row__chev" aria-hidden="true">›</span>
+      </a>
+
+      <!-- Cabecera pegajosa: hermana de sus filas, no las envuelve. -->
+      <div class="dayhead">
+        <a href="#">19 de agosto · hoy</a>
+        <span>miércoles</span>
+      </div>
+
+      <a class="row row--compact" href="#">
+        <span class="row__time row__time--allday">todo el día</span>
+        <span class="dot dot--indigo" aria-hidden="true"></span>
+        <span class="row__name">Guardia hospitalaria</span>
+        <span class="row__chev" aria-hidden="true">›</span>
+      </a>
+
+      <a class="row row--compact" href="#">
+        <span class="row__time">09:00</span>
+        <span class="dot dot--atendida" aria-hidden="true"></span>
+        <span class="row__name">Marisol Zamora</span>
+        <span class="row__chev" aria-hidden="true">›</span>
+      </a>
+
+      <a class="row row--compact" href="#">
+        <span class="row__time">10:30</span>
+        <span class="dot dot--agendada" aria-hidden="true"></span>
+        <span class="row__name">Hugo Interián</span>
+        <span class="row__chev" aria-hidden="true">›</span>
+      </a>
+
+      <a class="row row--compact" href="#">
+        <span class="row__time">12:00</span>
+        <span class="dot dot--evento" aria-hidden="true"></span>
+        <span class="row__name">Sesión de quirófano</span>
+        <span class="row__chev" aria-hidden="true">›</span>
+      </a>
+
+      <!-- gcal: la marca de Google sustituye al punto -->
+      <a class="row row--compact" href="#">
+        <span class="row__time">14:00</span>
+        <svg viewBox="0 0 48 48" width="11" height="11" aria-hidden="true" style="display:block"><path fill="#4285F4" d="M45.1 24.5c0-1.6-.1-3.2-.4-4.7H24v8.9h11.8c-.5 2.7-2.1 5-4.4 6.5v5.4h7c4.1-3.8 6.7-9.4 6.7-16.1z"/><path fill="#34A853" d="M24 46c5.9 0 10.9-2 14.4-5.4l-7-5.4c-2 1.3-4.5 2.1-7.4 2.1-5.7 0-10.5-3.8-12.2-9H4.6v5.6C8.2 41.2 15.5 46 24 46z"/><path fill="#FBBC05" d="M11.8 28.3c-.4-1.3-.7-2.8-.7-4.3s.3-3 .7-4.3v-5.6H4.6C3 17.1 2 20.4 2 24s1 6.9 2.6 9.9l7.2-5.6z"/><path fill="#EA4335" d="M24 10.3c3.2 0 6.1 1.1 8.4 3.3l6.2-6.2C34.9 3.9 29.9 2 24 2 15.5 2 8.2 6.8 4.6 14.1l7.2 5.6c1.7-5.2 6.5-9 12.2-9z"/></svg>
+        <span class="row__name">Cita pancho francisco</span>
+        <span class="row__chev" aria-hidden="true">›</span>
+      </a>
+
+      <a class="row row--compact" href="#">
+        <span class="row__time">15:00</span>
+        <span class="dot dot--agendada" aria-hidden="true"></span>
+        <span class="row__name">Patricia Novelo</span>
+        <span class="row__chev" aria-hidden="true">›</span>
+      </a>
+
+      <a class="row row--compact" href="#">
+        <span class="row__time">17:00</span>
+        <span class="dot dot--confirmada" aria-hidden="true"></span>
+        <span class="row__name">Carmen Ay</span>
+        <span class="row__chev" aria-hidden="true">›</span>
+      </a>
+
+      <!-- Cabecera pegajosa: hermana de sus filas, no las envuelve. -->
+      <div class="dayhead">
+        <a href="#">20 de agosto</a>
+        <span>jueves</span>
+      </div>
+
+      <a class="row row--compact" href="#">
+        <span class="row__time">08:00</span>
+        <span class="dot dot--confirmada" aria-hidden="true"></span>
+        <span class="row__name">Ana Cauich</span>
+        <span class="row__chev" aria-hidden="true">›</span>
+      </a>
+
+      <a class="row row--compact" href="#">
+        <span class="row__time">10:00</span>
+        <span class="dot dot--agendada" aria-hidden="true"></span>
+        <span class="row__name">Manuel Poot</span>
+        <span class="row__chev" aria-hidden="true">›</span>
+      </a>
+
+      <a class="row row--compact" href="#">
+        <span class="row__time">12:30</span>
+        <span class="dot dot--agendada" aria-hidden="true"></span>
+        <span class="row__name">Pedro Uc</span>
+        <span class="row__chev" aria-hidden="true">›</span>
+      </a>
+
+      <a class="row row--compact" href="#">
+        <span class="row__time">16:00</span>
+        <span class="dot dot--atendida" aria-hidden="true"></span>
+        <span class="row__name">Guadalupe Mena</span>
+        <span class="row__chev" aria-hidden="true">›</span>
+      </a>
+
+      <!-- Cabecera pegajosa: hermana de sus filas, no las envuelve. -->
+      <div class="dayhead">
+        <a href="#">21 de agosto</a>
+        <span>viernes</span>
+      </div>
+
+      <a class="row row--compact" href="#">
+        <span class="row__time">09:00</span>
+        <span class="dot dot--agendada" aria-hidden="true"></span>
+        <span class="row__name">Carmen Ay</span>
+        <span class="row__chev" aria-hidden="true">›</span>
+      </a>
+
+      <a class="row row--compact" href="#">
+        <span class="row__time">11:00</span>
+        <span class="dot dot--atendida" aria-hidden="true"></span>
+        <span class="row__name">Diego Chi</span>
+        <span class="row__chev" aria-hidden="true">›</span>
+      </a>
+
+      <a class="row row--compact" href="#">
+        <span class="row__time">13:00</span>
+        <span class="dot dot--cancelada" aria-hidden="true"></span>
+        <span class="row__name row__name--cancelada">Patricia Novelo</span>
+        <span class="row__chev" aria-hidden="true">›</span>
+      </a>
+
+      <a class="row row--compact" href="#">
+        <span class="row__time">17:00</span>
+        <span class="dot dot--confirmada" aria-hidden="true"></span>
+        <span class="row__name">Ramón Balam</span>
+        <span class="row__chev" aria-hidden="true">›</span>
+      </a>
+
+      <!-- Cabecera pegajosa: hermana de sus filas, no las envuelve. -->
+      <div class="dayhead">
+        <a href="#">22 de agosto</a>
+        <span>sábado</span>
+      </div>
+
+      <a class="row row--compact" href="#">
+        <span class="row__time">09:00</span>
+        <span class="dot dot--confirmada" aria-hidden="true"></span>
+        <span class="row__name">Guadalupe Mena</span>
+        <span class="row__chev" aria-hidden="true">›</span>
+      </a>
+
+      <a class="row row--compact" href="#">
+        <span class="row__time">10:00</span>
+        <span class="dot dot--agendada" aria-hidden="true"></span>
+        <span class="row__name">Ramón Balam</span>
+        <span class="row__chev" aria-hidden="true">›</span>
+      </a>
+  </div>
+
+  <!-- ═══ BARRA INFERIOR ═══ -->
+  <div class="bottombar">
+    <button type="button" class="cta"><span aria-hidden="true" style="font-size:20px">＋</span>Nueva cita</button>
+  </div>
+</div>
+</body>
+</html>

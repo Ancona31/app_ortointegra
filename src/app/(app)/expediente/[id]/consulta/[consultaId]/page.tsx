@@ -1,17 +1,17 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Paciente, Consulta, MedicoInfo } from '@/types'
 import { parseISO, format } from 'date-fns'
 import { generateDocFileName } from '@/lib/patientUtils'
 import { es } from 'date-fns/locale'
-import { ArrowLeft, Printer, Stethoscope, Plus, Loader2, FileText, Lock, PenLine, Sparkles } from 'lucide-react'
+import { ArrowLeft, Printer, Stethoscope, Plus, Loader2, Lock, PenLine, Sparkles, Eye } from 'lucide-react'
 import Link from 'next/link'
-import ReactMarkdown from 'react-markdown'
 import { useAuditAccess } from '@/hooks/useAudit'
 import { buildNotaRenderData } from '@/lib/notaRenderData'
+import CuerpoNota from '@/components/expediente/CuerpoNota'
 import { generarPdf } from '@/lib/mobileShare'
 
 type Addendum = {
@@ -19,18 +19,6 @@ type Addendum = {
   contenido: string
   medico_nombre: string
   created_at: string
-}
-
-// Mismo patrón que ModalConsultas: muestra el primer diagnóstico (CIE-10 ·
-// descripción) y cae al motivo_consulta si la consulta no tiene diagnóstico.
-function diagnosticoTexto(c: Consulta): string {
-  const primero = c.diagnosticos?.[0]
-  if (primero?.descripcion) {
-    return primero.codigo_cie10
-      ? `${primero.codigo_cie10} · ${primero.descripcion}`
-      : primero.descripcion
-  }
-  return c.motivo_consulta || 'Consulta sin detalles'
 }
 
 export default function ConsultaDetallePage() {
@@ -71,6 +59,31 @@ export default function ConsultaDetallePage() {
   const [guardandoAddendum, setGuardandoAddendum] = useState(false)
   const [error, setError] = useState('')
   const [imprimiendo, setImprimiendo] = useState(false)
+  const [pdfBlob, setPdfBlob] = useState<Blob | null>(null)
+
+  /**
+   * El botón no abre el PDF: se convierte en el enlace que lo abre.
+   *
+   * `generarPdf` lo abría él mismo al terminar, después del refresco del perfil
+   * médico, el fetch del logo, los imports dinámicos y el render. Para entonces
+   * la activación transitoria del gesto ya estaba consumida y Safari bloqueaba
+   * la apertura — en silencio en iOS y en la PWA. En una nota duele más que en
+   * un documento: la reimpresión no se persiste, así que si no se abre no queda
+   * en ninguna lista donde ir a buscarla.
+   *
+   * Con el href ya resuelto, entre el toque y la navegación no hay asincronía.
+   * Mismo criterio que ModalDocumentoGenerado, duplicado a propósito.
+   */
+  const pdfUrl = useMemo(() => (pdfBlob ? URL.createObjectURL(pdfBlob) : null), [pdfBlob])
+
+  useEffect(() => {
+    if (!pdfUrl) return
+    return () => {
+      // 60s de gracia: si el médico ya lo abrió, el visor tiene su copia
+      // interna y revocar es seguro.
+      setTimeout(() => URL.revokeObjectURL(pdfUrl), 60000)
+    }
+  }, [pdfUrl])
 
   useEffect(() => {
     // Perfil médico — best-effort
@@ -85,6 +98,15 @@ export default function ConsultaDetallePage() {
       .then(data => setAddendums(data.addendums ?? []))
       .catch(() => {})
   }, [consultaId])
+
+  /* ⚠️ UNA SOLA FUENTE PARA LA PANTALLA Y PARA EL PDF. Antes esto se armaba
+     dentro de `imprimir()` y la pantalla pintaba el cuerpo por su cuenta con
+     ReactMarkdown, así que el papel y la pantalla podían discrepar. Ahora los
+     dos leen este mismo objeto. */
+  const notaRenderData = useMemo(() => {
+    if (!consulta || !paciente) return null
+    return buildNotaRenderData({ origen: 'consulta', consulta, paciente, addendums, medicoVivo: medicoInfo })
+  }, [consulta, paciente, addendums, medicoInfo])
 
   async function guardarAddendum() {
     if (!addendumTexto.trim()) { setError('El addendum no puede estar vacío'); return }
@@ -108,6 +130,9 @@ export default function ConsultaDetallePage() {
     setAddendums(prev => [...prev, data.addendum])
     setAddendumTexto('')
     setShowAddendum(false)
+    // El PDF ya generado no lleva este addendum: se descarta para que el botón
+    // vuelva a "Imprimir" en lugar de ofrecer un enlace a un documento viejo.
+    setPdfBlob(null)
   }
 
   async function imprimir() {
@@ -125,20 +150,19 @@ export default function ConsultaDetallePage() {
         if (medico) medicoVivo = medico
       } catch { /* sin red: conservar medicoInfo del estado */ }
 
-      const notaRenderData = buildNotaRenderData({
-        origen: 'consulta',
-        consulta,
-        paciente,
-        addendums,
-        medicoVivo,
-      })
-      await generarPdf({
+      const datos = medicoVivo === medicoInfo && notaRenderData
+        ? notaRenderData
+        : buildNotaRenderData({ origen: 'consulta', consulta, paciente, addendums, medicoVivo })
+      const { blob } = await generarPdf({
         tipo: 'nota_evolucion',
         medico: null,
-        data: { ...notaRenderData },
-        logoUrl: notaRenderData.medico.logoUrl,
-        filename: generateDocFileName(notaRenderData.paciente.nombreCompleto, 'Nota-Evolucion'),
+        data: { ...datos },
+        logoUrl: datos.medico.logoUrl,
+        filename: generateDocFileName(datos.paciente.nombreCompleto, 'Nota-Evolucion'),
+        entregar: false,
       })
+
+      setPdfBlob(blob)
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error('[ConsultaDetalle] imprimir falló:', err)
@@ -190,15 +214,29 @@ export default function ConsultaDetallePage() {
           <span className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-400 bg-slate-50 border border-slate-200 rounded-lg">
             <Lock size={12} /> Nota sellada
           </span>
-          <button
-            onClick={imprimir}
-            disabled={imprimiendo}
-            className="flex items-center gap-2 px-4 py-2 border-2 border-[#1a3a5c] text-[#1a3a5c] rounded-lg text-sm font-medium hover:bg-[#1a3a5c] hover:text-white transition-colors disabled:opacity-50"
-          >
-            {imprimiendo
-              ? <><Loader2 size={16} className="animate-spin" /> Generando...</>
-              : <><Printer size={16} /> Imprimir</>}
-          </button>
+          {/* El enlace se queda hasta que se agregue un addendum (que invalida
+              el PDF) o se recargue la página: si el médico cierra la pestaña
+              del visor por error, puede volver a abrirla sin regenerar. */}
+          {pdfUrl ? (
+            <a
+              href={pdfUrl}
+              target="_blank"
+              rel="noopener"
+              className="flex items-center gap-2 px-4 py-2 bg-[#1a3a5c] border-2 border-[#1a3a5c] text-white rounded-lg text-sm font-medium hover:bg-[#0f2540] transition-colors"
+            >
+              <Eye size={16} /> Abrir PDF
+            </a>
+          ) : (
+            <button
+              onClick={imprimir}
+              disabled={imprimiendo}
+              className="flex items-center gap-2 px-4 py-2 border-2 border-[#1a3a5c] text-[#1a3a5c] rounded-lg text-sm font-medium hover:bg-[#1a3a5c] hover:text-white transition-colors disabled:opacity-50"
+            >
+              {imprimiendo
+                ? <><Loader2 size={16} className="animate-spin" /> Generando...</>
+                : <><Printer size={16} /> Imprimir</>}
+            </button>
+          )}
         </div>
       </div>
 
@@ -206,55 +244,21 @@ export default function ConsultaDetallePage() {
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">{error}</div>
       )}
 
-      {/* Contenido de la nota — inmutable */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-5">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pb-5 border-b border-slate-100">
-          <div>
-            <span className="text-xs text-slate-400 block mb-1">Diagnóstico</span>
-            <p className="text-sm font-medium text-slate-800">{diagnosticoTexto(consulta)}</p>
-          </div>
-          <div>
-            <span className="text-xs text-slate-400 block mb-1">Próxima cita</span>
-            <p className="text-sm font-medium text-slate-800">{consulta.proxima_cita || '—'}</p>
-          </div>
+      {/* ⚠️ EL CONTENIDO DE LA NOTA LO PONE `CuerpoNota`, QUE ES EL MISMO QUE
+          USA EL PANEL DE LA PESTAÑA CONSULTAS. Aquí vivía una copia: una
+          tarjeta de dos columnas con diagnóstico y próxima cita, el cuerpo
+          renderizado con ReactMarkdown —ni siquiera con el parser de la app, así
+          que las secciones salían sin numerar, sin subtítulo y en el orden del
+          texto— y su propia lista de aclaratorias. Lo que esta página aporta es
+          el CHASIS: la cabecera con retorno, las insignias, el botón de
+          imprimir y el formulario de aclaratoria de aquí abajo. El contenido,
+          no. Si necesitas cambiar cómo se lee una nota, se cambia en
+          `CuerpoNota` y las dos vistas se enteran. */}
+      <div className="bg-[var(--sp-surface)] rounded-[var(--sp-r-card)] border border-[color:var(--sp-line-card)] shadow-[var(--sp-shadow-flat)] px-[var(--sp-5)] py-[var(--sp-5)]">
+        <div className="mx-auto w-full max-w-[620px]">
+          {notaRenderData && <CuerpoNota data={notaRenderData} />}
         </div>
-
-        {consulta.notas_evolucion ? (
-          <div className="prose prose-sm max-w-none
-            prose-headings:text-[#1a3a5c] prose-headings:font-bold prose-headings:text-sm prose-headings:mt-4 prose-headings:mb-1
-            prose-strong:text-[#1a3a5c] prose-strong:font-semibold
-            prose-p:text-slate-700 prose-p:leading-relaxed prose-p:my-1
-            prose-ul:my-1 prose-li:my-0.5 prose-li:text-slate-700
-          ">
-            <ReactMarkdown>{consulta.notas_evolucion}</ReactMarkdown>
-          </div>
-        ) : (
-          <p className="text-slate-400 text-sm">Sin nota de evolución registrada</p>
-        )}
       </div>
-
-      {/* Addendums — notas aclaratorias */}
-      {addendums.length > 0 && (
-        <div className="space-y-3">
-          <h3 className="text-sm font-semibold text-slate-600 flex items-center gap-2">
-            <FileText size={14} /> Notas aclaratorias ({addendums.length})
-          </h3>
-          {addendums.map(a => (
-            <div key={a.id} className="bg-blue-50/50 border border-blue-100 rounded-xl p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-xs font-medium text-[#1e5fa8]">{a.medico_nombre}</span>
-                <span className="text-xs text-slate-400">
-                  {format(parseISO(a.created_at), "dd/MM/yyyy HH:mm", { locale: es })}
-                </span>
-                <span className="flex items-center gap-1 text-[10px] text-slate-400 ml-auto">
-                  <Lock size={9} /> Sellado
-                </span>
-              </div>
-              <p className="text-sm text-slate-700 whitespace-pre-line">{a.contenido}</p>
-            </div>
-          ))}
-        </div>
-      )}
 
       {/* Botón de agregar addendum — siempre visible */}
       {!showAddendum ? (

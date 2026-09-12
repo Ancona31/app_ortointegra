@@ -6,7 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { fechaHoraLocalAInstante, desplazarFecha } from '@/lib/dates'
+import { fechaHoraLocalAInstante, desplazarFecha, TZ_CLINICA } from '@/lib/dates'
 
 const PAGE_SIZE = 20
 
@@ -76,16 +76,32 @@ export async function GET(req: NextRequest) {
   const hastaRaw = searchParams.get('hasta') ?? ''
   let p_fecha_desde: string | null = null
   let p_fecha_hasta: string | null = null
+  // DEUDA CONSCIENTE — `TZ_CLINICA` en las dos conversiones es un apaño.
+  //
+  // `desde` y `hasta` son fechas-solo que el médico eligió en el sheet de
+  // filtros, así que los bordes de la ventana ("el día 1 entero", "hasta
+  // acabar el día 15") son los de SU DISPOSITIVO, no los del Centro. En
+  // Sonora la ventana sale corrida una hora por los dos extremos, y un
+  // paciente creado en la última hora del día cae fuera del filtro.
+  //
+  // No se cableó porque el huso no viaja por el cable: haría falta un campo
+  // nuevo en `ParamsListaExpediente`, mandarlo desde `fetchPacientes.ts` y
+  // validarlo aquí contra `Intl.supportedValuesOf('timeZone')` —un IANA sin
+  // validar no revienta gracias a estos try/catch, pero apagaría el filtro
+  // entero en silencio, que es peor—. Demasiado para un dato que no es una
+  // hora de cita. Se dejó anotado en vez de arreglado (commit B de husos,
+  // agosto de 2026). Hasta ese commit la zona del Centro llegaba sola, por
+  // el valor por defecto de `fechaHoraLocalAInstante`; ahora al menos se ve.
   try {
     if (FECHA_RE.test(desdeRaw)) {
-      p_fecha_desde = fechaHoraLocalAInstante(desdeRaw, '00:00')
+      p_fecha_desde = fechaHoraLocalAInstante(desdeRaw, '00:00', TZ_CLINICA)
     }
   } catch {
     p_fecha_desde = null
   }
   try {
     if (FECHA_RE.test(hastaRaw)) {
-      p_fecha_hasta = fechaHoraLocalAInstante(desplazarFecha(hastaRaw, { dias: 1 }), '00:00')
+      p_fecha_hasta = fechaHoraLocalAInstante(desplazarFecha(hastaRaw, { dias: 1 }), '00:00', TZ_CLINICA)
     }
   } catch {
     p_fecha_hasta = null

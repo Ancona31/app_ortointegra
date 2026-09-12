@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import {
   Home, Stethoscope, Pill, FileText, FlaskConical, ScanLine,
@@ -10,13 +11,19 @@ import {
   TrendingUp, UserPlus,
   Calculator,
 } from 'lucide-react'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { useMenuMovil } from '@/contexts/MenuMovilContext'
 import { useRouter } from 'next/navigation'
 import { useProfile, clearProfileCache } from '@/hooks/useProfile'
 import ConsultorioActivoSelector from '@/components/sidebar/ConsultorioActivoSelector'
+import ConsultaRapidaModal from '@/components/launcher/ConsultaRapidaModal'
+/* Sólo el tipo: `import type` se borra al compilar, así que la tabla de los
+   ocho formatos no entra en el bundle del menú. */
+import type { TipoDocumento } from '@/components/documentos/SelectorTipoDocumento'
 import { canManageClinica } from '@/lib/permissions'
 import { componerNombreMedicoCompleto } from '@/lib/nombreMedico'
 import { useClinica } from '@/hooks/useClinica'
+import { CLAVE_CONFIG } from '@/lib/configApp'
 import { useTheme } from '@/components/layout/ThemeProvider'
 import { useAuth } from '@/lib/auth-context'
 import { useSubscriptionGate } from '@/components/billing/SubscriptionGateProvider'
@@ -24,13 +31,31 @@ import { mutate } from 'swr'
 
 // Fase 8.2: hrefs que abren features de pago. Si la suscripción está
 // bloqueada, el click muestra el BloqueoFeatureModal en vez de navegar.
-// Cubre los 8 documentos del navDoctor y "Nuevo paciente" del navSecretaria.
-const BLOCKED_LINK_PREFIXES = ['/documentos?tipo=']
+// Cubre "Nuevo paciente" del navSecretaria.
+//
+// ⚠️ AQUÍ ESTUVO `BLOCKED_LINK_PREFIXES = ['/documentos?tipo=']`, Y NO SE HA
+// PERDIDO EL BLOQUEO DE LOS OCHO DOCUMENTOS: se mudó al `kind: 'doc'` de abajo.
+// Esas entradas dejaron de tener href al pasar a abrir el buscador de paciente,
+// así que un prefijo de url ya no podía reconocerlas. Todo `doc` es de pago por
+// definición, que es más difícil de romper que casar una cadena.
 const BLOCKED_EXACT = new Set(['/pacientes/nuevo'])
 
 function isBlockedHref(href: string): boolean {
-  if (BLOCKED_EXACT.has(href)) return true
-  return BLOCKED_LINK_PREFIXES.some((p) => href.startsWith(p))
+  return BLOCKED_EXACT.has(href)
+}
+
+/**
+ * El paciente que el médico tiene abierto ahora mismo, leído de la ruta.
+ *
+ * Se exige la forma de uuid y no «lo que haya después de /expediente/» porque
+ * ese hueco también lo ocupan rutas que no son un paciente; con un segmento
+ * cualquiera se navegaría a un expediente inexistente en vez de caer al
+ * buscador, que es la degradación correcta.
+ */
+const RUTA_PACIENTE = /^\/expediente\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:\/|$)/i
+
+function pacienteDeLaRuta(pathname: string): string | null {
+  return RUTA_PACIENTE.exec(pathname)?.[1] ?? null
 }
 
 /* ─── Tipos ───────────────────────────────────────────────── */
@@ -42,6 +67,37 @@ type NavLeaf = {
   icon: React.ElementType
   badge?: string
   disabled?: boolean
+  /**
+   * Apaga la precarga de este enlace.
+   *
+   * ⚠️ LA DECISIÓN VIVE AQUÍ, EN LOS DATOS DE NAVEGACIÓN, Y NO EN EL JSX DE
+   * ABAJO, PORQUE ES UNA DECISIÓN DE PRODUCTO: «¿esto lo va a pulsar de verdad
+   * quien está trabajando?». Al lado de la etiqueta y del icono se puede
+   * contestar; a treinta líneas de distancia, entre `className`es, no.
+   *
+   * QUÉ CUESTA UN ENLACE PRECARGADO, medido en local con build de producción:
+   * los `<Link>` de este menú están TODOS en el viewport desde el primer render
+   * en escritorio —la barra es fija—, así que se precargan todos a la vez, en
+   * competencia con lo que la página esté pidiendo de verdad. Y en Next 16 un
+   * prefetch no es UNA petición: la caché de segmentos pide el árbol de rutas y
+   * luego los segmentos que falten, todos a la misma URL con distinto `?_rsc=`.
+   * Una ruta dinámica de `(app)` sale por dos; una estática prerenderizada, por
+   * cinco. Cargando `/ayuda` eran 14 peticiones RSC antes de esta tanda.
+   *
+   * QUÉ SE PIERDE AL APAGARLO: la transición instantánea. Al pulsar, la ruta se
+   * pide en ese momento y se ve el esqueleto de `(app)/loading.tsx` — que existe
+   * y está cuidado — en vez de aparecer ya pintada. En un destino que se pulsa
+   * una vez al día eso no se nota; en uno que se pulsa cada cinco minutos, sí.
+   * Ése es el criterio, y por eso `/dashboard` y `/agenda` se quedan con
+   * precarga y los tres de abajo no.
+   *
+   * ⚠️ LOS HIJOS DE UN GRUPO NO NECESITAN ESTO Y NO SE LES PONE. Sólo se
+   * renderizan con el grupo desplegado (`expanded`), o sea que su precarga ya
+   * está condicionada a un gesto que ES una señal de intención: quien abre
+   * «Documentos» va a pulsar un documento. Ponerles `sinPrefetch` les quitaría
+   * la instantaneidad justo donde se la han ganado.
+   */
+  sinPrefetch?: boolean
 }
 
 type NavGroup = {
@@ -50,22 +106,43 @@ type NavGroup = {
   label: string
   icon: React.ElementType
   matchPaths?: string[]   // rutas que activan el grupo aunque no sean hijas directas
-  children: NavLeaf[]
+  children: (NavLeaf | NavDoc)[]
+}
+
+/**
+ * Entrada del menú que NO es un destino: abre el buscador de paciente y, con el
+ * paciente elegido, entra a su formulario. No lleva href porque la url no existe
+ * hasta que hay paciente — es la misma forma que «Nueva consulta» del dashboard.
+ */
+type NavDoc = {
+  kind: 'doc'
+  tipo: TipoDocumento
+  label: string
+  icon: React.ElementType
 }
 
 type NavSection = NavLeaf | NavGroup | { kind: 'divider' }
 
 /* ─── Estructura de navegación ────────────────────────────── */
 
-const DOCS_CHILDREN: NavLeaf[] = [
-  { kind: 'leaf', href: '/documentos?tipo=receta',        label: 'Receta médica',          icon: Pill },
-  { kind: 'leaf', href: '/documentos?tipo=lab',           label: 'Solicitud de laboratorio', icon: FlaskConical },
-  { kind: 'leaf', href: '/documentos?tipo=imagen',        label: 'Solicitud de imagen',    icon: ScanLine },
-  { kind: 'leaf', href: '/documentos?tipo=suplementacion',label: 'Plan de suplementación', icon: ClipboardList },
-  { kind: 'leaf', href: '/documentos?tipo=internamiento', label: 'Internamiento',           icon: BedDouble },
-  { kind: 'leaf', href: '/documentos?tipo=escrito',       label: 'Escrito médico',          icon: PenLine },
-  { kind: 'leaf', href: '/documentos?tipo=consentimiento',label: 'Consentimiento',          icon: ShieldCheck },
-  { kind: 'leaf', href: '/documentos?tipo=honorarios',    label: 'Honorarios / Cotización', icon: Receipt },
+/* ⚠️ LOS OCHO DEJARON DE SER ENLACES A `/documentos?tipo=…`, y el cambio es el
+   ítem 1 del pulido de flujo. Antes llevaban a una pantalla intermedia donde
+   había que elegir paciente; ahora abren el mismo buscador que «Nueva consulta»
+   y entran a `/expediente/[id]/documentos?tipo=…`, que es la ruta que registra
+   el acceso en `audit_log` y que hereda el guarda de rol de su layout padre.
+   Con un paciente ya abierto se saltan el buscador — ver `abrirDocumento`.
+
+   La `key` es el tipo y no una url: es lo único que los distingue, y es
+   exactamente lo que viaja en la query del destino. */
+const DOCS_CHILDREN: NavDoc[] = [
+  { kind: 'doc', tipo: 'receta',         label: 'Receta médica',             icon: Pill },
+  { kind: 'doc', tipo: 'lab',            label: 'Solicitud de laboratorio',  icon: FlaskConical },
+  { kind: 'doc', tipo: 'imagen',         label: 'Solicitud de imagenología', icon: ScanLine },
+  { kind: 'doc', tipo: 'suplementacion', label: 'Plan de suplementación',    icon: ClipboardList },
+  { kind: 'doc', tipo: 'internamiento',  label: 'Internamiento',             icon: BedDouble },
+  { kind: 'doc', tipo: 'escrito',        label: 'Escrito médico',            icon: PenLine },
+  { kind: 'doc', tipo: 'consentimiento', label: 'Consentimiento',            icon: ShieldCheck },
+  { kind: 'doc', tipo: 'honorarios',     label: 'Honorarios / Cotización',   icon: Receipt },
 ]
 
 function navDoctor(isAdmin: boolean): NavSection[] {
@@ -78,6 +155,10 @@ function navDoctor(isAdmin: boolean): NavSection[] {
   ]
 
   return [
+    /* ⚠️ `/dashboard` y `/agenda` CONSERVAN la precarga a propósito: son los dos
+       destinos que se pulsan de verdad durante la jornada, y son los únicos.
+       Si vienes a apagar más enlaces, empieza por medir; si vienes a
+       encenderlos todos otra vez, lee la nota de `sinPrefetch` arriba. */
     { kind: 'leaf', href: '/dashboard', label: 'Dashboard', icon: Home },
     {
       kind: 'group', key: 'pacientes', label: 'Pacientes', icon: Stethoscope,
@@ -88,7 +169,9 @@ function navDoctor(isAdmin: boolean): NavSection[] {
       ],
     },
     { kind: 'leaf', href: '/agenda', label: 'Agenda', icon: CalendarDays },
-    { kind: 'leaf', href: '/calculadoras-clinicas', label: 'Calculadoras', icon: Calculator },
+    /* Sin precarga: nadie sale de la agenda o del expediente a las calculadoras.
+       Se entra a propósito y desde el menú, con una intención propia. */
+    { kind: 'leaf', href: '/calculadoras-clinicas', label: 'Calculadoras', icon: Calculator, sinPrefetch: true },
     {
       kind: 'group', key: 'documentos', label: 'Documentos', icon: FileText,
       matchPaths: ['/documentos'],
@@ -100,8 +183,12 @@ function navDoctor(isAdmin: boolean): NavSection[] {
       children: adminChildren,
     },
     { kind: 'divider' },
-    { kind: 'leaf', href: '/perfil',  label: 'Mi perfil', icon: UserCircle },
-    { kind: 'leaf', href: '/ayuda',   label: 'Ayuda',     icon: HelpCircle },
+    /* Sin precarga: destino de configuración, no de flujo clínico. Se visita
+       al dar de alta la firma o el logo, no durante la consulta. */
+    { kind: 'leaf', href: '/perfil',  label: 'Mi perfil', icon: UserCircle, sinPrefetch: true },
+    /* Sin precarga: por definición se abre cuando algo no se entiende, que es
+       raro y nunca urgente. */
+    { kind: 'leaf', href: '/ayuda',   label: 'Ayuda',     icon: HelpCircle, sinPrefetch: true },
   ]
 }
 
@@ -130,7 +217,11 @@ function leafIsActive(href: string, pathname: string) {
 
 function groupHasActiveChild(group: NavGroup, pathname: string) {
   if (group.matchPaths?.some(p => pathname.startsWith(p))) return true
-  return group.children.some(c => leafIsActive(c.href, pathname))
+  /* Los `doc` no cuentan: son acciones, no sitios, así que nunca son «donde
+     estás». Con uno abierto quien resalta es el grupo Pacientes, porque el
+     destino vive bajo `/expediente/[id]/` — igual que hoy al entrar a los
+     documentos de un paciente desde su tarjeta del dashboard. */
+  return group.children.some(c => c.kind === 'leaf' && leafIsActive(c.href, pathname))
 }
 
 
@@ -140,7 +231,15 @@ function groupHasActiveChild(group: NavGroup, pathname: string) {
 export default function Sidebar() {
   const pathname = usePathname()
   const router   = useRouter()
-  const [mobileOpen, setMobileOpen] = useState(false)
+  /* ⚠️ EL ABIERTO/CERRADO DEL MENÚ MÓVIL YA NO VIVE AQUÍ, y el cambio es del
+     bloque 6. Aquí estuvo como `useState` local, que bastaba mientras el único
+     botón que lo tocaba era el de este mismo componente. Dejó de bastar cuando
+     la agenda móvil metió su hamburguesa DENTRO de su banda azul: ese botón está
+     en un componente HERMANO de éste y no podía alcanzar un estado local.
+     El comportamiento no cambia en ninguna página: el botón flotante de abajo
+     sigue existiendo igual y sigue siendo quien lo abre en las otras veinte. Lo
+     único que cambia es DÓNDE se guarda el booleano. Ver `MenuMovilContext`. */
+  const { abierto: mobileOpen, alternar: alternarMenu, cerrar: cerrarMenu } = useMenuMovil()
   const [expanded, setExpanded]     = useState<Set<string>>(new Set())
   const { profile }  = useProfile()
   const { nombreDisplay, subtitulo, logoUrl } = useClinica()
@@ -149,6 +248,29 @@ export default function Sidebar() {
   const { state: subState, openBloqueoModal } = useSubscriptionGate()
 
   const isAdmin = canManageClinica(profile)
+
+  /* El formato que espera paciente. No-nulo = buscador abierto; un solo estado
+     porque el modal no tiene nada que enseñar sin formato. Se guarda la entrada
+     ENTERA y no sólo su `tipo` porque el buscador enseña también su rótulo. */
+  const [docPendiente, setDocPendiente] = useState<NavDoc | null>(null)
+
+  /**
+   * Un formato del menú, pulsado.
+   *
+   * ⚠️ CON UN PACIENTE YA ABIERTO NO SE PREGUNTA POR ÉL. Pedirle que busque a
+   * quien tiene delante en la pantalla sería peor que la pantalla intermedia
+   * que esto viene a quitar, así que dentro de `/expediente/[id]/…` el menú
+   * navega directo. Fuera, abre el buscador.
+   */
+  function abrirDocumento(doc: NavDoc) {
+    close()
+    const abierto = pacienteDeLaRuta(pathname)
+    if (abierto) {
+      router.push(`/expediente/${abierto}/documentos?tipo=${doc.tipo}`)
+      return
+    }
+    setDocPendiente(doc)
+  }
 
   const sections: NavSection[] =
     profile?.role === 'secretaria'
@@ -174,6 +296,34 @@ export default function Sidebar() {
     })
   }
 
+  /* ⚠ LA CACHÉ DE CONFIGURACIÓN SE VACÍA AL DESMONTARSE ESTE SIDEBAR, NO DENTRO
+     DE `handleLogout`, Y NO ES UN CAPRICHO DE ESTILO.
+
+     `CLAVE_CONFIG` no es solo la clave de `useClinica`: desde que los cuatro
+     endpoints se consolidaron en /api/me/config es TAMBIÉN la de
+     `useConsultorios`. Vaciarla dentro del handler la vaciaba mientras el árbol
+     de (app) seguía montado —`router.push` no desmonta nada de forma síncrona—,
+     y `PrimerConsultorioModal` cuelga de `ConsultorioActivoProvider`
+     ((app)/layout.tsx:54), o sea que estaba en pantalla justo en ese instante.
+     `internalMutate` de SWR fija `data` y limpia `error`, pero NUNCA toca
+     `isLoading`: el hook quedaba en `consultorios: []` con `isLoading: false`
+     —un «no tienes ninguno» falso y estable, no un destello— y el modal de
+     configuración salía en CADA cierre de sesión, sin salida por Escape.
+
+     El desmontaje ES la señal de que la navegación ya sacó al usuario del árbol:
+     cuando esta limpieza corre, el modal ya no existe. El ref evita que un
+     desmontaje ajeno al logout (StrictMode en desarrollo, por ejemplo) borre la
+     caché de una sesión viva. */
+  const cerrandoSesionRef = useRef(false)
+
+  useEffect(() => {
+    return () => {
+      if (cerrandoSesionRef.current) {
+        mutate(CLAVE_CONFIG, null, { revalidate: false })
+      }
+    }
+  }, [])
+
   async function handleLogout() {
     // NOM-024: registrar logout antes de cerrar sesión
     fetch('/api/auth/audit-login', {
@@ -185,20 +335,88 @@ export default function Sidebar() {
     // stopMirrorEngine → clearMirror → cookies sb-* → sessionStorage → SDK signOut
     await signOut()
     clearProfileCache()
-    await mutate('/api/me/clinica', null, { revalidate: false })
+    // Marca para el cleanup de arriba; la caché del agregado —clínica,
+    // consultorios, horario y médicos de la sesión que cierra— se vacía cuando
+    // este componente se desmonte, no ahora.
+    cerrandoSesionRef.current = true
     router.push('/login')
     router.refresh()
   }
 
-  function close() { setMobileOpen(false) }
+  function close() { cerrarMenu() }
 
   /* ── Render ─────────────────────────────────────────────── */
   return (
     <>
-      {/* Mobile toggle */}
+      {/* Mobile toggle.
+
+          ⚠️ SE ESCONDE EN LA AGENDA, Y SÓLO AHÍ. Esa página sustituye el
+          encabezado móvil por una banda azul con su propio hamburguesa dentro
+          (bloque 6), así que este botón flotante quedaría duplicado y encima
+          por delante de la banda. En las otras veinte páginas no cambia nada.
+          El estado es el mismo en los dos sitios —vive en `MenuMovilContext`—,
+          o sea que el de la banda abre este mismo menú.
+
+          ⚠️⚠️ QUIEN LO ESCONDE ES CSS, NO ESTE COMPONENTE, Y EL CRITERIO SE
+          INVIRTIÓ A SABIENDAS. La regla es `body:has(.ag-banda-movil)
+          .menu-flotante` y vive en `globals.css`, pegada a la banda.
+
+          AQUÍ ESTUVO ESCRITO LO CONTRARIO, y conviene saber por qué dejó de
+          valer antes de reponerlo. Decía: «se decide por `pathname` y no por
+          CSS; la alternativa se descartó porque `:has()` degrada a "la regla no
+          casa", y aquí eso significa DOS hamburguesas encima de la banda, que es
+          peor que el defecto que viene a evitar».
+
+          El razonamiento comparaba mal los dos lados porque no se sabía cuál era
+          el defecto que se evitaba. Con `pathname`, el botón se esconde en el
+          PRIMER render, mientras que la banda no aparece hasta que corre el
+          efecto que descubre el ancho (`isMobile` arranca en `false` en
+          `agenda/page.tsx`). En esa ventana no hay hamburguesa NINGUNO: ni éste
+          ni el de la banda. Y no es sólo un parpadeo — si un efecto de
+          `AgendaPage` anterior a ése lanza, React ABORTA el resto de la lista de
+          efectos de ese fiber (`commitHookEffectListMount` en
+          `react-dom-client`: el `try` envuelve el bucle entero y el `catch` está
+          fuera), así que el de `isMobile` no corre nunca. La página cae al
+          `ErrorBoundary`, que en `(app)/layout.tsx` sólo envuelve a `{children}`
+          y deja vivo a este `Sidebar` — con el botón escondido y `pathname`
+          todavía en `/agenda`. Teléfono sin ninguna vía al menú, y sin
+          navegación en la tarjeta de error. Callejón sin salida, no fealdad.
+
+          Así que la comparación real no es «una hamburguesa contra dos», es
+          «dos contra CERO»:
+            · `:has()` no soportado o la banda ausente → la regla no casa → este
+              botón SE QUEDA. Dos hamburguesas un instante en el peor caso, y el
+              menú siempre alcanzable.
+            · `pathname` → el botón se va aunque no haya banda que lo sustituya.
+          El fallo de CSS degrada hacia el lado seguro y el de JS hacia el
+          peligroso. Por eso se cambió.
+
+          Y la condición ya no es un ESPEJO de la banda: es la banda. La regla
+          pregunta por el nodo real en el DOM, así que no puede desincronizarse de
+          él como sí podía una copia de la ruta o una bandera en un contexto.
+
+          `:has()` lo soporta Chrome 105+, y esta misma hoja ya lo usa para el
+          relleno de esta página (`main > div:has(.agenda-fc)`).
+
+          SI VUELVES A PONER `pathname` AQUÍ, relee esto: reintroduce el cero. */}
+      {/* ⚠️ EL `top` LLEVA EL ÁREA SEGURA SUMADA (bloque 6 · paso 10). Con
+          `viewport-fit=cover` los 16 px de `top-4` se miden desde el borde
+          FÍSICO, y una muesca de iPhone mide entre 47 y 59: este botón nacía
+          DEBAJO DEL RELOJ, medio tapado y con la mitad de su área táctil comida
+          por el sistema. Es el único acceso al menú en las veinte páginas que no
+          son la agenda, así que no es un detalle estético.
+          El 16 de diseño no se toca: se suma. En escritorio y en una pestaña
+          normal el `env()` vale 0 y esto es exactamente el `top-4` de siempre.
+          ⚠️ TIENE QUE QUEDAR POR ENCIMA DE LA FRANJA NAVY de `globals.css`
+          (`body::before`, z-index 45) y por eso conserva su `z-50`. Si alguien
+          sube la franja por encima de 50, este botón desaparece. */}
       <button
-        onClick={() => setMobileOpen(!mobileOpen)}
-        className="lg:hidden fixed top-4 left-4 z-50 text-white p-2 rounded-lg shadow-lg"
+        onClick={alternarMenu}
+        /* `menu-flotante` NO PINTA NADA: es el asidero de la regla de arriba. Su
+           única razón de ser es que el selector no cuelgue de las utilidades de
+           Tailwind, que cambian con cualquier retoque visual. No la quites al
+           reordenar clases. */
+        className="menu-flotante lg:hidden fixed top-[calc(1rem+env(safe-area-inset-top,0px))] left-4 z-50 text-white p-2 rounded-lg shadow-lg"
         style={{ background: 'var(--cp)' }}
       >
         {mobileOpen ? <X size={20} /> : <Menu size={20} />}
@@ -210,23 +428,56 @@ export default function Sidebar() {
       )}
 
       {/* Sidebar */}
+      {/* ⚠️ EL RELLENO VERTICAL ES DEL PASO 10. El `inset-y-0` llega a los dos
+          bordes físicos desde que el viewport es `viewport-fit=cover`, así que
+          sin esto el logo y el nombre del médico se meten bajo la barra de
+          estado y, abajo, «Cerrar sesión» y el aviso de privacidad quedan bajo
+          la barra de gestos — con el dedo compitiendo con el gesto de volver al
+          inicio, que es la peor mezcla posible para un botón de salir.
+          ⚠️ VA COMO RELLENO Y NO COMO `inset`, a propósito: el navy tiene que
+          seguir llegando a los cuatro bordes —un menú que se queda corto arriba
+          enseña una franja del fondo de la página y se lee como un panel mal
+          puesto—. El relleno encoge el CONTENIDO y deja el fondo entero.
+          ⚠️ ES EL MISMO NAVY QUE LA FRANJA de `globals.css`, así que en la app
+          instalada el menú y la barra de estado son una sola superficie.
+          ⚠️ SE APAGA EN `lg`: en escritorio no hay áreas seguras que valgan y
+          los `env()` ya devuelven 0, pero dejarlo explícito evita que un futuro
+          navegador de escritorio con insets meta relleno donde no toca. */}
+      {/* ⚠️ EL FONDO SALE DEL TOKEN Y YA NO DE LA FÓRMULA EN LÍNEA, Y ES UN
+          ARREGLO, NO UN REFACTOR. Aquí estuvo escrito
+          `hsl(from var(--cp, #1a3a5c) h s 20%)` a pelo, sin respaldo: en un
+          navegador sin sintaxis de color relativa esa declaración se descarta al
+          parsear, y como el `className` de abajo NO trae ninguna clase de fondo,
+          el menú se quedaba TRANSPARENTE con su texto blanco encima de la
+          página. `--ag-navy` resuelve a esa misma fórmula y trae el respaldo
+          literal en `globals.css`, así que un navegador viejo pinta el navy de
+          fábrica en vez de nada.
+          ⚠️ NO LO DEVUELVAS A LA FÓRMULA EN LÍNEA. Además del respaldo, el token
+          es lo que impide que el menú y la banda móvil de la agenda diverjan:
+          eran dos copias de la misma cuenta y ahora es una sola. */}
       <aside
         style={{
-          background: 'hsl(from var(--cp, #1a3a5c) h s 20%)',
+          background: 'var(--ag-navy)',
         }}
         className={`
           fixed inset-y-0 left-0 w-64 text-white z-40 flex flex-col
+          pt-[env(safe-area-inset-top,0px)] pb-[env(safe-area-inset-bottom,0px)] lg:pt-0 lg:pb-0
           transition-transform duration-300
           ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
         `}
       >
         {/* Logo + nombre */}
         <div className="flex flex-col items-center gap-2.5 px-5 py-5 border-b border-white/10">
-          <div className="w-14 h-14 bg-white rounded-full flex items-center justify-center overflow-hidden shadow-lg flex-shrink-0">
+          <div className="w-14 h-14 bg-[var(--ag-navy-logo-bg)] rounded-full flex items-center justify-center overflow-hidden shadow-lg flex-shrink-0">
+            {/* 112 = 2× los 56 px del círculo, para pantallas de alta densidad.
+                Las dos ramas pasan por next/image: el host de Supabase Storage
+                está declarado en `remotePatterns` de next.config.ts. */}
             {logoUrl?.startsWith('https://') ? (
-              <img src={logoUrl} alt="Logo" className="w-full h-full object-contain" />
+              <Image src={logoUrl} alt="Logo" width={112} height={112}
+                className="w-full h-full object-contain" />
             ) : (
-              <img src="/logo.png" alt="Logo" className="w-full h-full object-contain"
+              <Image src="/logo.png" alt="Logo" width={112} height={112} priority
+                className="w-full h-full object-contain"
                 onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
             )}
           </div>
@@ -234,7 +485,7 @@ export default function Sidebar() {
             <p className="font-semibold text-sm leading-tight">
               {nombreDisplay ?? (componerNombreMedicoCompleto(profile ?? {}) || '')}
             </p>
-            <p className="text-[11px] opacity-40 mt-0.5 leading-tight">
+            <p className="text-[11px] text-[var(--ag-navy-ink-soft)] mt-0.5 leading-tight">
               {profile?.role === 'secretaria'
                 ? 'Asistente Médico/a'
                 : subtitulo ?? profile?.especialidad ?? ''}
@@ -271,9 +522,16 @@ export default function Sidebar() {
                 )
               }
               return (
+                /* ⚠️ `undefined` Y NO `true` EN LA RAMA QUE SÍ PRECARGA. El valor
+                   por defecto de `prefetch` es `auto`, que decide según la ruta:
+                   una estática se precarga entera y una dinámica sólo hasta el
+                   `loading.tsx` más cercano. Pasarle `true` FORZARÍA la ruta
+                   completa también en las dinámicas — o sea que "no tocar nada"
+                   se escribe `undefined`, no `true`. */
                 <Link key={section.href} href={section.href} onClick={close}
+                  prefetch={section.sinPrefetch ? false : undefined}
                   className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all duration-150 ${
-                    active ? 'bg-white text-[var(--cp)] shadow-sm' : 'text-white/55 hover:bg-white/10 hover:text-white'
+                    active ? 'bg-white text-[var(--ag-navy-ink-activo)] shadow-sm' : 'text-[var(--ag-navy-ink)] hover:bg-white/10 hover:text-white'
                   }`}
                 >
                   <section.icon size={16} className={active ? 'opacity-100' : 'opacity-70'} />
@@ -296,8 +554,8 @@ onClick={() => toggleGroup(section.key)}
 hasActive && !isOpen
                           ? 'text-white bg-white/10'
                           : isOpen
-                            ? 'text-white/80'
-                            : 'text-white/55 hover:bg-white/10 hover:text-white'
+                            ? 'text-[var(--ag-navy-ink-strong)]'
+                            : 'text-[var(--ag-navy-ink)] hover:bg-white/10 hover:text-white'
                     }`}
                   >
                     <section.icon size={16} className={hasActive ? 'opacity-100' : 'opacity-70'} />
@@ -310,6 +568,36 @@ hasActive && !isOpen
 {isOpen && (
                     <div className="mt-0.5 ml-3 pl-3 border-l border-white/10 space-y-0.5">
                       {section.children.map(child => {
+                        /* Misma pinta que un enlace y distinto elemento: un
+                           `doc` abre el buscador de paciente, así que es un
+                           botón. La clase inactiva se comparte para que la
+                           columna no se vea de dos maneras. */
+                        const claseHijo = 'flex items-center gap-2 px-2.5 py-2 rounded-lg text-[12px] font-medium transition-all duration-150'
+                        const claseInactiva = 'text-[var(--ag-navy-ink-dim)] hover:bg-white/10 hover:text-white'
+
+                        if (child.kind === 'doc') {
+                          return (
+                            <button
+                              key={child.tipo}
+                              type="button"
+                              onClick={() => {
+                                /* Todo formato es de pago: sin suscripción, el
+                                   menú enseña el bloqueo y no busca a nadie. */
+                                if (subState.isBlocked) {
+                                  close()
+                                  openBloqueoModal()
+                                  return
+                                }
+                                abrirDocumento(child)
+                              }}
+                              className={`w-full text-left ${claseHijo} ${claseInactiva}`}
+                            >
+                              <child.icon size={13} className="opacity-60" />
+                              {child.label}
+                            </button>
+                          )
+                        }
+
                         const childActive = leafIsActive(child.href, pathname)
                         const childBlocked = subState.isBlocked && isBlockedHref(child.href)
                         return (
@@ -321,8 +609,8 @@ hasActive && !isOpen
                                 openBloqueoModal()
                               }
                             }}
-                            className={`flex items-center gap-2 px-2.5 py-2 rounded-lg text-[12px] font-medium transition-all duration-150 ${
-                              childActive ? 'bg-white text-[var(--cp)] shadow-sm' : 'text-white/50 hover:bg-white/10 hover:text-white'
+                            className={`${claseHijo} ${
+                              childActive ? 'bg-white text-[var(--ag-navy-ink-activo)] shadow-sm' : claseInactiva
                             }`}
                           >
                             <child.icon size={13} className={childActive ? 'opacity-100' : 'opacity-60'} />
@@ -343,21 +631,74 @@ hasActive && !isOpen
         {/* Footer */}
         <div className="px-3 py-3 border-t border-white/10 space-y-0.5">
           <button onClick={toggle}
-            className="w-full flex items-center gap-2.5 px-3 py-2.5 text-[13px] text-white/50 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-150">
+            className="w-full flex items-center gap-2.5 px-3 py-2.5 text-[13px] text-[var(--ag-navy-ink-dim)] hover:text-white hover:bg-white/10 rounded-xl transition-all duration-150">
             {dark ? <Sun size={14} /> : <Moon size={14} />}
             {dark ? 'Modo claro' : 'Modo oscuro'}
           </button>
           <button onClick={handleLogout}
-            className="w-full flex items-center gap-2.5 px-3 py-2.5 text-[13px] text-white/50 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-150">
+            className="w-full flex items-center gap-2.5 px-3 py-2.5 text-[13px] text-[var(--ag-navy-ink-dim)] hover:text-white hover:bg-white/10 rounded-xl transition-all duration-150">
             <LogOut size={14} />
             Cerrar sesión
           </button>
-          <Link href="/privacidad" target="_blank"
-            className="block text-center text-[10px] text-white/40 hover:text-white/70 transition-colors pt-2">
+          {/* ⚠️ EL `prefetch={false}` VA ATADO AL `target="_blank"`, Y SI ALGUIEN
+              QUITA EL SEGUNDO TIENE QUE REPLANTEARSE EL PRIMERO.
+
+              Sin él, este enlace pedía `/privacidad` CINCO VECES en cada carga de
+              cada página de `(app)` —no sólo en la agenda—, y las cinco eran
+              imposibles de aprovechar: con `target="_blank"` el clic abre un
+              contexto de navegación nuevo, que hace CARGA COMPLETA DE DOCUMENTO y
+              no consulta la caché del router de cliente. Lo precargado no se
+              consume nunca, en ningún escenario.
+
+              ⚠️ POR QUÉ CINCO Y NO UNA, que es lo que despista al medirlo. En Next
+              16 un prefetch no es una petición: la caché de segmentos pide primero
+              el árbol de rutas y después CADA SEGMENTO que falte
+              (`segment-cache/cache.js:990` y `:1296`), y en modo servidor todas
+              VAN A LA MISMA URL, distinguiéndose sólo por cabecera — en el registro
+              de red se ven como el mismo path con distinto `?_rsc=`.
+
+              Y `/privacidad` es la cara cara: está PRERENDERIZADA (sale en
+              `prerender-manifest.json`), y una ruta estática se precarga ENTERA,
+              árbol más todos sus segmentos. Las rutas de `(app)` son dinámicas y se
+              quedan en dos —árbol y poco más—, porque el prefetch se detiene en el
+              `loading.tsx` del grupo.
+
+              Medido en local con build de producción, cargando /ayuda: 14
+              peticiones RSC antes, 9 después. Las 5 que desaparecen son todas de
+              esta línea. */}
+          {/* ⚠️ `rel="noopener noreferrer"` ES OBLIGATORIO CON `target="_blank"`, y
+              faltaba: sin `noopener` la pestaña abierta recibe `window.opener` y
+              puede reescribir la URL de la de origen — que es una pantalla de la
+              aplicación con sesión abierta. Los navegadores lo aplican por defecto
+              desde 2021, así que hoy no es explotable; se escribe igual porque la
+              garantía no puede depender de la versión del navegador, y porque el
+              enlace gemelo de `app/login/page.tsx` ya lo declara obligatorio en un
+              comentario. Que dos sitios digan lo contrario sobre la misma regla es
+              lo que de verdad se arregla aquí. */}
+          <Link href="/privacidad" target="_blank" rel="noopener noreferrer" prefetch={false}
+            className="block text-center text-[10px] text-[var(--ag-navy-ink-soft)] hover:text-white/70 transition-colors pt-2">
             Aviso de Privacidad
           </Link>
         </div>
       </aside>
+
+      {/* Buscador de paciente de los ocho formatos.
+          ⚠️ VA FUERA DEL `<aside>`, y no es colocación estética: el aside es
+          `fixed w-64 overflow-y-auto`, o sea que recortaría por ambos lados un
+          hijo que se pinta a pantalla completa. Aquí es hermano suyo, con el
+          `z-[9998]` propio del modal por encima del `z-40` del menú y del
+          `z-50` del hamburguesa.
+          Cerrado devuelve `null`, así que en las veinte páginas donde nadie lo
+          abre no cuesta un nodo. */}
+      <ConsultaRapidaModal
+        open={docPendiente !== null}
+        onClose={() => setDocPendiente(null)}
+        /* `docPendiente` no puede ser null aquí: esta función sólo se llama con
+           el modal abierto, y abierto es justamente `docPendiente !== null`. */
+        destino={id => `/expediente/${id}/documentos?tipo=${docPendiente?.tipo}`}
+        titulo={docPendiente?.label}
+        rotuloCrear="Crear y continuar"
+      />
     </>
   )
 }
