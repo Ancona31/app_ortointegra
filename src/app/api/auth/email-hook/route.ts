@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
 import { createHmac } from 'crypto'
 import { logger } from '@/lib/logger'
+import { escapeHtml } from '@/lib/htmlEscape'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -62,7 +63,12 @@ export async function POST(req: NextRequest) {
     const body = JSON.parse(rawBody)
     const { user, email_data } = body
     const email: string = user?.email
-    const nombre: string = user?.user_metadata?.nombre || 'Doctor'
+    // `typeof` y no `||`: esto sale de JSON.parse, así que `nombre` puede no ser
+    // una cadena. Con un objeto, el `||` lo dejaba pasar y escapeHtml reventaría
+    // — y una excepción aquí es un correo de recuperación no enviado.
+    const nombre: string = typeof user?.user_metadata?.nombre === 'string'
+      ? user.user_metadata.nombre
+      : 'Doctor'
     const actionType: string = email_data?.email_action_type
     const tokenHash: string = email_data?.token_hash
     const redirectTo: string = email_data?.redirect_to || 'https://www.spinus.com.mx/auth/callback'
@@ -149,22 +155,25 @@ function emailBase(titulo: string, contenido: string): string {
 }
 
 function boton(url: string, texto: string): string {
+  // `texto` no se escapa: los tres sitios que llaman pasan un literal. `url` sí,
+  // por la razón de siempre — que la garantía no dependa de su procedencia.
+  const urlSegura = escapeHtml(url)
   return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:28px auto;">
     <tr><td align="center" style="background-color:#1e5fa8;padding:14px 36px;">
-      <!--[if mso]><v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" href="${url}" style="height:48px;width:220px;v-text-anchor:middle;" arcsize="20%" fillcolor="#1e5fa8" stroke="f"><v:textbox inset="0,0,0,0"><center style="color:#ffffff;font-family:Segoe UI,Helvetica,sans-serif;font-size:15px;font-weight:600;"><![endif]-->
-      <a href="${url}" style="display:inline-block;background-color:#1e5fa8;color:#ffffff;text-decoration:none;padding:14px 36px;font-weight:600;font-size:15px;font-family:Segoe UI,Helvetica,Arial,sans-serif;">
+      <!--[if mso]><v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" href="${urlSegura}" style="height:48px;width:220px;v-text-anchor:middle;" arcsize="20%" fillcolor="#1e5fa8" stroke="f"><v:textbox inset="0,0,0,0"><center style="color:#ffffff;font-family:Segoe UI,Helvetica,sans-serif;font-size:15px;font-weight:600;"><![endif]-->
+      <a href="${urlSegura}" style="display:inline-block;background-color:#1e5fa8;color:#ffffff;text-decoration:none;padding:14px 36px;font-weight:600;font-size:15px;font-family:Segoe UI,Helvetica,Arial,sans-serif;">
         ${texto}
       </a>
       <!--[if mso]></center></v:textbox></v:roundrect><![endif]-->
     </td></tr>
   </table>
   <p style="color:#64748b;font-size:12px;text-align:center;">Si el botón no funciona, copia este enlace:<br>
-  <span style="color:#1e5fa8;word-break:break-all;">${url}</span></p>`
+  <span style="color:#1e5fa8;word-break:break-all;">${urlSegura}</span></p>`
 }
 
 function emailConfirmacion(nombre: string, url: string): string {
   return emailBase('Confirma tu cuenta', `
-    <p style="color:#334155;font-size:15px;margin-top:0;">Hola <strong>${nombre}</strong>,</p>
+    <p style="color:#334155;font-size:15px;margin-top:0;">Hola <strong>${escapeHtml(nombre)}</strong>,</p>
     <p style="color:#475569;font-size:14px;line-height:1.6;">Tu cuenta de Spinus ha sido creada. Confirma tu correo electrónico para comenzar.</p>
     ${boton(url, 'Confirmar mi cuenta')}
   `)
@@ -172,7 +181,7 @@ function emailConfirmacion(nombre: string, url: string): string {
 
 function emailRecuperacion(nombre: string, url: string): string {
   return emailBase('Recupera tu contraseña', `
-    <p style="color:#334155;font-size:15px;margin-top:0;">Hola <strong>${nombre}</strong>,</p>
+    <p style="color:#334155;font-size:15px;margin-top:0;">Hola <strong>${escapeHtml(nombre)}</strong>,</p>
     <p style="color:#475569;font-size:14px;line-height:1.6;">Recibimos una solicitud para restablecer la contraseña de tu cuenta.</p>
     ${boton(url, 'Restablecer contraseña')}
   `)
@@ -180,7 +189,7 @@ function emailRecuperacion(nombre: string, url: string): string {
 
 function emailMagicLink(nombre: string, url: string): string {
   return emailBase('Tu enlace de acceso', `
-    <p style="color:#334155;font-size:15px;margin-top:0;">Hola <strong>${nombre}</strong>,</p>
+    <p style="color:#334155;font-size:15px;margin-top:0;">Hola <strong>${escapeHtml(nombre)}</strong>,</p>
     <p style="color:#475569;font-size:14px;line-height:1.6;">Usa el botón a continuación para acceder a tu cuenta.</p>
     ${boton(url, 'Acceder a Spinus')}
   `)

@@ -5,6 +5,7 @@ import { PLAN_LIMITS } from '@/lib/plans'
 import { checkAuthRateLimit } from '@/lib/rateLimit'
 import { logAudit } from '@/lib/audit'
 import { RegistroSchema } from '@/lib/perfil/schemas'
+import { escapeHtml } from '@/lib/htmlEscape'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -112,6 +113,14 @@ export async function POST(req: NextRequest) {
 }
 
 function generarEmailConfirmacion(nombre: string, confirmUrl: string): string {
+  /* ⚠️ `nombre` LO ESCRIBE QUIEN SE REGISTRA Y ESTE CORREO LO FIRMA DKIM CON
+     mail.spinus.com.mx. Sin escapar, un registro con marcado en `nombres`
+     produce un mensaje válido a ojos del receptor cuyo cuerpo y enlaces elige
+     el atacante, y el destinatario también. La url se escapa igual aunque hoy
+     la construya el servidor: la garantía no debe depender de que nadie cambie
+     de dónde sale. */
+  const nombreSeguro = escapeHtml(nombre)
+  const urlSegura = escapeHtml(confirmUrl)
   return `<!DOCTYPE html>
 <html lang="es" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
 <head>
@@ -129,19 +138,19 @@ function generarEmailConfirmacion(nombre: string, confirmUrl: string): string {
           <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;">Confirma tu cuenta</h1>
         </td></tr>
         <tr><td style="padding:32px;">
-          <p style="color:#334155;font-size:15px;margin-top:0;">Hola <strong>${nombre}</strong>,</p>
+          <p style="color:#334155;font-size:15px;margin-top:0;">Hola <strong>${nombreSeguro}</strong>,</p>
           <p style="color:#475569;font-size:14px;line-height:1.6;">Tu cuenta de Spinus ha sido creada. Confirma tu correo electrónico para comenzar a usar el sistema.</p>
           <table role="presentation" cellpadding="0" cellspacing="0" style="margin:28px auto;">
             <tr><td align="center" style="background-color:#1e5fa8;padding:14px 36px;">
-              <!--[if mso]><v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" href="${confirmUrl}" style="height:48px;width:220px;v-text-anchor:middle;" arcsize="20%" fillcolor="#1e5fa8" stroke="f"><v:textbox inset="0,0,0,0"><center style="color:#ffffff;font-family:Segoe UI,Helvetica,sans-serif;font-size:15px;font-weight:600;"><![endif]-->
-              <a href="${confirmUrl}" style="display:inline-block;background-color:#1e5fa8;color:#ffffff;text-decoration:none;padding:14px 36px;font-weight:600;font-size:15px;font-family:Segoe UI,Helvetica,Arial,sans-serif;">
+              <!--[if mso]><v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" href="${urlSegura}" style="height:48px;width:220px;v-text-anchor:middle;" arcsize="20%" fillcolor="#1e5fa8" stroke="f"><v:textbox inset="0,0,0,0"><center style="color:#ffffff;font-family:Segoe UI,Helvetica,sans-serif;font-size:15px;font-weight:600;"><![endif]-->
+              <a href="${urlSegura}" style="display:inline-block;background-color:#1e5fa8;color:#ffffff;text-decoration:none;padding:14px 36px;font-weight:600;font-size:15px;font-family:Segoe UI,Helvetica,Arial,sans-serif;">
                 Confirmar mi cuenta
               </a>
               <!--[if mso]></center></v:textbox></v:roundrect><![endif]-->
             </td></tr>
           </table>
           <p style="color:#64748b;font-size:12px;text-align:center;">Si el botón no funciona, copia este enlace:<br>
-          <span style="color:#1e5fa8;word-break:break-all;">${confirmUrl}</span></p>
+          <span style="color:#1e5fa8;word-break:break-all;">${urlSegura}</span></p>
           <p style="color:#94a3b8;font-size:12px;border-top:1px solid #f1f5f9;padding-top:16px;margin-top:24px;">
             Si no creaste esta cuenta, ignora este mensaje. El enlace expira en 24 horas.
           </p>

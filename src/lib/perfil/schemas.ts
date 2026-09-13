@@ -36,12 +36,31 @@ export type PerfilMedicoUpdateInput = z.infer<typeof PerfilMedicoUpdateSchema>
  * crear-usuario y registro CREAN el perfil: nombres + apellido_paterno son
  * OBLIGATORIOS. apellido_materno nullable (vacío → null). NUNCA escriben `nombre`.
  */
+/* El máximo lo pone el schema porque la base no lo pone: las tres columnas de
+   `profiles` son `text` (20260912190416_remote_schema.sql:570-572), sin bound.
+   Sin esto una fila de registro —ruta pública, sin sesión— admite un nombre de
+   kilobytes. 80 cubre nombres compuestos con holgura y por encima de eso el
+   nombre ya no cabe en la maqueta del correo, que es una tabla de 540px.
+   ⚠️ VA AQUÍ, EN LA FORMA COMPARTIDA, así que acota TAMBIÉN a CrearUsuarioSchema
+   (el alta de admin), no solo al registro. Es deliberado: las dos vías escriben
+   las mismas columnas sin límite. */
+const MAX_NOMBRE = 80
+
 const nombreAltaShape = {
-  nombres: z.string().trim().min(1, 'El nombre es obligatorio'),
-  apellido_paterno: z.string().trim().min(1, 'El apellido paterno es obligatorio'),
+  nombres: z
+    .string()
+    .trim()
+    .min(1, 'El nombre es obligatorio')
+    .max(MAX_NOMBRE, `El nombre no puede exceder ${MAX_NOMBRE} caracteres`),
+  apellido_paterno: z
+    .string()
+    .trim()
+    .min(1, 'El apellido paterno es obligatorio')
+    .max(MAX_NOMBRE, `El apellido paterno no puede exceder ${MAX_NOMBRE} caracteres`),
   apellido_materno: z
     .string()
     .trim()
+    .max(MAX_NOMBRE, `El apellido materno no puede exceder ${MAX_NOMBRE} caracteres`)
     .nullable()
     .optional()
     .transform((v) => (v ? v : null)),
