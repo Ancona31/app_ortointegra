@@ -26,6 +26,7 @@ import { useClinica } from '@/hooks/useClinica'
 import { CLAVE_CONFIG } from '@/lib/configApp'
 import { useTheme } from '@/components/layout/ThemeProvider'
 import { useAuth } from '@/lib/auth-context'
+import { useToast } from '@/components/ui/Toast'
 import { useSubscriptionGate } from '@/components/billing/SubscriptionGateProvider'
 import { mutate } from 'swr'
 
@@ -245,6 +246,7 @@ export default function Sidebar() {
   const { nombreDisplay, subtitulo, logoUrl } = useClinica()
   const { dark, toggle } = useTheme()
   const { signOut } = useAuth()
+  const toast = useToast()
   const { state: subState, openBloqueoModal } = useSubscriptionGate()
 
   const isAdmin = canManageClinica(profile)
@@ -325,15 +327,31 @@ export default function Sidebar() {
   }, [])
 
   async function handleLogout() {
-    // NOM-024: registrar logout antes de cerrar sesión
-    fetch('/api/auth/audit-login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'logout' }),
-    }).catch(() => {})
-    // signOut() del AuthContext es la ÚNICA fuente de limpieza:
-    // stopMirrorEngine → clearMirror → cookies sb-* → sessionStorage → SDK signOut
-    await signOut()
+    /* NOM-024: registrar el logout antes de cerrar sesión, y CON await.
+       ⚠️ EL `await` ES LA CORRECCIÓN, NO UN ADORNO. Esta ruta identifica al
+       usuario por sus cookies sb-*, o sea por lo mismo que signOut() borra: sin
+       esperar, las dos cosas competían y si el cierre ganaba la carrera el
+       registro se perdía. Si el registro falla por su cuenta, el cierre sigue —
+       quedarse dentro por no poder escribir en el log sería peor. */
+    try {
+      await fetch('/api/auth/audit-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'logout' }),
+      })
+    } catch { /* silent */ }
+
+    /* signOut() del AuthContext es la ÚNICA fuente de limpieza —cookies sb-*,
+       sessionStorage, meta— y LANZA si el servidor de Auth no confirma la
+       revocación. Nada de lo de abajo puede correr en ese caso: sin revocación
+       no se limpia local ni se navega. El usuario se queda dentro, entero. */
+    try {
+      await signOut()
+    } catch {
+      toast.error('No se pudo cerrar la sesión. Revisa tu conexión e inténtalo de nuevo.')
+      return
+    }
+
     clearProfileCache()
     // Marca para el cleanup de arriba; la caché del agregado —clínica,
     // consultorios, horario y médicos de la sesión que cierra— se vacía cuando
