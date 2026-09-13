@@ -15,6 +15,7 @@
  */
 
 import { createAdminClient } from '@/lib/supabase/admin'
+import { logger } from '@/lib/logger'
 
 export type AuditAccion =
   // Lecturas de datos clínicos
@@ -158,7 +159,7 @@ interface AuditParams {
 export async function logAudit(params: AuditParams): Promise<void> {
   try {
     const admin = createAdminClient()
-    await admin.from('audit_log').insert({
+    const { error } = await admin.from('audit_log').insert({
       user_id: params.userId ?? 'anonymous',
       accion: params.accion,
       tabla: params.tabla ?? null,
@@ -166,8 +167,21 @@ export async function logAudit(params: AuditParams): Promise<void> {
       ip: params.ip ?? null,
       descripcion: params.descripcion ?? null,
     })
-  } catch {
-    // Audit failure is silent — never block the main operation
+    /* El insert NO lanza cuando Postgres lo rechaza: supabase-js devuelve el
+       fallo en `error`. Sin este bloque el caso más probable —constraint,
+       permisos, columna— desaparecía en silencio. No lanza ni bloquea: solo
+       deja rastro.
+
+       ⚠️ NO AÑADAS AQUÍ EL CONTENIDO DE LA FILA, y en particular nunca
+       `params.descripcion`: en `login_fallido` lleva el correo de un médico, y
+       los logs de Vercel no tienen plazo de borrado. Solo la acción y el
+       código/mensaje del error. */
+    if (error) {
+      logger.error('audit', `fallo al registrar ${params.accion}: ${error.code} ${error.message}`)
+    }
+  } catch (e) {
+    // Excepción de red o al construir el cliente. Tampoco lanza ni bloquea.
+    logger.error('audit', `excepción al registrar ${params.accion}: ${e instanceof Error ? e.message : String(e)}`)
   }
 }
 

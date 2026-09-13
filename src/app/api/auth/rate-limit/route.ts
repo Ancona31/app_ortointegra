@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { checkAuthRateLimit } from '@/lib/rateLimit'
+import { checkAuthRateLimit, checkIpRateLimit } from '@/lib/rateLimit'
 import { logAudit } from '@/lib/audit'
 
 /**
@@ -22,9 +22,25 @@ const LIMITS: Record<string, { max: number; windowMin: number }> = {
   recovery:    { max: 3, windowMin: 60 },
 }
 
+/* Bloque B1. Mismo criterio que /api/auth/audit-login: el email llega de
+   internet sin sesión y acaba en audit_log (inmutable) y en la clave de
+   ip_rate_limits. Duplicado a propósito: aquel archivo se elimina entero. */
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+function emailValido(v: unknown): v is string {
+  return typeof v === 'string' && v.length <= 254 && EMAIL_RE.test(v)
+}
+
 export async function POST(req: NextRequest) {
   const { action, email } = await req.json()
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
+
+  // Bloque B1: tope por IP para toda la ruta, antes de cualquier escritura
+  // (incluidos los logAudit de abajo, que son irreversibles). Va antes de
+  // validar `action` porque la inundación con acción basura es el vector.
+  // 300/h: guarda anti-inundación, no regulador de uso — una clínica entera
+  // comparte una sola IP pública.
+  const limitado = await checkIpRateLimit(ip, 'auth-rate-limit', 300)
+  if (limitado) return limitado
 
   if (!action || !LIMITS[action]) {
     return NextResponse.json({ error: 'Acción inválida' }, { status: 400 })
@@ -34,7 +50,9 @@ export async function POST(req: NextRequest) {
 
   // Para login: verificar ambos límites (por email Y por IP)
   if (action === 'login_email') {
-    if (!email) return NextResponse.json({ error: 'Email requerido' }, { status: 400 })
+    if (!emailValido(email)) {
+      return NextResponse.json({ error: 'Email inválido' }, { status: 400 })
+    }
 
     const emailCheck = await checkAuthRateLimit(email.toLowerCase(), 'login_email', config.max, config.windowMin)
     if (emailCheck.blocked) {
@@ -84,7 +102,9 @@ export async function POST(req: NextRequest) {
 
   // Para recovery: solo por email
   if (action === 'recovery') {
-    if (!email) return NextResponse.json({ error: 'Email requerido' }, { status: 400 })
+    if (!emailValido(email)) {
+      return NextResponse.json({ error: 'Email inválido' }, { status: 400 })
+    }
     const check = await checkAuthRateLimit(email.toLowerCase(), 'recovery', config.max, config.windowMin)
     if (check.blocked) {
       // NO revelar que el rate limit se activó — siempre mostrar el mismo mensaje
