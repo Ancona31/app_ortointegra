@@ -52,10 +52,18 @@ export async function POST(req: NextRequest) {
   const clavePareja = `${email}|${ip}`
 
   // Comprobar SIN consumir: un login correcto no debe gastar presupuesto.
-  const previoPareja = await checkAuthRateLimit(clavePareja, 'login', 5, 15, { registrar: false })
-  const previoEmail = await checkAuthRateLimit(email, 'login_email_global', 20, 60, {
-    registrar: false,
-  })
+  /* ⚠️ EN PARALELO, Y ES SEGURO HACERLO: `checkAuthRateLimit` no comparte
+     estado entre llamadas. Cada una construye su propio cliente con
+     `createAdminClient()` —fábrica, no singleton (`lib/supabase/admin.ts:3`)—
+     y el resto es local a la invocación. Las dos claves son distintas por
+     construcción, así que ninguna lee ni escribe lo de la otra.
+     No dependen una de otra: la segunda no necesita el resultado de la
+     primera, sólo los necesita el `if` de abajo. En serie eran dos viajes a
+     Supabase; ahora es uno. */
+  const [previoPareja, previoEmail] = await Promise.all([
+    checkAuthRateLimit(clavePareja, 'login', 5, 15, { registrar: false }),
+    checkAuthRateLimit(email, 'login_email_global', 20, 60, { registrar: false }),
+  ])
 
   if (previoPareja.blocked || previoEmail.blocked) {
     /* ⚠️ EL AUDIT DICE CUÁL DE LOS DOS DISPARÓ, y no es un detalle cosmético:
@@ -85,12 +93,29 @@ export async function POST(req: NextRequest) {
   const { data, error } = await supabase.auth.signInWithPassword({ email, password })
 
   if (error || !data.user) {
-    // Ahora SÍ se consume, y en LOS DOS: se cuentan fallos, no intentos.
-    await checkAuthRateLimit(clavePareja, 'login', 5, 15, { registrar: true })
-    await checkAuthRateLimit(email, 'login_email_global', 20, 60, { registrar: true })
-    // ⚠️ CON `await`: la respuesta no sale hasta que la fila está escrita. Es la
-    // diferencia con el `fetch` sin esperar que hacía la pantalla.
-    await logLogin({ email, success: false, ip, userAgent })
+    /* Ahora SÍ se consume, y en LOS DOS: se cuentan fallos, no intentos.
+
+       ⚠️ EN PARALELO PERO CON `await`, Y ESA DISTINCIÓN ES LA RAZÓN DE SER DEL
+       BLOQUE. La respuesta NO sale hasta que las tres han terminado — es la
+       diferencia con el `fetch` sin esperar que hacía la pantalla. Convertir
+       esto en fire-and-forget ahorraría el viaje entero y devolvería el
+       registro de accesos justo al estado que B4 vino a arreglar: una fila de
+       `login_fallido` que se pierde si el proceso muere antes de escribirla.
+       La NOM-024 exige que ese rastro sea fiable. Lo que se quitó es la espera
+       EN SERIE entre las tres, no la espera.
+
+       `Promise.all` y NO `allSettled`, a propósito: si una escritura rechaza
+       queremos enterarnos —la excepción sale de `POST` y Next responde 500—.
+       `allSettled` se la tragaría en silencio y dejaría un fallo sin contar, o
+       un acceso sin registrar, sin que nadie lo sepa.
+
+       Son independientes entre sí: dos claves distintas de `ip_rate_limits` y
+       una fila de `audit_log`. Ninguna lee lo que otra escribe. */
+    await Promise.all([
+      checkAuthRateLimit(clavePareja, 'login', 5, 15, { registrar: true }),
+      checkAuthRateLimit(email, 'login_email_global', 20, 60, { registrar: true }),
+      logLogin({ email, success: false, ip, userAgent }),
+    ])
     // Mensaje genérico a propósito: no distingue «no existe» de «contraseña mal».
     return NextResponse.json(
       { error: 'Credenciales incorrectas. Verifica tu correo y contraseña.' },

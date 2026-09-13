@@ -46,9 +46,35 @@ import { Loader2, Eye, EyeOff, AlertTriangle, AlertCircle } from 'lucide-react'
    archivo lleva `focus:outline-none`: se lo comería.
 
    ⚠️ FUERA DE SCOPE EN ESTA TANDA, NO TOCAR SIN PLAN PROPIO: el blindaje
-   offline del `useEffect`, el rate-limit, el `signOut` previo, el
-   `window.location.href` final y el audit fire-and-forget de NOM-024. Lo
-   único que se operó de la lógica son los cinco defectos listados abajo. */
+   offline del `useEffect`, el `signOut` previo y el `window.location.href`
+   final. Lo único que se operó de la lógica son los cinco defectos listados
+   abajo.
+
+   ⚠️ ACTUALIZACIÓN (bloque B4) — DOS DE LOS INTOCABLES DE ARRIBA YA NO VIVEN
+   AQUÍ. El rate-limit y el audit de NOM-024 se movieron a `/api/auth/login`,
+   y con ellos se fue el «fire-and-forget»: las dos filas —`login_fallido` y
+   `login_exitoso`— se escriben en el servidor CON `await`, antes de que salga
+   la respuesta. Eran tres `fetch` que el cliente DECIDÍA si hacer; ahora no
+   hay nada que decidir. El camino viejo sigue en el `else` de `handleSubmit`
+   sólo mientras viva la bandera `LOGIN_SERVIDOR` de abajo. */
+
+/* ═══ BANDERA DE REVERSIÓN — TEMPORAL, SE RETIRA EN UNAS SEMANAS ═══════════
+   Decide si el envío va por `/api/auth/login` (servidor) o por el camino viejo
+   de `handleSubmit` (el `fetch` a /api/auth/rate-limit + `signInWithPassword`
+   del SDK + los dos `audit-login`), que se conserva ÍNTEGRO justamente para
+   esto.
+   Por defecto —variable ausente— usa la RUTA NUEVA. Sólo '0' o 'false' la
+   apagan. Es una red para el despliegue: si en producción aparece algo que
+   local no vio, se apaga sin tocar el código.
+   ⚠️ APAGARLA EXIGE REDESPLIEGUE, no sólo cambiar la variable. Las
+   `NEXT_PUBLIC_*` se incrustan en el bundle durante `next build`, así que
+   cambiarla en Vercel no surte efecto hasta un Redeploy (que se dispara desde
+   el panel, sin subir código, pero hay que dispararlo).
+   ⚠️ CADUCA. Cuando se retire, se van con ella el camino viejo entero de
+   `handleSubmit` y las rutas /api/auth/rate-limit y /api/auth/audit-login. */
+const LOGIN_SERVIDOR = !['0', 'false'].includes(
+  (process.env.NEXT_PUBLIC_LOGIN_SERVIDOR ?? '').trim().toLowerCase(),
+)
 
 /* Clase de error DISCRIMINADA — sustituye a `error.includes('expiró')`.
    Ese `includes` decidía si mostrar el enlace de recuperación mirando dentro
@@ -89,19 +115,30 @@ export default function LoginPage() {
        es visible dentro del mismo tick.
 
      ⚠️ POR QUÉ ESTO NO ES UNA MICRO-OPTIMIZACIÓN, y conviene tenerlo escrito
-     antes de que alguien lo revise a la baja: el limitador de intentos inserta
-     una fila por CADA intento RECIBIDO, antes de saber si la contraseña es
-     correcta (`lib/rateLimit.ts:88`, invocado desde la llamada de :130 de este
-     archivo, mientras `signInWithPassword` no corre hasta :161). Un login
-     EXITOSO no descuenta nada: los únicos DELETE de `ip_rate_limits` son la
-     limpieza de filas ya vencidas (`rateLimit.ts:91-97`). El umbral es de 5
-     por email en ventana deslizante de 15 minutos
-     (`api/auth/rate-limit/route.ts:19`, corte en `rateLimit.ts:84`) y el
-     producto NO expone ninguna vía de desbloqueo: solo esperar.
-     Consecuencia aritmética de una ejecución duplicada: el presupuesto real
-     baja de 5 envíos a 2, así que un médico que falla la contraseña dos veces
-     y acierta a la tercera se queda bloqueado 15 minutos CON la contraseña
-     correcta. Por eso el cerrojo va aquí y no en una capa de UI. */
+     antes de que alguien lo revise a la baja: un envío duplicado gasta
+     presupuesto del limitador de intentos, que no se recupera —los únicos
+     DELETE de `ip_rate_limits` son la limpieza de filas ya vencidas
+     (`rateLimit.ts`)— y el producto NO expone ninguna vía de desbloqueo: solo
+     esperar. Por eso el cerrojo va aquí y no en una capa de UI.
+
+     ⚠️ LO CARO DE DUPLICAR DEPENDE DEL CAMINO, y el párrafo que sigue MUERE
+     CON LA BANDERA `LOGIN_SERVIDOR`:
+     · CAMINO VIEJO (bandera apagada) — el limitador inserta una fila por cada
+       intento RECIBIDO, antes de saber si la contraseña es correcta, porque el
+       `fetch` a `/api/auth/rate-limit` corre ANTES que `signInWithPassword`.
+       Umbral de 5 por email en ventana deslizante de 15 minutos
+       (`api/auth/rate-limit/route.ts:19`). Aritmética de la duplicación: el
+       presupuesto real baja de 5 envíos a 2, así que un médico que falla la
+       contraseña dos veces y acierta a la tercera se queda bloqueado 15
+       minutos CON la contraseña correcta.
+     · CAMINO NUEVO (`/api/auth/login`) — ahí se cuentan FALLOS y no intentos:
+       la ruta comprueba los dos límites con `registrar: false` y sólo consume
+       si las credenciales no valen, de modo que un envío correcto duplicado no
+       gasta NADA. Lo que sigue costando es duplicar un envío ERRÓNEO: quema
+       dos fallos de los 5 del límite estricto (email+IP, 15 min) en vez de
+       uno, y otros dos de los 20 del amplio (email, 60 min). Menos brutal que
+       antes, pero sigue siendo presupuesto que no vuelve — el cerrojo se queda
+       cuando la bandera se retire. */
   const submitLockRef = useRef(false)
 
   useEffect(() => {
@@ -172,6 +209,79 @@ export default function LoginPage() {
       // este wrap, el spinner del login quedaba eterno.
       const isBrowserOffline = typeof navigator !== 'undefined' && navigator.onLine === false
 
+      /* ═══ CAMINO NUEVO — UNA SOLA LLAMADA ═════════════════════════════════
+         Sustituye a las TRES de abajo: el `fetch` a /api/auth/rate-limit, el
+         `signInWithPassword` del SDK y los dos `audit-login`. La ruta hace los
+         tres en el servidor, donde el cliente no puede saltárselos: comprueba
+         dos límites sin consumir, autentica, y sólo si falla consume límite y
+         escribe `login_fallido`; si acierta escribe `login_exitoso`.
+         Las cookies de sesión vienen en la respuesta: aquí no hay nada que
+         recoger ni que pasarle al SDK. */
+      if (LOGIN_SERVIDOR) {
+        const supabase = createClient()
+
+        // Cerrar sesión activa antes de iniciar con otra cuenta (igual que abajo).
+        if (sesionActiva) {
+          await supabase.auth.signOut()
+        }
+
+        let res: Response
+        try {
+          res = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password }),
+          })
+        } catch {
+          /* Sin red el POST revienta con TypeError y el Service Worker no lo
+             intercepta (sólo cachea GETs). Sin este `catch` el spinner quedaba
+             eterno — el mismo motivo por el que el camino viejo envuelve su
+             `fetch`. `isBrowserOffline` no evita la llamada aquí: con una sola
+             petición, saltársela sería no iniciar sesión en absoluto. */
+          setLoading(false)
+          setError({
+            kind: 'credenciales',
+            mensaje: 'Credenciales incorrectas. Verifica tu correo y contraseña.',
+          })
+          return
+        }
+
+        if (res.status === 429) {
+          const data: { error?: string } = await res.json().catch(() => ({}))
+          /* El mensaje lo redacta la ruta y NO se reescribe aquí: es la única
+             que sabe cuál de los dos límites saltó, y por tanto si la espera es
+             de 15 minutos (estricto, email+IP) o de 60 (amplio, email). */
+          setLoading(false)
+          setError({
+            kind: 'limite-intentos',
+            mensaje: data.error ?? 'Demasiados intentos fallidos. Espera 15 minutos.',
+          })
+          /* Este `return` sale del handler pero NO se salta el `finally`: el
+             cerrojo se libera igual, que es lo correcto — el usuario tiene que
+             poder reintentar cuando pase la ventana. */
+          return
+        }
+
+        if (!res.ok) {
+          // 401 (credenciales) y 400 (cuerpo inválido) caen aquí con el mismo
+          // mensaje genérico: no distingue «no existe» de «contraseña mal».
+          setLoading(false)
+          setError({
+            kind: 'credenciales',
+            mensaje: 'Credenciales incorrectas. Verifica tu correo y contraseña.',
+          })
+          return
+        }
+
+        sessionStorage.setItem('spinus_active', '1')
+        /* Se marca ANTES de la navegación, por lo mismo que abajo. */
+        navegando = true
+        window.location.href = '/inicio'
+        return
+      }
+
+      /* ═══ CAMINO VIEJO — sólo con la bandera apagada ══════════════════════
+         Se conserva íntegro y se borra entero cuando la bandera caduque. */
       if (!isBrowserOffline) {
         try {
           const rlRes = await fetch('/api/auth/rate-limit', {
@@ -251,8 +361,12 @@ export default function LoginPage() {
     } finally {
       /* ⚠️ EL CAMINO DE ÉXITO ES LA ÚNICA SALIDA QUE NO LIBERA EL CERROJO, Y NO
          ES UN OLVIDO. Tras `window.location.href` el documento se va, pero la
-         navegación NO es instantánea: quedan dos `fetch` de audit en vuelo y la
-         carga del documento nuevo. Si el cerrojo se liberara ahí, el botón
+         navegación NO es instantánea: queda la carga del documento nuevo, y por
+         el camino viejo además dos `fetch` de audit en vuelo — ese inciso muere
+         con la bandera `LOGIN_SERVIDOR`, porque por el camino nuevo el audit ya
+         se escribió en el servidor y no queda ninguno. Lo que no cambia es la
+         conclusión: la navegación sigue sin ser instantánea.
+         Si el cerrojo se liberara ahí, el botón
          volvería a aceptar clics durante ese hueco y reintroduciríamos el
          mismo doble envío que este cambio existe para matar — el gemelo exacto
          del defecto que ya se corrigió moviendo `setLoading(false)` dentro de
@@ -441,7 +555,11 @@ export default function LoginPage() {
                 propósito aunque `role="alert"` ya implique live-assertive:
                 explicitar la región es lo que hace que el comportamiento no
                 dependa de la tabla de mapeo del lector.
-                El enlace de recuperación cuelga del `kind`, no del texto. */}
+                El enlace de recuperación cuelga del `kind`, no del texto, y
+                aparece en DOS de los tres: además del enlace expirado, en
+                `limite-intentos`. Quien falla cinco veces seguidas no se
+                equivocó de tecla — no recuerda su contraseña, y decirle sólo
+                que espere lo deja igual de bloqueado quince minutos después. */}
             {error && (
               <div
                 role="alert"
@@ -451,12 +569,14 @@ export default function LoginPage() {
                 <AlertCircle className="h-4 w-4 shrink-0 text-[var(--lp-danger)]" aria-hidden="true" />
                 <div>
                   <p>{error.mensaje}</p>
-                  {error.kind === 'enlace-expirado' && (
+                  {(error.kind === 'enlace-expirado' || error.kind === 'limite-intentos') && (
                     <Link
                       href="/forgot-password"
                       className="mt-2 inline-block font-semibold underline underline-offset-2 transition-opacity duration-[var(--sp-dur-micro)] hover:opacity-80"
                     >
-                      Solicitar nuevo enlace →
+                      {error.kind === 'enlace-expirado'
+                        ? 'Solicitar nuevo enlace →'
+                        : 'Recuperar contraseña →'}
                     </Link>
                   )}
                 </div>

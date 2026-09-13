@@ -197,7 +197,7 @@ export async function middleware(request: NextRequest) {
     || pathname.startsWith('/offline-setup')
 
   // Rutas API que no requieren sesión (OAuth callbacks, Stripe webhook y Stripe checkout/portal que manejan su propia auth)
-  const publicApiPaths = ['/api/google/callback', '/api/stripe/webhook', '/api/stripe/checkout', '/api/stripe/portal', '/api/auth/registro', '/api/auth/email-hook', '/api/auth/verify-email', '/api/auth/audit-login', '/api/auth/rate-limit']
+  const publicApiPaths = ['/api/google/callback', '/api/stripe/webhook', '/api/stripe/checkout', '/api/stripe/portal', '/api/auth/registro', '/api/auth/email-hook', '/api/auth/verify-email', '/api/auth/audit-login', '/api/auth/rate-limit', '/api/auth/login']
   const isPublicApi = publicApiPaths.some(p => pathname.startsWith(p))
 
   // Si no hay sesión y no está en ruta pública → verificar cookies antes de redirigir.
