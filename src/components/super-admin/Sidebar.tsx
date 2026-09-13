@@ -72,7 +72,7 @@ export default function SuperAdminSidebar(): ReactElement {
       const { error } = await supabase.auth.signOut({ scope: 'global' })
       if (error) throw error
     } catch {
-      setErrorLogout('No se pudo cerrar la sesión. Revisa tu conexión e inténtalo de nuevo.')
+      setErrorLogout('No se pudo cerrar la sesión. Inténtalo de nuevo en unos momentos.')
       return
     }
 

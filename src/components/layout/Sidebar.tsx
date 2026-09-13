@@ -348,7 +348,7 @@ export default function Sidebar() {
     try {
       await signOut()
     } catch {
-      toast.error('No se pudo cerrar la sesión. Revisa tu conexión e inténtalo de nuevo.')
+      toast.error('No se pudo cerrar la sesión. Inténtalo de nuevo en unos momentos.')
       return
     }
 
