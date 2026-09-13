@@ -106,3 +106,19 @@ export const RegistroSchema = z.object({
   tipo: z.enum(['independiente', 'clinica']).default('independiente'),
 })
 export type RegistroInput = z.infer<typeof RegistroSchema>
+
+/**
+ * Login (POST /api/auth/login). Deliberadamente laxo con la contraseña: aquí
+ * solo se exige que VENGA. El mínimo real lo impone GoTrue, y duplicarlo aquí
+ * crearía dos fuentes de verdad que se desincronizan — unificarlo es de otro
+ * bloque. El tope de 254 del correo es el de la RFC 5321, y sirve para que un
+ * cuerpo de kilobytes no llegue a la clave del limitador ni a `audit_log`,
+ * que es inmutable por trigger.
+ */
+export const LoginSchema = z.object({
+  email: z
+    .email('Correo electrónico inválido')
+    .max(254, 'El correo no puede exceder 254 caracteres'),
+  password: z.string().min(1, 'La contraseña es obligatoria'),
+})
+export type LoginInput = z.infer<typeof LoginSchema>
