@@ -34,13 +34,15 @@ import type { Role } from '@/hooks/useProfile'
  * el consultorio. Logo y firma no los exige el criterio: son omitibles y solo
  * se enseñan a quien no los tiene.
  *
- * El paso de CLÍNICA no trae formulario A PROPÓSITO: hoy no existe ninguna ruta
- * que cree una clínica con sesión ya iniciada —el único INSERT vive en el
- * registro, con cliente de servicio— y `profiles.clinica_id` está congelado por
- * el trigger `proteger_columnas_sensibles_profiles`. Quien llega a ese paso hoy
- * es alguien a quien le borraron la clínica, y eso no se arregla con un
- * formulario. El POST llega con la cuarta parte del bloque, cuando el registro
- * se recorte a correo y contraseña.
+ * El paso de CLÍNICA tiene DOS CARAS, y la que se enseña la decide
+ * `gate.requiereSoporte` (o sea: si el médico es dueño o invitado).
+ *   · DUEÑO → formulario. Desde que el registro se recortó a correo y
+ *     contraseña, todo médico nuevo llega sin clínica y la crea aquí, con
+ *     `POST /api/me/clinica`.
+ *   · INVITADO → panel de soporte, sin formulario y sin «Continuar». No puede
+ *     crear ninguna: ya pertenecía a una y se la borraron
+ *     (`profiles_clinica_id_fkey` es ON DELETE SET NULL). Darle un formulario
+ *     sería darle algo que tiene prohibido usar.
  */
 
 type Paso = 'datos' | 'cedulas' | 'clinica' | 'consultorio' | 'logo' | 'firma'
@@ -114,6 +116,13 @@ export default function OnboardingModal({
   const [cedulaProfesional, setCedulaProfesional] = useState('')
   const [cedulaEspecialidad, setCedulaEspecialidad] = useState('')
   const [errorCedula, setErrorCedula] = useState('')
+
+  /* Paso clínica (solo el dueño). `clinicaCreada` juega el mismo papel que
+     `consultorioCreado`: el POST no es idempotente, así que retroceder y
+     avanzar otra vez crearía una segunda clínica — y la ruta, que solo admite
+     la PRIMERA, respondería 409. */
+  const [nombreClinica, setNombreClinica] = useState('')
+  const [clinicaCreada, setClinicaCreada] = useState(false)
 
   // Paso consultorio (tabla `consultorios`, no las columnas viejas de profiles)
   const [nombreCons, setNombreCons] = useState('')
@@ -190,6 +199,33 @@ export default function OnboardingModal({
       return true
     } catch {
       toast.error('Error al guardar. Intenta de nuevo.')
+      return false
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  async function crearClinica(): Promise<boolean> {
+    if (clinicaCreada) return true
+    if (!nombreClinica.trim()) { toast.error('El nombre de la clínica es obligatorio'); return false }
+
+    setGuardando(true)
+    try {
+      const res = await fetch('/api/me/clinica', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nombre: nombreClinica.trim() }),
+      })
+      if (!res.ok) {
+        const datos = await res.json().catch(() => ({}))
+        toast.error(datos.error ?? 'No se pudo crear la clínica. Inténtalo de nuevo.')
+        return false
+      }
+      setClinicaCreada(true)
+      await mutate('/api/me/perfil-medico')
+      return true
+    } catch {
+      toast.error('No se pudo crear la clínica: revisa tu conexión e inténtalo de nuevo.')
       return false
     } finally {
       setGuardando(false)
@@ -324,6 +360,7 @@ export default function OnboardingModal({
     let ok = true
     if (paso === 'datos') ok = await guardarDatos()
     else if (paso === 'cedulas') ok = await guardarCedulas()
+    else if (paso === 'clinica') ok = await crearClinica()
     else if (paso === 'consultorio') ok = await crearConsultorio()
     else if (paso === 'logo') ok = await subirLogo()
     if (ok) siguiente()
@@ -340,6 +377,9 @@ export default function OnboardingModal({
   if (pasos.length === 0) return null
 
   const requiereNombreCorto = nombreCons.trim().length > 12
+  /* El invitado sin clínica: única cara del flujo que no se puede resolver
+     desde aquí, así que no lleva «Continuar». */
+  const esPanelSoporte = paso === 'clinica' && gate.requiereSoporte
   const esOmitible = OMITIBLES.includes(paso)
   const esUltimo = indice === pasos.length - 1
 
@@ -352,11 +392,12 @@ export default function OnboardingModal({
       subtitle="Necesario para registrar pacientes y emitir documentos"
       maxWidth="max-w-lg"
       footer={
-        /* ⚠️ EL PIE SE PINTA TAMBIÉN EN EL PASO DE CLÍNICA, solo que sin
-           «Continuar»: ese paso no tiene salida hacia adelante —no hay nada que
-           el médico pueda escribir—, pero puede NO ser el primero (el gate los
-           pide en orden: datos, clínica, consultorio), y sin pie se quedaba sin
-           el «Atrás» y por tanto sin poder corregir lo anterior. */
+        /* ⚠️ «CONTINUAR» DESAPARECE EN EL PANEL DE SOPORTE, NO EN EL PASO DE
+           CLÍNICA ENTERO. El dueño escribe el nombre y avanza; el invitado no
+           tiene salida hacia adelante porque no hay nada que pueda escribir.
+           El «Atrás» se pinta en los dos: el paso puede NO ser el primero (el
+           gate los pide en orden: datos, clínica, consultorio) y sin pie el
+           invitado se quedaba sin poder corregir lo anterior. */
         <div className="flex items-center justify-between gap-3 px-5 py-3.5">
           <div>
             {indice > 0 && (
@@ -370,7 +411,7 @@ export default function OnboardingModal({
             )}
           </div>
 
-          {paso !== 'clinica' && (
+          {!esPanelSoporte && (
             <div className="flex items-center gap-3">
               {esOmitible ? (
                 <button
@@ -536,16 +577,15 @@ export default function OnboardingModal({
           </div>
         )}
 
-        {paso === 'clinica' && (
+        {esPanelSoporte && (
           <div className="space-y-4">
             <div className="w-12 h-12 rounded-full bg-amber-50 flex items-center justify-center">
               <LifeBuoy size={22} className="text-amber-600" />
             </div>
             <p className="text-sm font-semibold text-slate-800">Tu cuenta no está asociada a ninguna clínica</p>
             <p className="text-sm text-slate-600">
-              {gate.requiereSoporte
-                ? 'Los médicos invitados no pueden crear una clínica: quien administra la tuya debe volver a añadirte.'
-                : 'Sin clínica no podemos habilitar tu consultorio ni tus documentos.'}
+              Los médicos invitados no pueden crear una clínica: quien administra la tuya
+              debe volver a añadirte.
             </p>
             <p className="text-sm text-slate-600">
               Escríbenos y lo resolvemos contigo —no es algo que puedas arreglar desde aquí.
@@ -556,6 +596,50 @@ export default function OnboardingModal({
             >
               Escribir a soporte
             </a>
+          </div>
+        )}
+
+        {paso === 'clinica' && !gate.requiereSoporte && clinicaCreada && (
+          <div className="space-y-3">
+            <div className="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center">
+              <CheckCircle2 size={22} className="text-emerald-600" />
+            </div>
+            <p className="text-sm font-semibold text-slate-800">{nombreClinica.trim()} ya está creada</p>
+            <p className="text-sm text-slate-600">
+              Volviste a este paso, pero la clínica ya existe y no hace falta crearla otra vez.
+              Para cambiarle el nombre, entra a Mi Perfil.
+            </p>
+          </div>
+        )}
+
+        {paso === 'clinica' && !gate.requiereSoporte && !clinicaCreada && (
+          <div className="space-y-4">
+            {/* ⚠️ CLÍNICA Y CONSULTORIO NO SON LO MISMO, y el registro los
+                confundía: su campo decía «nombre del consultorio» y lo que
+                creaba era esto. Se explica aquí igual que el paso siguiente
+                explica lo suyo. */}
+            <p className="text-sm text-slate-600">
+              Tu clínica es la cuenta: el contenedor de tus pacientes, tus documentos y,
+              si algún día lo necesitas, tu equipo. El consultorio —el lugar físico donde
+              atiendes— lo configuras en el paso siguiente.
+            </p>
+            <div>
+              <label className="text-xs font-semibold text-slate-700 block mb-1">
+                Nombre de la clínica <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={nombreClinica}
+                onChange={e => setNombreClinica(e.target.value)}
+                maxLength={120}
+                placeholder="Ej: Clínica Ortointegra"
+                className="sp-input"
+              />
+              <p className="text-[11px] text-slate-500 mt-1">
+                Si trabajas por tu cuenta, pon tu nombre o el de tu práctica. Aparece en el
+                encabezado de tus documentos y puedes cambiarlo luego en Mi Perfil.
+              </p>
+            </div>
           </div>
         )}
 

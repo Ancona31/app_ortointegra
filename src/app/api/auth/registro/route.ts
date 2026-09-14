@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { Resend } from 'resend'
-import { PLAN_LIMITS } from '@/lib/plans'
 import { checkAuthRateLimit } from '@/lib/rateLimit'
 import { logAudit } from '@/lib/audit'
 import { RegistroSchema } from '@/lib/perfil/schemas'
@@ -9,6 +8,32 @@ import { escapeHtml } from '@/lib/htmlEscape'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
+/**
+ * Alta pública — correo y contraseña, y nada más (Bloque B5, quinta parte).
+ *
+ * QUÉ CREA: el usuario de `auth` sin confirmar y su fila en `profiles`. QUÉ YA
+ * NO CREA: la clínica (con su plan y sus topes) ni los datos del médico. Eso lo
+ * pide el gate de onboarding — la clínica por `POST /api/me/clinica`, el resto
+ * por `PUT /api/me/perfil-medico` y `POST /api/consultorios`.
+ *
+ * ⚠️ LA FILA DE `profiles` SE QUEDA AQUÍ, Y ES LOAD-BEARING. No hay trigger en
+ * `auth.users` que la cree. Sin ella, `/api/me/estado-perfil` responde 404, el
+ * gate lo lee como «todavía no sé» y NO monta el modal: el médico entraría sin
+ * saber qué le falta, con la RLS como único freno. O sea que el gate se quedaría
+ * ciego justo con el usuario que más lo necesita.
+ *
+ * ⚠️ `es_admin_de_clinica: true` NO ES DECORATIVO. La columna es
+ * `NOT NULL DEFAULT false`; con el default, `evaluarPerfil` devuelve
+ * `requiereSoporte: true` para todo médico nuevo —sin clínica y sin ser dueño—
+ * y el gate le enseña el panel de soporte en vez del formulario de clínica. Un
+ * encierro de fábrica. Quien se registra por su cuenta es el dueño de la cuenta
+ * que está creando; los invitados los da de alta el admin, con este flag en
+ * false (`api/admin/crear-usuario`).
+ *
+ * `nombre_confirmado` se queda en su default `false`: aquí ya no se captura
+ * ningún nombre. Lo pone en true `PUT /api/me/perfil-medico` cuando el médico
+ * guarda el primer paso del onboarding.
+ */
 export async function POST(req: NextRequest) {
   // Rate limit: 3 registros por IP por hora
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
@@ -23,10 +48,7 @@ export async function POST(req: NextRequest) {
     const first = parsed.error.issues[0]
     return NextResponse.json({ error: first?.message ?? 'Faltan campos obligatorios' }, { status: 400 })
   }
-  const {
-    email, password, nombres, apellido_paterno, apellido_materno, nombreClinica,
-    titulo, especialidad, cedula_profesional, cedula_especialidad, tipo,
-  } = parsed.data
+  const { email, password } = parsed.data
 
   const admin = createAdminClient()
 
@@ -36,28 +58,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Este correo ya está registrado. Inicia sesión.' }, { status: 409 })
   }
 
-  const limits = PLAN_LIMITS.free
-
-  // 1. Crear clínica
-  const { data: clinica, error: clinicaError } = await admin
-    .from('clinicas')
-    .insert({
-      nombre:             nombreClinica,
-      tipo,
-      plan:               'free',
-      suscripcion_estado: 'free',
-      max_medicos:        limits.max_medicos,
-      max_secretarias:    limits.max_secretarias,
-      max_pacientes:      limits.max_pacientes,
-    })
-    .select('id')
-    .single()
-
-  if (clinicaError || !clinica) {
-    return NextResponse.json({ error: 'Error al crear el consultorio. Intenta de nuevo.' }, { status: 500 })
-  }
-
-  // 2. Crear usuario sin confirmar (Supabase NO envía email)
+  // 1. Crear usuario sin confirmar (Supabase NO envía email)
   const { data: newUser, error: authError } = await admin.auth.admin.createUser({
     email,
     password,
@@ -65,32 +66,30 @@ export async function POST(req: NextRequest) {
   })
 
   if (authError) {
-    await admin.from('clinicas').delete().eq('id', clinica.id)
     return NextResponse.json({ error: 'Error al crear la cuenta. Intenta de nuevo.' }, { status: 400 })
   }
 
-  // 3. Crear perfil
-  // Todos los dueños de cuenta son medico + es_admin_de_clinica=true
-  // Post-refactor: el rol 'admin' fue eliminado. El médico-dueño se distingue
-  // por el flag es_admin_de_clinica que le da privilegios sobre la clínica.
-  const role = 'medico'
+  /* 2. Crear perfil. El rol 'admin' no existe desde el refactor de etapa 4: el
+        médico-dueño es `medico` + `es_admin_de_clinica`, que es lo que le da
+        privilegios sobre la clínica que creará en el onboarding.
 
-  await admin.from('profiles').upsert({
-    id:                   newUser.user.id,
-    role,
-    es_admin_de_clinica:  true,
-    nombres,
-    apellido_paterno,
-    apellido_materno,
-    nombre_confirmado:    true,   // el dueño captura su propio nombre
-    clinica_id:           clinica.id,
-    titulo,
-    especialidad,
-    cedula_profesional:   cedula_profesional  || null,
-    cedula_especialidad:  cedula_especialidad || null,
+     ⚠️ ESTE ERROR NO SE COMPROBABA, y por ahí nacieron las cuentas huérfanas:
+     si el upsert fallaba, la ruta respondía `ok` y quedaba un usuario de `auth`
+     sin fila en `profiles` —sin gate, sin rol, sin clínica— que además ya podía
+     iniciar sesión en cuanto confirmara el correo. Se revierte el usuario,
+     igual que se revertía la clínica cuando fallaba `createUser`. */
+  const { error: perfilError } = await admin.from('profiles').upsert({
+    id:                  newUser.user.id,
+    role:                'medico',
+    es_admin_de_clinica: true,
   })
 
-  // 4. Generar link de confirmación y enviar via Resend (Supabase no envía nada)
+  if (perfilError) {
+    await admin.auth.admin.deleteUser(newUser.user.id)
+    return NextResponse.json({ error: 'Error al crear la cuenta. Intenta de nuevo.' }, { status: 500 })
+  }
+
+  // 3. Generar link de confirmación y enviar via Resend (Supabase no envía nada)
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.spinus.com.mx'
   const { data: linkData } = await admin.auth.admin.generateLink({
     type: 'signup',
@@ -105,21 +104,23 @@ export async function POST(req: NextRequest) {
       from: 'Spinus <noreply@mail.spinus.com.mx>',
       to: email,
       subject: 'Confirma tu cuenta — Spinus',
-      html: generarEmailConfirmacion(nombres, confirmUrl),
+      html: generarEmailConfirmacion(confirmUrl),
     })
   }
 
   return NextResponse.json({ ok: true })
 }
 
-function generarEmailConfirmacion(nombre: string, confirmUrl: string): string {
-  /* ⚠️ `nombre` LO ESCRIBE QUIEN SE REGISTRA Y ESTE CORREO LO FIRMA DKIM CON
-     mail.spinus.com.mx. Sin escapar, un registro con marcado en `nombres`
-     produce un mensaje válido a ojos del receptor cuyo cuerpo y enlaces elige
-     el atacante, y el destinatario también. La url se escapa igual aunque hoy
-     la construya el servidor: la garantía no debe depender de que nadie cambie
-     de dónde sale. */
-  const nombreSeguro = escapeHtml(nombre)
+function generarEmailConfirmacion(confirmUrl: string): string {
+  /* EL SALUDO YA NO LLEVA NOMBRE porque el registro ya no lo pide: el médico lo
+     captura en el onboarding, después de confirmar. Mismo saludo que
+     `api/auth/reenviar-confirmacion/route.ts`, que lleva tiempo mandándolo sin
+     nombre (lee `user_metadata.nombre`, que esta ruta nunca escribió).
+     ⚠️ EL `escapeHtml` DE LA URL SE QUEDA aunque hoy la construya el servidor:
+     este correo lo firma DKIM con mail.spinus.com.mx, y la garantía de que su
+     cuerpo no lo elige un tercero no debe depender de que nadie cambie de dónde
+     sale el valor. Antes se escapaba también el nombre, que sí venía del
+     registro; ese riesgo se fue con el campo. */
   const urlSegura = escapeHtml(confirmUrl)
   return `<!DOCTYPE html>
 <html lang="es" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
@@ -138,7 +139,7 @@ function generarEmailConfirmacion(nombre: string, confirmUrl: string): string {
           <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;">Confirma tu cuenta</h1>
         </td></tr>
         <tr><td style="padding:32px;">
-          <p style="color:#334155;font-size:15px;margin-top:0;">Hola <strong>${nombreSeguro}</strong>,</p>
+          <p style="color:#334155;font-size:15px;margin-top:0;">Hola,</p>
           <p style="color:#475569;font-size:14px;line-height:1.6;">Tu cuenta de Spinus ha sido creada. Confirma tu correo electrónico para comenzar a usar el sistema.</p>
           <table role="presentation" cellpadding="0" cellspacing="0" style="margin:28px auto;">
             <tr><td align="center" style="background-color:#1e5fa8;padding:14px 36px;">
