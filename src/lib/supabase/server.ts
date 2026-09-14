@@ -13,9 +13,7 @@ export async function createClient() {
         setAll(cookiesToSet) {
           try {
             cookiesToSet.forEach(({ name, value, options }) => {
-              // Cookie de sesión: sin maxAge ni expires → se borra al cerrar el navegador
-              const { maxAge: _m, expires: _e, ...sessionOptions } = options ?? {}
-              cookieStore.set(name, value, sessionOptions)
+              cookieStore.set(name, value, options)
             })
           } catch {}
         },
