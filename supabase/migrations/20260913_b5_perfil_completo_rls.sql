@@ -4,22 +4,50 @@
 -- Revisión de auditoría: 2026-09-13 (ver «CAMBIOS DE LA AUDITORÍA» abajo)
 -- ───────────────────────────────────────────────────────────────────────
 -- ESTADO · LOCAL: APLICADA Y VERIFICADA — 2026-09-14
--- ESTADO · PRODUCCIÓN: PENDIENTE DE APLICAR (al 2026-09-14
---   `npx supabase migration list` solo la muestra en la columna Local)
+-- ESTADO · PRODUCCIÓN: APLICADA Y VERIFICADA — 2026-09-14
 --
--- La comprobación que respalda lo de arriba, corrida en local el 2026-09-14:
+-- La comprobación que respalda lo de producción, corrida el 2026-09-14
+-- DESPUÉS de aplicar:
 --
 --   SELECT to_regprocedure('public.perfil_completo()') IS NOT NULL,
---          (SELECT count(*) FROM pg_policy WHERE polname LIKE '%gates%'),
---          to_regprocedure('public.crear_paciente_con_medico_v2(jsonb,uuid,boolean)') IS NOT NULL,
+--          (SELECT count(*) FROM pg_policy WHERE polname LIKE '%gates_insert%'),
+--          md5(prosrc),
 --          has_function_privilege('authenticated',
---            'public.crear_paciente_con_medico(jsonb,uuid)', 'EXECUTE');
+--            'public.crear_paciente_con_medico(jsonb,uuid)', 'EXECUTE')
+--     FROM pg_proc
+--    WHERE oid = to_regprocedure('public.crear_paciente_con_medico_v2(jsonb,uuid,boolean)');
 --
---   → true · 7 · true · false
+--   → true · 7 · 0835cd6a598f740b1c5d1a85f8dbbb62 · false
 --
--- Cómo se lee: existe `perfil_completo()`; están las siete policies de gate;
--- existe el v2 reescrito; y el `false` final es lo que se busca, no un fallo —
--- es el §4 de la auditoría, el EXECUTE del RPC v1 retirado a `authenticated`.
+-- Cómo se lee, campo por campo:
+--   · `true`      — existe `perfil_completo()`.
+--   · `7`         — las siete policies `*_gates_insert` están puestas.
+--   · `0835cd6…`  — DOS COSAS A LA VEZ, y por eso se hashea en vez de mirar si
+--                   el objeto existe: confirma que el RPC v2 lleva el gate, y
+--                   confirma que se reescribió con LF. Producción tenía
+--                   `6c67ccbd…` —ese mismo cuerpo con CRLF— y el hash nuevo es
+--                   exactamente el que predijo la nota de la lista de hashes
+--                   del pre-vuelo. Aquella predicción queda comprobada aquí.
+--   · `false`     — el §4 aplicado: el EXECUTE del RPC v1 retirado a
+--                   `authenticated` en producción. Es el resultado buscado,
+--                   no un fallo.
+--
+-- La verificación de LOCAL, del mismo día y anterior a ésta, daba
+-- `true · 7 · true · false` con `to_regprocedure(...) IS NOT NULL` en el tercer
+-- campo en vez del hash.
+--
+-- ⚠️ PRIMERA MIGRACIÓN DE ESTE PROYECTO APLICADA CON EL CLI (`npx supabase db
+-- push`) Y NO PEGÁNDOLA EN EL SQL EDITOR. Cambia el sentido de una frase del
+-- §7 de `supabase/AUDITORIA-MIGRACIONES.md`: «"aplicada" a secas es la palabra
+-- de quien pegó el archivo». Aquí ya no hay nadie pegando nada — el CLI lleva
+-- los bytes del archivo tal cual y registra la versión en
+-- `supabase_migrations.schema_migrations`, así que el riesgo de que el editor
+-- normalice saltos de línea o pierda acentos desaparece por este camino. Lo
+-- que NO cambia es la razón de fondo del §7: que el CLI diga «applied» sigue
+-- siendo el informe de quien ejecuta, y lo que lo convierte en hecho
+-- consultable es la consulta de arriba. El resto del protocolo —incluido el
+-- §2, que da por supuesto el SQL Editor— está escrito para el flujo manual y
+-- habrá que revisarlo si este camino se adopta.
 --
 -- ⚠️ LA FIRMA DEL v2 LLEVA SUS TRES PARÁMETROS —(jsonb, uuid, boolean)— Y NO
 -- ES UN DETALLE DE ESTILO. `to_regprocedure` resuelve por firma exacta:
@@ -95,6 +123,11 @@
 -- despliegue — aplicarla ahora entrega exactamente los mismos errores crudos
 -- que describe el párrafo de arriba, porque producción sigue sirviendo la
 -- versión sin gate. Lo único que cambió es que ya hay algo que desplegar.
+--
+-- ✅ CERRADO EL 2026-09-14: el gate visible se desplegó a producción ANTES que
+-- esta migración, así que la condición que exige este bloque quedó cumplida y
+-- el orden se respetó. Los dos párrafos de arriba se conservan porque explican
+-- por qué nació con freno y por qué hubo que esperar.
 --
 -- Dependencias: helpers `clinica_no_suspendida()`, `clinica_tiene_acceso()` y
 -- `clinica_dentro_de_limite()`; las siete policies `*_gates_insert`; y el RPC
