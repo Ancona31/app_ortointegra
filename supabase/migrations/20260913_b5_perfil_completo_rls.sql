@@ -193,16 +193,42 @@ BEGIN
   -- ⚠️ EL CUERPO DEL RPC TIENE QUE SER EL QUE ESTA MIGRACIÓN ESPERA.
   -- Abajo se reescribe ENTERO con `CREATE OR REPLACE`, así que si alguien lo
   -- cambió a mano después del dump `20260912190416`, aplicar esto le borraría
-  -- el cambio en silencio. Los dos hashes admitidos:
+  -- el cambio en silencio. Los TRES hashes admitidos:
   --   6762f92416dc33bea3f2fcffda0f0218 → el cuerpo de hoy (sin el gate)
   --   0835cd6a598f740b1c5d1a85f8dbbb62 → el cuerpo de después (con el gate),
   --      que es lo que hace que repetir esta migración sea un no-op y no un
   --      aborto espurio.
-  -- Los dos se comprobaron contra la base: `md5(prosrc)` del RPC vivo es hoy
-  -- 6762f92…, y el cuerpo que escribe este archivo da 0835cd6… byte a byte.
-  -- CONSECUENCIA: si el editor donde pegas esto normaliza saltos de línea o
-  -- pierde acentos, el POST-FLIGHT abortará y revertirá todo. Falla cerrado,
-  -- pero pega el archivo tal cual, sin reformatear.
+  --   6c67ccbd1c76f4eb76122153fa2237f4 → EL MISMO CUERPO DEL DUMP, CON CRLF.
+  --      No es una versión distinta de la función: es byte por byte la de
+  --      6762f92… con `\r\n` en vez de `\n` como terminador de línea, heredado
+  --      de haberse pegado en su día desde un editor de Windows (el proyecto
+  --      desarrollaba ahí antes de migrar a WSL). Verificado el 2026-09-14
+  --      contra producción: `prosrc` trae 177 CR y 177 LF, mide 177 bytes más
+  --      que el del dump, y normalizando CR→LF da 6762f92… EXACTO; el diff
+  --      contra el cuerpo con gate es UN SOLO bloque de 39 líneas, que es el
+  --      gate y nada más. Por eso se admite: no hay ningún cambio a mano que
+  --      reescribir el RPC fuese a borrar.
+  -- Los tres se comprobaron contra la base: `md5(prosrc)` del RPC vivo es hoy
+  -- 6762f92… en local y 6c67ccbd… en producción, y el cuerpo que escribe este
+  -- archivo da 0835cd6… byte a byte.
+  --
+  -- ⚠️ EFECTO SECUNDARIO DE APLICAR: el `CREATE OR REPLACE` de abajo reescribe
+  -- el cuerpo con LF, así que el hash de producción pasará de 6c67ccbd… a
+  -- 0835cd6… y el primero NO VOLVERÁ A VERSE. Se queda en esta lista como
+  -- registro de por qué está, no porque haga falta después; quitarlo borraría
+  -- la explicación de un aborto que ya costó una tarde.
+  --
+  -- ⚠️⚠️ LA TRAMPA GENERAL, Y VALE PARA CUALQUIER MIGRACIÓN FUTURA QUE COPIE
+  -- ESTE PATRÓN: `md5(prosrc)` NO DISTINGUE UN CAMBIO DE TERMINADORES DE LÍNEA
+  -- DE UNA EDICIÓN REAL. Las dos cosas dan un hash distinto y el mismo mensaje
+  -- de aborto —«alguien lo modificó»—, que en el caso de los CRLF es falso y
+  -- manda a buscar una edición que no existe. Toda guarda de este tipo contra
+  -- un objeto que en algún momento se pegó desde un editor de Windows va a
+  -- abortar igual. Antes de dar por buena la acusación: sacar `prosrc`,
+  -- normalizar CR→LF y volver a hashear. Si ahí coincide, no hubo edición.
+  -- CONSECUENCIA APARTE: si el editor donde pegas esto normaliza saltos de
+  -- línea o pierde acentos, el POST-FLIGHT abortará y revertirá todo. Falla
+  -- cerrado, pero pega el archivo tal cual, sin reformatear.
   SELECT md5(prosrc) INTO v_md5
     FROM pg_proc
    WHERE oid = to_regprocedure('public.crear_paciente_con_medico_v2(jsonb,uuid,boolean)');
@@ -210,7 +236,8 @@ BEGIN
     RAISE EXCEPTION 'PRE-FLIGHT FALLO: no existe crear_paciente_con_medico_v2(jsonb,uuid,boolean). Abortando.';
   END IF;
   IF v_md5 NOT IN ('6762f92416dc33bea3f2fcffda0f0218',
-                   '0835cd6a598f740b1c5d1a85f8dbbb62') THEN
+                   '0835cd6a598f740b1c5d1a85f8dbbb62',
+                   '6c67ccbd1c76f4eb76122153fa2237f4') THEN
     RAISE EXCEPTION 'PRE-FLIGHT FALLO: el cuerpo de crear_paciente_con_medico_v2 no es el esperado (md5=%). Alguien lo modificó después del dump 20260912190416: reescribirlo entero borraría ese cambio. Revisar a mano y reconciliar antes de aplicar. Abortando.', v_md5;
   END IF;
 
