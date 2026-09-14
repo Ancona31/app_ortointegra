@@ -221,6 +221,60 @@ Recórrelas todas, en orden. Esta lista crece con cada auditoría (ver sección 
     pregunta si los valores que escribe ESTA migración son verdaderos; ésta, si
     los que escribirá el código MAÑANA podrán ser falsos sin que nada lo note.
 
+17. **Los OTROS caminos a la misma tabla, y lo que la documentación da por
+    muerto.** Cuando una migración añade una comprobación a un camino de
+    escritura —una policy, un RPC—, la pregunta no es «¿está bien puesta ahí?»
+    sino **«¿por dónde más se llega a esa tabla con ese privilegio?»**. Hay que
+    enumerarlos desde el catálogo, no desde la memoria:
+
+    ```sql
+    -- funciones que escriben en la tabla saltándose la RLS, y quién las llama
+    SELECT p.oid::regprocedure, pg_get_userbyid(p.proowner), p.prosecdef, p.proacl
+      FROM pg_proc p
+     WHERE p.pronamespace = 'public'::regnamespace
+       AND p.prosecdef
+       AND p.prosrc ILIKE '%insert into%<tabla>%';
+    ```
+
+    Un `SECURITY DEFINER` propiedad de un rol con `BYPASSRLS` **no evalúa
+    ninguna policy**: si además tiene `GRANT EXECUTE` a `anon` o
+    `authenticated`, está publicado en PostgREST y es una puerta del mismo
+    tamaño que la que la migración acaba de cerrar. Poner el gate en un camino
+    y dejar el gemelo abierto no es medio arreglo: es ninguno, porque el
+    atacante usa el que está abierto.
+
+    Y el corolario, que es el que muerde: **lo que un plan o un documento da
+    por eliminado se comprueba en `pg_proc` / `pg_policy` / `pg_class`, nunca
+    leyendo el plan.** Un ✅ en un `.md` es la intención de quien lo escribió,
+    no un hecho de la base. *Nació aquí:* el gate de perfil de B5 dejaba
+    intacto `crear_paciente_con_medico(jsonb,uuid)` —el RPC v1, `SECURITY
+    DEFINER` de `postgres`, con EXECUTE para `authenticated`—, que
+    `ETAPA5_PLAN.md:1338` daba por borrado con un ✅ mientras el dump de
+    producción del día anterior lo listaba vivo en la línea 953.
+
+18. **El canal del veredicto sólo transporta UN resultado.** La dimensión 5
+    obliga a terminar con un `SELECT` que se vea en la rejilla; ésta dice qué
+    pasa cuando pones más de uno. El SQL Editor de Supabase habla con
+    postgres-meta, y `dist/lib/db.js` resuelve el resultado así:
+
+    ```js
+    if (Array.isArray(res)) {
+      res = res.reverse().find((x) => x.rows.length !== 0) ?? { rows: [] }
+    }
+    ```
+
+    Es decir: de todo el script llega a la rejilla **un único conjunto de
+    resultados, el del último statement que devuelva filas**. Los demás se
+    tiran en silencio. Una migración que termine con tres `SELECT` —uno de
+    policies, uno del RPC, uno de censo— cumple la dimensión 5 sobre el papel y
+    **enseña sólo el tercero**; el autor cree haber publicado el veredicto y el
+    operador no lo ve nunca. La regla práctica: **un solo `SELECT` final**, con
+    todo lo que haya que comprobar dentro (un `UNION ALL` con una columna
+    `estado` que diga OK o REVISAR por renglón), y nada detrás de él. Si algo
+    tiene que consultarse aparte —un censo previo, por ejemplo—, no va al final
+    del archivo: va al pre-vuelo, que es donde puede además abortar
+    (dimensión 4).
+
 ---
 
 ## 5. Formato de respuesta
