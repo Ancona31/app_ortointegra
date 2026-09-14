@@ -19,12 +19,17 @@ import { useClinica } from '@/hooks/useClinica'
 import { useProfile } from '@/hooks/useProfile'
 import { useSubscriptionGate } from '@/components/billing/SubscriptionGateProvider'
 import { hoyEnTZ, desplazarFecha, fechaHoraLocalAInstante, tzDispositivo } from '@/lib/dates'
+import type { EstadoPerfil as EstadoGate } from '@/lib/perfil/gate'
 
 type GridMode = 'sin_pacientes' | 'nuevo' | 'activo'
 
 interface EstadoPerfil {
   porcentaje: number
   requiereOnboarding: boolean
+  /** Criterio único (`evaluarPerfil`). Es lo que decide el bloqueo. */
+  gate?: EstadoGate
+  tieneFirma: boolean
+  tieneLogo: boolean
   gridMode: GridMode
   role: string
   plan: string
@@ -92,7 +97,12 @@ export default function InicioPage() {
         .then(r => r.json())
         .then((data: EstadoPerfil) => {
           setEstado(data)
-          if (data.requiereOnboarding) setMostrarOnboarding(true)
+          /* ⚠️ LECTURA AFIRMATIVA, y por eso se pregunta por `data.gate` antes
+             que por lo que dice: el modal que abre esta línea es BLOQUEANTE.
+             Una respuesta que no trae gate —error, 401, un despliegue a medias—
+             es «todavía no sé», y con «todavía no sé» no se encierra a nadie.
+             El `.catch` de abajo deja esto sin ejecutar, que es lo correcto. */
+          if (data.gate && !data.gate.completo) setMostrarOnboarding(true)
         })
         .catch(() => {})
         .finally(() => setLoading(false))
@@ -187,11 +197,14 @@ export default function InicioPage() {
 
   return (
     <>
-      {mostrarOnboarding && (
+      {mostrarOnboarding && estado.gate && (
         <OnboardingModal
           onComplete={handleOnboardingComplete}
+          gate={estado.gate}
           role={estado.role}
           esAdminDeClinica={profile?.es_admin_de_clinica === true}
+          tieneFirma={estado.tieneFirma}
+          tieneLogo={estado.tieneLogo}
         />
       )}
 
@@ -292,14 +305,22 @@ export default function InicioPage() {
                   </p>
                 </div>
               </div>
-              <button
-                onClick={() => setMostrarOnboarding(true)}
+              {/* ⚠️ VA A MI PERFIL, YA NO ABRE EL ONBOARDING. Ese modal es
+                  bloqueante —sin ✕ y con `onClose` no-op—, así que abrirlo por
+                  voluntad propia era entrar en una habitación sin puerta: el
+                  banner sale con cualquier porcentaje < 100, y el porcentaje
+                  baja por cosas (cédula de especialidad, firma) que el criterio
+                  no exige y que el gate, por tanto, no tiene pasos para pedir.
+                  El modal lo monta el gate y solo el gate. Lo omitible se
+                  completa donde se edita: Mi Perfil. */}
+              <Link
+                href="/perfil"
                 className={`flex items-center gap-1 text-xs font-medium transition-colors shrink-0 ${
                   dark ? 'text-amber-400 hover:text-amber-200' : 'text-amber-700 hover:text-amber-900'
                 }`}
               >
                 Completar <ChevronRight size={13} />
-              </button>
+              </Link>
             </div>
           </div>
         )}

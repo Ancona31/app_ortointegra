@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { PLANS, type PlanKey } from '@/lib/plans'
+import { evaluarPerfil } from '@/lib/perfil/gate'
+import type { Role } from '@/hooks/useProfile'
 
 export async function GET() {
   const supabase = await createClient()
@@ -9,7 +11,7 @@ export async function GET() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role, nombres, especialidad, cedula_profesional, cedula_especialidad, firma_url, clinica_id')
+    .select('role, es_admin_de_clinica, nombres, especialidad, cedula_profesional, cedula_especialidad, firma_url, clinica_id')
     .eq('id', user.id)
     .single()
 
@@ -29,7 +31,33 @@ export async function GET() {
     porcentaje = 100
   }
 
-  const requiereOnboarding = porcentaje < 85 && role !== 'secretaria'
+  /* ⚠️ EL DISPARADOR DEL ONBOARDING YA NO ES EL PORCENTAJE DE AQUÍ ARRIBA.
+     Ese porcentaje pondera `cedula_especialidad` (10) y `firma_url` (15) y no
+     mira ni `clinica_id` ni los consultorios, así que discrepaba del criterio
+     único en los dos sentidos: un médico general con todo lo exigido se
+     quedaba en 75 —y con el modal ya bloqueante eso es un encierro de por
+     vida—, mientras que uno al 100 % sin consultorio pasaba sin modal y se
+     comía el rechazo de la RLS sin nada que pudiera hacer al respecto.
+     El porcentaje SE QUEDA porque el banner de /inicio lo pinta; lo que deja
+     de hacer es decidir el bloqueo. Eso lo decide `evaluarPerfil`, el mismo
+     criterio que `public.perfil_completo()` aplica en la base. */
+  const { count: consultoriosActivos } = await supabase
+    .from('consultorios')
+    .select('id', { count: 'exact', head: true })
+    .eq('medico_id', user.id)
+    .eq('activo', true)
+
+  const gate = evaluarPerfil({
+    role: role as Role,
+    es_admin_de_clinica: profile.es_admin_de_clinica as boolean | null,
+    nombres: profile.nombres as string | null,
+    especialidad: profile.especialidad as string | null,
+    cedula_profesional: profile.cedula_profesional as string | null,
+    clinica_id: profile.clinica_id as string | null,
+    consultoriosActivos: consultoriosActivos ?? 0,
+  })
+
+  const requiereOnboarding = !gate.completo
 
   // Determinar modo del grid
   let gridMode: 'sin_pacientes' | 'nuevo' | 'activo' = 'sin_pacientes'
@@ -53,16 +81,21 @@ export async function GET() {
   let suscripcion_estado = 'free'
   let es_vip_grant = false
   let count_pacientes = 0
+  // Los dos pasos OMITIBLES del onboarding (logo y firma) no salen del gate:
+  // el criterio no los exige. Se mandan aparte para no enseñárselos a quien
+  // ya los tiene. El logo vive en la clínica, no en el perfil.
+  let tieneLogo = false
   if (profile.clinica_id) {
     const { data: clinica } = await supabase
       .from('clinicas')
-      .select('plan, suscripcion_estado, es_vip_grant')
+      .select('plan, suscripcion_estado, es_vip_grant, logo_url')
       .eq('id', profile.clinica_id as string)
       .single()
     if (clinica) {
       plan = (clinica.plan as PlanKey) ?? 'free'
       suscripcion_estado = (clinica.suscripcion_estado as string) ?? 'free'
       es_vip_grant = (clinica.es_vip_grant as boolean) ?? false
+      tieneLogo = typeof clinica.logo_url === 'string' && clinica.logo_url.length > 0
     }
 
     // Count de pacientes activos para el gate de Fase 8.1.
@@ -82,6 +115,9 @@ export async function GET() {
   return NextResponse.json({
     porcentaje,
     requiereOnboarding,
+    gate,
+    tieneFirma: typeof profile.firma_url === 'string' && profile.firma_url.length > 0,
+    tieneLogo,
     gridMode,
     role,
     plan,
