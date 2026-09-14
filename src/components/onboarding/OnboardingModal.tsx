@@ -1,119 +1,198 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-import { CheckCircle2, ChevronRight, Loader2, X } from 'lucide-react'
+import { CheckCircle2, ChevronLeft, ChevronRight, LifeBuoy, Loader2 } from 'lucide-react'
+import { mutate } from 'swr'
 import EspecialidadSelector from '@/components/ui/EspecialidadSelector'
 import FirmaCaptura from '@/components/perfil/FirmaCaptura'
-import { validarCedula, validarTelefono, formatearTelefono } from '@/lib/validaciones'
+import ModalShell from '@/components/ui/ModalShell'
 import { useToast } from '@/components/ui/Toast'
-import { mutate } from 'swr'
+import { useSubscriptionGate } from '@/components/billing/SubscriptionGateProvider'
 import { canManageClinica } from '@/lib/permissions'
+import { validarCedula, validarTelefono, formatearTelefono } from '@/lib/validaciones'
+import { CLAVE_CONFIG } from '@/lib/configApp'
+import { LOGO_ACCEPT, revisarLogo } from '@/lib/perfil/logoArchivo'
+import { ZONAS_MEXICO, CHIPS_RAPIDOS } from '@/lib/consultorios/zonas-mexico'
+import type { EstadoPerfil } from '@/lib/perfil/gate'
+import type { Consultorio } from '@/types'
 import type { Role } from '@/hooks/useProfile'
+
+/**
+ * El gate de perfil — Bloque B5, tercera parte.
+ *
+ * ⚠️ ESTE MODAL ES BLOQUEANTE: sin ✕, sin Escape útil, sin omitir en los pasos
+ * obligatorios. Quien lo monta debe hacerlo SOLO ante una LECTURA AFIRMATIVA
+ * del gate, nunca por ausencia de evidencia — la distinción que `PrimerConsultorioModal`
+ * aprendió a golpes antes de que este gate lo sustituyera (retirado en la cuarta
+ * parte; el porqué, en `GateOnboarding.tsx`): «todavía no sé» y «sé que falta»
+ * no son lo mismo, y un modal que escribe y encierra no puede confundirlos.
+ * Un `fetch` de `/api/me/estado-perfil` que falla NO abre esto.
+ *
+ * Los pasos SALEN DEL GATE (`evaluarPerfil`, src/lib/perfil/gate.ts), no de una
+ * lista fija: el invitado no ve el de clínica porque no puede crear ninguna, y
+ * un médico dado de alta con el formulario viejo puede llegar a necesitar solo
+ * el consultorio. Logo y firma no los exige el criterio: son omitibles y solo
+ * se enseñan a quien no los tiene.
+ *
+ * El paso de CLÍNICA tiene DOS CARAS, y la que se enseña la decide
+ * `gate.requiereSoporte` (o sea: si el médico es dueño o invitado).
+ *   · DUEÑO → formulario. Desde que el registro se recortó a correo y
+ *     contraseña, todo médico nuevo llega sin clínica y la crea aquí, con
+ *     `POST /api/me/clinica`.
+ *   · INVITADO → panel de soporte, sin formulario y sin «Continuar». No puede
+ *     crear ninguna: ya pertenecía a una y se la borraron
+ *     (`profiles_clinica_id_fkey` es ON DELETE SET NULL). Darle un formulario
+ *     sería darle algo que tiene prohibido usar.
+ */
+
+type Paso = 'datos' | 'cedulas' | 'clinica' | 'consultorio' | 'logo' | 'firma'
+
+const ETIQUETAS: Record<Paso, string> = {
+  datos: 'Datos',
+  cedulas: 'Cédulas',
+  clinica: 'Clínica',
+  consultorio: 'Consultorio',
+  logo: 'Logo',
+  firma: 'Firma',
+}
+
+/** Los únicos que llevan «Omitir por ahora». El resto los exige el criterio. */
+const OMITIBLES: readonly Paso[] = ['logo', 'firma']
+
+/** Solo los dos del ejercicio clínico. Spinus es para médicos: Mtro./Lic./Ing.
+ *  sobran en el encabezado de una receta. */
+const TITULOS = ['Dr.', 'Dra.']
+
+/** Separador de especialidades. El MISMO que el registro, Mi Perfil y el alta
+ *  de admin (`' · '`): con `', '` la segunda especialidad se perdía al abrir
+ *  Mi Perfil, que parte por `' · '` y se encontraba una sola cadena. */
+const SEP_ESPECIALIDAD = ' · '
 
 interface Props {
   onComplete: () => void
+  /** Lectura afirmativa del criterio único. Decide qué pasos hay. */
+  gate: EstadoPerfil
   role: string
   esAdminDeClinica: boolean
+  tieneFirma: boolean
+  tieneLogo: boolean
 }
 
-type Paso = 1 | 2 | 3 | 4 | 5
+function pasosPendientes(
+  gate: EstadoPerfil, isAdmin: boolean, tieneLogo: boolean, tieneFirma: boolean,
+): Paso[] {
+  const pasos: Paso[] = []
+  /* `datos_medico` monta los DOS pasos de perfil aunque falte un solo campo:
+     el título es obligatorio desde este bloque y el gate no lo mira, así que
+     afinar más aquí dejaría fuera a quien solo le falta eso. */
+  if (gate.pendientes.includes('datos_medico')) pasos.push('datos', 'cedulas')
+  if (gate.pendientes.includes('clinica')) pasos.push('clinica')
+  if (gate.pendientes.includes('consultorio')) pasos.push('consultorio')
+  if (isAdmin && !tieneLogo) pasos.push('logo')
+  if (!tieneFirma) pasos.push('firma')
+  return pasos
+}
 
-const PASOS = [
-  { num: 1 as Paso, label: 'Datos', requerido: true },
-  { num: 2 as Paso, label: 'Cédulas', requerido: true },
-  { num: 3 as Paso, label: 'Consultorio', requerido: false },
-  { num: 4 as Paso, label: 'Logo', requerido: false },
-  { num: 5 as Paso, label: 'Firma', requerido: false },
-]
-
-const TITULOS = ['Dr.', 'Dra.', 'Mtro.', 'Mtra.', 'Lic.', 'Ing.']
-
-export default function OnboardingModal({ onComplete, role, esAdminDeClinica }: Props) {
+export default function OnboardingModal({
+  onComplete, gate, role, esAdminDeClinica, tieneFirma, tieneLogo,
+}: Props) {
   const toast = useToast()
+  const { state } = useSubscriptionGate()
   const isAdmin = canManageClinica({ role: role as Role, es_admin_de_clinica: esAdminDeClinica })
 
-  const [paso, setPaso] = useState<Paso>(1)
+  const [pasos] = useState<Paso[]>(() => pasosPendientes(gate, isAdmin, tieneLogo, tieneFirma))
+  const [indice, setIndice] = useState(0)
   const [guardando, setGuardando] = useState(false)
 
-  // Paso 1: Datos personales
-  const [titulo, setTitulo] = useState('Dr.')
+  // Paso 1: datos personales
+  const [titulo, setTitulo] = useState('')
   const [nombres, setNombres] = useState('')
   const [apellidoPaterno, setApellidoPaterno] = useState('')
   const [apellidoMaterno, setApellidoMaterno] = useState('')
   const [especialidades, setEspecialidades] = useState<string[]>([''])
   const [universidad, setUniversidad] = useState('')
 
-  // Paso 2: Cédulas
-  const [cedula_profesional, setCedulaProfesional] = useState('')
-  const [cedula_especialidad, setCedulaEspecialidad] = useState('')
+  // Paso 2: cédulas
+  const [cedulaProfesional, setCedulaProfesional] = useState('')
+  const [cedulaEspecialidad, setCedulaEspecialidad] = useState('')
   const [errorCedula, setErrorCedula] = useState('')
 
-  // Paso 3: Consultorio
+  /* Paso clínica (solo el dueño). `clinicaCreada` juega el mismo papel que
+     `consultorioCreado`: el POST no es idempotente, así que retroceder y
+     avanzar otra vez crearía una segunda clínica — y la ruta, que solo admite
+     la PRIMERA, respondería 409. */
+  const [nombreClinica, setNombreClinica] = useState('')
+  const [clinicaCreada, setClinicaCreada] = useState(false)
+
+  // Paso consultorio (tabla `consultorios`, no las columnas viejas de profiles)
+  const [nombreCons, setNombreCons] = useState('')
+  const [nombreCorto, setNombreCorto] = useState('')
   const [direccion, setDireccion] = useState('')
   const [telefono, setTelefono] = useState('')
+  const [timezone, setTimezone] = useState('')
   const [errorTelefono, setErrorTelefono] = useState('')
 
-  // Paso 4: Logo (solo admin)
-  const [logoFile, setLogoFile] = useState<File | null>(null)
-  const [logoPreview, setLogoPreview] = useState<string | null>(null)
-  const [subiendoLogo, setSubiendoLogo] = useState(false)
+  /* ⚠️ EL PASO ATRÁS OBLIGA A RECORDAR LO QUE YA SE ESCRIBIÓ, y no todas las
+     escrituras cuestan lo mismo si se repiten:
+     · `/api/me/perfil-medico` es un PUT parcial — reescribir los mismos valores
+       es inofensivo, así que datos y cédulas se pueden volver a guardar.
+     · `POST /api/consultorios` NO es idempotente: volver a este paso y avanzar
+       otra vez creaba un SEGUNDO consultorio. Por eso se guarda el id del que
+       se creó y el paso pasa a enseñar su confirmación en vez del formulario.
+       Editarlo es cosa de Mi Perfil → Mis consultorios, que es donde vive el
+       PATCH; meter aquí un segundo camino de escritura sería peor. */
+  const [consultorioCreado, setConsultorioCreado] = useState<string | null>(null)
 
-  // Paso 5: Firma
+  // Paso logo (solo dueño) y paso firma
+  const [logoFile, setLogoFile] = useState<File | null>(null)
+  /** El archivo que ya subió, por identidad. Evita reenviarlo al volver a pasar. */
+  const [logoSubido, setLogoSubido] = useState<File | null>(null)
+  const [logoPreview, setLogoPreview] = useState<string | null>(null)
   const [firmaUrl, setFirmaUrl] = useState<string | null>(null)
 
-  const inputCls = 'w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8] bg-white'
+  const paso = pasos[indice]
 
-  // ── Guardar paso 1 ──────────────────────────────────────────
-  async function guardarPaso1(): Promise<boolean> {
+  // ── Guardado por paso ───────────────────────────────────────
+  async function guardarDatos(): Promise<boolean> {
+    if (!titulo) { toast.error('El título es obligatorio'); return false }
     if (!nombres.trim()) { toast.error('El nombre es obligatorio'); return false }
     if (!apellidoPaterno.trim()) { toast.error('El apellido paterno es obligatorio'); return false }
-    const especialidad = especialidades.filter(Boolean).join(', ')
+    const especialidad = especialidades.map(e => e.trim()).filter(Boolean).join(SEP_ESPECIALIDAD)
     if (!especialidad) { toast.error('La especialidad es obligatoria'); return false }
 
-    setGuardando(true)
-    try {
-      const res = await fetch('/api/me/perfil-medico', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          titulo,
-          nombres: nombres.trim(),
-          apellido_paterno: apellidoPaterno.trim(),
-          apellido_materno: apellidoMaterno.trim() || null,
-          especialidad,
-          universidad: universidad.trim() || undefined,
-        }),
-      })
-      if (!res.ok) throw new Error()
-      await mutate('/api/me/perfil-medico')
-      return true
-    } catch {
-      toast.error('Error al guardar. Intenta de nuevo.')
-      return false
-    } finally {
-      setGuardando(false)
-    }
+    return guardarPerfil({
+      titulo,
+      nombres: nombres.trim(),
+      apellido_paterno: apellidoPaterno.trim(),
+      apellido_materno: apellidoMaterno.trim() || null,
+      especialidad,
+      universidad: universidad.trim() || undefined,
+    })
   }
 
-  // ── Guardar paso 2 ──────────────────────────────────────────
-  async function guardarPaso2(): Promise<boolean> {
-    if (!cedula_profesional.trim()) { toast.error('La cédula profesional es obligatoria'); return false }
-    if (!cedula_especialidad.trim()) { toast.error('La cédula de especialidad es obligatoria'); return false }
-
-    const errCedPro = validarCedula(cedula_profesional)
-    const errCedEsp = validarCedula(cedula_especialidad)
-    if (errCedPro || errCedEsp) {
-      setErrorCedula(errCedPro || errCedEsp || '')
-      return false
-    }
+  async function guardarCedulas(): Promise<boolean> {
+    /* La cédula de ESPECIALIDAD dejó de ser obligatoria: un médico general no
+       la tiene, y exigirla aquí —con el modal ya bloqueante— lo dejaba fuera
+       de la app para siempre. El criterio único tampoco la pide. */
+    if (!cedulaProfesional.trim()) { toast.error('La cédula profesional es obligatoria'); return false }
+    const errPro = validarCedula(cedulaProfesional)
+    const errEsp = cedulaEspecialidad.trim() ? validarCedula(cedulaEspecialidad) : null
+    if (errPro || errEsp) { setErrorCedula(errPro || errEsp || ''); return false }
     setErrorCedula('')
 
+    return guardarPerfil({
+      cedula_profesional: cedulaProfesional.trim(),
+      cedula_especialidad: cedulaEspecialidad.trim() || null,
+    })
+  }
+
+  async function guardarPerfil(body: Record<string, unknown>): Promise<boolean> {
     setGuardando(true)
     try {
       const res = await fetch('/api/me/perfil-medico', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cedula_profesional: cedula_profesional.trim(), cedula_especialidad: cedula_especialidad.trim() }),
+        body: JSON.stringify(body),
       })
       if (!res.ok) throw new Error()
       await mutate('/api/me/perfil-medico')
@@ -126,344 +205,579 @@ export default function OnboardingModal({ onComplete, role, esAdminDeClinica }: 
     }
   }
 
-  // ── Guardar paso 3 ──────────────────────────────────────────
-  async function guardarPaso3(): Promise<boolean> {
-    if (!direccion.trim() && !telefono.trim()) return true // totalmente opcional
+  async function crearClinica(): Promise<boolean> {
+    if (clinicaCreada) return true
+    if (!nombreClinica.trim()) { toast.error('El nombre de la clínica es obligatorio'); return false }
 
-    // El teléfono sigue siendo opcional (validarTelefono trata '' como válido), pero si viene
-    // debe salir de aquí ya normalizado: esta es la única escritura de telefono_consultorio y
-    // Mi Perfil ya no tiene campo donde corregir lo que se guarde mal.
-    const errTel = validarTelefono(telefono)
-    if (errTel) {
-      setErrorTelefono(errTel)
+    setGuardando(true)
+    try {
+      const res = await fetch('/api/me/clinica', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nombre: nombreClinica.trim() }),
+      })
+      if (!res.ok) {
+        const datos = await res.json().catch(() => ({}))
+        toast.error(datos.error ?? 'No se pudo crear la clínica. Inténtalo de nuevo.')
+        return false
+      }
+      setClinicaCreada(true)
+      await mutate('/api/me/perfil-medico')
+      return true
+    } catch {
+      toast.error('No se pudo crear la clínica: revisa tu conexión e inténtalo de nuevo.')
+      return false
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  /** Crea el consultorio DE VERDAD, en la tabla `consultorios`. Lo que este
+   *  paso escribía antes (`direccion_consultorio`, `telefono_consultorio` en
+   *  profiles) son columnas viejas que no crean ninguno, así que el gate
+   *  seguía viendo cero y el médico no salía nunca de aquí. */
+  async function crearConsultorio(): Promise<boolean> {
+    if (consultorioCreado) return true
+    if (!nombreCons.trim()) { toast.error('El nombre del consultorio es obligatorio'); return false }
+    if (!direccion.trim()) { toast.error('La dirección es obligatoria'); return false }
+    if (!timezone) { toast.error('Selecciona la zona horaria'); return false }
+    if (requiereNombreCorto && !nombreCorto.trim()) {
+      toast.error('El nombre corto es obligatorio cuando el nombre pasa de 12 caracteres')
       return false
     }
+    const errTel = validarTelefono(telefono)
+    if (errTel) { setErrorTelefono(errTel); return false }
     setErrorTelefono('')
 
     setGuardando(true)
     try {
-      const res = await fetch('/api/me/perfil-medico', {
-        method: 'PUT',
+      const body: Record<string, unknown> = {
+        nombre: nombreCons.trim(),
+        direccion: direccion.trim(),
+        timezone,
+      }
+      if (requiereNombreCorto) body.nombre_corto = nombreCorto.trim()
+      if (telefono.trim()) body.telefono = telefono.trim()
+
+      const res = await fetch('/api/consultorios', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ direccion_consultorio: direccion.trim(), telefono_consultorio: telefono.trim() }),
+        body: JSON.stringify(body),
       })
-      if (!res.ok) throw new Error()
-      await mutate('/api/me/perfil-medico')
-      return true
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        toast.error(data.error ?? 'Error al crear el consultorio. Intenta de nuevo.')
+        return false
+      }
+      const { consultorio } = await res.json() as { consultorio: Consultorio }
+      setConsultorioCreado(consultorio?.id ?? null)
+      // El agregado de configuración es la fuente de la lista para toda (app):
+      // sin esto el sidebar y la agenda siguen creyendo que no hay ninguno.
+      await mutate(CLAVE_CONFIG)
+      return Boolean(consultorio)
     } catch {
-      toast.error('Error al guardar.')
+      toast.error('Error de red. Verifica tu conexión.')
       return false
     } finally {
       setGuardando(false)
     }
   }
 
-  // ── Subir logo ──────────────────────────────────────────────
+  /* ⚠️ EL VEREDICTO SE PIDE AL ELEGIR EL ARCHIVO, NO AL SUBIRLO, y es el MISMO
+     que aplicará el servidor (`revisarLogo`, compartido). Antes aquí solo se
+     miraba el tamaño, y encima con un tope propio de 2 MB frente a los 500 KB
+     de la ruta: el médico elegía un .heic o un logo de 1 MB, veía la vista
+     previa, lo daba por bueno y se llevaba el rechazo dos pasos después.
+     Nada de esto sustituye a la comprobación del servidor: ésta es comodidad,
+     y el POST se puede hacer sin pasar por aquí. */
   const handleLogoChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-    if (file.size > 2 * 1024 * 1024) { toast.error('El logo no debe superar 2 MB'); return }
+    const veredicto = revisarLogo(file)
+    if (!veredicto.ok) {
+      toast.error(veredicto.error)
+      // Sin esto, volver a elegir el MISMO archivo no dispara `change` y la
+      // pantalla se queda muda.
+      e.target.value = ''
+      return
+    }
     setLogoFile(file)
-    const url = URL.createObjectURL(file)
-    setLogoPreview(url)
+    setLogoPreview(URL.createObjectURL(file))
   }, [toast])
 
   async function subirLogo(): Promise<boolean> {
-    if (!logoFile) return true
-    setSubiendoLogo(true)
+    if (!logoFile || logoFile === logoSubido) return true
+    setGuardando(true)
     try {
       const fd = new FormData()
       fd.append('logo', logoFile)
       const res = await fetch('/api/me/logo', { method: 'POST', body: fd })
-      if (!res.ok) throw new Error()
+      if (!res.ok) {
+        /* El aviso lo escribe la RUTA, que es la única que sabe por qué
+           rechazó —formato, tamaño, permisos—. Tirarlo y pintar un «Error al
+           subir el logo.» dejaba al médico probando a ciegas. El genérico
+           queda solo para cuando no venga nada (una caída que no llega a
+           responder JSON). */
+        const datos = await res.json().catch(() => ({}))
+        toast.error(datos.error ?? 'No se pudo subir el logo. Inténtalo de nuevo.')
+        return false
+      }
+      setLogoSubido(logoFile)
       await mutate('/api/me/perfil-medico')
       return true
     } catch {
-      toast.error('Error al subir el logo.')
+      toast.error('No se pudo subir el logo: revisa tu conexión e inténtalo de nuevo.')
       return false
     } finally {
-      setSubiendoLogo(false)
+      setGuardando(false)
     }
   }
 
-  // ── Avanzar paso ───────────────────────────────────────────
+  // ── Navegación ──────────────────────────────────────────────
+  function siguiente() {
+    if (indice >= pasos.length - 1) { onComplete(); return }
+    setIndice(indice + 1)
+  }
+
+  /* ⚠️ ATRÁS NAVEGA, NO CIERRA. El modal sigue sin salida al exterior; lo que
+     no puede es ser una calle de un solo sentido: quien se equivoca en el
+     nombre y lo nota tres pasos después no tiene más remedio que dejarlo mal o
+     cerrar sesión.
+     VA EN EL PIE Y LOS CÍRCULOS DEL STEPPER NO SON PULSABLES, por dos razones:
+     miden 24 px, muy por debajo del mínimo táctil del sistema (`--sp-tap`,
+     44 px); y un stepper pulsable invita también a SALTAR HACIA ADELANTE, que
+     aquí es justo lo que no puede pasar — cada paso escribe al avanzar y el
+     siguiente puede depender de lo que el anterior dejó en la base (sin
+     clínica no hay consultorio que crear). Un solo control, sin ambigüedad.
+     El estado vive en este componente y no por paso, así que al volver los
+     campos siguen con lo que el médico escribió. */
+  function atras() {
+    if (indice === 0) return
+    setIndice(indice - 1)
+  }
+
   async function avanzar() {
     let ok = true
-    if (paso === 1) ok = await guardarPaso1()
-    else if (paso === 2) ok = await guardarPaso2()
-    else if (paso === 3) ok = await guardarPaso3()
-    else if (paso === 4) ok = await subirLogo()
-
-    if (!ok) return
-
-    if (paso === 5) {
-      onComplete()
-      return
-    }
-    // Saltar paso 4 (logo) si no es admin
-    const siguiente = (paso + 1) as Paso
-    if (siguiente === 4 && !isAdmin) {
-      setPaso(5)
-    } else {
-      setPaso(siguiente)
-    }
+    if (paso === 'datos') ok = await guardarDatos()
+    else if (paso === 'cedulas') ok = await guardarCedulas()
+    else if (paso === 'clinica') ok = await crearClinica()
+    else if (paso === 'consultorio') ok = await crearConsultorio()
+    else if (paso === 'logo') ok = await subirLogo()
+    if (ok) siguiente()
   }
 
-  function saltarPaso() {
-    if (paso === 5) { onComplete(); return }
-    const siguiente = (paso + 1) as Paso
-    if (siguiente === 4 && !isAdmin) {
-      setPaso(5)
-    } else {
-      setPaso(siguiente)
-    }
-  }
+  /* Si la suscripción bloquea, este modal se calla. La salvaguarda viene de
+     `PrimerConsultorioModal`, que la llevaba antes de retirarse: dos modales sin
+     salida encima del mismo médico, y el de suscripción tapado por éste, es el
+     encierro que el bloque existe para evitar. */
+  if (state.isBlocked) return null
+  // Defensivo: quien monta esto ya comprobó `!gate.completo`, así que la lista
+  // nunca llega vacía. Si llegara, no hay nada que pedir y encerrar por nada
+  // sería lo peor posible.
+  if (pasos.length === 0) return null
 
-  // Pasos visibles según rol
-  const pasosVisibles = PASOS.filter(p => p.num !== 4 || isAdmin)
+  const requiereNombreCorto = nombreCons.trim().length > 12
+  /* El invitado sin clínica: única cara del flujo que no se puede resolver
+     desde aquí, así que no lleva «Continuar». */
+  const esPanelSoporte = paso === 'clinica' && gate.requiereSoporte
+  const esOmitible = OMITIBLES.includes(paso)
+  const esUltimo = indice === pasos.length - 1
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Backdrop blur */}
-      <div className="absolute inset-0 bg-[#0f1923]/70 backdrop-blur-sm" />
-
-      <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden">
-        {/* Header */}
-        <div className="bg-[#1a3a5c] px-6 pt-6 pb-5">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="text-lg font-bold text-white">Configura tu perfil</h2>
-              <p className="text-xs text-white/60 mt-0.5">Solo toma 2 minutos · Aparece en tus documentos PDF</p>
-            </div>
+    <ModalShell
+      open={true}
+      onClose={() => { /* bloqueante: no-op intencional */ }}
+      hideClose
+      title="Configura tu perfil"
+      subtitle="Necesario para registrar pacientes y emitir documentos"
+      maxWidth="max-w-lg"
+      footer={
+        /* ⚠️ «CONTINUAR» DESAPARECE EN EL PANEL DE SOPORTE, NO EN EL PASO DE
+           CLÍNICA ENTERO. El dueño escribe el nombre y avanza; el invitado no
+           tiene salida hacia adelante porque no hay nada que pueda escribir.
+           El «Atrás» se pinta en los dos: el paso puede NO ser el primero (el
+           gate los pide en orden: datos, clínica, consultorio) y sin pie el
+           invitado se quedaba sin poder corregir lo anterior. */
+        <div className="flex items-center justify-between gap-3 px-5 py-3.5">
+          <div>
+            {indice > 0 && (
+              <button
+                onClick={atras}
+                disabled={guardando}
+                className="sp-btn sp-btn--secondary"
+              >
+                <ChevronLeft size={15} /> Atrás
+              </button>
+            )}
           </div>
 
-          {/* Stepper */}
-          <div className="flex items-center gap-1">
-            {pasosVisibles.map((p, i) => {
-              const activo = p.num === paso
-              const completado = p.num < paso
-              return (
-                <div key={p.num} className="flex items-center gap-1 flex-1">
-                  <div className={`flex items-center gap-1.5 ${activo ? 'flex-1' : ''}`}>
-                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 transition-all ${
-                      completado ? 'bg-green-400 text-white' :
-                      activo ? 'bg-white text-[#1a3a5c]' :
-                      'bg-white/20 text-white/50'
-                    }`}>
-                      {completado ? <CheckCircle2 size={14} /> : p.num}
-                    </div>
-                    {activo && (
-                      <span className="text-xs font-medium text-white">{p.label}</span>
-                    )}
-                  </div>
-                  {i < pasosVisibles.length - 1 && (
-                    <div className={`h-px flex-1 ${completado ? 'bg-green-400' : 'bg-white/20'}`} />
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        </div>
-
-        {/* Contenido del paso */}
-        <div className="px-6 py-6 max-h-[60vh] overflow-y-auto">
-          {paso === 1 && (
-            <div className="space-y-4">
-              <p className="text-sm text-slate-600">¿Cómo aparecerás en tus documentos médicos?</p>
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="text-xs font-medium text-slate-500 block mb-1">Título</label>
-                  <select value={titulo} onChange={e => setTitulo(e.target.value)} className={inputCls}>
-                    {TITULOS.map(t => <option key={t}>{t}</option>)}
-                  </select>
-                </div>
-                <div className="col-span-2">
-                  <label className="text-xs font-medium text-slate-500 block mb-1">Nombre(s) <span className="text-red-400">*</span></label>
-                  <input
-                    type="text"
-                    value={nombres}
-                    onChange={e => setNombres(e.target.value)}
-                    placeholder="Ej: Juan"
-                    className={inputCls}
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-medium text-slate-500 block mb-1">Apellido paterno <span className="text-red-400">*</span></label>
-                  <input
-                    type="text"
-                    value={apellidoPaterno}
-                    onChange={e => setApellidoPaterno(e.target.value)}
-                    placeholder="Ej: García"
-                    className={inputCls}
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-slate-500 block mb-1">Apellido materno</label>
-                  <input
-                    type="text"
-                    value={apellidoMaterno}
-                    onChange={e => setApellidoMaterno(e.target.value)}
-                    placeholder="Ej: López"
-                    className={inputCls}
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="text-xs font-medium text-slate-500 block mb-1">Especialidad <span className="text-red-400">*</span></label>
-                <EspecialidadSelector
-                  value={especialidades}
-                  onChange={setEspecialidades}
-                />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-slate-500 block mb-1">Universidad / Institución (opcional)</label>
-                <input
-                  type="text"
-                  value={universidad}
-                  onChange={e => setUniversidad(e.target.value)}
-                  placeholder="Ej: UNAM, IPN, UAG..."
-                  className={inputCls}
-                />
-              </div>
-            </div>
-          )}
-
-          {paso === 2 && (
-            <div className="space-y-4">
-              <p className="text-sm text-slate-600">Tus cédulas aparecerán al pie de cada documento oficial.</p>
-              <div>
-                <label className="text-xs font-medium text-slate-500 block mb-1">Cédula profesional <span className="text-red-400">*</span></label>
-                <input
-                  type="text"
-                  value={cedula_profesional}
-                  onChange={e => { setCedulaProfesional(e.target.value); setErrorCedula('') }}
-                  placeholder="7 u 8 dígitos"
-                  className={inputCls}
-                />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-slate-500 block mb-1">Cédula de especialidad <span className="text-red-400">*</span></label>
-                <input
-                  type="text"
-                  value={cedula_especialidad}
-                  onChange={e => { setCedulaEspecialidad(e.target.value); setErrorCedula('') }}
-                  placeholder="7 u 8 dígitos"
-                  className={inputCls}
-                />
-              </div>
-              {errorCedula && (
-                <p className="text-xs text-red-500">{errorCedula}</p>
+          {!esPanelSoporte && (
+            <div className="flex items-center gap-3">
+              {esOmitible ? (
+                <button
+                  onClick={siguiente}
+                  disabled={guardando}
+                  className="text-xs text-slate-400 hover:text-slate-600 transition-colors"
+                >
+                  Omitir por ahora
+                </button>
+              ) : (
+                <span className="text-xs text-slate-400">Paso requerido</span>
               )}
-              <p className="text-xs text-slate-400 bg-slate-50 rounded-lg p-3">
-                Las cédulas son datos que amparan legalmente tus documentos médicos bajo la NOM-004-SSA3-2012.
-              </p>
-            </div>
-          )}
 
-          {paso === 3 && (
-            <div className="space-y-4">
-              <p className="text-sm text-slate-600">Datos de contacto que aparecen en el encabezado de tus documentos.</p>
-              <div>
-                <label className="text-xs font-medium text-slate-500 block mb-1">Dirección del consultorio</label>
-                <textarea
-                  value={direccion}
-                  onChange={e => setDireccion(e.target.value)}
-                  placeholder="Ej: Av. Insurgentes Sur 3600, Col. Pedregal, CDMX"
-                  rows={2}
-                  className={`${inputCls} resize-none`}
-                />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-slate-500 block mb-1">Teléfono del consultorio</label>
-                <input
-                  type="tel"
-                  value={telefono}
-                  onChange={e => { setTelefono(formatearTelefono(e.target.value)); setErrorTelefono('') }}
-                  placeholder="Ej: 55 1234 5678"
-                  className={inputCls}
-                />
-                {errorTelefono && (
-                  <p className="text-xs text-red-500 mt-1">{errorTelefono}</p>
-                )}
-              </div>
-            </div>
-          )}
-
-          {paso === 4 && isAdmin && (
-            <div className="space-y-4">
-              <p className="text-sm text-slate-600">El logo de tu clínica aparece en el encabezado de todos los documentos.</p>
-              <div className="border-2 border-dashed border-slate-200 rounded-xl p-6 text-center">
-                {logoPreview ? (
-                  <div className="space-y-3">
-                    <img src={logoPreview} alt="Logo" className="h-20 mx-auto object-contain rounded-lg" />
-                    <button
-                      onClick={() => { setLogoFile(null); setLogoPreview(null) }}
-                      className="text-xs text-red-400 hover:text-red-600"
-                    >
-                      Quitar logo
-                    </button>
-                  </div>
+              {/* ⚠️ `sp-btn--primary` Y NO UNA ARBITRARIA SOBRE LA VARIABLE DE
+                  MARCA, QUE ERA LO QUE TENÍA Y NO SE VEÍA. Esa variable la
+                  inyecta `ThemeProvider`, montado SOLO en
+                  `(app)/layout.tsx:106`; en el launcher —que es donde vive este
+                  modal— no existe, y una arbitraria de Tailwind sin fallback
+                  con la variable sin definir no pinta nada: fondo transparente
+                  y texto blanco sobre panel blanco. `--sp-primary` lleva el
+                  fallback puesto a propósito «para rutas sin provider»
+                  (spinus-tokens.css:11-13), así que se ve con provider y sin
+                  él, y sigue la marca de la clínica cuando la hay. De paso el
+                  deshabilitado deja de ser opacidad y pasa a color propio. */}
+              <button
+                onClick={avanzar}
+                disabled={guardando}
+                className="sp-btn sp-btn--primary"
+              >
+                {guardando ? (
+                  <><Loader2 size={15} className="animate-spin" /> Guardando…</>
+                ) : esUltimo ? (
+                  <><CheckCircle2 size={15} /> Finalizar</>
                 ) : (
-                  <label className="cursor-pointer block">
-                    <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                      <span className="text-2xl">🏥</span>
-                    </div>
-                    <p className="text-sm font-medium text-slate-700">Haz clic para subir el logo</p>
-                    <p className="text-xs text-slate-400 mt-1">PNG o JPG · Máximo 2 MB</p>
-                    <input type="file" accept="image/png,image/jpeg,image/webp" onChange={handleLogoChange} className="hidden" />
-                  </label>
+                  <>Continuar <ChevronRight size={15} /></>
                 )}
-              </div>
-              {subiendoLogo && (
-                <div className="flex items-center gap-2 text-sm text-slate-500">
-                  <Loader2 size={14} className="animate-spin" /> Subiendo logo...
-                </div>
-              )}
+              </button>
             </div>
           )}
+        </div>
+      }
+    >
+      {/* Stepper — INDICADOR, no navegación. Se mueve solo con «Atrás» y
+          «Continuar» del pie; ver el porqué en `atras()`. */}
+      <div className="flex items-center gap-1 px-5 pt-4">
+        {pasos.map((p, i) => {
+          const activo = i === indice
+          const completado = i < indice
+          return (
+            <div key={p} className="flex items-center gap-1 flex-1">
+              <div className={`flex items-center gap-1.5 ${activo ? 'flex-1' : ''}`}>
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 transition-all ${
+                  completado ? 'bg-emerald-500 text-white'
+                    : activo ? 'bg-[var(--sp-primary)] text-white'
+                    : 'bg-slate-200 text-slate-500'
+                }`}>
+                  {completado ? <CheckCircle2 size={14} /> : i + 1}
+                </div>
+                {activo && <span className="text-xs font-medium text-slate-700">{ETIQUETAS[p]}</span>}
+              </div>
+              {i < pasos.length - 1 && (
+                <div className={`h-px flex-1 ${completado ? 'bg-emerald-500' : 'bg-slate-200'}`} />
+              )}
+            </div>
+          )
+        })}
+      </div>
 
-          {paso === 5 && (
-            <div className="space-y-4">
-              <p className="text-sm text-slate-600">Tu firma autógrafa aparece sobre la línea de firma en todos tus documentos PDF.</p>
-              <FirmaCaptura
-                firmaActual={firmaUrl}
-                onFirmaCambiada={url => setFirmaUrl(url)}
+      <div className="px-5 py-5 max-h-[60vh] overflow-y-auto">
+        {paso === 'datos' && (
+          <div className="space-y-4">
+            <p className="text-sm text-slate-600">¿Cómo aparecerás en tus documentos médicos?</p>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">
+                  Título <span className="text-red-500">*</span>
+                </label>
+                <select value={titulo} onChange={e => setTitulo(e.target.value)} className="sp-input">
+                  <option value="">— Elige —</option>
+                  {TITULOS.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+              <div className="col-span-2">
+                <label className="text-xs font-semibold text-slate-700 block mb-1">
+                  Nombre(s) <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text" value={nombres} onChange={e => setNombres(e.target.value)}
+                  placeholder="Ej: Juan" className="sp-input"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">
+                  Apellido paterno <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text" value={apellidoPaterno} onChange={e => setApellidoPaterno(e.target.value)}
+                  placeholder="Ej: García" className="sp-input"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">Apellido materno</label>
+                <input
+                  type="text" value={apellidoMaterno} onChange={e => setApellidoMaterno(e.target.value)}
+                  placeholder="Ej: López" className="sp-input"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-700 block mb-1">
+                Especialidad <span className="text-red-500">*</span>
+              </label>
+              <EspecialidadSelector
+                value={especialidades}
+                onChange={setEspecialidades}
+                selectClassName="sp-input"
               />
             </div>
-          )}
-        </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-700 block mb-1">
+                Universidad / Institución <span className="text-slate-400 font-normal">(opcional)</span>
+              </label>
+              <input
+                type="text" value={universidad} onChange={e => setUniversidad(e.target.value)}
+                placeholder="Ej: UNAM, IPN, UAG…" className="sp-input"
+              />
+            </div>
+          </div>
+        )}
 
-        {/* Footer con botones */}
-        <div className="px-6 pb-6 pt-2 flex items-center justify-between border-t border-slate-100">
-          {PASOS.find(p => p.num === paso)?.requerido ? (
-            <span className="text-xs text-slate-400">Paso requerido</span>
-          ) : (
-            <button
-              onClick={saltarPaso}
-              disabled={guardando}
-              className="text-xs text-slate-400 hover:text-slate-600 transition-colors"
+        {paso === 'cedulas' && (
+          <div className="space-y-4">
+            <p className="text-sm text-slate-600">Tus cédulas aparecerán al pie de cada documento oficial.</p>
+            <div>
+              <label className="text-xs font-semibold text-slate-700 block mb-1">
+                Cédula profesional <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text" value={cedulaProfesional}
+                onChange={e => { setCedulaProfesional(e.target.value); setErrorCedula('') }}
+                placeholder="7 u 8 dígitos" className="sp-input"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-700 block mb-1">
+                Cédula de especialidad <span className="text-slate-400 font-normal">(opcional)</span>
+              </label>
+              <input
+                type="text" value={cedulaEspecialidad}
+                onChange={e => { setCedulaEspecialidad(e.target.value); setErrorCedula('') }}
+                placeholder="7 u 8 dígitos" className="sp-input"
+              />
+              <p className="text-[11px] text-slate-500 mt-1">
+                Déjala vacía si ejerces como médico general.
+              </p>
+            </div>
+            {errorCedula && <p className="text-xs text-red-500">{errorCedula}</p>}
+            <p className="text-xs text-slate-400 bg-slate-50 rounded-lg p-3">
+              Las cédulas son datos que amparan legalmente tus documentos médicos bajo la NOM-004-SSA3-2012.
+            </p>
+          </div>
+        )}
+
+        {esPanelSoporte && (
+          <div className="space-y-4">
+            <div className="w-12 h-12 rounded-full bg-amber-50 flex items-center justify-center">
+              <LifeBuoy size={22} className="text-amber-600" />
+            </div>
+            <p className="text-sm font-semibold text-slate-800">Tu cuenta no está asociada a ninguna clínica</p>
+            <p className="text-sm text-slate-600">
+              Los médicos invitados no pueden crear una clínica: quien administra la tuya
+              debe volver a añadirte.
+            </p>
+            <p className="text-sm text-slate-600">
+              Escríbenos y lo resolvemos contigo —no es algo que puedas arreglar desde aquí.
+            </p>
+            <a
+              href="mailto:soporte@spinus.com.mx?subject=Cuenta sin clínica asignada"
+              className="sp-btn sp-btn--primary no-underline"
             >
-              Omitir por ahora
-            </button>
-          )}
+              Escribir a soporte
+            </a>
+          </div>
+        )}
 
-          <button
-            onClick={avanzar}
-            disabled={guardando || subiendoLogo}
-            className="flex items-center gap-2 px-5 py-2.5 bg-[#1e5fa8] text-white rounded-xl text-sm font-medium hover:bg-[#1a3a5c] transition-colors disabled:opacity-60"
-          >
-            {guardando ? (
-              <><Loader2 size={15} className="animate-spin" /> Guardando...</>
-            ) : paso === 5 ? (
-              <><CheckCircle2 size={15} /> Finalizar</>
-            ) : (
-              <>Continuar <ChevronRight size={15} /></>
+        {paso === 'clinica' && !gate.requiereSoporte && clinicaCreada && (
+          <div className="space-y-3">
+            <div className="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center">
+              <CheckCircle2 size={22} className="text-emerald-600" />
+            </div>
+            <p className="text-sm font-semibold text-slate-800">{nombreClinica.trim()} ya está creada</p>
+            <p className="text-sm text-slate-600">
+              Volviste a este paso, pero la clínica ya existe y no hace falta crearla otra vez.
+              Para cambiarle el nombre, entra a Mi Perfil.
+            </p>
+          </div>
+        )}
+
+        {paso === 'clinica' && !gate.requiereSoporte && !clinicaCreada && (
+          <div className="space-y-4">
+            {/* ⚠️ CLÍNICA Y CONSULTORIO NO SON LO MISMO, y el registro los
+                confundía: su campo decía «nombre del consultorio» y lo que
+                creaba era esto. Se explica aquí igual que el paso siguiente
+                explica lo suyo. */}
+            <p className="text-sm text-slate-600">
+              Tu clínica es la cuenta: el contenedor de tus pacientes, tus documentos y,
+              si algún día lo necesitas, tu equipo. El consultorio —el lugar físico donde
+              atiendes— lo configuras en el paso siguiente.
+            </p>
+            <div>
+              <label className="text-xs font-semibold text-slate-700 block mb-1">
+                Nombre de la clínica <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={nombreClinica}
+                onChange={e => setNombreClinica(e.target.value)}
+                maxLength={120}
+                placeholder="Ej: Clínica Ortointegra"
+                className="sp-input"
+              />
+              <p className="text-[11px] text-slate-500 mt-1">
+                Si trabajas por tu cuenta, pon tu nombre o el de tu práctica. Aparece en el
+                encabezado de tus documentos y puedes cambiarlo luego en Mi Perfil.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {paso === 'consultorio' && consultorioCreado && (
+          <div className="space-y-3">
+            <div className="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center">
+              <CheckCircle2 size={22} className="text-emerald-600" />
+            </div>
+            <p className="text-sm font-semibold text-slate-800">{nombreCons.trim()} ya está creado</p>
+            <p className="text-sm text-slate-600">
+              Volviste a este paso, pero el consultorio ya existe y no hace falta crearlo otra vez.
+              Para cambiarle la dirección, el teléfono o la zona horaria, entra a
+              Mi Perfil → Mis consultorios.
+            </p>
+          </div>
+        )}
+
+        {paso === 'consultorio' && !consultorioCreado && (
+          <div className="space-y-4">
+            <p className="text-sm text-slate-600">
+              El consultorio es el lugar físico donde atiendes. Su dirección y su zona horaria
+              mandan en tus documentos y en tu agenda.
+            </p>
+            <div>
+              <label className="text-xs font-semibold text-slate-700 block mb-1">
+                Nombre del consultorio <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text" value={nombreCons} onChange={e => setNombreCons(e.target.value)}
+                placeholder="Ej: Consultorio Centro" className="sp-input"
+              />
+            </div>
+            {requiereNombreCorto && (
+              <div>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">
+                  Nombre corto (máx. 12 caracteres) <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text" value={nombreCorto} onChange={e => setNombreCorto(e.target.value)}
+                  maxLength={12} placeholder="Ej: Centro" className="sp-input"
+                />
+                <p className="text-[11px] text-slate-500 mt-1">
+                  Se muestra en el sidebar y en agenda cuando el nombre completo es muy largo.
+                </p>
+              </div>
             )}
-          </button>
-        </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-700 block mb-1">
+                Dirección <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text" value={direccion} onChange={e => setDireccion(e.target.value)}
+                placeholder="Ej: Calle 60 #400, Mérida, Yucatán" className="sp-input"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-700 block mb-1">
+                Teléfono <span className="text-slate-400 font-normal">(opcional)</span>
+              </label>
+              <input
+                type="tel" value={telefono}
+                onChange={e => { setTelefono(formatearTelefono(e.target.value)); setErrorTelefono('') }}
+                placeholder="Ej: 999 123 4567" className="sp-input"
+              />
+              {errorTelefono && <p className="text-xs text-red-500 mt-1">{errorTelefono}</p>}
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-700 block mb-1">
+                Zona horaria <span className="text-red-500">*</span>
+              </label>
+              <div className="flex flex-wrap gap-2 mb-2">
+                {CHIPS_RAPIDOS.map(chip => (
+                  <button
+                    key={chip.value}
+                    type="button"
+                    onClick={() => setTimezone(chip.value)}
+                    className={`px-3 py-1.5 text-xs rounded-full border transition-colors ${
+                      timezone === chip.value
+                        ? 'bg-[var(--sp-primary)] text-white border-[var(--sp-primary)]'
+                        : 'bg-white text-slate-700 border-slate-200 hover:border-slate-400'
+                    }`}
+                  >
+                    {chip.label}
+                  </button>
+                ))}
+              </div>
+              <select value={timezone} onChange={e => setTimezone(e.target.value)} className="sp-input">
+                <option value="">— Selecciona tu zona —</option>
+                {ZONAS_MEXICO.map(z => (
+                  <option key={z.value} value={z.value}>{z.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
+
+        {paso === 'logo' && (
+          <div className="space-y-4">
+            <p className="text-sm text-slate-600">El logo de tu clínica aparece en el encabezado de todos los documentos.</p>
+            <div className="border-2 border-dashed border-slate-200 rounded-xl p-6 text-center">
+              {logoPreview ? (
+                <div className="space-y-3">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={logoPreview} alt="Logo" className="h-20 mx-auto object-contain rounded-lg" />
+                  <button
+                    onClick={() => { setLogoFile(null); setLogoPreview(null) }}
+                    className="text-xs text-red-400 hover:text-red-600"
+                  >
+                    Quitar logo
+                  </button>
+                </div>
+              ) : (
+                <label className="cursor-pointer block">
+                  <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <span className="text-2xl">🏥</span>
+                  </div>
+                  <p className="text-sm font-medium text-slate-700">Haz clic para subir el logo</p>
+                  <p className="text-xs text-slate-400 mt-1">PNG, JPG, WEBP o SVG · Máximo 500 KB</p>
+                  <input type="file" accept={LOGO_ACCEPT} onChange={handleLogoChange} className="hidden" />
+                </label>
+              )}
+            </div>
+          </div>
+        )}
+
+        {paso === 'firma' && (
+          <div className="space-y-4">
+            <p className="text-sm text-slate-600">Tu firma autógrafa aparece sobre la línea de firma en todos tus documentos PDF.</p>
+            <FirmaCaptura firmaActual={firmaUrl} onFirmaCambiada={url => setFirmaUrl(url)} />
+            {!firmaUrl && (
+              <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3">
+                Si la omites, tus recetas y escritos saldrán <strong>sin firma</strong>: con la línea y tus
+                datos, pero sin el trazo. Puedes capturarla más tarde en Mi Perfil.
+              </p>
+            )}
+          </div>
+        )}
       </div>
-    </div>
+    </ModalShell>
   )
 }

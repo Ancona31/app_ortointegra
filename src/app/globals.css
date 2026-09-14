@@ -945,6 +945,65 @@ body::before {
   animation: fadeIn 0.18s ease-out both;
 }
 
+/* ── Aviso de perfil incompleto del sidebar (handoff 2a) ──────────────────
+   Las tres animaciones del banner ámbar. Van juntas y son INFINITAS a
+   propósito: el aviso tiene que seguir llamando la atención hasta que el
+   médico complete el perfil. Quien no se entera de que le falta la firma acaba
+   creyendo que los documentos salen mal y levanta un ticket.
+
+   ⚠️ EL PREFIJO `aviso-` NO SOBRA. `animate-pulse` a secas es una utilidad
+   propia de Tailwind con otros keyframes; declararla aquí la pisaría en toda
+   la aplicación.
+
+   ⚠️ `aviso-halo` VA EN UN ENVOLTORIO, NO EN LA TARJETA. Su `box-shadow`
+   sustituye al de la propiedad, así que aplicado sobre la tarjeta se comería
+   su sombra de elevación. El envoltorio lleva el halo y la tarjeta su sombra:
+   las dos a la vez, que es lo que pide la spec.
+
+   Valores normativos del handoff; no los redondees. */
+@keyframes avisoPulse {
+  0%, 100% { opacity: 1;   transform: scale(1); }
+  50%      { opacity: .35; transform: scale(.72); }
+}
+.animate-aviso-pulse { animation: avisoPulse 1.4s ease-in-out infinite; }
+
+@keyframes avisoHalo {
+  0%   { box-shadow: 0 0 0 0    rgba(240,180,41,.55); }
+  70%  { box-shadow: 0 0 0 10px rgba(240,180,41,0); }
+  100% { box-shadow: 0 0 0 0    rgba(240,180,41,0); }
+}
+.animate-aviso-halo { animation: avisoHalo 2.8s ease-out infinite; }
+
+/* ⚠️ EL RECORRIDO SE MIDE CONTRA LA TARJETA (`cqw`), NO CONTRA LA BANDA.
+   `translateX` en porcentaje se mide sobre el PROPIO elemento, y la banda mide
+   38px: el `220%` del handoff son 83px, o sea que el brillo se paraba a un
+   tercio del ancho y se quedaba ahí, a la vista, el 45% restante del ciclo.
+   Con `100cqw` el desplazamiento sale del ancho REAL de la tarjeta —232px aquí,
+   no los 300 que suponía la spec— así que el brillo la cruza entera y sale
+   limpio por el borde derecho a cualquier ancho. El contenedor lo declara la
+   tarjeta con `container-type: inline-size`.
+   La PAUSA del handoff se conserva —el brillo es un destello periódico, no una
+   banda que se pasea— pero ahora transcurre con la banda YA FUERA del borde
+   derecho, donde no se ve. Antes era un parón en mitad del recorrido. */
+@keyframes avisoSheen {
+  0%        { transform: translateX(-100%); }
+  55%, 100% { transform: translateX(calc(100cqw + 2px)); }
+}
+.animate-aviso-sheen { animation: avisoSheen 3.6s ease-in-out infinite; }
+
+/* El colapso del cuerpo. Clase propia y no utilidades sueltas para que el
+   bloque de movimiento reducido de abajo pueda apagarlo por nombre. */
+.aviso-perfil-colapso {
+  transition: grid-template-rows 180ms ease-out, opacity 120ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-aviso-pulse,
+  .animate-aviso-halo,
+  .animate-aviso-sheen { animation: none !important; }
+  .aviso-perfil-colapso { transition: none !important; }
+}
+
 /* macOS-style slide up — curva Apple quintic-out */
 @keyframes slideUp {
   from { opacity: 0; transform: translateY(12px); }

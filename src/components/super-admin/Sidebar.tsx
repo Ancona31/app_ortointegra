@@ -13,7 +13,7 @@ import {
   Scale,
   LogOut,
 } from 'lucide-react'
-import type { ReactElement } from 'react'
+import { useState, type ReactElement } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 interface NavItem {
@@ -36,8 +36,17 @@ export default function SuperAdminSidebar(): ReactElement {
   const pathname = usePathname()
   const router = useRouter()
 
+  /* El aviso vive aquí, en estado local, y NO en el `ToastProvider` del
+     proyecto: en `super-admin/dashboard/layout.tsx` ese provider envuelve sólo a
+     `{children}` y esta barra es su HERMANA, así que `useToast()` cogería el
+     contexto por defecto —cuatro funciones vacías— y el aviso se perdería sin
+     ruido. Peor que no ponerlo. */
+  const [errorLogout, setErrorLogout] = useState<string | null>(null)
+
   async function handleLogout(): Promise<void> {
-    // NOM-024: registrar logout antes de cerrar sesión (no bloqueante)
+    // NOM-024: registrar logout antes de cerrar sesión. El await no sobra: esta
+    // ruta identifica al usuario por sus cookies sb-*, o sea por lo mismo que el
+    // cierre borra. Si el registro falla, el cierre continúa igual.
     try {
       await fetch('/api/auth/audit-login', {
         method: 'POST',
@@ -46,13 +55,30 @@ export default function SuperAdminSidebar(): ReactElement {
       })
     } catch { /* silent */ }
 
-    try { sessionStorage.removeItem('spinus_active') } catch { /* silent */ }
-    try { localStorage.removeItem('spinus_session_meta') } catch { /* silent */ }
+    /* ⚠️ ESTO DUPLICA A PROPÓSITO EL `signOut()` DE `lib/auth-context.tsx`, Y NO
+       SE UNIFICA. `AuthProvider` está montado sólo en `(app)/layout.tsx`;
+       /super-admin vive fuera de ese grupo de rutas, así que un `useAuth()` aquí
+       lanzaría en el render y tumbaría el centro de control entero. Traerlo
+       metería además su *loading gate* en el área desde la que se resuelven
+       incidentes. Diez líneas repetidas es el precio correcto.
 
+       El orden es el mismo y por el mismo motivo: `@supabase/ssr` guarda la
+       sesión DENTRO de las cookies sb-*, así que limpiar antes dejaba al SDK sin
+       sesión que revocar y el refresh token seguía vivo en Supabase Auth.
+       Y auth-js NO LANZA aquí: DEVUELVE `{ error }`. */
+    setErrorLogout(null)
     try {
       const supabase = createClient()
-      await supabase.auth.signOut()
-    } catch { /* silent */ }
+      const { error } = await supabase.auth.signOut({ scope: 'global' })
+      if (error) throw error
+    } catch {
+      setErrorLogout('No se pudo cerrar la sesión. Inténtalo de nuevo en unos momentos.')
+      return
+    }
+
+    // Revocado. Sólo ahora se limpia lo local y se navega.
+    try { sessionStorage.removeItem('spinus_active') } catch { /* silent */ }
+    try { localStorage.removeItem('spinus_session_meta') } catch { /* silent */ }
 
     router.push('/login')
     router.refresh()
@@ -116,6 +142,11 @@ export default function SuperAdminSidebar(): ReactElement {
           <LogOut size={14} />
           Cerrar sesión
         </button>
+        {errorLogout ? (
+          <p role="alert" className="px-3 pt-1 text-[11px] leading-snug text-red-400">
+            {errorLogout}
+          </p>
+        ) : null}
       </div>
     </aside>
   )

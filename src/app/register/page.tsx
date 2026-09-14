@@ -4,8 +4,21 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Loader2, Eye, EyeOff, CheckCircle, RefreshCw } from 'lucide-react'
-import EspecialidadSelector from '@/components/ui/EspecialidadSelector'
-import { validarCedula } from '@/lib/validaciones'
+
+/**
+ * Registro público — correo y contraseña (Bloque B5, quinta parte).
+ *
+ * Los nueve campos que había aquí —título, nombre, apellidos, especialidad, las
+ * dos cédulas y el «nombre del consultorio»— los pide ahora el gate de
+ * onboarding, después de confirmar el correo. Dos razones: un formulario largo
+ * delante de quien todavía no ha visto el producto, y que esos datos ya se
+ * exigían otra vez en el gate, con otro criterio.
+ *
+ * ⚠️ EL «NOMBRE DEL CONSULTORIO» DE AQUÍ CREABA LA CLÍNICA, no un consultorio.
+ * La clínica es la cuenta; el consultorio, el lugar físico, y vive en otra
+ * tabla. En el onboarding son dos pasos distintos y cada uno se llama por su
+ * nombre.
+ */
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -54,17 +67,9 @@ export default function RegisterPage() {
     }
   }
 
-  const [especialidades, setEspecialidades] = useState<string[]>([''])
   const [form, setForm] = useState({
-    nombres:            '',
-    apellido_paterno:   '',
-    apellido_materno:   '',
-    email:              '',
-    password:           '',
-    nombreClinica:      '',
-    titulo:             'Dr.',
-    cedula_profesional: '',
-    cedula_especialidad:'',
+    email:    '',
+    password: '',
   })
 
   function set(field: keyof typeof form) {
@@ -74,19 +79,13 @@ export default function RegisterPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    const errCed = validarCedula(form.cedula_profesional)
-    const errCedEsp = validarCedula(form.cedula_especialidad)
-    if (errCed || errCedEsp) {
-      setError(errCed || errCedEsp || 'Revisa los campos de cédula')
-      return
-    }
     setLoading(true)
     setError('')
 
     const res = await fetch('/api/auth/registro', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ ...form, especialidad: especialidades.filter(Boolean).join(' · '), tipo: 'independiente' }),
+      body:    JSON.stringify(form),
     })
 
     const data = await res.json()
@@ -184,87 +183,10 @@ export default function RegisterPage() {
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
           <form onSubmit={handleSubmit} className="space-y-4">
 
-            {/* Datos del médico */}
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Datos del médico</p>
-
-            <div className="grid grid-cols-3 gap-2">
-              <div>
-                <label className="text-xs font-medium text-slate-500 block mb-1">Título</label>
-                <select value={form.titulo} onChange={set('titulo')}
-                  className="w-full px-2 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]">
-                  <option value="Dr.">Dr.</option>
-                  <option value="Dra.">Dra.</option>
-                </select>
-              </div>
-              <div className="col-span-2">
-                <label className="text-xs font-medium text-slate-500 block mb-1">Nombre(s) *</label>
-                <input type="text" value={form.nombres} onChange={set('nombres')}
-                  placeholder="Ej: Juan" required autoFocus
-                  className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="text-xs font-medium text-slate-500 block mb-1">Apellido paterno *</label>
-                <input type="text" value={form.apellido_paterno} onChange={set('apellido_paterno')}
-                  placeholder="Ej: Pérez" required
-                  className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-slate-500 block mb-1">Apellido materno</label>
-                <input type="text" value={form.apellido_materno} onChange={set('apellido_materno')}
-                  placeholder="Ej: García"
-                  className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
-              </div>
-            </div>
-
-            <div>
-              <label className="text-xs font-medium text-slate-500 block mb-1">Especialidad *</label>
-              <EspecialidadSelector
-                value={especialidades}
-                onChange={setEspecialidades}
-                selectClassName="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8] bg-white"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="text-xs font-medium text-slate-500 block mb-1">Cédula profesional *</label>
-                <input type="text" inputMode="numeric" value={form.cedula_profesional}
-                  onChange={e => setForm(f => ({ ...f, cedula_profesional: e.target.value.replace(/\D/g, '').slice(0, 8) }))}
-                  placeholder="Ej: 12345678" required
-                  className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
-                {form.cedula_profesional && validarCedula(form.cedula_profesional) && (
-                  <p className="text-[10px] text-red-500 mt-1">{validarCedula(form.cedula_profesional)}</p>
-                )}
-              </div>
-              <div>
-                <label className="text-xs font-medium text-slate-500 block mb-1">Cédula especialidad</label>
-                <input type="text" inputMode="numeric" value={form.cedula_especialidad}
-                  onChange={e => setForm(f => ({ ...f, cedula_especialidad: e.target.value.replace(/\D/g, '').slice(0, 8) }))}
-                  placeholder="Ej: 3890214"
-                  className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
-                {form.cedula_especialidad && validarCedula(form.cedula_especialidad) && (
-                  <p className="text-[10px] text-red-500 mt-1">{validarCedula(form.cedula_especialidad)}</p>
-                )}
-              </div>
-            </div>
-
-            <div className="border-t border-slate-100 pt-1" />
-
-            {/* Nombre del consultorio */}
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Consultorio</p>
-
-            <div>
-              <label className="text-xs font-medium text-slate-500 block mb-1">Nombre del consultorio *</label>
-              <input type="text" value={form.nombreClinica} onChange={set('nombreClinica')}
-                placeholder="Ej: Consultorio Dr. Pérez"
-                required
-                className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
-            </div>
-
-            <div className="border-t border-slate-100 pt-1" />
+            <p className="text-xs text-slate-500 leading-relaxed">
+              Crea tu cuenta con tu correo. Al entrar te pediremos tus datos
+              profesionales y los de tu clínica, una sola vez.
+            </p>
 
             {/* Acceso */}
             <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Acceso</p>
@@ -272,7 +194,7 @@ export default function RegisterPage() {
             <div>
               <label className="text-xs font-medium text-slate-500 block mb-1">Correo electrónico *</label>
               <input type="email" value={form.email} onChange={set('email')}
-                placeholder="correo@ejemplo.com" required
+                placeholder="correo@ejemplo.com" required autoFocus
                 className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
             </div>
 

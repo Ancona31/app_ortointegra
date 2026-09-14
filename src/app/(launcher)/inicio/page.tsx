@@ -19,17 +19,16 @@ import { useClinica } from '@/hooks/useClinica'
 import { useProfile } from '@/hooks/useProfile'
 import { useSubscriptionGate } from '@/components/billing/SubscriptionGateProvider'
 import { hoyEnTZ, desplazarFecha, fechaHoraLocalAInstante, tzDispositivo } from '@/lib/dates'
-
-type GridMode = 'sin_pacientes' | 'nuevo' | 'activo'
+import type { EstadoPerfil as EstadoGate } from '@/lib/perfil/gate'
 
 interface EstadoPerfil {
-  porcentaje: number
-  requiereOnboarding: boolean
-  gridMode: GridMode
+  /** Criterio único (`evaluarPerfil`). Es lo que decide el bloqueo. */
+  gate?: EstadoGate
+  tieneFirma: boolean
+  tieneLogo: boolean
   role: string
   plan: string
   planNombre: string
-  suscripcion_estado: string
 }
 
 const FRASES_MOTIVACIONALES = [
@@ -92,7 +91,12 @@ export default function InicioPage() {
         .then(r => r.json())
         .then((data: EstadoPerfil) => {
           setEstado(data)
-          if (data.requiereOnboarding) setMostrarOnboarding(true)
+          /* ⚠️ LECTURA AFIRMATIVA, y por eso se pregunta por `data.gate` antes
+             que por lo que dice: el modal que abre esta línea es BLOQUEANTE.
+             Una respuesta que no trae gate —error, 401, un despliegue a medias—
+             es «todavía no sé», y con «todavía no sé» no se encierra a nadie.
+             El `.catch` de abajo deja esto sin ejecutar, que es lo correcto. */
+          if (data.gate && !data.gate.completo) setMostrarOnboarding(true)
         })
         .catch(() => {})
         .finally(() => setLoading(false))
@@ -187,11 +191,14 @@ export default function InicioPage() {
 
   return (
     <>
-      {mostrarOnboarding && (
+      {mostrarOnboarding && estado.gate && (
         <OnboardingModal
           onComplete={handleOnboardingComplete}
+          gate={estado.gate}
           role={estado.role}
           esAdminDeClinica={profile?.es_admin_de_clinica === true}
+          tieneFirma={estado.tieneFirma}
+          tieneLogo={estado.tieneLogo}
         />
       )}
 
@@ -258,51 +265,14 @@ export default function InicioPage() {
         <div className="mx-6 mt-3">
         </div>
 
-        {/* Profile completion banner */}
-        {estado.porcentaje < 100 && estado.role !== 'secretaria' && (
-          <div className="mx-6 mt-2">
-            <div className={`rounded-xl px-4 py-3 flex items-center justify-between ${
-              dark
-                ? 'bg-amber-900/30 border border-amber-700/40'
-                : 'bg-amber-50 border border-amber-200'
-            }`}>
-              <div className="flex items-center gap-3">
-                <div className="relative w-9 h-9 shrink-0">
-                  <svg viewBox="0 0 36 36" className="w-9 h-9 -rotate-90">
-                    <circle cx="18" cy="18" r="15" fill="none" stroke={dark ? '#78350f' : '#fde68a'} strokeWidth="4" />
-                    <circle
-                      cx="18" cy="18" r="15"
-                      fill="none" stroke="#f59e0b" strokeWidth="4"
-                      strokeDasharray={`${(estado.porcentaje / 100) * 94.2} 94.2`}
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                  <span className={`absolute inset-0 flex items-center justify-center text-[9px] font-bold ${
-                    dark ? 'text-amber-400' : 'text-amber-700'
-                  }`}>
-                    {estado.porcentaje}%
-                  </span>
-                </div>
-                <div>
-                  <p className={`text-sm font-semibold ${dark ? 'text-amber-300' : 'text-amber-800'}`}>
-                    Completa tu perfil
-                  </p>
-                  <p className={`text-xs ${dark ? 'text-amber-400/70' : 'text-amber-600'}`}>
-                    Aparece en todos tus documentos PDF
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setMostrarOnboarding(true)}
-                className={`flex items-center gap-1 text-xs font-medium transition-colors shrink-0 ${
-                  dark ? 'text-amber-400 hover:text-amber-200' : 'text-amber-700 hover:text-amber-900'
-                }`}
-              >
-                Completar <ChevronRight size={13} />
-              </button>
-            </div>
-          </div>
-        )}
+        {/* ⚠️ AQUÍ NO VA NINGÚN AVISO DE PERFIL, Y NO ES UN OLVIDO. Vivió aquí
+            una barra con lo que falta —firma, cédula de especialidad, logo—
+            mientras el aviso del sidebar era una línea discreta. Con la tarjeta
+            ámbar del sidebar (handoff 2a) serían el mismo mensaje dicho dos
+            veces, así que el aviso vive SOLO allí. Antes de eso, aquí hubo un
+            anillo de porcentaje que el gate dejó obsoleto.
+            ⚠️ CONSECUENCIA CONOCIDA: `(launcher)` NO MONTA EL SIDEBAR, así que
+            en esta pantalla no hay aviso de ningún tipo. */}
 
         {/* Main content */}
         <div className="flex-1 flex flex-col items-center justify-center px-6 py-10">

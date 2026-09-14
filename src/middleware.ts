@@ -60,9 +60,7 @@ export async function middleware(request: NextRequest) {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
           supabaseResponse = NextResponse.next({ request })
           cookiesToSet.forEach(({ name, value, options }) => {
-            // Cookie de sesión: sin maxAge ni expires → se borra al cerrar el navegador
-            const { maxAge: _m, expires: _e, ...sessionOptions } = options ?? {}
-            supabaseResponse.cookies.set(name, value, sessionOptions)
+            supabaseResponse.cookies.set(name, value, options)
           })
         },
       },
@@ -197,7 +195,7 @@ export async function middleware(request: NextRequest) {
     || pathname.startsWith('/offline-setup')
 
   // Rutas API que no requieren sesión (OAuth callbacks, Stripe webhook y Stripe checkout/portal que manejan su propia auth)
-  const publicApiPaths = ['/api/google/callback', '/api/stripe/webhook', '/api/stripe/checkout', '/api/stripe/portal', '/api/auth/registro', '/api/auth/email-hook', '/api/auth/verify-email', '/api/auth/audit-login', '/api/auth/rate-limit']
+  const publicApiPaths = ['/api/google/callback', '/api/stripe/webhook', '/api/stripe/checkout', '/api/stripe/portal', '/api/auth/registro', '/api/auth/email-hook', '/api/auth/verify-email', '/api/auth/audit-login', '/api/auth/rate-limit', '/api/auth/login']
   const isPublicApi = publicApiPaths.some(p => pathname.startsWith(p))
 
   // Si no hay sesión y no está en ruta pública → verificar cookies antes de redirigir.
@@ -219,6 +217,32 @@ export async function middleware(request: NextRequest) {
 
   // Permitir acceso a /login aunque haya sesión activa
   // El usuario puede querer cambiar de cuenta — la página mostrará un aviso
+
+  /* LA RAÍZ, EN CAMBIO, SÍ EXPULSA A QUIEN TIENE SESIÓN, y la asimetría con las
+     dos líneas de arriba es deliberada, no un olvido: `/login` existe para
+     CAMBIAR DE IDENTIDAD, así que llegar ahí con sesión abierta es un caso
+     legítimo; la raíz es la página comercial, y quien ya tiene cuenta no va ahí
+     a contratarla. Sin esto, un médico que abría www.spinus.com.mx aterrizaba
+     en el argumentario de venta en vez de en su trabajo.
+
+     ⚠️ EXIGE `sesionValida`, NO LA PRESENCIA DE COOKIE. Es lo contrario del
+     `if` de arriba, que deja pasar con cookie aunque la verificación falle: ahí
+     el lado seguro es no expulsar a quien acaba de entrar, y aquí es no
+     expulsar de la landing a un visitante con una cookie caducada. Cada rama
+     degrada hacia servir la página, no hacia el redirect.
+
+     ⚠️ NO CUESTA NINGUNA CONSULTA: `sesionValida` ya está calculado arriba para
+     toda petición que pase el matcher, la raíz incluida. Esto lo usa en vez de
+     tirarlo. Por lo mismo NO se resuelve con un guarda de servidor en
+     `(landing)/layout.tsx`: la raíz está PRERENDERIZADA —sale como `○ /` en la
+     tabla de rutas del build— y un `getUser()` ahí la volvería dinámica y
+     pondría una llamada de red a Auth por cada visitante anónimo, que es
+     exactamente el gasto que el bloque medido de arriba vino a quitar.
+
+     Googlebot no manda cookies, así que sigue recibiendo la landing. */
+  if (sesionValida && pathname === '/') {
+    return NextResponse.redirect(new URL('/inicio', request.url))
+  }
 
   return supabaseResponse
 }

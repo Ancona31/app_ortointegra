@@ -177,7 +177,29 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setMeta(newMeta)
   }, [])
 
+  /**
+   * Cierra la sesión. LANZA si la revocación en el servidor no se consigue, y en
+   * ese caso NO limpia nada: ni cookies, ni sessionStorage, ni `meta`.
+   *
+   * ⚠️ EL ORDEN NO ES DE ESTILO. `@supabase/ssr` guarda la sesión DENTRO de las
+   * cookies sb-*, así que borrarlas primero —como se hacía— dejaba al SDK sin
+   * sesión que revocar: `_signOut` sólo llama al servidor `if (accessToken)`
+   * (GoTrueClient.js:1754), se saltaba esa rama entera y devolvía éxito. El
+   * refresh token seguía vivo en Supabase Auth. Primero se revoca; lo local se
+   * borra sólo con la confirmación del servidor en la mano.
+   *
+   * ⚠️ auth-js NO LANZA AQUÍ: DEVUELVE `{ error }`. Un try/catch alrededor no ve
+   * ese fallo — el mismo malentendido que ya se corrigió en logAudit. Lo que
+   * decide es el valor de retorno.
+   *
+   * `scope: 'global'` es deliberado: cierra la sesión en TODOS los dispositivos.
+   */
   const signOut = useCallback(async (): Promise<void> => {
+    const supabase = createClient()
+    const { error } = await supabase.auth.signOut({ scope: 'global' })
+    if (error) throw error
+
+    // Revocado. A partir de aquí sí se limpia lo local.
     try {
       document.cookie.split(';').forEach(c => {
         const name = c.trim().split('=')[0]
@@ -188,11 +210,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     } catch { /* silent */ }
     try {
       sessionStorage.removeItem('spinus_active')
-    } catch { /* silent */ }
-
-    try {
-      const supabase = createClient()
-      await supabase.auth.signOut()
     } catch { /* silent */ }
 
     const emptyMeta: SessionMeta = {

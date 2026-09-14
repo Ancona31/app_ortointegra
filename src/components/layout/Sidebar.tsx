@@ -12,6 +12,9 @@ import {
   Calculator,
 } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
+import useSWR from 'swr'
+import AvisoPerfilSidebar from '@/components/sidebar/AvisoPerfilSidebar'
+import { CLAVE_ESTADO_PERFIL } from '@/lib/perfil/claves'
 import { useMenuMovil } from '@/contexts/MenuMovilContext'
 import { useRouter } from 'next/navigation'
 import { useProfile, clearProfileCache } from '@/hooks/useProfile'
@@ -26,6 +29,7 @@ import { useClinica } from '@/hooks/useClinica'
 import { CLAVE_CONFIG } from '@/lib/configApp'
 import { useTheme } from '@/components/layout/ThemeProvider'
 import { useAuth } from '@/lib/auth-context'
+import { useToast } from '@/components/ui/Toast'
 import { useSubscriptionGate } from '@/components/billing/SubscriptionGateProvider'
 import { mutate } from 'swr'
 
@@ -228,6 +232,14 @@ function groupHasActiveChild(group: NavGroup, pathname: string) {
 
 /* ─── Componente ──────────────────────────────────────────── */
 
+/** Lo que este componente lee de `/api/me/estado-perfil`, y nada más. */
+interface RespuestaEstadoPerfil {
+  gate?: { exento: string | null }
+  tieneFirma: boolean
+  tieneLogo: boolean
+  faltaCedulaEspecialidad: boolean
+}
+
 export default function Sidebar() {
   const pathname = usePathname()
   const router   = useRouter()
@@ -245,7 +257,20 @@ export default function Sidebar() {
   const { nombreDisplay, subtitulo, logoUrl } = useClinica()
   const { dark, toggle } = useTheme()
   const { signOut } = useAuth()
+  const toast = useToast()
   const { state: subState, openBloqueoModal } = useSubscriptionGate()
+
+  /* Lo que le falta al médico después del gate (firma, cédula de especialidad,
+     logo). MISMA CLAVE que `GateOnboarding`, que ya la tiene montada en el
+     layout de (app): SWR comparte la entrada de caché, así que esto NO añade
+     ninguna petición. El `fetcher` va aquí porque el `SWRConfig` de (app) no
+     define uno global.
+     Sin `gate` en la respuesta —error, 401, carga— no se pinta nada: el mismo
+     criterio de lectura afirmativa del gate. */
+  const { data: estadoPerfil } = useSWR<RespuestaEstadoPerfil>(
+    CLAVE_ESTADO_PERFIL,
+    (url: string) => fetch(url).then(r => r.ok ? r.json() : Promise.reject(new Error(String(r.status)))),
+  )
 
   const isAdmin = canManageClinica(profile)
 
@@ -303,8 +328,10 @@ export default function Sidebar() {
      endpoints se consolidaron en /api/me/config es TAMBIÉN la de
      `useConsultorios`. Vaciarla dentro del handler la vaciaba mientras el árbol
      de (app) seguía montado —`router.push` no desmonta nada de forma síncrona—,
-     y `PrimerConsultorioModal` cuelga de `ConsultorioActivoProvider`
-     ((app)/layout.tsx:54), o sea que estaba en pantalla justo en ese instante.
+     y el gate de perfil (`GateOnboarding`) cuelga del layout de (app), o sea que
+     estaba en pantalla justo en ese instante. Quien lo sufrió primero fue
+     `PrimerConsultorioModal`, que colgaba de `ConsultorioActivoProvider` y se
+     retiró en el Bloque B5; el gate ocupa su lugar y hereda la exposición.
      `internalMutate` de SWR fija `data` y limpia `error`, pero NUNCA toca
      `isLoading`: el hook quedaba en `consultorios: []` con `isLoading: false`
      —un «no tienes ninguno» falso y estable, no un destello— y el modal de
@@ -325,15 +352,31 @@ export default function Sidebar() {
   }, [])
 
   async function handleLogout() {
-    // NOM-024: registrar logout antes de cerrar sesión
-    fetch('/api/auth/audit-login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'logout' }),
-    }).catch(() => {})
-    // signOut() del AuthContext es la ÚNICA fuente de limpieza:
-    // stopMirrorEngine → clearMirror → cookies sb-* → sessionStorage → SDK signOut
-    await signOut()
+    /* NOM-024: registrar el logout antes de cerrar sesión, y CON await.
+       ⚠️ EL `await` ES LA CORRECCIÓN, NO UN ADORNO. Esta ruta identifica al
+       usuario por sus cookies sb-*, o sea por lo mismo que signOut() borra: sin
+       esperar, las dos cosas competían y si el cierre ganaba la carrera el
+       registro se perdía. Si el registro falla por su cuenta, el cierre sigue —
+       quedarse dentro por no poder escribir en el log sería peor. */
+    try {
+      await fetch('/api/auth/audit-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'logout' }),
+      })
+    } catch { /* silent */ }
+
+    /* signOut() del AuthContext es la ÚNICA fuente de limpieza —cookies sb-*,
+       sessionStorage, meta— y LANZA si el servidor de Auth no confirma la
+       revocación. Nada de lo de abajo puede correr en ese caso: sin revocación
+       no se limpia local ni se navega. El usuario se queda dentro, entero. */
+    try {
+      await signOut()
+    } catch {
+      toast.error('No se pudo cerrar la sesión. Inténtalo de nuevo en unos momentos.')
+      return
+    }
+
     clearProfileCache()
     // Marca para el cleanup de arriba; la caché del agregado —clínica,
     // consultorios, horario y médicos de la sesión que cierra— se vacía cuando
@@ -640,6 +683,26 @@ hasActive && !isOpen
             <LogOut size={14} />
             Cerrar sesión
           </button>
+
+          {/* Lo que falta en el perfil (handoff 2a). VA AQUÍ, DEBAJO DE LOS DOS
+              BOTONES Y ENCIMA DEL AVISO DE PRIVACIDAD, que es el orden vertical
+              que fija §4 de la spec y el que implementa su referencia
+              ejecutable. §1 dice lo contrario —«arriba del grupo»— y se
+              descarta: además de perder 2 a 1, la tarjeta COLAPSA, así que
+              encima de los botones cada colapso los subiría y bajaría; debajo,
+              lo único que se mueve es la línea de abajo.
+              Solo a quien se le exige algo: la secretaria y el super_admin
+              están exentos del criterio y no tienen firma, cédula ni logo que
+              completar. */}
+          {estadoPerfil?.gate?.exento === null && (
+            <AvisoPerfilSidebar
+              faltaFirma={!estadoPerfil.tieneFirma}
+              faltaLogo={!estadoPerfil.tieneLogo}
+              faltaCedulaEspecialidad={estadoPerfil.faltaCedulaEspecialidad}
+              alNavegar={close}
+            />
+          )}
+
           {/* ⚠️ EL `prefetch={false}` VA ATADO AL `target="_blank"`, Y SI ALGUIEN
               QUITA EL SEGUNDO TIENE QUE REPLANTEARSE EL PRIMERO.
 

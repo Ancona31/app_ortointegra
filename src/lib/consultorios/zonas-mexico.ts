@@ -9,7 +9,8 @@
  * - Ordenado por offset UTC descendente (oeste → este).
  *
  * Usado en:
- * - PrimerConsultorioModal (F3-4, onboarding bloqueante)
+ * - OnboardingModal (Bloque B5, paso de consultorio del gate bloqueante; heredó
+ *   este uso de `PrimerConsultorioModal`, retirado en la cuarta parte)
  * - EditConsultorioModal (F3-5, edición desde perfil)
  *
  * MÓDULO NEUTRO — sin `'use client'` y sin dependencias de React. Lo consumen

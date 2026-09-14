@@ -66,7 +66,13 @@ export async function checkAuthRateLimit(
   identifier: string,
   action: string,
   limite: number,
-  windowMinutes: number
+  windowMinutes: number,
+  /* `registrar: false` comprueba SIN consumir presupuesto. Existe para el login
+     del servidor, que debe contar FALLOS y no intentos: comprueba antes de
+     pedirle nada a GoTrue y solo registra si las credenciales no valen. Sin
+     esto, cinco logins CORRECTOS seguidos dejaban al médico fuera quince
+     minutos. Por defecto `true`: los llamadores existentes no cambian. */
+  opciones?: { registrar?: boolean },
 ): Promise<{ blocked: boolean; remaining: number }> {
   const admin = createAdminClient()
   const windowStart = new Date(Date.now() - windowMinutes * 60 * 1000).toISOString()
@@ -85,7 +91,9 @@ export async function checkAuthRateLimit(
     return { blocked: true, remaining: 0 }
   }
 
-  await admin.from('ip_rate_limits').insert({ ip: identifier, ruta })
+  if (opciones?.registrar !== false) {
+    await admin.from('ip_rate_limits').insert({ ip: identifier, ruta })
+  }
 
   // Limpiar registros viejos sin bloquear
   admin
