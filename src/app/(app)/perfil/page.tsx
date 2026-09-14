@@ -23,6 +23,7 @@ import EspecialidadSelector from '@/components/ui/EspecialidadSelector'
 import { validarCedula } from '@/lib/validaciones'
 import FirmaCaptura from '@/components/perfil/FirmaCaptura'
 import { compressLogoImage } from '@/lib/compressImage'
+import { CLAVE_ESTADO_PERFIL } from '@/lib/perfil/claves'
 import { revisarLogo } from '@/lib/perfil/logoArchivo'
 import { syncDoctorProfile } from '@/lib/offline/doctorProfile'
 import { canManageClinica, isMedico } from '@/lib/permissions'
@@ -729,6 +730,20 @@ export default function PerfilPage() {
       revalidar(CLAVE_CONFIG)
     }
 
+    /* ⚠️ Y SIN ESTO, EL AVISO DE PERFIL INCOMPLETO DEL SIDEBAR SE QUEDA RANCIO.
+       Lo que ese aviso evalúa —firma, cédula de especialidad y logo— se edita
+       TODO en esta pantalla, así que guardar aquí tiene que refrescarlo en el
+       acto; si no, el médico guarda, ve el aviso de guardado y sigue leyendo
+       «Sin cédula de especialidad» hasta la siguiente revalidación.
+       ⚠️ `okPerfil` CUENTA AUNQUE SE HAYA TOCADO SOLO LA ESPECIALIDAD: la
+       exención de medicina general la decide `especialidad`, así que cambiarla
+       cambia lo que el aviso pide aunque la cédula no se toque.
+       La firma NO entra aquí — se guarda sola al capturarla, y revalida desde
+       su propio `onFirmaCambiada`. */
+    if (okPerfil || okLogo) {
+      revalidar(CLAVE_ESTADO_PERFIL)
+    }
+
     if (fallos.length === 0) {
       toast.success('Cambios guardados correctamente')
     } else if (fallos.length === intentos) {
@@ -1073,9 +1088,13 @@ export default function PerfilPage() {
 
                 <div className="flex flex-col gap-[var(--sp-2-5)]">
                   <p className="sp-label-field">Firma autógrafa</p>
+                  {/* La revalidación va AQUÍ y no dentro de `FirmaCaptura`
+                      porque ese componente lo comparte el onboarding, y allí
+                      invalidar esta clave a media captura haría que el gate
+                      recalculara y desmontara el modal antes de tiempo. */}
                   <FirmaCaptura
                     firmaActual={firmaUrl}
-                    onFirmaCambiada={url => setFirmaUrl(url)}
+                    onFirmaCambiada={url => { setFirmaUrl(url); revalidar(CLAVE_ESTADO_PERFIL) }}
                   />
                   <p className="sp-hint">
                     La firma se guarda en cuanto la capturas: no depende del botón de guardar.

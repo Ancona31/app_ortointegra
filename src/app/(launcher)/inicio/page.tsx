@@ -21,16 +21,12 @@ import { useSubscriptionGate } from '@/components/billing/SubscriptionGateProvid
 import { hoyEnTZ, desplazarFecha, fechaHoraLocalAInstante, tzDispositivo } from '@/lib/dates'
 import type { EstadoPerfil as EstadoGate } from '@/lib/perfil/gate'
 
-type GridMode = 'sin_pacientes' | 'nuevo' | 'activo'
-
 interface EstadoPerfil {
-  porcentaje: number
   requiereOnboarding: boolean
   /** Criterio único (`evaluarPerfil`). Es lo que decide el bloqueo. */
   gate?: EstadoGate
   tieneFirma: boolean
   tieneLogo: boolean
-  gridMode: GridMode
   role: string
   plan: string
   planNombre: string
@@ -271,59 +267,14 @@ export default function InicioPage() {
         <div className="mx-6 mt-3">
         </div>
 
-        {/* Profile completion banner */}
-        {estado.porcentaje < 100 && estado.role !== 'secretaria' && (
-          <div className="mx-6 mt-2">
-            <div className={`rounded-xl px-4 py-3 flex items-center justify-between ${
-              dark
-                ? 'bg-amber-900/30 border border-amber-700/40'
-                : 'bg-amber-50 border border-amber-200'
-            }`}>
-              <div className="flex items-center gap-3">
-                <div className="relative w-9 h-9 shrink-0">
-                  <svg viewBox="0 0 36 36" className="w-9 h-9 -rotate-90">
-                    <circle cx="18" cy="18" r="15" fill="none" stroke={dark ? '#78350f' : '#fde68a'} strokeWidth="4" />
-                    <circle
-                      cx="18" cy="18" r="15"
-                      fill="none" stroke="#f59e0b" strokeWidth="4"
-                      strokeDasharray={`${(estado.porcentaje / 100) * 94.2} 94.2`}
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                  <span className={`absolute inset-0 flex items-center justify-center text-[9px] font-bold ${
-                    dark ? 'text-amber-400' : 'text-amber-700'
-                  }`}>
-                    {estado.porcentaje}%
-                  </span>
-                </div>
-                <div>
-                  <p className={`text-sm font-semibold ${dark ? 'text-amber-300' : 'text-amber-800'}`}>
-                    Completa tu perfil
-                  </p>
-                  <p className={`text-xs ${dark ? 'text-amber-400/70' : 'text-amber-600'}`}>
-                    Aparece en todos tus documentos PDF
-                  </p>
-                </div>
-              </div>
-              {/* ⚠️ VA A MI PERFIL, YA NO ABRE EL ONBOARDING. Ese modal es
-                  bloqueante —sin ✕ y con `onClose` no-op—, así que abrirlo por
-                  voluntad propia era entrar en una habitación sin puerta: el
-                  banner sale con cualquier porcentaje < 100, y el porcentaje
-                  baja por cosas (cédula de especialidad, firma) que el criterio
-                  no exige y que el gate, por tanto, no tiene pasos para pedir.
-                  El modal lo monta el gate y solo el gate. Lo omitible se
-                  completa donde se edita: Mi Perfil. */}
-              <Link
-                href="/perfil"
-                className={`flex items-center gap-1 text-xs font-medium transition-colors shrink-0 ${
-                  dark ? 'text-amber-400 hover:text-amber-200' : 'text-amber-700 hover:text-amber-900'
-                }`}
-              >
-                Completar <ChevronRight size={13} />
-              </Link>
-            </div>
-          </div>
-        )}
+        {/* ⚠️ AQUÍ NO VA NINGÚN AVISO DE PERFIL, Y NO ES UN OLVIDO. Vivió aquí
+            una barra con lo que falta —firma, cédula de especialidad, logo—
+            mientras el aviso del sidebar era una línea discreta. Con la tarjeta
+            ámbar del sidebar (handoff 2a) serían el mismo mensaje dicho dos
+            veces, así que el aviso vive SOLO allí. Antes de eso, aquí hubo un
+            anillo de porcentaje que el gate dejó obsoleto.
+            ⚠️ CONSECUENCIA CONOCIDA: `(launcher)` NO MONTA EL SIDEBAR, así que
+            en esta pantalla no hay aviso de ningún tipo. */}
 
         {/* Main content */}
         <div className="flex-1 flex flex-col items-center justify-center px-6 py-10">

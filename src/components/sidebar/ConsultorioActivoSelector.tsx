@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { ChevronRight, Check } from 'lucide-react'
 import { useConsultorios } from '@/hooks/useConsultorios'
 import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
+import { useMenuMovil } from '@/contexts/MenuMovilContext'
 import { useProfile } from '@/hooks/useProfile'
 import { useToast } from '@/components/ui/Toast'
 import ModalShell from '@/components/ui/ModalShell'
@@ -26,6 +27,7 @@ export default function ConsultorioActivoSelector() {
   const { isDoctor } = useProfile()
   const { consultorios } = useConsultorios()
   const { consultorioActivo, cambiarActivo } = useConsultorioActivo()
+  const { cerrar: cerrarMenu } = useMenuMovil()
   const toast = useToast()
 
   const [open, setOpen] = useState(false)
@@ -117,7 +119,12 @@ export default function ConsultorioActivoSelector() {
             <div className="border-t border-slate-100 mt-1 pt-1">
               <Link
                 href="/perfil"
-                onClick={() => setOpen(false)}
+                /* Cierra los DOS: su propio desplegable y el menú lateral. En
+                   móvil la barra tapa la pantalla completa, así que sin
+                   `cerrar()` este enlace navegaba a /perfil y dejaba el menú
+                   encima de la página a la que acababa de llevar. Mismo gesto
+                   que el `onClick={close}` de cada enlace de `Sidebar.tsx`. */
+                onClick={() => { setOpen(false); cerrarMenu() }}
                 className="block px-3 py-2 text-xs text-[var(--cp)] hover:bg-slate-50 transition-colors"
               >
                 Gestionar consultorios →

@@ -2,6 +2,7 @@
 
 import useSWR from 'swr'
 import OnboardingModal from '@/components/onboarding/OnboardingModal'
+import { CLAVE_ESTADO_PERFIL } from '@/lib/perfil/claves'
 import type { EstadoPerfil } from '@/lib/perfil/gate'
 
 /**
@@ -48,14 +49,25 @@ async function fetcher(url: string): Promise<RespuestaEstado> {
 }
 
 export default function GateOnboarding() {
-  const { data, mutate } = useSWR<RespuestaEstado>('/api/me/estado-perfil', fetcher)
+  const { data, mutate } = useSWR<RespuestaEstado>(CLAVE_ESTADO_PERFIL, fetcher)
 
   if (!data?.gate || data.gate.completo) return null
 
   return (
     <OnboardingModal
-      // Revalidar la clave y no un refetch a mano: si el gate ya está completo,
-      // el `return null` de arriba desmonta el modal solo.
+      /* Revalidar la clave y no un refetch a mano: si el gate ya está completo,
+         el `return null` de arriba desmonta el modal solo. Y como el aviso del
+         sidebar LEE ESTA MISMA CLAVE, al terminar el onboarding se entera sin
+         hacer nada más — la firma o el logo que el médico acabe de subir ahí
+         dejan de aparecer como pendientes en el acto.
+
+         ⚠️ Y POR ESO LOS PASOS DEL MODAL NO REVALIDAN UNO A UNO, aunque
+         escriban las mismas cosas que Mi perfil sí invalida al guardar. Hacerlo
+         a media sesión sería un tiro en el pie: en cuanto el paso del
+         consultorio completa el criterio, `data.gate.completo` pasa a cierto y
+         el `return null` de arriba se lleva el modal por delante ANTES de que
+         el médico haya visto los pasos omitibles de logo y firma. La
+         revalidación va al final, que es cuando el modal ya no hace falta. */
       onComplete={() => { void mutate() }}
       gate={data.gate}
       role={data.role}

@@ -12,6 +12,9 @@ import {
   Calculator,
 } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
+import useSWR from 'swr'
+import AvisoPerfilSidebar from '@/components/sidebar/AvisoPerfilSidebar'
+import { CLAVE_ESTADO_PERFIL } from '@/lib/perfil/claves'
 import { useMenuMovil } from '@/contexts/MenuMovilContext'
 import { useRouter } from 'next/navigation'
 import { useProfile, clearProfileCache } from '@/hooks/useProfile'
@@ -229,6 +232,14 @@ function groupHasActiveChild(group: NavGroup, pathname: string) {
 
 /* ─── Componente ──────────────────────────────────────────── */
 
+/** Lo que este componente lee de `/api/me/estado-perfil`, y nada más. */
+interface RespuestaEstadoPerfil {
+  gate?: { exento: string | null }
+  tieneFirma: boolean
+  tieneLogo: boolean
+  faltaCedulaEspecialidad: boolean
+}
+
 export default function Sidebar() {
   const pathname = usePathname()
   const router   = useRouter()
@@ -248,6 +259,18 @@ export default function Sidebar() {
   const { signOut } = useAuth()
   const toast = useToast()
   const { state: subState, openBloqueoModal } = useSubscriptionGate()
+
+  /* Lo que le falta al médico después del gate (firma, cédula de especialidad,
+     logo). MISMA CLAVE que `GateOnboarding`, que ya la tiene montada en el
+     layout de (app): SWR comparte la entrada de caché, así que esto NO añade
+     ninguna petición. El `fetcher` va aquí porque el `SWRConfig` de (app) no
+     define uno global.
+     Sin `gate` en la respuesta —error, 401, carga— no se pinta nada: el mismo
+     criterio de lectura afirmativa del gate. */
+  const { data: estadoPerfil } = useSWR<RespuestaEstadoPerfil>(
+    CLAVE_ESTADO_PERFIL,
+    (url: string) => fetch(url).then(r => r.ok ? r.json() : Promise.reject(new Error(String(r.status)))),
+  )
 
   const isAdmin = canManageClinica(profile)
 
@@ -660,6 +683,26 @@ hasActive && !isOpen
             <LogOut size={14} />
             Cerrar sesión
           </button>
+
+          {/* Lo que falta en el perfil (handoff 2a). VA AQUÍ, DEBAJO DE LOS DOS
+              BOTONES Y ENCIMA DEL AVISO DE PRIVACIDAD, que es el orden vertical
+              que fija §4 de la spec y el que implementa su referencia
+              ejecutable. §1 dice lo contrario —«arriba del grupo»— y se
+              descarta: además de perder 2 a 1, la tarjeta COLAPSA, así que
+              encima de los botones cada colapso los subiría y bajaría; debajo,
+              lo único que se mueve es la línea de abajo.
+              Solo a quien se le exige algo: la secretaria y el super_admin
+              están exentos del criterio y no tienen firma, cédula ni logo que
+              completar. */}
+          {estadoPerfil?.gate?.exento === null && (
+            <AvisoPerfilSidebar
+              faltaFirma={!estadoPerfil.tieneFirma}
+              faltaLogo={!estadoPerfil.tieneLogo}
+              faltaCedulaEspecialidad={estadoPerfil.faltaCedulaEspecialidad}
+              alNavegar={close}
+            />
+          )}
+
           {/* ⚠️ EL `prefetch={false}` VA ATADO AL `target="_blank"`, Y SI ALGUIEN
               QUITA EL SEGUNDO TIENE QUE REPLANTEARSE EL PRIMERO.
 
