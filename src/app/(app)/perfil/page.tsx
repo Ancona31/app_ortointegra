@@ -23,6 +23,7 @@ import EspecialidadSelector from '@/components/ui/EspecialidadSelector'
 import { validarCedula } from '@/lib/validaciones'
 import FirmaCaptura from '@/components/perfil/FirmaCaptura'
 import { compressLogoImage } from '@/lib/compressImage'
+import { revisarLogo } from '@/lib/perfil/logoArchivo'
 import { syncDoctorProfile } from '@/lib/offline/doctorProfile'
 import { canManageClinica, isMedico } from '@/lib/permissions'
 import { useConsultorios } from '@/hooks/useConsultorios'
@@ -500,6 +501,20 @@ export default function PerfilPage() {
     if (!file) return
     try {
       const compressed = await compressLogoImage(file)
+      /* ⚠️ SE JUZGA EL COMPRIMIDO, NO EL ELEGIDO, y es deliberado: `compressed`
+         es EL archivo que viaja en el submit, así que es el que el servidor va
+         a juzgar —con este mismo `revisarLogo`—. Mirar el original rechazaría
+         fotos de 4 MB que la compresión deja en 90 KB y que hoy se aceptan sin
+         problema; aquí no se cambia qué se acepta, solo cuándo se entera el
+         médico. El nombre sobrevive a la compresión (`compressImage.ts:63`),
+         así que la extensión que ve esto es la que verá la ruta. */
+      const veredicto = revisarLogo(compressed)
+      if (!veredicto.ok) {
+        toast.error(veredicto.error)
+        // Para que volver a elegir el mismo archivo siga disparando `change`.
+        e.target.value = ''
+        return
+      }
       setLogoFile(compressed)
       setLogoPreview(URL.createObjectURL(compressed))
     } catch {

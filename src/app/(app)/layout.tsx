@@ -9,6 +9,7 @@ import { ToastProvider } from '@/components/ui/Toast'
 import CommandPalette from '@/components/CommandPalette'
 import PageTransition from '@/components/layout/PageTransition'
 import SessionGuard from '@/components/SessionGuard'
+import GateOnboarding from '@/components/onboarding/GateOnboarding'
 import OfflineAlert from '@/components/ui/OfflineAlert'
 import SuscripcionBanner from '@/components/billing/SuscripcionBanner'
 import { SubscriptionGateProvider } from '@/components/billing/SubscriptionGateProvider'
@@ -186,6 +187,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               </div>
               <CommandPalette />
               <SessionGuard />
+              {/* El gate de perfil (Bloque B5). VA AQUÍ, fuera de `<main>` y de
+                  `PageTransition`, con los demás elementos de alcance global:
+                  así no se desmonta al navegar y no vuelve a pedir nada. Por
+                  qué en el layout y no en una comprobación de servidor, en la
+                  cabecera del componente. */}
+              <GateOnboarding />
             </MenuMovilProvider>
             </ConsultorioActivoProvider>
           </SubscriptionGateProvider>

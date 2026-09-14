@@ -36,7 +36,7 @@ type ActualizadorConsultorios = (actual: DatosConsultorios | undefined) => Datos
  * El consultorio default está garantizado a existir cuando consultorios.length >= 1
  * (triggers BD enforce_consultorio_default_insert + enforce_consultorio_default_existencia).
  * Para médicos recién registrados con 0 consultorios, consultorioDefault será null y el
- * modal de onboarding (Bloque F3-4) los bloqueará hasta crear el primero.
+ * gate de perfil (Bloque B5) los bloqueará hasta crear el primero.
  */
 export function useConsultorios() {
   const { data, error, isLoading, mutate: mutarConfig } = useSWR<ConfigApp>(
@@ -72,8 +72,11 @@ export function useConsultorios() {
      ahí `consultorios: []` significa las cuatro cosas a la vez, y quien lo lea
      no puede reconstruir cuál era.
      Esta bandera conserva el dato: es `true` solo si el agregado respondió con
-     una lista. Existe porque `PrimerConsultorioModal` ESCRIBE, y un modal que
-     escribe no debe dispararse por ausencia de evidencia.
+     una lista. Existe porque el modal que pedía el primer consultorio ESCRIBE, y
+     un modal que escribe no debe dispararse por ausencia de evidencia. Lo pedía
+     `PrimerConsultorioModal`, retirado en el Bloque B5; hoy lo pide el paso de
+     consultorio del gate (`OnboardingModal`), que aplica la misma regla sobre su
+     propia fuente — `/api/me/estado-perfil`, no esta bandera.
      Subsume a `isLoading`: mientras carga, `data` es `undefined`. Y cubre lo
      que `isLoading` no veía —`internalMutate` de SWR fija `data` y limpia
      `error` pero nunca toca `isLoading`, así que un `mutate(CLAVE_CONFIG, null)`

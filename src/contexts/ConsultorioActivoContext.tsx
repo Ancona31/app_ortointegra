@@ -3,7 +3,6 @@
 import { createContext, useContext, useEffect, useState, useCallback, useMemo, ReactNode } from 'react'
 import { Consultorio } from '@/types'
 import { useConsultorios } from '@/hooks/useConsultorios'
-import PrimerConsultorioModal from '@/components/consultorios/PrimerConsultorioModal'
 
 const STORAGE_KEY = 'consultorio_activo_id'
 
@@ -76,7 +75,6 @@ export function ConsultorioActivoProvider({ children }: { children: ReactNode })
   return (
     <ConsultorioActivoContext.Provider value={value}>
       {children}
-      <PrimerConsultorioModal />
     </ConsultorioActivoContext.Provider>
   )
 }

@@ -11,6 +11,7 @@ import { useSubscriptionGate } from '@/components/billing/SubscriptionGateProvid
 import { canManageClinica } from '@/lib/permissions'
 import { validarCedula, validarTelefono, formatearTelefono } from '@/lib/validaciones'
 import { CLAVE_CONFIG } from '@/lib/configApp'
+import { LOGO_ACCEPT, revisarLogo } from '@/lib/perfil/logoArchivo'
 import { ZONAS_MEXICO, CHIPS_RAPIDOS } from '@/lib/consultorios/zonas-mexico'
 import type { EstadoPerfil } from '@/lib/perfil/gate'
 import type { Consultorio } from '@/types'
@@ -21,8 +22,9 @@ import type { Role } from '@/hooks/useProfile'
  *
  * ⚠️ ESTE MODAL ES BLOQUEANTE: sin ✕, sin Escape útil, sin omitir en los pasos
  * obligatorios. Quien lo monta debe hacerlo SOLO ante una LECTURA AFIRMATIVA
- * del gate, nunca por ausencia de evidencia — la misma distinción que
- * `PrimerConsultorioModal` aprendió a golpes: «todavía no sé» y «sé que falta»
+ * del gate, nunca por ausencia de evidencia — la distinción que `PrimerConsultorioModal`
+ * aprendió a golpes antes de que este gate lo sustituyera (retirado en la cuarta
+ * parte; el porqué, en `GateOnboarding.tsx`): «todavía no sé» y «sé que falta»
  * no son lo mismo, y un modal que escribe y encierra no puede confundirlos.
  * Un `fetch` de `/api/me/estado-perfil` que falla NO abre esto.
  *
@@ -245,10 +247,24 @@ export default function OnboardingModal({
     }
   }
 
+  /* ⚠️ EL VEREDICTO SE PIDE AL ELEGIR EL ARCHIVO, NO AL SUBIRLO, y es el MISMO
+     que aplicará el servidor (`revisarLogo`, compartido). Antes aquí solo se
+     miraba el tamaño, y encima con un tope propio de 2 MB frente a los 500 KB
+     de la ruta: el médico elegía un .heic o un logo de 1 MB, veía la vista
+     previa, lo daba por bueno y se llevaba el rechazo dos pasos después.
+     Nada de esto sustituye a la comprobación del servidor: ésta es comodidad,
+     y el POST se puede hacer sin pasar por aquí. */
   const handleLogoChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-    if (file.size > 2 * 1024 * 1024) { toast.error('El logo no debe superar 2 MB'); return }
+    const veredicto = revisarLogo(file)
+    if (!veredicto.ok) {
+      toast.error(veredicto.error)
+      // Sin esto, volver a elegir el MISMO archivo no dispara `change` y la
+      // pantalla se queda muda.
+      e.target.value = ''
+      return
+    }
     setLogoFile(file)
     setLogoPreview(URL.createObjectURL(file))
   }, [toast])
@@ -260,12 +276,21 @@ export default function OnboardingModal({
       const fd = new FormData()
       fd.append('logo', logoFile)
       const res = await fetch('/api/me/logo', { method: 'POST', body: fd })
-      if (!res.ok) throw new Error()
+      if (!res.ok) {
+        /* El aviso lo escribe la RUTA, que es la única que sabe por qué
+           rechazó —formato, tamaño, permisos—. Tirarlo y pintar un «Error al
+           subir el logo.» dejaba al médico probando a ciegas. El genérico
+           queda solo para cuando no venga nada (una caída que no llega a
+           responder JSON). */
+        const datos = await res.json().catch(() => ({}))
+        toast.error(datos.error ?? 'No se pudo subir el logo. Inténtalo de nuevo.')
+        return false
+      }
       setLogoSubido(logoFile)
       await mutate('/api/me/perfil-medico')
       return true
     } catch {
-      toast.error('Error al subir el logo.')
+      toast.error('No se pudo subir el logo: revisa tu conexión e inténtalo de nuevo.')
       return false
     } finally {
       setGuardando(false)
@@ -304,10 +329,10 @@ export default function OnboardingModal({
     if (ok) siguiente()
   }
 
-  /* Si la suscripción bloquea, este modal se calla — misma salvaguarda que
-     `PrimerConsultorioModal:38`. Dos modales sin salida encima del mismo
-     médico, y el de suscripción tapado por éste, es el encierro que el bloque
-     existe para evitar. */
+  /* Si la suscripción bloquea, este modal se calla. La salvaguarda viene de
+     `PrimerConsultorioModal`, que la llevaba antes de retirarse: dos modales sin
+     salida encima del mismo médico, y el de suscripción tapado por éste, es el
+     encierro que el bloque existe para evitar. */
   if (state.isBlocked) return null
   // Defensivo: quien monta esto ya comprobó `!gate.completo`, así que la lista
   // nunca llega vacía. Si llegara, no hay nada que pedir y encerrar por nada
@@ -648,8 +673,8 @@ export default function OnboardingModal({
                     <span className="text-2xl">🏥</span>
                   </div>
                   <p className="text-sm font-medium text-slate-700">Haz clic para subir el logo</p>
-                  <p className="text-xs text-slate-400 mt-1">PNG o JPG · Máximo 2 MB</p>
-                  <input type="file" accept="image/png,image/jpeg,image/webp" onChange={handleLogoChange} className="hidden" />
+                  <p className="text-xs text-slate-400 mt-1">PNG, JPG, WEBP o SVG · Máximo 500 KB</p>
+                  <input type="file" accept={LOGO_ACCEPT} onChange={handleLogoChange} className="hidden" />
                 </label>
               )}
             </div>

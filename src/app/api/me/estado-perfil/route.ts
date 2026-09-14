@@ -116,6 +116,10 @@ export async function GET() {
     porcentaje,
     requiereOnboarding,
     gate,
+    // Lo consume `GateOnboarding` para decidir si enseña el paso del logo. Va
+    // en la respuesta y no se lee de `useProfile` en el cliente porque ese hook
+    // cae a una copia en `secureStorage` que vive en el navegador del usuario.
+    es_admin_de_clinica: profile.es_admin_de_clinica === true,
     tieneFirma: typeof profile.firma_url === 'string' && profile.firma_url.length > 0,
     tieneLogo,
     gridMode,

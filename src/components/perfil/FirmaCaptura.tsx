@@ -169,7 +169,22 @@ export default function FirmaCaptura({ firmaActual, onFirmaCambiada }: Props) {
       const img = new window.Image()
       const objectUrl = URL.createObjectURL(file)
       img.src = objectUrl
-      await new Promise<void>((res, rej) => { img.onload = () => res(); img.onerror = rej })
+      /* ⚠️ EL FALLO AL DECODIFICAR SE NOMBRA AQUÍ, y no se deja caer al mensaje
+         genérico del `catch`. `onerror` rechaza con un Event, no con un Error,
+         así que el `err instanceof Error` de abajo daba false y el médico que
+         elegía un HEIC del iPhone —lo que da la cámara por defecto, y `accept`
+         lo permite— leía «Error al procesar la imagen» sin saber que el
+         problema era el formato.
+         NO se comprueba el tamaño de lo elegido: este canvas reduce a 400×200 y
+         entrega un PNG de unos kilobytes, así que una foto enorme se acepta hoy
+         y se seguirá aceptando. Lo que la ruta juzga es ESE PNG, no el archivo
+         de aquí. */
+      await new Promise<void>((res, rej) => {
+        img.onload = () => res()
+        img.onerror = () => rej(new Error(
+          'No pudimos leer esa imagen. Usa un PNG o un JPG, o dibuja la firma aquí mismo.',
+        ))
+      })
       const blob = await procesarImagen(img)
       URL.revokeObjectURL(objectUrl)
       mostrarPreview(blob)
@@ -226,12 +241,17 @@ export default function FirmaCaptura({ firmaActual, onFirmaCambiada }: Props) {
     setEliminando(true)
     try {
       const r = await fetch('/api/me/firma', { method: 'DELETE' })
-      if (!r.ok) throw new Error('Error al eliminar')
+      // El motivo lo sabe la ruta; el `catch` de abajo cubre el fallo de red,
+      // que es el único caso en el que no llega ninguno.
+      if (!r.ok) {
+        const datos = await r.json().catch(() => ({}))
+        throw new Error(datos.error ?? 'No se pudo eliminar la firma.')
+      }
       setFirmaUrl(null)
       onFirmaCambiada(null)
       toast.success('Firma eliminada')
-    } catch {
-      toast.error('No se pudo eliminar la firma')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'No se pudo eliminar la firma')
     } finally {
       setEliminando(false)
     }

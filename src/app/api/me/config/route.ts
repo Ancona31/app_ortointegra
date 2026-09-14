@@ -27,10 +27,12 @@ import { logger } from '@/lib/logger'
  * Devolvía 200 con `{clinica: null, consultorios: [], …}` sin sesión y sin
  * clínica, y hacía `consultoriosRes.data ?? []` sin mirar el error de la
  * consulta. Para SWR las tres cosas eran un éxito legítimo, indistinguible de
- * un médico que de verdad no tiene consultorios — y `PrimerConsultorioModal`,
- * que ESCRIBE, se dispara justo ante esa lectura. Un vacío inventado por un
- * fallo de base de datos le hacía crear un consultorio de más a un médico que
- * ya tenía los suyos.
+ * un médico que de verdad no tiene consultorios — y el paso de consultorio del
+ * gate de perfil (`OnboardingModal`, montado por `GateOnboarding`), que ESCRIBE,
+ * se dispara justo ante esa lectura. Un vacío inventado por un fallo de base de
+ * datos le hacía crear un consultorio de más a un médico que ya tenía los suyos.
+ * Quien recibía ese vacío hasta el Bloque B5 era `PrimerConsultorioModal`, ya
+ * retirado; el gate heredó su caso y con él este riesgo.
  *
  * Ahora: 401 sin sesión, 403 sin clínica (lo que ya hacía `/api/consultorios`),
  * 500 si cualquiera de las consultas falla. El 200 significa exactamente una

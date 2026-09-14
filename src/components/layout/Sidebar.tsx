@@ -305,8 +305,10 @@ export default function Sidebar() {
      endpoints se consolidaron en /api/me/config es TAMBIÉN la de
      `useConsultorios`. Vaciarla dentro del handler la vaciaba mientras el árbol
      de (app) seguía montado —`router.push` no desmonta nada de forma síncrona—,
-     y `PrimerConsultorioModal` cuelga de `ConsultorioActivoProvider`
-     ((app)/layout.tsx:54), o sea que estaba en pantalla justo en ese instante.
+     y el gate de perfil (`GateOnboarding`) cuelga del layout de (app), o sea que
+     estaba en pantalla justo en ese instante. Quien lo sufrió primero fue
+     `PrimerConsultorioModal`, que colgaba de `ConsultorioActivoProvider` y se
+     retiró en el Bloque B5; el gate ocupa su lugar y hereda la exposición.
      `internalMutate` de SWR fija `data` y limpia `error`, pero NUNCA toca
      `isLoading`: el hook quedaba en `consultorios: []` con `isLoading: false`
      —un «no tienes ninguno» falso y estable, no un destello— y el modal de
