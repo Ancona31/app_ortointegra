@@ -124,7 +124,31 @@ DECLARE
   -- este proyecto no hay staging donde mirarlo antes.
   -- Si tras verlo se decide seguir igualmente, se pone `true` AQUÍ, en un
   -- commit propio, con el número escrito en el mensaje de ese commit.
-  v_aceptar_bloqueo CONSTANT boolean := false;
+  --
+  -- ═══ PUESTO EN `true` EL 2026-09-14 — EL NÚMERO Y POR QUÉ SE ACEPTA ══════
+  -- El censo de ese día dio 3 médicos bloqueados de 18. A los tres les falta
+  -- EXACTAMENTE lo mismo, y solo eso: UN CONSULTORIO ACTIVO. Nombres,
+  -- especialidad, cédula profesional y clínica los tienen los tres.
+  --
+  -- Las tres cuentas entraron UNA SOLA VEZ, el mismo día que se crearon, y no
+  -- han vuelto desde entonces:
+  --   · creada 2026-04-14 · último acceso 2026-04-14, 1 minuto después
+  --   · creada 2026-04-28 · último acceso 2026-04-28, 32 minutos después
+  --   · creada 2026-06-12 · último acceso 2026-06-12, 53 minutos después
+  -- Ninguna llegó a crear un consultorio, que ya era requisito para emitir
+  -- cualquier documento. Son altas que no llegaron a operar: el gate no les
+  -- quita nada que estuvieran usando.
+  --
+  -- Y LO QUE HACE ACEPTABLE EL BLOQUEO, que es lo que de verdad decide: lo que
+  -- les falta SE RESUELVE SOLO DESDE LA APLICACIÓN. El modal de onboarding ya
+  -- está desplegado en producción y pide el consultorio; si alguno de los tres
+  -- vuelve, lo crea ahí y queda desbloqueado sin pasar por soporte. Ninguna de
+  -- las tres cuentas necesita intervención manual, ni antes ni después.
+  --
+  -- (Sin identidades a propósito: este repositorio es público. Fechas y
+  -- números sí, correos y nombres no.)
+  -- ════════════════════════════════════════════════════════════════════════
+  v_aceptar_bloqueo CONSTANT boolean := true;
 
   v_faltan     text;
   v_md5        text;
