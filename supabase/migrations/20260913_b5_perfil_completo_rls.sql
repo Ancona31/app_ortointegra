@@ -1,7 +1,31 @@
 -- ═══════════════════════════════════════════════════════════════════════
 -- Bloque B5 · segunda parte — el gate de perfil en la capa de datos
--- Rama: feature/auth-a · Escrita: 2026-09-13 · NO APLICADA A NINGUNA BASE
+-- Rama: feature/auth-a · Escrita: 2026-09-13
 -- Revisión de auditoría: 2026-09-13 (ver «CAMBIOS DE LA AUDITORÍA» abajo)
+-- ───────────────────────────────────────────────────────────────────────
+-- ESTADO · LOCAL: APLICADA Y VERIFICADA — 2026-09-14
+-- ESTADO · PRODUCCIÓN: PENDIENTE DE APLICAR (al 2026-09-14
+--   `npx supabase migration list` solo la muestra en la columna Local)
+--
+-- La comprobación que respalda lo de arriba, corrida en local el 2026-09-14:
+--
+--   SELECT to_regprocedure('public.perfil_completo()') IS NOT NULL,
+--          (SELECT count(*) FROM pg_policy WHERE polname LIKE '%gates%'),
+--          to_regprocedure('public.crear_paciente_con_medico_v2(jsonb,uuid,boolean)') IS NOT NULL,
+--          has_function_privilege('authenticated',
+--            'public.crear_paciente_con_medico(jsonb,uuid)', 'EXECUTE');
+--
+--   → true · 7 · true · false
+--
+-- Cómo se lee: existe `perfil_completo()`; están las siete policies de gate;
+-- existe el v2 reescrito; y el `false` final es lo que se busca, no un fallo —
+-- es el §4 de la auditoría, el EXECUTE del RPC v1 retirado a `authenticated`.
+--
+-- ⚠️ LA FIRMA DEL v2 LLEVA SUS TRES PARÁMETROS —(jsonb, uuid, boolean)— Y NO
+-- ES UN DETALLE DE ESTILO. `to_regprocedure` resuelve por firma exacta:
+-- preguntar por la del v1 —(jsonb, uuid)— devuelve NULL aunque el v2 esté
+-- perfectamente vivo, o sea un falso negativo que dice «no se aplicó». Pasó
+-- el 2026-09-14 al verificar esta misma migración.
 -- ═══════════════════════════════════════════════════════════════════════
 -- Propósito: llevar a la base el criterio único de «perfil completo» que ya
 -- vive en `src/lib/perfil/gate.ts` (función `evaluarPerfil`), y exigirlo en
@@ -55,6 +79,22 @@
 -- (comprobado con grep sobre `src/`); el propio `gate.ts:19` lo dice. Aplicar
 -- esto ANTES de que exista la pantalla entrega errores crudos a los médicos.
 -- En local da igual: ahí se aplica cuando convenga.
+--
+-- ⚠️ LO DE ARRIBA ERA CIERTO EL 2026-09-13 Y HOY YA NO LO ES — se deja escrito
+-- porque explica por qué esta migración nació con freno, no porque siga
+-- describiendo la realidad. Al 2026-09-14, en `feature/auth-a`, el gate visible
+-- está commiteado y consume `gate.ts` desde seis sitios: `GateOnboarding`
+-- —montado en `(app)/layout.tsx`, o sea en toda la aplicación—, el
+-- `OnboardingModal` que enseña, `api/me/estado-perfil` que evalúa el criterio en
+-- el servidor, `(launcher)/inicio/page.tsx`, `EspecialidadSelector` y el test.
+--
+-- ⚠️⚠️ Y ESO NO ADELANTA NADA: EL ORDEN NO CAMBIA. Lo que se cumple hoy es que
+-- el gate visible EXISTE EN LA RAMA; la condición que este bloque exige es que
+-- esté DESPLEGADO EN PRODUCCIÓN, y eso todavía no ha pasado. Código commiteado
+-- no es código servido. La migración sigue yendo LA ÚLTIMA, después del
+-- despliegue — aplicarla ahora entrega exactamente los mismos errores crudos
+-- que describe el párrafo de arriba, porque producción sigue sirviendo la
+-- versión sin gate. Lo único que cambió es que ya hay algo que desplegar.
 --
 -- Dependencias: helpers `clinica_no_suspendida()`, `clinica_tiene_acceso()` y
 -- `clinica_dentro_de_limite()`; las siete policies `*_gates_insert`; y el RPC
