@@ -22,7 +22,6 @@ import { hoyEnTZ, desplazarFecha, fechaHoraLocalAInstante, tzDispositivo } from 
 import type { EstadoPerfil as EstadoGate } from '@/lib/perfil/gate'
 
 interface EstadoPerfil {
-  requiereOnboarding: boolean
   /** Criterio único (`evaluarPerfil`). Es lo que decide el bloqueo. */
   gate?: EstadoGate
   tieneFirma: boolean
@@ -30,7 +29,6 @@ interface EstadoPerfil {
   role: string
   plan: string
   planNombre: string
-  suscripcion_estado: string
 }
 
 const FRASES_MOTIVACIONALES = [
