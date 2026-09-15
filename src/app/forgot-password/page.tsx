@@ -30,9 +30,23 @@ export default function ForgotPasswordPage() {
     }
 
     const supabase = createClient()
-    const redirectTo = `${window.location.origin}/reset-password`
 
-    await supabase.auth.resetPasswordForEmail(email, { redirectTo })
+    /* ⚠️ SIN `await`, Y ESO ES LO QUE CIERRA LA ENUMERACIÓN POR RELOJ.
+       El mensaje ya era el mismo para un correo que existe y uno que no, pero
+       el TIEMPO no: con un correo existente, GoTrue dispara el Auth Hook, que
+       hace `await resend.emails.send(...)` (`api/auth/email-hook:114`) antes de
+       contestar; con uno inexistente no hay hook ni Resend. Esperando aquí, esa
+       diferencia —el viaje entero a Resend— se medía con el cronómetro del
+       navegador. OWASP Forgot Password: «Ensure that the time taken for the
+       user response message is uniform».
+       El `catch` vacío es deliberado y va en el mismo sentido: un fallo del
+       envío tampoco puede cambiar lo que ve quien pregunta.
+
+       ⚠️ TAMPOCO SE PASA `redirectTo`, y no falta. La rama `recovery` de
+       `email-hook:89` construye la URL ella misma (`/reset-password?token_hash=`)
+       e ignora el `redirect_to` del payload; pasarlo aquí sugería que esta
+       pantalla elegía el destino, y no lo elige. */
+    supabase.auth.resetPasswordForEmail(email).catch(() => {})
 
     // Siempre mostrar éxito — no revelar si el email existe
     setLoading(false)

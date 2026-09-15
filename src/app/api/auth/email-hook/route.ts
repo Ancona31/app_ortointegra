@@ -87,7 +87,19 @@ export async function POST(req: NextRequest) {
       subject = 'Confirma tu cuenta — Spinus'
       html = emailConfirmacion(nombre, url)
     } else if (actionType === 'recovery') {
-      const url = `${siteUrl}/auth/confirm?token_hash=${tokenHash}&type=recovery`
+      /* ⚠️ APUNTA A NUESTRA PÁGINA Y EL TOKEN NO SE CANJEA EN EL NAVEGADOR.
+         `/reset-password` sólo pinta un formulario; quien canjea es
+         `/api/auth/reset-password`, en servidor, con un cliente sin cookies y
+         sin devolver sesión.
+         Aquí estuvo `/auth/confirm?token_hash=…&type=recovery`, que llamaba a
+         `verifyOtp` al montarse: eso ESTABLECE SESIÓN, así que un enlace ajeno
+         dejaba al médico dentro de la cuenta del atacante y todo lo que
+         escribiera aterrizaba en la clínica de otro vía `get_clinica_id()`.
+         · No lo mandes a `/auth/v1/verify` de GoTrue «para usar PKCE»: eso ata
+           la recuperación a UN navegador y la rompe entre dispositivos.
+         · No añadas `&type=`: el tipo lo fija el servidor. Un parámetro que el
+           cliente puede cambiar es una palanca, no un dato. */
+      const url = `${siteUrl}/reset-password?token_hash=${tokenHash}`
       subject = 'Recupera tu contraseña — Spinus'
       html = emailRecuperacion(nombre, url)
     } else if (actionType === 'magiclink') {

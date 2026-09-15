@@ -266,7 +266,24 @@ secure_password_change = false
 # Controls the minimum amount of time that must pass before sending another signup confirmation or password reset email.
 max_frequency = "1s"
 # Number of characters used in the email OTP.
-otp_length = 6
+#
+# ⚠️ ESTE VALOR NO ES UN AJUSTE COSMÉTICO: ES LA ENTROPÍA DEL ENLACE DE
+# RECUPERACIÓN. El `token_hash` que viaja en el correo es
+# `sha224(correo + OTP)` —`supabase/auth`, `internal/crypto/crypto.go`,
+# `GenerateTokenHash`—, así que el espacio de búsqueda de quien conozca el
+# correo de un médico es 10^otp_length, no el tamaño del hash. Con 6 son 10^6
+# y se recorre con un botnet dentro de la hora que dura `otp_expiry`; con 10
+# son 10^10 y deja de ser alcanzable. El máximo que admite GoTrue es 10
+# (`internal/conf/configuration.go`, `ApplyDefaults()`: fuera del rango 6-10
+# cae a 6 en silencio).
+#
+# ⚠️ Y AQUÍ MANDA EL PANEL, NO ESTE ARCHIVO. El 2026-09-15 esta línea decía 6
+# y producción estaba en 8: se planificó una decisión de seguridad —si hacía
+# falta un tope global de peticiones, con la denegación de servicio que eso
+# traía— sobre un número que este archivo se inventaba. Producción es
+# Authentication → Sign In / Providers → Email → Email OTP length, hoy en 10.
+# Si cambias uno, cambia el otro EN EL MISMO MOVIMIENTO.
+otp_length = 10
 # Number of seconds before the email OTP expires (defaults to 1 hour).
 otp_expiry = 3600
 

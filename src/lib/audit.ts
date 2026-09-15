@@ -70,6 +70,24 @@ export type AuditAccion =
   | 'login_exitoso'
   | 'login_fallido'
   | 'logout'
+  /* Canje de un enlace de recuperación de contraseña, y su fallo.
+
+     `recuperacion_fallida` es el ÚNICO detector de fuerza bruta contra
+     `token_hash` que va a existir: la ruta que lo canjea es pública y, al
+     canjear en servidor, GoTrue ve la IP de Vercel y no la del atacante, así
+     que su límite por IP deja de separarlos. Un pico de estas filas desde pocas
+     IPs ES el ataque, y no hay otro sitio donde se vea.
+
+     ⚠️ NI EL token_hash NI EL CORREO ENTRAN EN `descripcion`, y no es un olvido.
+     El audit_log es INMUTABLE POR TRIGGER (`supabase_migration_audit_
+     immutable.sql`): lo que se meta ahí no admite cancelación ARCO nunca. Y un
+     `token_hash` sigue siendo canjeable durante una hora (`otp_expiry`), o sea
+     que sería una credencial viva guardada para siempre.
+
+     `audit_log.accion` es `text` sin CHECK, así que estas dos líneas no
+     necesitan migración. */
+  | 'recuperacion_contrasena'
+  | 'recuperacion_fallida'
   // Derechos ARCO (LFPDPPP)
   | 'arco_acceso'
   /* Intento de exportación ARCO rechazado por rol insuficiente (QW3).
