@@ -5,9 +5,16 @@
 -- ───────────────────────────────────────────────────────────────────────
 -- ESTADO · LOCAL: APLICADA Y VERIFICADA — 2026-09-14
 --   Aplicada con `npx supabase db push --local`.
--- ESTADO · PRODUCCIÓN: PENDIENTE DE APLICAR (al 2026-09-14)
---   Al aplicar, sustituir este rótulo por «APLICADA Y VERIFICADA — <fecha>»
---   con el resultado de la consulta de abajo (§7 del protocolo).
+-- ESTADO · PRODUCCIÓN: APLICADA Y VERIFICADA — 2026-09-14
+--   Aplicada con `npx supabase db push`. La consulta de abajo devolvió los
+--   seis valores esperados: 1 · 1 · true · {"search_path=\"\""} · postgres · 1.
+--   Verificada además EN LA APLICACIÓN: se entró a producción con una cuenta
+--   de perfil completo y `/api/me/estado-perfil` respondió con la columna
+--   nueva en su `select`, sin modal y sin aviso.
+--   ⚠️ EL ORDEN SE RESPETÓ, Y ES EL RIESGO QUE ESTA CABECERA DOCUMENTA: la
+--   migración primero, el despliegue del código después. Al revés, el `select`
+--   de `estado-perfil` pide una columna que no existe, PostgREST responde 400
+--   a la consulta entera y `GateOnboarding` se queda sin gate para TODOS.
 --
 -- ✅ AUDITADA — 2026-09-14, por `supabase/AUDITORIA-MIGRACIONES.md`. Sus diez
 -- correcciones están incorporadas y listadas en «CAMBIOS DE LA AUDITORÍA»,
