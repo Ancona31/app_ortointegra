@@ -3,13 +3,21 @@
 -- Rama: feature/auth-b5-trigger · Escrita: 2026-09-14
 -- Revisión de auditoría: 2026-09-14 (ver «CAMBIOS DE LA AUDITORÍA» abajo)
 -- ───────────────────────────────────────────────────────────────────────
--- ESTADO · LOCAL: PENDIENTE DE APLICAR (al 2026-09-14)
+-- ESTADO · LOCAL: APLICADA Y VERIFICADA — 2026-09-14
+--   Aplicada con `npx supabase db push --local`.
 -- ESTADO · PRODUCCIÓN: PENDIENTE DE APLICAR (al 2026-09-14)
+--   Al aplicar, sustituir este rótulo por «APLICADA Y VERIFICADA — <fecha>»
+--   con el resultado de la consulta de abajo (§7 del protocolo).
 --
--- Al aplicar, sustituir los dos rótulos por «APLICADA Y VERIFICADA — <fecha>»
--- con el resultado de ESTA consulta, que hay que correr APARTE (§7 del
--- protocolo). Corre aparte porque `npx supabase db push` NO imprime conjuntos
--- de resultados: el `SELECT` del final del archivo no llega a ninguna pantalla.
+-- ✅ AUDITADA — 2026-09-14, por `supabase/AUDITORIA-MIGRACIONES.md`. Sus diez
+-- correcciones están incorporadas y listadas en «CAMBIOS DE LA AUDITORÍA»,
+-- más abajo. Este renglón sustituye al aviso de «pendiente de auditoría» que
+-- llevó el archivo mientras no había pasado por ella: queda como constancia de
+-- que pasó, no como adorno.
+--
+-- La comprobación que respalda lo de LOCAL, corrida aparte el 2026-09-14.
+-- Corre aparte porque `npx supabase db push` NO imprime conjuntos de
+-- resultados: el `SELECT` del final del archivo no llega a ninguna pantalla.
 --
 --   SELECT (SELECT count(*) FROM information_schema.columns
 --            WHERE table_schema='public' AND table_name='profiles'
@@ -25,6 +33,17 @@
 --     FROM pg_proc p WHERE p.oid = to_regprocedure('public.handle_new_user()');
 --
 --   Esperado: 1 · 1 · t · {"search_path=\"\""} · postgres · 1
+--   → En LOCAL devolvió EXACTAMENTE esos seis valores el 2026-09-14.
+--
+-- ⚠️ Y VERIFICADA EN COMPORTAMIENTO, NO SOLO EN CATÁLOGO. Que los seis valores
+-- cuadren dice que los objetos existen; no dice que el trigger haga su trabajo.
+-- El 2026-09-14, en local, un alta REAL por Google OAuth —con un correo que no
+-- estaba en la base— produjo un perfil con `role='medico'`, `clinica_id` NULL,
+-- `es_admin_de_clinica` false e `invitado_por` NULL: exactamente las cuatro
+-- cosas que las dos decisiones de diseño de abajo prometen. Ese mismo camino,
+-- antes de esta migración, dejaba la fila de `auth.users` SIN NINGÚN PERFIL —
+-- que es el hueco que este bloque viene a cerrar, comprobado en los dos
+-- sentidos.
 --
 -- ⚠️ `npx supabase db push` SIN `--local` APUNTA A PRODUCCIÓN. Comprobado el
 -- 2026-09-14: `--dry-run` respondió «Connecting to remote database... Would
