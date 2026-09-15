@@ -98,16 +98,57 @@ export async function POST(req: NextRequest) {
      mandarlo a pedir otro. Por eso el formulario valida longitud y coincidencia
      ANTES de llamar aquí: para que este camino sea raro. */
   const { error: errUpdate } = await supabase.auth.updateUser({ password })
-  if (errUpdate) {
-    /* No se reenvía `errUpdate.message`. GoTrue distingue «New password should
-       be different from the old password», que es un oráculo de contraseña. */
+
+  /* ⚠️ `same_password` NO ES UN FALLO AQUÍ, Y ES LA DECISIÓN MENOS OBVIA DE
+     ESTE ARCHIVO. Si la contraseña nueva es igual a la que ya había, el
+     resultado que el médico pidió YA ES CIERTO: se sigue por el camino de
+     éxito, se revocan las sesiones, se avisa y se le manda al login.
+
+     El motivo es que la alternativa no tiene salida buena. GoTrue rechaza con
+     422 y código `same_password` (`internal/api/user.go`, comprobación
+     incondicional), y contárselo al médico es contárselo también a quien traiga
+     un token robado: le confirma que la contraseña que probó ES la del médico
+     —y lo que eso quema no es esta cuenta, que ya tenía, sino el banco y el
+     correo de esa persona, donde la reutilice—. No hay redacción que informe a
+     uno y no al otro. Tratarlo como éxito no ESCONDE el oráculo: lo suprime,
+     porque acierte o no acierte la respuesta es idéntica.
+     Y el coste que evita era real y recurrente: el intento quemaba el enlace y
+     el médico no entendía por qué (visto en el QA del 2026-09-15), así que
+     pedía otro y volvía a tropezar, contra un tope de 2 correos por hora.
+
+     ⚠️ NO «ARREGLES» ESTO devolviendo un mensaje distinto para este caso, ni
+     siquiera uno insinuado del tipo «si escribiste la que ya tenías, elige
+     otra»: eso es exactamente la misma información para el atacante.
+
+     Se distingue por `code` y no por `message`: el código es API estable y
+     documentada (auth-js lo puebla desde `data.code`/`data.error_code`,
+     `lib/fetch.js:32-42`), el texto es inglés que cambia entre versiones. */
+  const mismaContrasena = errUpdate?.code === 'same_password'
+
+  if (errUpdate && !mismaContrasena) {
+    /* La sesión que `verifyOtp` acuñó hace tres líneas se queda viva en GoTrue
+       si no se revoca — sin dueño, porque nunca sale de este proceso, pero
+       viva. `local` y NO `global`: con `global`, cualquiera con un token
+       robado podría quemar el enlace Y echar al médico de todos sus
+       dispositivos en la misma petición. */
+    await supabase.auth.signOut({ scope: 'local' })
     await logAudit({
       userId: data.user.id,
       accion: 'recuperacion_fallida',
       ip,
       descripcion: 'contraseña rechazada con token ya consumido',
     })
-    return NextResponse.json({ error: 'password_rechazada' }, { status: 400 })
+    /* Código nuestro, no el de GoTrue: el texto que ve el médico vive en la
+       pantalla, en español, y no lo dicta una dependencia.
+       `password_debil` hoy es inalcanzable —la pantalla valida la longitud
+       antes de enviar— y deja de serlo cuando suba la política: con HIBP
+       encendido, GoTrue rechaza contraseñas filtradas y eso SOLO se sabe aquí.
+       Ese cambio tiene que traer su propia respuesta para no resucitar el
+       problema que `same_password` acaba de cerrar. */
+    return NextResponse.json(
+      { error: errUpdate.code === 'weak_password' ? 'password_debil' : 'password_rechazada' },
+      { status: 400 },
+    )
   }
 
   /* ⚠️ LA REVOCACIÓN ES EL MOTIVO DE LA MITAD DE LOS RESETS, no un extra: quien
@@ -127,6 +168,16 @@ export async function POST(req: NextRequest) {
   const { error: errSignOut } = await supabase.auth.signOut({ scope: 'global' })
   if (errSignOut) logger.error('RESET-PASSWORD', 'fallo al revocar sesiones (scope global)')
 
+  /* ⚠️ AQUÍ NO SE DISTINGUE EL CASO `same_password`, Y SI HAS VENIDO A ESTA
+     TABLA BUSCANDO ESA TRAZA, NO FALTA: ESTÁ OMITIDA A PROPÓSITO.
+     Anotar «este médico reutilizó su contraseña» metería el oráculo que la
+     rama de arriba acaba de suprimir en el ÚNICO sitio del que no se puede
+     sacar: `audit_log` es inmutable por trigger (`supabase_migration_audit_
+     immutable.sql`), no admite cancelación ARCO, y lo lee cualquier
+     `super_admin` desde el panel global. Sería cambiar un oráculo de un solo
+     tiro, que caduca en una hora, por uno permanente y consultable.
+     Lo que la NOM-024 pide que conste —quién, cuándo, desde dónde, y que el
+     acceso se restableció— consta igual en las dos ramas. */
   await logAudit({
     userId: data.user.id,
     accion: 'recuperacion_contrasena',
@@ -160,9 +211,14 @@ async function avisar(correo: string): Promise<void> {
     await resend.emails.send({
       from: 'Spinus <noreply@mail.spinus.com.mx>',
       to: correo,
-      subject: 'Tu contraseña de Spinus ha cambiado',
+      subject: 'Se restableció el acceso a tu cuenta de Spinus',
+      /* ⚠️ «SE RESTABLECIÓ EL ACCESO» Y NO «TU CONTRASEÑA CAMBIÓ», y el matiz
+         no es de estilo: cuando el médico teclea la contraseña que ya tenía,
+         la rama `same_password` llega hasta aquí y nada cambió. Este texto es
+         cierto en los dos casos —las sesiones se cerraron siempre—, y por eso
+         tampoco delata cuál de los dos fue. */
       html: `<div style="font-family:Segoe UI,Helvetica,Arial,sans-serif;color:#334155;font-size:14px;line-height:1.6;max-width:540px">
-        <p>La contraseña de tu cuenta de Spinus acaba de cambiarse, y se cerraron todas las sesiones abiertas.</p>
+        <p>Acabas de restablecer el acceso a tu cuenta de Spinus, y se cerraron todas las sesiones abiertas.</p>
         <p><strong>Si no fuiste tú</strong>, escribe de inmediato a soporte respondiendo a este correo. No sigas enlaces que digan «recupera tu cuenta»: nosotros no te los vamos a mandar en este mensaje.</p>
       </div>`,
     })

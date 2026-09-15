@@ -57,6 +57,13 @@ function ResetPasswordContent() {
         setError('Demasiados intentos desde esta conexión. Espera un rato e inténtalo de nuevo.')
       } else if (json.error === 'enlace_invalido') {
         setEnlaceMuerto(true)
+      } else if (json.error === 'password_debil') {
+        /* Hoy inalcanzable: la validación de arriba se adelanta. Queda cableado
+           para cuando suba la política de contraseña — ahí GoTrue podrá
+           rechazar por su cuenta (contraseña filtrada, con HIBP encendido) y
+           esto será lo que vea el médico. */
+        setError('Esa contraseña no cumple los requisitos, y este enlace ya se consumió. Solicita uno nuevo y elige otra.')
+        setEnlaceMuerto(true)
       } else if (json.error === 'password_rechazada') {
         setError('No se aceptó la contraseña, y este enlace ya se consumió. Solicita uno nuevo.')
         setEnlaceMuerto(true)
@@ -98,10 +105,16 @@ function ResetPasswordContent() {
                acaba de tocar no era la suya. */
             <div className="text-center space-y-4">
               <CheckCircle size={40} className="text-emerald-500 mx-auto" />
-              <h2 className="font-semibold text-slate-700">Contraseña actualizada</h2>
+              {/* ⚠️ «QUEDÓ ESTABLECIDA» Y NO «SE CAMBIÓ», a propósito. Si el
+                  médico tecleó la contraseña que ya tenía, el servidor lo trata
+                  como éxito (ver la rama `same_password` de
+                  `api/auth/reset-password/route.ts`) y no cambió nada. Este
+                  texto es cierto en los dos casos, y por eso tampoco le dice a
+                  quien traiga un token robado cuál de los dos ocurrió. */}
+              <h2 className="font-semibold text-slate-700">Listo</h2>
               {correo && (
                 <p className="text-sm text-slate-500">
-                  Se cambió la contraseña de <strong className="text-slate-700">{correo}</strong>, y se cerraron todas sus sesiones.
+                  La contraseña de <strong className="text-slate-700">{correo}</strong> quedó establecida, y se cerraron todas sus sesiones.
                 </p>
               )}
               <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-left">
