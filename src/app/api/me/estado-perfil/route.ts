@@ -39,9 +39,19 @@ export async function GET() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
+  /* ⚠️ `invitado_por` EXIGE LA MIGRACIÓN 20260914_b56 APLICADA, Y EL ORDEN DE
+     DESPLIEGUE NO ES NEGOCIABLE: LA MIGRACIÓN VA PRIMERO. Si este código sale
+     a producción antes que ella, la columna no existe, PostgREST responde 400
+     al `select` entero —no a la columna: a la consulta completa—, `profile`
+     llega vacío y esta ruta devuelve 404. Y esta ruta está en el CAMINO
+     CRÍTICO de entrar a la aplicación: `GateOnboarding` la llama en cada carga
+     dura de `(app)`, así que se queda sin gate para TODOS los usuarios, no
+     sólo para los afectados por el criterio.
+     Ni el build ni las pruebas lo detectan: son locales, y en local la
+     migración ya está puesta. */
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role, es_admin_de_clinica, nombres, especialidad, cedula_profesional, cedula_especialidad, firma_url, clinica_id')
+    .select('role, es_admin_de_clinica, invitado_por, nombres, especialidad, cedula_profesional, cedula_especialidad, firma_url, clinica_id')
     .eq('id', user.id)
     .single()
 
@@ -69,7 +79,11 @@ export async function GET() {
 
   const gate = evaluarPerfil({
     role: role as Role,
-    es_admin_de_clinica: profile.es_admin_de_clinica as boolean | null,
+    /* `es_admin_de_clinica` SIGUE EN EL SELECT de arriba y no es un resto: lo
+       necesita la respuesta (`es_admin_de_clinica` más abajo) para el paso del
+       logo. Lo que salió del gate es su uso como criterio de procedencia, no
+       la columna. */
+    invitado_por: profile.invitado_por as string | null,
     nombres: profile.nombres as string | null,
     especialidad: profile.especialidad as string | null,
     cedula_profesional: profile.cedula_profesional as string | null,

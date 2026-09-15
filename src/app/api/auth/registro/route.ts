@@ -22,13 +22,19 @@ const resend = new Resend(process.env.RESEND_API_KEY)
  * saber qué le falta, con la RLS como único freno. O sea que el gate se quedaría
  * ciego justo con el usuario que más lo necesita.
  *
- * ⚠️ `es_admin_de_clinica: true` NO ES DECORATIVO. La columna es
- * `NOT NULL DEFAULT false`; con el default, `evaluarPerfil` devuelve
- * `requiereSoporte: true` para todo médico nuevo —sin clínica y sin ser dueño—
- * y el gate le enseña el panel de soporte en vez del formulario de clínica. Un
- * encierro de fábrica. Quien se registra por su cuenta es el dueño de la cuenta
- * que está creando; los invitados los da de alta el admin, con este flag en
- * false (`api/admin/crear-usuario`).
+ * ⚠️ `es_admin_de_clinica: true` NO ES DECORATIVO, PERO YA NO POR LO QUE AQUÍ
+ * DECÍA. Esta nota justificaba el flag con el gate: que su `NOT NULL DEFAULT
+ * false` hacía `requiereSoporte: true` y encerraba al médico nuevo en el panel
+ * de soporte. Eso se arregló en B5.7 (2026-09-14) atacando la causa: el gate
+ * mira `invitado_por`, no este flag, así que hoy un médico sin clínica y sin
+ * invitador va al formulario aunque el flag esté en false.
+ *
+ * Lo que el flag decide —y por eso se escribe en true— es el PERMISO: es lo
+ * que `canManageClinica` (`lib/permissions.ts:98`) lee para dejarle crear
+ * consultorios, dar de alta a su equipo, tocar el logo y la facturación de la
+ * clínica. Quien se registra por su cuenta es el dueño de la cuenta que está
+ * creando. A los invitados los da de alta el admin con el flag en su default
+ * false y con `invitado_por` puesto (`api/admin/crear-usuario`).
  *
  * `nombre_confirmado` se queda en su default `false`: aquí ya no se captura
  * ningún nombre. Lo pone en true `PUT /api/me/perfil-medico` cuando el médico

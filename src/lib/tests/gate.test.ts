@@ -6,7 +6,6 @@ import { evaluarPerfil, type DatosPerfilGate } from '@/lib/perfil/gate'
    patrón que registroSchema.test.ts. */
 const DUENO_COMPLETO: DatosPerfilGate = {
   role: 'medico',
-  es_admin_de_clinica: true,
   nombres: 'Angel',
   especialidad: 'Traumatología',
   cedula_profesional: '9552456',
@@ -14,9 +13,11 @@ const DUENO_COMPLETO: DatosPerfilGate = {
   consultoriosActivos: 1,
 }
 
+/* Lo que distingue al invitado es QUIÉN lo dio de alta, no si administra la
+   clínica. El uuid es el de su administrador. */
 const INVITADO_COMPLETO: DatosPerfilGate = {
   ...DUENO_COMPLETO,
-  es_admin_de_clinica: false,
+  invitado_por: '7c9e1b34-52a1-4f0e-9d3b-1a8c6e4f2b90',
 }
 
 describe('evaluarPerfil — roles exentos', () => {
@@ -74,12 +75,6 @@ describe('evaluarPerfil — médico con todo', () => {
     expect(r.pendientes).toEqual([])
   })
 
-  it('es_admin_de_clinica ausente se trata como invitado, no rompe', () => {
-    const sinBandera: DatosPerfilGate = { ...DUENO_COMPLETO }
-    delete sinBandera.es_admin_de_clinica
-    const r = evaluarPerfil(sinBandera)
-    expect(r.completo).toBe(true)
-  })
 })
 
 describe('evaluarPerfil — paso 1, datos del médico', () => {
@@ -127,10 +122,17 @@ describe('evaluarPerfil — paso 1, datos del médico', () => {
 
 describe('evaluarPerfil — paso 2, clínica', () => {
   it('el dueño sin clinica_id debe crear la clínica', () => {
+    // Dueño = nadie lo invitó. El fixture no lleva `invitado_por`.
     const r = evaluarPerfil({ ...DUENO_COMPLETO, clinica_id: null })
     expect(r.pendientes).toEqual(['clinica'])
     expect(r.siguiente).toBe('clinica')
     expect(r.requiereSoporte).toBe(false)
+  })
+
+  it('el invitado CON clínica no requiere soporte', () => {
+    /* `invitado_por` sin el `sinClinica` mandaría a soporte a TODOS los
+       invitados de la aplicación. Éste es el caso que lo impide. */
+    expect(evaluarPerfil(INVITADO_COMPLETO).requiereSoporte).toBe(false)
   })
 
   it('el invitado sin clinica_id también se bloquea, pero no puede resolverlo', () => {
@@ -139,6 +141,24 @@ describe('evaluarPerfil — paso 2, clínica', () => {
     expect(r.completo).toBe(false)
     expect(r.pendientes).toEqual(['clinica'])
     expect(r.requiereSoporte).toBe(true)
+  })
+
+  it('invitado_por ausente se trata como DUEÑO, no como invitado', () => {
+    /* El lado al que falla es lo que importa: sin procedencia el gate enseña
+       un formulario de clínica de más, nunca el panel de soporte, que es un
+       encierro sin salida. La versión anterior de esta prueba afirmaba lo
+       contrario sobre `es_admin_de_clinica` —«ausente se trata como
+       invitado»—, y ese default false era precisamente el encierro. */
+    const sinProcedencia: DatosPerfilGate = { ...INVITADO_COMPLETO, clinica_id: null }
+    delete sinProcedencia.invitado_por
+    const r = evaluarPerfil(sinProcedencia)
+    expect(r.completo).toBe(false)
+    expect(r.requiereSoporte).toBe(false)
+  })
+
+  it('invitado_por en blanco es dueño, igual que ausente', () => {
+    const r = evaluarPerfil({ ...INVITADO_COMPLETO, invitado_por: '  ', clinica_id: null })
+    expect(r.requiereSoporte).toBe(false)
   })
 
   it('clinica_id en blanco no cuenta como clínica', () => {
@@ -173,7 +193,6 @@ describe('evaluarPerfil — orden y pureza', () => {
   it('un médico vacío devuelve los tres pasos en orden', () => {
     const r = evaluarPerfil({
       role: 'medico',
-      es_admin_de_clinica: true,
       nombres: null,
       especialidad: null,
       cedula_profesional: null,

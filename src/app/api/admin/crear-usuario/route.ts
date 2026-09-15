@@ -99,6 +99,15 @@ export async function POST(req: NextRequest) {
     apellido_materno,
     nombre_confirmado: parsed.data.role === 'secretaria',
     clinica_id: clinicaId ?? null,
+    /* B5.7 — PROCEDENCIA, no permiso, y por eso se escribe para los DOS roles
+       que salen de aquí: al médico invitado y a la secretaria los da de alta
+       un administrador. En la secretaria hoy no cambia nada visible —el gate
+       la exime antes de llegar al criterio—, pero el hecho es el mismo y
+       guardarlo a medias sería peor que no guardarlo. `user.id` es el del
+       llamante, ya validado arriba: sesión, `clinica_id` propio y
+       `canManageClinica`. Lo lee `lib/perfil/gate.ts` para decidir si un
+       usuario sin clínica va al formulario de alta o al panel de soporte. */
+    invitado_por: user.id,
     titulo,
     especialidad,
     cedula_profesional,
