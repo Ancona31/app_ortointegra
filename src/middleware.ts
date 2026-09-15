@@ -115,8 +115,9 @@ export async function middleware(request: NextRequest) {
       2. Las operaciones donde una sesión revocada sí importaría ya validan
          contra el servidor de Auth POR SÍ MISMAS, y ahí no se ha tocado nada:
          el cierre de sesión (`lib/auth-context.tsx`, `signOut()` va directo al
-         Auth), el cambio de contraseña (`app/reset-password/page.tsx`,
-         `updateUser()` ídem), y la gestión de usuarios de clínica
+         Auth), el cambio de contraseña (`api/auth/reset-password/route.ts`,
+         `updateUser()` + `signOut({ scope: 'global' })` ídem), y la gestión de
+         usuarios de clínica
          (`api/admin/usuarios` y `api/admin/crear-usuario`, que hacen
          `getUser()` con red ANTES de tocar `createAdminClient()`). Lo mismo
          vale para las 34 rutas que usan cliente de servicio: o llaman a
@@ -189,13 +190,13 @@ export async function middleware(request: NextRequest) {
      `notFound()` — ver la cabecera de `app/demo/receta/page.tsx`.
      Si se añaden más páginas bajo `/demo/`, esto pasa a ser un `startsWith`; con
      una sola, el literal es más honesto sobre lo que hay. */
-  const isPublicPage = ['/', '/forgot-password', '/reset-password', '/auth/confirm', '/auth/callback', '/auth/confirm-email', '/pricing', '/register', '/privacy', '/privacidad', '/terms', '/offline', '/demo/receta'].includes(pathname)
+  const isPublicPage = ['/', '/forgot-password', '/reset-password', '/auth/callback', '/auth/confirm-email', '/pricing', '/register', '/privacy', '/privacidad', '/terms', '/offline', '/demo/receta'].includes(pathname)
     || pathname.startsWith('/r/')
     || pathname.startsWith('/offline-mode')
     || pathname.startsWith('/offline-setup')
 
   // Rutas API que no requieren sesión (OAuth callbacks, Stripe webhook y Stripe checkout/portal que manejan su propia auth)
-  const publicApiPaths = ['/api/google/callback', '/api/stripe/webhook', '/api/stripe/checkout', '/api/stripe/portal', '/api/auth/registro', '/api/auth/email-hook', '/api/auth/verify-email', '/api/auth/audit-login', '/api/auth/rate-limit', '/api/auth/login']
+  const publicApiPaths = ['/api/google/callback', '/api/stripe/webhook', '/api/stripe/checkout', '/api/stripe/portal', '/api/auth/registro', '/api/auth/email-hook', '/api/auth/verify-email', '/api/auth/audit-login', '/api/auth/rate-limit', '/api/auth/login', '/api/auth/reset-password']
   const isPublicApi = publicApiPaths.some(p => pathname.startsWith(p))
 
   // Si no hay sesión y no está en ruta pública → verificar cookies antes de redirigir.

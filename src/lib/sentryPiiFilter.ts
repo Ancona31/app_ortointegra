@@ -17,6 +17,15 @@ const RFC_RE = /\b[A-Z&Ñ]{3,4}\d{6}[A-Z0-9]{2,3}\b/gi
 const PHONE_RE = /(?:\+?52\s?)?(?:\(?\d{2,3}\)?\s?)?[\d\s\-]{7,10}\d/g
 const EMAIL_RE = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g
 const UUID_RE = /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi
+/* Token de acción de GoTrue: `sha224(correo + OTP)` en hex son 56 caracteres
+   (`internal/crypto/crypto.go`, `GenerateTokenHash`), con un `pkce_` delante
+   cuando la petición nació en flujo PKCE. Va en la QUERY de `/reset-password` y
+   de `/auth/confirm-email`, y el SDK de Sentry lee `window.location.href` por su
+   cuenta — la cabecera `Referrer-Policy` de `next.config.ts:24` no lo alcanza.
+   Sin esta línea, `UUID_RE` no lo tocaba (no lleva guiones) y con
+   `replaysOnErrorSampleRate: 1.0` un solo error de esas pantallas subía a un
+   tercero una credencial canjeable durante una hora (`otp_expiry`). */
+const TOKEN_ACCION_RE = /\b(?:pkce_)?[0-9a-f]{56}\b/gi
 
 // Keys sensibles — si el nombre del campo contiene estas palabras, redactar el valor
 const SENSITIVE_KEYS = [
@@ -24,6 +33,15 @@ const SENSITIVE_KEYS = [
   'celular', 'curp', 'rfc', 'direccion', 'domicilio', 'diagnostico',
   'motivo_consulta', 'exploracion', 'antecedentes', 'medicamentos',
   'recomendaciones', 'contenido', 'notas_evolucion', 'signos', 'vitales',
+  /* Credenciales, no datos clínicos, y por eso estaban fuera de una lista que
+     nació pensando en PII de pacientes. `/api/auth/reset-password` recibe
+     `token_hash` y `password` EN EL MISMO CUERPO: sin estas tres, un breadcrumb
+     de `fetch` con cuerpo lo publicaba entero.
+     `token` cubre también `access_token` y `refresh_token` por subcadena.
+     ⚠️ NO añadas 'code' aquí: casaría con `error_code` y `status_code` y dejaría
+     los informes sin el dato que sirve para depurarlos. El `?code=` de OAuth es
+     un UUID y ya lo cubre `UUID_RE`. */
+  'password', 'contrasena', 'token',
 ]
 
 // Rutas API con datos clínicos sensibles
@@ -31,6 +49,9 @@ const SENSITIVE_API_PATHS = [
   '/api/pacientes', '/api/consultas',
   '/api/documentos', '/api/nota-medica',
   '/api/email/enviar-documento',
+  /* No lleva datos clínicos: lleva credenciales. Cubre `/api/auth/login` y
+     `/api/auth/reset-password`, cuyos cuerpos son contraseñas y tokens. */
+  '/api/auth/',
 ]
 
 // ── Funciones de redacción ───────────────────────────────────────────
@@ -38,6 +59,7 @@ const SENSITIVE_API_PATHS = [
 function redactString(text: string): string {
   if (!text || typeof text !== 'string') return text
   return text
+    .replace(TOKEN_ACCION_RE, '[TOKEN-REDACTADO]')
     .replace(CURP_RE, '[CURP-REDACTADO]')
     .replace(RFC_RE, '[RFC-REDACTADO]')
     .replace(EMAIL_RE, '[EMAIL-REDACTADO]')
