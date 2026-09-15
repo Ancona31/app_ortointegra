@@ -333,6 +333,39 @@ skip_nonce_check = false
 # If enabled, it will allow the user to successfully authenticate when the provider does not return an email address.
 email_optional = false
 
+# ─────────────────────────────────────────────────────────────────────────────
+# BLOQUE DE DESARROLLO — Google en el Supabase LOCAL, y solo ahí.
+#
+# Se añade para probar el enlace de identidades del bloque B6 contra la pila
+# local. ENCENDER GOOGLE EN PRODUCCIÓN ES UN PASO POSTERIOR Y SEPARADO: allí el
+# proveedor se configura en el panel de Supabase, no en este archivo, que el
+# CLI solo aplica a la instancia local.
+#
+# ⚠️ EL SECRETO NO VIVE AQUÍ. Va por sustitución de variable de entorno, igual
+# que el de apple y por el mismo motivo que advierte su comentario: este
+# repositorio es PÚBLICO y `config.toml` está versionado. El `client_id` sí es
+# público por diseño —viaja en la URL de autorización—, el secreto no.
+# ─────────────────────────────────────────────────────────────────────────────
+[auth.external.google]
+enabled = true
+client_id = "325218215379-15qgpb1thbrko5p9jdcqqvq2d5vd5ar3.apps.googleusercontent.com"
+# DO NOT commit your OAuth provider secret to git. Use environment variable substitution instead:
+secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET)"
+# Overrides the default auth callback URL derived from auth.external_url.
+redirect_uri = ""
+# Overrides the default auth provider URL. Used to support self-hosted gitlab, single-tenant Azure,
+# or any other third-party OIDC providers.
+url = ""
+# If enabled, the nonce check will be skipped. Required for local sign in with Google auth.
+# ⚠️ EN `true` PORQUE EL PROPIO CLI LO EXIGE PARA EL LOGIN CON GOOGLE EN LOCAL
+# —lo dice el comentario de arriba, que viene de la plantilla del CLI—. Es un
+# relajamiento de seguridad y SOLO APLICA A ESTA INSTANCIA LOCAL: en producción
+# ese interruptor vive en el panel de Supabase y está APAGADO. No lo copies
+# hacia allá al encender el proveedor.
+skip_nonce_check = true
+# If enabled, it will allow the user to successfully authenticate when the provider does not return an email address.
+email_optional = false
+
 # Allow Solana wallet holders to sign in to your project via the Sign in with Solana (SIWS, EIP-4361) standard.
 # You can configure "web3" rate limit in the [auth.rate_limit] section and set up [auth.captcha] if self-hosting.
 [auth.web3.solana]

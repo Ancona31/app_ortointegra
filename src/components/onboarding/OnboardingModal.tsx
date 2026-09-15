@@ -363,6 +363,25 @@ export default function OnboardingModal({
     else if (paso === 'clinica') ok = await crearClinica()
     else if (paso === 'consultorio') ok = await crearConsultorio()
     else if (paso === 'logo') ok = await subirLogo()
+    /* ⚠️ ESTA RAMA NO SUBE NADA, Y AHÍ ESTÁ LA DIFERENCIA CON LA DEL LOGO. El
+       logo se queda en un `File` hasta que «Continuar» lo manda (`subirLogo`);
+       la firma ya la mandó «Aceptar firma» dentro de `FirmaCaptura`, que es
+       quien escribe `profiles.firma_url`. Lo que falta aquí no es una
+       escritura: es ESPERARLA.
+       `firmaUrl` solo se puebla en el callback de un POST ya resuelto
+       (FirmaCaptura.tsx:230), así que exigirlo ORDENA las dos peticiones: el
+       `mutate` de `onComplete` sale después del update y no antes. Sin esta
+       rama, `ok` caía a `true` por omisión y el GET de estado-perfil —dos
+       selects— le ganaba al POST —multipart, Storage, update, signed URL—; el
+       aviso del sidebar seguía pidiendo una firma ya guardada y no se corregía
+       solo, porque (app) no se remonta al navegar y `focusThrottleInterval`
+       está en 300 s.
+       ⚠️ NO DISTINGUE «subiendo» de «no capturó» de «falló el POST»: el único
+       canal que sale de `FirmaCaptura` es `onFirmaCambiada`, así que los tres
+       se ven igual desde aquí. Por eso el camino sin firma es «Omitir por
+       ahora» y no éste. El `false` no llega a verse: el botón se deshabilita
+       con el mismo predicado (`esperandoFirma`, abajo). */
+    else if (paso === 'firma') ok = Boolean(firmaUrl)
     if (ok) siguiente()
   }
 
@@ -382,6 +401,11 @@ export default function OnboardingModal({
   const esPanelSoporte = paso === 'clinica' && gate.requiereSoporte
   const esOmitible = OMITIBLES.includes(paso)
   const esUltimo = indice === pasos.length - 1
+  /* El mismo predicado que la rama de firma de `avanzar()`, aquí como estado
+     del botón. Va sin `guardando`: el paso de firma nunca lo toca —el
+     `subiendo` de `FirmaCaptura` es interno y no sale de ahí—, que es
+     justamente por lo que «Finalizar» se podía pulsar con el POST en vuelo. */
+  const esperandoFirma = paso === 'firma' && !firmaUrl
 
   return (
     <ModalShell
@@ -438,7 +462,7 @@ export default function OnboardingModal({
                   deshabilitado deja de ser opacidad y pasa a color propio. */}
               <button
                 onClick={avanzar}
-                disabled={guardando}
+                disabled={guardando || esperandoFirma}
                 className="sp-btn sp-btn--primary"
               >
                 {guardando ? (
@@ -773,6 +797,8 @@ export default function OnboardingModal({
               <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3">
                 Si la omites, tus recetas y escritos saldrán <strong>sin firma</strong>: con la línea y tus
                 datos, pero sin el trazo. Puedes capturarla más tarde en Mi Perfil.
+                {' '}Para terminar <strong>con</strong> firma, pulsa «Aceptar firma» aquí arriba y espera a que
+                confirme; para terminar <strong>sin</strong> ella, usa «Omitir por ahora».
               </p>
             )}
           </div>

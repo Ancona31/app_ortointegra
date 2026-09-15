@@ -64,6 +64,35 @@ export function isSecretaria(p: RoleCheck): boolean {
  * de clínica (logo, horario, stripe, billing, invitar usuarios, etc.).
  *
  * Importante: super_admin NO pasa este chequeo (su universo es separado).
+ *
+ * ⚠️⚠️ ESTA FUNCIÓN NO MIRA `clinica_id`, Y NO ES UN OLVIDO. Afirma UNA cosa —
+ * «este usuario es dueño de clínica»— y nada más. El «¿de ESTA clínica?», o
+ * incluso el «¿de alguna?», lo pone SIEMPRE el llamador, al lado:
+ *
+ *     if (!profile?.clinica_id || !canManageClinica(profile)) → 403
+ *
+ * Dos razones, y las dos importan:
+ *
+ * 1 · LA BASE HACE EXACTAMENTE LO MISMO. `public.soy_admin_de_clinica()`
+ *     (20260912190416_remote_schema.sql:2087-2099) comprueba las mismas dos
+ *     condiciones y tampoco toca `clinica_id`. Lo que cierra la RLS no es la
+ *     función: es el `AND clinica_id = public.get_clinica_id()` que cada policy
+ *     escribe a su lado (`:2771`, `:2782`, `:2787`, `:2826`, `:2831`). La
+ *     aplicación replica ese reparto a propósito — guarda y ámbito separados,
+ *     igual arriba que abajo.
+ *
+ * 2 · METERLE `clinica_id` DENTRO ROMPERÍA EL ONBOARDING. `OnboardingModal.tsx`
+ *     la llama cuando el médico TODAVÍA NO TIENE CLÍNICA: es el modal que se la
+ *     va a crear. Con el campo dentro, ese `isAdmin` sería `false` durante todo
+ *     el flujo y al dueño recién registrado dejaría de ofrecérsele el paso del
+ *     logo. Es el único consumidor que corre legítimamente en ese estado, y es
+ *     el que hace inviable «arreglar» la función por dentro.
+ *     (Además el tipo `RoleCheck` ni siquiera incluye `clinica_id`.)
+ *
+ * Si encuentras una ruta que la usa SOLA, el arreglo es añadirle el primer
+ * término de la condición de arriba — no tocar esto. Se hizo así el 2026-09-14
+ * en `api/admin/crear-usuario`, `api/admin/usuarios` (sus dos handlers),
+ * `api/google/connect` y `lib/auth.ts`; las demás ya lo comprobaban.
  */
 export function canManageClinica(p: RoleCheck): boolean {
   return p?.role === 'medico' && p?.es_admin_de_clinica === true

@@ -16,7 +16,11 @@ import type { Role } from '@/hooks/useProfile'
  * el tipo `Role` —import de tipo, se borra al compilar, mismo precedente que
  * `src/lib/permissions.ts:18`— y no conoce ningún cliente de Supabase.
  *
- * Ninguna capa consume esto todavía: eso es la segunda parte del bloque.
+ * Desde el Bloque B5 (2026-09-13) sí hay consumidores: `evaluarPerfil` se
+ * alimenta en `api/me/estado-perfil/route.ts:70` y su `requiereSoporte` decide
+ * cuál de las dos caras del paso «clínica» enseña `OnboardingModal.tsx:401`.
+ * Esta línea decía «ninguna capa consume esto todavía», que era cierto el día
+ * en que se escribió el archivo y dejó de serlo en el bloque siguiente.
  */
 
 /** Los tres pasos, en el orden en que se le piden al usuario. */
@@ -34,8 +38,25 @@ export type MotivoExencion = 'super_admin' | 'secretaria'
  */
 export interface DatosPerfilGate {
   role: Role
-  /** Dueño = true. Invitado = false/null. */
-  es_admin_de_clinica?: boolean | null
+  /**
+   * Quién dio de alta a este usuario. NULL o ausente = se registró por su
+   * cuenta, o sea dueño de la clínica que está por crear. La escribe
+   * `api/admin/crear-usuario`, el único camino con invitador
+   * (20260914_b56_trigger_aprovisionamiento.sql:360-369).
+   *
+   * ⚠️ AQUÍ YA NO VA `es_admin_de_clinica`, Y NO ES UN OLVIDO. Esa columna
+   * significa «dueño de la clínica X» y sólo afirma algo cuando `clinica_id`
+   * NO es NULL. El criterio de abajo la interrogaba justo en el estado donde
+   * no afirma nada —sin clínica—, donde ni true ni false son correctos. Con
+   * el trigger de B5.6 puesto eso dejó de ser teórico: todo usuario nacido de
+   * Google OAuth o de un POST a `/auth/v1/signup` llega con `clinica_id` NULL
+   * y el `NOT NULL DEFAULT false` del flag, y caía en el panel de soporte —un
+   * modal bloqueante cuya única salida es un mailto—. El flag sigue siendo la
+   * respuesta correcta a «¿puede administrar la clínica?» y de ahí no se
+   * mueve (`lib/permissions.ts:98` y sus quince consumidores). Lo que este
+   * gate pregunta es PROCEDENCIA, y eso lo responde `invitado_por`.
+   */
+  invitado_por?: string | null
   nombres?: string | null
   especialidad?: string | null
   cedula_profesional?: string | null
@@ -65,7 +86,8 @@ export interface EstadoPerfil {
   /**
    * Hay un paso pendiente que el propio usuario NO puede resolver.
    *
-   * Hoy ocurre en UN caso: médico invitado sin `clinica_id`. El invitado no
+   * Hoy ocurre en UN caso: alguien a quien invitó un administrador
+   * (`invitado_por` no nulo) y que se quedó sin `clinica_id`. El invitado no
    * puede crear una clínica, así que enseñarle el paso «clínica» es darle un
    * formulario que tiene prohibido usar. No es hipotético:
    * `profiles_clinica_id_fkey` es ON DELETE SET NULL
@@ -73,6 +95,10 @@ export interface EstadoPerfil {
    * sus médicos exactamente así. Se bloquea igual —sin clínica, la app entera
    * filtra por un id que no existe— pero quien consuma esto debe mandarlo a
    * soporte y no al alta de clínica.
+   *
+   * Quien NO tiene invitador y no tiene clínica es el caso contrario: es su
+   * propia cuenta la que falta, y el formulario es exactamente lo que
+   * necesita.
    */
   requiereSoporte: boolean
 }
@@ -153,7 +179,11 @@ export function evaluarPerfil(datos: DatosPerfilGate): EstadoPerfil {
      «lo tiene». */
   if (!(datos.consultoriosActivos >= 1)) pendientes.push('consultorio')
 
-  const esDueno = datos.es_admin_de_clinica === true
+  /* `tieneValor` y no `!= null`, por lo mismo que `clinica_id` doce líneas
+     arriba: las dos llegan por JSON desde un `select`, y un '' o un '  ' no es
+     un invitador. De paso cubre el `undefined` de quien no manda el campo, que
+     es el lado al que hay que fallar —formulario de más, nunca encierro—. */
+  const fueInvitado = tieneValor(datos.invitado_por)
 
   return {
     completo: pendientes.length === 0,
@@ -161,6 +191,6 @@ export function evaluarPerfil(datos: DatosPerfilGate): EstadoPerfil {
     siguiente: pendientes[0] ?? null,
     camposFaltantes,
     exento: null,
-    requiereSoporte: sinClinica && !esDueno,
+    requiereSoporte: sinClinica && fueInvitado,
   }
 }
