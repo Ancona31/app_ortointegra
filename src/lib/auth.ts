@@ -44,11 +44,18 @@ export async function requireAdmin(): Promise<AuthResult> {
 
   const { data: profile, error } = await supabase
     .from('profiles')
-    .select('role, es_admin_de_clinica')
+    .select('role, clinica_id, es_admin_de_clinica')
     .eq('id', user.id)
     .single()
 
-  if (error || !profile || !canManageClinica(profile)) {
+  /* ⚠️ `clinica_id` ES PARTE DE LA GUARDA, no un campo de más en el `select`.
+     `canManageClinica` afirma «es dueño» y nada más; el «de esta clínica» lo
+     pone el llamador (el razonamiento completo, en `lib/permissions.ts`).
+     ⚠️ ESTA FUNCIÓN NO TIENE NINGÚN CONSUMIDOR HOY — comprobado con grep sobre
+     `src/`. Se corrigió igual porque está exportada y una guarda incompleta es
+     una trampa puesta para quien la estrene. Si vas a usarla: ya está completa,
+     no le añadas comprobaciones de clínica por fuera. */
+  if (error || !profile?.clinica_id || !canManageClinica(profile)) {
     return { user: null, error: NextResponse.json({ error: 'Sin permisos' }, { status: 403 }) }
   }
 

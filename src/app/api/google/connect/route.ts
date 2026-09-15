@@ -23,10 +23,15 @@ export async function GET(req: NextRequest) {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role, es_admin_de_clinica')
+    .select('role, clinica_id, es_admin_de_clinica')
     .eq('id', user.id)
     .single()
-  if (!canManageClinica(profile)) {
+  /* `clinica_id` en la condición por el mismo motivo que en el resto de rutas
+     de administración (ver `lib/permissions.ts`): la guarda sola no distingue a
+     un dueño sin clínica. La RESPUESTA no cambia —esta ruta redirige en vez de
+     contestar JSON, y `perfil/page.tsx:160` ya sabe traducir `solo_admin`—; su
+     gemela `google/callback:145` ya usaba el patrón completo. */
+  if (!profile?.clinica_id || !canManageClinica(profile)) {
     return NextResponse.redirect(new URL('/perfil?gcal_error=solo_admin', req.url))
   }
 

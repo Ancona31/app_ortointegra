@@ -12,7 +12,7 @@ export async function GET() {
   const { data: profile } = await supabase.from('profiles').select('role, clinica_id, es_admin_de_clinica').eq('id', user.id).single()
 
   // Solo admin de clínica puede gestionar usuarios
-  if (!profile || !canManageClinica(profile)) {
+  if (!profile?.clinica_id || !canManageClinica(profile)) {
     return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
   }
 
@@ -70,7 +70,7 @@ export async function DELETE(req: Request) {
   const { data: profile } = await supabase.from('profiles').select('role, clinica_id, es_admin_de_clinica').eq('id', user.id).single()
 
   // Solo admin de clínica puede eliminar
-  if (!profile || !canManageClinica(profile)) {
+  if (!profile?.clinica_id || !canManageClinica(profile)) {
     return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
   }
 

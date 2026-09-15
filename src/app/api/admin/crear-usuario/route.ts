@@ -15,7 +15,14 @@ export async function POST(req: NextRequest) {
     .eq('id', user.id)
     .single()
 
-  if (!creatorProfile || !canManageClinica(creatorProfile)) {
+  /* ⚠️ `clinica_id` VA EN LA CONDICIÓN, NO SOLO EN EL `select`. `canManageClinica`
+     afirma «es dueño», no «es dueño DE ESTA clínica» — ver su comentario en
+     `lib/permissions.ts`. Sin este primer término, una cuenta con el flag en
+     true y `clinica_id` NULL pasaba la guarda, y además se saltaba ENTEROS los
+     topes de plan de abajo, porque ese bloque cuelga de que `clinicaId` exista.
+     Sin rate limit en esta ruta, eso permitía acuñar usuarios de auth sin
+     límite. */
+  if (!creatorProfile?.clinica_id || !canManageClinica(creatorProfile)) {
     return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
   }
 
