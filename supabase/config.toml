@@ -159,7 +159,45 @@ site_url = "http://127.0.0.1:3000"
 # The public URL that Auth serves on. Defaults to the API external URL with `/auth/v1` appended.
 # external_url = ""
 # A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
-additional_redirect_urls = ["https://127.0.0.1:3000"]
+#
+# ⚠️ EL RETORNO DE OAUTH TIENE QUE ESTAR AQUÍ, EXACTO, O EL MÉDICO ACABA EN LA
+# RAÍZ. GoTrue valida el `redirect_to` que le manda `signInWithOAuth` contra
+# `site_url` (comparación exacta) más esta lista; si no encuentra coincidencia
+# NO falla con un error visible: redirige a `site_url` y punto. Es decir, el
+# login de Google funciona, la sesión se crea, y el médico aterriza en la raíz
+# sin pasar por /auth/callback ni entender qué pasó.
+#
+# ⚠️ HAY QUE LISTAR LOS DOS HOSTS —127.0.0.1 Y localhost— Y NO ES REDUNDANTE.
+# El botón manda `${window.location.origin}/auth/callback`, así que la URL de
+# retorno depende de POR DÓNDE ENTRÓ el desarrollador: el servidor de Next
+# responde en los dos hosts, pero el origen lo fija la barra de direcciones.
+# Comprobado el 2026-09-15 con solo 127.0.0.1 en la lista: entrando por
+# localhost:3000 el retorno acabó en
+# `http://127.0.0.1:3000/?code=9e275bd7-…` —la raíz, con el `?code=` colgando—
+# en vez de en `http://localhost:3000/auth/callback?code=…`. Ese es el fallo
+# silencioso descrito arriba, visto en vivo.
+#
+# ⚠️ Y SON DOS ORÍGENES DISTINTOS PARA EL NAVEGADOR, no dos nombres del mismo.
+# Las cookies de sesión NO se comparten entre `localhost` y `127.0.0.1`: quien
+# pruebe el login tiene que usar el MISMO host de principio a fin. Empezar en
+# uno y volver al otro deja la sesión en un origen y la pestaña en el otro, y
+# parece que el login no funcionó cuando sí lo hizo.
+#
+# La entrada "https://127.0.0.1:3000" de abajo es ANTERIOR a todo esto y hoy no
+# la usa nadie: es de esquema HTTPS y el servidor de desarrollo es HTTP, así que
+# no cubre ningún retorno actual. Se conserva —no estorba— pero no la borres sin
+# averiguar antes quién la puso y para qué.
+#
+# ⚠️ ESTE ARCHIVO ES SOLO LOCAL. El equivalente en producción NO se toca aquí:
+# es Authentication → URL Configuration del panel de Supabase, y va JUNTO al
+# encendido del proveedor de Google (hoy apagado en prod: /auth/v1/authorize
+# responde 400 «Unsupported provider: provider is not enabled»), no antes.
+# Añadir la URL de retorno con el proveedor apagado no habilita nada.
+additional_redirect_urls = [
+  "https://127.0.0.1:3000",
+  "http://127.0.0.1:3000/auth/callback",
+  "http://localhost:3000/auth/callback",
+]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600
 # JWT issuer URL. If not set, defaults to auth.external_url.

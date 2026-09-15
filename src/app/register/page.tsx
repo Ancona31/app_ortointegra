@@ -2,7 +2,9 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import Link from 'next/link'
+import { createClient } from '@/lib/supabase/client'
 import { Loader2, Eye, EyeOff, CheckCircle, RefreshCw } from 'lucide-react'
 
 /**
@@ -19,6 +21,20 @@ import { Loader2, Eye, EyeOff, CheckCircle, RefreshCw } from 'lucide-react'
  * tabla. En el onboarding son dos pasos distintos y cada uno se llama por su
  * nombre.
  */
+
+/* ═══ BANDERA DE GOOGLE — APAGADA POR DEFECTO ══════════════════════════════
+   Gemela de la de `login/page.tsx`, y DUPLICADA A PROPÓSITO: las dos páginas
+   no comparten sistema visual ni módulo, y sacar dos constantes de una línea a
+   un archivo común sería la abstracción prematura que el proyecto proscribe.
+   Lo único que sí se comparte es el SVG de la «G».
+   ⚠️ SI LA ENCIENDES, ENCIÉNDELA EN LAS DOS. Con una sola, el médico que se
+   registra con Google no encontraría después cómo volver a entrar (o al revés).
+   El orden de encendido —proveedor y URL de retorno EN EL PANEL primero, la
+   variable y el redespliegue después— está escrito entero en `login/page.tsx`,
+   junto a su bandera. */
+const GOOGLE_OAUTH = ['1', 'true'].includes(
+  (process.env.NEXT_PUBLIC_GOOGLE_OAUTH ?? '').trim().toLowerCase(),
+)
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -75,6 +91,29 @@ export default function RegisterPage() {
   function set(field: keyof typeof form) {
     return (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
       setForm(f => ({ ...f, [field]: e.target.value }))
+  }
+
+  /* ⚠️ AQUÍ NO SE «CREA UNA CUENTA», SE ENTRA — y por eso el botón dice
+     «Continuar con Google» y no «Registrarse con Google». Google no distingue
+     alta de acceso: es el mismo flujo, y si el correo ya existe entra a la
+     cuenta de siempre en vez de fallar con un 409 como hace `/api/auth/registro`.
+     Lo que venga después —perfil, clínica— lo pide el gate de onboarding, igual
+     que a quien se registra con correo.
+     ⚠️ No detecta fallos: `signInWithOAuth` sólo construye la URL y navega
+     (`window.location.assign`), devolviendo `error: null` siempre. El razonamiento
+     completo está junto al handler gemelo de `login/page.tsx`. */
+  async function entrarConGoogle() {
+    const supabase = createClient()
+    await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+        // Solo 'openid': GoTrue AÑADE esto a sus scopes por defecto
+        // (`email profile`), no los sustituye. Nunca el scope de Calendar.
+        scopes: 'openid',
+        queryParams: { prompt: 'select_account' },
+      },
+    })
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -224,6 +263,41 @@ export default function RegisterPage() {
                 : 'Crear cuenta gratuita'
               }
             </button>
+
+            {/* ═══ GOOGLE ═══
+                ⚠️ ESTE BOTÓN NO ES EL DE /login, Y NO SE COPIA DE ALLÍ. Aquella
+                pantalla corre sobre el sistema visual de la landing (tokens
+                `--lp-*`, `rounded-xl`, 15px, escala 8·12·16·24); ésta no: usa
+                hex literales, `slate-*`, `rounded-lg` y `text-sm`. Trasplantar
+                el otro botón metería medio sistema visual en una página que no
+                lo tiene. Lo único compartido entre las dos es el archivo SVG.
+                Lo que sí es idéntico a propósito es el TEXTO: «Continuar con
+                Google» en las dos.
+                ⚠️ LOS TRES COLORES DEL BOTÓN SON DE GOOGLE, NO NUESTROS: fondo
+                #FFFFFF, borde #747775, texto #1F1F1F. Su guía de marca no
+                permite recolorearlo, así que no los alinees con el `#1e5fa8` de
+                esta página aunque desentonen. En esta pantalla el choque es
+                menor que en /login —aquí ya se escriben hex a mano—, pero el
+                motivo por el que son intocables es el mismo.
+                Con la bandera apagada no se pinta NADA: esta página nunca tuvo
+                botón de Google, así que no hay estado previo que conservar, y
+                un «Próximamente» aquí sería una promesa nueva en vez de una
+                que ya estaba hecha (que es lo que sí ocurre en /login). */}
+            {GOOGLE_OAUTH && (
+              <>
+                <div className="flex items-center gap-3 pt-1">
+                  <span className="h-px flex-1 bg-slate-200" aria-hidden="true" />
+                  <span className="text-xs text-slate-400">o</span>
+                  <span className="h-px flex-1 bg-slate-200" aria-hidden="true" />
+                </div>
+
+                <button type="button" onClick={entrarConGoogle}
+                  className="w-full py-3 bg-[#FFFFFF] text-[#1F1F1F] border border-[#747775] rounded-lg font-medium text-sm hover:bg-slate-50 transition-colors flex items-center justify-center gap-2">
+                  <Image src="/google/boton-g.svg" alt="" width={18} height={18} className="h-[18px] w-[18px]" />
+                  Continuar con Google
+                </button>
+              </>
+            )}
 
             <p className="text-center text-xs text-slate-400 pt-1">
               ¿Ya tienes cuenta?{' '}

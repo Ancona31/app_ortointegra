@@ -76,6 +76,28 @@ const LOGIN_SERVIDOR = !['0', 'false'].includes(
   (process.env.NEXT_PUBLIC_LOGIN_SERVIDOR ?? '').trim().toLowerCase(),
 )
 
+/* ═══ BANDERA DE GOOGLE — APAGADA POR DEFECTO ══════════════════════════════
+   Enciende el botón de «Continuar con Google». Al revés que `LOGIN_SERVIDOR`
+   de arriba: aquí el valor por defecto —variable ausente— es APAGADO, y sólo
+   '1' o 'true' la encienden.
+   El motivo del sentido inverso es que esta bandera no protege un despliegue,
+   protege una PROMESA: el proveedor de Google está apagado en el servidor de
+   producción (`/auth/v1/authorize` responde 400 «Unsupported provider»), y con
+   el botón vivo el médico saldría hacia una pantalla de error de GoTrue sin
+   que la app pueda enterarse — ver el comentario de `entrarConGoogle`.
+   ⚠️ EL ORDEN DE ENCENDIDO NO ES NEGOCIABLE, Y ES EN EL PANEL PRIMERO:
+   1) Authentication → Providers → Google, con su client id y secret.
+   2) Authentication → URL Configuration, añadiendo la URL de retorno
+      `https://<dominio>/auth/callback` (en local es
+      `supabase/config.toml:additional_redirect_urls`; sin ella GoTrue
+      devuelve al médico a la raíz, sin error).
+   3) Sólo entonces `NEXT_PUBLIC_GOOGLE_OAUTH=1` y REDESPLIEGUE — las
+      `NEXT_PUBLIC_*` se incrustan durante `next build`, así que cambiarla en
+      Vercel no surte efecto hasta un Redeploy. */
+const GOOGLE_OAUTH = ['1', 'true'].includes(
+  (process.env.NEXT_PUBLIC_GOOGLE_OAUTH ?? '').trim().toLowerCase(),
+)
+
 /* Clase de error DISCRIMINADA — sustituye a `error.includes('expiró')`.
    Ese `includes` decidía si mostrar el enlace de recuperación mirando dentro
    de una cadena de UI: bastaba reescribir el copy (o traducirlo, o cambiar el
@@ -380,6 +402,44 @@ export default function LoginPage() {
     }
   }
 
+  /* ═══ GOOGLE ══════════════════════════════════════════════════════════════
+     ⚠️ ESTE HANDLER NO PUEDE DETECTAR QUE EL LOGIN FALLE, Y NO HAY NADA QUE
+     ARREGLAR AQUÍ. `signInWithOAuth` no hace ninguna petición: construye la
+     URL de `/auth/v1/authorize` y hace `window.location.assign`
+     (GoTrueClient.js:2038-2039), devolviendo `error: null` SIEMPRE (:2042).
+     Si el proveedor está apagado en el servidor, quien enseña el fallo es
+     GoTrue en su propia pantalla; la app ya se fue. Por eso el `error` que
+     devuelve no se mira —sería teatro— y por eso existe la bandera
+     `GOOGLE_OAUTH`: es la única defensa real contra enseñar un botón que
+     lleva a una pantalla de error.
+
+     No lleva cerrojo de doble envío como `handleSubmit`: no hay nada que
+     duplicar —no se consume límite de intentos ni se escribe audit—, y el
+     segundo clic simplemente reescribe la misma navegación ya en curso. */
+  async function entrarConGoogle() {
+    const supabase = createClient()
+    await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        /* Tiene que coincidir EXACTO con una entrada de la lista de redirects
+           de Supabase (panel en prod, `config.toml` en local) o GoTrue manda
+           al médico a la raíz en vez de a /auth/callback. */
+        redirectTo: `${window.location.origin}/auth/callback`,
+        /* ⚠️ SOLO 'openid', Y NO 'openid email profile'. GoTrue AÑADE lo que
+           le pases a sus scopes por defecto (`email profile`), no los
+           sustituye: escribir los tres produce literalmente
+           `scope=email+profile+openid+email+profile`.
+           ⛔ NUNCA metas aquí el scope de Google Calendar. Ese es otro flujo,
+           con otro cliente OAuth y su propio consentimiento; colarlo en el
+           login convertiría «entrar» en «dame tu agenda». */
+        scopes: 'openid',
+        /* Sin esto Google entra directo con la única cuenta con sesión, que
+           en un consultorio compartido es la del último que la usó. */
+        queryParams: { prompt: 'select_account' },
+      },
+    })
+  }
+
   function handleVolverDashboard() {
     router.push('/inicio')
   }
@@ -613,34 +673,69 @@ export default function LoginPage() {
               <span className="h-px flex-1 bg-[var(--lp-border)]" aria-hidden="true" />
             </div>
 
-            {/* ═══ GOOGLE — DESHABILITADO, SOLO TEXTO ═══
-                ⚠️ SIN LOGO DE GOOGLE Y SIN LA "G", A PROPÓSITO. La integración
-                NO EXISTE: no hay proveedor OAuth de Google configurado en este
-                flujo. Un botón con la marca y el tratamiento oficial afirma una
-                capacidad que el producto no tiene, que es exactamente lo que
-                §2·1 prohíbe del lado del demo. La pastilla "Próximamente" es lo
-                que convierte la afirmación falsa en una promesa declarada.
-                ⚠️ PROHIBIDO `opacity-40` (ni ningún otro apagado global) para
-                "verse deshabilitado". Sobre `--lp-surface-sunken` deja el texto
-                en 1.76:1, ilegible: el usuario no puede leer QUÉ es lo que no
-                puede usar. Lo deshabilitado se comunica con el estado del
-                control (`disabled` + `aria-disabled`), el relleno hundido y el
-                cursor — nunca borrando el texto. Va a OPACIDAD PLENA.
-                Borde `--lp-border` (1.20:1) y no `--lp-border-control`: WCAG
-                1.4.11 exime expresamente a los componentes inactivos, y aquí el
-                borde bajo es además la señal de que el control no está vivo.
-                La pastilla usa el tratamiento de kicker (12px, +0.12em, 1.0). */}
-            <button
-              type="button"
-              disabled
-              aria-disabled="true"
-              className="flex w-full cursor-not-allowed items-center justify-center gap-3 rounded-xl border border-[var(--lp-border)] bg-[var(--lp-surface-sunken)] px-4 py-4 text-[15px] font-semibold leading-none tracking-[-0.01em] text-[var(--lp-ink-700)]"
-            >
-              Continuar con Google
-              <span className="rounded-full bg-[var(--lp-accent-bg)] px-2 py-1 text-[12px] font-semibold uppercase tracking-[0.12em] leading-none text-[var(--lp-accent)]">
-                Próximamente
-              </span>
-            </button>
+            {/* ═══ GOOGLE — DOS ESTADOS, LOS DECIDE `GOOGLE_OAUTH` ═══
+                ⚠️ ESTE COMENTARIO SUSTITUYE AL QUE VETABA EL LOGO. Aquel decía
+                que «la integración NO EXISTE» y prohibía la marca por eso; con
+                el proveedor cableado esa parte CADUCÓ y se retira. Lo que NO
+                caduca está más abajo, y se mantiene palabra por palabra.
+
+                CON LA BANDERA APAGADA el botón queda EXACTAMENTE como estaba:
+                deshabilitado, con la pastilla «Próximamente» y SIN la «G». La
+                marca no aparece en un control muerto — enseñar el logotipo de
+                Google en algo que no se puede pulsar afirma una capacidad que
+                el producto todavía no ofrece, que es justo lo que el veto
+                original protegía.
+
+                ⚠️ LO QUE SIGUE VIVO DEL VETO, PARA EL ESTADO INACTIVO:
+                · PROHIBIDO `opacity-40`, y cualquier otro apagado global, para
+                  «verse deshabilitado». Sobre `--lp-surface-sunken` deja el
+                  texto en 1.76:1, ilegible: el médico no puede leer QUÉ es lo
+                  que no puede usar. Va a OPACIDAD PLENA.
+                · Lo deshabilitado se comunica con el estado del control
+                  (`disabled` + `aria-disabled`), el relleno hundido y el
+                  cursor — NUNCA borrando texto.
+                · Borde `--lp-border` (1.20:1) y no `--lp-border-control`: WCAG
+                  1.4.11 exime expresamente a los componentes inactivos, y aquí
+                  el borde bajo es además la señal de que no está vivo.
+                · La pastilla usa el tratamiento de kicker (12px, +0.12em, 1.0).
+
+                ⚠️⚠️ CON LA BANDERA ENCENDIDA, LOS TRES COLORES SON HEX
+                LITERALES Y ESO ROMPE A PROPÓSITO LA REGLA DE ARRIBA (:12-14,
+                «solo tokens --lp-*, NUNCA hex literales»). Fondo #FFFFFF,
+                borde #747775, texto #1F1F1F son los valores del botón oficial
+                de Google, y su guía de marca no admite recolorearlo con el
+                sistema visual de quien lo hospeda. La marca manda sobre el
+                sistema: ésta es la ÚNICA excepción del archivo, y va escrita
+                aquí para que nadie la «corrija» a `--lp-*` en una limpieza.
+                El riesgo del token sería real además: `--lp-surface` no es
+                blanco puro, y el botón dejaría de ser el botón de Google.
+
+                La «G» va en `/google/boton-g.svg`, con su propia reserva
+                escrita dentro (el degradado usa <foreignObject> y Safari y
+                Firefox pueden no pintarlo). `alt=""` porque el texto de al
+                lado ya dice lo mismo: anunciarla sería repetirlo. */}
+            {GOOGLE_OAUTH ? (
+              <button
+                type="button"
+                onClick={entrarConGoogle}
+                className="flex w-full items-center justify-center gap-3 rounded-xl border border-[#747775] bg-[#FFFFFF] px-4 py-4 text-[15px] font-semibold leading-none tracking-[-0.01em] text-[#1F1F1F] transition-all duration-[var(--sp-dur-micro)] hover:-translate-y-0.5 active:scale-[0.97]"
+              >
+                <Image src="/google/boton-g.svg" alt="" width={18} height={18} className="h-[18px] w-[18px]" />
+                Continuar con Google
+              </button>
+            ) : (
+              <button
+                type="button"
+                disabled
+                aria-disabled="true"
+                className="flex w-full cursor-not-allowed items-center justify-center gap-3 rounded-xl border border-[var(--lp-border)] bg-[var(--lp-surface-sunken)] px-4 py-4 text-[15px] font-semibold leading-none tracking-[-0.01em] text-[var(--lp-ink-700)]"
+              >
+                Continuar con Google
+                <span className="rounded-full bg-[var(--lp-accent-bg)] px-2 py-1 text-[12px] font-semibold uppercase tracking-[0.12em] leading-none text-[var(--lp-accent)]">
+                  Próximamente
+                </span>
+              </button>
+            )}
 
             {/* Rol caption. Los dos enlaces suben a `--lp-ink-500` (5.44:1):
                 venían en `text-slate-400`, por debajo de AA. */}
