@@ -17,7 +17,7 @@ import AvisoPerfilSidebar from '@/components/sidebar/AvisoPerfilSidebar'
 import { CLAVE_ESTADO_PERFIL } from '@/lib/perfil/claves'
 import { useMenuMovil } from '@/contexts/MenuMovilContext'
 import { useRouter } from 'next/navigation'
-import { useProfile, clearProfileCache } from '@/hooks/useProfile'
+import { useProfile, clearProfileCache, type Role } from '@/hooks/useProfile'
 import ConsultorioActivoSelector from '@/components/sidebar/ConsultorioActivoSelector'
 import ConsultaRapidaModal from '@/components/launcher/ConsultaRapidaModal'
 /* Sólo el tipo: `import type` se borra al compilar, así que la tabla de los
@@ -235,6 +235,8 @@ function groupHasActiveChild(group: NavGroup, pathname: string) {
 /** Lo que este componente lee de `/api/me/estado-perfil`, y nada más. */
 interface RespuestaEstadoPerfil {
   gate?: { exento: string | null }
+  role: string
+  es_admin_de_clinica: boolean
   tieneFirma: boolean
   tieneLogo: boolean
   faltaCedulaEspecialidad: boolean
@@ -272,7 +274,30 @@ export default function Sidebar() {
     (url: string) => fetch(url).then(r => r.ok ? r.json() : Promise.reject(new Error(String(r.status)))),
   )
 
-  const isAdmin = canManageClinica(profile)
+  /* ⚠️ LA FUENTE ES `estadoPerfil` Y NO `profile`, Y NO ES INDIFERENTE.
+     `useProfile` memoiza el perfil en una promesa a nivel de MÓDULO
+     (`useProfile.ts:37,59`) más una copia en `secureStorage`, y ninguna de las
+     dos se invalida cuando el onboarding crea la clínica y el médico pasa a
+     ser su dueño. Resultado: al que entra por Google le faltaban «Usuarios de
+     la clínica» y «Facturación» durante TODA la sesión, hasta recargar en duro
+     — no puede invitar a su equipo ni gestionar su suscripción.
+     `CLAVE_ESTADO_PERFIL` es la misma entrada de SWR que ya está montada
+     arriba: esto NO añade ninguna petición, y se corrige sola en el `mutate()`
+     de `onComplete` (`GateOnboarding.tsx:71`), que es el único momento en que
+     el gate revalida. Revalidarla antes está PROHIBIDO por otro motivo, y está
+     escrito allí: desmontaría el modal a media sesión.
+     ⚠️ ESTO SOLO ARREGLA EL MENÚ. Las pantallas que hay detrás de esos dos
+     enlaces comprueban `canManageClinica(profile)` por su cuenta al montarse y
+     rebotan a `/dashboard`; lo que las salva es el `clearProfileCache()` de
+     `OnboardingModal.crearClinica`. Sin él, esto es PEOR que el defecto:
+     enseñaría dos enlaces que expulsan al que los pulsa.
+     ⚠️ `profile` SIGUE SIENDO EL SUPLENTE, y tampoco es un resto: sin respuesta
+     —carga, 401, red caída— el hook conserva su copia cifrada local y el menú
+     del médico no se desmonta por estar sin cobertura. La respuesta fresca
+     manda cuando existe; la caché cubre cuando no. */
+  const isAdmin = estadoPerfil
+    ? canManageClinica({ role: estadoPerfil.role as Role, es_admin_de_clinica: estadoPerfil.es_admin_de_clinica })
+    : canManageClinica(profile)
 
   /* El formato que espera paciente. No-nulo = buscador abierto; un solo estado
      porque el modal no tiene nada que enseñar sin formato. Se guarda la entrada
