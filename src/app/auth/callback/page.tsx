@@ -1,86 +1,91 @@
 'use client'
 
 import { useEffect, Suspense } from 'react'
-import { useSearchParams, useRouter } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Loader2, CheckCircle } from 'lucide-react'
 import { useState } from 'react'
 
 function CallbackContent() {
   const searchParams = useSearchParams()
-  const router = useRouter()
   const [estado, setEstado] = useState<'verificando' | 'confirmado' | 'error'>('verificando')
 
   useEffect(() => {
     const supabase = createClient()
 
+    /* ⚠️ VA A /inicio Y CON `window.location.href`, NO A /dashboard NI CON
+       `router.push`. Dos correcciones distintas en la misma línea:
+       · /dashboard no es el destino del médico autenticado — lo es /inicio,
+         que es adonde manda el login (`login/page.tsx`) y adonde vuelve el
+         guard de sesión. Mandar a /dashboard es un rebote de más, o un 404.
+       · `router.push` es navegación de cliente: conserva el árbol de React y
+         los datos que el Router Cache ya tenga de cuando NO había sesión.
+         `window.location.href` fuerza una carga de documento completa, así
+         que el middleware vuelve a correr con la cookie de sesión recién
+         puesta y todo se pinta ya autenticado. Es lo mismo que hace el login. */
     function confirmar() {
       sessionStorage.setItem('spinus_active', '1')
       setEstado('confirmado')
-      setTimeout(() => router.push('/dashboard'), 2000)
+      setTimeout(() => { window.location.href = '/inicio' }, 2000)
     }
 
+    /* ═══ POR QUÉ ESTA FUNCIÓN NO CANJEA NADA ═══════════════════════════════
+       Aquí NO se llama a `exchangeCodeForSession`, Y NO ES UN OLVIDO.
+
+       Cuando el navegador vuelve de Google con `?code=`, el SDK YA lo canjeó
+       solo: `createBrowserClient` de @supabase/ssr fuerza `detectSessionInUrl:
+       true` (createBrowserClient.js:38-39, pisa lo que diga
+       `lib/supabase/client.ts`), y con esa opción el canje ocurre dentro de
+       `_initialize()` (GoTrueClient.js:271, :282) — es decir, antes de que
+       este `useEffect` llegue a correr.
+
+       El `code` de OAuth es DE UN SOLO USO. Canjearlo por segunda vez devuelve
+       error, y como esta pantalla traduce cualquier error a «el enlace ya fue
+       utilizado o expiró», el médico vería ese mensaje JUSTO CUANDO EL LOGIN
+       ACABA DE FUNCIONAR, con la sesión ya creada. Añadir el canje «por si
+       acaso» es exactamente lo que rompe este archivo.
+
+       ⚠️ Y EL CANJE TIENE QUE OCURRIR EN EL NAVEGADOR, no en una ruta de
+       servidor (no lo muevas a /api/auth/login ni a un route handler): PKCE
+       exige el `code_verifier`, y ese lo genera y lo guarda ESTE navegador en
+       el momento de salir hacia Google. El servidor no lo tiene.
+
+       Basta entonces con UNA sola lectura: `getSession()` espera internamente
+       a que `_initialize()` termine, así que si el canje salió bien la sesión
+       ya está ahí, y si no, no la hay. No hacen falta reintentos ni
+       `onAuthStateChange`.
+
+       ⚠️ AQUÍ VIVÍAN CUATRO CASOS Y SE BORRARON TRES. No los repongas:
+       · Casos 1 y 2 — tokens en el hash (`#access_token=…`). Inalcanzables:
+         @supabase/ssr fuerza `flowType: 'pkce'`, y con pkce
+         `_getSessionFromURL` rechaza los tokens del hash de plano
+         (GoTrueClient.js:1649-1651). Era código que no podía ejecutarse.
+       · Caso 4 — `?token_hash=` con `type=email|signup`, que llamaba a
+         `verifyOtp`. Muerto y además explotable: nada de este proyecto manda
+         a esta URL con esos tipos (el hook de correo manda `type=magiclink`,
+         `email-hook:94`, que ni siquiera entraba en la condición), así que lo
+         único que hacía era ofrecer un canjeador de OTP a quien trajera un
+         token de fuera. */
     async function manejar() {
-      const hash = window.location.hash
-
-      // Caso 1: tokens en el hash (#access_token=...)
-      if (hash.includes('access_token')) {
-        // Intentar obtener sesión directamente
-        const { data } = await supabase.auth.getSession()
-        if (data.session) { confirmar(); return }
-
-        // Si no hay sesión aún, escuchar el evento de auth con timeout
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((event: string, session: { user: { id: string } } | null) => {
-          if (session && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')) {
-            confirmar()
-          }
-        })
-
-        // Timeout: si después de 8s no se resuelve, verificar una vez más y decidir
-        setTimeout(async () => {
-          const { data: retry } = await supabase.auth.getSession()
-          subscription.unsubscribe()
-          if (retry.session) { confirmar() }
-          else { setEstado('error') }
-        }, 8000)
+      /* GoTrue devuelve los fallos de OAuth en la query, no como excepción:
+         el médico que cancela en la pantalla de Google vuelve con
+         `?error=access_denied`. Sin esta comprobación caeríamos al
+         `getSession()` de abajo, que no encontraría sesión y acabaría en el
+         mismo estado de error — pero sólo por casualidad, y después de una
+         ida y vuelta al storage. */
+      if (searchParams.get('error') || searchParams.get('error_code')) {
+        setEstado('error')
         return
       }
 
-      // Caso 2: hash vacío pero la sesión ya existe (Supabase procesó los tokens antes del mount)
-      if (hash === '#' || hash === '') {
-        const { data } = await supabase.auth.getSession()
-        if (data.session) { confirmar(); return }
-
-        // Esperar un momento — a veces el SDK necesita tiempo para procesar
-        await new Promise(r => setTimeout(r, 2000))
-        const { data: retry } = await supabase.auth.getSession()
-        if (retry.session) { confirmar(); return }
-      }
-
-      // Caso 3: ?code= (PKCE)
-      const code = searchParams.get('code')
-      if (code) {
-        const { error }: { error: { message: string } | null } = await supabase.auth.exchangeCodeForSession(code)
-        if (error) { setEstado('error'); return }
-        confirmar()
-        return
-      }
-
-      // Caso 4: ?token_hash= (token directo)
-      const tokenHash = searchParams.get('token_hash')
-      const type = searchParams.get('type')
-      if (tokenHash && (type === 'email' || type === 'signup')) {
-        const { error }: { error: { message: string } | null } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: 'email' })
-        if (error) { setEstado('error'); return }
-        confirmar()
-        return
-      }
+      const { data } = await supabase.auth.getSession()
+      if (data.session) { confirmar(); return }
 
       setEstado('error')
     }
 
     manejar()
-  }, [searchParams, router])
+  }, [searchParams])
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#f0f4f8] px-4">

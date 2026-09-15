@@ -15,7 +15,7 @@ import { LOGO_ACCEPT, revisarLogo } from '@/lib/perfil/logoArchivo'
 import { ZONAS_MEXICO, CHIPS_RAPIDOS } from '@/lib/consultorios/zonas-mexico'
 import type { EstadoPerfil } from '@/lib/perfil/gate'
 import type { Consultorio } from '@/types'
-import type { Role } from '@/hooks/useProfile'
+import { clearProfileCache, type Role } from '@/hooks/useProfile'
 
 /**
  * El gate de perfil — Bloque B5, tercera parte.
@@ -79,7 +79,7 @@ interface Props {
 }
 
 function pasosPendientes(
-  gate: EstadoPerfil, isAdmin: boolean, tieneLogo: boolean, tieneFirma: boolean,
+  gate: EstadoPerfil, seraDueno: boolean, tieneLogo: boolean, tieneFirma: boolean,
 ): Paso[] {
   const pasos: Paso[] = []
   /* `datos_medico` monta los DOS pasos de perfil aunque falte un solo campo:
@@ -88,7 +88,7 @@ function pasosPendientes(
   if (gate.pendientes.includes('datos_medico')) pasos.push('datos', 'cedulas')
   if (gate.pendientes.includes('clinica')) pasos.push('clinica')
   if (gate.pendientes.includes('consultorio')) pasos.push('consultorio')
-  if (isAdmin && !tieneLogo) pasos.push('logo')
+  if (seraDueno && !tieneLogo) pasos.push('logo')
   if (!tieneFirma) pasos.push('firma')
   return pasos
 }
@@ -98,9 +98,35 @@ export default function OnboardingModal({
 }: Props) {
   const toast = useToast()
   const { state } = useSubscriptionGate()
-  const isAdmin = canManageClinica({ role: role as Role, es_admin_de_clinica: esAdminDeClinica })
+  /* ⚠️ ESTO NO ES «ES DUEÑO», ES «VA A SERLO», Y LA DIFERENCIA ES EL DEFECTO
+     ENTERO. `pasos` se congela abajo en un `useState` con inicializador, y
+     `esAdminDeClinica` llega leído ANTES de que este mismo modal cree la
+     clínica: el médico que entra por Google trae el flag en `false` —el
+     trigger de B5.6 no lo escribe, y hace bien: escribir `true` convertiría a
+     cada invitado en dueño de la clínica ajena— y lo pone en `true`
+     `POST /api/me/clinica` tres pasos más tarde. Preguntando por el presente,
+     el paso del logo no se añadía nunca y el de Google recorría CINCO pasos
+     donde el de correo recorre SEIS.
 
-  const [pasos] = useState<Paso[]>(() => pasosPendientes(gate, isAdmin, tieneLogo, tieneFirma))
+     `creaClinicaAqui` es la predicción, y es segura porque coincide
+     exactamente con la cara del paso de clínica que SÍ tiene formulario
+     (`esPanelSoporte` más abajo, y el bloque de render sin `requiereSoporte`):
+     si el gate pide clínica y no manda a soporte, el médico verá el
+     formulario, y si el POST falla `avanzar()` no le deja pasar, así que nunca
+     llega al paso del logo sin ser ya dueño.
+     El invitado sin clínica (`requiereSoporte`) queda fuera, que es lo
+     correcto: no puede crear ninguna. La secretaria y el super_admin tampoco
+     entran — están exentos y con el gate completo este modal ni se monta.
+
+     ⚠️ NO LO CONVIERTAS EN REACTIVO (`useMemo` sobre `clinicaCreada`). Haría
+     crecer la lista de 5 a 6 a mitad del recorrido, con el stepper contando
+     «3 de 5» y luego «4 de 6», y a cambio de nada: el resultado es el mismo
+     porque el único paso que puede cambiar el flag va SIEMPRE antes del logo. */
+  const creaClinicaAqui = gate.pendientes.includes('clinica') && !gate.requiereSoporte
+  const seraDueno =
+    canManageClinica({ role: role as Role, es_admin_de_clinica: esAdminDeClinica }) || creaClinicaAqui
+
+  const [pasos] = useState<Paso[]>(() => pasosPendientes(gate, seraDueno, tieneLogo, tieneFirma))
   const [indice, setIndice] = useState(0)
   const [guardando, setGuardando] = useState(false)
 
@@ -222,6 +248,40 @@ export default function OnboardingModal({
         return false
       }
       setClinicaCreada(true)
+      /* ⚠️ ESTA LÍNEA NO ES PARA ESTE MODAL, ES PARA EL RESTO DE LA SESIÓN.
+         El POST acaba de cambiar DOS columnas que `useProfile` tiene cacheadas
+         y no vuelve a leer nunca —memoiza el perfil en una promesa a nivel de
+         módulo (`useProfile.ts:37,59`) más una copia en `secureStorage`—:
+         `clinica_id` y `es_admin_de_clinica`. Sin invalidar, `/billing` y
+         `/admin/usuarios` —que comprueban `canManageClinica(profile)` al
+         montarse y rebotan a `/dashboard` (`billing/page.tsx:54`,
+         `admin/usuarios/page.tsx:41`)— expulsan al dueño recién estrenado de
+         sus propias pantallas, y `billing` ni siquiera cargaría datos porque
+         ve `clinica_id` nulo.
+
+         ⚠️ ESTE DEFECTO NO NACIÓ CON B6 NI ES DE GOOGLE: afecta a LOS DOS
+         caminos de alta y lleva vivo desde que el registro se recortó a correo
+         y contraseña. Desde entonces ningún médico llega con clínica —el único
+         INSERT en `clinicas` que hacía el registro se retiró—, así que todos
+         la crean aquí y todos se quedan con el perfil cacheado en falso. Lo
+         que B6 añadió fue el segundo síntoma, el del flag de dueño; el de
+         `clinica_id` ya estaba.
+
+         ⚠️ NO BASTA PARA EL SIDEBAR y no es un olvido: está montado en el
+         layout de (app), así que su `useState` ya tiene el perfil viejo y
+         vaciar la caché no lo repinta. Ése se arregla por su lado, leyendo la
+         clave de SWR viva (`Sidebar.tsx`, junto a su `isAdmin`).
+
+         ⚠️ RIESGO ASUMIDO, ANOTADO PARA QUIEN LO RETOME: `clearProfileCache`
+         borra TAMBIÉN la copia cifrada, así que si la red se cae justo entre
+         este POST y la siguiente lectura de perfil, `fetchProfile()` cae a la
+         rama offline, no encuentra copia y memoiza `null` hasta recargar. La
+         ventana es estrecha —el POST acaba de funcionar y el paso siguiente
+         necesita red igual— y por eso se acepta. Si algún día hay que
+         cerrarla, la alternativa es invalidar SOLO la promesa de módulo y
+         conservar la copia cifrada; cuesta una función nueva en `useProfile`,
+         y por eso no se dio por supuesta aquí. */
+      clearProfileCache()
       await mutate('/api/me/perfil-medico')
       return true
     } catch {
