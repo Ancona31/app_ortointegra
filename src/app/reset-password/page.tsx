@@ -117,9 +117,20 @@ function ResetPasswordContent() {
                   La contraseña de <strong className="text-slate-700">{correo}</strong> quedó establecida, y se cerraron todas sus sesiones.
                 </p>
               )}
-              <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-left">
-                Si ese no es tu correo, no cambiaste tu contraseña: cambiaste la de otra cuenta. No uses esa contraseña en ningún otro sitio y avísanos.
-              </p>
+              {/* ⚠️ AQUÍ HUBO UN AVISO DEL TIPO «SI ESE NO ES TU CORREO, CAMBIASTE
+                  LA CONTRASEÑA DE OTRA CUENTA», Y SE RETIRÓ A PROPÓSITO. No lo
+                  repongas creyendo que falta:
+                  · Para el médico describe algo imposible. A esta pantalla solo
+                    se llega con un enlace que llegó a un correo, así que el
+                    correo que ve ES el suyo. Solo confunde.
+                  · Para la víctima real tampoco funciona: está escrito desde el
+                    conocimiento del atacante, no desde la confusión de quien
+                    acaba de ser engañado. Esa persona no concluye «me
+                    engañaron», concluye que la app se equivocó.
+                  El canal que sí llega a la persona correcta es el correo de
+                  aviso que manda `api/auth/reset-password/route.ts`. Lo que se
+                  queda aquí es el correo enmascarado: información neutra, y la
+                  señal para quien mire con atención. */}
               <Link
                 href="/login"
                 className="inline-block px-6 py-2.5 bg-[#1e5fa8] text-white text-sm font-semibold rounded-xl hover:bg-[#1a3a5c] transition-colors"
