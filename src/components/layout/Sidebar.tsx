@@ -398,15 +398,25 @@ export default function Sidebar() {
       })
     } catch { /* silent */ }
 
-    /* signOut() del AuthContext es la ÚNICA fuente de limpieza —cookies sb-*,
-       sessionStorage, meta— y LANZA si el servidor de Auth no confirma la
-       revocación. Nada de lo de abajo puede correr en ese caso: sin revocación
-       no se limpia local ni se navega. El usuario se queda dentro, entero. */
+    /* `signOut()` del AuthContext limpia SIEMPRE lo suyo —cookies sb-*,
+       sessionStorage, meta— y lanza DESPUÉS si el servidor de Auth no confirmó
+       la revocación. Ver su bloque en `lib/auth-context.tsx`. O sea que cuando
+       este `catch` corre, la sesión de ESTE navegador ya está destruida; lo que
+       queda abierto es la de otros dispositivos.
+
+       ⚠️ POR ESO LA LIMPIEZA DE ABAJO NO PUEDE VIVIR DENTRO DE LA RAMA FELIZ, Y
+       AQUÍ ESTUVO EL DEFECTO: este `catch` hacía `return` y se saltaba
+       `clearProfileCache()`, que borra `cache_user_profile` de **secureStorage**
+       (`hooks/useProfile.ts:105-113`) — el perfil del médico, CIFRADO PERO
+       PERSISTIDO en esa máquina. Dejarlo ahí justo después de haberle destruido
+       la credencial es el peor de los dos órdenes, y no lo arregla nadie más
+       tarde: sobrevive a la recarga, así que el `window.location.href` del
+       siguiente inicio de sesión no lo toca. */
+    let revocado = true
     try {
       await signOut()
     } catch {
-      toast.error('No se pudo cerrar la sesión. Inténtalo de nuevo en unos momentos.')
-      return
+      revocado = false
     }
 
     clearProfileCache()
@@ -414,6 +424,22 @@ export default function Sidebar() {
     // consultorios, horario y médicos de la sesión que cierra— se vacía cuando
     // este componente se desmonte, no ahora.
     cerrandoSesionRef.current = true
+
+    /* ⚠️ EL AVISO NO DICE «inténtalo de nuevo», Y NO ES UN MATIZ DE REDACCIÓN.
+       Un segundo clic encontraría este navegador ya sin `accessToken`, así que
+       `_signOut` se saltaría la llamada al servidor —sólo la hace
+       `if (accessToken)`, GoTrueClient.js:1754— y devolvería ÉXITO sin revocar
+       nada. El reintento mentiría. Lo que sí revoca de verdad en el servidor es
+       el cambio de contraseña (`api/auth/reset-password/route.ts:194`).
+       ⚠️ LIMITACIÓN CONOCIDA: el `ToastProvider` cuelga de `(app)/layout.tsx`, y
+       la navegación de abajo lo desmonta, así que este aviso puede alcanzar a
+       verse sólo un instante. Se mantiene porque no navegar tampoco lo salva
+       —`SessionGuard` expulsa igual en cuanto `status` pasa a UNAUTHENTICATED—
+       y sostenerlo exige pasarlo a `/login`, que es otro archivo. */
+    if (!revocado) {
+      toast.error('Sesión cerrada en este navegador, pero el servidor no confirmó la revocación: puede seguir abierta en otros dispositivos. Cambia la contraseña para cerrarlas todas.')
+    }
+
     router.push('/login')
     router.refresh()
   }

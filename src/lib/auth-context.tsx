@@ -178,28 +178,66 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, [])
 
   /**
-   * Cierra la sesión. LANZA si la revocación en el servidor no se consigue, y en
-   * ese caso NO limpia nada: ni cookies, ni sessionStorage, ni `meta`.
+   * Cierra la sesión: revoca en el servidor, limpia lo local SIEMPRE, y lanza al
+   * final si la revocación no se consiguió.
    *
-   * ⚠️ EL ORDEN NO ES DE ESTILO. `@supabase/ssr` guarda la sesión DENTRO de las
-   * cookies sb-*, así que borrarlas primero —como se hacía— dejaba al SDK sin
-   * sesión que revocar: `_signOut` sólo llama al servidor `if (accessToken)`
-   * (GoTrueClient.js:1754), se saltaba esa rama entera y devolvía éxito. El
-   * refresh token seguía vivo en Supabase Auth. Primero se revoca; lo local se
-   * borra sólo con la confirmación del servidor en la mano.
+   * ⚠️ LA LIMPIEZA LOCAL YA NO ESTÁ CONDICIONADA A LA REVOCACIÓN, Y AHÍ ESTABA EL
+   * DEFECTO DE SEGURIDAD. Antes, un `signOut` que devolviera `error` salía por un
+   * `throw` colocado ANTES del borrado, así que las cookies sb-* se quedaban con
+   * el JWT dentro y el refresh token al lado. Y no las borraba nadie más:
+   * `_signOut` de auth-js sólo llama a `_removeSession()` después de hablar con
+   * el servidor (GoTrueClient.js:1754+), así que en ese camino el SDK tampoco
+   * limpia. Resultado: el navegador se quedaba con una credencial completa y
+   * `autoRefreshToken: true` la renovaba sola. No era una ventana de una hora
+   * hasta el `exp`; era indefinida, en un equipo desde el que alguien acababa de
+   * pulsar «cerrar sesión».
+   * El invariante nuevo, y es el que hay que conservar: ESTE navegador nunca se
+   * queda con una credencial cuya revocación no esté confirmada. Que siga viva
+   * en OTROS dispositivos es lo que no controlamos desde aquí, y de eso informa
+   * el `throw` del final.
    *
-   * ⚠️ auth-js NO LANZA AQUÍ: DEVUELVE `{ error }`. Un try/catch alrededor no ve
-   * ese fallo — el mismo malentendido que ya se corrigió en logAudit. Lo que
-   * decide es el valor de retorno.
+   * ⚠️ EL ORDEN NO ES DE ESTILO, y la parte de revocar PRIMERO sigue vigente
+   * tal cual. `@supabase/ssr` guarda la sesión DENTRO de las cookies sb-*, así
+   * que borrarlas antes de llamar al servidor deja al SDK sin sesión que
+   * revocar: `_signOut` sólo llama al servidor `if (accessToken)`
+   * (GoTrueClient.js:1754), se salta esa rama entera y devuelve éxito con el
+   * refresh token vivo en Supabase Auth. Revocar → limpiar → informar, en ese
+   * orden y en ninguno otro.
+   *
+   * ⚠️ HACEN FALTA LAS DOS COSAS, `try/catch` Y MIRAR EL `{ error }`, y quedarse
+   * con una sola es un error que ya se ha cometido en los dos sentidos:
+   *  · auth-js DEVUELVE el fallo del SERVIDOR en `{ error }`, no lo lanza — el
+   *    mismo malentendido que ya se corrigió en logAudit. Un try/catch a secas
+   *    no lo ve.
+   *  · Pero `signOut()` SÍ RECHAZA por su cuenta antes de llegar al servidor:
+   *    envuelve todo en `_acquireLock(this.lockAcquireTimeout, …)`
+   *    (GoTrueClient.js:1748-1753) y `navigatorLock` lanza
+   *    `NavigatorLockAcquireTimeoutError` a los 5 s (`lib/locks.js:156`), o
+   *    antes si otra pestaña le roba el cerrojo (`:243`). Con varias pestañas
+   *    abiertas —lo normal en un consultorio— una puede estar refrescando el
+   *    token y sostener el cerrojo. Sin el `catch`, esa excepción se llevaba por
+   *    delante la limpieza de abajo y la invariante de este bloque no se cumplía
+   *    justo en el caso que la hace falta.
    *
    * `scope: 'global'` es deliberado: cierra la sesión en TODOS los dispositivos.
    */
   const signOut = useCallback(async (): Promise<void> => {
     const supabase = createClient()
-    const { error } = await supabase.auth.signOut({ scope: 'global' })
-    if (error) throw error
 
-    // Revocado. A partir de aquí sí se limpia lo local.
+    /* `fallo` recoge los dos caminos: el `{ error }` que devuelve auth-js y la
+       excepción que puede lanzar el cerrojo. Ver el bloque de arriba. */
+    let fallo: unknown = null
+    try {
+      const { error } = await supabase.auth.signOut({ scope: 'global' })
+      fallo = error
+    } catch (e) {
+      fallo = e
+    }
+
+    /* Limpieza local, pase lo que pase con la revocación. En el camino feliz el
+       `_removeSession()` del SDK ya borró las cookies por el adaptador de
+       `lib/supabase/client.ts`; esto es la red para el camino en que no llegó a
+       correr. Es idempotente: borrar dos veces la misma cookie no cuesta nada. */
     try {
       document.cookie.split(';').forEach(c => {
         const name = c.trim().split('=')[0]
@@ -217,6 +255,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
     setMeta(emptyMeta)
     saveMeta(emptyMeta)
+
+    /* Se informa AL FINAL, no antes: cuando esto lanza, la credencial de este
+       navegador ya está destruida y `status` ya es UNAUTHENTICATED, así que
+       `SessionGuard` saca al usuario del árbol de (app) aunque quien llame
+       decida no navegar.
+       ⚠️ NO SUBAS ESTA LÍNEA otra vez por encima de la limpieza. Eso es
+       exactamente el defecto que este bloque vino a cerrar. */
+    if (fallo) throw fallo
   }, [])
 
   // Inicialización: sync con SDK antes de renderizar children

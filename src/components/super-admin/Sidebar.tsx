@@ -67,18 +67,49 @@ export default function SuperAdminSidebar(): ReactElement {
        sesión que revocar y el refresh token seguía vivo en Supabase Auth.
        Y auth-js NO LANZA aquí: DEVUELVE `{ error }`. */
     setErrorLogout(null)
+    let revocado = false
     try {
       const supabase = createClient()
       const { error } = await supabase.auth.signOut({ scope: 'global' })
       if (error) throw error
-    } catch {
-      setErrorLogout('No se pudo cerrar la sesión. Inténtalo de nuevo en unos momentos.')
-      return
-    }
+      revocado = true
+    } catch { /* se decide abajo, después de limpiar */ }
 
-    // Revocado. Sólo ahora se limpia lo local y se navega.
+    /* ⚠️ LA LIMPIEZA LOCAL CORRE SIEMPRE, CONFIRME EL SERVIDOR O NO, y antes no:
+       el `return` del catch se iba sin borrar nada y dejaba la credencial entera
+       en el navegador. Mismo invariante y mismo razonamiento que en
+       `lib/auth-context.tsx` — leer el bloque de `signOut()` de allí antes de
+       tocar esto.
+       ⚠️ Y AQUÍ SE BORRAN LAS COOKIES sb-*, QUE ESTA RUTA NO TOCABA. El
+       `_removeSession()` del SDK sólo corre si el servidor contestó, así que sin
+       estas líneas el camino del fallo se quedaba con el JWT y el refresh token
+       dentro del navegador. Las diez líneas repetidas siguen siendo el precio
+       correcto por el motivo del bloque de arriba: aquí no hay `useAuth()`. */
+    try {
+      document.cookie.split(';').forEach(c => {
+        const name = c.trim().split('=')[0]
+        if (name.startsWith('sb-')) {
+          document.cookie = `${name}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`
+        }
+      })
+    } catch { /* silent */ }
     try { sessionStorage.removeItem('spinus_active') } catch { /* silent */ }
     try { localStorage.removeItem('spinus_session_meta') } catch { /* silent */ }
+
+    /* ⚠️ SIN REVOCACIÓN NO SE NAVEGA, PARA QUE EL AVISO SE LEA: `router.push`
+       desmontaría esta barra y con ella el `errorLogout`, que vive en su estado
+       local (ver el bloque del principio). La sesión de ESTE navegador ya está
+       cerrada cuando esto se pinta.
+       ⚠️ EL AVISO NO DICE «inténtalo de nuevo» A PROPÓSITO. Un segundo clic
+       encontraría el navegador ya sin `accessToken`, así que `_signOut` se
+       saltaría la llamada al servidor —sólo la hace `if (accessToken)`,
+       GoTrueClient.js:1754— y devolvería ÉXITO sin haber revocado nada. El
+       reintento mentiría. Lo que sí revoca de verdad en el servidor es el cambio
+       de contraseña (`api/auth/reset-password/route.ts:194`). */
+    if (!revocado) {
+      setErrorLogout('Sesión cerrada en este navegador, pero el servidor no confirmó la revocación: puede seguir abierta en otros dispositivos. Cambia la contraseña para cerrarlas todas.')
+      return
+    }
 
     router.push('/login')
     router.refresh()
