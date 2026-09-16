@@ -119,6 +119,18 @@ export type AuditAccion =
   | 'invitacion_reenviada'
   | 'invitacion_aceptada'
   | 'invitacion_fallida'
+  /* La baja de un miembro del equipo desde el panel. Era la ÚNICA acción de
+     `api/admin/usuarios` sin rastro: la ruta borraba la cuenta de auth y la
+     fila de `profiles` sin llamar a `logAudit`, así que de una persona que
+     registró pacientes y agendó citas durante meses no quedaba constancia de
+     quién la dio de baja ni cuándo.
+     Su rastro anterior SÍ sobrevive a la baja, y no por casualidad: `audit_log`
+     no tiene clave foránea contra `profiles`, así que las filas conservan su
+     `user_id` aunque la fila del perfil desaparezca. Esta acción es la que
+     cierra esa historia por el otro extremo.
+     Sin correo en la descripción, como las cuatro de arriba: va el ROL, y
+     `registro_id` con el id de quien se fue. */
+  | 'usuario_dado_de_baja'
   // Derechos ARCO (LFPDPPP)
   | 'arco_acceso'
   /* Intento de exportación ARCO rechazado por rol insuficiente (QW3).

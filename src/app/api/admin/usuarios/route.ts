@@ -3,6 +3,8 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { canManageClinica } from '@/lib/permissions'
 import { componerNombreMedicoCompleto } from '@/lib/nombreMedico'
+import { logAudit } from '@/lib/audit'
+import { logger } from '@/lib/logger'
 
 export async function GET() {
   const supabase = await createClient()
@@ -95,7 +97,9 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
   }
 
-  const { userId } = await req.json()
+  const cuerpo = await req.json().catch(() => null) as { userId?: unknown } | null
+  const userId = typeof cuerpo?.userId === 'string' ? cuerpo.userId : ''
+  if (!userId) return NextResponse.json({ error: 'Datos inválidos' }, { status: 400 })
   if (userId === user.id) return NextResponse.json({ error: 'No puedes eliminarte a ti mismo' }, { status: 400 })
 
   // Verificar que el objetivo pertenece a la misma clínica
@@ -106,8 +110,76 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ error: 'No puedes eliminar usuarios de otra clínica' }, { status: 403 })
   }
 
-  await admin.auth.admin.deleteUser(userId)
-  await admin.from('profiles').delete().eq('id', userId)
+  /* ⚠️ `profiles` PRIMERO Y `auth` DESPUÉS, AL REVÉS DE COMO ESTABA, Y EL
+     MOTIVO ES QUE ESTE ES EL ÚNICO PASO QUE SABE DECIR POR QUÉ FALLA.
+
+     Seis tablas apuntan a `profiles` con ON DELETE RESTRICT —`consultorios`,
+     `documentos.subido_por`, `mediciones_analitos`, `firmas_documento`,
+     `casos_clinicos`, `calculadora_resultados`—, así que borrar a un médico que
+     ejerce está BLOQUEADO por la base. Eso está bien: es lo que impide que una
+     baja se lleve por delante la autoría de un expediente.
+
+     Lo que estaba mal era enterarse. Comprobado contra GoTrue v2.196.0 con la
+     librería real:
+       · `admin.auth.admin.deleteUser()` devuelve `AuthApiError` 500 con
+         `code: 'unexpected_failure'` y «Database error deleting user». GoTrue
+         NO propaga el SQLSTATE, así que por esa vía es imposible distinguir
+         «tiene pacientes» de una caída de red.
+       · `profiles.delete()` devuelve `code: '23503'` con el nombre de la
+         restricción y la tabla que retiene. Código estable y documentado.
+     Y las dos llamadas iban SIN COMPROBAR SU ERROR, con un `{ok:true}` detrás:
+     el administrador leía «Usuario eliminado» y la persona seguía en la lista.
+
+     ⚠️⚠️ Y SI VIENES A CONSTRUIR LA BAJA DE VERDAD, LEE BAJA-01 EN
+     `DEUDA_TECNICA.md` ANTES DE TOCAR ESTO. El resumen: **la baja efectiva
+     probablemente NO es un `DELETE`**. Las columnas que NO son RESTRICT son
+     `ON DELETE SET NULL` —`consultas.medico_id` entre ellas—, así que borrar la
+     fila de `profiles` deja las notas clínicas sin autor, que es el defecto de
+     las 87 consultas que ya se arrastra. Quitarle el acceso a alguien y borrar
+     su fila son dos cosas distintas, y lo que hace falta es la primera.
+
+     ⚠️ SE BORRA, NO SE CONSULTA, y es deliberado: preguntar antes «¿tiene
+     consultorios, documentos, mediciones…?» son seis consultas y una lista que
+     se queda vieja en cuanto alguien añada una tabla con RESTRICT. Dejar que lo
+     diga la propia base no se desactualiza nunca.
+
+     ⚠️ Y EL ORDEN TIENE UN COSTE QUE HAY QUE CONOCER: si esto funciona y el
+     borrado de auth de abajo falla, queda una cuenta sin fila de `profiles`.
+     Esa persona podría iniciar sesión, pero no vería nada —sin perfil no hay
+     `clinica_id` y la RLS le niega todo— y el siguiente intento de baja la
+     termina de borrar. Se acepta a cambio de poder decirle al administrador qué
+     pasó; antes no se enteraba de nada. */
+  const { error: errPerfil } = await admin.from('profiles').delete().eq('id', userId)
+
+  if (errPerfil) {
+    /* 23503 = foreign_key_violation. El texto que ve el administrador vive en
+       la pantalla, en español; aquí va sólo el código. */
+    if (errPerfil.code === '23503') {
+      return NextResponse.json({ error: 'tiene_historia_clinica' }, { status: 409 })
+    }
+    logger.error('api/admin/usuarios', `baja: delete de profiles falló (${errPerfil.code}): ${errPerfil.message}`)
+    return NextResponse.json({ error: 'No se pudo dar de baja. Intenta de nuevo.' }, { status: 500 })
+  }
+
+  const { error: errAuth } = await admin.auth.admin.deleteUser(userId)
+  if (errAuth) {
+    logger.error(
+      'api/admin/usuarios',
+      `baja: la fila de profiles de ${userId} se borró pero su cuenta de auth NO (${errAuth.code}). Queda sin perfil: revisar a mano.`,
+    )
+    return NextResponse.json({ error: 'No se pudo dar de baja. Intenta de nuevo.' }, { status: 500 })
+  }
+
+  /* El rol viaja en la descripción y el correo NO, mismo criterio que las
+     cuatro acciones de la invitación. */
+  logAudit({
+    userId: user.id,
+    accion: 'usuario_dado_de_baja',
+    tabla: 'profiles',
+    registroId: userId,
+    ip: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown',
+    descripcion: `rol: ${targetProfile?.role ?? 'desconocido'}`,
+  })
 
   return NextResponse.json({ ok: true })
 }

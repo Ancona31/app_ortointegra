@@ -4344,4 +4344,70 @@ encajan con «a veces», y elegir una sería inventarse la causa.
 
 ---
 
+### BAJA-01 — Dar de baja a un médico con pacientes: bloqueada, y el `mailto` es una parada provisional
+
+**Estado:** 🔴 pendiente · **Decisión de producto tomada el 2026-09-16, sin
+construir** · **Archivos:** `src/app/api/admin/usuarios/route.ts` (el `DELETE`),
+`(app)/admin/usuarios/page.tsx` (el diálogo)
+**Detectado:** 2026-09-16, revisando el borrado de usuarios al cerrar B5-bis.
+
+**⚠️ LO PRIMERO, PORQUE ES LO QUE MÁS FÁCIL SE LEE AL REVÉS.** Con las palabras
+de Angel:
+
+> Dar de baja a un médico invitado es una facultad del administrador de su
+> clínica, y debe seguir siéndolo. Mandarlo a soporte es una parada provisional
+> mientras se construye el flujo de baja con volcado; no es el diseño, es lo
+> único honesto que se puede decir hoy.
+
+Quien lea el `mailto` del diálogo sin esto puede concluir que la decisión fue
+quitarle esa facultad al administrador. **No lo es.**
+
+**Qué hace la base hoy.** Seis claves foráneas contra `profiles` son
+`ON DELETE RESTRICT` —`consultorios.medico_id`, `documentos.subido_por`,
+`mediciones_analitos.creado_por`, `firmas_documento.creado_por`,
+`casos_clinicos.medico_id` y `calculadora_resultados.medico_id` (esta última sin
+acción declarada, o sea NO ACTION)—, así que **la baja de un médico que ejerce
+está bloqueada**. Eso está bien: es lo que impide que una baja deje un expediente
+sin autor. Y no es un caso raro: `perfil_completo()` exige un consultorio activo
+para escribir cualquier cosa, y archivarlo es un `UPDATE activo=false` que deja
+la fila, así que **todo médico que ha trabajado queda bloqueado para siempre**.
+
+**Qué hacía la aplicación hasta B5-bis.** Las dos llamadas de borrado iban sin
+comprobar su error, con un `{ok:true}` detrás: el administrador leía «Usuario
+eliminado» y la persona seguía en la lista. Si además la cuenta ya estaba
+aceptada, invitar otra vez ese correo respondía `422 email_exists`. Eso quedó
+arreglado: la ruta mira los dos errores y el diálogo dice qué pasó.
+
+**Lo medido, para que nadie lo repita:**
+- `admin.auth.admin.deleteUser()` sobre un médico bloqueado devuelve
+  `AuthApiError` 500 con `code: 'unexpected_failure'` y «Database error deleting
+  user». **GoTrue no propaga el SQLSTATE**, así que por esa vía es imposible
+  distinguir «tiene pacientes» de una caída de red.
+- `profiles.delete()` sí devuelve `code: '23503'` con la restricción y la tabla.
+  Por eso la ruta borra `profiles` primero: es el paso que sabe decir por qué.
+- La baja de una **asistente** no la bloquea nada, y es estructural: las seis
+  tablas con RESTRICT son clínicas y ella está excluida de todas por el guard de
+  `expediente/[id]/layout.tsx` y por la RLS. Su huella son dos columnas SET NULL
+  (`appointments.created_by`, `paciente_medico.asignado_por`) que quedan en
+  `null` sin llevarse nada: el paciente, la cita y la vinculación sobreviven
+  intactos, y su rastro en `audit_log` también —esa tabla no tiene clave foránea
+  contra `profiles`—.
+
+**La decisión de producto (Angel, 2026-09-16): COPIA, NO LLAVE.** Cuando se
+construya, el médico que se va recibe **una copia de lo que firmó** —sus
+pacientes, consultas y documentos—, no acceso continuado. Los expedientes se
+quedan en la clínica. El razonamiento: bajo la NOM-024 el custodio es la
+INSTITUCIÓN, pero el médico responde por lo que firmó con su cédula. De ahí que
+sea copia y no llave.
+
+**⚠️ Y UNA TRAMPA PARA QUIEN LO CONSTRUYA: la baja efectiva probablemente NO es
+un `DELETE`.** Si al final se borra la fila de `profiles`, las columnas
+`ON DELETE SET NULL` se disparan y `consultas.medico_id` queda en `null` — que
+es exactamente el defecto de las **87 consultas sin autor** que ya se arrastra.
+Quitarle el acceso a alguien y borrar su fila son dos cosas distintas, y aquí
+hace falta la primera. Los documentos ya emitidos llevan su firma y son
+inmutables: no se reescriben.
+
+---
+
 (Fin del registro actual. Nuevas etapas se añaden como secciones ## debajo.)

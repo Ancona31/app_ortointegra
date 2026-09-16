@@ -53,6 +53,10 @@ export default function AdminUsuariosPage() {
   const [form, setForm] = useState(FORM_VACIO)
   const [guardando, setGuardando] = useState(false)
   const [reenviando, setReenviando] = useState<string | null>(null)
+  /* La baja bloqueada por la base. Es un estado del diálogo y no un toast a
+     propósito: el mensaje lleva un correo que la persona tiene que escribir, y
+     un aviso que se desvanece en ocho segundos no sirve para eso. */
+  const [bajaBloqueada, setBajaBloqueada] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -146,16 +150,37 @@ export default function AdminUsuariosPage() {
   async function confirmarEliminar() {
     if (!confirmDelete) return
     const eraPendiente = confirmDelete.estado === 'pendiente'
-    await fetch('/api/admin/usuarios', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: confirmDelete.id }),
-    })
-    toast.success(eraPendiente
-      ? `Invitación de ${confirmDelete.email} cancelada`
-      : `Usuario ${confirmDelete.nombre || confirmDelete.email} eliminado`)
+    try {
+      const res = await fetch('/api/admin/usuarios', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: confirmDelete.id }),
+      })
+      const data = await res.json().catch(() => ({})) as { ok?: boolean; error?: string }
+
+      /* La base bloquea la baja de quien tiene historia clínica: seis tablas
+         apuntan a `profiles` con ON DELETE RESTRICT. Hasta ahora la ruta
+         respondía `ok` igual y esta pantalla cantaba «Usuario eliminado» con la
+         persona todavía en la lista. */
+      if (res.status === 409 && data.error === 'tiene_historia_clinica') {
+        setBajaBloqueada(true)
+        return
+      }
+      if (!res.ok) { toast.error(data.error || 'No se pudo dar de baja'); return }
+
+      toast.success(eraPendiente
+        ? `Invitación de ${confirmDelete.email} cancelada`
+        : `${confirmDelete.nombre || confirmDelete.email} ya no tiene acceso`)
+      setConfirmDelete(null)
+      cargarUsuarios()
+    } catch {
+      toast.error('No se pudo conectar. Revisa tu conexión e intenta de nuevo.')
+    }
+  }
+
+  function cerrarConfirmacion() {
     setConfirmDelete(null)
-    cargarUsuarios()
+    setBajaBloqueada(false)
   }
 
   if (loadingProfile || loading) return (
@@ -291,31 +316,70 @@ export default function AdminUsuariosPage() {
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
           <div className="bg-[var(--sp-surface-glass)] backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-xs overflow-hidden animate-slide-up">
             <div className="px-6 pt-6 pb-4 text-center">
-              <div className="w-12 h-12 rounded-full mx-auto mb-3 flex items-center justify-center" style={{ backgroundColor: '#FEF2F2' }}>
-                <AlertTriangle size={22} style={{ color: '#EF5350' }} />
+              <div className="w-12 h-12 rounded-full mx-auto mb-3 flex items-center justify-center"
+                style={{ backgroundColor: bajaBloqueada ? '#FFF7ED' : '#FEF2F2' }}>
+                <AlertTriangle size={22} style={{ color: bajaBloqueada ? '#F59E0B' : '#EF5350' }} />
               </div>
-              <h3 className="text-base font-semibold text-[#1d1d1f]">
-                {confirmDelete.estado === 'pendiente' ? 'Cancelar invitación' : 'Eliminar usuario'}
-              </h3>
-              <p className="text-sm text-[#86868b] mt-1">
-                {confirmDelete.estado === 'pendiente' ? (
-                  <>La invitación de <span className="font-semibold text-[#3d3d3f]">{confirmDelete.email}</span> dejará de funcionar y su plaza quedará libre.</>
-                ) : (
-                  <>¿Eliminar a <span className="font-semibold text-[#3d3d3f]">{confirmDelete.nombre || confirmDelete.email}</span>? Esta acción no se puede deshacer.</>
-                )}
-              </p>
+
+              {bajaBloqueada ? (
+                /* ⚠️ EL `mailto` ES UNA PARADA PROVISIONAL, NO EL DISEÑO. Con las
+                   palabras de Angel, que quedan aquí para que nadie las lea al
+                   revés: «Dar de baja a un médico invitado es una facultad del
+                   administrador de su clínica, y debe seguir siéndolo. Mandarlo
+                   a soporte es una parada provisional mientras se construye el
+                   flujo de baja con volcado; no es el diseño, es lo único
+                   honesto que se puede decir hoy.»
+                   Cuando exista ese flujo —el médico que se va recibe una COPIA
+                   de lo que firmó y los expedientes se quedan en la clínica—,
+                   esta pantalla deja de mandar a soporte y lo ofrece. Ver
+                   BAJA-01 en `DEUDA_TECNICA.md`. */
+                <>
+                  <h3 className="text-base font-semibold text-[#1d1d1f]">No se puede dar de baja</h3>
+                  <p className="text-sm text-[#86868b] mt-1">
+                    No se puede dar de baja a un médico que ya tiene pacientes en la clínica.
+                    Escríbenos a{' '}
+                    <a href="mailto:soporte@spinus.com.mx" className="font-semibold text-[#1e5fa8] hover:underline">
+                      soporte@spinus.com.mx
+                    </a>{' '}
+                    y lo resolvemos contigo.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <h3 className="text-base font-semibold text-[#1d1d1f]">
+                    {confirmDelete.estado === 'pendiente' ? 'Cancelar invitación' : 'Dar de baja'}
+                  </h3>
+                  <p className="text-sm text-[#86868b] mt-1">
+                    {confirmDelete.estado === 'pendiente' ? (
+                      <>La invitación de <span className="font-semibold text-[#3d3d3f]">{confirmDelete.email}</span> dejará de funcionar y su plaza quedará libre.</>
+                    ) : (
+                      <>¿Dar de baja a <span className="font-semibold text-[#3d3d3f]">{confirmDelete.nombre || confirmDelete.email}</span>? Perderá el acceso y su plaza quedará libre. Lo que haya registrado se queda en la clínica.</>
+                    )}
+                  </p>
+                </>
+              )}
             </div>
-            <div className="border-t border-slate-100 grid grid-cols-2">
-              <button onClick={() => setConfirmDelete(null)}
-                className="px-4 py-3.5 text-sm font-medium text-[#1e5fa8] hover:bg-slate-50 transition-colors border-r border-slate-100">
-                Volver
-              </button>
-              <button onClick={confirmarEliminar}
-                className="px-4 py-3.5 text-sm font-semibold transition-colors hover:bg-red-50"
-                style={{ color: '#EF5350' }}>
-                {confirmDelete.estado === 'pendiente' ? 'Cancelar invitación' : 'Eliminar'}
-              </button>
-            </div>
+
+            {bajaBloqueada ? (
+              <div className="border-t border-slate-100">
+                <button onClick={cerrarConfirmacion}
+                  className="w-full px-4 py-3.5 text-sm font-semibold text-[#1e5fa8] hover:bg-slate-50 transition-colors">
+                  Entendido
+                </button>
+              </div>
+            ) : (
+              <div className="border-t border-slate-100 grid grid-cols-2">
+                <button onClick={cerrarConfirmacion}
+                  className="px-4 py-3.5 text-sm font-medium text-[#1e5fa8] hover:bg-slate-50 transition-colors border-r border-slate-100">
+                  Volver
+                </button>
+                <button onClick={confirmarEliminar}
+                  className="px-4 py-3.5 text-sm font-semibold transition-colors hover:bg-red-50"
+                  style={{ color: '#EF5350' }}>
+                  {confirmDelete.estado === 'pendiente' ? 'Cancelar invitación' : 'Dar de baja'}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </Portal>
@@ -370,7 +434,7 @@ export default function AdminUsuariosPage() {
                       Reenviar
                     </button>
                   )}
-                  <button onClick={() => setConfirmDelete(u)}
+                  <button onClick={() => { setBajaBloqueada(false); setConfirmDelete(u) }}
                     title={pendiente ? 'Cancelar invitación' : 'Eliminar usuario'}
                     className="w-7 h-7 rounded-lg hover:bg-red-50 flex items-center justify-center transition-colors"
                     style={{ color: '#EF5350' }}>
