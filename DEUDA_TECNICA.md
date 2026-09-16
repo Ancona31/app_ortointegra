@@ -2062,8 +2062,9 @@ lanzamiento oficial. Proyecto independiente, no es scope de este plan.
   | `pro` | 5 | 2 | `plans.ts:88-89` |
   | `premium` | 10 | 2 | `plans.ts:110-111` |
 
-  Y se aplican de verdad: `src/app/api/admin/crear-usuario/route.ts:64-68`
-  rechaza con 403 al alcanzar el tope.
+  Y se aplican de verdad: `src/app/api/admin/invitar/route.ts:114-130`
+  rechaza con 403 al alcanzar el tope. (Esa ruta se llamaba
+  `api/admin/crear-usuario` hasta B5-bis, 2026-09-16.)
 - **Riesgo:** el doc de roles es la referencia que se consulta para decidir
   qué promete cada plan. Que diga "TBD" invita a inventar cifras. Nótese que
   `premium` **no sube de secretarias** respecto a `pro` (2 en ambos), cosa que
@@ -4210,6 +4211,37 @@ filtrar sin decirlo es peor defecto que la hora corrida que se venía a arreglar
 advertencia sobre los tres `America/Mexico_City` deliberados que quedan en producción
 —`dates.ts:69`, `gcal.ts:43` y `r/[folio]/page.tsx:258`— está al final de TZ-DT-1 y
 **aplica igual a esta entrada**: léela antes de tocar ningún literal de zona horaria.
+
+---
+
+### DEP-DT-4 — La maqueta de los correos vive triplicada
+
+**Estado:** 🟡 abierta, menor · **Archivos:** `src/app/api/auth/email-hook/route.ts:141-187`,
+`src/app/api/auth/registro/route.ts:148-200`, `src/app/api/admin/invitar/route.ts:260-330`
+**Detectado:** 2026-09-16, al añadir el correo de invitación (Bloque B5-bis).
+
+**La misma tabla de 540px, tres veces.** Cabecera navy con el rótulo «Spinus»,
+botón compatible con Outlook (incluido el bloque `<!--[if mso]>` con su
+`v:roundrect`) y pie de aviso. Las tres copias tienen los mismos colores
+literales —`#1a3a5c`, `#1e5fa8`, `#f8fafc`— y la misma estructura.
+
+**Por qué hay tres y no una.** El hook manda los correos de GoTrue; `registro`
+no puede usar el hook porque genera su enlace con `generateLink` y ése no lo
+dispara; e `invitar` es el tercero por el mismo motivo. Cuando se escribió la
+tercera, extraerla habría significado tocar los otros dos archivos en un cambio
+que no lo pedía — y uno de ellos es el camino por el que salen TODOS los correos
+de autenticación de producción.
+
+**Qué costaría cerrarla.** Un módulo neutro en `src/lib/` con `maqueta()` y
+`boton()`, y los tres llamadores apuntando ahí. Con tres usos reales ya cumple
+el criterio del Protocolo 4, así que la abstracción está justificada: lo que
+falta es la tanda donde tocar esos tres archivos sea el encargo y no un efecto
+secundario.
+
+**Lo que NO puede perderse al unificar:** el `escapeHtml` de cada valor
+interpolado. Los tres correos los firma DKIM con `mail.spinus.com.mx`, y la
+garantía de que su cuerpo no lo elige un tercero no debe depender de dónde
+venga el dato.
 
 ---
 

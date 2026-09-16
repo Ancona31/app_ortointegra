@@ -185,8 +185,22 @@ Estas versiones están elegidas conscientemente. NO actualizar sin discusión:
 | Node.js | 24.x | Alineado con `engines` de Vercel runtime |
 | npm | 11.x | Bundled con Node 24 |
 | Docker Desktop | 29.4.1 | Última estable al momento del setup |
-| Supabase CLI | 2.95.4 | Estable con varias semanas en el wild |
+| Supabase CLI | 2.95.4 ⚠️ | Estable con varias semanas en el wild |
 | WSL Ubuntu | 24.04 LTS | Última LTS soportada |
+
+> ⚠️ **EL PIN DE LA CLI DE SUPABASE ESTÁ DESFASADO Y EL PROPIO REPO LO
+> DEMUESTRA (2026-09-16).** La 2.95.4 **no puede leer `supabase/config.toml`**:
+> aborta con `failed to parse config: 'config.config' has invalid keys:
+> local_smtp`. `[local_smtp]` es el nombre nuevo de lo que antes era
+> `[inbucket]`, así que ese archivo lo escribió una CLI posterior. Comprobado al
+> parar y levantar el stack local en B5-bis; hubo que usar **2.117.0**, que sí
+> lo entiende.
+>
+> Mientras esta nota siga aquí, **el número de la tabla no es operable**: quien
+> necesite `supabase stop/start` tiene que usar una versión que lea el archivo.
+> Falta decidir cuál se fija, y fijarla **en los dos sitios a la vez**
+> (`CLAUDE.md` y `LOCAL_DEV.md`), con la regla de la semana en el wild aplicada
+> a esa versión y no a la vieja.
 
 **Regla de actualización:** NO usar versiones de herramientas con menos de 1
 semana en el wild. Regla específica para herramientas que tocan datos médicos

@@ -45,9 +45,10 @@ import { clearProfileCache, type Role } from '@/hooks/useProfile'
  *     sería darle algo que tiene prohibido usar.
  */
 
-type Paso = 'datos' | 'cedulas' | 'clinica' | 'consultorio' | 'logo' | 'firma'
+type Paso = 'nombre' | 'datos' | 'cedulas' | 'clinica' | 'consultorio' | 'logo' | 'firma'
 
 const ETIQUETAS: Record<Paso, string> = {
+  nombre: 'Tu nombre',
   datos: 'Datos',
   cedulas: 'Cédulas',
   clinica: 'Clínica',
@@ -79,9 +80,12 @@ interface Props {
 }
 
 function pasosPendientes(
-  gate: EstadoPerfil, seraDueno: boolean, tieneLogo: boolean, tieneFirma: boolean,
+  gate: EstadoPerfil, esMedico: boolean, seraDueno: boolean, tieneLogo: boolean, tieneFirma: boolean,
 ): Paso[] {
   const pasos: Paso[] = []
+  /* El paso de la secretaria. Va primero porque nunca convive con los demás:
+     si está, es el único. */
+  if (gate.pendientes.includes('nombre')) pasos.push('nombre')
   /* `datos_medico` monta los DOS pasos de perfil aunque falte un solo campo:
      el título es obligatorio desde este bloque y el gate no lo mira, así que
      afinar más aquí dejaría fuera a quien solo le falta eso. */
@@ -89,7 +93,17 @@ function pasosPendientes(
   if (gate.pendientes.includes('clinica')) pasos.push('clinica')
   if (gate.pendientes.includes('consultorio')) pasos.push('consultorio')
   if (seraDueno && !tieneLogo) pasos.push('logo')
-  if (!tieneFirma) pasos.push('firma')
+  /* ⚠️ `esMedico` NO ES DECORATIVO, Y ESTA LÍNEA ERA UN DEFECTO ESPERANDO A
+     B5-bis. La firma se añadía a TODO EL QUE LLEGARA HASTA AQUÍ, sin mirar el
+     rol, y funcionaba de milagro: la secretaria estaba exenta en el gate, así
+     que este modal no se le montaba nunca. En cuanto dejó de estarlo —para que
+     pueda escribir su nombre—, su primer minuto en Spinus habría sido una
+     pantalla pidiéndole su FIRMA DIGITAL. Ella no firma nada: no emite recetas
+     ni notas, y `profiles.firma_url` se queda vacío por diseño, así que el paso
+     no solo sobra, es que no tendría fin.
+     El logo no necesita lo mismo porque `seraDueno` ya lo cubre: una secretaria
+     no administra la clínica ni la crea aquí. */
+  if (esMedico && !tieneFirma) pasos.push('firma')
   return pasos
 }
 
@@ -126,7 +140,9 @@ export default function OnboardingModal({
   const seraDueno =
     canManageClinica({ role: role as Role, es_admin_de_clinica: esAdminDeClinica }) || creaClinicaAqui
 
-  const [pasos] = useState<Paso[]>(() => pasosPendientes(gate, seraDueno, tieneLogo, tieneFirma))
+  /* El rol decide qué pasos EXISTEN, no solo qué se pinta dentro de ellos. */
+  const esMedico = role === 'medico'
+  const [pasos] = useState<Paso[]>(() => pasosPendientes(gate, esMedico, seraDueno, tieneLogo, tieneFirma))
   const [indice, setIndice] = useState(0)
   const [guardando, setGuardando] = useState(false)
 
@@ -196,6 +212,23 @@ export default function OnboardingModal({
     })
   }
 
+  /* El paso de la secretaria. Reusa `guardarPerfil` —el mismo PUT que el
+     médico— porque `api/me/perfil-medico` no comprueba rol: escribe la fila
+     propia vía RLS, y pone `nombre_confirmado` en true solo al recibir
+     `nombres`.
+     Exige nombre Y apellido paterno aunque el gate solo mire `nombres`: es el
+     mismo reparto que `guardarDatos`, criterio por detrás del formulario. */
+  async function guardarNombre(): Promise<boolean> {
+    if (!nombres.trim()) { toast.error('El nombre es obligatorio'); return false }
+    if (!apellidoPaterno.trim()) { toast.error('El apellido paterno es obligatorio'); return false }
+
+    return guardarPerfil({
+      nombres: nombres.trim(),
+      apellido_paterno: apellidoPaterno.trim(),
+      apellido_materno: apellidoMaterno.trim() || null,
+    })
+  }
+
   async function guardarCedulas(): Promise<boolean> {
     /* La cédula de ESPECIALIDAD dejó de ser obligatoria: un médico general no
        la tiene, y exigirla aquí —con el modal ya bloqueante— lo dejaba fuera
@@ -221,6 +254,20 @@ export default function OnboardingModal({
         body: JSON.stringify(body),
       })
       if (!res.ok) throw new Error()
+      /* ⚠️ MISMO MOTIVO QUE EN `crearClinica`, Y AQUÍ FALTABA: `useProfile`
+         memoiza el perfil en una promesa de MÓDULO más una copia cifrada, y
+         ninguna de las dos se entera de este PUT. Sin esto, todo lo que se monte
+         después —Mi perfil, el panel, cualquier pantalla que componga el nombre—
+         sigue sirviendo el perfil de antes durante TODA la sesión: la asistente
+         guardaba su nombre y la aplicación seguía sin saberlo hasta recargar en
+         duro.
+         El riesgo asumido (borra también la copia cifrada) está razonado en
+         `crearClinica` y es el mismo: no se repite aquí.
+         ⚠️ Y NO BASTA PARA EL SIDEBAR, que está montado en el layout y ya tiene
+         su `useState` con el perfil viejo. Ése lee el nombre de la clave de SWR
+         viva —ver `Sidebar.tsx`, junto a su `isAdmin`—, que es lo que revalida
+         `GateOnboarding.onComplete`. Las dos piezas van juntas. */
+      clearProfileCache()
       await mutate('/api/me/perfil-medico')
       return true
     } catch {
@@ -418,7 +465,8 @@ export default function OnboardingModal({
 
   async function avanzar() {
     let ok = true
-    if (paso === 'datos') ok = await guardarDatos()
+    if (paso === 'nombre') ok = await guardarNombre()
+    else if (paso === 'datos') ok = await guardarDatos()
     else if (paso === 'cedulas') ok = await guardarCedulas()
     else if (paso === 'clinica') ok = await crearClinica()
     else if (paso === 'consultorio') ok = await crearConsultorio()
@@ -472,8 +520,18 @@ export default function OnboardingModal({
       open={true}
       onClose={() => { /* bloqueante: no-op intencional */ }}
       hideClose
-      title="Configura tu perfil"
-      subtitle="Necesario para registrar pacientes y emitir documentos"
+      /* ⚠️ «TE DAMOS LA BIENVENIDA» Y NO «BIENVENIDA», que fue lo primero que
+         escribí aquí. El rol se llama `secretaria` en la columna, pero la
+         persona puede ser un asistente: el propio panel lo llama «Asistente
+         Médico/a». Un rótulo que le asigna género a quien entra por primera vez
+         es un mal primer minuto, y esta forma no lo necesita. */
+      title={esMedico ? 'Configura tu perfil' : 'Te damos la bienvenida'}
+      /* El subtítulo del médico habla de emitir documentos, que es lo que él
+         hace y ella no. A ella se le está pidiendo una sola cosa y el rótulo lo
+         dice: nada de «configura tu perfil» delante de un único campo. */
+      subtitle={esMedico
+        ? 'Necesario para registrar pacientes y emitir documentos'
+        : 'Solo falta saber cómo te llamas'}
       maxWidth="max-w-lg"
       footer={
         /* ⚠️ «CONTINUAR» DESAPARECE EN EL PANEL DE SOPORTE, NO EN EL PASO DE
@@ -565,6 +623,41 @@ export default function OnboardingModal({
       </div>
 
       <div className="px-5 py-5 max-h-[60vh] overflow-y-auto">
+        {paso === 'nombre' && (
+          <div className="space-y-4">
+            <p className="text-sm text-slate-600">
+              Así te verá el resto del equipo en la clínica.
+            </p>
+            <div>
+              <label className="text-xs font-semibold text-slate-700 block mb-1">
+                Nombre(s) <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text" value={nombres} onChange={e => setNombres(e.target.value)}
+                placeholder="Ej: María" className="sp-input"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">
+                  Apellido paterno <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text" value={apellidoPaterno} onChange={e => setApellidoPaterno(e.target.value)}
+                  placeholder="Ej: González" className="sp-input"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">Apellido materno</label>
+                <input
+                  type="text" value={apellidoMaterno} onChange={e => setApellidoMaterno(e.target.value)}
+                  placeholder="Ej: López" className="sp-input"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
         {paso === 'datos' && (
           <div className="space-y-4">
             <p className="text-sm text-slate-600">¿Cómo aparecerás en tus documentos médicos?</p>

@@ -86,9 +86,17 @@ export default function SeccionCTA() {
               ocupa 2 renglones, y ahí el bloque de cierre acumula ~487px.
 
               ⚠️ COPY ACOTADO A LO VERIFICADO. NO lo ensanches:
-                · "da de alta", NUNCA "invita": no existe correo de
-                  invitación. El admin teclea email y contraseña él mismo
-                  (`admin/usuarios/page.tsx:36,74` → `/api/admin/crear-usuario`).
+                · "da de alta" SIGUE SIENDO CIERTO, pero su motivo caducó en
+                  B5-bis. Aquí decía «NUNCA "invita": no existe correo de
+                  invitación, el admin teclea email y contraseña él mismo».
+                  Hoy SÍ existe ese correo: el admin manda una invitación y la
+                  contraseña la elige quien la recibe
+                  (`admin/usuarios/page.tsx` → `/api/admin/invitar`).
+                  O sea que «invita» pasó de prohibido a igual de verdadero.
+                  ESTA LÍNEA NO SE CAMBIA DE PASO: es copy de la landing y se
+                  decide aparte, con su medición de renglones. Lo que se
+                  corrige aquí es la razón, que si no manda al siguiente a
+                  descartar una palabra que ya puede usar.
                 · "asistente médico", NUNCA "secretaria". ⚠️ ESTO REVIERTE LA
                   DECISIÓN DEL 2026-07-30 POR LA MAÑANA, que había fijado
                   "secretaria" y así se escribió esta línea. La sección

@@ -63,12 +63,16 @@ export async function POST(req: NextRequest) {
     const body = JSON.parse(rawBody)
     const { user, email_data } = body
     const email: string = user?.email
-    // `typeof` y no `||`: esto sale de JSON.parse, así que `nombre` puede no ser
-    // una cadena. Con un objeto, el `||` lo dejaba pasar y escapeHtml reventaría
-    // — y una excepción aquí es un correo de recuperación no enviado.
-    const nombre: string = typeof user?.user_metadata?.nombre === 'string'
-      ? user.user_metadata.nombre
-      : 'Doctor'
+    /* ⚠️ AQUÍ SE LEÍA UN NOMBRE DE `user_metadata` CON RESPALDO 'Doctor', Y EL
+       RESPALDO ERA EL ÚNICO VALOR QUE EXISTÍA: `user_metadata.nombre` no lo
+       escribe nadie en todo el proyecto —tres lecturas, cero escrituras—, así
+       que TODOS los correos de este hook saludaban «Hola, Doctor». Incluido el
+       de recuperación de contraseña de una asistente, que no es doctora.
+       El saludo va sin nombre, como en `api/auth/registro` y en
+       `api/auth/reenviar-confirmacion`. Si algún día hace falta el nombre de
+       verdad, sale de `profiles` y no de los metadatos de auth — pero eso es
+       una consulta a la base dentro del camino crítico del correo, y hoy no la
+       paga ningún beneficio. */
     const actionType: string = email_data?.email_action_type
     const tokenHash: string = email_data?.token_hash
     const redirectTo: string = email_data?.redirect_to || 'https://www.spinus.com.mx/auth/callback'
@@ -85,7 +89,7 @@ export async function POST(req: NextRequest) {
     if (actionType === 'signup') {
       const url = `${siteUrl}/auth/confirm-email?token_hash=${tokenHash}&type=email&redirect_to=${encodeURIComponent(redirectTo)}`
       subject = 'Confirma tu cuenta — Spinus'
-      html = emailConfirmacion(nombre, url)
+      html = emailConfirmacion(url)
     } else if (actionType === 'recovery') {
       /* ⚠️ APUNTA A NUESTRA PÁGINA Y EL TOKEN NO SE CANJEA EN EL NAVEGADOR.
          `/reset-password` sólo pinta un formulario; quien canjea es
@@ -101,11 +105,11 @@ export async function POST(req: NextRequest) {
            cliente puede cambiar es una palanca, no un dato. */
       const url = `${siteUrl}/reset-password?token_hash=${tokenHash}`
       subject = 'Recupera tu contraseña — Spinus'
-      html = emailRecuperacion(nombre, url)
+      html = emailRecuperacion(url)
     } else if (actionType === 'magiclink') {
       const url = `${siteUrl}/auth/callback?token_hash=${tokenHash}&type=magiclink`
       subject = 'Tu enlace de acceso — Spinus'
-      html = emailMagicLink(nombre, url)
+      html = emailMagicLink(url)
     } else {
       logger.info('EMAIL-HOOK', `Tipo no manejado: ${actionType}`)
       return NextResponse.json({ ok: true })
@@ -183,25 +187,25 @@ function boton(url: string, texto: string): string {
   <span style="color:#1e5fa8;word-break:break-all;">${urlSegura}</span></p>`
 }
 
-function emailConfirmacion(nombre: string, url: string): string {
+function emailConfirmacion(url: string): string {
   return emailBase('Confirma tu cuenta', `
-    <p style="color:#334155;font-size:15px;margin-top:0;">Hola <strong>${escapeHtml(nombre)}</strong>,</p>
+    <p style="color:#334155;font-size:15px;margin-top:0;">Hola,</p>
     <p style="color:#475569;font-size:14px;line-height:1.6;">Tu cuenta de Spinus ha sido creada. Confirma tu correo electrónico para comenzar.</p>
     ${boton(url, 'Confirmar mi cuenta')}
   `)
 }
 
-function emailRecuperacion(nombre: string, url: string): string {
+function emailRecuperacion(url: string): string {
   return emailBase('Recupera tu contraseña', `
-    <p style="color:#334155;font-size:15px;margin-top:0;">Hola <strong>${escapeHtml(nombre)}</strong>,</p>
+    <p style="color:#334155;font-size:15px;margin-top:0;">Hola,</p>
     <p style="color:#475569;font-size:14px;line-height:1.6;">Recibimos una solicitud para restablecer la contraseña de tu cuenta.</p>
     ${boton(url, 'Restablecer contraseña')}
   `)
 }
 
-function emailMagicLink(nombre: string, url: string): string {
+function emailMagicLink(url: string): string {
   return emailBase('Tu enlace de acceso', `
-    <p style="color:#334155;font-size:15px;margin-top:0;">Hola <strong>${escapeHtml(nombre)}</strong>,</p>
+    <p style="color:#334155;font-size:15px;margin-top:0;">Hola,</p>
     <p style="color:#475569;font-size:14px;line-height:1.6;">Usa el botón a continuación para acceder a tu cuenta.</p>
     ${boton(url, 'Acceder a Spinus')}
   `)

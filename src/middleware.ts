@@ -118,7 +118,7 @@ export async function middleware(request: NextRequest) {
          Auth), el cambio de contraseña (`api/auth/reset-password/route.ts`,
          `updateUser()` + `signOut({ scope: 'global' })` ídem), y la gestión de
          usuarios de clínica
-         (`api/admin/usuarios` y `api/admin/crear-usuario`, que hacen
+         (`api/admin/usuarios` y `api/admin/invitar`, que hacen
          `getUser()` con red ANTES de tocar `createAdminClient()`). Lo mismo
          vale para las 34 rutas que usan cliente de servicio: o llaman a
          `getUser()` en línea, o pasan por `requireSuperAdmin()` /
@@ -190,13 +190,20 @@ export async function middleware(request: NextRequest) {
      `notFound()` — ver la cabecera de `app/demo/receta/page.tsx`.
      Si se añaden más páginas bajo `/demo/`, esto pasa a ser un `startsWith`; con
      una sola, el literal es más honesto sobre lo que hay. */
-  const isPublicPage = ['/', '/forgot-password', '/reset-password', '/auth/callback', '/auth/confirm-email', '/pricing', '/register', '/privacy', '/privacidad', '/terms', '/offline', '/demo/receta'].includes(pathname)
+  /* ⚠️ `/invitacion` ES PÚBLICA Y TIENE QUE SERLO: quien la abre no tiene
+     cuenta con contraseña todavía —la está eligiendo—, así que jamás va a
+     traer sesión. Sin esta entrada, el enlace del correo de invitación rebota
+     al login y la persona no puede entrar nunca, que es el fallo con forma de
+     callejón sin salida. Su pareja es `/api/auth/aceptar-invitacion`, en la
+     lista de abajo: la pantalla sin la ruta redirige el POST y tampoco
+     funciona. Las dos entran juntas o ninguna. */
+  const isPublicPage = ['/', '/forgot-password', '/reset-password', '/invitacion', '/auth/callback', '/auth/confirm-email', '/pricing', '/register', '/privacy', '/privacidad', '/terms', '/offline', '/demo/receta'].includes(pathname)
     || pathname.startsWith('/r/')
     || pathname.startsWith('/offline-mode')
     || pathname.startsWith('/offline-setup')
 
   // Rutas API que no requieren sesión (OAuth callbacks, Stripe webhook y Stripe checkout/portal que manejan su propia auth)
-  const publicApiPaths = ['/api/google/callback', '/api/stripe/webhook', '/api/stripe/checkout', '/api/stripe/portal', '/api/auth/registro', '/api/auth/email-hook', '/api/auth/verify-email', '/api/auth/audit-login', '/api/auth/rate-limit', '/api/auth/login', '/api/auth/reset-password']
+  const publicApiPaths = ['/api/google/callback', '/api/stripe/webhook', '/api/stripe/checkout', '/api/stripe/portal', '/api/auth/registro', '/api/auth/email-hook', '/api/auth/verify-email', '/api/auth/audit-login', '/api/auth/rate-limit', '/api/auth/login', '/api/auth/reset-password', '/api/auth/aceptar-invitacion']
   const isPublicApi = publicApiPaths.some(p => pathname.startsWith(p))
 
   // Si no hay sesión y no está en ruta pública → verificar cookies antes de redirigir.

@@ -234,8 +234,15 @@ function groupHasActiveChild(group: NavGroup, pathname: string) {
 
 /** Lo que este componente lee de `/api/me/estado-perfil`, y nada más. */
 interface RespuestaEstadoPerfil {
-  gate?: { exento: string | null }
+  /* `gate` SE FUE DE AQUÍ en B5-bis y no es un olvido: este componente ya no
+     lo lee. Decidía el aviso de abajo por `gate.exento === null`, y ese campo
+     dejó de responder a la pregunta cuando la secretaria salió de la exención.
+     Ahora decide el rol, que es lo que el aviso significaba desde el principio.
+     El endpoint lo sigue devolviendo para `GateOnboarding`; declararlo aquí sin
+     leerlo contradiría el rótulo de esta interfaz. */
   role: string
+  /** Compuesto en servidor. Ver el porqué en `api/me/estado-perfil`. */
+  nombre: string
   es_admin_de_clinica: boolean
   tieneFirma: boolean
   tieneLogo: boolean
@@ -551,7 +558,14 @@ export default function Sidebar() {
           </div>
           <div className="text-center">
             <p className="font-semibold text-sm leading-tight">
-              {nombreDisplay ?? (componerNombreMedicoCompleto(profile ?? {}) || '')}
+              {/* ⚠️ `estadoPerfil.nombre` MANDA Y `profile` ES EL SUPLENTE, por lo
+                  mismo que en `isAdmin`: `useProfile` memoiza en una promesa de
+                  módulo y en una copia cifrada que no se invalidan al escribir,
+                  así que este componente —montado en el layout— se quedaba con
+                  el nombre de cuando se montó. La asistente guardaba el suyo en
+                  el onboarding y aquí seguía el de antes hasta recargar en duro.
+                  La clave de SWR sí se revalida al terminar el onboarding. */}
+              {nombreDisplay ?? (estadoPerfil?.nombre || componerNombreMedicoCompleto(profile ?? {}) || '')}
             </p>
             <p className="text-[11px] text-[var(--ag-navy-ink-soft)] mt-0.5 leading-tight">
               {profile?.role === 'secretaria'
@@ -716,10 +730,17 @@ hasActive && !isOpen
               descarta: además de perder 2 a 1, la tarjeta COLAPSA, así que
               encima de los botones cada colapso los subiría y bajaría; debajo,
               lo único que se mueve es la línea de abajo.
-              Solo a quien se le exige algo: la secretaria y el super_admin
-              están exentos del criterio y no tienen firma, cédula ni logo que
-              completar. */}
-          {estadoPerfil?.gate?.exento === null && (
+              ⚠️ PREGUNTA POR EL ROL Y NO POR `gate.exento`, Y EL CAMBIO ES DE
+              B5-bis. `exento === null` funcionaba como atajo de «es médico y
+              tiene cosas profesionales pendientes» mientras la secretaria
+              estaba exenta. Desde que el gate le pide su nombre
+              (`lib/perfil/gate.ts`), su `exento` es null como el de cualquier
+              médico — y con este aviso colgando de aquel atajo, a una asistente
+              se le anunciaría que le falta LA FIRMA y LA CÉDULA DE
+              ESPECIALIDAD. Las tres cosas que enumera esta tarjeta son de quien
+              ejerce: firma, cédula y logo. El `super_admin` queda fuera por la
+              misma condición, sin tener que nombrarlo. */}
+          {estadoPerfil?.role === 'medico' && (
             <AvisoPerfilSidebar
               faltaFirma={!estadoPerfil.tieneFirma}
               faltaLogo={!estadoPerfil.tieneLogo}
