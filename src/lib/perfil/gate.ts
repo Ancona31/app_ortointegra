@@ -208,7 +208,16 @@ export function evaluarPerfil(datos: DatosPerfilGate): EstadoPerfil {
      pedirla lo dejaría fuera para siempre. `firma_url` tampoco: es su propio
      escalón y vive en otra parte.
 
-     ⚠️ VENTANA FUTURA PENDIENTE — MARCA PERSONAL. Hoy el logo y los colores
+     ⚠️ MARCA PERSONAL — LA DECISIÓN YA SE TOMÓ (2026-09-16): cada médico podrá
+     tener SU PROPIO LOGO. Lo que sigue describía el hueco cuando la pregunta
+     seguía abierta, y se conserva porque el hueco no ha cambiado: lo que
+     cambió es que ya hay respuesta y falta construirla. Está anotada como
+     MARCA-01 en `DEUDA_TECNICA.md`, con lo que queda por decidir al hacerlo
+     (si van también los colores, cuál manda cuando hay dos, y si el paso del
+     logo del onboarding pasa a montarse para todos). Cuando exista, este paso
+     crece con los campos nuevos o nace un cuarto junto a él.
+
+     Hoy el logo y los colores
      con los que se imprimen los documentos de un médico NO son suyos: viven
      en `clinicas.logo_url`, `clinicas.color_primario` y
      `clinicas.color_secundario` (20260912190416_remote_schema.sql:225,
@@ -217,7 +226,11 @@ export function evaluarPerfil(datos: DatosPerfilGate): EstadoPerfil {
      aquí no se exige nada de marca. Cuando esa decisión se resuelva, este
      paso crece con los campos nuevos o nace un cuarto paso junto a él.
      NO SE CONSTRUYE NADA DE ESO AHORA: esta nota existe para que quien lo
-     retome sepa que el hueco es conocido y no un olvido. */
+     retome sepa que el hueco es conocido y no un olvido.
+
+     ⚠️ Y HAY UN DEFECTO VIVO COLGANDO DE ESTO, que no se arregla aquí: al
+     médico invitado se le pinta el aviso «Clínica sin logo» y no tiene ninguna
+     pantalla donde resolverlo. UI-DT-2 en `DEUDA_TECNICA.md`. */
   const camposFaltantes = CAMPOS_MEDICO.filter((campo) => !tieneValor(datos[campo]))
 
   const pendientes: PasoPerfil[] = []

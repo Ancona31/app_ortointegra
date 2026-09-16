@@ -4245,4 +4245,103 @@ venga el dato.
 
 ---
 
+## Marca del médico invitado — una decisión de producto y el defecto que la destapó (2026-09-16)
+
+Las tres entradas salen del QA de B5-bis (invitación por correo). Van juntas
+porque las dos primeras están encadenadas: **una es una decisión de producto sin
+construir y la otra es un aviso vivo que no tiene salida mientras esa decisión
+no exista.**
+
+---
+
+### MARCA-01 — Cada médico debe poder tener su propio logo
+
+**Estado:** 🔵 decidido el 2026-09-16, **sin construir**. NO es un defecto: es
+producto. **Decisión de Angel**, y **cambia un criterio anterior.**
+
+**Qué había.** El logo y los colores con los que se imprimen los documentos
+viven en la CLÍNICA —`clinicas.logo_url`, `color_primario`,
+`color_secundario`— y sólo los pone quien la administra. El invitado quedaba
+fuera **a propósito**: se le pinta el nombre de la clínica en lectura y no tiene
+controles de color ni de logo (`(app)/perfil/page.tsx:552-556`). La consecuencia
+conocida es que **un médico invitado imprime hoy con la marca de la clínica
+ajena a la que lo añadieron**, y estaba anotada como ventana futura en
+`src/lib/perfil/gate.ts` (bloque «MARCA PERSONAL» del paso 1).
+
+**Qué se decidió.** Que cada médico pueda tener el suyo. Esa nota del gate decía
+«cuando esa decisión se resuelva»; ya está resuelta, y allí queda apuntado.
+
+**Lo que no existe todavía.** Nada: `profiles` no tiene ninguna columna de
+marca. Construirlo es migración + almacenamiento + precedencia al imprimir, no
+un ajuste de interfaz.
+
+**Lo que habrá que decidir al construirlo, y conviene no improvisarlo:**
+- ¿Sólo el logo, o también los colores? Si son los dos, la marca del médico y la
+  de la clínica compiten en el mismo encabezado.
+- ¿Qué manda cuando hay los dos: el del médico o el de su clínica?
+- El paso «logo» del onboarding hoy sólo se le monta a quien va a ser dueño
+  (`OnboardingModal`, `seraDueno`). ¿Pasa a montarse para todos?
+- Los documentos ya emitidos llevan la marca con la que se generaron. No se
+  reescriben: son inmutables. Conviene decirlo antes de que alguien lo pida.
+
+---
+
+### UI-DT-2 — El aviso «Clínica sin logo» no tiene salida para el médico invitado
+
+**Estado:** 🔴 abierta, **defecto vivo** · **Archivos:**
+`src/components/sidebar/AvisoPerfilSidebar.tsx:124` (el ítem),
+`src/components/layout/Sidebar.tsx:729-733` (quién lo recibe),
+`src/app/api/me/estado-perfil/route.ts` (`tieneLogo`),
+`(app)/perfil/page.tsx:552-556` (por qué no puede resolverlo)
+**Detectado:** 2026-09-16, en el QA de B5-bis.
+
+**El aviso se le pinta a CUALQUIER médico**, y los tres ítems de esa tarjeta
+enlazan a `/perfil`. Pero el control del logo en `/perfil` **sólo existe para
+quien administra la clínica**. Al invitado se le queda un aviso permanente
+sobre algo que no depende de él y que no puede quitar desde ninguna pantalla.
+
+**Es anterior a B5-bis** —la condición de antes (`gate.exento === null`) cubría
+exactamente el mismo conjunto de personas—, pero la invitación por correo lo
+vuelve frecuente: los médicos invitados dejan de ser la excepción.
+
+**El arreglo mientras MARCA-01 no exista** es condicionar `faltaLogo` a quien
+administra. `es_admin_de_clinica` ya viaja en la respuesta de `estado-perfil` y
+el propio `Sidebar` ya lo lee para su `isAdmin`: es una línea.
+
+**⚠️ Y NO SE BORRA EL ÍTEM, SE LE CAMBIA LA CONDICIÓN.** Cuando MARCA-01 esté
+construido, el aviso vuelve a tener sentido para el invitado —con otro destino,
+el de su propio logo—. Quien lo quite del todo hoy tendrá que reponerlo entero
+mañana.
+
+---
+
+### PERF-DT-5 — Retraso al teclear en el onboarding (observación, sin diagnosticar)
+
+**Estado:** 🟡 observación, **no diagnosticada** · **Archivo (si se confirma):**
+`src/components/onboarding/OnboardingModal.tsx` (869 líneas)
+**Observado:** 2026-09-16, en el QA de B5-bis, en el servidor de DESARROLLO.
+
+**El síntoma.** Escribiendo en los campos del onboarding, a veces pasan entre
+medio segundo y un segundo entre la tecla y la letra en pantalla. **No siempre.**
+
+**Dos explicaciones, y no hay medición para elegir:**
+1. **El servidor de desarrollo recompilando.** `next dev` con webpack rehace el
+   módulo al vuelo. Si es esto, **en producción no existe** y no hay nada que
+   arreglar.
+2. **El modal repintándose entero con cada pulsación.** Todos los campos de los
+   seis pasos son `useState` del componente RAÍZ del modal, así que cada tecla
+   vuelve a renderizar el árbol completo —incluidos `EspecialidadSelector` y
+   `FirmaCaptura`, que no están memoizados—. Si es esto, **sí existe en
+   producción**.
+
+**Cómo se resuelve, y es barato:** probarlo en producción, que ya tiene el
+onboarding desplegado. Si el retraso aparece allí, es la explicación 2 y el
+arreglo es aislar el estado por paso o memoizar los subárboles caros. Si no
+aparece, se cierra esta entrada sin tocar código.
+
+**No se diagnostica desde el escritorio:** sin medición, las dos explicaciones
+encajan con «a veces», y elegir una sería inventarse la causa.
+
+---
+
 (Fin del registro actual. Nuevas etapas se añaden como secciones ## debajo.)
