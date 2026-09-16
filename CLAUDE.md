@@ -582,6 +582,80 @@ Al arreglarlo, la demo hereda además lo que la real estrenó y ella no tiene: e
 
 ---
 
+### SES-01 — vida explícita de 60 días para las cookies de sesión
+
+**Archivos afectados:** los TRES escritores de cookies del proyecto —
+`src/lib/supabase/client.ts` (`setAll`), `src/lib/supabase/server.ts:13-19` y
+`src/middleware.ts:59-65`.
+
+**⚠️ EL NÚMERO YA ESTÁ DECIDIDO: 60 DÍAS.** Lo eligió Angel el 2026-09-16. No lo
+vuelvas a preguntar. Sustituye a los 400 días que hoy vienen del default de
+`@supabase/ssr` (`dist/main/utils/constants.js:10`).
+
+> ### ⚠️⚠️ `cookieOptions.maxAge` NO SIRVE. NO EMPIECES POR AHÍ.
+>
+> Es el sitio evidente y **no funciona en ssr 0.9.0**: el adaptador fusiona tu
+> `cookieOptions` sobre sus defaults y ACTO SEGUIDO reescribe `maxAge` con el
+> suyo. Las dos ramas, cliente y servidor:
+>
+> ```js
+> const setCookieOptions = {
+>   ...DEFAULT_COOKIE_OPTIONS,
+>   ...cookieOptions,                      // tu 60 entra aquí…
+>   maxAge: DEFAULT_COOKIE_OPTIONS.maxAge, // …y muere aquí
+> }
+> ```
+>
+> `cookies.js:168-172` (navegador) y `cookies.js:327-331` (servidor).
+> Comprobado ejecutando el adaptador real con `cookieOptions: { maxAge:
+> 5184000 }`: lo que llega a `setAll` es `maxAge=34560000`, o sea los 400 días.
+> Si alguien «lo arregla» ahí, el número no cambia y parecerá que sí.
+
+**Dónde va entonces:** en el `setAll` de cada uno de los tres escritores,
+sobrescribiendo el `maxAge` recibido **sólo cuando es positivo**:
+
+```ts
+const VIDA_SESION_SEG = 60 * 60 * 24 * 60  // 60 días
+// dentro de setAll, antes de escribir:
+const vida = typeof options?.maxAge === 'number' && options.maxAge > 0
+  ? { ...options, maxAge: VIDA_SESION_SEG }
+  : options
+```
+
+> ### ⚠️ LA CONDICIÓN `> 0` ES TODO EL ÍTEM, NO UN DETALLE
+>
+> `maxAge: 0` es cómo el adaptador de ssr pide BORRAR la cookie
+> (`cookies.js:193-210`, y RFC 6265 §5.2.2: un `Max-Age` ≤ 0 caduca la cookie).
+> Un `maxAge: VIDA_SESION_SEG` sin condicionar convierte cada borrado en una
+> renovación de 60 días y **reintroduce exactamente el defecto de seguridad que
+> se cerró el 2026-09-16**: cookies de sesión que no mueren al cerrar sesión, con
+> el JWT y el refresh token dentro. Si tocas esto, comprueba el borrado, no sólo
+> el alta.
+
+**Por qué 400 no servía:** no era una decisión, era el default de la librería.
+Una cookie con el refresh token dentro viviendo 400 días en un equipo compartido
+de consultorio es exposición que no compra nada. Y **sólo empezó a aplicarse de
+verdad** cuando el adaptador del navegador dejó de descartar las `options`
+(2026-09-16): antes el cliente escribía cookies de sesión y el servidor de 400
+días, así que la misma cookie cambiaba de naturaleza según quién la hubiera
+escrito último.
+
+**Lo que este ítem NO es:** no es la barrera de revocación. La vida de la cookie
+no crea sesiones zombis —las crea no borrar y no revocar, ya cerrado— y bajar
+este número no acorta la ventana en la que un JWT revocado sigue siendo válido
+contra PostgREST. Esa ventana es el TTL del JWT, que se toca en el panel de
+Supabase y tiene su propio coste en tráfico a Auth. **No mezcles las dos cosas.**
+
+**Origen:** punto 5 de la auditoría del cierre de sesión del 2026-09-16. Sus
+puntos 1 y 2 (borrado real de cookies y limpieza local incondicional) ya están
+aplicados; los 3 y 4 siguen pendientes y son independientes de este ítem.
+
+**Alcance estimado:** 3 archivos, ~6 líneas, 20 min. **Verificación:** la columna
+`Expires` de `sb-*-auth-token` debe quedar a ~60 días y no a 2027 — y al cerrar
+sesión no debe quedar NI UNA cookie `sb-*`, ni vacía.
+
+---
+
 ## Mejoras post-rediseño de labs (retomar en sesión nueva)
 
 Identificadas durante QA de sub-fase 9. Son mejoras UX, no bugs

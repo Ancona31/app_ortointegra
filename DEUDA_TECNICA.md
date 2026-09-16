@@ -4410,4 +4410,43 @@ inmutables: no se reescriben.
 
 ---
 
+### AUTH-DT-1 — `spinus_active` no lo lee nadie, y hay un comentario que dice que sí
+
+**Señalado por la auditoría externa del arreglo de cierre de sesión, 2026-09-16.
+No se toca en esa tanda.**
+
+`sessionStorage.spinus_active` se **escribe** en tres sitios —`login/page.tsx:298`
+y `:367`, `auth/callback/page.tsx:27`— y se **borra** en dos —`lib/auth-context.tsx`
+(dentro de `signOut()`) y `components/super-admin/Sidebar.tsx`—. **Lectores: cero.**
+Comprobado con `grep -rn "spinus_active" src`: las cinco apariciones son
+escrituras o borrados. Es una bandera que nadie consulta.
+
+**Lo que lo convierte en deuda y no en basura inocua** es el comentario de
+`src/lib/supabase/client.ts:30-34`, que lo presenta como un mecanismo vivo:
+
+> «El SessionGuard usa `sessionStorage.SESSION_FLAG` como detector de "tab
+> nuevo" para mantener el auto-logout al cerrar navegador»
+
+Tres cosas mal en dos líneas: `SessionGuard.tsx` son 28 líneas que no tocan
+`sessionStorage` en absoluto; la clave no se llama `SESSION_FLAG` sino
+`spinus_active`; y el comportamiento que dice preservar —cerrar sesión al cerrar
+el navegador— se **retiró a propósito** en `5daa1c1` (2026-09-14), que hizo
+persistentes las cookies de sesión a petición de producto. El comentario describe
+una defensa que no existe, custodiando un comportamiento que se quitó queriendo.
+
+**Por qué importa:** el mismo bloque de comentario es el que afirma que la sesión
+vive en `localStorage`, que también es falso —`createBrowserClient.js:42` pisa el
+`auth.storage` que le pasa este archivo y la sesión vive en las cookies sb-*—. Es
+el párrafo que leerá quien toque la persistencia de sesión, y hoy da dos datos
+incorrectos de tres.
+
+**Qué hacer cuando toque:** decidir si la bandera se retira entera (cinco
+escrituras/borrados en cuatro archivos) o si se le da el lector que nunca tuvo, y
+corregir el comentario en cualquiera de los dos casos. **No se arregla de paso**
+dentro de un cambio de autenticación: tocar `login/page.tsx` y
+`auth/callback/page.tsx` por una bandera muerta, en la misma tanda en que se
+mueve el cierre de sesión, es cómo se mezcla una limpieza con una regresión.
+
+---
+
 (Fin del registro actual. Nuevas etapas se añaden como secciones ## debajo.)
