@@ -31,8 +31,9 @@ function ResetPasswordContent() {
   const [error, setError] = useState('')
   const [enlaceMuerto, setEnlaceMuerto] = useState(!tokenHash)
   const [correo, setCorreo] = useState<string | null>(null)
+  const [aviso, setAviso] = useState(false)
 
-  async function handleSubmit(e: React.FormEvent) {
+  function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     /* Se valida ANTES de enviar porque el canje consume el token: un rechazo del
        servidor por contraseña corta deja al médico sin enlace. El 6 de aquí es
@@ -40,17 +41,24 @@ function ResetPasswordContent() {
        mueven juntos cuando suba la política. */
     if (password !== confirmar) { setError('Las contraseñas no coinciden.'); return }
     if (password.length < 6) { setError('Mínimo 6 caracteres.'); return }
+    enviar(false)
+  }
 
+  /* `avisoVisto` en true es el segundo clic del médico sobre «usar esta de
+     todos modos». El servidor no cambia nada en la primera pasada —el aviso
+     llega ANTES del canje—, así que este reenvío no cuesta ningún enlace. */
+  async function enviar(avisoVisto: boolean) {
     setLoading(true)
     setError('')
     try {
       const res = await fetch('/api/auth/reset-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token_hash: tokenHash, password }),
+        body: JSON.stringify({ token_hash: tokenHash, password, aviso_visto: avisoVisto }),
       })
-      const json = await res.json() as { ok?: boolean; correo?: string; error?: string }
+      const json = await res.json() as { ok?: boolean; correo?: string; error?: string; aviso?: string }
 
+      if (json.aviso === 'password_conocida') { setAviso(true); return }
       if (res.ok && json.ok) { setCorreo(json.correo ?? ''); return }
 
       if (res.status === 429) {
@@ -146,6 +154,45 @@ function ResetPasswordContent() {
               <Link href="/forgot-password" className="block text-sm text-[#1e5fa8] hover:underline text-center">
                 Solicitar nuevo enlace
               </Link>
+            </div>
+          ) : aviso ? (
+            /* ⚠️ AVISA, NO BLOQUEA. La contraseña la elige el médico: esta
+               pantalla le da el dato que no tenía y le devuelve la decisión.
+               Por eso «usar esta de todos modos» es una salida visible y no una
+               casilla de «entiendo los riesgos» — eso es un regaño con
+               formulario.
+               El enlace sigue INTACTO aquí: el servidor consulta HIBP antes del
+               canje, así que dudar no cuesta un correo (y hay 2 por hora para
+               todo el proyecto).
+               ⚠️ NO AÑADAS EL NÚMERO DE APARICIONES que devuelve HIBP. Convence,
+               pero convierte el aviso en un informe técnico.
+               ⚠️ NI «CONTRASEÑA INSEGURA» NI «DÉBIL» NI «COMPROMETIDA»: son
+               juicios sobre él. Y la línea de que su cuenta no está afectada no
+               es relleno — es lo primero que va a pensar un médico al que le
+               avisan de algo en su expediente electrónico. */
+            <div className="space-y-4">
+              <h2 className="font-semibold text-slate-700">Esta contraseña ya es conocida</h2>
+              <p className="text-sm text-slate-500">
+                Apareció en robos de datos de otras páginas web, así que está en listas públicas que se usan para intentar entrar en cuentas ajenas.
+              </p>
+              <p className="text-sm text-slate-500">
+                <strong className="text-slate-700">Tu cuenta de Spinus no está afectada.</strong> Puedes usarla si quieres; otra distinta sería más difícil de adivinar.
+              </p>
+              <button
+                type="button"
+                onClick={() => { setAviso(false); setPassword(''); setConfirmar('') }}
+                className="w-full py-3 bg-[#1e5fa8] text-white rounded-xl font-medium hover:bg-[#1a3a5c] transition-colors"
+              >
+                Elegir otra
+              </button>
+              <button
+                type="button"
+                onClick={() => enviar(true)}
+                disabled={loading}
+                className="w-full text-sm text-slate-500 hover:text-slate-700 transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+              >
+                {loading ? <><Loader2 size={14} className="animate-spin" /> Guardando...</> : 'Usar esta de todos modos'}
+              </button>
             </div>
           ) : (
             <>

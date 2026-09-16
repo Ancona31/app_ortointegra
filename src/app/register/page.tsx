@@ -38,7 +38,7 @@ const GOOGLE_OAUTH = ['1', 'true'].includes(
 
 export default function RegisterPage() {
   const router = useRouter()
-  const [step,     setStep]     = useState<'form' | 'enviado'>('form')
+  const [step,     setStep]     = useState<'form' | 'enviado' | 'aviso'>('form')
   const [showPass, setShowPass] = useState(false)
   const [loading,  setLoading]  = useState(false)
   const [error,    setError]    = useState('')
@@ -116,19 +116,28 @@ export default function RegisterPage() {
     })
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    enviar(false)
+  }
+
+  /* `avisoVisto` en true es el segundo clic sobre «usar esta de todos modos».
+     En la primera pasada el servidor no crea nada ni consume presupuesto de
+     registro, así que dudar sale gratis. */
+  async function enviar(avisoVisto: boolean) {
     setLoading(true)
     setError('')
 
     const res = await fetch('/api/auth/registro', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify(form),
+      body:    JSON.stringify({ ...form, aviso_visto: avisoVisto }),
     })
 
     const data = await res.json()
     setLoading(false)
+
+    if (data.aviso === 'password_conocida') { setStep('aviso'); return }
 
     if (!res.ok) {
       if (res.status === 409) {
@@ -141,6 +150,55 @@ export default function RegisterPage() {
     }
 
     setStep('enviado')
+  }
+
+  /* ── Pantalla: la contraseña elegida es conocida ───────── */
+  if (step === 'aviso') {
+    /* ⚠️ AVISA, NO BLOQUEA. La contraseña la elige el médico: esta pantalla le
+       da el dato que no tenía y le devuelve la decisión. Por eso «usar esta de
+       todos modos» es una salida visible y no una casilla de «entiendo los
+       riesgos» — eso es un regaño con formulario.
+       Aquí todavía no se ha creado nada ni se ha consumido presupuesto de
+       registro (`api/auth/registro` comprueba antes de crear y con
+       `registrar: false`), así que dudar sale gratis.
+       ⚠️ NO AÑADAS EL NÚMERO DE APARICIONES que devuelve HIBP: convence, pero
+       convierte el aviso en un informe técnico.
+       ⚠️ NI «INSEGURA» NI «DÉBIL» NI «COMPROMETIDA»: son juicios sobre él. Y la
+       línea de que su cuenta no está afectada no es relleno — es lo primero que
+       va a pensar quien se está dando de alta en un expediente electrónico.
+       El texto es el mismo que el de `/reset-password`, a propósito: dos
+       redacciones distintas del mismo hecho se leen como dos hechos. */
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#f0f4f8] px-4 pt-[env(safe-area-inset-top,0px)]">
+        <div className="w-full max-w-sm">
+          <Logo />
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 space-y-4">
+            <h2 className="font-semibold text-slate-700">Esta contraseña ya es conocida</h2>
+            <p className="text-sm text-slate-500">
+              Apareció en robos de datos de otras páginas web, así que está en listas públicas que se usan para intentar entrar en cuentas ajenas.
+            </p>
+            <p className="text-sm text-slate-500">
+              <strong className="text-slate-700">Tu cuenta de Spinus no está afectada.</strong> Puedes usarla si quieres; otra distinta sería más difícil de adivinar.
+            </p>
+            <button
+              type="button"
+              onClick={() => { setForm(f => ({ ...f, password: '' })); setStep('form') }}
+              className="w-full py-3 bg-[#1e5fa8] text-white rounded-xl font-medium hover:bg-[#1a3a5c] transition-colors"
+            >
+              Elegir otra
+            </button>
+            <button
+              type="button"
+              onClick={() => enviar(true)}
+              disabled={loading}
+              className="w-full text-sm text-slate-500 hover:text-slate-700 transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+            >
+              {loading ? <><Loader2 size={14} className="animate-spin" /> Creando...</> : 'Usar esta de todos modos'}
+            </button>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   /* ── Pantalla: confirmación enviada ────────────────────── */

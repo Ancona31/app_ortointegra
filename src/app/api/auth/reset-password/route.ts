@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { Resend } from 'resend'
 import { z } from 'zod'
 import { checkIpRateLimit } from '@/lib/rateLimit'
+import { contrasenaConocida } from '@/lib/hibp'
 import { logAudit } from '@/lib/audit'
 import { logger } from '@/lib/logger'
 
@@ -44,6 +45,12 @@ const Body = z.object({
      médico con un error que la pantalla no supo evitar.
      72 es el tope de bcrypt en GoTrue: por encima, el error vendría de allí. */
   password: z.string().min(6).max(72),
+  /* El médico ya vio el aviso de contraseña conocida y decidió seguir.
+     ⚠️ LA MANDA EL CLIENTE Y ESTÁ BIEN ASÍ: el aviso es consultivo, no una
+     barrera, y ninguna propiedad de seguridad depende de esta bandera. Un
+     cliente que mienta se salta un aviso que era suyo saltarse de todos modos.
+     No la firmes ni la guardes en servidor: sería complejidad pagada por nada. */
+  aviso_visto: z.boolean().optional(),
 })
 
 export async function POST(req: NextRequest) {
@@ -69,7 +76,26 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ error: 'datos_invalidos' }, { status: 400 })
   }
-  const { token_hash, password } = parsed.data
+  const { token_hash, password, aviso_visto } = parsed.data
+
+  /* ⚠️ ESTA COMPROBACIÓN VA ANTES DEL CANJE, Y ESE ORDEN ES TODO EL DISEÑO.
+     Aquí todavía no se ha tocado el token: si la contraseña resulta conocida,
+     se devuelve el aviso y el enlace SIGUE VIVO, así que el médico puede elegir
+     otra y terminar sin pedir otro correo — contra un tope de 2 por hora para
+     todo el proyecto. Si esto se moviera debajo del `verifyOtp`, cada aviso
+     costaría un enlace, que es exactamente el defecto que cerramos con
+     `same_password`.
+     Va DESPUÉS del tope por IP y del zod, y eso también es deliberado: sin el
+     tope delante, la ruta sería una forma no autenticada de hacer que nuestro
+     servidor emita peticiones salientes a demanda; sin el zod delante, un
+     cuerpo de kilobytes acabaría en un hash y en un viaje de red.
+     Se comprueba SIEMPRE, aunque venga `aviso_visto`: la bandera decide si nos
+     detenemos, no si miramos. Si saltáramos la consulta al traer la bandera, el
+     médico que ve el aviso, cambia de idea y escribe OTRA contraseña también
+     conocida no sería avisado de la segunda. */
+  if (await contrasenaConocida(password) && !aviso_visto) {
+    return NextResponse.json({ aviso: 'password_conocida' })
+  }
 
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

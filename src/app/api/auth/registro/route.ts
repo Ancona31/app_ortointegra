@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { Resend } from 'resend'
 import { checkAuthRateLimit } from '@/lib/rateLimit'
+import { contrasenaConocida } from '@/lib/hibp'
 import { logAudit } from '@/lib/audit'
 import { RegistroSchema } from '@/lib/perfil/schemas'
 import { escapeHtml } from '@/lib/htmlEscape'
@@ -43,18 +44,40 @@ const resend = new Resend(process.env.RESEND_API_KEY)
 export async function POST(req: NextRequest) {
   // Rate limit: 3 registros por IP por hora
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
-  const { blocked } = await checkAuthRateLimit(ip, 'registro', 3, 60)
+  /* ⚠️ `registrar: false` AQUÍ: SE COMPRUEBA SIN CONSUMIR, y el presupuesto se
+     gasta más abajo, justo antes de crear. El motivo es el aviso de contraseña
+     conocida: con el consumo en esta línea, un médico que ve el aviso y decide
+     —dos envíos— gastaría 2 de sus 3 registros por hora solo por dudar, y el
+     tercero le dejaría fuera. Mismo criterio que `/api/auth/login`, que cuenta
+     fallos y no intentos. */
+  const { blocked } = await checkAuthRateLimit(ip, 'registro', 3, 60, { registrar: false })
   if (blocked) {
     logAudit({ accion: 'acceso_denegado', ip, descripcion: 'Registro bloqueado por rate limit (IP)' })
     return NextResponse.json({ error: 'Has excedido el límite de registros. Intenta más tarde.' }, { status: 429 })
   }
 
-  const parsed = RegistroSchema.safeParse(await req.json().catch(() => null))
+  const cuerpo = await req.json().catch(() => null)
+  const parsed = RegistroSchema.safeParse(cuerpo)
   if (!parsed.success) {
     const first = parsed.error.issues[0]
     return NextResponse.json({ error: first?.message ?? 'Faltan campos obligatorios' }, { status: 400 })
   }
   const { email, password } = parsed.data
+  /* Se lee del cuerpo crudo y no del esquema porque `RegistroSchema` describe
+     el ALTA —correo y contraseña—, y esta bandera es del diálogo del aviso, no
+     del registro. Es consultiva: la manda el cliente y ninguna propiedad de
+     seguridad depende de ella. */
+  const avisoVisto = (cuerpo as { aviso_visto?: unknown } | null)?.aviso_visto === true
+
+  /* Aviso de contraseña conocida. Va antes de crear nada y antes de consumir
+     presupuesto: si el médico decide elegir otra, no ha pasado nada. Aquí no
+     hay token que quemar —a diferencia de la recuperación—, pero el orden se
+     mantiene por la misma razón que allí: el aviso tiene que llegar cuando
+     todavía puede elegir.
+     Se comprueba siempre; la bandera decide si nos detenemos, no si miramos. */
+  if (await contrasenaConocida(password) && !avisoVisto) {
+    return NextResponse.json({ aviso: 'password_conocida' })
+  }
 
   const admin = createAdminClient()
 
@@ -63,6 +86,11 @@ export async function POST(req: NextRequest) {
   if (users.find(u => u.email === email)) {
     return NextResponse.json({ error: 'Este correo ya está registrado. Inicia sesión.' }, { status: 409 })
   }
+
+  /* Ahora sí se consume: llegados aquí se va a crear la cuenta. La pareja de
+     esta llamada es el `registrar: false` del principio — si quitas una, quita
+     la otra, o el presupuesto deja de contarse o se cuenta dos veces. */
+  await checkAuthRateLimit(ip, 'registro', 3, 60)
 
   // 1. Crear usuario sin confirmar (Supabase NO envía email)
   const { data: newUser, error: authError } = await admin.auth.admin.createUser({
