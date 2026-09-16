@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { PLANS, type PlanKey } from '@/lib/plans'
 import { evaluarPerfil } from '@/lib/perfil/gate'
+import { componerNombreMedicoCompleto } from '@/lib/nombreMedico'
 import type { Role } from '@/hooks/useProfile'
 
 /**
@@ -36,8 +37,30 @@ import type { Role } from '@/hooks/useProfile'
  */
 export async function GET() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+
+  /* ⚠️ `getClaims()` Y NO `getUser()`, Y ES LA MITAD DE LA ESPERA DE ESTA RUTA.
+     `getUser()` SIEMPRE sale a la red contra el servidor de Auth —el
+     razonamiento largo, con la medición, está en `src/middleware.ts`—, y esta
+     ruta está en el camino crítico de entrar a la aplicación: `GateOnboarding`
+     la llama en cada carga dura de `(app)` y hasta que responde el modal no se
+     monta, así que la aplicación se ve usable unos segundos antes de bloquearse.
+     `getClaims()` verifica la FIRMA del JWT con WebCrypto contra la clave
+     pública del proyecto: es criptografía, no confianza, y un token manipulado
+     falla igual. Depende de que el proyecto firme con clave ASIMÉTRICA, que es
+     el caso (ES256 con `kid`, comprobado al escribir el middleware); si alguien
+     rota a HS256, `getClaims()` cae solo a `getUser()` y esto vuelve a ser lento
+     sin romperse.
+     ⚠️ LO QUE NO CAMBIA: quién puede leer qué. Las consultas de abajo van con el
+     cliente de SESIÓN, así que la RLS evalúa el JWT igual que antes. Aquí sólo
+     hacía falta el `sub` para preguntar por la fila propia. Una sesión revocada
+     pasa por aquí hasta que caduque su token, que es exactamente la ventana que
+     el middleware ya documenta y acepta — y lo que se decide con esto es qué
+     pantalla se enseña, no a qué datos se llega. */
+  const { data: sesion } = await supabase.auth.getClaims()
+  const userId = sesion?.claims?.sub
+  if (typeof userId !== 'string') {
+    return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+  }
 
   /* ⚠️ `invitado_por` EXIGE LA MIGRACIÓN 20260914_b56 APLICADA, Y EL ORDEN DE
      DESPLIEGUE NO ES NEGOCIABLE: LA MIGRACIÓN VA PRIMERO. Si este código sale
@@ -49,11 +72,25 @@ export async function GET() {
      sólo para los afectados por el criterio.
      Ni el build ni las pruebas lo detectan: son locales, y en local la
      migración ya está puesta. */
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role, es_admin_de_clinica, invitado_por, nombres, especialidad, cedula_profesional, cedula_especialidad, firma_url, clinica_id')
-    .eq('id', user.id)
-    .single()
+  /* ⚠️ LAS DOS EN PARALELO, Y NO ES UN CAPRICHO: EL CONTEO NO DEPENDE DEL
+     PERFIL. Iban en fila —perfil, luego consultorios, luego clínica— y la
+     segunda sólo esperaba porque estaba escrita debajo. `consultorios` se filtra
+     por `medico_id`, que es el `sub` que ya tenemos; el único que sí depende del
+     perfil es el `select` de `clinicas`, y ése se queda donde está.
+     Si un día alguien añade aquí una consulta que necesite `profile`, NO la meta
+     en este `Promise.all`: va después, con la de la clínica. */
+  const [{ data: profile }, { count: consultoriosActivos }] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select('role, es_admin_de_clinica, invitado_por, titulo, nombres, apellido_paterno, apellido_materno, especialidad, cedula_profesional, cedula_especialidad, firma_url, clinica_id')
+      .eq('id', userId)
+      .single(),
+    supabase
+      .from('consultorios')
+      .select('id', { count: 'exact', head: true })
+      .eq('medico_id', userId)
+      .eq('activo', true),
+  ])
 
   if (!profile) return NextResponse.json({ error: 'Perfil no encontrado' }, { status: 404 })
 
@@ -71,11 +108,6 @@ export async function GET() {
      tiempo porque lo pintaba un banner de `/inicio`; ese banner se retiró —el
      aviso de perfil vive solo en el sidebar y dice QUÉ falta, no cuánto— y con
      él se fue su último lector. */
-  const { count: consultoriosActivos } = await supabase
-    .from('consultorios')
-    .select('id', { count: 'exact', head: true })
-    .eq('medico_id', user.id)
-    .eq('activo', true)
 
   const gate = evaluarPerfil({
     role: role as Role,
@@ -117,8 +149,18 @@ export async function GET() {
   const soloMedicinaGeneral =
     especialidades.length > 0 && especialidades.every((e) => e === 'Medicina General')
   const cedulaEspecialidad = profile.cedula_especialidad as string | null
+  /* ⚠️ `role === 'medico'` DELANTE, Y NO SOBRA. Sin ese término, el cálculo
+     daba `true` para cualquiera sin especialidad —una secretaria no tiene
+     ninguna, así que `soloMedicinaGeneral` es false y la cédula está vacía—, y
+     desde B5-bis ella ya no está exenta del gate: el campo habría viajado en su
+     respuesta afirmando que le falta un documento que no existe para su rol.
+     Hoy su único lector (el aviso del sidebar) ya pregunta por el rol, así que
+     esto es la segunda barrera; va aquí igualmente para que el dato no mienta
+     al siguiente que lo lea. */
   const faltaCedulaEspecialidad =
-    !soloMedicinaGeneral && !(typeof cedulaEspecialidad === 'string' && cedulaEspecialidad.trim().length > 0)
+    role === 'medico' &&
+    !soloMedicinaGeneral &&
+    !(typeof cedulaEspecialidad === 'string' && cedulaEspecialidad.trim().length > 0)
 
   // Plan de la clínica
   let plan: PlanKey = 'free'
@@ -140,6 +182,24 @@ export async function GET() {
 
   return NextResponse.json({
     gate,
+    /* ⚠️ EL NOMBRE VIAJA AQUÍ PARA QUE EL SIDEBAR NO DEPENDA DE `useProfile`.
+       Ese hook memoiza en una promesa de módulo y en una copia cifrada que no
+       se invalidan al escribir, así que el sidebar —montado en el layout— se
+       quedaba con el nombre de cuando se montó: la asistente guardaba el suyo
+       en el onboarding y no aparecía hasta recargar en duro. Esta clave de SWR
+       SÍ se revalida al terminar (`GateOnboarding.onComplete`), y es el mismo
+       remedio que ya usa `isAdmin` unas líneas más arriba en ese archivo.
+       Las tres columnas del nombre viajan en el `select` de arriba, que ya se
+       hacía igual: se compone aquí y no en el cliente para que haya UNA sola
+       forma de componerlo (`componerNombreMedicoCompleto`, NOMBRES_PLAN.md
+       Fase 4) y para no mandar tres campos sueltos que cada consumidor junte a
+       su manera. */
+    nombre: componerNombreMedicoCompleto({
+      titulo: profile.titulo as string | null,
+      nombres: profile.nombres as string | null,
+      apellido_paterno: profile.apellido_paterno as string | null,
+      apellido_materno: profile.apellido_materno as string | null,
+    }),
     faltaCedulaEspecialidad,
     // Lo consume `GateOnboarding` para decidir si enseña el paso del logo. Va
     // en la respuesta y no se lee de `useProfile` en el cliente porque ese hook

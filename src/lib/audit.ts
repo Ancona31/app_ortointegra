@@ -88,6 +88,37 @@ export type AuditAccion =
      necesitan migración. */
   | 'recuperacion_contrasena'
   | 'recuperacion_fallida'
+  /* Las tres de la invitación por correo (Bloque B5-bis). Existen porque el
+     alta de un miembro del equipo no dejaba NINGÚN rastro: `crear-usuario` no
+     llamaba a `logAudit`, y quien firma en un expediente clínico aparecía en la
+     clínica sin que constara quién lo metió ni cuándo. La trazabilidad es el
+     motivo entero del bloque, así que sin estas líneas el cambio se quedaba a
+     medias.
+
+     ⚠️ NINGUNA DE LAS TRES LLEVA EL CORREO DEL INVITADO EN `descripcion`, ni
+     el `token_hash` del enlace, por lo mismo que `recuperacion_fallida`: el
+     audit_log es inmutable por trigger y no admite cancelación ARCO. Con
+     `registro_id` —el id del perfil invitado— se responde a quién se invitó sin
+     guardar su dirección para siempre; lo que sí va en la descripción es el
+     ROL, que es lo que se querrá filtrar al auditar.
+
+     `invitacion_aceptada` la escribe una ruta PÚBLICA (`aceptar-invitacion`),
+     donde `userId` sale del canje del token y no de una sesión.
+
+     `invitacion_fallida` es el hermano de `recuperacion_fallida` y existe por
+     la misma razón exacta: al canjear en servidor, GoTrue ve la IP de Vercel y
+     no la del atacante, así que su límite por IP deja de separarlos y un pico
+     de estas filas desde pocas IPs ES el ataque. Un token de invitación tiene
+     la misma entropía que uno de recuperación —los dos salen de `otp_length`—,
+     así que el problema es simétrico y el detector también. NO la fundas con
+     `acceso_denegado`: mezclada con los demás rechazos, el pico deja de verse.
+
+     `audit_log.accion` es `text` sin CHECK, así que estas tres líneas no
+     necesitan migración. */
+  | 'usuario_invitado'
+  | 'invitacion_reenviada'
+  | 'invitacion_aceptada'
+  | 'invitacion_fallida'
   // Derechos ARCO (LFPDPPP)
   | 'arco_acceso'
   /* Intento de exportación ARCO rechazado por rol insuficiente (QW3).

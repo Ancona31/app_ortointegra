@@ -17,7 +17,15 @@ export async function GET() {
   }
 
   const admin = createAdminClient()
-  const { data: authUsers } = await admin.auth.admin.listUsers()
+  /* ⚠️ `perPage: 1000` Y NO LA LLAMADA PELADA. Sin el parámetro, GoTrue sirve
+     su página por defecto —50 cuentas de TODO el proyecto, no de esta
+     clínica—, así que a partir de la cuenta 51 el cruce de abajo no encuentra
+     al usuario. Hasta ahora eso solo pintaba el correo como «—»; desde que de
+     ese mismo cruce sale el ESTADO de la invitación, un usuario fuera de la
+     primera página se pintaría «Invitación enviada» llevando meses dentro. Un
+     defecto cosmético pasó a ser uno que miente, y por eso se arregla aquí.
+     Los otros seis llamadores de `listUsers` del proyecto ya pasan este valor. */
+  const { data: authUsers } = await admin.auth.admin.listUsers({ perPage: 1000 })
 
   // Traer perfiles de la misma clínica
   const { data: profiles } = await admin
@@ -33,9 +41,22 @@ export async function GET() {
       // nombre se COMPONE desde campos estructurados (NOMBRES_PLAN.md, Fase 4).
       // Filas migradas en Fase 2 ya tienen los 3 campos poblados. Se conserva la
       // key `nombre` en la respuesta → page.tsx / type Usuario no cambian.
+      /* ⚠️ EL ESTADO SE CALCULA EN SERVIDOR Y SALE DE `auth.users`, NO DE UNA
+         COLUMNA NUESTRA. No hace falta ninguna: GoTrue ya lo dice, y lo
+         comprobé contra v2.196.0 —recién invitado, `invited_at` puesto y
+         `email_confirmed_at` vacío; tras aceptar, los dos puestos—.
+         Se miran LOS DOS campos y no solo el segundo: un médico que se
+         registró por su cuenta y no ha confirmado el correo también tiene
+         `email_confirmed_at` vacío, y ése no es un invitado. `invited_at` solo
+         lo pone la invitación.
+         Las cuentas anteriores a B5-bis nacieron con `email_confirm: true`, así
+         que salen como 'activa', que es lo que son. */
+      const pendiente = Boolean(authUser?.invited_at) && !authUser?.email_confirmed_at
+
       return {
         id: p.id,
         role: p.role,
+        estado: pendiente ? 'pendiente' : 'activa',
         nombre: componerNombreMedicoCompleto({
           titulo: p.titulo,
           nombres: p.nombres,

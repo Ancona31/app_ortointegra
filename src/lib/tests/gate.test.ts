@@ -20,7 +20,7 @@ const INVITADO_COMPLETO: DatosPerfilGate = {
   invitado_por: '7c9e1b34-52a1-4f0e-9d3b-1a8c6e4f2b90',
 }
 
-describe('evaluarPerfil — roles exentos', () => {
+describe('evaluarPerfil — el único exento', () => {
   it('super_admin no requiere nada, ni siquiera clínica', () => {
     // Su perfil no tiene clínica POR DISEÑO: el caso realista es éste.
     const r = evaluarPerfil({
@@ -37,24 +37,80 @@ describe('evaluarPerfil — roles exentos', () => {
     expect(r.exento).toBe('super_admin')
   })
 
-  it('secretaria no requiere nada', () => {
+  it('el exento nunca trae campos faltantes ni requiere soporte', () => {
+    const r = evaluarPerfil({ role: 'super_admin', consultoriosActivos: 0 })
+    expect(r.camposFaltantes).toEqual([])
+    expect(r.requiereSoporte).toBe(false)
+  })
+})
+
+describe('evaluarPerfil — la secretaria: un solo paso, su nombre', () => {
+  /* Dejó de estar exenta en B5-bis. El motivo no es que se le exija más, sino
+     que su nombre ya no lo teclea nadie más: la invitación solo lleva correo y
+     rol, y ella no tiene «Mi perfil» en su menú. */
+  const SECRETARIA_SIN_NOMBRE: DatosPerfilGate = {
+    role: 'secretaria',
+    clinica_id: 'f1a52dd0-e62b-4683-ab88-0f2fe2656e61',
+    nombres: null,
+    consultoriosActivos: 0,
+  }
+
+  it('sin nombre pide exactamente un paso', () => {
+    const r = evaluarPerfil(SECRETARIA_SIN_NOMBRE)
+    expect(r.completo).toBe(false)
+    expect(r.pendientes).toEqual(['nombre'])
+    expect(r.siguiente).toBe('nombre')
+  })
+
+  it('con nombre está completa', () => {
+    const r = evaluarPerfil({ ...SECRETARIA_SIN_NOMBRE, nombres: 'María' })
+    expect(r.completo).toBe(true)
+    expect(r.pendientes).toEqual([])
+    expect(r.siguiente).toBeNull()
+  })
+
+  it('un nombre de solo espacios no cuenta como nombre', () => {
+    const r = evaluarPerfil({ ...SECRETARIA_SIN_NOMBRE, nombres: '   ' })
+    expect(r.pendientes).toEqual(['nombre'])
+  })
+
+  /* ⚠️ LA PRUEBA QUE DE VERDAD PROTEGE: que levantarle la exención NO le haya
+     traído de paso los pasos del médico. Sin clínica y sin consultorio sigue
+     completa, porque ninguna de las dos cosas puede resolverlas ella. */
+  it('sin clínica y sin consultorio sigue completa si tiene nombre', () => {
     const r = evaluarPerfil({
       role: 'secretaria',
-      clinica_id: 'clinica-1',
-      nombres: null,
+      clinica_id: null,
+      nombres: 'María',
       especialidad: null,
       cedula_profesional: null,
       consultoriosActivos: 0,
     })
     expect(r.completo).toBe(true)
     expect(r.pendientes).toEqual([])
-    expect(r.exento).toBe('secretaria')
   })
 
-  it('un exento nunca trae campos faltantes ni requiere soporte', () => {
-    const r = evaluarPerfil({ role: 'secretaria', consultoriosActivos: 0 })
-    expect(r.camposFaltantes).toEqual([])
+  it('nunca va al panel de soporte, aunque la invitara un administrador y no tenga clínica', () => {
+    const r = evaluarPerfil({
+      ...SECRETARIA_SIN_NOMBRE,
+      clinica_id: null,
+      invitado_por: '7c9e1b34-52a1-4f0e-9d3b-1a8c6e4f2b90',
+    })
     expect(r.requiereSoporte).toBe(false)
+  })
+
+  it('ya NO está exenta, y de ese campo cuelga el aviso del sidebar', () => {
+    /* `Sidebar.tsx` decidía por `exento === null` si enseñar el aviso de firma,
+       logo y cédula de especialidad. Con ella fuera de la exención, ese campo
+       deja de servir para esa pregunta — por eso el sidebar pasó a preguntar
+       por el rol. Esta prueba fija el hecho del que depende aquel cambio. */
+    expect(evaluarPerfil(SECRETARIA_SIN_NOMBRE).exento).toBeNull()
+    expect(evaluarPerfil({ ...SECRETARIA_SIN_NOMBRE, nombres: 'María' }).exento).toBeNull()
+  })
+
+  it('el nombre que le falta NO viaja en camposFaltantes', () => {
+    // Ese campo describe el paso del médico; su paso es otro.
+    expect(evaluarPerfil(SECRETARIA_SIN_NOMBRE).camposFaltantes).toEqual([])
   })
 })
 

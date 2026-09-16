@@ -2062,8 +2062,9 @@ lanzamiento oficial. Proyecto independiente, no es scope de este plan.
   | `pro` | 5 | 2 | `plans.ts:88-89` |
   | `premium` | 10 | 2 | `plans.ts:110-111` |
 
-  Y se aplican de verdad: `src/app/api/admin/crear-usuario/route.ts:64-68`
-  rechaza con 403 al alcanzar el tope.
+  Y se aplican de verdad: `src/app/api/admin/invitar/route.ts:114-130`
+  rechaza con 403 al alcanzar el tope. (Esa ruta se llamaba
+  `api/admin/crear-usuario` hasta B5-bis, 2026-09-16.)
 - **Riesgo:** el doc de roles es la referencia que se consulta para decidir
   qué promete cada plan. Que diga "TBD" invita a inventar cifras. Nótese que
   `premium` **no sube de secretarias** respecto a `pro` (2 en ambos), cosa que
@@ -4210,6 +4211,136 @@ filtrar sin decirlo es peor defecto que la hora corrida que se venía a arreglar
 advertencia sobre los tres `America/Mexico_City` deliberados que quedan en producción
 —`dates.ts:69`, `gcal.ts:43` y `r/[folio]/page.tsx:258`— está al final de TZ-DT-1 y
 **aplica igual a esta entrada**: léela antes de tocar ningún literal de zona horaria.
+
+---
+
+### DEP-DT-4 — La maqueta de los correos vive triplicada
+
+**Estado:** 🟡 abierta, menor · **Archivos:** `src/app/api/auth/email-hook/route.ts:141-187`,
+`src/app/api/auth/registro/route.ts:148-200`, `src/app/api/admin/invitar/route.ts:260-330`
+**Detectado:** 2026-09-16, al añadir el correo de invitación (Bloque B5-bis).
+
+**La misma tabla de 540px, tres veces.** Cabecera navy con el rótulo «Spinus»,
+botón compatible con Outlook (incluido el bloque `<!--[if mso]>` con su
+`v:roundrect`) y pie de aviso. Las tres copias tienen los mismos colores
+literales —`#1a3a5c`, `#1e5fa8`, `#f8fafc`— y la misma estructura.
+
+**Por qué hay tres y no una.** El hook manda los correos de GoTrue; `registro`
+no puede usar el hook porque genera su enlace con `generateLink` y ése no lo
+dispara; e `invitar` es el tercero por el mismo motivo. Cuando se escribió la
+tercera, extraerla habría significado tocar los otros dos archivos en un cambio
+que no lo pedía — y uno de ellos es el camino por el que salen TODOS los correos
+de autenticación de producción.
+
+**Qué costaría cerrarla.** Un módulo neutro en `src/lib/` con `maqueta()` y
+`boton()`, y los tres llamadores apuntando ahí. Con tres usos reales ya cumple
+el criterio del Protocolo 4, así que la abstracción está justificada: lo que
+falta es la tanda donde tocar esos tres archivos sea el encargo y no un efecto
+secundario.
+
+**Lo que NO puede perderse al unificar:** el `escapeHtml` de cada valor
+interpolado. Los tres correos los firma DKIM con `mail.spinus.com.mx`, y la
+garantía de que su cuerpo no lo elige un tercero no debe depender de dónde
+venga el dato.
+
+---
+
+## Marca del médico invitado — una decisión de producto y el defecto que la destapó (2026-09-16)
+
+Las tres entradas salen del QA de B5-bis (invitación por correo). Van juntas
+porque las dos primeras están encadenadas: **una es una decisión de producto sin
+construir y la otra es un aviso vivo que no tiene salida mientras esa decisión
+no exista.**
+
+---
+
+### MARCA-01 — Cada médico debe poder tener su propio logo
+
+**Estado:** 🔵 decidido el 2026-09-16, **sin construir**. NO es un defecto: es
+producto. **Decisión de Angel**, y **cambia un criterio anterior.**
+
+**Qué había.** El logo y los colores con los que se imprimen los documentos
+viven en la CLÍNICA —`clinicas.logo_url`, `color_primario`,
+`color_secundario`— y sólo los pone quien la administra. El invitado quedaba
+fuera **a propósito**: se le pinta el nombre de la clínica en lectura y no tiene
+controles de color ni de logo (`(app)/perfil/page.tsx:552-556`). La consecuencia
+conocida es que **un médico invitado imprime hoy con la marca de la clínica
+ajena a la que lo añadieron**, y estaba anotada como ventana futura en
+`src/lib/perfil/gate.ts` (bloque «MARCA PERSONAL» del paso 1).
+
+**Qué se decidió.** Que cada médico pueda tener el suyo. Esa nota del gate decía
+«cuando esa decisión se resuelva»; ya está resuelta, y allí queda apuntado.
+
+**Lo que no existe todavía.** Nada: `profiles` no tiene ninguna columna de
+marca. Construirlo es migración + almacenamiento + precedencia al imprimir, no
+un ajuste de interfaz.
+
+**Lo que habrá que decidir al construirlo, y conviene no improvisarlo:**
+- ¿Sólo el logo, o también los colores? Si son los dos, la marca del médico y la
+  de la clínica compiten en el mismo encabezado.
+- ¿Qué manda cuando hay los dos: el del médico o el de su clínica?
+- El paso «logo» del onboarding hoy sólo se le monta a quien va a ser dueño
+  (`OnboardingModal`, `seraDueno`). ¿Pasa a montarse para todos?
+- Los documentos ya emitidos llevan la marca con la que se generaron. No se
+  reescriben: son inmutables. Conviene decirlo antes de que alguien lo pida.
+
+---
+
+### UI-DT-2 — El aviso «Clínica sin logo» no tiene salida para el médico invitado
+
+**Estado:** 🔴 abierta, **defecto vivo** · **Archivos:**
+`src/components/sidebar/AvisoPerfilSidebar.tsx:124` (el ítem),
+`src/components/layout/Sidebar.tsx:729-733` (quién lo recibe),
+`src/app/api/me/estado-perfil/route.ts` (`tieneLogo`),
+`(app)/perfil/page.tsx:552-556` (por qué no puede resolverlo)
+**Detectado:** 2026-09-16, en el QA de B5-bis.
+
+**El aviso se le pinta a CUALQUIER médico**, y los tres ítems de esa tarjeta
+enlazan a `/perfil`. Pero el control del logo en `/perfil` **sólo existe para
+quien administra la clínica**. Al invitado se le queda un aviso permanente
+sobre algo que no depende de él y que no puede quitar desde ninguna pantalla.
+
+**Es anterior a B5-bis** —la condición de antes (`gate.exento === null`) cubría
+exactamente el mismo conjunto de personas—, pero la invitación por correo lo
+vuelve frecuente: los médicos invitados dejan de ser la excepción.
+
+**El arreglo mientras MARCA-01 no exista** es condicionar `faltaLogo` a quien
+administra. `es_admin_de_clinica` ya viaja en la respuesta de `estado-perfil` y
+el propio `Sidebar` ya lo lee para su `isAdmin`: es una línea.
+
+**⚠️ Y NO SE BORRA EL ÍTEM, SE LE CAMBIA LA CONDICIÓN.** Cuando MARCA-01 esté
+construido, el aviso vuelve a tener sentido para el invitado —con otro destino,
+el de su propio logo—. Quien lo quite del todo hoy tendrá que reponerlo entero
+mañana.
+
+---
+
+### PERF-DT-5 — Retraso al teclear en el onboarding (observación, sin diagnosticar)
+
+**Estado:** 🟡 observación, **no diagnosticada** · **Archivo (si se confirma):**
+`src/components/onboarding/OnboardingModal.tsx` (869 líneas)
+**Observado:** 2026-09-16, en el QA de B5-bis, en el servidor de DESARROLLO.
+
+**El síntoma.** Escribiendo en los campos del onboarding, a veces pasan entre
+medio segundo y un segundo entre la tecla y la letra en pantalla. **No siempre.**
+
+**Dos explicaciones, y no hay medición para elegir:**
+1. **El servidor de desarrollo recompilando.** `next dev` con webpack rehace el
+   módulo al vuelo. Si es esto, **en producción no existe** y no hay nada que
+   arreglar.
+2. **El modal repintándose entero con cada pulsación.** Todos los campos de los
+   seis pasos son `useState` del componente RAÍZ del modal, así que cada tecla
+   vuelve a renderizar el árbol completo —incluidos `EspecialidadSelector` y
+   `FirmaCaptura`, que no están memoizados—. Si es esto, **sí existe en
+   producción**.
+
+**Cómo se resuelve, y es barato:** probarlo en producción, que ya tiene el
+onboarding desplegado. Si el retraso aparece allí, es la explicación 2 y el
+arreglo es aislar el estado por paso o memoizar los subárboles caros. Si no
+aparece, se cierra esta entrada sin tocar código.
+
+**No se diagnostica desde el escritorio:** sin medición, las dos explicaciones
+encajan con «a veces», y elegir una sería inventarse la causa.
 
 ---
 

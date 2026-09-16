@@ -35,7 +35,7 @@ const resend = new Resend(process.env.RESEND_API_KEY)
  * consultorios, dar de alta a su equipo, tocar el logo y la facturación de la
  * clínica. Quien se registra por su cuenta es el dueño de la cuenta que está
  * creando. A los invitados los da de alta el admin con el flag en su default
- * false y con `invitado_por` puesto (`api/admin/crear-usuario`).
+ * false y con `invitado_por` puesto (`api/admin/invitar`).
  *
  * `nombre_confirmado` se queda en su default `false`: aquí ya no se captura
  * ningún nombre. Lo pone en true `PUT /api/me/perfil-medico` cuando el médico

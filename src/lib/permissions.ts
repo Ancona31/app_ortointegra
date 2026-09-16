@@ -91,7 +91,9 @@ export function isSecretaria(p: RoleCheck): boolean {
  *
  * Si encuentras una ruta que la usa SOLA, el arreglo es añadirle el primer
  * término de la condición de arriba — no tocar esto. Se hizo así el 2026-09-14
- * en `api/admin/crear-usuario`, `api/admin/usuarios` (sus dos handlers),
+ * en `api/admin/invitar` —entonces `api/admin/crear-usuario`, renombrada en
+ * B5-bis al pasar de dictar contraseñas a mandar invitaciones—,
+ * `api/admin/usuarios` (sus dos handlers),
  * `api/google/connect` y `lib/auth.ts`; las demás ya lo comprobaban.
  */
 export function canManageClinica(p: RoleCheck): boolean {

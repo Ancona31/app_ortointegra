@@ -23,14 +23,30 @@ import type { Role } from '@/hooks/useProfile'
  * en que se escribió el archivo y dejó de serlo en el bloque siguiente.
  */
 
-/** Los tres pasos, en el orden en que se le piden al usuario. */
-export type PasoPerfil = 'datos_medico' | 'clinica' | 'consultorio'
+/**
+ * Los pasos, en el orden en que se le piden al usuario.
+ *
+ * `nombre` es de la SECRETARIA y solo de ella, y nunca convive con los otros
+ * tres: a ella no se le pide clínica —no puede crearla— ni consultorio —no
+ * atiende en ninguno—, y los datos del médico no le aplican. Es un paso suelto
+ * y por eso tiene nombre propio en vez de colgar de `datos_medico`, que monta
+ * dos pantallas y exige título, especialidad y cédula.
+ */
+export type PasoPerfil = 'nombre' | 'datos_medico' | 'clinica' | 'consultorio'
 
 /** Campos del paso 1. El orden es el de presentación. */
 export type CampoMedico = 'nombres' | 'especialidad' | 'cedula_profesional'
 
-/** Por qué a alguien no se le exige nada. */
-export type MotivoExencion = 'super_admin' | 'secretaria'
+/**
+ * Por qué a alguien no se le exige nada.
+ *
+ * ⚠️ AQUÍ ESTUVO `'secretaria'` Y SE FUE EN B5-bis, no por limpieza. Desde que
+ * el alta por invitación dejó de pedirle el nombre al administrador, ESTE GATE
+ * ES EL ÚNICO SITIO DONDE ese nombre puede escribirse: la secretaria no tiene
+ * «Mi perfil» en su menú (`Sidebar.navSecretaria`) y el formulario del admin ya
+ * no lo lleva. Si vuelve a estar exenta, se queda «Sin nombre» para siempre.
+ */
+export type MotivoExencion = 'super_admin'
 
 /**
  * Lo que hay que darle. Nombres de columna tal cual están en `profiles`, para
@@ -41,7 +57,7 @@ export interface DatosPerfilGate {
   /**
    * Quién dio de alta a este usuario. NULL o ausente = se registró por su
    * cuenta, o sea dueño de la clínica que está por crear. La escribe
-   * `api/admin/crear-usuario`, el único camino con invitador
+   * `api/admin/invitar`, el único camino con invitador
    * (20260914_b56_trigger_aprovisionamiento.sql:360-369).
    *
    * ⚠️ AQUÍ YA NO VA `es_admin_de_clinica`, Y NO ES UN OLVIDO. Esa columna
@@ -79,7 +95,12 @@ export interface EstadoPerfil {
   pendientes: PasoPerfil[]
   /** El primero de `pendientes`, o null. Responde a «¿qué enseño?». */
   siguiente: PasoPerfil | null
-  /** Qué falta DENTRO del paso 1. Vacío si ese paso no está pendiente. */
+  /**
+   * Qué falta DENTRO del paso `datos_medico`. Vacío si ese paso no está
+   * pendiente — y vacío SIEMPRE para la secretaria, aunque le falte el nombre:
+   * su paso es `nombre`, no el del médico, y meter `'nombres'` aquí haría creer
+   * a quien lo lea que está a medio camino de un paso que no va a ver.
+   */
   camposFaltantes: CampoMedico[]
   /** Motivo de exención, o null si al usuario sí se le exige. */
   exento: MotivoExencion | null
@@ -137,9 +158,43 @@ export function evaluarPerfil(datos: DatosPerfilGate): EstadoPerfil {
      los incidentes. */
   if (datos.role === 'super_admin') return exencion('super_admin')
 
-  /* secretaria: exenta, decisión que ya estaba tomada y que aquí solo se
-     conserva (api/me/estado-perfil/route.ts:22-30). */
-  if (datos.role === 'secretaria') return exencion('secretaria')
+  /* ── La secretaria: UN solo paso, su nombre ───────────────────────────────
+     Estuvo exenta hasta B5-bis, y lo que cambió no fue la opinión sobre ella
+     sino de dónde sale su nombre. Antes lo tecleaba el administrador al darla
+     de alta; ahora la invitación solo lleva correo y rol, así que si no se lo
+     pedimos aquí no se lo pide nadie: no tiene «Mi perfil» en su menú y el
+     formulario del admin ya no tiene el campo.
+
+     ⚠️ SE PIDE `nombres` Y EL PASO EXIGE TAMBIÉN EL APELLIDO PATERNO. No es un
+     descuadre: es el mismo reparto que el médico, donde `CAMPOS_MEDICO` mira
+     `nombres` y `OnboardingModal.guardarDatos` exige los dos. El criterio va
+     por detrás del formulario, nunca por delante — al revés dejaría a alguien
+     bloqueado por un campo que su pantalla no le pide.
+
+     ⚠️ Y NO SE LE PIDE NADA MÁS, aunque no tenga clínica ni consultorio. La
+     clínica no puede crearla y en un consultorio no atiende; exigírselos la
+     encerraría en un modal sin salida. Por eso esta rama devuelve antes de
+     llegar a los tres pasos del médico.
+
+     ⚠️ ESTO NO SE ESPEJA EN LA BASE, Y ES DELIBERADO. `public.perfil_completo()`
+     (20260913_b5_perfil_completo_rls.sql) sigue eximiendo a `secretaria`, así
+     que su comentario de «espejo de evaluarPerfil()» deja de ser exacto para
+     este rol. Si alguien «arregla» la asimetría metiendo el nombre allí, le
+     quita el INSERT en `appointments` —el gate de la base es `WITH CHECK` de
+     seis policies— y la secretaria no podrá agendar citas, que es su trabajo.
+     Un nombre no es un requisito de integridad clínica: no firma nada. Lo que
+     lo hace exigible es el modal bloqueante, no la RLS. */
+  if (datos.role === 'secretaria') {
+    const faltaNombre = !tieneValor(datos.nombres)
+    return {
+      completo: !faltaNombre,
+      pendientes: faltaNombre ? ['nombre'] : [],
+      siguiente: faltaNombre ? 'nombre' : null,
+      camposFaltantes: [],
+      exento: null,
+      requiereSoporte: false,
+    }
+  }
 
   /* LISTA BLANCA DE EXENTOS, NO DE EXIGIDOS: todo lo demás —hoy solo
      'medico'— cae aquí y se le pide todo. Un rol futuro nace BLOQUEADO, que
@@ -153,7 +208,16 @@ export function evaluarPerfil(datos: DatosPerfilGate): EstadoPerfil {
      pedirla lo dejaría fuera para siempre. `firma_url` tampoco: es su propio
      escalón y vive en otra parte.
 
-     ⚠️ VENTANA FUTURA PENDIENTE — MARCA PERSONAL. Hoy el logo y los colores
+     ⚠️ MARCA PERSONAL — LA DECISIÓN YA SE TOMÓ (2026-09-16): cada médico podrá
+     tener SU PROPIO LOGO. Lo que sigue describía el hueco cuando la pregunta
+     seguía abierta, y se conserva porque el hueco no ha cambiado: lo que
+     cambió es que ya hay respuesta y falta construirla. Está anotada como
+     MARCA-01 en `DEUDA_TECNICA.md`, con lo que queda por decidir al hacerlo
+     (si van también los colores, cuál manda cuando hay dos, y si el paso del
+     logo del onboarding pasa a montarse para todos). Cuando exista, este paso
+     crece con los campos nuevos o nace un cuarto junto a él.
+
+     Hoy el logo y los colores
      con los que se imprimen los documentos de un médico NO son suyos: viven
      en `clinicas.logo_url`, `clinicas.color_primario` y
      `clinicas.color_secundario` (20260912190416_remote_schema.sql:225,
@@ -162,7 +226,11 @@ export function evaluarPerfil(datos: DatosPerfilGate): EstadoPerfil {
      aquí no se exige nada de marca. Cuando esa decisión se resuelva, este
      paso crece con los campos nuevos o nace un cuarto paso junto a él.
      NO SE CONSTRUYE NADA DE ESO AHORA: esta nota existe para que quien lo
-     retome sepa que el hueco es conocido y no un olvido. */
+     retome sepa que el hueco es conocido y no un olvido.
+
+     ⚠️ Y HAY UN DEFECTO VIVO COLGANDO DE ESTO, que no se arregla aquí: al
+     médico invitado se le pinta el aviso «Clínica sin logo» y no tiene ninguna
+     pantalla donde resolverlo. UI-DT-2 en `DEUDA_TECNICA.md`. */
   const camposFaltantes = CAMPOS_MEDICO.filter((campo) => !tieneValor(datos[campo]))
 
   const pendientes: PasoPerfil[] = []

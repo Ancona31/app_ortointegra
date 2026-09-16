@@ -48,7 +48,12 @@
  *     Stripe (`stripe/portal/route.ts:37-41`) para cancelar sin hablar con
  *     nadie.
  *  8. `plans.ts:68-69` (básica = 3 médicos + 1 asistente) y los topes que
- *     aplica `api/admin/crear-usuario/route.ts:64-69`. SIN precio.
+ *     aplica `api/admin/invitar/route.ts:114-130`. SIN precio.
+ *     ⚠️ Esa ruta se llamaba `api/admin/crear-usuario` hasta B5-bis, y los
+ *     topes no sólo cambiaron de sitio: ahora una invitación PENDIENTE ya
+ *     ocupa plaza, porque la fila de `profiles` se escribe al invitar. La
+ *     respuesta sigue siendo cierta —el tope es el mismo— pero si algún día
+ *     dice «hasta N activos», dejará de serlo.
  *  9. ⚠️ ESTA RESPUESTA DEPENDE DE UNA CLÁUSULA QUE ANTES NO EXISTÍA. Se
  *     escribió en `TerminosContent.tsx` (sección "Continuidad del servicio")
  *     en esta misma tanda. Si alguien la borra de los términos, esta
