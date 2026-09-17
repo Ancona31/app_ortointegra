@@ -82,7 +82,6 @@ export default function SeccionMedicionesLabs({ pacienteId, sexoPaciente }: Prop
   )
 
   function invalidarTodo() {
-    mutate(['stats-labs', pacienteId])
     mutate(['analitos-rastreados', pacienteId])
     if (claveSeleccionada) {
       mutate(['mediciones-analito', pacienteId, claveSeleccionada])

@@ -58,7 +58,6 @@ export default function SeccionDocumentosLabs({ pacienteId }: Props) {
 
   function invalidar() {
     mutate(['documentos-labs', pacienteId])
-    mutate(['stats-labs', pacienteId])
   }
 
   async function confirmarDelete() {
