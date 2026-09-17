@@ -140,6 +140,51 @@ Los siguientes archivos fueron eliminados intencionalmente en abril 2026 tras un
 
 ---
 
+## 🔐 Autoridad de sesión — NO NEGOCIABLE
+
+> Origen: el bucle de recarga de producción. Un médico que cerraba sesión
+> entraba en una ráfaga de ~90 peticiones por segundo alternando `/?_rsc=` e
+> `/inicio?_rsc=` hasta ahogar la pestaña. La causa no era ninguno de los dos
+> guardas por separado: era que **decidían con autoridades distintas** sobre el
+> mismo hecho. Tras una revocación el servidor borra la sesión pero el JWT
+> sigue siendo criptográficamente válido hasta su `exp`, así que la lectura
+> local decía «sí» y el servidor decía «no», y se rebotaban.
+
+**La autoridad se elige por el TIPO de decisión, no por la ruta.**
+
+* **Dejar pasar / no renderizar** (nodo terminal, dentro del área ya
+  autenticada): `getClaims()` o presencia de cookie. Barato. La barrera real de
+  datos es la RLS, no esto.
+* **Redirigir a otra página** (arista): siempre `getUser()`. Sin excepción.
+* **Un redirect nunca se decide con una autoridad más débil que la del
+  destino.** Si el destino pregunta al servidor, el origen pregunta al
+  servidor.
+
+Dónde está aplicado hoy, y por qué cada uno es lo que es:
+
+| Guarda | Decisión | Autoridad |
+|---|---|---|
+| `src/middleware.ts:177` (`sesionValida`) | dejar pasar | `getClaims()` — local, barata |
+| `src/middleware.ts` (`/` → `/inicio`) | redirigir | `getClaims()` — **excepción tolerada, con pasador en el propio archivo**: no cicla sólo porque `/login` es sumidero |
+| `src/app/login/layout.tsx` (`/login` → `/inicio`) | redirigir | `getUser()` |
+| `src/app/(launcher)/inicio/layout.tsx:16` | redirigir | `getUser()` |
+| `src/app/(app)/layout.tsx:26` y los `expediente/*` | redirigir | `getUser()` |
+
+Corolarios que cuestan caro si se olvidan:
+
+1. **Mover un guarda de página al middleware casi siempre degrada su
+   autoridad**, porque ahí sólo hay `getClaims()`. Es la tentación obvia
+   —ahorra el viaje a Auth— y es la forma de reintroducir el bucle.
+2. **Un redirect entre guardas de la misma autoridad no cicla si sus
+   condiciones son complementarias y las dos degradan hacia el mismo lado.**
+   `/inicio` redirige cuando NO hay usuario y `/login` cuando SÍ lo hay; las
+   dos, ante un error de Auth, acaban sirviendo el formulario de `/login`. Ese
+   sumidero es la propiedad que hay que conservar.
+3. Un guarda de servidor **no sustituye** al blindaje de cliente sin red: sin
+   red no hay petición, luego no hay guarda. Conviven.
+
+---
+
 ## 🧬 Stack y versiones (bleeding edge — verifica antes de proponer)
 
 * **Next.js 16.2.1** (App Router, Webpack explícito, no Turbopack)

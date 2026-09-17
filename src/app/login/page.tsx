@@ -172,29 +172,71 @@ export default function LoginPage() {
       })
     }
 
-    // Sprint 3 Hotfix — Blindaje offline del login:
-    // Si ya hay sesión local válida (cliente tiene tokens en localStorage),
-    // redirect automático a /inicio sin pedir credenciales. Esto cubre el
-    // caso en que el proxy server-side empuja al médico a /login en gray
-    // zone mientras la sesión del cliente sigue intacta.
+    /* ⚠️⚠️ LA AUTORIDAD DE ESTE REDIRECT ES `getUser()`, QUE PREGUNTA AL
+       SERVIDOR. NO LA DEVUELVAS A `getSession()`: AHÍ ESTUVO EL BUCLE DE
+       RECARGA QUE AHOGABA LA PESTAÑA.
+
+       `getSession()` es una lectura LOCAL —cookie/localStorage— que sólo mira
+       el `exp` del JWT y no toca la red. Tras un `signOut({ scope: 'global' })`
+       el servidor ya borró la sesión, pero ese JWT sigue siendo
+       criptográficamente válido hasta caducar, así que `getSession()` seguía
+       contestando «hay sesión». Con esa lectura decidiendo el `router.push`,
+       esta pantalla empujaba a /inicio, el guarda de
+       `(launcher)/inicio/layout.tsx:16` —que sí usa `getUser()`— devolvía a
+       /login, y las dos se rebotaban a la velocidad de React: ~90 navegaciones
+       RSC por segundo, que sólo se curaban borrando las cookies a mano.
+
+       ⚠️ EL RESPALDO LOCAL SE QUEDA, PERO SÓLO SIN RED, que es el caso para el
+       que se escribió el «Sprint 3 Hotfix — Blindaje offline»: el proxy
+       server-side empuja al médico a /login en gray zone mientras la sesión del
+       cliente sigue intacta. Lo que NUNCA puede caer al respaldo es la
+       respuesta del servidor, venga como venga:
+        · sin sesión → `AuthSessionMissingError` (`GoTrueClient.js:1455`).
+        · sesión revocada → el 401 de `/auth/v1/user` → `AuthApiError`, o
+          `AuthSessionMissingError` si el código es `session_not_found`
+          (`lib/fetch.js:61-64`).
+       Si alguno de esos dos cae al respaldo, el bucle vuelve entero.
+
+       ⚠️⚠️ Y LA CONDICIÓN ES `navigator.onLine === false`, NO EL TIPO DE ERROR.
+       Parece más fino comprobar `AuthRetryableFetchError`, y es una trampa: la
+       misma clase se lanza para un fallo de fetch (status 0) Y PARA CUALQUIER
+       5xx DE AUTH (`lib/fetch.js:22-25`, rango 500-599). Con Supabase caído
+       pero la red viva, el respaldo empujaría a /inicio, su guarda —que también
+       consulta Auth— fallaría igual y devolvería a /login: EL MISMO BUCLE, sólo
+       que disfrazado de caída ajena. Sin red no puede cerrarse, porque la
+       navegación RSC a /inicio ni siquiera sale del navegador. */
     const supabase = createClient()
-    supabase.auth.getSession()
-      .then(({ data: { session } }: { data: { session: { user: { email: string | null } } | null } }) => {
-        if (session?.user?.email) {
-          // Sesión válida local → volver a la app sin pedir credenciales
+    /* Las anotaciones son obligatorias, no adorno: el cliente de
+       `createBrowserClient` sale sin genérico `Database`, así que `getUser()`
+       devuelve `any` y sin ellas el build falla con «implicitly has an 'any'
+       type». Es el mismo motivo por el que las tenía el código anterior. */
+    supabase.auth.getUser()
+      .then(({ data, error }: {
+        data: { user: { email: string | null } | null }
+        error: unknown
+      }) => {
+        if (data.user?.email) {
+          /* El aviso se pinta ANTES de navegar y no después: `router.push` va a
+             la red a por el RSC de /inicio, y hasta que llega esta pantalla
+             sigue a la vista. Sin esto el médico ve un formulario de login en
+             blanco durante ese hueco. */
+          setSesionActiva(data.user.email)
           router.push('/inicio')
           return
         }
-        // Sin sesión local → flujo normal de login, detectar sesión residual
-        return supabase.auth.getUser().then((res: { data: { user: { email: string } | null } }) => {
-          if (res.data.user?.email) {
-            setSesionActiva(res.data.user.email)
-          }
-        })
+        const sinRed = typeof navigator !== 'undefined' && navigator.onLine === false
+        if (error && sinRed) {
+          return supabase.auth.getSession().then(
+            ({ data: { session } }: { data: { session: { user: { email: string | null } } | null } }) => {
+              if (session?.user?.email) router.push('/inicio')
+            }
+          )
+        }
+        // El servidor dice que no hay sesión → formulario de login normal.
       })
       .catch(() => {
-        // silent — si getSession/getUser fallan (SDK offline strict),
-        // permitir el form de login normal
+        // silent — un error que no es de auth (WebCrypto, SDK offline strict)
+        // no debe dejar la pantalla colgada: se sirve el formulario.
       })
   }, [router])
 
