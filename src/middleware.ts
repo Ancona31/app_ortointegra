@@ -37,6 +37,16 @@ const PWA_PUBLIC_ASSETS = new Set([
   '/offline',  // fallback del SW — debe ser accesible sin sesión
 ])
 
+/* ⚠️ LA VIDA DE LA COOKIE DE SESIÓN — 60 DÍAS, DECISIÓN DE ANGEL (ficha SES-01
+   de `CLAUDE.md`), en vez de los 400 días del default de `@supabase/ssr`
+   (`dist/main/utils/constants.js:10`), que no eligió nadie. Este middleware
+   ESCRIBE cookies de verdad: el `getClaims()` de abajo refresca el token cuando
+   está por caducar, y las cookies nuevas salen por el `setAll` de aquí.
+   ⚠️ DUPLICADA A PROPÓSITO EN LOS TRES ESCRITORES DE COOKIES —`lib/supabase/client.ts`,
+   `lib/supabase/server.ts` y éste—. Si cambia, cambian los tres A LA VEZ, o la
+   misma cookie dura distinto según quién la escribió último. */
+const VIDA_SESION_SEG = 60 * 60 * 24 * 60
+
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname
 
@@ -60,7 +70,19 @@ export async function middleware(request: NextRequest) {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
           supabaseResponse = NextResponse.next({ request })
           cookiesToSet.forEach(({ name, value, options }) => {
-            supabaseResponse.cookies.set(name, value, options)
+            /* ⚠️ LA CONDICIÓN `> 0` ES TODO EL ARREGLO, NO UN DETALLE.
+               `maxAge: 0` es como el adaptador de ssr pide BORRAR la cookie
+               (`cookies.js:193-210`, y RFC 6265 §5.2.2: un `Max-Age` ≤ 0 la
+               caduca). Pisarlo con 60 días convertiría cada borrado en una
+               renovación y dejaría vivas cookies con el JWT y el refresh token
+               dentro. Comprueba el BORRADO, no sólo el alta.
+               ⚠️ Y NO SE HACE CON `cookieOptions.maxAge` en `createServerClient`:
+               ssr lo fusiona y acto seguido lo pisa con su propio default
+               (`cookies.js:327-331`), así que se ignoraría en silencio. */
+            const vida = typeof options?.maxAge === 'number' && options.maxAge > 0
+              ? { ...options, maxAge: VIDA_SESION_SEG }
+              : options
+            supabaseResponse.cookies.set(name, value, vida)
           })
         },
       },
@@ -216,15 +238,56 @@ export async function middleware(request: NextRequest) {
   // pasada creyendo que compensas algo — cerrarlo expulsaría a quien acaba de
   // iniciar sesión, que es el motivo por el que se abrió.
   if (!sesionValida && !isLoginPage && !isPublicPage && !isPublicApi) {
+    /* ⚠️⚠️ SE MIRA EL VALOR, NO SÓLO EL NOMBRE, Y LA EXCLUSIÓN DEL
+       `-code-verifier` NO ES COSMÉTICA: SIN ELLA HAY UNA PUERTA ABIERTA.
+
+       La prueba era `startsWith('sb-') && includes('-auth-token')`, y
+       `sb-<ref>-auth-token-code-verifier` cumple las dos. Esa cookie la escribe
+       el flujo PKCE, que `createBrowserClient` fuerza siempre
+       (`createBrowserClient.js:38`), así que un VISITANTE ANÓNIMO que pulsa
+       «olvidé mi contraseña» se queda con ella en el navegador — y desde ese
+       momento este middleware lo contaba como sesión y NO LO MANDABA NUNCA a
+       /login. Tampoco es sólo el verifier: una cookie de sesión VACÍA
+       (`nombre=; path=/`) también contaba, que es exactamente lo que quedaba
+       cuando el adaptador del cliente tiraba las `options` y no llegaba a
+       borrar nada.
+
+       ⚠️ ESTO NO REINTRODUCE LA EXPULSIÓN QUE ADVIERTE EL COMENTARIO DE ARRIBA.
+       Lo que esa nota protege es el instante posterior al login, cuando la
+       cookie de sesión ya existe pero la verificación todavía no la valida: en
+       ese instante la cookie TIENE VALOR, así que sigue dejando pasar. Lo único
+       que deja de pasar es lo que nunca fue una sesión. */
     const hasSessionCookie = request.cookies.getAll()
-      .some(c => c.name.startsWith('sb-') && c.name.includes('-auth-token'))
+      .some(c =>
+        c.name.startsWith('sb-')
+        && c.name.includes('-auth-token')
+        && !c.name.includes('-code-verifier')
+        && c.value.trim() !== ''
+      )
     if (!hasSessionCookie) {
       return NextResponse.redirect(new URL('/login', request.url))
     }
   }
 
-  // Permitir acceso a /login aunque haya sesión activa
-  // El usuario puede querer cambiar de cuenta — la página mostrará un aviso
+  /* ⚠️ AQUÍ NO SE REDIRIGE /login AUNQUE HAYA SESIÓN, Y ES DELIBERADO: LA
+     AUTORIDAD DE ESTE ARCHIVO NO ALCANZA PARA ESE REDIRECT.
+     Quien expulsa de /login a un médico con sesión es el guarda de servidor de
+     `src/app/login/layout.tsx`, que pregunta con `getUser()` — la misma
+     autoridad que su destino, `(launcher)/inicio/layout.tsx:16`. Aquí sólo hay
+     `sesionValida`, que sale de `getClaims()`: criptografía LOCAL, que da por
+     buena una sesión revocada hasta que caduca su JWT. Con ese dato, este
+     archivo mandaría a /inicio a alguien a quien /inicio devuelve a /login, y
+     las dos se rebotarían en una cadena de redirects HTTP hasta
+     ERR_TOO_MANY_REDIRECTS. Ver `CLAUDE.md` § «Autoridad de sesión».
+     NO "ahorres el viaje" trayéndote ese redirect aquí. El viaje es lo que
+     compra que no cicle.
+
+     ⚠️ LO QUE ESTO CUESTA, Y CÓMO SOBREVIVE: /login deja de ser alcanzable con
+     sesión abierta, así que ya no sirve para cambiar de cuenta sobre la marcha.
+     La capacidad no se pierde, cambia de puerta: cerrar sesión desde la barra
+     borra las cookies y /login vuelve a ser alcanzable. Las etiquetas «Cambiar
+     de cuenta» de `login/page.tsx` quedan muertas a la espera de retirarse en
+     su propia tanda. */
 
   /* LA RAÍZ, EN CAMBIO, SÍ EXPULSA A QUIEN TIENE SESIÓN, y la asimetría con las
      dos líneas de arriba es deliberada, no un olvido: `/login` existe para
@@ -247,7 +310,29 @@ export async function middleware(request: NextRequest) {
      pondría una llamada de red a Auth por cada visitante anónimo, que es
      exactamente el gasto que el bloque medido de arriba vino a quitar.
 
-     Googlebot no manda cookies, así que sigue recibiendo la landing. */
+     Googlebot no manda cookies, así que sigue recibiendo la landing.
+
+     ⚠️⚠️ PASADOR — ESTA LÍNEA ES SEGURA POR UNA PROPIEDAD QUE NO ESTÁ AQUÍ, Y SI
+     ESA PROPIEDAD CAMBIA, CICLA. No es un defecto pendiente; está escrito para
+     que el siguiente lo vea antes de tocar nada.
+     Este redirect decide con `sesionValida`, o sea con `getClaims()`, que es
+     criptografía LOCAL: da por buena una sesión REVOCADA hasta que caduca su
+     JWT. Su destino, `(launcher)/inicio/layout.tsx:16`, decide con `getUser()`,
+     que pregunta al servidor. O sea que el origen es MÁS DÉBIL que el destino,
+     y eso normalmente es la receta del bucle.
+     No cicla por una sola razón: el camino termina. Un médico con sesión
+     revocada hace `/` → /inicio → /login, y AHÍ SE PARA, porque /login es
+     sumidero — su guarda (`app/login/layout.tsx`) sólo redirige cuando
+     `getUser()` dice que SÍ hay sesión, y en este caso dice que no, así que
+     pinta el formulario. Tres saltos y para.
+     ⚠️ LO QUE LO ROMPERÍA: que /login pasara a redirigir a /inicio con una
+     autoridad más débil que la de /inicio — típicamente, "trayendo" ese
+     redirect a este archivo para ahorrar el viaje a Auth, donde lo único
+     disponible es `sesionValida`. En ese momento /login deja de ser sumidero y
+     esta línea se convierte en la entrada de un bucle infinito de redirects
+     HTTP. La regla que lo prohíbe está en `CLAUDE.md` § «Autoridad de sesión».
+     Si algún día alguien mueve el guarda de /login, este párrafo es el que hay
+     que releer. */
   if (sesionValida && pathname === '/') {
     return NextResponse.redirect(new URL('/inicio', request.url))
   }
