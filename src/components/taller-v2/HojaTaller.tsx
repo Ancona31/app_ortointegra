@@ -32,7 +32,7 @@ import type { ReactElement } from 'react'
 import PanelCircular from '@/lib/pdf/v2/PanelCircular'
 import Membrete, { type MedicoMembrete } from '@/lib/pdf/v2/Membrete'
 import TituloDocumento from '@/lib/pdf/v2/TituloDocumento'
-import BloquePaciente from '@/lib/pdf/v2/BloquePaciente'
+import BloquePaciente, { type CeldaPaciente } from '@/lib/pdf/v2/BloquePaciente'
 import Campo from '@/lib/pdf/v2/Campo'
 import RielDatos from '@/lib/pdf/v2/RielDatos'
 import BloqueNegativo from '@/lib/pdf/v2/BloqueNegativo'
@@ -147,14 +147,14 @@ const estilos = StyleSheet.create({
   },
   nota: {
     ...estiloTipografico('titulo.subtitulo'),
-    marginTop: ESPACIO[32],
+    marginTop: ESPACIO[24],
   },
   /** Separación entre muestras de componentes distintos. Es del taller. */
   seccion: {
-    marginTop: ESPACIO[48],
+    marginTop: ESPACIO[24],
   },
   muestra: {
-    marginTop: ESPACIO[32],
+    marginTop: ESPACIO[20],
   },
   /**
    * Marca de arranque: dónde empezaría el bloque siguiente. Sirve para medir el
@@ -261,6 +261,31 @@ const PACIENTE_FICTICIO = {
 
 /** Cadena para comparar familias: la misma palabra en las dos celdas vecinas. */
 const CADENA_COMPARACION = 'Gonartrosis bilateral'
+
+/**
+ * v3 · LAS FILAS DE LA FICHA LAS DECLARA EL FORMATO, no el componente.
+ *
+ * Cada fila suma 12 columnas de `RIEL_CELDA` o la ficha no llega al borde derecho.
+ * Es el cambio que retira las siete ramas de riel que 2.D llevaba cableadas dentro.
+ */
+const FICHA_2D: readonly (readonly CeldaPaciente[])[] = [
+  [
+    { campo: 'paciente', columnas: 5 },
+    { campo: 'edad', columnas: 2 },
+    { campo: 'sexo', columnas: 2 },
+    { campo: 'expediente', columnas: 3 },
+  ],
+  [{ campo: 'diagnostico', columnas: 12 }],
+]
+
+/** La misma cadena en dos celdas vecinas, para comparar familias tipográficas. */
+const FICHA_2D_COMPARACION: readonly (readonly CeldaPaciente[])[] = [
+  [
+    { campo: 'paciente', columnas: 6 },
+    { campo: 'fecha', columnas: 6 },
+  ],
+  [{ campo: 'diagnostico', columnas: 12 }],
+]
 
 /**
  * Celdas sueltas para mirar 2.F sin pasar por 2.D. Los anchos son enteros de
@@ -447,11 +472,6 @@ function encabezado2N(medico: MedicoFicticio, acento: AcentoResuelto) {
   }
 }
 
-const ARRASTRE_2N =
-  'Con lo anterior se cierra la valoración del episodio y se da por terminada la nota. ' +
-  'El paciente queda citado para revisión en ocho semanas y se le entregan por escrito los ' +
-  'datos de alarma por los que debe volver antes de esa fecha.'
-
 /** Los firmantes de un Consentimiento, para 2.L. Inventados. */
 const FIRMAS_2L: readonly Firma[] = [
   {
@@ -526,7 +546,6 @@ function HojaTaller({
             <Rotulo>2.B membrete · completo</Rotulo>
             <View style={estilos.muestra}>
               <Membrete
-                variante="completo"
                 acento={acento}
                 medico={medicoMembrete(medico)}
                 consultorio={{
@@ -538,23 +557,13 @@ function HojaTaller({
             </View>
           </View>
 
-          <View style={estilos.seccion}>
-            <Rotulo>2.B membrete · continuacion</Rotulo>
-            <View style={estilos.muestra}>
-              <Membrete
-                variante="continuacion"
-                acento={acento}
-                medico={medicoMembrete(medico)}
-              />
-            </View>
-          </View>
-
           <Text style={estilos.nota}>
-            2.B · Membrete, cerrado por 2.O · FileteGruesoFino. El segmento grueso
-            del filete mide 96 pt y es el único sitio del sistema donde el acento
-            va como barra sólida; el resto de la línea es negro y no cambia con el
-            acento. La variante «continuacion» imprime nombre y cédula principal,
-            sin panel y sin riel de consultorio.
+            2.B · Membrete, cerrado por 2.O · FileteGruesoFino. v3 · una sola
+            composición: la variante «continuacion» ya no vive aquí — la hoja de
+            continuación entera la compone 2.V · EncabezadoHoja, que es donde se
+            resuelve una vez para los nueve formatos. Lo que hay que mirar aquí es la
+            BANDA DE DIRECCIÓN: el domicilio a la izquierda se recorta con elipsis y
+            el teléfono a la derecha nunca se monta encima (defecto §1).
           </Text>
         </View>
       </Page>
@@ -567,20 +576,20 @@ function HojaTaller({
           <Rotulo>2.C titulo · fijo, con subtitulo</Rotulo>
           <View style={estilos.muestra}>
             <TituloDocumento
-              variante="fijo"
               acento={acento}
               titulo="Solicitud de laboratorio"
               subtitulo="Estudios de laboratorio clínico"
+              emision="4 ago 2026 · 11:40"
+              folio="L-B8570E3FA164"
             />
           </View>
 
-          <Rotulo>2.C titulo · variable largo, con fecha</Rotulo>
+          <Rotulo>2.C titulo · variable largo, con emision</Rotulo>
           <View style={estilos.muestra}>
             <TituloDocumento
-              variante="variable"
               acento={acento}
               titulo="Constancia de atención médica y recomendaciones laborales"
-              fecha="4 ago 2026"
+              emision="4 ago 2026"
             />
           </View>
 
@@ -599,31 +608,36 @@ function HojaTaller({
 
         <View style={estilos.contenido}>
           <View>
-            <Rotulo>fijo · membrete → titulo → arranque</Rotulo>
+            <Rotulo>con titulo · membrete → titulo → arranque</Rotulo>
             <View style={estilos.muestra}>
               <Membrete
-                variante="continuacion"
                 acento={acento}
                 medico={medicoMembrete(medico)}
+                consultorio={{
+                  domicilio: medico.domicilio,
+                  telefono: medico.telefono,
+                }}
+                panel={{ variante: 'logo', acento, logo: medico.logo }}
               />
-              <TituloDocumento
-                variante="fijo"
-                acento={acento}
-                titulo="Solicitud de laboratorio"
-              />
+              <TituloDocumento acento={acento} titulo="Solicitud de laboratorio" />
               <View style={estilos.marcaArranque} />
             </View>
           </View>
 
           <View style={estilos.seccion}>
-            <Rotulo>ausente · membrete → titulo → arranque</Rotulo>
+            <Rotulo>sin titulo · membrete → titulo → arranque</Rotulo>
             <View style={estilos.muestra}>
               <Membrete
-                variante="continuacion"
                 acento={acento}
                 medico={medicoMembrete(medico)}
+                consultorio={{
+                  domicilio: medico.domicilio,
+                  telefono: medico.telefono,
+                }}
+                panel={{ variante: 'logo', acento, logo: medico.logo }}
               />
-              <TituloDocumento variante="ausente" />
+              {/* Sin `titulo`: la variante `ausente` del Escrito Médico. */}
+              <TituloDocumento acento={acento} />
               <View style={estilos.marcaArranque} />
             </View>
           </View>
@@ -643,45 +657,47 @@ function HojaTaller({
         <View style={estilos.guiaCaja} fixed />
 
         <View style={estilos.contenido}>
-          <Rotulo>2.D paciente · completo, las siete celdas</Rotulo>
+          <Rotulo>2.D ficha · las cuatro celdas de la fila, declaradas por el formato</Rotulo>
           <View style={estilos.muestra}>
-            <BloquePaciente variante="completo" {...PACIENTE_FICTICIO} />
+            <BloquePaciente valores={PACIENTE_FICTICIO} filas={FICHA_2D} />
           </View>
 
           <View style={estilos.seccion}>
-            <Rotulo>2.D paciente · como llega hoy, sin sexo ni expediente ni hora</Rotulo>
+            <Rotulo>2.D ficha · como llega hoy, sin sexo ni expediente</Rotulo>
             <View style={estilos.muestra}>
               <BloquePaciente
-                variante="completo"
-                paciente={PACIENTE_FICTICIO.paciente}
-                edad={PACIENTE_FICTICIO.edad}
-                diagnostico={PACIENTE_FICTICIO.diagnostico}
-                fecha={PACIENTE_FICTICIO.fecha}
+                valores={{
+                  paciente: PACIENTE_FICTICIO.paciente,
+                  edad: PACIENTE_FICTICIO.edad,
+                  diagnostico: PACIENTE_FICTICIO.diagnostico,
+                }}
+                filas={FICHA_2D}
               />
             </View>
           </View>
 
           <View style={estilos.seccion}>
-            <Rotulo>2.D paciente · reducido, hojas de continuacion</Rotulo>
+            <Rotulo>2.D ficha · calibracion declaracion, la de II.7 y II.9</Rotulo>
             <View style={estilos.muestra}>
               <BloquePaciente
-                variante="reducido"
-                paciente={PACIENTE_FICTICIO.paciente}
-                expediente={PACIENTE_FICTICIO.expediente}
+                valores={PACIENTE_FICTICIO}
+                filas={FICHA_2D}
+                calibracion="declaracion"
               />
             </View>
           </View>
 
           <View style={estilos.seccion}>
-            <Rotulo>2.D paciente · comparacion de familia</Rotulo>
+            <Rotulo>2.D ficha · comparacion de familia</Rotulo>
             <View style={estilos.muestra}>
-              {/* La misma cadena en dos celdas vecinas de la fila inferior:
-                  diagnóstico en la humanista, fecha en la neo-grotesca. */}
+              {/* La misma cadena en dos celdas vecinas: diagnóstico y fecha. */}
               <BloquePaciente
-                variante="completo"
-                paciente={PACIENTE_FICTICIO.paciente}
-                diagnostico={CADENA_COMPARACION}
-                fecha={CADENA_COMPARACION}
+                valores={{
+                  paciente: PACIENTE_FICTICIO.paciente,
+                  diagnostico: CADENA_COMPARACION,
+                  fecha: CADENA_COMPARACION,
+                }}
+                filas={FICHA_2D_COMPARACION}
               />
             </View>
           </View>
@@ -760,9 +776,10 @@ function HojaTaller({
           </View>
 
           <View style={estilos.seccion}>
-            <Rotulo>2.F riel · variante una linea</Rotulo>
+            <Rotulo>2.F riel · una sola fila</Rotulo>
             <View style={estilos.muestra}>
-              <RielDatos variante="unaLinea" celdas={CELDAS_2F.fila1} />
+              {/* v3 · `unaLinea` desaparece: una fila de `celdas` compone lo mismo. */}
+              <RielDatos variante="celdas" filas={[CELDAS_2F.fila1]} />
             </View>
           </View>
 
@@ -784,9 +801,9 @@ function HojaTaller({
           </View>
 
           <View style={estilos.seccion}>
-            <Rotulo>2.D sobre 2.F · el riel del paciente, sin cambios</Rotulo>
+            <Rotulo>2.D sobre 2.F · la ficha del paciente, sin cambios</Rotulo>
             <View style={estilos.muestra}>
-              <BloquePaciente variante="completo" {...PACIENTE_FICTICIO} />
+              <BloquePaciente valores={PACIENTE_FICTICIO} filas={FICHA_2D} />
             </View>
           </View>
 
@@ -822,10 +839,10 @@ function HojaTaller({
           </View>
 
           <View style={estilos.seccion}>
-            <Rotulo>2.H negativo · badge urgente y su repeticion reducida</Rotulo>
+            <Rotulo>2.H negativo · badge urgente</Rotulo>
             <View style={[estilos.muestra, estilos.filaBloques]}>
+              {/* v3 · una sola composición: `urgenteReducido` desaparece con `Lamina`. */}
               <BloqueNegativo variante="urgente" />
-              <BloqueNegativo variante="urgenteReducido" />
             </View>
           </View>
 
@@ -846,9 +863,13 @@ function HojaTaller({
         <View style={estilos.guiaCaja} fixed />
 
         <View style={estilos.contenido}>
-          <Rotulo>2.I destacado · alarma, filete superior e izquierdo</Rotulo>
+          <Rotulo>2.I destacado · recomendaciones, filete superior fino</Rotulo>
           <View style={estilos.muestra}>
-            <BloqueDestacado variante="alarma" texto={TEXTO_2I.alarma} />
+            <BloqueDestacado
+              variante="recomendaciones"
+              encabezado="Recomendaciones generales"
+              texto={TEXTO_2I.alarma}
+            />
           </View>
 
           <View style={estilos.destacado}>
@@ -862,9 +883,9 @@ function HojaTaller({
           </View>
 
           <View style={estilos.destacado}>
-            <Rotulo>2.I destacado · cita, solo izquierdo</Rotulo>
+            <Rotulo>2.I destacado · citaEscrito, la del Escrito Médico</Rotulo>
             <View style={estilos.muestra}>
-              <BloqueDestacado variante="cita" texto={TEXTO_2I.cita} />
+              <BloqueDestacado variante="citaEscrito" texto={TEXTO_2I.cita} />
             </View>
           </View>
 
@@ -888,16 +909,14 @@ function HojaTaller({
         <View style={estilos.guiaCaja} fixed />
 
         <View style={estilos.contenido}>
-          <Rotulo>2.K contador · hoja intermedia</Rotulo>
+          <Rotulo>2.K contador · la forma la decide el render</Rotulo>
           <View style={estilos.muestra}>
-            <ContadorLista forma="intermedia" items="estudios" hoja={1} hojas={2} total={9} />
-          </View>
-
-          <View style={estilos.seccion}>
-            <Rotulo>2.K contador · hoja final</Rotulo>
-            <View style={estilos.muestra}>
-              <ContadorLista forma="final" items="estudios" total={9} />
-            </View>
+            {/*
+              v3 · `forma`, `hoja` y `hojas` desaparecen: el componente las lee de
+              `subPageNumber` / `subPageTotalPages`. En una hoja suelta como ésta sale
+              siempre la forma final; la intermedia se ve en un documento que parte.
+            */}
+            <ContadorLista items="estudios" total={9} />
           </View>
 
           <Text style={estilos.nota}>
@@ -953,11 +972,6 @@ function HojaTaller({
                 marca={entrada.marca}
                 nota={entrada.nota}
                 acento={acento}
-                // La pareja de la Receta y la Suplementación: fila normal y nota
-                // apilada bajo el ancla. La otra —`compacta` + `columna`— es la
-                // tabla de Laboratorio y se ve en su propia hoja de taller.
-                calibracion="normal"
-                disposicion="apilada"
               />
             ))}
             {/* No debe haber regla entre esta línea y la última entrada. */}
@@ -972,8 +986,6 @@ function HojaTaller({
                 primera
                 ancla="Paracetamol · Tabletas 500 mg, caja con 10"
                 acento={acento}
-                calibracion="normal"
-                disposicion="apilada"
               />
               <View style={estilos.marcaArranque} />
             </View>
@@ -1084,9 +1096,10 @@ function HojaTaller({
           <Rotulo>2.Q apertura · comparada con el filete del membrete</Rotulo>
           <View style={estilos.muestra}>
             <Membrete
-              variante="continuacion"
               acento={acento}
               medico={medicoMembrete(medico)}
+              consultorio={{ domicilio: medico.domicilio, telefono: medico.telefono }}
+              panel={{ variante: 'logo', acento, logo: medico.logo }}
             />
           </View>
 
@@ -1100,7 +1113,7 @@ function HojaTaller({
             <AperturaSeccion
               numero={2}
               de={2}
-              rotulo="Indicaciones de ingreso a piso"
+              titulo="Indicaciones de ingreso a piso"
               lector="Para personal de enfermería y médico residente"
               acento={acento}
             />
@@ -1175,7 +1188,12 @@ function HojaTaller({
           />
         </View>
 
-        <PieDocumento variante="completo" folio="RX-2026-0042" acento={acento} />
+        <PieDocumento
+          variante="completo"
+          folio="RX-2026-0042"
+          documento="Receta médica"
+          acento={acento}
+        />
       </Page>
 
       <Page size={[PAPEL.ancho, PAPEL.alto]} style={estilos.paginaFlujo}>
@@ -1200,10 +1218,7 @@ function HojaTaller({
           <BloqueFirmas variante="reticula" firmas={FIRMAS_2L} />
         </View>
 
-        <PieDocumento
-          variante="sinFolio"
-          acento={acento}
-        />
+        <PieDocumento variante="sinFolio" documento="Escrito médico" acento={acento} />
       </Page>
 
       {/*
@@ -1229,7 +1244,6 @@ function HojaTaller({
 
         <MotorFlujo
           encabezado={encabezado2N(medico, acento)}
-          arrastre={ARRASTRE_2N}
           firmas={
             <BloqueFirmas
               variante="simple"
@@ -1279,7 +1293,6 @@ function HojaTaller({
         <MotorFlujo
           encabezado={encabezado2N(medico, acento)}
           contador={{ items: 'estudios', total: SECCIONES_2N_LISTA.length }}
-          arrastre={ARRASTRE_2N}
           firmas={
             <BloqueFirmas
               variante="simple"

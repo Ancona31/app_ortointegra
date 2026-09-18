@@ -1,561 +1,145 @@
 /**
- * Sistema de documentos v2 — componente 2.I · `BloqueDestacado`.
+ * Sistema de documentos v3 — 2.I · **BloqueDestacado**. «Separar del cuerpo un pasaje
+ * que el lector debe leer aunque lea en diagonal. Se distingue por filete, NUNCA por
+ * fondo de color.»
  *
- * FUENTE DE VERDAD: `DOCUMENTOS_SPEC.md` I.2 · 2.I. Transcripción, no diseño.
+ * ── DE CUATRO VARIANTES A TRES ──────────────────────────────────────────────
  *
- * Propósito: separar del cuerpo un pasaje que el lector debe leer aunque lea en
- * diagonal. Se distingue **por filete, NUNCA por fondo de color**.
+ *   `recomendaciones`   filete superior 0.63 + encabezado. Receta, Suplementación,
+ *                       Laboratorio, Imagenología
+ *   `instrucciones`     filete superior 2 en acento + encabezado + sangría 14.
+ *                       Internamiento
+ *   `citaEscrito`       filete IZQUIERDO de 2 en negro, sin encabezado. Escrito médico
  *
- * REGLA 1 — POR QUÉ NO HAY UN SOLO `backgroundColor` EN ESTE ARCHIVO
+ * **`alarma` se elimina**: su único consumidor era la Receta y el campo que lo
+ * alimentaba no existe —`RecetaForm` tiene un solo campo de cierre, y se llama
+ * Recomendaciones generales—. Con él se va `FILETE.alarma`, que era el grosor máximo
+ * del sistema. **No se reasigna**: a qué se le da el trazo más grueso de un documento
+ * es una decisión de diseño, no un hueco que rellenar porque quedó libre.
  *
- * Ninguna variante lleva fondo. Ni al velo del acento, que es el fondo tenue que
- * I.1.8 sí admite en otros sitios. La jerarquía la carga el GROSOR del filete,
- * que es lo único que sobrevive intacto a una fotocopia: un velo al 6 % se va en
- * la primera copia y con él se iría la distinción entre las tres variantes.
+ * **`cita` de Suplementación se elimina** con el bloque de cita de control (decisión
+ * de producto), y con ella los cuatro roles `cita.*` y su ancho fijo de 294 pt.
  *
- * Es también I.3.3 —el color nunca es el único portador de significado— aplicado
- * al caso en que la distinción no es de color sino de trama: una trama que
- * desaparece deja tres bloques idénticos.
+ * ── LA PRESENCIA MÍNIMA ENTRA POR PROP, Y ES DELIBERADO ─────────────────────
  *
- * LOS TRES GROSORES SE DERIVAN, NO SE ELIGEN
+ * Este bloque es el último contenido de seis de los nueve formatos, así que es quien
+ * lleva el `minPresenceAhead` de la tabla del §9.2. Entra por prop y no se cablea aquí
+ * porque **el valor es del formato**: 88 en Laboratorio, 96 en Receta, 108 en el
+ * Consentimiento. Con una cifra propia, el bloque reservaría lo mismo detrás de una
+ * banda de cierre de una celda que detrás de una de tres.
  *
- * La jerarquía es alarma > instrucciones > cita, y entre `filete.alarma` (3 pt) y
- * `filete.cita` (1.6 pt) la escala de I.1.6 tiene un solo miembro,
- * `filete.acento` (2 pt). No había nada que decidir (`CIERRA H1`). Que
- * `filete.acento` lo usen además la cabecera de tabla y el marco del QR no
- * estorba: un grosor es un grosor.
- *
- * QUÉ LADO LLEVA FILETE
- *
- * `alarma` lleva superior E izquierdo; `instrucciones` y `cita` solo izquierdo.
- * La `cita` con filete superior que aparecía en Suplementación quedó unificada a
- * solo izquierdo (`CONCILIA D42`): es lo que la distingue de la alarma.
- *
- * **Y AHORA SON CUATRO.** `recomendaciones` entra con la lámina aprobada de Receta y
- * es la primera que lleva **solo el superior**, en `filete.regla` y
- * `tinta.reglaSuave` en vez de `tinta.negra`. Ver `VarianteDestacado`.
- *
- * EL ENCABEZADO ES UNA RANURA, Y ANTES NO EXISTÍA
- *
- * Dos de las cuatro variantes lo llevan y las dos lo componen con rol propio —9.5 /
- * 13 la alarma, 9 / 13 las recomendaciones—, medidos en esa misma lámina. Ver la
- * prop `encabezado` para por qué no entra por el texto.
- *
- * LA RANURA DE 2.J, YA CONECTADA
- *
- * La regla 4 de la ficha dice que `instrucciones` compone lista NUMERADA, no con
- * raya. Esa composición es de `ParserBloques` (2.J), y la prop `texto` de aquí ya
- * tenía su forma: UNA SOLA CADENA (`CONCILIA D10`). La ranura que quedó marcada
- * al construir este componente está ocupada — el cambio fue interno y la entrada
- * no se movió, que era lo que se dejó anunciado.
- *
- * **Las tres variantes pasan por el parser**, no solo `instrucciones`: el pasaje
- * entra como cadena en las tres y la Receta compone su alarma «con
- * `ParserBloques` dentro» (II.3 §3). Lo que cambia entre variantes es la marca de
- * lista —número en `instrucciones`, raya en las otras dos— y el rol del cuerpo.
- * Una prosa sin viñetas sale de ahí como prosa: es la degradación segura del
- * parser, no una excepción de este componente.
- *
- * Sin `'use client'`: módulo neutro, como el resto de v2.
+ * `divisible` conserva su sentido de v2: un bloque de texto largo SÍ puede partirse
+ * entre hojas —si no, un pasaje de 200 pt al pie de hoja dejaría 200 pt de blanco—,
+ * y los cortos no.
  */
 
-import { View, Text, StyleSheet } from '@react-pdf/renderer'
+import { StyleSheet, Text, View } from '@react-pdf/renderer'
 import type { ReactElement, ReactNode } from 'react'
-import ParserBloques, {
-  type CalibracionParser,
-  type RolCuerpoParser,
-} from './ParserBloques'
+import ParserBloques from './ParserBloques'
 import {
   ESPACIO,
   FILETE,
-  FILETE_SUPLEMENTACION,
   TINTA,
+  TRANSICION,
   estiloTipografico,
-  type AcentoResuelto,
-  type Lamina,
-  type RolTipograficoNombre,
 } from './tokens'
 
-/**
- * SANGRÍA DEL TEXTO RESPECTO DEL FILETE — `espacio.16` EN LAS TRES VARIANTES.
- *
- * La regla 2 de la ficha dice «la sangría del texto respecto del filete», en
- * singular, y `alarma` tiene dos filetes. La sangría se aplica a los dos: el
- * texto guarda `espacio.16` con el filete que tiene a la izquierda y, cuando
- * existe, con el que tiene encima. Leerlo como «solo el izquierdo» dejaría el
- * texto de la alarma pegado a un filete de 3 pt, que es el más grueso del bloque
- * y el que más necesita aire. Queda registrado en el anexo A (P2-16).
- *
- * `CORRIGE HANDOFF` — el bloque de alarma figuraba con 14 pt, que no es miembro
- * de la escala de espaciado. No hay razón de alineación que exija 14: la sangría
- * no se alinea con la retícula, se alinea con el filete.
- */
-const SANGRIA = ESPACIO[16]
-
-/**
- * Geometría interna de las dos composiciones que las láminas miden y la ficha no
- * declara. I.1.7: lo que es geometría de un componente vive en su ficha, aunque no
- * sea múltiplo de `espacio.base`.
- *
- * ⚠ **`D15` QUEDA COMPUESTO, NO RESUELTO.** La sangría de la alarma es **14 pt** en
- * la lámina aprobada de Receta y `espacio.16` en el chasis, que además marcaba el 14
- * como `CORRIGE HANDOFF` «porque no es múltiplo de 4». Ese argumento ya no vale —la
- * escala tiene 14 desde Imagenología— pero la decisión sigue siendo de producto: se
- * compone la de esta lámina bajo `lamina`, y el chasis no se mueve.
- *
- * El padding de la alarma **no es uniforme y eso es lo que la ficha no preveía**:
- * `6 0 8 14` reparte más aire abajo que arriba y ninguno a la derecha, mientras que
- * la lectura de la ficha —«la sangría se aplica a los dos filetes»— da 16 y 16. Son
- * dos composiciones distintas del mismo bloque, no un ajuste del mismo valor.
- */
-/**
- * El padding de la alarma de Receta, extraído del bloque de abajo para que las
- * instrucciones de Internamiento lo LEAN en vez de repetirlo. Son la misma composición
- * con otro grosor de filete; escrito dos veces, serían dos sitios que desincronizar.
- */
-const ALARMA_RECETA = { superior: 6, izquierda: ESPACIO[14], inferior: 8 } as const
-
-const GEOMETRIA = {
-  /** Alarma en la lámina de Receta: `padding: 6pt 0 8pt 14pt`. */
-  alarmaReceta: ALARMA_RECETA,
-  /**
-   * Recomendaciones generales: filete SUPERIOR de `filete.regla` en
-   * `tinta.reglaSuave` y 6 pt de aire bajo él. **Sin sangría izquierda**, que es lo
-   * que la distingue de las otras tres y lo que hace que su cuerpo mida los 486 pt
-   * de `caja.ancho` — el único bloque del sistema que usa la medida completa.
-   */
-  recomendaciones: { superior: 6 },
-  /**
-   * Aire entre el encabezado y su cuerpo. Dos valores medidos y ninguno de la
-   * escala: la alarma aprieta más porque su cuerpo pesa más (12 / 18 en 500).
-   */
-  aireCuerpo: { alarma: 3, recomendaciones: ESPACIO[4] },
-  /**
-   * LA CITA DE CONTROL DE SUPLEMENTACIÓN, Y ROMPE LO QUE `CONCILIA D42` HABÍA UNIDO.
-   *
-   * ⚠ **LLEVA FILETE SUPERIOR E IZQUIERDO**, y `D42` unificó la variante `cita` a
-   * «solo izquierdo» precisamente porque una cita con filete superior aparecía en
-   * Suplementación: era lo que la distinguía de la alarma. **La lámina la compone con
-   * los dos**, así que la unificación no describe el archivo aprobado. Se compone bajo
-   * `lamina` y el chasis no se mueve — con lo que la distinción respecto de la alarma
-   * se queda en lo que siempre fue de verdad: el grosor (1.9 contra 4) y el color del
-   * cuerpo. **Reportado, no resuelto.**
-   *
-   * El grosor es `FILETE_SUPLEMENTACION.acento`, 1.9 pt, y no `filete.cita`, que vale
-   * 1.6. Es el mismo trazo con el que esa lámina separa la celda de peso en el riel.
-   *
-   * `ancho` es del BLOQUE, no de su medida de línea: es el único destacado del sistema
-   * que no ocupa la caja entera. Y la sangría son 12 pt aplicados a los dos filetes,
-   * que es la lectura de la regla 2 que ya fijó el anexo A (P2-16) para la alarma.
-   */
-  citaSuplementacion: { sangria: ESPACIO[12], ancho: 294 },
-  /**
-   * LAS INSTRUCCIONES AL PACIENTE DE INTERNAMIENTO — **la alarma de Receta con dos
-   * puntos menos de filete**.
-   *
-   * `padding: 6 0 8 14`, que son exactamente los de `alarmaReceta`, y filete superior E
-   * izquierdo de `filete.acento` (2 pt) en vez de los 4 de `filete.alarma`. Los tres
-   * valores de padding se leen de `alarmaReceta` en vez de repetirse: son la misma
-   * composición dos escalones más abajo, y `D15` y `D21` ya lo dicen con la cifra al lado
-   * —«la sangría real del sistema es 14 pt en alarma e instrucciones».
-   *
-   * ⚠ **LLEVA FILETE SUPERIOR Y LA FICHA DECLARA SOLO EL IZQUIERDO PARA ESTA VARIANTE.**
-   * Es el mismo caso que la cita de Suplementación rompiendo `D42`: la lámina compone los
-   * dos. Se compone bajo `lamina` y el chasis no se mueve. Lo que sigue distinguiendo a
-   * las instrucciones de la alarma es el GROSOR —2 contra 4— y que su lista va numerada.
-   * Reportado.
-   */
-  instruccionesInternamiento: ALARMA_RECETA,
-  /**
-   * LA CITA DEL ESCRITO MÉDICO — **solo filete izquierdo, y con sangría 12**.
-   *
-   * Es la variante `cita` tal como `CONCILIA D42` la unificó —sin filete superior, que es lo
-   * que la distingue de la alarma— con una sangría de 12 en vez de los `espacio.16` del
-   * chasis. Su cuerpo mide entonces **472.4** —486 − 1.6 − 12— contra los 472.57 que mide la
-   * lámina: 0.17 de residuo de caja de línea.
-   *
-   * ⚠ **DOS LÁMINAS COMPONEN ESTA VARIANTE Y NO COINCIDEN.** Suplementación le pone filete
-   * superior e izquierdo a 1.9 con sangría 12 y ancho 294; esta le pone solo el izquierdo a
-   * 1.6 con sangría 12 y el ancho de la caja. Lo único que comparten es la sangría. Se
-   * compone la de cada lámina y `D42` sigue **reportado**.
-   */
-  citaEscrito: { sangria: ESPACIO[12] },
-  /**
-   * Las notas adicionales de esa misma lámina: la anatomía de `recomendaciones` con
-   * **0.63 pt de filete en vez de 0.5**. Es el mismo hairline que su regla de entrada,
-   * y por eso el valor sale de `FILETE_SUPLEMENTACION` y no se escribe aquí.
-   *
-   * ⚠ **LO QUE NO SE COMPONE DE ESE BLOQUE SON LOS MÁRGENES DE SUS PÁRRAFOS**: la
-   * lámina mide **5 pt en cada uno** y 2.J compone 4 dentro de un bloque y 8 entre
-   * bloques (`dentroDelBloque` / `entreBloques`, anexo A, P2-20). Esa escala es del
-   * parser y la comparten los cuatro destacados y las notas de los otros formatos;
-   * moverla por esta lámina, o abrirle una ranura de márgenes a 2.J, es propagar una
-   * decisión de este bloque a un componente que no la toma. **Reportado, no compuesto.**
-   */
-} as const
+export type VarianteDestacado = 'recomendaciones' | 'instrucciones' | 'citaEscrito'
 
 const estilos = StyleSheet.create({
-  /**
-   * Lo común a las cuatro. Sin `backgroundColor` (regla 1) y sin margen: la
-   * separación respecto de los bloques vecinos es del contenedor, como en 2.E.
-   *
-   * **La sangría YA NO VIVE AQUÍ.** Vive en cada estilo de filete, porque
-   * `recomendaciones` no la lleva —su filete es superior y no izquierdo, así que no
-   * hay ningún filete a la izquierda del que separarse—. Dejarla en el bloque común
-   * habría sangrado un bloque sin filete izquierdo, que es sangría sin causa.
-   */
-  bloque: {},
-  fileteAlarma: {
-    borderLeftWidth: FILETE.alarma,
-    borderLeftColor: TINTA.negra,
-    borderTopWidth: FILETE.alarma,
-    borderTopColor: TINTA.negra,
-    paddingTop: SANGRIA,
-    paddingLeft: SANGRIA,
+  recomendaciones: {
+    borderTopWidth: FILETE.tabla,
+    borderTopColor: TINTA.reglaSuave,
+    paddingTop: ESPACIO[6],
   },
-  /** La misma alarma con el padding de la lámina de Receta. Ver `GEOMETRIA`. */
-  fileteAlarmaReceta: {
-    borderLeftWidth: FILETE.alarma,
-    borderLeftColor: TINTA.negra,
-    borderTopWidth: FILETE.alarma,
-    borderTopColor: TINTA.negra,
-    paddingTop: GEOMETRIA.alarmaReceta.superior,
-    paddingLeft: GEOMETRIA.alarmaReceta.izquierda,
-    paddingBottom: GEOMETRIA.alarmaReceta.inferior,
-  },
-  fileteInstrucciones: {
-    borderLeftWidth: FILETE.acento,
-    borderLeftColor: TINTA.negra,
-    paddingLeft: SANGRIA,
-  },
-  /** Las instrucciones de Internamiento: dos filetes y el padding de la alarma. */
-  fileteInstruccionesInternamiento: {
-    borderLeftWidth: FILETE.acento,
-    borderLeftColor: TINTA.negra,
+  /** La sangría de 14 y el padding `6 0 8 14` son de la lámina, no de la escala. */
+  instrucciones: {
     borderTopWidth: FILETE.acento,
     borderTopColor: TINTA.negra,
-    paddingTop: GEOMETRIA.instruccionesInternamiento.superior,
-    paddingLeft: GEOMETRIA.instruccionesInternamiento.izquierda,
-    paddingBottom: GEOMETRIA.instruccionesInternamiento.inferior,
+    paddingTop: 6,
+    paddingBottom: 8,
+    paddingLeft: 14,
   },
-  fileteCita: {
-    borderLeftWidth: FILETE.cita,
+  citaEscrito: {
+    borderLeftWidth: FILETE.acento,
     borderLeftColor: TINTA.negra,
-    paddingLeft: SANGRIA,
+    paddingLeft: 14,
+    paddingVertical: ESPACIO[4],
   },
-  /** La misma cita con la sangría medida en la lámina de II.8. */
-  fileteCitaEscrito: {
-    borderLeftWidth: FILETE.cita,
-    borderLeftColor: TINTA.negra,
-    paddingLeft: GEOMETRIA.citaEscrito.sangria,
+  encabezado: {
+    ...estiloTipografico('recomendaciones.encabezado'),
+    marginBottom: TRANSICION.seccionParrafo,
   },
-  /** La cita de Suplementación: dos filetes, sangría de 12 y ancho propio. */
-  fileteCitaSuplementacion: {
-    borderLeftWidth: FILETE_SUPLEMENTACION.acento,
-    borderLeftColor: TINTA.negra,
-    borderTopWidth: FILETE_SUPLEMENTACION.acento,
-    borderTopColor: TINTA.negra,
-    paddingTop: GEOMETRIA.citaSuplementacion.sangria,
-    paddingLeft: GEOMETRIA.citaSuplementacion.sangria,
-    width: GEOMETRIA.citaSuplementacion.ancho,
-  },
-  /**
-   * El único filete SUPERIOR del componente, y el único que no va en `tinta.negra`.
-   * Es también el más fino de los cuatro, y eso es la jerarquía funcionando: unas
-   * recomendaciones generales se leen después de la alarma, no antes.
-   */
-  fileteRecomendaciones: {
-    borderTopWidth: FILETE.regla,
-    borderTopColor: TINTA.reglaSuave,
-    paddingTop: GEOMETRIA.recomendaciones.superior,
-  },
-  /** El mismo, 0.13 pt más grueso. Ver `GEOMETRIA` antes de fusionarlos. */
-  fileteRecomendacionesSuplementacion: {
-    borderTopWidth: FILETE_SUPLEMENTACION.regla,
-    borderTopColor: TINTA.reglaSuave,
-    paddingTop: GEOMETRIA.recomendaciones.superior,
-  },
-  encabezadoAlarma: { ...estiloTipografico('alarma.encabezado') },
-  encabezadoRecomendaciones: { ...estiloTipografico('recomendaciones.encabezado') },
-  cuerpoTrasEncabezadoAlarma: { marginTop: GEOMETRIA.aireCuerpo.alarma },
-  cuerpoTrasEncabezadoRecomendaciones: {
-    marginTop: GEOMETRIA.aireCuerpo.recomendaciones,
+  texto: {
+    ...estiloTipografico('texto.corrido'),
   },
 })
 
-/**
- * QUÉ LE PIDE CADA VARIANTE AL PARSER.
- *
- * - **Rol del cuerpo.** `alarma` compone en `alarma.cuerpo` —IBM Plex Sans 12/18,
- *   peso 500 (`CONCILIA D16`)—, un punto por encima del texto corrido (II.3 §5);
- *   es el único cuerpo del sistema con ventaja declarada sobre `texto.corrido`.
- *   Las otras dos van en el texto corrido del sistema. El rol lo declara ESTA
- *   ficha y 2.J solo pone la ranura, igual que 2.F con la excepción de celda.
- * - **Marca de lista.** Número en `instrucciones`, porque la secuencia significa
- *   algo —primero presentarse, después el ayuno (regla 4)—; raya en las otras dos,
- *   que enumeran sin orden.
- */
-interface Composicion {
-  readonly rolCuerpo: RolCuerpoParser
-  readonly marca: 'raya' | 'numero'
-  readonly rolEncabezado: RolTipograficoNombre | null
-  readonly calibracion: CalibracionParser
-}
-
-const COMPOSICION = {
-  alarma: {
-    rolCuerpo: 'alarma.cuerpo',
-    marca: 'raya',
-    rolEncabezado: 'alarma.encabezado',
-    calibracion: 'chasis',
-  },
-  instrucciones: {
-    rolCuerpo: 'texto.corrido',
-    marca: 'numero',
-    rolEncabezado: null,
-    calibracion: 'chasis',
-  },
-  cita: { rolCuerpo: 'texto.corrido', marca: 'raya', rolEncabezado: null, calibracion: 'chasis' },
-  recomendaciones: {
-    rolCuerpo: 'texto.corrido',
-    marca: 'raya',
-    rolEncabezado: 'recomendaciones.encabezado',
-    calibracion: 'chasis',
-  },
-} as const satisfies Record<VarianteDestacado, Composicion>
-
-/**
- * LAS INSTRUCCIONES DE INTERNAMIENTO CAMBIAN LAS TRES COSAS QUE LA VARIANTE DECLARA.
- *
- *   cuerpo       `instruccion.texto`, que es el texto corrido un peso por encima
- *   encabezado   `alarma.encabezado` —9.5 / 13, 600, 0.22 em—, y el chasis no le pone
- *                ninguno: hasta esta lámina, `instrucciones` era un bloque sin rótulo
- *   calibración  `internamientoInstrucciones`: riel de 14 y ordinal `01`, no `1.`
- *
- * Vive aquí y no como una quinta variante porque **es la misma variante**: mismo filete de
- * `filete.acento`, misma sangría de 14 y misma lista numerada. Lo que cambia lo declara la
- * lámina, que es el mecanismo del sistema para exactamente este caso (I.3.5).
- */
-const INSTRUCCIONES_INTERNAMIENTO: Composicion = {
-  rolCuerpo: 'instruccion.texto',
-  marca: 'numero',
-  rolEncabezado: 'alarma.encabezado',
-  calibracion: 'internamientoInstrucciones',
-}
-
-function composicionDe(variante: VarianteDestacado, lamina: Lamina): Composicion {
-  return variante === 'instrucciones' && lamina === 'internamiento'
-    ? INSTRUCCIONES_INTERNAMIENTO
-    : COMPOSICION[variante]
-}
-
-/**
- * Las CUATRO variantes. `recomendaciones` entra con la lámina de Receta y es la
- * primera cuyo filete no va a la izquierda ni en `tinta.negra`.
- *
- * **No rompe la jerarquía de grosores, la extiende por abajo:** alarma (4) >
- * instrucciones (2) > cita (1.6) > recomendaciones (0.5). Y no es un cuarto miembro
- * inventado —los cuatro grosores ya estaban en la escala de I.1.6—; lo que hacía
- * falta era el sitio donde ponerlo.
- */
-export type VarianteDestacado = 'alarma' | 'instrucciones' | 'cita' | 'recomendaciones'
-
 export interface BloqueDestacadoProps {
-  /** Cuál de las cuatro, con su grosor y su rol. */
-  variante: VarianteDestacado
+  readonly variante: VarianteDestacado
+  /** Se compone en versalita. Colapsa solo: `citaEscrito` no lleva ninguno. */
+  readonly encabezado?: string
   /**
-   * EL ENCABEZADO DEL BLOQUE, como cadena y en capitalización de oración: se compone
-   * en mayúsculas aquí, como toda versalita del sistema.
-   *
-   * **Es una prop y no un renglón del texto**, aunque `ParserBloques` sepa reconocer
-   * encabezados: los que reconoce salen en `etiqueta` —7 / 11— y las láminas
-   * componen estos dos a 9 / 13 y 9.5 / 13. Meterlos por el texto obligaría a
-   * desviar el rol de 2.J por lámina, que es propagar una decisión de este bloque a
-   * un componente que no la toma. Además son cadenas del FORMATO —«Recomendaciones
-   * generales», «Acuda de inmediato a urgencias si presenta»—, no del médico, y las
-   * cadenas del formato no viajan mezcladas con el dato.
-   *
-   * Colapsa si no viene, y con él su aire: `instrucciones` y `cita` no lo llevan.
+   * El pasaje, como UNA cadena de texto libre. La estructura —encabezados, ítems,
+   * párrafos— la decide 2.J.
    */
-  encabezado?: string
+  readonly texto?: string
+  /** Composición propia del formato, cuando el pasaje no es texto libre. */
+  readonly contenido?: ReactNode
   /**
-   * El pasaje, como UNA cadena. Es la misma forma que espera `ParserBloques`
-   * (`CONCILIA D10`), así que cuando 2.J llegue no hay que cambiar la prop: el
-   * texto entra igual y lo que cambia es quién lo compone dentro.
-   *
-   * Uno de los dos, `texto` o `contenido`. Si vienen los dos, manda `contenido`.
+   * `minPresenceAhead` de este bloque, en pt. El valor de la tabla del §9.2 del brief
+   * 00. Ver la cabecera: **es un techo, `min(valor, altoDeLoQueSigue)`**, no una reserva.
    */
-  texto?: string
-  /**
-   * COMPOSICIÓN PROPIA DEL FORMATO, EN VEZ DEL PASAJE.
-   *
-   * ⚠ **NO ES UN ATAJO PARA METER PROSA POR OTRA PUERTA.** El pasaje entra por `texto`
-   * y lo compone 2.J, y eso no cambia: si lo que tienes es un párrafo, usa `texto`.
-   *
-   * Existe por un caso y hoy tiene uno: el bloque de cita de Suplementación son
-   * **cuatro datos con cuatro roles distintos** —rótulo, fecha, plazo y nota— y ninguno
-   * es prosa. Meterlos por `texto` obligaría a que 2.J supiera distinguirlos, que es
-   * pedirle a un analizador de viñetas que analice una ficha.
-   *
-   * Lo que este bloque sigue aportando es lo suyo y es todo lo que aporta: el filete,
-   * la sangría, el ancho y el `wrap={false}`. **La tipografía del contenido NO la pone
-   * el formato**: los cuatro roles `cita.*` viven en I.1.4, que es donde un formato
-   * puede leerlos sin escribir ni un cuerpo.
-   */
-  contenido?: ReactNode
-  /** Qué lámina fija el padding de la alarma. Sin ella, la del chasis. */
-  lamina?: Lamina
-  /**
-   * El acento, y solo para la marca de lista de las composiciones que la componen en
-   * `acento.tinta` —hoy una, el ordinal de las instrucciones de II.6—. Se pasa tal cual a
-   * 2.J; sin él, la marca cae a tinta negra y el bloque se imprime igual (I.3.7).
-   */
-  acento?: AcentoResuelto
-  /**
-   * ⚠ **LEVANTA LA REGLA 3 — que este bloque no se parta entre hojas— Y TIENE UN SOLO
-   * CONSUMIDOR: las instrucciones al paciente de II.6.**
-   *
-   * ── POR QUÉ LA REGLA ES BUENA Y AQUÍ NO ─────────────────────────────────────
-   *
-   * La regla existe para pasajes ACOTADOS: una alarma de tres renglones o una cita de
-   * cuatro datos partidas por la mitad se leen mal, y cabe siempre en cualquier hueco
-   * razonable, así que no partirlas no cuesta nada.
-   *
-   * Las instrucciones de ingreso son de otra especie: **las escribe el médico y no tienen
-   * techo**. Con la regla puesta, un bloque que no cupiera en el hueco que queda bajaba
-   * ENTERO, dejaba media hoja en blanco detrás y —si algún día superara el alto de una
-   * hoja— no habría hoja donde ponerlo. Aplicar a un bloque sin techo una regla escrita
-   * para bloques cortos es lo que producía el defecto.
-   *
-   * ── QUÉ PASA CON EL MARCO AL PARTIRSE, MEDIDO SOBRE EL PDF ──────────────────
-   *
-   * **El fragmento de la hoja siguiente llega SIN MARCO: ni filete superior, ni filete
-   * izquierdo, ni la sangría de 14.** No es una decisión de diseño, es lo que hace el
-   * renderer: al partir un nodo pone a cero el borde y el padding del lado del corte, y en
-   * esta composición el resto tampoco sobrevive. Comprobado renderizando el documento con
-   * doce instrucciones y mirando la hoja 2.
-   *
-   * Lo que SÍ ata la continuación con lo anterior es el ordinal: la lista sigue en `07`,
-   * `08`… con la numeración corrida de 2.J. El encabezado no se repite —es un hijo, no un
-   * borde—, así que el bloque se nombra una vez, donde empieza.
-   *
-   * ⚠ **Si algún día hace falta que el marco continúe**, no se consigue desde aquí: habría
-   * que mover el filete del bloque a cada fila de la lista —y entonces el aire de 8 pt
-   * entre ítems lo cortaría, dejando una regla a trazos— o renunciar al marco y componer
-   * estas instrucciones como los demás bloques del formato, con filete de título. Las dos
-   * son decisiones de diseño, no de implementación.
-   *
-   * No lo pongas en `alarma` ni en `cita` sin volver a hacer este razonamiento.
-   */
-  divisible?: boolean
+  readonly presencia?: number
+  /** `true` en los pasajes largos. Sin ella, el bloque no se parte. */
+  readonly divisible?: boolean
+  /*
+    ⚠ **NO HAY `acento` AQUÍ, Y NO ES UN OLVIDO.** La entrega declaraba la prop y no la
+    consumía: ninguna de las tres variantes tiñe nada —el filete de `cita` y el de
+    `citaEscrito` son negros, y el de `recomendaciones` es el fino del sistema—, así que
+    aceptarla habría sido prometer un color que el bloque no compone. Ninguno de los cinco
+    formatos que lo montan la pasaba. Si alguna variante futura tiñe, se repone entonces.
+  */
 }
 
-/**
- * Los tres estilos de filete, como unión de los objetos inferidos por
- * `StyleSheet.create`. El tipo NO se declara como interfaz por el mismo motivo
- * que en 2.B, 2.D y 2.F: el `Style` de react-pdf lleva un índice de media queries
- * que TypeScript presta a un tipo de objeto inferido pero nunca a una interfaz.
- */
-type EstiloFilete =
-  | typeof estilos.fileteAlarma
-  | typeof estilos.fileteAlarmaReceta
-  | typeof estilos.fileteInstrucciones
-  | typeof estilos.fileteInstruccionesInternamiento
-  | typeof estilos.fileteCita
-  | typeof estilos.fileteCitaSuplementacion
-  | typeof estilos.fileteCitaEscrito
-  | typeof estilos.fileteRecomendaciones
-  | typeof estilos.fileteRecomendacionesSuplementacion
-
-/** Filete y sangría de cada variante, con la lámina que la fija. */
-function estiloFilete(variante: VarianteDestacado, lamina: Lamina): EstiloFilete {
-  const suplementacion = lamina === 'suplementacion'
-  if (variante === 'alarma') {
-    return lamina === 'receta' ? estilos.fileteAlarmaReceta : estilos.fileteAlarma
-  }
-  if (variante === 'instrucciones') {
-    return lamina === 'internamiento'
-      ? estilos.fileteInstruccionesInternamiento
-      : estilos.fileteInstrucciones
-  }
-  if (variante === 'recomendaciones') {
-    return suplementacion
-      ? estilos.fileteRecomendacionesSuplementacion
-      : estilos.fileteRecomendaciones
-  }
-  if (suplementacion) return estilos.fileteCitaSuplementacion
-  return lamina === 'escrito' ? estilos.fileteCitaEscrito : estilos.fileteCita
-}
-
-/** 2.I · `BloqueDestacado`. */
+/** 2.I · `BloqueDestacado`. Devuelve `null` sin pasaje: el bloque colapsa entero. */
 export default function BloqueDestacado({
   variante,
   encabezado,
   texto,
   contenido,
-  lamina = 'chasis',
-  acento,
+  presencia,
   divisible = false,
-}: BloqueDestacadoProps): ReactElement {
-  const composicion = composicionDe(variante, lamina)
-  const hayEncabezado = encabezado !== undefined && encabezado.trim() !== ''
-  /**
-   * El rótulo se compone con el rol que declara la composición, no con el que deduce la
-   * variante. Es lo que permite que las instrucciones de II.6 lleven el suyo sin abrir una
-   * quinta variante: los dos roles que existen son de alarma y de recomendaciones, y este
-   * bloque toma el primero.
-   */
-  const estiloEncabezado =
-    composicion.rolEncabezado === 'alarma.encabezado'
-      ? estilos.encabezadoAlarma
-      : estilos.encabezadoRecomendaciones
+}: BloqueDestacadoProps): ReactElement | null {
+  const hayTexto = texto !== undefined && texto.trim() !== ''
+  if (!hayTexto && contenido === undefined) return null
 
   return (
-    // `wrap={false}` es la regla 3: un bloque destacado no se parte entre hojas.
-    // Es el `break-inside: avoid` de la ficha y uno de los cuatro bloques
-    // indivisibles que declara 2.N (`CONCILIA D44`). `divisible` la levanta, y
-    // solo un consumidor la levanta: ver esa prop.
-    <View style={[estilos.bloque, estiloFilete(variante, lamina)]} wrap={divisible}>
-      {hayEncabezado && composicion.rolEncabezado !== null ? (
-        <Text style={estiloEncabezado}>{encabezado.toUpperCase()}</Text>
-      ) : null}
+    <View
+      style={estilos[variante]}
+      wrap={divisible}
+      minPresenceAhead={presencia}
+    >
+      {encabezado === undefined || encabezado.trim() === '' ? null : (
+        <Text style={estilos.encabezado}>{encabezado.toUpperCase()}</Text>
+      )}
 
-      {/*
-        LA RANURA DE 2.J, OCUPADA. `ParserBloques` decide qué es encabezado, qué es
-        ítem y qué es párrafo —con el lookahead, que es lo que impide que la prosa
-        salga en versalita— y en `instrucciones` compone la lista NUMERADA de la
-        regla 4. Este componente no vuelve a mirar el texto: pone el filete, la
-        sangría y el rol, y entrega la cadena entera.
-
-        El aire sobre el parser existe SOLO si hay encabezado del que separarse; sin
-        él el cuerpo arranca pegado al padding del bloque, que es lo que hacen
-        `instrucciones` y `cita`.
-      */}
-      <View
-        style={
-          !hayEncabezado || composicion.rolEncabezado === null
-            ? {}
-            : variante === 'alarma'
-              ? estilos.cuerpoTrasEncabezadoAlarma
-              : /*
-                  Las instrucciones de II.6 se quedan con el aire de recomendaciones —4 pt—
-                  y la lámina no lo mide: solo da el alto del bloque, que depende de
-                  cuántos ítems rompen a dos líneas. `DERIVADO, NO MEDIDO`.
-                */
-                estilos.cuerpoTrasEncabezadoRecomendaciones
-        }
-      >
-        {contenido ??
-          (texto === undefined ? null : (
-            <ParserBloques
-              texto={texto}
-              marca={composicion.marca}
-              rolCuerpo={composicion.rolCuerpo}
-              calibracion={composicion.calibracion}
-              acento={acento}
-            />
-          ))}
-      </View>
+      {contenido ??
+        (hayTexto ? (
+          /*
+            El texto entra por 2.J y no como un `Text` suelto: una recomendación
+            escrita con viñetas tiene que salir como lista, y quien decide eso es el
+            analizador. `ascenderEncabezados: false` — en un bloque de cierre la
+            primera línea es parte del pasaje, no su rótulo (defecto §6): el rótulo lo
+            pone `encabezado`.
+          */
+          <ParserBloques
+            texto={texto}
+            marca="raya"
+            rolCuerpo="texto.corrido"
+            ascenderEncabezados={false}
+          />
+        ) : null)}
     </View>
   )
 }

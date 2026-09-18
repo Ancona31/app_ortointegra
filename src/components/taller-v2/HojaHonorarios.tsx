@@ -33,7 +33,6 @@
  */
 
 import { Document, pdf, type DocumentProps } from '@react-pdf/renderer'
-import QRCode from 'qrcode'
 import type { ReactElement } from 'react'
 import ReciboHonorarios, {
   type ConceptoCobrado,
@@ -113,14 +112,6 @@ const FOLIO_COTIZACION = 'Q-4F17A20C93B6'
 const FOLIO_RECIBO = 'R-B8570E3FA164'
 const FOLIO_MINIMO = 'R-2C60D419E7A5'
 
-/**
- * Token de verificación INVENTADO, y lo que va dentro del QR.
- *
- * Regla 3 de 2.R: **solo el token de acceso**, nunca el folio ni datos del paciente. Se
- * genera aquí, fuera del componente, que es donde la regla se puede vigilar.
- */
-const TOKEN_VERIFICACION = 'https://spinus.com.mx/v/DEMOSTRACION-DE-TALLER'
-
 /** Las dos líneas de cédula, redactadas por quien llama (2.B no las inventa). */
 function medicoMembrete(medico: MedicoFicticio): MedicoMembrete {
   return {
@@ -156,7 +147,7 @@ type SinChasis<T> = T extends unknown
   : never
 type DatosCaso = SinChasis<ReciboHonorariosProps>
 
-function datosDelCaso(caso: CasoHonorarios, qr: string): DatosCaso {
+function datosDelCaso(caso: CasoHonorarios): DatosCaso {
   if (caso === 'cotizacion') {
     return {
       tipo_doc: 'cotizacion',
@@ -176,10 +167,9 @@ function datosDelCaso(caso: CasoHonorarios, qr: string): DatosCaso {
         { origen: 'Material e implantes', total: '$65,000.00' },
       ],
       monto: '$190,000.00',
-      divisa: 'MXN',
+      divisa: 'MXN · Pesos mexicanos',
       notas: NOTAS_COTIZACION,
       folio: FOLIO_COTIZACION,
-      qr,
     }
   }
 
@@ -189,7 +179,7 @@ function datosDelCaso(caso: CasoHonorarios, qr: string): DatosCaso {
       paciente: PACIENTE,
       lineas: CONCEPTOS_RECIBO,
       monto: '$18,400.00',
-      divisa: 'USD',
+      divisa: 'USD · Dólares estadounidenses',
       anticipo: '−$6,000.00',
       saldo: '$12,400.00',
       forma_pago: 'Transferencia electrónica',
@@ -210,15 +200,19 @@ function datosDelCaso(caso: CasoHonorarios, qr: string): DatosCaso {
   }
 }
 
+/*
+  ⚠ **NI `qr` NI `QRCode`: II.5 RETIRÓ LA ZONA DE VERIFICACIÓN DE LA COTIZACIÓN.** El
+  taller generaba el ráster y lo pasaba, y el formato ya no lo acepta. Se retira el cable
+  entero en vez de dejarlo colgando, que es como un dato muerto acaba pareciendo vivo. Si
+  la cotización vuelve a ser verificable, lo que hay que reponer es la ranura del formato.
+*/
 function HojaHonorarios({
   medico,
   acentoHex,
-  qr,
   caso,
 }: {
   medico: MedicoFicticio
   acentoHex: string
-  qr: string
   caso: CasoHonorarios
 }): ReactElement {
   const acento = resolverAcento(acentoHex)
@@ -231,7 +225,7 @@ function HojaHonorarios({
         consultorio={{ domicilio: medico.domicilio, telefono: `Tel. ${medico.telefono}` }}
         panel={{ variante: 'logo', acento, logo: medico.logo }}
         acento={acento}
-        {...datosDelCaso(caso, qr)}
+        {...datosDelCaso(caso)}
       />
     </Document>
   )
@@ -244,14 +238,10 @@ export async function generarPdfHonorarios(
   caso: string,
 ): Promise<Blob> {
   registrarFuentesV2()
-  // PNG y sin margen: `<Image>` de react-pdf solo acepta JPG, PNG o base64 (I.3.8),
-  // y el aire alrededor del código lo pone la fila de cierre, no el ráster.
-  const qr = await QRCode.toDataURL(TOKEN_VERIFICACION, { margin: 0, width: 224 })
   const elemento: ReactElement<DocumentProps> = (
     <HojaHonorarios
       medico={medico}
       acentoHex={acentoHex}
-      qr={qr}
       caso={esCaso(caso) ? caso : 'cotizacion'}
     />
   )

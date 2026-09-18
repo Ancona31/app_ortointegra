@@ -8,7 +8,7 @@
  * CUATRO CASOS, Y CADA UNO ENSEÑA UNA RAMA DISTINTA
  *
  *   completo      los cinco firmantes, tres niveles y la hoja de anexo con fotografías
- *   sin fotos     **la hoja de anexo NO aparece**: es la verificación de la decisión 5
+ *   sin anexo     **la hoja de anexo NO aparece** y el sellado baja a la que queda última
  *   sustitución   el nivel 2 desaparece, Testigos se renumera a 2 y se compone su declaración
  *   sin sellar    **sin trazabilidad**: ni pies de celda ni bloque de cierre
  *
@@ -34,9 +34,18 @@
  * el médico edita en la app. No son PII: son boilerplate del sistema, y usarlos es lo que
  * hace que el taller mida renglones de verdad y no de una lorem ipsum más corta.
  *
- * ⚠ **LAS FOTOGRAFÍAS Y LAS RÚBRICAS SON UN PNG DE 1 × 1.** El taller no tiene capturas
- * reales y no debe inventarlas: lo que se comprueba aquí es la CAJA —228 × 144 con su
- * filete de acento y su fondo— y que la imagen no se estira, no el parecido de la foto.
+ * ⚠⚠ **NINGUNA IDENTIFICACIÓN TRAE FOTOGRAFÍA, Y ES LO QUE EL MÉDICO VA A VER.**
+ *
+ * La captura de la identificación **no está cableada** (II.7 §5, segunda entrega): el
+ * formulario no la pide todavía, así que en producción `foto` llega siempre sin valor y el
+ * recuadro compone su leyenda de ausencia con el tipo y el número debajo. El taller traía
+ * un PNG de 1 × 1 haciendo de fotografía en tres de los cuatro recuadros, y como el
+ * formato aún no monta el `<Image>`, esos tres salían **vacíos y sin leyenda**: una caja
+ * con borde y nada dentro, que es justo lo que el papel de verdad nunca va a enseñar.
+ *
+ * Se retira el ráster de las cuatro. Lo que se comprueba aquí sigue siendo la CAJA —228 ×
+ * 144 con su filete de acento y su fondo—, que no cambia de tamaño por estar vacía. Las
+ * RÚBRICAS sí siguen siendo el PNG de 1 × 1: ésas el formato sí las compone.
  *
  * ⚠ **EL TEXTO CORRIDO VA JUSTIFICADO**, que es la excepción declarada a I.3.2 de este
  * formato y no una opción del taller: el interruptor con el que se comparó existió durante
@@ -45,7 +54,7 @@
  * SIN GUÍAS, como los otros seis formatos: un documento tiene que verse como un documento.
  */
 
-import { Document, pdf, type DocumentProps } from '@react-pdf/renderer'
+import { pdf, type DocumentProps } from '@react-pdf/renderer'
 import type { ReactElement } from 'react'
 import ConsentimientoInformado, {
   type IdentificacionAnexo,
@@ -111,20 +120,17 @@ const IDENTIFICACIONES: readonly IdentificacionAnexo[] = [
     nombre: 'Renata Bustamante Oceguera',
     tipo: 'Credencial para votar',
     numero: 'BUOR010412MYN04',
-    foto: RASTER,
   },
   {
     rol: 'Familiar o responsable',
     nombre: 'María Bustamante Canul',
     tipo: 'Credencial para votar',
     numero: 'BUCM780921MYN08',
-    foto: RASTER,
   },
   {
     rol: 'Testigo 1',
     nombre: 'Juan Canul Uc',
     tipo: 'Credencial para votar',
-    // Sin fotografía: el recuadro se compone igual, con su leyenda y con estos dos datos.
     numero: 'CAUJ850614HYN02',
   },
   {
@@ -132,13 +138,20 @@ const IDENTIFICACIONES: readonly IdentificacionAnexo[] = [
     nombre: 'Rosa Pech Ek',
     tipo: 'Pasaporte',
     numero: 'G12345678',
-    foto: RASTER,
   },
 ]
 
-/** Las mismas identificaciones sin ninguna fotografía: la hoja de anexo NO se imprime. */
-const IDENTIFICACIONES_SIN_FOTO: readonly IdentificacionAnexo[] =
-  IDENTIFICACIONES.map(({ rol, nombre, tipo, numero }) => ({ rol, nombre, tipo, numero }))
+/**
+ * SIN NINGUNA IDENTIFICACIÓN, que es lo único que retira la hoja de anexo.
+ *
+ * ⚠ **EL CASO CAMBIÓ DE PREGUNTA CON v3.** Antes era «las mismas sin fotografía», porque la
+ * hoja desaparecía al faltar las imágenes. En v3 el recuadro sin imagen compone su leyenda
+ * y sus dos datos —tipo y número del documento con el que se identificó quien firmó—, que
+ * es contenido y no un hueco, así que la hoja se queda. Lo que la retira es no tener a
+ * nadie que reproducir. Y entonces el bloque de trazabilidad baja a la hoja de firmas: un
+ * sello que dice que el documento no se alteró no puede tener páginas detrás.
+ */
+const SIN_IDENTIFICACIONES: readonly IdentificacionAnexo[] = []
 
 /**
  * LOS CINCO FIRMANTES, con las rúbricas MEZCLADAS. Es lo que hay que mirar: el médico
@@ -185,17 +198,17 @@ const FIRMANTES_SIN_TESTIGOS = {
 } as const
 
 /**
- * Las identificaciones SIN tipo ni número, que es como llegan hoy: el formulario captura la
- * fotografía de la credencial y nada más. El pie del recuadro colapsa entero.
+ * Las identificaciones SIN tipo ni número: el pie del recuadro colapsa entero y el
+ * recuadro se queda con su rol, su nombre y la leyenda de que no hay fotografía.
  */
 const IDENTIFICACIONES_SIN_DATOS: readonly IdentificacionAnexo[] = IDENTIFICACIONES.map(
-  ({ rol, nombre, foto }) => ({ rol, nombre, foto }),
+  ({ rol, nombre }) => ({ rol, nombre }),
 )
 
 /** Folios INVENTADOS, con el prefijo `C-` que la lámina compone. */
 const FOLIOS = {
   completo: 'C-7F41A9C0D3E2',
-  sinFotos: 'C-2B60E4F19A7C',
+  sinAnexo: 'C-2B60E4F19A7C',
   sustitucion: 'C-9D08C5A2B461',
   sinSellar: 'C-5E13B7A6C209',
   autorizaciones: 'C-84A2F70B1D5E',
@@ -219,14 +232,14 @@ function medicoMembrete(medico: MedicoFicticio): MedicoMembrete {
 /** Un caso es un documento entero, no una hoja de un documento común (ver 2.N). */
 export type CasoConsentimiento =
   | 'completo'
-  | 'sinFotos'
+  | 'sinAnexo'
   | 'sustitucion'
   | 'sinSellar'
   /** Las dos autorizaciones, con la transfusión RECHAZADA. Ver `autorizaciones` en II.7. */
   | 'autorizaciones'
   /** El caso de consulta: el papel no declara ausencias de quien no fue convocado. */
   | 'sinTestigos'
-  /** El anexo como llega hoy: fotografía sin tipo ni número. El pie colapsa. */
+  /** El anexo sin tipo ni número: el pie del recuadro colapsa y queda la leyenda. */
   | 'anexoSinDatos'
 
 const CASOS: Record<
@@ -253,10 +266,10 @@ const CASOS: Record<
     folio: FOLIOS.completo,
     autorizaTransfusion: 'si',
   },
-  sinFotos: {
-    identificaciones: IDENTIFICACIONES_SIN_FOTO,
+  sinAnexo: {
+    identificaciones: SIN_IDENTIFICACIONES,
     sellado: SELLADO,
-    folio: FOLIOS.sinFotos,
+    folio: FOLIOS.sinAnexo,
   },
   sustitucion: {
     identificaciones: IDENTIFICACIONES,
@@ -303,13 +316,18 @@ function HojaConsentimiento({
   medico: MedicoFicticio
   acentoHex: string
   caso: CasoConsentimiento
-}): ReactElement {
+}): ReactElement<DocumentProps> {
   const acento = resolverAcento(acentoHex)
   const c = CASOS[caso]
 
+  /*
+    ⚠ SIN `<Document>` ALREDEDOR, Y ES LA DIFERENCIA DE v3.
+    II.7 compone tres elementos de página —cuerpo, testigos y anexo— y por eso
+    devuelve su propio `Document`. Envolverlo en otro produce un documento dentro de
+    un documento y el renderer revienta con `Cannot read properties of null`.
+  */
   return (
-    <Document title={`Carta de consentimiento informado — taller · ${caso}`}>
-      <ConsentimientoInformado
+    <ConsentimientoInformado
         medico={medicoMembrete(medico)}
         // El teléfono llega YA ROTULADO: 2.B coloca, no rotula.
         consultorio={{ domicilio: medico.domicilio, telefono: `Tel. ${medico.telefono}` }}
@@ -319,14 +337,15 @@ function HojaConsentimiento({
         procedimiento={PROCEDIMIENTO}
         secciones={SECCIONES}
         firmantes={c.firmantes ?? FIRMANTES}
-        pacienteNoPuedeFirmar={c.pacienteNoPuedeFirmar}
-        autorizaTransfusion={c.autorizaTransfusion}
-        autorizaFotos={c.autorizaFotos}
+        pacienteNoPuedeFirmar={c.pacienteNoPuedeFirmar ?? false}
+        autorizaTransfusion={
+          c.autorizaTransfusion === undefined ? undefined : c.autorizaTransfusion === 'si'
+        }
+        autorizaFotos={c.autorizaFotos ?? false}
         identificaciones={c.identificaciones}
         sellado={c.sellado}
-        folio={c.folio}
-      />
-    </Document>
+      folio={c.folio}
+    />
   )
 }
 

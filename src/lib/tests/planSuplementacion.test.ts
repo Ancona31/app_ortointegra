@@ -46,14 +46,12 @@ import PlanSuplementacion, {
 } from '@/lib/pdf/v2/formatos/PlanSuplementacion'
 import {
   CAJA,
-  ESPACIO,
   MARGEN,
   PAPEL,
-  RIEL_CELDA,
   TIPOGRAFIA,
   resolverAcento,
   ACENTO_BASE_POR_DEFECTO,
-  FILETE_SUPLEMENTACION,
+  FILETE,
 } from '@/lib/pdf/v2/tokens'
 
 const h = React.createElement
@@ -335,7 +333,11 @@ function bordes(hoja: Hoja, ancho: number, alto: number): readonly Rectangulo[] 
  */
 function abreLaLista(hoja: Hoja): number {
   const filete = filetes(hoja, 64, 2)[0]
-  return filete.arriba - ESPACIO[5] - (TIPOGRAFIA['titulo.seccion'].interlineado ?? 0)
+  /*
+    ⚠ v3 · el aire de la cabecera de lista baja de 5 a 3, y **`ESPACIO[5]` deja de
+    existir**: la escala se reduce a nueve miembros pares.
+  */
+  return filete.arriba - 3 - (TIPOGRAFIA['titulo.seccion'].interlineado ?? 0)
 }
 
 /**
@@ -381,13 +383,6 @@ const QR_MINIMO =
  * línea de paciente de la hoja 2— y los tres tienen que decir lo mismo.
  */
 const PESO = '72.5 kg'
-
-/**
- * La geometría del bloque de cita, de `GEOMETRIA.citaSuplementacion` en 2.I. Se repite
- * aquí porque una prueba de medición tiene que poder fallar contra el componente: si se
- * leyera del propio módulo, un cambio de 294 a otra cosa pasaría inadvertido.
- */
-const GEOMETRIA_CITA = { sangria: 12, ancho: 294 } as const
 
 const COMUN = {
   medico: {
@@ -465,47 +460,50 @@ async function componer(
 }
 
 describe('II.4 · Plan de Suplementación — medido sobre el PDF', () => {
-  it('compone el encabezado en 229.875 pt desde el margen', async () => {
+  it('compone el encabezado en 178.50 pt desde el margen', async () => {
     const [hoja] = await componer(CUATRO_FILAS)
 
-    // 232.51 de la lámina − 3 del panel + 0.365 de residuo. Ver la cabecera.
-    expect(abreLaLista(hoja) - MARGEN.superior).toBeCloseTo(229.875, 2)
+    /*
+      ⚠ **ERAN 229.875 Y SON 178.50, Y ES LA MISMA CIFRA QUE EN LOS OTROS TRES.**
+      En v2 cada lámina declaraba sus propios aires de encabezado y las cuatro medían
+      distinto; con `Lamina` retirado hay UNA composición. Si esta cifra vuelve a
+      separarse de la de Receta, Imagenología o Laboratorio, alguien reintrodujo
+      geometría por formato.
+    */
+    expect(abreLaLista(hoja) - MARGEN.superior).toBeCloseTo(178.50, 2)
   }, 60_000)
 
-  it('sitúa los bloques del encabezado donde la lámina los mide', async () => {
+  it('sitúa los bloques del encabezado donde v3 los compone', async () => {
     const [hoja] = await componer(CUATRO_FILAS)
 
-    const [membrete, titulo] = filetes(hoja, 96, 2.5)
+    /*
+      ⚠ **LOS ANCLAJES CAMBIAN PORQUE LOS RECTÁNGULOS CAMBIAN.** v2 leía dos filetes de
+      96 × 2.5; en v3 el bloque de título no repite el segmento grueso y el del membrete
+      mide 72 × 2.
+    */
+    const [membrete] = filetes(hoja, 72, 2)
+    expect(membrete).toBeDefined()
+    expect(membrete.x).toBeCloseTo(MARGEN.izquierdo, 2)
 
-    // Filete del membrete: el panel abre en el margen y cierra 8 pt antes. Los 56 son
-    // los del chasis; la lámina mide 59 y ahí nacen los 3 pt.
-    expect(membrete.arriba).toBeCloseTo(MARGEN.superior + 56 + 8, 2)
-
-    // Banda de dirección: DOS renglones de 12, el segundo pegado al primero, y con
-    // cédulas y universidad — que es lo que la distingue de la de Laboratorio.
+    /*
+      LA BANDA DE DIRECCIÓN ES DE UN SOLO RENGLÓN, y eran dos apilados.
+      ⚠ **Y LA UNIVERSIDAD YA NO SE IMPRIME** (`dudas.md` §9): sigue en el tipo y los
+      nueve adaptadores la leen, pero el membrete no la compone. Queda reportado.
+    */
     const direccion = renglon(hoja, 'Av. Ficticia')
     const credenciales = renglon(hoja, 'Céd. Prof.')
-    expect(credenciales.arriba - direccion.arriba).toBeCloseTo(12, 2)
-    expect(renglon(hoja, 'Universidad Nacional')).toBeDefined()
+    expect(credenciales.arriba).toBeCloseTo(direccion.arriba, 2)
+    expect(credenciales.x).toBeGreaterThan(direccion.x)
+    expect(hoja.renglones.some((r) => r.texto.startsWith('Universidad Nacional'))).toBe(
+      false,
+    )
 
-    // De donde abre la banda al filete del título hay: 24 de banda + 12 del espaciador
-    // que cierra el membrete —que aquí NO son los 10 de Receta— + 25 del bloque de
-    // título + 5 de aire. El bloque son 25 porque lo fija el riel derecho de 210.
-    const banda = direccion.arriba - TIPOGRAFIA['medico.credencial'].cuerpo * 0.878
-    expect(titulo.arriba - banda).toBeCloseTo(24 + 12 + 25 + 5, 1)
-
-    // Las dos celdas del riel derecho, alineadas entre sí y con la emisión primero.
+    // Las dos celdas del riel de folio, alineadas y con la emisión a la izquierda.
     expect(renglon(hoja, 'EMISIÓN').x).toBeLessThan(renglon(hoja, 'FOLIO').x)
     expect(renglon(hoja, 'EMISIÓN').arriba).toBeCloseTo(renglon(hoja, 'FOLIO').arriba, 2)
-
-    // Riel de identificación: 64.875 pt —0.75 + 30 + 0.375 + 33 + 0.75—, del filete del
-    // título + 2.5 + 10 hasta donde abre la cabecera, 14 pt más arriba. Los 10 de abajo
-    // son la única cifra propia de esta lámina en el bloque de título.
-    const abreRiel = titulo.arriba + 2.5 + 10
-    expect(abreLaLista(hoja) - ESPACIO[14] - abreRiel).toBeCloseTo(64.875, 2)
   }, 60_000)
 
-  it('mide los tres altos de la entrada de dos ranuras: 48 · 28 · 66', async () => {
+  it('mide los tres altos de la entrada de dos ranuras: 39.5 · 26.5 · 39.5', async () => {
     const [hoja] = await componer(CUATRO_FILAS)
     const [conJustificacion, sinJustificacion, sinDosis] = pasos(hoja, ANCLAS)
 
@@ -515,14 +513,22 @@ describe('II.4 · Plan de Suplementación — medido sobre el PDF', () => {
       que el 0.56 de Receta—, así que aquí se comparan 48 y 28. A cada uno se le suma la
       regla de 0.63 que la entrada de abajo trae encima.
     */
-    const REGLA = FILETE_SUPLEMENTACION.regla
+    /*
+      ⚠ **LOS TRES BAJAN, Y LA REGLA ES LA DEL CHASIS.** `FILETE_SUPLEMENTACION` —el
+      grupo de grosores propio de esta lámina— se retira con `Lamina`: la regla entre
+      entradas es ahora `FILETE.regla` para los nueve formatos. Y la entrada se compone
+      con la `entrada.*` única, sin el aire de 2 pt que la justificación llevaba.
 
-    // 1 · 5 de padding + 17 de ancla + 2 + 18 de justificación + 6 de padding = 48
-    expect(conJustificacion).toBeCloseTo(48 + REGLA, 2)
+          6 + 14 de ancla + 13 de justificación + 6 + 0.5 de regla = 39.5
+    */
+    const REGLA = FILETE.regla
 
-    // 2 · sin justificación: se van su renglón Y su aire de 2. Veinte puntos.
-    expect(sinJustificacion).toBeCloseTo(conJustificacion - 20, 2)
-    expect(sinJustificacion).toBeCloseTo(28 + REGLA, 2)
+    // 1 · con justificación
+    expect(conJustificacion).toBeCloseTo(39 + REGLA, 2)
+
+    // 2 · sin justificación: se va SU RENGLÓN y nada más. Trece puntos.
+    expect(sinJustificacion).toBeCloseTo(conJustificacion - 13, 2)
+    expect(sinJustificacion).toBeCloseTo(26 + REGLA, 2)
 
     // 3 · sin dosis NO cambia el alto: el ancla es una línea con una mitad o con dos.
     expect(sinDosis).toBeCloseTo(conJustificacion, 2)
@@ -534,7 +540,7 @@ describe('II.4 · Plan de Suplementación — medido sobre el PDF', () => {
       CUATRO_FILAS[1],
     ])
     expect(pasos(conDosLineas, ['Colecalciferol', 'Magnesio'])[0]).toBeCloseTo(
-      conJustificacion + (TIPOGRAFIA['texto.corrido'].interlineado ?? 0),
+      conJustificacion + (TIPOGRAFIA['entrada.nota'].interlineado ?? 13),
       2,
     )
   }, 120_000)
@@ -551,9 +557,8 @@ describe('II.4 · Plan de Suplementación — medido sobre el PDF', () => {
     const [hoja] = await componer(CUATRO_FILAS)
 
     // Ni un solo bloque en negativo: los de 2.H miden 14.5 pt de alto y aquí no hay.
-    expect(hoja.rectangulos.filter((r) => Math.abs(r.alto - 14.5) < EPSILON)).toHaveLength(
-      0,
-    )
+    // v3 · el bloque en negativo de 2.H mide 13, y medía 14.5.
+    expect(hoja.rectangulos.filter((r) => Math.abs(r.alto - 13) < EPSILON)).toHaveLength(0)
     expect(hoja.renglones.some((r) => r.texto.startsWith('VÍA'))).toBe(false)
     expect(hoja.renglones.some((r) => r.texto === 'GENÉRICO')).toBe(false)
     expect(hoja.renglones.some((r) => r.texto === 'PRESENTACIÓN')).toBe(false)
@@ -569,59 +574,34 @@ describe('II.4 · Plan de Suplementación — medido sobre el PDF', () => {
     expect(renglon(hoja, 'Zinc').texto).toBe('Zinc')
   }, 60_000)
 
-  it('compone la celda de peso con su rótulo doble y su filete de acento', async () => {
+  it('compone el peso como una celda más de la ficha, sin rótulo doble ni acento', async () => {
     const [hoja] = await componer(CUATRO_FILAS)
 
     /*
-      LOS DOS RÓTULOS COMPARTEN RENGLÓN, y es la lectura que hace cuadrar los 33 pt de
-      la fila. Si alguien los apila, esta comprobación se rompe y el encabezado se pasa
-      diez puntos de los 232.51.
+      ⚠⚠ **LOS TRES RASGOS PROPIOS DE ESTA CELDA DESAPARECEN EN v3, Y ESO ES 2.D.**
 
-      **Lo que se compara NO son las dos líneas base**, porque no coinciden ni tienen
-      por qué: las cajas se apoyan por su borde inferior —`alignItems: 'flex-end'`, lo
-      único alineable en react-pdf (2.C, regla 3)— y con los dos interlineados iguales
-      eso alinea también sus bordes superiores. La base va a `ascendente × cuerpo` de
-      ahí, así que la del calificador queda MÁS ALTA en la diferencia de cuerpos por el
-      ascendente de Archivo, 878/1000 em. Es la misma fórmula que documenta `cajaFecha`
-      en 2.C y no un residuo que perseguir.
+      v2 componía aquí una celda de lámina: rótulo DOBLE en el mismo renglón —`PESO` y
+      `BASE DEL CÁLCULO`—, filete de acento de 1.9 pt separándola del diagnóstico, y
+      padding izquierdo propio de 0 contra los 10 del resto. Los tres salían de
+      `FILETE_SUPLEMENTACION` y de una rama de `BloquePaciente` cableada por formato.
+
+      En v3 **el peso es una celda de la ficha como las otras seis**: su rótulo es
+      `PESO`, su filete el del chasis y su padding el de todas. Lo que decía el segundo
+      rótulo —contra qué peso se calcularon las dosis— no se pierde: sube al rótulo de la
+      CABECERA DE LA LISTA, que es donde el dato gobierna lo que viene debajo.
     */
-    const ASCENDENTE_ARCHIVO = 0.878
-    /** Cuerpo del calificador, de `GEOMETRIA.peso.base` en 2.D. */
-    const CUERPO_BASE = 6.5
-    const peso = renglon(hoja, 'PESO')
-    const base = renglon(hoja, 'BASE DEL CÁLCULO')
-    expect(peso.arriba - base.arriba).toBeCloseTo(
-      ASCENDENTE_ARCHIVO * (TIPOGRAFIA.etiqueta.cuerpo - CUERPO_BASE),
-      2,
-    )
-    expect(base.x).toBeGreaterThan(peso.x)
+    expect(renglon(hoja, 'PESO')).toBeDefined()
+    expect(hoja.renglones.some((r) => r.texto === 'BASE DEL CÁLCULO')).toBe(false)
+    expect(renglon(hoja, `Dosis calculada para ${PESO}`)).toBeDefined()
 
-    // La celda abre pegada al margen: su padding izquierdo es 0 y el de la fila de
-    // arriba es 10. Es de la lámina — ver `GEOMETRIA.peso` en 2.D.
-    expect(peso.x).toBeCloseTo(MARGEN.izquierdo, 2)
-    expect(renglon(hoja, 'PACIENTE').x).toBeCloseTo(MARGEN.izquierdo + 10, 2)
-
-    // Y el valor está, con su unidad, tal como lo entrega quien llama. Por `textoDe`
-    // porque abre con cifra: ver la nota del lector.
+    // El valor está, con su unidad, tal como lo entrega quien llama.
     expect(textoDe(hoja)).toContain(PESO)
 
-    /*
-      EL FILETE DE ACENTO ENTRE PESO Y DIAGNÓSTICO. Se compone como borde izquierdo de
-      la celda de diagnóstico (2.F), así que abre donde acaba la de peso: en el margen
-      más cuatro celdas de riel. Su alto es el de la fila —33 pt, los que fija la celda
-      de peso—, que es también la comprobación de que los dos rótulos comparten renglón.
-    */
-    const acentoVertical = bordes(hoja, FILETE_SUPLEMENTACION.acento, 33)
-    expect(acentoVertical).toHaveLength(1)
-    expect(acentoVertical[0].x).toBeCloseTo(MARGEN.izquierdo + 4 * RIEL_CELDA, 2)
+    // Y la celda se rotula y se sangra como cualquier otra de la ficha.
+    expect(renglon(hoja, 'PESO').x).toBeCloseTo(renglon(hoja, 'PACIENTE').x, 2)
 
-    // Y el diagnóstico arranca detrás de él: el filete de 1.9 se lleva el sitio que en
-    // cualquier otra celda ocupa el hairline de 0.375. Es la otra cara de la misma
-    // medida, y la que se rompería si alguien dejara el grosor por defecto.
-    expect(renglon(hoja, 'DIAGNÓSTICO').x).toBeCloseTo(
-      MARGEN.izquierdo + 4 * RIEL_CELDA + FILETE_SUPLEMENTACION.acento + 10,
-      2,
-    )
+    // Ningún filete de acento vertical: el que separaba peso de diagnóstico se fue.
+    expect(bordes(hoja, FILETE.acento, 33)).toHaveLength(0)
   }, 60_000)
 
   it('sin peso colapsan la celda, el rótulo de cálculo y el filete de acento', async () => {
@@ -639,25 +619,22 @@ describe('II.4 · Plan de Suplementación — medido sobre el PDF', () => {
       paciente: { ...COMUN.paciente, peso: undefined },
     })
 
-    // Desaparecen los dos: la celda del riel y el rótulo de la cabecera.
+    // Desaparecen los dos: la celda de la ficha y el rótulo de la cabecera de lista.
     expect(sinPeso.renglones.some((r) => r.texto === 'PESO')).toBe(false)
-    expect(sinPeso.renglones.some((r) => r.texto === 'BASE DEL CÁLCULO')).toBe(false)
     expect(sinPeso.renglones.some((r) => r.texto.startsWith('Dosis calculada'))).toBe(
       false,
     )
 
-    // Y el filete de acento se va con la celda: el diagnóstico pasa a ser la primera
-    // celda viva de su fila, y una primera celda no lleva regla. Sin esto quedaría un
-    // filete de 1.9 pt dibujado contra el margen.
-    expect(
-      sinPeso.recortes.filter(
-        (r) => Math.abs(r.ancho - FILETE_SUPLEMENTACION.acento) < EPSILON,
-      ),
-    ).toHaveLength(0)
-
-    // Las celdas que quedan se ensanchan hasta llenar el riel: el diagnóstico abre
-    // ahora en el margen, no cuatro celdas más adentro.
-    expect(renglon(sinPeso, 'DIAGNÓSTICO').x).toBeCloseTo(MARGEN.izquierdo + 10, 2)
+    /*
+      Las celdas que quedan se ensanchan hasta llenar la ficha: el diagnóstico abre
+      ahora donde abría el peso. ⚠ v3 · la celda se sangra como todas —`FICHA.lateral`—
+      y no con el padding 0 que esta lámina declaraba, así que la cota es el margen más
+      esa sangría, la misma que la de `PACIENTE`.
+    */
+    expect(renglon(sinPeso, 'DIAGNÓSTICO').x).toBeCloseTo(
+      renglon(sinPeso, 'PACIENTE').x,
+      2,
+    )
     expect(renglon(conPeso, 'DIAGNÓSTICO').x).toBeGreaterThan(
       renglon(sinPeso, 'DIAGNÓSTICO').x,
     )
@@ -668,79 +645,33 @@ describe('II.4 · Plan de Suplementación — medido sobre el PDF', () => {
     )
   }, 120_000)
 
-  it('compone el bloque de cita con sus dos filetes y su texto libre', async () => {
-    /*
-      ERAN CUATRO TEXTOS Y SON DOS: el encabezado y el seguimiento. La cita entraba como
-      objeto de tres campos —`fecha` requerida, `plazo` y `nota`— y ningún formulario los
-      captura: lo que se guarda es `seguimiento`, una cadena libre, y es lo que v1 imprime
-      en su badge. Se compone como lo que es.
-    */
-    const CITA = 'Control a 3 meses, el 4 de noviembre de 2026. Traer vitamina D.'
-    const uno: readonly SuplementoIndicado[] = [
-      { nombre: 'Colecalciferol', dosis: '2 000 UI cada 24 horas' },
-    ]
+  /*
+    ⚠⚠ **`compone el bloque de cita con sus dos filetes y su texto libre` SE RETIRA.**
 
-    const [conCita] = await componer(uno, { seguimiento: CITA, notas: 'Tome con alimentos.' })
+    El bloque de cita de control desaparece en v3 con sus cuatro roles —`cita.encabezado`,
+    `cita.fecha`, `cita.plazo` y `cita.nota`—, que el diff de tokens retira. Con él se va
+    la ranura `seguimiento` del formato y del adaptador: el formulario sigue guardando la
+    clave y el expediente sigue teniéndola, pero el papel deja de imprimirla.
 
-    expect(renglon(conCita, 'CITA DE CONTROL')).toBeDefined()
-    // Por `textoDe`: la cadena es larga y el renderer la parte en varios renglones.
-    expect(textoDe(conCita)).toContain('Control a 3 meses')
-    expect(textoDe(conCita)).toContain('Traer vitamina D.')
-
-    /*
-      LOS DOS FILETES, Y `CONCILIA D42` DECÍA QUE ERA UNO. El superior mide 294 pt —el
-      ancho del bloque, que es el único destacado del sistema que no ocupa la caja
-      entera— por 1.9 de grosor; el izquierdo, 1.9 de ancho por el alto del bloque. Que
-      existan los DOS es lo que esta prueba fija: la unificación a «solo izquierdo» no
-      describe esta lámina.
-    */
-    const superior = bordes(
-      conCita,
-      GEOMETRIA_CITA.ancho,
-      FILETE_SUPLEMENTACION.acento,
-    )
-    expect(superior).toHaveLength(1)
-    expect(superior[0].x).toBeCloseTo(MARGEN.izquierdo, 2)
-
-    // El del riel también mide 1.9 de ancho y vive arriba del todo, así que se descarta
-    // por altura: lo que se busca es el que abre con el filete superior de la cita.
-    const izquierdo = conCita.recortes.filter(
-      (r) =>
-        Math.abs(r.ancho - FILETE_SUPLEMENTACION.acento) < EPSILON &&
-        r.alto > FILETE_SUPLEMENTACION.acento &&
-        r.arriba >= superior[0].arriba,
-    )
-    expect(izquierdo).toHaveLength(1)
-    expect(izquierdo[0].x).toBeCloseTo(MARGEN.izquierdo, 2)
-    expect(izquierdo[0].arriba).toBeCloseTo(superior[0].arriba, 2)
-
-    // LA SANGRÍA, que se lee en dónde arrancan los textos: el filete de 1.9 más los 12
-    // de sangría. Es lo que fija las dos cifras a la vez.
-    expect(renglon(conCita, 'CITA DE CONTROL').x).toBeCloseTo(
-      MARGEN.izquierdo + FILETE_SUPLEMENTACION.acento + GEOMETRIA_CITA.sangria,
-      2,
-    )
-
-    // Y colapsa ENTERO sin cita: ni encabezado, ni fecha, ni filetes.
-    const [sinCita] = await componer(uno, { notas: 'Tome con alimentos.' })
-    expect(sinCita.renglones.some((r) => r.texto.startsWith('CITA DE CONTROL'))).toBe(
-      false,
-    )
-    expect(
-      bordes(sinCita, GEOMETRIA_CITA.ancho, FILETE_SUPLEMENTACION.acento),
-    ).toHaveLength(0)
-    // La firma sube: el bloque se fue con su aire, no dejó el hueco.
-    expect(renglon(sinCita, 'FIRMA DEL MÉDICO').arriba).toBeLessThan(
-      renglon(conCita, 'FIRMA DEL MÉDICO').arriba,
-    )
-  }, 180_000)
+    **Es una pérdida de contenido, no una simplificación de maqueta**, y por eso queda
+    escrita aquí y no sólo borrada: el médico escribe ahí cuándo quiere volver a ver al
+    paciente. Reportado para decidir si vuelve —y entonces esta prueba vuelve con ella— o
+    si el dato pasa a `notas`.
+  */
 
   it('reparte la fila de cierre: firma a la izquierda y verificación a la derecha', async () => {
     const paginas = await componer(CUATRO_FILAS)
     const hoja = paginas[paginas.length - 1]
 
     // La firma abre en el margen izquierdo, que es donde la lámina la sitúa.
-    expect(renglon(hoja, 'FIRMA DEL MÉDICO').x).toBeCloseTo(MARGEN.izquierdo, 2)
+    /*
+      ⚠ v3 · la celda del médico va SIN rótulo (brief 00 §6.1): quien firma lo dicen su
+      nombre y sus cédulas. El nombre sale dos veces en la hoja —membrete y firma—, así
+      que se toma el último: el orden de dibujo sigue al del árbol.
+    */
+    expect(hoja.renglones.some((r) => r.texto.startsWith('FIRMA DEL MÉDICO'))).toBe(false)
+    const nombres = hoja.renglones.filter((r) => r.texto === COMUN.medico.nombre)
+    expect(nombres[nombres.length - 1].x).toBeCloseTo(MARGEN.izquierdo, 2)
     // Y el rótulo es el de ESTA lámina, no el de las dos solicitudes (`D14`).
     expect(hoja.renglones.some((r) => r.texto.startsWith('FIRMA Y SELLO'))).toBe(false)
 
@@ -800,18 +731,20 @@ describe('II.4 · Plan de Suplementación — medido sobre el PDF', () => {
     }))
     const hojas = await componer(lista, {
       notas: 'Tome los suplementos con alimentos y separados de cualquier antibiótico.',
-      seguimiento: 'Control a 3 meses, el 4 de noviembre de 2026.',
     })
     expect(hojas.length).toBeGreaterThan(1)
 
     /*
       EL PASO, SUMADO DE SUS PARTES y no copiado de una medición: padding de la fila, ancla,
-      aire de la justificación, sus dos renglones, padding inferior y la regla que separa de
-      la siguiente. Es la misma cuenta que fija la prueba de los tres altos, más la regla.
+      los dos renglones de la justificación, padding inferior y la regla que separa de la
+      siguiente. Es la misma cuenta que fija la prueba de los tres altos, más un renglón.
+
+      ⚠ v3 · el aire de 2 pt entre el ancla y la justificación desaparece con la
+      calibración por lámina, y la nota se compone con `entrada.nota` (9.5 / 13) y no con
+      `texto.corrido`.
     */
     const esperado =
-      5 + 17 + 2 + 2 * (TIPOGRAFIA['texto.corrido'].interlineado ?? 0) + 6 +
-      FILETE_SUPLEMENTACION.regla
+      6 + 14 + 2 * (TIPOGRAFIA['entrada.nota'].interlineado ?? 13) + 6 + FILETE.regla
 
     for (const [indice, hoja] of hojas.entries()) {
       const anclas = hoja.renglones
@@ -824,15 +757,14 @@ describe('II.4 · Plan de Suplementación — medido sobre el PDF', () => {
     }
   }, 200_000)
 
-  it('reparte nueve suplementos en 6 y 3, con todo el cierre en la hoja 2', async () => {
+  it('reparte quince suplementos, con todo el cierre en la última hoja', async () => {
     /*
-      EL REPARTO DE LA LÁMINA. Nueve suplementos del estado más caro —ancla y
-      justificación de dos líneas— caen 6 y 3, y la hoja 2 se queda con las notas, la
-      cita, la firma y el QR.
+      EL REPARTO. ⚠ **ERAN NUEVE Y REPARTÍAN 6 + 3; en v3 los nueve caben en una hoja** y
+      la prueba se quedaba sin hoja 2 que medir. La entrada cara baja de 66 a 52.5 y el
+      encabezado de 229.875 a 178.50, así que se sube el caso hasta que vuelve a partir.
 
-      Cabe uno más por hoja que en Receta con siete, y no es casualidad: la fila cara de
-      aquella mide 89 pt y esta 66, y su encabezado pesa 220.88 contra los 229.875 de
-      este. La lista es más ligera aunque el encabezado sea más pesado.
+      La cifra es CONSECUENCIA: lo que la prueba fija es que la lista reparte y que el
+      cierre entero —notas, firma y código— cae en la última hoja, nunca a medias.
     */
     const caro = (i: number): SuplementoIndicado => ({
       nombre: `Suplemento ${i}`,
@@ -841,28 +773,30 @@ describe('II.4 · Plan de Suplementación — medido sobre el PDF', () => {
     })
     const cierre = {
       notas: 'Tome los suplementos con alimentos y separados de cualquier antibiótico.',
-      seguimiento: 'Control a 3 meses, el 4 de noviembre de 2026.',
     }
-    const lista = Array.from({ length: 9 }, (_, i) => caro(i))
+    const lista = Array.from({ length: 15 }, (_, i) => caro(i))
 
     const paginas = await componer(lista, cierre)
     expect(paginas).toHaveLength(2)
 
     const enHoja = (i: number): number =>
       paginas[i].renglones.filter((r) => /^Suplemento \d/.test(r.texto)).length
-    expect(enHoja(0)).toBe(6)
-    expect(enHoja(1)).toBe(3)
+    // El reparto exacto es consecuencia; lo que se fija es que reparte y que suman 15.
+    expect(enHoja(0)).toBeGreaterThan(0)
+    expect(enHoja(1)).toBeGreaterThan(0)
+    expect(enHoja(0) + enHoja(1)).toBe(15)
 
     // La hoja 1 no lleva nada del cierre: es lo que el motor hace posible.
     expect(paginas[0].renglones.some((r) => r.texto.startsWith('NOTAS ADICIONALES'))).toBe(
       false,
     )
-    expect(paginas[0].renglones.some((r) => r.texto.startsWith('CITA DE CONTROL'))).toBe(
-      false,
-    )
     expect(renglon(paginas[1], 'NOTAS ADICIONALES')).toBeDefined()
-    expect(renglon(paginas[1], 'CITA DE CONTROL')).toBeDefined()
-    expect(renglon(paginas[1], 'FIRMA DEL MÉDICO')).toBeDefined()
+    /*
+      v3 · la celda del médico va sin rótulo: la sonda es su línea de credencial. En la
+      hoja de CONTINUACIÓN el membrete no la compone —son 37 pt cerrados—, así que la
+      única que sale es la de la firma.
+    */
+    expect(renglon(paginas[1], 'Céd. Prof. 7000001')).toBeDefined()
     expect(renglon(paginas[1], 'VERIFICACIÓN')).toBeDefined()
 
     /*
@@ -873,4 +807,5 @@ describe('II.4 · Plan de Suplementación — medido sobre el PDF', () => {
     expect(renglon(paginas[1], 'Paciente · ')).toBeDefined()
     expect(textoDe(paginas[1])).toContain(`Peso ${PESO}`)
   }, 300_000)
+
 })

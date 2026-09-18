@@ -1,26 +1,25 @@
 /**
- * 2.B · El nombre del médico en el MEMBRETE — **la prueba del cuerpo ajustado.**
+ * 2.B · El nombre del médico en el MEMBRETE.
  *
- * QUÉ DEFIENDE
+ * ── QUÉ DEFENDÍA ESTA PRUEBA EN v2, Y POR QUÉ CAMBIA ────────────────────────
  *
- * El nombre se componía a 26 pt fijos en una caja de 412, así que uno largo partía en
- * dos renglones y la fila superior crecía de 56 a 75 pt. Esos 19 pt bajaban a TODO el
- * contenido, y en los NUEVE formatos, porque `Membrete` es chasis compartido.
+ * El nombre se componía a 26 pt en una caja de 412, así que uno largo partía en dos
+ * renglones y la fila superior crecía de 56 a 75 pt: 19 pt que bajaban a TODO el
+ * contenido en los nueve formatos. v2 lo cerró DERIVANDO el cuerpo del ancho compuesto
+ * (`cuerpoDelNombre()`), con techo en el cuerpo del rol y piso en el del rótulo del
+ * documento.
  *
- * Ahora el cuerpo se deriva del ancho compuesto (`cuerpoDelNombre()`), con techo en el
- * cuerpo declarado del rol y piso en el del rótulo del documento. Esta prueba mide el
- * PDF real y comprueba las cuatro cosas que pueden romperse:
+ * ⚠ **EN v3 ESE ALGORITMO SE RETIRA, Y NO ES UNA REGRESIÓN.** Los dos roles bajan a 15
+ * —`medico.nombre` y `titulo.documento`—, así que techo y piso coinciden y la función
+ * devolvería siempre la misma cifra: el intervalo se cerró solo. El nombre va a **15 pt
+ * fijos con `maxLines: 1` y elipsis**, que resuelve el mismo defecto sin calcular nada.
+ * `cuerpoDelNombre()`, `NOMBRE_MEMBRETE` y `metricasNombre.ts` quedan en el repo sin
+ * consumidor (`dudas.md` §3).
  *
- *   1. que un nombre que cabía a 26 sigue saliendo EXACTAMENTE igual
- *   2. que el largo deja de partir y la fila recupera sus 56 pt, sin empuje
- *   3. que el panel de identidad no se mueve —su centrado depende del alto de fila—
- *   4. que la tabla de métricas sigue correspondiendo a la fuente del repo
- *
- * LA CUARTA ES LA QUE ENVEJECE. `metricasNombre.ts` es un archivo GENERADO desde
- * `Archivo-SemiBold.ttf`; si alguien repone el TTF y no vuelve a correr
- * `scripts/generar-metricas-nombre.mjs`, el cuerpo elegido dejaría de corresponder al
- * ancho real y nada lo diría. Aquí se concilia la tabla contra el ancho que compone el
- * renderer, que es la única forma de que ese desfase se note.
+ * Las cinco cotas que medían el algoritmo describían la maqueta vieja y se reescriben
+ * contra el render nuevo. **Lo que defienden sigue siendo lo mismo y es lo que importa:
+ * que el nombre NO parta y que la fila NO crezca con él.** Las tres que ya lo medían
+ * así —la fila, el panel y la especialidad— se conservan.
  *
  * Lector de coordenadas: el mismo de `recetaMedica.test.ts`. Ver su cabecera.
  */
@@ -35,12 +34,9 @@ import RecetaMedica, {
   type MedicamentoRecetado,
   type RecetaMedicaProps,
 } from '@/lib/pdf/v2/formatos/RecetaMedica'
-import { cuerpoDelNombre } from '@/lib/pdf/v2/Membrete'
-import { avanceRelativo } from '@/lib/pdf/v2/metricasNombre'
 import { PANEL_DIAMETRO } from '@/lib/pdf/v2/PanelCircular'
 import {
   CAJA,
-  NOMBRE_MEMBRETE,
   PAPEL,
   TIPOGRAFIA,
   estiloTipografico,
@@ -375,44 +371,52 @@ function renglonesDelNombre(hoja: Hoja, nombre: string): number {
 }
 
 describe('2.B · nombre del médico en el membrete', () => {
-  it('la tabla de métricas concilia con el ancho que compone el renderer', async () => {
+  /*
+    ⚠ LA CONCILIACIÓN DE `metricasNombre.ts` SE RETIRA CON SU CONSUMIDOR.
+    Era la sonda que detectaba una tabla de métricas obsoleta frente al TTF del repo, y
+    sólo tenía sentido mientras alguien eligiera el cuerpo con esa tabla. Sin
+    `cuerpoDelNombre()` no hay elección que conciliar: el archivo generado queda inerte y
+    una prueba que lo vigile mide código sin consumidores. Si el algoritmo vuelve —haría
+    falta declarar un piso real, ver `dudas.md` §3—, esta prueba vuelve con él.
+  */
+
+  it('el cuerpo del nombre NO depende del nombre: su base cae en el mismo sitio', async () => {
     /*
-      LA SONDA QUE DETECTA UNA TABLA OBSOLETA. `metricasNombre.ts` se genera desde el
-      TTF; si el TTF cambia y nadie regenera, esto falla. La tolerancia es de 0.1 pt
-      —el error de la tabla frente al renderer, medido sobre once nombres reales—, no
-      un margen cómodo puesto a ojo.
+      ⚠ LA COTA QUE SUSTITUYE A `un nombre que cabe a 26 no se mueve`.
+      Aquella comprobaba que `cuerpoDelNombre()` devolvía el techo para un nombre corto.
+      Sin algoritmo, lo que hay que vigilar es lo contrario y es más fuerte: que el
+      cuerpo sea el mismo para CUALQUIER nombre. La línea base del renglón es el testigo
+      —`lineHeight` es un ratio, así que un cuerpo distinto la movería— y se compara el
+      corto contra el extremo de 74 caracteres, que es el que más tentaría a encogerlo.
     */
-    for (const nombre of [CORTO, LARGO, MUY_LARGO, EXTREMO]) {
-      const cuerpo = 26
-      const rol = TIPOGRAFIA['medico.nombre']
-      const previsto =
-        cuerpo *
-        (avanceRelativo(nombre) / 1000 + rol.tracking * [...nombre].length)
-      expect(await anchoReal(nombre, cuerpo), nombre).toBeCloseTo(previsto, 1)
-    }
+    const corto = (await componer(CORTO))[0]
+    const extremo = (await componer(EXTREMO))[0]
+    expect(renglonesDelNombre(corto, CORTO)).toBe(1)
+    expect(renglon(extremo, EXTREMO.split(' ')[0]).arriba).toBeCloseTo(
+      renglon(corto, CORTO.split(' ')[0]).arriba,
+      2,
+    )
   }, 200_000)
 
-  it('un nombre que cabe a 26 no se mueve: mismo cuerpo y una sola línea', async () => {
-    expect(cuerpoDelNombre(CORTO, DISPONIBLE)).toBe(NOMBRE_MEMBRETE.techo)
-    const hoja = (await componer(CORTO))[0]
-    expect(renglonesDelNombre(hoja, CORTO)).toBe(1)
-  }, 200_000)
-
-  it('el nombre largo cabe en UNA línea y no supera el ancho disponible', async () => {
-    for (const nombre of [LARGO, MUY_LARGO]) {
-      const cuerpo = cuerpoDelNombre(nombre, DISPONIBLE)
-      expect(cuerpo, nombre).toBeLessThan(NOMBRE_MEMBRETE.techo)
-      expect(cuerpo, nombre).toBeGreaterThanOrEqual(NOMBRE_MEMBRETE.piso)
-      // Lo que importa: al cuerpo elegido, el ancho compuesto CABE.
-      expect(await anchoReal(nombre, cuerpo), nombre).toBeLessThanOrEqual(DISPONIBLE)
+  it('NINGÚN nombre parte a dos renglones, ni el extremo de 74 caracteres', async () => {
+    /*
+      ⚠ ES LA COTA QUE HEREDA DE LAS DOS DE v2, y ahora cubre también el extremo.
+      Con el algoritmo, al llegar al piso un nombre de ~70 caracteres TODAVÍA no cabía y
+      se le dejaba partir: era el caso aceptado. Con 15 pt y elipsis ya no hay caso
+      aceptado — el que no cabe se recorta, y la fila nunca crece.
+    */
+    for (const nombre of [CORTO, INTERMEDIO, LARGO, MUY_LARGO, EXTREMO]) {
       expect(renglonesDelNombre((await componer(nombre))[0], nombre), nombre).toBe(1)
     }
   }, 200_000)
 
-  it('el piso no se cruza: al extremo se le deja partir, como antes', async () => {
-    expect(cuerpoDelNombre(EXTREMO, DISPONIBLE)).toBe(NOMBRE_MEMBRETE.piso)
-    // Y al piso todavía no cabe: por eso parte. Es el caso aceptado de ~70 caracteres.
-    expect(await anchoReal(EXTREMO, NOMBRE_MEMBRETE.piso)).toBeGreaterThan(DISPONIBLE)
+  it('el nombre compuesto no supera el ancho disponible del membrete', async () => {
+    const cuerpo = TIPOGRAFIA['medico.nombre'].cuerpo
+    for (const nombre of [CORTO, INTERMEDIO, LARGO, MUY_LARGO]) {
+      expect(await anchoReal(nombre, cuerpo), nombre).toBeLessThanOrEqual(DISPONIBLE)
+    }
+    // El extremo NO cabe ni a 15: es el que ejercita la elipsis.
+    expect(await anchoReal(EXTREMO, cuerpo)).toBeGreaterThan(DISPONIBLE)
   }, 200_000)
 
   it('la fila del membrete no crece: el empuje de 19 pt desaparece', async () => {
@@ -433,23 +437,20 @@ describe('2.B · nombre del médico en el membrete', () => {
     }
   }, 200_000)
 
-  it('la especialidad sube 2.2 pt, y es la consecuencia buscada', async () => {
+  it('la especialidad NO se mueve: el cuerpo del nombre ya no cambia', async () => {
     /*
-      ⚠ **ESTO NO ES UNA FUGA DEL EMPUJE: ES EL INTERLINEADO PROPORCIONAL FUNCIONANDO.**
-      Al encoger el cuerpo, el renglón del nombre mide menos —`lineHeight` es un RATIO,
-      así que baja con él— y el bloque nombre+especialidad pasa de 47 a 42.6 pt. Como la
-      fila lo centra verticalmente (`alignItems: 'center'`), el bloque se reparte la
-      diferencia y la especialidad sube (47 − 42.6) / 2 = 2.2 pt.
-
-      La fila sigue midiendo 56 —lo dice el panel, que no se mueve— y por eso NADA de lo
-      que viene debajo se entera. Queda medido en vez de tapado: si algún día esta cifra
-      cambia, es que cambió el centrado o el ratio, y conviene enterarse.
+      ⚠ **ERA UNA COTA DE 2.21 pt Y AHORA ES CERO, y el cambio es el esperado.**
+      En v2 el cuerpo encogía con el nombre, el renglón medía menos —`lineHeight` es un
+      ratio— y el bloque nombre+especialidad pasaba de 47 a 42.6 pt; como la fila lo
+      centra, la especialidad subía la mitad de la diferencia. En v3 el cuerpo es fijo,
+      así que el bloque mide lo mismo con cualquier nombre y nada se mueve. Si esta
+      diferencia dejara de ser cero, alguien reintrodujo un cuerpo variable.
     */
     const corto = (await componer(CORTO))[0]
     const largo = (await componer(LARGO))[0]
-    const delta = renglon(corto, 'Ortopedia').arriba - renglon(largo, 'Ortopedia').arriba
-    expect(delta).toBeGreaterThan(0)
-    expect(delta).toBeCloseTo(2.21, 1)
+    // v3 · 2.B la compone en versalita, así que la sonda va en mayúsculas.
+    const delta = renglon(corto, 'ORTOPEDIA').arriba - renglon(largo, 'ORTOPEDIA').arriba
+    expect(delta).toBeCloseTo(0, 2)
   }, 200_000)
 
   it('el panel de identidad no se mueve', async () => {
@@ -464,13 +465,11 @@ describe('2.B · nombre del médico en el membrete', () => {
     expect(renglon(largo, 'EM').arriba).toBeCloseTo(renglon(corto, 'EM').arriba, 2)
   }, 200_000)
 
-  it('con panel oculto el disponible es la caja entera', () => {
-    /*
-      Regla 4 de 2.A: sin panel no hay panel NI medianil. Si esto se restara siempre,
-      un membrete sin panel encogería el nombre sin necesidad. `MUY_LARGO` es el
-      testigo: con panel se encoge, sin panel cabe a 26.
-    */
-    expect(cuerpoDelNombre(INTERMEDIO, DISPONIBLE)).toBeLessThan(NOMBRE_MEMBRETE.techo)
-    expect(cuerpoDelNombre(INTERMEDIO, CAJA.ancho)).toBe(NOMBRE_MEMBRETE.techo)
-  })
+  /*
+    ⚠ `con panel oculto el disponible es la caja entera` SE RETIRA.
+    Medía `cuerpoDelNombre()` con dos anchos distintos para comprobar que sin panel no se
+    restaba ni el panel ni su medianil. Sin cuerpo variable, el ancho disponible ya no
+    decide nada sobre la composición del nombre: la regla 4 de 2.A la vigila la prueba de
+    2.A, que es donde vive el panel.
+  */
 })

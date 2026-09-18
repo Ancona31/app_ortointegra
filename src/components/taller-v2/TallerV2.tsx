@@ -234,14 +234,14 @@ const CASOS_INTERNAMIENTO: readonly EntradaCaso[] = [
  */
 const CASOS_CONSENTIMIENTO: readonly EntradaCaso[] = [
   { caso: 'completo', etiqueta: 'Completo', nota: 'Cinco firmantes, tres niveles y anexo' },
-  { caso: 'sinFotos', etiqueta: 'Sin fotos', nota: 'La hoja de anexo NO aparece' },
+  { caso: 'sinAnexo', etiqueta: 'Sin anexo', nota: 'Sin identificaciones: la hoja NO aparece y el sellado baja' },
   { caso: 'sustitucion', etiqueta: 'Sustitución', nota: 'Sin nivel 2: Testigos pasa a 2' },
   { caso: 'sinSellar', etiqueta: 'Sin sellar', nota: 'Sin sellos: nada que sellar' },
   // Los cuatro de la reconciliación con v1. Cada uno enseña algo que v2 no componía.
   { caso: 'autorizaciones', etiqueta: 'Autorizaciones', nota: 'Transfusión RECHAZADA y fotos' },
   { caso: 'sinTestigos', etiqueta: 'Sin testigos', nota: 'El cierre NO declara ausencias' },
   { caso: 'representante', etiqueta: 'Representante', nota: 'La celda cambia de rótulo' },
-  { caso: 'anexoSinDatos', etiqueta: 'Anexo sin datos', nota: 'El pie colapsa: solo la foto' },
+  { caso: 'anexoSinDatos', etiqueta: 'Anexo sin datos', nota: 'El pie colapsa: queda la leyenda' },
 ]
 
 /**

@@ -295,6 +295,21 @@ export function envolver(titulo: string, hoja: ReactElement): ReactElement<Docum
 }
 
 /**
+ * Para el formato que compone su propio `Document` —hoy sólo II.7, con sus hojas de
+ * testigos y de anexo como `Page` propios—. **Registra las fuentes igual**: es lo
+ * único que `envolver()` hacía además de envolver, y sin ello el documento sale con
+ * la fuente por defecto del renderer y **no falla**.
+ *
+ * No lleva `titulo`: lo pone el componente en su propio `Document`.
+ */
+export function envolverDocumento(
+  documento: ReactElement<DocumentProps>,
+): ReactElement<DocumentProps> {
+  registrarFuentesV2()
+  return documento
+}
+
+/**
  * Las cuatro piezas que los nueve formatos reciben igual. Se arman una vez por
  * documento porque el acento se deriva con tres conversiones de color y el panel
  * lo necesita ya resuelto.

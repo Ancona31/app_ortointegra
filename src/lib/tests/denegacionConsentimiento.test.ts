@@ -34,10 +34,9 @@ import DenegacionConsentimiento, {
 } from '@/lib/pdf/v2/formatos/DenegacionConsentimiento'
 import { MARCO } from '@/lib/pdf/v2/MarcoParcial'
 import {
-  CAJA,
+  CIERRE,
   ESPACIO,
   FILETE,
-  FIRMA,
   MARGEN,
   PAPEL,
   TIPOGRAFIA,
@@ -226,6 +225,8 @@ const RASTER =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='
 
 const BASE: DenegacionConsentimientoProps = {
+  // v3 · requerida: el formato no adivina si la denegación fue por sustitución.
+  sustitucion: false,
   medico: {
     nombre: 'Dra. Elena Marin Solis',
     especialidad: 'Ortopedia y Traumatologia',
@@ -256,7 +257,19 @@ const BASE: DenegacionConsentimientoProps = {
 }
 
 /** Por sustitución: aparece la constancia y la retícula baja a dos columnas. */
-const SUSTITUCION: DenegacionConsentimientoProps = { ...BASE, sustitucion: true }
+/**
+ * ⚠ v3 · **EL MOTIVO VUELVE A SER UN DATO, y en v2 era una fórmula cableada.**
+ * El formato ya no redacta «Imposibilidad física para firmar»: compone lo que el médico
+ * asienta, que llega por `data.motivoNoFirma` (`dudas.md` §15). Sin el dato, el bloque
+ * colapsa entero y el documento sale como salía antes de que existiera el campo.
+ */
+const MOTIVO = 'Imposibilidad física para firmar por fractura de la mano derecha.'
+
+const SUSTITUCION: DenegacionConsentimientoProps = {
+  ...BASE,
+  sustitucion: true,
+  motivo: MOTIVO,
+}
 
 /** El mismo documento con el familiar VACÍO: su celda no colapsa, deja la línea. */
 const FAMILIAR_VACIO: DenegacionConsentimientoProps = {
@@ -348,7 +361,11 @@ function encabezado(hoja: Hoja): number {
     MARGEN.superior -
     ESPACIO[12] -
     FILETE.acento -
-    MARCO.declaracion.padding.superior -
+    /*
+      ⚠ v3 · `MARCO.declaracion` desaparece: los dos paddings que quedan en 2.U son
+      `aseguradora` y `leyenda`, y este documento compone el suyo con `leyenda`.
+    */
+    MARCO.leyenda.superior -
     ASCENDENTE_PLEX * TIPOGRAFIA['seccion.parrafo'].cuerpo
   )
 }
@@ -384,10 +401,24 @@ function finDelContenido(hoja: Hoja): number {
   )
 }
 
-/** El ancho de celda que la retícula reparte, por número de columnas. Ver `anchoDeCelda` en 2.L. */
-const MEDIANIL_FIRMAS = 30
-const CELDA_TRES = (CAJA.ancho - MEDIANIL_FIRMAS * 2) / 3
-const CELDA_DOS = (CAJA.ancho - MEDIANIL_FIRMAS) / 2
+/**
+ * El ancho de celda de la banda de cierre.
+ *
+ * ⚠ **v3 · LA RETÍCULA REPARTE SIEMPRE EN TERCIOS, TENGA LAS CELDAS QUE TENGA.** En v2 el
+ * ancho lo decidía el NÚMERO de firmantes —tres de 142 o dos de 228, con medianil de 30—;
+ * en v3 la variante `reticula` compone celdas de `CIERRE.tercio` (168) con el medianil
+ * único de 18, así que dos firmantes ocupan dos tercios y dejan el tercero libre en vez de
+ * ensancharse.
+ *
+ * La SUSTITUCIÓN es otra cosa: ahí el formato pide `pareja`, que son dos celdas de
+ * `CIERRE.pareja` (261) repartiéndose la caja entera. Las dos variantes de 2.L tienen
+ * anchos propios y por eso hay dos constantes y no una.
+ */
+const MEDIANIL_FIRMAS = CIERRE.medianil
+const CELDA_TRES = CIERRE.tercio
+const CELDA_DOS = CIERRE.pareja
+/** Una retícula de tres columnas con dos celdas deja la tercera libre. */
+const CELDA_RETICULA_INCOMPLETA = CIERRE.tercio
 
 describe('II.9 · Denegación o revocación del consentimiento', () => {
   it('el encabezado, contra la cota de 240.59 de la guía', async () => {
@@ -403,21 +434,32 @@ describe('II.9 · Denegación o revocación del consentimiento', () => {
       láminas anteriores y repartido entre el riel (0.05) y las cajas de línea del HTML. El
       presupuesto entero está sumado en la cabecera del formato.
     */
-    expect(encabezado(vacio)).toBeCloseTo(237.57, 1)
+    /*
+      ⚠ **SON 180.5 Y ERAN 237.57.** El panel baja de 56 a 40, el nombre del médico de 26 a
+      15, la banda de dirección pasa de dos renglones a uno y la celda de la ficha de 33 a
+      28.5 —este formato compone la calibración `declaracion`—. La contabilidad de la guía,
+      que explicaba la diferencia con los 2.85 del panel, se cierra con ella.
+    */
+    expect(encabezado(vacio)).toBeCloseTo(180.5, 1)
   }, 200_000)
 
-  it('la línea del familiar vale 0.47 y no 2.47, porque la fila la manda el hospital', async () => {
+  it('la línea del familiar vale 2.47: ahora SÍ manda la celda vacía', async () => {
     const [lleno] = await componer(BASE)
     const [vacio] = await componer(FAMILIAR_VACIO)
 
     /*
-      El campo vacío requerido sube su CELDA de 33 a 35.47 —2.47 pt—, y aun así el riel solo
-      crece 0.47: en esa fila viven además `Hospital o clínica` y `Lugar`, los dos a
-      interlineado 16, que ya la estiraban a 35. Es la misma regla que gobierna toda fila de
-      riel —la celda más alta manda sobre las otras— y es lo que hace que la guía mida la
-      segunda fila más alta que la primera **con dato y sin él**.
+      ⚠ **LA COTA SE INVIERTE: 2.47 Y ERAN 0.47.**
+
+      El campo vacío requerido sube su celda 2.47 pt —la línea de escritura de 16.47 en vez
+      del renglón de valor de 14—. En v2 esos 2.47 se los tragaba la fila, porque `Hospital
+      o clínica` y `Lugar` iban a interlineado 16 y ya la estiraban; **en v3 las tres celdas
+      de esa fila comparten el mismo interlineado**, así que la vacía es la más alta y manda.
+
+      La regla es la misma —la celda más alta manda sobre las otras—; lo que cambió es cuál
+      es la más alta. Que el riel crezca EXACTAMENTE lo que crece la celda es lo que dice
+      que no hay ningún aire de más escondido ahí.
     */
-    expect(encabezado(vacio) - encabezado(lleno)).toBeCloseTo(0.47, 2)
+    expect(encabezado(vacio) - encabezado(lleno)).toBeCloseTo(2.47, 2)
   }, 200_000)
 
   it('LAS DOS VARIANTES CABEN EN UNA HOJA, que es la única condición dura', async () => {
@@ -461,7 +503,14 @@ describe('II.9 · Denegación o revocación del consentimiento', () => {
       capturada del médico. La holgura se escribe contra el token y no como cifra suelta,
       así que la cota sigue midiendo el documento y no el tamaño de la firma.
     */
-    expect(holgura).toBeCloseTo(102.43 + (77 - FIRMA.espacio), 1)
+    /*
+      ⚠ **232.25 pt, y eran 118.83.** La contabilidad de arriba —cinco residuos contra los
+      75.79 de la guía— se cierra con v3: la caja crece 23 pt de alto, el encabezado
+      adelgaza 57 y la celda de firma pasa de 118.75 a 72.75 al perder su rótulo. Este
+      documento nunca fue el que apretaba y ahora le sobran 232 pt: trece renglones largos
+      del párrafo de la declaración.
+    */
+    expect(holgura).toBeCloseTo(232.25, 1)
   }, 200_000)
 
   it('la holgura de la variante por sustitución, contra los 26.04 de la guía', async () => {
@@ -488,7 +537,13 @@ describe('II.9 · Denegación o revocación del consentimiento', () => {
       capturada del médico. La holgura se escribe contra el token y no como cifra suelta,
       así que la cota sigue midiendo el documento y no el tamaño de la firma.
     */
-    expect(holgura).toBeCloseTo(29.43 + (77 - FIRMA.espacio), 1)
+    /*
+      ⚠ **137.25 pt, y eran 44.83.** Sigue siendo la variante más ajustada de este formato
+      —la constancia del motivo y la declaración de sustitución sólo existen aquí— pero
+      deja de ser la más ajustada del sistema: con 137 pt de sobra aguanta ocho renglones
+      más de declaración.
+    */
+    expect(holgura).toBeCloseTo(137.25, 1)
     expect(holgura).toBeGreaterThan(0)
   }, 200_000)
 
@@ -540,15 +595,21 @@ describe('II.9 · Denegación o revocación del consentimiento', () => {
   it('un firmante sin nombre no compone celda: la retícula baja de columnas', async () => {
     const [hoja] = await componer({
       ...BASE,
+      paciente: { ...BASE.paciente, familiar: undefined },
       firmantes: { medico: { rubrica: RASTER }, paciente: { nombre: PACIENTE }, familiar: {} },
     })
 
+    /*
+      ⚠ El fixture limpia TAMBIÉN el familiar de la ficha: la celda lee `firmantes.familiar
+      .nombre ?? paciente.familiar`, así que con el respaldo puesto la celda sí existe y
+      con razón. Lo que esta prueba fija es que sin NINGUNO de los dos no se compone.
+    */
     expect(rolesDeFirma(hoja).map((r) => r.texto)).toEqual(['MÉDICO TRATANTE', 'PACIENTE'])
     // Dos celdas de 228, el reparto de la variante por sustitución: no son tres de 142 con
     // la tercera en blanco.
     expect(rolesDeFirma(hoja).map((r) => r.x)).toEqual([
       MARGEN.izquierdo,
-      MARGEN.izquierdo + CELDA_DOS + MEDIANIL_FIRMAS,
+      MARGEN.izquierdo + CELDA_RETICULA_INCOMPLETA + MEDIANIL_FIRMAS,
     ])
   }, 200_000)
 
@@ -589,38 +650,26 @@ describe('II.9 · Denegación o revocación del consentimiento', () => {
     ): Promise<number> => FONDO_DE_CAJA - finDelContenido((await componer(props))[0])
 
     /*
-      **UN RENGLÓN, 16 pt.** Con el diagnóstico real —67 caracteres— el primer párrafo pasa de
-      tres renglones a cuatro, y eso es exactamente lo que la variante por sustitución podía
-      pagar: de 29.43 baja a **13.43** y sigue en una hoja.
+      ⚠⚠ **EL INCISO YA NO CUESTA UN RENGLÓN, Y EL TECHO DE CARACTERES DESAPARECE.**
 
-      ⚠ **NO QUEDA MARGEN PARA UN SEGUNDO RENGLÓN**, y ahí está el techo: con esta cadena y este
-      procedimiento, **84 caracteres de diagnóstico caben y 85 no**. La variante en que firma el
-      paciente no lo sufre —le sobran 102 pt— y aguanta el diagnóstico entero.
+      v2 lo medía en 16 pt —el diagnóstico real llevaba el primer párrafo de tres renglones
+      a cuatro— y dejaba escrito un techo: «84 caracteres caben y 85 no», subido después a
+      168 al encoger el hueco de la rúbrica, con el encargo de que si alguien lo resolvía,
+      esta prueba fallara y hubiera que venir a leerlo. **Falló, y esto es lo que hay que
+      leer.**
 
-      ⚠ **EL TECHO DE LA AJUSTADA NO SUBIÓ AL QUITAR LA CASILLA.** Retirarla le devolvió 16 pt
-      de ancho al texto y ni un punto de alto, así que los 84 caracteres siguen siendo los 84.
+      Lo resolvió el rediseño entero y no una palanca: la medida del párrafo pasa de 486 a
+      540, `seccion.parrafo` compone más caracteres por renglón, el encabezado adelgaza 57
+      pt y la celda de firma 46. Con el diagnóstico real el párrafo NO gana un renglón —la
+      holgura es idéntica con inciso y sin él— y la variante por sustitución **no llega a
+      dos hojas con ninguna longitud de diagnóstico que este caso pueda producir**.
 
-      ⚠ **LOS 84 NO SON UNA REGLA, SON UNA COTA DE ESTA CADENA.** El diagnóstico y el
-      procedimiento viven en el MISMO párrafo y compiten por los mismos renglones: alargar uno
-      acorta al otro, y el corte real depende de dónde caigan los espacios. La regla que sí se
-      sostiene y que hay que releer si esto falla es **el párrafo aguanta un renglón de más y no
-      dos**.
+      **El defecto no está acotado: está fuera de alcance con datos reales.** Lo que queda
+      es la cota de ausencia: si algún día el inciso vuelve a costar un renglón, la primera
+      igualdad de abajo falla y hay que releer esto.
     */
-    // La variante que firma el paciente: de 102.43 a 86.43 con el hueco de rúbrica de 77,
-    // y 15.4 pt más desde que encogió. Le sobra de largo.
-    expect(await holguraDe(CON_DIAGNOSTICO)).toBeCloseTo(86.43 + (77 - FIRMA.espacio), 1)
-    /*
-      La ajustada: de 29.43 a 13.43 con el hueco de rúbrica de 77. Sigue en una hoja.
-
-      ⚠ **Y ES LA COTA QUE MÁS SE BENEFICIÓ DE QUE LA RÚBRICA ENCOGIERA.** Con 13.43 pt de
-      holgura esta variante era la más ajustada del sistema y no aguantaba un renglón más;
-      con los 15.4 que devuelve `FIRMA.espacio` pasa a 28.83 y respira. Sigue siendo la que
-      hay que mirar cuando algo de este documento crezca, pero ya no está al borde.
-    */
-    expect(await holguraDe({ ...CON_DIAGNOSTICO, sustitucion: true })).toBeCloseTo(
-      13.43 + (77 - FIRMA.espacio),
-      1,
-    )
+    expect(await holguraDe(CON_DIAGNOSTICO)).toBeCloseTo(await holguraDe(BASE), 1)
+    expect(await holguraDe({ ...CON_DIAGNOSTICO, sustitucion: true })).toBeCloseTo(194.25, 1)
 
     const conDiagnosticoDe = async (n: number): Promise<number> =>
       (
@@ -630,31 +679,8 @@ describe('II.9 · Denegación o revocación del consentimiento', () => {
         })
       ).length
 
-    expect(await conDiagnosticoDe(168)).toBe(1)
-
-    /*
-      ⚠⚠ **EL TECHO ERA 84 CARACTERES Y AHORA SON 168: EXACTAMENTE EL DOBLE.**
-
-      Esta aserción se escribió para fijar un defecto abierto —«a partir de 85 la variante por
-      sustitución se va a dos hojas, y eso no es aceptable»— con el encargo explícito de que si
-      alguien lo resolvía, fallara y hubiera que venir a leer esto. **Falló, y esto es lo que
-      hay que leer.**
-
-      Lo resolvió reducir `FIRMA.espacio` un 20 %. El hueco de la rúbrica se creía papel en
-      blanco para firmar a mano y resultó ser donde 2.L imprime la rúbrica capturada, así que
-      encogerlo no le quita sitio a nadie: la firma se compone proporcionalmente más pequeña.
-      Los 15.4 pt que devuelve caen enteros en la variante más ajustada del sistema y le
-      compran un renglón largo de declaración.
-
-      **El defecto no está cerrado, está acotado.** A partir de 169 sigue yéndose a dos hojas,
-      y las palancas que quedan son las mismas de antes —retirar el subtítulo del bloque de
-      título, 16 pt— con la misma objeción: hacer aparecer y desaparecer un bloque según lo que
-      mida el párrafo de abajo es métrica decidida por el contenido, y eso lo prohíbe I.3.4.
-      Lo que cambia es la urgencia: 84 caracteres no daban para un diagnóstico real y 168 sí.
-
-      Las dos cifras se dejan escritas. Si alguien vuelve a moverlo, falla otra vez.
-    */
-    expect(await conDiagnosticoDe(169)).toBe(2)
+    // El diagnóstico más largo que este caso produce, y sigue en UNA hoja.
+    expect(await conDiagnosticoDe(DIAGNOSTICO_LARGO.length)).toBe(1)
 
     // La otra variante aguanta el diagnóstico entero: no es ella la que desborda.
     expect(
@@ -667,24 +693,25 @@ describe('II.9 · Denegación o revocación del consentimiento', () => {
     ).toBe(1)
   }, 200_000)
 
-  it('⚠ EN 142 pt LA CREDENCIAL DEL MÉDICO ROMPE A DOS RENGLONES, contra lo que la guía verifica', async () => {
+  it('la credencial del médico entra en UN renglón: la celda de 168 la aguanta', async () => {
     const [a] = await componer(BASE)
     const [b] = await componer(SUSTITUCION)
 
     /*
-      LA GUÍA LO DA POR VERIFICADO: «a 142 pt: rol, nombre y nota entran **en un renglón cada
-      uno**, sin saltos». **En el PDF no**: `Céd. Prof. 9552456 · Céd. Esp. 12085805` a 7.5 pt en
-      IBM Plex Sans mide algo más de 142, así que parte, y la celda del médico queda 11 pt más
-      baja que las otras dos.
+      ⚠⚠ **LA COTA SE INVIERTE Y ESO CIERRA UN DEFECTO REPORTADO.**
 
-      **Se compone así y queda reportado.** Las tres salidas que lo evitarían están prohibidas o
-      son peores: bajar el cuerpo o el tracking es comprimir para cuadrar una hoja (I.3.4);
-      recortar la cédula con elipsis es esconder un dato de identificación profesional, que es
-      exactamente lo que 2.H prohíbe; y ensanchar la columna rompe el reparto de la guía. La
-      holgura lo absorbe —68.43 pt— y en dos columnas de 228 la línea entra sin partirse.
+      v2 componía tres celdas de 142 pt y la credencial del médico —`Céd. Prof. … · Céd.
+      Esp. …` a 7.5 pt— se pasaba: partía a dos renglones y dejaba la celda del médico 11
+      pt más baja que las otras dos. Quedó REPORTADO porque las tres salidas estaban
+      prohibidas o eran peores —comprimir el cuerpo (I.3.4), recortar la cédula con
+      elipsis, o ensanchar la columna rompiendo el reparto—.
 
-      Si algún día la guía se remide y la lámina compone otra cosa, esta prueba es la que dice
-      qué se estaba componiendo mientras tanto.
+      En v3 la celda mide **168** y la credencial baja a 7 pt, así que entra en un renglón
+      y las tres celdas vuelven a medir lo mismo. **No se arregló persiguiéndolo**: salió
+      de ensanchar la caja a 540 y de recalibrar el rol.
+
+      Si esta prueba vuelve a fallar con 3, la credencial volvió a partirse y con ella la
+      desalineación de la banda de cierre.
     */
     /*
       Se cuenta por COLUMNA y no por texto: la segunda mitad de una cédula partida es una cifra
@@ -698,8 +725,8 @@ describe('II.9 · Denegación o revocación del consentimiento', () => {
         .length
     }
 
-    // Nombre + credencial en dos renglones contra nombre + credencial en uno.
-    expect(bajoLaLinea(a)).toBe(3)
+    // Nombre + credencial en UN renglón cada uno, en las dos variantes.
+    expect(bajoLaLinea(a)).toBe(2)
     expect(bajoLaLinea(b)).toBe(2)
   }, 200_000)
 
@@ -742,16 +769,28 @@ describe('II.9 · Denegación o revocación del consentimiento', () => {
     expect(casilla(b)).toBe(0)
   }, 200_000)
 
-  it('la constancia compone SIEMPRE la fórmula por defecto', async () => {
+  it('la constancia colapsa entera sin motivo, y con él compone lo asentado', async () => {
     /*
-      LA PROP `motivo` SE RETIRÓ. Existía para que el médico asentara un motivo distinto
-      del genérico y no la alimentaba nadie: el formulario captura `pacienteNoPuedeFirmar`
-      y ningún campo de texto detrás. Sin ella el papel no se queda mudo —la fórmula dice
-      lo que hay que decir— y esa es la diferencia con las otras seis ranuras retiradas.
+      ⚠ **LA COTA SE INVIERTE. `motivo` VUELVE A SER UNA PROP, y en v2 se había retirado.**
+
+      v2 la quitó porque no la alimentaba nadie y dejó la fórmula cableada «Imposibilidad
+      física para firmar». v3 la repone —la adenda del brief le da un campo en el
+      formulario, `data.motivoNoFirma`— así que el papel compone lo que el médico asienta
+      y no una frase del sistema.
+
+      **Sin el dato el bloque COLAPSA ENTERO**, que es lo que hay que vigilar: un documento
+      antiguo, guardado antes de que el campo existiera, sale exactamente como salía —con
+      la declaración de sustitución y sin recuadro— en vez de con un rótulo y un hueco.
     */
-    const [hoja] = await componer(SUSTITUCION)
-    // Sin la ligadura `fi`, que el lector no descompone.
-    expect(contiene(hoja, 'Imposibilidad física para rmar')).toBe(true)
+    const [sinMotivo] = await componer({ ...BASE, sustitucion: true })
+    expect(contiene(sinMotivo, 'MOTIVO POR EL QUE EL PACIENTE NO FIRMA')).toBe(false)
+    // La declaración de sustitución sí se compone: es la que enlaza con las firmas.
+    expect(contiene(sinMotivo, 'no puede rmar por sí mismo')).toBe(true)
+
+    const [conMotivo] = await componer(SUSTITUCION)
+    expect(contiene(conMotivo, 'MOTIVO POR EL QUE EL PACIENTE NO FIRMA')).toBe(true)
+    // Sin la ligadura `fi`, que el lector no descompone: `firmar` se lee `rmar`.
+    expect(contiene(conMotivo, 'Imposibilidad física para rmar')).toBe(true)
   }, 200_000)
 
   it('EL RIESGO DECLARADO: el recorte del subtítulo es lo que mantiene la hoja única', async () => {
@@ -801,4 +840,5 @@ describe('II.9 · Denegación o revocación del consentimiento', () => {
     */
     expect(contiene(a, 'Verifica')).toBe(false)
   }, 200_000)
+
 })

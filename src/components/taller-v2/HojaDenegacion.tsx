@@ -226,7 +226,7 @@ function HojaDenegacion({
         paciente={c.paciente}
         procedimiento={c.procedimiento}
         firmantes={FIRMANTES}
-        sustitucion={c.sustitucion}
+        sustitucion={c.sustitucion ?? false}
         folio={c.folio}
       />
     </Document>

@@ -93,7 +93,7 @@ const RAYA = '—'
  */
 export type RolCuerpoParser =
   | 'texto.corrido'
-  | 'alarma.cuerpo'
+  /* v3 · `alarma.cuerpo` se retira con el bloque de alarma. `dudas.md` §11. */
   | 'texto.reducido'
   /**
    * **Y AHORA SON CUATRO.** `instruccion.texto` entra con las instrucciones al paciente de
@@ -205,12 +205,10 @@ const estilos = StyleSheet.create({
    */
   encabezado: { ...estiloTipografico('etiqueta') },
   cuerpoCorrido: { ...estiloTipografico('texto.corrido') },
-  cuerpoAlarma: { ...estiloTipografico('alarma.cuerpo') },
   cuerpoReducido: { ...estiloTipografico('texto.reducido') },
   cuerpoInstruccion: { ...estiloTipografico('instruccion.texto') },
   /** La marca hereda cuerpo e interlineado del texto y cambia de familia (D30). */
   marcaCorrido: { ...estiloTipografico('texto.corrido'), fontFamily: FUENTE.neogrotesca },
-  marcaAlarma: { ...estiloTipografico('alarma.cuerpo'), fontFamily: FUENTE.neogrotesca },
   marcaReducido: { ...estiloTipografico('texto.reducido'), fontFamily: FUENTE.neogrotesca },
   marcaInstruccion: {
     ...estiloTipografico('instruccion.texto'),
@@ -247,6 +245,11 @@ const estilos = StyleSheet.create({
 export interface ParserBloquesProps {
   /** UNA SOLA CADENA. Nunca un array (`CONCILIA D10`). */
   texto: string
+  /**
+   * Se reenvía a `analizar()`. Sin ella, `true`: los consumidores de v2 no cambian de
+   * comportamiento. La pasan en `false` los bloques de cierre de 2.I.
+   */
+  ascenderEncabezados?: boolean
   /** Raya o número: lo declara el bloque que lo instancia, no el contenido. */
   marca: 'raya' | 'numero'
   /** Rol del cuerpo. Sin él, el texto corrido del sistema. */
@@ -263,7 +266,6 @@ export interface ParserBloquesProps {
 
 /** El estilo del cuerpo de cada rol, para no ramificar dos veces en el render. */
 function estiloCuerpo(rol: RolCuerpoParser): typeof estilos.cuerpoCorrido {
-  if (rol === 'alarma.cuerpo') return estilos.cuerpoAlarma
   if (rol === 'texto.reducido') return estilos.cuerpoReducido
   if (rol === 'instruccion.texto') return estilos.cuerpoInstruccion
   return estilos.cuerpoCorrido
@@ -271,7 +273,6 @@ function estiloCuerpo(rol: RolCuerpoParser): typeof estilos.cuerpoCorrido {
 
 /** La marca cuando la calibración no declara rol: el cuerpo con la familia cambiada. */
 function estiloMarcaHeredada(rol: RolCuerpoParser): typeof estilos.marcaCorrido {
-  if (rol === 'alarma.cuerpo') return estilos.marcaAlarma
   if (rol === 'texto.reducido') return estilos.marcaReducido
   if (rol === 'instruccion.texto') return estilos.marcaInstruccion
   return estilos.marcaCorrido
@@ -398,10 +399,11 @@ export default function ParserBloques({
   rolCuerpo = 'texto.corrido',
   calibracion = 'chasis',
   acento,
+  ascenderEncabezados,
 }: ParserBloquesProps): ReactElement | null {
   return (
     <ListaDeNodos
-      nodos={analizar(texto)}
+      nodos={analizar(texto, { ascenderEncabezados })}
       marca={marca}
       rolCuerpo={rolCuerpo}
       calibracion={calibracion}

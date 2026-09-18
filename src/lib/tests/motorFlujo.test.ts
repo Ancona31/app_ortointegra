@@ -45,6 +45,8 @@ import {
   MARGEN,
   FLUJO,
   TIPOGRAFIA,
+  TRANSICION,
+  altoBloqueFirma,
   estiloTipografico,
   resolverAcento,
   ACENTO_BASE_POR_DEFECTO,
@@ -251,6 +253,31 @@ const ARRASTRE =
   'El paciente queda citado para revisión y se le entregan por escrito los datos de alarma ' +
   'por los que debe volver antes de esa fecha, de lo cual queda constancia.'
 
+/**
+ * v3 · EL BLOQUE DE CIERRE, CON SU `minPresenceAhead`.
+ *
+ * ⚠ **SUSTITUYE A LA PROP `arrastre` Y AL `umbralFirma()` QUE LA GOBERNABA.** En v2 el
+ * motor arrastraba tres renglones de texto con la firma cuando ésta no cabía, y el
+ * umbral lo calculaba `tokens.ts`. En v3 el motor no arrastra nada: **el formato declara
+ * cuánto sitio tiene que quedar detrás de su último bloque**, y si no lo hay, el bloque
+ * y la banda de cierre viajan juntos a la hoja siguiente (brief 00 §9.2).
+ *
+ * La cifra es el alto de la celda de firma MÁS el aire que la precede, que es
+ * exactamente lo que no puede quedarse solo.
+ *
+ * ⚠ **CON ROL, PORQUE `FIRMAS` LO LLEVA.** Una celda rotulada mide 83.75 y una sin
+ * rotular 72.75; declarar la de menos deja la reserva 11 pt corta y la banda se queda
+ * en la hoja anterior con la firma sola detrás — que es el defecto. Es la cifra que
+ * cada formato tiene que derivar de SU banda de cierre, no una constante del chasis.
+ */
+const PRESENCIA_CIERRE = altoBloqueFirma(true) + TRANSICION.contenidoCierre
+
+const CIERRE = h(
+  View,
+  { minPresenceAhead: PRESENCIA_CIERRE },
+  h(Text, { style: CORRIDO }, ARRASTRE),
+)
+
 /** Nombre que solo puede salir del bloque de firmas. */
 const FIRMANTE = 'Angel Ancona'
 
@@ -314,7 +341,7 @@ const ENCABEZADO = {
 function documento(
   hijos: number,
   props: {
-    arrastre?: string
+    cierre?: React.ReactElement
     firmas: React.ReactElement
     contador?: { items: string; total: number }
   },
@@ -348,10 +375,17 @@ const CONTENIDO_A_MEDIA_HOJA = 30
 // ─── Las pruebas ─────────────────────────────────────────────────────────────
 
 describe('2.N · MotorFlujo', () => {
-  it('regla 1: la firma no baja sola, baja con el arrastre, y la hoja 1 lo avisa', async () => {
+  /*
+    ⚠ **LA REGLA 1 CAMBIA DE MECANISMO EN v3 Y LA COTA SE REESCRIBE CON ELLA.**
+    Antes: el motor arrastraba tres renglones con la firma y el umbral salía de
+    `umbralFirma()`. Ahora: el formato declara `minPresenceAhead` en su último bloque y
+    el motor no arrastra nada. **Lo que la prueba defiende no cambia** —que la banda de
+    cierre no se quede sola en una hoja— y por eso las cotas de abajo son las mismas.
+  */
+  it('regla 1: la banda de cierre no se queda sola, y la hoja 1 lo avisa', async () => {
     const pdf = await renderToBuffer(
       documento(CONTENIDO_A_MEDIA_HOJA, {
-        arrastre: ARRASTRE,
+        cierre: CIERRE,
         firmas: FIRMAS,
       }),
     )
@@ -368,7 +402,7 @@ describe('2.N · MotorFlujo', () => {
     expect(texto[0]).toContain('CONTINÚA EN LA HOJA 2')
     expect(texto[0]).toContain('SIN FIRMA NO ES VÁLIDO')
 
-    // Y no se queda ni con el arrastre ni con la firma.
+    // Y no se queda ni con el bloque de cierre ni con la firma.
     expect(texto[0]).not.toContain('constancia')
     expect(texto[0]).not.toContain(FIRMANTE)
 
@@ -415,7 +449,7 @@ describe('2.N · MotorFlujo', () => {
     */
     const bases = basesPorHoja(
       await renderToBuffer(
-        documento(CONTENIDO_A_MEDIA_HOJA, { arrastre: ARRASTRE, firmas: FIRMAS }),
+        documento(CONTENIDO_A_MEDIA_HOJA, { cierre: CIERRE, firmas: FIRMAS }),
       ),
     )
 
@@ -440,7 +474,7 @@ describe('2.N · MotorFlujo', () => {
     const texto = textoPorHoja(
       await renderToBuffer(
         documento(80, {
-          arrastre: ARRASTRE,
+          cierre: CIERRE,
           firmas: FIRMAS,
           contador: { items: 'estudios', total: 9 },
         }),
@@ -482,7 +516,7 @@ describe('2.N · MotorFlujo', () => {
     const pdf = (
       await renderToBuffer(
         documento(CONTENIDO_A_MEDIA_HOJA, {
-          arrastre: ARRASTRE,
+          cierre: CIERRE,
           firmas: FIRMAS_SIN_ARCHIVO,
         }),
       )

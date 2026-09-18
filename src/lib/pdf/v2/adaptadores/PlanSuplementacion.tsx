@@ -58,7 +58,12 @@ export function propsPlanSuplementacion(entrada: EntradaAdaptador): PlanSuplemen
     seleccionados: filas(data.seleccionados).map(suplementoDe),
     emision: fechaCorta(data.fecha),
     notas: textoOpcional(data.notas),
-    seguimiento: textoOpcional(data.seguimiento),
+    /*
+     * ⚠ `seguimiento` SE DEJA DE IMPRIMIR EN v3, y no es un olvido de este archivo.
+     * Lo componía el bloque de cita de control, cuyos cuatro roles (`cita.*`) retira
+     * el diff de tokens. El formulario sigue guardando la clave y el expediente sigue
+     * teniéndola; lo que desaparece es su ranura en el papel. Reportado.
+     */
     /*
      * ⚠ El único formato que puede emitirse SIN FILA: si no hay paciente no hay
      * expediente donde guardarlo, así que no hay folio y el pie compone `Folio`

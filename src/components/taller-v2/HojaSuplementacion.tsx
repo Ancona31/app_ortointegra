@@ -154,14 +154,16 @@ const NOTAS = [
   'No duplique la dosis si olvida una toma. Suspenda y avise al consultorio si aparece náusea persistente, estreñimiento marcado o sed excesiva.',
 ].join('\n\n')
 
-/**
- * La cita de control. Colapsa entera en el caso mínimo.
- *
- * TEXTO LIBRE, que es lo que el formulario guarda en `seguimiento` y lo que v1 imprime.
- * Se redacta largo a propósito: es el caso que enseña que la caja crece con su contenido.
- */
-const CITA =
-  'Control a 3 meses, el 4 de noviembre de 2026. Traer 25-OH vitamina D y calcio sérico tomados la semana previa.'
+/*
+  ⚠ **LA CITA DE CONTROL YA NO TIENE RANURA, Y EL FORMULARIO SIGUE GUARDÁNDOLA.**
+
+  El dato vive en `seguimiento` y v1 lo imprime; II.4 retiró el bloque de cita con los
+  roles `cita.*`, así que el formato no lo acepta. Aquí había una cadena de ejemplo para
+  componerlo y se retira con él — dejarla sería un caso de taller que no se puede montar.
+
+  **No es una limpieza: es una pérdida de contenido pendiente de decidir.** Si se repone,
+  lo que hay que reponer es la ranura de II.4, no esta constante.
+*/
 
 /**
  * LOS CUATRO SUPLEMENTOS DEL CATÁLOGO DE v1, con sus textos REALES.
@@ -299,7 +301,6 @@ function HojaSuplementacion({
         seleccionados={c.seleccionados}
         emision={EMISION}
         notas={c.cierre ? NOTAS : undefined}
-        seguimiento={c.cierre ? CITA : undefined}
         folio={c.folio}
         qr={qr}
       />

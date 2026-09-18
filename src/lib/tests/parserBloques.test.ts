@@ -216,3 +216,41 @@ describe('degradación segura', () => {
     expect(textos(analizar(entrada))).toEqual(['a', 'b', 'c', 'd'])
   })
 })
+
+/**
+ * EL SEGUNDO PARÁMETRO — defecto §6 del diagnóstico, y las tres pruebas que lo cierran.
+ *
+ * El analizador **asciende a encabezado la primera línea de prosa cuando debajo hay
+ * viñetas**, y eso es correcto en el cuerpo del Internamiento —donde `Dieta` encabeza sus
+ * ítems— y es un defecto en los bloques de cierre de Laboratorio, Receta y Suplementación:
+ * ahí el rótulo lo pone el propio bloque (`Recomendaciones generales`) y la primera línea
+ * del pasaje es contenido del médico. Lo medido era una versalita que el médico no escribió
+ * seguida de sus propias viñetas.
+ *
+ * La opción es `true` por omisión a propósito: los cinco consumidores que ya llamaban con
+ * un solo argumento no cambian de comportamiento, y eso es lo que fija la segunda prueba.
+ */
+describe('caso 8 — `ascenderEncabezados`, la opción de los bloques de cierre', () => {
+  const PASAJE = 'Mantener reposo relativo durante dos semanas.\n- Hielo local\n- Analgésico'
+
+  it('en falso, la primera línea es párrafo y no hay ningún encabezado', () => {
+    const r = analizar(PASAJE, { ascenderEncabezados: false })
+    expect(tipos(r)).toEqual(['parrafo', 'item', 'item'])
+    expect(tipos(r)).not.toContain('encabezado')
+  })
+
+  it('sin opciones, el MISMO texto sigue ascendiendo: los cinco de v2 no cambian', () => {
+    const r = analizar(PASAJE)
+    expect(tipos(r)).toEqual(['encabezado', 'item', 'item'])
+  })
+
+  it('en falso, el corte por línea vacía sigue incrementando el bloque', () => {
+    const r = analizar(`${PASAJE}\n\nSegundo pasaje.\n- Otra viñeta`, {
+      ascenderEncabezados: false,
+    })
+    expect(tipos(r)).toEqual(['parrafo', 'item', 'item', 'parrafo', 'item'])
+    // El bloque es lo que la línea vacía incrementa; el ordinal de ítem sigue corrido.
+    expect(r.map((n) => n.bloque)).toEqual([0, 0, 0, 1, 1])
+    expect(ordinales(r)).toEqual([1, 2, 3])
+  })
+})

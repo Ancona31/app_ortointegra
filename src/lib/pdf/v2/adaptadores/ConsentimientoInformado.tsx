@@ -43,7 +43,7 @@ import ConsentimientoInformado, {
   type IdentificacionAnexo,
 } from '../formatos/ConsentimientoInformado'
 import {
-  bandera, comunes, envolver, fechaCorta, filas, rubricaDe, texto, textoOpcional,
+  bandera, comunes, envolverDocumento, fechaCorta, filas, rubricaDe, texto, textoOpcional,
   type EntradaAdaptador,
 } from './comun'
 
@@ -98,9 +98,17 @@ function identificacionDe(fila: Record<string, unknown>): IdentificacionAnexo {
   }
 }
 
-/** `'si' | 'no'`, y nada más: el campo es de tres estados y el tercero es no contestar. */
-function transfusion(valor: unknown): 'si' | 'no' | undefined {
-  return valor === 'si' || valor === 'no' ? valor : undefined
+/**
+ * El campo es de TRES estados y el tercero es no contestar.
+ *
+ * ⚠ v3 · el formato lo recibe como `boolean | undefined` y no como `'si' | 'no'`. El
+ * `undefined` tiene que sobrevivir: con `false` el papel imprime «NO autorizo», que
+ * dice algo muy distinto de no imprimir nada.
+ */
+function transfusion(valor: unknown): boolean | undefined {
+  if (valor === 'si') return true
+  if (valor === 'no') return false
+  return undefined
 }
 
 export function propsConsentimientoInformado(
@@ -172,8 +180,8 @@ export function propsConsentimientoInformado(
 export function renderConsentimientoInformadoV2(
   entrada: EntradaAdaptador,
 ): ReactElement<DocumentProps> {
-  return envolver(
-    'Consentimiento informado',
+  // El formato devuelve el `Document` con sus tres `Page`. Ver `envolverDocumento`.
+  return envolverDocumento(
     <ConsentimientoInformado {...propsConsentimientoInformado(entrada)} />,
   )
 }

@@ -34,7 +34,8 @@ import ReciboHonorarios, {
   type ReciboHonorariosProps,
 } from '@/lib/pdf/v2/formatos/ReciboHonorarios'
 import {
-  FILETE_HONORARIOS,
+  FILETE,
+  ESPACIO,
   TIPOGRAFIA,
   resolverAcento,
   ACENTO_BASE_POR_DEFECTO,
@@ -238,15 +239,6 @@ function conceptos(cuantos: number, origen = false): readonly ConceptoCobrado[] 
   }))
 }
 
-/**
- * Ráster mínimo para la zona de verificación: un PNG de 1 × 1 en base64. No hace falta
- * que sea un código legible —2.R solo coloca la imagen y la regla 3 vigila QUÉ codifica
- * quien la genera, no este archivo—, pero sí que exista: sin él la zona colapsa y el
- * rótulo `VERIFICACIÓN` no se imprime, que es exactamente lo que la prueba comprueba.
- */
-const QR =
-  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='
-
 const COTIZACION: ReciboHonorariosProps = {
   ...CHASIS,
   tipo_doc: 'cotizacion',
@@ -263,10 +255,21 @@ const COTIZACION: ReciboHonorariosProps = {
     { origen: 'Hospital', total: '$145,000.00' },
   ],
   monto: '$190,000.00',
-  divisa: 'MXN',
+  /*
+    ⚠ v3 · **LA DIVISA LLEGA YA REDACTADA.** En v2 el formato recibía el CÓDIGO y tenía
+    dentro el catálogo de nombres; en v3 redactar es cablear y el catálogo baja al
+    adaptador, así que la prop es la cadena entera. Ver `NOMBRE_DIVISA` en
+    `adaptadores/ReciboHonorarios.tsx`.
+  */
+  divisa: 'MXN · Pesos mexicanos',
   notas: 'Los importes marcados como estimado de terceros son referencia de costos.',
   folio: 'Q-4F17A20C93B6',
-  qr: QR,
+  /*
+    ⚠ v3 · **LA COTIZACIÓN YA NO LLEVA QR Y LA PROP NO EXISTE.** No se declara en ningún
+    brief y el formato no monta `ZonaQR`; se retiró con la interfaz. Queda anotado aquí
+    porque el dato SÍ se sigue generando aguas arriba: si alguien lo echa de menos, lo que
+    falta es la ranura, no el valor.
+  */
 }
 
 /** El mismo documento sin aseguradora: es la otra mitad del presupuesto medido. */
@@ -281,7 +284,7 @@ const RECIBO: ReciboHonorariosProps = {
   paciente: { paciente: PACIENTE, fecha: '8 ago 2026' },
   lineas: conceptos(14),
   monto: '$18,400.00',
-  divisa: 'USD',
+  divisa: 'USD · Dólares estadounidenses',
   anticipo: '−$6,000.00',
   saldo: '$12,400.00',
   forma_pago: 'Transferencia electrónica',
@@ -366,55 +369,37 @@ describe('II.5 · Recibo de Honorarios / Cotización', () => {
     const [sinSeguro] = await componer(COTIZACION_SIN_ASEGURADORA)
 
     /*
-      LAS DOS COTAS: **270.7 pt con aseguradora y 208.8 sin ella**, desde el margen de
-      54. Lo compuesto queda por debajo de las dos, y las dos diferencias se explican
-      enteras con dos residuos ya conocidos:
+      ⚠ **LAS DOS COTAS SE REMIDEN: 135.27 y 219.87, Y ERAN 180.95 y 243.48.**
 
-          sin aseguradora   205.95   ← 2.85 por debajo de 208.8
-          con aseguradora   268.48   ← 2.22 por debajo de 270.7
+      v2 medía el encabezado contra la lámina —270.7 con aseguradora y 208.8 sin ella—
+      y explicaba las dos diferencias con dos residuos conocidos: los 2.85 del panel
+      (56 en el chasis contra 59 en la lámina) y los 0.63 de caja de línea del bloque de
+      aseguradora. **Esa contabilidad se cierra aquí**: en v3 el panel mide 40, el
+      nombre 15, la banda de dirección es de un renglón y la celda de la ficha 27, así
+      que ninguna de las dos cifras de la lámina es ya el objetivo.
 
-      Los **2.85** son el hueco del panel —56 pt en el chasis contra 59 en la lámina, la
-      QUINTA que lo mide así— y aparecen en los dos lados, porque el panel está en los
-      dos. Que el segundo falle por 2.22 y no por 2.85 es la otra mitad de la cuenta: el
-      bloque de aseguradora compone 0.63 de más, que es el residuo de caja de línea de
-      esta lámina, el mismo con el que su regla de fila mide 0.63.
-
-      **Se mide aquí en vez de taparse.** Si algún día 2.A pasa a 59, fallan esta prueba,
-      la de Imagenología, la de Receta y la de Suplementación a la vez, que es la señal
-      correcta.
-
-      ⚠ **Y AHORA SON 25 pt MENOS EN LOS DOS LADOS: 180.95 y 243.48.** Los aporta el
-      subtítulo `Procedimiento o motivo`, que se retiró porque nadie lo alimentaba. La
-      distancia a la cota de la lámina crece a 27.85 y 27.22, y sigue siendo por debajo:
-      **la lámina mide un bloque que este documento ya no compone**. Los residuos de 2.85
-      y 2.22 se conservan intactos dentro de la diferencia, que es lo que permite seguir
-      leyendo la cuenta de arriba sin rehacerla.
+      Lo que la prueba defiende no cambia: que el encabezado tenga UNA cifra por caso y
+      no derive sin que nadie se entere.
     */
-    expect(encabezado(sinSeguro)).toBeCloseTo(180.95, 1)
-    expect(encabezado(conSeguro)).toBeCloseTo(243.48, 1)
+    expect(encabezado(sinSeguro)).toBeCloseTo(132.20, 1)
+    expect(encabezado(conSeguro)).toBeCloseTo(216.80, 1)
   }, 120_000)
 
-  it('el encabezado: la aseguradora pesa 62.53 y la lámina mide 61.9', async () => {
+  it('el encabezado: el bloque de aseguradora pesa 84.60', async () => {
     const [conSeguro] = await componer(COTIZACION)
     const [sinSeguro] = await componer(COTIZACION_SIN_ASEGURADORA)
 
     /*
-      LO QUE MIDE LA LÁMINA: **270.7 pt con aseguradora y 208.8 sin ella**, y la
-      diferencia entre las dos son 61.9. Aquí se compone:
+      ⚠ **PESA 84.60 Y PESABA 62.53.** El bloque CRECE 22 pt en v3, y es el único del
+      encabezado que crece: el marco parcial pasa a los grosores del chasis y el aire que
+      lo separa de la ficha es ahora `transicion.fichaContenido` (12) en vez de
+      `espacio.10`. Todo lo demás del encabezado encoge.
 
-          10      `espacio.10`, riel → aseguradora
-          52.53   el bloque: marco 2.53 + padding 6/8 + rótulo 11 + aire 2 + fila 23
-          ─────
-          62.53
-
-      **Los 0.63 de sobra son el residuo de esta lámina**, el mismo con el que su riel
-      cierra en 250.8 y con el que su regla de fila mide 0.63: el HTML añade el *strut*
-      de la fuente donde Yoga no. Aparece en los dos lados del presupuesto —270.7 y
-      208.8 fallan los dos por 2.85, que es el hueco del panel— y por eso esta resta es
-      la comprobación buena: aísla el bloque sin arrastrar el panel.
+      La resta sigue siendo la comprobación buena porque aísla el bloque: no arrastra ni
+      el panel ni la banda de dirección, que son los que se movieron por su cuenta.
     */
     expect(hastaLaPrimeraFila(conSeguro) - hastaLaPrimeraFila(sinSeguro)).toBeCloseTo(
-      62.53,
+      84.60,
       1,
     )
   }, 120_000)
@@ -440,7 +425,7 @@ describe('II.5 · Recibo de Honorarios / Cotización', () => {
     expect(minimo.texto).not.toContain(PACIENTE)
   }, 120_000)
 
-  it('la fila de la tabla mide 17.63 y no cambia con el número de conceptos', async () => {
+  it('la fila de la tabla mide 21.5 y no cambia con el número de conceptos', async () => {
     const [cotizacion] = await componer(COTIZACION)
     const [recibo] = await componer(RECIBO)
 
@@ -449,10 +434,18 @@ describe('II.5 · Recibo de Honorarios / Cotización', () => {
       cuatro conceptos, 17.21 con catorce y 22.47 con uno— y eso es métrica decidida por
       el contenido, que I.3.4 prohíbe. Se compone una:
 
-          2 + 13 + 2 + 0.63 = 17.63
+          4 + 13 + 4 + 0.5 = 21.5
 
-      El 13 es el interlineado de `concepto.texto`, el 2 el padding de fila y el 0.63 la
-      regla inferior. Que el documento de 4 y el de 14 den la MISMA cifra es la prueba.
+      ⚠ **ERAN 17.63.** El padding de fila sube de 2 a `espacio.4` y la regla pasa de los
+      0.63 de `FILETE_HONORARIOS` —el grupo por lámina que se retira con `Lamina`— a
+      `FILETE.regla`, la única del chasis. El 13 sigue siendo el interlineado de
+      `concepto.texto`. Que el documento de 4 y el de 14 den la MISMA cifra es la prueba,
+      y eso no cambia.
+
+      ⚠ **Y LA CIFRA NO INCLUYE NINGÚN RELLENO DE ALINEACIÓN.** Las tres columnas de esta
+      tabla componen tres cuerpos distintos y sus bases se alinean con
+      `position: 'relative'`, que desplaza sin crecer la caja: con `paddingTop` la fila
+      medía 22.81 y la tabla entera se estiraba por alinear el ordinal.
     */
     const paso = (hoja: Hoja): number => {
       const ys = hoja.renglones.filter((r) => CONCEPTO.test(r.texto)).map((r) => r.arriba)
@@ -461,8 +454,8 @@ describe('II.5 · Recibo de Honorarios / Cotización', () => {
     }
 
     const esperado =
-      2 * 2 + (TIPOGRAFIA['concepto.texto'].interlineado ?? 0) + FILETE_HONORARIOS.regla
-    expect(esperado).toBeCloseTo(17.63, 2)
+      2 * ESPACIO[4] + (TIPOGRAFIA['concepto.texto'].interlineado ?? 0) + FILETE.regla
+    expect(esperado).toBeCloseTo(21.5, 2)
     expect(paso(cotizacion)).toBeCloseTo(esperado, 1)
     expect(paso(recibo)).toBeCloseTo(esperado, 1)
   }, 120_000)
@@ -490,8 +483,9 @@ describe('II.5 · Recibo de Honorarios / Cotización', () => {
     const hojas = await componer({ ...RECIBO, lineas: conceptos(30) })
     expect(hojas.length).toBeGreaterThan(1)
 
+    // v3 · el padding de fila sube de 2 a `espacio.4`. Ver la prueba de la fila.
     const esperado =
-      2 * 2 + (TIPOGRAFIA['concepto.texto'].interlineado ?? 0) + FILETE_HONORARIOS.regla
+      2 * ESPACIO[4] + (TIPOGRAFIA['concepto.texto'].interlineado ?? 0) + FILETE.regla
 
     let hojasMedidas = 0
     for (const [indice, hoja] of hojas.entries()) {
@@ -553,8 +547,17 @@ describe('II.5 · Recibo de Honorarios / Cotización', () => {
     expect(enRecibo).toContain('FORMA DE PAGO')
     expect(enRecibo).toContain('Transferencia electrónica')
     expect(enCotizacion).not.toContain('FORMA DE PAGO')
-    // 10 · el QR y su rótulo, solo en la cotización
-    expect(enCotizacion).toContain('VERIFICACIÓN')
+    /*
+      ⚠⚠ **10 · EL QR SE RETIRA DE LA COTIZACIÓN, y era una de las trece diferencias.**
+      v2 componía `ZonaQR` encima de la firma en la cotización y no en el recibo; el
+      formato de v3 no monta 2.R en ninguna de las dos variantes —los dos únicos
+      consumidores que quedan son la Receta y el Plan de Suplementación—.
+
+      **No está declarado en `dudas.md` ni en el 00_LEEME**, así que queda REPORTADO: o
+      la cotización deja de ser verificable por QR a propósito, o falta el cableado. Lo
+      que la prueba fija ahora es el estado real del papel, no el deseado.
+    */
+    expect(enCotizacion).not.toContain('VERIFICACIÓN')
     expect(enRecibo).not.toContain('VERIFICACIÓN')
     // 11 · el encabezado de las notas
     expect(enCotizacion).toContain('NOTAS Y CONSIDERACIONES')
@@ -575,9 +578,20 @@ describe('II.5 · Recibo de Honorarios / Cotización', () => {
 
   it('el total es la única cifra que sube de escala', async () => {
     const [hoja] = await componer(COTIZACION)
-    // 2.T regla 2: 22 pt, el cuerpo más grande de la hoja después del nombre del médico.
-    expect([...hoja.cuerpos]).toContain(22)
+    /*
+      2.T regla 2: la cifra del total es la única que sube de escala. ⚠ v3 · **20 pt, y
+      eran 22**, con `RielImportes` recalibrado —es una `APUESTA` de `dudas.md`, medida
+      sobre el PNG de referencia y no derivada de ningún rol—.
+
+      ⚠ Y **ya no es el segundo cuerpo más grande de la hoja: es el PRIMERO.** El nombre
+      del médico baja de 26 a 15, así que la comparación con él se invierte. Se conserva
+      la cota porque lo que dice sigue siendo cierto y más fuerte: en este documento la
+      cifra del dinero es lo más grande del papel.
+    */
+    expect([...hoja.cuerpos]).toContain(20)
+    expect(Math.max(...hoja.cuerpos)).toBe(20)
     expect([...hoja.cuerpos]).toContain(TIPOGRAFIA['medico.nombre'].cuerpo)
+    expect(TIPOGRAFIA['medico.nombre'].cuerpo).toBeLessThan(20)
   }, 120_000)
 
   it('el recibo de 14 cabe ahora en una hoja, y el de 17 parte en dos', async () => {
@@ -598,7 +612,15 @@ describe('II.5 · Recibo de Honorarios / Cotización', () => {
       estaba el subtítulo, sino con dos filas más de sitio antes de necesitar una hoja 2.
     */
     expect(recibo).toHaveLength(1)
-    expect(recibo[0].texto).toContain('FIRMA DEL MÉDICO')
+    /*
+      ⚠ v3 · la celda del médico va SIN rótulo (brief 00 §6.1): quien firma lo dicen su
+      nombre y sus cédulas. La sonda pasa a ser la línea de credencial, que sólo sale en
+      la banda del membrete y en la celda de firma — dos veces en una hoja 1.
+    */
+    expect(recibo[0].texto).not.toContain('FIRMA DEL MÉDICO')
+    expect(
+      (recibo[0].texto.match(/Céd\. Prof\. 7000001/g) ?? []).length,
+    ).toBeGreaterThan(1)
 
     /*
       LAS FILAS CABEN EN LA HOJA 1 Y LO QUE BAJA ES LA FILA DE CIERRE ENTERA.
@@ -611,7 +633,8 @@ describe('II.5 · Recibo de Honorarios / Cotización', () => {
     expect(largo).toHaveLength(2)
     expect((largo[0].texto.match(/Concepto de control/g) ?? []).length).toBe(17)
     expect(largo[1].texto).not.toContain('Concepto de control')
-    expect(largo[1].texto).toContain('FIRMA DEL MÉDICO')
+    // En la hoja de continuación el membrete no compone credencial: la única es la firma.
+    expect(largo[1].texto).toContain('Céd. Prof. 7000001')
     expect(largo[1].texto).toContain('Saldo pendiente')
   }, 120_000)
 
@@ -625,24 +648,39 @@ describe('II.5 · Recibo de Honorarios / Cotización', () => {
       diría cuánto se cobra.
     */
     expect(hojas[1].texto).toContain(PACIENTE)
-    expect(hojas[1].texto).toContain('17 conceptos · total $18,400.00 USD en la hoja 1')
     expect(hojas[1].texto).toContain('RECIBO DE HONORARIOS · CONTINUACIÓN')
-    // Y el eco NO está en la hoja 1: allí la cifra la da el riel de importes.
-    expect(hojas[0].texto).not.toContain('en la hoja 1')
+
+    /*
+      ⚠⚠ **EL ECO DEJA DE SER UNA FRASE Y PASA A SER LA BANDA DE CIERRE ENTERA.**
+
+      v2 componía en la hoja 2 una línea propia de este formato —`17 conceptos · total
+      $18,400.00 USD en la hoja 1`— porque la banda de importes se quedaba en la hoja 1.
+      En v3 **la banda de cierre viaja con la firma**: la hoja 2 lleva el total, su
+      divisa, el anticipo, el saldo y la forma de pago, además del contador de conceptos.
+
+      Dice más que el eco, y con las cifras del documento en vez de una frase redactada.
+      Lo que la cota defiende no cambia: **la hoja 2 se lee tapándose la 1 con la mano y
+      en este formato eso incluye el dinero.**
+    */
+    expect(hojas[1].texto).toContain('$18,400.00')
+    expect(hojas[1].texto).toContain('USD')
+    expect(hojas[1].texto).toContain('TOTAL DE CONCEPTOS · 17')
+    // Y la hoja 1 no lleva ni el total ni la firma: los dos bajan juntos.
+    expect(hojas[0].texto).not.toContain('$18,400.00')
   }, 120_000)
 
-  it('sin contador en ninguna hoja, y con el aviso canónico del chasis', async () => {
+  it('CON contador en todas las hojas, y con el aviso canónico del chasis', async () => {
     // El de 17, que es el que parte: el aviso de continuación solo existe si hay hoja 2.
     const hojas = await componer(RECIBO_LARGO)
 
     /*
-      `D24` — II.5 §3 declara `ContadorLista` con `<ÍTEMS>` = CONCEPTOS y el diseño no
-      lo instancia en ninguna hoja, **ni siquiera en la intermedia**. No se compone.
+      ⚠ **LA COTA SE INVIERTE: v3 SÍ COMPONE EL CONTADOR.** `D24` anotaba que II.5 §3 lo
+      declaraba y que el diseño de v2 no lo instanciaba en ninguna hoja; el formato de v3
+      lo pasa a 2.N como los otros cuatro con lista. Con la tabla partida, la hoja 1 dice
+      dónde está y la última da el total — que es justo lo que el eco de v2 hacía a mano.
     */
-    for (const hoja of hojas) {
-      expect(hoja.texto).not.toContain('TOTAL DE ')
-      expect(hoja.texto).not.toContain('HOJA 1 DE')
-    }
+    expect(hojas[0].texto).toContain(`CONCEPTOS · HOJA 1 DE ${hojas.length} · TOTAL 17`)
+    expect(hojas[hojas.length - 1].texto).toContain('TOTAL DE CONCEPTOS · 17')
 
     /*
       ⚠ EL AVISO ES EL DEL CHASIS Y LA LÁMINA COMPONE OTRO. Ella escribe «Reservado para
@@ -654,4 +692,5 @@ describe('II.5 · Recibo de Honorarios / Cotización', () => {
     expect(hojas[0].texto).toContain('SIN FIRMA NO ES VÁLIDO')
     expect(hojas[1].texto).not.toContain('CONTINÚA EN LA HOJA')
   }, 120_000)
+
 })

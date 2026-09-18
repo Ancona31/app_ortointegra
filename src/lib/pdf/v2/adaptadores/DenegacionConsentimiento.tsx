@@ -67,6 +67,13 @@ export function propsDenegacionConsentimiento(
       familiar: { nombre: textoOpcional(data.familiar) },
     },
     sustitucion: bandera(data.pacienteNoPuedeFirmar),
+    /*
+     * Sólo se compone con `sustitucion`. El formato ya lo colapsa si no viene, así que
+     * un documento antiguo sin la clave sale exactamente como salía.
+     *
+     * ⚠ Misma advertencia que en el Recibo: **la clave está por confirmar**. `dudas.md` §15.
+     */
+    motivo: textoOpcional(data.motivoNoFirma),
     folio: texto(data.folio),
   }
 }

@@ -115,7 +115,26 @@ function clasificar(linea: string): LineaClasificada {
  * lo decidió el lookahead sobre el texto de origen, donde sí había un ítem debajo,
  * y sigue agrupando lo que va debajo de él.
  */
-export function analizar(texto: string): readonly NodoParser[] {
+/** Opciones del análisis. Ver la nota de `ascenderEncabezados`. */
+export interface OpcionesAnalisis {
+  /**
+   * ¿Una línea de prosa con ítems debajo se asciende a encabezado?
+   *
+   * `true` —el valor por defecto, que conserva el comportamiento de v2 para quien ya
+   * llama con un solo argumento— es lo que compone el cuerpo del Internamiento.
+   *
+   * `false` lo pasan los bloques de cierre (2.I): ahí el rótulo lo pone el propio
+   * bloque y la primera línea del pasaje es contenido del médico. Sin esto, el papel
+   * sale con un rótulo en versalita que el médico no escribió.
+   */
+  readonly ascenderEncabezados?: boolean
+}
+
+export function analizar(
+  texto: string,
+  opciones: OpcionesAnalisis = {},
+): readonly NodoParser[] {
+  const ascender = opciones.ascenderEncabezados ?? true
   const lineas = texto.split(/\r?\n/).map(clasificar)
 
   const crudos: NodoParser[] = []
@@ -142,7 +161,8 @@ export function analizar(texto: string): readonly NodoParser[] {
 
     // Prosa: aquí y solo aquí decide el LOOKAHEAD.
     const siguiente = lineas[i + 1]
-    const tieneItemsDebajo = siguiente !== undefined && siguiente.clase === 'item'
+    const tieneItemsDebajo =
+      ascender && siguiente !== undefined && siguiente.clase === 'item'
 
     if (tieneItemsDebajo && abierto) bloque += 1
     crudos.push({

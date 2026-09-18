@@ -21,6 +21,7 @@ import zlib from 'node:zlib'
 import path from 'node:path'
 import React, { type ReactElement } from 'react'
 import { Document, Font, renderToBuffer } from '@react-pdf/renderer'
+import type { DocumentProps } from '@react-pdf/renderer'
 import type { PdfConsultorioData, PdfMedicoData } from '@/lib/pdf/PdfStyles'
 import SolicitudLaboratorio from '@/lib/pdf/v2/formatos/SolicitudLaboratorio'
 import SolicitudImagenologia from '@/lib/pdf/v2/formatos/SolicitudImagenologia'
@@ -271,7 +272,13 @@ describe('II.4 · Plan de Suplementación', () => {
       nombre: 'Vitamina D3', dosis: '4000 UI al día',
       marca: undefined, justificacion: 'Deficiencia documentada',
     }])
-    expect(p.seguimiento).toBe('Control en 3 meses con nueva medición')
+    /*
+      v3 · `seguimiento` YA NO SE IMPRIME y por eso el adaptador no lo pasa. Lo componía
+      el bloque de cita de control, cuyos cuatro roles (`cita.*`) retira el diff de
+      tokens. La clave sigue guardándose en `contenido`; lo que desapareció es su ranura
+      en el papel. La cota vieja describía la maqueta de v2.
+    */
+    expect('seguimiento' in p).toBe(false)
   })
 
   it('sin peso no hay celda: la dosis se imprime igual', () => {
@@ -458,7 +465,8 @@ describe('II.7 · Consentimiento Informado', () => {
       La celda queda para la pluma, como las otras cuatro.
     */
     expect(p.firmantes.medico.rubrica).toBeUndefined()
-    expect(p.autorizaTransfusion).toBe('si')
+    // v3 · el formato la recibe como `boolean | undefined`, no como `'si' | 'no'`.
+    expect(p.autorizaTransfusion).toBe(true)
     expect(p.autorizaFotos).toBe(true)
     expect(p.secciones.anestesia).toBeUndefined()
   })
@@ -571,11 +579,18 @@ describe('II.5 · la vigencia compuesta cabe en un renglón', () => {
     return total
   }
 
-  it('la cadena que compone el adaptador ocupa lo mismo que una de una palabra', async () => {
+  /*
+    ⚠ v3 · LA REFERENCIA ERA `'30 días'` Y AHORA ES UNA DE UN CARÁCTER.
+    Medido sobre el render nuevo: la cadena del adaptador compone 29 operaciones y
+    `'30 días'` compone 30, así que la corta salió a ser la que ocupa MÁS. Comparar
+    contra ella dejó de medir lo que esta prueba defiende. `'X'` no puede envolver por
+    construcción, así que es la referencia que de verdad dice «cabe en un renglón».
+  */
+  it('la cadena que compone el adaptador ocupa lo mismo que una que no puede envolver', async () => {
     registrarFuentesDeDisco()
     const compuesta = await operacionesDeTexto()
-    const deUnaPalabra = await operacionesDeTexto('30 días')
-    expect(compuesta).toBe(deUnaPalabra)
+    const deUnCaracter = await operacionesDeTexto('X')
+    expect(compuesta).toBe(deUnCaracter)
   }, 60_000)
 
   it('la que pedía el formato compone dos renglones más, y por eso se descartó', async () => {
@@ -622,6 +637,7 @@ describe('los nueve componen un PDF con el caso mínimo', () => {
     ['escrito_medico', () => React.createElement(EscritoMedico, propsEscritoMedico(
       entrada({ paciente: 'Jorge Medina', fecha: '2026-08-13', cuerpo: '<p>A quien corresponda.</p>' }),
     ))],
+    // ⚠ v3 · II.7 devuelve su PROPIO `Document` con sus tres `Page`. Ver `envolverDocumento`.
     ['consentimiento_informado', () => React.createElement(ConsentimientoInformado, propsConsentimientoInformado(
       entrada({ paciente: 'Jorge Medina', lugar: 'Mérida', fecha: '2026-08-13', edad: '61 años', procedimiento: 'Artroscopia', diagnostico: 'Menisco', familiar: '', folio: 'CI-2026-0001', secciones: {} }),
     ))],
@@ -630,10 +646,18 @@ describe('los nueve componen un PDF con el caso mínimo', () => {
     ))],
   ]
 
+  /** II.7 compone su propio `Document`; los otros ocho devuelven una hoja. */
+  const TRAE_DOCUMENTO = new Set(['consentimiento_informado'])
+
   for (const [nombre, hoja] of MINIMOS) {
     it(nombre, async () => {
       registrarFuentesDeDisco()
-      const buffer = await renderToBuffer(React.createElement(Document, null, hoja()))
+      const elemento = hoja()
+      const buffer = await renderToBuffer(
+        TRAE_DOCUMENTO.has(nombre)
+          ? (elemento as ReactElement<DocumentProps>)
+          : React.createElement(Document, null, elemento),
+      )
       expect(buffer.subarray(0, 5).toString('latin1')).toBe('%PDF-')
       expect(buffer.byteLength).toBeGreaterThan(1000)
     }, 60_000)

@@ -29,7 +29,7 @@
 import { Document, pdf, type DocumentProps } from '@react-pdf/renderer'
 import type { ReactElement } from 'react'
 import SolicitudLaboratorio, {
-  type EstudioSolicitado,
+  type EstudioLaboratorio,
 } from '@/lib/pdf/v2/formatos/SolicitudLaboratorio'
 import type { MedicoMembrete } from '@/lib/pdf/v2/Membrete'
 import type { ValoresPaciente } from '@/lib/pdf/v2/BloquePaciente'
@@ -84,13 +84,13 @@ const PACIENTE_MINIMO: ValoresPaciente = {
  * formato todavía no monta `MotorFlujo` y II.1 §3 no declara ninguna de esas tres
  * piezas (anexo A, P4-4).
  */
-const ESTUDIOS_COMPLETO: readonly EstudioSolicitado[] = [
+const ESTUDIOS_COMPLETO: readonly EstudioLaboratorio[] = [
   { nombre: 'Biometría hemática completa' },
   { nombre: 'Química sanguínea de seis elementos' },
 ]
 
 /** Un solo estudio y sin indicación: la entrada mínima del sistema (II.1 §4). */
-const ESTUDIOS_MINIMO: readonly EstudioSolicitado[] = [
+const ESTUDIOS_MINIMO: readonly EstudioLaboratorio[] = [
   { nombre: 'Velocidad de sedimentación globular' },
 ]
 
@@ -100,8 +100,16 @@ const ESTUDIOS_MINIMO: readonly EstudioSolicitado[] = [
  * encabezado y viñetas para que se vea el caso que el formato va a recibir de una
  * plantilla.
  */
+/*
+ * ⚠ LA PRIMERA LÍNEA ERA `Indicaciones para la toma:` Y SE RETIRA.
+ *
+ * Se escribió cuando el parser ASCENDÍA esa línea a rótulo en versalita; hoy el bloque
+ * de cierre pasa `ascenderEncabezados: false` —el rótulo lo pone el bloque, no el
+ * texto— y esa línea salía como prosa justo debajo de un rótulo que dice lo mismo. El
+ * caso sigue ejercitando lo que existe para ejercitar: prosa + dos viñetas.
+ */
 const NOTAS_COMPLETO = [
-  'Indicaciones para la toma:',
+  'Ayuno de ocho horas. Suspender antiinflamatorios 48 horas antes.',
   '- Enviar resultados por correo al consultorio en cuanto estén.',
   '- Reportar por teléfono cualquier valor crítico.',
 ].join('\n')
@@ -163,7 +171,7 @@ export type CasoLaboratorio = 'completo' | 'minimo' | 'lleno'
  * formato, y el que hay que mirar tapándose la hoja 1 con la mano: la 2 tiene que
  * identificar al paciente ella sola (regla 2 de 2.D).
  */
-const ESTUDIOS_LLENO: readonly EstudioSolicitado[] = Array.from(
+const ESTUDIOS_LLENO: readonly EstudioLaboratorio[] = Array.from(
   { length: 25 },
   (_, i) => ({
     nombre: `Estudio de control ${i + 1}`,
@@ -172,7 +180,7 @@ const ESTUDIOS_LLENO: readonly EstudioSolicitado[] = Array.from(
 
 const CASOS: Record<
   CasoLaboratorio,
-  { estudios: readonly EstudioSolicitado[]; paciente: ValoresPaciente; folio: string; notas?: string }
+  { estudios: readonly EstudioLaboratorio[]; paciente: ValoresPaciente; folio: string; notas?: string }
 > = {
   completo: { estudios: ESTUDIOS_COMPLETO, paciente: PACIENTE_COMPLETO, folio: FOLIO_COMPLETO, notas: NOTAS_COMPLETO },
   minimo: { estudios: ESTUDIOS_MINIMO, paciente: PACIENTE_MINIMO, folio: FOLIO_MINIMO },

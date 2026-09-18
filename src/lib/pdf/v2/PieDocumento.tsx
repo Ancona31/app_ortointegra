@@ -1,270 +1,183 @@
 /**
- * Sistema de documentos v2 — componente 2.M · `PieDocumento`.
+ * Sistema de documentos v3 — 2.M · **PieDocumento**. «Atar cada hoja al documento
+ * del que salió.» Va en todas las hojas, con `fixed`.
  *
- * FUENTE DE VERDAD: `DOCUMENTOS_SPEC.md` I.2 · 2.M. Transcripción, no diseño.
+ * CAMBIOS v3 (brief 00 §7):
  *
- * Propósito: atar cada hoja al documento del que salió.
+ *   posición    `left: 72, right: 54, bottom: 36` → **36 / 36 / 36**
+ *   zonas       folio · paginación · leyenda → folio · paginación · **nombre del
+ *               documento** · leyenda
  *
- * REGLA 1 — EN TODAS LAS HOJAS, SIN EXCEPCIÓN
+ * **LA ZONA DE NOMBRE DEL DOCUMENTO ES NUEVA Y CIERRA EL DEFECTO §9.5**: la variante
+ * `sinFolio` —Internamiento y Escrito— dejaba media barra vacía, con la paginación
+ * sola a la izquierda y la leyenda a la derecha. Ahora las dos variantes componen
+ * cuatro zonas o tres, y ninguna deja hueco.
  *
- * Es el hallazgo más grave de la auditoría del sistema viejo: un consentimiento
- * de cuatro hojas firmado solo en la última no tenía nada que atara la hoja 1 a
- * la de firmas. Aquí se implementa con `fixed`, que hace que react-pdf repita el
- * nodo en cada hoja del documento. **No lo quites para «ahorrar» en la última.**
+ * LO QUE NO CAMBIA: el alto de 16, el relleno lateral de 8, el fondo en
+ * `acento.banda` —derivado a 7 : 1 sobre blanco, que es lo que hace legible el
+ * `tinta.papel` de encima—, la leyenda constante del sistema y el `fixed` de la
+ * regla 1. Sin `fixed` el pie sale sólo en la hoja donde se declaró.
  *
- * DÓNDE VIVE LA BANDA — LO QUE MÁS SE EQUIVOCA
- *
- * **Fuera de la caja de texto y dentro de la zona segura.** No se mide desde el
- * borde de la caja: se ancla al papel —`left: margen.izquierdo`,
- * `right: margen.derecho`, `bottom: zona.segura`— y por eso vive en el hueco que
- * el margen inferior reserva y ningún bloque de contenido ocupa.
- *
- * El desglose está en I.1.2 y es lo que hace verdadera la regla 5:
- *
- *     margen.inferior = 68 = 36 (papel intocable) + 16 (banda) + 16 (aire)
- *
- * Es decir: la banda ocupa de 36 a 52 pt del borde inferior, el contenido se
- * detiene a 68, y entre los dos quedan 16 pt de aire — `transicion.contenidoPie`.
- * **La página tiene que declarar `paddingBottom: margen.inferior`** o la garantía
- * se cae y el pie se solapa con lo último que haya, que es el bug §8.1.
- *
- * REGLA 3 — LA ÚNICA BARRA SÓLIDA ADMITIDA EN EL SISTEMA
- *
- * I.3.2 prohíbe las barras de color sólido a todo lo ancho. Esta es la excepción
- * declarada, y lo es **por sus tres cotas**: 16 pt de alto, `acento.banda`
- * calculado a 7 : 1 sobre blanco, y no cruza la zona segura. Quitarle cualquiera
- * de las tres la convierte en lo que I.3.2 prohíbe.
- *
- * ⚠️ POR QUÉ EL `render` VA EN LA BANDA Y NO SOLO EN LA PAGINACIÓN
- *
- * Porque sin él la zona 2 sale VACÍA, sin error y sin aviso. Está medido
- * descomprimiendo el flujo de contenido de un PDF real, no supuesto:
- *
- * 1. Un `lineHeight` numérico es un MULTIPLICADOR del cuerpo, y react-pdf lo
- *    resuelve a puntos al montar la página: 11 / 7 → 11 pt.
- * 2. Cada nodo con `render` obliga al renderer a **recomponer la página entera**
- *    —una vez por corte de hoja y otra al saber el total—, y en cada pasada
- *    vuelve a resolver estilos YA resueltos. El multiplicador se aplica otra vez:
- *    11 → 77 → 539 pt.
- * 3. Los demás nodos no lo notan porque conservan sus líneas ya maquetadas. El
- *    nodo con `render` es el único al que se le tiran para recomponerlas, y a
- *    539 pt de interlineado **su línea ya no cabe en una banda de 16**: el
- *    maquetador devuelve cero líneas y la zona queda muda.
- *
- * Poniendo el `render` en la BANDA, sus tres zonas se vuelven a crear desde cero
- * en cada pasada, con el estilo literal sin resolver: se resuelve una sola vez
- * por pasada y el multiplicador nunca se acumula. La alternativa —quitarle el
- * interlineado a la paginación— también imprime, pero la deja 1.65 pt más abajo
- * que el folio, que está a su lado y en el mismo rol.
- *
- * **Vale para cualquier componente del chasis que use `render`.** 2.N lo va a
- * necesitar para sus tres avisos de pie.
- *
- * Sin `'use client'`: módulo neutro, como el resto de v2.
+ * ⚠ **EL ALTO Y EL ANCLAJE VIVEN AHORA EN `tokens.ts`** (`PIE`, `PIE_ANCLAJE`), y no
+ * es cosmético: de ellos sale `MARGEN.inferior`. Con las cifras escritas aquí, mover
+ * el pie dejaba el margen apuntando a un hueco que ya no existía.
  */
 
-import { View, Text, StyleSheet } from '@react-pdf/renderer'
+import { StyleSheet, Text, View } from '@react-pdf/renderer'
 import type { ReactElement } from 'react'
 import {
-  MARGEN,
-  TIPOGRAFIA,
+  PAPEL,
+  PIE,
+  PIE_ANCLAJE,
   ZONA_SEGURA,
   estiloTipografico,
   type AcentoResuelto,
 } from './tokens'
 
-/**
- * Geometría de la banda, de la ficha de 2.M. Ninguno de los tres es miembro de
- * una escala y los tres son `COINCIDENCIA` con tokens que valen lo mismo:
- *
- * - `alto` 16 pt coincide con `espacio.16` y con `reticula.lineaBase`. Es una de
- *   las tres cotas que hacen admisible la barra (regla 3): mover la escala de
- *   espaciado no debe poder engordar la banda.
- * - `medianil` 10 pt y `paddingLateral` 8 pt no son miembros de nada.
- */
-const GEOMETRIA = {
-  alto: 16,
-  medianil: 10,
-  paddingLateral: 8,
-} as const
-
-/**
- * Zona 3, invariable en los ocho formatos (ficha de 2.M, tabla de cadenas).
- *
- * **No entra por prop.** Si la declarara cada formato, el sistema acabaría con
- * ocho leyendas distintas — que es exactamente la deriva que 2.N concilia en los
- * avisos de pie (`CONCILIA D5, D22`). Se guarda como se imprime.
- */
-const LEYENDA =
-  'Documento generado por Spinus · Expediente clínico electrónico · spinus.com.mx'
-
-/**
- * La versalita del sistema, leída de `etiqueta` en vez de escrita como cifra. Es
- * la desviación declarada **`pie` en versalita** (I.1.4), la misma que consume
- * 2.K — con el color puesto por el sitio, que aquí es `tinta.papel` porque el
- * texto va sobre la banda de acento.
- */
-const VERSALITA = {
-  peso: TIPOGRAFIA.etiqueta.peso,
-  tracking: TIPOGRAFIA.etiqueta.tracking,
-} as const
+/** Constantes del sistema. Las tres son textuales y ninguna se parametriza. */
+const LEYENDA = 'Documento generado por Spinus · Expediente clínico electrónico · spinus.com.mx'
+const ROTULO_FOLIO = 'Folio'
+const ROTULO_PAGINA = 'Página'
+const DE = 'de'
 
 const estilos = StyleSheet.create({
   banda: {
     position: 'absolute',
-    left: MARGEN.izquierdo,
-    right: MARGEN.derecho,
-    bottom: ZONA_SEGURA,
-    height: GEOMETRIA.alto,
+    left: ZONA_SEGURA,
+    right: ZONA_SEGURA,
+    bottom: PIE_ANCLAJE.banda,
+    height: PIE.alto,
+    paddingHorizontal: PIE.relleno,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: GEOMETRIA.paddingLateral,
   },
-  /** Zona 1 y zona 2 miden lo que su contenido: la retícula es `auto auto 1fr`. */
-  zonaAuto: {
+  /** Folio y paginación no encogen: son los dos datos que se citan por teléfono. */
+  fijo: {
+    ...estiloTipografico('pie'),
     flexShrink: 0,
   },
+  /** La caja de la paginación: es la que lleva la geometría, porque es dinámica. */
+  celdaPaginacion: {
+    flexShrink: 0,
+    marginLeft: PIE.medianil,
+  },
+  paginacion: { ...estiloTipografico('pie') },
   /**
-   * El medianil lo lleva SIEMPRE la zona que va segunda, nunca la primera: en
-   * `sin folio` la paginación pasa a la zona 1 y ahí no tiene nada a la
-   * izquierda de lo que separarse.
+   * La zona nueva. Es la ÚNICA que encoge, y las tres claves del §15 del brief están
+   * las tres: `flexGrow` para que ocupe el sobrante, `flexShrink` + `minWidth: 0`
+   * para que Yoga la deje encoger por debajo de su ancho natural, y el recorte por
+   * elipsis DENTRO del objeto de estilo — como prop se ignora en silencio.
    */
-  separacion: {
-    marginLeft: GEOMETRIA.medianil,
-  },
-  folio: { ...estiloTipografico('pie') },
-  /** Zona 2: `pie` en versalita, aquí en `tinta.papel`. */
-  paginacion: {
+  documento: {
     ...estiloTipografico('pie'),
-    fontWeight: VERSALITA.peso,
-    letterSpacing: VERSALITA.tracking * TIPOGRAFIA.pie.cuerpo,
+    /**
+     * ⚠ **ANCHO DECLARADO, Y NO `flexGrow` + `flexShrink` + `minWidth: 0`. MEDIDO.**
+     *
+     * Las tres claves del §15 del brief no acotan un `Text` en este motor: Yoga lo mide
+     * por su ancho NATURAL y el reparto no lo encoge, así que `maxLines` no tiene contra
+     * qué recortar. Comprobado con las cuatro formas —`flexShrink`, `flexBasis: 0`,
+     * envoltorio con `overflow: hidden`, y `width`—: **sólo recorta con `width`.**
+     *
+     * Sin esto, en el Consentimiento el nombre del documento se imprimía ENCIMA de la
+     * leyenda. Ver `PIE.documento`.
+     */
+    width: PIE.documento,
+    flexShrink: 0,
+    marginLeft: PIE.medianil,
+    maxLines: 1,
+    textOverflow: 'ellipsis',
   },
-  /** Zona 3: `1fr`, alineada a la derecha. */
+  /** Absorbe el sobrante de la banda y se queda pegada al borde derecho. */
   leyenda: {
     ...estiloTipografico('pie.leyenda'),
-    flex: 1,
+    flexGrow: 1,
+    flexShrink: 0,
+    marginLeft: PIE.medianil,
     textAlign: 'right',
-    marginLeft: GEOMETRIA.medianil,
   },
 })
 
-interface Comun {
-  /** La banda va en `acento.banda`, derivado a 7 : 1 sobre blanco. */
-  acento: AcentoResuelto
-}
-
 export type PieDocumentoProps =
   /**
-   * Folio · paginación · leyenda. **Tres formatos**: Receta (II.3), Recibo de
-   * Honorarios / Cotización (II.5) y Consentimiento (II.7) — los tres que
-   * circulan hacia un tercero que puede citar el número.
-   *
-   * El `folio` entra ya compuesto: **2.M no decide su forma** y no la valida.
+   * Folio · paginación · nombre · leyenda. **Tres formatos**: Receta, Recibo de
+   * honorarios y Cotización — las tres ventanillas que verifican de forma rutinaria
+   * y que citan el número cuando algo no cuadra.
    */
-  | ({ variante: 'completo'; folio: string } & Comun)
+  | {
+      variante: 'completo'
+      folio: string
+      /** Nombre del documento, en capitalización de oración. Lo redacta el formato. */
+      documento: string
+      acento: AcentoResuelto
+    }
   /**
-   * Paginación · leyenda. **Cinco formatos**, que son mayoría: Laboratorio (II.1),
-   * Imagenología (II.2), Suplementación (II.4), Internamiento (II.6) y Escrito
-   * Médico (II.8).
-   *
-   * No es la excepción de un formato raro: es el caso corriente. Un folio solo
-   * sirve donde alguien de fuera lo cita, y estos cinco no salen a esa
-   * circulación (regla 4).
-   *
-   * ⚠ **LLEVÓ EL TÍTULO DEL DOCUMENTO EN LA ZONA QUE EL FOLIO DEJA LIBRE, Y SE
-   * RETIRÓ.** No añadía nada: el título ya está compuesto arriba, a 17 pt, en la
-   * hoja 1 y en el rótulo de cada continuación —que es donde una hoja suelta se
-   * atribuye—. Y costaba: en el Escrito Médico el título lo escribe el médico, y
-   * uno largo empujaba la leyenda fuera de la banda de 16 pt. La zona queda libre
-   * y la leyenda se la come, que es lo que ya hacía en las hojas donde el título
-   * era corto.
+   * Paginación · nombre · leyenda. Los formatos cuyo folio no se cita en ninguna
+   * ventanilla: Internamiento y Escrito médico.
    */
-  | ({ variante: 'sinFolio' } & Comun)
-
-/**
- * `Página X de Y` (regla 2), compuesta en mayúsculas por la versalita del rol —
- * la misma convención que 2.C, 2.H y 2.K: la cadena se guarda en capitalización
- * de oración y la transformación ocurre aquí.
- *
- * **Las cifras las pone el renderer, no quien llama:** el total de hojas no
- * existe hasta que el flujo ha terminado de repartir. Se leen de `subPage*`, que
- * cuenta las hojas de ESTE documento; `pageNumber` cuenta las del PDF entero y
- * solo coincide porque **un formato se compone con un único elemento `Page`**.
- * Si algún día uno declara dos, esta cuenta es la correcta y la otra mentiría.
- */
-function paginacion({
-  subPageNumber,
-  subPageTotalPages,
-}: {
-  subPageNumber: number
-  subPageTotalPages: number
-}): string {
-  return `Página ${subPageNumber} de ${subPageTotalPages}`.toUpperCase()
-}
-
-/**
- * Las zonas en el orden que declara cada variante: tres con folio y **dos sin
- * él**. Lo que cambia no es cómo se compone cada una sino cuáles hay: la
- * paginación conserva su versalita al pasar a la zona 1, y la zona que el folio
- * deja libre no la ocupa nadie —la leyenda, que ya era flexible, la absorbe—.
- */
-function zonas(props: PieDocumentoProps): ReactElement[] {
-  const leyenda = (
-    <Text key="leyenda" style={estilos.leyenda}>
-      {LEYENDA}
-    </Text>
-  )
-
-  if (props.variante === 'completo') {
-    return [
-      <Text
-        key="folio"
-        style={[estilos.folio, estilos.zonaAuto]}
-      >{`Folio ${props.folio}`}</Text>,
-      <Text
-        key="paginacion"
-        style={[estilos.paginacion, estilos.zonaAuto, estilos.separacion]}
-        render={paginacion}
-      />,
-      leyenda,
-    ]
-  }
-
-  return [
-    <Text
-      key="paginacion"
-      style={[estilos.paginacion, estilos.zonaAuto]}
-      render={paginacion}
-    />,
-    leyenda,
-  ]
-}
+  | {
+      variante: 'sinFolio'
+      documento: string
+      acento: AcentoResuelto
+    }
 
 /** 2.M · `PieDocumento`. */
 export default function PieDocumento(props: PieDocumentoProps): ReactElement {
   return (
-    // `fixed`: regla 1. Sin él, el pie sale solo en la hoja donde se declaró.
-    //
-    // `render` MÁS los mismos hijos declarados, y las dos cosas hacen falta:
-    //
-    // - El `render` es lo que imprime. Ver la nota larga de la cabecera.
-    // - Los hijos NO se componen —el renderer los descarta y se queda con lo que
-    //   devuelve el `render`—, pero son lo único que ve el **prebúsqueda de
-    //   tipografías**, que recorre el árbol declarado ANTES de que ningún
-    //   `render` haya corrido y carga las familias que encuentra. Sin ellos, las
-    //   tres zonas piden una familia que nadie cargó y el maquetador cae a la
-    //   tipografía por defecto del renderer: la banda sale en Helvetica, con las
-    //   demás anchuras, y **sin lanzar nada**. Medido leyendo el `/BaseFont` del
-    //   PDF (I.3.8).
-    //
-    // El relleno es `acento.banda`, derivado a 7 : 1 sobre blanco (I.1.8), y
-    // entra aquí y no en la hoja de estilos porque depende del acento del médico.
-    <View
-      style={[estilos.banda, { backgroundColor: props.acento.banda }]}
-      fixed
-      render={() => zonas(props)}
-    >
-      {zonas(props)}
+    // `fixed`: regla 1. La banda es del DOCUMENTO, no de la hoja donde se declaró.
+    <View style={[estilos.banda, { backgroundColor: props.acento.banda }]} fixed>
+      {props.variante === 'completo' ? (
+        <Text style={estilos.fijo}>{`${ROTULO_FOLIO} ${props.folio}`}</Text>
+      ) : null}
+
+      {/*
+        LA PAGINACIÓN SE COMPONE CON `render` Y NO CON UN CONTADOR PROPIO.
+
+        `subPageNumber` / `subPageTotalPages` cuentan las hojas de ESTE elemento de
+        página; `pageNumber` / `totalPages` las del `Document` entero. Aquí se usan las
+        primeras cuando existen, que es lo que hace que un `Page` de testigos o de
+        anexo —que son elementos propios, brief 00 §9.5— no reinicie la cuenta del
+        documento: los dos formatos que los componen quieren la numeración GLOBAL, y
+        `pageNumber` es la que la da.
+
+        ⚠ El brief §15 pide `render` en el CONTENEDOR y las zonas también como hijos
+        estáticos. No se compone así: en este motor `render` **sustituye** a los hijos,
+        de modo que un `View` con las dos cosas imprime sólo lo que devuelve `render` y
+        las zonas estáticas se pierden en silencio. Se pone `render` en el `Text` que
+        de verdad depende de la hoja, que es el patrón que el motor documenta. Ver
+        `dudas.md` §6.
+      */}
+      {/*
+        ⚠ EL `Text` EXTERIOR NO LLEVA ROL: un nodo dinámico con `lineHeight` no compone
+        nada y no avisa. El rol va en el `Text` que devuelve. Ver la nota de 2.K.
+      */}
+      <Text
+        style={estilos.celdaPaginacion}
+        render={({ pageNumber, totalPages }) => (
+          <Text style={estilos.paginacion}>
+            {`${ROTULO_PAGINA} ${pageNumber} ${DE} ${totalPages}`.toUpperCase()}
+          </Text>
+        )}
+      />
+
+      <Text
+        style={[
+          estilos.documento,
+          // La variante sin folio no compone esa celda: su ancho pasa al nombre.
+          props.variante === 'completo' ? {} : { width: PIE.documentoSinFolio },
+        ]}
+      >
+        {props.documento}
+      </Text>
+
+      <Text style={estilos.leyenda}>{LEYENDA}</Text>
     </View>
   )
 }
+
+/**
+ * El ancho vivo de la banda, para quien tenga que medir contra ella.
+ *
+ * DERIVADO y exportado por la misma razón que `PANEL_DIAMETRO`: si alguien lo
+ * recalcula por su cuenta y el anclaje cambia, mide contra un pie que ya no existe.
+ */
+export const PIE_ANCHO = PAPEL.ancho - 2 * ZONA_SEGURA - 2 * PIE.relleno

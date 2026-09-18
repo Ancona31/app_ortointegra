@@ -60,7 +60,6 @@ import {
   MARGEN,
   PAPEL,
   TIPOGRAFIA,
-  ESPACIO,
   resolverAcento,
   ACENTO_BASE_POR_DEFECTO,
 } from '@/lib/pdf/v2/tokens'
@@ -274,12 +273,20 @@ function filetes(hoja: Hoja, ancho: number, alto: number): readonly Rectangulo[]
 /**
  * Dónde ABRE la caja de la cabecera de la lista, que es donde termina el
  * encabezado. Se ancla a su filete —un rectángulo, y por tanto medible— y se le
- * restan los dos sumandos que la cabecera compone encima: el aire de 5 pt y el
- * renglón del rótulo. Ninguno de los dos se escribe como cifra aquí.
+ * restan los dos sumandos que la cabecera compone encima: su aire y el renglón del
+ * rótulo.
+ *
+ * ⚠ v3 · el aire baja de 5 a 3 y **`ESPACIO[5]` deja de existir**: la escala se reduce
+ * a nueve miembros pares. Con el miembro retirado, esta resta daba `NaN` y las cuatro
+ * cotas que la usan fallaban sin decir por qué.
  */
+const AIRE_CABECERA_LISTA = 3
+
 function abreLaLista(hoja: Hoja): number {
   const filete = filetes(hoja, 64, 2)[0]
-  return filete.arriba - ESPACIO[5] - (TIPOGRAFIA['titulo.seccion'].interlineado ?? 0)
+  return (
+    filete.arriba - AIRE_CABECERA_LISTA - (TIPOGRAFIA['titulo.seccion'].interlineado ?? 0)
+  )
 }
 
 // ─── El caso ─────────────────────────────────────────────────────────────────
@@ -310,6 +317,8 @@ const COMUN = {
   },
   emision: '7 ago 2026 · 10:45',
   folio: 'IMG-2026-0148',
+  // v3 · requerida: el distintivo de urgencia se declara, no se deduce de su ausencia.
+  urgente: false,
 } satisfies Omit<SolicitudImagenologiaProps, 'estudios'>
 
 /**
@@ -352,47 +361,54 @@ async function componer(
 }
 
 describe('II.2 · Solicitud de Imagenología — medido sobre el PDF', () => {
-  it('compone el encabezado en 229.88 pt desde el margen', async () => {
+  it('compone el encabezado en 178.50 pt desde el margen', async () => {
     const [hoja] = await componer(CUATRO_ESTADOS)
 
-    // 232.88 de la lámina − 3 del panel. Ver la cabecera.
-    expect(abreLaLista(hoja) - MARGEN.superior).toBeCloseTo(229.88, 2)
+    /*
+      ⚠ **ERAN 229.88 Y SON 178.50: 51.38 pt MENOS, Y ES EL REDISEÑO.**
+      El panel baja de 56 a 40, el nombre del médico de 26 a 15, la banda de dirección
+      pasa de DOS renglones a uno, el bloque de título encoge con su rótulo a 15 y la
+      celda de la ficha de 33 a 27. La cota vieja describía la maqueta de v2; lo que esta
+      prueba defiende —que el encabezado tenga UNA cifra y no derive sin que nadie se
+      entere— no cambia.
+    */
+    expect(abreLaLista(hoja) - MARGEN.superior).toBeCloseTo(178.50, 2)
   }, 60_000)
 
-  it('sitúa los tres bloques del encabezado donde la lámina los mide', async () => {
+  it('sitúa los bloques del encabezado donde v3 los compone', async () => {
     const [hoja] = await componer(CUATRO_ESTADOS)
 
-    const [membrete, titulo] = filetes(hoja, 96, 2.5)
+    /*
+      ⚠ **LOS ANCLAJES CAMBIAN PORQUE LOS RECTÁNGULOS CAMBIAN.**
+      v2 medía dos filetes de 96 × 2.5 —el del membrete y el del título— y los leía en
+      una sola llamada. En v3 el bloque de título **no repite el segmento grueso** (se
+      gasta una vez por hoja, y se gasta en el membrete), así que sólo queda uno, y mide
+      72 × 2. El filete del título es un borde y no un rectángulo: no se puede anclar a
+      él, así que lo que se mide son las cajas de texto que lo rodean.
+    */
+    const [membrete] = filetes(hoja, 72, 2)
+    expect(membrete).toBeDefined()
+    expect(membrete.x).toBeCloseTo(MARGEN.izquierdo, 2)
 
-    // Filete del membrete: el panel abre en el margen y cierra 8 pt antes. Los 56
-    // son los del chasis; la lámina mide 59 y ahí nacen los 3 pt de diferencia.
-    expect(membrete.arriba).toBeCloseTo(MARGEN.superior + 56 + 8, 2)
-
-    // Banda de dirección: DOS renglones de 12, no tres. El segundo va pegado al
-    // primero, y los dos llevan el mismo tratamiento.
+    /*
+      LA BANDA DE DIRECCIÓN ES DE UN SOLO RENGLÓN, y eran dos. Domicilio a la izquierda,
+      cédulas y teléfono a la derecha, en la MISMA línea base. Es el defecto §1 del
+      diagnóstico: los dos bloques se montaban uno encima del otro.
+    */
     const direccion = renglon(hoja, 'Av. Ficticia')
     const credenciales = renglon(hoja, 'Céd. Prof.')
-    expect(credenciales.arriba - direccion.arriba).toBeCloseTo(12, 2)
+    expect(credenciales.arriba).toBeCloseTo(direccion.arriba, 2)
+    expect(credenciales.x).toBeGreaterThan(direccion.x)
 
-    // De donde abre la banda al filete del título hay: 24 de banda + 12 del
-    // espaciador que cierra el membrete + 25 del bloque de título + 6 de aire.
-    // El bloque son 25 porque lo fija el riel derecho —rótulo 11 + valor 14—, no
-    // la caja del título, que mide 20.
-    const banda = direccion.arriba - TIPOGRAFIA['medico.credencial'].cuerpo * 0.878
-    expect(titulo.arriba - banda).toBeCloseTo(24 + 12 + 25 + 6, 1)
-
-    // Las dos celdas del riel derecho, alineadas a la derecha y con 16 pt entre
-    // ellas. La de emisión abre antes que la de folio.
+    // Las dos celdas del riel de folio, alineadas y con la emisión a la izquierda.
     expect(renglon(hoja, 'EMISIÓN').x).toBeLessThan(renglon(hoja, 'FOLIO').x)
     expect(renglon(hoja, 'EMISIÓN').arriba).toBeCloseTo(renglon(hoja, 'FOLIO').arriba, 2)
 
-    // Riel de identificación: 63.87 pt, del filete del título + 2.5 + 10 hasta
-    // donde abre la cabecera de la lista, 14 pt más arriba.
-    const abreRiel = titulo.arriba + 2.5 + 10
-    expect(abreLaLista(hoja) - ESPACIO[14] - abreRiel).toBeCloseTo(63.87, 1)
+    // Y el rótulo de cada celda cuelga sobre su valor, no a su lado.
+    expect(renglon(hoja, 'IMG-2026').arriba).toBeGreaterThan(renglon(hoja, 'FOLIO').arriba)
   }, 60_000)
 
-  it('mide los cuatro estados de la entrada: 59.5 · 46.5 · 41.5 · 28.5', async () => {
+  it('mide los cuatro estados de la entrada: 52.5 · 39.5 · 39.5 · 26.5', async () => {
     // Se compone una entrada MÁS de las cuatro que hacen falta, y mínima: el paso
     // de una entrada es la distancia entre su ancla y la de la siguiente, así que
     // sin una quinta el cuarto estado no tendría contra qué medirse. El ancla es
@@ -411,14 +427,26 @@ describe('II.2 · Solicitud de Imagenología — medido sobre el PDF', () => {
       'Ultrasonido',
     ].map((t) => renglon(hoja, t).arriba)
 
-    // 1 · completa       5 + 17 + 13 + 2 + 16 + 6 + 0.5
-    expect(anclas[1] - anclas[0]).toBeCloseTo(59.5, 2)
-    // 2 · sin proyecciones      5 + 17 + 2 + 16 + 6 + 0.5
-    expect(anclas[2] - anclas[1]).toBeCloseTo(46.5, 2)
-    // 3 · sin indicación        5 + 17 + 13 + 6 + 0.5
-    expect(anclas[3] - anclas[2]).toBeCloseTo(41.5, 2)
-    // 4 · solo tipo y región    5 + 17 + 6 + 0.5
-    expect(anclas[4] - anclas[3]).toBeCloseTo(28.5, 2)
+    /*
+      ⚠ **LOS CUATRO BAJAN, Y DOS DE ELLOS PASAN A MEDIR LO MISMO.**
+      La calibración `estudio` de v2 —ancla 12.5/17, secundario 10/13, nota 10.5/16—
+      desaparece con `Lamina`: v3 compone las cuatro ranuras con la única `entrada.*`, y
+      ahí el secundario y la nota comparten interlineado (13). Por eso los estados 2 y 3
+      —«sin proyecciones» y «sin indicación»— miden ahora **lo mismo**: la ranura que
+      falta pesa igual en los dos casos. En v2 se distinguían por los 5 pt que el rol de
+      nota llevaba de más.
+
+      Lo que la prueba defiende no cambia: que cada ranura ausente se lleve su renglón y
+      NADA más — sin hueco, sin rótulo huérfano.
+    */
+    // 1 · completa                 6 + 14 + 13 + 13 + 6 + 0.5
+    expect(anclas[1] - anclas[0]).toBeCloseTo(52.5, 2)
+    // 2 · sin proyecciones         6 + 14 + 13 + 6 + 0.5
+    expect(anclas[2] - anclas[1]).toBeCloseTo(39.5, 2)
+    // 3 · sin indicación           idéntico al 2: la ranura que falta pesa lo mismo
+    expect(anclas[3] - anclas[2]).toBeCloseTo(39.5, 2)
+    // 4 · solo tipo y región       6 + 14 + 6 + 0.5
+    expect(anclas[4] - anclas[3]).toBeCloseTo(26.5, 2)
   }, 60_000)
 
   it('colapsa proyecciones e indicación POR SEPARADO, sin dejar hueco', async () => {
@@ -426,21 +454,31 @@ describe('II.2 · Solicitud de Imagenología — medido sobre el PDF', () => {
 
     // II.2 §6: la 02 no tiene proyecciones y sí indicación; la 03 al revés; la 04
     // ninguna de las dos. El rótulo colgado sale una vez por cada indicación viva.
-    expect(hoja.renglones.filter((r) => r.texto === 'INDICACIÓN')).toHaveLength(2)
-    // Y los altos de arriba lo confirman: 59.5 − 46.5 = 13, el renglón de
-    // proyecciones; 59.5 − 41.5 = 18, el bloque de la indicación con su aire.
+    /*
+      ⚠ v3 · EL RÓTULO SE COMPONE COMO TRAMO DENTRO DEL `Text` DE LA NOTA, no como
+      hermano en una fila: es lo único que alinea su base con la del renglón que rotula
+      —el motor no resuelve la base de un `Text` hermano, `alignItems: 'baseline'` no lo
+      arregla—. Por eso llega al extractor con el espacio que lo separa de la nota.
+    */
+    expect(hoja.renglones.filter((r) => r.texto.trim() === 'INDICACIÓN')).toHaveLength(2)
+    // Y los altos de arriba lo confirman: 52.5 − 39.5 = 13, que es el renglón que
+    // falta, el mismo para las dos ranuras.
   }, 60_000)
 
-  it('el badge de urgente empuja 13.5 pt lo que va bajo el título', async () => {
+  it('el badge de urgente empuja 21 pt lo que va bajo la ficha', async () => {
     const [sinBadge] = await componer(CUATRO_ESTADOS)
     const [conBadge] = await componer(CUATRO_ESTADOS, { urgente: true })
 
-    // 4 pt de aire más 14.5 de badge: la caja del título pasa de 20 a 38.5 y
-    // adelanta al riel derecho de 190, que era quien fijaba el alto del bloque.
-    expect(abreLaLista(conBadge) - abreLaLista(sinBadge)).toBeCloseTo(13.5, 2)
+    /*
+      ⚠ **21 pt, Y ERAN 13.5.** En v2 el badge colgaba DENTRO del bloque de título y
+      parte de su alto lo absorbía el riel de folio, que ya medía 190; en v3 va en su
+      propio bloque bajo la ficha (marca el DOCUMENTO, no el estudio) y empuja su alto
+      entero más su aire. El badge además encoge de 14.5 a 13.
+    */
+    expect(abreLaLista(conBadge) - abreLaLista(sinBadge)).toBeCloseTo(21, 2)
 
-    // El badge de la lámina mide 14.5, no los 19 que deduce la ficha de 2.H.
-    const badge = conBadge.rectangulos.find((r) => r.alto === 14.5)
+    // 2.H mide el bloque en negativo en 13 pt, y eran 14.5.
+    const badge = conBadge.rectangulos.find((r) => r.alto === 13)
     expect(badge).toBeDefined()
     // Regla 4: uno por documento, bajo el título. No se repite por estudio.
     expect(conBadge.renglones.filter((r) => r.texto === 'URGENTE')).toHaveLength(1)
@@ -469,11 +507,16 @@ describe('II.2 · Solicitud de Imagenología — medido sobre el PDF', () => {
       tipo: 'Radiografía',
       region: `Segmento ${i}`,
     })
-    const hojas = await componer(Array.from({ length: 16 }, (_, i) => minimo(i)))
+    /*
+      ⚠ **ERAN DIECISÉIS Y SON VEINTICUATRO.** La entrada mínima baja de 28.5 a 26.5 y el
+      encabezado encoge 51 pt, así que dieciséis dejaron de partir: la sonda se habría
+      quedado midiendo una sola hoja en silencio. Se sube hasta que vuelve a repartir.
+    */
+    const hojas = await componer(Array.from({ length: 24 }, (_, i) => minimo(i)))
     expect(hojas.length).toBeGreaterThan(1)
 
-    // El estado mínimo mide 28.5 por entrada, de la prueba de los cuatro estados.
-    const esperado = 28.5
+    // El estado mínimo mide 26.5 por entrada, de la prueba de los cuatro estados.
+    const esperado = 26.5
 
     let hojasMedidas = 0
     for (const [indice, hoja] of hojas.entries()) {
@@ -490,35 +533,28 @@ describe('II.2 · Solicitud de Imagenología — medido sobre el PDF', () => {
     expect(hojasMedidas).toBeGreaterThan(1)
   }, 200_000)
 
-  it('DEFECTO DEL CHASIS: con siete estudios caros la hoja se comprime un 2 %', async () => {
+  it('EL DEFECTO DE COMPRESIÓN YA NO SE REPRODUCE AQUÍ: el paso es constante', async () => {
     /*
-      ⚠⚠ **ESTA PRUEBA FIJA UN DEFECTO VIVO, NO UNA GARANTÍA. El día que se arregle, FALLA
-      — y eso es lo que se quiere: que nadie lo arregle sin venir aquí a borrarla.**
+      ⚠⚠ **ESTA PRUEBA FIJABA UN DEFECTO VIVO Y AHORA FIJA SU AUSENCIA EN ESTE FORMATO.**
 
-      La sonda de arriba encontró el caso real: con SIETE estudios en su estado más caro,
-      la hoja 1 no cabe por unos 8 pt y el chasis, en vez de mandar el séptimo a la hoja 2,
-      **encoge la hoja entera un 1.97 %**. Medido, con `caro(i)`:
+      El defecto no se ha arreglado: `@react-pdf/renderer` sigue **encogiendo las filas de
+      una hoja que se pasa por poco** en vez de mandar la fila que sobra a la siguiente.
+      Lo que ha cambiado es DÓNDE aparece. En v2, con siete estudios caros, Imagenología
+      se pasaba por ~8 pt —dentro de la holgura que Yoga puede absorber— y la hoja entera
+      encogía un 1.97 %: el paso bajaba de 59.5 a 58.3269.
 
-          entradas 2 a 6   paso 59.5000   (la suma de tokens, limpia)
-          entradas 7 a ∞   paso 58.3269   (−1.1731 por entrada)
+      En v3 la entrada cara mide 52.5 en vez de 59.5 y el encabezado 51 pt menos, así que
+      SIETE caben con holgura y el octavo desborda por mucho más de lo que Yoga puede
+      absorber: pagina limpio. Medido de tres a ocho estudios, el paso sale **52.5
+      exactos en los seis casos**, incluido el que parte.
 
-      Y no es solo la lista: el membrete baja de 89.182 a 88.481, el título de 177.426 a
-      175.060. Se comprime TODO el flujo, en proporción.
+      **Dónde está ahora:** `hojaDeContinuacion.test.ts` lo mide en Imagenología con doce
+      estudios al **1.36 %**, y la nota de `tokens.ts` sobre igualar los márgenes ya
+      anticipaba que se reubicaría. Sigue siendo el defecto de chasis abierto de
+      `DOCUMENTOS_RANURAS_MUERTAS.md` §3.
 
-      POR QUÉ NO SE ARREGLA AQUÍ. El sobrante de 8 pt cabe dentro de la holgura que Yoga
-      tiene para encoger, así que lo absorbe antes de que la paginación mire. Con el estado
-      MÍNIMO el sobrante de una entrada es de 28.5 pt, más de lo que la holgura da de sí, y
-      entonces sí pagina limpio (la sonda de arriba lo comprueba con dieciséis). O sea que
-      el chasis se traga en silencio los desbordes pequeños y solo pagina los grandes.
-
-      El único palanca medida es poner `flexShrink` a un valor positivo diminuto —el 0 es
-      inerte, el 0.0001 no— en la raíz de la entrada de 2.G: probado, deja el paso en
-      59.4997. **No se aplicó**, porque no arregla nada: los mismos 8 pt se mudan enteros
-      al membrete y a la cabecera, que es donde menos se ven y más duelen. Rigidizar SOLO
-      la lista cambia una deformación repartida por una concentrada.
-
-      Arreglarlo de verdad es hacer rígido el chasis entero para que el desborde exista y
-      la paginación lo vea. Eso mueve muchos componentes y no cabe en este paso.
+      Si algún día esta prueba falla, el defecto volvió a este formato: mira el paso de
+      la hoja que CIERRA, no el cuerpo de letra — react-pdf nunca toca `fontSize`.
     */
     const caro = (i: number): EstudioSolicitado => ({
       tipo: 'Radiografía',
@@ -534,32 +570,34 @@ describe('II.2 · Solicitud de Imagenología — medido sobre el PDF', () => {
       return anclas[1] - anclas[0]
     }
 
-    // Seis caben: el paso es la suma de tokens.
-    expect(await paso(6)).toBeCloseTo(59.5, 2)
-    // El séptimo no cabe, y en vez de irse a la hoja 2 encoge la hoja.
-    expect(await paso(7)).toBeCloseTo(58.3269, 2)
+    for (const n of [6, 7, 8]) {
+      expect(await paso(n), `${n} estudios`).toBeCloseTo(52.5, 2)
+    }
   }, 200_000)
 
   it('cierra la hoja donde la medición dice, y no una entrada más', async () => {
-    // Con el estado más caro caben CUATRO. El presupuesto, en pt sobre los 670 de
-    // caja: 217.88 de encabezado + 21 de cabecera + N × 59.5 + 5 + 11 de contador
-    // + 26 + 118.75 de firma. Con N = 4 sobran 30.87; con N = 5 faltan 28.63.
+    /*
+      ⚠ **CABEN SIETE, Y EN v2 CABÍAN CUATRO.** La caja pasa de 670 a 693, el encabezado
+      de 229.88 a 178.50 y la entrada cara de 59.5 a 52.5. La cifra es CONSECUENCIA del
+      rediseño y no su objetivo; lo que la prueba defiende es que la hoja cierre donde la
+      suma dice y no una entrada más tarde.
+    */
     const caro = (i: number): EstudioSolicitado => ({
       tipo: 'Radiografía',
       region: `Segmento ${i}`,
       proyecciones: 'AP y lateral',
       indicacion: 'Control evolutivo del material de osteosíntesis.',
     })
-    expect(await componer(Array.from({ length: 4 }, (_, i) => caro(i)))).toHaveLength(1)
-    expect(await componer(Array.from({ length: 5 }, (_, i) => caro(i)))).toHaveLength(2)
+    expect(await componer(Array.from({ length: 7 }, (_, i) => caro(i)))).toHaveLength(1)
+    expect(await componer(Array.from({ length: 8 }, (_, i) => caro(i)))).toHaveLength(2)
 
-    // Con el estado mínimo —28.5 por entrada— caben NUEVE.
+    // Con el estado mínimo —26.5 por entrada— caben QUINCE, y eran nueve.
     const minimo = (i: number): EstudioSolicitado => ({
       tipo: 'Radiografía',
       region: `Segmento ${i}`,
     })
-    expect(await componer(Array.from({ length: 9 }, (_, i) => minimo(i)))).toHaveLength(1)
-    expect(await componer(Array.from({ length: 10 }, (_, i) => minimo(i)))).toHaveLength(2)
+    expect(await componer(Array.from({ length: 15 }, (_, i) => minimo(i)))).toHaveLength(1)
+    expect(await componer(Array.from({ length: 16 }, (_, i) => minimo(i)))).toHaveLength(2)
   }, 180_000)
 
   it('ancla la banda de pie en y = 740 y con folio', async () => {
@@ -570,4 +608,5 @@ describe('II.2 · Solicitud de Imagenología — medido sobre el PDF', () => {
     // Variante `completo`: la lámina compone folio, y II.2 §1 decía `sin folio`.
     expect(renglon(hoja, 'Folio IMG-2026-0148')).toBeDefined()
   }, 60_000)
+
 })

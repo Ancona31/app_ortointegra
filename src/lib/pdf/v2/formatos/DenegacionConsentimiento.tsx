@@ -1,425 +1,117 @@
 /**
- * Sistema de documentos v2 — formato II.9 · **Denegación o revocación del consentimiento**.
+ * Sistema de documentos v3 — formato **II.9 · Denegación o Revocación del
+ * Consentimiento**. Brief `09`.
  *
- * FUENTE DE VERDAD: `GUIA_FORM_DENEGACION.md`, medido sobre el archivo aprobado
- * `Denegacion de Consentimiento.dc.html` en coordenadas absolutas desde el borde del papel.
+ * Documento INDEPENDIENTE de una hoja, que se emite **en lugar** del consentimiento
+ * cuando el paciente rechaza el procedimiento o revoca una autorización previa. **No es
+ * una hoja de II.7** y **no es el Consentimiento con menos cosas**, que es el error
+ * fácil de cometer: comparte con él la anatomía de celda de declaración y el marco de
+ * su párrafo, y **sus dos aires de encabezado son los del chasis**.
  *
- * QUÉ ES, Y POR QUÉ NO ES UNA HOJA DE II.7
+ * ── LO QUE CAMBIA RESPECTO DE v2 ────────────────────────────────────────────
  *
- * Un documento **independiente de una hoja** que se emite **en lugar** del consentimiento,
- * cuando el paciente rechaza el procedimiento o revoca una autorización previa. Si el paciente
- * deniega, no se imprimen las siete hojas que explican y otorgan lo que acaba de rechazar.
+ * 1. **CABE EN UNA HOJA, SIEMPRE** (defecto §7). En v2 el caso denso se iba a dos, y la
+ *    causa estaba medida: un título de dos renglones, una ficha de cuatro filas y la
+ *    credencial del médico partida. Tres cosas lo cierran, y las tres son del chasis:
+ *    el título con `maxLines: 2` + elipsis, la ficha reducida a **dos filas** con
+ *    hospital y lugar unidos en la misma, y la banda de cierre de 83.75 en vez de 105.4.
+ * 2. **El diagnóstico sale de la declaración** (brief 00 §5.2): se imprime una sola vez
+ *    por documento, y en este formato vive en la ficha. La declaración cita el
+ *    procedimiento, que es lo que se revoca.
+ * 3. **El médico firma a la izquierda**, como en los otros ocho.
+ * 4. **Sin aviso de continuación** (`aviso={false}`): un documento de una hoja por
+ *    construcción no anuncia una hoja 2 que no existe.
  *
- * Comparte con II.7 el formulario y los datos de identificación —se elige con un conmutador,
- * como recibo y cotización en II.5— y **no comparte su `documentos.tipo`**: un consentimiento y
- * una denegación son actos OPUESTOS, y una denegación etiquetada como consentimiento obligaría
- * a abrirla para saber que el paciente rechazó. El razonamiento entero está en la cabecera de
- * `supabase/migrations/20260811_folio_03_denegacion.sql`.
+ * ── LA VARIANTE POR SUSTITUCIÓN ─────────────────────────────────────────────
  *
- * LAS DOS VARIANTES, Y LAS DOS EN UNA HOJA
- *
- *     firma el paciente   3 firmantes   holgura **75.79 pt** de guía · **102.43** compuesta
- *     por sustitución     2 firmantes   holgura **26.04 pt** de guía · **29.43** compuesta
- *                                       — la más ajustada del documento y del sistema
- *
- * Lo que separa a la segunda son tres bloques que la primera no tiene: la declaración de
- * sustitución (22) con su espaciador (12) y la constancia del motivo (37.75) con el suyo (12).
- * Ver `EL RIESGO DECLARADO` abajo.
- *
- * ⚠ **LAS DOS CIFRAS COMPUESTAS SE SEPARARON AL RETIRAR LA CASILLA**, y conviene saber por qué
- * no se movieron a la vez. La declaración de sustitución dejó de componerse en la variante en
- * que firma el paciente —antes salía en las dos, con el cuadro vacío—, así que aquella ganó sus
- * 34 pt enteros. La de sustitución sigue componiéndola: allí lo único que se fue fue el cuadro
- * de 9 × 9 y su medianil de 7, que son 16 pt de ANCHO y ninguno de alto. **La cota ajustada se
- * quedó donde estaba**, y sigue siendo la que hay que mirar cuando algo de este documento
- * crezca. Las dos, fijadas en `denegacionConsentimiento.test.ts`.
- *
- * EL PRESUPUESTO DEL ENCABEZADO, SUMADO Y NO DECLARADO
- *
- * La guía mide **240.59 pt** desde el margen de 54. Como en los ocho anteriores, eso no es una
- * constante que copiar: es la suma de sus bloques.
- *
- *     fila superior del membrete    56       (el panel; la guía la mide en 58.85)
- *     aire                           8       `transicion.membreteFilete`
- *     filete principal               2.5
- *     aire                           6       `transicion.membreteLineaFina`
- *     banda de dirección            12       UN renglón, sin cédulas
- *     espaciador de cierre          12       ← 2.B, el del CHASIS
- *     bloque de título              56       título a DOS líneas (40) + 2 + subtítulo 14
- *     aire                           4       `transicion.tituloFilete`
- *     filete del título              2.5
- *     aire                           8       `transicion.tituloRiel`, el del CHASIS
- *     riel de identificación        70.57    (0.8 + 33 + 0.5 + 35.47 + 0.8)
- *                                 ────────
- *                                 237.57    + 2.85 (el panel) = **240.42**
- *
- * contra los **240.59** medidos: **0.17 pt**, del mismo orden que los residuos de las ocho
- * láminas anteriores. El riel se lee con el familiar VACÍO, que es como lo compone la guía —su
- * línea de escritura es lo que sube esa fila de 33 a 35.47—.
- *
- * ⚠⚠ **LOS DOS AIRES DEL ENCABEZADO SON LOS DEL CHASIS Y NO LOS DE II.7. NO LOS CAMBIES.**
- *
- * Este documento comparte con el consentimiento la banda de un renglón, la anatomía de celda
- * del riel y el marco de su declaración, así que la tentación es componerlo con
- * `lamina: 'consentimiento'`. **Con esa lámina el encabezado mide 258.59 y no 240.59**: aquella
- * cierra su membrete con 20 pt en vez de 12 y abre su cuerpo con 18 bajo el filete del título
- * en vez de 8. Los 18 pt de diferencia salen enteros de la holgura, y la variante por
- * sustitución solo tiene 26.04. Por eso existe la lámina `denegacion` — ver su nota en la capa
- * de tokens, que es donde se lee al lado de las otras ocho.
- *
- * LO QUE NO LLEVA, Y CADA COSA POR SU MOTIVO
- *
- *   **Sin QR.** El documento no autoriza nada: es la constancia de que no se autorizó. El
- *   folio se conserva —es lo que lo ata al expediente—, y esa separación entre folio y código
- *   es la misma que ya hace II.7.
- *
- *   **Sin anexo de identificaciones.** Con ello la numeración del pie queda cerrada: siempre
- *   `Página 1 de 1`.
- *
- *   **Sin bloque en negativo.** Con título propio duplicaría la función y competiría con él a
- *   dos renglones de distancia; la distinción de un vistazo la da el título.
- *
- *   **Sin diagnóstico y sin expediente en el riel.** Este documento no asienta un
- *   padecimiento: asienta que no se autorizó un procedimiento, y el procedimiento va como
- *   subtítulo del bloque de título.
- *
- *   **Sin sellos de trazabilidad.** II.7 los compone en dos sitios —pie de celda y bloque de
- *   cierre— y su guía los declara; la de este documento no mide ninguno de los dos y este
- *   archivo no los inventa. **Reportado**: si la NOM-004 los exige también aquí, lo que falta
- *   es medirlos en la lámina, no deducirlos de la de al lado.
- *
- * ⚠ **EL TEXTO CORRIDO VA JUSTIFICADO, y es la MISMA excepción declarada a I.3.2, no una
- * nueva.** I.3.2 prohíbe el justificado sin excepción en todo el sistema; Angel comparó las dos
- * versiones en papel y decidió el justificado para el consentimiento. Este documento es la
- * denegación de ese consentimiento —se emite en su lugar, con su formulario y sus datos—, así
- * que componerlo en bandera dejaría dos piezas del mismo acto con dos alineaciones. La
- * excepción sigue siendo de UN formato leído como uno solo, y los otros siete siguen en bandera
- * izquierda. Ver la cabecera de `ConsentimientoInformado.tsx`.
- *
- * ⚠ **LA PARTICIÓN SIGUE DESACTIVADA**, como allí: `fonts.ts` registra un
- * `registerHyphenationCallback` que devuelve la palabra entera, por el gate de I.3.1. El
- * justificado solo puede estirar espacios.
- *
- * EL RIESGO DECLARADO, Y QUÉ SE HACE CON ÉL
- *
- * La guía lo deja escrito: **con un nombre de procedimiento largo, la variante por sustitución
- * es la primera que desborda**. Su declaración crece un renglón de 16 pt y su holgura es de 26.
- *
- * **Angel decidió que una revocación en dos hojas NO es aceptable.** El documento es la
- * constancia de un acto único y una firma en otra hoja que la declaración es exactamente el
- * defecto que la regla 1 de 2.N existe para evitar. Así que lo que se recorta es el SUBTÍTULO
- * —el nombre del procedimiento bajo el título, que se repite dentro de la declaración dos
- * bloques más abajo—, no el documento. Ver `recortarSubtitulo()`.
- *
- * ⚠ **NO ES UN TRUNCADO DE CORTESÍA Y NO SE PUEDE QUITAR «PORQUE CASI NUNCA PASA».** Es lo
- * único que garantiza la hoja única, y su umbral está fijado en `denegacionConsentimiento.test.ts`
- * con el procedimiento más largo que el formulario admite.
- *
- * ⚠⚠ **Y EL TECHO NO DESAPARECIÓ: SE MOVIÓ, Y EL DIAGNÓSTICO LO VOLVIÓ A ACERCAR.**
- *
- * El diagnóstico entró en la declaración por su valor legal, y con él el primer párrafo pasa de
- * tres renglones a cuatro. **Eso era exactamente lo que la variante por sustitución podía
- * pagar**: su holgura baja de 29.43 a **13.43 pt**, y no queda sitio para un quinto renglón.
- * Medido, con la cadena de la prueba: **84 caracteres de diagnóstico caben y 85 no**.
- *
- * El diagnóstico y el procedimiento **viven en el mismo párrafo y compiten por los mismos
- * renglones**, así que los 84 no son una regla sino una cota de esa cadena; alargar uno acorta
- * al otro. La regla que sí se sostiene es **el párrafo aguanta un renglón de más y no dos**.
- *
- * **Lo que queda por decidir, y es de Angel.** No hay recorte que aplicar sin perder algo: lo
- * único truncable que queda es la declaración, que es la frase que el paciente firma y donde el
- * diagnóstico acaba de entrar —recortarla escondería el dato que el cambio existe para asentar—,
- * y el subtítulo ya va a un renglón. **La palanca que sobra es retirar el subtítulo entero del
- * bloque de título**: 16 pt, un renglón más de declaración. No se compone porque hacer aparecer
- * y desaparecer un bloque según lo que mida el párrafo de abajo es métrica decidida por el
- * contenido, que es lo que I.3.4 prohíbe — y porque dos denegaciones con estructura distinta y
- * sin motivo visible se leen como dos documentos.
- *
- * LOS DOS RECURSOS QUE ESTE FORMATO ESTRENA
- *
- *   **La retícula de firmas con columnas = firmantes** (2.L). Tres firmantes en dos columnas
- *   desbordaban 62 pt y dejaban media fila vacía. Es un parámetro del chasis, declarado en la
- *   ficha de 2.L, no un componente nuevo.
- *
- * ⚠ **LO QUE NO CUADRA CON LA GUÍA: LA CREDENCIAL DEL MÉDICO A 142 pt.**
- *
- * La guía lo da por verificado —«a 142 pt: rol, nombre y nota entran en un renglón cada uno, sin
- * saltos»— y en el PDF **no**: `Céd. Prof. 9552456 · Céd. Esp. 12085805` a 7.5 pt en IBM Plex
- * Sans mide algo más de 142, así que parte, y la celda del médico queda 11 pt más baja que las
- * otras dos. Solo pasa en la variante de tres columnas; en las dos de 228 entra sin partirse.
- *
- * **Se compone así y queda reportado**, porque las tres salidas están prohibidas o son peores:
- * bajar el cuerpo o el tracking es comprimir para cuadrar una hoja (I.3.4); recortar la cédula
- * con elipsis es esconder un dato de identificación profesional, que es lo que 2.H prohíbe; y
- * ensanchar la columna rompe el reparto de la guía. **La holgura lo absorbe de sobra**: la
- * variante que lo sufre es la de tres firmantes, la de 75.79 pt de guía, y aun con los 11 pt
- * queda en 102.43. Fijado en `denegacionConsentimiento.test.ts`.
- *
- *   **El bloque con borde completo y fondo** (la constancia). Ya existía sin declarar en la
- *   hoja 4 de II.7, que no lo compuso: el punto (g) de su cabecera lo deja reportado como lo
- *   único del sistema con esa anatomía, y `D34` solo declara marcos parciales. **Este documento
- *   es el segundo consumidor y sí lo compone**, aquí y no en el chasis — por lo mismo que la
- *   caja de fotografía del anexo de II.7 vive en su formato: 2.U declara marcos de dos lados, y
- *   una caja cerrada con fondo no es uno de ellos. Ver `CONSTANCIA`.
- *
- * Sin `'use client'`: módulo neutro, como el resto de v2.
+ * Cuando el paciente no puede firmar, la banda de cierre pasa de **tres celdas**
+ * —médico, paciente, familiar— a **dos** —médico, familiar—, y aparece la constancia
+ * del motivo: un bloque con fondo al velo del acento donde el médico asienta por qué
+ * firma otro. Es la única rama del formato, y su holgura es de **26.04 pt**: por eso los
+ * dos aires del encabezado son los del chasis y no los del Consentimiento — con
+ * aquéllos, el documento mide 258.59 de encabezado en vez de 240.59 y esos 18 pt salen
+ * justo de aquí.
  */
 
-import { Page, View, Text, StyleSheet } from '@react-pdf/renderer'
+import { Page, StyleSheet, Text, View } from '@react-pdf/renderer'
 import type { ReactElement } from 'react'
-import type { ConsultorioMembrete, MedicoMembrete } from '../Membrete'
-import type { PanelCircularProps } from '../PanelCircular'
-import type { ValoresPaciente } from '../BloquePaciente'
-import BloqueFirmas, { type Firma } from '../BloqueFirmas'
+import BloqueFirmas, { type CeldaFirma, type Firma } from '../BloqueFirmas'
 import MarcoParcial, { MARCO } from '../MarcoParcial'
 import MotorFlujo from '../MotorFlujo'
 import PieDocumento from '../PieDocumento'
-import { tieneValor } from '../Campo'
+import type { ConsultorioMembrete, MedicoMembrete } from '../Membrete'
+import type { PanelCircularProps } from '../PanelCircular'
+import type { CeldaPaciente, ValoresPaciente } from '../BloquePaciente'
 import {
+  CAJA,
   ESPACIO,
-  FILETE,
   MARGEN,
   PAPEL,
   TINTA,
+  TRANSICION,
   estiloTipografico,
+  veloDeAcento,
   type AcentoResuelto,
 } from '../tokens'
 
-/** La lámina que fija la composición de los componentes del chasis en este formato. */
-const LAMINA = 'denegacion' as const
-
-// ─── Cadenas ─────────────────────────────────────────────────────────────────
-
-/**
- * EL TÍTULO, y **ocupa dos renglones a propósito**.
- *
- * La regla 1 de 2.C dice que un título fijo que rompe a dos líneas es un error de redacción del
- * título. Aquí no lo es: la guía lo mide en dos renglones —40 de los 55.99 del bloque— y la
- * cadena no se puede acortar sin perder una de las dos cosas que el documento es. `Denegación`
- * es negarse a autorizar por primera vez y `revocación` es retirar una autorización ya dada;
- * el mismo formato sirve para las dos y el título tiene que decirlo, porque es lo único que un
- * tercero lee de un vistazo para saber que esta hoja **no** autoriza nada.
- */
 const TITULO = 'Denegación o revocación del consentimiento'
-
-/**
- * LOS TRES PÁRRAFOS DE LA DECLARACIÓN. **Son texto clínico-legal: no se tocan.**
- *
- * Van literales de la guía, con los tres ajustes ya aprobados en ella. El primero lo REDACTA
- * este archivo porque lleva CUATRO datos dentro —paciente, diagnóstico, procedimiento y
- * médico—, que es el mismo reparto que hace II.7 con el suyo.
- *
- * La guía destaca las menciones con peso **500**, no 600: son las que un tercero busca al leer
- * la hoja, y por eso el destaque no es decorativo. Van como `Text` anidado, que es como
- * react-pdf compone un tramo con otro peso dentro de un párrafo.
- *
- * ⚠ **EL DESTACADO VA EN 500 Y EL PUENTE DE v1 LO COMPONE EN 700.** Aquel archivo destaca sus
- * cuatro menciones con `declBold`, y hace bien: es su convención y sus otros tres destacados ya
- * la usaban, así que darle al diagnóstico otro peso lo leería como un dato de otra clase dentro
- * de la misma frase. **Aquí el peso lo fija el chasis**: el destacado dentro de texto corrido es
- * 500 en todo v2. No es una divergencia que conciliar — son dos sistemas, y cada uno compone el
- * suyo hasta que v1 se apague.
- */
-const DECLARACION_2 =
-  'No obstante, en pleno uso de mis facultades y de forma libre y voluntaria, manifiesto mi decisión de no autorizar o revocar la autorización previamente otorgada para la realización del procedimiento descrito, asumiendo las consecuencias que de ello puedan derivarse, las cuales me han sido explicadas.'
-const DECLARACION_3 =
-  'Se me ha informado que puedo cambiar de opinión y otorgar mi consentimiento en cualquier momento.'
-
-/**
- * LA DECLARACIÓN DE SUSTITUCIÓN, textual. **Es la misma cadena que compone II.7**, y se escribe
- * entera en vez de importarse de aquel formato: los dos son documentos distintos y una cadena
- * compartida ataría la redacción de uno a la del otro. Es el criterio del sistema con todas sus
- * cadenas (I.1.7).
- *
- * ⚠ **NO LLEVA CASILLA, Y SOLO SE COMPONE SI SE EJERCIÓ** — el mismo principio que II.7. En un
- * documento legal se imprime la frase o no se imprime nada: una casilla sin marcar dice «esto se
- * podía marcar y no se marcó», y de ahí no se distingue una negativa de un olvido.
- *
- * Aquí ese cuadrito llevaba además un defecto propio: **salía vacío en TODAS las denegaciones
- * emitidas**, porque el formulario ocultaba su control en esta rama y nunca persistía el campo.
- * El papel dibujaba una posibilidad que nadie podía ejercer. Ya lo guarda.
- */
-const TEXTO_SUSTITUCION =
-  'El paciente no puede firmar por sí mismo; firma en su lugar el familiar o responsable, cuyos datos se asientan en el recuadro de la derecha.'
-
-/** El rótulo y el motivo por defecto de la constancia. Ver `motivo` en las props. */
 const ROTULO_MOTIVO = 'Motivo por el que el paciente no firma'
-const MOTIVO_POR_DEFECTO =
-  'Imposibilidad física para firmar. Motivo valorado y asentado por el médico tratante.'
-
-/**
- * LOS TRES ROLES Y SUS NOTAS.
- *
- * **Fuera el anestesiólogo** —entrega su propio consentimiento— y **fuera los testigos**, que
- * son opcionales en una revocación. **Sin niveles y sin campo de parentesco**: los tres firman
- * el mismo acto, así que no hay jerarquía de otorgamiento que rotular, y el parentesco ya está
- * asentado en el riel.
- */
+const NOTA_SUSTITUCION =
+  'El paciente no puede firmar por sí mismo; firma en su lugar el familiar o responsable, cuyos datos se asientan en el recuadro de la derecha.'
 const ROL_MEDICO = 'Médico tratante'
 const ROL_PACIENTE = 'Paciente'
 const ROL_FAMILIAR = 'Familiar o responsable'
 const NOTA_PACIENTE = 'Nombre y firma'
 const NOTA_FAMILIAR = 'Representante del paciente'
-/** Por sustitución el familiar deja de ser opcional, y su nota lo dice. */
-const NOTA_FAMILIAR_SUSTITUCION = 'Firma en representación del paciente'
 
-// ─── Separaciones de primer nivel ────────────────────────────────────────────
+const PRESENCIA_DECLARACION = 96
 
-/**
- * SEPARACIÓN ENTRE BLOQUES DE PRIMER NIVEL — **12 pt, y son las cuatro iguales**.
- *
- *     riel → declaración                    12
- *     declaración → sustitución             12   solo en la variante por sustitución
- *     sustitución → constancia              12   solo en la variante por sustitución
- *     declaración o constancia → firmas     12
- *
- * Es el único formato del sistema donde todas las separaciones de primer nivel valen lo mismo,
- * y no es casualidad: el documento tiene hasta cuatro bloques y ninguna jerarquía entre ellos
- * —la declaración, la de sustitución que la califica, la constancia que explica quién firma y
- * las firmas—. Una sola constante, `espacio.12`, y ningún miembro nuevo de la escala.
- *
- * ⚠ **LA CADENA TIENE DOS FORMAS Y NO UNA**, desde que la sustitución dejó de componerse
- * siempre. En la variante en que firma el paciente son tres bloques, no cuatro: la declaración
- * enlaza con las firmas y los dos intermedios no existen. Que las cuatro separaciones valgan lo
- * mismo es lo que permite que la cadena se acorte sin recalcular nada.
- *
- * Faltan las tres del encabezado y las tres faltan porque ya están en el chasis: el espaciador
- * de cierre de 2.B, `transicion.tituloFilete` y `transicion.tituloRiel`. Sumar cualquiera aquí
- * la contaría dos veces.
- */
-const SEPARACION = ESPACIO[12]
+/** Velo del acento para la constancia de motivo. El 6 % del sistema. */
+const PROPORCION_VELO = 0.06
 
 /**
- * LA CONSTANCIA DEL MOTIVO — **el único bloque del sistema con borde en los cuatro lados y
- * fondo**, y por eso su geometría se declara aquí y no en 2.U.
- *
- * Se lee como constancia impresa y no como campo por llenar, que es exactamente lo contrario
- * de lo que dice un renglón de escritura: el motivo ya lo valoró y lo asentó el médico.
- *
- * ⚠ **EL FONDO NO ES EL ÚNICO PORTADOR DE SIGNIFICADO** (I.3.3), y esa es la condición que lo
- * hace componible: la caja se distingue además por su borde de 0.5 en los cuatro lados, así que
- * en fotocopia —donde `papelTenue` desaparece— sigue siendo una caja. **Quien quite el borde
- * deja el color solo y rompe la regla.** Es el mismo cuidado que se toma la caja de fotografía
- * del anexo de II.7, que es el otro sitio del sistema donde vive este octavo neutro.
- *
- * **`minHeight` y no `height`**: la caja crece con su contenido, así que aguanta un motivo más
- * largo sin romperse. Con el motivo por defecto mide 7 + 10 + 13 + 7 + 1 de bordes = **38**
- * contra los 37.75 de la guía: 0.25 pt.
+ * Dos filas y no cuatro. Ver el punto 1 de la cabecera: hospital y lugar comparten la
+ * segunda, y el familiar es **campo vacío requerido** —sin dato conserva su rótulo y
+ * deja la línea—.
  */
-const CONSTANCIA = {
-  ancho: MARCO.declaracion.ancho,
-  padding: { vertical: 7, lateral: 9 },
-  alto: 37.75,
-} as const
+const FICHA: readonly (readonly CeldaPaciente[])[] = [
+  [
+    { campo: 'paciente', columnas: 6 },
+    { campo: 'edad', columnas: 3 },
+    { campo: 'fecha', columnas: 3 },
+  ],
+  [
+    { campo: 'familiar', columnas: 4 },
+    { campo: 'hospital', columnas: 5, etiqueta: 'Hospital o clínica' },
+    { campo: 'lugar', columnas: 3 },
+  ],
+]
 
-// La casilla de sustitución —9 × 9 con marca sólida de 5 × 5— se fue con el principio de
-// arriba. Con ella se fueron sus tres cifras y el medianil de 7 que la separaba del texto:
-// la declaración ocupa ahora el ancho entero del marco. Ver `TEXTO_SUSTITUCION`.
-
-// ─── Props ───────────────────────────────────────────────────────────────────
-
-/**
- * Un firmante. **La rúbrica es por persona**, no por documento. En este documento no la
- * trae ninguno: se emite para firmarse a mano y no se sella nunca, así que las tres celdas
- * salen con su espacio en blanco de 77 pt, sin leyenda de «pendiente» —ese aviso vive en
- * pantalla, no en el papel—. La ranura sigue aquí porque el firmante es el mismo tipo.
- */
 export interface FirmanteDenegacion {
-  /** Nombre de quien firma. Sin él, el renglón se reserva para llenarlo a mano. */
+  /** Sin nombre, el renglón se reserva para llenarlo a mano. */
   readonly nombre?: string
-  /** Trazo capturado, ya normalizado a PNG o JPG por quien llama (I.3.8). */
   readonly rubrica?: string
 }
 
 export interface DenegacionConsentimientoProps {
   readonly medico: MedicoMembrete
-  /** Consultorio activo, leído por quien construye el documento (I.3.6, P2-3). */
   readonly consultorio: ConsultorioMembrete
   readonly panel: PanelCircularProps
   readonly acento: AcentoResuelto
-  /**
-   * Los datos del paciente. El riel compone SEIS de ellos en dos filas —**sin expediente**— y
-   * `familiar` es campo vacío requerido: conserva su línea si no viene.
-   *
-   * ⚠ **EL SÉPTIMO ES EL DIAGNÓSTICO, Y NO VA EN EL RIEL SINO DENTRO DE LA DECLARACIÓN.** Una
-   * revocación puede acabar en sede legal, y ahí importa no solo qué procedimiento se rechazó
-   * sino **de qué se estaba tratando al paciente**; puesto en el riel sería un dato de
-   * cabecera más, y lo que hace falta es que esté en la frase que el paciente firma. Se lee de
-   * aquí y no de una prop hermana a propósito: dos puertas para el mismo dato son dos valores
-   * que pueden discrepar, y el formato tendría que elegir uno en silencio.
-   *
-   * **Es opcional y su ausencia es un caso real**, no un descuido: en denegación el diagnóstico
-   * no es campo obligatorio —exigirlo bloquearía un rechazo por no haber redactado antes lo que
-   * el paciente acaba de rechazar—. Sin él la frase se compone **sin el inciso**. Ver el render.
-   */
   readonly paciente: ValoresPaciente
-  /**
-   * El procedimiento que se deniega o cuya autorización se revoca. Va en dos sitios: como
-   * subtítulo del bloque de título —recortado si es muy largo, ver `SUBTITULO`— y entero
-   * dentro del primer párrafo de la declaración.
-   */
+  /** El procedimiento que se rechaza o revoca. Bloquea emisión. */
   readonly procedimiento: string
-  /** Los tres firmantes, y ninguno trae rúbrica: este documento se firma a mano. */
   readonly firmantes: {
     readonly medico: FirmanteDenegacion
     readonly paciente: FirmanteDenegacion
     readonly familiar: FirmanteDenegacion
   }
-  /**
-   * VARIANTE POR SUSTITUCIÓN: el paciente no puede firmar y firma el familiar en su lugar.
-   *
-   * Y tiene sentido en una revocación tanto como en un otorgamiento: **un paciente que no
-   * puede firmar tampoco puede rechazar por escrito**, así que ahí el familiar decide por él.
-   * Es el mismo supuesto, del otro lado de la decisión.
-   *
-   * Cambia cuatro cosas a la vez: **se compone la declaración de sustitución**, aparece la
-   * constancia del motivo, la celda del paciente desaparece —la retícula pasa de tres columnas
-   * a dos— y la nota del familiar cambia a `Firma en representación del paciente`. Es
-   * sustitución y no adición: el familiar firma UNA vez.
-   *
-   * ⚠ **TUVO PRODUCTOR TARDE, Y ESTO ES LO QUE HAY QUE SABER AL LEER UNA FILA VIEJA.**
-   * `ConsentimientoInformadoForm` ocultaba su control en la rama de denegación y no persistía
-   * el campo, así que **ninguna denegación emitida hasta ahora puede traerlo**: todas se
-   * reimprimen en la variante en que firma el paciente, que es lo que su papel decía. Ya se
-   * captura y ya se guarda; las anteriores son inmutables y se quedan como están.
-   */
-  readonly sustitucion?: boolean
-  /*
-    ── AQUÍ NO HAY `motivo`, Y NO ES UN OLVIDO ───────────────────────────────
-
-    La constancia compone SIEMPRE la fórmula por defecto, `MOTIVO_POR_DEFECTO`, y no hay
-    manera de asentar otra. Llevó una prop para que el médico pudiera escribir el suyo y
-    **nadie la alimentaba**: `ConsentimientoInformadoForm` captura `pacienteNoPuedeFirmar`
-    —que es lo que enciende la variante— pero no un texto de motivo.
-
-    Se retiró en vez de dotarla porque el papel no se queda mudo sin ella: la fórmula dice
-    lo que hay que decir —imposibilidad física, valorada y asentada por el médico
-    tratante— y es la que la hoja 4 de II.7 ya tenía resuelta y medida. Lo que se pierde
-    es la posibilidad de matizarla, y esa posibilidad costaba un campo de texto en un
-    flujo que ocurre con el paciente delante y con la hoja ya impresa a medias.
-
-    La caja sigue siendo `minHeight` y sigue creciendo con su contenido: si algún día
-    hace falta el campo, entra por aquí sin tocar la composición.
-  */
-  /**
-   * Folio del documento, YA generado por la base. **Prefijo `DEN`**, no `D-`: la guía de
-   * composición proponía una sola letra siguiendo las láminas viejas, y la convención de las
-   * ocho clases existentes es de dos a tres letras. Lo fija
-   * `20260811_folio_03_denegacion.sql`; este formato lo recibe como dato y no lo genera.
-   */
+  /** `true` cuando el paciente no puede firmar. Ver la variante por sustitución. */
+  readonly sustitucion: boolean
+  /** Motivo asentado por el médico. Sólo se compone con `sustitucion`. */
+  readonly motivo?: string
   readonly folio: string
 }
-
-// ─── Estilos ─────────────────────────────────────────────────────────────────
-
-/**
- * LA EXCEPCIÓN A I.3.2, EN UN SOLO SITIO Y CON NOMBRE, igual que en II.7.
- *
- * Se esparce en los estilos de texto corrido del formato para que `grep -rn "'justify'"` sobre
- * este archivo devuelva **una** línea y se vea de un vistazo dónde vive. **No lo copies a
- * ningún otro archivo**: la prohibición sigue en pie para los siete formatos restantes.
- */
-const JUSTIFICADO = { textAlign: 'justify' } as const
 
 const estilos = StyleSheet.create({
   hoja: {
@@ -427,70 +119,28 @@ const estilos = StyleSheet.create({
     paddingTop: MARGEN.superior,
     paddingLeft: MARGEN.izquierdo,
     paddingRight: MARGEN.derecho,
-    // Regla 4 de 2.L: reserva los 36 + 16 + 16 pt donde vive la banda de 2.M.
     paddingBottom: MARGEN.inferior,
   },
-
-  // ── La declaración
-  declaracion: { marginTop: SEPARACION },
-  parrafo: { ...estiloTipografico('seccion.parrafo'), ...JUSTIFICADO },
-  /**
-   * `espacio.5` + 1 son los 6 pt que la guía mide entre párrafos. Es la misma suma que compone
-   * II.7 y por el mismo motivo: 6 no es miembro de la escala y tampoco tiene por qué serlo
-   * cuando sale exacto de dos que sí lo son.
-   */
-  parrafoSiguiente: {
+  declaracion: { marginBottom: ESPACIO[12] },
+  parrafo: {
     ...estiloTipografico('seccion.parrafo'),
-    marginTop: ESPACIO[5] + 1,
-    ...JUSTIFICADO,
+    /**
+     * ⚠ **LA PRIMERA DE LAS DOS EXCEPCIONES DECLARADAS A I.3.2** vive en el
+     * Consentimiento; ésta es la MISMA decisión aplicada a su documento hermano —«el
+     * Consentimiento va justificado, y con él toda la familia D»—. `grep -rn
+     * "'justify'"` tiene que devolver tres líneas contadas: II.7, II.8 y ésta.
+     */
+    textAlign: 'justify',
+    marginBottom: ESPACIO[8],
   },
-  /** Las menciones destacadas van en peso 500, no 600. Ver `DECLARACION_2`. */
-  destacado: { fontWeight: 500 },
-
-  // ── La declaración de sustitución
-  /**
-   * El ancho es el del marco de la declaración y no el de la caja: cuelga de ese bloque y se
-   * lee con él. Sin la casilla ni su medianil, el texto gana los 16 pt que ocupaban.
-   *
-   * ⚠ El token sigue llamándose `casilla.texto` y vive en `tokens.ts`, que es chasis. Ya no
-   * queda ninguna casilla en el sistema que lo justifique —II.7 la retiró antes que este
-   * formato—, así que el nombre es un fósil. Renombrarlo es trabajo de chasis y no de aquí.
-   */
-  declaracionSustitucion: {
-    ...estiloTipografico('casilla.texto'),
-    width: MARCO.declaracion.ancho,
-    marginTop: SEPARACION,
-  },
-
-  // ── La constancia del motivo
-  /** El bloque cerrado con fondo. Ver `CONSTANCIA` antes de tocar cualquiera de sus cifras. */
-  constancia: {
-    width: CONSTANCIA.ancho,
-    minHeight: CONSTANCIA.alto,
-    marginTop: SEPARACION,
-    borderWidth: FILETE.regla,
-    borderColor: TINTA.hairline,
-    backgroundColor: TINTA.papelTenue,
-    paddingVertical: CONSTANCIA.padding.vertical,
-    paddingHorizontal: CONSTANCIA.padding.lateral,
-  },
-  /**
-   * Rótulo en `aseguradora.rotulo` —6.5 / 10, peso 600, 0.22 em, `tinta.etiqueta`—, que son las
-   * cinco cifras que la guía mide para esta línea. El rol se llama así por su primer consumidor
-   * y no por su contenido; es el mismo criterio con el que II.7 lo reutiliza para el parentesco.
-   */
-  rotuloMotivo: { ...estiloTipografico('aseguradora.rotulo') },
-  /**
-   * El motivo en `cita.nota` —9.5 / 13, humanista, peso 400—, las tres cifras de la guía. **El
-   * color es `DERIVADO`**: la guía no lo declara, y `tinta.secundaria` es lo que el sistema
-   * pone en toda línea de esta anatomía. Anotado.
-   */
-  textoMotivo: { ...estiloTipografico('cita.nota') },
+  fuerte: { fontWeight: 500 },
+  nota: { ...estiloTipografico('texto.reducido'), marginBottom: ESPACIO[10] },
+  rotulo: { ...estiloTipografico('etiqueta') },
+  motivo: { ...estiloTipografico('seccion.parrafo') },
+  banda: { marginTop: TRANSICION.contenidoCierre },
 })
 
-// ─── El formato ──────────────────────────────────────────────────────────────
-
-/** II.9 · Denegación o revocación del consentimiento. */
+/** II.9 · Denegación o Revocación del Consentimiento. */
 export default function DenegacionConsentimiento({
   medico,
   consultorio,
@@ -500,61 +150,46 @@ export default function DenegacionConsentimiento({
   procedimiento,
   firmantes,
   sustitucion,
+  motivo,
   folio,
 }: DenegacionConsentimientoProps): ReactElement {
-  const porSustitucion = sustitucion === true
-
-  /**
-   * LOS TRES FIRMANTES. Cada uno imprime su rúbrica si la trae; aquí no la trae ninguno.
-   * Los renglones bajo la línea salen de I.1.9 y el del médico son sus cédulas, que se toman de
-   * `MedicoMembrete` en vez de pedirlas otra vez.
-   */
-  const firmaMedico: Firma = {
+  const celdaMedico: Firma = {
     rol: ROL_MEDICO,
     nombre: firmantes.medico.nombre ?? medico.nombre,
     credenciales: medico.cedulas,
     rubrica: firmantes.medico.rubrica,
   }
-  const firmaPaciente: Firma = {
+  const celdaPaciente: Firma = {
     rol: ROL_PACIENTE,
-    nombre: firmantes.paciente.nombre,
+    nombre: firmantes.paciente.nombre ?? paciente.paciente,
     credenciales: [NOTA_PACIENTE],
-    rubrica: firmantes.paciente.rubrica,
+    pesoNombre: 600,
   }
-  const firmaFamiliar: Firma = {
+  const nombreFamiliar = firmantes.familiar.nombre ?? paciente.familiar
+  const celdaFamiliar: Firma = {
     rol: ROL_FAMILIAR,
-    nombre: firmantes.familiar.nombre,
-    credenciales: [porSustitucion ? NOTA_FAMILIAR_SUSTITUCION : NOTA_FAMILIAR],
-    rubrica: firmantes.familiar.rubrica,
+    nombre: nombreFamiliar,
+    credenciales: [NOTA_FAMILIAR],
   }
 
   /**
-   * TANTAS COLUMNAS COMO FIRMANTES, UNA SOLA FILA SIEMPRE. Por sustitución la celda del
-   * paciente desaparece y quedan dos de 228; sin ella, tres de 142.
+   * Tres celdas en el caso normal y dos en la sustitución. Los huecos NO se usan aquí:
+   * cuando el paciente no firma, su celda **no existe** —no es una firma pendiente, es
+   * una firma que no se le pidió—, y lo que dice que no la dio es la constancia de
+   * motivo. Es la diferencia con el testigo ausente del Consentimiento.
    *
-   * ⚠ **`columnas` SE PASA Y NO SE DEDUCE DE `firmas.length`.** Es el formato quien sabe cuántas
-   * columnas quiere su lámina, y deducirlo en 2.L sería métrica decidida por el contenido en
-   * tiempo de render (I.3.4). Aquí las dos cifras salen del mismo sitio —la variante— y por eso
-   * se leen juntas. Ver `columnas` en la ficha de 2.L.
-   *
-   * ⚠ **Y UNA CELDA SIN NOMBRE NO SE COMPONE**, el mismo criterio que II.7. Aquí el caso es
-   * remoto —el formulario exige el familiar SIEMPRE en la denegación, y el paciente es campo
-   * obligatorio de los dos documentos— y se compone igual, porque lo que decide qué imprime el
-   * papel no puede ser una validación que vive en otro archivo. Una raya de firma en blanco
-   * afirma que ahí faltó alguien.
-   *
-   * **El médico no entra en la regla:** es el emisor y su nombre lo aporta el membrete.
-   *
-   * El mínimo de dos columnas es el ancho de celda del sistema: con una sola, la retícula
-   * repartiría los 486 pt enteros y la línea del médico mediría el doble que en cualquier otro
-   * documento.
+   * ⚠ **SOLO FIRMA QUIEN TIENE NOMBRE, y esa regla faltaba.** La celda del familiar se
+   * componía siempre, así que una denegación firmada por el paciente y sin familiar
+   * declarado sacaba una tercera columna rotulada y vacía: el papel decía que se previó
+   * una firma que nadie pidió. En la sustitución no aplica —ahí el familiar es quien
+   * firma y su nombre es obligatorio por construcción—.
    */
-  const firmas: readonly Firma[] = [
-    firmaMedico,
-    porSustitucion || !tieneValor(firmantes.paciente.nombre) ? null : firmaPaciente,
-    tieneValor(firmantes.familiar.nombre) ? firmaFamiliar : null,
-  ].filter((firma): firma is Firma => firma !== null)
-  const columnasDeFirma = Math.max(firmas.length, 2)
+  const hayFamiliar = nombreFamiliar !== undefined && nombreFamiliar.trim() !== ''
+  const firmas: readonly CeldaFirma[] = sustitucion
+    ? [celdaMedico, celdaFamiliar]
+    : hayFamiliar
+      ? [celdaMedico, celdaPaciente, celdaFamiliar]
+      : [celdaMedico, celdaPaciente]
 
   return (
     <Page size={[PAPEL.ancho, PAPEL.alto]} style={estilos.hoja}>
@@ -564,115 +199,112 @@ export default function DenegacionConsentimiento({
           consultorio,
           panel,
           acento,
-          lamina: LAMINA,
           titulo: TITULO,
-          /*
-            EL PROCEDIMIENTO VA ENTERO Y **2.C LO RECORTA A UN RENGLÓN** en esta lámina, que es
-            lo único que garantiza la hoja única: si rompiera a dos, el encabezado subiría 14 pt
-            y la variante por sustitución solo tiene 26.04 de holgura. Se recorta por
-            maquetación y no por caracteres — ver `subtituloRecortado` en 2.C—, y el nombre
-            completo se imprime abajo, dentro de la declaración.
-          */
+          /* El subtítulo nombra el procedimiento revocado, con una línea y elipsis: es
+             el recorte que devuelve este documento a su hoja única. */
           subtitulo: procedimiento,
-          paciente,
           folio,
+          paciente,
+          filasFicha: FICHA,
+          calibracionFicha: 'declaracion',
         }}
-        /*
-          El aire entre lo último del contenido y las firmas: los mismos 12 pt que separan todo
-          en este documento. Sin él, 2.N pondría `espacio.16`.
-        */
-        aireFirma={SEPARACION}
+        /* Ver el punto 4 de la cabecera. */
+        aviso={false}
         firmas={
-          <BloqueFirmas
-            variante="reticula"
-            lamina={LAMINA}
-            calibracion="compacta"
-            columnas={columnasDeFirma}
-            firmas={firmas}
-          />
+          <View style={estilos.banda}>
+            {/*
+              Dos ramas y no un ternario dentro de las props: `BloqueFirmasProps` es una
+              unión discriminada por `variante`, y `pareja` exige exactamente dos celdas
+              y no admite `columnas`.
+            */}
+            {sustitucion ? (
+              <BloqueFirmas variante="pareja" firmas={[firmas[0]!, firmas[1]!]} />
+            ) : (
+              <BloqueFirmas variante="reticula" firmas={firmas} columnas={3} />
+            )}
+          </View>
         }
       >
-        {/*
-          ═══ LA DECLARACIÓN ═══
-
-          Marco parcial de 2 pt en acento, **el mismo de la declaración de otorgamiento de
-          II.7**: comparten anatomía —426 pt, padding 9 / 12 / 11— y lo que las diferencia es el
-          título del documento. Las cifras se leen de `MARCO.declaracion`, donde ya están.
-
-          `wrap={false}` no hace falta aquí: el documento es de una hoja y el marco cabe entero.
-          Lo que garantiza esa hoja única es `recortarSubtitulo()`, no un `avoid` que solo
-          empujaría el desborde a la hoja siguiente.
-        */}
-        <View style={estilos.declaracion}>
-          <MarcoParcial
-            ancho={MARCO.declaracion.ancho}
-            padding={MARCO.declaracion.padding}
-            grosor={FILETE.acento}
-            acento={acento}
-          >
+        <View style={estilos.declaracion} minPresenceAhead={PRESENCIA_DECLARACION}>
+          <MarcoParcial padding={MARCO.leyenda} ancho={CAJA.ancho} color={acento.base}>
             <Text style={estilos.parrafo}>
               {'Yo, '}
-              <Text style={estilos.destacado}>{paciente.paciente}</Text>
+              <Text style={estilos.fuerte}>{paciente.paciente}</Text>
               {/*
-                EL INCISO DEL DIAGNÓSTICO, Y **DESAPARECE ENTERO CUANDO NO HAY DIAGNÓSTICO**:
-                sin hueco, sin guion y sin coma doble. La coma que abre el inciso viaja DENTRO
-                de él y la que cierra abre el tramo siguiente, así que `Yo, X, declaro…` sale
-                bien puntuado en los dos casos. Es la misma fórmula del puente de v1.
+                ⚠⚠ **EL INCISO DEL DIAGNÓSTICO, Y FALTABA EN LA ENTREGA.**
+
+                Este documento **no compone el diagnóstico en ningún otro sitio**: su ficha
+                no lleva esa celda, a diferencia de la del Consentimiento. Sin el inciso, la
+                denegación salía sin decir de qué se estaba denegando el tratamiento, que en
+                un documento que acredita una negativa es contenido, no adorno. Se repone
+                con la fórmula de v2, que es también la del puente de v1.
+
+                **DESAPARECE ENTERO CUANDO NO HAY DIAGNÓSTICO**: sin hueco, sin guion y sin
+                coma doble. La coma que abre el inciso viaja DENTRO de él y la que cierra
+                abre el tramo siguiente, así que `Yo, X, declaro…` sale bien puntuado en los
+                dos casos.
               */}
-              {tieneValor(paciente.diagnostico) ? (
+              {paciente.diagnostico === undefined || paciente.diagnostico.trim() === '' ? null : (
                 <>
                   {', con diagnóstico de '}
-                  <Text style={estilos.destacado}>{paciente.diagnostico}</Text>
+                  <Text style={estilos.fuerte}>{paciente.diagnostico}</Text>
                 </>
-              ) : null}
+              )}
               {', declaro que he sido informado de manera clara y completa sobre el procedimiento '}
-              <Text style={estilos.destacado}>{procedimiento}</Text>
-              {', sus riesgos, beneficios y alternativas, por el '}
-              <Text style={estilos.destacado}>{medico.nombre}</Text>
+              <Text style={estilos.fuerte}>{procedimiento}</Text>
+              {/*
+                ⚠ SIN ARTÍCULO ANTES DEL NOMBRE, y llevaba `por el`. El nombre ya trae
+                su tratamiento —`Dra. Elena Marín Solís`—, así que el artículo fijo en
+                masculino componía `por el Dra.` en cuanto firma una médica. Es la misma
+                redacción que usa la declaración de II.7, que nunca lo llevó.
+              */}
+              {', sus riesgos, beneficios y alternativas, por '}
+              <Text style={estilos.fuerte}>{medico.nombre}</Text>
               {'.'}
             </Text>
-            <Text style={estilos.parrafoSiguiente}>{DECLARACION_2}</Text>
-            <Text style={estilos.parrafoSiguiente}>{DECLARACION_3}</Text>
+            <Text style={estilos.parrafo}>
+              No obstante, en pleno uso de mis facultades y de forma libre y voluntaria,
+              manifiesto mi decisión de no autorizar o revocar la autorización previamente
+              otorgada para la realización del procedimiento descrito, asumiendo las
+              consecuencias que de ello puedan derivarse, las cuales me han sido explicadas.
+            </Text>
+            <Text style={estilos.parrafo}>
+              Se me ha informado que puedo cambiar de opinión y otorgar mi consentimiento en
+              cualquier momento.
+            </Text>
           </MarcoParcial>
         </View>
 
-        {/*
-          ═══ LA DECLARACIÓN DE SUSTITUCIÓN — SOLO SI SE EJERCIÓ ═══
-
-          Va debajo de la declaración, **fuera del marco**, y **solo en la variante por
-          sustitución**: se compone la frase o no se compone nada. Es la regla que ya sigue
-          II.7, y el porqué está en `TEXTO_SUSTITUCION`.
-
-          En la variante en que firma el paciente no queda hueco: la declaración enlaza
-          directamente con las firmas, con la misma separación de 12.
-        */}
-        {porSustitucion ? (
-          <Text style={estilos.declaracionSustitucion}>{TEXTO_SUSTITUCION}</Text>
-        ) : null}
-
-        {/*
-          ═══ LA CONSTANCIA DEL MOTIVO — SOLO POR SUSTITUCIÓN ═══
-
-          Responde en el texto a por qué el paciente no firma, que es lo que un tercero pregunta
-          al ver una hoja firmada por otro. En la variante en que el paciente firma no hay nada
-          que constatar, y por eso el bloque no existe en ella en vez de salir vacío.
-
-          `wrap={false}`: el rótulo y su línea son una sola cosa.
-        */}
-        {porSustitucion ? (
-          <View style={estilos.constancia} wrap={false}>
-            <Text style={estilos.rotuloMotivo}>{ROTULO_MOTIVO.toUpperCase()}</Text>
-            <Text style={estilos.textoMotivo}>{MOTIVO_POR_DEFECTO}</Text>
-          </View>
-        ) : null}
+        {!sustitucion ? null : (
+          <>
+            <Text style={estilos.nota}>{NOTA_SUSTITUCION}</Text>
+            {motivo === undefined || motivo.trim() === '' ? null : (
+              /*
+                El fondo al velo del acento NO es el único portador de significado
+                (I.3.3): el bloque se distingue además por su rótulo en versalita. En
+                fotocopia sigue siendo un recuadro rotulado.
+              */
+              <View
+                style={{
+                  backgroundColor: veloDeAcento(acento.base, PROPORCION_VELO),
+                  padding: ESPACIO[10],
+                  marginBottom: ESPACIO[12],
+                }}
+                wrap={false}
+              >
+                <Text style={estilos.rotulo}>{ROTULO_MOTIVO.toUpperCase()}</Text>
+                <Text style={estilos.motivo}>{motivo}</Text>
+              </View>
+            )}
+          </>
+        )}
       </MotorFlujo>
 
       {/*
-        Variante `completo`: folio · paginación · leyenda, con el prefijo `DEN`. **Sin QR**: el
-        documento no autoriza nada, es la constancia de que no se autorizó. La paginación es
-        siempre `Página 1 de 1` — no hay anexo que la abra.
+        `completo`: la denegación se archiva y se cita por folio —es el documento que
+        acredita que un procedimiento NO se autorizó—.
       */}
-      <PieDocumento variante="completo" folio={folio} acento={acento} />
+      <PieDocumento variante="completo" folio={folio} documento={TITULO} acento={acento} />
     </Page>
   )
 }

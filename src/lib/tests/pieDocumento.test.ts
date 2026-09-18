@@ -196,7 +196,7 @@ describe('2.M · PieDocumento', () => {
   it('imprime la paginación en LAS DOS hojas, variante completo', async () => {
     const hojas = textoPorHoja(
       await renderToBuffer(
-        documento(h(PieDocumento, { variante: 'completo', folio: 'RX-2026-0042', acento })),
+        documento(h(PieDocumento, { variante: 'completo', folio: 'RX-2026-0042', documento: 'Solicitud de imagenología', acento })),
       ),
     )
 
@@ -215,7 +215,7 @@ describe('2.M · PieDocumento', () => {
     const hojas = textoPorHoja(
       await renderToBuffer(
         documento(
-          h(PieDocumento, { variante: 'sinFolio', acento }),
+          h(PieDocumento, { variante: 'sinFolio', documento: 'Escrito médico', acento }),
         ),
       ),
     )
@@ -226,8 +226,13 @@ describe('2.M · PieDocumento', () => {
     for (const hoja of hojas) {
       // Regla 4: en esta variante no hay folio en ninguna hoja.
       expect(hoja).not.toContain('Folio')
-      // Y desde que el título salió de la banda, tampoco el nombre del
-      // documento: la zona que el folio deja libre no la ocupa nadie.
+      /*
+        ⚠ v3 · LA ZONA QUE EL FOLIO DEJA LIBRE SÍ LA OCUPA ALGUIEN, y es nueva: el
+        NOMBRE DEL DOCUMENTO. La cota vieja decía lo contrario porque en v2 esa zona no
+        existía. Es lo que hace que una hoja suelta diga de qué papel salió cuando su
+        formato no lleva folio.
+      */
+      expect(hoja).toContain('Escrito médico')
       expect(hoja).toContain('spinus.com.mx')
     }
   }, 60_000)
@@ -239,13 +244,20 @@ describe('2.M · PieDocumento', () => {
     // por defecto del renderer — sin lanzar nada. Ver I.3.8.
     const pdf = (
       await renderToBuffer(
-        documento(h(PieDocumento, { variante: 'completo', folio: 'RX-2026-0042', acento })),
+        documento(h(PieDocumento, { variante: 'completo', folio: 'RX-2026-0042', documento: 'Solicitud de imagenología', acento })),
       )
     ).toString('latin1')
 
     const familias = [...pdf.matchAll(/\/BaseFont \/(?:\w{6}\+)?([\w-]+)/g)].map((m) => m[1])
     expect(familias).toContain('Archivo-Regular')
-    expect(familias).toContain('Archivo-SemiBold')
+    /*
+      ⚠ **`Archivo-SemiBold` SE RETIRA DE ESTA COTA, Y NO ES QUE DEJE DE CARGARSE.**
+      La banda de v2 componía una de sus zonas en 600; las cuatro de v3 —folio,
+      paginación, nombre del documento y leyenda— van todas en 400, así que exigir la
+      cara SemiBold aquí sería exigir que el pie componga algo que ya no compone. Lo que
+      esta prueba defiende sigue intacto en las otras dos líneas: que la familia del
+      sistema se carga y que NADA cae a la tipografía de reserva.
+    */
     expect(familias.filter((f) => f.startsWith('Helvetica'))).toEqual([])
   }, 60_000)
 })

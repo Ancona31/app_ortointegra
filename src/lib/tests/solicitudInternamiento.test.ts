@@ -40,8 +40,7 @@ import SolicitudInternamiento, {
 import {
   CAJA,
   FILETE,
-  FIRMA,
-  FILETE_INTERNAMIENTO,
+  altoBloqueFirma,
   MARGEN,
   RIEL_CELDA,
   TIPOGRAFIA,
@@ -260,7 +259,7 @@ const INDICACIONES = [
   'Medicamentos',
   '— Cefalotina 1 g intravenoso cada 8 horas.',
   '',
-  'Cuidados generales',
+  'CUIDADOS GENERALES',
   '— Signos vitales cada 4 horas.',
 ].join('\n')
 
@@ -306,11 +305,18 @@ const COMPLETO: SolicitudInternamientoProps = {
 }
 
 /** Sin sección 2: la hoja 3 colapsa entera y la firma del médico baja a la 2. */
+/**
+ * ⚠ v3 · **`urgente` y `requerimientos` pasan a REQUERIDAS y no admiten `undefined`.**
+ * La bandera es un booleano y el catálogo una lista, los dos siempre presentes: quien
+ * decide si hay algo que componer es su VALOR —`false` y `[]`—, no su ausencia. El
+ * adaptador ya los entrega así; era el fixture el que se colaba con `undefined` y hacía
+ * reventar el `spread` del catálogo.
+ */
 const MINIMO: SolicitudInternamientoProps = {
   ...COMPLETO,
-  urgente: undefined,
+  urgente: false,
   procedimiento: undefined,
-  requerimientos: undefined,
+  requerimientos: [],
   indicacionesPiso: undefined,
 }
 
@@ -349,9 +355,9 @@ function renglon(hoja: Hoja, texto: string): Renglon {
  */
 function encabezado(hoja: Hoja): number {
   return (
-    renglon(hoja, 'Diagnósticos').arriba -
-    54 -
-    FILETE_INTERNAMIENTO.regla -
+    renglon(hoja, 'DIAGNÓSTICOS').arriba -
+    MARGEN.superior -
+    FILETE.regla -
     ASCENDENTE_ARCHIVO * TIPOGRAFIA['bloqueSimple.titulo'].cuerpo
   )
 }
@@ -373,42 +379,49 @@ describe('II.6 · Solicitud de Internamiento', () => {
       la de Imagenología, la de Receta, la de Suplementación y la de Honorarios a la vez,
       que es la señal correcta.
     */
-    expect(encabezado(hoja1)).toBeCloseTo(233.83, 1)
+    /*
+      ⚠ **SON 204.83 Y ERAN 233.83.** El panel baja de 56 a 40, el nombre del médico de 26
+      a 15, la banda de dirección pasa de dos renglones a uno y la celda de la ficha de 33
+      a 27; lo que sube es el badge de urgente, que en v3 va en su propio bloque bajo la
+      ficha. Este formato compone DOS filas de ficha, así que es el segundo encabezado más
+      pesado del sistema después del Consentimiento.
+    */
+    expect(encabezado(hoja1)).toBeCloseTo(204.83, 1)
   }, 120_000)
 
   it('la sección 1 llena su hoja y el cierre baja detrás, sin saltos declarados', async () => {
     const hojas = await componer(COMPLETO)
 
     /*
-      ⚠ **AQUÍ HABÍA DOS `break` Y AHORA QUEDA UNO.** El de la sección 2 se queda —otro
-      lector, hoja que en el hospital se separa—; el que abría hoja para las instrucciones y
-      las firmas se retiró: dejaba la hoja 1 cerrada a un tercio.
+      ⚠⚠ **v3 · SON DOS HOJAS Y ERAN TRES, Y ES LA MEJORA QUE EL REDISEÑO PERSIGUE.**
 
-      Ahora las instrucciones **empiezan en la hoja 1** y se parten si hace falta, así que lo
-      que decide el reparto es lo que trae el documento y no una constante. Con este caso
-      —siete requerimientos, dos diagnósticos y siete instrucciones— salen tres hojas y el
-      corte cae dentro de la lista.
+      v2 partía la sección 1 en dos —el bloque clínico en la hoja 1 y la cola de las
+      instrucciones con las firmas en la 2— y dejaba la sección 2 en la tercera. En v3 la
+      sección 1 entera cabe en su hoja: el encabezado adelgaza 57 pt, la caja crece 23 y la
+      celda de firma pierde 46 al quedarse sin rótulo.
+
+      **El salto declarado sigue siendo UNO y el mismo**: el de la sección 2, que cambia de
+      lector y se separa en el hospital. Lo que desaparece es el reparto accidental de la
+      sección 1, que es justo el defecto de «hojas finales que sólo llevan la firma».
     */
-    expect(hojas).toHaveLength(3)
+    expect(hojas).toHaveLength(2)
 
-    // Hoja 1 · el bloque clínico Y el principio de las instrucciones.
-    expect(hojas[0].texto).toContain('Diagnósticos')
-    expect(hojas[0].texto).toContain('Procedimiento o cirugía')
-    expect(hojas[0].texto).toContain('Requerimientos especiales')
+    // Hoja 1 · el bloque clínico, las instrucciones y las DOS firmas de la sección 1.
+    expect(hojas[0].texto).toContain('DIAGNÓSTICOS')
+    expect(hojas[0].texto).toContain('MOTIVO DE INTERNAMIENTO')
+    expect(hojas[0].texto).toContain('REQUERIMIENTOS ESPECIALES')
     expect(hojas[0].texto).toContain('INSTRUCCIONES PARA EL PACIENTE')
+    expect(hojas[0].texto).toContain('FIRMA DEL PACIENTE O FAMILIAR')
+    expect(hojas[0].texto).toContain(CHASIS.medico.nombre)
 
-    // Hoja 2 · la cola de las instrucciones y las dos firmas, que no se parten.
-    expect(hojas[1].texto).toContain('FIRMA DEL PACIENTE O FAMILIAR')
-    expect(hojas[1].texto).toContain('FIRMA Y SELLO DEL MÉDICO')
-    expect(hojas[1].texto).not.toContain('Requerimientos especiales')
+    // Hoja 2 · sección 2: apertura, bloques numerados y UNA firma.
+    expect(hojas[1].texto).toContain('Indicaciones de ingreso a piso')
+    expect(hojas[1].texto).toContain('PARA PERSONAL DE ENFERMERÍA Y MÉDICO RESIDENTE')
+    expect(hojas[1].texto).toContain('CUIDADOS GENERALES')
+    expect(hojas[1].texto).not.toContain('FIRMA DEL PACIENTE O FAMILIAR')
+    expect(hojas[1].texto).not.toContain('REQUERIMIENTOS ESPECIALES')
 
-    // Hoja 3 · sección 2: apertura, bloques numerados y UNA firma.
-    expect(hojas[2].texto).toContain('Indicaciones de ingreso a piso')
-    expect(hojas[2].texto).toContain('Para personal de enfermería y médico residente')
-    expect(hojas[2].texto).toContain('Cuidados generales')
-    expect(hojas[2].texto).not.toContain('FIRMA DEL PACIENTE O FAMILIAR')
-
-    expect(hojas[2].texto).toContain('PÁGINA 3 DE 3')
+    expect(hojas[1].texto).toContain('PÁGINA 2 DE 2')
   }, 120_000)
 
   it('la sección 2 se identifica DONDE EMPIEZA, no por el número de hoja', async () => {
@@ -429,13 +442,23 @@ describe('II.6 · Solicitud de Internamiento', () => {
     const hojaDeLaSeccion = (hojas: Hoja[]): number =>
       hojas.findIndex((hoja) => hoja.texto.includes('SECCIÓN 2 DE 2'))
 
-    expect(hojaDeLaSeccion(largo)).toBe(2)
+    /*
+      ⚠ v3 · **LAS DOS COMPOSICIONES ABREN AHORA EN LA MISMA HOJA, la 2.** La sección 1
+      entera cabe en la suya con instrucciones y sin ellas, así que este par deja de
+      distinguir por número de hoja.
+
+      **Lo que la prueba defiende sigue midiéndose y por el lado que importa**: que la
+      cadena `SECCIÓN 2 DE 2` viaje EN EL FLUJO —en el antetítulo de 2.Q— y no en un mapa
+      de cabeceras indexado por número de hoja. La comprobación es que sale donde la
+      sección empieza en las dos composiciones, y que la hoja 1 no la lleva nunca.
+    */
+    expect(hojaDeLaSeccion(largo)).toBe(1)
     expect(hojaDeLaSeccion(corto)).toBe(1)
 
     // Y en la hoja de la sección, el rótulo va PEGADO a su apertura, no en la cabecera.
-    for (const [hojas, indice] of [[largo, 2], [corto, 1]] as const) {
+    for (const [hojas, indice] of [[largo, 1], [corto, 1]] as const) {
       expect(hojas[indice].texto).toContain('Indicaciones de ingreso a piso')
-      expect(hojas[indice].texto).toContain('Para personal de enfermería y médico residente')
+      expect(hojas[indice].texto).toContain('PARA PERSONAL DE ENFERMERÍA Y MÉDICO RESIDENTE')
     }
   }, 120_000)
 
@@ -493,14 +516,27 @@ describe('II.6 · Solicitud de Internamiento', () => {
     const filetes = (hoja: Hoja): readonly Rectangulo[] =>
       hoja.rectangulos.filter((r) => r.alto <= FILETE.transicion && r.ancho >= 90)
 
-    expect(filetes(hojas[2])).toContainEqual({ ancho: 144, alto: FILETE.transicion })
+    /*
+      El segmento de la apertura sigue midiendo **144 × 4** y sigue siendo el más grueso del
+      documento: 2.Q conserva su grosor propio —es la transición entre dos LECTORES, no
+      entre dos temas— mientras el resto del chasis encoge.
+    */
+    const apertura = filetes(hojas[1]).filter((r) => r.alto === FILETE.transicion)
+    expect(apertura).toHaveLength(1)
+    expect(apertura[0].ancho).toBe(144)
+
+    // Y ningún otro filete del documento pasa de los 2.5 pt del principal.
     for (const hoja of [hojas[0], hojas[1]]) {
-      for (const filete of filetes(hoja)) expect(filete.alto).toBeLessThanOrEqual(2.5)
+      for (const filete of filetes(hoja)) {
+        if (filete === apertura[0]) continue
+        expect(filete.alto).toBeLessThanOrEqual(2.5)
+      }
     }
   }, 120_000)
 
   it('los bloques de un solo ítem conservan su raya', async () => {
-    const [, , hoja3] = await componer(COMPLETO)
+    // v3 · la sección 2 abre en la hoja 2: la sección 1 entera cabe en la suya.
+    const [, hoja3] = await componer(COMPLETO)
 
     /*
       EL DEFECTO QUE ESTA PRUEBA EXISTE PARA FIJAR. Tres de los cuatro bloques traen una
@@ -511,14 +547,31 @@ describe('II.6 · Solicitud de Internamiento', () => {
     const rayas = hoja3.renglones.filter((r) => r.texto === '—')
     expect(rayas).toHaveLength(5)
 
-    // Y los cuatro bloques llevan su número corrido, sin cero a la izquierda.
-    for (const numero of ['1', '2', '3', '4']) {
-      expect(hoja3.renglones.some((r) => r.texto === numero)).toBe(true)
+    /*
+      ⚠⚠ **LOS BLOQUES YA NO LLEVAN NÚMERO: LLEVAN SU ENCABEZADO.**
+
+      v2 los numeraba —`marca="numero"`, con el rol `instruccion.numero`—. v3 pasa
+      `marca="raya"` y deja que el ASCENSO de 2.J haga el trabajo: `Dieta`, `Soluciones`,
+      `Medicamentos` y `Cuidados generales` son encabezados de sus viñetas, y este es el
+      único consumidor del sistema donde ese ascenso es lo que el médico escribió. Un
+      ordinal delante de un rótulo que ya agrupa es ceremonia.
+    */
+    for (const rotulo of ['DIETA', 'SOLUCIONES', 'MEDICAMENTOS', 'CUIDADOS GENERALES']) {
+      expect(hoja3.renglones.some((r) => r.texto === rotulo), rotulo).toBe(true)
     }
+    /*
+      Y ninguna marca numérica cuelga del riel: los ordinales de bloque se retiran con
+      `marca="numero"`. El `2` de `SECCIÓN 2 DE 2` vive en la apertura, no en el riel.
+    */
+    expect(
+      hoja3.renglones.some(
+        (r) => /^\d$/.test(r.texto) && r.x <= MARGEN.izquierdo + 1 && r.texto !== '2',
+      ),
+    ).toBe(false)
   }, 120_000)
 
   it('la prosa suelta no consume número ni lleva raya (II.6 §6)', async () => {
-    const [, , hoja3] = await componer(CON_PROSA)
+    const [, hoja3] = await componer(CON_PROSA)
 
     // Los dos renglones salen enteros, en su caja y sin marca delante.
     const prosa1 = renglon(hoja3, PROSA_1)
@@ -531,8 +584,15 @@ describe('II.6 · Solicitud de Internamiento', () => {
       lo que el contador de bloques del analizador ya declara. Con cuatro bloques, el
       último es el 4 y no el 5.
     */
-    expect(hoja3.renglones.some((r) => r.texto === '4')).toBe(true)
-    expect(hoja3.renglones.some((r) => r.texto === '5')).toBe(false)
+    /*
+      ⚠ v3 · **LOS BLOQUES NO LLEVAN ORDINAL**: 2.J los compone con raya y su encabezado.
+      Lo que la prueba fija sigue en pie por el otro lado —la prosa no se convierte en un
+      bloque más—: los CUATRO rótulos están y los dos renglones de prosa salen sin marca.
+    */
+    for (const rotulo of ['DIETA', 'SOLUCIONES', 'MEDICAMENTOS', 'CUIDADOS GENERALES']) {
+      expect(hoja3.renglones.some((r) => r.texto === rotulo), rotulo).toBe(true)
+    }
+    expect(hoja3.renglones.filter((r) => r.texto === '—')).toHaveLength(5)
   }, 120_000)
 
   it('sin folio y sin contador en ninguna hoja', async () => {
@@ -555,7 +615,12 @@ describe('II.6 · Solicitud de Internamiento', () => {
       // 2.K no se instancia: el catálogo de requerimientos es abierto (regla 3).
       expect(hoja.texto).not.toContain('TOTAL DE ')
       // El título en la banda, no; en la cabecera de la hoja, sí.
-      expect(hoja.texto).not.toContain('Solicitud de internamiento')
+      /*
+        ⚠ v3 · **EL PIE SÍ LLEVA EL NOMBRE DEL DOCUMENTO**, en su zona nueva y con recorte
+        por elipsis. Lo que esta prueba defiende es que no lleva FOLIO ni contador, que es
+        otra cosa: este formato no es seriado y su lista no se cuenta.
+      */
+      expect(hoja.texto).toContain('Solicitud de internamiento')
       // La banda sigue ahí, con sus dos zonas: paginación y leyenda.
       expect(hoja.texto).toContain('spinus.com.mx')
     }
@@ -572,21 +637,21 @@ describe('II.6 · Solicitud de Internamiento', () => {
     */
     expect(hojas[0].texto).toContain('URGENTE')
     expect(hojas[1].texto).not.toContain('URGENTE')
-    expect(hojas[2].texto).not.toContain('URGENTE')
+    expect(hojas[1].texto).not.toContain('URGENTE')
 
     /*
       LA LÍNEA DE PACIENTE LLEVA EL HOSPITAL, que ningún otro formato tiene. Es lo que hace
       que una hoja separada se pueda devolver a su piso, que es para lo que existe la regla
       2 de 2.D.
     */
-    for (const hoja of [hojas[1], hojas[2]]) {
+    for (const hoja of [hojas[1]]) {
       expect(hoja.texto).toContain(
         `Paciente · ${PACIENTE} · 25 años · Exp. 2026-0184 · ${HOSPITAL}`,
       )
     }
   }, 120_000)
 
-  it('el riel de ingreso reparte 5 + 4 + 2 + 1, con ASA en la celda más estrecha', async () => {
+  it('el riel de ingreso reparte 4 + 4 + 3 + 1, con ASA en la celda más estrecha', async () => {
     const [hoja1] = await componer(COMPLETO)
 
     /*
@@ -595,10 +660,25 @@ describe('II.6 · Solicitud de Internamiento', () => {
       depender del padding ni del filete: lo que se compara son dos celdas con el mismo
       arranque relativo.
     */
+    /*
+      ⚠ v3 · **EL REPARTO ES 4 + 4 + 3 + 1 Y ERA 5 + 4 + 2 + 1.** La celda de riel pasa de
+      40.5 a 45 al ensancharse la caja, así que las mismas cadenas caben en menos columnas:
+      el hospital cede una y los días estimados la ganan. Las cuatro siguen sumando doce.
+    */
+    /*
+      ⚠ La PRIMERA celda de cada fila no lleva relleno izquierdo —es regla de 2.F, no una
+      excepción de esta lámina—, así que el primer salto arrastra el relleno y el filete de
+      la segunda. Los otros dos comparan celdas con el mismo arranque relativo y salen
+      múltiplos exactos.
+    */
+    const SANGRIA = FILETE.regla + 10
     const x = (etiqueta: string): number => renglon(hoja1, etiqueta).x
-    expect(x('TIPO DE INTERNAMIENTO') - x('HOSPITAL O LUGAR')).toBeCloseTo(5 * RIEL_CELDA, 0)
+    expect(x('TIPO DE INTERNAMIENTO') - x('HOSPITAL O LUGAR')).toBeCloseTo(
+      4 * RIEL_CELDA + SANGRIA,
+      1,
+    )
     expect(x('DÍAS EST.') - x('TIPO DE INTERNAMIENTO')).toBeCloseTo(4 * RIEL_CELDA, 1)
-    expect(x('ASA') - x('DÍAS EST.')).toBeCloseTo(2 * RIEL_CELDA, 1)
+    expect(x('ASA') - x('DÍAS EST.')).toBeCloseTo(3 * RIEL_CELDA, 1)
 
     // Y la de ASA es la última: lo que queda hasta el borde de la caja es UNA columna.
     expect(x('ASA') + RIEL_CELDA).toBeGreaterThan(MARGEN.izquierdo + CAJA.ancho - RIEL_CELDA)
@@ -617,9 +697,11 @@ describe('II.6 · Solicitud de Internamiento', () => {
     const [hoja1] = await componer(COMPLETO)
     const x = (etiqueta: string): number => renglon(hoja1, etiqueta).x
 
+    // La primera celda de la fila no lleva relleno izquierdo: el primer salto lo arrastra.
+    const SANGRIA = FILETE.regla + 10
     expect(hoja1.texto).toContain('12 de agosto de 2026')
-    expect(x('INGRESO') - x('PACIENTE')).toBeCloseTo(5 * RIEL_CELDA, 0)
-    expect(x('EXPEDIENTE') - x('INGRESO')).toBeCloseTo(4 * RIEL_CELDA, 0)
+    expect(x('INGRESO') - x('PACIENTE')).toBeCloseTo(5 * RIEL_CELDA + SANGRIA, 1)
+    expect(x('EXPEDIENTE') - x('INGRESO')).toBeCloseTo(4 * RIEL_CELDA, 1)
 
     // Y las dos celdas que este riel NO lleva, contra las del chasis.
     expect(hoja1.texto).not.toContain('SEXO')
@@ -634,7 +716,7 @@ describe('II.6 · Solicitud de Internamiento', () => {
       padding izquierdo es 0— y las otras dos sangran 10 pt tras su regla de 0.63.
     */
     const columna = (n: number): number =>
-      72 + n * 4 * RIEL_CELDA + (n === 0 ? 0 : FILETE_INTERNAMIENTO.regla + 10)
+      MARGEN.izquierdo + n * 4 * RIEL_CELDA + (n === 0 ? 0 : FILETE.regla + 10)
     expect(renglon(hoja1, 'Sangre y hemoderivados').x).toBeCloseTo(columna(0), 1)
     expect(renglon(hoja1, 'Material de osteosíntesis').x).toBeCloseTo(columna(1), 1)
     expect(renglon(hoja1, 'Implante especial').x).toBeCloseTo(columna(2), 1)
@@ -670,22 +752,19 @@ describe('II.6 · Solicitud de Internamiento', () => {
       el día que vuelva a moverse, esta cuenta lo sigue sola.
     */
     /*
-      El nombre del médico sale DOS veces en las hojas de continuación —arriba en la
-      cabecera del membrete y abajo bajo la línea de firma—, así que se toma el de más
-      abajo. Buscar el primero mediría contra el membrete y daría un salto negativo.
+      ⚠ v3 · **LA CELDA DEL MÉDICO VA SIN ROL Y LA DEL PACIENTE CON ÉL** (brief 00 §6.1), así
+      que las dos composiciones del documento se distinguen por eso y no por su hueco: la
+      del paciente mide `altoBloqueFirma(true)` = 83.75 y la del médico
+      `altoBloqueFirma(false)` = 72.75, once puntos menos —el renglón del rol—.
     */
-    const salto = (hoja: Hoja): number => {
-      const nombres = hoja.renglones
-        .filter((r) => r.texto === CHASIS.medico.nombre)
-        .map((r) => r.arriba)
-      expect(nombres.length).toBeGreaterThan(0)
-      return Math.max(...nombres) - renglon(hoja, 'FIRMA Y SELLO DEL MÉDICO').arriba
-    }
+    expect(altoBloqueFirma(true) - altoBloqueFirma(false)).toBeCloseTo(
+      TIPOGRAFIA['firma.rol'].interlineado ?? 11,
+      2,
+    )
 
-    const rol = ASCENDENTE_ARCHIVO * (TIPOGRAFIA['firma.rol'].cuerpo ?? 0)
-    const hueco = FIRMA.espacio
-    expect(salto(hojas[1])).toBeCloseTo(11 + hueco + 0.47 + 4 + ASCENDENTE_ARCHIVO * 10 - rol, 1)
-    expect(salto(hojas[2])).toBeCloseTo(11 + hueco + 0.75 + 4 + ASCENDENTE_ARCHIVO * 11 - rol, 1)
+    // Y la del paciente rotula mientras la del médico no, en la MISMA hoja.
+    expect(hojas[0].texto).toContain('FIRMA DEL PACIENTE O FAMILIAR')
+    expect(hojas[0].texto).not.toContain('FIRMA Y SELLO DEL MÉDICO')
   }, 120_000)
 
   it('sin indicaciones de piso: UNA hoja, y una sola firma del médico', async () => {
@@ -711,12 +790,20 @@ describe('II.6 · Solicitud de Internamiento', () => {
       no hay sección 2: montándola igual, este documento componía la rúbrica del médico dos
       veces —emparejada con la del paciente y otra vez suelta debajo, sin pareja—.
     */
-    expect(hojas[0].renglones.filter((r) => r.texto === 'FIRMA Y SELLO DEL MÉDICO'))
-      .toHaveLength(1)
+    /*
+      ⚠ v3 · el nombre sale DOS veces en una hoja 1 —membrete y celda de firma—, así que la
+      sonda es la línea de CREDENCIAL de la celda, que no lleva teléfono y por eso no se
+      confunde con la de la banda de dirección.
+    */
+    expect(
+      hojas[0].renglones.filter(
+        (r) => r.texto === 'Céd. Prof. 7000001 · Céd. Esp. 8000002',
+      ),
+    ).toHaveLength(1)
 
     // Y los tres bloques opcionales de la hoja 1 colapsan sin dejar rótulo ni hueco.
-    expect(hojas[0].texto).not.toContain('Procedimiento o cirugía')
-    expect(hojas[0].texto).not.toContain('Requerimientos especiales')
+    expect(hojas[0].texto).not.toContain('MOTIVO DE INTERNAMIENTO')
+    expect(hojas[0].texto).not.toContain('REQUERIMIENTOS ESPECIALES')
     expect(hojas[0].texto).not.toContain('URGENTE')
   }, 120_000)
 
@@ -731,10 +818,18 @@ describe('II.6 · Solicitud de Internamiento', () => {
     expect(hojas).toHaveLength(2)
     expect(hojas[0].texto).not.toContain('INSTRUCCIONES PARA EL PACIENTE')
     expect(hojas[0].texto).toContain('FIRMA DEL PACIENTE O FAMILIAR')
-    expect(hojas[0].renglones.filter((r) => r.texto === 'FIRMA Y SELLO DEL MÉDICO'))
-      .toHaveLength(1)
+    /*
+      ⚠ v3 · el nombre sale DOS veces en una hoja 1 —membrete y celda de firma—, así que la
+      sonda es la línea de CREDENCIAL de la celda, que no lleva teléfono y por eso no se
+      confunde con la de la banda de dirección.
+    */
+    expect(
+      hojas[0].renglones.filter(
+        (r) => r.texto === 'Céd. Prof. 7000001 · Céd. Esp. 8000002',
+      ),
+    ).toHaveLength(1)
     // Y la de la sección 2 en la suya: una firma por sección, que es el documento.
-    expect(hojas[1].renglones.filter((r) => r.texto === 'FIRMA Y SELLO DEL MÉDICO'))
+    expect(hojas[1].renglones.filter((r) => r.texto === CHASIS.medico.nombre))
       .toHaveLength(1)
   }, 120_000)
 
@@ -750,8 +845,10 @@ describe('II.6 · Solicitud de Internamiento', () => {
     */
     expect(hojas[0].texto).toContain('CONTINÚA EN LA HOJA 2')
     expect(hojas[0].texto).toContain('SIN FIRMA NO ES VÁLIDO')
-    expect(hojas[1].texto).toContain('CONTINÚA EN LA HOJA 3')
-    expect(hojas[2].texto).not.toContain('CONTINÚA EN LA HOJA')
+    // Y en la última no continúa nada: el aviso se calla solo.
+    expect(hojas[1].texto).not.toContain('CONTINÚA EN LA HOJA')
+    expect(hojas[1].texto).not.toContain('SIN FIRMA NO ES VÁLIDO')
     expect(hojas[0].texto).not.toContain('Sección 1 de 2')
   }, 120_000)
+
 })

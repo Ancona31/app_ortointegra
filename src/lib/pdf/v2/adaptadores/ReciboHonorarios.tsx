@@ -28,11 +28,29 @@
 import type { ReactElement } from 'react'
 import type { DocumentProps } from '@react-pdf/renderer'
 import ReciboHonorarios, {
-  type AseguradoraCotizacion,
+  type Aseguradora,
   type ConceptoCobrado,
-  type Divisa,
   type ReciboHonorariosProps,
 } from '../formatos/ReciboHonorarios'
+
+/**
+ * El código de divisa que guarda el formulario. v3 · **deja de ser un tipo del
+ * formato**: allí `divisa` llega ya redactada (`USD · Dólares estadounidenses`),
+ * porque redactar es cablear y el formato no redacta. El código sigue haciendo falta
+ * aquí para elegir la configuración regional de `toLocaleString`.
+ */
+type Divisa = 'MXN' | 'USD'
+
+/** El nombre de cada divisa. Catálogo de dos entradas; venía del formato. */
+const NOMBRE_DIVISA: Record<Divisa, string> = {
+  MXN: 'Pesos mexicanos',
+  USD: 'Dólares estadounidenses',
+}
+
+/** `USD · Dólares estadounidenses`, con la raya del sistema. */
+function divisaCompleta(divisa: Divisa | undefined): string | undefined {
+  return divisa === undefined ? undefined : `${divisa} · ${NOMBRE_DIVISA[divisa]}`
+}
 import {
   comunes, envolver, fechaCorta, filas, numero, rubricaDe, texto,
   textoOpcional, type EntradaAdaptador,
@@ -71,7 +89,7 @@ function lineaDe(fila: Record<string, unknown>, divisa: Divisa | undefined): Con
 }
 
 /** Colapsa ENTERA, no por celdas: sin nombre no hay caja de aseguradora. */
-function aseguradoraDe(valor: unknown): AseguradoraCotizacion | undefined {
+function aseguradoraDe(valor: unknown): Aseguradora | undefined {
   if (typeof valor !== 'object' || valor === null || Array.isArray(valor)) return undefined
   const fila = valor as Record<string, unknown>
   const nombre = texto(fila.nombre)
@@ -133,8 +151,15 @@ export function propsReciboHonorarios(entrada: EntradaAdaptador): ReciboHonorari
       vigencia: esCotizacion ? vigenciaDe(data) : undefined,
     },
     lineas: filas(data.lineas).map(fila => lineaDe(fila, divisa)),
+    /*
+     * ⚠ **LA CLAVE DE `contenido` ESTÁ POR CONFIRMAR.** `motivo` es la que usa el resto
+     * del sistema para este dato; si el formulario de honorarios lo guarda como
+     * `procedimiento` o como `concepto_general`, hay que cambiarla AQUÍ y en ningún
+     * otro sitio. Colapsa en silencio si no acierta. Ver `dudas.md` §15.
+     */
+    motivo: textoOpcional(data.motivo),
     monto: importe(data.monto, divisa) ?? '',
-    divisa,
+    divisa: divisaCompleta(divisa),
     notas: textoOpcional(data.notas),
     folio: texto(data.folio),
     rubrica: rubricaDe(entrada.medico),

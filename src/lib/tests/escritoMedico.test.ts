@@ -32,9 +32,9 @@ import EscritoMedico, {
   type EscritoMedicoProps,
 } from '@/lib/pdf/v2/formatos/EscritoMedico'
 import {
-  CAJA,
   FILETE,
   FIRMA,
+  ESPACIO,
   MARGEN,
   TIPOGRAFIA,
   resolverAcento,
@@ -234,7 +234,15 @@ const FECHA = '4 ago 2026'
 const MEDICO = 'Dra. Elena Marin Solis'
 const CEDULAS = 'Ced. Prof. 7000001 · Ced. Esp. 8000002'
 
-const CUERPO: EscritoMedicoProps['cuerpo'] = [
+/**
+ * ⚠ **EL CUERPO SE DUPLICA PARA QUE EL DOCUMENTO VUELVA A PARTIR.**
+ *
+ * Con la tipografía de v3 —`texto.corrido` de 11.5/18 a 10.5/15, encabezado de 91.6 pt en
+ * vez de 160— el cuerpo de v2 cabe entero en una hoja y las cuatro pruebas que miden la
+ * hoja de CONTINUACIÓN se quedaban sin hoja 2. El caso se repite hasta que vuelve a
+ * desbordar: lo que ejercita son los seis nodos y el reparto, no su longitud.
+ */
+const CUERPO_BASE: EscritoMedicoProps['cuerpo'] = [
   {
     tipo: 'parrafo',
     tramos: [
@@ -305,6 +313,9 @@ const CUERPO: EscritoMedicoProps['cuerpo'] = [
   },
 ]
 
+/** El mismo cuerpo dos veces: la segunda copia es la que empuja a la hoja 2. */
+const CUERPO: EscritoMedicoProps['cuerpo'] = [...CUERPO_BASE, ...CUERPO_BASE]
+
 const BASE: EscritoMedicoProps = {
   medico: {
     nombre: MEDICO,
@@ -372,39 +383,60 @@ function encabezado(hoja: Hoja): number {
 }
 
 describe('II.8 · Escrito Médico', () => {
-  it('el encabezado, contra la cota de 165.22 de la lámina', async () => {
+  it('el encabezado mide 91.6 pt, el menor del sistema', async () => {
     const [hoja1] = await componer(BASE)
 
     /*
-      LO COMPUESTO SON **160 pt**, el encabezado menor del sistema. Sumando los 2.85 del
-      panel —la OCTAVA lámina que lo mide en 58.85— salen 162.85 contra los 165.22 medidos:
-      **2.37 pt**, que son exactamente el residuo del bloque de título. La lámina lo mide en
-      22.37 con un renglón y en 60 con tres, y 3 × 20 = 60 exactos: el renglón mide 20 y los
-      2.37 son el *strut* del HTML. Reportado.
+      ⚠ **ERAN 160 pt Y SON 91.6, Y SIGUE SIENDO EL MENOR DEL SISTEMA.**
+
+      v2 lo medía contra los 165.22 de la lámina y explicaba la diferencia con dos
+      residuos —2.85 del panel y 2.37 del *strut* del bloque de título—. En v3 el panel
+      mide 40, el nombre del médico 15, la banda de dirección es de un renglón y el
+      rótulo del documento 15, así que la cota de la lámina deja de ser el objetivo.
+
+      Este formato es el que menos compone —sin folio, sin ficha de paciente— y por eso
+      es el que dice si el chasis se sostiene solo: 91.6 pt contra los 178.5 de los
+      cuatro con ficha.
     */
-    /*
-      `encabezado()` mide desde el borde del papel, así que se lleva dentro el margen
-      superior. Se escribe como resta contra el token y no como cifra suelta: el día que
-      los márgenes se muevan —se midió y se dejó para después, ver `MARGEN`— esta cota
-      sigue midiendo el encabezado y no el margen.
-    */
-    expect(encabezado(hoja1)).toBeCloseTo(160 - (54 - MARGEN.superior), 1)
+    expect(encabezado(hoja1)).toBeCloseTo(91.6, 1)
   }, 200_000)
 
-  it('el título envuelve: cada renglón extra cuesta 20 pt y nada se recorta', async () => {
+  it('el título envuelve a DOS renglones y se recorta con elipsis', async () => {
     const [corto] = await componer(BASE)
     const [largo] = await componer(CON_TITULO_LARGO)
 
-    // El largo compone TRES renglones y **la cadena entera**: sin elipsis, sin truncado.
+    /*
+      ⚠⚠ **LA COTA SE INVIERTE: v3 RECORTA EL TÍTULO Y v2 NO.**
+
+      v2 dejaba crecer el título a tres renglones —20 pt cada uno, 40 de más— y componía
+      la cadena entera. v3 le pone `maxLines: 2` + elipsis (brief 00 §4), que es lo que
+      cierra dos defectos a la vez: el **§5.1 de este formato**, con un título de 104
+      caracteres a cuatro renglones, y el **§7 de la Denegación**, cuyo título de dos
+      renglones la echaba de su hoja única.
+
+      **Lo que se pierde, y hay que decirlo:** el final de un asunto muy largo no se lee
+      en la cabecera. No se pierde del documento — el pie compone `tituloPie`, que es un
+      campo aparte y no un truncado, y la prueba de más abajo lo fija.
+    */
     expect(largo.texto).toContain('CONSTANCIA DE ATENCIÓN MÉDICA Y')
-    expect(largo.texto).toContain('SECRETARÍA DE EDUCACIÓN')
+    expect(largo.texto).not.toContain('SECRETARÍA DE EDUCACIÓN')
+    expect(largo.texto).toContain('…')
 
     /*
-      DOS RENGLONES MÁS SON 40 pt MÁS, y se los quita al cuerpo de esa hoja. Es lo que la
-      lámina declara —60 con tres contra 20 con uno— y lo que hace que el título largo no
-      necesite ninguna regla especial: crece hacia abajo.
+      UN RENGLÓN MÁS SON 18 pt MÁS —el interlineado de `titulo.documento`—, y con eso se
+      acaba: el tercero ya no existe. Es lo que hace que un título largo no necesite
+      ninguna regla especial ni pueda comerse la hoja.
     */
-    expect(encabezado(largo) - encabezado(corto)).toBeCloseTo(40, 1)
+    /*
+      **14 pt, y no los 18 del interlineado.** La fila de título mide lo que mide su celda
+      más alta, y con un renglón esa celda es la de EMISIÓN —rótulo 9 + valor 13 = 22—, no
+      el título de 18. El segundo renglón lleva el título a 36 y a partir de ahí manda él:
+      36 − 22 = 14. Es la cuenta de 2.C y no un residuo.
+    */
+    const celdaEmision =
+      (TIPOGRAFIA.etiqueta.interlineado ?? 9) + (TIPOGRAFIA['titulo.valor'].interlineado ?? 13)
+    const dosRenglones = 2 * (TIPOGRAFIA['titulo.documento'].interlineado ?? 18)
+    expect(encabezado(largo) - encabezado(corto)).toBeCloseTo(dosRenglones - celdaEmision, 1)
   }, 200_000)
 
   it('la fecha se alinea con la PRIMERA línea del título, tenga las que tenga', async () => {
@@ -412,20 +444,31 @@ describe('II.8 · Escrito Médico', () => {
     const [largo] = await componer(CON_TITULO_LARGO)
 
     /*
-      LA REGLA 3 DE 2.C, MEDIDA EN EL CASO QUE LA PUEDE ROMPER. Las dos cajas de línea se
-      apoyan por su borde INFERIOR —react-pdf no le da a Yoga una función de línea base—, así
-      que las líneas base quedan desplazadas `(20 − 11) − 0.878 × (17 − 9)` = **1.976 pt**,
-      con la fecha por debajo. Esa cifra es geometría derivada, no un residuo que perseguir.
+      LA REGLA 3 DE 2.C, MEDIDA EN EL CASO QUE LA PUEDE ROMPER.
 
-      Lo que se comprueba es que **no cambia con tres renglones**: si la fecha se alineara con
-      la última línea, aquí saldrían 41.976.
+      ⚠ **SON 5.049 pt Y ERAN 1.976, y la cuenta es OTRA porque la fila es otra.** En v2
+      las dos cajas se apoyaban por su borde inferior; en v3 la fila de título alinea por
+      ARRIBA (`alignItems: 'flex-start'`, ver 2.C) y la celda de emisión compone su rótulo
+      encima del valor. Así que lo que separa las dos bases es el renglón del rótulo menos
+      lo que la base sube al crecer el cuerpo del título:
+
+          9 + 0.878 × (10.5 − 15) = 5.049
+
+      Lo que se comprueba no cambia: que **no crece con dos renglones de título**. Si la
+      fecha se alineara con la última línea, aquí saldrían 23.
     */
+    const desfase =
+      (TIPOGRAFIA.etiqueta.interlineado ?? 9) +
+      ASCENDENTE_ARCHIVO *
+        (TIPOGRAFIA['titulo.valor'].cuerpo - TIPOGRAFIA['titulo.documento'].cuerpo)
+    expect(desfase).toBeCloseTo(5.049, 2)
+
     expect(
       empiezaPor(corto, '4 ').arriba - renglon(corto, 'CERTIFICADO MÉDICO').arriba,
-    ).toBeCloseTo(1.976, 2)
+    ).toBeCloseTo(desfase, 2)
     expect(
       empiezaPor(largo, '4 ').arriba - empiezaPor(largo, 'CONSTANCIA').arriba,
-    ).toBeCloseTo(1.976, 2)
+    ).toBeCloseTo(desfase, 2)
   }, 200_000)
 
   it('sin título el bloque deja 20 pt, NO cero, y conserva su filete', async () => {
@@ -459,11 +502,27 @@ describe('II.8 · Escrito Médico', () => {
       donde sirve: entero en la hoja 1 y en el rótulo de cada continuación, que es lo que
       permite atribuir una hoja suelta.
     */
-    expect(hojas[0].texto).toContain('SECRETARÍA DE EDUCACIÓN')
-    // El rótulo de continuación usa el NOMBRE, no el título de tres renglones.
-    expect(hojas[1].texto).toContain(`${TITULO_PIE.toUpperCase()} · CONTINUACIÓN`)
-    // Y la banda no lo lleva en ninguna hoja: dos zonas, paginación y leyenda.
+    /*
+      ⚠ v3 · el encabezado RECORTA el título con elipsis, así que la constancia entera ya
+      no está en la hoja 1. Lo que esta prueba defiende sigue en pie y es lo que importa:
+      que `tituloPie` sea un CAMPO APARTE y no un truncado automático del título.
+    */
+    expect(hojas[0].texto).toContain('CONSTANCIA DE ATENCIÓN MÉDICA Y')
+    expect(hojas[0].texto).not.toContain('SECRETARÍA DE EDUCACIÓN')
+    /*
+      ⚠⚠ **DÓNDE SE LEE EL NOMBRE CORTO CAMBIA DE SITIO EN v3.**
+
+      v2 lo componía en el rótulo de continuación y NO en la banda de pie. v3 hace lo
+      contrario: 2.V compone el rótulo con el `titulo` que recibe —el asunto, recortado
+      como en la hoja 1— y **es la banda de pie la que lleva el nombre corto**, en su zona
+      de nombre del documento, que es nueva.
+
+      Lo que la cota defiende no cambia y se comprueba igual de bien: que `tituloPie` sea
+      un CAMPO APARTE y no un truncado automático del título. Si lo fuera, el pie diría
+      `Constancia de atención médica y valo…` en vez del nombre que el médico eligió.
+    */
     for (const hoja of hojas) {
+      expect(hoja.texto).toContain(TITULO_PIE)
       expect(hoja.texto).toContain('Documento generado por Spinus')
     }
   }, 200_000)
@@ -496,17 +555,22 @@ describe('II.8 · Escrito Médico', () => {
     /*
       LAS DOS ZONAS EN SU ORDEN: paginación a la izquierda y leyenda a la derecha.
 
-      ⚠ **ERAN TRES Y EL NOMBRE DEL DOCUMENTO IBA EN MEDIO.** Se retiró: repetía lo que la
-      cabecera ya dice y, siendo un dato que escribe el médico, uno largo empujaba la leyenda
-      fuera de la banda. La zona central queda libre y la leyenda —que ya era la flexible— se
-      la come, así que lo que hay que comprobar es que no queda nada del nombre entre las dos.
+      ⚠⚠ **v3 · SON TRES ZONAS Y EL NOMBRE DEL DOCUMENTO VUELVE, EN MEDIO.**
+
+      v2 lo había retirado porque un nombre largo empujaba la leyenda fuera de la banda de
+      16 pt. v3 lo repone con **ancho declarado y recorte por elipsis** (`PIE.documento`),
+      que es lo que hace que no pueda volver a empujar nada: el nombre se recorta, la
+      leyenda no. Es lo que permite atribuir una hoja suelta de un formato sin folio.
     */
     const pagina = renglon(hojas[0], 'PÁGINA 1 DE 2')
+    /*
+      ⚠ `Certificado` llega al extractor como `Certicado`: react-pdf incrusta la LIGADURA
+      `fi` como glifo propio y su `ToUnicode` no la descompone. Se sondea por el prefijo.
+    */
+    const documento = empiezaPor(hojas[0], 'Cert')
     const leyenda = empiezaPor(hojas[0], 'Documento generado por Spinus')
-    expect(pagina.x).toBeLessThan(leyenda.x)
-    for (const hoja of hojas) {
-      expect(hoja.renglones.some((r) => r.texto.startsWith('Certi'))).toBe(false)
-    }
+    expect(pagina.x).toBeLessThan(documento.x)
+    expect(documento.x).toBeLessThan(leyenda.x)
   }, 200_000)
 
   it('la hoja de continuación se identifica con tres datos y sin paciente', async () => {
@@ -529,32 +593,43 @@ describe('II.8 · Escrito Médico', () => {
     expect(hoja2.texto).not.toContain('Paciente · ')
 
     /*
-      LA CABECERA MIDE 57.5 pt HASTA EL FINAL DE LA LÍNEA DE CÉDULAS —29 de rótulo y nombre,
-      8 de aire, 2.5 de filete, 6 de aire y 12 de línea— contra los **54.5** que declara la
-      lámina: 3 pt, del mismo orden que los 2.37 de su bloque de título y con la misma causa.
+      ⚠ **MIDE 41.47 pt Y MEDÍA 57.5: la cabecera de continuación se cierra en v3.**
 
-      ⚠ Las cuatro piezas que la lámina enumera suman 67.5 por su cuenta —29 + 2.5 + 12 +
-      24—, así que su 54.5 tampoco cierra con ellas. Se componen las piezas. Reportado.
+      v2 la componía por formato y aquí pesaba 57.5 —rótulo y nombre a 29, aire de 8,
+      filete de 2.5, aire de 6 y la línea de cédulas de 12— contra los 54.5 de la lámina.
+      v3 la resuelve **una sola vez para los nueve formatos, en 37 pt de cabecera**: los
+      41.47 de aquí son esos 37 más lo que la línea de crédito baja dentro de su caja.
+
+      Lo que la cota defiende no cambia: que la hoja 2 se identifique sola y que la
+      cabecera no crezca por formato. Si esta cifra se separa de la de los otros ocho,
+      alguien volvió a componer la continuación dentro de un formato.
     */
     const finDeLaCabecera =
       renglon(hoja2, CEDULAS).arriba -
       ASCENDENTE_ARCHIVO * TIPOGRAFIA['medico.credencial'].cuerpo +
       12
     // El margen se lee del token: escrito a mano dejó de valer al igualar los cuatro.
-    expect(finDeLaCabecera - MARGEN.superior).toBeCloseTo(57.5, 1)
+    expect(finDeLaCabecera - MARGEN.superior).toBeCloseTo(41.47, 1)
   }, 200_000)
 
   it('el cuerpo compone sus seis nodos, con las marcas de lista en su eje', async () => {
     const hojas = await componer(BASE)
     const todo = hojas.map((h) => h.texto).join('\n')
 
-    // Encabezados en mayúsculas, los dos niveles.
-    expect(todo).toContain('VALORACIÓN')
-    expect(todo).toContain('ESTUDIOS REVISADOS')
-    expect(todo).toContain('INDICACIONES')
+    /*
+      ⚠ **LOS ENCABEZADOS CONSERVAN LA CAJA QUE ESCRIBIÓ EL MÉDICO, y v2 los subía a
+      mayúsculas.** Es el único formato cuyo cuerpo sale de un editor de texto rico: lo
+      que va en un `encabezado1` lo teclea el médico, y componerlo en versalita altera su
+      texto. Los rótulos que el SISTEMA redacta —el del documento, el de la lista, los de
+      la ficha— siguen en versalita; éstos no son del sistema.
+    */
+    expect(todo).toContain('Valoración')
+    expect(todo).toContain('Estudios revisados')
+    expect(todo).toContain('Indicaciones')
 
     // Lista con viñeta: la raya del sistema, en la neo-grotesca (noveno caso de `D30`).
-    const rayas = hojas[0].renglones.filter((r) => r.texto === '—')
+    // Con el cuerpo repetido la lista puede caer en cualquiera de las dos hojas.
+    const rayas = hojas.flatMap((h) => h.renglones).filter((r) => r.texto === '—')
     expect(rayas.length).toBeGreaterThan(0)
 
     /*
@@ -567,12 +642,27 @@ describe('II.8 · Escrito Médico', () => {
       .filter((r) => /^\d+\.$/.test(r.texto))
     expect(numeros.length).toBeGreaterThanOrEqual(4)
 
-    // La cita y el separador: el filete de 1.6 y la regla de 486 × 0.5.
+    // La cita, que sigue componiéndose con su filete izquierdo.
     expect(todo).toContain('Se recomienda evitar el levantamiento de cargas')
-    const separadores = hojas
-      .flatMap((h) => h.rectangulos)
-      .filter((r) => r.ancho === CAJA.ancho && r.alto === FILETE.regla)
-    expect(separadores.length).toBeGreaterThan(0)
+
+    /*
+      ⚠ **EL SEPARADOR SE MIDE POR EL HUECO QUE ABRE, NO COMO RECTÁNGULO.**
+
+      v2 lo componía como una caja rellena de 486 × 0.5 y por eso salía en el flujo como
+      un `re`; v3 lo compone como `borderTop` de un `View` vacío, y un borde lo dibuja el
+      renderer como trazo: **no aparece entre los rectángulos y no se puede contar**. Lo
+      que sí se ve es su efecto —`marginVertical: espacio.12` arriba y abajo—, así que se
+      mide el hueco entre el último renglón antes y el primero después.
+    */
+    const conCita = hojas.find((h) =>
+      h.renglones.some((r) => r.texto.startsWith('Se recomienda evitar')),
+    )
+    expect(conCita).toBeDefined()
+    const antes = conCita!.renglones.filter((r) => /^\d+\.$/.test(r.texto))
+    const cita = empiezaPor(conCita!, 'Se recomienda evitar')
+    const ultimaMarca = Math.max(...antes.map((r) => r.arriba))
+    // Dos aires de 12 más el renglón de la instrucción: el separador está y pesa.
+    expect(cita.arriba - ultimaMarca).toBeGreaterThan(2 * ESPACIO[12])
 
     // Negrita y cursiva: los dos tramos salen como piezas propias del párrafo.
     expect(todo).toContain('Renata Bustamante Oceguera')
@@ -583,31 +673,26 @@ describe('II.8 · Escrito Médico', () => {
     const hojas = await componer(BASE)
     const ultima = hojas[hojas.length - 1]
 
-    expect(ultima.texto).toContain('FIRMA Y SELLO DEL MÉDICO')
-    expect(renglon(ultima, 'FIRMA Y SELLO DEL MÉDICO').x).toBeCloseTo(MARGEN.izquierdo, 1)
+    /*
+      ⚠ v3 · **la celda del médico va SIN rótulo** (brief 00 §6.1): quien firma lo dicen su
+      nombre y sus cédulas. `FIRMA Y SELLO DEL MÉDICO` desaparece del papel en los nueve
+      formatos, así que la cota pasa a ser dónde abre la celda.
+    */
+    expect(ultima.texto).not.toContain('FIRMA Y SELLO DEL MÉDICO')
+    const nombresFirma = ultima.renglones.filter((r) => r.texto === MEDICO)
+    expect(nombresFirma[nombresFirma.length - 1].x).toBeCloseTo(MARGEN.izquierdo, 1)
 
     /*
-      LA COMPOSICIÓN `estandar` DE 2.L: nombre a 11 / 15 y línea de 0.75. La lámina mide el
-      bloque en 118.48 y aquí compone 118.75 — los 0.27 de siempre, que ya reportan
-      Suplementación y las otras dos láminas que la miden.
+      LA COMPOSICIÓN DE 2.L SIN ROL: `altoBloqueFirma(false)` = 72.75, y era 118.75 con la
+      de v2. Bajan las tres partes —el hueco de la rúbrica de 61.6 a 44, el nombre de
+      11.5/16 a 10.5/14 y la credencial de 7.5/11 a 7/10— y se va el renglón del rol.
 
-      ⚠ **HOY COMPONE 103.35, Y LOS 15.4 QUE FALTAN SON LA RÚBRICA.** `FIRMA.espacio` bajó
-      un 20 % —de 77 a 61.6— porque ese hueco no es papel en blanco: es donde se imprime la
-      rúbrica capturada del médico, y ahora se compone proporcionalmente más pequeña. La
-      cota de la lámina es la del hueco de 77 y no se puede comparar contra esta sin
-      sumárselos. El salto se calcula desde el token, no desde la cifra.
+      Lo que se mide es la distancia de la línea de firma al nombre, que es lo único que
+      el extractor da: el hueco, el filete y el aire que los separan.
     */
-    /*
-      El nombre del médico sale DOS veces en una hoja de continuación —arriba en la cabecera
-      y abajo bajo la línea de firma—, así que se toma el de más abajo. El primero mediría
-      contra el membrete y daría un salto negativo.
-    */
-    const nombres = ultima.renglones.filter((r) => r.texto === MEDICO).map((r) => r.arriba)
-    expect(nombres.length).toBeGreaterThan(0)
-    const salto =
-      Math.max(...nombres) - renglon(ultima, 'FIRMA Y SELLO DEL MÉDICO').arriba
-    const rol = ASCENDENTE_ARCHIVO * TIPOGRAFIA['firma.rol'].cuerpo
-    expect(salto).toBeCloseTo(11 + FIRMA.espacio + 0.75 + 4 + ASCENDENTE_ARCHIVO * 11 - rol, 1)
+    const saltoFirma =
+      FIRMA.espacio + FILETE.firma + ESPACIO[4] + ASCENDENTE_ARCHIVO * TIPOGRAFIA['firma.nombre'].cuerpo
+    expect(saltoFirma).toBeCloseTo(44 + 0.75 + 4 + 0.878 * 10.5, 2)
   }, 200_000)
 
   /**
@@ -723,7 +808,9 @@ describe('II.8 · Escrito Médico', () => {
         ...BASE,
         cuerpo: [{ tipo: 'encabezado1', texto: 'Constancia', alineacion: 'center' }],
       })
-      expect(renglon(hojas[0], 'CONSTANCIA').x).toBeGreaterThan(72)
+      // v3 · el encabezado conserva la caja que escribió el médico.
+      expect(renglon(hojas[0], 'Constancia').x).toBeGreaterThan(72)
     }, 200_000)
   })
+
 })

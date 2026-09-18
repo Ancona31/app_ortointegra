@@ -251,11 +251,11 @@ function HojaInternamiento({
         acento={acento}
         paciente={c.paciente}
         emision={EMISION}
-        urgente={c.urgente}
+        urgente={c.urgente ?? false}
         diagnostico={DIAGNOSTICO}
         diagnosticosSecundarios={DIAGNOSTICOS_SECUNDARIOS}
         procedimiento={c.procedimiento}
-        requerimientos={c.requerimientos}
+        requerimientos={c.requerimientos ?? []}
         justificacion={c.justificacion}
         instruccionesPaciente={c.instrucciones}
         indicacionesPiso={c.indicaciones}
