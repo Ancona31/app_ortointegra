@@ -142,66 +142,45 @@ export default function MotorFlujo({
   return (
     <>
       {/*
-        ⚠⚠ **LOS DOS HIJOS ESTÁTICOS NO SON DECORACIÓN. NO LOS QUITES.**
+        ⚠⚠ **EL ENCABEZADO SON DOS PIEZAS EN DOS SITIOS, Y NO ES CAPRICHO.**
 
-        El renderer los DESCARTA al componer —se queda con lo que devuelve `render`—,
-        así que parecen código muerto y no lo son. Sin ellos, medido sobre este mismo
-        documento:
+        Un nodo `fixed` se mide UNA sola vez y el renderer **reutiliza esa misma caja en
+        todas las hojas**. De ahí sale la regla que gobierna este bloque: lo que viva
+        dentro del nodo repetido tiene que medir lo mismo en la hoja 1 que en la 5.
 
-        1. El reparto en hojas mide este nodo ANTES de saber en qué hoja está
-           (`subPageNumber` llega `undefined` en la pasada de `splitPage`), así que
-           corta con una altura y vuelve a componer con otra. El resultado no es sólo
-           el hueco de ~150 pt que se esperaba en la hoja 2: **los márgenes de los
-           bloques del cuerpo se quedan en cero** y los filetes de sección se imprimen
-           encima de los descendentes del párrafo anterior. Se vio en el
-           Consentimiento, que es el único documento con siete bloques seguidos.
-        2. La prebúsqueda de tipografías recorre el árbol DECLARADO antes de que corra
-           ningún `render` (I.3.8): sin los dos hijos, el encabezado de continuación
-           pediría familias que nadie cargó y saldría en la tipografía de reserva, sin
-           lanzar nada.
+        Montarlo de la forma evidente —el mástil y la banda como hijos del mismo nodo
+        `fixed`, y un `render` que elige— reserva la SUMA de los dos en todas las hojas.
+        Medido con `@react-pdf/layout` instrumentado sobre este documento: **268 pt
+        reservados contra 42 compuestos** en cada hoja de continuación. Y como el reparto
+        en hojas se decide sobre lo medido y no sobre lo compuesto, ese mástil fantasma
+        cortaba los párrafos 226 pt antes del final real de la hoja: el punto 7 del
+        Consentimiento partía a media frase y dejaba dos tercios de hoja en blanco debajo.
 
-        Montar los dos nodos `fixed` hermanos —cada uno devolviendo `null` en las hojas
-        que no le tocan— **no arregla el punto 1**: se probó y compone igual de mal.
+        La forma que sí mide lo que compone:
 
-        ─────────────────────────────────────────────────────────────────────────────────
-        ⚠ **LO QUE ESTO CUESTA, MEDIDO. NO ES GRATIS Y NO ESTÁ RESUELTO.**
+          · **En el nodo `fixed` vive SÓLO la banda de continuación**, como hijo declarado
+            —que es lo único que ve la prebúsqueda de tipografías (I.3.8)— y el `render`
+            devuelve `null` en la hoja 1.
+          · **El mástil va FUERA, como hijo normal.** Un hijo normal se consume en la hoja
+            1 y no reaparece: no hace falta `render` para que salga sólo ahí.
 
-        Un nodo `fixed` se mide UNA vez y el renderer reutiliza su caja en todas las
-        hojas, así que la altura reservada al encabezado es la MISMA en las nueve aunque
-        `render` componga dos piezas de tamaños muy distintos. Y la altura que se reserva
-        es la de los dos hijos declarados SUMADOS.
-
-        Medido sobre el Consentimiento con `@react-pdf/layout` instrumentado: **268 pt
-        reservados contra 42 compuestos** en cada hoja de continuación. Los ~226 de
-        diferencia son un mástil entero de fantasma por hoja, y es la razón de que el
-        bloque de cierre se vaya a una hoja propia teniendo sitio de sobra en la
-        anterior: el reparto cree que no cabe. Se comprobó dejando 270 pt libres y aun
-        así saltó.
-
-        Lo que NO lo arregla: declarar la continuación dentro de una caja de altura 0.
-        Recupera 42 pt medidos —y hasta ahí es correcto— pero cambia la composición de
-        `planSuplementacion` y `solicitudImagenologia`, que pasan a comprimir el paso de
-        entrada 0.58 y 0.72 pt (I.3.4). No se aplica: el protocolo prohíbe el atajo cuya
-        causa raíz no se sabe explicar.
-
-        Lo que sí lo arreglaría, y toca los nueve formatos: sacar el mástil del nodo
-        `fixed` y montarlo como primer hijo normal —sólo sale en la hoja 1 por sí solo—,
-        dejar en `fixed` únicamente la banda de continuación con `position: 'absolute'`
-        —sin alto de flujo, como ya hacen la banda del pie y el aviso— y subir el
-        `paddingTop` de cada `Page` a `ZONA_SEGURA` + el alto de la banda, compensando el
-        mástil con un `marginTop` negativo del mismo alto. Es una sub-fase propia, no un
-        arreglo de paso: cambia el estilo de hoja de los nueve formatos y las hojas
-        sueltas de II.7 que montan su encabezado a mano.
+        ⚠ **NO HACE FALTA COMPENSAR NADA EN LA HOJA 1, Y SE COMPROBÓ ANTES DE CREERLO.**
+        El primer montaje llevaba un margen negativo del alto de la banda, suponiendo que
+        el nodo `fixed` reservaría su caja también donde no imprime; con él, el mástil se
+        salía por arriba del papel y el nombre del médico quedaba cortado. Medido sobre el
+        PDF: el nodo reserva 0 donde su `render` devuelve `null` y su alto completo donde
+        devuelve la banda, así que el mástil se apoya solo en el margen. La cota que lo
+        fija: `yMin` del nombre del médico = 41.0 pt, el mismo valor que componía el
+        montaje anterior.
       */}
       <View
         fixed
-        render={({ subPageNumber }) =>
-          (subPageNumber ?? 1) === 1 ? primera : continuacion
-        }
+        render={({ subPageNumber }) => ((subPageNumber ?? 1) === 1 ? null : continuacion)}
       >
-        {primera}
         {continuacion}
       </View>
+
+      {primera}
 
       {children}
 

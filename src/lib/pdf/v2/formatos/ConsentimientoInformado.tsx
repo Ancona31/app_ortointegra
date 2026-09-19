@@ -39,7 +39,7 @@
  * nota.
  */
 
-import { Document, Page, StyleSheet, Text, View } from '@react-pdf/renderer'
+import { Document, Image, Page, StyleSheet, Text, View } from '@react-pdf/renderer'
 import type { DocumentProps } from '@react-pdf/renderer'
 import type { ReactElement, ReactNode } from 'react'
 import BloqueFirmas, { type CeldaFirma, type Firma } from '../BloqueFirmas'
@@ -68,10 +68,8 @@ const TITULO = 'Carta de consentimiento informado'
 const ROTULO_FUNDAMENTO = 'Fundamento legal'
 const ROTULO_DECLARACION = 'Declaración de consentimiento'
 const ROTULO_ANEXO = 'Anexo · identificación de firmantes'
-const ROTULO_TESTIGOS = 'Testigos del consentimiento'
 const ENTRADILLA_ANEXO =
   'Reproducción de la identificación oficial del paciente y de las personas que firman el consentimiento.'
-const SIN_FOTO = 'No se capturó fotografía de la identificación de este firmante.'
 
 /**
  * Los dos rótulos del bloque de trazabilidad del anexo.
@@ -363,7 +361,20 @@ const estilos = StyleSheet.create({
     borderTopWidth: FILETE.regla,
     borderTopColor: TINTA.hairline,
   },
-  banda: { marginTop: TRANSICION.contenidoCierre },
+  /*
+    ⚠ **SIN `marginTop`, Y NO ES UN OLVIDO.** El aire hasta el bloque de cierre lo pone ya
+    2.N en el contenedor que lo envuelve (`aireCierre`, el mismo `TRANSICION.contenidoCierre`),
+    así que declararlo también aquí lo componía DOS veces. En los demás formatos son 12 pt
+    de más y no se nota; en éste el bloque llega al borde de la caja —728.08 pt medidos
+    contra 729 en el caso más cargado— y esos 12 son la diferencia entre rozar el aviso de
+    continuación y no rozarlo. La duplicación sigue viva en los otros cuatro formatos que la
+    declaran; se retira aquí porque aquí se paga.
+  */
+  banda: {},
+  /** El aire entre la declaración y sus frases sueltas. */
+  declaraciones: { marginTop: ESPACIO[10], marginBottom: ESPACIO[16] },
+  /** El aire entre un nivel de firma y el siguiente. */
+  nivelSiguiente: { marginTop: ESPACIO[16] },
   parentesco: { ...estiloTipografico('aseguradora.rotulo'), marginBottom: ESPACIO[4] },
   lineaParentesco: {
     height: 16,
@@ -393,7 +404,8 @@ const estilos = StyleSheet.create({
     justifyContent: 'center',
     padding: ESPACIO[8],
   },
-  anexoSinFoto: { ...estiloTipografico('anexo.pie'), textAlign: 'center' },
+  /** La reproducción, dentro de su caja. `contain`: una credencial no se recorta. */
+  anexoFoto: { width: '100%', height: '100%', objectFit: 'contain' },
   anexoPie: { flexDirection: 'row', justifyContent: 'space-between', marginTop: ESPACIO[4] },
   anexoPieTexto: { ...estiloTipografico('anexo.pie') },
   selladoBloque: {
@@ -505,9 +517,26 @@ export default function ConsentimientoInformado(
     (s): s is typeof s & { texto: string } => s.texto !== undefined && s.texto.trim() !== '',
   )
 
+  /**
+   * LO QUE SE ANEXA ES LA FOTOGRAFÍA, NO LA FILA.
+   *
+   * ⚠⚠ **`identificaciones` TRAE UNA ENTRADA POR FIRMANTE PREVISTO, CON FOTO O SIN ELLA.**
+   * Tomar la lista entera como «lo anexado» hacía que el papel afirmara dos cosas falsas a
+   * la vez: la coletilla `con identificación anexa` salía bajo cuatro firmantes de los que
+   * no se había capturado ninguna credencial, y la hoja de anexo se componía entera con
+   * cuatro recuadros vacíos que decían que no había fotografía. Un documento que remite a
+   * un anexo que no reproduce nada es peor que uno que no remite a ninguno.
+   *
+   * De aquí en adelante, anexado = **tiene fotografía capturada**. Todo lo demás —la hoja,
+   * los recuadros, la coletilla— se deriva de esta lista y de ninguna otra.
+   */
+  const anexadas = identificaciones.filter(
+    (i) => i.foto !== undefined && i.foto.trim() !== '',
+  )
+
   /** ¿El anexo reproduce la identificación de este rol? Se compara por el rótulo. */
   const enAnexo = (rol: string): boolean =>
-    identificaciones.some((i) => i.rol.trim().toUpperCase() === rol.trim().toUpperCase())
+    anexadas.some((i) => i.rol.trim().toUpperCase() === rol.trim().toUpperCase())
 
   const celdaMedico: Firma = {
     rol: ROL.medico,
@@ -592,7 +621,12 @@ export default function ConsentimientoInformado(
   ]
 
   const hayTestigos = testigos.some((t) => t !== null)
-  const hayAnexo = identificaciones.length > 0
+  /**
+   * La hoja de anexo existe si hay algo que reproducir, y sólo entonces. Sin ninguna
+   * captura no tiene contenido: el documento termina en la hoja de firmas, y el bloque de
+   * sellado baja con él.
+   */
+  const hayAnexo = anexadas.length > 0
 
   /**
    * LOS NIVELES SE NUMERAN POR LOS QUE HAY, NO POR LOS QUE PODRÍA HABER.
@@ -607,8 +641,6 @@ export default function ConsentimientoInformado(
    */
   const hayRepresentacion = !pacienteNoPuedeFirmar && celdaFamiliar !== null
   const numeroTestigos = hayRepresentacion ? 3 : 2
-  /** La hoja de firmas existe si tiene algún nivel que componer. */
-  const hayHojaFirmas = hayRepresentacion || hayTestigos
 
   /**
    * LOS DOS NÚMEROS DEL RECUENTO, DERIVADOS de los firmantes y no recibidos por prop.
@@ -660,7 +692,73 @@ export default function ConsentimientoInformado(
         <MotorFlujo
           encabezado={encabezado}
           firmas={
+            /*
+              ⚠⚠ **LA HOJA DE FIRMAS ES ATÓMICA: `wrap={false}` SOBRE TODO EL BLOQUE.**
+
+              Dentro va la declaración de consentimiento y los tres niveles de firma
+              —otorgamiento, representación y testigos—, y no se parte nunca. Es un solo
+              acto: el paciente declara y a continuación firman los que estuvieron. Antes
+              la declaración iba en el flujo del cuerpo, el otorgamiento cerraba esa hoja y
+              los testigos vivían en un `Page` propio, así que cuatro firmantes del mismo
+              acto acababan repartidos en dos hojas con sitio de sobra en la primera.
+
+              Consecuencia buscada: los saltos los absorben los siete puntos clínicos, que
+              es donde un corte no le importa a nadie. Este bloque no corta.
+            */
             <View style={estilos.banda} wrap={false}>
+              <Text style={estilos.rotuloBloque}>{ROTULO_DECLARACION.toUpperCase()}</Text>
+              <MarcoParcial padding={MARCO.leyenda} ancho={CAJA.ancho} color={acento.base}>
+                {/*
+                  ⚠ **LA REDACCIÓN SIRVE PARA CUALQUIER PROCEDIMIENTO INVASIVO, NO SÓLO PARA
+                  CIRUGÍA.** La anterior cerraba con «durante el acto quirúrgico por hallazgos
+                  transoperatorios», que no encaja en un catéter, una punción ni una
+                  infiltración —y este consentimiento se emite para los tres—. La de ahora
+                  dice «durante su realización por hallazgos no previstos», que cubre el
+                  quirófano y el consultorio sin nombrar ninguno.
+
+                  Los tres resaltados son los tres datos que identifican el acto: quién
+                  consiente, quién informó y qué se va a hacer. **El del médico es nuevo**:
+                  su nombre iba en texto corrido y era el único de los tres sin marcar.
+                */}
+                <Text style={estilos.parrafo}>
+                  {'Yo, '}
+                  <Text style={estilos.fuerte}>{paciente.paciente}</Text>
+                  {', declaro que '}
+                  <Text style={estilos.fuerte}>{medico.nombre}</Text>
+                  {' me ha explicado de forma clara y comprensible la naturaleza y el propósito del procedimiento: '}
+                  <Text style={estilos.fuerte}>{procedimiento}</Text>
+                  {', así como sus riesgos, beneficios esperados y las alternativas de tratamiento disponibles.'}
+                </Text>
+                <Text style={estilos.parrafo}>
+                  He tenido la oportunidad de hacer preguntas y todas han sido respondidas a mi
+                  satisfacción. Comprendo que ningún procedimiento médico está libre de riesgos y
+                  que los resultados no pueden ser garantizados.
+                </Text>
+                <Text style={estilos.parrafo}>
+                  Por lo anterior, otorgo mi consentimiento libre, voluntario e informado para la
+                  realización del procedimiento descrito, así como para los procedimientos
+                  adicionales o de urgencia que resulten necesarios durante su realización por
+                  hallazgos no previstos.
+                </Text>
+              </MarcoParcial>
+
+              {/*
+                La constancia y las dos autorizaciones. Las tres son frases enteras y sin
+                casilla: una casilla vacía en un papel firmado no se distingue de una que
+                nadie marcó. La de transfusión es tri-estado: sin dato, no se compone.
+              */}
+              <View style={estilos.declaraciones}>
+                {pacienteNoPuedeFirmar ? (
+                  <Text style={estilos.casilla}>{TEXTO_SUSTITUCION}</Text>
+                ) : null}
+                {autorizaTransfusion === undefined ? null : (
+                  <Text style={estilos.casilla}>
+                    {autorizaTransfusion ? TRANSFUSION.si : TRANSFUSION.no}
+                  </Text>
+                )}
+                {autorizaFotos ? <Text style={estilos.casilla}>{FOTOS}</Text> : null}
+              </View>
+
               <Nivel numero={1} rotulo={NIVEL.otorgamiento} acento={acento} />
               {/*
                 Dos celdas como máximo (brief 00 §6.2). Cuando el paciente no puede
@@ -670,7 +768,22 @@ export default function ConsentimientoInformado(
                 variante="pareja"
                 firmas={[celdaMedico, pacienteNoPuedeFirmar ? celdaFamiliar : celdaPaciente]}
               />
-              {hayHojaFirmas || hayAnexo ? null : bloqueSellado}
+
+              {hayRepresentacion ? (
+                <View style={estilos.nivelSiguiente}>
+                  <Nivel numero={2} rotulo={NIVEL.representacion} acento={acento} />
+                  <BloqueFirmas variante="pareja" firmas={[celdaFamiliar, null]} />
+                </View>
+              ) : null}
+
+              {hayTestigos ? (
+                <View style={estilos.nivelSiguiente}>
+                  <Nivel numero={numeroTestigos} rotulo={NIVEL.testigos} acento={acento} />
+                  <BloqueFirmas variante="pareja" firmas={[testigos[0], testigos[1]]} />
+                </View>
+              ) : null}
+
+              {hayAnexo ? null : bloqueSellado}
             </View>
           }
         >
@@ -700,82 +813,10 @@ export default function ConsentimientoInformado(
             />
           ))}
 
-          {/* LA DECLARACIÓN. Sin salto declarado: comparte hoja con las secciones. */}
-          <View style={estilos.fundamento}>
-            <Text style={estilos.rotuloBloque}>{ROTULO_DECLARACION.toUpperCase()}</Text>
-            <MarcoParcial padding={MARCO.leyenda} ancho={CAJA.ancho} color={acento.base}>
-              <Text style={estilos.parrafo}>
-                {'Yo, '}
-                <Text style={estilos.fuerte}>{paciente.paciente}</Text>
-                {`, declaro que ${medico.nombre} me ha explicado de forma clara y comprensible la naturaleza del procedimiento: `}
-                <Text style={estilos.fuerte}>{procedimiento}</Text>
-                {', incluyendo sus riesgos, beneficios esperados y alternativas de tratamiento.'}
-              </Text>
-              <Text style={estilos.parrafo}>
-                He tenido la oportunidad de hacer preguntas y todas han sido respondidas a mi
-                satisfacción. Comprendo que ningún procedimiento médico está libre de riesgos y
-                que los resultados no pueden ser garantizados.
-              </Text>
-              <Text style={estilos.parrafo}>
-                Por lo anterior, otorgo mi consentimiento libre, voluntario e informado para la
-                realización del procedimiento descrito, así como para los procedimientos
-                adicionales que pudieran ser necesarios durante el acto quirúrgico por hallazgos
-                transoperatorios.
-              </Text>
-            </MarcoParcial>
-
-            {/*
-              La constancia y las dos autorizaciones. Las tres son frases enteras y sin
-              casilla: una casilla vacía en un papel firmado no se distingue de una que
-              nadie marcó. La de transfusión es tri-estado: sin dato, no se compone.
-            */}
-            <View style={{ marginTop: ESPACIO[10] }}>
-              {pacienteNoPuedeFirmar ? (
-                <Text style={estilos.casilla}>{TEXTO_SUSTITUCION}</Text>
-              ) : null}
-              {autorizaTransfusion === undefined ? null : (
-                <Text style={estilos.casilla}>
-                  {autorizaTransfusion ? TRANSFUSION.si : TRANSFUSION.no}
-                </Text>
-              )}
-              {autorizaFotos ? <Text style={estilos.casilla}>{FOTOS}</Text> : null}
-            </View>
-          </View>
         </MotorFlujo>
 
         <PieDocumento variante="completo" folio={folio} documento={TITULO} acento={acento} />
       </Page>
-
-      {/*
-        HOJA DE REPRESENTACIÓN Y TESTIGOS — `Page` propio con su rótulo escrito aquí.
-        Sólo existe si hay testigos: sin ellos, la representación cabe en la pareja de
-        la hoja anterior y esta hoja no se monta.
-      */}
-      {hayHojaFirmas ? (
-        <Page size={[PAPEL.ancho, PAPEL.alto]} style={estilos.hoja}>
-          <EncabezadoHoja
-            {...encabezado}
-            variante="continuacion"
-            rotulo={ROTULO_TESTIGOS}
-            /* `fixed`: si la hoja de testigos creciera a dos, la segunda lleva el mismo
-               rótulo — que es lo correcto, porque sigue siendo la hoja de testigos. */
-          />
-          {hayRepresentacion ? (
-            <View style={{ marginBottom: ESPACIO[16] }} wrap={false}>
-              <Nivel numero={2} rotulo={NIVEL.representacion} acento={acento} />
-              <BloqueFirmas variante="pareja" firmas={[celdaFamiliar, null]} />
-            </View>
-          ) : null}
-          {hayTestigos ? (
-            <View wrap={false}>
-              <Nivel numero={numeroTestigos} rotulo={NIVEL.testigos} acento={acento} />
-              <BloqueFirmas variante="pareja" firmas={[testigos[0], testigos[1]]} />
-            </View>
-          ) : null}
-          {hayAnexo ? null : bloqueSellado}
-          <PieDocumento variante="completo" folio={folio} documento={TITULO} acento={acento} />
-        </Page>
-      ) : null}
 
       {/*
         HOJA DE ANEXO — `Page` propio. Su rótulo ya no sale de un mapa por número de
@@ -788,7 +829,7 @@ export default function ConsentimientoInformado(
           <Text style={estilos.anexoEntradilla}>{ENTRADILLA_ANEXO}</Text>
 
           <View style={estilos.anexoRejilla}>
-            {identificaciones.map((identificacion, indice) => (
+            {anexadas.map((identificacion, indice) => (
               <View
                 key={indice}
                 style={[
@@ -821,24 +862,31 @@ export default function ConsentimientoInformado(
                   distingue además por su borde y por el filete de acento que la abre—,
                   así que en fotocopia sigue siendo una caja (I.3.3).
                 */}
+                {/*
+                  LA FOTOGRAFÍA SE COMPONE. Sólo llegan aquí las entradas con `foto`, que
+                  es lo que hacía falta para montar el `Image` sin riesgo: un `src` vacío
+                  no produce un hueco, produce un PDF roto. `contain` y no `cover` porque
+                  una credencial recortada deja de servir para cotejar.
+                */}
                 <View style={[estilos.anexoCaja, { borderTopColor: acento.base }]}>
-                  {identificacion.foto === undefined ? (
-                    <Text style={estilos.anexoSinFoto}>{SIN_FOTO}</Text>
-                  ) : null}
-                  {/*
-                    ⚠ LA FOTOGRAFÍA NO SE COMPONE TODAVÍA. `identificacion.foto` llega
-                    como data-URL y el recuadro está medido para recibirla con
-                    `objectFit: 'contain'`, pero **la captura no está cableada** (II.7
-                    §5, segunda entrega). Montar un `Image` con una cadena vacía produce
-                    un PDF roto, no un hueco; con la leyenda de ausencia, el papel dice
-                    la verdad. `dudas.md` §14.
-                  */}
+                  {/* eslint-disable-next-line jsx-a11y/alt-text */}
+                  <Image style={estilos.anexoFoto} src={identificacion.foto} />
                 </View>
 
-                <View style={estilos.anexoPie}>
-                  <Text style={estilos.anexoPieTexto}>{identificacion.tipo ?? ' '}</Text>
-                  <Text style={estilos.anexoPieTexto}>{identificacion.numero ?? ' '}</Text>
-                </View>
+                {/*
+                  ⚠ **EL PIE COLAPSA ENTERO, Y EN PRODUCCIÓN COLAPSA SIEMPRE.** El tipo y el
+                  número no se piden: el dato está impreso en la credencial fotografiada y
+                  teclearlo introduce divergencia en un documento legal (RANURAS_MUERTAS §2,
+                  y el adaptador lo dice en el mismo sitio donde los lee). Componerlos con
+                  un espacio en blanco cuando faltan dejaba una banda de 11 pt vacía bajo
+                  cada recuadro: aire que parece una alineación rota, no un dato ausente.
+                */}
+                {identificacion.tipo === undefined && identificacion.numero === undefined ? null : (
+                  <View style={estilos.anexoPie}>
+                    <Text style={estilos.anexoPieTexto}>{identificacion.tipo ?? ' '}</Text>
+                    <Text style={estilos.anexoPieTexto}>{identificacion.numero ?? ' '}</Text>
+                  </View>
+                )}
               </View>
             ))}
           </View>

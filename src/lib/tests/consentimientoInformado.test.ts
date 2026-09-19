@@ -31,6 +31,7 @@ import ConsentimientoInformado, {
   type ConsentimientoInformadoProps,
   type IdentificacionAnexo,
 } from '@/lib/pdf/v2/formatos/ConsentimientoInformado'
+import { propsConsentimientoInformado } from '@/lib/pdf/v2/adaptadores/ConsentimientoInformado'
 import {
   TIPOGRAFIA,
   FILETE,
@@ -127,6 +128,16 @@ interface Hoja {
   readonly cuerpos: ReadonlySet<number>
   readonly renglones: readonly Renglon[]
   readonly rectangulos: readonly Rectangulo[]
+  /**
+   * Cuántas IMÁGENES pinta la hoja, contando operadores `Do` del flujo.
+   *
+   * ⚠ **HACE FALTA PORQUE EL TEXTO NO DELATA UNA IMAGEN QUE FALTA.** Un `<Image>` que
+   * no se monta —o que se monta con una fuente que el renderer no sabe decodificar— no
+   * lanza nada: deja la caja vacía y el PDF sale bien formado. Todas las cotas de texto
+   * de este archivo pasaban con la hoja de anexo compuesta y sin una sola credencial
+   * dentro. `Do` es lo único que distingue las dos cosas.
+   */
+  readonly dibujos: number
 }
 
 function leer(pdf: Buffer): Hoja[] {
@@ -150,6 +161,7 @@ function leer(pdf: Buffer): Hoja[] {
     const cuerpos = new Set<number>()
     const renglones: Renglon[] = []
     const rectangulos: Rectangulo[] = []
+    const dibujos = [...contenido.matchAll(/\/[A-Za-z0-9]+ Do\b/g)].length
     const pila: Matriz[] = []
     let ctm: Matriz = IDENTIDAD
     let actual = ''
@@ -200,7 +212,7 @@ function leer(pdf: Buffer): Hoja[] {
       }
     }
     cerrar()
-    return { texto, cuerpos, renglones, rectangulos }
+    return { texto, cuerpos, renglones, rectangulos, dibujos }
   })
 }
 
@@ -231,7 +243,8 @@ const RASTER =
 const IDENTIFICACIONES: readonly IdentificacionAnexo[] = [
   { rol: 'Paciente', nombre: PACIENTE, tipo: 'Credencial para votar', numero: 'BUOR010412MYN04', foto: RASTER },
   { rol: 'Familiar o responsable', nombre: FAMILIAR, tipo: 'Credencial para votar', numero: 'BUCM780921MYN08', foto: RASTER },
-  // Sin fotografía: el recuadro se compone igual, con su leyenda y con sus dos datos.
+  // ⚠ LOS DOS TESTIGOS VAN SIN FOTOGRAFÍA A PROPÓSITO: son los que comprueban que una fila
+  // sin captura no compone recuadro, por mucho que traiga tipo y número.
   { rol: 'Testigo 1', nombre: 'Juan Canul Uc', tipo: 'Credencial para votar', numero: 'CAUJ850614HYN02' },
   { rol: 'Testigo 2', nombre: 'Rosa Pech Ek', tipo: 'Pasaporte', numero: 'G12345678' },
 ]
@@ -312,15 +325,22 @@ const FAMILIAR_VACIO: ConsentimientoInformadoProps = {
 }
 
 /**
- * Sin ninguna fotografía. **La hoja de anexo SIGUE EXISTIENDO**: ver la prueba del anexo.
+ * FILAS SIN FOTOGRAFÍA, que es como llega hoy la captura: el formulario todavía no la pide.
+ * **No hay nada que anexar, así que no hay hoja de anexo.**
  */
 const SIN_FOTOGRAFIAS: ConsentimientoInformadoProps = {
   ...COMPLETO,
   identificaciones: SIN_FOTOS,
 }
 
-/** Sin identificaciones de ninguna clase: eso, y sólo eso, retira la hoja de anexo. */
+/** Sin identificaciones de ninguna clase. Compone igual que el anterior. */
 const SIN_ANEXO: ConsentimientoInformadoProps = { ...COMPLETO, identificaciones: [] }
+
+/** Una sola captura, la del paciente: la hoja existe y monta UN recuadro. */
+const UNA_SOLA: ConsentimientoInformadoProps = {
+  ...COMPLETO,
+  identificaciones: [IDENTIFICACIONES[0], ...SIN_FOTOS.slice(1)],
+}
 
 /** Por sustitución: el familiar firma en el nivel 1 y el nivel 2 desaparece. */
 const SUSTITUCION: ConsentimientoInformadoProps = { ...COMPLETO, pacienteNoPuedeFirmar: true }
@@ -392,6 +412,7 @@ function encabezado(hoja: Hoja): number {
 
 describe('II.7 · Consentimiento Informado', () => {
 
+
   /**
    * ⚠ **COTA REESCRITA CONTRA v3. LA VIEJA DESCRIBÍA LA MAQUETA VIEJA**, no un defecto:
    * fijaba 507.385 pt de encabezado contra la lámina de 511.6, y las dos cifras son de un
@@ -411,25 +432,25 @@ describe('II.7 · Consentimiento Informado', () => {
     expect(encabezado(hoja1)).toBeCloseTo(346.7, 1)
   }, 200_000)
 
-  it('con el texto en bandera izquierda salen CINCO hojas', async () => {
+  it('el reparto son CUATRO hojas y cada una es de una cosa', async () => {
     const hojas = await componer(COMPLETO)
 
     /*
       ⚠ **LA CIFRA SE MIDE, NO SE FUERZA.** El cuerpo de este formato va JUSTIFICADO —la
       excepción declarada a I.3.2— y el justificado no cambia dónde corta cada renglón, solo
-      reparte el sobrante, así que el documento no repagina por él: medido con las dos
-      alineaciones antes de decidir, las dos daban seis hojas y el mismo reparto.
+      reparte el sobrante, así que el documento no repagina por él.
 
       **Si esta prueba falla al tocar un texto, la respuesta NO es apretar el interlineado**
-      (I.3.4): es actualizar la cifra y decirlo. Esto es decirlo: **eran SEIS, las de la
-      lámina, y son cinco desde que se retiraron las dos zonas de escritura** —96 pt bajo la
-      descripción del procedimiento y 64 bajo los riesgos específicos, renglones pautados que
-      el médico no llenaba porque esas secciones las escribe en el formulario—. Los 160 pt
-      recuperados son la hoja que sobraba.
+      (I.3.4): es actualizar la cifra y decirlo. Esto es decirlo, y son dos rebajas seguidas.
+      Eran SEIS en la lámina; bajaron a cinco al retirarse las dos zonas de escritura —96 pt
+      bajo la descripción del procedimiento y 64 bajo los riesgos específicos, renglones
+      pautados que el médico no llenaba—; y son CUATRO desde que el encabezado dejó de
+      reservar un mástil fantasma en cada hoja de continuación (2.N) y la hoja de testigos
+      dejó de ser un `Page` propio.
 
-      Y el reparto sigue el de la lámina en qué abre cada hoja:
+      El reparto ya no es «lo que quepa»: **cada hoja es de una cosa**, y eso es la regla.
     */
-    expect(hojas).toHaveLength(5)
+    expect(hojas).toHaveLength(4)
 
     // El título es el de II.7 —el término de la NOM-004—, no el de la lámina.
     expect(contiene(hojas[0], TITULO)).toBe(true)
@@ -446,16 +467,24 @@ describe('II.7 · Consentimiento Informado', () => {
     expect(hojas[0].texto).not.toContain('DATOS DE IDENTIFICACIÓN')
 
     /*
-      ⚠ v3 · **EL REPARTO CORRE UNA HOJA HACIA ARRIBA.** Las tres retiradas del encabezado
-      —margen, rótulo y ficha— devuelven la declaración a la hoja 2, y la banda de cierre
-      con ella a la 3. La 4 y la 5 no se reparten: son `Page` propios.
+      ⚠⚠ **LAS HOJAS 1 Y 2 SON LOS SIETE PUNTOS CLÍNICOS, LA 3 EL ACTO DE FIRMA Y LA 4 EL
+      ANEXO. Es la regla del reparto y esta prueba es donde vive.**
+
+      Los puntos clínicos son lo ÚNICO que absorbe los saltos: si el médico escribe más, se
+      reparte ahí, que es donde un corte no le importa a nadie. Lo que no se reparte nunca es
+      la hoja 3 —declaración más los firmantes— ni la 4.
     */
-    expect(contiene(hojas[1], 'DECLARACIÓN DE CONSENTIMIENTO')).toBe(true)
-    expect(contiene(hojas[2], 'OTORGAMIENTO')).toBe(true)
-    expect(contiene(hojas[3], 'REPRESENTACIÓN')).toBe(true)
-    expect(contiene(hojas[3], 'TESTIGOS')).toBe(true)
-    expect(contiene(hojas[4], 'ANEXO · IDENTIFICACIÓN DE FIRMANTES')).toBe(true)
-    expect(hojas[4].texto).toContain('PÁGINA 5 DE 5')
+    expect(hojas[1].texto).not.toContain('DECLARACIÓN DE CONSENTIMIENTO')
+    expect(contiene(hojas[2], 'DECLARACIÓN DE CONSENTIMIENTO')).toBe(true)
+    expect(contiene(hojas[3], 'ANEXO · IDENTIFICACIÓN DE FIRMANTES')).toBe(true)
+    expect(hojas[3].texto).toContain('PÁGINA 4 DE 4')
+
+    /*
+      Y NINGUNA HOJA SE CORTA A MEDIA FRASE. El punto 7 se partía en «…uso de ortesis o» y
+      dejaba dos tercios de hoja en blanco debajo, porque el reparto medía contra un mástil
+      que no se imprimía. La cota: el último punto clínico termina en su punto final.
+    */
+    expect(hojas[1].texto).toContain('reposo relativo y rehabilitación física.')
   }, 200_000)
 
   it('el pie de sello sale solo en quien firmó, y remite al anexo', async () => {
@@ -511,12 +540,12 @@ describe('II.7 · Consentimiento Informado', () => {
       termina en el anexo, así que el bloque baja con él. Un sello que dice que el documento no
       se alteró no puede tener páginas detrás.
     */
-    expect(conAnexo).toHaveLength(5)
-    expect(sinAnexo).toHaveLength(4)
-    expect(conAnexo[4].texto).toContain(`Documento sellado el ${SELLO_DOCUMENTO}`)
-    expect(sinAnexo[3].texto).toContain(`Documento sellado el ${SELLO_DOCUMENTO}`)
+    expect(conAnexo).toHaveLength(4)
+    expect(sinAnexo).toHaveLength(3)
+    expect(conAnexo[3].texto).toContain(`Documento sellado el ${SELLO_DOCUMENTO}`)
+    expect(sinAnexo[2].texto).toContain(`Documento sellado el ${SELLO_DOCUMENTO}`)
     // Y en ninguna otra: es un cierre, no una marca de página.
-    for (const hoja of conAnexo.slice(0, 4)) {
+    for (const hoja of conAnexo.slice(0, 3)) {
       expect(hoja.texto).not.toContain('Documento sellado')
     }
 
@@ -524,11 +553,11 @@ describe('II.7 · Consentimiento Informado', () => {
       EL RECUENTO SE HACE SOBRE LAS CELDAS COMPUESTAS. Cinco firmantes, dos con hora: la
       diferencia es lo que responde a la pregunta de por qué hay celdas en blanco.
     */
-    expect(conAnexo[4].texto).toContain(
+    expect(conAnexo[3].texto).toContain(
       sinLigadura('5 firmantes previstos, 2 firmaron, 3 omitidos'),
     )
-    expect(conAnexo[4].texto).toContain(`Huella SHA-256 · ${HUELLA}`)
-    expect(conAnexo[4].texto).toContain(
+    expect(conAnexo[3].texto).toContain(`Huella SHA-256 · ${HUELLA}`)
+    expect(conAnexo[3].texto).toContain(
       sinLigadura('verificable en el expediente electrónico'),
     )
   }, 200_000)
@@ -598,12 +627,11 @@ describe('II.7 · Consentimiento Informado', () => {
     })
 
     /*
-      LA HOJA ENTERA DESAPARECE. Con los cinco firmantes y sin anexo son cinco hojas —tres de
-      secciones, otorgamiento y la de representación y testigos—; sin nadie a quien
-      representar ni testigos que firmen, esa quinta no tiene nada que componer y el `break`
-      la habría abierto igualmente, numerada y con folio.
+      SON DOS HOJAS: los puntos clínicos y el acto de firma. Sin nadie a quien representar ni
+      testigos que firmen, los dos niveles de abajo no componen nada y la hoja de firmas se
+      queda con la declaración y las dos celdas del otorgamiento.
     */
-    expect(sinNadie).toHaveLength(3)
+    expect(sinNadie).toHaveLength(2)
 
     const todo = sinNadie.map((hoja) => hoja.texto).join('')
     // Ni los rótulos de nivel…
@@ -616,9 +644,9 @@ describe('II.7 · Consentimiento Informado', () => {
     expect(todo).not.toContain('PARENTESCO CON EL PACIENTE')
 
     // Y el nivel 1 sigue entero: el otorgamiento es lo que este documento es.
-    expect(contiene(sinNadie[2], 'OTORGAMIENTO')).toBe(true)
-    expect(contiene(sinNadie[2], 'MÉDICO TRATANTE')).toBe(true)
-    expect(contiene(sinNadie[2], 'PACIENTE')).toBe(true)
+    expect(contiene(sinNadie[1], 'OTORGAMIENTO')).toBe(true)
+    expect(contiene(sinNadie[1], 'MÉDICO TRATANTE')).toBe(true)
+    expect(contiene(sinNadie[1], 'PACIENTE')).toBe(true)
   }, 200_000)
 
   it('con un solo testigo se compone su celda y no la del otro', async () => {
@@ -686,7 +714,7 @@ describe('II.7 · Consentimiento Informado', () => {
       expect(hoja.texto).not.toContain(sinLigadura('firmantes previstos'))
     }
     // Y el documento sigue midiendo lo mismo: los sellos no cambian el reparto.
-    expect(hojas).toHaveLength(5)
+    expect(hojas).toHaveLength(4)
   }, 200_000)
 
   it('el riel son ocho celdas en cuatro filas, sin sexo y con celda base de 28.5', async () => {
@@ -756,97 +784,304 @@ describe('II.7 · Consentimiento Informado', () => {
     expect(sinDato.texto).not.toContain(FAMILIAR)
   }, 200_000)
 
-  it('cinco firmantes en tres niveles, repartidos en dos hojas', async () => {
+  /**
+   * ⚠⚠ **LA HOJA DE FIRMAS ES ATÓMICA. ESTA ES LA PRUEBA QUE LO FIJA.**
+   *
+   * La declaración de consentimiento y los tres niveles de firma van en UNA hoja y no se
+   * parten nunca. Antes la declaración iba en el flujo del cuerpo, el otorgamiento cerraba
+   * esa hoja y la representación y los testigos vivían en un `Page` propio: cuatro
+   * firmantes del mismo acto acababan repartidos en dos hojas, con la primera a un tercio.
+   *
+   * Es un solo acto —el paciente declara y acto seguido firman los que estuvieron—, y en un
+   * papel que puede acabar en sede legal, separar la declaración de las firmas que la
+   * acreditan es separar lo que se consintió de quién lo consintió.
+   */
+  it('la declaración y los cinco firmantes van en UNA sola hoja', async () => {
     const hojas = await componer(COMPLETO)
+    const firmas = hojas[2]
 
-    // Nivel 1 en la hoja 4: médico y paciente.
-    expect(contiene(hojas[2], 'MÉDICO TRATANTE')).toBe(true)
-    expect(contiene(hojas[2], 'Ced. Prof. 7000001 · Ced. Esp. 8000002')).toBe(true)
-    expect(hojas[2].texto).not.toContain('TESTIGO 1')
+    // La declaración y los tres niveles, en la misma hoja y en su orden.
+    expect(contiene(firmas, 'DECLARACIÓN DE CONSENTIMIENTO')).toBe(true)
+    expect(contiene(firmas, 'OTORGAMIENTO')).toBe(true)
+    expect(contiene(firmas, 'REPRESENTACIÓN')).toBe(true)
+    expect(contiene(firmas, 'TESTIGOS')).toBe(true)
 
-    // Niveles 2 y 3 en la hoja 5, con el parentesco colgando solo del familiar.
-    expect(contiene(hojas[3], 'FAMILIAR O RESPONSABLE')).toBe(true)
-    expect(contiene(hojas[3], 'PARENTESCO CON EL PACIENTE')).toBe(true)
-    expect(contiene(hojas[3], 'TESTIGO 1')).toBe(true)
-    expect(contiene(hojas[3], 'TESTIGO 2')).toBe(true)
+    // Y las cinco celdas, con el parentesco colgando sólo del familiar.
+    expect(contiene(firmas, 'MÉDICO TRATANTE')).toBe(true)
+    expect(contiene(firmas, 'Ced. Prof. 7000001 · Ced. Esp. 8000002')).toBe(true)
+    expect(contiene(firmas, 'FAMILIAR O RESPONSABLE')).toBe(true)
+    expect(contiene(firmas, 'PARENTESCO CON EL PACIENTE')).toBe(true)
+    expect(contiene(firmas, 'TESTIGO 1')).toBe(true)
+    expect(contiene(firmas, 'TESTIGO 2')).toBe(true)
 
     /*
-      LOS TRES NIVELES VAN NUMERADOS 1, 2 Y 3, y el 3 solo aparece en la hoja 5. Es lo que
-      distingue esta retícula de una de seis firmas seguidas: la jerarquía es del documento,
-      no del hueco que quede.
+      Ninguna otra hoja lleva una sola celda de firma: el acto no se reparte.
+
+      ⚠ Se ancla en `Mayor de edad` y no en `TESTIGO 1`: el rótulo del testigo se repite en
+      el ANEXO, que reproduce su identificación y es otra cosa. La nota de calidad sólo
+      existe bajo la raya de firma.
     */
-    expect(contiene(hojas[2], 'OTORGAMIENTO')).toBe(true)
-    expect(contiene(hojas[3], 'REPRESENTACIÓN')).toBe(true)
-    expect(contiene(hojas[3], 'TESTIGOS')).toBe(true)
+    for (const hoja of [hojas[0], hojas[1], hojas[3]]) {
+      expect(hoja.texto).not.toContain('MÉDICO TRATANTE')
+      expect(hoja.texto).not.toContain('OTORGAMIENTO')
+      expect(hoja.texto).not.toContain('Mayor de edad')
+    }
+
+    /*
+      ⚠ **Y CABE POR LOS PELOS, QUE ES LO QUE ESTA COTA VIGILA DE VERDAD.** El bloque llega
+      a 721.3 pt contra los 729 del borde de la caja: **7.7 pt de holgura** con cinco
+      celdas. La variante más cargada que se puede emitir hoy —cinco celdas, las dos
+      autorizaciones y el sellado dentro, porque sin identificaciones no hay hoja de anexo—
+      llega a 718.3 sobre el fixture corto y a 727.6 sobre los textos reales del formulario.
+      No desborda en ninguno de los casos medidos, pero **un procedimiento con nombre largo
+      que añada un renglón a la declaración sí lo haría**, y entonces el bloque se compone
+      encima del pie porque `wrap={false}` no tiene a dónde ir. Está reportado.
+    */
+    const ultima = Math.max(
+      ...firmas.renglones.filter((r) => r.arriba < 726).map((r) => r.arriba),
+    )
+    expect(ultima).toBeLessThan(725)
   }, 200_000)
 
   it('por sustitución desaparece el nivel 2 y Testigos se renumera a 2', async () => {
     const hojas = await componer(SUSTITUCION)
 
+    const firmas = hojas[2]
+
     /*
       SUSTITUCIÓN Y NO ADICIÓN: el familiar firma en el nivel 1, en la celda del paciente, y
       el nivel de Representación deja de existir. El de Testigos pasa de 3 a 2.
     */
-    expect(hojas[3].texto).not.toContain('REPRESENTACIÓN')
-    expect(contiene(hojas[3], 'TESTIGOS')).toBe(true)
-    expect(contiene(hojas[2], 'OTORGAMIENTO')).toBe(true)
+    expect(firmas.texto).not.toContain('REPRESENTACIÓN')
+    expect(contiene(firmas, 'TESTIGOS')).toBe(true)
+    expect(contiene(firmas, 'OTORGAMIENTO')).toBe(true)
 
-    // El familiar sube al nivel 1, con su parentesco, y ya no está en la hoja 5.
-    expect(contiene(hojas[2], 'FAMILIAR O RESPONSABLE')).toBe(true)
-    expect(contiene(hojas[2], 'PARENTESCO CON EL PACIENTE')).toBe(true)
-    expect(hojas[3].texto).not.toContain('PARENTESCO CON EL PACIENTE')
+    // El familiar ocupa la celda del paciente en el nivel 1, con su parentesco.
+    expect(contiene(firmas, 'FAMILIAR O RESPONSABLE')).toBe(true)
+    expect(contiene(firmas, 'PARENTESCO CON EL PACIENTE')).toBe(true)
+    expect(firmas.texto).not.toContain('Nombre y rma')
 
-    // El número del nivel de testigos es el 2, y en la hoja 5 no hay ningún 3.
-    const numeros = hojas[3].renglones.filter((r) => r.texto === '3')
-    expect(numeros).toHaveLength(0)
+    // El número del nivel de testigos es el 2: en la hoja de firmas no hay ningún 3.
+    expect(firmas.renglones.filter((r) => r.texto === '3')).toHaveLength(0)
   }, 200_000)
 
   /**
-   * ⚠ **COTA REESCRITA: LO QUE RETIRA LA HOJA NO ES LA FOTOGRAFÍA, SON LOS DATOS.**
+   * ⚠⚠ **LO QUE SE ANEXA ES LA FOTOGRAFÍA, Y ESTA PRUEBA ES DONDE VIVE LA REGLA.**
    *
-   * La vieja fijaba que un anexo sin ninguna fotografía no compusiera hoja, y describía la
-   * maqueta vieja. En v3 el recuadro sin imagen compone **su leyenda de ausencia y sus dos
-   * datos** —tipo y número del documento—, que es contenido de identificación y no un
-   * hueco: lo que falta es la imagen, no el dato. Retirar la hoja por eso borraría del
-   * papel el número de la credencial con la que se identificó quien firmó.
+   * `identificaciones` trae una fila por firmante previsto, con captura o sin ella. Las dos
+   * cotas anteriores de este archivo tomaron la lista entera como «lo anexado» —primero
+   * contando filas, luego contando filas con datos— y las dos hacían que el papel afirmara
+   * algo falso: una hoja de anexo con cuatro recuadros vacíos que decían «no se capturó
+   * fotografía», y la coletilla `con identificación anexa` bajo cuatro firmantes de los que
+   * no se había reproducido ninguna credencial.
    *
-   * La hoja desaparece cuando no hay identificaciones que reproducir, y entonces el bloque
-   * de sellado baja a la que quede última — que es la otra mitad de esta prueba.
+   * Anexado = **tiene fotografía**. La hoja existe si hay al menos una, monta SÓLO las que
+   * hay, y sin ninguna no se compone: el documento termina en la hoja de firmas y el bloque
+   * de sellado baja con él.
    */
-  it('el anexo desaparece sin identificaciones, no sin fotografías', async () => {
-    const conFotos = await componer(COMPLETO)
+  it('la hoja de anexo existe sólo si hay fotografía, y monta sólo las que hay', async () => {
+    const todas = await componer(COMPLETO)
+    const unaSola = await componer(UNA_SOLA)
     const sinFotos = await componer(SIN_FOTOGRAFIAS)
-    const sinAnexo = await componer(SIN_ANEXO)
-
-    expect(conFotos).toHaveLength(5)
-    expect(sinFotos).toHaveLength(5)
-    expect(contiene(sinFotos[4], 'ANEXO · IDENTIFICACIÓN DE FIRMANTES')).toBe(true)
-    expect(contiene(sinFotos[4], 'No se capturó fotografía')).toBe(true)
-    expect(contiene(sinFotos[4], 'BUOR010412MYN04')).toBe(true)
-
-    expect(sinAnexo).toHaveLength(4)
-    for (const hoja of sinAnexo) {
-      expect(hoja.texto).not.toContain('ANEXO · IDENTIFICACIÓN DE FIRMANTES')
-    }
-    expect(sinAnexo[3].texto).toContain('PÁGINA 4 DE 4')
-  }, 200_000)
-
-  it('el anexo imprime el tipo y el número haya foto o no', async () => {
-    const [, , , , anexo] = await componer(COMPLETO)
-
-    // Los cuatro recuadros, numerados con cero a la izquierda.
-    for (const numero of ['01', '02', '03', '04']) {
-      expect(anexo.renglones.some((r) => r.texto === numero)).toBe(true)
-    }
+    const sinNada = await componer(SIN_ANEXO)
 
     /*
-      EL QUE NO TIENE FOTOGRAFÍA LLEVA SU LEYENDA **Y SUS DOS DATOS**. Es la corrección que
-      la lámina ya traía aplicada: lo que falta es la imagen, no el dato.
+      CON DOS CAPTURAS, DOS RECUADROS. El fixture trae fotografía en el paciente y el
+      familiar, y deja a los dos testigos sin ella: **sus filas no componen recuadro aunque
+      traigan tipo y número.** La numeración es la del anexo y no la de la lista: corre 01 y
+      02, y no salta al 03 y al 04 dejando dos huecos.
     */
-    expect(contiene(anexo, 'No se capturó fotografía')).toBe(true)
-    expect(contiene(anexo, 'CAUJ850614HYN02')).toBe(true)
-    expect(contiene(anexo, 'Credencial para votar')).toBe(true)
-    expect(contiene(anexo, 'Pasaporte')).toBe(true)
+    expect(todas).toHaveLength(4)
+    const anexo = todas[3]
+    expect(contiene(anexo, 'ANEXO · IDENTIFICACIÓN DE FIRMANTES')).toBe(true)
+    expect(anexo.renglones.some((r) => r.texto === '01')).toBe(true)
+    expect(anexo.renglones.some((r) => r.texto === '02')).toBe(true)
+    expect(anexo.renglones.some((r) => r.texto === '03')).toBe(false)
+    expect(anexo.texto).not.toContain('Juan Canul Uc')
+    expect(anexo.texto).not.toContain('Rosa Pech Ek')
+    expect(anexo.texto).not.toContain('CAUJ850614HYN02')
+    // Y el pie del recuadro sigue llevando con qué documento se identificó quien sí está.
+    expect(contiene(anexo, 'BUOR010412MYN04')).toBe(true)
+    expect(contiene(anexo, 'BUCM780921MYN08')).toBe(true)
+
+    // CON UNA SOLA, UN SOLO RECUADRO. La hoja existe igual: hay algo que reproducir.
+    expect(unaSola).toHaveLength(4)
+    expect(unaSola[3].renglones.some((r) => r.texto === '01')).toBe(true)
+    expect(unaSola[3].renglones.some((r) => r.texto === '02')).toBe(false)
+    expect(contiene(unaSola[3], PACIENTE)).toBe(true)
+    expect(unaSola[3].texto).not.toContain('Juan Canul Uc')
+
+    /*
+      SIN NINGUNA, NO HAY HOJA — y da igual que las filas traigan tipo y número. Es el caso
+      normal hoy: la captura no está cableada, así que ningún consentimiento emitido lleva
+      anexo. La leyenda de ausencia se retira con él: no hay recuadro que rotular.
+    */
+    for (const documento of [sinFotos, sinNada]) {
+      expect(documento).toHaveLength(3)
+      const todo = documento.map((hoja) => hoja.texto).join('')
+      expect(todo).not.toContain('ANEXO · IDENTIFICACIÓN DE FIRMANTES')
+      expect(todo).not.toContain('No se capturó fotografía')
+      expect(documento[2].texto).toContain('PÁGINA 3 DE 3')
+    }
+  }, 200_000)
+
+  /**
+   * ⚠⚠ **LA CREDENCIAL SE IMPRIME. ESTA ES LA COTA QUE FALTABA Y COSTÓ UNA EMISIÓN REAL.**
+   *
+   * El formato componía el recuadro del anexo —su número, su rol, su nombre, su marco y su
+   * filete de acento— y **no montaba el `<Image>`**: se dejó fuera dando por hecho que la
+   * captura no estaba cableada, y sí lo está. Resultado en el papel: una caja con borde y
+   * nada dentro, ni la fotografía ni la leyenda de que faltaba, porque la fila tenía `foto`
+   * y la leyenda sólo salía sin ella. **Ninguna de las cotas de texto de este archivo podía
+   * verlo**: el PDF salía bien formado y con todas sus cadenas en su sitio.
+   *
+   * Por eso se cuenta `Do`, el operador con el que el flujo pinta una imagen. Una
+   * credencial anexada tiene que dejar rastro en el flujo, no sólo en la retícula.
+   */
+  it('cada identificación anexada pinta su credencial, no sólo su recuadro', async () => {
+    const todas = await componer(COMPLETO)
+    const unaSola = await componer(UNA_SOLA)
+    const sinFotos = await componer(SIN_FOTOGRAFIAS)
+
+    // Dos capturadas, dos imágenes pintadas en la hoja de anexo.
+    expect(todas[3].dibujos).toBe(2)
+    // Una capturada, una imagen.
+    expect(unaSola[3].dibujos).toBe(1)
+
+    /*
+      Y sin ninguna no hay hoja que las pinte. Las rúbricas del médico y del paciente SÍ son
+      imágenes y siguen pintándose en la hoja de firmas: se comprueba que el recuento no las
+      confunde con las credenciales, que viven en otra hoja.
+    */
+    expect(sinFotos).toHaveLength(3)
+    expect(sinFotos[2].dibujos).toBe(2)
+  }, 200_000)
+
+  /**
+   * ⚠⚠ **EL MISMO DOCUMENTO, PERO ENTRANDO POR DONDE ENTRA EN PRODUCCIÓN.**
+   *
+   * Las demás cotas de este archivo construyen las props a mano, y por eso no vieron dos
+   * defectos que el papel real enseñó a la primera:
+   *
+   *   · `contenido.identificaciones` trae **una fila por firmante QUE FIRMÓ**, con o sin
+   *     captura. Tomar la lista entera como «lo anexado» ponía la coletilla bajo los cuatro
+   *     y componía cuatro recuadros de los que dos salían vacíos.
+   *   · **`tipo` y `numero` llegan SIEMPRE ausentes.** El formulario no los pide —el dato
+   *     está en la credencial fotografiada— así que el pie del recuadro colapsa siempre, y
+   *     los fixtures de aquí, que sí los traen, nunca ejercitaban esa rama.
+   *
+   * Los rótulos de rol se escriben literales a propósito: son los de `TITULO_ROL` en
+   * `ConsentimientoInformadoForm`, y la coletilla los casa con los del formato. **Si los dos
+   * lados dejan de decir exactamente lo mismo, la coletilla desaparece en silencio** y esta
+   * prueba es lo único que lo nota.
+   */
+  it('con el contenido tal como lo escribe el formulario, todo cae donde debe', async () => {
+    const contenido: Record<string, unknown> = {
+      paciente: PACIENTE,
+      edad: '25 años',
+      expediente: '2026-0184',
+      fecha: '22 jun 2026',
+      familiar: FAMILIAR,
+      testigo1: 'Juan Canul Uc',
+      testigo2: 'Rosa Pech Ek',
+      diagnostico: 'Espondilolistesis degenerativa L4-L5',
+      procedimiento: PROCEDIMIENTO,
+      hospital: HOSPITAL,
+      lugar: 'Mérida, Yucatán',
+      secciones: SECCIONES,
+      autorizaTransfusion: 'si',
+      autorizaFotos: false,
+      pacienteNoPuedeFirmar: false,
+      // Los cinco firmaron: en una emisión real cada celda lleva su hora.
+      firmas: [
+        { rol: 'paciente', trazo: RASTER, firmadoEn: '2026-08-09T18:41:52.000Z' },
+        { rol: 'familiar', trazo: null, firmadoEn: '2026-08-09T18:42:10.000Z' },
+        { rol: 'testigo_1', trazo: null, firmadoEn: '2026-08-09T18:42:33.000Z' },
+        { rol: 'testigo_2', trazo: null, firmadoEn: '2026-08-09T18:42:51.000Z' },
+        { rol: 'medico', trazo: null, firmadoEn: '2026-08-09T18:43:07.000Z' },
+      ],
+      selladoEn: '2026-08-09T18:43:07.000Z',
+      huella: HUELLA,
+      // Una fila por firmante, SIN tipo ni número, y con captura sólo en dos.
+      identificaciones: [
+        { rol: 'Paciente', nombre: PACIENTE, foto: RASTER },
+        { rol: 'Familiar o responsable', nombre: FAMILIAR, foto: RASTER },
+        { rol: 'Testigo 1', nombre: 'Juan Canul Uc' },
+        { rol: 'Testigo 2', nombre: 'Rosa Pech Ek' },
+      ],
+      folio: 'CI-2026-0009',
+    }
+    const props = propsConsentimientoInformado({
+      data: contenido,
+      medico: {
+        nombre: 'Dra. Elena Marin Solis',
+        especialidad: 'Ortopedia y Traumatologia',
+        cedula_profesional: '7000001',
+        cedula_especialidad: '8000002',
+        universidad: 'Universidad Nacional Autonoma de Mexico',
+        color_primario: ACENTO_BASE_POR_DEFECTO,
+        firma_url: RASTER,
+      },
+      consultorio: {
+        nombre: 'Consultorio Ficticio',
+        direccion: 'Av. Ficticia 100, Col. Ejemplo, 06700 CDMX',
+        telefono: '55 0000 0000',
+      },
+      logoUrl: undefined,
+    })
+    const hojas = leer(await renderToBuffer(h(ConsentimientoInformado, props) as ReactElement<DocumentProps>))
+    const firmas = hojas[hojas.length - 2]
+    const anexo = hojas[hojas.length - 1]
+
+    // DOS coletillas, no cuatro: sólo el paciente y el familiar tienen credencial anexa.
+    const conColeta = firmas.renglones.filter((r) =>
+      r.texto.includes(sinLigadura('con identificación anexa')),
+    )
+    expect(conColeta).toHaveLength(2)
+
+    // DOS recuadros, y los dos pintan su credencial.
+    expect(anexo.renglones.some((r) => r.texto === '02')).toBe(true)
+    expect(anexo.renglones.some((r) => r.texto === '03')).toBe(false)
+    expect(anexo.dibujos).toBe(2)
+
+    // Y el pie del recuadro colapsa: sin tipo ni número no queda una banda vacía.
+    expect(anexo.texto).not.toContain('Credencial para votar')
+  }, 200_000)
+
+  /**
+   * ⚠⚠ **LA COLETILLA ES DE CADA FIRMANTE, NO DEL DOCUMENTO.**
+   *
+   * `con identificación anexa` sale bajo quien tiene su credencial reproducida en el anexo
+   * y bajo nadie más. Salía bajo los cuatro firmantes que consienten aunque no se hubiera
+   * capturado ninguna, que es una afirmación sobre un documento que no existe.
+   *
+   * El médico no la lleva NUNCA: el anexo reproduce la identificación de quien consiente,
+   * no la de quien informa. Es la otra mitad de la regla y se comprueba aquí.
+   */
+  it('la coletilla del anexo sale bajo quien tiene fotografía y bajo nadie más', async () => {
+    const unaSola = await componer(UNA_SOLA)
+    const sinFotos = await componer(SIN_FOTOGRAFIAS)
+
+    const pies = (hoja: Hoja): readonly string[] =>
+      hoja.renglones.filter((r) => r.texto.startsWith('Firmado ')).map((r) => r.texto)
+
+    /*
+      UNA CAPTURA, UNA COLETILLA. El paciente la lleva; el médico firmó a la misma hora y no
+      la lleva, que es lo que distingue «no se capturó» de «no se anexa la del médico».
+    */
+    const conUna = pies(unaSola[2])
+    expect(conUna.filter((p) => p.includes(sinLigadura('anexa')))).toHaveLength(1)
+    expect(
+      conUna.find((p) => p.startsWith(`Firmado ${SELLO_PACIENTE}`)),
+    ).toContain(sinLigadura('con identificación anexa'))
+    expect(
+      conUna.find((p) => p.startsWith(`Firmado ${SELLO_MEDICO}`)),
+    ).not.toContain('anexa')
+
+    // SIN NINGUNA, NINGUNA COLETILLA — y los pies de firma siguen ahí con su hora.
+    const todo = sinFotos.map((hoja) => hoja.texto).join('')
+    expect(todo).not.toContain(sinLigadura('identificación anexa'))
+    expect(pies(sinFotos[2])).toHaveLength(2)
   }, 200_000)
 
   /**
@@ -901,6 +1136,48 @@ describe('II.7 · Consentimiento Informado', () => {
       expect(hoja.texto).not.toContain('VERIFICACIÓN')
       // 2.K no se instancia: no hay lista paginable que contar.
       expect(hoja.texto).not.toContain('TOTAL DE ')
+    }
+  }, 200_000)
+
+  /**
+   * ⚠⚠ **LA DECLARACIÓN SIRVE PARA CUALQUIER PROCEDIMIENTO INVASIVO, NO SÓLO PARA CIRUGÍA.**
+   *
+   * La redacción anterior cerraba con «durante el acto quirúrgico por hallazgos
+   * transoperatorios», y este consentimiento se emite también para catéteres, punciones e
+   * infiltraciones, donde no hay acto quirúrgico ni transoperatorio que nombrar. El papel
+   * decía que se consentía a algo que no iba a ocurrir.
+   *
+   * Lo que esta prueba fija es la redacción entera, porque es texto legal: si alguien la
+   * cambia, que sea a sabiendas y aquí.
+   */
+  it('la declaración cubre cualquier procedimiento, no sólo el quirúrgico', async () => {
+    const hojas = await componer(COMPLETO)
+    const firmas = hojas[2]
+
+    // Lo que ya no dice, y es la razón del cambio.
+    const todo = hojas.map((hoja) => hoja.texto).join('')
+    expect(todo).not.toContain('acto quirúrgico')
+    expect(todo).not.toContain('transoperatorios')
+
+    // Lo que dice ahora, en sus tres párrafos.
+    expect(contiene(firmas, 'la naturaleza y el propósito del procedimiento')).toBe(true)
+    expect(contiene(firmas, sinLigadura('sus riesgos, beneficios esperados y las alternativas de tratamiento disponibles.'))).toBe(true)
+    expect(contiene(firmas, 'todas han sido respondidas a mi satisfacción')).toBe(true)
+    expect(contiene(firmas, 'los procedimientos adicionales o de urgencia que resulten')).toBe(true)
+    expect(contiene(firmas, 'durante su realización por hallazgos no previstos.')).toBe(true)
+
+    /*
+      LOS TRES RESALTADOS: paciente, médico y procedimiento. Un tramo con estilo propio se
+      compone como colocación de texto aparte, así que cada uno tiene que aparecer como
+      renglón completo en el flujo — no partido dentro de una frase más larga. **El del
+      médico es nuevo**: su nombre iba en texto corrido y era el único de los tres sin
+      marcar.
+    */
+    for (const resaltado of [PACIENTE, 'Dra. Elena Marin Solis', PROCEDIMIENTO]) {
+      expect(
+        firmas.renglones.some((r) => r.texto === resaltado),
+        `el resaltado «${resaltado}» no se compone como tramo propio`,
+      ).toBe(true)
     }
   }, 200_000)
 
