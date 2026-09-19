@@ -504,15 +504,25 @@ describe('2.N · la hoja de continuación, en los tres formatos', () => {
       }
     }, 120_000)
 
-    it(`${formato.nombre}: el aviso y el contador dicen lo que toca`, async () => {
+    it(`${formato.nombre}: el contador dice lo que toca, y no hay aviso`, async () => {
       const hojas = await componer(formato.elemento)
       const ultima = hojas.length
 
       for (const [indice, hoja] of hojas.entries()) {
         const esUltima = indice === ultima - 1
-        // El aviso va en todas menos la última: en ella no continúa nada.
-        expect(hoja.texto.includes(`CONTINÚA EN LA HOJA ${indice + 2}`)).toBe(!esUltima)
-        expect(hoja.texto.includes('SIN FIRMA NO ES VÁLIDO')).toBe(!esUltima)
+        /*
+          ⚠ v3 · **EL AVISO DE CONTINUACIÓN SE RETIRA DE LOS NUEVE FORMATOS**, y con él las
+          dos cotas que aquí comprobaban sus cadenas. «CONTINÚA EN LA HOJA n» era redundante
+          con el paginador de 2.M, que compone «PÁGINA 3 DE 4» en TODAS las hojas; y «SIN
+          FIRMA NO ES VÁLIDO» **nunca llegó a imprimirse** —su celda medía 0 de ancho y el
+          texto se componía fuera del papel—. Al irse la banda, el suelo de la caja vuelve
+          de 63 a 52 y las nueve hojas ganan 11 pt. Ver la nota de `MotorFlujo`.
+
+          Lo que sigue comprobándose es el contador, que es la pieza que de verdad sitúa la
+          hoja dentro de la lista.
+        */
+        expect(hoja.texto).not.toContain('CONTINÚA EN LA HOJA')
+        expect(hoja.texto).not.toContain('SIN FIRMA')
         // Y el contador sitúa la hoja mientras quedan, y da el total al cerrar.
         expect(hoja.texto.includes(`HOJA ${indice + 1} DE ${ultima} · TOTAL`)).toBe(
           !esUltima,

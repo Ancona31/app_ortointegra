@@ -41,6 +41,7 @@ import {
   TINTA,
   estiloTipografico,
   type Peso,
+  SIN_ENCOGER,
 } from './tokens'
 
 /** La raya del sistema, la misma con la que 2.B une las cédulas. */
@@ -115,7 +116,7 @@ const estilos = StyleSheet.create({
   },
   celda: {
     // Regla 3: una celda de firma no se parte entre hojas, nunca.
-    flexShrink: 0,
+    flexShrink: SIN_ENCOGER,
   },
   rol: {
     ...estiloTipografico('firma.rol'),

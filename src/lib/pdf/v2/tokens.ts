@@ -166,16 +166,26 @@ export const PIE = {
 } as const
 
 /** v3 · El aviso de continuación (2.N): un renglón del rol `pie`. */
-export const AVISO = {
-  alto: PIE_INTERLINEADO,
-} as const
+/*
+  ⚠ **AQUÍ VIVÍA `AVISO`, Y SE RETIRA CON LA BANDA QUE MEDÍA.**
+
+  Eran los 11 pt que el aviso de continuación —«CONTINÚA EN LA HOJA n»— reservaba bajo la
+  banda de pie. El aviso se retira de los nueve formatos: el paginador de 2.M ya dice
+  «PÁGINA 3 DE 4» en cada hoja, que es la misma información con más precisión y sin una
+  segunda banda que mantener. Con él se va su reserva, y el suelo de la caja vuelve de 63
+  a 52 en todos los formatos.
+*/
 
 /**
  * v3 · LOS CUATRO MÁRGENES SE APOYAN EN LA ZONA SEGURA, salvo el inferior.
  *
- * El inferior son 63 y no 36 porque **no está vacío**: 0→36 zona segura, 36→52 la
- * banda de pie (2.M, tinta), 52→63 el aviso de continuación (2.N, tinta). Con 36 la
- * caja pasaría por encima de las dos.
+ * El inferior son 52 y no 36 porque **no está vacío**: 0→36 zona segura, 36→52 la banda
+ * de pie (2.M, tinta). Con 36 la caja pasaría por encima de ella.
+ *
+ * ⚠ **ERAN 63 MIENTRAS EXISTIÓ EL AVISO DE CONTINUACIÓN**, que ocupaba 52→63. Al
+ * retirarse, esos 11 pt vuelven a la caja en las nueve hojas de los nueve formatos. No
+ * son un ajuste cosmético: son exactamente el margen que le faltaba a la hoja de firmas
+ * del Consentimiento, que llevaba tres revisiones a menos de 1 pt del borde.
  *
  * ⚠ `MARGEN.izquierdo` pierde la razón del perforado por decisión de producto: «no se
  * perfora nada». Es el cambio que ensancha la caja 54 pt.
@@ -184,21 +194,43 @@ export const MARGEN = {
   superior: ZONA_SEGURA,
   izquierdo: ZONA_SEGURA,
   derecho: ZONA_SEGURA,
-  /** DERIVADO: zona segura + banda de pie + aviso de continuación = 63. */
-  inferior: ZONA_SEGURA + PIE.alto + AVISO.alto,
+  /** DERIVADO: zona segura + banda de pie = 52. */
+  inferior: ZONA_SEGURA + PIE.alto,
 } as const
 
 /**
- * Anclaje vertical de las dos piezas fijas, medido desde el borde inferior.
+ * Anclaje vertical de la banda de pie, medido desde el borde inferior.
  *
- * ⚠ **EL AVISO VA EN 52 Y EL BRIEF ESCRIBE 56.** 52 es el valor que cuadra con el
- * desglose de `MARGEN.inferior` —banda 36→52, aviso 52→63—: con 56 el aviso invade
- * 4 pt de caja de contenido, que es el defecto que el margen de 63 existe para
- * cerrar. `dudas.md` §5.
+ * ⚠ **ERAN DOS PIEZAS Y AHORA ES UNA.** La segunda era el aviso de continuación, anclado
+ * en 52; se retira entero y con él su anclaje. Queda un solo objeto de un solo campo a
+ * propósito: la banda sigue siendo una pieza `absolute` y el día que vuelva a haber dos
+ * el sitio donde declararlo ya existe.
  */
+/**
+ * «NO TE ENCOJAS», dicho de la única forma que este motor entiende.
+ *
+ * ⚠⚠ **`flexShrink: 0` NO FUNCIONA EN react-pdf. SE CONVIERTE EN 1.** El adaptador de
+ * Yoga hace `setYogaValue('flexShrink')(value || 1)`
+ * (`@react-pdf/layout/lib/index.js:2033`), y `0` es falsy: **cada `flexShrink: 0` del
+ * sistema se aplicaba como el factor de encogimiento POR DEFECTO**, que es justo lo
+ * contrario de lo que declara.
+ *
+ * Lo que eso producía, medido sobre 24 entradas mínimas de Imagenología: en cuanto la
+ * hoja 1 pasaba de 19 entradas a 20, el motor **no mandaba la vigésima a la hoja
+ * siguiente, apretaba las veinte** — el paso caía de 26.5 a 26.182 en todas a la vez,
+ * sin aviso. Eso es exactamente lo que I.3.4 prohíbe, y es la causa de que la banda de
+ * firmas del Consentimiento llevara tres revisiones «cabiendo» por 0.7 pt: no cabía, se
+ * encogía.
+ *
+ * `0.0001` es falsy-safe y, contra un sobrante de unas decenas de puntos, reparte menos
+ * de una milésima de punto: cero a efectos de papel. No es un número de diseño y por eso
+ * no lleva unidad ni entra en ninguna fórmula: es la traducción de «0» al dialecto del
+ * motor.
+ */
+export const SIN_ENCOGER = 0.0001
+
 export const PIE_ANCLAJE = {
   banda: ZONA_SEGURA,
-  aviso: ZONA_SEGURA + PIE.alto,
 } as const
 
 /**

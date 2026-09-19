@@ -22,7 +22,7 @@
 
 import { Image, StyleSheet, Text, View } from '@react-pdf/renderer'
 import type { ReactElement } from 'react'
-import { ESPACIO, estiloTipografico, type AcentoResuelto } from './tokens'
+import { ESPACIO, estiloTipografico, type AcentoResuelto, SIN_ENCOGER } from './tokens'
 
 const LADO = 48
 const MEDIANIL = 12
@@ -31,7 +31,7 @@ const estilos = StyleSheet.create({
   zona: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    flexShrink: 0,
+    flexShrink: SIN_ENCOGER,
   },
   texto: {
     alignItems: 'flex-end',
@@ -44,7 +44,7 @@ const estilos = StyleSheet.create({
   codigo: {
     width: LADO,
     height: LADO,
-    flexShrink: 0,
+    flexShrink: SIN_ENCOGER,
   },
   aire: { height: ESPACIO[2] },
 })

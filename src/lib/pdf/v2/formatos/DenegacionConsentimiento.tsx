@@ -19,8 +19,9 @@
  *    por documento, y en este formato vive en la ficha. La declaración cita el
  *    procedimiento, que es lo que se revoca.
  * 3. **El médico firma a la izquierda**, como en los otros ocho.
- * 4. **Sin aviso de continuación** (`aviso={false}`): un documento de una hoja por
- *    construcción no anuncia una hoja 2 que no existe.
+ * 4. ~~Sin aviso de continuación (`aviso={false}`)~~. **El aviso se retiró de 2.N para los
+ *    nueve formatos**, así que este formato ya no tiene que declarar nada: no hay hoja 2
+ *    que anunciar ni interruptor que apagar.
  *
  * ── LA VARIANTE POR SUSTITUCIÓN ─────────────────────────────────────────────
  *
@@ -208,8 +209,6 @@ export default function DenegacionConsentimiento({
           filasFicha: FICHA,
           calibracionFicha: 'declaracion',
         }}
-        /* Ver el punto 4 de la cabecera. */
-        aviso={false}
         firmas={
           <View style={estilos.banda}>
             {/*

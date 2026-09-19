@@ -669,7 +669,7 @@ describe('II.5 · Recibo de Honorarios / Cotización', () => {
     expect(hojas[0].texto).not.toContain('$18,400.00')
   }, 120_000)
 
-  it('CON contador en todas las hojas, y con el aviso canónico del chasis', async () => {
+  it('CON contador en todas las hojas, y sin aviso de continuación', async () => {
     // El de 17, que es el que parte: el aviso de continuación solo existe si hay hoja 2.
     const hojas = await componer(RECIBO_LARGO)
 
@@ -683,14 +683,16 @@ describe('II.5 · Recibo de Honorarios / Cotización', () => {
     expect(hojas[hojas.length - 1].texto).toContain('TOTAL DE CONCEPTOS · 17')
 
     /*
-      ⚠ EL AVISO ES EL DEL CHASIS Y LA LÁMINA COMPONE OTRO. Ella escribe «Reservado para
-      la firma · continúa en la hoja 2» y «El recibo no es válido sin ella»; 2.N compone
-      una sola forma para los ocho formatos (`CONCILIA D5, D22`) y no la recibe por prop.
-      Se compone la del chasis y queda reportado.
+      ⚠ v3 · **YA NO HAY AVISO DE CONTINUACIÓN, NI EL DEL CHASIS NI EL DE LA LÁMINA.** Aquí
+      se comprobaba que se componía el del chasis —«CONTINÚA EN LA HOJA 2 · SIN FIRMA NO ES
+      VÁLIDO»— en vez del que la lámina escribía. La banda entera se retira de los nueve
+      formatos: el paginador de 2.M ya sitúa cada hoja, y la mitad derecha de esa banda
+      nunca se imprimió. La lámina, por tanto, tampoco espera ya nada aquí.
     */
-    expect(hojas[0].texto).toContain('CONTINÚA EN LA HOJA 2')
-    expect(hojas[0].texto).toContain('SIN FIRMA NO ES VÁLIDO')
-    expect(hojas[1].texto).not.toContain('CONTINÚA EN LA HOJA')
+    for (const hoja of hojas) {
+      expect(hoja.texto).not.toContain('CONTINÚA EN LA HOJA')
+      expect(hoja.texto).not.toContain('SIN FIRMA')
+    }
   }, 120_000)
 
 })

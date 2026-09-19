@@ -47,6 +47,7 @@ import {
   TINTA,
   estiloTipografico,
   type AcentoResuelto,
+  SIN_ENCOGER,
 } from './tokens'
 
 /**
@@ -64,7 +65,7 @@ const estilos = StyleSheet.create({
     paddingTop: AIRE.superior,
     paddingBottom: AIRE.inferior,
     // Regla 2: una entrada no se parte entre hojas. Su número y su pauta viajan juntos.
-    flexShrink: 0,
+    flexShrink: SIN_ENCOGER,
   },
   regla: {
     borderTopWidth: FILETE.regla,
@@ -72,7 +73,7 @@ const estilos = StyleSheet.create({
   },
   riel: {
     width: RETICULA.riel,
-    flexShrink: 0,
+    flexShrink: SIN_ENCOGER,
   },
   /**
    * ⚠⚠ **ANCHO DECLARADO, Y NO `flexGrow` + `flexShrink` + `minWidth: 0`.**
@@ -88,11 +89,27 @@ const estilos = StyleSheet.create({
    */
   caja: {
     width: CAJA.ancho - RETICULA.riel,
-    flexShrink: 0,
+    flexShrink: SIN_ENCOGER,
   },
+  /**
+   * ⚠⚠ **`flexShrink: 0` ES I.3.4, NO UNA PRECAUCIÓN.**
+   *
+   * Los hijos de una columna se encogen por defecto en este motor: cuando el contenido
+   * de una hoja pasa del alto de la caja por poco, Yoga NO lo manda a la hoja siguiente,
+   * **lo aprieta**. Medido sobre 24 entradas mínimas de Imagenología: el paso bajaba de
+   * 26.5 a 26.182 en TODAS a la vez, 0.318 por entrada, sin que nada lo dijera. Eso es
+   * exactamente lo que I.3.4 prohíbe, y se ve: la lista sale más apretada en la hoja que
+   * va llena que en la que va suelta.
+   *
+   * Lo declaran las tres piezas que componen la fila —ancla, secundario y nota—, porque
+   * el reparto flexible se aplica a cada hija de la columna y basta que una ceda para
+   * que la entrada mida distinto. El `flexShrink: 1` de `ancla` y `nota` es del eje
+   * HORIZONTAL, dentro de su fila, y ése sí tiene que ceder.
+   */
   filaAncla: {
     flexDirection: 'row',
     alignItems: 'flex-start',
+    flexShrink: SIN_ENCOGER,
   },
   ancla: {
     ...estiloTipografico('entrada.ancla'),
@@ -101,11 +118,12 @@ const estilos = StyleSheet.create({
     minWidth: 0,
   },
   marca: {
-    flexShrink: 0,
+    flexShrink: SIN_ENCOGER,
     marginLeft: ESPACIO[8],
   },
   secundario: {
     ...estiloTipografico('entrada.secundario'),
+    flexShrink: SIN_ENCOGER,
   },
   /**
    * El rótulo colgado va como TRAMO DENTRO del `Text` de la nota, no como hermano en

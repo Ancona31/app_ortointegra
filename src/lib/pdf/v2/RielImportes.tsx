@@ -26,7 +26,7 @@
 
 import { StyleSheet, Text, View } from '@react-pdf/renderer'
 import type { ReactElement } from 'react'
-import { ESPACIO, FILETE, TINTA, estiloTipografico } from './tokens'
+import { ESPACIO, FILETE, TINTA, estiloTipografico, SIN_ENCOGER } from './tokens'
 
 /** `APUESTA`. Ver la cabecera. */
 const CUERPO_TOTAL = 20
@@ -47,7 +47,7 @@ const estilos = StyleSheet.create({
   },
   importe: {
     ...estiloTipografico('concepto.texto'),
-    flexShrink: 0,
+    flexShrink: SIN_ENCOGER,
     marginLeft: ESPACIO[12],
     textAlign: 'right',
   },
@@ -66,7 +66,7 @@ const estilos = StyleSheet.create({
     fontSize: CUERPO_TOTAL,
     lineHeight: 1.15,
     fontWeight: 600,
-    flexShrink: 0,
+    flexShrink: SIN_ENCOGER,
     marginLeft: ESPACIO[12],
     textAlign: 'right',
   },

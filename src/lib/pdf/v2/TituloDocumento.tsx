@@ -49,6 +49,7 @@ import {
   TRANSICION,
   estiloTipografico,
   type AcentoResuelto,
+  SIN_ENCOGER,
 } from './tokens'
 
 /** Los dos rótulos del riel, constantes del sistema. Exportados para 2.V. */
@@ -78,7 +79,7 @@ const estilos = StyleSheet.create({
    * que un formato sin folio le da al título los 540 enteros.
    */
   titulo: {
-    flexShrink: 0,
+    flexShrink: SIN_ENCOGER,
   },
   tituloTexto: {
     ...estiloTipografico('titulo.documento'),
@@ -92,7 +93,7 @@ const estilos = StyleSheet.create({
     textOverflow: 'ellipsis',
   },
   celda: {
-    flexShrink: 0,
+    flexShrink: SIN_ENCOGER,
     marginLeft: TITULO_FILA.medianil,
   },
   etiqueta: {

@@ -47,6 +47,7 @@ import {
   TRANSICION,
   estiloTipografico,
   type AcentoResuelto,
+  SIN_ENCOGER,
 } from './tokens'
 
 /**
@@ -84,7 +85,7 @@ const estilos = StyleSheet.create({
   riel: {
     width: RETICULA.riel,
     marginRight: RETICULA.medianil,
-    flexShrink: 0,
+    flexShrink: SIN_ENCOGER,
   },
   /**
    * El título va tal como llega: **no se transforma a mayúsculas**. La regla de

@@ -21,7 +21,7 @@
 
 import { Image, StyleSheet, Text, View } from '@react-pdf/renderer'
 import type { ReactElement } from 'react'
-import { TINTA, estiloTipografico, type AcentoResuelto } from './tokens'
+import { TINTA, estiloTipografico, type AcentoResuelto, SIN_ENCOGER } from './tokens'
 
 /**
  * Diámetro EXTERIOR del panel, en pt. Exportado porque `Membrete` resta este valor
@@ -56,7 +56,7 @@ const estilos = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     // El panel nunca encoge: es una marca, no una caja de texto (regla 4 de 2.A).
-    flexShrink: 0,
+    flexShrink: SIN_ENCOGER,
   },
   disco: {
     width: GEOMETRIA.disco,

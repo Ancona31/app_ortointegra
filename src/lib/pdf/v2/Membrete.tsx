@@ -74,7 +74,7 @@ import PanelCircular, {
   PANEL_MEDIANIL,
   type PanelCircularProps,
 } from './PanelCircular'
-import { CAJA, TRANSICION, estiloTipografico, type AcentoResuelto } from './tokens'
+import { CAJA, TRANSICION, estiloTipografico, type AcentoResuelto, SIN_ENCOGER } from './tokens'
 
 /** La raya del sistema, la misma con la que 2.L une las credenciales. */
 const SEPARADOR = ' · '
@@ -166,7 +166,7 @@ const estilos = StyleSheet.create({
   },
   credenciales: {
     ...estiloTipografico('medico.credencial'),
-    flexShrink: 0,
+    flexShrink: SIN_ENCOGER,
     marginLeft: 12,
     textAlign: 'right',
   },

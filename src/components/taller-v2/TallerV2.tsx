@@ -234,7 +234,8 @@ const CASOS_INTERNAMIENTO: readonly EntradaCaso[] = [
  */
 const CASOS_CONSENTIMIENTO: readonly EntradaCaso[] = [
   { caso: 'completo', etiqueta: 'Completo', nota: 'Cinco firmantes, tres niveles y anexo' },
-  { caso: 'sinAnexo', etiqueta: 'Sin anexo', nota: 'Sin identificaciones: la hoja NO aparece y el sellado baja' },
+  { caso: 'sinAnexo', etiqueta: 'Sin anexo', nota: 'Sin capturas: la hoja NO aparece y el sellado baja' },
+  { caso: 'unaCaptura', etiqueta: 'Una captura', nota: 'Un recuadro, y la coletilla bajo uno' },
   { caso: 'sustitucion', etiqueta: 'Sustitución', nota: 'Sin nivel 2: Testigos pasa a 2' },
   { caso: 'sinSellar', etiqueta: 'Sin sellar', nota: 'Sin sellos: nada que sellar' },
   // Los cuatro de la reconciliación con v1. Cada uno enseña algo que v2 no componía.

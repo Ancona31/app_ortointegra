@@ -18,7 +18,7 @@
 
 import { StyleSheet, Text, View } from '@react-pdf/renderer'
 import type { ReactElement } from 'react'
-import { TINTA, estiloTipografico } from './tokens'
+import { TINTA, estiloTipografico, SIN_ENCOGER } from './tokens'
 
 /** La cadena del documento urgente, constante del sistema. */
 const URGENTE = 'Urgente'
@@ -30,7 +30,7 @@ const estilos = StyleSheet.create({
     backgroundColor: TINTA.negra,
     paddingVertical: RELLENO.vertical,
     paddingHorizontal: RELLENO.horizontal,
-    flexShrink: 0,
+    flexShrink: SIN_ENCOGER,
     // Sin esto el bloque se estira al ancho de su contenedor en una columna.
     alignSelf: 'flex-start',
   },

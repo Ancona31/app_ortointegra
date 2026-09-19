@@ -34,18 +34,18 @@
  * el médico edita en la app. No son PII: son boilerplate del sistema, y usarlos es lo que
  * hace que el taller mida renglones de verdad y no de una lorem ipsum más corta.
  *
- * ⚠⚠ **NINGUNA IDENTIFICACIÓN TRAE FOTOGRAFÍA, Y ES LO QUE EL MÉDICO VA A VER.**
+ * ⚠ **LAS IDENTIFICACIONES TRAEN UNA CREDENCIAL DE MENTIRA, Y NO TODAS.**
  *
- * La captura de la identificación **no está cableada** (II.7 §5, segunda entrega): el
- * formulario no la pide todavía, así que en producción `foto` llega siempre sin valor y el
- * recuadro compone su leyenda de ausencia con el tipo y el número debajo. El taller traía
- * un PNG de 1 × 1 haciendo de fotografía en tres de los cuatro recuadros, y como el
- * formato aún no monta el `<Image>`, esos tres salían **vacíos y sin leyenda**: una caja
- * con borde y nada dentro, que es justo lo que el papel de verdad nunca va a enseñar.
+ * La captura SÍ está cableada —lo que faltaba era el `<Image>` del formato, y ya está
+ * montado—, así que cada caso trae las capturas que su nombre promete: `completo` las
+ * cuatro, `unaCaptura` sólo la del paciente, `sinAnexo` ninguna. Es lo que hace que la
+ * hoja de anexo aparezca o no, y que la coletilla `con identificación anexa` salga bajo
+ * unos firmantes y no bajo otros.
  *
- * Se retira el ráster de las cuatro. Lo que se comprueba aquí sigue siendo la CAJA —228 ×
- * 144 con su filete de acento y su fondo—, que no cambia de tamaño por estar vacía. Las
- * RÚBRICAS sí siguen siendo el PNG de 1 × 1: ésas el formato sí las compone.
+ * El ráster es un PNG de 190 × 120 con la proporción de una credencial y colores planos
+ * —pesa medio kilobyte—: no se parece a ninguna identificación real y **no debe**, pero
+ * tiene la forma justa para ver que la imagen entra en la caja de 228 × 144 con
+ * `contain`, sin estirarse ni recortarse. Las RÚBRICAS siguen siendo el PNG de 1 × 1.
  *
  * ⚠ **EL TEXTO CORRIDO VA JUSTIFICADO**, que es la excepción declarada a I.3.2 de este
  * formato y no una opción del taller: el interruptor con el que se comparó existió durante
@@ -67,11 +67,14 @@ import { resolverAcento } from '@/lib/pdf/v2/tokens'
 import type { MedicoFicticio } from './HojaTaller'
 
 /**
- * Ráster mínimo: un PNG de 1 × 1 en base64. Hace de fotografía de identificación y de
- * rúbrica capturada. Ver la nota de la cabecera.
+ * Ráster mínimo: un PNG de 1 × 1 en base64. Hace de rúbrica capturada.
  */
 const RASTER =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='
+
+/** La credencial de mentira del anexo. Ver la nota de la cabecera. */
+const CREDENCIAL =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAL4AAAB4CAIAAADDp99jAAABSUlEQVR42u3asQnCUBiF0fuCe6QSAm6gjYV7uKiFjSMIgjuEQBawS2kIIvjiOa2NxI9fuKS0+3NgucYjQDpIB+kgHZAO0kE6SAfpgHSQDtJBOkgHpIN0kA7SAekgHaRDdUo/jJ4Crg7SQTpIB6SDdJAO0kE6IB2+YvP+4/vj+cvfftdt/YSuDuu6OvW6XG9+3c+djgdXB39YSAfpIB2QDtJBOsQkmLq3LFwdpIN0kA5IB+kgHaRDTILxlmAsn64O0kE6SAekg3SQDtIhJsHYynB1kA7SQTpIB6SDdJAOMQnGW4L594XT1UE6SAfpIB2QDtJBOsQkGBuaqwPSQTpIB+kgHZAO0iEmwXhLMCtcMl0dpIN0kA7SAekgHaRDTIKxrbk6MKf0w+gp4OogHaSDdEA6SAfpIB2kA9JBOkgH6SAdkA7SQTpIByYvkFoZVkDRCvkAAAAASUVORK5CYII='
 
 /**
  * Paciente del riel. INVENTADO. **Las ocho celdas que esta lámina compone**, sin sexo —este
@@ -113,45 +116,66 @@ const SECCIONES: SeccionesConsentimiento = {
     'Como alternativa al procedimiento propuesto, el paciente puede optar por tratamiento conservador que incluye manejo analgésico y antiinflamatorio, reposo relativo, rehabilitación física, uso de ortesis o inmovilización y otras medidas paliativas. Dicho tratamiento posiblemente mejore los síntomas sin resolver la causa de fondo, pudiendo requerir manejo definitivo en el futuro.',
 }
 
-/** Las cuatro identificaciones del anexo. Personas y claves INVENTADAS. */
+/**
+ * Las cuatro identificaciones del anexo, LAS CUATRO CAPTURADAS. Personas y claves
+ * INVENTADAS.
+ *
+ * ⚠ **EL TIPO Y EL NÚMERO NO LLEGAN ASÍ EN PRODUCCIÓN.** El formulario no los pide —el
+ * dato está impreso en la credencial fotografiada y teclearlo introduce divergencia en un
+ * documento legal, RANURAS_MUERTAS §2—, así que el pie del recuadro colapsa siempre. Aquí
+ * se componen a propósito: es la única forma de ver ese pie, que existe para el día que se
+ * decida capturarlos. El caso `anexoSinDatos` enseña la otra mitad.
+ */
 const IDENTIFICACIONES: readonly IdentificacionAnexo[] = [
   {
     rol: 'Paciente',
     nombre: 'Renata Bustamante Oceguera',
     tipo: 'Credencial para votar',
     numero: 'BUOR010412MYN04',
+    foto: CREDENCIAL,
   },
   {
     rol: 'Familiar o responsable',
     nombre: 'María Bustamante Canul',
     tipo: 'Credencial para votar',
     numero: 'BUCM780921MYN08',
+    foto: CREDENCIAL,
   },
   {
     rol: 'Testigo 1',
     nombre: 'Juan Canul Uc',
     tipo: 'Credencial para votar',
     numero: 'CAUJ850614HYN02',
+    foto: CREDENCIAL,
   },
   {
     rol: 'Testigo 2',
     nombre: 'Rosa Pech Ek',
     tipo: 'Pasaporte',
     numero: 'G12345678',
+    foto: CREDENCIAL,
   },
 ]
 
 /**
- * SIN NINGUNA IDENTIFICACIÓN, que es lo único que retira la hoja de anexo.
- *
- * ⚠ **EL CASO CAMBIÓ DE PREGUNTA CON v3.** Antes era «las mismas sin fotografía», porque la
- * hoja desaparecía al faltar las imágenes. En v3 el recuadro sin imagen compone su leyenda
- * y sus dos datos —tipo y número del documento con el que se identificó quien firmó—, que
- * es contenido y no un hueco, así que la hoja se queda. Lo que la retira es no tener a
- * nadie que reproducir. Y entonces el bloque de trazabilidad baja a la hoja de firmas: un
- * sello que dice que el documento no se alteró no puede tener páginas detrás.
+ * UNA SOLA CAPTURA, la del paciente. Las otras tres filas existen —a esas personas se les
+ * pidió firma— y no se anexan: es el caso que enseña que la hoja monta sólo lo capturado y
+ * que la coletilla es de cada firmante, no del documento.
  */
-const SIN_IDENTIFICACIONES: readonly IdentificacionAnexo[] = []
+const UNA_CAPTURA: readonly IdentificacionAnexo[] = IDENTIFICACIONES.map((i, indice) =>
+  indice === 0 ? i : { rol: i.rol, nombre: i.nombre, tipo: i.tipo, numero: i.numero },
+)
+
+/**
+ * SIN NINGUNA CAPTURA. Las cuatro filas siguen ahí —a esas personas se les pidió firma—
+ * y ninguna trae fotografía, que es lo que retira la hoja de anexo: lo que se reproduce es
+ * la credencial, y sin credenciales no hay nada que reproducir. **Es el caso corriente
+ * mientras la captura sea opcional.** El bloque de trazabilidad baja entonces a la hoja de
+ * firmas: un sello que dice que el documento no se alteró no puede tener páginas detrás.
+ */
+const SIN_IDENTIFICACIONES: readonly IdentificacionAnexo[] = IDENTIFICACIONES.map(
+  ({ rol, nombre, tipo, numero }) => ({ rol, nombre, tipo, numero }),
+)
 
 /**
  * LOS CINCO FIRMANTES, con las rúbricas MEZCLADAS. Es lo que hay que mirar: el médico
@@ -198,17 +222,18 @@ const FIRMANTES_SIN_TESTIGOS = {
 } as const
 
 /**
- * Las identificaciones SIN tipo ni número: el pie del recuadro colapsa entero y el
- * recuadro se queda con su rol, su nombre y la leyenda de que no hay fotografía.
+ * Las identificaciones CAPTURADAS pero sin tipo ni número, que es como llegan hoy: el pie
+ * del recuadro colapsa entero y queda la credencial con su rol y su nombre encima.
  */
 const IDENTIFICACIONES_SIN_DATOS: readonly IdentificacionAnexo[] = IDENTIFICACIONES.map(
-  ({ rol, nombre }) => ({ rol, nombre }),
+  ({ rol, nombre, foto }) => ({ rol, nombre, foto }),
 )
 
 /** Folios INVENTADOS, con el prefijo `C-` que la lámina compone. */
 const FOLIOS = {
   completo: 'C-7F41A9C0D3E2',
   sinAnexo: 'C-2B60E4F19A7C',
+  unaCaptura: 'C-6E31B8D05F2A',
   sustitucion: 'C-9D08C5A2B461',
   sinSellar: 'C-5E13B7A6C209',
   autorizaciones: 'C-84A2F70B1D5E',
@@ -233,6 +258,8 @@ function medicoMembrete(medico: MedicoFicticio): MedicoMembrete {
 export type CasoConsentimiento =
   | 'completo'
   | 'sinAnexo'
+  /** Una sola captura: la hoja monta un recuadro y la coletilla sale bajo uno. */
+  | 'unaCaptura'
   | 'sustitucion'
   | 'sinSellar'
   /** Las dos autorizaciones, con la transfusión RECHAZADA. Ver `autorizaciones` en II.7. */
@@ -271,6 +298,11 @@ const CASOS: Record<
     sellado: SELLADO,
     folio: FOLIOS.sinAnexo,
   },
+  unaCaptura: {
+    identificaciones: UNA_CAPTURA,
+    sellado: SELLADO,
+    folio: FOLIOS.unaCaptura,
+  },
   sustitucion: {
     identificaciones: IDENTIFICACIONES,
     pacienteNoPuedeFirmar: true,
@@ -296,7 +328,8 @@ const CASOS: Record<
     autorizaFotos: true,
   },
   sinTestigos: {
-    identificaciones: [],
+    // La captura del paciente, que es el único que firma en este caso.
+    identificaciones: [UNA_CAPTURA[0]],
     sellado: SELLADO,
     folio: FOLIOS.sinTestigos,
     firmantes: FIRMANTES_SIN_TESTIGOS,

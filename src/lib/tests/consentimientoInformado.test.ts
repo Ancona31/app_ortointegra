@@ -640,6 +640,7 @@ describe('II.7 · Consentimiento Informado', () => {
     // …ni las celdas: el rol y la nota se componían aunque el nombre faltara.
     expect(todo).not.toContain('TESTIGO 1')
     expect(todo).not.toContain('TESTIGO 2')
+    // v3 · y la nota `Mayor de edad` se retira de la celda de testigo en todos los casos.
     expect(todo).not.toContain('Mayor de edad')
     expect(todo).not.toContain('PARENTESCO CON EL PACIENTE')
 
@@ -666,8 +667,12 @@ describe('II.7 · Consentimiento Informado', () => {
 
     expect(contiene(firmas, 'TESTIGO 1')).toBe(true)
     expect(firmas.texto).not.toContain('TESTIGO 2')
-    // La nota de testigo se compone UNA vez: es lo que delata la celda del que no hay.
-    expect(firmas.renglones.filter((r) => r.texto === 'Mayor de edad')).toHaveLength(1)
+    /*
+      ⚠ v3 · **`Mayor de edad` SE RETIRA DE LA CELDA DE TESTIGO**, así que la nota ya no
+      sirve de ancla para contar celdas. Se cuenta el rótulo del rol, que es lo que queda:
+      uno y sólo uno, que es lo que delata la celda del testigo que no hay.
+    */
+    expect(firmas.renglones.filter((r) => /^TESTIGO \d$/.test(r.texto))).toHaveLength(1)
 
     /*
       SIN FAMILIAR NO HAY NIVEL DE REPRESENTACIÓN, y entonces Testigos es el 2 — como en la
@@ -817,30 +822,44 @@ describe('II.7 · Consentimiento Informado', () => {
     /*
       Ninguna otra hoja lleva una sola celda de firma: el acto no se reparte.
 
-      ⚠ Se ancla en `Mayor de edad` y no en `TESTIGO 1`: el rótulo del testigo se repite en
-      el ANEXO, que reproduce su identificación y es otra cosa. La nota de calidad sólo
-      existe bajo la raya de firma.
+      ⚠ No se ancla en `TESTIGO 1`: ese rótulo se repite en el ANEXO, que reproduce su
+      identificación y es otra cosa. Se ancla en las dos piezas que sólo existen bajo una
+      raya de firma.
     */
     for (const hoja of [hojas[0], hojas[1], hojas[3]]) {
       expect(hoja.texto).not.toContain('MÉDICO TRATANTE')
       expect(hoja.texto).not.toContain('OTORGAMIENTO')
-      expect(hoja.texto).not.toContain('Mayor de edad')
+      expect(hoja.texto).not.toContain(sinLigadura('Nombre y firma'))
     }
 
     /*
-      ⚠ **Y CABE POR LOS PELOS, QUE ES LO QUE ESTA COTA VIGILA DE VERDAD.** El bloque llega
-      a 721.3 pt contra los 729 del borde de la caja: **7.7 pt de holgura** con cinco
-      celdas. La variante más cargada que se puede emitir hoy —cinco celdas, las dos
-      autorizaciones y el sellado dentro, porque sin identificaciones no hay hoja de anexo—
-      llega a 718.3 sobre el fixture corto y a 727.6 sobre los textos reales del formulario.
-      No desborda en ninguno de los casos medidos, pero **un procedimiento con nombre largo
-      que añada un renglón a la declaración sí lo haría**, y entonces el bloque se compone
-      encima del pie porque `wrap={false}` no tiene a dónde ir. Está reportado.
+      ⚠⚠ **Y AHORA CABE DE VERDAD, QUE NO ES LO MISMO QUE CABER.**
+
+      El borde de la caja pasa de 729 a **740**: se retira el aviso de continuación y
+      `MARGEN.inferior` baja de 63 a 52. Lo que esos 11 pt compraron no fue holgura, fue
+      honestidad: **la variante más cargada no cabía y se estaba encogiendo sin decirlo.**
+
+      Se ve comparando las dos formas de la misma hoja sobre los textos reales del
+      formulario, con el sellado fuera —hay anexo— y dentro —no lo hay—:
+
+                          antes (suelo 729)   ahora (suelo 740)   coste real del sellado
+        con anexo            727.73               728.34
+        sin captura          728.26               739.05
+        diferencia            0.53                 10.71                  10.71
+
+      El bloque de sellado mide 10.71 pt. Antes esa diferencia era de medio punto: el motor
+      apretaba la hoja diez puntos para que cuadrara, porque `flexShrink: 0` no existe en
+      este renderer (ver `SIN_ENCOGER`). Ahora la diferencia es exactamente lo que el
+      bloque mide, y eso es lo que significa que la hoja ya no se comprime.
+
+      Lo que NO cambió: la holgura del caso más cargado sigue siendo de **0.95 pt**. Un
+      procedimiento con nombre largo que añada un renglón a la declaración la desborda, y
+      entonces `wrap={false}` no tiene a dónde ir. Sigue reportado.
     */
     const ultima = Math.max(
-      ...firmas.renglones.filter((r) => r.arriba < 726).map((r) => r.arriba),
+      ...firmas.renglones.filter((r) => r.arriba < 737).map((r) => r.arriba),
     )
-    expect(ultima).toBeLessThan(725)
+    expect(ultima).toBeLessThan(736)
   }, 200_000)
 
   it('por sustitución desaparece el nivel 2 y Testigos se renumera a 2', async () => {

@@ -62,6 +62,7 @@ import {
   PAPEL,
   estiloTipografico,
   type AcentoResuelto,
+  SIN_ENCOGER,
 } from '../tokens'
 
 const TITULO = 'Carta de consentimiento informado'
@@ -180,7 +181,6 @@ const TEXTO_SUSTITUCION =
 const NOTA = {
   paciente: 'Nombre y firma',
   familiar: 'Representante del paciente',
-  testigo: 'Mayor de edad',
   parentesco: 'Parentesco con el paciente',
 } as const
 
@@ -370,7 +370,7 @@ const estilos = StyleSheet.create({
     continuación y no rozarlo. La duplicación sigue viva en los otros cuatro formatos que la
     declaran; se retira aquí porque aquí se paga.
   */
-  banda: {},
+  banda: { flexShrink: SIN_ENCOGER },
   /** El aire entre la declaración y sus frases sueltas. */
   declaraciones: { marginTop: ESPACIO[10], marginBottom: ESPACIO[16] },
   /** El aire entre un nivel de firma y el siguiente. */
@@ -605,7 +605,6 @@ export default function ConsentimientoInformado(
       : {
           rol: ROL.testigo1,
           nombre: firmantes.testigo1.nombre,
-          credenciales: [NOTA.testigo],
           rubrica: firmantes.testigo1.rubrica,
           sello: pieDeSello(firmantes.testigo1.sello, enAnexo(ROL.testigo1), sellado !== undefined),
         },
@@ -614,7 +613,6 @@ export default function ConsentimientoInformado(
       : {
           rol: ROL.testigo2,
           nombre: firmantes.testigo2.nombre,
-          credenciales: [NOTA.testigo],
           rubrica: firmantes.testigo2.rubrica,
           sello: pieDeSello(firmantes.testigo2.sello, enAnexo(ROL.testigo2), sellado !== undefined),
         },

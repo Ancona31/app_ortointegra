@@ -32,6 +32,7 @@ import {
   ZONA_SEGURA,
   estiloTipografico,
   type AcentoResuelto,
+  SIN_ENCOGER,
 } from './tokens'
 
 /** Constantes del sistema. Las tres son textuales y ninguna se parametriza. */
@@ -54,11 +55,11 @@ const estilos = StyleSheet.create({
   /** Folio y paginación no encogen: son los dos datos que se citan por teléfono. */
   fijo: {
     ...estiloTipografico('pie'),
-    flexShrink: 0,
+    flexShrink: SIN_ENCOGER,
   },
   /** La caja de la paginación: es la que lleva la geometría, porque es dinámica. */
   celdaPaginacion: {
-    flexShrink: 0,
+    flexShrink: SIN_ENCOGER,
     marginLeft: PIE.medianil,
   },
   paginacion: { ...estiloTipografico('pie') },
@@ -82,7 +83,7 @@ const estilos = StyleSheet.create({
      * leyenda. Ver `PIE.documento`.
      */
     width: PIE.documento,
-    flexShrink: 0,
+    flexShrink: SIN_ENCOGER,
     marginLeft: PIE.medianil,
     maxLines: 1,
     textOverflow: 'ellipsis',
@@ -91,7 +92,7 @@ const estilos = StyleSheet.create({
   leyenda: {
     ...estiloTipografico('pie.leyenda'),
     flexGrow: 1,
-    flexShrink: 0,
+    flexShrink: SIN_ENCOGER,
     marginLeft: PIE.medianil,
     textAlign: 'right',
   },

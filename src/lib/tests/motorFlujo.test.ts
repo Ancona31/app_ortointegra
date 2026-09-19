@@ -366,11 +366,16 @@ function documento(
 }
 
 /**
- * 30 renglones son 540 pt sobre una caja de 670: el contenido termina a media
- * hoja y en lo que queda —130 pt— no cabe el umbral de 200.8. Es el caso de la
- * regla 1, y es el único que no se puede fabricar por accidente.
+ * El contenido termina a media hoja y en lo que queda no cabe la banda de cierre. Es el
+ * caso de la regla 1, y es el único que no se puede fabricar por accidente.
+ *
+ * ⚠ **ERAN 30, Y LA CIFRA SIGUE AL SUELO DE LA CAJA.** Al retirarse el aviso de
+ * continuación, `MARGEN.inferior` baja de 63 a 52 y la caja gana 11 pt en todas las
+ * hojas; con 30 renglones el cierre pasó a caber en la hoja 1 y el caso dejaba de
+ * existir — la prueba medía un documento de una sola hoja sin decirlo. Si el suelo vuelve
+ * a moverse, esta cifra se vuelve a medir.
  */
-const CONTENIDO_A_MEDIA_HOJA = 30
+const CONTENIDO_A_MEDIA_HOJA = 33
 
 // ─── Las pruebas ─────────────────────────────────────────────────────────────
 
@@ -382,7 +387,7 @@ describe('2.N · MotorFlujo', () => {
     el motor no arrastra nada. **Lo que la prueba defiende no cambia** —que la banda de
     cierre no se quede sola en una hoja— y por eso las cotas de abajo son las mismas.
   */
-  it('regla 1: la banda de cierre no se queda sola, y la hoja 1 lo avisa', async () => {
+  it('regla 1: la banda de cierre no se queda sola', async () => {
     const pdf = await renderToBuffer(
       documento(CONTENIDO_A_MEDIA_HOJA, {
         cierre: CIERRE,
@@ -393,14 +398,15 @@ describe('2.N · MotorFlujo', () => {
 
     expect(texto).toHaveLength(2)
 
-    // La hoja 1 cierra con el aviso. Esto es lo que se compone dentro de un
-    // `render` y lo que se cae en silencio: si falla, mira I.3.8 antes que el
-    // componente.
-    //
-    // UNA SOLA FORMA, y eran tres: el rango de la de lista pedía saber qué ítems
-    // cayeron en cada hoja, que el renderer no reporta. Ver `ZONA_IZQUIERDA` en 2.N.
-    expect(texto[0]).toContain('CONTINÚA EN LA HOJA 2')
-    expect(texto[0]).toContain('SIN FIRMA NO ES VÁLIDO')
+    /*
+      ⚠ v3 · **LA HOJA 1 YA NO AVISA NADA.** Aquí se comprobaba que cerrara con «CONTINÚA
+      EN LA HOJA 2 · SIN FIRMA NO ES VÁLIDO». La banda se retira de los nueve formatos: la
+      primera cadena la dice mejor el paginador de 2.M —«PÁGINA 1 DE 2», y en TODAS las
+      hojas— y la segunda no llegó a imprimirse nunca, porque su celda medía 0 de ancho.
+      Lo que esta prueba defiende no cambia: que la banda de cierre no se quede sola.
+    */
+    expect(texto[0]).not.toContain('CONTINÚA EN LA HOJA')
+    expect(texto[0]).not.toContain('SIN FIRMA')
 
     // Y no se queda ni con el bloque de cierre ni con la firma.
     expect(texto[0]).not.toContain('constancia')
@@ -409,10 +415,6 @@ describe('2.N · MotorFlujo', () => {
     // La hoja 2 trae las dos cosas. La firma sola sería el defecto.
     expect(texto[1]).toContain('constancia')
     expect(texto[1]).toContain(FIRMANTE)
-
-    // El aviso NO sale en la última hoja: en ella no continúa nada.
-    expect(texto[1]).not.toContain('CONTINÚA EN LA HOJA')
-    expect(texto[1]).not.toContain('SIN FIRMA NO ES VÁLIDO')
 
     // REGLA 2 DE 2.D, QUE ES LO QUE 2.N AÑADIÓ AL CABLEARSE: la hoja de continuación
     // identifica al paciente ella sola. Antes de esto llegaba sin membrete, sin folio
@@ -491,12 +493,12 @@ describe('2.N · MotorFlujo', () => {
     */
     for (let i = 0; i < ultima - 1; i += 1) {
       expect(texto[i]).toContain(`ESTUDIOS · HOJA ${i + 1} DE ${ultima} · TOTAL 9`)
-      expect(texto[i]).toContain('SIN FIRMA NO ES VÁLIDO')
     }
 
     // La última lleva la forma final, y ninguna otra la lleva.
     expect(texto[ultima - 1]).toContain('TOTAL DE ESTUDIOS · 9')
-    expect(texto[ultima - 1]).not.toContain('SIN FIRMA NO ES VÁLIDO')
+    // v3 · y en ninguna hay aviso de continuación: la banda se retiró del chasis.
+    expect(texto.every((t) => !t.includes('SIN FIRMA'))).toBe(true)
     expect(texto.slice(0, -1).every((t) => !t.includes('TOTAL DE ESTUDIOS'))).toBe(true)
 
     // Y en ninguna aparece la cifra que no se puede saber.

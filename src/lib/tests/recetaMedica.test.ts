@@ -994,16 +994,19 @@ describe('II.3 · Receta Médica — medido sobre el PDF', () => {
       reportaron: los siete caben en la hoja 1. Con la fila CARA —indicación de dos
       líneas, 72.5 pt— entran seis.
 
-      ⚠⚠ **v3 · LA LISTA GANA, EL CIERRE SIGUE SIN CABER, Y HAY QUE DECIRLO ASÍ.**
+      ⚠⚠ **v3 · LA COTA DE LOS BETATESTERS SE ALCANZA, Y ESTA ES LA PRUEBA QUE LO FIJA.**
 
-      Los SIETE caben en la hoja 1 con la fila cara —en v2 entraban seis y el séptimo
-      bajaba—, pero la banda de cierre sigue yéndose a la hoja 2. La cota que los
-      betatesters reportaron es «siete CON recomendaciones, firma y código en una hoja»
-      y **no se alcanza tampoco en v3**.
+      «Siete medicamentos CON recomendaciones, firma y código en UNA hoja» es lo que los
+      betatesters reportaron y lo que no se alcanzaba ni en v2 —donde entraban seis— ni en
+      las primeras revisiones de v3, donde entraban los siete pero la banda de cierre se
+      iba a la hoja 2. Angel lo había retirado del objetivo porque lo que faltaba salía
+      del hueco de la rúbrica, del contador o del riel, y ninguno de los tres se toca.
 
-      Angel ya la había retirado del objetivo en v2: lo que faltaba salía del hueco de la
-      rúbrica, del contador o del riel, y ninguno de los tres se toca. En v3 el hueco de
-      la rúbrica ya bajó de 61.6 a 44 y aun así no llega. Queda reportado, no tapado.
+      Lo que faltaba salió de otro sitio: al retirarse el aviso de continuación, el suelo
+      de la caja vuelve de 63 a 52 y la hoja gana 11 pt. **Con la fila corta, los siete y
+      su cierre caben en una sola hoja.** Con la fila cara —indicación de dos líneas,
+      72.5 pt— los siete siguen entrando en la hoja 1 y el cierre sigue bajando: ésa no se
+      alcanza, y se deja medida abajo para que se vea la diferencia entre las dos.
     */
     const caro = (i: number): MedicamentoRecetado => ({
       nombre_comercial: `Fármaco ${i}`,
@@ -1023,9 +1026,9 @@ describe('II.3 · Receta Médica — medido sobre el PDF', () => {
     const reparto = (hojas: readonly Hoja[]): number[] =>
       hojas.map((hoja) => hoja.renglones.filter((r) => /^Fármaco \d/.test(r.texto)).length)
 
-    // LA COTA DE LA REGRESIÓN: los siete en la hoja 1, con la fila corta Y con la cara.
+    // LA COTA DE LOS BETATESTERS: los siete Y su cierre en UNA hoja, con la fila corta.
     const cortos = Array.from({ length: 7 }, (_, i) => corto(i))
-    expect(reparto(await componer(cortos, cierre))).toEqual([7, 0])
+    expect(reparto(await componer(cortos, cierre))).toEqual([7])
 
     // Con la fila CARA, los mismos siete: en v2 entraban SEIS y el séptimo bajaba.
     expect(reparto(await componer(lista(7), cierre))).toEqual([7, 0])

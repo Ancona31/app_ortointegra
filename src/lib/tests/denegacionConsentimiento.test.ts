@@ -504,13 +504,19 @@ describe('II.9 · Denegación o revocación del consentimiento', () => {
       así que la cota sigue midiendo el documento y no el tamaño de la firma.
     */
     /*
-      ⚠ **232.25 pt, y eran 118.83.** La contabilidad de arriba —cinco residuos contra los
+      ⚠ v3 · **+11 pt EN LAS TRES HOLGURAS DE ESTE ARCHIVO, Y SON EL MISMO CAMBIO.** El
+      aviso de continuación se retira del chasis y `MARGEN.inferior` baja de 63 a 52, así
+      que la caja crece 11 pt en todas las hojas de los nueve formatos. El documento no
+      compone ni un punto distinto: lo que crece es el papel libre debajo. Ver la nota de
+      `MotorFlujo`.
+
+      ⚠ **243.25 pt, y eran 118.83.** La contabilidad de arriba —cinco residuos contra los
       75.79 de la guía— se cierra con v3: la caja crece 23 pt de alto, el encabezado
       adelgaza 57 y la celda de firma pasa de 118.75 a 72.75 al perder su rótulo. Este
       documento nunca fue el que apretaba y ahora le sobran 232 pt: trece renglones largos
       del párrafo de la declaración.
     */
-    expect(holgura).toBeCloseTo(232.25, 1)
+    expect(holgura).toBeCloseTo(243.25, 1)
   }, 200_000)
 
   it('la holgura de la variante por sustitución, contra los 26.04 de la guía', async () => {
@@ -538,12 +544,18 @@ describe('II.9 · Denegación o revocación del consentimiento', () => {
       así que la cota sigue midiendo el documento y no el tamaño de la firma.
     */
     /*
-      ⚠ **137.25 pt, y eran 44.83.** Sigue siendo la variante más ajustada de este formato
+      ⚠ v3 · **+11 pt EN LAS TRES HOLGURAS DE ESTE ARCHIVO, Y SON EL MISMO CAMBIO.** El
+      aviso de continuación se retira del chasis y `MARGEN.inferior` baja de 63 a 52, así
+      que la caja crece 11 pt en todas las hojas de los nueve formatos. El documento no
+      compone ni un punto distinto: lo que crece es el papel libre debajo. Ver la nota de
+      `MotorFlujo`.
+
+      ⚠ **148.25 pt, y eran 44.83.** Sigue siendo la variante más ajustada de este formato
       —la constancia del motivo y la declaración de sustitución sólo existen aquí— pero
       deja de ser la más ajustada del sistema: con 137 pt de sobra aguanta ocho renglones
       más de declaración.
     */
-    expect(holgura).toBeCloseTo(137.25, 1)
+    expect(holgura).toBeCloseTo(148.25, 1)
     expect(holgura).toBeGreaterThan(0)
   }, 200_000)
 
@@ -669,7 +681,7 @@ describe('II.9 · Denegación o revocación del consentimiento', () => {
       igualdad de abajo falla y hay que releer esto.
     */
     expect(await holguraDe(CON_DIAGNOSTICO)).toBeCloseTo(await holguraDe(BASE), 1)
-    expect(await holguraDe({ ...CON_DIAGNOSTICO, sustitucion: true })).toBeCloseTo(194.25, 1)
+    expect(await holguraDe({ ...CON_DIAGNOSTICO, sustitucion: true })).toBeCloseTo(205.25, 1)
 
     const conDiagnosticoDe = async (n: number): Promise<number> =>
       (

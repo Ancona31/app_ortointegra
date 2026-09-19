@@ -59,6 +59,7 @@ import {
   TRANSICION,
   estiloTipografico,
   type AcentoResuelto,
+  SIN_ENCOGER,
 } from '../tokens'
 
 const TITULO_RECIBO = 'Recibo de honorarios'
@@ -199,6 +200,8 @@ const estilos = StyleSheet.create({
     borderBottomWidth: FILETE.regla,
     borderBottomColor: TINTA.reglaFila,
     paddingVertical: ESPACIO[4],
+    // I.3.4 · una fila no se aprieta para que quepa una más. Ver `SIN_ENCOGER`.
+    flexShrink: SIN_ENCOGER,
   },
   /**
    * ⚠⚠ **LA GEOMETRÍA DE CADA CELDA VA EN SU `Text`, SIN `View` ENVOLVENTE.**
@@ -215,7 +218,7 @@ const estilos = StyleSheet.create({
     ...estiloTipografico('concepto.numero'),
     textAlign: 'right',
     width: TABLA.numero,
-    flexShrink: 0,
+    flexShrink: SIN_ENCOGER,
     ...alinearBase(TIPOGRAFIA['concepto.numero'].cuerpo),
   },
   concepto: {
@@ -230,27 +233,27 @@ const estilos = StyleSheet.create({
     ...estiloTipografico('concepto.origenPropio'),
     maxLines: 1,
     width: TABLA.origen,
-    flexShrink: 0,
+    flexShrink: SIN_ENCOGER,
     ...alinearBase(TIPOGRAFIA['concepto.origenPropio'].cuerpo),
   },
   origenTercero: {
     ...estiloTipografico('concepto.origenTercero'),
     maxLines: 1,
     width: TABLA.origen,
-    flexShrink: 0,
+    flexShrink: SIN_ENCOGER,
     ...alinearBase(TIPOGRAFIA['concepto.origenTercero'].cuerpo),
   },
   precio: {
     ...estiloTipografico('concepto.texto'),
     textAlign: 'right',
     width: TABLA.precio,
-    flexShrink: 0,
+    flexShrink: SIN_ENCOGER,
   },
   cabeceraNumero: {
     ...estiloTipografico('etiqueta'),
     textAlign: 'right',
     width: TABLA.numero,
-    flexShrink: 0,
+    flexShrink: SIN_ENCOGER,
   },
   cabeceraConcepto: {
     ...estiloTipografico('etiqueta'),
@@ -264,11 +267,11 @@ const estilos = StyleSheet.create({
     ...estiloTipografico('etiqueta'),
     textAlign: 'right',
     width: TABLA.precio,
-    flexShrink: 0,
+    flexShrink: SIN_ENCOGER,
   },
   banda: { flexDirection: 'row', alignItems: 'flex-start' },
   columnaIzquierda: { width: CIERRE.derecha, flexShrink: 0 },
-  columnaDerecha: { width: CIERRE.izquierda, flexShrink: 0, marginLeft: CIERRE.medianil },
+  columnaDerecha: { width: CIERRE.izquierda, flexShrink: SIN_ENCOGER, marginLeft: CIERRE.medianil },
   bloquePago: { marginBottom: ESPACIO[16] },
   valorPago: { ...estiloTipografico('formaPago.valor') },
   leyenda: { marginTop: ESPACIO[16] },

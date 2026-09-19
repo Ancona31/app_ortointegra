@@ -833,22 +833,29 @@ describe('II.6 · Solicitud de Internamiento', () => {
       .toHaveLength(1)
   }, 120_000)
 
-  it('el aviso de pie es el del chasis, y la lámina compone otro', async () => {
+  it('la zona de aviso del pie no compone nada, ni lo del chasis ni lo de la lámina', async () => {
     const hojas = await componer(COMPLETO)
 
     /*
-      ⚠ **REPORTADO Y NO COMPUESTO.** La lámina escribe `Continúa en la hoja 2 ·
-      instrucciones y firmas` a la izquierda y `Sección 1 de 2` a la derecha —la CUARTA
-      construcción distinta de esa zona, que es lo que `D22` lleva reportado desde la
-      conciliación—. 2.N compone una sola forma para los seis formatos (`CONCILIA D5, D22`)
-      y no la recibe por prop.
+      ⚠ v3 · **LA BANDA DE AVISO SE RETIRA DE LOS NUEVE FORMATOS.**
+
+      Esta prueba fijaba que se componía la forma del chasis —«CONTINÚA EN LA HOJA 2 · SIN
+      FIRMA NO ES VÁLIDO»— y no la de la lámina, que escribe «Continúa en la hoja 2 ·
+      instrucciones y firmas» a la izquierda y «Sección 1 de 2» a la derecha: la CUARTA
+      construcción distinta de esa zona, reportada desde la conciliación en `D22`.
+
+      Ahora no se compone ninguna de las cuatro, y `D22` se cierra por retirada: el
+      paginador de 2.M dice «PÁGINA 1 DE 2» en todas las hojas, que es lo que esa zona
+      intentaba decir con cuatro redacciones distintas. Lo que la prueba fija es que no
+      vuelva ninguna.
     */
-    expect(hojas[0].texto).toContain('CONTINÚA EN LA HOJA 2')
-    expect(hojas[0].texto).toContain('SIN FIRMA NO ES VÁLIDO')
-    // Y en la última no continúa nada: el aviso se calla solo.
-    expect(hojas[1].texto).not.toContain('CONTINÚA EN LA HOJA')
-    expect(hojas[1].texto).not.toContain('SIN FIRMA NO ES VÁLIDO')
-    expect(hojas[0].texto).not.toContain('Sección 1 de 2')
+    for (const hoja of hojas) {
+      expect(hoja.texto).not.toContain('CONTINÚA EN LA HOJA')
+      expect(hoja.texto).not.toContain('SIN FIRMA')
+      expect(hoja.texto).not.toContain('Sección 1 de 2')
+    }
+    // Y lo que sí compone esa hoja: su sitio en el documento, del paginador del pie.
+    expect(hojas[0].texto).toContain(`PÁGINA 1 DE ${hojas.length}`)
   }, 120_000)
 
 })

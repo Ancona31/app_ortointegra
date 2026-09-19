@@ -9,7 +9,9 @@
  * 2. Deja fluir el contenido del formato.
  * 3. Cierra con el contador de lista, el último bloque de contenido y la banda de
  *    cierre, con `transicion.contenidoCierre` (12) entre los dos últimos.
- * 4. Cuelga el aviso de continuación en las hojas que no son la última.
+ *
+ * ⚠ **YA NO CUELGA NINGÚN AVISO DE CONTINUACIÓN**, y era la cuarta cosa que hacía.
+ * Ver la nota de abajo, donde vivían sus dos cadenas.
  *
  * ── LO QUE DEJA DE HACER ────────────────────────────────────────────────────
  *
@@ -48,54 +50,34 @@
  * `dudas.md` §7.
  */
 
-import { StyleSheet, Text, View } from '@react-pdf/renderer'
+import { StyleSheet, View } from '@react-pdf/renderer'
 import type { ReactElement, ReactNode } from 'react'
 import ContadorLista, { type ContadorListaProps } from './ContadorLista'
 import EncabezadoHoja, { type EncabezadoHojaProps } from './EncabezadoHoja'
-import {
-  ESPACIO,
-  PIE_ANCLAJE,
-  TRANSICION,
-  ZONA_SEGURA,
-  estiloTipografico,
-  TINTA,
-} from './tokens'
+import { ESPACIO, TRANSICION } from './tokens'
 
-/**
- * Las dos cadenas del aviso, constantes del sistema.
- *
- * `válido` en masculino: concuerda con «documento», no con el nombre del formato. Es
- * la concordancia que `CONCILIA D22` fijó y que la lámina de Receta contradecía con
- * `válida`.
- */
-const CONTINUA = 'Continúa en la hoja'
-const SIN_FIRMA = 'Sin firma no es válido'
+/*
+  ⚠⚠ **AQUÍ VIVÍA LA BANDA DE AVISO, Y SE RETIRA ENTERA. LEE ESTO ANTES DE REPONERLA.**
+
+  Eran dos cadenas colgadas en `bottom: 52`, en las hojas que no son la última:
+
+    · «CONTINÚA EN LA HOJA n», a la izquierda. **Redundante**: el paginador de la banda
+      de pie (2.M) compone «PÁGINA 3 DE 4» en TODAS las hojas, que dice lo mismo con más
+      precisión y sin una segunda banda que mantener alineada con la primera.
+    · «SIN FIRMA NO ES VÁLIDO», a la derecha. **Nunca se imprimió.** Las dos celdas son
+      `Text` con `render` y `flexShrink: 0`, y un nodo dinámico mide 0 de ancho en la
+      pasada de reparto: con `justifyContent: 'space-between'` la celda derecha quedaba
+      anclada al borde de la caja con ancho cero, y su texto —alineado a la derecha
+      dentro de una caja de 0— se componía FUERA del papel. Medido: x = 915 en una hoja
+      de 612 de ancho. Nadie lo echó de menos porque nadie llegó a verlo.
+
+  Si algún día hace falta una advertencia de ese tipo, el sitio no es una segunda banda
+  absoluta: es la zona de leyenda de 2.M, que ya está medida, ya se compone y ya sabe
+  encoger. Reponer esta banda devolvería también los 11 pt de suelo que la caja acaba de
+  recuperar en los nueve formatos.
+*/
 
 const estilos = StyleSheet.create({
-  /**
-   * El aviso vive en `bottom: 52` —zona segura + alto de la banda de pie—, así que
-   * queda ENTRE la banda y el suelo de la caja de contenido, que empieza en 63. No
-   * invade ninguna de las dos: es la razón de que `MARGEN.inferior` sean 63 y no 36.
-   */
-  aviso: {
-    position: 'absolute',
-    left: ZONA_SEGURA,
-    right: ZONA_SEGURA,
-    bottom: PIE_ANCLAJE.aviso,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  /** Las dos cajas del aviso llevan la geometría: su texto es dinámico. */
-  celdaAviso: { flexShrink: 0 },
-  avisoIzquierda: {
-    ...estiloTipografico('pie'),
-    color: TINTA.negra,
-  },
-  avisoDerecha: {
-    ...estiloTipografico('pie'),
-    color: TINTA.etiqueta,
-    textAlign: 'right',
-  },
   aireContador: { marginTop: ESPACIO[4] },
 })
 
@@ -113,12 +95,6 @@ export interface MotorFlujoProps {
   readonly firmas?: ReactNode
   /** Aire hasta la banda de cierre. Sin él, `transicion.contenidoCierre` (12). */
   readonly aireCierre?: number
-  /**
-   * `false` en los formatos de una sola hoja por construcción —la Denegación— donde un
-   * aviso de continuación que nunca se cumple es tinta muerta. Sin ella, `true`: el
-   * aviso ya se calla solo en la última hoja.
-   */
-  readonly aviso?: boolean
   readonly children?: ReactNode
 }
 
@@ -129,7 +105,6 @@ export default function MotorFlujo({
   cierre,
   firmas,
   aireCierre = TRANSICION.contenidoCierre,
-  aviso = true,
   children,
 }: MotorFlujoProps): ReactElement {
   /**
@@ -209,33 +184,6 @@ export default function MotorFlujo({
         </View>
       )}
 
-      {aviso ? (
-        <View style={estilos.aviso} fixed>
-          {/*
-            `render` va en cada `Text` y no en el `View`: en este motor `render`
-            SUSTITUYE a los hijos, y el tipo de `ViewProps.render` ni siquiera declara
-            `totalPages`. Es el mismo patrón que compone la paginación de 2.M.
-          */}
-          <Text
-            style={estilos.celdaAviso}
-            render={({ pageNumber, totalPages }) =>
-              pageNumber >= totalPages ? null : (
-                <Text style={estilos.avisoIzquierda}>
-                  {`${CONTINUA} ${pageNumber + 1}`.toUpperCase()}
-                </Text>
-              )
-            }
-          />
-          <Text
-            style={estilos.celdaAviso}
-            render={({ pageNumber, totalPages }) =>
-              pageNumber >= totalPages ? null : (
-                <Text style={estilos.avisoDerecha}>{SIN_FIRMA.toUpperCase()}</Text>
-              )
-            }
-          />
-        </View>
-      ) : null}
     </>
   )
 }
