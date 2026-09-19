@@ -1,8 +1,7 @@
 /**
  * Sistema de documentos v3 — formato **II.8 · Escrito Médico**. Brief `08`.
- * Especial: **el chasis más desnudo.** Sin folio, sin ficha de identificación, sin
- * paciente y con un título que escribe el médico. Es el que dice si el chasis se
- * sostiene solo.
+ * Especial: **el chasis más desnudo.** Sin folio y con un título que escribe el médico.
+ * Es el que dice si el chasis se sostiene solo.
  *
  * ── LO QUE CAMBIA RESPECTO DE v2 ────────────────────────────────────────────
  *
@@ -15,8 +14,22 @@
  *    del encabezado más dos renglones de `texto.corrido`.
  * 3. **La banda de pie compone el nombre del documento** (defecto §9.5). Este formato y
  *    el Internamiento eran los dos que dejaban media barra vacía.
- * 4. **La hoja de continuación no lleva paciente** —no lo hay— y su línea inferior
- *    compone **las dos cédulas del médico**, que es lo que ata la hoja a su emisor.
+ * 4. **La ficha entra, con dos celdas y una sola fila**: `PACIENTE` en la celda ancha y
+ *    `FECHA` a la derecha. Era una decisión de producto —«la hoja membretada multiuso no
+ *    lleva riel de paciente, y si sale lo escribe el médico dentro del cuerpo»— y se
+ *    revierte: el dato se guardaba y no se componía.
+ *
+ *    ⚠⚠ **Y CON ELLA SALE `EMISIÓN` DE LA FILA DE TÍTULO.** Las dos componían la misma
+ *    fecha, así que dejarlas juntas imprimía el dato dos veces — que es el defecto que
+ *    este mismo formato ya corrigió una vez. Manda la ficha, como en II.7: el folio
+ *    arriba, la fecha en la ficha. Este formato no tiene folio, así que su fila de título
+ *    se queda sin riel y el título pasa a disponer de los 540 pt enteros en vez de 436.
+ *
+ *    ⚠ **LA FECHA SIGUE VIAJANDO A LAS HOJAS DE CONTINUACIÓN**, y por la puerta declarada
+ *    para eso: `extraResumen`, la misma que el Internamiento usa para el hospital y la
+ *    Suplementación para el peso. Sin ella, una hoja suelta de un escrito largo no
+ *    llevaría NI folio —no existe— ni fecha, y su línea inferior sólo diría el nombre del
+ *    paciente. Antes ese papel lo ataba la celda de `EMISIÓN`, que es la que se retira.
  *
  * ⚠ **ES EL ÚNICO FORMATO QUE CARGA LA ITÁLICA, Y NO HAY ITÁLICA DE PESO 500.** Un
  * tramo con negrita **y** cursiva a la vez pediría `IBM Plex Sans 500 italic`, que no
@@ -40,6 +53,7 @@ import MotorFlujo from '../MotorFlujo'
 import PieDocumento from '../PieDocumento'
 import type { ConsultorioMembrete, MedicoMembrete } from '../Membrete'
 import type { PanelCircularProps } from '../PanelCircular'
+import type { CeldaPaciente } from '../BloquePaciente'
 import {
   ESPACIO,
   FUENTE,
@@ -108,12 +122,51 @@ export interface EscritoMedicoProps {
    * renglones y la banda decir `Constancia de atención médica`.
    */
   readonly tituloPie?: string
-  /** Fecha de emisión, YA compuesta. Va en la celda `EMISIÓN` de la fila de título. */
+  /**
+   * El nombre del paciente. Va en la celda ancha de la ficha.
+   *
+   * **Campo vacío requerido**: sin él la celda no colapsa, deja su rótulo y su línea para
+   * llenarla a pluma. Un escrito emitido antes de que la ficha existiera no trae el dato
+   * en `contenido`, y una constancia dirigida a nadie es un caso legítimo; en los dos el
+   * papel dice dónde va el nombre en vez de disimular que no lo pide.
+   */
+  readonly paciente?: string
+  /**
+   * Fecha, YA compuesta. Va en la celda `FECHA` de la ficha —**no en la fila de título**,
+   * que es donde estaba: ver el punto 4 de la cabecera— y se repite en la línea inferior
+   * de las hojas de continuación.
+   */
   readonly fecha?: string
   /** El cuerpo, ya analizado por el editor. **Bloquea emisión** si viene vacío. */
   readonly cuerpo: readonly NodoEscrito[]
   readonly rubrica?: string
 }
+
+/**
+ * LA FICHA: UNA FILA, DOS CELDAS. El nombre en la ancha y la fecha a la derecha.
+ *
+ * ⚠⚠ **CUATRO COLUMNAS PARA LA FECHA, Y NO LAS TRES DEL CONSENTIMIENTO.** Las dos fechas
+ * del sistema no se componen igual: II.7 recibe `fechaCorta` —`22 jun 2026`— y este
+ * formato recibe `fechaLarga`, que es la redacción que pide un certificado —`19 de
+ * septiembre de 2026`—. Medido en el rol `dato` a 10.5, el peor mes del año:
+ *
+ *     30 de septiembre de 2026    120.58 pt
+ *     con 3 columnas la celda da  115.00 pt  → se parte en dos renglones
+ *     con 4 columnas la celda da  160.00 pt  → entra con 39.42 de sobra
+ *
+ * Y el ancho sale de donde sobraba. La celda del paciente baja de nueve columnas a ocho
+ * —de 395 pt de texto a 350— y sigue holgada para el nombre más largo que se puede
+ * esperar: `María de los Ángeles Hernández Villalobos`, 41 caracteres, mide **197.41**.
+ * Caben 73 caracteres antes de que ese nombre necesite un segundo renglón.
+ *
+ * El reparto es 8 + 4 = 12: la fila llega al borde derecho, que es la regla del riel.
+ */
+const FICHA: readonly (readonly CeldaPaciente[])[] = [
+  [
+    { campo: 'paciente', columnas: 8, requerido: true },
+    { campo: 'fecha', columnas: 4 },
+  ],
+]
 
 const estilos = StyleSheet.create({
   hoja: {
@@ -184,6 +237,7 @@ export default function EscritoMedico({
   acento,
   asunto,
   tituloPie,
+  paciente,
   fecha,
   cuerpo,
   rubrica,
@@ -204,9 +258,17 @@ export default function EscritoMedico({
           /* El rótulo de continuación sale de aquí: `CONSTANCIA … · CONTINUACIÓN`. Con
              el título vacío, del nombre del pie — nunca de una cadena inventada. */
           titulo: asunto ?? nombrePie,
-          emision: fecha,
-          /* Sin `paciente`: no hay ficha en la hoja 1 y la línea de continuación
-             compone las cédulas del médico. Ver el punto 4 de la cabecera. */
+          /*
+            SIN `emision`: la fecha vive en la ficha. Con las dos, el papel imprimía la
+            misma fecha dos veces. Ver el punto 4 de la cabecera.
+          */
+          paciente: { paciente: paciente ?? '', fecha },
+          filasFicha: FICHA,
+          /*
+            La fecha, a la línea inferior de las hojas de continuación. Es lo único que ata
+            una hoja suelta a su acto en un formato que no tiene folio.
+          */
+          extraResumen: fecha === undefined || fecha.trim() === '' ? undefined : [fecha],
         }}
         firmas={
           <View style={estilos.banda}>

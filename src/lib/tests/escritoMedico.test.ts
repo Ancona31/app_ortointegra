@@ -229,8 +229,32 @@ const acento = resolverAcento(ACENTO_BASE_POR_DEFECTO)
 const CORTO = 'Certificado médico'
 const LARGO =
   'Constancia de atención médica y valoración ortopédica para trámite escolar ante la Secretaría de Educación'
+/**
+ * ⚠ **`LARGO` YA NO SE RECORTA, Y ÉSE ES EL CAMBIO.** Sus 105 caracteres se componían a
+ * tres renglones en v2 y a dos con elipsis en v3, cuando la celda del título medía 436 pt
+ * —los 540 de la caja menos la celda de `EMISIÓN` y su medianil—. Al retirarse esa celda,
+ * el título dispone de los 540 enteros y la cadena cabe entera en dos renglones.
+ *
+ * El recorte sigue existiendo y sigue haciendo falta: lo ejercita `DESBORDADO`.
+ */
+const DESBORDADO =
+  'Constancia de atención médica y valoración ortopédica para trámite escolar ante la Secretaría de Educación Pública del Estado, con fines de reincorporación a clases'
 const TITULO_PIE = 'Constancia de atención médica'
 const FECHA = '4 ago 2026'
+/** El nombre de la ficha. Persona INVENTADA, como el resto del archivo. */
+const PACIENTE_FICHA = 'María Fernanda Ruiz Ortega'
+
+/**
+ * LA FECHA COMO LA COMPONE EL ADAPTADOR, y el mes más largo del año.
+ *
+ * `propsEscritoMedico` pasa `fechaLarga` —un certificado no fecha en abreviado—, así que
+ * `4 ago 2026` no es lo que este formato imprime en producción: es sólo el ancla corta con
+ * la que el resto del archivo localiza la celda. El caso que aprieta la celda es éste.
+ */
+const FECHA_LARGA = '30 de septiembre de 2026'
+
+/** El nombre más largo que cabe esperar, para medirlo contra la celda que le queda. */
+const PACIENTE_LARGO = 'María de los Ángeles Hernández Villalobos'
 const MEDICO = 'Dra. Elena Marin Solis'
 const CEDULAS = 'Ced. Prof. 7000001 · Ced. Esp. 8000002'
 
@@ -330,19 +354,34 @@ const BASE: EscritoMedicoProps = {
   panel: { variante: 'monograma', acento, iniciales: 'EM' },
   acento,
   asunto: CORTO,
+  paciente: PACIENTE_FICHA,
   fecha: FECHA,
   cuerpo: CUERPO,
 }
 
-/** Tres renglones de título, y un nombre corto propio para la banda de pie. */
+/** Dos renglones de título —enteros, sin recorte— y un nombre corto para la banda. */
 const CON_TITULO_LARGO: EscritoMedicoProps = {
   ...BASE,
   asunto: LARGO,
   tituloPie: TITULO_PIE,
 }
 
-/** Sin título: el bloque deja 20 pt con la fecha sola y conserva su filete. */
+/** El que SÍ desborda los dos renglones: es el que ejercita el recorte con elipsis. */
+const CON_TITULO_DESBORDADO: EscritoMedicoProps = {
+  ...BASE,
+  asunto: DESBORDADO,
+  tituloPie: TITULO_PIE,
+}
+
+/** Sin título: el bloque conserva su filete y la ficha va debajo. */
 const SIN_TITULO: EscritoMedicoProps = { ...BASE, asunto: undefined }
+
+/** La ficha en su peor caso: la fecha larga y el nombre largo, los dos a la vez. */
+const FICHA_APRETADA: EscritoMedicoProps = {
+  ...BASE,
+  paciente: PACIENTE_LARGO,
+  fecha: FECHA_LARGA,
+}
 
 /** Un `Document` con un solo `Page`, que es lo que ocurre en emisión real. */
 async function componer(props: EscritoMedicoProps): Promise<Hoja[]> {
@@ -383,27 +422,28 @@ function encabezado(hoja: Hoja): number {
 }
 
 describe('II.8 · Escrito Médico', () => {
-  it('el encabezado mide 91.6 pt, el menor del sistema', async () => {
+  it('el encabezado mide 128.2 pt, y sigue siendo el menor del sistema', async () => {
     const [hoja1] = await componer(BASE)
 
     /*
-      ⚠ **ERAN 160 pt Y SON 91.6, Y SIGUE SIENDO EL MENOR DEL SISTEMA.**
+      ⚠ **ERAN 91.6 Y SON 128.2: LOS 36.6 QUE TRAE LA FICHA.**
 
-      v2 lo medía contra los 165.22 de la lámina y explicaba la diferencia con dos
-      residuos —2.85 del panel y 2.37 del *strut* del bloque de título—. En v3 el panel
-      mide 40, el nombre del médico 15, la banda de dirección es de un renglón y el
-      rótulo del documento 15, así que la cota de la lámina deja de ser el objetivo.
+      La cota venía de 160 en v2 y bajó a 91.6 en v3 porque este formato era el único sin
+      folio Y sin ficha. La ficha entra —`PACIENTE` en la celda ancha y `FECHA` a la
+      derecha, una fila— y con ella sus 40 pt: 27 de celda, la regla que la cierra y el
+      aire hasta el cuerpo.
 
-      Este formato es el que menos compone —sin folio, sin ficha de paciente— y por eso
-      es el que dice si el chasis se sostiene solo: 91.6 pt contra los 178.5 de los
-      cuatro con ficha.
+      **Sigue siendo el menor del sistema**: 131.7 contra los 178.5 de los cuatro que
+      componen ficha de cuatro filas. Lo que este formato dice del chasis no cambia; lo
+      que cambia es que ya no lo dice desde el caso extremo.
     */
-    expect(encabezado(hoja1)).toBeCloseTo(91.6, 1)
+    expect(encabezado(hoja1)).toBeCloseTo(128.2, 1)
   }, 200_000)
 
   it('el título envuelve a DOS renglones y se recorta con elipsis', async () => {
     const [corto] = await componer(BASE)
     const [largo] = await componer(CON_TITULO_LARGO)
+    const [desbordado] = await componer(CON_TITULO_DESBORDADO)
 
     /*
       ⚠⚠ **LA COTA SE INVIERTE: v3 RECORTA EL TÍTULO Y v2 NO.**
@@ -418,57 +458,127 @@ describe('II.8 · Escrito Médico', () => {
       en la cabecera. No se pierde del documento — el pie compone `tituloPie`, que es un
       campo aparte y no un truncado, y la prueba de más abajo lo fija.
     */
+    /*
+      ⚠ **Y EL UMBRAL SE MUEVE CON LA CELDA.** Al retirarse `EMISIÓN` de la fila de título
+      —su fecha vive ahora en la ficha—, la celda del título pasa de 436 a los 540 de la
+      caja entera. Los 105 caracteres de `LARGO`, que en v3 se recortaban, **ahora caben
+      enteros en dos renglones**: ésa es la cota nueva, y es una mejora, no una regresión.
+
+      El recorte no se ha ido; lo ejercita `DESBORDADO`, que sí pasa de dos renglones.
+    */
     expect(largo.texto).toContain('CONSTANCIA DE ATENCIÓN MÉDICA Y')
-    expect(largo.texto).not.toContain('SECRETARÍA DE EDUCACIÓN')
-    expect(largo.texto).toContain('…')
+    expect(largo.texto).toContain('SECRETARÍA DE EDUCACIÓN')
+    expect(largo.texto).not.toContain('…')
+
+    expect(desbordado.texto).toContain('CONSTANCIA DE ATENCIÓN MÉDICA Y')
+    expect(desbordado.texto).not.toContain('REINCORPORACIÓN A CLASES')
+    expect(desbordado.texto).toContain('…')
 
     /*
-      UN RENGLÓN MÁS SON 18 pt MÁS —el interlineado de `titulo.documento`—, y con eso se
+      UN RENGLÓN MÁS SON 18 pt MÁS, el interlineado de `titulo.documento`, y con eso se
       acaba: el tercero ya no existe. Es lo que hace que un título largo no necesite
       ninguna regla especial ni pueda comerse la hoja.
+
+      ⚠ **ERAN 14 Y AHORA SON LOS 18 LIMPIOS.** Mientras la fila de título llevaba la
+      celda de `EMISIÓN`, la fila medía lo que su celda más alta: con un renglón mandaba
+      la emisión —rótulo 9 + valor 13 = 22— y no el título de 18, así que el segundo
+      renglón sólo sumaba 36 − 22 = 14. Retirada la celda, la fila mide el título y nada
+      más, y un renglón cuesta exactamente su interlineado.
     */
-    /*
-      **14 pt, y no los 18 del interlineado.** La fila de título mide lo que mide su celda
-      más alta, y con un renglón esa celda es la de EMISIÓN —rótulo 9 + valor 13 = 22—, no
-      el título de 18. El segundo renglón lleva el título a 36 y a partir de ahí manda él:
-      36 − 22 = 14. Es la cuenta de 2.C y no un residuo.
-    */
-    const celdaEmision =
-      (TIPOGRAFIA.etiqueta.interlineado ?? 9) + (TIPOGRAFIA['titulo.valor'].interlineado ?? 13)
-    const dosRenglones = 2 * (TIPOGRAFIA['titulo.documento'].interlineado ?? 18)
-    expect(encabezado(largo) - encabezado(corto)).toBeCloseTo(dosRenglones - celdaEmision, 1)
+    const unRenglon = TIPOGRAFIA['titulo.documento'].interlineado ?? 18
+    expect(encabezado(largo) - encabezado(corto)).toBeCloseTo(unRenglon, 1)
   }, 200_000)
 
-  it('la fecha se alinea con la PRIMERA línea del título, tenga las que tenga', async () => {
+  /**
+   * ⚠⚠ **LA FECHA SE MUDÓ A LA FICHA, Y ESTA PRUEBA ES LA GUARDIA DE QUE NO SALGA DOS
+   * VECES.**
+   *
+   * Aquí se medía la regla 3 de 2.C: que la celda `EMISIÓN` de la fila de título se
+   * alineara con la PRIMERA línea del título y no con la última —5.049 pt entre las dos
+   * bases, y 23 si se hubiera alineado abajo—. Esa celda ya no existe: al entrar la ficha,
+   * la fecha pasa a su celda `FECHA` y `EMISIÓN` se retira, porque las dos componían el
+   * mismo dato y el papel lo imprimía dos veces. Es el defecto que este formato ya había
+   * corregido una vez por otra puerta.
+   *
+   * Lo que se comprueba ahora es lo que sustituye a aquella regla: la fecha sale **una
+   * sola vez**, **debajo del filete de la fila de título** y **en la misma línea base que
+   * el nombre del paciente**, tenga el título los renglones que tenga.
+   */
+  /**
+   * ⚠⚠ **LA CELDA DE FECHA MIDE CUATRO COLUMNAS PORQUE LA FECHA LARGA NO CABE EN TRES.**
+   *
+   * Con tres —las que declara la ficha del Consentimiento— la celda da 115 pt de texto y
+   * `30 de septiembre de 2026` mide 120.58 en el rol `dato`: se partía en dos renglones y
+   * subía el alto de la fila entera, con la celda del paciente medio vacía al lado.
+   *
+   * Las dos fechas del sistema no se componen igual y por eso las dos celdas no miden lo
+   * mismo: II.7 recibe `fechaCorta` —`22 jun 2026`— y este formato `fechaLarga`, que es la
+   * redacción que pide un certificado. El ancho sale del sobrante del paciente, que baja de
+   * nueve columnas a ocho y conserva 350 pt de texto contra los 197.41 del nombre más largo
+   * que cabe esperar.
+   *
+   * **La prueba no mide anchos: mide que la fila no crezca.** Un renglón de más en
+   * cualquiera de las dos celdas sube la fila un interlineado de `dato` —13 pt— y eso se ve
+   * en el alto del encabezado, que es lo que se compara.
+   */
+  it('la fecha larga y el nombre largo caben los dos en un renglón', async () => {
+    const [corta] = await componer(BASE)
+    const [apretada] = await componer(FICHA_APRETADA)
+
+    expect(encabezado(apretada)).toBeCloseTo(encabezado(corta), 1)
+
+    // Y las dos piezas se componen enteras: ni recorte por elipsis ni segundo renglón.
+    expect(apretada.texto).toContain(PACIENTE_LARGO)
+    expect(apretada.texto).not.toContain('…')
+    expect(
+      apretada.renglones.filter((r) => r.texto.startsWith('30 ')),
+      'la fecha larga se partió en dos renglones',
+    ).toHaveLength(1)
+
+    /*
+      Y LAS DOS EN LA MISMA LÍNEA BASE, que es lo que delata una fila de dos alturas: si la
+      fecha hubiera envuelto, su primera línea subiría respecto del nombre.
+    */
+    expect(empiezaPor(apretada, '30 ').arriba).toBeCloseTo(
+      renglon(apretada, PACIENTE_LARGO).arriba,
+      2,
+    )
+  }, 200_000)
+
+  it('la fecha sale una sola vez, en la ficha y no en la fila de título', async () => {
     const [corto] = await componer(BASE)
     const [largo] = await componer(CON_TITULO_LARGO)
 
+    for (const [nombre, hoja] of [['corto', corto], ['largo', largo]] as const) {
+      /*
+        UNA sola vez en toda la hoja. Con las dos celdas montadas salían dos.
+
+        ⚠ Se ancla en `4 ` y no en `4 ago`: el extractor parte la fecha en dos tramos —el
+        día y el resto— porque así la compone el PDF, y `4 ago 2026` no existe como renglón.
+      */
+      const veces = hoja.renglones.filter((r) => r.texto.startsWith('4 ')).length
+      expect(veces, `fecha repetida en el caso ${nombre}`).toBe(1)
+
+      // Y en la ficha: su base es la del nombre del paciente, que comparte fila con ella.
+      const fecha = empiezaPor(hoja, '4 ')
+      expect(fecha.arriba, `la fecha del caso ${nombre} no está en la ficha`).toBeCloseTo(
+        renglon(hoja, PACIENTE_FICHA).arriba,
+        2,
+      )
+    }
+
     /*
-      LA REGLA 3 DE 2.C, MEDIDA EN EL CASO QUE LA PUEDE ROMPER.
-
-      ⚠ **SON 5.049 pt Y ERAN 1.976, y la cuenta es OTRA porque la fila es otra.** En v2
-      las dos cajas se apoyaban por su borde inferior; en v3 la fila de título alinea por
-      ARRIBA (`alignItems: 'flex-start'`, ver 2.C) y la celda de emisión compone su rótulo
-      encima del valor. Así que lo que separa las dos bases es el renglón del rótulo menos
-      lo que la base sube al crecer el cuerpo del título:
-
-          9 + 0.878 × (10.5 − 15) = 5.049
-
-      Lo que se comprueba no cambia: que **no crece con dos renglones de título**. Si la
-      fecha se alineara con la última línea, aquí saldrían 23.
+      Y POR DEBAJO DEL TÍTULO, que es lo que dice que ya no está en su fila: con el título
+      de dos renglones la distancia crece un interlineado, y si la fecha siguiera arriba
+      no se movería.
     */
-    const desfase =
-      (TIPOGRAFIA.etiqueta.interlineado ?? 9) +
-      ASCENDENTE_ARCHIVO *
-        (TIPOGRAFIA['titulo.valor'].cuerpo - TIPOGRAFIA['titulo.documento'].cuerpo)
-    expect(desfase).toBeCloseTo(5.049, 2)
-
-    expect(
-      empiezaPor(corto, '4 ').arriba - renglon(corto, 'CERTIFICADO MÉDICO').arriba,
-    ).toBeCloseTo(desfase, 2)
-    expect(
-      empiezaPor(largo, '4 ').arriba - empiezaPor(largo, 'CONSTANCIA').arriba,
-    ).toBeCloseTo(desfase, 2)
+    const bajoElTitulo = (hoja: Hoja, ancla: string): number =>
+      empiezaPor(hoja, '4 ').arriba - empiezaPor(hoja, ancla).arriba
+    expect(bajoElTitulo(corto, 'CERTIFICADO')).toBeGreaterThan(0)
+    expect(bajoElTitulo(largo, 'CONSTANCIA') - bajoElTitulo(corto, 'CERTIFICADO')).toBeCloseTo(
+      TIPOGRAFIA['titulo.documento'].interlineado ?? 18,
+      1,
+    )
   }, 200_000)
 
   it('sin título el bloque deja 20 pt, NO cero, y conserva su filete', async () => {
@@ -490,7 +600,8 @@ describe('II.8 · Escrito Médico', () => {
   }, 200_000)
 
   it('`tituloPie` es un campo aparte, no un truncado del título', async () => {
-    const hojas = await componer(CON_TITULO_LARGO)
+    // El que SÍ desborda: es donde un truncado automático se distinguiría de un campo.
+    const hojas = await componer(CON_TITULO_DESBORDADO)
 
     /*
       `CONCILIA D41`. El encabezado imprime la constancia entera y el rótulo de continuación
@@ -506,9 +617,13 @@ describe('II.8 · Escrito Médico', () => {
       ⚠ v3 · el encabezado RECORTA el título con elipsis, así que la constancia entera ya
       no está en la hoja 1. Lo que esta prueba defiende sigue en pie y es lo que importa:
       que `tituloPie` sea un CAMPO APARTE y no un truncado automático del título.
+
+      ⚠ **Y SE MIDE CON `DESBORDADO`, NO CON `LARGO`.** Al retirarse la celda de `EMISIÓN`
+      de la fila de título, la celda del título pasa de 436 a 540 pt y los 105 caracteres
+      de `LARGO` caben enteros: con él ya no habría recorte que distinguir de un campo.
     */
     expect(hojas[0].texto).toContain('CONSTANCIA DE ATENCIÓN MÉDICA Y')
-    expect(hojas[0].texto).not.toContain('SECRETARÍA DE EDUCACIÓN')
+    expect(hojas[0].texto).not.toContain('REINCORPORACIÓN A CLASES')
     /*
       ⚠⚠ **DÓNDE SE LEE EL NOMBRE CORTO CAMBIA DE SITIO EN v3.**
 
@@ -573,43 +688,60 @@ describe('II.8 · Escrito Médico', () => {
     expect(documento.x).toBeLessThan(leyenda.x)
   }, 200_000)
 
-  it('la hoja de continuación se identifica con tres datos y sin paciente', async () => {
+  it('la hoja de continuación se identifica sola, y ya sin segunda fecha', async () => {
     const hojas = await componer(BASE)
     expect(hojas.length).toBeGreaterThan(1)
     const [, hoja2] = hojas
 
     /*
-      SIN FOLIO Y SIN PACIENTE, lo que ata la hoja 2 a la 1 son tres cosas, y las tres están:
-      el título en el rótulo, el médico con SUS DOS CÉDULAS bajo el filete, y la fecha en el
-      riel derecho —**rotulada `Emisión`**, que es el segundo tratamiento de la misma fecha
-      dentro del formato (`D40`, reportado).
+      ⚠⚠ **`D40` SE CIERRA AQUÍ, Y POR RETIRADA.**
+
+      Esta prueba fijaba tres anclas —título en el rótulo, médico con sus dos cédulas bajo
+      el filete, y la fecha en el riel derecho **rotulada `EMISIÓN`**— y dejaba reportado
+      que esa era la segunda redacción de la misma fecha dentro del formato. Ahora el riel
+      no existe: la celda `EMISIÓN` se retiró de la fila de título al entrar la ficha, y
+      con ella la del encabezado de continuación, que se alimentaba de la misma prop.
+
+      Lo que ata la hoja 2 a la 1 sigue siendo tres cosas y ninguna es un folio, porque
+      este formato no tiene: **el título en el rótulo, el paciente y la fecha**, los dos
+      últimos en la misma línea. La fecha llega por `extraResumen`, la puerta declarada
+      para esto —el hospital en II.6, el peso en II.4— y sale UNA vez, no dos.
+
+      Lo que se va: las cédulas del médico. Las componía esa línea porque no había paciente
+      que poner; ahora lo hay, y la línea identifica el documento por su destinatario, que
+      es lo que hace en los otros ocho formatos.
     */
     expect(hoja2.texto).toContain(`${CORTO.toUpperCase()} · CONTINUACIÓN`)
-    expect(hoja2.texto).toContain(MEDICO)
-    expect(hoja2.texto).toContain(CEDULAS)
-    expect(hoja2.texto).toContain('EMISIÓN')
-
-    // Y NO hay línea de paciente: este formato no tiene paciente que poner.
-    expect(hoja2.texto).not.toContain('Paciente · ')
+    expect(hoja2.texto).toContain(`Paciente · ${PACIENTE_FICHA} · ${FECHA}`)
+    expect(hoja2.texto).not.toContain('EMISIÓN')
+    expect(hoja2.texto).not.toContain('FOLIO')
+    /*
+      Las cédulas siguen en la hoja, pero abajo: son las credenciales de la celda de firma.
+      Lo que se comprueba es que ya no están EN LA CABECERA, y eso lo dice su posición: la
+      línea de la cabecera va sobre el filete, muy por encima de la banda de cierre.
+    */
+    expect(renglon(hoja2, CEDULAS).arriba).toBeGreaterThan(
+      renglon(hoja2, `Paciente · ${PACIENTE_FICHA} · ${FECHA}`).arriba + 200,
+    )
 
     /*
-      ⚠ **MIDE 41.47 pt Y MEDÍA 57.5: la cabecera de continuación se cierra en v3.**
+      ⚠ **MIDE 30.47 pt Y MEDÍA 41.47: los 11 que se va el riel.**
 
-      v2 la componía por formato y aquí pesaba 57.5 —rótulo y nombre a 29, aire de 8,
-      filete de 2.5, aire de 6 y la línea de cédulas de 12— contra los 54.5 de la lámina.
-      v3 la resuelve **una sola vez para los nueve formatos, en 37 pt de cabecera**: los
-      41.47 de aquí son esos 37 más lo que la línea de crédito baja dentro de su caja.
+      La cabecera de continuación es una fila con el rótulo a la izquierda y la celda de
+      riel a la derecha, y mide lo que su pieza más alta: con celda, sus dos renglones
+      —etiqueta 9 + valor 13 = 22—; sin ella, el rótulo de 11. Es la misma cuenta de 2.C
+      en la fila de título, y el mismo ahorro.
 
       Lo que la cota defiende no cambia: que la hoja 2 se identifique sola y que la
-      cabecera no crezca por formato. Si esta cifra se separa de la de los otros ocho,
-      alguien volvió a componer la continuación dentro de un formato.
+      cabecera no crezca por formato. Esta cifra es ahora la del ÚNICO formato sin riel; si
+      se separa de esa condición, alguien volvió a componer la continuación por formato.
     */
     const finDeLaCabecera =
-      renglon(hoja2, CEDULAS).arriba -
+      renglon(hoja2, `Paciente · ${PACIENTE_FICHA} · ${FECHA}`).arriba -
       ASCENDENTE_ARCHIVO * TIPOGRAFIA['medico.credencial'].cuerpo +
       12
     // El margen se lee del token: escrito a mano dejó de valer al igualar los cuatro.
-    expect(finDeLaCabecera - MARGEN.superior).toBeCloseTo(41.47, 1)
+    expect(finDeLaCabecera - MARGEN.superior).toBeCloseTo(30.47, 1)
   }, 200_000)
 
   it('el cuerpo compone sus seis nodos, con las marcas de lista en su eje', async () => {

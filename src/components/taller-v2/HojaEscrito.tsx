@@ -10,17 +10,20 @@
  *   corto     `Certificado médico`         1 renglón
  *   medio     `Carta de recomendación`     1 renglón
  *   largo     la constancia de 105 caracteres, **3 renglones**
- *   sin       sin título: el bloque deja 20 pt con la fecha sola
+ *   sin       sin título: la fila de título se queda con su filete y nada más
  *
  * **Es el único formato cuyo título lo escribe el médico**, así que su verificación no es
  * cuántos datos trae sino qué pasa cuando el dato crece. En los cuatro hay que mirar lo
  * mismo:
  *
- * 1. **La fecha se alinea con la PRIMERA línea del título**, nunca con la última ni con el
- *    centro. Con tres renglones sigue arriba del todo.
- * 2. **El caso sin título deja su hueco de 20 pt**, no cero, y conserva el filete. Si el
- *    cuerpo arranca pegado al filete del membrete, la variante `ausente` colapsó y eso es lo
- *    que esta hoja existe para detectar.
+ * 1. **La ficha va debajo de la fila de título**, con `PACIENTE` en la celda ancha y
+ *    `FECHA` a la derecha. ⚠ **La fecha ya NO se compone arriba**: era la celda `EMISIÓN`
+ *    de la fila de título y se retiró al entrar la ficha, porque las dos decían lo mismo.
+ *    Si vuelve a salir arriba, el papel está imprimiendo la fecha dos veces.
+ * 2. **El caso sin título conserva su filete**, que es lo único que le queda a esa fila:
+ *    sin título y sin riel, la fila de título es el filete y el aire hasta la ficha. Si el
+ *    cuerpo arranca pegado al filete del membrete, la variante `ausente` colapsó y eso es
+ *    lo que esta hoja existe para detectar.
  * 3. **El pie no lleva folio en ninguna hoja**, la paginación va a la izquierda y el nombre
  *    del documento al centro. En el caso largo, el pie imprime `Constancia de atención
  *    médica` y el encabezado la cadena entera: son dos campos, no un truncado.
@@ -56,7 +59,21 @@ const TITULOS = {
 /** El nombre corto del caso largo. **Es un segundo campo, no un truncado.** */
 const TITULO_PIE_LARGO = 'Constancia de atención médica'
 
-const FECHA = '4 ago 2026'
+/**
+ * ⚠ **LA REDACCIÓN LARGA, QUE ES LA QUE EMITE EL ADAPTADOR.** `propsEscritoMedico` pasa
+ * `fechaLarga(data.fecha)` —un certificado no fecha en abreviado— y con la corta este caso
+ * enseñaba una celda que en producción no existe: la fecha larga es la que se parte en dos
+ * renglones si la celda se queda corta, y es lo que hay que poder ver aquí.
+ */
+const FECHA = '19 de septiembre de 2026'
+/**
+ * El nombre de la ficha. Persona INVENTADA, como el resto del taller.
+ *
+ * Es el MISMO que el cuerpo nombra en su primer párrafo: la ficha y el texto del escrito
+ * hablan de la misma persona, que es lo que hace un documento de verdad. Con dos nombres
+ * distintos, el caso enseñaría un papel que ningún médico emitiría.
+ */
+const PACIENTE = 'Renata Bustamante Oceguera'
 
 /**
  * EL CUERPO, con los seis nodos que el editor produce. Texto INVENTADO sobre un paciente
@@ -70,7 +87,7 @@ const CUERPO: readonly NodoEscrito[] = [
       { texto: 'Renata Bustamante Oceguera', negrita: true },
       {
         texto:
-          ', de 25 años de edad, acudió a consulta en este consultorio el día 4 de agosto de 2026 por dolor lumbar de tres semanas de evolución.',
+          ', de 25 años de edad, acudió a consulta en este consultorio el día 19 de septiembre de 2026 por dolor lumbar de tres semanas de evolución.',
       },
     ],
   },
@@ -223,7 +240,7 @@ const DOC_EDITOR = {
         content: [
           { type: 'text', text: 'Mérida, Yucatán' },
           { type: 'hardBreak' },
-          { type: 'text', text: 'a 4 de agosto de 2026' },
+          { type: 'text', text: 'a 19 de septiembre de 2026' },
         ],
       },
     ],
@@ -238,16 +255,23 @@ const CASOS: Record<
   {
     readonly asunto?: string
     readonly tituloPie?: string
+    /**
+     * El nombre de la ficha. `sin` lo deja fuera a propósito: es el único caso que enseña
+     * la celda vacía requerida —rótulo y línea para llenar a pluma—, que es lo que compone
+     * un escrito emitido antes de que la ficha existiera.
+     */
+    readonly paciente?: string
     /** Solo `editor`: el cuerpo sale del conversor y no de `CUERPO`. */
     readonly desdeEditor?: boolean
   }
 > = {
-  corto: { asunto: TITULOS.corto },
-  medio: { asunto: TITULOS.medio },
-  largo: { asunto: TITULOS.largo, tituloPie: TITULO_PIE_LARGO },
-  // Sin título y sin `tituloPie`: la banda cae al genérico `Escrito médico`.
+  corto: { asunto: TITULOS.corto, paciente: PACIENTE },
+  medio: { asunto: TITULOS.medio, paciente: PACIENTE },
+  largo: { asunto: TITULOS.largo, tituloPie: TITULO_PIE_LARGO, paciente: PACIENTE },
+  // Sin título, sin `tituloPie` y sin paciente: la banda cae al genérico `Escrito médico`
+  // y la celda de la ficha deja su línea.
   sin: {},
-  editor: { asunto: TITULOS.corto, desdeEditor: true },
+  editor: { asunto: TITULOS.corto, paciente: PACIENTE, desdeEditor: true },
 }
 
 function HojaEscrito({
@@ -272,6 +296,7 @@ function HojaEscrito({
         acento={acento}
         asunto={c.asunto}
         tituloPie={c.tituloPie}
+        paciente={c.paciente}
         fecha={FECHA}
         cuerpo={c.desdeEditor === true ? cuerpoEscritoDesde({ doc: DOC_EDITOR }).cuerpo : CUERPO}
       />

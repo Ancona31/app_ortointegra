@@ -18,12 +18,16 @@
  * su columna queda en NULL. Es el único de los nueve sin folio y está declarado en
  * el spec para que nadie lo reponga por consistencia mal entendida.
  *
- * ── Y NO TIENE RIEL DE PACIENTE ─────────────────────────────────────────────
+ * ── Y AHORA SÍ TIENE FICHA, CON DOS CELDAS ──────────────────────────────────
  *
- * Es una hoja membretada multiuso —certificado, constancia, carta a un colega—, no
- * una orden clínica: el paciente, si sale, lo escribe el médico dentro del cuerpo.
- * Por eso `contenido.paciente` se guarda (nombra el archivo y encabeza la lista del
- * expediente) y no se compone.
+ * Llevaba escrito aquí que no la tenía: «es una hoja membretada multiuso —certificado,
+ * constancia, carta a un colega—, no una orden clínica: el paciente, si sale, lo escribe
+ * el médico dentro del cuerpo». Era una decisión de producto y se revirtió. El dato ya se
+ * guardaba —nombra el archivo y encabeza la lista del expediente— y ahora también se
+ * compone: `PACIENTE` y `FECHA`, una fila, dos celdas.
+ *
+ * ⚠ **`fecha` YA NO VA A LA FILA DE TÍTULO.** Pasa a la celda `FECHA` de la ficha; si se
+ * compusiera en los dos sitios, el papel imprimiría la misma fecha dos veces.
  */
 
 import type { ReactElement } from 'react'
@@ -58,8 +62,9 @@ export function propsEscritoMedico(entrada: EntradaAdaptador): EscritoMedicoProp
     // filete del membrete hace doble trabajo y el cuerpo arranca bajo él.
     asunto: textoOpcional(data.asunto),
     tituloPie: textoOpcional(data.tituloPie),
-    // En el encabezado, a la derecha, sin rótulo. La línea de lugar y fecha
-    // formal la escribe el médico dentro del cuerpo, según exija el trámite.
+    // Las dos celdas de la ficha. La línea de lugar y fecha formal que exija el
+    // trámite la sigue escribiendo el médico dentro del cuerpo: esto es la ficha.
+    paciente: textoOpcional(data.paciente),
     fecha: fechaLarga(data.fecha),
     cuerpo,
     rubrica: rubricaDe(entrada.medico),
