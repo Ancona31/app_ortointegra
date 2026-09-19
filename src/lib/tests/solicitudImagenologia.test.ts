@@ -361,7 +361,7 @@ async function componer(
 }
 
 describe('II.2 · Solicitud de Imagenología — medido sobre el PDF', () => {
-  it('compone el encabezado en 178.50 pt desde el margen', async () => {
+  it('compone el encabezado en 189.50 pt desde el margen', async () => {
     const [hoja] = await componer(CUATRO_ESTADOS)
 
     /*
@@ -372,7 +372,15 @@ describe('II.2 · Solicitud de Imagenología — medido sobre el PDF', () => {
       prueba defiende —que el encabezado tenga UNA cifra y no derive sin que nadie se
       entere— no cambia.
     */
-    expect(abreLaLista(hoja) - MARGEN.superior).toBeCloseTo(178.50, 2)
+    /*
+      ⚠ **+11 pt: LA UNIVERSIDAD VUELVE AL MEMBRETE.** Se retiró en el rediseño y no debía
+      —es requisito en la receta—, así que se repone en **su propio renglón bajo la banda
+      de dirección**, a la izquierda y con los 540 de la caja. Dentro de la banda no cabía:
+      ese renglón gasta ya 448.37 pt y la universidad pide 160 más su raya. Cuesta su
+      renglón de `medico.credencial`, 11 pt, y sólo cuando el médico la tiene registrada:
+      sin ella el nodo no se monta y esta cota vuelve a la de antes. Ver la cabecera de 2.B.
+    */
+    expect(abreLaLista(hoja) - MARGEN.superior).toBeCloseTo(189.50, 2)
   }, 60_000)
 
   it('sitúa los bloques del encabezado donde v3 los compone', async () => {

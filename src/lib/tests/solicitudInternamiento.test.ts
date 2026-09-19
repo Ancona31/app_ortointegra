@@ -386,7 +386,15 @@ describe('II.6 · Solicitud de Internamiento', () => {
       ficha. Este formato compone DOS filas de ficha, así que es el segundo encabezado más
       pesado del sistema después del Consentimiento.
     */
-    expect(encabezado(hoja1)).toBeCloseTo(204.83, 1)
+    /*
+      ⚠ **+11 pt: LA UNIVERSIDAD VUELVE AL MEMBRETE.** Se retiró en el rediseño y no debía
+      —es requisito en la receta—, así que se repone en **su propio renglón bajo la banda
+      de dirección**, a la izquierda y con los 540 de la caja. Dentro de la banda no cabía:
+      ese renglón gasta ya 448.37 pt y la universidad pide 160 más su raya. Cuesta su
+      renglón de `medico.credencial`, 11 pt, y sólo cuando el médico la tiene registrada:
+      sin ella el nodo no se monta y esta cota vuelve a la de antes. Ver la cabecera de 2.B.
+    */
+    expect(encabezado(hoja1)).toBeCloseTo(215.83, 1)
   }, 120_000)
 
   it('la sección 1 llena su hoja y el cierre baja detrás, sin saltos declarados', async () => {

@@ -460,7 +460,7 @@ async function componer(
 }
 
 describe('II.4 · Plan de Suplementación — medido sobre el PDF', () => {
-  it('compone el encabezado en 178.50 pt desde el margen', async () => {
+  it('compone el encabezado en 189.50 pt desde el margen', async () => {
     const [hoja] = await componer(CUATRO_FILAS)
 
     /*
@@ -470,7 +470,15 @@ describe('II.4 · Plan de Suplementación — medido sobre el PDF', () => {
       separarse de la de Receta, Imagenología o Laboratorio, alguien reintrodujo
       geometría por formato.
     */
-    expect(abreLaLista(hoja) - MARGEN.superior).toBeCloseTo(178.50, 2)
+    /*
+      ⚠ **+11 pt: LA UNIVERSIDAD VUELVE AL MEMBRETE.** Se retiró en el rediseño y no debía
+      —es requisito en la receta—, así que se repone en **su propio renglón bajo la banda
+      de dirección**, a la izquierda y con los 540 de la caja. Dentro de la banda no cabía:
+      ese renglón gasta ya 448.37 pt y la universidad pide 160 más su raya. Cuesta su
+      renglón de `medico.credencial`, 11 pt, y sólo cuando el médico la tiene registrada:
+      sin ella el nodo no se monta y esta cota vuelve a la de antes. Ver la cabecera de 2.B.
+    */
+    expect(abreLaLista(hoja) - MARGEN.superior).toBeCloseTo(189.50, 2)
   }, 60_000)
 
   it('sitúa los bloques del encabezado donde v3 los compone', async () => {
@@ -487,16 +495,36 @@ describe('II.4 · Plan de Suplementación — medido sobre el PDF', () => {
 
     /*
       LA BANDA DE DIRECCIÓN ES DE UN SOLO RENGLÓN, y eran dos apilados.
-      ⚠ **Y LA UNIVERSIDAD YA NO SE IMPRIME** (`dudas.md` §9): sigue en el tipo y los
-      nueve adaptadores la leen, pero el membrete no la compone. Queda reportado.
+
+      ⚠⚠ **Y LA UNIVERSIDAD VUELVE A IMPRIMIRSE, EN SU RENGLÓN Y NO EN ESTA BANDA.** Esta
+      cota fijaba que el membrete no la compusiera (`dudas.md` §9). Se retiró y no debía
+      —es requisito en la receta—, así que vuelve **justo debajo**, en una línea propia con
+      el ancho entero de la caja.
+
+      DENTRO de la banda no cabía: el renglón gasta 448.37 pt de los 540 y la universidad
+      pide 160 más su raya, así que habría recortado el domicilio por elipsis.
+
+      Lo que esta prueba defiende no cambia y es lo que importa: **la banda sigue siendo de
+      un solo renglón** —domicilio y credenciales en la misma línea base— y la universidad
+      no se cuela en ella.
     */
     const direccion = renglon(hoja, 'Av. Ficticia')
     const credenciales = renglon(hoja, 'Céd. Prof.')
     expect(credenciales.arriba).toBeCloseTo(direccion.arriba, 2)
     expect(credenciales.x).toBeGreaterThan(direccion.x)
-    expect(hoja.renglones.some((r) => r.texto.startsWith('Universidad Nacional'))).toBe(
-      false,
+
+    const universidad = renglon(hoja, 'Universidad Nacional Autónoma de México')
+    /*
+      DEBAJO de la banda y no dentro: un renglón entero por debajo del domicilio, no en su
+      misma base. Los 11 pt son el interlineado de `medico.credencial`, el rol que
+      comparten — si alguna vez volviera a la banda, esta distancia sería cero.
+    */
+    expect(universidad.arriba - direccion.arriba).toBeCloseTo(
+      TIPOGRAFIA['medico.credencial'].interlineado ?? 11,
+      1,
     )
+    // Y a la izquierda, pegada al margen de la caja como el domicilio.
+    expect(universidad.x).toBeCloseTo(direccion.x, 1)
 
     // Las dos celdas del riel de folio, alineadas y con la emisión a la izquierda.
     expect(renglon(hoja, 'EMISIÓN').x).toBeLessThan(renglon(hoja, 'FOLIO').x)

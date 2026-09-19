@@ -2,18 +2,20 @@
  * Sistema de documentos v3 — 2.B · **Membrete**. «Identidad del médico y del
  * consultorio donde se emite.»
  *
- * Alto total del bloque: **64.8 pt**, y es la suma de sus piezas, no una constante:
+ * Alto total del bloque: **75.8 pt**, y es la suma de sus piezas, no una constante:
  *
  *     fila superior (la fija el panel)        40      `PANEL_DIAMETRO`
  *     aire                                     6      `transicion.membreteFilete`
  *     filete grueso + fino                     2.8    `FILETE.acento` + `FILETE.fino`
  *     aire                                     5      `transicion.membreteLineaFina`
  *     banda de dirección                      11      un renglón de `medico.credencial`
+ *     universidad                             11      otro, y COLAPSA si no la hay
  *                                           ─────
- *                                            64.8
+ *                                            75.8
  *
- * Más `transicion.membreteCierre` (10) hasta la fila de título: **74.8** desde el
- * margen. En v2 esa suma iba de 116 a 130 según la lámina.
+ * Más `transicion.membreteCierre` (10) hasta la fila de título: **85.8** desde el
+ * margen. Sin universidad registrada vuelve a 64.8 y 74.8, que es lo que medía antes de
+ * reponerla. En v2 esa suma iba de 116 a 130 según la lámina.
  *
  * ── LOS TRES CAMBIOS, Y EL PRIMERO ES UN DEFECTO CERRADO ─────────────────────
  *
@@ -26,11 +28,23 @@
  *    teléfono es el que encoge y se parte. **Con las tres, el domicilio se recorta y
  *    el teléfono nunca se imprime encima.**
  *
- * 2. **UN SOLO RENGLÓN, Y ERAN DOS EN CINCO LÁMINAS.** Las cédulas se unen con la
- *    raya del sistema a la zona derecha del renglón único, y **la universidad deja de
- *    imprimirse en el membrete de los nueve formatos**. Decisión de Angel: no la pide
- *    ninguna normativa que este documento tenga que cumplir en el membrete, y costaba
- *    12 pt en todas las hojas 1 del sistema.
+ * 2. **UN SOLO RENGLÓN EN LA BANDA, Y ERAN DOS EN CINCO LÁMINAS.** Las cédulas se unen
+ *    con la raya del sistema a la zona derecha del renglón único.
+ *
+ *    ⚠⚠ **LA UNIVERSIDAD VUELVE, EN SU PROPIO RENGLÓN BAJO LA BANDA. SE RETIRÓ Y NO
+ *    DEBÍA.** Aquí decía que «no la pide ninguna normativa que este documento tenga que
+ *    cumplir en el membrete»: es requisito en la receta, y el rediseño salió a producción
+ *    sin ella.
+ *
+ *    **DENTRO de la banda no cabe, y está medido.** Ese renglón gasta 448.37 pt de los
+ *    540 —domicilio 217.90, cédulas 150.73, teléfono 66.67 y sus dos rayas— y la
+ *    universidad pide 160 más su raya: **614.90 contra 540**. Ahí habría recortado el
+ *    domicilio por elipsis, que es el defecto §1 entrando por la otra puerta.
+ *
+ *    DEBAJO no compite con nadie: la izquierda entera y los 540 de la caja para una
+ *    cadena cuyo peor caso esperable —`Universidad Nacional Autónoma de México · Facultad
+ *    de Medicina`— mide 246.63. Cuesta su renglón, 11 pt, y **sólo cuando el médico la
+ *    tiene registrada**: sin ella el nodo no se monta y el membrete mide lo que medía.
  *
  * 3. **`Lamina` SALE DE LA FIRMA DE PROPS.** Las ocho láminas medían este bloque con
  *    seis espaciadores de cierre distintos (10, 12, 14, 16, 20, 24, 26) y dos
@@ -149,6 +163,19 @@ const estilos = StyleSheet.create({
     maxLines: 1,
     textOverflow: 'ellipsis',
   },
+  /**
+   * La universidad, en su propio renglón bajo la banda de dirección.
+   *
+   * Mismo rol que la banda —es una credencial, no un titular— y a la izquierda, con el
+   * ancho ENTERO de la caja: aquí no compite con nada, que es lo que la hacía imposible
+   * dentro de la banda. El recorte es el de sus hermanas, por si alguna institución trae
+   * un nombre desmedido: 540 pt contra los 246.63 de la cadena más larga esperable.
+   */
+  universidad: {
+    ...estiloTipografico('medico.credencial'),
+    maxLines: 1,
+    textOverflow: 'ellipsis',
+  },
   aireFilete: { height: TRANSICION.membreteFilete },
   aireBanda: { height: TRANSICION.membreteLineaFina },
   banda: {
@@ -185,7 +212,8 @@ export default function Membrete({
    * la raya. Se filtra lo vacío antes de unir — con una sola pieza no queda la raya
    * suelta, que es el defecto que una plantilla dejaría.
    *
-   * La universidad NO entra. Ver el punto 2 de la cabecera.
+   * La universidad NO entra en la banda: no cabe, y forzarla recortaría el domicilio.
+   * Va bajo la especialidad. Ver el punto 2 de la cabecera.
    */
   const derecha = [...medico.cedulas, consultorio.telefono]
     .filter((pieza) => pieza.trim() !== '')
@@ -210,6 +238,15 @@ export default function Membrete({
         <Text style={estilos.domicilio}>{consultorio.domicilio}</Text>
         {derecha === '' ? null : <Text style={estilos.credenciales}>{derecha}</Text>}
       </View>
+
+      {/*
+        LA UNIVERSIDAD, EN SU RENGLÓN. Sin mayúsculas: es un nombre propio, no un rótulo.
+        Colapsa ENTERO si el médico no la tiene registrada —`null`, ni una caja de cero—
+        y entonces el membrete mide lo que medía.
+      */}
+      {medico.universidad.trim() === '' ? null : (
+        <Text style={estilos.universidad}>{medico.universidad}</Text>
+      )}
 
       <View style={estilos.cierre} />
     </View>

@@ -422,11 +422,11 @@ function encabezado(hoja: Hoja): number {
 }
 
 describe('II.8 · Escrito Médico', () => {
-  it('el encabezado mide 128.2 pt, y sigue siendo el menor del sistema', async () => {
+  it('el encabezado mide 139.2 pt, y sigue siendo el menor del sistema', async () => {
     const [hoja1] = await componer(BASE)
 
     /*
-      ⚠ **ERAN 91.6 Y SON 128.2: LOS 36.6 QUE TRAE LA FICHA.**
+      ⚠ **ERAN 91.6 Y SON 139.2: LOS 36.6 DE LA FICHA MÁS LOS 11 DE LA UNIVERSIDAD.**
 
       La cota venía de 160 en v2 y bajó a 91.6 en v3 porque este formato era el único sin
       folio Y sin ficha. La ficha entra —`PACIENTE` en la celda ancha y `FECHA` a la
@@ -437,7 +437,15 @@ describe('II.8 · Escrito Médico', () => {
       componen ficha de cuatro filas. Lo que este formato dice del chasis no cambia; lo
       que cambia es que ya no lo dice desde el caso extremo.
     */
-    expect(encabezado(hoja1)).toBeCloseTo(128.2, 1)
+    /*
+      ⚠ **+11 pt: LA UNIVERSIDAD VUELVE AL MEMBRETE.** Se retiró en el rediseño y no debía
+      —es requisito en la receta—, así que se repone en **su propio renglón bajo la banda
+      de dirección**, a la izquierda y con los 540 de la caja. Dentro de la banda no cabía:
+      ese renglón gasta ya 448.37 pt y la universidad pide 160 más su raya. Cuesta su
+      renglón de `medico.credencial`, 11 pt, y sólo cuando el médico la tiene registrada:
+      sin ella el nodo no se monta y esta cota vuelve a la de antes. Ver la cabecera de 2.B.
+    */
+    expect(encabezado(hoja1)).toBeCloseTo(139.2, 1)
   }, 200_000)
 
   it('el título envuelve a DOS renglones y se recorta con elipsis', async () => {

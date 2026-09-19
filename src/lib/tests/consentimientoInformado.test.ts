@@ -429,7 +429,15 @@ describe('II.7 · Consentimiento Informado', () => {
   it('el encabezado del cuerpo mide 346.7 desde el margen', async () => {
     const [hoja1] = await componer(COMPLETO)
 
-    expect(encabezado(hoja1)).toBeCloseTo(346.7, 1)
+    /*
+      ⚠ **+11 pt: LA UNIVERSIDAD VUELVE AL MEMBRETE.** Se retiró en el rediseño y no debía
+      —es requisito en la receta—, así que se repone en **su propio renglón bajo la banda
+      de dirección**, a la izquierda y con los 540 de la caja. Dentro de la banda no cabía:
+      ese renglón gasta ya 448.37 pt y la universidad pide 160 más su raya. Cuesta su
+      renglón de `medico.credencial`, 11 pt, y sólo cuando el médico la tiene registrada:
+      sin ella el nodo no se monta y esta cota vuelve a la de antes. Ver la cabecera de 2.B.
+    */
+    expect(encabezado(hoja1)).toBeCloseTo(357.7, 1)
   }, 200_000)
 
   it('el reparto son CUATRO hojas y cada una es de una cosa', async () => {

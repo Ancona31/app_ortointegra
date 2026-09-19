@@ -381,8 +381,16 @@ describe('II.5 · Recibo de Honorarios / Cotización', () => {
       Lo que la prueba defiende no cambia: que el encabezado tenga UNA cifra por caso y
       no derive sin que nadie se entere.
     */
-    expect(encabezado(sinSeguro)).toBeCloseTo(132.20, 1)
-    expect(encabezado(conSeguro)).toBeCloseTo(216.80, 1)
+    /*
+      ⚠ **+11 pt: LA UNIVERSIDAD VUELVE AL MEMBRETE.** Se retiró en el rediseño y no debía
+      —es requisito en la receta—, así que se repone en **su propio renglón bajo la banda
+      de dirección**, a la izquierda y con los 540 de la caja. Dentro de la banda no cabía:
+      ese renglón gasta ya 448.37 pt y la universidad pide 160 más su raya. Cuesta su
+      renglón de `medico.credencial`, 11 pt, y sólo cuando el médico la tiene registrada:
+      sin ella el nodo no se monta y esta cota vuelve a la de antes. Ver la cabecera de 2.B.
+    */
+    expect(encabezado(sinSeguro)).toBeCloseTo(143.20, 1)
+    expect(encabezado(conSeguro)).toBeCloseTo(227.80, 1)
   }, 120_000)
 
   it('el encabezado: el bloque de aseguradora pesa 84.60', async () => {

@@ -642,7 +642,15 @@ describe('2.N · la hoja de continuación, en los tres formatos', () => {
     // piezas de la hoja 1 encogidas la diferencia era de 55 pt y la firma no cabía.
     expect(completo - continuacion).toBeGreaterThan(100)
     // Y las dos cifras, ancladas: si alguna se mueve, algo del encabezado cambió.
-    expect(completo).toBeCloseTo(194.16, 1)
+    /*
+      ⚠ **+11 pt: LA UNIVERSIDAD VUELVE AL MEMBRETE.** Se retiró en el rediseño y no debía
+      —es requisito en la receta—, así que se repone en **su propio renglón bajo la banda
+      de dirección**, a la izquierda y con los 540 de la caja. Dentro de la banda no cabía:
+      ese renglón gasta ya 448.37 pt y la universidad pide 160 más su raya. Cuesta su
+      renglón de `medico.credencial`, 11 pt, y sólo cuando el médico la tiene registrada:
+      sin ella el nodo no se monta y esta cota vuelve a la de antes. Ver la cabecera de 2.B.
+    */
+    expect(completo).toBeCloseTo(205.16, 1)
     expect(continuacion).toBeCloseTo(46.63, 1)
   }, 120_000)
 })

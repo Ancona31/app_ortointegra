@@ -506,7 +506,7 @@ async function componer(
 }
 
 describe('II.3 · Receta Médica — medido sobre el PDF', () => {
-  it('compone el encabezado en 178.50 pt desde el margen', async () => {
+  it('compone el encabezado en 189.50 pt desde el margen', async () => {
     const [hoja] = await componer(CUATRO_FILAS)
 
     /*
@@ -520,7 +520,15 @@ describe('II.3 · Receta Médica — medido sobre el PDF', () => {
       propios aires de encabezado. Con `Lamina` retirado hay UNA composición: si estas
       dos cifras vuelven a separarse, alguien reintrodujo geometría por formato.
     */
-    expect(abreLaLista(hoja) - MARGEN.superior).toBeCloseTo(178.50, 2)
+    /*
+      ⚠ **+11 pt: LA UNIVERSIDAD VUELVE AL MEMBRETE.** Se retiró en el rediseño y no debía
+      —es requisito en la receta—, así que se repone en **su propio renglón bajo la banda
+      de dirección**, a la izquierda y con los 540 de la caja. Dentro de la banda no cabía:
+      ese renglón gasta ya 448.37 pt y la universidad pide 160 más su raya. Cuesta su
+      renglón de `medico.credencial`, 11 pt, y sólo cuando el médico la tiene registrada:
+      sin ella el nodo no se monta y esta cota vuelve a la de antes. Ver la cabecera de 2.B.
+    */
+    expect(abreLaLista(hoja) - MARGEN.superior).toBeCloseTo(189.50, 2)
   }, 60_000)
 
   it('sitúa los bloques del encabezado donde v3 los compone', async () => {
@@ -994,7 +1002,7 @@ describe('II.3 · Receta Médica — medido sobre el PDF', () => {
       reportaron: los siete caben en la hoja 1. Con la fila CARA —indicación de dos
       líneas, 72.5 pt— entran seis.
 
-      ⚠⚠ **v3 · LA COTA DE LOS BETATESTERS SE ALCANZA, Y ESTA ES LA PRUEBA QUE LO FIJA.**
+      ⚠⚠ **v3 · LA COTA DE LOS BETATESTERS SE ALCANZÓ Y SE VOLVIÓ A PERDER, POR 11 pt.**
 
       «Siete medicamentos CON recomendaciones, firma y código en UNA hoja» es lo que los
       betatesters reportaron y lo que no se alcanzaba ni en v2 —donde entraban seis— ni en
@@ -1002,11 +1010,15 @@ describe('II.3 · Receta Médica — medido sobre el PDF', () => {
       iba a la hoja 2. Angel lo había retirado del objetivo porque lo que faltaba salía
       del hueco de la rúbrica, del contador o del riel, y ninguno de los tres se toca.
 
-      Lo que faltaba salió de otro sitio: al retirarse el aviso de continuación, el suelo
-      de la caja vuelve de 63 a 52 y la hoja gana 11 pt. **Con la fila corta, los siete y
-      su cierre caben en una sola hoja.** Con la fila cara —indicación de dos líneas,
-      72.5 pt— los siete siguen entrando en la hoja 1 y el cierre sigue bajando: ésa no se
-      alcanza, y se deja medida abajo para que se vea la diferencia entre las dos.
+      Se alcanzó al retirarse el aviso de continuación: el suelo de la caja volvió de 63 a
+      52 y la hoja ganó 11 pt, justo los que faltaban. **Y se volvió a perder al reponer la
+      universidad en el membrete**, que cuesta su renglón —11 pt— en la hoja 1 de los
+      nueve formatos. Los dos cambios se cancelan exactamente.
+
+      **No se toca ninguno de los dos para recuperarla.** La universidad es requisito en la
+      receta y el aviso era redundante; el reparto es consecuencia, no objetivo. Queda
+      medido aquí: siete con fila corta son 7 + 0, y bastan 11 pt en cualquier sitio de la
+      hoja 1 para que vuelvan a ser 7.
     */
     const caro = (i: number): MedicamentoRecetado => ({
       nombre_comercial: `Fármaco ${i}`,
@@ -1026,9 +1038,9 @@ describe('II.3 · Receta Médica — medido sobre el PDF', () => {
     const reparto = (hojas: readonly Hoja[]): number[] =>
       hojas.map((hoja) => hoja.renglones.filter((r) => /^Fármaco \d/.test(r.texto)).length)
 
-    // LA COTA DE LOS BETATESTERS: los siete Y su cierre en UNA hoja, con la fila corta.
+    // Los siete en la hoja 1 y el cierre en la 2, con la fila corta Y con la cara.
     const cortos = Array.from({ length: 7 }, (_, i) => corto(i))
-    expect(reparto(await componer(cortos, cierre))).toEqual([7])
+    expect(reparto(await componer(cortos, cierre))).toEqual([7, 0])
 
     // Con la fila CARA, los mismos siete: en v2 entraban SEIS y el séptimo bajaba.
     expect(reparto(await componer(lista(7), cierre))).toEqual([7, 0])

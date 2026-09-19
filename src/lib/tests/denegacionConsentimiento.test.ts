@@ -440,7 +440,15 @@ describe('II.9 · Denegación o revocación del consentimiento', () => {
       28.5 —este formato compone la calibración `declaracion`—. La contabilidad de la guía,
       que explicaba la diferencia con los 2.85 del panel, se cierra con ella.
     */
-    expect(encabezado(vacio)).toBeCloseTo(180.5, 1)
+    /*
+      ⚠ **+11 pt: LA UNIVERSIDAD VUELVE AL MEMBRETE.** Se retiró en el rediseño y no debía
+      —es requisito en la receta—, así que se repone en **su propio renglón bajo la banda
+      de dirección**, a la izquierda y con los 540 de la caja. Dentro de la banda no cabía:
+      ese renglón gasta ya 448.37 pt y la universidad pide 160 más su raya. Cuesta su
+      renglón de `medico.credencial`, 11 pt, y sólo cuando el médico la tiene registrada:
+      sin ella el nodo no se monta y esta cota vuelve a la de antes. Ver la cabecera de 2.B.
+    */
+    expect(encabezado(vacio)).toBeCloseTo(191.5, 1)
   }, 200_000)
 
   it('la línea del familiar vale 2.47: ahora SÍ manda la celda vacía', async () => {
@@ -516,7 +524,8 @@ describe('II.9 · Denegación o revocación del consentimiento', () => {
       documento nunca fue el que apretaba y ahora le sobran 232 pt: trece renglones largos
       del párrafo de la declaración.
     */
-    expect(holgura).toBeCloseTo(243.25, 1)
+    // v3 · −1 pt: el encabezado crece un punto al reponerse la universidad (2.B).
+    expect(holgura).toBeCloseTo(232.25, 1)
   }, 200_000)
 
   it('la holgura de la variante por sustitución, contra los 26.04 de la guía', async () => {
@@ -555,7 +564,8 @@ describe('II.9 · Denegación o revocación del consentimiento', () => {
       deja de ser la más ajustada del sistema: con 137 pt de sobra aguanta ocho renglones
       más de declaración.
     */
-    expect(holgura).toBeCloseTo(148.25, 1)
+    // v3 · −1 pt: el encabezado crece un punto al reponerse la universidad (2.B).
+    expect(holgura).toBeCloseTo(137.25, 1)
     expect(holgura).toBeGreaterThan(0)
   }, 200_000)
 
@@ -681,7 +691,7 @@ describe('II.9 · Denegación o revocación del consentimiento', () => {
       igualdad de abajo falla y hay que releer esto.
     */
     expect(await holguraDe(CON_DIAGNOSTICO)).toBeCloseTo(await holguraDe(BASE), 1)
-    expect(await holguraDe({ ...CON_DIAGNOSTICO, sustitucion: true })).toBeCloseTo(205.25, 1)
+    expect(await holguraDe({ ...CON_DIAGNOSTICO, sustitucion: true })).toBeCloseTo(194.25, 1)
 
     const conDiagnosticoDe = async (n: number): Promise<number> =>
       (
