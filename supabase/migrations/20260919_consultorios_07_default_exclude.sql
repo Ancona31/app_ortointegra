@@ -15,6 +15,44 @@
 --   aborta porque `public.ip_rate_limits` —que crea el volcado, línea 417—
 --   todavía no existe. O sea que HOY un `db reset` desde cero revienta en
 --   la primera migración, con o sin este archivo. Tiene su propio ticket.
+--
+--   ─── ANOTADO EL 2026-09-19, DESPUÉS ─────────────────────────────────
+--   El párrafo de arriba se queda como estaba —§7: se anota, no se
+--   enmienda— pero está INCOMPLETO y ya CADUCO. Tres correcciones:
+--
+--   1 · EL ORIGEN DEL DESORDEN ES EL VOLCADO, NO EL ARCHIVO DE AGOSTO.
+--       Decir «preexistente y ajeno» sugiere que alguien coló un archivo
+--       viejo por delante, y fue al revés. `20260805_auth_01_rate_limit_
+--       atomico.sql` entró el 2026-08-05 (commit `85e31bb`), y el volcado
+--       base `20260912190416_remote_schema.sql` entró un mes DESPUÉS
+--       (commit `6e2244c`, 2026-09-12) con un número que ordena por
+--       delante de él. El defecto nace el 12 de septiembre. Lo comprobado
+--       con `git log --follow`; antes se había leído el `mtime` del
+--       filesystem, que es de un checkout y no dice nada.
+--
+--   2 · AQUEL ARCHIVO NO ERA UN RESTO REDUNDANTE: ERA LO ÚNICO QUE
+--       CERRABA UN AGUJERO. Es la única pieza del repositorio que revoca
+--       `EXECUTE` a `anon` y `authenticated` sobre `rate_limit_intento` y
+--       `rate_limit_reset`, dos `SECURITY DEFINER` publicados en
+--       PostgREST. El volcado NO lo reproduce: `ALTER DEFAULT PRIVILEGES`
+--       vuelve a conceder ese permiso al recrear la función y el
+--       `REVOKE ... FROM PUBLIC` del volcado no quita un grant directo.
+--       Comprobado llamando los dos RPC con la anon key, sin sesión,
+--       contra una base construida sin él. O sea que el atajo evidente
+--       —«el volcado ya trae las funciones, esto sobra, lo archivo»— era
+--       exactamente el movimiento peligroso, y no había nada que avisara.
+--
+--   3 · YA NO ES UN PENDIENTE. Se cerró en la rama
+--       `fix/db-reset-permisos-rate-limit`: la migración
+--       `20260919230000_auth_02_reasentar_grants_rate_limit.sql` reasienta
+--       esos privilegios al final del orden de aplicación, y sólo
+--       entonces `20260805` se movió a `archivo-migraciones-historicas/`,
+--       que es donde vivían ya sus 69 hermanas pre-volcado. `db reset`
+--       desde cero completa en verde y termina con `anon` y
+--       `authenticated` sin `EXECUTE`. La frase «tiene su propio ticket»
+--       queda saldada; se conserva para que se entienda qué se sabía
+--       cuando esto corrió.
+--   ─────────────────────────────────────────────────────────────────────
 -- ESTADO · PRODUCCIÓN: APLICADA Y VERIFICADA — 2026-09-19
 --   Aplicada con `npx supabase db push --linked`.
 --
