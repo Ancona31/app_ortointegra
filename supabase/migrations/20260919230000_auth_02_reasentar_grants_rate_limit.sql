@@ -10,8 +10,16 @@
 -- ESTADO · PRODUCCIÓN: PENDIENTE DE APLICAR.
 --
 -- ✅ AUDITADA — 2026-09-19, por `supabase/AUDITORIA-MIGRACIONES.md`.
--- Veredicto: NO APTA. Este archivo es la respuesta a esa auditoría; sus
--- correcciones están listadas en «LO QUE LA AUDITORÍA TUMBÓ», más abajo.
+-- Veredicto: APTA.
+--
+-- El sello se apoya en dos cosas, y conviene que consten las dos. La
+-- primera auditoría dio NO APTA; sus hallazgos están corregidos y listados
+-- en «LO QUE LA AUDITORÍA TUMBÓ», más abajo. Sobre esa versión corregida se
+-- hizo una RE-AUDITORÍA ACOTADA que confirmó el SQL terminado y dejó por
+-- escrito tres correcciones de texto como ÚNICA condición pendiente: el
+-- censo de rutas de `checkAuthRateLimit` (línea y acciones), la columna
+-- `owner` de la rejilla y el alcance de lo que afirma su renglón de
+-- AUSENTE. Las tres están aplicadas. De ahí el APTA.
 --
 -- ═══ EL PORQUÉ ═════════════════════════════════════════════════════════
 --
@@ -68,12 +76,14 @@
 --
 -- `rate_limit_reset` rechaza por excepción toda ruta que no empiece por
 -- `auth:login_v2:`. Y NINGÚN CUBO DE LA APLICACIÓN SE LLAMA ASÍ:
--- `src/lib/rateLimit.ts:80` compone la ruta como `auth:${action}:${identifier}`
--- y las acciones vivas son `login`, `login_email_global`, `login_ip`,
--- `registro`, `recovery`, `auth-login-fallido`, `auth-rate-limit`,
--- `invitar`, `reset-password`, `aceptar-invitacion`. `login_v2` no aparece
--- en `src/` ni una vez. Así que, mientras eso siga así, esa función no
--- alcanza ningún cubo real.
+-- `src/lib/rateLimit.ts:79` compone la ruta de `checkAuthRateLimit` como
+-- `auth:${action}:${identifier}`, y sus seis acciones vivas son `login`,
+-- `login_email`, `login_email_global`, `login_ip`, `recovery` y `registro`.
+-- (`checkIpRateLimit` es la otra puerta a la misma tabla y NO usa ese
+-- prefijo: inserta la ruta cruda — `auth-rate-limit`, `auth-login-fallido`,
+-- `invitar`, `reset-password`, `aceptar-invitacion`.) `login_v2` no aparece
+-- en `src/` ni una vez, por ninguno de los dos caminos. Así que, mientras
+-- eso siga así, esa función no alcanza ningún cubo real.
 --
 -- Eso NO convierte el grant de más en algo inofensivo, y no es el motivo de
 -- este archivo: el motivo es que el ACL de una base reconstruida tiene que
@@ -288,12 +298,12 @@ COMMIT;
 -- Compartir texto entre las dos es como el archivo salía antes en verde.
 SELECT
   f.nombre                                            AS proname,
-  coalesce(pg_get_userbyid(p.proowner), '(sin firma declarada)') AS owner,
+  coalesce(pg_get_userbyid(p.proowner), '(ausente)')  AS owner,
   p.prosecdef                                         AS security_definer,
   coalesce(p.proacl::text, viva.acls, '(ninguno)')    AS proacl,
   CASE
     WHEN p.oid IS NULL AND viva.n = 0 THEN
-      'AUSENTE OK — no existe con ningún nombre; es el replay desde baseline/, no hay nada que reasentar'
+      'AUSENTE OK — no existe bajo los nombres rate_limit_intento ni rate_limit_reset; es el replay desde baseline/, no hay nada que reasentar'
     WHEN p.oid IS NULL AND viva.n > 0 THEN
       'FALLO — existe con OTRA firma (' || viva.firmas || '): el REVOKE se saltó y anon/authenticated pueden conservar EXECUTE. Corrige las cuatro LISTA DE FIRMAS de este archivo'
     WHEN has_function_privilege('anon',          p.oid, 'EXECUTE')
