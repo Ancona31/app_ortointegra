@@ -15,9 +15,68 @@
 --   aborta porque `public.ip_rate_limits` —que crea el volcado, línea 417—
 --   todavía no existe. O sea que HOY un `db reset` desde cero revienta en
 --   la primera migración, con o sin este archivo. Tiene su propio ticket.
--- ESTADO · PRODUCCIÓN: PENDIENTE DE APLICAR.
+-- ESTADO · PRODUCCIÓN: APLICADA Y VERIFICADA — 2026-09-19
+--   Aplicada con `npx supabase db push --linked`.
 --
--- ⚠️ PENDIENTE DE AUDITORÍA por `supabase/AUDITORIA-MIGRACIONES.md`.
+--   ⚠️ LA REJILLA DEL FINAL DE ESTE ARCHIVO NO SE IMPRIMIÓ, y por eso la
+--   comprobación consta CORRIDA APARTE: `npx supabase db push` no
+--   devuelve conjuntos de resultados a ninguna pantalla, así que su
+--   `SELECT` de veredicto se ejecutó sin que nadie lo viera. Mismo caso —y
+--   misma forma de registrarlo— que `20260914_b56_trigger_
+--   aprovisionamiento.sql:26-28`. La verificación que respalda este rótulo
+--   se corrió DESPUÉS, a mano, en el SQL Editor del Dashboard:
+--
+--     select
+--       (select conname from pg_constraint
+--         where conrelid='public.consultorios'::regclass and contype='x')        as constraint_nombre,
+--       (select condeferrable from pg_constraint
+--         where conrelid='public.consultorios'::regclass and contype='x')        as diferible,
+--       (select condeferred from pg_constraint
+--         where conrelid='public.consultorios'::regclass and contype='x')        as diferida_por_defecto,
+--       (select count(*) from pg_indexes
+--         where schemaname='public' and indexname='consultorios_default_unico'
+--           and indexdef ilike 'CREATE UNIQUE INDEX%')                           as indice_unico_viejo,
+--       (select n.nspname from pg_extension e
+--          join pg_namespace n on n.oid=e.extnamespace
+--         where e.extname='btree_gist')                                          as btree_gist_en,
+--       (select count(*) from pg_indexes
+--         where schemaname='public' and tablename='consultorios'
+--           and indexname in ('consultorios_pkey','consultorios_clinica',
+--                             'consultorios_medico_activo'))                     as otros_indices,
+--       (select count(*) from (
+--           select medico_id from public.consultorios
+--            where es_default and activo group by medico_id having count(*)>1) d) as medicos_con_dos_default;
+--
+--   Y esto es lo que devolvió en producción el 2026-09-19:
+--
+--    constraint_nombre          | diferible | diferida_por_defecto | indice_unico_viejo | btree_gist_en | otros_indices | medicos_con_dos_default
+--   ----------------------------+-----------+----------------------+--------------------+---------------+---------------+-------------------------
+--    consultorios_default_unico | true      | true                 | 0                  | extensions    | 3             | 0
+--
+--   Cómo se lee, columna por columna:
+--     · `consultorios_default_unico` — el objeto con `contype='x'`, o sea
+--       EXCLUDE, existe Y conserva el nombre del índice al que sustituye.
+--     · `true` · `true` — DIFERIBLE y DIFERIDA POR DEFECTO. Son las dos
+--       columnas que importan y la razón entera del archivo: sin ellas la
+--       constraint se comprobaría fila a fila y el bug seguiría ahí.
+--     · `0` — no queda ningún `CREATE UNIQUE INDEX` con ese nombre, así
+--       que la sustitución ocurrió y no se duplicó el invariante.
+--     · `extensions` — `btree_gist` quedó instalada donde se esperaba.
+--     · `3` — los otros tres índices de la tabla siguen en pie.
+--     · `0` — ningún médico con dos predeterminados activos.
+--
+--   ⚠️ Y VERIFICADA EN COMPORTAMIENTO, NO SÓLO EN CATÁLOGO. Que las siete
+--   columnas cuadren dice que el objeto quedó; no dice que el médico pueda
+--   volver atrás, que es lo único que este archivo vino a arreglar. En
+--   producción, con una cuenta real de dos consultorios, el cambio de
+--   predeterminado se hizo DE IDA Y DE VUELTA sin error —la vuelta era
+--   justo la dirección que devolvía 409 de forma permanente— y el membrete
+--   del PDF salió con la dirección del consultorio marcado.
+--
+-- ✅ AUDITADA — por `supabase/AUDITORIA-MIGRACIONES.md`. Veredicto: APTA.
+-- Este renglón sustituye al aviso de «pendiente de auditoría» que llevó el
+-- archivo mientras no había pasado por ella: queda como constancia de que
+-- pasó, no como adorno.
 --
 -- ═══ EL PORQUÉ ═════════════════════════════════════════════════════════
 --
