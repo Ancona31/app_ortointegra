@@ -142,7 +142,7 @@ export async function GET(req: NextRequest) {
  * - 401 no autenticado
  * - 403 sin clínica o no es médico
  * - 400 validación (Zod)
- * - 409 unique_violation (SQLSTATE 23505)
+ * - 409 unique_violation / exclusion_violation (SQLSTATE 23505 o 23P01)
  * - 409 check_violation (SQLSTATE 23514) — cap-10 alcanzado
  * - 500 otros errores
  */
@@ -202,8 +202,14 @@ export async function POST(req: NextRequest) {
     if (error) {
       console.error('[POST /api/consultorios] error:', error)
 
-      // 23505: unique_violation (índice consultorios_default_unico).
-      if (error.code === '23505') {
+      /* 23505 = unique_violation · 23P01 = exclusion_violation, sobre
+         `consultorios_default_unico`. Muerde en la carrera de dos INSERT
+         simultáneos del PRIMER consultorio de un médico: el trigger
+         `enforce_consultorio_default_insert` ve cero activos en los dos y
+         pone `es_default = true` en los dos. Desde la migración
+         20260919_consultorios_07_default_exclude ese conflicto llega como
+         23P01 Y AL COMMIT, no como 23505 a media sentencia. */
+      if (error.code === '23505' || error.code === '23P01') {
         return NextResponse.json(
           { error: 'Conflicto creando consultorio. Reintenta.' },
           { status: 409 }

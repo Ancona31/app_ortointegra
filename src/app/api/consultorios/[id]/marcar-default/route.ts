@@ -54,7 +54,15 @@ export async function PATCH(
           { status: 404 }
         )
       }
-      if (error.code === '23505') {
+      /* 23505 = unique_violation · 23P01 = exclusion_violation. LOS DOS, y no
+         por duplicar por si acaso: `consultorios_default_unico` dejó de ser un
+         índice único y pasó a ser una constraint EXCLUDE diferida
+         (migración 20260919_consultorios_07_default_exclude), y una EXCLUDE
+         violada lanza 23P01. El 23505 se queda porque esta rama es también el
+         paracaídas de cualquier otra unicidad que llegue a la tabla, y porque
+         el código tiene que sobrevivir a correr contra el esquema sin migrar.
+         Si se mira sólo uno de los dos, el conflicto sale como 500 crudo. */
+      if (error.code === '23505' || error.code === '23P01') {
         return NextResponse.json(
           { error: 'Conflicto de unicidad. Reintenta.' },
           { status: 409 }
