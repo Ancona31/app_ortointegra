@@ -17,6 +17,7 @@ if [ "$(docker inspect -f '{{.State.Running}}' "$contenedor" 2>/dev/null)" != "t
   exit 1
 fi
 
+export LC_ALL=C
 shopt -s nullglob
 archivos=("$raiz"/supabase/pruebas-sql/*.sql)
 if [ ${#archivos[@]} -eq 0 ]; then
@@ -26,6 +27,6 @@ fi
 
 for archivo in "${archivos[@]}"; do
   echo "→ $(basename "$archivo")"
-  docker exec -i "$contenedor" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -q -f - < "$archivo"
+  docker exec -i "$contenedor" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -q -o /dev/null -f - < "$archivo"
 done
 echo "Pruebas SQL: ${#archivos[@]} archivo(s) en verde (contenedor $contenedor)."
