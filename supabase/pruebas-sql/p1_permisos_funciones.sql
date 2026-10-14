@@ -40,9 +40,9 @@ begin
 end $$;
 
 -- Caso 3: criterio 2, las únicas cerradas a anon/authenticated/service_role son las de antes de P1.
--- La lista es la de la base local reconstruida con db reset. En producción es otra (10 según
--- 20260912190416_remote_schema.sql y 20260913_b5): el replay abre 7 de ellas a anon y authenticated
--- por los privilegios por omisión de public. Si una migración las vuelve a cerrar, esta lista crece.
+-- Desde P1b (20261014130000_reasentar_permisos_funciones.sql) la lista de la base local reconstruida
+-- con db reset es igual a la de producción: las 10 que cierran 20260912190416_remote_schema.sql y
+-- 20260913_b5. Si una migración cierra o abre otra, esta lista cambia con ella.
 do $$
 declare v text;
 begin
@@ -54,8 +54,8 @@ begin
     and not (has_function_privilege('anon', p.oid, 'EXECUTE')
              and has_function_privilege('authenticated', p.oid, 'EXECUTE')
              and has_function_privilege('service_role', p.oid, 'EXECUTE'));
-  if v <> 'crear_paciente_con_medico(jsonb,uuid), rate_limit_intento(text,text,integer,integer), rate_limit_reset(text)' then
-    raise exception 'P1 caso 3: esperaba solo las tres funciones de solo service_role, salió %', v;
+  if v <> 'alta_conexion_google(uuid,uuid,text,text,text,text,text,bigint), crear_paciente_con_medico(jsonb,uuid), enforce_limite_documentos_paciente(), generar_folio(text), guardar_secretos_conexion(uuid,uuid,text,text,bigint), leer_conexion_google_con_secretos(uuid,uuid), rate_limit_intento(text,text,integer,integer), rate_limit_reset(text), sync_antropometria_paciente(uuid), trg_mediciones_antropometria()' then
+    raise exception 'P1 caso 3: esperaba las diez funciones cerradas de producción, salió %', v;
   end if;
 end $$;
 
