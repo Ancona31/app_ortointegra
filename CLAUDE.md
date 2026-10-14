@@ -396,6 +396,12 @@ del médico logueado). Origen: sección 1 de `PLAN_LANDING_SPINUS.md`.
 
 ---
 
+## 🔑 Permisos de funciones
+
+Toda función nueva, en `public` o en cualquier otro esquema, y toda función que se borre y se vuelva a crear, termina con `revoke execute on function <esquema>.<f>(<args>) from public;` y `grant execute on function <esquema>.<f>(<args>) to anon, authenticated, service_role;`, escritos de forma explícita. Si una función debe quedar más cerrada (por ejemplo, solo `service_role`), el `revoke` es `from public, anon, authenticated`, se concede solo a esos, y la propuesta lo justifica: en `public` y en `storage`, los privilegios por omisión de Supabase por esquema conceden `EXECUTE` a `anon`, `authenticated` y `service_role` al crear la función, y revocar de `PUBLIC` no quita esos grants directos (así nació `20260919230000_auth_02_reasentar_grants_rate_limit.sql`). Si la ejecuta Supabase Auth o Storage (un hook, un disparador de `auth.*` o `storage.*`, o algo que esos alcanzan), se concede además a `supabase_auth_admin` o `supabase_storage_admin`. Nunca se concede `EXECUTE` a `PUBLIC`. `create or replace` conserva los permisos; `drop` + `create` pierde los `grant` y `revoke` explícitos y la función nace con los privilegios por omisión del esquema (en `public`, abierta a `anon` y `authenticated`), así que se repiten los dos renglones. Los privilegios por omisión de `postgres` son **globales** (sin `in schema`): toda función que cree `postgres`, en cualquier esquema, nace sin `EXECUTE` a `PUBLIC`. No alcanzan a las funciones de extensiones: esas son de `supabase_admin` (lo son las de `pg_trgm` y `unaccent` en `public`), conservan `PUBLIC` y no se tocan, porque no son de Spinus. Al instalar una extensión, se comprueba con `has_function_privilege` que `anon`, `authenticated` y `service_role` ejecuten las funciones de ella que use Spinus, y se conceden las que falten. Motivo: la consola de operador tiene su propia credencial y no debe poder ejecutar funciones de Spinus.
+
+---
+
 ## ⚖️ Cumplimiento normativo mexicano
 
 > ### ⚠️ EL MARCO LEGAL DE DATOS PERSONALES CAMBIÓ EN 2025 — VERIFICA ANTES DE ESCRIBIR TEXTO LEGAL
