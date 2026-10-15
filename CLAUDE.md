@@ -402,6 +402,12 @@ Toda función nueva, en `public` o en cualquier otro esquema, y toda función qu
 
 ---
 
+## 🤝 Contrato con spinus-consola
+
+La consola de operador (`spinus-consola`) lee esta base con vistas propias y depende de nombres exactos. **No se renombran ni se cambia el tipo o el significado** de: las columnas `clinicas.ajuste_max_medicos`, `ajuste_medicos_hasta`, `ajuste_max_secretarias`, `ajuste_secretarias_hasta`; la función `public.limite_efectivo(integer, integer, timestamptz)`; la regla de acceso de `public.clinica_tiene_acceso()` (RN-1: VIP, o suscripción activa, o nunca tuvo premium, o 5 pacientes o menos contando los dados de baja). Spinus nunca escribe `ajuste_*` (solo la consola). La base del límite efectivo es siempre `clinicas.max_*`, nunca `PLAN_LIMITS`. Reglas: nunca `CASCADE` sobre tablas de `public`; `supabase db pull` y `db diff` siempre con `--schema public`; antes de borrar una columna de `public` o cambiar su tipo, primero se ajusta la vista en `spinus-consola` (procedimiento en el `DESPLIEGUE.md` de la consola). Ante la duda, toda columna de `public` se considera usada por la consola.
+
+---
+
 ## ⚖️ Cumplimiento normativo mexicano
 
 > ### ⚠️ EL MARCO LEGAL DE DATOS PERSONALES CAMBIÓ EN 2025 — VERIFICA ANTES DE ESCRIBIR TEXTO LEGAL
