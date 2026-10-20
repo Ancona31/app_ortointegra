@@ -30,7 +30,7 @@ export async function GET() {
   const { data: authUsers } = await admin.auth.admin.listUsers({ perPage: 1000 })
 
   // Traer perfiles de la misma clínica
-  const { data: profiles } = await admin
+  const { data: profiles, error: profilesError } = await admin
     .from('profiles')
     .select('*')
     .eq('clinica_id', profile.clinica_id)
@@ -71,15 +71,42 @@ export async function GET() {
       }
     })
 
-  // Info de licencia
-  let licencia = null
-  if (profile.clinica_id) {
-    const { data: clinica } = await admin
-      .from('clinicas')
-      .select('max_medicos, max_secretarias')
-      .eq('id', profile.clinica_id)
-      .single()
-    if (clinica) licencia = { max_medicos: clinica.max_medicos, max_secretarias: clinica.max_secretarias }
+  /* Info de licencia: el LÍMITE EFECTIVO de cada rol, calculado por la base
+     (`limite_efectivo`, contrato con spinus-consola), y lo usado CONTADO IGUAL
+     QUE EN `api/admin/invitar`: todos los perfiles de la clínica con ese rol,
+     el propio administrador y las invitaciones pendientes incluidos. Por eso
+     sale de `profiles` y no de `usuarios`, que excluye al administrador.
+     Si algo falla, `licencia` va en null y la pantalla no pinta topes: decide
+     el servidor al invitar. */
+  let licencia: {
+    limite_medicos: number | null
+    limite_secretarias: number | null
+    usados_medicos: number
+    usados_secretarias: number
+  } | null = null
+  const { data: clinica } = await admin
+    .from('clinicas')
+    .select('max_medicos, max_secretarias, ajuste_max_medicos, ajuste_medicos_hasta, ajuste_max_secretarias, ajuste_secretarias_hasta')
+    .eq('id', profile.clinica_id)
+    .single()
+  if (profilesError) {
+    logger.error('api/admin/usuarios', `conteo de profiles falló (${profilesError.code}): ${profilesError.message}`)
+  }
+  if (clinica && !profilesError) {
+    const [medicos, secretarias] = await Promise.all([
+      admin.rpc('limite_efectivo', { p_base: clinica.max_medicos, p_ajuste: clinica.ajuste_max_medicos, p_hasta: clinica.ajuste_medicos_hasta }),
+      admin.rpc('limite_efectivo', { p_base: clinica.max_secretarias, p_ajuste: clinica.ajuste_max_secretarias, p_hasta: clinica.ajuste_secretarias_hasta }),
+    ])
+    if (medicos.error || secretarias.error) {
+      logger.error('api/admin/usuarios', `limite_efectivo falló: ${(medicos.error ?? secretarias.error)?.message}`)
+    } else {
+      licencia = {
+        limite_medicos: medicos.data,
+        limite_secretarias: secretarias.data,
+        usados_medicos: (profiles || []).filter(p => p.role === 'medico').length,
+        usados_secretarias: (profiles || []).filter(p => p.role === 'secretaria').length,
+      }
+    }
   }
 
   return NextResponse.json({ usuarios, licencia })

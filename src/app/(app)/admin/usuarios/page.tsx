@@ -7,6 +7,7 @@ import { useProfile, type Role } from '@/hooks/useProfile'
 import { canManageClinica, isMedico } from '@/lib/permissions'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/components/ui/Toast'
+import { mensajeLimite } from '@/lib/limitesUsuarios'
 
 /* ⚠️ AQUÍ YA NO SE ESCRIBE NINGUNA CONTRASEÑA (Bloque B5-bis). Hasta ahora este
    formulario pedía una, y el administrador se la dictaba a su médico o a su
@@ -34,9 +35,12 @@ type Usuario = {
   estado: EstadoUsuario
 }
 
+/** Límite efectivo (de la base) y usados contados como en `api/admin/invitar`. */
 type LicenciaInfo = {
-  max_medicos: number | null
-  max_secretarias: number | null
+  limite_medicos: number | null
+  limite_secretarias: number | null
+  usados_medicos: number
+  usados_secretarias: number
 }
 
 const FORM_VACIO = { email: '', role: 'secretaria' }
@@ -199,6 +203,14 @@ export default function AdminUsuariosPage() {
     </div>
   )
 
+  /* Mismo número y mismo mensaje que el tope del servidor. Sin licencia (no se
+     pudo leer), no se bloquea aquí: decide `api/admin/invitar`. */
+  const mensajeTope = licencia === null
+    ? null
+    : form.role === 'medico'
+      ? mensajeLimite('medico', licencia.usados_medicos, licencia.limite_medicos)
+      : mensajeLimite('secretaria', licencia.usados_secretarias, licencia.limite_secretarias)
+
   return (
     <div className="max-w-2xl mx-auto space-y-4 animate-slide-up">
       <div className="flex items-end justify-between">
@@ -267,6 +279,7 @@ export default function AdminUsuariosPage() {
                 </p>
               </div>
 
+              {mensajeTope && <p id="mensaje-tope" role="status" className="text-xs text-red-500 bg-red-50 px-3 py-2 rounded-xl">{mensajeTope}</p>}
               {error && <p className="text-xs text-red-500 bg-red-50 px-3 py-2 rounded-xl">{error}</p>}
             </form>
 
@@ -275,7 +288,8 @@ export default function AdminUsuariosPage() {
                 className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm font-medium text-[#3d3d3f] hover:bg-slate-50 transition-colors">
                 Cancelar
               </button>
-              <button type="submit" form="form-invitar" disabled={guardando}
+              <button type="submit" form="form-invitar" disabled={guardando || mensajeTope !== null}
+                aria-describedby={mensajeTope ? 'mensaje-tope' : undefined}
                 className="flex-1 py-2.5 bg-[#1e5fa8] text-white rounded-xl text-sm font-semibold hover:bg-[#1a3a5c] disabled:opacity-50 flex items-center justify-center gap-1.5 transition-colors">
                 {guardando ? <><Loader2 size={13} className="animate-spin" /> Enviando...</> : 'Enviar invitación'}
               </button>
@@ -286,22 +300,24 @@ export default function AdminUsuariosPage() {
       )}
 
       {/* Indicadores de licencia. Las invitaciones pendientes CUENTAN: ocupan
-          plaza en cuanto se envían, igual que en el tope del servidor. */}
+          plaza en cuanto se envían, igual que en el tope del servidor. El
+          número es el del servidor (el administrador incluido) y el límite es
+          el efectivo; `?? '∞'` porque solo null es «sin límite» y 0 se pinta 0. */}
       {licencia && (
         <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
           <div className="grid grid-cols-2 divide-x divide-slate-100">
             <div className="px-5 py-4">
               <p className="text-[10px] font-semibold text-[#86868b] uppercase tracking-widest">Médicos</p>
               <p className="text-xl font-bold text-[#1d1d1f] mt-1.5 tabular-nums">
-                {usuarios.filter(u => u.role === 'medico').length}
-                <span className="text-sm font-normal text-[#86868b]"> / {licencia.max_medicos ?? '∞'}</span>
+                {licencia.usados_medicos}
+                <span className="text-sm font-normal text-[#86868b]"> / {licencia.limite_medicos ?? '∞'}</span>
               </p>
             </div>
             <div className="px-5 py-4">
               <p className="text-[10px] font-semibold text-[#86868b] uppercase tracking-widest">Asistentes</p>
               <p className="text-xl font-bold text-[#1d1d1f] mt-1.5 tabular-nums">
-                {usuarios.filter(u => u.role === 'secretaria').length}
-                <span className="text-sm font-normal text-[#86868b]"> / {licencia.max_secretarias ?? '∞'}</span>
+                {licencia.usados_secretarias}
+                <span className="text-sm font-normal text-[#86868b]"> / {licencia.limite_secretarias ?? '∞'}</span>
               </p>
             </div>
           </div>

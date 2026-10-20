@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useProfile } from '@/hooks/useProfile'
 import { canManageClinica } from '@/lib/permissions'
 import { PLANS, formatPrecio, type PlanKey } from '@/lib/plans'
+import { textoLimite } from '@/lib/limitesUsuarios'
 import { CheckCircle, CreditCard, Loader2, ExternalLink, AlertTriangle, Zap, Users, UserCheck, FileText, ArrowUpRight, Sparkles } from 'lucide-react'
 import { BillingSkeleton } from '@/components/ui/Skeleton'
 import Link from 'next/link'
@@ -21,9 +22,19 @@ type ClinicaInfo = {
   stripe_customer_id: string | null
   stripe_subscription_id: string | null
   es_vip_grant: boolean
-  max_medicos: number
-  max_secretarias: number
+  max_medicos: number | null
+  max_secretarias: number | null
   max_pacientes: number | null
+  ajuste_max_medicos: number | null
+  ajuste_medicos_hasta: string | null
+  ajuste_max_secretarias: number | null
+  ajuste_secretarias_hasta: string | null
+}
+
+/** Límite efectivo de cada rol, tal como lo devuelve `limite_efectivo` en la base. */
+type LimitesEfectivos = {
+  medicos: number | null
+  secretarias: number | null
 }
 
 type UsageInfo = {
@@ -46,6 +57,7 @@ function BillingContent() {
   const { profile, loading: loadingProfile } = useProfile()
   const [clinica, setClinica] = useState<ClinicaInfo | null>(null)
   const [usage, setUsage] = useState<UsageInfo | null>(null)
+  const [limites, setLimites] = useState<LimitesEfectivos | null>(null)
   const [loading, setLoading] = useState(true)
   const [openingPortal, setOpeningPortal] = useState(false)
   const success = searchParams.get('success') === 'true'
@@ -64,19 +76,32 @@ function BillingContent() {
     async function load() {
       const [{ data: c }, { data: medicos }, { data: secretarias }, { data: pacientes }] = await Promise.all([
         supabase.from('clinicas').select(
-          'plan, suscripcion_estado, trial_ends_at, suscripcion_ends_at, stripe_customer_id, stripe_subscription_id, es_vip_grant, max_medicos, max_secretarias, max_pacientes, tipo'
+          'plan, suscripcion_estado, trial_ends_at, suscripcion_ends_at, stripe_customer_id, stripe_subscription_id, es_vip_grant, max_medicos, max_secretarias, max_pacientes, ajuste_max_medicos, ajuste_medicos_hasta, ajuste_max_secretarias, ajuste_secretarias_hasta'
         ).eq('id', profile!.clinica_id!).single(),
         supabase.from('profiles').select('id', { count: 'exact' }).eq('clinica_id', profile!.clinica_id!).eq('role', 'medico'),
         supabase.from('profiles').select('id', { count: 'exact' }).eq('clinica_id', profile!.clinica_id!).eq('role', 'secretaria'),
         supabase.from('pacientes').select('id', { count: 'exact' }).eq('clinica_id', profile!.clinica_id!),
       ])
-      setClinica(c as any)
-      // Independiente: el admin ES el médico → contar como 1
-      const esMedicoCount = (c as any)?.tipo === 'independiente'
-        ? 1
-        : (medicos?.length ?? 0)
+      const fila: ClinicaInfo | null = c
+      setClinica(fila)
+
+      /* ⚠️ EL LÍMITE QUE SE PINTA ES EL EFECTIVO Y LO CALCULA LA BASE
+         (`limite_efectivo`, contrato con spinus-consola), con la hora de la
+         base. Si la RPC falla se pinta la base `max_*`, que es lo que se veía
+         antes de los ajustes, y no la línea «Límite ampliado». */
+      if (fila) {
+        const [efMedicos, efSecretarias] = await Promise.all([
+          supabase.rpc('limite_efectivo', { p_base: fila.max_medicos, p_ajuste: fila.ajuste_max_medicos, p_hasta: fila.ajuste_medicos_hasta }),
+          supabase.rpc('limite_efectivo', { p_base: fila.max_secretarias, p_ajuste: fila.ajuste_max_secretarias, p_hasta: fila.ajuste_secretarias_hasta }),
+        ])
+        setLimites({
+          medicos: efMedicos.error ? fila.max_medicos : efMedicos.data,
+          secretarias: efSecretarias.error ? fila.max_secretarias : efSecretarias.data,
+        })
+      }
+
       setUsage({
-        medicos: esMedicoCount,
+        medicos: medicos?.length ?? 0,
         secretarias: secretarias?.length ?? 0,
         pacientes: pacientes?.length ?? 0,
       })
@@ -245,13 +270,17 @@ function BillingContent() {
               icon={<Users size={18} className="text-blue-600" />}
               label="Médicos"
               usado={usage?.medicos ?? 0}
-              limite={clinica.max_medicos}
+              limite={limites ? limites.medicos : clinica.max_medicos}
+              base={clinica.max_medicos}
+              hasta={clinica.ajuste_medicos_hasta}
             />
             <UsageCard
               icon={<UserCheck size={18} className="text-emerald-600" />}
               label="Asistentes"
               usado={usage?.secretarias ?? 0}
-              limite={clinica.max_secretarias}
+              limite={limites ? limites.secretarias : clinica.max_secretarias}
+              base={clinica.max_secretarias}
+              hasta={clinica.ajuste_secretarias_hasta}
             />
             <UsageCard
               icon={<FileText size={18} className="text-violet-600" />}
@@ -298,15 +327,21 @@ function BillingContent() {
   )
 }
 
-function UsageCard({ icon, label, usado, limite }: {
+/** `limite` es el efectivo; `base` (la columna `max_*`) y `hasta` solo hacen
+    falta para la línea «Límite ampliado». Sin `base`, se toma `limite`: no hay
+    ajuste que mostrar (Pacientes). */
+function UsageCard({ icon, label, usado, limite, base, hasta }: {
   icon: React.ReactNode
   label: string
   usado: number
   limite: number | null
+  base?: number | null
+  hasta?: string | null
 }) {
   const ilimitado = limite === null || limite === -1
   const porcentaje = ilimitado ? 0 : Math.min((usado / (limite || 1)) * 100, 100)
   const enLimite = !ilimitado && usado >= (limite ?? 0)
+  const texto = textoLimite(usado, ilimitado ? null : limite, base === undefined ? limite : base, hasta ?? null)
 
   return (
     <div className="bg-slate-50/80 rounded-2xl p-4">
@@ -315,11 +350,14 @@ function UsageCard({ icon, label, usado, limite }: {
         <span className="text-xs font-medium text-slate-500">{label}</span>
       </div>
       <p className="text-xl font-bold text-slate-800">
-        {usado}
+        {texto.usado}
         <span className="text-sm font-normal text-slate-400">
-          /{ilimitado ? '∞' : limite}
+          /{texto.limite}
         </span>
       </p>
+      {texto.ampliado && (
+        <p className="text-[11px] text-slate-500 mt-1">{texto.ampliado}</p>
+      )}
       {!ilimitado && (
         <div className="mt-2 h-1.5 bg-slate-200 rounded-full overflow-hidden">
           <div

@@ -9,6 +9,7 @@ import { InvitarUsuarioSchema } from '@/lib/perfil/schemas'
 import { escapeHtml } from '@/lib/htmlEscape'
 import { logAudit } from '@/lib/audit'
 import { logger } from '@/lib/logger'
+import { mensajeLimite } from '@/lib/limitesUsuarios'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -102,7 +103,7 @@ export async function POST(req: NextRequest) {
      al revés: ante la duda, dejaba pasar. */
   const { data: clinica } = await admin
     .from('clinicas')
-    .select('nombre, max_medicos, max_secretarias')
+    .select('nombre, max_medicos, max_secretarias, ajuste_max_medicos, ajuste_medicos_hasta, ajuste_max_secretarias, ajuste_secretarias_hasta')
     .eq('id', clinicaId)
     .single()
 
@@ -111,23 +112,37 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'No pudimos verificar tu plan. Intenta de nuevo.' }, { status: 500 })
   }
 
-  const tope = role === 'medico' ? clinica.max_medicos : clinica.max_secretarias
-  if (tope !== null) {
-    const { count } = await admin
+  /* ⚠️ EL TOPE ES EL LÍMITE EFECTIVO Y LO CALCULA LA BASE, no esta ruta:
+     `limite_efectivo(max_*, ajuste_max_*, ajuste_*_hasta)`, contrato con
+     spinus-consola (CLAUDE.md). La base es siempre `max_*` de la clínica, nunca
+     `PLAN_LIMITS`. NULL = sin límite; 0 = ninguno (R6).
+     Si la RPC falla, se para como cuando falta la clínica: ante la duda no se
+     deja pasar. */
+  const { data: tope, error: topeError } = await admin.rpc('limite_efectivo', role === 'medico'
+    ? { p_base: clinica.max_medicos, p_ajuste: clinica.ajuste_max_medicos, p_hasta: clinica.ajuste_medicos_hasta }
+    : { p_base: clinica.max_secretarias, p_ajuste: clinica.ajuste_max_secretarias, p_hasta: clinica.ajuste_secretarias_hasta })
+
+  if (topeError) {
+    logger.error('api/admin/invitar', `limite_efectivo falló (${topeError.code}): ${topeError.message}`)
+    return NextResponse.json({ error: 'No pudimos verificar tu plan. Intenta de nuevo.' }, { status: 500 })
+  }
+
+  const limite: number | null = tope
+  if (limite !== null) {
+    const { count, error: conteoError } = await admin
       .from('profiles')
       .select('*', { count: 'exact', head: true })
       .eq('clinica_id', clinicaId)
       .eq('role', role)
 
-    if ((count ?? 0) >= tope) {
-      return NextResponse.json(
-        {
-          error: role === 'medico'
-            ? 'Has alcanzado el límite de médicos de tu plan'
-            : 'Has alcanzado el límite de asistentes de tu plan',
-        },
-        { status: 403 },
-      )
+    if (conteoError || count === null) {
+      logger.error('api/admin/invitar', `conteo de profiles falló (${conteoError?.code}): ${conteoError?.message}`)
+      return NextResponse.json({ error: 'No pudimos verificar tu plan. Intenta de nuevo.' }, { status: 500 })
+    }
+
+    const mensaje = mensajeLimite(role, count, limite)
+    if (mensaje) {
+      return NextResponse.json({ error: mensaje }, { status: 403 })
     }
   }
 
