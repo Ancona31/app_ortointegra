@@ -4,6 +4,7 @@
    en comentarios y docs apuntan aquí. */
 
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
+import dynamic from 'next/dynamic'
 import FullCalendar from '@fullcalendar/react'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
@@ -19,15 +20,19 @@ import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
 import { useToast } from '@/components/ui/Toast'
 import { useProfile } from '@/hooks/useProfile'
 import { canManageClinica, canVerAgendaCompleta } from '@/lib/permissions'
-import ModalInvitacionCita from '@/components/agenda/ModalInvitacionCita'
 import { useSubscriptionGate } from '@/components/billing/SubscriptionGateProvider'
 import { componerNombreMedicoCompleto, componerInicialesMedico } from '@/lib/nombreMedico'
 import { useMenuMovil } from '@/contexts/MenuMovilContext'
 import { GoogleGIcon } from '@/components/agenda/GoogleGIcon'
-import AppointmentModal, {
-  type ModalState, type TodoElDiaInicial, type PacienteBusqueda, DEFAULT_DURATION,
-} from '@/components/agenda/AppointmentModal'
-import HorarioModal, { type FuenteHorario } from '@/components/agenda/HorarioModal'
+/* ⚠️ A2.6: `AppointmentModal`, `HorarioModal` y `ModalInvitacionCita` se
+   cargan en diferido más abajo, con `next/dynamic` — son los tres modales más
+   pesados de la agenda y no hacen falta en el JS inicial de `/agenda`. Lo que
+   SÍ se importa aquí arriba, a secas, son sólo TIPOS (`import type`, que se
+   borra en compilación) más `DEFAULT_DURATION`, que ya no vive en
+   `AppointmentModal.tsx` — ver `src/lib/agenda/duracionCita.ts`. */
+import type { ModalState, TodoElDiaInicial, PacienteBusqueda } from '@/components/agenda/AppointmentModal'
+import type { FuenteHorario } from '@/components/agenda/HorarioModal'
+import { DEFAULT_DURATION } from '@/lib/agenda/duracionCita'
 import ConfirmModal from '@/components/agenda/ConfirmModal'
 import { renderEventContent, type InicialesDeCita } from '@/components/agenda/renderEventContent'
 import { renderNowIndicator } from '@/components/agenda/renderNowIndicator'
@@ -89,6 +94,54 @@ import {
   masBreve, periodoDeLaVista,
 } from '@/lib/agenda/vistasAgenda'
 import { STATUS_CONFIG, clasesDelEvento } from '@/lib/agenda/tarjetasAgenda'
+
+/* ═══ A2.6 · LOS TRES MODALES EN DIFERIDO ═════════════════════════════════
+   `AppointmentModal` (el más grande: iconos, `Portal`, `QuickPatientModal`,
+   los hooks de consultorios…), `HorarioModal` y `ModalInvitacionCita` no
+   hacen falta en el JS inicial de `/agenda` — sólo se montan cuando algo los
+   abre. `dynamic()` va A NIVEL DE MÓDULO y no dentro del componente ni de un
+   render: es el propio aviso de la documentación de Next ("similar to
+   `React.lazy`") y es lo que permite que `precargarModalesAgenda` (más abajo)
+   dispare el mismo `import()` por su cuenta y los dos apunten al mismo chunk.
+
+   `ssr: false` porque viven dentro de un árbol de cliente que los monta sólo
+   tras una interacción (`modal.mode !== 'closed'`, `horarioOpen`,
+   `invitacion`) — nunca en el primer render — y porque, igual que el ejemplo
+   de la propia guía de Next, dependen de APIs de navegador (`Portal` lee
+   `document.body`).
+
+   `loading: () => null`: mientras el chunk no ha llegado no hay hueco visible
+   que dejar — no hay spinner ni placeholder, el modal simplemente aparece
+   cuando su JS está listo. Como el nombre del componente es el MISMO que el
+   que ya usaba el JSX de abajo, no hace falta tocar ni una línea del render. */
+const AppointmentModal = dynamic(() => import('@/components/agenda/AppointmentModal'), {
+  ssr: false, loading: () => null,
+})
+const HorarioModal = dynamic(() => import('@/components/agenda/HorarioModal'), {
+  ssr: false, loading: () => null,
+})
+const ModalInvitacionCita = dynamic(() => import('@/components/agenda/ModalInvitacionCita'), {
+  ssr: false, loading: () => null,
+})
+
+/**
+ * Descarga los chunks de los tres modales SIN montarlos. Misma ruta exacta de
+ * `import()` que el `dynamic()` de arriba de cada uno — para `webpack` es el
+ * mismo módulo, así que cuando el modal de verdad vaya a montarse el chunk ya
+ * está en caché y la espera no se nota.
+ *
+ * Llamarla más de una vez no pide la red otra vez: el `import()` de un módulo
+ * ya resuelto (o en vuelo) devuelve la misma promesa cacheada — por eso no
+ * hace falta un candado ni acordarse de si ya se llamó. La llaman dos sitios
+ * (ver `AgendaCliente`): el ocioso tras montar la agenda, y el `onMouseEnter`/
+ * `onFocus` del botón «Agendar» como red de seguridad si el ocioso todavía no
+ * disparó.
+ */
+function precargarModalesAgenda(): void {
+  void import('@/components/agenda/AppointmentModal')
+  void import('@/components/agenda/HorarioModal')
+  void import('@/components/agenda/ModalInvitacionCita')
+}
 
 /* ─── Tipos ────────────────────────────────────────────── */
 
@@ -2037,6 +2090,17 @@ export default function AgendaCliente({ semillaCitas }: AgendaClienteProps) {
      sin para qué seguir). */
   useEffect(() => cancelarPrecargaEnCurso, [])
 
+  /* A2.6: tras montar la agenda, en tiempo ocioso, se dispara la descarga de
+     los chunks de los tres modales (`precargarModalesAgenda`, a nivel de
+     módulo). Así la PRIMERA apertura de «Agendar» no espera a la red: para
+     cuando el médico pulsa, el chunk casi siempre ya llegó. Mismo candado
+     ocioso que la precarga de semanas vecinas (`enOcioso`/`cancelarOcioso`),
+     y se cancela igual al desmontar. */
+  useEffect(() => {
+    const idle = enOcioso(precargarModalesAgenda)
+    return () => cancelarOcioso(idle)
+  }, [])
+
   /* ── Helper: construir EventInput desde datos de cita ── */
   /* ⚠️ EL PARÁMETRO ES `DatosGuardado` Y NO `Partial<Appointment>`, Y ES LO QUE
      ARREGLA EL ALTA OPTIMISTA DE TODO EL DÍA. El camino optimista llama a esto
@@ -3689,6 +3753,11 @@ export default function AgendaCliente({ semillaCitas }: AgendaClienteProps) {
               const { fecha, hora } = partirFechaHora(new Date().toISOString())
               setModal({ mode: 'create', fecha, hora, tipo: 'cita', todoElDia: 'no' })
             }}
+            /* A2.6: red de seguridad de la precarga en ocioso — si el puntero
+               pasa por aquí o el teclado llega por Tab antes de que el
+               ocioso dispare, el chunk del modal ya va en camino al pulsar. */
+            onMouseEnter={precargarModalesAgenda}
+            onFocus={precargarModalesAgenda}
             data-onboard="nueva-cita"
             title="Nueva cita o evento — el tipo se elige arriba del modal"
             className="flex items-center gap-2 px-4 py-2.5 rounded-[var(--ag-r-btn)] text-sm font-semibold text-white transition-all shadow-sm hover:brightness-95 bg-[linear-gradient(135deg,var(--ag-brand-primary),var(--ag-brand-secondary))]"
@@ -4503,6 +4572,11 @@ export default function AgendaCliente({ semillaCitas }: AgendaClienteProps) {
               const { fecha, hora } = partirFechaHora(new Date().toISOString())
               setModal({ mode: 'create', fecha, hora, tipo: 'cita', todoElDia: 'no' })
             }}
+            /* A2.6: misma red de seguridad que el botón de escritorio — ver
+               su comentario. En táctil no hay `onMouseEnter`, pero no estorba
+               dejarlo por si algún día se navega esta barra con teclado. */
+            onMouseEnter={precargarModalesAgenda}
+            onFocus={precargarModalesAgenda}
           >
             <Plus size={19} />
             Agendar

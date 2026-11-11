@@ -6,11 +6,18 @@
  * Movido tal cual desde `AgendaCliente.tsx` (A2.3, movimiento puro), con sus
  * comentarios; sólo cambiaron los `import`/`export` que hacían falta.
  *
- * `ModalState`, `TodoElDiaInicial`, `PacienteBusqueda`, `Medico` y
- * `DEFAULT_DURATION` se exportan desde aquí porque, además del modal,
- * `AgendaCliente.tsx` los sigue usando directamente (el `useState<ModalState>`
- * de la página, `abrirAlta`, el `eventDrop` que no inventa duración, y los tres
- * componentes de la banda móvil que reciben `medicos: readonly Medico[]`).
+ * `ModalState`, `TodoElDiaInicial`, `PacienteBusqueda` y `Medico` se exportan
+ * desde aquí porque, además del modal, `AgendaCliente.tsx` y la banda móvil
+ * los siguen usando directamente (el `useState<ModalState>` de la página, los
+ * tres componentes que reciben `medicos: readonly Medico[]`). Son sólo TIPOS
+ * y un `import type` se borra en compilación, así que no pesan en ningún
+ * bundle.
+ *
+ * ⚠️ `DEFAULT_DURATION` YA NO VIVE AQUÍ (A2.6): se movió a
+ * `src/lib/agenda/duracionCita.ts` porque `AgendaCliente.tsx` la usa como
+ * VALOR, no como tipo, y este módulo ahora se carga con `next/dynamic` — un
+ * `import` de valor desde aquí habría obligado a cargarlo entero de forma
+ * estática. Ver el comentario de ese archivo.
  */
 
 import { useEffect, useId, useState } from 'react'
@@ -38,6 +45,7 @@ import {
 import { ESTADOS_CITA, ICONO_ETIQUETA, COLOR_ETIQUETA, STATUS_CONFIG, esEventoGenerico } from '@/lib/agenda/tarjetasAgenda'
 import { useDialogoModal } from '@/hooks/useDialogoModal'
 import ConfirmModal from '@/components/agenda/ConfirmModal'
+import { DEFAULT_DURATION } from '@/lib/agenda/duracionCita'
 
 export type PacienteBusqueda = { id: string; nombre: string; apellidos: string; telefono: string | null }
 
@@ -229,8 +237,6 @@ const DURATIONS = [
   { label: '1:30 h', value: 90  },
   { label: '2 horas', value: 120 },
 ]
-
-export const DEFAULT_DURATION = 60
 
 type ValoresIniciales = { fecha: string; hora: string; fechaFin: string; horaFin: string }
 
