@@ -733,7 +733,33 @@ reducido.
 Marcar aquí y hacer commit al cerrar cada punto. Quien retome empieza por el
 primero sin marcar.
 
-- [ ] A0 — Pruebas del inventario y línea base de carga
+- [x] A0 — Pruebas del inventario y línea base de carga (2026-11-11)
+  - Entorno: worktree `~/proyectos/app_ortointegra-agenda` (la carpeta de
+    siempre queda en `feature/limites-ajustables`). Base local sembrada con
+    `npx tsx scripts/agenda-semilla.ts` (ver `scripts/agenda-semilla.md`).
+    Pruebas: `npm run build && npx next start -p 3001`, luego
+    `npx playwright test` (el `globalSetup` aborta si el build es más viejo
+    que `src/`). Medición: `MEDICION_ETIQUETA=<paso> npx playwright test
+    --config=playwright.medicion.config.ts`.
+  - Red: 45 pruebas de navegador (escritorio 1440×900 y teléfono 390×844),
+    cada una comprobada con una mutación que la pone en rojo. Dos `test.fail()`
+    declarados: **Google lento (8 s) retrasa todas las citas** (objetivo A1) y
+    **defecto: «Ver todos los médicos» de la banda de vacío sigue filtrando**
+    (`setFiltroMedico('')` sin `aplicarFiltro`; no se arregla de paso).
+  - `npm run lint` ya fallaba en `main` (96 errores previos, 2 en
+    `agenda/page.tsx`): criterio = ningún error nuevo.
+  - **Línea base A0** (local, admin.a, mediana de 5; servidor y base sin
+    latencia entre sí):
+
+    | Medida | A0 |
+    |---|---|
+    | Primer evento visible, apertura en frío | 325 ms |
+    | Ídem con red limitada (60 ms, 10 Mbps) | 913 ms |
+    | `GET /user` contra Auth al abrir | 5 (4 servidor + 1 navegador) |
+    | Semana siguiente / anterior, citas visibles | 175 / 168 ms |
+    | Volver desde /dashboard, citas visibles | 125 ms |
+    | JS transferido en /agenda | 484 KB (mayor chunk 147 KB) |
+    | Google con 8 s de retraso | ninguna cita antes de 8 s |
 - [ ] A1 — Abrir rápido
 - [ ] A1-bis — Revisión completa de eficiencia y presupuesto de rendimiento
 - [ ] A2 — Partir `agenda/page.tsx`
@@ -745,4 +771,8 @@ primero sin marcar.
 
 **Bitácora** (una línea por sesión: fecha, qué quedó hecho, qué quedó a medias):
 
--
+- 2026-11-10/11 — Rama y worktree creados; A0 cerrado (sembrador, red e2e
+  revisada por un revisor independiente, línea base). A1 diseñado; decisiones:
+  no se cambia `getUser()` por `getClaims()` en ninguna API, A1.7 (Google
+  sembrado en servidor) fuera por ahora, la caché de rangos empieza en su
+  versión mínima.
