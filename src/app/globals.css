@@ -3373,8 +3373,16 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
    la rejilla de celdas mientras dura, así que la lista entera entraba
    desencajándose fila a fila. La rejilla conserva su entrada intacta.
    Y la exclusión va DENTRO del mismo `:not()` encadenado y no en un selector
-   aparte: dos reglas con el mismo cuerpo se desincronizan. */
-.agenda-fc .fc-event:not(.fc-event-mirror):not(.fc-list-event) {
+   aparte: dos reglas con el mismo cuerpo se desincronizan.
+
+   ⚠️ A1.9 (mejora_agendaV2): la entrada YA NO corre en cada tarjeta. Sólo la
+   recibe `.ag-ev-nuevo`, el evento genuinamente nuevo (CONTRASTE_Y_MOVIMIENTO
+   §2.2: al navegar y en la primera carga no se anima nada individual). Antes
+   corría en CADA montaje, y con la caché de rangos cada vuelta a una semana
+   habría vuelto a fundir todas las tarjetas. Hoy ninguna tarjeta lleva esa
+   clase: la pone el bloque F con la diferencia de ids de `eventsSet`. Hasta
+   entonces la cita recién creada entra sin animación, a propósito. */
+.agenda-fc .fc-event.ag-ev-nuevo:not(.fc-event-mirror):not(.fc-list-event) {
   animation: ag-entra var(--ag-dur-base) var(--ag-ease-out) backwards;
 }
 
