@@ -232,6 +232,33 @@ async function medirCambioDeSemana(browser: Browser, direccion: 'next' | 'prev')
   return { ms, peticiones }
 }
 
+/* A1.5a: volver a una semana YA VISTA. Actual → siguiente → actual, y se mide
+   el segundo paso a la siguiente, que la caché de rangos de citas ya tiene.
+   `bloqueantes` = `GET /api/appointments` del clic: la única petición que
+   retiene la rejilla (Google contesta al instante desde A1.3). */
+async function medirVueltaASemanaVista(browser: Browser) {
+  const context = await browser.newContext({ storageState: SESION.adminA })
+  const page = await context.newPage()
+  await page.goto('/agenda')
+  await page.locator('.fc-event').first().waitFor({ state: 'visible', timeout: 20000 })
+  await page.locator('.fc-next-button').click()
+  await page.locator('.fc-event', { hasText: EVENTO_SEMANA_SIGUIENTE }).first().waitFor({ state: 'visible', timeout: 15000 })
+  await page.locator('.fc-prev-button').click()
+  await page.locator('.fc-event', { hasText: EVENTO_SEMANA_SIGUIENTE }).first().waitFor({ state: 'hidden', timeout: 15000 })
+  await esperarQuieta(page)
+  const { peticiones, t0 } = instrumentar(page)
+  await page.locator('.fc-next-button').click()
+  await page.locator('.fc-event', { hasText: EVENTO_SEMANA_SIGUIENTE }).first().waitFor({ state: 'visible', timeout: 15000 })
+  const ms = Date.now() - t0
+  await context.close()
+  return { ms, peticiones, bloqueantes: bloqueantesDe(peticiones) }
+}
+
+/** `GET /api/appointments` de una tanda: lo que retiene la rejilla. */
+function bloqueantesDe(peticiones: PeticionCapturada[]): number {
+  return peticiones.filter(p => p.pathname === '/api/appointments' && p.method === 'GET').length
+}
+
 async function medirVueltaInterna(browser: Browser) {
   const context = await browser.newContext({ storageState: SESION.adminA })
   const page = await context.newPage()
@@ -248,7 +275,7 @@ async function medirVueltaInterna(browser: Browser) {
   await page.locator('.fc-event').first().waitFor({ state: 'visible', timeout: 20000 })
   const ms = Date.now() - t0
   await context.close()
-  return { ms, peticiones }
+  return { ms, peticiones, bloqueantes: bloqueantesDe(peticiones) }
 }
 
 /**
@@ -324,6 +351,10 @@ test('línea base de carga de la agenda', async ({ browser }) => {
   const vuelta: Awaited<ReturnType<typeof medirVueltaInterna>>[] = []
   for (let i = 0; i < REPETICIONES; i++) vuelta.push(await medirVueltaInterna(browser))
 
+  // 8 — volver a una semana ya vista (A1.5a).
+  const semanaVista: Awaited<ReturnType<typeof medirVueltaASemanaVista>>[] = []
+  for (let i = 0; i < REPETICIONES; i++) semanaVista.push(await medirVueltaASemanaVista(browser))
+
   // 7 — peso de JS (una sola medida; no depende de repetir).
   const peso = await pesoJs(browser)
 
@@ -369,7 +400,13 @@ test('línea base de carga de la agenda', async ({ browser }) => {
     },
     volverDesdeDashboard: {
       msHastaCitasVisibles: serie(vuelta.map(a => a.ms)),
+      bloqueantes: serie(vuelta.map(a => a.bloqueantes)),
       peticiones: ultimaVuelta,
+    },
+    volverASemanaVista: {
+      msHastaCitasVisibles: serie(semanaVista.map(a => a.ms)),
+      bloqueantes: serie(semanaVista.map(a => a.bloqueantes)),
+      peticiones: agrupar(semanaVista[semanaVista.length - 1].peticiones),
     },
     pesoJs: {
       totalBytesTransferidos: peso.totalBytes,

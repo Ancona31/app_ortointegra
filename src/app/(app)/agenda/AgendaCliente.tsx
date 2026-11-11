@@ -35,6 +35,7 @@ import {
   aEventosDeCalendario, claveGoogle, eventosProvisionales, leerGoogle, pedirEventosGoogle, traerGoogle,
   type EstadoGoogleAgenda, type ResultadoGoogle,
 } from '@/lib/agenda/cacheEventosGoogle'
+import { claveCitas, generacionCitas, guardarCitas, leerCitas, vaciarCacheCitas } from '@/lib/agenda/cacheRangosCitas'
 import {
   avisoDeRecorte,
   calcularVentanaRejilla,
@@ -6226,7 +6227,11 @@ export default function AgendaCliente() {
   /* `forzarGoogle`: lo piden los caminos que HOY obligan a volver a preguntar
      —«Reintentar», la reconexión del canal y el foco tras 2 min—. El resto
      (filtro, deshacer un guardado) se sirve de la caché de Google si está viva. */
+  /* A1.5a: los mismos caminos fuerzan también las citas, vaciando su caché. Va
+     ANTES del candado: vaciar no trae nada, y si el gesto se come esta traída,
+     la siguiente no puede servir lo de antes de la reconexión. */
   function refetch(forzarGoogle = false) {
+    if (forzarGoogle) vaciarCacheCitas()
     if (hayGestoEnCurso(gestoEnCursoRef)) return
     googleAplazadoRef.current = false
     if (forzarGoogle) forzarGoogleRef.current = true
@@ -6367,7 +6372,8 @@ export default function AgendaCliente() {
     if (fecha) api.changeView(tipo, fecha)
     else api.changeView(tipo)
     setCurrentView(tipo)
-    if (citasIncompletas) api.refetchEvents()
+    // Vaciar: la vista nueva podría estar guardada de antes y no se sirve aquí.
+    if (citasIncompletas) { vaciarCacheCitas(); api.refetchEvents() }
   }
 
   /* Mes con «Todos» no existe: mil filas entre seis semanas son 24 citas al día
@@ -6409,7 +6415,8 @@ export default function AgendaCliente() {
 
      Se estampa al SALIR la petición, no al volver: dos señales seguidas
      (`visibilitychange` y `focus` llegan juntas al restaurar una ventana
-     minimizada) dispararían si no dos peticiones idénticas. */
+     minimizada) dispararían si no dos peticiones idénticas.
+     Lo servido de la caché de rangos (A1.5a) NO la estampa: sólo cuenta la red. */
   const ultimaTraidaRef = useRef(0)
 
   /* ── Refetch al cambiar el filtro de médico ─────────────
@@ -6441,11 +6448,18 @@ export default function AgendaCliente() {
     failure: (err: Error) => void
   ) => {
     try {
-      ultimaTraidaRef.current = Date.now()
-      let url = `/api/appointments?from=${info.startStr}&to=${info.endStr}`
       /* El espejo primero: en una traída disparada por `changeView` este closure
          puede ser el del render anterior. Ver `filtroSincronoRef`. */
       const filtro = filtroSincronoRef.current ?? filtroEfectivo
+      /* A1.5a: sin perfil no hay de quién es la caché, como en Google. Servir de
+         aquí NO estampa `ultimaTraidaRef`: el refresco por foco cuenta la red. */
+      const clave = profile ? claveCitas(profile.id, filtro ?? '', info.startStr, info.endStr) : null
+      const guardadas = clave ? leerCitas(clave) : null
+      if (guardadas) { setErrorCitas(false); setCitasIncompletas(false); success(guardadas); return }
+      const salio = Date.now()
+      const gen = generacionCitas()
+      ultimaTraidaRef.current = salio
+      let url = `/api/appointments?from=${info.startStr}&to=${info.endStr}`
       if (filtro) url += `&medico_id=${filtro}`
       const res = await fetch(url)
       /* ⚠️⚠️ ESTAS DOS GUARDAS SON EL BLOQUE 9 ENTERO, Y NO SON DEFENSIVAS: sin
@@ -6474,7 +6488,7 @@ export default function AgendaCliente() {
          me consta que falte nada», que es donde estábamos, y no «falta algo». */
       setCitasIncompletas(data.incompleta === true)
 
-      success(apts.map(apt => ({
+      const eventos: EventInput[] = apts.map(apt => ({
         id:              apt.id,
         title:           apt.title,
         /* Las dos puntas y el `allDay`, de `puntasParaLaRejilla`: una fila de
@@ -6492,7 +6506,9 @@ export default function AgendaCliente() {
         backgroundColor: 'transparent',
         borderColor:     'transparent',
         extendedProps:   { ...apt },
-      })))
+      }))
+      if (clave) guardarCitas(clave, eventos, data.incompleta === true, salio, gen)
+      success(eventos)
     } catch (err: unknown) {
       /* El estado va ANTES del `failure()`, aunque el orden no se note: quien
          pinta la banda es esto, y `failure()` sólo cierra la traída dentro de
@@ -6505,7 +6521,7 @@ export default function AgendaCliente() {
       setCitasIncompletas(false)
       failure(err instanceof Error ? err : new Error('Error cargando citas'))
     }
-  }, [filtroEfectivo])
+  }, [filtroEfectivo, profile])
 
   /* ── Event source: Google Calendar ─────────────────────
    * Una sola cosa: `events`, los eventos del calendario de Spinus que NO son
@@ -6972,6 +6988,8 @@ export default function AgendaCliente() {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'appointments' },
         (payload: RealtimePostgresChangesPayload<FilaRealtime>) => {
+          // A1.5a: cualquier cambio, propio o ajeno, de cualquier semana.
+          vaciarCacheCitas()
           void aplicarCambioRef.current(payload)
         },
       )
@@ -7386,6 +7404,10 @@ export default function AgendaCliente() {
     // esto solo cubre cualquier camino futuro que se nos escape.
     if (id.startsWith(PREFIJO_OPTIMISTA)) { arg.revert(); return }
 
+    /* A1.5a: se vacía también al SALIR la escritura. Si no, navegar fuera y
+       volver mientras está en vuelo sirve la semana de antes encima de lo
+       optimista, y el eco propio —que se ignora— no lo repone. */
+    vaciarCacheCitas()
     const res = await fetch(`/api/appointments/${id}`, {
       method:  'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -7393,6 +7415,8 @@ export default function AgendaCliente() {
       // reconozca como propio (ver `firmarEscritura`).
       body:    JSON.stringify({ ...puntas, client_id: firmarEscritura() }),
     })
+    // A1.5a: arrastre y redimensionado, salga bien o se revierta.
+    vaciarCacheCitas()
 
     if (!res.ok) {
       arg.revert()
@@ -7537,6 +7561,7 @@ export default function AgendaCliente() {
     // Realtime como propio; en el POST es además la clave de idempotencia, y
     // un doble clic o un reintento devuelven la MISMA cita en vez de crear
     // otra (ver `firmarEscritura` y el manejo del 23505 en la ruta).
+    vaciarCacheCitas() // A1.5a: también al salir; ver `ejecutarDrop`.
     const res = await fetch(
       isEdit ? `/api/appointments/${data.id}` : '/api/appointments',
       {
@@ -7545,6 +7570,8 @@ export default function AgendaCliente() {
         body:    JSON.stringify({ ...data, client_id: firmarEscritura() }),
       }
     )
+    // A1.5a: alta o edición, y antes del `refetch()` de su rollback.
+    vaciarCacheCitas()
 
     if (!res.ok) {
       // Rollback: remover evento optimista y refrescar desde servidor
@@ -7641,7 +7668,9 @@ export default function AgendaCliente() {
     const existing = api?.getEventById(id)
     existing?.remove()
 
+    vaciarCacheCitas() // A1.5a: también al salir; ver `ejecutarDrop`.
     const res = await fetch(`/api/appointments/${id}`, { method: 'DELETE' })
+    vaciarCacheCitas() // A1.5a: baja, y antes del `refetch()` de su rollback.
     if (!res.ok) {
       // Rollback: restaurar estado desde servidor
       refetch()

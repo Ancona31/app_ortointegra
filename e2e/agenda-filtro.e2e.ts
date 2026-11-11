@@ -67,7 +67,10 @@ test.describe('filtro de médico — admin.a', () => {
     await select.selectOption({ label: 'Dra. Invitada Semilla Dos' })
     await expect(page.getByRole('button', { name: 'Ver todos los médicos' })).toBeVisible({ timeout: 15000 })
 
-    const siguientePeticion = page.waitForRequest(r => r.url().includes('/api/appointments') && r.method() === 'GET')
+    // Con tope propio desde A1.5a: el filtro viejo puede salir de la caché de
+    // rangos y entonces NO hay petición. Sin tope esperaba al de la prueba, y un
+    // `timedOut` no cuenta como el fallo esperado de `test.fail()`.
+    const siguientePeticion = page.waitForRequest(r => r.url().includes('/api/appointments') && r.method() === 'GET', { timeout: 5000 })
     await page.getByRole('button', { name: 'Ver todos los médicos' }).click()
     const peticion = await siguientePeticion
     expect(new URL(peticion.url()).searchParams.get('medico_id')).toBeNull()

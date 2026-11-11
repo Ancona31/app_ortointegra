@@ -19,6 +19,7 @@ import { useMenuMovil } from '@/contexts/MenuMovilContext'
 import { useRouter } from 'next/navigation'
 import { useProfile, clearProfileCache, type Role } from '@/hooks/useProfile'
 import { vaciarCacheGoogle } from '@/lib/agenda/cacheEventosGoogle'
+import { vaciarCacheCitas } from '@/lib/agenda/cacheRangosCitas'
 import ConsultorioActivoSelector from '@/components/sidebar/ConsultorioActivoSelector'
 import ConsultaRapidaModal from '@/components/launcher/ConsultaRapidaModal'
 /* Sólo el tipo: `import type` se borra al compilar, así que la tabla de los
@@ -421,8 +422,10 @@ export default function Sidebar() {
     }
 
     clearProfileCache()
-    // Los eventos de Google que la agenda guardó en memoria de la pestaña (A1.3).
+    // Los eventos de Google y los rangos de citas que la agenda guardó en
+    // memoria de la pestaña (A1.3 y A1.5a).
     vaciarCacheGoogle()
+    vaciarCacheCitas()
     // Marca para el cleanup de arriba; la caché del agregado —clínica,
     // consultorios, horario y médicos de la sesión que cierra— se vacía cuando
     // este componente se desmonte, no ahora.
