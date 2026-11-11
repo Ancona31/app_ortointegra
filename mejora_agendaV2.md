@@ -809,7 +809,37 @@ primero sin marcar.
     (A2).
   - **Decisión de Angel pendiente:** `ProximasCitas` vuelve a consultar en
     cada vuelta a la pestaña sin tope; ponerle uno cambia lo fresco que se ve.
-- [ ] A2 — Partir `agenda/page.tsx`
+- [x] A2 — Partir `agenda/page.tsx` (2026-11-12)
+  - `AgendaCliente.tsx` (antes `page.tsx`): 9,558 → 1,781 líneas. Todo
+    movimiento verificado (líneas quitadas = añadidas, salvo pegamento) y un
+    revisor independiente sin hallazgos de comportamiento.
+  - `src/lib/agenda/`: tiposAgenda, horarioAgenda, fechasAgenda, huecosAgenda,
+    conteoAgenda, vistasAgenda, tarjetasAgenda, eventosDeCita, traidaCitas,
+    ocioso, duracionCita (+ cachés y semilla de A1).
+  - `src/components/agenda/`: tarjetas (MemoizedEventContent, MonthChip,
+    BandaChip, GoogleEventCard, FilaLista*, render*), modales (AppointmentModal,
+    HorarioModal, ConfirmModal; `useDialogoModal` en `src/hooks/`), paneles,
+    banda móvil, CabeceraEscritorio, BarraAgendarMovil, AvisosAgenda,
+    LeyendaEstados, opcionesCalendario.
+  - Junto a la ruta (`src/app/(app)/agenda/`): useFiltroMedico,
+    useVentanaRejilla, useResumenVisible, useFuentesAgenda (fuentes, candado de
+    gesto, precarga), useTiempoRealAgenda, guardadoCitas, altaCitas.
+  - A2.6: modales con `next/dynamic` precargados en ocioso (~19.6 KB gz fuera
+    del camino crítico).
+  - Lint: el compilador de react-hooks se saltaba `AgendaCliente` entero (tiene
+    `async function`); en los ganchos nuevos aparece el patrón «último valor»
+    que FullCalendar exige (lee en su montaje, antes de los efectos del padre).
+    Marcado con `eslint-disable-next-line` justificado en cada línea; total
+    de lint 96 errores, igual que en `main`.
+  - Arreglado de paso, con su prueba: «Ver todos los médicos» de la banda de
+    vacío no limpiaba el filtro (defecto hallado por la red de A0).
+  - Medición final del bloque A (`A2`): Auth 2 (1 en el camino crítico), red
+    limitada 712 ms, semana vecina 61 ms, ya vista 50 ms, tras precarga 48 ms,
+    volver 71 ms, 0 bloqueantes.
+  - Pruebas al cierre: 818 Vitest, 73 e2e.
+  - Queda escrito, sin tocar: el bloque comentado del `QuickPatientModal`
+    viejo dentro de `AgendaCliente.tsx` (~100 líneas muertas; se pregunta
+    aparte por el Protocolo 2).
 - [ ] B — Cimientos
 - [ ] C — Google en los dos sentidos
 - [ ] D — Reserva por enlace
@@ -823,3 +853,7 @@ primero sin marcar.
   no se cambia `getUser()` por `getClaims()` en ninguna API, A1.7 (Google
   sembrado en servidor) fuera por ahora, la caché de rangos empieza en su
   versión mínima.
+- 2026-11-12 — Bloque A cerrado (A1, A1-bis, A2). Pendiente de Angel: aplicar
+  en producción `supabase/migrations/20261111120000_agenda_a18_indices_rango.sql`;
+  decidir el tope de `ProximasCitas`; revisar la semilla de tres semanas. Lo
+  siguiente: bloque B.
