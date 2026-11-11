@@ -143,19 +143,38 @@ export function usePanelDelMes({
   }, [calendarRef, diaSel, aplicarPanel])
 
   /* ⚠️ EL MES SE COMPARA CON UN REF, Y SIN ESO EL PANEL NO SE PODRÍA USAR.
-     La regla es «al navegar de mes, el panel muestra el primer día del mes», y
-     el sitio donde se sabe que el rango cambió es `datesSet`. Pero `datesSet` SE
-     REEMITE en cada cambio de la ventana vertical aunque el rango no se mueva
-     (la cadena está en la cabecera de `ventanaRejilla.ts`), así que escribir el
-     día en cada emisión borraría la selección del médico un fotograma después de
-     hacerla. Comparando la clave del mes, sólo escribe cuando el mes es otro. */
+     La regla es la del spec §8.3, la misma que ya usa el resumen de la vista
+     Día: «habla de HOY si hoy cae en el rango pintado; si no, del primer día
+     del rango». Aplicada aquí: si hoy cae dentro del mes que se acaba de
+     pintar, el panel abre en hoy; si no (se navegó a otro mes), abre en el
+     día 1 de ESE mes. El sitio donde se sabe que el rango cambió es
+     `datesSet`. Pero `datesSet` SE REEMITE en cada cambio de la ventana
+     vertical aunque el rango no se mueva (la cadena está en la cabecera de
+     `ventanaRejilla.ts`), así que escribir el día en cada emisión borraría la
+     selección del médico un fotograma después de hacerla. Comparando la
+     clave del mes, sólo escribe cuando el mes es otro.
+
+     F13(a): antes escribía `vista.currentStart` sin condición — el panel del
+     Mes móvil abría siempre en el día 1, también al montar en el mes de hoy,
+     porque `mesDelPanelRef.current` empieza en `''` y la primera emisión de
+     `datesSet` siempre cuenta como «mes distinto». */
   const mesDelPanelRef = useRef('')
   const sincronizarDiaDelPanel = useCallback((vista: ViewApi) => {
     if (vista.type !== 'dayGridMonth') { mesDelPanelRef.current = ''; return }
     const clave = vista.currentStart.toISOString()
     if (mesDelPanelRef.current === clave) return
     mesDelPanelRef.current = clave
-    setDiaSel(vista.currentStart)
+    /* `currentStart`/`currentEnd` son el mes NATURAL (ver `rangosDeLaVista`),
+       medio abierto [currentStart, currentEnd) — nunca el relleno a seis
+       semanas de `semanasPintadasDelMes`, que metería días de otro mes en la
+       comparación. `new Date()` y no `hoyEnTZ`: es el mismo «hoy» con el que
+       FullCalendar ya decide `fc-day-today` (reloj del sistema; no hay `now`
+       propio en `opcionesCalendario.ts`) — dos criterios de «hoy» distintos
+       aquí habrían podido abrir el panel en un día sin el anillo de hoy
+       puesto, o al revés. */
+    const hoy = new Date()
+    const diaInicial = hoy >= vista.currentStart && hoy < vista.currentEnd ? hoy : vista.currentStart
+    setDiaSel(diaInicial)
   }, [])
 
   /* La marca del día seleccionado. CONTORNO, no relleno: el relleno es de HOY, y

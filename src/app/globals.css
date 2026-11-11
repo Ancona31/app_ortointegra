@@ -4772,8 +4772,21 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
   html.dark .agenda-fc.ag-cal-mes-movil .fc-daygrid .fc-day-today {
     background: color-mix(in srgb, var(--ag-brand-secondary) 55%, var(--ag-bg-app)) !important;
   }
+  /* F13(b) — alpha subida de .55 a .8: medido con la fórmula de contraste de
+     luminancia relativa de §12 contra `--ag-brand-secondary` (#1e5fa8, el
+     relleno de HOY en claro) y contra la mezcla de oscuro de la regla de
+     arriba (`color-mix(... 55%, --ag-bg-app)`, ≈ #163d6b):
+
+       SIN halo, los cinco puntos de estado contra ese fondo en claro miden
+       1.00–2.02:1 (confirmada es literalmente el mismo hex que el fondo:
+       1.00:1, invisible) — ninguno llega a 3:1.
+       CON el halo de .55 el anillo mide 3.11:1 en claro (raya el mínimo,
+       vulnerable al antialiasing de 1 px) y 4.49:1 en oscuro.
+       CON .8 el anillo mide 4.77:1 en claro y 7.63:1 en oscuro — margen
+       cómodo sobre el 3:1 de objeto gráfico (§12) en los dos temas, sin
+       tocar ningún color de estado. */
   .agenda-fc.ag-cal-mes-movil .fc-daygrid .fc-day-today .ag-mes-punto {
-    box-shadow: 0 0 0 1px rgba(255, 255, 255, .55);
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, .8);
   }
   /* El contorno va POR DENTRO (`inset`) para no quedar tapado por las celdas
      vecinas: los `<td>` no crean contexto de apilamiento y una sombra hacia
