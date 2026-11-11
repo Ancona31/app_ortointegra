@@ -48,11 +48,12 @@ import {
 } from '@/lib/agenda/ventanaRejilla'
 import { addWeeks, differenceInCalendarDays, startOfWeek } from 'date-fns'
 import { TZ_CLINICA, desplazarFecha, fechaSoloSegura, renderEnTZ } from '@/lib/dates'
-import useSWR from 'swr'
+import useSWR, { useSWRConfig } from 'swr'
 import {
   CLAVE_CONFIG,
   CONFIG_DEDUPE_MS,
   fetcherConfig,
+  revalidarConfigAlMontar,
   type ConfigApp,
   type DiaSemana,
   type Horario,
@@ -5619,10 +5620,12 @@ export default function AgendaCliente({ semillaCitas }: AgendaClienteProps) {
      propios: la misma clave la piden ya el Sidebar y el provider de
      consultorios del layout, así que SWR la deduplica y abrir la agenda no
      añade ninguna petición por estos dos datos. */
+  const swr = useSWRConfig()
   const { data: config, error: errorConfig, mutate: mutarConfig } = useSWR<ConfigApp>(
     CLAVE_CONFIG,
     fetcherConfig,
-    { dedupingInterval: CONFIG_DEDUPE_MS },
+    // La semilla del layout no se vuelve a pedir al montar (A1.6).
+    { dedupingInterval: CONFIG_DEDUPE_MS, revalidateOnMount: revalidarConfigAlMontar(swr) },
   )
   const horario = config?.horario ?? HORARIO_DEFAULT
 
@@ -9243,7 +9246,13 @@ export default function AgendaCliente({ semillaCitas }: AgendaClienteProps) {
               if (res.ok) {
                 // El horario vive ya en el agregado: se escribe su rebanada en
                 // el cache en vez de en un estado local paralelo.
-                mutarConfig(c => c ? { ...c, horario: h } : c, { revalidate: false })
+                // ⚠️ `c ?? config` (A1.6): con la semilla del layout la caché
+                // está vacía y `c` llega `undefined`; sin esto el horario
+                // nuevo no se pintaba hasta recargar.
+                mutarConfig(c => {
+                  const base = c ?? config
+                  return base ? { ...base, horario: h } : base
+                }, { revalidate: false })
                 setHorarioOpen(false)
                 toast.success('Horario actualizado')
               } else {

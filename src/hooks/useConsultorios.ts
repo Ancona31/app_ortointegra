@@ -1,7 +1,7 @@
 'use client'
 
-import { useCallback } from 'react'
-import useSWR from 'swr'
+import { useCallback, useEffect } from 'react'
+import useSWR, { useSWRConfig } from 'swr'
 import { secureStorage } from '@/lib/secureStorage'
 import { Consultorio } from '@/types'
 import {
@@ -10,6 +10,9 @@ import {
   CONFIG_DEDUPE_MS,
   esErrorDeSesion,
   fetcherConfig,
+  persistirConfigCifrada,
+  revalidarConfigAlMontar,
+  semillaConfig,
   type ConfigApp,
 } from '@/lib/configApp'
 
@@ -39,14 +42,23 @@ type ActualizadorConsultorios = (actual: DatosConsultorios | undefined) => Datos
  * gate de perfil (Bloque B5) los bloqueará hasta crear el primero.
  */
 export function useConsultorios() {
+  const swr = useSWRConfig()
   const { data, error, isLoading, mutate: mutarConfig } = useSWR<ConfigApp>(
     CLAVE_CONFIG,
     fetcherConfig,
     {
       // revalidateOnFocus se hereda del <SWRConfig> de (app), ya con throttle.
       dedupingInterval: CONFIG_DEDUPE_MS,
+      // La semilla del layout no se vuelve a pedir al montar (A1.6).
+      revalidateOnMount: revalidarConfigAlMontar(swr),
     },
   )
+
+  // La semilla no pasa por el fetcher: su respaldo cifrado se escribe aquí.
+  const semilla = semillaConfig(swr)
+  useEffect(() => {
+    if (data && data === semilla) persistirConfigCifrada(data)
+  }, [data, semilla])
 
   // Fallback offline. NO se activa ante 401/403: ver `esErrorDeSesion` en
   // src/lib/configApp.ts — el cache cifrado respalda una red caída, nunca una
@@ -92,14 +104,21 @@ export function useConsultorios() {
         await mutarConfig()
         return
       }
+      /* ⚠️ `config ?? data` (A1.6): mientras se pinta la semilla del layout,
+         la caché de SWR está VACÍA —la semilla es `fallback`, no caché— y el
+         actualizador recibe `undefined`. Sin el `?? data`, con
+         `revalidate: false` el cambio se perdía y se seguía viendo la semilla. */
       await mutarConfig(
-        (config) => config
-          ? { ...config, ...actualizador({ consultorios: config.consultorios }) }
-          : config,
+        (config) => {
+          const base = config ?? data
+          return base
+            ? { ...base, ...actualizador({ consultorios: base.consultorios }) }
+            : base
+        },
         opciones,
       )
     },
-    [mutarConfig],
+    [mutarConfig, data],
   )
 
   return {

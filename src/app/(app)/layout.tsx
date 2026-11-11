@@ -1,6 +1,9 @@
-import { redirect } from 'next/navigation'
+import { redirect, unstable_rethrow } from 'next/navigation'
 import { SWRConfig } from 'swr'
-import { sesionServidor } from '@/lib/supabase/sesionServidor'
+import { sesionServidor, type SesionServidor } from '@/lib/supabase/sesionServidor'
+import { CLAVE_CONFIG, type ConfigApp } from '@/lib/configApp'
+import { leerConfigApp } from '@/lib/configAppServidor'
+import { logger } from '@/lib/logger'
 import Sidebar from '@/components/layout/Sidebar'
 import ScriptTema from '@/components/layout/ScriptTema'
 import { ThemeProvider } from '@/components/layout/ThemeProvider'
@@ -19,12 +22,35 @@ import { analizarPerfilSesion } from '@/lib/perfil/perfilSesion'
 import { ConsultorioActivoProvider } from '@/contexts/ConsultorioActivoContext'
 import { MenuMovilProvider } from '@/contexts/MenuMovilContext'
 
+/**
+ * La configuración de la app sembrada en el documento (A1.6): lo mismo que
+ * `GET /api/me/config` le daría a este usuario, leído con la sesión de
+ * `sesionServidor()` —cliente de sesión, RLS— y la clínica de su perfil. Así
+ * la carga dura no pide la ruta; ver `revalidarConfigAlMontar` en
+ * `lib/configApp.ts`.
+ * `null` = no siembra y el cliente pide como antes: sin clínica (la ruta
+ * respondería 403), perfil ilegible, o una consulta que falló. Sólo relanza
+ * los errores internos de Next (`unstable_rethrow.md`).
+ */
+async function sembrarConfig({ supabase, profile }: SesionServidor): Promise<ConfigApp | null> {
+  if (!profile?.clinica_id) return null
+  try {
+    const lectura = await leerConfigApp(supabase, profile.clinica_id)
+    return lectura.ok ? lectura.config : null
+  } catch (err: unknown) {
+    unstable_rethrow(err)
+    logger.warn('layout', `configuración sin sembrar: ${err instanceof Error ? err.message : 'error'}`)
+    return null
+  }
+}
+
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   /* ⚠️ A1.4c: el `getUser()` y el `profiles` de este layout salen de
      `sesionServidor()`, que los comparte con la página de la agenda dentro de
      la MISMA petición (`React.cache`). La autoridad y el redirect son los de
      siempre: `getUser()` contra Auth y, si no hay usuario, `/login`. */
-  const { supabase, user, profile } = await sesionServidor()
+  const sesion = await sesionServidor()
+  const { supabase, user, profile } = sesion
   if (!user) redirect('/login')
 
   /* ⚠️ DESDE A1.2 SE PIDEN LOS 12 CAMPOS DE `Profile` (`COLUMNAS_PERFIL_SESION`)
@@ -89,7 +115,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
      cuenta y caiga en su FAIL_OPEN documentado. Es un camino de error raro
      donde se paga un viaje de más; a cambio, nunca se le entrega un perfil
      vacío como si fuera bueno. */
-  const subscriptionState = await getSubscriptionState(supabase, profile ?? undefined)
+  /* La semilla de configuración va EN PARALELO con la suscripción: son
+     independientes, y encadenadas el layout tardaría la suma. */
+  const [subscriptionState, configSembrada] = await Promise.all([
+    getSubscriptionState(supabase, profile ?? undefined),
+    sembrarConfig(sesion),
+  ])
 
   /* `null` = no se siembra y `useProfile` lo pide él, como antes de A1.2. */
   const perfilInicial = analizarPerfilSesion(profile)
@@ -103,10 +134,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
          en cada alt-tab. Cinco minutos corta el grueso de esas peticiones.
        ⚠ `revalidateOnFocus` se queda ENCENDIDO a proposito. Es una aplicacion
        clinica: un dato rancio despues de cambiar de pestana es peor que una
-       peticion de mas. El throttle da el beneficio sin ese riesgo. */
+       peticion de mas. El throttle da el beneficio sin ese riesgo.
+       - fallback (A1.6): la configuracion sembrada arriba, bajo SU clave. Sin
+         semilla no se pasa y el cliente pide `/api/me/config` como antes. */
     <>
     <ScriptTema />
-    <SWRConfig value={{ keepPreviousData: true, focusThrottleInterval: 300_000 }}>
+    <SWRConfig value={{
+      keepPreviousData: true,
+      focusThrottleInterval: 300_000,
+      ...(configSembrada && { fallback: { [CLAVE_CONFIG]: configSembrada } }),
+    }}>
     <AuthProvider perfilInicial={perfilInicial}>
       <ToastProvider>
         <ThemeProvider>

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { logger } from '@/lib/logger'
+import { leerConfigApp } from '@/lib/configAppServidor'
 
 /**
  * GET /api/me/config
@@ -84,67 +85,14 @@ export async function GET() {
       return NextResponse.json({ error: 'sin_clinica' }, { status: 403 })
     }
 
-    const [clinicaRes, consultoriosRes, medicosRes] = await Promise.all([
-      /* Los siete campos de /api/me/clinica + el horario de /api/me/horario +
-         `tipo`.
-         ⚠️ `tipo` NO ES DE ESTE ENDPOINT NI DE LA MARCA: lo pide el dashboard,
-         que antes lo consultaba por su cuenta con un `clinicas?select=tipo`
-         propio. Aquella consulta encadenaba a la de `appointments` —medido en
-         producción: 539 ms de espera pura al final de la cascada— y pedía UNA
-         columna de esta misma fila, que aquí ya viaja entera. Pedirla aquí es
-         gratis: mismo viaje, misma fila.
-         Va en el `select` y en `ClinicaConfig` (src/lib/configApp.ts) a la vez;
-         son las dos mitades de la misma lista. */
-      supabase
-        .from('clinicas')
-        .select('id, nombre, nombre_display, subtitulo, color_primario, color_secundario, logo_url, tipo, horario_consulta')
-        .eq('id', profile.clinica_id)
-        .single(),
-      // Modo owner-scope de /api/consultorios: el filtrado lo hace la RLS.
-      // Los archivados no se exponen.
-      supabase
-        .from('consultorios')
-        .select('*')
-        .eq('activo', true)
-        .order('es_default', { ascending: false })
-        .order('created_at', { ascending: true }),
-      // Solo los campos con los que la agenda compone el nombre y las
-      // iniciales. `especialidad` y `es_admin_de_clinica` se quedan en
-      // /api/clinica/medicos, que es quien tiene consumidores para ellos.
-      supabase
-        .from('profiles')
-        .select('id, titulo, nombres, apellido_paterno, apellido_materno')
-        .eq('clinica_id', profile.clinica_id)
-        .eq('role', 'medico')
-        .order('apellido_paterno'),
-    ])
-
-    /* Las tres se comprueban por separado, y no con un `??` encadenado, por dos
-       razones: el log dice QUÉ rebanada falló, y TypeScript necesita el chequeo
-       individual para estrechar cada `data` a no-nulo. `.single()` de la clínica
-       también entra por aquí si la fila no existe, que es un estado roto y no
-       una clínica ausente. */
-    if (clinicaRes.error) {
-      logger.error('me/config', `consulta de clinica: ${clinicaRes.error.message}`)
+    /* La lectura vive en `lib/configAppServidor.ts` desde A1.6: la comparte
+       con `(app)/layout.tsx`, que la siembra en el documento. Esta ruta sigue
+       con SU `getUser()` y SU perfil de arriba; el cuerpo 200 es el mismo. */
+    const lectura = await leerConfigApp(supabase, profile.clinica_id)
+    if (!lectura.ok) {
       return NextResponse.json({ error: 'configuracion_ilegible' }, { status: 500 })
     }
-    if (consultoriosRes.error) {
-      logger.error('me/config', `consulta de consultorios: ${consultoriosRes.error.message}`)
-      return NextResponse.json({ error: 'configuracion_ilegible' }, { status: 500 })
-    }
-    if (medicosRes.error) {
-      logger.error('me/config', `consulta de medicos: ${medicosRes.error.message}`)
-      return NextResponse.json({ error: 'configuracion_ilegible' }, { status: 500 })
-    }
-
-    const { horario_consulta: horario = null, ...clinica } = clinicaRes.data
-
-    return NextResponse.json({
-      clinica,
-      consultorios: consultoriosRes.data,
-      horario,
-      medicos: medicosRes.data,
-    })
+    return NextResponse.json(lectura.config)
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Error interno'
     logger.error('me/config', message)
