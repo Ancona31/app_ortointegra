@@ -9,8 +9,6 @@ import FullCalendar from '@fullcalendar/react'
 import type { DateClickArg, EventResizeDoneArg } from '@fullcalendar/interaction'
 import type { DatesSetArg, EventClickArg, EventDropArg, DateSelectArg, EventApi, EventContentArg, DayHeaderContentArg } from '@fullcalendar/core'
 import esLocale from '@fullcalendar/core/locales/es'
-import { Calendar, ChevronsDownUp, TriangleAlert } from 'lucide-react'
-import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/components/ui/Toast'
 import { useProfile } from '@/hooks/useProfile'
@@ -18,9 +16,10 @@ import { canManageClinica, canVerAgendaCompleta } from '@/lib/permissions'
 import { useSubscriptionGate } from '@/components/billing/SubscriptionGateProvider'
 import { componerNombreMedicoCompleto, componerInicialesMedico } from '@/lib/nombreMedico'
 import { useMenuMovil } from '@/contexts/MenuMovilContext'
-import { GoogleGIcon } from '@/components/agenda/GoogleGIcon'
 import { CabeceraEscritorio } from '@/components/agenda/CabeceraEscritorio'
 import { BarraAgendarMovil } from '@/components/agenda/BarraAgendarMovil'
+import { LeyendaEstados } from '@/components/agenda/LeyendaEstados'
+import { AvisosAgenda } from '@/components/agenda/AvisosAgenda'
 import {
   VISTAS_FC, VISTAS_FC_MOVIL, TOOLBAR_ESCRITORIO, PLUGINS_FC, TEXTO_BOTONES_FC, FORMATO_HORA_FC,
 } from '@/components/agenda/opcionesCalendario'
@@ -40,7 +39,6 @@ import { CabeceraDiaLista } from '@/components/agenda/CabeceraDiaLista'
 import { BandaMovil } from '@/components/agenda/BandaMovil'
 import { PanelDelDia } from '@/components/agenda/PanelDelDia'
 import { PanelDia } from '@/components/agenda/PanelDia'
-import { Banda } from '@/components/agenda/Banda'
 import { renderSinEventos } from '@/components/agenda/renderSinEventos'
 import { vaciarCacheCitas } from '@/lib/agenda/cacheRangosCitas'
 import type { SemillaCitas } from '@/lib/agenda/semillaCitas'
@@ -61,7 +59,7 @@ import {
   type ConfigApp,
   type MedicoConfig,
 } from '@/lib/configApp'
-import type { Status, Appointment } from '@/lib/agenda/tiposAgenda'
+import type { Appointment } from '@/lib/agenda/tiposAgenda'
 export type { Appointment }
 import { DIAS, HORARIO_DEFAULT, horarioToBusinessHours } from '@/lib/agenda/horarioAgenda'
 import { rangosDeLaVista, partirFechaHora } from '@/lib/agenda/fechasAgenda'
@@ -70,7 +68,7 @@ import {
   esVistaDeRejilla, vistaEnElOtroFormato, vistaAdmiteCompactar,
   periodoDeLaVista,
 } from '@/lib/agenda/vistasAgenda'
-import { STATUS_CONFIG, clasesDelEvento } from '@/lib/agenda/tarjetasAgenda'
+import { clasesDelEvento } from '@/lib/agenda/tarjetasAgenda'
 
 /* ═══ A2.6 · LOS TRES MODALES EN DIFERIDO ═════════════════════════════════
    `AppointmentModal` (el más grande: iconos, `Portal`, `QuickPatientModal`,
@@ -1333,73 +1331,7 @@ export default function AgendaCliente({ semillaCitas }: AgendaClienteProps) {
             Semana la fila sólo tiene el punto de color y la leyenda ocuparía una
             fila entera de las pocas que caben; en Mes no hay ni punto de estado.
             En escritorio no cambia nada: sale en las tres. */}
-        {(!isMobile || currentView === 'listDay') && (
-        <div className="ag-leyenda">
-          {(Object.entries(STATUS_CONFIG) as [Status, typeof STATUS_CONFIG[Status]][]).map(([key, cfg]) => (
-            <div key={key} className="flex items-center gap-1.5">
-              <span
-                className="w-2 h-2 rounded-full flex-shrink-0"
-                /* UN token y un solo color: `-dot`, que es exactamente el que la
-                   tarjeta pinta en su `borderLeft`. Aquí hubo un cuadrado que
-                   mezclaba relleno de `-bg` con barra de `-dot` —dos colores
-                   para nombrar uno— y de lejos se leía el relleno pálido.
-                   Nunca un hex: hubo una segunda paleta a mano y enseñaba «No
-                   asistió» en naranja mientras la tarjeta lo pintaba gris. */
-                style={{ backgroundColor: `var(--ag-status-${key}-dot)` }}
-              />
-              <span className="text-[11px] font-medium text-[var(--ag-muted)]">{cfg.label}</span>
-            </div>
-          ))}
-          {/* ── GOOGLE VA APARTE, DETRÁS DE UNA BARRA ─────────────────────
-              Y no como un sexto estado. `STATUS_CONFIG` es `Record<Status, …>`
-              y ahí no cabe: un evento de Google no tiene estado de cita, viene
-              de otro sitio y no se edita. Meterlo dentro obligaría a ensanchar
-              `Status`, que es el tipo del que cuelgan el selector del modal, los
-              tokens de color y la exhaustividad que garantiza el compilador. La
-              barra dice justo eso: lo de la izquierda es una escala, esto no. */}
-          <span aria-hidden className="text-[11px] text-[var(--ag-faint)]">|</span>
-          <div className="flex items-center gap-1.5">
-            <GoogleGIcon size={11} />
-            {/* ── «GCal» Y NO «GOOGLE CALENDAR», POR ANCHO ─────────────────
-                Medido el 2026-08-25 a 1280 px de ventana, con la tarjeta a 954
-                px de interior: la leyenda pedía 542 px para caber en UNA línea y
-                su celda le daba 453,46, así que envolvía a dos y subía el
-                toolbar de 60,32 a 74 px. Acortar este rótulo se lleva 63 de esos
-                px —de 542 a 479—, que es el recorte más grande que se puede
-                hacer sin tocar los cinco rótulos de estado.
-
-                ⚠️ SOLO NO BASTABA: con 479 contra 453,46 seguían faltando 25,54
-                y la leyenda seguía en dos líneas. Lo que cerró el hueco fue
-                encoger la ETIQUETA DE FECHA —formato corto y 15 px en vez de
-                22—, que le devolvió 153,24 px a aquella celda.
-
-                ⚠️ ESA CUENTA CADUCÓ EN EL BLOQUE 8, y lo que queda de ella es el
-                orden de magnitud, no el margen. La leyenda ya no comparte fila con
-                la fecha: tiene fila propia y dispone del ancho entero de la
-                tarjeta menos los 36 px de su relleno, así que la etiqueta de fecha
-                salió de esta ecuación y reponerla larga ya no la estrecha.
-                Quien la estrecha ahora es el PANEL de la vista Día, que se lleva
-                los 300 px del riel más 14 de `gap`: sobre los 954 px de interior
-                medidos a 1280 de ventana quedan ~640, o ~604 para el contenido.
-                Ahí los 479 de «GCal» entran con holgura; por debajo de ~1155 px
-                de ventana, con el panel abierto, ya no —esa cuenta está en
-                `globals.css`, en el bloque del reparto de la tarjeta—. El rótulo
-                corto se queda porque no cuesta nada y porque es lo que empuja ese
-                umbral hacia abajo. Si lo alargas, mide CON EL PANEL PUESTO, que es
-                el caso estrecho.
-
-                ⚠️ EL NOMBRE COMPLETO SIGUE ACCESIBLE en el `title`: la
-                abreviatura es visual, no semántica, y un lector de pantalla no
-                tiene por qué deletrear «GCal». */}
-            <span
-              className="text-[11px] font-medium text-[var(--ag-gcal-text)]"
-              title="Google Calendar"
-            >
-              GCal
-            </span>
-          </div>
-        </div>
-        )}
+        {(!isMobile || currentView === 'listDay') && <LeyendaEstados />}
         {/* Va PRIMERA en el DOM aunque se pinte segunda, y es a propósito: el
             `order` de la hoja la coloca bajo el toolbar, y así el lector de
             pantalla oye el aviso antes que los controles y la rejilla que
@@ -1422,160 +1354,33 @@ export default function AgendaCliente({ semillaCitas }: AgendaClienteProps) {
             SE MONTA SIEMPRE, también sin ninguna banda: entonces mide cero y le
             sirve de ancla a la barra de carga, que se posiciona sobre él sin
             empujar la rejilla. El ORDEN de los hijos es la prioridad. */}
-        <div className="ag-avisos">
-          {/* La barra de 2 px de §11. Cae justo ENCIMA de la rejilla y no pegada
-              al toolbar, y es consecuencia de dónde vive el envoltorio: entre
-              medias está la fila de la leyenda, que es cromo de la tarjeta desde
-              el bloque 8. Marca el borde de lo que está cargando, que es lo que
-              se quería decir.
-              `aria-hidden` porque una raya no se lee; lo que declara el estado a
-              las ayudas técnicas es el `aria-busy` de la tarjeta. */}
-          {cargaVisible && <span className="ag-barra-carga" aria-hidden />}
-
-          {/* 1 · Error de carga. «Reintentar» llama al MISMO `refetch()` que usan
-              el cambio de filtro, la reconexión y la vuelta a la pestaña: una
-              sola puerta de recarga, y con el candado de arrastre incluido. */}
-          {errorCitas && (
-            <Banda tono="error" urgente>
-              <TriangleAlert size={14} className="ag-aviso-icono" aria-hidden />
-              <p className="ag-aviso-texto">
-                <strong>No se pudo cargar la agenda.</strong> Lo que se ve puede estar incompleto o desactualizado.
-              </p>
-              <button type="button" className="ag-aviso-accion" onClick={() => refetch(true)}>
-                Reintentar
-              </button>
-            </Banda>
-          )}
-
-          {/* 1 bis · La traída llegó ENTERA de forma y RECORTADA de fondo.
-              ⚠️ COMPARTE EL TONO ROJO CON LA DE ARRIBA Y NO ES PEREZA. Sólo hay
-              tres tonos (`ag-aviso--error|gcal|vacio`) y estrenar un cuarto
-              pediría un par de tokens nuevos en las DOS paletas de globals.css
-              para una distinción que el ojo no necesita: las dos bandas dicen
-              «lo que ves no es la agenda», y no pueden coincidir en pantalla
-              —una se escribe en el éxito y la otra en el catch—, así que el rojo
-              nunca significa dos cosas a la vez. Lo que las separa es el TEXTO,
-              que es donde estaba la diferencia de verdad: aquélla dice que no se
-              pudo cargar; ésta, que sí se cargó y aun así falta.
-              `urgente` (role="alert") por la misma razón que la otra, y aquí
-              todavía más literal: los huecos que faltan se ven LIBRES, y sobre
-              un hueco libre se agenda encima de una cita que existe.
-              SIN «Reintentar»: la misma consulta devolvería las mismas mil
-              filas. La salida es pedir MENOS RANGO, y eso es lo que ofrece el
-              botón — sólo desde Mes, que es de donde se sale; ya en Semana no
-              hay a dónde acortar y la banda se queda sin acción, que es más
-              honesto que un botón que no cambia nada. */}
-          {citasIncompletas && (
-            <Banda tono="error" urgente>
-              <TriangleAlert size={14} className="ag-aviso-icono" aria-hidden />
-              <p className="ag-aviso-texto">
-                <strong>Faltan citas por mostrar.</strong> Este periodo tiene más citas de las que caben en una carga; lo que ves está incompleto.
-              </p>
-              {/* `dayGridMonth` a secas y sin helper: el Mes es la ÚNICA vista
-                  que vale lo mismo ancha que estrecha (`FORMATOS_DE_VISTA`), así
-                  que aquí no hay pareja que resolver. */}
-              {currentView === 'dayGridMonth' && (
-                <button
-                  type="button"
-                  className="ag-aviso-accion"
-                  onClick={() => {
-                    /* Por `vistaEnElOtroFormato` y no con la cadena a mano: en un
-                       teléfono la Semana es `listWeek`, y `changeView` lanza con
-                       una vista que no se ha registrado. Es el mismo camino que
-                       usan el segmentado y la banda móvil.
-                       Y por `cambiarVista` y no por `changeView` a pelo: es lo
-                       que hace que este botón PIDA la semana en vez de heredar
-                       el recorte del mes. Sin eso no recuperaba nada — ver su
-                       cabecera. */
-                    cambiarVista(vistaEnElOtroFormato('timeGridWeek', isMobile))
-                  }}
-                >
-                  Ver por semana
-                </button>
-              )}
-            </Banda>
-          )}
-
-          {/* 2 · Fallo de Google. SIN «Reintentar» a propósito: reintentar no
-              arregla una credencial ni una cuota, y un botón que casi siempre
-              falla enseña a ignorarlo. La salida es /perfil, que es donde se
-              reconecta de verdad. */}
-          {googleFallo && (
-            <Banda tono="gcal">
-              <GoogleGIcon size={14} />
-              <p className="ag-aviso-texto">
-                <strong>No se pudo sincronizar con Google Calendar.</strong> Tus citas se muestran normal; faltan los eventos del calendario.
-              </p>
-              <Link href="/perfil" className="ag-aviso-accion">Revisar conexión</Link>
-            </Banda>
-          )}
-
-          {/* 3 · Vacío. Las dos frases salen del mismo cero; ver `vacioReal`. */}
-          {vacioReal && (
-            <Banda tono="vacio">
-              <Calendar size={14} className="ag-aviso-icono" aria-hidden />
-              <p className="ag-aviso-texto">
-                {vacioFiltrado && medicoFiltrado
-                  ? `Ningún evento de ${componerNombreMedicoCompleto(medicoFiltrado)} ${periodoVacio}`
-                  : `Sin citas ${periodoVacio}`}
-              </p>
-              {/* «Ver todos» pasa por `aplicarFiltro`, como el desplegable: un
-                  `setFiltroMedico('')` a secas dejaba `filtroSincronoRef` en el
-                  médico anterior y la traída seguía filtrada (defecto hallado
-                  por la red de A0). En Mes no hay «Todos» (`mesSinTodos`): ahí
-                  la banda sólo informa. */}
-              {vacioFiltrado ? (mesSinTodos ? null : (
-                <button type="button" className="ag-aviso-accion" onClick={() => aplicarFiltro('', false)}>
-                  Ver todos los médicos
-                </button>
-              )) : (
-                /* ⚠️ DICE «AGENDAR» Y NO «NUEVA CITA», que es lo que pedía §11.
-                   El botón del header se renombró a «Agendar» al montarle el
-                   conmutador «Cita | Evento»: el modal ya no crea sólo citas.
-                   Dos nombres para la misma puerta es peor que apartarse del
-                   spec en una palabra. Y hace lo mismo que aquel botón, bloqueo
-                   por suscripción incluido. */
-                <button
-                  type="button"
-                  className="ag-aviso-accion"
-                  onClick={() => {
-                    if (subState.isBlocked) { openBloqueoModal(); return }
-                    const { fecha, hora } = partirFechaHora(new Date().toISOString())
-                    setModal({ mode: 'create', fecha, hora, tipo: 'cita', todoElDia: 'no' })
-                  }}
-                >
-                  Agendar
-                </button>
-              )}
-            </Banda>
-          )}
-
-          {/* 4 · Vista compacta. Se queda EXACTAMENTE como estaba, sólo que ahora
-              dentro del envoltorio: no se migra a `Banda` porque su caja lleva su
-              propia geometría y sus propias clases desde el bloque 6, y
-              reescribirla para ganar tres líneas es arriesgar una que funciona. */}
-          {avisoRecorte && (
-            <div className="ag-banda-compacta" role="status">
-              <ChevronsDownUp size={14} className="ag-banda-compacta-icono" aria-hidden />
-              <p className="ag-banda-compacta-texto">
-                <strong>Vista compacta:</strong> {avisoRecorte}
-              </p>
-              {/* SEGUNDA salida, no la única: el botón del header sigue siendo por
-                  donde se enciende y también apaga. Existe porque el efecto que
-                  apaga «Compactar» al salir de time-grid ya dice el principio —un
-                  calendario que oculta información sin dar salida es peor que uno
-                  que no la oculta— y hasta ahora la única salida estaba en la otra
-                  punta de la pantalla, lejos de la frase que confiesa el recorte. */}
-              <button
-                type="button"
-                className="ag-banda-compacta-salida"
-                onClick={() => setCompactar(false)}
-              >
-                {compactaElMes ? 'Mostrar todos los días' : 'Mostrar rejilla completa'}
-              </button>
-            </div>
-          )}
-        </div>
+        <AvisosAgenda
+          cargaVisible={cargaVisible}
+          errorCitas={errorCitas}
+          onReintentar={() => refetch(true)}
+          citasIncompletas={citasIncompletas}
+          currentView={currentView}
+          onVerPorSemana={() => cambiarVista(vistaEnElOtroFormato('timeGridWeek', isMobile))}
+          googleFallo={googleFallo}
+          vacioReal={vacioReal}
+          vacioFiltrado={vacioFiltrado}
+          medicoFiltrado={medicoFiltrado}
+          periodoVacio={periodoVacio}
+          mesSinTodos={mesSinTodos}
+          onVerTodos={() => aplicarFiltro('', false)}
+          /* ⚠️ NO FUNDIR con el `onAgendar` de `CabeceraEscritorio` ni con el
+             de `BarraAgendarMovil`, aunque el cuerpo sea idéntico: el plan
+             A2.5 deja los 3 onClick de «Agendar» como cierres separados a
+             propósito (§invariantes, «los 3 onClick de Agendar — no fundir»). */
+          onAgendar={() => {
+            if (subState.isBlocked) { openBloqueoModal(); return }
+            const { fecha, hora } = partirFechaHora(new Date().toISOString())
+            setModal({ mode: 'create', fecha, hora, tipo: 'cita', todoElDia: 'no' })
+          }}
+          avisoRecorte={avisoRecorte}
+          compactaElMes={compactaElMes}
+          onSalirCompacta={() => setCompactar(false)}
+        />
         <FullCalendar
           ref={calendarRef}
           /* ⚠️ `listPlugin` VA EL ÚLTIMO, Y LA POSICIÓN ES UNA DECISIÓN. Este
