@@ -36,17 +36,10 @@ test.describe('filtro de médico — admin.a', () => {
     await expect(select).not.toHaveValue('')
   })
 
-  test('«Ver todos los médicos» de la banda vacía debería limpiar el filtro de la petición', async ({ page }) => {
-    // defecto: el botón llama a `setFiltroMedico('')` (page.tsx, banda vacía,
-    // ~línea 8658) sin pasar por `aplicarFiltro` (línea 6245), que es la que
-    // también escribe `filtroSincronoRef`. `appointmentSource` lee
-    // `filtroSincronoRef.current ?? filtroEfectivo` (línea 6407) y, como el
-    // ref sigue apuntando al médico anterior (no es `null`, es un id), el
-    // operador `??` nunca llega a mirar `filtroEfectivo`: la petición que
-    // dispara el refetch sigue mandando `medico_id`, aunque el desplegable ya
-    // diga «Todos los médicos» (mapa_agenda.md §6, observación). El botón, en
-    // los hechos, no hace nada.
-    test.fail()
+  test('«Ver todos los médicos» de la banda vacía limpia el filtro de la petición', async ({ page }) => {
+    // Defecto corregido tras A2.1: el botón llamaba a `setFiltroMedico('')` sin
+    // pasar por `aplicarFiltro`, y `filtroSincronoRef` seguía en el médico
+    // anterior, así que la traída salía filtrada. Hoy usa `aplicarFiltro`.
 
     // Se fuerza la banda vacía CON MUTACIÓN (barata, sólo en esta prueba): el
     // mock contesta vacío mientras la petición lleve `medico_id`, y deja
@@ -67,13 +60,15 @@ test.describe('filtro de médico — admin.a', () => {
     await select.selectOption({ label: 'Dra. Invitada Semilla Dos' })
     await expect(page.getByRole('button', { name: 'Ver todos los médicos' })).toBeVisible({ timeout: 15000 })
 
-    // Con tope propio desde A1.5a: el filtro viejo puede salir de la caché de
-    // rangos y entonces NO hay petición. Sin tope esperaba al de la prueba, y un
-    // `timedOut` no cuenta como el fallo esperado de `test.fail()`.
-    const siguientePeticion = page.waitForRequest(r => r.url().includes('/api/appointments') && r.method() === 'GET', { timeout: 5000 })
+    // «Todos» de esta semana no está en la caché de rangos (la semilla del
+    // admin es con su propio filtro), así que tiene que salir una petición, y
+    // sin `medico_id`.
+    const siguientePeticion = page.waitForRequest(r => r.url().includes('/api/appointments?') && r.method() === 'GET', { timeout: 5000 })
     await page.getByRole('button', { name: 'Ver todos los médicos' }).click()
     const peticion = await siguientePeticion
     expect(new URL(peticion.url()).searchParams.get('medico_id')).toBeNull()
+    await expect(select).toHaveValue('')
+    await expect(page.getByRole('button', { name: 'Ver todos los médicos' })).toHaveCount(0)
   })
 })
 

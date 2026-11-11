@@ -7755,11 +7755,16 @@ export default function AgendaCliente({ semillaCitas }: AgendaClienteProps) {
                   ? `Ningún evento de ${componerNombreMedicoCompleto(medicoFiltrado)} ${periodoVacio}`
                   : `Sin citas ${periodoVacio}`}
               </p>
-              {vacioFiltrado ? (
-                <button type="button" className="ag-aviso-accion" onClick={() => setFiltroMedico('')}>
+              {/* «Ver todos» pasa por `aplicarFiltro`, como el desplegable: un
+                  `setFiltroMedico('')` a secas dejaba `filtroSincronoRef` en el
+                  médico anterior y la traída seguía filtrada (defecto hallado
+                  por la red de A0). En Mes no hay «Todos» (`mesSinTodos`): ahí
+                  la banda sólo informa. */}
+              {vacioFiltrado ? (mesSinTodos ? null : (
+                <button type="button" className="ag-aviso-accion" onClick={() => aplicarFiltro('', false)}>
                   Ver todos los médicos
                 </button>
-              ) : (
+              )) : (
                 /* ⚠️ DICE «AGENDAR» Y NO «NUEVA CITA», que es lo que pedía §11.
                    El botón del header se renombró a «Agendar» al montarle el
                    conmutador «Cita | Evento»: el modal ya no crea sólo citas.
