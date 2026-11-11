@@ -67,8 +67,46 @@ function comprobarBuildFresco(): void {
   // sigue —y que falla si no— YA es esa comprobación.
 }
 
+/**
+ * Espera a que Realtime purgue las suscripciones de las páginas que ya se
+ * cerraron, ANTES de resembrar. Sin esto, dos corridas seguidas de la suite
+ * dejan a la segunda sin tiempo real durante su primer minuto: es lo que
+ * hacía fallar a ratos, juntas, las pruebas de `agenda-cache-rangos.e2e.ts`
+ * que esperan un eco (`observarEcosRealtime`, 10 s sin llegar).
+ *
+ * La cadena, comprobada en el Realtime local (v2.130.0) y en su código:
+ *  1. Al cerrarse una página, su fila de `realtime.subscription` NO se borra al
+ *     momento: el SubscriptionManager la encola y vacía la cola cada 15 s. Al
+ *     final de una corrida quedan hasta ~18 filas así.
+ *  2. La resiembra borra ~376 citas. Un DELETE se entrega a TODAS las
+ *     suscripciones de la tabla sin pasar por la RLS (`realtime.apply_rls`:
+ *     `if not is_rls_enabled or action = 'DELETE'`), filas muertas incluidas,
+ *     y el poller cuenta cada entrega contra `max_events_per_second` (100, en
+ *     media de 60 s): 376 × 18 ≈ 6.800 → 113/s → `MessagePerSecondRateLimitReached`.
+ *  3. Con el límite disparado el poller CONSUME los cambios y no los emite
+ *     (`replication_poller.ex`, rama `triggered: true`) hasta que la media baja,
+ *     hasta un minuto después: los ecos de ese minuto se pierden, no se retrasan.
+ * Con la tabla vacía cuando se borra, cada DELETE cuenta cero.
+ *
+ * Si no se vacía en 20 s es que hay una agenda ABIERTA de verdad (una pestaña
+ * de desarrollo): con una o dos la cuenta no llega al límite, así que se avisa
+ * y se sigue.
+ */
+async function esperarSuscripcionesRealtimePurgadas(): Promise<void> {
+  const contar = (): number => Number(execFileSync('docker', ['exec', '-i', 'supabase_db_app_ortointegra', 'psql', '-U', 'postgres', '-tAq',
+    '-c', 'select count(*) from realtime.subscription'], { encoding: 'utf8' }).trim())
+  const hasta = Date.now() + 20_000
+  let quedan = contar()
+  while (quedan > 0 && Date.now() < hasta) {
+    await new Promise((r) => setTimeout(r, 500))
+    quedan = contar()
+  }
+  if (quedan > 0) console.warn(`global-setup: ${quedan} suscripción(es) de Realtime siguen vivas; se resiembra igual.`)
+}
+
 export default async function globalSetup(): Promise<void> {
   comprobarBuildFresco()
+  await esperarSuscripcionesRealtimePurgadas()
   execFileSync('npx', ['tsx', 'scripts/agenda-semilla.ts'], { stdio: 'inherit', cwd: process.cwd() })
 
   const dirAuth = path.resolve(process.cwd(), 'e2e/.auth')
