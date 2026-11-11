@@ -49,7 +49,7 @@ import { useTiempoRealAgenda } from '@/app/(app)/agenda/useTiempoRealAgenda'
 import { useVentanaRejilla } from '@/app/(app)/agenda/useVentanaRejilla'
 import { useConteoVisible, usePanelDelMes, useResumenDelDia } from '@/app/(app)/agenda/useResumenVisible'
 import { crearGuardadoCitas, pacienteParaInvitacion } from '@/app/(app)/agenda/guardadoCitas'
-import { useAltaCitas } from '@/app/(app)/agenda/useAltaCitas'
+import { crearAltaCitas } from '@/app/(app)/agenda/altaCitas'
 import useSWR, { useSWRConfig } from 'swr'
 import {
   CLAVE_CONFIG,
@@ -236,8 +236,6 @@ function QuickPatientModal({
 }
 
 */
-
-/* ─── Modal de cita ─────────────────────────────────────── */
 
 /* ─── Página principal ─────────────────────────────────── */
 
@@ -666,7 +664,7 @@ export default function AgendaCliente({ semillaCitas }: AgendaClienteProps) {
     refetch, firmarEscritura, aplicarAppointmentAlEvento,
   })
 
-  const { handleDateClick, handleSelect, handleEventClick, abrirCita, abrirHueco } = useAltaCitas({
+  const { handleDateClick, handleSelect, handleEventClick, abrirCita, abrirHueco } = crearAltaCitas({
     calendarRef, isMobile, setDiaSel, subState, openBloqueoModal, horario, setModal, setConfirm,
     resumenDia, citasIncompletas,
   })
@@ -1360,6 +1358,14 @@ export default function AgendaCliente({ semillaCitas }: AgendaClienteProps) {
           onReintentar={() => refetch(true)}
           citasIncompletas={citasIncompletas}
           currentView={currentView}
+          /* Por `vistaEnElOtroFormato` y no con la cadena a mano: en un
+             teléfono la Semana es `listWeek`, y `changeView` lanza con
+             una vista que no se ha registrado. Es el mismo camino que
+             usan el segmentado y la banda móvil.
+             Y por `cambiarVista` y no por `changeView` a pelo: es lo
+             que hace que este botón PIDA la semana en vez de heredar
+             el recorte del mes. Sin eso no recuperaba nada — ver su
+             cabecera. */
           onVerPorSemana={() => cambiarVista(vistaEnElOtroFormato('timeGridWeek', isMobile))}
           googleFallo={googleFallo}
           vacioReal={vacioReal}

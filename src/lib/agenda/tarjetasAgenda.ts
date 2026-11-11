@@ -223,7 +223,7 @@ export function clasesDelEvento(arg: EventContentArg): string[] {
    volver: este mapa llegó a tener `bg`/`text`/`dot` con clases de Tailwind que
    ya nadie leía —el color salía de los tokens— y lo único que hacían era estar
    a mano para que alguien los usara por error y estrenara una tercera paleta.
-   Ver el aviso junto a `STATUS_STYLE` en `AgendaCliente.tsx`. Vive aquí desde A2.2. */
+   Ver el aviso junto a `STATUS_STYLE` en `AppointmentModal.tsx`. Vive aquí desde A2.2. */
 export const STATUS_CONFIG: Record<Status, { label: string }> = {
   scheduled:  { label: 'Agendada'   },
   confirmed:  { label: 'Confirmada' },

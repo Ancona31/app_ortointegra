@@ -218,6 +218,7 @@ export function useResumenDelDia({
   useEffect(() => {
     const api = calendarRef.current?.getApi()
     if (!api) return
+    // El plan preveía este disable también en los efectos E1 y E5, que no lo necesitaron; E8 (este) sí, por el mismo patrón que ya existe en AgendaCliente.tsx (L784 cargaVisible, L1159 auto-apagado de compactar).
     // eslint-disable-next-line react-hooks/set-state-in-effect -- sincroniza estado derivado de la API imperativa de FullCalendar (no hay render que lo calcule); guardado por firma para no re-renderizar de más
     aplicarResumen(api.getEvents(), rangoDeVista(), api.view.type)
   }, [calendarRef, horario, aplicarResumen, rangoDeVista])

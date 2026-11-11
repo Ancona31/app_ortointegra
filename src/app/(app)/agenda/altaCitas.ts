@@ -1,7 +1,7 @@
 'use client'
 
 /**
- * src/app/(app)/agenda/useAltaCitas.ts
+ * src/app/(app)/agenda/altaCitas.ts
  *
  * El alta y la edición de citas/eventos desde la rejilla: los cuatro
  * manejadores de interacción de FullCalendar (`handleDateClick`,
@@ -85,7 +85,7 @@ interface Params {
   citasIncompletas: boolean
 }
 
-export function useAltaCitas({
+export function crearAltaCitas({
   calendarRef, isMobile, setDiaSel, subState, openBloqueoModal, horario, setModal, setConfirm,
   resumenDia, citasIncompletas,
 }: Params) {

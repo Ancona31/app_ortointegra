@@ -34,7 +34,7 @@ import { Calendar as CalendarioFC, type EventApi, type EventDropArg } from '@ful
 import type { EventResizeDoneArg } from '@fullcalendar/interaction'
 import type { Horario } from '@/lib/configApp'
 import type { Profile } from '@/hooks/useProfile'
-import { useToast } from '@/components/ui/Toast'
+import type { useToast } from '@/components/ui/Toast'
 import { canVerAgendaCompleta } from '@/lib/permissions'
 import { vaciarCacheCitas } from '@/lib/agenda/cacheRangosCitas'
 import { buildEventInput, FUENTE_APPOINTMENTS, PREFIJO_OPTIMISTA } from '@/lib/agenda/eventosDeCita'

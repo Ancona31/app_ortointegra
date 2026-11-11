@@ -32,11 +32,12 @@ export function BarraAgendarMovil({ onAgendar, onIntencionAgendar }: Props) {
        no la tapa nada. Si algún día se esconde al hacer scroll, hay que dar
        antes otra puerta.
 
-       ⚠️ EL `onClick` ES EL MISMO QUE EL DE ESCRITORIO, LITERALMENTE. Mismo
-       bloqueo por suscripción, misma hora de arranque —la de ahora— y mismo
-       `tipo: 'cita'`. Dos puertas al mismo sitio tienen que hacer lo mismo;
-       si una de las dos cambia, cambian las dos. Por eso el padre pasa la
-       MISMA función como `onAgendar` a ésta y a `CabeceraEscritorio`. */
+       ⚠️ EL `onClick` TIENE EL MISMO CUERPO QUE EL DE ESCRITORIO, LITERALMENTE.
+       Mismo bloqueo por suscripción, misma hora de arranque —la de ahora— y
+       mismo `tipo: 'cita'`. Dos puertas al mismo sitio tienen que hacer lo
+       mismo; si una de las dos cambia, cambian las dos. Pero NO es la MISMA
+       función: el padre pasa tres cierres distintos a propósito —éste,
+       `CabeceraEscritorio` y `AvisosAgenda`— y no se funden en uno. */
     <div className="ag-barra-movil">
       <button
         type="button"

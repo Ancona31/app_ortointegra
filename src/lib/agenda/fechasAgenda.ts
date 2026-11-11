@@ -142,7 +142,7 @@ export const TOPE_GESTO_MS = 30_000
 
    ⚠️ VIVE FUERA DEL COMPONENTE A PROPÓSITO. Dentro, `refetch` pasaba a cerrar
    sobre una función del cuerpo y los efectos que llaman a `refetch` empezaban
-   a dar `react-hooks/exhaustive-deps`. Desde A2.5.6 esas deps son `[refetch]`
+   a dar `react-hooks/exhaustive-deps`. Desde A2.5.5 esas deps son `[refetch]`
    —`refetch` llega estable de `useFuentesAgenda` (`useCallback` con
    `[calendarRef]`)— y no `[]`; lo que no se toca sigue siendo el porqué de
    cada efecto, razonado donde vive cada uno. El que se mueve es este
