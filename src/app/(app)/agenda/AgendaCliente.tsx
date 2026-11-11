@@ -7,7 +7,7 @@ import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import dynamic from 'next/dynamic'
 import FullCalendar from '@fullcalendar/react'
 import type { DateClickArg, EventResizeDoneArg } from '@fullcalendar/interaction'
-import { Calendar as CalendarioFC, type DatesSetArg, EventClickArg, EventDropArg, DateSelectArg, EventInput, EventApi, EventContentArg, DayCellContentArg, DayHeaderContentArg, ViewApi } from '@fullcalendar/core'
+import { Calendar as CalendarioFC, type DatesSetArg, EventClickArg, EventDropArg, DateSelectArg, EventInput, EventApi, EventContentArg, DayHeaderContentArg, ViewApi } from '@fullcalendar/core'
 import esLocale from '@fullcalendar/core/locales/es'
 import { Calendar, Plus, Settings, ChevronDown,
          ChevronsDownUp, TriangleAlert } from 'lucide-react'
@@ -55,7 +55,7 @@ import { buildEventInput, FUENTE_APPOINTMENTS, PREFIJO_OPTIMISTA } from '@/lib/a
 import { traerCitasDeduplicado, engancharSemilla, type TraidaEnVuelo } from '@/lib/agenda/traidaCitas'
 import { enOcioso, cancelarOcioso } from '@/lib/agenda/ocioso'
 import { useVentanaRejilla } from '@/app/(app)/agenda/useVentanaRejilla'
-import { differenceInCalendarDays } from 'date-fns'
+import { useConteoVisible, usePanelDelMes, useResumenDelDia } from '@/app/(app)/agenda/useResumenVisible'
 import useSWR, { useSWRConfig } from 'swr'
 import {
   CLAVE_CONFIG,
@@ -72,19 +72,15 @@ import {
   avisoFueraDeHorario, avisoFinFueraDeHorario, avisoDiaCerrado,
 } from '@/lib/agenda/horarioAgenda'
 import {
-  type RangosDeVista, rangosDeLaVista, TOPE_GESTO_MS, hayGestoEnCurso,
+  rangosDeLaVista, TOPE_GESTO_MS, hayGestoEnCurso,
   addMinutes, partirFechaHora,
   ultimoDiaIncluido,
 } from '@/lib/agenda/fechasAgenda'
 import {
   type Tramo,
-  medianocheDe, type ResumenDia, resumenDelDia, firmaDelResumen,
+  medianocheDe,
 } from '@/lib/agenda/huecosAgenda'
-import {
-  type FilaDelDia, filasDelDia, firmaDeFilas,
-  type ConteoVisible,
-  type EventoParaConteo, contarVisibles, frasearConteo, frasearConteoBreve,
-} from '@/lib/agenda/conteoAgenda'
+import { frasearConteo, frasearConteoBreve } from '@/lib/agenda/conteoAgenda'
 import {
   esVistaDeRejilla, vistaEnElOtroFormato, etiquetaCompactar, vistaAdmiteCompactar,
   periodoDeLaVista,
@@ -336,8 +332,6 @@ interface PrecargaEnCurso { cancelado: boolean; idle: number }
    pasó a tener fila propia también en escritorio, así que ya no hay nada que
    redeclarar por debajo del umbral. */
 const ANCHO_MOVIL = 1024
-
-const CONTEO_VACIO: ConteoVisible = { citas: 0, eventos: 0, google: 0 }
 
 export interface AgendaClienteProps {
   /** Las citas de W-1, W y W+1 sembradas por `page.tsx` (A1.4c). Sin ella, o
@@ -686,165 +680,13 @@ export default function AgendaCliente({ semillaCitas }: AgendaClienteProps) {
     aplicarVentana, rangoDeVista, avisoRecorte, compactaElMes,
   } = useVentanaRejilla({ calendarRef, horario, currentView })
 
-  /* ── EL CONTEO DEL SUBTÍTULO ─────────────────────────────────────────
-     Mismo patrón que la ventana de la rejilla, y por el mismo motivo: cuelga de
-     `eventsSet`, que se emite en cada llegada de fetch —DOS por navegación, una
-     por fuente—, en cada alta optimista, en cada baja, en cada re-hidratación
-     tras un arrastre y en cada eco de Realtime.
+  const { conteo, aplicarConteo } = useConteoVisible({ calendarRef, diasOcultos, rangoDeVista })
 
-     ⚠️  EL ESTADO GUARDA LA SALIDA —tres enteros—, NO LOS EVENTOS DE LOS QUE
-     SALE. Es lo mismo que hace `ventana` con sus dos cadenas, y por la misma
-     razón: el array que llega en `eventsSet` NO se puede comparar, porque se
-     construye recorriendo un mapa (`buildEventApis` sobre `eventStore`) y su
-     ORDEN cambia con altas, bajas y refetches. Un reordenamiento sin ningún
-     cambio real diría «cambió». Tres números no tienen esa trampa.
+  const {
+    diaSel, setDiaSel, filasDia, aplicarPanel, sincronizarDiaDelPanel, dayCellClassNames,
+  } = usePanelDelMes({ calendarRef, isMobile })
 
-     La diferencia con la ventana, que conviene saber: esto NO alimenta ninguna
-     prop de FullCalendar, así que una escritura de más aquí es un render de más
-     y no un candidato a salto de scroll. La guarda sigue haciendo falta —dos
-     emisiones por navegación son dos renders del árbol entero— pero el precio de
-     fallarla es menor que allí. No la quites; sí sepas que no es lo mismo. */
-  const [conteo, setConteo] = useState<ConteoVisible>(CONTEO_VACIO)
-
-  /* Por ref y no por deps, igual que `horarioRef` y `compactarRef`: mete
-     `diasOcultos` en las deps y `aplicarConteo` se recrea con cada pliegue. */
-  const diasOcultosRef = useRef(diasOcultos)
-  diasOcultosRef.current = diasOcultos
-
-  /* ⚠️ YA NO RECIBE LA VISTA, Y ESO ES DEL BLOQUE 5. Llevaba un `vista: string`
-     con su propia nota —llegaba por parámetro y no del estado `currentView`
-     porque en `datesSet` el `setCurrentView` de al lado todavía no ha llegado al
-     render—, pero su ÚNICO consumidor era la reja `sinAllDay` de
-     `contarVisibles`, que se retiró al encender la banda. Sin ella el parámetro
-     quedaba muerto, y con él el `view.type` que los tres llamadores calculaban
-     sólo para pasárselo. El conteo no depende de la vista.
-
-     Si algún día vuelve a hacer falta la vista aquí, el motivo de arriba sigue
-     en pie: sácala del `arg` del handler, nunca de `currentView`. */
-  const aplicarConteo = useCallback((
-    eventos: readonly EventoParaConteo[],
-    rangos: RangosDeVista | null,
-  ) => {
-    const nuevo = contarVisibles(
-      eventos,
-      rangos?.activo ?? null,
-      diasOcultosRef.current,
-    )
-    /* Forma funcional devolviendo `prev` tal cual cuando no cambia, para que
-       React se salte el re-render por bail-out de identidad. Calcado de
-       `setVentana` y `setDiasOcultos`. */
-    setConteo(prev =>
-      prev.citas === nuevo.citas && prev.eventos === nuevo.eventos && prev.google === nuevo.google
-        ? prev
-        : nuevo
-    )
-  }, [])
-
-  /* `diasOcultos` es la TERCERA entrada del conteo y la escribe `aplicarVentana`
-     DESPUÉS de que los handlers hayan contado: dentro del handler el ref todavía
-     vale lo viejo. Este efecto es quien cubre esa entrada, igual que los dos de
-     más arriba cubren al horario y al botón. Y de paso hace el conteo del
-     montaje, antes del primer `eventsSet`. */
-  useEffect(() => {
-    const api = calendarRef.current?.getApi()
-    if (!api) return
-    aplicarConteo(api.getEvents(), rangoDeVista())
-  }, [diasOcultos, aplicarConteo, rangoDeVista])
-
-  /* ── EL DÍA QUE ENSEÑA EL PANEL DEL MES ────────────────────────────────
-     Sólo lo consume la vista Mes del teléfono. En cualquier otra queda inerte:
-     ni se pinta el panel ni se marca ninguna celda. */
-  const [diaSel, setDiaSel] = useState<Date | null>(null)
-  const [filasDia, setFilasDia] = useState<readonly FilaDelDia[]>([])
-
-  /* Por ref y no por deps, igual que `horarioRef` y `compactarRef`: con
-     `diaSel` en las deps, `aplicarPanel` se recrearía en cada toque de celda. */
-  const diaSelRef = useRef(diaSel)
-  diaSelRef.current = diaSel
-
-  const aplicarPanel = useCallback((eventos: readonly EventApi[]) => {
-    const dia = diaSelRef.current
-    const nuevas = dia ? filasDelDia(eventos, dia) : []
-    setFilasDia(prev => (firmaDeFilas(prev) === firmaDeFilas(nuevas) ? prev : nuevas))
-  }, [])
-
-  /* El día seleccionado es la SEGUNDA entrada del panel y no llega por ningún
-     handler del calendario: la escribe el toque en una celda y el cambio de mes.
-     Este efecto es quien la cubre, igual que los de más arriba cubren al horario,
-     al botón y a `diasOcultos`. */
-  useEffect(() => {
-    const api = calendarRef.current?.getApi()
-    if (!api) return
-    aplicarPanel(api.getEvents())
-  }, [diaSel, aplicarPanel])
-
-  /* ── EL RESUMEN Y LOS HUECOS DE LA VISTA DÍA (bloque 8) ────────────────
-     Mismo patrón que `conteo` y que el panel del mes, y por el mismo motivo:
-     cuelga de los dos disparadores del calendario, guarda LA SALIDA y no los
-     eventos de los que sale, y se protege con una firma para que las dos
-     emisiones por navegación no sean dos renders del árbol entero.
-
-     ⚠️ SE CALCULA EN EL CLIENTE Y SOBRE LO QUE YA ESTÁ CARGADO. Ni ruta nueva
-     ni consulta al servidor: los eventos del día ya están en el `eventStore` y
-     el horario ya llegó por SWR para `businessHours`. Un endpoint de
-     disponibilidad sería una segunda fuente de verdad sobre las mismas filas.
-
-     ⚠️ INERTE FUERA DE `timeGridDay`. Vale `null` en cualquier otra vista, así
-     que en Semana, en Mes y en las listas esto no cuesta ni un recorrido: la
-     guarda de vista está ANTES del cálculo, no después. */
-  const [resumenDia, setResumenDia] = useState<ResumenDia | null>(null)
-
-  const aplicarResumen = useCallback((
-    eventos: readonly EventApi[],
-    rangos: RangosDeVista | null,
-    vista: string,
-  ) => {
-    /* El día es `activeStart` y no `new Date()`: el panel sigue al calendario,
-       no compite con él (§8.3). En `timeGridDay` el rango activo es ese único
-       día, así que «el primer día del rango» y «el día pintado» son lo mismo y
-       no hace falta la rama de «hoy si cae dentro» que pide el spec para las
-       vistas de varios días — aquí no hay ninguna. */
-    const nuevo = vista === 'timeGridDay' && rangos
-      ? resumenDelDia(eventos, rangos.activo.activeStart, horarioRef.current)
-      : null
-    setResumenDia(prev => (firmaDelResumen(prev) === firmaDelResumen(nuevo) ? prev : nuevo))
-  }, [horarioRef])
-
-  /* El horario es la SEGUNDA entrada del resumen y llega por SWR, que puede
-     resolver DESPUÉS del último `eventsSet`. Este efecto es quien cubre esa
-     entrada —igual que el gemelo que cubre la ventana de la rejilla— y de paso
-     hace el primer cálculo del montaje. */
-  useEffect(() => {
-    const api = calendarRef.current?.getApi()
-    if (!api) return
-    aplicarResumen(api.getEvents(), rangoDeVista(), api.view.type)
-  }, [horario, aplicarResumen, rangoDeVista])
-
-  /* ⚠️ EL MES SE COMPARA CON UN REF, Y SIN ESO EL PANEL NO SE PODRÍA USAR.
-     La regla es «al navegar de mes, el panel muestra el primer día del mes», y
-     el sitio donde se sabe que el rango cambió es `datesSet`. Pero `datesSet` SE
-     REEMITE en cada cambio de la ventana vertical aunque el rango no se mueva
-     (la cadena está en la cabecera de `ventanaRejilla.ts`), así que escribir el
-     día en cada emisión borraría la selección del médico un fotograma después de
-     hacerla. Comparando la clave del mes, sólo escribe cuando el mes es otro. */
-  const mesDelPanelRef = useRef('')
-  const sincronizarDiaDelPanel = useCallback((vista: ViewApi) => {
-    if (vista.type !== 'dayGridMonth') { mesDelPanelRef.current = ''; return }
-    const clave = vista.currentStart.toISOString()
-    if (mesDelPanelRef.current === clave) return
-    mesDelPanelRef.current = clave
-    setDiaSel(vista.currentStart)
-  }, [])
-
-  /* La marca del día seleccionado. CONTORNO, no relleno: el relleno es de HOY, y
-     dos rellenos en la misma cuadrícula no se distinguen de un vistazo.
-     ⚠️ ACOTADA A MÓVIL A PROPÓSITO. `sincronizarDiaDelPanel` corre también en el
-     Mes de escritorio —es el mismo `datesSet`—, así que sin este `isMobile` el
-     día 1 aparecería contorneado en un escritorio donde no hay panel al que
-     corresponda ni forma de cambiar la selección. */
-  const dayCellClassNames = useCallback((arg: DayCellContentArg): string[] => (
-    isMobile && diaSel && differenceInCalendarDays(arg.date, diaSel) === 0 ? ['ag-mes-dia-sel'] : []
-  ), [isMobile, diaSel])
+  const { resumenDia, aplicarResumen } = useResumenDelDia({ calendarRef, horario, horarioRef, rangoDeVista })
 
   /* ── Detectar ancho y cambiar de FORMATO, no de vista ──────────────────
      ⚠️ ESTO ERA OTRA COSA HASTA EL BLOQUE 6, Y LA DIFERENCIA IMPORTA. Antes
