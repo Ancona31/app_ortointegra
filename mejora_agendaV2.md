@@ -840,7 +840,24 @@ primero sin marcar.
   - Queda escrito, sin tocar: el bloque comentado del `QuickPatientModal`
     viejo dentro de `AgendaCliente.tsx` (~100 líneas muertas; se pregunta
     aparte por el Protocolo 2).
-- [ ] B — Cimientos
+- [ ] B — Cimientos (en curso)
+  - Diseño en `scratchpad` de la sesión, resumido aquí. Interruptor por
+    clínica: `agenda_ajustes.agenda_v2_encendida`, apagado, solo `postgres`
+    lo cambia (lo enciende Angel por SQL).
+  - Hecho: P-0 pruebas SQL (`scripts/pruebas-sql.sh`, `supabase/pruebas-sql/`)
+    · B0 auditoría de citas siempre encendida (`log_cita_change`, migración
+    `20261112120000`, auditada APTA) · B1 tabla `agenda_ajustes` + interruptor
+    (migración `20261112130000`, auditada APTA) · B2 E5-DT-8: la tercera vía
+    (deshacer tras una traída) duplicaba la cita; arreglado con
+    `restaurarPosicion`.
+  - **Producción, las aplica Angel en orden:** `20261111120000` (A1.8),
+    `20261112120000` (B0), `20261112130000` (B1). Confirmar antes
+    `select version()` ≥ 14.
+  - Esperan decisión de Angel (P3-P9): empalme, cancelación, tipos de cita,
+    disponibilidad, pantalla de configuración, endurecer `PUT /api/me/horario`,
+    paso de turnos.
+  - Abierto y documentado en `DEUDA_TECNICA.md` (E5-DT-8): si otra persona
+    borra la cita a mitad del arrastre, al soltar queda una tarjeta fantasma.
 - [ ] C — Google en los dos sentidos
 - [ ] D — Reserva por enlace
 - [ ] E — Recordatorios y confirmación de asistencia
