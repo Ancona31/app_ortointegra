@@ -9,7 +9,7 @@ import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin, { DateClickArg, EventResizeDoneArg } from '@fullcalendar/interaction'
 import listPlugin, { type NoEventsContentArg } from '@fullcalendar/list'
-import { Calendar as CalendarioFC, type DatesSetArg, type FormatterInput, type PluginDef, EventClickArg, EventDropArg, DateSelectArg, EventInput, EventApi, EventContentArg, DayCellContentArg, DayHeaderContentArg, MoreLinkContentArg, NowIndicatorContentArg, ViewApi } from '@fullcalendar/core'
+import { Calendar as CalendarioFC, type DatesSetArg, type FormatterInput, type PluginDef, EventClickArg, EventDropArg, DateSelectArg, EventInput, EventApi, EventContentArg, DayCellContentArg, DayHeaderContentArg, NowIndicatorContentArg, ViewApi } from '@fullcalendar/core'
 import esLocale from '@fullcalendar/core/locales/es'
 import { X, Calendar, User, Plus, Trash2, Settings, ChevronDown, FileText, Stethoscope, Loader2, Mail,
          CalendarPlus, ChevronsDownUp, Menu, ChevronLeft, ChevronRight, TriangleAlert, type LucideIcon } from 'lucide-react'
@@ -44,11 +44,10 @@ import {
   calcularVentanaRejilla,
   diasOcultables,
   type EventoParaVentana,
-  type RangoVisible,
   type VentanaRejilla,
 } from '@/lib/agenda/ventanaRejilla'
-import { addWeeks, differenceInCalendarDays, startOfWeek } from 'date-fns'
-import { TZ_CLINICA, desplazarFecha, fechaSoloSegura, renderEnTZ } from '@/lib/dates'
+import { differenceInCalendarDays } from 'date-fns'
+import { desplazarFecha } from '@/lib/dates'
 import useSWR, { useSWRConfig } from 'swr'
 import {
   CLAVE_CONFIG,
@@ -60,66 +59,37 @@ import {
   type Horario,
   type MedicoConfig,
 } from '@/lib/configApp'
+import type { Status, Appointment, DatosGuardado } from '@/lib/agenda/tiposAgenda'
+export type { Appointment }
+import {
+  DIAS, HORARIO_DEFAULT, horarioToBusinessHours,
+  avisoFueraDeHorario, avisoFinFueraDeHorario, avisoDiaCerrado,
+} from '@/lib/agenda/horarioAgenda'
+import {
+  type RangosDeVista, rangosDeLaVista, TOPE_GESTO_MS, hayGestoEnCurso,
+  addMinutes, horaEnTZ, partirFechaHora, componerIso, diasEntreFechas,
+  ultimoDiaIncluido, fechasDeTodoElDia, duracionEscrita, puntasParaLaRejilla,
+  duracionDeLaFila,
+} from '@/lib/agenda/fechasAgenda'
+import {
+  type Tramo, HUECO_MINIMO, etiquetaDeRango, etiquetaDeDuracion, etiquetaDeHoras,
+  medianocheDe, type ResumenDia, resumenDelDia, firmaDelResumen,
+} from '@/lib/agenda/huecosAgenda'
+import {
+  type FilaDelDia, filasDelDia, firmaDeFilas,
+  type ConteoVisible, contarFilas,
+  type EventoParaConteo, contarVisibles, frasearConteo, frasearConteoBreve,
+} from '@/lib/agenda/conteoAgenda'
+import {
+  esVistaDeRejilla, vistaEnElOtroFormato, etiquetaCompactar, vistaAdmiteCompactar,
+  masBreve, periodoDeLaVista,
+} from '@/lib/agenda/vistasAgenda'
+import {
+  ESTADOS_CITA, ICONO_ETIQUETA, COLOR_ETIQUETA, esEventoGenerico, clasesDelEvento,
+  tintasDelChipDeBanda, tintasDelChipDeMes,
+} from '@/lib/agenda/tarjetasAgenda'
 
 /* ─── Tipos ────────────────────────────────────────────── */
-
-/* `attended` (plan §12.13). Lo escribe el servidor al crear la nota clínica que
-   salió de la cita, y también se puede poner a mano en el selector de abajo.
-
-   ⚠️ AÑADIR UN ESTADO AQUÍ ROMPE `STATUS_CONFIG` en compilación —es un
-   `Record<Status, …>`— pero NO rompe los tokens CSS, que se consumen por
-   interpolación (`var(--ag-status-${status}-dot)`). Si faltan los cuatro tokens
-   del estado nuevo en globals.css, la tarjeta sale transparente y sin borde, sin
-   un solo error. Los de `attended` están puestos, en claro y en oscuro.
-   El otro consumidor de esos mismos tokens es `dashboard/StatusChip.tsx`, que
-   sólo pinta `scheduled` y `confirmed` a propósito. */
-type Status = 'scheduled' | 'confirmed' | 'cancelled' | 'no_show' | 'attended'
-
-
-export type Appointment = {
-  id: string
-  title: string
-  start_time: string
-  end_time: string
-  /* Días enteros en vez de horas (bloque 5B). El CONVENIO va con la columna y
-     no se puede leer de otra forma: `start_time` es medianoche del primer día y
-     `end_time` medianoche del día SIGUIENTE al último —fin EXCLUSIVO—, las dos
-     en `consultorio_timezone`, NO en el huso de quien mira. Un evento del 19
-     va de `19T00:00` a `20T00:00`.
-     Quien la escribe es el SERVIDOR: el modal manda dos fechas y las rutas
-     componen la medianoche con la zona del consultorio. Ver
-     `appointments_all_day_medianoche_check`. */
-  all_day: boolean
-  status: Status
-  notes: string | null
-  paciente_id: string | null
-  medico_id: string | null
-  google_event_id: string | null
-  gcal_sync_status: 'synced' | 'pending' | 'failed' | 'unbound'
-  updated_at: string
-  // F3-6: snapshots de consultorio (persistidos en POST/PUT, devueltos en GET).
-  consultorio_id: string | null
-  consultorio_nombre: string | null
-  consultorio_nombre_corto: string | null
-  consultorio_direccion: string | null
-  consultorio_telefono: string | null
-  consultorio_timezone: string | null
-  /* La pinta del evento genérico sin paciente (§12.14). Una CITA no lleva
-     ninguna de las dos y ahí NULL es lo corriente, no una carencia. */
-  icono: IconoEvento | null
-  color: ColorEvento | null
-  /* `email` viaja desde `APPOINTMENT_SELECT` para un solo consumidor: el botón
-     de invitación. Que esté aquí es lo que evita una petición por cita abierta
-     sólo para saber si la ficha tiene correo.
-
-     OPCIONAL, y no por comodidad: la actualización optimista de `handleSave`
-     mete aquí el `PacienteBusqueda` que devuelve el buscador, que NO trae
-     correo porque su endpoint no lo selecciona. Ese hueco dura lo que tarda la
-     respuesta del PUT —que trae la fila canónica y la pisa vía
-     `aplicarAppointmentAlEvento`— y encima ocurre con el modal ya cerrado. */
-  pacientes?: { id: string; nombre: string; apellidos: string; telefono: string | null; email?: string | null } | null
-  medico?: { id: string; titulo: string | null; nombres: string | null; apellido_paterno: string | null; apellido_materno: string | null } | null
-}
 
 /**
  * Una fila de `appointments` tal como llega por Realtime: columnas de la
@@ -262,7 +232,6 @@ const STATUS_CONFIG: Record<Status, { label: string }> = {
    «Atendida» no significan nada sobre una junta de personal, y ofrecerlos sería
    fingir que sí. El orden es el de `STATUS_CONFIG`, que es el que el selector
    pintaba antes de que hubiera dos listas. */
-const ESTADOS_CITA:   readonly Status[] = ['scheduled', 'confirmed', 'cancelled', 'no_show', 'attended']
 const ESTADOS_EVENTO: readonly Status[] = ['scheduled', 'cancelled']
 
 /* ⚠️ AQUÍ VIVÍA `STATUS_STYLE`, UNA SEGUNDA PALETA DE ESTADO. NO LA REPONGAS.
@@ -354,32 +323,6 @@ function IconoDelEvento({ nombre, size, color }: { nombre: IconoEvento; size: nu
   )
 }
 
-const ICONO_ETIQUETA: Record<IconoEvento, string> = {
-  // Quirófano y hospital
-  cirugia:        'Cirugía',
-  instrumental:   'Instrumental',
-  urgencias:      'Urgencias',
-  internamiento:  'Internamiento',
-  ronda:          'Ronda hospitalaria',
-  // Clínica y estudios
-  columna:        'Columna',
-  ortopedia:      'Ortopedia',
-  imagen:         'Imagenología',
-  ultrasonido:    'Ultrasonido',
-  rehabilitacion: 'Rehabilitación',
-  laboratorio:    'Laboratorio',
-  vacuna:         'Vacunación',
-  // Agenda no clínica
-  junta:          'Junta',
-  videollamada:   'Videollamada',
-  docencia:       'Docencia',
-  congreso:       'Congreso',
-  viaje:          'Viaje',
-  comida:         'Comida',
-  personal:       'Personal',
-  bloqueo:        'Bloqueo de horario',
-}
-
 /* Las dos posiciones del control del alta. `Record<TipoFila, …>` no sirve aquí
    —hace falta el ORDEN, y la cita va primera porque es lo que la agenda hace
    todo el día—, así que la exhaustividad la da el tipo de cada `id`. */
@@ -387,240 +330,6 @@ const TIPOS_ALTA: ReadonlyArray<{ id: TipoFila; label: string; icono: LucideIcon
   { id: 'cita',   label: 'Cita',   icono: Calendar },
   { id: 'evento', label: 'Evento', icono: CalendarPlus },
 ]
-
-const COLOR_ETIQUETA: Record<ColorEvento, string> = {
-  indigo:  'Índigo',
-  magenta: 'Magenta',
-  carmin:  'Carmín',
-  oliva:   'Oliva',
-  bronce:  'Bronce',
-  grafito: 'Grafito',
-}
-
-/** True si la fila es un evento genérico y no una cita: lo decide el paciente. */
-function esEventoGenerico(apt: { paciente_id?: string | null }): boolean {
-  return !apt.paciente_id
-}
-
-/* ─── Horario de consulta ──────────────────────────────── */
-
-/* `DiaSemana`, `HorarioDia` y `Horario` viven en src/lib/configApp.ts: es el
-   tipo de `clinicas.horario_consulta` tal como lo devuelve el agregado. */
-
-/* `plural` es para la frase del aviso de fuera de horario («esta clínica no
-   atiende los domingos»), no para ninguna etiqueta de la interfaz. */
-const DIAS: { key: DiaSemana; label: string; plural: string; fc: number }[] = [
-  { key: 'lunes',     label: 'Lunes',     plural: 'los lunes',     fc: 1 },
-  { key: 'martes',    label: 'Martes',    plural: 'los martes',    fc: 2 },
-  { key: 'miercoles', label: 'Miércoles', plural: 'los miércoles', fc: 3 },
-  { key: 'jueves',    label: 'Jueves',    plural: 'los jueves',    fc: 4 },
-  { key: 'viernes',   label: 'Viernes',   plural: 'los viernes',   fc: 5 },
-  { key: 'sabado',    label: 'Sábado',    plural: 'los sábados',   fc: 6 },
-  { key: 'domingo',   label: 'Domingo',   plural: 'los domingos',  fc: 0 },
-]
-
-const HORARIO_DEFAULT: Horario = {
-  lunes:     { activo: true,  inicio: '09:00', fin: '19:00' },
-  martes:    { activo: true,  inicio: '09:00', fin: '19:00' },
-  miercoles: { activo: true,  inicio: '09:00', fin: '19:00' },
-  jueves:    { activo: true,  inicio: '09:00', fin: '19:00' },
-  viernes:   { activo: true,  inicio: '09:00', fin: '19:00' },
-  sabado:    { activo: false, inicio: '09:00', fin: '14:00' },
-  domingo:   { activo: false, inicio: '09:00', fin: '14:00' },
-}
-
-/**
- * Los dos rangos que publica la vista, porque el cálculo necesita los dos.
- *
- * ⚠️  NO SON INTERCAMBIABLES Y NO SE PUEDEN UNIFICAR. Ver `aplicarVentana`.
- *
- *  · `activo` es `activeRange`: lo que la vista PINTA. Ya viene recortado por
- *    `trimHiddenDays`, así que con columnas ocultas le faltan días.
- *  · `completo` es lo que la vista representa SIN recortar por columnas
- *    plegadas. En Semana y Día es `currentRange` tal cual sale de
- *    `buildCurrentRangeInfo` (`@fullcalendar/core/internal-common.js:2814`,
- *    versión 6.1.20); en MES es `renderRange` —el mes encajado a seis semanas—,
- *    que es lo que esa vista pinta de verdad. Lo calcula `rangosDeLaVista`, y el
- *    porqué de la excepción está en `semanasPintadasDelMes`.
- *  · `esMes` dice si la vista es `dayGridMonth`. Lo lee `aplicarVentana` para
- *    apagar la MITAD DEL ALTO del modo compacto: en Mes no hay `slotMinTime` que
- *    encoger, así que compactar ahí sólo pliega columnas.
- *
- * ⚠️  `completo` NO SON SIEMPRE SIETE DÍAS, y creerlo ya costó un fallo. Depende
- * de la vista:
- *
- *    · `timeGridWeek` → la semana entera, de lunes a lunes: siete días.
- *    · `timeGridDay`  → UN solo día.
- *    · `dayGridMonth` → SEIS SEMANAS enteras, de lunes a lunes: 42 días. Aquí
- *      es donde `completo` dejó de ser `currentRange` (que daba el mes natural,
- *      de 28 a 31 días, sin el relleno de semanas que la vista sí pinta).
- *
- * ⚠️  DE ESE HECHO DEPENDE UNA GUARDA DE `diasOcultables`, Y NO SE PUEDE
- * RETIRAR. Ahí se calcula el conjunto `cubiertos` —los días de la semana que
- * este rango abarca— y se pliega sólo lo que cae dentro, con el cierre
- * `ocultables.length >= cubiertos.size`. Las dos cosas existen justamente
- * porque `completo` puede traer menos de siete días: en la vista de Día trae
- * uno, y sin la guarda se plegaban los otros seis con datos que nadie pidió, o
- * se plegaba el único que hay y FullCalendar saltaba de día
- * (`internal-common.js:2955-2959`). Leído como «aquí siempre hay siete», ese
- * código parece muerto y se borra; hizo falta una auditoría entera para
- * encontrar lo que pasa cuando no está.
- *
- * Los dos usan las llaves de `RangoVisible` (`activeStart`/`activeEnd`) por no
- * duplicar el tipo; en `completo` esos nombres mienten un poco, y por eso este
- * comentario.
- */
-type RangosDeVista = { activo: RangoVisible; completo: RangoVisible; esMes: boolean }
-
-/* ⚠️ EL PRIMER DÍA DE LA SEMANA, Y TIENE QUE SER EL DE `esLocale`. El locale
-   español declara `week.dow: 1` (`@fullcalendar/core/locales/es.js:4`), o sea
-   lunes, y de ahí sale la primera columna de la rejilla del mes. Si algún día se
-   cambia el locale del calendario, este número cambia con él o el rango de abajo
-   deja de coincidir con lo que se pinta. */
-const PRIMER_DIA_SEMANA = 1
-
-/* ⚠️ SEIS, PORQUE `fixedWeekCount` NO SE TOCA. Su default es `true`
-   (`@fullcalendar/daygrid/internal.js:949-958`), así que `dayGridMonth` rellena
-   SIEMPRE hasta seis filas, mida lo que mida el mes. Si alguien pone
-   `fixedWeekCount: false` en `VISTAS_FC`, este número deja de ser fijo y hay que
-   derivarlo del rango. */
-const SEMANAS_PINTADAS_DEL_MES = 6
-
-/**
- * El rango que la vista Mes PINTA de verdad: el mes encajado a semanas
- * completas y rellenado hasta seis filas, o sea `renderRange`.
- *
- * ⚠️ ESTO ES EL «REQUISITO PREVIO» QUE PEDÍA `diasOcultables` POR ESCRITO, y no
- * un refinamiento. Aquella función decide qué columnas se pliegan a partir del
- * rango que se le pasa, y hasta ahora recibía `currentRange` — el mes natural,
- * del 1 al último. Pero el mes natural NO es lo que se pinta: faltan hasta ~12
- * días de relleno de las semanas de los extremos, así que una cita en uno de
- * esos días no protegía su columna y el mes podía plegar un día CON trabajo
- * dentro. Mientras «Compactar» estuvo apagado en Mes eso no mordía; al
- * encenderlo pasa a ser un fallo real, y por eso esto va PRIMERO.
- *
- * ⚠️ Y NO SIRVE `activeRange` PARA ESTO, aunque sea exactamente el rango
- * pintado. `trimHiddenDays` lo recorta por los dos extremos, así que con una
- * columna ya plegada el rango se estrecha, sus eventos caen fuera del filtro, la
- * columna sigue vacía y sigue plegada: un punto fijo del que sólo se sale
- * recargando. Esto se calcula desde `currentRange`, que nadie recorta, así que
- * el conjunto no depende de qué se plegó y el ciclo converge.
- *
- * Aritmética de CALENDARIO —`startOfWeek` y `addWeeks` de date-fns—, no de
- * milisegundos: en el cambio de horario de verano un día no dura 24 horas.
- */
-function semanasPintadasDelMes(inicio: Date): RangoVisible {
-  const desde = startOfWeek(inicio, { weekStartsOn: PRIMER_DIA_SEMANA })
-  return { activeStart: desde, activeEnd: addWeeks(desde, SEMANAS_PINTADAS_DEL_MES) }
-}
-
-/**
- * Los dos rangos de una vista, ya resueltos. Lo llaman los DOS sitios que antes
- * armaban el objeto a mano —`datesSet` y `rangoDeVista`—, para que la corrección
- * de Mes no pueda aplicarse en uno y olvidarse en el otro.
- */
-function rangosDeLaVista(vista: ViewApi): RangosDeVista {
-  const esMes = vista.type === 'dayGridMonth'
-  return {
-    activo:   { activeStart: vista.activeStart, activeEnd: vista.activeEnd },
-    completo: esMes
-      ? semanasPintadasDelMes(vista.currentStart)
-      : { activeStart: vista.currentStart, activeEnd: vista.currentEnd },
-    esMes,
-  }
-}
-
-function horarioToBusinessHours(h: Horario) {
-  return DIAS.filter(d => h[d.key]?.activo).map(d => ({
-    daysOfWeek: [d.fc],
-    startTime:  h[d.key].inicio,
-    endTime:    h[d.key].fin,
-  }))
-}
-
-/** Hora de pared del navegador, `HH:MM`. Comparable con `horario.inicio`/`fin`. */
-function horaDeReloj(date: Date): string {
-  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
-}
-
-/**
- * El aviso de que una hora cae fuera del horario de consulta, YA REDACTADO, o
- * `null` si cae dentro.
- *
- * ⚠️  EL TEXTO DICE LA HORA Y DICE EL HORARIO, A PROPÓSITO. Un «23:00» dentro
- * de una frase se reconoce como error de tecleo; un campo del formulario ya
- * relleno con 23:00 no se reconoce, porque es justo lo que no se vuelve a
- * mirar. En producción hay cinco citas de madrugada que salieron de ahí.
- *
- * ⚠️  NO BLOQUEA NADA, Y NO DEBE HACERLO. Agendar fuera de horario sigue
- * siendo un clic: hay urgencias, favores y consultas a deshora. Un bloqueo
- * duro no evita la cita rara, enseña a falsear el dato para colarla.
- *
- * `encabezado` es la frase hasta la hora, sin ella: «Vas a agendar a las».
- */
-function avisoFueraDeHorario(date: Date, h: Horario, encabezado: string): string | null {
-  const dia = DIAS.find(d => d.fc === date.getDay())
-  if (!dia) return null
-  const horarioDia = h[dia.key]
-  const hhmm = horaDeReloj(date)
-  if (!horarioDia?.activo) {
-    return `${encabezado} ${hhmm} del ${dia.label.toLowerCase()}, y esta clínica no atiende ${dia.plural}. ¿Es correcto?`
-  }
-  if (hhmm >= horarioDia.inicio && hhmm < horarioDia.fin) return null
-  return `${encabezado} ${hhmm}, y esta clínica atiende de ${horarioDia.inicio} a ${horarioDia.fin}. ¿Es correcto?`
-}
-
-/**
- * Lo mismo para la hora de FIN, que necesita su propia regla.
- *
- * ⚠️  EL CIERRE ES INCLUSIVO AQUÍ. Una cita de 18:00 a 19:00 en una clínica
- * que atiende hasta las 19:00 termina justo al cerrar y no tiene nada de raro;
- * con la regla del inicio (`hhmm < fin`) saltaría el aviso en TODAS las citas
- * de última hora, y un aviso que salta siempre se aprende a despachar sin
- * leerlo — que es peor que no tenerlo.
- *
- * Devuelve `null` en un día no atendido: de eso ya avisa la hora de inicio, y
- * dos ventanas seguidas para el mismo error son una de más.
- */
-function avisoFinFueraDeHorario(fin: Date, h: Horario): string | null {
-  const dia = DIAS.find(d => d.fc === fin.getDay())
-  if (!dia) return null
-  const horarioDia = h[dia.key]
-  if (!horarioDia?.activo) return null
-  const hhmm = horaDeReloj(fin)
-  if (hhmm > horarioDia.inicio && hhmm <= horarioDia.fin) return null
-  /* «Terminaría» y no «La cita terminaría»: esto lo disparan también el modal de
-     un EVENTO genérico y el redimensionado de su tarjeta, y ahí «la cita» nombra
-     algo que no existe. Sin sujeto la frase vale para los dos y no hace falta
-     pasarle el tipo de fila, que este ayudante no tiene ni necesita. */
-  return `Terminaría a las ${hhmm}, y esta clínica atiende de ${horarioDia.inicio} a ${horarioDia.fin}. ¿Es correcto?`
-}
-
-/**
- * El aviso de DÍA CERRADO, sin mencionar ninguna hora.
- *
- * Existe porque la vista Mes abre el alta SIN HORA (`ModalState`, `hora: null`),
- * y `avisoFueraDeHorario` no sirve ahí: su mensaje interpola la hora en las dos
- * ramas, así que soltaría «vas a agendar a las 00:00 del domingo» — justo el
- * dato inventado que se quiso quitar de esa ruta.
- *
- * ⚠️ NO LO FUSIONES CON `avisoFueraDeHorario` NI LA TOQUES A ELLA PARA
- * REUTILIZARLA. Esa función la usan `handleSelect` y las vistas de rejilla, con
- * una hora real y un mensaje que la nombra a propósito; ahí funciona bien.
- * Aquí la pregunta es OTRA —¿se atiende este día?— y por eso son dos.
- *
- * ⚠️ Y AQUÍ VIVÍA `horaDeAperturaDelDia`, QUE SE RETIRÓ: subía el clic del mes
- * a la hora de apertura para que el aviso no saltara siempre. Ya no hace falta
- * suponer ninguna hora, porque la ruta del mes no pone hora en absoluto. Si
- * vuelves a necesitar una hora por defecto para el mes, léete antes por qué se
- * quitó: inventarla hacía que el médico viera «07:00» donde quería las 10:00 y
- * cancelara creyendo que el sistema le había entendido mal.
- */
-function avisoDiaCerrado(date: Date, h: Horario): string | null {
-  const dia = DIAS.find(d => d.fc === date.getDay())
-  if (!dia || h[dia.key]?.activo) return null
-  return `Vas a agendar un ${dia.label.toLowerCase()}, y esta clínica no atiende ${dia.plural}. ¿Es correcto?`
-}
 
 /* ─── Modal de configuración de horario ─────────────────── */
 
@@ -977,7 +686,6 @@ const FUENTE_APPOINTMENTS = 'appointments'
 /** Prefijo del id temporal que lleva una cita aun no confirmada por el servidor. */
 const PREFIJO_OPTIMISTA = 'optimistic-'
 
-
 /* Antigüedad a partir de la cual volver a la pestaña sí pide datos otra vez.
    Ver el efecto de `visibilitychange`, que es quien lo justifica. */
 const UMBRAL_REFETCH_FOCO_MS = 120_000
@@ -990,169 +698,7 @@ const UMBRAL_REFETCH_FOCO_MS = 120_000
    opacidad de 180 ms de `--ag-dur-base` (CONTRASTE_Y_MOVIMIENTO §3). */
 const UMBRAL_CARGA_MS = 150
 
-/* Lo que como mucho puede durar un arrastre antes de que el candado de
-   `refetch()` se dé por atascado y se suelte solo. NO es la duración de un
-   gesto normal —esos son dos o tres segundos—, es la VÁLVULA DE SEGURIDAD:
-   el techo del daño si `eventDragStop` no llega nunca. Ver `hayGestoEnCurso`. */
-const TOPE_GESTO_MS = 30_000
-
-/* La válvula de seguridad del candado de `refetch()`, y NO es paranoia: hay un
-   camino real por el que `eventDragStop` puede no llegar nunca.
-
-   `stopDrag` —el único que dispara `dragend`, y con él `eventDragStop`— sale de
-   `mirror.stop()` (`@fullcalendar/interaction/index.js:818-826`). Cuando el
-   fantasma flotante está visible y hay que devolverlo a su sitio, ese `stop()`
-   pasa por `doRevertAnimation` y espera a `whenTransitionDone`
-   (`@fullcalendar/core/internal-common.js:301-311`), que SÓLO escucha
-   `transitionend` y NO tiene temporizador de respaldo. Si esa transición no
-   termina —la pestaña se va a segundo plano a mitad de la vuelta, el elemento
-   se retira— el callback no corre y el gesto no se cierra jamás. La agenda va
-   con `dragRevertDuration={200}`, así que ese camino está vivo.
-
-   De ahí que la marca sea un INSTANTE y no un booleano: pasado el tope se
-   suelta sola, y se suelta AQUÍ, en la primera consulta que la encuentre
-   caducada. Un booleano dejaría la agenda sin traer datos para siempre y sin
-   que nadie se entere, que es justo lo que un candado no debe hacer.
-
-   ⚠️ VIVE FUERA DEL COMPONENTE A PROPÓSITO. Dentro, `refetch` pasaba a cerrar
-   sobre una función del cuerpo y los tres efectos que llaman a `refetch` con
-   deps `[]` empezaban a dar `react-hooks/exhaustive-deps`. Esos `[]` están
-   razonados en cada efecto —sólo leen refs— y no se tocan; el que se mueve es
-   este ayudante. El ref entra por parámetro. */
-function hayGestoEnCurso(marca: { current: number }): boolean {
-  if (!marca.current) return false
-  if (Date.now() - marca.current < TOPE_GESTO_MS) return true
-  marca.current = 0
-  return false
-}
-
-function calcDuration(startIso: string, endIso: string) {
-  return Math.round((new Date(endIso).getTime() - new Date(startIso).getTime()) / 60000)
-}
-
-function addMinutes(iso: string, mins: number) {
-  const d = new Date(iso); d.setMinutes(d.getMinutes() + mins); return d.toISOString()
-}
-
-/* ─── F3-6e: helper para badge de timezone ───
-   `regionDeTimezone` estaba aquí y vive ahora en `@/lib/consultorios/zonas-mexico`:
-   el ancla de hora local de la descripción del evento de Google la necesita
-   desde el servidor, y este archivo es `'use client'`. */
-function horaEnTZ(startTimeISO: string, tz: string): string {
-  try {
-    return new Intl.DateTimeFormat('es-MX', {
-      timeZone: tz,
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-    }).format(new Date(startTimeISO))
-  } catch {
-    return ''
-  }
-}
-
 /* ─── Helpers ──────────────────────────────────────────── */
-
-/* Las dos mitades que piden los dos controles del modal, en hora LOCAL.
-   Sustituyen al par `toDatetimeLocal`/`fromDatetimeLocal` de cuando el campo era
-   un único `datetime-local`. Ese control no sabe sostener una fecha sin hora
-   —asignarle «2026-08-19» lo deja en cadena vacía y se lleva la fecha por
-   delante, comprobado en navegador—, y eso es justo lo que la vista Mes
-   necesita, así que el campo se partió en `<input type="date">` +
-   `<input type="time">` y estos dos ayudantes hablan su idioma. */
-function partirFechaHora(iso: string): { fecha: string; hora: string } {
-  const d = new Date(iso)
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return {
-    fecha: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
-    hora:  `${pad(d.getHours())}:${pad(d.getMinutes())}`,
-  }
-}
-/* La vuelta. `new Date('2026-08-19T10:00')` —sin zona— lo interpreta el motor en
-   la zona LOCAL, que es lo que queremos: el médico teclea su hora de pared. */
-function componerIso(fecha: string, hora: string) { return new Date(`${fecha}T${hora}`).toISOString() }
-
-/** Los días de calendario entre dos fechas-solo. Ancladas a mediodía, así que
- *  un cambio de horario de verano no suma ni resta un día por error. */
-function diasEntreFechas(desde: string, hasta: string): number {
-  return differenceInCalendarDays(fechaSoloSegura(hasta), fechaSoloSegura(desde))
-}
-
-/**
- * EL DÍA DE CALENDARIO DE UN INSTANTE, EN LA ZONA DEL CONSULTORIO DE SU FILA.
- *
- * ⚠️ NO ES `partirFechaHora`, Y ÉSA ES TODA LA GRACIA. Aquella lee en el huso
- * del DISPOSITIVO, que es la regla del resto de la agenda (`dates.ts`) y aquí
- * sería el bug: una fila de todo el día guarda medianoche en la zona de SU
- * consultorio, y leerla desde otro huso la corre un día entero. Un evento de
- * Cancún visto desde Tijuana empezaría el día anterior.
- *
- * `TZ_CLINICA` de respaldo por las filas anteriores a `consultorio_timezone`,
- * que se añadió sin rellenar las existentes. Una fila de todo el día NO puede
- * caer ahí —el CHECK de la base exige el huso— pero el respaldo va igual, que
- * es lo que permite llamar a esto sin preguntar antes.
- *
- * DOS CONSUMIDORES, Y NO HACEN LO MISMO CON EL RESULTADO: la FUENTE del
- * calendario se queda las dos fechas tal cual (su fin es exclusivo, como el de
- * la base), y `fechasDeTodoElDia` le resta un día al fin para enseñar el último
- * día INCLUIDO. Por eso lo común es esta lectura y no la función entera.
- */
-function diaEnZonaDelConsultorio(instante: string, timezone: string | null | undefined): string {
-  return renderEnTZ(instante, 'yyyy-MM-dd', timezone ?? TZ_CLINICA)
-}
-
-/* ── EL CONVENIO DE FIN EXCLUSIVO, SUS DOS DIRECCIONES, Y NADA MÁS ──────────
-   Los ÚNICOS dos sitios del cliente donde se corre un día, juntos a propósito:
-   son la misma regla leída al derecho y al revés, y separarlos es como se
-   consigue que una de las dos se quede desfasada.
-
-   La base, FullCalendar y Google usan las TRES el mismo convenio —el fin es
-   exclusivo—, así que casi todo el código pasa las fechas derechas y no llama a
-   ninguna de estas dos. Quien sí habla de «último día incluido» es la CAPA DE
-   ARRIBA: el modal, porque es lo que un humano entiende por «hasta el 21», y el
-   SERVIDOR, que recibe ese mismo formato en `all_day_hasta`.
-
-   Los cuatro llamadores, para que el censo no se quede corto otra vez:
-     · `ultimoDiaIncluido` ← `fechasDeTodoElDia` (leer una fila para el modal),
-       la rama `allDay` de `handleSelect` (el fin de un arrastre sobre la banda)
-       y `fechasDelGestoDeTodoElDia` (el fin de un evento movido o estirado).
-     · `finExclusivoDeUltimoDia` ← `puntasParaLaRejilla`, y sólo en el alta
-       optimista, que es el único sitio donde el cliente pinta desde lo que se
-       escribió en el modal y no desde la fila guardada.
-   Los tres primeros convierten HACIA el formato humano y el cuarto DESDE él, que
-   es exactamente el reparto que estas dos funciones existen para sostener.
-
-   ⚠️ SI TE VES ESCRIBIENDO UN `desplazarFecha(..., { dias: ±1 })` EN OTRO SITIO
-   DE ESTE ARCHIVO, PARA. O estás convirtiendo algo que ya venía convertido, o
-   la conversión que necesitas es una de estas dos. El servidor tiene su propio
-   `+1` al guardar (uno por ruta) y no cuenta aquí. */
-function ultimoDiaIncluido(finExclusivo: string): string {
-  return desplazarFecha(finExclusivo, { dias: -1 })
-}
-function finExclusivoDeUltimoDia(ultimoDia: string): string {
-  return desplazarFecha(ultimoDia, { dias: 1 })
-}
-
-/**
- * Las dos fechas que el modal enseña para un evento de TODO EL DÍA.
- *
- * El `-1` es la conversión de fin exclusivo a último día incluido, y vive en
- * `ultimoDiaIncluido` — ver el aviso de ahí arriba.
- */
-function fechasDeTodoElDia(apt: Appointment): { fecha: string; fechaFin: string } {
-  const tz = apt.consultorio_timezone
-  return {
-    fecha:    diaEnZonaDelConsultorio(apt.start_time, tz),
-    fechaFin: ultimoDiaIncluido(diaEnZonaDelConsultorio(apt.end_time, tz)),
-  }
-}
-
-/** Los minutos entre las dos puntas ESCRITAS, o `null` si falta alguna de las
- *  cuatro mitades. Es lo que decide qué chip de duración sale marcado. */
-function duracionEscrita(fecha: string, hora: string, fechaFin: string, horaFin: string): number | null {
-  if (!fecha || !hora || !fechaFin || !horaFin) return null
-  return calcDuration(componerIso(fecha, hora), componerIso(fechaFin, horaFin))
-}
 
 type ValoresIniciales = { fecha: string; hora: string; fechaFin: string; horaFin: string }
 
@@ -1355,87 +901,6 @@ function QuickPatientModal({
 */
 
 /* ─── Modal de cita ─────────────────────────────────────── */
-
-/**
- * Lo que el modal manda a guardar.
- *
- * Es `Partial<Appointment>` más DOS CAMPOS QUE NO SON COLUMNAS, y por eso están
- * nombrados aparte en vez de colarse dentro del tipo de la fila: `all_day_desde`
- * y `all_day_hasta` son FECHAS-SOLO (`YYYY-MM-DD`), y `all_day_hasta` es el
- * ÚLTIMO DÍA INCLUIDO, no el fin exclusivo que guarda la columna.
- *
- * ⚠️ POR QUÉ EL CLIENTE MANDA FECHAS Y NO INSTANTES. La medianoche de una fila
- * de todo el día es la de la zona del CONSULTORIO, y componerla aquí exigiría
- * que el navegador la conociera y la aplicara bien. `componerIso` no lo hace
- * —usa el reloj del dispositivo— y el resultado violaría
- * `appointments_all_day_medianoche_check` desde cualquier huso que no sea el
- * del consultorio. Así que el cliente manda el DÍA, que no tiene huso, y las
- * rutas componen el instante con la zona que ya tienen a mano.
- *
- * Cuando `all_day` es `false` estos dos no viajan y las puntas van en
- * `start_time`/`end_time` como siempre. Nunca viajan las cuatro a la vez.
- */
-type DatosGuardado = Partial<Appointment> & {
-  id?: string
-  all_day_desde?: string
-  all_day_hasta?: string
-}
-
-/**
- * LAS DOS PUNTAS DE UNA FILA TAL COMO LAS QUIERE LA REJILLA, y si es de todo
- * el día. Punto único de las DOS construcciones de `EventInput` —la fuente y
- * `buildEventInput`—, que antes decían cada una lo suyo.
- *
- * ⚠️ CON `allDay` NO SE PUEDEN ENTREGAR INSTANTES, Y AHÍ ESTABA EL BUG. Poner
- * `allDay: true` con un ISO hace que FullCalendar TRUNQUE al día en el huso del
- * CALENDARIO (`@fullcalendar/core/internal-common.js:3261-3263`,
- * `if (allDay && startMarker) startMarker = startOfDay(startMarker)`), y ese
- * huso es el del navegador: no hay opción `timeZone` en el `<FullCalendar>` de
- * abajo. Un evento de Hermosillo visto desde Cancún se pintaría el día
- * anterior. Por eso en todo el día viajan CADENAS DE SÓLO FECHA, que no tienen
- * huso que malinterpretar, leídas con `diaEnZonaDelConsultorio`.
- *
- * ⚠️ Y LOS DOS EXTREMOS VAN DERECHOS, SIN `-1`. El `end` de FullCalendar es
- * exclusivo, igual que el de la base. `fechasDeTodoElDia` NO sirve aquí: aquélla
- * devuelve el último día INCLUIDO —lo que enseña el modal— y usarla pintaría
- * todos los eventos un día cortos, y los de una sola jornada no los pintaría.
- *
- * ── LAS TRES FORMAS EN QUE LLEGA UNA FILA DE TODO EL DÍA ────────────────────
- * 1. Con sus dos instantes (`start_time`/`end_time`): es la fila YA GUARDADA,
- *    venga de la fuente, de Realtime o de la respuesta del POST. Se leen como
- *    días en la zona de su consultorio. Es el camino normal.
- * 2. Con `all_day_desde`/`all_day_hasta` y sin instantes: es el ALTA OPTIMISTA,
- *    donde todavía no hay fila —sólo lo que se escribió en el modal— y el
- *    servidor aún no ha compuesto nada. Aquí `all_day_hasta` es el último día
- *    incluido, así que hay que pasar al fin exclusivo.
- * 3. Ninguna de las dos: no debería ocurrir, y se sale con lo que haya en vez
- *    de inventar fechas. FullCalendar descartará el evento, que es lo honesto.
- *
- * El orden importa: los instantes mandan sobre las fechas del formulario,
- * porque el objeto de la respuesta del POST trae LAS DOS COSAS
- * (`{ ...data, ...json.appointment }`) y la buena es la de la fila.
- */
-function puntasParaLaRejilla(data: DatosGuardado): { allDay: boolean; start?: string; end?: string } {
-  if (data.all_day !== true) {
-    return { allDay: false, start: data.start_time, end: data.end_time }
-  }
-  if (data.start_time && data.end_time) {
-    const tz = data.consultorio_timezone
-    return {
-      allDay: true,
-      start:  diaEnZonaDelConsultorio(data.start_time, tz),
-      end:    diaEnZonaDelConsultorio(data.end_time, tz),
-    }
-  }
-  if (data.all_day_desde && data.all_day_hasta) {
-    return {
-      allDay: true,
-      start:  data.all_day_desde,
-      end:    finExclusivoDeUltimoDia(data.all_day_hasta),
-    }
-  }
-  return { allDay: true, start: data.start_time, end: data.end_time }
-}
 
 /**
  * Una cita de `/api/appointments` → lo que pinta FullCalendar. La usan la
@@ -3008,28 +2473,6 @@ const FORMATO_HORA_INICIO = new Intl.DateTimeFormat('es-MX', {
      viaja como CLASE, no como estilo. Tiene que ser así — ver la nota de
      `tier` abajo. */
 
-/* ¿La vista dibuja una REJILLA DE HORAS —Semana o Día—?
- *
- * ⚠️ NO ES LA MISMA PREGUNTA QUE «¿no es Mes?», y hasta el bloque 6 sí lo era
- * porque no había un tercer grupo de vistas. Con `@fullcalendar/list` instalado
- * lo hay, y las dos piezas que dependen de esto —el chip de la banda y el
- * sistema de tiers— sólo tienen sentido donde FullCalendar ASIGNA UN ALTO al
- * evento, que es exactamente la rejilla horaria.
- *
- * ⚠️ SE ENUMERAN LAS DOS QUE HAY, NO SE DESCARTAN LAS DE LISTA. Por descarte,
- * cualquier vista que se monte mañana —otra lista, `multiMonth`, lo que sea—
- * entraría en el camino de la rejilla y estrenaría el fallo en silencio; en
- * blanco, cae en el camino que no supone alto y como mucho se le queda corta la
- * pinta, que se ve. Las tres vistas del segmentado están en `VIEWS`.
- *
- * ⚠️ ESTO NO CONTRADICE EL AVISO DE `cayoEnLaBandaDeTodoElDia`, que prohíbe
- * preguntar por `view.type`. Allí la pregunta es DÓNDE cayó un gesto, y esa la
- * contesta el DOM porque la banda existe en más de una vista. Aquí la pregunta
- * es QUÉ VISTA está pintando, que es literalmente lo que este campo dice. */
-function esVistaDeRejilla(viewType: string): boolean {
-  return viewType === 'timeGridWeek' || viewType === 'timeGridDay'
-}
-
 const MemoizedEventContent = memo(function MemoizedEventContent({
   timeText, horaInicio, title, pacNombre, status, doctorInitial, tzDiff, icono, color, descriptor,
   esEvento, enRejilla,
@@ -3336,52 +2779,6 @@ const GoogleEventCard = memo(function GoogleEventCard({
   )
 })
 
-/* Las tintas del chip de la BANDA, derivadas de la fila. Fuera del componente
-   por el mismo motivo que `tintasDelChipDeMes`: para que quepa en su
-   presupuesto de líneas.
-
-   ⚠️ ES LA TERCERA COPIA DE LA PRECEDENCIA «color elegido > estado», Y ESO ESTÁ
-   DECIDIDO. `tintasDelChipDeMes` ya razona por qué no hay un helper común: son
-   cajas distintas y compartirlo ataría la pinta de una a cualquier cambio de la
-   otra. Lo que NO se duplica son las FÓRMULAS: el 10 % del fondo, el 32 % del
-   marco y el token pelado del filo son exactamente los de `MemoizedEventContent`,
-   que es donde se midieron. Si alguna vez hay que retocarlas, se retocan en los
-   tres sitios o la agenda dice tres cosas del mismo evento.
-
-   ⚠️ EL TÍTULO NO ENTRA AQUÍ, Y ES DELIBERADO. Va en tinta neutra por CLASE
-   (`.ag-banda`), nunca en el color del evento, y el motivo está medido y escrito
-   entero en `MemoizedEventContent`: el fondo es una MEZCLA DEL PROPIO COLOR al
-   10 %, así que teñir el texto de ese mismo color acota el contraste a la
-   distancia entre un color y una mezcla de sí mismo — cuatro de los seis caían
-   por debajo de AA. El icono sí lo lleva, y ahí no hay problema: es objeto
-   gráfico, umbral 3:1.
-
-   `undefined` quiere decir «que lo ponga la clase», y sólo pasa con Google: su
-   fondo, su marco y su tinta son fijos y viven en `.ag-banda--gcal`.
-
-   ⚠️ SIN `status` NO HAY PALETA QUE INTERPOLAR —`var(--ag-status-undefined-bg)`
-   no resuelve a nada y el chip saldría sin fondo—, así que el salvavidas cae a
-   `--ag-muted` y a dejar el fondo a la clase. Mismo criterio que el mes. */
-type TintasDeLaBanda = { fondo?: string; marco?: string; filo?: string; tinta: string }
-
-function tintasDelChipDeBanda(
-  isGcal: boolean,
-  color: ColorEvento | null,
-  status: Status | undefined,
-): TintasDeLaBanda {
-  if (isGcal) return { tinta: 'var(--ag-gcal-accent)' }
-  return {
-    tinta: color ? `var(--ag-evento-${color})`
-      : status ? `var(--ag-status-${status}-dot)` : 'var(--ag-muted)',
-    fondo: color ? `color-mix(in srgb, var(--ag-evento-${color}) 10%, var(--ag-surface))`
-      : status ? `var(--ag-status-${status}-bg)` : undefined,
-    marco: color ? `color-mix(in srgb, var(--ag-evento-${color}) 32%, transparent)`
-      : status ? `var(--ag-status-${status}-border)` : undefined,
-    filo: color ? `var(--ag-evento-${color})`
-      : status ? `var(--ag-status-${status}-dot)` : undefined,
-  }
-}
-
 /* ══════════════════════════════════════════════════════════════════════
    CHIP DE LA BANDA DE TODO EL DÍA (`.ag-banda`) — bloque 5
    ══════════════════════════════════════════════════════════════════════
@@ -3493,51 +2890,6 @@ const BandaChip = memo(function BandaChip(
   )
 })
 
-/* Los colores del chip de Mes, derivados de la fila. Vive FUERA de `MonthChip`
-   para que el componente quepa en su presupuesto de líneas.
-
-   Repite la precedencia de `MemoizedEventContent` (el color elegido manda sobre
-   el del estado) en vez de compartirla, y la duplicación es deliberada: son dos
-   cajas distintas, y un helper común ataría la pinta del mes a cualquier cambio
-   de la semana. Si alguna vez divergen, es que tenían que divergir.
-
-   `undefined` quiere decir «que lo ponga la clase», y sólo pasa con Google: su
-   fondo y su tinta son fijos y viven en `.ag-mes--gcal`.
-
-   ⚠️ SIN `status` NO HAY PALETA QUE INTERPOLAR: `var(--ag-status-undefined-bg)`
-   no resuelve a nada y el chip saldría sin fondo. Es el mismo salvavidas que el
-   despachador tiene abajo en su rama de texto pelado para Semana/Día. */
-type TintasDelChip = { fondo?: string; tinta: string; hora?: string }
-
-/* ⚠️ EL PARÁMETRO SE ENSANCHÓ A `Partial` EN EL PASO 9, y es un ensanche, no un
-   aflojamiento: esta función sólo lee `color` y `status`, y ya trataba a los dos
-   como ausentes en su cadena de ternarios —tenía que hacerlo, porque la fuente
-   de Google no trae ninguno—. Lo que cambia es que ahora también la llama el
-   panel del día, que anota `extendedProps` como `Partial` en vez de castearlo.
-   Quien pasaba una cita entera (`MonthChip`) sigue pudiendo. */
-function tintasDelChipDeMes(
-  ext: Partial<Appointment> & { isGcalBlock?: boolean },
-  isGcal: boolean,
-  esEvento: boolean,
-): TintasDelChip {
-  if (isGcal) return { tinta: 'var(--ag-gcal-text)' }
-  const { color, status } = ext
-  return {
-    tinta: color ? `var(--ag-evento-${color})`
-      : status ? `var(--ag-status-${status}-dot)` : 'var(--ag-muted)',
-    fondo: color ? `color-mix(in srgb, var(--ag-evento-${color}) 10%, var(--ag-surface))`
-      : status ? `var(--ag-status-${status}-bg)` : undefined,
-    /* ⚠️ LA HORA DE UN EVENTO VA EN NEUTRO Y LA DE UNA CITA EN EL COLOR DE SU
-       ESTADO. Está razonado entero en `MemoizedEventContent` y no se repite
-       aquí, pero hay un motivo extra que es SÓLO del mes: en un chip de una
-       línea la hora es el único texto que puede llevar color, así que es el
-       único sitio donde cabe el signo de tipo «en color = cita, en neutro =
-       evento». La tarjeta de Semana tiene otras cinco señales; ésta no. */
-    hora: esEvento ? 'var(--ag-ink-600)'
-      : status ? `var(--ag-status-${status}-text)` : 'var(--ag-muted)',
-  }
-}
-
 /* Chip de una línea para la Vista Mes (dayGridMonth). Branch DEDICADO: NO
    comparte caja con `MemoizedEventContent` (Semana/Día). Una sola fila:
    marcador · hora · icono · nombre, y la píldora «Evento» si viene de Google.
@@ -3599,79 +2951,6 @@ const MonthChip = memo(function MonthChip({ arg }: { arg: EventContentArg }) {
 /** Resuelve las iniciales del chip de médico de una cita ya pintada. */
 type InicialesDeCita = (ext: Appointment) => string | undefined
 
-/* ⚠️ `clasesDelEvento` ESTUVO RETIRADA Y HA VUELTO EN EL BLOQUE 6. Lee esto
- * antes de tocarla: la condición con la que se fue sigue vigente.
- *
- * SE FUE porque emitía seis marcadores semánticos en el `<a>` raíz del evento y
- * cinco no los leyó nunca nadie. El último, `ag-ev-cita`, encendía la píldora de
- * estado sólo en las citas, y eso resultó ser el bug: la píldora es del ESTADO, y
- * un evento genérico tiene estado igual que una cita. Al corregirlo, la regla
- * dejó de necesitar distinguir categorías y el marcador se quedó sin consumidor.
- * Un marcador emitido que nadie lee no se distingue de un descuido, así que se
- * fue la función entera y con ella la prop. La condición para volver era: JUNTO
- * con la regla que lo lee, no antes.
- *
- * VUELVE PORQUE ESA REGLA EXISTE. Las vistas de lista pintan su marca de color
- * en un nodo que el plugin construye a mano —`<span class="fc-list-event-dot">`,
- * `@fullcalendar/list/internal.js:60-63`, sin `ContentContainer` ni generador de
- * contenido—, así que NO hay forma de componerlo desde `eventContent`. Y encima
- * llega invisible: su único color sale del `borderColor` en línea del evento, y
- * las tres fuentes de esta página pasan `borderColor: 'transparent'`. La única
- * vía es la hoja de estilos, y para llegar ahí la fila necesita marcadores.
- * Los consumidores están en `globals.css`, en el bloque de la fila de lista.
- *
- * LAS DOS COSAS QUE COSTARON ENCONTRARSE Y SIGUEN SIENDO CIERTAS:
- *
- *   1. NINGUNA CLASE PUEDE PINTAR EL `<a>` RAÍZ. Ese elemento es el harness
- *      TRANSPARENTE de `globals.css` (`.fc .fc-event`: fondo, borde y sombra a
- *      cero con `!important`) y toda la pinta la ponen las tarjetas de
- *      `eventContent` por dentro. Un marcador sirve como ANCESTRO y nada más.
- *      ⚠️ ESTOS MARCADORES SALEN EN LAS CUATRO VISTAS, no sólo en las listas:
- *      `eventClassNames` es una opción GLOBAL y en rejilla aterriza en ese `<a>`.
- *      Por eso TODA regla que los lea lleva `.fc-list-event` en el selector, sin
- *      excepción. Es lo que garantiza que la rejilla no se entere de que existen.
- *      Si añades una regla nueva sin ese trozo, estás pintando el `<a>`.
- *   2. EL TIPO SE DERIVA, NO SE GUARDA. La tentación es meter un campo `tipo` en
- *      `extendedProps`, pero ese objeto tiene TRES productores independientes:
- *      el GET de `/api/appointments` (que vuelca la fila con `{ ...apt }`), la
- *      escritura optimista de `buildEventInput` —luego fusionada clave por clave
- *      por `aplicarAppointmentAlEvento`— y la fuente de Google, que no produce
- *      filas de `appointments` en absoluto y pone `{ isGcalBlock: true }` y nada
- *      más. Un valor guardado habría que escribirlo en los tres y reescribirlo en
- *      cada fusión; el día que uno se olvide, la tarjeta se pinta con el tipo
- *      anterior y no falla nada. `esEventoGenerico(ext)` lo deriva de lo que ya
- *      llega y no hay nada que sincronizar. (Y `TipoFila` ya existe en este
- *      archivo y significa otra cosa.)
- *
- * ⚠️ LOS NOMBRES SON LOS DEL PRODUCTO Y EN INGLÉS —`scheduled`, `no_show`,
- * `attended`—, que es como están en la columna `appointments.status`, y NO los
- * del mockup, que los escribe en español. Lo mismo con los seis colores, que
- * viajan tal cual al `CHECK` `appointments_color_check`. Interpolar aquí el
- * valor de la base es lo que hace que añadir un estado o un color no obligue a
- * tocar esta función; lo que sí hay que añadir entonces es su línea de token en
- * `globals.css`, igual que ya pasa con los tokens `--ag-status-*`.
- *
- * ⚠️ `extendedProps` SE ANOTA, NO SE CASTEA. Su tipo es `Record<string, any>`
- * (`Dictionary`, `core/internal-common.d.ts:2305`), así que leerlo directo
- * mete `any` en el archivo. Asignarlo a un local ANOTADO lo estrecha sin `as` y
- * sin `any`, y de paso declara qué se espera encontrar: `Partial`, porque la
- * fuente de Google no trae ninguno de estos campos.
- */
-function clasesDelEvento(arg: EventContentArg): string[] {
-  const ext: Partial<Appointment> & { isGcalBlock?: boolean } = arg.event.extendedProps
-  const clases: string[] = []
-  /* La bandera y no la vista: en una lista un evento de todo el día llega aquí
-     igual que en la banda, y su columna de hora es la que cambia de pinta. */
-  if (arg.event.allDay) clases.push('ag-ev-allday')
-  /* Google sale por su propia puerta y no lleva ni estado ni color: su fuente no
-     produce filas de `appointments`, así que no hay nada que interpolar. */
-  if (ext.isGcalBlock === true) { clases.push('ag-ev-gcal'); return clases }
-  if (esEventoGenerico(ext)) clases.push('ag-ev-evento')
-  if (ext.status) clases.push(`ag-ev-status--${ext.status}`)
-  if (ext.color)  clases.push(`ag-ev-color--${ext.color}`)
-  return clases
-}
-
 /* La fila de una vista de lista, variante COMPACTA (`listWeek`, y `listDay`
    hasta que el paso siguiente le dé su variante de detalle).
 
@@ -3723,13 +3002,6 @@ const FilaLista = memo(function FilaLista(
    de al lado. Un lector de pantalla que leyera «punto Agendada» diría de más. */
 const GLIFO_PILDORA: Record<Status, string> = {
   scheduled: '●', confirmed: '●', attended: '✓', no_show: '—', cancelled: '✕',
-}
-
-/** «60 min», o null si el evento no da un tramo con el que contar. */
-function duracionDeLaFila(inicio: Date | null, fin: Date | null): string | null {
-  if (!inicio || !fin) return null
-  const min = Math.round((fin.getTime() - inicio.getTime()) / 60000)
-  return min > 0 ? `${min} min` : null
 }
 
 /* La fila ANCHA, sólo de `listDay`. Cuatro renglones: nombre · duración ·
@@ -4288,88 +3560,6 @@ function BandaMovil(
    así Mes sigue teniendo UN solo renderizador de evento y no dos que puedan
    divergir. */
 
-/** Una fila del panel, ya resuelta: aquí no se vuelve a mirar el `EventApi`. */
-type FilaDelDia = {
-  id: string
-  /** Milisegundos del inicio, o `-1` en los de todo el día, que van primero. */
-  orden: number
-  hora: string
-  todoElDia: boolean
-  nombre: string
-  esDeGoogle: boolean
-  esEvento: boolean
-  cancelada: boolean
-  tinta: string
-}
-
-/**
- * Las filas del día `dia`, ordenadas: primero los de todo el día y después por
- * hora de inicio.
- *
- * ⚠️ SOLAPAMIENTO SEMIABIERTO, igual que en `ventanaDeEventos` y en
- * `diasOcultables` y por el mismo motivo: con `<=` entrarían los eventos que
- * TERMINAN a la medianoche de este día, o sea los del día anterior.
- *
- * ⚠️ EL NOMBRE ES EL DEL PACIENTE Y NO `event.title`, que es el motivo escrito
- * en el alta. Es la misma regla que ya aplica `MonthChip`, y las dos tienen que
- * decir lo mismo: el punto de la celda y la fila de abajo son el mismo evento.
- */
-function filasDelDia(eventos: readonly EventApi[], dia: Date): FilaDelDia[] {
-  const desde = new Date(dia)
-  desde.setHours(0, 0, 0, 0)
-  const hasta = new Date(desde)
-  hasta.setDate(hasta.getDate() + 1)
-
-  const filas: FilaDelDia[] = []
-  for (const ev of eventos) {
-    if (!ev.start) continue
-    if (!(ev.start < hasta && (ev.end ?? ev.start) > desde)) continue
-    /* ANOTADO Y NO CASTEADO, igual que en `clasesDelEvento` y por su mismo
-       motivo: `extendedProps` es `Record<string, any>` (`Dictionary`,
-       `core/internal-common.d.ts`) y leerlo directo mete `any` en el archivo.
-       `Partial` porque la fuente de Google no trae ninguno de estos campos.
-       Esta fila NO lleva la cita entera: para abrirla basta el `id`, y quien la
-       resuelve es `abrirCita` desde el `EventApi` — así el único punto del
-       archivo que estrecha `extendedProps` a `Appointment` sigue siendo uno. */
-    const ext: Partial<Appointment> & { isGcalBlock?: boolean } = ev.extendedProps
-    const esDeGoogle = ext?.isGcalBlock === true
-    const esEvento = esEventoGenerico(ext)
-    const pac = ext?.pacientes
-    filas.push({
-      id: ev.id,
-      orden: ev.allDay ? -1 : ev.start.getTime(),
-      hora: ev.allDay ? 'todo el día' : horaDeReloj(ev.start),
-      todoElDia: ev.allDay,
-      nombre: pac ? `${pac.nombre} ${pac.apellidos}` : ev.title,
-      esDeGoogle,
-      esEvento,
-      cancelada: ext?.status === 'cancelled',
-      tinta: tintasDelChipDeMes(ext, esDeGoogle, esEvento).tinta,
-    })
-  }
-  return filas.sort((a, b) => a.orden - b.orden)
-}
-
-/* La misma disciplina de guarda que `ventana` y `conteo`: se compara una CADENA
-   y no el array. `getEvents()` recorre un mapa, así que su orden cambia con
-   altas, bajas y refetches; aquí además las filas se reconstruyen enteras en
-   cada llamada, o sea que la identidad no vale para nada. Con la firma, un
-   `eventsSet` que no cambia nada del día muere en el bail-out de React. */
-function firmaDeFilas(filas: readonly FilaDelDia[]): string {
-  return filas.map(f => `${f.id}|${f.hora}|${f.nombre}|${f.tinta}|${f.cancelada}`).join('\n')
-}
-
-/** El conteo del día, en la MISMA forma que consume `frasearConteo`. */
-function contarFilas(filas: readonly FilaDelDia[]): ConteoVisible {
-  let citas = 0, eventos = 0, google = 0
-  for (const f of filas) {
-    if (f.esDeGoogle) google++
-    else if (f.esEvento) eventos++
-    else citas++
-  }
-  return { citas, eventos, google }
-}
-
 /* «mié, 19 ago». A nivel de módulo: un `Intl.DateTimeFormat` nuevo por render
    es caro y aquí no depende de nada que cambie. La mayúscula inicial la pone un
    `::first-letter` en la hoja, igual que en el resto de la agenda. */
@@ -4453,52 +3643,6 @@ function PanelDelDia(
 
    Si alguien vuelve al spec y ve la contradicción: la que vale es ésta. */
 
-/** Un tramo del día, en MINUTOS DESDE LA MEDIANOCHE LOCAL.
- *
- *  ⚠️ MINUTOS Y NO `Date`, A PROPÓSITO. El horario del consultorio es hora de
- *  PARED (`'09:00'`) y la rejilla coloca los eventos en la zona del navegador,
- *  que es la misma base. Trabajar en minutos desde medianoche deja la
- *  aritmética en enteros y hace que recortar, fusionar y restar sean una línea
- *  cada uno. La única grieta conocida es el día del cambio de horario de
- *  verano, donde «minutos desde medianoche» y hora de pared se separan 60: en
- *  México no aplica desde 2022, y el precio de cubrirlo sería arrastrar husos
- *  por todo el cálculo. */
-type Tramo = { desde: number; hasta: number }
-
-const MINUTOS_POR_DIA = 24 * 60
-
-/** El tramo libre más corto que se ofrece. Por debajo no cabe una consulta, y
- *  listarlo sería ruido: en el mockup los huecos de 30 min entre citas no
- *  salen. Es la misma cifra que dice el texto de la tarjeta vacía. */
-const HUECO_MINIMO = 60
-
-function minutosDeReloj(hhmm: string): number {
-  const [h = '0', m = '0'] = hhmm.split(':')
-  return Number(h) * 60 + Number(m)
-}
-
-function relojDeMinutos(min: number): string {
-  return `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`
-}
-
-/** «08:00 – 09:00». Guión largo, el mismo que `titleRangeSeparator`. */
-function etiquetaDeRango(t: Tramo): string {
-  return `${relojDeMinutos(t.desde)} – ${relojDeMinutos(t.hasta)}`
-}
-
-/** «60 min», «2 h», «2 h 30 min». El corte en 120 no es arbitrario: el mockup
- *  escribe «60 min» y no «1 h», así que la hora sola no se abrevia. */
-function etiquetaDeDuracion(min: number): string {
-  if (min < 120) return `${min} min`
-  const resto = min % 60
-  return resto === 0 ? `${min / 60} h` : `${Math.floor(min / 60)} h ${resto} min`
-}
-
-/** «5:00». El número grande del tile, en la forma H:MM del mockup. */
-function etiquetaDeHoras(min: number): string {
-  return `${Math.floor(min / 60)}:${String(min % 60).padStart(2, '0')}`
-}
-
 /** Las formas contadas de cada estado: «2 agendadas», «1 no asistió».
  *
  *  ⚠️ ES UNA SEGUNDA REDACCIÓN DE `STATUS_CONFIG`, y aquí sí hace falta. Aquél
@@ -4512,223 +3656,6 @@ const ESTADO_CONTADO: Record<Status, { uno: string; varios: string }> = {
   cancelled: { uno: 'cancelada',  varios: 'canceladas'    },
   no_show:   { uno: 'no asistió', varios: 'no asistieron' },
   attended:  { uno: 'atendida',   varios: 'atendidas'     },
-}
-
-/** La medianoche local del día. Base de toda la aritmética de este bloque. */
-function medianocheDe(dia: Date): Date {
-  const d = new Date(dia)
-  d.setHours(0, 0, 0, 0)
-  return d
-}
-
-/** La jornada del consultorio ese día, o `null` si no abre.
- *
- *  Sale del MISMO objeto `horario` que alimenta `businessHours`, así que el
- *  gris de fuera de horario de la rejilla y el suelo/techo de los huecos no
- *  pueden decir cosas distintas. */
-function jornadaDelDia(dia: Date, horario: Horario): Tramo | null {
-  const conf = DIAS.find(d => d.fc === dia.getDay())
-  if (!conf) return null
-  const hd = horario[conf.key]
-  if (!hd?.activo) return null
-  const desde = minutosDeReloj(hd.inicio)
-  const hasta = minutosDeReloj(hd.fin)
-  return hasta > desde ? { desde, hasta } : null
-}
-
-/** Si un evento consume hora del día. Las reglas están arriba, en la cabecera
- *  del bloque; esto es su única implementación. */
-function eventoOcupa(ev: EventApi): boolean {
-  if (ev.allDay) return false
-  /* ANOTADO Y NO CASTEADO, igual que en `filasDelDia`: `extendedProps` es
-     `Dictionary` (`Record<string, any>`) y leerlo directo mete `any` en el
-     archivo. `Partial` porque la fuente de Google no trae ninguno. */
-  const ext: Partial<Appointment> & { isGcalBlock?: boolean } = ev.extendedProps
-  if (ext?.isGcalBlock === true) return true
-  return ext?.status !== 'cancelled'
-}
-
-/**
- * Los tramos que los eventos ocupan dentro del día, ya recortados a él y sin
- * ordenar. Uno por evento: la fusión es el paso siguiente.
- *
- * ⚠️ SOLAPAMIENTO SEMIABIERTO, igual que en `filasDelDia`: un evento que TERMINA
- * a la medianoche de este día es del día anterior y no entra. Y el recorte a
- * `[0, MINUTOS_POR_DIA]` es lo que deja pasar sin cuidado a los eventos que
- * cruzan la medianoche por cualquiera de los dos extremos.
- */
-function tramosDeOcupacion(eventos: readonly EventApi[], dia: Date): Tramo[] {
-  const base = medianocheDe(dia).getTime()
-  const fin = base + MINUTOS_POR_DIA * 60_000
-  const tramos: Tramo[] = []
-  for (const ev of eventos) {
-    if (!ev.start || !ev.end) continue
-    if (!(ev.start.getTime() < fin && ev.end.getTime() > base)) continue
-    if (!eventoOcupa(ev)) continue
-    const desde = Math.max(0, Math.round((ev.start.getTime() - base) / 60_000))
-    const hasta = Math.min(MINUTOS_POR_DIA, Math.round((ev.end.getTime() - base) / 60_000))
-    if (hasta > desde) tramos.push({ desde, hasta })
-  }
-  return tramos
-}
-
-/** Ordena y funde los solapados en uno. Sin esto dos citas de 09:00–10:00 y
- *  09:30–10:30 darían dos horas ocupadas donde sólo hay hora y media, y el
- *  complemento —los huecos— saldría con tramos negativos. */
-function fusionarTramos(tramos: readonly Tramo[]): Tramo[] {
-  const fundidos: Tramo[] = []
-  for (const t of [...tramos].sort((a, b) => a.desde - b.desde)) {
-    const ultimo = fundidos[fundidos.length - 1]
-    if (ultimo && t.desde <= ultimo.hasta) ultimo.hasta = Math.max(ultimo.hasta, t.hasta)
-    else fundidos.push({ ...t })
-  }
-  return fundidos
-}
-
-/**
- * Recorta los tramos a la jornada y descarta los que se quedan fuera.
- *
- * ⚠️ ES LO QUE HACE QUE `ocupadas + libres` SEA LA JORNADA, SIEMPRE. Una cirugía
- * de 19:00 a 21:00 con el consultorio hasta las 18:00 aporta CERO horas
- * ocupadas: el día tiene diez horas de consulta y las diez se reparten entre
- * ocupadas y libres. Sin el recorte los dos números dejarían de ser
- * complementarios y el panel enseñaría una suma que no cuadra con su propio
- * horario. Es también lo que el mockup comprueba: 08:00–18:00, 5:00 y 5:00.
- */
-function recortarATramo(tramos: readonly Tramo[], jornada: Tramo): Tramo[] {
-  const dentro: Tramo[] = []
-  for (const t of tramos) {
-    const desde = Math.max(t.desde, jornada.desde)
-    const hasta = Math.min(t.hasta, jornada.hasta)
-    if (hasta > desde) dentro.push({ desde, hasta })
-  }
-  return dentro
-}
-
-/** El complemento de la ocupación dentro de la jornada, con suelo de duración.
- *  `ocupados` tiene que llegar ordenado y fundido. */
-function huecosDe(jornada: Tramo, ocupados: readonly Tramo[], minimo: number): Tramo[] {
-  const huecos: Tramo[] = []
-  let cursor = jornada.desde
-  for (const t of ocupados) {
-    if (t.desde - cursor >= minimo) huecos.push({ desde: cursor, hasta: t.desde })
-    cursor = Math.max(cursor, t.hasta)
-  }
-  if (jornada.hasta - cursor >= minimo) huecos.push({ desde: cursor, hasta: jornada.hasta })
-  return huecos
-}
-
-/**
- * El desglose por estado, SÓLO DE CITAS y sólo con los estados presentes.
- *
- * Cuenta las que TOCAN el día, no las que empiezan en él; el porqué está en la
- * reja, junto a la comparación.
- *
- * Ni los eventos genéricos ni los de Google entran: un evento no tiene estado
- * de cita —`ESTADOS_EVENTO` sólo le ofrece dos de los cinco— y un bloque de
- * Google no tiene ninguno. El mockup lo confirma: tres citas arriba, «2
- * agendadas · 1 atendida» abajo, y los tres eventos fuera de la lista.
- *
- * El orden es el de `ESTADOS_CITA`, que es el mismo del selector y el de la
- * leyenda: tres sitios que enumeran estados y ninguno en un orden propio.
- */
-function desgloseDeEstados(
-  eventos: readonly EventApi[],
-  dia: Date,
-): { estado: Status; n: number }[] {
-  const base = medianocheDe(dia).getTime()
-  const fin = base + MINUTOS_POR_DIA * 60_000
-  const cuenta = new Map<Status, number>()
-  for (const ev of eventos) {
-    if (!ev.start) continue
-    /* ⚠️ POR SOLAPE, NO POR DÓNDE EMPIEZA, Y ES LA CUARTA REJA IGUAL A LAS OTRAS
-       TRES. Aquí decía `start >= base && start < fin`, y era el ÚNICO sitio del
-       archivo que contaba de otra manera: `tramosDeOcupacion` (arriba),
-       `contarTodoElDia` (abajo) y `contarVisibles` ya preguntaban si el evento
-       TOCA el día. Con el criterio viejo, una cita que empieza el lunes y
-       termina el martes no aparecía en el desglose del martes aunque el panel
-       de ese día sí la contara como ocupación — dos números del MISMO panel
-       sacados de dos reglas distintas.
-       Que sea raro no lo salva: una cita de varios días con paciente asignado
-       es poco común, pero la incoherencia es permanente y el día que alguien
-       cree una, el desglose y las horas ocupadas se contradicen sin avisar.
-       Se escribe con la misma forma negada que `tramosDeOcupacion:4334` para
-       que las cuatro se lean igual. `ev.end ?? ev.start` porque aquí, a
-       diferencia de allí, no se exige `end` antes: una fila sin fin cuenta como
-       instantánea, que es lo que ya hace `contarTodoElDia`. */
-    if (!(ev.start.getTime() < fin && (ev.end ?? ev.start).getTime() > base)) continue
-    const ext: Partial<Appointment> & { isGcalBlock?: boolean } = ev.extendedProps
-    if (ext?.isGcalBlock === true) continue
-    if (esEventoGenerico({ paciente_id: ext?.paciente_id ?? null })) continue
-    const estado = ext?.status
-    if (!estado) continue
-    cuenta.set(estado, (cuenta.get(estado) ?? 0) + 1)
-  }
-  return ESTADOS_CITA
-    .map(estado => ({ estado, n: cuenta.get(estado) ?? 0 }))
-    .filter(x => x.n > 0)
-}
-
-/** Cuántos eventos de todo el día caen en el día. Sólo para la línea que
- *  explica por qué no dan horas; no entra en ningún número. */
-function contarTodoElDia(eventos: readonly EventApi[], dia: Date): number {
-  const base = medianocheDe(dia).getTime()
-  const fin = base + MINUTOS_POR_DIA * 60_000
-  let n = 0
-  for (const ev of eventos) {
-    if (!ev.allDay || !ev.start) continue
-    if (ev.start.getTime() < fin && (ev.end ?? ev.start).getTime() > base) n += 1
-  }
-  return n
-}
-
-/** Todo lo que el panel pinta, ya resuelto. Aquí no se vuelve a mirar ningún
- *  `EventApi`: el panel es una función de esto. */
-type ResumenDia = {
-  /** El día resumido. Lo necesita el clic en un hueco para componer la
-      selección; no se vuelve a derivar del calendario. */
-  dia: Date
-  porEstado: readonly { estado: Status; n: number }[]
-  todoElDia: number
-  /** `null` cuando el consultorio no abre. Entonces no hay horas ni huecos. */
-  jornada: Tramo | null
-  /** Minutos. Complementarios dentro de la jornada: suman su duración. */
-  ocupadas: number
-  libres: number
-  huecos: readonly Tramo[]
-}
-
-function resumenDelDia(eventos: readonly EventApi[], dia: Date, horario: Horario): ResumenDia {
-  const porEstado = desgloseDeEstados(eventos, dia)
-  const todoElDia = contarTodoElDia(eventos, dia)
-  const jornada = jornadaDelDia(dia, horario)
-  if (!jornada) return { dia, porEstado, todoElDia, jornada: null, ocupadas: 0, libres: 0, huecos: [] }
-
-  const ocupados = recortarATramo(fusionarTramos(tramosDeOcupacion(eventos, dia)), jornada)
-  const ocupadas = ocupados.reduce((suma, t) => suma + (t.hasta - t.desde), 0)
-  return {
-    dia,
-    porEstado,
-    todoElDia,
-    jornada,
-    ocupadas,
-    libres: (jornada.hasta - jornada.desde) - ocupadas,
-    huecos: huecosDe(jornada, ocupados, HUECO_MINIMO),
-  }
-}
-
-/* La misma disciplina de guarda que `ventana`, `conteo` y `filasDia`: se compara
-   una CADENA y no el objeto, porque el resumen se reconstruye entero en cada
-   llamada y su identidad no vale para nada. Con la firma, un `eventsSet` que no
-   cambia nada del día muere en el bail-out de React. */
-function firmaDelResumen(r: ResumenDia | null): string {
-  if (!r) return ''
-  return [
-    r.dia.getTime(), r.todoElDia, r.ocupadas, r.libres,
-    r.jornada ? `${r.jornada.desde}-${r.jornada.hasta}` : 'cerrado',
-    r.porEstado.map(e => `${e.estado}:${e.n}`).join(','),
-    r.huecos.map(h => `${h.desde}-${h.hasta}`).join(','),
-  ].join('|')
 }
 
 /* ─── Las piezas visuales ──────────────────────────────────────────────── */
@@ -4958,7 +3885,6 @@ function PanelDia(
   )
 }
 
-
 /* ─── Página principal ─────────────────────────────────── */
 
 /* Segmentos del control de vistas. SÓLO TEXTO desde el bloque 4: llevaban un
@@ -5000,64 +3926,6 @@ const ANCHO_MOVIL = 1024
    ⚠️ ESTA TABLA NO REGISTRA NADA. Las vistas se registran por el PLUGIN, en la
    prop `plugins` del <FullCalendar>; esto sólo dice quién es pareja de quién. Si
    añades un par aquí sin que las dos vistas existan, `changeView` lanzará. */
-const FORMATOS_DE_VISTA = [
-  { ancho: 'dayGridMonth', estrecho: 'dayGridMonth' },
-  { ancho: 'timeGridWeek', estrecho: 'listWeek'     },
-  { ancho: 'timeGridDay',  estrecho: 'listDay'      },
-] as const
-
-/**
- * La vista que le toca a `viewType` con el ancho de ahora, conservando el
- * periodo. Semana sigue siendo Semana; sólo cambia de formato.
- *
- * ⚠️ ES IDEMPOTENTE A PROPÓSITO: pasarle una vista que YA está en el formato
- * correcto devuelve la misma cadena. De eso vive el efecto del `resize`, que
- * dispara en cada píxel de arrastre y compara antes de llamar a `changeView`;
- * sin la idempotencia habría que acordarse de comparar fuera, y basta olvidarlo
- * una vez para reconstruir el `dateProfile` sesenta veces por segundo.
- *
- * ⚠️ UNA VISTA DESCONOCIDA SE DEVUELVE TAL CUAL, y no es pereza: es lo que
- * impide que un `changeView` a ciegas mande la agenda a una vista que nadie ha
- * registrado. Ante la duda, no se mueve.
- */
-function vistaEnElOtroFormato(viewType: string, movil: boolean): string {
-  const par = FORMATOS_DE_VISTA.find(p => p.ancho === viewType || p.estrecho === viewType)
-  if (!par) return viewType
-  return movil ? par.estrecho : par.ancho
-}
-
-/**
- * El rótulo de «Compactar», que NO es el mismo en las dos vistas que lo admiten.
- *
- * En rejilla el botón hace dos cosas —encoge el alto al horario y pliega las
- * columnas vacías—, y el rótulo nombra la primera porque es la que se ve de
- * golpe. En Mes sólo hace la segunda: ahí no hay `slotMinTime` que encoger, así
- * que hablar de «rejilla» y de «horario» describiría un recorte que esa vista no
- * puede hacer. Es el mismo criterio del gate de `aplicarVentana` y del texto de
- * salida de la banda; los tres cambian juntos o el botón promete una cosa, la
- * banda otra y la pantalla una tercera.
- */
-function etiquetaCompactar(viewType: string): string {
-  return viewType === 'dayGridMonth'
-    ? 'Ocultar los días de la semana sin actividad'
-    : 'Compactar la rejilla al horario de la clínica'
-}
-
-/**
- * ¿Tiene sentido «Compactar» en esta vista?
- *
- * Las de REJILLA por los dos ejes —alto y columnas— y MES sólo por el de las
- * columnas (ver el gate de `aplicarVentana`). Las dos de LISTA por ninguno: no
- * tienen ni rejilla de horas ni columnas de día, así que ahí el botón no se
- * pinta y el estado se apaga solo.
- *
- * ⚠️ ES LA MISMA PREGUNTA EN LOS DOS SITIOS —el apagado automático y el pintado
- * del botón— y por eso vive en una función y no duplicada en dos condiciones.
- * Si divergen, se puede quedar encendido donde no hay con qué apagarlo.
- */
-function vistaAdmiteCompactar(viewType: string): boolean {
-  return viewType.startsWith('timeGrid') || viewType === 'dayGridMonth'
-}
 
 /* Opciones POR VISTA. A nivel de módulo por la regla de identidad estable: un
    literal en el JSX sería un objeto nuevo en cada render y FullCalendar vuelve
@@ -5181,13 +4049,6 @@ const VISTAS_FC = {
    plieguen las vacías es una decisión del médico —el botón «Compactar» de la
    banda— y es reversible desde la misma banda. El mockup dibuja seis columnas
    con el domingo fijo; eso se descartó. */
-/* «+2», sin la palabra del locale. A nivel de módulo por la regla de identidad
-   estable, igual que el resto de renderizadores de esta página. El texto largo
-   sigue disponible para quien no lo ve: `moreLinkHint` del locale («Mostrar N
-   eventos más») es lo que va al `title` y al lector de pantalla, y no se toca. */
-function masBreve(arg: MoreLinkContentArg): string {
-  return `+${arg.num}`
-}
 
 const VISTAS_FC_MOVIL = {
   dayGridMonth: {
@@ -5290,28 +4151,6 @@ function renderSinEventos(arg: NoEventsContentArg): string {
 
    Pueden coincidir todas menos la 3, que se excluye con la 1, la 1 bis y la 2. */
 
-/* El mes de la banda de vacío, en minúsculas y sin año: «agosto». Sin `timeZone`
-   a propósito — el <FullCalendar> no lleva opción `timeZone`, así que sus fechas
-   son del huso del navegador y formatearlas en otro las movería de mes en el
-   primer día y en el último. */
-const FMT_MES_BANDA = new Intl.DateTimeFormat('es-MX', { month: 'long' })
-
-/**
- * Lo que va detrás de «Sin citas…» en la banda de vacío: «esta semana», «en
- * agosto». Cadena vacía en cualquier otra vista, y eso APAGA la banda — es lo
- * que la deja fuera de las dos vistas de LISTA, que ya tienen su propio vacío en
- * `noEventsContent`, y fuera de la vista Día, cuyo vacío lo cuenta el panel.
- *
- * ⚠️ «ESTA SEMANA» AUNQUE NO SEA ESTA SEMANA, y es literal del spec (§11). La
- * fecha exacta está en el toolbar, tres centímetros más arriba y en cuerpo
- * grande; repetirla aquí alargaría la frase para no decir nada nuevo.
- */
-function periodoDeLaVista(vista: ViewApi): string {
-  if (vista.type === 'dayGridMonth') return `en ${FMT_MES_BANDA.format(vista.currentStart)}`
-  if (vista.type === 'timeGridWeek') return 'esta semana'
-  return ''
-}
-
 /** La caja de una banda. Las cuatro comparten geometría y sólo cambia el tono. */
 function Banda(
   { tono, urgente, children }: {
@@ -5376,187 +4215,7 @@ const FORMATO_HORA_FC: FormatterInput = { hour: '2-digit', minute: '2-digit', me
 const OPCION_TODOS = (enElMes: boolean): string =>
   enElMes ? 'Todos los médicos — el mes se ve por médico' : 'Todos los médicos'
 
-/** Lo que el subtítulo cuenta, por categoría. */
-type ConteoVisible = { citas: number; eventos: number; google: number }
-
 const CONTEO_VACIO: ConteoVisible = { citas: 0, eventos: 0, google: 0 }
-
-/* Un evento tal como lo necesita el CONTEO, y nada más. Es un SUBCONJUNTO de
-   `EventoParaVentana` —que a su vez calca la de `EventApi`— para que los dos
-   cálculos se alimenten de la MISMA llamada, sin recorrer dos listas.
-
-   ⚠️ `allDay` SE CAYÓ DE AQUÍ EN EL BLOQUE 5 y no es un descuido: era la entrada
-   de la reja `sinAllDay`, que se retiró al encender la banda (ver el docstring
-   de `contarVisibles`). En `EventoParaVentana` SIGUE VIVO y ahí no se toca: lo
-   lee `tramoDeEvento` para que un evento de todo el día no estire la ventana
-   vertical de la rejilla a 24 horas. Son dos usos distintos del mismo campo. */
-/**
- * ¿El tramo `[inicio, fin)` toca algún día que NO esté plegado?
- *
- * Sólo lo usa `contarVisibles`, y sólo tiene efecto con «Compactar» encendido:
- * `ocultos` es el `hiddenDays` de FullCalendar, o sea los `getDay()` de las
- * columnas que se han quitado.
- *
- * ⚠️ RECORRE DÍAS DE CALENDARIO CON `setDate()` Y NO SUMANDO 24 h, por lo mismo
- * que `rangoQuePedir`: en el cambio de horario de verano un día no dura 24 horas
- * y la suma se desalinea. El tope de 7 vueltas es lo que impide que un evento
- * larguísimo pasee la semana entera sin necesidad: con siete días ya se han visto
- * todos los `getDay()` posibles, así que si ninguno era visible, ninguno lo será.
- */
-function tocaDiaVisible(inicio: Date, fin: Date, ocultos: readonly number[]): boolean {
-  const cursor = new Date(inicio.getFullYear(), inicio.getMonth(), inicio.getDate())
-  for (let i = 0; i < 7; i += 1) {
-    if (i > 0 && cursor >= fin) break
-    if (!ocultos.includes(cursor.getDay())) return true
-    cursor.setDate(cursor.getDate() + 1)
-  }
-  return false
-}
-
-/* ⚠️ LLEVA `end` DESDE QUE LA CONSULTA FILTRA POR SOLAPE, y no es opcional: sin
-   él no hay forma de saber si un evento que empezó antes de la ventana sigue
-   dentro. `EventApi` de FullCalendar lo trae, así que los tres llamadores lo
-   pasan sin cambiar nada. */
-type EventoParaConteo = { start: Date | null; end: Date | null; extendedProps: Record<string, unknown> }
-
-/**
- * Cuenta por categoría lo que la vista está PINTANDO ahora mismo.
- *
- * ⚠️ NO CUENTA EL `eventStore`, Y LA DIFERENCIA ES VISIBLE. `rangoQuePedir`
- * ensancha cada petición a semanas completas, así que el store guarda eventos
- * que la vista no dibuja; contarlos daría un subtítulo que promete citas que no
- * están en pantalla. De ahí el filtro por el rango ACTIVO.
- *
- * ⚠️⚠️ ESE FILTRO ES POR SOLAPE Y NO POR DÓNDE EMPIEZA EL EVENTO, y el cambio va
- * en pareja con el de `/api/appointments`. Mientras la consulta sólo devolvía lo
- * que EMPEZABA dentro de la ventana, mirar el inicio aquí bastaba porque no podía
- * llegar otra cosa. Desde que la consulta compara por solape sí llega: un evento
- * de varios días que arrancó la semana pasada. Con la reja vieja, ese evento se
- * PINTA y no se CUENTA — y eso no es un número flojo, es una contradicción en
- * pantalla, porque de este conteo cuelga también la banda de vacío del bloque 9:
- * la agenda enseñaría un congreso encima de una banda que dice «Sin citas esta
- * semana».
- *
- * La forma del test es la MISMA que la de `filasDelDia`, que ya contaba por
- * solape desde el bloque 6 (`ev.start < hasta && (ev.end ?? ev.start) > desde`).
- * Se copia en vez de compartirse porque son dos rejas contra rangos distintos —un
- * día allí, el rango activo aquí— y un helper común ataría el panel del mes al
- * conteo del subtítulo. Si divergen, es que tenían que divergir.
- *
- * `ev.end ?? ev.start` para el evento sin fin: entonces el solape se reduce a que
- * su instante caiga dentro, que es lo que se quiere.
- *
- * ⚠️ Y DESCUENTA `diasOcultos`, que es el caso que se escapa al filtro anterior:
- * con «Compactar» encendido, `hiddenDays` quita COLUMNAS que siguen cayendo
- * dentro de activeStart..activeEnd. Sin esta línea el subtítulo diría «5 citas»
- * con tres a la vista.
- *
- * ⚠️ HUBO UNA TERCERA REJA, `sinAllDay`, Y SE RETIRÓ EN EL BLOQUE 5. NO LA
- * REPONGAS. Decía —y era cierto— que con `allDaySlot={false}` FullCalendar no
- * MONTA la fila de todo el día, así que un evento `allDay` pasaba las otras dos
- * rejas y no se dibujaba en ninguna parte de Semana ni de Día: contarlo daba «1
- * de Google» sobre una rejilla que no lo enseñaba. Su propia nota avisaba de que
- * era el único de los tres filtros que dependía de una OPCIÓN del calendario y
- * no de la geometría de la vista, y de que había que retirarla el día que la
- * banda se encendiera.
- *
- * Ese día llegó: `allDaySlot` está en `true` y la banda pinta los `allDay` en
- * las tres vistas. La reja pasó de proteger a mentir al revés —descontaría unos
- * eventos que ahora SÍ están en pantalla—, así que se fue, y con ella el
- * parámetro y el `vista` que el llamador calculaba sólo para pasárselo.
- *
- * Es correcto HOY porque el único `allDay` posible viene de Google y cae en la
- * categoría `google`, que es la que le toca. El día que la aplicación sepa
- * escribir `all_day` (bloque 5B), un bloqueo de todo el día entrará por el
- * `else` de abajo y se contará como `cita` o como `evento` según tenga paciente:
- * eso es una decisión de producto que aquí no está tomada.
- *
- * ⚠️ EL FILTRO DE MÉDICO NO SE APLICA AQUÍ, Y NO ES UN OLVIDO: NO LO AÑADAS. Lo
- * aplica el SERVIDOR —las dos fuentes le mandan `medico_id` y devuelven ya
- * filtrado—, así que el store sólo contiene lo que pasa el filtro y contar el
- * store es contar lo filtrado. Un filtro de cliente encima sería o inocuo o,
- * el día que las dos reglas discrepen, un conteo distinto del que se pinta.
- *
- * ⚠️ AVISO PARA EL INTERRUPTOR DE GOOGLE (bloque siguiente): esto cuenta lo que
- * hay EN EL STORE. Si el interruptor se implementa retirando la fuente `gcal` de
- * `eventSourcesStable`, los eventos salen del store y el conteo se corrige solo.
- * Si en cambio se implementa ESCONDIENDO los eventos ya cargados —CSS,
- * `display: none`, una clase por `eventClassNames`—, seguirán aquí dentro y el
- * subtítulo dirá «1 de Google» con cero a la vista. La decisión es de aquel
- * bloque; la consecuencia cae en esta función.
- */
-function contarVisibles(
-  eventos: readonly EventoParaConteo[],
-  activo: RangoVisible | null,
-  ocultos: readonly number[],
-): ConteoVisible {
-  let citas = 0, genericos = 0, google = 0
-  for (const ev of eventos) {
-    const inicio = ev.start
-    if (!inicio) continue
-    const fin = ev.end ?? inicio
-    if (activo && !(inicio < activo.activeEnd && fin > activo.activeStart)) continue
-    /* ⚠️ LA REJA DE DÍAS OCULTOS MIRA EL TRAMO ENTERO Y NO SÓLO EL DÍA DE INICIO,
-       y es la misma corrección que la de arriba llevada a su terreno. Mirando el
-       inicio, un evento de varios días que ARRANCA en un sábado plegado no se
-       contaba aunque siguiera pintándose de lunes a viernes. Para un evento de un
-       solo día —que son todos menos los de todo el día— esto da exactamente lo
-       mismo que antes: su único día es el de inicio. */
-    if (ocultos.length > 0 && !tocaDiaVisible(inicio, fin, ocultos)) continue
-
-    const ext = ev.extendedProps
-    if (ext.isGcalBlock === true) { google += 1; continue }
-    /* Por `esEventoGenerico` y no reimplementando su regla: es el mismo
-       despachador que usan las tarjetas, y así no puede divergir. El `typeof`
-       es lo que estrecha el `unknown` de `extendedProps` sin un `as`. */
-    const pacienteId = ext.paciente_id
-    if (esEventoGenerico({ paciente_id: typeof pacienteId === 'string' ? pacienteId : null })) genericos += 1
-    else citas += 1
-  }
-  return { citas, eventos: genericos, google }
-}
-
-/** «3 citas · 2 eventos · 1 de Google». Sólo las categorías con al menos uno;
- *  cadena vacía si no hay ninguna.
- *
- *  ⚠️ DEVUELVE LA FRASE SUELTA, SIN SEPARADOR DELANTE. Lo llevaba —empezaba por
- *  « · » para pegarse detrás de «Gestión de citas clínicas»— y dejó de servir
- *  cuando esa frase pasó a esconderse por debajo de `2xl`: el separador se
- *  quedaba huérfano al principio de la línea. Ahora lo pone quien compone el
- *  subtítulo, que es el único que sabe si hay algo delante. */
-function frasearConteo(c: ConteoVisible): string {
-  const partes: string[] = []
-  if (c.citas > 0)   partes.push(`${c.citas} ${c.citas === 1 ? 'cita' : 'citas'}`)
-  if (c.eventos > 0) partes.push(`${c.eventos} ${c.eventos === 1 ? 'evento' : 'eventos'}`)
-  // Sin plural que cambiar: «1 de Google», «4 de Google».
-  if (c.google > 0)  partes.push(`${c.google} de Google`)
-  return partes.join(' · ')
-}
-
-/**
- * El mismo conteo, abreviado. SÓLO PARA MÓVIL.
- *
- * ⚠️ ES UNA SEGUNDA REDACCIÓN DEL MISMO DATO, y eso normalmente sería un olor.
- * Aquí es la decisión: en la banda del teléfono el subtítulo comparte fila con
- * el hamburguesa y la caja del título, y en 390 px «13 citas · 2 eventos · 1 de
- * Google» no cabe entero. Recortarlo con elipsis parte la última palabra a la
- * mitad («… · 1 de Goo…»), que se lee como un fallo; abreviado cabe y se
- * entiende. Escritorio se queda con la forma larga, donde sobra ancho.
- *
- * ⚠️ «GCal» Y NO «Google»: es exactamente el rótulo que la leyenda de la agenda
- * ya usa para lo mismo, y por el mismo motivo (ver su nota, con la medida). Dos
- * abreviaturas distintas del mismo origen serían peor que una.
- *
- * ⚠️ LOS NÚMEROS SON LOS MISMOS: esto sólo cambia las palabras. Si algún día hay
- * que tocar QUÉ se cuenta, se toca `contarVisibles` y las dos frases siguen.
- */
-function frasearConteoBreve(c: ConteoVisible): string {
-  const partes: string[] = []
-  if (c.citas > 0)   partes.push(`${c.citas} cit`)
-  if (c.eventos > 0) partes.push(`${c.eventos} ev`)
-  if (c.google > 0)  partes.push(`${c.google} GCal`)
-  return partes.join(' · ')
-}
 
 export interface AgendaClienteProps {
   /** Las citas de W-1, W y W+1 sembradas por `page.tsx` (A1.4c). Sin ella, o
