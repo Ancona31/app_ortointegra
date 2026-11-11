@@ -9,7 +9,7 @@ import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin, { DateClickArg, EventResizeDoneArg } from '@fullcalendar/interaction'
 import listPlugin, { type NoEventsContentArg } from '@fullcalendar/list'
-import { EventClickArg, EventDropArg, DateSelectArg, EventInput, EventApi, EventContentArg, DayCellContentArg, DayHeaderContentArg, MoreLinkContentArg, NowIndicatorContentArg, ViewApi } from '@fullcalendar/core'
+import { Calendar as CalendarioFC, EventClickArg, EventDropArg, DateSelectArg, EventInput, EventApi, EventContentArg, DayCellContentArg, DayHeaderContentArg, MoreLinkContentArg, NowIndicatorContentArg, ViewApi } from '@fullcalendar/core'
 import esLocale from '@fullcalendar/core/locales/es'
 import { X, Calendar, User, Plus, Trash2, Settings, ChevronDown, FileText, Stethoscope, Loader2, Mail,
          CalendarPlus, ChevronsDownUp, Menu, ChevronLeft, ChevronRight, TriangleAlert, type LucideIcon } from 'lucide-react'
@@ -7004,6 +7004,25 @@ export default function AgendaCliente({ semillaCitas }: AgendaClienteProps) {
    * apunta a esta función por su nombre.
    */
   function aplicarAppointmentAlEvento(appointment: Partial<Appointment> & { id?: string }) {
+    /* ⚠️ A1-bis.1 · UN SOLO REPINTADO PARA TODA LA TANDA. `fusionarCitaEnEvento`
+       hace un `setDates`, un `setProp` y un `setExtendedProp` POR CLAVE, y cada
+       uno es una mutación propia: sin agrupar, cada una repintaba FullCalendar
+       entero y emitía su `eventsSet` —~34 por cita; medido: 303 ms y una tarea
+       larga con 180 eventos en la semana, en CADA agenda abierta, por cada
+       UPDATE de Realtime—. Dentro de `batchRendering` el estado se muta igual,
+       paso a paso; sólo el repintado, y con él un único `eventsSet`, espera al
+       final. Los manejadores de `eventsSet` calculan sobre el estado FINAL, que
+       es el mismo que veía el último de los 34.
+       `instanceof` y no `as`: `getApi()` está tipado como `CalendarApi`, que no
+       declara `batchRendering`. Si no fuera un `Calendar`, se muta sin agrupar,
+       como antes. */
+    const api = calendarRef.current?.getApi()
+    if (api instanceof CalendarioFC) api.batchRendering(() => fusionarCitaEnEvento(appointment))
+    else fusionarCitaEnEvento(appointment)
+  }
+
+  /** El cuerpo de `aplicarAppointmentAlEvento`, sin agrupar. Ver su nota. */
+  function fusionarCitaEnEvento(appointment: Partial<Appointment> & { id?: string }) {
     if (!appointment?.id) return
     const existing = calendarRef.current?.getApi()?.getEventById(appointment.id)
     if (!existing) return
@@ -7775,25 +7794,31 @@ export default function AgendaCliente({ semillaCitas }: AgendaClienteProps) {
         // Actualizar el evento existente in-place
         const existing = api.getEventById(data.id!)
         if (existing) {
-          if (data.start_time) existing.setStart(data.start_time)
-          if (data.end_time)   existing.setEnd(data.end_time)
-          if (data.title)      existing.setProp('title', data.title)
-          // Actualizar extendedProps con el status nuevo. Ya no se copia
-          // ningún `colorStyle`: el color se deriva del status al pintar, así
-          // que basta con que el status esté al día.
-          existing.setExtendedProp('status', data.status ?? existing.extendedProps.status)
-          existing.setExtendedProp('notes', data.notes ?? existing.extendedProps.notes)
-          existing.setExtendedProp('pacientes', data.pacientes ?? null)
-          // La pinta del evento genérico. Va en la tanda optimista como el
-          // resto: sin esto, cambiar el color no se vería hasta que respondiera
-          // el servidor. `?? null` y no `??  lo que había`: el modal manda
-          // siempre las dos, y en una cita manda null a propósito.
-          existing.setExtendedProp('icono', data.icono ?? null)
-          existing.setExtendedProp('color', data.color ?? null)
-          // F3-6 fix Bug 1: actualizar también médico y consultorio_id (optimistic).
-          // El chip de iniciales sale de `medico_id` al pintar, así que basta con esto.
-          existing.setExtendedProp('medico_id', data.medico_id ?? null)
-          existing.setExtendedProp('consultorio_id', data.consultorio_id ?? existing.extendedProps.consultorio_id)
+          /* A1-bis.1: las once mutaciones en un solo repintado. Ver la nota de
+             `aplicarAppointmentAlEvento`. */
+          const mutar = () => {
+            if (data.start_time) existing.setStart(data.start_time)
+            if (data.end_time)   existing.setEnd(data.end_time)
+            if (data.title)      existing.setProp('title', data.title)
+            // Actualizar extendedProps con el status nuevo. Ya no se copia
+            // ningún `colorStyle`: el color se deriva del status al pintar, así
+            // que basta con que el status esté al día.
+            existing.setExtendedProp('status', data.status ?? existing.extendedProps.status)
+            existing.setExtendedProp('notes', data.notes ?? existing.extendedProps.notes)
+            existing.setExtendedProp('pacientes', data.pacientes ?? null)
+            // La pinta del evento genérico. Va en la tanda optimista como el
+            // resto: sin esto, cambiar el color no se vería hasta que respondiera
+            // el servidor. `?? null` y no `??  lo que había`: el modal manda
+            // siempre las dos, y en una cita manda null a propósito.
+            existing.setExtendedProp('icono', data.icono ?? null)
+            existing.setExtendedProp('color', data.color ?? null)
+            // F3-6 fix Bug 1: actualizar también médico y consultorio_id (optimistic).
+            // El chip de iniciales sale de `medico_id` al pintar, así que basta con esto.
+            existing.setExtendedProp('medico_id', data.medico_id ?? null)
+            existing.setExtendedProp('consultorio_id', data.consultorio_id ?? existing.extendedProps.consultorio_id)
+          }
+          if (api instanceof CalendarioFC) api.batchRendering(mutar)
+          else mutar()
         }
       } else {
         // Crear evento optimista temporal. `editable: false` cubre arrastre y
