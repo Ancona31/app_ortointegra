@@ -218,3 +218,16 @@ export function clasesDelEvento(arg: EventContentArg): string[] {
   return clases
 }
 
+
+/* SÓLO EL NOMBRE VISIBLE DE CADA ESTADO. El color NO está aquí y no debe
+   volver: este mapa llegó a tener `bg`/`text`/`dot` con clases de Tailwind que
+   ya nadie leía —el color salía de los tokens— y lo único que hacían era estar
+   a mano para que alguien los usara por error y estrenara una tercera paleta.
+   Ver el aviso junto a `STATUS_STYLE` en `AgendaCliente.tsx`. Vive aquí desde A2.2. */
+export const STATUS_CONFIG: Record<Status, { label: string }> = {
+  scheduled:  { label: 'Agendada'   },
+  confirmed:  { label: 'Confirmada' },
+  cancelled:  { label: 'Cancelada'  },
+  no_show:    { label: 'No asistió' },
+  attended:   { label: 'Atendida'   },
+}
