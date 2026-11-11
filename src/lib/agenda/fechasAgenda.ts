@@ -141,10 +141,12 @@ export const TOPE_GESTO_MS = 30_000
    que nadie se entere, que es justo lo que un candado no debe hacer.
 
    ⚠️ VIVE FUERA DEL COMPONENTE A PROPÓSITO. Dentro, `refetch` pasaba a cerrar
-   sobre una función del cuerpo y los tres efectos que llaman a `refetch` con
-   deps `[]` empezaban a dar `react-hooks/exhaustive-deps`. Esos `[]` están
-   razonados en cada efecto —sólo leen refs— y no se tocan; el que se mueve es
-   este ayudante. El ref entra por parámetro. */
+   sobre una función del cuerpo y los efectos que llaman a `refetch` empezaban
+   a dar `react-hooks/exhaustive-deps`. Desde A2.5.6 esas deps son `[refetch]`
+   —`refetch` llega estable de `useFuentesAgenda` (`useCallback` con
+   `[calendarRef]`)— y no `[]`; lo que no se toca sigue siendo el porqué de
+   cada efecto, razonado donde vive cada uno. El que se mueve es este
+   ayudante. El ref entra por parámetro. */
 export function hayGestoEnCurso(marca: { current: number }): boolean {
   if (!marca.current) return false
   if (Date.now() - marca.current < TOPE_GESTO_MS) return true
