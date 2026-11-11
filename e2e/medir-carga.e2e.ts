@@ -196,11 +196,30 @@ async function medirAperturaFria(browser: Browser, limitarRed: boolean) {
   return { ms, msAppointments: tAppointments.t ?? -1, peticiones, authUserTotal, authUserNavegador }
 }
 
+/* El reloj de un clic arranca con la página QUIETA: sin animaciones en curso y
+   sin `/api/*` en vuelo. Si no, `click()` espera a que el botón deje de
+   moverse (la entrada de la vista, la transición de página) y esa espera
+   entra en la medida: en A1.2 sumaba ~250 ms a un cambio de semana que en
+   realidad tardaba ~60, y daba un número PEOR justo cuando la agenda pintaba
+   antes. */
+async function esperarQuieta(page: Page): Promise<void> {
+  await page.waitForFunction(
+    // Las de iteración infinita (indicadores, pulsos) no terminan nunca y no
+    // mueven el botón: no cuentan.
+    () => document.getAnimations().every(a =>
+      a.playState !== 'running' || a.effect?.getTiming().iterations === Infinity),
+    undefined,
+    { timeout: 10000 },
+  )
+  await page.waitForLoadState('networkidle')
+}
+
 async function medirCambioDeSemana(browser: Browser, direccion: 'next' | 'prev') {
   const context = await browser.newContext({ storageState: SESION.adminA })
   const page = await context.newPage()
   await page.goto('/agenda')
   await page.locator('.fc-event').first().waitFor({ state: 'visible', timeout: 20000 })
+  await esperarQuieta(page)
   const { peticiones, t0 } = instrumentar(page)
   await page.locator(direccion === 'next' ? '.fc-next-button' : '.fc-prev-button').click()
   // GRAVE de medición: se espera un EVENTO CONOCIDO de la semana destino, no
@@ -223,6 +242,7 @@ async function medirVueltaInterna(browser: Browser) {
   await page.locator('.fc-event').first().waitFor({ state: 'visible', timeout: 20000 })
   await page.getByRole('link', { name: 'Dashboard', exact: true }).click()
   await page.getByRole('link', { name: 'Agenda', exact: true }).waitFor({ state: 'visible', timeout: 15000 })
+  await esperarQuieta(page)
   const { peticiones, t0 } = instrumentar(page)
   await page.getByRole('link', { name: 'Agenda', exact: true }).click()
   await page.locator('.fc-event').first().waitFor({ state: 'visible', timeout: 20000 })
