@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test'
 import {
   irAAgenda, arrastrarEventoPorMinutos, redimensionarFinEvento, soloEscritorio, SESION,
-  selectFiltroMedico, enContextoNuevo, toastConTexto,
+  selectFiltroMedico, enContextoNuevo, toastConTexto, sqlLocal,
 } from './ayudas'
 
 /**
@@ -21,7 +21,27 @@ import {
 soloEscritorio()
 test.use({ storageState: SESION.adminA })
 
+/** La auditoría de B0 (`log_cita_change`) de una cita de la clínica A de la
+ *  semilla, por su título: cuántas `cita_editada` tiene y los `campos` de la
+ *  última. Por SQL como `postgres` porque `audit_log` no se lee con la sesión. */
+function auditoriaDeCita(titulo: string): { editadas: number; ultimosCampos: string } {
+  const id = sqlLocal(`select a.id from public.appointments a join public.clinicas c on c.id = a.clinica_id
+                        where c.nombre = 'Clínica Semilla A' and a.title = :'titulo'`, { titulo })
+  if (!/^[0-9a-f-]{36}$/.test(id)) throw new Error(`auditoriaDeCita: esperaba UNA cita «${titulo}», salió «${id}»`)
+  const [editadas, ultimosCampos] = sqlLocal(`
+    select count(*),
+           coalesce((select descripcion::jsonb ->> 'campos' from public.audit_log
+                      where tabla = 'appointments' and registro_id = :'id' and accion = 'cita_editada'
+                      order by created_at desc limit 1), '')
+      from public.audit_log where tabla = 'appointments' and registro_id = :'id' and accion = 'cita_editada'`,
+  { id }).split('|')
+  return { editadas: Number(editadas), ultimosCampos }
+}
+
 test('arrastrar una cita a otra hora del mismo día; el rango exacto persiste en contexto nuevo', async ({ page, browser }) => {
+  // B0: el arrastre deja EXACTAMENTE una `cita_editada` (ni cero, ni una más por
+  // el after() de Google o por `client_id`, que el WHEN descarta).
+  const auditoriaAntes = auditoriaDeCita('Cirugía programada')
   await irAAgenda(page)
   const evento = page.locator('.fc-timegrid-event', { hasText: 'Cirugía programada' })
   await expect(evento.locator('.ag-tarjeta-hora-rango')).toHaveText('07:00 - 10:00')
@@ -45,6 +65,12 @@ test('arrastrar una cita a otra hora del mismo día; el rango exacto persiste en
       pagina.locator('.fc-timegrid-event', { hasText: 'Cirugía programada' }).locator('.ag-tarjeta-hora-rango'),
     ).toHaveText('09:00 - 12:00')
   })
+
+  // Se mira DESPUÉS del contexto nuevo, no al llegar la respuesta del PUT: así
+  // también le da tiempo a cualquier escritura del after() a dejar su fila.
+  const auditoriaDespues = auditoriaDeCita('Cirugía programada')
+  expect(auditoriaDespues.editadas - auditoriaAntes.editadas).toBe(1)
+  expect(auditoriaDespues.ultimosCampos).toBe('["end_time", "start_time"]')
 })
 
 test('redimensionar el fin de una cita; la nueva duración exacta persiste en contexto nuevo', async ({ page, browser }) => {
