@@ -104,8 +104,29 @@ async function esperarSuscripcionesRealtimePurgadas(): Promise<void> {
   if (quedan > 0) console.warn(`global-setup: ${quedan} suscripción(es) de Realtime siguen vivas; se resiembra igual.`)
 }
 
+/**
+ * Apaga el interruptor de la agenda v2 (`agenda_ajustes.agenda_v2_encendida`)
+ * en TODAS las clínicas de la base local, para que cada corrida empiece con la
+ * agenda de siempre y sólo la prueba que lo pida lo encienda
+ * (`interruptorAgenda` de `ayudas.ts`). Una corrida que abortó a medias pudo
+ * dejar uno encendido, y las clínicas que no son de la semilla no se resiembran.
+ *
+ * Si la tabla todavía no existe (base local sin la migración B1), no hay ningún
+ * interruptor que apagar: la agenda ya los trata a todos como apagados.
+ */
+function apagarInterruptoresAgenda(): void {
+  execFileSync('docker', ['exec', '-i', 'supabase_db_app_ortointegra', 'psql', '-U', 'postgres', '-X', '-tAq',
+    '-v', 'ON_ERROR_STOP=1', '-c',
+    `do $$ begin
+       if to_regclass('public.agenda_ajustes') is not null then
+         update public.agenda_ajustes set agenda_v2_encendida = false where agenda_v2_encendida;
+       end if;
+     end $$`], { encoding: 'utf8' })
+}
+
 export default async function globalSetup(): Promise<void> {
   comprobarBuildFresco()
+  apagarInterruptoresAgenda()
   await esperarSuscripcionesRealtimePurgadas()
   execFileSync('npx', ['tsx', 'scripts/agenda-semilla.ts'], { stdio: 'inherit', cwd: process.cwd() })
 

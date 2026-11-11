@@ -61,6 +61,48 @@ export function resembrar(): void {
   execFileSync('npx', ['tsx', 'scripts/agenda-semilla.ts'], { stdio: 'inherit', cwd: process.cwd() })
 }
 
+/** El contenedor de la base LOCAL (el mismo que usan `global-setup.ts` y la semilla). */
+const CONTENEDOR_DB = 'supabase_db_app_ortointegra'
+
+/**
+ * Corre SQL como `postgres` contra la base LOCAL de Docker y devuelve la salida
+ * cruda (`-tA`: sin cabecera, columnas separadas por `|`, una fila por línea).
+ * Los valores que vengan de la prueba van en `variables` y se citan en el SQL
+ * como `:'nombre'` —psql los escapa—, nunca concatenados en la cadena.
+ *
+ * ⚠️ SÓLO LOCAL: habla con el contenedor, no con ninguna URL. Como `postgres`
+ * no pasa por la RLS ni por los gates: úsala para PREPARAR o COMPROBAR la base,
+ * nunca para hacer lo que la prueba quiere demostrar que la app hace.
+ * El SQL entra por stdin (`-f -`) porque psql no interpola variables en `-c`.
+ */
+export function sqlLocal(sql: string, variables: Record<string, string> = {}): string {
+  const vars = Object.entries(variables).flatMap(([k, v]) => ['-v', `${k}=${v}`])
+  return execFileSync('docker', ['exec', '-i', CONTENEDOR_DB, 'psql', '-U', 'postgres', '-X', '-tAq',
+    '-v', 'ON_ERROR_STOP=1', ...vars, '-f', '-'], { input: sql, encoding: 'utf8' }).trim()
+}
+
+/** Las dos clínicas de `scripts/agenda-semilla.ts`, por su nombre (sus ids cambian en cada siembra). */
+const NOMBRE_CLINICA = { A: 'Clínica Semilla A', B: 'Clínica Semilla B' } as const
+
+/**
+ * Enciende o apaga el interruptor de la agenda v2 (`agenda_ajustes.agenda_v2_encendida`,
+ * plan del bloque B §1) de una clínica de la semilla. Lo hace como `postgres`,
+ * que es el único que puede (`trg_agenda_ajustes_proteger`), igual que Angel
+ * desde el editor SQL. Con `workers: 1` las pruebas van en serie, así que un
+ * archivo que lo enciende no pisa a otro; aun así, quien lo enciende lo apaga
+ * al terminar, y `global-setup.ts` los apaga todos al empezar.
+ */
+export function interruptorAgenda(clinica: keyof typeof NOMBRE_CLINICA, encendido: boolean): void {
+  const salida = sqlLocal(`
+    insert into public.agenda_ajustes (clinica_id, agenda_v2_encendida)
+    select id, :'encendido'::boolean from public.clinicas where nombre = :'nombre'
+    on conflict (clinica_id) do update set agenda_v2_encendida = excluded.agenda_v2_encendida
+    returning clinica_id;`, { nombre: NOMBRE_CLINICA[clinica], encendido: String(encendido) })
+  if (salida.split('\n').filter(Boolean).length !== 1) {
+    throw new Error(`interruptorAgenda: esperaba 1 clínica llamada «${NOMBRE_CLINICA[clinica]}», salió: «${salida}»`)
+  }
+}
+
 /**
  * El lunes de la semana que `/agenda` muestra por defecto al abrir HOY,
  * calculado una sola vez al cargar este módulo — MISMO cálculo que
