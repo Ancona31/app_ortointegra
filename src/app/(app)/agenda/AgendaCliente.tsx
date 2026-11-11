@@ -6,11 +6,8 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import dynamic from 'next/dynamic'
 import FullCalendar from '@fullcalendar/react'
-import dayGridPlugin from '@fullcalendar/daygrid'
-import timeGridPlugin from '@fullcalendar/timegrid'
-import interactionPlugin, { DateClickArg, EventResizeDoneArg } from '@fullcalendar/interaction'
-import listPlugin from '@fullcalendar/list'
-import { Calendar as CalendarioFC, type DatesSetArg, type FormatterInput, type PluginDef, EventClickArg, EventDropArg, DateSelectArg, EventInput, EventApi, EventContentArg, DayCellContentArg, DayHeaderContentArg, ViewApi } from '@fullcalendar/core'
+import type { DateClickArg, EventResizeDoneArg } from '@fullcalendar/interaction'
+import { Calendar as CalendarioFC, type DatesSetArg, EventClickArg, EventDropArg, DateSelectArg, EventInput, EventApi, EventContentArg, DayCellContentArg, DayHeaderContentArg, ViewApi } from '@fullcalendar/core'
 import esLocale from '@fullcalendar/core/locales/es'
 import { Calendar, Plus, Settings, ChevronDown,
          ChevronsDownUp, TriangleAlert } from 'lucide-react'
@@ -24,6 +21,9 @@ import { useSubscriptionGate } from '@/components/billing/SubscriptionGateProvid
 import { componerNombreMedicoCompleto, componerInicialesMedico } from '@/lib/nombreMedico'
 import { useMenuMovil } from '@/contexts/MenuMovilContext'
 import { GoogleGIcon } from '@/components/agenda/GoogleGIcon'
+import {
+  VISTAS_FC, VISTAS_FC_MOVIL, TOOLBAR_ESCRITORIO, PLUGINS_FC, TEXTO_BOTONES_FC, FORMATO_HORA_FC,
+} from '@/components/agenda/opcionesCalendario'
 /* ⚠️ A2.6: `AppointmentModal`, `HorarioModal` y `ModalInvitacionCita` se
    cargan en diferido más abajo, con `next/dynamic` — son los tres modales más
    pesados de la agenda y no hacen falta en el JS inicial de `/agenda`. Lo que
@@ -48,10 +48,9 @@ import {
   aEventosDeCalendario, claveGoogle, eventosProvisionales, leerGoogle, pedirEventosGoogle, traerGoogle,
   type EstadoGoogleAgenda, type ResultadoGoogle,
 } from '@/lib/agenda/cacheEventosGoogle'
-import { claveCitas, generacionCitas, guardarCitas, leerCitas, vaciarCacheCitas } from '@/lib/agenda/cacheRangosCitas'
-import { esperarSemilla, sembrarCacheCitas, type SemillaCitas } from '@/lib/agenda/semillaCitas'
+import { claveCitas, leerCitas, vaciarCacheCitas } from '@/lib/agenda/cacheRangosCitas'
+import { esperarSemilla, type SemillaCitas } from '@/lib/agenda/semillaCitas'
 import { semanaAnterior, semanaSiguiente } from '@/lib/agenda/semanasVecinas'
-import { logger } from '@/lib/logger'
 import {
   avisoDeRecorte,
   calcularVentanaRejilla,
@@ -59,6 +58,9 @@ import {
   type EventoParaVentana,
   type VentanaRejilla,
 } from '@/lib/agenda/ventanaRejilla'
+import { buildEventInput, FUENTE_APPOINTMENTS, PREFIJO_OPTIMISTA } from '@/lib/agenda/eventosDeCita'
+import { traerCitasDeduplicado, engancharSemilla, type TraidaEnVuelo } from '@/lib/agenda/traidaCitas'
+import { enOcioso, cancelarOcioso } from '@/lib/agenda/ocioso'
 import { differenceInCalendarDays } from 'date-fns'
 import useSWR, { useSWRConfig } from 'swr'
 import {
@@ -78,7 +80,7 @@ import {
 import {
   type RangosDeVista, rangosDeLaVista, TOPE_GESTO_MS, hayGestoEnCurso,
   addMinutes, partirFechaHora,
-  ultimoDiaIncluido, puntasParaLaRejilla,
+  ultimoDiaIncluido,
 } from '@/lib/agenda/fechasAgenda'
 import {
   type Tramo,
@@ -91,7 +93,7 @@ import {
 } from '@/lib/agenda/conteoAgenda'
 import {
   esVistaDeRejilla, vistaEnElOtroFormato, etiquetaCompactar, vistaAdmiteCompactar,
-  masBreve, periodoDeLaVista,
+  periodoDeLaVista,
 } from '@/lib/agenda/vistasAgenda'
 import { STATUS_CONFIG, clasesDelEvento } from '@/lib/agenda/tarjetasAgenda'
 
@@ -163,12 +165,6 @@ type FilaRealtime = Omit<Appointment, 'pacientes' | 'medico'> & {
    la identidad de `inicialesDeCita` y con ella la de `eventContent`, que
    FullCalendar usa para decidir si repintar las tarjetas. */
 const SIN_MEDICOS: MedicoConfig[] = []
-
-/** Id de la eventSource de citas; ver `eventSourcesStable`. */
-const FUENTE_APPOINTMENTS = 'appointments'
-
-/** Prefijo del id temporal que lleva una cita aun no confirmada por el servidor. */
-const PREFIJO_OPTIMISTA = 'optimistic-'
 
 /* Antigüedad a partir de la cual volver a la pestaña sí pide datos otra vez.
    Ver el efecto de `visibilitychange`, que es quien lo justifica. */
@@ -325,143 +321,12 @@ function QuickPatientModal({
 
 /* ─── Modal de cita ─────────────────────────────────────── */
 
-/**
- * Una cita de `/api/appointments` → lo que pinta FullCalendar. La usan la
- * fuente de citas y la semilla del servidor (A1.4c): UNA sola traducción, para
- * que lo sembrado y lo traído sean el mismo evento.
- */
-function citaAEvento(apt: Appointment): EventInput {
-  return {
-    id:              apt.id,
-    title:           apt.title,
-    /* Las dos puntas y el `allDay`, de `puntasParaLaRejilla`: una fila de
-       todo el día sale como fechas-solo en la zona de su consultorio, y
-       cualquier otra como los instantes de siempre. Sin esto, un evento de
-       todo el día entraba en la rejilla horaria como un bloque de 24 h a
-       caballo entre dos días. */
-    ...puntasParaLaRejilla(apt),
-    // Harness transparente: el color de la cita —que es el de su ESTADO— lo
-    // pone `eventContent` leyendo los tokens al pintar. Aquí NO va
-    // `textColor`: FullCalendar lo aplicaría como `color` en línea sobre
-    // `.fc-event-main`, y las tres tarjetas fijan el suyo en cada texto, así
-    // que no se heredaba nada. Lo que sí hacía era obligar a resolver un
-    // color aquí, que es de donde salía la segunda paleta.
-    backgroundColor: 'transparent',
-    borderColor:     'transparent',
-    extendedProps:   { ...apt },
-  }
-}
-
-/** Lo que `traerYGuardarCitas` entrega tras pedir y cachear un rango. */
-interface TraidaCitas { eventos: EventInput[]; incompleta: boolean }
-
-/**
- * Pide UN rango a `/api/appointments` y lo guarda en `cacheRangosCitas`
- * (A1.5a). La usan `appointmentSource` (la traída real) y la precarga de
- * semanas vecinas (A1.5b, `ejecutarPrecarga`): MISMA petición, MISMA
- * traducción (`citaAEvento`) y MISMO `guardarCitas` — sacarla de la fuente es
- * lo que evita tener dos copias que se desincronicen.
- *
- * `profileId` puede ser `null` (sin perfil no hay de quién es la caché, como
- * en `appointmentSource`): se pide igual, sólo que no se guarda nada.
- *
- * NO toca estado de React ni refs del componente — eso le toca a cada
- * llamador según lo que le corresponda (`errorCitas`, `ultimaTraidaRef`…).
- *
- * ⚠️⚠️ LAS DOS GUARDAS DE ABAJO (`res.ok` y el `Array.isArray`) NO SON
- * DEFENSIVAS, son el Bloque 9 entero: sin ellas un fallo del servidor se
- * pinta como una agenda VACÍA en vez de como un error — ver la nota larga que
- * llevaban en `appointmentSource` antes de este reparto. Las dos LANZAN, así
- * que sólo hay un camino de fallo: el `catch` de quien llame a esto.
- */
-async function traerYGuardarCitas(
-  startStr: string, endStr: string, filtro: string, profileId: string | null,
-): Promise<TraidaCitas> {
-  const salio = Date.now()
-  const gen = generacionCitas()
-  let url = `/api/appointments?from=${startStr}&to=${endStr}`
-  if (filtro) url += `&medico_id=${filtro}`
-  const res = await fetch(url)
-  if (!res.ok) throw new Error(`El servidor respondió ${res.status}`)
-  const data: { appointments?: Appointment[]; incompleta?: boolean } = await res.json()
-  if (!Array.isArray(data.appointments)) throw new Error('Respuesta de citas ilegible')
-  const eventos = data.appointments.map(citaAEvento)
-  const incompleta = data.incompleta === true
-  if (profileId) guardarCitas(claveCitas(profileId, filtro, startStr, endStr), eventos, incompleta, salio, gen)
-  return { eventos, incompleta }
-}
-
-/**
- * Lo que vive en el mapa de citas en vuelo: la promesa Y LA GENERACIÓN con la
- * que salió. Sin la generación, reutilizar la promesa es el bug grave de la
- * revisión: `vaciarCacheCitas()` NO toca este mapa (es independiente de
- * `cacheRangosCitas`), así que una petición que salió ANTES de un vaciado
- * podía devolverse a quien pide DESPUÉS — datos de antes de la cita que
- * acaba de llegar por tiempo real, servidos como si fueran los de ahora.
- */
-interface TraidaEnVuelo { gen: number; promesa: Promise<TraidaCitas> }
-
-/**
- * Evita que la traída real y la precarga pidan la MISMA clave a la vez: la
- * segunda que llegue reutiliza la promesa de la primera — PERO SÓLO SI salió
- * en la generación VIGENTE. Si hubo un vaciado de por medio, esa promesa es
- * de antes: se ignora (su propio `.finally` la retira sola cuando resuelva) y
- * se pide una nueva. `enVuelo` es `citasEnVueloRef.current`, compartido por
- * las dos — un `Map` de módulo sería memoria entre pestañas sin sentido, y
- * uno por componente ya es lo que hace falta para una sola agenda abierta.
- */
-function traerCitasDeduplicado(
-  startStr: string, endStr: string, filtro: string, profileId: string | null,
-  enVuelo: Map<string, TraidaEnVuelo>,
-): Promise<TraidaCitas> {
-  if (!profileId) return traerYGuardarCitas(startStr, endStr, filtro, profileId)
-  const clave = claveCitas(profileId, filtro, startStr, endStr)
-  const gen = generacionCitas()
-  const existente = enVuelo.get(clave)
-  if (existente && existente.gen === gen) return existente.promesa
-  const promesa = traerYGuardarCitas(startStr, endStr, filtro, profileId).finally(() => {
-    if (enVuelo.get(clave)?.promesa === promesa) enVuelo.delete(clave)
-  })
-  enVuelo.set(clave, { gen, promesa })
-  return promesa
-}
-
-/** Tiempo ocioso con respaldo: no todos los navegadores tienen `requestIdleCallback` (Safari, a la fecha). */
-function enOcioso(fn: () => void): number {
-  if (typeof window.requestIdleCallback === 'function') return window.requestIdleCallback(fn)
-  return window.setTimeout(fn, 1)
-}
-function cancelarOcioso(handle: number): void {
-  if (typeof window.cancelIdleCallback === 'function') window.cancelIdleCallback(handle)
-  else window.clearTimeout(handle)
-}
-
 /** Las dos vistas de 7 días donde se precarga (A1.5b). Mes y Día, no. */
 const VISTAS_PRECARGABLES = new Set(['timeGridWeek', 'listWeek'])
 
 /** Una secuencia de precarga en curso: su candado de cancelación y su
  *  temporizador ocioso, fundidos en un solo objeto — ver `ejecutarPrecarga`. */
 interface PrecargaEnCurso { cancelado: boolean; idle: number }
-
-/**
- * Engancha la semilla del servidor a `cacheRangosCitas` (A1.4c). La generación
- * y la hora se toman AQUÍ, al recibir la promesa: un vaciado (escritura propia,
- * tiempo real) mientras viaja la descarta. Resuelve con la marca de la semilla
- * si entró (ver `sembrarCacheCitas`) o `null`. Nunca rechaza: si la semilla
- * falla, la fuente de citas va a la red como siempre, sin aviso.
- */
-function engancharSemilla(semilla: Promise<SemillaCitas<Appointment> | null> | undefined): Promise<number | null> | null {
-  if (!semilla) return null
-  const gen = generacionCitas()
-  const recibida = Date.now()
-  return Promise.resolve(semilla).then(
-    (s) => (s ? sembrarCacheCitas(s, citaAEvento, gen, recibida) : null),
-    (err: unknown) => {
-      logger.warn('agenda', `semilla de citas perdida: ${err instanceof Error ? err.message : 'error'}`)
-      return null
-    },
-  )
-}
 
 /* ─── Página principal ─────────────────────────────────── */
 
@@ -477,204 +342,6 @@ function engancharSemilla(semilla: Promise<SemillaCitas<Appointment> | null> | u
    pasó a tener fila propia también en escritorio, así que ya no hay nada que
    redeclarar por debajo del umbral. */
 const ANCHO_MOVIL = 1024
-
-/* ── LAS TRES VISTAS, CADA UNA EN SUS DOS FORMATOS ─────────────────────────
-   Lo que el médico elige es un PERIODO —mes, semana, día—, no una vista de
-   FullCalendar. El formato en el que ese periodo se dibuja lo decide el ancho:
-   rejilla cuando sobra y lista cuando no.
-
-   ⚠️ MES APARECE A LOS DOS LADOS CON EL MISMO VALOR, Y NO ES UN HUECO SIN
-   RELLENAR. El mes se dibuja igual de ancho que de estrecho —lo que cambia son
-   sus celdas, que es otro bloque—, así que su pareja es él mismo. Ponerlo aquí y
-   no tratarlo como caso aparte es lo que deja `vistaEnElOtroFormato` sin ninguna
-   rama especial: la tabla contesta por las tres.
-
-   ⚠️ ESTA TABLA NO REGISTRA NADA. Las vistas se registran por el PLUGIN, en la
-   prop `plugins` del <FullCalendar>; esto sólo dice quién es pareja de quién. Si
-   añades un par aquí sin que las dos vistas existan, `changeView` lanzará. */
-
-/* Opciones POR VISTA. A nivel de módulo por la regla de identidad estable: un
-   literal en el JSX sería un objeto nuevo en cada render y FullCalendar vuelve
-   a refinar sus opciones cuando la referencia cambia.
-
-   `dayHeaderFormat` va aquí dentro y NO como prop suelta del calendario: a
-   nivel raíz se la comería también el time-grid, donde la cabecera la compone
-   `renderDayHeader` con su abreviatura de tres letras y su número apilado.
-   Sin esto, el fallback de FullCalendar para una vista de varias semanas es
-   `weekday: 'short'` (core/internal-common.js:6143-6144), que con `esLocale` da
-   «lun» — y el mockup del mes pide «LUNES». Las mayúsculas ya las pone
-   `globals.css` en `.fc-col-header-cell-cushion`; aquí sólo se pide el nombre
-   largo. */
-/* ⚠️ `titleFormat` VA AQUÍ DENTRO, POR VISTA, y no como prop suelta: cada una
-   quiere una forma distinta y a nivel raíz se la comerían las tres. El default
-   de FullCalendar para Semana es `{month:'short', day:'numeric', year:'numeric'}`,
-   que con `esLocale` daba «17 – 23 Ago 2026» — mes abreviado y sin preposición.
-
-   Cómo compone el rango la de SEMANA, porque no es obvio: `NativeFormatter`
-   detecta que la unidad que difiere es el DÍA, formatea los dos extremos
-   enteros («17 de agosto de 2026» / «22 de agosto de 2026»), busca la parte
-   común y la saca fuera. Resultado: «17 – 22 de agosto de 2026». Por eso basta
-   con pedir el formato de UNA fecha; el rango sale solo. El guión largo lo pone
-   `titleRangeSeparator` en el calendario — el default es « - », con guión
-   corto.
-
-   ⚠️ QUE EL TÍTULO LLEGUE HASTA EL 23 Y EL MOCKUP HASTA EL 22 NO ES UN FALLO DE
-   FORMATO: el mockup tiene el domingo plegado y nosotros no. El título sigue al
-   rango real de la vista, que es lo correcto. No lo «arregles».
-
-   La de DÍA sale «miércoles, 19 de agosto de 2026»: con coma, que es la forma
-   del locale, mientras que el mockup la dibujó sin ella. Se respeta el locale.
-   La mayúscula inicial —que Intl no pone en español— la da un `::first-letter`
-   en `globals.css`. Y NO el `text-transform: capitalize` de
-   `.fc .fc-toolbar-title`, que la regla de la agenda anula a propósito: ese
-   capitalize pone mayúscula en CADA palabra y con este formato largo daría
-   «17 – 22 De Agosto De 2026». Con el formato corto de antes no se notaba
-   porque no había preposiciones que estropear. */
-const VISTAS_FC = {
-  dayGridMonth: {
-    dayHeaderFormat: { weekday: 'long' },
-    titleFormat:     { month: 'long', year: 'numeric' },
-  },
-  /* ⚠️ `month: 'short'` Y NO `'long'`. En largo esto daba «24 – 28 de agosto de
-     2026» y medía 282,77 px a 22 px de cuerpo — el elemento más ancho de la fila
-     con diferencia, y lo que dejaba a la leyenda sin sitio para caber en una
-     línea. En corto sale «24 – 28 ago 2026». El separador largo lo pone
-     `titleRangeSeparator` en el <FullCalendar>, no esto.
-     Mes y Día se quedan en largo A PROPÓSITO: Mes ya es sólo «agosto de 2026» y
-     no aprieta, y en Día el día de la semana es información que ahí se quiere. */
-  /* ⚠️ `dayMaxEvents: 2` VA AQUÍ Y NO EN EL <FullCalendar>, y la diferencia es
-     visible. Es el tope de la BANDA DE TODO EL DÍA, y `dayMaxEvents` es una
-     opción global que Mes también lee: bajarla en el componente dejaría las
-     celdas del mes en dos chips, que es otro bloque y otra decisión. Puesta por
-     vista, sólo alcanza a las dos de rejilla.
-
-     QUE LA BANDA LA LEA ESTÁ COMPROBADO EN LA LIBRERÍA, no supuesto:
-     `@fullcalendar/timegrid/internal.js:315-322` (`getAllDayMaxEventProps`) la
-     saca de `this.context.options` y la reparte al `DayTable` de la banda en
-     `:1130`; sólo convierte el valor cuando es `true` (el modo «auto»), así que
-     un número pasa entero. Y `context.options` es POR VISTA —
-     `@fullcalendar/core/internal-common.js:2338-2342`, `buildViewContext` recibe
-     `viewOptions` y los publica como `options`—, que es lo que hace que ponerla
-     aquí funcione. */
-  timeGridWeek: { titleFormat: { day: 'numeric', month: 'short', year: 'numeric' }, dayMaxEvents: 2 },
-  timeGridDay:  { titleFormat: { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }, dayMaxEvents: 2 },
-  /* ⚠️ LAS DOS DE LISTA SÓLO LLEVAN `titleFormat`, Y NO ES UN OLVIDO: sus
-     `listDayFormat` / `listDaySideFormat` siguen SIN PONERSE a propósito, porque
-     los textos de la cabecera de día los compone `CabeceraDiaLista` a mano —los
-     defaults del plugin vienen invertidos, ver su nota—. Esto es otra cosa: es la
-     etiqueta de FECHA de la banda móvil, que sale de `view.title`.
-     Sin estas dos entradas caían al default de FullCalendar, que trae el año y el
-     mes abreviado —«17 – 22 ago 2026»—; el mockup pide «17 – 22 de agosto», sin
-     año, porque en una pantalla de 390 px el año es la parte que no aporta.
-     El rango lo compone solo `NativeFormatter` a partir del formato de UNA fecha,
-     igual que en `timeGridWeek`; el guión largo lo pone `titleRangeSeparator`. */
-  listDay:  { titleFormat: { weekday: 'short', day: 'numeric', month: 'long' } },
-  listWeek: { titleFormat: { day: 'numeric', month: 'long' } },
-} as const
-
-/* ── LAS OPCIONES DEL MES EN UN TELÉFONO ────────────────────────────────────
-   La MISMA tabla que la de arriba con la entrada de Mes sustituida. A nivel de
-   módulo por la regla de identidad estable, igual que su hermana, y como objeto
-   COMPLETO y no como spread: es la lista que hay que leer para saber qué ve el
-   teléfono, y un spread obliga a mirar dos sitios.
-
-   ⚠️ LA CUADRÍCULA SIGUE SIENDO LA DE FULLCALENDAR. Aquí no hay ninguna rejilla
-   propia: lo único que cambia son cuatro opciones y una hoja de estilos.
-
-   · `dayHeaderFormat: { weekday: 'narrow' }` — «L M X J V S D». En `long` («LUNES»)
-     las siete cabeceras se pisaban unas a otras a 51 px de columna. Es la
-     abreviatura más corta que el locale ofrece, que es «lo que quepa».
-   · `showNonCurrentDates: false` — los días de los meses vecinos se dejan en
-     blanco. Con `fixedWeekCount` en su default (`true`, y NO se toca: de él
-     depende el rango de `semanasPintadasDelMes`) las seis filas siguen ahí, así
-     que la rejilla no cambia de alto al navegar; lo que se va es el número de un
-     día que no es de este mes y que en modo punto no se distingue de los suyos.
-   · `dayMaxEvents: 3` — tres puntos y el cuarto hueco como «+N». El global es 3
-     también, pero el de aquí es POR VISTA y sobrevive a que alguien mueva aquél.
-   · `moreLinkContent` — «+2» y no «+2 más». El texto del locale son 35 px en una
-     celda de 51 que ya lleva tres puntos.
-   · ⚠️ `eventDisplay: 'list-item'` — Y ESTA NO ES COSMÉTICA, ES LO QUE HACE QUE
-     LA FILA DE PUNTOS FUNCIONE. Con el default (`'auto'`) `dayGridMonth` reparte
-     los segmentos en DOS mecanismos: los de hora van EN FLUJO dentro de la celda
-     y los de todo el día —y los de varios días— van a una capa de la FILA con
-     `position: absolute`. Un hijo posicionado en absoluto NO es un ítem de flex,
-     así que la fila centrada de la hoja no lo colocaría: la barra se quedaría en
-     el `top` que se calculó para el apilado vertical, encima del número del día.
-     Con `'list-item'` todos los segmentos van por el camino en flujo y por
-     celda, que es el único que la fila de puntos sabe repartir. De paso, un
-     evento de varios días deja un punto en CADA día que ocupa, que es justo lo
-     que un resumen de «cuánto hay» tiene que decir.
-   · `navLinks: false` — ⚠️ Y ESTO NO ES UN RECORTE, ES QUITAR UN CONFLICTO. El
-     número del día es un enlace a `timeGridDay` (ver `navLinkDayClick`), o sea
-     que en el teléfono llevaba a una REJILLA de horas, que es justo el formato
-     que el móvil no usa. Y además competía con el toque de la celda, que ahora
-     selecciona el día. La ruta a la vista Día en móvil es el «Ver día ›» del
-     panel de abajo, y es una sola.
-
-   ⚠️ `hiddenDays` NO SE TOCA AQUÍ: el mes arranca con las SIETE columnas. Que se
-   plieguen las vacías es una decisión del médico —el botón «Compactar» de la
-   banda— y es reversible desde la misma banda. El mockup dibuja seis columnas
-   con el domingo fijo; eso se descartó. */
-
-const VISTAS_FC_MOVIL = {
-  dayGridMonth: {
-    dayHeaderFormat:     { weekday: 'narrow' },
-    titleFormat:         { month: 'long', year: 'numeric' },
-    showNonCurrentDates: false,
-    dayMaxEvents:        3,
-    moreLinkContent:     masBreve,
-    eventDisplay:        'list-item',
-    navLinks:            false,
-  },
-  timeGridWeek: { titleFormat: { day: 'numeric', month: 'short', year: 'numeric' }, dayMaxEvents: 2 },
-  timeGridDay:  { titleFormat: { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }, dayMaxEvents: 2 },
-  /* ⚠️ AQUÍ ESTUVO `stickyHeaderDates: false` PARA `listDay`, Y SE RETIRÓ. NO LO
-     REPONGAS SIN LEER ESTO: el problema que venía a esquivar está resuelto por
-     su causa, y volver a apagar el pegado sólo lo taparía otra vez.
-
-     LA HISTORIA. En Día, al scrollear, la primera cita se metía debajo de la
-     cabecera del día y se leía a medias. Se apagó el pegado con el argumento de
-     que con UN solo grupo no hay relevo que hacer. Después se comprobó, mockup
-     en mano, que el solape es inevitable con cualquier cabecera pegada —el
-     propio mockup lo asume por escrito: «el fondo tiene que ser OPACO, o las
-     filas se ven por debajo»— y que el defecto de verdad era otro: el fondo NO
-     estaba tapando, porque vivía en el `<th>`, una caja de tabla cuyos adornos
-     se pintan en la posición de flujo y no viajan con el desplazamiento
-     pegajoso. Arreglado eso —fondo y líneas mudados al cushion, y orden de
-     pintado explícito; todo en `globals.css`, junto a `.fc-list-day-cushion`—,
-     el pegado ya no tapa nada legible y las dos vistas de lista se comportan
-     igual, que es lo que se quería. */
-  listDay:  { titleFormat: { weekday: 'short', day: 'numeric', month: 'long' } },
-  listWeek: { titleFormat: { day: 'numeric', month: 'long' } },
-} as const
-
-/* Las dos configuraciones del toolbar nativo, A NIVEL DE MÓDULO por la regla de
-   identidad estable: un literal en el JSX es un objeto nuevo en cada render y
-   FullCalendar vuelve a refinar sus opciones cuando la referencia cambia.
-   Estaban en línea y se subieron aquí al tocarlas en el bloque 4.
-
-   ⚠️ EN ESCRITORIO LA FECHA VA EN EL CHUNK `left`, con los botones, y `center`
-   queda vacío. Antes iba en `center`, o sea flotando en mitad de la tarjeta y
-   lejos de las flechas que la mueven. En MÓVIL se queda centrada: ahí el chunk
-   izquierdo sólo lleva las dos flechas y no hay ancho para poner la fecha al
-   lado sin partirla. */
-/* ⚠️ AQUÍ VIVÍA `TOOLBAR_MOVIL`, Y SE FUE EN EL PASO 8a. Era
-   `{ left: 'prev,next', center: 'title', right: 'today' }`, la configuración del
-   toolbar NATIVO en móvil. Ya no hay toolbar nativo en móvil: `headerToolbar` va
-   en `false` y lo sustituye entero `BandaMovil`. Si algún día vuelve el toolbar
-   nativo ahí, esa es la línea — pero entonces sobra la banda, no conviven. */
-const TOOLBAR_ESCRITORIO  = { left: 'prev,next today title', center: '', right: '' } as const
-
-/* ── A1-bis.2 · LAS PROPS LITERALES DE `<FullCalendar>`, A NIVEL DE MÓDULO ────
-   `@fullcalendar/react` llama a `resetOptions` con TODAS las props en cada render
-   del padre, y FullCalendar re-refina cada opción cuya identidad cambió —y con
-   una sola que cambie, repinta el calendario entero—. Un array o un objeto
-   escrito en el JSX es uno nuevo en cada render. Aquí son el mismo siempre.
-   ⚠️ El orden de `PLUGINS_FC` es una decisión: ver la nota junto a la prop. */
-const PLUGINS_FC: PluginDef[] = [dayGridPlugin, timeGridPlugin, interactionPlugin, listPlugin]
-const TEXTO_BOTONES_FC = { today: 'Hoy', month: 'Mes', week: 'Semana', day: 'Día' }
-/** El de las horas de las tarjetas y el de la columna de horas: el mismo. */
-const FORMATO_HORA_FC: FormatterInput = { hour: '2-digit', minute: '2-digit', meridiem: false, hour12: false }
 
 const CONTEO_VACIO: ConteoVisible = { citas: 0, eventos: 0, google: 0 }
 
@@ -2100,28 +1767,6 @@ export default function AgendaCliente({ semillaCitas }: AgendaClienteProps) {
     const idle = enOcioso(precargarModalesAgenda)
     return () => cancelarOcioso(idle)
   }, [])
-
-  /* ── Helper: construir EventInput desde datos de cita ── */
-  /* ⚠️ EL PARÁMETRO ES `DatosGuardado` Y NO `Partial<Appointment>`, Y ES LO QUE
-     ARREGLA EL ALTA OPTIMISTA DE TODO EL DÍA. El camino optimista llama a esto
-     con lo que el modal mandó a guardar, que en todo el día son
-     `all_day_desde`/`all_day_hasta` y NO `start_time`. Con el tipo viejo esas
-     dos claves ni se veían, así que salía un `EventInput` sin `start`,
-     `addEvent` devolvía `null` y no se pintaba nada hasta que contestara el
-     servidor. `DatosGuardado` es un superconjunto, así que los demás llamadores
-     no se enteran. */
-  function buildEventInput(data: DatosGuardado): EventInput {
-    return {
-      id:              data.id ?? `${PREFIJO_OPTIMISTA}${Date.now()}`,
-      title:           data.title ?? '',
-      ...puntasParaLaRejilla(data),
-      // Sin `textColor`, por el mismo motivo que en `appointmentSource`: el
-      // color de estado lo pinta `eventContent` desde los tokens.
-      backgroundColor: 'transparent',
-      borderColor:     'transparent',
-      extendedProps:   { ...data },
-    }
-  }
 
   /**
    * Re-hidrata un evento del calendario con la fila canónica que devolvió el
