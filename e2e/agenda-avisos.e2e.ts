@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { SESION } from './ayudas'
+import { DIA_LABORABLE_LIBRE, SESION } from './ayudas'
 
 test.use({ storageState: SESION.adminA })
 
@@ -29,23 +29,15 @@ test('si falla /api/google/events: las citas propias se siguen viendo', async ({
   await expect(page.getByText('No se pudo sincronizar con Google Calendar.')).toBeVisible({ timeout: 15000 })
 })
 
-test('objetivo A1: Google lento (8 s) no debería retrasar las citas propias más de 2 s', async ({ page }) => {
-  // objetivo A1: comprobado contra el servidor real — con `/api/google/events`
-  // retrasado 8 s, NINGÚN `.fc-event` aparece antes de esos 8 s, aunque
-  // `appointments` y `google` son dos `eventSources` independientes de
-  // FullCalendar (page.tsx, `eventSourcesStable`) y cada uno debería pintar
-  // en cuanto SU `success()` llega. El gancho `loading` que alimenta
-  // `ag-cargando` es el AGREGADO de las dos fuentes (comentario de
-  // `page.tsx` junto a `loading={...}`, citando
-  // `computeEventSourcesLoading` de FullCalendar) y sólo dimensiona
-  // (`opacity: .55`, `globals.css:1762`) — no debería ocultar nada—, pero el
-  // navegador tiene un límite de conexiones simultáneas por origen: con la
-  // petición a Google ya "en vuelo" (interceptada, pero ya contada contra
-  // ese límite) de un lado, la petición a `appointments` puede quedar en cola
-  // detrás de ella. Esto es tráfico real, no un mock que haga trampa: en
-  // producción, con Google de verdad lento, pasaría lo mismo.
-  test.fail()
-
+test('A1.3: Google lento (8 s) no retrasa las citas propias más de 2 s', async ({ page }) => {
+  // Era `test.fail()` («objetivo A1»). La causa, comprobada contra el
+  // servidor real y en el código de FullCalendar 6.1.20: NO era la cola de
+  // conexiones del navegador —`/api/appointments` contestaba a los ~220 ms con
+  // Google todavía en vuelo— sino que FullCalendar no pinta los eventos de
+  // NINGUNA fuente mientras quede una trayendo (`renderableEventStore`,
+  // `@fullcalendar/core/index.js:1396-1399`, con `progressiveEventRendering`
+  // en false). Desde A1.3 la fuente de Google contesta al instante desde
+  // `src/lib/agenda/cacheEventosGoogle.ts` y trae en segundo plano.
   await page.route('**/api/google/events**', async route => {
     // No hay otra señal que esperar: la mutación ES el retraso. 8 s fijos,
     // como pide el encargo.
@@ -58,6 +50,53 @@ test('objetivo A1: Google lento (8 s) no debería retrasar las citas propias má
   await page.locator('.fc-event').first().waitFor({ state: 'visible', timeout: 10000 })
   const ms = Date.now() - t0
   expect(ms).toBeLessThan(2000)
+})
+
+test('A1.3: Google lento CON eventos: las citas primero, sus eventos al llegar, sin segunda petición', async ({ page }) => {
+  // La segunda mitad del diseño: la fuente de Google contesta vacío al
+  // instante y, cuando llega la respuesta, se vuelve a pedir a sí misma y se
+  // sirve de la caché (`refrescarGoogle` en page.tsx). Si ese `refetch` no se
+  // sirviera de la caché saldría otra petición; si no se hiciera, el evento de
+  // Google no se pintaría nunca.
+  let pedidas = 0
+  await page.route('**/api/google/events**', async route => {
+    pedidas += 1
+    await new Promise(resolve => setTimeout(resolve, 3000))
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        estado: 'conectado',
+        events: [{
+          id: 'e2e-a13',
+          summary: 'Evento de Google A13',
+          start: { dateTime: `${DIA_LABORABLE_LIBRE}T12:00:00-06:00` },
+          end: { dateTime: `${DIA_LABORABLE_LIBRE}T12:30:00-06:00` },
+        }],
+      }),
+    })
+  })
+  const t0 = Date.now()
+  await page.goto('/agenda')
+  await page.locator('.fc-event').first().waitFor({ state: 'visible', timeout: 2500 })
+  expect(Date.now() - t0).toBeLessThan(2500)
+  const deGoogle = page.locator('.fc-event', { hasText: 'Evento de Google A13' })
+  await expect(deGoogle).toHaveCount(0)
+  await expect(deGoogle.first()).toBeVisible({ timeout: 15000 })
+  expect(pedidas).toBe(1)
+})
+
+test('A1.3: Google lento y caído, la banda de Google sale cuando contesta', async ({ page }) => {
+  // El aviso no cambia de casos, sólo de momento: sale cuando llega la
+  // respuesta, no antes, y las citas ya estaban pintadas.
+  await page.route('**/api/google/events**', async route => {
+    await new Promise(resolve => setTimeout(resolve, 3000))
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ estado: 'error_google', events: [] }) })
+  })
+  await page.goto('/agenda')
+  await expect(page.locator('.fc-event').first()).toBeVisible({ timeout: 2500 })
+  await expect(page.getByText('No se pudo sincronizar con Google Calendar.')).toHaveCount(0)
+  await expect(page.getByText('No se pudo sincronizar con Google Calendar.')).toBeVisible({ timeout: 15000 })
 })
 
 test('aviso de carga incompleta aparece en cualquier vista; «Ver por semana» sólo en Mes', async ({ page }) => {
@@ -86,4 +125,24 @@ test('aviso de carga incompleta aparece en cualquier vista; «Ver por semana» s
   // dos formatos.
   await verPorSemana.click()
   await expect(page.getByRole('tab', { name: 'Semana' })).toHaveAttribute('aria-selected', 'true')
+})
+
+test.describe('médico invitado', () => {
+  test.use({ storageState: SESION.medicoA })
+
+  test('A1.3: no pide /api/google/events — el servidor le contestaría vacío', async ({ page }) => {
+    // `events/route.ts` corta con `{ estado: 'conectado', events: [] }` cuando
+    // `!canVerAgendaCompleta`; la agenda contesta eso mismo sin preguntar.
+    const pedidas: string[] = []
+    page.on('request', r => { if (r.url().includes('/api/google/events')) pedidas.push(r.url()) })
+    const citas = page.waitForResponse(r => r.url().includes('/api/appointments') && r.request().method() === 'GET')
+    await page.goto('/agenda')
+    await citas
+    await expect(page.locator('.fc-event').first()).toBeVisible({ timeout: 15000 })
+    // Y tampoco al navegar a otra semana, que es otra traída de las dos fuentes.
+    const otra = page.waitForResponse(r => r.url().includes('/api/appointments') && r.request().method() === 'GET')
+    await page.locator('.fc-next-button:visible, [aria-label="Periodo siguiente"]:visible').first().click()
+    await otra
+    expect(pedidas).toEqual([])
+  })
 })

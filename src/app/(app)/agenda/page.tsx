@@ -29,6 +29,10 @@ import { regionDeTimezone } from '@/lib/consultorios/zonas-mexico'
 import { ICONOS_EVENTO, COLORES_EVENTO, type IconoEvento, type ColorEvento } from '@/lib/appointments'
 import { rangoQuePedir } from '@/lib/agenda/rangoQuePedir'
 import {
+  aEventosDeCalendario, claveGoogle, eventosProvisionales, leerGoogle, pedirEventosGoogle, traerGoogle,
+  type EstadoGoogleAgenda, type ResultadoGoogle,
+} from '@/lib/agenda/cacheEventosGoogle'
+import {
   avisoDeRecorte,
   calcularVentanaRejilla,
   diasOcultables,
@@ -63,16 +67,6 @@ import {
    sólo pinta `scheduled` y `confirmed` a propósito. */
 type Status = 'scheduled' | 'confirmed' | 'cancelled' | 'no_show' | 'attended'
 
-/* Lo que contesta `/api/google/events` en su campo `estado` (bloque 9).
-   ESPEJA `EstadoGoogle` de `src/lib/gcal.ts:62` y NO se importa de ahí a
-   propósito: ese módulo carga `googleapis`, y aunque un `import type` se borre
-   al compilar, dejaría escrita en un archivo de CLIENTE una ruta a un módulo de
-   servidor — el día que alguien le quite la palabra `type` se arrastra la
-   librería entera al navegador y nadie se entera hasta medir el bundle. Tres
-   literales copiados cuestan menos que ese riesgo.
-   Si el tipo de allá crece, esto no se rompe: quien lo consume compara contra
-   `'error_google'` y cualquier valor nuevo cae del lado silencioso. */
-type EstadoGoogleAgenda = 'conectado' | 'sin_token' | 'error_google'
 
 type Appointment = {
   id: string
@@ -5540,6 +5534,10 @@ export default function AgendaPage() {
      que pinta banda es 'error_google', así que el estado inicial tiene que ser
      cualquiera de los otros dos. */
   const [estadoGoogle, setEstadoGoogle] = useState<EstadoGoogleAgenda>('conectado')
+  /* Google todavía por contestar para lo que se está viendo (A1.3): la fuente
+     `gcal` ya respondió provisional y la de verdad vuela. Sólo lo lee
+     `vacioReal`. Ver `gcalSource`. */
+  const [googlePendiente, setGooglePendiente] = useState(false)
 
   /* El retraso de 150 ms de `cargaVisible`. Efecto y no `setTimeout` suelto para
      que el temporizador se cancele solo al desmontar y en cada cambio de
@@ -6185,10 +6183,50 @@ export default function AgendaPage() {
   /* Identidad estable: sólo tocan un ref, así que `[]` y no se re-registran en
      FullCalendar. Misma regla que `renderEC` y las fuentes. */
   const alEmpezarGesto = useCallback(() => { gestoEnCursoRef.current = Date.now() }, [])
-  const alTerminarGesto = useCallback(() => { gestoEnCursoRef.current = 0 }, [])
 
-  function refetch() {
+  /* Lo que avisa de que llegó Google (A1.3): vuelve a pedirle a la fuente `gcal`
+     SOLA, que esta vez se sirve de `cacheEventosGoogle` sin red. Ver la cabecera
+     de ese módulo para el porqué de que Google conteste en dos tiempos.
+     ⚠️ ESTE AVISO NO SE DESCARTA COMO UNA TRAÍDA, SE APLAZA: los datos ya están
+     en la caché y no hay otro disparador que los vaya a pintar. Con un gesto en
+     curso se anota y lo suelta `alTerminarGesto`.
+     ⚠️ Y TAMBIÉN LA VÁLVULA. Si `eventDragStop` no llega nunca (el camino que
+     describe `hayGestoEnCurso`), el aplazado se quedaría en `true` y los datos
+     sin pintar. Por eso, al aplazar, se arma un reintento para cuando venza el
+     tope: entonces `hayGestoEnCurso` suelta el candado y la traída sale. Si el
+     gesto ya cerró por su camino, el aplazado vale `false` y el reintento no hace
+     nada. Cualquier traída que pase el candado lo apaga: ya pinta `gcal`. */
+  const googleAplazadoRef = useRef(false)
+  const refrescarGoogle = useCallback(function refrescar() {
+    if (hayGestoEnCurso(gestoEnCursoRef)) {
+      googleAplazadoRef.current = true
+      window.setTimeout(() => { if (googleAplazadoRef.current) refrescar() }, TOPE_GESTO_MS + 1)
+      return
+    }
+    googleAplazadoRef.current = false
+    calendarRef.current?.getApi().getEventSourceById('gcal')?.refetch()
+  }, [])
+  /* El aplazado sale en un `setTimeout(0)`: `eventDragStop` se emite ANTES del
+     `MERGE_EVENTS` del soltar (`@fullcalendar/interaction/index.js:1371-1384`),
+     y así la traída cae con el gesto ya cerrado del todo. */
+  const alTerminarGesto = useCallback(() => {
+    gestoEnCursoRef.current = 0
+    if (!googleAplazadoRef.current) return
+    googleAplazadoRef.current = false
+    window.setTimeout(refrescarGoogle, 0)
+  }, [refrescarGoogle])
+
+  /* Si la siguiente traída de `gcal` sale por la red aunque haya caché vigente.
+     La escribe `refetch(true)` y la consume `gcalSource`. */
+  const forzarGoogleRef = useRef(false)
+
+  /* `forzarGoogle`: lo piden los caminos que HOY obligan a volver a preguntar
+     —«Reintentar», la reconexión del canal y el foco tras 2 min—. El resto
+     (filtro, deshacer un guardado) se sirve de la caché de Google si está viva. */
+  function refetch(forzarGoogle = false) {
     if (hayGestoEnCurso(gestoEnCursoRef)) return
+    googleAplazadoRef.current = false
+    if (forzarGoogle) forzarGoogleRef.current = true
     calendarRef.current?.getApi().refetchEvents()
   }
 
@@ -6506,33 +6544,43 @@ export default function AgendaPage() {
    * calendario vacío entre el remove y el add. Los datos que hagan falta aquí se
    * leen del ref, como este; la lista de fuentes no se toca.
    */
-  const gcalSource = useCallback(async (
+  /* ── A1.3 · GOOGLE CONTESTA EN DOS TIEMPOS ──────────────────────────────
+   * 1. AL INSTANTE: lo vigente de la caché, o lo último conocido para esa clave
+   *    (o nada) mientras se pregunta. Así la fuente `gcal` no retiene el
+   *    `loading` agregado, que es lo que dejaba la rejilla SIN NINGUNA cita
+   *    hasta que Google contestaba. Ver la cabecera de `cacheEventosGoogle`.
+   * 2. AL LLEGAR: `traerGoogle` guarda la respuesta y llama a
+   *    `refrescarGoogle`, que repite la traída de esta fuente sola; esa vez
+   *    `leerGoogle` la entrega de la caché y es entonces cuando se escribe el
+   *    estado. La banda de Google sale en los mismos casos que antes, sólo que
+   *    cuando de verdad se sabe.
+   * `googlePendiente` mientras tanto: el «Sin citas…» no puede afirmar un cero
+   * con Google todavía por contestar. */
+  const gcalSource = useCallback((
     info: { startStr: string; endStr: string },
     success: (events: EventInput[]) => void,
     failure: (err: Error) => void
   ) => {
-    try {
-      let url = `/api/google/events?from=${info.startStr}&to=${info.endStr}`
-      // Cadena vacía = 'todos los médicos'; ahí no se manda nada y el servidor
-      // devuelve el calendario completo de la clínica, como siempre.
-      // El espejo primero, por lo mismo que en la fuente de citas.
-      const filtro = filtroSincronoRef.current ?? filtroEfectivo
-      if (filtro) url += `&medico_id=${filtro}`
+    // El espejo primero, por lo mismo que en la fuente de citas.
+    const filtro = filtroSincronoRef.current ?? filtroEfectivo ?? ''
+    const forzar = forzarGoogleRef.current
+    forzarGoogleRef.current = false
 
-      // Espeja la lista blanca del servidor (`EventoAgenda` en
-      // /api/google/events). Las dos llaves de `start` y `end` son necesarias:
-      // un evento de día completo trae `date` y no `dateTime`.
-      type GCalEvent = { id: string; summary?: string; start?: { dateTime?: string; date?: string }; end?: { dateTime?: string; date?: string } }
+    /* El médico invitado: lo mismo que contesta la ruta (`events/route.ts`, el
+       corte de `canVerAgendaCompleta`) sin pedírselo — ahorra la petición y un
+       `getUser`. Sólo con el perfil YA leído: con `profile` nulo no se sabe el
+       rol y se pregunta, que es lo que decide el servidor. */
+    if (profile && !canVerAgendaCompleta(profile)) {
+      setEstadoGoogle('conectado'); setGooglePendiente(false); success([]); return
+    }
 
-      const res = await fetch(url)
-      /* ⚠️ UN `res.ok` FALSO NO TUMBA LA AGENDA: se anota como fallo de Google y
-         se contesta `success([])`. La ruta ya devuelve 200 en todos sus caminos
-         de fallo —el motivo viaja en `estado`— así que aquí sólo caen el 401 y
-         el 400 del `medico_id` mal formado. Ninguno de los dos es razón para
-         que las citas propias dejen de pintarse. */
-      const data: { estado?: EstadoGoogleAgenda; events?: GCalEvent[] } =
-        res.ok ? await res.json() : { estado: 'error_google' }
-
+    function entregar(r: ResultadoGoogle) {
+      setGooglePendiente(false)
+      /* Caída de red o cuerpo ilegible: fallo de Google y `failure()`, como
+         siempre — que la fuente de Google fracase NO purga los eventos de la de
+         citas: `RECEIVE_EVENT_ERROR` va por `sourceId`
+         (@fullcalendar/core/index.js:634-639). */
+      if (r.tipo === 'caida') { setEstadoGoogle('error_google'); failure(r.error); return }
       /* ⚠️ AQUÍ EL ESTADO YA NO SE TIRA, Y ES EL BLOQUE 9. Hasta ahora
          'sin_token' y 'error_google' se pintaban igual —sin eventos y sin una
          palabra—, con este argumento: la agenda no tiene botón de conectar, así
@@ -6550,46 +6598,32 @@ export default function AgendaPage() {
          contrario: la credencial muerta sigue siendo silenciosa aquí y se
          descubre en /perfil, igual que antes.
          Si algún día la ruta distingue los dos casos, ESTE es el sitio. */
-      setEstadoGoogle(data.estado ?? 'error_google')
-
-      /* La salida sin eventos se mantiene EXACTAMENTE como estaba: `success([])`
-         y no `failure()`. Es lo que aísla el fallo de Google de las citas
-         propias, y no depende de la banda de arriba para nada. */
-      if (data.estado !== 'conectado') { success([]); return }
-
-      const eventos = (data.events ?? [])
-        .map((e) => ({
-          id:              `gcal-${e.id}`,
-          // Sin 🔒: esto viene del calendario de Spinus, tiene título real y no
-          // es privado.
-          title:           e.summary || 'Evento sin título',
-          start:           e.start?.dateTime ?? e.start?.date ?? '',
-          end:             e.end?.dateTime ?? e.end?.date ?? undefined,
-          allDay:          !e.start?.dateTime,
-          // Harness transparente: la GoogleEventCard pinta su propio fondo/borde.
-          // Sin `textColor`, y era el ÚLTIMO que quedaba en las tres fuentes.
-          // Era un hex a mano que duplicaba --ag-gcal-text y que en tema oscuro
-          // se quedaba clavado mientras el token sí cambiaba. No hace falta:
-          // `GoogleEventCard` fija `color: var(--ag-gcal-text)` en su <div>
-          // raíz, y de ahí lo heredan la hora, el título y el borde de la
-          // etiqueta («currentColor»), así que no dependían de esta herencia.
-          backgroundColor: 'transparent',
-          borderColor:     'transparent',
-          editable:        false,
-          extendedProps:   { isGcalBlock: true },
-        }))
-
-      success(eventos)
-    } catch (err: unknown) {
-      /* Aquí sólo se cae por red o por un cuerpo ilegible: la ruta contesta 200
-         hasta cuando Google falla. Se anota como fallo de Google y se llama a
-         `failure()` como siempre — que la fuente de Google fracase NO purga los
-         eventos de la fuente de citas: `RECEIVE_EVENT_ERROR` va por `sourceId`
-         (@fullcalendar/core/index.js:634-639). El aislamiento es estructural. */
-      setEstadoGoogle('error_google')
-      failure(err instanceof Error ? err : new Error('Error cargando eventos'))
+      setEstadoGoogle(r.datos.estado)
+      /* Sin eventos: `success([])` y no `failure()`. Es lo que aísla el fallo de
+         Google de las citas propias, y no depende de la banda para nada. */
+      success(r.datos.estado === 'conectado' ? aEventosDeCalendario(r.datos.events) : [])
     }
-  }, [filtroEfectivo])
+
+    /* Sin perfil (el tope de 3 s de `useProfile` ganó sin caché) no hay de
+       quién es la caché: no se lee ni se escribe. Se pregunta y se entrega en
+       UN tiempo, como antes de A1.3 —Google vuelve al camino crítico sólo en
+       este camino degradado—. Los dos tiempos necesitan un sitio donde dejar la
+       respuesta para el `refetch`, y ese sitio es justo la caché. */
+    if (!profile) {
+      pedirEventosGoogle(info.startStr, info.endStr, filtro).then(
+        datos => entregar({ tipo: 'respuesta', datos }),
+        (err: unknown) => entregar({ tipo: 'caida', error: err instanceof Error ? err : new Error('Error cargando eventos') }),
+      )
+      return
+    }
+
+    const clave = claveGoogle(profile.id, filtro, info.startStr, info.endStr)
+    const listo = forzar ? null : leerGoogle(clave)
+    if (listo) { entregar(listo); return }
+    setGooglePendiente(true)
+    success(aEventosDeCalendario(eventosProvisionales(clave)))
+    traerGoogle(clave, () => pedirEventosGoogle(info.startStr, info.endStr, filtro), refrescarGoogle)
+  }, [filtroEfectivo, profile, refrescarGoogle])
 
   /* ── Stable eventSources ref (evita re-registro en cada render) ── */
   const appointmentSourceRef = useRef(appointmentSource)
@@ -6940,7 +6974,7 @@ export default function AgendaPage() {
       )
       .subscribe((estado: string) => {
         if (estado === 'SUBSCRIBED') {
-          if (huboCaida) { huboCaida = false; refetch() }
+          if (huboCaida) { huboCaida = false; refetch(true) }
           return
         }
         // CHANNEL_ERROR / TIMED_OUT / CLOSED: se perdió el hilo de los cambios.
@@ -6989,7 +7023,7 @@ export default function AgendaPage() {
     function alVolverAlFrente() {
       if (document.visibilityState !== 'visible') return
       if (Date.now() - ultimaTraidaRef.current < UMBRAL_REFETCH_FOCO_MS) return
-      refetch()
+      refetch(true)
     }
     document.addEventListener('visibilitychange', alVolverAlFrente)
     window.addEventListener('focus', alVolverAlFrente)
@@ -7808,6 +7842,11 @@ export default function AgendaPage() {
        · `!googleFallo`— con Google caído faltan eventos que sí existen. El cero
                          de la agenda propia puede ser cierto, pero la frase
                          «Sin citas esta semana» no lo sería.
+       · `!googlePendiente` — lo mismo que `huboTraida`, pero para Google: desde
+                         A1.3 su fuente contesta provisional al instante y ya no
+                         retiene el `loading`, así que `huboTraida` llega antes
+                         que sus eventos. Sin esto la banda salía y se iba al
+                         llegar Google; con esto sale cuando salía antes.
        · `!citasIncompletas` — el mismo principio que las dos de arriba: sobre un
                          conjunto que se sabe incompleto no se afirma un cero.
                          HONESTAMENTE, hoy cuesta alcanzarla: un mes truncado
@@ -7821,7 +7860,7 @@ export default function AgendaPage() {
      `periodoVacio` vacío apaga la banda en Día y en las dos listas; ver
      `periodoDeLaVista`. */
   const vacioReal =
-    huboTraida && !errorCitas && !googleFallo && !citasIncompletas &&
+    huboTraida && !errorCitas && !googleFallo && !googlePendiente && !citasIncompletas &&
     conteo.citas === 0 && conteo.eventos === 0 && conteo.google === 0 &&
     periodoVacio !== ''
 
@@ -8575,7 +8614,7 @@ export default function AgendaPage() {
               <p className="ag-aviso-texto">
                 <strong>No se pudo cargar la agenda.</strong> Lo que se ve puede estar incompleto o desactualizado.
               </p>
-              <button type="button" className="ag-aviso-accion" onClick={refetch}>
+              <button type="button" className="ag-aviso-accion" onClick={() => refetch(true)}>
                 Reintentar
               </button>
             </Banda>

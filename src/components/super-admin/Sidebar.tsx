@@ -43,6 +43,11 @@ export default function SuperAdminSidebar(): ReactElement {
      ruido. Peor que no ponerlo. */
   const [errorLogout, setErrorLogout] = useState<string | null>(null)
 
+  /* ⚠️ PENDIENTE CONOCIDO (A1.3): este cierre NO llama a `vaciarCacheGoogle()`
+     (`lib/agenda/cacheEventosGoogle.ts`), que sí llama el de
+     `components/layout/Sidebar.tsx`. Hoy no hace falta: el super_admin no entra a
+     la agenda, así que la caché de esta pestaña está vacía. Si algún día entra,
+     este cierre tiene que vaciarla también. */
   async function handleLogout(): Promise<void> {
     // NOM-024: registrar logout antes de cerrar sesión. El await no sobra: esta
     // ruta identifica al usuario por sus cookies sb-*, o sea por lo mismo que el
