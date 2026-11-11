@@ -760,7 +760,7 @@ primero sin marcar.
     | Volver desde /dashboard, citas visibles | 125 ms |
     | JS transferido en /agenda | 484 KB (mayor chunk 147 KB) |
     | Google con 8 s de retraso | ninguna cita antes de 8 s |
-- [ ] A1 — Abrir rápido (en curso; hechos A1.1-A1.6, A1.8, A1.9)
+- [x] A1 — Abrir rápido
   - Decisiones: ningún `getUser()` pasa a `getClaims()`; A1.7 (Google sembrado
     en servidor con cliente admin) queda fuera; la caché de rangos es la
     versión mínima (se vacía entera ante cualquier escritura o tiempo real).
@@ -783,8 +783,32 @@ primero sin marcar.
     volver desde /dashboard 78 ms sin petición; Google a 8 s ya no retrasa las
     citas (antes 8.2 s). El cambio de semana de A0 (175 ms) se midió con el
     método viejo y no es comparable.
-  - Falta: A1.5b precarga W±1 al navegar · A1.10 conteo (decidir en A1-bis).
-- [ ] A1-bis — Revisión completa de eficiencia y presupuesto de rendimiento
+  - A1.5b precarga W±1 en ocioso al navegar (W+1 → W+2 en 66 ms sin
+    petición). A1.10 cerrado sin cambio (ver A1-bis).
+  - Cerrado 2026-11-12 (medición final `A1`: Auth 2, red limitada 743 ms,
+    semana vista 51 ms, volver 78 ms, salto tras precarga 80 ms, 0 bloqueantes).
+- [x] A1-bis — Revisión completa de eficiencia y presupuesto de rendimiento (2026-11-12)
+  - Medido con build instrumentado (`npx playwright test
+    --config=e2e/playwright.a1bis.config.ts`). Sin ciclos; en reposo 0
+    estados y 0 peticiones.
+  - A1-bis.1: las ~30 mutaciones por cita en `batchRendering`. UPDATE de
+    tiempo real (el del `after()` de Google en todas las agendas abiertas):
+    34 repintados de FullCalendar → 3; con 30k citas 294 ms con tarea larga →
+    14 ms. Guardar 444 → 122 ms; arrastrar 378 → 83 ms.
+  - A1-bis.2: props estables de FullCalendar (0 opciones re-refinadas por
+    render). Con 30k: abrir 109 → 44 ms, semana siguiente 122 → 52 ms, abrir
+    el modal 22 → 0 ms.
+  - A1.10 sin cambio: `count: 'exact'` cuesta +0.7 ms en el camino por
+    defecto; sin él no se detecta el truncado. Lo que cuesta es la RLS por
+    fila (PERF-DT-4, medido en `supabase/auditorias/A1.8-…`): no se toca sin
+    auditoría propia.
+  - Pasado a otros bloques: invalidación fina de la caché por rango (A2/B; hoy
+    cualquier evento de tiempo real, de cualquier clínica, la vacía entera);
+    sondeo de `ModalInvitacionCita` con tiempo real como vía rápida (C); no
+    pedir Google tras `sin_token` (C); carga diferida de modales, ~17 KB gz
+    (A2).
+  - **Decisión de Angel pendiente:** `ProximasCitas` vuelve a consultar en
+    cada vuelta a la pestaña sin tope; ponerle uno cambia lo fresco que se ve.
 - [ ] A2 — Partir `agenda/page.tsx`
 - [ ] B — Cimientos
 - [ ] C — Google en los dos sentidos
