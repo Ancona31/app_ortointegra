@@ -225,6 +225,29 @@ export async function GET(req: NextRequest) {
     const puedeReparar = canManageClinica(profile)
     const admin = createAdminClient()
 
+    // ── LA RESTA ARRANCA AQUÍ, EN PARALELO CON GOOGLE, Y SE CONSUME ABAJO ──
+    // Su forma —cliente de SESIÓN, `clinica_id` explícito, solape y no inicio,
+    // sin filtro de médico, `count: 'exact'`— se explica abajo, donde se usa;
+    // no la cambies sin leer aquello. Va DESPUÉS de todos los cortes de arriba
+    // y sólo con conexión: sin conexión no hay eventos contra los que restar.
+    //
+    // El builder de PostgREST es un thenable PEREZOSO: no pide nada hasta que
+    // alguien llama a su `then`. `Promise.resolve` es lo que lo arranca. El
+    // `.catch` vacío NO se traga el error: sólo marca la promesa como atendida
+    // para que, si al final no se consume (eventos `null` o `[]`, o Google
+    // revienta antes), su rechazo no quede suelto. Quien la espera abajo sigue
+    // recibiendo el rechazo, y cae en el `catch` de afuera como siempre.
+    const consultaCitas = conexion === null ? null : Promise.resolve(
+      supabase
+        .from('appointments')
+        .select('google_event_id', { count: 'exact' })
+        .eq('clinica_id', profile.clinica_id)
+        .lte('start_time', timeMax)
+        .gte('end_time', timeMin)
+        .not('google_event_id', 'is', null),
+    )
+    consultaCitas?.catch(() => undefined)
+
     const eventos = await conCalendarioSpinus(conexion, admin, async (calendar, calendarId) => {
       calendarIdUsado = calendarId
 
@@ -279,7 +302,11 @@ export async function GET(req: NextRequest) {
     // null = la clínica no tiene conexión activa, no se pudo resolver el
     // calendario, o el modo estricto se negó a crearlo. Comparación explícita:
     // una lista vacía de eventos SÍ es una respuesta.
-    if (eventos === null) {
+    //
+    // `consultaCitas === null` sólo pasa sin conexión, y sin conexión
+    // `conCalendarioSpinus` ya devolvió null: la segunda condición no abre
+    // ningún camino, sólo se lo dice al compilador.
+    if (eventos === null || consultaCitas === null) {
       return NextResponse.json({ estado: estadoDeFallo(conexion) })
     }
 
@@ -318,9 +345,12 @@ export async function GET(req: NextRequest) {
     // truncable igual. No compensa.
 
     // ── SIN EVENTOS NO HAY NADA QUE RESTAR ────────────────────────────────
-    // Además de ahorrar la consulta (con su COUNT exacto) en toda clínica que
-    // no escribe eventos a mano, evita que la guarda de abajo levante la banda
-    // violeta por un conjunto incompleto que no podía duplicar nada.
+    // Evita que la guarda de abajo levante la banda violeta por un conjunto
+    // incompleto —o por una consulta rota— que no podía duplicar nada. La
+    // consulta ya salió en paralelo y aquí se tira sin esperarla: es el precio
+    // de no hacerla en serie. Antes este corte la ahorraba entera en toda
+    // clínica que no escribe eventos a mano; ahora se paga siempre que hay
+    // conexión, a cambio de no sumar su viaje al de Google.
     if (eventos.length === 0) {
       return NextResponse.json({ estado: 'conectado' satisfies EstadoGoogle, events: [] })
     }
@@ -340,13 +370,10 @@ export async function GET(req: NextRequest) {
     // `count: 'exact'` viene del `Content-Range` y cuenta las filas que
     // CUMPLEN el filtro, no las que caben en la respuesta. Si sobran filas,
     // el conjunto está incompleto y la resta no es de fiar.
-    const { data: citas, count: totalCitas, error: errorCitas } = await supabase
-      .from('appointments')
-      .select('google_event_id', { count: 'exact' })
-      .eq('clinica_id', profile.clinica_id)
-      .lte('start_time', timeMax)
-      .gte('end_time', timeMin)
-      .not('google_event_id', 'is', null)
+    //
+    // La consulta se lanzó arriba, antes de `conCalendarioSpinus`; aquí sólo
+    // se espera.
+    const { data: citas, count: totalCitas, error: errorCitas } = await consultaCitas
 
     // Las cuatro ramas son el MISMO fallo: no hay conjunto completo contra el
     // que restar. El `citas ?? []` que había aquí se tragaba las tres primeras
