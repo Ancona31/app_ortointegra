@@ -9,7 +9,7 @@ import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin, { DateClickArg, EventResizeDoneArg } from '@fullcalendar/interaction'
 import listPlugin, { type NoEventsContentArg } from '@fullcalendar/list'
-import { Calendar as CalendarioFC, EventClickArg, EventDropArg, DateSelectArg, EventInput, EventApi, EventContentArg, DayCellContentArg, DayHeaderContentArg, MoreLinkContentArg, NowIndicatorContentArg, ViewApi } from '@fullcalendar/core'
+import { Calendar as CalendarioFC, type DatesSetArg, type FormatterInput, type PluginDef, EventClickArg, EventDropArg, DateSelectArg, EventInput, EventApi, EventContentArg, DayCellContentArg, DayHeaderContentArg, MoreLinkContentArg, NowIndicatorContentArg, ViewApi } from '@fullcalendar/core'
 import esLocale from '@fullcalendar/core/locales/es'
 import { X, Calendar, User, Plus, Trash2, Settings, ChevronDown, FileText, Stethoscope, Loader2, Mail,
          CalendarPlus, ChevronsDownUp, Menu, ChevronLeft, ChevronRight, TriangleAlert, type LucideIcon } from 'lucide-react'
@@ -5347,6 +5347,17 @@ function Banda(
    nativo ahí, esa es la línea — pero entonces sobra la banda, no conviven. */
 const TOOLBAR_ESCRITORIO  = { left: 'prev,next today title', center: '', right: '' } as const
 
+/* ── A1-bis.2 · LAS PROPS LITERALES DE `<FullCalendar>`, A NIVEL DE MÓDULO ────
+   `@fullcalendar/react` llama a `resetOptions` con TODAS las props en cada render
+   del padre, y FullCalendar re-refina cada opción cuya identidad cambió —y con
+   una sola que cambie, repinta el calendario entero—. Un array o un objeto
+   escrito en el JSX es uno nuevo en cada render. Aquí son el mismo siempre.
+   ⚠️ El orden de `PLUGINS_FC` es una decisión: ver la nota junto a la prop. */
+const PLUGINS_FC: PluginDef[] = [dayGridPlugin, timeGridPlugin, interactionPlugin, listPlugin]
+const TEXTO_BOTONES_FC = { today: 'Hoy', month: 'Mes', week: 'Semana', day: 'Día' }
+/** El de las horas de las tarjetas y el de la columna de horas: el mismo. */
+const FORMATO_HORA_FC: FormatterInput = { hour: '2-digit', minute: '2-digit', meridiem: false, hour12: false }
+
 /* El rótulo de «Todos los médicos», que en Mes lleva pegado su motivo.
  *
  * ⚠️ LA NOTA VA DENTRO DEL PROPIO `<option>` Y NO AL LADO, y no es una
@@ -8173,6 +8184,95 @@ export default function AgendaCliente({ semillaCitas }: AgendaClienteProps) {
      estado vacío de §11 y el mismo cero que el de arriba, contado distinto. */
   const vacioFiltrado = vacioReal && medicoFiltrado !== undefined
 
+  /* ── A1-bis.2 · LOS MANEJADORES DE `<FullCalendar>`, CON IDENTIDAD ESTABLE ──
+     Antes iban en línea o como funciones del render: identidad nueva en cada
+     render del padre, y `@fullcalendar/react` hacía que FullCalendar re-refinara
+     las nueve opciones y repintara el calendario entero, también cuando lo único
+     que cambiaba era el modal o el conteo.
+
+     Ahora FullCalendar recibe nueve envoltorios con deps `[]` que llaman a la
+     versión del ÚLTIMO render a través de `manejadoresFcRef`, escrito en el
+     render —mismo patrón que `appointmentSourceRef` y `aplicarCambioRef`—.
+
+     ⚠️ ASÍ SIGUEN LEYENDO ESTADO FRESCO, y es lo que hay que conservar: varios
+     cierran sobre estado del render (`programarPrecarga` lee `profile`,
+     `filtroEfectivo` y `citasIncompletas`; `revertirMedicoForzado`, el filtro;
+     los `handle*`, `horario`, `subState`, `isMobile`…). Nunca guardes uno de
+     éstos en un `useCallback` con deps: el ref es lo que los mantiene al día.
+
+     Los cuerpos de los cuatro que iban en línea están tal cual, sólo con nombre;
+     sus notas siguen junto a cada prop en el JSX. */
+  function alCambiarFechas(arg: DatesSetArg) {
+    setCurrentView(arg.view.type)
+    setTituloVista(arg.view.title)
+    setPeriodoVacio(periodoDeLaVista(arg.view))
+    const eventos = calendarRef.current?.getApi().getEvents() ?? []
+    const rangos = rangosDeLaVista(arg.view)
+    aplicarVentana(eventos, rangos)
+    aplicarConteo(eventos, rangos)
+    /* El panel del mes va DETRÁS de los otros dos y de la misma llamada,
+       por lo mismo: los eventos ya están resueltos aquí. Primero se
+       sincroniza el día —que sólo escribe si el mes cambió— y luego se
+       recalculan las filas del que ya estaba; si el día acaba de cambiar,
+       quien recalcula es su propio efecto, un render después. */
+    sincronizarDiaDelPanel(arg.view)
+    aplicarPanel(eventos)
+    /* El resumen del bloque 8 va el último y de la misma llamada, por
+       lo mismo que los tres de arriba: los eventos y los rangos ya
+       están resueltos aquí. La VISTA sale del `arg` y NUNCA de
+       `currentView`: el `setCurrentView` de la primera línea de este
+       handler todavía no ha llegado al render. */
+    aplicarResumen(eventos, rangos, arg.view.type)
+    // A1.5b: última llamada, por lo mismo que las de arriba — sólo
+    // que ésta no pinta nada, programa la precarga en ocioso.
+    programarPrecarga(arg.view)
+  }
+
+  function alCambiarEventos(eventos: EventApi[]) {
+    const rangos = rangoDeVista()
+    aplicarVentana(eventos, rangos)
+    aplicarConteo(eventos, rangos)
+    aplicarPanel(eventos)
+    aplicarResumen(eventos, rangos, calendarRef.current?.getApi().view.type ?? '')
+    // A1.5b: `eventsSet` cubre lo que `datesSet` no — ver su nota
+    // larga, junto al `<FullCalendar>`—, y la vista sale de la API
+    // porque aquí no llega `arg.view`.
+    const vista = calendarRef.current?.getApi().view
+    if (vista) programarPrecarga(vista)
+  }
+
+  function alPulsarNumeroDeDia(fecha: Date) {
+    revertirMedicoForzado()
+    calendarRef.current?.getApi().changeView('timeGridDay', fecha)
+  }
+
+  function alCambiarCarga(estaCargando: boolean) {
+    setCargando(estaCargando)
+    if (!estaCargando) setHuboTraida(true)
+  }
+
+  const manejadoresFcRef = useRef({
+    alCambiarFechas, alCambiarEventos, alPulsarNumeroDeDia, alCambiarCarga,
+    handleDateClick, handleSelect, handleEventClick, handleEventDrop, handleEventResize,
+  })
+  manejadoresFcRef.current = {
+    alCambiarFechas, alCambiarEventos, alPulsarNumeroDeDia, alCambiarCarga,
+    handleDateClick, handleSelect, handleEventClick, handleEventDrop, handleEventResize,
+  }
+  const datesSetFc = useCallback((arg: DatesSetArg) => manejadoresFcRef.current.alCambiarFechas(arg), [])
+  const eventsSetFc = useCallback((eventos: EventApi[]) => manejadoresFcRef.current.alCambiarEventos(eventos), [])
+  const navLinkDayClickFc = useCallback((fecha: Date) => manejadoresFcRef.current.alPulsarNumeroDeDia(fecha), [])
+  const loadingFc = useCallback((estaCargando: boolean) => manejadoresFcRef.current.alCambiarCarga(estaCargando), [])
+  const dateClickFc = useCallback((arg: DateClickArg) => manejadoresFcRef.current.handleDateClick(arg), [])
+  const selectFc = useCallback((arg: DateSelectArg) => manejadoresFcRef.current.handleSelect(arg), [])
+  const eventClickFc = useCallback((arg: EventClickArg) => manejadoresFcRef.current.handleEventClick(arg), [])
+  const eventDropFc = useCallback((arg: EventDropArg) => { void manejadoresFcRef.current.handleEventDrop(arg) }, [])
+  const eventResizeFc = useCallback((arg: EventResizeDoneArg) => { void manejadoresFcRef.current.handleEventResize(arg) }, [])
+
+  /* `businessHours` era `horarioToBusinessHours(horario)` en el JSX: un array
+     nuevo en cada render. Sólo cambia cuando cambia el horario. */
+  const horasHabilesFc = useMemo(() => horarioToBusinessHours(horario), [horario])
+
   return (
     /* ⚠️⚠️ LA ALTURA DE ESTE `<div>` ES LO QUE PARTE LA PÁGINA EN DOS ZONAS: la
        de arriba fija (título, controles, barra de navegación y cabecera de
@@ -9061,7 +9161,7 @@ export default function AgendaCliente({ semillaCitas }: AgendaClienteProps) {
              listas habría CAMBIADO un comportamiento que no tenían que tocar.
              Puesto el último, añadirlo no mueve a nadie de sitio: el orden de
              desempate sigue siendo exactamente el de antes. */
-          plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, listPlugin]}
+          plugins={PLUGINS_FC}
           /* ⚠️ LITERAL, Y ANTES ERA `isMobile ? 'timeGridDay' : …`. Aquel
              ternario no decidía nada: `isMobile` arranca en `false` y sólo lo
              escribe un efecto, que corre DESPUÉS del montaje, así que
@@ -9098,44 +9198,9 @@ export default function AgendaCliente({ semillaCitas }: AgendaClienteProps) {
              `eventStore`. Su tercera entrada —`diasOcultos`, que `aplicarVentana`
              escribe justo encima y que aquí todavía no ha llegado al ref— la
              cubre un efecto propio, arriba. */
-          datesSet={arg => {
-            setCurrentView(arg.view.type)
-            setTituloVista(arg.view.title)
-            setPeriodoVacio(periodoDeLaVista(arg.view))
-            const eventos = calendarRef.current?.getApi().getEvents() ?? []
-            const rangos = rangosDeLaVista(arg.view)
-            aplicarVentana(eventos, rangos)
-            aplicarConteo(eventos, rangos)
-            /* El panel del mes va DETRÁS de los otros dos y de la misma llamada,
-               por lo mismo: los eventos ya están resueltos aquí. Primero se
-               sincroniza el día —que sólo escribe si el mes cambió— y luego se
-               recalculan las filas del que ya estaba; si el día acaba de cambiar,
-               quien recalcula es su propio efecto, un render después. */
-            sincronizarDiaDelPanel(arg.view)
-            aplicarPanel(eventos)
-            /* El resumen del bloque 8 va el último y de la misma llamada, por
-               lo mismo que los tres de arriba: los eventos y los rangos ya
-               están resueltos aquí. La VISTA sale del `arg` y NUNCA de
-               `currentView`: el `setCurrentView` de la primera línea de este
-               handler todavía no ha llegado al render. */
-            aplicarResumen(eventos, rangos, arg.view.type)
-            // A1.5b: última llamada, por lo mismo que las de arriba — sólo
-            // que ésta no pinta nada, programa la precarga en ocioso.
-            programarPrecarga(arg.view)
-          }}
-          eventsSet={eventos => {
-            const rangos = rangoDeVista()
-            aplicarVentana(eventos, rangos)
-            aplicarConteo(eventos, rangos)
-            aplicarPanel(eventos)
-            aplicarResumen(eventos, rangos, calendarRef.current?.getApi().view.type ?? '')
-            // A1.5b: `eventsSet` cubre lo que `datesSet` no — ver su nota
-            // larga, junto al `<FullCalendar>`—, y la vista sale de la API
-            // porque aquí no llega `arg.view`.
-            const vista = calendarRef.current?.getApi().view
-            if (vista) programarPrecarga(vista)
-          }}
-          buttonText={{ today: 'Hoy', month: 'Mes', week: 'Semana', day: 'Día' }}
+          datesSet={datesSetFc}
+          eventsSet={eventsSetFc}
+          buttonText={TEXTO_BOTONES_FC}
           slotMinTime={ventana.slotMinTime}
           slotMaxTime={ventana.slotMaxTime}
           /* Vacío mientras «Compactar» esté apagado. Nunca los siete: lo
@@ -9187,10 +9252,7 @@ export default function AgendaCliente({ semillaCitas }: AgendaClienteProps) {
              Esto no cambia a dónde se va; sólo añade la vuelta del filtro antes
              de ir. El `changeView` con fecha es exactamente lo que hacía la
              cadena. */
-          navLinkDayClick={(fecha: Date) => {
-            revertirMedicoForzado()
-            calendarRef.current?.getApi().changeView('timeGridDay', fecha)
-          }}
+          navLinkDayClick={navLinkDayClickFc}
           nowIndicator
           nowIndicatorContent={renderNowIndicator}
           /* ⚠️ APAGADO EN EL MES DEL TELÉFONO, Y NO ES UN RECORTE DE FUNCIONES.
@@ -9210,7 +9272,7 @@ export default function AgendaCliente({ semillaCitas }: AgendaClienteProps) {
           editable
           dragRevertDuration={200}
           eventResizableFromStart
-          businessHours={horarioToBusinessHours(horario)}
+          businessHours={horasHabilesFc}
           eventSources={eventSourcesStable}
           /* ── LOS DOS GANCHOS DE ESTADO DE CARGA (bloque 9) ────────────────
              `loading` es el AGREGADO de las dos fuentes: FullCalendar lo emite
@@ -9225,10 +9287,7 @@ export default function AgendaCliente({ semillaCitas }: AgendaClienteProps) {
              nada», que es la distinción de la que vive la banda de vacío. En una
              navegación posterior vuelve a haber carga, pero ya no vuelve a haber
              ignorancia: los datos viejos siguen en la rejilla. */
-          loading={estaCargando => {
-            setCargando(estaCargando)
-            if (!estaCargando) setHuboTraida(true)
-          }}
+          loading={loadingFc}
           /* ⚠️ AQUÍ NO VA `eventSourceFailure`, Y SE PROBÓ. Es el gancho GLOBAL
              de fallo y su firma sólo trae el `Error`: no dice QUÉ fuente falló.
              Cableado, un fallo de red de la fuente de Google levantaba la banda
@@ -9249,11 +9308,11 @@ export default function AgendaCliente({ semillaCitas }: AgendaClienteProps) {
              identidad estable. Volvió en el bloque 6 y su nota larga —incluida
              la condición con la que se fue— está junto a la función. */
           eventClassNames={clasesDelEvento}
-          dateClick={handleDateClick}
-          select={handleSelect}
-          eventClick={handleEventClick}
-          eventDrop={handleEventDrop}
-          eventResize={handleEventResize}
+          dateClick={dateClickFc}
+          select={selectFc}
+          eventClick={eventClickFc}
+          eventDrop={eventDropFc}
+          eventResize={eventResizeFc}
           /* Las cuatro puntas del candado de `refetch()`. Mientras haya un gesto
              en curso NO se traen citas: una traída a mitad de arrastre duplica
              la cita en pantalla, con el mismo id público y distintos ids
@@ -9294,8 +9353,8 @@ export default function AgendaCliente({ semillaCitas }: AgendaClienteProps) {
           expandRows
           slotDuration="00:30:00"
           slotLabelInterval="01:00:00"
-          eventTimeFormat={{ hour: '2-digit', minute: '2-digit', meridiem: false, hour12: false }}
-          slotLabelFormat={{ hour: '2-digit', minute: '2-digit', meridiem: false, hour12: false }}
+          eventTimeFormat={FORMATO_HORA_FC}
+          slotLabelFormat={FORMATO_HORA_FC}
         />
       </div>
 
