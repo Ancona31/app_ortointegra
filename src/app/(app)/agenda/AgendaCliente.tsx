@@ -36,6 +36,8 @@ import {
   type EstadoGoogleAgenda, type ResultadoGoogle,
 } from '@/lib/agenda/cacheEventosGoogle'
 import { claveCitas, generacionCitas, guardarCitas, leerCitas, vaciarCacheCitas } from '@/lib/agenda/cacheRangosCitas'
+import { esperarSemilla, sembrarCacheCitas, type SemillaCitas } from '@/lib/agenda/semillaCitas'
+import { logger } from '@/lib/logger'
 import {
   avisoDeRecorte,
   calcularVentanaRejilla,
@@ -72,7 +74,7 @@ import {
 type Status = 'scheduled' | 'confirmed' | 'cancelled' | 'no_show' | 'attended'
 
 
-type Appointment = {
+export type Appointment = {
   id: string
   title: string
   start_time: string
@@ -1431,6 +1433,53 @@ function puntasParaLaRejilla(data: DatosGuardado): { allDay: boolean; start?: st
     }
   }
   return { allDay: true, start: data.start_time, end: data.end_time }
+}
+
+/**
+ * Una cita de `/api/appointments` → lo que pinta FullCalendar. La usan la
+ * fuente de citas y la semilla del servidor (A1.4c): UNA sola traducción, para
+ * que lo sembrado y lo traído sean el mismo evento.
+ */
+function citaAEvento(apt: Appointment): EventInput {
+  return {
+    id:              apt.id,
+    title:           apt.title,
+    /* Las dos puntas y el `allDay`, de `puntasParaLaRejilla`: una fila de
+       todo el día sale como fechas-solo en la zona de su consultorio, y
+       cualquier otra como los instantes de siempre. Sin esto, un evento de
+       todo el día entraba en la rejilla horaria como un bloque de 24 h a
+       caballo entre dos días. */
+    ...puntasParaLaRejilla(apt),
+    // Harness transparente: el color de la cita —que es el de su ESTADO— lo
+    // pone `eventContent` leyendo los tokens al pintar. Aquí NO va
+    // `textColor`: FullCalendar lo aplicaría como `color` en línea sobre
+    // `.fc-event-main`, y las tres tarjetas fijan el suyo en cada texto, así
+    // que no se heredaba nada. Lo que sí hacía era obligar a resolver un
+    // color aquí, que es de donde salía la segunda paleta.
+    backgroundColor: 'transparent',
+    borderColor:     'transparent',
+    extendedProps:   { ...apt },
+  }
+}
+
+/**
+ * Engancha la semilla del servidor a `cacheRangosCitas` (A1.4c). La generación
+ * y la hora se toman AQUÍ, al recibir la promesa: un vaciado (escritura propia,
+ * tiempo real) mientras viaja la descarta. Resuelve con la marca de la semilla
+ * si entró (ver `sembrarCacheCitas`) o `null`. Nunca rechaza: si la semilla
+ * falla, la fuente de citas va a la red como siempre, sin aviso.
+ */
+function engancharSemilla(semilla: Promise<SemillaCitas<Appointment> | null> | undefined): Promise<number | null> | null {
+  if (!semilla) return null
+  const gen = generacionCitas()
+  const recibida = Date.now()
+  return Promise.resolve(semilla).then(
+    (s) => (s ? sembrarCacheCitas(s, citaAEvento, gen, recibida) : null),
+    (err: unknown) => {
+      logger.warn('agenda', `semilla de citas perdida: ${err instanceof Error ? err.message : 'error'}`)
+      return null
+    },
+  )
 }
 
 function AppointmentModal({
@@ -5405,7 +5454,17 @@ function frasearConteoBreve(c: ConteoVisible): string {
   return partes.join(' · ')
 }
 
-export default function AgendaCliente() {
+export interface AgendaClienteProps {
+  /** Las citas de W-1, W y W+1 sembradas por `page.tsx` (A1.4c). Sin ella, o
+   *  si resuelve `null`, la agenda pide a la red como antes. */
+  semillaCitas?: Promise<SemillaCitas<Appointment> | null>
+}
+
+export default function AgendaCliente({ semillaCitas }: AgendaClienteProps) {
+  /* A1.4c: se engancha en el PRIMER render, antes de que FullCalendar monte y
+     haga su primera traída. La consume esa traída (ver `appointmentSource`). */
+  const [semillaLista] = useState(() => engancharSemilla(semillaCitas))
+  const semillaPendienteRef = useRef(semillaLista)
   const calendarRef = useRef<InstanceType<typeof FullCalendar>>(null)
   const [modal,        setModal]        = useState<ModalState>({ mode: 'closed' })
   const [isMobile,     setIsMobile]     = useState(false)
@@ -6454,7 +6513,21 @@ export default function AgendaCliente() {
       /* A1.5a: sin perfil no hay de quién es la caché, como en Google. Servir de
          aquí NO estampa `ultimaTraidaRef`: el refresco por foco cuenta la red. */
       const clave = profile ? claveCitas(profile.id, filtro ?? '', info.startStr, info.endStr) : null
-      const guardadas = clave ? leerCitas(clave) : null
+      let guardadas = clave ? leerCitas(clave) : null
+      /* A1.4c: mientras la semilla del servidor siga en camino, una traída que
+         no encuentra su clave la espera hasta `TOPE_SEMILLA_MS` y vuelve a
+         mirar; al acabar esa espera se suelta y ya nadie más espera.
+         ⚠️ NO SE SUELTA AL EMPEZAR A ESPERAR: en el teléfono el `changeView` del
+         montaje pide otra vez mientras la primera espera, y esa segunda iba a
+         la red. Y si la semilla entró, su marca cuenta como la última traída
+         para el refresco por foco: es una traída, sólo que la hizo el servidor. */
+      const semilla = semillaPendienteRef.current
+      if (!guardadas && clave && semilla) {
+        const marca = await esperarSemilla(semilla)
+        semillaPendienteRef.current = null
+        guardadas = leerCitas(clave)
+        if (guardadas && marca !== null) ultimaTraidaRef.current = Math.max(ultimaTraidaRef.current, marca)
+      }
       if (guardadas) { setErrorCitas(false); setCitasIncompletas(false); success(guardadas); return }
       const salio = Date.now()
       const gen = generacionCitas()
@@ -6488,25 +6561,7 @@ export default function AgendaCliente() {
          me consta que falte nada», que es donde estábamos, y no «falta algo». */
       setCitasIncompletas(data.incompleta === true)
 
-      const eventos: EventInput[] = apts.map(apt => ({
-        id:              apt.id,
-        title:           apt.title,
-        /* Las dos puntas y el `allDay`, de `puntasParaLaRejilla`: una fila de
-           todo el día sale como fechas-solo en la zona de su consultorio, y
-           cualquier otra como los instantes de siempre. Sin esto, un evento de
-           todo el día entraba en la rejilla horaria como un bloque de 24 h a
-           caballo entre dos días. */
-        ...puntasParaLaRejilla(apt),
-        // Harness transparente: el color de la cita —que es el de su ESTADO— lo
-        // pone `eventContent` leyendo los tokens al pintar. Aquí NO va
-        // `textColor`: FullCalendar lo aplicaría como `color` en línea sobre
-        // `.fc-event-main`, y las tres tarjetas fijan el suyo en cada texto, así
-        // que no se heredaba nada. Lo que sí hacía era obligar a resolver un
-        // color aquí, que es de donde salía la segunda paleta.
-        backgroundColor: 'transparent',
-        borderColor:     'transparent',
-        extendedProps:   { ...apt },
-      }))
+      const eventos: EventInput[] = apts.map(citaAEvento)
       if (clave) guardarCitas(clave, eventos, data.incompleta === true, salio, gen)
       success(eventos)
     } catch (err: unknown) {

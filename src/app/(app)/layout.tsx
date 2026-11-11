@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { SWRConfig } from 'swr'
-import { createClient } from '@/lib/supabase/server'
+import { sesionServidor } from '@/lib/supabase/sesionServidor'
 import Sidebar from '@/components/layout/Sidebar'
 import ScriptTema from '@/components/layout/ScriptTema'
 import { ThemeProvider } from '@/components/layout/ThemeProvider'
@@ -15,15 +15,16 @@ import SuscripcionBanner from '@/components/billing/SuscripcionBanner'
 import { SubscriptionGateProvider } from '@/components/billing/SubscriptionGateProvider'
 import { getSubscriptionState } from '@/lib/subscription'
 import { AuthProvider } from '@/lib/auth-context'
-import { COLUMNAS_PERFIL_SESION, analizarPerfilSesion } from '@/lib/perfil/perfilSesion'
+import { analizarPerfilSesion } from '@/lib/perfil/perfilSesion'
 import { ConsultorioActivoProvider } from '@/contexts/ConsultorioActivoContext'
 import { MenuMovilProvider } from '@/contexts/MenuMovilContext'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  /* ⚠️ A1.4c: el `getUser()` y el `profiles` de este layout salen de
+     `sesionServidor()`, que los comparte con la página de la agenda dentro de
+     la MISMA petición (`React.cache`). La autoridad y el redirect son los de
+     siempre: `getUser()` contra Auth y, si no hay usuario, `/login`. */
+  const { supabase, user, profile } = await sesionServidor()
   if (!user) redirect('/login')
 
   /* ⚠️ DESDE A1.2 SE PIDEN LOS 12 CAMPOS DE `Profile` (`COLUMNAS_PERFIL_SESION`)
@@ -69,12 +70,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
      El caso vivo está en `expediente/[id]/layout.tsx:40`, que pide `role` a
      secas: por eso `/expediente/[id]` hace CUATRO viajes a Supabase donde
      `/documentos` hace tres. Medido. Registrado como PERF-DT-1 en
-     `DEUDA_TECNICA.md`, junto con por qué no se resolvió estructuralmente. */
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select(COLUMNAS_PERFIL_SESION)
-    .eq('id', user.id)
-    .single()
+     `DEUDA_TECNICA.md`, junto con por qué no se resolvió estructuralmente.
+     Desde A1.4c ese `select` está en `lib/supabase/sesionServidor.ts`. */
 
   if (profile?.role === 'super_admin') {
     redirect('/super-admin/dashboard')

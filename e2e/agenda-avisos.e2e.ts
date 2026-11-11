@@ -1,11 +1,49 @@
-import { test, expect } from '@playwright/test'
+/**
+ * Avisos de la agenda: fallo de citas, fallo y lentitud de Google, carga
+ * incompleta.
+ *
+ * ⚠️ EL FALLO DE LA SEMILLA DEL SERVIDOR (A1.4c) NO SE PUEDE SIMULAR DESDE
+ * PLAYWRIGHT. La semilla no es una petición del navegador que `page.route`
+ * pueda interceptar: es una promesa que viaja dentro del propio documento (el
+ * flujo RSC de `/agenda`), y no hay —ni debe haber— ningún gancho de pruebas en
+ * el código de producción para romperla. Lo que pasa cuando falla —rechaza,
+ * nunca llega (se suelta a los 3 s) o llega `null`— lo cubre la prueba unitaria
+ * de `esperarSemilla` en `src/lib/tests/semillaCitas.test.ts`: en los tres
+ * casos la fuente sigue a la red. Aquí se cubre la otra mitad: con la semilla
+ * PRESENTE, un fallo de `/api/appointments` al llegar a la primera semana no
+ * sembrada (W+2) saca la banda y «Reintentar».
+ */
+import { test, expect, type Page } from '@playwright/test'
 import { DIA_LABORABLE_LIBRE, SESION } from './ayudas'
 
 test.use({ storageState: SESION.adminA })
 
-test('si falla /api/appointments: «No se pudo cargar la agenda.» + «Reintentar»; reintentar recupera las citas', async ({ page }) => {
+/**
+ * Lleva la vista a la primera semana que NO viene sembrada (A1.4c): la página
+ * siembra W-1, W y W+1 desde el servidor, así que abrir y moverse una semana ya
+ * no pide `GET /api/appointments`, y un fallo de esa ruta no se ve hasta W+2.
+ * Escritorio: `.fc-next-button`; teléfono: «Periodo siguiente» (en Semana, que
+ * es la vista con la que abre, avanza una semana en los dos formatos).
+ */
+async function irASemanaNoSembrada(page: Page): Promise<void> {
+  const siguiente = page.locator('.fc-next-button:visible, [aria-label="Periodo siguiente"]:visible').first()
+  await siguiente.click()
+  await siguiente.click()
+}
+
+test('si falla /api/appointments tras navegar: «No se pudo cargar la agenda.» + «Reintentar»; reintentar recupera las citas', async ({ page }) => {
   await page.route('**/api/appointments**', route => route.fulfill({ status: 500, body: '{"error":"fallo simulado"}' }))
+  // La apertura sale de la semilla del servidor: con la ruta caída, abre bien y
+  // sin preguntarle. Ese cero es lo que dice que la semilla estaba PRESENTE.
+  let alAbrir = 0
+  const contar = (r: { url(): string; method(): string }): void => { if (r.url().includes('/api/appointments?') && r.method() === 'GET') alAbrir++ }
+  page.on('request', contar)
   await page.goto('/agenda')
+  await expect(page.locator('.fc-event').first()).toBeVisible({ timeout: 15000 })
+  await expect(page.getByText('No se pudo cargar la agenda.')).toHaveCount(0)
+  page.off('request', contar)
+  expect(alAbrir).toBe(0)
+  await irASemanaNoSembrada(page)
   await expect(page.getByText('No se pudo cargar la agenda.')).toBeVisible({ timeout: 15000 })
   const reintentar = page.getByRole('button', { name: 'Reintentar' })
   await expect(reintentar).toBeVisible()
@@ -107,6 +145,10 @@ test('aviso de carga incompleta aparece en cualquier vista; «Ver por semana» s
     body: JSON.stringify({ appointments: [], incompleta: true }),
   }))
   await page.goto('/agenda')
+  // La semilla del servidor no es `incompleta`: el aviso sale en la primera
+  // semana que pregunta a la red.
+  await expect(page.locator('.fc-event').first()).toBeVisible({ timeout: 15000 })
+  await irASemanaNoSembrada(page)
   const aviso = page.getByText('Faltan citas por mostrar.')
   await expect(aviso).toBeVisible({ timeout: 15000 })
   // En Semana (vista por defecto) no hay botón de acción: no hay a dónde
@@ -135,13 +177,13 @@ test.describe('médico invitado', () => {
     // `!canVerAgendaCompleta`; la agenda contesta eso mismo sin preguntar.
     const pedidas: string[] = []
     page.on('request', r => { if (r.url().includes('/api/google/events')) pedidas.push(r.url()) })
-    const citas = page.waitForResponse(r => r.url().includes('/api/appointments') && r.request().method() === 'GET')
     await page.goto('/agenda')
-    await citas
     await expect(page.locator('.fc-event').first()).toBeVisible({ timeout: 15000 })
     // Y tampoco al navegar a otra semana, que es otra traída de las dos fuentes.
+    // A W+2: W+1 viene sembrada y no pide citas a la red, así que no habría
+    // respuesta que esperar (A1.4c).
     const otra = page.waitForResponse(r => r.url().includes('/api/appointments') && r.request().method() === 'GET')
-    await page.locator('.fc-next-button:visible, [aria-label="Periodo siguiente"]:visible').first().click()
+    await irASemanaNoSembrada(page)
     await otra
     expect(pedidas).toEqual([])
   })
