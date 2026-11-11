@@ -256,10 +256,31 @@ export interface AgendaClienteProps {
   /** Las citas de W-1, W y W+1 sembradas por `page.tsx` (A1.4c). Sin ella, o
    *  si resuelve `null`, la agenda pide a la red como antes. */
   semillaCitas?: Promise<SemillaCitas<Appointment> | null>
+  /** El interruptor de la agenda v2 de la clínica, leído en el servidor por
+   *  `page.tsx` (plan del bloque B §1). Sin él, o si rechaza: apagado. */
+  interruptor?: Promise<boolean>
 }
 
-export default function AgendaCliente({ semillaCitas }: AgendaClienteProps) {
+export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClienteProps) {
   const calendarRef = useRef<InstanceType<typeof FullCalendar>>(null)
+  /* ⚠️ `agendaV2` ES `false` HASTA QUE LA PROMESA DEL SERVIDOR DIGA `true`:
+     falla cerrado, como `agendaV2Encendida`. Se lee con `.then()` y no con
+     `use()`, igual que la semilla, para no suspender la agenda entera por un
+     booleano. `null` = todavía sin respuesta (cuenta como apagado); se
+     distingue sólo para que `data-agenda-v2` de la raíz diga «pendiente» y
+     una prueba pueda esperar a la respuesta de verdad. Lo leerán los pasos
+     del bloque B que van detrás del interruptor. */
+  const [interruptorLeido, setInterruptorLeido] = useState<boolean | null>(null)
+  const agendaV2 = interruptorLeido === true
+  useEffect(() => {
+    if (!interruptor) return
+    let vigente = true
+    interruptor.then(
+      (v) => { if (vigente) setInterruptorLeido(v === true) },
+      () => { if (vigente) setInterruptorLeido(false) },
+    )
+    return () => { vigente = false }
+  }, [interruptor])
   const [modal,        setModal]        = useState<ModalState>({ mode: 'closed' })
   const [isMobile,     setIsMobile]     = useState(false)
   const [currentView,  setCurrentView]  = useState<string>('timeGridWeek')
@@ -1014,7 +1035,7 @@ export default function AgendaCliente({ semillaCitas }: AgendaClienteProps) {
        ENTERO —sin restar nada—, que es lo que deja a la banda meterse bajo el
        reloj y a la barra de «Agendar» bajo la de gestos. Si te preguntas por qué
        aquí no hay duplicación: porque en esa rama este calc no se aplica. */
-    <div className="agenda-raiz flex flex-col h-[calc(100dvh-88px-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px))] lg:h-[calc(100dvh-64px-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px))]">
+    <div data-agenda-v2={interruptorLeido === null ? 'pendiente' : agendaV2 ? 'encendida' : 'apagada'} className="agenda-raiz flex flex-col h-[calc(100dvh-88px-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px))] lg:h-[calc(100dvh-64px-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px))]">
 
       {/* ── Header ──────────────────────────────────────── */}
       {/* ⚠️ EL ENCABEZADO DE ESCRITORIO SE ENVUELVE, NO SE TOCA POR DENTRO. Por

@@ -4,6 +4,7 @@ import { sesionServidor } from '@/lib/supabase/sesionServidor'
 import { analizarPerfilSesion } from '@/lib/perfil/perfilSesion'
 import { consultaCitas } from '@/lib/agenda/consultaCitas'
 import { ventanaDeLaSemilla, type SemillaCitas } from '@/lib/agenda/semillaCitas'
+import { agendaV2Encendida } from '@/lib/agenda/ajustesAgenda'
 import { hoyEnTZ, TZ_CLINICA } from '@/lib/dates'
 import { logger } from '@/lib/logger'
 
@@ -53,6 +54,26 @@ async function sembrarCitas(): Promise<SemillaCitas<Appointment> | null> {
 }
 
 /**
+ * El interruptor de la agenda v2 de la clínica del usuario (plan del bloque B
+ * §1, `agenda_ajustes.agenda_v2_encendida`). Comparte el `getUser()` de
+ * `sesionServidor` con la semilla y el layout, y lee con el cliente de SESIÓN.
+ * FALLA CERRADO: sin sesión, sin clínica o ante cualquier error, `false`. Sólo
+ * rechaza con los errores internos de Next, como `sembrarCitas`.
+ */
+async function leerInterruptorAgenda(): Promise<boolean> {
+  try {
+    const { supabase, profile } = await sesionServidor()
+    const perfil = analizarPerfilSesion(profile)
+    if (!perfil?.clinica_id) return false
+    return await agendaV2Encendida(supabase, perfil.clinica_id)
+  } catch (err: unknown) {
+    unstable_rethrow(err)
+    logger.warn('agenda', `interruptor de la agenda sin leer: ${err instanceof Error ? err.message : 'error'}`)
+    return false
+  }
+}
+
+/**
  * Server component. NO ESPERA a la semilla: la promesa viaja a `AgendaCliente`
  * (`node_modules/next/dist/docs/01-app/01-getting-started/06-fetching-data.md`,
  * «Streaming data with the `use` API»), que no la lee con `use()` —no
@@ -67,5 +88,7 @@ async function sembrarCitas(): Promise<SemillaCitas<Appointment> | null> {
  * se renderiza y éste paga el suyo.
  */
 export default function AgendaPage() {
-  return <AgendaCliente semillaCitas={sembrarCitas()} />
+  /* El interruptor viaja igual que la semilla: promesa sin esperar, así que no
+     añade nada al TTFB; el cliente arranca en apagado hasta que resuelve. */
+  return <AgendaCliente semillaCitas={sembrarCitas()} interruptor={leerInterruptorAgenda()} />
 }

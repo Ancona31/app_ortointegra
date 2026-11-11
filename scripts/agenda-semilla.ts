@@ -156,6 +156,11 @@ async function borrar(): Promise<void> {
     if (pacIds.length) sinError(await admin.from('paciente_medico').delete().in('paciente_id', pacIds), 'borrar paciente_medico')
     sinError(await admin.from('pacientes').delete().in('clinica_id', clinicas), 'borrar pacientes')
     sinError(await admin.from('consultorios').delete().in('clinica_id', clinicas), 'borrar consultorios')
+    /* La FK de `agenda_ajustes` a `clinicas` es RESTRICT (migración B1): una
+       prueba que encendió el interruptor deja su fila, y sin esto el borrado de
+       la clínica de abajo falla. Con el rol de servicio: el disparador que
+       protege el interruptor no mira los DELETE. */
+    sinError(await admin.from('agenda_ajustes').delete().in('clinica_id', clinicas), 'borrar ajustes de la agenda')
   }
   for (const id of usuarios) {
     const { error } = await admin.auth.admin.deleteUser(id)
