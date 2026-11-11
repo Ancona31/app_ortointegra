@@ -205,7 +205,60 @@ sensibles de pacientes de terceros).
   resuelven ambas deudas.
 
 ### E5-DT-8 — Duplicación visual transitoria de citas al cambiar horario
-- **Estado:** 🔴 abierta
+- **Estado:** 🟢 duplicado cerrado por sus tres vías (2026-11-11, B2 de
+  `feature/agenda-v2`). 🟡 Queda abierta una vía de **fantasma** (no de
+  duplicado), descrita al final de esta entrada.
+- **Causa raíz común (medida en banco, no deducida):** `@fullcalendar/interaction`
+  guarda la cita al empezar el gesto indexada por su `defId` INTERNO, y tanto
+  el soltar (`MERGE_EVENTS`, `interaction/index.js:1381-1384`) como
+  `arg.revert()` (`:1389-1393`) mergean por esa clave. Una traída de una fuente
+  de función vuelve a parsear la cita con un `defId` nuevo; si cae entre la
+  captura y el merge, el merge no sustituye a nadie y AÑADE una segunda copia
+  con el mismo id público, invisible para `getEventById`. Ver la nota del
+  candado en `src/app/(app)/agenda/useFuentesAgenda.ts`.
+- **Vías y cómo se cerró cada una:**
+  1. **Eventos sin `sourceId`** — `b71f86e` («asignar sourceId al crear
+     eventos para evitar duplicados»).
+  2. **Traída a mitad del gesto** (reconexión del canal, foco, filtro o Google
+     entre `mousedown` y `mouseup`) — `80e06ea`, el candado de traída
+     (`gestoEnCursoRef`). Red: las pruebas 1 y 2 de
+     `e2e/agenda-candado-gesto.e2e.ts`. Comprobado el 2026-11-11 que es el
+     candado lo que la salva: quitando `if (hayGestoEnCurso(gestoEnCursoRef))
+     return` de `refetch()`, la prueba 2 sale con 2 tarjetas.
+  3. **Traída DESPUÉS de soltar y antes de deshacer** — el commit de B2
+     (`fix(agenda): B2 …`). El candado se suelta en `eventDragStop`, pero dos
+     caminos deshacían el gesto más tarde con `arg.revert()`: «Cancelar» en el
+     aviso de fuera de horario (arrastre y redimensionado) y el PUT fallido. Un
+     `refetch()` en esa ventana dejaba dos tarjetas. Medido con `el.fcSeg`:
+     tras la traída la cita tenía `defId 260`; al cancelar quedaban `260` y la
+     copia vieja `191`, las dos a la hora original. Las pruebas 3 y 4 del mismo
+     archivo salían en rojo con 2 tarjetas. Arreglo: `restaurarPosicion(arg)`
+     en `guardadoCitas.ts`, que hace `getEventById(id)?.setDates(oldStart,
+     oldEnd, { allDay })` sobre el evento VIVO. Comprobado en el navegador: tras
+     una traída es un no-op (mismo `defId`/`instanceId` y mismo rango), y sin
+     traída devuelve la cita a su sitio igual que `revert()` (arrastre,
+     redimensionado y PUT 500, mismo `defId`). Los `arg.revert()` síncronos de
+     los manejadores se quedan: ahí no cabe ninguna traída.
+- **Efecto lateral del arreglo de la vía 3, medido:** si otra persona BORRA la
+  cita mientras el aviso está abierto, «Cancelar» ya no la resucita (con
+  `revert()` volvía la copia vieja; ahora `getEventById` no la encuentra y no
+  se hace nada). Matiz que no cambió: si otra persona la MUEVE en esa ventana y
+  llega por traída o por Realtime, «Cancelar» la devuelve a la hora de antes del
+  gesto y no a la de la base, hasta la siguiente traída. Eso ya pasaba con
+  `revert()`; no duplica.
+- **🟡 Abierta — fantasma por borrado ajeno A MITAD DEL GESTO** (prueba
+  exploratoria 5 de B2, 2026-11-11). La secretaria borra la cita mientras el
+  médico la arrastra: el `DELETE` de Realtime la quita del store
+  (`aplicarCambioRealtime` → `remove()`, que el candado no frena porque sólo
+  cubre traídas); al soltar, el `MERGE_EVENTS` del soltar la vuelve a meter; el
+  PUT contesta 404 «Cita no encontrada» y la tarjeta se queda pintada en su hora
+  original, con la base ya sin la fila. Sale igual con `revert()` que con
+  `restaurarPosicion`: el fantasma lo crea el merge del soltar, no el deshacer.
+  Desaparece en la siguiente traída. No es un duplicado y no se arregló en B2;
+  si se ataca, el sitio natural es tratar el 404 de `ejecutarDrop` quitando el
+  evento en vez de restaurarlo.
+- **Lo que sigue es la entrada original (2026-05-30), conservada como
+  historia:**
 - **Detectada:** Etapa 5, sub-paso 5.H Paso 1 — smoke tests funcionales (2026-05-30)
 - **Archivo afectado:** src/app/(app)/agenda/page.tsx (ejecutarDrop ~líneas 1080-1100 + handlers de FullCalendar y `optimisticEvent`)
 - **Descripción:** Al cambiar el horario de una cita (drag&drop o resize en

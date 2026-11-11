@@ -1,7 +1,7 @@
 import { test, expect, request, type Locator, type Page, type WebSocketRoute } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
-import { irAAgenda, soloEscritorio, SESION, diaDeLaSemana, tituloUnico, toastConTexto } from './ayudas'
+import { irAAgenda, soloEscritorio, SESION, diaDeLaSemana, tituloUnico, toastConTexto, arrastrarEventoPorMinutos } from './ayudas'
 
 /**
  * EL CANDADO DEL ARRASTRE (`gestoEnCursoRef` en `useFuentesAgenda.ts`) con una
@@ -216,4 +216,124 @@ test('reconexión del canal a mitad del arrastre: el refetch de citas se descart
   await expect(tarjetas(page, titulo).locator('.ag-tarjeta-hora-rango')).toHaveText('11:30 - 12:00')
   // El refetch de la reconexión cayó con el gesto en curso: se descartó.
   expect(getsDuranteElGesto).toBe(0)
+})
+
+/* ══════════════════════════════════════════════════════════════════════════
+   LA TERCERA VÍA (B2, E5-DT-8): la traída que entra DESPUÉS de soltar.
+   ══════════════════════════════════════════════════════════════════════════
+   El candado cubre el gesto y se suelta en `eventDragStop`. Pero hay dos
+   caminos que deshacen el movimiento MÁS TARDE, con la traída ya libre:
+   «Cancelar» en el aviso de fuera de horario y el PUT que falla. Si entre el
+   soltar y ese deshacer entra un `refetch()` (aquí, la reconexión del canal),
+   la cita vuelve a parsearse con un `defId` nuevo; `arg.revert()` mergea la
+   copia de antes del gesto con el `defId` viejo, no sustituye a nadie y
+   AÑADE una segunda tarjeta.
+
+   Las dos pruebas se validan solas: antes de deshacer comprueban que la
+   traída SÍ se aplicó (la tarjeta ya enseña la hora de la base), así que no
+   pueden pasar en vacío con una traída que no llegó. */
+
+/** El websocket de Realtime con un corte a mano: cuántas uniones del canal de
+ *  citas contestó el servidor, y cortar el último socket para que el cliente
+ *  se reenganche (y, al volver SUBSCRIBED, llame a `refetch(true)`). */
+async function canalCortable(page: Page): Promise<{ uniones: () => number; cortar: () => Promise<void> }> {
+  const sockets: { pagina: WebSocketRoute; servidor: WebSocketRoute }[] = []
+  const pendientes = new Set<string>()
+  let uniones = 0
+  const texto = (m: string | Buffer): string => (typeof m === 'string' ? m : m.toString('utf8'))
+  const refDe = (t: string): unknown => {
+    const m = JSON.parse(t) as unknown
+    return Array.isArray(m) ? m[1] : (m as { ref?: unknown }).ref
+  }
+  await page.routeWebSocket(/\/realtime\/v1\/websocket/, ws => {
+    const servidor = ws.connectToServer()
+    ws.onMessage(m => {
+      const t = texto(m)
+      const ref = t.includes('"phx_join"') && t.includes('appointments-realtime') ? refDe(t) : null
+      if (typeof ref === 'string') pendientes.add(ref)
+      servidor.send(m)
+    })
+    servidor.onMessage(m => {
+      const t = texto(m)
+      const ref = t.includes('"phx_reply"') && t.includes('"ok"') ? refDe(t) : null
+      if (typeof ref === 'string' && pendientes.delete(ref)) uniones += 1
+      ws.send(m)
+    })
+    sockets.push({ pagina: ws, servidor })
+  })
+  return {
+    uniones: () => uniones,
+    cortar: async () => {
+      const ultimo = sockets[sockets.length - 1]
+      await ultimo.pagina.close()
+      await ultimo.servidor.close()
+    },
+  }
+}
+
+/** Corta el canal y espera a que la reconexión haya TRAÍDO las citas. */
+async function reconectarYTraer(page: Page, canal: Awaited<ReturnType<typeof canalCortable>>): Promise<void> {
+  const antes = canal.uniones()
+  const traida = page.waitForResponse(r => r.url().includes('/api/appointments?') && r.request().method() === 'GET',
+    { timeout: 15000 })
+  await canal.cortar()
+  await expect.poll(canal.uniones, { timeout: 15000 }).toBe(antes + 1)
+  expect((await traida).ok()).toBeTruthy()
+}
+
+test('Cancelar el aviso de fuera de horario tras una traída: la cita vuelve a su hora y no se duplica', async ({ page }) => {
+  const canal = await canalCortable(page)
+  await irAAgenda(page)
+  await expect.poll(canal.uniones, { timeout: 10000 }).toBe(1)
+  const titulo = tituloUnico('Tercera via aviso E2E')
+  // La clínica A cierra a las 18:00 (semilla): +60 la deja en 18:00-18:30.
+  await crearEventoAjeno(titulo, '17:00', '17:30')
+  await expect(tarjetas(page, titulo)).toHaveCount(1, { timeout: 10000 })
+
+  await arrastrarEventoPorMinutos(page, tarjetas(page, titulo), 60)
+  const dialogo = page.getByRole('dialog')
+  await expect(dialogo).toContainText('Vas a moverlo a las')
+  await expect(tarjetas(page, titulo).locator('.ag-tarjeta-hora-rango')).toHaveText('18:00 - 18:30')
+
+  await reconectarYTraer(page, canal)
+  // La traída se aplicó: pinta lo de la base, que nunca se movió.
+  await expect(tarjetas(page, titulo).locator('.ag-tarjeta-hora-rango')).toHaveText('17:00 - 17:30')
+
+  await dialogo.getByRole('button', { name: 'Cancelar' }).click()
+  await expect(dialogo).toBeHidden()
+  await page.waitForTimeout(500)
+  await expect(tarjetas(page, titulo)).toHaveCount(1)
+  await expect(tarjetas(page, titulo).locator('.ag-tarjeta-hora-rango')).toHaveText('17:00 - 17:30')
+})
+
+test('PUT fallido con una traída en medio: la cita vuelve a su hora y no se duplica', async ({ page }) => {
+  let soltarPut: () => void = () => {}
+  const compuerta = new Promise<void>(resolve => { soltarPut = resolve })
+  let putsRetenidos = 0
+  await page.route(/\/api\/appointments\/[0-9a-f-]+$/, async route => {
+    if (route.request().method() !== 'PUT') return route.fallback()
+    putsRetenidos += 1
+    await compuerta
+    await route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'Fallo simulado E2E' }) })
+  })
+  const canal = await canalCortable(page)
+  await irAAgenda(page)
+  await expect.poll(canal.uniones, { timeout: 10000 }).toBe(1)
+  const titulo = tituloUnico('Tercera via PUT E2E')
+  await crearEventoAjeno(titulo, '15:00', '15:30')
+  await expect(tarjetas(page, titulo)).toHaveCount(1, { timeout: 10000 })
+
+  await arrastrarEventoPorMinutos(page, tarjetas(page, titulo), 30)
+  await expect.poll(() => putsRetenidos, { timeout: 5000 }).toBe(1)
+  await expect(tarjetas(page, titulo).locator('.ag-tarjeta-hora-rango')).toHaveText('15:30 - 16:00')
+
+  await reconectarYTraer(page, canal)
+  // La traída se aplicó con el PUT todavía en vuelo: la base sigue a las 15:00.
+  await expect(tarjetas(page, titulo).locator('.ag-tarjeta-hora-rango')).toHaveText('15:00 - 15:30')
+
+  soltarPut()
+  await expect(toastConTexto(page, 'Fallo simulado E2E')).toBeVisible({ timeout: 10000 })
+  await page.waitForTimeout(500)
+  await expect(tarjetas(page, titulo)).toHaveCount(1)
+  await expect(tarjetas(page, titulo).locator('.ag-tarjeta-hora-rango')).toHaveText('15:00 - 15:30')
 })

@@ -252,7 +252,7 @@ export function crearGuardadoCitas({
       setConfirm({
         message: aviso,
         onConfirm: () => { setConfirm(null); ejecutarDrop(id, puntas, arg) },
-        onCancel:  () => { setConfirm(null); arg.revert() },
+        onCancel:  () => { setConfirm(null); restaurarPosicion(arg) },
       })
       return
     }
@@ -275,6 +275,32 @@ export function crearGuardadoCitas({
     | { start_time: string; end_time: string | undefined; all_day?: false }
     | { all_day: true; all_day_desde: string; all_day_hasta: string }
 
+  /* Deshace un gesto MÁS TARDE que en el propio manejador: al «Cancelar» del
+     aviso de fuera de horario y cuando el PUT falla (E5-DT-8, B2).
+
+     ⚠️ AQUÍ NO VALE `arg.revert()`, Y ESTÁ MEDIDO. `revert()` mergea la copia
+     de antes del gesto indexada por su `defId` interno
+     (`@fullcalendar/interaction/index.js:1389-1393`). El candado del gesto ya
+     se soltó en `eventDragStop`, así que mientras el aviso está abierto o el
+     PUT vuela puede entrar un `refetch()` (reconexión, foco tras 2 min): la
+     cita se vuelve a parsear con un `defId` nuevo, el viejo ya no existe y
+     `revert()` AÑADE una segunda tarjeta en vez de sustituir. Es el mismo
+     mecanismo que describe la nota del candado en `useFuentesAgenda.ts`.
+     `e2e/agenda-candado-gesto.e2e.ts` lo reproduce por las dos vías.
+
+     `setDates` muta el evento VIVO, sea cual sea su `defId`: sin traída de por
+     medio lo devuelve a su sitio; tras una traída ya está donde dice la base
+     (que nunca recibió el cambio) y el delta es cero. Si la cita ya no está
+     pintada —la borraron entretanto— no hay nada que devolver: `revert()` la
+     resucitaría. Los `arg.revert()` SÍNCRONOS de los manejadores se quedan:
+     ahí no hay hueco para que entre ninguna traída. */
+  function restaurarPosicion(arg: EventDropArg | EventResizeDoneArg): void {
+    const viejo = arg.oldEvent
+    if (!viejo.start) return
+    calendarRef.current?.getApi().getEventById(arg.event.id)
+      ?.setDates(viejo.start, viejo.end, { allDay: viejo.allDay })
+  }
+
   async function ejecutarDrop(id: string, puntas: PuntasDelMovimiento, arg: EventDropArg | EventResizeDoneArg) {
     // Guarda: un id temporal no existe en la base, el PUT devolveria un error
     // sin sentido. El evento optimista ya nace con `editable: false`, asi que
@@ -296,7 +322,7 @@ export function crearGuardadoCitas({
     vaciarCacheCitas()
 
     if (!res.ok) {
-      arg.revert()
+      restaurarPosicion(arg)
       const { error, message } = await res.json().catch(() => ({ error: 'Error desconocido' }))
       toast.error(message || error || 'Error de conexión — se devolvió a su horario original')
       return
@@ -359,7 +385,7 @@ export function crearGuardadoCitas({
       setConfirm({
         message: aviso,
         onConfirm: () => { setConfirm(null); ejecutarDrop(id, { start_time, end_time }, arg) },
-        onCancel:  () => { setConfirm(null); arg.revert() },
+        onCancel:  () => { setConfirm(null); restaurarPosicion(arg) },
       })
       return
     }
