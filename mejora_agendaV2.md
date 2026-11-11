@@ -760,7 +760,30 @@ primero sin marcar.
     | Volver desde /dashboard, citas visibles | 125 ms |
     | JS transferido en /agenda | 484 KB (mayor chunk 147 KB) |
     | Google con 8 s de retraso | ninguna cita antes de 8 s |
-- [ ] A1 — Abrir rápido
+- [ ] A1 — Abrir rápido (en curso; hechos A1.1-A1.6, A1.8, A1.9)
+  - Decisiones: ningún `getUser()` pasa a `getClaims()`; A1.7 (Google sembrado
+    en servidor con cliente admin) queda fuera; la caché de rangos es la
+    versión mínima (se vacía entera ante cualquier escritura o tiempo real).
+  - Hecho: A1.1 resta de Google en paralelo · A1.2 perfil sembrado desde el
+    layout · A1.3 Google fuera del camino crítico (causa: FullCalendar no pinta
+    ninguna fuente mientras otra carga) · A1.4a `page.tsx` → `AgendaCliente.tsx`
+    + página de servidor · A1.4b consulta en `lib/agenda/consultaCitas.ts` ·
+    A1.4c semilla de W-1..W+1 desde el servidor (`sesionServidor` con
+    `React.cache` compartido por layout y página) · A1.5a caché de rangos ·
+    A1.6 configuración sembrada desde el layout · A1.8 índices de rango
+    (migración `20261111120000`, auditada; **producción: la aplica Angel**) ·
+    A1.9 `ag-entra` solo para `.ag-ev-nuevo`.
+  - Decisión consciente a revisar por Angel: la semilla manda en cada
+    apertura tres semanas de citas (con nombre, teléfono y correo del
+    paciente) en vez de una; mismos datos y misma RLS que la API, sin salir a
+    terceros.
+  - Medido en local (mediana): `GET /user` al abrir 5 → 2 (1 en el camino
+    crítico; Google después de pintar); `/api/appointments` al abrir 1 → 0;
+    red limitada 913 → 745 ms; semana vecina ~80 ms, semana ya vista 53 ms y
+    volver desde /dashboard 78 ms sin petición; Google a 8 s ya no retrasa las
+    citas (antes 8.2 s). El cambio de semana de A0 (175 ms) se midió con el
+    método viejo y no es comparable.
+  - Falta: A1.5b precarga W±1 al navegar · A1.10 conteo (decidir en A1-bis).
 - [ ] A1-bis — Revisión completa de eficiencia y presupuesto de rendimiento
 - [ ] A2 — Partir `agenda/page.tsx`
 - [ ] B — Cimientos
