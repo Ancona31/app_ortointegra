@@ -259,6 +259,54 @@ function bloqueantesDe(peticiones: PeticionCapturada[]): number {
   return peticiones.filter(p => p.pathname === '/api/appointments' && p.method === 'GET').length
 }
 
+/** El próximo `GET /api/appointments?...` que responda (el `?` es a
+ *  propósito: sin él también atrapa el `GET /api/appointments/[id]` de
+ *  `traerCita`, que es otra ruta). LANZA si no llega a tiempo — un «no
+ *  llegó» es un fallo real de la medición (la precarga no salió) y no debe
+ *  colarse como un `-1` silencioso en la serie; tira la prueba entera, igual
+ *  que el fallo de `contarAuthUserTotal` más abajo. */
+function esperarProximoGetCitas(page: Page) {
+  return page.waitForResponse(
+    r => r.url().includes('/api/appointments?') && r.request().method() === 'GET', { timeout: 10000 },
+  )
+}
+
+/* A1.5b: salto W+1 → W+2 TRAS la precarga en ocioso. `irASemana` pinta W+1
+   con una petición real; la precarga que sigue trae, en serie, W (ya
+   cacheada, no pide) y W+2 (sí pide) — se espera esa segunda respuesta ANTES
+   de medir, o el salto mediría la petición que la precarga viene a evitar.
+   `urlDeW2` guarda esa url EXACTA: `bloqueantes` cuenta cuántas veces se
+   repite, no cualquier `/api/appointments` de la ventana medida.
+   ⚠️ NO VALE CONTAR CUALQUIER GET AHÍ: pintar W+2 dispara, a su vez, SU
+   PROPIA precarga (W+1, ya cacheada, y W+3, que sí pide red) — y ese GET de
+   W+3 puede alcanzar a salir dentro de la misma ventana, antes de que el
+   evento llegue al DOM. Es tráfico correcto de la semana SIGUIENTE, no lo
+   que esto mide: si se contara cualquier GET, `bloqueantes` saldría en 1
+   aunque la precarga hubiera hecho exactamente su trabajo. */
+async function medirSaltoTrasPrecarga(browser: Browser) {
+  const context = await browser.newContext({ storageState: SESION.adminA })
+  const page = await context.newPage()
+  await page.goto('/agenda')
+  await page.locator('.fc-event').first().waitFor({ state: 'visible', timeout: 20000 })
+
+  // W+1 ya viene de la semilla del servidor (A1.4c: cubre W-1, W y W+1 de
+  // hoy) — no pide red por sí sola. El PRIMER `GET /api/appointments?...`
+  // que sale tras pintarla es, por tanto, la precarga de SU vecina, W+2.
+  await page.locator('.fc-next-button').click()
+  await page.locator('.fc-event', { hasText: EVENTO_SEMANA_SIGUIENTE }).first().waitFor({ state: 'visible', timeout: 15000 })
+  const respuestaW2 = await esperarProximoGetCitas(page)
+  const urlDeW2 = respuestaW2.url()
+  await esperarQuieta(page)
+
+  const { peticiones, t0 } = instrumentar(page)
+  await page.locator('.fc-next-button').click()
+  await page.locator('.fc-event').first().waitFor({ state: 'visible', timeout: 15000 })
+  const ms = Date.now() - t0
+  await context.close()
+  const bloqueantes = peticiones.filter(p => p.url === urlDeW2).length
+  return { ms, peticiones, bloqueantes }
+}
+
 async function medirVueltaInterna(browser: Browser) {
   const context = await browser.newContext({ storageState: SESION.adminA })
   const page = await context.newPage()
@@ -355,6 +403,10 @@ test('línea base de carga de la agenda', async ({ browser }) => {
   const semanaVista: Awaited<ReturnType<typeof medirVueltaASemanaVista>>[] = []
   for (let i = 0; i < REPETICIONES; i++) semanaVista.push(await medirVueltaASemanaVista(browser))
 
+  // 9 — A1.5b: salto W+1 → W+2 tras la precarga en ocioso.
+  const saltoTrasPrecarga: Awaited<ReturnType<typeof medirSaltoTrasPrecarga>>[] = []
+  for (let i = 0; i < REPETICIONES; i++) saltoTrasPrecarga.push(await medirSaltoTrasPrecarga(browser))
+
   // 7 — peso de JS (una sola medida; no depende de repetir).
   const peso = await pesoJs(browser)
 
@@ -407,6 +459,12 @@ test('línea base de carga de la agenda', async ({ browser }) => {
       msHastaCitasVisibles: serie(semanaVista.map(a => a.ms)),
       bloqueantes: serie(semanaVista.map(a => a.bloqueantes)),
       peticiones: agrupar(semanaVista[semanaVista.length - 1].peticiones),
+    },
+    saltoTrasPrecarga: {
+      descripcion: 'A1.5b: W+1 → W+2 después de que la precarga en ocioso ya trajo W+2 sola.',
+      msHastaCitasVisibles: serie(saltoTrasPrecarga.map(a => a.ms)),
+      bloqueantes: serie(saltoTrasPrecarga.map(a => a.bloqueantes)),
+      peticiones: agrupar(saltoTrasPrecarga[saltoTrasPrecarga.length - 1].peticiones),
     },
     pesoJs: {
       totalBytesTransferidos: peso.totalBytes,

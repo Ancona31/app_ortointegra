@@ -1,6 +1,8 @@
 import { test, type Browser, type Locator, type Page, type WebSocket } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
 import { desplazarFecha, hoyEnTZ } from '../src/lib/dates'
+import { semanasAlrededor } from '../src/lib/agenda/semillaCitas'
+import { semanaAnterior, semanaSiguiente } from '../src/lib/agenda/semanasVecinas'
 
 /**
  * Ayudas compartidas por las pruebas E2E de la agenda. No es una abstracción
@@ -324,4 +326,60 @@ export function observarEcosRealtime(page: Page): (clientId: string, timeoutMs?:
       esperas.set(clientId, () => { clearTimeout(tope); resolve() })
     })
   }
+}
+
+/** Un rango `{startStr,endStr}` tal como lo pide `rangoQuePedir`. La usan
+ *  `ventanasDeLaSemilla` y las pruebas de precarga de A1.5b, que no quieren
+ *  arrastrar `@fullcalendar/core` sólo por su tipo `EventInput`. */
+export interface RangoISO { startStr: string; endStr: string }
+
+/**
+ * Corre `fn` con `TZ` fijado a la de la clínica, y lo restaura al salir.
+ *
+ * ⚠️ TODO lo que lea campos LOCALES de `Date` tiene que ir DENTRO de esta
+ * misma llamada, no encadenado después: `semanasAlrededor` (ventanas de la
+ * semilla) Y `semanaAnterior`/`semanaSiguiente` (sus vecinas) leen esos
+ * campos, y si la segunda corre ya con `TZ` restaurado a lo que sea que
+ * tenga el proceso de Playwright (no necesariamente la de la clínica), su
+ * cálculo sale de otra zona y deja de coincidir con lo que pide el
+ * navegador —que sí la lleva fijada (`timezoneId` en `playwright.config.ts`).
+ * Ocurrió exactamente así la primera vez que se escribió esto.
+ */
+function conTzDeLaClinica<T>(fn: () => T): T {
+  const TZ_ORIGINAL = process.env.TZ
+  process.env.TZ = 'America/Merida'
+  try {
+    return fn()
+  } finally {
+    process.env.TZ = TZ_ORIGINAL
+  }
+}
+
+/**
+ * Las tres ventanas W-1/W/W+1 que la semilla del SERVIDOR cubre (A1.4c), en
+ * la zona de la clínica — mismo cálculo que hace `AgendaCliente` al pedir
+ * (`semanasAlrededor`), no uno nuevo. La usa `agenda-semilla.e2e.ts`, para
+ * exigir que esas tres NO pidan red.
+ */
+export function ventanasDeLaSemilla(): RangoISO[] {
+  return conTzDeLaClinica(() => semanasAlrededor(new Date()))
+}
+
+/**
+ * Las dos vecinas de FUERA del trío sembrado — W-2 y W+2 — que la precarga
+ * de semanas vecinas (A1.5b) sí pide al llegar al borde del trío. Las usan
+ * `agenda-semilla.e2e.ts` (como lista PERMITIDA, lo único que tolera además
+ * de las tres sembradas) y `agenda-cache-rangos.e2e.ts` (para comprobar que
+ * la precarga de verdad pidió el rango exacto de W+2, y nada más).
+ */
+export function ventanasVecinasDeLaSemilla(): [RangoISO, RangoISO] {
+  return conTzDeLaClinica(() => {
+    const [w1, , w3] = semanasAlrededor(new Date())
+    return [semanaAnterior(w1), semanaSiguiente(w3)]
+  })
+}
+
+/** ¿Esta `url` de `GET /api/appointments` pide alguno de estos rangos? */
+export function esUnaDeEstasVentanas(url: string, ventanas: RangoISO[]): boolean {
+  return ventanas.some(v => url.includes(`from=${v.startStr}`) && url.includes(`to=${v.endStr}`))
 }

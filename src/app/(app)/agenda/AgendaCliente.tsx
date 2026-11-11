@@ -37,6 +37,7 @@ import {
 } from '@/lib/agenda/cacheEventosGoogle'
 import { claveCitas, generacionCitas, guardarCitas, leerCitas, vaciarCacheCitas } from '@/lib/agenda/cacheRangosCitas'
 import { esperarSemilla, sembrarCacheCitas, type SemillaCitas } from '@/lib/agenda/semillaCitas'
+import { semanaAnterior, semanaSiguiente } from '@/lib/agenda/semanasVecinas'
 import { logger } from '@/lib/logger'
 import {
   avisoDeRecorte,
@@ -1462,6 +1463,97 @@ function citaAEvento(apt: Appointment): EventInput {
     extendedProps:   { ...apt },
   }
 }
+
+/** Lo que `traerYGuardarCitas` entrega tras pedir y cachear un rango. */
+interface TraidaCitas { eventos: EventInput[]; incompleta: boolean }
+
+/**
+ * Pide UN rango a `/api/appointments` y lo guarda en `cacheRangosCitas`
+ * (A1.5a). La usan `appointmentSource` (la traída real) y la precarga de
+ * semanas vecinas (A1.5b, `ejecutarPrecarga`): MISMA petición, MISMA
+ * traducción (`citaAEvento`) y MISMO `guardarCitas` — sacarla de la fuente es
+ * lo que evita tener dos copias que se desincronicen.
+ *
+ * `profileId` puede ser `null` (sin perfil no hay de quién es la caché, como
+ * en `appointmentSource`): se pide igual, sólo que no se guarda nada.
+ *
+ * NO toca estado de React ni refs del componente — eso le toca a cada
+ * llamador según lo que le corresponda (`errorCitas`, `ultimaTraidaRef`…).
+ *
+ * ⚠️⚠️ LAS DOS GUARDAS DE ABAJO (`res.ok` y el `Array.isArray`) NO SON
+ * DEFENSIVAS, son el Bloque 9 entero: sin ellas un fallo del servidor se
+ * pinta como una agenda VACÍA en vez de como un error — ver la nota larga que
+ * llevaban en `appointmentSource` antes de este reparto. Las dos LANZAN, así
+ * que sólo hay un camino de fallo: el `catch` de quien llame a esto.
+ */
+async function traerYGuardarCitas(
+  startStr: string, endStr: string, filtro: string, profileId: string | null,
+): Promise<TraidaCitas> {
+  const salio = Date.now()
+  const gen = generacionCitas()
+  let url = `/api/appointments?from=${startStr}&to=${endStr}`
+  if (filtro) url += `&medico_id=${filtro}`
+  const res = await fetch(url)
+  if (!res.ok) throw new Error(`El servidor respondió ${res.status}`)
+  const data: { appointments?: Appointment[]; incompleta?: boolean } = await res.json()
+  if (!Array.isArray(data.appointments)) throw new Error('Respuesta de citas ilegible')
+  const eventos = data.appointments.map(citaAEvento)
+  const incompleta = data.incompleta === true
+  if (profileId) guardarCitas(claveCitas(profileId, filtro, startStr, endStr), eventos, incompleta, salio, gen)
+  return { eventos, incompleta }
+}
+
+/**
+ * Lo que vive en el mapa de citas en vuelo: la promesa Y LA GENERACIÓN con la
+ * que salió. Sin la generación, reutilizar la promesa es el bug grave de la
+ * revisión: `vaciarCacheCitas()` NO toca este mapa (es independiente de
+ * `cacheRangosCitas`), así que una petición que salió ANTES de un vaciado
+ * podía devolverse a quien pide DESPUÉS — datos de antes de la cita que
+ * acaba de llegar por tiempo real, servidos como si fueran los de ahora.
+ */
+interface TraidaEnVuelo { gen: number; promesa: Promise<TraidaCitas> }
+
+/**
+ * Evita que la traída real y la precarga pidan la MISMA clave a la vez: la
+ * segunda que llegue reutiliza la promesa de la primera — PERO SÓLO SI salió
+ * en la generación VIGENTE. Si hubo un vaciado de por medio, esa promesa es
+ * de antes: se ignora (su propio `.finally` la retira sola cuando resuelva) y
+ * se pide una nueva. `enVuelo` es `citasEnVueloRef.current`, compartido por
+ * las dos — un `Map` de módulo sería memoria entre pestañas sin sentido, y
+ * uno por componente ya es lo que hace falta para una sola agenda abierta.
+ */
+function traerCitasDeduplicado(
+  startStr: string, endStr: string, filtro: string, profileId: string | null,
+  enVuelo: Map<string, TraidaEnVuelo>,
+): Promise<TraidaCitas> {
+  if (!profileId) return traerYGuardarCitas(startStr, endStr, filtro, profileId)
+  const clave = claveCitas(profileId, filtro, startStr, endStr)
+  const gen = generacionCitas()
+  const existente = enVuelo.get(clave)
+  if (existente && existente.gen === gen) return existente.promesa
+  const promesa = traerYGuardarCitas(startStr, endStr, filtro, profileId).finally(() => {
+    if (enVuelo.get(clave)?.promesa === promesa) enVuelo.delete(clave)
+  })
+  enVuelo.set(clave, { gen, promesa })
+  return promesa
+}
+
+/** Tiempo ocioso con respaldo: no todos los navegadores tienen `requestIdleCallback` (Safari, a la fecha). */
+function enOcioso(fn: () => void): number {
+  if (typeof window.requestIdleCallback === 'function') return window.requestIdleCallback(fn)
+  return window.setTimeout(fn, 1)
+}
+function cancelarOcioso(handle: number): void {
+  if (typeof window.cancelIdleCallback === 'function') window.cancelIdleCallback(handle)
+  else window.clearTimeout(handle)
+}
+
+/** Las dos vistas de 7 días donde se precarga (A1.5b). Mes y Día, no. */
+const VISTAS_PRECARGABLES = new Set(['timeGridWeek', 'listWeek'])
+
+/** Una secuencia de precarga en curso: su candado de cancelación y su
+ *  temporizador ocioso, fundidos en un solo objeto — ver `ejecutarPrecarga`. */
+interface PrecargaEnCurso { cancelado: boolean; idle: number }
 
 /**
  * Engancha la semilla del servidor a `cacheRangosCitas` (A1.4c). La generación
@@ -6481,6 +6573,26 @@ export default function AgendaCliente({ semillaCitas }: AgendaClienteProps) {
      Lo servido de la caché de rangos (A1.5a) NO la estampa: sólo cuenta la red. */
   const ultimaTraidaRef = useRef(0)
 
+  /* ═══ A1.5b · PRECARGA DE SEMANAS VECINAS — refs ══════════════════════════
+     `citasEnVueloRef`: compartido por la traída real (`appointmentSource`) y
+     la precarga (`ejecutarPrecarga`), ver `traerCitasDeduplicado` y
+     `TraidaEnVuelo`.
+     `citasIncompletasRef`: espejo de estado para `ejecutarPrecarga`, que
+     corre DESPUÉS de un `requestIdleCallback` — puede haber renders de por
+     medio y un closure se quedaría con la bandera de incompleta de cuando se
+     PROGRAMÓ, no de cuando de verdad pide. Se escribe en cada render, igual
+     que `appointmentSourceRef.current = appointmentSource` más abajo.
+     `precargaRef`/`ultimaClavePrecargadaRef`: la secuencia en curso (ver
+     `PrecargaEnCurso`) y la clave de la última vista para la que ya se
+     programó —lo que evita la ráfaga: un vaciado por tiempo real reemite
+     `eventsSet` sin mover la vista, así que la clave sale igual y no hay
+     nada que programar otra vez. */
+  const citasEnVueloRef = useRef(new Map<string, TraidaEnVuelo>())
+  const citasIncompletasRef = useRef(citasIncompletas)
+  citasIncompletasRef.current = citasIncompletas
+  const precargaRef = useRef<PrecargaEnCurso | null>(null)
+  const ultimaClavePrecargadaRef = useRef<string | null>(null)
+
   /* ── Refetch al cambiar el filtro de médico ─────────────
      Se dispara DESPUÉS del commit del estado (no en el onChange síncrono),
      cuando appointmentSourceRef.current y gcalSourceRef.current ya apuntan a
@@ -6532,40 +6644,21 @@ export default function AgendaCliente({ semillaCitas }: AgendaClienteProps) {
         if (guardadas && marca !== null) ultimaTraidaRef.current = Math.max(ultimaTraidaRef.current, marca)
       }
       if (guardadas) { setErrorCitas(false); setCitasIncompletas(false); success(guardadas); return }
-      const salio = Date.now()
-      const gen = generacionCitas()
-      ultimaTraidaRef.current = salio
-      let url = `/api/appointments?from=${info.startStr}&to=${info.endStr}`
-      if (filtro) url += `&medico_id=${filtro}`
-      const res = await fetch(url)
-      /* ⚠️⚠️ ESTAS DOS GUARDAS SON EL BLOQUE 9 ENTERO, Y NO SON DEFENSIVAS: sin
-         ellas un fallo del servidor se pintaba como UNA AGENDA VACÍA.
-         El camino era éste y no tenía nada de raro: `/api/appointments` contesta
-         `{ error }` con 500 (route.ts:76 y :81), ese JSON no trae `appointments`,
-         el `??` de abajo lo convertía en `[]` y se llamaba a `success([])` — o
-         sea que se le decía a FullCalendar «la traída fue bien y no hay ninguna
-         cita». El médico veía una semana limpia y concluía que no tenía citas.
-         Un 500 NO es una semana vacía. `res.ok` lo separa.
-
-         ⚠️ LA SEGUNDA GUARDA NO SOBRA. `res.ok` sólo cubre el código de estado;
-         un 200 con el cuerpo cambiado —un despliegue a medias, un proxy que
-         reescribe— volvería a caer en el mismo `?? []`. Comprobar que la clave
-         es un array es lo que cierra esa puerta, y cuesta una línea.
-         Las dos LANZAN en vez de contestar: así hay UN solo camino de fallo, el
-         `catch` de abajo, y no dos que se puedan desincronizar. */
-      if (!res.ok) throw new Error(`El servidor respondió ${res.status}`)
-      const data: { appointments?: Appointment[]; incompleta?: boolean } = await res.json()
-      if (!Array.isArray(data.appointments)) throw new Error('Respuesta de citas ilegible')
-      const apts: Appointment[] = data.appointments
+      ultimaTraidaRef.current = Date.now()
+      /* A1.5b: si la precarga ya está pidiendo esta MISMA clave, su promesa
+         es la que contesta — no una segunda petición. La traída y el guardado
+         en caché, con sus dos guardas no-defensivas (Bloque 9: separar un 500
+         o un cuerpo roto de "no hay citas"), viven en `traerYGuardarCitas`;
+         ver su cabecera. */
+      const { eventos, incompleta } = await traerCitasDeduplicado(
+        info.startStr, info.endStr, filtro ?? '', profile?.id ?? null, citasEnVueloRef.current,
+      )
       setErrorCitas(false)
-      /* ⚠️ `=== true` Y NO `!!`, y no es manía de estilo: es lo que hace que un
-         servidor que todavía no manda el campo —un despliegue a medias, una
-         respuesta cacheada de antes— NO levante la banda. Ausencia significa «no
-         me consta que falte nada», que es donde estábamos, y no «falta algo». */
-      setCitasIncompletas(data.incompleta === true)
-
-      const eventos: EventInput[] = apts.map(citaAEvento)
-      if (clave) guardarCitas(clave, eventos, data.incompleta === true, salio, gen)
+      /* ⚠️ `incompleta` viene de `data.incompleta === true` dentro de
+         `traerYGuardarCitas`, y no `!!`: ausencia de campo (despliegue a
+         medias, respuesta vieja) significa «no me consta que falte nada», no
+         «falta algo». No levanta la banda sola. */
+      setCitasIncompletas(incompleta)
       success(eventos)
     } catch (err: unknown) {
       /* El estado va ANTES del `failure()`, aunque el orden no se note: quien
@@ -6769,6 +6862,102 @@ export default function AgendaCliente({ semillaCitas }: AgendaClienteProps) {
     { id: FUENTE_APPOINTMENTS, events: stableAppointmentSource },
     { id: 'gcal',              events: stableGcalSource },
   ], [stableAppointmentSource, stableGcalSource])
+
+  /* ═══ A1.5b · PRECARGA DE SEMANAS VECINAS ═════════════════════════════════
+     Apaga lo que esté en vuelo o programado: lo llama `programarPrecarga` al
+     cambiar de vista o de rango, y el efecto de desmontaje de abajo.
+     `cancelarOcioso` sobre un candado que ya disparó es inofensivo (como
+     `clearTimeout` sobre uno ya vencido), así que no hace falta recordar si
+     ya corrió. */
+  function cancelarPrecargaEnCurso(): void {
+    if (precargaRef.current) { precargaRef.current.cancelado = true; cancelarOcioso(precargaRef.current.idle) }
+    precargaRef.current = null
+    ultimaClavePrecargadaRef.current = null
+  }
+
+  /*
+   * Tras pintar Semana o Día-lista, programa EN OCIOSO la traída de W+1 y
+   * W-1 de la vista que se está mirando. La llaman `datesSet` y `eventsSet`
+   * —entre los dos cubren toda navegación, igual que ya hacen para la
+   * ventana y el conteo—, con la vista que entrega cada uno.
+   *
+   * ⚠️ LA CLAVE DEL RANGO, NO UN BOOLEANO, ES LO QUE EVITA LA RÁFAGA. Un
+   * vaciado por tiempo real reemite `eventsSet` SIN mover la vista (ver la
+   * nota junto al `<FullCalendar>`): el rango sale igual,
+   * `ultimaClavePrecargadaRef` ya lo tiene, y no se programa nada otra vez.
+   *
+   * ⚠️ Y ESO ES A PROPÓSITO, NO UN HUECO: tras un vaciado, las vecinas de LA
+   * VISTA ACTUAL no se vuelven a precargar hasta que el usuario de verdad
+   * navegue a una vista distinta. Lo que sí llega al día es la vista misma
+   * —`appointmentSource` → `traerCitasDeduplicado` ya descartan la promesa
+   * vieja por generación, es el punto 1 de esta ronda—; sus vecinas esperan
+   * a la próxima navegación, que es cuando de verdad hacen falta.
+   *
+   * Sólo se marca la clave como programada cuando los guardas de abajo SÍ
+   * dejan seguir — así una clínica sin perfil todavía, con un gesto en
+   * curso, con la semilla aún en camino (`semillaPendienteRef`) o con una
+   * traída real en vuelo (`citasEnVueloRef`, que la propia traída real
+   * también usa) reintenta en el próximo `eventsSet` —el que deja esa traída
+   * al resolver— en vez de quedarse marcada sin haber precargado nunca.
+   * Tampoco se programa con el filtro todavía sin decidir (`null`): no hay
+   * clave estable con la que no repetirse.
+   */
+  function programarPrecarga(vista: ViewApi): void {
+    if (!VISTAS_PRECARGABLES.has(vista.type)) { cancelarPrecargaEnCurso(); return }
+    if (!profile || hayGestoEnCurso(gestoEnCursoRef) || citasIncompletas) return
+    if (citasEnVueloRef.current.size > 0 || semillaPendienteRef.current) return
+    const filtroActual = filtroSincronoRef.current ?? filtroEfectivo
+    if (filtroActual === null) return
+    const rango = rangoQuePedir({ startStr: vista.currentStart.toISOString(), endStr: vista.currentEnd.toISOString() })
+    const clave = `${rango.startStr}|${rango.endStr}|${filtroActual}`
+    if (clave === ultimaClavePrecargadaRef.current) return
+    cancelarPrecargaEnCurso()
+    ultimaClavePrecargadaRef.current = clave
+    const profileId = profile.id
+    const token: PrecargaEnCurso = { cancelado: false, idle: 0 }
+    token.idle = enOcioso(() => void ejecutarPrecarga(rango, filtroActual, profileId, token))
+    precargaRef.current = token
+  }
+
+  /*
+   * W+1 y W-1 EN SERIE —nunca en paralelo, para no competir con la traída
+   * real si el usuario navega mientras tanto—. Antes de CADA paso se vuelve
+   * a mirar el candado, el gesto y `incompleta` (espejo `citasIncompletasRef`,
+   * porque esto corre DESPUÉS de un `requestIdleCallback` y un closure se
+   * quedaría con la bandera de cuando se PROGRAMÓ).
+   *
+   * `filtro` y `profileId` NO se vuelven a mirar: llegan ya CAPTURADOS de
+   * `programarPrecarga`. Si el filtro cambia mientras esto corre, lo peor es
+   * que se acabe de rellenar la caché del filtro ABANDONADO —trabajo de más,
+   * nunca un dato mal puesto bajo la clave de otro filtro—, y la próxima
+   * navegación lo sustituye. Si el perfil se fuera (cierre de sesión), el
+   * efecto de desmontaje de abajo ya suelta el candado.
+   *
+   * No toca NINGÚN estado de React ni `ultimaTraidaRef`: sólo cachea, vía
+   * `traerCitasDeduplicado` → `guardarCitas`, que ya descarta sola por
+   * generación (ver `cacheRangosCitas.ts`). Un fallo de red se traga: una
+   * precarga que no llegó no es un error que el usuario deba ver, la traída
+   * real irá a la red como si nunca hubiera habido precarga.
+   */
+  async function ejecutarPrecarga(
+    rango: { startStr: string; endStr: string }, filtro: string, profileId: string, token: PrecargaEnCurso,
+  ): Promise<void> {
+    for (const paso of [semanaSiguiente(rango), semanaAnterior(rango)]) {
+      if (token.cancelado || hayGestoEnCurso(gestoEnCursoRef) || citasIncompletasRef.current) return
+      if (leerCitas(claveCitas(profileId, filtro, paso.startStr, paso.endStr))) continue
+      try {
+        await traerCitasDeduplicado(paso.startStr, paso.endStr, filtro, profileId, citasEnVueloRef.current)
+      } catch {
+        return
+      }
+    }
+  }
+
+  /* Candado y temporizador no sobreviven al desmontaje — una precarga que
+     resuelve tarde sobre un componente ya ido no debe tocar nada (aunque no
+     tocaría estado de React de todos modos, el `fetch` en vuelo se queda
+     sin para qué seguir). */
+  useEffect(() => cancelarPrecargaEnCurso, [])
 
   /* ── Helper: construir EventInput desde datos de cita ── */
   /* ⚠️ EL PARÁMETRO ES `DatosGuardado` Y NO `Partial<Appointment>`, Y ES LO QUE
@@ -8905,6 +9094,9 @@ export default function AgendaCliente({ semillaCitas }: AgendaClienteProps) {
                `currentView`: el `setCurrentView` de la primera línea de este
                handler todavía no ha llegado al render. */
             aplicarResumen(eventos, rangos, arg.view.type)
+            // A1.5b: última llamada, por lo mismo que las de arriba — sólo
+            // que ésta no pinta nada, programa la precarga en ocioso.
+            programarPrecarga(arg.view)
           }}
           eventsSet={eventos => {
             const rangos = rangoDeVista()
@@ -8912,6 +9104,11 @@ export default function AgendaCliente({ semillaCitas }: AgendaClienteProps) {
             aplicarConteo(eventos, rangos)
             aplicarPanel(eventos)
             aplicarResumen(eventos, rangos, calendarRef.current?.getApi().view.type ?? '')
+            // A1.5b: `eventsSet` cubre lo que `datesSet` no — ver su nota
+            // larga, junto al `<FullCalendar>`—, y la vista sale de la API
+            // porque aquí no llega `arg.view`.
+            const vista = calendarRef.current?.getApi().view
+            if (vista) programarPrecarga(vista)
           }}
           buttonText={{ today: 'Hoy', month: 'Mes', week: 'Semana', day: 'Día' }}
           slotMinTime={ventana.slotMinTime}
