@@ -726,6 +726,36 @@ reducido.
   `AG-DT-5` y `AG-DT-6` parecen ya corregidas en el código: verificar antes de
   «arreglarlas».
 
+**Verificado el 2026-11-11 contra la documentación oficial de Google** (URL y
+cita en el informe de la sesión):
+- Causas de lentitud: medidas en A0 (ver §9).
+- Webhook: **ya no exige verificar el dominio**
+  (support.google.com/googleapi/answer/7072069, «no longer required»). Sí
+  exige HTTPS con certificado válido; el aviso llega sin cuerpo; los canales
+  caducan (7 días por omisión, máximo no documentado) y no se renuevan solos;
+  Google advierte que pierde mensajes, así que el sondeo con `syncToken` es
+  obligatorio de todos modos. `robots.txt` puede bloquear la entrega.
+- `events.watch`, `events.list` (con `syncToken`), `get`, `update`, `patch`,
+  `delete` y `calendars.insert` aceptan `calendar.app.created`. `channels.stop`
+  no documenta scopes.
+- `syncToken` no se combina con `timeMin`, `timeMax`, `orderBy`, `q` ni
+  `privateExtendedProperty` (400): el bucle de sincronización es una llamada
+  aparte de la de pintar. Los borrados llegan como `status: cancelled` (solo
+  `id` garantizado: mapear por `google_event_id`). 410 → sincronización
+  completa.
+- Conflictos: `etag` + `If-Match` → 412 (documentado para `update`/`delete`;
+  en `patch` no explícito). `patch` cuesta 3 unidades de cuota.
+- `attendees[].responseStatus` se lee con este scope; que un RSVP llegue por
+  `syncToken` o push no está documentado: prueba con cuenta real.
+- `extendedProperties.private` sirve para marcar el id de Spinus (nunca
+  `shared`, que ve el invitado).
+- **Sigue sin fuente pública:** que `calendar.app.created` sea no sensible
+  (la documentación remite a Cloud Console → Acceso a los datos). Lo vuelve a
+  mirar Angel. Cuotas: 600/min por usuario y 10,000/min por proyecto;
+  facturación por exceso anunciada para finales de 2026.
+- Recomendación para C: sondeo con `syncToken` (al abrir la agenda + tarea
+  programada) primero; webhook después, solo como acelerador.
+
 ---
 
 ## 9. Avance
