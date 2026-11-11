@@ -37,6 +37,11 @@ const PROFILE_CACHE_KEY = 'cache_user_profile'
 // usan useProfile() al mismo tiempo en la misma sesión.
 let profilePromise: Promise<Profile | null> | null = null
 
+/* El perfil que sembró el servidor (A1.2), en síncrono: es lo que deja a
+   `useProfile` montar ya con el perfil y `loading` en falso, sin esperar a la
+   promesa. `null` = sin siembra, y entonces todo es como antes de A1.2. */
+let perfilSembrado: Profile | null = null
+
 /** Lee el profile cacheado en secureStorage (cifrado AES-256-GCM) */
 async function getCachedProfile(): Promise<Profile | null> {
   try {
@@ -56,7 +61,8 @@ async function getCachedProfile(): Promise<Profile | null> {
  */
 const FETCH_TIMEOUT_MS = 3000
 
-function fetchProfile(): Promise<Profile | null> {
+/** Exportada sólo para las pruebas (`lib/tests/perfilSesion.test.ts`). */
+export function fetchProfile(): Promise<Profile | null> {
   if (profilePromise) return profilePromise
 
   // Offline declarado: no tocar Supabase, leer directo del cache
@@ -101,9 +107,29 @@ function fetchProfile(): Promise<Profile | null> {
   return profilePromise!
 }
 
+/**
+ * Siembra el perfil que leyó el servidor (`(app)/layout.tsx` → `AuthProvider`).
+ * Ocupa el lugar de la promesa de módulo, así que `fetchProfile()` ya no sale a
+ * la red, y lo guarda cifrado igual que la rama remota de `fetchProfile`.
+ *
+ * ⚠️ SÓLO DESDE EL CLIENTE, Y SÓLO CON UN PERFIL DEL `getUser()` DEL SERVIDOR
+ * PARA ESTA PETICIÓN. En el servidor este estado de módulo lo compartirían
+ * todas las peticiones; por eso lo llama un efecto de `AuthProvider`.
+ * Pisa lo que hubiera: una siembra o una promesa de otra sesión en la pestaña.
+ */
+export function sembrarPerfil(p: Profile): void {
+  perfilSembrado = p
+  profilePromise = Promise.resolve(p)
+  secureStorage.set(PROFILE_CACHE_KEY, p).catch(() => {})
+}
+
 /** Limpiar caché al cerrar sesión (llamar desde el botón de logout) */
 export function clearProfileCache() {
   profilePromise = null
+  /* La siembra también: sin esto, tras cerrar sesión —o tras el onboarding,
+     que llama aquí para forzar una relectura— el siguiente `useProfile`
+     montaría con el perfil viejo. */
+  perfilSembrado = null
   // Limpiar también el cache persistente
   try {
     secureStorage.remove(PROFILE_CACHE_KEY)
@@ -113,8 +139,8 @@ export function clearProfileCache() {
 }
 
 export function useProfile() {
-  const [profile, setProfile] = useState<Profile | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [profile, setProfile] = useState<Profile | null>(() => perfilSembrado)
+  const [loading, setLoading] = useState(() => perfilSembrado === null)
 
   useEffect(() => {
     fetchProfile().then(data => {

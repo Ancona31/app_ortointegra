@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { sembrarPerfil, type Profile } from '@/hooks/useProfile'
 import { Loader2 } from 'lucide-react'
 
 /* ──────────────────────────────────────────────────────────────────────
@@ -154,9 +155,12 @@ const AuthContext = createContext<AuthContextValue | null>(null)
 
 interface AuthProviderProps {
   children: ReactNode
+  /** El perfil que leyó `(app)/layout.tsx` en el servidor (A1.2). `null` o
+      ausente = no se siembra y `useProfile` lo pide él. */
+  perfilInicial?: Profile | null
 }
 
-export function AuthProvider({ children }: AuthProviderProps) {
+export function AuthProvider({ children, perfilInicial = null }: AuthProviderProps) {
   const [meta, setMeta] = useState<SessionMeta>(() => getStoredMeta())
   const [initialized, setInitialized] = useState(false)
 
@@ -265,9 +269,22 @@ export function AuthProvider({ children }: AuthProviderProps) {
     if (fallo) throw fallo
   }, [])
 
+  /* Sólo vale el de la PRIMERA renderización: es el perfil de la petición que
+     montó este proveedor. Un `router.refresh()` posterior no vuelve a sembrar. */
+  const perfilInicialRef = useRef(perfilInicial)
+
   // Inicialización: sync con SDK antes de renderizar children
   useEffect(() => {
     async function init() {
+      /* ⚠️ LA SIEMBRA VA AQUÍ, ANTES DE `setInitialized(true)`, Y NO EN EL
+         CUERPO DEL COMPONENTE. Ningún consumidor de `useProfile` existe todavía
+         —este proveedor no pinta hijos hasta `initialized`—, así que todos
+         montan con el perfil ya puesto y su primer render coincide con el
+         definitivo. Y dentro de un efecto nunca corre en el servidor, donde el
+         estado de módulo de `useProfile` lo compartirían todas las peticiones.
+         Sustituye a la siembra que hubiera de una sesión anterior en la pestaña:
+         es el perfil del `getUser()` del layout para ESTA petición. */
+      if (perfilInicialRef.current) sembrarPerfil(perfilInicialRef.current)
       const storedMeta = getStoredMeta()
       if (storedMeta.userId) {
         setMeta(storedMeta)

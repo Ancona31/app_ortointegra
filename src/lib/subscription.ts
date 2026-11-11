@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { COLUMNAS_PERFIL_SESION } from '@/lib/perfil/perfilSesion'
 
 /**
  * SubscriptionState — fuente única de verdad para el predicado de bloqueo
@@ -177,6 +178,8 @@ export async function getSubscriptionState(
       /* ⚠️⚠️ ESTA LISTA DE COLUMNAS TIENE QUE SER IDÉNTICA, CARÁCTER POR
          CARÁCTER, A LA DE `(app)/layout.tsx`. NO ES ESTILO: ES LO ÚNICO QUE
          EVITA UN VIAJE DUPLICADO A LA BASE, Y SE ROMPE EN SILENCIO.
+         Desde A1.2 las dos leen la MISMA constante, `COLUMNAS_PERFIL_SESION`
+         (`lib/perfil/perfilSesion.ts`): no escribas aquí una lista a mano.
 
          ⚠️ QUIÉN EJECUTA ESTE `select`, QUE ES LO QUE HACE QUE EL PAR EXISTA.
          NO es la llamada de `(app)/layout.tsx`: ése pasa el perfil por parámetro
@@ -222,7 +225,7 @@ export async function getSubscriptionState(
          garantía es este comentario y su gemelo en el layout. */
       const { data, error: profileErr } = await supabase
         .from('profiles')
-        .select('role, clinica_id, es_admin_de_clinica')
+        .select(COLUMNAS_PERFIL_SESION)
         .eq('id', user.id)
         .single()
       if (profileErr || !data) return FAIL_OPEN

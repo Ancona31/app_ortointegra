@@ -15,6 +15,7 @@ import SuscripcionBanner from '@/components/billing/SuscripcionBanner'
 import { SubscriptionGateProvider } from '@/components/billing/SubscriptionGateProvider'
 import { getSubscriptionState } from '@/lib/subscription'
 import { AuthProvider } from '@/lib/auth-context'
+import { COLUMNAS_PERFIL_SESION, analizarPerfilSesion } from '@/lib/perfil/perfilSesion'
 import { ConsultorioActivoProvider } from '@/contexts/ConsultorioActivoContext'
 import { MenuMovilProvider } from '@/contexts/MenuMovilContext'
 
@@ -25,8 +26,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  /* ⚠️ LAS TRES COLUMNAS NO SON PARA ESTE LAYOUT: SON PARA
-     `getSubscriptionState`, QUE LAS RECIBE ABAJO. Aquí sólo se mira `role`.
+  /* ⚠️ DESDE A1.2 SE PIDEN LOS 12 CAMPOS DE `Profile` (`COLUMNAS_PERFIL_SESION`)
+     PORQUE EL PERFIL SE SIEMBRA EN EL CLIENTE: viaja a `AuthProvider` como
+     `perfilInicial` y `useProfile` ya no lo pide desde el navegador. Lo de
+     abajo sigue valiendo para tres de ellas.
+     ⚠️ `role`, `clinica_id` Y `es_admin_de_clinica` NO SON SÓLO PARA ESTE
+     LAYOUT: SON PARA `getSubscriptionState`, QUE LAS RECIBE ABAJO.
      Van juntas en este `select` porque pedirlas cuesta LO MISMO que pedir una
      —es la misma fila, el mismo viaje— mientras que dejar que la función las
      pida por su cuenta cuesta un viaje entero MÁS un `auth.getUser()`, que
@@ -67,7 +72,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
      `DEUDA_TECNICA.md`, junto con por qué no se resolvió estructuralmente. */
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role, clinica_id, es_admin_de_clinica')
+    .select(COLUMNAS_PERFIL_SESION)
     .eq('id', user.id)
     .single()
 
@@ -89,6 +94,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
      vacío como si fuera bueno. */
   const subscriptionState = await getSubscriptionState(supabase, profile ?? undefined)
 
+  /* `null` = no se siembra y `useProfile` lo pide él, como antes de A1.2. */
+  const perfilInicial = analizarPerfilSesion(profile)
+
   return (
     /* Configuracion SWR de toda (app). Antes no habia ninguna, asi que regian
        los defaults y cada hook redefinia lo suyo a mano.
@@ -102,7 +110,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <>
     <ScriptTema />
     <SWRConfig value={{ keepPreviousData: true, focusThrottleInterval: 300_000 }}>
-    <AuthProvider>
+    <AuthProvider perfilInicial={perfilInicial}>
       <ToastProvider>
         <ThemeProvider>
           <SubscriptionGateProvider initialState={subscriptionState}>
