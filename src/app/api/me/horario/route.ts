@@ -2,6 +2,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { canManageClinica } from '@/lib/permissions'
+import { z } from 'zod'
+import { HorarioEnOrdenSchema } from '@/lib/agenda/disponibilidad'
+import { logAudit } from '@/lib/audit'
+
+/* P8 (`mejora_agendaV2.md` §6-bis), fuera del interruptor de la agenda v2:
+   antes se guardaba lo que llegara, sin mirar forma ni orden, y un día con el
+   cierre antes de la apertura llegaba a la rejilla y a los huecos. `strict`:
+   el cuerpo es `{ horario }` y nada más. */
+const CuerpoHorarioSchema = z.strictObject({ horario: HorarioEnOrdenSchema })
 
 async function getProfileAndClinica(supabase: Awaited<ReturnType<typeof createClient>>) {
   const { data: { user } } = await supabase.auth.getUser()
@@ -45,8 +54,11 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
     }
 
-    const { horario } = await req.json()
-    if (!horario) return NextResponse.json({ error: 'Horario requerido' }, { status: 400 })
+    const parsed = CuerpoHorarioSchema.safeParse(await req.json().catch(() => null))
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Horario inválido' }, { status: 400 })
+    }
+    const { horario } = parsed.data
 
     // clinicas no tiene política UPDATE para authenticated — necesita admin client (service role)
     const admin = createAdminClient()
@@ -56,6 +68,18 @@ export async function PUT(req: NextRequest) {
       .eq('id', profile.clinica_id)
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+    /* Sólo el hecho: quién, qué clínica, cuándo. Sin el horario, ni el de
+       antes ni el de después (el `audit_log` es inmutable). Con `await`
+       (LOG-DT-1): en Vercel una promesa suelta puede morir con la función.
+       `clinicas` no tiene disparador de auditoría y esta escritura va con el
+       cliente de servicio, así que si no queda aquí no queda en ninguna parte. */
+    await logAudit({
+      userId: profile.userId,
+      accion: 'horario_clinica_editado',
+      tabla: 'clinicas',
+      registroId: profile.clinica_id,
+    })
     return NextResponse.json({ ok: true })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Error interno'

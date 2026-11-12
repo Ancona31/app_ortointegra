@@ -205,6 +205,13 @@ export type AuditAccion =
   | 'gcal_conexion_baja'
   | 'gcal_calendario_recreado'
   | 'gcal_conexion_revocada'
+  /* `PUT /api/me/horario` (P8 de la agenda): el administrador cambió el
+     horario de consulta de la clínica. `registro_id` es la clínica y NO hay
+     `descripcion`: sólo el hecho, sin el horario de antes ni el de después.
+     `clinicas` no tiene disparador de auditoría y la ruta escribe con el
+     cliente de servicio, así que esta fila es el único rastro. Sin migración
+     (`accion` es `text` sin CHECK). */
+  | 'horario_clinica_editado'
 
 interface AuditParams {
   userId?: string | null

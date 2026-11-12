@@ -5,7 +5,7 @@
  * cerrados (falla cerrado).
  */
 import { describe, it, expect } from 'vitest'
-import { horarioEfectivo, horarioEnOrden } from '@/lib/agenda/disponibilidad'
+import { horarioEfectivo, horarioEnOrden, HorarioEnOrdenSchema } from '@/lib/agenda/disponibilidad'
 import { HORARIO_DEFAULT } from '@/lib/agenda/horarioAgenda'
 import type { Horario } from '@/lib/configApp'
 
@@ -98,5 +98,40 @@ describe('horarioEnOrden', () => {
 
   it('no mira las horas de un día inactivo', () => {
     expect(horarioEnOrden({ ...CLINICA, sabado: { activo: false, inicio: '18:00', fin: '09:00' } })).toBe(true)
+  })
+})
+
+describe('HorarioEnOrdenSchema (P8, PUT /api/me/horario)', () => {
+  it('acepta un horario bien formado y en orden', () => {
+    expect(HorarioEnOrdenSchema.safeParse(CLINICA).success).toBe(true)
+    expect(HorarioEnOrdenSchema.safeParse(HORARIO_DEFAULT).success).toBe(true)
+  })
+
+  it.each([['16:00', '16:00'], ['16:00', '08:00']])('rechaza un día activo de %s a %s y dice cuál', (inicio, fin) => {
+    const r = HorarioEnOrdenSchema.safeParse({ ...CLINICA, jueves: { activo: true, inicio, fin } })
+    expect(r.success).toBe(false)
+    expect(r.error?.issues).toHaveLength(1)
+    expect(r.error?.issues[0]?.path).toEqual(['jueves'])
+    expect(r.error?.issues[0]?.message).toBe('Jueves: la hora de cierre tiene que ir después de la de apertura')
+  })
+
+  it('no mira el orden de un día inactivo', () => {
+    expect(HorarioEnOrdenSchema.safeParse({ ...CLINICA, sabado: { activo: false, inicio: '18:00', fin: '09:00' } }).success).toBe(true)
+  })
+
+  it('rechaza la forma: falta un día, hora mal escrita o activo que no es booleano', () => {
+    const { domingo, ...sinDomingo } = CLINICA
+    expect(domingo.activo).toBe(false)
+    expect(HorarioEnOrdenSchema.safeParse(sinDomingo).success).toBe(false)
+    expect(HorarioEnOrdenSchema.safeParse({ ...CLINICA, lunes: { activo: true, inicio: '8:00', fin: '16:00' } }).success).toBe(false)
+    expect(HorarioEnOrdenSchema.safeParse({ ...CLINICA, lunes: { activo: true, inicio: '', fin: '16:00' } }).success).toBe(false)
+    expect(HorarioEnOrdenSchema.safeParse({ ...CLINICA, lunes: { activo: 'si', inicio: '08:00', fin: '16:00' } }).success).toBe(false)
+    expect(HorarioEnOrdenSchema.safeParse(null).success).toBe(false)
+  })
+
+  it('descarta las claves que no son del horario (no las guarda)', () => {
+    const r = HorarioEnOrdenSchema.safeParse({ ...CLINICA, festivos: ['2026-12-25'] })
+    expect(r.success).toBe(true)
+    expect(r.data && 'festivos' in r.data).toBe(false)
   })
 })

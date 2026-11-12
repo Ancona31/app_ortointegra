@@ -29,6 +29,9 @@ const nombreCortoSchema = z
 
 /**
  * Validador del horario JSONB. Estructura espejo de clinicas.horario_consulta.
+ * `horarioSchema` sólo mira la forma, no el orden: `HorarioEnOrdenSchema`
+ * (`src/lib/agenda/disponibilidad.ts`) le añade «fin > inicio» en los días
+ * activos, y es el que valida `PUT /api/me/horario` (P8).
  */
 const diaHorarioSchema = z.object({
   activo: z.boolean(),
@@ -36,7 +39,7 @@ const diaHorarioSchema = z.object({
   fin: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Formato HH:MM inválido'),
 })
 
-const horarioSchema = z.object({
+export const horarioSchema = z.object({
   lunes: diaHorarioSchema,
   martes: diaHorarioSchema,
   miercoles: diaHorarioSchema,

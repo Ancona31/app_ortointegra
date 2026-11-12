@@ -1689,7 +1689,13 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
                 setHorarioOpen(false)
                 toast.success('Horario actualizado')
               } else {
-                toast.error('No se pudo guardar el horario')
+                /* P8: el 400 dice qué día no cuadra («Jueves: la hora de
+                   cierre…»); se enseña tal cual. Sin cuerpo legible, el aviso
+                   de siempre. */
+                const cuerpo: unknown = await res.json().catch(() => null)
+                const motivo = res.status === 400 && cuerpo && typeof cuerpo === 'object' && 'error' in cuerpo
+                  && typeof cuerpo.error === 'string' ? cuerpo.error : null
+                toast.error(motivo ?? 'No se pudo guardar el horario')
               }
             } catch {
               /* El `fetch` ni siquiera llegó a responder (red caída). Para el
