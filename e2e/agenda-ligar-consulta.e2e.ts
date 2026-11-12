@@ -2,6 +2,7 @@ import { test, expect, type Page } from '@playwright/test'
 import {
   CORREO, SESION, DIA_LABORABLE_LIBRE, enContextoNuevo, interruptorAgenda, irAAgenda, modalCita, soloEscritorio, sqlLocal,
 } from './ayudas'
+import { editarDesdeTarjeta } from './interaccionesAyudas'
 import { clicEnTarjeta, crearCitaPorLigar, limpiarReservasE2e, type CitaPorLigar } from './reservaAyudas'
 import { fechaHoraLocalAInstante } from '../src/lib/dates'
 
@@ -43,7 +44,10 @@ function cita(nombre: string): CitaPorLigar {
 async function abrirCita(page: Page, nombre: string): Promise<void> {
   await irAAgenda(page)
   await expect(page.locator('.agenda-raiz')).toHaveAttribute('data-agenda-v2', 'encendida')
+  /* F3: con v2 las interacciones van en un chunk diferido; un clic antes de que llegue abriría el modal directo. */
+  await expect(page.locator('.agenda-raiz')).toHaveAttribute('data-interacciones-v2', 'listas')
   await clicEnTarjeta(page.locator('.fc-event', { hasText: nombre }))
+  await editarDesdeTarjeta(page)
   await expect(modalCita(page, 'Editar cita')).toBeVisible()
 }
 

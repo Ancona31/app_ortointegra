@@ -679,10 +679,13 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
   /* A2.5.7: no es un hook — ver la nota de cabecera de `guardadoCitas.ts`—, así
      que se vuelve a invocar en cada render, «fresca», igual que leer cualquier
      otra función de este componente. */
-  const { handleEventDrop, handleEventResize, handleSave, handleDelete, handleCancelar } = crearGuardadoCitas({
+  /* F3: el objeto entero viaja también a las interacciones v2, que leen de él
+     `cambiarEstadoCita` cuando Movimiento lo añada (ver `contratosV2.ts`). */
+  const guardado = crearGuardadoCitas({
     calendarRef, horario, profile, toast, setConfirm, setCitaCreada, setInvitacion, closeModal,
     refetch, firmarEscritura, aplicarAppointmentAlEvento, agendaV2,
   })
+  const { handleEventDrop, handleEventResize, handleSave, handleDelete, handleCancelar } = guardado
 
   const { handleDateClick, handleSelect, handleEventClick, abrirCita, abrirHueco } = crearAltaCitas({
     calendarRef, isMobile, setDiaSel, subState, openBloqueoModal, horario, setModal, setConfirm,
@@ -1695,10 +1698,14 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
           apiRef={interaccionesRef}
           alCambiarListas={setInteraccionesListas}
           calendarRef={calendarRef}
+          isMobile={isMobile}
+          zonaVisor={navegadorTZ}
+          quien={{ esMedico: isDoctor, perfilId: profile?.id ?? null }}
+          isSingleDoctor={isSingleDoctor}
           medicos={medicos}
           filtroMedico={filtroEfectivo || ((isSingleDoctor || isMedicoSinAdmin) && defaultMedicoId ? defaultMedicoId : null)}
           horario={horario}
-          guardado={{ handleSave }}
+          guardado={guardado}
           setModal={setModal}
           setConfirm={setConfirm}
         />

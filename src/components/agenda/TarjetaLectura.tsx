@@ -14,8 +14,8 @@
  * decide el llamador por `alAccion` (Confirmar → `cambiarEstadoCita`, Cancelar
  * y Eliminar → `ConfirmModal` antes, Reagendar → modal con el foco en la
  * fecha, Iniciar consulta → navegar, o el modal si está por ligar). Así la
- * tarjeta no repite ninguna regla de guardado.
- * `extra` es el hueco para lo que añada E7 («Enviar por WhatsApp»).
+ * tarjeta no repite ninguna regla de guardado. Lo enchufa `InteraccionesV2.tsx`.
+ * `extra` es el hueco del botón de WhatsApp de E7 (`BotonWhatsAppCita`).
  *
  * Accesibilidad: `role="dialog"` con `aria-modal`, nombrado por el paciente;
  * foco en la primera acción; las acciones en un `role="toolbar"` con flechas
@@ -47,6 +47,8 @@ interface Props {
   zonaVisor: string
   /** Las condiciones de hoy del modal: puede ver expedientes, es su cita y el consultorio existe. */
   puedeIniciarConsulta: boolean
+  /** `false` mientras no haya con qué confirmar (ver `accionesDeTarjeta`). */
+  conConfirmar?: boolean
   nombreMedico?: string | null
   alAccion: (accion: AccionTarjeta) => void
   alCerrar: () => void
@@ -81,10 +83,22 @@ function useSalida(alCerrar: () => void): { saliendo: boolean; salir: () => void
   return { saliendo, salir, alTerminar }
 }
 
+/**
+ * ¿Hay OTRO diálogo modal abierto encima? Entonces el toque es suyo, no
+ * «fuera» de esta capa: el aviso de empalme o de horario (`ConfirmModal`) sale
+ * encima de la capa abierta, y contestarle —también pulsando su velo, que es
+ * HERMANO del diálogo y no su hijo— no puede cerrarla.
+ */
+function hayOtroDialogoModal(propio: HTMLElement): boolean {
+  return Array.from(document.querySelectorAll('[role="dialog"][aria-modal="true"]')).some(d => d !== propio)
+}
+
 function useCerrarAlTocarFuera(panel: { current: HTMLElement | null }, salir: () => void): void {
   useEffect(() => {
     function alTocar(e: PointerEvent): void {
-      if (panel.current && e.target instanceof Node && !panel.current.contains(e.target)) salir()
+      if (!panel.current || !(e.target instanceof Element) || panel.current.contains(e.target)) return
+      if (hayOtroDialogoModal(panel.current)) return
+      salir()
     }
     document.addEventListener('pointerdown', alTocar, true)
     return () => document.removeEventListener('pointerdown', alTocar, true)
@@ -152,7 +166,7 @@ function BarraAcciones({ acciones, alAccion }: PropsBarra): ReactElement {
 }
 
 export default function TarjetaLectura(props: Props): ReactElement {
-  const { cita, ancla, punto, comoHoja, zonaVisor, puedeIniciarConsulta, nombreMedico, alAccion, alCerrar, extra } = props
+  const { cita, ancla, punto, comoHoja, zonaVisor, puedeIniciarConsulta, conConfirmar = true, nombreMedico, alAccion, alCerrar, extra } = props
   const { saliendo, salir, alTerminar } = useSalida(alCerrar)
   const { montarPanel, alPulsarTecla } = useDialogoModal(salir)
   const idTitulo = useId()
@@ -167,11 +181,15 @@ export default function TarjetaLectura(props: Props): ReactElement {
   }, [montarPanel])
   useCerrarAlTocarFuera(panel, salir)
   const horario = horarioDeTarjeta(cita, zonaVisor)
-  const clase = comoHoja ? 'ag-hoja' : 'ag-capa'
+  /* Sin ancla en escritorio (se abrió desde el buscador): centrada, como la ayuda. */
+  const clase = comoHoja ? 'ag-hoja' : ancla ? 'ag-capa' : 'ag-capa ag-capa--centro'
 
   return (
     <Portal>
-      {comoHoja && <div className="ag-capa-velo" aria-hidden="true" />}
+      {/* Velo con la hoja y con la capa centrada (sin ancla), como la ayuda:
+          atenúa el fondo y se queda el toque de cerrar, que así no cae además
+          sobre la rejilla de detrás. */}
+      {(comoHoja || !ancla) && <div className="ag-capa-velo" aria-hidden="true" />}
       <div ref={montar} role="dialog" aria-modal="true" aria-labelledby={idTitulo} tabIndex={-1}
         onKeyDown={alPulsarTecla} onAnimationEnd={e => { if (e.target === e.currentTarget) alTerminar() }}
         className={clase} data-estado={saliendo ? 'saliendo' : 'abierta'}>
@@ -185,7 +203,7 @@ export default function TarjetaLectura(props: Props): ReactElement {
           {horario.enConsultorio && <small>{horario.enConsultorio}</small>}
         </p>
         <Datos cita={cita} nombreMedico={nombreMedico} />
-        <BarraAcciones acciones={accionesDeTarjeta(cita, puedeIniciarConsulta)} alAccion={alAccion} />
+        <BarraAcciones acciones={accionesDeTarjeta(cita, puedeIniciarConsulta, conConfirmar)} alAccion={alAccion} />
         {extra}
       </div>
     </Portal>
