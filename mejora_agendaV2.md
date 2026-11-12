@@ -1769,6 +1769,27 @@ lista A 11):
   cita con el fijo SIN `origen` (la reserva normal de D, con su candado); el
   tope sólo cuenta la cadena de reagendados de una cita.
 
+**E10 · e2e de cierre de lo de este encargo** (`e2e/confirmacion-enlace.e2e.ts`,
+sólo `escritorio`, leyendo Mailpit): GET (tres agentes de usuario), HEAD,
+`?paso=cancelar`, `?r=` y el navegador sin pulsar no cambian la cita ni la
+auditoría, y la API por GET/HEAD da 405; confirmar (un POST, 303, auditado
+`system`/`enlace_paciente`; recargar no reenvía); cancelar en dos pasos y el
+turno vuelve a ofrecerse; la carrera a T−1h (cita a +1 h +8 s, se pulsa a los
+10 s: `fuera_de_plazo` con el teléfono, la cita sigue, confirmar aún vale);
+cita pasada («ya pasó», sin botones) y enlace revocado o inventado (404);
+clínica suspendida e interruptor apagado (404, sin cambio); reagendar con el
+fijo dos veces y la tercera con el tope (403 y sin oferta); el comprobante con
+el enlace y sin nada clínico. **No cubre** (son de E4/E7/E9, de otra rama): el
+recordatorio, la tarea programada, WhatsApp, el aviso a la clínica, el RSVP, ni
+el reflejo en Google contra el Google falso (sí en Vitest). Las citas del
+personal se siembran por SQL con su enlace (la emisión desde la agenda es de
+E4/E7). Las citas del personal que siembra (con un paciente de la semilla y HOY) se
+borran al terminar, con su enlace y su auditoría: sin eso, `agenda-iniciar-
+consulta` en `telefono` encontraba una de ellas al buscar la tarjeta de
+«Paciente Prueba 01» y fallaba. Una prueba de D10 (`reserva-candado`,
+«coincidir sólo por el teléfono») dio una vez 429 en una corrida completa y
+pasó al repetirla: la base local la comparten otros agentes; queda anotado.
+
 ### Bloque F
 
 - Las 18 propuestas de la auditoría visual, aprobadas. **El pulido visual y los
