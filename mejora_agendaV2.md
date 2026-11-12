@@ -3359,7 +3359,20 @@ primero sin marcar.
     con `src/` en `0729e24`: preexistentes, no de D11. Para correrla desde
     este worktree se cambió `localhost:3001` por `:3003` en las e2e SIN
     commitear (el :3001 es de otro worktree).
-- [ ] F — Interfaz, movimiento y orden visual
+- [ ] Cierre del proyecto (2026-11-12, worktree `~/proyectos/app_ortointegra-agenda`)
+  - (Aquí había un «- [ ] F» repetido, resto de la fusión de D11: F está
+    cerrado arriba.)
+  - **Paso 1 · verificación de la fusión `591aed1`** (base local tal como
+    estaba, con las tres `20261014*` de `feature/limites-ajustables` en su
+    historial): `npm run build` limpio; `npm run lint` 96 errores (los de
+    siempre); Vitest 1684 en 112 archivos; SQL 17 archivos en verde;
+    Playwright 244 pasan, 0 fallan, 211 saltadas (escritorio 204, teléfono
+    37, tableta 3; 7.5 min), con `agenda-google-dos-sentidos` y
+    `reserva-google` levantando su propio `next dev` :3002 contra el Google
+    falso; `reserva-carrera.sh` y `confirmacion-carrera.sh` en verde. Los 19
+    fallos que D11 vio en :3003 no salen contra el `next start` :3001 de
+    este worktree (los arregló el cierre de F, `2552a2f`/`a240295`). Nada
+    que arreglar.
 
 **Bitácora** (una línea por sesión: fecha, qué quedó hecho, qué quedó a medias):
 
