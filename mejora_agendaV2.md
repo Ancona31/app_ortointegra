@@ -817,6 +817,60 @@ queda listada aquí.
   (0–72), horizonte 60 días (1–365), vigencia del enlace de un solo uso 7 días
   (1–30); los números del candado (1 / 2 / 3 en 60 días) guardados sin exponer.
 
+### Bloque B — decisiones tomadas al construir (ninguna contradice §2)
+
+- **B3 cancelar:** con el interruptor encendido, `DELETE` de una cita con
+  paciente da 409 `cita_con_paciente` (antes de borrar y de programar el
+  borrado en Google); quitar el paciente de una cita (PUT) también da 409, para
+  que no se pueda desligar y borrar el resto. «Nunca se borra» solo rige con el
+  interruptor encendido; apagado, el borrado es el de hoy. Si leer el
+  interruptor falla en ese instante, cuenta como apagado (diseño «falla
+  cerrado» del interruptor) y la cita se borra como hoy. **Abierto:** un
+  `DELETE` directo por PostgREST, sin pasar por la API, no se bloquea (haría
+  falta una migración).
+- **B7 empalme:** se detecta en el servidor (autoridad: ve otras semanas,
+  médicos fuera del filtro y escrituras simultáneas) y en el cliente sobre lo
+  pintado (inmediato). El servidor responde 409 `{error:'empalme',
+  empalmes:[…]}` sin escribir salvo que todos estén en `empalmes_aceptados`;
+  nombres solo de filas que la RLS ya deja ver; como máximo 6 nombres. Tocar
+  extremos (10:00–10:30 y 10:30–11:00) no es empalme. Las filas
+  `origen='google'` no cuentan. Si la búsqueda falla, el guardado sigue sin
+  aviso (falla abierto: el aviso no bloquea).
+- **B5 disponibilidad:** el orden del horario (fin > inicio) solo se exige con
+  el interruptor encendido. `horarioEfectivo` cae a `HORARIO_DEFAULT` si la
+  clínica no tiene horario, igual que la rejilla. Aceptado por la auditoría:
+  el dueño puede escribir `consultorios.horario_propio` directo por PostgREST
+  con el interruptor apagado (la policy es por fila); nada lo lee fuera del
+  código que exige el interruptor.
+- **B6 tipos de cita:** el ámbito (`medico_id`) no se edita: se archiva y se
+  crea otro. No hay DELETE: se archivan. `tipos_cita` no lleva la policy
+  RESTRICTIVE de suscripción (como `agenda_ajustes`): una clínica degradada
+  puede crear tipos pero no citas. El servidor no impone la duración del tipo:
+  el modal propone fin = inicio + duración y el usuario puede cambiarla. Leer
+  el tipo falla cerrado (500); el empalme falla abierto. Con el interruptor
+  apagado, quitar el paciente conserva el tipo (no se nombran columnas
+  nuevas); al reencender, la siguiente edición lo limpia.
+- **B4 pantalla de configuración** (`/agenda/configuracion`): con el
+  interruptor apagado da `notFound()`; por la frontera de `loading.tsx`, el
+  estado HTTP puede ser 200 con la página de no encontrado (Next 16, «Status
+  Codes»); las API sí dan 404. La auditoría de los ajustes la hace el
+  disparador `log_tabla_change` (fila `UPDATE` con el usuario, sin diff de
+  valores). Con el interruptor encendido el engrane lo ven todos los roles
+  (P7) y lleva a la pantalla; apagado, queda como hoy. Invitado y secretaria
+  ven solo tipos activos; el administrador también los archivados.
+- **P8:** además de fin ≤ inicio, `PUT /api/me/horario` rechaza horas mal
+  escritas aunque el día esté inactivo y claves de más en el cuerpo.
+- **B8 turnos:** módulo `turnosAgenda.ts` (puro). En las cuatro zonas con
+  horario de verano de EE. UU. el servidor calcula bien; el panel del navegador
+  conserva su desfase de 60 min esos dos días del año (no se cambió lo que se
+  ve). La hora que no existe en marzo no ofrece turnos; la hora repetida de
+  noviembre se cuenta una vez.
+- **ProximasCitas:** la constante del umbral de 2 min se repite con una nota
+  que remite a la de la agenda (la original es local a un gancho de la ruta).
+- **Propuesta adicional para `AUDITORIA-MIGRACIONES.md`** (de los auditores de
+  B5 y B6; no se toca el archivo): vigilar columnas nuevas bajo una policy por
+  fila que solo un interruptor de la aplicación protege.
+
 ### Bloque C (propuestas aprobadas, con las diferencias por §2)
 
 - **C-b. Importación inicial:** desde hace 30 días, sin límite hacia adelante.
@@ -1060,18 +1114,19 @@ primero sin marcar.
   - Queda escrito, sin tocar: el bloque comentado del `QuickPatientModal`
     viejo dentro de `AgendaCliente.tsx` (~100 líneas muertas; se pregunta
     aparte por el Protocolo 2).
-- [ ] B — Cimientos (en curso)
-  - Diseño en `scratchpad` de la sesión, resumido aquí. Interruptor por
-    clínica: `agenda_ajustes.agenda_v2_encendida`, apagado, solo `postgres`
-    lo cambia (lo enciende Angel por SQL).
-  - Hecho: P-0 pruebas SQL (`scripts/pruebas-sql.sh`, `supabase/pruebas-sql/`)
-    · B0 auditoría de citas siempre encendida (`log_cita_change`, migración
-    `20261112120000`, auditada APTA) · B1 tabla `agenda_ajustes` + interruptor
-    (migración `20261112130000`, auditada APTA) · B2 E5-DT-8: la tercera vía
-    (deshacer tras una traída) duplicaba la cita; arreglado con
-    `restaurarPosicion`.
-  - Migraciones solo en local; van a producción como conjunto al final (§6).
-  - Decisiones de B, C, F y S1-S3 resueltas el 2026-11-12: ver §6-bis.
+- [x] B — Cimientos (2026-11-12)
+  - P-0 pruebas SQL · B0 auditoría de citas (siempre encendida) · B1 ajustes e
+    interruptor por clínica · B2 la cita ya no se duplica al deshacer tras una
+    traída · B3 cancelar en vez de borrar · B4 pantalla de configuración
+    (`/agenda/configuracion`) y P8 · B5 disponibilidad por consultorio · B6
+    tipos de cita (esquema, API, modal y rutas) · B7 aviso de empalme
+    (servidor + cliente) · B8 turnos en la zona del consultorio · tope de 2 min
+    en `ProximasCitas` · borradas las líneas muertas de `QuickPatientModal`.
+  - Migraciones (solo en local; van a producción como conjunto al final):
+    `20261112120000` B0, `20261112130000` B1, `20261112140000` B5,
+    `20261112150000` B6. Cada una con auditoría independiente: APTA.
+  - Pruebas al cierre: 961 Vitest, 4 archivos SQL, 113 e2e.
+  - Decisiones: §6-bis («Bloque B — decisiones tomadas al construir»).
   - Abierto y documentado en `DEUDA_TECNICA.md` (E5-DT-8): si otra persona
     borra la cita a mitad del arrastre, al soltar queda una tarjeta fantasma.
 - [ ] C — Google en los dos sentidos

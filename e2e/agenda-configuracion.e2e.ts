@@ -122,7 +122,7 @@ test.describe('con el interruptor encendido', () => {
     page.on('request', r => { if (r.url().includes(API_AJUSTES)) enviados += 1 })
     await page.getByLabel('Recordatorio por correo').fill('73')
     await page.getByRole('button', { name: 'Guardar ajustes' }).click()
-    await expect(page.getByRole('alert')).toHaveText('Recordatorio por correo: de 1 a 72 horas antes de la cita')
+    await expect(page.getByRole('alert').filter({ hasText: 'Recordatorio por correo' })).toHaveText('Recordatorio por correo: de 1 a 72 horas antes de la cita')
     expect(enviados).toBe(0)
 
     // El servidor dice lo mismo, y rechaza el interruptor y el candado.
