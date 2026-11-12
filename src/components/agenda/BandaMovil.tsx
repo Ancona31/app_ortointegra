@@ -131,7 +131,7 @@ export function BandaMovil(
           medicos={medicos} filtroMedico={filtroMedico}
           onFiltroMedico={onFiltroMedico} onHorario={onHorario}
           onCompactar={onCompactar} compactado={compactado}
-          mesSinTodos={mesSinTodos}
+          mesSinTodos={mesSinTodos} vista={vistaActual}
         />
       </div>
     </header>

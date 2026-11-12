@@ -15,7 +15,7 @@ test.beforeEach(({}, info) => {
 
 /** «Compactar» abre encendido (F1.5) y en tres días puede plegar el domingo: se apaga para contar columnas. */
 async function sinCompactar(page: Page): Promise<void> {
-  const boton = page.getByRole('button', { name: 'Ocultar los días de la semana sin actividad' })
+  const boton = page.locator('.ag-banda-movil button[aria-pressed]')
   if (await boton.count() && await boton.getAttribute('aria-pressed') === 'true') await boton.click()
 }
 
@@ -41,9 +41,12 @@ test('Semana es una rejilla de tres días, con el chip «3 días», y la navegac
 
 test('Día es la rejilla de un día y Mes es el del teléfono', async ({ page }) => {
   await irAAgenda(page)
+  // «Compactar» en la rejilla lleva el rótulo de la rejilla, no el del Mes.
+  await expect(page.getByRole('button', { name: 'Compactar la rejilla al horario de la clínica' })).toBeVisible()
   await page.getByRole('tab', { name: 'Día', exact: true }).click()
   await expect(page.locator('.fc-timeGridDay-view')).toBeVisible()
   await expect(page.locator('.fc-timegrid-col[data-date]')).toHaveCount(1)
+  await expect(page.locator('.agenda-fc .ag-leyenda')).toBeVisible()
   await page.getByRole('tab', { name: 'Mes', exact: true }).click()
   await expect(page.locator('.agenda-fc.ag-cal-mes-movil')).toBeVisible()
   await expect(page.locator('section[aria-label="Citas del día seleccionado"]')).toBeVisible()

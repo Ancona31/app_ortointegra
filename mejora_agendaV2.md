@@ -2424,6 +2424,21 @@ encontraba su evento) y los 20 pulsos caían fuera de la vista. Ahora pulsa
   formato. El arrastre con pulsación larga se prueba con eventos táctiles por
   CDP (1,2 s de pulsación, `eventLongPressDelay` es 1 s) y espera el PUT.
 
+**Revisión del paso 4 (corregido en commit aparte):**
+
+- **Grave, corregido:** `periodoDeLaVista` no conocía la vista de tres días y la
+  banda de vacío no salía nunca en la «Semana» de la tableta. Ahora dice «Sin
+  citas en estos tres días» (no «esta semana», que no lo es).
+- **Media, corregido:** el «Compactar» de la banda llevaba el rótulo del Mes
+  escrito a mano; en el teléfono sólo salía en Mes, pero en la tableta sale
+  también en la rejilla. Usa `etiquetaCompactar(vista)`, como el de escritorio.
+- **Media, corregido:** la leyenda no salía en el Día de la tableta, que es la
+  rejilla con píldoras (`timeGridDay`). Sale en `listDay` y en `timeGridDay`.
+- **Menor, sin tocar (no es archivo de la superficie):** la precarga en ocioso
+  de `useFuentesAgenda` (`VISTAS_PRECARGABLES`) no incluye la vista de tres
+  días: en la tableta no se precarga el periodo vecino. Es rendimiento, no
+  corrección; queda para quien lleve ese archivo.
+
 ### Menores
 
 - **`ProximasCitas`:** tope de refresco de 2 minutos al volver a la pestaña,

@@ -2,6 +2,7 @@
 
 import { ChevronsDownUp, Settings } from 'lucide-react'
 import { componerNombreMedicoCompleto } from '@/lib/nombreMedico'
+import { etiquetaCompactar } from '@/lib/agenda/vistasAgenda'
 import type { Medico } from '@/components/agenda/AppointmentModal'
 
 /* El rótulo de «Todos los médicos», que en Mes lleva pegado su motivo.
@@ -33,13 +34,16 @@ export const OPCION_TODOS = (enElMes: boolean): string =>
    existe aunque no tenga hijos —clínica de un médico sin engrane— y entonces
    sólo ocupa el hueco sobrante de la fila. */
 export function FiltrosBandaMovil(
-  { medicos, filtroMedico, onFiltroMedico, onHorario, onCompactar, compactado, mesSinTodos }: {
+  { medicos, filtroMedico, onFiltroMedico, onHorario, onCompactar, compactado, mesSinTodos, vista }: {
     medicos: readonly Medico[]; filtroMedico: string
     onFiltroMedico: (id: string) => void; onHorario: (() => void) | null
     onCompactar: (() => void) | null; compactado: boolean
     /** En Mes, «Todos» se apaga. Ver `OPCION_TODOS` y la nota del desplegable
         de escritorio, que es el mismo control con otra caja. */
     mesSinTodos: boolean
+    /** F1.16 · La vista, para el rótulo de «Compactar»: en el teléfono sólo
+        salía en Mes, y en la tableta también sale en la rejilla de horas. */
+    vista: string
   },
 ) {
   /* Mismo criterio que el header de escritorio: el filtro sólo tiene sentido en
@@ -64,7 +68,7 @@ export function FiltrosBandaMovil(
         <button type="button"
           className={`ag-banda-movil-ctrl ag-banda-movil-ctrl--marco${compactado ? ' ag-banda-movil-ctrl--on' : ''}`}
           onClick={onCompactar} aria-pressed={compactado}
-          aria-label="Ocultar los días de la semana sin actividad">
+          aria-label={etiquetaCompactar(vista)}>
           <ChevronsDownUp size={18} />
         </button>
       )}

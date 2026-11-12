@@ -129,6 +129,9 @@ const FMT_MES_BANDA = new Intl.DateTimeFormat('es-MX', { month: 'long' })
 export function periodoDeLaVista(vista: ViewApi): string {
   if (vista.type === 'dayGridMonth') return `en ${FMT_MES_BANDA.format(vista.currentStart)}`
   if (vista.type === 'timeGridWeek') return 'esta semana'
+  /* F1.16 · La «Semana» de la tableta son tres días: la banda de vacío no puede
+     decir «esta semana» de ellos. */
+  if (vista.type === 'timeGridTresDias') return 'en estos tres días'
   return ''
 }
 

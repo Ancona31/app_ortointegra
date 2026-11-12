@@ -1424,7 +1424,9 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
             Semana la fila sólo tiene el punto de color y la leyenda ocuparía una
             fila entera de las pocas que caben; en Mes no hay ni punto de estado.
             En escritorio no cambia nada: sale en las tres. */}
-        {(!isMobile || currentView === 'listDay') && <LeyendaEstados />}
+        {/* F1.16 · En la tableta, Día es la rejilla (`timeGridDay`) con su
+            píldora de estado, igual que la lista de Día del teléfono. */}
+        {(!isMobile || currentView === 'listDay' || currentView === 'timeGridDay') && <LeyendaEstados />}
         {/* Va PRIMERA en el DOM aunque se pinte segunda, y es a propósito: el
             `order` de la hoja la coloca bajo el toolbar, y así el lector de
             pantalla oye el aviso antes que los controles y la rejilla que
