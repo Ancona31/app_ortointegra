@@ -41,6 +41,7 @@ import { buildEventInput, FUENTE_APPOINTMENTS, PREFIJO_OPTIMISTA } from '@/lib/a
 import { addMinutes, ultimoDiaIncluido } from '@/lib/agenda/fechasAgenda'
 import { avisoFueraDeHorario, avisoFinFueraDeHorario } from '@/lib/agenda/horarioAgenda'
 import { DEFAULT_DURATION } from '@/lib/agenda/duracionCita'
+import { registrarNuevo, salirConAnimacion } from '@/lib/agenda/marcasMovimiento'
 import type { Appointment, DatosGuardado } from '@/lib/agenda/tiposAgenda'
 import {
   empalmesPintados, esListaDeEmpalmes, mensajeEmpalme, unirAceptados, ESTADOS_SIN_EMPALME, type Empalme,
@@ -517,7 +518,13 @@ export function crearGuardadoCitas({
         // Crear evento optimista temporal. `editable: false` cubre arrastre y
         // redimension a la vez: una cita que todavia no existe en la base no
         // tiene id que mandarle al servidor, solo el temporal.
-        optimisticEvent = api.addEvent({ ...buildEventInput(data), editable: false }, FUENTE_APPOINTMENTS)
+        const entrada = { ...buildEventInput(data), editable: false }
+        /* F2.4: la cita que acabas de crear entra animada, y SÓLO ella. Se
+           registra ANTES de `addEvent`, que pinta en síncrono y lee la marca
+           en `eventClassNames` (ver `marcasMovimiento.ts`). La real que la
+           sustituye abajo NO se registra: ésta ya entró en el mismo sitio. */
+        if (typeof entrada.id === 'string') registrarNuevo(entrada.id)
+        optimisticEvent = api.addEvent(entrada, FUENTE_APPOINTMENTS)
       }
     }
 
@@ -586,13 +593,21 @@ export function crearGuardadoCitas({
       // `null` ante CUALQUIER `EventInput` que FullCalendar no sepa parsear, y
       // esta línea no debe ser la que rompa un alta que por lo demás salió bien.
       // Lo que ya no hay que hacer es leerlo como «aquí falta un caso».
-      optimisticEvent?.remove()
-      const yaPresente = api?.getEventById(json.appointment.id)
-      if (yaPresente) {
-        aplicarAppointmentAlEvento(json.appointment)
-      } else {
-        api?.addEvent(buildEventInput({ ...data, ...json.appointment }), FUENTE_APPOINTMENTS)
+      /* F2.4: quitar la optimista y poner la real en UN solo repintado, para
+         que la tarjeta no pase ni un render sin estar y `eventsSet` salga una
+         vez. `aplicarAppointmentAlEvento` agrupa por su cuenta, y
+         `batchRendering` anidado no repinta hasta el último `resume`. */
+      const sustituir = () => {
+        optimisticEvent?.remove()
+        const yaPresente = api?.getEventById(json.appointment.id)
+        if (yaPresente) {
+          aplicarAppointmentAlEvento(json.appointment)
+        } else {
+          api?.addEvent(buildEventInput({ ...data, ...json.appointment }), FUENTE_APPOINTMENTS)
+        }
       }
+      if (api instanceof CalendarioFC) api.batchRendering(sustituir)
+      else sustituir()
     }
 
     // 'pending' es el caso normal —Google conectado, la escritura corre en el
@@ -644,9 +659,14 @@ export function crearGuardadoCitas({
     // podado a `{ id }` —la RLS no puede evaluarse sobre una fila que ya no
     // existe—, así que ni siquiera traería el `client_id`. Como esta baja ya
     // quitó el evento, su propio eco no encuentra nada que quitar.
+    /* F2.5: la tarjeta se desvanece (`--ag-dur-micro`) y DESPUÉS se quita;
+       sin `Calendar` (no debería pasar) se quita de golpe, como antes. La
+       única verdad sigue siendo el almacén de FullCalendar: ver
+       `salirConAnimacion`. El rollback no cambia: el `refetch()` trae la cita
+       como un objeto nuevo, sin la marca, y el temporizador no lo toca. */
     const api = calendarRef.current?.getApi()
-    const existing = api?.getEventById(id)
-    existing?.remove()
+    if (api instanceof CalendarioFC) salirConAnimacion(api, id)
+    else api?.getEventById(id)?.remove()
 
     vaciarCacheCitas() // A1.5a: también al salir; ver `ejecutarDrop`.
     const res = await fetch(`/api/appointments/${id}`, { method: 'DELETE' })

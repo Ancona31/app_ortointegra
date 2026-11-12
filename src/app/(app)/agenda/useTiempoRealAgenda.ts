@@ -17,13 +17,14 @@
 
 import { useEffect, useRef, type RefObject } from 'react'
 import type FullCalendar from '@fullcalendar/react'
-import { Calendar as CalendarioFC } from '@fullcalendar/core'
+import { Calendar as CalendarioFC, type CalendarApi } from '@fullcalendar/core'
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/client'
 import { vaciarCacheCitas } from '@/lib/agenda/cacheRangosCitas'
 import { buildEventInput, FUENTE_APPOINTMENTS } from '@/lib/agenda/eventosDeCita'
 import type { Appointment } from '@/lib/agenda/tiposAgenda'
 import { esCancelacionAjena } from '@/lib/agenda/avisoCancelacion'
+import { registrarNuevo, salirConAnimacion } from '@/lib/agenda/marcasMovimiento'
 
 type CalRef = RefObject<InstanceType<typeof FullCalendar> | null>
 
@@ -228,7 +229,7 @@ export function useTiempoRealAgenda({ calendarRef, filtroEfectivo, refetch, ulti
     // el evento, así que su eco tampoco encuentra nada que quitar.
     if (payload.eventType === 'DELETE') {
       const id = payload.old?.id
-      if (id) api.getEventById(id)?.remove()
+      if (id) quitarConSalida(api, id)
       return
     }
     if (payload.eventType !== 'INSERT' && payload.eventType !== 'UPDATE') return
@@ -273,7 +274,7 @@ export function useTiempoRealAgenda({ calendarRef, filtroEfectivo, refetch, ulti
       // Si estaba pintada y dejó de pertenecer a esta vista —la movieron a
       // otra semana, o se la reasignaron a un médico distinto del filtrado—,
       // se quita. Un evento que nunca estuvo aquí no genera nada.
-      api.getEventById(fila.id)?.remove()
+      quitarConSalida(api, fila.id)
       return
     }
 
@@ -307,8 +308,20 @@ export function useTiempoRealAgenda({ calendarRef, filtroEfectivo, refetch, ulti
     if (api.getEventById(fila.id)) {
       aplicarAppointmentAlEvento(cita)
     } else {
+      /* F2.4: lo que llega de otra persona entra con el anillo (`remoto`).
+         Antes de `addEvent`, que pinta en síncrono. Vale también para un
+         UPDATE que trae a la vista una cita que no estaba pintada (la movieron
+         aquí desde otra semana o se la asignaron a este médico): para quien
+         mira, eso también acaba de llegar. */
+      registrarNuevo(cita.id, { remoto: true })
       api.addEvent(buildEventInput(cita), FUENTE_APPOINTMENTS)
     }
+  }
+
+  /** F2.5: las dos bajas del canal salen animadas. Sin `Calendar`, de golpe. */
+  function quitarConSalida(api: CalendarApi, id: string): void {
+    if (api instanceof CalendarioFC) salirConAnimacion(api, id)
+    else api.getEventById(id)?.remove()
   }
 
   /* El handler se recrea en cada render (lee `filtroEfectivo`), pero el canal se

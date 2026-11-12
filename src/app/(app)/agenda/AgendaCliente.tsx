@@ -74,6 +74,7 @@ import {
   periodoDeLaVista,
 } from '@/lib/agenda/vistasAgenda'
 import { clasesDelEvento } from '@/lib/agenda/tarjetasAgenda'
+import { podarMarcas } from '@/lib/agenda/marcasMovimiento'
 
 /* ═══ A2.6 · LOS TRES MODALES EN DIFERIDO ═════════════════════════════════
    `AppointmentModal` (el más grande: iconos, `Portal`, `QuickPatientModal`,
@@ -915,7 +916,15 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
     programarPrecarga(arg.view)
   }
 
+  /* F2.4: los ids del `eventsSet` anterior. SÓLO PODAN las marcas de
+     entrada y hacen de candado (ver `podarMarcas`): quién entra animado lo
+     decide el registro explícito, nunca esta diferencia. */
+  const idsPreviosRef = useRef<ReadonlySet<string>>(new Set())
+
   function alCambiarEventos(eventos: EventApi[]) {
+    const ids = new Set(eventos.map(e => e.id))
+    podarMarcas(ids, idsPreviosRef.current)
+    idsPreviosRef.current = ids
     const rangos = rangoDeVista()
     aplicarVentana(eventos, rangos)
     aplicarConteo(eventos, rangos)

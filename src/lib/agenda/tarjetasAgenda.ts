@@ -8,9 +8,10 @@
  * cambiaron los `import`/`export` que hacían falta.
  */
 
-import type { EventContentArg } from '@fullcalendar/core'
+import type { EventApi } from '@fullcalendar/core'
 import type { IconoEvento, ColorEvento } from '@/lib/appointments'
 import type { Status, Appointment } from './tiposAgenda'
+import { clasesDeMovimiento } from './marcasMovimiento'
 
 export const ESTADOS_CITA:   readonly Status[] = ['scheduled', 'confirmed', 'cancelled', 'no_show', 'attended']
 
@@ -236,9 +237,19 @@ export function tintasDelChipDeMes(
  * sin `any`, y de paso declara qué se espera encontrar: `Partial`, porque la
  * fuente de Google no trae ninguno de estos campos.
  */
-export function clasesDelEvento(arg: EventContentArg): string[] {
-  const ext: Partial<Appointment> & { isGcalBlock?: boolean } = arg.event.extendedProps
-  const clases: string[] = []
+/* El parámetro es lo que de verdad lee, no el `EventContentArg` entero: éste lo
+   cumple (FullCalendar sigue pudiendo llamarla tal cual desde
+   `eventClassNames`), y así se puede probar sin montar un calendario. */
+export function clasesDelEvento(arg: { event: Pick<EventApi, 'id' | 'allDay' | 'extendedProps'> }): string[] {
+  const ext: Partial<Appointment> & { isGcalBlock?: boolean; saliendo?: unknown } = arg.event.extendedProps
+  /* Bloque F (F2.4/F2.5): la entrada de la cita nueva, el anillo de la que
+     llega por tiempo real y la salida. Las decide `marcasMovimiento.ts` por
+     REGISTRO explícito, nunca por diferencia de ids ni con `eventDidMount`
+     (ver su cabecera). Van primero y también en Google: una baja de Google no
+     las recibe hoy, pero la regla CSS no distingue fuentes. Toda regla que las
+     lea lleva `.fc-event` y respeta la exclusión de `.fc-list-event` donde
+     anima `transform` (ver el punto 1 de arriba). */
+  const clases: string[] = clasesDeMovimiento(arg.event.id, ext)
   /* La bandera y no la vista: en una lista un evento de todo el día llega aquí
      igual que en la banda, y su columna de hora es la que cambia de pinta. */
   if (arg.event.allDay) clases.push('ag-ev-allday')
