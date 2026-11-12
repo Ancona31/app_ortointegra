@@ -334,9 +334,15 @@ function useTiposCita(medicoId: string): TipoCita[] | null {
 export default function AppointmentModal({
   modal, onClose, onSave, onDelete, medicos, defaultMedicoId,
   hideMedicoDropdown, medicoDropdownRequired, canVerExpediente, canInvitar, onInvitar,
-  onCambiarTipo, horario, agendaV2 = false, onCancelarCita, buscarEmpalmes,
+  onCambiarTipo, horario, agendaV2 = false, onCancelarCita, buscarEmpalmes, saliendo = false,
 }: {
   modal: ModalState
+  /* F2.7 · El modal sigue montado mientras sale (lo decide la página, rama de
+     movimiento): velo y panel llevan `data-estado="saliendo"` para la animación
+     de `.ag-modal-velo`/`.ag-modal-panel`, y la raíz va `inert` para que nada
+     se pueda pulsar durante la salida (un Enter sobre «Guardar» crearía otra
+     cita). */
+  saliendo?: boolean
   onClose: () => void
   onSave: (data: DatosGuardado) => Promise<void>
   onDelete: (id: string) => Promise<void>
@@ -928,8 +934,10 @@ export default function AppointmentModal({
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-6 max-md:p-0"
       style={areaVisible ? { top: areaVisible.desde, height: areaVisible.alto } : undefined}
+      inert={saliendo}
     >
-      <div className="absolute inset-0 backdrop-blur-sm" style={{ background: 'var(--ag-modal-overlay)' }} onClick={onClose} />
+      <div className="ag-modal-velo absolute inset-0 backdrop-blur-sm" data-estado={saliendo ? 'saliendo' : undefined}
+        style={{ background: 'var(--ag-modal-overlay)' }} onClick={onClose} />
       {/* ── PANTALLA COMPLETA POR DEBAJO DE `md`, VENTANA DE AHÍ PARA ARRIBA ──
           Es el mismo trato que `ModalShell` da a sus modales con
           `fullscreenMobile` (`ModalShell.tsx:117`), o sea el patrón de la casa y
@@ -958,7 +966,11 @@ export default function AppointmentModal({
         aria-modal="true"
         aria-labelledby={tituloId}
         tabIndex={-1}
-        className="relative focus:outline-none rounded-[22px] max-md:rounded-none w-full max-w-[560px] max-md:max-w-full md:max-h-[92dvh] max-md:h-full flex flex-col animate-modal-enter overflow-hidden"
+        data-estado={saliendo ? 'saliendo' : undefined}
+        /* F2.7 · `ag-modal-panel` y no `animate-modal-enter`, que es de toda la
+           app (`ModalShell`): la entrada y la salida de este modal las define la
+           agenda (bloque F §2, «Modal completo»). */
+        className="ag-modal-panel relative focus:outline-none rounded-[22px] max-md:rounded-none w-full max-w-[560px] max-md:max-w-full md:max-h-[92dvh] max-md:h-full flex flex-col overflow-hidden"
         style={{ background: 'var(--ag-modal-bg)', boxShadow: '0 30px 80px rgba(16, 32, 64, .28)' }}>
 
         {/* Header
