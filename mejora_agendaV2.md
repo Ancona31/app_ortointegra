@@ -1774,8 +1774,8 @@ sólo `escritorio`, leyendo Mailpit): GET (tres agentes de usuario), HEAD,
 `?paso=cancelar`, `?r=` y el navegador sin pulsar no cambian la cita ni la
 auditoría, y la API por GET/HEAD da 405; confirmar (un POST, 303, auditado
 `system`/`enlace_paciente`; recargar no reenvía); cancelar en dos pasos y el
-turno vuelve a ofrecerse; la carrera a T−1h (cita a +1 h +8 s, se pulsa a los
-10 s: `fuera_de_plazo` con el teléfono, la cita sigue, confirmar aún vale);
+turno vuelve a ofrecerse; la carrera a T−1h (cita a +1 h +20 s; la página
+ofrece cancelar y se pulsa pasado el corte: `fuera_de_plazo` con el teléfono, la cita sigue, confirmar aún vale);
 cita pasada («ya pasó», sin botones) y enlace revocado o inventado (404);
 clínica suspendida e interruptor apagado (404, sin cambio); reagendar con el
 fijo dos veces y la tercera con el tope (403 y sin oferta); el comprobante con

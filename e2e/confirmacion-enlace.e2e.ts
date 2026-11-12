@@ -216,12 +216,14 @@ test('no podré asistir: dos pasos (el segundo GET no escribe), la cita se cance
 })
 
 test('la carrera a T−1h: la página ofrecía cancelar, el POST llega tarde y no cancela; confirmar todavía vale', async ({ page }) => {
-  const inicio = new Date(Date.now() + 60 * 60 * 1000 + 8000).toISOString()
+  // 20 s de colchón para sembrar, abrir y pintar la página; luego se espera a pasar el corte.
+  const corte = Date.now() + 20_000
+  const inicio = new Date(corte + 60 * 60 * 1000).toISOString()
   const { citaId, codigo } = citaDelPersonal(inicio)
   await page.goto(`/confirmar/${codigo}?paso=cancelar`)
   const boton = page.getByRole('button', { name: 'Sí, cancelar mi cita' })
   await expect(boton).toBeVisible()
-  await page.waitForTimeout(10_000)
+  await page.waitForTimeout(Math.max(0, corte - Date.now()) + 1500)
   await boton.click()
   await page.waitForURL(/\?r=fuera_de_plazo$/)
   await expect(page.getByRole('status')).toHaveText('Ya no es posible cancelar desde el enlace; comunícate al 9990001010.')
