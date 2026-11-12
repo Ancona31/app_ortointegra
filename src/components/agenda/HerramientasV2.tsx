@@ -25,13 +25,15 @@
  * día activo, Escape cierra y el foco vuelve al botón.
  */
 import { useCallback, useEffect, useRef, useState, type ReactElement, type ReactNode, type RefObject } from 'react'
-import { CalendarDays } from 'lucide-react'
+import { CalendarDays, Search } from 'lucide-react'
 import Portal from '@/components/ui/Portal'
 import MiniMes from '@/components/agenda/MiniMes'
+import BuscadorCitas from '@/components/agenda/BuscadorCitas'
 import { useDialogoModal } from '@/hooks/useDialogoModal'
 import type { ApiInteraccionesV2 } from '@/lib/agenda/contratosV2'
 import { posicionCapa, type Caja } from '@/lib/agenda/posicionCapa'
 import { partirFechaHora } from '@/lib/agenda/fechasAgenda'
+import { teclasDeAccion } from '@/lib/agenda/atajosAgenda'
 
 /** `'YYYY-MM-DD/YYYY-MM-DD'`: el periodo que pinta el calendario, `[desde, hasta)`. Lo escribe `datesSet`. */
 export type RangoVisibleV2 = string
@@ -148,6 +150,31 @@ function SelectorFecha({ rango, alIrAFecha }: { rango: RangoVisibleV2; alIrAFech
   )
 }
 
+/**
+ * La lupa y su buscador (F3.6). Elegir una cita la delega en la capa principal
+ * (`irACita`: su día en la vista Día y su tarjeta). `/` lo abre pulsando este
+ * botón (`InteraccionesV2`), así el foco vuelve aquí al cerrar.
+ */
+function BotonBuscar({ apiRef }: { apiRef: RefObject<ApiInteraccionesV2 | null> }): ReactElement {
+  const [ancla, setAncla] = useState<Caja | null>(null)
+  const cerrar = useCallback(() => setAncla(null), [])
+  return (
+    <>
+      <button type="button" className="ag-herramienta" data-buscar-citas=""
+        aria-label="Buscar citas de un paciente" title="Buscar citas de un paciente (/)"
+        aria-keyshortcuts={teclasDeAccion('buscar')} aria-haspopup="dialog" aria-expanded={ancla !== null}
+        onClick={e => setAncla(a => (a ? null : cajaDe(e.currentTarget)))}>
+        <Search size={16} aria-hidden="true" />
+      </button>
+      {ancla && (
+        <Desplegable ancla={ancla} etiqueta="Buscar citas" disparador="[data-buscar-citas]" alCerrar={cerrar}>
+          <BuscadorCitas agendaV2 alCerrar={cerrar} alElegirCita={c => { cerrar(); apiRef.current?.irACita(c) }} />
+        </Desplegable>
+      )}
+    </>
+  )
+}
+
 export interface PropsHerramientasV2 {
   /** La capa principal: el buscador y la ayuda se piden por aquí. */
   apiRef: RefObject<ApiInteraccionesV2 | null>
@@ -157,10 +184,11 @@ export interface PropsHerramientasV2 {
 }
 
 /** Los tres botones de la barra de escritorio. */
-export default function HerramientasV2({ rango, alIrAFecha }: PropsHerramientasV2): ReactElement {
+export default function HerramientasV2({ apiRef, rango, alIrAFecha }: PropsHerramientasV2): ReactElement {
   return (
     <div className="ag-herramientas" role="group" aria-label="Herramientas de la agenda">
       <SelectorFecha rango={rango} alIrAFecha={alIrAFecha} />
+      <BotonBuscar apiRef={apiRef} />
     </div>
   )
 }

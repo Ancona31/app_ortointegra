@@ -25,6 +25,11 @@ describe('HerramientasV2', () => {
     expect(html).toContain('aria-haspopup="dialog"')
     expect(html).toContain('aria-expanded="false"')
   })
+  it('F3.6: la lupa anuncia su atajo `/` y su diálogo', () => {
+    expect(html).toContain('aria-label="Buscar citas de un paciente"')
+    expect(html).toContain('aria-keyshortcuts="/"')
+    expect(html).toContain('data-buscar-citas=""')
+  })
   it('cerrado no pinta ningún diálogo', () => {
     expect(html).not.toContain('role="dialog"')
   })

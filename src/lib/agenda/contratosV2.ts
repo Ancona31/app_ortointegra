@@ -32,6 +32,7 @@
 import type { ModalState } from '@/components/agenda/AppointmentModal'
 import type { Appointment, Status } from '@/lib/agenda/tiposAgenda'
 import type { Caja, Punto } from '@/lib/agenda/posicionCapa'
+import type { CitaEncontrada } from '@/lib/agenda/buscarCitasPaciente'
 
 /** El alta del modal con los campos que añade F (opcionales). Ver la cabecera. */
 export type AperturaAltaV2 = Extract<ModalState, { mode: 'create' }> & {
@@ -76,6 +77,8 @@ export interface ApiInteraccionesV2 {
   abrirBurbuja: (gesto: GestoAlta) => void
   /** `ancla` null: la cita no tiene un sitio pulsado (panel del Mes, buscador). */
   abrirTarjeta: (cita: Appointment, ancla: Caja | null, punto?: Punto) => void
+  /** Del buscador: va al día de la cita (vista Día) y abre su tarjeta cuando está pintada. */
+  irACita: (cita: CitaEncontrada) => void
 }
 
 /**

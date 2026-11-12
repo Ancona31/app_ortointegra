@@ -26,11 +26,13 @@
 import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type Dispatch, type ReactElement, type Ref, type RefObject, type SetStateAction } from 'react'
 import { useRouter } from 'next/navigation'
 import type FullCalendar from '@fullcalendar/react'
+import type { EventApi } from '@fullcalendar/core'
 import type { ModalState } from '@/components/agenda/AppointmentModal'
 import BurbujaAlta, { type MasOpcionesBurbuja, type MedicoBurbuja } from '@/components/agenda/BurbujaAlta'
 import TarjetaLectura from '@/components/agenda/TarjetaLectura'
 import { BotonWhatsAppCita } from '@/components/agenda/BotonWhatsAppCita'
 import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
+import { useToast } from '@/components/ui/Toast'
 import { useConsultorios } from '@/hooks/useConsultorios'
 import type { Consultorio } from '@/types'
 import type { Horario, MedicoConfig } from '@/lib/configApp'
@@ -42,11 +44,17 @@ import { guardarAltaRapida, horasDelGesto, type DependenciasGuardado } from '@/l
 import { avisoFueraDeHorario, avisoFinFueraDeHorario } from '@/lib/agenda/horarioAgenda'
 import { empalmesPintados, mensajeEmpalme } from '@/lib/agenda/empalmesCita'
 import { esEventoGenerico } from '@/lib/agenda/tarjetasAgenda'
+import { vistaEnElOtroFormato } from '@/lib/agenda/vistasAgenda'
+import type { CitaEncontrada } from '@/lib/agenda/buscarCitasPaciente'
 import {
   pideConfirmacion, puedeIniciarConsulta, textoDeConfirmacion, type AccionTarjeta, type QuienMira,
 } from '@/lib/agenda/accionesTarjeta'
 
 type CalRef = RefObject<InstanceType<typeof FullCalendar> | null>
+export type CalendarApiV2 = ReturnType<InstanceType<typeof FullCalendar>['getApi']>
+/* Lo que se espera a que llegue la cita elegida en el buscador tras navegar a
+   su día (la traída de una semana no vista). Pasado esto, se avisa. */
+const ESPERA_CITA_MS = 6000
 /* Misma forma que el `useState` de `AgendaCliente.tsx`, duplicada a propósito
    como en `guardadoCitas.ts` y `altaCitas.ts`. */
 type ConfirmState = { message: string; onConfirm: () => void; onCancel: () => void } | null
@@ -73,6 +81,13 @@ export interface PropsInteraccionesV2 {
   quien: Omit<QuienMira, 'consultorioExiste'>
   /** Con un solo médico el nombre del médico no se enseña en la tarjeta. */
   isSingleDoctor: boolean
+  /** `cambiarVista` de la agenda (filtro forzado del Mes incluido). */
+  onVista: (tipo: string, fecha?: Date) => void
+  /** El filtro tal cual (`''` = «Todos», `null` = aún sin perfil) y cómo cambiarlo. */
+  filtroActivo: string | null
+  alFiltrarMedico: (id: string) => void
+  /** `abrirCita` de `altaCitas.ts`, la única puerta a una cita. */
+  abrirCita: (evento: EventApi) => void
   medicos: readonly MedicoConfig[]
   /** El médico de la burbuja: el del filtro, o el único; `null` = «Todos». */
   filtroMedico: string | null
@@ -238,11 +253,53 @@ function CapaTarjeta({ capa, p, cerrar }: PropsCapaTarjeta): ReactElement {
   )
 }
 
+/** Espera a que el evento `id` esté pintado (tras navegar) y lo entrega; `null` si no llega. */
+export function esperarEvento(api: CalendarApiV2, id: string, alLlegar: (ev: EventApi | null) => void): () => void {
+  const ya = api.getEventById(id)
+  if (ya) { alLlegar(ya); return () => undefined }
+  const alCambiar = (): void => {
+    const ev = api.getEventById(id)
+    if (ev) { limpiar(); alLlegar(ev) }
+  }
+  const t = window.setTimeout(() => { limpiar(); alLlegar(null) }, ESPERA_CITA_MS)
+  function limpiar(): void { api.off('eventsSet', alCambiar); window.clearTimeout(t) }
+  api.on('eventsSet', alCambiar)
+  return limpiar
+}
+
 /** La fila con las puntas vivas del evento pintado (tras un arrastre aún sin respuesta). */
 function conPuntasVivas(cita: Appointment, calendarRef: CalRef): Appointment {
   const ev = calendarRef.current?.getApi().getEventById(cita.id)
   if (!ev?.start || !ev.end || ev.allDay) return cita
   return { ...cita, start_time: ev.start.toISOString(), end_time: ev.end.toISOString() }
+}
+
+/**
+ * Del buscador a la cita (F3.6): si el filtro de médico la esconde se cambia al
+ * suyo, se va a su día en la vista Día y, cuando la cita está pintada, se abre
+ * su tarjeta (sin ancla: centrada, u hoja en el teléfono).
+ */
+function useIrACita(p: PropsInteraccionesV2): (c: CitaEncontrada) => void {
+  const toast = useToast()
+  const pRef = useRef(p)
+  useEffect(() => { pRef.current = p })
+  const espera = useRef<(() => void) | null>(null)
+  useEffect(() => () => espera.current?.(), [])
+  return useCallback((c: CitaEncontrada) => {
+    const { calendarRef, filtroActivo, alFiltrarMedico, onVista, isMobile } = pRef.current
+    const api = calendarRef.current?.getApi()
+    if (!api) return
+    espera.current?.()
+    if (filtroActivo && c.medico_id && c.medico_id !== filtroActivo) alFiltrarMedico(c.medico_id)
+    onVista(vistaEnElOtroFormato('timeGridDay', isMobile), new Date(c.start_time))
+    espera.current = esperarEvento(api, c.id, (ev) => {
+      espera.current = null
+      /* Por `abrirCita`, la única puerta (`altaCitas.ts`): la misma regla de
+         Google y el mismo estrechamiento de `extendedProps` que un clic. */
+      if (ev) pRef.current.abrirCita(ev)
+      else toast.info('No se pudo mostrar esa cita en la agenda.')
+    })
+  }, [toast])
 }
 
 export default function InteraccionesV2(p: PropsInteraccionesV2): ReactElement | null {
@@ -256,6 +313,11 @@ export default function InteraccionesV2(p: PropsInteraccionesV2): ReactElement |
     cerrarCapa(id)
   }, [capaRef, calendarRef, cerrarCapa])
 
+  const abrirTarjeta = useCallback<ApiInteraccionesV2['abrirTarjeta']>((cita, ancla, punto) => {
+    abrir({ tipo: 'tarjeta', cita, vista: conPuntasVivas(cita, calendarRef), ancla, ...(punto ? { punto } : {}) })
+  }, [abrir, calendarRef])
+  const irACita = useIrACita(p)
+
   useImperativeHandle(apiRef, () => ({
     abrirBurbuja: (gesto) => {
       const horas = horasDelGesto(gesto)
@@ -265,10 +327,9 @@ export default function InteraccionesV2(p: PropsInteraccionesV2): ReactElement |
       if (c?.tipo === 'burbuja' && c.gesto.fecha === gesto.fecha && c.horas.inicio === horas.inicio && c.horas.fin === horas.fin) return
       abrir({ tipo: 'burbuja', gesto, horas })
     },
-    abrirTarjeta: (cita, ancla, punto) => {
-      abrir({ tipo: 'tarjeta', cita, vista: conPuntasVivas(cita, calendarRef), ancla, ...(punto ? { punto } : {}) })
-    },
-  }), [abrir, capaRef, calendarRef])
+    abrirTarjeta,
+    irACita,
+  }), [abrir, capaRef, abrirTarjeta, irACita])
 
   useEffect(() => {
     alCambiarListas(true)

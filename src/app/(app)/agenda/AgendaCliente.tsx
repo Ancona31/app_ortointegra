@@ -1729,6 +1729,10 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
           zonaVisor={navegadorTZ}
           quien={{ esMedico: isDoctor, perfilId: profile?.id ?? null }}
           isSingleDoctor={isSingleDoctor}
+          onVista={cambiarVista}
+          filtroActivo={filtroEfectivo}
+          alFiltrarMedico={id => aplicarFiltro(id, false)}
+          abrirCita={abrirCita}
           medicos={medicos}
           filtroMedico={filtroEfectivo || ((isSingleDoctor || isMedicoSinAdmin) && defaultMedicoId ? defaultMedicoId : null)}
           horario={horario}
