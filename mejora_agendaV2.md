@@ -1598,6 +1598,34 @@ queda listada aquí.
   `fuera_de_plazo`; sin el `FOR UPDATE` de la cita, cancelaba la cita movida;
   confirmar y cancelar a la vez se serializan por el enlace.
 
+**E2 · `src/lib/confirmacion/enlaceConfirmacion.ts`:**
+- Subllave HKDF `confirmacion` en `secretos.ts` (`codigoDeConfirmacion(id)` =
+  HMAC('confirmacion:'||id), 22 caracteres); `codigoDeEnlace` no cambia (lo
+  fija una prueba). La forma del código es la misma (`esCodigoDeEnlace`).
+- API para E3-E9: `emitirEnlaceConfirmacion(clinicaId, citaId, creadoPor)` →
+  `{id, codigo, url} | null`; `resolverEnlaceConfirmacion(codigo)` →
+  `ContextoConfirmacion | null` (con `clinica_id` y `codigo_hash`, que NO van
+  al HTML); `responderEnlaceConfirmacion(ctx, 'confirmar'|'cancelar')` →
+  `{r_resultado, r_cita_id, r_google_event_id, r_gcal_etag} | null` (sólo desde
+  un POST); `revocarEnlaceConfirmacion(clinicaId, citaId)` → boolean;
+  `urlDeConfirmacion(codigo)`.
+- URL: `${NEXT_PUBLIC_APP_URL}/confirmar/<código>`, con el mismo valor por
+  omisión que el resto del repo (`https://www.spinus.com.mx`); una base que no
+  sea `http(s)://host` sin ruta no emite (ni escribe). Sin datos personales ni
+  ids en la URL.
+- Cliente de servicio sólo `.rpc()`; tolerante (PGRST202, 42883, 42P01,
+  PGRST205 → null, con `logger.warn`); al log sólo el nombre de la RPC y el
+  código, nunca el código del enlace ni la URL. Nada lanza.
+- **Para el procedimiento de despliegue:** rotar `RESERVA_SECRETO` invalida
+  también todos los enlaces de confirmación ya enviados; el siguiente envío de
+  cada cita los repara solo (revoca y reemite).
+- **Revisión independiente (APTO):** comprobó las formas reales de las RPC
+  contra la base local; aplicados sus dos detalles (comentario de por qué
+  `revocar` no exige el secreto y prueba de la rama «revocar falla al
+  reintentar»). Comprobado además de punta a punta contra el PostgREST local
+  (emitir → mismo enlace → contexto → confirmar → revocar → contexto nulo) con
+  datos propios borrados al final.
+
 ### Bloque F
 
 - Las 18 propuestas de la auditoría visual, aprobadas. **El pulido visual y los

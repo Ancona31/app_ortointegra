@@ -14,14 +14,19 @@
  *   - `codigo`:   el código de 6 dígitos del correo y la ficha de
  *                 verificación, atados al enlace y al correo.
  *   - `red`:      IP y dispositivo para los límites de intentos (nunca en claro).
+ *   - `confirmacion`: el código del enlace de confirmación de una cita (agenda
+ *                 E2) = HMAC('confirmacion:' || id), misma forma que el de
+ *                 `enlace` pero con su propia subllave: un código de reserva
+ *                 nunca abre una confirmación ni al revés.
  *
  * Sin secreto (o con uno corto o que no es hex) todas devuelven null y
  * `secretoDisponible()` es false: quien llama falla cerrado.
- * ROTAR el secreto invalida todos los enlaces y el historial del candado.
+ * ROTAR el secreto invalida todos los enlaces (de reserva y de confirmación)
+ * y el historial del candado.
  */
 import { createHash, createHmac, hkdfSync, randomBytes } from 'node:crypto'
 
-export type Proposito = 'enlace' | 'contacto' | 'codigo' | 'red'
+export type Proposito = 'enlace' | 'contacto' | 'codigo' | 'red' | 'confirmacion'
 export type ClaseContacto = 'telefono' | 'correo'
 export type ClaseRed = 'ip' | 'dispositivo'
 
@@ -52,15 +57,25 @@ export function secretoDisponible(): boolean {
   return secretoMaestro() !== null
 }
 
-/** El código del enlace `id` (uuid en minúsculas). null sin secreto o con id inválido. */
-export function codigoDeEnlace(id: string): string | null {
+/** Código de 22 caracteres (128 bits, base64url) para el `id`, con la subllave y el prefijo de `proposito`. */
+function codigoDe(proposito: 'enlace' | 'confirmacion', id: string): string | null {
   if (!UUID.test(id)) return null
-  const llave = subllave('enlace')
+  const llave = subllave(proposito)
   if (!llave) return null
-  return createHmac('sha256', llave).update(`enlace:${id}`, 'utf8').digest().subarray(0, 16).toString('base64url')
+  return createHmac('sha256', llave).update(`${proposito}:${id}`, 'utf8').digest().subarray(0, 16).toString('base64url')
 }
 
-/** ¿Tiene la forma de un código de enlace? Se mira antes de tocar la base. */
+/** El código del enlace `id` (uuid en minúsculas). null sin secreto o con id inválido. */
+export function codigoDeEnlace(id: string): string | null {
+  return codigoDe('enlace', id)
+}
+
+/** El código del enlace de CONFIRMACIÓN `id` (agenda E2). null sin secreto o con id inválido. */
+export function codigoDeConfirmacion(id: string): string | null {
+  return codigoDe('confirmacion', id)
+}
+
+/** ¿Tiene la forma de un código de enlace (de reserva o de confirmación)? Se mira antes de tocar la base. */
 export function esCodigoDeEnlace(codigo: string): boolean {
   return CODIGO.test(codigo)
 }

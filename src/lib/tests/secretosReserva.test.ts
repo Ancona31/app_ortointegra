@@ -4,9 +4,9 @@
  * todo devuelve null (falla cerrado).
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { createHash } from 'node:crypto'
+import { createHash, createHmac, hkdfSync } from 'node:crypto'
 import {
-  secretoDisponible, codigoDeEnlace, esCodigoDeEnlace, hashDeCodigo, hmacContacto, hmacCodigoCorreo,
+  secretoDisponible, codigoDeEnlace, codigoDeConfirmacion, esCodigoDeEnlace, hashDeCodigo, hmacContacto, hmacCodigoCorreo,
   hmacRed, hmacFicha, nuevaFicha,
 } from '@/lib/reserva/secretos'
 
@@ -114,5 +114,32 @@ describe('sin secreto utilizable, todo falla cerrado', () => {
 
   it('con el secreto bueno, disponible', () => {
     expect(secretoDisponible()).toBe(true)
+  })
+})
+
+describe('código de confirmación (agenda E2)', () => {
+  it('es determinista, 22 caracteres base64url, distinto del de reserva con el mismo id, y cambia con el secreto', () => {
+    const c = codigoDeConfirmacion(ID)
+    expect(c).toMatch(/^[A-Za-z0-9_-]{22}$/)
+    expect(esCodigoDeEnlace(c ?? '')).toBe(true)
+    expect(codigoDeConfirmacion(ID)).toBe(c)
+    expect(codigoDeConfirmacion(ID2)).not.toBe(c)
+    expect(c).not.toBe(codigoDeEnlace(ID))
+    vi.stubEnv('RESERVA_SECRETO', OTRO)
+    expect(codigoDeConfirmacion(ID)).not.toBe(c)
+  })
+
+  it('el código de reserva no cambia al añadir la subllave de confirmación', () => {
+    // Fijado con el cuerpo de D1: HMAC(HKDF(secreto, sal, «reserva:enlace»), 'enlace:' || id)[0:16].
+    const llave = Buffer.from(hkdfSync('sha256', Buffer.from(SECRETO, 'hex'), 'spinus-reserva-v1', 'reserva:enlace', 32))
+    const esperado = createHmac('sha256', llave).update(`enlace:${ID}`, 'utf8').digest().subarray(0, 16).toString('base64url')
+    expect(codigoDeEnlace(ID)).toBe(esperado)
+  })
+
+  it('sin secreto o con id inválido da null', () => {
+    expect(codigoDeConfirmacion(ID.toUpperCase())).toBeNull()
+    expect(codigoDeConfirmacion('')).toBeNull()
+    vi.stubEnv('RESERVA_SECRETO', '')
+    expect(codigoDeConfirmacion(ID)).toBeNull()
   })
 })
