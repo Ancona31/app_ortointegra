@@ -144,6 +144,51 @@ async function exigirSinExpediente(pacientes: string[]): Promise<void> {
   }
 }
 
+/**
+ * La reserva por enlace (bloque D) deja filas que el rol de servicio NO puede
+ * borrar (D1-D3 le quitan DELETE a propósito) y que cierran el paso con FKs
+ * RESTRICT. Se limpian como `postgres` por SQL, en dos tiempos alrededor del
+ * borrado de las citas:
+ *   · antes: soltar `reserva_enlaces.usado_cita_id`/`usado_en` (FK a la cita;
+ *     el CHECK pide las dos juntas y la protección deja pasar a `postgres`),
+ *     y borrar `reserva_verificaciones` (FK al enlace), `reserva_incidencias`
+ *     (FK a la cita) y `reserva_contactos` (FK a clínica y médico);
+ *   · después: borrar `reserva_enlaces` (las citas que lo apuntaban ya no
+ *     están; su FK a médico y clínica es RESTRICT).
+ * Cada tabla se mira con `to_regclass`: sin las migraciones de D no hace nada.
+ * Los avisos (`reserva_avisos`) no son de ninguna clínica y se quedan.
+ */
+function limpiarReserva(clinicas: string[], cuando: 'antes' | 'despues'): void {
+  if (!clinicas.every(id => /^[0-9a-f-]{36}$/.test(id))) throw new Error('id inválido para limpiar la reserva')
+  const antes = `
+    if to_regclass('public.reserva_enlaces') is not null then
+      update public.reserva_enlaces set usado_en = null, usado_cita_id = null
+       where clinica_id = any (v_c) and usado_cita_id is not null;
+    end if;
+    if to_regclass('public.reserva_verificaciones') is not null then
+      delete from public.reserva_verificaciones where clinica_id = any (v_c);
+    end if;
+    if to_regclass('public.reserva_incidencias') is not null then
+      delete from public.reserva_incidencias where clinica_id = any (v_c);
+    end if;
+    if to_regclass('public.reserva_contactos') is not null then
+      delete from public.reserva_contactos where clinica_id = any (v_c);
+    end if;`
+  const despues = `
+    if to_regclass('public.reserva_enlaces') is not null then
+      delete from public.reserva_enlaces where clinica_id = any (v_c);
+    end if;`
+  const sql = `\\set ON_ERROR_STOP on
+select set_config('semilla.clinicas', :'clinicas', false);
+do $$
+declare v_c uuid[] := string_to_array(current_setting('semilla.clinicas'), ',')::uuid[];
+begin${cuando === 'antes' ? antes : despues}
+end $$;
+`
+  execFileSync('docker', ['exec', '-i', CONTENEDOR_DB, 'psql', '-U', 'postgres', '-q', '-o', '/dev/null',
+    '-v', `clinicas=${clinicas.join(',')}`], { input: sql, encoding: 'utf8' })
+}
+
 async function borrar(): Promise<void> {
   const usuarios = await usuariosSembrados()
   const clinicas = await clinicasSembradas(usuarios)
@@ -152,7 +197,9 @@ async function borrar(): Promise<void> {
   const pacIds = pacientes.map(p => p.id)
   await exigirSinExpediente(pacIds)
   if (clinicas.length) {
+    limpiarReserva(clinicas, 'antes')
     sinError(await admin.from('appointments').delete().in('clinica_id', clinicas), 'borrar citas')
+    limpiarReserva(clinicas, 'despues')
     /* B6: los tipos de cita que siembra una prueba (`agenda-tipos-cita`). Sus
        FKs a `clinicas` y `profiles` son RESTRICT; sin esto, uno que se quedara
        tras una prueba fallida rompería la siguiente siembra. Después de las

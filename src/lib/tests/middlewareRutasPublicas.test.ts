@@ -66,3 +66,24 @@ describe('middleware — rutas públicas (C7)', () => {
     expect(await vaALogin('/api/appointments', 'sb-x-auth-token=')).toBe(true)
   })
 })
+
+describe('middleware — reserva por enlace (D5)', () => {
+  it('/reservar/<código> y /api/reservar/<código>/… pasan sin cookie', async () => {
+    for (const ruta of ['/reservar/AbCdEfGhIjKlMnOpQrStUv', '/api/reservar/AbCdEfGhIjKlMnOpQrStUv',
+      '/api/reservar/AbCdEfGhIjKlMnOpQrStUv/turnos?consultorio=x', '/api/reservar/x/codigo', '/api/reservar/x/verificar']) {
+      expect(await vaALogin(ruta), ruta).toBe(false)
+    }
+  })
+
+  it('el prefijo lleva barra: sus vecinas siguen protegidas', async () => {
+    for (const ruta of ['/reservar', '/reservarx', '/reservas/x', '/api/reservar', '/api/reservarx', '/api/reserva/x',
+      '/api/agenda/enlaces', '/agenda/reservar']) {
+      expect(await vaALogin(ruta), ruta).toBe(true)
+    }
+  })
+
+  it('/r/ sigue pública y no se confunde con /reservar/', async () => {
+    expect(await vaALogin('/r/ABC123')).toBe(false)
+    expect(await vaALogin('/rx/ABC123')).toBe(true)
+  })
+})

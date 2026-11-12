@@ -223,6 +223,13 @@ export async function middleware(request: NextRequest) {
     || pathname.startsWith('/r/')
     || pathname.startsWith('/offline-mode')
     || pathname.startsWith('/offline-setup')
+    /* ⚠️ LA RESERVA POR ENLACE (agenda D5) ES PÚBLICA Y VA EN SU LÍNEA, CON SU
+       PREFIJO Y LA BARRA FINAL: quien la abre aún no es paciente ni tiene
+       cuenta. NO LA CUBRE `startsWith('/r/')` de arriba ('/reservar/x' no
+       empieza por '/r/'), y esa línea NO se toca: es la verificación del QR
+       impreso de las recetas. La página no llama a getUser() ni redirige; su
+       puerta es el código del enlace, el interruptor y el aviso aprobado. */
+    || pathname.startsWith('/reservar/')
 
   // Rutas API que no requieren sesión (OAuth callbacks, Stripe webhook y Stripe checkout/portal que manejan su propia auth)
   const publicApiPaths = ['/api/google/callback', '/api/stripe/webhook', '/api/stripe/checkout', '/api/stripe/portal', '/api/auth/registro', '/api/auth/email-hook', '/api/auth/verify-email', '/api/auth/audit-login', '/api/auth/rate-limit', '/api/auth/login', '/api/auth/reset-password', '/api/auth/aceptar-invitacion']
@@ -235,6 +242,11 @@ export async function middleware(request: NextRequest) {
      `CRON_SECRET`, dentro de la propia ruta (S2 de `mejora_agendaV2.md`). */
   const isPublicApi = publicApiPaths.some(p => pathname.startsWith(p))
     || pathname === '/api/cron/google-sync'
+    /* La API de la reserva por enlace (D5), aparte de la lista y con prefijo
+       propio terminado en barra: sólo abre lo que cuelga de /api/reservar/.
+       Sin sesión por diseño; cada ruta exige el código del enlace, el
+       interruptor de la clínica y el aviso aprobado (404 uniforme si no). */
+    || pathname.startsWith('/api/reservar/')
 
   // Si no hay sesión y no está en ruta pública → verificar cookies antes de redirigir.
   // La verificación puede no dar sesión por latencia post-login (las cookies
