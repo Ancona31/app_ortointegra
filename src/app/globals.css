@@ -1984,6 +1984,13 @@ main > div:has(.agenda-fc) .agenda-raiz {
    contenedor sobre la propia fila de controles (su ancho lo da la rejilla, no su
    contenido). Medido: a 1024 px útiles la fila mide 643 y le quedan ~0 px. */
 .agenda-fc .ag-controles { container: ag-controles / inline-size; }
+/* ⚠️ Y POR ESO LLEVA `z-index`. Un contenedor de consulta aplica contención de
+   maquetación, y ésta crea CONTEXTO DE APILAMIENTO: sin un `z-index` propio, la
+   fila entera —y con ella el desplegable de «Por confirmar» (E7), que cuelga de
+   aquí— quedaría pintada por DEBAJO de las tarjetas de la rejilla, que van en
+   el contexto de la raíz con `z-index` de FullCalendar. 10 gana a la rejilla y
+   queda por debajo del popover de «+N» (9999) y de los modales. */
+.agenda-fc .ag-controles { position: relative; z-index: 10; }
 @container ag-controles (max-width: 720px) {
   .agenda-fc .ag-controles-conteo { display: none; }
 }

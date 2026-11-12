@@ -221,6 +221,24 @@ test.describe('escritorio · paso 2', () => {
     }
   })
 
+  test('F1.1 · por debajo de 1280 px y en Día con panel, la nativa arriba y los controles en una fila debajo', async ({ page }) => {
+    const filaUnica = async () => {
+      const nativa = await page.locator('.agenda-fc .fc-header-toolbar').boundingBox()
+      const controles = await page.locator('.agenda-fc .ag-controles').boundingBox()
+      expect(controles?.y ?? 0).toBeGreaterThanOrEqual((nativa?.y ?? 0) + (nativa?.height ?? 0) - 1)
+      const tops = await page.locator('.agenda-fc .ag-controles :is(button:not([role="tab"]), select, [role="tablist"])')
+        .evaluateAll(els => els.filter(e => (e as HTMLElement).offsetParent !== null).map(e => Math.round(e.getBoundingClientRect().top)))
+      expect(new Set(tops).size).toBe(1)
+    }
+    await page.setViewportSize({ width: 1180, height: 800 })
+    await irAAgenda(page)
+    await filaUnica()
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await page.getByRole('tab', { name: 'Día' }).click()
+    await expect(page.locator('.ag-dia--con-panel')).toBeVisible()
+    await filaUnica()
+  })
+
   test('F1.3 · densidad compacta: 24 px por franja, se recuerda y la jornada cabe sin desplazar', async ({ page }) => {
     await irAAgenda(page)
     const boton = page.getByRole('button', { name: 'Densidad compacta' })
