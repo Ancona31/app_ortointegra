@@ -12,6 +12,7 @@ import type { IconoEvento, ColorEvento } from '@/lib/appointments'
 import type { Status } from '@/lib/agenda/tiposAgenda'
 import { STATUS_CONFIG } from '@/lib/agenda/tarjetasAgenda'
 import { IconoDelEvento } from './IconoDelEvento'
+import { GLIFO_PILDORA } from './FilaListaDetalle'
 
 /* ─── Renderer de eventos (estilo Google) — memoizado ──── */
 
@@ -148,8 +149,15 @@ export const FORMATO_HORA_INICIO = new Intl.DateTimeFormat('es-MX', {
 
 export const MemoizedEventContent = memo(function MemoizedEventContent({
   timeText, horaInicio, title, pacNombre, status, doctorInitial, tzDiff, icono, color, descriptor,
-  esEvento, enRejilla, marca = null, marcaTitulo = null,
+  esEvento, enRejilla, marca = null, marcaTitulo = null, citaId, telefono = null, consultorio = null,
 }: {
+  /* F1.4 · El id de la cita, para `data-cita-id` en la raíz: es el contrato del
+     movimiento (`flipTarjetas.ts`, bloque F §2). Primitivo, el `memo` lo compara. */
+  citaId: string
+  /* F1.4 · Datos que sólo enseña la vista Día. Se MONTAN SIEMPRE y la vista
+     decide con CSS, como el resto de hijos: nunca una rama de marcado. */
+  telefono?: string | null
+  consultorio?: string | null
   /* True si la fila es un evento genérico y no una cita. Lo deriva el
      despachador con `esEventoGenerico`; aquí no se puede deducir de `icono` ni
      de `color`, que un evento puede no tener. Sólo decide la tinta de la hora. */
@@ -317,7 +325,11 @@ export const MemoizedEventContent = memo(function MemoizedEventContent({
   const estiloPildora: CSSProperties = doctorInitial ? { color: txt } : { color: txt, marginLeft: 'auto' }
 
   return (
-    <div ref={rootRef} className={tier ? `ag-tarjeta ag-tarjeta--${tier}` : 'ag-tarjeta'} style={root}>
+    /* F1.8 · En Semana la palabra del estado ya no se escribe: queda el glifo
+       delante de la hora (decisión 9 corregida, el color nunca es la única
+       señal) y el estado entero en el `title`. */
+    <div ref={rootRef} data-cita-id={citaId} title={`${name} · ${etiquetaEstado}`}
+      className={tier ? `ag-tarjeta ag-tarjeta--${tier}` : 'ag-tarjeta'} style={root}>
       <div className="ag-tarjeta-cab">
         {/* ⚠️ LA HORA DE UN EVENTO GENÉRICO VA EN NEUTRO, NUNCA EN EL COLOR DEL
             EVENTO. La de una cita sí toma el color de su estado.
@@ -348,6 +360,8 @@ export const MemoizedEventContent = memo(function MemoizedEventContent({
             izquierda (gráfico, umbral 3:1), el icono, el punto del mes, la
             píldora —fondo opaco— y el tinte del fondo. */}
         <span className="ag-tarjeta-hora" style={{ color: esEvento ? 'var(--ag-ink-600)' : txt }}>
+          {/* Fuera de `-rango` y de `-inicio`: las e2e leen esas dos tal cual. */}
+          <span className="ag-tarjeta-glifo" aria-hidden="true">{GLIFO_PILDORA[status]}</span>
           <span className="ag-tarjeta-hora-rango">{timeText}</span>
           <span className="ag-tarjeta-hora-inicio">{horaInicio}</span>
         </span>
@@ -385,13 +399,22 @@ export const MemoizedEventContent = memo(function MemoizedEventContent({
         {descriptor && <span className="ag-tarjeta-desc-sep"> · </span>}
         {/* ⚠️ EL ESTADO LLEVA SU COLOR, NO EL GRIS DEL DESCRIPTOR. Heredando
             `--ag-muted` los cinco estados caen a 3.07–3.26:1 en claro y `no_show`
-            a 4.35:1 en oscuro — por debajo de AA, y en Semana esta línea es el
-            ÚNICO sitio donde se escribe el estado, porque la píldora está
-            apagada. Es el mismo motivo por el que arriba se retiró la `opacity`
-            de las canceladas. El ` · ` y la nota se quedan en gris: ahí no hay
-            información de estado que leer. */}
+            a 4.35:1 en oscuro — por debajo de AA. Es el mismo motivo por el que
+            arriba se retiró la `opacity` de las canceladas. El ` · ` y la nota
+            se quedan en gris: ahí no hay información de estado que leer.
+            ⚠️ DESDE F1.8 ESTE SPAN NO SE VE EN NINGUNA VISTA DE REJILLA: en Día
+            lo dice la píldora y en Semana el glifo de la hora. Se monta igual
+            (regla de tamaño por clase, nunca ramas de marcado). */}
         <span className="ag-tarjeta-desc-estado" style={{ color: txt }}>{etiquetaEstado.toLowerCase()}</span>
       </span>
+      {/* Detrás del descriptor en el DOM: en la fila de Día comparten `order` y
+          así el motivo va antes que el teléfono y el consultorio. */}
+      {(telefono || consultorio) && (
+        <span className="ag-tarjeta-datos">
+          {telefono && <span className="ag-tarjeta-telefono">{telefono}</span>}
+          {consultorio && <span className="ag-tarjeta-consultorio">{consultorio}</span>}
+        </span>
+      )}
       {/* Píldora de estado: montada siempre, visible SÓLO en Día (globals.css), y
           en TODA fila con estado —cita o evento genérico—, que es lo que hace que
           la columna de Día se lea alineada. El borde y el punto salen de

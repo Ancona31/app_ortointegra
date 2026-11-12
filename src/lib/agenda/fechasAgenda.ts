@@ -9,7 +9,7 @@
  * falta.
  */
 
-import { addWeeks, differenceInCalendarDays, startOfWeek } from 'date-fns'
+import { addMonths, addWeeks, differenceInCalendarDays, startOfMonth, startOfWeek, subDays } from 'date-fns'
 import type { ViewApi } from '@fullcalendar/core'
 import { TZ_CLINICA, desplazarFecha, fechaSoloSegura, renderEnTZ } from '@/lib/dates'
 import type { RangoVisible } from '@/lib/agenda/ventanaRejilla'
@@ -25,7 +25,7 @@ import type { Appointment, DatosGuardado } from './tiposAgenda'
  *  · `completo` es lo que la vista representa SIN recortar por columnas
  *    plegadas. En Semana y Día es `currentRange` tal cual sale de
  *    `buildCurrentRangeInfo` (`@fullcalendar/core/internal-common.js:2814`,
- *    versión 6.1.20); en MES es `renderRange` —el mes encajado a seis semanas—,
+ *    versión 6.1.20); en MES es `renderRange` —el mes encajado a semanas, seis en el teléfono—,
  *    que es lo que esa vista pinta de verdad. Lo calcula `rangosDeLaVista`, y el
  *    porqué de la excepción está en `semanasPintadasDelMes`.
  *  · `esMes` dice si la vista es `dayGridMonth`. Lo lee `aplicarVentana` para
@@ -37,7 +37,8 @@ import type { Appointment, DatosGuardado } from './tiposAgenda'
  *
  *    · `timeGridWeek` → la semana entera, de lunes a lunes: siete días.
  *    · `timeGridDay`  → UN solo día.
- *    · `dayGridMonth` → SEIS SEMANAS enteras, de lunes a lunes: 42 días. Aquí
+ *    · `dayGridMonth` → las semanas que pinta, de lunes a lunes: seis (42
+ *      días) en el teléfono y de cuatro a seis en escritorio (F1.6). Aquí
  *      es donde `completo` dejó de ser `currentRange` (que daba el mes natural,
  *      de 28 a 31 días, sin el relleno de semanas que la vista sí pinta).
  *
@@ -65,16 +66,18 @@ export type RangosDeVista = { activo: RangoVisible; completo: RangoVisible; esMe
    deja de coincidir con lo que se pinta. */
 const PRIMER_DIA_SEMANA = 1
 
-/* ⚠️ SEIS, PORQUE `fixedWeekCount` NO SE TOCA. Su default es `true`
-   (`@fullcalendar/daygrid/internal.js:949-958`), así que `dayGridMonth` rellena
-   SIEMPRE hasta seis filas, mida lo que mida el mes. Si alguien pone
-   `fixedWeekCount: false` en `VISTAS_FC`, este número deja de ser fijo y hay que
-   derivarlo del rango. */
+/* ⚠️ SEIS SÓLO CON `fixedWeekCount` EN `true`, su default
+   (`@fullcalendar/daygrid/internal.js:949-958`): entonces `dayGridMonth` rellena
+   hasta seis filas, mida lo que mida el mes. Así sigue el teléfono. Desde F1.6
+   el escritorio lo pone en `false` (`VISTAS_FC`) y pinta sólo las semanas que
+   toca el mes: ahí el número sale del rango, ver `semanasPintadasDelMes`. */
 const SEMANAS_PINTADAS_DEL_MES = 6
 
 /**
  * El rango que la vista Mes PINTA de verdad: el mes encajado a semanas
- * completas y rellenado hasta seis filas, o sea `renderRange`.
+ * completas y, con `semanasFijas`, rellenado hasta seis filas, o sea
+ * `renderRange`. Sin `semanasFijas` (escritorio, F1.6) acaba en la semana que
+ * contiene el último día del mes, igual que `buildDayTableRenderRange`.
  *
  * ⚠️ ESTO ES EL «REQUISITO PREVIO» QUE PEDÍA `diasOcultables` POR ESCRITO, y no
  * un refinamiento. Aquella función decide qué columnas se pliegan a partir del
@@ -95,9 +98,11 @@ const SEMANAS_PINTADAS_DEL_MES = 6
  * Aritmética de CALENDARIO —`startOfWeek` y `addWeeks` de date-fns—, no de
  * milisegundos: en el cambio de horario de verano un día no dura 24 horas.
  */
-export function semanasPintadasDelMes(inicio: Date): RangoVisible {
+export function semanasPintadasDelMes(inicio: Date, semanasFijas = true): RangoVisible {
   const desde = startOfWeek(inicio, { weekStartsOn: PRIMER_DIA_SEMANA })
-  return { activeStart: desde, activeEnd: addWeeks(desde, SEMANAS_PINTADAS_DEL_MES) }
+  if (semanasFijas) return { activeStart: desde, activeEnd: addWeeks(desde, SEMANAS_PINTADAS_DEL_MES) }
+  const ultimoDia = subDays(addMonths(startOfMonth(inicio), 1), 1)
+  return { activeStart: desde, activeEnd: addWeeks(startOfWeek(ultimoDia, { weekStartsOn: PRIMER_DIA_SEMANA }), 1) }
 }
 
 /**
@@ -107,10 +112,13 @@ export function semanasPintadasDelMes(inicio: Date): RangoVisible {
  */
 export function rangosDeLaVista(vista: ViewApi): RangosDeVista {
   const esMes = vista.type === 'dayGridMonth'
+  /* F1.6 · La opción de la VISTA, no una constante: escritorio y teléfono la
+     tienen distinta (`VISTAS_FC` / `VISTAS_FC_MOVIL`). */
+  const fijas: unknown = esMes ? vista.getOption('fixedWeekCount') : true
   return {
     activo:   { activeStart: vista.activeStart, activeEnd: vista.activeEnd },
     completo: esMes
-      ? semanasPintadasDelMes(vista.currentStart)
+      ? semanasPintadasDelMes(vista.currentStart, fijas !== false)
       : { activeStart: vista.currentStart, activeEnd: vista.currentEnd },
     esMes,
   }

@@ -194,6 +194,9 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
      FullCalendar (`view.title`, que sale del `titleFormat` de `VISTAS_FC`) y se
      escribe en `datesSet`, que es quien sabe cuándo cambia el rango. */
   const [tituloVista, setTituloVista] = useState('')
+  /* F1.10 · ¿El periodo pintado contiene hoy? Apaga el «Hoy» de la banda móvil,
+     igual que FullCalendar apaga el suyo en escritorio. Booleano: bail-out. */
+  const [hoyEnRango, setHoyEnRango] = useState(true)
   /* El periodo que nombra la banda de vacío —«esta semana», «en agosto»—, ya
      formateado. Se escribe en `datesSet` junto al título, que es el único sitio
      donde se sabe qué rango pinta la vista.
@@ -892,6 +895,8 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
   function alCambiarFechas(arg: DatesSetArg) {
     setCurrentView(arg.view.type)
     setTituloVista(arg.view.title)
+    const ahora = Date.now()
+    setHoyEnRango(arg.view.currentStart.getTime() <= ahora && ahora < arg.view.currentEnd.getTime())
     setPeriodoVacio(periodoDeLaVista(arg.view))
     const eventos = calendarRef.current?.getApi().getEvents() ?? []
     const rangos = rangosDeLaVista(arg.view)
@@ -1064,6 +1069,8 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
           titulo={tituloVista}
           onPrev={() => calendarRef.current?.getApi().prev()}
           onNext={() => calendarRef.current?.getApi().next()}
+          onHoy={() => calendarRef.current?.getApi().today()}
+          hoyDeshabilitado={hoyEnRango}
           onMenu={abrirMenu}
           medicos={medicos}
           filtroMedico={filtroEfectivo ?? ''}

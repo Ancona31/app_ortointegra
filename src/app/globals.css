@@ -2088,8 +2088,12 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
   }
 }
 
+/* F1.15 · LAS DOS FILAS DE LA BANDA. 6 px y no 8 entre controles: la primera
+   fila lleva cinco piezas (☰, fecha, ‹, Hoy, ›) y a 360 px la fecha es la que
+   paga cada píxel. */
 .ag-banda-movil-fila,
-.ag-banda-movil-filtros { display: flex; align-items: center; gap: 8px; }
+.ag-banda-movil-filtros { display: flex; align-items: center; gap: var(--ag-1-5); }
+.ag-banda-movil-nav { flex: none; display: flex; align-items: center; gap: var(--ag-1); }
 
 /* 44 px es el mínimo táctil, y aquí no se negocia: son los cinco controles con
    los que se navega la agenda en un teléfono. */
@@ -2116,9 +2120,21 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
   background: rgba(255, 255, 255, .28);
 }
 .ag-banda-movil-ctrl:hover { background: rgba(255, 255, 255, .22); }
+/* F1.10 · «Hoy»: el mismo control con texto. Deshabilitado (ya estás en hoy) se
+   ve IGUAL, sin atenuar —atenuado parecía roto, punto 10 de la auditoría—, y
+   sólo pierde el hover y el cursor de mano. */
+.ag-banda-movil-hoy {
+  width: auto;
+  padding: 0 var(--ag-3);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+}
+.ag-banda-movil-hoy[aria-disabled="true"] { cursor: default; }
+.ag-banda-movil-hoy[aria-disabled="true"]:hover { background: rgba(255, 255, 255, .14); }
 
-.ag-banda-movil-titulo { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-.ag-banda-movil-titulo b { font-size: 19px; font-weight: 700; }
+/* F1.15 · La fecha con el conteo debajo, y es lo que cede ancho en la fila 1. */
+.ag-banda-movil-titulo { flex: 1 1 0; display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 /* ⚠️ EL SUBTÍTULO ES SÓLO EL CONTEO. El mockup escribe además el nombre del
    consultorio; esta página no tiene ese concepto y el lema de escritorio no cabe.
    El azul claro sobre el navy da 5.9:1 según el propio mockup, y es el mismo
@@ -2153,7 +2169,7 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 12.5px;
+  font-size: 12px;
   color: color-mix(in srgb, #fff 62%, var(--ag-navy));
 }
 
@@ -2169,8 +2185,10 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
    día vuelve el relleno, el de fuera tiene que crecer con él o las esquinas se
    ven pellizcadas — es la misma cuenta que hace el segmentado de escritorio. */
 .ag-banda-movil-vistas {
+  /* F1.15 · Ancho fijo: comparte fila con el filtro, que es quien cede. */
+  flex: 0 0 186px;
   display: flex;
-  gap: 4px;
+  gap: 2px;
   padding: 0;
   background: rgba(0, 0, 0, .22);
   border-radius: var(--ag-r-btn);
@@ -2183,7 +2201,9 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
   background: transparent;
   color: color-mix(in srgb, #fff 74%, var(--ag-navy));
   font-family: inherit;
-  font-size: 15px;
+  /* 13 y no 15: en 186 px, «Semana» a 15 no cabe con aire. */
+  font-size: 13px;
+  padding: 0;
   font-weight: 600;
   cursor: pointer;
 }
@@ -2203,7 +2223,7 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
    tres o cuatro hijos reparte el hueco ENTRE TODOS y el engrane se separaría del
    filtro. Aquí el único hueco elástico es éste. */
 .ag-banda-movil-medio {
-  flex: 1;
+  flex: 1 1 0;
   min-width: 0;
   display: flex;
   align-items: center;
@@ -2244,10 +2264,12 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
    `::first-letter`, igual que el título del toolbar de escritorio. NO
    `text-transform: capitalize`, que daría «17 – 22 De Agosto». */
 .ag-banda-movil-fecha {
+  /* F1.15 · Ya no va en fila propia: encabeza el bloque del título, a la
+     izquierda, a 15 px / 700 (la etiqueta de fecha del spec §2). */
   margin: 0;
-  text-align: center;
-  font-size: 15.5px;
-  font-weight: 600;
+  text-align: left;
+  font-size: 15px;
+  font-weight: 700;
   line-height: 1.2;
   white-space: nowrap;
   overflow: hidden;
@@ -2329,20 +2351,36 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
   border-color: var(--ag-border-card) !important;
   color: var(--ag-text) !important;
   border-radius: var(--ag-r-btn) !important;
+  /* Sólo fondo y borde, en micro (CONTRASTE §5). La global `.fc .fc-button`
+     trae `transition: all .15s`, fuera de la escala y sobre todo. */
+  transition: background-color var(--ag-dur-micro) var(--ag-ease),
+              border-color var(--ag-dur-micro) var(--ag-ease) !important;
 }
+/* F1.10 · «HOY» ES UN BOTÓN SECUNDARIO: superficie, borde y tinta, como las
+   flechas. Era navy relleno y, deshabilitado (ya estás en hoy), se atenuaba a
+   .55 y parecía roto (punto 10 de la auditoría). Ahora deshabilitado se ve
+   IGUAL y sólo pierde el hover y el cursor de mano.
+   ⚠️ El fondo lleva `!important` porque la global `.fc .fc-today-button` lo
+   pinta navy con `!important`; las demás tintas salen de `.agenda-fc
+   .fc-button`. En oscuro, `html.dark .agenda-fc .fc-button` pone la superficie. */
 .agenda-fc .fc-today-button {
-  background: var(--ag-brand-primary) !important;
-  border-color: var(--ag-brand-primary) !important;
-  color: #fff !important; /* gana a `.agenda-fc .fc-button` (misma especificidad, va después) */
+  background: var(--ag-surface) !important;
+  border-color: var(--ag-border-card) !important;
+  color: var(--ag-text) !important;
+  font-weight: 600 !important;
 }
 .agenda-fc .fc-today-button:hover {
-  background: var(--ag-ink) !important;
-  border-color: var(--ag-ink) !important;
-  color: #fff !important;
+  background: var(--ag-bg-app) !important;
+  border-color: var(--ag-border-card) !important;
+  color: var(--ag-ink) !important;
 }
 .agenda-fc .fc-today-button:disabled {
-  opacity: .55;            /* FullCalendar lo deshabilita cuando ya estás en hoy */
-  color: #fff !important;  /* texto legible aun atenuado */
+  opacity: 1;
+  cursor: default;
+}
+.agenda-fc .fc-today-button:disabled:hover {
+  background: var(--ag-surface) !important;
+  color: var(--ag-text) !important;
 }
 
 /* Cabecera de días.
@@ -2952,11 +2990,12 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
    que no queda columna ragged. En el compacto sigue en pie y sin tocar. */
 .agenda-fc .fc-listDay-view .fc-list-event-graphic { display: none; }
 
-/* La fila crece: el mockup sube el relleno vertical de 10 a 14 y ancla arriba,
-   porque el cuerpo ya no es una línea. */
+/* La fila ancla arriba, porque el cuerpo son dos líneas. ⚠️ F1.14: el relleno
+   vertical bajó de 14 a 10 al pasar de cuatro renglones a dos; con 14 la fila
+   de una cita con motivo pasaba de los 72 px que pide el diseño a 390. */
 .agenda-fc .fc-listDay-view .fc-list-event > td {
-  padding-top: 14px;
-  padding-bottom: 14px;
+  padding-top: var(--ag-2-5);
+  padding-bottom: var(--ag-2-5);
   vertical-align: top;
 }
 /* La hora deja de ir centrada con una línea y se alinea con el nombre. El resto
@@ -2984,11 +3023,10 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
    que no se arreglara. Era una lectura equivocada del export —sus dos anchos
    conviven, sí, pero el ojo lo lee como un defecto— y se revocó al verlo en
    pantalla. No repongas aquel aviso.
-   ⚠️ EL PUNTO CONSERVA SU `margin-top: 5px` Y NO SE CENTRA EN VERTICAL. La caja
-   ancla arriba (`align-items: flex-start` en `.ag-listadia`) y esos 5 px son lo
-   que lo pone a la altura óptica de la PRIMERA LÍNEA del nombre. Centrado en los
-   34 px caería a media altura del bloque de cuatro renglones, que es donde no
-   hay nada con lo que alinearse. */
+   ⚠️ EL PUNTO LLEVA SU `margin-top` Y NO SE CENTRA EN VERTICAL. La caja ancla
+   arriba (`align-items: flex-start` en `.ag-listadia`) y ese margen es lo que
+   lo pone a la altura óptica de la PRIMERA LÍNEA, la del nombre. Centrado
+   caería a media altura del bloque de dos renglones. */
 .agenda-fc .fc-listDay-view .ag-listadia-punto {
   flex: none;
   width: 34px;
@@ -3027,38 +3065,61 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
   border-color: var(--ag-gcal-border);
 }
 
-/* ── El cuerpo, cuatro renglones ──────────────────────────────────────── */
+/* ── El cuerpo, DOS renglones (F1.14) ─────────────────────────────────
+   Línea 1: el nombre. Línea 2: «duración · motivo» y, empujada a la derecha,
+   la píldora. Eran cuatro renglones y cada cita ocupaba 110–130 px a 390. */
 .agenda-fc .fc-listDay-view .ag-listadia-cuerpo {
   flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
+  align-items: stretch;
+  gap: var(--ag-1);
 }
-/* 16 px y sin elipsis, al revés que el compacto: aquí sobra ancho y el nombre
-   puede envolver a dos líneas sin comerse nada. */
+/* ⚠️ SIN `nowrap`, Y ES LA MISMA LECCIÓN QUE `.ag-listafila-nombre` (léela): en
+   una tabla de maquetación automática un texto que no puede partirse ensancha la
+   columna y la lista se sale por la derecha. Un nombre largo baja a dos líneas;
+   los de la semilla caben en una y la fila queda en ~66 px. */
 .agenda-fc .fc-listDay-view .ag-listadia-nombre {
-  font-size: 16px;
+  flex: 0 1 auto;
+  min-width: 0;
+  font-size: 15.5px;
   font-weight: 600;
+  line-height: 1.3;
   color: var(--ag-ink);
+  overflow-wrap: anywhere;
+}
+/* La segunda línea: el detalle cede ancho y la píldora va a la derecha. El
+   detalle se recorta a UNA línea con `line-clamp` y no con `nowrap`: así su
+   ancho mínimo sigue siendo la palabra más larga (ver la nota de arriba). */
+.agenda-fc .fc-listDay-view .ag-listadia-linea2 {
+  display: flex;
+  align-items: center;
+  gap: var(--ag-2);
+  min-width: 0;
+}
+.agenda-fc .fc-listDay-view .ag-listadia-linea2 .ag-listadia-pildora { margin-left: auto; }
+.agenda-fc .fc-listDay-view .ag-listadia-detalle {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--ag-ink-600);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
+  overflow: hidden;
+  overflow-wrap: anywhere;
 }
 .agenda-fc .fc-listDay-view .ag-listadia-nombre--cancelada {
   color: var(--ag-ink-600);
   text-decoration: line-through;
 }
-/* La duración, en su renglón. Es el dato más débil de la fila —se deduce de la
-   hora de inicio y la de fin— así que va en el escalón de tinta más bajo que
-   sigue pasando AA, y en cifras de ancho fijo como toda hora de la agenda. */
-.agenda-fc .fc-listDay-view .ag-listadia-dur {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--ag-ink-600);
-}
-.agenda-fc .fc-listDay-view .ag-listadia-meta {
-  font-size: 13.5px;
-  color: var(--ag-ink-600);
-}
+/* La duración abre la segunda línea. Es el dato más débil de la fila —se deduce
+   de la hora de inicio y la de fin— así que va en el escalón de tinta más bajo
+   que sigue pasando AA, y en cifras de ancho fijo como toda hora de la agenda. */
+.agenda-fc .fc-listDay-view .ag-listadia-dur { font-weight: 600; }
 
 /* ── La píldora ───────────────────────────────────────────────────────────
    ⚠️ NO REUSA `.ag-tarjeta-pildora`, y no es duplicación por descuido: aquélla
@@ -3584,6 +3645,11 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
    encoge. En una columna de Semana de ~135 px, la cita de 30 min —que es
    exactamente la que cae en `tiny`— se quedaba con ~26 px para el nombre, y con
    ~2 px si el evento llevaba icono. */
+/* F1.8 · EL GLIFO DEL ESTADO, delante de la hora. En Semana es la única señal
+   del estado que no es color (decisión 9 corregida, spec §12): agendada `○`,
+   confirmada `●`, atendida `✓`, no asistió `—`, cancelada `✕`. 11 px fijos y
+   no los 10.5 de la hora: a 10.5 el `○` y el `●` se confunden en pantalla. */
+.agenda-fc .ag-tarjeta-glifo { font-size: 11px; margin-right: var(--ag-1); }
 .agenda-fc .ag-tarjeta-hora-inicio { display: none; }
 .agenda-fc .ag-tarjeta--tiny .ag-tarjeta-hora-rango { display: none; }
 .agenda-fc .ag-tarjeta--tiny .ag-tarjeta-hora-inicio { display: inline; }
@@ -3814,8 +3880,34 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
    Con la píldora encendida, la etiqueta se va del descriptor: decirlo dos veces
    en la misma fila es ruido. */
 .agenda-fc .fc-timeGridDay-view .ag-tarjeta-pildora { display: inline-flex; }
-.agenda-fc .fc-timeGridDay-view .ag-tarjeta-desc-sep,
-.agenda-fc .fc-timeGridDay-view .ag-tarjeta-desc-estado { display: none; }
+/* F1.8 · Y EN SEMANA TAMPOCO SE ESCRIBE: el glifo de la hora y el `title` de
+   la tarjeta dicen el estado, y la tercera línea queda para el motivo. Por eso
+   estas dos reglas ya no llevan `.fc-timeGridDay-view` delante. */
+.agenda-fc .ag-tarjeta-desc-sep,
+.agenda-fc .ag-tarjeta-desc-estado { display: none; }
+/* Sin motivo, la línea entera se va también en Semana. */
+.agenda-fc .ag-tarjeta .ag-tarjeta-desc--solo-estado { display: none; }
+/* F1.4 · Teléfono y consultorio: montados siempre, visibles sólo en Día, donde
+   sobra ancho. Detrás del motivo y antes del chip y la píldora. */
+.agenda-fc .ag-tarjeta-datos { display: none; }
+.agenda-fc .fc-timeGridDay-view .ag-tarjeta-datos {
+  display: inline-flex;
+  order: 5;
+  /* Cede ancho ANTES que el nombre: en una cita estrecha (simultáneas) el que
+     se recorta es el teléfono, nunca el paciente. */
+  flex: 0 1000 auto;
+  min-width: 0;
+  overflow: hidden;
+  gap: var(--ag-2);
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.2;
+  white-space: nowrap;
+  /* `--ag-ink-600` y no el `--ag-muted` del descriptor: éste da ~3:1 sobre el
+     tinte del estado y aquí van cifras que se leen. */
+  color: var(--ag-ink-600);
+}
+.agenda-fc .ag-tarjeta-datos > * + *::before { content: '·'; margin-right: var(--ag-2); }
 
 /* Y si el estado era lo ÚNICO que llevaba el descriptor —un evento genérico sin
    `notes`—, en Día la línea se queda sin nada que decir: no se pinta, en vez de
@@ -6035,7 +6127,10 @@ html.dark .agenda-fc .fc-button:hover {
   color: var(--ag-ink) !important;
   border-color: var(--ag-border-card) !important;
 }
-/* (.fc-today-button conserva --ag-brand-primary: es marca, texto blanco legible — decisión PO 🟠2) */
+/* (.fc-today-button dejó de ser de marca en F1.10: es secundario como las
+   flechas y hereda las dos reglas de arriba; sólo el deshabilitado vuelve a la
+   superficie al pasar el ratón.) */
+html.dark .agenda-fc .fc-today-button:disabled:hover { background: var(--ag-surface) !important; }
 
 /* ⚠️ AQUÍ VIVÍA `html.dark .agenda-fc .fc-timegrid .fc-col-header-cell`, Y SE
    RETIRÓ ENTERA AL CIERRE DEL BLOQUE 4 PORQUE NO LE QUEDABA NADA VIVO. No la

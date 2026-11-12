@@ -576,7 +576,8 @@ function diasTocados(ev: EventoParaVentana, rango: RangoVisible): number[] {
  * en `dayGridMonth` eso es el mes natural, del día 1 al último. Pero esa vista
  * no pinta el mes natural — pinta `renderRange`, que `buildDayTableRenderRange`
  * encaja a semanas completas y `fixedWeekCount` rellena hasta seis filas
- * (`@fullcalendar/daygrid/internal.js:949-958`). Son hasta ~12 días de relleno
+ * (`@fullcalendar/daygrid/internal.js:949-958`; desde F1.6 sólo en el
+ * teléfono, el escritorio pinta sus semanas reales). Son hasta ~12 días de relleno
  * VISIBLES que caen fuera del rango con el que se decide aquí, así que una cita
  * en uno de esos días no protegería su columna.
  *

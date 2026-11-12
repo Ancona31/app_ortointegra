@@ -75,15 +75,19 @@ test('modal de horario: abre y cierra sin guardar', async ({ page }) => {
   await expect(dialogo).toBeHidden()
 })
 
+/* F1.5 · La semilla tiene el domingo cerrado, así que «Compactar» abre ENCENDIDO
+   (decisión 13); la prueba arranca de ahí y recorre el ciclo entero. */
 test('botón Compactar alterna aria-pressed y aparece la banda compacta', async ({ page }) => {
   await irAAgenda(page)
   const boton = page.getByRole('button', { name: /Compactar la rejilla al horario de la clínica/ })
-  await expect(boton).toHaveAttribute('aria-pressed', 'false')
-  await boton.click()
   await expect(boton).toHaveAttribute('aria-pressed', 'true')
   await expect(page.locator('.ag-banda-compacta')).toBeVisible()
   await boton.click()
   await expect(boton).toHaveAttribute('aria-pressed', 'false')
+  await expect(page.locator('.ag-banda-compacta')).toHaveCount(0)
+  await boton.click()
+  await expect(boton).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.locator('.ag-banda-compacta')).toBeVisible()
 })
 
 test('refresco automático al volver de segundo plano: nada antes de 2 minutos, refetch al pasarlos', async ({ page }) => {

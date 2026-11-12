@@ -2232,6 +2232,74 @@ archivos nuevos se importa todavía desde la agenda):
   `agendaV2`.
 - `data-cita-id` en las raíces de las tarjetas (superficie, F1.4).
 
+### Bloque F — decisiones tomadas en la superficie
+
+Agente A («Superficie»), §1 del diseño (`e2e/resultados/plan_F.md`). Todo sale
+directo, sin interruptor. Pruebas en `e2e/agenda-f-pulido.e2e.ts`.
+
+**Medición «antes» de cuadros** (F §4, antes de tocar `src/`): `capturar.ts
+--solo=cuadros --cpu=4`, mes lleno con `--volumen 2000`, en
+`e2e/resultados/F/antes/cuadros-cpu4.json`. **Arreglo del script:** tras
+navegar por Mes, FullCalendar deja la fecha en el día 1 y al volver a Semana
+pintaba la semana del día 1, no la de hoy; la baja salía «OMITIDO» (no
+encontraba su evento) y los 20 pulsos caían fuera de la vista. Ahora pulsa
+«Hoy» al acabar los tramos de navegación. Sólo cambió el script.
+
+**Paso 1 · F1.4, F1.5, F1.6, F1.8, F1.10, F1.14, F1.15**
+
+- **F1.4.** `data-cita-id` en la raíz de `MemoizedEventContent`, `MonthChip`,
+  `FilaLista` y `FilaListaDetalle` (no en `BandaChip` ni en `GoogleEventCard`:
+  la banda de todo el día no es un archivo de la superficie y Google no es una
+  cita). Teléfono (`pacientes.telefono`, o `reserva_telefono` en una por ligar)
+  y consultorio (`consultorio_nombre_corto`) montados siempre y visibles sólo en
+  Día, detrás del motivo, en `--ag-ink-600` (el `--ag-muted` del descriptor da
+  ~3:1 sobre el tinte). Ceden ancho antes que el nombre (`flex-shrink: 1000`).
+- **F1.8 / decisión 9 corregida.** La palabra del estado sale de la tarjeta en
+  TODAS las vistas de rejilla (en Día ya la decía la píldora); sin motivo, la
+  tercera línea desaparece. El glifo va delante de la hora en Semana y en Día,
+  a 11 px, en el color de la hora: **agendada `○`, confirmada `●`**, atendida
+  `✓`, no asistió `—`, cancelada `✕`. `GLIFO_PILDORA` se exporta de
+  `FilaListaDetalle.tsx` y lo usan las dos, así que la píldora de `listDay`
+  cambia también (agendada pasa a `○`). Comprobado en captura a 11 px en claro
+  y oscuro: `○` y `●` se distinguen. La píldora de Día de escritorio no usa el
+  glifo (su punto es un `::before`) y no cambia. El `title` de la tarjeta es
+  «Nombre · Estado».
+- **F1.5.** Encendido si el horario tiene algún día cerrado. Se decide UNA vez
+  y no se recuerda. **Hallazgo del revisor, corregido antes del commit:** si la
+  semilla de config del layout falla, el primer render trae `HORARIO_DEFAULT`
+  (fin de semana cerrado) y habría encendido «Compactar» en una clínica abierta
+  los siete días; ahora no se decide mientras el horario sea esa constante (se
+  compara por identidad) y un efecto decide una vez al llegar el real. Afectó a una e2e
+  (`agenda-vistas`, que esperaba arrancar apagado): ahora arranca encendido y
+  recorre el ciclo. No hizo falta la ayuda `apagarCompactar`: ninguna otra e2e
+  pulsa horas o domingos fuera de horario en la semana visible.
+- **F1.6.** Con «Compactar» encendido en Mes, FullCalendar recorta los días
+  plegados de los bordes del mes ANTES de encajar a semanas (`trimHiddenDays`
+  sobre `currentRange`), así que un mes que empieza en domingo pierde la
+  primera fila cuando el domingo está plegado. Es correcto (esa fila sólo
+  tendría días del mes anterior) y `semanasPintadasDelMes` sigue calculando el
+  rango sin recortar, como antes. `rangosDeLaVista` lee `fixedWeekCount` de la
+  vista (`getOption`), no una constante.
+- **F1.10.** Escritorio: «Hoy» secundario (superficie, borde, tinta); el
+  deshabilitado se ve igual, sin hover y con `cursor: default`. La transición de
+  `.agenda-fc .fc-button` pasa de `all .15s` a fondo y borde en micro. Teléfono:
+  «Hoy» en la primera fila de la banda, con `aria-disabled` (enfocable, no
+  actúa) cuando `currentStart ≤ ahora < currentEnd`. **Toca `AgendaCliente`
+  (un estado booleano y dos props), que no estaba en la lista de F1.10 del
+  diseño: sin eso el botón no puede navegar.**
+- **F1.14.** La píldora no cabe junto al nombre a 390 px («Paciente Prueba 01»
+  bajaba a dos líneas y la fila pasaba de 72): va a la DERECHA DE LA SEGUNDA
+  LÍNEA, junto a «duración · motivo». El nombre conserva el ajuste de línea y
+  la segunda línea se recorta con `line-clamp`, no con `nowrap`: en la tabla de
+  maquetación automática un `nowrap` ensancha la columna y saca la lista por la
+  derecha (la misma lección de `.ag-listafila-nombre`). Relleno vertical de 14 a
+  10 px. Medido a 390: 69 px por cita con paciente; un título largo (eventos
+  de la semilla) baja a dos líneas y la fila mide 83.
+- **F1.15.** Fila 1: ☰ · fecha (15 px/700) con el conteo debajo (12 px) · ‹ ·
+  Hoy · ›. Fila 2: conmutador de 186 px (13 px de letra; a 172 «Semana» no
+  cabía) · filtro (`flex: 1 1 0`) · «Compactar» · engrane. Medido: 114 px de
+  banda (eran ~195); el filtro mide 118 px a 390 y 88 a 360.
+
 ### Menores
 
 - **`ProximasCitas`:** tope de refresco de 2 minutos al volver a la pestaña,

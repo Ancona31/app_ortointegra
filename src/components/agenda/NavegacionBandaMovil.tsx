@@ -1,45 +1,35 @@
 'use client'
 
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import type { Medico } from '@/components/agenda/AppointmentModal'
-import { FiltrosBandaMovil } from '@/components/agenda/FiltrosBandaMovil'
 
-/* La tercera fila de la banda: navegación de periodo con los filtros en medio.
+/* La navegación de periodo de la banda: ‹ · Hoy · ›, en la primera fila y
+   pegada a la fecha (F1.15).
 
-   ⚠️ LAS FLECHAS VAN AQUÍ Y PEGADAS A LOS BORDES, Y ES EL SITIO DEL MOCKUP —los
-   tres lo dibujan igual, en su `.datenav`—. En el paso 8c subieron a la fila del
-   título para ahorrar una fila entera, y ahí no se leen: junto a «Agenda»
-   parecen navegación de la app y no del periodo. Flanqueando el filtro, con la
-   fecha centrada justo debajo, dicen lo que hacen.
+   ⚠️ YA NO LLEVA LOS FILTROS EN MEDIO. Hasta F1.15 era la tercera fila, con las
+   flechas en los extremos y el filtro entre ellas; ahora el filtro va en la
+   segunda fila, junto al conmutador, y esto sólo navega.
 
-   ⚠️ QUIEN LAS EMPUJA A LOS EXTREMOS ES LA CAJA ELÁSTICA DEL MEDIO, no un
-   `justify-content: space-between` en esta fila: con tres o cuatro hijos, aquél
-   repartiría el hueco entre todos y el engrane se despegaría del filtro. El
-   porqué entero está junto a `.ag-banda-movil-medio` en globals.css. */
+   F1.10 · «HOY» ES NUEVO EN EL TELÉFONO, y sale sin interruptor (decisión 16).
+   Con el rango que ya contiene hoy se queda `aria-disabled` —enfocable y con su
+   nombre, pero sin hacer nada—, igual que el «Hoy» de FullCalendar en
+   escritorio, que se deshabilita en el mismo caso. */
 export function NavegacionBandaMovil(
-  { medicos, filtroMedico, onFiltroMedico, onHorario, onCompactar, compactado, onPrev, onNext,
-    mesSinTodos }: {
-    medicos: readonly Medico[]; filtroMedico: string
-    onFiltroMedico: (id: string) => void; onHorario: (() => void) | null
-    onCompactar: (() => void) | null; compactado: boolean
-    onPrev: () => void; onNext: () => void
-    mesSinTodos: boolean
+  { onPrev, onNext, onHoy, hoyDeshabilitado }: {
+    onPrev: () => void; onNext: () => void; onHoy: () => void; hoyDeshabilitado: boolean
   },
 ) {
   return (
-    <div className="ag-banda-movil-filtros">
+    <span className="ag-banda-movil-nav">
       <button type="button" className="ag-banda-movil-ctrl" onClick={onPrev} aria-label="Periodo anterior">
         <ChevronLeft size={20} />
       </button>
-      <FiltrosBandaMovil
-        medicos={medicos} filtroMedico={filtroMedico}
-        onFiltroMedico={onFiltroMedico} onHorario={onHorario}
-        onCompactar={onCompactar} compactado={compactado}
-        mesSinTodos={mesSinTodos}
-      />
+      <button type="button" className="ag-banda-movil-ctrl ag-banda-movil-hoy"
+        aria-disabled={hoyDeshabilitado} onClick={hoyDeshabilitado ? undefined : onHoy}>
+        Hoy
+      </button>
       <button type="button" className="ag-banda-movil-ctrl" onClick={onNext} aria-label="Periodo siguiente">
         <ChevronRight size={20} />
       </button>
-    </div>
+    </span>
   )
 }

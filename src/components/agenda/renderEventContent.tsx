@@ -88,6 +88,7 @@ export function renderEventContent(arg: EventContentArg, navegadorTZ: string, in
     if (arg.view.type === 'listDay') {
       return (
         <FilaListaDetalle
+          citaId={arg.event.id}
           nombre={nombreLista}
           esDeGoogle={ext?.isGcalBlock === true}
           icono={ext?.icono ?? null}
@@ -105,6 +106,7 @@ export function renderEventContent(arg: EventContentArg, navegadorTZ: string, in
     }
     return (
       <FilaLista
+        citaId={arg.event.id}
         nombre={nombreLista}
         esDeGoogle={ext?.isGcalBlock === true}
         icono={ext?.icono ?? null}
@@ -150,6 +152,11 @@ export function renderEventContent(arg: EventContentArg, navegadorTZ: string, in
   const marca = marcaPorLigar(ext)
   return (
     <MemoizedEventContent
+      citaId={arg.event.id}
+      /* F1.4 · Sólo los enseña la vista Día (globals.css). El teléfono es el de
+         la ficha y, en una cita por ligar, el que dejó al reservar. */
+      telefono={pac?.telefono ?? ext.reserva_telefono ?? null}
+      consultorio={ext.consultorio_nombre_corto ?? null}
       timeText={arg.timeText}
       horaInicio={arg.event.start ? FORMATO_HORA_INICIO.format(arg.event.start) : arg.timeText}
       title={ext.title}

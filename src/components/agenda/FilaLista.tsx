@@ -31,13 +31,15 @@ import { IconoDelEvento } from './IconoDelEvento'
    del nombre, exactamente en el sitio donde un evento genérico lleva su icono.
    El componente es el mismo que ya usan `MonthChip` y `GoogleEventCard`. */
 export const FilaLista = memo(function FilaLista(
-  { nombre, esDeGoogle, icono, tinta, cancelada }: {
+  { citaId, nombre, esDeGoogle, icono, tinta, cancelada }: {
+    /** F1.4 · `data-cita-id`, el contrato del movimiento (bloque F §2). */
+    citaId: string
     nombre: string; esDeGoogle: boolean; icono: IconoEvento | null
     tinta: string | null; cancelada: boolean
   },
 ) {
   return (
-    <span className="ag-listafila">
+    <span className="ag-listafila" data-cita-id={citaId}>
       {esDeGoogle && <GoogleGIcon size={11} />}
       {/* 13 px es el `.ico--sm` del mockup, el tamaño del icono cuando acompaña
           al nombre en vez de ocupar su propio cuadro. El color es el del evento,

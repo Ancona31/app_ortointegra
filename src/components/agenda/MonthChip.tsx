@@ -37,6 +37,7 @@ export const MonthChip = memo(function MonthChip({ arg }: { arg: EventContentArg
 
   return (
     <div
+      data-cita-id={arg.event.id}
       className={`ag-mes${isGcal ? ' ag-mes--gcal' : ''}${esEvento ? ' ag-mes--evento' : ''}${
         ext?.status === 'cancelled' ? ' ag-mes--cancelada' : ''}`}
       style={{ background: fondo }}

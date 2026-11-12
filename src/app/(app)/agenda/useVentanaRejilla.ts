@@ -23,7 +23,7 @@ import {
   type VentanaRejilla,
 } from '@/lib/agenda/ventanaRejilla'
 import { type RangosDeVista, rangosDeLaVista } from '@/lib/agenda/fechasAgenda'
-import { DIAS } from '@/lib/agenda/horarioAgenda'
+import { DIAS, HORARIO_DEFAULT } from '@/lib/agenda/horarioAgenda'
 import { vistaAdmiteCompactar } from '@/lib/agenda/vistasAgenda'
 import type { Horario } from '@/lib/configApp'
 
@@ -33,6 +33,11 @@ interface Params {
   calendarRef: CalRef
   horario: Horario
   currentView: string
+}
+
+/** F1.5 · ¿El horario tiene algún día cerrado? Decide el «Compactar» inicial. */
+function hayDiasCerrados(horario: Horario): boolean {
+  return DIAS.some(d => !horario[d.key]?.activo)
 }
 
 export function useVentanaRejilla({ calendarRef, horario, currentView }: Params) {
@@ -68,8 +73,27 @@ export function useVentanaRejilla({ calendarRef, horario, currentView }: Params)
      peor final posible —abrir la agenda un lunes, encontrarla recortada por una
      decisión de hace tres semanas y no saber qué la recortó.
 
-     ⚠️  DECLARADO ANTES QUE `ventana`: su inicializador lo lee en el render. */
-  const [compactar, setCompactar] = useState(false)
+     ⚠️  DECLARADO ANTES QUE `ventana`: su inicializador lo lee en el render.
+
+     F1.5 · ENCENDIDO AL ABRIR SI EL HORARIO TIENE DÍAS CERRADOS (decisión 13).
+     Se decide UNA vez y sigue sin recordarse: lo que el médico apague se queda
+     apagado hasta recargar. Pliega sólo lo cerrado y sin citas
+     (`diasOcultables`), y la banda dice qué se ocultó.
+     ⚠️ SE DECIDE CON EL HORARIO DE LA CLÍNICA, NO CON `HORARIO_DEFAULT`. A1.6
+     siembra la config desde el layout y casi siempre llega en el montaje; si esa
+     semilla falló, `AgendaCliente` pasa el objeto `HORARIO_DEFAULT` mismo (su
+     `?? HORARIO_DEFAULT`), que trae el fin de semana cerrado, y decidir con él
+     encendería «Compactar» en una clínica abierta los siete días. Por eso se
+     compara por IDENTIDAD con la constante: mientras sea ella, no se decide, y
+     el efecto de abajo decide una vez cuando llega el de verdad. Si no llega
+     nunca, queda apagado, como hasta F1.5. */
+  const [compactar, setCompactar] = useState(() => horario !== HORARIO_DEFAULT && hayDiasCerrados(horario))
+  const compactarDecididoRef = useRef(horario !== HORARIO_DEFAULT)
+  useEffect(() => {
+    if (compactarDecididoRef.current || horario === HORARIO_DEFAULT) return
+    compactarDecididoRef.current = true
+    setCompactar(hayDiasCerrados(horario))
+  }, [horario])
 
   const [ventana, setVentana] = useState<VentanaRejilla>(
     () => calcularVentanaRejilla([], null, horario, { compacta: false }),

@@ -22,24 +22,16 @@ import type { Medico } from '@/components/agenda/AppointmentModal'
 export const OPCION_TODOS = (enElMes: boolean): string =>
   enElMes ? 'Todos los médicos — el mes se ve por médico' : 'Todos los médicos'
 
-/* La tercera fila de la banda: filtro de médico y engrane de horario.
+/* La segunda fila de la banda, a la derecha del conmutador (F1.15): filtro de
+   médico, «Compactar» y engrane de horario.
 
    ⚠️ ES UN COMPONENTE APARTE POR TAMAÑO, NO POR REUTILIZACIÓN — sólo lo usa la
-   banda. `BandaMovil` con esta fila dentro medía 63 líneas y el proyecto tiene
-   el tope en 50; la fila de los filtros es el trozo más autocontenido y el único
-   con condiciones propias, así que es el que sale.
+   banda (tope de 50 líneas por función).
 
-   ⚠️ SE PARTIÓ EN DOS EN EL PASO 9b, y sigue siendo por tamaño y no por
-   reutilización: la fila entera —flechas incluidas— pasaba de las 50 líneas de
-   tope. `NavegacionBandaMovil` es la fila; esto es lo que va en su centro.
-
-   ⚠️ Y YA NO DEVUELVE `null` PARA AHORRAR LA FILA. Devolvía `null` en una clínica
-   de un solo médico sin permiso de horario, y con ello se ahorraban 56 px. Hoy
-   la fila lleva además las DOS FLECHAS DE NAVEGACIÓN, que no son opcionales en
-   ninguna clínica —sin ellas no hay forma de cambiar de día, de semana ni de
-   mes—, así que la fila se pinta siempre y este centro puede quedarse vacío. La
-   caja sigue existiendo aunque no tenga hijos: es el muelle que empuja la flecha
-   derecha contra el borde. Ver su nota en globals.css. */
+   ⚠️ EL FILTRO ES LO QUE CEDE ANCHO (`flex: 1 1 0; min-width: 0` en
+   globals.css): el conmutador tiene ancho fijo y los botones 44 px. La caja
+   existe aunque no tenga hijos —clínica de un médico sin engrane— y entonces
+   sólo ocupa el hueco sobrante de la fila. */
 export function FiltrosBandaMovil(
   { medicos, filtroMedico, onFiltroMedico, onHorario, onCompactar, compactado, mesSinTodos }: {
     medicos: readonly Medico[]; filtroMedico: string

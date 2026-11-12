@@ -4,6 +4,7 @@ import { Menu } from 'lucide-react'
 import type { Medico } from '@/components/agenda/AppointmentModal'
 import { vistaEnElOtroFormato } from '@/lib/agenda/vistasAgenda'
 import { NavegacionBandaMovil } from '@/components/agenda/NavegacionBandaMovil'
+import { FiltrosBandaMovil } from '@/components/agenda/FiltrosBandaMovil'
 
 /* ═══ BANDA AZUL DEL ENCABEZADO MÓVIL (bloque 6 · paso 8a) ══════════════════
    Sustituye al encabezado blanco de escritorio por debajo de `ANCHO_MOVIL`, y
@@ -59,19 +60,24 @@ export const VIEWS = [
   { type: 'timeGridDay',  label: 'Día'    },
 ] as const
 
-/* ⚠️ EL SUBTÍTULO VUELVE A SER SÓLO EL CONTEO (paso 9b), que es la decisión
-   original y lo que enseñan la vista Día y la Semana del mockup. La fecha estuvo
-   ahí desde el 8c por no tener fila propia; ahora la tiene otra vez, la cuarta.
-   Y con ella se va el separador « · » que se pintaba sin su espacio de delante.
-   ⚠️ Y LA CUARTA FILA VUELVE A EXISTIR, después de haberla fundido en el 8c. No
-   es un paso atrás: entonces costaba 52 px porque llevaba dentro las dos flechas
-   de 44; ahora sólo lleva la etiqueta, que son unos 19. */
+/* ═══ F1.15 · DOS FILAS (eran cuatro y la banda medía ~195 px de 844) ═══════
+   Fila 1: ☰ · fecha (15 px, negrita) con el conteo debajo (12 px) · ‹ · Hoy · ›.
+   Fila 2: segmentado Mes/Semana/Día de ancho fijo · filtro (cede ancho) · los
+   botones de «Compactar» y del engrane cuando los hay.
+   ⚠️ «Agenda» SIGUE SIENDO EL `<h1>`, sólo que `sr-only`: la fecha es lo que
+   nombra la pantalla a la vista, y el título se lo dice al lector de pantalla.
+   ⚠️ LAS FLECHAS SIGUEN JUNTO A LA FECHA y no junto al conmutador (la nota de
+   arriba del paso 8c): pegadas a las pestañas se leerían como «cambia de vista».
+   Todos los controles miden 44 × 44 o más. */
 export function BandaMovil(
-  { conteo, vistaActual, onVista, titulo, onPrev, onNext, onMenu,
+  { conteo, vistaActual, onVista, titulo, onPrev, onNext, onHoy, hoyDeshabilitado, onMenu,
     medicos, filtroMedico, onFiltroMedico, onHorario, onCompactar, compactado,
     mesSinTodos }: {
     conteo: string; vistaActual: string; onVista: (tipo: string) => void
-    titulo: string; onPrev: () => void; onNext: () => void; onMenu: () => void
+    titulo: string; onPrev: () => void; onNext: () => void
+    /** F1.10 · «Hoy» del teléfono; deshabilitado (aria) si el rango ya lo contiene. */
+    onHoy: () => void; hoyDeshabilitado: boolean
+    onMenu: () => void
     medicos: readonly Medico[]; filtroMedico: string
     onFiltroMedico: (id: string) => void; onHorario: (() => void) | null
     onCompactar: (() => void) | null; compactado: boolean
@@ -80,37 +86,37 @@ export function BandaMovil(
 ) {
   return (
     <header className="ag-banda-movil">
+      <h1 className="sr-only">Agenda</h1>
       <div className="ag-banda-movil-fila">
         <button type="button" className="ag-banda-movil-ctrl" onClick={onMenu} aria-label="Abrir menú">
           <Menu size={19} />
         </button>
         <span className="ag-banda-movil-titulo">
-          <b>Agenda</b>
+          <span className="ag-banda-movil-fecha">{titulo}</span>
           <span className="ag-banda-movil-sub">{conteo}</span>
         </span>
+        <NavegacionBandaMovil onPrev={onPrev} onNext={onNext} onHoy={onHoy} hoyDeshabilitado={hoyDeshabilitado} />
       </div>
-      <div className="ag-banda-movil-vistas" role="tablist" aria-label="Vista del calendario">
-        {VIEWS.map(v => {
-          /* El mismo traductor que el segmentado de escritorio y que el efecto
-             del ancho: aquí `isMobile` es true por construcción —esta banda sólo
-             se monta en móvil—, así que «Semana» apunta a `listWeek`. */
-          const tipo = vistaEnElOtroFormato(v.type, true)
-          return (
-            <button key={v.type} type="button" role="tab" aria-selected={vistaActual === tipo}
-              onClick={() => onVista(tipo)}>{v.label}</button>
-          )
-        })}
+      <div className="ag-banda-movil-filtros">
+        <div className="ag-banda-movil-vistas" role="tablist" aria-label="Vista del calendario">
+          {VIEWS.map(v => {
+            /* El mismo traductor que el segmentado de escritorio y que el efecto
+               del ancho: aquí `isMobile` es true por construcción —esta banda sólo
+               se monta en móvil—, así que «Semana» apunta a `listWeek`. */
+            const tipo = vistaEnElOtroFormato(v.type, true)
+            return (
+              <button key={v.type} type="button" role="tab" aria-selected={vistaActual === tipo}
+                onClick={() => onVista(tipo)}>{v.label}</button>
+            )
+          })}
+        </div>
+        <FiltrosBandaMovil
+          medicos={medicos} filtroMedico={filtroMedico}
+          onFiltroMedico={onFiltroMedico} onHorario={onHorario}
+          onCompactar={onCompactar} compactado={compactado}
+          mesSinTodos={mesSinTodos}
+        />
       </div>
-      <NavegacionBandaMovil
-        medicos={medicos} filtroMedico={filtroMedico}
-        onFiltroMedico={onFiltroMedico} onHorario={onHorario}
-        onCompactar={onCompactar} compactado={compactado}
-        onPrev={onPrev} onNext={onNext}
-        mesSinTodos={mesSinTodos}
-      />
-      {/* La fecha, centrada bajo las flechas. `<p>` y no `<span>`: es la etiqueta
-          de lo que se está mirando, no un trozo del título. */}
-      <p className="ag-banda-movil-fecha">{titulo}</p>
     </header>
   )
 }

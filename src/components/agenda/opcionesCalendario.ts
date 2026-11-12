@@ -67,10 +67,19 @@ import { masBreve } from '@/lib/agenda/vistasAgenda'
    capitalize pone mayúscula en CADA palabra y con este formato largo daría
    «17 – 22 De Agosto De 2026». Con el formato corto de antes no se notaba
    porque no había preposiciones que estropear. */
+/* F1.6 · EL MES DE ESCRITORIO PINTA SUS SEMANAS REALES (spec §7.2, decisión
+   14): `fixedWeekCount: false` quita la sexta fila de relleno y `expandRows:
+   false` deja que cada fila mida su contenido (la prop global `expandRows` del
+   <FullCalendar> es para la rejilla de horas; ésta, por vista, la pisa sólo
+   aquí). ⚠️ `semanasPintadasDelMes` lee `fixedWeekCount` de la vista para
+   contar las semanas: si quitas esto, aquélla vuelve a seis sola. El teléfono
+   (`VISTAS_FC_MOVIL`) sigue con seis: lo exige `.ag-cal-mes-movil`. */
 export const VISTAS_FC = {
   dayGridMonth: {
     dayHeaderFormat: { weekday: 'long' },
     titleFormat:     { month: 'long', year: 'numeric' },
+    fixedWeekCount:  false,
+    expandRows:      false,
   },
   /* ⚠️ `month: 'short'` Y NO `'long'`. En largo esto daba «24 – 28 de agosto de
      2026» y medía 282,77 px a 22 px de cuerpo — el elemento más ancho de la fila
@@ -122,8 +131,8 @@ export const VISTAS_FC = {
      las siete cabeceras se pisaban unas a otras a 51 px de columna. Es la
      abreviatura más corta que el locale ofrece, que es «lo que quepa».
    · `showNonCurrentDates: false` — los días de los meses vecinos se dejan en
-     blanco. Con `fixedWeekCount` en su default (`true`, y NO se toca: de él
-     depende el rango de `semanasPintadasDelMes`) las seis filas siguen ahí, así
+     blanco. Con `fixedWeekCount` en su default (`true`, y NO se toca aquí: el
+     escritorio lo apaga desde F1.6, el teléfono no) las seis filas siguen ahí, así
      que la rejilla no cambia de alto al navegar; lo que se va es el número de un
      día que no es de este mes y que en modo punto no se distingue de los suyos.
    · `dayMaxEvents: 3` — tres puntos y el cuarto hueco como «+N». El global es 3
