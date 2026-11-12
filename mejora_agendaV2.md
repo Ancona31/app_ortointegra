@@ -1539,6 +1539,136 @@ queda listada aquí.
   de una reserva) debería componer con el mismo convenio
   (`pacienteParaGoogle`, o `{nombre: reserva_nombre, apellidos: ''}`).
 
+### Bloque D — sincronización con Google antes de reservar (decisión de Angel)
+
+**Lo que pidió Angel (2026-11-16), literal:** «El enlace de reserva no debe
+depender de la tarea programada de Vercel para conocer lo que hay en Google.
+1. En GET de turnos: si la clínica tiene Google conectado y la última
+sincronización buena tiene más de 60 s, haz la sincronización incremental (la
+misma del sondeo al abrir la agenda) antes de calcular la ocupación. 2. En POST
+de reservar: sincroniza SIEMPRE justo antes de llamar a la RPC, sin el tope de
+60 s. Si el turno quedó ocupado, responde con el mismo error de turno no
+disponible. 3. Si Google falla o tarda demasiado (pon un tiempo máximo corto):
+permite la reserva solo si la última sincronización buena tiene menos de 30
+minutos. Si es más vieja, responde que no se puede reservar por ahora y muestra
+el teléfono del consultorio. Clínicas sin Google conectado no cambian. 4. Si
+una sincronización posterior importa o mueve en Google algo que se empalma con
+una cita reservada por enlace, avisa a la clínica por el mismo canal del aviso
+de cancelación (E8) y regístralo en auditoría. 5. Pruebas: e2e contra el
+Google falso para los cuatro casos, y que la garantía atómica de la RPC no
+cambie.»
+
+**Causa de fondo:** la ocupación de la reserva sale de la base
+(`reserva_ocupacion`, D3), que sólo sabe de Google cuando alguien sincroniza
+(el sondeo al abrir la agenda, C6, o la tarea, C7). Sin agenda abierta y sin
+la tarea activa, un evento recién creado en Google no ocupaba el turno.
+
+**Cómo quedó** (`src/lib/reserva/sincronizarReserva.ts`, llamado desde
+`/api/reservar/[codigo]/turnos` y `/api/reservar/[codigo]`):
+- **GET:** `sincronizarClinica` (la pasada de siempre) con `minIntervaloSeg: 60`:
+  el umbral lo impone `gcal_sync_tomar` (C1) en la base, el mismo de las
+  pestañas; con la última buena más reciente no toma el candado ni llama a
+  Google. Va después de los límites por IP y antes de leer la ocupación.
+- **POST:** la misma pasada con `minIntervaloSeg: 0`, JUSTO antes de
+  `reservar_por_enlace` / `reagendar_por_enlace` (después de `turnoValido`,
+  que usa la ocupación de antes: así un turno que Google acaba de ocupar llega
+  a la RPC y sale su `ocupado`, el mismo 409 `turno_ocupado`, y no un 400
+  `turno_invalido`). Fuera de la transacción: **la RPC no cambió**.
+- **Sin solapes del `syncToken`:** el candado con testigo de C1. Si otra pasada
+  lo tiene (el sondeo, la tarea u otra reserva de la misma clínica), el POST
+  espera en pasos de 250 ms (`gcal_sync_frescura` dice si está tomado) y hace
+  la suya; el GET no espera. Si no está tomado y aun así no se pudo (espera
+  creciente tras fallos de Google), no se gira: se aplica la ventana.
+- **Tope: 4 s** (`TIEMPO_GOOGLE_MS`) para todo lo de Google en la petición
+  (espera del candado incluida). Por qué 4: una incremental es una página de
+  `events.list` (y algún `patch` de restablecimiento), que en condiciones
+  normales tarda bastante menos de 1 s; 4 s deja margen a un Google lento sin
+  que la página pública parezca colgada, y es el límite que Angel sugería
+  (3–4 s). **Cancela de verdad:** un `AbortController` cuya señal llevan
+  `events.list` y el `patch` del restablecimiento (`OpcionesSincronizacion.senal`,
+  nueva, opcional: el sondeo y la tarea no la pasan y no cambian); se aborta
+  con una razón propia (no `TimeoutError`), así gaxios no reintenta. Lo que no
+  lleva la señal (el refresco del token OAuth, la base) lo cubre una carrera
+  con el reloj. Un corte cuenta como fallo de Google (`ultimo_error =
+  'google_tiempo'`, espera creciente incluida).
+- **Ventana: 30 min** (`VENTANA_TOLERADA_MS`) sobre `ultima_ok` cuando la pasada
+  no terminó `ok` (error, tope, parcial, candado ajeno hasta el tope). Una
+  clínica sin acceso (S3, `sin_acceso`) sigue: la rechaza la RPC con el 404
+  uniforme de D5 (un 503 la distinguiría; corrección del revisor). 30 min justos ya no valen. Sin ninguna buena nunca: no se reserva.
+  La lectura es una función nueva (`gcal_sync_frescura`) porque la tabla sólo
+  se toca por `gcal_sync_*` (su COMMENT); no un `.from()` con el cliente de
+  servicio.
+- **Respuesta (GET y POST):** 503 `{ error: 'no_disponible_por_ahora',
+  mensaje, telefono }`, teléfono del consultorio elegido (o el del médico), sin
+  decir que la clínica tiene Google ni qué falló. La página ya pintaba
+  `mensaje`; no cambió. Texto **PENDIENTE DE REVISIÓN**: «Por ahora no se puede
+  reservar en línea. Para agendar, comunícate con el consultorio: {tel}.»
+- **Sin Google** (sin conexión de clínica, o conexión sin calendario), o sin
+  las migraciones de C o de D11: exactamente como antes. Con el interruptor
+  apagado el enlace ya da 404 antes de llegar aquí (D5).
+- **Aislamiento:** la clínica sale de `reserva_contexto` (hash del código). La
+  conexión se lee con `resolverConexionClinica(admin, clinicaId)`
+  (`.eq('clinica_id')`, el mismo de D8) y se comprueba que su `clinicaId` sea
+  ése; todo lo demás es RPC con `p_clinica_id`.
+- **Fallo al leer la conexión:** se decide por la ventana (con la última buena
+  reciente, se reserva; sin ella, no). Cerrado ante la duda.
+
+**Punto 4 · empalmes** (migración `20261116120000_agenda_d11_sync_antes_de_reservar.sql`):
+- **Dónde se detecta:** en la sincronización (cualquiera: sondeo, tarea o
+  reserva), por página, tras aplicar y restablecer: las citas que de verdad se
+  IMPORTARON (`gcal_importar_evento` devolvió fila) o cuya HORA se aplicó
+  (`aplicar` con puntas que prendió) van a `reserva_empalmes_registrar`, que
+  busca en esa clínica y con el mismo médico los pares con una reserva por
+  enlace activa (scheduled/confirmed, con hora, futura) que se solapan con
+  algo que ocupa (las reglas de `reserva_ocupacion`). Incluye la reserva movida
+  desde Google (D4 acepta su hora).
+- **Sin duplicar:** `reserva_empalmes_google` con UNIQUE por par; resincronizar
+  o repetir una página no vuelve a avisar (además, lo que no cambió no llega).
+  Dos reservas empalmadas entre sí, un solo par (orden canónico). Un par nuevo
+  con la misma reserva (otro evento) sí avisa.
+- **Auditoría:** `reserva_empalme_google` en `audit_log`, `user_id 'system'`,
+  `registro_id` = la reserva, `{clinica_id, cita_empalmada, via:'sondeo'}`: sólo
+  ids. En la MISMA sentencia que el par: si la auditoría falla, no queda par
+  (P10). Un fallo de esa llamada cuenta en `errores` y no tumba la página (la
+  pasada avanza el token: ese aviso se pierde; resto conocido).
+- **Canal de E8:** `GET /api/agenda/por-confirmar` devuelve `empalmes` (sesión,
+  `clinica_id` explícito, RLS de la tabla y de `appointments`): pares de los
+  últimos 30 días cuyo empalme SIGUE en pie (si el personal movió o canceló
+  una, sale). El panel «Por confirmar» los pinta en «Reservas por enlace
+  empalmadas con Google» y los suma al contador rojo; si al recargar trae uno
+  detectado hace menos de 2 min, un aviso emergente sin nombre (una vez por
+  pestaña). La agenda recarga el panel cuando su sondeo trae cambios. **Límite
+  conocido**, el de E8: en móvil no hay panel; y lo que detecte la tarea o una
+  reserva con la agenda abierta se ve al abrir el panel o en el siguiente
+  sondeo con cambios, no al instante.
+- **Tabla sin FK a `appointments`**, a propósito (FK a `clinicas` RESTRICT):
+  B3 y la siembra borran citas, y una FK RESTRICT bloquearía esos borrados en
+  la base compartida; la lectura cruza con `appointments`. Los pares huérfanos
+  se quedan (sin purga), como un registro. La semilla la borra como postgres.
+
+**Para tener presente:**
+- **Resto conocido (revisor):** un reenvío del mismo `client_id` con Google
+  caído y la última buena ya vieja recibe el 503 en vez de `repetida`, porque
+  la idempotencia vive en la RPC y no se llega a llamar. La cita y su
+  comprobante ya existen; cerrarlo exigiría tocar la RPC.
+- Cada POST hace una llamada a Google (los límites por IP, dispositivo y
+  enlace de D5 van antes y la acotan; el candado serializa por clínica). Con
+  muchas reservas a la vez en una clínica, la segunda espera a la primera
+  (hasta 4 s).
+- La prueba de la garantía atómica sigue siendo `scripts/reserva-carrera.sh`
+  (psql directo, con su control sin candado) y la carrera de
+  `reserva-enlace.e2e.ts` (sin Google). Con Google conectado, la espera del
+  candado de la sincronización ya serializa dos POST simultáneos: comprobado
+  quitando el candado consultivo de la RPC en la base local (restaurada
+  después, mismo md5), la e2e de dos POST seguía dando una cita. Por eso esa
+  e2e prueba otra cosa: que el segundo POST espera y hace SU pasada (con la
+  espera quitada, contesta 503).
+- Sin probar en local: latencias y errores reales de Google (el falso
+  responde al instante salvo cuando se le pide demora o fallo), el refresco
+  del token OAuth dentro del tope y el comportamiento en Vercel de una pasada
+  abortada (que su `soltar` llegue antes de que congelen la función; si no,
+  el candado caduca a los 30 s).
+
 ### Bloque E — decisiones tomadas en E1-E2
 
 **E1 · migración `20261115120000_agenda_e1_confirmacion_enlace.sql`:**
@@ -3064,6 +3194,22 @@ primero sin marcar.
     por WhatsApp a pacientes **existentes** quizá no lo cubre su consentimiento
     actual (LFPDPPP 2025).
   - Pruebas al cierre: 1394 Vitest, 16 archivos SQL, 163 e2e.
+- [x] D11 — Sincronización con Google antes de reservar por enlace (decisión
+  de Angel, 2026-11-16; rama `feature/agenda-v2-dsync`, worktree
+  `~/proyectos/app_ortointegra-agenda-b56`)
+  - GET de turnos: pasada incremental si la última buena tiene más de 60 s ·
+    POST: siempre, justo antes de la RPC (que no cambia), esperando el candado
+    si otra pasada lo tiene · tope de 4 s que aborta `events.list` y el
+    restablecimiento · si Google falla o tarda, reserva sólo con una buena de
+    menos de 30 min; si no, 503 con el teléfono · empalmes con reservas por
+    enlace: registrados una vez por par, auditados y en el panel «Por
+    confirmar». Decisiones: §6-bis «Bloque D — sincronización con Google
+    antes de reservar».
+  - Migración (sólo local): `20261116120000` D11 (`gcal_sync_frescura`,
+    `reserva_empalmes_google`, `reserva_empalmes_registrar`), con revisión
+    independiente APTA CON CAMBIOS aplicados; auditoría formal pendiente.
+  - e2e `e2e/reserva-google.e2e.ts` contra el Google falso (`next dev` :3002),
+    que ganó demora y fallo configurables para `events.list`.
 - [ ] F — Interfaz, movimiento y orden visual
 
 **Bitácora** (una línea por sesión: fecha, qué quedó hecho, qué quedó a medias):
