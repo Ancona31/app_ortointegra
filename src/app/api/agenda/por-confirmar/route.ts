@@ -9,6 +9,9 @@
  * NO devuelve el teléfono: el botón de la fila lo pide a `/api/agenda/whatsapp`
  * (`preparar`), que vuelve a comprobar todo.
  *
+ * E8 añade `canceladas` y D11 `empalmes` (reservas por enlace a las que una
+ * sincronización con Google les metió encima un evento importado o movido).
+ *
  * Puertas: `entradaGestion()` (401 / 403 / 404 con el interruptor apagado).
  * Cliente de SESIÓN: la RLS de `appointments` decide (el invitado, sólo las
  * suyas) y la consulta lleva `clinica_id` explícito.
@@ -21,6 +24,7 @@ import {
 } from '@/lib/agenda/whatsappServidor'
 import type { FilaPorConfirmar } from '@/lib/agenda/whatsappCita'
 import { VENTANA_CANCELADAS_MS, type FilaCancelada } from '@/lib/agenda/avisoCancelacion'
+import { empalmesVigentes, VENTANA_EMPALMES_MS, type FilaEmpalme } from '@/lib/agenda/avisoEmpalmeReserva'
 import { logger } from '@/lib/logger'
 
 export const dynamic = 'force-dynamic'
@@ -65,6 +69,38 @@ async function canceladasRecientes(supabase: ClienteSesion, clinicaId: string, a
   })
 }
 
+const Par = z.object({ cita_reserva_id: z.string(), cita_otra_id: z.string(), detectado_en: z.string() })
+const CitaDelPar = z.object({
+  id: z.string(), title: z.string().nullable(), start_time: z.string(), end_time: z.string(),
+  consultorio_timezone: z.string().nullable(), status: z.string(), all_day: z.boolean(), medico_id: z.string().nullable(),
+})
+
+/**
+ * D11 · «Reservas por enlace empalmadas con Google»: los pares que registró
+ * la sincronización (`reserva_empalmes_google`) en los últimos 30 días, si el
+ * empalme sigue en pie con las citas de hoy. Dos lecturas con la SESIÓN y
+ * `clinica_id` explícito: la RLS de la tabla sólo deja ver los pares cuya
+ * reserva se ve, y la de `appointments` decide qué citas salen. Sin la
+ * migración de D11, vacía.
+ */
+async function empalmesConReservas(supabase: ClienteSesion, clinicaId: string, ahora: number): Promise<FilaEmpalme[]> {
+  const { data, error } = await supabase.from('reserva_empalmes_google').select('cita_reserva_id, cita_otra_id, detectado_en')
+    .eq('clinica_id', clinicaId).gte('detectado_en', new Date(ahora - VENTANA_EMPALMES_MS).toISOString())
+    .order('detectado_en', { ascending: false }).limit(TOPE)
+  if (error) {
+    if (error.code && AUSENTE.has(error.code)) return []
+    throw new Error(`empalmes sin leer: ${error.code ?? ''}`)
+  }
+  const pares = z.array(Par).parse(data ?? [])
+  if (pares.length === 0) return []
+  const ids = [...new Set(pares.flatMap((p) => [p.cita_reserva_id, p.cita_otra_id]))]
+  const { data: filas, error: e2 } = await supabase.from('appointments')
+    .select('id, title, start_time, end_time, consultorio_timezone, status, all_day, medico_id')
+    .eq('clinica_id', clinicaId).in('id', ids)
+  if (e2) throw new Error(`citas de empalmes sin leer: ${e2.code ?? ''}`)
+  return empalmesVigentes(pares, z.array(CitaDelPar).parse(filas ?? []), ahora)
+}
+
 export async function GET(): Promise<NextResponse> {
   const e = await entradaGestion()
   if (!e.ok) return e.respuesta
@@ -85,7 +121,8 @@ export async function GET(): Promise<NextResponse> {
         tiene_telefono: telefonoDeCita(c) !== null, whatsapp_reminder_sent_at: c.whatsapp_reminder_sent_at,
       }))
     const canceladas = await canceladasRecientes(e.supabase, e.clinicaId, ahora)
-    return NextResponse.json({ citas, canceladas }, { headers: { 'Cache-Control': 'no-store' } })
+    const empalmes = await empalmesConReservas(e.supabase, e.clinicaId, ahora)
+    return NextResponse.json({ citas, canceladas, empalmes }, { headers: { 'Cache-Control': 'no-store' } })
   } catch (err: unknown) {
     logger.error('agenda', `GET por confirmar: ${err instanceof Error ? err.name : 'error'}`)
     return NextResponse.json({ error: 'Error interno' }, { status: 500 })

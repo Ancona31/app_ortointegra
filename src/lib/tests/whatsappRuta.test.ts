@@ -20,6 +20,9 @@ const h = vi.hoisted(() => ({
   /** E8: lo que devuelve `cita_confirmaciones` (o su error). */
   respuestas: [] as Array<Record<string, unknown>>,
   errorRespuestas: null as { code: string } | null,
+  /** D11: lo que devuelve `reserva_empalmes_google` (o su error). */
+  empalmes: [] as Array<Record<string, unknown>>,
+  errorEmpalmes: null as { code: string } | null,
   enlace: { id: 'e', codigo: 'c', url: 'https://spinus.prueba/confirmar/AbCdEfGhIjKlMnOpQrStUv' } as { id: string; codigo: string; url: string } | null,
   emisiones: [] as unknown[][],
 }))
@@ -30,7 +33,9 @@ function cadena(tabla: string): Record<string, unknown> {
     c[op] = (...args: unknown[]) => { h.llamadas.push({ op, args }); return c }
   }
   c.maybeSingle = async () => ({ data: h.fila, error: null })
-  const resultado = tabla === 'cita_confirmaciones' ? { data: h.respuestas, error: h.errorRespuestas } : { data: h.filas, error: null }
+  const resultado = tabla === 'cita_confirmaciones' ? { data: h.respuestas, error: h.errorRespuestas }
+    : tabla === 'reserva_empalmes_google' ? { data: h.empalmes, error: h.errorEmpalmes }
+      : { data: h.filas, error: null }
   c.then = (ok: (r: unknown) => unknown) => Promise.resolve(resultado).then(ok)
   return c
 }
@@ -74,6 +79,8 @@ beforeEach(() => {
   h.filas = []
   h.respuestas = []
   h.errorRespuestas = null
+  h.empalmes = []
+  h.errorEmpalmes = null
   h.emisiones = []
   h.enlace = { id: 'e', codigo: 'c', url: 'https://spinus.prueba/confirmar/AbCdEfGhIjKlMnOpQrStUv' }
   vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://spinus.prueba')
@@ -189,7 +196,8 @@ describe('GET /api/agenda/por-confirmar — canceladas por el paciente (E8)', ()
     const { canceladas } = await (await GET()).json()
     expect(canceladas).toEqual([{ id: 'c1', inicio: FUTURO, zona: 'America/Mexico_City', titulo: 'Cita uno', respondido_en: '2026-11-12T10:00:00+00:00' }])
     const deClinica = h.llamadas.filter((l) => l.op === 'eq' && l.args[0] === 'clinica_id')
-    expect(deClinica).toHaveLength(3)
+    // Lista de mañana, respuestas, sus citas y (D11) los empalmes, vacíos aquí.
+    expect(deClinica).toHaveLength(4)
     expect(h.llamadas.some((l) => l.op === 'eq' && l.args[0] === 'respuesta' && l.args[1] === 'cancelo')).toBe(true)
   })
 
@@ -203,5 +211,30 @@ describe('GET /api/agenda/por-confirmar — canceladas por el paciente (E8)', ()
   it('otro error al leer las respuestas → 500', async () => {
     h.errorRespuestas = { code: '57014' }
     expect((await GET()).status).toBe(500)
+  })
+})
+
+describe('GET /api/agenda/por-confirmar — reservas empalmadas con Google (D11)', () => {
+  const FIN = new Date(Date.parse(FUTURO) + 30 * 60_000).toISOString()
+  it('sólo los pares en pie, con clinica_id en las dos lecturas y sin datos de contacto', async () => {
+    h.empalmes = [{ cita_reserva_id: 'r1', cita_otra_id: 'g1', detectado_en: '2026-11-12T10:00:00+00:00' }]
+    h.filas = [
+      cita({ id: 'r1', title: 'Persona Reserva', end_time: FIN, medico_id: 'm1', reserva_canal: 'fijo', reserva_telefono: '5512345678' }),
+      cita({ id: 'g1', title: 'Junta', end_time: FIN, medico_id: 'm1' }),
+    ]
+    const { empalmes } = await (await GET()).json()
+    expect(empalmes).toEqual([{ id: 'r1', inicio: FUTURO, zona: 'America/Mexico_City', titulo: 'Persona Reserva', detectado_en: '2026-11-12T10:00:00+00:00' }])
+    expect(JSON.stringify(empalmes)).not.toContain('5512345678')
+    expect(h.llamadas.some((l) => l.op === 'from' && l.args[0] === 'reserva_empalmes_google')).toBe(true)
+    // Lista de mañana, respuestas (vacías), los pares y sus citas.
+    const deClinica = h.llamadas.filter((l) => l.op === 'eq' && l.args[0] === 'clinica_id')
+    expect(deClinica).toHaveLength(4)
+  })
+
+  it('sin la tabla de D11 (42P01): la sección sale vacía y la lista sigue', async () => {
+    h.errorEmpalmes = { code: '42P01' }
+    const res = await GET()
+    expect(res.status).toBe(200)
+    expect((await res.json()).empalmes).toEqual([])
   })
 })
