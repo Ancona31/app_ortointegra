@@ -1266,6 +1266,49 @@ queda listada aquí.
   banco de N = 1/5/20 reservas con supabase-js y el `EXPLAIN` con la semilla de
   30k citas.
 
+### Bloque D — decisiones tomadas en D6-D7 (lado interno)
+
+**Gestión de enlaces y contactos (lo que quedó pendiente de D1 y D2):**
+- **Rutas:** `/api/agenda/enlaces` (GET, POST), `/api/agenda/enlaces/[id]` (GET
+  código, PATCH revocar), `/api/agenda/reservas/contactos` (GET, POST) y
+  `/api/agenda/reservas/historial?cita=` (GET). Entrada común
+  (`src/lib/reserva/gestionServidor.ts`): `getUser()` → perfil con clínica
+  (403; un error al leerlo, 500) → interruptor (404). Cliente de sesión,
+  `clinica_id` explícito en cada consulta y RLS; nada de `createAdminClient()`.
+  Las RPC sin parámetro de clínica (`reserva_enlace_regenerar_fijo`,
+  `reserva_contactos_bloqueados`, `reserva_contacto_marcar`) acotan con el
+  `get_clinica_id()` de la sesión; la lista de bloqueados se vuelve a filtrar
+  por médico en la ruta.
+- **Permisos (lista A, 16):** `puedeGestionarDelMedico` = administrador o
+  secretaria (`canVerAgendaCompleta`), o el médico dueño. Se comprueba antes de
+  escribir (403) aunque la RLS diga lo mismo. Un `super_admin` no gestiona nada.
+- **El código no viaja en la lista.** `GET /api/agenda/enlaces` devuelve sólo
+  los VIGENTES (fijo sin revocar; únicos sin usar, sin revocar y sin caducar),
+  sin código ni hash; el código se pide uno a uno a `GET …/enlaces/[id]`
+  (410 si ya no está vigente, `no-store`), y el alta lo devuelve en el momento.
+  En el navegador sólo vive en el estado de la pantalla. Usados, caducados y
+  revocados no se listan (siguen en la base; nunca se borran). Tope de 200.
+- **Sin `RESERVA_SECRETO`:** el alta da 503 sin escribir nada (un enlace cuyo
+  código no se puede derivar no sirve) y la pantalla lo dice; la lista sí sale.
+- **Fijo:** crear y regenerar son la misma llamada (`reserva_enlace_regenerar_fijo`:
+  revoca el vigente y emite otro en una transacción). Regenerar y revocar piden
+  confirmación. El único se emite con etiqueta opcional; la vigencia la congela
+  la base con el ajuste de ese momento y el cuerpo no puede mandarla
+  (`strictObject`).
+- **La dirección** que se enseña es `<origen>/reservar/<código>`, la página de D5.
+- **Contactos bloqueados:** la lista y «Desbloquear» por cita
+  (`reserva_contacto_marcar`, que desbloquea los dos seudónimos). Bloquear a
+  mano se hace desde el modal de la cita (D6). Se hereda el límite de D2: un
+  bloqueo manual sin citas en (ventana + 366) días no sale en la lista.
+- **Pantalla:** las dos secciones salen para cualquier médico (los suyos) y para
+  administrador y secretaria (los de todos), sólo con v2 encendida, como el
+  resto de la pantalla.
+- **e2e y la semilla:** `scripts/agenda-semilla.ts` no conoce las tablas de D
+  y sus FKs RESTRICT le impedirían volver a sembrar si una prueba deja filas;
+  las e2e de este lado limpian como `postgres` con `session_replication_role =
+  replica` (`e2e/reservaAyudas.ts`). Quien integre D10 debería enseñar a la
+  semilla a borrarlas también.
+
 ### Bloque F
 
 - Las 18 propuestas de la auditoría visual, aprobadas. **El pulido visual y los

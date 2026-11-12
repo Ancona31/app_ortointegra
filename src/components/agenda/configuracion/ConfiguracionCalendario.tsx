@@ -32,6 +32,8 @@ import SeccionHorarioClinica from '@/components/agenda/configuracion/SeccionHora
 import SeccionAjustesReserva from '@/components/agenda/configuracion/SeccionAjustesReserva'
 import SeccionDisponibilidad from '@/components/agenda/configuracion/SeccionDisponibilidad'
 import SeccionTiposCita from '@/components/agenda/configuracion/SeccionTiposCita'
+import SeccionEnlacesReserva from '@/components/agenda/configuracion/SeccionEnlacesReserva'
+import SeccionContactosBloqueados from '@/components/agenda/configuracion/SeccionContactosBloqueados'
 
 /** Reescribe la rebanada del agregado que acaba de guardarse, sin volver a pedirlo. */
 export type ActualizarConfig = (cambio: (config: ConfigApp) => ConfigApp) => void
@@ -43,9 +45,14 @@ interface Props {
   tipos: TipoCita[] | null
   puedeAdministrar: boolean
   usuarioId: string
+  /** Bloque D, lista A punto 16: administrador o secretaria gestionan los
+   *  enlaces y los contactos de TODOS los médicos; un médico, los suyos. */
+  gestionaReservasDeTodos: boolean
+  /** Un médico (dueño o invitado) gestiona los suyos; la secretaria no tiene. */
+  esMedico: boolean
 }
 
-export default function ConfiguracionCalendario({ ajustes, tipos, puedeAdministrar, usuarioId }: Props) {
+export default function ConfiguracionCalendario({ ajustes, tipos, puedeAdministrar, usuarioId, gestionaReservasDeTodos, esMedico }: Props) {
   const swr = useSWRConfig()
   const { data: config, error, mutate } = useSWR<ConfigApp>(
     CLAVE_CONFIG,
@@ -90,6 +97,13 @@ export default function ConfiguracionCalendario({ ajustes, tipos, puedeAdministr
         actualizarConfig={actualizarConfig}
       />
       <SeccionTiposCita tipos={tipos} puedeEditar={puedeAdministrar} medicos={config?.medicos ?? []} />
+      {(gestionaReservasDeTodos || esMedico) && (
+        <>
+          <SeccionEnlacesReserva medicos={config?.medicos ?? []} usuarioId={usuarioId}
+            gestionaTodos={gestionaReservasDeTodos} vigenciaDias={ajustes?.vigencia_enlace_unico_dias ?? null} />
+          <SeccionContactosBloqueados medicos={config?.medicos ?? []} gestionaTodos={gestionaReservasDeTodos} />
+        </>
+      )}
     </div>
   )
 }
