@@ -20,6 +20,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { decrypt } from '@/lib/encrypt'
 import { logger } from '@/lib/logger'
 import { componerNombreMedicoCompleto, type CamposNombre } from '@/lib/nombreMedico'
+import { rootUrlGoogleFalso } from '@/lib/gcalFalso'
 import {
   leerConexionConSecretos,
   guardarSecretos,
@@ -241,8 +242,12 @@ async function abrirSesionGoogle(
     await refrescarSesion(oauth2Client, conexion)
   }
 
+  // Sólo en las e2e, contra el Google FALSO local: doble guarda en
+  // `gcalFalso.ts` (nunca en producción, nunca con una Supabase no local). En
+  // cualquier otro caso es `null` y la llamada es la de siempre.
+  const rootUrl = rootUrlGoogleFalso()
   return {
-    calendar:   google.calendar({ version: 'v3', auth: oauth2Client }),
+    calendar:   google.calendar({ version: 'v3', auth: oauth2Client, ...(rootUrl ? { rootUrl } : {}) }),
     calendarId: fila.calendarId,
   }
 }

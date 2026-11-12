@@ -1061,6 +1061,52 @@ queda listada aquí.
   carrera de milisegundos; queda auditado (`gcal_conflicto_cita
   {gana:'google', via:'edicion'}`).
 
+**C6 · disparo al abrir la agenda:**
+- **`POST /api/google/sync`** (`maxDuration` 30, `force-dynamic`). Puertas en
+  orden, todas con el cliente de SESIÓN y antes de tocar el de servicio:
+  `getUser()` (401) → perfil con clínica (403) → `canVerAgendaCompleta`
+  (invitado: `omitida`) → interruptor (`omitida`) → S3: `clinica_no_suspendida()`
+  y `clinica_tiene_acceso()` por RPC con la sesión, las originales sin copiar
+  (error = `sin_acceso`) → conexión bajo RLS (`sin_conexion`). Luego
+  `sincronizarClinica` con 8 s de presupuesto, candado de 30 s y 60 s mínimos
+  (los impone `gcal_sync_tomar` para todas las pestañas). Responde sólo
+  `{estado, cambios}`; `cambios` cuenta filas de Spinus (lo restablecido cambia
+  Google, no la agenda). Un fallo inesperado: `{estado:'error'}` sin detalle.
+  No hace falta tocar el middleware: lleva cookie.
+- **Cliente** (`AgendaCliente.tsx`): con v2 y `canVerAgendaCompleta`, el sondeo
+  sale en `enOcioso` tras montar y al volver a la pestaña pasados 2 min (mismo
+  umbral que el refresco por foco, repetido: es local a su gancho). Si
+  `cambios > 0`: `vaciarCacheGoogle()` y `refetch(true)` (vacía también la de
+  citas y fuerza Google). Fallos, silenciosos. Apagado no sale ninguna
+  petición (lo prueba la e2e).
+- **Sin duplicados:** la resta de `/api/google/events` ya quita todo evento con
+  fila (por construcción, con la guarda del `count`). De seguro, `gcalSource`
+  descarta los ids que ya son `google_event_id` de las citas pintadas
+  (`quitarEventosImportados`), para la caché de 5 min de antes del sondeo. No
+  hubo que migrar datos: encender v2 importa en la primera completa y lo
+  importado sale solo de la vista. **Ninguna migración nueva en C5-C6.**
+- **Google falso para las e2e** (`src/lib/gcalFalso.ts`): `rootUrl` sólo si
+  `GCAL_FALSO_URL` está, `NODE_ENV` y `VERCEL_ENV` no son `production`, la
+  Supabase es `localhost`/`127.0.0.1` **y** el propio destino es local (los
+  tokens viajan en `Authorization`). Prueba: `gcalFalso.test.ts`. Hay un único
+  `google.calendar(` en `gcal.ts` (el del callback de OAuth no se toca: las e2e
+  no hacen OAuth).
+- **Consecuencia de la guarda: las e2e de Google corren contra `next dev` en
+  :3002, no contra :3001.** `next start` siempre tiene `NODE_ENV=production`,
+  así que contra él el desvío no puede abrirse (es lo pedido). La prueba
+  (`e2e/agenda-google-dos-sentidos.e2e.ts`, sólo en `escritorio`) arranca el
+  Google falso en su proceso, siembra una conexión de la clínica A con tokens
+  falsos cifrados con la clave local y que no caducan (sin refresco posible),
+  levanta `next dev --webpack -p 3002` con `GOOGLE_CLIENT_ID/SECRET` falsos, y
+  al acabar lo para y borra la conexión (también antes de empezar), para que
+  :3001 no la vea. `next dev` escribe en `.next/dev` y no pisa el build. Simula
+  los 60 s entre sondeos poniendo `ultima_ok` en el pasado.
+- La e2e no cubre al médico invitado ni a la secretaria en el navegador (lo
+  cubre `googleSyncRuta.test.ts`), ni el 412/`If-Match` de la edición, el 410
+  ni la paginación: los cubren `gcalEscrituraV2.test.ts`,
+  `gcalSincronizacion.test.ts` y `c4_gcal_flujo.sql`. El Google falso ya
+  responde 412, por si se quiere añadir.
+
 ### Bloque F
 
 - Las 18 propuestas de la auditoría visual, aprobadas. **El pulido visual y los
@@ -1281,10 +1327,15 @@ primero sin marcar.
     `gcalSincronizacion.ts` (`sincronizarClinica`, que hoy no llama nadie),
     `listarConexionesParaSincronizar` en `gcalConexion.ts`, cerrojo nuevo y
     `supabase/pruebas-sql/c4_gcal_flujo.sql`.
-  - Falta: C5 (escritura saliente: marcas, `etag`, `If-Match`, `attended`, y
-    consumir `restablecer`), C6 (sondeo al abrir la agenda), C7 (cron y
-    middleware), C8 (e2e contra un Google falso). Decisiones: §6-bis,
-    «Bloque C — decisiones tomadas en C0-C4».
+  - C5 (2026-11-13): escritura saliente v2 (`src/lib/gcalEscritura.ts`,
+    `gcalSincronizacionRestablecer.ts`; rutas de citas y de consultas): marca
+    privada, `etag`, `If-Match` + 412, gana el último auditado, `attended` y
+    restablecer. C6: `POST /api/google/sync`, sondeo en ocioso en la agenda,
+    sin duplicados en la vista de Google, desvío a un Google falso con doble
+    guarda y e2e `agenda-google-dos-sentidos.e2e.ts` (contra `next dev` :3002;
+    cubre lo de C8 salvo 410 y paginación, que cubren Vitest y SQL).
+  - Falta: C7 (cron y middleware, en otro agente). Decisiones: §6-bis,
+    «Bloque C — decisiones tomadas en C0-C4» y «… en C5-C6».
 - [ ] D — Reserva por enlace
 - [ ] E — Recordatorios y confirmación de asistencia
 - [ ] F — Interfaz, movimiento y orden visual

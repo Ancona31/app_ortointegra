@@ -42,6 +42,7 @@ import { PanelDelDia } from '@/components/agenda/PanelDelDia'
 import { PanelDia } from '@/components/agenda/PanelDia'
 import { renderSinEventos } from '@/components/agenda/renderSinEventos'
 import { vaciarCacheCitas } from '@/lib/agenda/cacheRangosCitas'
+import { vaciarCacheGoogle } from '@/lib/agenda/cacheEventosGoogle'
 import type { SemillaCitas } from '@/lib/agenda/semillaCitas'
 import { enOcioso, cancelarOcioso } from '@/lib/agenda/ocioso'
 import { useFiltroMedico } from '@/app/(app)/agenda/useFiltroMedico'
@@ -134,6 +135,10 @@ const SIN_MEDICOS: MedicoConfig[] = []
    de que el ojo lo lea como un estado, y encima le cae encima la rampa de
    opacidad de 180 ms de `--ag-dur-base` (CONTRASTE_Y_MOVIMIENTO §3). */
 const UMBRAL_CARGA_MS = 150
+/* C6: volver a sondear Google al volver a la pestaña. El mismo valor que
+   `UMBRAL_REFETCH_FOCO_MS` de `useTiempoRealAgenda.ts`, repetido a propósito
+   (es local a ese gancho). */
+const UMBRAL_SONDEO_FOCO_MS = 120_000
 
 /* ─── Página principal ─────────────────────────────────── */
 
@@ -582,6 +587,48 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
     const idle = enOcioso(precargarModalesAgenda)
     return () => cancelarOcioso(idle)
   }, [])
+
+  /* ── C6 · SONDEO DE GOOGLE AL ABRIR LA AGENDA (mejora_agendaV2.md, C-g) ──
+     Sólo con el interruptor v2 encendido y sólo administrador o secretaria
+     (`canVerAgendaCompleta`): en tiempo ocioso tras la primera pintura, y otra
+     vez al volver a la pestaña pasados 2 min (el mismo umbral que el refresco
+     por foco). No bloquea nada y un fallo no se ve: es un sondeo. El mínimo
+     de 60 s entre sondeos por clínica lo impone la base para todas las
+     pestañas. Si cambió algo en Spinus, se vacían las dos cachés y se vuelve
+     a pedir: así lo importado sale de la vista de solo lectura (la ruta de
+     Google lo resta) y aparece como fila. Apagado, este efecto no hace nada
+     y no sale ninguna petición. */
+  const ultimoSondeoRef = useRef(0)
+  const puedeSondear = agendaV2 && profile !== null && canVerAgendaCompleta(profile)
+  useEffect(() => {
+    if (!puedeSondear) return
+    let vigente = true
+    const sondear = (): void => {
+      ultimoSondeoRef.current = Date.now()
+      fetch('/api/google/sync', { method: 'POST' })
+        .then(async (res): Promise<number> => {
+          if (!res.ok) return 0
+          const datos: unknown = await res.json()
+          return typeof datos === 'object' && datos !== null && 'cambios' in datos && typeof datos.cambios === 'number' ? datos.cambios : 0
+        })
+        .then((cambios) => {
+          if (!vigente || cambios <= 0) return
+          vaciarCacheGoogle()
+          refetch(true)
+        })
+        .catch(() => undefined)
+    }
+    const idle = enOcioso(sondear)
+    const alVolver = (): void => {
+      if (document.visibilityState === 'visible' && Date.now() - ultimoSondeoRef.current >= UMBRAL_SONDEO_FOCO_MS) sondear()
+    }
+    document.addEventListener('visibilitychange', alVolver)
+    return () => {
+      vigente = false
+      cancelarOcioso(idle)
+      document.removeEventListener('visibilitychange', alVolver)
+    }
+  }, [puedeSondear, refetch])
 
   const { firmarEscritura, aplicarAppointmentAlEvento } = useTiempoRealAgenda({
     calendarRef, filtroEfectivo, refetch, ultimaTraidaRef,

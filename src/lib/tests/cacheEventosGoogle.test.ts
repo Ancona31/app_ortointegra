@@ -14,7 +14,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import {
   TTL_GOOGLE_MS, aEventosDeCalendario, claveGoogle, eventosProvisionales, leerGoogle,
-  pedirEventosGoogle, traerGoogle, vaciarCacheGoogle, type RespuestaGoogle,
+  pedirEventosGoogle, quitarEventosImportados, traerGoogle, vaciarCacheGoogle, type RespuestaGoogle,
+  type EventoGoogle as EventoGoogleC6,
 } from '@/lib/agenda/cacheEventosGoogle'
 
 const CLAVE = claveGoogle('u1', '', '2026-11-09T06:00:00.000Z', '2026-11-16T06:00:00.000Z')
@@ -190,5 +191,19 @@ describe('aEventosDeCalendario', () => {
   it('día completo cuando no hay dateTime; título por omisión; no editable', () => {
     const [ev] = aEventosDeCalendario([{ id: 'x', start: { date: '2026-11-10' }, end: { date: '2026-11-11' } }])
     expect(ev).toMatchObject({ id: 'gcal-x', title: 'Evento sin título', start: '2026-11-10', end: '2026-11-11', allDay: true, editable: false })
+  })
+})
+
+describe('C6 · quitarEventosImportados (sin duplicados tras el sondeo)', () => {
+  const ev = (id: string): EventoGoogleC6 => ({ id, summary: id, start: { dateTime: '2031-06-06T16:00:00Z' }, end: { dateTime: '2031-06-06T17:00:00Z' } })
+
+  it('quita los que ya son filas de Spinus y deja el resto (recurrentes incluidos)', () => {
+    const lista = [ev('importado'), ev('serie_0'), ev('otro')]
+    expect(quitarEventosImportados(lista, new Set(['importado'])).map((e) => e.id)).toEqual(['serie_0', 'otro'])
+  })
+
+  it('sin citas ligadas devuelve la misma lista', () => {
+    const lista = [ev('a')]
+    expect(quitarEventosImportados(lista, new Set())).toBe(lista)
   })
 })

@@ -157,6 +157,19 @@ export async function pedirEventosGoogle(desde: string, hasta: string, filtro: s
   return { estado: data.estado ?? 'error_google', events: data.events ?? [] }
 }
 
+/**
+ * C6 · Quita de la vista de solo lectura los eventos de Google que YA son
+ * filas de Spinus (`google_event_id` de las citas cargadas). La ruta
+ * `/api/google/events` los resta al responder, así que esto sólo hace falta con
+ * una respuesta guardada aquí de ANTES de que el sondeo los importara (hasta
+ * `TTL_GOOGLE_MS`): sin esto se verían dos veces, la fila editable y el bloque
+ * de Google. No toca la caché; filtra lo que se entrega.
+ */
+export function quitarEventosImportados(eventos: EventoGoogle[], ligados: ReadonlySet<string>): EventoGoogle[] {
+  if (ligados.size === 0) return eventos
+  return eventos.filter((e) => !ligados.has(e.id))
+}
+
 /** De la lista blanca del servidor a lo que pinta FullCalendar. */
 export function aEventosDeCalendario(eventos: EventoGoogle[]): EventInput[] {
   return eventos.map((e) => ({

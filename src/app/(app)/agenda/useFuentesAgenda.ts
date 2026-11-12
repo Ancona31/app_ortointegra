@@ -28,8 +28,8 @@ import type { Profile } from '@/hooks/useProfile'
 import { canVerAgendaCompleta } from '@/lib/permissions'
 import { rangoQuePedir } from '@/lib/agenda/rangoQuePedir'
 import {
-  aEventosDeCalendario, claveGoogle, eventosProvisionales, leerGoogle, pedirEventosGoogle, traerGoogle,
-  type EstadoGoogleAgenda, type ResultadoGoogle,
+  aEventosDeCalendario, claveGoogle, eventosProvisionales, leerGoogle, pedirEventosGoogle, quitarEventosImportados, traerGoogle,
+  type EstadoGoogleAgenda, type EventoGoogle, type ResultadoGoogle,
 } from '@/lib/agenda/cacheEventosGoogle'
 import { claveCitas, leerCitas, vaciarCacheCitas } from '@/lib/agenda/cacheRangosCitas'
 import { esperarSemilla, type SemillaCitas } from '@/lib/agenda/semillaCitas'
@@ -377,6 +377,16 @@ export function useFuentesAgenda({
       setEstadoGoogle('conectado'); setGooglePendiente(false); success([]); return
     }
 
+    /* C6: los eventos de Google que ya son citas cargadas (importados por el
+       sondeo) no se pintan otra vez como bloque de solo lectura. Ver
+       `quitarEventosImportados`. */
+    const ligados = new Set<string>()
+    for (const ev of calendarRef.current?.getApi().getEvents() ?? []) {
+      const id: unknown = ev.extendedProps.google_event_id
+      if (typeof id === 'string' && id) ligados.add(id)
+    }
+    const pintables = (eventos: EventoGoogle[]): EventInput[] => aEventosDeCalendario(quitarEventosImportados(eventos, ligados))
+
     function entregar(r: ResultadoGoogle) {
       setGooglePendiente(false)
       /* Caída de red o cuerpo ilegible: fallo de Google y `failure()`, como
@@ -404,7 +414,7 @@ export function useFuentesAgenda({
       setEstadoGoogle(r.datos.estado)
       /* Sin eventos: `success([])` y no `failure()`. Es lo que aísla el fallo de
          Google de las citas propias, y no depende de la banda para nada. */
-      success(r.datos.estado === 'conectado' ? aEventosDeCalendario(r.datos.events) : [])
+      success(r.datos.estado === 'conectado' ? pintables(r.datos.events) : [])
     }
 
     /* Sin perfil (el tope de 3 s de `useProfile` ganó sin caché) no hay de
@@ -424,9 +434,9 @@ export function useFuentesAgenda({
     const listo = forzar ? null : leerGoogle(clave)
     if (listo) { entregar(listo); return }
     setGooglePendiente(true)
-    success(aEventosDeCalendario(eventosProvisionales(clave)))
+    success(pintables(eventosProvisionales(clave)))
     traerGoogle(clave, () => pedirEventosGoogle(info.startStr, info.endStr, filtro), refrescarGoogle)
-  }, [filtroEfectivo, filtroSincronoRef, profile, refrescarGoogle])
+  }, [calendarRef, filtroEfectivo, filtroSincronoRef, profile, refrescarGoogle])
 
   /* ── Stable eventSources ref (evita re-registro en cada render) ── */
   const appointmentSourceRef = useRef(appointmentSource)
