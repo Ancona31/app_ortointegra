@@ -37,6 +37,12 @@ describe('limitesReserva', () => {
     expect(llamadas.every(l => l.p_clave === 'reserva' && !l.p_ruta.includes('1.2.3.4'))).toBe(true)
     expect(llamadas.map(l => [l.p_limite, l.p_ventana_min])).toEqual([[6, 60], [4, 60], [30, 1440]])
   })
+  it('confirmar (E3): 30 por IP y 10 por enlace cada hora, con su propia llave', async () => {
+    llamadas.length = 0
+    expect(await dentroDeLimites('confirmar', { ip: 'c'.repeat(64), enlace: 'd'.repeat(64) })).toBe(true)
+    expect(llamadas.map(l => [l.p_ruta.split(':').slice(0, 3).join(':'), l.p_limite, l.p_ventana_min]))
+      .toEqual([['reserva:confirmar:ip', 30, 60], ['reserva:confirmar:enlace', 10, 60]])
+  })
   it('un sujeto que no aplica (enlace único: sin tope por enlace) no se cuenta ni bloquea', async () => {
     llamadas.length = 0
     expect(await dentroDeLimites('reservar', { ip: seudonimoRed('ip', '1.2.3.4'), enlace: undefined })).toBe(true)

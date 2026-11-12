@@ -230,6 +230,10 @@ export async function middleware(request: NextRequest) {
        impreso de las recetas. La página no llama a getUser() ni redirige; su
        puerta es el código del enlace, el interruptor y el aviso aprobado. */
     || pathname.startsWith('/reservar/')
+    /* La confirmación de asistencia por enlace (agenda E3), con su prefijo y la
+       barra final, como /reservar/. Pública: quien la abre es el paciente desde
+       su correo. La página sólo LEE; su puerta es el código del enlace. */
+    || pathname.startsWith('/confirmar/')
 
   // Rutas API que no requieren sesión (OAuth callbacks, Stripe webhook y Stripe checkout/portal que manejan su propia auth)
   const publicApiPaths = ['/api/google/callback', '/api/stripe/webhook', '/api/stripe/checkout', '/api/stripe/portal', '/api/auth/registro', '/api/auth/email-hook', '/api/auth/verify-email', '/api/auth/audit-login', '/api/auth/rate-limit', '/api/auth/login', '/api/auth/reset-password', '/api/auth/aceptar-invitacion']
@@ -247,6 +251,9 @@ export async function middleware(request: NextRequest) {
        Sin sesión por diseño; cada ruta exige el código del enlace, el
        interruptor de la clínica y el aviso aprobado (404 uniforme si no). */
     || pathname.startsWith('/api/reservar/')
+    /* El POST de la confirmación (E3): EXACTA, con el código de 22 y nada
+       detrás, por la misma razón que C7 no entró en `publicApiPaths`. */
+    || /^\/api\/confirmar\/[A-Za-z0-9_-]{22}$/.test(pathname)
 
   // Si no hay sesión y no está en ruta pública → verificar cookies antes de redirigir.
   // La verificación puede no dar sesión por latencia post-login (las cookies

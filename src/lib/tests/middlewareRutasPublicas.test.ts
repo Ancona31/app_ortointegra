@@ -87,3 +87,26 @@ describe('middleware — reserva por enlace (D5)', () => {
     expect(await vaALogin('/rx/ABC123')).toBe(true)
   })
 })
+
+describe('middleware — confirmación de asistencia (E3)', () => {
+  const COD = 'AbCdEfGhIjKlMnOpQrSt_-'
+  it('/confirmar/<código> (con o sin ?paso/?r) y POST /api/confirmar/<22> pasan sin cookie', async () => {
+    for (const ruta of [`/confirmar/${COD}`, `/confirmar/${COD}?paso=cancelar`, `/confirmar/${COD}?r=confirmada`, '/confirmar/x',
+      `/api/confirmar/${COD}`]) {
+      expect(await vaALogin(ruta), ruta).toBe(false)
+    }
+  })
+
+  it('la API es exacta: lo que cuelga, lo corto o lo vecino sigue protegido', async () => {
+    for (const ruta of [`/api/confirmar/${COD}/x`, `/api/confirmar/${COD}x`, `/api/confirmar/${COD.slice(1)}`, '/api/confirmar/',
+      '/api/confirmar', '/api/confirmarx', `/api/confirmar/${COD.slice(0, 21)}.`, '/confirmar', '/confirmarx']) {
+      expect(await vaALogin(ruta), ruta).toBe(true)
+    }
+  })
+
+  it('lo de antes no cambia: /r/ y /reservar/ siguen públicas', async () => {
+    expect(await vaALogin('/r/ABC123')).toBe(false)
+    expect(await vaALogin('/reservar/AbCdEfGhIjKlMnOpQrStUv')).toBe(false)
+    expect(await vaALogin('/api/reservar/AbCdEfGhIjKlMnOpQrStUv')).toBe(false)
+  })
+})

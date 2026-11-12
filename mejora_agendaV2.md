@@ -1633,6 +1633,62 @@ queda listada aquí.
   (emitir → mismo enlace → contexto → confirmar → revocar → contexto nulo) con
   datos propios borrados al final.
 
+### Bloque E — decisiones tomadas en E3, E5, E6 y E10
+
+**E1 · cierre de la clínica suspendida** (encargo tras la auditoría de E1):
+ver la nota «Cerrado el 2026-11-13» en E1-E2. Se editó la migración de E1 (no
+estaba en producción) y se re-anotó en local. La degradada sigue respondiendo
+(lista A 9). Re-auditoría: APTA; señaló que `gcal_aplicar_evento` no mira la
+suspensión, a tener en cuenta en E9 si el RSVP escribe por ahí.
+
+**E3 · página `/confirmar/[codigo]` y `POST /api/confirmar/[codigo]`:**
+- **El estado sólo cambia con el POST.** La página es de servidor y sólo
+  llama a `cita_confirmacion_contexto` (STABLE): ni «visto» ni límites por
+  GET. «No podré asistir» es un GET (`?paso=cancelar`) que pinta el «¿Seguro?»
+  con su propio formulario (lista A 18: cancelar en dos pasos, confirmar en
+  uno). La API sólo exporta POST (GET y HEAD, 405). Formularios HTML sin JS
+  obligatorio.
+- **303 explícito** (`NextResponse.redirect(url, {status: 303})`) a la misma
+  página con `?r=` de una lista fija (`confirmada`, `cancelada`,
+  `ya_confirmada`, `ya_cancelada`, `fuera_de_plazo`, `cerrada`, `pasada`,
+  `limite`); cualquier otro valor se ignora. Recargar no reenvía el POST
+  (comprobado en el navegador).
+- **`referrer: 'same-origin'`, no `'no-referrer'` como decía plan_E:** con
+  `no-referrer` el navegador manda `Origin: null` en el POST del formulario
+  (Fetch, «append a request Origin header») y la comprobación de origen
+  rechazaría el botón. `same-origin` tampoco deja salir el código a terceros.
+- **Origen:** `Origin` con el host de la petición; sin `Origin`, sólo
+  `Sec-Fetch-Site: same-origin`; si no, 403 (un `curl` sin cabeceras no
+  responde). No es la barrera principal: sin el código no se llega a nada.
+- **Orden del POST:** origen → forma del código (404 sin base) → `accion`
+  (Zod, 400) → contexto (404 si no hay enlace vigente) → límites → responder.
+  El contexto va ANTES de los límites (el plan los ponía antes): un código
+  inventado no deja filas en `ip_rate_limits`, y el GET de la página ya hace
+  esa misma lectura sin límite.
+- **Límites:** acción `confirmar` en `limitesReserva.ts` (10 por enlace y 30
+  por IP cada hora, `rate_limit_intento`, llave con el sha256 del código y el
+  HMAC de la IP). Pasarlo: 303 a `?r=limite` sin responder.
+- **404 uniforme** para revocado, interruptor apagado, clínica suspendida,
+  paciente de la cita cambiado, RPC ausente, `invalido` o un error. Una cita
+  pasada no es 404: «Esta cita ya pasó» (el enlace no tiene caducidad guardada,
+  lista A 7).
+- **Lo que se pinta** (lista A 16): fecha y hora en la zona del consultorio,
+  con la etiqueta de zona si no es la de la clínica; médico (título y nombre,
+  sin especialidad); consultorio, dirección y teléfono. Título «Tu cita»,
+  `noindex`, sin `openGraph`. Ningún id ni la clínica en el HTML.
+- **Dentro de la hora previa:** se ofrece confirmar y no cancelar, con «Ya no
+  es posible cancelar desde el enlace; comunícate al {teléfono}».
+- **Google** (`googleConfirmacion.ts`, lista A 10): `after()` sólo con
+  `confirmada`/`cancelada` y evento → `restablecerEnGoogle` de C5 con `If-Match`
+  del `etag` guardado y `sendUpdates:'none'`. Conexión por
+  `resolverConexionClinica` y `conCalendarioSpinus` (los de D8, filtran por
+  `clinica_id`; es el único `.from()` del camino y es el mismo que ya usa D8),
+  `puedeReparar:false`. Un 412 se deja al sondeo. Sin prueba e2e con el Google
+  falso (sí con Vitest): no estaba en la lista de E10 del encargo.
+- **Middleware:** `startsWith('/confirmar/')` y la API EXACTA
+  (`/^\/api\/confirmar\/[A-Za-z0-9_-]{22}$/`); ninguna entrada existente cambia.
+- **Textos** en `vistaConfirmacion.ts` y la página: PENDIENTES DE REVISIÓN.
+
 ### Bloque F
 
 - Las 18 propuestas de la auditoría visual, aprobadas. **El pulido visual y los

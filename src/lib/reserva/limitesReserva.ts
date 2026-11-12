@@ -21,7 +21,8 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { logger } from '@/lib/logger'
 import { hmacRed } from '@/lib/reserva/secretos'
 
-export type Accion = 'turnos' | 'codigo' | 'verificar' | 'reservar'
+/** `confirmar`: el POST del enlace de confirmación de una cita (agenda E3), con el hash de SU código como `enlace`. */
+export type Accion = 'turnos' | 'codigo' | 'verificar' | 'reservar' | 'confirmar'
 export type Sujeto = 'ip' | 'disp' | 'correo' | 'enlace'
 const SUJETOS: readonly Sujeto[] = ['ip', 'disp', 'correo', 'enlace']
 
@@ -31,6 +32,8 @@ export const LIMITES: Readonly<Record<Accion, Partial<Record<Sujeto, readonly [n
   codigo: { correo: [3, 60], ip: [10, 60], disp: [5, 60] },
   verificar: { ip: [20, 60] },
   reservar: { ip: [6, 60], disp: [4, 60], enlace: [30, 1440] },
+  // E3 (plan_E): 10 por enlace y 30 por IP cada hora.
+  confirmar: { ip: [30, 60], enlace: [10, 60] },
 }
 
 /** Nombre de la cookie de dispositivo. Path propio: sólo viaja a estas rutas. */
