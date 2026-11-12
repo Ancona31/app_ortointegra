@@ -3209,7 +3209,19 @@ primero sin marcar.
     `reserva_empalmes_google`, `reserva_empalmes_registrar`), con revisión
     independiente APTA CON CAMBIOS aplicados; auditoría formal pendiente.
   - e2e `e2e/reserva-google.e2e.ts` contra el Google falso (`next dev` :3002),
-    que ganó demora y fallo configurables para `events.list`.
+    que ganó demora y fallo configurables para `events.list`. Cada caso, en
+    rojo con su mutación (quitar la sincronización del GET, la del POST o el
+    aviso de empalmes; ventana de 60 min; tope de 20 s; quitar la espera del
+    candado).
+  - Pruebas al cierre: 1670 Vitest, 17 archivos SQL, `reserva-carrera.sh` en
+    verde (con candado 1 cita; control sin candado, 2). Batería Playwright
+    contra un `next start` propio en :3003: 216 pasan, 19 fallan y 210 se
+    saltan; los 19 (agenda-empalme y agenda-f-atajos, -buscador, -minimes,
+    -movimiento, -tarjeta: el aviso de perfil incompleto de la barra lateral
+    anima fuera de la regla y altas que chocan con la semilla) fallan IGUAL
+    con `src/` en `0729e24`: preexistentes, no de D11. Para correrla desde
+    este worktree se cambió `localhost:3001` por `:3003` en las e2e SIN
+    commitear (el :3001 es de otro worktree).
 - [ ] F — Interfaz, movimiento y orden visual
 
 **Bitácora** (una línea por sesión: fecha, qué quedó hecho, qué quedó a medias):
