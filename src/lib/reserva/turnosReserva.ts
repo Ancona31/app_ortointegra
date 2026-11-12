@@ -15,8 +15,8 @@
  *
  * `turnoOfrecido` es el CONVENIO que pide el COMMENT de
  * `reservar_por_enlace` (D3): la base no conoce el horario ni la alineación;
- * la ruta de reservar llama a esto ANTES de la RPC, SIN ocupación (¿es un
- * turno de verdad? si no, 400). Si sigue libre lo decide la RPC bajo su
+ * la ruta de reservar llama a `turnoValido` ANTES de la RPC (¿es un turno
+ * que se pudo ofrecer? si no, 400). Si sigue libre lo decide la RPC bajo su
  * candado (`ocupado`), que además resuelve la carrera entre dos personas.
  */
 import type { Horario } from '@/lib/configApp'
@@ -104,6 +104,25 @@ export function turnoOfrecido(r: ReglasReserva, inicio: string, ocupacion: reado
   if (Number.isNaN(ms)) return null
   const [dia] = turnosDeDias(r, fechaEnZona(new Date(ms), r.tz), ocupacion, ahora, 1)
   return dia?.turnos.find(t => Date.parse(t.inicio) === ms) ?? null
+}
+
+/**
+ * EL CONVENIO DE D3 PARA RESERVAR: ¿`inicio` es un turno que la página pudo
+ * ofrecer? Por P9 los turnos van desde el inicio de CADA HUECO, así que
+ * dependen de la ocupación (con una cita de 10:00 a 10:20, el turno es
+ * 10:20). Vale si es un turno con la ocupación de ahora QUITANDO las citas
+ * que coinciden exactamente con él —la propia, en un reenvío del mismo
+ * `client_id`, o la de otra persona, que la RPC rechazará con `ocupado`—, o
+ * si lo es con la jornada vacía (alineado al inicio del día). Lo que no
+ * cumple ninguna de las dos no está en horario o no está alineado: 400.
+ * Que siga libre lo decide la RPC bajo su candado.
+ */
+export function turnoValido(r: ReglasReserva, inicio: string, ocupacion: readonly OcupacionCita[], ahora: Date): Turno | null {
+  const ms = Date.parse(inicio)
+  if (Number.isNaN(ms)) return null
+  const finMs = ms + r.duracionMin * 60_000
+  const sinLaMisma = ocupacion.filter(o => !(Date.parse(o.start_time) === ms && Date.parse(o.end_time) === finMs))
+  return turnoOfrecido(r, inicio, sinLaMisma, ahora) ?? turnoOfrecido(r, inicio, [], ahora)
 }
 
 /** La ocupación de la RPC, en la forma de `turnosAgenda` (sin estado: ocupa). */

@@ -77,7 +77,8 @@ async function intento(ruta: string, limite: number, ventanaMin: number): Promis
 
 /**
  * ¿Pasan todos los límites de la acción? `seudonimos` trae, por sujeto, el
- * HMAC ya calculado. Cada llamada es su propia transacción y van en paralelo:
+ * HMAC ya calculado; un sujeto ausente (o `undefined`) no se cuenta, uno en
+ * `null` hace fallar cerrado. Cada llamada es su propia transacción y van en paralelo:
  * todas consumen aunque otra bloquee (así un ataque no se salva por orden).
  */
 export async function dentroDeLimites(accion: Accion, seudonimos: Partial<Record<Sujeto, string | null>>): Promise<boolean> {
@@ -85,6 +86,10 @@ export async function dentroDeLimites(accion: Accion, seudonimos: Partial<Record
   for (const sujeto of SUJETOS) {
     const regla = LIMITES[accion][sujeto]
     if (!regla) continue
+    // `undefined` = ese sujeto no aplica a esta petición (el enlace único no
+    // tiene tope por enlace); `null` = aplica pero no hay seudónimo (sin
+    // secreto): falla cerrado.
+    if (!(sujeto in seudonimos) || seudonimos[sujeto] === undefined) continue
     const valor = seudonimos[sujeto]
     const llave = valor ? llaveLimite(accion, sujeto, valor) : null
     if (!llave) return false

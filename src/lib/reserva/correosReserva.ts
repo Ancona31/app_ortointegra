@@ -28,3 +28,45 @@ export function correoCodigo(medico: string, codigo: string): CorreoListo {
   ])
   return { asunto, texto, html }
 }
+
+export interface DatosComprobante {
+  medico: string
+  consultorio: string
+  direccion: string | null
+  telefono: string | null
+  /** Instante de inicio (ISO) y la zona IANA del consultorio. */
+  inicio: string
+  zona: string
+}
+
+/** «lunes 16 de noviembre de 2026, 10:30» en la zona del consultorio. */
+export function fechaHoraEnZona(inicio: string, zona: string): string {
+  const fecha = new Intl.DateTimeFormat('es-MX', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: zona })
+    .format(new Date(inicio))
+  const hora = new Intl.DateTimeFormat('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: zona })
+    .format(new Date(inicio))
+  return `${fecha}, ${hora} h`
+}
+
+/**
+ * El comprobante (D8): fecha y hora en la zona del consultorio, médico,
+ * consultorio, dirección y teléfono. SIN tipo de cita (lista A, 10), sin la
+ * clínica y sin datos clínicos. El enlace para confirmar o cancelar lo añade
+ * el bloque E; hasta entonces, «comunícate con el consultorio».
+ */
+export function correoComprobante(d: DatosComprobante): CorreoListo {
+  const cuando = fechaHoraEnZona(d.inicio, d.zona)
+  const lugar = d.direccion ? `${d.consultorio}, ${d.direccion}` : d.consultorio
+  const renglones = [
+    `Tu cita quedó agendada para el ${cuando}.`,
+    `Con: ${d.medico}.`,
+    `En: ${lugar}.`,
+    ...(d.telefono ? [`Teléfono del consultorio: ${d.telefono}.`] : []),
+    'Para cambiar o cancelar, comunícate con el consultorio.',
+  ]
+  return {
+    asunto: `Tu cita con ${d.medico}`,
+    texto: renglones.join('\n'),
+    html: envolver(renglones.map(escapeHtml)),
+  }
+}

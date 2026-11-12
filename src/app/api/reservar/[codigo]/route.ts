@@ -2,26 +2,26 @@
  * POST /api/reservar/[codigo] — reservar un turno por enlace (agenda D5).
  *
  * Pública y sin sesión. El orden importa y es éste:
- *   1. puerta común (404 uniforme) y estado del único (410);
+ *   1. puerta común (404 uniforme); usado o caducado lo dice la RPC (410);
  *   2. forma del cuerpo (400) y casilla del aviso (`acepta_aviso: true`);
  *   3. límites por IP, dispositivo y enlace fijo (429);
  *   4. teléfono de México y correo con forma (400);
  *   5. consultorio y tipo del enlace (400);
  *   6. CONVENIO DE D3: `inicio` tiene que ser un turno ofrecido —horario del
  *      consultorio, alineación al paso del tipo, anticipación y horizonte—
- *      (400 si no lo es). Si sigue libre lo decide la RPC (409);
+ *      (400 si no lo es; `turnoValido`). Si sigue libre lo decide la RPC (409);
  *   7. `reservar_por_enlace`, que bajo su candado vuelve a comprobar enlace,
  *      interruptor, aviso, S3, ventana, empalme, verificación y candado de la
  *      persona, e inserta la cita.
- * Después de responder (`after()`), D8: el evento de Google y el comprobante.
+ * Después de responder (`after()`, D8): el evento de Google y el comprobante.
  */
 import { cookies } from 'next/headers'
-import type { NextRequest } from 'next/server'
+import { after, type NextRequest } from 'next/server'
 import { ReservarSchema } from '@/lib/reserva/esquemasReserva'
 import {
-  abrirEnlace, cuerpoJson, noEncontrado, responder, respuestaEstado, telefonoDeContacto,
+  abrirEnlace, cuerpoJson, noEncontrado, nombreDelMedico, responder, telefonoDeContacto,
 } from '@/lib/reserva/puertaReserva'
-import { reservar } from '@/lib/reserva/servidorReserva'
+import { ocupacionDeEnlace, reservar } from '@/lib/reserva/servidorReserva'
 import {
   COOKIE_DISPOSITIVO, OPCIONES_COOKIE, dentroDeLimites, dispositivoDe, ipDe, seudonimoRed,
 } from '@/lib/reserva/limitesReserva'
@@ -29,7 +29,12 @@ import { normalizarCorreo, normalizarTelefonoMx } from '@/lib/reserva/contacto'
 import { hmacContacto, hmacFicha } from '@/lib/reserva/secretos'
 import { AVISO_VERSION, hashAviso } from '@/lib/reserva/avisoReserva'
 import { respuestaErrorRpc, respuestaReserva } from '@/lib/reserva/respuestasReserva'
-import { reglasDe, turnoOfrecido } from '@/lib/reserva/turnosReserva'
+import { fechaEnZona, ocupacionSinEstado, rangoDeConsulta, reglasDe, turnoValido } from '@/lib/reserva/turnosReserva'
+import { crearEventoReserva } from '@/lib/reserva/googleReserva'
+import { correoComprobante } from '@/lib/reserva/correosReserva'
+import { enviarCorreo } from '@/lib/correo/transporte'
+import { logger } from '@/lib/logger'
+import type { ContextoReserva, ResultadoReservaRpc } from '@/lib/reserva/servidorReserva'
 
 export const dynamic = 'force-dynamic'
 
@@ -39,9 +44,10 @@ export async function POST(req: NextRequest, rctx: RouteContext<'/api/reservar/[
   const { codigo } = await rctx.params
   const enlace = await abrirEnlace(codigo)
   if (!enlace) return noEncontrado()
+  // Un único usado o caducado NO se corta aquí: lo dice la RPC (410), que
+  // antes reconoce un reenvío del mismo client_id y devuelve la cita
+  // (`repetida`, 200). Cortarlo aquí rompía la idempotencia del único.
   const { ctx, codigoHash } = enlace
-  const estado = respuestaEstado(ctx)
-  if (estado) return responder(estado)
 
   const cuerpo = ReservarSchema.safeParse(await cuerpoJson(req))
   if (!cuerpo.success) return MAL('solicitud_invalida')
@@ -69,10 +75,14 @@ export async function POST(req: NextRequest, rctx: RouteContext<'/api/reservar/[
 
   const ahora = new Date()
   const reglas = reglasDe(consultorio, ctx.clinica?.horario, tipo.duracion_min, ctx.ajustes)
-  // Sin ocupación a propósito: lo libre lo decide la RPC bajo su candado
-  // (`ocupado` → 409), y así un reenvío del mismo client_id llega a la RPC y
-  // sale `repetida` en vez de chocar con su propia cita.
-  const turno = turnoOfrecido(reglas, b.inicio, [], ahora)
+  // Ver `turnoValido`: con la ocupación del día (P9: los turnos arrancan en
+  // cada hueco) sin la cita idéntica, para que un reenvío del mismo client_id
+  // llegue a la RPC y salga `repetida`. Lo libre lo decide la RPC (409).
+  const dia = Number.isNaN(Date.parse(b.inicio)) ? null : rangoDeConsulta(fechaEnZona(new Date(b.inicio), reglas.tz), reglas.tz, 1)
+  if (!dia) return MAL('turno_invalido')
+  const ocupacion = await ocupacionDeEnlace(ctx, dia.desde, dia.hasta)
+  if (!ocupacion) return responder({ status: 500, cuerpo: { error: 'no_disponible' } })
+  const turno = turnoValido(reglas, b.inicio, ocupacionSinEstado(ocupacion), ahora)
   if (!turno) return MAL('turno_invalido')
 
   const r = await reservar(ctx, {
@@ -81,5 +91,36 @@ export async function POST(req: NextRequest, rctx: RouteContext<'/api/reservar/[
     fichaHmac: b.ficha ? hmacFicha(b.ficha) : null, avisoVersion: AVISO_VERSION, avisoSha: hashAviso(), clientId: b.client_id,
   })
   if (!r.ok) return responder(respuestaErrorRpc(r.ausente, r.codigo))
+  // D8, sólo con una reserva NUEVA (una `repetida` ya los programó la primera vez).
+  if (r.data.r_resultado === 'ok') programarDespues(ctx, consultorio, b, r.data)
   return responder(respuestaReserva(r.data.r_resultado, telefonoDeContacto(ctx, consultorio.id)))
+}
+
+type ConsultorioCtx = ContextoReserva['consultorios'][number]
+
+/**
+ * Después de responder (D8): el evento de Google (`googleReserva.ts`, sólo
+ * nombre, clínica y hora; invitado sólo el médico) y el comprobante por
+ * `transporte.ts` (en local, a Mailpit), sin tipo de cita. Nada de esto
+ * cambia la respuesta: la cita ya existe.
+ */
+function programarDespues(ctx: ContextoReserva, consultorio: ConsultorioCtx, b: { nombre: string; correo: string }, fila: ResultadoReservaRpc): void {
+  const { r_cita_id: citaId, r_inicio: inicio, r_fin: fin } = fila
+  if (!citaId || !inicio || !fin) return
+  const nombre = b.nombre.trim()
+  after(async () => {
+    await crearEventoReserva({
+      clinicaId: ctx.clinica_id, citaId, medicoId: ctx.medico_id, nombre, inicio, fin, zona: consultorio.timezone,
+      clinica: ctx.clinica ? { nombre: ctx.clinica.nombre ?? '', nombre_display: ctx.clinica.nombre_display } : null,
+    })
+    try {
+      const plantilla = correoComprobante({
+        medico: nombreDelMedico(ctx), consultorio: consultorio.nombre, direccion: consultorio.direccion,
+        telefono: consultorio.telefono ?? ctx.medico.telefono, inicio, zona: consultorio.timezone,
+      })
+      await enviarCorreo({ para: b.correo, ...plantilla, etiqueta: 'reserva_comprobante' })
+    } catch (err) {
+      logger.error('reserva', `comprobante no compuesto: ${err instanceof Error ? err.name : 'desconocido'}`)
+    }
+  })
 }

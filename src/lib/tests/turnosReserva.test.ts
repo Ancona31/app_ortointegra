@@ -6,7 +6,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import type { DiaSemana, Horario } from '@/lib/configApp'
-import { ocupacionSinEstado, primerDia, rangoDeConsulta, reglasDe, turnoOfrecido, turnosDeDias } from '@/lib/reserva/turnosReserva'
+import { ocupacionSinEstado, primerDia, rangoDeConsulta, reglasDe, turnoOfrecido, turnoValido, turnosDeDias } from '@/lib/reserva/turnosReserva'
 
 function horario(inicio: string, fin: string): Horario {
   const dia = (d: DiaSemana) => ({ activo: d !== 'domingo', inicio, fin })
@@ -63,5 +63,31 @@ describe('turnosDeDias / turnoOfrecido', () => {
     expect(primerDia('2020-01-01', MERIDA, AHORA)).toBe('2031-05-05')
     expect(primerDia('2031-05-09', MERIDA, AHORA)).toBe('2031-05-09')
     expect(rangoDeConsulta('2031-05-06', MERIDA)).toEqual({ desde: '2031-05-06T06:00:00.000Z', hasta: '2031-05-13T06:00:00.000Z' })
+  })
+})
+
+describe('turnoValido (P9: los turnos arrancan en cada hueco)', () => {
+  const r = reglasDe({ horario: { lunes: { activo: true, inicio: '08:00', fin: '10:00' }, martes: { activo: true, inicio: '08:00', fin: '10:00' },
+    miercoles: { activo: false, inicio: '08:00', fin: '10:00' }, jueves: { activo: false, inicio: '08:00', fin: '10:00' },
+    viernes: { activo: false, inicio: '08:00', fin: '10:00' }, sabado: { activo: false, inicio: '08:00', fin: '10:00' },
+    domingo: { activo: false, inicio: '08:00', fin: '10:00' } }, horario_propio: true, timezone: 'America/Merida' }, null, 30, AJ)
+  const AHORA2 = new Date('2031-05-05T12:00:00Z')
+  // Martes 2031-05-06: cita de 08:00 a 08:20 → turnos 08:20, 08:50, 09:20.
+  const ocup = ocupacionSinEstado([{ start_time: '2031-05-06T14:00:00Z', end_time: '2031-05-06T14:20:00Z' }])
+
+  it('un turno que arranca en el hueco (08:20) vale aunque no esté alineado a la jornada', () => {
+    expect(turnoValido(r, '2031-05-06T14:20:00Z', ocup, AHORA2)?.fin).toBe('2031-05-06T14:50:00.000Z')
+  })
+  it('alineado a la jornada también vale (la RPC dirá si está ocupado)', () => {
+    expect(turnoValido(r, '2031-05-06T14:30:00Z', ocup, AHORA2)).not.toBeNull()
+  })
+  it('el reenvío: la cita idéntica (la propia) no lo invalida', () => {
+    const propia = ocupacionSinEstado([{ start_time: '2031-05-06T14:20:00Z', end_time: '2031-05-06T14:50:00Z' }, ...ocup])
+    expect(turnoValido(r, '2031-05-06T14:20:00Z', propia, AHORA2)).not.toBeNull()
+  })
+  it('desalineado o fuera de horario: no', () => {
+    expect(turnoValido(r, '2031-05-06T14:25:00Z', ocup, AHORA2)).toBeNull()
+    expect(turnoValido(r, '2031-05-06T16:00:00Z', ocup, AHORA2)).toBeNull()
+    expect(turnoValido(r, 'x', ocup, AHORA2)).toBeNull()
   })
 })

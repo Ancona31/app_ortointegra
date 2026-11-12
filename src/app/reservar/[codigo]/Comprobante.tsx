@@ -16,7 +16,7 @@ export default function Comprobante({ medico, consultorio, inicio }: Props): Rea
       <p>{medico}</p>
       <p>{consultorio.nombre}{consultorio.direccion ? ` · ${consultorio.direccion}` : ''}</p>
       {consultorio.telefono && <p>Teléfono: {consultorio.telefono}</p>}
-      <p className="text-slate-500">Para cambiar o cancelar, comunícate con el consultorio.</p>
+      <p className="text-slate-500">Te enviamos el comprobante por correo. Para cambiar o cancelar, comunícate con el consultorio.</p>
     </section>
   )
 }

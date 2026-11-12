@@ -56,7 +56,18 @@ export const GCAL_RECORDATORIO_MINUTOS = 60
  * prefijo — ahi no hay nada que anunciar como cita medica.
  */
 function tituloParaGoogle(paciente: PacienteEnCita, fallback: string): string {
-  return paciente ? `Cita médica: ${paciente.nombre} ${paciente.apellidos}` : fallback
+  return paciente ? `Cita médica: ${nombreCompuesto(paciente)}` : fallback
+}
+
+/* `.trim()` (agenda D8): una cita POR LIGAR se compone con el convenio
+   `{ nombre: reserva_nombre, apellidos: '' }` —el mismo del espejo de Google
+   (D4, `gcal_citas_por_evento`) y de `pacienteParaGoogle` del lado interno
+   (D6)— y sin recortar el título salía «Cita médica: Ana López » con un
+   espacio al final, distinto de lo que compara el sondeo. Aquí, en el único
+   sitio donde se compone, para que Google, el espejo y la agenda den el mismo
+   texto. Para un paciente con los dos campos no cambia nada. */
+function nombreCompuesto(paciente: NonNullable<PacienteEnCita>): string {
+  return `${paciente.nombre} ${paciente.apellidos}`.trim()
 }
 
 /** Nombre de la clinica de cara a Google. `nombre_display` es nullable; `nombre` no. */
@@ -329,7 +340,7 @@ export function eventoParaGoogle(
   // venga de aqui o de un instante corrupto.
   const ancla = startISO === null ? null : anclaDeHora(startISO, timezone)
   const renglones = paciente
-    ? [clinicaNombre, 'Consulta:', `${paciente.nombre} ${paciente.apellidos}`, ancla]
+    ? [clinicaNombre, 'Consulta:', nombreCompuesto(paciente), ancla]
     : [clinicaNombre, ancla]
 
   const titulo = tituloParaGoogle(paciente, fallbackTitulo)
