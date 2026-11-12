@@ -1266,6 +1266,153 @@ queda listada aquí.
   banco de N = 1/5/20 reservas con supabase-js y el `EXPLAIN` con la semilla de
   30k citas.
 
+### Bloque D — decisiones tomadas en D4-D10 (lado público)
+
+- **Orden de los commits:** D4 → D9 → D5 → D8 → D10. D9 va antes que D5
+  porque la página y la API exigen el hash del aviso (`reserva_contexto`).
+- **D4. Google y la cita por ligar** (`20261114150000`): no se usó la
+  sustitución sobre `pg_get_functiondef` del diseño; la migración COPIA los
+  dos cuerpos de C2 (bloque C cerrado) y el pre-vuelo aborta si el cuerpo
+  vigente no es el de C2 ni el de D4 (md5 de `prosrc`). Además de
+  `gcal_aplicar_evento` (5 predicados), cambia `gcal_citas_por_evento`: una
+  cita por ligar sale con `r_con_paciente = true` y `reserva_nombre` como
+  nombre con apellidos `''`, así que el código de C (`resumenEsperado`,
+  restablecer) compone y restablece «Cita médica: {nombre}» sin tocar
+  TypeScript. La hora de una cita por ligar sí se acepta desde Google, como
+  la de una con paciente. Auditoría: APTA CON CAMBIOS (COMMENT del convenio
+  en las dos funciones y en `appointments.reserva_nombre`, aplicado).
+- **D5. Rutas:** página `/reservar/[codigo]`; API `/api/reservar/[codigo]`
+  (POST reservar), `…/turnos` (GET), `…/codigo` y `…/verificar` (POST). En
+  el middleware, dos líneas nuevas con prefijo propio terminado en barra
+  (`startsWith('/reservar/')` y `startsWith('/api/reservar/')`), aparte de
+  `publicApiPaths`; ninguna entrada existente cambió (`/r/` incluida), y
+  `middlewareRutasPublicas.test.ts` prueba las vecinas.
+- **D5. 404 uniforme:** sin `RESERVA_SECRETO`, código con mala forma, aviso
+  con la marca de pendiente, enlace inexistente o revocado, interruptor
+  apagado, aviso sin aprobar, clínica sin acceso, médico que se fue o RPC
+  ausente dan el MISMO `{"error":"no_encontrado"}` (y `notFound()` en la
+  página). Usado o caducado: «Este enlace ya no está disponible» con el
+  teléfono, y 410 en la API. Un enlace sin consultorios activos o sin tipos
+  activos también muestra «no disponible».
+- **D5. Lo que va al navegador:** nombre y especialidad del médico, sus
+  consultorios activos (nombre, dirección, teléfono, zona), los tipos (nombre
+  y duración) y el aviso rellenado. Nunca ids de clínica, enlace o médico, ni
+  el horario crudo, ni el nombre de la clínica (lista A, 24). La e2e lo
+  comprueba sobre el HTML. Metadata `noindex, nofollow` y `no-referrer`.
+- **D5. Turnos** (`turnosReserva.ts`): `horarioEfectivo` (propio del
+  consultorio o el de la clínica, normalizado) + `turnosDelDia` con la
+  anticipación y el horizonte de `agenda_ajustes` que devuelve
+  `reserva_contexto`; ocupación de `reserva_ocupacion` (ya sin `cancelled`,
+  `no_show` ni todo el día; llega sin estado, así que `citaOcupa` no cuenta
+  `no_show`). 7 días por consulta; una fecha pasada se sube a hoy en la zona
+  del consultorio.
+- **D5. Alineación y horario (lo que señaló el auditor de D3):** antes de la
+  RPC, el POST exige que `inicio` sea un turno que la página pudo ofrecer
+  (`turnoValido`): horario del consultorio, anticipación, horizonte y
+  alineación. Como por P9 los turnos arrancan en CADA HUECO, se calcula con
+  la ocupación del día quitando la cita idéntica (la propia en un reenvío),
+  o con la jornada vacía; lo que no cumple ninguna es 400 `turno_invalido`.
+  Si sigue libre lo decide la RPC bajo su candado (`ocupado` → 409). Usado o
+  caducado en el POST también lo dice la RPC (410), para que un reenvío del
+  mismo `client_id` con un único ya gastado salga `repetida` (200). Las dos
+  cosas las encontraron las e2e.
+- **D5. Límites** (`rate_limit_intento`, lista A 13): turnos 120/IP/10 min;
+  código 3/correo/h, 10/IP/h, 5/dispositivo/h; verificar 20/IP/h; reservar
+  6/IP/h, 4/dispositivo/h, 30/día por enlace fijo. `rate_limit_intento`
+  cuenta por `p_ruta`, así que la llave entera va ahí
+  (`reserva:<acción>:<sujeto>:<hmac>`) y `p_clave` es la constante
+  `reserva`: ni la IP, ni el correo, ni la cookie en claro. Todas las
+  llamadas de una acción van en paralelo y consumen aunque otra bloquee.
+  Falla cerrado (error de la RPC = 429). Un sujeto que no aplica (el único no
+  tiene tope por enlace) no se cuenta; antes de arreglarlo, todo único daba
+  429 al reservar. IP: `x-real-ip` y si no el primer
+  `x-forwarded-for`; **verificado en la documentación de Vercel** (consultada
+  el 2026-11-12, «Request headers»): Vercel sobrescribe `X-Forwarded-For` y
+  no reenvía IP externas «to prevent IP spoofing»; `x-real-ip` es idéntica.
+  Cookie de dispositivo `sp_rdisp` (24 bytes al azar, httpOnly, Secure,
+  SameSite=Strict, Path=/api/reservar, 30 días). Sin IP, todas cuentan como
+  la misma (`sin-ip`). `rate_limit_intento` no recibe `p_clinica_id`: no es
+  dato de clínica.
+- **D5. Cliente de servicio sólo `.rpc()`** en las rutas públicas
+  (`servidorReserva.ts`, `limitesReserva.ts`). La clínica sale de
+  `reserva_contexto` por el hash del código, nunca de la petición.
+- **D5. Correo del código:** sale por `transporte.ts` (`reserva_codigo`).
+  Si el transporte está apagado o falla, 503 `correo_no_enviado`: con el
+  transporte apagado en producción el enlace fijo no puede reservar (el
+  único sí). La respuesta de `/codigo` no dice si el correo ya reservó ni si
+  está bloqueado.
+- **D5. Página:** sin `getUser()` ni redirect; sin localStorage. Pasos:
+  consultorio (si hay más de uno) → tipo → turno (por semanas) → datos +
+  aviso con casilla desmarcada → código (sólo fijo) → comprobante. El
+  enlace único reserva directamente tras los datos.
+- **D5. Sembrador:** limpia `reserva_verificaciones`, `reserva_incidencias`,
+  `reserva_contactos`, suelta `reserva_enlaces.usado_cita_id`/`usado_en` y
+  borra `reserva_enlaces`, como `postgres` por SQL (el rol de servicio no
+  tiene DELETE en esas tablas), antes y después de borrar las citas. El
+  encargo hablaba de «la columna `usado_por`»: no existe; la que cierra el
+  paso es `usado_cita_id` (FK RESTRICT a la cita). `reserva_avisos` no es de
+  ninguna clínica y se queda.
+- **D8. Google:** `googleReserva.ts`, en el `after()` del POST sólo con `ok`
+  (una `repetida` no reprograma nada): `eventoParaGoogle` con el convenio de
+  la cita por ligar `{nombre: reserva_nombre, apellidos: ''}` —el mismo del
+  espejo de D4 y de `pacienteParaGoogle` del lado interno (D6,
+  `porLigarServidor.ts`)— → «Cita médica: {nombre}» y la descripción de una
+  cita con paciente; invitado sólo el médico; marca privada `spinus_cita`;
+  `puedeReparar: false`. No se añadió un `pacienteParaGoogle` propio en
+  `appointments.ts` para no duplicar el nombre del de D6. Para ligar el
+  evento NO hay `.from()`: `citasDeEventos` + `aplicarEvento(vincular)` de
+  `gcalSincronizacionBase.ts` (el cerrojo de C prohíbe nombrar esas RPC
+  fuera de ahí); sólo columnas técnicas, no mueve `updated_at` ni audita.
+  Conexión y correo del médico, con `resolverConexionClinica` y
+  `correoDelMedico` (filtran por `clinica_id`), como el alta. Sin conexión
+  la cita queda `pending` (D3); si no prende el ligado, el sondeo lo liga
+  por la marca. **Deuda aceptada (revisor):** si Google FALLA, la cita también
+  queda `pending` y no `failed` como en el alta (marcarla exigiría `.from()`
+  o ampliar `gcal_aplicar_evento`); queda el log y la primera edición
+  reintenta el alta del evento.
+- **D8. Título sin espacio colgante:** el recorte va en `tituloParaGoogle` y
+  en el renglón de la descripción de `appointments.ts`, el único sitio donde
+  se compone: así Google, el espejo de D4 (`resumenEsperado` ya recortaba) y
+  el lado interno dan el mismo texto. **Archivo compartido**: es el único
+  cambio de D8 fuera de `src/lib/reserva/` y `src/app/(api/)reservar/`.
+- **D8. Comprobante** (`correosReserva.ts`, `reserva_comprobante`): fecha y
+  hora en la zona del consultorio, médico, consultorio, dirección y
+  teléfono, y «Para cambiar o cancelar, comunícate con el consultorio».
+  Sin tipo de cita, sin la clínica, sin datos clínicos, sin el teléfono de
+  la persona. Sólo con `ok` (una `repetida` no lo reenvía).
+- **D9. Aviso** (`avisoReserva.ts`, versión `reserva-2026-11-v1`, sha256 `4b80a964…`): texto en `AVISO_PLANTILLA`
+  (el texto aprobado no puede llevar marca ni `[VERIFICAR]`). Doble cierre: la base exige el sha256 aprobado (`reserva_avisos`) y
+  `avisoPublicable()` es falso mientras lleve «PENDIENTE DE REVISIÓN LEGAL —
+  no publicar». Para las e2e, `RESERVA_AVISO_BORRADOR_LOCAL=1` (añadida al
+  `.env.local` de este worktree con su comentario) abre el borrador SÓLO con
+  Supabase en loopback a ciencia cierta y fuera de Vercel (corrección del
+  revisor: sin URL contaba como local). Aprobar: `npx tsx
+  scripts/aviso-reserva-hash.ts` y el INSERT que imprime; el script se niega
+  mientras haya marca. Plazo propuesto del historial: 12 meses, con nota de
+  que **hoy no hay purga** de `reserva_incidencias` ni `reserva_contactos`.
+- **D10 (lado público):** `e2e/reserva-enlace.e2e.ts` (flujo completo con
+  el fijo leyendo el código de Mailpit por `GET /api/v1/search`; dos reservas
+  simultáneas → `[201, 409]` y una cita; reenvío idempotente; único usado y
+  caducado; cinco códigos erróneos, sin ficha, ficha usada; interruptor
+  apagado y aviso sin aprobar → el mismo 404 que un enlace inventado; JSON de
+  turnos en lista blanca y consultorio de otra clínica → 400; séptimo POST
+  por IP → 429; comprobante capturado sin tipo, sin teléfono de la persona y
+  sin «Consulta:», y HTML de la página sin ids internos) y
+  `e2e/reserva-candado.e2e.ts` (segunda reserva → `ya_tiene_cita`; tres
+  cancelaciones → 403 con el teléfono; desbloquear abre; el único se lo
+  salta; coincidir sólo por teléfono bloquea). Ayudas en
+  `e2e/reservaPublicaAyudas.ts` (nombre distinto del `reservaAyudas.ts` de
+  D6) y `e2e/mailpit.ts` (sólo lectura: no borra el buzón). Sólo
+  `escritorio`. Los enlaces se emiten por SQL con el código del mismo
+  `RESERVA_SECRETO`; el candado se cierra cancelando por cambio de estado y
+  se abre escribiendo lo mismo que «Desbloquear». Cada petición sale con una
+  IP inventada (TEST-NET-3), porque `ip_rate_limits` sobrevive a la siembra.
+  Las e2e del lado interno (D6/D7) son de la otra rama y no se duplicaron.
+  Sin hacer: la medición del presupuesto de A0 y el banco de D3.
+- **El mismo `RESERVA_SECRETO`** en los dos worktrees de agenda (comparten
+  la base local): con secretos distintos, un enlace emitido desde uno no se
+  abriría en el otro.
+
 ### Bloque F
 
 - Las 18 propuestas de la auditoría visual, aprobadas. **El pulido visual y los
