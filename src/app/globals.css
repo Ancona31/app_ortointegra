@@ -3493,7 +3493,8 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
      cita), `.ag-capa` (burbuja y tarjeta de lectura), `.ag-hoja` (la tarjeta en
      el teléfono)—: quien los use hereda esta escotilla sin tocarla. Cada capa va
      ELLA MISMA y con sus descendientes, porque la animación de entrada es de la
-     capa y un selector `X *` no casa a X.
+     capa y un selector `X *` no casa a X. `.ag-capa-velo` es el velo de la
+     ayuda de atajos y de la hoja del teléfono (F3), que no es hijo de ninguna.
      El anillo de tiempo real (`.ag-ev-remoto::after`) no necesita línea: entra
      por `.fc *::after`.
      ⚠️ `.ag-dia-aside` VA ÉL MISMO además de sus descendientes desde F2.2: el
@@ -3504,7 +3505,7 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
      animan. Una regla CSS no puede apagar un `element.animate()`. */
   .fc *, .agenda-fc *, .ag-dia-aside, .ag-dia-aside *, .fc *::before, .fc *::after,
   .ag-modal-panel, .ag-modal-velo,
-  .ag-capa, .ag-capa *, .ag-hoja, .ag-hoja * {
+  .ag-capa, .ag-capa *, .ag-hoja, .ag-hoja *, .ag-capa-velo {
     animation-duration: .01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: .01ms !important;
@@ -5340,6 +5341,334 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
   flex: none;
   color: var(--ag-faint);
 }
+
+/* ═══ CAPAS E INTERACCIONES V2 (bloque F, F3) ═══════════════════════════════
+   Las piezas nuevas del bloque F que van DETRÁS DEL INTERRUPTOR `agendaV2`:
+   la burbuja de alta rápida, la tarjeta de lectura (capa en escritorio, hoja
+   inferior en el teléfono), la ayuda de atajos, el minicalendario y el
+   buscador de citas. Con el interruptor apagado nada de esto se monta, así que
+   estas reglas no casan con nada. Es la ÚNICA sección que el bloque F añade al
+   final del bloque de la agenda (reparto del diseño F, agente C).
+
+   ⚠️ TODO VIVE EN `document.body` (Portal), FUERA DE `.agenda-fc`. Por eso las
+   clases van sin prefijo de ancestro, y por eso el bloque de movimiento
+   reducido de la agenda nombra `.ag-capa` y `.ag-hoja` aparte (F0).
+
+   ⚠️ COLOR SÓLO POR TOKENS QUE YA TIENEN CONTRAPARTE OSCURA (`--ag-surface`,
+   `--ag-border-card`, `--ag-ink`, `--ag-text`, `--ag-muted`, `--ag-shadow-pop`,
+   `--ag-status-*`): esta sección no añade nada a `html.dark`. Espaciado con la
+   escala `--ag-*` de F0, radios por papel.
+
+   ⚠️ CAPA POR DEBAJO DE LOS MODALES: `z-index: 45`, entre la rejilla y el modal
+   de la cita (`z-50`) y la confirmación (`z-[60]`). «Más opciones» abre el modal
+   encima, y el aviso de empalme (B7) sale por encima de la burbuja abierta.
+
+   MOVIMIENTO (diseño F §2, decisión 4): la capa entra con opacidad y
+   `scale(.97) → 1` desde el punto pulsado (`transform-origin` en línea, lo
+   calcula `posicionCapa`), en base con ease-out; sale al revés hacia el mismo
+   punto, en micro con ease-in. Es una capa y no una tarjeta de la rejilla: la
+   regla de «nada de escalado en tarjetas» va por las citas. La hoja del
+   teléfono entra con opacidad y 6 px, nunca deslizándose al 100 %.
+   ⚠️ ENTRADA CON `backwards`, SALIDA CON `forwards`. La salida sí retiene: el
+   nodo se desmonta al acabar (`onAnimationEnd`) y sin retener daría un
+   destello a opacidad plena en el último fotograma. */
+@keyframes ag-capa-entra { from { opacity: 0; transform: scale(.97); } }
+@keyframes ag-capa-sale  { to   { opacity: 0; transform: scale(.97); } }
+@keyframes ag-hoja-entra { from { opacity: 0; transform: translateY(6px); } }
+@keyframes ag-hoja-sale  { to   { opacity: 0; transform: translateY(6px); } }
+@keyframes ag-velo-entra { from { opacity: 0; } }
+
+.ag-capa {
+  position: fixed;
+  z-index: 45;
+  width: 320px;
+  max-width: calc(100vw - 2 * var(--ag-2));
+  display: flex;
+  flex-direction: column;
+  gap: var(--ag-3);
+  padding: var(--ag-4);
+  background: var(--ag-surface);
+  color: var(--ag-text);
+  border: 1px solid var(--ag-border-card);
+  border-radius: var(--ag-r-card);
+  box-shadow: var(--ag-shadow-pop);
+  animation: ag-capa-entra var(--ag-dur-base) var(--ag-ease-out) backwards;
+}
+.ag-capa:focus { outline: none; }
+.ag-capa[data-estado="saliendo"] {
+  animation: ag-capa-sale var(--ag-dur-micro) var(--ag-ease-in) forwards;
+  pointer-events: none;
+}
+/* La ayuda de atajos no tiene ancla: va centrada sobre su velo. */
+.ag-capa--centro {
+  left: 50%;
+  top: 50%;
+  translate: -50% -50%;
+  width: 360px;
+}
+
+.ag-hoja {
+  position: fixed;
+  z-index: 45;
+  inset-inline: 0;
+  bottom: 0;
+  max-height: 80dvh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ag-3);
+  padding: var(--ag-4) var(--ag-4) calc(var(--ag-4) + env(safe-area-inset-bottom));
+  background: var(--ag-surface);
+  color: var(--ag-text);
+  border-top: 1px solid var(--ag-border-card);
+  border-radius: var(--ag-r-card) var(--ag-r-card) 0 0;
+  box-shadow: var(--ag-shadow-pop);
+  animation: ag-hoja-entra var(--ag-dur-base) var(--ag-ease-out) backwards;
+}
+.ag-hoja:focus { outline: none; }
+.ag-hoja[data-estado="saliendo"] {
+  animation: ag-hoja-sale var(--ag-dur-micro) var(--ag-ease-in) forwards;
+  pointer-events: none;
+}
+
+.ag-capa-velo {
+  position: fixed;
+  inset: 0;
+  z-index: 44;
+  background: rgba(16, 32, 64, .28);
+  animation: ag-velo-entra var(--ag-dur-base) var(--ag-ease-out) backwards;
+}
+
+/* Cabecera común: título a la izquierda, ✕ a la derecha, centrados en una línea. */
+.ag-capa-cab {
+  display: flex;
+  align-items: center;
+  gap: var(--ag-2);
+  min-width: 0;
+}
+.ag-capa-titulo {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--ag-ink);
+  overflow-wrap: anywhere;
+}
+.ag-capa-cerrar {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--ag-r-btn);
+  color: var(--ag-muted);
+  transition: background-color var(--ag-dur-micro) var(--ag-ease);
+}
+.ag-capa-cerrar:hover { background: var(--ag-btn-ghost-hover); }
+
+.ag-capa-campo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ag-1);
+  min-width: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ag-muted);
+}
+.ag-capa-campo input,
+.ag-capa-campo select {
+  height: 36px;
+  padding: 0 var(--ag-2-5);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ag-ink);
+  background: var(--ag-surface);
+  border: 1px solid var(--ag-input-border);
+  border-radius: var(--ag-r-btn);
+}
+.ag-capa-fila {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--ag-2);
+}
+.ag-capa-error {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--ag-status-cancelled-text);
+}
+
+/* Las listas de opciones (`role="listbox"`) de la burbuja y del buscador. */
+.ag-opciones {
+  margin: 0;
+  padding: var(--ag-1);
+  list-style: none;
+  max-height: 240px;
+  overflow-y: auto;
+  border: 1px solid var(--ag-border-card);
+  border-radius: var(--ag-r-btn);
+}
+.ag-opcion {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--ag-1-5) var(--ag-2);
+  border-radius: var(--ag-r-btn-sm);
+  font-size: 14px;
+  color: var(--ag-ink);
+  cursor: pointer;
+  transition: background-color var(--ag-dur-micro) var(--ag-ease);
+}
+.ag-opcion-meta { font-size: 12px; color: var(--ag-muted); }
+.ag-opcion:hover,
+.ag-opcion[aria-selected="true"] { background: var(--ag-primary-bg-faint); }
+.ag-opciones-vacio { margin: 0; padding: var(--ag-2); font-size: 12.5px; color: var(--ag-muted); }
+
+/* Los botones del pie y de la barra de acciones: todos a 36 px, en una fila. */
+.ag-capa-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ag-2);
+}
+.ag-capa-boton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ag-1-5);
+  height: 36px;
+  padding: 0 var(--ag-3);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ag-text);
+  background: var(--ag-surface);
+  border: 1px solid var(--ag-input-border);
+  border-radius: var(--ag-r-btn);
+  transition: background-color var(--ag-dur-micro) var(--ag-ease),
+              border-color var(--ag-dur-micro) var(--ag-ease);
+}
+.ag-capa-boton:hover { background: var(--ag-btn-ghost-hover); }
+.ag-capa-boton:disabled { cursor: default; opacity: .55; }
+.ag-capa-boton--principal {
+  color: #fff;
+  background: var(--ag-brand-secondary);
+  border-color: var(--ag-brand-secondary);
+}
+.ag-capa-boton--principal:hover { background: var(--ag-brand-secondary); }
+.ag-hoja .ag-capa-boton { height: 44px; }   /* el mínimo táctil de la agenda, como `.ag-hueco` */
+
+/* La tarjeta de lectura. */
+.ag-lectura-pildora {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 0 var(--ag-2);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  border: 1px solid;
+  border-radius: var(--ag-r-pill);
+}
+.ag-lectura-hora {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--ag-ink);
+}
+.ag-lectura-hora small { display: block; font-size: 12px; font-weight: 600; color: var(--ag-muted); }
+.ag-lectura-datos {
+  margin: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--ag-1) var(--ag-3);
+  font-size: 13px;
+}
+.ag-lectura-datos dt { color: var(--ag-muted); font-weight: 600; }
+.ag-lectura-datos dd { margin: 0; color: var(--ag-text); overflow-wrap: anywhere; }
+.ag-lectura-nota {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* La ayuda de atajos. */
+.ag-atajos {
+  margin: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--ag-1-5) var(--ag-3);
+  font-size: 13px;
+  align-items: center;
+}
+.ag-atajos dd { margin: 0; color: var(--ag-text); }
+.ag-atajos kbd {
+  display: inline-grid;
+  place-items: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 var(--ag-1-5);
+  font: 700 12px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--ag-ink);
+  background: var(--ag-surface-sunken);
+  border: 1px solid var(--ag-border-card);
+  border-radius: var(--ag-r-btn-sm);
+}
+.ag-capa-interruptor {
+  display: flex;
+  align-items: center;
+  gap: var(--ag-2);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ag-text);
+}
+.ag-capa-interruptor input { width: 20px; height: 20px; }
+
+/* El buscador de citas: campo y lista, en columna. */
+.ag-buscador { display: flex; flex-direction: column; gap: var(--ag-2); min-width: 0; }
+
+/* El minicalendario. Siete columnas iguales y celdas cuadradas. */
+.ag-minimes { display: flex; flex-direction: column; gap: var(--ag-2); }
+.ag-minimes-cab { display: flex; align-items: center; gap: var(--ag-1); }
+.ag-minimes-titulo {
+  flex: 1;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ag-ink);
+}
+.ag-minimes-titulo::first-letter { text-transform: uppercase; }
+.ag-minimes-rejilla { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.ag-minimes-rejilla th {
+  padding-bottom: var(--ag-1);
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--ag-muted);
+  text-align: center;
+}
+.ag-minimes-rejilla td { padding: 1px; text-align: center; }
+.ag-minimes-dia {
+  width: 100%;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--ag-ink);
+  border-radius: 50%;
+  transition: background-color var(--ag-dur-micro) var(--ag-ease);
+}
+.ag-minimes-dia:hover { background: var(--ag-btn-ghost-hover); }
+.ag-minimes-dia[data-fuera="true"] { color: var(--ag-faint); }
+td[aria-selected="true"] > .ag-minimes-dia { background: var(--ag-primary-bg-faint); }
+.ag-minimes-dia[aria-current="date"] { color: #fff; background: var(--ag-brand-secondary); }
+
+/* El gesto de deslizar: el navegador se queda el eje vertical (`pan-y`) y el
+   horizontal llega a `useDeslizarPeriodo` como `pointermove`. */
+.ag-deslizable .fc-view-harness { touch-action: pan-y; }
 
 /* ════════════════════════════════════════════════════════════════
    AGENDA — MODO OSCURO (sub-fase 6). Contrapartes de los --ag-*.
