@@ -5670,6 +5670,27 @@ td[aria-selected="true"] > .ag-minimes-dia { background: var(--ag-primary-bg-fai
    horizontal llega a `useDeslizarPeriodo` como `pointermove`. */
 .ag-deslizable .fc-view-harness { touch-action: pan-y; }
 
+/* ── El enchufe (F3): botones de la barra, desplegable de fecha, panel ───────
+   Los tres botones de `HerramientasV2` (fecha, lupa, atajos) a la altura de los
+   controles de la barra (36 px, el radio de botón) y con el mismo hover en
+   micro que el resto de la sección. El desplegable de fecha es una capa más
+   estrecha que la burbuja (el minicalendario no necesita 320 px). */
+.ag-herramientas { display: inline-flex; align-items: center; gap: var(--ag-1); }
+.ag-herramienta {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  color: var(--ag-text);
+  background: var(--ag-surface);
+  border: 1px solid var(--ag-border-card);
+  border-radius: var(--ag-r-btn);
+  transition: background-color var(--ag-dur-micro) var(--ag-ease), border-color var(--ag-dur-micro) var(--ag-ease);
+}
+.ag-herramienta:hover { background: var(--ag-btn-ghost-hover); }
+.ag-herramienta[aria-expanded="true"] { border-color: var(--ag-brand-secondary); }
+.ag-capa--fecha { width: 264px; }
+
 /* ════════════════════════════════════════════════════════════════
    AGENDA — MODO OSCURO (sub-fase 6). Contrapartes de los --ag-*.
    Valores del handoff design/agenda/design_handoff_agenda/theme.js

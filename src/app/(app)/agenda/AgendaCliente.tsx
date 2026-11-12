@@ -111,6 +111,14 @@ const ModalInvitacionCita = dynamic(() => import('@/components/agenda/ModalInvit
 const InteraccionesV2 = dynamic(() => import('@/components/agenda/InteraccionesV2'), {
   ssr: false, loading: () => null,
 })
+/* Las dos piezas que van fuera de la capa: los botones de la barra y el
+   minicalendario del panel de Día. Mismo módulo, mismo chunk. */
+const HerramientasV2 = dynamic(() => import('@/components/agenda/HerramientasV2'), {
+  ssr: false, loading: () => null,
+})
+const MiniMesPanelV2 = dynamic(() => import('@/components/agenda/HerramientasV2').then(m => m.MiniMesPanelV2), {
+  ssr: false, loading: () => null,
+})
 
 /**
  * Descarga los chunks de los tres modales SIN montarlos. Misma ruta exacta de
@@ -201,6 +209,10 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
   const [interaccionesListas, setInteraccionesListas] = useState(false)
   const interaccionesRef = useRef<ApiInteraccionesV2 | null>(null)
   const seleccionDesdeHueco = useRef<SeleccionDesdeHueco['current']>(null)
+  /* F3: el periodo que pinta el calendario (`'desde/hasta'`), para el
+     minicalendario. Cadena y no fechas, como `tituloVista`: no repinta si no
+     cambió. */
+  const [rangoVisible, setRangoVisible] = useState('')
   useEffect(() => {
     if (!agendaV2) return
     const idle = enOcioso(() => setMontarV2(true))
@@ -914,6 +926,9 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
   function alCambiarFechas(arg: DatesSetArg) {
     setCurrentView(arg.view.type)
     setTituloVista(arg.view.title)
+    /* F3: siempre, aunque sólo lo lea el minicalendario v2: el interruptor se
+       resuelve DESPUÉS del primer `datesSet`. Una cadena más no repinta nada. */
+    setRangoVisible(`${partirFechaHora(arg.view.currentStart.toISOString()).fecha}/${partirFechaHora(arg.view.currentEnd.toISOString()).fecha}`)
     setPeriodoVacio(periodoDeLaVista(arg.view))
     const eventos = calendarRef.current?.getApi().getEvents() ?? []
     const rangos = rangosDeLaVista(arg.view)
@@ -948,6 +963,11 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
     // porque aquí no llega `arg.view`.
     const vista = calendarRef.current?.getApi().view
     if (vista) programarPrecarga(vista)
+  }
+
+  /* F3: el minicalendario va a un día CONSERVANDO la vista (no es `changeView`). */
+  function irAFecha(fecha: string) {
+    calendarRef.current?.getApi().gotoDate(fecha)
   }
 
   function alPulsarNumeroDeDia(fecha: Date) {
@@ -1075,7 +1095,13 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
           onIntencionAgendar={precargarModalesAgenda}
           /* E7: la lista de mañana por confirmar (WhatsApp manual). Sólo con
              la v2 encendida: apagada no se monta y no sale ninguna petición. */
-          porConfirmar={agendaV2 ? <PanelPorConfirmar recarga={recargaPanel} /> : undefined}
+          porConfirmar={agendaV2 ? (
+            <>
+              {/* F3: provisional en esta ranura hasta que la barra tenga las suyas (`HerramientasV2.tsx`). */}
+              {montarV2 && <HerramientasV2 apiRef={interaccionesRef} rango={rangoVisible} alIrAFecha={irAFecha} />}
+              <PanelPorConfirmar recarga={recargaPanel} />
+            </>
+          ) : undefined}
         />
       )}
 
@@ -1643,6 +1669,7 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
           resumen={resumenDia}
           unMedico={unMedico}
           onHueco={abrirHueco}
+          miniMes={agendaV2 && montarV2 ? <MiniMesPanelV2 rango={rangoVisible} alIrAFecha={irAFecha} /> : undefined}
           /* La MISMA bandera que levanta la banda roja de arriba. Sin esto el
              panel afirmaba horas y ofrecía huecos sobre un día recortado. */
           incompleto={citasIncompletas}
