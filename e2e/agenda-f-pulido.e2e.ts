@@ -46,11 +46,13 @@ test.describe('escritorio', () => {
     await irAAgenda(page)
     const ids = await page.locator('.fc-timegrid-event .ag-tarjeta').evaluateAll(els => els.map(e => e.getAttribute('data-cita-id')))
     expect(ids.length).toBeGreaterThan(0)
-    for (const id of ids) expect(id ?? '').toMatch(UUID)
+    expect(ids.filter(id => !UUID.test(id ?? '')), 'data-cita-id que no son uuid').toEqual([])
     await page.getByRole('tab', { name: 'Mes' }).click()
+    // `evaluateAll` no espera: primero, que el mes haya pintado sus chips.
+    await expect(page.locator('.fc-dayGridMonth-view .ag-mes').first()).toBeVisible()
     const mes = await page.locator('.fc-daygrid-event .ag-mes:not(.ag-mes--gcal)').evaluateAll(els => els.map(e => e.getAttribute('data-cita-id')))
     expect(mes.length).toBeGreaterThan(0)
-    for (const id of mes) expect(id ?? '').toMatch(UUID)
+    expect(mes.filter(id => !UUID.test(id ?? '')), 'data-cita-id del mes que no son uuid').toEqual([])
   })
 
   test('F1.8 · en Semana no se escribe el estado; queda el glifo, distinto para agendada y confirmada', async ({ page }) => {
@@ -199,14 +201,14 @@ test.describe('escritorio · paso 2', () => {
     for (const [ancho, alto] of [[1440, 900], [1280, 720], [1536, 900]] as const) {
       await page.setViewportSize({ width: ancho, height: alto })
       await irAAgenda(page)
-      const centro = async (sel: string) => {
-        const c = await page.locator(sel).first().boundingBox()
-        return (c?.y ?? -999) + (c?.height ?? 0) / 2
-      }
-      const nativa = await centro('.fc-prev-button')
-      for (const sel of ['[data-onboard="nueva-cita"]', '.agenda-fc .ag-controles [role="tablist"]', '.fc-today-button']) {
-        expect(Math.abs(await centro(sel) - nativa)).toBeLessThanOrEqual(1)
-      }
+      /* Los cuatro centros en UNA lectura del DOM: medidos por separado, la
+         entrada de la página (que mueve el contenido unos píxeles) los pillaba
+         en cuadros distintos. */
+      const sels = ['.fc-prev-button', '[data-onboard="nueva-cita"]', '.agenda-fc .ag-controles [role="tablist"]', '.fc-today-button']
+      await expect.poll(() => page.evaluate((ss) => {
+        const cs = ss.map(s => { const r = document.querySelector(s)?.getBoundingClientRect(); return r ? r.top + r.height / 2 : NaN })
+        return Math.max(...cs) - Math.min(...cs)
+      }, sels)).toBeLessThanOrEqual(1)
       for (const sel of ['.agenda-fc .fc-header-toolbar', '.agenda-fc .ag-controles']) {
         expect((await page.locator(sel).boundingBox())?.height ?? 999).toBeLessThanOrEqual(61.5) // 60 + el borde
       }

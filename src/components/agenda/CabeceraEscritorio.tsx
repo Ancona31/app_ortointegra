@@ -14,7 +14,8 @@
  * estrecha de esto.
  */
 
-import type { ReactNode } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
+import { teclasDeAccion, type AccionAtajo } from '@/lib/agenda/atajosAgenda'
 import { ChevronDown, Settings, Plus, ChevronsDownUp, Rows4 } from 'lucide-react'
 import { VIEWS } from '@/components/agenda/BandaMovil'
 import { OPCION_TODOS } from '@/components/agenda/FiltrosBandaMovil'
@@ -43,13 +44,47 @@ interface Props {
   /** F1.3 · Densidad compacta (franja de 24 px), preferencia del navegador. */
   densidadCompacta: boolean
   onDensidad: () => void
+  /** F3 (contrato de interacciones): el minicalendario, junto a la fecha. */
+  selectorFecha?: ReactNode
+  /** F3: el botón de búsqueda por paciente. */
+  buscar?: ReactNode
+  /** F3: con los atajos de una tecla activos, `aria-keyshortcuts` en ‹ › Hoy
+      y en las vistas. Lo decide quien gestiona los atajos; sin él, nada. */
+  atajos?: boolean
 }
+
+/* La acción de atajo de cada segmento de vista (por su tipo ancho). */
+const ATAJO_DE_VISTA: Record<string, AccionAtajo> = {
+  dayGridMonth: 'vista-mes', timeGridWeek: 'vista-semana', timeGridDay: 'vista-dia',
+}
+/* Los botones nativos de FullCalendar y su acción. No aceptan atributos propios
+   desde las opciones, así que se ponen sobre el DOM (ver el efecto). */
+const ATAJO_NATIVO: ReadonlyArray<[string, AccionAtajo]> = [
+  ['.fc-today-button', 'hoy'], ['.fc-prev-button', 'anterior'], ['.fc-next-button', 'siguiente'],
+]
 
 export function CabeceraEscritorio({
   resumenConteo, currentView, isMobile, onVista, compactar, onCompactar, isSingleDoctor,
   filtroEfectivo, mesSinTodos, medicos, onFiltroMedico, canEditHorario, onHorario, onAgendar,
-  onIntencionAgendar, porConfirmar, densidadCompacta, onDensidad,
+  onIntencionAgendar, porConfirmar, densidadCompacta, onDensidad, selectorFecha, buscar, atajos = false,
 }: Props) {
+  /* F3 · `aria-keyshortcuts` en los tres botones de la barra nativa. Va sobre el
+     DOM porque FullCalendar no deja poner atributos en sus botones; se repite al
+     cambiar de vista por si su barra se volvió a montar, y en el cuadro
+     siguiente porque `<FullCalendar>` monta su DOM después de este efecto. */
+  const raizRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const id = requestAnimationFrame(() => {
+      const tarjeta = raizRef.current?.closest('.agenda-fc')
+      for (const [sel, accion] of ATAJO_NATIVO) {
+        const boton = tarjeta?.querySelector(sel)
+        if (!boton) continue
+        if (atajos) boton.setAttribute('aria-keyshortcuts', teclasDeAccion(accion))
+        else boton.removeAttribute('aria-keyshortcuts')
+      }
+    })
+    return () => cancelAnimationFrame(id)
+  }, [atajos, currentView])
   return (
     /* ═══ F1.1 · UNA SOLA BARRA ════════════════════════════════════════════
        Desde F1.1 esto NO es un encabezado encima de la tarjeta: es un ítem más
@@ -62,8 +97,11 @@ export function CabeceraEscritorio({
        ⚠️ El CONTEO va el primero, en gris, con elipsis, y es lo PRIMERO que cede
        ancho: los demás controles no encogen. Se fue «Gestión de citas clínicas»,
        que era decorativa (lo decía el título, que ya no se ve). */
-    <div className="ag-controles">
+    <div className="ag-controles" ref={raizRef}>
       <h1 className="sr-only">Agenda</h1>
+      {/* F3 · La ranura del minicalendario va la PRIMERA: la fecha de
+          FullCalendar queda justo a su izquierda, al final de la barra nativa. */}
+      {selectorFecha}
       <p className="ag-controles-conteo" title={resumenConteo || undefined}>{resumenConteo}</p>
       {/* Segmented control de vistas. Sincronizado con la vista real vía
           `datesSet`.
@@ -109,6 +147,7 @@ export function CabeceraEscritorio({
               key={v.type}
               role="tab"
               aria-selected={active}
+              aria-keyshortcuts={atajos ? teclasDeAccion(ATAJO_DE_VISTA[v.type]) : undefined}
               onClick={() => onVista(tipo)}
               className={`inline-flex items-center ${active ? '' : 'bg-transparent hover:bg-[var(--ag-btn-ghost-hover)]'}`}
               style={{
@@ -330,6 +369,7 @@ export function CabeceraEscritorio({
           única pista de que el conmutador existe apuntando en la dirección
           contraria. «Agendar» es el verbo que cubre las dos cosas y de paso
           ocupa menos. El `title` dice el resto. */}
+      {buscar}
       {porConfirmar}
       <button
         onClick={onAgendar}

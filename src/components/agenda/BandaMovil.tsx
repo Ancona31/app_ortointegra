@@ -5,6 +5,12 @@ import type { Medico } from '@/components/agenda/AppointmentModal'
 import { vistaEnElOtroFormato } from '@/lib/agenda/vistasAgenda'
 import { NavegacionBandaMovil } from '@/components/agenda/NavegacionBandaMovil'
 import { FiltrosBandaMovil } from '@/components/agenda/FiltrosBandaMovil'
+import type { ReactNode } from 'react'
+import { teclasDeAccion, type AccionAtajo } from '@/lib/agenda/atajosAgenda'
+
+const ATAJO_DE_VISTA: Record<string, AccionAtajo> = {
+  dayGridMonth: 'vista-mes', timeGridWeek: 'vista-semana', timeGridDay: 'vista-dia',
+}
 
 /* ═══ BANDA AZUL DEL ENCABEZADO MÓVIL (bloque 6 · paso 8a) ══════════════════
    Sustituye al encabezado blanco de escritorio por debajo de `ANCHO_MOVIL`, y
@@ -72,7 +78,7 @@ export const VIEWS = [
 export function BandaMovil(
   { conteo, vistaActual, onVista, titulo, onPrev, onNext, onHoy, hoyDeshabilitado, onMenu,
     medicos, filtroMedico, onFiltroMedico, onHorario, onCompactar, compactado,
-    mesSinTodos }: {
+    mesSinTodos, selectorFecha, buscar, atajos = false }: {
     conteo: string; vistaActual: string; onVista: (tipo: string) => void
     titulo: string; onPrev: () => void; onNext: () => void
     /** F1.10 · «Hoy» del teléfono; deshabilitado (aria) si el rango ya lo contiene. */
@@ -82,6 +88,12 @@ export function BandaMovil(
     onFiltroMedico: (id: string) => void; onHorario: (() => void) | null
     onCompactar: (() => void) | null; compactado: boolean
     mesSinTodos: boolean
+    /** F3 (contrato de interacciones): ranuras opcionales. El minicalendario no
+        va en el teléfono (decisión 21); la ranura existe para que el contrato
+        encaje. `atajos`: `aria-keyshortcuts` en ‹ › Hoy y en las vistas. */
+    selectorFecha?: ReactNode
+    buscar?: ReactNode
+    atajos?: boolean
   },
 ) {
   return (
@@ -95,7 +107,8 @@ export function BandaMovil(
           <span className="ag-banda-movil-fecha">{titulo}</span>
           <span className="ag-banda-movil-sub">{conteo}</span>
         </span>
-        <NavegacionBandaMovil onPrev={onPrev} onNext={onNext} onHoy={onHoy} hoyDeshabilitado={hoyDeshabilitado} />
+        {selectorFecha}
+        <NavegacionBandaMovil onPrev={onPrev} onNext={onNext} onHoy={onHoy} hoyDeshabilitado={hoyDeshabilitado} atajos={atajos} />
       </div>
       <div className="ag-banda-movil-filtros">
         <div className="ag-banda-movil-vistas" role="tablist" aria-label="Vista del calendario">
@@ -106,10 +119,12 @@ export function BandaMovil(
             const tipo = vistaEnElOtroFormato(v.type, true)
             return (
               <button key={v.type} type="button" role="tab" aria-selected={vistaActual === tipo}
+                aria-keyshortcuts={atajos ? teclasDeAccion(ATAJO_DE_VISTA[v.type]) : undefined}
                 onClick={() => onVista(tipo)}>{v.label}</button>
             )
           })}
         </div>
+        {buscar}
         <FiltrosBandaMovil
           medicos={medicos} filtroMedico={filtroMedico}
           onFiltroMedico={onFiltroMedico} onHorario={onHorario}
