@@ -136,8 +136,12 @@ export type ModalState =
      dentro del modal— y por eso es opcional. No lo conviertas en obligatorio ni
      lo siembres con `null` desde los demás `setModal`: `undefined` significa
      «esta ruta no trae paciente», que no es lo mismo que «se eligió ninguno». */
-  | { mode: 'create'; fecha: string; hora: string | null; tipo: TipoFila; todoElDia: TodoElDiaInicial; fechaFin?: string; paciente?: PacienteBusqueda }
-  | { mode: 'edit';   appointment: Appointment }
+  /* F3 (contrato de la rama de interacciones, `contratosV2.ts`): `horaFin` y
+     `medicoId` los trae «Más opciones» de la burbuja de alta rápida —el fin
+     arrastrado y el médico ya elegido—; `enfocar: 'fecha'` lo trae «Reagendar»
+     de la tarjeta de lectura. Opcionales: ninguna ruta de hoy los pone. */
+  | { mode: 'create'; fecha: string; hora: string | null; tipo: TipoFila; todoElDia: TodoElDiaInicial; fechaFin?: string; paciente?: PacienteBusqueda; horaFin?: string; medicoId?: string }
+  | { mode: 'edit';   appointment: Appointment; enfocar?: 'fecha' }
 
 /**
  * Con qué interruptor de «todo el día» abre el alta, y si se puede tocar.
@@ -276,6 +280,9 @@ function valoresInicialesDelModal(modal: ModalState, todoElDia: boolean): Valore
   /* `modal.fechaFin` sólo llega desde el arrastre sobre la banda; el clic suelto
      y la vista Mes no lo traen y el fin se propone igual al inicio, como siempre. */
   if (!hora) return { fecha: modal.fecha, hora: '', fechaFin: modal.fechaFin ?? modal.fecha, horaFin: '' }
+  /* F3 · Con `horaFin` (la duración arrastrada en la burbuja) manda ésa, el
+     mismo día; sin ella, la duración por omisión como siempre. */
+  if (modal.horaFin) return { fecha: modal.fecha, hora, fechaFin: modal.fechaFin ?? modal.fecha, horaFin: modal.horaFin }
   const fin = partirFechaHora(addMinutes(componerIso(modal.fecha, hora), DEFAULT_DURATION))
   return { fecha: modal.fecha, hora, fechaFin: fin.fecha, horaFin: fin.hora }
 }
@@ -467,7 +474,8 @@ export default function AppointmentModal({
   const [search,      setSearch]      = useState('')
   const [showSearch,  setShowSearch]  = useState(false)
   const [quickCreate, setQuickCreate] = useState(false)
-  const [medicoId,    setMedicoId]    = useState<string>(apt?.medico_id ?? defaultMedicoId)
+  const [medicoId,    setMedicoId]    = useState<string>(
+    apt?.medico_id ?? (modal.mode === 'create' && modal.medicoId ? modal.medicoId : defaultMedicoId))
   /* B6c: el tipo ELEGIDO. Lo que se guarda es `tipoEfectivo`, de más abajo. */
   const [tipoCitaId,  setTipoCitaId]  = useState<string | null>(apt?.tipo_cita_id ?? null)
   const [saving,      setSaving]      = useState(false)
@@ -1411,6 +1419,9 @@ export default function AppointmentModal({
               <input
                 type="date"
                 value={fecha}
+                /* F3 · «Reagendar» abre la edición con el foco aquí. `useDialogoModal`
+                   no se lo quita: sólo enfoca el panel si el foco no está dentro. */
+                autoFocus={modal.mode === 'edit' && modal.enfocar === 'fecha'}
                 onChange={e => todoElDia ? moverFechaDeTodoElDia(e.target.value) : moverInicio(e.target.value, hora)}
                 className="w-full px-3 py-2.5 max-md:py-3 text-sm rounded-xl border border-[var(--ag-input-border)] bg-[var(--ag-input-bg)] text-[var(--ag-text)] focus:outline-none focus:ring-2 focus:ring-[var(--ag-input-focus-ring)] focus:border-[var(--ag-input-focus-border)] transition-all"
               />
