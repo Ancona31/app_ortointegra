@@ -1356,7 +1356,23 @@ primero sin marcar.
   - Decisiones: §6-bis («Bloque B — decisiones tomadas al construir»).
   - Abierto y documentado en `DEUDA_TECNICA.md` (E5-DT-8): si otra persona
     borra la cita a mitad del arrastre, al soltar queda una tarjeta fantasma.
-- [ ] C — Google en los dos sentidos (en curso, rama `feature/agenda-v2-c`)
+- [x] C — Google en los dos sentidos (2026-11-13)
+  - C0 deuda (AG-DT-5 cerrada; LP-DT-6 pendiente de la prueba con cuenta real)
+    · C1 estado de sincronización, candado y puerta S3
+    (`gcal_sync_clinica_habilitada`) · C2 aplicar e importar con C-d, C-e y S1
+    en la base, y `via:'google'` en la auditoría · C3 decisión pura · C4
+    orquestador con paginación y 410 · C5 escritura saliente v2
+    (`extendedProperties.private`, `etag`/`If-Match`, conflicto auditado,
+    `attended`, restablecer citas cerradas) · C6 sondeo al abrir la agenda
+    (`POST /api/google/sync`, 60 s mínimos) · C7 tarea programada
+    (`/api/cron/google-sync`, `CRON_SECRET` en tiempo constante, cada 10 min
+    en `vercel.json`; sin activar) · C8 e2e contra un Google falso (solo en
+    `next dev` local; la guarda impide activarlo en producción).
+  - Migraciones (solo local): `20261113120000` C1, `20261113130000` C2, con
+    auditoría independiente APTA CON CAMBIOS aplicados.
+  - Pruebas al cierre: 1106 Vitest, 7 archivos SQL, 120 e2e.
+  - Lo activa Angel: `CRON_SECRET` en Vercel, desplegar, prueba con cuenta
+    real (§7). Antes de encender: revisar el panel de auditoría (C-h).
   - Diseño: `e2e/resultados/plan_C.md` del worktree de `feature/agenda-v2`,
     acotado por C-a, C-d, C-e y S1-S3 de §6-bis, que mandan.
   - C0 (2026-11-13): AG-DT-5 cerrada en `DEUDA_TECNICA.md` (la arregló
