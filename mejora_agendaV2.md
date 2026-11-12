@@ -994,6 +994,50 @@ queda listada aquí.
   en Spinus de una fila importada pisaría su descripción en Google con el
   formato fijo y el sondeo siguiente la importaría como notas.
 
+### Bloque C — decisiones tomadas en C7
+
+- **Ruta:** `GET /api/cron/google-sync`, `dynamic = 'force-dynamic'` (lo pide
+  la documentación de Vercel Cron; en Next 16 sigue valiendo porque el
+  proyecto no usa `cacheComponents`) y `maxDuration = 60`. No está activa:
+  falta `CRON_SECRET` en Production y desplegar (lo hace Angel).
+- **Secreto (S2):** se compara la cabecera entera con `Bearer <CRON_SECRET>`
+  reduciendo los dos lados a SHA-256 y comparando con `timingSafeEqual`. Así los
+  buffers miden siempre 32 bytes: una longitud distinta no lanza y la longitud
+  no se filtra por el tiempo. Sin la variable, o vacía: 401 a todo.
+- **Respuesta (S2):** `{ ok: true }` con `no-store`; 401 y 500 sin cuerpo. El
+  plan C decía «solo conteos»: manda S2, que no admite ni conteos. Lo que pasó
+  queda en `gcal_sync_estado` y en la auditoría; en el log, solo cuántas
+  pasadas fallaron, sin ids.
+- **Middleware (S2):** la ruta entra con `===`, aparte de `publicApiPaths`,
+  porque esa lista compara con `startsWith` y abriría cualquier ruta que
+  empiece igual. Las entradas existentes no cambian (`/r/` incluida).
+- **Presupuesto:** 45 s por ejecución, como máximo 15 s por clínica (para que
+  una sincronización completa grande no deje a las demás sin turno: guarda la
+  página y sigue en la siguiente ejecución), y no se empieza una clínica con
+  menos de 5 s por delante. Las clínicas van en serie.
+- **Listado:** se piden 100 conexiones (el tope de
+  `gcal_sync_clinicas_pendientes`), no 20 como decía el plan: el listado no
+  descarta las clínicas sin acceso ni las que están en espera creciente, y
+  como las ordena por `ultima_ok` con NULL primero, 20 clínicas así ocuparían
+  siempre las 20 plazas. Cada una cuesta una llamada a `gcal_sync_tomar` que no
+  prende; el presupuesto corta antes de terminar la lista si hace falta.
+  **Resto conocido:** con más de 100 clínicas sin acceso y la v2 encendida,
+  las demás no entrarían por la tarea (sí por el sondeo al abrir la agenda).
+- **Candado:** `leaseSeg = 90` (más que `maxDuration`, por si la función muere
+  a media página: a los 90 s otra ejecución puede seguir). `minIntervaloSeg =
+  60`, no 0 como decía el plan: Vercel puede repetir una ejecución, y con 0 la
+  repetida volvería a sincronizar cada clínica recién terminada (inocuo, pero
+  el doble de cuota de Google). Una pasada a medias (`page_token` guardado) no
+  espera ese mínimo (lo dice `gcal_sync_tomar`).
+- **`actorId: 'cron'`**: sólo va a los logs (`ContextoGCal`); la auditoría del
+  sondeo sigue saliendo a nombre del dueño de la conexión con
+  `origen:'sistema'`, como la escribe C4.
+- **`restablecer`:** la tarea no lo consume (C5 y C6 iban en paralelo y no se
+  sabía cómo lo harían). Como dice C4, si nadie lo consume no se pierde nada que
+  hoy exista; si C5 añade un consumidor, la tarea tendría que llamarlo también.
+- **`robots.txt`:** no existe en el repo (ni en `public/` ni como `robots.ts`)
+  y no se creó.
+
 ### Bloque F
 
 - Las 18 propuestas de la auditoría visual, aprobadas. **El pulido visual y los
