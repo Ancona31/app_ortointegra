@@ -2232,6 +2232,105 @@ archivos nuevos se importa todavía desde la agenda):
   `agendaV2`.
 - `data-cita-id` en las raíces de las tarjetas (superficie, F1.4).
 
+### Bloque F — decisiones tomadas en el movimiento
+
+Ronda F2.3–F2.8 (agente «Movimiento», rama `feature/agenda-v2-fb`), en paralelo
+con la superficie (A) y las interacciones v2 (C). Manda CONTRASTE §2 sobre la
+tabla del plan, como ya decían las decisiones 1–7.
+
+- **Entrada solo de la cita nueva (F2.4).** Se registra antes de `addEvent` en
+  el alta optimista (`handleSave`) y en la rama de alta de
+  `aplicarCambioRealtime` (con `remoto`). `eventsSet` solo poda y hace de
+  candado (`podarMarcas`, con los ids del anterior en una ref de
+  `AgendaCliente`). `clasesDelEvento` antepone `clasesDeMovimiento`; su
+  parámetro se estrechó a `{ event: Pick<EventApi, 'id' | 'allDay' |
+  'extendedProps'> }`, que `EventContentArg` cumple, para poder probarla sin
+  calendario. Sin `eventDidMount`.
+- **La rama de alta del canal incluye un UPDATE que trae a la vista una cita
+  que no estaba pintada** (movida aquí desde otra semana, o asignada a este
+  médico): también entra con anillo. Para quien mira, acaba de llegar.
+- **Sustitución de la optimista por la real** en un solo `batchRendering`; la
+  real no se marca. Si la respuesta llega antes de 180 ms, la entrada se corta.
+- **Mes y banda de todo el día entran solo con opacidad** (`ag-entra-opacidad`),
+  igual que las filas de lista: la regla de `ag-entra` excluye ahora
+  `.fc-daygrid-event` y `.ag-ev-saliendo`.
+- **El anillo va POR DENTRO de la caja** (`inset: 0`, `box-shadow: inset 0 0 0
+  2px var(--ag-pulso)`), no a `-3px` por fuera como decía el diseño: tres de
+  las cinco cajas (`.ag-tarjeta`, `.ag-mes`, `.ag-banda`) llevan
+  `overflow: hidden` y lo recortarían. Cuelga de la caja y no del `<a>`, porque
+  el `::after` del `<a>` es de FullCalendar (foco y selección). En lista rodea
+  solo la celda del nombre. Su opacidad en reposo es 0: la clase puede quedarse
+  puesta hasta el siguiente repintado y no se ve.
+- **La clase de entrada puede seguir en el DOM pasados 600 ms** hasta que
+  FullCalendar vuelva a pintar esa tarjeta: `eventClassNames` solo se evalúa al
+  pintar. No tiene efecto (la animación ya corrió y el anillo está a 0); un
+  montaje posterior ya no la lleva.
+- **Salida (F2.5).** `handleDelete` y las dos bajas del canal (DELETE y «dejó de
+  pertenecer a esta vista») usan `salirConAnimacion`; sin `Calendar`, se quitan
+  de golpe como antes. Una marca huérfana (si `addEvent` devolviera `null`) se
+  poda en el siguiente `eventsSet` o caduca.
+- **FLIP (F2.6)** en el UPDATE ajeno sobre una cita pintada y en
+  `restaurarPosicion`, con `api.el` como raíz. **Sin `data-cita-id` no anima
+  nada** (aplica y degrada a lo de hoy). **ASUMIENDO, sin verificar en el
+  navegador:** entre columnas no anima, porque FullCalendar crea otro `<a>` en
+  la columna nueva y `@fullcalendar/react` pinta el contenido por portal un
+  momento después, así que al volver de `aplicar()` no se encuentra la tarjeta.
+  Dentro de la misma columna el `<a>` se conserva y sí se desliza.
+- **Fundido de navegación (F2.3)** del `.fc-view-harness`, de 0.7 a 1 en micro,
+  con WAAPI. Solo si es el mismo tipo de vista y cambió `view.currentStart`: el
+  primer `datesSet` y el cambio de vista ya los anima `ag-vista`, y un `datesSet`
+  sin cambio de periodo (p. ej. al plegar días) no se anima (CONTRASTE §2.8).
+  **No se funde sobre una rejilla ya atenuada** (`ag-cargando` o
+  `ag-desactualizada`): sería un destello sobre el 0.55. Dos navegaciones
+  seguidas: la segunda corta el fundido de la primera (`id` de la animación).
+  Borde aceptado: si la segunda llega antes de que la primera encienda la
+  atenuación (150 ms), su fundido puede tapar hasta ~20 ms el arranque de la
+  rampa a 0.55.
+- **`dragRevertDuration={180}`**, literal (prop primitiva). El regreso lo anima
+  FullCalendar con `top`/`left` en línea sobre el espejo, que es suyo (spec §8)
+  y queda fuera de la regla de `getAnimations`. Para el movimiento reducido se
+  añadió `.fc-event` suelto al bloque que ya existe: el espejo cuelga de `body`,
+  fuera de `.fc`, y el `!important` gana a su estilo en línea; con `.01ms` su
+  `transitionend` sigue llegando.
+- **Avisos y banda compacta (F2.8).** Entrada CSS al montarse: opacidad y 6 px
+  en lento. Salida con `ConSalida`, un componente local de `AvisosAgenda.tsx`
+  (cinco usos en el archivo): la banda sigue montada `--ag-dur-base` ms con
+  `data-estado="saliendo"`, `inert` (suelta el foco del botón que la apagó,
+  cosa que `aria-hidden` no permite) y sin punteros, y **retiene el texto
+  que enseñaba**, para que un «Sin citas esta semana» que se va no diga el
+  periodo nuevo. Sin animar el alto: la rejilla salta una vez. **La banda que
+  ya está al abrir la agenda entra con la vista**, no aparte: se aceptó como
+  parte de «la vista entera» de la primera carga.
+- **Modal (F2.7).** `.ag-modal-panel` y `.ag-modal-velo`, con su salida. El
+  `ConfirmModal` pasa a esas clases (entrada sin salida; decisión 17). Los otros
+  modales de la agenda (`HorarioModal`, `ModalInvitacionCita`) siguen con
+  `animate-modal-enter`: no son archivos de este agente. **La salida del modal
+  de la cita está escrita pero APAGADA** (`SALIDA_DEL_MODAL = false` en
+  `AgendaCliente`): `modal` sigue siendo la única verdad y se cierra al
+  instante; `modalSaliente` solo sostiene el pintado. Encenderla sin el cambio
+  del modal lo dejaría montado 180 ms, sin animar y pulsable (un segundo
+  «Guardar» crearía otra cita).
+
+  **Lo que tiene que aplicar el agente de la superficie en
+  `AppointmentModal.tsx`:**
+  1. Prop nueva `saliendo?: boolean` en el tipo de las props del componente
+     (declarado en línea en su firma).
+  2. Velo (`<div className="absolute inset-0 backdrop-blur-sm" …>`): añadir la
+     clase `ag-modal-velo` y `data-estado={saliendo ? 'saliendo' : undefined}`.
+  3. Panel (el `role="dialog"`): cambiar `animate-modal-enter` por
+     `ag-modal-panel` y añadir el mismo `data-estado`.
+  4. Raíz del modal (el `fixed inset-0` que envuelve a los dos): `inert={saliendo}`,
+     porque `pointer-events: none` no corta el teclado.
+  5. Al integrarlo, en `AgendaCliente`: `SALIDA_DEL_MODAL = true` y
+     `saliendo={modal.mode === 'closed'}` en el `<AppointmentModal>` (mientras
+     sale, `modal` ya está cerrado y lo que se pinta es `modalPintado`).
+- **e2e `agenda-f-movimiento`** (escrita, sin correr). Las clases viven 120–600
+  ms, así que no se esperan con `toHaveClass`: un observador instalado con
+  `addInitScript` (texto, no función, por el `__name`) anota cada `.fc-event`
+  que las llega a llevar y cada `element.animate()`. El fundido se comprueba
+  por ese registro (solo `opacity`, ≤ 240 ms). Con movimiento reducido se exige
+  que no haya ninguna llamada a WAAPI.
+
 ### Menores
 
 - **`ProximasCitas`:** tope de refresco de 2 minutos al volver a la pestaña,
