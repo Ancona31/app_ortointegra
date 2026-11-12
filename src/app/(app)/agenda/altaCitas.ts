@@ -28,6 +28,12 @@ import { medianocheDe } from '@/lib/agenda/huecosAgenda'
 import { avisoFueraDeHorario, avisoFinFueraDeHorario, avisoDiaCerrado } from '@/lib/agenda/horarioAgenda'
 import { partirFechaHora, ultimoDiaIncluido } from '@/lib/agenda/fechasAgenda'
 import type { Appointment } from '@/lib/agenda/tiposAgenda'
+/* F3 (interacciones v2): SÓLO TIPOS. La burbuja y la tarjeta viven en un chunk
+   diferido (`InteraccionesV2.tsx`) que se llama por `interacciones`; con el
+   interruptor apagado o el chunk sin llegar, la referencia está vacía y cada
+   gesto abre el modal como siempre. Ver `contratosV2.ts`. */
+import type { ApiInteraccionesV2, SeleccionDesdeHueco } from '@/lib/agenda/contratosV2'
+import type { Caja, Punto } from '@/lib/agenda/posicionCapa'
 
 type CalRef = RefObject<InstanceType<typeof FullCalendar> | null>
 
@@ -72,6 +78,63 @@ function cayoEnLaBandaDeTodoElDia(objetivo: EventTarget | null | undefined, allD
   return objetivo instanceof Element && objetivo.closest('.fc-timegrid') !== null
 }
 
+/* ── F3 · DÓNDE CAYÓ EL GESTO, PARA COLOCAR LA BURBUJA Y LA TARJETA ─────────
+   Sin `instanceof MouseEvent`: se pregunta por las propiedades, como
+   `esObjetivoEditable`, y `Element` se comprueba antes de usarlo, para que el
+   enrutado se pueda probar en Vitest, que corre sin DOM. */
+
+/** El punto pulsado. Con teclado (Enter en una cita) no hay punto. */
+function puntoDe(e: Event | null | undefined): Punto | undefined {
+  if (!e || !('clientX' in e) || !('clientY' in e)) return undefined
+  const { clientX: x, clientY: y } = e
+  return typeof x === 'number' && typeof y === 'number' ? { x, y } : undefined
+}
+
+/** Lo que se lee de un elemento para colocar la capa; un `Element` lo cumple. */
+type ConCaja = { getBoundingClientRect(): { left: number; top: number; width: number; height: number } }
+
+function cajaDe(el: ConCaja | null | undefined): Caja | null {
+  if (!el) return null
+  const { left, top, width, height } = el.getBoundingClientRect()
+  return { left, top, width, height }
+}
+
+/** El elemento de la celda o la columna bajo el gesto (`jsEvent.target`). */
+function celdaDe(e: Event | null | undefined): Element | null {
+  const t = e?.target
+  return typeof Element !== 'undefined' && t instanceof Element ? t.closest('.fc-daygrid-day, .fc-timegrid-col') : null
+}
+
+/**
+ * El ancla de la burbuja: el ESPEJO de la selección si lo hay (`selectMirror`,
+ * el tramo marcado en la rejilla), la celda si es del Mes, y si no un punto.
+ * La columna entera de la rejilla horaria NO sirve de ancla: mide el día
+ * entero y la capa no cabría a ningún lado.
+ */
+function anclaDelGesto(celda: Element | null | undefined, punto: Punto | undefined): Caja | null {
+  const espejo = typeof document === 'undefined' ? null : document.querySelector('.fc-event-mirror')
+  return cajaDe(espejo) ?? cajaDe(celda?.closest('.fc-daygrid-day'))
+    ?? (punto ? { left: punto.x, top: punto.y, width: 1, height: 1 } : null)
+}
+
+/** El botón del hueco pulsado, si tiene el foco; si no, el panel de Día donde vive. */
+function anclaDelHueco(): Element | null {
+  if (typeof document === 'undefined') return null
+  const activo = document.activeElement
+  return activo?.closest('.ag-dia-aside') ? activo : document.querySelector('.ag-dia-aside')
+}
+
+/** Lo que la burbuja necesita del gesto, además de fecha y hora. `null`: no hay sitio, va al modal. */
+type SitioDelGesto = { fin: Date | null; desdeHueco: boolean; ancla: Caja; punto?: Punto }
+
+function sitioDelGesto(
+  celda: Element | null | undefined, jsEvent: Event | null | undefined, fin: Date | null, hueco: { ancla: Caja | null } | null,
+): SitioDelGesto | null {
+  const punto = puntoDe(jsEvent)
+  const ancla = hueco?.ancla ?? anclaDelGesto(celda, punto)
+  return ancla ? { fin, desdeHueco: hueco !== null, ancla, ...(punto ? { punto } : {}) } : null
+}
+
 interface Params {
   calendarRef: CalRef
   isMobile: boolean
@@ -83,11 +146,15 @@ interface Params {
   setConfirm: Dispatch<SetStateAction<ConfirmState>>
   resumenDia: ResumenDia | null
   citasIncompletas: boolean
+  /** F3: el interruptor y la API del chunk de interacciones (vacía si no llegó). */
+  agendaV2: boolean
+  interacciones: { current: ApiInteraccionesV2 | null }
+  seleccionDesdeHueco: SeleccionDesdeHueco
 }
 
 export function crearAltaCitas({
   calendarRef, isMobile, setDiaSel, subState, openBloqueoModal, horario, setModal, setConfirm,
-  resumenDia, citasIncompletas,
+  resumenDia, citasIncompletas, agendaV2, interacciones, seleccionDesdeHueco,
 }: Params) {
   /* ── Handlers ────────────────────────────────────────── */
   /* ⚠️ `tipo: 'cita'` DE AQUÍ ABAJO ES EL VALOR DE PARTIDA, NO UN CIERRE.
@@ -132,7 +199,11 @@ export function crearAltaCitas({
        `cayoEnLaBandaDeTodoElDia`; la de si hay hora se queda aquí. */
     const { fecha, hora } = partirFechaHora(arg.date.toISOString())
     const enLaBanda = cayoEnLaBandaDeTodoElDia(arg.dayEl, arg.allDay)
-    abrirAlta(arg.date, fecha, arg.allDay ? null : hora, enLaBanda ? 'fijo' : 'no')
+    /* F3: la banda de todo el día sigue yendo al modal (decisión 18); la
+       rejilla horaria y la celda del Mes llevan su sitio, y con v2 abren la
+       burbuja. Un clic no trae fin: la burbuja propone la duración por omisión. */
+    const sitio = enLaBanda ? null : sitioDelGesto(arg.dayEl, arg.jsEvent, null, null)
+    abrirAlta(arg.date, fecha, arg.allDay ? null : hora, enLaBanda ? 'fijo' : 'no', undefined, undefined, sitio)
   }
 
   /* El alta desde la rejilla, con o sin hora, y el aviso que corresponda a cada
@@ -162,20 +233,28 @@ export function crearAltaCitas({
      coinciden: el aviso es de citas con hora y el último día es de eventos de
      todo el día. Juntarlos en un parámetro obligaría a convertir de uno a otro,
      y esa conversión es justo la que corre un día cuando el huso no cuadra. */
+  /* ⚠️ F3 · LA BURBUJA ENTRA POR AQUÍ DENTRO, DETRÁS DEL MISMO AVISO. Con v2
+     y un `sitio` (rejilla horaria o celda del Mes), lo que se abre es la
+     burbuja en vez del modal; el bloqueo de suscripción (antes, en los
+     llamadores) y el aviso de fuera de horario (aquí) son los de siempre. Sin
+     `sitio`, sin v2 o sin el chunk cargado, el modal de hoy. */
   function abrirAlta(
     instante: Date, fecha: string, hora: string | null,
-    todoElDia: TodoElDiaInicial, finParaAvisar?: Date, ultimoDia?: string,
+    todoElDia: TodoElDiaInicial, finParaAvisar?: Date, ultimoDia?: string, sitio?: SitioDelGesto | null,
   ) {
     const aviso = hora === null
       ? avisoDiaCerrado(instante, horario)
       : (avisoFueraDeHorario(instante, horario, 'Vas a agendar a las')
          ?? (finParaAvisar ? avisoFinFueraDeHorario(finParaAvisar, horario) : null))
-    const abrir = () => setModal({
-      mode: 'create', fecha, hora,
-      tipo: todoElDia === 'fijo' ? 'evento' : 'cita',
-      todoElDia,
-      ...(ultimoDia ? { fechaFin: ultimoDia } : {}),
-    })
+    const capas = agendaV2 && sitio ? interacciones.current : null
+    const abrir = capas && sitio
+      ? () => capas.abrirBurbuja({ fecha, hora, inicio: instante, ...sitio })
+      : () => setModal({
+        mode: 'create', fecha, hora,
+        tipo: todoElDia === 'fijo' ? 'evento' : 'cita',
+        todoElDia,
+        ...(ultimoDia ? { fechaFin: ultimoDia } : {}),
+      })
     if (aviso) {
       setConfirm({
         message: aviso,
@@ -188,6 +267,9 @@ export function crearAltaCitas({
   }
 
   function handleSelect(arg: DateSelectArg) {
+    // F3: la marca de `abrirHueco` se recoge y se vacía antes que nada.
+    const hueco = seleccionDesdeHueco.current
+    seleccionDesdeHueco.current = null
     // Fase 8.2: idem handleDateClick
     if (subState.isBlocked) { openBloqueoModal(); return }
     /* Arrastrar sobre la rejilla fija las dos puntas, así que se miran las dos:
@@ -222,10 +304,16 @@ export function crearAltaCitas({
          Mes, donde el modal abre como CITA y `fechaFin` significa otra cosa —el
          día del fin CON HORA—: sembrarlo allí cambiaría el alta de siempre. */
       const ultimoDia = enLaBanda && arg.endStr ? ultimoDiaIncluido(arg.endStr) : undefined
-      abrirAlta(arg.start, fecha, null, enLaBanda ? 'fijo' : 'no', undefined, ultimoDia)
+      /* F3: sólo la celda SUELTA del Mes va a la burbuja; arrastrar por varios
+         días sigue abriendo el modal, como hoy. */
+      const unDia = !enLaBanda && !!arg.endStr && ultimoDiaIncluido(arg.endStr) === arg.startStr
+      const sitio = unDia ? sitioDelGesto(celdaDe(arg.jsEvent), arg.jsEvent, null, null) : null
+      abrirAlta(arg.start, fecha, null, enLaBanda ? 'fijo' : 'no', undefined, ultimoDia, sitio)
       return
     }
-    abrirAlta(arg.start, fecha, hora, 'no', arg.end)
+    /* F3: el fin del arrastre viaja a la burbuja, que respeta la duración
+       arrastrada (más de una franja); desde un hueco del panel, no. */
+    abrirAlta(arg.start, fecha, hora, 'no', arg.end, undefined, sitioDelGesto(celdaDe(arg.jsEvent), arg.jsEvent, arg.end, hueco))
   }
 
   /* ⚠️ LA ÚNICA PUERTA A LA EDICIÓN DE UNA CITA, Y POR ESO ESTÁ SUELTA. Nació
@@ -236,13 +324,22 @@ export function crearAltaCitas({
      editar— no pueda aplicarse en una y olvidarse en la otra.
      Y de paso deja UN solo sitio en el archivo donde `extendedProps` se estrecha
      a `Appointment`. Si algún día se abre una tercera puerta, entra por aquí. */
-  function abrirCita(evento: EventApi) {
+  /* F3: con v2 (y el chunk cargado) la puerta abre la TARJETA DE LECTURA en
+     vez del modal (§2); el modal sigue a un clic, en «Editar». Las dos puertas
+     de hoy —el clic en la rejilla y el panel del Mes del teléfono— pasan por
+     aquí, así que la tarjeta no puede faltar en una y estar en la otra. */
+  function abrirCita(evento: EventApi, sitio?: { ancla: Caja | null; punto?: Punto }) {
     if (evento.extendedProps.isGcalBlock) return
-    setModal({ mode: 'edit', appointment: evento.extendedProps as Appointment })
+    const cita = evento.extendedProps as Appointment
+    const capas = agendaV2 ? interacciones.current : null
+    if (capas) { capas.abrirTarjeta(cita, sitio?.ancla ?? null, sitio?.punto); return }
+    setModal({ mode: 'edit', appointment: cita })
   }
 
+  /* `arg.el` es la tarjeta pulsada (o la que tenía el foco, con Enter: FC
+     manda el `KeyboardEvent`, sin punto). */
   function handleEventClick(arg: EventClickArg) {
-    abrirCita(arg.event)
+    abrirCita(arg.event, { ancla: cajaDe(arg.el), punto: puntoDe(arg.jsEvent) })
   }
 
   /* ⚠️ `select()` ANTES DE ABRIR EL FORMULARIO, Y ESE ORDEN ES EL PUNTO (§8.4):
@@ -264,6 +361,10 @@ export function crearAltaCitas({
        traída de citas: dos puertas al mismo daño. */
     if (citasIncompletas) return
     const base = medianocheDe(resumenDia.dia).getTime()
+    /* F3 · `seleccionDesdeHueco`: un hueco de tres horas no propone tres horas
+       (decisión 19). La burbuja se ancla al botón del hueco si tiene el foco
+       y, si no (Safari no enfoca un botón al pulsarlo), al panel entero. */
+    seleccionDesdeHueco.current = { ancla: cajaDe(anclaDelHueco()) }
     api.select(new Date(base + t.desde * 60_000), new Date(base + t.hasta * 60_000))
   }
 

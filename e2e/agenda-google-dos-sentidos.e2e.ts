@@ -2,6 +2,7 @@ import { test, expect, type Browser, type Page } from '@playwright/test'
 import { spawn, type ChildProcess } from 'node:child_process'
 import { closeSync, mkdirSync, openSync, readFileSync } from 'node:fs'
 import { SESION, CORREO, DIA_LABORABLE_LIBRE, interruptorAgenda, sqlLocal, eventoConTexto, modalCita, tituloUnico } from './ayudas'
+import { editarDesdeTarjeta } from './interaccionesAyudas'
 import { arrancarGoogleFalso, CALENDARIO, type EventoFalso, type GoogleFalso } from './google-falso/servidor'
 import { fechaHoraLocalAInstante } from '../src/lib/dates'
 import { encrypt } from '../src/lib/encrypt'
@@ -274,7 +275,10 @@ test('encendido: un evento creado en Google aparece como fila editable y una sol
   expect(importada.split('|').slice(1)).toEqual(['google', 'Notas escritas en Google'])
   // Una sola tarjeta: la fila; el bloque de solo lectura ya no sale.
   await expect(page.locator('.fc-event', { hasText: titulo })).toHaveCount(1, { timeout: 30_000 })
+  /* F3: con v2 el clic abre la tarjeta de lectura; la edición está en «Editar». */
+  await expect(page.locator('.agenda-raiz')).toHaveAttribute('data-interacciones-v2', 'listas')
   await eventoConTexto(page, titulo).click()
+  await editarDesdeTarjeta(page)
   await expect(modalCita(page, 'Editar evento')).toBeVisible({ timeout: 30_000 })
 })
 

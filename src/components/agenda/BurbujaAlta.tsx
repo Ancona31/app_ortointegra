@@ -6,9 +6,9 @@
  * La burbuja de creación rápida (bloque F, F3.1, detrás del interruptor;
  * decisión de §2 del plan: «clic en un hueco abre una burbuja con paciente,
  * hora y Guardar, con Más opciones hacia el modal completo, que se conserva»).
- * Archivo nuevo de F3, sin enchufar todavía: el enrutado (`abrirAlta` →
- * burbuja si `agendaV2` y el gesto es de una franja de la rejilla o de una
- * celda del Mes) va en `altaCitas.ts` en la ronda de después de E.
+ * La monta `InteraccionesV2.tsx`; el enrutado (`abrirAlta` → burbuja si
+ * `agendaV2` y el gesto es de una franja de la rejilla o de una celda del Mes)
+ * vive en `altaCitas.ts`. Desde una celda del Mes abre con las horas en blanco.
  *
  * Lo que decide el llamador, y por eso no está aquí: el bloqueo por
  * suscripción y la confirmación de «fuera de horario» (ANTES de abrir), el
@@ -37,7 +37,7 @@ import { duracionToken, prefiereMenosMovimiento } from '@/lib/agenda/movimientoA
 import { idDeOpcion, indiceTrasTecla } from '@/lib/agenda/opcionesLista'
 import { buscarPacientes, limpiarTextoBusqueda } from '@/lib/agenda/buscarCitasPaciente'
 import {
-  consultorioPropuesto, datosDeAltaRapida, etiquetaBurbuja, medicoPropuesto, motivoParaNoGuardar,
+  consultorioPropuesto, datosDeAltaRapida, etiquetaBurbuja, finTrasMoverInicio, medicoPropuesto, motivoParaNoGuardar,
   necesitaElegirMedico, type ConsultorioAlta,
 } from '@/lib/agenda/altaRapida'
 
@@ -62,8 +62,8 @@ interface Props {
   /** El filtro de médico de la agenda; `null` = «Todos». */
   filtroMedico: string | null
   consultorioActivo: ConsultorioAlta | null
-  /** Guarda (`handleSave`); `true` si quedó guardada y la burbuja puede cerrarse. */
-  alGuardar: (datos: DatosGuardado) => Promise<boolean>
+  /** Guarda (avisos y `handleSave`); `true` si se mandó a guardar y la burbuja puede cerrarse. */
+  alGuardar: (datos: DatosGuardado, horas: { inicio: string; fin: string }) => Promise<boolean>
   alMasOpciones: (valores: MasOpcionesBurbuja) => void
   alCerrar: () => void
 }
@@ -96,6 +96,16 @@ function useSalida(alCerrar: () => void): { saliendo: boolean; salir: () => void
 }
 
 /**
+ * ¿Hay OTRO diálogo modal abierto encima? Entonces el toque es suyo, no
+ * «fuera» de esta capa: el aviso de empalme o de horario (`ConfirmModal`) sale
+ * encima de la capa abierta, y contestarle —también pulsando su velo, que es
+ * HERMANO del diálogo y no su hijo— no puede cerrarla.
+ */
+function hayOtroDialogoModal(propio: HTMLElement): boolean {
+  return Array.from(document.querySelectorAll('[role="dialog"][aria-modal="true"]')).some(d => d !== propio)
+}
+
+/**
  * Tocar fuera cierra (con su salida), como en cualquier calendario. `pointerdown`
  * en captura: llega antes de que FullCalendar empiece una selección nueva.
  * ⚠️ COPIA DELIBERADA en `TarjetaLectura.tsx`: dos usos no justifican un gancho
@@ -104,7 +114,9 @@ function useSalida(alCerrar: () => void): { saliendo: boolean; salir: () => void
 function useCerrarAlTocarFuera(panel: { current: HTMLElement | null }, salir: () => void): void {
   useEffect(() => {
     function alTocar(e: PointerEvent): void {
-      if (panel.current && e.target instanceof Node && !panel.current.contains(e.target)) salir()
+      if (!panel.current || !(e.target instanceof Element) || panel.current.contains(e.target)) return
+      if (hayOtroDialogoModal(panel.current)) return
+      salir()
     }
     document.addEventListener('pointerdown', alTocar, true)
     return () => document.removeEventListener('pointerdown', alTocar, true)
@@ -173,7 +185,8 @@ function CamposHorario({ inicio, fin, alCambiar }: PropsHorario): ReactElement {
     <div className="ag-capa-fila">
       <label className="ag-capa-campo">
         Inicio
-        <input type="time" step={300} value={inicio} onChange={e => alCambiar(e.target.value, fin)} />
+        {/* Mover el inicio arrastra el fin con la misma duración, como el modal. */}
+        <input type="time" step={300} value={inicio} onChange={e => alCambiar(e.target.value, finTrasMoverInicio(inicio, fin, e.target.value))} />
       </label>
       <label className="ag-capa-campo">
         Fin
@@ -235,7 +248,7 @@ export default function BurbujaAlta(props: Props): ReactElement {
     const datos = datosDeAltaRapida(entrada)
     if (!datos) { setEstado({ guardando: false, error: motivoParaNoGuardar(entrada) }); return }
     setEstado({ guardando: true, error: null })
-    if (await alGuardar(datos)) salir()
+    if (await alGuardar(datos, horas)) salir()
     else setEstado({ guardando: false, error: null })
   }
   const masOpciones = (): void => alMasOpciones({ fecha, hora: horas.inicio, horaFin: horas.fin, paciente: paciente ?? undefined, medicoId })

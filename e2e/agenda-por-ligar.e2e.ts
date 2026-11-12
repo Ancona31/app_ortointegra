@@ -2,6 +2,7 @@ import { test, expect, type Page } from '@playwright/test'
 import {
   CORREO, SESION, DIA_LABORABLE_LIBRE, interruptorAgenda, irAAgenda, modalCita, soloEscritorio, sqlLocal, toastConTexto,
 } from './ayudas'
+import { editarDesdeTarjeta } from './interaccionesAyudas'
 import { clicEnTarjeta, crearCitaPorLigar, limpiarReservasE2e, type CitaPorLigar } from './reservaAyudas'
 import { fechaHoraLocalAInstante } from '../src/lib/dates'
 
@@ -44,6 +45,8 @@ const estado = (id: string) => sqlLocal(`select coalesce((select status from pub
 async function abrirAgendaV2(page: Page): Promise<void> {
   await irAAgenda(page)
   await expect(page.locator('.agenda-raiz')).toHaveAttribute('data-agenda-v2', 'encendida')
+  /* F3: con v2 las interacciones van en un chunk diferido; un clic antes de que llegue abriría el modal directo. */
+  await expect(page.locator('.agenda-raiz')).toHaveAttribute('data-interacciones-v2', 'listas')
 }
 
 test('encendido: la tarjeta dice «Por ligar · 3» y el modal enseña quién reservó, con su historial en vivo', async ({ page }) => {
@@ -81,6 +84,7 @@ test('encendido: la tarjeta dice «Por ligar · 3» y el modal enseña quién re
 
   const historial = page.waitForResponse(r => r.url().includes('/api/agenda/reservas/historial'))
   await clicEnTarjeta(tarjeta(page))
+  await editarDesdeTarjeta(page)
   const modal = modalCita(page, 'Editar cita')
   await expect(modal).toBeVisible()
   expect((await historial).ok()).toBeTruthy()
@@ -95,6 +99,7 @@ test('encendido: bloquear y desbloquear el contacto desde el modal', async ({ pa
   const c = cita('17:00', 'fijo')
   await abrirAgendaV2(page)
   await clicEnTarjeta(tarjeta(page))
+  await editarDesdeTarjeta(page)
   const modal = modalCita(page, 'Editar cita')
   /* `exact`: sin él, 'Bloquear contacto' también casa con «Desbloquear
      contacto» (Playwright compara por subcadena sin distinguir mayúsculas), y
@@ -118,6 +123,7 @@ test('encendido: una cita por ligar que gastó un enlace único se cancela; el D
 
   await abrirAgendaV2(page)
   await clicEnTarjeta(tarjeta(page))
+  await editarDesdeTarjeta(page)
   await expect(modalCita(page, 'Editar cita')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Eliminar cita', exact: true })).toHaveCount(0)
   await page.getByRole('button', { name: 'Cancelar cita', exact: true }).click()
@@ -132,6 +138,7 @@ test('encendido: guardarla sin paciente conserva el título y no manda paciente_
   const c = cita('17:00', 'fijo')
   await abrirAgendaV2(page)
   await clicEnTarjeta(tarjeta(page))
+  await editarDesdeTarjeta(page)
   const modal = modalCita(page, 'Editar cita')
   await modal.getByPlaceholder('Instrucciones, observaciones...').fill('Trae estudios')
   const put = page.waitForResponse(r => r.url().includes(`/api/appointments/${c.citaId}`) && r.request().method() === 'PUT')

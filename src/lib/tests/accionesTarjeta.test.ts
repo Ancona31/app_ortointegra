@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
-  accionesDeTarjeta, horarioDeTarjeta, nombreDeTarjeta, pideConfirmacion, telefonoDeTarjeta,
+  accionesDeTarjeta, horarioDeTarjeta, nombreDeTarjeta, pideConfirmacion, puedeIniciarConsulta, telefonoDeTarjeta,
+  textoDeConfirmacion,
 } from '@/lib/agenda/accionesTarjeta'
 
 const CITA = { paciente_id: 'p1', reserva_canal: null } as const
@@ -61,5 +62,41 @@ describe('horarioDeTarjeta', () => {
   })
   it('sin zona del consultorio, sólo el tramo', () => {
     expect(horarioDeTarjeta({ ...cita, consultorio_timezone: null }, 'America/Merida').enConsultorio).toBeNull()
+  })
+})
+
+/* ── F3 · el enchufe de la tarjeta ─────────────────────────────────────── */
+
+describe('accionesDeTarjeta sin `cambiarEstadoCita`', () => {
+  it('no ofrece «Confirmar» aunque la cita esté agendada', () => {
+    expect(accionesDeTarjeta({ ...CITA, status: 'scheduled' }, false, false)).toEqual(['reagendar', 'cancelar', 'editar'])
+  })
+})
+
+describe('puedeIniciarConsulta (las condiciones del modal)', () => {
+  const medico = { esMedico: true, perfilId: 'm1', consultorioExiste: true }
+  const conPaciente = { pacientes: { id: 'p', nombre: 'Ana', apellidos: 'Pech', telefono: null }, paciente_id: 'p', reserva_canal: null, medico_id: 'm1' }
+  it('médico, su cita, su consultorio y con paciente: sí', () => {
+    expect(puedeIniciarConsulta(conPaciente, medico)).toBe(true)
+  })
+  it('una por ligar suya también (D7 la liga en el modal)', () => {
+    expect(puedeIniciarConsulta({ ...conPaciente, pacientes: null, paciente_id: null, reserva_canal: 'fijo' }, medico)).toBe(true)
+  })
+  it('no: si no es médico, si la cita es de otro, si el consultorio no está o si es un evento', () => {
+    expect(puedeIniciarConsulta(conPaciente, { ...medico, esMedico: false })).toBe(false)
+    expect(puedeIniciarConsulta({ ...conPaciente, medico_id: 'otro' }, medico)).toBe(false)
+    expect(puedeIniciarConsulta(conPaciente, { ...medico, consultorioExiste: false })).toBe(false)
+    expect(puedeIniciarConsulta({ ...conPaciente, pacientes: null, paciente_id: null }, medico)).toBe(false)
+  })
+})
+
+describe('textoDeConfirmacion', () => {
+  const base = { title: 'Junta', pacientes: null, reserva_nombre: null, paciente_id: null, reserva_canal: null }
+  it('cancelar nombra al paciente y dice que la cita se queda (B3)', () => {
+    expect(textoDeConfirmacion('cancelar', { ...base, pacientes: { id: 'p', nombre: 'Ana', apellidos: 'Pech', telefono: null } }))
+      .toMatch(/^¿Cancelar la cita de Ana Pech\?.*cancelada\.$/)
+  })
+  it('eliminar nombra el evento', () => {
+    expect(textoDeConfirmacion('eliminar', base)).toBe('¿Eliminar el evento «Junta»? No se puede deshacer.')
   })
 })

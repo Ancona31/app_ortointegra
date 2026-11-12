@@ -1,6 +1,6 @@
 'use client'
 
-import { type ReactElement } from 'react'
+import { type ReactElement, type ReactNode } from 'react'
 import { type Tramo, type ResumenDia } from '@/lib/agenda/huecosAgenda'
 import { CardResumen } from '@/components/agenda/CardResumen'
 import { CardHuecos } from '@/components/agenda/CardHuecos'
@@ -38,8 +38,12 @@ import { CardHuecos } from '@/components/agenda/CardHuecos'
  * las horas y los huecos no, y por eso los tiles de horas pasan a guión por el
  * mismo camino (`horasVisibles`). Ver la nota de `SIN_DATO`.
  */
+/* F3 · `miniMes` ES UN HUECO, NO UNA DEPENDENCIA: el minicalendario vive en
+   el chunk de las interacciones v2 y sólo llega con el interruptor encendido
+   (lo decide `AgendaCliente`). Sin él, el panel es el de siempre. Va al final,
+   en el hueco inferior que la auditoría visual (punto 4) vio vacío. */
 export function PanelDia(
-  { titulo, citas, eventos, resumen, unMedico, onHueco, incompleto }: {
+  { titulo, citas, eventos, resumen, unMedico, onHueco, incompleto, miniMes }: {
     titulo: string
     citas: number
     eventos: number
@@ -48,6 +52,8 @@ export function PanelDia(
     onHueco: (t: Tramo) => void
     /** `citasIncompletas` de la página. Ver las cabeceras de las dos tarjetas. */
     incompleto: boolean
+    /** F3: el minicalendario de mes, sólo con la agenda v2. */
+    miniMes?: ReactNode
   },
 ): ReactElement {
   return (
@@ -61,6 +67,11 @@ export function PanelDia(
         incompleto={incompleto}
       />
       {unMedico && <CardHuecos resumen={resumen} onHueco={onHueco} incompleto={incompleto} />}
+      {miniMes && (
+        <section className="ag-panelcard" aria-label="Calendario del mes">
+          {miniMes}
+        </section>
+      )}
     </aside>
   )
 }

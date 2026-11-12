@@ -18,6 +18,8 @@
  */
 import type { DatosGuardado } from '@/lib/agenda/tiposAgenda'
 import type { PacienteBusqueda } from '@/components/agenda/AppointmentModal'
+import type { GestoAlta } from '@/lib/agenda/contratosV2'
+import type { Empalme, TramoCita } from '@/lib/agenda/empalmesCita'
 import { DEFAULT_DURATION } from '@/lib/agenda/duracionCita'
 import { componerIso } from '@/lib/agenda/fechasAgenda'
 
@@ -47,6 +49,32 @@ export function sumarMinutos(hora: string, minutos: number): string {
   const [h, m] = hora.split(':').map(Number)
   const total = Math.min(h * 60 + m + minutos, 23 * 60 + 59)
   return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`
+}
+
+const HORA = /^\d{2}:\d{2}$/
+
+/**
+ * Las dos horas con las que abre la burbuja. Un gesto sobre un DÍA (celda del
+ * Mes) no trae hora y abre con las dos en blanco: inventarse una es lo que la
+ * agenda dejó de hacer (ver `ModalState`). Con hora, el fin es el inicio más
+ * `duracionDeSeleccion`.
+ */
+export function horasDelGesto(g: Pick<GestoAlta, 'hora' | 'inicio' | 'fin' | 'desdeHueco'>): { inicio: string; fin: string } {
+  if (g.hora === null) return { inicio: '', fin: '' }
+  return { inicio: g.hora, fin: sumarMinutos(g.hora, duracionDeSeleccion(g.inicio, g.fin, g.desdeHueco)) }
+}
+
+/**
+ * El fin tras cambiar el inicio en la burbuja: conserva la duración que había
+ * (como `moverInicio` del modal), y si no la había —horas en blanco, o un fin
+ * que no era posterior— propone la de por omisión. Sin inicio válido, el fin
+ * no se toca.
+ */
+export function finTrasMoverInicio(inicio: string, fin: string, nuevoInicio: string): string {
+  if (!HORA.test(nuevoInicio)) return fin
+  const minutos = (h: string): number => Number(h.slice(0, 2)) * 60 + Number(h.slice(3))
+  const duracion = HORA.test(inicio) && HORA.test(fin) && fin > inicio ? minutos(fin) - minutos(inicio) : DEFAULT_DURATION
+  return sumarMinutos(nuevoInicio, duracion)
 }
 
 /** Un médico de la clínica, tal como lo lista la agenda. */
@@ -95,7 +123,7 @@ export function motivoParaNoGuardar(e: EntradaAltaRapida): string | null {
   if (!e.paciente) return 'Elige un paciente.'
   if (!e.medicoId) return 'Elige el médico.'
   if (!e.consultorioId) return 'El consultorio activo no es de este médico: usa «Más opciones».'
-  if (!/^\d{2}:\d{2}$/.test(e.horaInicio) || !/^\d{2}:\d{2}$/.test(e.horaFin)) return 'Escribe la hora de inicio y de fin.'
+  if (!HORA.test(e.horaInicio) || !HORA.test(e.horaFin)) return 'Escribe la hora de inicio y de fin.'
   if (e.horaFin <= e.horaInicio) return 'La hora de fin tiene que ser posterior a la de inicio.'
   return null
 }
@@ -128,8 +156,53 @@ export function datosDeAltaRapida(e: EntradaAltaRapida): DatosGuardado | null {
 
 const FORMATO_DIA = new Intl.DateTimeFormat('es-MX', { weekday: 'short', day: 'numeric', timeZone: 'UTC' })
 
-/** El nombre accesible de la burbuja: «Nueva cita · mié 11, 10:00–11:30». */
+/** El nombre accesible de la burbuja: «Nueva cita · mié 11, 10:00–11:30»; sin horas, «Nueva cita · mié 11». */
 export function etiquetaBurbuja(fecha: string, horaInicio: string, horaFin: string): string {
   const dia = FORMATO_DIA.format(new Date(`${fecha}T12:00:00Z`)).replace(/[.,]/g, '')
-  return `Nueva cita · ${dia}, ${horaInicio}–${horaFin}`
+  return HORA.test(horaInicio) && HORA.test(horaFin) ? `Nueva cita · ${dia}, ${horaInicio}–${horaFin}` : `Nueva cita · ${dia}`
+}
+
+/* ── Guardar desde la burbuja ───────────────────────────────────────────── */
+
+/** Lo que `guardarAltaRapida` necesita de la agenda, inyectado para probarlo sin DOM. */
+export interface DependenciasGuardado {
+  /** El aviso de fuera de horario de esas puntas (`avisoFueraDeHorario` ?? `avisoFinFueraDeHorario`). */
+  avisoHorario: (inicio: Date, fin: Date) => string | null
+  /** B7c: los empalmes contra lo pintado (`empalmesPintados`). */
+  buscarEmpalmes: (tramo: TramoCita) => Empalme[]
+  mensajeEmpalme: (lista: readonly Empalme[]) => string
+  /** Un `ConfirmModal`: `true` si se acepta. */
+  confirmar: (mensaje: string) => Promise<boolean>
+  /** `handleSave`, que ya trae el bloque optimista, el 409 de empalme y la invitación de Google. */
+  guardar: (datos: DatosGuardado) => void
+}
+
+/**
+ * El orden de los avisos al guardar desde la burbuja, el MISMO que el del
+ * modal (P3): primero el de fuera de horario, después el de empalme, y sólo
+ * entonces el guardado. `true` si se mandó a guardar (la burbuja se cierra);
+ * `false` si alguien dijo que no (la burbuja se queda abierta como estaba).
+ *
+ * ⚠️ EL AVISO DE HORARIO SE SALTA SI LAS HORAS SON LAS DE LA APERTURA: ése ya
+ * se preguntó antes de abrir (`abrirAlta`) y repetirlo sería preguntar dos
+ * veces lo mismo. Si se tocaron, se pregunta por las nuevas, como el modal.
+ * El 409 del servidor lo sigue manejando `handleSave` (preguntarEmpalme y
+ * reintento): esto sólo adelanta en el cliente lo que ya está pintado.
+ */
+export async function guardarAltaRapida(
+  datos: DatosGuardado, horasDeApertura: { inicio: string; fin: string }, horas: { inicio: string; fin: string },
+  d: DependenciasGuardado,
+): Promise<boolean> {
+  if (!datos.start_time || !datos.end_time) return false
+  const inicio = new Date(datos.start_time)
+  const fin = new Date(datos.end_time)
+  const tocadas = horas.inicio !== horasDeApertura.inicio || horas.fin !== horasDeApertura.fin
+  const aviso = tocadas ? d.avisoHorario(inicio, fin) : null
+  if (aviso && !(await d.confirmar(aviso))) return false
+  const lista = d.buscarEmpalmes({
+    id: '', medicoId: datos.medico_id ?? null, inicio, fin, todoElDia: false, noOcupa: false, deGoogle: false, titulo: '',
+  })
+  if (lista.length && !(await d.confirmar(d.mensajeEmpalme(lista)))) return false
+  d.guardar(lista.length ? { ...datos, empalmes_aceptados: lista.map(e => e.id) } : datos)
+  return true
 }

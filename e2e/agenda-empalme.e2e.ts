@@ -3,6 +3,7 @@ import {
   soloEscritorio, SESION, diaDeLaSemana, interruptorAgenda, sqlLocal, irAAgenda,
   arrastrarEventoPorMinutos, redimensionarFinEvento, modalCita, toastConTexto,
 } from './ayudas'
+import { editarDesdeTarjeta } from './interaccionesAyudas'
 import { fechaHoraLocalAInstante } from '../src/lib/dates'
 
 /**
@@ -182,6 +183,8 @@ function aviso(page: Page, texto: RegExp) {
 async function abrir(page: Page, estado: 'encendida' | 'apagada'): Promise<void> {
   await irAAgenda(page)
   await expect(page.locator('.agenda-raiz')).toHaveAttribute('data-agenda-v2', estado)
+  /* F3: con v2 las interacciones van en un chunk diferido; un clic antes de que llegue abriría el modal directo. */
+  if (estado === 'encendida') await expect(page.locator('.agenda-raiz')).toHaveAttribute('data-interacciones-v2', 'listas')
 }
 
 function putsDe(page: Page, id: string): { cuantos: () => number } {
@@ -373,6 +376,7 @@ test('modal encendido: editar sólo las notas de una cita empalmada no avisa; ca
   await abrir(page, 'encendida')
 
   await tarjeta(page, JUEVES, 'Prueba 21', '17:40').click()
+  await editarDesdeTarjeta(page)
   await expect(modalCita(page, 'Editar cita')).toBeVisible()
   await page.getByPlaceholder('Instrucciones, observaciones...').fill('Nota de prueba B7')
   const resp = page.waitForResponse(r => r.request().method() === 'PUT' && r.url().includes('/api/appointments/'))
@@ -383,6 +387,7 @@ test('modal encendido: editar sólo las notas de una cita empalmada no avisa; ca
   await expect(page.getByRole('dialog', { name: /Se empalma/ })).toHaveCount(0)
 
   await tarjeta(page, JUEVES, 'Prueba 21', '17:40').click()
+  await editarDesdeTarjeta(page)
   await expect(modalCita(page, 'Editar cita')).toBeVisible()
   await page.locator('input[type="time"]').nth(0).fill('17:30')
   await page.getByRole('button', { name: 'Guardar' }).click()

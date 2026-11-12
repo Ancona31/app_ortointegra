@@ -3,6 +3,7 @@ import {
   irAAgenda, modalCita, soloEscritorio, SESION, DIA_LABORABLE_LIBRE, tituloUnico,
   eventoConTexto, toastConTexto, enContextoNuevo, interruptorAgenda, sqlLocal,
 } from './ayudas'
+import { editarDesdeTarjeta } from './interaccionesAyudas'
 import { fechaHoraLocalAInstante } from '../src/lib/dates'
 
 /**
@@ -79,6 +80,8 @@ function tarjetaDe(page: Page, hora: string) {
 async function abrirAgendaV2(page: Page): Promise<void> {
   await irAAgenda(page)
   await expect(page.locator('.agenda-raiz')).toHaveAttribute('data-agenda-v2', 'encendida')
+  /* F3: con v2 las interacciones van en un chunk diferido; un clic antes de que llegue abriría el modal directo. */
+  await expect(page.locator('.agenda-raiz')).toHaveAttribute('data-interacciones-v2', 'listas')
 }
 
 test('encendido: la papelera de una cita con paciente la CANCELA; sigue pintada y queda cita_cancelada', async ({ page, browser }) => {
@@ -87,6 +90,7 @@ test('encendido: la papelera de una cita con paciente la CANCELA; sigue pintada 
   await abrirAgendaV2(page)
 
   await tarjetaDe(page, '15:05').click()
+  await editarDesdeTarjeta(page)
   await expect(modalCita(page, 'Editar cita')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Eliminar cita', exact: true })).toHaveCount(0)
 
@@ -107,6 +111,7 @@ test('encendido: la papelera de una cita con paciente la CANCELA; sigue pintada 
   await enContextoNuevo(browser, SESION.adminA, async (pagina) => {
     await abrirAgendaV2(pagina)
     await tarjetaDe(pagina, '15:05').click()
+    await editarDesdeTarjeta(pagina)
     await expect(modalCita(pagina, 'Editar cita')).toBeVisible()
     await expect(pagina.getByRole('button', { name: 'Cancelar cita', exact: true })).toHaveCount(0)
     await expect(pagina.getByRole('button', { name: 'Eliminar cita', exact: true })).toHaveCount(0)
@@ -120,6 +125,7 @@ test('encendido: la X del paciente también cancela, con su propio aviso', async
   await abrirAgendaV2(page)
 
   await tarjetaDe(page, '15:40').click()
+  await editarDesdeTarjeta(page)
   await expect(modalCita(page, 'Editar cita')).toBeVisible()
   await page.getByRole('button', { name: 'Quitar paciente y cancelar la cita', exact: true }).click()
   const aviso = page.getByRole('dialog', { name: /quitar al paciente CANCELA la cita/ })
@@ -140,6 +146,7 @@ test('encendido: un evento sin paciente se sigue borrando y deja cita_eliminada'
   await abrirAgendaV2(page)
 
   await eventoConTexto(page, titulo).click()
+  await editarDesdeTarjeta(page)
   await expect(modalCita(page, 'Editar evento')).toBeVisible()
   const resp = page.waitForResponse(r => r.url().includes(`/api/appointments/${id}`) && r.request().method() === 'DELETE')
   await page.getByRole('button', { name: 'Eliminar evento', exact: true }).click()

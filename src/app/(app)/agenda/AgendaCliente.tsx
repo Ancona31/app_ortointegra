@@ -56,6 +56,7 @@ import { useConteoVisible, usePanelDelMes, useResumenDelDia } from '@/app/(app)/
 import { crearGuardadoCitas, pacienteParaInvitacion } from '@/app/(app)/agenda/guardadoCitas'
 import { empalmesPintados } from '@/lib/agenda/empalmesCita'
 import { crearAltaCitas } from '@/app/(app)/agenda/altaCitas'
+import type { ApiInteraccionesV2, SeleccionDesdeHueco } from '@/lib/agenda/contratosV2'
 import useSWR, { useSWRConfig } from 'swr'
 import {
   CLAVE_CONFIG,
@@ -105,6 +106,21 @@ const HorarioModal = dynamic(() => import('@/components/agenda/HorarioModal'), {
   ssr: false, loading: () => null,
 })
 const ModalInvitacionCita = dynamic(() => import('@/components/agenda/ModalInvitacionCita'), {
+  ssr: false, loading: () => null,
+})
+/* F3 · LAS INTERACCIONES V2 (burbuja, tarjeta, minicalendario, buscador,
+   atajos, deslizar) en UN chunk aparte, montado sólo con el interruptor
+   encendido y en ocioso (ver `montarV2`). Apagado no se descarga nada: de su
+   contrato aquí sólo entran tipos (`contratosV2.ts`). */
+const InteraccionesV2 = dynamic(() => import('@/components/agenda/InteraccionesV2'), {
+  ssr: false, loading: () => null,
+})
+/* Las dos piezas que van fuera de la capa: los botones de la barra y el
+   minicalendario del panel de Día. Mismo módulo, mismo chunk. */
+const HerramientasV2 = dynamic(() => import('@/components/agenda/HerramientasV2'), {
+  ssr: false, loading: () => null,
+})
+const MiniMesPanelV2 = dynamic(() => import('@/components/agenda/HerramientasV2').then(m => m.MiniMesPanelV2), {
   ssr: false, loading: () => null,
 })
 
@@ -215,6 +231,21 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
     return () => { vigente = false }
   }, [interruptor])
   const [modal,        setModal]        = useState<ModalState>({ mode: 'closed' })
+  /* F3: el chunk de interacciones se monta en ocioso y sólo con v2; mientras
+     no está, `interaccionesRef` es null y los gestos abren el modal de hoy. */
+  const [montarV2, setMontarV2] = useState(false)
+  const [interaccionesListas, setInteraccionesListas] = useState(false)
+  const interaccionesRef = useRef<ApiInteraccionesV2 | null>(null)
+  const seleccionDesdeHueco = useRef<SeleccionDesdeHueco['current']>(null)
+  /* F3: el periodo que pinta el calendario (`'desde/hasta'`), para el
+     minicalendario. Cadena y no fechas, como `tituloVista`: no repinta si no
+     cambió. */
+  const [rangoVisible, setRangoVisible] = useState('')
+  useEffect(() => {
+    if (!agendaV2) return
+    const idle = enOcioso(() => setMontarV2(true))
+    return () => cancelarOcioso(idle)
+  }, [agendaV2])
   const [isMobile,     setIsMobile]     = useState(false)
   /* F1.16 · El tramo de tableta (768–1023): banda azul como el teléfono, pero
      Semana y Día en rejilla (Semana de tres días). */
@@ -238,7 +269,8 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
   /* F1.2 · FullCalendar 6 no observa su contenedor (cero `ResizeObserver` en el
      núcleo): sólo reacciona al `resize` de la ventana. Al plegar la barra lateral
      la página gana 192 px sin `resize`, así que aquí se le avisa, en el cuadro
-     siguiente y sólo si cambió el ANCHO. */
+     siguiente y sólo si cambió el ANCHO. La misma raíz es donde el gesto de
+     deslizar (F3.7) cuelga sus oyentes de puntero. */
   const raizRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     const raiz = raizRef.current
@@ -764,14 +796,17 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
   /* A2.5.7: no es un hook — ver la nota de cabecera de `guardadoCitas.ts`—, así
      que se vuelve a invocar en cada render, «fresca», igual que leer cualquier
      otra función de este componente. */
-  const { handleEventDrop, handleEventResize, handleSave, handleDelete, handleCancelar } = crearGuardadoCitas({
+  /* F3: el objeto entero viaja también a las interacciones v2, que leen de él
+     `cambiarEstadoCita` cuando Movimiento lo añada (ver `contratosV2.ts`). */
+  const guardado = crearGuardadoCitas({
     calendarRef, horario, profile, toast, setConfirm, setCitaCreada, setInvitacion, closeModal,
     refetch, firmarEscritura, aplicarAppointmentAlEvento, agendaV2,
   })
+  const { handleEventDrop, handleEventResize, handleSave, handleDelete, handleCancelar } = guardado
 
   const { handleDateClick, handleSelect, handleEventClick, abrirCita, abrirHueco } = crearAltaCitas({
     calendarRef, isMobile, setDiaSel, subState, openBloqueoModal, horario, setModal, setConfirm,
-    resumenDia, citasIncompletas,
+    resumenDia, citasIncompletas, agendaV2, interacciones: interaccionesRef, seleccionDesdeHueco,
   })
 
   /* Header de día apilado para Semana/Día. Mes conserva su header por defecto
@@ -1016,6 +1051,9 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
     if (listaHoyPendienteRef.current) listaHoyVistaRef.current = true
     irAHoyRef.current = false
     intentarListaHoy()
+    /* F3: siempre, aunque sólo lo lea el minicalendario v2: el interruptor se
+       resuelve DESPUÉS del primer `datesSet`. Una cadena más no repinta nada. */
+    setRangoVisible(`${partirFechaHora(arg.view.currentStart.toISOString()).fecha}/${partirFechaHora(arg.view.currentEnd.toISOString()).fecha}`)
     setPeriodoVacio(periodoDeLaVista(arg.view))
     const eventos = calendarRef.current?.getApi().getEvents() ?? []
     const rangos = rangosDeLaVista(arg.view)
@@ -1059,6 +1097,11 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
     const vista = calendarRef.current?.getApi().view
     if (vista) programarPrecarga(vista)
     intentarListaHoy()
+  }
+
+  /* F3: el minicalendario va a un día CONSERVANDO la vista (no es `changeView`). */
+  function irAFecha(fecha: string) {
+    calendarRef.current?.getApi().gotoDate(fecha)
   }
 
   function alPulsarNumeroDeDia(fecha: Date) {
@@ -1148,7 +1191,8 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
        ENTERO —sin restar nada—, que es lo que deja a la banda meterse bajo el
        reloj y a la barra de «Agendar» bajo la de gestos. Si te preguntas por qué
        aquí no hay duplicación: porque en esa rama este calc no se aplica. */
-    <div ref={raizRef} data-densidad={densidadCompacta ? 'compacta' : 'normal'} data-agenda-v2={interruptorLeido === null ? 'pendiente' : agendaV2 ? 'encendida' : 'apagada'} className="agenda-raiz flex flex-col h-[calc(100dvh-88px-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px))] lg:h-[calc(100dvh-64px-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px))]">
+    <div ref={raizRef} data-densidad={densidadCompacta ? 'compacta' : 'normal'} data-agenda-v2={interruptorLeido === null ? 'pendiente' : agendaV2 ? 'encendida' : 'apagada'}
+      data-interacciones-v2={interaccionesListas ? 'listas' : undefined} className="agenda-raiz flex flex-col h-[calc(100dvh-88px-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px))] lg:h-[calc(100dvh-64px-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px))]">
 
       {isMobile && (
         <BandaMovil
@@ -1659,6 +1703,10 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
              elegido. En cualquier otra vista y en escritorio no cambia nada. */
           selectable={!esMesMovil}
           selectMirror
+          /* F3: tocar dentro de una capa (la burbuja) no suelta el tramo
+             marcado. Primitivo; sin capas en pantalla no casa con nada, así que
+             con el interruptor apagado se comporta como hoy. */
+          unselectCancel=".ag-capa"
           editable
           /* F2.3: 180 = `--ag-dur-base` (decisión 5 del bloque F). Literal y
              primitivo a propósito: es una prop de `<FullCalendar>` y no puede
@@ -1771,6 +1819,7 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
           resumen={resumenDia}
           unMedico={unMedico}
           onHueco={abrirHueco}
+          miniMes={agendaV2 && montarV2 ? <MiniMesPanelV2 rango={rangoVisible} alIrAFecha={irAFecha} /> : undefined}
           /* La MISMA bandera que levanta la banda roja de arriba. Sin esto el
              panel afirmaba horas y ofrecía huecos sobre un día recortado. */
           incompleto={citasIncompletas}
@@ -1817,6 +1866,38 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
             setModal({ mode: 'create', fecha, hora, tipo: 'cita', todoElDia: 'no' })
           }}
           onIntencionAgendar={precargarModalesAgenda}
+        />
+      )}
+
+      {/* ── F3 · Interacciones v2 (chunk diferido, sólo con el interruptor) ── */}
+      {agendaV2 && montarV2 && (
+        <InteraccionesV2
+          apiRef={interaccionesRef}
+          alCambiarListas={setInteraccionesListas}
+          calendarRef={calendarRef}
+          raizRef={raizRef}
+          currentView={currentView}
+          isMobile={isMobile}
+          zonaVisor={navegadorTZ}
+          quien={{ esMedico: isDoctor, perfilId: profile?.id ?? null }}
+          isSingleDoctor={isSingleDoctor}
+          onVista={cambiarVista}
+          filtroActivo={filtroEfectivo}
+          alFiltrarMedico={id => aplicarFiltro(id, false)}
+          abrirCita={abrirCita}
+          /* El atajo `c`: el mismo cuerpo que los tres «Agendar», en un cuarto
+             cierre propio (la regla de no fundirlos, plan A2.5). */
+          onAgendar={() => {
+            if (subState.isBlocked) { openBloqueoModal(); return }
+            const { fecha, hora } = partirFechaHora(new Date().toISOString())
+            setModal({ mode: 'create', fecha, hora, tipo: 'cita', todoElDia: 'no' })
+          }}
+          medicos={medicos}
+          filtroMedico={filtroEfectivo || ((isSingleDoctor || isMedicoSinAdmin) && defaultMedicoId ? defaultMedicoId : null)}
+          horario={horario}
+          guardado={guardado}
+          setModal={setModal}
+          setConfirm={setConfirm}
         />
       )}
 

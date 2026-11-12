@@ -126,4 +126,17 @@ describe('TarjetaLectura', () => {
     expect(hoja).toContain('class="ag-hoja"')
     expect(hoja).not.toContain('Iniciar consulta')
   })
+  it('F3: sin ancla en escritorio (desde el buscador) va centrada', () => {
+    const centrada = renderToStaticMarkup(<TarjetaLectura {...props} ancla={null} cita={CITA} puedeIniciarConsulta={false} />)
+    expect(centrada).toContain('class="ag-capa ag-capa--centro"')
+  })
+  it('F3: sin `cambiarEstadoCita` no se ofrece Confirmar', () => {
+    const sin = renderToStaticMarkup(<TarjetaLectura {...props} cita={CITA} puedeIniciarConsulta conConfirmar={false} />)
+    expect(sin).not.toContain('>Confirmar<')
+    expect(sin).toContain('Reagendar')
+  })
+  it('F3: el hueco `extra` pinta lo que le den (el WhatsApp de E7)', () => {
+    const conExtra = renderToStaticMarkup(<TarjetaLectura {...props} cita={CITA} puedeIniciarConsulta extra={<span data-whatsapp-cita="c" />} />)
+    expect(conExtra).toContain('data-whatsapp-cita="c"')
+  })
 })

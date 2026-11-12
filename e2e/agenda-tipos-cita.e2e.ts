@@ -2,6 +2,7 @@ import { test, expect, type Page } from '@playwright/test'
 import {
   soloEscritorio, SESION, diaDeLaSemana, interruptorAgenda, sqlLocal, irAAgenda, modalCita, tituloUnico,
 } from './ayudas'
+import { editarDesdeTarjeta } from './interaccionesAyudas'
 import { fechaHoraLocalAInstante } from '../src/lib/dates'
 
 /**
@@ -169,6 +170,8 @@ test('API apagado: tipo_cita_id se ignora en el alta y en la edición', async ({
 async function abrir(page: Page, estado: 'encendida' | 'apagada'): Promise<void> {
   await irAAgenda(page)
   await expect(page.locator('.agenda-raiz')).toHaveAttribute('data-agenda-v2', estado)
+  /* F3: con v2 las interacciones van en un chunk diferido; un clic antes de que llegue abriría el modal directo. */
+  if (estado === 'encendida') await expect(page.locator('.agenda-raiz')).toHaveAttribute('data-interacciones-v2', 'listas')
 }
 
 async function rellenarAlta(page: Page, apellidos: string, desde: string, hasta: string): Promise<void> {
@@ -218,6 +221,7 @@ test('modal encendido: elegir un tipo escribe el fin; se guarda con su instantá
 
   // Editar: el tipo viene marcado; cambiarlo reescribe el fin y la instantánea.
   await laTarjeta.click()
+  await editarDesdeTarjeta(page)
   await expect(modalCita(page, 'Editar cita')).toBeVisible()
   const grupoEd = page.getByRole('radiogroup', { name: 'Tipo de cita' })
   await expect(grupoEd.getByRole('radio', { name: new RegExp(largo.nombre) })).toHaveAttribute('aria-checked', 'true')
@@ -233,6 +237,7 @@ test('modal encendido: elegir un tipo escribe el fin; se guarda con su instantá
 
   // Editar sólo las notas: no viaja tipo_cita_id.
   await tarjeta(page, 'Prueba 06', '13:20').click()
+  await editarDesdeTarjeta(page)
   await expect(modalCita(page, 'Editar cita')).toBeVisible()
   await page.getByPlaceholder('Instrucciones, observaciones...').fill('Nota B6c')
   const notas = page.waitForResponse(r => r.url().includes(`/api/appointments/${id}`) && r.request().method() === 'PUT')

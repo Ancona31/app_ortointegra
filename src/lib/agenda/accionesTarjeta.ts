@@ -43,20 +43,49 @@ const VIVAS: readonly Status[] = ['scheduled', 'confirmed']
 /** Lo que mira la tarjeta de la fila. */
 export type CitaTarjeta = Pick<Appointment, 'status' | 'paciente_id' | 'reserva_canal'>
 
-/** Las acciones de la cita, en el orden en que se pintan (la principal primero). */
-export function accionesDeTarjeta(cita: CitaTarjeta, puedeIniciarConsulta: boolean): AccionTarjeta[] {
+/**
+ * Las acciones de la cita, en el orden en que se pintan (la principal primero).
+ * `conConfirmar: false` la quita aunque la cita esté agendada: el enchufe la
+ * apaga mientras `guardadoCitas` no exponga `cambiarEstadoCita` (`contratosV2.ts`).
+ */
+export function accionesDeTarjeta(cita: CitaTarjeta, puedeIniciarConsulta: boolean, conConfirmar = true): AccionTarjeta[] {
   if (esEventoGenerico(cita)) return ['editar', 'eliminar']
   const acciones: AccionTarjeta[] = []
   if (puedeIniciarConsulta) acciones.push('iniciar-consulta')
-  if (cita.status === 'scheduled') acciones.push('confirmar')
+  if (conConfirmar && cita.status === 'scheduled') acciones.push('confirmar')
   if (VIVAS.includes(cita.status)) acciones.push('reagendar', 'cancelar')
   acciones.push('editar')
   return acciones
 }
 
+/** Quién mira, para decidir «Iniciar consulta». */
+export interface QuienMira { esMedico: boolean; perfilId: string | null; consultorioExiste: boolean }
+
+/**
+ * ¿Sale «Iniciar consulta»? LAS MISMAS CONDICIONES QUE EL MODAL
+ * (`showIniciarConsulta` y, en una por ligar, `showLigarYConsultar` de D7):
+ * quien mira es médico, la cita es SUYA, su consultorio está en su lista, y hay
+ * paciente o es una por ligar. Un evento sin paciente, nunca. Si el modal
+ * cambia sus condiciones, éstas cambian con él.
+ */
+export function puedeIniciarConsulta(
+  cita: Pick<Appointment, 'pacientes' | 'paciente_id' | 'reserva_canal' | 'medico_id'>, quien: QuienMira,
+): boolean {
+  if (!quien.esMedico || !quien.perfilId || cita.medico_id !== quien.perfilId || !quien.consultorioExiste) return false
+  return Boolean(cita.pacientes) || esPorLigar(cita)
+}
+
 /** ¿Pide confirmación antes de hacerse? Cancelar y eliminar, sí (decisión 20). */
 export function pideConfirmacion(accion: AccionTarjeta): boolean {
   return accion === 'cancelar' || accion === 'eliminar'
+}
+
+/** El mensaje del aviso de las dos acciones que preguntan (`pideConfirmacion`). */
+export function textoDeConfirmacion(
+  accion: AccionTarjeta, cita: Pick<Appointment, 'title' | 'pacientes' | 'reserva_nombre' | 'paciente_id' | 'reserva_canal'>,
+): string {
+  if (accion === 'eliminar') return `¿Eliminar el evento «${cita.title}»? No se puede deshacer.`
+  return `¿Cancelar la cita de ${nombreDeTarjeta(cita)}? El horario queda libre y la cita se queda en la agenda como cancelada.`
 }
 
 /** El nombre que se lee arriba: el paciente, quien reservó o el título del evento. */
