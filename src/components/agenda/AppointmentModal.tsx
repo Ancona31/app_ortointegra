@@ -958,7 +958,7 @@ export default function AppointmentModal({
         aria-modal="true"
         aria-labelledby={tituloId}
         tabIndex={-1}
-        className="relative focus:outline-none rounded-[22px] max-md:rounded-none w-full max-w-[480px] max-md:max-w-full md:max-h-[92dvh] max-md:h-full flex flex-col animate-modal-enter overflow-hidden"
+        className="relative focus:outline-none rounded-[22px] max-md:rounded-none w-full max-w-[560px] max-md:max-w-full md:max-h-[92dvh] max-md:h-full flex flex-col animate-modal-enter overflow-hidden"
         style={{ background: 'var(--ag-modal-bg)', boxShadow: '0 30px 80px rgba(16, 32, 64, .28)' }}>
 
         {/* Header
@@ -1489,11 +1489,15 @@ export default function AppointmentModal({
               <label className="block text-[11px] font-bold uppercase tracking-[.06em] mb-2" style={{ color: 'var(--ag-muted2)' }}>Duración</label>
               {/* El blanco del chip marcado sale de `text-white` y no de un
                   `#fff` en el `style`, por lo mismo que la perilla de arriba. El
-                  fondo y el borde sí van en línea: son tokens. */}
-              <div className="flex flex-wrap gap-2">
+                  fondo y el borde sí van en línea: son tokens.
+                  ⚠️ F1.17 · REJILLA SIN HUÉRFANOS: los seis en UNA fila desde
+                  `md` (el modal mide 560) y en dos filas de tres por debajo. Era
+                  un `flex-wrap` que a 480 partía en cinco y uno suelto. Sin
+                  transición: el marcado cambia de golpe (CONTRASTE §8). */}
+              <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
                 {DURATIONS.map(d => (
                   <button key={d.value} type="button" onClick={() => escribirFinConChip(d.value)}
-                    className={`px-4 py-2 max-md:py-3 rounded-full text-[13px] font-bold border transition-all ${duracionElegida === d.value ? 'text-white' : ''}`}
+                    className={`px-1 py-2 max-md:py-3 rounded-full text-[13px] font-bold border text-center whitespace-nowrap ${duracionElegida === d.value ? 'text-white' : ''}`}
                     style={duracionElegida === d.value
                       ? { background: 'var(--ag-brand-primary)', borderColor: 'var(--ag-brand-primary)' }
                       : { background: 'var(--ag-input-bg)', color: 'var(--ag-text)', borderColor: 'var(--ag-input-border)' }}
@@ -1518,13 +1522,18 @@ export default function AppointmentModal({
                   «Cancelada». Se recorre la lista del tipo y NO `STATUS_CONFIG`
                   entero, que es lo que hacía antes: así añadir un estado no le
                   aparece automáticamente a las juntas de personal. */}
-              <div className="grid grid-cols-2 gap-2">
+              {/* ⚠️ F1.18 · UNA FILA: los cinco de una cita en `grid-cols-5` (eran
+                  dos columnas y uno suelto) y los dos de un evento en dos. El
+                  punto va ENCIMA de la etiqueta para que «Confirmada» y «No
+                  asistió» quepan a 390 px (~65 px por casilla). Sin transición:
+                  el cambio de estado cambia de golpe (CONTRASTE §8). */}
+              <div className={`grid ${esEvento ? 'grid-cols-2' : 'grid-cols-5'} gap-2`}>
                 {(esEvento ? ESTADOS_EVENTO : ESTADOS_CITA).map(key => {
                   const cfg = STATUS_CONFIG[key]
                   const on = status === key
                   return (
                     <button key={key} onClick={() => setStatus(key)}
-                      className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold transition-all"
+                      className="flex flex-col items-center justify-center gap-1 min-h-[52px] px-1 py-2 rounded-xl text-[11.5px] max-md:text-[11px] leading-tight font-bold text-center"
                       style={on
                         ? { background: `var(--ag-status-${key}-bg)`, color: `var(--ag-status-${key}-text)`, border: `1.5px solid var(--ag-status-${key}-dot)` }
                         : { background: 'var(--ag-input-bg)', color: 'var(--ag-text)', border: '1.5px solid var(--ag-input-border)' }}
@@ -1596,7 +1605,9 @@ export default function AppointmentModal({
             <label className="block text-[11px] font-bold uppercase tracking-[.06em] mb-2" style={{ color: 'var(--ag-muted2)' }}>Notas</label>
             <textarea value={notes} onChange={e => setNotes(e.target.value)}
               placeholder="Instrucciones, observaciones..."
-              rows={3}
+              /* F1.17 · Dos filas: con tres, «Guardar» quedaba fuera a 1280×720
+                 y había que desplazar. Crece con el texto sólo si se escribe. */
+              rows={2}
               className="w-full px-3 py-2.5 max-md:py-3 text-sm rounded-xl border border-[var(--ag-input-border)] bg-[var(--ag-input-bg)] text-[var(--ag-text)] focus:outline-none focus:ring-2 focus:ring-[var(--ag-input-focus-ring)] focus:border-[var(--ag-input-focus-border)] transition-all resize-none"
             />
           </div>
@@ -1682,7 +1693,7 @@ export default function AppointmentModal({
               disabled={deleting}
               title={deleting ? 'Cancelando...' : 'Cancelar cita'}
               aria-label={deleting ? 'Cancelando cita' : 'Cancelar cita'}
-              className="flex items-center justify-center p-2.5 rounded-xl text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50 max-md:w-11 max-md:h-11 max-md:p-0 max-md:flex-none"
+              className="flex items-center justify-center w-10 h-10 flex-none rounded-xl text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50 max-md:w-11 max-md:h-11"
             >
               {deleting ? <Loader2 size={16} className="animate-spin" /> : <CalendarX size={16} />}
             </button>
@@ -1695,7 +1706,7 @@ export default function AppointmentModal({
               aria-label={deleting
                 ? (esEvento ? 'Eliminando evento' : 'Eliminando cita')
                 : (esEvento ? 'Eliminar evento'   : 'Eliminar cita')}
-              className="flex items-center justify-center p-2.5 rounded-xl text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50 max-md:w-11 max-md:h-11 max-md:p-0 max-md:flex-none"
+              className="flex items-center justify-center w-10 h-10 flex-none rounded-xl text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50 max-md:w-11 max-md:h-11"
             >
               {deleting ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
             </button>
@@ -1703,8 +1714,8 @@ export default function AppointmentModal({
           {showLigarYConsultar && !ligar && (
             <button type="button" onClick={abrirLigar}
               aria-label="Iniciar consulta" title="Iniciar consulta: primero se liga a un paciente"
-              className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-sm font-bold border transition-colors hover:bg-[var(--ag-btn-ghost-hover)] max-md:w-11 max-md:h-11 max-md:px-0 max-md:py-0 max-md:flex-none"
-              style={{ color: 'var(--ag-text)', borderColor: 'var(--ag-input-border)' }}>
+              className="flex items-center justify-center gap-1.5 h-10 px-3 rounded-xl text-sm font-bold hover:brightness-95 max-md:w-11 max-md:h-11 max-md:px-0 max-md:flex-none"
+              style={{ color: 'var(--ag-brand-legible)', background: 'var(--ag-modal-icon-bg)' }}>
               <Stethoscope size={15} />
               <span className="max-md:hidden">Iniciar consulta</span>
             </button>
@@ -1725,8 +1736,11 @@ export default function AppointmentModal({
                  `aria-label` y en `title`, los dos en las dos anchuras. */
               aria-label="Iniciar consulta"
               title="Iniciar consulta"
-              className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-sm font-bold border transition-colors hover:bg-[var(--ag-btn-ghost-hover)] max-md:w-11 max-md:h-11 max-md:px-0 max-md:py-0 max-md:flex-none"
-              style={{ color: 'var(--ag-text)', borderColor: 'var(--ag-input-border)' }}
+              /* F1.18 · Es la acción principal del día, así que deja de pesar
+                 menos que «Guardar»: el mismo alto (40 px) y relleno TONAL
+                 (el azul suave del icono del encabezado), con su icono. */
+              className="flex items-center justify-center gap-1.5 h-10 px-3 rounded-xl text-sm font-bold hover:brightness-95 max-md:w-11 max-md:h-11 max-md:px-0 max-md:flex-none"
+              style={{ color: 'var(--ag-brand-legible)', background: 'var(--ag-modal-icon-bg)' }}
             >
               <Stethoscope size={15} />
               <span className="max-md:hidden">Iniciar consulta</span>
@@ -1739,7 +1753,7 @@ export default function AppointmentModal({
               derecha con su tamaño de siempre: el `ml-auto` sólo se apaga por
               debajo de `md`. */}
           <div className="flex items-center gap-2 ml-auto max-md:ml-0 max-md:flex-1 max-md:min-w-0">
-            <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm font-bold transition-colors hover:bg-[var(--ag-btn-ghost-hover)] max-md:flex-1 max-md:min-w-0 max-md:h-11 max-md:px-2" style={{ color: 'var(--ag-muted)' }}>
+            <button onClick={onClose} className="h-10 px-4 rounded-xl text-sm font-bold transition-colors hover:bg-[var(--ag-btn-ghost-hover)] max-md:flex-1 max-md:min-w-0 max-md:h-11 max-md:px-2" style={{ color: 'var(--ag-muted)' }}>
               Cancelar
             </button>
             {/* ⚠️ GUARDANDO ES UN GIRADOR Y YA NO «Guardando...», Y NO ES UN
@@ -1755,7 +1769,7 @@ export default function AppointmentModal({
                 `aria-label`. */}
             <button onClick={handleSave} disabled={saving || faltaLoEsencial || faltanPuntas || finAntesDelInicio || !consultorioId}
               aria-label={saving ? 'Guardando' : undefined}
-              className="flex items-center justify-center px-5 py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-50 transition-all hover:brightness-95 shadow-sm bg-[linear-gradient(135deg,var(--ag-brand-primary),var(--ag-brand-secondary))] max-md:flex-1 max-md:min-w-0 max-md:h-11 max-md:px-2">
+              className="flex items-center justify-center h-10 px-5 rounded-xl text-sm font-bold text-white disabled:opacity-50 hover:brightness-95 shadow-sm bg-[linear-gradient(135deg,var(--ag-brand-primary),var(--ag-brand-secondary))] max-md:flex-1 max-md:min-w-0 max-md:h-11 max-md:px-2">
               {saving ? <Loader2 size={16} className="animate-spin" /> : 'Guardar'}
             </button>
           </div>

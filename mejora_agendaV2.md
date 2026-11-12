@@ -2342,6 +2342,47 @@ encontraba su evento) y los 20 pulsos caían fuera de la vista. Ahora pulsa
   día posterior con citas (la lista sólo pinta días con filas). Queda pendiente
   hasta que haya filas que medir: se reintenta en `eventsSet`.
 
+**Revisión del paso 2 (corregido en commit aparte):**
+
+- **Grave, corregido:** la consulta de contenedor de `.ag-controles` crea
+  contexto de apilamiento, y el desplegable de «Por confirmar» (E7) quedaba
+  pintado por debajo de las tarjetas de la rejilla. La fila lleva ahora
+  `position: relative; z-index: 10`. Comprobado en captura con la v2 encendida
+  a 1280 y 1440. Queda dentro de una tarjeta con `overflow-clip`: con su
+  `max-h-[60vh]` cabe en la tarjeta en cualquier ventana de más de ~215 px de
+  alto, así que no se recorta en la práctica.
+- **Media, aceptada:** el orden de tabulación es controles → ‹ › Hoy, al revés
+  que el visual (izquierda → derecha). Es el mismo orden que antes de F1.1 (el
+  encabezado iba encima de la tarjeta) y el que pide el spec §12 («toolbar →
+  chips → navegación → filtro → calendario»). Para invertirlo habría que montar
+  los controles después de `<FullCalendar>`, y entonces irían detrás de todas
+  las citas de la rejilla.
+- **Menor, añadido:** una e2e de la variante de dos filas (1180 px y Día con
+  panel), comprobada con la mutación de quitar la variante.
+- **Menor, aceptada:** el hover de «Agendar» (`brightness`) no tiene
+  transición; `filter` no está entre lo que se anima (sólo `transform` y
+  `opacity`), así que cambia de golpe. Lo mismo vale para «Guardar» e «Iniciar
+  consulta» del modal (revisión del paso 3).
+
+**Paso 3 · F1.17, F1.18 (modal)**
+
+- **F1.17.** 560 px de ancho (decisión 17). Duraciones en `grid-cols-3
+  md:grid-cols-6`: una fila desde `md` y dos de tres por debajo. Notas en 2
+  filas. El pie ya era fijo (el cuerpo es el que desplaza); a 1280×720
+  «Guardar» queda a la vista. Sin `transition-all` en duraciones y estados: el
+  marcado cambia de golpe (CONTRASTE §8).
+- **F1.18.** Los cinco estados de una cita en `grid-cols-5` (un evento, dos en
+  `grid-cols-2`), con el punto ENCIMA de la etiqueta: a 390 px cada casilla
+  mide ~65 px y «Confirmada» no cabe con el punto delante (11 px de letra en
+  móvil; «No asistió» baja a dos líneas y las cinco casillas miden lo mismo).
+  «Iniciar consulta» (y «ligar y consultar» de D7) a 40 px como «Guardar», con
+  relleno tonal: fondo `--ag-modal-icon-bg` (el azul suave del icono del
+  encabezado) y tinta `--ag-brand-legible`, sin borde. Los botones de icono del
+  pie (eliminar, cancelar cita) también a 40.
+- **e2e `agenda-f-simetria`:** filas sin huérfanos (6 / 3+3 / 5), centros de
+  los estados (±1 px), alto de «Iniciar consulta» = «Guardar». Mutaciones
+  comprobadas: volver a 480 px, `flex-wrap`, `rows=3`, `grid-cols-2`.
+
 ### Menores
 
 - **`ProximasCitas`:** tope de refresco de 2 minutos al volver a la pestaña,
