@@ -2004,9 +2004,24 @@ pasó al repetirla: la base local la comparten otros agentes; queda anotado.
   nombre); `agenda-tipos-cita.e2e.ts` no podía borrar sus citas: el botón de
   WhatsApp de E7 emite el enlace de confirmación AL ABRIR el modal
   (`preparar` en un `useEffect`) y la tarea de E4 registra envíos, y las dos
-  FK son RESTRICT. Para quien escriba e2e nuevas: abrir con v2 encendida el
-  modal de una cita con paciente y teléfono deja una fila en
-  `cita_confirmaciones`.
+  FK son RESTRICT. **Corregido después** (ver abajo): abrir ya no escribe.
+- **E7: el enlace se emite AL PULSAR, no al abrir** (corrección del
+  coordinador: mirar no escribe en la base). `BotonWhatsAppCita` (lo usan el
+  modal y la lista «Por confirmar»; la lista en sí sólo hace un GET de
+  lectura) ya no llama a `preparar` al montarse. Al pulsar, dentro del mismo
+  gesto, `window.open('', '_blank')` abre una pestaña en blanco (un
+  `window.open` tras un `await` lo bloquean los navegadores; síncrono en el
+  clic, no) y se le corta el `opener`; después se prepara, se le asigna la URL
+  de `wa.me` y se marca `abierto`, como antes. Si la preparación falla, la
+  pestaña se cierra y sale el motivo. Si el navegador la bloqueó igual, queda
+  un enlace real «Abrir WhatsApp» (un `<a target="_blank">` pulsado no se
+  bloquea) que marca al pulsarlo. Elegida por ser la única que abre WhatsApp
+  con UN clic sin emitir nada antes. Prueba: `whatsapp-manual.e2e.ts` «abrir el
+  modal de una cita con teléfono y cerrarlo NO crea ningún enlace» (comprobada
+  contra el botón viejo: daba 1 enlace y 1 fila de auditoría), y la de la lista
+  comprueba 0 antes de pulsar y 1 después. Se quitó de `agenda-tipos-cita` la
+  limpieza de E que sólo hacía falta por eso. Las e2e de WhatsApp y de E8 crean
+  su propio paciente (la tarjeta pinta el nombre del paciente).
 - **¿Llega una clínica suspendida a `gcal_aplicar_evento` por el RSVP (E9)?
   No.** Los dos únicos llamadores de `sincronizarClinica` son
   `POST /api/google/sync` (que antes comprueba `clinica_no_suspendida()` y

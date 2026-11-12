@@ -47,7 +47,6 @@ test.beforeAll(() => {
 })
 test.afterAll(() => {
   sqlLocal(`
-    delete from public.cita_correos where appointment_id = :'id';
     delete from public.cita_confirmaciones where appointment_id = :'id';
     delete from public.appointments where id = :'id';
     delete from public.pacientes where id = :'p';`, { id: citaId, p: pacienteId })

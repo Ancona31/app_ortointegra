@@ -5,20 +5,26 @@
  * de una cita (agenda E7). Lo usan el modal de la cita (`tipo:'enlace'`) y la
  * lista «citas de mañana por confirmar» (`tipo:'recordatorio'`).
  *
- * Al montarse pide, en tiempo ocioso, el enlace ya escrito
- * (`POST /api/agenda/whatsapp`, `paso:'preparar'`) y pinta un `<a>` real con
- * `target="_blank"`: un enlace de verdad no lo bloquea el navegador como
- * ventana emergente (abrirlo tras un `await` sí). Al pulsarlo, avisa
- * `paso:'abierto'` con `keepalive` (la pestaña puede irse a WhatsApp) y enseña
- * «Abierto en WhatsApp hh:mm»: se ABRIÓ, no se envió (eso no se sabe).
+ * ⚠️ MONTARLO NO ESCRIBE NADA. `paso:'preparar'` EMITE el enlace de
+ * confirmación (una fila en `cita_confirmaciones` y su auditoría), así que
+ * sólo se pide AL PULSAR, nunca al abrir el modal o la lista para mirar.
+ *
+ * Al pulsar, dentro del mismo gesto: `window.open('', '_blank')` abre una
+ * pestaña EN BLANCO (un `window.open` después de un `await` lo bloquean los
+ * navegadores como ventana emergente; síncrono dentro del clic, no), se le
+ * corta el `opener`, se prepara el enlace y se le asigna la URL de `wa.me`;
+ * luego se avisa `paso:'abierto'` con `keepalive` y se enseña «Abierto en
+ * WhatsApp hh:mm»: se ABRIÓ, no se envió (eso no se sabe). Si la preparación
+ * falla, la pestaña en blanco se cierra y sale el motivo. Si el navegador
+ * bloqueó igual la pestaña, se enseña un enlace real «Abrir WhatsApp» (un
+ * `<a target="_blank">` pulsado no lo bloquea) que marca al pulsarlo.
  *
  * Sólo se monta con la agenda v2 encendida (quien lo usa lo decide).
  */
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { MessageCircle } from 'lucide-react'
-import { enOcioso, cancelarOcioso } from '@/lib/agenda/ocioso'
 
-type Estado = { tipo: 'preparando' } | { tipo: 'listo'; url: string } | { tipo: 'error'; motivo: string }
+type Estado = { tipo: 'inicial' } | { tipo: 'preparando' } | { tipo: 'listo'; url: string } | { tipo: 'error'; motivo: string }
 
 const MOTIVOS: Record<string, string> = {
   sin_telefono: 'Sin teléfono registrado.',
@@ -58,25 +64,39 @@ interface Props {
   compacto?: boolean
 }
 
+/** `paso:'abierto'`: la marca de que se abrió WhatsApp. `keepalive`: la pestaña puede irse. */
+function avisarAbierto(citaId: string, tipo: 'enlace' | 'recordatorio'): void {
+  void fetch('/api/agenda/whatsapp', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, keepalive: true,
+    body: JSON.stringify({ cita_id: citaId, paso: 'abierto', tipo }),
+  }).catch(() => undefined)
+}
+
+/** Una pestaña en blanco, abierta DENTRO del gesto y sin `opener`; null si el navegador la bloqueó. */
+function pestanaEnBlanco(): Window | null {
+  const w = window.open('', '_blank')
+  if (w) w.opener = null
+  return w
+}
+
 export function BotonWhatsAppCita({ citaId, tipo, marcadoEn, etiqueta = 'Enviar por WhatsApp', compacto = false }: Props) {
-  const [estado, setEstado] = useState<Estado>({ tipo: 'preparando' })
+  const [estado, setEstado] = useState<Estado>({ tipo: 'inicial' })
   const [abierto, setAbierto] = useState<string | null>(marcadoEn)
 
-  useEffect(() => {
-    let vigente = true
-    const pedir = (): void => {
-      void prepararWhatsApp(citaId, tipo).then((e) => { if (vigente) setEstado(e) })
-    }
-    const idle = enOcioso(pedir)
-    return () => { vigente = false; cancelarOcioso(idle) }
-  }, [citaId, tipo])
-
-  function alAbrir(): void {
+  function marcar(): void {
     setAbierto(new Date().toISOString())
-    void fetch('/api/agenda/whatsapp', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, keepalive: true,
-      body: JSON.stringify({ cita_id: citaId, paso: 'abierto', tipo }),
-    }).catch(() => undefined)
+    avisarAbierto(citaId, tipo)
+  }
+
+  async function alPulsar(): Promise<void> {
+    const pestana = pestanaEnBlanco()
+    setEstado({ tipo: 'preparando' })
+    const e = await prepararWhatsApp(citaId, tipo)
+    if (e.tipo !== 'listo') { pestana?.close(); setEstado(e); return }
+    if (!pestana) { setEstado(e); return } // bloqueada: queda el enlace real para pulsar
+    pestana.location.href = e.url
+    setEstado({ tipo: 'inicial' })
+    marcar()
   }
 
   const clase = `${compacto ? 'px-2.5 py-1.5 text-[12px]' : 'w-full px-3 py-2.5 text-sm'} flex items-center justify-center gap-1.5 rounded-xl font-bold border transition-colors`
@@ -84,12 +104,13 @@ export function BotonWhatsAppCita({ citaId, tipo, marcadoEn, etiqueta = 'Enviar 
   return (
     <div data-whatsapp-cita={citaId}>
       {estado.tipo === 'listo' ? (
-        <a href={estado.url} target="_blank" rel="noopener noreferrer" onClick={alAbrir}
+        <a href={estado.url} target="_blank" rel="noopener noreferrer" onClick={() => { marcar(); setEstado({ tipo: 'inicial' }) }}
           className={`${clase} hover:bg-[var(--ag-btn-ghost-hover)]`} style={estilo}>
-          <MessageCircle size={15} /> {etiqueta}
+          <MessageCircle size={15} /> Abrir WhatsApp
         </a>
       ) : (
-        <button type="button" disabled className={`${clase} opacity-60 cursor-not-allowed`} style={estilo}>
+        <button type="button" disabled={estado.tipo === 'preparando'} onClick={() => { void alPulsar() }}
+          className={`${clase} ${estado.tipo === 'preparando' ? 'opacity-60 cursor-wait' : 'hover:bg-[var(--ag-btn-ghost-hover)]'}`} style={estilo}>
           <MessageCircle size={15} /> {estado.tipo === 'preparando' ? 'Preparando…' : etiqueta}
         </button>
       )}

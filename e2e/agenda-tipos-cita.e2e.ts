@@ -31,18 +31,8 @@ test.afterEach(() => {
 })
 
 test.afterAll(() => {
-  // Las citas de la prueba pueden haber recibido un enlace de confirmación o un envío
-  // (bloque E: la tarea de recordatorios procesa toda cita de A en la ventana); sus FK son RESTRICT.
   sqlLocal(`
-    create temp table _b6c as select id from public.appointments
-     where tipo_cita_id in (select id from public.tipos_cita where nombre like 'E2E B6c%');
-    do $e$ begin
-      if to_regclass('public.cita_correos') is not null then delete from public.cita_correos where appointment_id in (select id from _b6c); end if;
-      if to_regclass('public.cita_confirmaciones') is not null then
-        delete from public.cita_confirmaciones where appointment_id in (select id from _b6c);
-      end if;
-    end $e$;
-    delete from public.appointments where id in (select id from _b6c);
+    delete from public.appointments where tipo_cita_id in (select id from public.tipos_cita where nombre like 'E2E B6c%');
     delete from public.tipos_cita where nombre like 'E2E B6c%';`)
 })
 
