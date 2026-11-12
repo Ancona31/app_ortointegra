@@ -776,9 +776,11 @@ queda listada aquí.
 
 ### Bloque B (propuestas aprobadas)
 
-- **P3. Empalme:** del mismo médico (no del consultorio); cuentan citas,
-  eventos sin paciente y `no_show`; no cuentan los eventos de Google ni los de
-  todo el día; si además cae fuera de horario, dos avisos seguidos. No bloquea.
+- **P3. Empalme:** del mismo médico (no del consultorio); cuentan citas y
+  eventos sin paciente; **no cuentan las citas `no_show` ni `cancelled`**
+  (corrección de Angel del 2026-11-12, igual que no ocupan hueco en
+  `docs/spec/SPEC_AGENDA.md` §8.4), ni los eventos de Google ni los de todo el
+  día; si además cae fuera de horario, dos avisos seguidos. No bloquea.
 - **P4. Cancelación:** el evento de Google se conserva con el prefijo
   «CANCELADA — » (correo de «evento actualizado») en vez de borrarse; una cita
   con paciente cancelada no se puede borrar nunca; una cita `attended` se puede
@@ -820,20 +822,21 @@ queda listada aquí.
 - **Conflicto:** gana el último cambio (`event.updated` contra `updated_at`), con
   `etag` + `If-Match` al escribir; todo conflicto a `audit_log` (nombres de
   campos, nunca valores).
-- **Diferencias con la propuesta original, porque manda §2** («lo que se mueva,
-  edite o cancele en Google sobre el calendario Spinus vuelve a Spinus»;
-  «eventos creados en Google entran como filas reales»):
-  - **C-a. Recurrentes creados en Google:** la propuesta era no importarlos;
-    por §2 **se importan** como filas reales, instancia por instancia
-    (`singleEvents`), dentro del horizonte de la agenda.
-  - **C-d. Título de una cita con paciente editado en Google:** la propuesta
-    era no aceptarlo; por §2 **vuelve a Spinus**. Las observaciones de una cita
-    con paciente siguen sin viajar en ningún sentido (§2 y S1).
-  - **C-e. Mover o borrar en Google una cita `attended`, `no_show` o
-    `cancelled`:** la propuesta era ignorarlo; por §2 **vuelve a Spinus**
-    (mover cambia la hora; borrar la cancela). Se audita con `via='google'`.
-    Restaurar en Google un evento borrado no reactiva la cita (§2 no lo cubre;
-    opción que menos cambia).
+- **Correcciones de Angel del 2026-11-12, que mandan sobre §2:**
+  - **C-a. Recurrentes creados en Google:** **no** se importan como filas;
+    siguen como hoy, visibles en solo lectura.
+  - **C-d. Título:** el de una cita **con** paciente no se acepta desde Google;
+    Spinus lo restablece. En eventos **sin** paciente el título sí vuelve a
+    Spinus. Las observaciones de una cita con paciente no viajan en ningún
+    sentido (S1).
+  - **C-e. Estado:** solo las citas `scheduled` o `confirmed` aceptan cambios
+    desde Google. Si en Google se mueve o se borra el evento de una cita
+    `attended`, `no_show` o `cancelled`, Spinus lo ignora, lo registra en
+    auditoría y vuelve a escribir en Google el estado que tiene en Spinus.
+    Restaurar en Google un evento borrado no reactiva la cita.
+  - Diferencia con §2 («lo que se mueva, edite o cancele en Google vuelve a
+    Spinus»; «eventos creados en Google entran como filas reales»): §2 queda
+    acotado por estas tres reglas.
 
 ### Seguridad (decididas por Angel el 2026-11-12)
 
