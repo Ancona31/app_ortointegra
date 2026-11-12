@@ -1539,6 +1539,65 @@ queda listada aquí.
   de una reserva) debería componer con el mismo convenio
   (`pacienteParaGoogle`, o `{nombre: reserva_nombre, apellidos: ''}`).
 
+### Bloque E — decisiones tomadas en E1-E2
+
+**E1 · migración `20261115120000_agenda_e1_confirmacion_enlace.sql`:**
+- **Una tabla, no dos:** `cita_confirmaciones` guarda el enlace Y la ÚLTIMA
+  respuesta del paciente (`respuesta` `confirmo|cancelo`, `respondido_en`),
+  como en el diseño. Un «confirmó y luego canceló» deja `cancelo`; el
+  historial completo queda en `audit_log` (`log_cita_change` en la cita y
+  `log_tabla_change` en la tabla). Una tabla de respuestas aparte duplicaría
+  la auditoría. `cita_correos` (E4) y `cita_reagendos` (E6) son de sus pasos.
+- **`appointments` no gana columnas** (hallazgo 4). Ningún `CASCADE`; FK a
+  `appointments` y `clinicas` RESTRICT; `creado_por` → `profiles` SET NULL
+  (como `created_by` de D1); `paciente_id` sin FK a propósito (convenio en el
+  `COMMENT`). RLS: un SELECT de 7 columnas para `authenticated` por la RLS de
+  `appointments` (sin recursión); sin escritura para `authenticated`.
+- **Lista final de `via`** (`c_vias` de `log_cita_change`, sólo sin
+  `auth.uid()`): `google` (C2), `enlace_paciente` (respuesta por el enlace, E1,
+  y el reagendar de E6) y `google_rsvp` (E9). Un literal fuera de la lista no se
+  escribe. **No** se añadió un literal para la reserva por enlace: D3 (cerrado)
+  no pone `spinus.via` y ya deja su propia fila `cita_reservada_enlace`; un
+  literal sin productor sería letra muerta. El encargo sugería `enlace` y
+  `paciente`: manda el diseño («o los que fije el diseño»).
+- **Pre-vuelo de `log_cita_change`:** aborta si `md5(prosrc)` no es el de C2
+  (`e57358a1…`) ni el de E1 (`80c3556c…`), como D4. El cuerpo es el de C2 con
+  una sola diferencia (la lista blanca); `c_tecnicas` y el WHEN no se tocan.
+- **Cinco funciones**, INVOKER: `cita_confirmacion_coincide` (pura, regla
+  general de permisos) y `…_emitir`, `…_contexto`, `…_responder`, `…_revocar`
+  (sólo `service_role`). Diferencias con el diseño:
+  - `emitir` devuelve `(r_id, r_codigo_hash)` en vez de un uuid: si el vigente
+    se emitió con otro `RESERVA_SECRETO`, el servidor lo detecta, lo revoca y
+    emite otro (si no, la cita quedaría con un enlace muerto para siempre).
+  - `revocar(p_clinica_id, p_cita_id)` es nueva (la pide E2 y la usará E6).
+  - `contexto` es la única sin `p_clinica_id`: la clínica se resuelve por el
+    hash del código, como `reserva_contexto` de D3; la devuelve para que el
+    POST la mande a `responder`, que la vuelve a casar con la fila.
+  - Índice `cita_confirmaciones_cita (appointment_id)` para la FK RESTRICT.
+- **Lista A aplicada:** 7 (sin caducidad guardada: vale mientras la cita no
+  empiece; el cambio de paciente lo invalida; ligar una cita por ligar no), 8
+  (confirmar hasta el inicio; cancelar hasta T−1h estricto, con
+  `clock_timestamp()` después de los dos `FOR UPDATE`), 9 (emitir exige la
+  puerta S3; responder funciona en una clínica degradada o suspendida).
+- **Resto conocido:** (a) una cita por ligar ligada a P y después cambiada a Q
+  conserva el enlace (está atado al correo de la reserva, que sigue en la
+  cita); (b) con el interruptor apagado, el `DELETE` de una cita con enlace da
+  23503, que `DELETE /api/appointments/[id]` ya traduce a 409 «cancélala»
+  (D6); (c) `scripts/agenda-semilla.ts` y las limpiezas de las e2e no conocen
+  `cita_confirmaciones`: hoy nada crea filas fuera de las pruebas SQL (que
+  terminan en rollback), pero quien integre E3+ tiene que enseñarles a
+  borrarlas (FK RESTRICT); (d) sin purga: unas pocas filas por cita.
+- **Auditoría independiente (APTA CON CAMBIOS):** aplicado, el candado 1791
+  también en `revocar`. **No aplicado, para revisar por Angel:** el auditor
+  pidió que `contexto` y `responder` se cierren con `clinicas.suspendida`; se
+  mantuvo la lista A 9 (la respuesta del paciente es un UPDATE como los del
+  personal, y `appointments_update` no mira la suspensión). Cerrarlo es un
+  `EXISTS` en las dos funciones; la prueba (caso 4) fija el comportamiento.
+- **Carrera:** `scripts/confirmacion-carrera.sh` (sólo local): el personal
+  mueve la cita a +30 min mientras el paciente cancela → B espera ~1,9 s y sale
+  `fuera_de_plazo`; sin el `FOR UPDATE` de la cita, cancelaba la cita movida;
+  confirmar y cancelar a la vez se serializan por el enlace.
+
 ### Bloque F
 
 - Las 18 propuestas de la auditoría visual, aprobadas. **El pulido visual y los
