@@ -41,10 +41,11 @@ import {
   decidirEvento, marcaSpinus, type ContextoDecision, type Decision, type EventoGoogle, type FilaEspejo,
 } from '@/lib/gcalSincronizacionDecidir'
 import {
-  aplicarEvento, avanzarPagina, citasDeEventos, clinicaHabilitada, importarEvento, reiniciarToken,
+  aplicarEvento, avanzarPagina, citasDeEventos, clinicaHabilitada, confirmarPorRsvp, importarEvento, reiniciarToken,
   soltarCandado, SincronizacionNoDisponible, tomarCandado, type Candado,
 } from '@/lib/gcalSincronizacionBase'
 import { restablecerEnGoogle, type PorRestablecer } from '@/lib/gcalSincronizacionRestablecer'
+import { aceptaronDe, rsvpGoogleEncendido } from '@/lib/gcalRsvp'
 
 /** C-b: la primera sincronización completa empieza hace 30 días, sin límite hacia adelante. */
 export const DIAS_VENTANA_COMPLETA = 30
@@ -266,7 +267,7 @@ async function procesarPagina(
   const tareas = items.map((evento) => {
     const marca = marcaSpinus(evento)
     const fila: FilaEspejo | null = (evento.id ? porEvento.get(evento.id) : undefined) ?? (marca ? porId.get(marca) : undefined) ?? null
-    return { evento, decision: decidirEvento(evento, fila, ctx) }
+    return { evento, fila, decision: decidirEvento(evento, fila, ctx) }
   })
   const pendientes: PorRestablecer[] = []
   for (let i = 0; i < tareas.length; i += LOTE) {
@@ -286,6 +287,30 @@ async function procesarPagina(
   // el token (si esto no llegara a correr, la página no avanza y se repite).
   const { errores } = await restablecerEnGoogle(conexion.clinicaId, calendar, pagina.calendarId, pendientes)
   pasada.r.errores += errores
+  if (rsvpGoogleEncendido()) await confirmarPorRsvps(pasada, pagina.calendarId, tareas)
+}
+
+/**
+ * E9 · `accepted` del paciente → confirmada. DESPUÉS de las decisiones de C3,
+ * que no cambian: sólo citas agendadas, con paciente o por ligar, ligadas a un
+ * evento vivo. La base compara el correo y decide; un fallo cuenta en
+ * `errores` y no tumba la página. Sólo con `AGENDA_RSVP_GOOGLE=encendido`.
+ */
+async function confirmarPorRsvps(
+  pasada: Pasada, calendarId: string, tareas: Array<{ evento: EventoGoogle; fila: FilaEspejo | null }>,
+): Promise<void> {
+  const { conexion } = pasada
+  for (const { evento, fila } of tareas) {
+    if (!fila || !evento.id || evento.status === 'cancelled' || fila.status !== 'scheduled' || !fila.conPaciente) continue
+    const aceptaron = aceptaronDe(evento)
+    if (aceptaron.length === 0) continue
+    try {
+      if (await confirmarPorRsvp(conexion.clinicaId, calendarId, fila.id, evento.id, aceptaron)) pasada.r.cambios += 1
+    } catch {
+      pasada.r.errores += 1
+      logger.warn('GCalSync', `RSVP sin aplicar ${JSON.stringify({ clinica: conexion.clinicaId, evento: evento.id })}`)
+    }
+  }
 }
 
 /**

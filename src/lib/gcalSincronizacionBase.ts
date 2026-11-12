@@ -190,3 +190,19 @@ export async function importarEvento(clinicaId: string, calendarId: string, d: D
     p_timezone: d.zona, p_notas: d.notas, p_medico_id: d.medicoId,
   }))
 }
+
+/* ── E9: RSVP de Google ────────────────────────────────────────────────── */
+
+/**
+ * `accepted` del paciente → la cita pasa de agendada a confirmada
+ * (`20261115160000_agenda_e9_rsvp_google.sql`). true = la confirmó; false =
+ * sin cambio (no era scheduled, no casó el correo, apagada…).
+ */
+export async function confirmarPorRsvp(
+  clinicaId: string, calendarId: string, citaId: string, eventId: string, aceptaron: string[],
+): Promise<boolean> {
+  const r = z.enum(['confirmada', 'sin_cambio']).parse(await llamar('cita_rsvp_google', clinicaId, {
+    p_cita_id: citaId, p_calendar_id: calendarId, p_google_event_id: eventId, p_aceptaron: aceptaron,
+  }))
+  return r === 'confirmada'
+}

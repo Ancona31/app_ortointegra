@@ -75,6 +75,9 @@ export type Appointment = {
   reserva_telefono?: string | null
   reserva_correo?: string | null
   reserva_historial_previo?: number | null
+  /* E7 · La marca del WhatsApp manual (columna del baseline, vacía hasta E7):
+     cuándo se ABRIÓ el mensaje desde el botón de la cita. Llega por el `*`. */
+  whatsapp_sent_at?: string | null
   /* `email` viaja desde `APPOINTMENT_SELECT` para un solo consumidor: el botón
      de invitación. Que esté aquí es lo que evita una petición por cita abierta
      sólo para saber si la ficha tiene correo.

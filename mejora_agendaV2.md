@@ -1790,6 +1790,196 @@ consulta` en `telefono` encontraba una de ellas al buscar la tarjeta de
 «coincidir sólo por el teléfono») dio una vez 429 en una corrida completa y
 pasó al repetirla: la base local la comparten otros agentes; queda anotado.
 
+### Bloque E — decisiones tomadas en E4, E7, E8 y E9
+
+**E4 · migración `20261115140000_agenda_e4_correos_cita.sql` y la tarea de recordatorios:**
+- **Tabla `cita_correos`** como en el diseño (llave `(cita, tipo, inicio_cita)`,
+  sin destinatario ni contenido, testigo + `tomado_en`, 3 intentos). Diferencias
+  con plan_E: la puerta S3 también en el **listado** (si no, las clínicas sin
+  acceso ocuparían el tope de 200 en cada ejecución, el mismo resto que tiene
+  C7); `fallido` con motivo `duplicado` (409 de Resend) **no** se reintenta;
+  `intentos` CHECK 1..3 (no 1..5); índice por `clinica_id` para la FK RESTRICT;
+  CHECK de coherencia más estricto. El tipo `comprobante` queda listo para E5
+  (mismas `tomar`/`marcar`).
+- **Auditoría (APTA CON CAMBIOS):** aplicado el hallazgo 1 (un comprobante
+  `enviando` de hace menos de 10 min también impide el recordatorio del mismo
+  inicio). No aplicados, para Angel: (2) un envío en su tercer intento cuya
+  ejecución muere queda `enviando` para siempre (no manda nada de más; falta
+  el renglón de cierre); (3) `duplicado` junta el 409 de otro cuerpo y el
+  concurrente; (5) el pre-vuelo no compara el disparador. El auditor resolvió
+  lo que B0-E1 dejaban «sin calificar»: el `BEGIN/COMMIT` explícito con el
+  `SELECT` final fuera es correcto con postgres-meta.
+- **Propuesta de dimensión 19 para `AUDITORIA-MIGRACIONES.md`** (del auditor de
+  E4; no se tocó el archivo): *funciones que leen el `prosrc` de OTRA función,
+  lo reescriben y lo ejecutan (la puerta S3 de C1): el pre-vuelo debe exigir la
+  forma exacta de la fuente y abortar si cambió, la reejecución debe correr con
+  los mismos privilegios y `search_path`, y la sustitución no debe abrir
+  inyección.* Hay otra dimensión 19 propuesta en «Menores»: numerarlas al decidir.
+- **Ruta `GET /api/cron/recordatorios`** (S2): `autorizada()` extraída a
+  `src/lib/cronAutorizacion.ts` y usada también por `/api/cron/google-sync`
+  (lista A 19); `{ok:true}` o 401/500 sin cuerpo; la ruta no crea clientes y
+  `recordatorios.ts` sólo llama RPC con el `clinica_id` del listado; entrada
+  `===` en el middleware. `vercel.json`: `*/15 * * * *`, sin activar (faltan
+  `CRON_SECRET`, `EMAIL_TRANSPORT=resend` y el despliegue).
+- **Cuándo no toma nada:** transporte apagado **o sin `RESERVA_SECRETO`** (el
+  diseño sólo decía transporte): sin secreto no hay enlace y cada envío quedaría
+  `omitido/sin_enlace` para siempre; así los intentos siguen enteros cuando se
+  encienda. Sin las RPC de E4: `{ok:true}`.
+- **Presupuesto:** 45 s, 200 citas, 600 ms entre envíos que llegaron a salir.
+  ⚠️ **Por verificar** el límite por segundo de la cuenta de Resend antes de
+  encender.
+- **Transporte:** `Correo.idempotencia` (`^[a-z0-9/_-]{1,256}$`; otra forma se
+  manda SIN llave) → `idempotencyKey` de Resend; `invalid_idempotent_request` y
+  `concurrent_idempotent_requests` → motivo `duplicado`. Mailpit la ignora.
+- **Texto del recordatorio** (`correosCita.ts`, PENDIENTE DE REVISIÓN):
+  asunto «Recordatorio: tu cita del {fecha}» sin médico; cuerpo con fecha, hora
+  y «zona horaria: {región}» (`regionDeTimezone`), médico, consultorio,
+  dirección, teléfono y el enlace; la versión `confirmed` dice «Avisar que no
+  podré asistir» sin «Confirmar». Determinista (sin «ahora»). Zona ausente o
+  inválida → `America/Mexico_City`.
+- **Semilla:** `agenda-semilla.ts` borra `cita_correos` y `cita_confirmaciones`
+  (FK RESTRICT a la cita, sin DELETE para el rol de servicio) en el tiempo
+  «antes», como postgres. `cita_confirmaciones` es de E1, pero el recordatorio
+  y WhatsApp la llenan; si E3 añade la misma línea, el choque es trivial.
+- **e2e** `e2e/recordatorios.e2e.ts`: escrita, **no corrida**. Necesita un
+  `CRON_SECRET` sólo de prueba en `.env.local` (no se añadió: sin él el archivo
+  se salta).
+- **Encontrado al verificar:** la base local compartida tiene ya otra versión de
+  `cita_confirmacion_contexto` (la de E3, que cierra la suspendida), así que
+  `e1_confirmacion_enlace.sql` de ESTA rama falla en su caso 4 contra ella; las
+  demás pruebas SQL, `e4_correos_cita.sql` incluida, pasan una a una. Se
+  resuelve al fusionar con la rama de E3.
+- **Revisión independiente del diff (APTO):** confirmó contra la documentación
+  de Resend los dos nombres de error de la llave; sin hallazgos nuevos aparte
+  del envío zombi del tercer intento (ya anotado) y de una ventana de
+  milisegundos entre la toma y la emisión del enlace (si en ese instante se
+  apaga el interruptor, el envío queda `omitido/sin_enlace`).
+
+**E7 · WhatsApp manual (sin migración):**
+- **Formato verificado en la documentación oficial de WhatsApp el 2026-11-12:**
+  https://faq.whatsapp.com/5913398998672934 («Usa `https://wa.me/<number>` …
+  número de teléfono completo en formato internacional. No incluyas ceros,
+  paréntesis ni guiones»; mensaje en `?text=` codificado) y
+  https://faq.whatsapp.com/1294841057948784 («Los números de teléfono de México
+  (código de país "52") deben incluir un "1" después del "+52"»). Por tanto
+  `https://wa.me/521` + 10 dígitos (`normalizarTelefonoMx` de D5); si no se
+  puede normalizar, el botón queda deshabilitado con «Teléfono sin formato
+  válido».
+- **`POST /api/agenda/whatsapp`** `{cita_id, paso:'preparar'|'abierto', tipo:'enlace'|'recordatorio'}`
+  (`strictObject`). Puertas: `entradaGestion()` (la de D6: 401/403/404 con el
+  interruptor apagado) → la cita con la SESIÓN y `clinica_id` (404 si la RLS no
+  la deja ver) → con paciente o por ligar, `scheduled`/`confirmed`, con hora y
+  futura (409 `no_aplica`) → teléfono del paciente o de la reserva (422).
+  `preparar` emite el enlace de E2 con el `clinica_id` y el perfil de la sesión
+  y devuelve el `wa.me` ya armado (el servidor compone el texto); no escribe en
+  `appointments`. `abierto` escribe UNA columna con la hora del servidor, con
+  el cliente de sesión, sin tocar `updated_at` (lo audita `log_cita_change` a
+  nombre de quien pulsó). Sin enlace (sin secreto o apagado en la base) → 503.
+- **Quién puede:** cualquier rol que vea la cita (la RLS decide; el invitado,
+  sólo las suyas). No se añadió un permiso propio.
+- **Texto** (`whatsappCita.ts`, PENDIENTE DE REVISIÓN): «Hola. Le escribimos del
+  consultorio de {médico}. Su cita es el {fecha} a las {hora} en {consultorio}.
+  Para confirmar o avisar que no podrá asistir: {url}» (confirmada: «Si no podrá
+  asistir, avísenos aquí»). Sin nombre del paciente ni nada clínico.
+- **Botón en el modal** (`BotonWhatsAppCita`, `tipo:'enlace'` →
+  `whatsapp_sent_at`): con v2, en edición, en una cita (no evento) agendada o
+  confirmada. Prepara en ocioso al abrir y pinta un `<a target="_blank">` real
+  (no lo bloquea el navegador); al pulsar, `abierto` con `keepalive` y «Abierto
+  en WhatsApp hh:mm». Que sea futura y tenga teléfono lo dice el servidor en el
+  motivo del botón. **La tarjeta de lectura no lo lleva**: es del bloque F (otra
+  rama); el componente está listo para montarse ahí.
+- **«Por confirmar (N)»** (`PanelPorConfirmar`, en `CabeceraEscritorio` por una
+  ranura `porConfirmar`; sólo con v2): `GET /api/agenda/por-confirmar` con la
+  sesión, citas `scheduled` de MAÑANA en la zona de cada consultorio
+  (`esDeManana`; lista A 13), con paciente o por ligar; las confirmadas salen.
+  Sin teléfono en la respuesta. Cada fila lleva su botón (`tipo:'recordatorio'`
+  → `whatsapp_reminder_sent_at`), que se prepara al abrir el panel (emite el
+  enlace de cada cita de la lista). **Sólo escritorio**: en móvil no hay botón
+  (la banda móvil es otra cabecera); queda para F.
+- **Pruebas:** `whatsappCita.test.ts` (formatos de número, texto, zona) y
+  `whatsappRuta.test.ts` (puertas, `preparar` sin escribir, `abierto` con una
+  columna y `clinica_id`, lista de mañana). e2e `e2e/whatsapp-manual.e2e.ts`
+  escrita, **no corrida** (intercepta `wa.me` con `page.route`).
+- **Revisión independiente (APTO):** volvió a comprobar las dos páginas de
+  WhatsApp, la RLS de `appointments_update` (médico de la cita, administrador y
+  secretaria) y que apagado no sale ninguna petición. Detalle anotado: la
+  documentación escribe `wa.me/<número>/?text=` con barra y el código la omite
+  (`wa.me/<número>?text=`, la forma de su ejemplo con número); las dos abren.
+
+**E8 · «Avisa a la clínica» (sin migración):**
+- Como en el diseño: **sin correo a la clínica** (lista A 12), sin tocar la
+  publicación de Realtime y sin truco de `client_id`.
+- **Aviso emergente:** `useTiempoRealAgenda` gana `onCanceladaAjena?`; se llama
+  sólo con un UPDATE a `cancelled` de una cita PINTADA que no estaba cancelada
+  y que no es eco propio (`esCancelacionAjena`, se evalúa antes de consumir la
+  firma y de fusionar). La agenda (sólo con v2) pregunta una vez a
+  `GET /api/agenda/respuestas?cita=` (sesión, RLS de las 7 columnas de E1,
+  `clinica_id` explícito; sin la tabla, `{respuesta:null}`) y avisa sólo si es
+  `cancelo` de hace menos de 2 min: «Un paciente canceló su cita del {fecha} a
+  las {hora}.», sin nombre. Una cita fuera de la vista no avisa: queda en el
+  panel. Una cancelación del personal o de Google no avisa (no hay respuesta
+  reciente).
+- **Aviso persistente:** `GET /api/agenda/por-confirmar` devuelve también
+  `canceladas` (respuestas `cancelo` de las últimas 48 h cuya cita SIGUE
+  cancelada: si el personal la reactivó, sale), y el panel las pinta en
+  «Canceladas por el paciente (48 h)» con un contador rojo junto a «Por
+  confirmar». El panel se recarga cuando sale el aviso.
+- **Límite conocido:** quien tenga la agenda en móvil ve el aviso emergente
+  pero no el panel (el panel sólo está en la cabecera de escritorio, E7).
+- **Pruebas:** `avisoCancelacion.test.ts` (eco propio, otro estado, ya
+  cancelada, no pintada, INSERT/DELETE, antigüedad). e2e
+  `e2e/aviso-cancelacion.e2e.ts` escrita, **no corrida** (cancela llamando a
+  `cita_confirmacion_responder` como `service_role`, como haría el POST de E3).
+- **Revisión independiente (APTO).** Nota suya, para Angel: la sección del
+  panel enseña el TÍTULO de la cita (en una cita con paciente, su nombre), como
+  la lista de mañana de E7; es la vista del personal, con la RLS de siempre. «Sin
+  nombre» vale para el aviso emergente, no para el panel.
+
+**E9 · RSVP de Google (migración `20261115160000_agenda_e9_rsvp_google.sql`):**
+- **Detrás de `AGENDA_RSVP_GOOGLE=encendido`** (variable de entorno, apagada por
+  omisión; cualquier otro valor apaga), además de la v2 y de las puertas del
+  sondeo de C. Angel la enciende después de comprobar con su cuenta real que un
+  RSVP llega por `syncToken` (§8, sin documentar). **No se escribió**
+  `scripts/gcal-rsvp-humo.ts` (el diseño lo proponía para esa prueba): habla con
+  Google real y aquí no se toca; queda para Angel.
+- **`cita_rsvp_google(clinica, cita, calendario, evento, correos[])`**, INVOKER,
+  sólo `service_role`: `scheduled` → `confirmed` si un correo aceptado (en
+  minúsculas y sin espacios, en la base) es `pacientes.email` o
+  `reserva_correo` de ESA cita; cita futura (hora real tras `FOR UPDATE`), con
+  hora, con paciente o por ligar, ligada a ESE evento (diferencia con el diseño:
+  la firma lleva el id del evento) y calendario de la conexión activa;
+  `updated_at` = máximo(el que tenía, ahora); auditoría `via:'google_rsvp'`,
+  `user_id 'system'`. Nunca cancela ni reactiva; `declined` no llega.
+- **En el sondeo** (`gcalSincronizacion.ts`): DESPUÉS de las decisiones de C3 y
+  del restablecimiento de C5, que no cambian (lo prueba
+  `gcalSincronizacion.test.ts`: lo aplicado es idéntico con y sin RSVP); sólo
+  filas `scheduled` con paciente o por ligar y eventos vivos; los correos salen
+  de `aceptaronDe` (sin organizador, `self` ni `resource`; ≤ 50). Un fallo
+  cuenta en `errores` y la página avanza. El envoltorio vive en
+  `gcalSincronizacionBase.ts` (añadido al cerrojo).
+- **El color de Google no se cambia** al confirmar por RSVP (no se escribe en
+  Google desde un RSVP); se corrige en la siguiente edición desde Spinus, como
+  el resto conocido de C5 con el color de `confirmed`.
+- **Riesgo aceptado (plan_E):** un asistente con el mismo correo que el
+  paciente, que no es el paciente, confirmaría la cita.
+- **Auditoría independiente (APTA, sin cambios).** Su hallazgo 1 («la rama por
+  ligar es inalcanzable porque el sondeo filtra con `conPaciente`») resultó
+  falso: desde D4, `r_con_paciente` incluye las citas por ligar. Propuso una
+  dimensión más para `AUDITORIA-MIGRACIONES.md` (no se tocó el archivo): *el
+  alcance del llamador frente a las ramas de la función: leer el código que la
+  invoca y comprobar que cada rama que la prueba SQL certifica se ejerce de
+  verdad.*
+- **Pruebas:** `e9_rsvp_google.sql` (correo del paciente en otra caja, reserva
+  por ligar, diez casos sin cambio, 22023, permisos), `gcalRsvp.test.ts` y el
+  bloque E9 de `gcalSincronizacion.test.ts` contra el Google simulado (apagado
+  sin llamadas, encendido con los aceptados normalizados, filtros, fallo
+  contado, decisiones de C3 idénticas).
+- **Revisión independiente del diff (APTO):** confirmó en la base local que
+  `gcal_citas_por_evento` marca las por ligar con `r_con_paciente = true` y que
+  la función aplicada es idéntica al archivo. Nota: el filtro de TS usa la foto
+  de la fila tomada al empezar la página, así que puede haber una llamada de
+  más que la base contesta `sin_cambio` (gasto, no riesgo).
+
 ### Bloque F
 
 - Las 18 propuestas de la auditoría visual, aprobadas. **El pulido visual y los

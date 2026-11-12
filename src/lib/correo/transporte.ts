@@ -39,11 +39,19 @@ export interface Correo {
   html: string
   /** Literal del código (`^[a-z0-9_-]{1,40}$`): es lo único que va al logger. */
   etiqueta: string
+  /**
+   * Llave de idempotencia de Resend (agenda E4): con la misma llave y el mismo
+   * cuerpo, Resend no vuelve a mandar durante 24 h. Sólo `^[a-z0-9/_-]{1,256}$`
+   * (`recordatorio/<uuid>`); otra forma no se manda y el envío sigue sin llave.
+   * Mailpit la ignora. Nunca va al logger.
+   */
+  idempotencia?: string
 }
 
 export type ResultadoEnvio =
   | { ok: true; modo: 'captura' | 'resend' }
-  | { ok: false; modo: ModoTransporte; motivo: 'apagado' | 'fallo' }
+  /** `duplicado`: Resend respondió 409 a la llave de idempotencia (el primero salió o sigue en curso). */
+  | { ok: false; modo: ModoTransporte; motivo: 'apagado' | 'fallo' | 'duplicado' }
 
 type Entorno = Readonly<Record<string, string | undefined>>
 
@@ -138,15 +146,23 @@ async function enviarPorMailpit(c: Correo, env: Entorno, etiqueta: string): Prom
   return respuesta.ok
 }
 
-async function enviarPorResend(c: Correo, llave: string, etiqueta: string): Promise<boolean> {
+const IDEMPOTENCIA = /^[a-z0-9/_-]{1,256}$/
+/** Los dos 409 de la llave de idempotencia (resend.com/docs/dashboard/emails/idempotency-keys). */
+const ERRORES_DUPLICADO = new Set(['invalid_idempotent_request', 'concurrent_idempotent_requests'])
+
+async function enviarPorResend(c: Correo, llave: string, etiqueta: string): Promise<'ok' | 'fallo' | 'duplicado'> {
   const { Resend } = await import('resend')
   const resend = new Resend(llave)
+  const opciones = c.idempotencia !== undefined && IDEMPOTENCIA.test(c.idempotencia)
+    ? { idempotencyKey: c.idempotencia }
+    : undefined
   const { error } = await resend.emails.send({
     from: REMITENTE, to: c.para, subject: c.asunto, html: c.html, text: c.texto,
-  })
+  }, opciones)
+  if (!error) return 'ok'
   // Sólo el código del error: su mensaje puede repetir la dirección.
-  if (error) logger.error(TAG, `(${etiqueta}) Resend rechazó el envío: ${error.name}`)
-  return !error
+  logger.error(TAG, `(${etiqueta}) Resend rechazó el envío: ${error.name}`)
+  return ERRORES_DUPLICADO.has(error.name) ? 'duplicado' : 'fallo'
 }
 
 /**
@@ -161,10 +177,10 @@ export async function enviarCorreo(c: Correo, env: Entorno = process.env): Promi
     return { ok: false, modo: 'apagado', motivo: 'apagado' }
   }
   try {
-    const ok = decision.modo === 'captura'
-      ? await enviarPorMailpit(c, env, etiqueta)
+    const r = decision.modo === 'captura'
+      ? ((await enviarPorMailpit(c, env, etiqueta)) ? 'ok' : 'fallo')
       : await enviarPorResend(c, decision.llave, etiqueta)
-    return ok ? { ok: true, modo: decision.modo } : { ok: false, modo: decision.modo, motivo: 'fallo' }
+    return r === 'ok' ? { ok: true, modo: decision.modo } : { ok: false, modo: decision.modo, motivo: r }
   } catch (e) {
     const nombre = e instanceof Error ? e.name : 'desconocido'
     logger.error(TAG, `(${etiqueta}) falló el envío por ${decision.modo}: ${nombre}`)

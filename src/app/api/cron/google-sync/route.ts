@@ -10,10 +10,9 @@
  * · PÚBLICA en el middleware (entrada EXACTA, no prefijo), porque Vercel no
  *   manda cookie y no sigue redirecciones: sin esa entrada recibiría un 302 a
  *   /login y fallaría en silencio. La autenticación es `CRON_SECRET`, aquí.
- * · El secreto se compara en TIEMPO CONSTANTE: los dos lados se reducen a
- *   SHA-256 (32 bytes siempre) y se comparan con `timingSafeEqual`. Así los
- *   buffers tienen la misma longitud por construcción, una cabecera de otra
- *   longitud no lanza, y la longitud del secreto no se filtra por el tiempo.
+ * · El secreto se compara en TIEMPO CONSTANTE (`autorizada()`, extraída a
+ *   `src/lib/cronAutorizacion.ts` en E4 para compartirla con
+ *   `/api/cron/recordatorios`; plan_E lista A 19).
  * · La respuesta NO LLEVA NINGÚN DATO: `{ ok: true }`, 401 o 500 sin cuerpo.
  *   Ni conteos, ni ids, ni errores. Lo que pasó queda en `gcal_sync_estado`
  *   (`ultimo_error`, códigos fijos) y en la auditoría.
@@ -29,8 +28,8 @@
  *   deja a la segunda sin nada que hacer, y `MIN_INTERVALO_SEG` evita que
  *   repita una clínica que la primera acaba de terminar.
  */
-import { createHash, timingSafeEqual } from 'node:crypto'
 import { NextResponse, type NextRequest } from 'next/server'
+import { autorizada } from '@/lib/cronAutorizacion'
 import { listarConexionesParaSincronizar } from '@/lib/gcalConexion'
 import { sincronizarClinica, type EstadoSincronizacion } from '@/lib/gcalSincronizacion'
 import { logger } from '@/lib/logger'
@@ -55,22 +54,6 @@ const LEASE_SEG = 90
 const MIN_INTERVALO_SEG = 60
 
 const SIN_CACHE = { 'Cache-Control': 'no-store' } as const
-
-function huella(valor: string): Buffer {
-  return createHash('sha256').update(valor, 'utf8').digest()
-}
-
-/**
- * ¿La cabecera `Authorization` es exactamente `Bearer <CRON_SECRET>`? Sin
- * secreto configurado, nunca. Compara huellas de 32 bytes: misma longitud
- * siempre, así que `timingSafeEqual` no lanza y el tiempo no depende de dónde
- * difieran ni de cuánto midan.
- */
-function autorizada(cabecera: string | null): boolean {
-  const secreto = process.env.CRON_SECRET
-  if (!secreto || cabecera === null) return false
-  return timingSafeEqual(huella(cabecera), huella(`Bearer ${secreto}`))
-}
 
 /** Recorre las clínicas en serie dentro del presupuesto. Devuelve los estados, sólo para el log. */
 async function recorrerClinicas(inicio: number): Promise<EstadoSincronizacion[]> {
