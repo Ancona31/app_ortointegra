@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto'
+import type { Locator } from '@playwright/test'
 import { sqlLocal } from './ayudas'
 
 /**
@@ -108,4 +109,25 @@ export function limpiarReservasE2e(): void {
     delete from public.audit_log where tabla = 'reserva_avisos' and registro_id in (select id from public.reserva_avisos where version = '${AVISO_E2E}');
     delete from public.reserva_avisos where version = '${AVISO_E2E}';
     commit;`)
+}
+
+/**
+ * Clic en la tarjeta de la rejilla por su esquina superior IZQUIERDA, no por
+ * su centro (el clic por omisión de Playwright).
+ *
+ * ⚠️ NO ES UN `force`: Playwright sigue comprobando que el punto sea de la
+ * tarjeta. Es que el centro puede no serlo. Con dos citas del mismo médico a
+ * la misma hora, FullCalendar (`slotEventOverlap`) pinta la primera a todo el
+ * ancho de la columna y monta la siguiente ENCIMA, desplazada a la derecha
+ * (`.fc-timegrid-event-harness-inset`); el orden lo decide el título. Medido el
+ * 2026-11-12 con la semilla («Paciente Prueba 02» a las 17:00 del jueves): la
+ * tarjeta «Ligada…» quedaba debajo, 143.7 px de ancho, con el centro tapado
+ * por el arnés de la vecina (`elementFromPoint` devolvía el arnés), mientras
+ * que «Reserva…» quedaba encima. La tarjeta era estable: 0 mutaciones, 0
+ * reemplazos y un solo rectángulo en 241 cuadros. La esquina izquierda es
+ * siempre de la tarjeta, esté debajo o encima, que es donde haría clic una
+ * persona.
+ */
+export async function clicEnTarjeta(tarjeta: Locator): Promise<void> {
+  await tarjeta.click({ position: { x: 8, y: 8 } })
 }

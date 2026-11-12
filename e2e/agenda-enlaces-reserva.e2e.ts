@@ -107,7 +107,9 @@ test('el médico invitado sólo gestiona sus enlaces', async ({ browser }) => {
     expect(lista.enlaces.every(e => e.medico_id === idDe(CORREO.medicoA))).toBe(true)
     await page.goto(RUTA)
     await expect(page.getByRole('heading', { name: 'Enlaces de reserva' })).toBeVisible()
-    await expect(page.getByText('Un solo uso')).toBeVisible()
+    /* Acotado a la sección: «un solo uso» también sale en la de ajustes
+       («Vigencia del enlace de un solo uso»). */
+    await expect(page.getByRole('region', { name: 'Enlaces de reserva' }).getByText('Un solo uso', { exact: true })).toBeVisible()
   })
 })
 

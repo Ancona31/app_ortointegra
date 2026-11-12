@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test'
 import {
   CORREO, SESION, DIA_LABORABLE_LIBRE, interruptorAgenda, irAAgenda, modalCita, soloEscritorio, sqlLocal, toastConTexto,
 } from './ayudas'
-import { crearCitaPorLigar, limpiarReservasE2e, type CitaPorLigar } from './reservaAyudas'
+import { clicEnTarjeta, crearCitaPorLigar, limpiarReservasE2e, type CitaPorLigar } from './reservaAyudas'
 import { fechaHoraLocalAInstante } from '../src/lib/dates'
 
 /**
@@ -53,9 +53,34 @@ test('encendido: la tarjeta dice «Por ligar · 3» y el modal enseña quién re
   await expect(tarjeta(page)).toHaveCount(1)
   await expect(tarjeta(page).locator('.ag-tarjeta-marca')).toHaveText(/Por ligar · 3/i)
   await expect(tarjeta(page)).not.toHaveClass(/ag-ev-evento/)
+  /* La píldora no hace oscilar el tier de la tarjeta (su `ResizeObserver`).
+     Primero se deja asentar la entrada de la rejilla: TODAS las tarjetas,
+     con o sin píldora y con el interruptor apagado o encendido, bajan ~1 px en
+     los primeros ~110 ms (medido el 2026-11-12). Después, en un segundo de
+     cuadros la caja no cambia ni se vuelve a montar. */
+  expect(await page.evaluate(async (n) => {
+    const caja = () => [...document.querySelectorAll('.fc-event')].find(e => e.textContent?.includes(n))
+    const rect = (el: Element) => { const b = el.getBoundingClientRect(); return `${b.x},${b.y},${b.width},${b.height}` }
+    const cuadro = () => new Promise(r => requestAnimationFrame(r))
+    let iguales = 0, previo = ''
+    for (let i = 0; i < 120 && iguales < 10; i++) {
+      await cuadro()
+      const el = caja(); const r = el ? rect(el) : ''
+      iguales = r === previo ? iguales + 1 : 0; previo = r
+    }
+    const primera = caja()
+    const vistas = new Set<string>()
+    for (let i = 0; i < 60; i++) {
+      await cuadro()
+      const el = caja()
+      if (el !== primera || !el) return 'se volvió a montar'
+      vistas.add(rect(el))
+    }
+    return vistas.size
+  }, NOMBRE)).toBe(1)
 
   const historial = page.waitForResponse(r => r.url().includes('/api/agenda/reservas/historial'))
-  await tarjeta(page).click()
+  await clicEnTarjeta(tarjeta(page))
   const modal = modalCita(page, 'Editar cita')
   await expect(modal).toBeVisible()
   expect((await historial).ok()).toBeTruthy()
@@ -69,13 +94,17 @@ test('encendido: bloquear y desbloquear el contacto desde el modal', async ({ pa
   interruptorAgenda('A', true)
   const c = cita('17:00', 'fijo')
   await abrirAgendaV2(page)
-  await tarjeta(page).click()
+  await clicEnTarjeta(tarjeta(page))
   const modal = modalCita(page, 'Editar cita')
-  await modal.getByRole('button', { name: 'Bloquear contacto' }).click()
+  /* `exact`: sin él, 'Bloquear contacto' también casa con «Desbloquear
+     contacto» (Playwright compara por subcadena sin distinguir mayúsculas), y
+     la espera de abajo se cumplía ANTES de que el desbloqueo llegara a la
+     base: la consulta siguiente leía 0. */
+  await modal.getByRole('button', { name: 'Bloquear contacto', exact: true }).click()
   await expect(modal.getByText('Bloqueado a mano para reservar por el enlace')).toBeVisible()
   expect(sqlLocal(`select count(*) from public.reserva_contactos where medico_id = :'m' and bloqueado_en is not null`, { m: c.medicoId })).toBe('2')
-  await modal.getByRole('button', { name: 'Desbloquear contacto' }).click()
-  await expect(modal.getByRole('button', { name: 'Bloquear contacto' })).toBeVisible()
+  await modal.getByRole('button', { name: 'Desbloquear contacto', exact: true }).click()
+  await expect(modal.getByRole('button', { name: 'Bloquear contacto', exact: true })).toBeVisible()
   expect(sqlLocal(`select count(*) from public.reserva_contactos where medico_id = :'m' and perdonado_en is not null`, { m: c.medicoId })).toBe('2')
 })
 
@@ -88,7 +117,7 @@ test('encendido: una cita por ligar que gastó un enlace único se cancela; el D
   expect(estado(c.citaId)).toBe('scheduled')
 
   await abrirAgendaV2(page)
-  await tarjeta(page).click()
+  await clicEnTarjeta(tarjeta(page))
   await expect(modalCita(page, 'Editar cita')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Eliminar cita', exact: true })).toHaveCount(0)
   await page.getByRole('button', { name: 'Cancelar cita', exact: true }).click()
@@ -102,7 +131,7 @@ test('encendido: guardarla sin paciente conserva el título y no manda paciente_
   interruptorAgenda('A', true)
   const c = cita('17:00', 'fijo')
   await abrirAgendaV2(page)
-  await tarjeta(page).click()
+  await clicEnTarjeta(tarjeta(page))
   const modal = modalCita(page, 'Editar cita')
   await modal.getByPlaceholder('Instrucciones, observaciones...').fill('Trae estudios')
   const put = page.waitForResponse(r => r.url().includes(`/api/appointments/${c.citaId}`) && r.request().method() === 'PUT')
