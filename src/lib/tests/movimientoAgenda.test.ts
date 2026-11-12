@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
-  curvaToken, duracionMovimiento, duracionToken, incumplimientosDeMovimiento, interpretarDuracion,
-  prefiereMenosMovimiento, type AnimacionObservada,
+  curvaToken, duracionMovimiento, duracionToken, esCambioDeFecha, fundirNavegacion, incumplimientosDeMovimiento,
+  interpretarDuracion, prefiereMenosMovimiento, type AnimacionObservada,
 } from '@/lib/agenda/movimientoAgenda'
 
 /** Simula un navegador mínimo: tokens en la raíz y la preferencia de movimiento. */
@@ -81,5 +81,72 @@ describe('incumplimientosDeMovimiento', () => {
   })
   it('una duración infinita o no numérica incumple', () => {
     expect(incumplimientosDeMovimiento([{ ...buena, duracionMs: Infinity }])).toHaveLength(1)
+  })
+})
+
+describe('esCambioDeFecha (F2.3)', () => {
+  const semana = (inicio: number) => ({ tipo: 'timeGridWeek', inicio })
+  it('funde al pasar de semana dentro de la misma vista', () => {
+    expect(esCambioDeFecha(semana(1), semana(2))).toBe(true)
+  })
+  it('no funde en el primer datesSet: la vista entera ya entra con ag-vista', () => {
+    expect(esCambioDeFecha(null, semana(1))).toBe(false)
+  })
+  it('no funde al cambiar de tipo de vista (lo hace ag-vista)', () => {
+    expect(esCambioDeFecha(semana(1), { tipo: 'dayGridMonth', inicio: 2 })).toBe(false)
+  })
+  it('no funde si el periodo no cambió (Compactar reemite datesSet)', () => {
+    expect(esCambioDeFecha(semana(1), semana(1))).toBe(false)
+  })
+})
+
+describe('fundirNavegacion (F2.3)', () => {
+  type Llamada = { fotogramas: Keyframe[]; opciones: KeyframeAnimationOptions }
+  const armazon = (atenuado = false) => {
+    const llamadas: Llamada[] = []
+    const vivas: { id: string; cancelada: boolean; cancel(): void }[] = []
+    return {
+      llamadas,
+      vivas,
+      animate: (fotogramas: Keyframe[], opciones: KeyframeAnimationOptions) => {
+        llamadas.push({ fotogramas, opciones })
+        const viva = { id: opciones.id ?? '', cancelada: false, cancel() { viva.cancelada = true } }
+        vivas.push(viva)
+        return null
+      },
+      closest: (s: string) => (atenuado && s.includes('.ag-cargando') ? {} : null),
+      getAnimations: () => vivas.filter(v => !v.cancelada),
+    }
+  }
+
+  it('anima sólo la opacidad de .7 a 1, en micro con ease-out, sin traslación', () => {
+    const a = armazon()
+    expect(fundirNavegacion(a)).toBe(true)
+    expect(a.llamadas).toEqual([{
+      fotogramas: [{ opacity: 0.7 }, { opacity: 1 }],
+      opciones: { id: 'ag-fundido-navegacion', duration: 120, easing: 'cubic-bezier(0, 0, .2, 1)' },
+    }])
+    const props = a.llamadas[0].fotogramas.flatMap(f => Object.keys(f))
+    expect(props.every(p => p === 'opacity')).toBe(true)
+  })
+  it('no anima sobre una rejilla ya atenuada (la atenuación es un estado y manda)', () => {
+    const a = armazon(true)
+    expect(fundirNavegacion(a)).toBe(false)
+    expect(a.llamadas).toHaveLength(0)
+  })
+  it('dos navegaciones seguidas: la segunda corta el fundido de la primera', () => {
+    const a = armazon()
+    fundirNavegacion(a)
+    fundirNavegacion(a)
+    expect(a.vivas.map(v => v.cancelada)).toEqual([true, false])
+  })
+  it('sin armazón no hace nada', () => {
+    expect(fundirNavegacion(null)).toBe(false)
+  })
+  it('MUTACIÓN: con movimiento reducido no anima', () => {
+    navegador({}, true)
+    const a = armazon()
+    expect(fundirNavegacion(a)).toBe(false)
+    expect(a.llamadas).toHaveLength(0)
   })
 })

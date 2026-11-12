@@ -3508,7 +3508,13 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
      navegación, la vuelta del deslizamiento): esas miran
      `prefiereMenosMovimiento()` de `src/lib/agenda/movimientoAgenda.ts` y no
      animan. Una regla CSS no puede apagar un `element.animate()`. */
+  /* ⚠️ `.fc-event` SUELTO ES POR EL ESPEJO DEL ARRASTRE (F2.3): al revertir,
+     FullCalendar lo devuelve con una `transition: top, left` EN LÍNEA sobre un
+     clon que cuelga de `body`, fuera de `.fc`. El `!important` de aquí gana al
+     estilo en línea, y con `.01ms` su `transitionend` sigue llegando, que es
+     lo que FullCalendar espera para soltarlo. */
   .fc *, .agenda-fc *, .ag-dia-aside, .ag-dia-aside *, .fc *::before, .fc *::after,
+  .fc-event,
   .ag-modal-panel, .ag-modal-velo,
   .ag-capa, .ag-capa *, .ag-hoja, .ag-hoja *, .ag-capa-velo {
     animation-duration: .01ms !important;

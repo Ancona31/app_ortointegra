@@ -9,6 +9,7 @@ import { useRouter } from 'next/navigation'
 import FullCalendar from '@fullcalendar/react'
 import type { DateClickArg, EventResizeDoneArg } from '@fullcalendar/interaction'
 import type { DatesSetArg, EventClickArg, EventDropArg, DateSelectArg, EventApi, EventContentArg, DayHeaderContentArg } from '@fullcalendar/core'
+import { Calendar as CalendarioFC } from '@fullcalendar/core'
 import esLocale from '@fullcalendar/core/locales/es'
 import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/components/ui/Toast'
@@ -75,6 +76,7 @@ import {
 } from '@/lib/agenda/vistasAgenda'
 import { clasesDelEvento } from '@/lib/agenda/tarjetasAgenda'
 import { podarMarcas } from '@/lib/agenda/marcasMovimiento'
+import { esCambioDeFecha, fundirNavegacion, type MarcaDeVista } from '@/lib/agenda/movimientoAgenda'
 
 /* ═══ A2.6 · LOS TRES MODALES EN DIFERIDO ═════════════════════════════════
    `AppointmentModal` (el más grande: iconos, `Portal`, `QuickPatientModal`,
@@ -890,7 +892,20 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
 
      Los cuerpos de los cuatro que iban en línea están tal cual, sólo con nombre;
      sus notas siguen junto a cada prop en el JSX. */
+  /* F2.3: lo último que se pintó, para saber si este `datesSet` es un cambio de
+     FECHA (fundido) o el primero / un cambio de vista (lo hace `ag-vista`). */
+  const vistaPreviaRef = useRef<MarcaDeVista | null>(null)
+
   function alCambiarFechas(arg: DatesSetArg) {
+    /* F2.3 · el fundido de navegación: el armazón de .7 a 1 en micro, SIN
+       traslación (CONTRASTE §2.3). Va primero porque `datesSet` llega con el
+       rango nuevo ya pintado. Ver `fundirNavegacion`. */
+    const marca = { tipo: arg.view.type, inicio: arg.view.currentStart.getTime() }
+    if (esCambioDeFecha(vistaPreviaRef.current, marca)) {
+      const api = calendarRef.current?.getApi()
+      fundirNavegacion(api instanceof CalendarioFC ? api.el.querySelector('.fc-view-harness') : null)
+    }
+    vistaPreviaRef.current = marca
     setCurrentView(arg.view.type)
     setTituloVista(arg.view.title)
     setPeriodoVacio(periodoDeLaVista(arg.view))
@@ -1522,7 +1537,12 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
           selectable={!esMesMovil}
           selectMirror
           editable
-          dragRevertDuration={200}
+          /* F2.3: 180 = `--ag-dur-base` (decisión 5 del bloque F). Literal y
+             primitivo a propósito: es una prop de `<FullCalendar>` y no puede
+             cambiar de identidad (A1-bis.2). Si cambia el token, cambia esto.
+             El regreso lo anima FullCalendar con `top`/`left` en línea sobre
+             el espejo; con movimiento reducido lo corta el bloque CSS. */
+          dragRevertDuration={180}
           eventResizableFromStart
           businessHours={horasHabilesFc}
           eventSources={eventSourcesStable}
