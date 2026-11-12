@@ -1980,6 +1980,50 @@ pasó al repetirla: la base local la comparten otros agentes; queda anotado.
   de la fila tomada al empezar la página, así que puede haber una llamada de
   más que la base contesta `sin_cambio` (gasto, no riesgo).
 
+**Integración con E4, E7, E8 y E9 (tras el merge `8ff7af5`):**
+- **Lista A 4, cumplida:** el comprobante de E5 se registra en `cita_correos`
+  (`src/lib/reserva/comprobanteReserva.ts`): `cita_correo_tomar` con
+  `tipo:'comprobante'` → enlace → plantilla → `Idempotency-Key =
+  comprobante/<envío>` → `cita_correo_marcar`. El destinatario es el de la
+  base (`r_para`). Con lo que menos cambia lo de hoy: sin las RPC de E4 o si
+  la toma falla, sale como en D8 sin registro (puede salir también el
+  recordatorio: nunca menos correo que hoy); si la base dice que no toca, no
+  sale; un fallo del transporte queda `fallido` y no impide el recordatorio.
+  `recordatorios.ts` (E4) exporta `tomarEnvio` y `marcarEnvio` con el tipo
+  como parámetro, para no repetir la forma de las RPC. Prueba e2e: una reserva
+  dentro de la ventana deja un `comprobante:enviado`, un solo correo y ningún
+  recordatorio tras dos pasadas de la tarea.
+- **`CRON_SECRET` de prueba** al final del `.env.local` de este worktree
+  (aleatorio, con su comentario; ignorado por git): sólo local, para
+  `e2e/recordatorios.e2e.ts`. El de producción lo pone Angel en Vercel.
+- **Defectos de integración arreglados** (las e2e de E4 y E8 estaban
+  «escritas, no corridas»): `recordatorios.e2e.ts` mandaba un texto a una
+  columna uuid (`nullif(:'p','')::uuid`); `aviso-cancelacion.e2e.ts` buscaba
+  la tarjeta por el título de una cita CON paciente, y la tarjeta pinta el
+  nombre del paciente (ahora crea su propio paciente con el título por
+  nombre); `agenda-tipos-cita.e2e.ts` no podía borrar sus citas: el botón de
+  WhatsApp de E7 emite el enlace de confirmación AL ABRIR el modal
+  (`preparar` en un `useEffect`) y la tarea de E4 registra envíos, y las dos
+  FK son RESTRICT. Para quien escriba e2e nuevas: abrir con v2 encendida el
+  modal de una cita con paciente y teléfono deja una fila en
+  `cita_confirmaciones`.
+- **¿Llega una clínica suspendida a `gcal_aplicar_evento` por el RSVP (E9)?
+  No.** Los dos únicos llamadores de `sincronizarClinica` son
+  `POST /api/google/sync` (que antes comprueba `clinica_no_suspendida()` y
+  `clinica_tiene_acceso()` con la sesión) y `GET /api/cron/google-sync`; y
+  `sincronizarClinica`, después de tomar el candado y ANTES de leer eventos,
+  llama a `gcal_sync_clinica_habilitada` (suspensión + acceso) y sale con
+  `sin_acceso`. El RSVP (`confirmarPorRsvps` → `cita_rsvp_google`) y el resto
+  de escrituras de C (`aplicarEvento`, `restablecerEnGoogle`) sólo corren
+  dentro de esa pasada. Los otros dos caminos a `gcal_aplicar_evento` sólo
+  tocan columnas técnicas (`vincular`/`etag`): el ligado del evento de una
+  reserva (D8; la reserva exige S3) y el reflejo de la respuesta del paciente
+  (E3; `responder` ya cierra a la suspendida). No hizo falta ningún `if`:
+  queda fijado con una prueba (`gcalSincronizacion.test.ts`, «encendido, con
+  la clínica suspendida o sin acceso (S3): ni RSVP ni Google»). Resto
+  conocido, el mismo de todo C: una suspensión que llegue A MEDIA pasada (≤ 15
+  s por clínica) no corta esa pasada.
+
 ### Bloque F
 
 - Las 18 propuestas de la auditoría visual, aprobadas. **El pulido visual y los

@@ -519,6 +519,16 @@ describe('E9 · RSVP de Google (detrás de AGENDA_RSVP_GOOGLE)', () => {
     vi.unstubAllEnvs()
   })
 
+  it('encendido, con la clínica suspendida o sin acceso (S3): ni RSVP ni Google; sale antes de leer eventos', async () => {
+    vi.stubEnv('AGENDA_RSVP_GOOGLE', 'encendido')
+    conAsistentes()
+    db.habilitada = false
+    expect(await sincronizarClinica(conexion, op)).toMatchObject({ estado: 'sin_acceso' })
+    expect(db.rsvps).toEqual([])
+    expect(llamadas()).toHaveLength(0)
+    vi.unstubAllEnvs()
+  })
+
   it('encendido: manda sólo los que aceptaron (sin organizador), normalizados, y cuenta el cambio', async () => {
     vi.stubEnv('AGENDA_RSVP_GOOGLE', 'encendido')
     conAsistentes()
