@@ -680,7 +680,7 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
   /* A2.5.7: no es un hook — ver la nota de cabecera de `guardadoCitas.ts`—, así
      que se vuelve a invocar en cada render, «fresca», igual que leer cualquier
      otra función de este componente. */
-  const { handleEventDrop, handleEventResize, handleSave, handleDelete } = crearGuardadoCitas({
+  const { handleEventDrop, handleEventResize, handleSave, handleDelete, handleCancelar } = crearGuardadoCitas({
     calendarRef, horario, profile, toast, setConfirm, setCitaCreada, setInvitacion, closeModal,
     refetch, firmarEscritura, aplicarAppointmentAlEvento,
   })
@@ -1715,6 +1715,8 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
           onClose={closeModal}
           onSave={handleSave}
           onDelete={handleDelete}
+          agendaV2={agendaV2}
+          onCancelarCita={handleCancelar}
           medicos={medicos}
           horario={horario}
           defaultMedicoId={defaultMedicoId}

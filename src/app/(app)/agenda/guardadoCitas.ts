@@ -570,9 +570,42 @@ export function crearGuardadoCitas({
     if (!res.ok) {
       // Rollback: restaurar estado desde servidor
       refetch()
-      toast.error('No se pudo eliminar')
+      /* El 409 `cita_con_paciente` (B3) sólo sale con el interruptor encendido
+         y una pestaña que aún no lo sabía: se dice por qué. Cualquier otro
+         fallo conserva el aviso de siempre. */
+      const cuerpo: { error?: string; message?: string } | null = await res.json().catch(() => null)
+      toast.error(cuerpo?.error === 'cita_con_paciente' && cuerpo.message ? cuerpo.message : 'No se pudo eliminar')
     }
   }
 
-  return { handleEventDrop, handleEventResize, handleSave, handleDelete }
+  /* B3: «eliminar» una cita con paciente, con el interruptor encendido, la
+     CANCELA. Mismo camino que cambiar el estado en el modal —el PUT de
+     siempre—, así que el `after()` de la ruta ya marca el evento de Google
+     con «CANCELADA — » en vez de borrarlo (P4), y la auditoría la deja el
+     disparador de B0 (`cita_cancelada`). La tarjeta se queda, en cancelada. */
+  async function handleCancelar(id: string) {
+    closeModal()
+    toast.success('Se canceló la cita')
+    const evento = calendarRef.current?.getApi().getEventById(id)
+    evento?.setExtendedProp('status', 'cancelled')
+
+    vaciarCacheCitas() // A1.5a: también al salir; ver `ejecutarDrop`.
+    const res = await fetch(`/api/appointments/${id}`, {
+      method:  'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ status: 'cancelled', client_id: firmarEscritura() }),
+    })
+    vaciarCacheCitas()
+
+    if (!res.ok) {
+      refetch()
+      const cuerpo: { error?: string; message?: string } | null = await res.json().catch(() => null)
+      toast.error(cuerpo?.message || cuerpo?.error || 'No se pudo cancelar')
+      return
+    }
+    const json: { appointment?: Partial<Appointment> & { id?: string } } | null = await res.json().catch(() => null)
+    if (json?.appointment) aplicarAppointmentAlEvento(json.appointment)
+  }
+
+  return { handleEventDrop, handleEventResize, handleSave, handleDelete, handleCancelar }
 }

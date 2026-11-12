@@ -11,6 +11,7 @@ import { APPOINTMENT_SELECT, eventoParaGoogle, puntasParaGoogle, componerAsisten
 import { correoDelMedico } from '@/lib/medicoCorreo'
 import { TZ_CLINICA, desplazarFecha, fechaHoraLocalAInstante, renderEnTZ } from '@/lib/dates'
 import { comprobarTopeDuracion } from '@/lib/agenda/topeDuracion'
+import { agendaV2Encendida } from '@/lib/agenda/ajustesAgenda'
 
 /* Una fecha-solo `YYYY-MM-DD` QUE ADEMÁS EXISTE EN EL CALENDARIO: la forma no
    basta, porque `2026-02-30` la pasa y el motor la DESBORDA al 2 de marzo en vez
@@ -177,13 +178,29 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
        sobre los valores EFECTIVOS, y el que no venga en el cuerpo sale de aquí.
        Sin esta columna, un PUT que sólo mandara `paciente_id` sobre una fila que
        ya es de todo el día no vería el conflicto. */
-    const { data: existing } = await supabase
-      .from('appointments')
-      .select('id, google_event_id, gcal_sync_status, updated_at, medico_id, status, start_time, end_time, paciente_id, consultorio_timezone, all_day')
-      .eq('id', id)
-      .single()
+    /* El interruptor de la agenda v2 (plan del bloque B §1) va en paralelo con
+       la lectura de la fila: una consulta por clave primaria, sin esperar. */
+    const [{ data: existing }, v2] = await Promise.all([
+      supabase
+        .from('appointments')
+        .select('id, google_event_id, gcal_sync_status, updated_at, medico_id, status, start_time, end_time, paciente_id, consultorio_timezone, all_day')
+        .eq('id', id)
+        .single(),
+      agendaV2Encendida(supabase, profile.clinica_id),
+    ])
 
     if (!existing) return NextResponse.json({ error: 'Cita no encontrada' }, { status: 404 })
+
+    /* B3: con el interruptor encendido, una cita con paciente no se puede
+       quedar SIN paciente. Sería la puerta de atrás del 409 del DELETE —
+       desligar y luego borrar el «evento» que queda—, y la interfaz nunca lo
+       pide: la X del paciente cancela. Cambiar a OTRO paciente sigue igual. */
+    if (v2 && existing.paciente_id && paciente_id !== undefined && !paciente_id) {
+      return NextResponse.json(
+        { error: 'cita_con_paciente', message: 'Una cita con paciente no se puede quedar sin paciente: cancélala.' },
+        { status: 409 }
+      )
+    }
 
     if (clientUpdatedAt && existing.updated_at !== clientUpdatedAt) {
       return NextResponse.json(
@@ -1120,15 +1137,35 @@ export async function DELETE(_req: NextRequest, ctx: RouteContext<'/api/appointm
 
     const { id } = await ctx.params
 
-    // RLS filtra por clinica_id
-    const { data: existing } = await supabase
-      .from('appointments')
-      .select('id, google_event_id')
-      .eq('id', id)
-      .single()
+    // RLS filtra por clinica_id. El interruptor (B3) va en paralelo con la
+    // lectura de la fila: una consulta por clave primaria más, sin esperar.
+    const [{ data: existing }, v2] = await Promise.all([
+      supabase
+        .from('appointments')
+        .select('id, google_event_id, paciente_id')
+        .eq('id', id)
+        .single(),
+      agendaV2Encendida(supabase, profile.clinica_id),
+    ])
     if (!existing) return NextResponse.json({ error: 'Cita no encontrada' }, { status: 404 })
 
-    const { error } = await supabase.from('appointments').delete().eq('id', id)
+    /* ── B3: UNA CITA CON PACIENTE NO SE BORRA, SE CANCELA ──────────────────
+       Sólo con el interruptor encendido (P2, P4). Va ANTES del borrado y antes
+       de resolver la conexión, así que tampoco se programa el `events.delete`
+       del `after()`: el evento de Google se conserva y lo marca la
+       cancelación (`PUT {status:'cancelled'}`, prefijo «CANCELADA — »). Cubre
+       también la cita ya cancelada: con paciente no se borra nunca.
+       Con el interruptor apagado, o la tabla sin crear, `v2` es `false` y la
+       baja sigue siendo la de siempre. Los eventos sin paciente, igual. */
+    if (v2 && existing.paciente_id) {
+      return NextResponse.json(
+        { error: 'cita_con_paciente', message: 'Una cita con paciente no se elimina: se cancela y queda en la agenda.' },
+        { status: 409 }
+      )
+    }
+
+    // `clinica_id` explícito: defensa en profundidad, la RLS ya acota.
+    const { error } = await supabase.from('appointments').delete().eq('id', id).eq('clinica_id', profile.clinica_id)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
     // Se resuelve antes de responder, con el cliente de sesión, y sólo si la

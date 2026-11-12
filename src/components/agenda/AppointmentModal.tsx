@@ -22,7 +22,7 @@
 
 import { useEffect, useId, useState } from 'react'
 import {
-  X, Calendar, Plus, Trash2, ChevronDown, FileText, Stethoscope, Loader2, Mail, CalendarPlus,
+  X, Calendar, Plus, Trash2, ChevronDown, FileText, Stethoscope, Loader2, Mail, CalendarPlus, CalendarX,
   type LucideIcon,
 } from 'lucide-react'
 import Link from 'next/link'
@@ -302,12 +302,17 @@ function usePacientes(query: string) {
 export default function AppointmentModal({
   modal, onClose, onSave, onDelete, medicos, defaultMedicoId,
   hideMedicoDropdown, medicoDropdownRequired, canVerExpediente, canInvitar, onInvitar,
-  onCambiarTipo, horario,
+  onCambiarTipo, horario, agendaV2 = false, onCancelarCita,
 }: {
   modal: ModalState
   onClose: () => void
   onSave: (data: DatosGuardado) => Promise<void>
   onDelete: (id: string) => Promise<void>
+  /* B3: el interruptor de la agenda v2 y la cancelación que sustituye al
+     borrado de una cita con paciente. Sin ellos —o con el interruptor
+     apagado— la papelera y la X borran como siempre. */
+  agendaV2?: boolean
+  onCancelarCita?: (id: string) => Promise<void>
   medicos: Medico[]
   defaultMedicoId: string
   /* El horario de consulta, para el aviso de fuera de horario. Hasta ahora ese
@@ -420,6 +425,13 @@ export default function AppointmentModal({
   const [deleting,    setDeleting]    = useState(false)
   /* La alerta de la X del paciente. Ver el botón, más abajo. */
   const [quitarPaciente, setQuitarPaciente] = useState(false)
+  /* B3: con el interruptor encendido, una CITA ya guardada no se borra: la
+     papelera y la X la cancelan. `yaCancelada` mira la FILA, no el selector
+     de estado del formulario: lo que no se puede es borrar lo guardado. Una
+     cita ya cancelada no ofrece ni lo uno ni lo otro (P4: con paciente no se
+     borra nunca, y cancelarla otra vez no cambia nada). */
+  const cancelaEnVezDeBorrar = agendaV2 && isEdit && !esEvento && onCancelarCita !== undefined
+  const yaCancelada = apt?.status === 'cancelled'
   /* El aviso de fuera de horario ya redactado, o `null`. Guardar la FRASE y no
      un booleano es lo que deja que el mismo estado sirva para el inicio y para
      el fin sin tener que volver a decidir cuál de los dos falló. */
@@ -667,6 +679,13 @@ export default function AppointmentModal({
     if (!apt?.id) return
     setDeleting(true)
     await onDelete(apt.id)
+    setDeleting(false)
+  }
+
+  async function handleCancelarCita() {
+    if (!apt?.id || !onCancelarCita) return
+    setDeleting(true)
+    await onCancelarCita(apt.id)
     setDeleting(false)
   }
 
@@ -1045,12 +1064,18 @@ export default function AppointmentModal({
 
                     En ALTA sigue limpiando el campo y ya está: no hay cita
                     todavía que borrar. */}
+                {/* B3: con el interruptor encendido la X CANCELA (ver la
+                    alerta, abajo); sobre una cita ya cancelada no queda nada
+                    que hacer con ella y no se pinta. */}
+                {!(cancelaEnVezDeBorrar && yaCancelada) && (
                 <button
                   onClick={() => {
                     if (isEdit) setQuitarPaciente(true)
                     else { setPaciente(null); setSearch('') }
                   }}
-                  aria-label={isEdit ? 'Quitar paciente y eliminar la cita' : 'Quitar paciente'}
+                  aria-label={cancelaEnVezDeBorrar
+                    ? 'Quitar paciente y cancelar la cita'
+                    : (isEdit ? 'Quitar paciente y eliminar la cita' : 'Quitar paciente')}
                   /* ⚠️ ERA EL CONTROL MÁS PEQUEÑO DEL MODAL Y EL MÁS PELIGROSO:
                      14 × 14 px sin relleno, y en EDICIÓN no vacía un campo sino
                      que abre la confirmación que borra la cita entera. Un
@@ -1062,6 +1087,7 @@ export default function AppointmentModal({
                 >
                   <X size={14} />
                 </button>
+                )}
               </div>
             ) : (
               <div className="relative">
@@ -1440,7 +1466,20 @@ export default function AppointmentModal({
               médico y puede decir «Cita: Pancho» sin serlo.
               Aquí se ramifica en vez de buscar una frase neutra: es un control
               con etiqueta y merece el nombre exacto de lo que borra. */}
-          {isEdit && (
+          {/* B3: con el interruptor encendido una cita con paciente se
+              CANCELA en vez de borrarse, y una ya cancelada no ofrece botón. */}
+          {cancelaEnVezDeBorrar && !yaCancelada && (
+            <button
+              onClick={handleCancelarCita}
+              disabled={deleting}
+              title={deleting ? 'Cancelando...' : 'Cancelar cita'}
+              aria-label={deleting ? 'Cancelando cita' : 'Cancelar cita'}
+              className="flex items-center justify-center p-2.5 rounded-xl text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50 max-md:w-11 max-md:h-11 max-md:p-0 max-md:flex-none"
+            >
+              {deleting ? <Loader2 size={16} className="animate-spin" /> : <CalendarX size={16} />}
+            </button>
+          )}
+          {isEdit && !cancelaEnVezDeBorrar && (
             <button
               onClick={handleDelete}
               disabled={deleting}
@@ -1513,7 +1552,18 @@ export default function AppointmentModal({
         El texto nombra el desenlace REAL en la primera frase —se elimina la
         cita completa— porque el gesto no lo sugiere: quien pulsa una X sobre un
         nombre espera vaciar un campo. */}
-    {quitarPaciente && (
+    {quitarPaciente && cancelaEnVezDeBorrar && (
+      <ConfirmModal
+        message={
+          'Una cita con paciente no se elimina: quitar al paciente CANCELA la cita. '
+          + 'Seguirá en la agenda como cancelada, y en el calendario de Google de quien esté invitado '
+          + 'quedará marcada como cancelada. ¿Deseas cancelarla?'
+        }
+        onConfirm={() => { setQuitarPaciente(false); void handleCancelarCita() }}
+        onCancel={() => setQuitarPaciente(false)}
+      />
+    )}
+    {quitarPaciente && !cancelaEnVezDeBorrar && (
       <ConfirmModal
         message={
           'Quitar al paciente elimina la CITA COMPLETA, no sólo su nombre: '
