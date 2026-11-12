@@ -474,3 +474,19 @@ export const INTERRUPTORES_INVITADOS = {
   guestsCanInviteOthers:   false,
   guestsCanSeeOtherGuests: false,
 } as const
+
+/* ═══ MARCA DE SPINUS EN EL EVENTO (agenda v2, paso C5) ═════════════════════ */
+
+/**
+ * `extendedProperties` que liga un evento de Google con su cita de Spinus. La
+ * lee la sincronización de vuelta (`marcaSpinus` en
+ * `gcalSincronizacionDecidir.ts`): liga el evento aunque el `after()` todavía
+ * no haya escrito `google_event_id`, y evita importarlo como evento de Google.
+ *
+ * ⚠️ SIEMPRE `private`, NUNCA `shared`: `shared` lo ven los invitados en su
+ * copia del evento. Lleva el uuid de la cita y la versión, nada que identifique
+ * a nadie. Sólo se manda con el interruptor v2 encendido.
+ */
+export function propiedadesSpinus(citaId: string): calendar_v3.Schema$Event['extendedProperties'] {
+  return { private: { spinus_cita: citaId, spinus_v: '2' } }
+}

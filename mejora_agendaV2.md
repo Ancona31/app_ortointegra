@@ -994,6 +994,73 @@ queda listada aquí.
   en Spinus de una fila importada pisaría su descripción en Google con el
   formato fijo y el sondeo siguiente la importaría como notas.
 
+### Bloque C — decisiones tomadas en C5-C6 (2026-11-13, sin regla previa)
+
+**C5 · escritura saliente (todo sólo con el interruptor encendido; apagado, los
+`after()` son los de antes, sin nombrar `gcal_etag` ni mandar marca):**
+- **Marca:** `extendedProperties.private = {spinus_cita, spinus_v:'2'}` en el
+  alta, en la reparación de la edición y en cada `patch` de v2 (así las citas
+  de antes de v2 se marcan en su primera edición). Nunca `shared`.
+- **`etag`:** se guarda el que devuelve Google en el alta, la reparación, el
+  `patch` de la edición y el restablecimiento. **No** se guarda el del `patch`
+  de `attended` (consultas): va sin `If-Match` y su `etag` taparía como eco un
+  cambio hecho en Google antes y aún sin leer; el sondeo siguiente lo guarda o
+  restablece.
+- **Conflicto en la edición** (`src/lib/gcalEscritura.ts`): `get`; si el
+  `etag` difiere del guardado y `event.updated` es posterior al `updated_at`
+  escrito, gana Google: no se escribe ni se toca la fila, se audita
+  `gcal_conflicto_cita {gana:'google', campos, via:'edicion'}` y el sondeo
+  aplica. Si gana Spinus (empate incluido), el `patch` lleva el estado COMPLETO
+  (puntas de la fila, descripción según S1, color) y `status:'confirmed'`, que
+  deshace un borrado hecho en Google: «gana el último» vale también para un
+  borrado más viejo que la edición. Se audita `{gana:'spinus'}`. Una fila sin
+  `etag` guardado (anterior a v2) no detecta conflicto: parchea como hoy.
+- **412:** repite `get` y decisión una vez; un segundo 412 deja la fila
+  `failed`, como cualquier fallo de Google.
+- **Releer `updated_at`** con el cliente de servicio (`.eq('clinica_id')`)
+  antes del `get`: si consta otro valor, otro escritor más nuevo pasó y no se
+  escribe nada. Si la lectura falla, se sigue como hoy. Resto conocido: si el
+  sondeo aplicó un cambio de Google justo entre la ruta y su `after()`, un
+  cambio de Spinus que Google no acepta como contenido (el color de
+  `confirmed`) no llega hasta la siguiente edición; los que sí importan
+  (cancelar, título con paciente) los devuelve el restablecimiento.
+- **S1 en la edición:** una fila `origen='google'` sin paciente manda como
+  descripción sus `notes` (el texto que vino de Google) **sólo si las notas
+  cambiaron** en esa edición o si gana Spinus un conflicto; si no, no se manda
+  `description`, para no pisar con texto plano el HTML de Google. Ligada a un
+  paciente, el formato fijo de siempre. Cualquier otra fila, el formato fijo.
+  **Diferencia con plan_C** («con `origen='google'` no se manda
+  `description`»): manda S1, que pide los dos sentidos.
+- **`attended`:** `POST /api/consultas` añade `.select('id, google_event_id')`
+  al update (también apagado: devuelve la fila, sin otro efecto) y, sólo si
+  pasó a atendida ahí, tenía evento y v2 está encendido, programa en `after()`
+  un `patch` con `colorId:'8'` y nada más (`puedeReparar:false`, sin `get`).
+- **Restablecer** (`src/lib/gcalSincronizacionRestablecer.ts`): por página,
+  después de aplicar y antes de avanzar el token, con el mismo cliente. Relee
+  las filas por RPC y escribe título (`resumenEsperado`), puntas, color,
+  `status:'confirmed'` (Google documenta que un evento cancelado del
+  organizador «can be restored (undeleted)») y la marca; **no** la
+  descripción. `If-Match` = el `etag` de la página: un 412 se deja para la
+  pasada siguiente. `sendUpdates:'none'` (devolver el evento a como estaba no
+  avisa a los invitados; si Angel prefiere avisar, es una línea). El `etag`
+  nuevo se guarda con `gcal_aplicar_evento` sin cambios (comparar-y-cambiar
+  sobre `updated_at`). Un fallo cuenta en `errores` y la página avanza igual.
+  Una cancelada borrada en Google se restaura con «CANCELADA — ».
+- **«Gana Spinus» en el sondeo** también se restablece (plan_C §3.13 decía
+  dejarla `failed`); C4 ya la mandaba a `restablecer` y la tarea pide
+  consumirla.
+- El `STATUS_COLOR` del PUT queda como estaba; el restablecimiento lleva una
+  copia (Protocolo 4). Son ya varios sitios con el mismo mapa de colores (y
+  `'8'` de `attended` en `gcalEscritura.ts`): deuda anotada, sin abstraer.
+- `PREFIJO_CANCELADA` no se exportó (plan_C lo pedía): nadie de fuera lo
+  necesita, porque `eventoParaGoogle` y `resumenEsperado` ya lo aplican.
+- **Para tener presente (de la revisión):** cuando en la edición gana Google,
+  la fila de Spinus ya quedó escrita con el cambio del usuario y el sondeo
+  siguiente la sobrescribe con lo de Google (en los campos que se aceptan) sin
+  aviso en el modal. Es «gana el último cambio» tal como está pedido, en una
+  carrera de milisegundos; queda auditado (`gcal_conflicto_cita
+  {gana:'google', via:'edicion'}`).
+
 ### Bloque F
 
 - Las 18 propuestas de la auditoría visual, aprobadas. **El pulido visual y los

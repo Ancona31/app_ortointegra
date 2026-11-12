@@ -34,6 +34,9 @@ const h = vi.hoisted(() => {
     llamadas: [] as unknown[],
     calendarioRegistrado: 'cal-spinus@group.calendar.google.com' as string | null,
     insertCalendario: 0,
+    /** C5: los `events.patch` del restablecimiento, con sus opciones (If-Match). */
+    parches: [] as Array<{ params: unknown; opciones: unknown }>,
+    patchFalla: null as number | null,
     rpc: { data: null as unknown, error: null as { code: string; message: string } | null, args: [] as unknown[] },
   }
   return { estado }
@@ -54,6 +57,11 @@ vi.mock('googleapis', () => ({
           const paso = h.estado.guion.shift()
           if (!paso) throw new Error('guion agotado')
           return { data: paso(p) }
+        },
+        patch: async (params: unknown, opciones: unknown) => {
+          h.estado.parches.push({ params, opciones })
+          if (h.estado.patchFalla) throw Object.assign(new Error(`HTTP ${h.estado.patchFalla}`), { code: h.estado.patchFalla })
+          return { data: { etag: '"e3"' } }
         },
       },
       calendars: {
@@ -191,7 +199,7 @@ beforeEach(() => {
     noDisponible: false, noDisponibleC2: false, soltados: [], reinicios: 0, filas: [fila()], aplicadas: [], importadas: [], fallarAplicar: new Set(),
     aplicarDevuelve: 1,
   })
-  Object.assign(h.estado, { guion: [], llamadas: [], calendarioRegistrado: CAL, insertCalendario: 0 })
+  Object.assign(h.estado, { guion: [], llamadas: [], calendarioRegistrado: CAL, insertCalendario: 0, parches: [], patchFalla: null })
   h.estado.rpc = { data: null, error: null, args: [] }
   vi.mocked(logAudit).mockClear()
   vi.spyOn(console, 'warn').mockImplementation(() => undefined)
@@ -334,7 +342,8 @@ describe('cada decisión llega a su RPC', () => {
     h.estado.guion = [pagina([evento()], { nextSyncToken: 't' })]
     const r = await sincronizarClinica(conexion, op)
     expect(r.restablecer).toEqual([CITA])
-    expect(db.aplicadas).toHaveLength(0)
+    // C5: nada de contenido se aplica; sólo se guarda el etag del restablecimiento.
+    expect(db.aplicadas).toEqual([expect.objectContaining({ citaId: CITA, etag: '"e3"', cambios: {}, vincular: null, desvincular: false })])
     expect(vi.mocked(logAudit)).toHaveBeenCalledWith(expect.objectContaining({
       accion: 'gcal_cambio_rechazado', registroId: CITA, userId: DUENO, tabla: 'appointments',
     }))
@@ -354,8 +363,9 @@ describe('cada decisión llega a su RPC', () => {
     db.filas = [fila({ updatedAt: '2031-05-25T00:00:00+00:00' })]
     h.estado.guion = [pagina([evento()], { nextSyncToken: 't' })]
     const r = await sincronizarClinica(conexion, op)
-    expect(db.aplicadas).toHaveLength(0)
+    expect(db.aplicadas.filter((a) => Object.keys(a.cambios).length > 0)).toHaveLength(0)
     expect(r.restablecer).toEqual([CITA])
+    expect(h.estado.parches).toHaveLength(1)
   })
 
   it('comparar-y-cambiar que no prende (n = 0): ni auditoría ni restablecer', async () => {
@@ -418,5 +428,65 @@ describe('la capa de base real', () => {
     await expect(conexiones.listarConexionesParaSincronizar(20)).resolves.toEqual([
       { id: CITA, clinicaId: CLINICA, userId: DUENO, rol: 'clinica', calendarId: CAL, estado: 'activa', googleAccountEmail: null },
     ])
+  })
+})
+
+describe('C5 · restablecer en Google lo rechazado', () => {
+  it('attended movida en Google: patch con la hora de Spinus, confirmed, color, marca e If-Match; sin descripción', async () => {
+    db.filas = [fila({ status: 'attended' })]
+    h.estado.guion = [pagina([evento()], { nextSyncToken: 't' })]
+    const r = await sincronizarClinica(conexion, op)
+    expect(r.errores).toBe(0)
+    expect(h.estado.parches).toHaveLength(1)
+    const { params, opciones } = h.estado.parches[0] as { params: calendar_v3.Params$Resource$Events$Patch; opciones: { headers: Record<string, string> } }
+    expect(opciones).toEqual({ headers: { 'If-Match': '"e2"' } })
+    expect(params).toMatchObject({ calendarId: CAL, eventId: 'ev1', sendUpdates: 'none' })
+    expect(params.requestBody).toMatchObject({
+      summary: 'Junta', status: 'confirmed', colorId: '8',
+      start: { dateTime: '2031-06-06T16:00:00+00:00', date: null }, end: { dateTime: '2031-06-06T17:00:00+00:00', date: null },
+      extendedProperties: { private: { spinus_cita: CITA, spinus_v: '2' } },
+    })
+    expect(params.requestBody).not.toHaveProperty('description')
+  })
+
+  it('cancelada borrada en Google: se restaura con «CANCELADA — » (status confirmed)', async () => {
+    db.filas = [fila({ status: 'cancelled' })]
+    h.estado.guion = [pagina([{ id: 'ev1', etag: '"e9"', status: 'cancelled' }], { nextSyncToken: 't' })]
+    await sincronizarClinica(conexion, op)
+    const { params } = h.estado.parches[0] as { params: calendar_v3.Params$Resource$Events$Patch }
+    expect(params.requestBody).toMatchObject({ summary: 'CANCELADA — Junta', status: 'confirmed', colorId: '11' })
+  })
+
+  it('C-d: el título de una cita con paciente vuelve al de Spinus aunque la hora se acepte', async () => {
+    db.filas = [fila({ conPaciente: true, tituloSinPaciente: null, paciente: { nombre: 'Ana', apellidos: 'Pérez' } })]
+    h.estado.guion = [pagina([evento({ summary: 'Otra cosa', start: { dateTime: '2031-06-06T14:00:00-06:00' }, end: { dateTime: '2031-06-06T15:00:00-06:00' } })], { nextSyncToken: 't' })]
+    await sincronizarClinica(conexion, op)
+    expect(db.aplicadas[0].cambios).toHaveProperty('puntas')
+    const { params } = h.estado.parches[0] as { params: calendar_v3.Params$Resource$Events$Patch }
+    expect(String(params.requestBody?.summary)).toContain('Ana Pérez')
+  })
+
+  it('412 al restablecer: no se guarda etag ni cuenta como error (la pasada siguiente decide)', async () => {
+    db.filas = [fila({ status: 'attended' })]
+    h.estado.patchFalla = 412
+    h.estado.guion = [pagina([evento()], { nextSyncToken: 't' })]
+    const r = await sincronizarClinica(conexion, op)
+    expect(r).toMatchObject({ estado: 'ok', errores: 0 })
+    expect(db.aplicadas).toHaveLength(0)
+  })
+
+  it('otro fallo de Google al restablecer: cuenta un error y la página avanza igual', async () => {
+    db.filas = [fila({ status: 'attended' })]
+    h.estado.patchFalla = 500
+    h.estado.guion = [pagina([evento()], { nextSyncToken: 't' })]
+    const r = await sincronizarClinica(conexion, op)
+    expect(r).toMatchObject({ estado: 'ok', errores: 1 })
+    expect(db.syncToken).toBe('t')
+  })
+
+  it('lo aceptado sin nada rechazado no escribe en Google', async () => {
+    h.estado.guion = [pagina([evento({ summary: 'Junta movida' })], { nextSyncToken: 't' })]
+    await sincronizarClinica(conexion, op)
+    expect(h.estado.parches).toHaveLength(0)
   })
 })

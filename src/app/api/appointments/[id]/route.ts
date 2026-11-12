@@ -6,7 +6,7 @@ import { conCalendarioSpinus, registrarFalloGCal } from '@/lib/gcal'
 import { resolverConexionClinica, type ConexionGoogle } from '@/lib/gcalConexion'
 import { canManageClinica } from '@/lib/permissions'
 import { APPOINTMENT_SELECT, eventoParaGoogle, puntasParaGoogle, componerAsistentes, INTERRUPTORES_INVITADOS,
-         ICONOS_EVENTO, COLORES_EVENTO, pintaValida,
+         propiedadesSpinus, ICONOS_EVENTO, COLORES_EVENTO, pintaValida,
          type ClinicaEnCita, type PacienteEnCita } from '@/lib/appointments'
 import { correoDelMedico } from '@/lib/medicoCorreo'
 import { TZ_CLINICA, desplazarFecha, fechaHoraLocalAInstante, renderEnTZ } from '@/lib/dates'
@@ -15,6 +15,10 @@ import { agendaV2Encendida } from '@/lib/agenda/ajustesAgenda'
 import { comprobarEmpalmes, type VeredictoEmpalme } from '@/lib/agenda/empalmesServidor'
 import { ESTADOS_SIN_EMPALME } from '@/lib/agenda/empalmesCita'
 import { comprobarTipoDelPut, leerTipoCitaId, CUERPO_TIPO_INVALIDO } from '@/lib/agenda/tipoCitaServidor'
+import {
+  auditarConflictoEdicion, camposEditados, descripcionV2, parchearConEtag, releerUpdatedAt,
+  type CampoEdicion, type EventoGoogle, type ResultadoParche,
+} from '@/lib/gcalEscritura'
 
 /* Una fecha-solo `YYYY-MM-DD` QUE ADEMÁS EXISTE EN EL CALENDARIO: la forma no
    basta, porque `2026-02-30` la pasa y el motor la DESBORDA al 2 de marzo en vez
@@ -64,6 +68,8 @@ async function fijarEventoCreado(
     googleEventId: string | null
     estado: 'synced' | 'failed'
     calendarId: string | null
+    /** C5, sólo con v2: el `etag` del evento creado. Ausente = no se nombra la columna (apagado). */
+    etag?: string | null
   },
 ): Promise<void> {
   const { data: fijadas, error } = await admin
@@ -72,6 +78,7 @@ async function fijarEventoCreado(
       google_event_id:  datos.googleEventId,
       gcal_sync_status: datos.estado,
       gcal_calendar_id: datos.calendarId,
+      ...(datos.etag !== undefined ? { gcal_etag: datos.etag } : {}),
     })
     .eq('id', datos.appointmentId)
     .eq('clinica_id', datos.clinicaId)
@@ -99,6 +106,85 @@ async function fijarEventoCreado(
       { operacion: 'events.delete (duplicado de reparación)', userId: datos.userId, conexionId: conexion.id, calendarId: datos.calendarId, eventId },
       err,
     )
+  }
+}
+
+/* ── C5: LA EDICIÓN EN GOOGLE CON EL INTERRUPTOR V2 ─────────────────────────
+   Fuera del cuerpo de la ruta por tamaño. Lo que hace y por qué, en
+   `src/lib/gcalEscritura.ts`. Se llama SÓLO con v2 encendido. */
+interface EdicionV2 {
+  admin: ReturnType<typeof createAdminClient>
+  conexion: ConexionGoogle
+  puedeReparar: boolean
+  userId: string
+  clinicaId: string
+  citaId: string
+  eventId: string
+  etagGuardado: string | null
+  spinusUpdatedAt: string | null
+  sendUpdates: 'all' | 'none'
+  campos: CampoEdicion[]
+  /** Lo que se manda siempre (lo que cambió, como hoy). */
+  base: EventoGoogle
+  /** Lo que se añade si gana Spinus sobre un cambio de Google. */
+  completo: EventoGoogle
+  asistentes: (previos: calendar_v3.Schema$EventAttendee[]) => calendar_v3.Schema$EventAttendee[]
+}
+
+/** Las dos puntas de la fila ya escrita, con la limpieza de la otra forma (ver `puntasParaGoogle`). */
+function puntasCompletas(
+  apt: { all_day?: boolean | null; start_time: string; end_time: string },
+  tz: string,
+): { start: calendar_v3.Schema$EventDateTime; end: calendar_v3.Schema$EventDateTime } {
+  return apt.all_day === true
+    ? puntasParaGoogle({ todoElDia: true, inicio: renderEnTZ(apt.start_time, 'yyyy-MM-dd', tz), fin: renderEnTZ(apt.end_time, 'yyyy-MM-dd', tz), timezone: tz }, { limpiarLaOtraForma: true })
+    : puntasParaGoogle({ todoElDia: false, inicio: apt.start_time, fin: apt.end_time, timezone: tz }, { limpiarLaOtraForma: true })
+}
+
+async function editarEnGoogleV2(e: EdicionV2): Promise<void> {
+  // Otro escritor más nuevo (el sondeo u otra edición) ya pasó: él se encarga.
+  const vigente = await releerUpdatedAt(e.admin, e.citaId, e.clinicaId)
+  if (vigente !== null && e.spinusUpdatedAt !== null && vigente !== e.spinusUpdatedAt) return
+  let calendarIdUsado: string | null = null
+  let resultado: ResultadoParche | null = null
+  try {
+    resultado = await conCalendarioSpinus(e.conexion, e.admin, (calendar, calendarId) => {
+      calendarIdUsado = calendarId
+      return parchearConEtag(calendar, {
+        calendarId, eventId: e.eventId, etagGuardado: e.etagGuardado, spinusUpdatedAt: e.spinusUpdatedAt,
+        componer: (evento, conflicto) => ({
+          sendUpdates: e.sendUpdates,
+          requestBody: {
+            ...e.base, ...(conflicto ? e.completo : {}),
+            attendees: e.asistentes(evento.attendees ?? []),
+            extendedProperties: propiedadesSpinus(e.citaId),
+          },
+        }),
+      })
+    }, { puedeReparar: e.puedeReparar, actorId: e.userId })
+    if (!resultado) {
+      registrarFalloGCal(
+        { operacion: 'events.patch v2 (edición de cita, sin respuesta)', userId: e.userId, conexionId: e.conexion.id, calendarId: calendarIdUsado, eventId: e.eventId },
+        new Error('no se resolvió calendario de clínica (¿modo estricto?)'),
+      )
+    }
+  } catch (err) {
+    registrarFalloGCal({ operacion: 'events.patch v2 (edición de cita)', userId: e.userId, conexionId: e.conexion.id, calendarId: calendarIdUsado, eventId: e.eventId }, err)
+  }
+  // Gana Google: no se escribe nada en Google ni en la fila; el sondeo lo aplica.
+  if (resultado?.tipo === 'gana_google') {
+    await auditarConflictoEdicion({ userId: e.userId, clinicaId: e.clinicaId, citaId: e.citaId, gana: 'google', campos: e.campos })
+    return
+  }
+  const parcheado = resultado?.tipo === 'parcheado' ? resultado : null
+  const { error } = await e.admin
+    .from('appointments')
+    .update({ gcal_sync_status: parcheado ? 'synced' : 'failed', gcal_calendar_id: calendarIdUsado, ...(parcheado ? { gcal_etag: parcheado.etag } : {}) })
+    .eq('id', e.citaId)
+    .eq('clinica_id', e.clinicaId)
+  if (error) registrarFalloGCal({ operacion: 'appointments.update(gcal v2)', userId: e.userId, conexionId: e.conexion.id, calendarId: calendarIdUsado }, error)
+  if (parcheado?.conflicto) {
+    await auditarConflictoEdicion({ userId: e.userId, clinicaId: e.clinicaId, citaId: e.citaId, gana: 'spinus', campos: e.campos })
   }
 }
 
@@ -224,7 +310,7 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
     const [{ data: existing }, v2] = await Promise.all([
       supabase
         .from('appointments')
-        .select('id, google_event_id, gcal_sync_status, updated_at, medico_id, status, start_time, end_time, paciente_id, consultorio_timezone, all_day')
+        .select('id, google_event_id, gcal_sync_status, updated_at, medico_id, status, start_time, end_time, paciente_id, consultorio_timezone, all_day, title, notes, origen, gcal_etag')
         .eq('id', id)
         .single(),
       agendaV2Encendida(supabase, profile.clinica_id),
@@ -824,12 +910,18 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
       after(async () => {
         let google_event_id: string | null = null
         let calendarIdUsado: string | null = null
+        // C5: el `etag` del evento creado, sólo con v2.
+        let gcal_etag: string | null = null
         try {
           // `null` apaga el ancla de hora en un evento de todo el día, igual que
           // en el alta y en el patch.
           const instanteParaAncla = esTodoElDia ? null : apt.start_time
-          const { summary, description, reminders } =
+          const { summary, description: descripcionFija, reminders } =
             eventoParaGoogle(pacienteCita, clinicaCita, apt.title, instanteParaAncla, tzCita, apt.status)
+          /* S1 con v2: una fila nacida en Google y sin paciente lleva sus notas
+             (que vinieron de Google); cualquier otra, el formato fijo. Apagado,
+             el formato fijo de siempre. */
+          const description = v2 ? (descripcionV2(apt, descripcionFija, true) ?? '') : descripcionFija
 
           /* El médico entra en el mismo `insert`, como en el alta: si tiene la
              cita asignada, tiene que tenerla en su calendario. Si su correo no
@@ -863,11 +955,13 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
               requestBody: {
                 summary, description, attendees: asistentes,
                 ...INTERRUPTORES_INVITADOS, reminders, ...puntasDelAlta,
+                ...(v2 ? { extendedProperties: propiedadesSpinus(id) } : {}),
               },
             })
           }, { puedeReparar, actorId: userId })
 
           google_event_id = creado?.data.id ?? null
+          gcal_etag = creado?.data.etag ?? null
           if (!google_event_id) {
             registrarFalloGCal(
               { operacion: 'events.insert (reparación, sin respuesta)', userId, conexionId: conexion.id, calendarId: calendarIdUsado },
@@ -888,6 +982,7 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
           googleEventId: google_event_id,
           estado:        google_event_id ? 'synced' : 'failed',
           calendarId:    calendarIdUsado,
+          ...(v2 ? { etag: gcal_etag } : {}),
         })
       })
     }
@@ -1091,6 +1186,45 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
             .eq('clinica_id', clinicaId)
             .maybeSingle<{ email: string | null }>()
           correoPacienteSaliente = anterior?.email?.trim().toLowerCase() || null
+        }
+
+        /* ── C5: CON EL INTERRUPTOR V2 ENCENDIDO, `etag` + `If-Match` ─────────
+           Mismo cuerpo que el camino de siempre, más: la marca privada, el
+           `etag` guardado, «gana el último cambio» y, con S1, la descripción de
+           las filas nacidas en Google. Apagado, no se entra: lo de abajo es el
+           `after()` de siempre, sin una línea cambiada. */
+        if (v2) {
+          const campos = camposEditados(existing, apt)
+          const conPaciente = { origen: apt.origen, paciente_id: apt.paciente_id, notes: apt.notes }
+          const descripcion = descripcionV2(conPaciente, description, campos.includes('notas'))
+          const colorEstado = typeof apt.status === 'string' ? STATUS_COLOR[apt.status] : undefined
+          await editarEnGoogleV2({
+            admin, conexion, puedeReparar, userId, clinicaId, citaId: id, eventId: gcalEventId,
+            etagGuardado: typeof existing.gcal_etag === 'string' ? existing.gcal_etag : null,
+            spinusUpdatedAt: typeof apt.updated_at === 'string' ? apt.updated_at : null,
+            sendUpdates, campos,
+            base: {
+              summary,
+              ...(descripcion !== undefined ? { description: descripcion } : {}),
+              ...INTERRUPTORES_INVITADOS,
+              ...(mandaInicio ? { start: puntasDelPatch.start } : {}),
+              ...(mandaFin    ? { end:   puntasDelPatch.end   } : {}),
+              ...(status !== undefined && STATUS_COLOR[status] ? { colorId: STATUS_COLOR[status] } : {}),
+            },
+            // Gana Spinus sobre un cambio de Google: el estado COMPLETO de la
+            // fila, y `confirmed` deshace un borrado hecho en Google.
+            completo: {
+              ...puntasCompletas(apt, tzCita),
+              description: descripcionV2(conPaciente, description, true) ?? '',
+              status: 'confirmed',
+              ...(colorEstado ? { colorId: colorEstado } : {}),
+            },
+            asistentes: (previos) => componerAsistentes(previos, {
+              medicoActual: correoMedicoActual, medicoSaliente: correoMedicoSaliente,
+              pacienteSaliente: correoPacienteSaliente, nuevos: [],
+            }),
+          })
+          return
         }
 
         try {

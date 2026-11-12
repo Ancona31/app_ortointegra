@@ -10,8 +10,10 @@
  * (C6) y la tarea programada (C7); hoy no la llama nadie.
  *
  * ── LO QUE NO HACE, A PROPÓSITO ─────────────────────────────────────────────
- * · No escribe en Google. Lo que se rechaza o no se acepta (C-d, C-e, gana
- *   Spinus) sale en `restablecer`, y la reescritura es de C5.
+ * · Sólo escribe en Google para RESTABLECER: lo que se rechaza o no se acepta
+ *   (C-d, C-e, gana Spinus) se vuelve a escribir con el estado de Spinus, por
+ *   página y antes de avanzar el token (C5, `gcalSincronizacionRestablecer.ts`).
+ *   También sale en `restablecer`.
  * · No crea calendarios ni desvincula citas: `puedeReparar: false` siempre.
  * · No consulta tablas directamente: todo va por RPC
  *   (cerrojoGcalSincronizacion.test.ts).
@@ -42,6 +44,7 @@ import {
   aplicarEvento, avanzarPagina, citasDeEventos, clinicaHabilitada, importarEvento, reiniciarToken,
   soltarCandado, SincronizacionNoDisponible, tomarCandado, type Candado,
 } from '@/lib/gcalSincronizacionBase'
+import { restablecerEnGoogle, type PorRestablecer } from '@/lib/gcalSincronizacionRestablecer'
 
 /** C-b: la primera sincronización completa empieza hace 30 días, sin límite hacia adelante. */
 export const DIAS_VENTANA_COMPLETA = 30
@@ -57,7 +60,7 @@ export interface ResultadoSincronizacion {
   paginas: number
   /** Eventos que fallaron sin tumbar la página. */
   errores: number
-  /** Citas cuyo estado de Spinus hay que volver a escribir en Google (C5). */
+  /** Citas cuyo estado de Spinus se volvió a escribir (o se intentó) en Google (C5). */
   restablecer: string[]
 }
 
@@ -218,7 +221,7 @@ async function recorrer(pasada: Pasada, calendar: GCalCliente, calendarId: strin
     if (datos === 'perdido') return perdido(r)
     if (datos === 'otra_vez') continue
     r.paginas += 1
-    await procesarPagina(pasada, datos.items ?? [], { calendarId, ventana: c.ventana, zona: datos.timeZone ?? null })
+    await procesarPagina(pasada, calendar, datos.items ?? [], { calendarId, ventana: c.ventana, zona: datos.timeZone ?? null })
     const siguiente = datos.nextPageToken ? { pageToken: datos.nextPageToken }
       : datos.nextSyncToken ? { syncToken: datos.nextSyncToken } : null
     if (!siguiente) throw new Error('events.list sin nextPageToken ni nextSyncToken')
@@ -246,6 +249,7 @@ function perdido(r: ResultadoSincronizacion): true {
 /** Una página: una sola lectura del espejo, una decisión por evento, escrituras de cinco en cinco. */
 async function procesarPagina(
   pasada: Pasada,
+  calendar: GCalCliente,
   items: EventoGoogle[],
   pagina: { calendarId: string; ventana: string | null; zona: string | null },
 ): Promise<void> {
@@ -264,33 +268,44 @@ async function procesarPagina(
     const fila: FilaEspejo | null = (evento.id ? porEvento.get(evento.id) : undefined) ?? (marca ? porId.get(marca) : undefined) ?? null
     return { evento, decision: decidirEvento(evento, fila, ctx) }
   })
+  const pendientes: PorRestablecer[] = []
   for (let i = 0; i < tareas.length; i += LOTE) {
     const lote = tareas.slice(i, i + LOTE)
     const hechos = await Promise.allSettled(lote.map((t) => ejecutar(pasada, pagina.calendarId, t.decision)))
     hechos.forEach((h, j) => {
+      const { evento, decision } = lote[j]
       if (h.status === 'rejected') {
         pasada.r.errores += 1
-        logger.warn('GCalSync', `evento sin aplicar ${JSON.stringify({ clinica: conexion.clinicaId, evento: lote[j].evento.id ?? null })}`)
+        logger.warn('GCalSync', `evento sin aplicar ${JSON.stringify({ clinica: conexion.clinicaId, evento: evento.id ?? null })}`)
+      } else if (h.value && evento.id && (decision.tipo === 'rechazar' || decision.tipo === 'aplicar')) {
+        pendientes.push({ citaId: decision.citaId, eventId: evento.id, etag: evento.etag ?? null })
       }
     })
   }
+  // C5: lo rechazado vuelve a Google con el estado de Spinus, ANTES de avanzar
+  // el token (si esto no llegara a correr, la página no avanza y se repite).
+  const { errores } = await restablecerEnGoogle(conexion.clinicaId, calendar, pagina.calendarId, pendientes)
+  pasada.r.errores += errores
 }
 
-/** Ejecuta UNA decisión. Lanza si la base falla (lo cuenta `procesarPagina`). */
-async function ejecutar(pasada: Pasada, calendarId: string, d: Decision): Promise<void> {
+/**
+ * Ejecuta UNA decisión. Lanza si la base falla (lo cuenta `procesarPagina`).
+ * `true` = hay que volver a escribir en Google el estado de Spinus (C5).
+ */
+async function ejecutar(pasada: Pasada, calendarId: string, d: Decision): Promise<boolean> {
   const { conexion, r } = pasada
   switch (d.tipo) {
     case 'ignorar':
       if (d.motivo === 'recurrente_ligado') logger.warn('GCalSync', `cita convertida en serie en Google: se ignora ${conexion.clinicaId}`)
-      return
+      return false
     case 'importar':
       if (await importarEvento(conexion.clinicaId, calendarId, d.datos)) r.cambios += 1
-      return
+      return false
     case 'rechazar':
       r.restablecer.push(d.citaId)
       await auditar(conexion, d.citaId, d.motivo === 'gana_spinus' ? 'gcal_conflicto_cita' : 'gcal_cambio_rechazado',
         { gana: 'spinus', motivo: d.motivo, campos: d.campos })
-      return
+      return true
     case 'aplicar': {
       const n = await aplicarEvento(conexion.clinicaId, calendarId, d)
       if (n > 0 && d.campos.length > 0) r.cambios += 1
@@ -303,6 +318,7 @@ async function ejecutar(pasada: Pasada, calendarId: string, d: Decision): Promis
       if (n > 0 && d.conflicto === 'gana_google') {
         await auditar(conexion, d.citaId, 'gcal_conflicto_cita', { gana: 'google', motivo: 'mas_reciente', campos: d.campos })
       }
+      return n > 0 && d.restablecer.length > 0
     }
   }
 }

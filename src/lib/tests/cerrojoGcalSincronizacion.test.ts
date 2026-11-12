@@ -8,7 +8,7 @@
  *   · `gcal_sync_clinicas_pendientes` (la única lectura entre clínicas, para
  *     el cron) sólo dentro de `src/lib/gcalConexion.ts`, el dueño de leer la
  *     conexión.
- *   · NINGÚN `.from(` en los tres `src/lib/gcalSincronizacion*.ts`: todo lo
+ *   · NINGÚN `.from(` en los cuatro `src/lib/gcalSincronizacion*.ts`: todo lo
  *     que tocan de la base pasa por RPC con `p_clinica_id`. Es la defensa del
  *     pendiente prioritario de CLAUDE.md (createAdminClient esquiva la RLS).
  *
@@ -22,7 +22,7 @@ import { join, relative } from 'node:path'
 
 const BASE = 'src/lib/gcalSincronizacionBase.ts'
 const CONEXION = 'src/lib/gcalConexion.ts'
-const SINCRONIZACION = ['src/lib/gcalSincronizacion.ts', BASE, 'src/lib/gcalSincronizacionDecidir.ts'] as const
+const SINCRONIZACION = ['src/lib/gcalSincronizacion.ts', BASE, 'src/lib/gcalSincronizacionDecidir.ts', 'src/lib/gcalSincronizacionRestablecer.ts'] as const
 
 /** RPC → único archivo autorizado a llamarla. */
 const DUENOS: Record<string, string> = {

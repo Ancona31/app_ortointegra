@@ -5,7 +5,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { conCalendarioSpinus, registrarFalloGCal } from '@/lib/gcal'
 import { resolverConexionClinica } from '@/lib/gcalConexion'
 import { canManageClinica } from '@/lib/permissions'
-import { APPOINTMENT_SELECT, eventoParaGoogle, puntasParaGoogle, componerAsistentes, INTERRUPTORES_INVITADOS,
+import { APPOINTMENT_SELECT, eventoParaGoogle, puntasParaGoogle, componerAsistentes, INTERRUPTORES_INVITADOS, propiedadesSpinus,
          ICONOS_EVENTO, COLORES_EVENTO, pintaValida,
          type ClinicaEnCita, type PacienteEnCita } from '@/lib/appointments'
 import { correoDelMedico } from '@/lib/medicoCorreo'
@@ -518,6 +518,8 @@ export async function POST(req: NextRequest) {
         let gcal_sync_status: 'synced' | 'pending' | 'failed' = 'pending'
         let google_event_id: string | null = null
         let calendarIdUsado: string | null = null
+        // C5: el `etag` del evento recién creado, sólo con v2 (ver el update de abajo).
+        let gcal_etag: string | null = null
 
         try {
           // La descripción lleva un formato fijo (clínica y paciente) y NADA
@@ -610,6 +612,10 @@ export async function POST(req: NextRequest) {
                 // Google, ninguna edición posterior desde Spinus se lo reimpone.
                 reminders,
                 ...puntas,
+                /* C5, sólo con v2: la marca privada (nunca `shared`) que liga
+                   el evento con la cita aunque el update de abajo no llegue a
+                   escribir `google_event_id`. */
+                ...(v2 ? { extendedProperties: propiedadesSpinus(apt.id) } : {}),
               },
             })
           }, { puedeReparar, actorId: profile.userId })
@@ -619,6 +625,7 @@ export async function POST(req: NextRequest) {
           // el calendario, o porque Google contestó sin `id`. Esas citas se
           // quedaban en 'synced' sin nada en Google y nadie volvía a mirarlas.
           google_event_id  = creado?.data.id ?? null
+          gcal_etag        = creado?.data.etag ?? null
           if (google_event_id) {
             gcal_sync_status = 'synced'
           } else {
@@ -648,9 +655,13 @@ export async function POST(req: NextRequest) {
         // siguiente pueda arreglar el ámbito de `desvincularCitas`: sin saber en
         // qué calendario vive cada evento, el barrido no puede dejar de acotar
         // por `medico_id` (plan §0.7).
+        //
+        // C5: con v2 se guarda además el `etag`, el primer eslabón del eco y del
+        // conflicto (gcalSincronizacionDecidir.ts, gcalEscritura.ts). Apagado,
+        // el update no nombra la columna: es el de siempre.
         const { error: errEstado } = await admin
           .from('appointments')
-          .update({ google_event_id, gcal_sync_status, gcal_calendar_id: calendarIdUsado })
+          .update({ google_event_id, gcal_sync_status, gcal_calendar_id: calendarIdUsado, ...(v2 ? { gcal_etag } : {}) })
           .eq('id', apt.id)
           .eq('clinica_id', profile.clinica_id)
         if (errEstado) {
