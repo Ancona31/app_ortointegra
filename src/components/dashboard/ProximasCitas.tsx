@@ -23,6 +23,13 @@ const FILAS_VISIBLES = 4
    nada distinto y por encima una cita podría seguir «en curso» ya terminada. */
 const TIC_MS = 60_000
 
+/* Dos minutos: antigüedad mínima de la última traída para que volver a la
+   pestaña pida otra vez. Es el MISMO criterio y la misma cifra que
+   `UMBRAL_REFETCH_FOCO_MS` de `agenda/useTiempoRealAgenda.ts`; allí no se
+   exporta y vive en un gancho de la agenda, así que se repite aquí en vez de
+   importar el dashboard desde la agenda. Si cambia una, cambia la otra. */
+const UMBRAL_REFETCH_FOCO_MS = 120_000
+
 type Cita = {
   id: string
   title: string
@@ -240,9 +247,16 @@ export default function ProximasCitas({ medicoId, acciones }: {
      dos pueden solaparse. */
   const peticionRef = useRef(0)
 
+  /* Cuándo salió la última petición. Se estampa al SALIR, no al volver, como en
+     la agenda: así dos señales seguidas no piden dos veces. Una petición que
+     FALLA también cuenta, igual que allí: con la red caída, cambiar de pestaña
+     no debe martillear. Para eso está «Reintentar», que no pasa por el tope. */
+  const ultimaTraidaRef = useRef(0)
+
   const cargar = useCallback(async () => {
     if (!clinicaId) return
     const mia = ++peticionRef.current
+    ultimaTraidaRef.current = Date.now()
     setError(false)
     try {
       const supabase = createClient()
@@ -303,9 +317,16 @@ export default function ProximasCitas({ medicoId, acciones }: {
   /* Al volver a la pestaña, refetch. Mismo patrón que `lib/auth-context.tsx:219`
      —`visibilityState === 'visible'`, listener en `document`, limpieza en el
      retorno—; y `cargar` va memoizada sobre los dos ids justamente para que
-     este efecto no se remonte en cada render. */
+     este efecto no se remonte en cada render.
+     ⚠️ CON TOPE DE 2 MINUTOS desde la última traída, el de la agenda: cambiar
+     de pestaña diez veces en un minuto eran diez consultas iguales. Lo que
+     vence entre medias lo retira el tic de abajo, sin red. */
   useEffect(() => {
-    const alVolver = () => { if (document.visibilityState === 'visible') void cargar() }
+    const alVolver = () => {
+      if (document.visibilityState !== 'visible') return
+      if (Date.now() - ultimaTraidaRef.current < UMBRAL_REFETCH_FOCO_MS) return
+      void cargar()
+    }
     document.addEventListener('visibilitychange', alVolver)
     return () => document.removeEventListener('visibilitychange', alVolver)
   }, [cargar])
