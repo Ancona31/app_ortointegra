@@ -1635,6 +1635,190 @@ queda listada aquí.
 - Punto 11 (Compactar a media cita): no se reproduce (desajuste de ≤ 1 px).
 - Punto 13 (Mes del teléfono): defecto confirmado y arreglado (`7f81548`).
 
+### Bloque F — decisiones tomadas en F0, F2 lib y F3 componentes
+
+Ronda hecha en paralelo con el bloque E, sin tocar sus archivos
+(`AppointmentModal.tsx`, `CabeceraEscritorio.tsx`, `useTiempoRealAgenda.ts`,
+`AgendaCliente.tsx`, rutas públicas, middleware, cron). Diseño completo en
+`e2e/resultados/plan_F.md` (fuera de git, en el worktree de la agenda).
+
+**Las 25 decisiones de producto del diseño**, con la opción que menos cambia
+lo de hoy:
+
+1. **Cambio de fecha sin deslizamiento** (manda CONTRASTE §3): un fundido del
+   armazón de 0.7 a 1 en `--ag-dur-micro`, con WAAPI. Alternativa: un desliz de
+   4 px solo del título.
+2. **Pulso de la cita que llega por tiempo real:** un anillo por opacidad
+   (`::after` con `box-shadow` fijo `0 0 0 2px var(--ag-pulso)`; se anima solo
+   la opacidad, en `--ag-dur-lento` con retraso `--ag-dur-base`, una vez). Sustituye
+   al pulso de `box-shadow` de 900 ms del spec, que pasa del tope de 240 ms.
+3. **Salida de una cita:** solo opacidad, 120 ms, sin «encogerse».
+4. **Burbuja y tarjeta:** `scale(.97)` desde el punto pulsado (son capas, no
+   tarjetas de la rejilla). Si se lee estricto «solo `translateY`», 4 px de
+   `translateY`. Construido con `scale` (`.ag-capa`).
+5. **Arrastre:** no se añade animación (spec §8); `dragRevertDuration` pasa de
+   200 a 180 (= `--ag-dur-base`).
+6. **Hora actual:** no se anima (spec §6).
+7. **Avisos y paneles:** no se anima el alto; la rejilla salta una vez.
+8. **Leyenda:** al pie, siempre visible, en vez de detrás de «?».
+9. **CORREGIDA. Estado fuera de la tarjeta de Semana:** el diseño lo dejaba
+   solo en el `title`, y entonces agendada y confirmada se distinguían solo por
+   color, contra el spec §12 («el color nunca es la única señal»). **Se
+   sustituye la palabra por el glifo de `GLIFO_PILDORA`
+   (`FilaListaDetalle.tsx`) delante de la hora, además del `title`.** Lo hace el
+   agente de la superficie (es su archivo). ⚠️ **Para él, sin resolver todavía:**
+   hoy `GLIFO_PILDORA` da el MISMO glifo (`●`) a agendada y a confirmada, así que
+   el glifo solo no separa justo ese par. Hace falta uno distinto para una de
+   las dos (p. ej. `○` para agendada, «aún sin confirmar»); como el glifo
+   también sale en la píldora de `listDay`, cambiarlo se ve allí. Si se decide
+   no tocarlo, el par sigue dependiendo del color en Semana.
+10. **Nombre corto:** «Nombre I.» (primer nombre y la inicial del primer apellido).
+11. **Barra lateral:** plegable solo en /agenda; desplegada por omisión;
+    preferencia por navegador; fuera de la agenda siempre desplegada; sin animar
+    el ancho.
+12. **Densidad:** «Normal» por omisión; la compacta es de 24 px por franja;
+    preferencia local.
+13. **«Compactar» por omisión:** se decide al abrir si hay días cerrados; no se
+    recuerda.
+14. **Mes con filas al contenido:** puede quedar espacio debajo; la primera
+    fila con días del mes anterior se queda si el día 1 no cae en lunes.
+15. **Tableta:** chip «3 días» en rejilla; Día en rejilla; Mes como en el
+    teléfono. Alternativa: dejarla como hoy.
+16. **«Hoy» en el teléfono:** sale sin interruptor (§6-bis no lo pone en la lista).
+17. **Modal:** 560 px de ancho; duraciones en una fila; estados en una fila de 5;
+    «Iniciar consulta» con relleno tonal; salida animada solo en el modal de la cita.
+18. **Burbuja:** solo citas con paciente; la banda de todo el día va al modal;
+    médico el del filtro, y con «Todos» se pide; consultorio el activo, y si no
+    es del médico, «Más opciones»; sin tipo de cita; se conserva la
+    confirmación de «fuera de horario» antes de abrir; se conserva la
+    invitación de Google tras crear.
+19. **Duración:** más de una franja es arrastre; un clic o un hueco del panel
+    dan la duración por omisión.
+20. **Tarjeta:** Google sigue sin abrir nada; por ligar, «Iniciar consulta» abre
+    el modal; Reagendar abre el modal con el foco en la fecha; Cancelar y
+    Eliminar piden confirmación; en el teléfono, hoja inferior.
+21. **Minicalendario:** sin puntos de ocupación; en el panel de Día y en un
+    desplegable de la fecha; en el teléfono, no.
+22. **Búsqueda:** desde hace 30 días hasta dentro de un año, 20 resultados, con
+    las citas por ligar, sin API nueva.
+23. **Atajos:** encendidos por omisión con v2; se pueden apagar (WCAG 2.1.4).
+24. **Deslizar:** solo en las listas de Día y Semana del teléfono.
+25. **Capturas del «después»:** dos juegos, interruptor apagado (mismos nombres)
+    y encendido (`v2/`).
+
+**Decisiones de construcción de esta ronda** (sin regla previa):
+
+- **F0 · tokens.** `--ag-1 … --ag-8` con los medios `--ag-1-5`, `--ag-2-5`,
+  `--ag-3-5` y `--ag-4-5: 18px`; **no hay `--ag-7`** (el spec salta de 24 a 32).
+  Declararlos no migra nada: el enganche regla por regla es F1.19.
+  `--ag-pulso` en claro sigue a la marca (`--ag-brand-secondary`) y en oscuro es
+  `#6b9bff`, el mismo reparto que `--ag-month-today-ring`.
+- **F0 · movimiento reducido.** Un solo bloque, el que ya existía; se le
+  añadieron `.ag-modal-panel`, `.ag-modal-velo`, `.ag-capa`, `.ag-capa *`,
+  `.ag-hoja`, `.ag-hoja *` (contrato de F0), y en esta ronda `.ag-dia-aside`
+  (el panel mismo, que ahora entra con `ag-vista`) y `.ag-capa-velo`.
+- **F0 · `movimientoAgenda.ts`.** `duracionToken`, `curvaToken`,
+  `prefiereMenosMovimiento` y `duracionMovimiento` (0 con `reduce`). La REGLA de
+  la e2e es pura y vive aquí (`incumplimientosDeMovimiento`, solo
+  `opacity`/`transform` y ≤ 240 ms, excepción `ag-barra-carga`), probada con
+  Vitest, incluida la mutación de la `transition: width` en datos. La ayuda
+  `animacionesFueraDeRegla()` (`e2e/movimientoAyudas.ts`) solo extrae
+  `document.getAnimations()`. **La mutación contra el navegador queda para
+  quien corra la e2e con servidor.**
+- **F0 · `capturar.ts`** (fuera de git, `e2e/resultados/F/`): resuelve el repo
+  desde su propia ruta (antes tenía el worktree escrito a mano); el interruptor
+  se reaplica tras cada siembra, porque la semilla rehace `agenda_ajustes`; con
+  `encendido` la salida va a `<fase>/v2/`; `--reducido` añade el sufijo
+  `-reducido`; el JSON de cuadros va a `cuadros[-cpuN][-reducido].json`; un tramo
+  que no se puede hacer (la burbuja sin interruptor) sale «OMITIDO» y no rompe la
+  corrida. ASUMIENDO que `postgres` puede insertar y borrar las 20 citas de la
+  ráfaga (como la semilla). **No se ha ejecutado: el «antes» lo mide el
+  orquestador con el servidor.**
+- **F2.1 · hover.** Fuera `scale(1.02)` y `drop-shadow`; queda el `z-index: 10`
+  (no es movimiento: con dos citas encimadas pone delante la de debajo del
+  ratón). **El hover ya no cambia ningún color**: el fondo y los bordes de
+  `.ag-tarjeta` van en línea, y un tinte de hover tendría que ir en
+  `MemoizedEventContent` (archivo de la superficie). **Pendiente, en un archivo de
+  E:** los botones de la barra siguen con `transition-all` de Tailwind
+  (`CabeceraEscritorio.tsx`); el diseño los pasa a `background-color` y
+  `border-color` en micro.
+- **F2.2 · `ag-vista`.** Sobre `.agenda-fc .fc-view-harness > .fc-view` y
+  `.ag-dia-aside`, con `backwards`. Comprobado en FullCalendar que `.fc-view` solo
+  se vuelve a montar al cambiar de tipo de vista.
+- **F2.6-lib · `flipTarjetas.ts`.** El selector es `[data-cita-id="…"]` con
+  `JSON.stringify` (sin `CSS.escape`, que no existe fuera del navegador); umbral de
+  0.5 px; en filas de lista, fundido 0 → 1 en base con ease-out. Hasta que la
+  superficie ponga `data-cita-id` (F1.4) no encuentra nada y aplica sin animar.
+- **`marcasMovimiento.ts`.** Marca de 600 ms; `ApiSalida` la cumple el `Calendar`
+  de `@fullcalendar/core`, no el tipo `CalendarApi` de `getApi()` (no declara
+  `batchRendering`): el llamador estrecha con `instanceof`, como ya hacen
+  `useTiempoRealAgenda` y `guardadoCitas`. `vaciarMarcas` queda para el cierre de
+  sesión, sin enchufar.
+- **`posicionCapa.ts`.** Derecha, si no izquierda, si no debajo, si no encima;
+  8 px de separación y de margen; con punto, la capa sube 24 px para que su
+  cabecera quede a la altura del dedo.
+- **`gestoDeslizar.ts` / `useDeslizarPeriodo.ts`.** Resistencia 0.6 hasta el
+  umbral y 0.2 después; solo dedo o lápiz; `pointercancel` vuelve sin pasar de
+  periodo; `touch-action: pan-y` por la clase `ag-deslizable`.
+- **Atajos.** Mayús no cuenta como modificador (sin ella no salen `/` ni `?` en el
+  teclado español); la repetición de tecla se ignora; «capa abierta» se mira
+  también en el DOM (`[role="dialog"][aria-modal="true"]`), para cubrir cualquier
+  modal; preferencia en `localStorage` `spinus.agenda.atajos` (`si`/`no`).
+- **Minicalendario.** Seis semanas fijas (el alto no cambia entre meses);
+  Mayús+Re Pág/Av Pág cambia de año, como en APG; el foco solo se mueve tras una
+  tecla. El archivo puro se llama `rejillaMes.ts` y no `miniMes.ts`, para no
+  chocar por mayúsculas con `MiniMes.tsx`.
+- **Búsqueda.** La consulta de pacientes vive en `buscarCitasPaciente.ts` (no en
+  `altaRapida.ts`, que queda pura) y la usan el buscador y la burbuja. **Una
+  diferencia con la del modal:** el texto se limpia de `,`, `(`, `)`, `%`, `*`,
+  `\` y `"` antes de ir dentro de `.or(...)`, donde son sintaxis de PostgREST.
+  No hay filtro de médico propio: manda la RLS (`appointments_select`).
+- **Alta rápida.** Una selección que cruza de día cae a la duración por omisión;
+  el fin se topa en 23:59; sin paciente no se arma nada (nunca un evento ni una
+  por ligar).
+- **Tarjeta.** «Reagendar» y «Cancelar» solo con la cita agendada o confirmada;
+  «Iniciar consulta» la decide el llamador con las condiciones del modal. El
+  archivo puro es `accionesTarjeta.ts`, no `tarjetaLectura.ts` (mayúsculas).
+- **`opcionesLista.ts`** (nuevo, no estaba en el diseño): la tecla → opción
+  activa de los tres controles con foco itinerante (lista de la burbuja, lista
+  del buscador, barra de la tarjeta). Tres usos.
+- **Capas.** Escape, foco atrapado y devolución del foco con `useDialogoModal`;
+  tocar fuera cierra; salida con `data-estado="saliendo"` + `animationend` +
+  temporizador de seguridad. `colocar`, `useSalida` y `useCerrarAlTocarFuera`
+  están COPIADOS a propósito en `BurbujaAlta.tsx` y `TarjetaLectura.tsx` (dos usos,
+  protocolo 4). `z-index: 45`, entre la rejilla y los modales (50 y 60). La hoja
+  del teléfono y la ayuda llevan velo; la burbuja y la tarjeta de escritorio no.
+  La ayuda de atajos cierra sin animación de salida (es un panel de consulta, se
+  abre poco); las capas no se recolocan si la ventana cambia de tamaño con ellas
+  abiertas (se cierran al tocar fuera). Hallazgos menores del revisor, aceptados.
+- **Buscador:** una respuesta tardía de un paciente anterior no pisa la lista del
+  actual (contador de petición, hallazgo del revisor, corregido antes del commit).
+- **Pruebas sin DOM.** Vitest corre en `node` y no hay `jsdom` ni Testing Library
+  (sin dependencias nuevas): los componentes se prueban con
+  `renderToStaticMarkup` (roles, nombres, foco itinerante) y los ganchos por sus
+  manejadores exportados (`manejarTeclaAtajo`, `crearDeslizador`). El
+  comportamiento con teclado de punta a punta va en la e2e del enchufe.
+
+**Lo que queda para enchufar después de integrar E** (ninguno de estos
+archivos nuevos se importa todavía desde la agenda):
+
+- `clasesDelEvento` (`tarjetasAgenda.ts`) llama a `clasesDeMovimiento`;
+  `registrarNuevo` antes de `addEvent` en `handleSave` y en
+  `aplicarCambioRealtime`; `podarMarcas` en `alCambiarEventos`;
+  `salirConAnimacion` en `handleDelete` y en las dos bajas de
+  `useTiempoRealAgenda`. El CSS de `.ag-ev-remoto::after` y `.ag-ev-saliendo` (F2.4/F2.5).
+- `animarFlip` en `useTiempoRealAgenda` (cita movida) y en `restaurarPosicion`.
+- El fundido de navegación (F2.3) en `alCambiarFechas`, y `dragRevertDuration={180}`.
+- Burbuja y tarjeta en `altaCitas.ts` (`abrirAlta`/`abrirCita` con `agendaV2`),
+  `seleccionDesdeHueco` en `abrirHueco`, `unselectCancel=".ag-capa"`,
+  `eventInteractive={agendaV2}`, `cambiarEstadoCita` en `guardadoCitas.ts`, y
+  `ModalState.create.horaFin` / `ModalState.edit.enfocar` en `AppointmentModal`.
+- `MiniMes` en `PanelDia.tsx` y en el desplegable de la barra; `BuscadorCitas`
+  tras la lupa; `useAtajosAgenda` + `AyudaAtajos`; `useDeslizarPeriodo` en las
+  listas del teléfono. Todo con `next/dynamic` y precarga en ocioso solo con
+  `agendaV2`.
+- `data-cita-id` en las raíces de las tarjetas (superficie, F1.4).
+
 ### Menores
 
 - **`ProximasCitas`:** tope de refresco de 2 minutos al volver a la pestaña,
