@@ -2326,7 +2326,30 @@ primero sin marcar.
     - Los scripts de prueba limpian con `session_replication_role = replica`
       para borrar sus propias filas de `audit_log` en la base local: no debe
       usarse fuera de pruebas.
-- [ ] E — Recordatorios y confirmación de asistencia
+- [x] E — Recordatorios y confirmación de asistencia (2026-11-14)
+  - E1 enlace de confirmación (`cita_confirmaciones`, solo el sha256 del
+    código) y `via` en la auditoría (`google`, `enlace_paciente`,
+    `google_rsvp`); clínica suspendida = «no disponible» (hallazgo de la
+    auditoría, corregido) · E2 código del enlace (subllave `confirmacion` de
+    `RESERVA_SECRETO`) · E3 página `/confirmar/{código}` que solo LEE; el
+    estado cambia solo con el POST de un botón (abrir el enlace, una vista
+    previa de correo o de WhatsApp no cambian nada, probado); cancelar hasta
+    T-1h, en dos pasos · E4 recordatorio por correo N horas antes (ajuste) con
+    registro de envíos idempotente y tarea `/api/cron/recordatorios` (S2, cada
+    15 min en `vercel.json`, sin activar) · E5 comprobante con enlace (solo
+    reserva por enlace) registrado en `cita_correos` · E6 reagendar desde «no
+    podré asistir» con tope de 2 · E7 WhatsApp manual (`wa.me/521…`, formato
+    verificado en la ayuda oficial de WhatsApp; el enlace se emite solo al
+    pulsar) · E8 aviso a la clínica cuando el paciente cancela · E9 RSVP de
+    Google detrás de `AGENDA_RSVP_GOOGLE` (apagado; lo prueba Angel con cuenta
+    real) · E10 e2e.
+  - Migraciones (solo local): `20261115120000` E1, `130000` E6, `140000` E4,
+    `160000` E9, con auditoría independiente.
+  - Textos del correo, de la página y de WhatsApp: **PENDIENTE DE REVISIÓN**.
+  - Cumplimiento a revisar por Angel: mandar recordatorios por correo y avisos
+    por WhatsApp a pacientes **existentes** quizá no lo cubre su consentimiento
+    actual (LFPDPPP 2025).
+  - Pruebas al cierre: 1394 Vitest, 16 archivos SQL, 163 e2e.
 - [ ] F — Interfaz, movimiento y orden visual
 
 **Bitácora** (una línea por sesión: fecha, qué quedó hecho, qué quedó a medias):
