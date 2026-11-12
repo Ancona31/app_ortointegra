@@ -2762,6 +2762,105 @@ proponer el gancho compartido, pero crearlo pide el visto bueno de Angel.
 - Dos e2e de `agenda-f-tarjeta` (Confirmar, Reagendar con foco) quedan en rojo
   hasta esas dos piezas.
 
+### Bloque F — decisiones tomadas en la integración y el cierre
+
+Agente de integración, sobre la fusión `0729e24` (superficie + movimiento +
+interacciones). Commits `2552a2f` (paso 1) y `a240295` (paso 2).
+
+**Herramientas v2 en sus ranuras (paso 1)**
+
+- `HerramientasV2` se parte en `SelectorFechaV2` (ranura `selectorFecha`) y
+  `BuscarV2` (ranura `buscar`: la lupa y, a su lado, «Atajos de teclado»), cada
+  uno con `next/dynamic` y montado sólo con `agendaV2 && montarV2`.
+- **Teléfono: sólo la lupa, en `buscar` (delante del filtro), a 44 px.** El
+  diseño pide la lupa en la banda y el minicalendario no (decisión 21). El botón
+  de la ayuda NO va en la banda: a 360 px el filtro se quedaba sin ancho. Coste
+  aceptado de la lupa: con v2, el filtro de médico baja a ~68 px a 390 y ~38 a
+  360 (se lee «Dr.»; el desplegable nativo enseña el nombre entero). Con un
+  teclado físico en el teléfono, `?` sigue abriendo la ayuda.
+- `atajos` (el `aria-keyshortcuts` de Hoy, ‹ ›, las vistas, la lupa y la ayuda)
+  es verdadero sólo con v2, el chunk montado y los atajos sin apagar: el chunk
+  lo publica con un callback (`alCambiarAtajos`), el mismo patrón que
+  `alCambiarListas`; sin abstracción nueva.
+
+**Defectos de la fusión hallados al correr juntas, por primera vez, las e2e de F**
+
+- **Código · la tarjeta no devolvía el foco a la cita** con el ratón:
+  FullCalendar cancela el `mousedown` (para poder arrastrar) y el clic no
+  enfoca la cita, así que `useDialogoModal` devolvía el foco a lo que lo tenía
+  (p. ej. «›»). Ahora `handleEventClick` enfoca la cita antes de abrir la
+  tarjeta, sólo con v2. Efecto visible aceptado: la capa de foco de
+  FullCalendar (`.fc-event:focus`, negro al 25 %) se ve sobre la cita mientras
+  tiene el foco, también tras un clic; es el indicador de foco y está donde
+  está el foco (WCAG 2.4.7). **En las listas del teléfono no hay a qué volver,
+  y no es de F:** con `eventContent` propio FullCalendar no monta el `<a>` de la
+  fila y el `<tr>` no admite foco; hacerlas enfocables cambiaría el orden de
+  tabulación de las listas y queda fuera.
+- **Código · el modal de la cita animaba el anillo de foco**: sus campos y
+  botones llevaban `transition-all` (150 ms, fuera de escala, con `box-shadow` y
+  `outline`). Pasan a `.ag-transicion-color` (fondo, borde y tinta en micro).
+  Se pierde el fundido del `disabled:opacity-50` del selector de consultorio
+  (ahora cambia de golpe, CONTRASTE §8).
+- **Prueba · la regla de movimiento de las e2e** contaba como incumplimiento
+  el hover de color en micro (que el diseño PIDE, CONTRASTE §5) y animaciones
+  que no son de la agenda (el aviso de perfil de la barra lateral, los toasts).
+  Ahora admite `background-color`, `color` y `border-*-color`, mira sólo lo que
+  cuelga de la agenda o de sus portales (`.agenda-raiz`, `.ag-capa`, `.ag-hoja`,
+  `.ag-modal-*`, `.fc-event`) y trata `spin` (el giro de «guardando») como
+  `ag-barra-carga`. Siguen fuera `width`/`height`/`top`/`left`/`box-shadow`/
+  `outline-*` y el tope de 240 ms. **Pendiente, no tocado:** `HorarioModal` y
+  `ModalInvitacionCita` siguen con `animate-modal-enter` (de toda la app) y con
+  `transition-all` + `hover:brightness-95`; no tienen clase propia y la regla no
+  los mira (ninguna e2e de movimiento los abre).
+- **Prueba · arrastre a mitad de un FLIP**: tras «Cancelar» un aviso,
+  `restaurarPosicion` desliza la cita 180 ms (F2.6) y la ayuda medía su caja a
+  mitad, así que el ratón caía en una franja vacía y abría la burbuja. Las
+  ayudas de arrastre esperan a que la cita deje de animarse (sin esperar
+  bucles infinitos).
+- **Prueba · `agenda-f-tarjeta`**: sus altas chocaban con el empalme de B7
+  (con v2 el servidor contesta 409) y se acumulaban en el mismo viernes, así
+  que `.first()` agarraba la cita de otra prueba. Aceptan el empalme (el patrón
+  de `agenda-empalme`) y se borran al acabar cada prueba.
+- **Prueba · la barra en dos filas** (`agenda-f-pulido`) medía en el cuadro en
+  que la fila se recoloca (0.6 px); espera a que la maquetación se asiente.
+
+**F1.5 («Compactar» abierto por omisión) — DECISIÓN PENDIENTE DE ANGEL**
+
+- **Causa raíz del coste:** con «Compactar» encendido, la ventana de horas y
+  los días plegados se recalculaban con las citas de CADA semana; una semana con
+  una cita a las 07:00 y la siguiente sin ella cambiaban `slotMinTime` /
+  `hiddenDays` al navegar, y FullCalendar reconstruía el perfil de fechas y
+  repintaba la rejilla entera.
+- **Arreglo, que se queda:** una «sesión de Compactar» (misma vista, mismo
+  horario, sin apagarlo) en la que la ventana sólo se une y los días plegados
+  sólo se intersecan. No esconde nunca una cita pintada (revisado). Lo que se
+  pierde: dentro de la sesión la rejilla no vuelve a encoger al ir a una semana
+  con menos; vuelve a ajustarse al apagar y encender. Navegación de vuelta a la
+  base (semana siguiente 67 → 61, ya vista 62 → 52 ms).
+- **La apertura en frío seguía por encima** con F1.5 encendido (276 contra 256
+  ms; volver del dashboard 80 contra 72), también con el estado inicial ya
+  compacto (se probó y se retiró: no mejoró la medida). **Se deja F1.5 apagado**
+  tras `COMPACTAR_AL_ABRIR = false` (`src/lib/agenda/ventanaRejilla.ts`): la
+  agenda abre como antes de F1.5. Encenderlo es cambiar esa constante; las e2e
+  la leen y se adaptan solas. Si Angel prefiere F1.5 al presupuesto, cuesta
+  ~20 ms al abrir con la semilla (que tiene citas fuera de horario cada
+  semana); en una clínica sin ellas el coste debería ser menor (sin medir).
+
+**Medición y entrega (paso 5)**
+
+- `capturar.ts` (fuera de git) se adaptó al «después»: «Compactar» se pone
+  apagado para comparar igual con igual salvo en `semana-compactar`; la pestaña
+  de Semana de la tableta se llama «3 días»; con v2 la «modal-edicion» se toma
+  entrando por «Editar» de la tarjeta; las guardas con v2 aceptan el aviso de
+  empalme; las capas v2 (burbuja, burbuja con arrastre, tarjeta, por ligar,
+  minicalendario, buscador, ayuda, hoja del teléfono, tres días) y los vídeos
+  v2 (alta por la burbuja, tiempo real, deslizar). `comparar.ts` (nuevo, fuera
+  de git) arma `comparativa/index.html`. **No se hizo el PNG compuesto por
+  pareja** del diseño (§5.3): la página ya pone las tres columnas juntas.
+- La batería A1-bis (`e2e/playwright.a1bis.config.ts`, build instrumentado)
+  **no se corrió** en el cierre: las props nuevas de `<FullCalendar>` las metió
+  F1/F2/F3 (primitivos), y el cierre no añadió ninguna.
+
 ### Menores
 
 - **`ProximasCitas`:** tope de refresco de 2 minutos al volver a la pestaña,
@@ -3064,7 +3163,44 @@ primero sin marcar.
     por WhatsApp a pacientes **existentes** quizá no lo cubre su consentimiento
     actual (LFPDPPP 2025).
   - Pruebas al cierre: 1394 Vitest, 16 archivos SQL, 163 e2e.
-- [ ] F — Interfaz, movimiento y orden visual
+- [x] F — Interfaz, movimiento y orden visual (2026-11-12)
+  - Superficie (F1, las 18 propuestas): `054e923`..`bfd0621`. Movimiento (F2):
+    fusión `8988f45`. Interacciones v2 (F3: burbuja, tarjeta, minicalendario,
+    buscador, atajos, deslizar): fusión `0729e24`. Integración y cierre:
+    `2552a2f` (herramientas v2 en sus ranuras de barra y banda, `atajos`
+    cableado, dos defectos de código y cuatro de prueba de la fusión) y
+    `a240295` (sesión de «Compactar» que sólo se ensancha; F1.5 apagado,
+    pendiente de Angel). Decisiones: §6-bis, las cuatro subsecciones de F.
+  - Verificación al cierre (build de `a240295`): `npm run build` limpio; lint
+    96 errores (los de siempre); Vitest 1642 en 110 archivos; SQL 16 archivos;
+    Playwright 239 pasan, 0 fallan (escritorio 199, teléfono 37, tableta 3; 206
+    saltadas por proyecto). Las once e2e de F corrieron juntas por primera vez.
+  - Presupuesto de A (`F-final`, mediana de 5, misma máquina; «base» es
+    `e932f75`, antes de F): Auth 2 (=), apertura 254 ms (base 256), red
+    limitada 725 (717), semana siguiente 67 (62), anterior 65 (62), ya vista 49
+    (48), tras precarga 49 (47), volver 75 (72), 0 bloqueantes; JS 539 943 B
+    (+5,0 KB sobre la base: barra plegable, densidad, tableta, ranuras de F3 y
+    la tabla de atajos). La semana siguiente queda ~5 ms por encima en todas
+    las medidas desde la fusión de F2/F3, también con F1.5 apagado: no viene de
+    F1.5 y no se aisló (candidatos: el fundido de navegación o el
+    `setRangoVisible` de cada `datesSet`).
+  - Cuadros (`capturar.ts --solo=cuadros --cpu=4`, mes lleno con
+    `--volumen 2000`, una muestra por tramo; perdidos/peor ms/tareas largas en
+    total sobre 22 tramos): antes 45 / — / 18; después 62 / — / 17; con v2 70 /
+    — / 18. El peor cuadro por tramo es igual o mejor en casi todos (p. ej.
+    `mes-siguiente-1` 149 → 135, `baja-con-salida` 101 → 82); los perdidos de
+    más se concentran en `semana-siguiente-2/3` del «después» (9 y 5), que con
+    v2 dan 2 y 2: con una muestra a CPU ×4 la variación entre corridas es de
+    ese orden. Tabla completa en `comparativa/index.html` y
+    `comparativa/cuadros-antes-despues.json`.
+  - Entrega (fuera de git, en `e2e/resultados/F/`): `despues/` (51 capturas,
+    mismos nombres que `antes/`), `despues/v2/` (82), vídeos en
+    `despues/video/` (7, más sus 7 con movimiento reducido) y
+    `despues/v2/video/` (10), y `comparativa/index.html`.
+  - Lo que no se pudo probar en local: el rendimiento en un teléfono y una
+    tableta reales (todo es Chromium emulado, también el arrastre táctil y el
+    deslizar); lectores de pantalla reales sobre las capas v2; la batería
+    A1-bis instrumentada; F1.5 con datos de una clínica real.
 
 **Bitácora** (una línea por sesión: fecha, qué quedó hecho, qué quedó a medias):
 
@@ -3077,3 +3213,7 @@ primero sin marcar.
   en producción `supabase/migrations/20261111120000_agenda_a18_indices_rango.sql`;
   decidir el tope de `ProximasCitas`; revisar la semilla de tres semanas. Lo
   siguiente: bloque B.
+- 2026-11-12 — Bloque F cerrado: integración de superficie, movimiento e
+  interacciones; herramientas v2 en sus ranuras, la batería entera en verde
+  (239), sesión de «Compactar» y F1.5 apagado a la espera de Angel; capturas,
+  vídeos, cuadros y comparativa. Push: lo hace el coordinador.
