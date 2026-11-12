@@ -999,8 +999,8 @@ queda listada aquí.
 - **D0. Transporte de correo** (`src/lib/correo/transporte.ts`): tres modos por
   `EMAIL_TRANSPORT`: `captura` (Mailpit por `POST /api/v1/send`, sólo host
   loopback, sin seguir redirecciones, 10 s de espera), `resend`, y apagado para
-  todo lo demás (sin variable, vacía o valor desconocido, sin distinguir
-  mayúsculas: `RESEND` también apaga). **Doble guarda de Resend:** la variable
+  todo lo demás (sin variable, vacía o valor desconocido; se compara tal
+  cual, así que `RESEND` también apaga). **Doble guarda de Resend:** la variable
   Y una `NEXT_PUBLIC_SUPABASE_URL` remota (`https:` y nombre DNS de dos o más
   etiquetas que no sea IP, `.localhost`, `.local` ni `.internal`; ausente o mal
   escrita cuenta como local). Sin `RESEND_API_KEY` también apaga. No se exige
@@ -1015,6 +1015,40 @@ queda listada aquí.
   reales desde local** con la llave de `.env.local` (contra §6). Para que
   Angel lo anote. `.env.local` no se tocó: sin `EMAIL_TRANSPORT=captura`, el
   transporte nuevo queda apagado también en local.
+- **Alcance de D1-D3 en esta ronda:** migraciones, RPC, lógica pura
+  (`src/lib/reserva/secretos.ts`) y sus pruebas. Las rutas
+  `/api/agenda/enlaces*` y `/api/agenda/reservas/*` y las secciones de la
+  pantalla de configuración (enlaces, contactos bloqueados) que el diseño pone
+  en D1 y D2 quedan para la ronda D4-D10.
+- **D1. Código del enlace:** no se guarda; `HMAC(subllave «enlace», 'enlace:'||id)`
+  truncado a 16 bytes en base64url (22 caracteres); la base guarda sha256 del
+  código. Subllaves HKDF-SHA256 (sal `spinus-reserva-v1`, info
+  `reserva:<propósito>`) para `enlace`, `contacto`, `codigo` y `red`; la clase
+  entra en el mensaje (`telefono:` / `correo:`, `ip:` / `dispositivo:`); la
+  ficha de verificación usa la subllave `codigo` con prefijo `ficha:`. Sin
+  `RESERVA_SECRETO` de 32+ bytes hex, todo devuelve null (falla cerrado).
+- **D1. CHECK con NULL:** el CHECK de coherencia de `appointments.reserva_*`
+  y el de vigencia del enlace del diseño **dejaban pasar NULL** (un CHECK que
+  evalúa a NULL no falla). Cada columna lleva ahora su `IS NOT NULL`
+  explícito. El pre-vuelo aborta si una constraint creada «si no existe el
+  nombre» existe con otra fórmula.
+- **D1. Auditoría (APTA CON CAMBIOS):** `usado_cita_id` podía apuntar a una
+  cita de otra clínica. En vez de FK compuesta + `UNIQUE(id, clinica_id)` en
+  `appointments` (propuesta del auditor: índice nuevo en la tabla más
+  grande), la protección del enlace exige que la cita que lo gasta sea de ese
+  enlace y de esa clínica. Más `COMMENT` en las 8 columnas que no lo tenían.
+- **D1. Lista A aplicada:** 15 (el único se ata sólo al médico; etiqueta
+  interna opcional ≤ 60), 16 (cada médico ve y gestiona sus enlaces;
+  administrador y secretaria, los de todos), 19 (con el interruptor apagado
+  los enlaces se conservan y los únicos siguen caducando), 9 (al ligar, los
+  datos de contacto se quedan en la cita: el CHECK lo permite y nada los
+  borra). Un invitado que intenta emitir un enlace de otro médico lo para la
+  protección (23514, no ve su perfil) antes que la RLS.
+- **D1. Cita por ligar y borrado:** `reserva_enlaces.usado_cita_id` es
+  `RESTRICT`, así que una cita que gastó un enlace único no se puede borrar
+  (23503). Hasta que D6 la trate como cita (B3: se cancela, no se borra), un
+  `DELETE` de la API sobre ella daría 500. Con el interruptor apagado no
+  existen citas así.
 
 ### Bloque F
 
