@@ -1064,6 +1064,50 @@ queda listada aquí.
 - **D2. Auditoría (APTA CON CAMBIOS):** pre-vuelo con dueño de las tres tablas;
   ventana de la lista ligada al ajuste (ventana + 366, no + 30 como proponía el
   auditor, por la razón de la cabecera).
+- **D3. Garantía de un solo turno:** `FOR UPDATE` sobre la fila del enlace +
+  `pg_advisory_xact_lock(1790, hashtext(medico_id))`; dentro se vuelven a
+  comprobar empalme y candado y se inserta. Sin restricción de exclusión (§2:
+  el personal empalma). La función exige READ COMMITTED (25001 si no): en
+  REPEATABLE READ la instantánea no vería la reserva ganadora. **Límite
+  aceptado:** el alta del personal y la importación de Google no toman el
+  candado; una cita suya en el mismo instante puede empalmarse con una
+  reserva. Medido en local: la segunda reserva esperó 1,5-1,9 s al candado y salió
+  «ocupado»; con la línea del candado quitada, las dos reservaban.
+- **D3. Puertas:** la reserva exige, por este orden, enlace vigente, interruptor
+  encendido, aviso aprobado con el mismo sha256, puerta S3
+  (`gcal_sync_clinica_habilitada`, porque `service_role` se salta
+  `appointments_gates_insert`), médico aún en la clínica, consultorio activo
+  del médico y tipo activo de la clínica o del médico. Emitir el código del
+  correo exige también la puerta S3 y el interruptor (el diseño sólo el
+  interruptor); `reserva_ocupacion` exige el interruptor. Todo sólo para
+  `service_role`, INVOKER; ninguna escribe `agenda_ajustes` (fila 5 del
+  veredicto).
+- **D3. Lista A aplicada:** 5 (ocupan las citas y las filas de Google; no
+  ocupan las de todo el día, `cancelled` ni `no_show`), 14 (6 dígitos, 10 min,
+  5 intentos por código, pedir otro invalida el anterior; ficha de 30 min y un
+  solo uso; el bloqueo se dice sólo después de verificar), 21 (activa =
+  `scheduled`/`confirmed` con fin futuro), 22 (no se detecta si quien reserva
+  ya es paciente). El enlace único se salta verificación, bloqueo y «1
+  activa» (§2). `reserva_historial_previo` = cancelaciones + no_show al
+  reservar.
+- **D3. Valores escritos:** la cita nace `scheduled`, `origen='spinus'`,
+  `created_by` NULL, título = nombre de quien reserva, fin = inicio + duración
+  del tipo, y `gcal_sync_status='pending'` (el diseño dejaba el valor por
+  omisión `synced`, falso sin evento en Google; D8 decidirá el envío). Dos
+  filas de auditoría: `cita_alta` y `cita_reservada_enlace` (`'system'`, sin
+  datos personales).
+- **D3. Idempotencia:** el mismo `client_id` con el mismo enlace devuelve
+  `repetida` con la cita original. Un `client_id` que ya use otra cita (índice
+  único global) hace fallar la llamada (23505): la ruta de D5 lo traducirá.
+- **D3. Prueba de carrera:** `scripts/reserva-carrera.sh`, sólo local, con dos
+  `psql` en paralelo y datos de una clínica de prueba con ids fijos. Al final
+  los borra como `postgres` con `session_replication_role = replica` en esa
+  transacción, incluidas SUS filas de `audit_log` (por `registro_id` de sus
+  objetos y por el `clinica_id` de su descripción), que de otro modo protege
+  `prevent_audit_modification`. Comprobado: no queda ninguna fila.
+- **D3. Sin hacer** (lo pedía el diseño como medición, no como garantía): el
+  banco de N = 1/5/20 reservas con supabase-js y el `EXPLAIN` con la semilla de
+  30k citas.
 
 ### Bloque F
 
