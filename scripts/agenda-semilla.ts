@@ -189,6 +189,10 @@ function limpiarReserva(clinicas: string[], cuando: 'antes' | 'despues'): void {
     end if;
     if to_regclass('public.cita_correos') is not null then
       delete from public.cita_correos where clinica_id = any (v_c);
+    end if;
+    -- D11: avisos de empalme (FK RESTRICT a la clínica; sin DELETE para el rol de servicio).
+    if to_regclass('public.reserva_empalmes_google') is not null then
+      delete from public.reserva_empalmes_google where clinica_id = any (v_c);
     end if;`
   const despues = `
     if to_regclass('public.reserva_enlaces') is not null then
