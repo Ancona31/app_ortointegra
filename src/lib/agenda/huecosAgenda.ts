@@ -5,10 +5,10 @@
  * su fusión y recorte a la jornada, el desglose por estado y las etiquetas
  * que lo escriben. `jornadaDelDia` vive aquí y no en `horarioAgenda.ts`
  * —aunque el mapa original la listaba como "Horario"— para evitar un
- * import circular: necesita `Tramo` y `minutosDeReloj`, que son de este
- * módulo. Movido tal cual desde `AgendaCliente.tsx` (A2.1, movimiento
- * puro), con sus comentarios; sólo cambiaron los `import`/`export` que
- * hacían falta.
+ * import circular: necesita `Tramo` y `minutosDeReloj`, que eran de este
+ * módulo (hoy de `tramos.ts`, B8). Movido tal cual desde `AgendaCliente.tsx`
+ * (A2.1, movimiento puro), con sus comentarios; sólo cambiaron los
+ * `import`/`export` que hacían falta.
  */
 
 import type { EventApi } from '@fullcalendar/core'
@@ -16,34 +16,33 @@ import type { Horario } from '@/lib/configApp'
 import type { Appointment, Status } from './tiposAgenda'
 import { DIAS } from './horarioAgenda'
 import { ESTADOS_CITA, esEventoGenerico } from './tarjetasAgenda'
+import {
+  type Tramo, MINUTOS_POR_DIA, minutosDeReloj, relojDeMinutos, fusionarTramos, recortarATramo, huecosDe,
+} from './tramos'
 
-/** Un tramo del día, en MINUTOS DESDE LA MEDIANOCHE LOCAL.
- *
- *  ⚠️ MINUTOS Y NO `Date`, A PROPÓSITO. El horario del consultorio es hora de
- *  PARED (`'09:00'`) y la rejilla coloca los eventos en la zona del navegador,
- *  que es la misma base. Trabajar en minutos desde medianoche deja la
- *  aritmética en enteros y hace que recortar, fusionar y restar sean una línea
- *  cada uno. La única grieta conocida es el día del cambio de horario de
- *  verano, donde «minutos desde medianoche» y hora de pared se separan 60: en
- *  México no aplica desde 2022, y el precio de cubrirlo sería arrastrar husos
- *  por todo el cálculo. */
-export type Tramo = { desde: number; hasta: number }
+/* La aritmética pura de tramos vive en `tramos.ts` (B8) para que el servidor la
+   use sin FullCalendar; se vuelve a exportar aquí para que nada de lo que ya
+   importaba de este módulo cambie.
 
-const MINUTOS_POR_DIA = 24 * 60
+   ⚠️ EL HORARIO DE VERANO SÍ APLICA EN MÉXICO. Aquí los minutos se cuentan como
+   tiempo TRANSCURRIDO desde la medianoche del DISPOSITIVO (`medianocheDe`), y el
+   horario como hora de PARED: el día del cambio se separan 60 min. México dejó
+   el horario de verano en 2022, pero no la franja fronteriza norte:
+   `America/Tijuana`, `Ciudad_Juarez`, `Ojinaga` y `Matamoros` siguen el de
+   EE. UU. (segundo domingo de marzo, primer domingo de noviembre). En un
+   dispositivo en esas zonas, esos dos días el panel corre 60 min las citas
+   posteriores al cambio. Se deja así a propósito: B8 no cambia lo que ve el
+   panel. El cálculo del servidor (`turnosAgenda.ts`) cuenta en hora de pared
+   de la zona del consultorio y no tiene la grieta; `turnosAgenda.test.ts` la
+   deja escrita. */
+export {
+  type Tramo, minutosDeReloj, relojDeMinutos, fusionarTramos, recortarATramo, huecosDe,
+} from './tramos'
 
 /** El tramo libre más corto que se ofrece. Por debajo no cabe una consulta, y
  *  listarlo sería ruido: en el mockup los huecos de 30 min entre citas no
  *  salen. Es la misma cifra que dice el texto de la tarjeta vacía. */
 export const HUECO_MINIMO = 60
-
-export function minutosDeReloj(hhmm: string): number {
-  const [h = '0', m = '0'] = hhmm.split(':')
-  return Number(h) * 60 + Number(m)
-}
-
-export function relojDeMinutos(min: number): string {
-  return `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`
-}
 
 /** «08:00 – 09:00». Guión largo, el mismo que `titleRangeSeparator`. */
 export function etiquetaDeRango(t: Tramo): string {
@@ -119,52 +118,6 @@ export function tramosDeOcupacion(eventos: readonly EventApi[], dia: Date): Tram
     if (hasta > desde) tramos.push({ desde, hasta })
   }
   return tramos
-}
-
-/** Ordena y funde los solapados en uno. Sin esto dos citas de 09:00–10:00 y
- *  09:30–10:30 darían dos horas ocupadas donde sólo hay hora y media, y el
- *  complemento —los huecos— saldría con tramos negativos. */
-export function fusionarTramos(tramos: readonly Tramo[]): Tramo[] {
-  const fundidos: Tramo[] = []
-  for (const t of [...tramos].sort((a, b) => a.desde - b.desde)) {
-    const ultimo = fundidos[fundidos.length - 1]
-    if (ultimo && t.desde <= ultimo.hasta) ultimo.hasta = Math.max(ultimo.hasta, t.hasta)
-    else fundidos.push({ ...t })
-  }
-  return fundidos
-}
-
-/**
- * Recorta los tramos a la jornada y descarta los que se quedan fuera.
- *
- * ⚠️ ES LO QUE HACE QUE `ocupadas + libres` SEA LA JORNADA, SIEMPRE. Una cirugía
- * de 19:00 a 21:00 con el consultorio hasta las 18:00 aporta CERO horas
- * ocupadas: el día tiene diez horas de consulta y las diez se reparten entre
- * ocupadas y libres. Sin el recorte los dos números dejarían de ser
- * complementarios y el panel enseñaría una suma que no cuadra con su propio
- * horario. Es también lo que el mockup comprueba: 08:00–18:00, 5:00 y 5:00.
- */
-export function recortarATramo(tramos: readonly Tramo[], jornada: Tramo): Tramo[] {
-  const dentro: Tramo[] = []
-  for (const t of tramos) {
-    const desde = Math.max(t.desde, jornada.desde)
-    const hasta = Math.min(t.hasta, jornada.hasta)
-    if (hasta > desde) dentro.push({ desde, hasta })
-  }
-  return dentro
-}
-
-/** El complemento de la ocupación dentro de la jornada, con suelo de duración.
- *  `ocupados` tiene que llegar ordenado y fundido. */
-export function huecosDe(jornada: Tramo, ocupados: readonly Tramo[], minimo: number): Tramo[] {
-  const huecos: Tramo[] = []
-  let cursor = jornada.desde
-  for (const t of ocupados) {
-    if (t.desde - cursor >= minimo) huecos.push({ desde: cursor, hasta: t.desde })
-    cursor = Math.max(cursor, t.hasta)
-  }
-  if (jornada.hasta - cursor >= minimo) huecos.push({ desde: cursor, hasta: jornada.hasta })
-  return huecos
 }
 
 /**
