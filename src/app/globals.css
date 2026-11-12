@@ -217,6 +217,44 @@
   --ag-ease-in:  cubic-bezier(.4, 0, 1, 1);    /* algo se va */
   --ag-ease:     cubic-bezier(.4, 0, .2, 1);   /* algo se mueve */
 
+  /* El anillo de la cita que llega por tiempo real (bloque F, `.ag-ev-remoto`).
+     ES COLOR, ASÍ QUE ÉSTE SÍ TIENE CONTRAPARTE EN html.dark (#6b9bff). Mismo
+     reparto que `--ag-month-today-ring`: en claro sigue a la marca; en oscuro es
+     literal, porque el azul de la marca sobre la superficie oscura no llega a
+     los 3:1 de un elemento gráfico.
+     ⚠️ NO LO CUELGUES DE `--ag-status-confirmed-*` aunque hoy valga lo mismo: el
+     anillo dice «esto acaba de llegar», no «esto está confirmado», y la próxima
+     rotación de la paleta de estados se lo llevaría.
+     ⚠️ SÓLO SE ANIMA LA OPACIDAD DEL ANILLO. El `box-shadow` que lo dibuja es
+     fijo; el pulso de 900 ms de `box-shadow` del spec se sustituyó por esto
+     (decisión 2 del bloque F en mejora_agendaV2.md §6-bis). */
+  --ag-pulso: var(--ag-brand-secondary);
+
+  /* ── ESPACIADO — LA ESCALA DEL SPEC (§1.3), bloque F ─────────────────
+     Una medida, no un color: NO TIENE CONTRAPARTE EN html.dark.
+     Los diez peldaños del spec (4 · 6 · 8 · 10 · 12 · 14 · 16 · 20 · 24 · 32)
+     más `--ag-4-5`, que el spec usa (§8.2, el `gap` del panel de Día) sin
+     haberlo puesto en su propia lista, y que la barra de herramientas y la
+     banda compacta ya tenían escrito a mano como 18.
+     ⚠️ NO HAY `--ag-7`, Y NO ES UN HUECO: el spec salta de 24 a 32. Si hace falta
+     un 28, la pregunta es qué es ese elemento, igual que con los radios.
+     ⚠️ LOS MEDIOS VAN CON GUION (`--ag-2-5`), NO CON PUNTO: un `.` en el nombre de
+     una custom property es válido escapado y una trampa sin escapar.
+     ⚠️ DECLARARLOS NO MIGRA NADA: los `padding` y `gap` sueltos que hay hoy en la
+     hoja se enganchan a la escala en el barrido de simetría (F1.19), regla por
+     regla, no de golpe. */
+  --ag-1:    4px;
+  --ag-1-5:  6px;
+  --ag-2:    8px;
+  --ag-2-5: 10px;
+  --ag-3:   12px;
+  --ag-3-5: 14px;
+  --ag-4:   16px;
+  --ag-4-5: 18px;
+  --ag-5:   20px;
+  --ag-6:   24px;
+  --ag-8:   32px;
+
   /* ── RADIOS — LA ESCALA DEL REDISEÑO (spec §1.3) ──────────────────────
      Cinco peldaños, y cada uno nombra un PAPEL, no un tamaño. Esa es toda la
      gracia: el que llegue después no elige «un radio que quede bien», elige el
@@ -235,9 +273,9 @@
      estos números. La frontera de hoy: dentro de la agenda mandan estos tokens;
      fuera, Tailwind. No migres el resto de la app a esto sin pedirlo.
 
-     ⚠️ LA TIPOGRAFÍA Y EL ESPACIADO DEL SPEC NO ESTÁN AQUÍ, Y ES DELIBERADO. Son
-     escalas largas y se irán creando cuando llegue el bloque que las consuma.
-     No las adelantes «para tenerlas». */
+     ⚠️ LA TIPOGRAFÍA DEL SPEC NO ESTÁ AQUÍ, Y ES DELIBERADO: es una escala larga
+     y se creará cuando llegue el bloque que la consuma. No la adelantes «para
+     tenerla». La del ESPACIADO sí llegó con su bloque (F) y está justo encima. */
   --ag-r-note:    6px;   /* tarjeta de evento: .ag-tarjeta, .ag-gcal, .ag-mes.
                             NO el harness `.fc-event` que las envuelve — ése ya
                             vale 6 pero es otra cosa (un <a> transparente cuyo
@@ -3400,8 +3438,24 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
 @media (prefers-reduced-motion: reduce) {
   /* `.ag-dia-aside` va en la lista porque el panel del bloque 8 es HERMANO
      de `.agenda-fc`, no descendiente suyo: sin él, la transición de color del
-     botón de hueco se quedaría fuera de esta escotilla. */
-  .fc *, .agenda-fc *, .ag-dia-aside *, .fc *::before, .fc *::after {
+     botón de hueco se quedaría fuera de esta escotilla.
+
+     ⚠️ BLOQUE F: LAS CAPAS SE PINTAN EN `document.body` (Portal), FUERA DE LOS
+     TRES DE ARRIBA, y por eso van con nombre propio. Los nombres son el
+     contrato fijado en F0 —`.ag-modal-panel` y `.ag-modal-velo` (modal de la
+     cita), `.ag-capa` (burbuja y tarjeta de lectura), `.ag-hoja` (la tarjeta en
+     el teléfono)—: quien los use hereda esta escotilla sin tocarla. Cada capa va
+     ELLA MISMA y con sus descendientes, porque la animación de entrada es de la
+     capa y un selector `X *` no casa a X.
+     El anillo de tiempo real (`.ag-ev-remoto::after`) no necesita línea: entra
+     por `.fc *::after`.
+     ⚠️ ESTO NO ALCANZA A LO QUE SE ANIMA CON WAAPI (FLIP, fundido de
+     navegación, la vuelta del deslizamiento): esas miran
+     `prefiereMenosMovimiento()` de `src/lib/agenda/movimientoAgenda.ts` y no
+     animan. Una regla CSS no puede apagar un `element.animate()`. */
+  .fc *, .agenda-fc *, .ag-dia-aside *, .fc *::before, .fc *::after,
+  .ag-modal-panel, .ag-modal-velo,
+  .ag-capa, .ag-capa *, .ag-hoja, .ag-hoja * {
     animation-duration: .01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: .01ms !important;
@@ -5331,6 +5385,9 @@ html.dark {
      única sobre la que se dibuja (un elemento gráfico pide 3.0). */
   --ag-month-more: #8ab4f8;                   /* ◆ */
   --ag-month-today-ring: #6b9bff;             /* ◆ = familia de confirmed-dot */
+  /* El anillo de tiempo real (ver la variante clara): literal por lo mismo que
+     el anillo de hoy de aquí arriba — la marca no se aclara sola en oscuro. */
+  --ag-pulso: #6b9bff;
   /* Ver la nota larga de la variante clara: aquí la marca se ACLARA, no se
      oscurece, porque es tinta y no relleno. */
   --ag-brand-legible: color-mix(in srgb, var(--ag-brand-secondary) 55%, white);
