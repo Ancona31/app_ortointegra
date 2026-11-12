@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { irAAgenda, soloEscritorio, SESION } from './ayudas'
+import { COMPACTAR_AL_ABRIR } from '../src/lib/agenda/ventanaRejilla'
 
 /**
  * Lectura pura (ningún cambio de datos): usa el `storageState` de
@@ -75,19 +76,24 @@ test('modal de horario: abre y cierra sin guardar', async ({ page }) => {
   await expect(dialogo).toBeHidden()
 })
 
-/* F1.5 · La semilla tiene el domingo cerrado, así que «Compactar» abre ENCENDIDO
-   (decisión 13); la prueba arranca de ahí y recorre el ciclo entero. */
+/* F1.5 · La semilla tiene el domingo cerrado: con `COMPACTAR_AL_ABRIR`
+   «Compactar» abre ENCENDIDO (decisión 13); sin él (cierre de F, pendiente de
+   Angel), apagado como antes. La prueba arranca del estado que toque y recorre
+   el ciclo entero. */
 test('botón Compactar alterna aria-pressed y aparece la banda compacta', async ({ page }) => {
   await irAAgenda(page)
   const boton = page.getByRole('button', { name: /Compactar la rejilla al horario de la clínica/ })
-  await expect(boton).toHaveAttribute('aria-pressed', 'true')
-  await expect(page.locator('.ag-banda-compacta')).toBeVisible()
+  const banda = page.locator('.ag-banda-compacta')
+  const comprobar = async (encendido: boolean): Promise<void> => {
+    await expect(boton).toHaveAttribute('aria-pressed', String(encendido))
+    if (encendido) await expect(banda).toBeVisible()
+    else await expect(banda).toHaveCount(0)
+  }
+  await comprobar(COMPACTAR_AL_ABRIR)
   await boton.click()
-  await expect(boton).toHaveAttribute('aria-pressed', 'false')
-  await expect(page.locator('.ag-banda-compacta')).toHaveCount(0)
+  await comprobar(!COMPACTAR_AL_ABRIR)
   await boton.click()
-  await expect(boton).toHaveAttribute('aria-pressed', 'true')
-  await expect(page.locator('.ag-banda-compacta')).toBeVisible()
+  await comprobar(COMPACTAR_AL_ABRIR)
 })
 
 test('refresco automático al volver de segundo plano: nada antes de 2 minutos, refetch al pasarlos', async ({ page }) => {

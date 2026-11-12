@@ -18,7 +18,10 @@ import type FullCalendar from '@fullcalendar/react'
 import {
   avisoDeRecorte,
   calcularVentanaRejilla,
+  COMPACTAR_AL_ABRIR,
   diasOcultables,
+  intersecarOcultos,
+  unirVentanas,
   type EventoParaVentana,
   type VentanaRejilla,
 } from '@/lib/agenda/ventanaRejilla'
@@ -29,6 +32,16 @@ import type { Horario } from '@/lib/configApp'
 
 type CalRef = RefObject<InstanceType<typeof FullCalendar> | null>
 
+/** F1.5 · Lo acumulado en una sesión de «Compactar» (ver `unirVentanas` en `ventanaRejilla.ts`). */
+interface SesionCompacta {
+  vista: string
+  horario: Horario
+  ventana: VentanaRejilla | null
+  ocultos: number[] | null
+}
+
+const SIN_SESION: SesionCompacta = { vista: '', horario: HORARIO_DEFAULT, ventana: null, ocultos: null }
+
 interface Params {
   calendarRef: CalRef
   horario: Horario
@@ -38,6 +51,21 @@ interface Params {
 /** F1.5 · ¿El horario tiene algún día cerrado? Decide el «Compactar» inicial. */
 function hayDiasCerrados(horario: Horario): boolean {
   return DIAS.some(d => !horario[d.key]?.activo)
+}
+
+/**
+ * La sesión vigente de «Compactar», o `null` con él apagado. Una vista, un
+ * horario (por identidad) o un apagado distintos de los de la sesión guardada
+ * abren una nueva, vacía.
+ */
+function sesionDeCompactar(
+  ref: { current: SesionCompacta }, compacta: boolean, vista: string, horario: Horario,
+): SesionCompacta | null {
+  if (!compacta) { ref.current = SIN_SESION; return null }
+  if (ref.current === SIN_SESION || ref.current.vista !== vista || ref.current.horario !== horario) {
+    ref.current = { vista, horario, ventana: null, ocultos: null }
+  }
+  return ref.current
 }
 
 export function useVentanaRejilla({ calendarRef, horario, currentView }: Params) {
@@ -87,10 +115,15 @@ export function useVentanaRejilla({ calendarRef, horario, currentView }: Params)
      compara por IDENTIDAD con la constante: mientras sea ella, no se decide, y
      el efecto de abajo decide una vez cuando llega el de verdad. Si no llega
      nunca, queda apagado, como hasta F1.5. */
-  const [compactar, setCompactar] = useState(() => horario !== HORARIO_DEFAULT && hayDiasCerrados(horario))
+  /* ⚠️ CIERRE DE F: F1.5 ESTÁ APAGADO (`COMPACTAR_AL_ABRIR`, en
+     `ventanaRejilla.ts`) hasta que Angel decida. Encendido, la apertura en frío
+     cuesta ~20 ms más que el presupuesto de A (medido: 276 contra 256) aun con
+     la sesión que sólo se ensancha, que sí devolvió la navegación a la base. Lo
+     de abajo queda escrito tal cual: encenderlo es cambiar esa constante. */
+  const [compactar, setCompactar] = useState(() => COMPACTAR_AL_ABRIR && horario !== HORARIO_DEFAULT && hayDiasCerrados(horario))
   const compactarDecididoRef = useRef(horario !== HORARIO_DEFAULT)
   useEffect(() => {
-    if (compactarDecididoRef.current || horario === HORARIO_DEFAULT) return
+    if (!COMPACTAR_AL_ABRIR || compactarDecididoRef.current || horario === HORARIO_DEFAULT) return
     compactarDecididoRef.current = true
     setCompactar(hayDiasCerrados(horario))
   }, [horario])
@@ -141,6 +174,14 @@ export function useVentanaRejilla({ calendarRef, horario, currentView }: Params)
   // eslint-disable-next-line react-hooks/refs -- patrón último valor: FullCalendar lee en componentDidMount/Update, antes de los efectos del padre
   compactarRef.current = compactar
 
+  /* F1.5 · LA SESIÓN DE «COMPACTAR» SÓLO SE ENSANCHA. Mientras sigan la misma
+     vista, el mismo horario y «Compactar» encendido, la ventana se une con la
+     anterior y los días plegados se intersecan: navegar a una semana con menos
+     citas fuera de horario ya no cambia `slotMinTime` ni `hiddenDays`, y
+     FullCalendar no vuelve a pintar la rejilla entera (era el coste medido de
+     F1.5). Cambiar de vista, de horario o apagar «Compactar» abre otra. */
+  const sesionRef = useRef<SesionCompacta>(SIN_SESION)
+
   /* ⚠️  LOS DOS EJES USAN RANGOS DISTINTOS, Y ES DELIBERADO. NO LOS UNIFIQUES.
 
      · La ALTURA (`calcularVentanaRejilla`) va con el rango ACTIVO, el pintado.
@@ -170,7 +211,12 @@ export function useVentanaRejilla({ calendarRef, horario, currentView }: Params)
        compactar es sólo el eje de las COLUMNAS, y eso es lo que queda vivo dos
        líneas más abajo. */
     const compactaElAlto = compacta && !(rangos?.esMes ?? false)
-    const nueva = calcularVentanaRejilla(eventos, rangos?.activo ?? null, horarioRef.current, { compacta: compactaElAlto })
+    const sesion = sesionDeCompactar(sesionRef, compacta, calendarRef.current?.getApi().view.type ?? '', horarioRef.current)
+    let nueva = calcularVentanaRejilla(eventos, rangos?.activo ?? null, horarioRef.current, { compacta: compactaElAlto })
+    if (compactaElAlto && sesion) {
+      nueva = sesion.ventana ? unirVentanas(sesion.ventana, nueva) : nueva
+      sesion.ventana = nueva
+    }
     /* Forma funcional, y devolviendo `prev` tal cual cuando no cambia: React se
        salta el re-render por su propio camino (bail-out por identidad). Un `if`
        alrededor del `setState` haría lo mismo, pero habría que repetirlo en los
@@ -201,15 +247,20 @@ export function useVentanaRejilla({ calendarRef, horario, currentView }: Params)
        Y con el rango COMPLETO el ciclo sí converge de verdad: el conjunto no
        depende de qué se recortó, así que la segunda vuelta da lo mismo que la
        primera y muere ahí. */
-    const ocultos = compacta
+    let ocultos = compacta
       ? diasOcultables(eventos, rangos?.completo ?? null, horarioRef.current, DIAS)
       : []
+    /* Sólo con un rango: antes del primer `datesSet` no hay nada que acumular. */
+    if (sesion && rangos) {
+      ocultos = sesion.ocultos ? intersecarOcultos(sesion.ocultos, ocultos) : ocultos
+      sesion.ocultos = ocultos
+    }
     setDiasOcultos(prev =>
       prev.length === ocultos.length && prev.every((d, i) => d === ocultos[i])
         ? prev
         : ocultos
     )
-  }, [])
+  }, [calendarRef])
 
   /** Los dos rangos de la vista. `null` antes del primer `datesSet`. */
   const rangoDeVista = useCallback((): RangosDeVista | null => {

@@ -1,6 +1,7 @@
 import { test, expect, type Page } from '@playwright/test'
 import { hoyEnTZ } from '../src/lib/dates'
-import { irAAgenda, eventoConTexto, SESION, CORREO, DIA_LABORABLE_LIBRE, sqlLocal, selectFiltroMedico } from './ayudas'
+import { COMPACTAR_AL_ABRIR } from '../src/lib/agenda/ventanaRejilla'
+import { irAAgenda, eventoConTexto, SESION, CORREO, DIA_LABORABLE_FIJO, DIA_LABORABLE_LIBRE, diaDeLaSemana, sqlLocal, selectFiltroMedico } from './ayudas'
 
 /**
  * Bloque F §1 · pulido visual que sale directo, sin interruptor (diseño en
@@ -73,6 +74,7 @@ test.describe('escritorio', () => {
   })
 
   test('F1.5 · con el domingo cerrado, «Compactar» abre encendido y la banda lo dice', async ({ page }) => {
+    test.skip(!COMPACTAR_AL_ABRIR, 'F1.5 apagado en el cierre de F (COMPACTAR_AL_ABRIR), pendiente de Angel')
     await irAAgenda(page)
     const boton = page.getByRole('button', { name: /Compactar la rejilla al horario de la clínica/ })
     await expect(boton).toHaveAttribute('aria-pressed', 'true')
@@ -80,6 +82,46 @@ test.describe('escritorio', () => {
     await expect(page.locator('.ag-banda-compacta')).toContainText(/domingo/i)
     await boton.click()
     await expect(page.locator('.fc-timegrid-col.fc-day-sun')).toHaveCount(1)
+  })
+
+  test('F1.5 apagado · abre como antes: «Compactar» sin pulsar y el domingo a la vista', async ({ page }) => {
+    test.skip(COMPACTAR_AL_ABRIR, 'F1.5 encendido')
+    await irAAgenda(page)
+    const boton = page.getByRole('button', { name: /Compactar la rejilla al horario de la clínica/ })
+    await expect(boton).toHaveAttribute('aria-pressed', 'false')
+    await expect(page.locator('.fc-timegrid-col.fc-day-sun')).toHaveCount(1)
+    await expect(page.locator('.ag-banda-compacta')).toHaveCount(0)
+  })
+
+  /* Cierre de F · la sesión de «Compactar» sólo se ensancha: esta semana tiene
+     una cita propia a las 06:30 (la crea la prueba) y la siguiente ninguna
+     antes de las 07:00 (se comprueba); al navegar la rejilla conserva las
+     06:00 (no se vuelve a pintar entera) y apagar y encender abre una sesión
+     nueva, que sí se ajusta a la semana pintada.
+     MUTACIÓN: quitar `unirVentanas` en `aplicarVentana` → rojo. */
+  test('F1.5 · con «Compactar» encendido, navegar no encoge la rejilla; reabrir la sesión, sí', async ({ page }) => {
+    const antesDeLas7 = sqlLocal(`select count(*) from public.appointments a join auth.users u on u.id = a.medico_id
+      where u.email = :'correo' and a.status <> 'cancelled' and not a.all_day
+        and a.start_time >= (:'lunes')::date and a.start_time < (:'lunes')::date + 7
+        and (a.start_time at time zone 'America/Merida')::time < '07:00'`, { correo: CORREO.adminA, lunes: diaDeLaSemana(1, 0) })
+    expect(antesDeLas7, 'precondición: la semana siguiente no tiene citas antes de las 07:00').toBe('0')
+    const id = citaSql(CORREO.adminA, 'Sesión Compactar F', `${DIA_LABORABLE_FIJO}T06:30:00-06:00`, 30)
+    try {
+      await irAAgenda(page)
+      const boton = page.getByRole('button', { name: /Compactar la rejilla al horario de la clínica/ })
+      if (await boton.getAttribute('aria-pressed') !== 'true') await boton.click()
+      const primeraHora = () => page.locator('td.fc-timegrid-slot-lane').first().getAttribute('data-time')
+      await expect.poll(primeraHora).toBe('06:00:00')
+      await page.locator('.fc-next-button').click()
+      await expect(page.locator('.fc-today-button')).toBeEnabled()
+      await page.waitForTimeout(600)
+      expect(await primeraHora()).toBe('06:00:00')
+      await boton.click()
+      await boton.click()
+      await expect.poll(primeraHora).not.toBe('06:00:00')
+    } finally {
+      sqlLocal(`delete from public.appointments where id = :'id'`, { id })
+    }
   })
 
   test('F1.6 · el Mes de escritorio pinta sus semanas reales', async ({ page }) => {
@@ -224,14 +266,18 @@ test.describe('escritorio · paso 2', () => {
   })
 
   test('F1.1 · por debajo de 1280 px y en Día con panel, la nativa arriba y los controles en una fila debajo', async ({ page }) => {
-    const filaUnica = async () => {
+    /* `toPass`: tras cambiar de ventana o entrar en Día con panel la fila se
+       recoloca (el panel entra, el `ResizeObserver` llama a `updateSize()`) y
+       medir en ese cuadro daba 0.6 px de diferencia de vez en cuando. Se espera
+       a que la maquetación se asiente; la condición es la misma. */
+    const filaUnica = () => expect(async () => {
       const nativa = await page.locator('.agenda-fc .fc-header-toolbar').boundingBox()
       const controles = await page.locator('.agenda-fc .ag-controles').boundingBox()
       expect(controles?.y ?? 0).toBeGreaterThanOrEqual((nativa?.y ?? 0) + (nativa?.height ?? 0) - 1)
       const tops = await page.locator('.agenda-fc .ag-controles :is(button:not([role="tab"]), select, [role="tablist"])')
         .evaluateAll(els => els.filter(e => (e as HTMLElement).offsetParent !== null).map(e => Math.round(e.getBoundingClientRect().top)))
       expect(new Set(tops).size).toBe(1)
-    }
+    }).toPass({ timeout: 3000 })
     await page.setViewportSize({ width: 1180, height: 800 })
     await irAAgenda(page)
     await filaUnica()
@@ -251,7 +297,7 @@ test.describe('escritorio · paso 2', () => {
     await page.reload()
     await page.locator('.fc-event').first().waitFor()
     await expect(page.getByRole('button', { name: 'Densidad compacta' })).toHaveAttribute('aria-pressed', 'true')
-    // Con «Compactar» (abre encendido) la jornada entera cabe: el desplazador no desplaza.
+    // La jornada entera cabe (07:00–21:00 a 48 px por hora; con «Compactar», menos): el desplazador no desplaza.
     const sobra = await page.locator('.fc-timegrid-body').evaluate(el => {
       const sc = el.closest('.fc-scroller') as HTMLElement | null
       return sc ? sc.scrollHeight - sc.clientHeight : 999

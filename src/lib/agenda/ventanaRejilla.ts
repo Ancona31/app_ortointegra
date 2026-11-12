@@ -704,3 +704,38 @@ export function avisoDeRecorte(
 
   return partes.length === 0 ? null : partes.join(' · ')
 }
+
+/* ── F1.5 · LA SESIÓN DE «COMPACTAR»: SÓLO SE ENSANCHA ──────────────────────
+   Con «Compactar» encendido por omisión (decisión 13), la ventana y los días
+   plegados seguían a las citas de CADA semana: una semana con una cita a las
+   07:00 y la siguiente sin ella cambiaban `slotMinTime` al navegar, y
+   FullCalendar reconstruía el perfil de fechas y volvía a pintar la rejilla
+   entera una segunda vez (+10–16 ms por navegación, medido en el cierre de la
+   superficie). Dentro de una sesión —misma vista, mismo horario, «Compactar»
+   sin tocar— la ventana sólo CRECE (unión) y los días plegados sólo MENGUAN
+   (intersección). Las dos siguen siendo correctas para lo que se ve: la unión
+   contiene la ventana de la semana pintada y la intersección no pliega ningún
+   día que en ella tenga citas. Lo que se pierde es encoger de vuelta al
+   navegar a una semana con menos; vuelve a encoger al reabrir la sesión. */
+
+/**
+ * F1.5 · ¿«Compactar» abre encendido cuando el horario tiene días cerrados?
+ * (decisión 13, aprobada). ⚠️ APAGADO EN EL CIERRE DE F, DECISIÓN PENDIENTE DE
+ * ANGEL (§6-bis, «integración y cierre de F»): encendido, la apertura en frío
+ * pasa el presupuesto de A (276 contra 256 ms, mediana de 5) incluso con la
+ * sesión que sólo se ensancha. Lo leen `useVentanaRejilla` y las e2e.
+ */
+export const COMPACTAR_AL_ABRIR: boolean = false
+
+/** La ventana que cubre a las dos (`HH:MM:SS` con cero delante: el orden de texto es el de reloj). */
+export function unirVentanas(a: VentanaRejilla, b: VentanaRejilla): VentanaRejilla {
+  return {
+    slotMinTime: a.slotMinTime <= b.slotMinTime ? a.slotMinTime : b.slotMinTime,
+    slotMaxTime: a.slotMaxTime >= b.slotMaxTime ? a.slotMaxTime : b.slotMaxTime,
+  }
+}
+
+/** Los días plegados en las dos, en el orden de `a`. */
+export function intersecarOcultos(a: readonly number[], b: readonly number[]): number[] {
+  return a.filter(d => b.includes(d))
+}
