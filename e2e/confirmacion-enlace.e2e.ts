@@ -1,7 +1,7 @@
 import { test, expect, type APIRequestContext, type Page } from '@playwright/test'
 import { randomUUID } from 'node:crypto'
 import { interruptorAgenda, sqlLocal, soloEscritorio } from './ayudas'
-import { esperarCorreo, type CorreoCapturado } from './mailpit'
+import { contarCorreos, esperarCorreo, type CorreoCapturado } from './mailpit'
 import {
   api, cerrarEscenario, citaDe, emitirEnlace, ipAlAzar, personaNueva, prepararEscenario, reservar, turnosLibres, verificarCorreo,
   type Escenario, type Turno,
@@ -324,4 +324,39 @@ test('reagendar desde «no podré asistir» con el enlace fijo, hasta el tope de
   await expect(page.getByText(/^Para agendar otra cita, comunícate/)).toBeVisible()
   const tope = await reservarFijo(fijo, telefono, codigo)
   expect({ status: tope.status, error: tope.error }).toEqual({ status: 403, error: 'tope_reagendados' })
+})
+
+test('lista A 4: una reserva dentro de la ventana recibe UN correo (el comprobante); la tarea de recordatorios, después, no manda otro', async () => {
+  const cron = process.env.CRON_SECRET ?? ''
+  test.skip(cron === '', 'Falta CRON_SECRET (sólo de prueba) en .env.local')
+  // Ventana de 72 h para tener turnos dentro sin depender del día de la semana; se restablece al terminar.
+  sqlLocal(`update public.agenda_ajustes set recordatorio_horas = 72 where clinica_id = :'c';`, { c: e.clinicaId })
+  try {
+    const { codigo } = emitirEnlace(e, 'unico')
+    const ahora = Date.now()
+    const dentro = (await turnosLibres(e, codigo, 0))
+      .find(t => Date.parse(t.inicio) > ahora + 3 * 3600_000 && Date.parse(t.inicio) < ahora + 70 * 3600_000)
+    test.skip(!dentro, 'Sin turnos libres dentro de las próximas 70 h')
+    const p = personaNueva()
+    expect((await reservar(e, codigo, { inicio: dentro?.inicio ?? '', persona: p })).status).toBe(201)
+    await codigoDelComprobante(p.correo)
+    const citaId = citaDe(p.correo)?.id ?? ''
+    expect(sqlLocal(`select tipo || ':' || estado from public.cita_correos where appointment_id = :'id';`, { id: citaId })).toBe('comprobante:enviado')
+
+    const ctx = await api()
+    try {
+      for (let i = 0; i < 2; i++) {
+        const r = await ctx.get('/api/cron/recordatorios', { headers: { authorization: `Bearer ${cron}` } })
+        expect(r.status()).toBe(200)
+      }
+    } finally {
+      await ctx.dispose()
+    }
+    await new Promise(r => setTimeout(r, 1500))
+    expect(await contarCorreos(p.correo, 'Tu cita con')).toBe(1)
+    expect(await contarCorreos(p.correo, 'Recordatorio')).toBe(0)
+    expect(sqlLocal(`select count(*) from public.cita_correos where appointment_id = :'id' and tipo = 'recordatorio';`, { id: citaId })).toBe('0')
+  } finally {
+    sqlLocal(`update public.agenda_ajustes set recordatorio_horas = 24 where clinica_id = :'c';`, { c: e.clinicaId })
+  }
 })

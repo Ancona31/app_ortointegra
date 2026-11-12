@@ -32,10 +32,7 @@ import { AVISO_VERSION, hashAviso } from '@/lib/reserva/avisoReserva'
 import { respuestaErrorRpc, respuestaReserva } from '@/lib/reserva/respuestasReserva'
 import { fechaEnZona, ocupacionSinEstado, rangoDeConsulta, reglasDe, turnoValido } from '@/lib/reserva/turnosReserva'
 import { crearEventoReserva } from '@/lib/reserva/googleReserva'
-import { correoComprobante } from '@/lib/reserva/correosReserva'
-import { emitirEnlaceConfirmacion } from '@/lib/confirmacion/enlaceConfirmacion'
-import { enviarCorreo } from '@/lib/correo/transporte'
-import { logger } from '@/lib/logger'
+import { enviarComprobante } from '@/lib/reserva/comprobanteReserva'
 import type { ContextoReserva, ResultadoReservaRpc } from '@/lib/reserva/servidorReserva'
 
 export const dynamic = 'force-dynamic'
@@ -107,8 +104,8 @@ type ConsultorioCtx = ContextoReserva['consultorios'][number]
  * `transporte.ts` (en local, a Mailpit), sin tipo de cita. Nada de esto
  * cambia la respuesta: la cita ya existe.
  * E5 (lista A 1): el comprobante lleva el enlace de confirmación de la cita
- * (`emitirEnlaceConfirmacion`, sistema: `creadoPor` null). Si no se puede
- * emitir (E1 sin aplicar, sin secreto, error), sale el de D8 tal cual. Las
+ * y queda registrado en `cita_correos` (E4), para que el recordatorio no
+ * salga otra vez para ese inicio (lista A 4): `comprobanteReserva.ts`. Las
  * citas que agenda el personal siguen sin correo al agendar.
  */
 function programarDespues(ctx: ContextoReserva, consultorio: ConsultorioCtx, b: { nombre: string; correo: string }, fila: ResultadoReservaRpc): void {
@@ -120,17 +117,12 @@ function programarDespues(ctx: ContextoReserva, consultorio: ConsultorioCtx, b: 
       clinicaId: ctx.clinica_id, citaId, medicoId: ctx.medico_id, nombre, inicio, fin, zona: consultorio.timezone,
       clinica: ctx.clinica ? { nombre: ctx.clinica.nombre ?? '', nombre_display: ctx.clinica.nombre_display } : null,
     })
-    try {
-      // Nunca lanza (E2); el catch es por si eso cambia: sin enlace, sale el comprobante de D8.
-      const enlace = await emitirEnlaceConfirmacion(ctx.clinica_id, citaId, null).catch(() => null)
-      const plantilla = correoComprobante({
+    await enviarComprobante({
+      clinicaId: ctx.clinica_id, citaId, correoEscrito: b.correo,
+      datos: {
         medico: nombreDelMedico(ctx), consultorio: consultorio.nombre, direccion: consultorio.direccion,
         telefono: consultorio.telefono ?? ctx.medico.telefono, inicio, zona: consultorio.timezone,
-        urlConfirmacion: enlace?.url ?? null,
-      })
-      await enviarCorreo({ para: b.correo, ...plantilla, etiqueta: 'reserva_comprobante' })
-    } catch (err) {
-      logger.error('reserva', `comprobante no compuesto: ${err instanceof Error ? err.name : 'desconocido'}`)
-    }
+      },
+    })
   })
 }

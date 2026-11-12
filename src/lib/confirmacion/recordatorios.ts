@@ -74,14 +74,29 @@ const TomaSchema = z.object({
   r_medico: NombreSchema.nullable(),
   r_consultorio: z.object({ nombre: z.string().nullable(), direccion: z.string().nullable(), telefono: z.string().nullable() }),
 })
-type Toma = z.infer<typeof TomaSchema>
+export type Toma = z.infer<typeof TomaSchema>
 
-type Cierre = { estado: 'enviado'; motivo: null } | { estado: 'fallido' | 'omitido'; motivo: 'transporte' | 'duplicado' | 'sin_enlace' | 'plantilla' }
+export type Cierre = { estado: 'enviado'; motivo: null } | { estado: 'fallido' | 'omitido'; motivo: 'transporte' | 'duplicado' | 'sin_enlace' | 'plantilla' }
 
-async function tomar(clinicaId: string, citaId: string, testigo: string): Promise<Toma | null> {
-  const data = await llamar('cita_correo_tomar', { p_clinica_id: clinicaId, p_cita_id: citaId, p_tipo: 'recordatorio', p_testigo: testigo })
+/**
+ * Toma UN envío de `tipo` (`cita_correo_tomar`). null = la base dice que no
+ * toca. Lanza `RecordatoriosNoDisponibles` sin las RPC de E4 y Error ante otro
+ * fallo. La usa también el comprobante de la reserva por enlace (E5,
+ * `comprobanteReserva.ts`), con `tipo: 'comprobante'`.
+ */
+export async function tomarEnvio(clinicaId: string, citaId: string, tipo: 'recordatorio' | 'comprobante', testigo: string): Promise<Toma | null> {
+  const data = await llamar('cita_correo_tomar', { p_clinica_id: clinicaId, p_cita_id: citaId, p_tipo: tipo, p_testigo: testigo })
   const filas = z.array(TomaSchema).parse(data ?? [])
   return filas[0] ?? null
+}
+
+async function tomar(clinicaId: string, citaId: string, testigo: string): Promise<Toma | null> {
+  return tomarEnvio(clinicaId, citaId, 'recordatorio', testigo)
+}
+
+/** Cierra UN envío tomado por `testigo` (`cita_correo_marcar`). false = ya no era suyo. */
+export async function marcarEnvio(clinicaId: string, envioId: string, testigo: string, c: Cierre): Promise<boolean> {
+  return marcar(clinicaId, envioId, testigo, c)
 }
 
 async function marcar(clinicaId: string, envioId: string, testigo: string, c: Cierre): Promise<boolean> {
