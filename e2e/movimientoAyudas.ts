@@ -7,7 +7,9 @@ import {
  * Ayuda e2e del bloque F (F0): la regla de movimiento de la agenda, comprobada
  * en el navegador. Recorre `document.getAnimations()` —CSS, transiciones y
  * WAAPI por igual— y devuelve las que animan algo distinto de `opacity` y
- * `transform` o duran más de 240 ms. Vacío = se cumple.
+ * `transform` (y de los colores de hover y foco) o duran más de 240 ms. Sólo
+ * mira lo de la agenda: lo de toda la app (avisos de la barra lateral, los
+ * toasts) queda fuera de esta regla. Vacío = se cumple.
  *
  * La REGLA vive en `src/lib/agenda/movimientoAgenda.ts` y se prueba con Vitest;
  * aquí sólo se extrae lo que el navegador está animando EN ESTE INSTANTE, así
@@ -47,7 +49,15 @@ export async function animacionesFueraDeRegla(
       const elemento = destino instanceof Element
         ? `${destino.tagName.toLowerCase()}${destino.classList.length ? '.' + [...destino.classList].join('.') : ''}`
         : '(sin elemento)'
-      return { nombre, propiedades: [...props], duracionMs: typeof duracion === 'number' ? duracion : Number.NaN, elemento }
+      /* De la agenda: dentro de su raíz, o en uno de sus portales a `body`
+         (capas, hoja, modales y su velo, el espejo del arrastre).
+         ⚠️ QUEDAN FUERA `HorarioModal` y `ModalInvitacionCita`: siguen con la
+         entrada de toda la app (`animate-modal-enter`) y sin clase propia que
+         los nombre; ninguna e2e de movimiento los abre. Pendiente anotado en
+         §6-bis («integración y cierre de F»). */
+      const deLaAgenda = destino instanceof Element
+        && destino.closest('.agenda-raiz, .ag-capa, .ag-capa-velo, .ag-hoja, .ag-modal-panel, .ag-modal-velo, .fc-event') !== null
+      return { nombre, propiedades: [...props], duracionMs: typeof duracion === 'number' ? duracion : Number.NaN, elemento, deLaAgenda }
     })
   })
   return incumplimientosDeMovimiento(observadas, regla)

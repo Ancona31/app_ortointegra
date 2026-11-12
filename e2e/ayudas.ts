@@ -235,8 +235,23 @@ async function pxPorMinuto(page: Page): Promise<number> {
  * cantidad RELATIVA a la propia caja del evento, ya traída a la vista, evita
  * el problema entero.
  */
+/**
+ * Espera a que el evento deje de animarse (él y lo de dentro). Desde F2.6, una
+ * cita que vuelve a su sitio (`restaurarPosicion`, el «Cancelar» de un aviso) o
+ * que mueve otra persona SE DESLIZA 180 ms con un `translate` (FLIP): medir su
+ * caja a mitad del deslizamiento da una posición que no es la suya, y el ratón
+ * cae en una franja vacía (que abre la burbuja de alta en vez de arrastrar).
+ */
+async function esperarQueNoSeAnime(evento: Locator): Promise<void> {
+  /* Un bucle (iteraciones infinitas) no termina nunca: no se espera. */
+  await evento.evaluate(el => Promise.all(el.getAnimations({ subtree: true })
+    .filter(a => a.effect?.getTiming().iterations !== Infinity)
+    .map(a => a.finished.catch(() => undefined))))
+}
+
 export async function arrastrarEventoPorMinutos(page: Page, evento: Locator, deltaMinutos: number): Promise<void> {
   const porMinuto = await pxPorMinuto(page)
+  await esperarQueNoSeAnime(evento)
   const margen = 70
   // ⚠️ EL DESTINO PUEDE CAER FUERA DE LO VISIBLE, Y ESO ROMPE EL ARRASTRE SIN
   // AVISO: se probó mover el ratón a una `y` fuera de la zona que el propio
@@ -278,6 +293,7 @@ export async function arrastrarEventoPorMinutos(page: Page, evento: Locator, del
 /** Redimensiona el FIN de un evento arrastrando su asa `.fc-event-resizer-end`. */
 export async function redimensionarFinEvento(page: Page, evento: Locator, deltaMinutos: number): Promise<void> {
   const porMinuto = await pxPorMinuto(page)
+  await esperarQueNoSeAnime(evento)
   const resizer = evento.locator('.fc-event-resizer-end')
   await evento.scrollIntoViewIfNeeded()
   // El asa sólo tiene caja de layout con el ratón ENCIMA del evento (CSS por

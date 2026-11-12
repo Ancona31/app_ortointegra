@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { CORREO, SESION, interruptorAgenda, soloEscritorio, sqlLocal } from './ayudas'
+import { CORREO, SESION, interruptorAgenda, sqlLocal } from './ayudas'
 import { abrirAgendaApagada, abrirAgendaV2, tarjetaLectura } from './interaccionesAyudas'
 
 /**
@@ -22,7 +22,11 @@ import { abrirAgendaApagada, abrirAgendaV2, tarjetaLectura } from './interaccion
  * de servicio en `buscarCitasPaciente.ts` → la prueba del invitado se pone en
  * rojo; quitar el `agendaV2` del botón → «apagado» lo ve.
  */
-soloEscritorio()
+/* Escritorio, salvo el bloque «teléfono» (la lupa de la banda azul). */
+test.beforeEach(({}, info) => {
+  const delTelefono = info.titlePath.includes('teléfono')
+  test.skip(info.project.name !== (delTelefono ? 'telefono' : 'escritorio'), delTelefono ? 'banda del teléfono' : 'barra de escritorio')
+})
 
 test.afterEach(() => { interruptorAgenda('A', false) })
 
@@ -104,5 +108,39 @@ test.describe('médico invitado', () => {
     const filas = await (await respuesta).json() as { medico_id: string }[]
     expect(filas.length).toBeGreaterThan(0)
     expect(filas.every(f => f.medico_id === invitado)).toBe(true)
+  })
+})
+
+/* Cierre de F · en el teléfono la lupa va en la ranura `buscar` de la banda,
+   delante del filtro, a 44 px; ni el minicalendario (decisión 21) ni el botón
+   de la ayuda. MUTACIÓN: quitar el `buscar=` de `<BandaMovil>` → rojo. */
+test.describe('teléfono', () => {
+  test.use({ storageState: SESION.adminA })
+
+  test('apagado: la banda no tiene lupa', async ({ page }) => {
+    await abrirAgendaApagada(page)
+    await expect(page.locator('.ag-banda-movil')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Buscar citas de un paciente' })).toHaveCount(0)
+  })
+
+  test('encendido: la lupa de la banda (44 px) abre el buscador dentro de la pantalla', async ({ page }) => {
+    interruptorAgenda('A', true)
+    await abrirAgendaV2(page)
+    const banda = page.locator('.ag-banda-movil')
+    const boton = banda.getByRole('button', { name: 'Buscar citas de un paciente' })
+    const caja = await boton.boundingBox()
+    expect(caja?.width).toBeGreaterThanOrEqual(44)
+    expect(caja?.height).toBeGreaterThanOrEqual(44)
+    await expect(banda.getByRole('button', { name: 'Ir a una fecha' })).toHaveCount(0)
+    await expect(banda.getByRole('button', { name: 'Atajos de teclado' })).toHaveCount(0)
+    await boton.click()
+    const dialogo = page.getByRole('dialog', { name: 'Buscar citas' })
+    await expect(dialogo.getByRole('combobox')).toBeFocused()
+    const d = await dialogo.boundingBox()
+    const ancho = page.viewportSize()?.width ?? 0
+    expect(d && d.x >= 0 && d.x + d.width <= ancho).toBe(true)
+    await page.keyboard.press('Escape')
+    await expect(dialogo).toHaveCount(0)
+    await expect(boton).toBeFocused()
   })
 })

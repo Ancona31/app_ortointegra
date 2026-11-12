@@ -19,8 +19,8 @@
  * `prefiereMenosMovimiento()`.
  *
  * También vive aquí la REGLA que se comprueba en las e2e
- * (`incumplimientosDeMovimiento`): sólo `opacity` y `transform`, y nada por
- * encima de 240 ms. Es pura para poder probarla con Vitest; la extracción de
+ * (`incumplimientosDeMovimiento`): sólo `opacity` y `transform` (más los colores
+ * de hover y foco), y nada por encima de 240 ms. Es pura para poder probarla con Vitest; la extracción de
  * `document.getAnimations()` la hace `e2e/movimientoAyudas.ts`.
  */
 
@@ -156,6 +156,9 @@ export interface AnimacionObservada {
   duracionMs: number
   /** Selector corto del elemento, sólo para el mensaje. */
   elemento: string
+  /** `false` si el elemento no es de la agenda (la barra lateral, los avisos
+      de toda la app): la regla es de la agenda y no lo mira. Sin el campo, cuenta. */
+  deLaAgenda?: boolean
 }
 
 export interface ReglaMovimiento {
@@ -166,16 +169,28 @@ export interface ReglaMovimiento {
 
 export const REGLA_AGENDA: ReglaMovimiento = {
   /* El rastro de la barra de carga es un BUCLE de 1.1 s documentado junto a su
-     regla en `globals.css`: no es una transición de la escala. */
-  excepciones: ['ag-barra-carga'],
+     regla en `globals.css`: no es una transición de la escala. `spin` es el
+     mismo papel: el giro del indicador de «guardando» de un botón (Tailwind
+     `animate-spin`), un estado y no un movimiento de la escala. */
+  excepciones: ['ag-barra-carga', 'spin'],
   topeMs: TOPE_MOVIMIENTO_MS,
 }
 
-const PROPIEDADES_PERMITIDAS = new Set(['opacity', 'transform'])
+/* `opacity` y `transform` es la regla de lo que SE MUEVE (no recalcula la
+   rejilla). Los colores entran por CONTRASTE §5 y el diseño de F («Hover y
+   foco: fondo y borde en `--ag-dur-micro`»): son el cambio de fondo, borde y
+   tinta de hover y foco, que sólo repintan y que el diseño PIDE. Siguen fuera
+   `width`, `height`, `top`, `left`, `box-shadow`, `outline-*`… y el tope de
+   240 ms vale para todo. */
+const PROPIEDADES_PERMITIDAS = new Set([
+  'opacity', 'transform',
+  'background-color', 'color', 'border-color',
+  'border-top-color', 'border-right-color', 'border-bottom-color', 'border-left-color',
+])
 
 /** Qué incumple una animación, en texto; `null` si cumple. */
 export function motivoDeIncumplimiento(a: AnimacionObservada, regla: ReglaMovimiento): string | null {
-  if (regla.excepciones.includes(a.nombre)) return null
+  if (regla.excepciones.includes(a.nombre) || a.deLaAgenda === false) return null
   const malas = a.propiedades.filter(p => !PROPIEDADES_PERMITIDAS.has(p))
   const motivos: string[] = []
   if (malas.length) motivos.push(`anima ${malas.join(', ')}`)

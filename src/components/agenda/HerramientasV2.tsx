@@ -4,21 +4,24 @@
  * src/components/agenda/HerramientasV2.tsx
  *
  * Las piezas de las interacciones v2 (bloque F, F3) que viven FUERA de la capa
- * principal: los tres botones de la barra de escritorio —«Ir a una fecha» con
- * el minicalendario desplegable, «Buscar citas de un paciente» y «Atajos de
- * teclado»— y el minicalendario del panel de la vista Día.
+ * principal: los botones de la barra —«Ir a una fecha» con el minicalendario
+ * desplegable, «Buscar citas de un paciente» y «Atajos de teclado»— y el
+ * minicalendario del panel de la vista Día.
  *
  * Como `InteraccionesV2.tsx`, sólo se carga con el interruptor encendido
  * (`next/dynamic` en `AgendaCliente`). Lo que abre la capa principal (el
  * buscador, la ayuda) se pide por `apiRef`, la misma referencia que usa
  * `altaCitas.ts`.
  *
- * ⚠️ HOY VAN EN EL HUECO `porConfirmar` DE `CabeceraEscritorio`, junto a
- * «Agendar», porque es la única ranura de nodos que esa barra tiene y la barra
- * es de la superficie. Su sitio del diseño es junto a la fecha (el
- * desplegable) y en la barra (la lupa): pedido a la superficie como dos
- * ranuras, `selectorFecha` y `buscar`, en su barra única (F1.1) y en la banda
- * del teléfono. Mientras tanto se ven y se prueban aquí.
+ * ⚠️ CADA PIEZA VA EN SU RANURA (cierre de F). `CabeceraEscritorio` y
+ * `BandaMovil` tienen dos: `selectorFecha` (la primera de la fila de controles,
+ * pegada a la fecha de FullCalendar) y `buscar` (antes de «Por confirmar»). En
+ * escritorio, `SelectorFechaV2` va en la primera y `BuscarV2` —la lupa y, a su
+ * lado, «Atajos de teclado»— en la segunda. En el teléfono sólo la lupa, en
+ * `buscar` (delante del filtro) y a 44 px: el minicalendario no va allí
+ * (decisión 21) y el botón de la ayuda le quitaría al filtro el ancho que le
+ * queda a 360 px. Hasta el cierre de F estuvieron juntas en el hueco
+ * `porConfirmar`, provisionales.
  *
  * El desplegable sigue el patrón «Date Picker Dialog» de APG: botón con
  * `aria-haspopup="dialog"` y `aria-expanded`, diálogo modal con el foco en el
@@ -155,16 +158,18 @@ function SelectorFecha({ rango, alIrAFecha }: { rango: RangoVisibleV2; alIrAFech
  * (`irACita`: su día en la vista Día y su tarjeta). `/` lo abre pulsando este
  * botón (`InteraccionesV2`), así el foco vuelve aquí al cerrar.
  */
-function BotonBuscar({ apiRef }: { apiRef: RefObject<ApiInteraccionesV2 | null> }): ReactElement {
+function BotonBuscar({ apiRef, clase, icono, atajos }: {
+  apiRef: RefObject<ApiInteraccionesV2 | null>; clase: string; icono: number; atajos: boolean
+}): ReactElement {
   const [ancla, setAncla] = useState<Caja | null>(null)
   const cerrar = useCallback(() => setAncla(null), [])
   return (
     <>
-      <button type="button" className="ag-herramienta" data-buscar-citas=""
-        aria-label="Buscar citas de un paciente" title="Buscar citas de un paciente (/)"
-        aria-keyshortcuts={teclasDeAccion('buscar')} aria-haspopup="dialog" aria-expanded={ancla !== null}
+      <button type="button" className={clase} data-buscar-citas=""
+        aria-label="Buscar citas de un paciente" title={atajos ? 'Buscar citas de un paciente (/)' : 'Buscar citas de un paciente'}
+        aria-keyshortcuts={atajos ? teclasDeAccion('buscar') : undefined} aria-haspopup="dialog" aria-expanded={ancla !== null}
         onClick={e => setAncla(a => (a ? null : cajaDe(e.currentTarget)))}>
-        <Search size={16} aria-hidden="true" />
+        <Search size={icono} aria-hidden="true" />
       </button>
       {ancla && (
         <Desplegable ancla={ancla} etiqueta="Buscar citas" disparador="[data-buscar-citas]" alCerrar={cerrar}>
@@ -175,25 +180,37 @@ function BotonBuscar({ apiRef }: { apiRef: RefObject<ApiInteraccionesV2 | null> 
   )
 }
 
-export interface PropsHerramientasV2 {
-  /** La capa principal: el buscador y la ayuda se piden por aquí. */
-  apiRef: RefObject<ApiInteraccionesV2 | null>
+/** Ranura `selectorFecha` de la barra de escritorio: «Ir a una fecha» y su minicalendario. */
+export function SelectorFechaV2({ rango, alIrAFecha }: {
   rango: RangoVisibleV2
   /** `api.gotoDate(fecha)`: conserva la vista. */
   alIrAFecha: (fecha: string) => void
+}): ReactElement {
+  return <SelectorFecha rango={rango} alIrAFecha={alIrAFecha} />
 }
 
-/** Los tres botones de la barra de escritorio. */
-export default function HerramientasV2({ apiRef, rango, alIrAFecha }: PropsHerramientasV2): ReactElement {
+export interface PropsBuscarV2 {
+  /** La capa principal: el buscador y la ayuda se piden por aquí. */
+  apiRef: RefObject<ApiInteraccionesV2 | null>
+  /** Con los atajos de una tecla activos: `aria-keyshortcuts` y la tecla en el `title`. */
+  atajos: boolean
+  /** En la banda del teléfono: la lupa sola, a 44 px y con la pinta de la banda. */
+  enBanda?: boolean
+}
+
+/** Ranura `buscar`: la lupa y, en escritorio, el botón de la ayuda de atajos. */
+export function BuscarV2({ apiRef, atajos, enBanda = false }: PropsBuscarV2): ReactElement {
+  if (enBanda) {
+    return <BotonBuscar apiRef={apiRef} atajos={atajos} icono={18} clase="ag-banda-movil-ctrl ag-banda-movil-ctrl--marco" />
+  }
   return (
     <div className="ag-herramientas" role="group" aria-label="Herramientas de la agenda">
-      <SelectorFecha rango={rango} alIrAFecha={alIrAFecha} />
-      <BotonBuscar apiRef={apiRef} />
+      <BotonBuscar apiRef={apiRef} atajos={atajos} icono={16} clase="ag-herramienta" />
       {/* WCAG 2.1.4: la ayuda tiene que poder abrirse SIN el atajo, porque es
           donde se vuelven a encender cuando alguien los apagó. */}
       <button type="button" className="ag-herramienta"
-        aria-label="Atajos de teclado" title="Atajos de teclado (?)"
-        aria-keyshortcuts={teclasDeAccion('ayuda')} onClick={() => apiRef.current?.abrirAyuda()}>
+        aria-label="Atajos de teclado" title={atajos ? 'Atajos de teclado (?)' : 'Atajos de teclado'}
+        aria-keyshortcuts={atajos ? teclasDeAccion('ayuda') : undefined} onClick={() => apiRef.current?.abrirAyuda()}>
         <Keyboard size={16} aria-hidden="true" />
       </button>
     </div>

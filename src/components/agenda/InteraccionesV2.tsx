@@ -76,6 +76,10 @@ export interface PropsInteraccionesV2 {
   apiRef: Ref<ApiInteraccionesV2>
   /** `true` al montar, `false` al desmontar: la raíz lo publica para las pruebas. */
   alCambiarListas: (listas: boolean) => void
+  /** Si los atajos de una tecla están encendidos (la preferencia de la ayuda);
+      `false` al desmontar. La agenda lo pasa a la barra y a la banda como
+      `atajos` (`aria-keyshortcuts`): sólo anuncian teclas que funcionan. */
+  alCambiarAtajos: (encendidos: boolean) => void
   calendarRef: CalRef
   /** En el teléfono la tarjeta es una hoja inferior. */
   isMobile: boolean
@@ -376,7 +380,7 @@ function useDeslizarV2(p: PropsInteraccionesV2): void {
 }
 
 export default function InteraccionesV2(p: PropsInteraccionesV2): ReactElement | null {
-  const { apiRef, alCambiarListas, calendarRef, medicos } = p
+  const { apiRef, alCambiarListas, alCambiarAtajos, calendarRef, medicos } = p
   const { capa, capaRef, abrir, cerrar: cerrarCapa } = useCapa()
 
   /* Cerrar la burbuja suelta también el tramo marcado en la rejilla, que
@@ -412,6 +416,10 @@ export default function InteraccionesV2(p: PropsInteraccionesV2): ReactElement |
     alCambiarListas(true)
     return () => alCambiarListas(false)
   }, [alCambiarListas])
+  useEffect(() => {
+    alCambiarAtajos(atajos.encendidos)
+  }, [alCambiarAtajos, atajos.encendidos])
+  useEffect(() => () => alCambiarAtajos(false), [alCambiarAtajos])
   const medicosBurbuja = useMemo(() => medicos.map(m => ({ id: m.id, nombre: componerNombreMedicoCompleto(m) })), [medicos])
 
   if (capa?.tipo === 'burbuja') return <CapaBurbuja key={capa.id} capa={capa} medicos={medicosBurbuja} p={p} cerrar={cerrar} />

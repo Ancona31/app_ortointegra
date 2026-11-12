@@ -339,6 +339,17 @@ export function crearAltaCitas({
   /* `arg.el` es la tarjeta pulsada (o la que tenía el foco, con Enter: FC
      manda el `KeyboardEvent`, sin punto). */
   function handleEventClick(arg: EventClickArg) {
+    /* F3.2 · LA CITA PULSADA SE ENFOCA ANTES DE ABRIR SU TARJETA. Con el ratón
+       no recibe el foco sola: FullCalendar cancela el `mousedown` (es lo que le
+       deja arrastrar), así que el foco seguía donde estaba —p. ej. en «›»— y
+       `useDialogoModal` lo devolvía ahí al cerrar, no a la cita (diseño §3.2:
+       «Escape devuelve el foco a la cita»). Sólo en el camino de la tarjeta:
+       con el interruptor apagado el clic hace exactamente lo de hoy.
+       ⚠️ EN LAS LISTAS DEL TELÉFONO NO HAY NADA QUE ENFOCAR, y no es de F: con
+       `eventContent` propio FullCalendar no monta el `<a>` de la fila, y el
+       `<tr>` no admite foco (`focus()` no hace nada). Allí el foco vuelve a lo
+       que lo tenía, como antes. */
+    if (agendaV2 && interacciones.current && !arg.event.extendedProps.isGcalBlock) arg.el.focus({ preventScroll: true })
     abrirCita(arg.event, { ancla: cajaDe(arg.el), punto: puntoDe(arg.jsEvent) })
   }
 

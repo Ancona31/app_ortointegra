@@ -12,19 +12,26 @@ import { renderToStaticMarkup } from 'react-dom/server'
 vi.mock('@/components/ui/Portal', () => ({ default: ({ children }: { children: ReactNode }) => children }))
 vi.mock('@/lib/supabase/client', () => ({ createClient: () => { throw new Error('sin red en pruebas') } }))
 
-import HerramientasV2, { MiniMesPanelV2 } from '@/components/agenda/HerramientasV2'
+import { BuscarV2, MiniMesPanelV2, SelectorFechaV2 } from '@/components/agenda/HerramientasV2'
 import { PanelDia } from '@/components/agenda/PanelDia'
 
 const nada = (): void => undefined
 const RANGO = '2026-11-09/2026-11-16'
 
-describe('HerramientasV2', () => {
-  const html = renderToStaticMarkup(<HerramientasV2 apiRef={{ current: null }} rango={RANGO} alIrAFecha={nada} />)
+describe('SelectorFechaV2 (ranura `selectorFecha`)', () => {
+  const html = renderToStaticMarkup(<SelectorFechaV2 rango={RANGO} alIrAFecha={nada} />)
   it('el botón «Ir a una fecha» anuncia su diálogo y empieza cerrado', () => {
     expect(html).toContain('aria-label="Ir a una fecha"')
     expect(html).toContain('aria-haspopup="dialog"')
     expect(html).toContain('aria-expanded="false"')
   })
+  it('cerrado no pinta ningún diálogo', () => {
+    expect(html).not.toContain('role="dialog"')
+  })
+})
+
+describe('BuscarV2 (ranura `buscar`)', () => {
+  const html = renderToStaticMarkup(<BuscarV2 apiRef={{ current: null }} atajos />)
   it('F3.6: la lupa anuncia su atajo `/` y su diálogo', () => {
     expect(html).toContain('aria-label="Buscar citas de un paciente"')
     expect(html).toContain('aria-keyshortcuts="/"')
@@ -36,6 +43,17 @@ describe('HerramientasV2', () => {
   })
   it('cerrado no pinta ningún diálogo', () => {
     expect(html).not.toContain('role="dialog"')
+  })
+  it('con los atajos apagados no anuncia teclas, pero la ayuda sigue ahí', () => {
+    const sin = renderToStaticMarkup(<BuscarV2 apiRef={{ current: null }} atajos={false} />)
+    expect(sin).not.toContain('aria-keyshortcuts')
+    expect(sin).toContain('aria-label="Atajos de teclado"')
+  })
+  it('en la banda del teléfono: sólo la lupa, con la pinta de la banda', () => {
+    const banda = renderToStaticMarkup(<BuscarV2 apiRef={{ current: null }} atajos enBanda />)
+    expect(banda).toContain('aria-label="Buscar citas de un paciente"')
+    expect(banda).toContain('ag-banda-movil-ctrl')
+    expect(banda).not.toContain('aria-label="Atajos de teclado"')
   })
 })
 

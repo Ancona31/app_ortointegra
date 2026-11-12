@@ -75,9 +75,29 @@ describe('incumplimientosDeMovimiento', () => {
     const larga: AnimacionObservada = { ...buena, nombre: 'ag-pulso', duracionMs: 900 }
     expect(incumplimientosDeMovimiento([larga])[0]).toContain('dura 900 ms')
   })
-  it('la barra de carga es la única excepción', () => {
+  it('las excepciones son los dos bucles de carga: la barra y el giro del «guardando»', () => {
     const bucle: AnimacionObservada = { nombre: 'ag-barra-carga', propiedades: ['transform'], duracionMs: 1100, elemento: 'div' }
-    expect(incumplimientosDeMovimiento([bucle])).toEqual([])
+    const giro: AnimacionObservada = { nombre: 'spin', propiedades: ['transform'], duracionMs: 1000, elemento: 'svg' }
+    expect(incumplimientosDeMovimiento([bucle, giro])).toEqual([])
+    expect(incumplimientosDeMovimiento([{ ...bucle, nombre: 'ag-pulso' }])).toHaveLength(1)
+  })
+  it('CONTRASTE §5: el fondo, el borde y la tinta del hover en micro cumplen', () => {
+    const hover: AnimacionObservada = {
+      nombre: 'background-color', propiedades: ['background-color', 'border-top-color', 'color'], duracionMs: 120, elemento: 'button.fc-next-button',
+    }
+    expect(incumplimientosDeMovimiento([hover])).toEqual([])
+  })
+  it('MUTACIÓN: el anillo de foco animado (`transition-all`: box-shadow, outline) incumple', () => {
+    const foco: AnimacionObservada = { nombre: 'all', propiedades: ['box-shadow', 'outline-width'], duracionMs: 150, elemento: 'input' }
+    expect(incumplimientosDeMovimiento([foco])[0]).toContain('anima box-shadow, outline-width')
+  })
+  it('un color por encima del tope incumple igual', () => {
+    expect(incumplimientosDeMovimiento([{ ...buena, propiedades: ['background-color'], duracionMs: 300 }])).toHaveLength(1)
+  })
+  it('lo que no es de la agenda (la barra lateral, los avisos de la app) no cuenta; sin el campo, sí', () => {
+    const ajena: AnimacionObservada = { nombre: 'avisoHalo', propiedades: ['box-shadow'], duracionMs: 2800, elemento: 'div', deLaAgenda: false }
+    expect(incumplimientosDeMovimiento([ajena])).toEqual([])
+    expect(incumplimientosDeMovimiento([{ ...ajena, deLaAgenda: undefined }])).toHaveLength(1)
   })
   it('una duración infinita o no numérica incumple', () => {
     expect(incumplimientosDeMovimiento([{ ...buena, duracionMs: Infinity }])).toHaveLength(1)

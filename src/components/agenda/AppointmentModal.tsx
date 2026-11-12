@@ -1124,7 +1124,7 @@ export default function AppointmentModal({
                   value={titulo}
                   onChange={e => setTitulo(e.target.value)}
                   placeholder="Cirugía Sr. Pérez, Junta de personal, Bloqueo…"
-                  className="w-full px-3 py-2.5 max-md:py-3 text-sm rounded-xl border border-[var(--ag-input-border)] bg-[var(--ag-input-bg)] text-[var(--ag-text)] focus:outline-none focus:ring-2 focus:ring-[var(--ag-input-focus-ring)] focus:border-[var(--ag-input-focus-border)] transition-all"
+                  className="w-full px-3 py-2.5 max-md:py-3 text-sm rounded-xl border border-[var(--ag-input-border)] bg-[var(--ag-input-bg)] text-[var(--ag-text)] focus:outline-none focus:ring-2 focus:ring-[var(--ag-input-focus-ring)] focus:border-[var(--ag-input-focus-border)] ag-transicion-color"
                 />
                 {/* ⚠️ ESTE TEXTO NO ES DE RELLENO. El título viaja TAL CUAL al
                     calendario de Google —sin filtro y sin forma de sanearlo, que
@@ -1154,7 +1154,7 @@ export default function AppointmentModal({
                         title={ICONO_ETIQUETA[key]}
                         aria-label={ICONO_ETIQUETA[key]}
                         aria-pressed={on}
-                        className="w-10 h-10 max-md:w-11 max-md:h-11 rounded-xl flex items-center justify-center transition-all"
+                        className="w-10 h-10 max-md:w-11 max-md:h-11 rounded-xl flex items-center justify-center ag-transicion-color"
                         style={on
                           ? { background: 'var(--ag-modal-icon-bg)', color: 'var(--ag-brand-primary)', border: '1.5px solid var(--ag-brand-primary)' }
                           : { background: 'var(--ag-input-bg)', color: 'var(--ag-muted)', border: '1.5px solid var(--ag-input-border)' }}
@@ -1180,7 +1180,7 @@ export default function AppointmentModal({
                         title={COLOR_ETIQUETA[key]}
                         aria-label={COLOR_ETIQUETA[key]}
                         aria-pressed={on}
-                        className="w-10 h-10 max-md:w-11 max-md:h-11 rounded-xl flex items-center justify-center transition-all"
+                        className="w-10 h-10 max-md:w-11 max-md:h-11 rounded-xl flex items-center justify-center ag-transicion-color"
                         style={{
                           background: `color-mix(in srgb, var(--ag-evento-${key}) 14%, var(--ag-input-bg))`,
                           border: on
@@ -1287,7 +1287,7 @@ export default function AppointmentModal({
                   onChange={e => { setSearch(e.target.value); setShowSearch(true) }}
                   onFocus={() => setShowSearch(true)}
                   placeholder="Buscar paciente por nombre o apellido..."
-                  className="w-full px-3 py-2.5 max-md:py-3 text-sm rounded-xl border border-[var(--ag-input-border)] bg-[var(--ag-input-bg)] text-[var(--ag-text)] focus:outline-none focus:ring-2 focus:ring-[var(--ag-input-focus-ring)] focus:border-[var(--ag-input-focus-border)] transition-all"
+                  className="w-full px-3 py-2.5 max-md:py-3 text-sm rounded-xl border border-[var(--ag-input-border)] bg-[var(--ag-input-bg)] text-[var(--ag-text)] focus:outline-none focus:ring-2 focus:ring-[var(--ag-input-focus-ring)] focus:border-[var(--ag-input-focus-border)] ag-transicion-color"
                 />
                 {/* ⚠️ ALTO MÁXIMO Y SCROLL PROPIO. Esta lista es `absolute` DENTRO
                     del cuerpo del modal, que es `overflow-y: auto`: todo lo que
@@ -1427,7 +1427,7 @@ export default function AppointmentModal({
                    no se lo quita: sólo enfoca el panel si el foco no está dentro. */
                 autoFocus={modal.mode === 'edit' && modal.enfocar === 'fecha'}
                 onChange={e => todoElDia ? moverFechaDeTodoElDia(e.target.value) : moverInicio(e.target.value, hora)}
-                className="w-full px-3 py-2.5 max-md:py-3 text-sm rounded-xl border border-[var(--ag-input-border)] bg-[var(--ag-input-bg)] text-[var(--ag-text)] focus:outline-none focus:ring-2 focus:ring-[var(--ag-input-focus-ring)] focus:border-[var(--ag-input-focus-border)] transition-all"
+                className="w-full px-3 py-2.5 max-md:py-3 text-sm rounded-xl border border-[var(--ag-input-border)] bg-[var(--ag-input-bg)] text-[var(--ag-text)] focus:outline-none focus:ring-2 focus:ring-[var(--ag-input-focus-ring)] focus:border-[var(--ag-input-focus-border)] ag-transicion-color"
               />
             </div>
             {!todoElDia && (
@@ -1440,7 +1440,7 @@ export default function AppointmentModal({
                   value={hora}
                   step={900}
                   onChange={e => moverInicio(fecha, e.target.value)}
-                  className="w-full px-3 py-2.5 max-md:py-3 text-sm rounded-xl border border-[var(--ag-input-border)] bg-[var(--ag-input-bg)] text-[var(--ag-text)] focus:outline-none focus:ring-2 focus:ring-[var(--ag-input-focus-ring)] focus:border-[var(--ag-input-focus-border)] transition-all"
+                  className="w-full px-3 py-2.5 max-md:py-3 text-sm rounded-xl border border-[var(--ag-input-border)] bg-[var(--ag-input-bg)] text-[var(--ag-text)] focus:outline-none focus:ring-2 focus:ring-[var(--ag-input-focus-ring)] focus:border-[var(--ag-input-focus-border)] ag-transicion-color"
                 />
               </div>
             )}
@@ -1452,7 +1452,7 @@ export default function AppointmentModal({
                 type="date"
                 value={fechaFin}
                 onChange={e => setFechaFin(e.target.value)}
-                className="w-full px-3 py-2.5 max-md:py-3 text-sm rounded-xl border border-[var(--ag-input-border)] bg-[var(--ag-input-bg)] text-[var(--ag-text)] focus:outline-none focus:ring-2 focus:ring-[var(--ag-input-focus-ring)] focus:border-[var(--ag-input-focus-border)] transition-all"
+                className="w-full px-3 py-2.5 max-md:py-3 text-sm rounded-xl border border-[var(--ag-input-border)] bg-[var(--ag-input-bg)] text-[var(--ag-text)] focus:outline-none focus:ring-2 focus:ring-[var(--ag-input-focus-ring)] focus:border-[var(--ag-input-focus-border)] ag-transicion-color"
               />
             </div>
             {!todoElDia && (
@@ -1465,7 +1465,7 @@ export default function AppointmentModal({
                   value={horaFin}
                   step={900}
                   onChange={e => setHoraFin(e.target.value)}
-                  className="w-full px-3 py-2.5 max-md:py-3 text-sm rounded-xl border border-[var(--ag-input-border)] bg-[var(--ag-input-bg)] text-[var(--ag-text)] focus:outline-none focus:ring-2 focus:ring-[var(--ag-input-focus-ring)] focus:border-[var(--ag-input-focus-border)] transition-all"
+                  className="w-full px-3 py-2.5 max-md:py-3 text-sm rounded-xl border border-[var(--ag-input-border)] bg-[var(--ag-input-bg)] text-[var(--ag-text)] focus:outline-none focus:ring-2 focus:ring-[var(--ag-input-focus-ring)] focus:border-[var(--ag-input-focus-border)] ag-transicion-color"
                 />
               </div>
             )}
@@ -1494,7 +1494,7 @@ export default function AppointmentModal({
                   const marcado = tipoEfectivo === o.id
                   return (
                     <button key={o.id ?? 'sin-tipo'} type="button" role="radio" aria-checked={marcado} onClick={o.elegir}
-                      className={`inline-flex items-center gap-1.5 px-3 py-2 max-md:py-3 rounded-full text-[13px] font-semibold border transition-all ${marcado ? 'text-white' : ''}`}
+                      className={`inline-flex items-center gap-1.5 px-3 py-2 max-md:py-3 rounded-full text-[13px] font-semibold border ag-transicion-color ${marcado ? 'text-white' : ''}`}
                       style={marcado
                         ? { background: 'var(--ag-brand-primary)', borderColor: 'var(--ag-brand-primary)' }
                         : { background: 'var(--ag-input-bg)', color: 'var(--ag-text)', borderColor: 'var(--ag-input-border)' }}
@@ -1585,7 +1585,7 @@ export default function AppointmentModal({
                   value={medicoId}
                   onChange={e => setMedicoId(e.target.value)}
                   required={medicoDropdownRequired}
-                  className="w-full pl-3 pr-9 py-2.5 max-md:py-3 text-sm rounded-xl border border-[var(--ag-input-border)] bg-[var(--ag-input-bg)] text-[var(--ag-text)] focus:outline-none focus:ring-2 focus:ring-[var(--ag-input-focus-ring)] focus:border-[var(--ag-input-focus-border)] transition-all appearance-none cursor-pointer"
+                  className="w-full pl-3 pr-9 py-2.5 max-md:py-3 text-sm rounded-xl border border-[var(--ag-input-border)] bg-[var(--ag-input-bg)] text-[var(--ag-text)] focus:outline-none focus:ring-2 focus:ring-[var(--ag-input-focus-ring)] focus:border-[var(--ag-input-focus-border)] ag-transicion-color appearance-none cursor-pointer"
                 >
                   {!medicoDropdownRequired && <option value="">Sin asignar</option>}
                   {medicos.map(m => (
@@ -1608,7 +1608,7 @@ export default function AppointmentModal({
                 onChange={e => setConsultorioId(e.target.value)}
                 required
                 disabled={consultoriosList.length === 0}
-                className="w-full pl-3 pr-9 py-2.5 max-md:py-3 text-sm rounded-xl border border-[var(--ag-input-border)] bg-[var(--ag-input-bg)] text-[var(--ag-text)] focus:outline-none focus:ring-2 focus:ring-[var(--ag-input-focus-ring)] focus:border-[var(--ag-input-focus-border)] transition-all appearance-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full pl-3 pr-9 py-2.5 max-md:py-3 text-sm rounded-xl border border-[var(--ag-input-border)] bg-[var(--ag-input-bg)] text-[var(--ag-text)] focus:outline-none focus:ring-2 focus:ring-[var(--ag-input-focus-ring)] focus:border-[var(--ag-input-focus-border)] ag-transicion-color appearance-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {consultoriosList.length === 0 ? (
                   <option value="">Sin consultorios disponibles</option>
@@ -1635,7 +1635,7 @@ export default function AppointmentModal({
               /* F1.17 · Dos filas: con tres, «Guardar» quedaba fuera a 1280×720
                  y había que desplazar. Crece con el texto sólo si se escribe. */
               rows={2}
-              className="w-full px-3 py-2.5 max-md:py-3 text-sm rounded-xl border border-[var(--ag-input-border)] bg-[var(--ag-input-bg)] text-[var(--ag-text)] focus:outline-none focus:ring-2 focus:ring-[var(--ag-input-focus-ring)] focus:border-[var(--ag-input-focus-border)] transition-all resize-none"
+              className="w-full px-3 py-2.5 max-md:py-3 text-sm rounded-xl border border-[var(--ag-input-border)] bg-[var(--ag-input-bg)] text-[var(--ag-text)] focus:outline-none focus:ring-2 focus:ring-[var(--ag-input-focus-ring)] focus:border-[var(--ag-input-focus-border)] ag-transicion-color resize-none"
             />
           </div>
 

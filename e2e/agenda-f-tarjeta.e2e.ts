@@ -33,7 +33,19 @@ import { fechaHoraLocalAInstante } from '../src/lib/dates'
  */
 test.use({ storageState: SESION.adminA })
 
+/* Las citas que crea cada prueba, para borrarlas al acabar: todas van al mismo
+   viernes y a las mismas horas, y si se acumulan, `citaEnRejilla(…).first()`
+   puede agarrar la de otra prueba (una ya confirmada, por ejemplo). */
+const creadas: string[] = []
+
 test.afterEach(() => {
+  if (creadas.length) {
+    sqlLocal(`
+      delete from public.cita_correos where appointment_id = any (string_to_array(:'ids', ',')::uuid[]);
+      delete from public.cita_confirmaciones where appointment_id = any (string_to_array(:'ids', ',')::uuid[]);
+      delete from public.appointments where id = any (string_to_array(:'ids', ',')::uuid[]);`, { ids: creadas.join(',') })
+    creadas.length = 0
+  }
   limpiarReservasE2e()
   interruptorAgenda('A', false)
 })
@@ -56,13 +68,24 @@ function idsAdminA(apellidos: string): { medico: string; consultorio: string; pa
 /** Alta por la API en el viernes de la semana +2; `apellidos` null = evento sin paciente. */
 async function alta(page: Page, hora: string, apellidos: string | null, titulo?: string): Promise<{ id: string; paciente: string }> {
   const ids = idsAdminA(apellidos ?? 'Prueba 15')
-  const res = await page.request.post('/api/appointments', { data: {
+  const cuerpo = {
     title: apellidos ? `Paciente ${apellidos}` : titulo, start_time: fechaHoraLocalAInstante(VIERNES, hora, TZ),
     end_time: new Date(new Date(fechaHoraLocalAInstante(VIERNES, hora, TZ)).getTime() + 25 * 60_000).toISOString(),
     medico_id: ids.medico, consultorio_id: ids.consultorio, paciente_id: apellidos ? ids.paciente : null, notes: null, status: 'scheduled',
-  } })
+  }
+  /* Con el interruptor encendido el servidor contesta 409 si el tramo se
+     empalma (B7), y la semilla —o lo que dejó otro archivo— puede tener citas
+     ese viernes: se acepta el empalme y se reenvía, como el `alta` de
+     `agenda-empalme.e2e.ts`. Esto no prueba B7. */
+  let res = await page.request.post('/api/appointments', { data: cuerpo })
+  if (res.status() === 409) {
+    const { empalmes } = await res.json() as { empalmes: { id: string }[] }
+    res = await page.request.post('/api/appointments', { data: { ...cuerpo, empalmes_aceptados: empalmes.map(e => e.id) } })
+  }
   expect(res.ok(), await res.text()).toBeTruthy()
-  return { id: ((await res.json()) as { appointment: { id: string } }).appointment.id, paciente: ids.paciente }
+  const id = ((await res.json()) as { appointment: { id: string } }).appointment.id
+  creadas.push(id)
+  return { id, paciente: ids.paciente }
 }
 
 async function aLaSemanaMasDos(page: Page): Promise<void> {

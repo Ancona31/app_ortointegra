@@ -115,9 +115,13 @@ const ModalInvitacionCita = dynamic(() => import('@/components/agenda/ModalInvit
 const InteraccionesV2 = dynamic(() => import('@/components/agenda/InteraccionesV2'), {
   ssr: false, loading: () => null,
 })
-/* Las dos piezas que van fuera de la capa: los botones de la barra y el
+/* Las piezas que van fuera de la capa: el desplegable de fecha (ranura
+   `selectorFecha`), la lupa con la ayuda de atajos (ranura `buscar`) y el
    minicalendario del panel de Día. Mismo módulo, mismo chunk. */
-const HerramientasV2 = dynamic(() => import('@/components/agenda/HerramientasV2'), {
+const SelectorFechaV2 = dynamic(() => import('@/components/agenda/HerramientasV2').then(m => m.SelectorFechaV2), {
+  ssr: false, loading: () => null,
+})
+const BuscarV2 = dynamic(() => import('@/components/agenda/HerramientasV2').then(m => m.BuscarV2), {
   ssr: false, loading: () => null,
 })
 const MiniMesPanelV2 = dynamic(() => import('@/components/agenda/HerramientasV2').then(m => m.MiniMesPanelV2), {
@@ -235,6 +239,12 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
      no está, `interaccionesRef` es null y los gestos abren el modal de hoy. */
   const [montarV2, setMontarV2] = useState(false)
   const [interaccionesListas, setInteraccionesListas] = useState(false)
+  /* F3.5 · La preferencia de los atajos de una tecla vive en el chunk
+     (`InteraccionesV2`, que la publica con `alCambiarAtajos`). `atajos` es lo
+     que reciben la barra y la banda: `aria-keyshortcuts` sólo cuando las teclas
+     funcionan de verdad (v2, el chunk montado y los atajos sin apagar). */
+  const [atajosEncendidos, setAtajosEncendidos] = useState(false)
+  const atajos = agendaV2 && interaccionesListas && atajosEncendidos
   const interaccionesRef = useRef<ApiInteraccionesV2 | null>(null)
   const seleccionDesdeHueco = useRef<SeleccionDesdeHueco['current']>(null)
   /* F3: el periodo que pinta el calendario (`'desde/hasta'`), para el
@@ -1220,6 +1230,10 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
              Semana y Día son listas aquí. */
           onCompactar={vistaAdmiteCompactar(currentView) ? () => setCompactar(v => !v) : null}
           compactado={compactar}
+          /* F3 · Sólo la lupa (sin minicalendario, decisión 21; sin el botón de
+             la ayuda, que no cabe con el filtro a 360 px). */
+          buscar={agendaV2 && montarV2 ? <BuscarV2 apiRef={interaccionesRef} atajos={atajos} enBanda /> : undefined}
+          atajos={atajos}
         />
       )}
 
@@ -1480,6 +1494,10 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
             /* E7: la lista de mañana por confirmar (WhatsApp manual). Sólo con
                la v2 encendida: apagada no se monta y no sale ninguna petición. */
             porConfirmar={agendaV2 ? <PanelPorConfirmar recarga={recargaPanel} /> : undefined}
+            /* F3 · Las herramientas v2 en sus ranuras; apagado, ni se descargan. */
+            selectorFecha={agendaV2 && montarV2 ? <SelectorFechaV2 rango={rangoVisible} alIrAFecha={irAFecha} /> : undefined}
+            buscar={agendaV2 && montarV2 ? <BuscarV2 apiRef={interaccionesRef} atajos={atajos} /> : undefined}
+            atajos={atajos}
           />
         )}
         {/* ── Leyenda ───────────────────────────────────────────────────
@@ -1874,6 +1892,7 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
         <InteraccionesV2
           apiRef={interaccionesRef}
           alCambiarListas={setInteraccionesListas}
+          alCambiarAtajos={setAtajosEncendidos}
           calendarRef={calendarRef}
           raizRef={raizRef}
           currentView={currentView}

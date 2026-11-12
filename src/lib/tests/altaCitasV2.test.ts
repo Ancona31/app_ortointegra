@@ -25,6 +25,9 @@ class ElementoFalso {
     return sel.split(',').map(x => x.trim().slice(1)).some(c => this.clases.includes(c)) ? this : null
   }
   getBoundingClientRect() { return this.caja }
+  /** Cuántas veces se enfocó (la tarjeta de lectura enfoca la cita antes de abrirse). */
+  enfocada = 0
+  focus(): void { this.enfocada += 1 }
 }
 
 /* Miércoles 11 de noviembre de 2026, hora local del navegador. */
@@ -171,6 +174,14 @@ describe('interruptor ENCENDIDO: la tarjeta de lectura', () => {
     m.alta.handleEventClick({ event: evento, el: COLUMNA, jsEvent: raton(1, 2) } as unknown as EventClickArg)
     expect(m.setModal).not.toHaveBeenCalled()
     expect(m.api.abrirTarjeta).toHaveBeenCalledWith(evento.extendedProps, COLUMNA.getBoundingClientRect(), { x: 1, y: 2 })
+  })
+  it('la cita pulsada se enfoca antes de abrir la tarjeta (el foco vuelve a ella al cerrar); apagado, no', () => {
+    const el = new ElementoFalso(['fc-event'])
+    montar({ agendaV2: true }).alta.handleEventClick({ event: evento, el, jsEvent: raton(1, 2) } as unknown as EventClickArg)
+    expect(el.enfocada).toBe(1)
+    const apagado = new ElementoFalso(['fc-event'])
+    montar({ agendaV2: false }).alta.handleEventClick({ event: evento, el: apagado, jsEvent: raton(1, 2) } as unknown as EventClickArg)
+    expect(apagado.enfocada).toBe(0)
   })
   it('con teclado (Enter, sin punto) la tarjeta se abre igual, sin punto', () => {
     const m = montar({ agendaV2: true })

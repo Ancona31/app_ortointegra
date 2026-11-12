@@ -100,3 +100,27 @@ test('encendido: `?` abre la ayuda; apagar los atajos se recuerda al recargar (W
   await page.keyboard.press('m')
   await expect(vista(page, 'dayGridMonth')).toBeVisible()
 })
+
+/* Cierre de F · la barra anuncia las teclas (`aria-keyshortcuts`) sólo cuando
+   funcionan: v2, el chunk montado y los atajos sin apagar. MUTACIÓN: pasar
+   `atajos={agendaV2}` (sin mirar la preferencia) → la segunda mitad se pone en rojo. */
+test('`aria-keyshortcuts` en Hoy, las vistas y la lupa sólo con los atajos encendidos', async ({ page }) => {
+  await abrirAgendaApagada(page)
+  await expect(page.locator('.fc-today-button')).not.toHaveAttribute('aria-keyshortcuts', /.*/)
+  await expect(page.getByRole('tab', { name: 'Semana' })).not.toHaveAttribute('aria-keyshortcuts', /.*/)
+
+  interruptorAgenda('A', true)
+  await page.reload()
+  await abrirAgendaV2(page)
+  await expect(page.locator('.fc-today-button')).toHaveAttribute('aria-keyshortcuts', 'T')
+  await expect(page.locator('.fc-next-button')).toHaveAttribute('aria-keyshortcuts', 'J N')
+  await expect(page.getByRole('tab', { name: 'Semana' })).toHaveAttribute('aria-keyshortcuts', 'S')
+  await expect(page.getByRole('button', { name: 'Buscar citas de un paciente' })).toHaveAttribute('aria-keyshortcuts', '/')
+
+  await page.getByRole('button', { name: 'Atajos de teclado' }).click()
+  await page.getByRole('dialog', { name: 'Atajos de teclado' }).getByRole('switch').uncheck()
+  await page.keyboard.press('Escape')
+  await expect(page.locator('.fc-today-button')).not.toHaveAttribute('aria-keyshortcuts', /.*/)
+  await expect(page.getByRole('tab', { name: 'Semana' })).not.toHaveAttribute('aria-keyshortcuts', /.*/)
+  await expect(page.getByRole('button', { name: 'Buscar citas de un paciente' })).not.toHaveAttribute('aria-keyshortcuts', /.*/)
+})

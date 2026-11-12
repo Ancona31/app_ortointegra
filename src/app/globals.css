@@ -3866,6 +3866,16 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
   animation: ag-modal-velo-sale var(--ag-dur-base) var(--ag-ease-in) forwards;
   pointer-events: none;
 }
+/* Cierre de F · los campos y botones del modal de la cita llevaban
+   `transition-all` de Tailwind (150 ms, fuera de la escala), que también
+   animaba el ANILLO DE FOCO (`box-shadow`, `outline`): el diseño de F pide
+   «fondo y borde en micro; el anillo de foco no lleva transición» (CONTRASTE
+   §5). Esto es eso, y nada más. */
+.ag-transicion-color {
+  transition: background-color var(--ag-dur-micro) var(--ag-ease),
+              border-color var(--ag-dur-micro) var(--ag-ease),
+              color var(--ag-dur-micro) var(--ag-ease);
+}
 
 /* ══════════════════════════════════════════════════════════════════════
    TARJETA DE EVENTO DE SEMANA/DÍA (`.ag-tarjeta`) — bloque 3A
