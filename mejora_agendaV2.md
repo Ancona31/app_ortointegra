@@ -3012,6 +3012,57 @@ interacciones). Commits `2552a2f` (paso 1) y `a240295` (paso 2).
   (`appointments.paciente_id SET NULL`, `consultas.appointment_id SET NULL`,
   `appointments.clinica_id CASCADE`) se reportan y no se cambian.
 
+### Cierre del proyecto — auditoría del conjunto y decisiones (2026-11-12)
+
+Detalle en `supabase/AUDITORIA-CONJUNTO-AGENDA-V2.md`. Resumen:
+
+- **El conjunto es APTO para producción, con notas.** 16 migraciones; 15 APTA
+  como estaban y D11 APTA tras los cambios de su auditoría formal, que se hizo
+  en el cierre. Ningún objeto de `main` cambia (huella md5 de todo `public`
+  antes y después). Ninguna función nueva da EXECUTE a PUBLIC. No hay
+  CASCADE nuevo ni FK nueva a `pacientes`.
+- **Hallazgos del conjunto y qué se hizo** (coordinador y revisor
+  independiente):
+  - **H1, FK RESTRICT hacia `appointments`.** Una cita con historial de agenda
+    (enlace, correo, incidencia, reagendado) ya no se borra, y una clínica con
+    filas de agenda tampoco. Es lo buscado, y el código ya lo traduce a 409.
+    Sin cambio.
+  - **H2, choque al fusionar con limites-ajustables.** `p1` caso 3 se pone en
+    rojo. Lo actualiza Angel al fusionar.
+  - **H3, ruido en el log.** Sin tablas, cada petición deja un `warn`. Orden
+    recomendado: migraciones antes que código.
+  - **H4, suspendida en E9.** E9 no cierra la suspendida por sí misma; la
+    cierra la puerta del sondeo. Sin cambio.
+  - **H5, techo del candado.** `candado_reagendados` > 100. Ya anotado en E6.
+  - **H6, `spinus.via` puesto hasta el fin de la transacción.** Inocuo con una
+    RPC por transacción.
+  - **H7, entorno local.** El reset cambia las imágenes de Docker y quita las
+    `20261014*`.
+  - **H8, semilla.** No toleraba la falta de `agenda_ajustes`; arreglada.
+- **Decisiones tomadas sin preguntar:**
+  - **CLI 2.117.0** (la de fnm), no la 2.95.4 fijada: es la única que lee
+    `config.toml` (`CLAUDE.md`, nota del pin).
+  - **D11 corregida en su propio archivo**, no con una migración posterior: no
+    estaba en producción y es lo que se hizo con E1. Anotado en la cabecera.
+  - **Lo no aplicado de D11 queda para Angel:** el par que reaparece pasados 30
+    días y el `OR` de la consulta.
+  - **La base local queda con las 21 de esta rama más la semilla**, sin las
+    `20261014*` de `feature/limites-ajustables`. Es lo que pidió el encargo; la
+    guía explica cómo volver al estado combinado.
+  - **Tolerancia a producción, probada con un reset local** que aplicó solo las
+    5 de `main`. No se usó una base temporal aparte.
+  - **`AUDITORIA-MIGRACIONES.md` no se tocó.** Sus §6 piden añadir
+    dimensiones; las propuestas van aquí abajo.
+- **Propuestas de dimensión nueva** (se suman a las de «Menores» y a las de las
+  auditorías de B5, C1, C2, D1, D2, D3, E4 y E9):
+  - **Desempates canónicos.** Que el representante elegido cumpla los filtros
+    de su papel.
+  - **Fechas del nombre y de la cabecera.** Que no sean futuras.
+  - **Efecto agregado de las FK RESTRICT** hacia una tabla con policy de
+    DELETE.
+  - **Pruebas que fijan listas textuales del catálogo.** Correr las pruebas de
+    las dos ramas sobre la base combinada.
+
 ---
 
 ## 8. Sin verificar — comprobar antes de apoyarse en ello
@@ -3405,6 +3456,19 @@ primero sin marcar.
     pre-vuelo exige `agenda_v2_encendida`, fila 7 de la rejilla (el UNIQUE del
     par), dos COMMENT. Reaplicada desde cero y en segunda pasada: rejilla 7 × OK,
     no-op. SQL 17 archivos en verde.
+  - **Paso 4 · auditoría del conjunto** (`supabase/AUDITORIA-CONJUNTO-AGENDA-V2.md`).
+    Catálogo comprobado en cuatro bases (rama, sólo `main`, combinada con
+    `feature/limites-ajustables` y final) y huella md5 de cada objeto de
+    `public`: **0 objetos de `main` cambiados** (S3 no tocó
+    `clinica_tiene_acceso()` ni ninguna policy), 38 funciones sin PUBLIC, sin
+    sobrecargas, sin DEFINER sin `search_path`, sin CASCADE nuevo, las 5
+    policies de `appointments` intactas, lista blanca de `via` completa. Con
+    las 24 migraciones combinadas todo aplica y las 21 pruebas SQL de las dos
+    ramas pasan salvo `p1_permisos_funciones.sql` caso 3 (lista fija de
+    funciones cerradas: hay que añadir las 30 del proyecto al fusionar). Un
+    revisor independiente en otro modelo (Sonnet) auditó el conjunto sin ver
+    estas conclusiones; sus cinco hallazgos y los del coordinador, con lo que
+    se hizo con cada uno, en el §4 del documento y en §6-bis «Cierre».
 
 **Bitácora** (una línea por sesión: fecha, qué quedó hecho, qué quedó a medias):
 
