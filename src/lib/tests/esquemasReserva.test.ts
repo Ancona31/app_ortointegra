@@ -21,6 +21,12 @@ describe('esquemas de la reserva', () => {
     void _quitado
     expect(ReservarSchema.safeParse(sin).success).toBe(false)
   })
+  it('reservar (E6): origen opcional, sólo con forma de código de 22', () => {
+    expect(ReservarSchema.safeParse({ ...BASE, origen: 'AbCdEfGhIjKlMnOpQrSt_-' }).success).toBe(true)
+    for (const malo of ['corto', 'a'.repeat(23), 'AbCdEfGhIjKlMnOpQrSt_/', '']) {
+      expect(ReservarSchema.safeParse({ ...BASE, origen: malo }).success, malo).toBe(false)
+    }
+  })
   it('reservar: la ficha tiene forma de 43 caracteres base64url', () => {
     expect(ReservarSchema.safeParse({ ...BASE, ficha: 'a'.repeat(43) }).success).toBe(true)
     expect(ReservarSchema.safeParse({ ...BASE, ficha: 'a'.repeat(42) }).success).toBe(false)

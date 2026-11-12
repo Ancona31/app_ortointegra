@@ -106,15 +106,33 @@ export interface ArgsReserva {
   fichaHmac: string | null; avisoVersion: string; avisoSha: string; clientId: string
 }
 
-/** La reserva atómica (D3). Devuelve la fila o el error con su código SQL. */
-export async function reservar(ctx: ContextoReserva, a: ArgsReserva): Promise<Llamada<ResultadoReservaRpc>> {
-  const r = await llamar('reservar_por_enlace', {
+function argsReserva(ctx: ContextoReserva, a: ArgsReserva): Record<string, unknown> {
+  return {
     p_clinica_id: ctx.clinica_id, p_codigo_hash: a.codigoHash, p_consultorio_id: a.consultorioId, p_tipo_cita_id: a.tipoCitaId,
     p_inicio: a.inicio, p_nombre: a.nombre, p_telefono: a.telefono, p_correo: a.correo, p_tel_hmac: a.telHmac,
     p_correo_hmac: a.correoHmac, p_ficha_hmac: a.fichaHmac, p_aviso_version: a.avisoVersion, p_aviso_sha256: a.avisoSha,
     p_client_id: a.clientId,
-  }, true)
+  }
+}
+
+async function reservarCon(rpc: string, args: Record<string, unknown>): Promise<Llamada<ResultadoReservaRpc>> {
+  const r = await llamar(rpc, args, true)
   if (!r.ok) return r
   const p = ReservaSchema.safeParse(r.data)
   return p.success ? { ok: true, data: p.data } : { ok: false, ausente: false, codigo: 'forma' }
+}
+
+/** La reserva atómica (D3). Devuelve la fila o el error con su código SQL. */
+export async function reservar(ctx: ContextoReserva, a: ArgsReserva): Promise<Llamada<ResultadoReservaRpc>> {
+  return reservarCon('reservar_por_enlace', argsReserva(ctx, a))
+}
+
+/**
+ * Reagendar (E6): la misma reserva, envuelta por `reagendar_por_enlace`, que
+ * valida en la misma transacción el enlace de confirmación de la cita
+ * cancelada (`confirmacionHash` = sha256 de su código) y el tope. Sin la
+ * migración de E6, `ausente` (404 uniforme).
+ */
+export async function reagendar(ctx: ContextoReserva, a: ArgsReserva, confirmacionHash: string): Promise<Llamada<ResultadoReservaRpc>> {
+  return reservarCon('reagendar_por_enlace', { p_confirmacion_hash: confirmacionHash, ...argsReserva(ctx, a) })
 }

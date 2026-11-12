@@ -34,7 +34,10 @@ export function respuestaReserva(resultado: string, telefono: string | null): Re
     case 'fuera_de_ventana': return { status: 400, cuerpo: { error: 'fuera_de_ventana' } }
     case 'consultorio_invalido': return { status: 400, cuerpo: { error: 'consultorio_invalido' } }
     case 'tipo_invalido': return { status: 400, cuerpo: { error: 'tipo_invalido' } }
-    // enlace_invalido, apagado, aviso_no_aprobado, clinica_sin_acceso y cualquier otro: 404 uniforme.
+    // E6 (reagendar): el tope y «ya reagendada» se dicen; reagendar_invalido es el 404 uniforme de abajo.
+    case 'tope_reagendados': return { status: 403, cuerpo: { error: 'tope_reagendados', mensaje: mensajeBloqueo(telefono), telefono } }
+    case 'ya_reagendada': return { status: 409, cuerpo: { error: 'ya_reagendada' } }
+    // enlace_invalido, apagado, aviso_no_aprobado, clinica_sin_acceso, reagendar_invalido y cualquier otro: 404 uniforme.
     default: return NO_ENCONTRADO
   }
 }

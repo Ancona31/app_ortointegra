@@ -1705,6 +1705,70 @@ lista A 4 («no hay recordatorio si ya salió el comprobante para ese inicio»)
 no se cumplirá. Texto PENDIENTE DE REVISIÓN. La e2e de D10 (`reserva-enlace`)
 pasa a esperar `/confirmar/<22>` en vez de «comunícate con el consultorio».
 
+**E6 · reagendar desde «no podré asistir»** (migración `20261115130000`,
+lista A 11):
+- **El flujo de §2 al pie de la letra:** primero se cancela por el enlace; la
+  página cancelada ofrece «Elegir otro horario», que lleva al ENLACE FIJO del
+  médico de D (`/reservar/<fijo>?origen=<código de confirmación>`). La reserva
+  es la de D entera (código al correo, candado, «1 activa»); con `origen`, la
+  ruta de D5 llama a `reagendar_por_enlace`, que valida en la misma
+  transacción el enlace de confirmación (vigente, con `cancelo`, del mismo
+  destinatario, hasta 7 días después de la respuesta), que la cita de origen
+  siga cancelada (`FOR UPDATE`: el personal no la reactiva a la vez), que no
+  esté reagendada ya, el enlace fijo vigente del MISMO médico y el tope
+  (`origen.reserva_reagendados < candado_reagendados`, 2), y llama a
+  `reservar_por_enlace`. Con `ok`: `reserva_reagendados = origen + 1` (auditado
+  `cita_editada` con `via:'enlace_paciente'`) y una fila en `cita_reagendos`.
+- **Auditoría independiente: APTA CON CAMBIOS**, aplicados: un `repetida` de
+  D3 que no es el reagendado de ese origen da `reagendar_invalido`; `spinus.via`
+  se limpia tras anotar (dura hasta el fin de la transacción); COMMENT de
+  `appointments.reserva_reagendados` con el convenio de E6. **Para revisar por
+  Angel:** el correo que se verifica al reagendar no tiene por qué ser el de la
+  cita de origen (una cita del personal no guarda su seudónimo), así que quien
+  tenga el enlace de confirmación puede reagendar con otro correo; el personal
+  liga la cita nueva al iniciar la consulta, como toda reserva.
+- **Timestamp y nombre:** `20261115130000_agenda_e6_reagendar.sql` (el diseño
+  decía `…140000_agenda_e3_reagendar`; el encargo fijó 130000).
+- **Diferencias con el SQL del diseño:** cierre de la clínica suspendida en
+  las dos funciones (como E1, con la huella de `clinica_no_suspendida()` en el
+  pre-vuelo); `FOR UPDATE` también sobre la cita de origen (mismo orden de
+  candados que `responder`: confirmación → cita); `authenticated` lee 6
+  columnas, sin `confirmacion_id`; índice para la FK a `cita_confirmaciones`;
+  `ya_reagendada` se dice antes que `vencida` en la oferta; pre-vuelo con la
+  firma Y el resultado de `reservar_por_enlace`, y con el md5 de
+  `log_cita_change` de E1 (sin la lista blanca, el reagendado no quedaría a
+  nombre del paciente).
+- **La oferta sólo se enseña si el fijo abre de verdad** (`abrirEnlace`:
+  secreto, aviso publicable y aprobado, interruptor, S3, médico en la
+  clínica; vigente, con consultorios y tipos). Si no, o con `tope`,
+  `sin_enlace` o `vencida`: «Para agendar otra cita, comunícate al
+  {teléfono}». Ya reagendada: «Ya elegiste otro horario para esta cita». La
+  oferta es STABLE: el GET de la página sigue sin escribir nada.
+- **`/reservar/<fijo>?origen=`** sólo se toma si el código es un enlace de
+  confirmación cancelado por el paciente y de la MISMA clínica; si no, se
+  ignora y la reserva es normal. Enseña «Estás reagendando tu cita del
+  {fecha}». La base vuelve a validarlo todo.
+- **Respuestas nuevas** (`respuestasReserva.ts`): `tope_reagendados` 403 con
+  «Para agendar, comunícate con el consultorio: {teléfono}»; `ya_reagendada`
+  409; `reagendar_invalido` (y `apagado`) el 404 uniforme. Sin la migración,
+  `ausente` → 404.
+- **El enlace de confirmación de la cita de origen NO se revoca** al
+  reagendar (E1 pensaba usar `revocar` aquí): revocado, el correo viejo daría
+  404; vigente, dice «Ya elegiste otro horario». La cita nueva recibe su propio
+  enlace en su comprobante (E5).
+- **La cita nueva es «por ligar»** aunque la de origen tuviera paciente (la
+  reserva pública no liga pacientes). **Sin la línea «Reagendada desde la cita
+  del {fecha}» en el modal** que pedía el diseño: `AppointmentModal.tsx` no se
+  toca en este encargo (otro agente). La tabla `cita_reagendos` ya es legible
+  por la RLS para quien la añada.
+- **Coherencia con D2:** con origen por enlace, cancelar → reagendar (1) →
+  cancelar → reagendar (2) → cancelar son tres incidencias: tope y bloqueo a
+  la vez. Con origen del personal (sin `reserva_canal`) la primera
+  cancelación no es incidencia: el tope llega con dos.
+- **El tope no impide una reserva nueva:** la persona puede reservar otra
+  cita con el fijo SIN `origen` (la reserva normal de D, con su candado); el
+  tope sólo cuenta la cadena de reagendados de una cita.
+
 ### Bloque F
 
 - Las 18 propuestas de la auditoría visual, aprobadas. **El pulido visual y los

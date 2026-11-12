@@ -62,6 +62,7 @@ export function mensajeDeError(r: RespuestaApi): string {
     correo_no_enviado: 'No pudimos enviar el correo. Intenta más tarde.',
     enlace_usado: 'Este enlace ya se usó.',
     enlace_caducado: 'Este enlace venció.',
+    ya_reagendada: 'Esa cita ya se reagendó.',
   }
   return textos[error] ?? 'No se pudo completar. Intenta de nuevo.'
 }

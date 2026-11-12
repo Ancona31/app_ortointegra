@@ -12,7 +12,8 @@
  *      (400 si no lo es; `turnoValido`). Si sigue libre lo decide la RPC (409);
  *   7. `reservar_por_enlace`, que bajo su candado vuelve a comprobar enlace,
  *      interruptor, aviso, S3, ventana, empalme, verificación y candado de la
- *      persona, e inserta la cita.
+ *      persona, e inserta la cita. Con `origen` (E6, reagendar), la misma
+ *      llamada envuelta por `reagendar_por_enlace`.
  * Después de responder (`after()`, D8): el evento de Google y el comprobante.
  */
 import { cookies } from 'next/headers'
@@ -21,12 +22,12 @@ import { ReservarSchema } from '@/lib/reserva/esquemasReserva'
 import {
   abrirEnlace, cuerpoJson, noEncontrado, nombreDelMedico, responder, telefonoDeContacto,
 } from '@/lib/reserva/puertaReserva'
-import { ocupacionDeEnlace, reservar } from '@/lib/reserva/servidorReserva'
+import { ocupacionDeEnlace, reagendar, reservar } from '@/lib/reserva/servidorReserva'
 import {
   COOKIE_DISPOSITIVO, OPCIONES_COOKIE, dentroDeLimites, dispositivoDe, ipDe, seudonimoRed,
 } from '@/lib/reserva/limitesReserva'
 import { normalizarCorreo, normalizarTelefonoMx } from '@/lib/reserva/contacto'
-import { hmacContacto, hmacFicha } from '@/lib/reserva/secretos'
+import { hashDeCodigo, hmacContacto, hmacFicha } from '@/lib/reserva/secretos'
 import { AVISO_VERSION, hashAviso } from '@/lib/reserva/avisoReserva'
 import { respuestaErrorRpc, respuestaReserva } from '@/lib/reserva/respuestasReserva'
 import { fechaEnZona, ocupacionSinEstado, rangoDeConsulta, reglasDe, turnoValido } from '@/lib/reserva/turnosReserva'
@@ -86,11 +87,12 @@ export async function POST(req: NextRequest, rctx: RouteContext<'/api/reservar/[
   const turno = turnoValido(reglas, b.inicio, ocupacionSinEstado(ocupacion), ahora)
   if (!turno) return MAL('turno_invalido')
 
-  const r = await reservar(ctx, {
+  const args = {
     codigoHash, consultorioId: consultorio.id, tipoCitaId: tipo.id, inicio: turno.inicio,
     nombre: b.nombre, telefono, correo: b.correo, telHmac, correoHmac,
     fichaHmac: b.ficha ? hmacFicha(b.ficha) : null, avisoVersion: AVISO_VERSION, avisoSha: hashAviso(), clientId: b.client_id,
-  })
+  }
+  const r = b.origen ? await reagendar(ctx, args, hashDeCodigo(b.origen)) : await reservar(ctx, args)
   if (!r.ok) return responder(respuestaErrorRpc(r.ausente, r.codigo))
   // D8, sólo con una reserva NUEVA (una `repetida` ya los programó la primera vez).
   if (r.data.r_resultado === 'ok') programarDespues(ctx, consultorio, b, r.data)

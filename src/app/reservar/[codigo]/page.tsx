@@ -3,6 +3,10 @@ import type { ReactElement } from 'react'
 import { notFound } from 'next/navigation'
 import { AVISO_CASILLA, textoAviso } from '@/lib/reserva/avisoReserva'
 import { abrirEnlace, nombreDelMedico, telefonoDeContacto } from '@/lib/reserva/puertaReserva'
+import { resolverEnlaceConfirmacion } from '@/lib/confirmacion/enlaceConfirmacion'
+import { fechaHoraEnZona } from '@/lib/reserva/correosReserva'
+import { esCodigoDeEnlace } from '@/lib/reserva/secretos'
+import type { EnlaceAbierto } from '@/lib/reserva/puertaReserva'
 import ReservaCliente, { type DatosPagina } from './ReservaCliente'
 
 /* ═══ /reservar/[codigo] — RESERVA POR ENLACE (agenda D5) ═══
@@ -41,7 +45,20 @@ function NoDisponible({ telefono }: { telefono: string | null }): ReactElement {
   )
 }
 
-export default async function Page({ params }: PageProps<'/reservar/[codigo]'>): Promise<ReactElement> {
+/**
+ * E6: `?origen=` es el código de confirmación de la cita que la persona canceló
+ * y quiere reagendar. Sólo se toma si ese enlace existe, está cancelado por el
+ * paciente y es de la MISMA clínica; si no, se ignora y la reserva es normal.
+ * Sólo lee (STABLE). La base vuelve a validarlo todo al reservar.
+ */
+async function origenDe(valor: string | string[] | undefined, enlace: EnlaceAbierto): Promise<DatosPagina['origen']> {
+  if (typeof valor !== 'string' || !esCodigoDeEnlace(valor)) return null
+  const c = await resolverEnlaceConfirmacion(valor)
+  if (!c || c.clinica_id !== enlace.ctx.clinica_id || c.estado !== 'cancelada' || c.respuesta !== 'cancelo') return null
+  return { codigo: valor, cuando: fechaHoraEnZona(c.inicio, c.zona ?? 'America/Mexico_City') }
+}
+
+export default async function Page({ params, searchParams }: PageProps<'/reservar/[codigo]'>): Promise<ReactElement> {
   const { codigo } = await params
   const enlace = await abrirEnlace(codigo)
   if (!enlace) notFound()
@@ -66,6 +83,7 @@ export default async function Page({ params }: PageProps<'/reservar/[codigo]'>):
       url: '',
     }),
     casilla: AVISO_CASILLA,
+    origen: ctx.clase === 'fijo' ? await origenDe((await searchParams).origen, enlace) : null,
   }
   return <ReservaCliente datos={datos} />
 }

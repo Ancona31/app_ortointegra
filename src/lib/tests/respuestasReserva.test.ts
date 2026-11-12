@@ -20,6 +20,14 @@ describe('respuestaReserva', () => {
     expect(r.cuerpo.error).toBe('autoservicio_cerrado')
     expect(r.cuerpo.mensaje).toBe('Para agendar, comunícate con el consultorio: 9991234567.')
   })
+  it('reagendar (E6): el tope se dice con el teléfono; ya reagendada 409; inválido es el 404 uniforme', () => {
+    const tope = respuestaReserva('tope_reagendados', '9991234567')
+    expect(tope.status).toBe(403)
+    expect(tope.cuerpo).toMatchObject({ error: 'tope_reagendados', mensaje: 'Para agendar, comunícate con el consultorio: 9991234567.' })
+    expect(respuestaReserva('ya_reagendada', null)).toEqual({ status: 409, cuerpo: { error: 'ya_reagendada' } })
+    expect(respuestaReserva('reagendar_invalido', '999')).toEqual(NO_ENCONTRADO)
+    expect(respuestaReserva('apagado', '999')).toEqual(NO_ENCONTRADO)
+  })
   it('errores de la RPC: ausente 404; forma 400; lo demás 500', () => {
     expect(respuestaErrorRpc(true, 'PGRST202')).toEqual(NO_ENCONTRADO)
     expect(respuestaErrorRpc(false, '22023').status).toBe(400)

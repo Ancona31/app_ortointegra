@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import type { ReactElement, ReactNode } from 'react'
 import { notFound } from 'next/navigation'
 import { resolverEnlaceConfirmacion } from '@/lib/confirmacion/enlaceConfirmacion'
+import { ofertaReagendar, type OfertaReagendar } from '@/lib/confirmacion/reagendarConfirmacion'
 import {
   citaPintada, comunicate, esPasoCancelar, leerResultado, mensajeDeResultado, textoDeEstado,
 } from '@/lib/confirmacion/vistaConfirmacion'
@@ -20,6 +21,9 @@ import {
    Cualquier causa de no abrir —código con mala forma o inexistente,
    revocado, interruptor apagado, clínica suspendida, paciente de la cita
    cambiado, sin RESERVA_SECRETO, migraciones ausentes— da el MISMO notFound().
+
+   Cancelada por el paciente: se ofrece «Elegir otro horario» con el enlace
+   fijo del médico (E6, `ofertaReagendar`: otra lectura STABLE), o el teléfono.
 
    ⚠️ AL HTML SÓLO VA LO QUE SE PINTA: fecha, hora y zona, médico, consultorio,
    dirección y teléfono. Nunca clinica_id, el hash ni ningún id; nada clínico.
@@ -48,6 +52,20 @@ function Marco({ children }: { children: ReactNode }): ReactElement {
   )
 }
 
+/** Tras cancelar: «Elegir otro horario» (E6) o el teléfono. PENDIENTE DE REVISIÓN. */
+function Reagendar({ oferta, telefono }: { oferta: OfertaReagendar | null; telefono: string | null }): ReactElement {
+  if (oferta?.tipo === 'enlace') {
+    return (
+      <div className="space-y-2">
+        <p className="text-sm text-slate-600">¿Quieres otra fecha? Puedes elegir un horario libre con el enlace de reserva del consultorio.</p>
+        <a href={oferta.href} className={`${BOTON} block bg-[#1e5fa8] text-center text-white`}>Elegir otro horario</a>
+      </div>
+    )
+  }
+  if (oferta?.tipo === 'ya_reagendada') return <p className="text-sm text-slate-600">Ya elegiste otro horario para esta cita.</p>
+  return <p className="text-sm text-slate-600">Para agendar otra cita, {comunicate(telefono)}.</p>
+}
+
 function Formulario({ codigo, accion, texto, clase }: { codigo: string; accion: 'confirmar' | 'cancelar'; texto: string; clase: string }): ReactElement {
   return (
     <form method="post" action={`/api/confirmar/${codigo}`}>
@@ -65,6 +83,7 @@ export default async function Page({ params, searchParams }: PageProps<'/confirm
   const resultado = leerResultado(consulta.r)
   const cita = citaPintada(ctx)
   const pidiendoCancelar = esPasoCancelar(consulta.paso) && ctx.puede_cancelar
+  const oferta = ctx.estado === 'cancelada' ? await ofertaReagendar(ctx, codigo) : null
 
   return (
     <Marco>
@@ -94,9 +113,7 @@ export default async function Page({ params, searchParams }: PageProps<'/confirm
           {!ctx.puede_cancelar && resultado !== 'fuera_de_plazo' && (ctx.estado === 'agendada' || ctx.estado === 'confirmada') && (
             <p className="text-sm text-slate-600">Ya no es posible cancelar desde el enlace; {comunicate(cita.telefono)}.</p>
           )}
-          {ctx.estado === 'cancelada' && (
-            <p className="text-sm text-slate-600">Para agendar otra cita, {comunicate(cita.telefono)}.</p>
-          )}
+          {ctx.estado === 'cancelada' && <Reagendar oferta={oferta} telefono={cita.telefono} />}
         </section>
       )}
     </Marco>

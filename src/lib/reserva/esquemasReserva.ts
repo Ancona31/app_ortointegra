@@ -42,6 +42,12 @@ export const ReservarSchema = z.strictObject({
   acepta_aviso: z.literal(true),
   /** Idempotencia: el mismo envío repetido devuelve la misma cita. */
   client_id: UUID,
+  /**
+   * Agenda E6: el código del enlace de CONFIRMACIÓN de la cita que la persona
+   * canceló y reagenda (de `/reservar/<fijo>?origen=`). La base lo valida
+   * (`reagendar_por_enlace`); aquí sólo la forma.
+   */
+  origen: z.string().regex(/^[A-Za-z0-9_-]{22}$/).optional(),
 })
 
 export type ReservarEntrada = z.infer<typeof ReservarSchema>

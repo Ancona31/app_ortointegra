@@ -17,6 +17,8 @@ export interface DatosPagina {
   tipos: TipoPagina[]
   aviso: string
   casilla: string
+  /** E6: la cita cancelada que se reagenda (su código de confirmación y su fecha), o null. */
+  origen: { codigo: string; cuando: string } | null
 }
 
 type Paso = 'turno' | 'datos' | 'codigo' | 'listo'
@@ -24,9 +26,9 @@ type Paso = 'turno' | 'datos' | 'codigo' | 'listo'
 const SELECT = 'mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-base'
 
 /** El cuerpo de POST /api/reservar/[codigo]. */
-function cuerpoReserva(c: string, t: string, turno: TurnoPagina, d: Datos, clientId: string, ficha: string | null) {
+function cuerpoReserva(c: string, t: string, turno: TurnoPagina, d: Datos, clientId: string, ficha: string | null, origen: string | null) {
   return { consultorio_id: c, tipo_cita_id: t, inicio: turno.inicio, nombre: d.nombre, telefono: d.telefono, correo: d.correo,
-    acepta_aviso: true, client_id: clientId, ...(ficha ? { ficha } : {}) }
+    acepta_aviso: true, client_id: clientId, ...(ficha ? { ficha } : {}), ...(origen ? { origen } : {}) }
 }
 
 export default function ReservaCliente({ datos }: { datos: DatosPagina }): ReactElement {
@@ -43,7 +45,7 @@ export default function ReservaCliente({ datos }: { datos: DatosPagina }): React
 
   async function reservar(d: Datos, ficha: string | null): Promise<void> {
     if (!turno) return
-    const r = await pedir(base, 'POST', cuerpoReserva(consultorioId, tipoId, turno, d, clientId, ficha))
+    const r = await pedir(base, 'POST', cuerpoReserva(consultorioId, tipoId, turno, d, clientId, ficha, datos.origen?.codigo ?? null))
     if (r.status === 201 || r.status === 200) { setPaso('listo'); return }
     setError(mensajeDeError(r))
     if (r.cuerpo.error === 'turno_ocupado' || r.cuerpo.error === 'turno_invalido') { setTurno(null); setPaso('turno') }
@@ -73,6 +75,10 @@ export default function ReservaCliente({ datos }: { datos: DatosPagina }): React
           <h1 className="text-xl font-semibold text-slate-800">Reservar cita con {datos.medico}</h1>
           {datos.especialidad && <p className="text-sm text-slate-500">{datos.especialidad}</p>}
         </header>
+        {datos.origen && (
+          // PENDIENTE DE REVISIÓN (texto).
+          <p className="rounded-lg bg-slate-100 px-3 py-2 text-sm text-slate-700">Estás reagendando tu cita del {datos.origen.cuando}.</p>
+        )}
         {error && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
         {paso === 'listo' && turno && consultorio
           ? <Comprobante medico={datos.medico} consultorio={consultorio} inicio={turno.inicio} />
