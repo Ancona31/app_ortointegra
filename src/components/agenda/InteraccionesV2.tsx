@@ -32,6 +32,7 @@ import BurbujaAlta, { type MasOpcionesBurbuja, type MedicoBurbuja } from '@/comp
 import TarjetaLectura from '@/components/agenda/TarjetaLectura'
 import AyudaAtajos from '@/components/agenda/AyudaAtajos'
 import { useAtajosAgenda } from '@/app/(app)/agenda/useAtajosAgenda'
+import { useDeslizarPeriodo } from '@/app/(app)/agenda/useDeslizarPeriodo'
 import { BotonWhatsAppCita } from '@/components/agenda/BotonWhatsAppCita'
 import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
 import { useToast } from '@/components/ui/Toast'
@@ -89,6 +90,10 @@ export interface PropsInteraccionesV2 {
   /** El filtro tal cual (`''` = «Todos», `null` = aún sin perfil) y cómo cambiarlo. */
   filtroActivo: string | null
   alFiltrarMedico: (id: string) => void
+  /** La raíz de la agenda, donde cuelga el gesto de deslizar (F3.7). */
+  raizRef: RefObject<HTMLDivElement | null>
+  /** La vista de FullCalendar (`datesSet`): el gesto sólo vale en las listas del teléfono. */
+  currentView: string
   /** El botón «Agendar» (atajo `c`): el modal de alta, con el bloqueo de suscripción delante. */
   onAgendar: () => void
   /** `abrirCita` de `altaCitas.ts`, la única puerta a una cita. */
@@ -347,6 +352,24 @@ function useIrACita(p: PropsInteraccionesV2): (c: CitaEncontrada) => void {
   }, [toast])
 }
 
+/**
+ * F3.7: deslizar en las listas de Día y Semana del teléfono; en el Mes, no
+ * (ahí tocar elige el día). Las flechas ‹ › siguen ahí (WCAG 2.5.1).
+ */
+export function deslizarActivo(isMobile: boolean, vista: string): boolean {
+  return isMobile && (vista === 'listDay' || vista === 'listWeek')
+}
+
+function useDeslizarV2(p: PropsInteraccionesV2): void {
+  const { calendarRef } = p
+  useDeslizarPeriodo({
+    raiz: p.raizRef,
+    activo: deslizarActivo(p.isMobile, p.currentView),
+    alSiguiente: () => calendarRef.current?.getApi().next(),
+    alAnterior: () => calendarRef.current?.getApi().prev(),
+  })
+}
+
 export default function InteraccionesV2(p: PropsInteraccionesV2): ReactElement | null {
   const { apiRef, alCambiarListas, calendarRef, medicos } = p
   const { capa, capaRef, abrir, cerrar: cerrarCapa } = useCapa()
@@ -364,6 +387,7 @@ export default function InteraccionesV2(p: PropsInteraccionesV2): ReactElement |
   const irACita = useIrACita(p)
   const abrirAyuda = useCallback(() => abrir({ tipo: 'ayuda' }), [abrir])
   const atajos = useAtajosV2(p, capa !== null, abrirAyuda)
+  useDeslizarV2(p)
 
   useImperativeHandle(apiRef, () => ({
     abrirBurbuja: (gesto) => {
@@ -383,11 +407,7 @@ export default function InteraccionesV2(p: PropsInteraccionesV2): ReactElement |
     alCambiarListas(true)
     return () => alCambiarListas(false)
   }, [alCambiarListas])
-
-  const medicosBurbuja = useMemo(
-    () => medicos.map(m => ({ id: m.id, nombre: componerNombreMedicoCompleto(m) })),
-    [medicos],
-  )
+  const medicosBurbuja = useMemo(() => medicos.map(m => ({ id: m.id, nombre: componerNombreMedicoCompleto(m) })), [medicos])
 
   if (capa?.tipo === 'burbuja') return <CapaBurbuja key={capa.id} capa={capa} medicos={medicosBurbuja} p={p} cerrar={cerrar} />
   if (capa?.tipo === 'tarjeta') return <CapaTarjeta key={capa.id} capa={capa} p={p} cerrar={cerrar} />

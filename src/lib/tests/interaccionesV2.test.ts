@@ -9,7 +9,7 @@ import type { EventApi } from '@fullcalendar/core'
 
 vi.mock('@/lib/supabase/client', () => ({ createClient: () => { throw new Error('sin red en pruebas') } }))
 
-import { ejecutarAtajo, esperarEvento, type CalendarApiV2, type PropsInteraccionesV2 } from '@/components/agenda/InteraccionesV2'
+import { deslizarActivo, ejecutarAtajo, esperarEvento, type CalendarApiV2, type PropsInteraccionesV2 } from '@/components/agenda/InteraccionesV2'
 import { ATAJOS } from '@/lib/agenda/atajosAgenda'
 
 function calendario(): { api: CalendarApiV2; pintar: (id: string) => void; oyentes: () => number } {
@@ -113,5 +113,15 @@ describe('ejecutarAtajo: cada tecla hace lo que su botón', () => {
         .reduce((n, f) => n + vi.mocked(f).mock.calls.length, 0)
       expect(llamadas, accion).toBe(1)
     }
+  })
+})
+
+describe('deslizarActivo (F3.7)', () => {
+  it('MUTACIÓN: sólo en las listas de Día y Semana del teléfono', () => {
+    expect(deslizarActivo(true, 'listDay')).toBe(true)
+    expect(deslizarActivo(true, 'listWeek')).toBe(true)
+    expect(deslizarActivo(true, 'dayGridMonth')).toBe(false)
+    expect(deslizarActivo(false, 'listDay')).toBe(false)
+    expect(deslizarActivo(false, 'timeGridWeek')).toBe(false)
   })
 })

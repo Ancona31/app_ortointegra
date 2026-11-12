@@ -209,6 +209,8 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
   const [interaccionesListas, setInteraccionesListas] = useState(false)
   const interaccionesRef = useRef<ApiInteraccionesV2 | null>(null)
   const seleccionDesdeHueco = useRef<SeleccionDesdeHueco['current']>(null)
+  /* F3.7: la raíz, donde el gesto de deslizar cuelga sus oyentes de puntero. */
+  const raizRef = useRef<HTMLDivElement>(null)
   /* F3: el periodo que pinta el calendario (`'desde/hasta'`), para el
      minicalendario. Cadena y no fechas, como `tituloVista`: no repinta si no
      cambió. */
@@ -1057,7 +1059,7 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
        ENTERO —sin restar nada—, que es lo que deja a la banda meterse bajo el
        reloj y a la barra de «Agendar» bajo la de gestos. Si te preguntas por qué
        aquí no hay duplicación: porque en esa rama este calc no se aplica. */
-    <div data-agenda-v2={interruptorLeido === null ? 'pendiente' : agendaV2 ? 'encendida' : 'apagada'}
+    <div ref={raizRef} data-agenda-v2={interruptorLeido === null ? 'pendiente' : agendaV2 ? 'encendida' : 'apagada'}
       data-interacciones-v2={interaccionesListas ? 'listas' : undefined} className="agenda-raiz flex flex-col h-[calc(100dvh-88px-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px))] lg:h-[calc(100dvh-64px-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px))]">
 
       {/* ── Header ──────────────────────────────────────── */}
@@ -1725,6 +1727,8 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
           apiRef={interaccionesRef}
           alCambiarListas={setInteraccionesListas}
           calendarRef={calendarRef}
+          raizRef={raizRef}
+          currentView={currentView}
           isMobile={isMobile}
           zonaVisor={navegadorTZ}
           quien={{ esMedico: isDoctor, perfilId: profile?.id ?? null }}
