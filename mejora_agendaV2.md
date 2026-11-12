@@ -1151,6 +1151,121 @@ queda listada aquí.
 - **`robots.txt`:** no existe en el repo (ni en `public/` ni como `robots.ts`)
   y no se creó.
 
+### Bloque D — decisiones tomadas en D0-D3 (2026-11-11, sin regla previa)
+
+- **D0. Transporte de correo** (`src/lib/correo/transporte.ts`): tres modos por
+  `EMAIL_TRANSPORT`: `captura` (Mailpit por `POST /api/v1/send`, sólo host
+  loopback, sin seguir redirecciones, 10 s de espera), `resend`, y apagado para
+  todo lo demás (sin variable, vacía o valor desconocido; se compara tal
+  cual, así que `RESEND` también apaga). **Doble guarda de Resend:** la variable
+  Y una `NEXT_PUBLIC_SUPABASE_URL` remota (`https:` y nombre DNS de dos o más
+  etiquetas que no sea IP, `.localhost`, `.local` ni `.internal`; ausente o mal
+  escrita cuenta como local). Sin `RESEND_API_KEY` también apaga. No se exige
+  además `VERCEL=1` (el diseño lo proponía; el encargo no). `resend` se importa
+  sólo en su rama; en local ni se lee la llave. Nunca lanza: devuelve
+  `{ok, modo, motivo}`. Al logger sólo van la etiqueta (literal del código,
+  saneada) y el código de error, nunca destinatario, asunto, cuerpo ni el
+  mensaje de error de Resend. `MAILPIT_URL` opcional (sólo loopback).
+- **D0, sin cambiar:** las seis rutas que construyen `new Resend()` directo
+  (registro, reset-password, email-hook, reenviar-confirmación,
+  enviar-documento, admin/invitar) siguen igual y **pueden mandar correos
+  reales desde local** con la llave de `.env.local` (contra §6). Para que
+  Angel lo anote. `.env.local` no se tocó: sin `EMAIL_TRANSPORT=captura`, el
+  transporte nuevo queda apagado también en local.
+- **Alcance de D1-D3 en esta ronda:** migraciones, RPC, lógica pura
+  (`src/lib/reserva/secretos.ts`) y sus pruebas. Las rutas
+  `/api/agenda/enlaces*` y `/api/agenda/reservas/*` y las secciones de la
+  pantalla de configuración (enlaces, contactos bloqueados) que el diseño pone
+  en D1 y D2 quedan para la ronda D4-D10.
+- **D1. Código del enlace:** no se guarda; `HMAC(subllave «enlace», 'enlace:'||id)`
+  truncado a 16 bytes en base64url (22 caracteres); la base guarda sha256 del
+  código. Subllaves HKDF-SHA256 (sal `spinus-reserva-v1`, info
+  `reserva:<propósito>`) para `enlace`, `contacto`, `codigo` y `red`; la clase
+  entra en el mensaje (`telefono:` / `correo:`, `ip:` / `dispositivo:`); la
+  ficha de verificación usa la subllave `codigo` con prefijo `ficha:`. Sin
+  `RESERVA_SECRETO` de 32+ bytes hex, todo devuelve null (falla cerrado).
+- **D1. CHECK con NULL:** el CHECK de coherencia de `appointments.reserva_*`
+  y el de vigencia del enlace del diseño **dejaban pasar NULL** (un CHECK que
+  evalúa a NULL no falla). Cada columna lleva ahora su `IS NOT NULL`
+  explícito. El pre-vuelo aborta si una constraint creada «si no existe el
+  nombre» existe con otra fórmula.
+- **D1. Auditoría (APTA CON CAMBIOS):** `usado_cita_id` podía apuntar a una
+  cita de otra clínica. En vez de FK compuesta + `UNIQUE(id, clinica_id)` en
+  `appointments` (propuesta del auditor: índice nuevo en la tabla más
+  grande), la protección del enlace exige que la cita que lo gasta sea de ese
+  enlace y de esa clínica. Más `COMMENT` en las 8 columnas que no lo tenían.
+- **D1. Lista A aplicada:** 15 (el único se ata sólo al médico; etiqueta
+  interna opcional ≤ 60), 16 (cada médico ve y gestiona sus enlaces;
+  administrador y secretaria, los de todos), 19 (con el interruptor apagado
+  los enlaces se conservan y los únicos siguen caducando), 9 (al ligar, los
+  datos de contacto se quedan en la cita: el CHECK lo permite y nada los
+  borra). Un invitado que intenta emitir un enlace de otro médico lo para la
+  protección (23514, no ve su perfil) antes que la RLS.
+- **D1. Cita por ligar y borrado:** `reserva_enlaces.usado_cita_id` es
+  `RESTRICT`, así que una cita que gastó un enlace único no se puede borrar
+  (23503). Hasta que D6 la trate como cita (B3: se cancela, no se borra), un
+  `DELETE` de la API sobre ella daría 500. Con el interruptor apagado no
+  existen citas así.
+- **D2. Candado** (lista A 1, 2, 3 y 6): persona = teléfono **o** correo
+  (seudónimos HMAC), siempre por médico; incidencia = toda cancelación o
+  `no_show` de una cita por enlace, la haga quien la haga (personal, Google por
+  C2, o la persona); reactivar la anula; `cancelled`→`no_show` la re-etiqueta
+  sin contar doble. Sólo cuentan las citas por enlace. Desbloquear a mano
+  descuenta las incidencias anteriores; bloquear a mano basta sin
+  incidencias. La lista de bloqueados mira las citas creadas en los últimos
+  (ventana + 366) días; un bloqueo manual de alguien sin citas en ese plazo
+  sigue bloqueando pero no sale en la lista. Las incidencias no se auditan
+  aparte (las derivan cambios de cita ya auditados); los contactos sí
+  (`log_tabla_change`). Empate de marca de tiempo entre desbloqueo y bloqueo
+  en la misma transacción: gana el desbloqueo.
+- **D2. Auditoría (APTA CON CAMBIOS):** pre-vuelo con dueño de las tres tablas;
+  ventana de la lista ligada al ajuste (ventana + 366, no + 30 como proponía el
+  auditor, por la razón de la cabecera).
+- **D3. Garantía de un solo turno:** `FOR UPDATE` sobre la fila del enlace +
+  `pg_advisory_xact_lock(1790, hashtext(medico_id))`; dentro se vuelven a
+  comprobar empalme y candado y se inserta. Sin restricción de exclusión (§2:
+  el personal empalma). La función exige READ COMMITTED (25001 si no): en
+  REPEATABLE READ la instantánea no vería la reserva ganadora. **Límite
+  aceptado:** el alta del personal y la importación de Google no toman el
+  candado; una cita suya en el mismo instante puede empalmarse con una
+  reserva. Medido en local: la segunda reserva esperó 1,5-1,9 s al candado y salió
+  «ocupado»; con la línea del candado quitada, las dos reservaban.
+- **D3. Puertas:** la reserva exige, por este orden, enlace vigente, interruptor
+  encendido, aviso aprobado con el mismo sha256, puerta S3
+  (`gcal_sync_clinica_habilitada`, porque `service_role` se salta
+  `appointments_gates_insert`), médico aún en la clínica, consultorio activo
+  del médico y tipo activo de la clínica o del médico. Emitir el código del
+  correo exige también la puerta S3 y el interruptor (el diseño sólo el
+  interruptor); `reserva_ocupacion` exige el interruptor. Todo sólo para
+  `service_role`, INVOKER; ninguna escribe `agenda_ajustes` (fila 5 del
+  veredicto).
+- **D3. Lista A aplicada:** 5 (ocupan las citas y las filas de Google; no
+  ocupan las de todo el día, `cancelled` ni `no_show`), 14 (6 dígitos, 10 min,
+  5 intentos por código, pedir otro invalida el anterior; ficha de 30 min y un
+  solo uso; el bloqueo se dice sólo después de verificar), 21 (activa =
+  `scheduled`/`confirmed` con fin futuro), 22 (no se detecta si quien reserva
+  ya es paciente). El enlace único se salta verificación, bloqueo y «1
+  activa» (§2). `reserva_historial_previo` = cancelaciones + no_show al
+  reservar.
+- **D3. Valores escritos:** la cita nace `scheduled`, `origen='spinus'`,
+  `created_by` NULL, título = nombre de quien reserva, fin = inicio + duración
+  del tipo, y `gcal_sync_status='pending'` (el diseño dejaba el valor por
+  omisión `synced`, falso sin evento en Google; D8 decidirá el envío). Dos
+  filas de auditoría: `cita_alta` y `cita_reservada_enlace` (`'system'`, sin
+  datos personales).
+- **D3. Idempotencia:** el mismo `client_id` con el mismo enlace devuelve
+  `repetida` con la cita original. Un `client_id` que ya use otra cita (índice
+  único global) hace fallar la llamada (23505): la ruta de D5 lo traducirá.
+- **D3. Prueba de carrera:** `scripts/reserva-carrera.sh`, sólo local, con dos
+  `psql` en paralelo y datos de una clínica de prueba con ids fijos. Al final
+  los borra como `postgres` con `session_replication_role = replica` en esa
+  transacción, incluidas SUS filas de `audit_log` (por `registro_id` de sus
+  objetos y por el `clinica_id` de su descripción), que de otro modo protege
+  `prevent_audit_modification`. Comprobado: no queda ninguna fila.
+- **D3. Sin hacer** (lo pedía el diseño como medición, no como garantía): el
+  banco de N = 1/5/20 reservas con supabase-js y el `EXPLAIN` con la semilla de
+  30k citas.
+
 ### Bloque F
 
 - Las 18 propuestas de la auditoría visual, aprobadas. **El pulido visual y los
