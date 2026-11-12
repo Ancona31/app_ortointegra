@@ -1355,6 +1355,43 @@ queda listada aquí.
   clínicas ni salta el candado público; se anota para la auditoría (D1).
 - **Sin migración en D6.**
 
+**D7 · ligar al iniciar la consulta:**
+- **Dónde:** en una cita por ligar, «Iniciar consulta» (mismas condiciones que
+  hoy: médico de la cita, con consultorio suyo, y sólo con v2) no navega:
+  cambia el bloque de la reserva por «Ligar a un paciente» (`PanelLigarCita`).
+  Un paciente existente con el buscador del modal (precargado con la primera
+  palabra del nombre de quien reservó, porque el buscador compara nombre O
+  apellidos por separado y el nombre completo no daría nada), o uno nuevo con
+  `QuickPatientModal` (precarga nombre y correo con la prop nueva
+  `emailInicial`; el teléfono se enseña para copiarlo a mano). El
+  consentimiento de privacidad lo sigue exigiendo `QuickPatientModal`.
+- **Ligar = el PUT de siempre** (`src/lib/agenda/ligarCita.ts`) con
+  `{paciente_id, title: nombre del paciente, updated_at}`; con 200 se navega a
+  `/expediente/<paciente>/nueva-nota?cita=<cita>`, así `/api/consultas` la
+  pasa a `attended` al guardar la nota. Vacía la caché de rangos (la agenda se
+  desmonta y al volver pintaría la cita aún por ligar).
+- **Servidor:** al ligar (v2, cita por ligar, `paciente_id` nuevo) se exige
+  que el paciente sea de la clínica y lo vea quien liga (RLS de `pacientes`):
+  400 `paciente_invalido` si no (la FK no mira la clínica). Después de
+  escribir, `cita_ligada` en `audit_log` con `{clinica, campos, via:'ligar'}`:
+  sólo nombres de campo, ni el paciente ni el nombre de quien reservó. El
+  disparador de B0 deja además su `cita_editada`.
+- **Datos de contacto** (lista A, 9): se quedan en la cita; el PUT no los toca
+  y no se copian a la ficha.
+- **Google (S1 con C5):** al ligar, el `after()` del PUT compone el evento con
+  el paciente («Cita médica: <paciente>», descripción fija sin observaciones),
+  y `descripcionV2` deja de mandar notas aunque la fila hubiera nacido en
+  Google. Antes de ligar, una cita por ligar se compone con
+  `{nombre: reserva_nombre, apellidos: ''}`, el mismo convenio que el espejo de
+  D4 (`gcal_citas_por_evento`), para que una edición desde Spinus no deje en
+  Google un título que el sondeo vuelva a restablecer. `sendUpdates` no cambia
+  al ligar (no hay paciente saliente): no avisa a nadie.
+- **e2e:** no se guarda la nota (una nota no se borra y rompería la siembra);
+  el paso a `attended` es el de `/api/consultas`, que compara `paciente_id`.
+- **Sin migración en D7.** Pendiente para quien integre: D8 (alta del evento
+  de una reserva) debería componer con el mismo convenio
+  (`pacienteParaGoogle`, o `{nombre: reserva_nombre, apellidos: ''}`).
+
 ### Bloque F
 
 - Las 18 propuestas de la auditoría visual, aprobadas. **El pulido visual y los

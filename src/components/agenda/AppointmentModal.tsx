@@ -26,6 +26,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Portal from '@/components/ui/Portal'
 import QuickPatientModal from '@/components/ui/QuickPatientModal'
@@ -44,6 +45,8 @@ import {
 } from '@/lib/agenda/fechasAgenda'
 import { ESTADOS_CITA, ICONO_ETIQUETA, COLOR_ETIQUETA, STATUS_CONFIG, esEventoGenerico, esPorLigar } from '@/lib/agenda/tarjetasAgenda'
 import BloqueReservaPorLigar from '@/components/agenda/BloqueReservaPorLigar'
+import PanelLigarCita from '@/components/agenda/PanelLigarCita'
+import { ligarCitaAPaciente, type PacienteParaLigar } from '@/lib/agenda/ligarCita'
 import { useDialogoModal } from '@/hooks/useDialogoModal'
 import ConfirmModal from '@/components/agenda/ConfirmModal'
 import { DEFAULT_DURATION } from '@/lib/agenda/duracionCita'
@@ -509,6 +512,33 @@ export default function AppointmentModal({
     paciente &&
     defaultMedicoId === apt?.medico_id &&
     citaConsultorio
+  /* D7: en una cita POR LIGAR, «Iniciar consulta» sale con las mismas
+     condiciones sin exigir paciente (sólo con v2: el ligado se audita y se
+     valida en el servidor con el interruptor), y en vez de navegar pide
+     primero ligarla (`ligar`, abajo). */
+  const showLigarYConsultar = Boolean(
+    isEdit && canVerExpediente && reserva && !paciente && agendaV2 &&
+    defaultMedicoId === apt?.medico_id && citaConsultorio,
+  )
+  const router = useRouter()
+  /* `null` = el bloque de la reserva; con valor, el panel «Ligar a un paciente». */
+  const [ligar, setLigar] = useState<{ enviando: boolean; error: string | null } | null>(null)
+  function abrirLigar(): void {
+    setLigar({ enviando: false, error: null })
+    // El buscador compara nombre O apellidos: con el nombre completo no saldría nada.
+    setSearch((reserva?.reserva_nombre ?? reserva?.title ?? '').trim().split(/\s+/)[0] ?? '')
+  }
+  /* Liga y, con 200, abre la nota con `?cita=` (así `/api/consultas` la pasa
+     a atendida). Si falla, el panel lo dice y la cita sigue por ligar. */
+  async function ligarYConsultar(p: PacienteParaLigar): Promise<void> {
+    if (!apt || !citaConsultorio) return
+    setLigar({ enviando: true, error: null })
+    const r = await ligarCitaAPaciente({ citaId: apt.id, updatedAt: apt.updated_at, paciente: p })
+    if (!r.ok) { setLigar({ enviando: false, error: r.motivo }); return }
+    cambiarActivo(citaConsultorio)
+    onClose()
+    router.push(`/expediente/${p.id}/nueva-nota?cita=${apt.id}`)
+  }
 
   // State del consultorio seleccionado.
   // Pre-selección cascada: apt (edición) → activo del sidebar si está en lista
@@ -1199,6 +1229,21 @@ export default function AppointmentModal({
                 </button>
                 )}
               </div>
+            ) : reserva && ligar ? (
+              <PanelLigarCita
+                nombreReserva={reserva.reserva_nombre ?? reserva.title}
+                telefono={reserva.reserva_telefono ?? null}
+                correo={reserva.reserva_correo ?? null}
+                search={search}
+                onSearch={setSearch}
+                resultados={search.trim().length >= 2 ? results : []}
+                buscando={searchLoading}
+                enviando={ligar.enviando}
+                error={ligar.error}
+                onElegir={p => void ligarYConsultar(p)}
+                onNuevo={() => setQuickCreate(true)}
+                onVolver={() => setLigar(null)}
+              />
             ) : reserva ? (
               <BloqueReservaPorLigar
                 citaId={reserva.id}
@@ -1639,6 +1684,15 @@ export default function AppointmentModal({
               {deleting ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
             </button>
           )}
+          {showLigarYConsultar && !ligar && (
+            <button type="button" onClick={abrirLigar}
+              aria-label="Iniciar consulta" title="Iniciar consulta: primero se liga a un paciente"
+              className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-sm font-bold border transition-colors hover:bg-[var(--ag-btn-ghost-hover)] max-md:w-11 max-md:h-11 max-md:px-0 max-md:py-0 max-md:flex-none"
+              style={{ color: 'var(--ag-text)', borderColor: 'var(--ag-input-border)' }}>
+              <Stethoscope size={15} />
+              <span className="max-md:hidden">Iniciar consulta</span>
+            </button>
+          )}
           {showIniciarConsulta && (
             <Link
               href={`/expediente/${paciente.id}/nueva-nota${apt ? `?cita=${apt.id}` : ''}`}
@@ -1748,8 +1802,15 @@ export default function AppointmentModal({
     {/* Modal de creación rápida — z-index superior al modal de cita */}
     {quickCreate && (
       <QuickPatientModal
-        nombreInicial={search}
-        onCreated={p => { setPaciente(p); setQuickCreate(false); setSearch('') }}
+        /* D7: al ligar una cita por ligar, con el nombre y el correo de quien
+           reservó; el consentimiento lo sigue exigiendo el modal. */
+        nombreInicial={reserva && ligar ? (reserva.reserva_nombre ?? reserva.title) : search}
+        emailInicial={reserva && ligar ? (reserva.reserva_correo ?? '') : ''}
+        onCreated={p => {
+          setQuickCreate(false)
+          if (reserva && ligar) { void ligarYConsultar(p); return }
+          setPaciente(p); setSearch('')
+        }}
         onClose={() => setQuickCreate(false)}
       />
     )}

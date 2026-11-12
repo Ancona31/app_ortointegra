@@ -15,7 +15,7 @@ import { agendaV2Encendida } from '@/lib/agenda/ajustesAgenda'
 import { comprobarEmpalmes, type VeredictoEmpalme } from '@/lib/agenda/empalmesServidor'
 import { ESTADOS_SIN_EMPALME } from '@/lib/agenda/empalmesCita'
 import { comprobarTipoDelPut, leerTipoCitaId, CUERPO_TIPO_INVALIDO } from '@/lib/agenda/tipoCitaServidor'
-import { estaPorLigar } from '@/lib/agenda/porLigarServidor'
+import { auditarLigado, estaPorLigar, pacienteParaGoogle, pacienteVisible } from '@/lib/agenda/porLigarServidor'
 import {
   auditarConflictoEdicion, camposEditados, descripcionV2, parchearConEtag, releerUpdatedAt,
   type CampoEdicion, type EventoGoogle, type ResultadoParche,
@@ -336,6 +336,21 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
         { error: 'cita_con_paciente', message: 'Una cita con paciente no se puede quedar sin paciente: cancélala.' },
         { status: 409 }
       )
+    }
+
+    /* D7: LIGAR una cita por ligar a un paciente (al iniciar la consulta).
+       La FK de `paciente_id` no mira la clínica: el paciente tiene que ser de
+       ESTA y verlo quien liga (RLS de `pacientes`). Si no, 400 y no se escribe. */
+    const ligando = porLigar && typeof paciente_id === 'string' && paciente_id !== ''
+    if (ligando) {
+      const visible = await pacienteVisible(supabase, profile.clinica_id, paciente_id)
+      if (visible === null) return NextResponse.json({ error: 'Error interno' }, { status: 500 })
+      if (!visible) {
+        return NextResponse.json(
+          { error: 'paciente_invalido', message: 'Ese paciente no es de esta clínica o no lo puedes ver.' },
+          { status: 400 }
+        )
+      }
     }
 
     if (clientUpdatedAt && existing.updated_at !== clientUpdatedAt) {
@@ -798,6 +813,16 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
     }
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
+    /* D7: el ligado, auditado sólo con NOMBRES de campo. Después de escribir:
+       si la escritura falló, no hubo ligado. Los datos de contacto de la
+       reserva no se tocan: se quedan en la cita (lista A, punto 9). */
+    if (ligando) {
+      await auditarLigado({
+        userId: user.id, clinicaId: profile.clinica_id, citaId: id,
+        campos: ['paciente_id', ...(title !== undefined ? ['title'] : [])],
+      })
+    }
+
     // Google Calendar sync en background con el cliente admin, espejando al
     // POST de /api/appointments.
     //
@@ -888,7 +913,8 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
       const clinicaId = profile.clinica_id
       const puedeReparar = canManageClinica(profile)
       const admin = createAdminClient()
-      const pacienteCita: PacienteEnCita = apt.pacientes ?? null
+      // D7: una por ligar se compone con el nombre de quien reservó (convenio de D4).
+      const pacienteCita: PacienteEnCita = pacienteParaGoogle(apt, v2)
       const clinicaCita:  ClinicaEnCita  = apt.clinicas  ?? null
       const tzCita: string = apt.consultorio_timezone ?? TZ_CLINICA
       const esTodoElDia = apt.all_day === true
@@ -1008,7 +1034,8 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
       const admin = createAdminClient()
       // El titulo del evento sale del paciente ligado; si la cita no tiene
       // paciente, del titulo libre de la cita.
-      const pacienteCita: PacienteEnCita = apt.pacientes ?? null
+      // D7: una por ligar se compone con el nombre de quien reservó (convenio de D4).
+      const pacienteCita: PacienteEnCita = pacienteParaGoogle(apt, v2)
       const clinicaCita:  ClinicaEnCita  = apt.clinicas  ?? null
       // EL HUSO DEL EVENTO ES EL DEL CONSULTORIO, NO EL DEL CENTRO. Espeja al
       // POST: antes se etiquetaba con una constante fija (Ciudad de Mexico) y

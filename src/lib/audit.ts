@@ -227,6 +227,13 @@ export type AuditAccion =
      `gcal_conexion_revocada`. `accion` es `text` sin CHECK: sin migración. */
   | 'gcal_conflicto_cita'
   | 'gcal_cambio_rechazado'
+  /* D7 de la agenda (reserva por enlace): una cita POR LIGAR —nacida de una
+     reserva sin paciente— quedó ligada a un paciente al iniciar la consulta.
+     `registro_id` es la cita; `descripcion` lleva la clínica y los NOMBRES de
+     los campos cambiados, nunca valores (ni el paciente ni el nombre de quien
+     reservó). El disparador de citas deja además su `cita_editada`. Sin
+     migración (`accion` es `text` sin CHECK). */
+  | 'cita_ligada'
 
 interface AuditParams {
   userId?: string | null
