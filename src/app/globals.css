@@ -3336,7 +3336,11 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
   padding:       0 !important;
   box-shadow:    none !important;
   cursor:        pointer !important;
-  transition:    transform 0.15s ease, filter 0.15s ease !important;
+  /* F2.1: sólo color, en la escala (CONTRASTE §5). Era `transform .15s,
+     filter .15s` —fuera de la escala y animando lo que no se anima en un
+     hover—; ver la nota de la regla de abajo. */
+  transition:    background-color var(--ag-dur-micro) var(--ag-ease),
+                 border-color     var(--ag-dur-micro) var(--ag-ease) !important;
 }
 /* ⚠️ `:not(.fc-list-event)` ACOTA ESTO A LA REJILLA, Y NO ES COSMÉTICA. Las
    filas de las vistas de lista son `<tr>` y también llevan `fc-event` —se lo
@@ -3347,10 +3351,22 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
    zoom sigue exactamente igual.
    El hover de la lista lo pone la regla nativa `.fc .fc-list-event:hover td`,
    que tiñe el fondo de las tres celdas — ver `--fc-list-event-hover-bg-color`
-   arriba. No hace falta nada más aquí. */
+   arriba. No hace falta nada más aquí.
+
+   ⚠️ F2.1 (bloque F): YA NO HAY `scale(1.02)` NI `drop-shadow`, Y NO VUELVEN.
+   CONTRASTE §5: «nada de `transform` en el hover de una tarjeta» — levantarla
+   dentro de una rejilla de horas desplaza su posición aparente, y la posición
+   ES el dato: una cita que parece moverse media hora al pasar el ratón es un
+   error de lectura. Y la sombra choca con «tarjetas sin sombra», que es parte
+   de la esencia de la agenda.
+   Lo que queda es el `z-index`, que no es movimiento: con dos citas encimadas
+   pone delante la que está bajo el ratón, para poder leerla entera.
+   ⚠️ EL HOVER YA NO CAMBIA NINGÚN COLOR, y es consecuencia de dónde vive el
+   color: el fondo y los bordes de `.ag-tarjeta` van en línea (los interpola
+   `MemoizedEventContent` por estado o por color de evento), así que una regla
+   de aquí no los puede tocar sin `!important` y sin volcar la paleta entera.
+   Si la superficie quiere un tinte de hover, va en ese componente. */
 .fc .fc-event:not(.fc-list-event):hover {
-  transform: scale(1.02) !important;
-  filter:    drop-shadow(0 4px 8px rgba(0,0,0,0.12)) !important;
   z-index:   10 !important;
 }
 
@@ -3405,6 +3421,37 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
 @keyframes ag-entra {
   from { opacity: 0; transform: translateY(4px); }
 }
+/* ⚠️ DESDE F2.1 EL HOVER YA NO ANIMA `transform` (ver su regla), así que la
+   trampa 1 de arriba ya no muerde POR EL HOVER. El relleno sigue en
+   `backwards` igualmente, y por dos motivos que siguen vivos: un `transform`
+   retenido crea bloque contenedor (la lección de `pageEnter`), y la técnica
+   FLIP de F2.6 (`flipTarjetas.ts`) anima `transform` sobre este mismo `.fc-event`
+   con WAAPI. Las trampas 2 y 3 valen sin cambios. */
+
+/* ── Cambio de vista (F2.2) ─────────────────────────────────────────────
+   CONTRASTE §2.3: al cambiar de vista el contenido cambia de NATURALEZA, y ahí
+   sí hay fundido y 6 px de subida («bloques»); al cambiar de FECHA no hay
+   traslación (eso va aparte, con WAAPI, en F2.3).
+   `.fc-view` sólo se vuelve a montar al cambiar de TIPO de vista —navegar
+   dentro de la misma lo conserva—, así que esto corre exactamente una vez por
+   cambio de vista y nunca al pasar de semana. El panel de Día entra con la misma
+   animación porque se monta a la vez (`panelDelDia`).
+
+   ⚠️ `backwards`, NUNCA `both` NI `forwards`, aunque el spec escriba `both`. Con
+   relleno hacia delante el `transform` QUEDA RETENIDO al acabar, y un
+   `transform` distinto de `none` convierte la vista en bloque contenedor de
+   todo lo `position: fixed` de dentro —el espejo del arrastre táctil, el
+   popover de «+N más»— y en contexto de apilamiento propio. Es la lección de
+   `pageEnter`. `backwards` pinta el primer fotograma desde el principio (sin
+   destello a opacidad plena) y suelta el elemento al terminar.
+   ⚠️ Y SIN `to {}`, por lo mismo que `ag-entra`. */
+@keyframes ag-vista {
+  from { opacity: 0; transform: translateY(6px); }
+}
+.agenda-fc .fc-view-harness > .fc-view,
+.ag-dia-aside {
+  animation: ag-vista var(--ag-dur-base) var(--ag-ease-out) backwards;
+}
 /* ⚠️ LA SEGUNDA EXCLUSIÓN ES DEL BLOQUE 6 Y ES LA MISMA HISTORIA QUE LA DEL
    HOVER: esta entrada anima `transform`, y las filas de lista son `<tr>`. Un
    `transform` sobre una fila de tabla crea un bloque contenedor y la despega de
@@ -3449,11 +3496,13 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
      capa y un selector `X *` no casa a X.
      El anillo de tiempo real (`.ag-ev-remoto::after`) no necesita línea: entra
      por `.fc *::after`.
+     ⚠️ `.ag-dia-aside` VA ÉL MISMO además de sus descendientes desde F2.2: el
+     panel entero entra con `ag-vista`, y `.ag-dia-aside *` no casa al panel.
      ⚠️ ESTO NO ALCANZA A LO QUE SE ANIMA CON WAAPI (FLIP, fundido de
      navegación, la vuelta del deslizamiento): esas miran
      `prefiereMenosMovimiento()` de `src/lib/agenda/movimientoAgenda.ts` y no
      animan. Una regla CSS no puede apagar un `element.animate()`. */
-  .fc *, .agenda-fc *, .ag-dia-aside *, .fc *::before, .fc *::after,
+  .fc *, .agenda-fc *, .ag-dia-aside, .ag-dia-aside *, .fc *::before, .fc *::after,
   .ag-modal-panel, .ag-modal-velo,
   .ag-capa, .ag-capa *, .ag-hoja, .ag-hoja * {
     animation-duration: .01ms !important;
