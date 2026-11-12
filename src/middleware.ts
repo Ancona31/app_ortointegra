@@ -242,6 +242,9 @@ export async function middleware(request: NextRequest) {
      `CRON_SECRET`, dentro de la propia ruta (S2 de `mejora_agendaV2.md`). */
   const isPublicApi = publicApiPaths.some(p => pathname.startsWith(p))
     || pathname === '/api/cron/google-sync'
+    /* E4: la tarea del recordatorio por correo, igual que la de arriba: `===`,
+       fuera de la lista, y su autenticación es `CRON_SECRET` en la ruta. */
+    || pathname === '/api/cron/recordatorios'
     /* La API de la reserva por enlace (D5), aparte de la lista y con prefijo
        propio terminado en barra: sólo abre lo que cuelga de /api/reservar/.
        Sin sesión por diseño; cada ruta exige el código del enlace, el

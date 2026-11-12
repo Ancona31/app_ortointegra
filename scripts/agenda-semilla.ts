@@ -157,6 +157,9 @@ async function exigirSinExpediente(pacientes: string[]): Promise<void> {
  *     están; su FK a médico y clínica es RESTRICT).
  * Cada tabla se mira con `to_regclass`: sin las migraciones de D no hace nada.
  * Los avisos (`reserva_avisos`) no son de ninguna clínica y se quedan.
+ * Bloque E, igual y en el mismo tiempo «antes» (FK RESTRICT a la cita, sin
+ * DELETE para el rol de servicio): `cita_correos` (E4, el registro de envíos)
+ * y `cita_confirmaciones` (E1, el enlace que emite el recordatorio y WhatsApp).
  */
 function limpiarReserva(clinicas: string[], cuando: 'antes' | 'despues'): void {
   if (!clinicas.every(id => /^[0-9a-f-]{36}$/.test(id))) throw new Error('id inválido para limpiar la reserva')
@@ -173,6 +176,12 @@ function limpiarReserva(clinicas: string[], cuando: 'antes' | 'despues'): void {
     end if;
     if to_regclass('public.reserva_contactos') is not null then
       delete from public.reserva_contactos where clinica_id = any (v_c);
+    end if;
+    if to_regclass('public.cita_correos') is not null then
+      delete from public.cita_correos where clinica_id = any (v_c);
+    end if;
+    if to_regclass('public.cita_confirmaciones') is not null then
+      delete from public.cita_confirmaciones where clinica_id = any (v_c);
     end if;`
   const despues = `
     if to_regclass('public.reserva_enlaces') is not null then

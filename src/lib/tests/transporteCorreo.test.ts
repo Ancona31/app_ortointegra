@@ -9,13 +9,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 interface RespuestaResend { data: { id: string } | null; error: { name: string; message: string } | null }
-interface Dobles { construidas: string[]; envios: unknown[]; respuesta: RespuestaResend; avisos: string[] }
+interface Dobles { construidas: string[]; envios: unknown[]; opciones: unknown[]; respuesta: RespuestaResend; avisos: string[] }
 
-const h = vi.hoisted((): Dobles => ({ construidas: [], envios: [], respuesta: { data: null, error: null }, avisos: [] }))
+const h = vi.hoisted((): Dobles => ({ construidas: [], envios: [], opciones: [], respuesta: { data: null, error: null }, avisos: [] }))
 
 vi.mock('resend', () => ({
   Resend: class {
-    emails = { send: async (p: unknown) => { h.envios.push(p); return h.respuesta } }
+    emails = { send: async (p: unknown, o?: unknown) => { h.envios.push(p); h.opciones.push(o); return h.respuesta } }
     constructor(llave: string) { h.construidas.push(llave) }
   },
 }))
@@ -41,6 +41,7 @@ let fetchFalso: ReturnType<typeof vi.fn<Fetch>>
 beforeEach(() => {
   h.construidas = []
   h.envios = []
+  h.opciones = []
   h.avisos = []
   h.respuesta = { data: { id: 'x' }, error: null }
   fetchFalso = vi.fn<Fetch>(async () => new Response('{"ID":"abc"}', { status: 200 }))
@@ -199,5 +200,40 @@ describe('enviarCorreo', () => {
     expect(todo).not.toContain('Asunto de prueba')
     expect(todo).not.toContain('Hola')
     expect(todo).toContain('sin_etiqueta')
+  })
+})
+
+describe('enviarCorreo: llave de idempotencia (agenda E4)', () => {
+  const ENV = { EMAIL_TRANSPORT: 'resend', NEXT_PUBLIC_SUPABASE_URL: PROD, RESEND_API_KEY: 're_prod' }
+
+  it('la llave válida llega a Resend como idempotencyKey; sin llave, sin opciones', async () => {
+    await enviarCorreo({ ...CORREO, idempotencia: 'recordatorio/00000000-0000-4000-8000-000000000001' }, ENV)
+    await enviarCorreo(CORREO, ENV)
+    expect(h.opciones).toEqual([{ idempotencyKey: 'recordatorio/00000000-0000-4000-8000-000000000001' }, undefined])
+  })
+
+  it('una llave con otra forma no se manda (el envío sale sin ella)', async () => {
+    for (const mala of ['', 'Recordatorio/x', 'a b', 'x'.repeat(257), 'correo@ejemplo.mx']) {
+      await enviarCorreo({ ...CORREO, idempotencia: mala }, ENV)
+    }
+    expect(h.opciones).toEqual([undefined, undefined, undefined, undefined, undefined])
+  })
+
+  it.each(['invalid_idempotent_request', 'concurrent_idempotent_requests'])('409 %s → motivo duplicado', async (nombre) => {
+    h.respuesta = { data: null, error: { name: nombre, message: `para ${PARA}` } }
+    const r = await enviarCorreo({ ...CORREO, idempotencia: 'recordatorio/x' }, ENV)
+    expect(r).toEqual({ ok: false, modo: 'resend', motivo: 'duplicado' })
+    expect(h.avisos.join('\n')).not.toContain(PARA)
+  })
+
+  it('otro error de Resend sigue siendo fallo', async () => {
+    h.respuesta = { data: null, error: { name: 'rate_limit_exceeded', message: 'x' } }
+    expect(await enviarCorreo({ ...CORREO, idempotencia: 'recordatorio/x' }, ENV)).toEqual({ ok: false, modo: 'resend', motivo: 'fallo' })
+  })
+
+  it('Mailpit ignora la llave: el cuerpo de su API no cambia', async () => {
+    await enviarCorreo({ ...CORREO, idempotencia: 'recordatorio/x' }, { EMAIL_TRANSPORT: 'captura' })
+    const cuerpo = JSON.parse(String(fetchFalso.mock.calls[0][1].body))
+    expect(Object.keys(cuerpo).sort()).toEqual(['From', 'HTML', 'Subject', 'Tags', 'Text', 'To'])
   })
 })

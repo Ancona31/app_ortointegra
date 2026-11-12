@@ -67,6 +67,15 @@ describe('middleware — rutas públicas (C7)', () => {
   })
 })
 
+describe('middleware — tarea de recordatorios (E4)', () => {
+  it('/api/cron/recordatorios pasa sin cookie; sus vecinas, no', async () => {
+    expect(await vaALogin('/api/cron/recordatorios')).toBe(false)
+    for (const ruta of ['/api/cron/recordatorios-x', '/api/cron/recordatorios/x', '/api/cron/recordatorio', '/api/cron/Recordatorios']) {
+      expect(await vaALogin(ruta), ruta).toBe(true)
+    }
+  })
+})
+
 describe('middleware — reserva por enlace (D5)', () => {
   it('/reservar/<código> y /api/reservar/<código>/… pasan sin cookie', async () => {
     for (const ruta of ['/reservar/AbCdEfGhIjKlMnOpQrStUv', '/api/reservar/AbCdEfGhIjKlMnOpQrStUv',

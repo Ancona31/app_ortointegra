@@ -1626,6 +1626,71 @@ queda listada aquí.
   (emitir → mismo enlace → contexto → confirmar → revocar → contexto nulo) con
   datos propios borrados al final.
 
+### Bloque E — decisiones tomadas en E4, E7, E8 y E9
+
+**E4 · migración `20261115140000_agenda_e4_correos_cita.sql` y la tarea de recordatorios:**
+- **Tabla `cita_correos`** como en el diseño (llave `(cita, tipo, inicio_cita)`,
+  sin destinatario ni contenido, testigo + `tomado_en`, 3 intentos). Diferencias
+  con plan_E: la puerta S3 también en el **listado** (si no, las clínicas sin
+  acceso ocuparían el tope de 200 en cada ejecución, el mismo resto que tiene
+  C7); `fallido` con motivo `duplicado` (409 de Resend) **no** se reintenta;
+  `intentos` CHECK 1..3 (no 1..5); índice por `clinica_id` para la FK RESTRICT;
+  CHECK de coherencia más estricto. El tipo `comprobante` queda listo para E5
+  (mismas `tomar`/`marcar`).
+- **Auditoría (APTA CON CAMBIOS):** aplicado el hallazgo 1 (un comprobante
+  `enviando` de hace menos de 10 min también impide el recordatorio del mismo
+  inicio). No aplicados, para Angel: (2) un envío en su tercer intento cuya
+  ejecución muere queda `enviando` para siempre (no manda nada de más; falta
+  el renglón de cierre); (3) `duplicado` junta el 409 de otro cuerpo y el
+  concurrente; (5) el pre-vuelo no compara el disparador. El auditor resolvió
+  lo que B0-E1 dejaban «sin calificar»: el `BEGIN/COMMIT` explícito con el
+  `SELECT` final fuera es correcto con postgres-meta.
+- **Propuesta de dimensión 19 para `AUDITORIA-MIGRACIONES.md`** (del auditor de
+  E4; no se tocó el archivo): *funciones que leen el `prosrc` de OTRA función,
+  lo reescriben y lo ejecutan (la puerta S3 de C1): el pre-vuelo debe exigir la
+  forma exacta de la fuente y abortar si cambió, la reejecución debe correr con
+  los mismos privilegios y `search_path`, y la sustitución no debe abrir
+  inyección.* Hay otra dimensión 19 propuesta en «Menores»: numerarlas al decidir.
+- **Ruta `GET /api/cron/recordatorios`** (S2): `autorizada()` extraída a
+  `src/lib/cronAutorizacion.ts` y usada también por `/api/cron/google-sync`
+  (lista A 19); `{ok:true}` o 401/500 sin cuerpo; la ruta no crea clientes y
+  `recordatorios.ts` sólo llama RPC con el `clinica_id` del listado; entrada
+  `===` en el middleware. `vercel.json`: `*/15 * * * *`, sin activar (faltan
+  `CRON_SECRET`, `EMAIL_TRANSPORT=resend` y el despliegue).
+- **Cuándo no toma nada:** transporte apagado **o sin `RESERVA_SECRETO`** (el
+  diseño sólo decía transporte): sin secreto no hay enlace y cada envío quedaría
+  `omitido/sin_enlace` para siempre; así los intentos siguen enteros cuando se
+  encienda. Sin las RPC de E4: `{ok:true}`.
+- **Presupuesto:** 45 s, 200 citas, 600 ms entre envíos que llegaron a salir.
+  ⚠️ **Por verificar** el límite por segundo de la cuenta de Resend antes de
+  encender.
+- **Transporte:** `Correo.idempotencia` (`^[a-z0-9/_-]{1,256}$`; otra forma se
+  manda SIN llave) → `idempotencyKey` de Resend; `invalid_idempotent_request` y
+  `concurrent_idempotent_requests` → motivo `duplicado`. Mailpit la ignora.
+- **Texto del recordatorio** (`correosCita.ts`, PENDIENTE DE REVISIÓN):
+  asunto «Recordatorio: tu cita del {fecha}» sin médico; cuerpo con fecha, hora
+  y «zona horaria: {región}» (`regionDeTimezone`), médico, consultorio,
+  dirección, teléfono y el enlace; la versión `confirmed` dice «Avisar que no
+  podré asistir» sin «Confirmar». Determinista (sin «ahora»). Zona ausente o
+  inválida → `America/Mexico_City`.
+- **Semilla:** `agenda-semilla.ts` borra `cita_correos` y `cita_confirmaciones`
+  (FK RESTRICT a la cita, sin DELETE para el rol de servicio) en el tiempo
+  «antes», como postgres. `cita_confirmaciones` es de E1, pero el recordatorio
+  y WhatsApp la llenan; si E3 añade la misma línea, el choque es trivial.
+- **e2e** `e2e/recordatorios.e2e.ts`: escrita, **no corrida**. Necesita un
+  `CRON_SECRET` sólo de prueba en `.env.local` (no se añadió: sin él el archivo
+  se salta).
+- **Encontrado al verificar:** la base local compartida tiene ya otra versión de
+  `cita_confirmacion_contexto` (la de E3, que cierra la suspendida), así que
+  `e1_confirmacion_enlace.sql` de ESTA rama falla en su caso 4 contra ella; las
+  demás pruebas SQL, `e4_correos_cita.sql` incluida, pasan una a una. Se
+  resuelve al fusionar con la rama de E3.
+- **Revisión independiente del diff (APTO):** confirmó contra la documentación
+  de Resend los dos nombres de error de la llave; sin hallazgos nuevos aparte
+  del envío zombi del tercer intento (ya anotado) y de una ventana de
+  milisegundos entre la toma y la emisión del enlace (si en ese instante se
+  apaga el interruptor, el envío queda `omitido/sin_enlace`).
+
 ### Bloque F
 
 - Las 18 propuestas de la auditoría visual, aprobadas. **El pulido visual y los
