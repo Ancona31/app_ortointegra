@@ -1,3 +1,5 @@
+'use client'
+
 /**
  * src/components/agenda/AvisosAgenda.tsx
  *
@@ -19,12 +21,58 @@
  * propósito.
  */
 
+import { useEffect, useState, type ReactElement, type ReactNode } from 'react'
 import Link from 'next/link'
 import { Calendar, ChevronsDownUp, TriangleAlert } from 'lucide-react'
 import { Banda } from '@/components/agenda/Banda'
 import { GoogleGIcon } from '@/components/agenda/GoogleGIcon'
 import { componerNombreMedicoCompleto } from '@/lib/nombreMedico'
 import type { MedicoConfig } from '@/lib/configApp'
+import { duracionMovimiento } from '@/lib/agenda/movimientoAgenda'
+
+/**
+ * Bloque F (F2.8): una banda que deja de aplicar no desaparece de golpe; se
+ * desvanece en `--ag-dur-base` (más rápido de lo que entró, `--ag-dur-lento`)
+ * y DESPUÉS se desmonta. La entrada es sólo CSS (al montarse); esto existe
+ * para la salida, que necesita el nodo montado mientras dura.
+ *
+ * `texto` es el que la banda enseñaba: mientras sale se RETIENE el último, para
+ * que un «Sin citas esta semana» que se va no diga durante 180 ms lo del
+ * periodo nuevo. Las bandas de texto fijo no lo pasan.
+ *
+ * ⚠️ NO SE ANIMA EL ALTO, Y ES LA DECISIÓN 7 DEL BLOQUE F: la banda ocupa su
+ * sitio entero hasta desmontarse, así que la rejilla salta UNA vez (al entrar
+ * o al terminar de salir) en vez de recalcularse en cada cuadro.
+ * ⚠️ CON MOVIMIENTO REDUCIDO LA ESPERA ES 0 y se desmonta como antes.
+ *
+ * Local a este archivo a propósito (protocolo 4): la usan sus cinco bandas y
+ * nadie más. Ajusta estado durante el render al cambiar una prop (el patrón
+ * de React para eso), sin efecto; el único efecto es el temporizador.
+ */
+function ConSalida({ visible, texto = '', children }: {
+  visible: boolean
+  texto?: string
+  children: (texto: string, saliendo: boolean) => ReactNode
+}): ReactElement | null {
+  const actual = visible ? texto : null
+  const [ultimo, setUltimo] = useState<string | null>(actual)
+  const [saliendo, setSaliendo] = useState(false)
+  if (actual !== null && (actual !== ultimo || saliendo)) {
+    setUltimo(actual)
+    setSaliendo(false)
+  } else if (actual === null && ultimo !== null && !saliendo) {
+    if (duracionMovimiento('--ag-dur-base') > 0) setSaliendo(true)
+    else setUltimo(null)
+  }
+  useEffect(() => {
+    if (!saliendo) return
+    const t = setTimeout(() => { setSaliendo(false); setUltimo(null) }, duracionMovimiento('--ag-dur-base'))
+    return () => clearTimeout(t)
+  }, [saliendo])
+  const pintado = actual ?? ultimo
+  if (pintado === null) return null
+  return <>{children(pintado, actual === null)}</>
+}
 
 interface Props {
   cargaVisible: boolean
@@ -65,8 +113,8 @@ export function AvisosAgenda({
       {/* 1 · Error de carga. «Reintentar» llama al MISMO `refetch()` que usan
           el cambio de filtro, la reconexión y la vuelta a la pestaña: una
           sola puerta de recarga, y con el candado de arrastre incluido. */}
-      {errorCitas && (
-        <Banda tono="error" urgente>
+      <ConSalida visible={errorCitas}>{(_, saliendo) => (
+        <Banda tono="error" urgente saliendo={saliendo}>
           <TriangleAlert size={14} className="ag-aviso-icono" aria-hidden />
           <p className="ag-aviso-texto">
             <strong>No se pudo cargar la agenda.</strong> Lo que se ve puede estar incompleto o desactualizado.
@@ -75,7 +123,7 @@ export function AvisosAgenda({
             Reintentar
           </button>
         </Banda>
-      )}
+      )}</ConSalida>
 
       {/* 1 bis · La traída llegó ENTERA de forma y RECORTADA de fondo.
           ⚠️ COMPARTE EL TONO ROJO CON LA DE ARRIBA Y NO ES PEREZA. Sólo hay
@@ -95,8 +143,8 @@ export function AvisosAgenda({
           botón — sólo desde Mes, que es de donde se sale; ya en Semana no
           hay a dónde acortar y la banda se queda sin acción, que es más
           honesto que un botón que no cambia nada. */}
-      {citasIncompletas && (
-        <Banda tono="error" urgente>
+      <ConSalida visible={citasIncompletas}>{(_, saliendo) => (
+        <Banda tono="error" urgente saliendo={saliendo}>
           <TriangleAlert size={14} className="ag-aviso-icono" aria-hidden />
           <p className="ag-aviso-texto">
             <strong>Faltan citas por mostrar.</strong> Este periodo tiene más citas de las que caben en una carga; lo que ves está incompleto.
@@ -110,31 +158,29 @@ export function AvisosAgenda({
             </button>
           )}
         </Banda>
-      )}
+      )}</ConSalida>
 
       {/* 2 · Fallo de Google. SIN «Reintentar» a propósito: reintentar no
           arregla una credencial ni una cuota, y un botón que casi siempre
           falla enseña a ignorarlo. La salida es /perfil, que es donde se
           reconecta de verdad. */}
-      {googleFallo && (
-        <Banda tono="gcal">
+      <ConSalida visible={googleFallo}>{(_, saliendo) => (
+        <Banda tono="gcal" saliendo={saliendo}>
           <GoogleGIcon size={14} />
           <p className="ag-aviso-texto">
             <strong>No se pudo sincronizar con Google Calendar.</strong> Tus citas se muestran normal; faltan los eventos del calendario.
           </p>
           <Link href="/perfil" className="ag-aviso-accion">Revisar conexión</Link>
         </Banda>
-      )}
+      )}</ConSalida>
 
       {/* 3 · Vacío. Las dos frases salen del mismo cero; ver `vacioReal`. */}
-      {vacioReal && (
-        <Banda tono="vacio">
+      <ConSalida visible={vacioReal} texto={vacioFiltrado && medicoFiltrado
+        ? `Ningún evento de ${componerNombreMedicoCompleto(medicoFiltrado)} ${periodoVacio}`
+        : `Sin citas ${periodoVacio}`}>{(texto, saliendo) => (
+        <Banda tono="vacio" saliendo={saliendo}>
           <Calendar size={14} className="ag-aviso-icono" aria-hidden />
-          <p className="ag-aviso-texto">
-            {vacioFiltrado && medicoFiltrado
-              ? `Ningún evento de ${componerNombreMedicoCompleto(medicoFiltrado)} ${periodoVacio}`
-              : `Sin citas ${periodoVacio}`}
-          </p>
+          <p className="ag-aviso-texto">{texto}</p>
           {/* «Ver todos» pasa por `aplicarFiltro`, como el desplegable: un
               `setFiltroMedico('')` a secas dejaba `filtroSincronoRef` en el
               médico anterior y la traída seguía filtrada (defecto hallado
@@ -156,17 +202,18 @@ export function AvisosAgenda({
             </button>
           )}
         </Banda>
-      )}
+      )}</ConSalida>
 
       {/* 4 · Vista compacta. Se queda EXACTAMENTE como estaba, sólo que ahora
           dentro del envoltorio: no se migra a `Banda` porque su caja lleva su
           propia geometría y sus propias clases desde el bloque 6, y
           reescribirla para ganar tres líneas es arriesgar una que funciona. */}
-      {avisoRecorte && (
-        <div className="ag-banda-compacta" role="status">
+      <ConSalida visible={!!avisoRecorte} texto={avisoRecorte ?? ''}>{(texto, saliendo) => (
+        <div className="ag-banda-compacta" role="status"
+          data-estado={saliendo ? 'saliendo' : undefined} inert={saliendo || undefined}>
           <ChevronsDownUp size={14} className="ag-banda-compacta-icono" aria-hidden />
           <p className="ag-banda-compacta-texto">
-            <strong>Vista compacta:</strong> {avisoRecorte}
+            <strong>Vista compacta:</strong> {texto}
           </p>
           {/* SEGUNDA salida, no la única: el botón del header sigue siendo por
               donde se enciende y también apaga. Existe porque el efecto que
@@ -178,7 +225,7 @@ export function AvisosAgenda({
             {compactaElMes ? 'Mostrar todos los días' : 'Mostrar rejilla completa'}
           </button>
         </div>
-      )}
+      )}</ConSalida>
     </div>
   )
 }

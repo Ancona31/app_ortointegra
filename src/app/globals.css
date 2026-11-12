@@ -3606,6 +3606,36 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
 }
 
 /* ══════════════════════════════════════════════════════════════════════
+   AVISOS Y BANDA COMPACTA — bloque F (F2.8)
+   ══════════════════════════════════════════════════════════════════════
+   CONTRASTE §2.6: entra con opacidad y 6 px («bloques») en `--ag-dur-lento`
+   con `--ag-ease-out`; sale sólo con opacidad, MÁS RÁPIDO (`--ag-dur-base`,
+   `--ag-ease-in`): lo que ya leíste se quita sin hacerse esperar. La salida la
+   sostiene `ConSalida` (`AvisosAgenda.tsx`), que deja la banda montada con
+   `data-estado="saliendo"` mientras dura.
+   ⚠️ NO SE ANIMA EL ALTO (decisión 7): la banda ocupa su sitio entero hasta
+   desmontarse y la rejilla salta UNA vez. Animar el alto recalcularía
+   FullCalendar en cada cuadro.
+   ⚠️ `backwards` en la entrada (no retiene `transform`) y sin `to {}`, por lo
+   de `ag-entra`. La salida retiene `opacity` con `forwards`, que es seguro.
+   Con movimiento reducido entran por `.agenda-fc *`. */
+@keyframes ag-aviso-entra {
+  from { opacity: 0; transform: translateY(6px); }
+}
+@keyframes ag-aviso-sale {
+  to { opacity: 0; }
+}
+.agenda-fc .ag-aviso,
+.agenda-fc .ag-banda-compacta {
+  animation: ag-aviso-entra var(--ag-dur-lento) var(--ag-ease-out) backwards;
+}
+.agenda-fc .ag-aviso[data-estado="saliendo"],
+.agenda-fc .ag-banda-compacta[data-estado="saliendo"] {
+  animation: ag-aviso-sale var(--ag-dur-base) var(--ag-ease-in) forwards;
+  pointer-events: none;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
    TARJETA DE EVENTO DE SEMANA/DÍA (`.ag-tarjeta`) — bloque 3A
    ══════════════════════════════════════════════════════════════════════
    La caja de `MemoizedEventContent`, que antes vivía entera en estilos en
