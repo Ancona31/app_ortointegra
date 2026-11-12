@@ -148,7 +148,7 @@ export const FORMATO_HORA_INICIO = new Intl.DateTimeFormat('es-MX', {
 
 export const MemoizedEventContent = memo(function MemoizedEventContent({
   timeText, horaInicio, title, pacNombre, status, doctorInitial, tzDiff, icono, color, descriptor,
-  esEvento, enRejilla,
+  esEvento, enRejilla, marca = null, marcaTitulo = null,
 }: {
   /* True si la fila es un evento genérico y no una cita. Lo deriva el
      despachador con `esEventoGenerico`; aquí no se puede deducir de `icono` ni
@@ -183,6 +183,15 @@ export const MemoizedEventContent = memo(function MemoizedEventContent({
      `arg.view`, con `esVistaDeRejilla`. En `false` ni se mide ni sale clase de
      tier — el porqué de cada una, en las dos notas de abajo. */
   enRejilla: boolean
+  /* D6 · «Por ligar» (y «· N» si la persona traía historial al reservar) de
+     una cita por ligar; `null` en cualquier otra fila. Dos cadenas sueltas y
+     no un objeto, para que el `memo` siga comparando primitivos. Va en la
+     línea del NOMBRE, detrás de él, y no en una línea nueva: la tarjeta sigue
+     teniendo dos líneas (P5) y en el tier `tiny`, donde el descriptor no se
+     ve, la marca sí. `marcaTitulo` es la frase entera (el número solo no dice
+     qué cuenta). */
+  marca?: string | null
+  marcaTitulo?: string | null
 }) {
   const rootRef = useRef<HTMLDivElement>(null)
   const [height, setHeight] = useState<number | null>(null)
@@ -364,6 +373,7 @@ export const MemoizedEventContent = memo(function MemoizedEventContent({
           className="ag-tarjeta-nombre"
           style={isCancelled ? { textDecoration: 'line-through' } : undefined}
         >{name}</span>
+        {marca && <span className="ag-tarjeta-marca" title={marcaTitulo ?? undefined}>{marca}</span>}
       </div>
       {tzDiff && <span className="ag-tarjeta-tz">{tzDiff}</span>}
       {/* Tercera línea: «Consulta de seguimiento · atendida». El estado va en su

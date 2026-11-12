@@ -3523,6 +3523,24 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
   text-overflow: ellipsis;
 }
 
+/* D6 · «Por ligar» de una cita por ligar, detrás del nombre y en su misma
+   línea (la tarjeta no gana una tercera). La misma píldora que `.ag-mes-badge`
+   del mes, en tinta neutra: no es un estado y no compite con su color. No
+   encoge: el que cede sitio es el nombre, que ya lleva elipsis. */
+.agenda-fc .ag-tarjeta-marca {
+  flex: 0 0 auto;
+  padding: 0 4px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .02em;
+  line-height: 1.5;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--ag-ink-600);
+}
+
 .agenda-fc .ag-tarjeta-tz {
   flex: 0 0 auto;
   font-size: 9.5px;
@@ -3618,7 +3636,9 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
 .agenda-fc .ag-tarjeta--tiny .ag-tarjeta-icono,
 .agenda-fc .fc-timeGridDay-view .ag-tarjeta-icono { order: 2; }
 .agenda-fc .ag-tarjeta--tiny .ag-tarjeta-nombre,
-.agenda-fc .fc-timeGridDay-view .ag-tarjeta-nombre { order: 3; }
+.agenda-fc .fc-timeGridDay-view .ag-tarjeta-nombre,
+.agenda-fc .ag-tarjeta--tiny .ag-tarjeta-marca,
+.agenda-fc .fc-timeGridDay-view .ag-tarjeta-marca { order: 3; }
 .agenda-fc .ag-tarjeta--tiny .ag-tarjeta-tz,
 .agenda-fc .fc-timeGridDay-view .ag-tarjeta-tz { order: 4; }
 .agenda-fc .ag-tarjeta--tiny .ag-tarjeta-desc,

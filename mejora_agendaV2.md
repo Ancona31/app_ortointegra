@@ -1309,6 +1309,52 @@ queda listada aquí.
   replica` (`e2e/reservaAyudas.ts`). Quien integre D10 debería enseñar a la
   semilla a borrarlas también.
 
+**D6 · por ligar, historial y bloqueos en la agenda:**
+- **`esEventoGenerico` = `!paciente_id && !reserva_canal`**, y `esPorLigar`
+  aparte. Los 8 llamadores: los seis que reciben la fila entera ya ven
+  `reserva_canal` (llega por el `*` de `APPOINTMENT_SELECT`); los dos que
+  arman el objeto a mano (`contarVisibles`, `desgloseDeEstados`) lo pasan. Sin
+  la columna llega `undefined` y la regla es la de antes. La clasificación va
+  por el DATO, no por el interruptor: con v2 apagado sólo cambia algo si la
+  clínica tuvo v2 y lo apagó con reservas en la agenda (entonces se ven como
+  citas «Por ligar», que es lo que son).
+- **Marca en la tarjeta:** píldora «Por ligar» (o «Por ligar · N» con
+  `reserva_historial_previo` > 0) en la línea del NOMBRE, detrás de él; la
+  tarjeta sigue con dos líneas y la marca se ve también en el tier `tiny`. La
+  frase entera («traía N cancelaciones o inasistencias») va en `title`: N es
+  la instantánea de D3, que suma cancelaciones e inasistencias, así que no se
+  escribe «3 cancelaciones» a secas. En Mes, la misma píldora que «Evento» de
+  Google. Las filas de las vistas de lista no llevan marca.
+- **Modal:** una cita por ligar se abre como «Editar cita»; en el sitio del
+  paciente, el bloque «Reservó por enlace» (nombre, teléfono, correo, historial
+  EN VIVO de `GET /api/agenda/reservas/historial` y «Bloquear / Desbloquear
+  contacto»). Sin buscador: se liga al iniciar la consulta (D7). Guardar sin
+  paciente conserva el título y NO manda `paciente_id`. El botón de bloquear
+  sale para administrador y secretaria, o para el médico de la cita; sin v2,
+  sólo la instantánea.
+- **Servidor (PUT y DELETE, sólo con v2):** una lectura más,
+  `estaPorLigar` (`src/lib/agenda/porLigarServidor.ts`), en las filas SIN
+  paciente; si falla, 500 sin escribir. Una por ligar: el DELETE da el mismo
+  409 `cita_con_paciente` de B3 (se cancela); el PUT le aplica las reglas de
+  cita: no puede pasar a todo el día (400 `todo_el_dia_con_paciente`), lleva el
+  tope de duración de una cita y puede llevar tipo (`comprobarTipoDelPut` con
+  `porLigar`: `conPaciente = paciente_id || reserva_canal`, P5 ampliado; el
+  mensaje de `tipo_sin_paciente` dice «con paciente o por ligar»).
+- **El 500 de la FK, corregido:** con v2 encendido no se llega al borrado (409
+  de arriba). Apagado, el DELETE de una cita que sostiene una FK RESTRICT
+  (sólo pasa con las tablas de D: enlace único gastado o incidencia) da 409
+  `cita_con_paciente` «cancélala», en vez del 500 con el texto de Postgres.
+- **«Con el interruptor apagado no existen reservas», hasta dónde es cierto**
+  (prueba `d6_cita_por_ligar.sql`): por el camino de la reserva sí,
+  `reservar_por_enlace` contesta «apagado» y no escribe ni gasta el enlace.
+  Pero no es un invariante de la base: (a) si la clínica apaga v2 después de
+  recibir reservas, las citas se quedan (de ahí el 409 de arriba); (b) la RLS
+  de `reserva_enlaces` y de `appointments` no mira el interruptor, así que
+  alguien de la clínica, por PostgREST directo, podría crear un enlace y una
+  cita con `reserva_*` de su propia clínica con v2 apagado. Nada de eso cruza
+  clínicas ni salta el candado público; se anota para la auditoría (D1).
+- **Sin migración en D6.**
+
 ### Bloque F
 
 - Las 18 propuestas de la auditoría visual, aprobadas. **El pulido visual y los

@@ -49,9 +49,42 @@ export const COLOR_ETIQUETA: Record<ColorEvento, string> = {
   grafito: 'Grafito',
 }
 
-/** True si la fila es un evento genérico y no una cita: lo decide el paciente. */
-export function esEventoGenerico(apt: { paciente_id?: string | null }): boolean {
-  return !apt.paciente_id
+/** Lo que deciden las dos funciones de abajo, y nada más. */
+type FilaParaTipo = { paciente_id?: string | null; reserva_canal?: string | null }
+
+/**
+ * True si la fila es un evento genérico y no una cita: lo decide el paciente
+ * o, desde D6, que la fila haya nacido de una reserva por enlace (lista A,
+ * punto 7: una cita POR LIGAR es una cita en tarjetas, conteos, huecos y B3).
+ * Sin las columnas de D1 `reserva_canal` llega `undefined` y esto vuelve a ser
+ * exactamente `!paciente_id`.
+ */
+export function esEventoGenerico(apt: FilaParaTipo): boolean {
+  return !apt.paciente_id && !apt.reserva_canal
+}
+
+/** True si es una cita por ligar: nació de una reserva por enlace y aún no tiene paciente. */
+export function esPorLigar(apt: FilaParaTipo): boolean {
+  return !apt.paciente_id && Boolean(apt.reserva_canal)
+}
+
+/**
+ * La marca de la tarjeta de una cita por ligar (lista A, punto 17): «Por
+ * ligar», más «· N» si la persona traía cancelaciones o inasistencias con ese
+ * médico al reservar (`reserva_historial_previo`, la instantánea; el historial
+ * en vivo sólo está en el modal). `null` si no está por ligar.
+ * `titulo` es la frase entera para `title`: el número suelto no dice qué cuenta.
+ */
+export function marcaPorLigar(
+  apt: FilaParaTipo & { reserva_historial_previo?: number | null },
+): { texto: string; titulo: string } | null {
+  if (!esPorLigar(apt)) return null
+  const n = apt.reserva_historial_previo ?? 0
+  if (n <= 0) return { texto: 'Por ligar', titulo: 'Por ligar: reservada por enlace, aún sin paciente' }
+  return {
+    texto: `Por ligar · ${n}`,
+    titulo: `Por ligar: reservada por enlace, aún sin paciente. Al reservar traía ${n} ${n === 1 ? 'cancelación o inasistencia' : 'cancelaciones o inasistencias'}`,
+  }
 }
 
 /* Las tintas del chip de la BANDA, derivadas de la fila. Fuera del componente

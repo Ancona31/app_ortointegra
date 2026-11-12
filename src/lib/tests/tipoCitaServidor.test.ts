@@ -154,6 +154,19 @@ describe('comprobarTipoDelPut', () => {
     })).toMatchObject({ ok: false, status: 400, cuerpo: { error: 'tipo_sin_paciente' } })
   })
 
+  it('D6: una cita POR LIGAR (sin paciente) sí puede llevar tipo; un evento sigue sin poder', async () => {
+    h.respuestas.appointments = { data: { tipo_cita_id: null }, error: null }
+    tipoEnBase()
+    const args = {
+      clinicaId: 'c1', citaId: 'x', tipoDelCuerpo: TIPO, antes: { medico_id: MED, paciente_id: null },
+      medicoEfectivo: MED, pacienteEfectivo: null,
+    }
+    expect(await comprobarTipoDelPut(await createClient(), { ...args, porLigar: true }))
+      .toEqual({ ok: true, columnas: { tipo_cita_id: TIPO, tipo_cita_nombre: 'Primera vez' } })
+    expect(await comprobarTipoDelPut(await createClient(), { ...args, porLigar: false }))
+      .toMatchObject({ ok: false, status: 400, cuerpo: { error: 'tipo_sin_paciente' } })
+  })
+
   it('sin poder leer la fila: 500', async () => {
     h.respuestas.appointments = { data: null, error: { message: 'caída' } }
     expect(await comprobarTipoDelPut(await createClient(), {

@@ -8,7 +8,7 @@
 import { memo } from 'react'
 import type { EventContentArg } from '@fullcalendar/core'
 import type { Appointment } from '@/lib/agenda/tiposAgenda'
-import { esEventoGenerico, tintasDelChipDeMes } from '@/lib/agenda/tarjetasAgenda'
+import { esEventoGenerico, marcaPorLigar, tintasDelChipDeMes } from '@/lib/agenda/tarjetasAgenda'
 import { GoogleGIcon } from './GoogleGIcon'
 import { IconoDelEvento } from './IconoDelEvento'
 
@@ -32,6 +32,8 @@ export const MonthChip = memo(function MonthChip({ arg }: { arg: EventContentArg
   // así que una cita salía con el motivo escrito en el alta y no con el
   // paciente, que es lo que el médico busca al barrer el mes con la vista.
   const pac = ext?.pacientes
+  // D6: «Por ligar» con la misma píldora que «Evento» de Google; `null` en el resto.
+  const marca = ext ? marcaPorLigar(ext) : null
 
   return (
     <div
@@ -55,6 +57,7 @@ export const MonthChip = memo(function MonthChip({ arg }: { arg: EventContentArg
         </span>
       )}
       <span className="ag-mes-nombre">{pac ? `${pac.nombre} ${pac.apellidos}` : arg.event.title}</span>
+      {marca && <span className="ag-mes-badge" title={marca.titulo}>{marca.texto}</span>}
       {isGcal && (
         <span className="ag-mes-badge">
           {/* Mismo texto y mismo motivo que en GoogleEventCard, donde está

@@ -161,7 +161,7 @@ export function desgloseDeEstados(
     if (!(ev.start.getTime() < fin && (ev.end ?? ev.start).getTime() > base)) continue
     const ext: Partial<Appointment> & { isGcalBlock?: boolean } = ev.extendedProps
     if (ext?.isGcalBlock === true) continue
-    if (esEventoGenerico({ paciente_id: ext?.paciente_id ?? null })) continue
+    if (esEventoGenerico({ paciente_id: ext?.paciente_id ?? null, reserva_canal: ext?.reserva_canal ?? null })) continue
     const estado = ext?.status
     if (!estado) continue
     cuenta.set(estado, (cuenta.get(estado) ?? 0) + 1)

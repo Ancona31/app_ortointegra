@@ -63,6 +63,18 @@ export type Appointment = {
      se pinta en la tarjeta (P5); sólo la lee el selector del modal. */
   tipo_cita_id?: string | null
   tipo_cita_nombre?: string | null
+  /* D6 · La reserva por enlace (migración 20261114120000). OPCIONALES por lo
+     mismo que el tipo: llegan sólo por el `*` de `APPOINTMENT_SELECT` cuando
+     las columnas existen, y en una base sin D1 no llegan nunca (`undefined`
+     cuenta como «no nació de una reserva»). «Por ligar» = `reserva_canal` no
+     nulo y `paciente_id` nulo (`esPorLigar`). `reserva_historial_previo` es la
+     instantánea de cancelaciones + inasistencias AL RESERVAR; el historial en
+     vivo lo pide el modal. Los `*_hmac` también llegan y nadie los lee aquí. */
+  reserva_canal?: 'fijo' | 'unico' | null
+  reserva_nombre?: string | null
+  reserva_telefono?: string | null
+  reserva_correo?: string | null
+  reserva_historial_previo?: number | null
   /* `email` viaja desde `APPOINTMENT_SELECT` para un solo consumidor: el botón
      de invitación. Que esté aquí es lo que evita una petición por cita abierta
      sólo para saber si la ficha tiene correo.
