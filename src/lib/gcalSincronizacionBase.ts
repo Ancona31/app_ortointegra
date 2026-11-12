@@ -113,6 +113,24 @@ export async function reiniciarToken(clinicaId: string, candado: string): Promis
   return z.boolean().parse(await llamar('gcal_sync_reiniciar', clinicaId, { p_candado: candado }))
 }
 
+const FrescuraSchema = z.object({ r_ultima_ok: z.string().nullable(), r_ocupada: z.boolean() })
+
+export interface Frescura {
+  /** La última sincronización buena (token final guardado), o null si nunca la hubo. */
+  ultimaOk: string | null
+  /** Otra pasada tiene el candado ahora mismo. */
+  ocupada: boolean
+}
+
+/**
+ * D11 (`gcal_sync_frescura`): la última buena y si el candado está tomado.
+ * Sólo lectura. Sin fila (nunca sincronizó) = `{ ultimaOk: null, ocupada: false }`.
+ */
+export async function frescuraSincronizacion(clinicaId: string): Promise<Frescura> {
+  const f = z.array(FrescuraSchema).parse((await llamar('gcal_sync_frescura', clinicaId, {})) ?? [])[0]
+  return { ultimaOk: f?.r_ultima_ok ?? null, ocupada: f?.r_ocupada ?? false }
+}
+
 /** Suelta el candado. `error` = código corto fijo (nunca texto de Google); null = presupuesto agotado. */
 export async function soltarCandado(clinicaId: string, candado: string, error: string | null): Promise<boolean> {
   return z.boolean().parse(await llamar('gcal_sync_soltar', clinicaId, { p_candado: candado, p_error: error }))
@@ -189,6 +207,19 @@ export async function importarEvento(clinicaId: string, calendarId: string, d: D
     p_title: d.titulo, p_start: d.puntas.inicio, p_end: d.puntas.fin, p_all_day: d.puntas.todoElDia,
     p_timezone: d.zona, p_notas: d.notas, p_medico_id: d.medicoId,
   }))
+}
+
+/* ── D11: empalmes con reservas por enlace ─────────────────────────────── */
+
+/**
+ * Las citas que la pasada acaba de importar o de mover desde Google: la base
+ * registra (sin repetir) los pares nuevos con una reserva por enlace del
+ * mismo médico y los audita (`20261116120000_agenda_d11_sync_antes_de_reservar.sql`).
+ * Devuelve cuántos pares nuevos hubo.
+ */
+export async function registrarEmpalmesReserva(clinicaId: string, citaIds: string[]): Promise<number> {
+  const ids = z.array(z.guid()).parse([...new Set(citaIds)])
+  return z.number().int().parse(await llamar('reserva_empalmes_registrar', clinicaId, { p_citas: ids }))
 }
 
 /* ── E9: RSVP de Google ────────────────────────────────────────────────── */

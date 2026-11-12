@@ -41,8 +41,8 @@ import {
   decidirEvento, marcaSpinus, type ContextoDecision, type Decision, type EventoGoogle, type FilaEspejo,
 } from '@/lib/gcalSincronizacionDecidir'
 import {
-  aplicarEvento, avanzarPagina, citasDeEventos, clinicaHabilitada, confirmarPorRsvp, importarEvento, reiniciarToken,
-  soltarCandado, SincronizacionNoDisponible, tomarCandado, type Candado,
+  aplicarEvento, avanzarPagina, citasDeEventos, clinicaHabilitada, confirmarPorRsvp, importarEvento, registrarEmpalmesReserva,
+  reiniciarToken, soltarCandado, SincronizacionNoDisponible, tomarCandado, type Candado,
 } from '@/lib/gcalSincronizacionBase'
 import { restablecerEnGoogle, type PorRestablecer } from '@/lib/gcalSincronizacionRestablecer'
 import { aceptaronDe, rsvpGoogleEncendido } from '@/lib/gcalRsvp'
@@ -73,6 +73,12 @@ export interface OpcionesSincronizacion {
   minIntervaloSeg: number
   /** Reloj inyectable para las pruebas. */
   ahora?: () => number
+  /**
+   * D11 · corta de verdad las llamadas a Google (`events.list`, `patch` del
+   * restablecimiento) cuando la ruta pública de reserva agota su tope. Sin
+   * ella (sondeo, tarea programada), todo como antes.
+   */
+  senal?: AbortSignal
 }
 
 interface Pasada {
@@ -82,6 +88,8 @@ interface Pasada {
   ahora: () => number
   limite: number
   r: ResultadoSincronizacion
+  /** D11: citas importadas o movidas desde Google en la página en curso. */
+  movidas: string[]
 }
 
 /** El estado HTTP de un error de googleapis (gaxios), si lo trae. */
@@ -128,7 +136,7 @@ export async function sincronizarClinica(
     // Sonda de C2 ANTES de Google: con C1 aplicada y C2 no, se sale aquí
     // (no_disponible, candado suelto) sin haber llamado a events.list.
     await citasDeEventos(conexion.clinicaId, [], [])
-    const pasada: Pasada = { conexion, candado, op, ahora, limite: ahora() + op.presupuestoMs, r }
+    const pasada: Pasada = { conexion, candado, op, ahora, limite: ahora() + op.presupuestoMs, r, movidas: [] }
     const hecho = await conCalendarioSpinus(conexion, createAdminClient(),
       (calendar, calendarId) => recorrer(pasada, calendar, calendarId),
       { puedeReparar: false, actorId: op.actorId })
@@ -142,8 +150,11 @@ export async function sincronizarClinica(
       if (candado) await soltarCandado(conexion.clinicaId, candado.candado, null).catch(() => false)
       return { ...r, estado: 'no_disponible' }
     }
-    logger.error('GCalSync', `pasada fallida ${JSON.stringify({ clinica: conexion.clinicaId, codigo: codigoDeError(err) })}`)
-    if (candado) await soltarCandado(conexion.clinicaId, candado.candado, codigoDeError(err)).catch(() => false)
+    // D11: un corte por el tope de la reserva pública cuenta como fallo de
+    // Google (espera creciente incluida), con su propio código.
+    const codigo = op.senal?.aborted ? 'google_tiempo' : codigoDeError(err)
+    logger.error('GCalSync', `pasada fallida ${JSON.stringify({ clinica: conexion.clinicaId, codigo })}`)
+    if (candado) await soltarCandado(conexion.clinicaId, candado.candado, codigo).catch(() => false)
     return { ...r, estado: 'error' }
   }
 }
@@ -172,7 +183,7 @@ async function pedirPagina(
       // ⚠️ syncToken y timeMin NUNCA juntos: Google responde 400.
       ...(c.token ? { syncToken: c.token } : { timeMin: c.ventana ?? undefined }),
       ...(c.pagina ? { pageToken: c.pagina } : {}),
-    })
+    }, pasada.op.senal ? { signal: pasada.op.senal } : {})
     return data
   } catch (err) {
     const s = statusDe(err)
@@ -212,7 +223,7 @@ async function recorrer(pasada: Pasada, calendar: GCalCliente, calendarId: strin
     ventana: token ? candado.ventanaDesde : candado.ventanaDesde ?? ventanaNueva(pasada.ahora()),
   }
   for (;;) {
-    if (pasada.ahora() > pasada.limite) {
+    if (pasada.ahora() > pasada.limite || op.senal?.aborted) {
       // Presupuesto agotado: se suelta SIN error y la página queda guardada.
       await soltarCandado(conexion.clinicaId, candado.candado, null)
       r.estado = 'parcial'
@@ -285,8 +296,9 @@ async function procesarPagina(
   }
   // C5: lo rechazado vuelve a Google con el estado de Spinus, ANTES de avanzar
   // el token (si esto no llegara a correr, la página no avanza y se repite).
-  const { errores } = await restablecerEnGoogle(conexion.clinicaId, calendar, pagina.calendarId, pendientes)
+  const { errores } = await restablecerEnGoogle(conexion.clinicaId, calendar, pagina.calendarId, pendientes, pasada.op.senal)
   pasada.r.errores += errores
+  await avisarEmpalmes(pasada)
   if (rsvpGoogleEncendido()) await confirmarPorRsvps(pasada, pagina.calendarId, tareas)
 }
 
@@ -314,6 +326,27 @@ async function confirmarPorRsvps(
 }
 
 /**
+ * D11 · lo importado o movido en esta página que se empalma con una cita
+ * reservada por enlace: la base lo registra una sola vez por par y lo audita
+ * (el aviso lo lee el panel «Por confirmar» de la agenda, canal de E8). Sólo
+ * lo que de verdad cambió (`importar` con fila nueva, `aplicar` con puntas
+ * que prendió): repetir una página o resincronizar no vuelve a avisar. Un
+ * fallo cuenta en `errores` y no tumba la página; sin la migración de D11,
+ * no hace nada.
+ */
+async function avisarEmpalmes(pasada: Pasada): Promise<void> {
+  const ids = pasada.movidas.splice(0)
+  if (ids.length === 0) return
+  try {
+    await registrarEmpalmesReserva(pasada.conexion.clinicaId, ids)
+  } catch (err) {
+    if (err instanceof SincronizacionNoDisponible) return
+    pasada.r.errores += 1
+    logger.warn('GCalSync', `empalmes con reservas sin registrar ${JSON.stringify({ clinica: pasada.conexion.clinicaId })}`)
+  }
+}
+
+/**
  * Ejecuta UNA decisión. Lanza si la base falla (lo cuenta `procesarPagina`).
  * `true` = hay que volver a escribir en Google el estado de Spinus (C5).
  */
@@ -323,9 +356,14 @@ async function ejecutar(pasada: Pasada, calendarId: string, d: Decision): Promis
     case 'ignorar':
       if (d.motivo === 'recurrente_ligado') logger.warn('GCalSync', `cita convertida en serie en Google: se ignora ${conexion.clinicaId}`)
       return false
-    case 'importar':
-      if (await importarEvento(conexion.clinicaId, calendarId, d.datos)) r.cambios += 1
+    case 'importar': {
+      const nueva = await importarEvento(conexion.clinicaId, calendarId, d.datos)
+      if (nueva) {
+        r.cambios += 1
+        pasada.movidas.push(nueva)
+      }
       return false
+    }
     case 'rechazar':
       r.restablecer.push(d.citaId)
       await auditar(conexion, d.citaId, d.motivo === 'gana_spinus' ? 'gcal_conflicto_cita' : 'gcal_cambio_rechazado',
@@ -334,6 +372,7 @@ async function ejecutar(pasada: Pasada, calendarId: string, d: Decision): Promis
     case 'aplicar': {
       const n = await aplicarEvento(conexion.clinicaId, calendarId, d)
       if (n > 0 && d.campos.length > 0) r.cambios += 1
+      if (n > 0 && d.cambios.puntas) pasada.movidas.push(d.citaId)
       // n = 0: Spinus escribió entre la lectura y el aplicar; es el más
       // reciente y la pasada siguiente relee. Nada que auditar ni restablecer.
       if (n > 0 && d.restablecer.length > 0) {
