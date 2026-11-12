@@ -30,6 +30,8 @@ import type { EventApi } from '@fullcalendar/core'
 import type { ModalState } from '@/components/agenda/AppointmentModal'
 import BurbujaAlta, { type MasOpcionesBurbuja, type MedicoBurbuja } from '@/components/agenda/BurbujaAlta'
 import TarjetaLectura from '@/components/agenda/TarjetaLectura'
+import AyudaAtajos from '@/components/agenda/AyudaAtajos'
+import { useAtajosAgenda } from '@/app/(app)/agenda/useAtajosAgenda'
 import { BotonWhatsAppCita } from '@/components/agenda/BotonWhatsAppCita'
 import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
 import { useToast } from '@/components/ui/Toast'
@@ -45,6 +47,7 @@ import { avisoFueraDeHorario, avisoFinFueraDeHorario } from '@/lib/agenda/horari
 import { empalmesPintados, mensajeEmpalme } from '@/lib/agenda/empalmesCita'
 import { esEventoGenerico } from '@/lib/agenda/tarjetasAgenda'
 import { vistaEnElOtroFormato } from '@/lib/agenda/vistasAgenda'
+import { guardarAtajosEncendidos, leerAtajosEncendidos, type AccionAtajo, type AlmacenPreferencia } from '@/lib/agenda/atajosAgenda'
 import type { CitaEncontrada } from '@/lib/agenda/buscarCitasPaciente'
 import {
   pideConfirmacion, puedeIniciarConsulta, textoDeConfirmacion, type AccionTarjeta, type QuienMira,
@@ -86,6 +89,8 @@ export interface PropsInteraccionesV2 {
   /** El filtro tal cual (`''` = «Todos», `null` = aún sin perfil) y cómo cambiarlo. */
   filtroActivo: string | null
   alFiltrarMedico: (id: string) => void
+  /** El botón «Agendar» (atajo `c`): el modal de alta, con el bloqueo de suscripción delante. */
+  onAgendar: () => void
   /** `abrirCita` de `altaCitas.ts`, la única puerta a una cita. */
   abrirCita: (evento: EventApi) => void
   medicos: readonly MedicoConfig[]
@@ -103,6 +108,7 @@ type Capa =
      hoy); `vista`, la misma con las puntas VIVAS del evento, que es lo que se
      lee en la tarjeta justo después de un arrastre. */
   | { id: number; tipo: 'tarjeta'; cita: Appointment; vista: Appointment; ancla: Caja | null; punto?: Punto }
+  | { id: number; tipo: 'ayuda' }
 
 type SinId<T> = T extends unknown ? Omit<T, 'id'> : never
 
@@ -267,6 +273,45 @@ export function esperarEvento(api: CalendarApiV2, id: string, alLlegar: (ev: Eve
   return limpiar
 }
 
+/** `localStorage`, o `null` si el navegador lo bloquea (modo privado, datos del sitio bloqueados). */
+function almacenLocal(): AlmacenPreferencia | null {
+  try { return window.localStorage } catch { return null }
+}
+
+/**
+ * Lo que hace cada atajo (F3.5): lo mismo que su botón. Las vistas pasan por
+ * `cambiarVista` (con el formato del ancho, como el segmentado) y `/` pulsa la
+ * lupa de la barra, para que el foco vuelva a ella al cerrar el buscador.
+ */
+export function ejecutarAtajo(a: AccionAtajo, p: PropsInteraccionesV2, abrirAyuda: () => void): void {
+  const api = p.calendarRef.current?.getApi()
+  if (a === 'hoy') api?.today()
+  else if (a === 'siguiente') api?.next()
+  else if (a === 'anterior') api?.prev()
+  else if (a === 'vista-dia') p.onVista(vistaEnElOtroFormato('timeGridDay', p.isMobile))
+  else if (a === 'vista-semana') p.onVista(vistaEnElOtroFormato('timeGridWeek', p.isMobile))
+  else if (a === 'vista-mes') p.onVista('dayGridMonth')
+  else if (a === 'agendar') p.onAgendar()
+  else if (a === 'buscar') document.querySelector<HTMLButtonElement>('[data-buscar-citas]')?.click()
+  else abrirAyuda()
+}
+
+/**
+ * Los atajos con su preferencia (WCAG 2.1.4: se pueden apagar desde la ayuda y
+ * se recuerda en el navegador). No actúan con una capa abierta.
+ */
+function useAtajosV2(p: PropsInteraccionesV2, capaAbierta: boolean, abrirAyuda: () => void): {
+  encendidos: boolean; cambiarEncendidos: (v: boolean) => void
+} {
+  const [encendidos, setEncendidos] = useState(() => leerAtajosEncendidos(almacenLocal()))
+  const cambiarEncendidos = useCallback((v: boolean) => {
+    setEncendidos(v)
+    guardarAtajosEncendidos(almacenLocal(), v)
+  }, [])
+  useAtajosAgenda({ activo: true, encendidos, capaAbierta, alAccion: a => ejecutarAtajo(a, p, abrirAyuda) })
+  return { encendidos, cambiarEncendidos }
+}
+
 /** La fila con las puntas vivas del evento pintado (tras un arrastre aún sin respuesta). */
 function conPuntasVivas(cita: Appointment, calendarRef: CalRef): Appointment {
   const ev = calendarRef.current?.getApi().getEventById(cita.id)
@@ -317,6 +362,8 @@ export default function InteraccionesV2(p: PropsInteraccionesV2): ReactElement |
     abrir({ tipo: 'tarjeta', cita, vista: conPuntasVivas(cita, calendarRef), ancla, ...(punto ? { punto } : {}) })
   }, [abrir, calendarRef])
   const irACita = useIrACita(p)
+  const abrirAyuda = useCallback(() => abrir({ tipo: 'ayuda' }), [abrir])
+  const atajos = useAtajosV2(p, capa !== null, abrirAyuda)
 
   useImperativeHandle(apiRef, () => ({
     abrirBurbuja: (gesto) => {
@@ -329,7 +376,8 @@ export default function InteraccionesV2(p: PropsInteraccionesV2): ReactElement |
     },
     abrirTarjeta,
     irACita,
-  }), [abrir, capaRef, abrirTarjeta, irACita])
+    abrirAyuda,
+  }), [abrir, capaRef, abrirTarjeta, irACita, abrirAyuda])
 
   useEffect(() => {
     alCambiarListas(true)
@@ -343,5 +391,8 @@ export default function InteraccionesV2(p: PropsInteraccionesV2): ReactElement |
 
   if (capa?.tipo === 'burbuja') return <CapaBurbuja key={capa.id} capa={capa} medicos={medicosBurbuja} p={p} cerrar={cerrar} />
   if (capa?.tipo === 'tarjeta') return <CapaTarjeta key={capa.id} capa={capa} p={p} cerrar={cerrar} />
+  if (capa?.tipo === 'ayuda') {
+    return <AyudaAtajos key={capa.id} encendidos={atajos.encendidos} alCambiarEncendidos={atajos.cambiarEncendidos} alCerrar={() => cerrar(capa.id)} />
+  }
   return null
 }

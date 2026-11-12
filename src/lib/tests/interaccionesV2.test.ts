@@ -9,7 +9,8 @@ import type { EventApi } from '@fullcalendar/core'
 
 vi.mock('@/lib/supabase/client', () => ({ createClient: () => { throw new Error('sin red en pruebas') } }))
 
-import { esperarEvento, type CalendarApiV2 } from '@/components/agenda/InteraccionesV2'
+import { ejecutarAtajo, esperarEvento, type CalendarApiV2, type PropsInteraccionesV2 } from '@/components/agenda/InteraccionesV2'
+import { ATAJOS } from '@/lib/agenda/atajosAgenda'
 
 function calendario(): { api: CalendarApiV2; pintar: (id: string) => void; oyentes: () => number } {
   const pintados = new Map<string, EventApi>()
@@ -64,5 +65,53 @@ describe('esperarEvento', () => {
     c.pintar('d')
     vi.advanceTimersByTime(6000)
     expect(alLlegar).not.toHaveBeenCalled()
+  })
+})
+
+describe('ejecutarAtajo: cada tecla hace lo que su botón', () => {
+  function montar(isMobile = false) {
+    const api = { today: vi.fn(), next: vi.fn(), prev: vi.fn() }
+    const p = {
+      calendarRef: { current: { getApi: () => api } }, isMobile,
+      onVista: vi.fn(), onAgendar: vi.fn(),
+    } as unknown as PropsInteraccionesV2
+    const lupa = { click: vi.fn() }
+    vi.stubGlobal('document', { querySelector: (sel: string) => (sel === '[data-buscar-citas]' ? lupa : null) })
+    return { api, p, lupa, abrirAyuda: vi.fn() }
+  }
+  it('navegación: hoy, siguiente y anterior', () => {
+    const m = montar()
+    ejecutarAtajo('hoy', m.p, m.abrirAyuda)
+    ejecutarAtajo('siguiente', m.p, m.abrirAyuda)
+    ejecutarAtajo('anterior', m.p, m.abrirAyuda)
+    expect([m.api.today, m.api.next, m.api.prev].map(f => f.mock.calls.length)).toEqual([1, 1, 1])
+  })
+  it('las vistas pasan por `cambiarVista` con el formato del ancho', () => {
+    const escritorio = montar(false)
+    ejecutarAtajo('vista-dia', escritorio.p, escritorio.abrirAyuda)
+    ejecutarAtajo('vista-semana', escritorio.p, escritorio.abrirAyuda)
+    ejecutarAtajo('vista-mes', escritorio.p, escritorio.abrirAyuda)
+    expect(vi.mocked(escritorio.p.onVista).mock.calls).toEqual([['timeGridDay'], ['timeGridWeek'], ['dayGridMonth']])
+    const telefono = montar(true)
+    ejecutarAtajo('vista-semana', telefono.p, telefono.abrirAyuda)
+    expect(telefono.p.onVista).toHaveBeenCalledWith('listWeek')
+  })
+  it('agendar, buscar (pulsa la lupa) y ayuda', () => {
+    const m = montar()
+    ejecutarAtajo('agendar', m.p, m.abrirAyuda)
+    ejecutarAtajo('buscar', m.p, m.abrirAyuda)
+    ejecutarAtajo('ayuda', m.p, m.abrirAyuda)
+    expect(m.p.onAgendar).toHaveBeenCalledTimes(1)
+    expect(m.lupa.click).toHaveBeenCalledTimes(1)
+    expect(m.abrirAyuda).toHaveBeenCalledTimes(1)
+  })
+  it('ninguna acción de la tabla se queda sin hacer nada', () => {
+    for (const { accion } of ATAJOS) {
+      const m = montar()
+      ejecutarAtajo(accion, m.p, m.abrirAyuda)
+      const llamadas = [m.api.today, m.api.next, m.api.prev, m.p.onVista, m.p.onAgendar, m.lupa.click, m.abrirAyuda]
+        .reduce((n, f) => n + vi.mocked(f).mock.calls.length, 0)
+      expect(llamadas, accion).toBe(1)
+    }
   })
 })

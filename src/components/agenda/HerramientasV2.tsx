@@ -25,7 +25,7 @@
  * día activo, Escape cierra y el foco vuelve al botón.
  */
 import { useCallback, useEffect, useRef, useState, type ReactElement, type ReactNode, type RefObject } from 'react'
-import { CalendarDays, Search } from 'lucide-react'
+import { CalendarDays, Keyboard, Search } from 'lucide-react'
 import Portal from '@/components/ui/Portal'
 import MiniMes from '@/components/agenda/MiniMes'
 import BuscadorCitas from '@/components/agenda/BuscadorCitas'
@@ -189,6 +189,13 @@ export default function HerramientasV2({ apiRef, rango, alIrAFecha }: PropsHerra
     <div className="ag-herramientas" role="group" aria-label="Herramientas de la agenda">
       <SelectorFecha rango={rango} alIrAFecha={alIrAFecha} />
       <BotonBuscar apiRef={apiRef} />
+      {/* WCAG 2.1.4: la ayuda tiene que poder abrirse SIN el atajo, porque es
+          donde se vuelven a encender cuando alguien los apagó. */}
+      <button type="button" className="ag-herramienta"
+        aria-label="Atajos de teclado" title="Atajos de teclado (?)"
+        aria-keyshortcuts={teclasDeAccion('ayuda')} onClick={() => apiRef.current?.abrirAyuda()}>
+        <Keyboard size={16} aria-hidden="true" />
+      </button>
     </div>
   )
 }

@@ -44,7 +44,7 @@ function montar(o: { agendaV2: boolean; conChunk?: boolean; bloqueada?: boolean 
   const setModal = vi.fn()
   const setConfirm = vi.fn()
   const openBloqueoModal = vi.fn()
-  const api = { abrirBurbuja: vi.fn(), abrirTarjeta: vi.fn(), irACita: vi.fn() }
+  const api = { abrirBurbuja: vi.fn(), abrirTarjeta: vi.fn(), irACita: vi.fn(), abrirAyuda: vi.fn() }
   const seleccion: SeleccionDesdeHueco = { current: null }
   /* `api.select()` dispara `select` en el acto, como el real. */
   const select = vi.fn((inicio: Date, fin: Date) => alta.handleSelect(argSelect(inicio, fin, null)))

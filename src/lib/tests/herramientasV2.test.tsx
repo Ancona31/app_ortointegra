@@ -30,6 +30,10 @@ describe('HerramientasV2', () => {
     expect(html).toContain('aria-keyshortcuts="/"')
     expect(html).toContain('data-buscar-citas=""')
   })
+  it('F3.5: la ayuda tiene su botón (para reencender los atajos sin atajo) con `?`', () => {
+    expect(html).toContain('aria-label="Atajos de teclado"')
+    expect(html).toContain('aria-keyshortcuts="?"')
+  })
   it('cerrado no pinta ningún diálogo', () => {
     expect(html).not.toContain('role="dialog"')
   })

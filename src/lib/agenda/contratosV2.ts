@@ -79,6 +79,8 @@ export interface ApiInteraccionesV2 {
   abrirTarjeta: (cita: Appointment, ancla: Caja | null, punto?: Punto) => void
   /** Del buscador: va al día de la cita (vista Día) y abre su tarjeta cuando está pintada. */
   irACita: (cita: CitaEncontrada) => void
+  /** La ayuda de los atajos (el botón de la barra la abre aunque los atajos estén apagados). */
+  abrirAyuda: () => void
 }
 
 /**

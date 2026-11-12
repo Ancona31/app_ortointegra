@@ -1733,6 +1733,13 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
           filtroActivo={filtroEfectivo}
           alFiltrarMedico={id => aplicarFiltro(id, false)}
           abrirCita={abrirCita}
+          /* El atajo `c`: el mismo cuerpo que los tres «Agendar», en un cuarto
+             cierre propio (la regla de no fundirlos, plan A2.5). */
+          onAgendar={() => {
+            if (subState.isBlocked) { openBloqueoModal(); return }
+            const { fecha, hora } = partirFechaHora(new Date().toISOString())
+            setModal({ mode: 'create', fecha, hora, tipo: 'cita', todoElDia: 'no' })
+          }}
           medicos={medicos}
           filtroMedico={filtroEfectivo || ((isSingleDoctor || isMedicoSinAdmin) && defaultMedicoId ? defaultMedicoId : null)}
           horario={horario}
