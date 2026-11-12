@@ -24,7 +24,7 @@ import { AvisosAgenda } from '@/components/agenda/AvisosAgenda'
 import { PanelPorConfirmar } from '@/components/agenda/PanelPorConfirmar'
 import { esRespuestaReciente, leerRespuesta, textoAvisoCancelacion } from '@/lib/agenda/avisoCancelacion'
 import {
-  VISTAS_FC, VISTAS_FC_MOVIL, TOOLBAR_ESCRITORIO, PLUGINS_FC, TEXTO_BOTONES_FC, FORMATO_HORA_FC,
+  VISTAS_FC, VISTAS_FC_MOVIL, VISTAS_FC_TABLETA, TOOLBAR_ESCRITORIO, PLUGINS_FC, TEXTO_BOTONES_FC, FORMATO_HORA_FC,
 } from '@/components/agenda/opcionesCalendario'
 /* ⚠️ A2.6: `AppointmentModal`, `HorarioModal` y `ModalInvitacionCita` se
    cargan en diferido más abajo, con `next/dynamic` — son los tres modales más
@@ -71,7 +71,7 @@ import { rangosDeLaVista, partirFechaHora } from '@/lib/agenda/fechasAgenda'
 import { frasearConteo, frasearConteoBreve } from '@/lib/agenda/conteoAgenda'
 import {
   esVistaDeRejilla, vistaEnElOtroFormato, vistaAdmiteCompactar,
-  periodoDeLaVista,
+  periodoDeLaVista, ANCHO_TABLETA,
 } from '@/lib/agenda/vistasAgenda'
 import { clasesDelEvento } from '@/lib/agenda/tarjetasAgenda'
 import { desplazarListaAHoy, diaLocalISO } from '@/lib/agenda/listaHoy'
@@ -208,6 +208,9 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
   }, [interruptor])
   const [modal,        setModal]        = useState<ModalState>({ mode: 'closed' })
   const [isMobile,     setIsMobile]     = useState(false)
+  /* F1.16 · El tramo de tableta (768–1023): banda azul como el teléfono, pero
+     Semana y Día en rejilla (Semana de tres días). */
+  const [esTableta,    setEsTableta]    = useState(false)
   const [currentView,  setCurrentView]  = useState<string>('timeGridWeek')
   /* La etiqueta de fecha de la banda móvil. Con `headerToolbar={false}` ya no
      hay toolbar nativo que la pinte, así que se guarda lo que compone
@@ -524,10 +527,12 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
   useEffect(() => {
     function check() {
       const movil = window.innerWidth < ANCHO_MOVIL
+      const tableta = movil && window.innerWidth >= ANCHO_TABLETA
       setIsMobile(movil)
+      setEsTableta(tableta)
       const api = calendarRef.current?.getApi()
       if (!api) return
-      const destino = vistaEnElOtroFormato(api.view.type, movil)
+      const destino = vistaEnElOtroFormato(api.view.type, movil, tableta)
       if (destino !== api.view.type) api.changeView(destino)
     }
     check()
@@ -1100,6 +1105,7 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
           onPrev={() => calendarRef.current?.getApi().prev()}
           onNext={() => calendarRef.current?.getApi().next()}
           onHoy={() => { irAHoyRef.current = true; calendarRef.current?.getApi().today() }}
+          tableta={esTableta}
           hoyDeshabilitado={hoyEnRango}
           onMenu={abrirMenu}
           medicos={medicos}
@@ -1455,7 +1461,7 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
              que hace que este botón PIDA la semana en vez de heredar
              el recorte del mes. Sin eso no recuperaba nada — ver su
              cabecera. */
-          onVerPorSemana={() => cambiarVista(vistaEnElOtroFormato('timeGridWeek', isMobile))}
+          onVerPorSemana={() => cambiarVista(vistaEnElOtroFormato('timeGridWeek', isMobile, esTableta))}
           googleFallo={googleFallo}
           vacioReal={vacioReal}
           vacioFiltrado={vacioFiltrado}
@@ -1551,7 +1557,7 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
              así que la identidad sigue siendo estable en los dos lados y
              FullCalendar no vuelve a refinar opciones por culpa de esto. Lo
              único que cambia entre ellas es la entrada de Mes. */
-          views={isMobile ? VISTAS_FC_MOVIL : VISTAS_FC}
+          views={!isMobile ? VISTAS_FC : esTableta ? VISTAS_FC_TABLETA : VISTAS_FC_MOVIL}
           /* Marca la celda del día que enseña el panel. Sólo pinta en móvil. */
           dayCellClassNames={dayCellClassNames}
           /* El número de día del mes lleva a la vista Día de ESE día. Antes no
@@ -1732,7 +1738,7 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
             const evento = calendarRef.current?.getApi().getEventById(id)
             if (evento) abrirCita(evento)
           }}
-          onVerDia={() => cambiarVista(vistaEnElOtroFormato('timeGridDay', true), diaSel)}
+          onVerDia={() => cambiarVista(vistaEnElOtroFormato('timeGridDay', true, esTableta), diaSel)}
         />
       )}
 

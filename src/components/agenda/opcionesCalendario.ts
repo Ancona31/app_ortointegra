@@ -74,7 +74,18 @@ import { masBreve } from '@/lib/agenda/vistasAgenda'
    aquí). ⚠️ `semanasPintadasDelMes` lee `fixedWeekCount` de la vista para
    contar las semanas: si quitas esto, aquélla vuelve a seis sola. El teléfono
    (`VISTAS_FC_MOVIL`) sigue con seis: lo exige `.ag-cal-mes-movil`. */
+/* F1.16 · LA VISTA DE TRES DÍAS DE LA TABLETA. Va en las tres tablas (no sólo
+   en la de tableta): si la ventana cruza el umbral con ella puesta, la vista
+   tiene que seguir registrada hasta que el efecto del ancho la cambie. */
+const TRES_DIAS = {
+  type: 'timeGrid',
+  duration: { days: 3 },
+  titleFormat: { day: 'numeric', month: 'short' },
+  dayMaxEvents: 2,
+} as const
+
 export const VISTAS_FC = {
+  timeGridTresDias: TRES_DIAS,
   dayGridMonth: {
     dayHeaderFormat: { weekday: 'long' },
     titleFormat:     { month: 'long', year: 'numeric' },
@@ -163,6 +174,7 @@ export const VISTAS_FC = {
    con el domingo fijo; eso se descartó. */
 
 export const VISTAS_FC_MOVIL = {
+  timeGridTresDias: TRES_DIAS,
   dayGridMonth: {
     dayHeaderFormat:     { weekday: 'narrow' },
     titleFormat:         { month: 'long', year: 'numeric' },
@@ -192,6 +204,17 @@ export const VISTAS_FC_MOVIL = {
      igual, que es lo que se quería. */
   listDay:  { titleFormat: { weekday: 'short', day: 'numeric', month: 'long' } },
   listWeek: { titleFormat: { day: 'numeric', month: 'long' } },
+} as const
+
+/* F1.16 · LA TABLETA: el mes del teléfono (la misma entrada, por referencia) y
+   las rejillas de escritorio, más la de tres días. Identidad estable. */
+export const VISTAS_FC_TABLETA = {
+  timeGridTresDias: TRES_DIAS,
+  dayGridMonth: VISTAS_FC_MOVIL.dayGridMonth,
+  timeGridWeek: VISTAS_FC.timeGridWeek,
+  timeGridDay: VISTAS_FC.timeGridDay,
+  listDay: VISTAS_FC_MOVIL.listDay,
+  listWeek: VISTAS_FC_MOVIL.listWeek,
 } as const
 
 /* Las dos configuraciones del toolbar nativo, A NIVEL DE MÓDULO por la regla de

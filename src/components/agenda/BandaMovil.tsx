@@ -76,13 +76,15 @@ export const VIEWS = [
    arriba del paso 8c): pegadas a las pestañas se leerían como «cambia de vista».
    Todos los controles miden 44 × 44 o más. */
 export function BandaMovil(
-  { conteo, vistaActual, onVista, titulo, onPrev, onNext, onHoy, hoyDeshabilitado, onMenu,
+  { conteo, vistaActual, onVista, titulo, onPrev, onNext, onHoy, hoyDeshabilitado, tableta = false, onMenu,
     medicos, filtroMedico, onFiltroMedico, onHorario, onCompactar, compactado,
     mesSinTodos, selectorFecha, buscar, atajos = false }: {
     conteo: string; vistaActual: string; onVista: (tipo: string) => void
     titulo: string; onPrev: () => void; onNext: () => void
     /** F1.10 · «Hoy» del teléfono; deshabilitado (aria) si el rango ya lo contiene. */
     onHoy: () => void; hoyDeshabilitado: boolean
+    /** F1.16 · En tableta «Semana» es la rejilla de tres días y se rotula así. */
+    tableta?: boolean
     onMenu: () => void
     medicos: readonly Medico[]; filtroMedico: string
     onFiltroMedico: (id: string) => void; onHorario: (() => void) | null
@@ -116,11 +118,11 @@ export function BandaMovil(
             /* El mismo traductor que el segmentado de escritorio y que el efecto
                del ancho: aquí `isMobile` es true por construcción —esta banda sólo
                se monta en móvil—, así que «Semana» apunta a `listWeek`. */
-            const tipo = vistaEnElOtroFormato(v.type, true)
+            const tipo = vistaEnElOtroFormato(v.type, true, tableta)
             return (
               <button key={v.type} type="button" role="tab" aria-selected={vistaActual === tipo}
                 aria-keyshortcuts={atajos ? teclasDeAccion(ATAJO_DE_VISTA[v.type]) : undefined}
-                onClick={() => onVista(tipo)}>{v.label}</button>
+                onClick={() => onVista(tipo)}>{tipo === 'timeGridTresDias' ? '3 días' : v.label}</button>
             )
           })}
         </div>

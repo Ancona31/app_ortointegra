@@ -2383,6 +2383,47 @@ encontraba su evento) y los 20 pulsos caían fuera de la vista. Ahora pulsa
   los estados (±1 px), alto de «Iniciar consulta» = «Guardar». Mutaciones
   comprobadas: volver a 480 px, `flex-wrap`, `rows=3`, `grid-cols-2`.
 
+**Commits aparte pedidos por los otros dos agentes (sin interruptor de por medio):**
+
+- **F2.7 (movimiento):** prop `saliendo` en `AppointmentModal`; velo con
+  `ag-modal-velo` y panel con `ag-modal-panel` (en vez de `animate-modal-enter`,
+  que es de toda la app), los dos con `data-estado="saliendo"`, y la raíz
+  `inert` durante la salida. Hasta que llegue el CSS de la rama de movimiento,
+  el modal de la cita entra sin animación; ninguna prueba dependía de ella.
+- **Contrato de F3 (interacciones), modal:** `ModalState.create` gana `horaFin`
+  y `medicoId` (el fin y el médico iniciales salen de ahí si vienen);
+  `ModalState.edit` gana `enfocar: 'fecha'`, que pone `autoFocus` en «Fecha de
+  inicio» (`useDialogoModal` no lo pisa: sólo enfoca el panel si el foco no está
+  dentro). Ninguna ruta de hoy los pone: los probará la e2e del enchufe.
+- **Contrato de F3, barra y banda:** ranuras `selectorFecha` (la primera de la
+  fila de controles, pegada a la fecha de FullCalendar) y `buscar` (antes de «Por
+  confirmar») en `CabeceraEscritorio` y en `BandaMovil` (en la banda,
+  `selectorFecha` va junto a la fecha aunque el minicalendario no se use en el
+  teléfono, decisión 21; `buscar`, delante del filtro). Prop `atajos`: con ella,
+  `aria-keyshortcuts` (`teclasDeAccion`) en las vistas y en ‹ Hoy ›. En
+  escritorio esos tres son botones de FullCalendar, que no admite atributos
+  propios: se ponen sobre su DOM en un efecto (un cuadro después del montaje y
+  otra vez al cambiar de vista). **Nadie pasa `atajos` todavía**: lo cablea la
+  integración con el gancho de atajos, que sabe si el usuario los apagó.
+
+**Paso 4 · F1.16 (tableta)**
+
+- Vista `timeGridTresDias` (`type: 'timeGrid'`, `duration: { days: 3 }`, título
+  «12 – 14 nov»), registrada en las TRES tablas de vistas para que siga
+  existiendo si la ventana cruza el umbral con ella puesta. `VISTAS_FC_TABLETA`:
+  el Mes del teléfono (seis semanas, puntos) y las rejillas de escritorio.
+- `vistaEnElOtroFormato(vista, movil, tableta = false)`: el tercer parámetro
+  es opcional y sólo cuenta en estrecho, así que ningún llamador de dos
+  formatos cambia. `ANCHO_TABLETA = 768` vive en `vistasAgenda.ts`.
+- El chip de la banda dice «3 días» cuando la vista es la de tres días.
+- Sin panel de Día (sigue siendo de escritorio) y sin leyenda en la rejilla
+  (como en el teléfono). «Compactar» sí está: pliega columnas y recorta horas
+  igual que en Semana.
+- Proyecto Playwright `tableta` (820×1180, táctil) que sólo corre
+  `agenda-f-tableta.e2e.ts`: el resto de la suite no sabe de este tercer
+  formato. El arrastre con pulsación larga se prueba con eventos táctiles por
+  CDP (1,2 s de pulsación, `eventLongPressDelay` es 1 s) y espera el PUT.
+
 ### Menores
 
 - **`ProximasCitas`:** tope de refresco de 2 minutos al volver a la pestaña,

@@ -46,5 +46,18 @@ export default defineConfig({
         hasTouch: true,
       },
     },
+    /* F1.16 · La tableta vertical (768–1023 px): Semana en rejilla de tres
+       días. Sólo corre su propio archivo; el resto de la suite ya cubre
+       escritorio y teléfono, y sus pruebas no saben de este tercer formato. */
+    {
+      name: 'tableta',
+      testMatch: '**/agenda-f-tableta.e2e.ts',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 820, height: 1180 },
+        isMobile: true,
+        hasTouch: true,
+      },
+    },
   ],
 })

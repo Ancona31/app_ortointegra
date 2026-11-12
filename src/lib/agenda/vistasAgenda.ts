@@ -29,13 +29,17 @@ import type { ViewApi, MoreLinkContentArg } from '@fullcalendar/core'
  * contesta el DOM porque la banda existe en más de una vista. Aquí la pregunta
  * es QUÉ VISTA está pintando, que es literalmente lo que este campo dice. */
 export function esVistaDeRejilla(viewType: string): boolean {
-  return viewType === 'timeGridWeek' || viewType === 'timeGridDay'
+  return viewType === 'timeGridWeek' || viewType === 'timeGridDay' || viewType === 'timeGridTresDias'
 }
 
+/* F1.16 · TERCER FORMATO, LA TABLETA (768–1023 px): Semana se dibuja como
+   rejilla de TRES DÍAS (`timeGridTresDias`, vista propia en `opcionesCalendario`),
+   Día como la rejilla de un día y Mes como en el teléfono. La banda azul se
+   queda (`isMobile` sigue a 1024): sólo cambia el formato del periodo. */
 export const FORMATOS_DE_VISTA = [
-  { ancho: 'dayGridMonth', estrecho: 'dayGridMonth' },
-  { ancho: 'timeGridWeek', estrecho: 'listWeek'     },
-  { ancho: 'timeGridDay',  estrecho: 'listDay'      },
+  { ancho: 'dayGridMonth', estrecho: 'dayGridMonth', tableta: 'dayGridMonth'     },
+  { ancho: 'timeGridWeek', estrecho: 'listWeek',     tableta: 'timeGridTresDias' },
+  { ancho: 'timeGridDay',  estrecho: 'listDay',      tableta: 'timeGridDay'      },
 ] as const
 
 /**
@@ -52,11 +56,18 @@ export const FORMATOS_DE_VISTA = [
  * impide que un `changeView` a ciegas mande la agenda a una vista que nadie ha
  * registrado. Ante la duda, no se mueve.
  */
-export function vistaEnElOtroFormato(viewType: string, movil: boolean): string {
-  const par = FORMATOS_DE_VISTA.find(p => p.ancho === viewType || p.estrecho === viewType)
+export function vistaEnElOtroFormato(viewType: string, movil: boolean, tableta = false): string {
+  const par = FORMATOS_DE_VISTA.find(p => p.ancho === viewType || p.estrecho === viewType || p.tableta === viewType)
   if (!par) return viewType
+  /* `tableta` sólo cuenta en estrecho: la tableta es un tramo del móvil. El
+     tercer parámetro es opcional para que los llamadores de dos formatos sigan
+     igual. */
+  if (movil && tableta) return par.tableta
   return movil ? par.estrecho : par.ancho
 }
+
+/** F1.16 · ¿El ancho es de tableta (768–1023 px)? Por debajo de 768, teléfono. */
+export const ANCHO_TABLETA = 768
 
 /**
  * El rótulo de «Compactar», que NO es el mismo en las dos vistas que lo admiten.
