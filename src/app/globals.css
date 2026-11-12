@@ -217,6 +217,44 @@
   --ag-ease-in:  cubic-bezier(.4, 0, 1, 1);    /* algo se va */
   --ag-ease:     cubic-bezier(.4, 0, .2, 1);   /* algo se mueve */
 
+  /* El anillo de la cita que llega por tiempo real (bloque F, `.ag-ev-remoto`).
+     ES COLOR, ASÍ QUE ÉSTE SÍ TIENE CONTRAPARTE EN html.dark (#6b9bff). Mismo
+     reparto que `--ag-month-today-ring`: en claro sigue a la marca; en oscuro es
+     literal, porque el azul de la marca sobre la superficie oscura no llega a
+     los 3:1 de un elemento gráfico.
+     ⚠️ NO LO CUELGUES DE `--ag-status-confirmed-*` aunque hoy valga lo mismo: el
+     anillo dice «esto acaba de llegar», no «esto está confirmado», y la próxima
+     rotación de la paleta de estados se lo llevaría.
+     ⚠️ SÓLO SE ANIMA LA OPACIDAD DEL ANILLO. El `box-shadow` que lo dibuja es
+     fijo; el pulso de 900 ms de `box-shadow` del spec se sustituyó por esto
+     (decisión 2 del bloque F en mejora_agendaV2.md §6-bis). */
+  --ag-pulso: var(--ag-brand-secondary);
+
+  /* ── ESPACIADO — LA ESCALA DEL SPEC (§1.3), bloque F ─────────────────
+     Una medida, no un color: NO TIENE CONTRAPARTE EN html.dark.
+     Los diez peldaños del spec (4 · 6 · 8 · 10 · 12 · 14 · 16 · 20 · 24 · 32)
+     más `--ag-4-5`, que el spec usa (§8.2, el `gap` del panel de Día) sin
+     haberlo puesto en su propia lista, y que la barra de herramientas y la
+     banda compacta ya tenían escrito a mano como 18.
+     ⚠️ NO HAY `--ag-7`, Y NO ES UN HUECO: el spec salta de 24 a 32. Si hace falta
+     un 28, la pregunta es qué es ese elemento, igual que con los radios.
+     ⚠️ LOS MEDIOS VAN CON GUION (`--ag-2-5`), NO CON PUNTO: un `.` en el nombre de
+     una custom property es válido escapado y una trampa sin escapar.
+     ⚠️ DECLARARLOS NO MIGRA NADA: los `padding` y `gap` sueltos que hay hoy en la
+     hoja se enganchan a la escala en el barrido de simetría (F1.19), regla por
+     regla, no de golpe. */
+  --ag-1:    4px;
+  --ag-1-5:  6px;
+  --ag-2:    8px;
+  --ag-2-5: 10px;
+  --ag-3:   12px;
+  --ag-3-5: 14px;
+  --ag-4:   16px;
+  --ag-4-5: 18px;
+  --ag-5:   20px;
+  --ag-6:   24px;
+  --ag-8:   32px;
+
   /* ── RADIOS — LA ESCALA DEL REDISEÑO (spec §1.3) ──────────────────────
      Cinco peldaños, y cada uno nombra un PAPEL, no un tamaño. Esa es toda la
      gracia: el que llegue después no elige «un radio que quede bien», elige el
@@ -235,9 +273,9 @@
      estos números. La frontera de hoy: dentro de la agenda mandan estos tokens;
      fuera, Tailwind. No migres el resto de la app a esto sin pedirlo.
 
-     ⚠️ LA TIPOGRAFÍA Y EL ESPACIADO DEL SPEC NO ESTÁN AQUÍ, Y ES DELIBERADO. Son
-     escalas largas y se irán creando cuando llegue el bloque que las consuma.
-     No las adelantes «para tenerlas». */
+     ⚠️ LA TIPOGRAFÍA DEL SPEC NO ESTÁ AQUÍ, Y ES DELIBERADO: es una escala larga
+     y se creará cuando llegue el bloque que la consuma. No la adelantes «para
+     tenerla». La del ESPACIADO sí llegó con su bloque (F) y está justo encima. */
   --ag-r-note:    6px;   /* tarjeta de evento: .ag-tarjeta, .ag-gcal, .ag-mes.
                             NO el harness `.fc-event` que las envuelve — ése ya
                             vale 6 pero es otra cosa (un <a> transparente cuyo
@@ -3298,7 +3336,11 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
   padding:       0 !important;
   box-shadow:    none !important;
   cursor:        pointer !important;
-  transition:    transform 0.15s ease, filter 0.15s ease !important;
+  /* F2.1: sólo color, en la escala (CONTRASTE §5). Era `transform .15s,
+     filter .15s` —fuera de la escala y animando lo que no se anima en un
+     hover—; ver la nota de la regla de abajo. */
+  transition:    background-color var(--ag-dur-micro) var(--ag-ease),
+                 border-color     var(--ag-dur-micro) var(--ag-ease) !important;
 }
 /* ⚠️ `:not(.fc-list-event)` ACOTA ESTO A LA REJILLA, Y NO ES COSMÉTICA. Las
    filas de las vistas de lista son `<tr>` y también llevan `fc-event` —se lo
@@ -3309,10 +3351,22 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
    zoom sigue exactamente igual.
    El hover de la lista lo pone la regla nativa `.fc .fc-list-event:hover td`,
    que tiñe el fondo de las tres celdas — ver `--fc-list-event-hover-bg-color`
-   arriba. No hace falta nada más aquí. */
+   arriba. No hace falta nada más aquí.
+
+   ⚠️ F2.1 (bloque F): YA NO HAY `scale(1.02)` NI `drop-shadow`, Y NO VUELVEN.
+   CONTRASTE §5: «nada de `transform` en el hover de una tarjeta» — levantarla
+   dentro de una rejilla de horas desplaza su posición aparente, y la posición
+   ES el dato: una cita que parece moverse media hora al pasar el ratón es un
+   error de lectura. Y la sombra choca con «tarjetas sin sombra», que es parte
+   de la esencia de la agenda.
+   Lo que queda es el `z-index`, que no es movimiento: con dos citas encimadas
+   pone delante la que está bajo el ratón, para poder leerla entera.
+   ⚠️ EL HOVER YA NO CAMBIA NINGÚN COLOR, y es consecuencia de dónde vive el
+   color: el fondo y los bordes de `.ag-tarjeta` van en línea (los interpola
+   `MemoizedEventContent` por estado o por color de evento), así que una regla
+   de aquí no los puede tocar sin `!important` y sin volcar la paleta entera.
+   Si la superficie quiere un tinte de hover, va en ese componente. */
 .fc .fc-event:not(.fc-list-event):hover {
-  transform: scale(1.02) !important;
-  filter:    drop-shadow(0 4px 8px rgba(0,0,0,0.12)) !important;
   z-index:   10 !important;
 }
 
@@ -3367,6 +3421,37 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
 @keyframes ag-entra {
   from { opacity: 0; transform: translateY(4px); }
 }
+/* ⚠️ DESDE F2.1 EL HOVER YA NO ANIMA `transform` (ver su regla), así que la
+   trampa 1 de arriba ya no muerde POR EL HOVER. El relleno sigue en
+   `backwards` igualmente, y por dos motivos que siguen vivos: un `transform`
+   retenido crea bloque contenedor (la lección de `pageEnter`), y la técnica
+   FLIP de F2.6 (`flipTarjetas.ts`) anima `transform` sobre este mismo `.fc-event`
+   con WAAPI. Las trampas 2 y 3 valen sin cambios. */
+
+/* ── Cambio de vista (F2.2) ─────────────────────────────────────────────
+   CONTRASTE §2.3: al cambiar de vista el contenido cambia de NATURALEZA, y ahí
+   sí hay fundido y 6 px de subida («bloques»); al cambiar de FECHA no hay
+   traslación (eso va aparte, con WAAPI, en F2.3).
+   `.fc-view` sólo se vuelve a montar al cambiar de TIPO de vista —navegar
+   dentro de la misma lo conserva—, así que esto corre exactamente una vez por
+   cambio de vista y nunca al pasar de semana. El panel de Día entra con la misma
+   animación porque se monta a la vez (`panelDelDia`).
+
+   ⚠️ `backwards`, NUNCA `both` NI `forwards`, aunque el spec escriba `both`. Con
+   relleno hacia delante el `transform` QUEDA RETENIDO al acabar, y un
+   `transform` distinto de `none` convierte la vista en bloque contenedor de
+   todo lo `position: fixed` de dentro —el espejo del arrastre táctil, el
+   popover de «+N más»— y en contexto de apilamiento propio. Es la lección de
+   `pageEnter`. `backwards` pinta el primer fotograma desde el principio (sin
+   destello a opacidad plena) y suelta el elemento al terminar.
+   ⚠️ Y SIN `to {}`, por lo mismo que `ag-entra`. */
+@keyframes ag-vista {
+  from { opacity: 0; transform: translateY(6px); }
+}
+.agenda-fc .fc-view-harness > .fc-view,
+.ag-dia-aside {
+  animation: ag-vista var(--ag-dur-base) var(--ag-ease-out) backwards;
+}
 /* ⚠️ LA SEGUNDA EXCLUSIÓN ES DEL BLOQUE 6 Y ES LA MISMA HISTORIA QUE LA DEL
    HOVER: esta entrada anima `transform`, y las filas de lista son `<tr>`. Un
    `transform` sobre una fila de tabla crea un bloque contenedor y la despega de
@@ -3400,8 +3485,27 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
 @media (prefers-reduced-motion: reduce) {
   /* `.ag-dia-aside` va en la lista porque el panel del bloque 8 es HERMANO
      de `.agenda-fc`, no descendiente suyo: sin él, la transición de color del
-     botón de hueco se quedaría fuera de esta escotilla. */
-  .fc *, .agenda-fc *, .ag-dia-aside *, .fc *::before, .fc *::after {
+     botón de hueco se quedaría fuera de esta escotilla.
+
+     ⚠️ BLOQUE F: LAS CAPAS SE PINTAN EN `document.body` (Portal), FUERA DE LOS
+     TRES DE ARRIBA, y por eso van con nombre propio. Los nombres son el
+     contrato fijado en F0 —`.ag-modal-panel` y `.ag-modal-velo` (modal de la
+     cita), `.ag-capa` (burbuja y tarjeta de lectura), `.ag-hoja` (la tarjeta en
+     el teléfono)—: quien los use hereda esta escotilla sin tocarla. Cada capa va
+     ELLA MISMA y con sus descendientes, porque la animación de entrada es de la
+     capa y un selector `X *` no casa a X. `.ag-capa-velo` es el velo de la
+     ayuda de atajos y de la hoja del teléfono (F3), que no es hijo de ninguna.
+     El anillo de tiempo real (`.ag-ev-remoto::after`) no necesita línea: entra
+     por `.fc *::after`.
+     ⚠️ `.ag-dia-aside` VA ÉL MISMO además de sus descendientes desde F2.2: el
+     panel entero entra con `ag-vista`, y `.ag-dia-aside *` no casa al panel.
+     ⚠️ ESTO NO ALCANZA A LO QUE SE ANIMA CON WAAPI (FLIP, fundido de
+     navegación, la vuelta del deslizamiento): esas miran
+     `prefiereMenosMovimiento()` de `src/lib/agenda/movimientoAgenda.ts` y no
+     animan. Una regla CSS no puede apagar un `element.animate()`. */
+  .fc *, .agenda-fc *, .ag-dia-aside, .ag-dia-aside *, .fc *::before, .fc *::after,
+  .ag-modal-panel, .ag-modal-velo,
+  .ag-capa, .ag-capa *, .ag-hoja, .ag-hoja *, .ag-capa-velo {
     animation-duration: .01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: .01ms !important;
@@ -5238,6 +5342,334 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
   color: var(--ag-faint);
 }
 
+/* ═══ CAPAS E INTERACCIONES V2 (bloque F, F3) ═══════════════════════════════
+   Las piezas nuevas del bloque F que van DETRÁS DEL INTERRUPTOR `agendaV2`:
+   la burbuja de alta rápida, la tarjeta de lectura (capa en escritorio, hoja
+   inferior en el teléfono), la ayuda de atajos, el minicalendario y el
+   buscador de citas. Con el interruptor apagado nada de esto se monta, así que
+   estas reglas no casan con nada. Es la ÚNICA sección que el bloque F añade al
+   final del bloque de la agenda (reparto del diseño F, agente C).
+
+   ⚠️ TODO VIVE EN `document.body` (Portal), FUERA DE `.agenda-fc`. Por eso las
+   clases van sin prefijo de ancestro, y por eso el bloque de movimiento
+   reducido de la agenda nombra `.ag-capa` y `.ag-hoja` aparte (F0).
+
+   ⚠️ COLOR SÓLO POR TOKENS QUE YA TIENEN CONTRAPARTE OSCURA (`--ag-surface`,
+   `--ag-border-card`, `--ag-ink`, `--ag-text`, `--ag-muted`, `--ag-shadow-pop`,
+   `--ag-status-*`): esta sección no añade nada a `html.dark`. Espaciado con la
+   escala `--ag-*` de F0, radios por papel.
+
+   ⚠️ CAPA POR DEBAJO DE LOS MODALES: `z-index: 45`, entre la rejilla y el modal
+   de la cita (`z-50`) y la confirmación (`z-[60]`). «Más opciones» abre el modal
+   encima, y el aviso de empalme (B7) sale por encima de la burbuja abierta.
+
+   MOVIMIENTO (diseño F §2, decisión 4): la capa entra con opacidad y
+   `scale(.97) → 1` desde el punto pulsado (`transform-origin` en línea, lo
+   calcula `posicionCapa`), en base con ease-out; sale al revés hacia el mismo
+   punto, en micro con ease-in. Es una capa y no una tarjeta de la rejilla: la
+   regla de «nada de escalado en tarjetas» va por las citas. La hoja del
+   teléfono entra con opacidad y 6 px, nunca deslizándose al 100 %.
+   ⚠️ ENTRADA CON `backwards`, SALIDA CON `forwards`. La salida sí retiene: el
+   nodo se desmonta al acabar (`onAnimationEnd`) y sin retener daría un
+   destello a opacidad plena en el último fotograma. */
+@keyframes ag-capa-entra { from { opacity: 0; transform: scale(.97); } }
+@keyframes ag-capa-sale  { to   { opacity: 0; transform: scale(.97); } }
+@keyframes ag-hoja-entra { from { opacity: 0; transform: translateY(6px); } }
+@keyframes ag-hoja-sale  { to   { opacity: 0; transform: translateY(6px); } }
+@keyframes ag-velo-entra { from { opacity: 0; } }
+
+.ag-capa {
+  position: fixed;
+  z-index: 45;
+  width: 320px;
+  max-width: calc(100vw - 2 * var(--ag-2));
+  display: flex;
+  flex-direction: column;
+  gap: var(--ag-3);
+  padding: var(--ag-4);
+  background: var(--ag-surface);
+  color: var(--ag-text);
+  border: 1px solid var(--ag-border-card);
+  border-radius: var(--ag-r-card);
+  box-shadow: var(--ag-shadow-pop);
+  animation: ag-capa-entra var(--ag-dur-base) var(--ag-ease-out) backwards;
+}
+.ag-capa:focus { outline: none; }
+.ag-capa[data-estado="saliendo"] {
+  animation: ag-capa-sale var(--ag-dur-micro) var(--ag-ease-in) forwards;
+  pointer-events: none;
+}
+/* La ayuda de atajos no tiene ancla: va centrada sobre su velo. */
+.ag-capa--centro {
+  left: 50%;
+  top: 50%;
+  translate: -50% -50%;
+  width: 360px;
+}
+
+.ag-hoja {
+  position: fixed;
+  z-index: 45;
+  inset-inline: 0;
+  bottom: 0;
+  max-height: 80dvh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ag-3);
+  padding: var(--ag-4) var(--ag-4) calc(var(--ag-4) + env(safe-area-inset-bottom));
+  background: var(--ag-surface);
+  color: var(--ag-text);
+  border-top: 1px solid var(--ag-border-card);
+  border-radius: var(--ag-r-card) var(--ag-r-card) 0 0;
+  box-shadow: var(--ag-shadow-pop);
+  animation: ag-hoja-entra var(--ag-dur-base) var(--ag-ease-out) backwards;
+}
+.ag-hoja:focus { outline: none; }
+.ag-hoja[data-estado="saliendo"] {
+  animation: ag-hoja-sale var(--ag-dur-micro) var(--ag-ease-in) forwards;
+  pointer-events: none;
+}
+
+.ag-capa-velo {
+  position: fixed;
+  inset: 0;
+  z-index: 44;
+  background: rgba(16, 32, 64, .28);
+  animation: ag-velo-entra var(--ag-dur-base) var(--ag-ease-out) backwards;
+}
+
+/* Cabecera común: título a la izquierda, ✕ a la derecha, centrados en una línea. */
+.ag-capa-cab {
+  display: flex;
+  align-items: center;
+  gap: var(--ag-2);
+  min-width: 0;
+}
+.ag-capa-titulo {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--ag-ink);
+  overflow-wrap: anywhere;
+}
+.ag-capa-cerrar {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--ag-r-btn);
+  color: var(--ag-muted);
+  transition: background-color var(--ag-dur-micro) var(--ag-ease);
+}
+.ag-capa-cerrar:hover { background: var(--ag-btn-ghost-hover); }
+
+.ag-capa-campo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ag-1);
+  min-width: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ag-muted);
+}
+.ag-capa-campo input,
+.ag-capa-campo select {
+  height: 36px;
+  padding: 0 var(--ag-2-5);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ag-ink);
+  background: var(--ag-surface);
+  border: 1px solid var(--ag-input-border);
+  border-radius: var(--ag-r-btn);
+}
+.ag-capa-fila {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--ag-2);
+}
+.ag-capa-error {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--ag-status-cancelled-text);
+}
+
+/* Las listas de opciones (`role="listbox"`) de la burbuja y del buscador. */
+.ag-opciones {
+  margin: 0;
+  padding: var(--ag-1);
+  list-style: none;
+  max-height: 240px;
+  overflow-y: auto;
+  border: 1px solid var(--ag-border-card);
+  border-radius: var(--ag-r-btn);
+}
+.ag-opcion {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--ag-1-5) var(--ag-2);
+  border-radius: var(--ag-r-btn-sm);
+  font-size: 14px;
+  color: var(--ag-ink);
+  cursor: pointer;
+  transition: background-color var(--ag-dur-micro) var(--ag-ease);
+}
+.ag-opcion-meta { font-size: 12px; color: var(--ag-muted); }
+.ag-opcion:hover,
+.ag-opcion[aria-selected="true"] { background: var(--ag-primary-bg-faint); }
+.ag-opciones-vacio { margin: 0; padding: var(--ag-2); font-size: 12.5px; color: var(--ag-muted); }
+
+/* Los botones del pie y de la barra de acciones: todos a 36 px, en una fila. */
+.ag-capa-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ag-2);
+}
+.ag-capa-boton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ag-1-5);
+  height: 36px;
+  padding: 0 var(--ag-3);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ag-text);
+  background: var(--ag-surface);
+  border: 1px solid var(--ag-input-border);
+  border-radius: var(--ag-r-btn);
+  transition: background-color var(--ag-dur-micro) var(--ag-ease),
+              border-color var(--ag-dur-micro) var(--ag-ease);
+}
+.ag-capa-boton:hover { background: var(--ag-btn-ghost-hover); }
+.ag-capa-boton:disabled { cursor: default; opacity: .55; }
+.ag-capa-boton--principal {
+  color: #fff;
+  background: var(--ag-brand-secondary);
+  border-color: var(--ag-brand-secondary);
+}
+.ag-capa-boton--principal:hover { background: var(--ag-brand-secondary); }
+.ag-hoja .ag-capa-boton { height: 44px; }   /* el mínimo táctil de la agenda, como `.ag-hueco` */
+
+/* La tarjeta de lectura. */
+.ag-lectura-pildora {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 0 var(--ag-2);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  border: 1px solid;
+  border-radius: var(--ag-r-pill);
+}
+.ag-lectura-hora {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--ag-ink);
+}
+.ag-lectura-hora small { display: block; font-size: 12px; font-weight: 600; color: var(--ag-muted); }
+.ag-lectura-datos {
+  margin: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--ag-1) var(--ag-3);
+  font-size: 13px;
+}
+.ag-lectura-datos dt { color: var(--ag-muted); font-weight: 600; }
+.ag-lectura-datos dd { margin: 0; color: var(--ag-text); overflow-wrap: anywhere; }
+.ag-lectura-nota {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* La ayuda de atajos. */
+.ag-atajos {
+  margin: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--ag-1-5) var(--ag-3);
+  font-size: 13px;
+  align-items: center;
+}
+.ag-atajos dd { margin: 0; color: var(--ag-text); }
+.ag-atajos kbd {
+  display: inline-grid;
+  place-items: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 var(--ag-1-5);
+  font: 700 12px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--ag-ink);
+  background: var(--ag-surface-sunken);
+  border: 1px solid var(--ag-border-card);
+  border-radius: var(--ag-r-btn-sm);
+}
+.ag-capa-interruptor {
+  display: flex;
+  align-items: center;
+  gap: var(--ag-2);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ag-text);
+}
+.ag-capa-interruptor input { width: 20px; height: 20px; }
+
+/* El buscador de citas: campo y lista, en columna. */
+.ag-buscador { display: flex; flex-direction: column; gap: var(--ag-2); min-width: 0; }
+
+/* El minicalendario. Siete columnas iguales y celdas cuadradas. */
+.ag-minimes { display: flex; flex-direction: column; gap: var(--ag-2); }
+.ag-minimes-cab { display: flex; align-items: center; gap: var(--ag-1); }
+.ag-minimes-titulo {
+  flex: 1;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ag-ink);
+}
+.ag-minimes-titulo::first-letter { text-transform: uppercase; }
+.ag-minimes-rejilla { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.ag-minimes-rejilla th {
+  padding-bottom: var(--ag-1);
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--ag-muted);
+  text-align: center;
+}
+.ag-minimes-rejilla td { padding: 1px; text-align: center; }
+.ag-minimes-dia {
+  width: 100%;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--ag-ink);
+  border-radius: 50%;
+  transition: background-color var(--ag-dur-micro) var(--ag-ease);
+}
+.ag-minimes-dia:hover { background: var(--ag-btn-ghost-hover); }
+.ag-minimes-dia[data-fuera="true"] { color: var(--ag-faint); }
+td[aria-selected="true"] > .ag-minimes-dia { background: var(--ag-primary-bg-faint); }
+.ag-minimes-dia[aria-current="date"] { color: #fff; background: var(--ag-brand-secondary); }
+
+/* El gesto de deslizar: el navegador se queda el eje vertical (`pan-y`) y el
+   horizontal llega a `useDeslizarPeriodo` como `pointermove`. */
+.ag-deslizable .fc-view-harness { touch-action: pan-y; }
+
 /* ════════════════════════════════════════════════════════════════
    AGENDA — MODO OSCURO (sub-fase 6). Contrapartes de los --ag-*.
    Valores del handoff design/agenda/design_handoff_agenda/theme.js
@@ -5331,6 +5763,9 @@ html.dark {
      única sobre la que se dibuja (un elemento gráfico pide 3.0). */
   --ag-month-more: #8ab4f8;                   /* ◆ */
   --ag-month-today-ring: #6b9bff;             /* ◆ = familia de confirmed-dot */
+  /* El anillo de tiempo real (ver la variante clara): literal por lo mismo que
+     el anillo de hoy de aquí arriba — la marca no se aclara sola en oscuro. */
+  --ag-pulso: #6b9bff;
   /* Ver la nota larga de la variante clara: aquí la marca se ACLARA, no se
      oscurece, porque es tinta y no relleno. */
   --ag-brand-legible: color-mix(in srgb, var(--ag-brand-secondary) 55%, white);
