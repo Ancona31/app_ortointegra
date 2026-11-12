@@ -36,7 +36,7 @@ export default function SuscripcionBanner({ desktopSidebarOffset = false }: Prop
   const { state } = useSubscriptionGate()
   if (!state.isBlocked) return null
 
-  const offsetClass = desktopSidebarOffset ? ' lg:ml-64' : ''
+  const offsetClass = desktopSidebarOffset ? ' lg:ml-64 sb-banner-desplazado' : ''
 
   return (
     <div className={`sticky top-0 z-40 border-b border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30${offsetClass}`}>

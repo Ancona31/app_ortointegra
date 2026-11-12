@@ -113,9 +113,12 @@ const ALTO_MINIMO_FULL = 55
    un piso que no es el que la rejilla está usando. */
 const PISO_FRANJA_FALLBACK = 36
 
-/** Piso de franja vigente, leído del token que fijan las media queries. */
-function leerPisoFranja(): number {
-  const crudo = getComputedStyle(document.documentElement).getPropertyValue('--ag-slot-h')
+/** Piso de franja vigente, leído del token que fijan las media queries.
+ *  ⚠️ F1.3 · SE LEE DEL NODO DE LA TARJETA Y NO DE LA RAÍZ DEL DOCUMENTO: la
+ *  densidad compacta declara `--ag-slot-h: 24px` en `.agenda-raiz`, y leído de
+ *  `<html>` daría el tramo de la ventana (36/42/48) con la rejilla a 24. */
+function leerPisoFranja(el: Element): number {
+  const crudo = getComputedStyle(el).getPropertyValue('--ag-slot-h')
   const px = Number.parseFloat(crudo)
   return Number.isFinite(px) && px > 0 ? px : PISO_FRANJA_FALLBACK
 }
@@ -126,6 +129,15 @@ function leerPisoFranja(): number {
    `hour12: false` por lo mismo que en el indicador de hora: el segundo deja
    pasar «24:00» en algunas locales. A nivel de módulo para no reconstruir un
    Intl por tarjeta y por render. */
+/** El tier de una tarjeta de la rejilla por su alto y el piso de franja. Puro
+ *  (F1.3: se prueba con Vitest a 24 px). `null` = aún sin medir → `full`. */
+export function tierDeTarjeta(alto: number | null, piso: number): 'tiny' | 'compact' | 'full' {
+  if (alto == null) return 'full'
+  if (alto < Math.max(piso * TIER_TINY_FRANJAS, ALTO_MINIMO_COMPACT)) return 'tiny'
+  if (alto < Math.max(piso * TIER_COMPACT_FRANJAS, ALTO_MINIMO_FULL)) return 'compact'
+  return 'full'
+}
+
 export const FORMATO_HORA_INICIO = new Intl.DateTimeFormat('es-MX', {
   hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
 })
@@ -149,8 +161,11 @@ export const FORMATO_HORA_INICIO = new Intl.DateTimeFormat('es-MX', {
 
 export const MemoizedEventContent = memo(function MemoizedEventContent({
   timeText, horaInicio, title, pacNombre, status, doctorInitial, tzDiff, icono, color, descriptor,
-  esEvento, enRejilla, marca = null, marcaTitulo = null, citaId, telefono = null, consultorio = null,
+  esEvento, enRejilla, marca = null, marcaTitulo = null, citaId, telefono = null, consultorio = null, nombreCorto = null,
 }: {
+  /* F1.7 · «Hugo I.»: lo enseña una consulta de contenedor en una tarjeta de
+     96 px o menos (globals.css). `null` = el mismo nombre. */
+  nombreCorto?: string | null
   /* F1.4 · El id de la cita, para `data-cita-id` en la raíz: es el contrato del
      movimiento (`flipTarjetas.ts`, bloque F §2). Primitivo, el `memo` lo compara. */
   citaId: string
@@ -237,7 +252,7 @@ export const MemoizedEventContent = memo(function MemoizedEventContent({
     if (!el) return
     const update = () => {
       setHeight(el.getBoundingClientRect().height)
-      setPisoFranja(leerPisoFranja())
+      setPisoFranja(leerPisoFranja(el))
     }
     update()
     const ro = new ResizeObserver(update)
@@ -274,14 +289,7 @@ export const MemoizedEventContent = memo(function MemoizedEventContent({
      El resto del régimen —los tres tiers, los dos criterios por umbral y el
      `Math.max`— NO SE TOCA: en la rejilla `enRejilla` es `true` y esto es la
      escalera de siempre, letra por letra. */
-  const umbralTiny = Math.max(pisoFranja * TIER_TINY_FRANJAS, ALTO_MINIMO_COMPACT)
-  const umbralCompact = Math.max(pisoFranja * TIER_COMPACT_FRANJAS, ALTO_MINIMO_FULL)
-  const tier: 'tiny' | 'compact' | 'full' | null =
-    !enRejilla ? null
-      : height == null ? 'full'
-        : height < umbralTiny ? 'tiny'
-          : height < umbralCompact ? 'compact'
-            : 'full'
+  const tier = enRejilla ? tierDeTarjeta(height, pisoFranja) : null
 
   /* El color elegido MANDA sobre el del estado cuando lo hay, y sólo lo hay en
      un evento genérico. Motivo: en un evento el estado dice poco —está agendado
@@ -387,6 +395,8 @@ export const MemoizedEventContent = memo(function MemoizedEventContent({
           className="ag-tarjeta-nombre"
           style={isCancelled ? { textDecoration: 'line-through' } : undefined}
         >{name}</span>
+        <span className="ag-tarjeta-nombre-corto"
+          style={isCancelled ? { textDecoration: 'line-through' } : undefined}>{nombreCorto ?? name}</span>
         {marca && <span className="ag-tarjeta-marca" title={marcaTitulo ?? undefined}>{marca}</span>}
       </div>
       {tzDiff && <span className="ag-tarjeta-tz">{tzDiff}</span>}

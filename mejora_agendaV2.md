@@ -2300,6 +2300,48 @@ encontraba su evento) y los 20 pulsos caían fuera de la vista. Ahora pulsa
   cabía) · filtro (`flex: 1 1 0`) · «Compactar» · engrane. Medido: 114 px de
   banda (eran ~195); el filtro mide 118 px a 390 y 88 a 360.
 
+**Paso 2 · F1.1, F1.2, F1.3, F1.7, F1.9, F1.12**
+
+- **F1.1 · barra única.** `CabeceraEscritorio` pasa a ser `.ag-controles`,
+  ítem de la rejilla de la tarjeta en la fila de la barra nativa (60 px; todos
+  los controles y los botones de FullCalendar a 36). El conteo es el primero
+  que cede (base 0, elipsis) y **se quita entero cuando la fila de controles
+  mide 720 px o menos** (consulta de contenedor): a 1024 px útiles no le
+  quedaba sitio y se veía una tira con «…». Después cede el filtro de médico
+  (de 240 a 140 px). Si aún no cabe —con la v2, el «Por confirmar» de E7— la
+  fila ENVUELVE en vez de recortarse. **Dos filas** (nativa arriba, controles
+  debajo) por debajo de 1280 px de ventana y en Día con panel (la tarjeta pierde
+  314 px): no hay forma de que quepan a la vez la fecha larga de Día y los
+  controles. Se fue «Gestión de citas clínicas» (decorativa). La leyenda va al
+  pie en 28 px. El hueco entre ‹ › Hoy y la fecha bajó de 14 a 8 px.
+  Segmentado: el hover pasa de `opacity` a fondo. Medido: la fila cabe sin
+  envolver a 1280×720, 1440×900 y 1536×900.
+- **F1.2 · barra lateral.** `aria-expanded`/`aria-controls` en «Plegar menú» (al
+  pie de la barra, sólo en /agenda y desde `lg`). Plegada: logo de 40 px, sin
+  nombre, sin selector de consultorio ni aviso de perfil, enlaces y pie sólo
+  con icono y `aria-label`/`title`. Lo plegado se esconde por CSS (no por JS)
+  para que el cajón móvil, que es la misma barra, nunca se vea afectado; pulsar
+  un grupo plegado despliega la barra y abre el grupo (sólo desde `lg`). El
+  `ResizeObserver` de `AgendaCliente` **sí hace falta**: comprobado que sin él
+  FullCalendar conserva los anchos de columna explícitos y quedan ~250 px sin
+  usar (la e2e lo mide).
+- **F1.3 · densidad.** Botón «Densidad compacta» (icono `Rows4`, `aria-pressed`)
+  junto a «Compactar», sólo en la rejilla de horas. Preferencia en
+  `localStorage` `spinus.agenda.densidad`, leída con `useSyncExternalStore` (sin
+  desajuste de hidratación); el mismo patrón que la barra plegada, copiado a
+  propósito (dos usos). Al cambiar, `updateSize()` en el cuadro siguiente: las
+  coordenadas de las franjas no siguen a una variable CSS. El tier sale a una
+  función pura `tierDeTarjeta` (Vitest: 30/60/90 min a 24 px → tiny/compact/
+  full). `expandRows` sigue estirando la franja si sobra alto: 24 px es un
+  suelo, y con «Compactar» la jornada entera cabe sin desplazar.
+- **F1.7.** Nombre corto con partículas saltadas («de la Cruz» → «C.»); sin
+  apellidos, el segundo nombre hace de apellido; en una cita por ligar sale de
+  `reserva_nombre`; un evento genérico conserva su título entero. Las dos
+  consultas de contenedor tienen nombre (`ag-tarjeta`, `ag-controles`).
+- **F1.12.** La lista de Semana abre en la cabecera de hoy, o en la del primer
+  día posterior con citas (la lista sólo pinta días con filas). Queda pendiente
+  hasta que haya filas que medir: se reintenta en `eventsSet`.
+
 ### Menores
 
 - **`ProximasCitas`:** tope de refresco de 2 minutos al volver a la pestaña,

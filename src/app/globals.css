@@ -1539,10 +1539,11 @@ main > div:has(.agenda-fc) .agenda-raiz {
 
 /* ⚠️⚠️ `grid-template-rows` Y `grid-template-areas` SON UNA PAREJA: EL NÚMERO DE
    PISTAS Y EL NÚMERO DE FILAS DE ÁREAS TIENEN QUE COINCIDIR, Y SE MUEVEN JUNTOS.
-   Aquí son CUATRO y CUATRO, y desde el bloque 8 éste es el ÚNICO sitio donde se
-   declaran: la variante estrecha que las redeclaraba se retiró al quedarse
-   idéntica a ésta. Si añades o quitas una fila de áreas, la lista de pistas
-   cambia con ella.
+   ⚠️ F1.1 · YA NO ES UN SOLO SITIO: la base son CUATRO y CUATRO (con dos
+   columnas en la primera fila), la variante de dos filas son CINCO y CINCO, y el
+   mes del teléfono redeclara las pistas para la de cinco. Si añades o quitas una
+   fila de áreas, cambian las tres. (Hasta F1.1 éste era el único sitio: la
+   variante estrecha del bloque 4 se había retirado al quedarse idéntica.)
 
    POR QUÉ ES GRAVE Y NO SÓLO FEO: sobrar filas de áreas NO es un error de CSS y
    no se queja nadie. Las que no tienen tamaño en `grid-template-rows` las
@@ -1568,17 +1569,37 @@ main > div:has(.agenda-fc) .agenda-raiz {
    compacta, que ni siquiera estaba en el DOM, y cero en la de la rejilla. */
 .agenda-fc {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: auto auto auto minmax(0, 1fr);   /* 4 pistas ↔ 4 filas */
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr) auto;   /* 4 pistas ↔ 4 filas */
   grid-template-areas:
-    "toolbar"
-    "leyenda"
-    "banda"
-    "rejilla";
+    "toolbar controles"
+    "banda   banda"
+    "rejilla rejilla"
+    "pie     pie";
+}
+/* F1.1 · UNA SOLA BARRA. Los controles (`CabeceraEscritorio`) entran en la
+   tarjeta y comparten fila con la barra nativa de FullCalendar; la leyenda baja
+   al pie (decisión 8). Cuando la fila no cabe —ventana de menos de 1280 px, o la
+   vista Día con su panel, que se lleva 314 px de la tarjeta— los controles bajan
+   a una segunda fila en vez de envolver a trozos. ⚠️ Las dos variantes
+   redeclaran el PAR entero (pistas ↔ áreas): cinco y cinco. Y la del mes del
+   teléfono, más abajo, también. */
+@media (max-width: 1279px) {
+  .agenda-fc {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto auto minmax(0, 1fr) auto;   /* 5 pistas ↔ 5 filas */
+    grid-template-areas: "toolbar" "controles" "banda" "rejilla" "pie";
+  }
+}
+.ag-dia--con-panel .agenda-fc {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto;   /* 5 pistas ↔ 5 filas */
+  grid-template-areas: "toolbar" "controles" "banda" "rejilla" "pie";
 }
 .agenda-fc .fc { display: contents; }
 .agenda-fc .fc-header-toolbar { grid-area: toolbar; }
-.agenda-fc .ag-leyenda        { grid-area: leyenda; }
+.agenda-fc .ag-controles      { grid-area: controles; }
+.agenda-fc .ag-leyenda        { grid-area: pie; }
 /* ⚠️ EL ÁREA `banda` LA OCUPA EL ENVOLTORIO DE AVISOS, Y ANTES LA OCUPABA
    `.ag-banda-compacta` DIRECTAMENTE (bloque 9). Es la ÚNICA línea que cambió
    aquí al montar las tres bandas nuevas, y ese es justo el punto: apilarlas
@@ -1813,7 +1834,7 @@ main > div:has(.agenda-fc) .agenda-raiz {
    para compensar, porque un `gap` solo se lee y se ajusta; un gap calculado
    contra un margen ajeno se rompe el día que la librería cambie ese `.75em`.
    Tres clases contra las dos de la nativa, así que gana sin `!important`. */
-.agenda-fc .fc-toolbar-chunk { display: flex; align-items: center; gap: 14px; }
+.agenda-fc .fc-toolbar-chunk { display: flex; align-items: center; gap: var(--ag-2); }
 .agenda-fc .fc-toolbar > * > :not(:first-child) { margin-left: 0; margin-right: 0; }
 
 /* ── LA BARRA DE SCROLL DE LA REJILLA ──────────────────────────────────────
@@ -1881,6 +1902,7 @@ main > div:has(.agenda-fc) .agenda-raiz {
 
 /* Toolbar */
 .fc .fc-toolbar,
+.agenda-fc .ag-controles,
 .agenda-fc .ag-leyenda {
   padding: 12px 16px;
   background: #ffffff;
@@ -1936,7 +1958,67 @@ main > div:has(.agenda-fc) .agenda-raiz {
    se queda igual porque es lo que permite montar otro `.fc` sin heredar
    este toolbar. */
 .agenda-fc .fc-toolbar {
-  padding: 14px 18px;
+  /* F1.1 · 12 + 36 + 12 = 60 px: la fila de la barra única. */
+  padding: 12px 18px;
+}
+/* F1.1 · Los controles, a la derecha de la barra nativa y en la misma fila. Sin
+   relleno izquierdo: el de la barra ya separa.
+   ⚠️ QUIÉN CEDE ANCHO, EN ORDEN: el conteo (base 0, crece con lo que sobre, se
+   recorta con elipsis), luego el filtro de médico (base 0, entre 140 y 240 px,
+   y crece antes que el conteo). Los demás no encogen. Medido a 1024 px útiles
+   (1280 de ventana, barra lateral desplegada) cabe en una fila con el conteo a
+   cero; si algo más entra en la fila (el «Por confirmar» de la v2), ENVUELVE a
+   una segunda línea en vez de recortarse. */
+.agenda-fc .ag-controles {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: var(--ag-2);
+  min-width: 0;
+  padding: 12px 18px 12px 0;
+}
+.agenda-fc .ag-controles-filtro { flex: 100 1 0; min-width: 140px; max-width: 240px; }
+/* Y cuando la fila es tan estrecha que al conteo le quedarían unos pocos píxeles,
+   se quita entero: una tira de texto recortada con «…» no dice nada. Consulta de
+   contenedor sobre la propia fila de controles (su ancho lo da la rejilla, no su
+   contenido). Medido: a 1024 px útiles la fila mide 643 y le quedan ~0 px. */
+.agenda-fc .ag-controles { container: ag-controles / inline-size; }
+@container ag-controles (max-width: 720px) {
+  .agenda-fc .ag-controles-conteo { display: none; }
+}
+.agenda-fc .ag-controles-conteo {
+  flex: 1 1 0;
+  min-width: 0;
+  margin: 0 auto 0 0;
+  font-size: 13px;
+  color: var(--ag-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Fondo y borde en micro, nada más (CONTRASTE §5); el foco sin transición. */
+.agenda-fc .ag-controles :is(button, select) {
+  transition: background-color var(--ag-dur-micro) var(--ag-ease),
+              border-color var(--ag-dur-micro) var(--ag-ease);
+}
+/* El «Por confirmar» de E7 trae su relleno de 40 px: aquí mide lo que la fila. */
+.agenda-fc .ag-controles [data-por-confirmar] { height: 36px; padding-block: 0; }
+/* En la variante de dos filas, la nativa pierde su línea y los controles van
+   debajo, alineados a la izquierda con las flechas, y pueden envolver. */
+@media (max-width: 1279px) {
+  .agenda-fc .fc-toolbar { padding-bottom: 6px; border-bottom: 0; }
+  .agenda-fc .ag-controles { justify-content: flex-start; flex-wrap: wrap; padding: 6px 18px 12px; }
+}
+.ag-dia--con-panel .agenda-fc .fc-toolbar { padding-bottom: 6px; border-bottom: 0; }
+.ag-dia--con-panel .agenda-fc .ag-controles { justify-content: flex-start; flex-wrap: wrap; padding: 6px 18px 12px; }
+/* F1.1 · Los botones nativos (‹ › Hoy) a 36 px, como los controles. */
+.agenda-fc .fc-button {
+  height: 36px;
+  padding-block: 0 !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* ── LA LEYENDA, SU ASPECTO PROPIO ────────────────────────────────────
@@ -1969,7 +2051,11 @@ main > div:has(.agenda-fc) .agenda-raiz {
   align-items: center;
   justify-content: flex-start;
   gap: 12px;
-  padding: 14px 18px;
+  /* F1.1 · Al pie, en una fila de 28 px y con la línea ARRIBA. */
+  min-height: 28px;
+  padding: 0 18px;
+  border-bottom: 0;
+  border-top: 1px solid #f1f5f9;
 }
 
 /* ═══ BANDA AZUL DEL ENCABEZADO MÓVIL Y BARRA INFERIOR (bloque 6 · 8a) ══════
@@ -2057,6 +2143,23 @@ main > div:has(.agenda-fc) .agenda-raiz {
    botón desaparecería otra vez. La presencia de la banda ya dice todo lo que hay
    que saber — sólo se monta en móvil. */
 body:has(.ag-banda-movil) .menu-flotante { display: none; }
+
+/* ═══ F1.2 · LA BARRA LATERAL PLEGADA (sólo la agenda, desde `lg`) ══════════
+   `Sidebar` pone `data-plegada` en el `<aside>`; aquí se le da ancho de iconos.
+   ⚠️ SIN ANIMAR EL ANCHO: animarlo reacomoda la rejilla en cada cuadro
+   (CONTRASTE §2.1); FullCalendar se reajusta una vez con el `ResizeObserver` de
+   `AgendaCliente`. El margen de `<main>` y el del aviso de suscripción ganan a
+   la utilidad `lg:ml-64` porque estas reglas no van en capa. */
+@media (min-width: 1024px) {
+  aside[data-plegada="true"] { width: 4rem; }
+  aside[data-plegada="true"] .sb-etiqueta { display: none; }
+  aside[data-plegada="true"] .sb-cabecera { padding-inline: 0; }
+  aside[data-plegada="true"] .sb-logo { width: 2.5rem; height: 2.5rem; }
+  aside[data-plegada="true"] nav { padding-inline: .5rem; }
+  aside[data-plegada="true"] :is(a, button) { justify-content: center; padding-inline: 0; }
+  aside[data-plegada="true"] ~ main { margin-left: 4rem; }
+  body:has(aside[data-plegada="true"]) .sb-banner-desplazado { margin-left: 4rem; }
+}
 
 /* ── Cabecera móvil del dashboard (bloque 2 del rediseño) ──────────────────
    Mismo mecanismo que la banda de la agenda de aquí arriba, y por el mismo
@@ -3380,6 +3483,12 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
 @media (min-height:  861px) { :root { --ag-slot-h: 42px } }
 @media (min-height: 1101px) { :root { --ag-slot-h: 48px } }
 .fc .fc-timegrid-slot { height: var(--ag-slot-h) !important; }
+/* F1.3 · DENSIDAD COMPACTA (decisión 12): 24 px por franja, 48 por hora. Se
+   declara en la raíz de la página y no en `:root`: la tarjeta lee el piso de su
+   propio nodo (`leerPisoFranja(el)` en `MemoizedEventContent`), así que sus
+   umbrales de tamaño siguen a la densidad. Aquí entran en juego los «suelos
+   físicos» de aquel archivo, escritos para una franja así. */
+.agenda-raiz[data-densidad="compacta"] { --ag-slot-h: 24px; }
 
 /* Etiquetas del gutter de horas */
 .fc .fc-timegrid-slot-label-cushion {
@@ -3598,6 +3707,8 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
 
 /* Caja. El color de `background` y de los bordes lo pone el estilo en línea. */
 .agenda-fc .ag-tarjeta {
+  /* F1.7 · Contenedor de consulta para el nombre corto (abajo). */
+  container: ag-tarjeta / inline-size;
   height: 100%;
   box-sizing: border-box;
   overflow: hidden;
@@ -3681,7 +3792,15 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
   flex: 0 0 auto;
 }
 
-.agenda-fc .ag-tarjeta-nombre {
+.agenda-fc .ag-tarjeta-nombre-corto { display: none; }
+/* F1.7 · En una tarjeta de 96 px o menos (dos citas simultáneas con «Todos»)
+   el nombre entero se queda en «Hug…»: se cambia por «Hugo I.». Sin JS. */
+@container ag-tarjeta (max-width: 96px) {
+  .agenda-fc .ag-tarjeta-nombre { display: none; }
+  .agenda-fc .ag-tarjeta-nombre-corto { display: block; }
+}
+.agenda-fc .ag-tarjeta-nombre,
+.agenda-fc .ag-tarjeta-nombre-corto {
   flex: 0 1 auto;
   min-width: 0;
   font-size: 12px;
@@ -3807,6 +3926,8 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
 .agenda-fc .fc-timeGridDay-view .ag-tarjeta-icono { order: 2; }
 .agenda-fc .ag-tarjeta--tiny .ag-tarjeta-nombre,
 .agenda-fc .fc-timeGridDay-view .ag-tarjeta-nombre,
+.agenda-fc .ag-tarjeta--tiny .ag-tarjeta-nombre-corto,
+.agenda-fc .fc-timeGridDay-view .ag-tarjeta-nombre-corto,
 .agenda-fc .ag-tarjeta--tiny .ag-tarjeta-marca,
 .agenda-fc .fc-timeGridDay-view .ag-tarjeta-marca { order: 3; }
 .agenda-fc .ag-tarjeta--tiny .ag-tarjeta-tz,
@@ -3841,7 +3962,8 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
    entre piezas sube en la misma proporción (8 → 14 px), medido en el mockup
    entre la hora y el cuadro del icono. */
 .agenda-fc .fc-timeGridDay-view .ag-tarjeta { padding: 6px 12px; gap: 14px; }
-.agenda-fc .fc-timeGridDay-view .ag-tarjeta-nombre { font-size: 15px; }
+.agenda-fc .fc-timeGridDay-view .ag-tarjeta-nombre,
+.agenda-fc .fc-timeGridDay-view .ag-tarjeta-nombre-corto { font-size: 15px; }
 .agenda-fc .fc-timeGridDay-view .ag-tarjeta-hora,
 .agenda-fc .fc-timeGridDay-view .ag-tarjeta-desc { font-size: 13px; }
 
@@ -4833,7 +4955,8 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
        5 + 5 de relleno del cushion, ~13 del texto de 11 px y 1 del borde inferior,
        o sea 24. Pasarse deja a `expandRows` estirando las filas un píxel por
        encima de los 52 (imperceptible); quedarse corto da scroll interno. */
-    grid-template-rows: auto auto auto minmax(0, calc(28px + 6 * var(--ag-mes-celda-movil)));
+    /* F1.1 · cinco pistas: la variante estrecha de `.agenda-fc` tiene cinco áreas. */
+    grid-template-rows: auto auto auto minmax(0, calc(28px + 6 * var(--ag-mes-celda-movil))) auto;
     flex: 0 1 auto;
     min-height: 180px;
   }
@@ -6112,10 +6235,12 @@ html.dark .agenda-fc .fc {
 
 /* Toolbar (global .fc .fc-toolbar: bg #ffffff + border #f1f5f9) */
 html.dark .agenda-fc .fc-toolbar,
+html.dark .agenda-fc .ag-controles,
 html.dark .agenda-fc .ag-leyenda {
   background: var(--ag-surface);
   border-bottom-color: var(--ag-border-card);
 }
+html.dark .agenda-fc .ag-leyenda { border-top-color: var(--ag-border-card); }
 
 /* Botones prev/next (global .fc .fc-button: bg #ffffff). color/borde ya
    vienen de --ag-text/--ag-border-card vía .agenda-fc .fc-button (tokenizado). */

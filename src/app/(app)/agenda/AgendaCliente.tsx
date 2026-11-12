@@ -3,7 +3,7 @@
 /* Hasta A1.4a este archivo era `agenda/page.tsx`; las referencias `page.tsx:NNNN`
    en comentarios y docs apuntan aquí. */
 
-import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
+import { useEffect, useRef, useState, useCallback, useMemo, useSyncExternalStore } from 'react'
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
 import FullCalendar from '@fullcalendar/react'
@@ -74,6 +74,7 @@ import {
   periodoDeLaVista,
 } from '@/lib/agenda/vistasAgenda'
 import { clasesDelEvento } from '@/lib/agenda/tarjetasAgenda'
+import { desplazarListaAHoy, diaLocalISO } from '@/lib/agenda/listaHoy'
 
 /* ═══ A2.6 · LOS TRES MODALES EN DIFERIDO ═════════════════════════════════
    `AppointmentModal` (el más grande: iconos, `Portal`, `QuickPatientModal`,
@@ -157,6 +158,25 @@ const UMBRAL_SONDEO_FOCO_MS = 120_000
    redeclarar por debajo del umbral. */
 const ANCHO_MOVIL = 1024
 
+/* ═══ F1.3 · DENSIDAD, PREFERENCIA DEL NAVEGADOR ════════════════════════════
+   Mismo patrón que la barra plegada de `Sidebar` (copiado a propósito, dos usos):
+   `useSyncExternalStore` con `false` en el servidor, así que no hay desajuste de
+   hidratación. Sin datos de nadie: sólo «compacta» o no. */
+const CLAVE_DENSIDAD = 'spinus.agenda.densidad'
+const EVENTO_DENSIDAD = 'spinus:agenda-densidad'
+function leerDensidadCompacta(): boolean {
+  try { return localStorage.getItem(CLAVE_DENSIDAD) === 'compacta' } catch { return false }
+}
+function suscribirDensidad(aviso: () => void): () => void {
+  window.addEventListener('storage', aviso)
+  window.addEventListener(EVENTO_DENSIDAD, aviso)
+  return () => { window.removeEventListener('storage', aviso); window.removeEventListener(EVENTO_DENSIDAD, aviso) }
+}
+function guardarDensidad(compacta: boolean): void {
+  try { localStorage.setItem(CLAVE_DENSIDAD, compacta ? 'compacta' : 'normal') } catch { /* modo privado */ }
+  window.dispatchEvent(new Event(EVENTO_DENSIDAD))
+}
+
 export interface AgendaClienteProps {
   /** Las citas de W-1, W y W+1 sembradas por `page.tsx` (A1.4c). Sin ella, o
    *  si resuelve `null`, la agenda pide a la red como antes. */
@@ -197,6 +217,45 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
   /* F1.10 · ¿El periodo pintado contiene hoy? Apaga el «Hoy» de la banda móvil,
      igual que FullCalendar apaga el suyo en escritorio. Booleano: bail-out. */
   const [hoyEnRango, setHoyEnRango] = useState(true)
+  /* F1.3 · Densidad compacta. Al cambiar, FullCalendar tiene que volver a medir
+     las franjas (sus coordenadas no siguen a una variable CSS): `updateSize`. */
+  const densidadCompacta = useSyncExternalStore(suscribirDensidad, leerDensidadCompacta, () => false)
+  useEffect(() => {
+    const id = requestAnimationFrame(() => calendarRef.current?.getApi().updateSize())
+    return () => cancelAnimationFrame(id)
+  }, [densidadCompacta])
+  /* F1.2 · FullCalendar 6 no observa su contenedor (cero `ResizeObserver` en el
+     núcleo): sólo reacciona al `resize` de la ventana. Al plegar la barra lateral
+     la página gana 192 px sin `resize`, así que aquí se le avisa, en el cuadro
+     siguiente y sólo si cambió el ANCHO. */
+  const raizRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const raiz = raizRef.current
+    if (!raiz || typeof ResizeObserver === 'undefined') return
+    let ancho = raiz.getBoundingClientRect().width
+    let cuadro = 0
+    const ro = new ResizeObserver(([e]) => {
+      if (!e || Math.abs(e.contentRect.width - ancho) < 0.5) return
+      ancho = e.contentRect.width
+      cancelAnimationFrame(cuadro)
+      cuadro = requestAnimationFrame(() => calendarRef.current?.getApi().updateSize())
+    })
+    ro.observe(raiz)
+    return () => { ro.disconnect(); cancelAnimationFrame(cuadro) }
+  }, [])
+  /* F1.12 · La lista de Semana del teléfono abre en HOY: la primera vez que se
+     pinta un rango con hoy, y otra vez tras pulsar «Hoy». Queda PENDIENTE hasta
+     que haya filas que medir (llegan con `eventsSet` si no estaban en caché). */
+  const listaHoyVistaRef = useRef(false)
+  const listaHoyPendienteRef = useRef(false)
+  const irAHoyRef = useRef(false)
+  const intentarListaHoy = (): void => {
+    if (!listaHoyPendienteRef.current) return
+    requestAnimationFrame(() => {
+      const raiz = raizRef.current
+      if (raiz && desplazarListaAHoy(raiz, diaLocalISO(new Date()))) listaHoyPendienteRef.current = false
+    })
+  }
   /* El periodo que nombra la banda de vacío —«esta semana», «en agosto»—, ya
      formateado. Se escribe en `datesSet` junto al título, que es el único sitio
      donde se sabe qué rango pinta la vista.
@@ -397,29 +456,33 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
     []
   )
 
+  const {
+    filtroEfectivo, filtroSincronoRef, aplicarFiltro, forzarMedicoParaElMes, revertirMedicoForzado,
+  } = useFiltroMedico({ profile, cargandoPerfil, isSecretaria, defaultMedicoId, medicos, isSingleDoctor })
+
   /* Iniciales del chip de médico. Se calculan AL PINTAR, no al traer las citas.
      Al montar, `medicos` viene vacío, así que `isSingleDoctor` vale true y el
      event source no tenía con qué calcularlas; eso se corregía con un
      `refetchEvents()` en cuanto llegaban los médicos — una segunda vuelta
      entera a /api/appointments y /api/google/events por dos letras. Calculado
      aquí, el chip aparece solo en el siguiente render y la red no se toca. */
+  /* F1.9 · Y SÓLO CON «TODOS»: filtrado a un médico, todas las tarjetas son
+     suyas y el chip no distingue nada (decisión del diseño, punto 9). Cambiar
+     el filtro ya provoca una traída, así que la dependencia nueva no añade
+     repintados. Por eso va DEBAJO de `useFiltroMedico`, que da el filtro. */
   const inicialesDeCita = useCallback<InicialesDeCita>((ext) => {
-    if (isSingleDoctor || !ext.medico_id) return undefined
+    if (isSingleDoctor || !ext.medico_id || filtroEfectivo) return undefined
     // La lista manda sobre el join de la cita: al reasignar médico, el
     // `medico` de extendedProps sigue siendo el anterior hasta que responde
     // el servidor. La cita optimista tampoco trae join, solo `medico_id`.
     const m = medicos.find(x => x.id === ext.medico_id) ?? ext.medico
     return m ? componerInicialesMedico(m) : undefined
-  }, [isSingleDoctor, medicos])
+  }, [isSingleDoctor, medicos, filtroEfectivo])
 
   const renderEC = useCallback(
     (arg: EventContentArg) => renderEventContent(arg, navegadorTZ, inicialesDeCita),
     [navegadorTZ, inicialesDeCita]
   )
-
-  const {
-    filtroEfectivo, filtroSincronoRef, aplicarFiltro, forzarMedicoParaElMes, revertirMedicoForzado,
-  } = useFiltroMedico({ profile, cargandoPerfil, isSecretaria, defaultMedicoId, medicos, isSingleDoctor })
 
   const {
     compactar, setCompactar, ventana, diasOcultos, scrollTime, horarioRef,
@@ -896,7 +959,12 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
     setCurrentView(arg.view.type)
     setTituloVista(arg.view.title)
     const ahora = Date.now()
-    setHoyEnRango(arg.view.currentStart.getTime() <= ahora && ahora < arg.view.currentEnd.getTime())
+    const conHoy = arg.view.currentStart.getTime() <= ahora && ahora < arg.view.currentEnd.getTime()
+    setHoyEnRango(conHoy)
+    listaHoyPendienteRef.current = arg.view.type === 'listWeek' && conHoy && (!listaHoyVistaRef.current || irAHoyRef.current)
+    if (listaHoyPendienteRef.current) listaHoyVistaRef.current = true
+    irAHoyRef.current = false
+    intentarListaHoy()
     setPeriodoVacio(periodoDeLaVista(arg.view))
     const eventos = calendarRef.current?.getApi().getEvents() ?? []
     const rangos = rangosDeLaVista(arg.view)
@@ -931,6 +999,7 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
     // porque aquí no llega `arg.view`.
     const vista = calendarRef.current?.getApi().view
     if (vista) programarPrecarga(vista)
+    intentarListaHoy()
   }
 
   function alPulsarNumeroDeDia(fecha: Date) {
@@ -1020,46 +1089,7 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
        ENTERO —sin restar nada—, que es lo que deja a la banda meterse bajo el
        reloj y a la barra de «Agendar» bajo la de gestos. Si te preguntas por qué
        aquí no hay duplicación: porque en esa rama este calc no se aplica. */
-    <div data-agenda-v2={interruptorLeido === null ? 'pendiente' : agendaV2 ? 'encendida' : 'apagada'} className="agenda-raiz flex flex-col h-[calc(100dvh-88px-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px))] lg:h-[calc(100dvh-64px-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px))]">
-
-      {/* ── Header ──────────────────────────────────────── */}
-      {/* ⚠️ EL ENCABEZADO DE ESCRITORIO SE ENVUELVE, NO SE TOCA POR DENTRO. Por
-          debajo de `ANCHO_MOVIL` lo sustituye `BandaMovil`, que es otra cosa —
-          navy, cuatro filas, controles de 44 px— y no una versión estrecha de
-          esto. El contenido vive en `CabeceraEscritorio` (A2.5.9); aquí sólo
-          queda la condición de montaje. */}
-      {!isMobile && (
-        <CabeceraEscritorio
-          resumenConteo={resumenConteo}
-          currentView={currentView}
-          isMobile={isMobile}
-          onVista={tipo => cambiarVista(tipo)}
-          compactar={compactar}
-          onCompactar={() => setCompactar(v => !v)}
-          isSingleDoctor={isSingleDoctor}
-          filtroEfectivo={filtroEfectivo}
-          mesSinTodos={mesSinTodos}
-          medicos={medicos}
-          onFiltroMedico={id => aplicarFiltro(id, false)}
-          canEditHorario={verEngrane}
-          onHorario={abrirConfiguracion}
-          /* ⚠️ NO FUNDIR con el `onAgendar` de `BarraAgendarMovil` ni con el
-             de la banda vacía, aunque el cuerpo sea idéntico: el plan A2.5
-             los deja como tres cierres separados a propósito (§invariantes,
-             «los 3 onClick de Agendar — no fundir»). */
-          onAgendar={() => {
-            if (subState.isBlocked) { openBloqueoModal(); return }
-            /* El botón sí aporta hora: la de ahora. Es una de las cuatro
-               rutas que NO cambian con la hora vacía de la vista Mes. */
-            const { fecha, hora } = partirFechaHora(new Date().toISOString())
-            setModal({ mode: 'create', fecha, hora, tipo: 'cita', todoElDia: 'no' })
-          }}
-          onIntencionAgendar={precargarModalesAgenda}
-          /* E7: la lista de mañana por confirmar (WhatsApp manual). Sólo con
-             la v2 encendida: apagada no se monta y no sale ninguna petición. */
-          porConfirmar={agendaV2 ? <PanelPorConfirmar recarga={recargaPanel} /> : undefined}
-        />
-      )}
+    <div ref={raizRef} data-densidad={densidadCompacta ? 'compacta' : 'normal'} data-agenda-v2={interruptorLeido === null ? 'pendiente' : agendaV2 ? 'encendida' : 'apagada'} className="agenda-raiz flex flex-col h-[calc(100dvh-88px-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px))] lg:h-[calc(100dvh-64px-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px))]">
 
       {isMobile && (
         <BandaMovil
@@ -1069,7 +1099,7 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
           titulo={tituloVista}
           onPrev={() => calendarRef.current?.getApi().prev()}
           onNext={() => calendarRef.current?.getApi().next()}
-          onHoy={() => calendarRef.current?.getApi().today()}
+          onHoy={() => { irAHoyRef.current = true; calendarRef.current?.getApi().today() }}
           hoyDeshabilitado={hoyEnRango}
           onMenu={abrirMenu}
           medicos={medicos}
@@ -1190,6 +1220,12 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
           120. Que después subiera a 36 es lo que abrió el hueco de arriba, y es
           posterior a esta bajada. Los dos cambios están anotados donde viven.
 
+          ⚠️ F1.1 · LA CUENTA BAJÓ OTRA VEZ CON LA BARRA ÚNICA: el encabezado de
+          encima de la tarjeta (54 + 24 de margen) entra en la fila del toolbar
+          (60) y la leyenda pasa al pie a 28. Peor caso hoy, con banda compacta:
+          60 + 33 + 35 + 28 = 156, y la página gana los 78 px del encabezado.
+          Lo de abajo es la historia de antes de F1.1.
+
           ⚠️ LA LEYENDA YA NO COMPARTE FILA CON EL TOOLBAR, Y ESTA CUENTA SUBIÓ
           45 EN EL BLOQUE 8. Compartiéndola no gastaba alto propio: cabía en la
           celda de al lado de la fecha —479 px en una línea con «GCal» contra los
@@ -1304,7 +1340,49 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
         className={`agenda-fc bg-white rounded-2xl border border-slate-100 shadow-sm overflow-clip flex-1 min-h-[250px]${
         esMesMovil ? ' ag-cal-mes-movil' : ''}${cargaVisible ? ' ag-cargando' : ''}${
         errorCitas ? ' ag-desactualizada' : ''}`}>
+        {/* ── Controles de escritorio (F1.1: DENTRO de la tarjeta) ────────
+            Por debajo de `ANCHO_MOVIL` los sustituye `BandaMovil`. Son un ítem
+            más de la rejilla de `.agenda-fc` (`grid-area: controles`), en la
+            fila de la barra nativa; el reparto, en globals.css. */}
+        {!isMobile && (
+          <CabeceraEscritorio
+            resumenConteo={resumenConteo}
+            currentView={currentView}
+            isMobile={isMobile}
+            onVista={tipo => cambiarVista(tipo)}
+            compactar={compactar}
+            onCompactar={() => setCompactar(v => !v)}
+            densidadCompacta={densidadCompacta}
+            onDensidad={() => guardarDensidad(!densidadCompacta)}
+            isSingleDoctor={isSingleDoctor}
+            filtroEfectivo={filtroEfectivo}
+            mesSinTodos={mesSinTodos}
+            medicos={medicos}
+            onFiltroMedico={id => aplicarFiltro(id, false)}
+            canEditHorario={verEngrane}
+            onHorario={abrirConfiguracion}
+            /* ⚠️ NO FUNDIR con el `onAgendar` de `BarraAgendarMovil` ni con el
+               de la banda vacía, aunque el cuerpo sea idéntico: el plan A2.5
+               los deja como tres cierres separados a propósito (§invariantes,
+               «los 3 onClick de Agendar — no fundir»). */
+            onAgendar={() => {
+              if (subState.isBlocked) { openBloqueoModal(); return }
+              /* El botón sí aporta hora: la de ahora. Es una de las cuatro
+                 rutas que NO cambian con la hora vacía de la vista Mes. */
+              const { fecha, hora } = partirFechaHora(new Date().toISOString())
+              setModal({ mode: 'create', fecha, hora, tipo: 'cita', todoElDia: 'no' })
+            }}
+            onIntencionAgendar={precargarModalesAgenda}
+            /* E7: la lista de mañana por confirmar (WhatsApp manual). Sólo con
+               la v2 encendida: apagada no se monta y no sale ninguna petición. */
+            porConfirmar={agendaV2 ? <PanelPorConfirmar recarga={recargaPanel} /> : undefined}
+          />
+        )}
         {/* ── Leyenda ───────────────────────────────────────────────────
+            ⚠️ F1.1 · DESDE EL BLOQUE F VA AL PIE de la tarjeta, en una fila de
+            28 px (`grid-area: pie`, decisión 8): la fila de arriba la ocupa la
+            barra única. Lo de abajo es su historia; el DOM no cambia de sitio
+            (el lector de pantalla la sigue oyendo antes que la rejilla).
             ⚠️ VIVE DENTRO DE LA TARJETA Y EN FILA PROPIA, entre la fila de
             navegación y la cabecera del día. Quien la coloca es el
             `grid-template-areas` de `.agenda-fc` en globals.css, y allí está el
@@ -1601,6 +1679,9 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
              siendo el suelo y las filas crecen por encima. Coherente con la nota
              de esa regla: reducirla es peligroso, aumentarla es seguro. */
           expandRows
+          /* F1.7 · Simultáneas en partes iguales, sin encimarse (spec §7.1).
+             Primitivo: identidad estable, no re-refina opciones. */
+          slotEventOverlap={false}
           slotDuration="00:30:00"
           slotLabelInterval="01:00:00"
           eventTimeFormat={FORMATO_HORA_FC}

@@ -10,8 +10,9 @@ import {
   HelpCircle, ChevronRight, Menu, X, LogOut, Moon, Sun,
   TrendingUp, UserPlus,
   Calculator,
+  PanelLeftClose, PanelLeftOpen,
 } from 'lucide-react'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useSyncExternalStore } from 'react'
 import useSWR from 'swr'
 import AvisoPerfilSidebar from '@/components/sidebar/AvisoPerfilSidebar'
 import { CLAVE_ESTADO_PERFIL } from '@/lib/perfil/claves'
@@ -252,6 +253,27 @@ interface RespuestaEstadoPerfil {
   faltaCedulaEspecialidad: boolean
 }
 
+/* ═══ F1.2 · LA BARRA PLEGADA, SÓLO EN LA AGENDA ════════════════════════════
+   Preferencia de interfaz por navegador (`localStorage`, sin datos de nadie,
+   decisión 11). Se lee con `useSyncExternalStore` y no en un efecto: el servidor
+   pinta siempre desplegada (`false`) y el cliente pasa a lo guardado sin
+   desajuste de hidratación. El evento propio avisa a esta misma pestaña; el de
+   `storage`, a las otras. */
+const CLAVE_PLEGADA = 'spinus.barra.plegada'
+const EVENTO_PLEGADA = 'spinus:barra-plegada'
+function leerPlegada(): boolean {
+  try { return localStorage.getItem(CLAVE_PLEGADA) === 'si' } catch { return false }
+}
+function suscribirPlegada(aviso: () => void): () => void {
+  window.addEventListener('storage', aviso)
+  window.addEventListener(EVENTO_PLEGADA, aviso)
+  return () => { window.removeEventListener('storage', aviso); window.removeEventListener(EVENTO_PLEGADA, aviso) }
+}
+function guardarPlegada(plegada: boolean): void {
+  try { localStorage.setItem(CLAVE_PLEGADA, plegada ? 'si' : 'no') } catch { /* modo privado: sólo esta vista */ }
+  window.dispatchEvent(new Event(EVENTO_PLEGADA))
+}
+
 export default function Sidebar() {
   const pathname = usePathname()
   const router   = useRouter()
@@ -265,6 +287,10 @@ export default function Sidebar() {
      único que cambia es DÓNDE se guarda el booleano. Ver `MenuMovilContext`. */
   const { abierto: mobileOpen, alternar: alternarMenu, cerrar: cerrarMenu } = useMenuMovil()
   const [expanded, setExpanded]     = useState<Set<string>>(new Set())
+  /* F1.2 · Plegada sólo vale en la agenda (y desde `lg`, que lo pone la hoja):
+     fuera de ella la barra va siempre desplegada, guarde lo que guarde. */
+  const enAgenda = pathname === '/agenda' || pathname.startsWith('/agenda/')
+  const plegada = useSyncExternalStore(suscribirPlegada, leerPlegada, () => false) && enAgenda
   const { profile }  = useProfile()
   const { nombreDisplay, subtitulo, logoUrl } = useClinica()
   const { dark, toggle } = useTheme()
@@ -349,6 +375,14 @@ export default function Sidebar() {
   }, [pathname])
 
   function toggleGroup(key: string) {
+    /* Plegada no hay sitio para los hijos: pulsar un grupo despliega la barra y
+       abre el grupo (no lo cierra si ya estaba abierto). Sólo desde `lg`: por
+       debajo la barra es el cajón móvil y nunca se pinta plegada. */
+    if (plegada && window.matchMedia('(min-width: 1024px)').matches) {
+      guardarPlegada(false)
+      setExpanded(prev => new Set(prev).add(key))
+      return
+    }
     setExpanded(prev => {
       const next = new Set(prev)
       next.has(key) ? next.delete(key) : next.add(key)
@@ -566,6 +600,8 @@ export default function Sidebar() {
           es lo que impide que el menú y la banda móvil de la agenda diverjan:
           eran dos copias de la misma cuenta y ahora es una sola. */}
       <aside
+        id="barra-lateral"
+        data-plegada={plegada ? 'true' : 'false'}
         style={{
           background: 'var(--ag-navy)',
         }}
@@ -577,8 +613,8 @@ export default function Sidebar() {
         `}
       >
         {/* Logo + nombre */}
-        <div className="flex flex-col items-center gap-2.5 px-5 py-5 border-b border-white/10">
-          <div className="w-14 h-14 bg-[var(--ag-navy-logo-bg)] rounded-full flex items-center justify-center overflow-hidden shadow-lg flex-shrink-0">
+        <div className="sb-cabecera flex flex-col items-center gap-2.5 px-5 py-5 border-b border-white/10">
+          <div className="sb-logo w-14 h-14 bg-[var(--ag-navy-logo-bg)] rounded-full flex items-center justify-center overflow-hidden shadow-lg flex-shrink-0">
             {/* 112 = 2× los 56 px del círculo, para pantallas de alta densidad.
                 Las dos ramas pasan por next/image: el host de Supabase Storage
                 está declarado en `remotePatterns` de next.config.ts. */}
@@ -591,7 +627,7 @@ export default function Sidebar() {
                 onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
             )}
           </div>
-          <div className="text-center">
+          <div className="sb-etiqueta text-center">
             <p className="font-semibold text-sm leading-tight">
               {/* ⚠️ `estadoPerfil.nombre` MANDA Y `profile` ES EL SUPLENTE, por lo
                   mismo que en `isAdmin`: `useProfile` memoiza en una promesa de
@@ -610,7 +646,7 @@ export default function Sidebar() {
           </div>
         </div>
 
-        <ConsultorioActivoSelector />
+        <div className="sb-etiqueta"><ConsultorioActivoSelector /></div>
 
         {/* Navegación */}
         <nav className="flex-1 px-2.5 py-3 overflow-y-auto space-y-0.5">
@@ -647,12 +683,13 @@ export default function Sidebar() {
                    se escribe `undefined`, no `true`. */
                 <Link key={section.href} href={section.href} onClick={close}
                   prefetch={section.sinPrefetch ? false : undefined}
+                  aria-label={plegada ? section.label : undefined} title={plegada ? section.label : undefined}
                   className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all duration-150 ${
                     active ? 'bg-white text-[var(--ag-navy-ink-activo)] shadow-sm' : 'text-[var(--ag-navy-ink)] hover:bg-white/10 hover:text-white'
                   }`}
                 >
                   <section.icon size={16} className={active ? 'opacity-100' : 'opacity-70'} />
-                  <span className="flex-1">{section.label}</span>
+                  <span className="sb-etiqueta flex-1">{section.label}</span>
                 </Link>
               )
             }
@@ -667,6 +704,7 @@ export default function Sidebar() {
                   {/* Header del grupo */}
                   <button
 onClick={() => toggleGroup(section.key)}
+                    aria-label={plegada ? section.label : undefined} title={plegada ? section.label : undefined}
                     className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all duration-150 ${
 hasActive && !isOpen
                           ? 'text-white bg-white/10'
@@ -676,14 +714,14 @@ hasActive && !isOpen
                     }`}
                   >
                     <section.icon size={16} className={hasActive ? 'opacity-100' : 'opacity-70'} />
-                    <span className="flex-1 text-left">{section.label}</span>
-{<ChevronRight size={13} className={`opacity-50 transition-transform duration-200 ${isOpen ? 'rotate-90' : ''}`} />
+                    <span className="sb-etiqueta flex-1 text-left">{section.label}</span>
+{<ChevronRight size={13} className={`sb-etiqueta opacity-50 transition-transform duration-200 ${isOpen ? 'rotate-90' : ''}`} />
                     }
                   </button>
 
                   {/* Sub-items */}
 {isOpen && (
-                    <div className="mt-0.5 ml-3 pl-3 border-l border-white/10 space-y-0.5">
+                    <div className="sb-etiqueta mt-0.5 ml-3 pl-3 border-l border-white/10 space-y-0.5">
                       {section.children.map(child => {
                         /* Misma pinta que un enlace y distinto elemento: un
                            `doc` abre el buscador de paciente, así que es un
@@ -747,15 +785,26 @@ hasActive && !isOpen
 
         {/* Footer */}
         <div className="px-3 py-3 border-t border-white/10 space-y-0.5">
-          <button onClick={toggle}
+          {/* F1.2 · Plegar / desplegar, sólo en la agenda y desde `lg` (por
+              debajo la barra es el cajón del menú móvil). */}
+          {enAgenda && (
+            <button type="button" onClick={() => guardarPlegada(!plegada)}
+              aria-expanded={!plegada} aria-controls="barra-lateral"
+              aria-label={plegada ? 'Desplegar menú' : 'Plegar menú'}
+              className="hidden lg:flex w-full items-center gap-2.5 px-3 py-2.5 text-[13px] text-[var(--ag-navy-ink-dim)] hover:text-white hover:bg-white/10 rounded-xl transition-colors duration-150">
+              {plegada ? <PanelLeftOpen size={14} /> : <PanelLeftClose size={14} />}
+              <span className="sb-etiqueta">{plegada ? 'Desplegar menú' : 'Plegar menú'}</span>
+            </button>
+          )}
+          <button onClick={toggle} aria-label={plegada ? (dark ? 'Modo claro' : 'Modo oscuro') : undefined}
             className="w-full flex items-center gap-2.5 px-3 py-2.5 text-[13px] text-[var(--ag-navy-ink-dim)] hover:text-white hover:bg-white/10 rounded-xl transition-all duration-150">
             {dark ? <Sun size={14} /> : <Moon size={14} />}
-            {dark ? 'Modo claro' : 'Modo oscuro'}
+            <span className="sb-etiqueta">{dark ? 'Modo claro' : 'Modo oscuro'}</span>
           </button>
-          <button onClick={handleLogout}
+          <button onClick={handleLogout} aria-label={plegada ? 'Cerrar sesión' : undefined}
             className="w-full flex items-center gap-2.5 px-3 py-2.5 text-[13px] text-[var(--ag-navy-ink-dim)] hover:text-white hover:bg-white/10 rounded-xl transition-all duration-150">
             <LogOut size={14} />
-            Cerrar sesión
+            <span className="sb-etiqueta">Cerrar sesión</span>
           </button>
 
           {/* Lo que falta en el perfil (handoff 2a). VA AQUÍ, DEBAJO DE LOS DOS
@@ -776,12 +825,12 @@ hasActive && !isOpen
               ejerce: firma, cédula y logo. El `super_admin` queda fuera por la
               misma condición, sin tener que nombrarlo. */}
           {estadoPerfil?.role === 'medico' && (
-            <AvisoPerfilSidebar
+            <div className="sb-etiqueta"><AvisoPerfilSidebar
               faltaFirma={!estadoPerfil.tieneFirma}
               faltaLogo={!estadoPerfil.tieneLogo}
               faltaCedulaEspecialidad={estadoPerfil.faltaCedulaEspecialidad}
               alNavegar={close}
-            />
+            /></div>
           )}
 
           {/* ⚠️ EL `prefetch={false}` VA ATADO AL `target="_blank"`, Y SI ALGUIEN
@@ -820,7 +869,7 @@ hasActive && !isOpen
               comentario. Que dos sitios digan lo contrario sobre la misma regla es
               lo que de verdad se arregla aquí. */}
           <Link href="/privacidad" target="_blank" rel="noopener noreferrer" prefetch={false}
-            className="block text-center text-[10px] text-[var(--ag-navy-ink-soft)] hover:text-white/70 transition-colors pt-2">
+            className="sb-etiqueta block text-center text-[10px] text-[var(--ag-navy-ink-soft)] hover:text-white/70 transition-colors pt-2">
             Aviso de Privacidad
           </Link>
         </div>

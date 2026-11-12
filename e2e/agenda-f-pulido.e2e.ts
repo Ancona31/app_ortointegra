@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 import { hoyEnTZ } from '../src/lib/dates'
-import { irAAgenda, eventoConTexto, SESION } from './ayudas'
+import { irAAgenda, eventoConTexto, SESION, CORREO, DIA_LABORABLE_LIBRE, sqlLocal, selectFiltroMedico } from './ayudas'
 
 /**
  * Bloque F §1 · pulido visual que sale directo, sin interruptor (diseño en
@@ -169,5 +169,146 @@ test.describe('teléfono', () => {
     const ids = await page.locator('.fc-listWeek-view .fc-list-event:not(.ag-ev-gcal) .ag-listafila').evaluateAll(els => els.map(e => e.getAttribute('data-cita-id')))
     expect(ids.length).toBeGreaterThan(0)
     for (const id of ids) expect(id ?? '').toMatch(UUID)
+  })
+})
+
+/* ── Paso 2 · F1.1, F1.3, F1.7, F1.9, F1.12 ─────────────────────────────── */
+
+/** Un evento o cita de un médico de la clínica A, insertado como `postgres`. Devuelve el id. */
+function citaSql(correo: string, titulo: string, inicio: string, minutos: number, conPaciente: number | null = null): string {
+  return sqlLocal(`
+    insert into public.appointments (clinica_id, created_by, title, start_time, end_time, status, gcal_sync_status,
+      medico_id, client_id, consultorio_id, consultorio_nombre, consultorio_nombre_corto, consultorio_direccion,
+      consultorio_telefono, consultorio_timezone, origen, icono, color, all_day, paciente_id)
+    select p.clinica_id, p.id, :'titulo', :'inicio'::timestamptz, :'inicio'::timestamptz + make_interval(mins => :'min'::int),
+           'scheduled', 'pending', p.id, gen_random_uuid()::text, c.id, c.nombre, c.nombre_corto, c.direccion,
+           c.telefono, c.timezone, 'spinus',
+           case when :'pac' = '' then 'junta' end, case when :'pac' = '' then 'indigo' end, false,
+           case when :'pac' = '' then null else (select x.id from public.pacientes x where x.clinica_id = p.clinica_id
+                                                   order by x.apellidos, x.nombre offset nullif(:'pac', '')::int limit 1) end
+      from auth.users u join public.profiles p on p.id = u.id
+      cross join lateral (select * from public.consultorios c where c.medico_id = p.id and c.activo limit 1) c
+     where u.email = :'correo'
+    returning id;`, { titulo, inicio, min: String(minutos), correo, pac: conPaciente === null ? '' : String(conPaciente) })
+}
+
+test.describe('escritorio · paso 2', () => {
+  soloEn('escritorio')
+
+  test('F1.1 · una sola barra: la nativa y los controles comparten fila, nada envuelve, la leyenda al pie', async ({ page }) => {
+    for (const [ancho, alto] of [[1440, 900], [1280, 720], [1536, 900]] as const) {
+      await page.setViewportSize({ width: ancho, height: alto })
+      await irAAgenda(page)
+      const centro = async (sel: string) => {
+        const c = await page.locator(sel).first().boundingBox()
+        return (c?.y ?? -999) + (c?.height ?? 0) / 2
+      }
+      const nativa = await centro('.fc-prev-button')
+      for (const sel of ['[data-onboard="nueva-cita"]', '.agenda-fc .ag-controles [role="tablist"]', '.fc-today-button']) {
+        expect(Math.abs(await centro(sel) - nativa)).toBeLessThanOrEqual(1)
+      }
+      for (const sel of ['.agenda-fc .fc-header-toolbar', '.agenda-fc .ag-controles']) {
+        expect((await page.locator(sel).boundingBox())?.height ?? 999).toBeLessThanOrEqual(61.5) // 60 + el borde
+      }
+      /* Las pestañas del segmentado miden 30 dentro de su pista de 36: se mide la pista. */
+      const altos = await page.locator('.agenda-fc .ag-controles :is(button:not([role="tab"]), select, [role="tablist"]), .agenda-fc .fc-button').evaluateAll(els =>
+        els.filter(e => (e as HTMLElement).offsetParent !== null).map(e => Math.round(e.getBoundingClientRect().height)))
+      for (const h of altos) expect(h).toBe(36)
+      const rejilla = await page.locator('.fc-view-harness').boundingBox()
+      const leyenda = await page.locator('.agenda-fc .ag-leyenda').boundingBox()
+      expect(leyenda?.y ?? 0).toBeGreaterThanOrEqual((rejilla?.y ?? 0) + (rejilla?.height ?? 0) - 1)
+      await expect(page.getByRole('heading', { name: 'Agenda', level: 1 })).toBeAttached()
+    }
+  })
+
+  test('F1.3 · densidad compacta: 24 px por franja, se recuerda y la jornada cabe sin desplazar', async ({ page }) => {
+    await irAAgenda(page)
+    const boton = page.getByRole('button', { name: 'Densidad compacta' })
+    await expect(boton).toHaveAttribute('aria-pressed', 'false')
+    await boton.click()
+    await expect(boton).toHaveAttribute('aria-pressed', 'true')
+    await expect(page.locator('.agenda-raiz')).toHaveAttribute('data-densidad', 'compacta')
+    await page.reload()
+    await page.locator('.fc-event').first().waitFor()
+    await expect(page.getByRole('button', { name: 'Densidad compacta' })).toHaveAttribute('aria-pressed', 'true')
+    // Con «Compactar» (abre encendido) la jornada entera cabe: el desplazador no desplaza.
+    const sobra = await page.locator('.fc-timegrid-body').evaluate(el => {
+      const sc = el.closest('.fc-scroller') as HTMLElement | null
+      return sc ? sc.scrollHeight - sc.clientHeight : 999
+    })
+    expect(sobra).toBeLessThanOrEqual(1)
+    await page.getByRole('button', { name: 'Densidad compacta' }).click()
+    await expect(page.locator('.agenda-raiz')).toHaveAttribute('data-densidad', 'normal')
+  })
+
+  test('F1.3 · a 24 px por franja la cita de 60 min es «compact»: el piso se lee de la tarjeta', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    const titulo = `Densidad F ${Date.now().toString(36)}`
+    const ids = [
+      citaSql(CORREO.adminA, titulo, `${DIA_LABORABLE_LIBRE}T16:00:00-06:00`, 60),
+      // Una de noche estira la ventana: con tantas filas la rejilla no estira la franja de 24.
+      citaSql(CORREO.adminA, `${titulo} noche`, `${DIA_LABORABLE_LIBRE}T22:00:00-06:00`, 60),
+    ]
+    try {
+      await page.addInitScript(() => { try { localStorage.setItem('spinus.agenda.densidad', 'compacta') } catch { /* */ } })
+      await irAAgenda(page)
+      const compactar = page.getByRole('button', { name: /Compactar la rejilla al horario de la clínica/ })
+      if (await compactar.getAttribute('aria-pressed') === 'true') await compactar.click()
+      const franja = await page.locator('td.fc-timegrid-slot-lane').first().evaluate(e => e.getBoundingClientRect().height)
+      expect(Math.abs(franja - 24)).toBeLessThanOrEqual(1)
+      await expect(page.locator('.fc-timegrid-event', { hasText: titulo }).first().locator('.ag-tarjeta')).toHaveClass(/ag-tarjeta--compact/)
+    } finally {
+      sqlLocal(`delete from public.appointments where id = any(string_to_array(:'ids', ',')::uuid[]);`, { ids: ids.join(',') })
+    }
+  })
+
+  test('F1.7 · dos citas simultáneas con «Todos»: mismo ancho y el nombre nunca queda en una inicial', async ({ page }) => {
+    const inicio = `${DIA_LABORABLE_LIBRE}T07:00:00-06:00`
+    const ids = [citaSql(CORREO.adminA, 'Simultánea F uno', inicio, 30, 0), citaSql(CORREO.medicoA, 'Simultánea F dos', inicio, 30, 1)]
+    try {
+      await irAAgenda(page)
+      await selectFiltroMedico(page).selectOption({ label: 'Todos los médicos' })
+      const tarjetas = page.locator(`.fc-timegrid-col[data-date="${DIA_LABORABLE_LIBRE}"] .fc-timegrid-event`)
+        .filter({ has: page.locator('[data-cita-id]') })
+        .filter({ has: page.locator(`.ag-tarjeta-hora-inicio`, { hasText: /^07:00$/ }) })
+      await expect(tarjetas).toHaveCount(2)
+      const anchos = await tarjetas.evaluateAll(els => els.map(e => e.getBoundingClientRect().width))
+      expect(Math.abs(anchos[0] - anchos[1])).toBeLessThanOrEqual(1)
+      const visibles = await tarjetas.locator('.ag-tarjeta-tit').evaluateAll(els => els.map(e => (e as HTMLElement).innerText.trim()))
+      for (const v of visibles) expect(v).toMatch(/^\p{L}{2,}/u)
+    } finally {
+      sqlLocal(`delete from public.appointments where id = any(string_to_array(:'ids', ',')::uuid[]);`, { ids: ids.join(',') })
+    }
+  })
+
+  test('F1.9 · el chip de iniciales sólo con «Todos»', async ({ page }) => {
+    await irAAgenda(page)
+    await selectFiltroMedico(page).selectOption({ label: 'Dr. Admin Semilla Uno' })
+    await expect(page.locator('.fc-timegrid-event').first()).toBeVisible()
+    await expect(page.locator('.ag-tarjeta-chip')).toHaveCount(0)
+    await selectFiltroMedico(page).selectOption({ label: 'Todos los médicos' })
+    await expect(page.locator('.ag-tarjeta-chip').first()).toBeAttached()
+  })
+})
+
+test.describe('teléfono · paso 2', () => {
+  soloEn('telefono')
+
+  test('F1.12 · la lista de Semana abre con la cabecera de hoy en lo alto', async ({ page }) => {
+    await irAAgenda(page)
+    await expect(page.locator('.fc-listWeek-view')).toBeVisible()
+    const hoy = hoyEnTZ('America/Merida')
+    await expect(page.locator('.fc-listWeek-view tr.fc-list-day[data-date]').first()).toBeAttached()
+    /* La cabecera de hoy (o la del primer día posterior con citas) queda en lo
+       alto del desplazador, salvo que la lista ya no dé para más (fondo). */
+    await expect.poll(() => page.evaluate((iso) => {
+      const sc = document.querySelector<HTMLElement>('.fc-listWeek-view .fc-scroller')
+      const cab = Array.from(document.querySelectorAll<HTMLElement>('.fc-listWeek-view tr.fc-list-day[data-date]'))
+        .find(c => (c.dataset.date ?? '') >= iso)
+      if (!sc || !cab) return 'sin lista'
+      const d = cab.getBoundingClientRect().top - sc.getBoundingClientRect().top
+      const alFondo = sc.scrollTop >= sc.scrollHeight - sc.clientHeight - 1
+      return Math.abs(d) <= 2 || (alFondo && d > 0 && sc.scrollTop > 0) ? 'en hoy' : `a ${Math.round(d)} px`
+    }, hoy)).toBe('en hoy')
   })
 })

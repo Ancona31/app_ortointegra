@@ -17,6 +17,7 @@ import { GoogleEventCard } from './GoogleEventCard'
 import { FilaLista } from './FilaLista'
 import { FilaListaDetalle } from './FilaListaDetalle'
 import { MemoizedEventContent, FORMATO_HORA_INICIO } from './MemoizedEventContent'
+import { nombreCortoDeTexto, nombreCortoPaciente } from '@/lib/agenda/nombresTarjeta'
 
 /** Resuelve las iniciales del chip de médico de una cita ya pintada. */
 export type InicialesDeCita = (ext: Appointment) => string | undefined
@@ -157,6 +158,8 @@ export function renderEventContent(arg: EventContentArg, navegadorTZ: string, in
          la ficha y, en una cita por ligar, el que dejó al reservar. */
       telefono={pac?.telefono ?? ext.reserva_telefono ?? null}
       consultorio={ext.consultorio_nombre_corto ?? null}
+      /* F1.7 · Sólo personas: un evento genérico conserva su título entero. */
+      nombreCorto={pac ? nombreCortoPaciente(pac.nombre, pac.apellidos) : marca ? nombreCortoDeTexto(ext.title) : null}
       timeText={arg.timeText}
       horaInicio={arg.event.start ? FORMATO_HORA_INICIO.format(arg.event.start) : arg.timeText}
       title={ext.title}
