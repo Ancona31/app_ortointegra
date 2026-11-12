@@ -46,6 +46,7 @@ import { ESTADOS_CITA, ICONO_ETIQUETA, COLOR_ETIQUETA, STATUS_CONFIG, esEventoGe
 import { useDialogoModal } from '@/hooks/useDialogoModal'
 import ConfirmModal from '@/components/agenda/ConfirmModal'
 import { DEFAULT_DURATION } from '@/lib/agenda/duracionCita'
+import { ESTADOS_SIN_EMPALME, mensajeEmpalme, type Empalme, type TramoCita } from '@/lib/agenda/empalmesCita'
 
 export type PacienteBusqueda = { id: string; nombre: string; apellidos: string; telefono: string | null }
 
@@ -302,7 +303,7 @@ function usePacientes(query: string) {
 export default function AppointmentModal({
   modal, onClose, onSave, onDelete, medicos, defaultMedicoId,
   hideMedicoDropdown, medicoDropdownRequired, canVerExpediente, canInvitar, onInvitar,
-  onCambiarTipo, horario, agendaV2 = false, onCancelarCita,
+  onCambiarTipo, horario, agendaV2 = false, onCancelarCita, buscarEmpalmes,
 }: {
   modal: ModalState
   onClose: () => void
@@ -313,6 +314,10 @@ export default function AppointmentModal({
      apagado— la papelera y la X borran como siempre. */
   agendaV2?: boolean
   onCancelarCita?: (id: string) => Promise<void>
+  /* B7c: los empalmes de una cita contra lo PINTADO en la rejilla. Sólo llega
+     con el interruptor encendido; sin él no se pregunta nada. Lo que no está
+     pintado lo dice el servidor con un 409 (ver `handleSave` de la página). */
+  buscarEmpalmes?: (cita: TramoCita) => Empalme[]
   medicos: Medico[]
   defaultMedicoId: string
   /* El horario de consulta, para el aviso de fuera de horario. Hasta ahora ese
@@ -436,6 +441,8 @@ export default function AppointmentModal({
      un booleano es lo que deja que el mismo estado sirva para el inicio y para
      el fin sin tener que volver a decidir cuál de los dos falló. */
   const [avisoHorario, setAvisoHorario] = useState<string | null>(null)
+  /* B7c: el aviso de empalme ya redactado y los ids que se aceptan con él. */
+  const [avisoEmpalme, setAvisoEmpalme] = useState<{ mensaje: string; ids: string[] } | null>(null)
 
   // F3-6: hook de consultorio activo (siempre disponible bajo el Provider).
   const { consultorioActivo, cambiarActivo } = useConsultorioActivo()
@@ -624,10 +631,38 @@ export default function AppointmentModal({
          ?? avisoFinFueraDeHorario(new Date(componerIso(fechaFin, horaFin)), horario))
     if (aviso) { setAvisoHorario(aviso); return }
 
+    await seguirTrasHorario()
+  }
+
+  /* B7c: los empalmes de lo que está en el formulario, con las reglas de P3 y
+     del PUT: en una EDICIÓN sólo si cambian el inicio, el fin o el médico, o
+     la cita vuelve a ocupar su hueco (editar las notas de una cita que ya
+     estaba empalmada no avisa). Todo el día y los estados que no ocupan, no. */
+  function empalmesDelFormulario(): Empalme[] {
+    if (!buscarEmpalmes || todoElDia || ESTADOS_SIN_EMPALME.includes(status) || !medicoId) return []
+    const inicio = new Date(componerIso(fecha, hora))
+    const fin    = new Date(componerIso(fechaFin, horaFin))
+    if (apt) {
+      const igual = inicio.getTime() === new Date(apt.start_time).getTime()
+        && fin.getTime() === new Date(apt.end_time).getTime()
+        && medicoId === apt.medico_id
+        && !ESTADOS_SIN_EMPALME.includes(apt.status) && !apt.all_day
+      if (igual) return []
+    }
+    return buscarEmpalmes({
+      id: apt?.id ?? '', medicoId, inicio, fin, todoElDia: false, noOcupa: false, deGoogle: false, titulo: '',
+    })
+  }
+
+  /* Después del aviso de horario, el de empalme: si aplican los dos salen
+     seguidos (P3). El modal sigue abierto detrás; «Cancelar» vuelve a él. */
+  async function seguirTrasHorario() {
+    const lista = empalmesDelFormulario()
+    if (lista.length) { setAvisoEmpalme({ mensaje: mensajeEmpalme(lista), ids: lista.map(e => e.id) }); return }
     await guardar()
   }
 
-  async function guardar() {
+  async function guardar(empalmesAceptados: string[] = []) {
     setSaving(true)
 
     // F3-6: enviar consultorio_id en creación SIEMPRE; en edición SOLO si cambió.
@@ -671,6 +706,8 @@ export default function AppointmentModal({
       medico_id:   medicoId || null,
       ...(consultorioChanged ? { consultorio_id: consultorioId } : {}),
       updated_at:  apt?.updated_at,
+      // B7c: sólo si se aceptó alguno; sin interruptor nunca viaja.
+      ...(empalmesAceptados.length ? { empalmes_aceptados: empalmesAceptados } : {}),
     })
     setSaving(false)
   }
@@ -1583,8 +1620,18 @@ export default function AppointmentModal({
     {avisoHorario && (
       <ConfirmModal
         message={avisoHorario}
-        onConfirm={() => { setAvisoHorario(null); void guardar() }}
+        onConfirm={() => { setAvisoHorario(null); void seguirTrasHorario() }}
         onCancel={() => setAvisoHorario(null)}
+      />
+    )}
+
+    {/* B7c: el aviso de empalme. Mismo patrón que el de horario: el modal se
+        queda detrás, y «Cancelar» vuelve al formulario para cambiar la hora. */}
+    {avisoEmpalme && (
+      <ConfirmModal
+        message={avisoEmpalme.mensaje}
+        onConfirm={() => { const ids = avisoEmpalme.ids; setAvisoEmpalme(null); void guardar(ids) }}
+        onCancel={() => setAvisoEmpalme(null)}
       />
     )}
 

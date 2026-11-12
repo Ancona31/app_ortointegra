@@ -383,7 +383,7 @@ export function crearGuardadoCitas({
           return
         }
         restaurarPosicion(arg)
-        toast.error(cuerpo?.message || cuerpo?.error || 'Error de conexión — se devolvió a su horario original')
+        toast.error(cuerpo ? (cuerpo.message || cuerpo.error || 'Error de conexión — se devolvió a su horario original') : 'Error desconocido')
         return
       }
       restaurarPosicion(arg)
@@ -459,7 +459,10 @@ export function crearGuardadoCitas({
     seguir()
   }
 
-  async function handleSave(data: DatosGuardado) {
+  /* `reintentoEmpalme`: el reenvío tras aceptar un 409 `empalme` (B7c). El
+     acuse optimista ya salió en el primer intento; repetirlo antes de saber si
+     el segundo entra sería anunciar un éxito que todavía no hay. */
+  async function handleSave(data: DatosGuardado, reintentoEmpalme = false) {
     const isEdit = !!data.id
     const api = calendarRef.current?.getApi()
 
@@ -474,7 +477,7 @@ export function crearGuardadoCitas({
        «actualizado») y acaba siendo dos frases escritas como una. Cuando la frase
        neutra sale natural, gana. Donde no —el botón de eliminar del modal, que es
        un control con etiqueta— sí se ramifica. */
-    toast.success(isEdit ? 'Cambios guardados' : 'Se agendó correctamente')
+    if (!reintentoEmpalme) toast.success(isEdit ? 'Cambios guardados' : 'Se agendó correctamente')
     if (!isEdit) setCitaCreada(true)
 
     let optimisticEvent: ReturnType<NonNullable<typeof api>['addEvent']> | null = null
@@ -539,12 +542,27 @@ export function crearGuardadoCitas({
       // Rollback: remover evento optimista y refrescar desde servidor
       if (optimisticEvent) optimisticEvent.remove()
       refetch()
-      const { error, message } = await res.json().catch(() => ({ error: 'Error desconocido' }))
-      toast.error(message || error || 'No se pudo guardar')
+      const cuerpo: CuerpoDeError = await res.json().catch(() => null)
+      /* B7c: un 409 `empalme` es lo que el modal no vio pintado (otra semana,
+         otro médico fuera del filtro, otra persona). Ya se deshizo lo
+         optimista; se pregunta y, si se acepta, se reenvía lo mismo con los
+         ids. El modal ya se cerró: «Cancelar» deja la agenda como estaba. */
+      if (res.status === 409 && cuerpo?.error === 'empalme' && esListaDeEmpalmes(cuerpo.empalmes)) {
+        const lista = cuerpo.empalmes
+        preguntarEmpalme(
+          lista,
+          () => { void handleSave({ ...data, empalmes_aceptados: unirAceptados(data.empalmes_aceptados ?? [], lista) }, true) },
+          () => toast.info('No se guardó: la agenda se quedó como estaba.'),
+        )
+        return
+      }
+      toast.error(cuerpo ? (cuerpo.message || cuerpo.error || 'No se pudo guardar') : 'Error desconocido')
       return
     }
 
     const json = await res.json()
+    // B7c: el reintento se acusa cuando de verdad entró (ver el parámetro).
+    if (reintentoEmpalme) toast.success(isEdit ? 'Cambios guardados' : 'Se agendó correctamente')
 
     if (isEdit && json.appointment) {
       aplicarAppointmentAlEvento(json.appointment)

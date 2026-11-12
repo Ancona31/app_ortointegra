@@ -49,6 +49,7 @@ import { useTiempoRealAgenda } from '@/app/(app)/agenda/useTiempoRealAgenda'
 import { useVentanaRejilla } from '@/app/(app)/agenda/useVentanaRejilla'
 import { useConteoVisible, usePanelDelMes, useResumenDelDia } from '@/app/(app)/agenda/useResumenVisible'
 import { crearGuardadoCitas, pacienteParaInvitacion } from '@/app/(app)/agenda/guardadoCitas'
+import { empalmesPintados } from '@/lib/agenda/empalmesCita'
 import { crearAltaCitas } from '@/app/(app)/agenda/altaCitas'
 import useSWR, { useSWRConfig } from 'swr'
 import {
@@ -1717,6 +1718,12 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
           onDelete={handleDelete}
           agendaV2={agendaV2}
           onCancelarCita={handleCancelar}
+          /* B7c: sólo con el interruptor encendido; lee lo pintado en el
+             momento de guardar, sin traer nada. */
+          buscarEmpalmes={agendaV2 ? (cita) => {
+            const api = calendarRef.current?.getApi()
+            return api ? empalmesPintados(cita, api.getEvents()) : []
+          } : undefined}
           medicos={medicos}
           horario={horario}
           defaultMedicoId={defaultMedicoId}

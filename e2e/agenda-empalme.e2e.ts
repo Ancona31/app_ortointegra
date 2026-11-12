@@ -1,7 +1,7 @@
 import { test, expect, type Page } from '@playwright/test'
 import {
   soloEscritorio, SESION, diaDeLaSemana, interruptorAgenda, sqlLocal, irAAgenda,
-  arrastrarEventoPorMinutos, redimensionarFinEvento,
+  arrastrarEventoPorMinutos, redimensionarFinEvento, modalCita, toastConTexto,
 } from './ayudas'
 import { fechaHoraLocalAInstante } from '../src/lib/dates'
 
@@ -295,4 +295,109 @@ test('rejilla apagado: arrastrar sobre otra cita no avisa y el PUT no lleva empa
   expect(res.request().postDataJSON()).not.toHaveProperty('empalmes_aceptados')
   await expect(page.getByRole('dialog', { name: /Se empalma/ })).toHaveCount(0)
   expect(horasEnBase(movida)).toBe('17:05-17:20')
+})
+
+/* ── El modal: alta y edición (B7c) ──────────────────────────────────────── */
+
+/** Abre el alta, elige al paciente y escribe el día y las dos horas. */
+async function rellenarAlta(page: Page, apellidos: string, fecha: string, desde: string, hasta: string): Promise<void> {
+  await page.locator('[data-onboard="nueva-cita"]').click()
+  await expect(modalCita(page, 'Nueva cita')).toBeVisible()
+  await page.getByPlaceholder('Buscar paciente por nombre o apellido...').fill(apellidos)
+  await page.getByRole('button', { name: new RegExp(`Paciente ${apellidos}`) }).click()
+  await page.locator('input[type="date"]').first().fill(fecha)
+  await page.locator('input[type="time"]').nth(0).fill(desde)
+  await page.locator('input[type="date"]').nth(1).fill(fecha)
+  await page.locator('input[type="time"]').nth(1).fill(hasta)
+}
+
+const esAlta = (r: { url(): string; request(): { method(): string } }) =>
+  r.url().endsWith('/api/appointments') && r.request().method() === 'POST'
+
+test('modal encendido: alta empalmada y fuera de horario da los dos avisos seguidos; Cancelar vuelve al formulario', async ({ page }) => {
+  interruptorAgenda('A', true)
+  await alta(page, 'Prueba 16', MARTES, '18:20', 20)
+  await abrir(page, 'encendida')
+  let altas = 0
+  page.on('request', r => { if (esAlta({ url: () => r.url(), request: () => r })) altas++ })
+
+  await rellenarAlta(page, 'Prueba 17', MARTES, '18:25', '18:45')
+  await page.getByRole('button', { name: 'Guardar' }).click()
+  const horario = aviso(page, /Vas a agendar a las 18:25/)
+  await expect(horario).toBeVisible()
+  await horario.getByRole('button', { name: 'Aceptar' }).click()
+  const empalme = aviso(page, /«Paciente Prueba 16» \(18:20–18:40\)/)
+  await expect(empalme).toBeVisible()
+  await empalme.getByRole('button', { name: 'Cancelar' }).click()
+  await expect(modalCita(page, 'Nueva cita')).toBeVisible()
+  expect(altas).toBe(0)
+
+  await page.getByRole('button', { name: 'Guardar' }).click()
+  await aviso(page, /Vas a agendar a las 18:25/).getByRole('button', { name: 'Aceptar' }).click()
+  const resp = page.waitForResponse(esAlta)
+  await aviso(page, /«Paciente Prueba 16»/).getByRole('button', { name: 'Aceptar' }).click()
+  const res = await resp
+  expect(res.ok()).toBeTruthy()
+  expect((res.request().postDataJSON() as { empalmes_aceptados?: string[] }).empalmes_aceptados?.length).toBeGreaterThan(0)
+  await expect(toastConTexto(page, 'Se agendó correctamente')).toBeVisible()
+  expect(citasDe('Prueba 17', MARTES, '18:25')).toBe(1)
+})
+
+test('modal encendido: lo que no está pintado lo detecta el servidor (alta en otra semana) y se pregunta igual', async ({ page }) => {
+  interruptorAgenda('A', true)
+  const lejos = diaDeLaSemana(3, 1)
+  await alta(page, 'Prueba 18', lejos, '14:05', 25)
+  await abrir(page, 'encendida')
+
+  await rellenarAlta(page, 'Prueba 19', lejos, '14:15', '14:45')
+  const primera = page.waitForResponse(esAlta)
+  await page.getByRole('button', { name: 'Guardar' }).click()
+  const r409 = await primera
+  expect(r409.status()).toBe(409)
+  const cuerpo = await r409.json() as { error: string; empalmes: { titulo: string }[] }
+  expect(cuerpo.error).toBe('empalme')
+  expect(cuerpo.empalmes.map(e => e.titulo)).toContain('Paciente Prueba 18')
+
+  const elAviso = aviso(page, /«Paciente Prueba 18» \(14:05–14:30\)/)
+  await expect(elAviso).toBeVisible()
+  const segunda = page.waitForResponse(esAlta)
+  await elAviso.getByRole('button', { name: 'Aceptar' }).click()
+  expect((await segunda).ok()).toBeTruthy()
+  expect(citasDe('Prueba 19', lejos, '14:15')).toBe(1)
+})
+
+test('modal encendido: editar sólo las notas de una cita empalmada no avisa; cambiarle la hora sí', async ({ page }) => {
+  interruptorAgenda('A', true)
+  await alta(page, 'Prueba 20', JUEVES, '17:35', 20)
+  await alta(page, 'Prueba 21', JUEVES, '17:40', 20)
+  await abrir(page, 'encendida')
+
+  await tarjeta(page, JUEVES, 'Prueba 21', '17:40').click()
+  await expect(modalCita(page, 'Editar cita')).toBeVisible()
+  await page.getByPlaceholder('Instrucciones, observaciones...').fill('Nota de prueba B7')
+  const resp = page.waitForResponse(r => r.request().method() === 'PUT' && r.url().includes('/api/appointments/'))
+  await page.getByRole('button', { name: 'Guardar' }).click()
+  const res = await resp
+  expect(res.ok()).toBeTruthy()
+  expect(res.request().postDataJSON()).not.toHaveProperty('empalmes_aceptados')
+  await expect(page.getByRole('dialog', { name: /Se empalma/ })).toHaveCount(0)
+
+  await tarjeta(page, JUEVES, 'Prueba 21', '17:40').click()
+  await expect(modalCita(page, 'Editar cita')).toBeVisible()
+  await page.locator('input[type="time"]').nth(0).fill('17:30')
+  await page.getByRole('button', { name: 'Guardar' }).click()
+  await expect(aviso(page, /«Paciente Prueba 20» \(17:35–17:55\)/)).toBeVisible()
+})
+
+test('modal apagado: un alta empalmada se guarda sin preguntar', async ({ page }) => {
+  await alta(page, 'Prueba 22', MARTES, '17:35', 20)
+  await abrir(page, 'apagada')
+
+  await rellenarAlta(page, 'Prueba 23', MARTES, '17:40', '17:55')
+  const resp = page.waitForResponse(esAlta)
+  await page.getByRole('button', { name: 'Guardar' }).click()
+  const res = await resp
+  expect(res.ok()).toBeTruthy()
+  expect(res.request().postDataJSON()).not.toHaveProperty('empalmes_aceptados')
+  await expect(page.getByRole('dialog', { name: /Se empalma/ })).toHaveCount(0)
 })

@@ -92,4 +92,7 @@ export type DatosGuardado = Partial<Appointment> & {
   id?: string
   all_day_desde?: string
   all_day_hasta?: string
+  /** B7: los ids de las citas con las que el usuario ACEPTÓ empalmarse. Sólo
+   *  viaja si hay alguno, y el servidor lo ignora con el interruptor apagado. */
+  empalmes_aceptados?: string[]
 }
