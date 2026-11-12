@@ -20,6 +20,19 @@ export function mensajeBloqueo(telefono: string | null): string {
     : 'Para agendar, comunícate con el consultorio.'
 }
 
+/**
+ * D11 · no se pudo comprobar la ocupación al día (la sincronización previa
+ * falló o tardó y la última buena es más vieja que la ventana tolerada).
+ * ⚠️ No dice por qué: ni que la clínica tiene Google ni qué falló. Texto
+ * PENDIENTE DE REVISIÓN (Angel).
+ */
+export function respuestaNoPorAhora(telefono: string | null): Respuesta {
+  const mensaje = telefono
+    ? `Por ahora no se puede reservar en línea. Para agendar, comunícate con el consultorio: ${telefono}.`
+    : 'Por ahora no se puede reservar en línea. Para agendar, comunícate con el consultorio.'
+  return { status: 503, cuerpo: { error: 'no_disponible_por_ahora', mensaje, telefono } }
+}
+
 /** El resultado de `reservar_por_enlace` (D3) traducido a HTTP. */
 export function respuestaReserva(resultado: string, telefono: string | null): Respuesta {
   switch (resultado) {

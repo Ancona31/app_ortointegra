@@ -7,10 +7,16 @@
  * que ser del enlace: uno de otra clínica o de otro médico es 400.
  * 404 uniforme para cualquier enlace que no abre; 410 si el único se usó o
  * caducó; 429 al pasar el límite por IP.
+ * D11 (decisión de Angel): antes de leer la ocupación, la sincronización
+ * incremental con Google si la última buena tiene más de 60 s
+ * (`sincronizarAntesDeReservar`). Si Google falla o tarda y la última buena
+ * tiene 30 min o más: 503 «no se puede reservar por ahora» con el teléfono.
  */
 import type { NextRequest } from 'next/server'
 import { TurnosQuerySchema } from '@/lib/reserva/esquemasReserva'
-import { abrirEnlace, noEncontrado, responder, respuestaEstado } from '@/lib/reserva/puertaReserva'
+import { abrirEnlace, noEncontrado, responder, respuestaEstado, telefonoDeContacto } from '@/lib/reserva/puertaReserva'
+import { respuestaNoPorAhora } from '@/lib/reserva/respuestasReserva'
+import { sincronizarAntesDeReservar } from '@/lib/reserva/sincronizarReserva'
 import { ocupacionDeEnlace } from '@/lib/reserva/servidorReserva'
 import { dentroDeLimites, ipDe, seudonimoRed } from '@/lib/reserva/limitesReserva'
 import { ocupacionSinEstado, primerDia, rangoDeConsulta, reglasDe, turnosDeDias } from '@/lib/reserva/turnosReserva'
@@ -38,6 +44,9 @@ export async function GET(req: NextRequest, ctx: RouteContext<'/api/reservar/[co
   const reglas = reglasDe(consultorio, enlace.ctx.clinica?.horario, tipo.duracion_min, enlace.ctx.ajustes)
   const desde = primerDia(q.data.desde, reglas.tz, ahora)
   const rango = rangoDeConsulta(desde, reglas.tz)
+  if (await sincronizarAntesDeReservar(enlace.ctx.clinica_id, 'turnos') === 'no_por_ahora') {
+    return responder(respuestaNoPorAhora(telefonoDeContacto(enlace.ctx, consultorio.id)))
+  }
   const ocupacion = await ocupacionDeEnlace(enlace.ctx, rango.desde, rango.hasta)
   if (!ocupacion) return responder({ status: 500, cuerpo: { error: 'no_disponible' } })
 
