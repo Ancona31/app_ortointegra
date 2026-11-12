@@ -2232,6 +2232,147 @@ archivos nuevos se importa todavía desde la agenda):
   `agendaV2`.
 - `data-cita-id` en las raíces de las tarjetas (superficie, F1.4).
 
+### Bloque F — decisiones tomadas en las interacciones
+
+Enchufe de las interacciones v2 (F3), worktree `-agenda-menores`, rama
+`feature/agenda-v2-fc`. Todas detrás del interruptor `agendaV2`; con el
+interruptor apagado cada gesto hace lo de hoy y no se descarga ningún chunk
+nuevo (comprobado en el build: el código de las capas sale en un chunk que no
+figura en el manifiesto de la página `/agenda`).
+
+**Carga y contrato**
+
+- **Un chunk, montado en ocioso.** `InteraccionesV2.tsx` (capas, atajos,
+  deslizar) y `HerramientasV2.tsx` (botones de la barra, minicalendario del
+  panel) se cargan con `next/dynamic` y se MONTAN sólo con v2 y tras
+  `enOcioso` (patrón de A2.6: el montaje es la precarga). Mientras no llegan,
+  `interaccionesRef.current` es `null` y el gesto abre el modal de siempre: un
+  clic en los primeros milisegundos tras abrir puede abrir el modal en vez de
+  la burbuja o la tarjeta. Se acepta (la opción que menos cambia); la raíz
+  publica `data-interacciones-v2="listas"` y las e2e lo esperan.
+- **`contratosV2.ts`, sólo tipos.** `ApiInteraccionesV2` (lo que `altaCitas` y
+  la barra piden al chunk) y las ampliaciones OPCIONALES que pertenecen a
+  archivos ajenos: `ModalState.create.horaFin`/`medicoId`,
+  `ModalState.edit.enfocar` y `cambiarEstadoCita`. El enchufe ya las manda o
+  las lee; funcionan en cuanto su dueño las aplique, sin tocar el enchufe.
+- **`eventInteractive` NO se pasa, y el diseño decía `eventInteractive={agendaV2}`.**
+  FullCalendar ya hace las citas enfocables y abribles con Enter cuando hay
+  `eventClick` (`getSegAnchorAttrs`, `@fullcalendar/core/internal-common.js:4483-4500`:
+  sin la opción, `Boolean(emitter.hasHandlers('eventClick'))`). Pasar
+  `agendaV2` habría QUITADO el teclado a las citas con el interruptor apagado.
+  La devolución del foco a la cita funciona sin la prop.
+- **`unselectCancel=".ag-capa"` siempre**, no sólo con v2: es un primitivo y sin
+  capas en pantalla no casa con nada.
+
+**Burbuja (F3.1)**
+
+- Va a la burbuja: la franja de la rejilla (clic o arrastre), la celda SUELTA
+  del Mes y el hueco del panel de Día. Siguen al modal: la banda de todo el día,
+  el arrastre por varios días del Mes, el botón «Agendar», la barra del
+  teléfono y el enlace profundo.
+- Desde una celda del Mes la burbuja abre con las horas en blanco (no se
+  inventa una, como el modal); al escribir el inicio se propone el fin con la
+  duración de por omisión, y mover el inicio conserva la duración.
+- El clic dispara `dateClick` y `select`: la segunda llamada encuentra la misma
+  burbuja (fecha y horas iguales) y no la vuelve a montar.
+- Al guardar: aviso de fuera de horario SÓLO si se tocaron las horas (el de la
+  apertura ya se preguntó en `abrirAlta`), después el de empalme contra lo
+  pintado (B7c) y después `handleSave`, que ya maneja el 409, el bloque
+  optimista y la invitación de Google. Decir que no a un aviso deja la burbuja
+  abierta como estaba.
+- Tocar dentro de OTRO diálogo modal (el aviso, su velo) no cierra la capa de
+  debajo (hallazgo del revisor: el velo de `ConfirmModal` es hermano del
+  diálogo, no su hijo).
+- El hueco del panel se ancla al botón si tiene el foco y, si no (Safari no
+  enfoca un botón al pulsarlo; hallazgo del revisor), al panel de Día entero.
+- «Más opciones» manda `horaFin` y `medicoId` al modal (`AperturaAltaV2`);
+  hasta que la superficie los aplique, el modal abre con la duración de por
+  omisión y el médico de siempre.
+
+**Tarjeta (F3.2)**
+
+- `abrirCita` sigue siendo la única puerta: la rejilla, el panel del Mes del
+  teléfono y el buscador pasan por ella. Google sigue sin abrir nada.
+- «Iniciar consulta» con las mismas condiciones del modal (`puedeIniciarConsulta`
+  en `accionesTarjeta.ts`, copia de `showIniciarConsulta`/`showLigarYConsultar`):
+  médico, su cita, su consultorio en su lista, con paciente o por ligar. Con
+  paciente: `cambiarActivo` y la nota con `?cita=`; por ligar: el modal (D7).
+- «Confirmar» sólo sale cuando `crearGuardadoCitas` devuelva
+  `cambiarEstadoCita`; mientras tanto la tarjeta no la ofrece (no se inventa una
+  segunda escritura de la cita fuera de `guardadoCitas.ts`).
+- «Cancelar» y «Eliminar» preguntan con `ConfirmModal`; «Eliminar» comprueba
+  otra vez que sea un evento sin paciente antes de `handleDelete` (dos puertas
+  al mismo daño; el servidor contesta 409 igual).
+- Cada acción cierra la tarjeta sin salida animada: lo que abre la tapa, y el
+  foco vuelve a la cita antes de que lo tome el modal o el aviso.
+- La hora que se lee es la VIVA del evento (tras un arrastre sin respuesta
+  todavía); al modal le llega la fila del evento, como hoy.
+- El WhatsApp de E7 (`BotonWhatsAppCita`) va en el hueco `extra` de la tarjeta,
+  con las condiciones del modal (cita agendada o confirmada, con paciente o por
+  ligar). Montarlo no emite nada. No hizo falta tocar ningún archivo ajeno.
+- Abierta desde el buscador, sin ancla: centrada en escritorio, hoja en el
+  teléfono.
+
+**Minicalendario (F3.3)**
+
+- En el panel de Día va como tarjeta propia («Calendario del mes»), la última,
+  en el hueco que la auditoría vio vacío (punto 4). Ranura `miniMes` en
+  `PanelDia`: sin ella el panel es el de siempre.
+- El desplegable de la barra es un diálogo modal (APG «Date Picker Dialog»):
+  el foco entra en el día activo, Escape cierra y el foco vuelve al botón. Al
+  elegir, `gotoDate`: la vista se conserva.
+- El rango visible viaja como cadena `'desde/hasta'` (`currentStart`/`currentEnd`,
+  no el `activeStart` con los días del mes anterior), escrita siempre en
+  `datesSet` porque el interruptor se resuelve después del primer `datesSet`.
+
+**Buscador (F3.6)**
+
+- Botón con lupa en la barra (y `/`, que pulsa ese botón: así el foco vuelve a
+  él al cerrar). Elegir una cita: si el filtro de médico la esconde, se cambia
+  al suyo; se va a su día en Día; y en cuanto la cita está pintada (hasta 6 s,
+  escuchando `eventsSet`) se abre su tarjeta por `abrirCita`. Si no llega, un
+  aviso.
+- **RLS comprobada, no supuesta.** En la base local (2026-11-12), como el médico
+  invitado: de 86 citas sobre cinco pacientes compartidos, 85 eran del otro
+  médico y ninguna le fue visible; tampoco las por ligar de otro médico. La
+  e2e del invitado lo vuelve a comprobar en la respuesta de PostgREST.
+- En el teléfono no hay lupa todavía: la banda es de la superficie (pedido).
+
+**Atajos (F3.5)**
+
+- Viven en el chunk, así que con el interruptor apagado no hay ni oyente.
+- La ayuda se abre con `?` y TAMBIÉN con un botón «Atajos de teclado» en la
+  barra: si alguien apaga los atajos, la única forma de volver a encenderlos no
+  puede ser un atajo (WCAG 2.1.4).
+- `aria-keyshortcuts` en los botones del enchufe (lupa `/`, ayuda `?`). Los de
+  Hoy, ‹ › y las vistas son de FullCalendar o de la superficie: pedido.
+
+**Deslizar (F3.7)**
+
+- Sólo en `listDay`/`listWeek` del teléfono; el oyente cuelga de la raíz
+  (`raizRef`, la única prop nueva en un nodo de `AgendaCliente`).
+
+**Copias deliberadas.** `colocar`, `hayOtroDialogoModal` y
+`useCerrarAlTocarFuera` existen en tres archivos (`BurbujaAlta`,
+`TarjetaLectura`, `HerramientasV2`). Con tres usos el protocolo 4 permite
+proponer el gancho compartido, pero crearlo pide el visto bueno de Angel.
+
+**Lo que queda en archivos ajenos** (el enchufe ya lo manda o lo lee; ver
+`contratosV2.ts`):
+
+- Superficie, `AppointmentModal.tsx`: `ModalState.create.horaFin` (y
+  `medicoId`), que `valoresInicialesDelModal` use en vez de `DEFAULT_DURATION`;
+  `ModalState.edit.enfocar: 'fecha'`, que lleve el foco al campo Fecha.
+- Superficie, `CabeceraEscritorio.tsx` y la banda del teléfono: ranuras
+  `selectorFecha` (junto a la fecha) y `buscar`, para sacar `HerramientasV2`
+  del hueco `porConfirmar`; `aria-keyshortcuts` en Hoy (`T`), ‹ › (`K P`/`J N`)
+  y las vistas (`D`/`S`/`M`), con `teclasDeAccion`.
+- Movimiento, `guardadoCitas.ts`: `cambiarEstadoCita(id, estado)` en el retorno
+  de `crearGuardadoCitas`, con el PUT, la firma y la auditoría de
+  `handleCancelar`. En cuanto exista, la tarjeta ofrece «Confirmar».
+- Dos e2e de `agenda-f-tarjeta` (Confirmar, Reagendar con foco) quedan en rojo
+  hasta esas dos piezas.
+
 ### Menores
 
 - **`ProximasCitas`:** tope de refresco de 2 minutos al volver a la pestaña,
