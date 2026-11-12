@@ -2473,6 +2473,42 @@ encontraba su evento) y los 20 pulsos caían fuera de la vista. Ahora pulsa
   para ganar a la de FullCalendar por especificidad y no por orden de carga; la
   e2e de la hora mide sólo las celdas con hora escrita.
 
+**Presupuesto de A al cerrar la superficie** (`MEDICION_ETIQUETA=F-superficie`,
+`playwright.medicion.config.ts`, medianas de 5; «base» es `e932f75` medido el
+mismo día en la misma máquina, porque el A2 del diseño es de otro día):
+
+| Medida | A2 | base | F (superficie) | F sin «Compactar» por omisión |
+|---|---|---|---|---|
+| Validaciones contra Auth | 2 | 2 | 2 | 2 |
+| Apertura en frío (ms) | 255 | 256 | 274 | 256 |
+| Red limitada (ms) | 712 | 717 | 743 | 728 |
+| Semana siguiente (ms) | 61 | 62 | 72 | 64 |
+| Semana anterior (ms) | 62 | 62 | 73 | 62 |
+| Semana ya vista (ms) | 50 | 48 | 64 | 50 |
+| Tras precarga (ms) | 48 | 47 | 55 | 48 |
+| Volver del dashboard (ms) | 71 | 72 | 82 | 71 |
+| Peticiones bloqueantes | 0 | 0 | 0 | 0 |
+| JS transferido (bytes) | 496 143 | 534 938 | 537 730 | 537 697 |
+
+- **⚠️ EMPEORA, Y LA CAUSA ESTÁ AISLADA: ES F1.5.** Con «Compactar» encendido
+  por omisión, la ventana de horas sigue a las citas de CADA semana (y la
+  semilla tiene una cirugía a las 07:00 sólo en la semana de hoy), así que al
+  navegar `slotMinTime` cambia y FullCalendar vuelve a pintar la rejilla entera
+  una segunda vez. Con F1.5 apagado (misma rama, una línea) todo vuelve a la
+  base dentro del ruido. Las consultas de contenedor de la tarjeta (F1.7) pesan
+  ~4 ms en navegación y se dejaron (medido sin ellas: 68/67/63/54/83).
+  **Decisión pendiente para el coordinador o Angel:** F1.5 está aprobado
+  (decisión 13) y el presupuesto dice «no empeorar»; no se pueden cumplir los
+  dos con la arquitectura de hoy. Se deja F1.5 puesto. Si se prefiere el
+  presupuesto, basta con que el `useState` de `compactar` en
+  `useVentanaRejilla.ts` arranque en `false`. En una clínica real (sin citas
+  fuera de horario cada semana) la ventana no cambia al navegar y el coste
+  desaparece.
+- **JS:** +2,8 KB sobre la base (con E ya integrado, la base ya pasa los +2 KB
+  del diseño sobre A2). Lo de la superficie es la barra plegable, la densidad,
+  la tableta, las ranuras de F3 y el import de `teclasDeAccion` (con él viaja
+  la tabla de atajos aunque el interruptor esté apagado).
+
 ### Menores
 
 - **`ProximasCitas`:** tope de refresco de 2 minutos al volver a la pestaña,
