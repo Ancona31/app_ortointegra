@@ -76,7 +76,7 @@ import {
 } from '@/lib/agenda/vistasAgenda'
 import { clasesDelEvento } from '@/lib/agenda/tarjetasAgenda'
 import { podarMarcas } from '@/lib/agenda/marcasMovimiento'
-import { esCambioDeFecha, fundirNavegacion, type MarcaDeVista } from '@/lib/agenda/movimientoAgenda'
+import { duracionMovimiento, esCambioDeFecha, fundirNavegacion, type MarcaDeVista } from '@/lib/agenda/movimientoAgenda'
 
 /* ═══ A2.6 · LOS TRES MODALES EN DIFERIDO ═════════════════════════════════
    `AppointmentModal` (el más grande: iconos, `Portal`, `QuickPatientModal`,
@@ -144,6 +144,10 @@ const UMBRAL_CARGA_MS = 150
    `UMBRAL_REFETCH_FOCO_MS` de `useTiempoRealAgenda.ts`, repetido a propósito
    (es local a ese gancho). */
 const UMBRAL_SONDEO_FOCO_MS = 120_000
+
+/* F2.7: la salida animada del modal de la cita, apagada hasta que
+   `AppointmentModal` acepte `saliendo` (ver la nota junto a `closeModal`). */
+const SALIDA_DEL_MODAL: boolean = false
 
 /* ─── Página principal ─────────────────────────────────── */
 
@@ -472,7 +476,34 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
     return () => window.removeEventListener('resize', check)
   }, [])
 
-  function closeModal() { setModal({ mode: 'closed' }) }
+  /* ── F2.7 · LA SALIDA DEL MODAL DE LA CITA ─────────────────────────────
+     `modal` sigue siendo la ÚNICA verdad de si está abierto: se cierra al
+     instante, como siempre, y todo lo que mira `modal.mode` no se entera.
+     Lo que dura `--ag-dur-base` es sólo el PINTADO: `modalSaliente` guarda el
+     que se va para que siga montado, con `saliendo`, mientras se desvanece
+     (CSS `.ag-modal-panel[data-estado="saliendo"]`). Si se abre otro antes de
+     que acabe, manda el nuevo y el temporizador no toca nada que no sea suyo.
+     Con movimiento reducido la espera es 0 y se desmonta como antes.
+
+     ⚠️ APAGADO HASTA INTEGRAR EL CAMBIO DE `AppointmentModal` (es de otro
+     agente): el modal tiene que recibir `saliendo`, poner `data-estado` en el
+     panel y en el velo, e `inert` en su raíz. Sin eso seguiría montado
+     180 ms SIN animar y, peor, pulsable: un segundo «Guardar» crearía otra
+     cita. Al integrarlo: `SALIDA_DEL_MODAL = true` y
+     `saliendo={modal.mode === 'closed'}` en el JSX del modal. */
+  const [modalSaliente, setModalSaliente] = useState<ModalState | null>(null)
+
+  function closeModal() {
+    const espera = SALIDA_DEL_MODAL && modal.mode !== 'closed' ? duracionMovimiento('--ag-dur-base') : 0
+    if (espera > 0) {
+      const saliente = modal
+      setModalSaliente(saliente)
+      setTimeout(() => setModalSaliente(m => (m === saliente ? null : m)), espera)
+    }
+    setModal({ mode: 'closed' })
+  }
+  /** Lo que se pinta: el abierto, o el que está saliendo. */
+  const modalPintado: ModalState = modal.mode !== 'closed' ? modal : (modalSaliente ?? modal)
 
   const {
     eventSourcesStable, refetch, alEmpezarGesto, alTerminarGesto, programarPrecarga, ultimaTraidaRef,
@@ -1695,7 +1726,7 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
       )}
 
       {/* ── Modal cita ──────────────────────────────────── */}
-      {modal.mode !== 'closed' && (
+      {modalPintado.mode !== 'closed' && (
         <AppointmentModal
           /* ⚠️ LA `key` NO ES DECORATIVA: ES EL MECANISMO DE RESETEO.
              Cambiar de cita a evento en el alta cambia esta clave, React tira el
@@ -1722,8 +1753,8 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
              estado, y eso desarma el mecanismo entero por un caso de borde
              —teclear la hora ANTES de cambiar de tipo— que además avisa solo,
              porque el campo se ve vacío. */
-          key={modal.mode === 'create' ? modal.tipo : modal.appointment.id}
-          modal={modal}
+          key={modalPintado.mode === 'create' ? modalPintado.tipo : modalPintado.appointment.id}
+          modal={modalPintado}
           onClose={closeModal}
           onSave={handleSave}
           onDelete={handleDelete}

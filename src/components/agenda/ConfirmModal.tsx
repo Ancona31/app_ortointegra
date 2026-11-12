@@ -23,7 +23,12 @@ export default function ConfirmModal({ message, onConfirm, onCancel }: {
   return (
     <Portal>
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onCancel} />
+      {/* Bloque F (F2.7): `ag-modal-velo` y `ag-modal-panel` y no
+          `animate-modal-enter`, que es de toda la app (220 ms, `scale(.94)`,
+          curva propia): fuera de la escala de la agenda. Entrada con fundido y
+          6 px; SIN salida animada (decisión 17: sólo el modal de la cita la
+          tiene). Las dos clases ya están en el bloque de movimiento reducido. */}
+      <div className="ag-modal-velo absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onCancel} />
       {/* ⚠️ `aria-alertdialog` NO: el rol correcto para una confirmación es
           `alertdialog`, pero exige `aria-describedby` apuntando al mensaje y
           `role="dialog"` con el mensaje como NOMBRE hace exactamente lo que
@@ -36,7 +41,7 @@ export default function ConfirmModal({ message, onConfirm, onCancel }: {
         aria-modal="true"
         aria-labelledby={mensajeId}
         tabIndex={-1}
-        className="relative focus:outline-none bg-white rounded-2xl shadow-2xl w-full max-w-sm animate-modal-enter p-6"
+        className="ag-modal-panel relative focus:outline-none bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6"
       >
         <p id={mensajeId} className="text-sm text-[#1d1d1f] leading-relaxed">{message}</p>
         <div className="flex justify-end gap-2 mt-5">

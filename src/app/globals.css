@@ -3636,6 +3636,53 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
 }
 
 /* ══════════════════════════════════════════════════════════════════════
+   MODALES DE LA AGENDA — bloque F (F2.7)
+   ══════════════════════════════════════════════════════════════════════
+   Clases propias y NO `animate-modal-enter`, que es de toda la app (220 ms,
+   `scale(.94)`, curva propia): fuera de la escala y con escalado. Contrato de
+   F0: `.ag-modal-panel` (el panel) y `.ag-modal-velo` (el fondo), los dos ya
+   en el bloque de movimiento reducido de arriba (se pintan en `body`, fuera
+   de `.fc`).
+   · Entrada: el panel sube 6 px con fundido en `--ag-dur-lento`
+     (`--ag-ease-out`); el velo se oscurece a la vez, en el mismo tiempo.
+   · Salida (`[data-estado="saliendo"]`): el panel baja 6 px y se desvanece en
+     `--ag-dur-base` (`--ag-ease-in`), el velo se aclara a la vez. Sólo la
+     tiene el modal de la cita (decisión 17); la sostiene `AgendaCliente`
+     (estado `modalSaliente`), que lo deja montado `--ag-dur-base` ms.
+   ⚠️ MIENTRAS SALE NO SE PUEDE PULSAR: `pointer-events: none` aquí, y el
+   modal pone además `inert` en su raíz, porque los punteros no cortan el
+   teclado y un Enter sobre «Guardar» volvería a guardar.
+   ⚠️ `backwards` en la entrada, por lo de `pageEnter`: un `transform`
+   retenido haría del panel el bloque contenedor de lo `fixed` de dentro.
+   La salida sí retiene (`forwards`): el nodo se desmonta al acabar. */
+@keyframes ag-modal-entra {
+  from { opacity: 0; transform: translateY(6px); }
+}
+@keyframes ag-modal-sale {
+  to { opacity: 0; transform: translateY(6px); }
+}
+@keyframes ag-modal-velo-entra {
+  from { opacity: 0; }
+}
+@keyframes ag-modal-velo-sale {
+  to { opacity: 0; }
+}
+.ag-modal-panel {
+  animation: ag-modal-entra var(--ag-dur-lento) var(--ag-ease-out) backwards;
+}
+.ag-modal-velo {
+  animation: ag-modal-velo-entra var(--ag-dur-lento) var(--ag-ease-out) backwards;
+}
+.ag-modal-panel[data-estado="saliendo"] {
+  animation: ag-modal-sale var(--ag-dur-base) var(--ag-ease-in) forwards;
+  pointer-events: none;
+}
+.ag-modal-velo[data-estado="saliendo"] {
+  animation: ag-modal-velo-sale var(--ag-dur-base) var(--ag-ease-in) forwards;
+  pointer-events: none;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
    TARJETA DE EVENTO DE SEMANA/DÍA (`.ag-tarjeta`) — bloque 3A
    ══════════════════════════════════════════════════════════════════════
    La caja de `MemoizedEventContent`, que antes vivía entera en estilos en
