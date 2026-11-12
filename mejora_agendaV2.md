@@ -725,11 +725,21 @@ reducido.
 
 ## 7. Lo que le toca a Angel
 
+Al día con el cierre del proyecto (2026-11-12). Guía para levantarlo todo en
+local: `GUIA_AUDITORIA_AGENDA_V2.md`. Auditoría del conjunto de migraciones:
+`supabase/AUDITORIA-CONJUNTO-AGENDA-V2.md`. Lo que no se pudo probar: §10.
+
 | Momento | Qué |
 |---|---|
 | Durante el proyecto | Nada obligatorio: los reportes de bloque son informativos |
-| Al final, en local | Auditar con lo que se entrega: conjunto de migraciones con sus auditorías, datos inventados sembrados, guía corta para levantar todo, sección «Decisiones para la auditoría final» y lista de lo que no se pudo probar en local |
-| Después de auditar | `select version()` en producción; aplicar el conjunto de migraciones; prueba con cuenta real de Google; variables, `CRON_SECRET` y tareas programadas en Vercel; revisar el texto legal del consentimiento y de los correos; encender el interruptor por clínica |
+| Al final, en local | Auditar con lo que se entrega: el conjunto de 16 migraciones con sus auditorías (cabeceras y `supabase/AUDITORIA-CONJUNTO-AGENDA-V2.md`), datos inventados sembrados (`scripts/agenda-semilla.ts`), la guía corta, §6-bis y §10. Decidir las propuestas de dimensión nueva para `AUDITORIA-MIGRACIONES.md` (§6-bis, «Cierre del proyecto»; no se tocó el archivo) |
+| Decisiones pendientes | **F1.5** `COMPACTAR_AL_ABRIR` (`src/lib/agenda/ventanaRejilla.ts`, hoy `false`; ver §6-bis «F1.5»); **S3**: quedarse con la puerta que lee `pg_proc` (C1) o la copia con huella; las «NO aplicado, para revisar por Angel» de las auditorías de E1, E4, E6 y D11 (cabeceras y §6-bis); si E9 debe cerrar la clínica suspendida también dentro de la función (H4); el plazo de conservación del historial del candado (propuesto 12 meses) |
+| Antes de aplicar | `select version()` en producción (≥ 14). Comprobar que producción tiene las 5 migraciones de `main` y decidir el orden con `feature/limites-ajustables` (sus `20261014*` van antes por fecha; al fusionar las dos, añadir las 30 funciones cerradas del proyecto a la lista fija del caso 3 de `p1_permisos_funciones.sql`; el resto de `p1`, `p1b`, `p2` y `p3` pasan con el conjunto combinado: hallazgo H2 de la auditoría del conjunto) |
+| Aplicar | **Antes de desplegar el código** (los dos órdenes son seguros, pero con el código primero cada petición deja un `warn` en el log: hallazgo H3). El conjunto, en orden de nombre de archivo, uno por uno, mirando la rejilla final de cada uno (todas las filas OK). Después, la línea `-- ESTADO · PRODUCCIÓN` de cada archivo con fecha y comprobación (`AUDITORIA-MIGRACIONES.md` §7) |
+| Vercel | Variables `RESERVA_SECRETO`, `EMAIL_TRANSPORT=resend`, `CRON_SECRET` (las tareas de `vercel.json` se activan con el despliegue y sin `CRON_SECRET` contestan 401); `AGENDA_RSVP_GOOGLE` sólo tras la prueba de RSVP |
+| Google real | Prueba con cuenta real: ida y vuelta (C), sincronización antes de reservar (D11), RSVP (E9). Cerrar o no LP-DT-6. Antes de encender: revisar el panel de auditoría (C-h, `user_id='system'`) |
+| Texto legal | Revisar el aviso de la reserva (D9) y aprobar su hash; revisar los textos PENDIENTE DE REVISIÓN (lista en §10); decidir si el consentimiento de los pacientes existentes cubre recordatorios y WhatsApp |
+| Encender | El interruptor por clínica (`agenda_ajustes.agenda_v2_encendida`, por SQL como `postgres`; guía §5), primero en una clínica |
 | Al final | `git merge` local sobre `main` |
 
 ---
@@ -3496,6 +3506,12 @@ primero sin marcar.
     Después, la base se dejó otra vez con las 21 y sembrada (con D11
     corregida), y se repitió todo: SQL 17, Vitest 1684, Playwright 244 pasan y
     0 fallan (204/37/3), las dos carreras en verde, lint 96.
+  - **Paso 6 · entregables**: `GUIA_AUDITORIA_AGENDA_V2.md` (raíz: requisitos,
+    base desde cero, variables, `next start`/Google falso, interruptor,
+    cuentas, Mailpit, baterías, capturas de F); §7 al día con los pasos de
+    Angel; §10 nueva, «Lo que no se pudo probar en local», consolidando §8,
+    §9 y §6-bis, con la lista de textos PENDIENTE DE REVISIÓN (grep en
+    `src/`).
 
 **Bitácora** (una línea por sesión: fecha, qué quedó hecho, qué quedó a medias):
 
@@ -3512,3 +3528,87 @@ primero sin marcar.
   interacciones; herramientas v2 en sus ranuras, la batería entera en verde
   (239), sesión de «Compactar» y F1.5 apagado a la espera de Angel; capturas,
   vídeos, cuadros y comparativa. Push: lo hace el coordinador.
+
+---
+
+## 10. Lo que no se pudo probar en local
+
+Consolidado de todos los bloques (§8, §9 y las subsecciones de §6-bis), al
+cierre del proyecto. Todo lo demás se probó contra la base local de Docker,
+el Google falso y Mailpit (cifras en §9, «Cierre del proyecto»). Ninguno de
+estos puntos se puede cerrar desde aquí sin romper las reglas de §6 (nada
+contra producción, Google real, correo real ni Vercel).
+
+**Producción y base**
+- `select version()` en producción (≥ 14; las migraciones usan `CREATE OR
+  REPLACE TRIGGER`). Lo corre Angel antes de aplicar el conjunto.
+- Que el esquema de producción coincida con el del repo (§8). Las migraciones
+  se protegen solas donde dependen de un cuerpo ajeno: C1 evalúa la puerta S3
+  contra la base antes del `COMMIT` y aborta si `clinica_tiene_acceso()` o
+  `clinica_no_suspendida()` tienen otra forma; E1 y E6 exigen el md5 de
+  `clinica_no_suspendida()`. Si abortan en producción, no se adivina: se
+  revisa C1/E1 contra la definición real.
+- El conjunto aplicado por el SQL Editor de Supabase (aquí se aplicó con
+  `supabase db reset --local`, CLI 2.117.0, y archivo a archivo con `psql`).
+  La rejilla de cada archivo se vio con `psql`, no con el SQL Editor.
+- Volumen real: los bloqueos y tiempos se midieron con la semilla (≈365
+  citas; 30 000 en A1.8). Con el volumen de producción que cita la cabecera
+  de A1.8 (~154 citas, dato de noviembre sin volver a medir) deberían ser
+  instantáneos.
+
+**Google**
+- Cualquier cosa contra una cuenta real: OAuth, refresco del token dentro del
+  tope de 4 s de D11, cuotas, latencias y errores reales, el `syncToken` real
+  y el 410 real (el falso los imita; 410 y paginación sólo en Vitest/SQL).
+- Que un RSVP llegue por `syncToken` (E9, detrás de `AGENDA_RSVP_GOOGLE`,
+  apagado). No se escribió `scripts/gcal-rsvp-humo.ts`.
+- Que `calendar.app.created` siga siendo un permiso no sensible (§8).
+- LP-DT-6 (sincronización de ida y vuelta) sigue abierta hasta esa prueba; el
+  texto «en tiempo real» sigue prohibido (sin webhook).
+- El hueco de C: un evento creado por Spinus antes de v2 sin
+  `google_event_id` guardado se importaría como evento de Google.
+
+**Correo**
+- Envío real por Resend (`EMAIL_TRANSPORT=resend`): comprobante, recordatorio
+  y aviso de cancelación sólo se vieron en Mailpit. Entregabilidad, SPF/DKIM
+  y el 409 de idempotencia de Resend real, sin probar.
+
+**Vercel**
+- Variables (`RESERVA_SECRETO`, `EMAIL_TRANSPORT=resend`, `CRON_SECRET`; y,
+  cuando toque, `AGENDA_RSVP_GOOGLE`) y las dos tareas de `vercel.json`
+  (`/api/cron/google-sync` cada 10 min, `/api/cron/recordatorios` cada 15).
+  Las tareas se activan solas con el primer despliegue de producción que
+  lleve `vercel.json`; sin `CRON_SECRET` responden 401 y no hacen nada.
+- Una pasada abortada por Vercel (que su `soltar` llegue antes de que congelen
+  la función; si no, el candado caduca a los 30 s en D11 y a los 90 s en el
+  cron) y el `after()` de las rutas en el entorno real.
+- Ninguna Preview: las rutas públicas nuevas (`/reservar`, `/confirmar`, las
+  dos de `/api/cron`) no se han visto detrás del dominio real ni de su HTTPS.
+
+**Texto legal y cumplimiento**
+- El aviso de privacidad de la reserva (D9) está **PENDIENTE DE REVISIÓN
+  LEGAL**: el enlace de reserva no abre en producción hasta que Angel quite
+  la marca, lo revise contra la LFPDPPP vigente y apruebe su hash
+  (`npx tsx scripts/aviso-reserva-hash.ts`).
+- Textos **PENDIENTE DE REVISIÓN** (grep `PENDIENTE DE REVISI` en `src/`):
+  `src/lib/reserva/avisoReserva.ts` (aviso, legal),
+  `src/lib/reserva/correosReserva.ts` (comprobante),
+  `src/lib/reserva/respuestasReserva.ts` (respuestas de la API pública),
+  `src/app/reservar/[codigo]/ReservaCliente.tsx` (texto de la página),
+  `src/lib/confirmacion/correosCita.ts` (recordatorio y comprobante con
+  enlace), `src/lib/confirmacion/vistaConfirmacion.ts` (página de
+  confirmación), `src/app/confirmar/[codigo]/page.tsx` («Elegir otro
+  horario»), `src/lib/agenda/whatsappCita.ts` (mensaje de WhatsApp).
+- Consentimiento de los pacientes **existentes** para recibir recordatorios
+  por correo y avisos por WhatsApp (LFPDPPP 2025): no está claro que lo cubra
+  el consentimiento que firmaron.
+- Plazo de conservación del historial del candado (propuesto 12 meses, sin
+  purga automática).
+
+**Interfaz**
+- Rendimiento en un teléfono y una tableta reales (todo fue Chromium
+  emulado, también el arrastre táctil y el deslizar).
+- Lectores de pantalla reales sobre las capas v2.
+- La batería A1-bis instrumentada (`e2e/playwright.a1bis.config.ts`) no se
+  volvió a correr tras F.
+- F1.5 («Compactar» al abrir) con datos de una clínica real.
