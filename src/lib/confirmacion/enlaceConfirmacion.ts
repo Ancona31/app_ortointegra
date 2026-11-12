@@ -149,8 +149,8 @@ export async function emitirEnlaceConfirmacion(clinicaId: string, citaId: string
 
 /**
  * Lo que la página enseña de un código, o null (mala forma, sin secreto,
- * inexistente, revocado, interruptor apagado, el paciente de la cita cambió,
- * RPC ausente o error). NO escribe nada: la base la declara STABLE.
+ * inexistente, revocado, interruptor apagado, clínica suspendida, el paciente
+ * de la cita cambió, RPC ausente o error). NO escribe nada: la base la declara STABLE.
  */
 export async function resolverEnlaceConfirmacion(codigo: string): Promise<ContextoConfirmacion | null> {
   if (!secretoDisponible() || !esCodigoDeEnlace(codigo)) return null
@@ -165,7 +165,8 @@ export async function resolverEnlaceConfirmacion(codigo: string): Promise<Contex
 /**
  * La respuesta del paciente: SÓLO desde un POST (nunca al abrir el enlace).
  * `ctx` sale de `resolverEnlaceConfirmacion`. null si la RPC falla o falta;
- * la base decide plazos y transiciones y deja la auditoría (`via` =
+ * la base decide plazos y transiciones (y da `invalido` si la clínica se
+ * suspendió entre la lectura y el POST) y deja la auditoría (`via` =
  * `enlace_paciente`).
  */
 export async function responderEnlaceConfirmacion(ctx: ContextoConfirmacion, accion: AccionConfirmacion): Promise<RespuestaConfirmacion | null> {

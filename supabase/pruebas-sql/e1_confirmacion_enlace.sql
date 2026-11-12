@@ -275,12 +275,43 @@ begin
   -- Degradada: emitir no, pero responder sí (lista A, 9).
   v_h := pg_temp.sembrar('00000000-0000-4000-8000-0000000e1020', '00000000-0000-4000-8000-000000e1c002', '00000000-0000-4000-8000-000000e1a020', '00000000-0000-4000-8000-000000e1f009');
   perform pg_temp.esperar('caso 4 degradada responde', pg_temp.r('00000000-0000-4000-8000-000000e1c002', v_h, 'confirmar'), 'confirmada');
-  -- Suspendida: tampoco emite, y la respuesta sigue funcionando, como el UPDATE del
-  -- personal (appointments_update no mira la suspensión; lista A, 9). Decisión que la
-  -- auditoría señaló (hallazgo 1) y se mantuvo: esta prueba la fija.
+  -- Suspendida: no emite, y desde el cierre por la auditoría (hallazgo 1) tampoco
+  -- enseña ni responde: «no disponible», lo mismo que un enlace que no existe.
   v_h := pg_temp.sembrar('00000000-0000-4000-8000-0000000e1040', '00000000-0000-4000-8000-000000e1c004', '00000000-0000-4000-8000-000000e1a040', '00000000-0000-4000-8000-000000e1f007');
-  perform pg_temp.esperar('caso 4 suspendida contexto', pg_temp.ctx(v_h) ->> 'estado', 'agendada');
-  perform pg_temp.esperar('caso 4 suspendida responde', pg_temp.r('00000000-0000-4000-8000-000000e1c004', v_h, 'cancelar'), 'cancelada');
+  perform pg_temp.esperar('caso 4 suspendida contexto', coalesce(pg_temp.ctx(v_h)::text, 'NULL'), 'NULL');
+  perform pg_temp.esperar('caso 4 suspendida confirmar', pg_temp.r('00000000-0000-4000-8000-000000e1c004', v_h, 'confirmar'), 'invalido');
+  perform pg_temp.esperar('caso 4 suspendida cancelar', pg_temp.r('00000000-0000-4000-8000-000000e1c004', v_h, 'cancelar'), 'invalido');
+  perform pg_temp.esperar('caso 4 suspendida intacta',
+    (select a.status || '/' || coalesce(c.respuesta, 'NULL') from public.appointments a
+       join public.cita_confirmaciones c on c.appointment_id = a.id
+      where a.id = '00000000-0000-4000-8000-000000e1a040'), 'scheduled/NULL');
+  -- Al levantar la suspensión, el mismo enlace vuelve a valer (no se revocó nada).
+  update public.clinicas set suspendida = false where id = '00000000-0000-4000-8000-000000e1c004';
+  perform pg_temp.esperar('caso 4 reabierta contexto', pg_temp.ctx(v_h) ->> 'estado', 'agendada');
+  update public.clinicas set suspendida = true where id = '00000000-0000-4000-8000-000000e1c004';
+  perform pg_temp.esperar('caso 4 vuelta a suspender', coalesce(pg_temp.ctx(v_h)::text, 'NULL'), 'NULL');
+end $$;
+
+-- ── Caso 4b: el cierre por clínica dice lo mismo que clinica_no_suspendida() ──
+-- Para cada clínica (con la sesión de su administrador, la original; con su id,
+-- el predicado que copian contexto y responder).
+do $$
+declare v record; v_orig boolean;
+begin
+  for v in select * from (values
+      ('00000000-0000-4000-8000-000000e1b001'::uuid, '00000000-0000-4000-8000-000000e1c001'::uuid),
+      ('00000000-0000-4000-8000-000000e1b009'::uuid, '00000000-0000-4000-8000-000000e1c002'::uuid),
+      ('00000000-0000-4000-8000-000000e1b008'::uuid, '00000000-0000-4000-8000-000000e1c003'::uuid),
+      ('00000000-0000-4000-8000-000000e1b007'::uuid, '00000000-0000-4000-8000-000000e1c004'::uuid)) t(usuario, clinica) loop
+    perform pg_temp.como(v.usuario);
+    set local role authenticated;
+    v_orig := public.clinica_no_suspendida();
+    reset role;
+    perform pg_temp.esperar('caso 4b ' || v.clinica,
+      exists (select 1 from public.clinicas k where k.id = v.clinica and not k.suspendida)::text, v_orig::text);
+  end loop;
+  perform pg_temp.esperar('caso 4b la suspendida es la única cerrada', (select string_agg(id::text, ',') from public.clinicas
+                            where id::text like '00000000-0000-4000-8000-000000e1c00%' and suspendida), '00000000-0000-4000-8000-000000e1c004');
 end $$;
 
 -- ── Caso 5: transiciones de responder ─────────────────────────────────

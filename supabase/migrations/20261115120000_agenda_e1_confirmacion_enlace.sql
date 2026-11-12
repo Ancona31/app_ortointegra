@@ -27,6 +27,9 @@
 --   Comprobación:
 --     select md5(prosrc) from pg_proc where oid = 'public.log_cita_change()'::regprocedure;
 --   → 80c3556c1655ddf2eaf1d57995190463.
+--   ⚠️ LO DE ARRIBA ES LA PRIMERA APLICACIÓN (2026-11-12). El archivo se
+--   EDITÓ después (2026-11-13, ver «CIERRE DE LA SUSPENDIDA» abajo) y se
+--   volvió a aplicar en local: ver «SEGUNDA APLICACIÓN».
 -- ESTADO · PRODUCCIÓN: PENDIENTE DE APLICAR (después de B0, B1, C1, C2, D1 y D2).
 -- AUDITORÍA INDEPENDIENTE 2026-11-12: APTA CON CAMBIOS
 -- (supabase/AUDITORIA-MIGRACIONES.md). Aplicado antes del commit:
@@ -47,6 +50,45 @@
 --     pruebas de Vitest (src/lib/tests/confirmacionEnlace.test.ts).
 --   Sin calificar, como en B0-D4: cómo envuelve el SQL Editor un BEGIN/COMMIT
 --   explícito. Sin dimensión nueva para AUDITORIA-MIGRACIONES.md.
+-- CIERRE DE LA SUSPENDIDA (2026-11-13, por la auditoría; manda sobre el
+--   «NO aplicado» del hallazgo 1 de arriba, que se deja como constancia):
+--   contexto devuelve NULL y responder 'invalido' si la clínica está
+--   suspendida: es clinica_no_suspendida() evaluada con la clínica del enlace
+--   (`EXISTS clinicas k WHERE k.id = … AND NOT k.suspendida`; la clínica que
+--   no existe, cerrada, como el coalesce(…, false) de la original). Para el
+--   paciente es lo mismo que un enlace que no existe (404). Copia del
+--   predicado, no lectura de pg_proc como C1: es una columna, y la prueba
+--   (caso 4b) comprueba que da lo mismo que clinica_no_suspendida() en cada
+--   clínica de la prueba; el caso 4, que contexto y responder cierran. Lo
+--   degradado NO se cierra (lista A 9 sigue para la degradada: el UPDATE del
+--   personal tampoco mira el acceso). Pre-vuelo: exige clinicas.suspendida
+--   boolean NOT NULL, SELECT de service_role en clinicas y que
+--   clinica_no_suspendida() siga siendo la copiada (md5 normalizado). Rejilla:
+--   fila 9 nueva, md5 de los dos cuerpos (el censo pasa a la 10). El
+--   reagendar de E6 (migración 20261115130000, se audita aparte) lleva el
+--   mismo cierre.
+--   Re-auditoría independiente 2026-11-13: APTA. Aplicados sus tres
+--   hallazgos leves (huella de la original en el pre-vuelo, fila 9 por md5 y
+--   no por texto, cabecera). No aplicado (4, aceptado por el auditor): una
+--   suspensión que se confirme entre la lectura de clinicas y el UPDATE de
+--   responder no se ve, igual que en el UPDATE del personal (READ COMMITTED).
+--   Señalado para E9: gcal_aplicar_evento no mira la suspensión; si el RSVP
+--   responde por ahí, necesitará el mismo cierre.
+-- SEGUNDA APLICACIÓN · LOCAL: APLICADA Y VERIFICADA — 2026-11-13. El archivo
+--   completo sobre la base que ya tenía la primera (rejilla: 9 × OK + 1 INFO,
+--   0 / 0 / 0; sólo cambian los cuerpos de contexto y responder, CREATE OR
+--   REPLACE), y otra pasada encima: misma rejilla, sólo los 4 NOTICE «already
+--   exists, skipping», y la huella de catálogo de 129 renglones sin
+--   diferencias. Pre-vuelo nuevo probado en ROLLBACK (aborta con
+--   suspendida sin NOT NULL, sin SELECT de service_role en clinicas y con
+--   clinica_no_suspendida() alterada). Repetido tras la re-auditoría. Fila de
+--   supabase_migrations.schema_migrations (20261115120000) borrada y vuelta a
+--   anotar con las 38 sentencias de este archivo. Pruebas: e1_confirmacion_enlace.sql
+--   (casos 4 y 4b) y confirmacion-carrera.sh, en verde.
+--   Comprobación:
+--     select proname, md5(prosrc) from pg_proc
+--      where proname in ('cita_confirmacion_contexto', 'cita_confirmacion_responder') order by 1;
+--   → 2fca66ffb8ea3b15eb7d0224c90a4f1a / 7961e24a4f9f7bda0ce2df744f5b46aa.
 --
 -- ═══ EL PORQUÉ ═════════════════════════════════════════════════════════
 -- mejora_agendaV2.md §2 («Confirmación de asistencia», «Cancelación por el
@@ -83,6 +125,7 @@
 --   scheduled|confirmed→cancelled; nada sobre attended/no_show; nunca
 --   reactiva. updated_at = esa hora («gana el último», bloque C). La
 --   cancelación dispara reserva_registrar_incidencia (D2) igual que hoy.
+--   Con la clínica suspendida, ni contexto ni respuesta (ver CIERRE arriba).
 -- AUDITORÍA: log_cita_change es la de C2 con UNA diferencia: «via» deja de
 --   ser sólo 'google' y pasa a una lista blanca de literales, SÓLO sin
 --   auth.uid(): 'google' (C2), 'enlace_paciente' (E1 y el reagendar de E6:
@@ -153,6 +196,8 @@ DECLARE
   -- md5(prosrc) de log_cita_change: el cuerpo de C2 y el de esta migración.
   c_log_c2  CONSTANT text := 'e57358a132ad89fc94c4df136c40f65f';
   c_log_e1  CONSTANT text := '80c3556c1655ddf2eaf1d57995190463';
+  -- md5(prosrc con espacios normalizados) de clinica_no_suspendida(), la que se copia.
+  c_no_susp CONSTANT text := '588de29d551f6d474eb24346748e1148';
   -- Huella de constraints e índices de cita_confirmaciones tal como los deja
   -- esta migración (md5 de sus definiciones, sin «public.»): un replay sobre
   -- una tabla con el mismo nombre y OTRAS reglas aborta en vez de saltarlas.
@@ -183,6 +228,21 @@ BEGIN
         AND attname IN ('id', 'clinica_id', 'titulo', 'nombres', 'apellido_paterno', 'apellido_materno')) <> 6 THEN
     RAISE EXCEPTION 'PRE-VUELO FALLÓ: profiles no tiene id, clinica_id, titulo, nombres y apellidos.';
   END IF;
+  -- contexto y responder cierran a una clínica suspendida con una COPIA del
+  -- predicado de clinica_no_suspendida() (por clínica, no por sesión). La
+  -- columna tiene que existir como boolean NOT NULL (con NULL el EXISTS falla
+  -- cerrado, pero ya no diría lo mismo que la original), y la original tiene
+  -- que seguir siendo la que se copió (md5 de prosrc con los espacios
+  -- normalizados; su texto es el de 20260912190416_remote_schema.sql:896).
+  -- Si alguien la cambia, se aborta: hay que revisar la copia a mano.
+  IF NOT EXISTS (SELECT 1 FROM pg_attribute WHERE attrelid = 'public.clinicas'::regclass AND attname = 'suspendida'
+                   AND atttypid = 'boolean'::regtype AND attnotnull AND NOT attisdropped) THEN
+    RAISE EXCEPTION 'PRE-VUELO FALLÓ: clinicas.suspendida no existe como boolean NOT NULL.';
+  END IF;
+  IF (SELECT md5(regexp_replace(p.prosrc, '\s+', ' ', 'g')) FROM pg_proc p
+       WHERE p.oid = to_regprocedure('public.clinica_no_suspendida()')) IS DISTINCT FROM c_no_susp THEN
+    RAISE EXCEPTION 'PRE-VUELO FALLÓ: clinica_no_suspendida() no es la que copian contexto y responder (cambió o no existe). Revisar la copia antes de aplicar.';
+  END IF;
   IF to_regprocedure('public.log_tabla_change()') IS NULL OR to_regprocedure('public.get_clinica_id()') IS NULL THEN
     RAISE EXCEPTION 'PRE-VUELO FALLÓ: falta log_tabla_change() o get_clinica_id().';
   END IF;
@@ -196,8 +256,9 @@ BEGIN
   IF NOT (has_table_privilege('service_role', 'public.appointments', 'SELECT')
           AND has_table_privilege('service_role', 'public.appointments', 'UPDATE')
           AND has_table_privilege('service_role', 'public.profiles', 'SELECT')
-          AND has_table_privilege('service_role', 'public.agenda_ajustes', 'SELECT')) THEN
-    RAISE EXCEPTION 'PRE-VUELO FALLÓ: service_role sin privilegios sobre appointments, profiles o agenda_ajustes.';
+          AND has_table_privilege('service_role', 'public.agenda_ajustes', 'SELECT')
+          AND has_table_privilege('service_role', 'public.clinicas', 'SELECT')) THEN
+    RAISE EXCEPTION 'PRE-VUELO FALLÓ: service_role sin privilegios sobre appointments, profiles, agenda_ajustes o clinicas.';
   END IF;
   IF NOT pg_has_role(current_user, (SELECT relowner FROM pg_class WHERE oid = 'public.appointments'::regclass), 'USAGE') THEN
     RAISE EXCEPTION 'PRE-VUELO FALLÓ: el rol % no es dueño de public.appointments.', current_user;
@@ -426,6 +487,11 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM public.agenda_ajustes j WHERE j.clinica_id = v_c.clinica_id AND j.agenda_v2_encendida) THEN
     RETURN NULL;
   END IF;
+  -- Clínica suspendida = no disponible (auditoría de E1, hallazgo 1). Es
+  -- clinica_no_suspendida() con la clínica del enlace en vez de get_clinica_id().
+  IF NOT EXISTS (SELECT 1 FROM public.clinicas k WHERE k.id = v_c.clinica_id AND NOT k.suspendida) THEN
+    RETURN NULL;
+  END IF;
   SELECT a.id, a.status, a.start_time, a.end_time, a.medico_id, a.paciente_id, a.reserva_correo_hmac,
          a.consultorio_nombre, a.consultorio_direccion, a.consultorio_telefono, a.consultorio_timezone
     INTO v_a
@@ -482,7 +548,9 @@ BEGIN
    WHERE c.codigo_hash = p_codigo_hash AND c.clinica_id = p_clinica_id
    FOR UPDATE;
   IF NOT FOUND OR v_c.revocado_en IS NOT NULL
-     OR NOT EXISTS (SELECT 1 FROM public.agenda_ajustes j WHERE j.clinica_id = p_clinica_id AND j.agenda_v2_encendida) THEN
+     OR NOT EXISTS (SELECT 1 FROM public.agenda_ajustes j WHERE j.clinica_id = p_clinica_id AND j.agenda_v2_encendida)
+     -- Suspendida = no disponible, como en contexto (auditoría de E1, hallazgo 1).
+     OR NOT EXISTS (SELECT 1 FROM public.clinicas k WHERE k.id = p_clinica_id AND NOT k.suspendida) THEN
     r_resultado := 'invalido'; RETURN NEXT; RETURN;
   END IF;
   -- La cita, bloqueada: lo de abajo decide sobre la fila VIGENTE.
@@ -690,7 +758,13 @@ FROM (
          (SELECT string_agg(policyname, ',' ORDER BY policyname) FROM pg_policies WHERE schemaname = 'public' AND tablename = 'appointments'),
          'appointments_delete,appointments_gates_insert,appointments_insert,appointments_select,appointments_update'
   UNION ALL
-  SELECT 9, 'censo: enlaces / vigentes / con respuesta',
+  SELECT 9, 'contexto / responder: md5 del cuerpo con el cierre de la suspendida (hallazgo 1)',
+         coalesce((SELECT string_agg(p.proname || '=' || md5(p.prosrc), ',' ORDER BY p.proname)
+                     FROM pg_proc p WHERE p.oid IN (to_regprocedure('public.cita_confirmacion_contexto(text)'),
+                                                     to_regprocedure('public.cita_confirmacion_responder(uuid, text, text)'))), '-'),
+         'cita_confirmacion_contexto=2fca66ffb8ea3b15eb7d0224c90a4f1a,cita_confirmacion_responder=7961e24a4f9f7bda0ce2df744f5b46aa'
+  UNION ALL
+  SELECT 10, 'censo: enlaces / vigentes / con respuesta',
          (SELECT count(*)::text FROM public.cita_confirmaciones) || ' / '
          || (SELECT count(*)::text FROM public.cita_confirmaciones WHERE revocado_en IS NULL) || ' / '
          || (SELECT count(*)::text FROM public.cita_confirmaciones WHERE respuesta IS NOT NULL), NULL

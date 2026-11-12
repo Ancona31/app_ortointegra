@@ -1579,6 +1579,8 @@ queda listada aquí.
   (confirmar hasta el inicio; cancelar hasta T−1h estricto, con
   `clock_timestamp()` después de los dos `FOR UPDATE`), 9 (emitir exige la
   puerta S3; responder funciona en una clínica degradada o suspendida).
+  **Corregido el 2026-11-13:** la suspendida ya no responde (ver abajo); la
+  degradada, sí.
 - **Resto conocido:** (a) una cita por ligar ligada a P y después cambiada a Q
   conserva el enlace (está atado al correo de la reserva, que sigue en la
   cita); (b) con el interruptor apagado, el `DELETE` de una cita con enlace da
@@ -1593,6 +1595,11 @@ queda listada aquí.
   mantuvo la lista A 9 (la respuesta del paciente es un UPDATE como los del
   personal, y `appointments_update` no mira la suspensión). Cerrarlo es un
   `EXISTS` en las dos funciones; la prueba (caso 4) fija el comportamiento.
+  **Cerrado el 2026-11-13** (encargo de Angel tras la auditoría): `contexto`
+  da NULL y `responder` `invalido` con `clinicas.suspendida`; para el paciente,
+  404 como un enlace que no existe. Se editó la migración E1 (sin aplicar en
+  producción), se volvió a aplicar en local y se re-anotó; ver su cabecera
+  («CIERRE DE LA SUSPENDIDA») y los casos 4 y 4b de su prueba.
 - **Carrera:** `scripts/confirmacion-carrera.sh` (sólo local): el personal
   mueve la cita a +30 min mientras el paciente cancela → B espera ~1,9 s y sale
   `fuera_de_plazo`; sin el `FOR UPDATE` de la cita, cancelaba la cita movida;
