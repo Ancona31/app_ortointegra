@@ -34,6 +34,7 @@ const DUENOS: Record<string, string> = {
   gcal_citas_por_evento: BASE,
   gcal_aplicar_evento: BASE,
   gcal_importar_evento: BASE,
+  cita_rsvp_google: BASE,
   gcal_sync_clinicas_pendientes: CONEXION,
 }
 

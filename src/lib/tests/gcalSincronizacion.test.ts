@@ -115,6 +115,9 @@ const db = vi.hoisted(() => ({
   importadas: [] as DatosImportar[],
   fallarAplicar: new Set<string>(),
   aplicarDevuelve: 1,
+  /** E9: las llamadas a `confirmarPorRsvp` y lo que devuelve (o lanza). */
+  rsvps: [] as Array<{ citaId: string; eventId: string; aceptaron: string[] }>,
+  rsvpDevuelve: true as boolean | 'lanza',
 }))
 
 vi.mock('@/lib/gcalSincronizacionBase', async (importOriginal) => {
@@ -153,6 +156,11 @@ vi.mock('@/lib/gcalSincronizacionBase', async (importOriginal) => {
       if (db.fallarAplicar.has(a.citaId)) throw new Error('la base falló')
       db.aplicadas.push(a)
       return db.aplicarDevuelve
+    },
+    confirmarPorRsvp: async (_c: string, _cal: string, citaId: string, eventId: string, aceptaron: string[]) => {
+      db.rsvps.push({ citaId, eventId, aceptaron })
+      if (db.rsvpDevuelve === 'lanza') throw new Error('la base falló')
+      return db.rsvpDevuelve
     },
     importarEvento: async (_c: string, _cal: string, d: DatosImportar) => {
       db.importadas.push(d)
@@ -197,7 +205,7 @@ beforeEach(() => {
   Object.assign(db, {
     fase: 'completa', syncToken: null, pageToken: null, ventana: null, candado: null, ocupado: false, habilitada: true,
     noDisponible: false, noDisponibleC2: false, soltados: [], reinicios: 0, filas: [fila()], aplicadas: [], importadas: [], fallarAplicar: new Set(),
-    aplicarDevuelve: 1,
+    aplicarDevuelve: 1, rsvps: [], rsvpDevuelve: true,
   })
   Object.assign(h.estado, { guion: [], llamadas: [], calendarioRegistrado: CAL, insertCalendario: 0, parches: [], patchFalla: null })
   h.estado.rpc = { data: null, error: null, args: [] }
@@ -488,5 +496,76 @@ describe('C5 · restablecer en Google lo rechazado', () => {
     h.estado.guion = [pagina([evento({ summary: 'Junta movida' })], { nextSyncToken: 't' })]
     await sincronizarClinica(conexion, op)
     expect(h.estado.parches).toHaveLength(0)
+  })
+})
+
+describe('E9 · RSVP de Google (detrás de AGENDA_RSVP_GOOGLE)', () => {
+  const PACIENTE = { nombre: 'Ana', apellidos: 'Pérez' }
+  const asistentes: calendar_v3.Schema$EventAttendee[] = [
+    { email: 'medico@ejemplo.mx', organizer: true, responseStatus: 'accepted' },
+    { email: 'Paciente@Ejemplo.MX ', responseStatus: 'accepted' },
+    { email: 'otro@ejemplo.mx', responseStatus: 'declined' },
+  ]
+  function conAsistentes(): void {
+    db.filas = [fila({ conPaciente: true, paciente: PACIENTE, tituloSinPaciente: null })]
+    h.estado.guion = [pagina([evento({ etag: '"e1"', summary: 'Cita médica: Ana Pérez', attendees: asistentes })], { nextSyncToken: 's1' })]
+  }
+
+  it('apagado (sin la variable): ninguna llamada aunque el paciente haya aceptado', async () => {
+    vi.stubEnv('AGENDA_RSVP_GOOGLE', '')
+    conAsistentes()
+    await sincronizarClinica(conexion, op)
+    expect(db.rsvps).toEqual([])
+    vi.unstubAllEnvs()
+  })
+
+  it('encendido: manda sólo los que aceptaron (sin organizador), normalizados, y cuenta el cambio', async () => {
+    vi.stubEnv('AGENDA_RSVP_GOOGLE', 'encendido')
+    conAsistentes()
+    const r = await sincronizarClinica(conexion, op)
+    expect(db.rsvps).toEqual([{ citaId: CITA, eventId: 'ev1', aceptaron: ['paciente@ejemplo.mx'] }])
+    expect(r.cambios).toBeGreaterThanOrEqual(1)
+    expect(r.errores).toBe(0)
+    vi.unstubAllEnvs()
+  })
+
+  it('encendido: ni confirmadas, ni sin paciente, ni eventos borrados, ni sin aceptados', async () => {
+    vi.stubEnv('AGENDA_RSVP_GOOGLE', 'encendido')
+    for (const [f, e] of [
+      [fila({ conPaciente: true, paciente: PACIENTE, status: 'confirmed' }), evento({ attendees: asistentes })],
+      [fila(), evento({ attendees: asistentes })],
+      [fila({ conPaciente: true, paciente: PACIENTE }), evento({ status: 'cancelled', attendees: asistentes })],
+      [fila({ conPaciente: true, paciente: PACIENTE }), evento({ attendees: [{ email: 'p@e.mx', responseStatus: 'needsAction' }] })],
+    ] as const) {
+      Object.assign(db, { candado: null, fase: 'completa', syncToken: null, pageToken: null })
+      db.filas = [f]
+      h.estado.guion = [pagina([e], { nextSyncToken: 's1' })]
+      await sincronizarClinica(conexion, op)
+    }
+    expect(db.rsvps).toEqual([])
+    vi.unstubAllEnvs()
+  })
+
+  it('un fallo de la RPC cuenta como error y la página avanza igual', async () => {
+    vi.stubEnv('AGENDA_RSVP_GOOGLE', 'encendido')
+    conAsistentes()
+    db.rsvpDevuelve = 'lanza'
+    const r = await sincronizarClinica(conexion, op)
+    expect(r.errores).toBe(1)
+    expect(db.syncToken).toBe('s1')
+    vi.unstubAllEnvs()
+  })
+
+  it('las decisiones de C3 no cambian: con o sin RSVP se aplica lo mismo', async () => {
+    conAsistentes()
+    vi.stubEnv('AGENDA_RSVP_GOOGLE', '')
+    await sincronizarClinica(conexion, op)
+    const sin = JSON.stringify(db.aplicadas)
+    Object.assign(db, { candado: null, fase: 'completa', syncToken: null, pageToken: null, aplicadas: [] })
+    conAsistentes()
+    vi.stubEnv('AGENDA_RSVP_GOOGLE', 'encendido')
+    await sincronizarClinica(conexion, op)
+    expect(JSON.stringify(db.aplicadas)).toBe(sin)
+    vi.unstubAllEnvs()
   })
 })

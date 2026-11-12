@@ -1771,6 +1771,51 @@ queda listada aquí.
   la lista de mañana de E7; es la vista del personal, con la RLS de siempre. «Sin
   nombre» vale para el aviso emergente, no para el panel.
 
+**E9 · RSVP de Google (migración `20261115160000_agenda_e9_rsvp_google.sql`):**
+- **Detrás de `AGENDA_RSVP_GOOGLE=encendido`** (variable de entorno, apagada por
+  omisión; cualquier otro valor apaga), además de la v2 y de las puertas del
+  sondeo de C. Angel la enciende después de comprobar con su cuenta real que un
+  RSVP llega por `syncToken` (§8, sin documentar). **No se escribió**
+  `scripts/gcal-rsvp-humo.ts` (el diseño lo proponía para esa prueba): habla con
+  Google real y aquí no se toca; queda para Angel.
+- **`cita_rsvp_google(clinica, cita, calendario, evento, correos[])`**, INVOKER,
+  sólo `service_role`: `scheduled` → `confirmed` si un correo aceptado (en
+  minúsculas y sin espacios, en la base) es `pacientes.email` o
+  `reserva_correo` de ESA cita; cita futura (hora real tras `FOR UPDATE`), con
+  hora, con paciente o por ligar, ligada a ESE evento (diferencia con el diseño:
+  la firma lleva el id del evento) y calendario de la conexión activa;
+  `updated_at` = máximo(el que tenía, ahora); auditoría `via:'google_rsvp'`,
+  `user_id 'system'`. Nunca cancela ni reactiva; `declined` no llega.
+- **En el sondeo** (`gcalSincronizacion.ts`): DESPUÉS de las decisiones de C3 y
+  del restablecimiento de C5, que no cambian (lo prueba
+  `gcalSincronizacion.test.ts`: lo aplicado es idéntico con y sin RSVP); sólo
+  filas `scheduled` con paciente o por ligar y eventos vivos; los correos salen
+  de `aceptaronDe` (sin organizador, `self` ni `resource`; ≤ 50). Un fallo
+  cuenta en `errores` y la página avanza. El envoltorio vive en
+  `gcalSincronizacionBase.ts` (añadido al cerrojo).
+- **El color de Google no se cambia** al confirmar por RSVP (no se escribe en
+  Google desde un RSVP); se corrige en la siguiente edición desde Spinus, como
+  el resto conocido de C5 con el color de `confirmed`.
+- **Riesgo aceptado (plan_E):** un asistente con el mismo correo que el
+  paciente, que no es el paciente, confirmaría la cita.
+- **Auditoría independiente (APTA, sin cambios).** Su hallazgo 1 («la rama por
+  ligar es inalcanzable porque el sondeo filtra con `conPaciente`») resultó
+  falso: desde D4, `r_con_paciente` incluye las citas por ligar. Propuso una
+  dimensión más para `AUDITORIA-MIGRACIONES.md` (no se tocó el archivo): *el
+  alcance del llamador frente a las ramas de la función: leer el código que la
+  invoca y comprobar que cada rama que la prueba SQL certifica se ejerce de
+  verdad.*
+- **Pruebas:** `e9_rsvp_google.sql` (correo del paciente en otra caja, reserva
+  por ligar, diez casos sin cambio, 22023, permisos), `gcalRsvp.test.ts` y el
+  bloque E9 de `gcalSincronizacion.test.ts` contra el Google simulado (apagado
+  sin llamadas, encendido con los aceptados normalizados, filtros, fallo
+  contado, decisiones de C3 idénticas).
+- **Revisión independiente del diff (APTO):** confirmó en la base local que
+  `gcal_citas_por_evento` marca las por ligar con `r_con_paciente = true` y que
+  la función aplicada es idéntica al archivo. Nota: el filtro de TS usa la foto
+  de la fila tomada al empezar la página, así que puede haber una llamada de
+  más que la base contesta `sin_cambio` (gasto, no riesgo).
+
 ### Bloque F
 
 - Las 18 propuestas de la auditoría visual, aprobadas. **El pulido visual y los
