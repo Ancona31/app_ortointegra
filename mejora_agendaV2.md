@@ -1689,6 +1689,22 @@ suspensión, a tener en cuenta en E9 si el RSVP escribe por ahí.
   (`/^\/api\/confirmar\/[A-Za-z0-9_-]{22}$/`); ninguna entrada existente cambia.
 - **Textos** en `vistaConfirmacion.ts` y la página: PENDIENTES DE REVISIÓN.
 
+**E5 · comprobante con el enlace de confirmación** (lista A 1, la que menos
+cambia): sólo la reserva por enlace manda comprobante, como en D8; el `after()`
+de `POST /api/reservar/[codigo]` emite el enlace (`emitirEnlaceConfirmacion`,
+`creadoPor` null = sistema) y la plantilla cambia el último renglón por «Para
+confirmar tu asistencia o avisar que no podrás ir, usa este enlace:» con la
+URL (y un `href` sólo `http(s)` sin comillas ni espacios). Si no se puede
+emitir (E1 sin aplicar, sin secreto, cita ya pasada, error), sale el
+comprobante de D8 tal cual. Las citas del personal siguen sin correo al
+agendar. El cuerpo es determinista (lo necesita la idempotencia de E4).
+**No se registra en `cita_correos`** (`cita_correo_tomar/marcar` de plan_E):
+esa tabla es de E4, que va en otra rama y aún no existe aquí. Quien integre E4
+tiene que envolver este envío con su registro (`comprobante/<envío>`), o la
+lista A 4 («no hay recordatorio si ya salió el comprobante para ese inicio»)
+no se cumplirá. Texto PENDIENTE DE REVISIÓN. La e2e de D10 (`reserva-enlace`)
+pasa a esperar `/confirmar/<22>` en vez de «comunícate con el consultorio».
+
 ### Bloque F
 
 - Las 18 propuestas de la auditoría visual, aprobadas. **El pulido visual y los

@@ -68,4 +68,23 @@ describe('correoComprobante', () => {
     expect(c.html).not.toContain('<b>x</b>')
     expect(c.html).toContain('&lt;b&gt;')
   })
+  it('E5: con el enlace de confirmación, lo lleva en texto y en el href; sin él, el cierre de D8', () => {
+    const url = 'https://www.spinus.com.mx/confirmar/AbCdEfGhIjKlMnOpQrSt_-'
+    const base = { medico: 'Dr. X', consultorio: 'C', direccion: null, telefono: null, inicio: '2031-05-06T16:00:00.000Z', zona: 'America/Merida' }
+    const con = correoComprobante({ ...base, urlConfirmacion: url })
+    expect(con.texto).toContain(url)
+    expect(con.texto).toContain('Para confirmar tu asistencia o avisar que no podrás ir')
+    expect(con.texto).not.toContain('comunícate con el consultorio')
+    expect(con.html).toContain(`href="${url}"`)
+    for (const sin of [null, undefined, 'javascript:alert(1)', 'https://x.mx/"><b>']) {
+      const c = correoComprobante({ ...base, urlConfirmacion: sin })
+      expect(c.texto).toContain('Para cambiar o cancelar, comunícate con el consultorio')
+      expect(c.html).not.toContain('href=')
+    }
+  })
+  it('E5: el cuerpo es determinista (mismos datos, mismo correo)', () => {
+    const d = { medico: 'Dr. X', consultorio: 'C', direccion: null, telefono: null, inicio: '2031-05-06T16:00:00.000Z', zona: 'America/Merida',
+      urlConfirmacion: 'https://www.spinus.com.mx/confirmar/AbCdEfGhIjKlMnOpQrSt_-' }
+    expect(correoComprobante(d)).toEqual(correoComprobante(d))
+  })
 })

@@ -32,6 +32,7 @@ import { respuestaErrorRpc, respuestaReserva } from '@/lib/reserva/respuestasRes
 import { fechaEnZona, ocupacionSinEstado, rangoDeConsulta, reglasDe, turnoValido } from '@/lib/reserva/turnosReserva'
 import { crearEventoReserva } from '@/lib/reserva/googleReserva'
 import { correoComprobante } from '@/lib/reserva/correosReserva'
+import { emitirEnlaceConfirmacion } from '@/lib/confirmacion/enlaceConfirmacion'
 import { enviarCorreo } from '@/lib/correo/transporte'
 import { logger } from '@/lib/logger'
 import type { ContextoReserva, ResultadoReservaRpc } from '@/lib/reserva/servidorReserva'
@@ -103,6 +104,10 @@ type ConsultorioCtx = ContextoReserva['consultorios'][number]
  * nombre, clínica y hora; invitado sólo el médico) y el comprobante por
  * `transporte.ts` (en local, a Mailpit), sin tipo de cita. Nada de esto
  * cambia la respuesta: la cita ya existe.
+ * E5 (lista A 1): el comprobante lleva el enlace de confirmación de la cita
+ * (`emitirEnlaceConfirmacion`, sistema: `creadoPor` null). Si no se puede
+ * emitir (E1 sin aplicar, sin secreto, error), sale el de D8 tal cual. Las
+ * citas que agenda el personal siguen sin correo al agendar.
  */
 function programarDespues(ctx: ContextoReserva, consultorio: ConsultorioCtx, b: { nombre: string; correo: string }, fila: ResultadoReservaRpc): void {
   const { r_cita_id: citaId, r_inicio: inicio, r_fin: fin } = fila
@@ -114,9 +119,12 @@ function programarDespues(ctx: ContextoReserva, consultorio: ConsultorioCtx, b: 
       clinica: ctx.clinica ? { nombre: ctx.clinica.nombre ?? '', nombre_display: ctx.clinica.nombre_display } : null,
     })
     try {
+      // Nunca lanza (E2); el catch es por si eso cambia: sin enlace, sale el comprobante de D8.
+      const enlace = await emitirEnlaceConfirmacion(ctx.clinica_id, citaId, null).catch(() => null)
       const plantilla = correoComprobante({
         medico: nombreDelMedico(ctx), consultorio: consultorio.nombre, direccion: consultorio.direccion,
         telefono: consultorio.telefono ?? ctx.medico.telefono, inicio, zona: consultorio.timezone,
+        urlConfirmacion: enlace?.url ?? null,
       })
       await enviarCorreo({ para: b.correo, ...plantilla, etiqueta: 'reserva_comprobante' })
     } catch (err) {

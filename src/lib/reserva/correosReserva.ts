@@ -37,6 +37,13 @@ export interface DatosComprobante {
   /** Instante de inicio (ISO) y la zona IANA del consultorio. */
   inicio: string
   zona: string
+  /** El enlace de confirmación de la cita (agenda E5), o null/ausente si no se pudo emitir. */
+  urlConfirmacion?: string | null
+}
+
+/** Sólo `http(s)://` y sin espacios ni comillas: lo único que entra al `href`. */
+function urlSegura(url: string | null | undefined): string | null {
+  return url && /^https?:\/\/[^\s"'<>]+$/.test(url) ? url : null
 }
 
 /** «lunes 16 de noviembre de 2026, 10:30» en la zona del consultorio. */
@@ -51,22 +58,31 @@ export function fechaHoraEnZona(inicio: string, zona: string): string {
 /**
  * El comprobante (D8): fecha y hora en la zona del consultorio, médico,
  * consultorio, dirección y teléfono. SIN tipo de cita (lista A, 10), sin la
- * clínica y sin datos clínicos. El enlace para confirmar o cancelar lo añade
- * el bloque E; hasta entonces, «comunícate con el consultorio».
+ * clínica y sin datos clínicos. Con el enlace de confirmación de la cita (E5,
+ * lista A 1), el último renglón invita a confirmar o cancelar por él; sin
+ * enlace, queda el «comunícate con el consultorio» de D8.
+ * ⚠️ TEXTO PENDIENTE DE REVISIÓN (lista B 12 de plan_E). Determinista: nada
+ * de «ahora» en el cuerpo (E4 lo manda con llave de idempotencia).
  */
 export function correoComprobante(d: DatosComprobante): CorreoListo {
   const cuando = fechaHoraEnZona(d.inicio, d.zona)
   const lugar = d.direccion ? `${d.consultorio}, ${d.direccion}` : d.consultorio
+  const url = urlSegura(d.urlConfirmacion)
   const renglones = [
     `Tu cita quedó agendada para el ${cuando}.`,
     `Con: ${d.medico}.`,
     `En: ${lugar}.`,
     ...(d.telefono ? [`Teléfono del consultorio: ${d.telefono}.`] : []),
-    'Para cambiar o cancelar, comunícate con el consultorio.',
   ]
+  const cierre = url
+    ? 'Para confirmar tu asistencia o avisar que no podrás ir, usa este enlace:'
+    : 'Para cambiar o cancelar, comunícate con el consultorio.'
   return {
     asunto: `Tu cita con ${d.medico}`,
-    texto: renglones.join('\n'),
-    html: envolver(renglones.map(escapeHtml)),
+    texto: [...renglones, cierre, ...(url ? [url] : [])].join('\n'),
+    html: envolver([
+      ...renglones.map(escapeHtml), escapeHtml(cierre),
+      ...(url ? [`<a href="${escapeHtml(url)}">Confirmar o cancelar mi cita</a>`] : []),
+    ]),
   }
 }

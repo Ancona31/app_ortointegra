@@ -73,7 +73,8 @@ test('flujo completo con el enlace fijo: código leído de Mailpit, reserva y co
 
   // El comprobante (D8), capturado: sin el tipo de cita, sin el teléfono de la persona, sin notas.
   const comprobante = await esperarCorreo(p.correo, 'Tu cita con')
-  expect(comprobante.texto).toContain('Para cambiar o cancelar, comunícate con el consultorio')
+  // E5: ahora lleva el enlace de confirmación de la cita, en vez de «comunícate con el consultorio».
+  expect(comprobante.texto).toMatch(/\/confirmar\/[A-Za-z0-9_-]{22}(\s|$)/)
   for (const cuerpo of [comprobante.texto, comprobante.html, comprobante.asunto]) {
     expect(cuerpo).not.toContain(e.tipoNombre)
     expect(cuerpo).not.toContain(p.telefono)
