@@ -1056,7 +1056,9 @@ export default function AppointmentModal({
                 role="tablist"
                 aria-label="Tipo de lo que se va a crear"
                 className="inline-flex w-full"
-                style={{ background: 'var(--ag-segment-bg)', borderRadius: 12, padding: 3, gap: 2 }}
+                /* F1.19 · Los radios del segmentado de la barra (nota de
+                   `--ag-segment-*` en globals.css): pista = botón + relleno. */
+                style={{ background: 'var(--ag-segment-bg)', borderRadius: 'calc(var(--ag-r-btn) + 3px)', padding: 3, gap: 2 }}
               >
                 {TIPOS_ALTA.map(t => {
                   const activo = tipo === t.id
@@ -1081,13 +1083,15 @@ export default function AppointmentModal({
                       disabled={bloqueado}
                       title={bloqueado ? 'Un evento de todo el día no puede ser una cita.' : undefined}
                       onClick={() => { if (!activo && !bloqueado) onCambiarTipo(t.id) }}
-                      className={`flex-1 inline-flex items-center justify-center gap-1.5 transition-all ${activo || bloqueado ? '' : 'hover:opacity-70'}`}
+                      className={`flex-1 inline-flex items-center justify-center gap-1.5 ${activo || bloqueado ? '' : 'bg-transparent hover:bg-[var(--ag-btn-ghost-hover)]'}`}
                       style={{
-                        border: 'none', cursor: bloqueado ? 'not-allowed' : 'pointer', borderRadius: 9, padding: '7px 13px',
+                        border: 'none', cursor: bloqueado ? 'not-allowed' : 'pointer', borderRadius: 'var(--ag-r-btn)', padding: '7px 13px',
+                        /* CONTRASTE §5: el chip cambia fondo y tinta en micro. */
+                        transition: 'background-color var(--ag-dur-micro) var(--ag-ease), color var(--ag-dur-micro) var(--ag-ease)',
                         fontSize: 13, fontWeight: activo ? 700 : 600,
                         ...(activo
                           ? { background: 'var(--ag-segment-active-bg)', color: 'var(--ag-segment-active-text)', boxShadow: 'var(--ag-segment-active-shadow)' }
-                          : { background: 'transparent', color: 'var(--ag-segment-text)' }),
+                          : { color: 'var(--ag-segment-text)' }),
                         ...(bloqueado ? { opacity: .45 } : {}),
                       }}
                     >

@@ -2439,6 +2439,40 @@ encontraba su evento) y los 20 pulsos caían fuera de la vista. Ahora pulsa
   días: en la tableta no se precarga el periodo vecino. Es rendimiento, no
   corrección; queda para quien lleve ese archivo.
 
+**Paso 5 · F1.19 (orden y simetría)**
+
+- **Escala.** Pasan a `--ag-*` los rellenos y huecos de la barra, la leyenda,
+  los controles, la tarjeta (horizontales y huecos), la tarjeta de Google, el
+  chip del Mes, el chip de la banda de todo el día y la fila de la lista de
+  Día. Cambios de valor: 9→10 px de relleno horizontal de la tarjeta, 5→6 px de
+  hueco en tarjeta, chips y píldora, 7→8 en el chip del Mes. **Quedan fuera, a
+  propósito, los valores verticales de 1–5 px** (relleno vertical de tarjeta,
+  chips y píldoras): de ellos cuelgan los suelos de tamaño de la tarjeta
+  (`ALTO_MINIMO_*`) y no son espaciado de maquetación sino de tipografía.
+  Informe no bloqueante (`e2e/resultados/F/informe-escala.ts`): 24 → 16
+  declaraciones fuera de la escala; las que siguen son esos verticales, el mes
+  del teléfono (micro) y tres de otros agentes (`.ag-banda-compacta` y
+  `.ag-aviso`, de movimiento; `.ag-opcion`, de interacciones).
+- **Radios.** El segmentado Cita/Evento del modal usa `calc(var(--ag-r-btn) +
+  3px)` en la pista y `--ag-r-btn` en el botón, como el de la barra (era 12 y 9
+  a mano); su hover pasa de `opacity` a fondo.
+- **La hora del gutter, en su línea.** FullCalendar la centra en la franja, así
+  que «10:00» quedaba a media franja bajo su línea. Ahora va arriba
+  (`vertical-align: top`, `line-height: 1.2`, 2 px de aire): el texto empieza en
+  su línea.
+- **e2e `agenda-f-simetria`:** columnas de Semana iguales (± 1 px) y cada
+  cabecera centrada sobre su columna (± 1); cada etiqueta de hora a ± 2 px de
+  su línea (antes, a media franja); iconos de los botones sin texto centrados
+  (± 1) en la barra y en la banda. Mutaciones comprobadas: ancho fijo en una
+  columna, quitar el `vertical-align`, desplazar los iconos.
+- **El conteo a 1440 px** sale recortado con «…» («23 citas · 4…»): es lo que
+  cede ancho primero; a partir de 720 px de fila de controles se quita entero.
+- **Revisión del paso 5, corregido antes del commit:** el segmentado del modal
+  y los controles de la barra cambian fondo, borde y TINTA en micro (CONTRASTE
+  §5 pide `color` en el chip de vista); la regla de la hora lleva tres clases
+  para ganar a la de FullCalendar por especificidad y no por orden de carga; la
+  e2e de la hora mide sólo las celdas con hora escrita.
+
 ### Menores
 
 - **`ProximasCitas`:** tope de refresco de 2 minutos al volver a la pestaña,

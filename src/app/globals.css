@@ -339,12 +339,10 @@
      comparten EL COLOR a propósito — tocar estos tokens cambia los dos, y eso es
      lo que se quiere.
 
-     ⚠️ EL COLOR SÍ, EL RADIO NO, Y HOY ESTÁN DIVERGIDOS. El del header pasó a la
+     ⚠️ EL COLOR SÍ, EL RADIO NO (aunque desde F1.19 coinciden). El del header pasó a la
      escala del spec (`calc(var(--ag-r-btn) + 3px)` en la pista y `--ag-r-btn` en
-     la pastilla); el del alta sigue con 12 y 9 a número pelado en su JSX, porque
-     el modal quedó fuera del alcance del bloque 4. PENDIENTE: engancharlo a los
-     mismos tokens cuando se toque el modal. Hasta entonces, no leas esta nota
-     como que el radio también se propaga: no lo hace.
+     la pastilla). El del alta se enganchó a los mismos tokens en F1.19: ya son
+     iguales, pero el radio sigue escrito en cada JSX, no sale de aquí.
 
      ⚠️ EL SEGMENTO ACTIVO PASÓ A RELLENO DE MARCA CON TINTA BLANCA (bloque 4).
      Era una pastilla BLANCA con sombra sobre la pista gris, o sea la misma
@@ -1959,7 +1957,7 @@ main > div:has(.agenda-fc) .agenda-raiz {
    este toolbar. */
 .agenda-fc .fc-toolbar {
   /* F1.1 · 12 + 36 + 12 = 60 px: la fila de la barra única. */
-  padding: 12px 18px;
+  padding: var(--ag-3) var(--ag-4-5);
 }
 /* F1.1 · Los controles, a la derecha de la barra nativa y en la misma fila. Sin
    relleno izquierdo: el de la barra ya separa.
@@ -1976,7 +1974,7 @@ main > div:has(.agenda-fc) .agenda-raiz {
   flex-wrap: wrap;
   gap: var(--ag-2);
   min-width: 0;
-  padding: 12px 18px 12px 0;
+  padding: var(--ag-3) var(--ag-4-5) var(--ag-3) 0;
 }
 .agenda-fc .ag-controles-filtro { flex: 100 1 0; min-width: 140px; max-width: 240px; }
 /* Y cuando la fila es tan estrecha que al conteo le quedarían unos pocos píxeles,
@@ -2004,21 +2002,23 @@ main > div:has(.agenda-fc) .agenda-raiz {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-/* Fondo y borde en micro, nada más (CONTRASTE §5); el foco sin transición. */
+/* Fondo, borde y tinta en micro, nada más (CONTRASTE §5: el chip de vista
+   cambia `background-color` y `color`); el foco sin transición. */
 .agenda-fc .ag-controles :is(button, select) {
   transition: background-color var(--ag-dur-micro) var(--ag-ease),
-              border-color var(--ag-dur-micro) var(--ag-ease);
+              border-color var(--ag-dur-micro) var(--ag-ease),
+              color var(--ag-dur-micro) var(--ag-ease);
 }
 /* El «Por confirmar» de E7 trae su relleno de 40 px: aquí mide lo que la fila. */
 .agenda-fc .ag-controles [data-por-confirmar] { height: 36px; padding-block: 0; }
 /* En la variante de dos filas, la nativa pierde su línea y los controles van
    debajo, alineados a la izquierda con las flechas, y pueden envolver. */
 @media (max-width: 1279px) {
-  .agenda-fc .fc-toolbar { padding-bottom: 6px; border-bottom: 0; }
-  .agenda-fc .ag-controles { justify-content: flex-start; flex-wrap: wrap; padding: 6px 18px 12px; }
+  .agenda-fc .fc-toolbar { padding-bottom: var(--ag-1-5); border-bottom: 0; }
+  .agenda-fc .ag-controles { justify-content: flex-start; flex-wrap: wrap; padding: var(--ag-1-5) var(--ag-4-5) var(--ag-3); }
 }
-.ag-dia--con-panel .agenda-fc .fc-toolbar { padding-bottom: 6px; border-bottom: 0; }
-.ag-dia--con-panel .agenda-fc .ag-controles { justify-content: flex-start; flex-wrap: wrap; padding: 6px 18px 12px; }
+.ag-dia--con-panel .agenda-fc .fc-toolbar { padding-bottom: var(--ag-1-5); border-bottom: 0; }
+.ag-dia--con-panel .agenda-fc .ag-controles { justify-content: flex-start; flex-wrap: wrap; padding: var(--ag-1-5) var(--ag-4-5) var(--ag-3); }
 /* F1.1 · Los botones nativos (‹ › Hoy) a 36 px, como los controles. */
 .agenda-fc .fc-button {
   height: 36px;
@@ -2057,10 +2057,10 @@ main > div:has(.agenda-fc) .agenda-raiz {
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  gap: 12px;
+  gap: var(--ag-3);
   /* F1.1 · Al pie, en una fila de 28 px y con la línea ARRIBA. */
   min-height: 28px;
-  padding: 0 18px;
+  padding: 0 var(--ag-4-5);
   border-bottom: 0;
   border-top: 1px solid #f1f5f9;
 }
@@ -3116,7 +3116,7 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
 .agenda-fc .fc-listDay-view .ag-listadia {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
+  gap: var(--ag-3);
   min-width: 0;
 }
 /* ── La marca ─────────────────────────────────────────────────────────────
@@ -3246,9 +3246,9 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
 .agenda-fc .fc-listDay-view .ag-listadia-pildora {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--ag-1-5);
   flex: 0 0 auto;
-  padding: 3px 10px;
+  padding: 3px var(--ag-2-5);
   border: 1px solid transparent;
   border-radius: var(--ag-r-pill);
   font-size: 12px;
@@ -3502,8 +3502,16 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
   font-size: 11.5px;
   color: var(--ag-faint);
   font-weight: 600;
-  padding-right: 8px;
+  padding-right: var(--ag-2);
 }
+/* F1.19 · LA HORA, A LA ALTURA DE SU LÍNEA. FullCalendar la centra en la
+   franja (`vertical-align: middle`), o sea que «10:00» quedaba a media franja
+   por debajo de la línea de las 10:00, entre ella y la de las 10:30. Arriba y
+   con una línea de texto ceñida, el texto arranca en su línea (± 2 px).
+   Tres clases (con `.fc`) para ganar a la regla de la librería por
+   especificidad y no por orden de carga. */
+.agenda-fc .fc .fc-timegrid-slot-label { vertical-align: top; }
+.agenda-fc .fc .fc-timegrid-slot-label-cushion { line-height: 1.2; padding-top: 2px; }
 
 /* Eventos — contenedor transparente, todo lo visual va en eventContent */
 .fc .fc-event {
@@ -3724,7 +3732,7 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
   flex-direction: column;
   justify-content: flex-start;
   gap: 1px;
-  padding: 4px 9px;
+  padding: var(--ag-1) var(--ag-2-5);
   border: 1px solid;
   border-left-width: 3.5px;
   border-radius: var(--ag-r-note);
@@ -3738,7 +3746,7 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
 .agenda-fc .ag-tarjeta-tit {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: var(--ag-1-5);
   min-width: 0;
   flex-shrink: 0;
 }
@@ -3781,7 +3789,7 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
   font-weight: 800;
   letter-spacing: .02em;
   line-height: 1.4;
-  padding: 1px 5px;
+  padding: 1px var(--ag-1-5);
   border-radius: 5px;
   background: var(--ag-chip-bg);
   color: var(--ag-chip-text);
@@ -3866,9 +3874,9 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
 .agenda-fc .ag-tarjeta-pildora {
   display: none;
   align-items: center;
-  gap: 5px;
+  gap: var(--ag-1-5);
   flex: 0 0 auto;
-  padding: 2px 9px;
+  padding: 2px var(--ag-2-5);
   border: 1px solid currentColor;
   border-radius: var(--ag-r-pill);
   background: var(--ag-surface);
@@ -3896,7 +3904,7 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
    ESTE BLOQUE ES EL DE SEMANA. En Día, todo lo que decide aquí lo pisa después
    el bloque de esa vista, que tiene un selector más específico: el relleno de
    abajo sólo se ve en Semana, y los tres hijos que esconde vuelven allí. */
-.agenda-fc .ag-tarjeta--tiny { padding: 2px 8px; }
+.agenda-fc .ag-tarjeta--tiny { padding: 2px var(--ag-2); }
 .agenda-fc .ag-tarjeta--tiny .ag-tarjeta-chip,
 .agenda-fc .ag-tarjeta--tiny .ag-tarjeta-tz,
 .agenda-fc .ag-tarjeta--tiny .ag-tarjeta-desc { display: none; }
@@ -3968,7 +3976,7 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
    por encima de los 10.5 px de Semana y todavía por debajo del nombre. El hueco
    entre piezas sube en la misma proporción (8 → 14 px), medido en el mockup
    entre la hora y el cuadro del icono. */
-.agenda-fc .fc-timeGridDay-view .ag-tarjeta { padding: 6px 12px; gap: 14px; }
+.agenda-fc .fc-timeGridDay-view .ag-tarjeta { padding: var(--ag-1-5) var(--ag-3); gap: var(--ag-3-5); }
 .agenda-fc .fc-timeGridDay-view .ag-tarjeta-nombre,
 .agenda-fc .fc-timeGridDay-view .ag-tarjeta-nombre-corto { font-size: 15px; }
 .agenda-fc .fc-timeGridDay-view .ag-tarjeta-hora,
@@ -4062,7 +4070,7 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 5px 9px;
+  padding: 5px var(--ag-2-5);
   border: 1px solid var(--ag-gcal-accent);
   border-left-width: 3px;
   border-radius: var(--ag-r-note);
@@ -4072,7 +4080,7 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
 .agenda-fc .ag-gcal-cab {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: var(--ag-1-5);
   min-width: 0;
   flex-shrink: 0;
 }
@@ -4102,7 +4110,7 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
 .agenda-fc .ag-gcal-badge {
   flex: 0 0 auto;
   margin-left: auto;
-  padding: 0 5px;
+  padding: 0 var(--ag-1-5);
   border: 1px solid currentColor;
   border-radius: 999px;
   font-size: 9px;
@@ -4180,10 +4188,10 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
   height: 20px;
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: var(--ag-1-5);
   min-width: 0;
   overflow: hidden;
-  padding: 0 6px;
+  padding: 0 var(--ag-1-5);
   border: 1px solid transparent;
   border-left-width: 3px;
   border-radius: var(--ag-r-note);
@@ -4415,10 +4423,10 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
   display: flex;
   flex: 1 1 auto;
   align-items: center;
-  gap: 5px;
+  gap: var(--ag-1-5);
   min-width: 0;
   overflow: hidden;
-  padding: 2px 7px;
+  padding: 2px var(--ag-2);
   border-radius: var(--ag-r-note);
   font-size: 11px;
   line-height: 1.45;

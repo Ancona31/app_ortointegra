@@ -72,3 +72,53 @@ test('F1.18 · edición: los cinco estados en una fila, mismo centro; «Iniciar 
   const hg = (await dialogo.getByRole('button', { name: 'Guardar' }).boundingBox())?.height ?? 0
   expect(Math.abs(hi - hg)).toBeLessThanOrEqual(1)
 })
+
+/* ── F1.19 · barrido de simetría ─────────────────────────────────────────
+   (La barra —mismos altos y centros— la prueba `agenda-f-pulido`, F1.1.) */
+
+test('F1.19 · Semana: columnas de día iguales y cada cabecera centrada sobre su columna', async ({ page }, info) => {
+  test.skip(info.project.name !== 'escritorio', 'escritorio')
+  await irAAgenda(page)
+  const r = await page.evaluate(() => {
+    const cols = Array.from(document.querySelectorAll('.fc-timegrid-col[data-date]')).map(e => e.getBoundingClientRect())
+    const cabs = Array.from(document.querySelectorAll('.fc-col-header-cell[data-date] .ag-dayhead')).map(e => e.getBoundingClientRect())
+    return {
+      anchos: cols.map(c => c.width),
+      desvios: cabs.map((c, i) => Math.abs((c.left + c.width / 2) - (cols[i].left + cols[i].width / 2))),
+    }
+  })
+  expect(r.anchos.length).toBeGreaterThan(1)
+  expect(Math.max(...r.anchos) - Math.min(...r.anchos)).toBeLessThanOrEqual(1)
+  for (const d of r.desvios) expect(d).toBeLessThanOrEqual(1)
+})
+
+test('F1.19 · cada etiqueta de hora está a la altura de su línea', async ({ page }, info) => {
+  test.skip(info.project.name !== 'escritorio', 'escritorio')
+  await irAAgenda(page)
+  // Sólo las celdas con hora escrita: las de media hora van vacías.
+  const desvios = await page.evaluate(() => Array.from(document.querySelectorAll('td.fc-timegrid-slot-label[data-time]:has(.fc-timegrid-slot-label-cushion)'))
+    .map(etq => {
+      const linea = document.querySelector(`td.fc-timegrid-slot-lane[data-time="${etq.getAttribute('data-time')}"]`)
+      const texto = etq.querySelector('.fc-timegrid-slot-label-cushion') ?? etq
+      return linea ? Math.abs(texto.getBoundingClientRect().top - linea.getBoundingClientRect().top) : 0
+    }))
+  expect(desvios.length).toBeGreaterThan(4)
+  // La caja del texto arranca en la línea de su hora (± 2 px), no a media franja.
+  for (const d of desvios) expect(d).toBeLessThanOrEqual(2)
+})
+
+test('F1.19 · los iconos van centrados en su botón', async ({ page }, info) => {
+  await irAAgenda(page)
+  const sel = info.project.name === 'escritorio'
+    ? '.agenda-fc .ag-controles button:not([role="tab"])'
+    : '.ag-banda-movil button.ag-banda-movil-ctrl:not(.ag-banda-movil-hoy)'
+  const desvios = await page.locator(sel).evaluateAll(btns => btns
+    .filter(b => (b as HTMLElement).offsetParent !== null && b.querySelector('svg') && !(b as HTMLElement).innerText.trim())
+    .map(b => {
+      const r = b.getBoundingClientRect()
+      const i = (b.querySelector('svg') as SVGElement).getBoundingClientRect()
+      return Math.max(Math.abs((i.left + i.width / 2) - (r.left + r.width / 2)), Math.abs((i.top + i.height / 2) - (r.top + r.height / 2)))
+    }))
+  expect(desvios.length).toBeGreaterThan(0)
+  for (const d of desvios) expect(d).toBeLessThanOrEqual(1)
+})
