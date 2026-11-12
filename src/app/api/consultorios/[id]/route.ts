@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { EditarConsultorioSchema } from '@/lib/consultorios/schemas'
+import { agendaV2Encendida } from '@/lib/agenda/ajustesAgenda'
+import { horarioEnOrden } from '@/lib/agenda/disponibilidad'
 
 async function getProfile(supabase: Awaited<ReturnType<typeof createClient>>) {
   const {
@@ -139,6 +141,22 @@ export async function PATCH(
     // Si no se envió nombre_corto en absoluto, queda undefined → no se incluye
     // en el payload → se preserva el valor previo.
 
+    // Agenda B5 (disponibilidad por consultorio), SÓLO con la agenda v2
+    // encendida para la clínica. Apagada —o sin la tabla de ajustes—, el
+    // handler se comporta como antes: `horario_propio` se ignora y el horario
+    // no se valida en orden. El interruptor sólo se lee si el cuerpo toca el
+    // horario, para no añadir una consulta a las demás ediciones.
+    const tocaDisponibilidad = input.horario_propio !== undefined || input.horario !== undefined
+    const v2 = tocaDisponibilidad && profile.clinica_id
+      ? await agendaV2Encendida(supabase, profile.clinica_id)
+      : false
+    if (v2 && input.horario !== undefined && !horarioEnOrden(input.horario)) {
+      return NextResponse.json(
+        { error: 'En los días abiertos, la hora de cierre tiene que ir después de la de apertura' },
+        { status: 400 }
+      )
+    }
+
     // Construir payload solo con campos presentes (PATCH parcial).
     const updatePayload: Record<string, unknown> = {}
     if (input.nombre !== undefined) updatePayload.nombre = input.nombre
@@ -147,6 +165,7 @@ export async function PATCH(
     if (input.telefono !== undefined) updatePayload.telefono = input.telefono
     if (input.timezone !== undefined) updatePayload.timezone = input.timezone
     if (input.horario !== undefined) updatePayload.horario = input.horario
+    if (v2 && input.horario_propio !== undefined) updatePayload.horario_propio = input.horario_propio
 
     if (Object.keys(updatePayload).length === 0) {
       return NextResponse.json({ error: 'Nada que actualizar' }, { status: 400 })

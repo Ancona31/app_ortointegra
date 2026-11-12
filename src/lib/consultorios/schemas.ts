@@ -107,6 +107,13 @@ export const EditarConsultorioSchema = z.object({
   telefono: z.string().trim().min(1).nullable().optional(),
   timezone: timezoneSchema.optional(),
   horario: horarioSchema.optional(),
+  /**
+   * Agenda B5: `true` = la disponibilidad de este consultorio es su `horario`;
+   * `false` = la de la clínica. Sólo se escribe con la agenda v2 encendida
+   * (lo decide el handler); con ella apagada se ignora, como hoy. Convenio en
+   * `src/lib/agenda/disponibilidad.ts`.
+   */
+  horario_propio: z.boolean().optional(),
 })
 
 export type EditarConsultorioInput = z.infer<typeof EditarConsultorioSchema>
