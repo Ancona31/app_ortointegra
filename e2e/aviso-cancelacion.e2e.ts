@@ -19,6 +19,7 @@ test.use({ storageState: SESION.adminA })
 
 let citaId = ''
 let clinicaId = ''
+let pacienteId = ''
 let titulo = ''
 const HASH = 'e8'.repeat(32)
 
@@ -29,7 +30,10 @@ test.beforeAll(() => {
   const fila = sqlLocal(`
     with c as (select id from public.clinicas where nombre = 'Clínica Semilla A'),
          m as (select p.id from public.profiles p where p.clinica_id = (select id from c) and p.es_admin_de_clinica limit 1),
-         p as (select id from public.pacientes where clinica_id = (select id from c) and activo order by created_at limit 1),
+         -- Un paciente propio con el título por nombre: la tarjeta de una cita con paciente pinta el
+         -- NOMBRE del paciente, no el título de la cita (con uno de la semilla, la tarjeta no se encontraba).
+         p as (insert into public.pacientes (clinica_id, nombre, apellidos)
+               select (select id from c), :'titulo', 'E8' returning id),
          a as (insert into public.appointments (clinica_id, paciente_id, medico_id, title, start_time, end_time, status,
                                                 consultorio_timezone)
                select (select id from c), (select id from p), (select id from m), :'titulo',
@@ -38,13 +42,15 @@ test.beforeAll(() => {
                returning id, clinica_id, paciente_id)
     insert into public.cita_confirmaciones (id, clinica_id, appointment_id, codigo_hash, paciente_id)
     select gen_random_uuid(), a.clinica_id, a.id, :'hash', a.paciente_id from a
-    returning appointment_id || '|' || clinica_id;`, { titulo, hash: HASH })
-  ;[citaId = '', clinicaId = ''] = fila.split('|')
+    returning appointment_id || '|' || clinica_id || '|' || paciente_id;`, { titulo, hash: HASH })
+  ;[citaId = '', clinicaId = '', pacienteId = ''] = fila.split('|')
 })
 test.afterAll(() => {
   sqlLocal(`
+    delete from public.cita_correos where appointment_id = :'id';
     delete from public.cita_confirmaciones where appointment_id = :'id';
-    delete from public.appointments where id = :'id';`, { id: citaId })
+    delete from public.appointments where id = :'id';
+    delete from public.pacientes where id = :'p';`, { id: citaId, p: pacienteId })
   interruptorAgenda('A', false)
 })
 

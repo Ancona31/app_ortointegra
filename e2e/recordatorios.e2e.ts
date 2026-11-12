@@ -49,7 +49,7 @@ function cita(horas: number, extra: { paciente?: string | null; status?: string 
   const id = sqlLocal(`
     insert into public.appointments (clinica_id, paciente_id, medico_id, title, start_time, end_time, status, all_day,
                                      consultorio_timezone, consultorio_nombre, consultorio_direccion, consultorio_telefono, notes)
-    values (:'c', nullif(:'p', ''), :'m', 'TITULO CLINICO SECRETO',
+    values (:'c', nullif(:'p', '')::uuid, :'m', 'TITULO CLINICO SECRETO',
             date_trunc('minute', now()) + make_interval(hours => :'h'::int),
             date_trunc('minute', now()) + make_interval(hours => :'h'::int, mins => 30),
             :'s', false, 'America/Mexico_City', 'Consultorio E4', 'Calle E4 1', '5550000004', 'NOTA CLINICA SECRETA')
