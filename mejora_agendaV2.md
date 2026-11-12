@@ -994,6 +994,28 @@ queda listada aquí.
   en Spinus de una fila importada pisaría su descripción en Google con el
   formato fijo y el sondeo siguiente la importaría como notas.
 
+### Bloque D — decisiones tomadas en D0-D3 (2026-11-11, sin regla previa)
+
+- **D0. Transporte de correo** (`src/lib/correo/transporte.ts`): tres modos por
+  `EMAIL_TRANSPORT`: `captura` (Mailpit por `POST /api/v1/send`, sólo host
+  loopback, sin seguir redirecciones, 10 s de espera), `resend`, y apagado para
+  todo lo demás (sin variable, vacía o valor desconocido, sin distinguir
+  mayúsculas: `RESEND` también apaga). **Doble guarda de Resend:** la variable
+  Y una `NEXT_PUBLIC_SUPABASE_URL` remota (`https:` y nombre DNS de dos o más
+  etiquetas que no sea IP, `.localhost`, `.local` ni `.internal`; ausente o mal
+  escrita cuenta como local). Sin `RESEND_API_KEY` también apaga. No se exige
+  además `VERCEL=1` (el diseño lo proponía; el encargo no). `resend` se importa
+  sólo en su rama; en local ni se lee la llave. Nunca lanza: devuelve
+  `{ok, modo, motivo}`. Al logger sólo van la etiqueta (literal del código,
+  saneada) y el código de error, nunca destinatario, asunto, cuerpo ni el
+  mensaje de error de Resend. `MAILPIT_URL` opcional (sólo loopback).
+- **D0, sin cambiar:** las seis rutas que construyen `new Resend()` directo
+  (registro, reset-password, email-hook, reenviar-confirmación,
+  enviar-documento, admin/invitar) siguen igual y **pueden mandar correos
+  reales desde local** con la llave de `.env.local` (contra §6). Para que
+  Angel lo anote. `.env.local` no se tocó: sin `EMAIL_TRANSPORT=captura`, el
+  transporte nuevo queda apagado también en local.
+
 ### Bloque F
 
 - Las 18 propuestas de la auditoría visual, aprobadas. **El pulido visual y los
