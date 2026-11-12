@@ -41,7 +41,10 @@ import { buildEventInput, FUENTE_APPOINTMENTS, PREFIJO_OPTIMISTA } from '@/lib/a
 import { addMinutes, ultimoDiaIncluido } from '@/lib/agenda/fechasAgenda'
 import { avisoFueraDeHorario, avisoFinFueraDeHorario } from '@/lib/agenda/horarioAgenda'
 import { DEFAULT_DURATION } from '@/lib/agenda/duracionCita'
-import type { Appointment, DatosGuardado } from '@/lib/agenda/tiposAgenda'
+import { registrarNuevo, salirConAnimacion } from '@/lib/agenda/marcasMovimiento'
+import { animarFlip } from '@/lib/agenda/flipTarjetas'
+import type { Appointment, DatosGuardado, Status } from '@/lib/agenda/tiposAgenda'
+import { ESTADOS_CITA, STATUS_CONFIG } from '@/lib/agenda/tarjetasAgenda'
 import {
   empalmesPintados, esListaDeEmpalmes, mensajeEmpalme, unirAceptados, ESTADOS_SIN_EMPALME, type Empalme,
 } from '@/lib/agenda/empalmesCita'
@@ -307,9 +310,18 @@ export function crearGuardadoCitas({
      ahí no hay hueco para que entre ninguna traída. */
   function restaurarPosicion(arg: EventDropArg | EventResizeDoneArg): void {
     const viejo = arg.oldEvent
-    if (!viejo.start) return
-    calendarRef.current?.getApi().getEventById(arg.event.id)
-      ?.setDates(viejo.start, viejo.end, { allDay: viejo.allDay })
+    const inicio = viejo.start
+    if (!inicio) return
+    const api = calendarRef.current?.getApi()
+    const evento = api?.getEventById(arg.event.id)
+    if (!evento) return
+    const aplicar = (): void => evento.setDates(inicio, viejo.end, { allDay: viejo.allDay })
+    /* F2.6: al cancelar el aviso, la tarjeta VUELVE deslizándose a su franja
+       (FLIP, `flipTarjetas.ts`) en vez de saltar. Sin `data-cita-id` (F1.4),
+       con movimiento reducido o entre columnas, aplica sin animar: degrada a
+       lo de antes. */
+    if (api instanceof CalendarioFC) animarFlip(api.el, arg.event.id, aplicar)
+    else aplicar()
   }
 
   /* ── B7b: EL AVISO DE EMPALME DEL GESTO ────────────────────────────────
@@ -517,7 +529,13 @@ export function crearGuardadoCitas({
         // Crear evento optimista temporal. `editable: false` cubre arrastre y
         // redimension a la vez: una cita que todavia no existe en la base no
         // tiene id que mandarle al servidor, solo el temporal.
-        optimisticEvent = api.addEvent({ ...buildEventInput(data), editable: false }, FUENTE_APPOINTMENTS)
+        const entrada = { ...buildEventInput(data), editable: false }
+        /* F2.4: la cita que acabas de crear entra animada, y SÓLO ella. Se
+           registra ANTES de `addEvent`, que pinta en síncrono y lee la marca
+           en `eventClassNames` (ver `marcasMovimiento.ts`). La real que la
+           sustituye abajo NO se registra: ésta ya entró en el mismo sitio. */
+        if (typeof entrada.id === 'string') registrarNuevo(entrada.id)
+        optimisticEvent = api.addEvent(entrada, FUENTE_APPOINTMENTS)
       }
     }
 
@@ -586,13 +604,21 @@ export function crearGuardadoCitas({
       // `null` ante CUALQUIER `EventInput` que FullCalendar no sepa parsear, y
       // esta línea no debe ser la que rompa un alta que por lo demás salió bien.
       // Lo que ya no hay que hacer es leerlo como «aquí falta un caso».
-      optimisticEvent?.remove()
-      const yaPresente = api?.getEventById(json.appointment.id)
-      if (yaPresente) {
-        aplicarAppointmentAlEvento(json.appointment)
-      } else {
-        api?.addEvent(buildEventInput({ ...data, ...json.appointment }), FUENTE_APPOINTMENTS)
+      /* F2.4: quitar la optimista y poner la real en UN solo repintado, para
+         que la tarjeta no pase ni un render sin estar y `eventsSet` salga una
+         vez. `aplicarAppointmentAlEvento` agrupa por su cuenta, y
+         `batchRendering` anidado no repinta hasta el último `resume`. */
+      const sustituir = () => {
+        optimisticEvent?.remove()
+        const yaPresente = api?.getEventById(json.appointment.id)
+        if (yaPresente) {
+          aplicarAppointmentAlEvento(json.appointment)
+        } else {
+          api?.addEvent(buildEventInput({ ...data, ...json.appointment }), FUENTE_APPOINTMENTS)
+        }
       }
+      if (api instanceof CalendarioFC) api.batchRendering(sustituir)
+      else sustituir()
     }
 
     // 'pending' es el caso normal —Google conectado, la escritura corre en el
@@ -644,9 +670,14 @@ export function crearGuardadoCitas({
     // podado a `{ id }` —la RLS no puede evaluarse sobre una fila que ya no
     // existe—, así que ni siquiera traería el `client_id`. Como esta baja ya
     // quitó el evento, su propio eco no encuentra nada que quitar.
+    /* F2.5: la tarjeta se desvanece (`--ag-dur-micro`) y DESPUÉS se quita;
+       sin `Calendar` (no debería pasar) se quita de golpe, como antes. La
+       única verdad sigue siendo el almacén de FullCalendar: ver
+       `salirConAnimacion`. El rollback no cambia: el `refetch()` trae la cita
+       como un objeto nuevo, sin la marca, y el temporizador no lo toca. */
     const api = calendarRef.current?.getApi()
-    const existing = api?.getEventById(id)
-    existing?.remove()
+    if (api instanceof CalendarioFC) salirConAnimacion(api, id)
+    else api?.getEventById(id)?.remove()
 
     vaciarCacheCitas() // A1.5a: también al salir; ver `ejecutarDrop`.
     const res = await fetch(`/api/appointments/${id}`, { method: 'DELETE' })
@@ -666,30 +697,50 @@ export function crearGuardadoCitas({
      CANCELA. Mismo camino que cambiar el estado en el modal —el PUT de
      siempre—, así que el `after()` de la ruta ya marca el evento de Google
      con «CANCELADA — » en vez de borrarlo (P4), y la auditoría la deja el
-     disparador de B0 (`cita_cancelada`). La tarjeta se queda, en cancelada. */
+     disparador de B0 (`cita_cancelada`). La tarjeta se queda, en cancelada.
+     Desde F3 es un caso de `cambiarEstadoCita`. */
   async function handleCancelar(id: string) {
+    await cambiarEstadoCita(id, 'cancelled')
+  }
+
+  /* F3 · el cambio de estado de una cita SIN abrir el modal (tarjeta de
+     lectura: «Confirmar», «Cancelar»). Es `handleCancelar` generalizado: el
+     mismo PUT parcial (`{ status, client_id }`), la misma firma para
+     reconocer el eco, la auditoría del disparador de B0, lo optimista y la
+     caché de rangos vaciada antes y después.
+     ⚠️ NUNCA BORRA (B3): cancelar es un PUT y la tarjeta se queda, en
+     cancelada y de golpe (spec §8: el cambio de estado no se anima); no pasa
+     por `salirConAnimacion`. Un estado fuera de los cinco no sale a la red. */
+  async function cambiarEstadoCita(id: string, estado: Status): Promise<void> {
+    if (!ESTADOS_CITA.includes(estado)) {
+      toast.error('Estado de cita no válido')
+      return
+    }
+    const textos = estado === 'cancelled'
+      ? { hecho: 'Se canceló la cita', fallo: 'No se pudo cancelar' }
+      : { hecho: `Estado cambiado a «${STATUS_CONFIG[estado].label}»`, fallo: 'No se pudo cambiar el estado' }
     closeModal()
-    toast.success('Se canceló la cita')
+    toast.success(textos.hecho)
     const evento = calendarRef.current?.getApi().getEventById(id)
-    evento?.setExtendedProp('status', 'cancelled')
+    evento?.setExtendedProp('status', estado)
 
     vaciarCacheCitas() // A1.5a: también al salir; ver `ejecutarDrop`.
     const res = await fetch(`/api/appointments/${id}`, {
       method:  'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ status: 'cancelled', client_id: firmarEscritura() }),
+      body:    JSON.stringify({ status: estado, client_id: firmarEscritura() }),
     })
     vaciarCacheCitas()
 
     if (!res.ok) {
       refetch()
       const cuerpo: { error?: string; message?: string } | null = await res.json().catch(() => null)
-      toast.error(cuerpo?.message || cuerpo?.error || 'No se pudo cancelar')
+      toast.error(cuerpo?.message || cuerpo?.error || textos.fallo)
       return
     }
     const json: { appointment?: Partial<Appointment> & { id?: string } } | null = await res.json().catch(() => null)
     if (json?.appointment) aplicarAppointmentAlEvento(json.appointment)
   }
 
-  return { handleEventDrop, handleEventResize, handleSave, handleDelete, handleCancelar }
+  return { handleEventDrop, handleEventResize, handleSave, handleDelete, handleCancelar, cambiarEstadoCita }
 }

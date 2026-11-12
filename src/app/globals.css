@@ -3649,10 +3649,15 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
    recibe `.ag-ev-nuevo`, el evento genuinamente nuevo (CONTRASTE_Y_MOVIMIENTO
    §2.2: al navegar y en la primera carga no se anima nada individual). Antes
    corría en CADA montaje, y con la caché de rangos cada vuelta a una semana
-   habría vuelto a fundir todas las tarjetas. Hoy ninguna tarjeta lleva esa
-   clase: la pone el bloque F con la diferencia de ids de `eventsSet`. Hasta
-   entonces la cita recién creada entra sin animación, a propósito. */
-.agenda-fc .fc-event.ag-ev-nuevo:not(.fc-event-mirror):not(.fc-list-event) {
+   habría vuelto a fundir todas las tarjetas. La clase la pone el bloque F
+   (F2.4) por REGISTRO EXPLÍCITO en los dos sitios donde nace una cita —el
+   alta optimista y el INSERT por tiempo real—, no por la diferencia de ids de
+   `eventsSet`, que sólo poda (ver `src/lib/agenda/marcasMovimiento.ts`).
+   ⚠️ F2.4 AÑADE DOS EXCLUSIONES MÁS, Y LAS DOS SON DEL MISMO TIPO QUE LAS DE
+   ARRIBA: `.fc-daygrid-event` (Mes y banda de todo el día) entra sólo con
+   opacidad —la variante de la sección de movimiento de abajo—, y
+   `.ag-ev-saliendo` no puede volver a entrar mientras se va. */
+.agenda-fc .fc-event.ag-ev-nuevo:not(.fc-event-mirror):not(.fc-list-event):not(.fc-daygrid-event):not(.ag-ev-saliendo) {
   animation: ag-entra var(--ag-dur-base) var(--ag-ease-out) backwards;
 }
 
@@ -3688,13 +3693,178 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
      navegación, la vuelta del deslizamiento): esas miran
      `prefiereMenosMovimiento()` de `src/lib/agenda/movimientoAgenda.ts` y no
      animan. Una regla CSS no puede apagar un `element.animate()`. */
+  /* ⚠️ `.fc-event` SUELTO ES POR EL ESPEJO DEL ARRASTRE (F2.3): al revertir,
+     FullCalendar lo devuelve con una `transition: top, left` EN LÍNEA sobre un
+     clon que cuelga de `body`, fuera de `.fc`. El `!important` de aquí gana al
+     estilo en línea, y con `.01ms` su `transitionend` sigue llegando, que es
+     lo que FullCalendar espera para soltarlo. */
   .fc *, .agenda-fc *, .ag-dia-aside, .ag-dia-aside *, .fc *::before, .fc *::after,
+  .fc-event,
   .ag-modal-panel, .ag-modal-velo,
   .ag-capa, .ag-capa *, .ag-hoja, .ag-hoja *, .ag-capa-velo {
     animation-duration: .01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: .01ms !important;
   }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   MOVIMIENTO DE LAS CITAS — bloque F (F2.4, F2.5)
+   ══════════════════════════════════════════════════════════════════════
+   Las tres clases las pone `clasesDelEvento` (`eventClassNames`) a partir de
+   `src/lib/agenda/marcasMovimiento.ts`, en el `<a>`/`<tr>` raíz del evento:
+   · `.ag-ev-nuevo`: la cita que acabas de crear o que acaba de llegar;
+   · `.ag-ev-remoto`: además, llegó por tiempo real (lleva el anillo);
+   · `.ag-ev-saliendo`: la baja, mientras se desvanece antes de quitarse.
+   Las tres viven ~600 ms (la salida, `--ag-dur-micro`) y ninguna sale al
+   abrir ni al navegar: no hay registro, no hay clase.
+
+   ⚠️ LAS FILAS DE LISTA (`<tr>`) Y EL MES SÓLO ANIMAN OPACIDAD. Un `transform`
+   sobre un `<tr>` lo despega de la rejilla de la tabla (la nota de `ag-entra`);
+   en Mes el diseño pide lo mismo (plan_F §2), y la banda de todo el día de
+   Semana/Día es `.fc-daygrid-event` también, así que entra igual.
+   ⚠️ SIN `to {}` Y CON `backwards` EN LAS ENTRADAS, por lo de `ag-entra`. */
+@keyframes ag-entra-opacidad {
+  from { opacity: 0; }
+}
+.agenda-fc .fc-event.ag-ev-nuevo.fc-list-event:not(.ag-ev-saliendo),
+.agenda-fc .fc-event.ag-ev-nuevo.fc-daygrid-event:not(.fc-event-mirror):not(.ag-ev-saliendo) {
+  animation: ag-entra-opacidad var(--ag-dur-base) var(--ag-ease-out) backwards;
+}
+
+/* El ANILLO de lo que llega por tiempo real (decisión 2 del bloque F): un
+   `box-shadow` FIJO dibuja el anillo y sólo se anima su OPACIDAD, 0 → 1 → 0,
+   una vez, en `--ag-dur-lento` tras esperar a que termine la entrada
+   (`--ag-dur-base`). Sustituye al pulso de 900 ms de `box-shadow` del spec,
+   que pasa del tope.
+   ⚠️ CUELGA DE LA CAJA DE LA TARJETA, NO DEL `<a>` NI DEL `<tr>`. El `::after`
+   del `<a>` es de FullCalendar (la capa de `.fc-event:focus` y de
+   `.fc-event-selected`), y un `<tr>` no tiene caja donde ponerlo. Tres de
+   las cinco cajas (`.ag-tarjeta`, `.ag-mes`, `.ag-banda`) llevan
+   `overflow: hidden`, así que el anillo va POR DENTRO (`inset` 0 y sombra
+   `inset`): uno por fuera saldría recortado. En las dos de lista el resultado
+   es el mismo y se deja igual por simetría. En lista rodea sólo la celda del
+   nombre, la única que pinta `eventContent`.
+   ⚠️ LA OPACIDAD EN REPOSO ES 0: la clase puede seguir puesta tras la
+   animación (FullCalendar no recalcula clases sin repintar) y el anillo no
+   debe quedarse visible. Con movimiento reducido entra por `.fc *::after`. */
+@keyframes ag-pulso {
+  0%, 100% { opacity: 0; }
+  50%      { opacity: 1; }
+}
+.agenda-fc .fc-event.ag-ev-remoto .ag-tarjeta,
+.agenda-fc .fc-event.ag-ev-remoto .ag-mes,
+.agenda-fc .fc-event.ag-ev-remoto .ag-banda,
+.agenda-fc .fc-event.ag-ev-remoto .ag-listafila,
+.agenda-fc .fc-event.ag-ev-remoto .ag-listadia {
+  position: relative;
+}
+.agenda-fc .fc-event.ag-ev-remoto .ag-tarjeta::after,
+.agenda-fc .fc-event.ag-ev-remoto .ag-mes::after,
+.agenda-fc .fc-event.ag-ev-remoto .ag-banda::after,
+.agenda-fc .fc-event.ag-ev-remoto .ag-listafila::after,
+.agenda-fc .fc-event.ag-ev-remoto .ag-listadia::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 2px var(--ag-pulso);
+  pointer-events: none;
+  opacity: 0;
+  animation: ag-pulso var(--ag-dur-lento) var(--ag-ease) var(--ag-dur-base) 1;
+}
+
+/* La SALIDA (decisión 3): sólo opacidad, `--ag-dur-micro`, `--ag-ease-in` —
+   lo que se va acelera y dura menos que lo que llega—. Sin encogerse: «nada
+   de escalado en tarjetas». `forwards` aquí SÍ, y es seguro: retiene
+   `opacity`, que no crea bloque contenedor, y el nodo se quita al acabar.
+   Sin punteros: una cita que se va no se puede volver a abrir ni arrastrar
+   (además va con `editable: false`).
+   ⚠️ LA CANCELACIÓN NO PASA POR AQUÍ: la tarjeta se queda y cambia de color
+   de golpe (spec §8). */
+@keyframes ag-sale {
+  to { opacity: 0; }
+}
+.agenda-fc .fc-event.ag-ev-saliendo {
+  animation: ag-sale var(--ag-dur-micro) var(--ag-ease-in) forwards;
+  pointer-events: none;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   AVISOS Y BANDA COMPACTA — bloque F (F2.8)
+   ══════════════════════════════════════════════════════════════════════
+   CONTRASTE §2.6: entra con opacidad y 6 px («bloques») en `--ag-dur-lento`
+   con `--ag-ease-out`; sale sólo con opacidad, MÁS RÁPIDO (`--ag-dur-base`,
+   `--ag-ease-in`): lo que ya leíste se quita sin hacerse esperar. La salida la
+   sostiene `ConSalida` (`AvisosAgenda.tsx`), que deja la banda montada con
+   `data-estado="saliendo"` mientras dura.
+   ⚠️ NO SE ANIMA EL ALTO (decisión 7): la banda ocupa su sitio entero hasta
+   desmontarse y la rejilla salta UNA vez. Animar el alto recalcularía
+   FullCalendar en cada cuadro.
+   ⚠️ `backwards` en la entrada (no retiene `transform`) y sin `to {}`, por lo
+   de `ag-entra`. La salida retiene `opacity` con `forwards`, que es seguro.
+   Con movimiento reducido entran por `.agenda-fc *`. */
+@keyframes ag-aviso-entra {
+  from { opacity: 0; transform: translateY(6px); }
+}
+@keyframes ag-aviso-sale {
+  to { opacity: 0; }
+}
+.agenda-fc .ag-aviso,
+.agenda-fc .ag-banda-compacta {
+  animation: ag-aviso-entra var(--ag-dur-lento) var(--ag-ease-out) backwards;
+}
+.agenda-fc .ag-aviso[data-estado="saliendo"],
+.agenda-fc .ag-banda-compacta[data-estado="saliendo"] {
+  animation: ag-aviso-sale var(--ag-dur-base) var(--ag-ease-in) forwards;
+  pointer-events: none;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   MODALES DE LA AGENDA — bloque F (F2.7)
+   ══════════════════════════════════════════════════════════════════════
+   Clases propias y NO `animate-modal-enter`, que es de toda la app (220 ms,
+   `scale(.94)`, curva propia): fuera de la escala y con escalado. Contrato de
+   F0: `.ag-modal-panel` (el panel) y `.ag-modal-velo` (el fondo), los dos ya
+   en el bloque de movimiento reducido de arriba (se pintan en `body`, fuera
+   de `.fc`).
+   · Entrada: el panel sube 6 px con fundido en `--ag-dur-lento`
+     (`--ag-ease-out`); el velo se oscurece a la vez, en el mismo tiempo.
+   · Salida (`[data-estado="saliendo"]`): el panel baja 6 px y se desvanece en
+     `--ag-dur-base` (`--ag-ease-in`), el velo se aclara a la vez. Sólo la
+     tiene el modal de la cita (decisión 17); la sostiene `AgendaCliente`
+     (estado `modalSaliente`), que lo deja montado `--ag-dur-base` ms.
+   ⚠️ MIENTRAS SALE NO SE PUEDE PULSAR: `pointer-events: none` aquí, y el
+   modal pone además `inert` en su raíz, porque los punteros no cortan el
+   teclado y un Enter sobre «Guardar» volvería a guardar.
+   ⚠️ `backwards` en la entrada, por lo de `pageEnter`: un `transform`
+   retenido haría del panel el bloque contenedor de lo `fixed` de dentro.
+   La salida sí retiene (`forwards`): el nodo se desmonta al acabar. */
+@keyframes ag-modal-entra {
+  from { opacity: 0; transform: translateY(6px); }
+}
+@keyframes ag-modal-sale {
+  to { opacity: 0; transform: translateY(6px); }
+}
+@keyframes ag-modal-velo-entra {
+  from { opacity: 0; }
+}
+@keyframes ag-modal-velo-sale {
+  to { opacity: 0; }
+}
+.ag-modal-panel {
+  animation: ag-modal-entra var(--ag-dur-lento) var(--ag-ease-out) backwards;
+}
+.ag-modal-velo {
+  animation: ag-modal-velo-entra var(--ag-dur-lento) var(--ag-ease-out) backwards;
+}
+.ag-modal-panel[data-estado="saliendo"] {
+  animation: ag-modal-sale var(--ag-dur-base) var(--ag-ease-in) forwards;
+  pointer-events: none;
+}
+.ag-modal-velo[data-estado="saliendo"] {
+  animation: ag-modal-velo-sale var(--ag-dur-base) var(--ag-ease-in) forwards;
+  pointer-events: none;
 }
 
 /* ══════════════════════════════════════════════════════════════════════

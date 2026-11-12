@@ -92,6 +92,60 @@ export function duracionMovimiento(token: TokenDuracion, el?: Element): number {
   return prefiereMenosMovimiento() ? 0 : duracionToken(token, el)
 }
 
+/* ── El fundido de navegación (F2.3) ───────────────────────────────────── */
+
+/** Lo que identifica lo pintado para decidir el fundido: el tipo de vista y el inicio del periodo. */
+export interface MarcaDeVista { tipo: string; inicio: number }
+
+/**
+ * ¿El `datesSet` que llega es un cambio de FECHA dentro de la misma vista?
+ * Sólo entonces hay fundido. No en el primero (la vista entera ya entra con
+ * `ag-vista`), no al cambiar de tipo (ídem: `.fc-view` se vuelve a montar) y
+ * no si el periodo no cambió —«Compactar» pliega días y reemite `datesSet`
+ * con el mismo `currentStart`, y su plegado no se anima (CONTRASTE §2.8)—.
+ */
+export function esCambioDeFecha(previa: MarcaDeVista | null, actual: MarcaDeVista): boolean {
+  return previa !== null && previa.tipo === actual.tipo && previa.inicio !== actual.inicio
+}
+
+/** De .7 a 1, SIN traslación (CONTRASTE §2.3: «ninguna traslación al cambiar de fecha»). */
+export const FOTOGRAMAS_NAVEGACION: Keyframe[] = [{ opacity: 0.7 }, { opacity: 1 }]
+
+/** Lo mínimo del armazón (`.fc-view-harness`) que hace falta; un `HTMLElement` lo cumple. */
+export interface NodoFundido {
+  animate(fotogramas: Keyframe[], opciones: KeyframeAnimationOptions): unknown
+  closest(selector: string): object | null
+  getAnimations(): ReadonlyArray<{ id: string; cancel(): void }>
+}
+
+/** El `id` de la animación del fundido, para encontrar la anterior y cortarla. */
+export const ID_FUNDIDO_NAVEGACION = 'ag-fundido-navegacion'
+
+/**
+ * El fundido del armazón al cambiar de fecha, con WAAPI, en `--ag-dur-micro`
+ * y `--ag-ease-out`. Devuelve si animó.
+ *
+ * ⚠️ NO PELEA CON LA ATENUACIÓN DE CARGA, y por dos razones: dura 120 ms y la
+ * atenuación no aparece antes de 150 (`UMBRAL_CARGA_MS`), y si la rejilla YA
+ * está atenuada —carga visible (`ag-cargando`) o lectura rota
+ * (`ag-desactualizada`)— no se funde: subir a 1 encima de un .55 y volver de
+ * golpe sería un destello. La atenuación es un estado y manda.
+ * ⚠️ Con movimiento reducido no anima: el bloque CSS no alcanza a WAAPI.
+ */
+export function fundirNavegacion(armazon: NodoFundido | null): boolean {
+  if (!armazon || prefiereMenosMovimiento()) return false
+  /* Dos navegaciones seguidas: la anterior se corta, para que nunca corran dos
+     fundidos a la vez sobre el armazón. Queda un borde aceptado: si la
+     segunda llega antes de que la primera encienda la atenuación (150 ms), el
+     fundido nuevo puede tapar hasta ~20 ms el arranque de la rampa a .55. */
+  for (const a of armazon.getAnimations()) if (a.id === ID_FUNDIDO_NAVEGACION) a.cancel()
+  if (armazon.closest('.ag-cargando, .ag-desactualizada')) return false
+  armazon.animate(FOTOGRAMAS_NAVEGACION, {
+    id: ID_FUNDIDO_NAVEGACION, duration: duracionToken('--ag-dur-micro'), easing: curvaToken('--ag-ease-out'),
+  })
+  return true
+}
+
 /* ── La regla, en puro ─────────────────────────────────────────────────── */
 
 /** Una animación tal como la extrae `e2e/movimientoAyudas.ts` del navegador. */

@@ -47,17 +47,25 @@ import { type ReactElement, type ReactNode } from 'react'
 
 /** La caja de una banda. Las cuatro comparten geometría y sólo cambia el tono. */
 export function Banda(
-  { tono, urgente, children }: {
+  { tono, urgente, saliendo, children }: {
     tono: 'error' | 'gcal' | 'vacio'
     /** `role="alert"` en vez de `role="status"`: interrumpe al lector de
      *  pantalla. Sólo la banda de error lo lleva — una agenda que no cargó sí
      *  merece cortar lo que se estuviera leyendo; un día sin citas, no. */
     urgente?: boolean
+    /** Bloque F (F2.8): la banda ya no aplica y se está desvaneciendo antes de
+     *  desmontarse. La pone `ConSalida` (`AvisosAgenda.tsx`); el CSS lee
+     *  `data-estado`. Mientras sale va `inert` y no `aria-hidden`: lo que dice
+     *  ya no es verdad y se oculta a las ayudas técnicas, pero además suelta el
+     *  foco (p. ej. el del botón que la acaba de apagar), que `aria-hidden` no
+     *  puede contener. */
+    saliendo?: boolean
     children: ReactNode
   },
 ): ReactElement {
   return (
-    <div className={`ag-aviso ag-aviso--${tono}`} role={urgente ? 'alert' : 'status'}>
+    <div className={`ag-aviso ag-aviso--${tono}`} role={urgente ? 'alert' : 'status'}
+      data-estado={saliendo ? 'saliendo' : undefined} inert={saliendo || undefined}>
       {children}
     </div>
   )

@@ -9,6 +9,7 @@ import { useRouter } from 'next/navigation'
 import FullCalendar from '@fullcalendar/react'
 import type { DateClickArg, EventResizeDoneArg } from '@fullcalendar/interaction'
 import type { DatesSetArg, EventClickArg, EventDropArg, DateSelectArg, EventApi, EventContentArg, DayHeaderContentArg } from '@fullcalendar/core'
+import { Calendar as CalendarioFC } from '@fullcalendar/core'
 import esLocale from '@fullcalendar/core/locales/es'
 import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/components/ui/Toast'
@@ -75,6 +76,8 @@ import {
 } from '@/lib/agenda/vistasAgenda'
 import { clasesDelEvento } from '@/lib/agenda/tarjetasAgenda'
 import { desplazarListaAHoy, diaLocalISO } from '@/lib/agenda/listaHoy'
+import { podarMarcas } from '@/lib/agenda/marcasMovimiento'
+import { duracionMovimiento, esCambioDeFecha, fundirNavegacion, type MarcaDeVista } from '@/lib/agenda/movimientoAgenda'
 
 /* ═══ A2.6 · LOS TRES MODALES EN DIFERIDO ═════════════════════════════════
    `AppointmentModal` (el más grande: iconos, `Portal`, `QuickPatientModal`,
@@ -142,6 +145,11 @@ const UMBRAL_CARGA_MS = 150
    `UMBRAL_REFETCH_FOCO_MS` de `useTiempoRealAgenda.ts`, repetido a propósito
    (es local a ese gancho). */
 const UMBRAL_SONDEO_FOCO_MS = 120_000
+
+/* F2.7: la salida animada del modal de la cita (ver la nota junto a
+   `closeModal`). `AppointmentModal` ya recibe `saliendo`: `data-estado` en
+   velo y panel, e `inert` en su raíz. */
+const SALIDA_DEL_MODAL: boolean = true
 
 /* ─── Página principal ─────────────────────────────────── */
 
@@ -540,7 +548,32 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
     return () => window.removeEventListener('resize', check)
   }, [])
 
-  function closeModal() { setModal({ mode: 'closed' }) }
+  /* ── F2.7 · LA SALIDA DEL MODAL DE LA CITA ─────────────────────────────
+     `modal` sigue siendo la ÚNICA verdad de si está abierto: se cierra al
+     instante, como siempre, y todo lo que mira `modal.mode` no se entera.
+     Lo que dura `--ag-dur-base` es sólo el PINTADO: `modalSaliente` guarda el
+     que se va para que siga montado, con `saliendo`, mientras se desvanece
+     (CSS `.ag-modal-panel[data-estado="saliendo"]`). Si se abre otro antes de
+     que acabe, manda el nuevo y el temporizador no toca nada que no sea suyo.
+     Con movimiento reducido la espera es 0 y se desmonta como antes.
+
+     ⚠️ `saliendo={modal.mode === 'closed'}` EN EL JSX NO SE QUITA: el modal
+     pone `data-estado` en el panel y en el velo, e `inert` en su raíz. Sin
+     eso seguiría montado 180 ms SIN animar y, peor, pulsable: un segundo
+     «Guardar» crearía otra cita. */
+  const [modalSaliente, setModalSaliente] = useState<ModalState | null>(null)
+
+  function closeModal() {
+    const espera = SALIDA_DEL_MODAL && modal.mode !== 'closed' ? duracionMovimiento('--ag-dur-base') : 0
+    if (espera > 0) {
+      const saliente = modal
+      setModalSaliente(saliente)
+      setTimeout(() => setModalSaliente(m => (m === saliente ? null : m)), espera)
+    }
+    setModal({ mode: 'closed' })
+  }
+  /** Lo que se pinta: el abierto, o el que está saliendo. */
+  const modalPintado: ModalState = modal.mode !== 'closed' ? modal : (modalSaliente ?? modal)
 
   const {
     eventSourcesStable, refetch, alEmpezarGesto, alTerminarGesto, programarPrecarga, ultimaTraidaRef,
@@ -960,7 +993,20 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
 
      Los cuerpos de los cuatro que iban en línea están tal cual, sólo con nombre;
      sus notas siguen junto a cada prop en el JSX. */
+  /* F2.3: lo último que se pintó, para saber si este `datesSet` es un cambio de
+     FECHA (fundido) o el primero / un cambio de vista (lo hace `ag-vista`). */
+  const vistaPreviaRef = useRef<MarcaDeVista | null>(null)
+
   function alCambiarFechas(arg: DatesSetArg) {
+    /* F2.3 · el fundido de navegación: el armazón de .7 a 1 en micro, SIN
+       traslación (CONTRASTE §2.3). Va primero porque `datesSet` llega con el
+       rango nuevo ya pintado. Ver `fundirNavegacion`. */
+    const marca = { tipo: arg.view.type, inicio: arg.view.currentStart.getTime() }
+    if (esCambioDeFecha(vistaPreviaRef.current, marca)) {
+      const api = calendarRef.current?.getApi()
+      fundirNavegacion(api instanceof CalendarioFC ? api.el.querySelector('.fc-view-harness') : null)
+    }
+    vistaPreviaRef.current = marca
     setCurrentView(arg.view.type)
     setTituloVista(arg.view.title)
     const ahora = Date.now()
@@ -993,7 +1039,15 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
     programarPrecarga(arg.view)
   }
 
+  /* F2.4: los ids del `eventsSet` anterior. SÓLO PODAN las marcas de
+     entrada y hacen de candado (ver `podarMarcas`): quién entra animado lo
+     decide el registro explícito, nunca esta diferencia. */
+  const idsPreviosRef = useRef<ReadonlySet<string>>(new Set())
+
   function alCambiarEventos(eventos: EventApi[]) {
+    const ids = new Set(eventos.map(e => e.id))
+    podarMarcas(ids, idsPreviosRef.current)
+    idsPreviosRef.current = ids
     const rangos = rangoDeVista()
     aplicarVentana(eventos, rangos)
     aplicarConteo(eventos, rangos)
@@ -1606,7 +1660,12 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
           selectable={!esMesMovil}
           selectMirror
           editable
-          dragRevertDuration={200}
+          /* F2.3: 180 = `--ag-dur-base` (decisión 5 del bloque F). Literal y
+             primitivo a propósito: es una prop de `<FullCalendar>` y no puede
+             cambiar de identidad (A1-bis.2). Si cambia el token, cambia esto.
+             El regreso lo anima FullCalendar con `top`/`left` en línea sobre
+             el espejo; con movimiento reducido lo corta el bloque CSS. */
+          dragRevertDuration={180}
           eventResizableFromStart
           businessHours={horasHabilesFc}
           eventSources={eventSourcesStable}
@@ -1762,7 +1821,7 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
       )}
 
       {/* ── Modal cita ──────────────────────────────────── */}
-      {modal.mode !== 'closed' && (
+      {modalPintado.mode !== 'closed' && (
         <AppointmentModal
           /* ⚠️ LA `key` NO ES DECORATIVA: ES EL MECANISMO DE RESETEO.
              Cambiar de cita a evento en el alta cambia esta clave, React tira el
@@ -1789,8 +1848,9 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
              estado, y eso desarma el mecanismo entero por un caso de borde
              —teclear la hora ANTES de cambiar de tipo— que además avisa solo,
              porque el campo se ve vacío. */
-          key={modal.mode === 'create' ? modal.tipo : modal.appointment.id}
-          modal={modal}
+          key={modalPintado.mode === 'create' ? modalPintado.tipo : modalPintado.appointment.id}
+          modal={modalPintado}
+          saliendo={modal.mode === 'closed'}
           onClose={closeModal}
           onSave={handleSave}
           onDelete={handleDelete}
