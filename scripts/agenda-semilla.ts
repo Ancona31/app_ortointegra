@@ -232,8 +232,11 @@ async function borrar(): Promise<void> {
     /* La FK de `agenda_ajustes` a `clinicas` es RESTRICT (migración B1): una
        prueba que encendió el interruptor deja su fila, y sin esto el borrado de
        la clínica de abajo falla. Con el rol de servicio: el disparador que
-       protege el interruptor no mira los DELETE. */
-    sinError(await admin.from('agenda_ajustes').delete().in('clinica_id', clinicas), 'borrar ajustes de la agenda')
+       protege el interruptor no mira los DELETE. La tabla puede no existir sin
+       la migración B1 (base local sólo con las migraciones de `main`, la de la
+       prueba de tolerancia del cierre): mismo trato que `tipos_cita`. */
+    const ajustes = await admin.from('agenda_ajustes').delete().in('clinica_id', clinicas)
+    if (ajustes.error && ajustes.error.code !== '42P01' && ajustes.error.code !== 'PGRST205') sinError(ajustes, 'borrar ajustes de la agenda')
   }
   for (const id of usuarios) {
     const { error } = await admin.auth.admin.deleteUser(id)

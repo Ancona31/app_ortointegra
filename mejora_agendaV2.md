@@ -3469,6 +3469,33 @@ primero sin marcar.
     revisor independiente en otro modelo (Sonnet) auditó el conjunto sin ver
     estas conclusiones; sus cinco hallazgos y los del coordinador, con lo que
     se hizo con cada uno, en el §4 del documento y en §6-bis «Cierre».
+  - **Paso 5 · tolerancia a producción** (base local reiniciada SÓLO con las 5
+    migraciones de `main`, `db reset --local --workdir` desde un directorio
+    temporal; el `next start` :3001 con el build de la rama). Sin ninguna
+    tabla nueva ni el interruptor, y sin `log_cita_change`:
+    - Las 23 e2e que no tocan tablas nuevas (agenda, vistas, filtro, alta y
+      edición de citas, arrastre y redimensionado, banda de todo el día,
+      tiempo real, caché, enlace profundo, iniciar consulta, secretaria,
+      móvil, tableta…): **99 pasan, 1 falla, y la que falla es la que debe**:
+      `agenda-arrastre` comprueba la fila `cita_editada` de B0, que sin B0 no
+      existe. El arrastre en sí persiste (PUT 200, contexto nuevo).
+    - Sondas a mano con la sesión de admin.a: alta, edición y **baja** de una
+      cita con paciente → 200/200/200 (se borra, como en `main`);
+      `/agenda/configuracion` → página de no encontrado; `/reservar/{código}`
+      y `/confirmar/{código}` → 404; `POST /api/reservar/{código}` → 404;
+      `/api/agenda/{por-confirmar,tipos-cita,enlaces,reservas}` → 404;
+      `POST /api/google/sync` → 200 `{"estado":"omitida"}`; las dos tareas →
+      401 sin secreto, 200 `{"ok":true}` con él y sin hacer nada.
+    - Log del servidor: ningún error. Sí un `warn` por petición
+      («interruptor de la agenda sin leer (cuenta como apagado)», 150 en la
+      corrida): no va a Sentry, pero ensucia el log de Vercel. Orden
+      recomendado al desplegar: migraciones primero (hallazgo H3).
+    - Arreglado (herramienta, no producto): la semilla borraba
+      `agenda_ajustes` sin tolerar que la tabla faltara y la segunda siembra
+      sobre esa base fallaba. Ahora la trata como a `tipos_cita`.
+    Después, la base se dejó otra vez con las 21 y sembrada (con D11
+    corregida), y se repitió todo: SQL 17, Vitest 1684, Playwright 244 pasan y
+    0 fallan (204/37/3), las dos carreras en verde, lint 96.
 
 **Bitácora** (una línea por sesión: fecha, qué quedó hecho, qué quedó a medias):
 
