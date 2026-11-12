@@ -924,6 +924,61 @@ queda listada aquí.
   prueba SQL que demuestra el mismo veredicto que la original para VIP,
   suscripción activa, free virgen y free degradada.
 
+### Bloque C — decisiones tomadas en C0-C4 (2026-11-13, sin regla previa)
+
+- **S3, cómo quedó:** `gcal_sync_clinica_habilitada(p_clinica_id)` (C1) **no
+  copia RN-1**: lee en cada llamada el cuerpo vigente de
+  `clinica_no_suspendida()` y `clinica_tiene_acceso()` desde `pg_proc`,
+  sustituye `public.get_clinica_id()` por el parámetro (`EXECUTE … USING`) y lo
+  ejecuta como `service_role`. Prueba: `c1_gcal_sync_estado.sql` casos 1-3 y
+  12 (mismo veredicto en los cuatro casos; muta la original en un savepoint y
+  la nueva la sigue). **Para revisar por Angel:** si alguien reescribe una de
+  las dos originales cambiando su FORMA (a plpgsql, dos sentencias,
+  `get_clinica_id()` sin `public.`), la nueva lanza y la sincronización se
+  detiene, cerrada, hasta revisar C1. El aviso NO se puso en el `COMMENT` de
+  las originales, porque S3 prohíbe tocarlas.
+- **RN-1 no coincide con su descripción:** el contrato con la consola de
+  `CLAUDE.md` (rama `feature/limites-ajustables`) incluye «o 5 pacientes o
+  menos contando los dados de baja», y la función de esta rama y de la base
+  local no lo tiene. Manda la función; como S3 no la copia, heredaría ese
+  cambio si llega.
+- **La puerta del sondeo** = `clinica_no_suspendida()` Y
+  `clinica_tiene_acceso()` (las dos de `appointments_gates_insert`);
+  `perfil_completo()` no aplica (es del usuario que escribe). Una clínica sin
+  acceso suelta el candado con `sin_acceso`, que cuenta para la espera
+  creciente.
+- **C-d, cómo se detecta el título editado:** se compara con el `summary` que
+  Spinus compone (`eventoParaGoogle`), por eso `gcal_citas_por_evento` devuelve
+  nombre y apellidos del paciente de las citas con paciente (lo mismo que ya
+  viaja a Google). Sin nombre conocido, no se marca.
+- **C-e con borrado:** una cita `attended`, `no_show` o `cancelled` cuyo
+  evento se borra en Google no se toca en la base (ni se desvincula): se
+  audita y se marca para que C5 vuelva a escribirla (una cancelada, con
+  «CANCELADA — »). Lo rechazado no guarda el `etag` nuevo.
+- **«La marca» para C5:** `sincronizarClinica()` devuelve `restablecer` (ids
+  de cita); no hay columna ni cola. Si C5 no la consume, no se pierde nada que
+  hoy exista.
+- **No aceptados aunque la cita admita cambios:** título vacío; pasar a todo
+  el día una cita con paciente o una sin `consultorio_timezone` (la CHECK
+  `appointments_all_day_medianoche_check` lo impediría); duraciones por encima
+  del tope. Se marcan para restablecer.
+- **Descripción** de una cita con paciente o nacida en Spinus editada en
+  Google: se ignora y no se restablece (S1 dice que no viaja; C-d sólo habla
+  del título).
+- **Empate exacto** de `event.updated` y `updated_at`: gana Spinus.
+- **Auditoría:** dos acciones nuevas en `src/lib/audit.ts`
+  (`gcal_conflicto_cita`, `gcal_cambio_rechazado`), con nombres de campo; lo
+  aceptado lo audita el disparador con `"via":"google"`. D y E deberán usar
+  otro literal en `spinus.via`, nunca `'google'`.
+- **Hueco conocido, sin arreglar:** un evento creado por Spinus antes de v2
+  cuyo `google_event_id` nunca se guardó (falló el `after()`) se importaría
+  como evento de Google, con «Cita médica: <nombre>» de título. Hoy ya se ve
+  duplicado, en solo lectura. Las marcas de C5 lo evitan para lo nuevo.
+- **Orden obligatorio:** C5 antes que C6. Hasta que C5 deje de mandar
+  `description` en las filas `origen='google'` y guarde el `etag`, una edición
+  en Spinus de una fila importada pisaría su descripción en Google con el
+  formato fijo y el sondeo siguiente la importaría como notas.
+
 ### Bloque F
 
 - Las 18 propuestas de la auditoría visual, aprobadas. **El pulido visual y los
@@ -1129,7 +1184,25 @@ primero sin marcar.
   - Decisiones: §6-bis («Bloque B — decisiones tomadas al construir»).
   - Abierto y documentado en `DEUDA_TECNICA.md` (E5-DT-8): si otra persona
     borra la cita a mitad del arrastre, al soltar queda una tarjeta fantasma.
-- [ ] C — Google en los dos sentidos
+- [ ] C — Google en los dos sentidos (en curso, rama `feature/agenda-v2-c`)
+  - Diseño: `e2e/resultados/plan_C.md` del worktree de `feature/agenda-v2`,
+    acotado por C-a, C-d, C-e y S1-S3 de §6-bis, que mandan.
+  - C0 (2026-11-13): AG-DT-5 cerrada en `DEUDA_TECNICA.md` (la arregló
+    `18b9864`, verificado en el código); LP-DT-6 anotada: sigue abierta hasta
+    la prueba con cuenta real, y «en tiempo real» sigue prohibido sin webhook.
+  - C1 (migración `20261113120000`, auditada APTA CON CAMBIOS, aplicados):
+    `gcal_sync_estado`, candado con testigo, listado del cron y la puerta S3.
+    C2 (`20261113130000`, APTA CON CAMBIOS, aplicados): espejo, aplicar,
+    importar y `"via":"google"` en `log_cita_change`. Las dos solo en local.
+  - C3: `src/lib/gcalSincronizacionDecidir.ts`, decisión pura. C4:
+    `gcalSincronizacionBase.ts` (única puerta a las RPC),
+    `gcalSincronizacion.ts` (`sincronizarClinica`, que hoy no llama nadie),
+    `listarConexionesParaSincronizar` en `gcalConexion.ts`, cerrojo nuevo y
+    `supabase/pruebas-sql/c4_gcal_flujo.sql`.
+  - Falta: C5 (escritura saliente: marcas, `etag`, `If-Match`, `attended`, y
+    consumir `restablecer`), C6 (sondeo al abrir la agenda), C7 (cron y
+    middleware), C8 (e2e contra un Google falso). Decisiones: §6-bis,
+    «Bloque C — decisiones tomadas en C0-C4».
 - [ ] D — Reserva por enlace
 - [ ] E — Recordatorios y confirmación de asistencia
 - [ ] F — Interfaz, movimiento y orden visual

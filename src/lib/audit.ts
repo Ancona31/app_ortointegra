@@ -212,6 +212,21 @@ export type AuditAccion =
      cliente de servicio, así que esta fila es el único rastro. Sin migración
      (`accion` es `text` sin CHECK). */
   | 'horario_clinica_editado'
+  /* La sincronización de vuelta desde Google (bloque C de mejora_agendaV2.md),
+     en `src/lib/gcalSincronizacion.ts`. Los cambios ACEPTADOS ya los audita
+     el disparador de citas (`log_cita_change`, con "via":"google"); estas dos
+     son lo que el disparador no puede ver porque no se escribe nada:
+       · `gcal_conflicto_cita` — gana el último cambio, y el otro se pierde:
+         ganó Google sobre una escritura de Spinus pendiente, o ganó Spinus
+         sobre un cambio hecho en Google.
+       · `gcal_cambio_rechazado` — Google movió, editó o borró una cita que ya
+         no admite cambios (attended, no_show, cancelled: decisión C-e), o
+         cambió algo que no se acepta (el título de una cita con paciente, C-d).
+     Igual que el disparador: NOMBRES de campo, nunca valores. `registro_id` es
+     la cita; `user_id`, el dueño de la conexión, con `origen: 'sistema'`, como
+     `gcal_conexion_revocada`. `accion` es `text` sin CHECK: sin migración. */
+  | 'gcal_conflicto_cita'
+  | 'gcal_cambio_rechazado'
 
 interface AuditParams {
   userId?: string | null
