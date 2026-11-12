@@ -193,6 +193,8 @@ export interface Consultorio {
   es_default: boolean
   activo: boolean
   fecha_baja: string | null
+  /** Agenda B5. Opcional: falta mientras la migración 20261112140000 no esté aplicada. */
+  horario_propio?: boolean
   created_at: string
   updated_at: string
 }
