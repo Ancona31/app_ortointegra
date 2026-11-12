@@ -923,6 +923,21 @@ queda listada aquí.
   `service_role`, sin modificar `clinica_tiene_acceso()` ni ninguna policy, con
   prueba SQL que demuestra el mismo veredicto que la original para VIP,
   suscripción activa, free virgen y free degradada.
+  - **Cómo quedó (C1, `gcal_sync_clinica_habilitada(p_clinica_id)`), para
+    revisar en la auditoría:** no copia la regla. En cada llamada lee de
+    `pg_proc` el cuerpo vigente de `clinica_no_suspendida()` y
+    `clinica_tiene_acceso()`, sustituye `public.get_clinica_id()` por el
+    parámetro y lo ejecuta con `EXECUTE … USING`. INVOKER, solo
+    `service_role`, sin suplantar claims ni rol, sin tocar las originales.
+    Ventaja: sigue sola cualquier cambio de la regla (RN-1 está pendiente en
+    `feature/limites-ajustables` y se heredaría al fusionar). Si la forma de
+    las originales cambia (plpgsql, varias sentencias, `get_clinica_id()` sin
+    `public.`), lanza P0001 y la sincronización se detiene, cerrada. Prueba:
+    `supabase/pruebas-sql/c1_gcal_sync_estado.sql` (casos 1-3 y 12).
+    **Alternativa más simple de leer**, si Angel la prefiere: copiar el
+    predicado en la función nueva y añadir una prueba que falle si el cuerpo
+    de las originales cambia (huella de `pg_get_functiondef`); obliga a
+    actualizar la copia a mano al fusionar RN-1.
 
 ### Bloque C — decisiones tomadas en C0-C4 (2026-11-13, sin regla previa)
 
