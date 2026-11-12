@@ -5,6 +5,7 @@
 
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import dynamic from 'next/dynamic'
+import { useRouter } from 'next/navigation'
 import FullCalendar from '@fullcalendar/react'
 import type { DateClickArg, EventResizeDoneArg } from '@fullcalendar/interaction'
 import type { DatesSetArg, EventClickArg, EventDropArg, DateSelectArg, EventApi, EventContentArg, DayHeaderContentArg } from '@fullcalendar/core'
@@ -354,6 +355,18 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
   const isSecretaria = profile?.role === 'secretaria'
 
   const canEditHorario  = canManageClinica(profile)
+  /* B4: con la agenda v2 encendida, el engrane lleva a la pantalla de
+     configuración del calendario en vez de abrir el modal de horario, y lo ve
+     también quien no administra: allí ve en solo lectura y cada médico edita
+     la disponibilidad de sus consultorios (P7). Apagada, todo sigue como hoy:
+     sólo el administrador ve el engrane y abre el modal. La ruta es
+     `(app)/agenda/configuracion`, que con el interruptor apagado da 404. */
+  const router = useRouter()
+  const verEngrane = canEditHorario || agendaV2
+  const abrirConfiguracion = useCallback(() => {
+    if (agendaV2) router.push('/agenda/configuracion')
+    else setHorarioOpen(true)
+  }, [agendaV2, router])
   /* Sólo `abrir`, no `alternar`: el hamburguesa de la banda no cierra el menú,
      porque cuando el menú está abierto lo tapa entero. Quien cierra es el propio
      menú —su botón de arriba y su velo—, igual que en el resto de la app. */
@@ -953,8 +966,8 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
           mesSinTodos={mesSinTodos}
           medicos={medicos}
           onFiltroMedico={id => aplicarFiltro(id, false)}
-          canEditHorario={canEditHorario}
-          onHorario={() => setHorarioOpen(true)}
+          canEditHorario={verEngrane}
+          onHorario={abrirConfiguracion}
           /* ⚠️ NO FUNDIR con el `onAgendar` de `BarraAgendarMovil` ni con el
              de la banda vacía, aunque el cuerpo sea idéntico: el plan A2.5
              los deja como tres cierres separados a propósito (§invariantes,
@@ -986,8 +999,8 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
              que sin marca de forzado. Ver `aplicarFiltro`. */
           onFiltroMedico={id => aplicarFiltro(id, false)}
           /* `null` y no un booleano: es el manejador o no hay botón. Misma
-             condición que el de escritorio (`canEditHorario`). */
-          onHorario={canEditHorario ? () => setHorarioOpen(true) : null}
+             condición que el de escritorio (`verEngrane`). */
+          onHorario={verEngrane ? abrirConfiguracion : null}
           /* Misma forma y misma pregunta que el de escritorio: en móvil las dos
              vistas que `vistaAdmiteCompactar` acepta se reducen a Mes, porque
              Semana y Día son listas aquí. */
@@ -1689,7 +1702,13 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
                 setHorarioOpen(false)
                 toast.success('Horario actualizado')
               } else {
-                toast.error('No se pudo guardar el horario')
+                /* P8: el 400 dice qué día no cuadra («Jueves: la hora de
+                   cierre…»); se enseña tal cual. Sin cuerpo legible, el aviso
+                   de siempre. */
+                const cuerpo: unknown = await res.json().catch(() => null)
+                const motivo = res.status === 400 && cuerpo && typeof cuerpo === 'object' && 'error' in cuerpo
+                  && typeof cuerpo.error === 'string' ? cuerpo.error : null
+                toast.error(motivo ?? 'No se pudo guardar el horario')
               }
             } catch {
               /* El `fetch` ni siquiera llegó a responder (red caída). Para el

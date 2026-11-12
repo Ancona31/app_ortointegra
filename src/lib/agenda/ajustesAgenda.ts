@@ -45,7 +45,27 @@ export const LIMITES_AJUSTES_AGENDA = {
   vigencia_enlace_unico_dias: { min: 1, max: 30 },
 } as const
 
-const entero = (l: { min: number; max: number }) => z.number().int().min(l.min).max(l.max)
+export type CampoAjusteAgenda = keyof typeof LIMITES_AJUSTES_AGENDA
+
+/** Cómo se llama cada ajuste en pantalla y en los mensajes del 400 (§2). */
+export const ETIQUETAS_AJUSTES_AGENDA: Record<CampoAjusteAgenda, { nombre: string; unidad: string }> = {
+  recordatorio_horas: { nombre: 'Recordatorio por correo', unidad: 'horas antes de la cita' },
+  anticipacion_min_horas: { nombre: 'Anticipación mínima para reservar por enlace', unidad: 'horas' },
+  horizonte_dias: { nombre: 'Hasta cuándo se puede reservar', unidad: 'días adelante' },
+  vigencia_enlace_unico_dias: { nombre: 'Vigencia del enlace de un solo uso', unidad: 'días' },
+}
+
+/** El orden en que se pintan y se validan. */
+export const CAMPOS_AJUSTES_AGENDA: readonly CampoAjusteAgenda[] = [
+  'recordatorio_horas', 'anticipacion_min_horas', 'horizonte_dias', 'vigencia_enlace_unico_dias',
+]
+
+const entero = (campo: CampoAjusteAgenda) => {
+  const l = LIMITES_AJUSTES_AGENDA[campo]
+  const { nombre, unidad } = ETIQUETAS_AJUSTES_AGENDA[campo]
+  const rango = `${nombre}: de ${l.min} a ${l.max} ${unidad}`
+  return z.number(rango).int(`${nombre}: tiene que ser un número entero`).min(l.min, rango).max(l.max, rango)
+}
 
 /**
  * Los cuatro ajustes y NADA MÁS: `strictObject` rechaza cualquier otra clave
@@ -53,15 +73,34 @@ const entero = (l: { min: number; max: number }) => z.number().int().min(l.min).
  * interruptor y el candado sólo se cambian desde el editor SQL.
  */
 export const AjustesAgendaSchema = z.strictObject({
-  recordatorio_horas: entero(LIMITES_AJUSTES_AGENDA.recordatorio_horas),
-  anticipacion_min_horas: entero(LIMITES_AJUSTES_AGENDA.anticipacion_min_horas),
-  horizonte_dias: entero(LIMITES_AJUSTES_AGENDA.horizonte_dias),
-  vigencia_enlace_unico_dias: entero(LIMITES_AJUSTES_AGENDA.vigencia_enlace_unico_dias),
+  recordatorio_horas: entero('recordatorio_horas'),
+  anticipacion_min_horas: entero('anticipacion_min_horas'),
+  horizonte_dias: entero('horizonte_dias'),
+  vigencia_enlace_unico_dias: entero('vigencia_enlace_unico_dias'),
 })
 
 export type AjustesAgenda = z.infer<typeof AjustesAgendaSchema>
 
-const COLUMNAS_AJUSTES = 'recordatorio_horas, anticipacion_min_horas, horizonte_dias, vigencia_enlace_unico_dias'
+/**
+ * Lo que el formulario de la pantalla de configuración (B4) tiene escrito, a
+ * los cuatro ajustes, con el MISMO esquema que aplica el servidor. Un campo
+ * vacío es un error propio y no un 0: `Number('')` vale 0, y 0 es un valor
+ * válido de la anticipación. Sólo ayuda a avisar antes de enviar; quien manda
+ * es el `safeParse` de la ruta.
+ */
+export function ajustesDesdeFormulario(
+  valores: Record<CampoAjusteAgenda, string>,
+): { ok: true; ajustes: AjustesAgenda } | { ok: false; error: string } {
+  const vacio = CAMPOS_AJUSTES_AGENDA.find(c => valores[c].trim() === '')
+  if (vacio) return { ok: false, error: `${ETIQUETAS_AJUSTES_AGENDA[vacio].nombre}: escribe un número` }
+  const r = AjustesAgendaSchema.safeParse(
+    Object.fromEntries(CAMPOS_AJUSTES_AGENDA.map(c => [c, Number(valores[c])])),
+  )
+  return r.success ? { ok: true, ajustes: r.data } : { ok: false, error: r.error.issues[0]?.message ?? 'Datos inválidos' }
+}
+
+/** Las columnas de los cuatro ajustes: ni el candado ni el interruptor. */
+export const COLUMNAS_AJUSTES = 'recordatorio_horas, anticipacion_min_horas, horizonte_dias, vigencia_enlace_unico_dias'
 
 /** Los ajustes de la clínica, o los de fábrica si no hay fila o algo falla. */
 export async function leerAjustesAgenda(supabase: ClienteSesion, clinicaId: string): Promise<AjustesAgenda> {

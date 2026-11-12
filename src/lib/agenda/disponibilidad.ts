@@ -22,7 +22,8 @@
  */
 import { z } from 'zod'
 import type { DiaSemana, Horario, HorarioDia } from '@/lib/configApp'
-import { HORARIO_DEFAULT } from '@/lib/agenda/horarioAgenda'
+import { DIAS, HORARIO_DEFAULT } from '@/lib/agenda/horarioAgenda'
+import { horarioSchema } from '@/lib/consultorios/schemas'
 
 const DIAS_SEMANA: readonly DiaSemana[] = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo']
 
@@ -92,3 +93,22 @@ export function horarioEfectivo(
 export function horarioEnOrden(h: Horario): boolean {
   return DIAS_SEMANA.every(dia => !h[dia].activo || h[dia].inicio < h[dia].fin)
 }
+
+/**
+ * El horario de la clínica tal como lo acepta `PUT /api/me/horario` (P8): la
+ * forma de `horarioSchema` (los siete días, `HH:MM`) y, en cada día activo, el
+ * cierre después de la apertura. Un aviso por día que falle, con su nombre,
+ * para que el toast diga cuál. Las horas de los días inactivos sólo se
+ * comprueban de forma, igual que `horarioEnOrden`.
+ */
+export const HorarioEnOrdenSchema = horarioSchema.superRefine((h, ctx) => {
+  for (const { key, label } of DIAS) {
+    if (h[key].activo && h[key].inicio >= h[key].fin) {
+      ctx.addIssue({
+        code: 'custom',
+        path: [key],
+        message: `${label}: la hora de cierre tiene que ir después de la de apertura`,
+      })
+    }
+  }
+})
