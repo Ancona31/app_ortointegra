@@ -12,6 +12,8 @@ import { correoDelMedico } from '@/lib/medicoCorreo'
 import { TZ_CLINICA, desplazarFecha, fechaHoraLocalAInstante } from '@/lib/dates'
 import { comprobarTopeDuracion } from '@/lib/agenda/topeDuracion'
 import { consultaCitas } from '@/lib/agenda/consultaCitas'
+import { agendaV2Encendida } from '@/lib/agenda/ajustesAgenda'
+import { comprobarEmpalmes } from '@/lib/agenda/empalmesServidor'
 
 /* Una fecha-solo `YYYY-MM-DD`, que es lo que manda el modal para un evento de
    todo el día. NO acepta un instante ISO: si llegara uno, `AT TIME ZONE` de la
@@ -89,11 +91,16 @@ export async function POST(req: NextRequest) {
     // Gate Fase 8.1 (extendido en Fase 8.2): bloquear creación de citas si
     // la clínica está cancelada, no es VIP y ya tiene >5 pacientes activos
     // (ex-cliente pagado). Free de buena fe (≤5 pacientes) NO se ve afectado.
-    const { data: clinicaGate } = await supabase
-      .from('clinicas')
-      .select('suscripcion_estado, es_vip_grant')
-      .eq('id', profile.clinica_id)
-      .single()
+    /* El interruptor de la agenda v2 (plan del bloque B §1) va en paralelo con
+       la lectura del gate: una consulta por clave primaria, sin esperar. */
+    const [{ data: clinicaGate }, v2] = await Promise.all([
+      supabase
+        .from('clinicas')
+        .select('suscripcion_estado, es_vip_grant')
+        .eq('id', profile.clinica_id)
+        .single(),
+      agendaV2Encendida(supabase, profile.clinica_id),
+    ])
     if (clinicaGate?.suscripcion_estado === 'cancelado' && !clinicaGate?.es_vip_grant) {
       const { count: activosCount } = await supabase
         .from('pacientes')
@@ -364,6 +371,20 @@ export async function POST(req: NextRequest) {
     const errorDeTope = comprobarTopeDuracion(inicioFila, finFila, Boolean(paciente_id))
     if (errorDeTope) {
       return NextResponse.json(errorDeTope, { status: 400 })
+    }
+
+    /* ── B7: EL EMPALME, CON EL INTERRUPTOR ENCENDIDO ────────────────────────
+       Después de todas las validaciones y con las puntas ya compuestas, que es
+       lo que se va a guardar. Un evento de todo el día no se empalma (P3). Sin
+       el interruptor, `empalmes_aceptados` se ignora y no se consulta nada. El
+       `client_id` sale de la búsqueda: un reintento del alta que YA entró no
+       debe empalmarse consigo mismo (lo resuelve el 23505 de más abajo). */
+    if (v2 && !esTodoElDia) {
+      const veredicto = await comprobarEmpalmes(supabase, {
+        clinicaId: profile.clinica_id, medicoId: finalMedicoId, inicio: inicioFila, fin: finFila,
+        excluirClientId: typeof client_id === 'string' ? client_id : undefined,
+      }, body.empalmes_aceptados)
+      if (!veredicto.ok) return NextResponse.json(veredicto.cuerpo, { status: veredicto.status })
     }
 
     // RLS filtra por clinica_id

@@ -12,6 +12,8 @@ import { correoDelMedico } from '@/lib/medicoCorreo'
 import { TZ_CLINICA, desplazarFecha, fechaHoraLocalAInstante, renderEnTZ } from '@/lib/dates'
 import { comprobarTopeDuracion } from '@/lib/agenda/topeDuracion'
 import { agendaV2Encendida } from '@/lib/agenda/ajustesAgenda'
+import { comprobarEmpalmes, type VeredictoEmpalme } from '@/lib/agenda/empalmesServidor'
+import { ESTADOS_SIN_EMPALME } from '@/lib/agenda/empalmesCita'
 
 /* Una fecha-solo `YYYY-MM-DD` QUE ADEMÁS EXISTE EN EL CALENDARIO: la forma no
    basta, porque `2026-02-30` la pasa y el motor la DESBORDA al 2 de marzo en vez
@@ -97,6 +99,44 @@ async function fijarEventoCreado(
       err,
     )
   }
+}
+
+/* B7: la comprobación de empalme del PUT, fuera del cuerpo de la ruta para no
+   alargarlo más. `existing` es la fila de ANTES y `updates` lo que se va a
+   escribir; lo que no venga en `updates` se queda como estaba. */
+interface FilaAntes {
+  medico_id: string | null
+  status: string
+  start_time: string
+  end_time: string
+  all_day: boolean | null
+}
+
+async function empalmeDelPut(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  clinicaId: string,
+  id: string,
+  existing: FilaAntes,
+  updates: Record<string, unknown>,
+  todoElDia: boolean,
+  aceptados: unknown,
+): Promise<VeredictoEmpalme> {
+  const inicio = typeof updates.start_time === 'string' ? updates.start_time : existing.start_time
+  const fin    = typeof updates.end_time   === 'string' ? updates.end_time   : existing.end_time
+  const medico = typeof updates.medico_id  === 'string' ? updates.medico_id  : existing.medico_id
+  const estado = typeof updates.status     === 'string' ? updates.status     : existing.status
+  if (todoElDia || ESTADOS_SIN_EMPALME.includes(estado) || !medico) return { ok: true }
+
+  const instante = (v: string): number => new Date(v).getTime()
+  const cambia =
+    instante(inicio) !== instante(existing.start_time) ||
+    instante(fin)    !== instante(existing.end_time)   ||
+    medico !== existing.medico_id                      ||
+    ESTADOS_SIN_EMPALME.includes(existing.status)      ||
+    existing.all_day === true
+  if (!cambia) return { ok: true }
+
+  return comprobarEmpalmes(supabase, { clinicaId, medicoId: medico, inicio, fin, excluirId: id }, aceptados)
 }
 
 /* Formato UUID. A nivel de módulo porque lo usan el PUT (consultorio y
@@ -591,6 +631,18 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
       if (errorDeTopeTodoElDia) {
         return NextResponse.json(errorDeTopeTodoElDia, { status: 400 })
       }
+    }
+
+    /* ── B7: EL EMPALME, CON EL INTERRUPTOR ENCENDIDO ────────────────────────
+       Sobre los valores EFECTIVOS que va a guardar este PUT, y SÓLO cuando
+       cambian el inicio, el fin o el médico, o la cita vuelve a ocupar su hueco
+       (sale de `cancelled`/`no_show`) o sale de todo el día: editar las notas
+       de una cita que ya estaba empalmada no debe avisar. Una fila que queda
+       `cancelled`, `no_show` o de todo el día no se empalma (P3). La propia
+       cita queda fuera de la búsqueda. */
+    if (v2) {
+      const veredicto = await empalmeDelPut(supabase, profile.clinica_id, id, existing, updates, todoElDiaEfectivo, body.empalmes_aceptados)
+      if (!veredicto.ok) return NextResponse.json(veredicto.cuerpo, { status: veredicto.status })
     }
 
     // RLS filtra por clinica_id

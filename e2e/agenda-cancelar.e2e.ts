@@ -47,12 +47,17 @@ async function alta(page: Page, opciones: { hora: string; minutos: number; pacie
   const ids = idsAdminA()
   const inicio = fechaHoraLocalAInstante(DIA_LABORABLE_LIBRE, opciones.hora, TZ)
   const fin = new Date(new Date(inicio).getTime() + opciones.minutos * 60_000).toISOString()
-  const res = await page.request.post('/api/appointments', {
-    data: {
-      title: opciones.titulo, start_time: inicio, end_time: fin, medico_id: ids.medico, consultorio_id: ids.consultorio,
-      paciente_id: opciones.paciente ? ids.paciente : null, notes: null, status: 'scheduled',
-    },
-  })
+  const cuerpo = {
+    title: opciones.titulo, start_time: inicio, end_time: fin, medico_id: ids.medico, consultorio_id: ids.consultorio,
+    paciente_id: opciones.paciente ? ids.paciente : null, notes: null, status: 'scheduled',
+  }
+  let res = await page.request.post('/api/appointments', { data: cuerpo })
+  /* Con el interruptor encendido, el alta puede caer sobre una cita aleatoria
+     de la semilla (B7): aquí no se prueba eso, así que se aceptan y se reenvía. */
+  if (res.status() === 409) {
+    const { empalmes } = await res.json() as { empalmes: { id: string }[] }
+    res = await page.request.post('/api/appointments', { data: { ...cuerpo, empalmes_aceptados: empalmes.map(e => e.id) } })
+  }
   expect(res.ok(), await res.text()).toBeTruthy()
   const { appointment } = await res.json() as { appointment: { id: string } }
   return appointment.id
