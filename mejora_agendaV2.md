@@ -3420,7 +3420,7 @@ primero sin marcar.
     con `src/` en `0729e24`: preexistentes, no de D11. Para correrla desde
     este worktree se cambió `localhost:3001` por `:3003` en las e2e SIN
     commitear (el :3001 es de otro worktree).
-- [ ] Cierre del proyecto (2026-11-12, worktree `~/proyectos/app_ortointegra-agenda`)
+- [x] Cierre del proyecto (2026-11-12, worktree `~/proyectos/app_ortointegra-agenda`)
   - (Aquí había un «- [ ] F» repetido, resto de la fusión de D11: F está
     cerrado arriba.)
   - **Paso 1 · verificación de la fusión `591aed1`** (base local tal como
@@ -3512,6 +3512,13 @@ primero sin marcar.
     Angel; §10 nueva, «Lo que no se pudo probar en local», consolidando §8,
     §9 y §6-bis, con la lista de textos PENDIENTE DE REVISIÓN (grep en
     `src/`).
+  - **Paso 7 · `CLAUDE.md` y `DEUDA_TECNICA.md`** (lo que pide el bloque F
+    «al cerrar el proyecto»): en `CLAUDE.md`, una sección «Agenda v2» con el
+    estado, el interruptor, las rutas públicas nuevas y las reglas que no se
+    rompen, sólo añadida (ninguna regla de seguridad cambia); en
+    `DEUDA_TECNICA.md`, AG-DT-10 resuelta por B0 (pendiente de producción) y
+    AG-DT-13 a AG-DT-25 con lo que queda abierto.
+  - Push: lo hace el coordinador.
 
 **Bitácora** (una línea por sesión: fecha, qué quedó hecho, qué quedó a medias):
 
@@ -3528,6 +3535,11 @@ primero sin marcar.
   interacciones; herramientas v2 en sus ranuras, la batería entera en verde
   (239), sesión de «Compactar» y F1.5 apagado a la espera de Angel; capturas,
   vídeos, cuadros y comparativa. Push: lo hace el coordinador.
+- 2026-11-12 — Cierre del proyecto: fusión de D11 verificada; conjunto de 16
+  migraciones reiniciado desde cero y en verde; auditoría formal de D11 (APTA
+  CON CAMBIOS, aplicados) y del conjunto (APTO, con notas para Angel);
+  tolerancia a producción comprobada sin las tablas; guía, §7, §10,
+  `CLAUDE.md` y `DEUDA_TECNICA.md`. Lo siguiente es de Angel (§7).
 
 ---
 

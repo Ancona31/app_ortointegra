@@ -3659,7 +3659,14 @@ bloque del modal tiene que apagar ese campo, no sólo rellenarlo.
 
 ### AG-DT-10 — `appointments` no tiene trigger de auditoría, y es la única tabla clínica sin él
 
-**Estado:** 🔴 abierta · **Archivo:** `supabase/baseline/06_triggers.sql`
+**Estado:** 🟢 **resuelta en `feature/agenda-v2`, pendiente de producción** —
+la migración B0 (`supabase/migrations/20261112120000_agenda_b0_auditoria_citas.sql`)
+crea `log_cita_change()` y los disparadores `audit_appointments` y
+`audit_appointments_update` (alta, edición, cancelación, reactivación y borrado;
+sólo nombres de columna, nunca valores). Siempre encendida, fuera del
+interruptor. Se cierra del todo cuando Angel aplique el conjunto en producción
+(`mejora_agendaV2.md` §7). El texto de abajo es la entrada original.
+· **Archivo:** `supabase/baseline/06_triggers.sql`
 **Detectado:** 2026-08-26, misma auditoría (hallazgo lateral: no lo introduce
 `all_day`).
 
@@ -3798,6 +3805,123 @@ usa `TZ_CLINICA` donde correspondía el huso del dispositivo; aquí se usa el de
 dispositivo donde correspondería el del consultorio. Antes de tocar cualquier
 literal de zona horaria, léase la advertencia sobre los tres
 `America/Mexico_City` deliberados, al final de TZ-DT-1.
+
+---
+
+### Agenda v2 — lo que quedó abierto al cerrar el proyecto (2026-11-12)
+
+Hallazgos anotados en `mejora_agendaV2.md` (§6-bis y §9) y en
+`supabase/AUDITORIA-CONJUNTO-AGENDA-V2.md` que no se corrigieron, o porque son
+anteriores a v2, o porque cerrarlos exigía una decisión de Angel. Las funciones
+de v2 están detrás del interruptor por clínica
+(`agenda_ajustes.agenda_v2_encendida`).
+
+### AG-DT-13 — El PUT de una cita no comprueba que el paciente nuevo sea de la clínica
+
+**Estado:** 🔴 abierta, anterior a v2 · **Archivo:**
+`src/app/api/appointments/[id]/route.ts` (`PUT`, :277). Cambiar una cita de un
+paciente a otro guarda el `paciente_id` que llega sin comprobar que sea de la
+misma clínica (la FK acepta cualquier paciente y la RLS de `appointments` mira
+la fila de la cita, no la del paciente). El ligado nuevo de D7 sí lo comprueba.
+Encaja en el pendiente prioritario de `CLAUDE.md` (aislamiento entre clínicas).
+
+### AG-DT-14 — Un `DELETE` directo por PostgREST se salta el «no se borra, se cancela» de v2
+
+**Estado:** 🟡 abierta · B3 bloquea en la API el borrado de una cita con
+paciente o por ligar (409). Por PostgREST directo, la policy `appointments_delete`
+lo permite: sólo lo frena una FK RESTRICT de las tablas de v2, si la cita tiene
+historial (23503). Cerrarlo pide una migración, por ejemplo un disparador
+`BEFORE DELETE` que mire el interruptor. Lo audita B0 (`cita_eliminada`).
+
+### AG-DT-15 — Con el interruptor apagado, la RLS deja escribir lo de v2 por PostgREST
+
+**Estado:** 🟡 abierta, aceptada · Las policies de las tablas de v2 y la de
+`consultorios.horario_propio` miran la clínica y el rol, no el interruptor.
+Alguien de la clínica podría crear filas de reserva o marcar `horario_propio`
+directo por PostgREST con v2 apagada. Hoy nada lo lee fuera del código que exige
+el interruptor, así que es inerte.
+
+### AG-DT-16 — Seis rutas viejas llaman a Resend directamente, sin `EMAIL_TRANSPORT`
+
+**Estado:** 🔴 abierta · **Archivos:** `src/app/api/auth/registro`,
+`auth/reset-password`, `auth/email-hook`, `auth/reenviar-confirmacion`,
+`email/enviar-documento` y `admin/invitar` (`route.ts` de cada una). Todo el
+correo de la agenda pasa por `src/lib/correo/transporte.ts`, que en local
+captura en Mailpit. Estas seis no: en local mandarían correo real con la llave de
+`.env.local`. Ninguna prueba las dispara. Pasarlas al transporte es el arreglo.
+
+### AG-DT-17 — Sin purga: el historial del candado y los registros de v2 crecen sin fin
+
+**Estado:** 🟡 abierta, pendiente de decisión legal · Ni
+`reserva_incidencias` (el historial del candado, con seudónimos HMAC de
+teléfono y correo), ni `cita_confirmaciones`, `cita_correos`,
+`reserva_empalmes_google` o `reserva_verificaciones` tienen purga automática. El
+aviso de privacidad propone 12 meses para el historial; el plazo lo fija Angel
+con la revisión legal (D9).
+
+### AG-DT-18 — Una suspensión que llega a mitad de una pasada de sincronización no la corta
+
+**Estado:** 🟡 abierta, aceptada · La puerta S3
+(`gcal_sync_clinica_habilitada`: no suspendida y con acceso) se evalúa al
+empezar cada pasada (`src/lib/gcalSincronizacion.ts:132`), no en cada RPC. Si la
+clínica se suspende mientras corre, esa pasada termina (incluidos los RSVP de E9
+y los avisos de D11). La siguiente ya no entra. Igual en el sondeo y en la
+tarea.
+
+### AG-DT-19 — Reenviar una reserva con Google caído más de 30 min da 503 en vez de «repetida»
+
+**Estado:** 🟡 abierta · D11: si la última sincronización buena tiene más de
+30 min y Google falla, el POST de reserva responde 503 con el teléfono antes de
+llamar a la RPC, y la idempotencia por `client_id` vive en la RPC. Un reenvío de
+una reserva que ya existe recibe 503 en vez de `repetida`. La cita y su
+comprobante sí existen. Cerrarlo exige tocar la RPC.
+
+### AG-DT-20 — `HorarioModal` y `ModalInvitacionCita`, fuera de la regla de movimiento de la agenda
+
+**Estado:** 🟡 abierta · Siguen con `animate-modal-enter` (de toda la app) y
+`transition-all` + `hover:brightness-95`. No tienen clase propia, la regla de
+movimiento de F2 no los mira y ninguna e2e de movimiento los abre
+(`mejora_agendaV2.md` §6-bis, «Bloque F — movimiento»).
+
+### AG-DT-21 — Si Google falla al crear el evento de una reserva, la cita se queda `pending`
+
+**Estado:** 🟡 abierta · La cita reservada por enlace nace con
+`gcal_sync_status = 'pending'`. Si el `after()` que crea el evento falla, no pasa
+a `failed`: lo reintenta la primera edición.
+
+### AG-DT-22 — Un envío de correo «enviando» en su tercer intento puede quedarse así para siempre
+
+**Estado:** 🟡 abierta (auditoría de E4, hallazgo 2, no aplicado) · Si la
+ejecución muere sin marcar en el tercer intento, la fila de `cita_correos` queda
+`enviando` y nunca pasa a `fallido`. No se manda nada de más; sólo falta el
+renglón de cierre, que pide un barrido aparte.
+
+### AG-DT-23 — D11: un empalme que reaparece pasados 30 días no se vuelve a avisar, y la consulta de pares recorre la clínica
+
+**Estado:** 🟡 abierta (auditoría formal de D11, hallazgos 2 y 3, no
+aplicados) ·
+- `reserva_empalmes_google` es UNIQUE por par, con `DO NOTHING`, y el panel
+  sólo lee 30 días: un par que se separa y vuelve a empalmarse después no
+  reaparece, ni se audita de nuevo.
+- La consulta de `reserva_empalmes_registrar` usa un `OR` entre los dos lados
+  que impide la llave primaria: con mucho historial recorre todas las citas de
+  la clínica. La alternativa es partirla en dos ramas con `UNION`.
+
+### AG-DT-24 — Un evento que Spinus creó antes de v2 sin guardar su `google_event_id` entra como evento de Google
+
+**Estado:** 🟡 abierta, anterior a v2 · Si el `after()` de entonces falló, el
+evento existe en Google y la cita no lo conoce. Con v2, la sincronización lo
+importa como fila `origen='google'`, con «Cita médica: <nombre>» de título. Hoy
+ya se ve duplicado, en solo lectura. Las marcas privadas de C5 lo evitan para
+todo lo nuevo.
+
+### AG-DT-25 — Las limpiezas de las pruebas borran `audit_log` con `session_replication_role = replica`
+
+**Estado:** 🟡 vigilada · Las carreras (`scripts/reserva-carrera.sh`,
+`confirmacion-carrera.sh`), la semilla y las e2e borran sus propias filas de
+`audit_log` como `postgres` con `session_replication_role = replica`, que apaga
+los disparadores y las FK de esa transacción. Sólo vale en la base local. **No
+se copia nunca a producción ni a código de la aplicación.**
 
 ---
 

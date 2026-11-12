@@ -437,6 +437,74 @@ Tu primer mensaje en cada sesión debe ser:
 - **CALCULADORAS_ROADMAP.md** — Sistema de 200 calculadoras clínicas. Leer ANTES de trabajar en calculadoras.
 - **RESUMEN_DASHBOARD.md** — Dashboard del paciente en /expediente/[id]/estado. Leer ANTES de trabajar en esa página.
 - **DOCUMENTOS_RANURAS_MUERTAS.md** — ✅ **Cerrado.** Las siete ranuras de v2 sin productor se retiraron de los formatos, así que ya no hay nada que vigilar al cablear ni al encender `usa_documentos_v2`. Lo que queda vivo dentro es su **§2**: tres decisiones que parecen huecos y no lo son —el folio de Internamiento, el tipo y número del anexo, y las tres celdas de riel pendientes de cable—. Leerlo solo si algo de eso parece un defecto que arreglar. También registra un defecto de chasis abierto (§3): react-pdf comprime las filas de una hoja que se pasa por poco.
+- **mejora_agendaV2.md** — Agenda v2 (reserva por enlace, Google en los dos sentidos, recordatorios). Leer ANTES de tocar la agenda, sus rutas públicas o sus migraciones. Resumen y reglas en la sección «Agenda v2» de abajo.
+
+---
+
+## 📅 Agenda v2 — estado y reglas (cierre del proyecto, 2026-11-12)
+
+Plan, decisiones y avance: `mejora_agendaV2.md` (§6-bis decisiones, §7 lo que
+le toca a Angel, §10 lo que no se probó en local). Auditoría del conjunto de
+migraciones: `supabase/AUDITORIA-CONJUNTO-AGENDA-V2.md`. Guía local:
+`GUIA_AUDITORIA_AGENDA_V2.md`. Deuda abierta: `DEUDA_TECNICA.md`, AG-DT-13 a
+AG-DT-25.
+
+**Estado:** el código y las 16 migraciones (`20261111120000` a
+`20261116120000`) están en `feature/agenda-v2`, probados sólo en local. En
+producción no hay nada aplicado ni encendido hasta que Angel lo haga (§7).
+
+**Reglas que un editor futuro no debe romper:**
+
+* **Interruptor por clínica** `agenda_ajustes.agenda_v2_encendida`: nace en
+  `false` y sólo `postgres`/`supabase_admin` lo cambian
+  (`trg_agenda_ajustes_proteger`). **Falla cerrado:** un error al leerlo o la
+  tabla ausente cuentan como apagado, y apagado la agenda es la de antes. No
+  quites esa tolerancia, ni la de las RPC ausentes (PGRST202/42P01).
+* **Rutas públicas nuevas en `src/middleware.ts`**, cada una en su línea:
+  * `/reservar/` y `/confirmar/` con prefijo y barra final;
+  * `/api/reservar/` con prefijo;
+  * `/api/confirmar/{22}` con expresión exacta;
+  * `/api/cron/google-sync` y `/api/cron/recordatorios` con `===`, **nunca
+    dentro de `publicApiPaths`**, que compara con `startsWith`.
+
+  Ninguna sustituye ni toca `startsWith('/r/')` (el QR de las recetas). Su
+  puerta es el código del enlace o `CRON_SECRET`, comparado en tiempo
+  constante y con respuesta sin datos.
+* **`/confirmar/{código}` sólo lee.** El estado de la cita cambia sólo con el
+  POST de un botón: ni abrir el enlace ni la vista previa de un correo o de
+  WhatsApp cambian nada.
+* **Códigos de enlace:** se derivan por HMAC de `RESERVA_SECRETO`, y en la base
+  sólo se guarda su sha256. Rotar el secreto invalida todos los enlaces y el
+  historial del candado.
+* **`log_cita_change()`** (auditoría de citas, siempre encendida):
+  * escribe NOMBRES de columna, nunca valores;
+  * la lista de columnas técnicas está dos veces (en la función y en el WHEN
+    de `audit_appointments_update`) y van juntas;
+  * `via` sólo sale de la lista blanca `c_vias` (`google`, `enlace_paciente`,
+    `google_rsvp`); un literal nuevo exige migración.
+* **Puerta S3** (`gcal_sync_clinica_habilitada`): lee el cuerpo vigente de
+  `clinica_tiene_acceso()` y `clinica_no_suspendida()`. Si cambias la FORMA
+  de cualquiera de las dos (plpgsql, varias sentencias, `get_clinica_id()` sin
+  `public.`), la sincronización con Google se detiene, cerrada (P0001), hasta
+  revisar C1. E1 y E6 exigen además el md5 de `clinica_no_suspendida()`.
+  Ninguna migración de v2 modifica esas dos funciones ni ninguna policy
+  existente, y no se añade otra puerta RESTRICTIVE: `tipos_cita` y
+  `agenda_ajustes` no la llevan, a propósito.
+* **A Google no viaja nada nuevo:** las observaciones escritas en Spinus no
+  viajan (S1), y el título de una cita con paciente no se acepta desde Google.
+  En correos y en WhatsApp nunca va nada clínico.
+* **Con v2 encendida, una cita con paciente o por ligar no se borra: se
+  cancela.** Las tablas de v2 apuntan a `appointments` y a `clinicas` con
+  RESTRICT, y la API traduce el 23503 a 409. No las cambies a CASCADE.
+* **Correo:** todo el de la agenda pasa por `src/lib/correo/transporte.ts`
+  (`EMAIL_TRANSPORT`; `captura` → Mailpit en local). No llames a Resend directo
+  desde código nuevo (AG-DT-16).
+* **El Google falso** (`src/lib/gcalFalso.ts`) sólo se abre con
+  `GCAL_FALSO_URL`, fuera de `NODE_ENV=production` y con la Supabase local. No
+  relajes esa doble guarda.
+* **El aviso de privacidad de la reserva** (`src/lib/reserva/avisoReserva.ts`)
+  está PENDIENTE DE REVISIÓN LEGAL. Mientras lleve la marca, el enlace no abre
+  aunque se apruebe su hash. No quites la marca sin la revisión de Angel.
 
 ---
 
