@@ -1,7 +1,7 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
-  consultorioPropuesto, datosDeAltaRapida, duracionDeSeleccion, etiquetaBurbuja, medicoPropuesto,
-  motivoParaNoGuardar, necesitaElegirMedico, sumarMinutos, type EntradaAltaRapida,
+  consultorioPropuesto, datosDeAltaRapida, duracionDeSeleccion, etiquetaBurbuja, finTrasMoverInicio, guardarAltaRapida,
+  horasDelGesto, medicoPropuesto, motivoParaNoGuardar, necesitaElegirMedico, sumarMinutos, type EntradaAltaRapida,
 } from '@/lib/agenda/altaRapida'
 import { DEFAULT_DURATION } from '@/lib/agenda/duracionCita'
 
@@ -99,5 +99,83 @@ describe('datosDeAltaRapida', () => {
 describe('etiquetaBurbuja', () => {
   it('nombra la burbuja con el día y el tramo', () => {
     expect(etiquetaBurbuja('2026-11-11', '10:00', '11:30')).toBe('Nueva cita · mié 11, 10:00–11:30')
+  })
+})
+
+/* ── F3 · el enchufe de la burbuja ─────────────────────────────────────── */
+
+describe('horasDelGesto', () => {
+  it('MUTACIÓN más de una franja: el arrastre 10:00–11:30 abre con fin 11:30', () => {
+    expect(horasDelGesto({ hora: '10:00', inicio: D(10), fin: D(11, 30), desdeHueco: false })).toEqual({ inicio: '10:00', fin: '11:30' })
+  })
+  it('un clic y un hueco del panel abren con la duración por omisión', () => {
+    expect(horasDelGesto({ hora: '10:00', inicio: D(10), fin: null, desdeHueco: false }).fin).toBe(sumarMinutos('10:00', DEFAULT_DURATION))
+    expect(horasDelGesto({ hora: '10:00', inicio: D(10), fin: D(13), desdeHueco: true }).fin).toBe(sumarMinutos('10:00', DEFAULT_DURATION))
+  })
+  it('una celda del Mes abre sin horas (no se inventa una)', () => {
+    expect(horasDelGesto({ hora: null, inicio: D(0), fin: null, desdeHueco: false })).toEqual({ inicio: '', fin: '' })
+  })
+})
+
+describe('finTrasMoverInicio', () => {
+  it('conserva la duración que había', () => {
+    expect(finTrasMoverInicio('10:00', '11:30', '12:00')).toBe('13:30')
+  })
+  it('sin fin (horas en blanco) propone la de por omisión', () => {
+    expect(finTrasMoverInicio('', '', '09:00')).toBe(sumarMinutos('09:00', DEFAULT_DURATION))
+  })
+  it('un inicio a medio escribir no toca el fin', () => {
+    expect(finTrasMoverInicio('10:00', '11:00', '')).toBe('11:00')
+  })
+})
+
+describe('etiquetaBurbuja sin horas', () => {
+  it('nombra sólo el día', () => {
+    expect(etiquetaBurbuja('2026-11-11', '', '')).toBe('Nueva cita · mié 11')
+  })
+})
+
+describe('guardarAltaRapida: el orden de los avisos (P3)', () => {
+  const datos = datosDeAltaRapida({
+    fecha: '2026-11-11', horaInicio: '10:00', horaFin: '11:00',
+    paciente: { id: 'p', nombre: 'Ana', apellidos: 'Ruiz', telefono: null }, medicoId: 'm', consultorioId: 'c',
+  })!
+  const abiertas = { inicio: '10:00', fin: '11:00' }
+  function deps(o: { aviso?: string | null; empalmes?: { id: string }[]; respuestas?: boolean[] }) {
+    const respuestas = [...(o.respuestas ?? [])]
+    return {
+      avisoHorario: vi.fn(() => o.aviso ?? null),
+      buscarEmpalmes: vi.fn(() => (o.empalmes ?? []).map(e => ({ ...e, titulo: 'X', inicio: '', fin: '' }))),
+      mensajeEmpalme: () => 'Se empalma',
+      confirmar: vi.fn(async () => respuestas.shift() ?? false),
+      guardar: vi.fn(),
+    }
+  }
+  it('sin avisos guarda tal cual y no pregunta nada', async () => {
+    const d = deps({})
+    expect(await guardarAltaRapida(datos, abiertas, abiertas, d)).toBe(true)
+    expect(d.confirmar).not.toHaveBeenCalled()
+    expect(d.guardar).toHaveBeenCalledWith(datos)
+  })
+  it('con las horas de la apertura NO repite el aviso de horario (ya se preguntó al abrir)', async () => {
+    const d = deps({ aviso: 'Vas a agendar a las 20:00' })
+    await guardarAltaRapida(datos, abiertas, abiertas, d)
+    expect(d.avisoHorario).not.toHaveBeenCalled()
+  })
+  it('con horas tocadas pregunta el horario; decir que no deja la burbuja abierta', async () => {
+    const d = deps({ aviso: 'Vas a agendar a las 20:00', respuestas: [false] })
+    expect(await guardarAltaRapida(datos, abiertas, { inicio: '20:00', fin: '21:00' }, d)).toBe(false)
+    expect(d.guardar).not.toHaveBeenCalled()
+  })
+  it('B7: un empalme se pregunta y, aceptado, viaja en `empalmes_aceptados`', async () => {
+    const d = deps({ empalmes: [{ id: 'e1' }], respuestas: [true] })
+    expect(await guardarAltaRapida(datos, abiertas, abiertas, d)).toBe(true)
+    expect(d.buscarEmpalmes).toHaveBeenCalledWith(expect.objectContaining({ medicoId: 'm', todoElDia: false }))
+    expect(d.guardar).toHaveBeenCalledWith({ ...datos, empalmes_aceptados: ['e1'] })
+  })
+  it('B7: un empalme rechazado no guarda', async () => {
+    const d = deps({ empalmes: [{ id: 'e1' }], respuestas: [false] })
+    expect(await guardarAltaRapida(datos, abiertas, abiertas, d)).toBe(false)
+    expect(d.guardar).not.toHaveBeenCalled()
   })
 })
