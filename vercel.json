@@ -1,3 +1,9 @@
 {
-  "buildCommand": "next build --webpack"
+  "buildCommand": "next build --webpack",
+  "crons": [
+    {
+      "path": "/api/cron/google-sync",
+      "schedule": "*/10 * * * *"
+    }
+  ]
 }
