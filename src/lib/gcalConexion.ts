@@ -736,3 +736,56 @@ export async function borrarConexion(args: { conexion: ConexionGoogle }): Promis
     .eq('user_id', args.conexion.userId)
   if (errEspejo) registrarFalloEspejo('borrarConexion', errEspejo.message)
 }
+
+/* ── Sincronización de vuelta (bloque C) ────────────────── */
+
+interface FilaPendiente {
+  r_conexion_id:          string
+  r_clinica_id:           string
+  r_user_id:              string
+  r_calendar_id:          string | null
+  r_google_account_email: string | null
+}
+
+const UUID_PENDIENTE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const esUuid = (v: unknown): boolean => typeof v === 'string' && UUID_PENDIENTE.test(v)
+
+function esFilaPendiente(x: unknown): x is FilaPendiente {
+  if (typeof x !== 'object' || x === null) return false
+  const f = x as Record<string, unknown>
+  return esUuid(f.r_conexion_id) && esUuid(f.r_clinica_id) && esUuid(f.r_user_id)
+    && (f.r_calendar_id === null || typeof f.r_calendar_id === 'string')
+    && (f.r_google_account_email === null || typeof f.r_google_account_email === 'string')
+}
+
+/**
+ * Las conexiones de clínica a sondear por la tarea programada (C7): activas,
+ * con calendario, con la agenda v2 encendida y sin candado vivo, las menos
+ * recientes primero. Vive aquí porque este módulo es el dueño de leer la
+ * conexión, aunque la lea por RPC (`gcal_sync_clinicas_pendientes`, de
+ * `20261113120000_agenda_c1_gcal_sync_estado.sql`).
+ *
+ * ⚠️ ES LA ÚNICA LECTURA ENTRE CLÍNICAS DEL BLOQUE C, a propósito: el cron
+ * tiene que saber a quién sondear. Devuelve descriptores, sin secretos.
+ *
+ * TOLERANTE: si la RPC todavía no existe en esta base (migración sin aplicar)
+ * devuelve `[]` sin error, para que la tarea no haga nada. Otro fallo se lanza.
+ */
+export async function listarConexionesParaSincronizar(limite: number): Promise<ConexionGoogle[]> {
+  const admin = createAdminClient()
+  const { data, error } = await admin.rpc('gcal_sync_clinicas_pendientes', { p_limite: limite })
+  if (error) {
+    if (error.code === 'PGRST202' || error.code === '42883' || error.code === '42P01') return []
+    throw new Error(`listarConexionesParaSincronizar: ${error.message}`)
+  }
+  const filas: unknown[] = Array.isArray(data) ? data : []
+  return filas.filter(esFilaPendiente).map((f) => ({
+    id:         f.r_conexion_id,
+    clinicaId:  f.r_clinica_id,
+    userId:     f.r_user_id,
+    rol:        'clinica',
+    calendarId: f.r_calendar_id,
+    estado:     'activa',
+    googleAccountEmail: f.r_google_account_email,
+  }))
+}
