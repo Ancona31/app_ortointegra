@@ -10,13 +10,19 @@
  * al montarse y otra vez al abrir el panel (lo confirmado mientras tanto, por
  * el enlace del correo o por el personal, ya no sale). Un fallo deja el
  * botón sin número; no es un aviso.
+ *
+ * D11: también «Reservas por enlace empalmadas con Google» (el mismo canal
+ * que E8), con aviso emergente si la recarga trae uno detectado hace menos
+ * de 2 min y esta pestaña aún no lo avisó.
  */
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { MessageCircle, X } from 'lucide-react'
 import { enOcioso, cancelarOcioso } from '@/lib/agenda/ocioso'
 import type { FilaPorConfirmar } from '@/lib/agenda/whatsappCita'
 import type { FilaCancelada } from '@/lib/agenda/avisoCancelacion'
 import { BotonWhatsAppCita } from '@/components/agenda/BotonWhatsAppCita'
+import { useToast } from '@/components/ui/Toast'
+import { esEmpalmeReciente, textoAvisoEmpalme, type FilaEmpalme } from '@/lib/agenda/avisoEmpalmeReserva'
 
 function esFila(x: unknown): x is FilaPorConfirmar {
   return typeof x === 'object' && x !== null
@@ -33,7 +39,14 @@ function esCancelada(x: unknown): x is FilaCancelada {
     && 'respondido_en' in x && typeof x.respondido_en === 'string'
 }
 
-interface Listas { citas: FilaPorConfirmar[]; canceladas: FilaCancelada[] }
+function esEmpalme(x: unknown): x is FilaEmpalme {
+  return typeof x === 'object' && x !== null
+    && 'id' in x && typeof x.id === 'string' && 'inicio' in x && typeof x.inicio === 'string'
+    && 'zona' in x && typeof x.zona === 'string' && 'titulo' in x && typeof x.titulo === 'string'
+    && 'detectado_en' in x && typeof x.detectado_en === 'string'
+}
+
+interface Listas { citas: FilaPorConfirmar[]; canceladas: FilaCancelada[]; empalmes: FilaEmpalme[] }
 
 async function pedirPorConfirmar(): Promise<Listas | null> {
   try {
@@ -42,7 +55,8 @@ async function pedirPorConfirmar(): Promise<Listas | null> {
     const datos: unknown = await res.json()
     if (typeof datos !== 'object' || datos === null || !('citas' in datos) || !Array.isArray(datos.citas)) return null
     const canceladas = 'canceladas' in datos && Array.isArray(datos.canceladas) ? datos.canceladas.filter(esCancelada) : []
-    return { citas: datos.citas.filter(esFila), canceladas }
+    const empalmes = 'empalmes' in datos && Array.isArray(datos.empalmes) ? datos.empalmes.filter(esEmpalme) : []
+    return { citas: datos.citas.filter(esFila), canceladas, empalmes }
   } catch {
     return null
   }
@@ -77,6 +91,24 @@ function SeccionCanceladas({ canceladas }: { canceladas: FilaCancelada[] }) {
   )
 }
 
+/** D11 · «Reservas por enlace empalmadas con Google»: siguen ahí mientras el empalme siga en pie. */
+function SeccionEmpalmes({ empalmes }: { empalmes: FilaEmpalme[] }) {
+  if (empalmes.length === 0) return null
+  return (
+    <div className="mt-4 pt-3 border-t" style={{ borderColor: 'var(--ag-hairline)' }} data-empalmes-reserva>
+      <p className="text-[13px] font-bold mb-2" style={{ color: 'var(--ag-text)' }}>Reservas por enlace empalmadas con Google</p>
+      <ul className="flex flex-col gap-2">
+        {empalmes.map((c) => (
+          <li key={c.id} data-fila-empalme={c.id}>
+            <p className="text-[13px] font-semibold truncate" style={{ color: 'var(--ag-text)' }}>{c.titulo || 'Cita'}</p>
+            <p className="text-[12px]" style={{ color: 'var(--ag-muted)' }}>{horaEnZona(c.inicio, c.zona, true)} · se empalma con un evento de Google</p>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
 /** Las filas de mañana, cada una con su botón de WhatsApp (`tipo:'recordatorio'`). */
 function ListaPorConfirmar({ citas }: { citas: FilaPorConfirmar[] }) {
   return (
@@ -100,10 +132,23 @@ function ListaPorConfirmar({ citas }: { citas: FilaPorConfirmar[] }) {
 export function PanelPorConfirmar({ recarga = 0 }: { recarga?: number }) {
   const [listas, setListas] = useState<Listas | null>(null)
   const [abierto, setAbierto] = useState(false)
+  const toast = useToast()
+  /** D11: los empalmes ya avisados en esta pestaña (el aviso emergente sale una vez). */
+  const avisados = useRef(new Set<string>())
 
   const recargar = useCallback((): void => {
-    void pedirPorConfirmar().then((l) => { if (l) setListas(l) })
-  }, [])
+    void pedirPorConfirmar().then((l) => {
+      if (!l) return
+      setListas(l)
+      const ahora = Date.now()
+      for (const e of l.empalmes) {
+        const llave = `${e.id}@${e.detectado_en}`
+        if (avisados.current.has(llave) || !esEmpalmeReciente(e.detectado_en, ahora)) continue
+        avisados.current.add(llave)
+        toast.info(textoAvisoEmpalme(e.inicio, e.zona))
+      }
+    })
+  }, [toast])
 
   useEffect(() => {
     const idle = enOcioso(recargar)
@@ -112,7 +157,7 @@ export function PanelPorConfirmar({ recarga = 0 }: { recarga?: number }) {
 
   const citas = listas?.citas ?? null
   const n = citas?.length ?? null
-  const m = listas?.canceladas.length ?? 0
+  const m = (listas?.canceladas.length ?? 0) + (listas?.empalmes.length ?? 0)
   return (
     <div className="relative">
       <button type="button" data-por-confirmar
@@ -122,7 +167,7 @@ export function PanelPorConfirmar({ recarga = 0 }: { recarga?: number }) {
         aria-expanded={abierto}>
         <MessageCircle size={15} /> Por confirmar{n !== null ? ` (${n})` : ''}
         {m > 0 && <span className="ml-1 px-1.5 rounded-full text-[11px] font-bold text-white" style={{ background: 'var(--ag-status-cancelled-dot)' }}
-          title="Canceladas por el paciente en las últimas 48 h">{m}</span>}
+          title="Canceladas por el paciente (48 h) y reservas por enlace empalmadas con Google">{m}</span>}
       </button>
       {abierto && (
         <div role="dialog" aria-label="Citas de mañana por confirmar"
@@ -136,6 +181,7 @@ export function PanelPorConfirmar({ recarga = 0 }: { recarga?: number }) {
           {citas?.length === 0 && <p className="text-[12px]" style={{ color: 'var(--ag-muted)' }}>No hay citas de mañana sin confirmar.</p>}
           <ListaPorConfirmar citas={citas ?? []} />
           <SeccionCanceladas canceladas={listas?.canceladas ?? []} />
+          <SeccionEmpalmes empalmes={listas?.empalmes ?? []} />
         </div>
       )}
     </div>

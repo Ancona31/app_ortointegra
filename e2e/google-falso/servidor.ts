@@ -53,6 +53,12 @@ export interface GoogleFalso {
   modificar: (id: string, cambios: Partial<EventoFalso>) => EventoFalso
   /** Lo borra como Google: queda `cancelled`. */
   borrar: (id: string) => void
+  /**
+   * D11 · cómo responde el `events.list` de la SINCRONIZACIÓN (sin
+   * `singleEvents`): con retraso (ms) o con un estado de error. La vista de
+   * solo lectura y el resto de métodos no cambian. 0 / null = normal.
+   */
+  lista: { demoraMs: number; falla: number | null }
   cerrar: () => Promise<void>
 }
 
@@ -156,7 +162,7 @@ function atender(g: GoogleFalso, marcas: Map<string, number>, metodo: string, pa
 export async function arrancarGoogleFalso(puerto = 0): Promise<GoogleFalso> {
   const marcas = new Map<string, number>()
   const g: GoogleFalso = {
-    url: '', eventos: new Map(), peticiones: [],
+    url: '', eventos: new Map(), peticiones: [], lista: { demoraMs: 0, falla: null },
     crear: (datos) => {
       const id = datos.id ?? `google${secuencia + 1}`
       const e = sellar({ ...datos, id, status: 'confirmed', etag: '', updated: '' }, {}, marcas)
@@ -180,6 +186,9 @@ export async function arrancarGoogleFalso(puerto = 0): Promise<GoogleFalso> {
       const cuerpo = await leerCuerpo(req)
       const ifMatch = typeof req.headers['if-match'] === 'string' ? req.headers['if-match'] : null
       g.peticiones.push({ metodo: req.method ?? 'GET', ruta: url.pathname + url.search, ifMatch, cuerpo })
+      const esListaDeSync = req.method === 'GET' && partes[2] === 'events' && !partes[3] && url.searchParams.get('singleEvents') !== 'true'
+      if (esListaDeSync && g.lista.demoraMs > 0) await new Promise((ok) => setTimeout(ok, g.lista.demoraMs))
+      if (esListaDeSync && g.lista.falla) { responder(res, g.lista.falla, { error: { code: g.lista.falla, message: 'falso' } }); return }
       const [estado, salida] = atender(g, marcas, req.method ?? 'GET', partes, url.searchParams, cuerpo, ifMatch)
       if (estado === 204) { res.writeHead(204); res.end(); return }
       responder(res, estado, salida)

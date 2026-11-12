@@ -32,6 +32,8 @@ const h = vi.hoisted(() => {
   const estado = {
     guion: [] as Array<(p: unknown) => unknown>,
     llamadas: [] as unknown[],
+    /** D11: el segundo argumento de cada `events.list` (la señal). */
+    opcionesLista: [] as unknown[],
     calendarioRegistrado: 'cal-spinus@group.calendar.google.com' as string | null,
     insertCalendario: 0,
     /** C5: los `events.patch` del restablecimiento, con sus opciones (If-Match). */
@@ -52,8 +54,9 @@ vi.mock('googleapis', () => ({
     },
     calendar: () => ({
       events: {
-        list: async (p: unknown) => {
+        list: async (p: unknown, opciones?: unknown) => {
           h.estado.llamadas.push(p)
+          h.estado.opcionesLista.push(opciones)
           const paso = h.estado.guion.shift()
           if (!paso) throw new Error('guion agotado')
           return { data: paso(p) }
@@ -118,6 +121,9 @@ const db = vi.hoisted(() => ({
   /** E9: las llamadas a `confirmarPorRsvp` y lo que devuelve (o lanza). */
   rsvps: [] as Array<{ citaId: string; eventId: string; aceptaron: string[] }>,
   rsvpDevuelve: true as boolean | 'lanza',
+  /** D11: las llamadas a `registrarEmpalmesReserva` y su comportamiento. */
+  empalmes: [] as string[][],
+  empalmesFalla: null as null | 'lanza' | 'ausente',
 }))
 
 vi.mock('@/lib/gcalSincronizacionBase', async (importOriginal) => {
@@ -162,6 +168,12 @@ vi.mock('@/lib/gcalSincronizacionBase', async (importOriginal) => {
       if (db.rsvpDevuelve === 'lanza') throw new Error('la base falló')
       return db.rsvpDevuelve
     },
+    registrarEmpalmesReserva: async (_c: string, ids: string[]) => {
+      db.empalmes.push(ids)
+      if (db.empalmesFalla === 'ausente') throw new real.SincronizacionNoDisponible('reserva_empalmes_registrar')
+      if (db.empalmesFalla === 'lanza') throw new Error('la base falló')
+      return 1
+    },
     importarEvento: async (_c: string, _cal: string, d: DatosImportar) => {
       db.importadas.push(d)
       return '55555555-5555-4555-8555-555555555555'
@@ -205,9 +217,9 @@ beforeEach(() => {
   Object.assign(db, {
     fase: 'completa', syncToken: null, pageToken: null, ventana: null, candado: null, ocupado: false, habilitada: true,
     noDisponible: false, noDisponibleC2: false, soltados: [], reinicios: 0, filas: [fila()], aplicadas: [], importadas: [], fallarAplicar: new Set(),
-    aplicarDevuelve: 1, rsvps: [], rsvpDevuelve: true,
+    aplicarDevuelve: 1, rsvps: [], rsvpDevuelve: true, empalmes: [], empalmesFalla: null,
   })
-  Object.assign(h.estado, { guion: [], llamadas: [], calendarioRegistrado: CAL, insertCalendario: 0, parches: [], patchFalla: null })
+  Object.assign(h.estado, { guion: [], llamadas: [], opcionesLista: [], calendarioRegistrado: CAL, insertCalendario: 0, parches: [], patchFalla: null })
   h.estado.rpc = { data: null, error: null, args: [] }
   vi.mocked(logAudit).mockClear()
   vi.spyOn(console, 'warn').mockImplementation(() => undefined)
@@ -577,5 +589,72 @@ describe('E9 · RSVP de Google (detrás de AGENDA_RSVP_GOOGLE)', () => {
     await sincronizarClinica(conexion, op)
     expect(JSON.stringify(db.aplicadas)).toBe(sin)
     vi.unstubAllEnvs()
+  })
+})
+
+describe('D11 · señal de la reserva pública y empalmes con reservas por enlace', () => {
+  const IMPORTADA = '55555555-5555-4555-8555-555555555555'
+
+  it('sin señal (sondeo, tarea): events.list sin opciones, como antes', async () => {
+    h.estado.guion = [pagina([], { nextSyncToken: 't' })]
+    await sincronizarClinica(conexion, op)
+    expect(h.estado.opcionesLista).toEqual([{}])
+  })
+
+  it('con señal: la lleva events.list y el patch del restablecimiento', async () => {
+    const senal = new AbortController().signal
+    db.filas = [fila({ status: 'attended' })]
+    h.estado.guion = [pagina([evento()], { nextSyncToken: 't' })]
+    await sincronizarClinica(conexion, { ...op, senal })
+    expect(h.estado.opcionesLista).toEqual([{ signal: senal }])
+    expect(h.estado.parches[0].opciones).toMatchObject({ signal: senal, headers: { 'If-Match': '"e2"' } })
+  })
+
+  it('señal abortada a media pasada: error con código propio (google_tiempo), sin avanzar el token', async () => {
+    const control = new AbortController()
+    h.estado.guion = [() => { control.abort(new Error('tope')); throw new Error('This operation was aborted') }]
+    const r = await sincronizarClinica(conexion, { ...op, senal: control.signal })
+    expect(r.estado).toBe('error')
+    expect(db.soltados).toEqual(['google_tiempo'])
+    expect(db.syncToken).toBeNull()
+  })
+
+  it('señal ya abortada entre páginas: suelta sin error y deja la página (parcial)', async () => {
+    const control = new AbortController()
+    h.estado.guion = [(p) => { control.abort(new Error('tope')); return pagina([], { nextPageToken: 'p2' })(p) }]
+    expect(await sincronizarClinica(conexion, { ...op, senal: control.signal })).toMatchObject({ estado: 'parcial' })
+    expect(db).toMatchObject({ pageToken: 'p2', soltados: [null] })
+  })
+
+  it('lo importado y lo movido de la página va a registrar empalmes, una vez por página', async () => {
+    h.estado.guion = [pagina([nuevo, evento()], { nextSyncToken: 't' })]
+    expect(await sincronizarClinica(conexion, op)).toMatchObject({ estado: 'ok', errores: 0 })
+    expect(db.empalmes).toEqual([[IMPORTADA, CITA]])
+  })
+
+  it('sin cambios de hora (sólo el título) ni importaciones: no se llama', async () => {
+    db.filas = [fila({ inicio: '2031-06-06T18:00:00+00:00', fin: '2031-06-06T19:00:00+00:00' })]
+    h.estado.guion = [pagina([evento({ summary: 'Otra junta' })], { nextSyncToken: 't' })]
+    await sincronizarClinica(conexion, op)
+    expect(db.aplicadas).toHaveLength(1)
+    expect(db.empalmes).toEqual([])
+  })
+
+  it('un aplicar que no prendió (n = 0) no cuenta como movido', async () => {
+    db.aplicarDevuelve = 0
+    h.estado.guion = [pagina([evento()], { nextSyncToken: 't' })]
+    await sincronizarClinica(conexion, op)
+    expect(db.empalmes).toEqual([])
+  })
+
+  it('un fallo al registrar cuenta en errores y la página avanza; sin la migración, ni eso', async () => {
+    db.empalmesFalla = 'lanza'
+    h.estado.guion = [pagina([nuevo], { nextSyncToken: 't1' })]
+    expect(await sincronizarClinica(conexion, op)).toMatchObject({ estado: 'ok', errores: 1 })
+    expect(db.syncToken).toBe('t1')
+    db.empalmesFalla = 'ausente'
+    h.estado.guion = [pagina([nuevo], { nextSyncToken: 't2' })]
+    expect(await sincronizarClinica(conexion, op)).toMatchObject({ estado: 'ok', errores: 0 })
+    expect(db.syncToken).toBe('t2')
   })
 })

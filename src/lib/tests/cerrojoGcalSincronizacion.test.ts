@@ -1,9 +1,9 @@
 /**
- * EL CANDADO de la sincronización de vuelta (bloque C): las nueve RPC que
+ * EL CANDADO de la sincronización de vuelta (bloque C): las doce RPC que
  * escriben o leen citas y estado con el cliente de servicio sólo se llaman
  * desde su dueño, y los archivos de sincronización no consultan tablas.
  *
- *   · Ocho RPC sólo por `.rpc(` dentro de `src/lib/gcalSincronizacionBase.ts`,
+ *   · Once RPC (las dos de D11 incluidas) sólo por `.rpc(` dentro de `src/lib/gcalSincronizacionBase.ts`,
  *     que valida `clinicaId` y lo manda como `p_clinica_id` en cada una.
  *   · `gcal_sync_clinicas_pendientes` (la única lectura entre clínicas, para
  *     el cron) sólo dentro de `src/lib/gcalConexion.ts`, el dueño de leer la
@@ -35,6 +35,8 @@ const DUENOS: Record<string, string> = {
   gcal_aplicar_evento: BASE,
   gcal_importar_evento: BASE,
   cita_rsvp_google: BASE,
+  gcal_sync_frescura: BASE,
+  reserva_empalmes_registrar: BASE,
   gcal_sync_clinicas_pendientes: CONEXION,
 }
 
@@ -88,7 +90,7 @@ describe('cerrojo de la sincronización con Google (bloque C)', () => {
     expect(conFrom).toEqual([])
   })
 
-  it('el detector no está muerto: ve las nueve RPC en sus dueños y un .from( de verdad', () => {
+  it('el detector no está muerto: ve las doce RPC en sus dueños y un .from( de verdad', () => {
     const vistos = new Set<string>()
     for (const rel of [BASE, CONEXION]) {
       for (const m of readFileSync(join(process.cwd(), rel), 'utf8').matchAll(LITERAL)) vistos.add(m[1])

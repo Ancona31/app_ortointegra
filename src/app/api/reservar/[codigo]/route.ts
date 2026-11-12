@@ -10,6 +10,12 @@
  *   6. CONVENIO DE D3: `inicio` tiene que ser un turno ofrecido —horario del
  *      consultorio, alineación al paso del tipo, anticipación y horizonte—
  *      (400 si no lo es; `turnoValido`). Si sigue libre lo decide la RPC (409);
+ *   6-bis. D11 (decisión de Angel): sincronizar con Google JUSTO ANTES de la
+ *      RPC, siempre y sin el mínimo de 60 s (`sincronizarAntesDeReservar`,
+ *      fuera de la transacción: la RPC no cambia). Lo importado ocupa y la
+ *      RPC contesta `ocupado` (409, el mismo «turno no disponible»). Si
+ *      Google falla o tarda y la última buena tiene 30 min o más: 503 «no se
+ *      puede reservar por ahora» con el teléfono del consultorio;
  *   7. `reservar_por_enlace`, que bajo su candado vuelve a comprobar enlace,
  *      interruptor, aviso, S3, ventana, empalme, verificación y candado de la
  *      persona, e inserta la cita. Con `origen` (E6, reagendar), la misma
@@ -29,7 +35,8 @@ import {
 import { normalizarCorreo, normalizarTelefonoMx } from '@/lib/reserva/contacto'
 import { hashDeCodigo, hmacContacto, hmacFicha } from '@/lib/reserva/secretos'
 import { AVISO_VERSION, hashAviso } from '@/lib/reserva/avisoReserva'
-import { respuestaErrorRpc, respuestaReserva } from '@/lib/reserva/respuestasReserva'
+import { respuestaErrorRpc, respuestaNoPorAhora, respuestaReserva } from '@/lib/reserva/respuestasReserva'
+import { sincronizarAntesDeReservar } from '@/lib/reserva/sincronizarReserva'
 import { fechaEnZona, ocupacionSinEstado, rangoDeConsulta, reglasDe, turnoValido } from '@/lib/reserva/turnosReserva'
 import { crearEventoReserva } from '@/lib/reserva/googleReserva'
 import { enviarComprobante } from '@/lib/reserva/comprobanteReserva'
@@ -88,6 +95,9 @@ export async function POST(req: NextRequest, rctx: RouteContext<'/api/reservar/[
     codigoHash, consultorioId: consultorio.id, tipoCitaId: tipo.id, inicio: turno.inicio,
     nombre: b.nombre, telefono, correo: b.correo, telHmac, correoHmac,
     fichaHmac: b.ficha ? hmacFicha(b.ficha) : null, avisoVersion: AVISO_VERSION, avisoSha: hashAviso(), clientId: b.client_id,
+  }
+  if (await sincronizarAntesDeReservar(ctx.clinica_id, 'reservar') === 'no_por_ahora') {
+    return responder(respuestaNoPorAhora(telefonoDeContacto(ctx, consultorio.id)))
   }
   const r = b.origen ? await reagendar(ctx, args, hashDeCodigo(b.origen)) : await reservar(ctx, args)
   if (!r.ok) return responder(respuestaErrorRpc(r.ausente, r.codigo))

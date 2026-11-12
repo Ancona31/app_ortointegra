@@ -747,6 +747,10 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
      Google lo resta) y aparece como fila. Apagado, este efecto no hace nada
      y no sale ninguna petición. */
   const ultimoSondeoRef = useRef(0)
+  /* E8 y D11: sube para que el panel «Por confirmar» se recargue (cancelación
+     del paciente, o un sondeo que trajo cambios y puede traer un empalme con
+     una reserva por enlace). */
+  const [recargaPanel, setRecargaPanel] = useState(0)
   const puedeSondear = agendaV2 && profile !== null && canVerAgendaCompleta(profile)
   useEffect(() => {
     if (!puedeSondear) return
@@ -763,6 +767,7 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
           if (!vigente || cambios <= 0) return
           vaciarCacheGoogle()
           refetch(true)
+          setRecargaPanel((n) => n + 1)
         })
         .catch(() => undefined)
     }
@@ -784,7 +789,6 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
      `/api/agenda/respuestas` si fue el paciente por el enlace hace menos de
      2 min; si sí, un aviso sin el nombre del paciente y el panel se recarga.
      Apagada, el gancho no recibe el callback y no sale ninguna petición. */
-  const [recargaPanel, setRecargaPanel] = useState(0)
   const avisarCancelacionPaciente = agendaV2 ? (id: string): void => {
     const ev = calendarRef.current?.getApi().getEventById(id)
     const inicio = ev?.start?.toISOString() ?? null

@@ -71,7 +71,7 @@ export function cuerpoRestablecido(fila: FilaEspejo): EventoGoogle {
 
 /** Uno. `true` = escrito; `false` = no tocaba (412 o sin fila). Lanza el resto. */
 async function restablecerUno(
-  clinicaId: string, calendar: GCalCliente, calendarId: string, p: PorRestablecer, fila: FilaEspejo,
+  clinicaId: string, calendar: GCalCliente, calendarId: string, p: PorRestablecer, fila: FilaEspejo, senal?: AbortSignal,
 ): Promise<boolean> {
   const eventId = fila.googleEventId ?? p.eventId
   if (fila.googleEventId && fila.googleEventId !== p.eventId) return false
@@ -79,7 +79,7 @@ async function restablecerUno(
   try {
     const { data } = await calendar.events.patch(
       { calendarId, eventId, sendUpdates: 'none', requestBody: cuerpoRestablecido(fila) },
-      p.etag ? { headers: { 'If-Match': p.etag } } : {},
+      { ...(p.etag ? { headers: { 'If-Match': p.etag } } : {}), ...(senal ? { signal: senal } : {}) },
     )
     etag = data.etag ?? null
   } catch (err) {
@@ -100,7 +100,7 @@ async function restablecerUno(
  * se escribieron y cuántas fallaron; un fallo no tumba a las demás. Nunca lanza.
  */
 export async function restablecerEnGoogle(
-  clinicaId: string, calendar: GCalCliente, calendarId: string, lista: readonly PorRestablecer[],
+  clinicaId: string, calendar: GCalCliente, calendarId: string, lista: readonly PorRestablecer[], senal?: AbortSignal,
 ): Promise<{ escritas: number; errores: number }> {
   const unicas = [...new Map(lista.map((p) => [p.citaId, p])).values()]
   if (unicas.length === 0) return { escritas: 0, errores: 0 }
@@ -118,7 +118,7 @@ export async function restablecerEnGoogle(
     const fila = porId.get(p.citaId)
     if (!fila) continue
     try {
-      if (await restablecerUno(clinicaId, calendar, calendarId, p, fila)) escritas += 1
+      if (await restablecerUno(clinicaId, calendar, calendarId, p, fila, senal)) escritas += 1
     } catch {
       errores += 1
       logger.warn('GCalSync', `restablecer: evento sin escribir ${JSON.stringify({ clinica: clinicaId, evento: p.eventId })}`)
