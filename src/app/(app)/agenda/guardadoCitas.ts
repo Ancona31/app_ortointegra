@@ -43,7 +43,8 @@ import { avisoFueraDeHorario, avisoFinFueraDeHorario } from '@/lib/agenda/horari
 import { DEFAULT_DURATION } from '@/lib/agenda/duracionCita'
 import { registrarNuevo, salirConAnimacion } from '@/lib/agenda/marcasMovimiento'
 import { animarFlip } from '@/lib/agenda/flipTarjetas'
-import type { Appointment, DatosGuardado } from '@/lib/agenda/tiposAgenda'
+import type { Appointment, DatosGuardado, Status } from '@/lib/agenda/tiposAgenda'
+import { ESTADOS_CITA, STATUS_CONFIG } from '@/lib/agenda/tarjetasAgenda'
 import {
   empalmesPintados, esListaDeEmpalmes, mensajeEmpalme, unirAceptados, ESTADOS_SIN_EMPALME, type Empalme,
 } from '@/lib/agenda/empalmesCita'
@@ -696,30 +697,50 @@ export function crearGuardadoCitas({
      CANCELA. Mismo camino que cambiar el estado en el modal —el PUT de
      siempre—, así que el `after()` de la ruta ya marca el evento de Google
      con «CANCELADA — » en vez de borrarlo (P4), y la auditoría la deja el
-     disparador de B0 (`cita_cancelada`). La tarjeta se queda, en cancelada. */
+     disparador de B0 (`cita_cancelada`). La tarjeta se queda, en cancelada.
+     Desde F3 es un caso de `cambiarEstadoCita`. */
   async function handleCancelar(id: string) {
+    await cambiarEstadoCita(id, 'cancelled')
+  }
+
+  /* F3 · el cambio de estado de una cita SIN abrir el modal (tarjeta de
+     lectura: «Confirmar», «Cancelar»). Es `handleCancelar` generalizado: el
+     mismo PUT parcial (`{ status, client_id }`), la misma firma para
+     reconocer el eco, la auditoría del disparador de B0, lo optimista y la
+     caché de rangos vaciada antes y después.
+     ⚠️ NUNCA BORRA (B3): cancelar es un PUT y la tarjeta se queda, en
+     cancelada y de golpe (spec §8: el cambio de estado no se anima); no pasa
+     por `salirConAnimacion`. Un estado fuera de los cinco no sale a la red. */
+  async function cambiarEstadoCita(id: string, estado: Status): Promise<void> {
+    if (!ESTADOS_CITA.includes(estado)) {
+      toast.error('Estado de cita no válido')
+      return
+    }
+    const textos = estado === 'cancelled'
+      ? { hecho: 'Se canceló la cita', fallo: 'No se pudo cancelar' }
+      : { hecho: `Estado cambiado a «${STATUS_CONFIG[estado].label}»`, fallo: 'No se pudo cambiar el estado' }
     closeModal()
-    toast.success('Se canceló la cita')
+    toast.success(textos.hecho)
     const evento = calendarRef.current?.getApi().getEventById(id)
-    evento?.setExtendedProp('status', 'cancelled')
+    evento?.setExtendedProp('status', estado)
 
     vaciarCacheCitas() // A1.5a: también al salir; ver `ejecutarDrop`.
     const res = await fetch(`/api/appointments/${id}`, {
       method:  'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ status: 'cancelled', client_id: firmarEscritura() }),
+      body:    JSON.stringify({ status: estado, client_id: firmarEscritura() }),
     })
     vaciarCacheCitas()
 
     if (!res.ok) {
       refetch()
       const cuerpo: { error?: string; message?: string } | null = await res.json().catch(() => null)
-      toast.error(cuerpo?.message || cuerpo?.error || 'No se pudo cancelar')
+      toast.error(cuerpo?.message || cuerpo?.error || textos.fallo)
       return
     }
     const json: { appointment?: Partial<Appointment> & { id?: string } } | null = await res.json().catch(() => null)
     if (json?.appointment) aplicarAppointmentAlEvento(json.appointment)
   }
 
-  return { handleEventDrop, handleEventResize, handleSave, handleDelete, handleCancelar }
+  return { handleEventDrop, handleEventResize, handleSave, handleDelete, handleCancelar, cambiarEstadoCita }
 }
