@@ -22,6 +22,7 @@ import { BarraAgendarMovil } from '@/components/agenda/BarraAgendarMovil'
 import { LeyendaEstados } from '@/components/agenda/LeyendaEstados'
 import { AvisosAgenda } from '@/components/agenda/AvisosAgenda'
 import { PanelPorConfirmar } from '@/components/agenda/PanelPorConfirmar'
+import { esRespuestaReciente, leerRespuesta, textoAvisoCancelacion } from '@/lib/agenda/avisoCancelacion'
 import {
   VISTAS_FC, VISTAS_FC_MOVIL, TOOLBAR_ESCRITORIO, PLUGINS_FC, TEXTO_BOTONES_FC, FORMATO_HORA_FC,
 } from '@/components/agenda/opcionesCalendario'
@@ -631,8 +632,29 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
     }
   }, [puedeSondear, refetch])
 
+  /* ── E8 · «AVISA A LA CLÍNICA» (§2, plan_E lista A 12) ─────────────────
+     Sólo con la v2 encendida. Cuando el canal trae una cancelación AJENA de
+     una cita pintada (no eco propio), se pregunta UNA vez a
+     `/api/agenda/respuestas` si fue el paciente por el enlace hace menos de
+     2 min; si sí, un aviso sin el nombre del paciente y el panel se recarga.
+     Apagada, el gancho no recibe el callback y no sale ninguna petición. */
+  const [recargaPanel, setRecargaPanel] = useState(0)
+  const avisarCancelacionPaciente = agendaV2 ? (id: string): void => {
+    const ev = calendarRef.current?.getApi().getEventById(id)
+    const inicio = ev?.start?.toISOString() ?? null
+    const zona: unknown = ev?.extendedProps.consultorio_timezone
+    fetch(`/api/agenda/respuestas?cita=${encodeURIComponent(id)}`)
+      .then(async (res) => (res.ok ? leerRespuesta(await res.json()) : null))
+      .then((r) => {
+        if (!r || !esRespuestaReciente(r.respuesta, r.respondidoEn, Date.now())) return
+        setRecargaPanel((n) => n + 1)
+        toast.info(textoAvisoCancelacion(inicio, typeof zona === 'string' ? zona : null))
+      })
+      .catch(() => undefined)
+  } : undefined
+
   const { firmarEscritura, aplicarAppointmentAlEvento } = useTiempoRealAgenda({
-    calendarRef, filtroEfectivo, refetch, ultimaTraidaRef,
+    calendarRef, filtroEfectivo, refetch, ultimaTraidaRef, onCanceladaAjena: avisarCancelacionPaciente,
   })
 
   /* A2.5.7: no es un hook — ver la nota de cabecera de `guardadoCitas.ts`—, así
@@ -1030,7 +1052,7 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
           onIntencionAgendar={precargarModalesAgenda}
           /* E7: la lista de mañana por confirmar (WhatsApp manual). Sólo con
              la v2 encendida: apagada no se monta y no sale ninguna petición. */
-          porConfirmar={agendaV2 ? <PanelPorConfirmar /> : undefined}
+          porConfirmar={agendaV2 ? <PanelPorConfirmar recarga={recargaPanel} /> : undefined}
         />
       )}
 

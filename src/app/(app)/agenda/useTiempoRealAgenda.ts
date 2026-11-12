@@ -23,6 +23,7 @@ import { createClient } from '@/lib/supabase/client'
 import { vaciarCacheCitas } from '@/lib/agenda/cacheRangosCitas'
 import { buildEventInput, FUENTE_APPOINTMENTS } from '@/lib/agenda/eventosDeCita'
 import type { Appointment } from '@/lib/agenda/tiposAgenda'
+import { esCancelacionAjena } from '@/lib/agenda/avisoCancelacion'
 
 type CalRef = RefObject<InstanceType<typeof FullCalendar> | null>
 
@@ -49,9 +50,12 @@ interface Params {
   filtroEfectivo: string | null
   refetch: (forzarGoogle?: boolean) => void
   ultimaTraidaRef: RefObject<number>
+  /** E8: una cita PINTADA pasó a cancelada por un cambio ajeno (no eco propio).
+   *  Sólo con la agenda v2 encendida; apagada, el padre no lo pasa. */
+  onCanceladaAjena?: (id: string) => void
 }
 
-export function useTiempoRealAgenda({ calendarRef, filtroEfectivo, refetch, ultimaTraidaRef }: Params) {
+export function useTiempoRealAgenda({ calendarRef, filtroEfectivo, refetch, ultimaTraidaRef, onCanceladaAjena }: Params) {
   /**
    * Re-hidrata un evento del calendario con la fila canónica que devolvió el
    * servidor. Recorre `extendedProps` y FUSIONA clave por clave: no sustituye
@@ -231,6 +235,17 @@ export function useTiempoRealAgenda({ calendarRef, filtroEfectivo, refetch, ulti
 
     const fila = payload.new
     if (!fila?.id || !fila.start_time) return
+
+    // E8 · ANTES de consumir la firma y de fusionar: hace falta el estado que
+    // estaba pintado. Sólo avisa al padre; quien decide si fue el paciente es él.
+    if (onCanceladaAjena) {
+      const pintado: unknown = api.getEventById(fila.id)?.extendedProps.status
+      if (esCancelacionAjena({
+        tipo: payload.eventType, statusNuevo: fila.status,
+        statusPintado: typeof pintado === 'string' ? pintado : undefined,
+        esEco: !!fila.client_id && escriturasPropias.current.has(fila.client_id),
+      })) onCanceladaAjena(fila.id)
+    }
 
     // ¿Es mía? La actualización optimista ya la reflejó. La firma se CONSUME
     // al usarse, no se guarda: si se quedara, cualquier cambio posterior de

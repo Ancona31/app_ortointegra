@@ -1742,6 +1742,35 @@ queda listada aquí.
   documentación escribe `wa.me/<número>/?text=` con barra y el código la omite
   (`wa.me/<número>?text=`, la forma de su ejemplo con número); las dos abren.
 
+**E8 · «Avisa a la clínica» (sin migración):**
+- Como en el diseño: **sin correo a la clínica** (lista A 12), sin tocar la
+  publicación de Realtime y sin truco de `client_id`.
+- **Aviso emergente:** `useTiempoRealAgenda` gana `onCanceladaAjena?`; se llama
+  sólo con un UPDATE a `cancelled` de una cita PINTADA que no estaba cancelada
+  y que no es eco propio (`esCancelacionAjena`, se evalúa antes de consumir la
+  firma y de fusionar). La agenda (sólo con v2) pregunta una vez a
+  `GET /api/agenda/respuestas?cita=` (sesión, RLS de las 7 columnas de E1,
+  `clinica_id` explícito; sin la tabla, `{respuesta:null}`) y avisa sólo si es
+  `cancelo` de hace menos de 2 min: «Un paciente canceló su cita del {fecha} a
+  las {hora}.», sin nombre. Una cita fuera de la vista no avisa: queda en el
+  panel. Una cancelación del personal o de Google no avisa (no hay respuesta
+  reciente).
+- **Aviso persistente:** `GET /api/agenda/por-confirmar` devuelve también
+  `canceladas` (respuestas `cancelo` de las últimas 48 h cuya cita SIGUE
+  cancelada: si el personal la reactivó, sale), y el panel las pinta en
+  «Canceladas por el paciente (48 h)» con un contador rojo junto a «Por
+  confirmar». El panel se recarga cuando sale el aviso.
+- **Límite conocido:** quien tenga la agenda en móvil ve el aviso emergente
+  pero no el panel (el panel sólo está en la cabecera de escritorio, E7).
+- **Pruebas:** `avisoCancelacion.test.ts` (eco propio, otro estado, ya
+  cancelada, no pintada, INSERT/DELETE, antigüedad). e2e
+  `e2e/aviso-cancelacion.e2e.ts` escrita, **no corrida** (cancela llamando a
+  `cita_confirmacion_responder` como `service_role`, como haría el POST de E3).
+- **Revisión independiente (APTO).** Nota suya, para Angel: la sección del
+  panel enseña el TÍTULO de la cita (en una cita con paciente, su nombre), como
+  la lista de mañana de E7; es la vista del personal, con la RLS de siempre. «Sin
+  nombre» vale para el aviso emergente, no para el panel.
+
 ### Bloque F
 
 - Las 18 propuestas de la auditoría visual, aprobadas. **El pulido visual y los
