@@ -47,6 +47,9 @@ import { useDialogoModal } from '@/hooks/useDialogoModal'
 import ConfirmModal from '@/components/agenda/ConfirmModal'
 import { DEFAULT_DURATION } from '@/lib/agenda/duracionCita'
 import { ESTADOS_SIN_EMPALME, mensajeEmpalme, type Empalme, type TramoCita } from '@/lib/agenda/empalmesCita'
+/* B6c: SÓLO EL TIPO. `tiposCita.ts` trae Zod en valor, y este modal se carga
+   en diferido (A2.6): un import de valor de ahí lo metería en este chunk. */
+import type { TipoCita } from '@/lib/agenda/tiposCita'
 
 export type PacienteBusqueda = { id: string; nombre: string; apellidos: string; telefono: string | null }
 
@@ -300,6 +303,29 @@ function usePacientes(query: string) {
   return { results, loading }
 }
 
+/* ─── B6c: los tipos de cita del médico ───────────────────
+   `GET /api/agenda/tipos-cita?medico_id=` devuelve los activos de la clínica y
+   los personales de ese médico (la RLS quita los que no se ven). `medicoId`
+   vacío = no se pide nada (interruptor apagado, o un evento). `null` = aún sin
+   lista para ESE médico; si la petición falla, lista vacía: el tipo es
+   opcional y la cita se guarda sin él. El estado recuerda para qué médico es,
+   así un cambio de médico no enseña la lista del anterior. */
+function useTiposCita(medicoId: string): TipoCita[] | null {
+  const [cargados, setCargados] = useState<{ medicoId: string; tipos: TipoCita[] } | null>(null)
+
+  useEffect(() => {
+    if (!medicoId) return
+    const control = new AbortController()
+    fetch(`/api/agenda/tipos-cita?medico_id=${encodeURIComponent(medicoId)}`, { signal: control.signal })
+      .then(r => (r.ok ? r.json() : { tipos: [] }))
+      .then((j: { tipos?: TipoCita[] }) => setCargados({ medicoId, tipos: j.tipos ?? [] }))
+      .catch(() => { if (!control.signal.aborted) setCargados({ medicoId, tipos: [] }) })
+    return () => control.abort()
+  }, [medicoId])
+
+  return medicoId && cargados?.medicoId === medicoId ? cargados.tipos : null
+}
+
 export default function AppointmentModal({
   modal, onClose, onSave, onDelete, medicos, defaultMedicoId,
   hideMedicoDropdown, medicoDropdownRequired, canVerExpediente, canInvitar, onInvitar,
@@ -426,6 +452,8 @@ export default function AppointmentModal({
   const [showSearch,  setShowSearch]  = useState(false)
   const [quickCreate, setQuickCreate] = useState(false)
   const [medicoId,    setMedicoId]    = useState<string>(apt?.medico_id ?? defaultMedicoId)
+  /* B6c: el tipo ELEGIDO. Lo que se guarda es `tipoEfectivo`, de más abajo. */
+  const [tipoCitaId,  setTipoCitaId]  = useState<string | null>(apt?.tipo_cita_id ?? null)
   const [saving,      setSaving]      = useState(false)
   const [deleting,    setDeleting]    = useState(false)
   /* La alerta de la X del paciente. Ver el botón, más abajo. */
@@ -507,6 +535,35 @@ export default function AppointmentModal({
 
   const { results, loading: searchLoading } = usePacientes(search)
   const showDropdown = showSearch && search.trim().length >= 2
+
+  /* ── B6c: TIPO DE CITA (P5), SÓLO CON EL INTERRUPTOR Y EN UNA CITA ─────────
+     Apagado no se pide la lista ni viaja `tipo_cita_id`: el modal es el de
+     siempre. `tipoEfectivo` es lo que se guarda, y se DERIVA en vez de
+     limpiarse con un efecto: sin paciente no hay tipo (P5: sólo citas con
+     paciente), y al cambiar de médico un tipo que no está en su lista cae a
+     «sin tipo» (era de otro médico; el servidor daría 400). El que la cita YA
+     tenía se conserva mientras el médico sea el mismo, aunque esté archivado:
+     el servidor sólo exige `activo` a un tipo recién asignado. */
+  const conTipos = agendaV2 && !esEvento
+  const tiposCita = useTiposCita(conTipos ? medicoId : '')
+  const tipoConservable = apt && medicoId === apt.medico_id ? (apt.tipo_cita_id ?? null) : null
+  const tipoEfectivo: string | null = conTipos && paciente && tipoCitaId
+    && (tipoCitaId === tipoConservable || tiposCita?.some(t => t.id === tipoCitaId)) ? tipoCitaId : null
+  /* Las opciones del selector: «Sin tipo», el que la cita ya tenía si no viene
+     en la lista (archivado, u oculto por la RLS), y la lista. Elegir uno de la
+     lista escribe el fin como los botones de duración; los otros dos no tocan
+     las horas. Con una sola opción («Sin tipo») el selector no se pinta. */
+  const opcionesTipo: { id: string | null; nombre: string; color: ColorEvento | null; duracion: number | null; elegir: () => void }[] = [
+    { id: null, nombre: 'Sin tipo', color: null, duracion: null, elegir: () => setTipoCitaId(null) },
+    ...(tipoConservable && tiposCita && !tiposCita.some(t => t.id === tipoConservable)
+      ? [{ id: tipoConservable, nombre: apt?.tipo_cita_nombre ?? 'Tipo actual', color: null, duracion: null,
+           elegir: () => setTipoCitaId(tipoConservable) }]
+      : []),
+    ...(tiposCita ?? []).map(t => ({
+      id: t.id, nombre: t.nombre, color: t.color, duracion: t.duracion_min,
+      elegir: () => { setTipoCitaId(t.id); escribirFinConChip(t.duracion_min) },
+    })),
+  ]
 
   /* Lo mínimo para poder guardar, según el tipo. Una CITA necesita paciente; un
      EVENTO necesita título con algo escrito —`appointments.title` es NOT NULL y
@@ -708,6 +765,10 @@ export default function AppointmentModal({
       updated_at:  apt?.updated_at,
       // B7c: sólo si se aceptó alguno; sin interruptor nunca viaja.
       ...(empalmesAceptados.length ? { empalmes_aceptados: empalmesAceptados } : {}),
+      /* B6c: sólo con el interruptor y sólo si cambia respecto a la fila (en un
+         alta, si hay tipo). Un evento sin paciente que arrastre un tipo viejo
+         manda `null` y lo limpia. */
+      ...(agendaV2 && tipoEfectivo !== (apt?.tipo_cita_id ?? null) ? { tipo_cita_id: tipoEfectivo } : {}),
     })
     setSaving(false)
   }
@@ -1324,6 +1385,33 @@ export default function AppointmentModal({
                 ? 'El último día no puede ir antes del primero.'
                 : 'La hora de fin tiene que ir después de la de inicio.'}
             </p>
+          )}
+
+          {/* B6c · Tipo de cita (P5). Sólo con el interruptor, en una cita con
+              paciente y si hay algún tipo que ofrecer. Opcional: «Sin tipo»
+              siempre está. El color es SÓLO la marca de la lista; la tarjeta
+              sigue con el color del estado y sin el nombre del tipo. */}
+          {conTipos && paciente && opcionesTipo.length > 1 && (
+            <div>
+              <label id={`${tituloId}-tipo`} className="block text-[11px] font-bold uppercase tracking-[.06em] mb-2" style={{ color: 'var(--ag-muted2)' }}>Tipo de cita</label>
+              <div role="radiogroup" aria-labelledby={`${tituloId}-tipo`} className="flex flex-wrap gap-2">
+                {opcionesTipo.map(o => {
+                  const marcado = tipoEfectivo === o.id
+                  return (
+                    <button key={o.id ?? 'sin-tipo'} type="button" role="radio" aria-checked={marcado} onClick={o.elegir}
+                      className={`inline-flex items-center gap-1.5 px-3 py-2 max-md:py-3 rounded-full text-[13px] font-semibold border transition-all ${marcado ? 'text-white' : ''}`}
+                      style={marcado
+                        ? { background: 'var(--ag-brand-primary)', borderColor: 'var(--ag-brand-primary)' }
+                        : { background: 'var(--ag-input-bg)', color: 'var(--ag-text)', borderColor: 'var(--ag-input-border)' }}
+                    >
+                      {o.color && <span aria-hidden className="w-2.5 h-2.5 rounded-full flex-none" style={{ background: `var(--ag-evento-${o.color})` }} />}
+                      {o.nombre}
+                      {o.duracion !== null && <span className="font-normal opacity-80">· {o.duracion} min</span>}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
           )}
 
           {/* Duración — un ATAJO para escribir el fin, no un dato aparte. En todo

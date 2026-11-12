@@ -791,6 +791,19 @@ queda listada aquí.
   nunca sustituye al color del estado; solo citas con paciente; opcional; con
   instantánea del nombre; reasignar a un médico incompatible → 400; el nombre
   del tipo **no** aparece en la tarjeta (se conserva la tarjeta de dos líneas).
+  - **B6c, cómo quedó en el alta y la edición:** la duración del tipo **no** la
+    impone el servidor: elegirlo en el modal escribe el fin (inicio + duración)
+    como los botones de duración, y el usuario puede retocarlo; el servidor
+    guarda y calcula el empalme con el fin que llega. La validación del tipo va
+    antes del empalme (un 400 nunca llega después de aceptar un empalme) y falla
+    cerrada (si no se puede leer el tipo, 500 y no se escribe). Con B3: quitar el
+    paciente de una cita sigue dando el 409 `cita_con_paciente`, que va primero;
+    `tipo_sin_paciente` sólo sale al ponerle un tipo a un evento sin paciente.
+    Resto conocido: con el interruptor apagado, una cita con tipo a la que se le
+    quita el paciente conserva el tipo (apagado no se nombran las columnas); al
+    volver a encenderlo, el modal manda `tipo_cita_id: null` al editar ese evento.
+    Al editar, el tipo que la cita ya tenía se conserva aunque esté archivado
+    (se muestra con su instantánea) mientras no cambie el médico.
 - **P6. Disponibilidad:** un tramo por día, sin pausa de comida (la forma
   actual del horario); el horario del consultorio lo edita su dueño (RLS de
   hoy); la rejilla sigue pintando el horario de la clínica.

@@ -14,6 +14,7 @@ import { comprobarTopeDuracion } from '@/lib/agenda/topeDuracion'
 import { agendaV2Encendida } from '@/lib/agenda/ajustesAgenda'
 import { comprobarEmpalmes, type VeredictoEmpalme } from '@/lib/agenda/empalmesServidor'
 import { ESTADOS_SIN_EMPALME } from '@/lib/agenda/empalmesCita'
+import { comprobarTipoDelPut, leerTipoCitaId, CUERPO_TIPO_INVALIDO } from '@/lib/agenda/tipoCitaServidor'
 
 /* Una fecha-solo `YYYY-MM-DD` QUE ADEMÁS EXISTE EN EL CALENDARIO: la forma no
    basta, porque `2026-02-30` la pasa y el motor la DESBORDA al 2 de marzo en vez
@@ -631,6 +632,28 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
       if (errorDeTopeTodoElDia) {
         return NextResponse.json(errorDeTopeTodoElDia, { status: 400 })
       }
+    }
+
+    /* ── B6c: EL TIPO DE CITA, CON EL INTERRUPTOR ENCENDIDO ──────────────────
+       Apagado, `tipo_cita_id` se ignora y el update no nombra `tipo_cita_*`.
+       Encendido, se valida el tipo con el que QUEDA la cita (el del cuerpo o el
+       que ya tenía) contra el médico y el paciente EFECTIVOS, y sólo si el
+       cuerpo trae el tipo o cambian el médico o el paciente (ver
+       `comprobarTipoDelPut`). Antes del empalme, como en el POST.
+       ⚠️ CON B3: quitar el paciente de una cita con paciente ya contestó 409
+       `cita_con_paciente` arriba del todo, antes de llegar aquí. Por eso
+       `tipo_sin_paciente` sólo sale al ponerle un tipo a un EVENTO sin
+       paciente; no compite con aquel 409 ni lo sustituye. */
+    if (v2) {
+      const tipoDelCuerpo = leerTipoCitaId(body.tipo_cita_id)
+      if (tipoDelCuerpo === false) return NextResponse.json(CUERPO_TIPO_INVALIDO, { status: 400 })
+      const veredicto = await comprobarTipoDelPut(supabase, {
+        clinicaId: profile.clinica_id, citaId: id, tipoDelCuerpo, antes: existing,
+        medicoEfectivo: typeof updates.medico_id === 'string' ? updates.medico_id : existing.medico_id,
+        pacienteEfectivo,
+      })
+      if (!veredicto.ok) return NextResponse.json(veredicto.cuerpo, { status: veredicto.status })
+      if (veredicto.columnas) Object.assign(updates, veredicto.columnas)
     }
 
     /* ── B7: EL EMPALME, CON EL INTERRUPTOR ENCENDIDO ────────────────────────

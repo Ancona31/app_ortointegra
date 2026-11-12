@@ -14,6 +14,7 @@ import { comprobarTopeDuracion } from '@/lib/agenda/topeDuracion'
 import { consultaCitas } from '@/lib/agenda/consultaCitas'
 import { agendaV2Encendida } from '@/lib/agenda/ajustesAgenda'
 import { comprobarEmpalmes } from '@/lib/agenda/empalmesServidor'
+import { comprobarTipoDeCita, leerTipoCitaId, CUERPO_TIPO_INVALIDO } from '@/lib/agenda/tipoCitaServidor'
 
 /* Una fecha-solo `YYYY-MM-DD`, que es lo que manda el modal para un evento de
    todo el día. NO acepta un instante ISO: si llegara uno, `AT TIME ZONE` de la
@@ -373,6 +374,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(errorDeTope, { status: 400 })
     }
 
+    /* ── B6c: EL TIPO DE CITA, CON EL INTERRUPTOR ENCENDIDO ──────────────────
+       Apagado, `tipo_cita_id` se ignora y el insert no nombra `tipo_cita_*`
+       (las columnas pueden no existir en producción). Va DESPUÉS de resolver el
+       médico y ANTES del empalme: un 400 por tipo no debe llegar después de que
+       el usuario aceptara un empalme. La regla está en `validarTipoParaCita`;
+       sin paciente, un tipo da `tipo_sin_paciente`. */
+    let columnasTipo: { tipo_cita_id: string | null; tipo_cita_nombre: string | null } | null = null
+    if (v2) {
+      const tipoCitaId = leerTipoCitaId(body.tipo_cita_id)
+      if (tipoCitaId === false) return NextResponse.json(CUERPO_TIPO_INVALIDO, { status: 400 })
+      if (tipoCitaId) {
+        const veredicto = await comprobarTipoDeCita(supabase, {
+          clinicaId: profile.clinica_id, tipoCitaId, tipoAnterior: null,
+          medicoId: finalMedicoId, conPaciente: Boolean(paciente_id),
+        })
+        if (!veredicto.ok) return NextResponse.json(veredicto.cuerpo, { status: veredicto.status })
+        columnasTipo = veredicto.columnas
+      }
+    }
+
     /* ── B7: EL EMPALME, CON EL INTERRUPTOR ENCENDIDO ────────────────────────
        Después de todas las validaciones y con las puntas ya compuestas, que es
        lo que se va a guardar. Un evento de todo el día no se empalma (P3). Sin
@@ -407,6 +428,8 @@ export async function POST(req: NextRequest) {
         // corriente y no una carencia.
         icono:            iconoValidado,
         color:            colorValidado,
+        // B6c: sólo con el interruptor encendido y un tipo validado.
+        ...(columnasTipo ?? {}),
         // Snapshot inmutable del consultorio (Fase 2.6).
         consultorio_id:            consultorio.id,
         consultorio_nombre:        consultorio.nombre,

@@ -153,6 +153,12 @@ async function borrar(): Promise<void> {
   await exigirSinExpediente(pacIds)
   if (clinicas.length) {
     sinError(await admin.from('appointments').delete().in('clinica_id', clinicas), 'borrar citas')
+    /* B6: los tipos de cita que siembra una prueba (`agenda-tipos-cita`). Sus
+       FKs a `clinicas` y `profiles` son RESTRICT; sin esto, uno que se quedara
+       tras una prueba fallida rompería la siguiente siembra. Después de las
+       citas, que los referencian. La tabla puede no existir sin la migración. */
+    const tipos = await admin.from('tipos_cita').delete().in('clinica_id', clinicas)
+    if (tipos.error && tipos.error.code !== '42P01' && tipos.error.code !== 'PGRST205') sinError(tipos, 'borrar tipos de cita')
     if (pacIds.length) sinError(await admin.from('paciente_medico').delete().in('paciente_id', pacIds), 'borrar paciente_medico')
     sinError(await admin.from('pacientes').delete().in('clinica_id', clinicas), 'borrar pacientes')
     sinError(await admin.from('consultorios').delete().in('clinica_id', clinicas), 'borrar consultorios')

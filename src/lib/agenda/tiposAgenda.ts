@@ -56,6 +56,13 @@ export type Appointment = {
      ninguna de las dos y ahí NULL es lo corriente, no una carencia. */
   icono: IconoEvento | null
   color: ColorEvento | null
+  /* B6 · Tipo de cita (P5) y la instantánea de su nombre. OPCIONALES, y no por
+     comodidad: llegan sólo porque `APPOINTMENT_SELECT` es `*`, y en producción
+     las columnas pueden no existir todavía (migración 20261112150000). Ninguna
+     consulta las nombra salvo con el interruptor encendido. La instantánea NO
+     se pinta en la tarjeta (P5); sólo la lee el selector del modal. */
+  tipo_cita_id?: string | null
+  tipo_cita_nombre?: string | null
   /* `email` viaja desde `APPOINTMENT_SELECT` para un solo consumidor: el botón
      de invitación. Que esté aquí es lo que evita una petición por cita abierta
      sólo para saber si la ficha tiene correo.

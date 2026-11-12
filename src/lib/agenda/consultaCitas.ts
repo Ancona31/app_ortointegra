@@ -93,6 +93,12 @@ function construirConsulta(supabase: ClienteSesion, { clinicaId, from, to, medic
  * Supabase no lleva el genérico `Database` (ver `(app)/layout.tsx`), así que las
  * filas llegan sin tipo y quien llama dice qué espera, igual que el cliente lo
  * dice al leer `res.json()`. La ruta no elige ninguno: las reenvía tal cual.
+ *
+ * ⚠️ B6: `tipo_cita_id` y `tipo_cita_nombre` llegan por el `*` de
+ * `APPOINTMENT_SELECT` cuando existen, y por eso son OPCIONALES en
+ * `Appointment`. NO LOS NOMBRES AQUÍ: esta consulta corre con el interruptor
+ * apagado, y en una base sin la migración 20261112150000 PostgREST contestaría
+ * 400 y la agenda no cargaría.
  */
 export async function consultaCitas<F = unknown>(
   supabase: ClienteSesion,
