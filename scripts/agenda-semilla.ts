@@ -157,10 +157,23 @@ async function exigirSinExpediente(pacientes: string[]): Promise<void> {
  *     están; su FK a médico y clínica es RESTRICT).
  * Cada tabla se mira con `to_regclass`: sin las migraciones de D no hace nada.
  * Los avisos (`reserva_avisos`) no son de ninguna clínica y se quedan.
+ * Bloque E, también antes y en este orden: `cita_reagendos` (E6: FK RESTRICT a
+ * las dos citas y al enlace de confirmación) y `cita_confirmaciones` (E1: FK
+ * RESTRICT a la cita y a la clínica). Desde E5 cada reserva por enlace deja
+ * un enlace de confirmación, y sin esto la siguiente siembra no podría borrar
+ * las citas ni las clínicas. Por clínica, así que también se lleva los que
+ * dejó huérfanos una limpieza con `session_replication_role = replica`. Los
+ * envíos de E4 (`cita_correos`) son de esa otra rama.
  */
 function limpiarReserva(clinicas: string[], cuando: 'antes' | 'despues'): void {
   if (!clinicas.every(id => /^[0-9a-f-]{36}$/.test(id))) throw new Error('id inválido para limpiar la reserva')
   const antes = `
+    if to_regclass('public.cita_reagendos') is not null then
+      delete from public.cita_reagendos where clinica_id = any (v_c);
+    end if;
+    if to_regclass('public.cita_confirmaciones') is not null then
+      delete from public.cita_confirmaciones where clinica_id = any (v_c);
+    end if;
     if to_regclass('public.reserva_enlaces') is not null then
       update public.reserva_enlaces set usado_en = null, usado_cita_id = null
        where clinica_id = any (v_c) and usado_cita_id is not null;

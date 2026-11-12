@@ -87,7 +87,9 @@ export function bloquearContactoE2e(c: CitaPorLigar): void {
 /**
  * Borra TODO lo de reserva de las dos clínicas de la semilla: citas por enlace,
  * incidencias, contactos, enlaces y el aviso de las e2e, con sus filas de
- * `audit_log`. Ver la nota de la cabecera.
+ * `audit_log`; y los enlaces de confirmación y reagendados del bloque E de
+ * esas clínicas (todos: ninguna prueba los deja a propósito). Ver la nota de
+ * la cabecera.
  */
 export function limpiarReservasE2e(): void {
   sqlLocal(`
@@ -101,6 +103,17 @@ export function limpiarReservasE2e(): void {
       union all select id from public.reserva_contactos where clinica_id in (select id from _cl)
       union all select id from public.reserva_incidencias where clinica_id in (select id from _cl);
     delete from public.audit_log where registro_id in (select id from _obj);
+    -- Bloque E (E1 y E6): FK RESTRICT a la cita; con replica no saltarían y quedarían huérfanos.
+    do $e$ begin
+      if to_regclass('public.cita_reagendos') is not null then
+        delete from public.audit_log where registro_id in (select id from public.cita_reagendos where clinica_id in (select id from _cl));
+        delete from public.cita_reagendos where clinica_id in (select id from _cl);
+      end if;
+      if to_regclass('public.cita_confirmaciones') is not null then
+        delete from public.audit_log where registro_id in (select id from public.cita_confirmaciones where clinica_id in (select id from _cl));
+        delete from public.cita_confirmaciones where clinica_id in (select id from _cl);
+      end if;
+    end $e$;
     delete from public.reserva_incidencias where clinica_id in (select id from _cl);
     delete from public.reserva_contactos where clinica_id in (select id from _cl);
     update public.reserva_enlaces set usado_en = null, usado_cita_id = null where clinica_id in (select id from _cl);
