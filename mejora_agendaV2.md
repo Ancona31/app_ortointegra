@@ -1691,6 +1691,57 @@ queda listada aquí.
   milisegundos entre la toma y la emisión del enlace (si en ese instante se
   apaga el interruptor, el envío queda `omitido/sin_enlace`).
 
+**E7 · WhatsApp manual (sin migración):**
+- **Formato verificado en la documentación oficial de WhatsApp el 2026-11-12:**
+  https://faq.whatsapp.com/5913398998672934 («Usa `https://wa.me/<number>` …
+  número de teléfono completo en formato internacional. No incluyas ceros,
+  paréntesis ni guiones»; mensaje en `?text=` codificado) y
+  https://faq.whatsapp.com/1294841057948784 («Los números de teléfono de México
+  (código de país "52") deben incluir un "1" después del "+52"»). Por tanto
+  `https://wa.me/521` + 10 dígitos (`normalizarTelefonoMx` de D5); si no se
+  puede normalizar, el botón queda deshabilitado con «Teléfono sin formato
+  válido».
+- **`POST /api/agenda/whatsapp`** `{cita_id, paso:'preparar'|'abierto', tipo:'enlace'|'recordatorio'}`
+  (`strictObject`). Puertas: `entradaGestion()` (la de D6: 401/403/404 con el
+  interruptor apagado) → la cita con la SESIÓN y `clinica_id` (404 si la RLS no
+  la deja ver) → con paciente o por ligar, `scheduled`/`confirmed`, con hora y
+  futura (409 `no_aplica`) → teléfono del paciente o de la reserva (422).
+  `preparar` emite el enlace de E2 con el `clinica_id` y el perfil de la sesión
+  y devuelve el `wa.me` ya armado (el servidor compone el texto); no escribe en
+  `appointments`. `abierto` escribe UNA columna con la hora del servidor, con
+  el cliente de sesión, sin tocar `updated_at` (lo audita `log_cita_change` a
+  nombre de quien pulsó). Sin enlace (sin secreto o apagado en la base) → 503.
+- **Quién puede:** cualquier rol que vea la cita (la RLS decide; el invitado,
+  sólo las suyas). No se añadió un permiso propio.
+- **Texto** (`whatsappCita.ts`, PENDIENTE DE REVISIÓN): «Hola. Le escribimos del
+  consultorio de {médico}. Su cita es el {fecha} a las {hora} en {consultorio}.
+  Para confirmar o avisar que no podrá asistir: {url}» (confirmada: «Si no podrá
+  asistir, avísenos aquí»). Sin nombre del paciente ni nada clínico.
+- **Botón en el modal** (`BotonWhatsAppCita`, `tipo:'enlace'` →
+  `whatsapp_sent_at`): con v2, en edición, en una cita (no evento) agendada o
+  confirmada. Prepara en ocioso al abrir y pinta un `<a target="_blank">` real
+  (no lo bloquea el navegador); al pulsar, `abierto` con `keepalive` y «Abierto
+  en WhatsApp hh:mm». Que sea futura y tenga teléfono lo dice el servidor en el
+  motivo del botón. **La tarjeta de lectura no lo lleva**: es del bloque F (otra
+  rama); el componente está listo para montarse ahí.
+- **«Por confirmar (N)»** (`PanelPorConfirmar`, en `CabeceraEscritorio` por una
+  ranura `porConfirmar`; sólo con v2): `GET /api/agenda/por-confirmar` con la
+  sesión, citas `scheduled` de MAÑANA en la zona de cada consultorio
+  (`esDeManana`; lista A 13), con paciente o por ligar; las confirmadas salen.
+  Sin teléfono en la respuesta. Cada fila lleva su botón (`tipo:'recordatorio'`
+  → `whatsapp_reminder_sent_at`), que se prepara al abrir el panel (emite el
+  enlace de cada cita de la lista). **Sólo escritorio**: en móvil no hay botón
+  (la banda móvil es otra cabecera); queda para F.
+- **Pruebas:** `whatsappCita.test.ts` (formatos de número, texto, zona) y
+  `whatsappRuta.test.ts` (puertas, `preparar` sin escribir, `abierto` con una
+  columna y `clinica_id`, lista de mañana). e2e `e2e/whatsapp-manual.e2e.ts`
+  escrita, **no corrida** (intercepta `wa.me` con `page.route`).
+- **Revisión independiente (APTO):** volvió a comprobar las dos páginas de
+  WhatsApp, la RLS de `appointments_update` (médico de la cita, administrador y
+  secretaria) y que apagado no sale ninguna petición. Detalle anotado: la
+  documentación escribe `wa.me/<número>/?text=` con barra y el código la omite
+  (`wa.me/<número>?text=`, la forma de su ejemplo con número); las dos abren.
+
 ### Bloque F
 
 - Las 18 propuestas de la auditoría visual, aprobadas. **El pulido visual y los

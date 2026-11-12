@@ -15,6 +15,7 @@
  * esto.
  */
 
+import type { ReactNode } from 'react'
 import { ChevronDown, Settings, Plus, ChevronsDownUp } from 'lucide-react'
 import { VIEWS } from '@/components/agenda/BandaMovil'
 import { OPCION_TODOS } from '@/components/agenda/FiltrosBandaMovil'
@@ -38,12 +39,14 @@ interface Props {
   onHorario: () => void
   onAgendar: () => void
   onIntencionAgendar: () => void
+  /** E7: «Por confirmar (N)», sólo con la agenda v2 encendida (lo decide el padre). */
+  porConfirmar?: ReactNode
 }
 
 export function CabeceraEscritorio({
   resumenConteo, currentView, isMobile, onVista, compactar, onCompactar, isSingleDoctor,
   filtroEfectivo, mesSinTodos, medicos, onFiltroMedico, canEditHorario, onHorario, onAgendar,
-  onIntencionAgendar,
+  onIntencionAgendar, porConfirmar,
 }: Props) {
   return (
     <div className="flex items-center justify-between gap-4 mb-6">
@@ -323,6 +326,7 @@ export function CabeceraEscritorio({
             única pista de que el conmutador existe apuntando en la dirección
             contraria. «Agendar» es el verbo que cubre las dos cosas y de paso
             ocupa menos. El `title` dice el resto. */}
+        {porConfirmar}
         <button
           onClick={onAgendar}
           /* A2.6: red de seguridad de la precarga en ocioso — si el puntero

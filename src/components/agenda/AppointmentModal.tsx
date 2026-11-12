@@ -54,6 +54,7 @@ import { ESTADOS_SIN_EMPALME, mensajeEmpalme, type Empalme, type TramoCita } fro
 /* B6c: SÓLO EL TIPO. `tiposCita.ts` trae Zod en valor, y este modal se carga
    en diferido (A2.6): un import de valor de ahí lo metería en este chunk. */
 import type { TipoCita } from '@/lib/agenda/tiposCita'
+import { BotonWhatsAppCita } from '@/components/agenda/BotonWhatsAppCita'
 
 export type PacienteBusqueda = { id: string; nombre: string; apellidos: string; telefono: string | null }
 
@@ -1633,6 +1634,21 @@ export default function AppointmentModal({
                   calendario aún no existe — quien administra lo crea al abrir la agenda.
                 </p>
               )}
+            </div>
+          )}
+
+          {/* E7 · WhatsApp MANUAL (§2): el botón abre wa.me con el mensaje y el
+              enlace de confirmación ya escritos; la persona pulsa enviar. Sólo
+              con la v2 encendida, en edición, en una cita con paciente o por
+              ligar, agendada o confirmada. Que sea futura y tenga teléfono lo
+              comprueba el servidor (`/api/agenda/whatsapp`), que lo dice en el
+              motivo del botón. */}
+          {isEdit && agendaV2 && apt && !esEvento && (apt.status === 'scheduled' || apt.status === 'confirmed') && (
+            <div>
+              <label className="block text-[11px] font-bold uppercase tracking-[.06em] mb-2" style={{ color: 'var(--ag-muted2)' }}>
+                WhatsApp
+              </label>
+              <BotonWhatsAppCita citaId={apt.id} tipo="enlace" marcadoEn={apt.whatsapp_sent_at ?? null} />
             </div>
           )}
         </div>

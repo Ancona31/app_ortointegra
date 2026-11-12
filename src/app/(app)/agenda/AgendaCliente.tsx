@@ -21,6 +21,7 @@ import { CabeceraEscritorio } from '@/components/agenda/CabeceraEscritorio'
 import { BarraAgendarMovil } from '@/components/agenda/BarraAgendarMovil'
 import { LeyendaEstados } from '@/components/agenda/LeyendaEstados'
 import { AvisosAgenda } from '@/components/agenda/AvisosAgenda'
+import { PanelPorConfirmar } from '@/components/agenda/PanelPorConfirmar'
 import {
   VISTAS_FC, VISTAS_FC_MOVIL, TOOLBAR_ESCRITORIO, PLUGINS_FC, TEXTO_BOTONES_FC, FORMATO_HORA_FC,
 } from '@/components/agenda/opcionesCalendario'
@@ -1027,6 +1028,9 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
             setModal({ mode: 'create', fecha, hora, tipo: 'cita', todoElDia: 'no' })
           }}
           onIntencionAgendar={precargarModalesAgenda}
+          /* E7: la lista de mañana por confirmar (WhatsApp manual). Sólo con
+             la v2 encendida: apagada no se monta y no sale ninguna petición. */
+          porConfirmar={agendaV2 ? <PanelPorConfirmar /> : undefined}
         />
       )}
 
