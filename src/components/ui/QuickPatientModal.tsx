@@ -17,10 +17,14 @@ const MEDICOS_CACHE_KEY = 'cache_medicos_clinica'
 
 export default function QuickPatientModal({
   nombreInicial,
+  emailInicial = '',
   onCreated,
   onClose,
 }: {
   nombreInicial: string
+  /* D7 de la agenda: el correo de quien reservó por enlace, al ligar su cita.
+     Sólo precarga el campo; se puede borrar y no salta el consentimiento. */
+  emailInicial?: string
   onCreated: (p: PacienteBusqueda) => void
   onClose: () => void
 }) {
@@ -33,7 +37,7 @@ export default function QuickPatientModal({
   const [apellidos, setApellidos] = useState(partes.slice(1).join(' '))
   const [fechaNac,  setFechaNac]  = useState('')
   const [edad,      setEdad]      = useState('')
-  const [email,     setEmail]     = useState('')
+  const [email,     setEmail]     = useState(emailInicial)
   const [saving,    setSaving]    = useState(false)
   const [error,     setError]     = useState('')
   const [consentimiento, setConsentimiento] = useState(false)

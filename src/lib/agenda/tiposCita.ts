@@ -11,7 +11,7 @@
  *     paciente es `TOPE_CITA_HORAS = 10`);
  *   - el color es sólo marca en el selector, NUNCA sustituye al color del
  *     estado en la tarjeta;
- *   - sólo para citas con paciente, opcional, con instantánea del nombre.
+ *   - sólo para citas con paciente o por ligar (D6), opcional, con instantánea del nombre.
  *
  * ⚠️ MÓDULO NEUTRO: sin `'use client'` ni nada de servidor. Lo usan las rutas
  * de `/api/agenda/tipos-cita` y lo usarán POST/PUT de `/api/appointments` y el
@@ -100,7 +100,7 @@ export const MENSAJE_ERROR_TIPO_CITA: Record<ErrorTipoCita, string> = {
   tipo_no_encontrado: 'El tipo de cita no existe o no está disponible',
   tipo_archivado: 'Ese tipo de cita está archivado',
   tipo_incompatible: 'Ese tipo de cita es de otro médico',
-  tipo_sin_paciente: 'Los tipos de cita sólo se usan en citas con paciente',
+  tipo_sin_paciente: 'Los tipos de cita sólo se usan en citas con paciente o por ligar',
 }
 
 export type ResultadoTipoCita =
@@ -120,6 +120,10 @@ export type ResultadoTipoCita =
  *   como estaba.
  * - `medicoId` y `conPaciente` son los EFECTIVOS tras la escritura: reasignar
  *   la cita a un médico incompatible con su tipo da `tipo_incompatible` (P5).
+ *   D6 amplía P5: `conPaciente` = tiene paciente O está POR LIGAR (nació de
+ *   una reserva por enlace, `reserva_canal` no nulo), porque quien reserva
+ *   elige tipo. Lo calcula el llamador (`comprobarTipoDelPut` con `porLigar`);
+ *   esta función sigue siendo pura y no sabe de dónde viene.
  *
  * ⚠️ QUITAR EL PACIENTE DE UNA CITA CON TIPO DA `tipo_sin_paciente`, aunque el
  * cuerpo no toque el tipo. No limpia el tipo por su cuenta, a propósito: el

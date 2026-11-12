@@ -1413,6 +1413,132 @@ queda listada aquí.
   la base local): con secretos distintos, un enlace emitido desde uno no se
   abriría en el otro.
 
+### Bloque D — decisiones tomadas en D6-D7 (lado interno)
+
+**Gestión de enlaces y contactos (lo que quedó pendiente de D1 y D2):**
+- **Rutas:** `/api/agenda/enlaces` (GET, POST), `/api/agenda/enlaces/[id]` (GET
+  código, PATCH revocar), `/api/agenda/reservas/contactos` (GET, POST) y
+  `/api/agenda/reservas/historial?cita=` (GET). Entrada común
+  (`src/lib/reserva/gestionServidor.ts`): `getUser()` → perfil con clínica
+  (403; un error al leerlo, 500) → interruptor (404). Cliente de sesión,
+  `clinica_id` explícito en cada consulta y RLS; nada de `createAdminClient()`.
+  Las RPC sin parámetro de clínica (`reserva_enlace_regenerar_fijo`,
+  `reserva_contactos_bloqueados`, `reserva_contacto_marcar`) acotan con el
+  `get_clinica_id()` de la sesión; la lista de bloqueados se vuelve a filtrar
+  por médico en la ruta.
+- **Permisos (lista A, 16):** `puedeGestionarDelMedico` = administrador o
+  secretaria (`canVerAgendaCompleta`), o el médico dueño. Se comprueba antes de
+  escribir (403) aunque la RLS diga lo mismo. Un `super_admin` no gestiona nada.
+- **El código no viaja en la lista.** `GET /api/agenda/enlaces` devuelve sólo
+  los VIGENTES (fijo sin revocar; únicos sin usar, sin revocar y sin caducar),
+  sin código ni hash; el código se pide uno a uno a `GET …/enlaces/[id]`
+  (410 si ya no está vigente, `no-store`), y el alta lo devuelve en el momento.
+  En el navegador sólo vive en el estado de la pantalla. Usados, caducados y
+  revocados no se listan (siguen en la base; nunca se borran). Tope de 200.
+- **Sin `RESERVA_SECRETO`:** el alta da 503 sin escribir nada (un enlace cuyo
+  código no se puede derivar no sirve) y la pantalla lo dice; la lista sí sale.
+- **Fijo:** crear y regenerar son la misma llamada (`reserva_enlace_regenerar_fijo`:
+  revoca el vigente y emite otro en una transacción). Regenerar y revocar piden
+  confirmación. El único se emite con etiqueta opcional; la vigencia la congela
+  la base con el ajuste de ese momento y el cuerpo no puede mandarla
+  (`strictObject`).
+- **La dirección** que se enseña es `<origen>/reservar/<código>`, la página de D5.
+- **Contactos bloqueados:** la lista y «Desbloquear» por cita
+  (`reserva_contacto_marcar`, que desbloquea los dos seudónimos). Bloquear a
+  mano se hace desde el modal de la cita (D6). Se hereda el límite de D2: un
+  bloqueo manual sin citas en (ventana + 366) días no sale en la lista.
+- **Pantalla:** las dos secciones salen para cualquier médico (los suyos) y para
+  administrador y secretaria (los de todos), sólo con v2 encendida, como el
+  resto de la pantalla.
+- **e2e y la semilla:** `scripts/agenda-semilla.ts` no conoce las tablas de D
+  y sus FKs RESTRICT le impedirían volver a sembrar si una prueba deja filas;
+  las e2e de este lado limpian como `postgres` con `session_replication_role =
+  replica` (`e2e/reservaAyudas.ts`). Quien integre D10 debería enseñar a la
+  semilla a borrarlas también.
+
+**D6 · por ligar, historial y bloqueos en la agenda:**
+- **`esEventoGenerico` = `!paciente_id && !reserva_canal`**, y `esPorLigar`
+  aparte. Los 8 llamadores: los seis que reciben la fila entera ya ven
+  `reserva_canal` (llega por el `*` de `APPOINTMENT_SELECT`); los dos que
+  arman el objeto a mano (`contarVisibles`, `desgloseDeEstados`) lo pasan. Sin
+  la columna llega `undefined` y la regla es la de antes. La clasificación va
+  por el DATO, no por el interruptor: con v2 apagado sólo cambia algo si la
+  clínica tuvo v2 y lo apagó con reservas en la agenda (entonces se ven como
+  citas «Por ligar», que es lo que son).
+- **Marca en la tarjeta:** píldora «Por ligar» (o «Por ligar · N» con
+  `reserva_historial_previo` > 0) en la línea del NOMBRE, detrás de él; la
+  tarjeta sigue con dos líneas y la marca se ve también en el tier `tiny`. La
+  frase entera («traía N cancelaciones o inasistencias») va en `title`: N es
+  la instantánea de D3, que suma cancelaciones e inasistencias, así que no se
+  escribe «3 cancelaciones» a secas. En Mes, la misma píldora que «Evento» de
+  Google. Las filas de las vistas de lista no llevan marca.
+- **Modal:** una cita por ligar se abre como «Editar cita»; en el sitio del
+  paciente, el bloque «Reservó por enlace» (nombre, teléfono, correo, historial
+  EN VIVO de `GET /api/agenda/reservas/historial` y «Bloquear / Desbloquear
+  contacto»). Sin buscador: se liga al iniciar la consulta (D7). Guardar sin
+  paciente conserva el título y NO manda `paciente_id`. El botón de bloquear
+  sale para administrador y secretaria, o para el médico de la cita; sin v2,
+  sólo la instantánea.
+- **Servidor (PUT y DELETE, sólo con v2):** una lectura más,
+  `estaPorLigar` (`src/lib/agenda/porLigarServidor.ts`), en las filas SIN
+  paciente; si falla, 500 sin escribir. Una por ligar: el DELETE da el mismo
+  409 `cita_con_paciente` de B3 (se cancela); el PUT le aplica las reglas de
+  cita: no puede pasar a todo el día (400 `todo_el_dia_con_paciente`), lleva el
+  tope de duración de una cita y puede llevar tipo (`comprobarTipoDelPut` con
+  `porLigar`: `conPaciente = paciente_id || reserva_canal`, P5 ampliado; el
+  mensaje de `tipo_sin_paciente` dice «con paciente o por ligar»).
+- **El 500 de la FK, corregido:** con v2 encendido no se llega al borrado (409
+  de arriba). Apagado, el DELETE de una cita que sostiene una FK RESTRICT
+  (sólo pasa con las tablas de D: enlace único gastado o incidencia) da 409
+  `cita_con_paciente` «cancélala», en vez del 500 con el texto de Postgres.
+- **«Con el interruptor apagado no existen reservas», hasta dónde es cierto**
+  (prueba `d6_cita_por_ligar.sql`): por el camino de la reserva sí,
+  `reservar_por_enlace` contesta «apagado» y no escribe ni gasta el enlace.
+  Pero no es un invariante de la base: (a) si la clínica apaga v2 después de
+  recibir reservas, las citas se quedan (de ahí el 409 de arriba); (b) la RLS
+  de `reserva_enlaces` y de `appointments` no mira el interruptor, así que
+  alguien de la clínica, por PostgREST directo, podría crear un enlace y una
+  cita con `reserva_*` de su propia clínica con v2 apagado. Nada de eso cruza
+  clínicas ni salta el candado público; se anota para la auditoría (D1).
+- **Sin migración en D6.**
+
+**D7 · ligar al iniciar la consulta:**
+- **Dónde:** en una cita por ligar, «Iniciar consulta» (mismas condiciones que
+  hoy: médico de la cita, con consultorio suyo, y sólo con v2) no navega:
+  cambia el bloque de la reserva por «Ligar a un paciente» (`PanelLigarCita`).
+  Un paciente existente con el buscador del modal (precargado con la primera
+  palabra del nombre de quien reservó, porque el buscador compara nombre O
+  apellidos por separado y el nombre completo no daría nada), o uno nuevo con
+  `QuickPatientModal` (precarga nombre y correo con la prop nueva
+  `emailInicial`; el teléfono se enseña para copiarlo a mano). El
+  consentimiento de privacidad lo sigue exigiendo `QuickPatientModal`.
+- **Ligar = el PUT de siempre** (`src/lib/agenda/ligarCita.ts`) con
+  `{paciente_id, title: nombre del paciente, updated_at}`; con 200 se navega a
+  `/expediente/<paciente>/nueva-nota?cita=<cita>`, así `/api/consultas` la
+  pasa a `attended` al guardar la nota. Vacía la caché de rangos (la agenda se
+  desmonta y al volver pintaría la cita aún por ligar).
+- **Servidor:** al ligar (v2, cita por ligar, `paciente_id` nuevo) se exige
+  que el paciente sea de la clínica y lo vea quien liga (RLS de `pacientes`):
+  400 `paciente_invalido` si no (la FK no mira la clínica). Después de
+  escribir, `cita_ligada` en `audit_log` con `{clinica, campos, via:'ligar'}`:
+  sólo nombres de campo, ni el paciente ni el nombre de quien reservó. El
+  disparador de B0 deja además su `cita_editada`.
+- **Datos de contacto** (lista A, 9): se quedan en la cita; el PUT no los toca
+  y no se copian a la ficha.
+- **Google (S1 con C5):** al ligar, el `after()` del PUT compone el evento con
+  el paciente («Cita médica: <paciente>», descripción fija sin observaciones),
+  y `descripcionV2` deja de mandar notas aunque la fila hubiera nacido en
+  Google. Antes de ligar, una cita por ligar se compone con
+  `{nombre: reserva_nombre, apellidos: ''}`, el mismo convenio que el espejo de
+  D4 (`gcal_citas_por_evento`), para que una edición desde Spinus no deje en
+  Google un título que el sondeo vuelva a restablecer. `sendUpdates` no cambia
+  al ligar (no hay paciente saliente): no avisa a nadie.
+- **e2e:** no se guarda la nota (una nota no se borra y rompería la siembra);
+  el paso a `attended` es el de `/api/consultas`, que compara `paciente_id`.
+- **Sin migración en D7.** Pendiente para quien integre: D8 (alta del evento
+  de una reserva) debería componer con el mismo convenio
+  (`pacienteParaGoogle`, o `{nombre: reserva_nombre, apellidos: ''}`).
+
 ### Bloque F
 
 - Las 18 propuestas de la auditoría visual, aprobadas. **El pulido visual y los

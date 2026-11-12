@@ -26,6 +26,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Portal from '@/components/ui/Portal'
 import QuickPatientModal from '@/components/ui/QuickPatientModal'
@@ -42,7 +43,10 @@ import { avisoFueraDeHorario, avisoFinFueraDeHorario, avisoDiaCerrado } from '@/
 import {
   addMinutes, partirFechaHora, componerIso, diasEntreFechas, duracionEscrita, fechasDeTodoElDia,
 } from '@/lib/agenda/fechasAgenda'
-import { ESTADOS_CITA, ICONO_ETIQUETA, COLOR_ETIQUETA, STATUS_CONFIG, esEventoGenerico } from '@/lib/agenda/tarjetasAgenda'
+import { ESTADOS_CITA, ICONO_ETIQUETA, COLOR_ETIQUETA, STATUS_CONFIG, esEventoGenerico, esPorLigar } from '@/lib/agenda/tarjetasAgenda'
+import BloqueReservaPorLigar from '@/components/agenda/BloqueReservaPorLigar'
+import PanelLigarCita from '@/components/agenda/PanelLigarCita'
+import { ligarCitaAPaciente, type PacienteParaLigar } from '@/lib/agenda/ligarCita'
 import { useDialogoModal } from '@/hooks/useDialogoModal'
 import ConfirmModal from '@/components/agenda/ConfirmModal'
 import { DEFAULT_DURATION } from '@/lib/agenda/duracionCita'
@@ -386,6 +390,11 @@ export default function AppointmentModal({
     ? modal.tipo
     : (apt && esEventoGenerico(apt) ? 'evento' : 'cita')
   const esEvento = tipo === 'evento'
+  /* D6 · Una cita POR LIGAR (reserva por enlace sin paciente) es una CITA
+     (`tipo` ya vale 'cita' por `esEventoGenerico`) a la que todavía le falta
+     el paciente. Se edita sin él: conserva su título (el nombre de quien
+     reservó) y no manda `paciente_id`. Se liga al iniciar la consulta (D7). */
+  const reserva = apt && esPorLigar(apt) ? apt : null
 
   /* EL INTERRUPTOR DE TODO EL DÍA, y la guarda que impide que exista fuera de un
      evento. `esEvento &&` no es defensa de más: al cambiar de rama el modal
@@ -503,6 +512,33 @@ export default function AppointmentModal({
     paciente &&
     defaultMedicoId === apt?.medico_id &&
     citaConsultorio
+  /* D7: en una cita POR LIGAR, «Iniciar consulta» sale con las mismas
+     condiciones sin exigir paciente (sólo con v2: el ligado se audita y se
+     valida en el servidor con el interruptor), y en vez de navegar pide
+     primero ligarla (`ligar`, abajo). */
+  const showLigarYConsultar = Boolean(
+    isEdit && canVerExpediente && reserva && !paciente && agendaV2 &&
+    defaultMedicoId === apt?.medico_id && citaConsultorio,
+  )
+  const router = useRouter()
+  /* `null` = el bloque de la reserva; con valor, el panel «Ligar a un paciente». */
+  const [ligar, setLigar] = useState<{ enviando: boolean; error: string | null } | null>(null)
+  function abrirLigar(): void {
+    setLigar({ enviando: false, error: null })
+    // El buscador compara nombre O apellidos: con el nombre completo no saldría nada.
+    setSearch((reserva?.reserva_nombre ?? reserva?.title ?? '').trim().split(/\s+/)[0] ?? '')
+  }
+  /* Liga y, con 200, abre la nota con `?cita=` (así `/api/consultas` la pasa
+     a atendida). Si falla, el panel lo dice y la cita sigue por ligar. */
+  async function ligarYConsultar(p: PacienteParaLigar): Promise<void> {
+    if (!apt || !citaConsultorio) return
+    setLigar({ enviando: true, error: null })
+    const r = await ligarCitaAPaciente({ citaId: apt.id, updatedAt: apt.updated_at, paciente: p })
+    if (!r.ok) { setLigar({ enviando: false, error: r.motivo }); return }
+    cambiarActivo(citaConsultorio)
+    onClose()
+    router.push(`/expediente/${p.id}/nueva-nota?cita=${apt.id}`)
+  }
 
   // State del consultorio seleccionado.
   // Pre-selección cascada: apt (edición) → activo del sidebar si está en lista
@@ -547,7 +583,7 @@ export default function AppointmentModal({
   const conTipos = agendaV2 && !esEvento
   const tiposCita = useTiposCita(conTipos ? medicoId : '')
   const tipoConservable = apt && medicoId === apt.medico_id ? (apt.tipo_cita_id ?? null) : null
-  const tipoEfectivo: string | null = conTipos && paciente && tipoCitaId
+  const tipoEfectivo: string | null = conTipos && (paciente || reserva) && tipoCitaId
     && (tipoCitaId === tipoConservable || tiposCita?.some(t => t.id === tipoCitaId)) ? tipoCitaId : null
   /* Las opciones del selector: «Sin tipo», el que la cita ya tenía si no viene
      en la lista (archivado, u oculto por la RLS), y la lista. Elegir uno de la
@@ -571,7 +607,7 @@ export default function AppointmentModal({
      sitios porque lo leen el botón (para apagarse) y `handleSave` (defensa en
      profundidad, por si el botón se saltara). */
   const tituloLimpio = titulo.trim()
-  const faltaLoEsencial = esEvento ? tituloLimpio === '' : !paciente
+  const faltaLoEsencial = esEvento ? tituloLimpio === '' : !paciente && !reserva
 
   /* Las puntas que el formulario exige, que dependen del interruptor: con todo
      el día encendido no hay horas que pedir, sólo los dos días. Apagado sigue
@@ -738,7 +774,10 @@ export default function AppointmentModal({
       /* De dónde sale el título, que es la diferencia de fondo entre los dos
          tipos: la cita lo COMPONE del paciente (y por eso no tiene campo de
          título), el evento lo lleva escrito a mano. */
-      title:       esEvento ? tituloLimpio : `${paciente!.nombre} ${paciente!.apellidos}`,
+      title:       esEvento ? tituloLimpio
+        : paciente ? `${paciente.nombre} ${paciente.apellidos}`
+        // D6: una cita por ligar conserva su título (el nombre de quien reservó).
+        : (reserva?.title ?? ''),
       all_day:     esTodoElDia,
       /* LAS DOS PUNTAS, Y NUNCA LAS CUATRO A LA VEZ. Un evento de todo el día
          manda FECHAS y deja que el servidor componga la medianoche en la zona
@@ -751,10 +790,13 @@ export default function AppointmentModal({
         : { start_time: componerIso(fecha, hora), end_time: componerIso(fechaFin, horaFin) }),
       notes:       notes.trim() || null,
       status,
-      paciente_id: esEvento ? null : paciente!.id,
-      // El bloque optimista de handleSave pinta la tarjeta antes de que
-      // responda el servidor; sin esto escribiria el paciente anterior.
-      pacientes:   esEvento ? null : paciente,
+      /* El bloque optimista de handleSave pinta la tarjeta antes de que
+         responda el servidor; sin `pacientes` escribiría el paciente anterior.
+         D6: una cita por ligar sin paciente NO manda `paciente_id` (el PUT no
+         lo toca) y su `pacientes` sigue en null. */
+      ...(esEvento ? { paciente_id: null, pacientes: null }
+        : paciente ? { paciente_id: paciente.id, pacientes: paciente }
+        : { pacientes: null }),
       // La pinta viaja SIEMPRE, también en una cita, y ahí va en null: si sólo
       // se mandara desde el evento, convertir el valor a null nunca llegaría al
       // servidor (el PUT sólo toca la columna si el campo viene).
@@ -1187,6 +1229,31 @@ export default function AppointmentModal({
                 </button>
                 )}
               </div>
+            ) : reserva && ligar ? (
+              <PanelLigarCita
+                nombreReserva={reserva.reserva_nombre ?? reserva.title}
+                telefono={reserva.reserva_telefono ?? null}
+                correo={reserva.reserva_correo ?? null}
+                search={search}
+                onSearch={setSearch}
+                resultados={search.trim().length >= 2 ? results : []}
+                buscando={searchLoading}
+                enviando={ligar.enviando}
+                error={ligar.error}
+                onElegir={p => void ligarYConsultar(p)}
+                onNuevo={() => setQuickCreate(true)}
+                onVolver={() => setLigar(null)}
+              />
+            ) : reserva ? (
+              <BloqueReservaPorLigar
+                citaId={reserva.id}
+                nombre={reserva.reserva_nombre ?? reserva.title}
+                telefono={reserva.reserva_telefono ?? null}
+                correo={reserva.reserva_correo ?? null}
+                historialPrevio={reserva.reserva_historial_previo ?? 0}
+                enVivo={agendaV2}
+                puedeGestionar={canInvitar || (canVerExpediente && defaultMedicoId === reserva.medico_id)}
+              />
             ) : (
               <div className="relative">
                 <input
@@ -1391,7 +1458,7 @@ export default function AppointmentModal({
               paciente y si hay algún tipo que ofrecer. Opcional: «Sin tipo»
               siempre está. El color es SÓLO la marca de la lista; la tarjeta
               sigue con el color del estado y sin el nombre del tipo. */}
-          {conTipos && paciente && opcionesTipo.length > 1 && (
+          {conTipos && (paciente || reserva) && opcionesTipo.length > 1 && (
             <div>
               <label id={`${tituloId}-tipo`} className="block text-[11px] font-bold uppercase tracking-[.06em] mb-2" style={{ color: 'var(--ag-muted2)' }}>Tipo de cita</label>
               <div role="radiogroup" aria-labelledby={`${tituloId}-tipo`} className="flex flex-wrap gap-2">
@@ -1617,6 +1684,15 @@ export default function AppointmentModal({
               {deleting ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
             </button>
           )}
+          {showLigarYConsultar && !ligar && (
+            <button type="button" onClick={abrirLigar}
+              aria-label="Iniciar consulta" title="Iniciar consulta: primero se liga a un paciente"
+              className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-sm font-bold border transition-colors hover:bg-[var(--ag-btn-ghost-hover)] max-md:w-11 max-md:h-11 max-md:px-0 max-md:py-0 max-md:flex-none"
+              style={{ color: 'var(--ag-text)', borderColor: 'var(--ag-input-border)' }}>
+              <Stethoscope size={15} />
+              <span className="max-md:hidden">Iniciar consulta</span>
+            </button>
+          )}
           {showIniciarConsulta && (
             <Link
               href={`/expediente/${paciente.id}/nueva-nota${apt ? `?cita=${apt.id}` : ''}`}
@@ -1726,8 +1802,15 @@ export default function AppointmentModal({
     {/* Modal de creación rápida — z-index superior al modal de cita */}
     {quickCreate && (
       <QuickPatientModal
-        nombreInicial={search}
-        onCreated={p => { setPaciente(p); setQuickCreate(false); setSearch('') }}
+        /* D7: al ligar una cita por ligar, con el nombre y el correo de quien
+           reservó; el consentimiento lo sigue exigiendo el modal. */
+        nombreInicial={reserva && ligar ? (reserva.reserva_nombre ?? reserva.title) : search}
+        emailInicial={reserva && ligar ? (reserva.reserva_correo ?? '') : ''}
+        onCreated={p => {
+          setQuickCreate(false)
+          if (reserva && ligar) { void ligarYConsultar(p); return }
+          setPaciente(p); setSearch('')
+        }}
         onClose={() => setQuickCreate(false)}
       />
     )}

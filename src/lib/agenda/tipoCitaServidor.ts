@@ -95,6 +95,11 @@ export async function comprobarTipoDelPut(supabase: ClienteSesion, a: {
   antes: { medico_id: string | null; paciente_id: string | null }
   medicoEfectivo: string | null
   pacienteEfectivo: string | null
+  /** D6 (P5 ampliado): la cita está POR LIGAR (reserva por enlace sin
+   *  paciente), y entonces puede llevar tipo aunque no tenga paciente:
+   *  `conPaciente = paciente_id || reserva_canal`. Lo resuelve el PUT, que es
+   *  quien puede nombrar `reserva_canal` (sólo con v2). */
+  porLigar?: boolean
 }): Promise<VeredictoTipoCita> {
   const cambia = a.medicoEfectivo !== a.antes.medico_id || a.pacienteEfectivo !== a.antes.paciente_id
   if (a.tipoDelCuerpo === undefined && !cambia) return { ok: true, columnas: null }
@@ -110,6 +115,6 @@ export async function comprobarTipoDelPut(supabase: ClienteSesion, a: {
     tipoCitaId: a.tipoDelCuerpo === undefined ? anterior : a.tipoDelCuerpo,
     tipoAnterior: anterior,
     medicoId: a.medicoEfectivo,
-    conPaciente: Boolean(a.pacienteEfectivo),
+    conPaciente: Boolean(a.pacienteEfectivo) || a.porLigar === true,
   })
 }

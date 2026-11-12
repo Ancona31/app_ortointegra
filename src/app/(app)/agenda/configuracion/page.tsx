@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import { sesionServidor } from '@/lib/supabase/sesionServidor'
 import { analizarPerfilSesion } from '@/lib/perfil/perfilSesion'
-import { canManageClinica } from '@/lib/permissions'
+import { canManageClinica, canVerAgendaCompleta, isMedico } from '@/lib/permissions'
 import { AjustesAgendaSchema, CAMPOS_AJUSTES_AGENDA, COLUMNAS_AJUSTES, type AjustesAgenda } from '@/lib/agenda/ajustesAgenda'
 import { COLUMNAS_TIPO_CITA, type TipoCita } from '@/lib/agenda/tiposCita'
 import { logger } from '@/lib/logger'
@@ -81,6 +81,8 @@ export default async function ConfiguracionCalendarioPage() {
       tipos={tipos}
       puedeAdministrar={canManageClinica(perfil)}
       usuarioId={perfil.id}
+      gestionaReservasDeTodos={canVerAgendaCompleta(perfil)}
+      esMedico={isMedico(perfil)}
     />
   )
 }

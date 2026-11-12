@@ -15,6 +15,7 @@ import { agendaV2Encendida } from '@/lib/agenda/ajustesAgenda'
 import { comprobarEmpalmes, type VeredictoEmpalme } from '@/lib/agenda/empalmesServidor'
 import { ESTADOS_SIN_EMPALME } from '@/lib/agenda/empalmesCita'
 import { comprobarTipoDelPut, leerTipoCitaId, CUERPO_TIPO_INVALIDO } from '@/lib/agenda/tipoCitaServidor'
+import { auditarLigado, estaPorLigar, pacienteParaGoogle, pacienteVisible } from '@/lib/agenda/porLigarServidor'
 import {
   auditarConflictoEdicion, camposEditados, descripcionV2, parchearConEtag, releerUpdatedAt,
   type CampoEdicion, type EventoGoogle, type ResultadoParche,
@@ -318,6 +319,14 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
 
     if (!existing) return NextResponse.json({ error: 'Cita no encontrada' }, { status: 404 })
 
+    /* D6: ¿es una cita POR LIGAR? Sólo con v2 (nombra `reserva_canal`) y sólo
+       si no tiene paciente; con paciente ya es una cita y las reglas de abajo
+       la tratan como tal. Una por ligar ES una cita (lista A, punto 7): no
+       puede ser de todo el día, lleva el tope de duración de una cita y puede
+       llevar tipo (P5 ampliado). Si no se puede leer, 500 sin escribir. */
+    const porLigar = v2 && !existing.paciente_id ? await estaPorLigar(supabase, profile.clinica_id, id) : false
+    if (porLigar === null) return NextResponse.json({ error: 'Error interno' }, { status: 500 })
+
     /* B3: con el interruptor encendido, una cita con paciente no se puede
        quedar SIN paciente. Sería la puerta de atrás del 409 del DELETE —
        desligar y luego borrar el «evento» que queda—, y la interfaz nunca lo
@@ -327,6 +336,21 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
         { error: 'cita_con_paciente', message: 'Una cita con paciente no se puede quedar sin paciente: cancélala.' },
         { status: 409 }
       )
+    }
+
+    /* D7: LIGAR una cita por ligar a un paciente (al iniciar la consulta).
+       La FK de `paciente_id` no mira la clínica: el paciente tiene que ser de
+       ESTA y verlo quien liga (RLS de `pacientes`). Si no, 400 y no se escribe. */
+    const ligando = porLigar && typeof paciente_id === 'string' && paciente_id !== ''
+    if (ligando) {
+      const visible = await pacienteVisible(supabase, profile.clinica_id, paciente_id)
+      if (visible === null) return NextResponse.json({ error: 'Error interno' }, { status: 500 })
+      if (!visible) {
+        return NextResponse.json(
+          { error: 'paciente_invalido', message: 'Ese paciente no es de esta clínica o no lo puedes ver.' },
+          { status: 400 }
+        )
+      }
     }
 
     if (clientUpdatedAt && existing.updated_at !== clientUpdatedAt) {
@@ -376,7 +400,8 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
        cuente como paciente en un sitio y sí en el otro. */
     const todoElDiaEfectivo = all_day !== undefined ? all_day === true : existing.all_day === true
     const pacienteEfectivo  = paciente_id !== undefined ? (paciente_id || null) : existing.paciente_id
-    if (todoElDiaEfectivo && pacienteEfectivo) {
+    // D6: una cita por ligar también es una cita (lleva hora).
+    if (todoElDiaEfectivo && (pacienteEfectivo || porLigar)) {
       return NextResponse.json(
         { error: 'todo_el_dia_con_paciente', message: 'Un evento de todo el día no puede ser una cita: una cita siempre lleva hora.' },
         { status: 400 }
@@ -428,7 +453,7 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
        recién compuestas. Son dos sitios y no uno a propósito; unificarlos exige
        mover la composición, que es lo que aquel bloque explica que no se puede
        hacer sin conocer antes el huso efectivo. */
-    const errorDeTope = comprobarTopeDuracion(inicioEfectivo, finEfectivo, Boolean(pacienteEfectivo))
+    const errorDeTope = comprobarTopeDuracion(inicioEfectivo, finEfectivo, Boolean(pacienteEfectivo) || porLigar)
     if (errorDeTope) {
       return NextResponse.json(errorDeTope, { status: 400 })
     }
@@ -736,7 +761,7 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
       const veredicto = await comprobarTipoDelPut(supabase, {
         clinicaId: profile.clinica_id, citaId: id, tipoDelCuerpo, antes: existing,
         medicoEfectivo: typeof updates.medico_id === 'string' ? updates.medico_id : existing.medico_id,
-        pacienteEfectivo,
+        pacienteEfectivo, porLigar,
       })
       if (!veredicto.ok) return NextResponse.json(veredicto.cuerpo, { status: veredicto.status })
       if (veredicto.columnas) Object.assign(updates, veredicto.columnas)
@@ -787,6 +812,16 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
       )
     }
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+    /* D7: el ligado, auditado sólo con NOMBRES de campo. Después de escribir:
+       si la escritura falló, no hubo ligado. Los datos de contacto de la
+       reserva no se tocan: se quedan en la cita (lista A, punto 9). */
+    if (ligando) {
+      await auditarLigado({
+        userId: user.id, clinicaId: profile.clinica_id, citaId: id,
+        campos: ['paciente_id', ...(title !== undefined ? ['title'] : [])],
+      })
+    }
 
     // Google Calendar sync en background con el cliente admin, espejando al
     // POST de /api/appointments.
@@ -878,7 +913,8 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
       const clinicaId = profile.clinica_id
       const puedeReparar = canManageClinica(profile)
       const admin = createAdminClient()
-      const pacienteCita: PacienteEnCita = apt.pacientes ?? null
+      // D7: una por ligar se compone con el nombre de quien reservó (convenio de D4).
+      const pacienteCita: PacienteEnCita = pacienteParaGoogle(apt, v2)
       const clinicaCita:  ClinicaEnCita  = apt.clinicas  ?? null
       const tzCita: string = apt.consultorio_timezone ?? TZ_CLINICA
       const esTodoElDia = apt.all_day === true
@@ -998,7 +1034,8 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
       const admin = createAdminClient()
       // El titulo del evento sale del paciente ligado; si la cita no tiene
       // paciente, del titulo libre de la cita.
-      const pacienteCita: PacienteEnCita = apt.pacientes ?? null
+      // D7: una por ligar se compone con el nombre de quien reservó (convenio de D4).
+      const pacienteCita: PacienteEnCita = pacienteParaGoogle(apt, v2)
       const clinicaCita:  ClinicaEnCita  = apt.clinicas  ?? null
       // EL HUSO DEL EVENTO ES EL DEL CONSULTORIO, NO EL DEL CENTRO. Espeja al
       // POST: antes se etiquetaba con una constante fija (Ciudad de Mexico) y
@@ -1372,9 +1409,36 @@ export async function DELETE(_req: NextRequest, ctx: RouteContext<'/api/appointm
         { status: 409 }
       )
     }
+    /* D6: una cita POR LIGAR también es una cita (lista A, punto 7): el mismo
+       409, con el mismo código para que la agenda diga el motivo. Era además
+       un 500: si gastó un enlace de un solo uso, la FK RESTRICT
+       `reserva_enlaces_usado_cita_fkey` impide borrarla (y, si se canceló,
+       también `reserva_incidencias_cita_fkey`). Si no se puede saber, no se
+       borra. */
+    if (v2) {
+      const porLigar = await estaPorLigar(supabase, profile.clinica_id, id)
+      if (porLigar === null) return NextResponse.json({ error: 'Error interno' }, { status: 500 })
+      if (porLigar) {
+        return NextResponse.json(
+          { error: 'cita_con_paciente', message: 'Una cita reservada por enlace no se elimina: se cancela y queda en la agenda.' },
+          { status: 409 }
+        )
+      }
+    }
 
     // `clinica_id` explícito: defensa en profundidad, la RLS ya acota.
     const { error } = await supabase.from('appointments').delete().eq('id', id).eq('clinica_id', profile.clinica_id)
+    /* 23503: otra fila la sostiene con una FK RESTRICT. Hoy sólo pasa con las
+       tablas de la reserva por enlace (D1, D2) y una cita por enlace: con v2
+       encendido no se llega aquí (409 de arriba); apagado, sólo si la clínica
+       tuvo v2 y lo apagó después. 409 con un texto que se entiende, en vez del
+       500 con el mensaje de Postgres, que nombra tablas. */
+    if (error?.code === '23503') {
+      return NextResponse.json(
+        { error: 'cita_con_paciente', message: 'Esta cita no se puede eliminar: cancélala.' },
+        { status: 409 }
+      )
+    }
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
     // Se resuelve antes de responder, con el cliente de sesión, y sólo si la

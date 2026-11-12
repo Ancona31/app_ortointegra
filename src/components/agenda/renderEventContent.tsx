@@ -8,7 +8,7 @@
 import type { EventContentArg } from '@fullcalendar/core'
 import type { Appointment } from '@/lib/agenda/tiposAgenda'
 import { esVistaDeRejilla } from '@/lib/agenda/vistasAgenda'
-import { esEventoGenerico } from '@/lib/agenda/tarjetasAgenda'
+import { esEventoGenerico, marcaPorLigar } from '@/lib/agenda/tarjetasAgenda'
 import { horaEnTZ, duracionDeLaFila } from '@/lib/agenda/fechasAgenda'
 import { regionDeTimezone } from '@/lib/consultorios/zonas-mexico'
 import { MonthChip } from './MonthChip'
@@ -147,6 +147,7 @@ export function renderEventContent(arg: EventContentArg, navegadorTZ: string, in
     }
   }
 
+  const marca = marcaPorLigar(ext)
   return (
     <MemoizedEventContent
       timeText={arg.timeText}
@@ -161,6 +162,8 @@ export function renderEventContent(arg: EventContentArg, navegadorTZ: string, in
       descriptor={ext.notes?.trim() || null}
       esEvento={esEventoGenerico(ext)}
       enRejilla={enRejilla}
+      marca={marca?.texto ?? null}
+      marcaTitulo={marca?.titulo ?? null}
     />
   )
 }

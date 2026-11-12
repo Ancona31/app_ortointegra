@@ -227,7 +227,11 @@ export function contarVisibles(
        despachador que usan las tarjetas, y así no puede divergir. El `typeof`
        es lo que estrecha el `unknown` de `extendedProps` sin un `as`. */
     const pacienteId = ext.paciente_id
-    if (esEventoGenerico({ paciente_id: typeof pacienteId === 'string' ? pacienteId : null })) genericos += 1
+    const canal = ext.reserva_canal
+    if (esEventoGenerico({
+      paciente_id: typeof pacienteId === 'string' ? pacienteId : null,
+      reserva_canal: typeof canal === 'string' ? canal : null,
+    })) genericos += 1
     else citas += 1
   }
   return { citas, eventos: genericos, google }
