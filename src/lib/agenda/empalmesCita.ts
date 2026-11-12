@@ -98,3 +98,40 @@ function esEmpalme(e: unknown): e is Empalme {
 export function esListaDeEmpalmes(valor: unknown): valor is Empalme[] {
   return Array.isArray(valor) && valor.every(esEmpalme)
 }
+
+/** Lo que hace falta de un evento pintado en la rejilla. `EventApi` de
+ *  FullCalendar lo cumple tal cual; así este módulo no depende de él. */
+export interface EventoPintado {
+  id: string
+  start: Date | null
+  end: Date | null
+  allDay: boolean
+  title: string
+  extendedProps: Record<string, unknown>
+}
+
+/** Un evento pintado como `TramoCita`, o `null` si no tiene puntas. */
+export function tramoDePintado(ev: EventoPintado): TramoCita | null {
+  if (!ev.start || !ev.end) return null
+  const x = ev.extendedProps
+  return {
+    id: ev.id,
+    medicoId: typeof x.medico_id === 'string' ? x.medico_id : null,
+    inicio: ev.start,
+    fin: ev.end,
+    todoElDia: ev.allDay,
+    noOcupa: typeof x.status === 'string' && ESTADOS_SIN_EMPALME.includes(x.status),
+    deGoogle: x.isGcalBlock === true,
+    titulo: ev.title,
+  }
+}
+
+/** Los empalmes de `cita` contra lo pintado en la rejilla. */
+export function empalmesPintados(cita: TramoCita, pintados: readonly EventoPintado[]): Empalme[] {
+  const otras: TramoCita[] = []
+  for (const ev of pintados) {
+    const t = tramoDePintado(ev)
+    if (t) otras.push(t)
+  }
+  return empalmesDe(cita, otras)
+}

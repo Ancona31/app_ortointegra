@@ -42,6 +42,9 @@ import { addMinutes, ultimoDiaIncluido } from '@/lib/agenda/fechasAgenda'
 import { avisoFueraDeHorario, avisoFinFueraDeHorario } from '@/lib/agenda/horarioAgenda'
 import { DEFAULT_DURATION } from '@/lib/agenda/duracionCita'
 import type { Appointment, DatosGuardado } from '@/lib/agenda/tiposAgenda'
+import {
+  empalmesPintados, esListaDeEmpalmes, mensajeEmpalme, unirAceptados, ESTADOS_SIN_EMPALME, type Empalme,
+} from '@/lib/agenda/empalmesCita'
 
 type CalRef = RefObject<InstanceType<typeof FullCalendar> | null>
 
@@ -81,11 +84,16 @@ interface Params {
   refetch: (forzarGoogle?: boolean) => void
   firmarEscritura: () => string
   aplicarAppointmentAlEvento: (appointment: Partial<Appointment> & { id?: string }) => void
+  /** El interruptor de la agenda v2: decide si se avisa de empalmes (B7). */
+  agendaV2: boolean
 }
+
+/** El cuerpo de error de la API de citas, sin creerle la forma a `res.json()`. */
+type CuerpoDeError = { error?: string; message?: string; empalmes?: unknown } | null
 
 export function crearGuardadoCitas({
   calendarRef, horario, profile, toast, setConfirm, setCitaCreada, setInvitacion, closeModal,
-  refetch, firmarEscritura, aplicarAppointmentAlEvento,
+  refetch, firmarEscritura, aplicarAppointmentAlEvento, agendaV2,
 }: Params) {
   /**
    * ¿Hay que REVERTIR este gesto? Devuelve `true` —y ya ha revertido— sólo en
@@ -248,10 +256,13 @@ export function crearGuardadoCitas({
        fin se saltaba justo en el único caso donde el fin es nuevo. */
     const aviso = avisoFueraDeHorario(arg.event.start!, horario, 'Vas a moverlo a las')
       ?? (end_time ? avisoFinFueraDeHorario(new Date(end_time), horario) : null)
+    /* B7b: el empalme va DESPUÉS del aviso de horario, y si los dos aplican
+       salen seguidos, no uno combinado (P3). */
+    const seguir = () => seguirSiNoSeEmpalma(arg, start_time, end_time, (aceptados) => ejecutarDrop(id, puntas, arg, aceptados))
     if (aviso) {
       setConfirm({
         message: aviso,
-        onConfirm: () => { setConfirm(null); ejecutarDrop(id, puntas, arg) },
+        onConfirm: () => { setConfirm(null); seguir() },
         onCancel:  () => { setConfirm(null); restaurarPosicion(arg) },
       })
       return
@@ -259,7 +270,7 @@ export function crearGuardadoCitas({
 
     // Sin updated_at — drag & drop no requiere chequeo de concurrencia
     // FullCalendar ya movió el evento visualmente — solo sincronizar con servidor
-    ejecutarDrop(id, puntas, arg)
+    seguir()
   }
 
   /* Las dos formas del cuerpo de un movimiento, y NUNCA las cuatro claves a la
@@ -301,7 +312,43 @@ export function crearGuardadoCitas({
       ?.setDates(viejo.start, viejo.end, { allDay: viejo.allDay })
   }
 
-  async function ejecutarDrop(id: string, puntas: PuntasDelMovimiento, arg: EventDropArg | EventResizeDoneArg) {
+  /* ── B7b: EL AVISO DE EMPALME DEL GESTO ────────────────────────────────
+     Se pregunta con el gesto YA CERRADO (`eventDrop`/`eventResize`), leyendo
+     lo pintado de forma síncrona: nada de traídas a mitad del gesto, y nada de
+     `eventOverlap`/`eventAllow`, que bloquean y sólo ven lo pintado. No
+     bloquea: «Aceptar» guarda con los ids aceptados; «Cancelar» deshace con
+     `restaurarPosicion` (B2), nunca con `arg.revert()`, porque el aviso deja
+     abierta la misma ventana en la que una traída duplicaba la tarjeta.
+     Con el interruptor apagado no se mira nada y el gesto sigue como hoy. */
+  function preguntarEmpalme(lista: readonly Empalme[], aceptar: () => void, cancelar: () => void): void {
+    setConfirm({
+      message:   mensajeEmpalme(lista),
+      onConfirm: () => { setConfirm(null); aceptar() },
+      onCancel:  () => { setConfirm(null); cancelar() },
+    })
+  }
+
+  function seguirSiNoSeEmpalma(
+    arg: EventDropArg | EventResizeDoneArg, inicio: string, fin: string | undefined,
+    despues: (aceptados: string[]) => void,
+  ): void {
+    const api = calendarRef.current?.getApi()
+    if (!agendaV2 || !api) { despues([]); return }
+    const finEfectivo = fin ?? addMinutes(inicio, DEFAULT_DURATION)
+    const medico = arg.event.extendedProps.medico_id
+    const lista = empalmesPintados({
+      id: arg.event.id, medicoId: typeof medico === 'string' ? medico : null,
+      inicio: new Date(inicio), fin: new Date(finEfectivo), todoElDia: false,
+      noOcupa: ESTADOS_SIN_EMPALME.includes(String(arg.event.extendedProps.status)),
+      deGoogle: false, titulo: arg.event.title,
+    }, api.getEvents())
+    if (!lista.length) { despues([]); return }
+    preguntarEmpalme(lista, () => despues(lista.map(e => e.id)), () => restaurarPosicion(arg))
+  }
+
+  async function ejecutarDrop(
+    id: string, puntas: PuntasDelMovimiento, arg: EventDropArg | EventResizeDoneArg, aceptados: readonly string[] = [],
+  ) {
     // Guarda: un id temporal no existe en la base, el PUT devolveria un error
     // sin sentido. El evento optimista ya nace con `editable: false`, asi que
     // esto solo cubre cualquier camino futuro que se nos escape.
@@ -316,12 +363,29 @@ export function crearGuardadoCitas({
       headers: { 'Content-Type': 'application/json' },
       // `client_id` firma la escritura para que el eco de Realtime se
       // reconozca como propio (ver `firmarEscritura`).
-      body:    JSON.stringify({ ...puntas, client_id: firmarEscritura() }),
+      /* `empalmes_aceptados` sólo viaja si hay alguno (B7): con el interruptor
+         apagado el cuerpo es el de siempre. */
+      body:    JSON.stringify({ ...puntas, client_id: firmarEscritura(), ...(aceptados.length ? { empalmes_aceptados: aceptados } : {}) }),
     })
     // A1.5a: arrastre y redimensionado, salga bien o se revierta.
     vaciarCacheCitas()
 
     if (!res.ok) {
+      /* B7b: un 409 `empalme` es lo que lo pintado no veía (otra persona, otra
+         semana, el techo). Se atiende SIEMPRE, aunque el cliente crea el
+         interruptor apagado: la tarjeta sigue en su sitio nuevo mientras se
+         pregunta, y «Cancelar» la devuelve. Cualquier otro fallo, como hoy. */
+      if (res.status === 409) {
+        const cuerpo: CuerpoDeError = await res.json().catch(() => null)
+        const lista = cuerpo?.error === 'empalme' && esListaDeEmpalmes(cuerpo.empalmes) ? cuerpo.empalmes : null
+        if (lista) {
+          preguntarEmpalme(lista, () => ejecutarDrop(id, puntas, arg, unirAceptados(aceptados, lista)), () => restaurarPosicion(arg))
+          return
+        }
+        restaurarPosicion(arg)
+        toast.error(cuerpo?.message || cuerpo?.error || 'Error de conexión — se devolvió a su horario original')
+        return
+      }
       restaurarPosicion(arg)
       const { error, message } = await res.json().catch(() => ({ error: 'Error desconocido' }))
       toast.error(message || error || 'Error de conexión — se devolvió a su horario original')
@@ -381,16 +445,18 @@ export function crearGuardadoCitas({
        está puesto, así que se puede arrastrar cualquiera de los dos bordes. */
     const aviso = avisoFueraDeHorario(arg.event.start!, horario, 'Empezaría a las')
       ?? (arg.event.end ? avisoFinFueraDeHorario(arg.event.end, horario) : null)
+    // B7b: como en el arrastre, el empalme después del aviso de horario.
+    const seguir = () => seguirSiNoSeEmpalma(arg, start_time, end_time, (aceptados) => ejecutarDrop(id, { start_time, end_time }, arg, aceptados))
     if (aviso) {
       setConfirm({
         message: aviso,
-        onConfirm: () => { setConfirm(null); ejecutarDrop(id, { start_time, end_time }, arg) },
+        onConfirm: () => { setConfirm(null); seguir() },
         onCancel:  () => { setConfirm(null); restaurarPosicion(arg) },
       })
       return
     }
 
-    ejecutarDrop(id, { start_time, end_time }, arg)
+    seguir()
   }
 
   async function handleSave(data: DatosGuardado) {

@@ -682,7 +682,7 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
      otra función de este componente. */
   const { handleEventDrop, handleEventResize, handleSave, handleDelete, handleCancelar } = crearGuardadoCitas({
     calendarRef, horario, profile, toast, setConfirm, setCitaCreada, setInvitacion, closeModal,
-    refetch, firmarEscritura, aplicarAppointmentAlEvento,
+    refetch, firmarEscritura, aplicarAppointmentAlEvento, agendaV2,
   })
 
   const { handleDateClick, handleSelect, handleEventClick, abrirCita, abrirHueco } = crearAltaCitas({
@@ -1756,7 +1756,10 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
       )}
 
       {/* ── Confirm ─────────────────────────────────────── */}
-      {confirm && <ConfirmModal {...confirm} />}
+      {/* La `key` es el mensaje: dos avisos seguidos (fuera de horario y
+          empalme, B7) son dos diálogos, y el segundo se monta de nuevo con su
+          foco en vez de heredar el del primero. */}
+      {confirm && <ConfirmModal key={confirm.message} {...confirm} />}
 
       {/* ── Modal horario ────────────────────────────────── */}
       {horarioOpen && (
