@@ -1049,6 +1049,21 @@ queda listada aquí.
   (23503). Hasta que D6 la trate como cita (B3: se cancela, no se borra), un
   `DELETE` de la API sobre ella daría 500. Con el interruptor apagado no
   existen citas así.
+- **D2. Candado** (lista A 1, 2, 3 y 6): persona = teléfono **o** correo
+  (seudónimos HMAC), siempre por médico; incidencia = toda cancelación o
+  `no_show` de una cita por enlace, la haga quien la haga (personal, Google por
+  C2, o la persona); reactivar la anula; `cancelled`→`no_show` la re-etiqueta
+  sin contar doble. Sólo cuentan las citas por enlace. Desbloquear a mano
+  descuenta las incidencias anteriores; bloquear a mano basta sin
+  incidencias. La lista de bloqueados mira las citas creadas en los últimos
+  (ventana + 366) días; un bloqueo manual de alguien sin citas en ese plazo
+  sigue bloqueando pero no sale en la lista. Las incidencias no se auditan
+  aparte (las derivan cambios de cita ya auditados); los contactos sí
+  (`log_tabla_change`). Empate de marca de tiempo entre desbloqueo y bloqueo
+  en la misma transacción: gana el desbloqueo.
+- **D2. Auditoría (APTA CON CAMBIOS):** pre-vuelo con dueño de las tres tablas;
+  ventana de la lista ligada al ajuste (ventana + 366, no + 30 como proponía el
+  auditor, por la razón de la cabecera).
 
 ### Bloque F
 
