@@ -1784,7 +1784,48 @@ primero sin marcar.
     cubre lo de C8 salvo 410 y paginación, que cubren Vitest y SQL).
   - Falta: C7 (cron y middleware, en otro agente). Decisiones: §6-bis,
     «Bloque C — decisiones tomadas en C0-C4» y «… en C5-C6».
-- [ ] D — Reserva por enlace
+- [x] D — Reserva por enlace (2026-11-13)
+  - D0 transporte de correo (`EMAIL_TRANSPORT`: `captura` a Mailpit en local,
+    `resend` solo con Supabase remota) · D1 enlaces (código derivado por HMAC,
+    solo se guarda su sha256) · D2 candado e incidencias · D3 reserva
+    transaccional (candado por médico; dos reservas al mismo turno dejan una
+    sola cita, probado en carrera real) · D4 Google no reescribe el título de
+    una cita por ligar · D5 página y API públicas `/reservar/{código}` y
+    `/api/reservar/{código}` (404 uniforme, límites por IP, dispositivo, correo
+    y enlace) · D6 marca «Por ligar · N», historial y bloqueos · D7 ligar al
+    iniciar la consulta (con consentimiento) · D8 evento de Google y comprobante
+    capturado · D9 aviso de privacidad **PENDIENTE DE REVISIÓN LEGAL**, el
+    enlace no abre hasta que Angel apruebe su hash (`npx tsx
+    scripts/aviso-reserva-hash.ts`) · D10 e2e.
+  - Gestión: `/agenda/configuracion` (enlaces y contactos bloqueados).
+  - Migraciones (solo local): `20261114120000` D1, `130000` D2, `140000` D3,
+    `150000` D4, con auditoría independiente.
+  - Variables nuevas (las configura Angel en Vercel): `RESERVA_SECRETO` (si se
+    rota, se invalidan todos los enlaces y el historial del candado),
+    `EMAIL_TRANSPORT=resend`. En local: `EMAIL_TRANSPORT=captura`,
+    `RESERVA_AVISO_BORRADOR_LOCAL=1` (solo e2e, solo loopback).
+  - Pruebas al cierre: 1239 Vitest, 12 archivos SQL, 145 e2e (dos corridas).
+  - **Hallazgos para la auditoría (no corregidos):**
+    - Aislamiento: el PUT normal de una cita que cambia de un paciente a otro
+      no comprueba que el paciente sea de la clínica (preexistente; el ligado
+      nuevo sí lo comprueba). Encaja en el pendiente prioritario de
+      `CLAUDE.md`.
+    - Con el interruptor apagado, alguien de la clínica podría crear filas de
+      reserva de su propia clínica por PostgREST directo (la RLS no mira el
+      interruptor).
+    - Un `DELETE` directo por PostgREST de una cita con paciente no se bloquea
+      (B3 lo bloquea en la API).
+    - Seis rutas viejas (registro, reset-password, email-hook,
+      reenviar-confirmacion, enviar-documento, admin/invitar) llaman a Resend
+      directamente: en local podrían mandar correos reales con la llave de
+      `.env.local`. Ninguna prueba las dispara.
+    - El historial del candado no tiene purga automática (el aviso propone 12
+      meses; plazo a fijar con la revisión legal).
+    - Si Google falla al crear el evento de una reserva, la cita queda
+      `pending` (no `failed`); la primera edición reintenta.
+    - Los scripts de prueba limpian con `session_replication_role = replica`
+      para borrar sus propias filas de `audit_log` en la base local: no debe
+      usarse fuera de pruebas.
 - [ ] E — Recordatorios y confirmación de asistencia
 - [ ] F — Interfaz, movimiento y orden visual
 
