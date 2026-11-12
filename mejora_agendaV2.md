@@ -3373,6 +3373,24 @@ primero sin marcar.
     fallos que D11 vio en :3003 no salen contra el `next start` :3001 de
     este worktree (los arregló el cierre de F, `2552a2f`/`a240295`). Nada
     que arreglar.
+  - **Paso 2 · el conjunto desde cero** (CLI 2.117.0 de fnm, `supabase db
+    reset --local --workdir` de este worktree; antes, comprobado sin imprimir
+    secretos: `NEXT_PUBLIC_SUPABASE_URL` = `127.0.0.1:54321`, sin
+    `project-ref` en `supabase/.temp`, sin variables `SUPABASE_*`/`PG*` en el
+    entorno, contenedor `supabase_db_app_ortointegra`). 21 migraciones (5 de
+    `main` + las 16 del proyecto) aplicadas en orden sin un solo fallo, 48 s
+    de reinicio completo; `schema_migrations` = 21, última `20261116120000`.
+    El reinicio recreó los contenedores con las imágenes que fija la 2.117.0
+    (Postgres 17.6.1.167, antes 17.6.1.084; storage-api nueva) y avisa
+    `no files matched pattern: supabase/seed.sql` (no hay seed.sql: normal).
+    Semilla `agenda-semilla.ts` en 1.4 s (A: 25 pacientes, 348 citas; B: 3 y
+    17; aislamiento comprobado por sesión). **Quedan fuera de la base local
+    las tres `20261014*` de `feature/limites-ajustables`** (ese worktree las
+    tenía aplicadas): ver la guía, §2.
+    Vuelta a correr todo, mismas cifras que en el paso 1: SQL 17 en verde,
+    Vitest 1684/112, Playwright 244 pasan y 0 fallan (204/37/3, 7.4 min),
+    `reserva-carrera.sh` y `confirmacion-carrera.sh` en verde (build y lint no
+    dependen de la base: los del paso 1).
 
 **Bitácora** (una línea por sesión: fecha, qué quedó hecho, qué quedó a medias):
 
