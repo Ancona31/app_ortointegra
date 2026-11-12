@@ -671,30 +671,55 @@ reducido.
 
 ## 6. Cómo trabajar
 
-- **Rama:** no trabajar sobre `main`. Usar una rama aparte; `CLAUDE.md` pide
-  prefijo `feature/` (por ejemplo `feature/agenda-v2`). Un commit por paso
-  terminado, empujado al momento.
-- **Entorno:** Docker corriendo, Supabase CLI en una versión que lea
-  `supabase/config.toml` (la 2.95.4 fijada en `CLAUDE.md` no puede; la 2.117.0
-  sí), Node 24. La base local es para probar migraciones y flujos; producción no
-  se toca.
-- **Agentes secundarios:** el orquestador reparte y verifica.
-  - Modelo más capaz (Opus) para lo delicado: migraciones y RLS, sincronización
-    con Google, seguridad del enlace de reserva.
-  - Modelo más rápido (Sonnet) para lo mecánico: partir archivos, pruebas,
-    interfaz.
-  - Un revisor independiente, en otro modelo, lee cada cambio sin conocer la
-    conclusión de quien lo escribió.
-  - Cada migración pasa además por el prompt de
-    `supabase/AUDITORIA-MIGRACIONES.md`.
-- **Verificación del orquestador, en cada paso:** leer el diff, `npm run build`,
-  `npm run lint`, `npm run test`, y las pruebas de navegador del área tocada. Un
-  paso no está hecho porque un agente diga que lo está.
-- **Reporte al cerrar cada bloque**, en pocas líneas: qué se hizo, archivos
-  tocados, qué no funcionó, decisiones tomadas sin preguntar, qué sigue.
-- **Parar y preguntar solo si:** el cambio toca una regla de seguridad de
-  `CLAUDE.md`, el build no se puede reparar, o hace falta una decisión de
-  producto que no esté en §2.
+> **Reglas vigentes desde el 2026-11-12** (mensaje de Angel; sustituyen a las
+> anteriores donde las contradigan).
+
+**Todo es local primero.** Hasta que Angel termine su auditoría en local:
+- Base de datos: solo la local (Docker). Nada contra producción, ni de lectura.
+- Google: solo contra el Google simulado. Ninguna cuenta ni credencial real, y
+  no se conecta ninguna.
+- Correos: ninguno real. En local se capturan (Mailpit / transporte de prueba)
+  y se comprueba el contenido sin que salga.
+- Vercel: no se despliega, no se configuran variables ni tareas programadas, no
+  se prueba en Preview. El código y la configuración quedan en la rama listos;
+  activarlos le toca a Angel.
+- El código nuevo tolera que en producción aún no existan las tablas nuevas:
+  con el interruptor apagado o la tabla ausente, la agenda se comporta
+  exactamente como hoy, sin errores.
+
+**Migraciones.**
+- Ninguna va a producción hasta el final del proyecto. Todas se aplican solo
+  en la base LOCAL.
+- Se entregan como UN conjunto. Antes de darlo por bueno: reiniciar la base
+  local desde cero, aplicarlas todas en orden y correr todas las pruebas.
+  Auditoría independiente de cada una (`supabase/AUDITORIA-MIGRACIONES.md`) y
+  una auditoría del conjunto buscando conflictos entre ellas.
+- `select version()` (≥ 14) se comprueba al final, antes de aplicar el conjunto.
+
+**Commits y push.**
+- Rama `feature/agenda-v2` (worktree `~/proyectos/app_ortointegra-agenda`).
+  Un commit por paso terminado, en local.
+- `git push` SOLO al cerrar cada bloque (B, C, D, E, F), con todos sus
+  commits juntos: cada push dispara una Preview de Vercel. Excepción: un push
+  de respaldo al día como máximo si un bloque dura muchas horas.
+- Sin pull requests. Nunca merge ni push a `main`: el merge lo hace Angel.
+
+**Cómo avanzar.**
+- No se detiene el trabajo por decisiones de producto: si el plan no lo
+  cubre, se toma la opción que menos cambia el comportamiento actual, se anota
+  en «Decisiones para la auditoría final» y se sigue.
+- Reportes de cierre de bloque informativos; no se espera visto bueno.
+- Se reparte en paralelo entre agentes lo que no toque los mismos archivos.
+- Agentes: modelo más capaz para migraciones, RLS, sincronización con Google y
+  seguridad del enlace; el más rápido para lo mecánico; un revisor
+  independiente, en otro modelo, lee cada cambio.
+- Verificación en cada paso: diff, `npm run build`, `npm run lint` (96 errores
+  previos, sin subir), `npm run test` y las e2e del área tocada.
+- **Detenerse solo si:** el build no se puede reparar; algo obliga a cambiar
+  una regla de seguridad de `CLAUDE.md`; el entorno apunta a producción; o no
+  hay alternativa para S3 tal como la pidió Angel.
+
+**Orden:** terminar B, luego C, D y E, y F al final.
 
 ---
 
@@ -702,13 +727,162 @@ reducido.
 
 | Momento | Qué |
 |---|---|
-| Al inicio | Máquina con Docker; las tres autorizaciones de §3; confirmar o corregir la tabla de valores de §2 |
-| Al cerrar cada bloque | Probar; aplicar en producción el SQL entregado (ya auditado y probado en local) |
-| Bloque C | Prueba con una cuenta real de Google (conectar exige un clic humano); variables y, si aplica, tarea programada en Vercel |
-| Bloque D | Aprobar el texto de consentimiento; encender el enlace |
-| Bloque E | Activar la tarea programada de recordatorios; revisar el texto de los correos |
-| Bloque F | Ver las capturas y grabaciones de antes y después; decir qué ajustar |
+| Durante el proyecto | Nada obligatorio: los reportes de bloque son informativos |
+| Al final, en local | Auditar con lo que se entrega: conjunto de migraciones con sus auditorías, datos inventados sembrados, guía corta para levantar todo, sección «Decisiones para la auditoría final» y lista de lo que no se pudo probar en local |
+| Después de auditar | `select version()` en producción; aplicar el conjunto de migraciones; prueba con cuenta real de Google; variables, `CRON_SECRET` y tareas programadas en Vercel; revisar el texto legal del consentimiento y de los correos; encender el interruptor por clínica |
 | Al final | `git merge` local sobre `main` |
+
+---
+
+## 6-bis. Decisiones para la auditoría final
+
+Todas las decisiones tomadas sin una regla previa del plan, con el valor que
+quedó y por qué. Angel aprobó el 2026-11-12 los valores propuestos de B y C
+**siempre que no contradigan §2**; donde contradicen, manda §2 y la diferencia
+queda listada aquí.
+
+### Generales y de entorno
+
+- **P1. Interruptor:** uno por clínica, `agenda_ajustes.agenda_v2_encendida`
+  (`false` por omisión), que solo `postgres`/`supabase_admin` cambian (lo
+  enciende Angel por SQL). Falla cerrado: error al leer o tabla ausente =
+  apagado. Por qué: se puede probar en una clínica antes que en todas, y una
+  constante no podría valer distinto en local y en producción.
+- **P2** (aprobado al inicio): turno = duración del tipo de cita; «eliminar»
+  una cita con paciente la cancela y queda en auditoría; funciones nuevas
+  apagadas por interruptor.
+- **P10. Auditoría estricta:** si falla la escritura en `audit_log`, falla la
+  de la cita. Igual que las otras 7 tablas clínicas.
+- **Auditoría siempre encendida** (B0), fuera del interruptor: es regla de
+  `CLAUDE.md`.
+- **Lint:** el compilador de react-hooks se saltaba `AgendaCliente` entero; en
+  los ganchos nuevos el patrón «último valor» que exige FullCalendar va con
+  `eslint-disable-next-line` justificado en cada línea. Total: 96 errores, igual
+  que `main`.
+- **No se cambió ningún `getUser()` por `getClaims()`.** A1.7 (Google sembrado
+  en servidor con cliente admin) quedó fuera.
+
+### Bloque A
+
+- **Semilla de 3 semanas por apertura** (W-1, W, W+1, con nombre, teléfono y
+  correo del paciente): aprobada por Angel el 2026-11-12.
+- **Caché de rangos:** versión mínima, se vacía entera ante cualquier escritura
+  propia o evento de tiempo real (de cualquier clínica, porque los DELETE de
+  Realtime llegan sin RLS con solo el `id`). Invalidación fina: pendiente.
+- **`count: 'exact'`** se queda (+0.7 ms; sin él no se detecta el truncado).
+- **PERF-DT-4** (funciones de RLS por fila) medido, no tocado: es RLS.
+- **«Ver todos los médicos»** de la banda de vacío: arreglado (defecto), y no
+  se muestra en Mes, donde «Todos» no existe.
+
+### Bloque B (propuestas aprobadas)
+
+- **P3. Empalme:** del mismo médico (no del consultorio); cuentan citas,
+  eventos sin paciente y `no_show`; no cuentan los eventos de Google ni los de
+  todo el día; si además cae fuera de horario, dos avisos seguidos. No bloquea.
+- **P4. Cancelación:** el evento de Google se conserva con el prefijo
+  «CANCELADA — » (correo de «evento actualizado») en vez de borrarse; una cita
+  con paciente cancelada no se puede borrar nunca; una cita `attended` se puede
+  seguir cancelando como hoy; las canceladas siguen visibles en la rejilla.
+- **P5. Tipos de cita:** de clínica o de un médico (`medico_id` opcional); los
+  edita el administrador; el invitado no ve tipos personales de otros médicos;
+  duración 5–600 min en múltiplos de 5; el color es solo marca en el selector,
+  nunca sustituye al color del estado; solo citas con paciente; opcional; con
+  instantánea del nombre; reasignar a un médico incompatible → 400; el nombre
+  del tipo **no** aparece en la tarjeta (se conserva la tarjeta de dos líneas).
+- **P6. Disponibilidad:** un tramo por día, sin pausa de comida (la forma
+  actual del horario); el horario del consultorio lo edita su dueño (RLS de
+  hoy); la rejilla sigue pintando el horario de la clínica.
+- **P7. Pantalla de configuración:** secretaria e invitado la ven en solo
+  lectura; cada médico edita su propia disponibilidad.
+- **P8.** `PUT /api/me/horario` se endurece (rechaza fin ≤ inicio en un día
+  activo) y se audita. Fuera del interruptor.
+- **P9. Turnos ofrecidos:** consecutivos desde el inicio de cada hueco, con paso
+  igual a la duración del tipo.
+- **Ajustes por clínica** (§2): recordatorio 24 h (1–72), anticipación 2 h
+  (0–72), horizonte 60 días (1–365), vigencia del enlace de un solo uso 7 días
+  (1–30); los números del candado (1 / 2 / 3 en 60 días) guardados sin exponer.
+
+### Bloque C (propuestas aprobadas, con las diferencias por §2)
+
+- **C-b. Importación inicial:** desde hace 30 días, sin límite hacia adelante.
+- **C-c. Médico de un evento importado:** el dueño de la cuenta de Google
+  conectada (lo que ya hace la vista de hoy).
+- **C-f. Cancelación desde Google:** sin aviso aparte a la clínica; se ve en la
+  agenda y en la auditoría.
+- **C-g. Tarea programada:** Vercel Pro (confirmado por Angel): cada 10 min,
+  más sondeo al abrir la agenda (administrador y secretaria, mínimo 60 s entre
+  sondeos por clínica), para que nada dependa solo de la tarea. Se deja el
+  código y `vercel.json` listos; activarlo le toca a Angel.
+- **C-h.** Antes de encender, revisar el panel de auditoría: C es el primer
+  productor en volumen de `user_id='system'` (no es uuid).
+- **Disparo:** sondeo con `syncToken`; webhook (`events.watch`) solo como fase
+  opcional posterior.
+- **Conflicto:** gana el último cambio (`event.updated` contra `updated_at`), con
+  `etag` + `If-Match` al escribir; todo conflicto a `audit_log` (nombres de
+  campos, nunca valores).
+- **Diferencias con la propuesta original, porque manda §2** («lo que se mueva,
+  edite o cancele en Google sobre el calendario Spinus vuelve a Spinus»;
+  «eventos creados en Google entran como filas reales»):
+  - **C-a. Recurrentes creados en Google:** la propuesta era no importarlos;
+    por §2 **se importan** como filas reales, instancia por instancia
+    (`singleEvents`), dentro del horizonte de la agenda.
+  - **C-d. Título de una cita con paciente editado en Google:** la propuesta
+    era no aceptarlo; por §2 **vuelve a Spinus**. Las observaciones de una cita
+    con paciente siguen sin viajar en ningún sentido (§2 y S1).
+  - **C-e. Mover o borrar en Google una cita `attended`, `no_show` o
+    `cancelled`:** la propuesta era ignorarlo; por §2 **vuelve a Spinus**
+    (mover cambia la hora; borrar la cancela). Se audita con `via='google'`.
+    Restaurar en Google un evento borrado no reactiva la cita (§2 no lo cubre;
+    opción que menos cambia).
+
+### Seguridad (decididas por Angel el 2026-11-12)
+
+- **S1. Observaciones a Google:** las observaciones escritas en Spinus **no**
+  viajan a Google, tampoco las de eventos sin paciente (una reserva por enlace
+  es un evento sin paciente con datos de una persona). Única excepción: un
+  evento que nació en Google conserva su descripción sincronizada en los dos
+  sentidos mientras no esté ligado a un paciente; al ligarlo, deja de
+  enviarse. **Diferencia con §2**, que decía que las de eventos sin paciente sí
+  viajaban: manda la decisión de Angel.
+- **S2. Ruta de la tarea programada:** pública, protegida con `CRON_SECRET`;
+  comparación del secreto en tiempo constante; respuesta sin ningún dato; cada
+  consulta con cliente de servicio filtrada por `clinica_id`; la ruta se añade
+  a las rutas públicas del middleware sin tocar las existentes.
+- **S3. Acceso de la clínica para sincronizar:** **no** se suplantan claims ni
+  rol. Función aparte que recibe `clinica_id`, ejecutable solo por
+  `service_role`, sin modificar `clinica_tiene_acceso()` ni ninguna policy, con
+  prueba SQL que demuestra el mismo veredicto que la original para VIP,
+  suscripción activa, free virgen y free degradada.
+
+### Bloque F
+
+- Las 18 propuestas de la auditoría visual, aprobadas. **El pulido visual y los
+  defectos salen directo; las interacciones nuevas** (burbuja de creación
+  rápida, tarjeta de lectura, mini calendario, atajos, búsqueda, gestos,
+  arrastrar con duración) **van detrás del interruptor**.
+- Punto 11 (Compactar a media cita): no se reproduce (desajuste de ≤ 1 px).
+- Punto 13 (Mes del teléfono): defecto confirmado y arreglado (`7f81548`).
+
+### Menores
+
+- **`ProximasCitas`:** tope de refresco de 2 minutos al volver a la pestaña,
+  el mismo criterio que la agenda.
+- **Líneas muertas de `QuickPatientModal`** en `AgendaCliente.tsx`: se borran
+  tras comprobar con grep que nada las usa, en un commit propio.
+- **Propuesta para `supabase/AUDITORIA-MIGRACIONES.md`** (no se modifica el
+  archivo; queda aquí para que Angel decida). Dimensión 19: *las protecciones
+  por disparador que deciden con `current_user` no son un invariante: una
+  función `SECURITY DEFINER` propiedad de `postgres`/`supabase_admin` que
+  escriba en la tabla protegida las evade (y evade la RLS, porque esos roles
+  tienen `BYPASSRLS`). Antes de confiar en una, listar desde el catálogo las
+  funciones `SECURITY DEFINER` de esos dueños que escriben en la tabla.* Y una
+  nota sobre falsos positivos del Security Advisor de Supabase con funciones
+  `RETURNS trigger` (no son invocables por RPC).
+- **Hallazgos de las auditorías, no corregidos por ser patrones heredados:**
+  `service_role` conserva DELETE/TRUNCATE en las tablas nuevas como en
+  `clinicas`/`consultorios`; FKs existentes que incumplen la regla
+  (`appointments.paciente_id SET NULL`, `consultas.appointment_id SET NULL`,
+  `appointments.clinica_id CASCADE`) se reportan y no se cambian.
 
 ---
 
@@ -880,12 +1054,8 @@ primero sin marcar.
     (migración `20261112130000`, auditada APTA) · B2 E5-DT-8: la tercera vía
     (deshacer tras una traída) duplicaba la cita; arreglado con
     `restaurarPosicion`.
-  - **Producción, las aplica Angel en orden:** `20261111120000` (A1.8),
-    `20261112120000` (B0), `20261112130000` (B1). Confirmar antes
-    `select version()` ≥ 14.
-  - Esperan decisión de Angel (P3-P9): empalme, cancelación, tipos de cita,
-    disponibilidad, pantalla de configuración, endurecer `PUT /api/me/horario`,
-    paso de turnos.
+  - Migraciones solo en local; van a producción como conjunto al final (§6).
+  - Decisiones de B, C, F y S1-S3 resueltas el 2026-11-12: ver §6-bis.
   - Abierto y documentado en `DEUDA_TECNICA.md` (E5-DT-8): si otra persona
     borra la cita a mitad del arrastre, al soltar queda una tarjeta fantasma.
 - [ ] C — Google en los dos sentidos
