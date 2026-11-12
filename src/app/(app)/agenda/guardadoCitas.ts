@@ -42,6 +42,7 @@ import { addMinutes, ultimoDiaIncluido } from '@/lib/agenda/fechasAgenda'
 import { avisoFueraDeHorario, avisoFinFueraDeHorario } from '@/lib/agenda/horarioAgenda'
 import { DEFAULT_DURATION } from '@/lib/agenda/duracionCita'
 import { registrarNuevo, salirConAnimacion } from '@/lib/agenda/marcasMovimiento'
+import { animarFlip } from '@/lib/agenda/flipTarjetas'
 import type { Appointment, DatosGuardado } from '@/lib/agenda/tiposAgenda'
 import {
   empalmesPintados, esListaDeEmpalmes, mensajeEmpalme, unirAceptados, ESTADOS_SIN_EMPALME, type Empalme,
@@ -308,9 +309,18 @@ export function crearGuardadoCitas({
      ahí no hay hueco para que entre ninguna traída. */
   function restaurarPosicion(arg: EventDropArg | EventResizeDoneArg): void {
     const viejo = arg.oldEvent
-    if (!viejo.start) return
-    calendarRef.current?.getApi().getEventById(arg.event.id)
-      ?.setDates(viejo.start, viejo.end, { allDay: viejo.allDay })
+    const inicio = viejo.start
+    if (!inicio) return
+    const api = calendarRef.current?.getApi()
+    const evento = api?.getEventById(arg.event.id)
+    if (!evento) return
+    const aplicar = (): void => evento.setDates(inicio, viejo.end, { allDay: viejo.allDay })
+    /* F2.6: al cancelar el aviso, la tarjeta VUELVE deslizándose a su franja
+       (FLIP, `flipTarjetas.ts`) en vez de saltar. Sin `data-cita-id` (F1.4),
+       con movimiento reducido o entre columnas, aplica sin animar: degrada a
+       lo de antes. */
+    if (api instanceof CalendarioFC) animarFlip(api.el, arg.event.id, aplicar)
+    else aplicar()
   }
 
   /* ── B7b: EL AVISO DE EMPALME DEL GESTO ────────────────────────────────

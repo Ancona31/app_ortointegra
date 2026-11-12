@@ -25,6 +25,7 @@ import { buildEventInput, FUENTE_APPOINTMENTS } from '@/lib/agenda/eventosDeCita
 import type { Appointment } from '@/lib/agenda/tiposAgenda'
 import { esCancelacionAjena } from '@/lib/agenda/avisoCancelacion'
 import { registrarNuevo, salirConAnimacion } from '@/lib/agenda/marcasMovimiento'
+import { animarFlip } from '@/lib/agenda/flipTarjetas'
 
 type CalRef = RefObject<InstanceType<typeof FullCalendar> | null>
 
@@ -306,7 +307,14 @@ export function useTiempoRealAgenda({ calendarRef, filtroEfectivo, refetch, ulti
     // o un refetch de reconexión, y dos eventos con el mismo id es el bug que
     // costó una rama entera cerrar.
     if (api.getEventById(fila.id)) {
-      aplicarAppointmentAlEvento(cita)
+      /* F2.6: la cita que otra persona movió se DESLIZA a su hora nueva en vez
+         de saltar (FLIP con WAAPI, `flipTarjetas.ts`). Sólo aquí, en el cambio
+         ajeno: el eco propio ya salió arriba y el arrastre lo anima
+         FullCalendar. Si no se movió, o la tarjeta no lleva `data-cita-id`
+         todavía (F1.4), o se fue a otra columna (FullCalendar crea otro `<a>`
+         y el contenido de React llega después), aplica sin animar. */
+      if (api instanceof CalendarioFC) animarFlip(api.el, fila.id, () => aplicarAppointmentAlEvento(cita))
+      else aplicarAppointmentAlEvento(cita)
     } else {
       /* F2.4: lo que llega de otra persona entra con el anillo (`remoto`).
          Antes de `addEvent`, que pinta en síncrono. Vale también para un
