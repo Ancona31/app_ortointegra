@@ -159,6 +159,26 @@ select pg_temp.esperar('caso 5-bis (orden canónico)', (select cita_reserva_id |
 select pg_temp.esperar('caso 5-bis (repetido desde la otra)', pg_temp.registrar('00000000-0000-4000-8000-000000d1c001',
   array['00000000-0000-4000-8000-000000d1a201']::uuid[])::text, '0');
 
+-- ── Caso 5-ter (auditoría del cierre, hallazgo 1): la reserva de id MENOR ya
+--    no puede hacer de reserva (attended) y la de id mayor sí → el par sale
+--    igual, con la activa como reserva. Antes del arreglo daba 0. ──
+insert into public.appointments (id, clinica_id, paciente_id, medico_id, title, start_time, end_time, status,
+                                 reserva_enlace_id, reserva_canal, reserva_nombre, reserva_telefono, reserva_correo,
+                                 reserva_tel_hmac, reserva_correo_hmac, reserva_aviso_version, reserva_aceptado_en, reserva_historial_previo)
+select x.id, '00000000-0000-4000-8000-000000d1c001', null, '00000000-0000-4000-8000-000000d1b001', 'Persona D11 ter',
+       x.ini, x.ini + interval '30 min', x.estado,
+       '00000000-0000-4000-8000-000000d1e001', 'fijo', 'Persona D11 ter', '5500000013', 'd11ter@prueba.local',
+       pg_temp.h('t:' || x.id), pg_temp.h('c:' || x.id), 'v1-prueba-d11', now(), 0
+  from (values
+    ('00000000-0000-4000-8000-000000d1a301'::uuid, date_trunc('day', now()) + interval '4 days 10 hours', 'attended'),
+    ('00000000-0000-4000-8000-000000d1a302'::uuid, date_trunc('day', now()) + interval '4 days 10 hours 15 min', 'scheduled')
+  ) x(id, ini, estado);
+select pg_temp.esperar('caso 5-ter (un par)', pg_temp.registrar('00000000-0000-4000-8000-000000d1c001',
+  array['00000000-0000-4000-8000-000000d1a302']::uuid[])::text, '1');
+select pg_temp.esperar('caso 5-ter (la activa es la reserva)', (select cita_reserva_id || '>' || cita_otra_id from public.reserva_empalmes_google
+  where cita_reserva_id in ('00000000-0000-4000-8000-000000d1a301', '00000000-0000-4000-8000-000000d1a302')),
+  '00000000-0000-4000-8000-000000d1a302>00000000-0000-4000-8000-000000d1a301');
+
 -- ── Caso 6: argumentos inválidos → 22023 (500 ids todavía valen) ──
 select pg_temp.esperar('caso 6 (500 ids)', pg_temp.registrar('00000000-0000-4000-8000-000000d1c001',
   array_fill('00000000-0000-4000-8000-000000d1a105'::uuid, array[500]))::text, '0');
@@ -245,7 +265,8 @@ begin
   set local role authenticated;
   select string_agg(cita_otra_id::text, ',' order by cita_otra_id) into v_n from public.reserva_empalmes_google;
   reset role;
-  perform pg_temp.esperar('caso 9 (c1)', v_n, '00000000-0000-4000-8000-000000d1a101,00000000-0000-4000-8000-000000d1a110,00000000-0000-4000-8000-000000d1a202');
+  -- d1a301: el par del caso 5-ter (la activa d1a302 es la reserva).
+  perform pg_temp.esperar('caso 9 (c1)', v_n, '00000000-0000-4000-8000-000000d1a101,00000000-0000-4000-8000-000000d1a110,00000000-0000-4000-8000-000000d1a202,00000000-0000-4000-8000-000000d1a301');
   perform set_config('request.jwt.claims', json_build_object('sub', '00000000-0000-4000-8000-000000d1b002', 'role', 'authenticated')::text, true);
   set local role authenticated;
   select string_agg(cita_otra_id::text, ',') into v_n from public.reserva_empalmes_google;

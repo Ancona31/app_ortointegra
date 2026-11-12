@@ -3391,6 +3391,20 @@ primero sin marcar.
     Vitest 1684/112, Playwright 244 pasan y 0 fallan (204/37/3, 7.4 min),
     `reserva-carrera.sh` y `confirmacion-carrera.sh` en verde (build y lint no
     dependen de la base: los del paso 1).
+  - **Paso 3 · auditoría de cada migración** (las 16 de
+    `git diff --name-only main...HEAD -- supabase/migrations`). Cada auditoría
+    previa se revisó contra las 18 dimensiones de `AUDITORIA-MIGRACIONES.md` y
+    las reglas transversales se comprobaron en el catálogo de la base recién
+    reiniciada: tabla de veredictos en `supabase/AUDITORIA-CONJUNTO-AGENDA-V2.md`
+    §2. Quince APTA tal como estaban (E1, E6, E4 y E9 con notas para Angel).
+    **D11 no tenía auditoría formal** (sólo la revisión de su diff): se la hizo
+    un auditor independiente → APTA CON CAMBIOS, **aplicados en el archivo**
+    (no estaba en producción; anotado en su cabecera): el desempate «id menor»
+    de dos reservas empalmadas perdía el par si la de id menor ya no podía ser
+    reserva (prueba nueva, caso 5-ter, en rojo con el predicado viejo), el
+    pre-vuelo exige `agenda_v2_encendida`, fila 7 de la rejilla (el UNIQUE del
+    par), dos COMMENT. Reaplicada desde cero y en segunda pasada: rejilla 7 × OK,
+    no-op. SQL 17 archivos en verde.
 
 **Bitácora** (una línea por sesión: fecha, qué quedó hecho, qué quedó a medias):
 

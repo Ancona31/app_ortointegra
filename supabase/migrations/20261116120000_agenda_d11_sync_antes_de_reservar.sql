@@ -23,6 +23,32 @@
 --   del par reserva-reserva. No aplicado: comprobar el dueño de objetos
 --   previos (Postgres ya rechaza reemplazar uno ajeno).
 -- AUDITORÍA INDEPENDIENTE: pendiente (supabase/AUDITORIA-MIGRACIONES.md).
+--   ↑ Superado: AUDITORÍA INDEPENDIENTE 2026-11-12 (cierre del proyecto):
+--   APTA CON CAMBIOS (supabase/AUDITORIA-MIGRACIONES.md, las 18
+--   dimensiones; detalle en supabase/AUDITORIA-CONJUNTO-AGENDA-V2.md §2).
+--   Aplicado en este archivo (no estaba en producción; en local se volvió a
+--   aplicar con el reinicio desde cero del conjunto):
+--   · Hallazgo 1: el desempate «id menor» de dos reservas empalmadas perdía
+--     el par cuando la de id menor no podía hacer de reserva (attended, o
+--     ya terminada) y la otra sí: ahora el orden canónico sólo rige entre
+--     dos reservas que las dos podrían serlo. Prueba: caso 5-ter.
+--   · Hallazgo 4: el pre-vuelo exige agenda_ajustes.agenda_v2_encendida
+--     boolean y SELECT de service_role en agenda_ajustes.
+--   · Hallazgo 5: fila 7 de la rejilla, el UNIQUE del par del que depende el
+--     ON CONFLICT ON CONSTRAINT.
+--   · Hallazgo 6: COMMENT de la tabla (el orden canónico de un par
+--     reserva-reserva) y de gcal_sync_frescura (también ultima_ok NULL).
+--   NO aplicado, para Angel: (2) un par que vuelve a empalmarse pasados los
+--   30 días del panel no reaparece (UNIQUE + DO NOTHING; cambiarlo rompe
+--   «nadie UPDATE»); (3) con mucho historial, el OR de la consulta de pares
+--   recorre todas las citas de la clínica (opcional: partirla en dos ramas
+--   con UNION); comprobar dueños de objetos previos (Postgres ya lo rechaza).
+--   Texto inexacto, se deja como constancia: «Escrita / APLICADA 2026-11-16»
+--   de arriba y de la cabecera son fechas adelantadas (el commit bee670e es
+--   del 2026-11-12); el nombre del archivo no se cambia (es su versión).
+--   «Bloqueos de catálogo» del renglón de aplicación: la FK toma además
+--   SHARE ROW EXCLUSIVE sobre clinicas hasta el COMMIT (bloquea escrituras
+--   en clinicas, no lecturas), con el lock_timeout de 5 s.
 --
 -- ═══ EL PORQUÉ ═════════════════════════════════════════════════════════
 -- Decisión de Angel (mejora_agendaV2.md §6-bis, «Bloque D — sincronización
@@ -100,6 +126,12 @@ BEGIN
   IF to_regclass('public.gcal_sync_estado') IS NULL OR to_regclass('public.agenda_ajustes') IS NULL THEN
     RAISE EXCEPTION 'PRE-VUELO FALLÓ: falta gcal_sync_estado (C1) o agenda_ajustes (B1).';
   END IF;
+  -- Auditoría 2026-11-12 (hallazgo 4): el cuerpo plpgsql no se valida al crearse.
+  IF NOT EXISTS (SELECT 1 FROM pg_attribute WHERE attrelid = 'public.agenda_ajustes'::regclass AND NOT attisdropped
+                   AND attname = 'agenda_v2_encendida' AND atttypid = 'bool'::regtype)
+     OR NOT has_table_privilege('service_role', 'public.agenda_ajustes', 'SELECT') THEN
+    RAISE EXCEPTION 'PRE-VUELO FALLÓ: agenda_ajustes sin agenda_v2_encendida boolean (B1) o sin SELECT de service_role.';
+  END IF;
   IF (SELECT count(*) FROM pg_attribute WHERE attrelid = 'public.gcal_sync_estado'::regclass AND NOT attisdropped
         AND (attname, atttypid) IN (('clinica_id', 'uuid'::regtype), ('ultima_ok', 'timestamptz'::regtype),
               ('candado', 'uuid'::regtype), ('candado_hasta', 'timestamptz'::regtype))) <> 4 THEN
@@ -172,7 +204,7 @@ CREATE POLICY reserva_empalmes_google_select ON public.reserva_empalmes_google F
                       WHERE a.id = reserva_empalmes_google.cita_reserva_id AND a.clinica_id = public.get_clinica_id()));
 
 COMMENT ON TABLE public.reserva_empalmes_google IS
-  'D11: pares (cita reservada por enlace, cita que se le empalma) detectados por la sincronización con Google al importar o mover una cita. UNIQUE por par: una resincronización no repite el aviso. Sólo lo escribe reserva_empalmes_registrar (service_role), que audita cada par nuevo. Sin FK a appointments a propósito (ver la migración 20261116120000); el lector cruza con appointments.';
+  'D11: pares (cita reservada por enlace, cita que se le empalma) detectados por la sincronización con Google al importar o mover una cita. UNIQUE por par: una resincronización no repite el aviso. Sólo lo escribe reserva_empalmes_registrar (service_role), que audita cada par nuevo. Sin FK a appointments a propósito (ver la migración 20261116120000); el lector cruza con appointments. cita_otra_id puede ser también una reserva por enlace: entre dos reservas activas, cita_reserva_id es la de id menor; si sólo una está activa (scheduled/confirmed y sin terminar), es ésa.';
 
 -- ---------------------------------------------------------------------
 -- 3 · Las funciones. INVOKER, search_path vacío, sólo service_role.
@@ -224,8 +256,12 @@ BEGIN
        AND o.status NOT IN ('cancelled', 'no_show') AND NOT o.all_day
        AND o.start_time < r.end_time AND o.end_time > r.start_time
        AND (r.id = ANY (p_citas) OR o.id = ANY (p_citas))
-       -- Reserva contra reserva: un solo par por solape, en orden canónico.
-       AND (o.reserva_canal IS NULL OR r.id < o.id)
+       -- Reserva contra reserva: un solo par por solape, en orden canónico,
+       -- SÓLO si la otra también podría hacer de reserva (activa y sin
+       -- terminar); si no, este r es el único representante posible
+       -- (auditoría 2026-11-12, hallazgo 1).
+       AND (o.reserva_canal IS NULL OR r.id < o.id
+            OR o.status NOT IN ('scheduled', 'confirmed') OR o.end_time <= now())
   ), nuevos AS (
     INSERT INTO public.reserva_empalmes_google (clinica_id, cita_reserva_id, cita_otra_id)
     SELECT p.clinica_id, p.reserva, p.otra FROM pares p
@@ -250,7 +286,7 @@ REVOKE EXECUTE ON FUNCTION public.reserva_empalmes_registrar(uuid, uuid[]) FROM 
 GRANT  EXECUTE ON FUNCTION public.reserva_empalmes_registrar(uuid, uuid[]) TO service_role;
 
 COMMENT ON FUNCTION public.gcal_sync_frescura(uuid) IS
-  'D11: ultima_ok y si el candado de sincronización de la clínica está tomado ahora. Sólo lectura, sólo service_role. Cero filas si nunca sincronizó.';
+  'D11: ultima_ok y si el candado de sincronización de la clínica está tomado ahora. Sólo lectura, sólo service_role. Cero filas si nunca se tomó el candado; ultima_ok NULL si se tomó y ninguna pasada terminó bien.';
 COMMENT ON FUNCTION public.reserva_empalmes_registrar(uuid, uuid[]) IS
   'D11: registra (sin repetir) los pares reserva por enlace / cita empalmada del mismo médico en los que participa alguna de p_citas (recién importadas o movidas desde Google) y audita cada par nuevo en la misma sentencia. Devuelve los pares nuevos. Sólo service_role; interruptor apagado = 0.';
 
@@ -295,5 +331,11 @@ FROM (
              AND NOT has_function_privilege('anon', p.oid, 'EXECUTE')
              AND NOT has_function_privilege('authenticated', p.oid, 'EXECUTE')
              AND NOT EXISTS (SELECT 1 FROM aclexplode(p.proacl) x WHERE x.grantee = 0 AND x.privilege_type = 'EXECUTE')), '2'
+  UNION ALL
+  SELECT 7, 'UNIQUE del par (lo usa ON CONFLICT ON CONSTRAINT)',
+         coalesce((SELECT pg_get_constraintdef(oid) FROM pg_constraint
+                    WHERE conrelid = to_regclass('public.reserva_empalmes_google')
+                      AND conname = 'reserva_empalmes_google_par_key'), 'AUSENTE'),
+         'UNIQUE (cita_reserva_id, cita_otra_id)'
 ) t
 ORDER BY t.n;
