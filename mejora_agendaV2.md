@@ -2357,6 +2357,19 @@ figura en el manifiesto de la página `/agenda`).
 `TarjetaLectura`, `HerramientasV2`). Con tres usos el protocolo 4 permite
 proponer el gancho compartido, pero crearlo pide el visto bueno de Angel.
 
+**Hallazgos de los revisores aceptados sin cambio**
+
+- En Mes, el minicalendario marca el MES natural (`currentStart`/`currentEnd`)
+  y no las seis semanas que pinta la rejilla (`rangosDeLaVista().completo`): se
+  marca el periodo elegido, no los días de relleno. Si se prefiere lo pintado,
+  es cambiar esa línea por `rangos.completo`.
+- `setRangoVisible` corre también con el interruptor apagado: va en el mismo
+  manejador que `setTituloVista`, así que React lo agrupa y no añade render.
+- Con un teclado físico en el teléfono, `/` no abre nada (la lupa sólo está en
+  la barra de escritorio) hasta que la banda tenga su ranura.
+- Las e2e se escribieron por interacción pero se corren al final: la de `/` en
+  `agenda-f-buscador` necesita también el commit de atajos.
+
 **Lo que queda en archivos ajenos** (el enchufe ya lo manda o lo lee; ver
 `contratosV2.ts`):
 

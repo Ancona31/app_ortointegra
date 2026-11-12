@@ -342,13 +342,18 @@ function useIrACita(p: PropsInteraccionesV2): (c: CitaEncontrada) => void {
     espera.current?.()
     if (filtroActivo && c.medico_id && c.medico_id !== filtroActivo) alFiltrarMedico(c.medico_id)
     onVista(vistaEnElOtroFormato('timeGridDay', isMobile), new Date(c.start_time))
-    espera.current = esperarEvento(api, c.id, (ev) => {
+    /* Si ya estaba pintada, `esperarEvento` contesta antes de volver: entonces
+       no queda nada que limpiar y `espera` se queda en null. */
+    let resuelta = false
+    const limpiar = esperarEvento(api, c.id, (ev) => {
+      resuelta = true
       espera.current = null
       /* Por `abrirCita`, la única puerta (`altaCitas.ts`): la misma regla de
          Google y el mismo estrechamiento de `extendedProps` que un clic. */
       if (ev) pRef.current.abrirCita(ev)
       else toast.info('No se pudo mostrar esa cita en la agenda.')
     })
+    if (!resuelta) espera.current = limpiar
   }, [toast])
 }
 
