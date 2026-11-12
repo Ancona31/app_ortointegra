@@ -1061,7 +1061,12 @@ primero sin marcar.
   - Decisiones de B, C, F y S1-S3 resueltas el 2026-11-12: ver §6-bis.
   - Abierto y documentado en `DEUDA_TECNICA.md` (E5-DT-8): si otra persona
     borra la cita a mitad del arrastre, al soltar queda una tarjeta fantasma.
-- [ ] C — Google en los dos sentidos
+- [ ] C — Google en los dos sentidos (en curso, rama `feature/agenda-v2-c`)
+  - Diseño: `e2e/resultados/plan_C.md` del worktree de `feature/agenda-v2`,
+    acotado por C-a, C-d, C-e y S1-S3 de §6-bis, que mandan.
+  - C0 (2026-11-13): AG-DT-5 cerrada en `DEUDA_TECNICA.md` (la arregló
+    `18b9864`, verificado en el código); LP-DT-6 anotada: sigue abierta hasta
+    la prueba con cuenta real, y «en tiempo real» sigue prohibido sin webhook.
 - [ ] D — Reserva por enlace
 - [ ] E — Recordatorios y confirmación de asistencia
 - [ ] F — Interfaz, movimiento y orden visual

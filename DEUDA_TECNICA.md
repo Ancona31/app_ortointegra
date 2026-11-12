@@ -1667,6 +1667,14 @@ lanzamiento oficial. Proyecto independiente, no es scope de este plan.
 - **Detectada:** Auditoría de landing (2026-07-28)
 - **Descripción:** Bug de sync de Google Calendar — bloquea el claim "en
   tiempo real" en toda la página.
+- **Actualización (2026-11-13, bloque C de `mejora_agendaV2.md`):** el «bug»
+  es que la sincronización va en un solo sentido
+  (`src/components/landing/sections/SeccionSeguridad.tsx:35`). El bloque C la
+  hace de ida y vuelta para las clínicas con la agenda v2 encendida. **Sigue
+  abierta hasta la prueba con cuenta real de Google, que es de Angel.** Y aun
+  cerrada, **el texto «en tiempo real» sigue prohibido**: sin webhook, lo que se
+  mueve en Google llega a Spinus con el retraso del sondeo (al abrir la agenda y
+  cada 10 minutos).
 
 ### LP-DT-7 — Dashboard que los médicos no entienden
 - **Estado:** 🔴 abierta
@@ -3457,7 +3465,18 @@ hasta el siguiente refetch.
 
 ### AG-DT-5 — La sincronización a Google manda `dateTime` siempre, y el ancla de hora mete una línea falsa en el correo al paciente
 
-**Estado:** 🔴 abierta · **Archivos:** `src/app/api/appointments/route.ts:386`,
+**Estado:** 🟢 **CERRADA (commit `18b9864`, 2026-08-27)** — verificado el
+2026-11-13 al diseñar el bloque C de `mejora_agendaV2.md`: (a) las dos rutas
+componen las puntas con `puntasParaGoogle` (`src/lib/appointments.ts`), que
+manda `{ date }` en los eventos de todo el día, y la lectura usa
+`allDay: !e.start?.dateTime` (`src/lib/agenda/cacheEventosGoogle.ts`); (b) las
+dos rutas pasan `instanteParaAncla = null` en un evento de todo el día, y
+`eventoParaGoogle(..., null, ...)` apaga la línea de hora. Queda un caso
+heredado, sin arreglo propio: los eventos de todo el día que se escribieron en
+Google antes del 2026-08-27 siguen con `dateTime` de 00:00 a 00:00; la
+sincronización de vuelta (bloque C) los tolera comparando instantes. El texto
+de abajo describe el defecto tal como se encontró y se conserva.
+· **Archivos:** `src/app/api/appointments/route.ts:386`,
 `src/app/api/appointments/[id]/route.ts:525`, `src/lib/appointments.ts:89-100`
 **Detectado:** 2026-08-26, misma auditoría.
 
