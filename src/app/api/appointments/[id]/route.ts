@@ -1432,8 +1432,12 @@ export async function DELETE(_req: NextRequest, ctx: RouteContext<'/api/appointm
        tablas de la reserva por enlace (D1, D2) y una cita por enlace: con v2
        encendido no se llega aquí (409 de arriba); apagado, sólo si la clínica
        tuvo v2 y lo apagó después. 409 con un texto que se entiende, en vez del
-       500 con el mensaje de Postgres, que nombra tablas. */
-    if (error?.code === '23503') {
+       500 con el mensaje de Postgres, que nombra tablas.
+       42501: el disparador `cita_proteger_borrado` (corrección de seguridad,
+       punto 3) la protege porque la base sí ve v2 encendido y la cita con
+       paciente o por ligar, aunque arriba la lectura del interruptor saliera
+       apagada (falla cerrado). La RLS de DELETE no da 42501: filtra filas. */
+    if (error?.code === '23503' || error?.code === '42501') {
       return NextResponse.json(
         { error: 'cita_con_paciente', message: 'Esta cita no se puede eliminar: cancélala.' },
         { status: 409 }

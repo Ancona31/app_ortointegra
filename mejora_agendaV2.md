@@ -837,7 +837,8 @@ queda listada aquí.
   interruptor falla en ese instante, cuenta como apagado (diseño «falla
   cerrado» del interruptor) y la cita se borra como hoy. **Abierto:** un
   `DELETE` directo por PostgREST, sin pasar por la API, no se bloquea (haría
-  falta una migración).
+  falta una migración). **→ Cerrado por `20261117120000` (ver «Correcciones de
+  seguridad en la base tras la revisión independiente»).**
 - **B7 empalme:** se detecta en el servidor (autoridad: ve otras semanas,
   médicos fuera del filtro y escrituras simultáneas) y en el cliente sobre lo
   pintado (inmediato). El servidor responde 409 `{error:'empalme',
@@ -1510,6 +1511,9 @@ queda listada aquí.
   alguien de la clínica, por PostgREST directo, podría crear un enlace y una
   cita con `reserva_*` de su propia clínica con v2 apagado. Nada de eso cruza
   clínicas ni salta el candado público; se anota para la auditoría (D1).
+  **→ Cerrado (b) por `20261117121000` y `20261117122000`: la sesión ya no
+  escribe `reserva_*` ni emite enlaces (ver «Correcciones de seguridad en la
+  base tras la revisión independiente»).**
 - **Sin migración en D6.**
 
 **D7 · ligar al iniciar la consulta:**
@@ -3036,7 +3040,10 @@ Detalle en `supabase/AUDITORIA-CONJUNTO-AGENDA-V2.md`. Resumen:
   - **H1, FK RESTRICT hacia `appointments`.** Una cita con historial de agenda
     (enlace, correo, incidencia, reagendado) ya no se borra, y una clínica con
     filas de agenda tampoco. Es lo buscado, y el código ya lo traduce a 409.
-    Sin cambio.
+    Sin cambio. **(Corregido después: las demás citas con paciente o por
+    ligar sí se podían borrar por PostgREST; lo cierra
+    `20261117120000_agenda_seg_borrado_cita.sql`, ver «Correcciones de
+    seguridad en la base tras la revisión independiente».)**
   - **H2, choque al fusionar con limites-ajustables.** `p1` caso 3 se pone en
     rojo. Lo actualiza Angel al fusionar.
   - **H3, ruido en el log.** Sin tablas, cada petición deja un `warn`. Orden
@@ -3229,6 +3236,105 @@ evento de una reserva no lleva observaciones. La base no repite la regla
   de 60 s de `gcal_sync_tomar`. Un fallo al consultar el tope cuenta como sin
   cupo (cerrado) y también decide la ventana. Los cuatro casos de D11 siguen
   en verde (`reserva-google.e2e.ts`).
+
+### Correcciones de seguridad en la base tras la revisión independiente (decisiones de Angel)
+
+Pedido de Angel (2026-11-12), puntos 3, 4 y 7a de su lista; rama
+`feature/agenda-v2-seg2` (worktree `app_ortointegra-agenda-menores`). Tres
+migraciones (`20261117120000`, `…121000`, `…122000`), sólo en la base local.
+Ninguna toca una policy existente, las puertas de suscripción ni una regla de
+`CLAUDE.md`.
+
+- **3 · Borrado directo de una cita con paciente** (`20261117120000`).
+  Disparador `BEFORE DELETE` `trg_appointments_proteger_borrado` →
+  `cita_proteger_borrado()` (INVOKER, `search_path=''`). Lee sólo `OLD` y la
+  fila de `agenda_ajustes` de `OLD.clinica_id`; nunca `appointments` (sin
+  autorreferencia). Con v2 encendida y la cita con paciente o por ligar
+  (`reserva_canal` no nulo) → 42501. Con v2 apagada, sin fila de ajustes o una
+  cita sin paciente ni reserva: como antes.
+  - **Aplica también a `service_role`** (lo que pedía la orientación): ningún
+    camino legítimo del servidor borra una cita así con v2 encendida. La única
+    baja de la app es `DELETE /api/appointments/[id]` con la sesión, que ya da
+    409 antes; Google no borra filas (cancela, C-e). **No aplica a `postgres`
+    ni `supabase_admin`** (el patrón de B1/D1): editor SQL, ayudantes de las
+    e2e, y las acciones referenciales, que Postgres ejecuta como dueño de la
+    tabla (comprobado: un `CASCADE` desde `clinicas` lanzado por
+    `service_role` llega al disparador con `current_user = postgres`).
+  - **La semilla** borraba las citas con `service_role` antes que
+    `agenda_ajustes`; con v2 encendida en una clínica sembrada (la guía, §5)
+    ya no podría. Ahora borra `agenda_ajustes` primero
+    (`scripts/agenda-semilla.ts`).
+  - **La API** traduce también el 42501 del borrado a su 409 «cancélala»: el
+    caso en que la lectura del interruptor en la ruta falla (cuenta como
+    apagado) y la base sí lo ve encendido.
+  - **H1 de la auditoría del conjunto, corregido en el documento**: «sin
+    perder datos» sólo era cierto para las citas con historial de agenda.
+- **4 · Columnas `reserva_*`** (`20261117121000`). Disparador `BEFORE INSERT
+  OR UPDATE` `trg_appointments_proteger_reserva` → `cita_proteger_reserva()`.
+  Para todo rol que no sea `service_role`, `postgres` o `supabase_admin`: al
+  crear, toda `reserva_*` NULL (y `reserva_reagendados` 0, su DEFAULT); al
+  editar, ninguna cambia, salvo poner `reserva_telefono`/`reserva_correo` en
+  NULL (supresión a petición del titular; los `*_hmac` se quedan para el
+  candado, como ya decía el COMMENT de D1). Las 11 columnas, listadas del
+  catálogo con todo el conjunto aplicado: `reserva_aceptado_en`,
+  `_aviso_version`, `_canal`, `_correo`, `_correo_hmac`, `_enlace_id`,
+  `_historial_previo`, `_nombre`, `_reagendados`, `_tel_hmac`, `_telefono`.
+  - **Disparador (a) y no privilegios por columna (b)**: (b) obliga a listar
+    las ~40 columnas permitidas y a acordarse de cada columna futura (una
+    olvidada rompe la app), toca los privilegios de una tabla con datos
+    clínicos que lee `spinus-consola`, y no puede decir «sólo hacia NULL».
+    El disparador lista las columnas **desde la fila** (prefijo `reserva_`):
+    una columna `reserva_*` nueva queda cerrada sola. **Convenio** (en el
+    COMMENT de la función): una columna con ese prefijo es del servidor; una
+    nueva con DEFAULT haría fallar el alta de la sesión (el pre-vuelo lo
+    comprueba hoy; la prueba SQL cuenta 11 y se pone en rojo si hay más).
+  - **Caminos legítimos comprobados** (ninguno escribe `reserva_*` con la
+    sesión): alta y PUT de `/api/appointments` (objeto campo a campo), ligar
+    (D7: `paciente_id` y `title`), cambiar el estado, WhatsApp manual
+    (`whatsapp_*`), `/api/consultas` (`status`), arrastre y redimensionado. Los
+    del servidor (`reservar_por_enlace`, `reagendar_por_enlace`, Google)
+    corren como `service_role`.
+- **7a · El código del enlace lo calcula siempre el servidor**
+  (`20261117122000`). **Lo encontrado:** el alta de un enlace la hacía el
+  cliente de sesión (INSERT directo o `reserva_enlace_regenerar_fijo`), así
+  que cualquiera con sesión podía emitir por PostgREST un enlace con el
+  `codigo_hash` de un código elegido por él (corto, conocido, o que no deriva
+  de `RESERVA_SECRETO` y sobrevive a su rotación). Cambiar el hash de uno
+  emitido ya estaba prohibido (D1). La base no conoce el secreto, así que no
+  puede comprobar el hash: la garantía es que sólo inserte el servidor.
+  - `proteger_reserva_enlaces()` reemplazada (misma firma y grants; pre-vuelo
+    por md5 del cuerpo de D1): INSERT sólo de `service_role` (42501 para los
+    demás); `created_by` y `revocado_por` = `coalesce(auth.uid(), lo que
+    venga)` (la sesión sigue sellando su uid al revocar; el servidor pasa el
+    actor). Lo demás, idéntico.
+  - Función nueva `reserva_enlace_emitir(p_clinica_id, p_actor, p_id,
+    p_medico_id, p_clase, p_codigo_hash, p_etiqueta)`, INVOKER, **sólo
+    `service_role`**: repite la regla de las policies de `reserva_enlaces`
+    con el actor (de esa clínica; el propio médico, un médico administrador o
+    la secretaria; 42501 si no); fijo = revoca el vigente y emite otro, en una
+    transacción; único = emite.
+  - `POST /api/agenda/enlaces` la llama con `createAdminClient()`,
+    `p_clinica_id` = la clínica de la sesión y `p_actor` = quien la pide, tras
+    las mismas puertas de antes (sesión, clínica, interruptor, 403 de
+    `puedeGestionarDelMedico`). Es la única excepción al «sólo cliente de
+    sesión» de `gestionServidor.ts` (anotada allí). Leer, mostrar el código y
+    revocar siguen con la sesión y la RLS.
+  - **Sin tocar:** las policies `reserva_enlaces_insert/update` (la de INSERT
+    se queda sin camino que la use) y `reserva_enlace_regenerar_fijo`, que ya
+    no puede insertar con la sesión y queda sin llamadores; retirarla es una
+    limpieza aparte (Protocolo 2).
+  - **Al fusionar con `feature/limites-ajustables`**: `reserva_enlace_emitir`
+    es una función más que no ejecutan los tres roles; va a la lista del
+    caso 3 de `p1_permisos_funciones.sql` junto con las 30 del H2 (serán 31).
+- **Pruebas:** `supabase/pruebas-sql/seg_borrado_cita.sql`,
+  `seg_columnas_reserva.sql`, `seg_emision_enlaces.sql` (como `authenticated`
+  con claims, como `service_role` y como `anon`); `d1_enlaces_reserva.sql`
+  adaptada (las altas pasan por `reserva_enlace_emitir`; sus casos de permisos
+  ahora prueban la regla de la función); `e2e/seguridad-postgrest.e2e.ts`
+  (PostgREST directo con el JWT de `admin.a`, más el alta por la API). Cada una
+  en rojo con su mutación (§9).
+- **Lo que no se pudo hacer sin pedir permiso:** nada; ningún punto obligó a
+  cambiar una policy ni una regla de `CLAUDE.md`.
 
 ---
 
@@ -3676,6 +3782,53 @@ primero sin marcar.
     `DEUDA_TECNICA.md`, AG-DT-10 resuelta por B0 (pendiente de producción) y
     AG-DT-13 a AG-DT-25 con lo que queda abierto.
   - Push: lo hace el coordinador.
+- [x] Correcciones de seguridad en la base tras la revisión independiente
+  (puntos 3, 4 y 7a de Angel; 2026-11-12, worktree
+  `app_ortointegra-agenda-menores`, rama `feature/agenda-v2-seg2`, sale de
+  `501d453`). Decisiones en §6-bis, «Correcciones de seguridad en la base
+  tras la revisión independiente».
+  - Migraciones (sólo local, al final del conjunto): `20261117120000`
+    (borrado), `20261117121000` (columnas `reserva_*`), `20261117122000`
+    (emisión de enlaces). Cada una en seco con ROLLBACK, aplicada dos veces
+    (rejillas 5/5/6 × OK, segunda pasada sin cambios) y anotada a mano en
+    `schema_migrations`. Auditoría independiente (Sonnet, 18 dimensiones,
+    pruebas en vivo rol por rol): las tres APTA; único hallazgo, las líneas de
+    ESTADO · LOCAL sin rellenar (rellenadas).
+  - Código: `POST /api/agenda/enlaces` emite con `reserva_enlace_emitir`
+    (cliente de servicio, clínica de la sesión); `DELETE
+    /api/appointments/[id]` traduce el 42501 del disparador a 409; la semilla
+    borra `agenda_ajustes` antes que las citas.
+  - Pruebas y mutaciones en rojo:
+    - `seg_borrado_cita.sql`: quitar el RAISE → «caso 1: la sesión borró una
+      cita con paciente»; dejar fuera a `service_role` → «caso 2».
+    - `seg_columnas_reserva.sql`: dejar salir a `authenticated` → «caso 1»;
+      permitir cualquier cambio de teléfono/correo → «caso 2: la sesión
+      cambió reserva_telefono».
+    - `seg_emision_enlaces.sql`: quitar el «sólo service_role» del alta →
+      «caso 1: la sesión emitió un enlace con un hash elegido».
+    - `e2e/seguridad-postgrest.e2e.ts` (PostgREST directo con el JWT de
+      admin.a): con las tres funciones mutadas a no-op, los 3 casos en rojo.
+    - `d1_enlaces_reserva.sql` adaptada (altas por `reserva_enlace_emitir`).
+  - Verificación: build limpio; lint 96 errores (sin subir); Vitest 1684 en
+    112 archivos; SQL 18 de 20 en verde. Los 2 rojos (`d2_candado_reserva`
+    caso 4 y `d3_reservar_por_enlace` caso 5) los provoca la migración
+    `20261117130000_agenda_seg1_candado_correo.sql` del otro agente, aplicada
+    después en la misma base: sus versiones de esas dos pruebas (en su
+    worktree) pasan contra esta base con los tres disparadores nuevos.
+    Playwright completo contra `next start` :3004 (puertos cambiados en las
+    e2e SIN commitear): 245 pasan, 2 fallan, 214 saltadas. Los 2:
+    `reserva-candado` «coincidir sólo por el teléfono» (mismo motivo: el
+    candado cambió en `20261117130000`, y el otro agente actualizó esa e2e en
+    su rama) y `seguridad-postgrest` punto 3, que heredaba un enlace fijo
+    vigente que dejó ese fallo; arreglado limpiando también antes de cada
+    caso, y vuelto a correr detrás de `reserva-candado`: verde.
+  - Para quien integre las dos ramas: el disparador de columnas cierra solo
+    toda columna nueva `reserva_*` de `appointments` (y una con DEFAULT haría
+    fallar el alta de la sesión; la prueba SQL cuenta 11); `reserva_enlace_emitir`
+    va a la lista del caso 3 de `p1_permisos_funciones.sql` al fusionar con
+    `feature/limites-ajustables`; y si otra migración reemplaza
+    `proteger_reserva_enlaces()`, tiene que partir del cuerpo de
+    `20261117122000` (md5 `acd4128b…`), no del de D1.
 
 - [x] seg1 — Correcciones de seguridad del enlace de reserva tras la revisión
   independiente (decisiones de Angel, 2026-11-12; rama `feature/agenda-v2-seg1`,
@@ -3717,6 +3870,9 @@ primero sin marcar.
 - 2026-11-12 — seg1: correcciones de seguridad del enlace de reserva (puntos 1,
   2, 5, 6, 7b y 8 de Angel), migración `20261117130000` y pruebas. Para Angel:
   la excepción del bloqueo manual por teléfono (§6-bis) y AG-DT-26 a AG-DT-28.
+- 2026-11-12 — Correcciones de seguridad en la base (3, 4 y 7a): tres
+  migraciones locales con auditoría APTA, la ruta de alta de enlaces por el
+  servidor, H1 corregido en la auditoría del conjunto. Nada a medias.
 
 ---
 

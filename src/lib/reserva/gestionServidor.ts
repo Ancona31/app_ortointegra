@@ -15,7 +15,10 @@
  * ⚠️ CLIENTE DE SESIÓN, NUNCA `createAdminClient()`: lo que se ve y lo que se
  * escribe lo decide la RLS de `reserva_enlaces`, `reserva_contactos`,
  * `reserva_incidencias` y `appointments`. Cada consulta lleva además
- * `clinica_id` explícito (pendiente prioritario de `CLAUDE.md`).
+ * `clinica_id` explícito (pendiente prioritario de `CLAUDE.md`). Única
+ * excepción: el ALTA de un enlace (`POST /api/agenda/enlaces`), que la base
+ * sólo acepta de `service_role` (corrección de seguridad 7a); va por
+ * `reserva_enlace_emitir` con la clínica de la sesión.
  *
  * SÓLO SERVIDOR.
  */
