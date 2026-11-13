@@ -446,12 +446,13 @@ Tu primer mensaje en cada sesión debe ser:
 Plan, decisiones y avance: `mejora_agendaV2.md` (§6-bis decisiones, §7 lo que
 le toca a Angel, §10 lo que no se probó en local). Auditoría del conjunto de
 migraciones: `supabase/AUDITORIA-CONJUNTO-AGENDA-V2.md`. Guía local:
-`GUIA_AUDITORIA_AGENDA_V2.md`. Deuda abierta: `DEUDA_TECNICA.md`, AG-DT-13 a
-AG-DT-25.
+`GUIA_AUDITORIA_AGENDA_V2.md`; pruebas a mano: `GUIA_PRUEBAS_AGENDA_V2.md`.
+Deuda abierta: `DEUDA_TECNICA.md`, AG-DT-13 a AG-DT-29.
 
-**Estado:** el código y las 16 migraciones (`20261111120000` a
-`20261116120000`) están en `feature/agenda-v2`, probados sólo en local. En
-producción no hay nada aplicado ni encendido hasta que Angel lo haga (§7).
+**Estado:** el código y las 20 migraciones (`20261111120000` a
+`20261117130000`: las 16 del cierre y las 4 de las correcciones de seguridad)
+están en `feature/agenda-v2`, probados sólo en local. En producción no hay nada
+aplicado ni encendido hasta que Angel lo haga (§7).
 
 **Reglas que un editor futuro no debe romper:**
 
@@ -495,7 +496,43 @@ producción no hay nada aplicado ni encendido hasta que Angel lo haga (§7).
   En correos y en WhatsApp nunca va nada clínico.
 * **Con v2 encendida, una cita con paciente o por ligar no se borra: se
   cancela.** Las tablas de v2 apuntan a `appointments` y a `clinicas` con
-  RESTRICT, y la API traduce el 23503 a 409. No las cambies a CASCADE.
+  RESTRICT, y la API traduce el 23503 a 409. No las cambies a CASCADE. Además
+  la **base** lo rechaza aunque se salte la API: el disparador
+  `trg_appointments_proteger_borrado` (`cita_proteger_borrado()`,
+  `20261117120000`) da 42501 a todo rol salvo `postgres`/`supabase_admin`,
+  **también a `service_role`**. Un borrado de citas del servidor con v2
+  encendida falla; quien limpie citas (semilla, scripts) borra antes la fila de
+  `agenda_ajustes` o lo hace como `postgres`.
+* **Las columnas `reserva_*` de `appointments` sólo las escribe el servidor**
+  (`trg_appointments_proteger_reserva`, `20261117121000`): para todo rol que no
+  sea `service_role`/`postgres`/`supabase_admin`, al crear van todas NULL
+  (`reserva_reagendados` 0) y al editar no cambian, salvo vaciar
+  `reserva_telefono`/`reserva_correo`. El disparador lista las columnas **por
+  el prefijo**, así que una columna nueva `reserva_*` queda cerrada sola; si
+  lleva DEFAULT, **rompe el alta de citas con la sesión** (dale otro nombre o
+  añade la excepción en la función). Las funciones que las escriben son
+  INVOKER y las llama `service_role`; una SECURITY DEFINER de `postgres` se
+  saltaría el disparador sin que nadie lo note.
+* **El candado automático decide por el correo verificado; el teléfono, sólo
+  por el bloqueo manual** (`20261117130000`, decisión de Angel). «Una cita
+  activa», cancelaciones, inasistencias y el bloqueo automático cuentan por
+  `correo_hmac`; el teléfono no bloquea solo. En el enlace fijo la ficha del
+  correo se comprueba antes de leer nada de la persona, para que la respuesta
+  no dependa del teléfono. No vuelvas a contar por teléfono (dejaría
+  perjudicar a un tercero con su número). El bloqueo manual sí corta por
+  teléfono, también en el enlace de un solo uso (AG-DT-28).
+* **Los enlaces de reserva sólo los emite `reserva_enlace_emitir`** (sólo
+  `service_role`; `proteger_reserva_enlaces()` rechaza cualquier otro INSERT),
+  llamada con `createAdminClient()` desde `POST /api/agenda/enlaces` y filtrada
+  por la `clinica_id` de la sesión (`p_clinica_id`) y el actor (`p_actor`), tras
+  las mismas puertas de sesión, interruptor y permisos. Es una excepción
+  anotada a «sólo cliente de sesión» de `gestionServidor.ts`; leer, mostrar y
+  revocar siguen con la sesión. La base no conoce `RESERVA_SECRETO`: la única
+  garantía de que el hash lo calculó el servidor es que sólo el servidor
+  inserte.
+* **Quien reemplace `proteger_reserva_enlaces()` parte del cuerpo de
+  `20261117122000`** (md5 de `prosrc` `acd4128b…`), no del de D1: el de D1
+  deja insertar a la sesión.
 * **Correo:** todo el de la agenda pasa por `src/lib/correo/transporte.ts`
   (`EMAIL_TRANSPORT`; `captura` → Mailpit en local). No llames a Resend directo
   desde código nuevo (AG-DT-16).

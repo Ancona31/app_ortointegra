@@ -725,16 +725,20 @@ reducido.
 
 ## 7. Lo que le toca a Angel
 
-Al día con el cierre del proyecto (2026-11-12). Guía para levantarlo todo en
-local: `GUIA_AUDITORIA_AGENDA_V2.md`. Auditoría del conjunto de migraciones:
-`supabase/AUDITORIA-CONJUNTO-AGENDA-V2.md`. Lo que no se pudo probar: §10.
+Al día con la integración de las correcciones de seguridad (2026-11-12). Guía
+para levantarlo todo en local: `GUIA_AUDITORIA_AGENDA_V2.md`; **guía de
+pruebas a mano, paso a paso y sin código: `GUIA_PRUEBAS_AGENDA_V2.md`** (el
+Google simulado se arranca con un comando, `npx tsx
+scripts/google-falso-manual.ts`). Auditoría del conjunto de migraciones:
+`supabase/AUDITORIA-CONJUNTO-AGENDA-V2.md` (§8, las correcciones). Lo que no se
+pudo probar: §10.
 
 | Momento | Qué |
 |---|---|
 | Durante el proyecto | Nada obligatorio: los reportes de bloque son informativos |
-| Al final, en local | Auditar con lo que se entrega: el conjunto de 16 migraciones con sus auditorías (cabeceras y `supabase/AUDITORIA-CONJUNTO-AGENDA-V2.md`), datos inventados sembrados (`scripts/agenda-semilla.ts`), la guía corta, §6-bis y §10. Decidir las propuestas de dimensión nueva para `AUDITORIA-MIGRACIONES.md` (§6-bis, «Cierre del proyecto»; no se tocó el archivo) |
-| Decisiones pendientes | **F1.5** `COMPACTAR_AL_ABRIR` (`src/lib/agenda/ventanaRejilla.ts`, hoy `false`; ver §6-bis «F1.5»); **S3**: quedarse con la puerta que lee `pg_proc` (C1) o la copia con huella; las «NO aplicado, para revisar por Angel» de las auditorías de E1, E4, E6 y D11 (cabeceras y §6-bis); si E9 debe cerrar la clínica suspendida también dentro de la función (H4); el plazo de conservación del historial del candado (propuesto 12 meses) |
-| Antes de aplicar | `select version()` en producción (≥ 14). Comprobar que producción tiene las 5 migraciones de `main` y decidir el orden con `feature/limites-ajustables` (sus `20261014*` van antes por fecha; al fusionar las dos, añadir las 30 funciones cerradas del proyecto a la lista fija del caso 3 de `p1_permisos_funciones.sql`; el resto de `p1`, `p1b`, `p2` y `p3` pasan con el conjunto combinado: hallazgo H2 de la auditoría del conjunto) |
+| Al final, en local | Auditar con lo que se entrega: el conjunto de **20** migraciones (las 16 del cierre y las 4 de las correcciones) con sus auditorías (cabeceras y `supabase/AUDITORIA-CONJUNTO-AGENDA-V2.md`), datos inventados sembrados (`scripts/agenda-semilla.ts`), la guía corta, §6-bis y §10. Decidir las propuestas de dimensión nueva para `AUDITORIA-MIGRACIONES.md` (§6-bis, «Cierre del proyecto»; no se tocó el archivo) |
+| Decisiones pendientes | **La contradicción de los puntos 1 y 6** (el bloqueo manual por teléfono se nota desde el enlace; se dejó como pediste en el punto 2; alternativa: que mire sólo el correo; §6-bis «Integración…», AG-DT-28); **convertir en cita un evento nacido en Google** (§2 lo pide y no hay camino en la pantalla; AG-DT-29); AG-DT-26 (límite en las páginas públicas) y AG-DT-27 (todo el día en los avisos de empalme); **F1.5** `COMPACTAR_AL_ABRIR` (`src/lib/agenda/ventanaRejilla.ts`, hoy `false`; ver §6-bis «F1.5»); **S3**: quedarse con la puerta que lee `pg_proc` (C1) o la copia con huella; las «NO aplicado, para revisar por Angel» de las auditorías de E1, E4, E6 y D11 (cabeceras y §6-bis); si E9 debe cerrar la clínica suspendida también dentro de la función (H4); el plazo de conservación del historial del candado (propuesto 12 meses) |
+| Antes de aplicar | `select version()` en producción (≥ 14). Comprobar que producción tiene las 5 migraciones de `main` y decidir el orden con `feature/limites-ajustables` (sus `20261014*` van antes por fecha; al fusionar las dos, cambiar la lista fija del caso 3 de `p1_permisos_funciones.sql` por la de **41** funciones (las 10 de producción y 31 del proyecto, con `reserva_enlace_emitir`), que está escrita entera en la auditoría del conjunto §8.5; el resto de `p1`, `p1b`, `p2`, `p3` y las 21 pruebas del proyecto pasan con el conjunto combinado: hallazgos H2 e I1) |
 | Aplicar | **Antes de desplegar el código** (los dos órdenes son seguros, pero con el código primero cada petición deja un `warn` en el log: hallazgo H3). El conjunto, en orden de nombre de archivo, uno por uno, mirando la rejilla final de cada uno (todas las filas OK). Después, la línea `-- ESTADO · PRODUCCIÓN` de cada archivo con fecha y comprobación (`AUDITORIA-MIGRACIONES.md` §7) |
 | Vercel | Variables `RESERVA_SECRETO`, `EMAIL_TRANSPORT=resend`, `CRON_SECRET` (las tareas de `vercel.json` se activan con el despliegue y sin `CRON_SECRET` contestan 401); `AGENDA_RSVP_GOOGLE` sólo tras la prueba de RSVP |
 | Google real | Prueba con cuenta real: ida y vuelta (C), sincronización antes de reservar (D11), RSVP (E9). Cerrar o no LP-DT-6. Antes de encender: revisar el panel de auditoría (C-h, `user_id='system'`) |
@@ -2731,6 +2735,12 @@ tabla del plan, como ya decían las decisiones 1–7.
   instante; `modalSaliente` solo sostiene el pintado. Encenderla sin el cambio
   del modal lo dejaría montado 180 ms, sin animar y pulsable (un segundo
   «Guardar» crearía otra cita).
+  **⚠️ Corregido en la integración de las correcciones (2026-11-12): esta nota
+  es vieja.** La salida está **encendida**: `SALIDA_DEL_MODAL = true` en
+  `AgendaCliente.tsx` desde la fusión `8988f45`, con los cinco pasos de abajo
+  aplicados (`saliendo` en las props de `AppointmentModal`, `data-estado` en
+  velo y panel, `inert={saliendo}` en la raíz y `saliendo={modal.mode ===
+  'closed'}` en el JSX). Lo que sigue se queda como registro de cómo se hizo.
 
   **Lo que tiene que aplicar el agente de la superficie en
   `AppointmentModal.tsx`:**
@@ -3336,6 +3346,57 @@ Ninguna toca una policy existente, las puertas de suscripción ni una regla de
 - **Lo que no se pudo hacer sin pedir permiso:** nada; ningún punto obligó a
   cambiar una policy ni una regla de `CLAUDE.md`.
 
+### Integración de las correcciones de seguridad (2026-11-12)
+
+Las dos ramas (`feature/agenda-v2-seg1` y `-seg2`) fusionadas en
+`feature/agenda-v2` y probadas juntas desde cero. Auditoría del conjunto:
+`supabase/AUDITORIA-CONJUNTO-AGENDA-V2.md` §8 (las cuatro APTA; ningún objeto
+de `main` cambia; ninguna policy tocada). Lo que queda para Angel:
+
+- **⚠️ Para Angel: los puntos 1 y 6 de tu lista se contradicen en un caso, y
+  se dejó como pediste en el punto 2.** El punto 1 pide que el enlace no revele
+  nada de un teléfono; el 2 y el 6, que el bloqueo **manual** por teléfono
+  corte (también el enlace de un solo uso). Un rechazo que se decide por un
+  dato que nadie verifica lo ve quien lo manda: **desde el enlace se puede
+  saber si la clínica bloqueó A MANO un número con ese médico** (sale «Para
+  agendar, comunícate con el consultorio: {teléfono}.»). Ya **no** se puede
+  saber si un teléfono tiene cita ni historial: eso sólo lo decide el correo
+  verificado. Lo acotan los límites de intentos (6 reservas por red y 4 por
+  navegador cada hora) y, en el enlace fijo, que hace falta un correo
+  verificado propio. **Alternativa:** que el bloqueo manual mire sólo el
+  correo; entonces el teléfono no decidiría nada, y un contacto bloqueado
+  entraría con otro correo. `DEUDA_TECNICA.md` AG-DT-28.
+- **Hallazgo para Angel: no hay forma en la pantalla de convertir en cita un
+  evento nacido en Google.** §2 lo pide («convertibles en cita ligándolos a un
+  paciente»). Un evento importado entra como evento sin paciente; el modal
+  deduce el tipo de la fila al editar y no lo deja cambiar (decisión D5,
+  comentada en `AppointmentModal.tsx`: quitar o poner paciente por un selector
+  reabriría el borrado sin alerta), y
+  el panel de ligar (D7) sólo existe para las citas «Por ligar» de la reserva
+  por enlace. **Se dejó así** (la opción que menos cambia): hoy se borra el
+  evento y se agenda la cita, o se agenda encima. `DEUDA_TECNICA.md` AG-DT-29.
+- **Decisiones tomadas sin preguntar en la integración:**
+  - `seg1_candado_correo.sql` lleva un `grant` más (a su ayudante
+    `pg_temp.dia`): fallaba en la base combinada con
+    `feature/limites-ajustables` (hallazgo I1). Es la prueba, no la migración.
+  - **El hallazgo 2 del revisor** (siete funciones de `main` ejecutables por
+    PUBLIC en la base local de esta rama) **no se trató aquí**: no lo trae la
+    agenda, y es lo que corrige `feature/limites-ajustables` (I2).
+  - **Google simulado para las pruebas a mano:** pasa de un programa que la
+    guía hacía copiar a mano a `scripts/google-falso-manual.ts`, que además
+    arranca él mismo la app del 3002 (un comando en vez de dos terminales con
+    variables). Al cerrarlo con Ctrl+C borra la conexión y el estado de
+    sincronización, los eventos que entraron desde el Google falso y los
+    avisos de empalme de la sesión, y suelta del falso las citas que se le
+    mandaron (vuelven a `pending`). Lo hecho a mano en la agenda se queda, y la
+    auditoría no se toca. La limpieza al cerrar es asíncrona a propósito:
+    `npx tsx` remata al hijo con SIGKILL si en 30 ms no le contesta (comentado
+    en el archivo).
+  - **SEG-A5 de la guía estaba mal:** decía que dentro de la agenda un evento
+    de todo el día da un aviso de empalme. No lo da, ni antes ni ahora
+    (`empalmesServidor.ts` filtra `all_day = false`): la cita se guarda sin
+    aviso. Se corrigió la guía; el código no cambió.
+
 ---
 
 ## 8. Sin verificar — comprobar antes de apoyarse en ello
@@ -3847,6 +3908,39 @@ primero sin marcar.
     clínica); e2e `reserva-seg1.e2e.ts` (nueva) y `reserva-candado.e2e.ts`
     (invertida la de «sólo por teléfono»). `reserva-carrera.sh` en verde.
 
+- [x] Integración de las correcciones de seguridad (2026-11-12; worktree
+  `~/proyectos/app_ortointegra-agenda`, rama `feature/agenda-v2`, sobre la
+  fusión `0dbfbd9` de seg1 y seg2). Decisiones en §6-bis, «Integración de las
+  correcciones de seguridad»; auditoría en
+  `supabase/AUDITORIA-CONJUNTO-AGENDA-V2.md` §8.
+  - **Paso 1 · la fusión:** build limpio, lint 96 errores (sin subir), Vitest
+    1701 en 113 archivos, SQL 21 de 21 en verde. Nada que arreglar: con las dos
+    migraciones juntas no quedó ningún rojo.
+  - **Paso 2 · desde cero** (CLI 2.117.0; antes, sin imprimir secretos:
+    `NEXT_PUBLIC_SUPABASE_URL` local, sin `project-ref`, sin variables
+    `SUPABASE_*`/`PG*`): 25 migraciones (5 de `main` + 20 del proyecto) en
+    orden, sin un fallo, 28 s; semilla 1.3 s. SQL 21 y Vitest 1701 en verde;
+    Playwright completo contra `next start` :3001: **252 pasan, 0 fallan**
+    (escritorio 212, teléfono 37, tableta 3; 219 saltadas), 7.5 min, con las
+    e2e del Google falso (`agenda-google-dos-sentidos`, `reserva-google`),
+    `seguridad-postgrest` y `reserva-seg1` dentro. `reserva-carrera.sh` en
+    verde y su control sin candado (la copia de la función sin la línea del
+    candado, hecha del cuerpo vigente) reserva las dos: la garantía atómica
+    sigue. `confirmacion-carrera.sh` en verde.
+  - **Paso 3 · auditoría del conjunto** (commit `39ebe2f`): las cuatro APTA, 0
+    objetos de `main` cambiados, ninguna policy tocada; base combinada con
+    `feature/limites-ajustables` (28 migraciones) con la lista de 41 para el
+    caso 3 de `p1`. Hallazgo I1: `seg1_candado_correo.sql` en rojo sólo en la
+    base combinada (ayudante de `pg_temp` sin `grant`); arreglado, y en rojo sin
+    el arreglo. Revisor en Sonnet en paralelo: mismos veredictos; su hallazgo 2
+    (PUBLIC en funciones de `main` en la base local) no es de la agenda (I2).
+  - **Paso 4 · documentos:** §6-bis (contradicción de los puntos 1 y 6,
+    convertir en cita un evento de Google, la nota vieja de
+    `SALIDA_DEL_MODAL`), §7, este punto, §10, `CLAUDE.md` (sección «Agenda
+    v2», sólo ampliada) y `DEUDA_TECNICA.md` AG-DT-29.
+  - **Paso 5 · guía de pruebas a mano y Google simulado:** ver la entrada de
+    la bitácora y el commit del paso.
+
 **Bitácora** (una línea por sesión: fecha, qué quedó hecho, qué quedó a medias):
 
 - 2026-11-10/11 — Rama y worktree creados; A0 cerrado (sembrador, red e2e
@@ -3873,6 +3967,12 @@ primero sin marcar.
 - 2026-11-12 — Correcciones de seguridad en la base (3, 4 y 7a): tres
   migraciones locales con auditoría APTA, la ruta de alta de enlaces por el
   servidor, H1 corregido en la auditoría del conjunto. Nada a medias.
+- 2026-11-12 — Integración de seg1 y seg2: fusión verificada, conjunto de 20
+  migraciones desde cero y en verde (252 e2e, 1701 Vitest, 21 SQL, carreras),
+  auditoría del conjunto §8 con la base combinada, documentos, el Google
+  simulado como script del repo y la guía de pruebas a mano seguida comando
+  por comando. Para Angel: la contradicción de los puntos 1 y 6 y AG-DT-29.
+  Nada a medias.
 
 ---
 
@@ -3957,3 +4057,29 @@ contra producción, Google real, correo real ni Vercel).
 - La batería A1-bis instrumentada (`e2e/playwright.a1bis.config.ts`) no se
   volvió a correr tras F.
 - F1.5 («Compactar» al abrir) con datos de una clínica real.
+
+**Correcciones de seguridad (seg1 y seg2, integradas el 2026-11-12)**
+- **El tiempo de respuesta del enlace** con teléfonos distintos (punto 1): se
+  igualó el TRABAJO de la base (mismos contadores de `pg_stat_xact_user_tables`
+  con un teléfono con historial, uno bloqueado a mano y uno limpio), no se midió
+  el tiempo con la red, Vercel y Supabase reales.
+- **Los tres disparadores con los roles de producción:** en local, `postgres`
+  y `supabase_admin` pasan los tres, y `service_role` el de columnas y el de
+  enlaces pero no el de borrado. Que el
+  SQL Editor de producción corra como `postgres` (y por eso pase) no se vio.
+  Tampoco con la credencial propia de `spinus-consola`, que no escribe en
+  `appointments` según su contrato; si algún día lo hiciera, el disparador de
+  borrado y el de columnas la rechazarían.
+- **El nombre de quien reserva en el título de Google real** (punto 7b): sólo
+  se vio con el Google simulado; cómo lo pinta Google en la web y en el
+  teléfono, no.
+- **El tope de sincronizaciones por clínica** (punto 8, 60 cada 10 min) con
+  tráfico real: sólo con Vitest y las e2e de D11.
+- **El conjunto combinado con `feature/limites-ajustables` en producción:** en
+  local aplica y pasa con la lista de 41 en `p1`; el orden real en producción
+  lo decide Angel (§7).
+- **La guía de pruebas a mano:** el integrador siguió la preparación (P1–P11)
+  comando por comando sobre una base recién reiniciada, ejecutó los comandos
+  de SEG-A3, SEG-A4 y SEG-A7 y probó cada orden del Google simulado contra la
+  app del 3002; las pruebas de pantalla (A a F, X) no las recorrió con un
+  navegador: las cubre la batería de Playwright.

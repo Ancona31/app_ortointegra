@@ -3964,6 +3964,23 @@ alternativa es que el bloqueo manual mire sólo el correo. Decide Angel
 (`mejora_agendaV2.md` §6-bis, «Correcciones de seguridad tras la revisión
 independiente»).
 
+### AG-DT-29 — Un evento nacido en Google no se puede convertir en cita desde la pantalla
+
+**Estado:** 🟡 abierta (integración de las correcciones, 2026-11-12) · §2 del
+plan dice que los eventos creados en Google entran a Spinus «editables desde
+Spinus (título, hora, observaciones, cancelar) y **convertibles en cita**
+ligándolos a un paciente». Lo primero está; lo segundo no tiene camino: el
+evento importado entra sin paciente, `AppointmentModal.tsx` deduce el tipo
+(cita o evento) de la fila al editar y no deja cambiarlo (decisión D5,
+comentada allí: un selector mutable reabriría el borrado de la cita sin
+alerta), y el panel de ligar (`PanelLigarCita`, D7) sólo existe para las citas
+«Por ligar» de la reserva por enlace. Hoy, para tener la cita, se borra el
+evento y se agenda la cita aparte. Cerrarlo pide decidir el gesto (un «Ligar a
+un paciente» en la tarjeta de un evento con `origen = 'google'`, reutilizando
+el buscador del panel de ligar) y qué pasa con el título que viene de Google
+(con paciente, Google ya no puede cambiarlo, C4). Decide Angel
+(`mejora_agendaV2.md` §6-bis, «Integración de las correcciones de seguridad»).
+
 ---
 
 ## Latencia de `/agenda` — investigación y tanda de arreglos (2026-08-31)
