@@ -3073,6 +3073,163 @@ Detalle en `supabase/AUDITORIA-CONJUNTO-AGENDA-V2.md`. Resumen:
   - **Pruebas que fijan listas textuales del catálogo.** Correr las pruebas de
     las dos ramas sobre la base combinada.
 
+### Correcciones de seguridad tras la revisión independiente (decisiones de Angel)
+
+Rama `feature/agenda-v2-seg1` (worktree `~/proyectos/app_ortointegra-agenda-b56`).
+Otro agente lleva en `feature/agenda-v2-seg2` el resto de la lista (borrado de
+citas, columnas `reserva_*`, emisión de enlaces). Lo que pidió Angel, literal,
+de lo que toca aquí:
+
+> «1. El enlace de reserva no debe revelar nada sobre un teléfono. Hoy el correo
+> se verifica con código y el teléfono no, y la respuesta cambia según el
+> teléfono (409 ya_tiene_cita, 403 bloqueado): quien tenga el enlace puede
+> averiguar si un número tiene cita o historial con ese médico. La respuesta y
+> su tiempo no deben distinguir por teléfono. Solo el correo verificado puede
+> recibir un mensaje específico.
+> 2. Nadie debe poder perjudicar a un tercero usando su teléfono. Hoy se puede
+> reservar con el teléfono de otra persona, dejarla con "ya tiene cita" y
+> cargarle cancelaciones. Las decisiones automáticas del candado (cita activa,
+> cancelaciones, bloqueo automático) se basan en el correo verificado. El
+> teléfono queda como dato visible para la clínica y para el bloqueo MANUAL,
+> pero no bloquea solo. Anota en 6-bis que esto debilita el candado frente a
+> quien cambie de correo, y que es decisión mía.
+> 5. Eventos de todo el día. Un evento de todo el día del médico (vacaciones,
+> congreso) SÍ debe bloquear esos días en el enlace de reserva. Dentro de la
+> agenda no cambia nada: ahí el empalme solo alerta.
+> 6. Enlaces de un solo uso. Se siguen saltando los límites automáticos, pero
+> NO el bloqueo manual: a un contacto que la clínica bloqueó a mano no le sirve
+> ningún enlace.
+> 7. Comprueba y, si aplica, corrige: […] que el nombre que escribe quien
+> reserva no pueda meter texto engañoso en el título del evento de Google
+> (límite de longitud razonable y sin URLs).
+> 8. Menores, solo si son baratos; si no, a DEUDA_TECNICA.md: poner el límite
+> de peticiones ANTES de la consulta a la base en las rutas públicas, y un tope
+> por clínica a las sincronizaciones con Google que dispara el tráfico
+> público.»
+
+**Migración** `20261117130000_agenda_seg1_candado_correo.sql` (sólo `CREATE OR
+REPLACE` de `reserva_contacto_estado`, `reserva_ocupacion` y
+`reservar_por_enlace`, con el pre-vuelo por md5 de D4; ninguna tabla, dato ni
+policy). Prueba: `supabase/pruebas-sql/seg1_candado_correo.sql`.
+
+**1 · El enlace no revela nada de un teléfono.**
+- **Lo que había:** en el enlace fijo, con SU PROPIO correo verificado,
+  cualquiera escribía el teléfono de otro y leía `ya_tiene_cita` (409) o
+  `autoservicio_cerrado` (403). Y aun SIN ficha, la RPC leía el estado del
+  contacto (por teléfono) antes de mirar la verificación: el trabajo variaba
+  con el teléfono (medido: una fila más de `reserva_contactos` para un número
+  bloqueado a mano). En el único, el candado no se miraba, pero el estado sí.
+  `/codigo`, `/verificar` y `/turnos` no reciben teléfono; la gestión de E
+  (confirmar, cancelar, reagendar) no mira el candado salvo el reagendar, que
+  pasa por `reservar_por_enlace`.
+- **Cómo quedó:** en el fijo la ficha del correo se comprueba ANTES de leer
+  nada de la persona; lo automático pasa a decidir por el correo (punto 2).
+  Se igualó el TRABAJO, no se añadió relleno de tiempo: sin ficha, los tres
+  teléfonos de la prueba (con historial, bloqueado a mano, limpio) dan la
+  misma respuesta y los mismos contadores de `pg_stat_xact_user_tables` (ni se
+  leen incidencias ni contactos). Con el correo verificado, el teléfono ya no
+  cambia nada de lo automático.
+- **Mensaje específico:** la opción que menos cambia: los mismos mensajes de
+  siempre en la respuesta (no se añadió un canal por correo), que ahora sólo
+  pueden depender del correo verificado de esa sesión (`ya_tiene_cita` y el
+  bloqueo automático sólo existen en el fijo, después de la ficha). Ningún
+  texto visible cambió.
+- **⚠️ La única excepción, inevitable, para que decida Angel:** el bloqueo
+  MANUAL por teléfono corta (puntos 2 y 6 lo piden), y cualquier rechazo que
+  se base en un dato no verificado lo ve quien lo manda. Quien tenga el enlace
+  puede saber si la clínica bloqueó A MANO un número con ese médico (sale el
+  mismo 403 «Para agendar, comunícate con el consultorio» que cualquier
+  bloqueo; acotado a 6 por IP y 4 por dispositivo por hora, y en el fijo con
+  un correo verificado propio). Ya no se puede saber si tiene cita ni
+  historial. **Alternativa:** que el bloqueo manual también mire sólo el
+  correo (el teléfono no decidiría nada; un contacto bloqueado entraría con
+  otro correo). En el único, un bloqueo manual por correo se dice a quien usa
+  el enlace sin que ese correo esté verificado; el único lo emite la clínica a
+  una persona, y se acepta. Anotado en `DEUDA_TECNICA.md` AG-DT-28.
+
+**2 · Nadie perjudica a un tercero con su teléfono.**
+- `reserva_contacto_estado`: las incidencias (cancelaciones y `no_show`)
+  cuentan SÓLO por `correo_hmac`, y el desbloqueo que las descuenta es el del
+  correo (`reserva_contacto_marcar` desbloquea las dos claves, así que en la
+  práctica es el mismo). `manual` sigue mirando teléfono y correo. «1 activa»
+  sólo por `reserva_correo_hmac`. `tel_hmac` se sigue guardando en citas e
+  incidencias (COMMENT de `reserva_incidencias`) y el teléfono se sigue viendo
+  en la cita.
+- **Decisión sin regla previa:** lo que ve la clínica (la instantánea
+  «Por ligar · N», el historial EN VIVO del modal y la lista de bloqueados)
+  también cuenta por correo: lee la misma función, y contar ahí por teléfono
+  dejaría a un tercero manchar el historial de otro y empujar a la clínica a
+  un bloqueo manual.
+- **Esto debilita el candado frente a quien cambie de correo; decisión de
+  Angel.** Quien cancela tres veces y vuelve con otro correo (y el mismo
+  teléfono) reserva otra vez; sólo lo para el bloqueo manual.
+- Pruebas que cambiaron con la decisión: `d2_candado_reserva.sql` caso 4
+  (coincidir sólo por teléfono ya no bloquea), `d3_reservar_por_enlace.sql`
+  caso 5 (el único con bloqueo manual), y la e2e de D10
+  `reserva-candado.e2e.ts` «coincidir sólo por el teléfono» (ahora ya NO
+  bloquea; por el correo, sí).
+
+**5 · Todo el día ocupa en el enlace.**
+- `reserva_ocupacion` y el empalme de `reservar_por_enlace` ya no excluyen
+  `all_day`. P3 sigue: `cancelled` y `no_show` no ocupan. Las puntas de una
+  fila de todo el día son las medianoches de la zona de SU consultorio
+  (`appointments_all_day_medianoche_check`), así que tapan esos días enteros;
+  `turnosReserva.ts` no cambia (ya recortaba al día). Vale igual para lo
+  importado de Google.
+- **Resto conocido:** con consultorios del médico en zonas distintas, los
+  bordes del día son los de la zona del evento, no los del consultorio que se
+  reserva (una hora o dos al principio o al final del día). La agenda interna
+  no cambia (`empalmesServidor.ts` sigue con `all_day = false`).
+- **Sin cambiar** (la opción que menos cambia): el aviso de empalmes de D11
+  (`reserva_empalmes_registrar`) sigue sin contar un evento de todo el día:
+  unas vacaciones puestas en Google encima de una reserva ya hecha no avisan a
+  la clínica. `DEUDA_TECNICA.md` AG-DT-27.
+- `d3_reservar_por_enlace.sql` caso 6 pasaba con «todo el día no ocupa»: ahora
+  espera `ocupado`, y el evento se movió a un día lejos de los demás turnos
+  (en el día de antes, según la hora a la que corriera la prueba, habría
+  tapado otros casos).
+
+**6 · El único respeta el bloqueo manual.** `bloqueado` = manual (teléfono o
+correo; en los dos enlaces) o automático por correo (sólo en el fijo). El
+único se sigue saltando lo automático y «1 activa» (§2).
+
+**7b · El nombre en el título de Google.** `ReservarSchema.nombre`
+(`esquemasReserva.ts`): 80 caracteres como máximo (antes 120: un nombre con
+dos apellidos rara vez pasa de 60, y 120 daba sitio a una frase), sin
+caracteres de control, de formato (`\p{Cf}`: RTL override, ancho cero) ni
+separadores de línea, y sin URLs ni dominios (`://`, `www.` o letra/dígito +
+punto + dos letras seguidas). El mismo 400 `solicitud_invalida`. La casilla de
+la página baja a `maxLength={80}`. «Ma.Guadalupe» (sin espacio) se rechaza: se
+acepta. **No** se rechazan dígitos: «llame al 55…» cabe en 80 caracteres;
+rechazarlos es una línea si Angel lo quiere. S1 no cambia: la descripción del
+evento de una reserva no lleva observaciones. La base no repite la regla
+(`reservar_por_enlace` sólo mira ≤ 120; sólo la llama `service_role`).
+
+**8 · Menores (los dos, baratos):**
+- **Límite antes de la base.** `codigoAbrible()` (`puertaReserva.ts`: secreto,
+  forma del código y aviso publicable, sin base) → límites de red (IP y
+  dispositivo) → `reserva_contexto`. Los que necesitan el enlace o el correo
+  (tope de 30 al día del fijo, 3 por correo y hora del código) van después de
+  abrirlo, para que un código inventado no deje una fila por cada correo. Así
+  en `/api/reservar/[codigo]`, `…/turnos`, `…/codigo` y `…/verificar`, y en
+  `/api/confirmar/[codigo]` (IP antes de `cita_confirmacion_contexto`; el
+  límite por enlace después). **Cambia una decisión de E3**, que ponía el
+  contexto antes de los límites para que un código inventado no dejara filas:
+  ahora deja, a lo sumo, la de su IP (una por IP, no una por código). Los
+  sujetos de una misma fase siguen contando en paralelo.
+- **Sin hacer** (contradice E3, «ni límites por GET»): las PÁGINAS
+  `/reservar/[codigo]` y `/confirmar/[codigo]` siguen leyendo el contexto sin
+  límite. `DEUDA_TECNICA.md` AG-DT-26.
+- **Tope por clínica de las pasadas con Google del POST público**
+  (`sincronizarReserva.ts`, `LIMITES.sincronizar`: 60 cada 10 min por clínica,
+  llave `reserva:sincronizar:clinica:<sha256>`): se pregunta UNA vez por
+  petición (la espera del candado no lo vuelve a contar) y sólo si la clínica
+  tiene Google. Pasado, no se llama a Google y decide la ventana de 30 min de
+  D11, como cuando Google falla. El GET no lo necesita: lo acota ya el mínimo
+  de 60 s de `gcal_sync_tomar`. Un fallo al consultar el tope cuenta como sin
+  cupo (cerrado) y también decide la ventana. Los cuatro casos de D11 siguen
+  en verde (`reserva-google.e2e.ts`).
+
 ---
 
 ## 8. Sin verificar — comprobar antes de apoyarse en ello
@@ -3520,6 +3677,23 @@ primero sin marcar.
     AG-DT-13 a AG-DT-25 con lo que queda abierto.
   - Push: lo hace el coordinador.
 
+- [x] seg1 — Correcciones de seguridad del enlace de reserva tras la revisión
+  independiente (decisiones de Angel, 2026-11-12; rama `feature/agenda-v2-seg1`,
+  worktree `~/proyectos/app_ortointegra-agenda-b56`; puntos 1, 2, 5, 6, 7b y 8)
+  - Decisiones: §6-bis «Correcciones de seguridad tras la revisión
+    independiente (decisiones de Angel)».
+  - Migración (sólo local): `20261117130000` seg1 (`reserva_contacto_estado`,
+    `reserva_ocupacion`, `reservar_por_enlace`), con auditoría independiente
+    (cabecera).
+  - Pruebas: `seg1_candado_correo.sql` (casos 1-6, cada uno en rojo con su
+    mutación: estado antes de la ficha, incidencias o «1 activa» por teléfono,
+    único sin bloqueo manual, todo el día fuera del empalme o de la
+    ocupación); `d2` caso 4 y `d3` casos 5 y 6 ajustados a la decisión; Vitest
+    `esquemasReserva` (nombre), `reservarRutasLimites` (orden límite → base,
+    nuevo), `confirmarRuta`, `sincronizarReserva` y `limitesReserva` (tope por
+    clínica); e2e `reserva-seg1.e2e.ts` (nueva) y `reserva-candado.e2e.ts`
+    (invertida la de «sólo por teléfono»). `reserva-carrera.sh` en verde.
+
 **Bitácora** (una línea por sesión: fecha, qué quedó hecho, qué quedó a medias):
 
 - 2026-11-10/11 — Rama y worktree creados; A0 cerrado (sembrador, red e2e
@@ -3540,6 +3714,9 @@ primero sin marcar.
   CON CAMBIOS, aplicados) y del conjunto (APTO, con notas para Angel);
   tolerancia a producción comprobada sin las tablas; guía, §7, §10,
   `CLAUDE.md` y `DEUDA_TECNICA.md`. Lo siguiente es de Angel (§7).
+- 2026-11-12 — seg1: correcciones de seguridad del enlace de reserva (puntos 1,
+  2, 5, 6, 7b y 8 de Angel), migración `20261117130000` y pruebas. Para Angel:
+  la excepción del bloqueo manual por teléfono (§6-bis) y AG-DT-26 a AG-DT-28.
 
 ---
 
