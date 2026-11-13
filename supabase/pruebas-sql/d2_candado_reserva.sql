@@ -137,12 +137,16 @@ end $$;
 update public.reserva_incidencias set created_at = now() - interval '10 days'
  where appointment_id = '00000000-0000-4000-8000-000000d2d001';
 
--- Caso 4: basta coincidir sólo por teléfono o sólo por correo; otro médico no hereda.
+-- Caso 4: basta coincidir sólo por correo; otro médico no hereda.
+-- seg1 (decisión de Angel, 20261117130000): lo automático cuenta SÓLO por el
+-- correo; coincidir sólo por el teléfono ya no bloquea (antes, sí).
 do $$
 begin
-  if not (select bloqueado from pg_temp.estado('00000000-0000-4000-8000-000000d2b001', '5500000001', 'otro-correo'))
-     or not (select bloqueado from pg_temp.estado('00000000-0000-4000-8000-000000d2b001', '5599999999', 'p')) then
-    raise exception 'D2 caso 4: coincidir por un solo dato no bastó';
+  if not (select bloqueado from pg_temp.estado('00000000-0000-4000-8000-000000d2b001', '5599999999', 'p')) then
+    raise exception 'D2 caso 4: coincidir sólo por el correo no bastó';
+  end if;
+  if (select bloqueado from pg_temp.estado('00000000-0000-4000-8000-000000d2b001', '5500000001', 'otro-correo')) then
+    raise exception 'D2 caso 4: coincidir sólo por el teléfono bloqueó (seg1: lo automático es por correo)';
   end if;
   if (select bloqueado from pg_temp.estado('00000000-0000-4000-8000-000000d2b001', '5599999999', 'otro-correo')) then
     raise exception 'D2 caso 4: un contacto sin relación quedó bloqueado';
