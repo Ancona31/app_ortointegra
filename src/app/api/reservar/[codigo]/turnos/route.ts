@@ -6,7 +6,9 @@
  * otras citas (la RPC de ocupación sólo da puntas). Consultorio y tipo tienen
  * que ser del enlace: uno de otra clínica o de otro médico es 400.
  * 404 uniforme para cualquier enlace que no abre; 410 si el único se usó o
- * caducó; 429 al pasar el límite por IP.
+ * caducó; 429 al pasar el límite por IP. seg1 (punto 8): el límite va ANTES
+ * de la primera consulta a la base (`reserva_contexto`); un código sin forma
+ * sigue siendo 404 sin tocar la base.
  * D11 (decisión de Angel): antes de leer la ocupación, la sincronización
  * incremental con Google si la última buena tiene más de 60 s
  * (`sincronizarAntesDeReservar`). Si Google falla o tarda y la última buena
@@ -14,7 +16,7 @@
  */
 import type { NextRequest } from 'next/server'
 import { TurnosQuerySchema } from '@/lib/reserva/esquemasReserva'
-import { abrirEnlace, noEncontrado, responder, respuestaEstado, telefonoDeContacto } from '@/lib/reserva/puertaReserva'
+import { abrirEnlace, codigoAbrible, noEncontrado, responder, respuestaEstado, telefonoDeContacto } from '@/lib/reserva/puertaReserva'
 import { respuestaNoPorAhora } from '@/lib/reserva/respuestasReserva'
 import { sincronizarAntesDeReservar } from '@/lib/reserva/sincronizarReserva'
 import { ocupacionDeEnlace } from '@/lib/reserva/servidorReserva'
@@ -25,6 +27,10 @@ export const dynamic = 'force-dynamic'
 
 export async function GET(req: NextRequest, ctx: RouteContext<'/api/reservar/[codigo]/turnos'>) {
   const { codigo } = await ctx.params
+  if (!codigoAbrible(codigo)) return noEncontrado()
+  if (!(await dentroDeLimites('turnos', { ip: seudonimoRed('ip', ipDe(req.headers)) }))) {
+    return responder({ status: 429, cuerpo: { error: 'demasiados_intentos' } })
+  }
   const enlace = await abrirEnlace(codigo)
   if (!enlace) return noEncontrado()
   const estado = respuestaEstado(enlace.ctx)
@@ -35,10 +41,6 @@ export async function GET(req: NextRequest, ctx: RouteContext<'/api/reservar/[co
   const consultorio = enlace.ctx.consultorios.find(c => c.id === q.data.consultorio)
   const tipo = enlace.ctx.tipos.find(t => t.id === q.data.tipo)
   if (!consultorio || !tipo) return responder({ status: 400, cuerpo: { error: 'consultorio_o_tipo_invalido' } })
-
-  if (!(await dentroDeLimites('turnos', { ip: seudonimoRed('ip', ipDe(req.headers)) }))) {
-    return responder({ status: 429, cuerpo: { error: 'demasiados_intentos' } })
-  }
 
   const ahora = new Date()
   const reglas = reglasDe(consultorio, enlace.ctx.clinica?.horario, tipo.duracion_min, enlace.ctx.ajustes)

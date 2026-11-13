@@ -10,9 +10,13 @@
  *   1. `Origin` (o, sin él, `Sec-Fetch-Site: same-origin`) del propio host: 403;
  *   2. forma del código: 404 sin tocar la base;
  *   3. `accion` ∈ {confirmar, cancelar} del formulario: 400;
+ *   3-bis. seg1 (punto 8): límite por IP (30 cada hora) ANTES de la primera
+ *      consulta a la base: 303 a `?r=limite`. (E3 lo ponía después del
+ *      contexto para que un código inventado no dejara filas; ahora deja, a
+ *      lo sumo, la de su IP, una por IP y no una por código.)
  *   4. `cita_confirmacion_contexto` (STABLE): 404 si no hay enlace vigente
  *      (revocado, apagado, suspendida, paciente cambiado, RPC ausente…);
- *   5. límites (10 por enlace y 30 por IP cada hora): 303 a `?r=limite`;
+ *   5. límite por enlace (10 cada hora): 303 a `?r=limite`;
  *   6. `cita_confirmacion_responder`: la base decide transiciones y plazos
  *      (cancelar hasta T−1h estricto) bajo sus candados, y audita con
  *      `via='enlace_paciente'`; `invalido` o un fallo: 404;
@@ -73,10 +77,10 @@ export async function POST(req: NextRequest, rctx: RouteContext<'/api/confirmar/
   const accion = await accionDe(req)
   if (!accion) return vacia(400)
 
+  if (!(await dentroDeLimites('confirmar', { ip: seudonimoRed('ip', ipDe(req.headers)) }))) return volver(req, codigo, 'limite')
   const ctx = await resolverEnlaceConfirmacion(codigo)
   if (!ctx) return vacia(404)
-  const pasa = await dentroDeLimites('confirmar', { ip: seudonimoRed('ip', ipDe(req.headers)), enlace: ctx.codigo_hash })
-  if (!pasa) return volver(req, codigo, 'limite')
+  if (!(await dentroDeLimites('confirmar', { enlace: ctx.codigo_hash }))) return volver(req, codigo, 'limite')
 
   const r = await responderEnlaceConfirmacion(ctx, accion)
   if (!r || r.r_resultado === 'invalido') return vacia(404)

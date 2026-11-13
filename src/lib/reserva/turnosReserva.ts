@@ -9,9 +9,12 @@
  *   · paso y tamaño: la duración del tipo de cita (P9), desde el inicio de
  *     cada hueco;
  *   · anticipación mínima y horizonte: los de `agenda_ajustes`;
- *   · ocupación (P3): `reserva_ocupacion` ya quita `cancelled`, `no_show` y
- *     todo el día; llega sin estado (`status: null`), así que aquí todo ocupa
- *     y `turnosAgenda.citaOcupa` (que cuenta `no_show`) no cambia nada.
+ *   · ocupación (P3): `reserva_ocupacion` ya quita `cancelled` y `no_show`;
+ *     llega sin estado (`status: null`) y sin `all_day`, así que aquí todo
+ *     ocupa y `turnosAgenda.citaOcupa` (que cuenta `no_show`) no cambia nada.
+ *     seg1 (punto 5): un evento de TODO EL DÍA del médico sí llega (sus puntas
+ *     son las medianoches de su zona) y tapa esos días enteros; en la agenda
+ *     interna no cambia nada (ahí el empalme sólo alerta).
  *
  * `turnoOfrecido` es el CONVENIO que pide el COMMENT de
  * `reservar_por_enlace` (D3): la base no conoce el horario ni la alineación;

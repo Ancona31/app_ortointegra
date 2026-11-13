@@ -2,9 +2,11 @@
  * POST /api/reservar/[codigo] — reservar un turno por enlace (agenda D5).
  *
  * Pública y sin sesión. El orden importa y es éste:
+ *   0. seg1 (punto 8): forma del código sin tocar la base (404) y límites por
+ *      IP y dispositivo (429) ANTES de la primera consulta a la base;
  *   1. puerta común (404 uniforme); usado o caducado lo dice la RPC (410);
  *   2. forma del cuerpo (400) y casilla del aviso (`acepta_aviso: true`);
- *   3. límites por IP, dispositivo y enlace fijo (429);
+ *   3. límite por enlace fijo (429; necesita saber la clase del enlace);
  *   4. teléfono de México y correo con forma (400);
  *   5. consultorio y tipo del enlace (400);
  *   6. CONVENIO DE D3: `inicio` tiene que ser un turno ofrecido —horario del
@@ -26,7 +28,7 @@ import { cookies } from 'next/headers'
 import { after, type NextRequest } from 'next/server'
 import { ReservarSchema } from '@/lib/reserva/esquemasReserva'
 import {
-  abrirEnlace, cuerpoJson, noEncontrado, nombreDelMedico, responder, telefonoDeContacto,
+  abrirEnlace, codigoAbrible, cuerpoJson, noEncontrado, nombreDelMedico, responder, telefonoDeContacto,
 } from '@/lib/reserva/puertaReserva'
 import { ocupacionDeEnlace, reagendar, reservar } from '@/lib/reserva/servidorReserva'
 import {
@@ -48,6 +50,14 @@ const MAL = (error: string) => responder({ status: 400, cuerpo: { error } })
 
 export async function POST(req: NextRequest, rctx: RouteContext<'/api/reservar/[codigo]'>) {
   const { codigo } = await rctx.params
+  if (!codigoAbrible(codigo)) return noEncontrado()
+  const almacen = await cookies()
+  const disp = dispositivoDe(almacen.get(COOKIE_DISPOSITIVO)?.value)
+  if (disp.nuevo) almacen.set(COOKIE_DISPOSITIVO, disp.id, OPCIONES_COOKIE)
+  if (!(await dentroDeLimites('reservar', { ip: seudonimoRed('ip', ipDe(req.headers)), disp: seudonimoRed('disp', disp.id) }))) {
+    return responder({ status: 429, cuerpo: { error: 'demasiados_intentos' } })
+  }
+
   const enlace = await abrirEnlace(codigo)
   if (!enlace) return noEncontrado()
   // Un único usado o caducado NO se corta aquí: lo dice la RPC (410), que
@@ -58,15 +68,9 @@ export async function POST(req: NextRequest, rctx: RouteContext<'/api/reservar/[
   const cuerpo = ReservarSchema.safeParse(await cuerpoJson(req))
   if (!cuerpo.success) return MAL('solicitud_invalida')
   const b = cuerpo.data
-
-  const almacen = await cookies()
-  const disp = dispositivoDe(almacen.get(COOKIE_DISPOSITIVO)?.value)
-  if (disp.nuevo) almacen.set(COOKIE_DISPOSITIVO, disp.id, OPCIONES_COOKIE)
-  const pasa = await dentroDeLimites('reservar', {
-    ip: seudonimoRed('ip', ipDe(req.headers)), disp: seudonimoRed('disp', disp.id),
-    enlace: ctx.clase === 'fijo' ? codigoHash : undefined,
-  })
-  if (!pasa) return responder({ status: 429, cuerpo: { error: 'demasiados_intentos' } })
+  if (ctx.clase === 'fijo' && !(await dentroDeLimites('reservar', { enlace: codigoHash }))) {
+    return responder({ status: 429, cuerpo: { error: 'demasiados_intentos' } })
+  }
 
   const telefono = normalizarTelefonoMx(b.telefono)
   const correoLlave = normalizarCorreo(b.correo)

@@ -16,15 +16,18 @@
  *
  * Falla CERRADO: si la RPC falla, cuenta como bloqueado (429).
  */
-import { randomBytes } from 'node:crypto'
+import { createHash, randomBytes } from 'node:crypto'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { logger } from '@/lib/logger'
 import { hmacRed } from '@/lib/reserva/secretos'
 
-/** `confirmar`: el POST del enlace de confirmación de una cita (agenda E3), con el hash de SU código como `enlace`. */
-export type Accion = 'turnos' | 'codigo' | 'verificar' | 'reservar' | 'confirmar'
-export type Sujeto = 'ip' | 'disp' | 'correo' | 'enlace'
-const SUJETOS: readonly Sujeto[] = ['ip', 'disp', 'correo', 'enlace']
+/**
+ * `confirmar`: el POST del enlace de confirmación de una cita (agenda E3), con el hash de SU código como `enlace`.
+ * `sincronizar` (seg1, punto 8): las pasadas con Google que dispara el POST público de reservar (D11), por clínica.
+ */
+export type Accion = 'turnos' | 'codigo' | 'verificar' | 'reservar' | 'confirmar' | 'sincronizar'
+export type Sujeto = 'ip' | 'disp' | 'correo' | 'enlace' | 'clinica'
+const SUJETOS: readonly Sujeto[] = ['ip', 'disp', 'correo', 'enlace', 'clinica']
 
 /** Límite y ventana, en minutos. Lista A, 13 (tabla de D5). */
 export const LIMITES: Readonly<Record<Accion, Partial<Record<Sujeto, readonly [number, number]>>>> = {
@@ -34,6 +37,10 @@ export const LIMITES: Readonly<Record<Accion, Partial<Record<Sujeto, readonly [n
   reservar: { ip: [6, 60], disp: [4, 60], enlace: [30, 1440] },
   // E3 (plan_E): 10 por enlace y 30 por IP cada hora.
   confirmar: { ip: [30, 60], enlace: [10, 60] },
+  // seg1: 60 pasadas con Google cada 10 min por clínica desde el POST público
+  // (6 por minuto). Una clínica de verdad no recibe ni una fracción; pasado
+  // el tope, la reserva no llama a Google y decide la ventana de 30 min de D11.
+  sincronizar: { clinica: [60, 10] },
 }
 
 /** Nombre de la cookie de dispositivo. Path propio: sólo viaja a estas rutas. */
@@ -60,6 +67,14 @@ export function ipDe(cabeceras: Headers): string {
 /** La llave de `p_ruta`. null si no hay secreto o valor (la ruta ya falló cerrada antes). */
 export function llaveLimite(accion: Accion, sujeto: Sujeto, valorSeudonimo: string): string | null {
   return /^[0-9a-f]{64}$/.test(valorSeudonimo) ? `reserva:${accion}:${sujeto}:${valorSeudonimo}` : null
+}
+
+/**
+ * La llave de una clínica: sha256 de su id (no es secreto ni dato personal;
+ * sólo hace falta la forma de 64 hexadecimales de `llaveLimite`).
+ */
+export function seudonimoClinica(clinicaId: string): string {
+  return createHash('sha256').update(`clinica:${clinicaId}`).digest('hex')
 }
 
 /** Seudónimo de red de una IP o dispositivo para la llave. */

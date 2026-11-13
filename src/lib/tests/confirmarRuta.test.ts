@@ -24,6 +24,7 @@ const h = vi.hoisted(() => ({
   ctx: null as unknown,
   resp: null as unknown,
   limite: true,
+  limiteEnlace: true,
   despues: [] as (() => unknown)[],
   google: [] as unknown[],
   limites: [] as unknown[],
@@ -40,7 +41,10 @@ vi.mock('@/lib/confirmacion/enlaceConfirmacion', () => ({
 vi.mock('@/lib/reserva/limitesReserva', () => ({
   ipDe: () => '203.0.113.9',
   seudonimoRed: () => 'b'.repeat(64),
-  dentroDeLimites: async (accion: string, s: unknown) => { h.orden.push(`limites:${accion}`); h.limites.push(s); return h.limite },
+  dentroDeLimites: async (accion: string, s: object) => {
+    h.orden.push(`limites:${accion}`); h.limites.push(s)
+    return 'enlace' in s ? h.limiteEnlace : h.limite
+  },
 }))
 vi.mock('@/lib/confirmacion/googleConfirmacion', () => ({ reflejarEnGoogle: async (c: unknown) => { h.google.push(c) } }))
 
@@ -64,7 +68,7 @@ async function post(o: { codigo?: string; accion?: string | null; origin?: strin
 }
 
 beforeEach(() => {
-  h.orden = []; h.ctx = CTX; h.resp = respuesta({}); h.limite = true; h.despues = []; h.google = []; h.limites = []
+  h.orden = []; h.ctx = CTX; h.resp = respuesta({}); h.limite = true; h.limiteEnlace = true; h.despues = []; h.google = []; h.limites = []
 })
 
 describe('POST /api/confirmar/[codigo]', () => {
@@ -90,10 +94,11 @@ describe('POST /api/confirmar/[codigo]', () => {
     expect(h.orden).toEqual([])
   })
 
-  it('enlace sin contexto (revocado, apagado, suspendida, RPC ausente): 404 sin límites ni respuesta', async () => {
+  it('enlace sin contexto (revocado, apagado, suspendida, RPC ausente): 404 tras el límite por IP, sin el del enlace ni respuesta', async () => {
     h.ctx = null
     expect((await post()).status).toBe(404)
-    expect(h.orden).toEqual(['contexto'])
+    expect(h.orden).toEqual(['limites:confirmar', 'contexto'])
+    expect(h.limites).toEqual([{ ip: 'b'.repeat(64) }])
   })
 
   it('cada resultado es un 303 a la página con su ?r=, nunca 307', async () => {
@@ -105,13 +110,21 @@ describe('POST /api/confirmar/[codigo]', () => {
     }
   })
 
-  it('el límite va por la IP y por el hash del enlace, y al pasarlo no responde: ?r=limite', async () => {
+  it('seg1 (punto 8): el límite por IP va ANTES de la base; pasado, ?r=limite sin leer el contexto', async () => {
     h.limite = false
     const res = await post()
     expect(res.status).toBe(303)
     expect(res.headers.get('location')).toBe(`http://localhost:3001/confirmar/${COD}?r=limite`)
-    expect(h.orden).toEqual(['contexto', 'limites:confirmar'])
-    expect(h.limites[0]).toEqual({ ip: 'b'.repeat(64), enlace: CTX.codigo_hash })
+    expect(h.orden).toEqual(['limites:confirmar'])
+    expect(h.limites).toEqual([{ ip: 'b'.repeat(64) }])
+  })
+
+  it('el límite por el hash del enlace va después del contexto; pasado, ?r=limite sin responder', async () => {
+    h.limiteEnlace = false
+    const res = await post()
+    expect(res.headers.get('location')).toBe(`http://localhost:3001/confirmar/${COD}?r=limite`)
+    expect(h.orden).toEqual(['limites:confirmar', 'contexto', 'limites:confirmar'])
+    expect(h.limites).toEqual([{ ip: 'b'.repeat(64) }, { enlace: CTX.codigo_hash }])
   })
 
   it('invalido o RPC caída: 404', async () => {
@@ -136,6 +149,6 @@ describe('POST /api/confirmar/[codigo]', () => {
 
   it('la acción del formulario llega tal cual a la base', async () => {
     await post({ accion: 'cancelar' })
-    expect(h.orden).toEqual(['contexto', 'limites:confirmar', 'responder:cancelar'])
+    expect(h.orden).toEqual(['limites:confirmar', 'contexto', 'limites:confirmar', 'responder:cancelar'])
   })
 })
