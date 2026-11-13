@@ -279,6 +279,7 @@ una con su auditoría independiente en la cabecera (las tres APTA):
 | S3 | `20261117120000_agenda_seg_borrado_cita.sql` | con v2 encendida, la base no deja borrar una cita con paciente o por ligar (corrige H1) |
 | S4 | `20261117121000_agenda_seg_columnas_reserva.sql` | las columnas `reserva_*` de `appointments` sólo las escribe el servidor |
 | S7a | `20261117122000_agenda_seg_emision_enlaces.sql` | un enlace de reserva sólo lo emite `service_role` (`reserva_enlace_emitir`) |
+| seg1 | `20261117130000_agenda_seg1_candado_correo.sql` | el candado automático decide por el correo verificado; el bloqueo manual corta también el enlace único; todo el día ocupa en el enlace (rama `feature/agenda-v2-seg1`) |
 
 Efecto sobre las comprobaciones del §3: tres funciones nuevas sin PUBLIC
 (`cita_proteger_borrado` y `cita_proteger_reserva`, de disparador, con los
@@ -288,4 +289,190 @@ disparadores BEFORE nuevos en `appointments` (fila 6 ya no son «todos
 AFTER»); `proteger_reserva_enlaces` reemplazada con la misma firma y grants;
 ninguna policy, ninguna FK ni ningún permiso de tabla cambian. Detalle en
 `mejora_agendaV2.md` §6-bis, «Correcciones de seguridad en la base tras la
-revisión independiente».
+revisión independiente». seg1 (cuarta fila) sólo reemplaza
+`reserva_contacto_estado`, `reserva_ocupacion` y `reservar_por_enlace`, con la
+misma firma y los mismos permisos. Las cuatro juntas, auditadas como conjunto,
+en el §8.
+
+## 8. Integración de las correcciones (2026-11-12)
+
+Las ramas `feature/agenda-v2-seg1` y `feature/agenda-v2-seg2` se escribieron en
+paralelo sobre la misma base local, y cada una sólo se había probado con la
+migración de la otra ya aplicada encima. Aquí se auditan juntas, sobre la rama
+`feature/agenda-v2` con las dos fusionadas (`0dbfbd9`). Un revisor
+independiente en otro modelo (Sonnet) hizo la misma auditoría en paralelo, sin
+ver estas conclusiones; abajo se dice qué vio cada uno.
+
+### 8.1 El conjunto, desde cero
+
+`git diff --name-only main...HEAD -- supabase/migrations` = **20 migraciones**
+del proyecto (las 16 del cierre + las 4 de las correcciones). `supabase db
+reset --local` (CLI 2.117.0) aplicó las **25** (5 de `main` + 20) en orden y sin
+un solo fallo, en 28 s; `schema_migrations` = 25, última `20261117130000`.
+Ninguna rejilla dio REVISAR. Semilla en 1.3 s.
+
+### 8.2 Veredicto de las cuatro
+
+| # | Archivo | Auditoría previa (cabecera) | Integración | Veredicto |
+|---|---|---|---|---|
+| S3 | `20261117120000_agenda_seg_borrado_cita.sql` | APTA | Sin conflicto con las limpiezas ni con Google (§8.4, B) | APTA |
+| S4 | `20261117121000_agenda_seg_columnas_reserva.sql` | APTA | Todos los escritores reales de `reserva_*` pasan (§8.4, A) | APTA |
+| S7a | `20261117122000_agenda_seg_emision_enlaces.sql` | APTA | Nadie posterior depende del cuerpo viejo de `proteger_reserva_enlaces` (§8.4, C) | APTA |
+| seg1 | `20261117130000_agenda_seg1_candado_correo.sql` | APTA (auditoría independiente en cabecera) | Sus tres funciones no las toca seg2; su pre-vuelo por md5 cuadra | APTA |
+
+El revisor llegó a los mismos cuatro veredictos.
+
+### 8.3 Catálogo: qué cambió de verdad
+
+Huella md5 por objeto de `public` (la misma consulta del §3: definición y
+`proacl` de cada función, cada policy, disparador, tabla y constraint) contra
+las que se tomaron en el cierre:
+
+- **Contra `main` (355 huellas): 0 objetos cambiados o quitados.**
+  `clinica_tiene_acceso()` y `clinica_no_suspendida()` siguen idénticas
+  (definición y permisos), y ninguna policy de `main` cambia.
+- **Contra la base final del cierre (F): exactamente** 4 funciones
+  reemplazadas con los mismos permisos (`proteger_reserva_enlaces`,
+  `reserva_contacto_estado`, `reserva_ocupacion`, `reservar_por_enlace`), 3
+  funciones nuevas (`cita_proteger_borrado`, `cita_proteger_reserva`,
+  `reserva_enlace_emitir`) y 2 disparadores nuevos en `appointments`. **Ninguna
+  policy, tabla, constraint, FK ni permiso de tabla** cambia.
+- **EXECUTE a PUBLIC:** ninguna de las 7 funciones nuevas o reemplazadas.
+  `cita_proteger_borrado` y `cita_proteger_reserva` (de disparador) y
+  `proteger_reserva_enlaces`: los tres roles. `reserva_enlace_emitir`,
+  `reserva_ocupacion` y `reservar_por_enlace`: sólo `service_role`.
+  `reserva_contacto_estado`: `authenticated` y `service_role`, como en D2. Todas
+  INVOKER con `search_path=''`.
+- **Disparadores de `appointments`:** dos BEFORE (DELETE; INSERT OR UPDATE) en
+  eventos distintos y tres AFTER (`audit_appointments`,
+  `audit_appointments_update`, `trg_appointments_reserva_incidencia`). El BEFORE
+  de columnas sólo lee y lanza, no cambia `NEW`, así que el orden entre ellos
+  no importa.
+
+### 8.4 Conflictos entre ellas y con las anteriores
+
+**A · El disparador de columnas `reserva_*` (S4) contra quien las escribe.**
+Decide con `current_user` y deja pasar a `service_role`, `postgres` y
+`supabase_admin`. Las funciones del conjunto que escriben `appointments`
+(`reservar_por_enlace` y `gcal_importar_evento` insertan;
+`reagendar_por_enlace`, `gcal_aplicar_evento`, `cita_confirmacion_responder` y
+`cita_rsvp_google` actualizan) son **todas INVOKER, propiedad de `postgres` y
+ejecutables sólo por `service_role`**: corren con `current_user =
+service_role` y pasan. No hay ninguna SECURITY DEFINER que escriba
+`appointments` (la única DEFINER que la nombra, `log_cita_change`, sólo
+escribe `audit_log`), así que tampoco hay una que se salte el disparador «por
+dueño» (la dimensión 19 propuesta en §6-bis). Las acciones referenciales que
+tocan la tabla (`paciente_id SET NULL`, el CASCADE de `clinica_id`) corren como
+su dueño, `postgres`. Comprobado ejecutando: `reservar_por_enlace` como
+`service_role` reserva (revisor) y la batería completa, las dos carreras y las
+e2e de reserva, reagendado, confirmación y Google pasan (§8.6). Y al revés: la
+sesión que cambia `reserva_correo_hmac`, `reserva_nombre`, `reserva_canal` o
+`reserva_aceptado_en` recibe 42501 (revisor y coordinador, éste por PostgREST
+con el JWT de `admin.a`).
+
+**B · El disparador de borrado (S3) contra las limpiezas y Google.**
+- La semilla borra `agenda_ajustes` antes que las citas (con la fila y v2
+  encendida el borrado da 42501; sin ella, pasa: lo probó el revisor).
+- Las e2e (`sqlLocal`), `reserva-carrera.sh` y `confirmacion-carrera.sh` borran
+  como `postgres`, que el disparador deja pasar.
+- La sincronización con Google **nunca borra** una fila de `appointments`
+  (cancela o suelta el vínculo); el único `DELETE` de citas en `src/` es
+  `DELETE /api/appointments/[id]`, que con v2 ya da 409 antes. No existe un
+  borrado de Google de eventos sin paciente que pueda chocar.
+- B2 («la cita ya no se duplica al deshacer») deshace en el cliente con
+  `revert()` o con un PUT; no borra.
+- El script nuevo del Google simulado (`scripts/google-falso-manual.ts`) sólo
+  borra al cerrar eventos sin paciente nacidos en Google, como `postgres`.
+
+**C · `proteger_reserva_enlaces()` reemplazada por S7a.** seg1 no la toca, y
+ninguna migración posterior compara su md5 ni parte de su cuerpo. Quien la
+reemplace en el futuro tiene que partir del cuerpo de `20261117122000` (md5 de
+`prosrc` `acd4128b5f25df54f6b4fd95391cf1dc`), no del de D1; queda en
+`CLAUDE.md`. `reserva_enlace_regenerar_fijo` (D1) ya no puede insertar con la
+sesión y no tiene llamadores; falla entera, sin dejar revocado el enlace
+anterior (lo comprobó el revisor). Retirarla es una limpieza aparte
+(Protocolo 2).
+
+**D · seg1 contra seg2.** Ninguna de las tres funciones de seg1 la cambia
+seg2, y el pre-vuelo por md5 de seg1 compara los cuerpos de D2/D3, que siguen
+siendo los de antes cuando seg1 se aplica (va última por nombre). No hay
+sobrecargas nuevas.
+
+### 8.5 La base combinada con `feature/limites-ajustables`
+
+Reinicio con las **28** migraciones (5 de `main` + las tres `20261014*` + las
+20 del proyecto, en orden de nombre): todas aplican sin fallo. Los objetos del
+proyecto quedan **idénticos** a los de la rama (huella: 0 diferencias en
+funciones, policies, disparadores y constraints de la agenda); lo que cambia es
+sólo lo de limites (permisos de las funciones de `main` y sus objetos nuevos).
+
+- **`p1_permisos_funciones.sql`, caso 3: en rojo con su lista de 10, como se
+  esperaba (H2).** Son ahora **41** funciones: las 10 de producción más **31**
+  del proyecto (las 30 del cierre y `reserva_enlace_emitir`). Confirmado con la
+  misma consulta del caso 3 en la base combinada. Con la lista ampliada, el
+  caso 3 pasa.
+- `p1` (resto de casos), `p1b`, `p2`, `p3` y 20 de las 21 pruebas del proyecto,
+  en verde. **La 21.ª, `seg1_candado_correo.sql`, en rojo** (hallazgo I1).
+- `reserva-carrera.sh` (con su control sin candado: A=ok, B=ok) y
+  `confirmacion-carrera.sh`, en verde.
+
+**La lista exacta para el caso 3** (a pegar en lugar de la de diez al fusionar
+las dos ramas; el texto del `raise` cambia de «las diez» a «las 41»):
+
+```
+alta_conexion_google(uuid,uuid,text,text,text,text,text,bigint), cita_confirmacion_contexto(text), cita_confirmacion_emitir(uuid,uuid,uuid,text,uuid), cita_confirmacion_responder(uuid,text,text), cita_confirmacion_revocar(uuid,uuid), cita_correo_marcar(uuid,uuid,uuid,text,text), cita_correo_tomar(uuid,uuid,text,uuid), cita_correos_pendientes(integer), cita_reagendar_oferta(uuid,text), cita_rsvp_google(uuid,uuid,text,text,text[]), crear_paciente_con_medico(jsonb,uuid), enforce_limite_documentos_paciente(), gcal_aplicar_evento(uuid,uuid,timestamp with time zone,text,text,timestamp with time zone,text,boolean,timestamp with time zone,timestamp with time zone,boolean,text,boolean,text,boolean), gcal_citas_por_evento(uuid,text[],uuid[]), gcal_importar_evento(uuid,text,text,text,timestamp with time zone,text,timestamp with time zone,timestamp with time zone,boolean,text,text,uuid), gcal_sync_avanzar(uuid,uuid,text,text,timestamp with time zone,integer), gcal_sync_clinica_habilitada(uuid), gcal_sync_clinicas_pendientes(integer), gcal_sync_frescura(uuid), gcal_sync_reiniciar(uuid,uuid), gcal_sync_soltar(uuid,uuid,text), gcal_sync_tomar(uuid,uuid,text,integer,integer), generar_folio(text), guardar_secretos_conexion(uuid,uuid,text,text,bigint), leer_conexion_google_con_secretos(uuid,uuid), rate_limit_intento(text,text,integer,integer), rate_limit_reset(text), reagendar_por_enlace(text,uuid,text,uuid,uuid,timestamp with time zone,text,text,text,text,text,text,text,text,uuid), reserva_codigo_emitir(uuid,uuid,text,text), reserva_codigo_verificar(uuid,uuid,text,text,text), reserva_contacto_estado(uuid,uuid,text,text), reserva_contacto_marcar(uuid,text), reserva_contactos_bloqueados(), reserva_contexto(text,text,text), reserva_empalmes_registrar(uuid,uuid[]), reserva_enlace_emitir(uuid,uuid,uuid,uuid,text,text,text), reserva_enlace_regenerar_fijo(uuid,uuid,text), reserva_ocupacion(uuid,uuid,timestamp with time zone,timestamp with time zone), reservar_por_enlace(uuid,text,uuid,uuid,timestamp with time zone,text,text,text,text,text,text,text,text,uuid), sync_antropometria_paciente(uuid), trg_mediciones_antropometria()
+```
+
+### 8.6 Pruebas, antes y después del reinicio
+
+| | Sobre la fusión (antes) | Desde cero (después) |
+|---|---|---|
+| `npm run build` | limpio | (no depende de la base) |
+| `npm run lint` | 96 errores (sin subir) | igual |
+| Vitest | 1701 pruebas en 113 archivos | 1701 en 113 |
+| SQL (`pruebas-sql.sh`) | 21 archivos en verde | 21 en verde |
+| Playwright completo | — | 252 pasan, 0 fallan, 219 saltadas (escritorio 212, teléfono 37, tableta 3), 7.5 min |
+| e2e de Google falso, `seguridad-postgrest`, `reserva-seg1` | — | dentro de la batería, en verde (20 pruebas) |
+| `reserva-carrera.sh` | — | verde; control sin candado = 2 citas |
+| `confirmacion-carrera.sh` | — | verde |
+
+Antes del reinicio no se corrió Playwright: la fusión sólo pedía build, lint,
+Vitest y SQL, y Playwright necesita la base sembrada desde cero.
+
+### 8.7 Hallazgos de la integración
+
+**I1 · `seg1_candado_correo.sql` falla en la base combinada** (coordinador).
+`permission denied for function dia`: la prueba crea un ayudante en `pg_temp`
+y lo llama como `service_role`. Con los privilegios por omisión de P1
+(globales, sin PUBLIC), una función nueva de `postgres` nace sin EXECUTE
+también en `pg_temp`; los demás ayudantes de esa prueba ya llevaban su
+`grant`, al del caso 6 le faltaba. Es de la prueba, no de la migración.
+**Arreglado** con el `grant` explícito (comentado en el archivo). En rojo sin
+él en la base combinada; verde con él en la rama y en la combinada. Es
+justamente la dimensión propuesta en §6 («correr las pruebas de las dos ramas
+sobre la base combinada»).
+
+**I2 · En la base local de esta rama, 7 funciones de `main` ejecutables por
+PUBLIC** (revisor, hallazgo 2). Es cierto en la base reconstruida sin las
+`20261014*`: `alta_conexion_google`, `enforce_limite_documentos_paciente`,
+`generar_folio`, `guardar_secretos_conexion`,
+`leer_conexion_google_con_secretos`, `sync_antropometria_paciente` y
+`trg_mediciones_antropometria`, más el PUBLIC de casi todas las de `main`. El
+revisor proponía fusionar limites antes que la agenda «para que el hueco no
+llegue a producción». **No lo trae la agenda:** la huella de §8.3 dice que
+ningún permiso de un objeto de `main` cambia, y en producción esos permisos son
+los que ya están aplicados allí, no los de esta base local. Arreglarlo es el
+objeto de P1/P1b, en `feature/limites-ajustables`, y el orden de fusión de las
+dos ramas no lo empeora ni lo mejora. Sin cambio aquí; anotado.
+
+**I3 · La semilla depende del orden «ajustes antes que citas»** (revisor,
+informativo). Ya está explicado en el comentario de `scripts/agenda-semilla.ts`
+con el nombre de la función. Sin cambio.
+
+**I4 · El revisor no ejercitó en vivo el enlace fijo con ficha de correo**
+(nota de cobertura). Lo cubren `seg1_candado_correo.sql` y
+`e2e/reserva-seg1.e2e.ts`, en verde en §8.6. Sin cambio.
+
+Fuera de la base, pero encontrado en la misma pasada: no hay camino en la
+interfaz para convertir en cita un evento nacido en Google (§2 del plan lo
+pide). `DEUDA_TECNICA.md` AG-DT-29.

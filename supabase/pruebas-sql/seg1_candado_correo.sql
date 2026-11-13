@@ -251,6 +251,11 @@ end $$;
 create function pg_temp.dia(p_horas integer) returns timestamptz language sql as $$
   select (date_trunc('day', pg_temp.t(p_horas) at time zone 'America/Mexico_City') at time zone 'America/Mexico_City');
 $$;
+-- Se usa abajo como service_role. Con los privilegios por omisión de P1
+-- (feature/limites-ajustables) una función nueva de postgres nace sin EXECUTE a
+-- PUBLIC, también en pg_temp: sin este grant, la base combinada da «permission
+-- denied for function dia» (integración, 2026-11-12).
+grant execute on function pg_temp.dia(integer) to anon, authenticated, service_role;
 insert into public.appointments (clinica_id, medico_id, title, start_time, end_time, status, origen, all_day, consultorio_timezone) values
   ('00000000-0000-4000-8000-0000005e1c01', '00000000-0000-4000-8000-0000005e1b01', 'Vacaciones',
    pg_temp.dia(200), pg_temp.dia(200) + interval '1 day', 'scheduled', 'spinus', true, 'America/Mexico_City'),
