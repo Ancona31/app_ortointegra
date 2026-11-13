@@ -71,13 +71,23 @@ test('tres cancelaciones cierran el autoservicio (403 con el teléfono); desbloq
   expect(unico.status).toBe(201)
 })
 
-test('coincidir sólo por el teléfono también bloquea', async () => {
+// seg1 (decisión de Angel, mejora_agendaV2.md §6-bis): lo automático del candado
+// decide por el CORREO verificado. Antes, coincidir sólo por el teléfono también
+// bloqueaba; ahora no (cualquiera puede escribir un teléfono ajeno). Debilita el
+// candado frente a quien cambie de correo; el bloqueo manual por teléfono sigue
+// cortando (reserva-seg1.e2e.ts).
+test('coincidir sólo por el teléfono ya NO bloquea; coincidir por el correo, sí', async () => {
   const { codigo } = emitirEnlace(e, 'fijo')
   const p = personaNueva()
   await tresCancelaciones(p)
-  const mismaPersonaOtroCorreo = { ...personaNueva(), telefono: p.telefono }
+  const mismoTelefonoOtroCorreo = { ...personaNueva(), telefono: p.telefono }
   const r = await reservar(e, codigo, {
-    inicio: turno(), persona: mismaPersonaOtroCorreo, ficha: await verificarCorreo(codigo, mismaPersonaOtroCorreo.correo),
+    inicio: turno(), persona: mismoTelefonoOtroCorreo, ficha: await verificarCorreo(codigo, mismoTelefonoOtroCorreo.correo),
   })
-  expect(r).toMatchObject({ status: 403, cuerpo: { error: 'autoservicio_cerrado' } })
+  expect({ status: r.status, error: r.cuerpo.error }).toEqual({ status: 201, error: undefined })
+  const mismoCorreoOtroTelefono = { ...personaNueva(), correo: p.correo }
+  const c = await reservar(e, codigo, {
+    inicio: turno(), persona: mismoCorreoOtroTelefono, ficha: await verificarCorreo(codigo, p.correo),
+  })
+  expect(c).toMatchObject({ status: 403, cuerpo: { error: 'autoservicio_cerrado' } })
 })
