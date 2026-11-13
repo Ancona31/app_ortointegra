@@ -1,6 +1,6 @@
 /** esquemasReserva.test.ts — agenda D5: strictObject (claves de más → error) y la casilla del aviso obligatoria. */
 import { describe, it, expect } from 'vitest'
-import { PedirCodigoSchema, ReservarSchema, TurnosQuerySchema, VerificarCodigoSchema } from '@/lib/reserva/esquemasReserva'
+import { NOMBRE_MAX, PedirCodigoSchema, ReservarSchema, TurnosQuerySchema, VerificarCodigoSchema, nombreSeguro } from '@/lib/reserva/esquemasReserva'
 
 const ID = '00000000-0000-4000-8000-000000000001'
 const BASE = {
@@ -47,3 +47,37 @@ describe('fecha de turnos', () => {
     expect(TurnosQuerySchema.safeParse({ consultorio: ID, tipo: ID, desde: '2026-02-30' }).success).toBe(false)
   })
 })
+
+describe('nombre de quien reserva (seg1, punto 7b: llega al título de Google)', () => {
+  const con = (nombre: string) => ReservarSchema.safeParse({ ...BASE, nombre }).success
+  it('acepta nombres reales: acentos, ñ, apóstrofo, guion, abreviaturas con espacio', () => {
+    for (const n of ['Ana', 'María José Pérez-Núñez', "D'Angelo O'Brien", 'Ma. Guadalupe Ruiz', 'J. R. Tolkien', 'Ángel Ancona Pérez']) {
+      expect(con(n), n).toBe(true)
+    }
+    expect(con('A'.repeat(NOMBRE_MAX))).toBe(true)
+  })
+  it('rechaza lo que pasa de 80 caracteres', () => {
+    expect(NOMBRE_MAX).toBe(80)
+    expect(con('A'.repeat(NOMBRE_MAX + 1))).toBe(false)
+  })
+  it('rechaza URLs y dominios', () => {
+    for (const n of ['Ana https://evil.mx', 'Ana http://x', 'www.evil', 'Ana evil.com', 'Visita spinus.mx', 'ana@correo.mx',
+                     'Ana HTTP://X', 'Ana WWW.EVIL', 'pago.seguro.mx Ana', 'Ana ftp://x', 'Ana 1.mx']) {
+      expect(con(n), n).toBe(false)
+    }
+  })
+  it('rechaza saltos de línea, tabuladores y caracteres de control o de formato', () => {
+    for (const n of ['Ana\nCancelada', 'Ana\rLópez', 'Ana\tLópez', 'Ana\u0000', 'Ana\u202eetnaregaP', 'Ana\u200bLópez',
+                     'Ana\u2028López', 'Ana\u2029López', 'Ana\u00adLópez']) {
+      expect(con(n), JSON.stringify(n)).toBe(false)
+    }
+  })
+  it('el recorte de los extremos sigue igual (un salto al final no cuenta)', () => {
+    expect(con('  Ana López \n')).toBe(true)
+  })
+  it('nombreSeguro es lo que usa el esquema', () => {
+    expect(nombreSeguro('Ana López')).toBe(true)
+    expect(nombreSeguro('Ana evil.com')).toBe(false)
+  })
+})
+
