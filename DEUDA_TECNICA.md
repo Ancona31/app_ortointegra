@@ -3923,6 +3923,38 @@ todo lo nuevo.
 los disparadores y las FK de esa transacción. Sólo vale en la base local. **No
 se copia nunca a producción ni a código de la aplicación.**
 
+### AG-DT-26 — Las páginas públicas de reserva y de confirmación leen el contexto sin límite
+
+**Estado:** 🟡 abierta (seg1, punto 8) · Las rutas API públicas ya ponen el
+límite por IP antes de la primera consulta a la base. Las PÁGINAS
+`/reservar/[codigo]` y `/confirmar/[codigo]` (componentes de servidor) siguen
+llamando a `reserva_contexto` / `cita_confirmacion_contexto` en cada GET sin
+límite: una ráfaga de GET con códigos con forma llega a la base. Se dejó así
+porque E3 decidió que abrir un enlace nunca escribe (los filtros de correo y las
+vistas previas lo abren solos) y `rate_limit_intento` escribe. Cerrarlo pide
+decidir si un límite por IP en el GET cuenta como «escribir».
+
+### AG-DT-27 — Los avisos de empalme de D11 no cuentan un evento de todo el día
+
+**Estado:** 🟡 abierta (seg1, punto 5) · Desde seg1 un evento de todo el día
+del médico tapa esos días en el enlace de reserva. Pero
+`reserva_empalmes_registrar` (D11) sigue excluyendo `all_day`: unas vacaciones
+puestas en Google ENCIMA de una reserva ya hecha no avisan a la clínica en el
+panel «Por confirmar». Cerrarlo es quitar `AND NOT o.all_day` de esa función
+(migración) y su espejo `avisoEmpalmeReserva.ts`.
+
+### AG-DT-28 — Un bloqueo manual por teléfono se nota desde el enlace
+
+**Estado:** 🟡 abierta, aceptada por decisión (seg1, puntos 1, 2 y 6) · Lo
+automático del candado decide ya sólo por el correo verificado y el enlace no
+dice nada de si un teléfono tiene cita o historial. Pero el bloqueo MANUAL por
+teléfono corta (lo pidió Angel), y un rechazo por un dato que nadie verifica lo
+ve quien lo manda: con el enlace, se puede saber si la clínica bloqueó a mano un
+número con ese médico (acotado por los límites de IP y dispositivo). La
+alternativa es que el bloqueo manual mire sólo el correo. Decide Angel
+(`mejora_agendaV2.md` §6-bis, «Correcciones de seguridad tras la revisión
+independiente»).
+
 ---
 
 ## Latencia de `/agenda` — investigación y tanda de arreglos (2026-08-31)

@@ -20,9 +20,16 @@ const d = vi.hoisted(() => ({
   frescura: { ultimaOk: null as string | null, ocupada: false } as { ultimaOk: string | null; ocupada: boolean } | 'ausente' | 'lanza',
   /** La señal de la pasada colgada se abortó. */
   abortada: false,
+  /** seg1: ¿queda cupo de pasadas para la clínica? Y cuántas veces se preguntó. */
+  cupo: true,
+  cupos: [] as unknown[],
 }))
 
 vi.mock('@/lib/supabase/admin', () => ({ createAdminClient: () => ({}) }))
+vi.mock('@/lib/reserva/limitesReserva', async (importOriginal) => {
+  const real = await importOriginal<typeof import('@/lib/reserva/limitesReserva')>()
+  return { ...real, dentroDeLimites: async (accion: string, s: unknown) => { d.cupos.push([accion, s]); return d.cupo } }
+})
 vi.mock('@/lib/gcalConexion', () => ({
   resolverConexionClinica: async (_s: unknown, clinicaId: string) => {
     if (d.conexion === 'lanza') throw new Error('base caída')
@@ -56,6 +63,7 @@ vi.mock('@/lib/gcalSincronizacionBase', async (importOriginal) => {
 import {
   sincronizarAntesDeReservar, MIN_INTERVALO_TURNOS_SEG, TIEMPO_GOOGLE_MS, VENTANA_TOLERADA_MS,
 } from '@/lib/reserva/sincronizarReserva'
+import { seudonimoClinica } from '@/lib/reserva/limitesReserva'
 
 const AHORA = Date.parse('2031-06-01T12:00:00Z')
 const conexion: ConexionGoogle = {
@@ -66,7 +74,7 @@ const reloj = { ahora: () => AHORA, dormir: async () => undefined }
 const hace = (ms: number): string => new Date(AHORA - ms).toISOString()
 
 beforeEach(() => {
-  Object.assign(d, { conexion, pasadas: [], opciones: [], frescura: { ultimaOk: null, ocupada: false }, abortada: false })
+  Object.assign(d, { conexion, pasadas: [], opciones: [], frescura: { ultimaOk: null, ocupada: false }, abortada: false, cupo: true, cupos: [] })
   vi.spyOn(console, 'warn').mockImplementation(() => undefined)
   vi.spyOn(console, 'error').mockImplementation(() => undefined)
 })
@@ -149,6 +157,35 @@ describe('reservar (POST): siempre, sin el tope de 60 s', () => {
     expect(await sincronizarAntesDeReservar(CLINICA, 'reservar', lento)).toBe('no_por_ahora')
     expect(t - AHORA).toBeLessThanOrEqual(TIEMPO_GOOGLE_MS)
     expect(d.opciones.length).toBeLessThan(100)
+  })
+})
+
+describe('seg1 (punto 8): tope por clínica de las pasadas que dispara el POST público', () => {
+  it('con cupo: una sola pregunta por petición, con la llave de la clínica, aunque espere el candado', async () => {
+    d.pasadas = ['omitida', 'omitida', 'ok']
+    d.frescura = { ultimaOk: hace(VENTANA_TOLERADA_MS * 10), ocupada: true }
+    expect(await sincronizarAntesDeReservar(CLINICA, 'reservar', reloj)).toBe('seguir')
+    expect(d.cupos).toEqual([['sincronizar', { clinica: seudonimoClinica(CLINICA) }]])
+    expect(seudonimoClinica(CLINICA)).toMatch(/^[0-9a-f]{64}$/)
+  })
+
+  it('sin cupo: no llama a Google y decide la ventana (reciente: seguir; vieja: no_por_ahora)', async () => {
+    d.cupo = false
+    d.pasadas = ['ok']
+    d.frescura = { ultimaOk: hace(10 * 60_000), ocupada: false }
+    expect(await sincronizarAntesDeReservar(CLINICA, 'reservar', reloj)).toBe('seguir')
+    d.frescura = { ultimaOk: hace(VENTANA_TOLERADA_MS * 2), ocupada: false }
+    expect(await sincronizarAntesDeReservar(CLINICA, 'reservar', reloj)).toBe('no_por_ahora')
+    expect(d.opciones).toHaveLength(0)
+  })
+
+  it('clínica sin Google y GET de turnos: no cuentan contra el tope', async () => {
+    d.conexion = null
+    expect(await sincronizarAntesDeReservar(CLINICA, 'reservar', reloj)).toBe('seguir')
+    d.conexion = conexion
+    d.pasadas = ['ok']
+    expect(await sincronizarAntesDeReservar(CLINICA, 'turnos', reloj)).toBe('seguir')
+    expect(d.cupos).toEqual([])
   })
 })
 

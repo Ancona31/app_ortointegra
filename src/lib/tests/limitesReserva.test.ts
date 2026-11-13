@@ -60,4 +60,13 @@ describe('limitesReserva', () => {
     expect(dispositivoDe(nueva.id)).toEqual({ id: nueva.id, nuevo: false })
     expect(dispositivoDe('corta').nuevo).toBe(true)
   })
+  it('sincronizar (seg1): 60 cada 10 min por clínica, con la llave de 64 hex y sin el id en claro', async () => {
+    llamadas.length = 0
+    const { seudonimoClinica } = await import('@/lib/reserva/limitesReserva')
+    const id = '33333333-3333-4333-8333-333333333333'
+    expect(await dentroDeLimites('sincronizar', { clinica: seudonimoClinica(id) })).toBe(true)
+    expect(llamadas.map(l => [l.p_ruta.split(':').slice(0, 3).join(':'), l.p_limite, l.p_ventana_min]))
+      .toEqual([['reserva:sincronizar:clinica', 60, 10]])
+    expect(llamadas[0]?.p_ruta).not.toContain(id)
+  })
 })

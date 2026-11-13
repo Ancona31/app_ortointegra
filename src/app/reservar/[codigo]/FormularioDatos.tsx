@@ -23,7 +23,8 @@ export default function FormularioDatos({ aviso, casilla, ocupado, textoBoton, o
   return (
     <form onSubmit={enviar} className="space-y-4">
       <label className="block text-sm text-slate-700">Nombre completo
-        <input className={CAMPO} required maxLength={120} autoComplete="name" value={d.nombre}
+        {/* 80: el tope de NOMBRE_MAX (esquemasReserva.ts, seg1); el servidor lo vuelve a exigir. */}
+        <input className={CAMPO} required maxLength={80} autoComplete="name" value={d.nombre}
           onChange={e => setD({ ...d, nombre: e.target.value })} />
       </label>
       <label className="block text-sm text-slate-700">Teléfono (10 dígitos)

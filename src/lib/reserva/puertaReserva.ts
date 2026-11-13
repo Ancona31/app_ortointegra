@@ -21,9 +21,20 @@ import { componerNombreMedicoCompleto } from '@/lib/nombreMedico'
 
 export interface EnlaceAbierto { ctx: ContextoReserva; codigoHash: string }
 
+/**
+ * Pasos 1 a 3 sin tocar la base: ¿vale la pena preguntar por este código?
+ * seg1 (punto 8): las rutas públicas lo miran ANTES de su límite por IP, y el
+ * límite va ANTES de `reserva_contexto` (la primera consulta de verdad). Así
+ * un código sin forma sigue sin tocar la base, y una ráfaga de códigos con
+ * forma la frena el límite antes de llegar al contexto.
+ */
+export function codigoAbrible(codigo: string): boolean {
+  return secretoDisponible() && esCodigoDeEnlace(codigo) && avisoPublicable()
+}
+
 /** El enlace abierto, o null por cualquier causa (todas cuentan como 404). */
 export async function abrirEnlace(codigo: string): Promise<EnlaceAbierto | null> {
-  if (!secretoDisponible() || !esCodigoDeEnlace(codigo) || !avisoPublicable()) return null
+  if (!codigoAbrible(codigo)) return null
   const codigoHash = hashDeCodigo(codigo)
   const ctx = await contextoDeEnlace(codigoHash, AVISO_VERSION, hashAviso())
   return ctx ? { ctx, codigoHash } : null

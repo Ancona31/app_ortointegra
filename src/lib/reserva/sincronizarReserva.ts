@@ -23,6 +23,12 @@
  *   · Si la pasada no terminó `ok`: se reserva sólo si la última buena tiene
  *     menos de `VENTANA_TOLERADA_MS`; si no, «no se puede reservar por ahora».
  *
+ *   · seg1 (punto 8): en `reservar`, un tope POR CLÍNICA de pasadas con Google
+ *     (`LIMITES.sincronizar`, contado una vez por petición y sólo si la clínica
+ *     tiene Google). Pasado, no se llama a Google y decide la ventana, igual
+ *     que cuando Google falla. En `turnos` no hace falta: lo acota ya el mínimo
+ *     de 60 s de `gcal_sync_tomar` (y su espera creciente tras fallos).
+ *
  * Sin conexión de Google, o sin las migraciones de C/D11: `seguir`, como hoy.
  * Clínica sin acceso (S3): `seguir`; la RPC la rechaza con el 404 uniforme.
  * Resto conocido: un reenvío del mismo `client_id` con Google caído y la
@@ -38,6 +44,7 @@ import { resolverConexionClinica } from '@/lib/gcalConexion'
 import { sincronizarClinica, type ResultadoSincronizacion } from '@/lib/gcalSincronizacion'
 import { frescuraSincronizacion, SincronizacionNoDisponible } from '@/lib/gcalSincronizacionBase'
 import { logger } from '@/lib/logger'
+import { dentroDeLimites, seudonimoClinica } from '@/lib/reserva/limitesReserva'
 
 /** Tope para todo lo de Google en una petición pública (ver §6-bis D11). */
 export const TIEMPO_GOOGLE_MS = 4_000
@@ -72,13 +79,27 @@ async function conTope<T>(ms: number, fn: (senal: AbortSignal) => Promise<T>): P
   }
 }
 
-/** Una pasada dentro del tope. `sin_conexion` = la clínica no tiene Google (o sin calendario): nada que sincronizar. */
+/** ¿Queda cupo de pasadas para la clínica? Se pregunta una sola vez por petición (la espera del candado reintenta). */
+function cupoUnaVez(clinicaId: string, modo: ModoReserva): () => Promise<boolean> {
+  let cupo: Promise<boolean> | null = null
+  return () => {
+    if (modo !== 'reservar') return Promise.resolve(true)
+    cupo ??= dentroDeLimites('sincronizar', { clinica: seudonimoClinica(clinicaId) })
+    return cupo
+  }
+}
+
+/**
+ * Una pasada dentro del tope. `sin_conexion` = la clínica no tiene Google (o sin calendario): nada que sincronizar.
+ * `sin_cupo` = la clínica pasó el tope de seg1: no se llama a Google.
+ */
 async function pasadaDentroDelTope(
-  clinicaId: string, modo: ModoReserva, restanteMs: number,
-): Promise<ResultadoSincronizacion['estado'] | 'tiempo' | 'sin_conexion'> {
+  clinicaId: string, modo: ModoReserva, restanteMs: number, hayCupo: () => Promise<boolean>,
+): Promise<ResultadoSincronizacion['estado'] | 'tiempo' | 'sin_conexion' | 'sin_cupo'> {
   return conTope(restanteMs, async (senal) => {
     const conexion = await resolverConexionClinica(createAdminClient(), clinicaId)
     if (!conexion || conexion.clinicaId !== clinicaId || !conexion.calendarId) return 'sin_conexion' as const
+    if (!(await hayCupo())) return 'sin_cupo' as const
     const s = await sincronizarClinica(conexion, {
       actorId: 'reserva', presupuestoMs: restanteMs, leaseSeg: LEASE_SEG, senal,
       minIntervaloSeg: modo === 'turnos' ? MIN_INTERVALO_TURNOS_SEG : 0,
@@ -93,8 +114,9 @@ async function pasadaDentroDelTope(
  */
 async function intentar(clinicaId: string, modo: ModoReserva, reloj: Reloj): Promise<string> {
   const limite = reloj.ahora() + TIEMPO_GOOGLE_MS
+  const hayCupo = cupoUnaVez(clinicaId, modo)
   for (;;) {
-    const estado = await pasadaDentroDelTope(clinicaId, modo, limite - reloj.ahora())
+    const estado = await pasadaDentroDelTope(clinicaId, modo, limite - reloj.ahora(), hayCupo)
     if (estado !== 'omitida' || modo !== 'reservar') return estado
     const f = await frescuraSincronizacion(clinicaId)
     if (!f.ocupada || limite - reloj.ahora() <= ESPERA_CANDADO_MS) return estado

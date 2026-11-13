@@ -259,7 +259,8 @@ begin
   end if;
 end $$;
 
--- ── Caso 5: bloqueado (sólo en el fijo); el único se salta el candado y la regla de 1 activa ──
+-- ── Caso 5: bloqueado. seg1 (20261117130000): el bloqueo MANUAL corta también el único; el
+--    único se salta lo automático y la regla de 1 activa ──
 do $$
 begin
   insert into public.reserva_contactos (clinica_id, medico_id, clave_hmac, clase, bloqueado_en)
@@ -278,14 +279,18 @@ begin
      'unico', pg_temp.h('u3'), 7, now() + interval '7 days'),
     ('00000000-0000-4000-8000-000000d3f007', '00000000-0000-4000-8000-000000d3c001', '00000000-0000-4000-8000-000000d3b001',
      'unico', pg_temp.h('u4'), 7, now() + interval '7 days');
-  perform pg_temp.esperar('caso 5 único salta el bloqueo', pg_temp.res(pg_temp.h('u3'), '00000000-0000-4000-8000-00000d3cc001',
-          '00000000-0000-4000-8000-000000d3a001', pg_temp.t(18), '5500000004', 'fede', null), 'ok');
+  perform pg_temp.esperar('caso 5 único con bloqueo manual', pg_temp.res(pg_temp.h('u3'), '00000000-0000-4000-8000-00000d3cc001',
+          '00000000-0000-4000-8000-000000d3a001', pg_temp.t(18), '5500000004', 'fede', null), 'bloqueado');
+  perform pg_temp.esperar('caso 5 único sin bloqueo manual', pg_temp.res(pg_temp.h('u3'), '00000000-0000-4000-8000-00000d3cc001',
+          '00000000-0000-4000-8000-000000d3a001', pg_temp.t(18), '5500000005', 'fede', null), 'ok');
   perform pg_temp.esperar('caso 5 único salta 1 activa', pg_temp.res(pg_temp.h('u4'), '00000000-0000-4000-8000-00000d3cc001',
-          '00000000-0000-4000-8000-000000d3a001', pg_temp.t(20), '5500000004', 'fede', null), 'ok');
+          '00000000-0000-4000-8000-000000d3a001', pg_temp.t(20), '5500000005', 'fede', null), 'ok');
 end $$;
 
 -- ── Caso 6: ocupación. Cita del personal y fila de Google ocupan; no_show, cancelada y de todo
---    el día no; tocar el extremo no es empalme; otro médico no cuenta ──
+--    el día no (seg1, 20261117130000: lo de todo el día SÍ ocupa en el enlace; va en un día lejos
+--    de los demás turnos para no taparlos según la hora a la que corra la prueba); tocar el
+--    extremo no es empalme; otro médico no cuenta ──
 insert into public.appointments (id, clinica_id, medico_id, title, start_time, end_time, status, origen, all_day, consultorio_timezone) values
   ('00000000-0000-4000-8000-000000d3d001', '00000000-0000-4000-8000-000000d3c001', '00000000-0000-4000-8000-000000d3b001',
    'Personal', pg_temp.t(30), pg_temp.t(30) + interval '1 hour', 'scheduled', 'spinus', false, null),
@@ -298,8 +303,8 @@ insert into public.appointments (id, clinica_id, medico_id, title, start_time, e
   ('00000000-0000-4000-8000-000000d3d005', '00000000-0000-4000-8000-000000d3c001', '00000000-0000-4000-8000-000000d3b002',
    'De b2', pg_temp.t(38), pg_temp.t(38) + interval '1 hour', 'scheduled', 'spinus', false, null),
   ('00000000-0000-4000-8000-000000d3d006', '00000000-0000-4000-8000-000000d3c001', '00000000-0000-4000-8000-000000d3b001',
-   'Vacaciones', (date_trunc('day', pg_temp.t(48) at time zone 'America/Mexico_City') at time zone 'America/Mexico_City'),
-   (date_trunc('day', pg_temp.t(48) at time zone 'America/Mexico_City') at time zone 'America/Mexico_City') + interval '1 day',
+   'Vacaciones', (date_trunc('day', pg_temp.t(120) at time zone 'America/Mexico_City') at time zone 'America/Mexico_City'),
+   (date_trunc('day', pg_temp.t(120) at time zone 'America/Mexico_City') at time zone 'America/Mexico_City') + interval '1 day',
    'scheduled', 'spinus', true, 'America/Mexico_City');
 do $$
 declare
@@ -325,6 +330,8 @@ begin
   perform pg_temp.esperar('caso 6 otro médico', pg_temp.res(pg_temp.h('o6'), '00000000-0000-4000-8000-00000d3cc001',
           '00000000-0000-4000-8000-000000d3a001', pg_temp.t(38), '5500000016', 'g6', null), 'ok');
   perform pg_temp.esperar('caso 6 todo el día', pg_temp.res(pg_temp.h('o7'), '00000000-0000-4000-8000-00000d3cc001',
+          '00000000-0000-4000-8000-000000d3a001', pg_temp.t(120), '5500000017', 'g7', null), 'ocupado');
+  perform pg_temp.esperar('caso 6 fuera del día de todo el día', pg_temp.res(pg_temp.h('o7'), '00000000-0000-4000-8000-00000d3cc001',
           '00000000-0000-4000-8000-000000d3a001', pg_temp.t(48), '5500000017', 'g7', null), 'ok');
   -- reserva_ocupacion: sólo dos columnas, sólo del médico del enlace, ≤ 15 días, apagada → nada.
   select string_agg(n, ',' order by o) into v_cols

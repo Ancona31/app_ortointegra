@@ -6,12 +6,15 @@
  * `transporte.ts` (en local, a Mailpit). El código no se guarda: la base
  * guarda su HMAC atado al enlace y al correo (seudónimo). La respuesta no
  * dice si ese correo ya reservó ni si está bloqueado (lista A, 14).
+ * seg1 (punto 8): los límites de red (IP y dispositivo) van ANTES de la primera
+ * consulta a la base; el del correo, después de abrir el enlace (así un código
+ * inventado no deja una fila por cada correo que alguien pruebe).
  */
 import { randomInt } from 'node:crypto'
 import { cookies } from 'next/headers'
 import type { NextRequest } from 'next/server'
 import { PedirCodigoSchema } from '@/lib/reserva/esquemasReserva'
-import { abrirEnlace, cuerpoJson, noEncontrado, nombreDelMedico, responder } from '@/lib/reserva/puertaReserva'
+import { abrirEnlace, codigoAbrible, cuerpoJson, noEncontrado, nombreDelMedico, responder } from '@/lib/reserva/puertaReserva'
 import { emitirCodigo } from '@/lib/reserva/servidorReserva'
 import { COOKIE_DISPOSITIVO, OPCIONES_COOKIE, dentroDeLimites, dispositivoDe, ipDe, seudonimoRed } from '@/lib/reserva/limitesReserva'
 import { normalizarCorreo } from '@/lib/reserva/contacto'
@@ -23,6 +26,14 @@ export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest, ctx: RouteContext<'/api/reservar/[codigo]/codigo'>) {
   const { codigo } = await ctx.params
+  if (!codigoAbrible(codigo)) return noEncontrado()
+  const almacen = await cookies()
+  const disp = dispositivoDe(almacen.get(COOKIE_DISPOSITIVO)?.value)
+  if (disp.nuevo) almacen.set(COOKIE_DISPOSITIVO, disp.id, OPCIONES_COOKIE)
+  if (!(await dentroDeLimites('codigo', { ip: seudonimoRed('ip', ipDe(req.headers)), disp: seudonimoRed('disp', disp.id) }))) {
+    return responder({ status: 429, cuerpo: { error: 'demasiados_intentos' } })
+  }
+
   const enlace = await abrirEnlace(codigo)
   if (!enlace) return noEncontrado()
   if (enlace.ctx.clase !== 'fijo') return responder({ status: 400, cuerpo: { error: 'no_aplica' } })
@@ -32,14 +43,9 @@ export async function POST(req: NextRequest, ctx: RouteContext<'/api/reservar/[c
   const correo = destinatario ? normalizarCorreo(destinatario) : null
   const correoHmac = correo ? hmacContacto('correo', correo) : null
   if (!destinatario || !correoHmac) return responder({ status: 400, cuerpo: { error: 'correo_invalido' } })
-
-  const almacen = await cookies()
-  const disp = dispositivoDe(almacen.get(COOKIE_DISPOSITIVO)?.value)
-  if (disp.nuevo) almacen.set(COOKIE_DISPOSITIVO, disp.id, OPCIONES_COOKIE)
-  const pasa = await dentroDeLimites('codigo', {
-    correo: correoHmac, ip: seudonimoRed('ip', ipDe(req.headers)), disp: seudonimoRed('disp', disp.id),
-  })
-  if (!pasa) return responder({ status: 429, cuerpo: { error: 'demasiados_intentos' } })
+  if (!(await dentroDeLimites('codigo', { correo: correoHmac }))) {
+    return responder({ status: 429, cuerpo: { error: 'demasiados_intentos' } })
+  }
 
   const digitos = String(randomInt(0, 1_000_000)).padStart(6, '0')
   const codigoHmac = hmacCodigoCorreo(enlace.ctx.enlace_id, correoHmac, digitos)
