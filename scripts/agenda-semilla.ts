@@ -217,6 +217,18 @@ async function borrar(): Promise<void> {
   const pacIds = pacientes.map(p => p.id)
   await exigirSinExpediente(pacIds)
   if (clinicas.length) {
+    /* La FK de `agenda_ajustes` a `clinicas` es RESTRICT (migración B1): una
+       prueba que encendió el interruptor deja su fila, y sin esto el borrado de
+       la clínica de abajo falla. Con el rol de servicio: el disparador que
+       protege el interruptor no mira los DELETE. La tabla puede no existir sin
+       la migración B1 (base local sólo con las migraciones de `main`, la de la
+       prueba de tolerancia del cierre): mismo trato que `tipos_cita`.
+       ANTES que las citas: con v2 encendido, la base no deja borrar una cita
+       con paciente ni por ligar, tampoco al rol de servicio (corrección de
+       seguridad, punto 3, `cita_proteger_borrado`). Sin la fila, v2 está
+       apagado y las citas se borran como siempre. */
+    const ajustes = await admin.from('agenda_ajustes').delete().in('clinica_id', clinicas)
+    if (ajustes.error && ajustes.error.code !== '42P01' && ajustes.error.code !== 'PGRST205') sinError(ajustes, 'borrar ajustes de la agenda')
     limpiarReserva(clinicas, 'antes')
     sinError(await admin.from('appointments').delete().in('clinica_id', clinicas), 'borrar citas')
     limpiarReserva(clinicas, 'despues')
@@ -229,14 +241,6 @@ async function borrar(): Promise<void> {
     if (pacIds.length) sinError(await admin.from('paciente_medico').delete().in('paciente_id', pacIds), 'borrar paciente_medico')
     sinError(await admin.from('pacientes').delete().in('clinica_id', clinicas), 'borrar pacientes')
     sinError(await admin.from('consultorios').delete().in('clinica_id', clinicas), 'borrar consultorios')
-    /* La FK de `agenda_ajustes` a `clinicas` es RESTRICT (migración B1): una
-       prueba que encendió el interruptor deja su fila, y sin esto el borrado de
-       la clínica de abajo falla. Con el rol de servicio: el disparador que
-       protege el interruptor no mira los DELETE. La tabla puede no existir sin
-       la migración B1 (base local sólo con las migraciones de `main`, la de la
-       prueba de tolerancia del cierre): mismo trato que `tipos_cita`. */
-    const ajustes = await admin.from('agenda_ajustes').delete().in('clinica_id', clinicas)
-    if (ajustes.error && ajustes.error.code !== '42P01' && ajustes.error.code !== 'PGRST205') sinError(ajustes, 'borrar ajustes de la agenda')
   }
   for (const id of usuarios) {
     const { error } = await admin.auth.admin.deleteUser(id)
