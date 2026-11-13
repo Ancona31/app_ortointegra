@@ -55,6 +55,11 @@ function citaConPaciente(): string {
   return id
 }
 
+/* Antes también: una prueba anterior que falló puede dejar un enlace fijo
+   vigente de admin.a, y `crearCitaPorLigar` emite otro (un fijo vigente por
+   médico, `reserva_enlaces_fijo_vigente`). */
+test.beforeEach(() => limpiarReservasE2e())
+
 test.afterEach(() => {
   sqlLocal(`delete from public.appointments where title = :'t'`, { t: TITULO })
   limpiarReservasE2e()
