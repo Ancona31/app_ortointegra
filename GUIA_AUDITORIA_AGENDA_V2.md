@@ -25,9 +25,9 @@ Desde `~/proyectos/app_ortointegra-agenda` (rama `feature/agenda-v2`):
 
 ```bash
 SB=<ruta de la CLI 2.117.0>
-$SB db reset --local                 # borra la base LOCAL y aplica las 21 migraciones en orden (~50 s)
+$SB db reset --local                 # borra la base LOCAL y aplica las 25 migraciones en orden (~30 s)
 docker exec supabase_db_app_ortointegra psql -U postgres -Atc \
-  "select count(*), max(version) from supabase_migrations.schema_migrations"   # → 21|20261116120000
+  "select count(*), max(version) from supabase_migrations.schema_migrations"   # → 25|20261117130000
 npx tsx scripts/agenda-semilla.ts    # datos inventados (~2 s); su candado aborta si la URL no es local
 ```
 
@@ -74,6 +74,10 @@ npm run build && npx next start -p 3001     # lo que usan las e2e (globalSetup a
   `GCAL_FALSO_URL`. El desvío no se abre nunca con `NODE_ENV=production` (o
   sea, nunca en `next start`) ni con una Supabase remota. Para verlo en el
   navegador: `npx playwright test e2e/reserva-google.e2e.ts --project=escritorio --headed`.
+  Para probarlo a mano: `npx tsx scripts/google-falso-manual.ts` (arranca el
+  falso, conecta la Clínica Semilla A, levanta la app en :3002 y atiende
+  órdenes por `curl` en :4556; Ctrl+C lo deshace). Instrucciones en
+  `GUIA_PRUEBAS_AGENDA_V2.md` §4, C0.
 - **Mailpit** (correos capturados): http://127.0.0.1:54324
 - **Studio** local: http://127.0.0.1:54323
 

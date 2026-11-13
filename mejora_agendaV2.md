@@ -3389,9 +3389,15 @@ de `main` cambia; ninguna policy tocada). Lo que queda para Angel:
     sincronización, los eventos que entraron desde el Google falso y los
     avisos de empalme de la sesión, y suelta del falso las citas que se le
     mandaron (vuelven a `pending`). Lo hecho a mano en la agenda se queda, y la
-    auditoría no se toca. La limpieza al cerrar es asíncrona a propósito:
+    auditoría no se borra. La limpieza al cerrar es asíncrona a propósito:
     `npx tsx` remata al hijo con SIGKILL si en 30 ms no le contesta (comentado
-    en el archivo).
+    en el archivo). Si una sesión se cerró de golpe, al arrancar para la app del
+    3002 que dejó (sólo procesos de esa carpeta con una marca propia en su
+    entorno) y quita lo que lleva la marca exacta del falso; un evento importado
+    ya cancelado y suelto se queda hasta la próxima siembra. Revisado por un
+    revisor en Sonnet: sus cuatro hallazgos (borrar al arrancar sin marca
+    exacta, borrar al arrancar todos los avisos de empalme, el comentario de la
+    auditoría y la ventana sin manejador de señales) se corrigieron.
   - **SEG-A5 de la guía estaba mal:** decía que dentro de la agenda un evento
     de todo el día da un aviso de empalme. No lo da, ni antes ni ahora
     (`empalmesServidor.ts` filtra `all_day = false`): la cita se guarda sin
@@ -3938,8 +3944,23 @@ primero sin marcar.
     convertir en cita un evento de Google, la nota vieja de
     `SALIDA_DEL_MODAL`), §7, este punto, §10, `CLAUDE.md` (sección «Agenda
     v2», sólo ampliada) y `DEUDA_TECNICA.md` AG-DT-29.
-  - **Paso 5 · guía de pruebas a mano y Google simulado:** ver la entrada de
-    la bitácora y el commit del paso.
+  - **Paso 5 · guía de pruebas a mano y Google simulado:**
+    `scripts/google-falso-manual.ts` (nuevo) sustituye al programa que la guía
+    hacía copiar; probado contra la app del 3002: cada orden (`lista`,
+    `crear`, serie, `mover`, `titulo`, `descripcion`, `borrar`, `caido`,
+    `lento`, `normal`, `ya`, `ultima`, órdenes con datos malos) con su efecto
+    comprobado en la base tras `POST /api/google/sync` (importar, mover,
+    renombrar, cancelar, no importar la serie, 503 → `google_5xx`, 3 s de
+    espera), la ida Spinus → Google sin las observaciones, el título de una
+    cita con paciente restablecido, y el Ctrl+C real (señal al grupo, como el
+    terminal): conexión, estado, importados y vínculos deshechos, puertos
+    libres, sin procesos sueltos; también tras un cierre de golpe (SIGKILL).
+    La guía se siguió desde una base recién reiniciada: P1–P11 comando por
+    comando (la vía `npx --yes supabase@2.117.0` incluida, que reinició la base
+    bien), §1.6, §1.8, el cron de recordatorios sin imprimir el secreto (200 y
+    401), los correos de Mailpit con enlaces al 3000, y los comandos de SEG-A3,
+    SEG-A4 y SEG-A7 con las salidas que la guía dice. Las 11 marcas
+    PENDIENTE-SEG resueltas; SEG-A5 corregida (en la agenda no hay aviso).
 
 **Bitácora** (una línea por sesión: fecha, qué quedó hecho, qué quedó a medias):
 

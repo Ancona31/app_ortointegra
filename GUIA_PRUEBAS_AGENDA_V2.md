@@ -16,6 +16,12 @@ partes:
 Al final está la lista de casillas para ir marcando (§11), lo que no se puede
 probar en tu computadora (§12) y el anexo para el día de producción (§13).
 
+**Al día con las correcciones de seguridad (2026-11-12).** Ya están integradas
+y probadas: sus pruebas son las de §9.2. La preparación (P1 a P11) se siguió
+comando por comando sobre una base recién reiniciada, y los comandos de las
+pruebas de seguridad que preguntan directo a la base se ejecutaron uno por uno
+para comprobar que responden lo que aquí se dice.
+
 **Cómo leer los comandos.** Cada recuadro gris es un comando. Cópialo entero,
 pégalo en la terminal de Ubuntu y pulsa Enter. Debajo de cada uno se dice qué
 hace y qué debe responder. Están pensados para la terminal normal de Ubuntu
@@ -92,11 +98,19 @@ SB=$(ls ~/.local/share/fnm/node-versions/*/installation/lib/node_modules/supabas
 $SB --version
 ```
 
-Debe decir `2.117.0`. Puede añadir un aviso de que hay una versión más nueva:
-ignóralo, no actualices. Si en vez de eso sale «No such file», no la tienes
-instalada en ese sitio; en ese caso usa `SB="npx supabase@2.117.0"` y vuelve a
-probar `$SB --version` (esta segunda vía no se probó al escribir la guía: si
-tampoco responde `2.117.0`, detente y pide ayuda).
+Debe decir `2.117.0`. Puede añadir un aviso de que hay una versión más nueva
+(«A new version of Supabase CLI is available…»): ignóralo, no actualices. Si la
+primera línea respondió «No such file or directory», o `$SB --version` dice
+«command not found», no la tienes instalada en ese sitio; usa esta otra línea,
+que la descarga de internet la primera vez (tarda un poco):
+
+```bash
+SB="npx --yes supabase@2.117.0"
+```
+
+y vuelve a probar `$SB --version`: también debe decir `2.117.0`. (Las dos vías
+se probaron al revisar esta guía; si ninguna responde `2.117.0`, detente y pide
+ayuda.)
 
 **P3. Comprobar que todo apunta a tu computadora y no a producción.**
 
@@ -137,9 +151,12 @@ en orden.
 $SB db reset --local
 ```
 
-Tarda alrededor de un minuto. El aviso `no files matched pattern:
-supabase/seed.sql` es normal. Al final debe decir que terminó sin errores. Puede
-recrear los contenedores con imágenes nuevas de Docker; también es normal.
+Tarda alrededor de medio minuto. Va diciendo «Applying migration …» por cada
+archivo. El aviso `no files matched pattern: supabase/seed.sql` es normal. Al
+final dice «Finished supabase db reset on branch main.»: ese «main» es una
+etiqueta de la herramienta de Supabase, **no** la rama de git (tú sigues en
+`feature/agenda-v2`). Puede recrear los contenedores con imágenes nuevas de
+Docker; también es normal. Si en algún momento sale «ERROR», detente.
 
 > ⚠️ Escribe siempre `--local`. Nunca `--linked` ni `--db-url`.
 
@@ -149,8 +166,8 @@ Comprueba cuántas migraciones quedaron:
 docker exec supabase_db_app_ortointegra psql -U postgres -Atc "select count(*), max(version) from supabase_migrations.schema_migrations"
 ```
 
-Debe responder `21|20261116120000` (las 5 de `main` más las 16 de la agenda).
-<!-- PENDIENTE-SEG: si las correcciones de seguridad añaden migraciones, el número y la última versión cambian aquí. -->
+Debe responder `25|20261117130000`: las 5 de `main` más las 20 de la agenda
+(las 16 de los bloques A a F y las 4 de las correcciones de seguridad).
 
 > Este reinicio deja fuera las tres migraciones `20261014…` de la otra rama
 > (`feature/limites-ajustables`). Para probar la agenda no hacen falta. Si
@@ -216,7 +233,8 @@ Responde algo como `Clínica Semilla A|t` (encendida) y `Clínica Semilla B|f`
 
 > Si algún día corres las pruebas automáticas (Playwright), éstas apagan todos
 > los interruptores y vuelven a sembrar al empezar. Después repite P7 si hizo
-> falta y P8.
+> falta y P8, y vuelve a crear el tipo «Consulta» (bloque D, «Antes de
+> empezar»): sembrar borra los tipos de cita y los enlaces.
 
 **P9. Instalar dependencias (sólo si es la primera vez en esta carpeta).**
 
@@ -833,136 +851,61 @@ computadora; la prueba con tu cuenta real es aparte (§12).
 
 ### C0. Preparar el Google simulado
 
-El Google simulado no tiene pantalla: se maneja con comandos cortos. Necesitas
-**tres terminales**, todas en `~/proyectos/app_ortointegra-agenda`.
+El Google simulado no tiene pantalla: se maneja con comandos cortos. Hacen
+falta **dos terminales**, las dos en `~/proyectos/app_ortointegra-agenda`.
 
 > ⚠️ **Antes de nada, detén la app del puerto 3000** (Ctrl+C en su terminal).
 > Mientras el Google simulado esté conectado, la app del 3000 (la de P11)
 > intentaría hablar con el Google de verdad con llaves falsas. Para estas
-> pruebas se usa sólo el puerto **3002**.
+> pruebas se usa sólo la app del puerto **3002**, que arranca el propio
+> programa del Google simulado.
 
-**Terminal 1 — el Google simulado.** Primero se escribe un pequeño programa de
-control (sólo hay que hacerlo una vez; queda en una carpeta que git ignora).
-Copia **todo** el bloque, desde `cat` hasta la última `EOF`, y pégalo de una
-vez:
+**Terminal 1 — el Google simulado y la app del 3002.** Un solo comando:
 
 ```bash
-cat > e2e/resultados/google-falso-manual.ts <<'EOF'
-// Google simulado para pruebas A MANO. Sólo local. Lo escribió la guía de pruebas.
-import { config } from 'dotenv'
-import { execFileSync } from 'node:child_process'
-import { createServer } from 'node:http'
-import { arrancarGoogleFalso, CALENDARIO } from '../google-falso/servidor'
-import { encrypt } from '../../src/lib/encrypt'
-
-config({ path: '.env.local', quiet: true })
-const CLINICA = 'Clínica Semilla A'
-
-function sql(q: string, v: Record<string, string> = {}): string {
-  const vars = Object.entries(v).flatMap(([k, x]) => ['-v', `${k}=${x}`])
-  return execFileSync('docker', ['exec', '-i', 'supabase_db_app_ortointegra', 'psql', '-U', 'postgres', '-X', '-tAq',
-    '-v', 'ON_ERROR_STOP=1', '-v', `clinica=${CLINICA}`, ...vars, '-f', '-'], { input: q, encoding: 'utf8' }).trim()
-}
-
-const BORRAR_CONEXION = `
-delete from private.google_conexiones_secretos s using public.clinica_conexiones_google g, public.clinicas c
- where s.conexion_id = g.id and g.clinica_id = c.id and c.nombre = :'clinica';
-delete from public.gcal_sync_estado e using public.clinicas c where e.clinica_id = c.id and c.nombre = :'clinica';
-delete from public.clinica_conexiones_google g using public.clinicas c where g.clinica_id = c.id and c.nombre = :'clinica';`
-
-function puntas(dia: string, hora: string, min: number) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(dia) || !/^\d{2}:\d{2}$/.test(hora) || !(min > 0)) throw new Error('dia=AAAA-MM-DD, hora=HH:MM, min>0')
-  const ini = new Date(`${dia}T${hora}:00-06:00`) // hora de Mérida
-  return { start: { dateTime: ini.toISOString() }, end: { dateTime: new Date(ini.getTime() + min * 60_000).toISOString() } }
-}
-const merida = (iso?: string | null) => iso ? new Date(iso).toLocaleString('es-MX', { timeZone: 'America/Merida' }) : '-'
-
-async function main(): Promise<void> {
-  const g = await arrancarGoogleFalso(4555)
-  sql(`delete from public.reserva_empalmes_google r using public.clinicas c where r.clinica_id = c.id and c.nombre = :'clinica';` + BORRAR_CONEXION)
-  const hecha = sql(`with x as (
-      insert into public.clinica_conexiones_google (clinica_id, user_id, rol, calendar_id, estado, google_account_email)
-      select c.id, u.id, 'clinica', :'cal', 'activa', 'falso@google-falso.test'
-        from public.clinicas c, auth.users u where c.nombre = :'clinica' and u.email = 'admin.a@semilla.spinus.test'
-      returning id)
-    insert into private.google_conexiones_secretos (conexion_id, access_token, refresh_token, expires_at)
-    select x.id, :'a', :'r', :'e'::bigint from x returning conexion_id;`,
-  { cal: CALENDARIO, a: encrypt('token-falso-de-acceso'), r: encrypt('token-falso-de-refresco'), e: String(Date.now() + 10 * 365 * 86_400_000) })
-  if (!hecha) throw new Error('no se pudo conectar la Clínica Semilla A (¿sembraste?)')
-
-  createServer((req, res) => {
-    const u = new URL(req.url ?? '/', 'http://127.0.0.1')
-    const p = (k: string) => u.searchParams.get(k) ?? ''
-    let salida = ''
-    try {
-      switch (u.pathname) {
-        case '/lista':
-          salida = [...g.eventos.values()].map((e) => `${e.id} | ${e.status} | ${e.summary ?? ''} | ${merida(e.start?.dateTime ?? e.start?.date)} → ${merida(e.end?.dateTime ?? e.end?.date)}${e.recurrence ? ' | serie' : ''} | descripción: ${(e.description ?? '').replace(/\s+/g, ' ').slice(0, 80)}`).join('\n') || '(sin eventos)'
-          break
-        case '/crear': {
-          const veces = Number(p('veces') || '0')
-          const e = g.crear({ summary: p('titulo'), description: p('descripcion') || undefined, ...puntas(p('dia'), p('hora'), Number(p('min') || '60')), ...(veces > 1 ? { recurrence: [`RRULE:FREQ=DAILY;COUNT=${veces}`] } : {}) })
-          salida = `creado ${e.id}`
-          break
-        }
-        case '/mover': g.modificar(p('id'), puntas(p('dia'), p('hora'), Number(p('min') || '60'))); salida = 'movido'; break
-        case '/titulo': g.modificar(p('id'), { summary: p('texto') }); salida = 'título cambiado'; break
-        case '/descripcion': g.modificar(p('id'), { description: p('texto') }); salida = 'descripción cambiada'; break
-        case '/borrar': g.borrar(p('id')); salida = 'borrado (cancelado en Google)'; break
-        case '/caido': g.lista = { demoraMs: 0, falla: 503 }; salida = 'Google CAÍDO'; break
-        case '/lento': g.lista = { demoraMs: Number(p('ms') || '8000'), falla: null }; salida = `Google LENTO (${g.lista.demoraMs} ms)`; break
-        case '/normal': g.lista = { demoraMs: 0, falla: null }; salida = 'Google normal'; break
-        case '/ya':
-          sql(`update public.gcal_sync_estado e set ultima_ok = now() - interval '5 minutes' from public.clinicas c where e.clinica_id = c.id and c.nombre = :'clinica';`)
-          salida = 'listo: la próxima recarga de la agenda vuelve a leer Google'
-          break
-        case '/ultima':
-          sql(`update public.gcal_sync_estado e set ultima_ok = now() - make_interval(secs => :'s'::int), errores_seguidos = 0, ultimo_error = null, candado = null, candado_hasta = null from public.clinicas c where e.clinica_id = c.id and c.nombre = :'clinica';`, { s: String(Number(p('seg') || '0')) })
-          salida = `última lectura buena de Google: hace ${p('seg')} s`
-          break
-        default: salida = 'órdenes: /lista /crear /mover /titulo /descripcion /borrar /caido /lento /normal /ya /ultima'
-      }
-    } catch (err) { salida = `ERROR: ${err instanceof Error ? err.message : String(err)}` }
-    res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end(salida + '\n')
-  }).listen(4556, '127.0.0.1')
-
-  const cerrar = (): void => { try { sql(BORRAR_CONEXION) } catch { /* nada */ } console.log('\nConexión de prueba borrada. Adiós.'); process.exit(0) }
-  process.on('SIGINT', cerrar); process.on('SIGTERM', cerrar)
-  console.log(`Google simulado en ${g.url} — órdenes en http://127.0.0.1:4556 — Ctrl+C para terminar y desconectar.`)
-}
-main().catch((e: unknown) => { console.error(e); process.exit(1) })
-EOF
+npx tsx scripts/google-falso-manual.ts
 ```
 
-No responde nada (sólo crea el archivo). Después, en la misma terminal:
+Primero dice «Google simulado en http://127.0.0.1:4555/ y órdenes en
+http://127.0.0.1:4556 (Clínica Semilla A conectada).» y «Arrancando la app en
+http://localhost:3002 (puede tardar un par de minutos)…». Cuando la app está
+lista, dice «Lista: abre http://localhost:3002/agenda. Deja esta ventana
+abierta; Ctrl+C para terminar.» y se queda corriendo.
 
-```bash
-npx tsx e2e/resultados/google-falso-manual.ts
-```
+Esto **conecta la Clínica Semilla A** a un Google de mentira (como si el Dr.
+Admin hubiera conectado su cuenta) y levanta la app en el puerto 3002, la única
+que habla con ese Google de mentira. No hay que copiar nada más ni cambiar
+ninguna configuración.
 
-Debe decir «Google simulado en http://127.0.0.1:4555/ — órdenes en
-http://127.0.0.1:4556 — Ctrl+C para terminar y desconectar.» y quedarse
-corriendo. Esto **conecta la Clínica Semilla A** a ese Google de mentira (como
-si el Dr. Admin hubiera conectado su cuenta). Cuando acabes las pruebas de C y
-de D11, pulsa **Ctrl+C** aquí: borra la conexión de prueba.
-
-**Terminal 2 — la app, en modo de prueba con Google simulado (puerto 3002).**
-
-```bash
-NODE_ENV=development GCAL_FALSO_URL=http://127.0.0.1:4555/ GOOGLE_CLIENT_ID=cliente-falso GOOGLE_CLIENT_SECRET=secreto-falso NEXT_PUBLIC_APP_URL=http://localhost:3002 NEXT_TELEMETRY_DISABLED=1 npx next dev --webpack -p 3002
-```
-
-Debe decir «Ready». Esta app sólo habla con el Google simulado por cuatro
-cerrojos a la vez: modo de prueba, dirección local del simulado, base local y
-llaves falsas. **Copia el comando entero, sin cambiar nada.** La primera vez
-que abras cada pantalla tarda (se compila en el momento): puede tardar uno o
-dos minutos.
+Si en vez de eso dice:
+- «el puerto 3002 ya está en uso…»: hay otra app en el 3002 (quizá de otra
+  terminal). Ciérrala y repite.
+- «No encontré la Clínica Semilla A o al Dr. Admin: siembra primero (P6).»:
+  siembra (P6) y repite.
+- «la app del 3002 no respondió…» o «…se cerró»: algo falló al arrancar la app;
+  el detalle queda en el archivo `test-results/google-falso-manual-next.log`.
+  Pide ayuda con ese archivo.
 
 Abre **http://localhost:3002/agenda** (la sesión del 3000 vale aquí). La v2
-tiene que estar encendida (P8).
+tiene que estar encendida (P8). La primera vez que abras cada pantalla tarda
+(se compila en el momento): puede tardar uno o dos minutos.
 
-**Terminal 3 — las órdenes al Google simulado.** Aquí escribirás comandos
-como éstos:
+**Al terminar las pruebas de C y de D11, pulsa Ctrl+C en la terminal 1** y
+espera a que diga «Listo: app del 3002 parada, conexión de prueba borrada y
+base como estaba.» (unos segundos; puede salir debajo de la línea donde ya
+puedes escribir, y es normal). Eso deshace todo lo del Google simulado: quita
+la conexión de la Clínica A, borra los eventos que entraron desde Google y
+suelta de él las citas de Spinus que se le mandaron. Lo que hiciste a mano en
+la agenda (citas nuevas, cancelaciones) se queda, como en cualquier prueba, y
+la bitácora de auditoría no se borra (la limpieza le deja sus renglones
+normales). Si alguna vez se cierra de golpe (por ejemplo, si se apaga la
+computadora), la próxima vez que lo arranques dice «Paré la app del 3002 que
+dejó una sesión anterior cerrada de golpe.», quita la conexión vieja y sigue.
+En ese caso puede quedarse en la agenda algún evento de Google ya cancelado;
+desaparece la próxima vez que siembres (P6).
+
+**Terminal 2 — las órdenes al Google simulado.** Aquí escribirás comandos
+como éste:
 
 ```bash
 curl -s 127.0.0.1:4556/lista
@@ -971,17 +914,31 @@ curl -s 127.0.0.1:4556/lista
 Muestra los eventos del Google simulado, uno por renglón: su código (por
 ejemplo `falso3x` o `google5`), si está vivo (`confirmed`) o borrado
 (`cancelled`), el título, la hora de Mérida y el principio de la descripción.
-Las demás órdenes (cambia las fechas por las de tu semana; usa el formato
-AAAA-MM-DD):
+Si no hay ninguno, dice «(sin eventos)». Las demás órdenes (cambia las fechas
+por las de tu semana, en formato AAAA-MM-DD, y el código por el que viste en
+`/lista`):
 
-| Para… | Comando |
-|---|---|
-| crear un evento «como en Google» | `curl -sG 127.0.0.1:4556/crear --data-urlencode "titulo=Junta en Google" -d dia=2026-11-19 -d hora=12:00 -d min=60` |
-| crear una serie que se repite | lo mismo con `-d veces=3` |
-| mover un evento | `curl -sG 127.0.0.1:4556/mover -d id=falso3x -d dia=2026-11-19 -d hora=17:00 -d min=30` |
-| cambiar su título | `curl -sG 127.0.0.1:4556/titulo -d id=falso3x --data-urlencode "texto=Otro título"` |
-| borrarlo | `curl -sG 127.0.0.1:4556/borrar -d id=falso3x` |
-| que Spinus vuelva a leer Google ya | `curl -s 127.0.0.1:4556/ya` y luego **recarga la agenda** (F5) |
+| Para… | Comando | Responde |
+|---|---|---|
+| crear un evento «como en Google» | `curl -sG 127.0.0.1:4556/crear --data-urlencode "titulo=Junta en Google" -d dia=2026-11-19 -d hora=12:00 -d min=60` | `creado google5` (su código) |
+| crear una serie que se repite | lo mismo con `-d veces=3` | `creado …` |
+| crear con descripción | añade `--data-urlencode "descripcion=Notas de Google"` | `creado …` |
+| mover un evento | `curl -sG 127.0.0.1:4556/mover -d id=falso3x -d dia=2026-11-19 -d hora=17:00 -d min=30` | `movido` |
+| cambiar su título | `curl -sG 127.0.0.1:4556/titulo -d id=falso3x --data-urlencode "texto=Otro título"` | `título cambiado` |
+| cambiar su descripción | `curl -sG 127.0.0.1:4556/descripcion -d id=falso3x --data-urlencode "texto=Otra nota"` | `descripción cambiada` |
+| borrarlo | `curl -sG 127.0.0.1:4556/borrar -d id=falso3x` | `borrado (queda cancelado en Google)` |
+| que Spinus vuelva a leer Google ya | `curl -s 127.0.0.1:4556/ya` y luego **recarga la agenda** (F5) | `listo: la próxima recarga de la agenda vuelve a leer Google` |
+| Google caído (para G3) | `curl -s 127.0.0.1:4556/caido` | `Google CAÍDO (responde 503 al leer)` |
+| Google lento (para G4) | `curl -sG 127.0.0.1:4556/lento -d ms=8000` | `Google LENTO (8000 ms al leer)` |
+| Google normal otra vez | `curl -s 127.0.0.1:4556/normal` | `Google normal` |
+| fingir cuándo fue la última lectura buena (para G1–G5) | `curl -sG 127.0.0.1:4556/ultima -d seg=120` | `última lectura buena de Google: hace 120 s` |
+| ver la lista de órdenes | `curl -s 127.0.0.1:4556/ayuda` | la lista |
+
+Si una orden responde `ERROR: …`, el texto dice qué faltó (por ejemplo «no hay
+ningún evento «falso9x» (mira /lista)» o «faltan datos: dia=AAAA-MM-DD,
+hora=HH:MM…»). Si `/ya` o `/ultima` responden «todavía no hay lectura de
+Google: abre una vez http://localhost:3002/agenda y repite la orden», abre la
+agenda del 3002 una vez y repite.
 
 **Cómo «vuelve» un cambio a Spinus.** La agenda lee Google al abrirse (y al
 volver a la pestaña después de 2 minutos), como mucho una vez por minuto. Así
@@ -1109,13 +1066,15 @@ recargo. Después la vuelvo a encender.
 
 **Si falla, significa que…** el interruptor no protege esta función.
 
-> **Hallazgo al preparar esta guía (para que lo decidas).** El plan decía que un
-> evento creado en Google se podía **convertir en cita** ligándolo a un
-> paciente. En la pantalla no encontré cómo: un evento importado se edita como
-> evento y no deja ponerle paciente. Queda anotado en §12.
+> **Hallazgo para que lo decidas.** El plan decía que un evento creado en
+> Google se podía **convertir en cita** ligándolo a un paciente. En la pantalla
+> no hay cómo: un evento importado se edita como evento y no deja ponerle
+> paciente. Se dejó así y quedó anotado como pendiente (`DEUDA_TECNICA.md`,
+> AG-DT-29; ver también §12).
 
-Cuando termines C y D11: Ctrl+C en la terminal 1 (desconecta) y en la terminal
-2, y vuelve a arrancar la app del 3000 (P11).
+Si vas a seguir con el bloque D11 (§6), deja la terminal 1 corriendo. Si no:
+Ctrl+C en la terminal 1 (espera el «Listo…») y vuelve a arrancar la app del
+3000 (P11).
 
 ---
 
@@ -1123,6 +1082,16 @@ Cuando termines C y D11: Ctrl+C en la terminal 1 (desconecta) y en la terminal
 
 **Antes de empezar:** app del **3000** (P11), v2 encendida (P8), aviso aprobado
 (P7) y el tipo «Consulta» activo (B4). Mailpit abierto (§1.5).
+
+Si no hiciste B4, o si volviste a sembrar después (sembrar borra los tipos de
+cita), este comando crea «Consulta» (30 minutos, toda la clínica) sin pasar por
+la pantalla; si ya existe, no hace nada:
+
+```bash
+docker exec supabase_db_app_ortointegra psql -U postgres -c "insert into public.tipos_cita (clinica_id, nombre, duracion_min, activo) select id, 'Consulta', 30, true from public.clinicas c where c.nombre = 'Clínica Semilla A' and not exists (select 1 from public.tipos_cita t where t.clinica_id = c.id and t.nombre = 'Consulta' and t.activo);"
+```
+
+Responde `INSERT 0 1` (lo creó) o `INSERT 0 0` (ya estaba).
 
 ### D0. Crear el enlace fijo del Dr. Admin
 
@@ -1245,7 +1214,11 @@ con `ana1@prueba.test` (que ya tiene la cita de D1), verificando el código.
 9990000002).
 
 **Si falla, significa que…** una persona puede acaparar varios turnos.
-<!-- PENDIENTE-SEG: tras la corrección A2 el candado decide por el correo verificado; confirmar que este texto no cambia. -->
+
+> El texto no cambió con las correcciones de seguridad. Lo que cambió es **qué
+> se mira**: «una cita activa» se decide por el **correo verificado**, no por
+> el teléfono. Con el correo de Ana sale este mensaje; con el teléfono de Ana y
+> otro correo, se reserva (lo comprueba SEG-A2).
 
 ### D7. Candado: tres cancelaciones cierran el autoservicio
 
@@ -1360,8 +1333,9 @@ lee Google, para no ofrecer un turno que ya se ocupó allá. Si Google tarda o
 está caído, sólo se reserva si la última lectura buena tiene menos de 30
 minutos.
 
-**Antes de empezar:** el Google simulado y la app del **3002** (C0), v2
-encendida, aviso aprobado, tipo «Consulta» y un enlace fijo del Dr. Admin. El
+**Antes de empezar:** el Google simulado con su app del **3002** corriendo (C0,
+terminal 1), v2 encendida, aviso aprobado, tipo «Consulta» y un enlace fijo del
+Dr. Admin. El
 enlace se abre en `http://localhost:3002/reservar/<código>` (cambia 3000 por
 3002 en la dirección). Abre una vez la agenda en el 3002 para que exista el
 estado de sincronización.
@@ -1437,8 +1411,8 @@ cambiando el filtro o mirando todo) hay un `reserva_empalme_google`.
 **Si falla, significa que…** la clínica no se entera de un choque entre una
 reserva y su Google.
 
-Al terminar: Ctrl+C en las terminales 1 y 2, y arranca otra vez la app del 3000
-(P11).
+Al terminar: Ctrl+C en la terminal 1 del Google simulado (espera el
+«Listo…»), y arranca otra vez la app del 3000 (P11).
 
 ---
 
@@ -1651,6 +1625,11 @@ navegador de Windows):
 ```bash
 explorer.exe "$(wslpath -w e2e/resultados/F/comparativa/index.html)"
 ```
+
+(Si no estás en la terminal de Ubuntu de Windows, sino en un Linux normal, usa
+`xdg-open e2e/resultados/F/comparativa/index.html`. Esa carpeta no viaja con
+git: sólo existe en la computadora donde se hicieron las capturas; si el
+comando dice que no la encuentra, salta este paso.)
 
 Pone lado a lado las capturas de antes, de después y de después con la v2, a
 los cuatro tamaños, más los videos.
@@ -2101,18 +2080,17 @@ Nunca un mensaje que diga si el enlace existe.
 **Si falla, significa que…** los enlaces funcionan con la función apagada o
 dejan adivinar cuáles existen.
 
-### 9.2 Correcciones de seguridad (parte A)
+### 9.2 Correcciones de seguridad
 
-> ### ⚠️ SE AJUSTARÁ AL TERMINAR LAS CORRECCIONES
->
-> Estas ocho pruebas describen cómo **debe** comportarse la app **después** de
-> las correcciones que se están programando ahora. Hasta que estén terminadas,
-> varias **fallarán a propósito** (y alguna, como SEG-A3, hace justo el daño
-> que se quiere impedir). **No las corras hasta que te digan que las
-> correcciones están listas.** Los textos exactos de algunos mensajes todavía
-> no están decididos; están marcados para completarlos.
+Estas ocho pruebas comprueban las correcciones de seguridad que pediste
+después de la revisión independiente. **Ya están hechas e integradas**: todas
+deben salir como se describe. Las de SEG-A3, SEG-A4 y SEG-A7 se hacen con
+comandos que preguntan directo a la base; están listos para copiar tal cual,
+sin cambiar nada.
 
-Usan los atajos `entrar` y `pg` de S2.
+Usan los atajos `entrar` y `pg` de S2: si abriste una terminal nueva, cópialos
+otra vez antes de empezar. Hazlas en el orden en que están, después de D1, D3
+y D8 (necesitan a «Ana Reserva Uno» con su cita y a «Beto Reserva Dos»).
 
 #### SEG-A1. El enlace no revela si un teléfono ya tiene cita
 
@@ -2122,9 +2100,12 @@ nuevo (`otro1@prueba.test`), y pulso «Enviar código a mi correo» **sin
 verificar**. Repito en otra ventana de incógnito con un teléfono limpio
 (5599999999) y otro correo nuevo (`otro2@prueba.test`).
 
-**Qué debo ver:** **exactamente la misma respuesta** en los dos casos (pide el
-código). Nada distingue al teléfono que ya tiene cita.
-<!-- PENDIENTE-SEG: texto exacto de la respuesta común, y si el aviso de «ya tienes cita» se muestra sólo tras verificar el correo. -->
+**Qué debo ver:** **exactamente la misma respuesta** en los dos casos: «Te
+enviamos un código de 6 dígitos a {el correo}. Vence en 10 minutos.». En este
+paso el teléfono ni siquiera viaja: sólo se manda el correo. Y aunque
+siguieras y verificaras el código, el aviso de «ya tienes cita» («Para agendar,
+comunícate con el consultorio: 9990000001.») sólo sale cuando **el correo
+verificado** es el que ya tiene una cita activa (D6), nunca por el teléfono.
 
 **Si falla, significa que…** cualquiera podría averiguar si un número de
 teléfono tiene cita con ese médico.
@@ -2133,16 +2114,30 @@ teléfono tiene cita con ese médico.
 
 **Qué hago:**
 1. Con el teléfono de «Ana Reserva Uno» (5512345601) y un correo nuevo
-   verificado (`otro3@prueba.test`), reservo por el enlace fijo.
-2. Bloqueo a mano el contacto de «Beto Reserva Dos» (D8). Intento reservar con
-   el teléfono de Beto y un correo nuevo verificado (`otro4@prueba.test`).
+   (`otro3@prueba.test`), reservo por el enlace fijo, verificando el código.
+2. Con «Beto Reserva Dos» bloqueado a mano (D8: «Bloquear contacto»; si lo
+   desbloqueaste al final de D8, vuelve a bloquearlo), intento
+   reservar con el teléfono de Beto (5512345602) y un correo nuevo
+   (`otro4@prueba.test`), verificando el código.
 
 **Qué debo ver:**
-1. **Sí reserva**: el teléfono, por sí solo, ya no bloquea (el candado de «una
-   cita activa» y el de cancelaciones van por el correo verificado).
-2. **No reserva**: el teléfono sí cuenta para un **bloqueo manual**. Mensaje:
-   «Para agendar, comunícate con el consultorio: {teléfono}.».
-<!-- PENDIENTE-SEG: confirmar el mensaje del caso 2 y si el bloqueo manual por teléfono se aplica antes o después de verificar el correo. -->
+1. **Sí reserva**: «Tu cita quedó agendada». El teléfono, por sí solo, ya no
+   bloquea: «una cita activa» y las cancelaciones se cuentan por el correo
+   verificado.
+2. **No reserva**: el teléfono sí cuenta para un **bloqueo manual**. Después
+   de escribir el código sale «Para agendar, comunícate con el consultorio:
+   9990000001.» (el teléfono del consultorio que elegiste; Hosp Norte es
+   9990000002). El código del correo sí se manda y se verifica: el bloqueo
+   manual se mira al reservar.
+
+> **Para que lo decidas (ya anotado como pendiente, AG-DT-28).** Este caso 2 es
+> la única forma que queda de saber algo de un teléfono desde el enlace: quien
+> lo tenga puede averiguar si la clínica **bloqueó a mano** ese número (no si
+> tiene cita ni historial). Lo limitan los topes de intentos (SEG-A8) y que en
+> el enlace fijo hace falta un correo verificado propio. Se dejó así porque
+> pediste que el bloqueo manual corte también por teléfono. La alternativa es
+> que el bloqueo manual mire sólo el correo; entonces un bloqueado podría
+> volver con otro correo.
 
 **Si falla, significa que…** alguien con el mismo teléfono que un paciente
 (familia, número reciclado) queda bloqueado sin razón, o un bloqueado a mano se
@@ -2150,85 +2145,132 @@ cuela cambiando de correo.
 
 #### SEG-A3. Con la v2 encendida, nadie borra una cita con paciente, ni saltándose la pantalla
 
-> ⚠️ **Antes de las correcciones este comando SÍ borra la cita.** Córrelo sólo
-> cuando te confirmen que la corrección está aplicada.
-
-**Qué hago:** con la v2 encendida, busco una cita con paciente y otra por
-ligar:
-
-```bash
-docker exec supabase_db_app_ortointegra psql -U postgres -c "select a.id, a.title, (a.paciente_id is not null) as con_paciente, a.reserva_canal from public.appointments a join public.clinicas c on c.id = a.clinica_id where c.nombre = 'Clínica Semilla A' and a.status = 'scheduled' and a.start_time > now() and (a.paciente_id is not null or a.reserva_canal is not null) order by a.reserva_canal nulls last, a.start_time limit 4;"
-```
-
-Copio el `id` de una con paciente y lo pongo en lugar de `<ID>`:
+**Qué hago:** con la v2 encendida (P8), entro a la base como el Dr. Admin:
 
 ```bash
 entrar admin.a@semilla.spinus.test
 ```
 
+Debe decir «Sesión lista: admin.a@semilla.spinus.test». Ahora busco una cita
+**con paciente** (este comando sólo lee y guarda su código en `ID`):
+
 ```bash
-pg "appointments?id=eq.<ID>" -X DELETE
+ID=$(docker exec supabase_db_app_ortointegra psql -U postgres -Atc "select a.id from public.appointments a join public.clinicas c on c.id = a.clinica_id where c.nombre = 'Clínica Semilla A' and a.paciente_id is not null and a.status = 'scheduled' and a.start_time > now() order by a.start_time limit 1"); echo "$ID"
 ```
 
-Repito con el `id` de una por ligar (con `reserva_canal`).
+Imprime un código largo (letras, números y guiones). Intento borrarla por
+fuera de la pantalla:
 
-**Qué debo ver:** la base lo rechaza (un error, no `[]` con la cita dentro) y la
-cita **sigue** en la agenda. Con la v2 apagada, el borrado de hoy no cambia.
-<!-- PENDIENTE-SEG: código de error y texto que devuelve la base (y el HTTP). -->
+```bash
+pg "appointments?id=eq.$ID" -X DELETE
+```
+
+Y compruebo que sigue ahí:
+
+```bash
+docker exec supabase_db_app_ortointegra psql -U postgres -Atc "select count(*) from public.appointments where id = '$ID'"
+```
+
+Después hago lo mismo con una cita **por ligar** (la de «Ana Reserva Uno» o
+cualquier reserva por enlace): primero la busco con este otro comando, y luego
+repito, sin cambiarlos, el de borrar (`pg … -X DELETE`) y el de comprobar:
+
+```bash
+ID=$(docker exec supabase_db_app_ortointegra psql -U postgres -Atc "select a.id from public.appointments a join public.clinicas c on c.id = a.clinica_id where c.nombre = 'Clínica Semilla A' and a.reserva_canal is not null and a.status = 'scheduled' order by a.start_time limit 1"); echo "$ID"
+```
+
+(Si no imprime nada, todavía no hay ninguna reserva por enlace: haz D1.)
+
+**Qué debo ver:** el borrado se **rechaza**, con este texto exacto:
+
+```
+{"code":"42501","details":null,"hint":"Cancélala (status cancelled) en vez de borrarla","message":"Una cita con paciente o por ligar no se borra: se cancela"}
+HTTP 403
+```
+
+y el comprobante responde `1`: la cita sigue ahí (y en la agenda). Lo mismo
+con la por ligar. Un evento **sin paciente** sí se puede borrar así (responde
+`HTTP 200` con el evento borrado), y con la v2 **apagada** el borrado es el de
+siempre: una cita con paciente que nunca tuvo enlace ni correo de la v2 se
+borra (`HTTP 200`).
 
 **Si falla, significa que…** alguien de la clínica puede borrar citas con
-paciente por fuera de la pantalla (hoy pasa: es lo que se corrige).
+paciente por fuera de la pantalla.
 
 #### SEG-A4. Los datos de la reserva y del consentimiento no se cambian desde fuera
 
-**Qué hago:** con el `id` de una cita por ligar (consulta de SEG-A3) y la sesión
-del Dr. Admin:
+**Qué hago:** con la sesión del Dr. Admin (`entrar` de SEG-A3) y la cita **por
+ligar** de SEG-A3 (el último `ID` que buscaste; si abriste otra terminal,
+vuelve a buscarla con el segundo comando de búsqueda de SEG-A3), intento
+cambiar quién reservó:
 
 ```bash
-pg "appointments?id=eq.<ID>" -X PATCH -d '{"reserva_nombre":"Nombre cambiado"}'
+pg "appointments?id=eq.$ID" -X PATCH -d '{"reserva_nombre":"Nombre cambiado"}'
 ```
+
+Cuándo aceptó el aviso de privacidad y qué versión:
 
 ```bash
-pg "appointments?id=eq.<ID>" -X PATCH -d '{"reserva_aceptado_en":"2020-01-01T00:00:00Z","reserva_aviso_version":"otra"}'
+pg "appointments?id=eq.$ID" -X PATCH -d '{"reserva_aceptado_en":"2020-01-01T00:00:00Z","reserva_aviso_version":"otra"}'
 ```
+
+Y por último, borrar su teléfono y su correo de la reserva:
 
 ```bash
-pg "appointments?id=eq.<ID>" -X PATCH -d '{"reserva_telefono":null,"reserva_correo":null}'
+pg "appointments?id=eq.$ID&select=reserva_nombre,reserva_telefono,reserva_correo" -X PATCH -d '{"reserva_telefono":null,"reserva_correo":null}'
 ```
 
-**Qué debo ver:** los dos primeros se **rechazan** (error) y la cita conserva su
-nombre de reserva y su consentimiento. El tercero **sí se permite**: borrar el
-teléfono y el correo de la reserva es lo único que se deja hacer (por ejemplo,
-si el paciente lo pide).
-<!-- PENDIENTE-SEG: código de error de los dos primeros; lista final de columnas protegidas (¿reserva_canal, reserva_enlace_id, *_hmac, reserva_historial_previo, reserva_reagendados?). -->
+**Qué debo ver:**
+- El primero se **rechaza**: `{"code":"42501","details":null,"hint":null,"message":"La columna reserva_nombre de la cita sólo la escribe el servidor"}` y `HTTP 403`.
+- El segundo, igual, con `La columna reserva_aceptado_en de la cita sólo la
+  escribe el servidor` y `HTTP 403`. La cita conserva su nombre de reserva y
+  su consentimiento.
+- El tercero **sí se permite**: `[{"reserva_nombre":"Ana Reserva Uno","reserva_telefono":null,"reserva_correo":null}]`
+  y `HTTP 200`. Borrar el teléfono y el correo de la reserva es lo único que
+  se deja hacer (por ejemplo, si la persona lo pide). Ojo: esa cita se queda
+  sin teléfono ni correo en la agenda; si la necesitas para otra prueba, usa
+  otra reserva.
+
+Las columnas protegidas son las once que empiezan por `reserva_`: quién
+reservó (`reserva_nombre`, `reserva_telefono`, `reserva_correo`), con qué
+enlace (`reserva_canal`, `reserva_enlace_id`), el consentimiento
+(`reserva_aceptado_en`, `reserva_aviso_version`), el historial que vio la
+clínica (`reserva_historial_previo`), las veces que se reagendó
+(`reserva_reagendados`) y las dos huellas para el candado (`reserva_tel_hmac`,
+`reserva_correo_hmac`). Desde la sesión no se pueden poner al crear una cita
+ni cambiar después; sólo vaciar el teléfono y el correo.
 
 **Si falla, significa que…** se podría falsear quién reservó o cuándo aceptó el
 aviso de privacidad.
 
-#### SEG-A5. Un evento de todo el día bloquea esos días en el enlace, y en la agenda sólo avisa
+#### SEG-A5. Un evento de todo el día bloquea esos días en el enlace, y en la agenda no
 
 **Qué hago:** como Dr. Admin creo un evento de **todo el día** «Congreso del
 Dr. Admin» para un martes de la semana siguiente. Abro su enlace de reserva y
 miro ese martes. Después agendo dentro de la agenda una cita de «Paciente
 Prueba 14» ese martes a las 09:00.
 
-**Qué debo ver:** en el enlace, ese martes **no ofrece ningún horario**. En la
-agenda, al guardar la cita sale un **aviso** que menciona el evento de todo el
-día, y con «Aceptar» se guarda (no bloquea al personal).
-<!-- PENDIENTE-SEG: texto exacto del aviso dentro de la agenda para el evento de todo el día. -->
+**Qué debo ver:** en el enlace, ese martes **no ofrece ningún horario** (los
+demás días sí). En la agenda, la cita se guarda **sin ningún aviso** («Se agendó
+correctamente»): dentro de la agenda un evento de todo el día no cuenta como
+empalme, igual que antes de la corrección. Si cancelas el congreso, el martes
+vuelve a ofrecer horarios en el enlace.
 
 **Si falla, significa que…** los pacientes pueden reservar en días que el
 médico tiene ocupados, o el personal queda bloqueado.
 
 #### SEG-A6. Un enlace de un solo uso no le sirve a un contacto bloqueado a mano
 
-**Qué hago:** con «Beto Reserva Dos» bloqueado a mano (D8), emito un enlace de
-un solo uso y reservo con su teléfono y su correo.
+**Qué hago:** con «Beto Reserva Dos» bloqueado a mano (D8; si no lo está,
+«Bloquear contacto» en su cita), emito un enlace de un solo uso y, en incógnito, reservo con su teléfono (5512345602) y su correo
+(`beto2@prueba.test`). Después lo desbloqueo («Desbloquear contacto») y vuelvo a
+intentarlo **con el mismo enlace**.
 
-**Qué debo ver:** **no reserva**. El enlace de un solo uso se sigue saltando el
+**Qué debo ver:** la primera vez **no reserva**: «Para agendar, comunícate con
+el consultorio: 9990000001.». El enlace de un solo uso se sigue saltando el
 límite de una cita activa y el de cancelaciones, pero ya **no** el bloqueo
-manual. El enlace no se gasta.
-<!-- PENDIENTE-SEG: mensaje exacto que ve la persona y si el enlace queda sin gastar. -->
+manual. El enlace **no se gasta**: tras desbloquear, el mismo enlace reserva
+(«Tu cita quedó agendada»).
 
 **Si falla, significa que…** alguien bloqueado a mano puede volver con un
 enlace que se le mandó antes.
@@ -2236,30 +2278,36 @@ enlace que se le mandó antes.
 #### SEG-A7. El código del enlace lo pone siempre el servidor, y el nombre no ensucia Google
 
 **Qué hago:**
-1. Intento crear un enlace con un código elegido por mí, directo en la base
-   (con la sesión del Dr. Admin). Primero, los datos que hacen falta:
+1. Intento crear, directo en la base y con la sesión del Dr. Admin (`entrar`
+   de SEG-A3), un enlace con un código elegido por mí (todo ceros). El comando
+   busca solo la clínica y el médico:
 
 ```bash
-docker exec supabase_db_app_ortointegra psql -U postgres -Atc "select c.id || ' ' || p.id from public.clinicas c join public.profiles p on p.clinica_id = c.id join auth.users u on u.id = p.id where c.nombre = 'Clínica Semilla A' and u.email = 'admin.a@semilla.spinus.test';"
+pg "reserva_enlaces" -X POST -d "$(docker exec supabase_db_app_ortointegra psql -U postgres -Atc "select json_build_object('clinica_id', c.id, 'medico_id', p.id, 'clase', 'unico', 'codigo_hash', repeat('0', 64), 'vigencia_dias', 7, 'caduca_en', '2030-01-01T00:00:00Z') from public.clinicas c join public.profiles p on p.clinica_id = c.id join auth.users u on u.id = p.id where c.nombre = 'Clínica Semilla A' and u.email = 'admin.a@semilla.spinus.test'")"
 ```
 
-   Responde dos códigos separados por un espacio: el primero es la clínica y el
-   segundo el médico. Ponlos en lugar de `<CLINICA>` y `<MEDICO>`:
+   Y compruebo que no quedó:
 
 ```bash
-pg "reserva_enlaces" -X POST -d '{"clinica_id":"<CLINICA>","medico_id":"<MEDICO>","clase":"unico","codigo_hash":"0000000000000000000000000000000000000000000000000000000000000000","vigencia_dias":7,"caduca_en":"2030-01-01T00:00:00Z"}'
+docker exec supabase_db_app_ortointegra psql -U postgres -Atc "select count(*) from public.reserva_enlaces where codigo_hash = repeat('0', 64)"
 ```
 
-2. Con el Google simulado (C0) y el enlace en el 3002, reservo con el nombre
-   `Ana https://sitio-malo.test/promo` seguido de un texto muy largo (pega 300
-   letras). Después `curl -s 127.0.0.1:4556/lista`.
+2. Con el enlace fijo (en el 3000; no hace falta el Google simulado), reservo
+   con el nombre `Ana https://sitio-malo.test/promo`, verificando el código.
+3. Pruebo a pegar en «Nombre completo» un texto muy largo (300 letras).
 
 **Qué debo ver:**
-1. La base **rechaza** el alta: los enlaces sólo se crean desde la pantalla, y
-   su código lo genera el servidor.
-2. En `/lista`, el título del evento es «Cita médica: …» **sin** la dirección
-   web y sin el texto larguísimo.
-<!-- PENDIENTE-SEG: código de error del alta directa; regla exacta de limpieza del nombre (¿se quita el enlace, se rechaza la reserva con un mensaje?, largo máximo). -->
+1. La base **rechaza** el alta: `{"code":"42501","details":null,"hint":null,"message":"Los enlaces de reserva los emite el servidor"}`
+   y `HTTP 403`; el comprobante responde `0`. Los enlaces sólo se crean desde
+   la pantalla, y su código lo genera el servidor.
+2. Después del código, la reserva **se rechaza** con «No se pudo completar.
+   Intenta de nuevo.» y **no se crea ninguna cita** (ni, por tanto, nada en
+   Google). La regla del nombre: hasta **80 caracteres**, sin direcciones web
+   (nada con `://`, `www.` o un «punto y dos letras» pegados, como
+   `sitio.com`) y sin caracteres invisibles ni saltos de línea. Ojo: por esa
+   regla, **«Ma.Guadalupe» (sin espacio después del punto) también se
+   rechaza**; «Ma. Guadalupe» pasa. Se aceptó así. Los números sí se aceptan.
+3. La casilla no deja escribir más de 80 caracteres: el texto pegado se corta.
 
 **Si falla, significa que…** alguien podría fabricar enlaces con códigos
 conocidos, o usar el calendario del médico para mandar enlaces sospechosos a
@@ -2276,7 +2324,7 @@ los invitados.
 
 **Qué debo ver:** cuando se pasa el límite, «Demasiados intentos. Espera un rato
 y vuelve a probar.» (o, en la confirmación, el mismo texto en la página). Los
-límites de hoy son:
+límites finales, después de las correcciones (no cambiaron los números):
 
 | Acción | Límite |
 |---|---|
@@ -2288,7 +2336,13 @@ límites de hoy son:
 
 En el paso 1 el cuarto pedido ya no manda correo. En el 2, la quinta reserva no
 pasa.
-<!-- PENDIENTE-SEG: números finales tras las correcciones (la tabla puede cambiar) y si hay rutas públicas nuevas con límite. -->
+
+Lo que cambió con las correcciones es **cuándo** se cuentan: ahora el límite
+por red y por navegador se mira **antes** de consultar la base, así que un
+enlace inventado ya no la toca. Y hay un tope nuevo que no se ve en pantalla:
+cada clínica lee Google a lo sumo 60 veces cada 10 minutos por culpa de las
+reservas por enlace; pasado eso, se decide como cuando Google está caído (G3).
+No hay páginas públicas nuevas.
 
 **Si falla, significa que…** alguien podría inundar el buzón de un paciente o
 llenar la agenda con reservas falsas.
@@ -2379,7 +2433,7 @@ sigue apagado.
 Marca cada una al pasarla. Si una falla, anota el número y qué viste.
 
 **Preparación**
-- [ ] P1–P11. Base reiniciada (21 migraciones), sembrada, aviso aprobado, app en el 3000
+- [ ] P1–P11. Base reiniciada (25 migraciones), sembrada, aviso aprobado, app en el 3000
 
 **Bloque A (v2 apagada)**
 - [ ] A1. Abrir la agenda
@@ -2498,14 +2552,14 @@ Marca cada una al pasarla. Si una falla, anota el número y qué viste.
 - [ ] S2. Lo mismo, directo a la base
 - [ ] S3. La invitada sólo ve lo suyo, directo
 - [ ] S4. Enlaces públicos con la v2 apagada
-- [ ] SEG-A1. El enlace no revela teléfonos *(tras las correcciones)*
-- [ ] SEG-A2. Candado por correo verificado *(tras las correcciones)*
-- [ ] SEG-A3. Nadie borra citas con paciente *(tras las correcciones)*
-- [ ] SEG-A4. Datos de reserva y consentimiento intocables *(tras las correcciones)*
-- [ ] SEG-A5. Todo el día bloquea el enlace *(tras las correcciones)*
-- [ ] SEG-A6. Un solo uso no salta el bloqueo manual *(tras las correcciones)*
-- [ ] SEG-A7. Código del servidor y nombre limpio en Google *(tras las correcciones)*
-- [ ] SEG-A8. Límites de intentos *(tras las correcciones)*
+- [ ] SEG-A1. El enlace no revela teléfonos
+- [ ] SEG-A2. Candado por correo verificado (y el caso del bloqueo manual: **decidir**, AG-DT-28)
+- [ ] SEG-A3. Nadie borra citas con paciente
+- [ ] SEG-A4. Datos de reserva y consentimiento intocables
+- [ ] SEG-A5. Todo el día bloquea el enlace (en la agenda, sin aviso)
+- [ ] SEG-A6. Un solo uso no salta el bloqueo manual
+- [ ] SEG-A7. Código del servidor y nombre limpio
+- [ ] SEG-A8. Límites de intentos
 
 **Con el interruptor apagado**
 - [ ] X1. Pulsar y agendar como siempre
@@ -2523,7 +2577,7 @@ Marca cada una al pasarla. Si una falla, anota el número y qué viste.
 | Qué | Por qué no aquí | Cómo y cuándo |
 |---|---|---|
 | **Google con tu cuenta real**: ida y vuelta (C), Google antes de reservar (D11) y respuestas a la invitación (RSVP) | Aquí sólo hay un Google simulado | En producción, con la v2 encendida **en una sola clínica de prueba**, conecta tu cuenta y repite C1–C9 y G1–G5 desde el calendario «Spinus» de tu Google (en la web o el teléfono). Antes de encender, revisa la auditoría: aparecerán muchos renglones a nombre de `system`. La respuesta a la invitación se enciende con `AGENDA_RSVP_GOOGLE=encendido` sólo después de comprobar que llega |
-| **Convertir en cita un evento creado en Google** | No encontré el camino en la pantalla (ver la nota en C10) | Decide si hace falta; si sí, pídelo como tarea aparte |
+| **Convertir en cita un evento creado en Google** | No existe el camino en la pantalla (ver la nota en C10; `DEUDA_TECNICA.md` AG-DT-29) | Decide si hace falta; si sí, pídelo como tarea aparte |
 | **Teléfono y tableta reales** | El modo de dispositivo de Chrome no mide velocidad real, ni el dedo, ni el teclado | Con la v2 encendida en tu clínica de prueba, abre la agenda en tu teléfono y en una tableta y repite F12–F15, F21–F28. Fíjate en la fluidez al cambiar de semana y al deslizar |
 | **Lectores de pantalla** | No se probó con uno real | Si te interesa: VoiceOver en iPhone o TalkBack en Android sobre la burbuja y la tarjeta |
 | **Tareas programadas de Vercel** (Google cada 10 min, recordatorios cada 15) | Vercel no se toca en local | Se activan solas al desplegar a producción. Sin `CRON_SECRET` responden 401 y no hacen nada. Tras desplegar, mira en Vercel → Cron Jobs que corren y en los logs que no hay errores |
@@ -2560,11 +2614,16 @@ Marca cada una al pasarla. Si una falla, anota el número y qué viste.
 
 3. **Si se fusiona también `feature/limites-ajustables`:** sus tres migraciones
    `20261014…` van **antes** que las de la agenda (por su fecha). Y hay una
-   cosa que **tienes que pedirle a quien programe (o a Claude) antes de
-   fusionar las dos ramas**: actualizar la lista de funciones de la prueba
-   `p1_permisos_funciones.sql` (su «caso 3») añadiendo las 30 funciones nuevas
-   de la agenda. No es un hueco de seguridad: es una prueba que tiene escrita a
-   mano una lista y, si no se actualiza, sale en rojo.
+   cosa que **tienes que pedirle a quien programe (o a Claude) al fusionar las
+   dos ramas**: cambiar la lista de funciones de la prueba
+   `p1_permisos_funciones.sql` (su «caso 3»). Esa prueba tiene escrita a mano
+   la lista de las funciones de la base que no pueden usar todos los roles; hoy
+   tiene 10 y, con la agenda, son **41** (las 10 de siempre y 31 de la agenda).
+   La lista completa, lista para pegar, está en
+   `supabase/AUDITORIA-CONJUNTO-AGENDA-V2.md`, §8.5. **No es un hueco de
+   seguridad**: si no se cambia, esa prueba sale en rojo, nada más. Se probó
+   en tu computadora con las dos ramas juntas: con la lista nueva, todas las
+   pruebas pasan.
 
 4. Cada migración se revisa antes con `supabase/AUDITORIA-MIGRACIONES.md` (ya
    están auditadas una por una y en conjunto en
@@ -2604,8 +2663,16 @@ Marca cada una al pasarla. Si una falla, anota el número y qué viste.
 | 14 | `20261115140000_agenda_e4_correos_cita.sql` | Registro de correos enviados (comprobante y recordatorio) para no mandar dos veces |
 | 15 | `20261115160000_agenda_e9_rsvp_google.sql` | Confirmar la cita cuando el paciente acepta la invitación de Google (queda apagado por variable) |
 | 16 | `20261116120000_agenda_d11_sync_antes_de_reservar.sql` | Cuándo fue la última lectura buena de Google y el registro de reservas que se empalman con Google |
+| 17 | `20261117120000_agenda_seg_borrado_cita.sql` | Corrección de seguridad: con la v2 encendida, la base no deja borrar una cita con paciente o por ligar, aunque alguien se salte la pantalla (SEG-A3) |
+| 18 | `20261117121000_agenda_seg_columnas_reserva.sql` | Corrección de seguridad: los datos de quien reservó y de su consentimiento sólo los escribe el servidor (SEG-A4) |
+| 19 | `20261117122000_agenda_seg_emision_enlaces.sql` | Corrección de seguridad: los enlaces de reserva sólo los crea el servidor, con un código que nadie elige a mano (SEG-A7) |
+| 20 | `20261117130000_agenda_seg1_candado_correo.sql` | Corrección de seguridad: el candado decide por el correo verificado, el bloqueo manual corta también el enlace de un solo uso y un evento de todo el día ocupa ese día en el enlace (SEG-A1, A2, A5, A6) |
 
-<!-- PENDIENTE-SEG: migraciones de las correcciones -->
+Son **20**, y van en este orden aunque las cuatro últimas se escribieron
+después: las 17 y 18 añaden reglas a la tabla de citas, la 19 reemplaza
+la protección de los enlaces que puso la 8, y la 20 reemplaza tres funciones de
+las 9 y 10. Por eso, una vez más: **nunca vuelvas a correr la 8, la 9 ni la 10
+después de éstas** (desharías las correcciones).
 
 ### 13.3 Variables en Vercel (Production)
 
@@ -2625,7 +2692,7 @@ Sólo los nombres y para qué sirven; los valores los generas tú.
 ### 13.4 El orden recomendado
 
 1. `select version()` y lo de 13.1.
-2. **Las 16 migraciones**, una por una, en el orden de 13.2.
+2. **Las 20 migraciones**, una por una, en el orden de 13.2.
 3. Las variables de 13.3 (menos `AGENDA_RSVP_GOOGLE`).
 4. `git merge` local de la rama sobre `main` y `git push` (despliega el código).
    Si despliegas el código antes que las migraciones no se rompe nada, pero
