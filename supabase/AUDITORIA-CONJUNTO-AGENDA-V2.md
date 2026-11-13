@@ -119,10 +119,24 @@ dos.
     (`src/app/api/appointments/[id]/route.ts:1398-1440`);
   - el único borrado de clínicas del código (`api/me/clinica`, que deshace
     una clínica recién creada) no tiene filas que lo bloqueen.
-- Lo que queda: un `DELETE` directo por PostgREST recibe el 23503 en crudo, sin
-  perder datos.
-- **Sin cambio.** El revisor lo calificó «probable, por confirmar en `src/`»;
-  queda confirmado como manejado.
+- ~~Lo que queda: un `DELETE` directo por PostgREST recibe el 23503 en crudo, sin
+  perder datos.~~ **Falso tal como estaba escrito (corregido el 2026-11-12,
+  revisión independiente posterior al cierre).** Sólo era cierto para las
+  citas **con historial de agenda** (las que sostiene alguna FK RESTRICT de
+  arriba). Una cita con paciente o por ligar **sin** ese historial —la gran
+  mayoría— **sí se podía borrar** por PostgREST, sin pasar por la API: la RLS
+  `appointments_delete` deja borrar a médico, administrador y secretaria
+  cualquier cita de su clínica, y el 409 de B3/D6 sólo vive en la API.
+- **Corregido** con `20261117120000_agenda_seg_borrado_cita.sql`: el disparador
+  `BEFORE DELETE` `trg_appointments_proteger_borrado` rechaza (42501) borrar una
+  cita con paciente o por ligar cuando la clínica tiene la v2 encendida, también
+  a `service_role`; con la v2 apagada o sin fila de ajustes, se borra como
+  antes. Lee sólo `OLD` y `agenda_ajustes`, nunca `appointments`; no toca
+  ninguna policy. Prueba: `supabase/pruebas-sql/seg_borrado_cita.sql` y
+  `e2e/seguridad-postgrest.e2e.ts`. Detalle en `mejora_agendaV2.md` §6-bis,
+  «Correcciones de seguridad en la base tras la revisión independiente».
+- El revisor lo calificó «probable, por confirmar en `src/`»; en `src/` estaba
+  manejado, pero la base no.
 
 **H2 · Fusionar con `feature/limites-ajustables` pone en rojo
 `p1_permisos_funciones.sql`, caso 3.** Lo vieron los dos; confirmado en la
@@ -253,3 +267,25 @@ archivo no se tocó: decide Angel.
 - **Pruebas que fijan listas textuales del catálogo** (p1, caso 3): una rama
   paralela las rompe al fusionar. Al auditar un conjunto, correr las pruebas de
   las dos ramas sobre la base combinada. Viene de H2.
+
+## 7. Correcciones posteriores al cierre (2026-11-12)
+
+Revisión de seguridad independiente posterior al cierre (rama
+`feature/agenda-v2-seg2`). Tres migraciones más, al final del conjunto, cada
+una con su auditoría independiente en la cabecera (las tres APTA):
+
+| # | Archivo | Qué hace |
+|---|---|---|
+| S3 | `20261117120000_agenda_seg_borrado_cita.sql` | con v2 encendida, la base no deja borrar una cita con paciente o por ligar (corrige H1) |
+| S4 | `20261117121000_agenda_seg_columnas_reserva.sql` | las columnas `reserva_*` de `appointments` sólo las escribe el servidor |
+| S7a | `20261117122000_agenda_seg_emision_enlaces.sql` | un enlace de reserva sólo lo emite `service_role` (`reserva_enlace_emitir`) |
+
+Efecto sobre las comprobaciones del §3: tres funciones nuevas sin PUBLIC
+(`cita_proteger_borrado` y `cita_proteger_reserva`, de disparador, con los
+tres roles; `reserva_enlace_emitir`, sólo `service_role`, que se suma a la
+lista del caso 3 de `p1_permisos_funciones.sql` al fusionar, H2); dos
+disparadores BEFORE nuevos en `appointments` (fila 6 ya no son «todos
+AFTER»); `proteger_reserva_enlaces` reemplazada con la misma firma y grants;
+ninguna policy, ninguna FK ni ningún permiso de tabla cambian. Detalle en
+`mejora_agendaV2.md` §6-bis, «Correcciones de seguridad en la base tras la
+revisión independiente».

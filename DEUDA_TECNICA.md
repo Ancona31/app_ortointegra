@@ -3827,7 +3827,12 @@ Encaja en el pendiente prioritario de `CLAUDE.md` (aislamiento entre clínicas).
 
 ### AG-DT-14 — Un `DELETE` directo por PostgREST se salta el «no se borra, se cancela» de v2
 
-**Estado:** 🟡 abierta · B3 bloquea en la API el borrado de una cita con
+**Estado:** ✅ resuelta en local (pendiente de producción) por
+`20261117120000_agenda_seg_borrado_cita.sql`: un disparador `BEFORE DELETE`
+rechaza (42501) borrar una cita con paciente o por ligar con v2 encendida,
+también a `service_role` (prueba `seg_borrado_cita.sql`). Texto original:
+
+🟡 abierta · B3 bloquea en la API el borrado de una cita con
 paciente o por ligar (409). Por PostgREST directo, la policy `appointments_delete`
 lo permite: sólo lo frena una FK RESTRICT de las tablas de v2, si la cita tiene
 historial (23503). Cerrarlo pide una migración, por ejemplo un disparador
@@ -3840,6 +3845,10 @@ historial (23503). Cerrarlo pide una migración, por ejemplo un disparador
 Alguien de la clínica podría crear filas de reserva o marcar `horario_propio`
 directo por PostgREST con v2 apagada. Hoy nada lo lee fuera del código que exige
 el interruptor, así que es inerte.
+**Acotada (2026-11-12, local):** las columnas `reserva_*` de `appointments` ya
+sólo las escribe el servidor (`20261117121000`), y los enlaces de reserva sólo
+los emite el servidor (`20261117122000`), con v2 encendida o apagada. Lo que
+queda es lo demás de v2 (p. ej. `horario_propio`, `tipos_cita`).
 
 ### AG-DT-16 — Seis rutas viejas llaman a Resend directamente, sin `EMAIL_TRANSPORT`
 
