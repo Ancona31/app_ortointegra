@@ -38,33 +38,39 @@ $$;
 -- Sólo para esta prueba (rollback): los privilegios por omisión de postgres le quitan EXECUTE a
 -- PUBLIC también en pg_temp, y la prueba la llama ya con el rol cambiado.
 grant execute on function pg_temp.h(text) to anon, authenticated, service_role;
+-- Desde la corrección de seguridad 7a (20261117122000) los enlaces sólo los emite service_role,
+-- por reserva_enlace_emitir con el actor que lo pide (la regla de las policies, repetida dentro).
+-- Este ayudante la llama como lo hace POST /api/agenda/enlaces y deja el rol como estaba.
+create function pg_temp.emitir(p_actor uuid, p_id uuid, p_medico uuid, p_clase text, p_hash text) returns void
+language plpgsql as $$
+begin
+  perform set_config('request.jwt.claims', json_build_object('role', 'service_role')::text, true);
+  set local role service_role;
+  perform public.reserva_enlace_emitir('00000000-0000-4000-8000-000000d1c001', p_actor, p_id, p_medico, p_clase, p_hash, null);
+  reset role;
+exception when others then
+  reset role;
+  raise;
+end $$;
 
 -- Caso 1: altas. Invitado b1 emite su fijo y un único; la secretaria emite el fijo de b2; el
--- administrador uno suyo. Lo que mande quien escribe en created_by, caduca_en, usado_* y
--- revocado_* se reescribe; la vigencia del único sale del ajuste (5 días).
-select pg_temp.como('00000000-0000-4000-8000-000000d1b001');
-set local role authenticated;
+-- administrador uno suyo. Lo que mande quien escribe en caduca_en, usado_*, revocado_* y
+-- created_at se reescribe (también siendo service_role); created_by es el actor; la vigencia
+-- del único sale del ajuste (5 días). (Antes de 7a: con la sesión, y created_by = auth.uid().)
+select set_config('request.jwt.claims', json_build_object('role', 'service_role')::text, true);
+set local role service_role;
 insert into public.reserva_enlaces (id, clinica_id, medico_id, clase, codigo_hash, vigencia_dias, caduca_en,
                                     created_by, usado_en, revocado_en, created_at)
 values ('00000000-0000-4000-8000-000000d1f001', '00000000-0000-4000-8000-000000d1c001',
         '00000000-0000-4000-8000-000000d1b001', 'unico', pg_temp.h('u1'), 30, now() + interval '900 days',
-        '00000000-0000-4000-8000-000000d1a002', null, null, now() - interval '9 days');
-insert into public.reserva_enlaces (id, clinica_id, medico_id, clase, codigo_hash)
-values ('00000000-0000-4000-8000-000000d1f002', '00000000-0000-4000-8000-000000d1c001',
-        '00000000-0000-4000-8000-000000d1b001', 'fijo', pg_temp.h('f1'));
+        '00000000-0000-4000-8000-000000d1b001', null, null, now() - interval '9 days');
 reset role;
-select pg_temp.como('00000000-0000-4000-8000-000000d1e001');
-set local role authenticated;
-insert into public.reserva_enlaces (id, clinica_id, medico_id, clase, codigo_hash)
-values ('00000000-0000-4000-8000-000000d1f003', '00000000-0000-4000-8000-000000d1c001',
-        '00000000-0000-4000-8000-000000d1b002', 'fijo', pg_temp.h('f2'));
-reset role;
-select pg_temp.como('00000000-0000-4000-8000-000000d1a001');
-set local role authenticated;
-insert into public.reserva_enlaces (id, clinica_id, medico_id, clase, codigo_hash)
-values ('00000000-0000-4000-8000-000000d1f004', '00000000-0000-4000-8000-000000d1c001',
-        '00000000-0000-4000-8000-000000d1a001', 'fijo', pg_temp.h('fa'));
-reset role;
+select pg_temp.emitir('00000000-0000-4000-8000-000000d1b001', '00000000-0000-4000-8000-000000d1f002',
+                      '00000000-0000-4000-8000-000000d1b001', 'fijo', pg_temp.h('f1'));
+select pg_temp.emitir('00000000-0000-4000-8000-000000d1e001', '00000000-0000-4000-8000-000000d1f003',
+                      '00000000-0000-4000-8000-000000d1b002', 'fijo', pg_temp.h('f2'));
+select pg_temp.emitir('00000000-0000-4000-8000-000000d1a001', '00000000-0000-4000-8000-000000d1f004',
+                      '00000000-0000-4000-8000-000000d1a001', 'fijo', pg_temp.h('fa'));
 do $$
 declare v public.reserva_enlaces%rowtype;
 begin
@@ -117,56 +123,43 @@ begin
   end loop;
 end $$;
 
--- Caso 4: alta inválida. Invitado b2 no emite para b1; nadie emite para una secretaria ni
--- para un médico de otra clínica (23514); la otra clínica no emite en la 1 (RLS).
+-- Caso 4: alta inválida. Invitado b2 no emite para b1 (42501, la regla de reserva_enlace_emitir);
+-- nadie emite para una secretaria ni para un médico de otra clínica (23514, el disparador); el
+-- administrador de la otra clínica no emite en la 1 (42501).
 do $$
 begin
-  perform pg_temp.como('00000000-0000-4000-8000-000000d1b002');
-  set local role authenticated;
   begin
-    insert into public.reserva_enlaces (id, clinica_id, medico_id, clase, codigo_hash)
-    values (gen_random_uuid(), '00000000-0000-4000-8000-000000d1c001', '00000000-0000-4000-8000-000000d1b001',
-            'unico', pg_temp.h('x1'));
+    perform pg_temp.emitir('00000000-0000-4000-8000-000000d1b002', gen_random_uuid(),
+                           '00000000-0000-4000-8000-000000d1b001', 'unico', pg_temp.h('x1'));
     raise exception 'D1 caso 4: un invitado emitió un enlace de otro médico';
-  -- Lo para el disparador (23514) antes que la RLS: es INVOKER y un invitado no ve el perfil
-  -- de otro médico (profiles_select).
-  exception when check_violation or insufficient_privilege then null;
+  exception when insufficient_privilege then null;
   end;
-  reset role;
-  perform pg_temp.como('00000000-0000-4000-8000-000000d1a001');
-  set local role authenticated;
   begin
-    insert into public.reserva_enlaces (id, clinica_id, medico_id, clase, codigo_hash)
-    values (gen_random_uuid(), '00000000-0000-4000-8000-000000d1c001', '00000000-0000-4000-8000-000000d1e001',
-            'fijo', pg_temp.h('x2'));
+    perform pg_temp.emitir('00000000-0000-4000-8000-000000d1a001', gen_random_uuid(),
+                           '00000000-0000-4000-8000-000000d1e001', 'fijo', pg_temp.h('x2'));
     raise exception 'D1 caso 4: se emitió un enlace para una secretaria';
   exception when check_violation then null;
   end;
   begin
-    insert into public.reserva_enlaces (id, clinica_id, medico_id, clase, codigo_hash)
-    values (gen_random_uuid(), '00000000-0000-4000-8000-000000d1c001', '00000000-0000-4000-8000-000000d1a002',
-            'fijo', pg_temp.h('x3'));
+    perform pg_temp.emitir('00000000-0000-4000-8000-000000d1a001', gen_random_uuid(),
+                           '00000000-0000-4000-8000-000000d1a002', 'fijo', pg_temp.h('x3'));
     raise exception 'D1 caso 4: se emitió un enlace para un médico de otra clínica';
   exception when check_violation then null;
   end;
-  reset role;
-  perform pg_temp.como('00000000-0000-4000-8000-000000d1a002');
-  set local role authenticated;
   begin
-    insert into public.reserva_enlaces (id, clinica_id, medico_id, clase, codigo_hash)
-    values (gen_random_uuid(), '00000000-0000-4000-8000-000000d1c001', '00000000-0000-4000-8000-000000d1b001',
-            'unico', pg_temp.h('x4'));
+    perform pg_temp.emitir('00000000-0000-4000-8000-000000d1a002', gen_random_uuid(),
+                           '00000000-0000-4000-8000-000000d1b001', 'unico', pg_temp.h('x4'));
     raise exception 'D1 caso 4: otra clínica emitió en la uno';
-  exception when check_violation or insufficient_privilege then null;
+  exception when insufficient_privilege then null;
   end;
-  reset role;
 end $$;
 
--- Caso 5: segundo fijo vigente del mismo médico → 23505
+-- Caso 5: segundo fijo vigente del mismo médico → 23505 (insert directo del servidor; la
+-- emisión normal revoca antes el vigente, caso 7)
 do $$
 begin
-  perform pg_temp.como('00000000-0000-4000-8000-000000d1b001');
-  set local role authenticated;
+  perform set_config('request.jwt.claims', json_build_object('role', 'service_role')::text, true);
+  set local role service_role;
   begin
     insert into public.reserva_enlaces (id, clinica_id, medico_id, clase, codigo_hash)
     values (gen_random_uuid(), '00000000-0000-4000-8000-000000d1c001', '00000000-0000-4000-8000-000000d1b001',
@@ -221,34 +214,42 @@ end $$;
 
 -- Caso 7: regenerar el fijo. Si el alta falla (código mal formado), la revocación se deshace;
 -- si va bien, el viejo queda revocado y el nuevo vigente. Un invitado no regenera el de otro.
+-- (Desde 7a, regenerar es reserva_enlace_emitir con clase fijo; reserva_enlace_regenerar_fijo ya no
+-- puede insertar con la sesión: falla entera, sin dejar revocado nada.)
 do $$
 begin
+  begin
+    perform pg_temp.emitir('00000000-0000-4000-8000-000000d1b001', '00000000-0000-4000-8000-000000d1f005',
+                           '00000000-0000-4000-8000-000000d1b001', 'fijo', 'no-es-hex');
+    raise exception 'D1 caso 7: regenerar aceptó un código mal formado';
+  exception when check_violation then null;
+  end;
   perform pg_temp.como('00000000-0000-4000-8000-000000d1b001');
   set local role authenticated;
   begin
     perform public.reserva_enlace_regenerar_fijo('00000000-0000-4000-8000-000000d1f005',
-              '00000000-0000-4000-8000-000000d1b001', 'no-es-hex');
-    raise exception 'D1 caso 7: regenerar aceptó un código mal formado';
-  exception when check_violation then null;
+              '00000000-0000-4000-8000-000000d1b001', pg_temp.h('f1-sesion'));
+    raise exception 'D1 caso 7: la sesión regeneró con reserva_enlace_regenerar_fijo';
+  exception when insufficient_privilege then null;
   end;
   reset role;
   if (select revocado_en from public.reserva_enlaces where id = '00000000-0000-4000-8000-000000d1f002') is not null then
     raise exception 'D1 caso 7: un regenerar fallido dejó revocado el fijo';
   end if;
-  perform pg_temp.como('00000000-0000-4000-8000-000000d1b001');
-  set local role authenticated;
-  perform public.reserva_enlace_regenerar_fijo('00000000-0000-4000-8000-000000d1f005',
-            '00000000-0000-4000-8000-000000d1b001', pg_temp.h('f1-nuevo'));
+  perform pg_temp.emitir('00000000-0000-4000-8000-000000d1b001', '00000000-0000-4000-8000-000000d1f005',
+                         '00000000-0000-4000-8000-000000d1b001', 'fijo', pg_temp.h('f1-nuevo'));
   begin
-    perform public.reserva_enlace_regenerar_fijo(gen_random_uuid(), '00000000-0000-4000-8000-000000d1b002', pg_temp.h('f2-intruso'));
+    perform pg_temp.emitir('00000000-0000-4000-8000-000000d1b001', gen_random_uuid(),
+                           '00000000-0000-4000-8000-000000d1b002', 'fijo', pg_temp.h('f2-intruso'));
     raise exception 'D1 caso 7: un invitado regeneró el fijo de otro médico';
-  exception when check_violation or insufficient_privilege then null;
+  exception when insufficient_privilege then null;
   end;
-  reset role;
   if (select revocado_en from public.reserva_enlaces where id = '00000000-0000-4000-8000-000000d1f002') is null
+     or (select revocado_por from public.reserva_enlaces where id = '00000000-0000-4000-8000-000000d1f002')
+          is distinct from '00000000-0000-4000-8000-000000d1b001'
      or (select revocado_en from public.reserva_enlaces where id = '00000000-0000-4000-8000-000000d1f005') is not null
      or (select revocado_en from public.reserva_enlaces where id = '00000000-0000-4000-8000-000000d1f003') is not null then
-    raise exception 'D1 caso 7: regenerar no dejó viejo revocado / nuevo vigente / el de b2 intacto';
+    raise exception 'D1 caso 7: regenerar no dejó viejo revocado (por b1) / nuevo vigente / el de b2 intacto';
   end if;
   -- Sin sesión (service_role, sin sub en los claims) no hay clínica: regenerar no hace nada y lo dice.
   perform set_config('request.jwt.claims', json_build_object('role', 'service_role')::text, true);
@@ -272,12 +273,8 @@ values ('00000000-0000-4000-8000-000000d1d001', '00000000-0000-4000-8000-000000d
         pg_temp.h('tel'), pg_temp.h('correo'), 'v1-prueba-d1', now(), 0);
 do $$
 begin
-  perform pg_temp.como('00000000-0000-4000-8000-000000d1b002');
-  set local role authenticated;
-  insert into public.reserva_enlaces (id, clinica_id, medico_id, clase, codigo_hash)
-  values ('00000000-0000-4000-8000-000000d1f006', '00000000-0000-4000-8000-000000d1c001',
-          '00000000-0000-4000-8000-000000d1b002', 'unico', pg_temp.h('u2'));
-  reset role;
+  perform pg_temp.emitir('00000000-0000-4000-8000-000000d1b002', '00000000-0000-4000-8000-000000d1f006',
+                         '00000000-0000-4000-8000-000000d1b002', 'unico', pg_temp.h('u2'));
   perform set_config('request.jwt.claims', '', true);
   insert into public.appointments (id, clinica_id, medico_id, title, start_time, end_time,
     reserva_enlace_id, reserva_canal, reserva_nombre, reserva_tel_hmac, reserva_correo_hmac, reserva_aviso_version,

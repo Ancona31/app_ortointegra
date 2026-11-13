@@ -6,7 +6,14 @@
  * Puertas comunes en `entradaGestion()`: sesión (401), clínica (403) e
  * interruptor de la agenda v2 (404). Permisos (lista A, punto 16): cada médico
  * lo suyo; administrador y secretaria, lo de todos. La RLS de
- * `reserva_enlaces` dice lo mismo y es la barrera real.
+ * `reserva_enlaces` dice lo mismo y es la barrera real para leer y revocar.
+ *
+ * ⚠️ EL ALTA VA CON EL CLIENTE DE SERVICIO (corrección de seguridad 7a,
+ * migración `20261117122000`): la base sólo deja insertar enlaces a
+ * `service_role`, porque el hash del código lo tiene que calcular el servidor
+ * con `RESERVA_SECRETO` y la base no puede comprobarlo. Una sola llamada, a
+ * `reserva_enlace_emitir`, con `p_clinica_id` = la clínica de la sesión y
+ * `p_actor` = quien la pide; la función repite la regla de las policies.
  *
  * ⚠️ EL CÓDIGO NO ESTÁ EN LA BASE: se deriva del id con `RESERVA_SECRETO`
  * (`codigoDeEnlace`). La lista NO lo lleva; se pide uno a uno a
@@ -19,6 +26,7 @@
 import { randomUUID } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { entradaGestion } from '@/lib/reserva/gestionServidor'
+import { createAdminClient } from '@/lib/supabase/admin'
 import {
   COLUMNAS_ENLACE, CrearEnlaceSchema, gestionaTodos, puedeGestionarDelMedico, respuestaErrorEnlace,
 } from '@/lib/reserva/gestionReserva'
@@ -77,12 +85,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     if (!codigo) return NextResponse.json(SIN_SECRETO, { status: 503 })
     const codigoHash = hashDeCodigo(codigo)
 
-    const { error } = cuerpo.clase === 'fijo'
-      ? await e.supabase.rpc('reserva_enlace_regenerar_fijo', { p_id: id, p_medico_id: cuerpo.medico_id, p_codigo_hash: codigoHash })
-      : await e.supabase.from('reserva_enlaces').insert({
-          id, clinica_id: e.clinicaId, medico_id: cuerpo.medico_id, clase: 'unico',
-          codigo_hash: codigoHash, etiqueta: cuerpo.etiqueta ?? null,
-        })
+    // Fijo: revoca el vigente y emite otro en una transacción. Único: emite.
+    const { error } = await createAdminClient().rpc('reserva_enlace_emitir', {
+      p_clinica_id: e.clinicaId, p_actor: e.perfil.id, p_id: id, p_medico_id: cuerpo.medico_id,
+      p_clase: cuerpo.clase, p_codigo_hash: codigoHash,
+      p_etiqueta: cuerpo.clase === 'unico' ? (cuerpo.etiqueta ?? null) : null,
+    })
     if (error) {
       const r = respuestaErrorEnlace(error)
       if (r.status === 500) logger.error('agenda', `enlace de reserva sin emitir: ${error.code ?? ''}`)
