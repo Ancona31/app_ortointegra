@@ -5793,6 +5793,12 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
   z-index: 45;
   width: 320px;
   max-width: calc(100vw - 2 * var(--ag-2));
+  /* T1 (punto 3): nunca sale de la ventana. El JS (`posicionCapa`) pone el
+     `max-height` exacto con la parte visible; esto vale mientras tanto y para
+     la capa centrada, que no tiene ancla. Lo que no cabe se desplaza DENTRO. */
+  max-height: calc(100dvh - 2 * var(--ag-2));
+  overflow-y: auto;
+  overscroll-behavior: contain;
   display: flex;
   flex-direction: column;
   gap: var(--ag-3);
@@ -5805,6 +5811,9 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
   animation: ag-capa-entra var(--ag-dur-base) var(--ag-ease-out) backwards;
 }
 .ag-capa:focus { outline: none; }
+/* T1 · Con `max-height`, los hijos NO encogen (la lista de pacientes, que se
+   desplaza por su cuenta, se aplastaría primero): desplaza la capa entera. */
+.ag-capa > * { flex-shrink: 0; }
 .ag-capa[data-estado="saliendo"] {
   animation: ag-capa-sale var(--ag-dur-micro) var(--ag-ease-in) forwards;
   pointer-events: none;
@@ -5966,6 +5975,32 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
 }
 .ag-capa-boton--principal:hover { background: var(--ag-brand-secondary); }
 .ag-hoja .ag-capa-boton { height: 44px; }   /* el mínimo táctil de la agenda, como `.ag-hueco` */
+
+/* T1 · La burbuja tras agendar (puntos 13 y 14): el acuse; las dos de enviar
+   en pila a todo el ancho; el pie («Listo» y «Más opciones») en dos columnas
+   iguales, como «Guardar» y «Más opciones». La opción «Registrar…» de la lista
+   (punto 2) va separada de los pacientes por una línea. */
+.ag-capa-hecho {
+  display: flex;
+  align-items: center;
+  gap: var(--ag-2);
+  margin: 0;
+  padding: var(--ag-2) var(--ag-3);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ag-success-text);
+  background: var(--ag-success-bg);
+  border: 1px solid var(--ag-success-border);
+  border-radius: var(--ag-r-btn);
+}
+.ag-capa-rejilla {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--ag-2);
+}
+.ag-capa-rejilla > * { min-width: 0; }
+.ag-capa-pila { display: flex; flex-direction: column; gap: var(--ag-2); }
+.ag-opcion--registrar { margin-top: var(--ag-1); border-top: 1px solid var(--ag-hairline); border-radius: 0 0 var(--ag-r-btn-sm) var(--ag-r-btn-sm); }
 
 /* La tarjeta de lectura. */
 .ag-lectura-pildora {

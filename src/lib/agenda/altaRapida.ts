@@ -16,7 +16,7 @@
  * archivo: va en `buscarCitasPaciente.ts`, que la necesita también, y así éste
  * sigue sin red y se prueba sin simular Supabase.
  */
-import type { DatosGuardado } from '@/lib/agenda/tiposAgenda'
+import type { AltaGuardada, DatosGuardado } from '@/lib/agenda/tiposAgenda'
 import type { PacienteBusqueda } from '@/components/agenda/AppointmentModal'
 import type { GestoAlta } from '@/lib/agenda/contratosV2'
 import type { Empalme, TramoCita } from '@/lib/agenda/empalmesCita'
@@ -173,15 +173,28 @@ export interface DependenciasGuardado {
   mensajeEmpalme: (lista: readonly Empalme[]) => string
   /** Un `ConfirmModal`: `true` si se acepta. */
   confirmar: (mensaje: string) => Promise<boolean>
-  /** `handleSave`, que ya trae el bloque optimista, el 409 de empalme y la invitación de Google. */
-  guardar: (datos: DatosGuardado) => void
+  /**
+   * `handleSave`, que ya trae el bloque optimista, el 409 de empalme y la
+   * invitación de Google. T1: devuelve la cita creada (o `null` si no entró o
+   * si sigue por el aviso de empalme del servidor).
+   */
+  guardar: (datos: DatosGuardado) => Promise<AltaGuardada | null>
 }
+
+/**
+ * T1 · Lo que sale de `guardarAltaRapida`: si alguien dijo que no a un aviso
+ * (`enviada: false`, la burbuja se queda como estaba) o si se mandó a guardar,
+ * con la cita creada si entró (la burbuja enseña «Cita agendada») o `null` (se
+ * cierra, como antes de T1).
+ */
+export type SalidaAltaRapida = { enviada: false } | { enviada: true; alta: AltaGuardada | null }
 
 /**
  * El orden de los avisos al guardar desde la burbuja, el MISMO que el del
  * modal (P3): primero el de fuera de horario, después el de empalme, y sólo
- * entonces el guardado. `true` si se mandó a guardar (la burbuja se cierra);
- * `false` si alguien dijo que no (la burbuja se queda abierta como estaba).
+ * entonces el guardado. `{ enviada: true }` si se mandó a guardar (con la cita
+ * creada, T1); `{ enviada: false }` si alguien dijo que no (la burbuja se queda
+ * abierta como estaba).
  *
  * ⚠️ EL AVISO DE HORARIO SE SALTA SI LAS HORAS SON LAS DE LA APERTURA: ése ya
  * se preguntó antes de abrir (`abrirAlta`) y repetirlo sería preguntar dos
@@ -192,17 +205,18 @@ export interface DependenciasGuardado {
 export async function guardarAltaRapida(
   datos: DatosGuardado, horasDeApertura: { inicio: string; fin: string }, horas: { inicio: string; fin: string },
   d: DependenciasGuardado,
-): Promise<boolean> {
-  if (!datos.start_time || !datos.end_time) return false
+): Promise<SalidaAltaRapida> {
+  const no = { enviada: false } as const
+  if (!datos.start_time || !datos.end_time) return no
   const inicio = new Date(datos.start_time)
   const fin = new Date(datos.end_time)
   const tocadas = horas.inicio !== horasDeApertura.inicio || horas.fin !== horasDeApertura.fin
   const aviso = tocadas ? d.avisoHorario(inicio, fin) : null
-  if (aviso && !(await d.confirmar(aviso))) return false
+  if (aviso && !(await d.confirmar(aviso))) return no
   const lista = d.buscarEmpalmes({
     id: '', medicoId: datos.medico_id ?? null, inicio, fin, todoElDia: false, noOcupa: false, deGoogle: false, titulo: '',
   })
-  if (lista.length && !(await d.confirmar(d.mensajeEmpalme(lista)))) return false
-  d.guardar(lista.length ? { ...datos, empalmes_aceptados: lista.map(e => e.id) } : datos)
-  return true
+  if (lista.length && !(await d.confirmar(d.mensajeEmpalme(lista)))) return no
+  const alta = await d.guardar(lista.length ? { ...datos, empalmes_aceptados: lista.map(e => e.id) } : datos)
+  return { enviada: true, alta }
 }

@@ -1919,6 +1919,12 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
           filtroMedico={filtroEfectivo || ((isSingleDoctor || isMedicoSinAdmin) && defaultMedicoId ? defaultMedicoId : null)}
           horario={horario}
           guardado={guardado}
+          /* T1 · La invitación tras agendar desde la burbuja: el mismo modal
+             que «Agregar invitados»; espera al evento de Google si aún no hay. */
+          puedeInvitar={canVerAgendaCompleta(profile)}
+          invitar={cita => setInvitacion({
+            citaId: cita.id, paciente: pacienteParaInvitacion(cita), esperandoEvento: !cita.google_event_id,
+          })}
           setModal={setModal}
           setConfirm={setConfirm}
         />

@@ -347,7 +347,8 @@ export default function AppointmentModal({
      cita). */
   saliendo?: boolean
   onClose: () => void
-  onSave: (data: DatosGuardado) => Promise<void>
+  /* T1: `handleSave` devuelve el alta creada (la usa la burbuja); el modal no la lee. */
+  onSave: (data: DatosGuardado) => Promise<unknown>
   onDelete: (id: string) => Promise<void>
   /* B3: el interruptor de la agenda v2 y la cancelación que sustituye al
      borrado de una cita con paciente. Sin ellos —o con el interruptor

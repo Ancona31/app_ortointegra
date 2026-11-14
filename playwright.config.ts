@@ -47,11 +47,12 @@ export default defineConfig({
       },
     },
     /* F1.16 · La tableta vertical (768–1023 px): Semana en rejilla de tres
-       días. Sólo corre su propio archivo; el resto de la suite ya cubre
-       escritorio y teléfono, y sus pruebas no saben de este tercer formato. */
+       días. Sólo corre sus propios archivos; el resto de la suite ya cubre
+       escritorio y teléfono, y sus pruebas no saben de este tercer formato.
+       T1: también la colocación de la burbuja y la tarjeta (punto 3). */
     {
       name: 'tableta',
-      testMatch: '**/agenda-f-tableta.e2e.ts',
+      testMatch: ['**/agenda-f-tableta.e2e.ts', '**/agenda-t1-capas.e2e.ts'],
       use: {
         ...devices['Desktop Chrome'],
         viewport: { width: 820, height: 1180 },

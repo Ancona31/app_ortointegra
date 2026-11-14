@@ -40,7 +40,7 @@ import { useConsultorios } from '@/hooks/useConsultorios'
 import type { Consultorio } from '@/types'
 import type { Horario, MedicoConfig } from '@/lib/configApp'
 import { componerNombreMedicoCompleto } from '@/lib/nombreMedico'
-import type { Appointment, DatosGuardado } from '@/lib/agenda/tiposAgenda'
+import type { AltaGuardada, Appointment, DatosGuardado, OpcionesGuardado } from '@/lib/agenda/tiposAgenda'
 import type { ApiInteraccionesV2, AperturaAltaV2, AperturaEdicionV2, CambiarEstadoCita, GestoAlta } from '@/lib/agenda/contratosV2'
 import type { Caja, Punto } from '@/lib/agenda/posicionCapa'
 import { guardarAltaRapida, horasDelGesto, type DependenciasGuardado } from '@/lib/agenda/altaRapida'
@@ -66,7 +66,8 @@ type ConfirmState = { message: string; onConfirm: () => void; onCancel: () => vo
 
 /** Lo que la agenda le presta para guardar: sus mismas funciones. */
 export interface GuardadoV2 {
-  handleSave: (datos: DatosGuardado) => Promise<void>
+  /** T1: devuelve el alta que entró (la burbuja ofrece ahí mismo WhatsApp e invitación). */
+  handleSave: (datos: DatosGuardado, reintentoEmpalme?: boolean, opciones?: OpcionesGuardado) => Promise<AltaGuardada | null>
   handleCancelar: (id: string) => Promise<void>
   handleDelete: (id: string) => Promise<void>
   /** De `guardadoCitas.ts` (Movimiento) cuando exista; sin ella, la tarjeta no ofrece «Confirmar». */
@@ -108,6 +109,10 @@ export interface PropsInteraccionesV2 {
   filtroMedico: string | null
   horario: Horario
   guardado: GuardadoV2
+  /** T1 · Quien mira puede invitar a una cita (`canVerAgendaCompleta`, la regla de `handleSave`). */
+  puedeInvitar: boolean
+  /** T1 · Abre el modal de invitación de la agenda para esa cita (el de «Agregar invitados»). */
+  invitar: (cita: Appointment) => void
   setModal: Dispatch<SetStateAction<ModalState>>
   setConfirm: Dispatch<SetStateAction<ConfirmState>>
 }
@@ -166,7 +171,8 @@ function useDependenciasGuardado(p: PropsInteraccionesV2): DependenciasGuardado 
       onConfirm: () => { setConfirm(null); resolver(true) },
       onCancel: () => { setConfirm(null); resolver(false) },
     })),
-    guardar: (datos) => { void guardado.handleSave(datos) },
+    /* T1: sin la invitación automática; la burbuja la ofrece como botón. */
+    guardar: (datos) => guardado.handleSave(datos, false, { sinInvitacion: true }),
   }
 }
 
@@ -187,6 +193,12 @@ function CapaBurbuja({ capa, medicos, p, cerrar }: PropsCapaBurbuja): ReactEleme
       medicos={medicos} filtroMedico={p.filtroMedico} consultorioActivo={consultorioActivo}
       alGuardar={(datos, horas) => guardarAltaRapida(datos, capa.horas, horas, deps)}
       alMasOpciones={(v) => { cerrar(capa.id); p.setModal(aperturaDesdeBurbuja(v)) }}
+      /* T1 · Tras agendar. Las dos cierran la burbuja SIN salida animada (lo
+         que abren la tapa): la invitación no se ofrece dos veces seguidas
+         (`ModalInvitacionCita` explica por qué) y el modal es el de editar. */
+      puedeInvitar={p.puedeInvitar}
+      alInvitar={(cita) => { cerrar(capa.id); p.invitar(cita) }}
+      alEditar={(cita) => { cerrar(capa.id); p.setModal({ mode: 'edit', appointment: cita }) }}
       alCerrar={() => cerrar(capa.id)}
     />
   )

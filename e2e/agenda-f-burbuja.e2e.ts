@@ -107,6 +107,10 @@ test('encendido: Guardar manda el POST del modal (paciente, puntas, estado, méd
   expect(typeof cuerpo.medico_id).toBe('string')
   expect(typeof cuerpo.consultorio_id).toBe('string')
   expect(cuerpo).not.toHaveProperty('tipo_cita_id')
+  /* T1 (punto 13): la burbuja ya no se cierra al guardar; enseña «Cita
+     agendada» y se cierra con «Listo». */
+  await expect(b.getByText('Cita agendada', { exact: true })).toBeVisible()
+  await b.getByRole('button', { name: 'Listo', exact: true }).click()
   await expect(b).toHaveCount(0)
   await expect(page.locator(`.fc-timegrid-col[data-date="${MARTES}"] .fc-timegrid-event`, { hasText: 'Prueba 11' })).toHaveCount(1)
 })

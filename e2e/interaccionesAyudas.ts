@@ -82,7 +82,9 @@ export async function arrastrarFranjas(page: Page, fecha: string, desde: string,
 /** Elige un paciente en el combobox de la burbuja (o del buscador) por sus apellidos. */
 export async function elegirPaciente(capa: Locator, apellidos: string): Promise<void> {
   await capa.getByRole('combobox').fill(apellidos)
-  await capa.getByRole('option', { name: new RegExp(apellidos) }).first().click()
+  /* T1: la última opción de la burbuja es «Registrar «…»» con lo escrito, que
+     también casa con el texto: se elige un paciente, nunca esa. */
+  await capa.getByRole('option', { name: new RegExp(apellidos) }).filter({ hasNotText: 'Registrar' }).first().click()
 }
 
 /** Las peticiones de un método a `/api/appointments…`, contadas desde ahora. */

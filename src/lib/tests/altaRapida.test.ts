@@ -4,6 +4,7 @@ import {
   horasDelGesto, medicoPropuesto, motivoParaNoGuardar, necesitaElegirMedico, sumarMinutos, type EntradaAltaRapida,
 } from '@/lib/agenda/altaRapida'
 import { DEFAULT_DURATION } from '@/lib/agenda/duracionCita'
+import type { AltaGuardada } from '@/lib/agenda/tiposAgenda'
 
 /* Instantes en hora LOCAL, como los que entrega FullCalendar con `timeZone: 'local'`. */
 const D = (h: number, m = 0, dia = 11) => new Date(2026, 10, dia, h, m)
@@ -141,19 +142,19 @@ describe('guardarAltaRapida: el orden de los avisos (P3)', () => {
     paciente: { id: 'p', nombre: 'Ana', apellidos: 'Ruiz', telefono: null }, medicoId: 'm', consultorioId: 'c',
   })!
   const abiertas = { inicio: '10:00', fin: '11:00' }
-  function deps(o: { aviso?: string | null; empalmes?: { id: string }[]; respuestas?: boolean[] }) {
+  function deps(o: { aviso?: string | null; empalmes?: { id: string }[]; respuestas?: boolean[]; alta?: AltaGuardada }) {
     const respuestas = [...(o.respuestas ?? [])]
     return {
       avisoHorario: vi.fn(() => o.aviso ?? null),
       buscarEmpalmes: vi.fn(() => (o.empalmes ?? []).map(e => ({ ...e, titulo: 'X', inicio: '', fin: '' }))),
       mensajeEmpalme: () => 'Se empalma',
       confirmar: vi.fn(async () => respuestas.shift() ?? false),
-      guardar: vi.fn(),
+      guardar: vi.fn(async () => o.alta ?? null),
     }
   }
   it('sin avisos guarda tal cual y no pregunta nada', async () => {
     const d = deps({})
-    expect(await guardarAltaRapida(datos, abiertas, abiertas, d)).toBe(true)
+    expect(await guardarAltaRapida(datos, abiertas, abiertas, d)).toEqual({ enviada: true, alta: null })
     expect(d.confirmar).not.toHaveBeenCalled()
     expect(d.guardar).toHaveBeenCalledWith(datos)
   })
@@ -164,18 +165,29 @@ describe('guardarAltaRapida: el orden de los avisos (P3)', () => {
   })
   it('con horas tocadas pregunta el horario; decir que no deja la burbuja abierta', async () => {
     const d = deps({ aviso: 'Vas a agendar a las 20:00', respuestas: [false] })
-    expect(await guardarAltaRapida(datos, abiertas, { inicio: '20:00', fin: '21:00' }, d)).toBe(false)
+    expect(await guardarAltaRapida(datos, abiertas, { inicio: '20:00', fin: '21:00' }, d)).toEqual({ enviada: false })
     expect(d.guardar).not.toHaveBeenCalled()
   })
   it('B7: un empalme se pregunta y, aceptado, viaja en `empalmes_aceptados`', async () => {
     const d = deps({ empalmes: [{ id: 'e1' }], respuestas: [true] })
-    expect(await guardarAltaRapida(datos, abiertas, abiertas, d)).toBe(true)
+    expect(await guardarAltaRapida(datos, abiertas, abiertas, d)).toEqual({ enviada: true, alta: null })
     expect(d.buscarEmpalmes).toHaveBeenCalledWith(expect.objectContaining({ medicoId: 'm', todoElDia: false }))
     expect(d.guardar).toHaveBeenCalledWith({ ...datos, empalmes_aceptados: ['e1'] })
   })
   it('B7: un empalme rechazado no guarda', async () => {
     const d = deps({ empalmes: [{ id: 'e1' }], respuestas: [false] })
-    expect(await guardarAltaRapida(datos, abiertas, abiertas, d)).toBe(false)
+    expect(await guardarAltaRapida(datos, abiertas, abiertas, d)).toEqual({ enviada: false })
     expect(d.guardar).not.toHaveBeenCalled()
+  })
+  it('T1: devuelve la cita creada para que la burbuja ofrezca WhatsApp e invitación ahí mismo', async () => {
+    const cita: AltaGuardada['cita'] = {
+      id: 'nueva', title: 'Ana Ruiz', start_time: datos.start_time ?? '', end_time: datos.end_time ?? '', all_day: false,
+      status: 'scheduled', notes: null, paciente_id: 'p', medico_id: 'm', google_event_id: null, gcal_sync_status: 'pending',
+      updated_at: '', consultorio_id: 'c', consultorio_nombre: null, consultorio_nombre_corto: null, consultorio_direccion: null,
+      consultorio_telefono: null, consultorio_timezone: null, icono: null, color: null,
+    }
+    const alta: AltaGuardada = { cita, gcalSync: 'pending' }
+    const d = deps({ alta })
+    expect(await guardarAltaRapida(datos, abiertas, abiertas, d)).toEqual({ enviada: true, alta })
   })
 })

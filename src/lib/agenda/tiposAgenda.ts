@@ -24,6 +24,11 @@ import type { IconoEvento, ColorEvento } from '@/lib/appointments'
    sólo pinta `scheduled` y `confirmed` a propósito. */
 export type Status = 'scheduled' | 'confirmed' | 'cancelled' | 'no_show' | 'attended'
 
+/** T1 · Lo que `handleSave` devuelve de un ALTA que entró: la fila del servidor y el estado de Google. */
+export interface AltaGuardada { cita: Appointment; gcalSync: string | null }
+/** T1 · `sinInvitacion`: no abrir sola la invitación de Google tras el alta (la burbuja la ofrece como botón). */
+export interface OpcionesGuardado { sinInvitacion?: boolean }
+
 export type Appointment = {
   id: string
   title: string

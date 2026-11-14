@@ -76,7 +76,8 @@ describe('BuscadorCitas', () => {
 describe('BurbujaAlta', () => {
   const base = {
     fecha: '2026-11-11', horaInicio: '10:00', horaFin: '11:30', ancla: { left: 0, top: 0, width: 100, height: 60 },
-    consultorioActivo: { id: 'c1', medico_id: 'm1' }, alGuardar: async () => true, alMasOpciones: nada, alCerrar: nada,
+    consultorioActivo: { id: 'c1', medico_id: 'm1' }, alGuardar: async () => ({ enviada: false } as const), alMasOpciones: nada, alCerrar: nada,
+    puedeInvitar: false, alInvitar: nada, alEditar: nada,
   }
   const dos = [{ id: 'm1', nombre: 'Dra. Uno' }, { id: 'm2', nombre: 'Dr. Dos' }]
   it('diálogo nombrado con el día y el tramo, con buscador, Guardar y Más opciones', () => {
