@@ -37,6 +37,10 @@ interface Props {
   onFiltroMedico: (id: string) => void
   canEditHorario: boolean
   onHorario: () => void
+  /** T3 · Con la agenda v2 el engrane lleva a la configuración de la agenda
+      (no al modal de horario): sólo icono, y su nombre lo dice. Apagada, el de
+      siempre («Horario»). Lo decide el padre con el interruptor. */
+  engraneConfiguracion?: boolean
   onAgendar: () => void
   onIntencionAgendar: () => void
   /** E7: «Por confirmar (N)», sólo con la agenda v2 encendida (lo decide el padre). */
@@ -67,7 +71,9 @@ export function CabeceraEscritorio({
   resumenConteo, currentView, isMobile, onVista, compactar, onCompactar, isSingleDoctor,
   filtroEfectivo, mesSinTodos, medicos, onFiltroMedico, canEditHorario, onHorario, onAgendar,
   onIntencionAgendar, porConfirmar, densidadCompacta, onDensidad, selectorFecha, buscar, atajos = false,
+  engraneConfiguracion = false,
 }: Props) {
+  const rotuloEngrane = engraneConfiguracion ? 'Configuración de la agenda' : 'Configurar horario de consulta'
   /* F3 · `aria-keyshortcuts` en los tres botones de la barra nativa. Va sobre el
      DOM porque FullCalendar no deja poner atributos en sus botones; se repite al
      cambiar de vista por si su barra se volvió a montar, y en el cuadro
@@ -318,15 +324,17 @@ export function CabeceraEscritorio({
              `2xl` este botón es sólo un engranaje, y sin él su nombre
              accesible dependía del `title`, que es el último recurso del
              algoritmo de nombre y no todos los lectores lo anuncian igual. */
-          aria-label="Configurar horario de consulta"
-          title="Configurar horario de consulta"
+          aria-label={rotuloEngrane}
+          title={rotuloEngrane}
         >
-          <Settings size={15} />
+          <Settings size={15} aria-hidden="true" />
           {/* `2xl` por lo mismo que «Compactar» —ver su nota—: `sm` mostraba
               la etiqueta desde 640 px, o sea prácticamente siempre, y estos
               ~60 px eran parte de lo que tiraba la fila a la línea de
-              abajo. El `title` de arriba es lo que queda diciéndolo. */}
-          <span className="hidden 2xl:inline">Horario</span>
+              abajo. El `title` de arriba es lo que queda diciéndolo.
+              T3 · Con la v2 no hay etiqueta a ningún ancho: el engrane abre la
+              configuración entera, no el horario (petición de Angel). */}
+          {!engraneConfiguracion && <span className="hidden 2xl:inline">Horario</span>}
         </button>
       )}
       {/* ── UNA PUERTA, Y EL TIPO SE ELIGE DENTRO ──────────────────────

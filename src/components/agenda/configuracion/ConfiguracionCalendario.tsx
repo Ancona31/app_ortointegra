@@ -42,6 +42,8 @@ import SeccionEnlacesReserva from '@/components/agenda/configuracion/SeccionEnla
 import SeccionContactosBloqueados from '@/components/agenda/configuracion/SeccionContactosBloqueados'
 import PasosConfiguracion, { pasosDe } from '@/components/agenda/configuracion/PasosConfiguracion'
 import { cargarListaEnlaces, type EstadoLista } from '@/components/agenda/configuracion/listaEnlaces'
+import PreferenciaTarjetaAlPasar from '@/components/agenda/configuracion/PreferenciaTarjetaAlPasar'
+import TarjetaSeccion from '@/components/agenda/configuracion/TarjetaSeccion'
 
 /** Reescribe la rebanada del agregado que acaba de guardarse, sin volver a pedirlo. */
 export type ActualizarConfig = (cambio: (config: ConfigApp) => ConfigApp) => void
@@ -190,7 +192,10 @@ export default function ConfiguracionCalendario({ ajustes, tipos, puedeAdministr
         {conEnlaces && <SeccionContactosBloqueados medicos={medicos} gestionaTodos={gestionaReservasDeTodos} />}
       </Grupo>
       <Grupo titulo="Preferencias de este dispositivo" nota="Valen sólo en este navegador; no cambian nada para los demás.">
-        {/* T3: aquí va <PreferenciaTarjetaAlPasar /> */}
+        {/* Integración T2+T3: en su tarjeta, para que el grupo siga la retícula de las demás. */}
+        <TarjetaSeccion id="config-dispositivo" titulo="Tarjeta de la cita">
+          <PreferenciaTarjetaAlPasar />
+        </TarjetaSeccion>
       </Grupo>
     </div>
   )

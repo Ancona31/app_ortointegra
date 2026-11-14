@@ -215,7 +215,9 @@ interface PropsPaciente {
   campo: { current: HTMLInputElement | null }
 }
 
-function CampoPaciente({ paciente, alElegir, alRegistrar, campo }: PropsPaciente): ReactElement {
+/* T3 · Exportado: lo reutiliza `ConvertirEnCita` (convertir en cita un evento de Google),
+   con su «Registrar «…»» (T1) cableado a su propio `QuickPatientModal`. */
+export function CampoPaciente({ paciente, alElegir, alRegistrar, campo }: PropsPaciente): ReactElement {
   const [texto, setTexto] = useState('')
   const [activa, setActiva] = useState(-1)
   const { lista, listo } = usePacientes(paciente ? '' : texto)

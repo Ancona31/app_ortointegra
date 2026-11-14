@@ -75,13 +75,17 @@ export interface GestoAlta {
 /** Lo que el chunk de interacciones expone a la agenda. */
 export interface ApiInteraccionesV2 {
   abrirBurbuja: (gesto: GestoAlta) => void
-  /** `ancla` null: la cita no tiene un sitio pulsado (panel del Mes, buscador). */
-  abrirTarjeta: (cita: Appointment, ancla: Caja | null, punto?: Punto) => void
+  /** `ancla` null: la cita no tiene un sitio pulsado (panel del Mes, buscador).
+      T3 · `alPasar`: abierta al dejar el ratón quieto encima (no modal, sin foco). */
+  abrirTarjeta: (cita: Appointment, ancla: Caja | null, punto?: Punto, alPasar?: boolean) => void
   /** Del buscador: va al día de la cita (vista Día) y abre su tarjeta cuando está pintada. */
   irACita: (cita: CitaEncontrada) => void
   /** La ayuda de los atajos (el botón de la barra la abre aunque los atajos estén apagados). */
   abrirAyuda: () => void
 }
+
+/** T3 · Dónde abrir una cita: la caja pulsada, el punto y si es al pasar el ratón. */
+export interface SitioCita { ancla: Caja | null; punto?: Punto; alPasar?: boolean }
 
 /**
  * `abrirHueco` deja aquí el ancla del botón del hueco ANTES de `api.select()`,

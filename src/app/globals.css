@@ -3563,6 +3563,32 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
 .fc .fc-event:not(.fc-list-event):hover {
   z-index:   10 !important;
 }
+/* T3 · ELEVACIÓN DE 1 px AL PASAR EL RATÓN, SÓLO CON LA AGENDA V2 (petición
+   de Angel, punto 16 de la tanda tras sus pruebas a mano). Manda sobre la nota
+   de arriba («nada de `transform` en el hover»), que era del diseño y no suya:
+   se quedó en 1 px —lo mínimo que pidió— para que la cita no parezca cambiar de
+   franja. Las reglas que la acotan, y ninguna sobra:
+   · SOBRE LA CAJA DE DENTRO (`.ag-tarjeta`, `.ag-mes`, `.ag-banda`), NUNCA sobre
+     el `.fc-event`: ése lo posiciona FullCalendar y lo anima el FLIP de F2.6
+     (`flipTarjetas.ts`, WAAPI sobre `transform`) y lo mide `getBoundingClientRect`;
+     un `transform` ahí falsearía la medida y pelearía con la animación;
+   · sólo con ratón (`hover: hover`) y sin movimiento reducido: con `reduce` no
+     se mueve NADA, ni sin transición;
+   · ni el espejo que FullCalendar pinta al arrastrar O AL ESTIRAR (en la
+     rejilla de horas las dos cosas dibujan un espejo con `fc-event-mirror` y la
+     clase del gesto, y esconden la original): van las tres exclusiones;
+   · ni las filas de lista (`<tr>`, la nota de arriba) ni los bloques de Google
+     de solo lectura (no se abren: levantarlos diría que sí);
+   · una TRANSICIÓN de `transform` en `--ag-dur-micro`: nada de rebote ni de
+     `box-shadow` (regla de movimiento del bloque F). */
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .agenda-raiz[data-agenda-v2="encendida"] .fc .fc-event:not(.fc-list-event) :is(.ag-tarjeta, .ag-mes:not(.ag-mes--gcal), .ag-banda:not(.ag-banda--gcal)) {
+    transition: transform var(--ag-dur-micro) var(--ag-ease);
+  }
+  .agenda-raiz[data-agenda-v2="encendida"] .fc .fc-event:not(.fc-list-event):not(.fc-event-mirror):not(.fc-event-dragging):not(.fc-event-resizing):hover :is(.ag-tarjeta, .ag-mes:not(.ag-mes--gcal), .ag-banda:not(.ag-banda--gcal)) {
+    transform: translateY(-1px);
+  }
+}
 
 /* ── Entrada de la tarjeta de evento ──────────────────────────────────
    Un fundido y una subida de 4 px cada vez que la tarjeta se monta, para que no
@@ -5827,6 +5853,10 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
   animation: ag-capa-sale var(--ag-dur-micro) var(--ag-ease-in) forwards;
   pointer-events: none;
 }
+/* T3 · La tarjeta abierta al pasar el ratón que se FIJA con un clic se cambia
+   por la de siempre en el mismo sitio: ya estaba a la vista, así que no vuelve
+   a entrar. La salida sí (el `:not` deja ganar a la regla de arriba). */
+.ag-capa--sin-entrada:not([data-estado="saliendo"]) { animation: none; }
 /* La ayuda de atajos no tiene ancla: va centrada sobre su velo. */
 .ag-capa--centro {
   left: 50%;

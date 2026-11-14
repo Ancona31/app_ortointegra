@@ -199,4 +199,21 @@ describe('interruptor ENCENDIDO: la tarjeta de lectura', () => {
     expect(m.api.abrirTarjeta).not.toHaveBeenCalled()
     expect(m.setModal).not.toHaveBeenCalled()
   })
+  /* T3 · punto 15. MUTACIÓN: quitar la rama `alPasar` de `abrirCita` → sin el
+     chunk (o apagado) el ratón quieto abriría el MODAL de edición. */
+  it('al pasar el ratón sólo hay tarjeta, marcada `alPasar`; sin chunk o apagado, nada (nunca el modal)', () => {
+    const caja = { left: 1, top: 2, width: 3, height: 4 }
+    const m = montar({ agendaV2: true })
+    m.alta.abrirCita(evento, { ancla: caja, punto: { x: 5, y: 6 }, alPasar: true })
+    expect(m.api.abrirTarjeta).toHaveBeenCalledWith(evento.extendedProps, caja, { x: 5, y: 6 }, true)
+    for (const o of [{ agendaV2: true, conChunk: false }, { agendaV2: false }]) {
+      const x = montar(o)
+      x.alta.abrirCita(evento, { ancla: caja, alPasar: true })
+      expect(x.setModal).not.toHaveBeenCalled()
+      expect(x.api.abrirTarjeta).not.toHaveBeenCalled()
+    }
+    const bloque = montar({ agendaV2: true })
+    bloque.alta.abrirCita({ extendedProps: { isGcalBlock: true } } as unknown as EventApi, { ancla: caja, alPasar: true })
+    expect(bloque.api.abrirTarjeta).not.toHaveBeenCalled()
+  })
 })

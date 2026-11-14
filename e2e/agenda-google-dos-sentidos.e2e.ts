@@ -2,7 +2,7 @@ import { test, expect, type Browser, type Page } from '@playwright/test'
 import { spawn, type ChildProcess } from 'node:child_process'
 import { closeSync, mkdirSync, openSync, readFileSync } from 'node:fs'
 import { SESION, CORREO, DIA_LABORABLE_LIBRE, interruptorAgenda, sqlLocal, eventoConTexto, modalCita, tituloUnico } from './ayudas'
-import { editarDesdeTarjeta } from './interaccionesAyudas'
+import { editarDesdeTarjeta, tarjetaLectura } from './interaccionesAyudas'
 import { arrancarGoogleFalso, CALENDARIO, type EventoFalso, type GoogleFalso } from './google-falso/servidor'
 import { fechaHoraLocalAInstante } from '../src/lib/dates'
 import { encrypt } from '../src/lib/encrypt'
@@ -280,6 +280,54 @@ test('encendido: un evento creado en Google aparece como fila editable y una sol
   await eventoConTexto(page, titulo).click()
   await editarDesdeTarjeta(page)
   await expect(modalCita(page, 'Editar evento')).toBeVisible({ timeout: 30_000 })
+})
+
+/* T3 · punto 6 (AG-DT-29): convertir en cita un evento nacido en Google, desde
+   la tarjeta. A Google va el título del paciente y la descripción fija, nunca
+   las notas (S1); un título cambiado después en Google no pisa la cita (C-d).
+   Mutación en rojo: `descripcionV2` mandando las notas aunque haya paciente. */
+test('encendido: un evento creado en Google se convierte en cita; a Google va el paciente sin las notas y su título no vuelve', async ({ page }) => {
+  interruptorAgenda('A', true)
+  const titulo = tituloUnico('Google a cita')
+  const inicio = fechaHoraLocalAInstante(DIA_LABORABLE_LIBRE, '20:30', TZ)
+  const creado = g().crear({
+    summary: titulo, description: 'NOTAS-GOOGLE-T3',
+    start: { dateTime: inicio, timeZone: TZ }, end: { dateTime: new Date(Date.parse(inicio) + 1_800_000).toISOString(), timeZone: TZ },
+  })
+  permitirSondeo()
+  await abrirYSondear(page)
+  const id = sqlLocal(`select id from public.appointments where google_event_id = :'ev'`, { ev: creado.id })
+  expect(id).not.toBe('')
+  const columna = (c: 'title' | 'notes'): string => sqlLocal(`select coalesce(${c}, '') from public.appointments where id = :'id'`, { id })
+
+  await expect(page.locator('.agenda-raiz')).toHaveAttribute('data-interacciones-v2', 'listas')
+  /* La FILA importada (por su `data-cita-id`), no el bloque de solo lectura de
+     Google que la caché pudo pintar antes del sondeo. */
+  const filaPintada = page.locator(`.fc-event:has([data-cita-id="${id}"])`)
+  await expect(filaPintada).toHaveCount(1, { timeout: 30_000 })
+  await filaPintada.click()
+  await tarjetaLectura(page).getByRole('button', { name: 'Convertir en cita' }).click()
+  const dialogo = page.getByRole('dialog', { name: 'Convertir en cita' })
+  await dialogo.getByRole('combobox', { name: 'Paciente' }).fill('Prueba 20')
+  await dialogo.getByRole('option', { name: /Paciente Prueba 20/ }).click()
+  const consultorio = dialogo.getByLabel('Consultorio')
+  if ((await consultorio.inputValue()) === '') await consultorio.selectOption({ index: 1 })
+  const put = page.waitForResponse(r => r.url().includes(`/api/appointments/${id}`) && r.request().method() === 'PUT')
+  await dialogo.getByRole('button', { name: 'Convertir en cita' }).click()
+  expect((await put).status()).toBe(200)
+
+  await expect.poll(() => g().eventos.get(creado.id)?.summary, { timeout: 30_000 }).toBe('Cita médica: Paciente Prueba 20')
+  const descripcion = g().eventos.get(creado.id)?.description ?? ''
+  expect(descripcion).not.toContain('NOTAS-GOOGLE-T3')
+  expect(descripcion).toContain('Paciente Prueba 20')
+  expect(columna('notes')).toBe('NOTAS-GOOGLE-T3')
+
+  g().modificar(creado.id, { summary: 'Cambiado en Google', description: 'Otra descripción en Google' })
+  permitirSondeo()
+  await abrirYSondear(page)
+  expect(columna('title')).toBe('Paciente Prueba 20')
+  expect(columna('notes')).toBe('NOTAS-GOOGLE-T3')
+  await expect.poll(() => g().eventos.get(creado.id)?.summary, { timeout: 30_000 }).toBe('Cita médica: Paciente Prueba 20')
 })
 
 test('encendido: un recurrente creado en Google sigue en solo lectura (no se importa)', async ({ page }) => {

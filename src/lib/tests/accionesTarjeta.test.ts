@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  accionesDeTarjeta, horarioDeTarjeta, nombreDeTarjeta, pideConfirmacion, puedeIniciarConsulta, telefonoDeTarjeta,
+  accionesDeTarjeta, esConvertible, horarioDeTarjeta, nombreDeTarjeta, pideConfirmacion, puedeIniciarConsulta, telefonoDeTarjeta,
   textoDeConfirmacion,
 } from '@/lib/agenda/accionesTarjeta'
 
@@ -98,5 +98,26 @@ describe('textoDeConfirmacion', () => {
   })
   it('eliminar nombra el evento', () => {
     expect(textoDeConfirmacion('eliminar', base)).toBe('¿Eliminar el evento «Junta»? No se puede deshacer.')
+  })
+})
+
+/* T3 · punto 6 (AG-DT-29). MUTACIÓN: devolver siempre `['editar', 'eliminar']`
+   a los eventos → «nacido en Google, con hora…» en rojo. */
+describe('«Convertir en cita» (un evento nacido en Google)', () => {
+  const EVENTO_GOOGLE = { paciente_id: null, reserva_canal: null, origen: 'google', all_day: false, medico_id: 'm1' } as const
+  it('nacido en Google, con hora, con médico y vivo: editar, convertir y eliminar', () => {
+    for (const status of ['scheduled', 'confirmed'] as const) {
+      expect(accionesDeTarjeta({ ...EVENTO_GOOGLE, status }, false)).toEqual(['editar', 'convertir', 'eliminar'])
+    }
+  })
+  it('no: nacido en Spinus, de todo el día, sin médico, cancelado, con paciente o por ligar', () => {
+    const casos = [
+      { ...EVENTO_GOOGLE, origen: 'spinus' as const }, { ...EVENTO_GOOGLE, origen: undefined },
+      { ...EVENTO_GOOGLE, all_day: true }, { ...EVENTO_GOOGLE, medico_id: null },
+    ]
+    for (const c of casos) expect(esConvertible({ ...c, status: 'scheduled' })).toBe(false)
+    expect(esConvertible({ ...EVENTO_GOOGLE, status: 'cancelled' })).toBe(false)
+    expect(esConvertible({ ...EVENTO_GOOGLE, paciente_id: 'p1', status: 'scheduled' })).toBe(false)
+    expect(esConvertible({ ...EVENTO_GOOGLE, reserva_canal: 'fijo', status: 'scheduled' })).toBe(false)
   })
 })

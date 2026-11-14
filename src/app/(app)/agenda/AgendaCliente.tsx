@@ -1249,6 +1249,7 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
           /* `null` y no un booleano: es el manejador o no hay botón. Misma
              condición que el de escritorio (`verEngrane`). */
           onHorario={verEngrane ? abrirConfiguracion : null}
+          engraneConfiguracion={agendaV2}
           /* Misma forma y misma pregunta que el de escritorio: en móvil las dos
              vistas que `vistaAdmiteCompactar` acepta se reducen a Mes, porque
              Semana y Día son listas aquí. */
@@ -1503,6 +1504,8 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
             onFiltroMedico={id => aplicarFiltro(id, false)}
             canEditHorario={verEngrane}
             onHorario={abrirConfiguracion}
+            /* T3 · Con la v2 abre la configuración: sólo icono, «Configuración de la agenda». */
+            engraneConfiguracion={agendaV2}
             /* ⚠️ NO FUNDIR con el `onAgendar` de `BarraAgendarMovil` ni con el
                de la banda vacía, aunque el cuerpo sea idéntico: el plan A2.5
                los deja como tres cierres separados a propósito (§invariantes,
@@ -1935,6 +1938,8 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
             const { fecha, hora } = partirFechaHora(new Date().toISOString())
             setModal({ mode: 'create', fecha, hora, tipo: 'cita', todoElDia: 'no' })
           }}
+          /* T3 · «Convertir en cita» pasa la misma puerta de suscripción que «Agendar». */
+          puedeAgendar={() => { if (subState.isBlocked) { openBloqueoModal(); return false } return true }}
           medicos={medicos}
           filtroMedico={filtroEfectivo || ((isSingleDoctor || isMedicoSinAdmin) && defaultMedicoId ? defaultMedicoId : null)}
           horario={horario}

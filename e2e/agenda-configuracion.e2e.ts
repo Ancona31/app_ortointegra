@@ -86,9 +86,37 @@ test.describe('con el interruptor encendido', () => {
 
   test('el engrane lleva a la pantalla', async ({ page }) => {
     await irAAgenda(page)
-    await page.getByRole('button', { name: 'Configurar horario de consulta' }).click()
+    await page.getByRole('button', { name: 'Configuración de la agenda' }).click()
     await page.waitForURL(`**${RUTA}`)
     await expect(page.getByRole('heading', { name: 'Configuración del calendario' })).toBeVisible()
+  })
+
+  /* T3 · punto 5: con la v2 el engrane es SÓLO icono a cualquier ancho (también
+     a `2xl`, donde apagada se ve «Horario»), con nombre y `title` «Configuración
+     de la agenda»; en el teléfono, el mismo nombre y 44 px de toque. */
+  test('el engrane es sólo icono, se llama «Configuración de la agenda» y no dice «Horario»', async ({ page, browser }) => {
+    await page.setViewportSize({ width: 1700, height: 900 })
+    await irAAgenda(page)
+    const engrane = page.getByRole('button', { name: 'Configuración de la agenda' })
+    await expect(engrane).toHaveAttribute('title', 'Configuración de la agenda')
+    await expect(engrane).toHaveText('')
+    await expect(page.getByRole('button', { name: 'Configurar horario de consulta' })).toHaveCount(0)
+
+    const ctx = await browser.newContext({
+      storageState: SESION.adminA, viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true,
+      locale: 'es-MX', timezoneId: 'America/Merida',
+    })
+    try {
+      const movil = await ctx.newPage()
+      await irAAgenda(movil)
+      const engraneMovil = movil.getByRole('button', { name: 'Configuración de la agenda' })
+      await expect(engraneMovil).toHaveText('')
+      const caja = await engraneMovil.boundingBox()
+      // Redondeado: el navegador da 43.99999… por subpíxeles.
+      expect(Math.round(Math.min(caja?.width ?? 0, caja?.height ?? 0))).toBeGreaterThanOrEqual(44)
+    } finally {
+      await ctx.close()
+    }
   })
 
   test('el administrador edita los ajustes: persisten y quedan en audit_log', async ({ page }) => {
@@ -136,7 +164,7 @@ test.describe('con el interruptor encendido', () => {
   test('la secretaria lo ve en solo lectura y su PUT da 403', async ({ browser }) => {
     await enContextoNuevo(browser, SESION.secretariaA, async (p) => {
       await irAAgenda(p)
-      await p.getByRole('button', { name: 'Configurar horario de consulta' }).click()
+      await p.getByRole('button', { name: 'Configuración de la agenda' }).click()
       await p.waitForURL(`**${RUTA}`)
       await expect(p.getByLabel('Recordatorio por correo')).toBeDisabled()
       await expect(p.getByLabel('Recordatorio por correo')).toHaveValue('24')
