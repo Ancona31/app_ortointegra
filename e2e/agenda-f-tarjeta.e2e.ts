@@ -1,7 +1,7 @@
 import { test, expect, type Page } from '@playwright/test'
 import { CORREO, SESION, diaDeLaSemana, interruptorAgenda, modalCita, sqlLocal, toastConTexto, tituloUnico } from './ayudas'
 import { abrirAgendaApagada, abrirAgendaV2, contarPeticiones, tarjetaLectura } from './interaccionesAyudas'
-import { crearCitaPorLigar, limpiarReservasE2e } from './reservaAyudas'
+import { crearCitaPorLigar, aparcarEnlacesVigentes, devolverEnlaces, limpiarReservasE2e, marcaE2e } from './reservaAyudas'
 import { fechaHoraLocalAInstante } from '../src/lib/dates'
 
 /**
@@ -33,6 +33,15 @@ import { fechaHoraLocalAInstante } from '../src/lib/dates'
  */
 test.use({ storageState: SESION.adminA })
 
+/** Lo creado desde aquí es de este archivo: lo único que limpia (`limpiarReservasE2e`). Los
+    enlaces vigentes de antes (p. ej. uno hecho a mano) se aparcan y se devuelven al terminar. */
+let desde = ''
+let aparcados: string[] = []
+test.beforeAll(() => { aparcados = aparcarEnlacesVigentes(); desde = marcaE2e() })
+test.afterAll(() => {
+  try { limpiarReservasE2e(desde) } finally { devolverEnlaces(aparcados) }
+})
+
 /* Las citas que crea cada prueba, para borrarlas al acabar: todas van al mismo
    viernes y a las mismas horas, y si se acumulan, `citaEnRejilla(…).first()`
    puede agarrar la de otra prueba (una ya confirmada, por ejemplo). */
@@ -46,7 +55,7 @@ test.afterEach(() => {
       delete from public.appointments where id = any (string_to_array(:'ids', ',')::uuid[]);`, { ids: creadas.join(',') })
     creadas.length = 0
   }
-  limpiarReservasE2e()
+  limpiarReservasE2e(desde)
   interruptorAgenda('A', false)
 })
 

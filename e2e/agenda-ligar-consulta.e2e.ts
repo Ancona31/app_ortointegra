@@ -3,7 +3,7 @@ import {
   CORREO, SESION, DIA_LABORABLE_LIBRE, enContextoNuevo, interruptorAgenda, irAAgenda, modalCita, soloEscritorio, sqlLocal,
 } from './ayudas'
 import { editarDesdeTarjeta } from './interaccionesAyudas'
-import { clicEnTarjeta, crearCitaPorLigar, limpiarReservasE2e, type CitaPorLigar } from './reservaAyudas'
+import { clicEnTarjeta, crearCitaPorLigar, aparcarEnlacesVigentes, devolverEnlaces, limpiarReservasE2e, marcaE2e, type CitaPorLigar } from './reservaAyudas'
 import { fechaHoraLocalAInstante } from '../src/lib/dates'
 
 /**
@@ -27,10 +27,19 @@ import { fechaHoraLocalAInstante } from '../src/lib/dates'
 soloEscritorio()
 test.use({ storageState: SESION.adminA })
 
+/** Lo creado desde aquí es de este archivo: lo único que limpia (`limpiarReservasE2e`). Los
+    enlaces vigentes de antes (p. ej. uno hecho a mano) se aparcan y se devuelven al terminar. */
+let desde = ''
+let aparcados: string[] = []
+test.beforeAll(() => { aparcados = aparcarEnlacesVigentes(); desde = marcaE2e() })
+test.afterAll(() => {
+  try { limpiarReservasE2e(desde) } finally { devolverEnlaces(aparcados) }
+})
+
 const TZ = 'America/Merida'
 
 test.afterEach(() => {
-  limpiarReservasE2e()
+  limpiarReservasE2e(desde)
   interruptorAgenda('A', false)
 })
 

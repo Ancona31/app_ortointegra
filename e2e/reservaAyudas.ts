@@ -85,43 +85,102 @@ export function bloquearContactoE2e(c: CitaPorLigar): void {
 }
 
 /**
- * Borra TODO lo de reserva de las dos clínicas de la semilla: citas por enlace,
- * incidencias, contactos, enlaces y el aviso de las e2e, con sus filas de
- * `audit_log`; y los enlaces de confirmación y reagendados del bloque E de
- * esas clínicas (todos: ninguna prueba los deja a propósito). Ver la nota de
- * la cabecera.
+ * El instante (reloj de la BASE) en que empieza un archivo de pruebas: lo que
+ * se cree desde entonces en las tablas de reserva es de las pruebas. Se pide en
+ * el `beforeAll` y se pasa a `limpiarReservasE2e`.
  */
-export function limpiarReservasE2e(): void {
+export function marcaE2e(): string {
+  return sqlLocal(`select clock_timestamp()::text`)
+}
+
+/**
+ * Aparca (revoca) los enlaces VIGENTES de las clínicas de la semilla, para que
+ * una prueba que necesita empezar sin enlace fijo no choque con uno hecho a
+ * mano, y devuelve sus ids para `devolverEnlaces`. Se llama ANTES de
+ * `marcaE2e()`: así `limpiarReservasE2e` no los «des-revoca» por su cuenta.
+ */
+export function aparcarEnlacesVigentes(): string[] {
+  return sqlLocal(`
+    update public.reserva_enlaces set revocado_en = now()
+     where revocado_en is null
+       and clinica_id in (select id from public.clinicas where nombre in ('Clínica Semilla A', 'Clínica Semilla B'))
+    returning id;`).split('\n').filter(Boolean)
+}
+
+/** Vuelve a dejar vigentes los enlaces aparcados por `aparcarEnlacesVigentes`. */
+export function devolverEnlaces(ids: readonly string[]): void {
+  if (ids.length === 0) return
+  sqlLocal(`update public.reserva_enlaces set revocado_en = null where id = any (string_to_array(:'ids', ',')::uuid[])`,
+    { ids: ids.join(',') })
+}
+
+/**
+ * Borra lo de reserva que se CREÓ DESDE `desde` (`marcaE2e()` del archivo) en
+ * las dos clínicas de la semilla: citas por enlace, incidencias, contactos,
+ * enlaces y los enlaces de confirmación y reagendados del bloque E, con sus
+ * filas de `audit_log`, y el aviso de las e2e. Los enlaces de ANTES que una
+ * prueba revocó (emitir un fijo revoca el vigente del médico) vuelven a quedar
+ * vigentes. Ver la nota de la cabecera.
+ *
+ * ⚠️ HASTA EL 2026-11-13 BORRABA TODO LO DE RESERVA DE ESAS CLÍNICAS, también
+ * lo hecho a mano (se llevó un enlace fijo de Angel). Lo de antes de `desde` no
+ * se toca; lo que se cree A MANO mientras corre el archivo, sí se borra: no se
+ * prueba a mano a la vez (`GUIA_PRUEBAS_AGENDA_V2.md`, §1). Y la semilla, que
+ * corre `global-setup.ts` al empezar cada corrida, recrea las dos clínicas
+ * enteras (AG-DT-46).
+ */
+export function limpiarReservasE2e(desde: string): void {
+  /* Sin marca (el `beforeAll` falló antes de `marcaE2e`) el archivo no creó nada. */
+  if (!desde) return
   sqlLocal(`
     begin;
     set local session_replication_role = replica;
+    -- Para el bloque DO, donde psql no sustituye :'desde'.
+    select set_config('e2e.desde', :'desde', true);
     create temp table _cl on commit drop as
       select id from public.clinicas where nombre in ('Clínica Semilla A', 'Clínica Semilla B');
+    create temp table _citas on commit drop as
+      select id from public.appointments
+       where clinica_id in (select id from _cl) and reserva_canal is not null and created_at >= :'desde'::timestamptz;
     create temp table _obj on commit drop as
-      select id from public.appointments where clinica_id in (select id from _cl) and reserva_canal is not null
-      union all select id from public.reserva_enlaces where clinica_id in (select id from _cl)
-      union all select id from public.reserva_contactos where clinica_id in (select id from _cl)
-      union all select id from public.reserva_incidencias where clinica_id in (select id from _cl);
+      select id from _citas
+      union all select id from public.reserva_enlaces where clinica_id in (select id from _cl) and created_at >= :'desde'::timestamptz
+      union all select id from public.reserva_contactos where clinica_id in (select id from _cl) and created_at >= :'desde'::timestamptz
+      union all select id from public.reserva_incidencias where clinica_id in (select id from _cl) and created_at >= :'desde'::timestamptz;
     delete from public.audit_log where registro_id in (select id from _obj);
     -- Bloque E (E1 y E6): FK RESTRICT a la cita; con replica no saltarían y quedarían huérfanos.
     do $e$ begin
       if to_regclass('public.cita_reagendos') is not null then
-        delete from public.audit_log where registro_id in (select id from public.cita_reagendos where clinica_id in (select id from _cl));
-        delete from public.cita_reagendos where clinica_id in (select id from _cl);
+        create temp table _reag on commit drop as
+          select id from public.cita_reagendos where clinica_id in (select id from _cl)
+             and (created_at >= current_setting('e2e.desde')::timestamptz
+                  or cita_origen_id in (select id from _citas) or cita_nueva_id in (select id from _citas));
+        delete from public.audit_log where registro_id in (select id from _reag);
+        delete from public.cita_reagendos where id in (select id from _reag);
+      end if;
+      if to_regclass('public.cita_correos') is not null then
+        delete from public.cita_correos where appointment_id in (select id from _citas);
       end if;
       if to_regclass('public.cita_confirmaciones') is not null then
-        delete from public.audit_log where registro_id in (select id from public.cita_confirmaciones where clinica_id in (select id from _cl));
-        delete from public.cita_confirmaciones where clinica_id in (select id from _cl);
+        delete from public.audit_log where registro_id in (select id from public.cita_confirmaciones
+          where clinica_id in (select id from _cl) and (created_at >= current_setting('e2e.desde')::timestamptz or appointment_id in (select id from _citas)));
+        delete from public.cita_confirmaciones where clinica_id in (select id from _cl)
+          and (created_at >= current_setting('e2e.desde')::timestamptz or appointment_id in (select id from _citas));
       end if;
     end $e$;
-    delete from public.reserva_incidencias where clinica_id in (select id from _cl);
-    delete from public.reserva_contactos where clinica_id in (select id from _cl);
-    update public.reserva_enlaces set usado_en = null, usado_cita_id = null where clinica_id in (select id from _cl);
-    delete from public.appointments where clinica_id in (select id from _cl) and reserva_canal is not null;
-    delete from public.reserva_enlaces where clinica_id in (select id from _cl);
+    delete from public.reserva_incidencias where id in (select id from _obj) or appointment_id in (select id from _citas);
+    delete from public.reserva_contactos where id in (select id from _obj);
+    update public.reserva_enlaces set usado_en = null, usado_cita_id = null where usado_cita_id in (select id from _citas);
+    delete from public.appointments where id in (select id from _citas);
+    delete from public.reserva_verificaciones where enlace_id in (select id from _obj);
+    delete from public.reserva_enlaces where id in (select id from _obj);
+    -- Defensivo: con aparcarEnlacesVigentes() antes de la marca no hay ninguno; sin
+    -- aparcar (un archivo que no lo haga), el fijo de antes que una prueba revocó.
+    update public.reserva_enlaces set revocado_en = null
+     where clinica_id in (select id from _cl) and created_at < :'desde'::timestamptz and revocado_en >= :'desde'::timestamptz;
     delete from public.audit_log where tabla = 'reserva_avisos' and registro_id in (select id from public.reserva_avisos where version = '${AVISO_E2E}');
     delete from public.reserva_avisos where version = '${AVISO_E2E}';
-    commit;`)
+    commit;`, { desde })
 }
 
 /**

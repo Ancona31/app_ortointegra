@@ -106,10 +106,14 @@ async function esperarSuscripcionesRealtimePurgadas(): Promise<void> {
 
 /**
  * Apaga el interruptor de la agenda v2 (`agenda_ajustes.agenda_v2_encendida`)
- * en TODAS las clínicas de la base local, para que cada corrida empiece con la
+ * en las dos clínicas de la semilla, para que cada corrida empiece con la
  * agenda de siempre y sólo la prueba que lo pida lo encienda
- * (`interruptorAgenda` de `ayudas.ts`). Una corrida que abortó a medias pudo
- * dejar uno encendido, y las clínicas que no son de la semilla no se resiembran.
+ * (`interruptorAgenda` de `ayudas.ts`, que sólo enciende éstas). Una corrida
+ * que abortó a medias pudo dejar uno encendido.
+ *
+ * Sólo las de la semilla (2026-11-13): antes apagaba TODAS, también la de una
+ * clínica que alguien use para probar a mano fuera de la semilla
+ * (`GUIA_PRUEBAS_AGENDA_V2.md`, §1).
  *
  * Si la tabla todavía no existe (base local sin la migración B1), no hay ningún
  * interruptor que apagar: la agenda ya los trata a todos como apagados.
@@ -119,7 +123,9 @@ function apagarInterruptoresAgenda(): void {
     '-v', 'ON_ERROR_STOP=1', '-c',
     `do $$ begin
        if to_regclass('public.agenda_ajustes') is not null then
-         update public.agenda_ajustes set agenda_v2_encendida = false where agenda_v2_encendida;
+         update public.agenda_ajustes set agenda_v2_encendida = false
+          where agenda_v2_encendida and clinica_id in (select id from public.clinicas
+                                                       where nombre in ('Clínica Semilla A', 'Clínica Semilla B'));
        end if;
      end $$`], { encoding: 'utf8' })
 }

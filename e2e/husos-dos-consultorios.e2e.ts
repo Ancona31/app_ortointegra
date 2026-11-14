@@ -3,7 +3,7 @@ import { resolve } from 'node:path'
 import { config } from 'dotenv'
 import { interruptorAgenda, irAAgenda, soloEscritorio, sqlLocal } from './ayudas'
 import { contarCorreos, esperarCorreo } from './mailpit'
-import { limpiarReservasE2e } from './reservaAyudas'
+import { aparcarEnlacesVigentes, devolverEnlaces, limpiarReservasE2e, marcaE2e } from './reservaAyudas'
 import { aprobarAviso, emitirEnlace, personaNueva, reservar, type Escenario, type Turno, api } from './reservaPublicaAyudas'
 import { hoyEnTZ, desplazarFecha } from '../src/lib/dates'
 
@@ -47,8 +47,15 @@ const horaEn = (iso: string, tz: string) =>
 
 test.use({ storageState: 'e2e/.auth/admin-a.json', timezoneId: 'America/Merida' })
 
+/** Lo creado desde aquí es de este archivo: lo único que limpia (`limpiarReservasE2e`). Los
+    enlaces vigentes de antes (p. ej. uno hecho a mano) se aparcan y se devuelven al terminar. */
+let desde = ''
+let aparcados: string[] = []
+
 test.beforeAll(() => {
-  limpiarReservasE2e()
+  aparcados = aparcarEnlacesVigentes()
+  desde = marcaE2e()
+  limpiarReservasE2e(desde)
   interruptorAgenda('A', true)
   aprobarAviso(true)
   ajustesAntes = sqlLocal(`select recordatorio_horas from public.agenda_ajustes where clinica_id = (select id from public.clinicas where nombre = 'Clínica Semilla A')`)
@@ -86,7 +93,7 @@ test.afterAll(() => {
     delete from public.consultorios where id = :'k';
     delete from public.tipos_cita where id = :'t';
     commit;`, { k: e.consultorioId, t: e.tipoId })
-  limpiarReservasE2e()
+  try { limpiarReservasE2e(desde) } finally { devolverEnlaces(aparcados) }
   if (paciente.id) sqlLocal(`update public.pacientes set email = nullif(:'e', '') where id = :'p'`, { e: paciente.email, p: paciente.id })
   sqlLocal(`update public.agenda_ajustes set recordatorio_horas = :'h'::int where clinica_id = :'c'`, { h: ajustesAntes || '24', c: e.clinicaId })
   interruptorAgenda('A', false)
@@ -97,8 +104,8 @@ let turno: Turno
 test('turnos del enlace en el consultorio de Tijuana: empiezan a las 09:00 de Tijuana', async () => {
   const ctx = await api()
   try {
-    const desde = desplazarFecha(hoyEnTZ(TIJUANA), { dias: 1 })
-    const r = await ctx.get(`/api/reservar/${codigo}/turnos?consultorio=${e.consultorioId}&tipo=${e.tipoId}&desde=${desde}`)
+    const manana = desplazarFecha(hoyEnTZ(TIJUANA), { dias: 1 })
+    const r = await ctx.get(`/api/reservar/${codigo}/turnos?consultorio=${e.consultorioId}&tipo=${e.tipoId}&desde=${manana}`)
     expect(r.status()).toBe(200)
     const datos: { dias: { fecha: string; turnos: Turno[] }[] } = await r.json()
     const todos = datos.dias.flatMap(d => d.turnos)

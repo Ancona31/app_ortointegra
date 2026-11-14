@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 import { CORREO, SESION, interruptorAgenda, soloEscritorio, sqlLocal, enContextoNuevo } from './ayudas'
-import { bloquearContactoE2e, crearCitaPorLigar, limpiarReservasE2e } from './reservaAyudas'
+import { bloquearContactoE2e, crearCitaPorLigar, aparcarEnlacesVigentes, devolverEnlaces, limpiarReservasE2e, marcaE2e } from './reservaAyudas'
 
 /**
  * Bloque D · gestión de la reserva por enlace desde la clínica (lo que quedó
@@ -20,14 +20,25 @@ import { bloquearContactoE2e, crearCitaPorLigar, limpiarReservasE2e } from './re
 soloEscritorio()
 test.use({ storageState: SESION.adminA })
 
+/** Lo creado desde aquí es de este archivo: lo único que limpia (`limpiarReservasE2e`). Los
+    enlaces vigentes de antes (p. ej. uno hecho a mano) se aparcan y se devuelven al terminar. */
+let desde = ''
+let aparcados: string[] = []
+test.beforeAll(() => { aparcados = aparcarEnlacesVigentes(); desde = marcaE2e() })
+test.afterAll(() => {
+  try { limpiarReservasE2e(desde) } finally { devolverEnlaces(aparcados) }
+})
+
 const RUTA = '/agenda/configuracion'
 
 function idDe(correo: string): string {
   return sqlLocal(`select id from auth.users where email = :'c'`, { c: correo })
 }
+/** Los enlaces del médico creados en este archivo (los de antes, p. ej. hechos a mano, no cuentan). */
 function enlacesDe(medicoId: string): string[] {
   return sqlLocal(`select clase || ':' || (revocado_en is null)::text || ':' || coalesce(vigencia_dias::text, '-')
-                     from public.reserva_enlaces where medico_id = :'m' order by created_at`, { m: medicoId }).split('\n').filter(Boolean)
+                     from public.reserva_enlaces where medico_id = :'m' and created_at >= :'d'::timestamptz order by created_at`,
+  { m: medicoId, d: desde }).split('\n').filter(Boolean)
 }
 async function abrir(page: Page): Promise<void> {
   await page.goto(RUTA)
@@ -35,7 +46,7 @@ async function abrir(page: Page): Promise<void> {
 }
 
 test.afterEach(() => {
-  limpiarReservasE2e()
+  limpiarReservasE2e(desde)
   interruptorAgenda('A', false)
 })
 
@@ -47,7 +58,8 @@ test('con el interruptor apagado, las rutas de gestión dan 404', async ({ page 
   expect((await page.request.get('/api/agenda/reservas/contactos')).status()).toBe(404)
   expect((await page.request.get(`/api/agenda/reservas/historial?cita=${cita}`)).status()).toBe(404)
   expect(sqlLocal(`select count(*) from public.reserva_enlaces
-                     where clinica_id in (select id from public.clinicas where nombre = 'Clínica Semilla A')`)).toBe('0')
+                     where clinica_id in (select id from public.clinicas where nombre = 'Clínica Semilla A')
+                       and created_at >= :'d'::timestamptz`, { d: desde })).toBe('0')
 })
 
 test('el administrador crea, muestra, regenera y revoca el enlace fijo de un médico', async ({ page }) => {

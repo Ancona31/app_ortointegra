@@ -4,7 +4,7 @@ import { resolve } from 'node:path'
 import { config } from 'dotenv'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { CORREO, SESION, interruptorAgenda, soloEscritorio, sqlLocal } from './ayudas'
-import { crearCitaPorLigar, limpiarReservasE2e } from './reservaAyudas'
+import { crearCitaPorLigar, aparcarEnlacesVigentes, devolverEnlaces, limpiarReservasE2e, marcaE2e } from './reservaAyudas'
 
 /**
  * Correcciones de seguridad en la base (puntos 3, 4 y 7a de Angel), probadas
@@ -25,6 +25,15 @@ import { crearCitaPorLigar, limpiarReservasE2e } from './reservaAyudas'
 config({ path: resolve(process.cwd(), '.env.local'), quiet: true })
 soloEscritorio()
 test.use({ storageState: SESION.adminA })
+
+/** Lo creado desde aquí es de este archivo: lo único que limpia (`limpiarReservasE2e`). Los
+    enlaces vigentes de antes (p. ej. uno hecho a mano) se aparcan y se devuelven al terminar. */
+let desde = ''
+let aparcados: string[] = []
+test.beforeAll(() => { aparcados = aparcarEnlacesVigentes(); desde = marcaE2e() })
+test.afterAll(() => {
+  try { limpiarReservasE2e(desde) } finally { devolverEnlaces(aparcados) }
+})
 
 const CONTRASENA_SEMILLA = 'Semilla-Agenda-2026'
 const TITULO = 'E2E seg PostgREST'
@@ -58,11 +67,11 @@ function citaConPaciente(): string {
 /* Antes también: una prueba anterior que falló puede dejar un enlace fijo
    vigente de admin.a, y `crearCitaPorLigar` emite otro (un fijo vigente por
    médico, `reserva_enlaces_fijo_vigente`). */
-test.beforeEach(() => limpiarReservasE2e())
+test.beforeEach(() => limpiarReservasE2e(desde))
 
 test.afterEach(() => {
   sqlLocal(`delete from public.appointments where title = :'t'`, { t: TITULO })
-  limpiarReservasE2e()
+  limpiarReservasE2e(desde)
   interruptorAgenda('A', false)
 })
 

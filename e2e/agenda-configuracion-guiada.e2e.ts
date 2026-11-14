@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 import { CORREO, SESION, diaDeLaSemana, enContextoNuevo, interruptorAgenda, irAAgenda, soloEscritorio, sqlLocal, toastConTexto } from './ayudas'
-import { limpiarReservasE2e } from './reservaAyudas'
+import { aparcarEnlacesVigentes, devolverEnlaces, limpiarReservasE2e, marcaE2e } from './reservaAyudas'
 import { aprobarAviso, emitirEnlace, type Escenario } from './reservaPublicaAyudas'
 
 /**
@@ -34,15 +34,70 @@ const clinicaA = () => sqlLocal(`select id from public.clinicas where nombre = '
 
 /** El horario de Rehab tal como lo dejó la semilla, para devolverlo al terminar. */
 let horarioRehab = ''
+/** Lo creado desde aquí es de este archivo: lo único que limpian `limpiar()` y `limpiarReservasE2e`. */
+let desde = ''
+/** Los tipos de cita activos que había (los de la semilla o hechos a mano): se
+    aparcan (inactivos) para que la prueba empiece «sin tipos» y se devuelven. */
+let tiposAparcados: string[] = []
+/** Lo mismo con los enlaces vigentes (un enlace fijo hecho a mano chocaría con «Crear enlace fijo»). */
+let enlacesAparcados: string[] = []
+
+/**
+ * CENTINELAS · lo que alguien hizo A MANO en la Clínica A antes de la prueba
+ * (un tipo de cita y un enlace de un solo uso ya revocado). Hasta el
+ * 2026-11-13 este archivo borraba todos los tipos de la clínica y
+ * `limpiarReservasE2e` todos los enlaces: se llevaron un tipo y un enlace de
+ * Angel. La última prueba comprueba que siguen ahí.
+ */
+const CENTINELA_TIPO = 'Cita a mano (centinela e2e)'
+let centinelaEnlace = ''
+
+function crearCentinelas(): void {
+  sqlLocal(`insert into public.tipos_cita (clinica_id, nombre, duracion_min, activo, created_at)
+            values (:'c', :'n', 45, true, now() - interval '2 days')`, { c: clinicaA(), n: CENTINELA_TIPO })
+  centinelaEnlace = sqlLocal(`
+    insert into public.reserva_enlaces (id, clinica_id, medico_id, clase, codigo_hash, vigencia_dias, caduca_en, revocado_en, created_at)
+    values (gen_random_uuid(), :'c', :'m', 'unico', encode(sha256(gen_random_uuid()::text::bytea), 'hex'), 7, now() + interval '5 days',
+            now() - interval '1 day', now() - interval '2 days')
+    returning id;`, { c: clinicaA(), m: idDe(CORREO.adminA) })
+}
+
+function borrarCentinelas(): void {
+  sqlLocal(`
+    begin;
+    set local session_replication_role = replica;
+    delete from public.audit_log where registro_id = :'e'::uuid
+       or registro_id in (select id from public.tipos_cita where nombre = :'n');
+    delete from public.reserva_enlaces where id = :'e'::uuid;
+    delete from public.tipos_cita where nombre = :'n';
+    commit;`, { e: centinelaEnlace || '00000000-0000-0000-0000-000000000000', n: CENTINELA_TIPO })
+}
 
 function limpiar(): void {
-  limpiarReservasE2e()
-  sqlLocal(`delete from public.tipos_cita where clinica_id = (select id from public.clinicas where nombre = 'Clínica Semilla A')`)
+  limpiarReservasE2e(desde)
+  sqlLocal(`delete from public.tipos_cita where clinica_id = :'c' and created_at >= :'d'::timestamptz`, { c: clinicaA(), d: desde })
   sqlLocal(`update public.consultorios set horario_propio = false, horario = :'h'::jsonb where nombre = :'n'`, { n: REHAB, h: horarioRehab })
 }
 
 test.beforeAll(() => {
   horarioRehab = sqlLocal(`select horario::text from public.consultorios where nombre = :'n'`, { n: REHAB })
+  crearCentinelas()
+  tiposAparcados = sqlLocal(`update public.tipos_cita set activo = false where clinica_id = :'c' and activo returning id`, { c: clinicaA() })
+    .split('\n').filter(Boolean)
+  enlacesAparcados = aparcarEnlacesVigentes()
+  desde = marcaE2e()
+})
+test.afterAll(() => {
+  /* Cada paso aunque falle el anterior: lo aparcado se devuelve siempre. */
+  try { limpiarReservasE2e(desde) } finally {
+    try { devolverEnlaces(enlacesAparcados) } finally {
+      try {
+        if (tiposAparcados.length) {
+          sqlLocal(`update public.tipos_cita set activo = true where id = any (string_to_array(:'ids', ',')::uuid[])`, { ids: tiposAparcados.join(',') })
+        }
+      } finally { borrarCentinelas() }
+    }
+  }
 })
 
 test.beforeEach(() => {
@@ -152,4 +207,10 @@ test('10 · la rejilla de la invitada pinta el horario propio de su consultorio;
     await irAAgenda(p)
     await expect.poll(() => enFueraDeHorario(p, lunes, '13:00:00')).toBe(false)
   })
+})
+
+test('lo hecho a mano antes de la prueba sigue ahí: el tipo de cita (aparcado) y el enlace', () => {
+  /* Las limpiezas ya corrieron antes y después de cada prueba de este archivo. */
+  expect(sqlLocal(`select activo from public.tipos_cita where nombre = :'n'`, { n: CENTINELA_TIPO })).toBe('f')
+  expect(sqlLocal(`select count(*) from public.reserva_enlaces where id = :'e'::uuid and revocado_en is not null`, { e: centinelaEnlace })).toBe('1')
 })
