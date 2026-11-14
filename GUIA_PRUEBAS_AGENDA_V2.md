@@ -1,7 +1,8 @@
 # Guía de pruebas a mano — Agenda v2
 
 Para Angel. Sirve para probar a mano, en tu computadora y con datos inventados,
-todo lo que se hizo en la mejora de la agenda: bloques A, B, C, D, D11, E y F.
+todo lo que se hizo en la mejora de la agenda: bloques A, B, C, D, D11, E y F,
+y la tanda tras tus primeras pruebas a mano (§8-bis).
 No hace falta leer código. Todo pasa en tu máquina: la base de datos, los
 correos (que no salen a internet) y un Google de mentira. Nada toca producción.
 
@@ -21,6 +22,31 @@ y probadas: sus pruebas son las de §9.2. La preparación (P1 a P11) se siguió
 comando por comando sobre una base recién reiniciada, y los comandos de las
 pruebas de seguridad que preguntan directo a la base se ejecutaron uno por uno
 para comprobar que responden lo que aquí se dice.
+
+**Al día con la tanda tras tus primeras pruebas a mano (2026-11-13).** Tus 16
+puntos están hechos (§8-bis), salvo uno que te toca decidir (T2-2). Ya
+decidiste: el bloqueo manual por teléfono se queda (SEG-A2) y «Compactar» al
+abrir se queda apagado (F5). **Lee primero el aviso de §1.1 sobre tus datos
+hechos a mano**: una corrida de pruebas automáticas o de la semilla los borra.
+
+**Qué repetir tras la tanda del 2026-11-13.** Las nuevas, todas las de §8-bis
+(T1-1 a T1-8, T2-1 a T2-7, T3-1 a T3-8). Y de las que ya tenías, éstas, porque
+cambiaron o tocan algo que cambió:
+
+- **Bloque B:** B1 (el engrane se llama distinto y la pantalla va en grupos),
+  B2 («Plazos y recordatorios»), B3, B4, B6 (la rejilla ya pinta el horario
+  propio), B7.
+- **Bloque C:** C6 y C10 (un evento de Google ya se puede convertir en cita).
+- **Bloque D:** D0 (otro subtítulo y la ficha por médico), D3 (otra nota), D9.
+- **Bloque E:** E10 (WhatsApp sólo cuando aplica, con logo verde y el motivo
+  si falla) y E11.
+- **Bloque F:** F5 (ya decidido: apagado),
+  F12 (la lista de Semana del teléfono llega a hoy también en fin de semana),
+  F21 (la burbuja ya no se cierra al guardar), F22 (WhatsApp, «Convertir en
+  cita» y la tarjeta al pasar el ratón), F24 (el buscador encuentra por nombre
+  y apellido en cualquier orden), F27.
+- **Seguridad:** SEG-A2 (ya decidido).
+- **Apagado:** X1 (la búsqueda del formulario sale también apagada) y X2.
 
 **Cómo leer los comandos.** Cada recuadro gris es un comando. Cópialo entero,
 pégalo en la terminal de Ubuntu y pulsa Enter. Debajo de cada uno se dice qué
@@ -50,6 +76,7 @@ cd ~/proyectos/app_ortointegra-agenda
 6. Bloque D11 — Google antes de reservar
 7. Bloque E — Recordatorios y confirmación
 8. Bloque F — Interfaz, movimiento y orden visual
+8-bis. Tanda tras tus primeras pruebas a mano (2026-11-13)
 9. Seguridad
 10. Con el interruptor APAGADO
 11. Lista de casillas
@@ -68,6 +95,36 @@ cd ~/proyectos/app_ortointegra-agenda
 - Nadie más usando la base local: ni la otra carpeta del proyecto ni otro
   agente. La base es una sola para las dos carpetas; reiniciarla les borra todo
   a los demás.
+
+> ## ⚠️ TUS DATOS HECHOS A MANO SE BORRAN SI ALGUIEN SIEMBRA O CORRE LAS PRUEBAS AUTOMÁTICAS
+>
+> **La semilla (P6) y cualquier corrida de las pruebas automáticas
+> (Playwright, `npx playwright test`, que siembra al empezar) BORRAN Y VUELVEN A
+> CREAR enteras la Clínica Semilla A y la B.** Todo lo que hiciste a mano en
+> ellas desaparece: tipos de cita (como tu «Cita Dr Ancona»), enlaces de
+> reserva, citas, pacientes, contactos bloqueados, la conexión con el Google
+> simulado y la v2 encendida. Pasa igual si las corre otra persona o un agente
+> en esta computadora: la base es una sola.
+>
+> Desde el 2026-11-13 las pruebas automáticas, mientras corren, borran **sólo
+> lo que ellas mismas crean**, y lo que ya había (por ejemplo un enlace fijo
+> tuyo) lo apartan un momento y lo devuelven al terminar. Pero eso no te salva
+> de la siembra del principio, y lo que crees a mano **mientras** corren sí
+> puede borrarse.
+>
+> **Cómo no perder nada:**
+> 1. **No pruebes a mano mientras alguien siembra o corre pruebas.** Antes de
+>    empezar, pregunta si hay un agente o un programador trabajando con la base.
+> 2. **Apunta lo que creas a mano** que quieras conservar (nombre y duración de
+>    tus tipos de cita, a qué médico van tus enlaces) para rehacerlo en un
+>    minuto.
+> 3. **Después de una siembra o de una corrida de pruebas:** repite P7 si hizo
+>    falta y P8, vuelve a crear «Consulta» (comando al principio del bloque D),
+>    tus tipos y tus enlaces, y vuelve a arrancar el Google simulado si lo usas.
+>
+> Hoy no hay una clínica que la semilla no toque. Registrar una cuenta nueva en
+> la app local **no** es buena salida: el registro todavía manda un correo de
+> verdad (`DEUDA_TECNICA.md` AG-DT-16 y AG-DT-46).
 
 ### 1.2 Paso a paso, desde cero
 
@@ -231,10 +288,11 @@ docker exec supabase_db_app_ortointegra psql -U postgres -Atc "select c.nombre, 
 Responde algo como `Clínica Semilla A|t` (encendida) y `Clínica Semilla B|f`
 (apagada).
 
-> Si algún día corres las pruebas automáticas (Playwright), éstas apagan todos
-> los interruptores y vuelven a sembrar al empezar. Después repite P7 si hizo
-> falta y P8, y vuelve a crear el tipo «Consulta» (bloque D, «Antes de
-> empezar»): sembrar borra los tipos de cita y los enlaces.
+> Si algún día corres las pruebas automáticas (Playwright), éstas apagan los
+> interruptores de las dos clínicas de la semilla y vuelven a sembrar al
+> empezar: **borran lo que hiciste a mano** (aviso de §1.1). Después repite P7
+> si hizo falta y P8, y vuelve a crear el tipo «Consulta» (bloque D, «Antes de
+> empezar») y tus enlaces.
 
 **P9. Instalar dependencias (sólo si es la primera vez en esta carpeta).**
 
@@ -301,7 +359,9 @@ sábado de 08:00 a 13:00, domingo cerrado.
   teléfono.
 - **Pacientes:** «Paciente Prueba 01» a «Paciente Prueba 25». Del 01 al 15 son
   del Dr. Admin; del 16 al 25, de la Dra. Invitada. Cada uno tiene teléfono
-  (`99900000NN`) y correo (`paciente.NN@semilla.spinus.test`).
+  (`99900000NN`) y correo (`paciente.NN@semilla.spinus.test`). Y uno más del
+  Dr. Admin, **«Hugo Interián Canché»** (9990000026, **sin citas**), para probar
+  la búsqueda con acentos y en cualquier orden (T1-1).
 - **Citas:** unas 350, de 4 semanas antes a 4 semanas después. Hay de los cinco
   estados. El Dr. Admin tiene **una cita todos los días hábiles a las 10:00**
   en Centro; los martes y jueves la Dra. Invitada también tiene a las 10:00.
@@ -630,20 +690,26 @@ Entra como **Dr. Admin**.
 
 ### B1. La pantalla de configuración
 
-**Qué hago:** pulso el engrane de la barra de la agenda (al pasar el ratón dice
-«Configurar horario de consulta»).
+**Qué hago:** pulso el engrane de la barra de la agenda (sólo el dibujo, sin
+texto; al pasar el ratón dice «Configuración de la agenda»).
 
 **Qué debo ver:** se abre «Configuración del calendario», con «‹ Agenda» para
-volver y estas secciones: «Horario de la clínica», «Reserva por enlace y
-recordatorios», «Disponibilidad por consultorio», «Tipos de cita», «Enlaces de
-reserva» y «Contactos bloqueados».
+volver. Arriba, mientras te falte algo para recibir reservas, la tarjeta «Para
+empezar» (T2-1). Debajo, cuatro grupos con su rótulo:
+- **Horario y disponibilidad:** «Horario de la clínica» y «Disponibilidad por
+  consultorio»;
+- **Citas:** «Tipos de cita»;
+- **Reserva por enlace:** «Enlaces de reserva» (una ficha por médico), «Plazos
+  y recordatorios» y «Contactos bloqueados»;
+- **Preferencias de este dispositivo:** «Tarjeta de la cita», con la casilla
+  «Abrir la tarjeta al pasar el ratón» (T3-6).
 
 **Si falla, significa que…** el interruptor no se leyó (sigues viendo el
 modal viejo «Horario de consulta») o la pantalla nueva no carga.
 
 ### B2. Los cuatro ajustes de la clínica
 
-**Qué hago:** en «Reserva por enlace y recordatorios» cambio «Recordatorio por
+**Qué hago:** en «Plazos y recordatorios» cambio «Recordatorio por
 correo» a 12 y «Anticipación mínima para reservar por enlace» a 14. Pulso
 «Guardar ajustes». Recargo la página. Después pruebo valores malos, uno a la
 vez: 73 en el recordatorio, el campo vacío, y 2.5. Al final dejo los valores de
@@ -729,9 +795,12 @@ eventos.
 dejarlo como estaba (o déjalo para comprobarlo en D13).
 
 **Qué debo ver:** «Disponibilidad guardada», la fila dice «Horario propio» y
-«08:00 – 12:00». Al volver: «Ahora usa el horario de la clínica». La rejilla de
-la agenda **sigue pintando el horario de la clínica** (es lo acordado); el
-horario propio lo usan los turnos del enlace de reserva.
+«08:00 – 12:00». Al volver: «Ahora usa el horario de la clínica», y la fila
+dice sólo «Usa el horario de la clínica» (ya no repite las siete líneas).
+**Cambió el 2026-11-13:** mientras tiene horario propio, la rejilla de la
+agenda de la Dra. Invitada **pinta ese horario** (de 12:00 en adelante, el
+lunes sale en gris) y los avisos de fuera de horario lo usan; detalle en T2-5.
+Los turnos del enlace de reserva también lo usan.
 
 **Si falla, significa que…** la disponibilidad por consultorio no se guarda.
 
@@ -1066,11 +1135,9 @@ recargo. Después la vuelvo a encender.
 
 **Si falla, significa que…** el interruptor no protege esta función.
 
-> **Hallazgo para que lo decidas.** El plan decía que un evento creado en
-> Google se podía **convertir en cita** ligándolo a un paciente. En la pantalla
-> no hay cómo: un evento importado se edita como evento y no deja ponerle
-> paciente. Se dejó así y quedó anotado como pendiente (`DEUDA_TECNICA.md`,
-> AG-DT-29; ver también §12).
+> **Resuelto el 2026-11-13.** Un evento creado en Google ya se puede
+> **convertir en cita** desde su tarjeta («Convertir en cita»): pruebas T3-2 a
+> T3-4 (§8-bis).
 
 Si vas a seguir con el bloque D11 (§6), deja la terminal 1 corriendo. Si no:
 Ctrl+C en la terminal 1 (espera el «Listo…») y vuelve a arrancar la app del
@@ -1098,9 +1165,12 @@ Responde `INSERT 0 1` (lo creó) o `INSERT 0 0` (ya estaba).
 **Qué hago:** como **Dr. Admin**, engrane → «Enlaces de reserva». En su bloque,
 «Crear enlace fijo». Pulso «Copiar».
 
-**Qué debo ver:** el subtítulo «Quien tenga un enlace puede agendar en un
-horario libre. No son públicos: sólo los tiene a quien se los mandes.». Al
-crear, «Enlace fijo creado» y una dirección del tipo
+**Qué debo ver:** el subtítulo «Cada médico tiene los suyos. Quien tenga un
+enlace puede agendar en un horario libre; sólo lo tiene a quien se lo mandes.»
+y una ficha por médico, la tuya primero («Dr. Admin Semilla Uno (tú)»). Sin
+enlace, la ficha dice «Aún no hay enlace fijo: se comparte una vez y sirve
+siempre.». Si falta el tipo «Consulta», sale un recuadro ámbar «Para que el
+enlace abra, falta: Un tipo de cita.» (T2-1). Al crear, «Enlace fijo creado» y una dirección del tipo
 `http://localhost:3000/reservar/<22 letras y números>`. Al copiar, el botón
 dice «Copiado». Si recargas, la dirección se esconde: «Mostrar enlace» la
 vuelve a enseñar.
@@ -1166,7 +1236,7 @@ dirección. En incógnito nueva reservo con «Beto Reserva Dos», 5512345602,
 `beto2@prueba.test`. Después abro **otra vez** el mismo enlace.
 
 **Qué debo ver:** la fila «Un solo uso · Para Beto» con «caduca el {fecha}» (7
-días) y la nota «Vale 7 días y una sola reserva.». Al reservar, el botón dice
+días) y la nota «Uno de un solo uso vale 7 días y una sola reserva.». Al reservar, el botón dice
 «Reservar cita» y **no pide código** al correo. La segunda vez: «Este enlace ya
 no está disponible» con «Para agendar, comunícate con el consultorio:
 {teléfono}.».
@@ -1576,15 +1646,18 @@ recordatorio para la misma hora. Deja el ajuste en 24 al final.
 ### E10. WhatsApp manual desde la cita
 
 **Qué hago:** como Dr. Admin, pulso una cita futura de «Paciente Prueba 05»
-(agendada). En la tarjeta (o en «Editar»), pulso «Enviar por WhatsApp».
+(agendada). En la tarjeta (o en «Editar»), pulso «Enviar por WhatsApp» (el
+botón lleva el logo verde de WhatsApp).
 
 **Qué debo ver:** se abre una pestaña de WhatsApp (`wa.me/5219990000005…`) con
 el mensaje ya escrito: «Hola. Le escribimos del consultorio de Dr. Admin Semilla
 Uno. Su cita es el {fecha} a las {hora} en {consultorio}. Para confirmar o
 avisar que no podrá asistir: {enlace}». **No envíes nada**: cierra la pestaña.
 El botón pasa a «Abierto en WhatsApp hh:mm». No va el nombre del paciente ni
-nada clínico. En una cita cancelada o atendida no aparece el botón. Abrir la
-cita sin pulsar el botón no crea nada.
+nada clínico. **Desde el 2026-11-13** el botón sólo aparece cuando el mensaje
+se puede mandar: no en una cita cancelada, atendida, de «no asistió», de todo el
+día, que ya pasó o sin teléfono (T1-6); y si aun así falla, dice el motivo
+(T1-7). Abrir la cita sin pulsar el botón no crea nada.
 
 **Si falla, significa que…** el mensaje sale con datos de más o no se puede
 mandar.
@@ -1681,15 +1754,15 @@ mes» (sólo con la v2: F23).
 
 **Si falla, significa que…** el ancho de la vista Día sigue desaprovechado.
 
-### F5. «Compactar» al abrir — APAGADO, pendiente de tu decisión
+### F5. «Compactar» al abrir — APAGADO, decidido por ti
 
 **Qué hago:** abro la agenda. Luego pulso «Compactar» a mano.
 
 **Qué debo ver:** al abrir, «Compactar» está **apagado** y el domingo se ve.
 Esta mejora quedó **apagada a propósito**: encendida costaba unos 20 ms más al
-abrir y el presupuesto decía «no empeorar». Encenderla es cambiar una sola
-línea (`COMPACTAR_AL_ABRIR` en `src/lib/agenda/ventanaRejilla.ts`); **decide
-tú** si la quieres. Al pulsarlo a mano: desaparece el domingo y aparece la
+abrir y el presupuesto decía «no empeorar». **Lo decidiste el 2026-11-13: se
+queda apagada** (`COMPACTAR_AL_ABRIR = false` en
+`src/lib/agenda/ventanaRejilla.ts`). Al pulsarlo a mano: desaparece el domingo y aparece la
 banda «Vista compacta: …». Al cambiar de semana, la rejilla no salta.
 
 **Si falla, significa que…** (si al abrir ya viene encendido) alguien cambió
@@ -1874,7 +1947,10 @@ viendo movimiento.
 **Qué debo ver:**
 1. Una burbuja pequeña junto al punto: «Nueva cita · jue {día}, 16:00–…», con
    «Paciente» ya enfocado, «Inicio», «Fin», «Guardar» y «Más opciones».
-2. «Se agendó correctamente».
+2. «Se agendó correctamente» y, **desde el 2026-11-13, la burbuja no se
+   cierra**: dice «Cita agendada» y ofrece «Enviar por WhatsApp», «Invitar por
+   correo» (sólo con Google conectado), «Listo» y «Más opciones» (T1-8).
+   «Listo» la cierra.
 3. La burbuja respeta la duración arrastrada (11:00–12:30).
 4. Se abre el formulario completo con el paciente, la hora de fin y el médico ya
    puestos.
@@ -1895,14 +1971,16 @@ instante después).
 
 **Qué hago:** pulso una cita agendada de «Paciente Prueba 01». Pruebo cada
 botón en citas distintas. Luego pulso un evento sin paciente y un evento
-«Evento» de Google (si tienes alguno de C9).
+«Evento» de Google (si tienes alguno de C9). Desde el 2026-11-13, además, dejar
+el ratón quieto un segundo sobre una cita abre su tarjeta sola (T3-5).
 
 **Qué debo ver:** una tarjeta con el paciente, el estado, la hora, el médico, el
 consultorio, el teléfono y la nota, y los botones «Iniciar consulta» (sólo el
 médico de la cita), «Confirmar» (si está agendada), «Reagendar» (abre el
 formulario con el foco en la fecha), «Cancelar cita» (pregunta antes), «Editar»
-y «Enviar por WhatsApp». En un evento sin paciente sólo «Editar» y «Eliminar
-evento». Lo de Google en sólo lectura no abre nada. Escape la cierra y el foco
+y «Enviar por WhatsApp» (sólo si la cita lo admite: T1-6). En un evento sin
+paciente sólo «Editar» y «Eliminar evento»; si el evento nació en Google, también
+«Convertir en cita» (T3-2). Lo de Google en sólo lectura no abre nada. Escape la cierra y el foco
 vuelve a la cita. En el teléfono sale como una hoja desde abajo.
 
 **Si falla, significa que…** se abre la edición directa o falta alguna acción.
@@ -1993,6 +2071,326 @@ vacíos: «Sin citas en estos tres días». Para arrastrar una cita, mantener
 pulsado un segundo.
 
 **Si falla, significa que…** la tableta se ve como teléfono estirado.
+
+---
+
+## 8-bis. Tanda tras tus primeras pruebas a mano (2026-11-13)
+
+Lo que se cambió por tus 16 puntos, en tres grupos: **T1** búsqueda, burbuja,
+ventanas que no se salen de la pantalla y WhatsApp; **T2** la configuración
+guiada; **T3** el engrane, convertir en cita, la tarjeta al pasar el ratón y la
+elevación. Todo detrás del interruptor de la v2, **salvo T1-1** (la búsqueda del
+formulario completo era un defecto y sale también con la v2 apagada).
+
+**Antes de empezar:** v2 encendida en la Clínica A (P8), aviso aprobado (P7),
+la app del 3000 (P11). Recién sembrado no hay tipos de cita ni enlaces (T2
+empieza justo así). Cada prueba se comprobó con una prueba automática que hace
+lo mismo (entre paréntesis, su archivo en `e2e/`).
+
+### T1-1. Buscar un paciente por nombre y apellido, en cualquier orden (también con la v2 apagada)
+
+**Qué hago:** pulso «Agendar» y en «Paciente» escribo «Hugo Interián». Luego
+borro y pruebo «interian hugo», «HUGO» y «canche». Al final, «Hugo Prueba».
+
+**Qué debo ver:** en los cuatro primeros casos aparece «Hugo Interián Canché»
+(paciente de la semilla, del Dr. Admin, sin citas). Con «Hugo Prueba» no
+aparece nadie, sólo «Registrar "Hugo Prueba"». Igual con la v2 apagada (P8 con
+`false`). (`agenda-t1-busqueda`)
+
+**Si falla, significa que…** la búsqueda sigue comparando el texto entero
+contra el nombre o contra los apellidos, o no ignora los acentos.
+
+### T1-2. Lo mismo en la burbuja
+
+**Qué hago:** con la v2 encendida, clic en un hueco libre de la semana; en la
+burbuja escribo «interian hugo».
+
+**Qué debo ver:** «Hugo Interián Canché» en la lista; al elegirlo queda escrito
+en el campo. (`agenda-t1-busqueda`)
+
+**Si falla, significa que…** la burbuja no usa la búsqueda nueva.
+
+### T1-3. Registrar un paciente nuevo desde la burbuja
+
+**Qué hago:** en la burbuja escribo un nombre que no exista («Zoila Prueba
+Nueva») y elijo «Registrar «Zoila Prueba Nueva»», al final de la lista. En la
+ventana «Registrar paciente» pulso «Crear y continuar» SIN marcar el aviso de
+privacidad; luego lo marco y pulso otra vez.
+
+**Qué debo ver:** la primera vez, «Debes marcar el consentimiento del aviso de
+privacidad.»; la segunda, la ventana se cierra y en la burbuja queda elegida
+«Zoila Prueba Nueva», con el cursor en «Guardar». (`agenda-t1-burbuja`)
+
+**Si falla, significa que…** la burbuja no ofrece crear paciente, o se saltó el
+consentimiento (**grave: avísame**).
+
+### T1-4. La burbuja al fondo de la pantalla
+
+**Qué hago:** en Semana (o en la tableta, «3 días»), clic en la última franja
+que se ve abajo; si avisa de fuera de horario, «Aceptar». En la burbuja escribo
+«Prueba» para que salga la lista.
+
+**Qué debo ver:** la burbuja se abre entera dentro de la pantalla (sube o se
+pone al lado); al salir la lista sigue entera dentro, y si no cabe todo se puede
+bajar DENTRO de la burbuja hasta «Guardar». En la tableta, al abrirse el
+teclado, la burbuja sube a lo que queda visible. (`agenda-t1-capas`)
+
+**Si falla, significa que…** la burbuja no se recoloca al crecer o no mira la
+parte visible de la pantalla.
+
+### T1-5. La tarjeta al fondo de la pantalla
+
+**Qué hago:** en una ventana baja (o el portátil), clic en una cita de abajo del
+todo; en el teléfono, toco una cita de la lista.
+
+**Qué debo ver:** la tarjeta entera dentro de la pantalla (en el teléfono, la
+hoja de abajo, sin cortarse). (`agenda-t1-capas`)
+
+**Si falla, significa que…** la tarjeta no se acota a la ventana.
+
+### T1-6. WhatsApp sólo cuando aplica
+
+**Qué hago:** abro una cita de la semana PASADA (agendada), una atendida, una
+cancelada y una futura de un paciente con teléfono (p. ej. «Paciente Prueba
+05» la semana que viene).
+
+**Qué debo ver:** sólo en la futura aparece «Enviar por WhatsApp» (con el logo
+verde). En las otras no hay botón. (`agenda-t1-burbuja`)
+
+**Si falla, significa que…** la pantalla no usa la misma regla que el servidor.
+
+### T1-7. Si aun así sale el error, dice por qué
+
+**Qué hago:** abro la tarjeta de una cita futura con teléfono; en otra pestaña
+la cancelo; vuelvo a la primera y pulso «Enviar por WhatsApp».
+
+**Qué debo ver:** debajo del botón, «La cita está cancelada.» (o «La cita ya
+pasó.» si pasó). No se abre WhatsApp. (`agenda-t1-burbuja`)
+
+**Si falla, significa que…** el servidor no manda el motivo o el botón no lo lee.
+
+### T1-8. Después de agendar desde la burbuja
+
+**Qué hago:** clic en un hueco, elijo «Paciente Prueba 05» y «Guardar».
+
+**Qué debo ver:** la burbuja **no se cierra**: dice «Cita agendada»; debajo
+«Enviar por WhatsApp» (logo verde) y, si la clínica tiene Google conectado
+(Google simulado arrancado, C0), «Invitar por correo»; abajo «Listo» (azul,
+con el cursor) y «Más opciones», del mismo ancho. «Listo» cierra; «Más
+opciones» abre la edición de esa cita; «Invitar por correo» abre «Invitar por
+correo» y cierra la burbuja. Sin Google conectado no sale «Invitar por correo».
+La invitación **ya no se abre sola** encima de la burbuja (desde «Agendar», el
+formulario completo, sí, como antes). (`agenda-t1-burbuja`)
+
+**Si falla, significa que…** la burbuja no recibe la cita creada.
+
+### T2-1. «Para empezar» y lo que falta para el enlace
+
+**Qué hago:** recién sembrado, como **Dr. Admin**, abro el engrane.
+
+**Qué debo ver:** arriba, la tarjeta «Para empezar» con «1 de 3»: «Horario y
+disponibilidad · Hecho», «Tipos de cita · Pendiente» y «Enlace de reserva ·
+Pendiente», cada pendiente con su «Ir». En «Enlaces de reserva», en mi ficha
+(«Dr. Admin Semilla Uno (tú)») y en la de la Dra. Invitada, un recuadro ámbar
+«Para que el enlace abra, falta: Un tipo de cita.» con el botón «Crear
+«Consulta», 30 min». Lo pulso: «Tipo de cita «Consulta» creado», los dos
+recuadros desaparecen, el paso 2 pasa a «Hecho» y en «Tipos de cita» aparece
+«Consulta 30 min · Toda la clínica». Pulso «Crear enlace fijo» en mi ficha: la
+tarjeta «Para empezar» desaparece. Recargo: sigue sin salir.
+(`agenda-configuracion-guiada`)
+
+**Si falla, significa que…** la pantalla vuelve a dejar crear un enlace que no
+abre sin decirlo, o la lista guía no se calcula de los datos.
+
+### T2-2. La Dra. Invitada no puede crear el tipo — **te toca decidir**
+
+**Qué hago:** sin tipos de cita (recién sembrado, o archívalos), entro como
+**Dra. Invitada** y abro el engrane.
+
+**Qué debo ver:** en su ficha, «Un tipo de cita.» y «Pídele a quien administra
+la clínica que cree uno.» (sin botón). En «Para empezar», el paso 2 dice lo
+mismo.
+
+**Si falla, significa que…** se le ofrece algo que la base le va a rechazar.
+
+> **Para que lo decidas.** Pediste que cada médico prepare su enlace. El médico
+> invitado no puede crear tipos de cita: lo impide una regla de la base (sólo
+> quien administra la clínica los crea). Cambiarla es tocar una regla de
+> seguridad de la base y no se hizo. Si quieres que el invitado pueda crear sus
+> propios tipos, pídelo como tarea aparte.
+
+### T2-3. El enlace que no abrirá lo dice
+
+**Qué hago:** como **Dr. Admin**, sin tipos, creo el enlace fijo de la Dra.
+Invitada y lo copio. Lo abro en una ventana de incógnito. Luego creo
+«Consulta» y, como Dra. Invitada, pongo su consultorio con horario propio y
+todos los días cerrados. Recargo la configuración como Dr. Admin.
+
+**Qué debo ver:** primero, bajo «Enlace fijo» de la Dra. Invitada, en ámbar:
+«No abrirá: no hay un tipo de cita para este médico.»; en incógnito, «Este
+enlace ya no está disponible» (el paciente no ve el motivo). Después: «Abrirá
+sin horarios: ningún consultorio del médico tiene días abiertos.».
+(`agenda-configuracion-guiada`)
+
+**Si falla, significa que…** la pantalla y la página pública usan reglas
+distintas.
+
+### T2-4. Cada médico, su ficha
+
+**Qué hago:** abro el engrane como Dr. Admin, como Dra. Invitada y como
+secretaria.
+
+**Qué debo ver:** el Dr. Admin, dos fichas (la suya primero, «(tú)»); la Dra.
+Invitada, sólo la suya y sin nombre encima; la secretaria, las dos.
+(`agenda-configuracion-guiada`)
+
+**Si falla, significa que…** alguien ve o gestiona el enlace de otro médico sin
+ser administrador ni secretaria.
+
+### T2-5. La agenda pinta el horario propio del consultorio
+
+**Qué hago:** como **Dra. Invitada**, pongo «Rehabilitación (ficticio)» con
+horario propio, lunes de 08:00 a 12:00. Voy a la agenda. Intento agendar el
+lunes a las 13:00.
+
+**Qué debo ver:** el lunes, de 12:00 en adelante, en gris de fuera de horario;
+al guardar a las 13:00, el aviso «Vas a agendar a las 13:00, y esta clínica
+atiende de 08:00 a 12:00. ¿Es correcto?». Con la v2 apagada, el gris vuelve a
+empezar a las 18:00 y no hay aviso a las 13:00. Como Dr. Admin con «Todos los
+médicos», el gris es el de la clínica. (`agenda-configuracion-guiada`)
+
+**Si falla, significa que…** la rejilla y el enlace vuelven a contradecirse.
+
+### T2-6. Un médico con un consultorio en otra zona (qué se ve; sin cambio)
+
+**Qué hago:** creo para el Dr. Admin un consultorio en Tijuana con horario
+propio de 09:00 a 11:00 (en Mi perfil, zona «Baja California») y reservo por su
+enlace el primer turno.
+
+**Qué debo ver:** el enlace ofrece 09:00, 09:30, 10:00 y 10:30 (hora de
+Tijuana). El comprobante y el recordatorio dicen «09:00» con «(zona horaria:
+Baja California)»; la página de confirmación, «… 09:00 h (hora estándar del
+Pacífico)». En la agenda, en una computadora de Mérida, la tarjeta sale a las
+**11:00** con la etiqueta «09:00 hora Baja California». Si ese consultorio es
+el activo, la banda gris dice que atiende de 09:00 a 11:00 **de Mérida**, así
+que la tarjeta de las 11:00 cae fuera: **es un resto conocido, anotado en
+`DEUDA_TECNICA.md` AG-DT-31**, no un fallo nuevo. (`husos-dos-consultorios`)
+
+**Si falla, significa que…** el correo o la confirmación no usan la zona del
+consultorio.
+
+### T2-7. La pantalla, ordenada (escritorio y teléfono, claro y oscuro)
+
+**Qué hago:** abro la configuración en la computadora y en el teléfono (§1.7),
+en claro y en oscuro.
+
+**Qué debo ver:** cuatro grupos con su rótulo, las tarjetas del mismo ancho y
+alineadas, los botones del mismo alto; en el teléfono el botón «Editar
+horario» baja bajo el texto en vez de apretarlo; un consultorio con el horario
+de la clínica dice «Usa el horario de la clínica» sin repetir el horario.
+(`agenda-f-simetria`)
+
+### T3-1. El engrane ya no dice «Horario»
+
+**Qué hago:** con la v2 encendida, como Dr. Admin, en una pantalla ancha, paso
+el ratón por el engrane de arriba a la derecha y lo pulso. Luego en el
+teléfono.
+
+**Qué debo ver:** sólo el dibujo del engrane, sin la palabra «Horario»; al
+dejar el ratón encima, «Configuración de la agenda». Al pulsarlo llego a
+«Configuración del calendario». En el teléfono, el mismo botón con el mismo
+nombre. Con la v2 apagada, como antes: «Configurar horario de consulta» y el
+formulario «Horario de consulta» (X2). (`agenda-configuracion`)
+
+**Si falla, significa que…** el botón no se enteró de que la v2 está encendida.
+
+### T3-2. Convertir en cita un evento que creé en Google
+
+**Qué hago:** con el Google simulado arrancado (C0), creo en él un evento
+«Junta con representante» para mañana a las 13:00 con la descripción «traer
+muestras» (como en C6: `/crear … --data-urlencode "descripcion=traer
+muestras"`). `/ya` y recargo la agenda del 3002. Pulso el evento.
+
+**Qué debo ver:** la tarjeta ofrece «Editar», «Convertir en cita» y «Eliminar
+evento». Pulso «Convertir en cita»: me pide «Paciente», «Consultorio» y (si
+hay) «Tipo de cita»; también puedo registrar un paciente nuevo («Registrar
+«…»» en la lista o «Registrar paciente nuevo»), que pide el aviso de
+privacidad. Busco «Prueba 22», elijo «Paciente Prueba 22», dejo el consultorio
+que propone y pulso «Convertir en cita». La agenda dice «Cambios guardados» y
+la tarjeta ya es la cita de Paciente Prueba 22 (con «Cancelar cita», no
+«Eliminar evento»). En `/lista`, el evento se llama ahora «Cita médica:
+Paciente Prueba 22» y su descripción ya no dice «traer muestras» (eso se quedó
+como nota en Spinus). (`agenda-convertir-google`, `agenda-google-dos-sentidos`)
+
+**Si falla, significa que…** la conversión no llegó a la base, o a Google viajó
+algo de más (las notas) o de menos (el nombre).
+
+### T3-3. Google ya no le cambia el nombre a la cita convertida
+
+**Qué hago:** después de T3-2, en el Google simulado cambio el título del
+evento a «Otra cosa» (`/titulo`). `/ya` y recargo.
+
+**Qué debo ver:** en Spinus la cita sigue siendo de Paciente Prueba 22, con su
+nota «traer muestras»; en `/lista` el título vuelve a «Cita médica: Paciente
+Prueba 22». (`agenda-google-dos-sentidos`)
+
+**Si falla, significa que…** la regla de que el título de una cita con paciente
+no se acepta desde Google no se aplica a las convertidas.
+
+### T3-4. Sólo los eventos de Google se convierten
+
+**Qué hago:** pulso «Cirugía programada» (un evento creado en Spinus).
+
+**Qué debo ver:** su tarjeta ofrece «Editar» y «Eliminar evento», sin
+«Convertir en cita». (`agenda-convertir-google`)
+
+**Si falla, significa que…** se ofrece convertir lo que no pide el plan.
+
+### T3-5. La tarjeta al dejar el ratón quieto
+
+**Qué hago:** en una computadora con ratón, dejo el ratón quieto sobre una cita
+más de un segundo, sin pulsar.
+
+**Qué debo ver:** se abre su tarjeta junto a la cita. Si muevo el ratón dentro
+de la cita antes del segundo, tarda otro segundo. Si quito el ratón, se cierra;
+si lo llevo a la tarjeta, se queda. Si pulso la cita, se queda fija (ya no se
+cierra al quitar el ratón; Escape o la ✕ la cierran). Si arrastro una cita o
+estiro su borde, no sale ninguna tarjeta (y si había una, se cierra). Al
+escribir en el buscador con la tarjeta abierta, el cursor no salta a la
+tarjeta. (`agenda-f-tarjeta-al-pasar`)
+
+**Si falla, significa que…** el tiempo, el cierre o la prioridad del clic no
+quedaron como pediste.
+
+### T3-6. Apagar la tarjeta al pasar el ratón
+
+**Qué hago:** en «Configuración del calendario» → «Preferencias de este
+dispositivo» → «Tarjeta de la cita», desmarco «Abrir la tarjeta al pasar el
+ratón». Vuelvo a la agenda y dejo el ratón quieto sobre una cita.
+
+**Qué debo ver:** no se abre nada; al pulsar la cita, sí. En otro navegador o en
+otra computadora sigue encendida (es de este dispositivo).
+(`agenda-f-tarjeta-al-pasar`)
+
+**Si falla, significa que…** la preferencia no se guarda o la agenda no la lee.
+
+### T3-7. En el teléfono, sólo el toque
+
+**Qué hago:** en el teléfono abro la agenda y toco una cita.
+
+**Qué debo ver:** la hoja de la cita, como antes. Nada se abre solo.
+(`agenda-f-tarjeta-al-pasar`)
+
+### T3-8. Las citas suben un pelo al pasar el ratón
+
+**Qué hago:** paso el ratón despacio por varias citas en Semana y en Mes.
+
+**Qué debo ver:** cada una sube apenas (1 px), sin rebote ni sombra, y baja al
+salir. Los bloques grises de Google de sólo lectura no suben. Con «Reducir
+movimiento» del sistema activado, nada se mueve. Con la v2 apagada, nada se
+mueve. (`agenda-f-pasar-raton`)
+
+**Si falla, significa que…** la elevación se salió de lo pedido.
 
 ---
 
@@ -2130,7 +2528,7 @@ teléfono tiene cita con ese médico.
    9990000002). El código del correo sí se manda y se verifica: el bloqueo
    manual se mira al reservar.
 
-> **Para que lo decidas (ya anotado como pendiente, AG-DT-28).** Este caso 2 es
+> **Decidido por ti el 2026-11-13: se queda así** (AG-DT-28). Este caso 2 es
 > la única forma que queda de saber algo de un teléfono desde el enlace: quien
 > lo tenga puede averiguar si la clínica **bloqueó a mano** ese número (no si
 > tiene cita ni historial). Lo limitan los topes de intentos (SEG-A8) y que en
@@ -2522,7 +2920,7 @@ Marca cada una al pasarla. Si una falla, anota el número y qué viste.
 - [ ] F2. Plegar el menú
 - [ ] F3. Densidad compacta
 - [ ] F4. Más datos en Día
-- [ ] F5. «Compactar» al abrir (apagado; **decidir**)
+- [ ] F5. «Compactar» al abrir (apagado, decidido)
 - [ ] F6. Mes sin semanas vacías
 - [ ] F7. Citas simultáneas legibles
 - [ ] F8. Sin la palabra del estado
@@ -2547,13 +2945,38 @@ Marca cada una al pasarla. Si una falla, anota el número y qué viste.
 - [ ] F27. El teléfono completo
 - [ ] F28. La tableta completa
 
+**Tanda del 2026-11-13 (§8-bis)**
+- [ ] T1-1. Buscar por nombre y apellido en cualquier orden (también apagada)
+- [ ] T1-2. Lo mismo en la burbuja
+- [ ] T1-3. Registrar un paciente desde la burbuja (con consentimiento)
+- [ ] T1-4. La burbuja al fondo de la pantalla
+- [ ] T1-5. La tarjeta al fondo de la pantalla
+- [ ] T1-6. WhatsApp sólo cuando aplica
+- [ ] T1-7. El error de WhatsApp dice por qué
+- [ ] T1-8. Después de agendar desde la burbuja
+- [ ] T2-1. «Para empezar» y lo que falta para el enlace
+- [ ] T2-2. La Dra. Invitada no puede crear el tipo (**decidir**)
+- [ ] T2-3. El enlace que no abrirá lo dice
+- [ ] T2-4. Cada médico, su ficha
+- [ ] T2-5. La agenda pinta el horario propio del consultorio
+- [ ] T2-6. Consultorio en otra zona (qué se ve)
+- [ ] T2-7. La configuración ordenada
+- [ ] T3-1. El engrane sin «Horario»
+- [ ] T3-2. Convertir en cita un evento de Google
+- [ ] T3-3. Google no le cambia el nombre a la convertida
+- [ ] T3-4. Sólo los eventos de Google se convierten
+- [ ] T3-5. La tarjeta al dejar el ratón quieto
+- [ ] T3-6. Apagar la tarjeta al pasar el ratón
+- [ ] T3-7. En el teléfono, sólo el toque
+- [ ] T3-8. Las citas suben un pelo
+
 **Seguridad**
 - [ ] S1. La Clínica B no ve la A
 - [ ] S2. Lo mismo, directo a la base
 - [ ] S3. La invitada sólo ve lo suyo, directo
 - [ ] S4. Enlaces públicos con la v2 apagada
 - [ ] SEG-A1. El enlace no revela teléfonos
-- [ ] SEG-A2. Candado por correo verificado (y el caso del bloqueo manual: **decidir**, AG-DT-28)
+- [ ] SEG-A2. Candado por correo verificado (el bloqueo manual por teléfono se queda, decidido)
 - [ ] SEG-A3. Nadie borra citas con paciente
 - [ ] SEG-A4. Datos de reserva y consentimiento intocables
 - [ ] SEG-A5. Todo el día bloquea el enlace (en la agenda, sin aviso)
@@ -2577,7 +3000,6 @@ Marca cada una al pasarla. Si una falla, anota el número y qué viste.
 | Qué | Por qué no aquí | Cómo y cuándo |
 |---|---|---|
 | **Google con tu cuenta real**: ida y vuelta (C), Google antes de reservar (D11) y respuestas a la invitación (RSVP) | Aquí sólo hay un Google simulado | En producción, con la v2 encendida **en una sola clínica de prueba**, conecta tu cuenta y repite C1–C9 y G1–G5 desde el calendario «Spinus» de tu Google (en la web o el teléfono). Antes de encender, revisa la auditoría: aparecerán muchos renglones a nombre de `system`. La respuesta a la invitación se enciende con `AGENDA_RSVP_GOOGLE=encendido` sólo después de comprobar que llega |
-| **Convertir en cita un evento creado en Google** | No existe el camino en la pantalla (ver la nota en C10; `DEUDA_TECNICA.md` AG-DT-29) | Decide si hace falta; si sí, pídelo como tarea aparte |
 | **Teléfono y tableta reales** | El modo de dispositivo de Chrome no mide velocidad real, ni el dedo, ni el teclado | Con la v2 encendida en tu clínica de prueba, abre la agenda en tu teléfono y en una tableta y repite F12–F15, F21–F28. Fíjate en la fluidez al cambiar de semana y al deslizar |
 | **Lectores de pantalla** | No se probó con uno real | Si te interesa: VoiceOver en iPhone o TalkBack en Android sobre la burbuja y la tarjeta |
 | **Tareas programadas de Vercel** (Google cada 10 min, recordatorios cada 15) | Vercel no se toca en local | Se activan solas al desplegar a producción. Sin `CRON_SECRET` responden 401 y no hacen nada. Tras desplegar, mira en Vercel → Cron Jobs que corren y en los logs que no hay errores |

@@ -725,7 +725,7 @@ reducido.
 
 ## 7. Lo que le toca a Angel
 
-Al día con la integración de las correcciones de seguridad (2026-11-12). Guía
+Al día con la integración de la tanda tras las primeras pruebas a mano (2026-11-13). **Ya decididas por Angel ese día:** el bloqueo manual por teléfono se queda (AG-DT-28) y «Compactar» al abrir se queda apagado (F1.5). **Resuelta:** convertir en cita un evento de Google (AG-DT-29). Guía
 para levantarlo todo en local: `GUIA_AUDITORIA_AGENDA_V2.md`; **guía de
 pruebas a mano, paso a paso y sin código: `GUIA_PRUEBAS_AGENDA_V2.md`** (el
 Google simulado se arranca con un comando, `npx tsx
@@ -737,8 +737,8 @@ pudo probar: §10.
 |---|---|
 | Durante el proyecto | Nada obligatorio: los reportes de bloque son informativos |
 | Al final, en local | Auditar con lo que se entrega: el conjunto de **20** migraciones (las 16 del cierre y las 4 de las correcciones) con sus auditorías (cabeceras y `supabase/AUDITORIA-CONJUNTO-AGENDA-V2.md`), datos inventados sembrados (`scripts/agenda-semilla.ts`), la guía corta, §6-bis y §10. Decidir las propuestas de dimensión nueva para `AUDITORIA-MIGRACIONES.md` (§6-bis, «Cierre del proyecto»; no se tocó el archivo) |
-| Decisiones pendientes | **La contradicción de los puntos 1 y 6** (el bloqueo manual por teléfono se nota desde el enlace; se dejó como pediste en el punto 2; alternativa: que mire sólo el correo; §6-bis «Integración…», AG-DT-28); **convertir en cita un evento nacido en Google** (§2 lo pide y no hay camino en la pantalla; AG-DT-29); AG-DT-26 (límite en las páginas públicas) y AG-DT-27 (todo el día en los avisos de empalme); **F1.5** `COMPACTAR_AL_ABRIR` (`src/lib/agenda/ventanaRejilla.ts`, hoy `false`; ver §6-bis «F1.5»); **S3**: quedarse con la puerta que lee `pg_proc` (C1) o la copia con huella; las «NO aplicado, para revisar por Angel» de las auditorías de E1, E4, E6 y D11 (cabeceras y §6-bis); si E9 debe cerrar la clínica suspendida también dentro de la función (H4); el plazo de conservación del historial del candado (propuesto 12 meses) |
-| Antes de aplicar | `select version()` en producción (≥ 14). Comprobar que producción tiene las 5 migraciones de `main` y decidir el orden con `feature/limites-ajustables` (sus `20261014*` van antes por fecha; al fusionar las dos, cambiar la lista fija del caso 3 de `p1_permisos_funciones.sql` por la de **41** funciones (las 10 de producción y 31 del proyecto, con `reserva_enlace_emitir`), que está escrita entera en la auditoría del conjunto §8.5; el resto de `p1`, `p1b`, `p2`, `p3` y las 21 pruebas del proyecto pasan con el conjunto combinado: hallazgos H2 e I1) |
+| Decisiones pendientes | **Punto 9 de la tanda del 2026-11-13: el médico invitado no puede crear tipos de cita** (policy `tipos_cita_insert`, exige administrador), así que al preparar su enlace no puede aceptar «Consulta, 30 min»; cambiarlo es cambiar esa policy y no se hizo (§6-bis «Tanda tras las primeras pruebas a mano»); AG-DT-26 (límite en las páginas públicas) y AG-DT-27 (todo el día en los avisos de empalme); proponer o no un módulo común para `colocar` y para «hay un diálogo modal» (AG-DT-38, AG-DT-39); **S3**: quedarse con la puerta que lee `pg_proc` (C1) o la copia con huella; las «NO aplicado, para revisar por Angel» de las auditorías de E1, E4, E6 y D11 (cabeceras y §6-bis); si E9 debe cerrar la clínica suspendida también dentro de la función (H4); el plazo de conservación del historial del candado (propuesto 12 meses) |
+| Antes de aplicar | `select version()` en producción (≥ 14). **Comprobar también que el PostgREST de producción admite `imatch`** (≥ 10; en local hay 14.5): la búsqueda de pacientes del punto 1 de la tanda del 2026-11-13 sale **sin interruptor** y lo usa (prueba: en la app, buscar «hugo interian» en «Agendar» devuelve el paciente y no un error 400 en la consola; o `GET /rest/v1/pacientes?nombre=imatch.x&limit=0` con sesión responde 200). Comprobar que producción tiene las 5 migraciones de `main` y decidir el orden con `feature/limites-ajustables` (sus `20261014*` van antes por fecha; al fusionar las dos, cambiar la lista fija del caso 3 de `p1_permisos_funciones.sql` por la de **41** funciones (las 10 de producción y 31 del proyecto, con `reserva_enlace_emitir`), que está escrita entera en la auditoría del conjunto §8.5; el resto de `p1`, `p1b`, `p2`, `p3` y las 21 pruebas del proyecto pasan con el conjunto combinado: hallazgos H2 e I1) |
 | Aplicar | **Antes de desplegar el código** (los dos órdenes son seguros, pero con el código primero cada petición deja un `warn` en el log: hallazgo H3). El conjunto, en orden de nombre de archivo, uno por uno, mirando la rejilla final de cada uno (todas las filas OK). Después, la línea `-- ESTADO · PRODUCCIÓN` de cada archivo con fecha y comprobación (`AUDITORIA-MIGRACIONES.md` §7) |
 | Vercel | Variables `RESERVA_SECRETO`, `EMAIL_TRANSPORT=resend`, `CRON_SECRET` (las tareas de `vercel.json` se activan con el despliegue y sin `CRON_SECRET` contestan 401); `AGENDA_RSVP_GOOGLE` sólo tras la prueba de RSVP |
 | Google real | Prueba con cuenta real: ida y vuelta (C), sincronización antes de reservar (D11), RSVP (E9). Cerrar o no LP-DT-6. Antes de encender: revisar el panel de auditoría (C-h, `user_id='system'`) |
@@ -3403,6 +3403,231 @@ de `main` cambia; ninguna policy tocada). Lo que queda para Angel:
     (`empalmesServidor.ts` filtra `all_day = false`): la cita se guarda sin
     aviso. Se corrigió la guía; el código no cambió.
 
+### Tanda tras las primeras pruebas a mano (2026-11-13)
+
+Angel probó la agenda a mano y mandó 16 puntos. Se repartieron en tres ramas
+(`feature/agenda-v2-t1`, `-t2`, `-t3`), fusionadas e integradas en
+`feature/agenda-v2` el mismo día. **Sin migraciones** (el conjunto sigue en
+25). Todo lo nuevo va detrás del interruptor, salvo la búsqueda de paciente
+del formulario completo (punto 1), que sale directa porque era un defecto.
+
+**Decisiones de Angel (no volver a preguntar):**
+
+- **AG-DT-28 se queda como está:** el bloqueo MANUAL por teléfono sigue
+  cortando el enlace (también el de un solo uso), aunque desde el enlace se
+  note. No se cambia a «sólo correo».
+- **«Compactar» al abrir (F1.5) se queda APAGADO** (`COMPACTAR_AL_ABRIR =
+  false` en `src/lib/agenda/ventanaRejilla.ts`). Cierra el pendiente de F1.5.
+
+**Decisión pendiente de Angel (punto 9):** el **médico invitado no puede crear
+tipos de cita** (la policy `tipos_cita_insert` exige `soy_admin_de_clinica()`,
+P5), así que al preparar su enlace no puede aceptar «Crear «Consulta», 30 min»:
+la pantalla le dice «Pídele a quien administra la clínica que cree uno.».
+Permitirlo exigiría cambiar esa policy y **no se hizo** (regla de la tanda:
+ninguna policy existente se toca). Si lo quieres, es una migración aparte.
+
+**Cambia la decisión 18 de F** («se conserva la invitación de Google tras
+crear»): se conserva, pero **desde la burbuja ya no se abre sola**; tras
+agendar, la burbuja ofrece «Invitar por correo» como botón. Desde el formulario
+completo sigue abriéndose sola, como antes.
+
+#### T1 · búsqueda, burbuja, capas y WhatsApp (puntos 1, 2, 3, 4, 13 y 14)
+
+**Punto 1 · buscar un paciente con varias palabras (sin interruptor).**
+- Causa: la consulta era UN `.or(nombre.ilike.%texto%,apellidos.ilike.%texto%)`
+  con el texto entero. «Hugo Interián» no está entero ni en `nombre` («Hugo»)
+  ni en `apellidos` («Interián Canché»), y `ilike` no iguala «interian» con
+  «Interián». El mismo defecto en el formulario completo, la burbuja y el
+  buscador.
+- Arreglo sin migración: `buscarPacientes` (`src/lib/agenda/buscarCitasPaciente.ts`)
+  parte el texto en palabras sin acentos (hasta 5) y manda UN `.or()` POR
+  PALABRA con `imatch` (`nombre.imatch."patrón",apellidos.imatch."patrón"`);
+  PostgREST junta los `or` con AND. El patrón (`patronSinAcentos`) cambia cada
+  vocal, la n y la c por su clase con las variantes acentuadas en las dos
+  cajas: no depende del locale ni de `unaccent`. Sólo `[a-z0-9]` y corchetes:
+  nada que PostgREST o la regex lean como sintaxis. Comprobado contra el
+  PostgREST local (v14.5). **En producción hay que comprobar una vez que
+  PostgREST admite `imatch` (≥ 10) antes de fusionar (§7).**
+- Por qué no `unaccent`: pediría migración, permisos y tolerancia a su
+  ausencia; con `imatch` vale ya en producción y la RLS sigue decidiendo qué
+  pacientes se ven.
+- El formulario completo usa ahora `buscarPacientes` (antes tenía su copia):
+  el texto se limpia de `, ( ) % * \ "` y un error queda en el log.
+- Semilla: un paciente nuevo de admin.a, «Hugo Interián Canché» (9990000026),
+  sin citas.
+
+**Punto 2 · crear paciente desde la burbuja.** Al final de la lista, cuando la
+búsqueda ya contestó, sale «Registrar «…»». Abre `QuickPatientModal` tal cual
+(consentimiento del aviso de privacidad, duplicados, médico para la secretaria;
+la puerta de suscripción la pone el RPC). El paciente queda elegido y el foco
+va a «Guardar». El modal se pinta HERMANO del diálogo de la burbuja y, mientras
+está abierto, el «tocar fuera» de la burbuja se pausa.
+
+**Punto 3 · capas dentro de la ventana.**
+- Causa: `colocar` medía la capa una vez, al montar, sin alto máximo, y la
+  «ventana» era la de layout (con el teclado de la tableta abierto, la parte
+  visible es más baja).
+- `posicionCapa` devuelve `altoMaximo` (la capa lo usa como `max-height`, con
+  desplazamiento interno) y acepta la parte visible (`visualViewport`). Orden:
+  derecha, izquierda, debajo si cabe, encima si cabe; si no, el lado con más
+  sitio; si ni eso llega a 160 px, la ventana entera.
+- Se recoloca al cambiar de alto (`ResizeObserver`) o la parte visible, en un
+  `requestAnimationFrame`. La hoja del teléfono se apoya en el borde de abajo
+  de la parte visible y no pasa del 80 %.
+- `colocar` sigue siendo copia deliberada en tres archivos (burbuja, tarjeta,
+  herramientas) y el arreglo va en las tres (deuda AG-DT-38).
+
+**Punto 4 · WhatsApp.**
+- Causa: el cliente pintaba el botón con una regla más floja que la del
+  servidor, que contestaba `409 no_aplica` sin motivo («Esta cita ya no admite
+  el mensaje.»). Lo más probable en la prueba de Angel: una cita pasada.
+- Una sola regla pura, `motivoSinWhatsApp` (`whatsappCita.ts`), con su motivo
+  (`sin_paciente`, `cancelada`, `atendida`, `no_asistio`, `otro_estado`,
+  `todo_el_dia`, `pasada`, `sin_telefono`, `telefono_invalido`). La usan la
+  ruta, la lista de mañana y el cliente para decidir si PINTA el botón (modal,
+  tarjeta y burbuja).
+- El 409 trae `motivo` y el botón lo dice en llano («La cita ya pasó.»…), con
+  `role="alert"`. Un teléfono sin formato de México se rechaza (422) ANTES de
+  emitir el enlace de confirmación.
+
+**Puntos 13 y 14 · después de agendar desde la burbuja.**
+- La burbuja ya no se cierra al guardar: enseña «Cita agendada» (anunciado por
+  un `role="status"` siempre presente). `handleSave` devuelve el alta
+  (`AltaGuardada`) y acepta `{ sinInvitacion }`.
+- **Acción principal: «Listo»** (la que menos cambia: quien no quiere nada más
+  pulsa donde estaba «Guardar»; el consentimiento para WhatsApp de los
+  pacientes existentes sigue pendiente, §7). Secundarias: «Enviar por
+  WhatsApp» e «Invitar por correo», a todo el ancho; pie «Listo» | «Más
+  opciones».
+- «Invitar por correo» abre el mismo «Agregar invitados», sólo si habrá evento
+  de Google y quien agenda puede invitar; cierra la burbuja. «Más opciones»
+  abre la edición de la cita creada.
+- Logo de WhatsApp: SVG propio en #25D366, decorativo; el nombre del botón es
+  su texto. En todas sus apariciones.
+- El toast «Se agendó correctamente» se conserva (doble anuncio, AG-DT-41).
+
+#### T2 · configuración guiada (puntos 7 a 12)
+
+- **Punto 9 · permisos de los enlaces: la base ya coincidía; no se cambió
+  ninguna policy.** Dueño: todos; médico invitado: sólo los suyos (403 y 42501
+  para otro); secretaria: todos (lista A, punto 16, lo que menos cambia). La
+  regla está en las policies, en `reserva_enlace_emitir` y en la ruta, y dice
+  lo mismo.
+- **Punto 9 · dónde vive el enlace de cada médico:** una **ficha por médico
+  dentro de la configuración** («Enlaces de reserva»), no en `/perfil` (otra
+  página, otro sistema de diseño, sin interruptor). El médico ve sólo la suya;
+  administrador y secretaria, una por médico, la propia primero con «(tú)».
+- **Punto 8 · una sola regla para «¿abre este enlace?»**:
+  `src/lib/reserva/aperturaEnlace.ts` (`motivosApertura`), compartida por la
+  página pública y la configuración. Sin ningún día abierto la página sigue
+  abriendo (como hoy) y la clínica ve «Abrirá sin horarios». Lo que la base
+  decide antes (aviso sin aprobar, clínica sin acceso) sale como «No abrirá:
+  la clínica no puede recibir reservas ahora…».
+- **Punto 8 · cómo se calcula** (`preparacionServidor.ts`, en `GET
+  /api/agenda/enlaces`, campo `preparacion`): con enlace vigente, se abre con
+  `abrirEnlace()` como la página; sin él, de las tablas. **Segunda excepción a
+  «sólo cliente de sesión»:** los consultorios de OTROS médicos se leen con
+  `createAdminClient()`, filtrado por `clinica_id` y con el alcance del rol;
+  del navegador sólo sale el motivo.
+- **Punto 8 · crear el enlace sigue permitido** aunque falte algo: la ficha
+  pide lo que falta («Para que el enlace abra, falta:») con «Crear «Consulta»,
+  30 min» (sólo a quien administra; ver la decisión pendiente arriba).
+- **Punto 10 · el horario del consultorio activo en la rejilla**
+  (`horarioRejilla.ts`): cuando la rejilla enseña a UN médico, (1) el
+  consultorio activo de la app si es suyo; (2) si no, su único consultorio
+  activo; (3) varios sin elegir o «Todos» → el de la clínica. Con horario
+  propio manda el suyo. Lo leen la rejilla y TODOS los avisos de fuera de
+  horario (una sola variable). Apagada: `config?.horario ?? HORARIO_DEFAULT`,
+  el mismo objeto (A1-bis).
+- **Punto 11 · husos:** no se cambió la rejilla (sigue en la hora del
+  dispositivo); queda en deuda con su ejemplo (AG-DT-31).
+- **Punto 7 · «Para empezar»:** sólo para médicos; tres pasos calculados en
+  cada carga (consultorio con día abierto, tipo activo que le aplique, enlace
+  vigente); desaparece con los tres hechos.
+- **Punto 12 · pulido:** cuatro grupos (Horario y disponibilidad · Citas ·
+  Reserva por enlace · Preferencias de este dispositivo); «Reserva por enlace y
+  recordatorios» pasa a **«Plazos y recordatorios»**; un consultorio con el
+  horario de la clínica no repite las siete líneas; botones en dos altos;
+  `TarjetaSeccion.tsx` y `clasesConfig.ts` (ocho usos reales); tokens
+  `--ag-aviso-*`.
+
+#### T3 · engrane, convertir en cita, tarjeta al pasar, elevación (puntos 5, 6, 15 y 16)
+
+- **Punto 5 · engrane:** con la v2, sólo icono a cualquier ancho, con
+  «Configuración de la agenda» (`aria-label` y `title`), en escritorio y
+  teléfono. **Apagada se queda como estaba** («Configurar horario de
+  consulta», abre el modal de siempre). Lo decide la prop
+  `engraneConfiguracion`.
+- **Punto 6 · convertir en cita un evento nacido en Google (cierra AG-DT-29):**
+  en la tarjeta de un evento sin paciente con `origen = 'google'`, con hora,
+  médico y agendado o confirmado, «Convertir en cita». Pide paciente (el
+  buscador de la burbuja, con su «Registrar «…»», o «Registrar paciente
+  nuevo»), consultorio del médico del evento y, opcional, tipo. Guarda por
+  `handleSave` (el PUT de siempre). Sólo eventos de Google (§2). No cambian
+  `origen`, `google_event_id`, `gcal_etag` ni las notas (se quedan en Spinus).
+  A Google va lo de cualquier cita con paciente (título del paciente,
+  descripción fija; nunca las notas; `sendUpdates: 'none'`).
+- **Punto 6 · servidor:** colgarle un paciente a una fila sin paciente que no
+  está por ligar es un ALTA, así que pasa las puertas del alta
+  (`vetoDeConversion`, `porLigarServidor.ts`): las tres funciones de
+  `appointments_gates_insert` ORIGINALES por RPC con la sesión, consultorio
+  obligatorio y paciente de ESTA clínica visible (`pacienteVisible`). Vale
+  para cualquier evento sin paciente con v2 (acota AG-DT-13). En el cliente,
+  la misma puerta de suscripción que «Agendar» (`puedeAgendar`). Auditoría
+  `cita_ligada` con `via: 'convertir'` por `logAudit` (no se añadió a `c_vias`:
+  pediría migración). Ligar una por ligar (D7) sigue sin pasar las puertas de
+  suscripción, a propósito.
+- **Punto 15 · tarjeta al pasar el ratón:** con la v2 y ratón, 1 s de quietud
+  sobre una cita abre su tarjeta; se cierra al salir de la cita y de la
+  tarjeta (300 ms de margen); un clic la fija (la de siempre, en su sitio, sin
+  volver a entrar). Es NO modal, no roba el foco, Escape la cierra. Nunca con
+  un botón pulsado, encima de otra capa, en el teléfono o en táctil.
+  Preferencia por dispositivo «Abrir la tarjeta al pasar el ratón»,
+  **encendida por omisión** (lo pidió Angel).
+- **Punto 16 · elevación:** 1 px (`translateY(-1px)`) en la caja de dentro
+  (`.ag-tarjeta`, `.ag-mes`, `.ag-banda`), nunca en el `.fc-event` (FLIP);
+  nada con movimiento reducido, en filas de lista, en bloques de Google de
+  sólo lectura ni en el espejo de arrastre. Manda sobre la nota F2.1 («nada de
+  `transform` en el hover»): lo pidió Angel; 1 px es el mínimo.
+
+#### Integración (decisiones sin preguntar)
+
+- **La preferencia de la tarjeta al pasar va en su propia tarjeta**, «Tarjeta
+  de la cita», dentro del grupo «Preferencias de este dispositivo» de T2: así
+  el grupo sigue la retícula de las demás secciones (e2e `agenda-f-simetria`).
+- **La tarjeta al pasar también se recoloca** al crecer o al cambiar la parte
+  visible de la ventana (el seguimiento de T1 en las dos variantes, gancho
+  `useColocacionSeguida`). Sigue sin acompañar al desplazamiento de la rejilla
+  (AG-DT-36).
+- **«Convertir en cita» conserva su botón «Registrar paciente nuevo»** además
+  de la opción «Registrar «…»» de la lista (que abre el alta con lo escrito).
+- **La e2e `reserva-seg1` «punto 5» fallaba según el día** (400
+  `turno_invalido` en vez de 409 `turno_ocupado`). Causa: elegía el último
+  turno libre de la cuarta semana; la ruta, antes de la RPC, exige que el turno
+  se haya podido ofrecer con la ocupación del momento o con la jornada vacía, y
+  con el evento de todo el día puesto sólo vale lo segundo. Si ese día había
+  una cita de 13:00 a 13:15, el último turno era p. ej. 17:15, no alineado a la
+  jornada vacía: 400 antes de la RPC. Qué día y qué citas dependía de la fecha
+  de la siembra y de hoy. Ahora elige un turno de un día sin citas del médico
+  (semana a semana, dentro del horizonte), así que la petición llega a la RPC y
+  vuelve a medir que el evento de todo el día ocupa. Sigue en rojo con la
+  mutación `AND NOT a.all_day` en `reservar_por_enlace` (201 en vez de 409).
+  Era la prueba, no el código.
+- **F1.12 fallaba los sábados** (la lista de Semana del teléfono no llegaba a
+  la cabecera de hoy). Era el código, no la prueba: en el primer cuadro las
+  cabeceras de día miden 17 px y en el siguiente 38, y el navegador recorta el
+  `scrollTop` al alto de ese momento; con hoy cerca del final de la lista se
+  quedaba corto. `desplazarListaAHoyEstable` (`listaHoy.ts`) lo repite cuadro
+  a cuadro (máximo 10) mientras la lista cambie de alto, una sola vuelta a la
+  vez. Sale sin interruptor, como todo F1. Prueba: `listaHoy.test.ts` (en rojo
+  con una sola vuelta).
+- **Las e2e ya no borran lo que no crearon** (lo pidió Angel: le borraron un
+  tipo «Cita Dr Ancona» y un enlace fijo hechos a mano). Ver §9 y la guía.
+  Aviso honesto: **la semilla (y por tanto cada corrida de Playwright, cuyo
+  `global-setup` siembra) BORRA Y RECREA las clínicas Semilla A y B enteras**;
+  eso no cambió. Lo que se cambió es que, dentro de una corrida, cada e2e
+  limpia sólo lo creado desde que empezó su archivo.
+
 ---
 
 ## 8. Sin verificar — comprobar antes de apoyarse en ello
@@ -3962,6 +4187,62 @@ primero sin marcar.
     SEG-A4 y SEG-A7 con las salidas que la guía dice. Las 11 marcas
     PENDIENTE-SEG resueltas; SEG-A5 corregida (en la agenda no hay aviso).
 
+- [x] Tanda tras las primeras pruebas a mano de Angel (2026-11-13; 16 puntos
+  repartidos en `feature/agenda-v2-t1`, `-t2` y `-t3`, worktrees `-agenda-b56`,
+  `-agenda-menores` y `-agenda-t3`; integración en `feature/agenda-v2`).
+  Decisiones en §6-bis, «Tanda tras las primeras pruebas a mano». Sin
+  migraciones: el conjunto sigue en 25.
+  - **T1** (puntos 1, 2, 3, 4, 13 y 14): `92d42c8`, `f991fd4`, `ac1619a`,
+    `a4991f4`. **T2** (puntos 7 a 12): `32c6803`, `69ae5df`, `bd4e407`,
+    `a48c16e`. **T3** (puntos 5, 6, 15 y 16): `24aa491`, `fb17fcd`, `0b92d2f`,
+    `8db9e14`, `9adb88b`, `3e19abb`.
+  - **Paso 1 · fusiones:** T2 (`b872b02`) y T1 (`5152da4`) sin conflictos; T3
+    (`719b9ae`) con cuatro: `BurbujaAlta` (`CampoPaciente` exportado con la
+    firma de T1; «Convertir en cita» usa su «Registrar «…»»), `TarjetaLectura`
+    (las dos variantes de T3 con la colocación seguida de T1,
+    `useColocacionSeguida`), `InteraccionesV2` (`abiertaEn` de T1 y
+    `alPasar`/`sinEntrada` de T3) y `ConfiguracionCalendario` (la estructura
+    de T2 con la preferencia de T3 en su hueco, en su tarjeta). Revisor en
+    Sonnet: sin hallazgos graves.
+  - **Paso 2 · verificación:** build limpio, lint 96 errores (sin subir),
+    Vitest 1759 en 118 archivos, SQL 21 de 21, Playwright completo contra
+    `next start` :3001 **306 pasan, 0 fallan** (escritorio 255, teléfono 46,
+    tableta 5; 264 saltadas; 9.1 min, con las e2e del Google falso dentro),
+    `reserva-carrera.sh` y `confirmacion-carrera.sh` en verde. La e2e
+    `reserva-seg1` «punto 5», que fallaba según el día (400 en vez de 409), se
+    hizo determinista (`0b91b1a`; causa en §6-bis); sigue en rojo con su
+    mutación `AND NOT a.all_day`.
+  - **Paso 3 · desde cero** (CLI 2.117.0, `db reset --local`): 25 migraciones
+    (`20261117130000` la última), sin un error; semilla 1.5 s. SQL 21, Vitest
+    1759 y Playwright **306 pasan, 0 fallan** (mismas cifras).
+  - **Paso 4 · los datos a mano de Angel** (`442fc03`): las e2e limpian sólo lo
+    creado desde que empezó su archivo (`marcaE2e` + `limpiarReservasE2e(desde)`),
+    apartan los enlaces vigentes y los tipos activos que había y los devuelven
+    al terminar; `global-setup` sólo apaga el interruptor de las clínicas de la
+    semilla. Prueba nueva en `agenda-configuracion-guiada` (centinelas: un tipo
+    y un enlace «hechos a mano»), en rojo con dos mutaciones (volver a borrar
+    todos los tipos de la clínica; volver a borrar todos los enlaces).
+    Comprobado además con datos como los de Angel («Cita Dr Ancona» y un enlace
+    fijo vigente del Dr. Admin) corriendo los siete archivos sin resembrar:
+    siguen ahí, igual, y las pruebas en verde. La semilla sigue recreando las
+    clínicas: la guía lo avisa en §1.1 (AG-DT-46).
+  - **Paso 5 · documentos:** §6-bis, §7, este punto, §10, `CLAUDE.md`
+    (sección «Agenda v2», ampliada), `DEUDA_TECNICA.md` (AG-DT-29 resuelta,
+    AG-DT-28 decidida, AG-DT-13 acotada, AG-DT-30 a AG-DT-46 nuevas) y la guía
+    (§8-bis con 23 pruebas nuevas, «Qué repetir», el aviso de §1.1, B1, B2, B6,
+    D0, D3, E10, F5, F21, F22, casillas).
+  - **F1.12 los fines de semana** (`7c07fbd`): la batería del paso 4 la vio
+    fallar en el teléfono (ya era sábado 14). Era el código; causa y arreglo en
+    §6-bis. En la misma batería falló `husos-dos-consultorios` «la agenda»
+    porque corrió suelta, sin el archivo que la prepara: no era un fallo.
+  - **Paso 6 · batería otra vez** (tras `442fc03` y `7c07fbd`, build nuevo):
+    lint 96 errores, Vitest 1763 en 119 archivos, SQL 21 de 21, Playwright
+    **307 pasan, 0 fallan** (escritorio 256, teléfono 46, tableta 5; 265
+    saltadas; 9.1 min), las dos carreras en verde. Cada cambio de código,
+    revisado por un revisor en Sonnet; atendidos sus hallazgos (orden de los
+    `afterAll` con try/finally, `cita_correos` en la limpieza, una sola vuelta
+    a la vez en F1.12, el filtro por clínica en seg1).
+
 **Bitácora** (una línea por sesión: fecha, qué quedó hecho, qué quedó a medias):
 
 - 2026-11-10/11 — Rama y worktree creados; A0 cerrado (sembrador, red e2e
@@ -3994,6 +4275,12 @@ primero sin marcar.
   simulado como script del repo y la guía de pruebas a mano seguida comando
   por comando. Para Angel: la contradicción de los puntos 1 y 6 y AG-DT-29.
   Nada a medias.
+- 2026-11-13/14 — Tanda tras las primeras pruebas a mano (T1, T2, T3):
+  fusiones con cuatro conflictos resueltos, e2e de seg1 determinista, las e2e
+  ya no borran lo hecho a mano, F1.12 arreglado para los fines de semana;
+  desde cero, 25 migraciones y 307 e2e en verde. Para Angel: la decisión del
+  punto 9 (el invitado no crea tipos), comprobar `imatch` en producción y la
+  guía (§8-bis y «Qué repetir»). Nada a medias.
 
 ---
 
@@ -4078,6 +4365,17 @@ contra producción, Google real, correo real ni Vercel).
 - La batería A1-bis instrumentada (`e2e/playwright.a1bis.config.ts`) no se
   volvió a correr tras F.
 - F1.5 («Compactar» al abrir) con datos de una clínica real.
+
+**Tanda tras las primeras pruebas a mano (2026-11-13)**
+- **`imatch` en el PostgREST de producción:** la búsqueda de pacientes (punto
+  1) sale sin interruptor y lo usa; en local hay PostgREST 14.5. Comprobarlo
+  antes de fusionar (§7).
+- **La tarjeta al pasar el ratón y la elevación** con un ratón y un panel
+  táctil reales, y en equipos híbridos (pantalla táctil con ratón): todo fue
+  Chromium con `(hover: hover) and (pointer: fine)` emulado.
+- **El teclado real de una tableta** (`visualViewport` al abrirse): en las e2e
+  se simula encogiendo la parte visible.
+- **El Google real con «Convertir en cita»:** sólo con el Google simulado.
 
 **Correcciones de seguridad (seg1 y seg2, integradas el 2026-11-12)**
 - **El tiempo de respuesta del enlace** con teléfonos distintos (punto 1): se

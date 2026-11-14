@@ -447,7 +447,7 @@ Plan, decisiones y avance: `mejora_agendaV2.md` (§6-bis decisiones, §7 lo que
 le toca a Angel, §10 lo que no se probó en local). Auditoría del conjunto de
 migraciones: `supabase/AUDITORIA-CONJUNTO-AGENDA-V2.md`. Guía local:
 `GUIA_AUDITORIA_AGENDA_V2.md`; pruebas a mano: `GUIA_PRUEBAS_AGENDA_V2.md`.
-Deuda abierta: `DEUDA_TECNICA.md`, AG-DT-13 a AG-DT-29.
+Deuda abierta: `DEUDA_TECNICA.md`, AG-DT-13 a AG-DT-46.
 
 **Estado:** el código y las 20 migraciones (`20261111120000` a
 `20261117130000`: las 16 del cierre y las 4 de las correcciones de seguridad)
@@ -542,6 +542,60 @@ aplicado ni encendido hasta que Angel lo haga (§7).
 * **El aviso de privacidad de la reserva** (`src/lib/reserva/avisoReserva.ts`)
   está PENDIENTE DE REVISIÓN LEGAL. Mientras lleve la marca, el enlace no abre
   aunque se apruebe su hash. No quites la marca sin la revisión de Angel.
+
+**Tanda tras las primeras pruebas a mano (2026-11-13, ramas T1-T3; sin
+migraciones).** Además de lo de arriba:
+
+* **La búsqueda de pacientes de la agenda** (formulario completo, burbuja,
+  buscador, «Convertir en cita») es `buscarPacientes`
+  (`src/lib/agenda/buscarCitasPaciente.ts`): UN `.or()` POR PALABRA con
+  `imatch` y el patrón sin acentos (`patronSinAcentos`). No vuelvas al `.or()`
+  único con el texto entero (era el defecto de «Hugo Interián»), ni metas en el
+  patrón nada que no sea `[a-z0-9]` y las clases de vocales (PostgREST y la
+  regex lo leerían como sintaxis). Sale sin interruptor: depende de que
+  PostgREST admita `imatch` (comprobar en producción, `mejora_agendaV2.md` §7).
+* **Si el botón de WhatsApp se pinta o no lo decide `motivoSinWhatsApp`**
+  (`whatsappCita.ts`), la MISMA función que usa la ruta. Ninguna condición
+  propia en los componentes.
+* **Las capas flotantes (burbuja, tarjeta, desplegable de fecha) nunca salen
+  de la ventana:** `posicionCapa` devuelve `altoMaximo` y el componente lo pone
+  como `max-height`, midiendo el alto NATURAL (`scrollHeight`) y la parte
+  VISIBLE (`visualViewport`). `colocar` está copiado en tres archivos
+  (AG-DT-38): un arreglo va en las tres copias.
+* **`handleSave` devuelve el alta creada (`AltaGuardada`) y acepta
+  `{ sinInvitacion }`:** la burbuja ofrece la invitación de Google como botón;
+  desde el formulario completo sigue abriéndose sola tras crear.
+* **Una sola regla para «¿abre este enlace?»** (`src/lib/reserva/aperturaEnlace.ts`):
+  la usan la página pública y la configuración. No escribas a mano la condición
+  de «Este enlace ya no está disponible» en un sitio solo.
+  `sin_disponibilidad` NO cierra la página, a propósito.
+* **`preparacionServidor.ts` es la segunda excepción a «sólo cliente de
+  sesión»** de la gestión de enlaces: lee con `createAdminClient()` sólo
+  `medico_id, horario, horario_propio` de `consultorios`, filtrado por
+  `clinica_id` y con el alcance del rol; del navegador sólo sale el motivo.
+* **La rejilla y TODOS los avisos de fuera de horario leen una sola variable**
+  (`horario` de `AgendaCliente`, `horarioDeLaRejilla` en `horarioRejilla.ts`).
+  Con la v2 apagada debe ser el MISMO objeto `config?.horario ??
+  HORARIO_DEFAULT` (A1-bis). No pases a un aviso un horario distinto del que
+  pinta la rejilla.
+* **Convertir en cita (AG-DT-29) es un alta:** con la v2, colgarle un paciente
+  a una fila sin paciente que no está por ligar pasa por `vetoDeConversion`
+  (`porLigarServidor.ts`): las tres funciones de `appointments_gates_insert`
+  ORIGINALES por RPC con la sesión, consultorio obligatorio y paciente de la
+  clínica visible para quien convierte. No lo quites creyéndolo redundante con
+  la RLS: la de UPDATE no tiene esas puertas. A Google va lo de cualquier cita
+  con paciente (título del paciente, descripción fija; nunca las notas).
+* **La tarjeta al pasar el ratón no es modal y no toca el foco:** no le pongas
+  `aria-modal` ni `useDialogoModal`. Abre por `abrirCita` (nunca el modal) y
+  nunca con un botón pulsado.
+* **La elevación del hover va en la caja de dentro** (`.ag-tarjeta`,
+  `.ag-mes`, `.ag-banda`), nunca en el `.fc-event` (FLIP), y nada con
+  movimiento reducido.
+* **Las e2e limpian sólo lo que crearon** (`marcaE2e()` en el `beforeAll` y
+  `limpiarReservasE2e(desde)`; los tipos de cita que había se aparcan y se
+  devuelven). No vuelvas a un `delete` de todo lo de una clínica en una
+  prueba. Pero la semilla, y por tanto cada corrida de Playwright, recrea las
+  clínicas Semilla A y B enteras (AG-DT-46).
 
 ---
 

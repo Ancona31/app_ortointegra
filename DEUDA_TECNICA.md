@@ -3824,6 +3824,12 @@ paciente a otro guarda el `paciente_id` que llega sin comprobar que sea de la
 misma clínica (la FK acepta cualquier paciente y la RLS de `appointments` mira
 la fila de la cita, no la del paciente). El ligado nuevo de D7 sí lo comprueba.
 Encaja en el pendiente prioritario de `CLAUDE.md` (aislamiento entre clínicas).
+**Acotada (tanda del 2026-11-13, T3):** con la v2 encendida, colgarle un
+paciente a una fila SIN paciente (un evento, de Google o de Spinus) ya pasa por
+`pacienteVisible` dentro de `vetoDeConversion` (`porLigarServidor.ts`): 400
+`paciente_invalido` si no es de la clínica o quien convierte no lo ve. Sigue
+abierto cambiar el paciente de una cita que YA tiene uno, y todo con la v2
+apagada.
 
 ### AG-DT-14 — Un `DELETE` directo por PostgREST se salta el «no se borra, se cancela» de v2
 
@@ -3954,7 +3960,11 @@ panel «Por confirmar». Cerrarlo es quitar `AND NOT o.all_day` de esa función
 
 ### AG-DT-28 — Un bloqueo manual por teléfono se nota desde el enlace
 
-**Estado:** 🟡 abierta, aceptada por decisión (seg1, puntos 1, 2 y 6) · Lo
+**Estado:** ✅ decidida por Angel (2026-11-13): **se queda como está**; el
+bloqueo manual sigue mirando el teléfono (`mejora_agendaV2.md` §6-bis, «Tanda
+tras las primeras pruebas a mano»). Texto original:
+
+🟡 abierta, aceptada por decisión (seg1, puntos 1, 2 y 6) · Lo
 automático del candado decide ya sólo por el correo verificado y el enlace no
 dice nada de si un teléfono tiene cita o historial. Pero el bloqueo MANUAL por
 teléfono corta (lo pidió Angel), y un rechazo por un dato que nadie verifica lo
@@ -3966,7 +3976,13 @@ independiente»).
 
 ### AG-DT-29 — Un evento nacido en Google no se puede convertir en cita desde la pantalla
 
-**Estado:** 🟡 abierta (integración de las correcciones, 2026-11-12) · §2 del
+**Estado:** ✅ resuelta en la tanda del 2026-11-13 (T3, punto 6; fusionada en
+`719b9ae`): «Convertir en cita» en la tarjeta de un evento con
+`origen = 'google'` (`ConvertirEnCita.tsx`), que pide paciente, consultorio y
+tipo y guarda por el PUT de siempre con las puertas del alta
+(`vetoDeConversion`). Detalle en `mejora_agendaV2.md` §6-bis. Texto original:
+
+🟡 abierta (integración de las correcciones, 2026-11-12) · §2 del
 plan dice que los eventos creados en Google entran a Spinus «editables desde
 Spinus (título, hora, observaciones, cancelar) y **convertibles en cita**
 ligándolos a un paciente». Lo primero está; lo segundo no tiene camino: el
@@ -3980,6 +3996,160 @@ un paciente» en la tarjeta de un evento con `origen = 'google'`, reutilizando
 el buscador del panel de ligar) y qué pasa con el título que viene de Google
 (con paciente, Google ya no puede cambiarlo, C4). Decide Angel
 (`mejora_agendaV2.md` §6-bis, «Integración de las correcciones de seguridad»).
+
+### Agenda v2 — tanda tras las primeras pruebas a mano (2026-11-13)
+
+Lo que dejaron abierto las ramas T1, T2 y T3 y su integración
+(`mejora_agendaV2.md` §6-bis, «Tanda tras las primeras pruebas a mano»).
+
+### AG-DT-30 — La búsqueda de pacientes con el defecto de «Hugo Interián» sigue en otras pantallas
+
+**Estado:** 🟡 abierta (tanda del 2026-11-13, T1) · La misma consulta de texto
+entero (`.or(nombre.ilike.%q%,apellidos.ilike.%q%)` o su equivalente) sigue en
+`src/components/CommandPalette.tsx:152`,
+`src/components/launcher/ConsultaRapidaModal.tsx:125`,
+`src/app/(app)/documentos/page.tsx:81` y en el RPC
+`listar_pacientes_expediente` (lista de Expedientes): «Hugo Interián» o
+«interian» no encuentran a nadie ahí. Arreglo: usar `buscarPacientes`
+(`src/lib/agenda/buscarCitasPaciente.ts`) en las tres primeras y, para el RPC,
+la misma idea palabra a palabra en SQL (migración). Fuera del alcance de la
+tanda (sólo burbuja, buscador y formulario de la agenda).
+
+### AG-DT-31 — La rejilla dibuja en la hora del dispositivo aunque el consultorio esté en otra zona
+
+**Estado:** 🟡 abierta, anterior a v2 (T2, punto 11; no se cambió) · Un
+médico con consultorios en dos zonas ve las citas de la otra zona desplazadas
+(con la etiqueta de su hora local en la tarjeta), y la banda gris del horario
+propio de ese consultorio se pinta en horas del dispositivo, no del
+consultorio: contradice los turnos del enlace. Ejemplo (Dr. Admin, computadora
+en Mérida, UTC-6; consultorios Centro en Mérida y Tijuana en UTC-8 en
+noviembre, los dos con horario propio de 09:00 a 11:00): el enlace de Tijuana
+ofrece 09:00–10:30 de Tijuana (= 11:00–12:30 de Mérida); un paciente reserva
+Tijuana 09:00 y comprobante y recordatorio dicen «a las 09:00 (zona horaria:
+Baja California)»; en la agenda la tarjeta sale a las **11:00–11:30** con
+«09:00 hora Baja California»; con Tijuana como consultorio activo, la banda
+gris marca 09:00–11:00 **de Mérida**, la tarjeta de las 11:00 cae en gris y
+arrastrarla a su sitio dispara el aviso de fuera de horario. Con Centro activo
+coincide. Arreglo posible: `timeZone` de FullCalendar por consultorio activo
+(cambio grande: arrastre, `now`, caché de rangos, todo el día). Prueba que lo
+enseña: e2e `husos-dos-consultorios`; guía T2-6. Familia de AG-DT-3 y
+AG-DT-12.
+
+### AG-DT-32 — `GET /api/agenda/enlaces` lee el contexto público una vez por médico con enlace
+
+**Estado:** 🟡 abierta, aceptada (T2, punto 8) · Para calcular `preparacion`,
+la ruta abre cada enlace vigente con `abrirEnlace()` (`reserva_contexto`) más
+tres lecturas de tablas. Con pocos médicos no se nota; con muchos, convendría
+una RPC que devuelva la preparación de todos de una vez.
+
+### AG-DT-33 — El aviso de fuera de horario del formulario mira el consultorio de la rejilla, no el elegido
+
+**Estado:** 🟡 abierta (T2, punto 10) · Si la rejilla enseña el consultorio A
+(horario propio) y en el formulario se elige el consultorio B del mismo
+médico, el aviso mira el horario de A. Arreglo: que `AppointmentModal`
+resuelva el horario con `horarioEfectivo` del consultorio elegido (con la v2).
+
+### AG-DT-34 — «No abrirá: …aviso sin aprobar o clínica sin acceso» no distingue la causa
+
+**Estado:** 🟡 abierta, aceptada (T2) · `reserva_contexto` devuelve un nulo
+uniforme a propósito. Si hace falta distinguir, la ruta podría preguntar
+aparte `reserva_avisos` y `gcal_sync_clinica_habilitada`.
+
+### AG-DT-35 — La página de confirmación nombra la zona con la fecha de hoy, no con la de la cita
+
+**Estado:** 🟡 abierta (visto en T2, punto 11; no se tocó) ·
+`etiquetaDeZona` (`src/lib/confirmacion/vistaConfirmacion.ts`) toma el nombre
+de la zona con la fecha de HOY: una cita de Tijuana en verano vista en invierno
+diría «hora estándar del Pacífico».
+
+### AG-DT-36 — La tarjeta al pasar el ratón no acompaña al desplazamiento de la rejilla
+
+**Estado:** 🟡 abierta, aceptada (T3, punto 15) · Desde la integración se
+recoloca al crecer o al cambiar la parte visible de la ventana (como la fija),
+pero se coloca con el rectángulo de la cita del momento de abrir: si la agenda
+se desplaza con ella abierta, se queda donde estaba hasta que el ratón sale.
+
+### AG-DT-37 — Un atajo que abre el modal de la cita no cierra la tarjeta al pasar
+
+**Estado:** 🟡 abierta, inofensiva (T3) · Con la tarjeta al pasar abierta, un
+atajo que abre el modal («c») la deja detrás (z-index 45 contra 50) hasta que
+el ratón sale o se pulsa Escape (que con el modal encima es del modal).
+
+### AG-DT-38 — `colocar` y `seguirColocacion` están copiados en tres archivos
+
+**Estado:** 🟡 abierta, pide el visto bueno de Angel (T1) · `BurbujaAlta.tsx`,
+`TarjetaLectura.tsx` y `HerramientasV2.tsx` (este sin `seguirColocacion`).
+Copia deliberada (protocolo 4); con tres usos reales ya se puede proponer
+sacarlas a un módulo. Mientras, un arreglo va en las tres.
+
+### AG-DT-39 — «¿Hay un diálogo modal abierto?» está escrito en varios sitios
+
+**Estado:** 🟡 abierta, pide el visto bueno de Angel (T3) · `hayDialogoModal`
+(`useTarjetaAlPasar.ts`), `hayDialogoModalAbierto` (`useAtajosAgenda.ts`) y
+`hayOtroDialogoModal` (`TarjetaLectura.tsx`, `BurbujaAlta.tsx` y
+`HerramientasV2.tsx`, que excluyen el propio). Con tres usos reales se puede
+proponer un módulo compartido.
+
+### AG-DT-40 — `QuickPatientModal` no es un diálogo accesible
+
+**Estado:** 🟡 abierta (T1) · Sin `role="dialog"`, sin trampa de foco ni
+Escape, igual en el formulario completo, en documentos, en el ligado de D7 y
+ahora en la burbuja y en «Convertir en cita». La burbuja convive con él
+pausando su «tocar fuera». El arreglo es del componente compartido.
+
+### AG-DT-41 — Doble anuncio tras agendar desde la burbuja
+
+**Estado:** 🟡 abierta, aceptada (T1) · El toast «Se agendó correctamente» y
+el `role="status"` «Cita agendada…» de la burbuja: un lector de pantalla oye
+los dos. Si molesta, `handleSave` puede callar el toast cuando lo pide la
+burbuja.
+
+### AG-DT-42 — Las citas por ligar se siguen buscando con el texto entero
+
+**Estado:** 🟡 abierta (T1) · `buscarCitasPorLigar` usa
+`reserva_nombre ilike %q%`: «Ana Pech» encuentra «Ana Pech» pero no «Pech Ana»
+ni sin acentos. Mismo arreglo palabra a palabra que `buscarPacientes`.
+
+### AG-DT-43 — La búsqueda de pacientes no usa índice
+
+**Estado:** 🟡 vigilada (T1) · `imatch` con un patrón sin ancla recorre los
+pacientes que la RLS deja ver (como el `ilike '%…%'` de antes). Con clínicas
+grandes, el siguiente paso es un índice trigram sobre una expresión sin
+acentos (función inmutable propia + migración).
+
+### AG-DT-44 — Un nombre guardado en NFD no casa a mitad de palabra
+
+**Estado:** 🟡 vigilada (T1) · La regex de `patronSinAcentos` espera la vocal
+acentuada precompuesta (NFC). Los formularios guardan NFC; un dato importado
+descompuesto (vocal + tilde combinante) podría no encontrarse.
+
+### AG-DT-45 — Ligar una cita por ligar no pasa las puertas de suscripción; convertir un evento, sí
+
+**Estado:** 🟡 abierta, aceptada (T3) · La conversión (AG-DT-29) crea una cita
+y pasa `vetoDeConversion`; el ligado de D7 liga una cita ya reservada y no lo
+pasa. Si se quiere la misma regla, es una línea en el PUT (`ligando` →
+`vetoDeConversion` sin el consultorio).
+
+### AG-DT-46 — La semilla y cada corrida de Playwright recrean las clínicas Semilla A y B
+
+**Estado:** 🟡 abierta, aceptada (integración de la tanda, 2026-11-13) ·
+`scripts/agenda-semilla.ts` borra y vuelve a crear las dos clínicas de la
+semilla (usuarios, pacientes, citas, consultorios, tipos de cita, enlaces,
+contactos, conexión con Google, interruptor), y `e2e/global-setup.ts` la corre
+al empezar CADA corrida de Playwright. Todo lo hecho a mano en esas clínicas se
+pierde. Desde esta tanda las e2e, dentro de la corrida, limpian sólo lo creado
+desde que empezó su archivo (`marcaE2e` + `limpiarReservasE2e(desde)`; los
+tipos de la configuración guiada se aparcan y se devuelven), y el apagado de
+interruptores al empezar sólo toca las clínicas de la semilla. Pero la siembra
+sigue siendo destructiva: la guía (§1, «Antes de probar a mano») dice cómo no
+perder datos. Quedan además dos efectos ajenos al aislamiento por archivo:
+`emitirEnlace(…, 'fijo')` de `reservaPublicaAyudas.ts` revoca el fijo vigente
+del Dr. Admin, y las e2e de Google borran la conexión de la Clínica A. Y si
+el proceso de Playwright MUERE a mitad de un archivo (no un fallo normal: ahí
+corren sus `afterAll`), lo que dejó se trata como «de antes» en los archivos
+siguientes de esa corrida (se aparca y se devuelve, no se borra) hasta la
+siguiente siembra; algunas cuentas de `reserva_contactos` por médico de
+`agenda-por-ligar` y `agenda-enlaces-reserva` dan por hecho que no hay otros.
 
 ---
 
