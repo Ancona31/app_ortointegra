@@ -31,6 +31,7 @@ import type { ModalState } from '@/components/agenda/AppointmentModal'
 import BurbujaAlta, { type MasOpcionesBurbuja, type MedicoBurbuja } from '@/components/agenda/BurbujaAlta'
 import TarjetaLectura from '@/components/agenda/TarjetaLectura'
 import AyudaAtajos from '@/components/agenda/AyudaAtajos'
+import ConvertirEnCita, { type EleccionConversion } from '@/components/agenda/ConvertirEnCita'
 import { useAtajosAgenda } from '@/app/(app)/agenda/useAtajosAgenda'
 import { useDeslizarPeriodo } from '@/app/(app)/agenda/useDeslizarPeriodo'
 import { useTarjetaAlPasar } from '@/app/(app)/agenda/useTarjetaAlPasar'
@@ -102,6 +103,9 @@ export interface PropsInteraccionesV2 {
   currentView: string
   /** El botón «Agendar» (atajo `c`): el modal de alta, con el bloqueo de suscripción delante. */
   onAgendar: () => void
+  /** T3 · La puerta de suscripción del alta, para «Convertir en cita»: `false` y
+      enseña el aviso de bloqueo si la clínica no puede agendar. */
+  puedeAgendar: () => boolean
   /** `abrirCita` de `altaCitas.ts`, la única puerta a una cita (T3: también al pasar el ratón). */
   abrirCita: (evento: EventApi, sitio?: SitioCita) => void
   medicos: readonly MedicoConfig[]
@@ -123,6 +127,8 @@ type Capa =
          la de siempre que la sustituye al fijarla con un clic, sin volver a entrar. */
       alPasar?: boolean; sinEntrada?: boolean }
   | { id: number; tipo: 'ayuda' }
+  /* T3 · «Convertir en cita» de un evento nacido en Google (§2, AG-DT-29). */
+  | { id: number; tipo: 'convertir'; cita: Appointment }
 
 type SinId<T> = T extends unknown ? Omit<T, 'id'> : never
 
@@ -202,6 +208,8 @@ interface ContextoAccion {
   consultorio: Consultorio | null
   cambiarActivo: (c: Consultorio) => void
   navegar: (url: string) => void
+  /** T3 · Abre el diálogo de convertir en cita. */
+  convertir: () => void
 }
 
 /**
@@ -218,6 +226,7 @@ function ejecutarAccion(a: AccionTarjeta, cita: Appointment, x: ContextoAccion):
   const hacer = (): void => {
     switch (a) {
       case 'editar': editar(); return
+      case 'convertir': x.convertir(); return
       case 'reagendar': editar('fecha'); return
       case 'confirmar': void guardado.cambiarEstadoCita?.(cita.id, 'confirmed'); return
       case 'cancelar': void guardado.handleCancelar(cita.id); return
@@ -246,9 +255,11 @@ interface PropsCapaTarjeta {
   /** T3 · El vigía de la tarjeta al pasar y cómo fijarla. */
   vigia: RefObject<VigiaAlPasar | null>
   fijar: () => void
+  /** T3 · «Convertir en cita»: la capa del diálogo (tras la puerta de suscripción). */
+  abrirConvertir: (cita: Appointment) => void
 }
 
-function CapaTarjeta({ capa, p, cerrar, vigia, fijar }: PropsCapaTarjeta): ReactElement {
+function CapaTarjeta({ capa, p, cerrar, vigia, fijar, abrirConvertir }: PropsCapaTarjeta): ReactElement {
   const { consultorios } = useConsultorios()
   const { cambiarActivo } = useConsultorioActivo()
   const router = useRouter()
@@ -260,7 +271,7 @@ function CapaTarjeta({ capa, p, cerrar, vigia, fijar }: PropsCapaTarjeta): React
      aviso) la tapa, y el foco vuelve a la cita antes de que lo tome lo nuevo. */
   const alAccion = (a: AccionTarjeta): void => {
     cerrar(capa.id)
-    ejecutarAccion(a, cita, { p, consultorio, cambiarActivo, navegar: url => router.push(url) })
+    ejecutarAccion(a, cita, { p, consultorio, cambiarActivo, navegar: url => router.push(url), convertir: () => abrirConvertir(cita) })
   }
   return (
     <TarjetaLectura
@@ -277,6 +288,37 @@ function CapaTarjeta({ capa, p, cerrar, vigia, fijar }: PropsCapaTarjeta): React
         ? <BotonWhatsAppCita citaId={cita.id} tipo="enlace" marcadoEn={cita.whatsapp_sent_at ?? null} compacto />
         : undefined}
     />
+  )
+}
+
+/**
+ * T3 · Lo que guarda «Convertir en cita»: el PUT de siempre por `handleSave`
+ * (optimista, empalmes y errores incluidos), con lo que una cita lleva y un
+ * evento no: paciente (y el título que se compone de él, como el modal),
+ * consultorio y tipo. La pinta del evento se vacía, como en una cita.
+ */
+export function datosDeConversion(cita: Appointment, e: EleccionConversion): DatosGuardado {
+  return {
+    id: cita.id,
+    title: `${e.paciente.nombre} ${e.paciente.apellidos}`,
+    paciente_id: e.paciente.id,
+    pacientes: e.paciente,
+    medico_id: cita.medico_id,
+    consultorio_id: e.consultorioId,
+    icono: null,
+    color: null,
+    updated_at: cita.updated_at,
+    ...(e.tipoCitaId ? { tipo_cita_id: e.tipoCitaId } : {}),
+  }
+}
+
+interface PropsCapaConvertir { capa: Extract<Capa, { tipo: 'convertir' }>; p: PropsInteraccionesV2; cerrar: (id: number) => void }
+
+function CapaConvertir({ capa, p, cerrar }: PropsCapaConvertir): ReactElement {
+  return (
+    <ConvertirEnCita cita={capa.cita} perfilId={p.quien.perfilId} zonaVisor={p.zonaVisor}
+      alCerrar={() => cerrar(capa.id)}
+      alConvertir={(e) => { cerrar(capa.id); void p.guardado.handleSave(datosDeConversion(capa.cita, e)) }} />
   )
 }
 
@@ -447,6 +489,9 @@ export default function InteraccionesV2(p: PropsInteraccionesV2): ReactElement |
   }, [abrir, calendarRef, capaRef])
   const irACita = useIrACita(p)
   const abrirAyuda = useCallback(() => abrir({ tipo: 'ayuda' }), [abrir])
+  const abrirConvertir = useCallback((cita: Appointment) => {
+    if (p.puedeAgendar()) abrir({ tipo: 'convertir', cita })
+  }, [abrir, p])
   const atajos = useAtajosV2(p, capa !== null && !esAlPasar(capa), abrirAyuda)
   const { vigia, fijar } = useAlPasarV2(p, capaRef, cerrar, abrirTarjeta)
   /* La tarjeta al pasar dejó de serlo (se fijó, se cerró o la tapó otra capa): el vigía la suelta. */
@@ -478,7 +523,10 @@ export default function InteraccionesV2(p: PropsInteraccionesV2): ReactElement |
   const medicosBurbuja = useMemo(() => medicos.map(m => ({ id: m.id, nombre: componerNombreMedicoCompleto(m) })), [medicos])
 
   if (capa?.tipo === 'burbuja') return <CapaBurbuja key={capa.id} capa={capa} medicos={medicosBurbuja} p={p} cerrar={cerrar} />
-  if (capa?.tipo === 'tarjeta') return <CapaTarjeta key={capa.id} capa={capa} p={p} cerrar={cerrar} vigia={vigia} fijar={fijar} />
+  if (capa?.tipo === 'tarjeta') {
+    return <CapaTarjeta key={capa.id} capa={capa} p={p} cerrar={cerrar} vigia={vigia} fijar={fijar} abrirConvertir={abrirConvertir} />
+  }
+  if (capa?.tipo === 'convertir') return <CapaConvertir key={capa.id} capa={capa} p={p} cerrar={cerrar} />
   if (capa?.tipo === 'ayuda') {
     return <AyudaAtajos key={capa.id} encendidos={atajos.encendidos} alCambiarEncendidos={atajos.cambiarEncendidos} alCerrar={() => cerrar(capa.id)} />
   }

@@ -9,7 +9,8 @@
  *
  * Reglas (diseño F §3.2 y decisión 20):
  *   · Evento sin paciente: «Editar» y «Eliminar» (eliminar SÓLO aquí: una cita
- *     con paciente se cancela, no se borra — P2).
+ *     con paciente se cancela, no se borra — P2). T3: si nació en Google, tiene
+ *     hora, médico y sigue viva, además «Convertir en cita» (§2, AG-DT-29).
  *   · Cita (con paciente o por ligar):
  *       – «Iniciar consulta», la acción principal, si el llamador dice que se
  *         puede (las mismas condiciones que el modal: puede ver expedientes, es
@@ -27,7 +28,7 @@ import { esEventoGenerico, esPorLigar } from '@/lib/agenda/tarjetasAgenda'
 import { horaEnTZ } from '@/lib/agenda/fechasAgenda'
 import { regionDeTimezone } from '@/lib/consultorios/zonas-mexico'
 
-export type AccionTarjeta = 'iniciar-consulta' | 'confirmar' | 'reagendar' | 'cancelar' | 'editar' | 'eliminar'
+export type AccionTarjeta = 'iniciar-consulta' | 'confirmar' | 'reagendar' | 'cancelar' | 'editar' | 'convertir' | 'eliminar'
 
 export const ETIQUETA_ACCION: Record<AccionTarjeta, string> = {
   'iniciar-consulta': 'Iniciar consulta',
@@ -35,6 +36,7 @@ export const ETIQUETA_ACCION: Record<AccionTarjeta, string> = {
   reagendar: 'Reagendar',
   cancelar: 'Cancelar cita',
   editar: 'Editar',
+  convertir: 'Convertir en cita',
   eliminar: 'Eliminar evento',
 }
 
@@ -42,6 +44,18 @@ const VIVAS: readonly Status[] = ['scheduled', 'confirmed']
 
 /** Lo que mira la tarjeta de la fila. */
 export type CitaTarjeta = Pick<Appointment, 'status' | 'paciente_id' | 'reserva_canal'>
+  & Partial<Pick<Appointment, 'origen' | 'all_day' | 'medico_id'>>
+
+/**
+ * T3 · ¿Se puede convertir en cita? Un evento sin paciente NACIDO EN GOOGLE
+ * (lo que pide §2), con hora (una cita siempre la lleva: el servidor rechaza
+ * todo el día con paciente), con médico (la cita es suya y el consultorio sale
+ * de él) y vivo (agendado o confirmado).
+ */
+export function esConvertible(cita: CitaTarjeta): boolean {
+  return esEventoGenerico(cita) && cita.origen === 'google' && cita.all_day !== true
+    && Boolean(cita.medico_id) && VIVAS.includes(cita.status)
+}
 
 /**
  * Las acciones de la cita, en el orden en que se pintan (la principal primero).
@@ -49,7 +63,7 @@ export type CitaTarjeta = Pick<Appointment, 'status' | 'paciente_id' | 'reserva_
  * apaga mientras `guardadoCitas` no exponga `cambiarEstadoCita` (`contratosV2.ts`).
  */
 export function accionesDeTarjeta(cita: CitaTarjeta, puedeIniciarConsulta: boolean, conConfirmar = true): AccionTarjeta[] {
-  if (esEventoGenerico(cita)) return ['editar', 'eliminar']
+  if (esEventoGenerico(cita)) return esConvertible(cita) ? ['editar', 'convertir', 'eliminar'] : ['editar', 'eliminar']
   const acciones: AccionTarjeta[] = []
   if (puedeIniciarConsulta) acciones.push('iniciar-consulta')
   if (conConfirmar && cita.status === 'scheduled') acciones.push('confirmar')

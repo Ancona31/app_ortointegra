@@ -35,6 +35,8 @@ const h = vi.hoisted(() => ({
   /** Fallos de `events.patch`, en orden (null = sale bien). */
   fallosPatch: [] as Array<number | null>,
   reparar: [] as boolean[],
+  /** T3 · Lo que contestan las tres puertas del alta por RPC (convertir en cita). */
+  puertas: true,
 }))
 
 class Consulta implements PromiseLike<unknown> {
@@ -63,6 +65,7 @@ class Consulta implements PromiseLike<unknown> {
       return Promise.resolve({ data: { id: 'u1', clinica_id: 'clinica-1', role: 'medico', es_admin_de_clinica: true } })
     }
     if (tabla === 'agenda_ajustes') return Promise.resolve({ data: { agenda_v2_encendida: h.interruptor }, error: null })
+    if (tabla === 'pacientes') return Promise.resolve({ data: { id: 'p1' }, error: null })
     if (tabla === 'clinicas') return Promise.resolve({ data: { suscripcion_estado: 'activo', es_vip_grant: false }, error: null })
     if (tabla === 'admin:consultorios') {
       return Promise.resolve({ data: { id: 'c1', nombre: 'Centro', nombre_corto: null, direccion: null, telefono: null, timezone: 'America/Merida' }, error: null })
@@ -85,6 +88,7 @@ vi.mock('@/lib/supabase/server', () => ({
   createClient: async () => ({
     auth: { getUser: async () => ({ data: { user: { id: 'u1' } } }) },
     from: (tabla: string) => new Consulta(tabla),
+    rpc: async (nombre: string) => { h.ops.push({ tabla: `rpc:${nombre}`, verbo: 'select', filtros: {} }); return { data: h.puertas, error: null } },
   }),
 }))
 vi.mock('@/lib/supabase/admin', () => ({ createAdminClient: () => ({ from: (tabla: string) => new Consulta(`admin:${tabla}`) }) }))
@@ -169,7 +173,7 @@ const guardados = (): Array<Record<string, unknown>> =>
 
 beforeEach(() => {
   Object.assign(h, {
-    ops: [], google: [], despues: [], interruptor: false, fila: CITA, vigente: null, gets: [], fallosPatch: [], reparar: [],
+    ops: [], google: [], despues: [], interruptor: false, fila: CITA, vigente: null, gets: [], fallosPatch: [], reparar: [], puertas: true,
     escrita: { ...CITA, status: 'confirmed', updated_at: DESPUES },
   })
   vi.mocked(logAudit).mockClear()
@@ -294,11 +298,26 @@ describe('PUT /api/appointments/[id] — C5 con v2', () => {
   it('S1 · fila de Google ligada a un paciente: formato fijo, sin sus notas', async () => {
     h.fila = DE_GOOGLE
     h.escrita = { ...DE_GOOGLE, paciente_id: 'p1', pacientes: CITA.pacientes, notes: 'texto de Google', updated_at: DESPUES }
-    await editar({ paciente_id: 'p1' })
+    // T3 · convertir en cita (AG-DT-29): el alta pide consultorio y pasa las puertas.
+    await editar({ paciente_id: 'p1', consultorio_id: '33333333-3333-4333-8333-333333333333' })
     await correrDespues()
     const d = String(cuerpo(parches()[0]).description)
     expect(d).toContain('Paciente Prueba')
     expect(d).not.toContain('texto de Google')
+    expect(String(cuerpo(parches()[0]).summary)).toBe('Cita médica: Paciente Prueba')
+  })
+
+  /* T3 · MUTACIÓN: quitar `vetoDeConversion` del PUT → la fila se escribe. */
+  it('convertir con la clínica sin acceso: 403, sin escribir ni tocar Google', async () => {
+    h.fila = DE_GOOGLE
+    h.puertas = false
+    const res = await editar({ paciente_id: 'p1', consultorio_id: '33333333-3333-4333-8333-333333333333' })
+    expect(res.status).toBe(403)
+    expect(h.ops.filter(o => o.tabla.startsWith('rpc:')).map(o => o.tabla).sort())
+      .toEqual(['rpc:clinica_no_suspendida', 'rpc:clinica_tiene_acceso', 'rpc:perfil_completo'])
+    expect(h.ops.some(o => o.tabla === 'appointments' && o.verbo === 'update')).toBe(false)
+    await correrDespues()
+    expect(h.google).toEqual([])
   })
 
   it('fila sin etag guardado (de antes de v2): no hay conflicto posible, parchea', async () => {

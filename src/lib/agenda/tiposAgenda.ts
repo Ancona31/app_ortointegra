@@ -75,6 +75,11 @@ export type Appointment = {
   reserva_telefono?: string | null
   reserva_correo?: string | null
   reserva_historial_previo?: number | null
+  /* C (T3) · De dónde nació la fila: `google` = importada por el sondeo de la
+     v2 (migración C1). OPCIONAL por lo mismo que `reserva_*`: llega por el `*`
+     de `APPOINTMENT_SELECT` sólo si la columna existe. La lee la tarjeta para
+     ofrecer «Convertir en cita» (§2, AG-DT-29). */
+  origen?: 'spinus' | 'google' | null
   /* E7 · La marca del WhatsApp manual (columna del baseline, vacía hasta E7):
      cuándo se ABRIÓ el mensaje desde el botón de la cita. Llega por el `*`. */
   whatsapp_sent_at?: string | null

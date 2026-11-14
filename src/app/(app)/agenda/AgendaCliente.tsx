@@ -1918,6 +1918,8 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
             const { fecha, hora } = partirFechaHora(new Date().toISOString())
             setModal({ mode: 'create', fecha, hora, tipo: 'cita', todoElDia: 'no' })
           }}
+          /* T3 · «Convertir en cita» pasa la misma puerta de suscripción que «Agendar». */
+          puedeAgendar={() => { if (subState.isBlocked) { openBloqueoModal(); return false } return true }}
           medicos={medicos}
           filtroMedico={filtroEfectivo || ((isSingleDoctor || isMedicoSinAdmin) && defaultMedicoId ? defaultMedicoId : null)}
           horario={horario}

@@ -141,7 +141,8 @@ function usePacientes(texto: string): PacienteBusqueda[] {
 
 interface PropsPaciente { paciente: PacienteBusqueda | null; alElegir: (p: PacienteBusqueda | null) => void }
 
-function CampoPaciente({ paciente, alElegir }: PropsPaciente): ReactElement {
+/* T3 · Exportado: lo reutiliza `ConvertirEnCita` (convertir en cita un evento de Google). */
+export function CampoPaciente({ paciente, alElegir }: PropsPaciente): ReactElement {
   const [texto, setTexto] = useState('')
   const [activa, setActiva] = useState(-1)
   const lista = usePacientes(paciente ? '' : texto)

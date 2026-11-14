@@ -15,7 +15,7 @@ import { agendaV2Encendida } from '@/lib/agenda/ajustesAgenda'
 import { comprobarEmpalmes, type VeredictoEmpalme } from '@/lib/agenda/empalmesServidor'
 import { ESTADOS_SIN_EMPALME } from '@/lib/agenda/empalmesCita'
 import { comprobarTipoDelPut, leerTipoCitaId, CUERPO_TIPO_INVALIDO } from '@/lib/agenda/tipoCitaServidor'
-import { auditarLigado, estaPorLigar, pacienteParaGoogle, pacienteVisible } from '@/lib/agenda/porLigarServidor'
+import { auditarLigado, estaPorLigar, pacienteParaGoogle, pacienteVisible, vetoDeConversion } from '@/lib/agenda/porLigarServidor'
 import {
   auditarConflictoEdicion, camposEditados, descripcionV2, parchearConEtag, releerUpdatedAt,
   type CampoEdicion, type EventoGoogle, type ResultadoParche,
@@ -351,6 +351,21 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
           { status: 400 }
         )
       }
+    }
+
+    /* T3 · CONVERTIR EN CITA un evento sin paciente (§2, AG-DT-29): con v2,
+       colgarle un paciente a una fila que no lo tenía y no está por ligar. Es un
+       alta de cita por un UPDATE: pasa las puertas del alta (suscripción y
+       perfil, las funciones originales por RPC), lleva consultorio y el
+       paciente tiene que ser de ESTA clínica y verlo quien convierte. Ver
+       `vetoDeConversion`. Lo que va a Google lo decide el `after()` de abajo
+       como con cualquier cita con paciente: «Cita médica: <paciente>» y la
+       descripción fija, sin observaciones (S1); C-d impide que el título
+       vuelva desde Google. */
+    const convirtiendo = v2 && !existing.paciente_id && !porLigar && typeof paciente_id === 'string' && paciente_id !== ''
+    if (convirtiendo) {
+      const veto = await vetoDeConversion(supabase, profile.clinica_id, paciente_id, consultorio_id)
+      if (veto) return NextResponse.json(veto.cuerpo, { status: veto.estado })
     }
 
     if (clientUpdatedAt && existing.updated_at !== clientUpdatedAt) {
@@ -816,10 +831,11 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
     /* D7: el ligado, auditado sólo con NOMBRES de campo. Después de escribir:
        si la escritura falló, no hubo ligado. Los datos de contacto de la
        reserva no se tocan: se quedan en la cita (lista A, punto 9). */
-    if (ligando) {
+    if (ligando || convirtiendo) {
       await auditarLigado({
         userId: user.id, clinicaId: profile.clinica_id, citaId: id,
         campos: ['paciente_id', ...(title !== undefined ? ['title'] : [])],
+        via: convirtiendo ? 'convertir' : 'ligar',
       })
     }
 
