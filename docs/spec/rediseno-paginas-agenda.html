@@ -1,0 +1,606 @@
+<title>Rediseño páginas agenda</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
+<style>
+/* Layout: un conmutador de cuatro pantallas; cada una es la maqueta a la izquierda
+   (marco de teléfono o de escritorio) y, al lado, qué cambia respecto de hoy. */
+:root{
+  --bg:#f4f7fa; --panel:#ffffff; --sunken:#f7f9fb; --muted:#eef2f7;
+  --ink:#14345c; --ink2:#3b4a5c; --ink3:#6b7b8f; --line:#dbe3ec; --line2:#edf1f6;
+  --navy:#1a3a5c; --navy2:#16456f; --brand:#1e5fa8; --brand-bg:#eaf1f9; --brand-brd:#c7dcef; --on-brand:#ffffff;
+  --ok:#16a34a; --ok-bg:#e9f7ef; --ok-brd:#cfe6d6; --ok-tx:#0f7a52;
+  --warn:#b45309; --warn-bg:#fef6e7; --warn-brd:#f4dfae;
+  --bad:#c0392b; --bad-bg:#fdf2f2; --bad-brd:#f3c9c9;
+  --wa:#25d366; --frame:#0f1b2b;
+  --font:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#10151b; --panel:#19212a; --sunken:#1f2832; --muted:#243040;
+  --ink:#e8eef6; --ink2:#c3cdd9; --ink3:#8f9cac; --line:#2f3b49; --line2:#26313d;
+  --navy:#14304d; --navy2:#173a5d; --brand:#6aa8ea; --brand-bg:#1c2f45; --brand-brd:#2e4b6d; --on-brand:#0d1722;
+  --ok:#4cc47a; --ok-bg:#16301f; --ok-brd:#27523a; --ok-tx:#74d79a;
+  --warn:#f0a53a; --warn-bg:#33270f; --warn-brd:#5a4318;
+  --bad:#ef8a7f; --bad-bg:#371c19; --bad-brd:#63302a; --frame:#000; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#10151b; --panel:#19212a; --sunken:#1f2832; --muted:#243040;
+  --ink:#e8eef6; --ink2:#c3cdd9; --ink3:#8f9cac; --line:#2f3b49; --line2:#26313d;
+  --navy:#14304d; --navy2:#173a5d; --brand:#6aa8ea; --brand-bg:#1c2f45; --brand-brd:#2e4b6d; --on-brand:#0d1722;
+  --ok:#4cc47a; --ok-bg:#16301f; --ok-brd:#27523a; --ok-tx:#74d79a;
+  --warn:#f0a53a; --warn-bg:#33270f; --warn-brd:#5a4318;
+  --bad:#ef8a7f; --bad-bg:#371c19; --bad-brd:#63302a; --frame:#000; color-scheme:dark}
+
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink2);font-family:var(--font);font-size:15px;line-height:1.5;
+  font-variant-numeric:tabular-nums;padding-block:24px 56px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:1120px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+h1{font-size:24px;font-weight:800;color:var(--ink);margin:0;letter-spacing:-.01em;text-wrap:balance}
+h2{font-size:16px;font-weight:700;color:var(--ink);margin:0}
+p{margin:0;max-width:68ch}
+.tag{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3)}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,a:focus-visible,input:focus-visible{outline:3px solid var(--brand);outline-offset:2px}
+
+.nav{display:flex;flex-wrap:wrap;gap:6px;background:var(--muted);padding:5px;border-radius:12px;width:fit-content;max-width:100%}
+.nav button{border:0;background:transparent;padding:9px 14px;border-radius:9px;font-weight:600;font-size:14px;color:var(--ink3);min-height:40px}
+.nav button[aria-selected="true"]{background:var(--panel);color:var(--ink);box-shadow:0 1px 2px rgba(20,52,92,.12)}
+
+.vista{display:grid;grid-template-columns:minmax(0,auto) minmax(0,1fr);gap:28px;align-items:start}
+.vista--ancha{grid-template-columns:minmax(0,1fr)}
+@media (max-width:820px){.vista{grid-template-columns:minmax(0,1fr)}}
+.notas{display:flex;flex-direction:column;gap:12px;min-width:0}
+.notas ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:7px}
+.notas .antes{font-size:13.5px;color:var(--ink3);border-top:1px solid var(--line);padding-top:12px}
+
+/* ── marco de teléfono ── */
+.tel{width:372px;max-width:100%;background:var(--frame);border-radius:34px;padding:9px;margin:0 auto}
+.tel__pant{background:var(--bg);border-radius:26px;overflow:hidden;display:flex;flex-direction:column;min-height:700px;position:relative}
+.cab{background:linear-gradient(180deg,var(--navy) 0%,var(--navy2) 100%);color:#fff;padding:16px 18px 18px;display:flex;flex-direction:column;gap:14px}
+.marca{display:flex;align-items:center;gap:8px;font-weight:700;font-size:14px;letter-spacing:.01em}
+.marca i{width:24px;height:24px;border-radius:7px;background:#fff;color:#1a3a5c;display:grid;place-items:center;font-style:normal;font-weight:800;font-size:13px}
+.medico{display:flex;gap:12px;align-items:center}
+.avatar{width:46px;height:46px;border-radius:50%;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.3);display:grid;place-items:center;font-weight:700;flex:none}
+.medico b{display:block;font-size:16px;font-weight:700;line-height:1.25}
+.medico span{font-size:12.5px;color:#b9cfe6}
+.pasos{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:12px 18px 0}
+.paso{display:flex;flex-direction:column;gap:5px;font-size:10.5px;font-weight:600;color:var(--ink3)}
+.paso::before{content:"";height:4px;border-radius:99px;background:var(--line)}
+.paso[data-e="hecho"]::before{background:var(--brand)}
+.paso[data-e="actual"]::before{background:var(--brand)}
+.paso[data-e="actual"]{color:var(--ink)}
+.cuerpo{padding:16px 18px 18px;display:flex;flex-direction:column;gap:16px;flex:1}
+.cuerpo h3{margin:0;font-size:17px;font-weight:700;color:var(--ink)}
+.cuerpo .sub{font-size:13px;color:var(--ink3);margin-top:-10px}
+.grupo{display:flex;flex-direction:column;gap:8px}
+.grupo>.tag{margin-bottom:0}
+.op{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;min-height:56px}
+.op b{display:block;font-size:14.5px;color:var(--ink);font-weight:600}
+.op span{font-size:12.5px;color:var(--ink3)}
+.op .rad{width:18px;height:18px;border-radius:50%;border:2px solid var(--line);margin-top:2px;flex:none}
+.op[aria-checked="true"]{border-color:var(--brand);background:var(--brand-bg)}
+.op[aria-checked="true"] .rad{border-color:var(--brand);background:radial-gradient(circle,var(--brand) 0 45%,transparent 50%)}
+.op .dur{margin-left:auto;font-size:12.5px;font-weight:600;color:var(--ink2);white-space:nowrap;padding-top:1px}
+.btn{border:0;border-radius:12px;min-height:50px;padding:0 18px;font-weight:700;font-size:15px;background:var(--brand);color:var(--on-brand);width:100%}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.btn--sec{background:transparent;border:1px solid var(--line);color:var(--ink)}
+.btn--peligro{background:transparent;border:1px solid var(--bad-brd);color:var(--bad)}
+.atras{background:none;border:0;padding:0;font-size:13px;font-weight:600;color:var(--brand);align-self:flex-start;min-height:28px}
+.semana{display:flex;align-items:center;justify-content:space-between;font-size:13.5px;font-weight:700;color:var(--ink)}
+.semana button{width:38px;height:38px;border-radius:10px;border:1px solid var(--line);background:var(--panel);font-size:16px}
+.dias{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
+.dia{border:1px solid var(--line);background:var(--panel);border-radius:11px;padding:7px 0 6px;display:flex;flex-direction:column;align-items:center;gap:1px;min-height:58px}
+.dia small{font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--ink3)}
+.dia b{font-size:16px;color:var(--ink);font-weight:700}
+.dia em{font-style:normal;width:5px;height:5px;border-radius:50%;background:var(--ok)}
+.dia[disabled]{opacity:.4;cursor:not-allowed}.dia[disabled] em{background:transparent}
+.dia[aria-pressed="true"]{background:var(--brand);border-color:var(--brand)}
+.dia[aria-pressed="true"] small,.dia[aria-pressed="true"] b{color:var(--on-brand)}
+.dia[aria-pressed="true"] em{background:var(--on-brand)}
+.horas{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}
+.hora{border:1px solid var(--line);background:var(--panel);border-radius:10px;min-height:44px;font-weight:600;font-size:14px;color:var(--ink)}
+.hora[aria-pressed="true"]{background:var(--brand);border-color:var(--brand);color:var(--on-brand)}
+.vacio{font-size:13px;color:var(--ink3);background:var(--sunken);border:1px dashed var(--line);border-radius:10px;padding:12px;text-align:center}
+.resumen{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:13.5px}
+.resumen dt{color:var(--ink3)}.resumen dd{margin:0;color:var(--ink);font-weight:600;text-align:right}
+.pie{position:sticky;bottom:0;background:var(--panel);border-top:1px solid var(--line);padding:12px 18px 14px;display:flex;flex-direction:column;gap:8px}
+.pie small{font-size:12.5px;color:var(--ink3);text-align:center}
+.pie small b{color:var(--ink)}
+.campo{display:flex;flex-direction:column;gap:5px;font-size:12.5px;font-weight:600;color:var(--ink2)}
+.campo input{font:inherit;font-weight:400;font-size:15px;min-height:46px;border:1px solid var(--line);border-radius:10px;padding:0 12px;background:var(--panel);color:var(--ink);width:100%}
+.acepto{display:flex;gap:10px;align-items:flex-start;font-size:12.5px;color:var(--ink2)}
+.acepto input{width:20px;height:20px;margin:1px 0 0;flex:none;accent-color:var(--brand)}
+.codigo{display:grid;grid-template-columns:repeat(6,1fr);gap:7px}
+.codigo span{height:52px;border:1px solid var(--line);border-radius:10px;background:var(--panel);display:grid;place-items:center;font-size:22px;font-weight:700;color:var(--ink)}
+.exito{display:flex;flex-direction:column;align-items:center;text-align:center;gap:10px;padding-top:8px}
+.exito i{width:60px;height:60px;border-radius:50%;background:var(--ok-bg);border:1px solid var(--ok-brd);color:var(--ok-tx);display:grid;place-items:center;font-size:28px;font-style:normal;font-weight:700}
+.aviso{font-size:12.5px;border-radius:10px;padding:10px 12px;border:1px solid var(--brand-brd);background:var(--brand-bg);color:var(--ink2)}
+.aviso--ok{border-color:var(--ok-brd);background:var(--ok-bg);color:var(--ok-tx);font-weight:600}
+.aviso--warn{border-color:var(--warn-brd);background:var(--warn-bg);color:var(--warn)}
+.fecha-g{font-size:26px;font-weight:800;color:var(--ink);line-height:1.15;letter-spacing:-.01em}
+.fecha-g small{display:block;font-size:14px;font-weight:600;color:var(--brand);letter-spacing:0}
+
+/* ── correos ── */
+.correos{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:18px}
+.correo{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden;display:flex;flex-direction:column;min-width:0}
+.correo__meta{padding:10px 14px;border-bottom:1px solid var(--line2);font-size:12px;color:var(--ink3)}
+.correo__meta b{display:block;color:var(--ink);font-size:13.5px}
+.correo__cab{background:var(--navy);color:#fff;padding:14px 16px}
+.correo__c{padding:16px;display:flex;flex-direction:column;gap:12px;font-size:14px}
+.correo__c h4{margin:0;font-size:17px;color:var(--ink);font-weight:700}
+.otp{font-size:30px;font-weight:800;letter-spacing:.22em;color:var(--ink);background:var(--sunken);border:1px solid var(--line);border-radius:12px;text-align:center;padding:12px 0}
+.correo__pie{font-size:11.5px;color:var(--ink3);border-top:1px solid var(--line2);padding:10px 16px}
+.fila2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+
+/* ── configuración (escritorio) ── */
+.scroll{overflow-x:auto;border-radius:14px}
+.esc{min-width:860px;background:var(--panel);border:1px solid var(--line);border-radius:14px;display:grid;grid-template-columns:210px 1fr}
+.esc__nav{border-right:1px solid var(--line2);padding:16px 12px;display:flex;flex-direction:column;gap:2px}
+.esc__nav b{font-size:15px;color:var(--ink);padding:2px 10px 10px}
+.esc__nav a{display:flex;justify-content:space-between;gap:8px;padding:8px 10px;border-radius:8px;font-size:13.5px;font-weight:500;color:var(--ink2);text-decoration:none}
+.esc__nav a[aria-current]{background:var(--brand-bg);color:var(--brand);font-weight:600}
+.esc__nav a small{font-size:11px;font-weight:700;color:var(--warn)}
+.esc__m{padding:20px 22px;display:flex;flex-direction:column;gap:18px;min-width:0}
+.tarj{border:1px solid var(--line);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:12px}
+.tarj__t{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.tarj__t p{font-size:13px;color:var(--ink3)}
+.guia{background:var(--brand-bg);border-color:var(--brand-brd)}
+.barra{height:6px;border-radius:99px;background:var(--panel);overflow:hidden}.barra i{display:block;height:100%;width:66%;background:var(--brand)}
+.pasoc{display:grid;grid-template-columns:24px 1fr auto;gap:10px;align-items:center;font-size:14px}
+.pasoc i{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-style:normal;font-size:12px;font-weight:700;border:2px solid var(--brand-brd);color:var(--ink3);background:var(--panel)}
+.pasoc[data-ok] i{background:var(--ok);border-color:var(--ok);color:#fff}
+.pasoc b{color:var(--ink);font-weight:600}.pasoc span{display:block;font-size:12.5px;color:var(--ink3)}
+.mini{border:0;border-radius:8px;min-height:34px;padding:0 12px;font-size:13px;font-weight:600;background:var(--brand);color:var(--on-brand)}
+.mini--sec{background:transparent;border:1px solid var(--line);color:var(--ink)}
+.lista{display:flex;flex-direction:column}
+.fila{display:grid;grid-template-columns:1fr auto auto;gap:14px;align-items:center;padding:10px 0;border-top:1px solid var(--line2);font-size:14px}
+.fila:first-child{border-top:0;padding-top:0}
+.fila b{color:var(--ink);font-weight:600}.fila span{display:block;font-size:12.5px;color:var(--ink3)}
+.pill{font-size:11px;font-weight:700;letter-spacing:.03em;padding:3px 9px;border-radius:99px;border:1px solid;white-space:nowrap}
+.pill--ok{color:var(--ok-tx);background:var(--ok-bg);border-color:var(--ok-brd)}
+.pill--warn{color:var(--warn);background:var(--warn-bg);border-color:var(--warn-brd)}
+.ajustes{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.aj{border:1px solid var(--line2);border-radius:10px;padding:12px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+.aj b{display:block;color:var(--ink);font-size:13.5px;font-weight:600}.aj span{font-size:12px;color:var(--ink3)}
+.paso-n{display:flex;align-items:center;border:1px solid var(--line);border-radius:9px;overflow:hidden;flex:none}
+.paso-n button{width:32px;height:34px;border:0;background:var(--sunken);font-weight:700}
+.paso-n output{min-width:74px;text-align:center;font-weight:700;color:var(--ink);font-size:13.5px}
+.dsem{display:flex;gap:4px}.dsem i{font-style:normal;width:26px;height:26px;border-radius:7px;display:grid;place-items:center;font-size:11px;font-weight:700;background:var(--brand-bg);color:var(--brand)}
+.dsem i[data-off]{background:var(--muted);color:var(--ink3)}
+/* ── burbuja y tarjeta de la cita ── */
+.piezas{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:22px;align-items:start}
+.pieza{display:flex;flex-direction:column;gap:10px;min-width:0}
+.capa{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px;display:flex;flex-direction:column;gap:14px;
+  box-shadow:0 10px 30px rgba(20,52,92,.14);max-width:360px;width:100%}
+.capa__cab{display:flex;align-items:center;gap:10px}
+.capa__cab h3{margin:0;font-size:17px;font-weight:700;color:var(--ink);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cerrar{width:32px;height:32px;border-radius:8px;border:0;background:transparent;color:var(--ink3);font-size:18px;flex:none}
+.estado{font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:3px 9px;border-radius:99px;border:1px solid var(--warn-brd);background:var(--warn-bg);color:var(--warn);white-space:nowrap}
+.cuando{font-size:16px;font-weight:700;color:var(--ink);line-height:1.3}
+.cuando small{display:block;font-size:12.5px;font-weight:500;color:var(--ink3)}
+.datos{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:13.5px;margin:0}
+.datos dt{color:var(--ink3)}.datos dd{margin:0;color:var(--ink);font-weight:600}
+.acc{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}
+.acc .ancho{grid-column:1/-1}
+.bt{display:flex;align-items:center;justify-content:center;gap:7px;min-height:42px;border-radius:10px;border:1px solid var(--line);background:var(--panel);
+  color:var(--ink);font-weight:600;font-size:13px;padding:0 8px;white-space:nowrap}
+.acc .bt:not(.bt--pri){min-height:50px}
+.dosl{text-align:left;line-height:1.2;white-space:normal}
+.bt--pri{background:var(--brand);border-color:var(--brand);color:var(--on-brand);min-height:46px;font-size:14.5px;font-weight:700}
+.bt svg{flex:none}
+.sep{height:1px;background:var(--line2);margin:0}
+.peligro{background:none;border:0;color:var(--bad);font-weight:600;font-size:13.5px;min-height:36px;align-self:center;padding:0 10px}
+.seg{display:grid;grid-template-columns:1fr 1fr;background:var(--muted);border-radius:10px;padding:4px;gap:4px}
+.seg span{text-align:center;font-size:13.5px;font-weight:600;color:var(--ink3);padding:8px 0;border-radius:7px}
+.seg span[data-on]{background:var(--panel);color:var(--ink);box-shadow:0 1px 2px rgba(20,52,92,.12)}
+.busca{border:1px solid var(--brand);border-radius:10px;background:var(--panel);overflow:hidden;box-shadow:0 0 0 4px var(--brand-bg)}
+.busca input{font:inherit;font-size:14.5px;border:0;outline:0;background:transparent;color:var(--ink);padding:11px 12px;width:100%}
+.res{display:flex;justify-content:space-between;gap:10px;padding:9px 12px;border-top:1px solid var(--line2);font-size:13.5px}
+.res b{color:var(--ink);font-weight:600}.res span{color:var(--ink3);font-size:12.5px}
+.res--nuevo{color:var(--brand);font-weight:600;background:var(--brand-bg)}
+.chips{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.chips span{text-align:center;font-size:13px;font-weight:600;padding:8px 0;border-radius:9px;border:1px solid var(--line);color:var(--ink)}
+.chips span[data-on]{background:var(--navy);border-color:var(--navy);color:#fff}
+.hecho{display:flex;align-items:center;gap:10px}
+.hecho i{width:34px;height:34px;border-radius:50%;background:var(--ok-bg);border:1px solid var(--ok-brd);color:var(--ok-tx);display:grid;place-items:center;font-style:normal;font-weight:700;flex:none}
+.enlace{background:none;border:0;color:var(--brand);font-weight:600;font-size:13px;align-self:center;min-height:32px}
+.rej{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;display:grid;grid-template-columns:1fr 1fr;gap:12px;max-width:360px;
+  background-image:repeating-linear-gradient(to bottom,transparent 0 47px,var(--line2) 47px 48px)}
+.cita{border:1px solid var(--warn-brd);border-left:3px solid #d97706;background:var(--warn-bg);border-radius:6px;padding:6px 9px;min-height:62px;cursor:pointer}
+.cita time{display:block;font-size:11.5px;font-weight:700;color:var(--warn)}
+.cita b{font-size:12.5px;color:var(--ink);font-weight:600}
+.cita--arriba,.cita:hover{transform:translateY(-3px);box-shadow:0 8px 18px rgba(20,52,92,.18);border-color:#d97706}
+@media (prefers-reduced-motion:no-preference){.cita{transition:transform .12s cubic-bezier(0,0,.2,1),box-shadow .12s cubic-bezier(0,0,.2,1),border-color .12s}}
+.pieza p{font-size:13px;color:var(--ink3)}
+.nota-pie{font-size:13px;color:var(--ink3);border-top:1px solid var(--line);padding-top:14px}
+@media (prefers-reduced-motion:no-preference){.op,.dia,.hora,.nav button{transition:background-color .12s,border-color .12s,color .12s}}
+</style>
+
+<div class="wrap">
+  <div style="display:flex;flex-direction:column;gap:8px">
+    <span class="tag">Agenda Spinus · propuesta de diseño para aprobar</span>
+    <h1>Las páginas nuevas, con la identidad de Spinus</h1>
+    <p>Cinco pantallas rediseñadas. La reserva y la confirmación se pueden recorrer tocando; las demás son estáticas. Todos los datos son ficticios.</p>
+  </div>
+
+  <div class="nav" role="tablist" aria-label="Pantallas">
+    <button role="tab" data-v="reserva" aria-selected="true">Reserva por enlace</button>
+    <button role="tab" data-v="confirmar" aria-selected="false">Confirmar asistencia</button>
+    <button role="tab" data-v="correos" aria-selected="false">Correos</button>
+    <button role="tab" data-v="configuracion" aria-selected="false">Configuración</button>
+    <button role="tab" data-v="tarjetas" aria-selected="false">Burbuja y tarjeta</button>
+  </div>
+
+  <!-- ═════════ RESERVA ═════════ -->
+  <section class="vista" id="v-reserva">
+    <div class="tel"><div class="tel__pant">
+      <div class="cab">
+        <div class="marca"><i>S</i>Spinus</div>
+        <div class="medico"><div class="avatar">AS</div><div><b>Dr. Admin Semilla Uno</b><span>Ortopedia y Traumatología</span></div></div>
+      </div>
+      <div class="pasos" id="r-pasos">
+        <div class="paso">Qué y dónde</div><div class="paso">Día y hora</div><div class="paso">Tus datos</div><div class="paso">Listo</div>
+      </div>
+      <div class="cuerpo" id="r-cuerpo"></div>
+      <div class="pie" id="r-pie"></div>
+    </div></div>
+    <div class="notas">
+      <h2>Qué cambia en la reserva</h2>
+      <ul>
+        <li>Cabecera con la marca y la tarjeta del médico: el paciente sabe con quién y dónde reserva.</li>
+        <li>Cuatro pasos visibles en lugar de una sola página larga.</li>
+        <li>El día se elige en una tira de fechas; los días sin horario salen atenuados.</li>
+        <li>Solo se ven los horarios del día elegido, agrupados en mañana y tarde, en rejilla pareja.</li>
+        <li>El consultorio y el tipo de cita son tarjetas con dirección y duración completas, no desplegables que se cortan.</li>
+        <li>Un resumen de lo elegido acompaña hasta el final.</li>
+        <li>Botones de 44 px o más: está pensada primero para teléfono.</li>
+      </ul>
+      <p class="antes">Hoy: fondo plano sin marca, otra tipografía, todos los días y horarios en una lista hacia abajo, y «13 De Noviembre» con la preposición en mayúscula.</p>
+    </div>
+  </section>
+
+  <!-- ═════════ CONFIRMAR ═════════ -->
+  <section class="vista" id="v-confirmar" hidden>
+    <div class="tel"><div class="tel__pant">
+      <div class="cab">
+        <div class="marca"><i>S</i>Spinus</div>
+        <div class="medico"><div class="avatar">AS</div><div><b>Dr. Admin Semilla Uno</b><span>Ortopedia y Traumatología</span></div></div>
+      </div>
+      <div class="cuerpo" id="c-cuerpo"></div>
+    </div></div>
+    <div class="notas">
+      <h2>Qué cambia al confirmar</h2>
+      <ul>
+        <li>La fecha y la hora son lo más grande de la pantalla.</li>
+        <li>Dos botones claros: confirmar es el principal; «no podré asistir» pide un segundo paso antes de cancelar.</li>
+        <li>Al cancelar se ofrece elegir otro horario, sin salir de la página.</li>
+        <li>Cada resultado tiene su propio estado, con color y texto, no solo un mensaje.</li>
+        <li>Solo muestra fecha, hora, médico y consultorio. Nada clínico.</li>
+      </ul>
+      <p class="antes">Abrir el enlace no cambia nada; el estado solo cambia al pulsar un botón. Eso ya funciona así y no se toca.</p>
+    </div>
+  </section>
+
+  <!-- ═════════ CORREOS ═════════ -->
+  <section class="vista vista--ancha" id="v-correos" hidden>
+    <div class="correos">
+      <article class="correo">
+        <div class="correo__meta"><b>Tu código para reservar</b>Spinus · ahora</div>
+        <div class="correo__cab"><div class="marca"><i>S</i>Spinus</div></div>
+        <div class="correo__c">
+          <h4>Tu código de verificación</h4>
+          <p>Escríbelo en la página de reserva del Dr. Admin Semilla Uno.</p>
+          <div class="otp">482 913</div>
+          <p style="font-size:13px;color:var(--ink3)">Vence en 10 minutos. Si no lo pediste, ignora este correo.</p>
+        </div>
+        <div class="correo__pie">Consultorio Centro · 999 000 0001</div>
+      </article>
+      <article class="correo">
+        <div class="correo__meta"><b>Tu cita quedó agendada</b>Spinus · ahora</div>
+        <div class="correo__cab"><div class="marca"><i>S</i>Spinus</div></div>
+        <div class="correo__c">
+          <h4>Cita agendada</h4>
+          <div class="fecha-g"><small>Viernes</small>13 de noviembre · 10:45</div>
+          <dl class="resumen"><dt>Médico</dt><dd>Dr. Admin Semilla Uno</dd><dt>Consultorio</dt><dd>Centro</dd><dt>Dirección</dt><dd>Calle Ficticia 1, Centro</dd><dt>Duración</dt><dd>30 min</dd></dl>
+          <button class="btn">Confirmar o cancelar mi cita</button>
+        </div>
+        <div class="correo__pie">Puedes cancelar hasta 1 hora antes de tu cita.</div>
+      </article>
+      <article class="correo">
+        <div class="correo__meta"><b>Recordatorio: tu cita es mañana</b>Spinus · 24 h antes</div>
+        <div class="correo__cab"><div class="marca"><i>S</i>Spinus</div></div>
+        <div class="correo__c">
+          <h4>Tu cita es mañana</h4>
+          <div class="fecha-g"><small>Viernes</small>13 de noviembre · 10:45</div>
+          <p>Con el Dr. Admin Semilla Uno, en Consultorio Centro.</p>
+          <div class="fila2"><button class="btn">Confirmo</button><button class="btn btn--sec">No podré asistir</button></div>
+        </div>
+        <div class="correo__pie">Calle Ficticia 1, Centro · 999 000 0001</div>
+      </article>
+    </div>
+    <div class="notas">
+      <h2>Qué cambia en los correos</h2>
+      <ul>
+        <li>Los tres comparten cabecera de marca y la misma jerarquía: qué pasó, cuándo, dónde, qué hacer.</li>
+        <li>El código va en grande, para leerlo de un vistazo y teclearlo.</li>
+        <li>Botones anchos, pensados para el dedo en el correo del teléfono.</li>
+        <li>Se leen aunque el correo no cargue imágenes: la marca es texto y color, no una imagen.</li>
+        <li>Nunca llevan nada clínico: solo fecha, hora, médico y consultorio.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ═════════ CONFIGURACIÓN ═════════ -->
+  <section class="vista vista--ancha" id="v-configuracion" hidden>
+    <div class="scroll"><div class="esc">
+      <nav class="esc__nav" aria-label="Secciones de la configuración">
+        <b>Configuración</b>
+        <a href="#configuracion" aria-current="page">Primeros pasos <small>1 pendiente</small></a>
+        <a href="#configuracion">Horario y disponibilidad</a>
+        <a href="#configuracion">Tipos de cita</a>
+        <a href="#configuracion">Enlaces de reserva</a>
+        <a href="#configuracion">Reserva y recordatorios</a>
+        <a href="#configuracion">Contactos bloqueados</a>
+      </nav>
+      <div class="esc__m">
+        <div class="tarj guia">
+          <div class="tarj__t"><h2>Primeros pasos</h2><p>2 de 3 listos</p></div>
+          <div class="barra"><i></i></div>
+          <div class="pasoc" data-ok><i>✓</i><div><b>Horario y disponibilidad</b><span>Centro y Hosp Norte, lunes a sábado</span></div><button class="mini mini--sec">Revisar</button></div>
+          <div class="pasoc" data-ok><i>✓</i><div><b>Tipos de cita</b><span>Consulta · 30 min, Primera vez · 45 min</span></div><button class="mini mini--sec">Revisar</button></div>
+          <div class="pasoc"><i>3</i><div><b>Enlace de reserva</b><span>Para que tus pacientes agenden por su cuenta</span></div><button class="mini">Crear enlace</button></div>
+        </div>
+
+        <div class="tarj">
+          <div class="tarj__t"><h2>Disponibilidad por consultorio</h2><p>Si un consultorio no tiene horario propio, usa el de la clínica.</p></div>
+          <div class="lista">
+            <div class="fila"><div><b>Consultorio Centro</b><span>08:00 – 18:00 · sábado 08:00 – 13:00</span></div>
+              <div class="dsem"><i>L</i><i>M</i><i>X</i><i>J</i><i>V</i><i>S</i><i data-off>D</i></div><button class="mini mini--sec">Editar</button></div>
+            <div class="fila"><div><b>Hosp Norte</b><span>Usa el horario de la clínica</span></div>
+              <div class="dsem"><i>L</i><i>M</i><i>X</i><i>J</i><i>V</i><i data-off>S</i><i data-off>D</i></div><button class="mini mini--sec">Editar</button></div>
+          </div>
+        </div>
+
+        <div class="tarj">
+          <div class="tarj__t"><h2>Enlaces de reserva</h2><button class="mini">Nuevo enlace</button></div>
+          <div class="lista">
+            <div class="fila"><div><b>Dr. Admin Semilla Uno · enlace fijo</b><span>spinus.com.mx/reservar/k3P9…xQ</span></div><span class="pill pill--ok">Activo</span><button class="mini mini--sec">Copiar</button></div>
+            <div class="fila"><div><b>Dra. Invitada Semilla Dos · enlace fijo</b><span>No abrirá: falta un tipo de cita para esta médica</span></div><span class="pill pill--warn">Incompleto</span><button class="mini">Completar</button></div>
+            <div class="fila"><div><b>Un solo uso · para Hugo I.</b><span>Vence en 6 días</span></div><span class="pill pill--ok">Sin usar</span><button class="mini mini--sec">Copiar</button></div>
+          </div>
+        </div>
+
+        <div class="tarj">
+          <div class="tarj__t"><h2>Reserva y recordatorios</h2><p>Valen para toda la clínica.</p></div>
+          <div class="ajustes">
+            <div class="aj"><div><b>Recordatorio por correo</b><span>Antes de la cita</span></div><div class="paso-n"><button aria-label="Menos">−</button><output>24 horas</output><button aria-label="Más">+</button></div></div>
+            <div class="aj"><div><b>Anticipación mínima</b><span>Para reservar por enlace</span></div><div class="paso-n"><button aria-label="Menos">−</button><output>2 horas</output><button aria-label="Más">+</button></div></div>
+            <div class="aj"><div><b>Reservar hasta</b><span>Días hacia adelante</span></div><div class="paso-n"><button aria-label="Menos">−</button><output>60 días</output><button aria-label="Más">+</button></div></div>
+            <div class="aj"><div><b>Enlace de un solo uso</b><span>Vigencia</span></div><div class="paso-n"><button aria-label="Menos">−</button><output>7 días</output><button aria-label="Más">+</button></div></div>
+          </div>
+        </div>
+      </div>
+    </div></div>
+    <div class="notas">
+      <h2>Qué cambia en la configuración</h2>
+      <ul>
+        <li>«Primeros pasos» guía la primera vez y desaparece al completarse. No es un asistente de pantallas seguidas.</li>
+        <li>Un menú lateral ordena las secciones, en vez de una página larga de bloques iguales.</li>
+        <li>Cada enlace dice si funciona. Si no va a abrir, explica por qué y ofrece arreglarlo ahí mismo.</li>
+        <li>La relación entre el horario de la clínica y el del consultorio se dice en una línea.</li>
+        <li>Los cuatro ajustes se cambian con controles de más y menos, con su unidad a la vista.</li>
+      </ul>
+      <p class="antes">En teléfono este marco se desliza de lado porque es la versión de escritorio; la versión real apilaría el menú arriba.</p>
+    </div>
+  </section>
+
+  <!-- ═════════ BURBUJA Y TARJETA ═════════ -->
+  <section class="vista vista--ancha" id="v-tarjetas" hidden>
+    <div class="piezas">
+      <div class="pieza">
+        <span class="tag">1 · Alta rápida</span>
+        <div class="capa">
+          <div class="capa__cab"><h3>Nueva cita</h3><button class="cerrar" aria-label="Cerrar">×</button></div>
+          <div class="seg" aria-label="Qué vas a crear"><span data-on>Cita</span><span>Evento</span></div>
+          <div class="busca">
+            <input id="t-busca" value="maria nueva" aria-label="Buscar paciente">
+            <div class="res"><b>María Cetina Uc</b><span>999 000 0002</span></div>
+            <div class="res res--nuevo">+ Registrar «María Nueva»</div>
+          </div>
+          <div class="cuando">Lun 14 nov · 08:00 – 08:45<small>Dr. Admin Semilla Uno · Consultorio Centro</small></div>
+          <div class="chips" aria-label="Duración"><span>30 min</span><span data-on>45 min</span><span>1 hora</span><span>Otra</span></div>
+          <div class="acc"><button class="bt">Más opciones</button><button class="bt bt--pri" style="min-height:42px">Guardar</button></div>
+        </div>
+        <p>Encuentra por nombre y apellido en cualquier orden, y ofrece registrar al paciente si no existe.</p>
+      </div>
+
+      <div class="pieza">
+        <span class="tag">2 · Después de agendar</span>
+        <div class="capa">
+          <div class="hecho"><i>✓</i><div class="cuando" style="font-size:15.5px">Cita agendada<small>María Cetina Uc · Lun 14 nov · 08:00</small></div></div>
+          <div class="acc">
+            <button class="bt bt--pri ancho">Listo</button>
+            <button class="bt"><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path fill="#25D366" d="M12 2.2a9.8 9.8 0 0 0-8.5 14.7L2.2 21.8l5-1.3A9.8 9.8 0 1 0 12 2.2z"/><path fill="#fff" d="M9.1 6.9c-.3-.6-.5-.6-.8-.6h-.6c-.2 0-.6.1-.9.4-.3.3-1.1 1.1-1.1 2.7s1.2 3.1 1.3 3.3c.2.2 2.3 3.6 5.6 4.9 2.8 1.1 3.3.9 3.9.8.6-.1 1.9-.8 2.2-1.5.3-.8.3-1.4.2-1.5-.1-.1-.3-.2-.6-.4l-2.1-1c-.3-.1-.5-.2-.7.1-.2.3-.8 1-1 1.2-.2.2-.4.2-.6.1-.3-.1-1.3-.5-2.5-1.5-.9-.8-1.5-1.8-1.7-2.1-.2-.3 0-.5.1-.6l.5-.5c.1-.2.2-.3.3-.5.1-.2 0-.4 0-.5l-1-2.3z"/></svg><span class="dosl">Enviar<br>confirmación</span></button>
+            <button class="bt"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="m4 7 8 6 8-6"/></svg>Por correo</button>
+          </div>
+          <button class="enlace">Más opciones</button>
+        </div>
+        <p>Avisar al paciente queda a un clic, sin reabrir la cita. El correo sale con o sin Google conectado.</p>
+      </div>
+
+      <div class="pieza">
+        <span class="tag">3 · Tarjeta de la cita</span>
+        <div class="capa">
+          <div class="capa__cab"><h3>María Cetina Uc</h3><span class="estado">Agendada</span><button class="cerrar" aria-label="Cerrar">×</button></div>
+          <div class="cuando">Lun 14 nov · 08:00 – 09:00<small>60 min</small></div>
+          <dl class="datos"><dt>Médico</dt><dd>Dr. Admin Semilla Uno</dd><dt>Consultorio</dt><dd>Consultorio Centro</dd></dl>
+          <div class="acc">
+            <button class="bt bt--pri ancho">Iniciar consulta</button>
+            <button class="bt">Confirmar</button>
+            <button class="bt">Reagendar</button>
+            <button class="bt"><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path fill="#25D366" d="M12 2.2a9.8 9.8 0 0 0-8.5 14.7L2.2 21.8l5-1.3A9.8 9.8 0 1 0 12 2.2z"/><path fill="#fff" d="M9.1 6.9c-.3-.6-.5-.6-.8-.6h-.6c-.2 0-.6.1-.9.4-.3.3-1.1 1.1-1.1 2.7s1.2 3.1 1.3 3.3c.2.2 2.3 3.6 5.6 4.9 2.8 1.1 3.3.9 3.9.8.6-.1 1.9-.8 2.2-1.5.3-.8.3-1.4.2-1.5-.1-.1-.3-.2-.6-.4l-2.1-1c-.3-.1-.5-.2-.7.1-.2.3-.8 1-1 1.2-.2.2-.4.2-.6.1-.3-.1-1.3-.5-2.5-1.5-.9-.8-1.5-1.8-1.7-2.1-.2-.3 0-.5.1-.6l.5-.5c.1-.2.2-.3.3-.5.1-.2 0-.4 0-.5l-1-2.3z"/></svg><span class="dosl">Enviar<br>confirmación</span></button>
+            <button class="bt">Editar</button>
+          </div>
+          <div class="sep"></div>
+          <button class="peligro">Cancelar cita</button>
+        </div>
+        <p>Una acción principal, cuatro secundarias del mismo tamaño, y cancelar aparte para no pulsarlo por error.</p>
+      </div>
+
+      <div class="pieza">
+        <span class="tag">4 · Hover sobre una cita</span>
+        <div class="rej">
+          <div class="cita"><time>08:00 – 09:00</time><b>En reposo</b></div>
+          <div class="cita cita--arriba"><time>08:00 – 09:00</time><b>Con el ratón encima</b></div>
+        </div>
+        <p>Pasa el ratón sobre la primera para verlo en vivo. Sube 3 px, con sombra suave y el borde más marcado. A los 0,5 s se abre la tarjeta.</p>
+      </div>
+    </div>
+    <div class="notas">
+      <h2>Qué cambia</h2>
+      <ul>
+        <li>Desaparece el aviso negro del navegador al pasar el ratón; para eso está la tarjeta.</li>
+        <li>La tarjeta dice el día además de la hora, y el estado va junto al nombre.</li>
+        <li>Botones del mismo alto y en rejilla pareja: ninguno suelto ni de ancho distinto.</li>
+        <li>«Enviar confirmación» lleva el logo de WhatsApp; el de correo, un sobre.</li>
+        <li>Solo se muestran las acciones que aplican a esa cita.</li>
+      </ul>
+    </div>
+  </section>
+
+  <p class="nota-pie">Es una maqueta para decidir la dirección visual, no la app: no guarda nada y los botones de la configuración y de los correos no hacen nada. El cuadro con la «S» ocupa el lugar del logo real de Spinus.</p>
+</div>
+
+<script>
+(function(){
+  /* ── conmutador de pantallas, con el hash ── */
+  var tabs=[].slice.call(document.querySelectorAll('.nav button'));
+  function ver(v){
+    if(!document.getElementById('v-'+v)) v='reserva';
+    tabs.forEach(function(t){var on=t.dataset.v===v;t.setAttribute('aria-selected',on);document.getElementById('v-'+t.dataset.v).hidden=!on;});
+  }
+  tabs.forEach(function(t){t.addEventListener('click',function(){location.hash=t.dataset.v;ver(t.dataset.v);});});
+  window.addEventListener('hashchange',function(){ver(location.hash.slice(1));});
+  ver(location.hash.slice(1)||'reserva');
+
+  function el(tag,cls,txt){var x=document.createElement(tag);if(cls)x.className=cls;if(txt!=null)x.textContent=txt;return x;}
+  function boton(cls,txt,fn){var b=el('button',cls,txt);b.type='button';b.addEventListener('click',fn);return b;}
+
+  /* ── RESERVA ── */
+  var DIAS=[
+    {d:'Lun',n:9,libre:false},{d:'Mar',n:10,libre:false},{d:'Mié',n:11,libre:false},{d:'Jue',n:12,libre:false},
+    {d:'Vie',n:13,libre:true,nombre:'Viernes 13 de noviembre',m:['09:30','10:45'],t:['13:00','14:00','14:30','15:00','15:30','17:30']},
+    {d:'Sáb',n:14,libre:true,nombre:'Sábado 14 de noviembre',m:['08:00','08:30','09:30','10:00','10:30'],t:['12:00','12:30']},
+    {d:'Dom',n:15,libre:false}
+  ];
+  var CONS=[{id:'c',n:'Consultorio Centro',s:'Calle Ficticia 1, Centro, Mérida'},{id:'n',n:'Hosp Norte',s:'Av. Inventada 200, piso 3, Mérida'}];
+  var TIPOS=[{id:'a',n:'Consulta',dur:'30 min'},{id:'b',n:'Primera vez',dur:'45 min'}];
+  var e={paso:0,cons:'c',tipo:'a',dia:4,hora:null,codigo:false};
+  var cuerpo=document.getElementById('r-cuerpo'),pie=document.getElementById('r-pie'),pasos=document.getElementById('r-pasos').children;
+
+  function opcion(o,sel,alElegir,dur){
+    var b=el('button','op');b.type='button';b.setAttribute('role','radio');b.setAttribute('aria-checked',sel);
+    b.appendChild(el('span','rad'));var t=el('div');t.appendChild(el('b','',o.n));if(o.s)t.appendChild(el('span','',o.s));b.appendChild(t);
+    if(dur)b.appendChild(el('span','dur',dur));b.addEventListener('click',alElegir);return b;
+  }
+  function resumen(){
+    var d=DIAS[e.dia],dl=el('dl','resumen');
+    [['Cuándo',d.nombre+' · '+e.hora],['Consultorio',CONS.filter(function(c){return c.id===e.cons})[0].n],
+     ['Tipo',TIPOS.filter(function(t){return t.id===e.tipo})[0].n+' · '+TIPOS.filter(function(t){return t.id===e.tipo})[0].dur]]
+     .forEach(function(p){dl.appendChild(el('dt','',p[0]));dl.appendChild(el('dd','',p[1]));});
+    return dl;
+  }
+  function pintar(){
+    cuerpo.textContent='';pie.textContent='';
+    var idx=e.paso>=3?(e.paso===4?3:2):e.paso;
+    [].forEach.call(pasos,function(p,i){p.dataset.e=i<idx?'hecho':(i===idx?'actual':'');});
+    if(e.paso>0&&e.paso<4)cuerpo.appendChild(boton('atras','‹ Volver',function(){e.paso=e.paso===3?2:e.paso-1;e.codigo=false;pintar();}));
+
+    if(e.paso===0){
+      cuerpo.appendChild(el('h3','','¿Qué necesitas y dónde?'));
+      var g1=el('div','grupo');g1.setAttribute('role','radiogroup');g1.appendChild(el('span','tag','Consultorio'));
+      CONS.forEach(function(c){g1.appendChild(opcion(c,e.cons===c.id,function(){e.cons=c.id;pintar();}));});
+      var g2=el('div','grupo');g2.setAttribute('role','radiogroup');g2.appendChild(el('span','tag','Tipo de cita'));
+      TIPOS.forEach(function(t){g2.appendChild(opcion(t,e.tipo===t.id,function(){e.tipo=t.id;pintar();},t.dur));});
+      cuerpo.appendChild(g1);cuerpo.appendChild(g2);
+      pie.appendChild(boton('btn','Elegir día y hora',function(){e.paso=1;pintar();}));
+    }
+    if(e.paso===1){
+      cuerpo.appendChild(el('h3','','Elige día y hora'));
+      var s=el('div','semana');var a=el('button','', '‹');a.disabled=true;a.setAttribute('aria-label','Semana anterior');
+      var z=el('button','','›');z.setAttribute('aria-label','Semana siguiente');
+      s.appendChild(a);s.appendChild(el('span','','9 – 15 de noviembre'));s.appendChild(z);cuerpo.appendChild(s);
+      var tira=el('div','dias');
+      DIAS.forEach(function(d,i){var b=el('button','dia');b.type='button';b.disabled=!d.libre;b.setAttribute('aria-pressed',i===e.dia);
+        b.setAttribute('aria-label',d.d+' '+d.n+(d.libre?'':' , sin horarios'));
+        b.appendChild(el('small','',d.d));b.appendChild(el('b','',d.n));b.appendChild(el('em'));
+        b.addEventListener('click',function(){e.dia=i;e.hora=null;pintar();});tira.appendChild(b);});
+      cuerpo.appendChild(tira);
+      var d=DIAS[e.dia];
+      [['Mañana',d.m],['Tarde',d.t]].forEach(function(par){
+        var g=el('div','grupo');g.appendChild(el('span','tag',par[0]));
+        if(!par[1].length){g.appendChild(el('div','vacio','Sin horarios'));}
+        else{var r=el('div','horas');par[1].forEach(function(h){var b=el('button','hora',h);b.type='button';b.setAttribute('aria-pressed',e.hora===h);
+          b.addEventListener('click',function(){e.hora=h;pintar();});r.appendChild(b);});g.appendChild(r);}
+        cuerpo.appendChild(g);});
+      var sm=el('small');if(e.hora){sm.appendChild(el('b','',d.nombre+' · '+e.hora));}else sm.textContent='Elige un horario para continuar';
+      pie.appendChild(sm);var c=boton('btn','Continuar',function(){e.paso=2;pintar();});c.disabled=!e.hora;pie.appendChild(c);
+    }
+    if(e.paso===2||e.paso===3){
+      cuerpo.appendChild(el('h3','',e.paso===2?'Tus datos':'Revisa tu correo'));
+      cuerpo.appendChild(resumen());
+      if(e.paso===2){
+        [['Nombre completo','María Ejemplo Ficticia','text'],['Teléfono','999 000 1234','tel'],['Correo','maria@ejemplo.test','email']].forEach(function(c,i){
+          var l=el('label','campo',c[0]);var inp=el('input');inp.type=c[2];inp.value=c[1];inp.id='r-campo-'+i;l.appendChild(inp);cuerpo.appendChild(l);});
+        var ac=el('label','acepto');var ch=el('input');ch.type='checkbox';ch.checked=true;ch.id='r-aviso';ac.appendChild(ch);
+        ac.appendChild(el('span','','He leído y acepto el aviso de privacidad para agendar esta cita.'));cuerpo.appendChild(ac);
+        pie.appendChild(boton('btn','Enviar código a mi correo',function(){e.paso=3;pintar();}));
+      }else{
+        cuerpo.appendChild(el('p','sub','Te mandamos un código de 6 cifras a maria@ejemplo.test.'));
+        var cd=el('div','codigo');'482913'.split('').forEach(function(n){cd.appendChild(el('span','',n));});cuerpo.appendChild(cd);
+        cuerpo.appendChild(el('div','aviso','El código vence en 10 minutos. ¿No llegó? Podrás pedir otro en 60 segundos.'));
+        pie.appendChild(boton('btn','Confirmar mi cita',function(){e.paso=4;pintar();}));
+      }
+    }
+    if(e.paso===4){
+      var x=el('div','exito');x.appendChild(el('i','','✓'));x.appendChild(el('h3','','Tu cita quedó agendada'));
+      x.appendChild(el('p','','Te enviamos el comprobante a tu correo.'));cuerpo.appendChild(x);
+      cuerpo.appendChild(resumen());
+      cuerpo.appendChild(el('div','aviso','Un día antes te llegará un recordatorio para confirmar tu asistencia. Puedes cancelar hasta 1 hora antes.'));
+      pie.appendChild(boton('btn btn--sec','Ver la maqueta desde el inicio',function(){e={paso:0,cons:'c',tipo:'a',dia:4,hora:null,codigo:false};pintar();}));
+    }
+  }
+  pintar();
+
+  /* ── CONFIRMAR ── */
+  var cc=document.getElementById('c-cuerpo'),ce='pendiente';
+  function tarjetaCita(){
+    var f=el('div','fecha-g');f.appendChild(el('small','','Viernes'));f.appendChild(document.createTextNode('13 de noviembre · 10:45'));
+    var dl=el('dl','resumen');[['Consultorio','Centro'],['Dirección','Calle Ficticia 1, Centro'],['Duración','30 min']].forEach(function(p){dl.appendChild(el('dt','',p[0]));dl.appendChild(el('dd','',p[1]));});
+    var w=el('div','grupo');w.appendChild(el('span','tag','Tu cita'));w.appendChild(f);w.appendChild(dl);return w;
+  }
+  function pintarC(){
+    cc.textContent='';cc.appendChild(tarjetaCita());
+    if(ce==='pendiente'){
+      cc.appendChild(boton('btn','Confirmo mi asistencia',function(){ce='confirmada';pintarC();}));
+      cc.appendChild(boton('btn btn--sec','No podré asistir',function(){ce='duda';pintarC();}));
+      cc.appendChild(el('div','aviso','Puedes cancelar hasta 1 hora antes de tu cita.'));
+    }
+    if(ce==='confirmada'){
+      cc.appendChild(el('div','aviso aviso--ok','✓ Asistencia confirmada. Te esperamos.'));
+      cc.appendChild(boton('btn btn--sec','Cambié de opinión: no podré asistir',function(){ce='duda';pintarC();}));
+    }
+    if(ce==='duda'){
+      cc.appendChild(el('div','aviso aviso--warn','¿Seguro que no podrás asistir? Se cancelará tu cita y se liberará tu horario.'));
+      cc.appendChild(boton('btn btn--peligro','Sí, cancelar mi cita',function(){ce='cancelada';pintarC();}));
+      cc.appendChild(boton('btn btn--sec','Conservar mi cita',function(){ce='pendiente';pintarC();}));
+    }
+    if(ce==='cancelada'){
+      cc.appendChild(el('div','aviso','Tu cita quedó cancelada y avisamos al consultorio.'));
+      cc.appendChild(boton('btn','Elegir otro horario',function(){location.hash='reserva';ver('reserva');}));
+      cc.appendChild(boton('btn btn--sec','Ver la maqueta desde el inicio',function(){ce='pendiente';pintarC();}));
+    }
+  }
+  pintarC();
+})();
+</script>
