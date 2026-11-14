@@ -132,6 +132,8 @@ test('G2 · 7 y 8 · «Primeros pasos» en orden con su avance; «Crear enlace»
   await items.nth(2).getByRole('button', { name: 'Crear enlace' }).click()
   const falta = pasos(page).getByRole('note', { name: 'Falta para crear el enlace' })
   await expect(falta).toContainText('Para que tu enlace abra, falta:')
+  // Una sola pregunta en la tarjeta (la del paso 2 se esconde mientras tanto).
+  await expect(pasos(page).getByRole('group', { name: '¿Cuánto dura tu consulta?' })).toHaveCount(1)
   await falta.getByText('45 min', { exact: true }).click()
   await falta.getByRole('button', { name: 'Guardar y crear el enlace' }).click()
   await expect(toastConTexto(page, 'Enlace fijo creado')).toBeVisible()
