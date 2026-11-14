@@ -78,7 +78,7 @@ import {
   periodoDeLaVista, ANCHO_TABLETA,
 } from '@/lib/agenda/vistasAgenda'
 import { clasesDelEvento } from '@/lib/agenda/tarjetasAgenda'
-import { desplazarListaAHoy, diaLocalISO } from '@/lib/agenda/listaHoy'
+import { desplazarListaAHoyEstable, diaLocalISO } from '@/lib/agenda/listaHoy'
 import { podarMarcas } from '@/lib/agenda/marcasMovimiento'
 import { duracionMovimiento, esCambioDeFecha, fundirNavegacion, type MarcaDeVista } from '@/lib/agenda/movimientoAgenda'
 
@@ -304,11 +304,20 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
   const listaHoyVistaRef = useRef(false)
   const listaHoyPendienteRef = useRef(false)
   const irAHoyRef = useRef(false)
+  /* Una sola vuelta a la vez: `datesSet` y `eventsSet` pueden pedirla seguidas
+     y la repetición dura hasta 10 cuadros (`desplazarListaAHoyEstable`). */
+  const listaHoyEnVueloRef = useRef(false)
   const intentarListaHoy = (): void => {
-    if (!listaHoyPendienteRef.current) return
+    if (!listaHoyPendienteRef.current || listaHoyEnVueloRef.current) return
+    listaHoyEnVueloRef.current = true
     requestAnimationFrame(() => {
       const raiz = raizRef.current
-      if (raiz && desplazarListaAHoy(raiz, diaLocalISO(new Date()))) listaHoyPendienteRef.current = false
+      const terminar = (llego: boolean): void => {
+        listaHoyEnVueloRef.current = false
+        if (llego) listaHoyPendienteRef.current = false
+      }
+      if (raiz) desplazarListaAHoyEstable(raiz, diaLocalISO(new Date()), terminar)
+      else terminar(false)
     })
   }
   /* El periodo que nombra la banda de vacío —«esta semana», «en agosto»—, ya
