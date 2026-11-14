@@ -78,7 +78,7 @@ export const VIEWS = [
 export function BandaMovil(
   { conteo, vistaActual, onVista, titulo, onPrev, onNext, onHoy, hoyDeshabilitado, tableta = false, onMenu,
     medicos, filtroMedico, onFiltroMedico, onHorario, onCompactar, compactado,
-    mesSinTodos, selectorFecha, buscar, atajos = false }: {
+    mesSinTodos, selectorFecha, buscar, atajos = false, engraneConfiguracion = false }: {
     conteo: string; vistaActual: string; onVista: (tipo: string) => void
     titulo: string; onPrev: () => void; onNext: () => void
     /** F1.10 · «Hoy» del teléfono; deshabilitado (aria) si el rango ya lo contiene. */
@@ -90,6 +90,8 @@ export function BandaMovil(
     onFiltroMedico: (id: string) => void; onHorario: (() => void) | null
     onCompactar: (() => void) | null; compactado: boolean
     mesSinTodos: boolean
+    /** T3 · Con la v2, el engrane se nombra «Configuración de la agenda». */
+    engraneConfiguracion?: boolean
     /** F3 (contrato de interacciones): ranuras opcionales. El minicalendario no
         va en el teléfono (decisión 21); la ranura existe para que el contrato
         encaje. `atajos`: `aria-keyshortcuts` en ‹ › Hoy y en las vistas. */
@@ -131,7 +133,7 @@ export function BandaMovil(
           medicos={medicos} filtroMedico={filtroMedico}
           onFiltroMedico={onFiltroMedico} onHorario={onHorario}
           onCompactar={onCompactar} compactado={compactado}
-          mesSinTodos={mesSinTodos} vista={vistaActual}
+          mesSinTodos={mesSinTodos} vista={vistaActual} engraneConfiguracion={engraneConfiguracion}
         />
       </div>
     </header>

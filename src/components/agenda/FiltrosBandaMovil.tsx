@@ -34,9 +34,11 @@ export const OPCION_TODOS = (enElMes: boolean): string =>
    existe aunque no tenga hijos —clínica de un médico sin engrane— y entonces
    sólo ocupa el hueco sobrante de la fila. */
 export function FiltrosBandaMovil(
-  { medicos, filtroMedico, onFiltroMedico, onHorario, onCompactar, compactado, mesSinTodos, vista }: {
+  { medicos, filtroMedico, onFiltroMedico, onHorario, onCompactar, compactado, mesSinTodos, vista, engraneConfiguracion = false }: {
     medicos: readonly Medico[]; filtroMedico: string
     onFiltroMedico: (id: string) => void; onHorario: (() => void) | null
+    /** T3 · Con la v2 el engrane abre la configuración de la agenda y se nombra así. */
+    engraneConfiguracion?: boolean
     onCompactar: (() => void) | null; compactado: boolean
     /** En Mes, «Todos» se apaga. Ver `OPCION_TODOS` y la nota del desplegable
         de escritorio, que es el mismo control con otra caja. */
@@ -74,8 +76,10 @@ export function FiltrosBandaMovil(
       )}
       {onHorario && (
         <button type="button" className="ag-banda-movil-ctrl ag-banda-movil-ctrl--marco"
-          onClick={onHorario} aria-label="Configurar horario de consulta">
-          <Settings size={18} />
+          onClick={onHorario}
+          aria-label={engraneConfiguracion ? 'Configuración de la agenda' : 'Configurar horario de consulta'}
+          title={engraneConfiguracion ? 'Configuración de la agenda' : undefined}>
+          <Settings size={18} aria-hidden="true" />
         </button>
       )}
     </div>
