@@ -66,6 +66,11 @@ export type AuditAccion =
      `audit_log.accion` es `text` sin CHECK, así que esta línea no necesita
      migración. */
   | 'enviar_invitacion_cita'
+  /* G3 (agenda v2) · El correo de confirmación de Spinus que el personal manda
+     desde la agenda (`POST /api/agenda/correo`), con o sin Google. Sin
+     dirección de correo en la descripción (mismo criterio que la de arriba):
+     `registro_id` es la cita. `accion` es `text` sin CHECK: sin migración. */
+  | 'enviar_confirmacion_cita'
   // Autenticación
   | 'login_exitoso'
   | 'login_fallido'

@@ -98,3 +98,18 @@ export function correoRecordatorio(d: DatosRecordatorio): CorreoRecordatorio {
   ])
   return { asunto, texto, html }
 }
+
+/**
+ * G3 (punto 14) · El correo de CONFIRMACIÓN que manda el personal desde la
+ * agenda, con o sin Google. Es el MISMO cuerpo que el recordatorio (fecha,
+ * hora con su zona, médico, consultorio con su dirección y teléfono, y el
+ * enlace de confirmar o avisar que no asistirá; nada clínico) con su propio
+ * asunto: así hereda cualquier cambio de la plantilla de los correos de cita
+ * sin copiarla. Determinista, como el recordatorio (misma Idempotency-Key,
+ * mismo cuerpo). ⚠️ TEXTO PENDIENTE DE REVISIÓN, como el del recordatorio.
+ */
+export function correoConfirmacion(d: DatosRecordatorio): CorreoRecordatorio {
+  const correo = correoRecordatorio(d)
+  const { fecha } = fechaYHora(d.inicio, zonaValida(d.zona))
+  return { ...correo, asunto: d.confirmada ? `Tu cita del ${fecha}` : `Confirma tu cita del ${fecha}` }
+}

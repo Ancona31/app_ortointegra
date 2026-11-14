@@ -51,8 +51,11 @@ export interface CitaParaWhatsApp {
   start_time: string
 }
 
+/** G3 · Los motivos que salen de la CITA (no del teléfono ni del correo). */
+export type MotivoPorCita = Exclude<MotivoSinWhatsApp, 'sin_telefono' | 'telefono_invalido'>
+
 /** El motivo por la CITA (paciente, estado, todo el día, hora), sin mirar el teléfono. `ahora` en ms. */
-export function motivoCitaSinWhatsApp(c: CitaParaWhatsApp, ahora: number): MotivoSinWhatsApp | null {
+export function motivoCitaSinWhatsApp(c: CitaParaWhatsApp, ahora: number): MotivoPorCita | null {
   if (c.paciente_id === null && !c.reserva_canal) return 'sin_paciente'
   if (c.status === 'cancelled') return 'cancelada'
   if (c.status === 'attended') return 'atendida'
@@ -87,6 +90,40 @@ export const TEXTO_SIN_WHATSAPP: Readonly<Record<MotivoSinWhatsApp, string>> = {
   pasada: 'La cita ya pasó.',
   sin_telefono: 'La cita no tiene teléfono.',
   telefono_invalido: 'El teléfono no es un número de México de 10 dígitos.',
+}
+
+/* ── G3 · ¿Se le puede mandar el CORREO de confirmación de Spinus? ──────────
+   Punto 14 de la tanda de diseño: el correo propio de Spinus, con o sin
+   Google. LA MISMA REGLA en el servidor (`POST /api/agenda/correo`) y en el
+   cliente, que con ella decide si PINTA el botón (formulario y burbuja tras
+   agendar). La parte de la cita es la del WhatsApp (con paciente o por
+   ligar, agendada o confirmada, con hora y futura); en vez del teléfono, el
+   correo: el del paciente y, si no tiene, el de la reserva — la MISMA
+   expresión que el destinatario de `cita_correo_tomar` en la base. */
+
+/** Por qué no, en una palabra (también viaja en el 409 de la ruta como `motivo`). */
+export type MotivoSinCorreo = MotivoPorCita | 'sin_correo'
+
+/** El correo al que va: el de la ficha y, si no, el de la reserva (vacío cuenta como ninguno). */
+export function correoParaConfirmacion(dePaciente: string | null | undefined, deReserva: string | null | undefined): string | null {
+  return dePaciente?.trim() || deReserva?.trim() || null
+}
+
+/** El motivo completo: el de la cita y, si la cita vale, el del correo. `null` = se puede. */
+export function motivoSinCorreo(c: CitaParaWhatsApp, correo: string | null, ahora: number): MotivoSinCorreo | null {
+  return motivoCitaSinWhatsApp(c, ahora) ?? (correo ? null : 'sin_correo')
+}
+
+/** El motivo, dicho en llano para quien pulsó el botón. */
+export const TEXTO_SIN_CORREO: Readonly<Record<MotivoSinCorreo, string>> = {
+  sin_paciente: TEXTO_SIN_WHATSAPP.sin_paciente,
+  cancelada: TEXTO_SIN_WHATSAPP.cancelada,
+  atendida: TEXTO_SIN_WHATSAPP.atendida,
+  no_asistio: TEXTO_SIN_WHATSAPP.no_asistio,
+  otro_estado: TEXTO_SIN_WHATSAPP.otro_estado,
+  todo_el_dia: TEXTO_SIN_WHATSAPP.todo_el_dia,
+  pasada: TEXTO_SIN_WHATSAPP.pasada,
+  sin_correo: 'El paciente no tiene correo registrado.',
 }
 
 export interface DatosMensaje {
