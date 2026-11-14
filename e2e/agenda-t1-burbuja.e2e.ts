@@ -81,6 +81,18 @@ async function alta(page: Page, fecha: string, hora: string, apellidos: string):
   return id
 }
 
+/**
+ * Guardar en la burbuja. En la batería completa otras e2e dejan citas en esta
+ * semana: si sale el aviso de empalme (B7), se acepta (aquí no se prueba B7).
+ */
+async function guardarEnBurbuja(page: Page): Promise<void> {
+  await burbuja(page).getByRole('button', { name: 'Guardar', exact: true }).click()
+  const aviso = page.getByRole('dialog', { name: /Se empalma/ })
+  const hecho = burbuja(page).getByText('Cita agendada', { exact: true })
+  await expect(aviso.or(hecho).first()).toBeVisible()
+  if (await aviso.count()) await aviso.getByRole('button', { name: 'Aceptar' }).click()
+}
+
 test('punto 2: un paciente que no existe se registra desde la burbuja (con consentimiento) y queda elegido', async ({ page }) => {
   interruptorAgenda('A', true)
   await abrirAgendaV2(page)
@@ -111,7 +123,7 @@ test('puntos 13 y 14: tras Guardar, «Cita agendada» con «Listo» (foco) y Wha
   const b = burbuja(page)
   await elegirPaciente(b, 'Prueba 21')
   const post = page.waitForResponse(r => r.request().method() === 'POST' && r.url().endsWith('/api/appointments'))
-  await b.getByRole('button', { name: 'Guardar', exact: true }).click()
+  await guardarEnBurbuja(page)
   creadas.push(((await (await post).json()) as { appointment: { id: string } }).appointment.id)
   await expect(b.getByRole('status')).toHaveText(/^Cita agendada: /)
   await expect(b.getByText('Cita agendada', { exact: true })).toBeVisible()
@@ -146,7 +158,7 @@ test('punto 13: con el evento de Google en camino, «Invitar por correo» abre l
   await clicEnFranja(page, JUEVES, '14:30')
   const b = burbuja(page)
   await elegirPaciente(b, 'Prueba 22')
-  await b.getByRole('button', { name: 'Guardar', exact: true }).click()
+  await guardarEnBurbuja(page)
   await expect(b.getByText('Cita agendada', { exact: true })).toBeVisible()
   // Desde la burbuja la invitación NO se abre sola: es un botón.
   await expect(page.getByRole('dialog', { name: 'Invitar por correo' })).toHaveCount(0)
