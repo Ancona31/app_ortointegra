@@ -54,6 +54,8 @@ import { ESTADOS_SIN_EMPALME, mensajeEmpalme, type Empalme, type TramoCita } fro
 /* B6c: SÓLO EL TIPO. `tiposCita.ts` trae Zod en valor, y este modal se carga
    en diferido (A2.6): un import de valor de ahí lo metería en este chunk. */
 import type { TipoCita } from '@/lib/agenda/tiposCita'
+/* G2: la regla de qué tipos valen en un consultorio (módulo sin Zod). */
+import { tiposDelConsultorio } from '@/lib/agenda/tiposPorConsultorio'
 import { BotonWhatsAppCita } from '@/components/agenda/BotonWhatsAppCita'
 import { motivoSinWhatsApp, telefonoParaWhatsApp } from '@/lib/agenda/whatsappCita'
 
@@ -596,7 +598,10 @@ export default function AppointmentModal({
      tenía se conserva mientras el médico sea el mismo, aunque esté archivado:
      el servidor sólo exige `activo` a un tipo recién asignado. */
   const conTipos = agendaV2 && !esEvento
-  const tiposCita = useTiposCita(conTipos ? medicoId : '')
+  /* G2: los del CONSULTORIO elegido (una duración distinta en uno sustituye
+     allí a la general del médico), con la regla de la reserva. */
+  const tiposDelMedico = useTiposCita(conTipos ? medicoId : '')
+  const tiposCita = tiposDelMedico ? tiposDelConsultorio(tiposDelMedico, consultorioId || null) : null
   const tipoConservable = apt && medicoId === apt.medico_id ? (apt.tipo_cita_id ?? null) : null
   const tipoEfectivo: string | null = conTipos && (paciente || reserva) && tipoCitaId
     && (tipoCitaId === tipoConservable || tiposCita?.some(t => t.id === tipoCitaId)) ? tipoCitaId : null

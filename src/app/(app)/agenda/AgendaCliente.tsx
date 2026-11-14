@@ -70,6 +70,7 @@ import type { Appointment } from '@/lib/agenda/tiposAgenda'
 export type { Appointment }
 import { DIAS, horarioToBusinessHours } from '@/lib/agenda/horarioAgenda'
 import { horarioDeLaRejilla } from '@/lib/agenda/horarioRejilla'
+import { useAjusteTurno } from '@/app/(app)/agenda/useAjusteTurno'
 import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
 import { rangosDeLaVista, partirFechaHora } from '@/lib/agenda/fechasAgenda'
 import { frasearConteo, frasearConteoBreve } from '@/lib/agenda/conteoAgenda'
@@ -541,6 +542,11 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
     agendaV2, horarioClinica: horarioClinicaConfig, consultorios: consultoriosConfig ?? [],
     consultorioActivo, medicoMostrado,
   }), [agendaV2, horarioClinicaConfig, consultoriosConfig, consultorioActivo, medicoMostrado])
+  /* G2 (punto 9): clic, burbuja y arrastre caen en el turno más cercano de la
+     rejilla del médico en ese consultorio. Apagada la v2, no hace nada. */
+  const ajustarTurno = useAjusteTurno({
+    agendaV2, consultorios: consultoriosConfig, horarioClinica: horarioClinicaConfig, consultorioActivo, medicoMostrado,
+  })
 
   /* Iniciales del chip de médico. Se calculan AL PINTAR, no al traer las citas.
      Al montar, `medicos` viene vacío, así que `isSingleDoctor` vale true y el
@@ -843,13 +849,13 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
      `cambiarEstadoCita` cuando Movimiento lo añada (ver `contratosV2.ts`). */
   const guardado = crearGuardadoCitas({
     calendarRef, horario, profile, toast, setConfirm, setCitaCreada, setInvitacion, closeModal,
-    refetch, firmarEscritura, aplicarAppointmentAlEvento, agendaV2,
+    refetch, firmarEscritura, aplicarAppointmentAlEvento, agendaV2, ajustarTurno,
   })
   const { handleEventDrop, handleEventResize, handleSave, handleDelete, handleCancelar } = guardado
 
   const { handleDateClick, handleSelect, handleEventClick, abrirCita, abrirHueco } = crearAltaCitas({
     calendarRef, isMobile, setDiaSel, subState, openBloqueoModal, horario, setModal, setConfirm,
-    resumenDia, citasIncompletas, agendaV2, interacciones: interaccionesRef, seleccionDesdeHueco,
+    resumenDia, citasIncompletas, agendaV2, interacciones: interaccionesRef, seleccionDesdeHueco, ajustarTurno,
   })
 
   /* Header de día apilado para Semana/Día. Mes conserva su header por defecto
