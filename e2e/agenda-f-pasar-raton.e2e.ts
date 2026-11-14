@@ -88,7 +88,8 @@ test.describe('con el interruptor encendido', () => {
     await page.mouse.move(inicio.x, inicio.y + 30, { steps: 8 })
     await expect(page.locator('.fc-event-resizing')).not.toHaveCount(0)
     expect(await transformDe(page.locator('.fc-event-resizing .ag-tarjeta').first())).toBe('none')
-    expect(await transformDe(caja)).toBe('none')
+    // La original (escondida) termina de bajar de su hover previo y no vuelve a subir.
+    await expect.poll(() => transformDe(caja)).toBe('none')
     await page.mouse.move(inicio.x, inicio.y, { steps: 8 })
     await page.mouse.up()
   })
