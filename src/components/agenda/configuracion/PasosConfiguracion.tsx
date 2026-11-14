@@ -148,7 +148,8 @@ export default function PasosConfiguracion({ pasos, motivos, medicoId, resumen, 
       <ol className="flex flex-col gap-[var(--ag-4)]">
         {pasos.map((p, i) => (
           <FilaPaso key={p.clave} paso={p} n={i + 1} detalle={p.hecho ? resumen[p.clave] ?? 'Listo' : AYUDA[p.clave]} accion={accionDe(p)}>
-            {p.clave === 'duracion' && !p.hecho && (
+            {/* Con «Crear enlace» abierto la pregunta va ahí (una sola vez en la tarjeta). */}
+            {p.clave === 'duracion' && !p.hecho && !pidiendo && (
               <div className="ml-0 rounded-[var(--ag-r-btn)] border border-[var(--ag-border-card)] bg-[var(--ag-surface)] p-[var(--ag-3)] sm:ml-9">
                 <DuracionConsulta medicoId={medicoId} pregunta="¿Cuánto dura tu consulta?" onHecho={() => alDuracion(false)} />
               </div>

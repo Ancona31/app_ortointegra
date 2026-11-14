@@ -13,7 +13,7 @@
  * la policy (`tipos_cita_insert`: el administrador, o el médico para sí mismo).
  */
 import { useId, useState, type FormEvent } from 'react'
-import { BOTON_FILA, BOTON_PRIMARIO, CAMPO } from '@/components/agenda/configuracion/clasesConfig'
+import { BOTON_PRIMARIO, BOTON_SECUNDARIO, CAMPO } from '@/components/agenda/configuracion/clasesConfig'
 import { leerMotivoError } from '@/components/agenda/configuracion/leerMotivoError'
 import { CrearTipoCitaSchema, EditarTipoCitaSchema, LIMITES_TIPO_CITA } from '@/lib/agenda/tiposCita'
 
@@ -112,7 +112,7 @@ export default function DuracionConsulta(p: Props) {
         <button type="submit" className={BOTON_PRIMARIO} disabled={guardando || minutos === null}>
           {guardando ? 'Guardando…' : p.textoBoton ?? 'Guardar'}
         </button>
-        {p.onCancelar && <button type="button" className={`${BOTON_FILA} h-9`} onClick={p.onCancelar}>Cancelar</button>}
+        {p.onCancelar && <button type="button" className={BOTON_SECUNDARIO} onClick={p.onCancelar}>Cancelar</button>}
       </div>
       {error && <p role="alert" className="text-sm font-medium text-red-600">{error}</p>}
     </form>
