@@ -176,6 +176,10 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:3px solid var(-
 .capa__cab h3{margin:0;font-size:17px;font-weight:700;color:var(--ink);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cerrar{width:32px;height:32px;border-radius:8px;border:0;background:transparent;color:var(--ink3);font-size:18px;flex:none}
 .estado{font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:3px 9px;border-radius:99px;border:1px solid var(--warn-brd);background:var(--warn-bg);color:var(--warn);white-space:nowrap}
+.estado--co{border-color:var(--brand-brd);background:var(--brand-bg);color:var(--brand)}
+.estado--at{border-color:var(--ok-brd);background:var(--ok-bg);color:var(--ok-tx)}
+.estado--ca{border-color:var(--bad-brd);background:var(--bad-bg);color:var(--bad)}
+.cerrar{display:grid;place-items:center}
 .cuando{font-size:16px;font-weight:700;color:var(--ink);line-height:1.3}
 .cuando small{display:block;font-size:12.5px;font-weight:500;color:var(--ink3)}
 .datos{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:13.5px;margin:0}
@@ -429,26 +433,52 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:3px solid var(-
       </div>
 
       <div class="pieza">
-        <span class="tag">3 · Tarjeta de la cita</span>
+        <span class="tag">3 · Tarjeta · agendada</span>
         <div class="capa">
-          <div class="capa__cab"><h3>María Cetina Uc</h3><span class="estado">Agendada</span><button class="cerrar" aria-label="Cerrar">×</button></div>
+          <div class="capa__cab"><h3>María Cetina Uc</h3><span class="estado ">Agendada</span><button class="cerrar" aria-label="Configuración de la cita"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.800 2.800l-.1-.1a1.7 1.7 0 0 0-2.800 1.200V21a2 2 0 1 1-4 0v-.1A1.7 1.7 0 0 0 9 19.400a1.700 1.700 0 0 0-1.800.300l-.1.1a2 2 0 1 1-2.800-2.800l.1-.1A1.700 1.700 0 0 0 4.600 15 1.700 1.700 0 0 0 3 14H3a2 2 0 1 1 0-4h.1A1.700 1.700 0 0 0 4.600 9a1.700 1.700 0 0 0-.300-1.800l-.1-.1a2 2 0 1 1 2.800-2.800l.1.1A1.700 1.700 0 0 0 9 4.600 1.700 1.700 0 0 0 10 3V3a2 2 0 1 1 4 0v.1A1.700 1.700 0 0 0 15 4.600a1.700 1.700 0 0 0 1.800-.300l.1-.1a2 2 0 1 1 2.800 2.800l-.1.1A1.700 1.700 0 0 0 19.400 9c.200.600.800 1 1.500 1H21a2 2 0 1 1 0 4h-.1a1.700 1.700 0 0 0-1.500 1Z"/></svg></button><button class="cerrar" aria-label="Cerrar">×</button></div>
           <div class="cuando">Lun 14 nov · 08:00 – 09:00<small>60 min</small></div>
           <dl class="datos"><dt>Médico</dt><dd>Dr. Admin Semilla Uno</dd><dt>Consultorio</dt><dd>Consultorio Centro</dd></dl>
-          <div class="acc">
-            <button class="bt bt--pri ancho">Iniciar consulta</button>
-            <button class="bt">Confirmar</button>
-            <button class="bt">Reagendar</button>
-            <button class="bt"><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path fill="#25D366" d="M12 2.2a9.8 9.8 0 0 0-8.5 14.7L2.2 21.8l5-1.3A9.8 9.8 0 1 0 12 2.2z"/><path fill="#fff" d="M9.1 6.9c-.3-.6-.5-.6-.8-.6h-.6c-.2 0-.6.1-.9.4-.3.3-1.1 1.1-1.1 2.7s1.2 3.1 1.3 3.3c.2.2 2.3 3.6 5.6 4.9 2.8 1.1 3.3.9 3.9.8.6-.1 1.9-.8 2.2-1.5.3-.8.3-1.4.2-1.5-.1-.1-.3-.2-.6-.4l-2.1-1c-.3-.1-.5-.2-.7.1-.2.3-.8 1-1 1.2-.2.2-.4.2-.6.1-.3-.1-1.3-.5-2.5-1.5-.9-.8-1.5-1.8-1.7-2.1-.2-.3 0-.5.1-.6l.5-.5c.1-.2.2-.3.3-.5.1-.2 0-.4 0-.5l-1-2.3z"/></svg><span class="dosl">Enviar<br>confirmación</span></button>
-            <button class="bt">Editar</button>
-          </div>
+          <div class="acc"><button class="bt bt--pri ancho">Iniciar consulta</button><button class="bt">Confirmar</button><button class="bt">Reagendar</button><button class="bt ancho"><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path fill="#25D366" d="M12 2.2a9.8 9.8 0 0 0-8.5 14.7L2.2 21.8l5-1.3A9.8 9.8 0 1 0 12 2.2z"/><path fill="#fff" d="M9.1 6.9c-.3-.6-.5-.6-.8-.6h-.6c-.2 0-.6.1-.9.4-.3.3-1.1 1.1-1.1 2.7s1.2 3.1 1.3 3.3c.2.2 2.3 3.6 5.6 4.9 2.8 1.1 3.3.9 3.9.8.6-.1 1.9-.8 2.2-1.5.3-.8.3-1.4.2-1.5-.1-.1-.3-.2-.6-.4l-2.1-1c-.3-.1-.5-.2-.7.1-.2.3-.8 1-1 1.2-.2.2-.4.2-.6.1-.3-.1-1.3-.5-2.5-1.5-.9-.8-1.5-1.8-1.7-2.1-.2-.3 0-.5.1-.6l.5-.5c.1-.2.2-.3.3-.5.1-.2 0-.4 0-.5l-1-2.3z"/></svg>Enviar confirmación</button></div>
           <div class="sep"></div>
           <button class="peligro">Cancelar cita</button>
         </div>
-        <p>Una acción principal, cuatro secundarias del mismo tamaño, y cancelar aparte para no pulsarlo por error.</p>
+        <p>El engrane junto a la «×» abre el formulario completo; sustituye al botón «Editar».</p>
+      </div>
+      <div class="pieza">
+        <span class="tag">4 · Tarjeta · confirmada</span>
+        <div class="capa">
+          <div class="capa__cab"><h3>Luis Pech Canul</h3><span class="estado estado--co">Confirmada</span><button class="cerrar" aria-label="Configuración de la cita"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.800 2.800l-.1-.1a1.7 1.7 0 0 0-2.800 1.200V21a2 2 0 1 1-4 0v-.1A1.7 1.7 0 0 0 9 19.400a1.700 1.700 0 0 0-1.800.300l-.1.1a2 2 0 1 1-2.800-2.800l.1-.1A1.700 1.700 0 0 0 4.600 15 1.700 1.700 0 0 0 3 14H3a2 2 0 1 1 0-4h.1A1.700 1.700 0 0 0 4.600 9a1.700 1.700 0 0 0-.300-1.800l-.1-.1a2 2 0 1 1 2.800-2.800l.1.1A1.700 1.700 0 0 0 9 4.600 1.700 1.700 0 0 0 10 3V3a2 2 0 1 1 4 0v.1A1.700 1.700 0 0 0 15 4.600a1.700 1.700 0 0 0 1.800-.300l.1-.1a2 2 0 1 1 2.800 2.800l-.1.1A1.700 1.700 0 0 0 19.400 9c.200.600.800 1 1.500 1H21a2 2 0 1 1 0 4h-.1a1.700 1.700 0 0 0-1.500 1Z"/></svg></button><button class="cerrar" aria-label="Cerrar">×</button></div>
+          <div class="cuando">Lun 14 nov · 10:00 – 10:45<small>45 min</small></div>
+          <dl class="datos"><dt>Médico</dt><dd>Dr. Admin Semilla Uno</dd><dt>Consultorio</dt><dd>Consultorio Centro</dd></dl>
+          <div class="acc"><button class="bt bt--pri ancho">Iniciar consulta</button><button class="bt">Reagendar</button><button class="bt"><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path fill="#25D366" d="M12 2.2a9.8 9.8 0 0 0-8.5 14.7L2.2 21.8l5-1.3A9.8 9.8 0 1 0 12 2.2z"/><path fill="#fff" d="M9.1 6.9c-.3-.6-.5-.6-.8-.6h-.6c-.2 0-.6.1-.9.4-.3.3-1.1 1.1-1.1 2.7s1.2 3.1 1.3 3.3c.2.2 2.3 3.6 5.6 4.9 2.8 1.1 3.3.9 3.9.8.6-.1 1.9-.8 2.2-1.5.3-.8.3-1.4.2-1.5-.1-.1-.3-.2-.6-.4l-2.1-1c-.3-.1-.5-.2-.7.1-.2.3-.8 1-1 1.2-.2.2-.4.2-.6.1-.3-.1-1.3-.5-2.5-1.5-.9-.8-1.5-1.8-1.7-2.1-.2-.3 0-.5.1-.6l.5-.5c.1-.2.2-.3.3-.5.1-.2 0-.4 0-.5l-1-2.3z"/></svg><span class="dosl">Enviar<br>recordatorio</span></button></div>
+          <div class="sep"></div>
+          <button class="peligro">Cancelar cita</button>
+        </div>
+        <p>Ya no hay nada que confirmar: el aviso pasa a ser un recordatorio.</p>
+      </div>
+      <div class="pieza">
+        <span class="tag">5 · Tarjeta · atendida</span>
+        <div class="capa">
+          <div class="capa__cab"><h3>Hugo Interián Canché</h3><span class="estado estado--at">Atendida</span><button class="cerrar" aria-label="Configuración de la cita"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.800 2.800l-.1-.1a1.7 1.7 0 0 0-2.800 1.200V21a2 2 0 1 1-4 0v-.1A1.7 1.7 0 0 0 9 19.400a1.700 1.700 0 0 0-1.800.300l-.1.1a2 2 0 1 1-2.800-2.800l.1-.1A1.700 1.700 0 0 0 4.600 15 1.700 1.700 0 0 0 3 14H3a2 2 0 1 1 0-4h.1A1.700 1.700 0 0 0 4.600 9a1.700 1.700 0 0 0-.300-1.800l-.1-.1a2 2 0 1 1 2.800-2.800l.1.1A1.700 1.700 0 0 0 9 4.600 1.700 1.700 0 0 0 10 3V3a2 2 0 1 1 4 0v.1A1.700 1.700 0 0 0 15 4.600a1.700 1.700 0 0 0 1.800-.300l.1-.1a2 2 0 1 1 2.800 2.800l-.1.1A1.700 1.700 0 0 0 19.400 9c.200.600.800 1 1.500 1H21a2 2 0 1 1 0 4h-.1a1.700 1.700 0 0 0-1.500 1Z"/></svg></button><button class="cerrar" aria-label="Cerrar">×</button></div>
+          <div class="cuando">Vie 11 nov · 09:00 – 09:30<small>30 min</small></div>
+          <dl class="datos"><dt>Médico</dt><dd>Dr. Admin Semilla Uno</dd><dt>Consultorio</dt><dd>Consultorio Centro</dd></dl>
+          <div class="acc"><button class="bt bt--pri ancho">Ver expediente</button></div>
+        </div>
+        <p>La atención ya concluyó: solo queda ver el expediente.</p>
+      </div>
+      <div class="pieza">
+        <span class="tag">6 · Tarjeta · cancelada o no asistió</span>
+        <div class="capa">
+          <div class="capa__cab"><h3>Rosa Canul May</h3><span class="estado estado--ca">Cancelada</span><button class="cerrar" aria-label="Configuración de la cita"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.800 2.800l-.1-.1a1.7 1.7 0 0 0-2.800 1.200V21a2 2 0 1 1-4 0v-.1A1.7 1.7 0 0 0 9 19.400a1.700 1.700 0 0 0-1.800.300l-.1.1a2 2 0 1 1-2.800-2.800l.1-.1A1.700 1.700 0 0 0 4.600 15 1.700 1.700 0 0 0 3 14H3a2 2 0 1 1 0-4h.1A1.700 1.700 0 0 0 4.600 9a1.700 1.700 0 0 0-.300-1.800l-.1-.1a2 2 0 1 1 2.800-2.800l.1.1A1.700 1.700 0 0 0 9 4.600 1.700 1.700 0 0 0 10 3V3a2 2 0 1 1 4 0v.1A1.700 1.700 0 0 0 15 4.600a1.700 1.700 0 0 0 1.800-.300l.1-.1a2 2 0 1 1 2.800 2.800l-.1.1A1.700 1.700 0 0 0 19.400 9c.200.600.800 1 1.500 1H21a2 2 0 1 1 0 4h-.1a1.700 1.700 0 0 0-1.500 1Z"/></svg></button><button class="cerrar" aria-label="Cerrar">×</button></div>
+          <div class="cuando">Jue 10 nov · 16:00 – 16:30<small>30 min</small></div>
+          <dl class="datos"><dt>Médico</dt><dd>Dr. Admin Semilla Uno</dd><dt>Consultorio</dt><dd>Consultorio Centro</dd></dl>
+          <div class="acc"><button class="bt bt--pri ancho">Reagendar cita</button></div>
+        </div>
+        <p>Lo único útil es darle otra fecha.</p>
       </div>
 
       <div class="pieza">
-        <span class="tag">4 · Hover sobre una cita</span>
+        <span class="tag">7 · Hover sobre una cita</span>
         <div class="rej">
           <div class="cita"><time>08:00 – 09:00</time><b>En reposo</b></div>
           <div class="cita cita--arriba"><time>08:00 – 09:00</time><b>Con el ratón encima</b></div>
@@ -463,7 +493,8 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:3px solid var(-
         <li>La tarjeta dice el día además de la hora, y el estado va junto al nombre.</li>
         <li>Botones del mismo alto y en rejilla pareja: ninguno suelto ni de ancho distinto.</li>
         <li>«Enviar confirmación» lleva el logo de WhatsApp; el de correo, un sobre.</li>
-        <li>Solo se muestran las acciones que aplican a esa cita.</li>
+        <li>Las acciones cambian con el estado: atendida solo ofrece ver el expediente; cancelada o no asistió, reagendar.</li>
+        <li>«Editar» y «Reagendar» hacían lo mismo: queda «Reagendar», y el formulario completo se abre con el engrane.</li>
       </ul>
     </div>
   </section>
