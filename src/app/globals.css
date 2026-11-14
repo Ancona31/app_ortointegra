@@ -493,6 +493,15 @@
   --ag-success-bg: #e7f6ec;
   --ag-success-border: #bfe6cb;
 
+  /* AVISO — «esto no va a funcionar así» en la configuración de la agenda
+     (tanda T2: el enlace de reserva que no abrirá y lo que falta para que
+     abra). NO es un estado de cita: no lo cuelgues de --ag-status-scheduled-*
+     aunque hoy se parezca, por la misma razón que el éxito de arriba.
+     Texto #92400e sobre #fff7e8: 7.3:1. */
+  --ag-aviso-text: #92400e;
+  --ag-aviso-bg: #fff7e8;
+  --ag-aviso-border: #f2d9a6;
+
   /* EVENTO GENÉRICO SIN PACIENTE — la paleta DEFINITIVA del rediseño: seis
      colores, un token por color, y el fondo/borde se derivan con color-mix.
      Uno solo en vez de cuatro tokens por color para que ajustar un tono siga
@@ -6272,6 +6281,10 @@ html.dark {
   --ag-success-text: #7eecb4;
   --ag-success-bg: rgba(22, 163, 74, .18);
   --ag-success-border: rgba(52, 211, 153, .34);
+  /* Aviso de la configuración (ver la variante clara). */
+  --ag-aviso-text: #fcd38a;
+  --ag-aviso-bg: rgba(217, 119, 6, .16);
+  --ag-aviso-border: rgba(251, 191, 36, .34);
   /* Evento genérico en oscuro: los mismos seis, derivados con el criterio que
      ya usaban los pares claro→oscuro de esta hoja —mismo hue, luminosidad
      subida a L50-76, contraste sobre el fondo #0f1828 entre 5.9 y 12—.

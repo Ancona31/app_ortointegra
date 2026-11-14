@@ -6,10 +6,13 @@
  * secretaria, todos los de la clínica—, cada uno con el horario que manda para
  * ofrecer turnos. Cada médico edita sólo los suyos.
  *
- * ⚠️ LA AGENDA NO LEE ESTO (P6): la rejilla, «Compactar» y los avisos de fuera
- * de horario siguen con el horario de la clínica. Esto decide los turnos que
- * se ofrecen (reserva por enlace, bloque D).
+ * Decide los turnos que se ofrecen (reserva por enlace, bloque D) y, desde la
+ * tanda T2 (punto 10), también lo que pinta la agenda del consultorio activo
+ * cuando tiene horario propio (`horarioDeLaRejilla`).
  */
+import Link from 'next/link'
+import TarjetaSeccion from '@/components/agenda/configuracion/TarjetaSeccion'
+import { TEXTO_SUAVE } from '@/components/agenda/configuracion/clasesConfig'
 import FilaDisponibilidad from '@/components/agenda/configuracion/FilaDisponibilidad'
 import type { ActualizarConfig } from '@/components/agenda/configuracion/ConfiguracionCalendario'
 import { componerNombreMedicoCompleto } from '@/lib/nombreMedico'
@@ -24,33 +27,33 @@ interface Props {
   medicos: readonly MedicoConfig[]
   usuarioId: string
   actualizarConfig: ActualizarConfig
+  /** Tras guardar: «Para empezar» y los avisos de los enlaces se recalculan. */
+  alCambiar?: () => void
 }
 
-export default function SeccionDisponibilidad({ consultorios, fallo, horarioClinica, medicos, usuarioId, actualizarConfig }: Props) {
+export default function SeccionDisponibilidad({ consultorios, fallo, horarioClinica, medicos, usuarioId, actualizarConfig, alCambiar }: Props) {
   const nombreDe = (id: string) => {
     const m = medicos.find(x => x.id === id)
     return m ? componerNombreMedicoCompleto(m) : null
   }
   return (
-    <section aria-labelledby="config-disponibilidad" className="rounded-2xl border border-[var(--ag-border-card)] bg-[var(--ag-surface)] p-5 space-y-4">
-      <div>
-        <h2 id="config-disponibilidad" className="text-base font-semibold text-[var(--ag-text)]">Disponibilidad por consultorio</h2>
-        <p className="text-sm text-[var(--ag-muted)]">
-          Qué horario se ofrece en cada consultorio: el de la clínica o uno propio. Cada médico cambia el de sus consultorios. La agenda sigue pintando el horario de la clínica.
-        </p>
-      </div>
+    <TarjetaSeccion id="config-disponibilidad" titulo="Disponibilidad por consultorio"
+      ayuda="Qué días y horas atiende cada consultorio: los de la clínica o unos propios. Cada médico cambia los de sus consultorios.">
       {!consultorios ? (
-        <p className="text-sm text-[var(--ag-muted)]">{fallo ? 'No se pudieron cargar los consultorios. Recarga la página.' : 'Cargando los consultorios…'}</p>
+        <p className={TEXTO_SUAVE}>{fallo ? 'No se pudieron cargar los consultorios. Recarga la página.' : 'Cargando los consultorios…'}</p>
       ) : consultorios.length === 0 ? (
-        <p className="text-sm text-[var(--ag-muted)]">No hay consultorios activos.</p>
+        <p className={TEXTO_SUAVE}>
+          Aún no hay consultorios activos. Se dan de alta en{' '}
+          <Link href="/perfil" className="font-medium text-[var(--ag-text)] underline underline-offset-2">Mi perfil</Link>.
+        </p>
       ) : (
         <ul className="divide-y divide-[var(--ag-border-card)]">
           {consultorios.map(c => (
             <FilaDisponibilidad key={c.id} consultorio={c} horarioClinica={horarioClinica} esDueno={c.medico_id === usuarioId}
-              nombreMedico={nombreDe(c.medico_id)} actualizarConfig={actualizarConfig} />
+              nombreMedico={nombreDe(c.medico_id)} actualizarConfig={actualizarConfig} alCambiar={alCambiar} />
           ))}
         </ul>
       )}
-    </section>
+    </TarjetaSeccion>
   )
 }

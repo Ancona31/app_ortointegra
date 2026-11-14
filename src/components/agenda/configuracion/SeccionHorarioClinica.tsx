@@ -16,6 +16,8 @@ import ResumenHorario from '@/components/agenda/configuracion/ResumenHorario'
 import type { ActualizarConfig } from '@/components/agenda/configuracion/ConfiguracionCalendario'
 import { leerMotivoError } from '@/components/agenda/configuracion/leerMotivoError'
 import { HORARIO_DEFAULT } from '@/lib/agenda/horarioAgenda'
+import TarjetaSeccion from '@/components/agenda/configuracion/TarjetaSeccion'
+import { BOTON_SECUNDARIO, TEXTO_SUAVE } from '@/components/agenda/configuracion/clasesConfig'
 import { useToast } from '@/components/ui/Toast'
 import type { Horario } from '@/lib/configApp'
 
@@ -49,35 +51,25 @@ export default function SeccionHorarioClinica({ fuente, puedeEditar, actualizarC
     }
   }
 
+  const editar = puedeEditar && (
+    <button type="button" onClick={() => setAbierto(true)} disabled={fuente.estado !== 'listo'} className={BOTON_SECUNDARIO}>
+      Editar horario
+    </button>
+  )
   return (
-    <section aria-labelledby="config-horario" className="rounded-2xl border border-[var(--ag-border-card)] bg-[var(--ag-surface)] p-5 space-y-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h2 id="config-horario" className="text-base font-semibold text-[var(--ag-text)]">Horario de la clínica</h2>
-          <p className="text-sm text-[var(--ag-muted)]">Es el que pinta la agenda y el que usan los avisos de fuera de horario.</p>
-        </div>
-        {puedeEditar && (
-          <button
-            type="button"
-            onClick={() => setAbierto(true)}
-            disabled={fuente.estado !== 'listo'}
-            className="shrink-0 px-3 py-2 rounded-xl text-sm font-medium border border-[var(--ag-border-card)] text-[var(--ag-text)] hover:bg-[var(--ag-bg-app)] disabled:opacity-50"
-          >
-            Editar horario
-          </button>
-        )}
-      </div>
+    <TarjetaSeccion id="config-horario" titulo="Horario de la clínica" acciones={editar}
+      ayuda="La plantilla: la usan la agenda y los avisos de fuera de horario en todo consultorio sin horario propio.">
       {fuente.estado === 'listo' ? (
         <>
-          {!fuente.horario && <p className="text-sm text-[var(--ag-muted)]">La clínica aún no tiene horario; la agenda usa este.</p>}
+          {!fuente.horario && <p className={TEXTO_SUAVE}>La clínica aún no tiene horario; mientras tanto se usa este.</p>}
           <ResumenHorario horario={fuente.horario ?? HORARIO_DEFAULT} />
         </>
       ) : (
-        <p className="text-sm text-[var(--ag-muted)]">
+        <p className={TEXTO_SUAVE}>
           {fuente.estado === 'error' ? 'No se pudo cargar el horario. Recarga la página.' : 'Cargando el horario…'}
         </p>
       )}
       {abierto && <HorarioModal fuente={fuente} onClose={() => setAbierto(false)} onSave={guardar} />}
-    </section>
+    </TarjetaSeccion>
   )
 }
