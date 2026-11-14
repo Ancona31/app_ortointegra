@@ -5835,6 +5835,10 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
   animation: ag-capa-sale var(--ag-dur-micro) var(--ag-ease-in) forwards;
   pointer-events: none;
 }
+/* T3 · La tarjeta abierta al pasar el ratón que se FIJA con un clic se cambia
+   por la de siempre en el mismo sitio: ya estaba a la vista, así que no vuelve
+   a entrar. La salida sí (el `:not` deja ganar a la regla de arriba). */
+.ag-capa--sin-entrada:not([data-estado="saliendo"]) { animation: none; }
 /* La ayuda de atajos no tiene ancla: va centrada sobre su velo. */
 .ag-capa--centro {
   left: 50%;

@@ -32,7 +32,7 @@ import type { Appointment } from '@/lib/agenda/tiposAgenda'
    diferido (`InteraccionesV2.tsx`) que se llama por `interacciones`; con el
    interruptor apagado o el chunk sin llegar, la referencia está vacía y cada
    gesto abre el modal como siempre. Ver `contratosV2.ts`. */
-import type { ApiInteraccionesV2, SeleccionDesdeHueco } from '@/lib/agenda/contratosV2'
+import type { ApiInteraccionesV2, SeleccionDesdeHueco, SitioCita } from '@/lib/agenda/contratosV2'
 import type { Caja, Punto } from '@/lib/agenda/posicionCapa'
 
 type CalRef = RefObject<InstanceType<typeof FullCalendar> | null>
@@ -328,10 +328,13 @@ export function crearAltaCitas({
      vez del modal (§2); el modal sigue a un clic, en «Editar». Las dos puertas
      de hoy —el clic en la rejilla y el panel del Mes del teléfono— pasan por
      aquí, así que la tarjeta no puede faltar en una y estar en la otra. */
-  function abrirCita(evento: EventApi, sitio?: { ancla: Caja | null; punto?: Punto }) {
+  function abrirCita(evento: EventApi, sitio?: SitioCita) {
     if (evento.extendedProps.isGcalBlock) return
     const cita = evento.extendedProps as Appointment
     const capas = agendaV2 ? interacciones.current : null
+    /* T3 · Al pasar el ratón sólo hay tarjeta (no modal): nunca el modal, y sin
+       la v2 nada (el oyente ni siquiera existe sin ella). */
+    if (sitio?.alPasar) { capas?.abrirTarjeta(cita, sitio.ancla, sitio.punto, true); return }
     if (capas) { capas.abrirTarjeta(cita, sitio?.ancla ?? null, sitio?.punto); return }
     setModal({ mode: 'edit', appointment: cita })
   }

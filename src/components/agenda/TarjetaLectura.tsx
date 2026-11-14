@@ -22,8 +22,17 @@
  * (foco itinerante); Escape cierra y `useDialogoModal` devuelve el foco a la
  * cita (que es enfocable con `eventInteractive`).
  * El estado se nombra con palabra en la píldora, no sólo con color (spec §12).
+ *
+ * T3 · ABIERTA AL PASAR EL RATÓN (`alPasar`, punto 15 de la tanda tras las
+ * pruebas a mano de Angel) es OTRA tarjeta en lo que importa a la
+ * accesibilidad: NO es modal (sin `aria-modal`, sin trapo de foco), NO roba el
+ * foco (ni el del panel ni el `autoFocus` de la primera acción) y no lo
+ * devuelve al cerrar —eso lo hace `useDialogoModal`, y por eso esa variante no
+ * lo usa—. Escape la cierra desde cualquier sitio. Un clic dentro, fuera de un
+ * botón, la fija (`alFijar`: el llamador la cambia por la de siempre, en su
+ * sitio y sin volver a entrar, `sinEntrada`).
  */
-import { Fragment, useCallback, useEffect, useId, useRef, useState, type KeyboardEvent, type ReactElement, type ReactNode } from 'react'
+import { Fragment, useCallback, useEffect, useId, useRef, useState, type KeyboardEvent, type PointerEvent as EventoPuntero, type ReactElement, type ReactNode } from 'react'
 import { X } from 'lucide-react'
 import Portal from '@/components/ui/Portal'
 import { useDialogoModal } from '@/hooks/useDialogoModal'
@@ -53,6 +62,15 @@ interface Props {
   alAccion: (accion: AccionTarjeta) => void
   alCerrar: () => void
   extra?: ReactNode
+  /** T3 · Abierta al pasar el ratón: no modal, sin robar el foco. */
+  alPasar?: boolean
+  /** T3 · La de siempre que sustituye a una abierta al pasar: sin animación de entrada. */
+  sinEntrada?: boolean
+  /** T3 · Sólo con `alPasar`: el ratón entra o sale de la tarjeta (el vigía no la cierra mientras está dentro). */
+  alEntrarPuntero?: () => void
+  alSalirPuntero?: () => void
+  /** T3 · Sólo con `alPasar`: un clic dentro (fuera de un control) la fija. */
+  alFijar?: () => void
 }
 
 /* ⚠️ `colocar`, `useSalida` y `useCerrarAlTocarFuera` SON COPIA DELIBERADA de
@@ -93,16 +111,26 @@ function hayOtroDialogoModal(propio: HTMLElement): boolean {
   return Array.from(document.querySelectorAll('[role="dialog"][aria-modal="true"]')).some(d => d !== propio)
 }
 
-function useCerrarAlTocarFuera(panel: { current: HTMLElement | null }, salir: () => void): void {
+/** T3 · ¿El toque cae en la cita `id` (su `.fc-event`, con la caja `data-cita-id`)? */
+function tocaLaCita(objetivo: Element, id: string): boolean {
+  return objetivo.closest('.fc-event')?.querySelector(`[data-cita-id=${JSON.stringify(id)}]`) != null
+}
+
+/* T3 · `citaPropia`: sólo la tarjeta abierta al pasar. Pulsar SU cita no la
+   cierra: el clic que sigue la fija (`abrirTarjeta` con la misma cita) sin que
+   la vieja empiece a salir y la nueva vuelva a entrar; un arrastre la cierra
+   desde el vigía (`mover` con botón pulsado). */
+function useCerrarAlTocarFuera(panel: { current: HTMLElement | null }, salir: () => void, citaPropia: string | null = null): void {
   useEffect(() => {
     function alTocar(e: PointerEvent): void {
       if (!panel.current || !(e.target instanceof Element) || panel.current.contains(e.target)) return
       if (hayOtroDialogoModal(panel.current)) return
+      if (citaPropia !== null && tocaLaCita(e.target, citaPropia)) return
       salir()
     }
     document.addEventListener('pointerdown', alTocar, true)
     return () => document.removeEventListener('pointerdown', alTocar, true)
-  }, [panel, salir])
+  }, [panel, salir, citaPropia])
 }
 
 function Datos({ cita, nombreMedico }: { cita: Appointment; nombreMedico?: string | null }): ReactElement | null {
@@ -139,10 +167,10 @@ function Pildora({ cita }: { cita: Appointment }): ReactElement {
   )
 }
 
-interface PropsBarra { acciones: AccionTarjeta[]; alAccion: (a: AccionTarjeta) => void }
+interface PropsBarra { acciones: AccionTarjeta[]; alAccion: (a: AccionTarjeta) => void; autoFoco: boolean }
 
 /** La barra de acciones: `role="toolbar"` con foco itinerante y flechas (APG). */
-function BarraAcciones({ acciones, alAccion }: PropsBarra): ReactElement {
+function BarraAcciones({ acciones, alAccion, autoFoco }: PropsBarra): ReactElement {
   const [activa, setActiva] = useState(0)
   const barra = useRef<HTMLDivElement>(null)
   function alTeclear(e: KeyboardEvent<HTMLDivElement>): void {
@@ -155,7 +183,7 @@ function BarraAcciones({ acciones, alAccion }: PropsBarra): ReactElement {
   return (
     <div ref={barra} role="toolbar" aria-label="Acciones de la cita" className="ag-capa-acciones" onKeyDown={alTeclear}>
       {acciones.map((a, i) => (
-        <button key={a} type="button" tabIndex={i === activa ? 0 : -1} autoFocus={i === 0}
+        <button key={a} type="button" tabIndex={i === activa ? 0 : -1} autoFocus={autoFoco && i === 0}
           className={i === 0 ? 'ag-capa-boton ag-capa-boton--principal' : 'ag-capa-boton'}
           onFocus={() => setActiva(i)} onClick={() => alAccion(a)}>
           {ETIQUETA_ACCION[a]}
@@ -165,8 +193,75 @@ function BarraAcciones({ acciones, alAccion }: PropsBarra): ReactElement {
   )
 }
 
-export default function TarjetaLectura(props: Props): ReactElement {
-  const { cita, ancla, punto, comoHoja, zonaVisor, puedeIniciarConsulta, conConfirmar = true, nombreMedico, alAccion, alCerrar, extra } = props
+/** Lo de dentro, igual en las dos variantes. */
+function Contenido({ props, idTitulo, salir, autoFoco }: { props: Props; idTitulo: string; salir: () => void; autoFoco: boolean }): ReactElement {
+  const { cita, zonaVisor, puedeIniciarConsulta, conConfirmar = true, nombreMedico, alAccion, extra } = props
+  const horario = horarioDeTarjeta(cita, zonaVisor)
+  return (
+    <>
+      <div className="ag-capa-cab">
+        <h2 id={idTitulo} className="ag-capa-titulo">{nombreDeTarjeta(cita)}</h2>
+        <button type="button" className="ag-capa-cerrar" aria-label="Cerrar" onClick={salir}><X size={16} aria-hidden="true" /></button>
+      </div>
+      <Pildora cita={cita} />
+      <p className="ag-lectura-hora">
+        {horario.tramo}
+        {horario.enConsultorio && <small>{horario.enConsultorio}</small>}
+      </p>
+      <Datos cita={cita} nombreMedico={nombreMedico} />
+      <BarraAcciones acciones={accionesDeTarjeta(cita, puedeIniciarConsulta, conConfirmar)} alAccion={alAccion} autoFoco={autoFoco} />
+      {extra}
+    </>
+  )
+}
+
+/** T3 · Escape cierra la tarjeta abierta al pasar aunque el foco esté fuera de
+    ella; no si hay un diálogo modal encima (el Escape es suyo). */
+function useEscapeEnDocumento(panel: { current: HTMLElement | null }, salir: () => void): void {
+  useEffect(() => {
+    function alTeclear(e: globalThis.KeyboardEvent): void {
+      if (e.key !== 'Escape' || (panel.current && hayOtroDialogoModal(panel.current))) return
+      salir()
+    }
+    document.addEventListener('keydown', alTeclear)
+    return () => document.removeEventListener('keydown', alTeclear)
+  }, [panel, salir])
+}
+
+/** T3 · La abierta al pasar el ratón: capa NO modal, sin tocar el foco. */
+function TarjetaAlPasar(props: Props): ReactElement {
+  const { ancla, punto, alCerrar, alEntrarPuntero, alSalirPuntero, alFijar } = props
+  const { saliendo, salir, alTerminar } = useSalida(alCerrar)
+  const idTitulo = useId()
+  const colocacion = useRef({ ancla, punto })
+  const panel = useRef<HTMLDivElement | null>(null)
+  const montar = useCallback((nodo: HTMLDivElement | null) => {
+    panel.current = nodo
+    const c = colocacion.current
+    if (nodo && c.ancla) colocar(nodo, c.ancla, c.punto)
+  }, [])
+  useCerrarAlTocarFuera(panel, salir, props.cita.id)
+  useEscapeEnDocumento(panel, salir)
+  /* Un clic dentro la fija; sobre un control, no: el botón hace lo suyo. */
+  const alPulsar = (e: EventoPuntero<HTMLDivElement>): void => {
+    if (e.target instanceof Element && e.target.closest('button, a, input, select, textarea')) return
+    alFijar?.()
+  }
+  return (
+    <Portal>
+      <div ref={montar} role="dialog" aria-labelledby={idTitulo} data-al-pasar=""
+        onPointerEnter={alEntrarPuntero} onPointerLeave={alSalirPuntero} onPointerDown={alPulsar}
+        onAnimationEnd={e => { if (e.target === e.currentTarget) alTerminar() }}
+        className="ag-capa" data-estado={saliendo ? 'saliendo' : 'abierta'}>
+        <Contenido props={props} idTitulo={idTitulo} salir={salir} autoFoco={false} />
+      </div>
+    </Portal>
+  )
+}
+
+/** La de siempre (clic, Enter, buscador): diálogo modal con foco atrapado. */
+function TarjetaModal(props: Props): ReactElement {
+  const { ancla, punto, comoHoja, alCerrar, sinEntrada = false } = props
   const { saliendo, salir, alTerminar } = useSalida(alCerrar)
   const { montarPanel, alPulsarTecla } = useDialogoModal(salir)
   const idTitulo = useId()
@@ -180,9 +275,8 @@ export default function TarjetaLectura(props: Props): ReactElement {
     if (nodo && !c.comoHoja && c.ancla) colocar(nodo, c.ancla, c.punto)
   }, [montarPanel])
   useCerrarAlTocarFuera(panel, salir)
-  const horario = horarioDeTarjeta(cita, zonaVisor)
   /* Sin ancla en escritorio (se abrió desde el buscador): centrada, como la ayuda. */
-  const clase = comoHoja ? 'ag-hoja' : ancla ? 'ag-capa' : 'ag-capa ag-capa--centro'
+  const clase = (comoHoja ? 'ag-hoja' : ancla ? 'ag-capa' : 'ag-capa ag-capa--centro') + (sinEntrada ? ' ag-capa--sin-entrada' : '')
 
   return (
     <Portal>
@@ -193,19 +287,12 @@ export default function TarjetaLectura(props: Props): ReactElement {
       <div ref={montar} role="dialog" aria-modal="true" aria-labelledby={idTitulo} tabIndex={-1}
         onKeyDown={alPulsarTecla} onAnimationEnd={e => { if (e.target === e.currentTarget) alTerminar() }}
         className={clase} data-estado={saliendo ? 'saliendo' : 'abierta'}>
-        <div className="ag-capa-cab">
-          <h2 id={idTitulo} className="ag-capa-titulo">{nombreDeTarjeta(cita)}</h2>
-          <button type="button" className="ag-capa-cerrar" aria-label="Cerrar" onClick={salir}><X size={16} aria-hidden="true" /></button>
-        </div>
-        <Pildora cita={cita} />
-        <p className="ag-lectura-hora">
-          {horario.tramo}
-          {horario.enConsultorio && <small>{horario.enConsultorio}</small>}
-        </p>
-        <Datos cita={cita} nombreMedico={nombreMedico} />
-        <BarraAcciones acciones={accionesDeTarjeta(cita, puedeIniciarConsulta, conConfirmar)} alAccion={alAccion} />
-        {extra}
+        <Contenido props={props} idTitulo={idTitulo} salir={salir} autoFoco />
       </div>
     </Portal>
   )
+}
+
+export default function TarjetaLectura(props: Props): ReactElement {
+  return props.alPasar ? <TarjetaAlPasar {...props} /> : <TarjetaModal {...props} />
 }

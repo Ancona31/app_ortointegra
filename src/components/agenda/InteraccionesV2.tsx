@@ -33,6 +33,8 @@ import TarjetaLectura from '@/components/agenda/TarjetaLectura'
 import AyudaAtajos from '@/components/agenda/AyudaAtajos'
 import { useAtajosAgenda } from '@/app/(app)/agenda/useAtajosAgenda'
 import { useDeslizarPeriodo } from '@/app/(app)/agenda/useDeslizarPeriodo'
+import { useTarjetaAlPasar } from '@/app/(app)/agenda/useTarjetaAlPasar'
+import type { VigiaAlPasar } from '@/lib/agenda/tarjetaAlPasar'
 import { BotonWhatsAppCita } from '@/components/agenda/BotonWhatsAppCita'
 import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
 import { useToast } from '@/components/ui/Toast'
@@ -41,7 +43,7 @@ import type { Consultorio } from '@/types'
 import type { Horario, MedicoConfig } from '@/lib/configApp'
 import { componerNombreMedicoCompleto } from '@/lib/nombreMedico'
 import type { Appointment, DatosGuardado } from '@/lib/agenda/tiposAgenda'
-import type { ApiInteraccionesV2, AperturaAltaV2, AperturaEdicionV2, CambiarEstadoCita, GestoAlta } from '@/lib/agenda/contratosV2'
+import type { ApiInteraccionesV2, AperturaAltaV2, AperturaEdicionV2, CambiarEstadoCita, GestoAlta, SitioCita } from '@/lib/agenda/contratosV2'
 import type { Caja, Punto } from '@/lib/agenda/posicionCapa'
 import { guardarAltaRapida, horasDelGesto, type DependenciasGuardado } from '@/lib/agenda/altaRapida'
 import { avisoFueraDeHorario, avisoFinFueraDeHorario } from '@/lib/agenda/horarioAgenda'
@@ -100,8 +102,8 @@ export interface PropsInteraccionesV2 {
   currentView: string
   /** El botón «Agendar» (atajo `c`): el modal de alta, con el bloqueo de suscripción delante. */
   onAgendar: () => void
-  /** `abrirCita` de `altaCitas.ts`, la única puerta a una cita. */
-  abrirCita: (evento: EventApi) => void
+  /** `abrirCita` de `altaCitas.ts`, la única puerta a una cita (T3: también al pasar el ratón). */
+  abrirCita: (evento: EventApi, sitio?: SitioCita) => void
   medicos: readonly MedicoConfig[]
   /** El médico de la burbuja: el del filtro, o el único; `null` = «Todos». */
   filtroMedico: string | null
@@ -116,7 +118,10 @@ type Capa =
   /* `cita` es la fila tal como la tiene el evento (la que recibe el modal, como
      hoy); `vista`, la misma con las puntas VIVAS del evento, que es lo que se
      lee en la tarjeta justo después de un arrastre. */
-  | { id: number; tipo: 'tarjeta'; cita: Appointment; vista: Appointment; ancla: Caja | null; punto?: Punto }
+  | { id: number; tipo: 'tarjeta'; cita: Appointment; vista: Appointment; ancla: Caja | null; punto?: Punto
+      /* T3 · `alPasar`: abierta al dejar el ratón quieto (no modal); `sinEntrada`:
+         la de siempre que la sustituye al fijarla con un clic, sin volver a entrar. */
+      alPasar?: boolean; sinEntrada?: boolean }
   | { id: number; tipo: 'ayuda' }
 
 type SinId<T> = T extends unknown ? Omit<T, 'id'> : never
@@ -236,9 +241,14 @@ function ejecutarAccion(a: AccionTarjeta, cita: Appointment, x: ContextoAccion):
   })
 }
 
-interface PropsCapaTarjeta { capa: Extract<Capa, { tipo: 'tarjeta' }>; p: PropsInteraccionesV2; cerrar: (id: number) => void }
+interface PropsCapaTarjeta {
+  capa: Extract<Capa, { tipo: 'tarjeta' }>; p: PropsInteraccionesV2; cerrar: (id: number) => void
+  /** T3 · El vigía de la tarjeta al pasar y cómo fijarla. */
+  vigia: RefObject<VigiaAlPasar | null>
+  fijar: () => void
+}
 
-function CapaTarjeta({ capa, p, cerrar }: PropsCapaTarjeta): ReactElement {
+function CapaTarjeta({ capa, p, cerrar, vigia, fijar }: PropsCapaTarjeta): ReactElement {
   const { consultorios } = useConsultorios()
   const { cambiarActivo } = useConsultorioActivo()
   const router = useRouter()
@@ -259,6 +269,8 @@ function CapaTarjeta({ capa, p, cerrar }: PropsCapaTarjeta): ReactElement {
       conConfirmar={p.guardado.cambiarEstadoCita !== undefined}
       nombreMedico={medico ? componerNombreMedicoCompleto(medico) : null}
       alAccion={alAccion} alCerrar={() => cerrar(capa.id)}
+      alPasar={capa.alPasar} sinEntrada={capa.sinEntrada} alFijar={fijar}
+      alEntrarPuntero={() => vigia.current?.entrarTarjeta()} alSalirPuntero={() => vigia.current?.salirTarjeta()}
       /* E7 · el WhatsApp manual, con las condiciones del modal (cita viva, con
          paciente o por ligar). Montarlo no emite nada: sólo al pulsar. */
       extra={viva && !esEventoGenerico(cita)
@@ -379,6 +391,37 @@ function useDeslizarV2(p: PropsInteraccionesV2): void {
   })
 }
 
+/** T3 · ¿Es la tarjeta abierta al pasar el ratón? */
+function esAlPasar(c: Capa | null): c is Extract<Capa, { tipo: 'tarjeta' }> {
+  return c?.tipo === 'tarjeta' && c.alPasar === true
+}
+
+/**
+ * T3 · La tarjeta al pasar el ratón (punto 15): el oyente y el vigía
+ * (`useTarjetaAlPasar`), y `fijar`, que cambia la tarjeta al pasar por la de
+ * siempre (un clic dentro de ella). Abre por `abrirCita`, la única puerta.
+ */
+function useAlPasarV2(
+  p: PropsInteraccionesV2, capaRef: RefObject<Capa | null>,
+  cerrar: (id: number) => void, abrirTarjeta: ApiInteraccionesV2['abrirTarjeta'],
+): { vigia: RefObject<VigiaAlPasar | null>; fijar: () => void } {
+  const vigia = useTarjetaAlPasar({
+    raiz: p.raizRef,
+    desactivada: p.isMobile,
+    ocupada: () => capaRef.current !== null && !esAlPasar(capaRef.current),
+    abrir: (id, ancla, punto) => {
+      const ev = p.calendarRef.current?.getApi().getEventById(id)
+      if (ev) p.abrirCita(ev, { ancla, punto, alPasar: true })
+    },
+    cerrar: () => { const c = capaRef.current; if (esAlPasar(c)) cerrar(c.id) },
+  })
+  const fijar = useCallback(() => {
+    const c = capaRef.current
+    if (esAlPasar(c)) abrirTarjeta(c.cita, c.ancla, c.punto)
+  }, [capaRef, abrirTarjeta])
+  return { vigia, fijar }
+}
+
 export default function InteraccionesV2(p: PropsInteraccionesV2): ReactElement | null {
   const { apiRef, alCambiarListas, alCambiarAtajos, calendarRef, medicos } = p
   const { capa, capaRef, abrir, cerrar: cerrarCapa } = useCapa()
@@ -390,12 +433,24 @@ export default function InteraccionesV2(p: PropsInteraccionesV2): ReactElement |
     cerrarCapa(id)
   }, [capaRef, calendarRef, cerrarCapa])
 
-  const abrirTarjeta = useCallback<ApiInteraccionesV2['abrirTarjeta']>((cita, ancla, punto) => {
-    abrir({ tipo: 'tarjeta', cita, vista: conPuntasVivas(cita, calendarRef), ancla, ...(punto ? { punto } : {}) })
-  }, [abrir, calendarRef])
+  const abrirTarjeta = useCallback<ApiInteraccionesV2['abrirTarjeta']>((cita, ancla, punto, alPasar = false) => {
+    const c = capaRef.current
+    /* T3 · Al pasar el ratón nunca encima de otra capa (burbuja, tarjeta fija, ayuda). */
+    if (alPasar && c !== null && !esAlPasar(c)) return
+    /* T3 · El clic sobre la cita cuya tarjeta se abrió al pasar la FIJA: la de
+       siempre, en el mismo sitio y sin volver a entrar. */
+    if (!alPasar && esAlPasar(c) && c.cita.id === cita.id) {
+      abrir({ tipo: 'tarjeta', cita, vista: conPuntasVivas(cita, calendarRef), ancla: c.ancla, ...(c.punto ? { punto: c.punto } : {}), sinEntrada: true })
+      return
+    }
+    abrir({ tipo: 'tarjeta', cita, vista: conPuntasVivas(cita, calendarRef), ancla, ...(punto ? { punto } : {}), ...(alPasar ? { alPasar } : {}) })
+  }, [abrir, calendarRef, capaRef])
   const irACita = useIrACita(p)
   const abrirAyuda = useCallback(() => abrir({ tipo: 'ayuda' }), [abrir])
-  const atajos = useAtajosV2(p, capa !== null, abrirAyuda)
+  const atajos = useAtajosV2(p, capa !== null && !esAlPasar(capa), abrirAyuda)
+  const { vigia, fijar } = useAlPasarV2(p, capaRef, cerrar, abrirTarjeta)
+  /* La tarjeta al pasar dejó de serlo (se fijó, se cerró o la tapó otra capa): el vigía la suelta. */
+  useEffect(() => { if (!esAlPasar(capa)) vigia.current?.soltar() }, [capa, vigia])
   useDeslizarV2(p)
 
   useImperativeHandle(apiRef, () => ({
@@ -423,7 +478,7 @@ export default function InteraccionesV2(p: PropsInteraccionesV2): ReactElement |
   const medicosBurbuja = useMemo(() => medicos.map(m => ({ id: m.id, nombre: componerNombreMedicoCompleto(m) })), [medicos])
 
   if (capa?.tipo === 'burbuja') return <CapaBurbuja key={capa.id} capa={capa} medicos={medicosBurbuja} p={p} cerrar={cerrar} />
-  if (capa?.tipo === 'tarjeta') return <CapaTarjeta key={capa.id} capa={capa} p={p} cerrar={cerrar} />
+  if (capa?.tipo === 'tarjeta') return <CapaTarjeta key={capa.id} capa={capa} p={p} cerrar={cerrar} vigia={vigia} fijar={fijar} />
   if (capa?.tipo === 'ayuda') {
     return <AyudaAtajos key={capa.id} encendidos={atajos.encendidos} alCambiarEncendidos={atajos.cambiarEncendidos} alCerrar={() => cerrar(capa.id)} />
   }

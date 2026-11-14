@@ -34,6 +34,7 @@ import SeccionDisponibilidad from '@/components/agenda/configuracion/SeccionDisp
 import SeccionTiposCita from '@/components/agenda/configuracion/SeccionTiposCita'
 import SeccionEnlacesReserva from '@/components/agenda/configuracion/SeccionEnlacesReserva'
 import SeccionContactosBloqueados from '@/components/agenda/configuracion/SeccionContactosBloqueados'
+import PreferenciaTarjetaAlPasar from '@/components/agenda/configuracion/PreferenciaTarjetaAlPasar'
 
 /** Reescribe la rebanada del agregado que acaba de guardarse, sin volver a pedirlo. */
 export type ActualizarConfig = (cambio: (config: ConfigApp) => ConfigApp) => void
@@ -104,6 +105,7 @@ export default function ConfiguracionCalendario({ ajustes, tipos, puedeAdministr
           <SeccionContactosBloqueados medicos={config?.medicos ?? []} gestionaTodos={gestionaReservasDeTodos} />
         </>
       )}
+      <PreferenciaTarjetaAlPasar />
     </div>
   )
 }
