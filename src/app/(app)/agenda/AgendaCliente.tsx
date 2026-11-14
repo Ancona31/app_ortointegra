@@ -68,7 +68,9 @@ import {
 } from '@/lib/configApp'
 import type { Appointment } from '@/lib/agenda/tiposAgenda'
 export type { Appointment }
-import { DIAS, HORARIO_DEFAULT, horarioToBusinessHours } from '@/lib/agenda/horarioAgenda'
+import { DIAS, horarioToBusinessHours } from '@/lib/agenda/horarioAgenda'
+import { horarioDeLaRejilla } from '@/lib/agenda/horarioRejilla'
+import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
 import { rangosDeLaVista, partirFechaHora } from '@/lib/agenda/fechasAgenda'
 import { frasearConteo, frasearConteoBreve } from '@/lib/agenda/conteoAgenda'
 import {
@@ -376,7 +378,6 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
     // La semilla del layout no se vuelve a pedir al montar (A1.6).
     { dedupingInterval: CONFIG_DEDUPE_MS, revalidateOnMount: revalidarConfigAlMontar(swr) },
   )
-  const horario = config?.horario ?? HORARIO_DEFAULT
 
   /* ── LO QUE VE EL MODAL DE HORARIO, QUE NO ES LO DE ARRIBA ────────────────
      `horario` lleva `HORARIO_DEFAULT` aplicado para la rejilla y ahí es
@@ -512,6 +513,25 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
   const {
     filtroEfectivo, filtroSincronoRef, aplicarFiltro, forzarMedicoParaElMes, revertirMedicoForzado,
   } = useFiltroMedico({ profile, cargandoPerfil, isSecretaria, defaultMedicoId, medicos, isSingleDoctor })
+
+  /* ── EL HORARIO DE LA REJILLA (tanda T2, punto 10) ─────────────────────
+     Con la v2, el del consultorio activo cuando tiene horario propio; si no,
+     el de la clínica (la plantilla). Lo usan la rejilla (`businessHours`,
+     «Compactar», la banda de fuera de horario, el resumen) y los avisos de
+     fuera de horario del alta, el arrastre y el modal: TODOS leen esta
+     variable, así que no pueden contradecirse. Apagada, es
+     `config?.horario ?? HORARIO_DEFAULT`, el MISMO objeto de antes
+     (`horarioDeLaRejilla`), y la memo conserva su identidad entre renders
+     (invariante A1-bis: `horasHabilesFc` y la ventana dependen de ella).
+     `horario` lleva `HORARIO_DEFAULT` aplicado: ver la nota de `fuenteHorario`. */
+  const { consultorioActivo } = useConsultorioActivo()
+  const medicoMostrado = filtroEfectivo || (isSingleDoctor ? medicos[0]?.id ?? null : null)
+  const consultoriosConfig = config?.consultorios
+  const horarioClinicaConfig = config?.horario
+  const horario = useMemo(() => horarioDeLaRejilla({
+    agendaV2, horarioClinica: horarioClinicaConfig, consultorios: consultoriosConfig ?? [],
+    consultorioActivo, medicoMostrado,
+  }), [agendaV2, horarioClinicaConfig, consultoriosConfig, consultorioActivo, medicoMostrado])
 
   /* Iniciales del chip de médico. Se calculan AL PINTAR, no al traer las citas.
      Al montar, `medicos` viene vacío, así que `isSingleDoctor` vale true y el

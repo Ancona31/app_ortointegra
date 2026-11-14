@@ -13,6 +13,7 @@ import { COLOR_ETIQUETA } from '@/lib/agenda/tarjetasAgenda'
 import { LIMITES_TIPO_CITA } from '@/lib/agenda/tiposCita'
 import { componerNombreMedicoCompleto } from '@/lib/nombreMedico'
 import type { MedicoConfig } from '@/lib/configApp'
+import { BOTON_FILA, BOTON_PRIMARIO, CAMPO as CAMPO_BASE } from '@/components/agenda/configuracion/clasesConfig'
 
 export interface DatosTipoCita {
   nombre: string
@@ -32,7 +33,8 @@ interface Props {
   onCancelar?: () => void
 }
 
-const CAMPO = 'px-2 py-1.5 text-sm rounded-lg border border-[var(--ag-border-card)] bg-[var(--ag-surface)] text-[var(--ag-text)]'
+const CAMPO = CAMPO_BASE
+const ETIQUETA = 'flex flex-col gap-[var(--ag-1)] text-sm text-[var(--ag-text)]'
 
 export default function FormTipoCita({ inicial, medicos, textoBoton, onGuardar, onCancelar }: Props) {
   const id = useId()
@@ -50,17 +52,17 @@ export default function FormTipoCita({ inicial, medicos, textoBoton, onGuardar, 
   }
 
   return (
-    <form onSubmit={enviar} noValidate className="flex flex-wrap items-end gap-3">
-      <label className="flex flex-col gap-1 text-sm text-[var(--ag-text)]" htmlFor={`${id}-nombre`}>Nombre
+    <form onSubmit={enviar} noValidate className="flex flex-wrap items-end gap-[var(--ag-3)]">
+      <label className={ETIQUETA} htmlFor={`${id}-nombre`}>Nombre
         <input id={`${id}-nombre`} className={`${CAMPO} w-48`} value={datos.nombre} maxLength={LIMITES_TIPO_CITA.nombreMax}
           onChange={e => poner({ nombre: e.target.value })} />
       </label>
-      <label className="flex flex-col gap-1 text-sm text-[var(--ag-text)]" htmlFor={`${id}-duracion`}>Duración (min)
+      <label className={ETIQUETA} htmlFor={`${id}-duracion`}>Duración (min)
         <input id={`${id}-duracion`} className={`${CAMPO} w-24`} type="number" inputMode="numeric" value={datos.duracion}
           min={LIMITES_TIPO_CITA.duracionMin} max={LIMITES_TIPO_CITA.duracionMax} step={LIMITES_TIPO_CITA.pasoDuracion}
           onChange={e => poner({ duracion: e.target.value })} />
       </label>
-      <label className="flex flex-col gap-1 text-sm text-[var(--ag-text)]" htmlFor={`${id}-color`}>Color
+      <label className={ETIQUETA} htmlFor={`${id}-color`}>Color
         <select id={`${id}-color`} className={CAMPO} value={datos.color}
           onChange={e => poner({ color: COLORES_EVENTO.find(c => c === e.target.value) ?? '' })}>
           <option value="">Sin color</option>
@@ -68,20 +70,19 @@ export default function FormTipoCita({ inicial, medicos, textoBoton, onGuardar, 
         </select>
       </label>
       {medicos && (
-        <label className="flex flex-col gap-1 text-sm text-[var(--ag-text)]" htmlFor={`${id}-ambito`}>Para
+        <label className={ETIQUETA} htmlFor={`${id}-ambito`}>Para
           <select id={`${id}-ambito`} className={CAMPO} value={datos.medicoId} onChange={e => poner({ medicoId: e.target.value })}>
             <option value="">Toda la clínica</option>
             {medicos.map(m => <option key={m.id} value={m.id}>{componerNombreMedicoCompleto(m)}</option>)}
           </select>
         </label>
       )}
-      <div className="flex gap-2">
-        <button type="submit" disabled={guardando}
-          className="px-3 py-2 rounded-xl text-sm font-semibold text-white bg-[#1e5fa8] hover:bg-[#1a4f8c] disabled:opacity-50">
+      <div className="flex gap-[var(--ag-2)]">
+        <button type="submit" disabled={guardando} className={BOTON_PRIMARIO}>
           {guardando ? 'Guardando…' : textoBoton}
         </button>
         {onCancelar && (
-          <button type="button" onClick={onCancelar} className="px-3 py-2 rounded-xl text-sm font-medium text-[var(--ag-muted)] hover:bg-[var(--ag-bg-app)]">
+          <button type="button" onClick={onCancelar} className={`${BOTON_FILA} h-9`}>
             Cancelar
           </button>
         )}

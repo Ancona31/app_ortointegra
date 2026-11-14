@@ -15,6 +15,9 @@ import { useRouter } from 'next/navigation'
 import FilaTipoCita from '@/components/agenda/configuracion/FilaTipoCita'
 import FormTipoCita, { type DatosTipoCita } from '@/components/agenda/configuracion/FormTipoCita'
 import { leerMotivoError } from '@/components/agenda/configuracion/leerMotivoError'
+import TarjetaSeccion from '@/components/agenda/configuracion/TarjetaSeccion'
+import { TIPO_POR_DEFECTO } from '@/components/agenda/configuracion/FaltaParaEnlace'
+import { BOTON_SECUNDARIO, TEXTO_SUAVE } from '@/components/agenda/configuracion/clasesConfig'
 import { CrearTipoCitaSchema, EditarTipoCitaSchema, type TipoCita } from '@/lib/agenda/tiposCita'
 import { componerNombreMedicoCompleto } from '@/lib/nombreMedico'
 import { useToast } from '@/components/ui/Toast'
@@ -48,9 +51,29 @@ function editarTipo(id: string, cambios: Record<string, unknown>): Promise<strin
   return enviarTipo(`/api/agenda/tipos-cita/${id}`, 'PATCH', r.data)
 }
 
-interface Props { tipos: TipoCita[] | null; puedeEditar: boolean; medicos: readonly MedicoConfig[] }
+/** Estado vacío con su acción (tanda T2, punto 12): el mismo tipo por defecto que ofrece el enlace. */
+function VacioTipos({ puedeEditar, ocupado, onCrear }: { puedeEditar: boolean; ocupado: boolean; onCrear: () => void }) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-[var(--ag-3)]">
+      <p className={TEXTO_SUAVE}>
+        {puedeEditar ? 'Aún no hay tipos de cita. Con uno basta para empezar.' : 'Aún no hay tipos de cita; los crea quien administra la clínica.'}
+      </p>
+      {puedeEditar && (
+        <button type="button" className={BOTON_SECUNDARIO} disabled={ocupado} onClick={onCrear}>Crear «Consulta», 30 min</button>
+      )}
+    </div>
+  )
+}
 
-export default function SeccionTiposCita({ tipos, puedeEditar, medicos }: Props) {
+interface Props {
+  tipos: TipoCita[] | null
+  puedeEditar: boolean
+  medicos: readonly MedicoConfig[]
+  /** Tras cualquier cambio: «Para empezar» y los avisos de los enlaces se recalculan. */
+  alCambiar?: () => void
+}
+
+export default function SeccionTiposCita({ tipos, puedeEditar, medicos, alCambiar }: Props) {
   const router = useRouter()
   const toast = useToast()
   const [, startTransition] = useTransition()
@@ -66,6 +89,7 @@ export default function SeccionTiposCita({ tipos, puedeEditar, medicos }: Props)
   const guardado = (hecho: string) => {
     toast.success(hecho)
     startTransition(() => router.refresh())
+    alCambiar?.()
   }
   async function editar(t: TipoCita, d: DatosTipoCita): Promise<string | null> {
     const motivo = await editarTipo(t.id, { nombre: d.nombre, duracion_min: Number(d.duracion), color: d.color || null })
@@ -85,15 +109,17 @@ export default function SeccionTiposCita({ tipos, puedeEditar, medicos }: Props)
     else guardado(activo ? 'Tipo de cita reactivado' : 'Tipo de cita archivado')
   }
   const visibles = (tipos ?? []).filter(t => puedeEditar || t.activo)
+  const crearPorDefecto = (): void => {
+    setOcupado('por-defecto')
+    void crear({ nombre: TIPO_POR_DEFECTO.nombre, duracion: String(TIPO_POR_DEFECTO.duracion_min), color: '', medicoId: '' })
+      .then(m => { setOcupado(null); if (m) toast.error(m) })
+  }
 
   return (
-    <section aria-labelledby="config-tipos" className="rounded-2xl border border-[var(--ag-border-card)] bg-[var(--ag-surface)] p-5 space-y-4">
-      <div>
-        <h2 id="config-tipos" className="text-base font-semibold text-[var(--ag-text)]">Tipos de cita</h2>
-        <p className="text-sm text-[var(--ag-muted)]">Al elegir uno en una cita con paciente, su duración fija la hora de fin.</p>
-      </div>
-      {!tipos ? <p className="text-sm text-[var(--ag-muted)]">No se pudieron leer los tipos de cita. Recarga la página.</p>
-        : visibles.length === 0 ? <p className="text-sm text-[var(--ag-muted)]">Aún no hay tipos de cita.</p>
+    <TarjetaSeccion id="config-tipos" titulo="Tipos de cita"
+      ayuda="Al elegir uno en una cita con paciente, su duración fija la hora de fin. La reserva por enlace necesita al menos uno.">
+      {!tipos ? <p className={TEXTO_SUAVE}>No se pudieron leer los tipos de cita. Recarga la página.</p>
+        : visibles.length === 0 ? <VacioTipos puedeEditar={puedeEditar} ocupado={ocupado !== null} onCrear={crearPorDefecto} />
         : (
           <ul className="divide-y divide-[var(--ag-border-card)]">
             {visibles.map(t => editando === t.id ? (
@@ -108,12 +134,12 @@ export default function SeccionTiposCita({ tipos, puedeEditar, medicos }: Props)
           </ul>
         )}
       {puedeEditar && tipos && (
-        <div className="space-y-2 border-t border-[var(--ag-border-card)] pt-4">
-          <h3 className="text-sm font-semibold text-[var(--ag-text)]">Nuevo tipo de cita</h3>
+        <div className="flex flex-col gap-[var(--ag-2)] border-t border-[var(--ag-border-card)] pt-[var(--ag-4)]">
+          <h4 className="text-sm font-semibold text-[var(--ag-text)]">Nuevo tipo de cita</h4>
           <FormTipoCita key={altaKey} inicial={VACIO} medicos={medicos} textoBoton="Crear tipo"
             onGuardar={crear} />
         </div>
       )}
-    </section>
+    </TarjetaSeccion>
   )
 }

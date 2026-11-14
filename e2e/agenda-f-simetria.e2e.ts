@@ -1,5 +1,5 @@
 import { test, expect, type Locator, type Page } from '@playwright/test'
-import { irAAgenda, modalCita, SESION } from './ayudas'
+import { interruptorAgenda, irAAgenda, modalCita, SESION } from './ayudas'
 
 /**
  * Bloque F · orden y simetría (diseño en `e2e/resultados/plan_F.md` §1, filas
@@ -121,4 +121,38 @@ test('F1.19 · los iconos van centrados en su botón', async ({ page }, info) =>
     }))
   expect(desvios.length).toBeGreaterThan(0)
   for (const d of desvios) expect(d).toBeLessThanOrEqual(1)
+})
+
+/* ── Tanda T2 · punto 12: la configuración de la agenda en la misma retícula ──
+   Con la v2 encendida (la pantalla sólo existe así). Las tarjetas de sección
+   comparten borde izquierdo y ancho; su título, la misma sangría (`--ag-5`);
+   y cada botón mide uno de los dos altos de la retícula (`h-8` en las filas,
+   `h-9` en el resto: `clasesConfig.ts`). */
+test('T2 · configuración: tarjetas alineadas, títulos a la misma sangría y botones en dos altos', async ({ page }) => {
+  interruptorAgenda('A', true)
+  try {
+    await page.goto('/agenda/configuracion')
+    await expect(page.getByRole('heading', { name: 'Enlaces de reserva' })).toBeVisible()
+    await expect(page.getByText('Cargando', { exact: false })).toHaveCount(0)
+    const m = await page.evaluate(() => {
+      const tarjetas = Array.from(document.querySelectorAll<HTMLElement>('.ag-config-tarjeta'))
+      return {
+        cajas: tarjetas.map(t => { const r = t.getBoundingClientRect(); return { left: r.left, width: r.width } }),
+        sangrias: tarjetas.map(t => (t.querySelector('h3')?.getBoundingClientRect().left ?? 0) - t.getBoundingClientRect().left),
+        altos: tarjetas.flatMap(t => Array.from(t.querySelectorAll('button')))
+          .filter(b => b.offsetParent !== null).map(b => Math.round(b.getBoundingClientRect().height)),
+      }
+    })
+    expect(m.cajas.length).toBeGreaterThanOrEqual(6)
+    for (const c of m.cajas) {
+      expect(Math.abs(c.left - m.cajas[0].left)).toBeLessThanOrEqual(1)
+      expect(Math.abs(c.width - m.cajas[0].width)).toBeLessThanOrEqual(1)
+    }
+    // 20 px de relleno (`--ag-5`) más el borde de 1 px.
+    for (const s of m.sangrias) expect(Math.abs(s - 21)).toBeLessThanOrEqual(1)
+    expect(m.altos.length).toBeGreaterThan(3)
+    for (const a of m.altos) expect([32, 36]).toContain(a)
+  } finally {
+    interruptorAgenda('A', false)
+  }
 })

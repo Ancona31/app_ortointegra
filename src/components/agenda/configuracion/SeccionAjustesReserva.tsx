@@ -10,6 +10,8 @@
  */
 import { useState, type FormEvent } from 'react'
 import CampoAjuste from '@/components/agenda/configuracion/CampoAjuste'
+import TarjetaSeccion from '@/components/agenda/configuracion/TarjetaSeccion'
+import { BOTON_PRIMARIO, TEXTO_SUAVE } from '@/components/agenda/configuracion/clasesConfig'
 import { leerMotivoError } from '@/components/agenda/configuracion/leerMotivoError'
 import { useToast } from '@/components/ui/Toast'
 import {
@@ -65,16 +67,13 @@ export default function SeccionAjustesReserva({ inicial, puedeEditar }: { inicia
   }
 
   return (
-    <section aria-labelledby="config-ajustes" className="rounded-2xl border border-[var(--ag-border-card)] bg-[var(--ag-surface)] p-5 space-y-4">
-      <div>
-        <h2 id="config-ajustes" className="text-base font-semibold text-[var(--ag-text)]">Reserva por enlace y recordatorios</h2>
-        <p className="text-sm text-[var(--ag-muted)]">Valen hacia adelante: un enlace de un solo uso ya emitido conserva la vigencia con la que nació.</p>
-      </div>
+    <TarjetaSeccion id="config-ajustes" titulo="Plazos y recordatorios"
+      ayuda="Valen hacia adelante: un enlace de un solo uso ya emitido conserva la vigencia con la que nació.">
       {!valores ? (
-        <p className="text-sm text-[var(--ag-muted)]">No se pudieron leer los ajustes. Recarga la página.</p>
+        <p className={TEXTO_SUAVE}>No se pudieron leer los ajustes. Recarga la página.</p>
       ) : (
-        <form onSubmit={guardar} noValidate className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2">
+        <form onSubmit={guardar} noValidate className="flex flex-col gap-[var(--ag-4)]">
+          <div className="grid gap-[var(--ag-4)] sm:grid-cols-2">
             {CAMPOS_AJUSTES_AGENDA.map(c => (
               <CampoAjuste key={c} campo={c} valor={valores[c]} deshabilitado={!puedeEditar || guardando}
                 onCambio={v => setValores(prev => (prev ? { ...prev, [c]: v } : prev))} />
@@ -82,13 +81,12 @@ export default function SeccionAjustesReserva({ inicial, puedeEditar }: { inicia
           </div>
           {error && <p role="alert" className="text-sm font-medium text-red-600">{error}</p>}
           {puedeEditar && (
-            <button type="submit" disabled={guardando}
-              className="px-4 py-2 rounded-xl text-sm font-semibold text-white bg-[#1e5fa8] hover:bg-[#1a4f8c] disabled:opacity-50">
+            <button type="submit" disabled={guardando} className={`${BOTON_PRIMARIO} self-start`}>
               {guardando ? 'Guardando…' : 'Guardar ajustes'}
             </button>
           )}
         </form>
       )}
-    </section>
+    </TarjetaSeccion>
   )
 }

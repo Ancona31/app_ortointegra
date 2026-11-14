@@ -13,13 +13,15 @@
  */
 import { useCallback, useEffect, useState } from 'react'
 import { leerMotivoError } from '@/components/agenda/configuracion/leerMotivoError'
+import TarjetaSeccion from '@/components/agenda/configuracion/TarjetaSeccion'
+import { BOTON_FILA, TEXTO_SUAVE } from '@/components/agenda/configuracion/clasesConfig'
 import { frasearHistorial, type ContactoBloqueado } from '@/lib/reserva/gestionReserva'
 import { componerNombreMedicoCompleto } from '@/lib/nombreMedico'
 import { useToast } from '@/components/ui/Toast'
 import type { MedicoConfig } from '@/lib/configApp'
 
 const FECHA = new Intl.DateTimeFormat('es-MX', { dateStyle: 'medium' })
-const BOTON = 'px-2.5 py-1 rounded-lg text-sm text-[var(--ag-text)] hover:bg-[var(--ag-bg-app)] disabled:opacity-50'
+const BOTON = BOTON_FILA
 
 /** Por qué está bloqueado, en una frase. */
 function motivo(c: ContactoBloqueado): string {
@@ -71,18 +73,15 @@ export default function SeccionContactosBloqueados({ medicos, gestionaTodos }: P
     await recargar()
   }
   return (
-    <section aria-labelledby="config-bloqueados" className="rounded-2xl border border-[var(--ag-border-card)] bg-[var(--ag-surface)] p-5 space-y-4">
-      <div>
-        <h2 id="config-bloqueados" className="text-base font-semibold text-[var(--ag-text)]">Contactos bloqueados</h2>
-        <p className="text-sm text-[var(--ag-muted)]">Quien cancela o falta seguido deja de poder reservar por el enlace fijo; tendrá que llamar al consultorio.</p>
-      </div>
-      {contactos === null ? <p className="text-sm text-[var(--ag-muted)]">Cargando…</p>
-        : contactos === 'error' ? <p className="text-sm text-[var(--ag-muted)]">No se pudo leer la lista. Recarga la página.</p>
-        : contactos.length === 0 ? <p className="text-sm text-[var(--ag-muted)]">No hay contactos bloqueados.</p>
+    <TarjetaSeccion id="config-bloqueados" titulo="Contactos bloqueados"
+      ayuda="Quien cancela o falta seguido deja de poder reservar por el enlace fijo; tendrá que llamar al consultorio.">
+      {contactos === null ? <p className={TEXTO_SUAVE}>Cargando…</p>
+        : contactos === 'error' ? <p className={TEXTO_SUAVE}>No se pudo leer la lista. Recarga la página.</p>
+        : contactos.length === 0 ? <p className={TEXTO_SUAVE}>No hay contactos bloqueados.</p>
         : (
           <ul className="divide-y divide-[var(--ag-border-card)]">
             {contactos.map(c => (
-              <li key={`${c.medico_id}:${c.cita_id}`} className="flex flex-wrap items-center gap-3 py-2">
+              <li key={`${c.medico_id}:${c.cita_id}`} className="flex flex-wrap items-center gap-x-[var(--ag-3)] gap-y-[var(--ag-1)] py-[var(--ag-2)]">
                 <span className="text-sm font-medium text-[var(--ag-text)]">{c.nombre ?? 'Sin nombre'}</span>
                 <span className="text-sm text-[var(--ag-muted)]">{[c.telefono, c.correo].filter(Boolean).join(' · ')}</span>
                 {gestionaTodos && <span className="text-sm text-[var(--ag-muted)]">· {nombreMedico(c.medico_id)}</span>}
@@ -93,6 +92,6 @@ export default function SeccionContactosBloqueados({ medicos, gestionaTodos }: P
             ))}
           </ul>
         )}
-    </section>
+    </TarjetaSeccion>
   )
 }

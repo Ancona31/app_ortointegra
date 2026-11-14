@@ -22,6 +22,7 @@ import { leerMotivoError } from '@/components/agenda/configuracion/leerMotivoErr
 import { horarioEfectivo } from '@/lib/agenda/disponibilidad'
 import { DIAS, HORARIO_DEFAULT } from '@/lib/agenda/horarioAgenda'
 import { useToast } from '@/components/ui/Toast'
+import { BOTON_SECUNDARIO } from '@/components/agenda/configuracion/clasesConfig'
 import type { Horario } from '@/lib/configApp'
 import type { Consultorio } from '@/types'
 
@@ -32,13 +33,14 @@ interface Props {
   /** El médico dueño, para quien ve consultorios ajenos (la secretaria). */
   nombreMedico: string | null
   actualizarConfig: ActualizarConfig
+  alCambiar?: () => void
 }
 
 type Cambios = { horario_propio: boolean; horario?: Horario }
 
-const BOTON = 'px-3 py-2 rounded-xl text-sm font-medium border border-[var(--ag-border-card)] text-[var(--ag-text)] hover:bg-[var(--ag-bg-app)] disabled:opacity-50'
+const BOTON = BOTON_SECUNDARIO
 
-export default function FilaDisponibilidad({ consultorio, horarioClinica, esDueno, nombreMedico, actualizarConfig }: Props) {
+export default function FilaDisponibilidad({ consultorio, horarioClinica, esDueno, nombreMedico, actualizarConfig, alCambiar }: Props) {
   const [modal, setModal] = useState(false)
   const [guardando, setGuardando] = useState(false)
   const toast = useToast()
@@ -56,6 +58,7 @@ export default function FilaDisponibilidad({ consultorio, horarioClinica, esDuen
       actualizarConfig(c => ({ ...c, consultorios: c.consultorios.map(x => (x.id === consultorio.id ? { ...x, ...cambios } : x)) }))
       setModal(false)
       toast.success(hecho)
+      alCambiar?.()
     } catch {
       toast.error('No se pudo guardar la disponibilidad')
     } finally {
@@ -64,8 +67,8 @@ export default function FilaDisponibilidad({ consultorio, horarioClinica, esDuen
   }
 
   return (
-    <li className="py-3 space-y-3" aria-label={consultorio.nombre}>
-      <div className="flex flex-wrap items-start justify-between gap-3">
+    <li className="flex flex-col gap-[var(--ag-3)] py-[var(--ag-4)] first:pt-0 last:pb-0" aria-label={consultorio.nombre}>
+      <div className="flex flex-wrap items-start justify-between gap-[var(--ag-3)]">
         <div>
           <p className="text-sm font-semibold text-[var(--ag-text)]">{consultorio.nombre}</p>
           <p className="text-sm text-[var(--ag-muted)]">
@@ -73,7 +76,7 @@ export default function FilaDisponibilidad({ consultorio, horarioClinica, esDuen
           </p>
         </div>
         {esDueno && (
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-[var(--ag-2)]">
             <button type="button" className={BOTON} disabled={guardando} onClick={() => setModal(true)}>
               {propio ? 'Editar horario propio' : 'Usar horario propio'}
             </button>
@@ -86,7 +89,9 @@ export default function FilaDisponibilidad({ consultorio, horarioClinica, esDuen
           </div>
         )}
       </div>
-      <ResumenHorario horario={horarioEfectivo(consultorio, horarioClinica)} />
+      {/* Tanda T2 (punto 12): el horario de la clínica ya está arriba; aquí sólo se
+          repite el propio, que es el que difiere. */}
+      {propio && <ResumenHorario horario={horarioEfectivo(consultorio, horarioClinica)} />}
       {modal && (
         <HorarioModal fuente={{ estado: 'listo', horario: base }} onClose={() => setModal(false)}
           onSave={h => enviar({ horario_propio: true, horario: h }, 'Disponibilidad guardada')} />

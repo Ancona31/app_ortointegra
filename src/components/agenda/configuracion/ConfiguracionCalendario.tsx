@@ -19,9 +19,15 @@
  * ajustes y los tipos; cada médico, la disponibilidad de SUS consultorios (la
  * RLS de `consultorios` sólo deja actualizar al dueño). Los demás lo ven en
  * solo lectura. Lo decide el servidor en cada ruta; aquí sólo se pinta.
+ *
+ * Tanda T2 (puntos 7 y 12): las secciones van en cuatro grupos —horario,
+ * citas, reserva por enlace y este dispositivo— con la retícula `--ag-*`
+ * (`TarjetaSeccion`), y arriba «Para empezar» mientras al médico le falte un
+ * paso. La lista de enlaces se pide aquí una vez y la leen las dos.
  */
 import Link from 'next/link'
-import { useCallback, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from 'react'
 import useSWR, { useSWRConfig } from 'swr'
 import { ChevronLeft } from 'lucide-react'
 import { CLAVE_CONFIG, CONFIG_DEDUPE_MS, fetcherConfig, revalidarConfigAlMontar, type ConfigApp } from '@/lib/configApp'
@@ -34,6 +40,8 @@ import SeccionDisponibilidad from '@/components/agenda/configuracion/SeccionDisp
 import SeccionTiposCita from '@/components/agenda/configuracion/SeccionTiposCita'
 import SeccionEnlacesReserva from '@/components/agenda/configuracion/SeccionEnlacesReserva'
 import SeccionContactosBloqueados from '@/components/agenda/configuracion/SeccionContactosBloqueados'
+import PasosConfiguracion, { pasosDe } from '@/components/agenda/configuracion/PasosConfiguracion'
+import { cargarListaEnlaces, type EstadoLista } from '@/components/agenda/configuracion/listaEnlaces'
 
 /** Reescribe la rebanada del agregado que acaba de guardarse, sin volver a pedirlo. */
 export type ActualizarConfig = (cambio: (config: ConfigApp) => ConfigApp) => void
@@ -52,7 +60,77 @@ interface Props {
   esMedico: boolean
 }
 
-export default function ConfiguracionCalendario({ ajustes, tipos, puedeAdministrar, usuarioId, gestionaReservasDeTodos, esMedico }: Props) {
+/** Un grupo de secciones: su rótulo y, si hace falta, una línea que lo explica. */
+function Grupo({ titulo, nota, children }: { titulo: string; nota?: string; children?: ReactNode }) {
+  return (
+    <div className="flex flex-col gap-[var(--ag-3)]">
+      <div className="flex flex-col gap-[var(--ag-1)] px-[var(--ag-1)]">
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--ag-muted)]">{titulo}</h2>
+        {nota && <p className="text-sm text-[var(--ag-muted)]">{nota}</p>}
+      </div>
+      {children}
+    </div>
+  )
+}
+
+/** La lista de enlaces, pedida una vez para «Para empezar» y la sección de enlaces. */
+function useListaEnlaces(activa: boolean): { lista: EstadoLista; recargar: () => Promise<void> } {
+  const [lista, setLista] = useState<EstadoLista>(null)
+  /* Una relectura en vuelo no escribe tras desmontar (p. ej. crear un enlace y volver a la agenda). */
+  const montado = useRef(true)
+  useEffect(() => () => { montado.current = false }, [])
+  const recargar = useCallback(async (): Promise<void> => {
+    const l = await cargarListaEnlaces()
+    if (montado.current) setLista(l)
+  }, [])
+  /* La primera carga con `.then`: el `setState` va en el callback, no en el cuerpo del efecto. */
+  useEffect(() => {
+    if (!activa) return
+    let vivo = true
+    void cargarListaEnlaces().then(l => { if (vivo) setLista(l) })
+    return () => { vivo = false }
+  }, [activa])
+  return { lista, recargar }
+}
+
+/**
+ * La guía de la pantalla (puntos 7 y 8): la lista de enlaces, «Para empezar»
+ * del médico que mira y qué hacer tras crear el tipo por defecto.
+ */
+function useGuiaEnlaces(o: { conEnlaces: boolean; esMedico: boolean; usuarioId: string; puedeAdministrar: boolean }) {
+  const { lista, recargar } = useListaEnlaces(o.conEnlaces)
+  const router = useRouter()
+  const [, startTransition] = useTransition()
+  /* Tras crear el tipo por defecto desde un enlace: los tipos vienen del servidor
+     (`router.refresh()`) y la preparación de los enlaces, de la lista. */
+  const alCrearTipo = useCallback(() => {
+    startTransition(() => router.refresh())
+    void recargar()
+  }, [router, recargar])
+  const pasos = o.esMedico && lista && lista !== 'error' ? pasosDe(lista, o.usuarioId, o.puedeAdministrar) : null
+  const pendientes = pasos?.some(p => !p.hecho) ? pasos : null
+  return { lista, recargar, alCrearTipo, pendientes }
+}
+
+/** El encabezado: volver a la agenda, el título y para qué sirve la pantalla. */
+function Encabezado({ puedeAdministrar }: { puedeAdministrar: boolean }) {
+  return (
+    <header className="flex flex-col gap-[var(--ag-1)]">
+      <Link href="/agenda" className="inline-flex w-fit items-center gap-[var(--ag-1)] text-sm font-medium text-[var(--ag-muted)] hover:text-[var(--ag-text)]">
+        <ChevronLeft size={16} aria-hidden="true" /> Agenda
+      </Link>
+      <h1 className="text-2xl font-semibold text-[var(--ag-text)]">Configuración del calendario</h1>
+      <p className="text-sm text-[var(--ag-muted)]">
+        {puedeAdministrar
+          ? 'Horario, tipos de cita y reserva por enlace de la clínica.'
+          : 'El horario de la clínica, los ajustes y los tipos de cita los cambia quien administra la clínica; aquí los ves en solo lectura.'}
+      </p>
+    </header>
+  )
+}
+
+/** El agregado de configuración (horario, consultorios, médicos) y cómo reescribir su rebanada. */
+function useConfigAgregada() {
   const swr = useSWRConfig()
   const { data: config, error, mutate } = useSWR<ConfigApp>(
     CLAVE_CONFIG,
@@ -72,38 +150,48 @@ export default function ConfiguracionCalendario({ ajustes, tipos, puedeAdministr
     if (error) return { estado: 'error' }
     return { estado: 'cargando' }
   }, [config, error])
+  return { config, fuente, actualizarConfig }
+}
+
+export default function ConfiguracionCalendario({ ajustes, tipos, puedeAdministrar, usuarioId, gestionaReservasDeTodos, esMedico }: Props) {
+  const { config, fuente, actualizarConfig } = useConfigAgregada()
+  const conEnlaces = gestionaReservasDeTodos || esMedico
+  const { lista, recargar, alCrearTipo, pendientes } = useGuiaEnlaces({ conEnlaces, esMedico, usuarioId, puedeAdministrar })
+  const alCambiar = conEnlaces ? () => void recargar() : undefined
+  const medicos = config?.medicos ?? []
 
   return (
-    <div className="max-w-3xl mx-auto space-y-5">
-      <header className="space-y-1">
-        <Link href="/agenda" className="inline-flex items-center gap-1 text-sm font-medium text-[var(--ag-muted)] hover:text-[var(--ag-text)]">
-          <ChevronLeft size={16} aria-hidden="true" /> Agenda
-        </Link>
-        <h1 className="text-2xl font-semibold text-[var(--ag-text)]">Configuración del calendario</h1>
-        {!puedeAdministrar && (
-          <p className="text-sm text-[var(--ag-muted)]">
-            El horario de la clínica, los ajustes y los tipos de cita los cambia quien administra la clínica; aquí los ves en solo lectura.
-          </p>
+    <div className="mx-auto flex max-w-3xl flex-col gap-[var(--ag-6)] pb-[var(--ag-8)]">
+      <Encabezado puedeAdministrar={puedeAdministrar} />
+      {pendientes && <PasosConfiguracion pasos={pendientes} />}
+      <Grupo titulo="Horario y disponibilidad"
+        nota="El horario de la clínica es la plantilla; un consultorio con horario propio manda en su agenda y en su enlace de reserva.">
+        <SeccionHorarioClinica fuente={fuente} puedeEditar={puedeAdministrar} actualizarConfig={actualizarConfig} />
+        <SeccionDisponibilidad
+          consultorios={config?.consultorios ?? null}
+          fallo={fuente.estado === 'error'}
+          horarioClinica={config?.horario ?? null}
+          medicos={medicos}
+          usuarioId={usuarioId}
+          actualizarConfig={actualizarConfig}
+          alCambiar={alCambiar}
+        />
+      </Grupo>
+      <Grupo titulo="Citas">
+        <SeccionTiposCita tipos={tipos} puedeEditar={puedeAdministrar} medicos={medicos} alCambiar={alCambiar} />
+      </Grupo>
+      <Grupo titulo="Reserva por enlace">
+        {conEnlaces && (
+          <SeccionEnlacesReserva lista={lista} recargar={recargar} medicos={medicos} usuarioId={usuarioId}
+            gestionaTodos={gestionaReservasDeTodos} vigenciaDias={ajustes?.vigencia_enlace_unico_dias ?? null}
+            puedeCrearTipos={puedeAdministrar} alCrearTipo={alCrearTipo} />
         )}
-      </header>
-      <SeccionHorarioClinica fuente={fuente} puedeEditar={puedeAdministrar} actualizarConfig={actualizarConfig} />
-      <SeccionAjustesReserva inicial={ajustes} puedeEditar={puedeAdministrar} />
-      <SeccionDisponibilidad
-        consultorios={config?.consultorios ?? null}
-        fallo={fuente.estado === 'error'}
-        horarioClinica={config?.horario ?? null}
-        medicos={config?.medicos ?? []}
-        usuarioId={usuarioId}
-        actualizarConfig={actualizarConfig}
-      />
-      <SeccionTiposCita tipos={tipos} puedeEditar={puedeAdministrar} medicos={config?.medicos ?? []} />
-      {(gestionaReservasDeTodos || esMedico) && (
-        <>
-          <SeccionEnlacesReserva medicos={config?.medicos ?? []} usuarioId={usuarioId}
-            gestionaTodos={gestionaReservasDeTodos} vigenciaDias={ajustes?.vigencia_enlace_unico_dias ?? null} />
-          <SeccionContactosBloqueados medicos={config?.medicos ?? []} gestionaTodos={gestionaReservasDeTodos} />
-        </>
-      )}
+        <SeccionAjustesReserva inicial={ajustes} puedeEditar={puedeAdministrar} />
+        {conEnlaces && <SeccionContactosBloqueados medicos={medicos} gestionaTodos={gestionaReservasDeTodos} />}
+      </Grupo>
+      <Grupo titulo="Preferencias de este dispositivo" nota="Valen sólo en este navegador; no cambian nada para los demás.">
+        {/* T3: aquí va <PreferenciaTarjetaAlPasar /> */}
+      </Grupo>
     </div>
   )
 }

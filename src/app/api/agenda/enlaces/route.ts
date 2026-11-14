@@ -31,6 +31,8 @@ import {
   COLUMNAS_ENLACE, CrearEnlaceSchema, gestionaTodos, puedeGestionarDelMedico, respuestaErrorEnlace,
 } from '@/lib/reserva/gestionReserva'
 import { codigoDeEnlace, hashDeCodigo, secretoDisponible } from '@/lib/reserva/secretos'
+import { avisoPublicable } from '@/lib/reserva/avisoReserva'
+import { preparacionDe } from '@/lib/reserva/preparacionServidor'
 import { logger } from '@/lib/logger'
 
 export const dynamic = 'force-dynamic'
@@ -42,6 +44,12 @@ const SIN_SECRETO = { error: 'sin_secreto', mensaje: 'La reserva por enlace no e
  * médico y los de un solo uso sin usar ni caducar. Sin códigos. Los usados,
  * caducados y revocados se quedan en la base (no se borran nunca) pero no se
  * listan: ya no sirven y no hay nada que hacer con ellos.
+ *
+ * Tanda T2 (punto 8): además, `aviso` (¿el aviso de la reserva es
+ * publicable?; si no, no abre ningún enlace) y `preparacion`: por médico del
+ * alcance, por qué su enlace no abriría (`preparacionServidor.ts`, con la
+ * misma regla que la página pública). `preparacion: null` si no se pudo
+ * calcular: la lista sale igual.
  */
 export async function GET(): Promise<NextResponse> {
   const e = await entradaGestion()
@@ -59,7 +67,11 @@ export async function GET(): Promise<NextResponse> {
       logger.error('agenda', `enlaces de reserva sin leer: ${error.code ?? ''}`)
       return NextResponse.json({ error: 'No se pudieron leer los enlaces' }, { status: 500 })
     }
-    return NextResponse.json({ enlaces: data ?? [], secreto: secretoDisponible() })
+    const enlaces = data ?? []
+    const secreto = secretoDisponible()
+    const aviso = avisoPublicable()
+    const preparacion = await preparacionDe(e.supabase, e.clinicaId, e.perfil, enlaces, secreto && aviso)
+    return NextResponse.json({ enlaces, secreto, aviso, preparacion })
   } catch (err: unknown) {
     logger.error('agenda', `GET enlaces: ${err instanceof Error ? err.message : 'error'}`)
     return NextResponse.json({ error: 'Error interno' }, { status: 500 })

@@ -6,6 +6,7 @@ import { abrirEnlace, nombreDelMedico, telefonoDeContacto } from '@/lib/reserva/
 import { resolverEnlaceConfirmacion } from '@/lib/confirmacion/enlaceConfirmacion'
 import { fechaHoraEnZona } from '@/lib/reserva/correosReserva'
 import { esCodigoDeEnlace } from '@/lib/reserva/secretos'
+import { cierraLaPagina, motivosApertura } from '@/lib/reserva/aperturaEnlace'
 import type { EnlaceAbierto } from '@/lib/reserva/puertaReserva'
 import ReservaCliente, { type DatosPagina } from './ReservaCliente'
 
@@ -63,8 +64,13 @@ export default async function Page({ params, searchParams }: PageProps<'/reserva
   const enlace = await abrirEnlace(codigo)
   if (!enlace) notFound()
   const { ctx } = enlace
-  if (ctx.estado !== 'vigente') return <NoDisponible telefono={telefonoDeContacto(ctx)} />
-  if (ctx.consultorios.length === 0 || ctx.tipos.length === 0) return <NoDisponible telefono={telefonoDeContacto(ctx)} />
+  /* La MISMA regla con la que la pantalla de configuración marca el enlace que
+     no abrirá (tanda T2, punto 8): usado, caducado, sin consultorio o sin
+     tipos. Hacia el paciente, el mensaje es siempre el genérico. */
+  const motivos = motivosApertura({
+    estado: ctx.estado, consultorios: ctx.consultorios, tipos: ctx.tipos.length, horarioClinica: ctx.clinica?.horario ?? null,
+  })
+  if (motivos.some(cierraLaPagina)) return <NoDisponible telefono={telefonoDeContacto(ctx)} />
 
   const medico = nombreDelMedico(ctx)
   const principal = ctx.consultorios[0]

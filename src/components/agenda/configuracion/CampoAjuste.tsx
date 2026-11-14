@@ -3,6 +3,7 @@
  * número y unidad, con los límites a la vista. En solo lectura (P7) el campo
  * va deshabilitado, no escondido: quien no administra ve el valor vigente.
  */
+import { CAMPO } from '@/components/agenda/configuracion/clasesConfig'
 import { ETIQUETAS_AJUSTES_AGENDA, LIMITES_AJUSTES_AGENDA, type CampoAjusteAgenda } from '@/lib/agenda/ajustesAgenda'
 
 interface Props {
@@ -17,9 +18,9 @@ export default function CampoAjuste({ campo, valor, deshabilitado, onCambio }: P
   const { min, max } = LIMITES_AJUSTES_AGENDA[campo]
   const id = `ajuste-${campo}`
   return (
-    <div className="space-y-1">
+    <div className="flex flex-col gap-[var(--ag-1)]">
       <label htmlFor={id} className="block text-sm font-medium text-[var(--ag-text)]">{nombre}</label>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-[var(--ag-2)]">
         <input
           id={id}
           type="number"
@@ -31,7 +32,7 @@ export default function CampoAjuste({ campo, valor, deshabilitado, onCambio }: P
           disabled={deshabilitado}
           onChange={e => onCambio(e.target.value)}
           aria-describedby={`${id}-rango`}
-          className="w-24 px-2 py-1.5 text-sm rounded-lg border border-[var(--ag-border-card)] bg-[var(--ag-surface)] text-[var(--ag-text)] disabled:opacity-60"
+          className={`${CAMPO} w-24`}
         />
         <span className="text-sm text-[var(--ag-muted)]">{unidad}</span>
       </div>
