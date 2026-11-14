@@ -12,6 +12,7 @@ import { z } from 'zod'
 import { formatInTimeZone } from 'date-fns-tz'
 import { desplazarFecha } from '@/lib/dates'
 import type { ClienteSesion } from '@/lib/reserva/gestionServidor'
+import { motivoCitaSinWhatsApp, telefonoParaWhatsApp } from '@/lib/agenda/whatsappCita'
 
 export const SELECT_CITA_WHATSAPP =
   'id, title, status, start_time, all_day, paciente_id, reserva_canal, reserva_telefono, consultorio_nombre, consultorio_timezone, ' +
@@ -58,18 +59,17 @@ export function citasWhatsApp(filas: unknown): CitaWhatsApp[] {
 
 /** El teléfono al que va el mensaje: el del paciente y, si no, el de la reserva. */
 export function telefonoDeCita(c: CitaWhatsApp): string | null {
-  return c.pacientes?.telefono?.trim() || c.reserva_telefono?.trim() || null
+  return telefonoParaWhatsApp(c.pacientes?.telefono, c.reserva_telefono)
 }
 
 /**
  * ¿Se le puede mandar el WhatsApp? Con paciente o por ligar, agendada o
- * confirmada, con hora y futura. `ahora` en ms.
+ * confirmada, con hora y futura. `ahora` en ms. T1: es la regla compartida con
+ * el cliente (`motivoCitaSinWhatsApp`, sin el teléfono: la lista de mañana
+ * enseña «Sin teléfono» en vez de esconder la fila).
  */
 export function citaAdmiteWhatsApp(c: CitaWhatsApp, ahora: number): boolean {
-  return (c.paciente_id !== null || c.reserva_canal !== null)
-    && (c.status === 'scheduled' || c.status === 'confirmed')
-    && c.all_day !== true
-    && new Date(c.start_time).getTime() > ahora
+  return motivoCitaSinWhatsApp(c, ahora) === null
 }
 
 /** Zona por omisión de una cita sin `consultorio_timezone` (la de la clínica). */

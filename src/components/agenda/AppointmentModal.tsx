@@ -55,6 +55,7 @@ import { ESTADOS_SIN_EMPALME, mensajeEmpalme, type Empalme, type TramoCita } fro
    en diferido (A2.6): un import de valor de ahí lo metería en este chunk. */
 import type { TipoCita } from '@/lib/agenda/tiposCita'
 import { BotonWhatsAppCita } from '@/components/agenda/BotonWhatsAppCita'
+import { motivoSinWhatsApp, telefonoParaWhatsApp } from '@/lib/agenda/whatsappCita'
 
 export type PacienteBusqueda = { id: string; nombre: string; apellidos: string; telefono: string | null }
 
@@ -385,6 +386,9 @@ export default function AppointmentModal({
 }) {
   const isEdit = modal.mode === 'edit'
   const apt    = modal.mode === 'edit' ? modal.appointment : null
+  /* T1 · El instante en que se abrió, para la regla del WhatsApp (una cita que
+     ya pasó no lo ofrece). Fijo mientras el modal esté abierto. */
+  const [abiertoEn] = useState(() => Date.now())
 
   /* CITA o EVENTO GENÉRICO. Al editar NO se elige: se deduce de la fila, porque
      el tipo es fijo tras crear (ver `TipoFila`). Al crear lo trae `modal`, y lo
@@ -1672,11 +1676,12 @@ export default function AppointmentModal({
 
           {/* E7 · WhatsApp MANUAL (§2): el botón abre wa.me con el mensaje y el
               enlace de confirmación ya escritos; la persona pulsa enviar. Sólo
-              con la v2 encendida, en edición, en una cita con paciente o por
-              ligar, agendada o confirmada. Que sea futura y tenga teléfono lo
-              comprueba el servidor (`/api/agenda/whatsapp`), que lo dice en el
-              motivo del botón. */}
-          {isEdit && agendaV2 && apt && !esEvento && (apt.status === 'scheduled' || apt.status === 'confirmed') && (
+              con la v2 encendida, en edición, y —T1, punto 4 de Angel— con la
+              MISMA regla del servidor (`motivoSinWhatsApp`): con paciente o por
+              ligar, agendada o confirmada, con hora, futura y con teléfono de
+              México. Si aun así el servidor la rechaza, el botón dice el motivo. */}
+          {isEdit && agendaV2 && apt && !esEvento
+            && motivoSinWhatsApp(apt, telefonoParaWhatsApp(apt.pacientes?.telefono, apt.reserva_telefono), abiertoEn) === null && (
             <div>
               <label className="block text-[11px] font-bold uppercase tracking-[.06em] mb-2" style={{ color: 'var(--ag-muted2)' }}>
                 WhatsApp

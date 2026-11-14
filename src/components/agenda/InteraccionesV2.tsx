@@ -53,6 +53,7 @@ import type { CitaEncontrada } from '@/lib/agenda/buscarCitasPaciente'
 import {
   pideConfirmacion, puedeIniciarConsulta, textoDeConfirmacion, type AccionTarjeta, type QuienMira,
 } from '@/lib/agenda/accionesTarjeta'
+import { motivoSinWhatsApp, telefonoParaWhatsApp } from '@/lib/agenda/whatsappCita'
 
 type CalRef = RefObject<InstanceType<typeof FullCalendar> | null>
 export type CalendarApiV2 = ReturnType<InstanceType<typeof FullCalendar>['getApi']>
@@ -116,7 +117,7 @@ type Capa =
   /* `cita` es la fila tal como la tiene el evento (la que recibe el modal, como
      hoy); `vista`, la misma con las puntas VIVAS del evento, que es lo que se
      lee en la tarjeta justo después de un arrastre. */
-  | { id: number; tipo: 'tarjeta'; cita: Appointment; vista: Appointment; ancla: Caja | null; punto?: Punto }
+  | { id: number; tipo: 'tarjeta'; cita: Appointment; vista: Appointment; ancla: Caja | null; punto?: Punto; abiertaEn: number }
   | { id: number; tipo: 'ayuda' }
 
 type SinId<T> = T extends unknown ? Omit<T, 'id'> : never
@@ -245,7 +246,10 @@ function CapaTarjeta({ capa, p, cerrar }: PropsCapaTarjeta): ReactElement {
   const { cita } = capa
   const consultorio = consultorios.find(c => c.id === cita.consultorio_id) ?? null
   const medico = !p.isSingleDoctor && cita.medico_id ? p.medicos.find(m => m.id === cita.medico_id) : undefined
-  const viva = cita.status === 'scheduled' || cita.status === 'confirmed'
+  /* T1 · La regla del servidor (`motivoSinWhatsApp`), con la hora VIVA de la
+     tarjeta y el instante en que se abrió: ni pasada, ni atendida, ni
+     cancelada, ni de todo el día, ni sin teléfono. */
+  const conWhatsApp = motivoSinWhatsApp(capa.vista, telefonoParaWhatsApp(cita.pacientes?.telefono, cita.reserva_telefono), capa.abiertaEn) === null
   /* La acción cierra la tarjeta SIN salida animada: lo que abre (el modal, el
      aviso) la tapa, y el foco vuelve a la cita antes de que lo tome lo nuevo. */
   const alAccion = (a: AccionTarjeta): void => {
@@ -259,9 +263,9 @@ function CapaTarjeta({ capa, p, cerrar }: PropsCapaTarjeta): ReactElement {
       conConfirmar={p.guardado.cambiarEstadoCita !== undefined}
       nombreMedico={medico ? componerNombreMedicoCompleto(medico) : null}
       alAccion={alAccion} alCerrar={() => cerrar(capa.id)}
-      /* E7 · el WhatsApp manual, con las condiciones del modal (cita viva, con
-         paciente o por ligar). Montarlo no emite nada: sólo al pulsar. */
-      extra={viva && !esEventoGenerico(cita)
+      /* E7 · el WhatsApp manual, con la regla del modal y del servidor (T1).
+         Montarlo no emite nada: sólo al pulsar. */
+      extra={conWhatsApp
         ? <BotonWhatsAppCita citaId={cita.id} tipo="enlace" marcadoEn={cita.whatsapp_sent_at ?? null} compacto />
         : undefined}
     />
@@ -391,7 +395,7 @@ export default function InteraccionesV2(p: PropsInteraccionesV2): ReactElement |
   }, [capaRef, calendarRef, cerrarCapa])
 
   const abrirTarjeta = useCallback<ApiInteraccionesV2['abrirTarjeta']>((cita, ancla, punto) => {
-    abrir({ tipo: 'tarjeta', cita, vista: conPuntasVivas(cita, calendarRef), ancla, ...(punto ? { punto } : {}) })
+    abrir({ tipo: 'tarjeta', cita, vista: conPuntasVivas(cita, calendarRef), ancla, ...(punto ? { punto } : {}), abiertaEn: Date.now() })
   }, [abrir, calendarRef])
   const irACita = useIrACita(p)
   const abrirAyuda = useCallback(() => abrir({ tipo: 'ayuda' }), [abrir])

@@ -5,7 +5,9 @@
  * la zona del consultorio.
  */
 import { describe, it, expect } from 'vitest'
-import { enlaceWaMe, numeroWaMe, textoWhatsApp } from '@/lib/agenda/whatsappCita'
+import {
+  enlaceWaMe, motivoSinWhatsApp, numeroWaMe, telefonoParaWhatsApp, textoWhatsApp, TEXTO_SIN_WHATSAPP,
+} from '@/lib/agenda/whatsappCita'
 import { esDeManana } from '@/lib/agenda/whatsappServidor'
 
 describe('numeroWaMe', () => {
@@ -77,5 +79,38 @@ describe('esDeManana (zona del consultorio)', () => {
   it('sin zona usa la de la clínica; zona inválida → false', () => {
     expect(esDeManana('2026-11-17T16:00:00Z', null, AHORA)).toBe(true)
     expect(esDeManana('2026-11-17T16:00:00Z', 'No/Existe', AHORA)).toBe(false)
+  })
+})
+
+describe('T1 · motivoSinWhatsApp: la regla del botón y de la ruta', () => {
+  const AHORA = Date.parse('2026-11-16T15:00:00Z')
+  const base = { paciente_id: 'p', reserva_canal: null, status: 'scheduled', all_day: false, start_time: '2026-11-17T15:00:00Z' }
+  it('futura, agendada o confirmada, con paciente o por ligar, y teléfono de México → se puede', () => {
+    expect(motivoSinWhatsApp(base, '9991234567', AHORA)).toBeNull()
+    expect(motivoSinWhatsApp({ ...base, status: 'confirmed' }, '9991234567', AHORA)).toBeNull()
+    expect(motivoSinWhatsApp({ ...base, paciente_id: null, reserva_canal: 'fijo' }, '9991234567', AHORA)).toBeNull()
+  })
+  it('cada caso que no aplica tiene su motivo', () => {
+    expect(motivoSinWhatsApp({ ...base, start_time: '2026-11-16T14:59:00Z' }, '9991234567', AHORA)).toBe('pasada')
+    expect(motivoSinWhatsApp({ ...base, status: 'attended' }, '9991234567', AHORA)).toBe('atendida')
+    expect(motivoSinWhatsApp({ ...base, status: 'cancelled' }, '9991234567', AHORA)).toBe('cancelada')
+    expect(motivoSinWhatsApp({ ...base, status: 'no_show' }, '9991234567', AHORA)).toBe('no_asistio')
+    expect(motivoSinWhatsApp({ ...base, all_day: true }, '9991234567', AHORA)).toBe('todo_el_dia')
+    expect(motivoSinWhatsApp({ ...base, paciente_id: null }, '9991234567', AHORA)).toBe('sin_paciente')
+    expect(motivoSinWhatsApp(base, null, AHORA)).toBe('sin_telefono')
+    expect(motivoSinWhatsApp(base, '123', AHORA)).toBe('telefono_invalido')
+  })
+  it('sin la columna reserva_canal (base sin D1) cuenta como «no nació de una reserva»', () => {
+    const sinColumna = { paciente_id: null, status: 'scheduled', all_day: false, start_time: base.start_time }
+    expect(motivoSinWhatsApp(sinColumna, '9991234567', AHORA)).toBe('sin_paciente')
+  })
+  it('cada motivo se dice en llano', () => {
+    expect(TEXTO_SIN_WHATSAPP.pasada).toBe('La cita ya pasó.')
+    expect(TEXTO_SIN_WHATSAPP.cancelada).toBe('La cita está cancelada.')
+    expect(TEXTO_SIN_WHATSAPP.sin_telefono).toBe('La cita no tiene teléfono.')
+  })
+  it('el teléfono: el de la ficha y, si está vacío, el de la reserva', () => {
+    expect(telefonoParaWhatsApp('  ', '5598765432')).toBe('5598765432')
+    expect(telefonoParaWhatsApp(null, null)).toBeNull()
   })
 })

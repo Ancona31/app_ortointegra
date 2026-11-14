@@ -30,6 +30,65 @@ export function numeroWaMe(telefono: string | null | undefined): string | null {
   return diez ? `521${diez}` : null
 }
 
+/* ── T1 · ¿Se le puede mandar el WhatsApp a esta cita? ─────────────────────
+   LA MISMA REGLA en el servidor (`POST /api/agenda/whatsapp` y la lista de
+   mañana, por `citaAdmiteWhatsApp`) y en el cliente, que con ella decide si
+   PINTA el botón (modal, tarjeta de lectura y burbuja tras agendar). Antes el
+   cliente miraba sólo el estado y el servidor contestaba «no_aplica» a una cita
+   pasada o de todo el día, que el personal leía como un error sin motivo. */
+
+/** Por qué no, en una palabra (también viaja en el 409 de la ruta como `motivo`). */
+export type MotivoSinWhatsApp =
+  | 'sin_paciente' | 'cancelada' | 'atendida' | 'no_asistio' | 'otro_estado' | 'todo_el_dia' | 'pasada'
+  | 'sin_telefono' | 'telefono_invalido'
+
+/** Lo que la regla mira de la cita; `reserva_canal` falta (undefined) en una base sin D1. */
+export interface CitaParaWhatsApp {
+  paciente_id: string | null
+  reserva_canal?: string | null
+  status: string
+  all_day: boolean | null
+  start_time: string
+}
+
+/** El motivo por la CITA (paciente, estado, todo el día, hora), sin mirar el teléfono. `ahora` en ms. */
+export function motivoCitaSinWhatsApp(c: CitaParaWhatsApp, ahora: number): MotivoSinWhatsApp | null {
+  if (c.paciente_id === null && !c.reserva_canal) return 'sin_paciente'
+  if (c.status === 'cancelled') return 'cancelada'
+  if (c.status === 'attended') return 'atendida'
+  if (c.status === 'no_show') return 'no_asistio'
+  if (c.status !== 'scheduled' && c.status !== 'confirmed') return 'otro_estado'
+  if (c.all_day === true) return 'todo_el_dia'
+  if (!(new Date(c.start_time).getTime() > ahora)) return 'pasada'
+  return null
+}
+
+/** El teléfono al que va: el de la ficha y, si no, el de la reserva (vacío cuenta como ninguno). */
+export function telefonoParaWhatsApp(dePaciente: string | null | undefined, deReserva: string | null | undefined): string | null {
+  return dePaciente?.trim() || deReserva?.trim() || null
+}
+
+/** El motivo completo: el de la cita y, si la cita vale, el del teléfono. `null` = se puede. */
+export function motivoSinWhatsApp(c: CitaParaWhatsApp, telefono: string | null, ahora: number): MotivoSinWhatsApp | null {
+  const porCita = motivoCitaSinWhatsApp(c, ahora)
+  if (porCita) return porCita
+  if (!telefono) return 'sin_telefono'
+  return numeroWaMe(telefono) ? null : 'telefono_invalido'
+}
+
+/** El motivo, dicho en llano para quien pulsó el botón. */
+export const TEXTO_SIN_WHATSAPP: Readonly<Record<MotivoSinWhatsApp, string>> = {
+  sin_paciente: 'Es un evento sin paciente: no hay a quién escribir.',
+  cancelada: 'La cita está cancelada.',
+  atendida: 'La cita ya se atendió.',
+  no_asistio: 'La cita está marcada como «no asistió».',
+  otro_estado: 'La cita ya no está agendada ni confirmada.',
+  todo_el_dia: 'Es un evento de todo el día, sin hora que avisar.',
+  pasada: 'La cita ya pasó.',
+  sin_telefono: 'La cita no tiene teléfono.',
+  telefono_invalido: 'El teléfono no es un número de México de 10 dígitos.',
+}
+
 export interface DatosMensaje {
   /** «martes 12 de noviembre», ya en la zona del consultorio. */
   fecha: string

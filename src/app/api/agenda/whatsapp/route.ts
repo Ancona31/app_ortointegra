@@ -13,7 +13,8 @@
  * Puertas: `entradaGestion()` (401 / 403 sin clínica / 404 con el interruptor
  * apagado) → cuerpo estricto (400) → la cita con la SESIÓN (RLS: el invitado,
  * sólo las suyas; 404 si no la ve) → con paciente o por ligar, agendada o
- * confirmada, futura (409 `no_aplica`) → teléfono (422).
+ * confirmada, futura (409 `no_aplica` con su `motivo`, T1) → teléfono, con
+ * formato de México (422 `sin_telefono` / `telefono_invalido`).
  *
  * ⚠️ La marca va con el cliente de SESIÓN (la RLS de `appointments_update`
  * decide) y NO toca `updated_at`: no provoca un 409 en el modal abierto ni gana
@@ -26,8 +27,8 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { z } from 'zod'
 import { entradaGestion } from '@/lib/reserva/gestionServidor'
-import { citaAdmiteWhatsApp, leerCitaWhatsApp, telefonoDeCita, type CitaWhatsApp } from '@/lib/agenda/whatsappServidor'
-import { enlaceWaMe, textoWhatsApp } from '@/lib/agenda/whatsappCita'
+import { leerCitaWhatsApp, telefonoDeCita, type CitaWhatsApp } from '@/lib/agenda/whatsappServidor'
+import { enlaceWaMe, motivoSinWhatsApp, textoWhatsApp } from '@/lib/agenda/whatsappCita'
 import { emitirEnlaceConfirmacion } from '@/lib/confirmacion/enlaceConfirmacion'
 import { fechaYHora } from '@/lib/confirmacion/correosCita'
 import { componerNombreMedicoCompleto } from '@/lib/nombreMedico'
@@ -81,8 +82,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   try {
     const cita = await leerCitaWhatsApp(e.supabase, e.clinicaId, p.data.cita_id)
     if (!cita) return json({ error: 'Cita no encontrada' }, 404)
-    if (!citaAdmiteWhatsApp(cita, Date.now())) return json({ error: 'no_aplica' }, 409)
-    if (!telefonoDeCita(cita)) return json({ error: 'sin_telefono' }, 422)
+    /* T1: la regla compartida con el botón (`motivoSinWhatsApp`), y el MOTIVO
+       en el 409 para que el botón lo diga en llano («La cita ya pasó»). El
+       teléfono sin formato se rechaza aquí, antes de emitir ningún enlace. */
+    const motivo = motivoSinWhatsApp(cita, telefonoDeCita(cita), Date.now())
+    if (motivo === 'sin_telefono' || motivo === 'telefono_invalido') return json({ error: motivo }, 422)
+    if (motivo) return json({ error: 'no_aplica', motivo }, 409)
     return p.data.paso === 'preparar'
       ? await preparar(e.clinicaId, e.perfil.id, cita)
       : await marcarAbierto(e, cita.id, p.data.tipo)
