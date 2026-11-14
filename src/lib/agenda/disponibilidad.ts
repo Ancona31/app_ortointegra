@@ -8,10 +8,11 @@
  *
  * ⚠️ MÓDULO PURO: sin `'use client'`, sin Supabase, sin tipos de FullCalendar.
  *
- * ⚠️⚠️ LA REJILLA NO LEE ESTO. El gris de fuera de horario, «Compactar», los
- * avisos de fuera de horario y el panel del día siguen gobernados por
- * `clinicas.horario_consulta` (decisión P6). Esto sólo decide qué turnos se
- * pueden OFRECER; cambiar la rejilla para que lo use es otra decisión.
+ * ⚠️⚠️ LA REJILLA LO LEE DESDE LA TANDA T2 (punto 10), y sólo con la v2: el
+ * gris de fuera de horario, «Compactar», los avisos de fuera de horario y el
+ * panel del día usan el del consultorio activo cuando tiene horario propio
+ * (`horarioRejilla.ts`); si no, `clinicas.horario_consulta`. Apagada, siguen
+ * con el de la clínica (P6 tal cual).
  *
  * El convenio de `consultorios.horario_propio` (migración
  * `20261112140000_agenda_b5_horario_propio.sql`, y su COMMENT ON COLUMN):
