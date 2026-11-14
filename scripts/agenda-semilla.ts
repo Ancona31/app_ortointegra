@@ -329,9 +329,9 @@ async function crearConsultorio(s: Sesion, entrada: CrearConsultorioInput): Prom
 }
 
 /** `POST /api/pacientes` → `crear_paciente_con_medico_v2`. El RPC escribe el consentimiento (true, now(), versión del aviso). */
-async function crearPaciente(s: Sesion, medicoId: string, n: string, i: number): Promise<Paciente> {
+async function crearPaciente(s: Sesion, medicoId: string, n: string, i: number, nombre?: { nombre: string; apellidos: string }): Promise<Paciente> {
   const p_datos = {
-    nombre: 'Paciente', apellidos: `Prueba ${n}`, fecha_nacimiento: `${1950 + (i * 3) % 60}-0${1 + i % 9}-1${i % 10}`,
+    nombre: nombre?.nombre ?? 'Paciente', apellidos: nombre?.apellidos ?? `Prueba ${n}`, fecha_nacimiento: `${1950 + (i * 3) % 60}-0${1 + i % 9}-1${i % 10}`,
     sexo: i % 2 ? 'F' : 'M', telefono: `99900${String(i).padStart(5, '0')}`, email: `paciente.${n.toLowerCase()}${DOMINIO}`,
   }
   const r: { resultado: string; id: string | null } = exigir(await s.cliente
@@ -570,6 +570,11 @@ async function sembrarEquipo(): Promise<{ ses: Record<Clave, Sesion>; ctx: Conte
     pac[quien].push(await crearPaciente(i > 20 ? secretariaA : adminA, ses[quien].id, n, i))
   }
   for (let i = 1; i <= 3; i++) pac.adminB.push(await crearPaciente(adminB, adminB.id, `B${i}`, 30 + i))
+  /* T1 · Un paciente con nombre de verdad, acentos y dos apellidos, para la
+     búsqueda por varias palabras («Hugo Interián», «interian hugo»). SIN CITAS
+     y fuera de `pac`: así no entra en el reparto de citas y no mueve nada de lo
+     que las demás pruebas esperan de la semilla. */
+  await crearPaciente(adminA, adminA.id, 'HI', 26, { nombre: 'Hugo', apellidos: 'Interián Canché' })
   return { ses, ctx: { cons: { centro, norte, rehab, b }, pac } }
 }
 

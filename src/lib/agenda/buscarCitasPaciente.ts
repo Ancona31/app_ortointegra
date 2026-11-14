@@ -14,13 +14,15 @@
  * las de otro. Aquí no se añade ningún filtro de médico «por si acaso»: con dos
  * criterios distintos, el día que diverjan uno de los dos mentiría.
  *
- * Primero pacientes (la MISMA consulta que `usePacientes` de
- * `AppointmentModal`: activos, nombre o apellidos, 8, por apellidos), y después
- * sus citas: desde hace 30 días hasta dentro de un año, 20 como mucho
- * (decisión 22). Con v2 se añaden las citas por ligar por `reserva_nombre`.
+ * Primero pacientes (`buscarPacientes`, que desde T1 es también la consulta de
+ * `usePacientes` de `AppointmentModal`: activos, palabra a palabra en nombre o
+ * apellidos, 8, por apellidos), y después sus citas: desde hace 30 días hasta
+ * dentro de un año, 20 como mucho (decisión 22). Con v2 se añaden las citas por
+ * ligar por `reserva_nombre`.
  *
- * ⚠️ UNA DIFERENCIA CON LA CONSULTA DEL MODAL, A PROPÓSITO: el texto se limpia
- * de `,`, `(`, `)`, `%`, `*`, `\` y `"` antes de ir dentro de `.or(...)`. Ahí
+ * ⚠️ `limpiarTextoBusqueda` (de antes de T1; hoy decide el mínimo de 2
+ * caracteres y limpia el texto de `buscarCitasPorLigar`): quita
+ * `,`, `(`, `)`, `%`, `*`, `\` y `"` antes de ir dentro de `.or(...)`. Ahí
  * van sin escapar y son la sintaxis del filtro de PostgREST: una coma partía el
  * filtro en dos. No cambia lo que se encuentra (nadie busca un paciente por una
  * coma) y no abre nada: la RLS sigue mandando.
@@ -74,17 +76,59 @@ export function juntarCitas(a: readonly CitaEncontrada[], b: readonly CitaEncont
 
 const COLUMNAS_CITA = 'id, title, start_time, end_time, status, medico_id, paciente_id'
 
-/** Pacientes activos por nombre o apellidos. Vacío si el texto es corto o la consulta falla. */
+/* Cada letra base con sus variantes acentuadas, en las dos cajas (las acentuadas
+   no se confían a `~*`: plegar «É» a «é» depende del locale de la base). */
+const VARIANTES: Readonly<Record<string, string>> = {
+  a: 'aáàâäAÁÀÂÄ', e: 'eéèêëEÉÈÊË', i: 'iíìîïIÍÌÎÏ', o: 'oóòôöOÓÒÔÖ', u: 'uúùûüUÚÙÛÜ', n: 'nñNÑ', c: 'cçCÇ',
+}
+/** Tope de palabras: cada una es un filtro más en la URL. */
+export const MAX_PALABRAS = 5
+
+/**
+ * T1 · Las palabras del texto, sin acentos y en minúsculas, sólo `[a-z0-9]`:
+ * «Hugo  Interián» → ['hugo', 'interian']. Lo que no es letra ni dígito
+ * (guion, apóstrofo, punto) separa palabras.
+ */
+export function palabrasDeBusqueda(texto: string): string[] {
+  return texto.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
+    .split(/[^a-z0-9]+/).filter(Boolean).slice(0, MAX_PALABRAS)
+}
+
+/**
+ * La expresión regular de una palabra que ya pasó por `palabrasDeBusqueda`:
+ * cada vocal, la n y la c con sus variantes (`interian` → `[iíì…]nt[eé…]r…`).
+ * Sólo letras, dígitos y corchetes: nada que PostgREST ni la regex lean como
+ * sintaxis, y ningún cuantificador del usuario.
+ */
+export function patronSinAcentos(palabra: string): string {
+  return [...palabra].map(ch => (VARIANTES[ch] ? `[${VARIANTES[ch]}]` : ch)).join('')
+}
+
+/**
+ * Pacientes activos cuyo nombre o apellidos contienen TODAS las palabras del
+ * texto, en cualquier orden y sin mirar acentos ni mayúsculas (T1, punto 1 de
+ * Angel). Vacío si el texto es corto o la consulta falla.
+ *
+ * ⚠️ UN `.or()` POR PALABRA, Y POSTGREST LOS JUNTA CON AND. Antes era un solo
+ * `.or()` con el texto entero contra cada columna: «Hugo Interián» no está en
+ * `nombre` («Hugo») ni en `apellidos` («Interián Canché»), así que no salía
+ * nada; y `ilike` no iguala «interian» con «Interián». Ahora cada palabra va en
+ * nombre O apellidos (`imatch`, `~*` en Postgres) y todas tienen que estar.
+ * Sin función ni índice nuevo en la base: funciona igual con o sin las
+ * migraciones de la agenda v2. La RLS sigue decidiendo qué pacientes se ven.
+ */
 export async function buscarPacientes(texto: string): Promise<PacienteBusqueda[]> {
-  const q = limpiarTextoBusqueda(texto)
-  if (!q) return []
-  const { data, error } = await createClient()
+  const palabras = limpiarTextoBusqueda(texto) ? palabrasDeBusqueda(texto) : []
+  if (palabras.length === 0) return []
+  let consulta = createClient()
     .from('pacientes')
     .select('id, nombre, apellidos, telefono')
     .neq('activo', false)
-    .or(`nombre.ilike.%${q}%,apellidos.ilike.%${q}%`)
-    .order('apellidos')
-    .limit(MAX_PACIENTES)
+  for (const p of palabras) {
+    const patron = patronSinAcentos(p)
+    consulta = consulta.or(`nombre.imatch."${patron}",apellidos.imatch."${patron}"`)
+  }
+  const { data, error } = await consulta.order('apellidos').limit(MAX_PACIENTES)
   if (error) { logger.warn('buscarPacientes', error.code ?? 'sin código'); return [] }
   return data ?? []
 }

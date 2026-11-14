@@ -27,7 +27,7 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
+import { buscarPacientes } from '@/lib/agenda/buscarCitasPaciente'
 import Portal from '@/components/ui/Portal'
 import QuickPatientModal from '@/components/ui/QuickPatientModal'
 import { useConsultorios } from '@/hooks/useConsultorios'
@@ -297,16 +297,11 @@ function usePacientes(query: string) {
     if (query.trim().length < 2) { setResults([]); return }
     const timer = setTimeout(async () => {
       setLoading(true)
-      const supabase = createClient()
-      const queryNorm = query.trim().replace(/\s+/g, ' ')
-      const { data } = await supabase
-        .from('pacientes')
-        .select('id, nombre, apellidos, telefono')
-        .neq('activo', false)
-        .or(`nombre.ilike.%${queryNorm}%,apellidos.ilike.%${queryNorm}%`)
-        .order('apellidos')
-        .limit(8)
-      setResults(data ?? [])
+      /* T1 (punto 1 de Angel), SIN INTERRUPTOR: la consulta de la burbuja,
+         palabra a palabra en nombre o apellidos y sin mirar acentos. Antes era
+         un `.or()` con el texto entero contra cada columna, y «Hugo Interián»
+         no encontraba a nadie. Ver `buscarPacientes`. */
+      setResults(await buscarPacientes(query))
       setLoading(false)
     }, 300)
     return () => clearTimeout(timer)
