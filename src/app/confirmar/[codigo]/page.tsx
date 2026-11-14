@@ -1,11 +1,14 @@
 import type { Metadata } from 'next'
-import type { ReactElement, ReactNode } from 'react'
+import type { ReactElement } from 'react'
 import { notFound } from 'next/navigation'
 import { resolverEnlaceConfirmacion } from '@/lib/confirmacion/enlaceConfirmacion'
 import { ofertaReagendar, type OfertaReagendar } from '@/lib/confirmacion/reagendarConfirmacion'
 import {
   citaPintada, comunicate, esPasoCancelar, leerResultado, mensajeDeResultado, textoDeEstado,
+  type CitaPintada, type ResultadoPagina,
 } from '@/lib/confirmacion/vistaConfirmacion'
+import type { ContextoConfirmacion } from '@/lib/confirmacion/enlaceConfirmacion'
+import MarcoPublico from '@/components/agendaPublica/MarcoPublico'
 
 /* ═══ /confirmar/[codigo] — CONFIRMACIÓN DE ASISTENCIA (agenda E3) ═══
    Pública y sin sesión. NO llama a getUser() ni redirige.
@@ -32,7 +35,12 @@ import {
    'no-referrer' el navegador manda `Origin: null` en el POST del formulario
    (Fetch, «append a request Origin header») y la ruta lo rechazaría por
    origen. 'same-origin' tampoco deja salir el código a terceros.
-   TEXTOS: PENDIENTES DE REVISIÓN (ver vistaConfirmacion.ts). */
+   TEXTOS: PENDIENTES DE REVISIÓN (ver vistaConfirmacion.ts).
+
+   Tanda G1: el lenguaje visual de la reserva (`MarcoPublico`, `--ag-*`, claro
+   y oscuro según el teléfono). La fecha es lo más grande; cada estado y cada
+   resultado tienen su color además de su texto. Los textos, los nombres de
+   los botones y el orden de las puertas NO cambiaron. */
 
 export const metadata: Metadata = {
   title: 'Tu cita',
@@ -42,36 +50,73 @@ export const metadata: Metadata = {
 
 export const dynamic = 'force-dynamic'
 
-const BOTON = 'w-full rounded-lg px-4 py-3 text-base font-medium'
-
-function Marco({ children }: { children: ReactNode }): ReactElement {
-  return (
-    <main className="min-h-screen bg-[#f0f4f8] px-4 py-8">
-      <div className="mx-auto w-full max-w-md space-y-5 rounded-2xl border border-slate-200 bg-white p-6">{children}</div>
-    </main>
-  )
+/** El color de la nota según lo que dice: verde lo confirmado, rojo lo cancelado, ámbar lo que pide llamar. */
+function claseDeEstado(estado: ContextoConfirmacion['estado']): string {
+  if (estado === 'confirmada') return 'rp-nota rp-nota--ok'
+  if (estado === 'cancelada') return 'rp-nota rp-nota--error'
+  return 'rp-nota'
+}
+function claseDeResultado(r: ResultadoPagina): string {
+  if (r === 'confirmada' || r === 'ya_confirmada') return 'rp-nota rp-nota--ok'
+  if (r === 'fuera_de_plazo' || r === 'limite') return 'rp-nota rp-nota--atencion'
+  return 'rp-nota'
 }
 
 /** Tras cancelar: «Elegir otro horario» (E6) o el teléfono. PENDIENTE DE REVISIÓN. */
 function Reagendar({ oferta, telefono }: { oferta: OfertaReagendar | null; telefono: string | null }): ReactElement {
   if (oferta?.tipo === 'enlace') {
     return (
-      <div className="space-y-2">
-        <p className="text-sm text-slate-600">¿Quieres otra fecha? Puedes elegir un horario libre con el enlace de reserva del consultorio.</p>
-        <a href={oferta.href} className={`${BOTON} block bg-[#1e5fa8] text-center text-white`}>Elegir otro horario</a>
+      <div className="rp-grupo">
+        <p className="rp-sub">¿Quieres otra fecha? Puedes elegir un horario libre con el enlace de reserva del consultorio.</p>
+        <a href={oferta.href} className="rp-btn">Elegir otro horario</a>
       </div>
     )
   }
-  if (oferta?.tipo === 'ya_reagendada') return <p className="text-sm text-slate-600">Ya elegiste otro horario para esta cita.</p>
-  return <p className="text-sm text-slate-600">Para agendar otra cita, {comunicate(telefono)}.</p>
+  if (oferta?.tipo === 'ya_reagendada') return <p className="rp-sub">Ya elegiste otro horario para esta cita.</p>
+  return <p className="rp-sub">Para agendar otra cita, {comunicate(telefono)}.</p>
 }
 
 function Formulario({ codigo, accion, texto, clase }: { codigo: string; accion: 'confirmar' | 'cancelar'; texto: string; clase: string }): ReactElement {
   return (
     <form method="post" action={`/api/confirmar/${codigo}`}>
       <input type="hidden" name="accion" value={accion} />
-      <button type="submit" className={`${BOTON} ${clase}`}>{texto}</button>
+      <button type="submit" className={clase}>{texto}</button>
     </form>
+  )
+}
+
+/** Fecha grande, consultorio con su dirección completa y teléfono (punto 2). Nada clínico. */
+function TarjetaCita({ cita }: { cita: CitaPintada }): ReactElement {
+  return (
+    <>
+      <div className="rp-grupo">
+        <h1 className="rp-etiqueta" style={{ margin: 0 }}>Tu cita</h1>
+        <p className="rp-fecha"><small>{cita.partes.dia}</small>{cita.partes.fecha}{cita.zona && <span>{cita.zona}</span>}</p>
+      </div>
+      {(cita.consultorio || cita.direccion || cita.telefono) && (
+        <dl className="rp-resumen" aria-label="Dónde">
+          {cita.consultorio && <><dt>Consultorio</dt><dd data-consultorio>{cita.consultorio}</dd></>}
+          {cita.direccion && <><dt>Dirección</dt><dd data-direccion>{cita.direccion}</dd></>}
+          {cita.telefono && <><dt>Teléfono</dt><dd>{cita.telefono}</dd></>}
+        </dl>
+      )}
+    </>
+  )
+}
+
+interface Acciones { codigo: string; ctx: ContextoConfirmacion; cita: CitaPintada; resultado: ResultadoPagina | null; oferta: OfertaReagendar | null }
+
+function Botones({ codigo, ctx, cita, resultado, oferta }: Acciones): ReactElement {
+  return (
+    <section className="rp-grupo" style={{ gap: 'var(--ag-3)' }}>
+      {!resultado && <p className={claseDeEstado(ctx.estado)}>{textoDeEstado(ctx)}</p>}
+      {ctx.puede_confirmar && <Formulario codigo={codigo} accion="confirmar" texto="Confirmo mi asistencia" clase="rp-btn" />}
+      {ctx.puede_cancelar && <a href={`/confirmar/${codigo}?paso=cancelar`} className="rp-btn rp-btn--sec">No podré asistir</a>}
+      {!ctx.puede_cancelar && resultado !== 'fuera_de_plazo' && (ctx.estado === 'agendada' || ctx.estado === 'confirmada') && (
+        <p className="rp-sub">Ya no es posible cancelar desde el enlace; {comunicate(cita.telefono)}.</p>
+      )}
+      {ctx.estado === 'cancelada' && <Reagendar oferta={oferta} telefono={cita.telefono} />}
+    </section>
   )
 }
 
@@ -86,36 +131,20 @@ export default async function Page({ params, searchParams }: PageProps<'/confirm
   const oferta = ctx.estado === 'cancelada' ? await ofertaReagendar(ctx, codigo) : null
 
   return (
-    <Marco>
-      <header className="space-y-1">
-        <h1 className="text-xl font-semibold text-slate-800">Tu cita</h1>
-        <p className="text-slate-700"><span className="capitalize">{cita.cuando}</span>{cita.zona ? ` ${cita.zona}` : ''}</p>
-        {cita.medico && <p className="text-sm text-slate-600">Con: {cita.medico}</p>}
-        {cita.consultorio && <p className="text-sm text-slate-600">En: {cita.consultorio}{cita.direccion ? `, ${cita.direccion}` : ''}</p>}
-        {cita.telefono && <p className="text-sm text-slate-600">Teléfono del consultorio: {cita.telefono}</p>}
-      </header>
-
-      {resultado && <p role="status" className="rounded-lg bg-slate-100 px-3 py-2 text-sm text-slate-800">{mensajeDeResultado(resultado, cita.telefono)}</p>}
-
-      {pidiendoCancelar ? (
-        <section className="space-y-3">
-          <p className="text-slate-700">¿Seguro que no podrás asistir? Se cancelará tu cita y se liberará tu horario.</p>
-          <Formulario codigo={codigo} accion="cancelar" texto="Sí, cancelar mi cita" clase="bg-red-600 text-white" />
-          <a href={`/confirmar/${codigo}`} className="block text-center text-sm text-[#1e5fa8]">Volver</a>
-        </section>
-      ) : (
-        <section className="space-y-3">
-          {!resultado && <p className="text-slate-700">{textoDeEstado(ctx)}</p>}
-          {ctx.puede_confirmar && <Formulario codigo={codigo} accion="confirmar" texto="Confirmo mi asistencia" clase="bg-[#1e5fa8] text-white" />}
-          {ctx.puede_cancelar && (
-            <a href={`/confirmar/${codigo}?paso=cancelar`} className={`${BOTON} block border border-slate-300 text-center text-slate-700`}>No podré asistir</a>
-          )}
-          {!ctx.puede_cancelar && resultado !== 'fuera_de_plazo' && (ctx.estado === 'agendada' || ctx.estado === 'confirmada') && (
-            <p className="text-sm text-slate-600">Ya no es posible cancelar desde el enlace; {comunicate(cita.telefono)}.</p>
-          )}
-          {ctx.estado === 'cancelada' && <Reagendar oferta={oferta} telefono={cita.telefono} />}
-        </section>
-      )}
-    </Marco>
+    <MarcoPublico medico={cita.medico ? { nombre: cita.medico } : null}>
+      <div className="rp-tarjeta">
+        <div className="rp-paso">
+          <TarjetaCita cita={cita} />
+          {resultado && <p role="status" className={claseDeResultado(resultado)}>{mensajeDeResultado(resultado, cita.telefono)}</p>}
+          {pidiendoCancelar ? (
+            <section className="rp-grupo" style={{ gap: 'var(--ag-3)' }}>
+              <p className="rp-nota rp-nota--atencion">¿Seguro que no podrás asistir? Se cancelará tu cita y se liberará tu horario.</p>
+              <Formulario codigo={codigo} accion="cancelar" texto="Sí, cancelar mi cita" clase="rp-btn rp-btn--peligro" />
+              <a href={`/confirmar/${codigo}`} className="rp-enlace">Volver</a>
+            </section>
+          ) : <Botones codigo={codigo} ctx={ctx} cita={cita} resultado={resultado} oferta={oferta} />}
+        </div>
+      </div>
+    </MarcoPublico>
   )
 }

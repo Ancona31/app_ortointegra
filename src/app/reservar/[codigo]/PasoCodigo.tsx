@@ -14,18 +14,16 @@ export default function PasoCodigo({ correo, ocupado, onVerificar, onReenviar }:
   const [codigo, setCodigo] = useState('')
   const enviar = (e: FormEvent) => { e.preventDefault(); if (/^[0-9]{6}$/.test(codigo)) onVerificar(codigo) }
   return (
-    <form onSubmit={enviar} className="space-y-4">
-      <p className="text-sm text-slate-600">Te enviamos un código de 6 dígitos a <strong>{correo}</strong>. Vence en 10 minutos.</p>
-      <label className="block text-sm text-slate-700">Código
-        <input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-lg tracking-widest" required
-          inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={codigo}
+    <form onSubmit={enviar} className="rp-paso" style={{ animation: 'none' }}>
+      <p className="rp-sub">Te enviamos un código de 6 dígitos a <strong style={{ color: 'var(--ag-ink)', overflowWrap: 'anywhere' }}>{correo}</strong>. Vence en 10 minutos.</p>
+      <label className="rp-campo rp-campo--codigo">Código
+        <input required inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={codigo}
           onChange={e => setCodigo(e.target.value.replace(/\D/g, ''))} />
       </label>
-      <button type="submit" disabled={ocupado || codigo.length !== 6}
-        className="w-full rounded-xl bg-[#1e5fa8] px-4 py-2.5 text-sm font-semibold text-white disabled:bg-slate-300">
-        {ocupado ? 'Un momento…' : 'Verificar y reservar'}
-      </button>
-      <button type="button" disabled={ocupado} onClick={onReenviar} className="w-full text-sm text-[#1e5fa8]">Enviar otro código</button>
+      <div className="rp-pie">
+        <button type="submit" className="rp-btn" disabled={ocupado || codigo.length !== 6}>{ocupado ? 'Un momento…' : 'Verificar y reservar'}</button>
+        <button type="button" className="rp-enlace" disabled={ocupado} onClick={onReenviar}>Enviar otro código</button>
+      </div>
     </form>
   )
 }
