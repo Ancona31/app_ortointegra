@@ -27,7 +27,7 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
+import { buscarPacientes } from '@/lib/agenda/buscarCitasPaciente'
 import Portal from '@/components/ui/Portal'
 import QuickPatientModal from '@/components/ui/QuickPatientModal'
 import { useConsultorios } from '@/hooks/useConsultorios'
@@ -55,6 +55,7 @@ import { ESTADOS_SIN_EMPALME, mensajeEmpalme, type Empalme, type TramoCita } fro
    en diferido (A2.6): un import de valor de ahí lo metería en este chunk. */
 import type { TipoCita } from '@/lib/agenda/tiposCita'
 import { BotonWhatsAppCita } from '@/components/agenda/BotonWhatsAppCita'
+import { motivoSinWhatsApp, telefonoParaWhatsApp } from '@/lib/agenda/whatsappCita'
 
 export type PacienteBusqueda = { id: string; nombre: string; apellidos: string; telefono: string | null }
 
@@ -297,16 +298,11 @@ function usePacientes(query: string) {
     if (query.trim().length < 2) { setResults([]); return }
     const timer = setTimeout(async () => {
       setLoading(true)
-      const supabase = createClient()
-      const queryNorm = query.trim().replace(/\s+/g, ' ')
-      const { data } = await supabase
-        .from('pacientes')
-        .select('id, nombre, apellidos, telefono')
-        .neq('activo', false)
-        .or(`nombre.ilike.%${queryNorm}%,apellidos.ilike.%${queryNorm}%`)
-        .order('apellidos')
-        .limit(8)
-      setResults(data ?? [])
+      /* T1 (punto 1 de Angel), SIN INTERRUPTOR: la consulta de la burbuja,
+         palabra a palabra en nombre o apellidos y sin mirar acentos. Antes era
+         un `.or()` con el texto entero contra cada columna, y «Hugo Interián»
+         no encontraba a nadie. Ver `buscarPacientes`. */
+      setResults(await buscarPacientes(query))
       setLoading(false)
     }, 300)
     return () => clearTimeout(timer)
@@ -351,7 +347,8 @@ export default function AppointmentModal({
      cita). */
   saliendo?: boolean
   onClose: () => void
-  onSave: (data: DatosGuardado) => Promise<void>
+  /* T1: `handleSave` devuelve el alta creada (la usa la burbuja); el modal no la lee. */
+  onSave: (data: DatosGuardado) => Promise<unknown>
   onDelete: (id: string) => Promise<void>
   /* B3: el interruptor de la agenda v2 y la cancelación que sustituye al
      borrado de una cita con paciente. Sin ellos —o con el interruptor
@@ -390,6 +387,9 @@ export default function AppointmentModal({
 }) {
   const isEdit = modal.mode === 'edit'
   const apt    = modal.mode === 'edit' ? modal.appointment : null
+  /* T1 · El instante en que se abrió, para la regla del WhatsApp (una cita que
+     ya pasó no lo ofrece). Fijo mientras el modal esté abierto. */
+  const [abiertoEn] = useState(() => Date.now())
 
   /* CITA o EVENTO GENÉRICO. Al editar NO se elige: se deduce de la fila, porque
      el tipo es fijo tras crear (ver `TipoFila`). Al crear lo trae `modal`, y lo
@@ -1677,11 +1677,12 @@ export default function AppointmentModal({
 
           {/* E7 · WhatsApp MANUAL (§2): el botón abre wa.me con el mensaje y el
               enlace de confirmación ya escritos; la persona pulsa enviar. Sólo
-              con la v2 encendida, en edición, en una cita con paciente o por
-              ligar, agendada o confirmada. Que sea futura y tenga teléfono lo
-              comprueba el servidor (`/api/agenda/whatsapp`), que lo dice en el
-              motivo del botón. */}
-          {isEdit && agendaV2 && apt && !esEvento && (apt.status === 'scheduled' || apt.status === 'confirmed') && (
+              con la v2 encendida, en edición, y —T1, punto 4 de Angel— con la
+              MISMA regla del servidor (`motivoSinWhatsApp`): con paciente o por
+              ligar, agendada o confirmada, con hora, futura y con teléfono de
+              México. Si aun así el servidor la rechaza, el botón dice el motivo. */}
+          {isEdit && agendaV2 && apt && !esEvento
+            && motivoSinWhatsApp(apt, telefonoParaWhatsApp(apt.pacientes?.telefono, apt.reserva_telefono), abiertoEn) === null && (
             <div>
               <label className="block text-[11px] font-bold uppercase tracking-[.06em] mb-2" style={{ color: 'var(--ag-muted2)' }}>
                 WhatsApp

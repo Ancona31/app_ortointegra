@@ -40,7 +40,7 @@ import { useConsultorios } from '@/hooks/useConsultorios'
 import type { Consultorio } from '@/types'
 import type { Horario, MedicoConfig } from '@/lib/configApp'
 import { componerNombreMedicoCompleto } from '@/lib/nombreMedico'
-import type { Appointment, DatosGuardado } from '@/lib/agenda/tiposAgenda'
+import type { AltaGuardada, Appointment, DatosGuardado, OpcionesGuardado } from '@/lib/agenda/tiposAgenda'
 import type { ApiInteraccionesV2, AperturaAltaV2, AperturaEdicionV2, CambiarEstadoCita, GestoAlta } from '@/lib/agenda/contratosV2'
 import type { Caja, Punto } from '@/lib/agenda/posicionCapa'
 import { guardarAltaRapida, horasDelGesto, type DependenciasGuardado } from '@/lib/agenda/altaRapida'
@@ -53,6 +53,7 @@ import type { CitaEncontrada } from '@/lib/agenda/buscarCitasPaciente'
 import {
   pideConfirmacion, puedeIniciarConsulta, textoDeConfirmacion, type AccionTarjeta, type QuienMira,
 } from '@/lib/agenda/accionesTarjeta'
+import { motivoSinWhatsApp, telefonoParaWhatsApp } from '@/lib/agenda/whatsappCita'
 
 type CalRef = RefObject<InstanceType<typeof FullCalendar> | null>
 export type CalendarApiV2 = ReturnType<InstanceType<typeof FullCalendar>['getApi']>
@@ -65,7 +66,8 @@ type ConfirmState = { message: string; onConfirm: () => void; onCancel: () => vo
 
 /** Lo que la agenda le presta para guardar: sus mismas funciones. */
 export interface GuardadoV2 {
-  handleSave: (datos: DatosGuardado) => Promise<void>
+  /** T1: devuelve el alta que entró (la burbuja ofrece ahí mismo WhatsApp e invitación). */
+  handleSave: (datos: DatosGuardado, reintentoEmpalme?: boolean, opciones?: OpcionesGuardado) => Promise<AltaGuardada | null>
   handleCancelar: (id: string) => Promise<void>
   handleDelete: (id: string) => Promise<void>
   /** De `guardadoCitas.ts` (Movimiento) cuando exista; sin ella, la tarjeta no ofrece «Confirmar». */
@@ -107,6 +109,10 @@ export interface PropsInteraccionesV2 {
   filtroMedico: string | null
   horario: Horario
   guardado: GuardadoV2
+  /** T1 · Quien mira puede invitar a una cita (`canVerAgendaCompleta`, la regla de `handleSave`). */
+  puedeInvitar: boolean
+  /** T1 · Abre el modal de invitación de la agenda para esa cita (el de «Agregar invitados»). */
+  invitar: (cita: Appointment) => void
   setModal: Dispatch<SetStateAction<ModalState>>
   setConfirm: Dispatch<SetStateAction<ConfirmState>>
 }
@@ -116,7 +122,7 @@ type Capa =
   /* `cita` es la fila tal como la tiene el evento (la que recibe el modal, como
      hoy); `vista`, la misma con las puntas VIVAS del evento, que es lo que se
      lee en la tarjeta justo después de un arrastre. */
-  | { id: number; tipo: 'tarjeta'; cita: Appointment; vista: Appointment; ancla: Caja | null; punto?: Punto }
+  | { id: number; tipo: 'tarjeta'; cita: Appointment; vista: Appointment; ancla: Caja | null; punto?: Punto; abiertaEn: number }
   | { id: number; tipo: 'ayuda' }
 
 type SinId<T> = T extends unknown ? Omit<T, 'id'> : never
@@ -165,7 +171,8 @@ function useDependenciasGuardado(p: PropsInteraccionesV2): DependenciasGuardado 
       onConfirm: () => { setConfirm(null); resolver(true) },
       onCancel: () => { setConfirm(null); resolver(false) },
     })),
-    guardar: (datos) => { void guardado.handleSave(datos) },
+    /* T1: sin la invitación automática; la burbuja la ofrece como botón. */
+    guardar: (datos) => guardado.handleSave(datos, false, { sinInvitacion: true }),
   }
 }
 
@@ -186,6 +193,12 @@ function CapaBurbuja({ capa, medicos, p, cerrar }: PropsCapaBurbuja): ReactEleme
       medicos={medicos} filtroMedico={p.filtroMedico} consultorioActivo={consultorioActivo}
       alGuardar={(datos, horas) => guardarAltaRapida(datos, capa.horas, horas, deps)}
       alMasOpciones={(v) => { cerrar(capa.id); p.setModal(aperturaDesdeBurbuja(v)) }}
+      /* T1 · Tras agendar. Las dos cierran la burbuja SIN salida animada (lo
+         que abren la tapa): la invitación no se ofrece dos veces seguidas
+         (`ModalInvitacionCita` explica por qué) y el modal es el de editar. */
+      puedeInvitar={p.puedeInvitar}
+      alInvitar={(cita) => { cerrar(capa.id); p.invitar(cita) }}
+      alEditar={(cita) => { cerrar(capa.id); p.setModal({ mode: 'edit', appointment: cita }) }}
       alCerrar={() => cerrar(capa.id)}
     />
   )
@@ -245,7 +258,10 @@ function CapaTarjeta({ capa, p, cerrar }: PropsCapaTarjeta): ReactElement {
   const { cita } = capa
   const consultorio = consultorios.find(c => c.id === cita.consultorio_id) ?? null
   const medico = !p.isSingleDoctor && cita.medico_id ? p.medicos.find(m => m.id === cita.medico_id) : undefined
-  const viva = cita.status === 'scheduled' || cita.status === 'confirmed'
+  /* T1 · La regla del servidor (`motivoSinWhatsApp`), con la hora VIVA de la
+     tarjeta y el instante en que se abrió: ni pasada, ni atendida, ni
+     cancelada, ni de todo el día, ni sin teléfono. */
+  const conWhatsApp = motivoSinWhatsApp(capa.vista, telefonoParaWhatsApp(cita.pacientes?.telefono, cita.reserva_telefono), capa.abiertaEn) === null
   /* La acción cierra la tarjeta SIN salida animada: lo que abre (el modal, el
      aviso) la tapa, y el foco vuelve a la cita antes de que lo tome lo nuevo. */
   const alAccion = (a: AccionTarjeta): void => {
@@ -259,9 +275,9 @@ function CapaTarjeta({ capa, p, cerrar }: PropsCapaTarjeta): ReactElement {
       conConfirmar={p.guardado.cambiarEstadoCita !== undefined}
       nombreMedico={medico ? componerNombreMedicoCompleto(medico) : null}
       alAccion={alAccion} alCerrar={() => cerrar(capa.id)}
-      /* E7 · el WhatsApp manual, con las condiciones del modal (cita viva, con
-         paciente o por ligar). Montarlo no emite nada: sólo al pulsar. */
-      extra={viva && !esEventoGenerico(cita)
+      /* E7 · el WhatsApp manual, con la regla del modal y del servidor (T1).
+         Montarlo no emite nada: sólo al pulsar. */
+      extra={conWhatsApp
         ? <BotonWhatsAppCita citaId={cita.id} tipo="enlace" marcadoEn={cita.whatsapp_sent_at ?? null} compacto />
         : undefined}
     />
@@ -391,7 +407,7 @@ export default function InteraccionesV2(p: PropsInteraccionesV2): ReactElement |
   }, [capaRef, calendarRef, cerrarCapa])
 
   const abrirTarjeta = useCallback<ApiInteraccionesV2['abrirTarjeta']>((cita, ancla, punto) => {
-    abrir({ tipo: 'tarjeta', cita, vista: conPuntasVivas(cita, calendarRef), ancla, ...(punto ? { punto } : {}) })
+    abrir({ tipo: 'tarjeta', cita, vista: conPuntasVivas(cita, calendarRef), ancla, ...(punto ? { punto } : {}), abiertaEn: Date.now() })
   }, [abrir, calendarRef])
   const irACita = useIrACita(p)
   const abrirAyuda = useCallback(() => abrir({ tipo: 'ayuda' }), [abrir])

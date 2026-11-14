@@ -29,7 +29,7 @@ import Portal from '@/components/ui/Portal'
 import { useDialogoModal } from '@/hooks/useDialogoModal'
 import type { Appointment } from '@/lib/agenda/tiposAgenda'
 import { STATUS_CONFIG, marcaPorLigar } from '@/lib/agenda/tarjetasAgenda'
-import { posicionCapa, type Caja, type Punto } from '@/lib/agenda/posicionCapa'
+import { posicionCapa, ventanaVisible, type Caja, type Punto } from '@/lib/agenda/posicionCapa'
 import { duracionToken, prefiereMenosMovimiento } from '@/lib/agenda/movimientoAgenda'
 import { indiceTrasTecla } from '@/lib/agenda/opcionesLista'
 import {
@@ -55,15 +55,48 @@ interface Props {
   extra?: ReactNode
 }
 
-/* ⚠️ `colocar`, `useSalida` y `useCerrarAlTocarFuera` SON COPIA DELIBERADA de
-   `BurbujaAlta.tsx`: dos usos no justifican un gancho compartido (CLAUDE.md,
-   protocolo 4). Un arreglo en una se aplica a las dos. */
+/* ⚠️ `colocar`, `seguirColocacion`, `useSalida` y `useCerrarAlTocarFuera` SON
+   COPIA DELIBERADA de `BurbujaAlta.tsx`: dos usos no justifican un gancho
+   compartido (CLAUDE.md, protocolo 4). Un arreglo en una se aplica a las dos.
+   T1 (punto 3 de Angel): alto NATURAL, parte VISIBLE de la ventana y
+   `max-height`, para que la tarjeta no se corte al fondo de la pantalla. */
 function colocar(nodo: HTMLElement, ancla: Caja, punto?: Punto): void {
-  const p = posicionCapa(ancla, { width: nodo.offsetWidth, height: nodo.offsetHeight },
-    { width: window.innerWidth, height: window.innerHeight }, punto)
+  const alto = nodo.scrollHeight + (nodo.offsetHeight - nodo.clientHeight)
+  const ventana = ventanaVisible(window.visualViewport, { width: window.innerWidth, height: window.innerHeight })
+  const p = posicionCapa(ancla, { width: nodo.offsetWidth, height: alto }, ventana, punto)
   nodo.style.left = `${p.left}px`
   nodo.style.top = `${p.top}px`
+  nodo.style.maxHeight = `${p.altoMaximo}px`
   nodo.style.transformOrigin = p.origen
+}
+
+/**
+ * T1 · La hoja del teléfono y la tableta se apoya en el borde de abajo de la
+ * parte VISIBLE (con el teclado abierto, encima de él) y no pasa del 80 % de
+ * ella; el CSS (`.ag-hoja`) da lo mismo sin `visualViewport`.
+ */
+function colocarHoja(nodo: HTMLElement): void {
+  const vv = window.visualViewport
+  if (!vv) return
+  nodo.style.bottom = `${Math.max(0, Math.round(window.innerHeight - (vv.offsetTop + vv.height)))}px`
+  nodo.style.maxHeight = `${Math.floor(vv.height * 0.8)}px`
+}
+
+/** T1 · Recoloca al cambiar de alto o la parte visible de la ventana (ver `BurbujaAlta.tsx`). */
+function seguirColocacion(nodo: HTMLElement, recolocar: () => void): () => void {
+  let marco = 0
+  const pedir = (): void => { cancelAnimationFrame(marco); marco = requestAnimationFrame(recolocar) }
+  const observador = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(pedir)
+  observador?.observe(nodo)
+  const vv = window.visualViewport
+  vv?.addEventListener('resize', pedir)
+  vv?.addEventListener('scroll', pedir)
+  return () => {
+    cancelAnimationFrame(marco)
+    observador?.disconnect()
+    vv?.removeEventListener('resize', pedir)
+    vv?.removeEventListener('scroll', pedir)
+  }
 }
 
 function useSalida(alCerrar: () => void): { saliendo: boolean; salir: () => void; alTerminar: () => void } {
@@ -165,21 +198,38 @@ function BarraAcciones({ acciones, alAccion }: PropsBarra): ReactElement {
   )
 }
 
-export default function TarjetaLectura(props: Props): ReactElement {
-  const { cita, ancla, punto, comoHoja, zonaVisor, puedeIniciarConsulta, conConfirmar = true, nombreMedico, alAccion, alCerrar, extra } = props
+/** El panel: rol, foco, salida y su colocación (T1: seguida mientras está abierto). */
+function usePanelTarjeta(ancla: Caja | null, punto: Punto | undefined, comoHoja: boolean, alCerrar: () => void) {
   const { saliendo, salir, alTerminar } = useSalida(alCerrar)
   const { montarPanel, alPulsarTecla } = useDialogoModal(salir)
-  const idTitulo = useId()
   const colocacion = useRef({ ancla, punto, comoHoja })
   useEffect(() => { colocacion.current = { ancla, punto, comoHoja } }, [ancla, punto, comoHoja])
   const panel = useRef<HTMLDivElement | null>(null)
+  const dejarDeSeguir = useRef<(() => void) | null>(null)
   const montar = useCallback((nodo: HTMLDivElement | null) => {
     montarPanel(nodo)
     panel.current = nodo
+    dejarDeSeguir.current?.()
+    dejarDeSeguir.current = null
     const c = colocacion.current
-    if (nodo && !c.comoHoja && c.ancla) colocar(nodo, c.ancla, c.punto)
+    /* Sin ancla en escritorio va centrada por CSS, con su `max-height`. */
+    if (!nodo || (!c.comoHoja && !c.ancla)) return
+    const recolocar = (): void => {
+      const a = colocacion.current
+      if (a.comoHoja) colocarHoja(nodo)
+      else if (a.ancla) colocar(nodo, a.ancla, a.punto)
+    }
+    recolocar()
+    dejarDeSeguir.current = seguirColocacion(nodo, recolocar)
   }, [montarPanel])
   useCerrarAlTocarFuera(panel, salir)
+  return { saliendo, salir, alTerminar, alPulsarTecla, montar }
+}
+
+export default function TarjetaLectura(props: Props): ReactElement {
+  const { cita, ancla, punto, comoHoja, zonaVisor, puedeIniciarConsulta, conConfirmar = true, nombreMedico, alAccion, alCerrar, extra } = props
+  const { saliendo, salir, alTerminar, alPulsarTecla, montar } = usePanelTarjeta(ancla, punto, comoHoja, alCerrar)
+  const idTitulo = useId()
   const horario = horarioDeTarjeta(cita, zonaVisor)
   /* Sin ancla en escritorio (se abrió desde el buscador): centrada, como la ayuda. */
   const clase = comoHoja ? 'ag-hoja' : ancla ? 'ag-capa' : 'ag-capa ag-capa--centro'

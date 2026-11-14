@@ -43,7 +43,7 @@ import { avisoFueraDeHorario, avisoFinFueraDeHorario } from '@/lib/agenda/horari
 import { DEFAULT_DURATION } from '@/lib/agenda/duracionCita'
 import { registrarNuevo, salirConAnimacion } from '@/lib/agenda/marcasMovimiento'
 import { animarFlip } from '@/lib/agenda/flipTarjetas'
-import type { Appointment, DatosGuardado, Status } from '@/lib/agenda/tiposAgenda'
+import type { AltaGuardada, Appointment, DatosGuardado, OpcionesGuardado, Status } from '@/lib/agenda/tiposAgenda'
 import { ESTADOS_CITA, STATUS_CONFIG } from '@/lib/agenda/tarjetasAgenda'
 import {
   empalmesPintados, esListaDeEmpalmes, mensajeEmpalme, unirAceptados, ESTADOS_SIN_EMPALME, type Empalme,
@@ -474,7 +474,12 @@ export function crearGuardadoCitas({
   /* `reintentoEmpalme`: el reenvío tras aceptar un 409 `empalme` (B7c). El
      acuse optimista ya salió en el primer intento; repetirlo antes de saber si
      el segundo entra sería anunciar un éxito que todavía no hay. */
-  async function handleSave(data: DatosGuardado, reintentoEmpalme = false) {
+  /* T1 · Devuelve el ALTA que entró (la fila del servidor y `gcalSync`) para
+     que la burbuja ofrezca ahí mismo WhatsApp y la invitación; `null` en una
+     edición, en un fallo o cuando el alta sigue por el aviso de empalme.
+     `opciones.sinInvitacion`: la burbuja ofrece la invitación como botón, así
+     que no se abre sola encima. */
+  async function handleSave(data: DatosGuardado, reintentoEmpalme = false, opciones: OpcionesGuardado = {}): Promise<AltaGuardada | null> {
     const isEdit = !!data.id
     const api = calendarRef.current?.getApi()
 
@@ -572,10 +577,10 @@ export function crearGuardadoCitas({
           () => { void handleSave({ ...data, empalmes_aceptados: unirAceptados(data.empalmes_aceptados ?? [], lista) }, true) },
           () => toast.info('No se guardó: la agenda se quedó como estaba.'),
         )
-        return
+        return null
       }
       toast.error(cuerpo ? (cuerpo.message || cuerpo.error || 'No se pudo guardar') : 'Error desconocido')
-      return
+      return null
     }
 
     const json = await res.json()
@@ -652,13 +657,14 @@ export function crearGuardadoCitas({
           algo que no llega;
         · el permiso, o un médico invitado recibiría un modal condenado a un 403
           (el gate de verdad está en la ruta; esto sólo evita el paseo). */
-    if (!isEdit && json.gcalSync === 'pending' && canVerAgendaCompleta(profile) && json.appointment?.id) {
+    if (!isEdit && json.gcalSync === 'pending' && canVerAgendaCompleta(profile) && json.appointment?.id && !opciones.sinInvitacion) {
       setInvitacion({
         citaId: json.appointment.id,
         paciente: pacienteParaInvitacion(json.appointment),
         esperandoEvento: true,
       })
     }
+    return !isEdit && json.appointment?.id ? { cita: json.appointment, gcalSync: json.gcalSync ?? null } : null
   }
 
   async function handleDelete(id: string) {

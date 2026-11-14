@@ -115,6 +115,15 @@ describe('POST /api/agenda/whatsapp — puertas', () => {
     }
   })
 
+  it('T1: el 409 dice el MOTIVO (el botón lo enseña en llano) y no emite ningún enlace', async () => {
+    for (const [extra, motivo] of [[{ start_time: new Date(Date.now() - 60_000).toISOString() }, 'pasada'],
+      [{ status: 'attended' }, 'atendida'], [{ status: 'cancelled' }, 'cancelada'], [{ all_day: true }, 'todo_el_dia']] as const) {
+      h.fila = cita(extra)
+      expect(await (await POST(post({ cita_id: CITA, paso: 'preparar', tipo: 'enlace' }))).json()).toEqual({ error: 'no_aplica', motivo })
+    }
+    expect(h.emisiones).toEqual([])
+  })
+
   it('sin teléfono → 422 sin_telefono; con teléfono raro → 422 telefono_invalido', async () => {
     h.fila = cita({ pacientes: { telefono: null } })
     expect(await (await POST(post({ cita_id: CITA, paso: 'preparar', tipo: 'enlace' }))).json()).toEqual({ error: 'sin_telefono' })
