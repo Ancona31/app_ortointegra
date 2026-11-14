@@ -7,26 +7,30 @@
  * reserva. ⚠️ NADA CLÍNICO: ni el tipo de cita (lista A, 10: puede revelar el
  * padecimiento), ni notas, ni motivo. El nombre de la clínica tampoco (lista
  * A, 24): va el médico, el consultorio, su dirección y su teléfono.
+ *
+ * Tanda G1: el HTML y el texto los arma `plantillaCita.ts` (marca, jerarquía,
+ * botones grandes, sin depender de imágenes). Las firmas, los asuntos y las
+ * frases del texto plano NO cambiaron (las leen las e2e y quien llama); el
+ * texto plano sólo gana delante «Spinus» y el título.
  */
-import { escapeHtml } from '@/lib/htmlEscape'
+import { fechaDeCorreo, htmlCorreoCita, textoCorreoCita, urlSegura, type PartesCorreo } from '@/lib/correo/plantillaCita'
 
 export interface CorreoListo { asunto: string; texto: string; html: string }
 
-function envolver(parrafos: string[]): string {
-  const cuerpo = parrafos.map(p => `<p style="margin:0 0 12px">${p}</p>`).join('')
-  return `<!doctype html><html lang="es"><body style="font-family:Arial,Helvetica,sans-serif;color:#1a2b3c;line-height:1.5">${cuerpo}</body></html>`
-}
-
 /** El código de 6 dígitos para verificar el correo antes de reservar. */
 export function correoCodigo(medico: string, codigo: string): CorreoListo {
-  const asunto = `Tu código para reservar: ${codigo}`
-  const texto = `Tu código para reservar con ${medico} es ${codigo}. Vence en 10 minutos.\n\nSi no lo pediste, ignora este correo.`
-  const html = envolver([
-    `Tu código para reservar con ${escapeHtml(medico)} es <strong style="font-size:20px;letter-spacing:2px">${escapeHtml(codigo)}</strong>.`,
-    'Vence en 10 minutos.',
-    'Si no lo pediste, ignora este correo.',
-  ])
-  return { asunto, texto, html }
+  const partes: PartesCorreo = {
+    preencabezado: `Tu código es ${codigo}. Vence en 10 minutos.`,
+    titulo: 'Tu código para reservar',
+    parrafos: [`Escríbelo en la página de reserva de ${medico}.`],
+    codigo,
+    pie: ['Vence en 10 minutos.', 'Si no lo pediste, ignora este correo.'],
+  }
+  return {
+    asunto: `Tu código para reservar: ${codigo}`,
+    texto: textoCorreoCita(partes, [`Tu código para reservar con ${medico} es ${codigo}. Vence en 10 minutos.`, 'Si no lo pediste, ignora este correo.']),
+    html: htmlCorreoCita(partes),
+  }
 }
 
 export interface DatosComprobante {
@@ -39,11 +43,6 @@ export interface DatosComprobante {
   zona: string
   /** El enlace de confirmación de la cita (agenda E5), o null/ausente si no se pudo emitir. */
   urlConfirmacion?: string | null
-}
-
-/** Sólo `http(s)://` y sin espacios ni comillas: lo único que entra al `href`. */
-function urlSegura(url: string | null | undefined): string | null {
-  return url && /^https?:\/\/[^\s"'<>]+$/.test(url) ? url : null
 }
 
 /** «lunes 16 de noviembre de 2026, 10:30» en la zona del consultorio. */
@@ -77,12 +76,20 @@ export function correoComprobante(d: DatosComprobante): CorreoListo {
   const cierre = url
     ? 'Para confirmar tu asistencia o avisar que no podrás ir, usa este enlace:'
     : 'Para cambiar o cancelar, comunícate con el consultorio.'
+  const partes: PartesCorreo = {
+    preencabezado: `Tu cita con ${d.medico}: ${cuando}.`,
+    titulo: 'Cita agendada',
+    fecha: fechaDeCorreo(d.inicio, d.zona),
+    datos: [
+      { etiqueta: 'Médico', valor: d.medico }, { etiqueta: 'Consultorio', valor: d.consultorio },
+      { etiqueta: 'Dirección', valor: d.direccion }, { etiqueta: 'Teléfono', valor: d.telefono },
+    ],
+    invitacion: cierre,
+    botones: url ? [{ texto: 'Confirmar o cancelar mi cita', url }] : [],
+  }
   return {
     asunto: `Tu cita con ${d.medico}`,
-    texto: [...renglones, cierre, ...(url ? [url] : [])].join('\n'),
-    html: envolver([
-      ...renglones.map(escapeHtml), escapeHtml(cierre),
-      ...(url ? [`<a href="${escapeHtml(url)}">Confirmar o cancelar mi cita</a>`] : []),
-    ]),
+    texto: textoCorreoCita(partes, [renglones.join('\n'), [cierre, ...(url ? [url] : [])].join('\n')]),
+    html: htmlCorreoCita(partes),
   }
 }

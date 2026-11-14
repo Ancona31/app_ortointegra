@@ -17,9 +17,14 @@
  * del reloj.
  *
  * Todo valor interpolado en el HTML va escapado: el consultorio y su dirección
- * los escribe la clínica.
+ * los escribe la clínica (lo hace `plantillaCita.ts`).
+ *
+ * Tanda G1: el HTML y el texto los arma `plantillaCita.ts`, el mismo armado de
+ * todos los correos de cita. El asunto y las frases del texto plano NO
+ * cambiaron. «No podré asistir» lleva a `?paso=cancelar`, que sólo PINTA el
+ * «¿Seguro?» (un GET que no escribe, como el resto de la página).
  */
-import { escapeHtml } from '@/lib/htmlEscape'
+import { fechaDeCorreo, htmlCorreoCita, textoCorreoCita, type BotonCorreo } from '@/lib/correo/plantillaCita'
 import { regionDeTimezone } from '@/lib/consultorios/zonas-mexico'
 
 /** Zona por omisión si la cita no la guardó (la de la clínica, `TZ_CLINICA`). */
@@ -59,9 +64,12 @@ export function fechaYHora(inicio: string, zona: string): { fecha: string; hora:
   return { fecha, hora }
 }
 
-function envolver(parrafos: string[]): string {
-  const cuerpo = parrafos.map(p => `<p style="margin:0 0 12px">${p}</p>`).join('')
-  return `<!doctype html><html lang="es"><body style="font-family:Arial,Helvetica,sans-serif;color:#1a2b3c;line-height:1.5">${cuerpo}</body></html>`
+/** Los botones: «Confirmo» y «No podré asistir»; con la cita ya confirmada, sólo el segundo. */
+function botonesRecordatorio(url: string, confirmada: boolean): BotonCorreo[] {
+  const cancelar = `${url}?paso=cancelar`
+  return confirmada
+    ? [{ texto: 'Avisar que no podré asistir', url: cancelar }]
+    : [{ texto: 'Confirmo mi asistencia', url }, { texto: 'No podré asistir', url: cancelar, secundario: true }]
 }
 
 /** El recordatorio N horas antes. Lanza sólo si `inicio` no es una fecha. */
@@ -89,12 +97,17 @@ export function correoRecordatorio(d: DatosRecordatorio): CorreoRecordatorio {
     `${llamada}: ${d.url}`,
     plazo,
     cierre,
-  ].join('\n\n')
-  const html = envolver([
-    `Tienes una cita <strong>${escapeHtml(cuando)}</strong>${escapeHtml(conQuien)} en <strong>${escapeHtml(donde)}</strong>.`,
-    `<a href="${escapeHtml(d.url)}" style="color:#1e5fa8;font-weight:bold">${escapeHtml(llamada)}</a>`,
-    escapeHtml(plazo),
-    escapeHtml(cierre),
-  ])
-  return { asunto, texto, html }
+  ]
+  const partes = {
+    preencabezado: `Tienes una cita ${cuando}.`,
+    titulo: 'Recordatorio de tu cita',
+    fecha: { ...fechaDeCorreo(d.inicio, zona), zona: region ? `Zona horaria: ${region}` : null },
+    datos: [
+      { etiqueta: 'Médico', valor: medico }, { etiqueta: 'Consultorio', valor: d.consultorio.nombre },
+      { etiqueta: 'Dirección', valor: direccion }, { etiqueta: 'Teléfono', valor: telefono },
+    ],
+    botones: botonesRecordatorio(d.url, d.confirmada),
+    pie: [plazo, cierre],
+  }
+  return { asunto, texto: textoCorreoCita(partes, texto), html: htmlCorreoCita(partes) }
 }
