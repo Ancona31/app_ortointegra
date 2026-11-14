@@ -112,7 +112,8 @@ test.describe('con el interruptor encendido', () => {
       const engraneMovil = movil.getByRole('button', { name: 'Configuración de la agenda' })
       await expect(engraneMovil).toHaveText('')
       const caja = await engraneMovil.boundingBox()
-      expect(Math.min(caja?.width ?? 0, caja?.height ?? 0)).toBeGreaterThanOrEqual(44)
+      // Redondeado: el navegador da 43.99999… por subpíxeles.
+      expect(Math.round(Math.min(caja?.width ?? 0, caja?.height ?? 0))).toBeGreaterThanOrEqual(44)
     } finally {
       await ctx.close()
     }
