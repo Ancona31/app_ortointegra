@@ -55,7 +55,8 @@ import { ESTADOS_SIN_EMPALME, mensajeEmpalme, type Empalme, type TramoCita } fro
    en diferido (A2.6): un import de valor de ahí lo metería en este chunk. */
 import type { TipoCita } from '@/lib/agenda/tiposCita'
 import { BotonWhatsAppCita } from '@/components/agenda/BotonWhatsAppCita'
-import { motivoSinWhatsApp, telefonoParaWhatsApp } from '@/lib/agenda/whatsappCita'
+import { BotonCorreoCita } from '@/components/agenda/BotonCorreoCita'
+import { correoParaConfirmacion, motivoSinCorreo, motivoSinWhatsApp, telefonoParaWhatsApp } from '@/lib/agenda/whatsappCita'
 
 export type PacienteBusqueda = { id: string; nombre: string; apellidos: string; telefono: string | null }
 
@@ -142,7 +143,10 @@ export type ModalState =
      arrastrado y el médico ya elegido—; `enfocar: 'fecha'` lo trae «Reagendar»
      de la tarjeta de lectura. Opcionales: ninguna ruta de hoy los pone. */
   | { mode: 'create'; fecha: string; hora: string | null; tipo: TipoFila; todoElDia: TodoElDiaInicial; fechaFin?: string; paciente?: PacienteBusqueda; horaFin?: string; medicoId?: string }
-  | { mode: 'edit';   appointment: Appointment; enfocar?: 'fecha' }
+  /* G3 · `reabrir`: «Reagendar cita» de una cita cancelada o con inasistencia
+     (la única acción de su tarjeta) reabre ESA cita: el estado arranca en
+     «Agendada» (se ve y se puede cambiar) y la fecha enfocada. */
+  | { mode: 'edit';   appointment: Appointment; enfocar?: 'fecha'; reabrir?: true }
 
 /**
  * Con qué interruptor de «todo el día» abre el alta, y si se puede tocar.
@@ -390,6 +394,9 @@ export default function AppointmentModal({
   /* T1 · El instante en que se abrió, para la regla del WhatsApp (una cita que
      ya pasó no lo ofrece). Fijo mientras el modal esté abierto. */
   const [abiertoEn] = useState(() => Date.now())
+  /* G3 · Los dos avisos al paciente, con las reglas del servidor. */
+  const avisoWhatsApp = apt ? motivoSinWhatsApp(apt, telefonoParaWhatsApp(apt.pacientes?.telefono, apt.reserva_telefono), abiertoEn) === null : false
+  const avisoCorreo = apt ? motivoSinCorreo(apt, correoParaConfirmacion(apt.pacientes?.email, apt.reserva_correo), abiertoEn) === null : false
 
   /* CITA o EVENTO GENÉRICO. Al editar NO se elige: se deduce de la fila, porque
      el tipo es fijo tras crear (ver `TipoFila`). Al crear lo trae `modal`, y lo
@@ -448,7 +455,7 @@ export default function AppointmentModal({
   const [horaFin,   setHoraFin]   = useState(inicial.horaFin)
   const [todoElDia, setTodoElDia] = useState(todoElDiaInicial)
   const [notes,       setNotes]       = useState(apt?.notes ?? '')
-  const [status,      setStatus]      = useState<Status>(apt?.status ?? 'scheduled')
+  const [status,      setStatus]      = useState<Status>(modal.mode === 'edit' && modal.reabrir ? 'scheduled' : apt?.status ?? 'scheduled')
   /* Dos siembras, una por modo. En EDICIÓN sale de la fila; en ALTA sale de
      `modal.paciente`, que sólo trae el enlace profundo y en los demás casos es
      `undefined` → `null`, o sea el buscador en blanco de siempre.
@@ -1681,13 +1688,20 @@ export default function AppointmentModal({
               MISMA regla del servidor (`motivoSinWhatsApp`): con paciente o por
               ligar, agendada o confirmada, con hora, futura y con teléfono de
               México. Si aun así el servidor la rechaza, el botón dice el motivo. */}
-          {isEdit && agendaV2 && apt && !esEvento
-            && motivoSinWhatsApp(apt, telefonoParaWhatsApp(apt.pacientes?.telefono, apt.reserva_telefono), abiertoEn) === null && (
+          {/* G3 (puntos 14 y 15): «Enviar confirmación» (WhatsApp, una línea a
+              todo el ancho; «Enviar recordatorio» si ya está confirmada) y el
+              correo PROPIO de Spinus, «Enviar confirmación por correo», con o
+              sin Google (`motivoSinCorreo`, la regla de la ruta). La invitación
+              de Google sigue arriba, en «Invitados», como un extra. */}
+          {isEdit && agendaV2 && apt && !esEvento && (avisoWhatsApp || avisoCorreo) && (
             <div>
               <label className="block text-[11px] font-bold uppercase tracking-[.06em] mb-2" style={{ color: 'var(--ag-muted2)' }}>
-                WhatsApp
+                Avisar al paciente
               </label>
-              <BotonWhatsAppCita citaId={apt.id} tipo="enlace" marcadoEn={apt.whatsapp_sent_at ?? null} />
+              <div className="flex flex-col gap-2">
+                {avisoWhatsApp && <BotonWhatsAppCita citaId={apt.id} tipo="enlace" marcadoEn={apt.whatsapp_sent_at ?? null} confirmada={apt.status === 'confirmed'} />}
+                {avisoCorreo && <BotonCorreoCita citaId={apt.id} confirmada={apt.status === 'confirmed'} />}
+              </div>
             </div>
           )}
         </div>

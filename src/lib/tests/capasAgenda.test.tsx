@@ -16,7 +16,7 @@ vi.mock('@/lib/supabase/client', () => ({ createClient: () => { throw new Error(
 import AyudaAtajos from '@/components/agenda/AyudaAtajos'
 import MiniMes from '@/components/agenda/MiniMes'
 import BuscadorCitas from '@/components/agenda/BuscadorCitas'
-import BurbujaAlta from '@/components/agenda/BurbujaAlta'
+import BurbujaAlta, { AcuseAgendada } from '@/components/agenda/BurbujaAlta'
 import TarjetaLectura from '@/components/agenda/TarjetaLectura'
 import { ATAJOS } from '@/lib/agenda/atajosAgenda'
 import type { Appointment } from '@/lib/agenda/tiposAgenda'
@@ -103,6 +103,17 @@ const CITA: Appointment = {
   pacientes: { id: 'p1', nombre: 'Hugo', apellidos: 'Interián', telefono: '9991234567' },
 }
 
+describe('BurbujaAlta tras agendar (G3, punto 19)', () => {
+  it('el acuse dice quién y cuándo y, si el consultorio está en otra zona, su hora y región', () => {
+    const otra = renderToStaticMarkup(<AcuseAgendada cita={{ ...CITA, consultorio_timezone: 'America/Tijuana' }} zonaVisor="America/Merida" />)
+    expect(otra).toContain('Cita agendada')
+    expect(otra).toContain('Hugo Interián · Mié 11 nov · 10:00 – 11:00')
+    expect(otra).toMatch(/class="ag-lectura-huso">08:00–09:00 hora Baja California</)
+    const misma = renderToStaticMarkup(<AcuseAgendada cita={CITA} zonaVisor="America/Merida" />)
+    expect(misma).not.toContain('ag-lectura-huso')
+  })
+})
+
 describe('TarjetaLectura', () => {
   const props = { ancla: { left: 0, top: 0, width: 100, height: 40 }, comoHoja: false, zonaVisor: 'America/Merida', alAccion: nada, alCerrar: nada }
   const html = renderToStaticMarkup(<TarjetaLectura {...props} cita={CITA} puedeIniciarConsulta />)
@@ -116,8 +127,8 @@ describe('TarjetaLectura', () => {
     expect(html.indexOf('Iniciar consulta')).toBeLessThan(html.indexOf('Confirmar'))
     expect(html).not.toContain('Eliminar')
   })
-  it('enseña hora, consultorio, teléfono y nota', () => {
-    expect(html).toContain('10:00–11:00')
+  it('enseña fecha y hora juntas (G3), consultorio, teléfono y nota', () => {
+    expect(html).toContain('Mié 11 nov · 10:00 – 11:00')
     expect(html).toContain('Centro')
     expect(html).toContain('9991234567')
     expect(html).toContain('ag-lectura-nota')
@@ -136,8 +147,14 @@ describe('TarjetaLectura', () => {
     expect(sin).not.toContain('>Confirmar<')
     expect(sin).toContain('Reagendar')
   })
-  it('F3: el hueco `extra` pinta lo que le den (el WhatsApp de E7)', () => {
-    const conExtra = renderToStaticMarkup(<TarjetaLectura {...props} cita={CITA} puedeIniciarConsulta extra={<span data-whatsapp-cita="c" />} />)
-    expect(conExtra).toContain('data-whatsapp-cita="c"')
+  it('G3: el WhatsApp de E7 es una pieza de la rejilla (a todo el ancho y en una línea si va solo)', () => {
+    const conAviso = renderToStaticMarkup(<TarjetaLectura {...props} cita={CITA} puedeIniciarConsulta
+      whatsapp={o => <span data-whatsapp-cita="c" data-dos-lineas={String(o.dosLineas)} className={o.claseCelda} />} />)
+    expect(conAviso).toContain('data-whatsapp-cita="c"')
+    // Agendada: Confirmar | Reagendar, y el aviso solo, a todo el ancho y en una línea.
+    expect(conAviso).toContain('data-dos-lineas="false"')
+    const confirmada = renderToStaticMarkup(<TarjetaLectura {...props} cita={{ ...CITA, status: 'confirmed' }} puedeIniciarConsulta
+      whatsapp={o => <span data-whatsapp-cita="c" data-dos-lineas={String(o.dosLineas)} />} />)
+    expect(confirmada).toContain('data-dos-lineas="true"')
   })
 })

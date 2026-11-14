@@ -7,37 +7,71 @@
  * propósito, porque dos nombres que sólo se distinguen por la mayúscula no
  * compilan en macOS ni en Windows (CLAUDE.md, «Estilo de código»).
  *
- * Reglas (diseño F §3.2 y decisión 20):
- *   · Evento sin paciente: «Editar» y «Eliminar» (eliminar SÓLO aquí: una cita
- *     con paciente se cancela, no se borra — P2). T3: si nació en Google, tiene
- *     hora, médico y sigue viva, además «Convertir en cita» (§2, AG-DT-29).
- *   · Cita (con paciente o por ligar):
- *       – «Iniciar consulta», la acción principal, si el llamador dice que se
- *         puede (las mismas condiciones que el modal: puede ver expedientes, es
- *         su cita y el consultorio existe). En una por ligar abre el modal,
- *         donde vive el ligado (D7); eso lo decide el llamador.
- *       – «Confirmar» sólo si está agendada.
- *       – «Reagendar» y «Cancelar» mientras esté agendada o confirmada: una
- *         cita atendida, cancelada o con inasistencia ya pasó por su estado y no
- *         se mueve ni se cancela desde aquí (desde «Editar», sí, como hoy).
- *       – «Editar» siempre: es el modal de hoy, entero.
+ * Reglas (diseño F §3.2 y decisión 20; G3, punto 17 de la tanda de diseño,
+ * con el ajuste de Angel «las acciones dependen del estado de la cita»):
+ *   · «Editar» ya no es un botón en una CITA: hacía lo mismo que «Reagendar».
+ *     El formulario completo se abre con el engrane «Configuración de la
+ *     cita» de la cabecera (en TODAS las tarjetas).
+ *   · Cita con paciente, por estado:
+ *       – Agendada: «Iniciar consulta» (si el llamador dice que se puede: las
+ *         mismas condiciones que el modal), «Confirmar», «Reagendar», el aviso
+ *         por WhatsApp y, aparte, «Cancelar cita».
+ *       – Confirmada: igual, sin «Confirmar» (el aviso pasa a recordatorio).
+ *       – Atendida: SÓLO «Ver expediente» (la atención concluyó): ni iniciar,
+ *         ni reagendar, ni avisos, ni cancelar.
+ *       – Cancelada o No asistió: SÓLO «Reagendar cita» (reabre la MISMA cita
+ *         en el formulario, con la fecha enfocada y el estado «Agendada»).
+ *   · Cita por ligar y evento sin paciente: conservan lo que tenían, en su
+ *     orden (incluido «Editar»), con el engrane. Evento: «Editar», T3
+ *     «Convertir en cita» si nació en Google (§2, AG-DT-29), y «Eliminar»
+ *     aparte (eliminar SÓLO aquí: una cita con paciente se cancela — P2).
  *   · Los bloques de Google no abren nada (los filtra `abrirCita` antes).
+ * El SERVIDOR rechaza lo que no corresponde al estado aunque se llame a mano
+ * (`vetoPorEstado` de `estadoCita.ts`, en `PUT /api/appointments/[id]`; el WhatsApp y el correo,
+ * con `motivoSinWhatsApp`/`motivoSinCorreo`): ocultar el botón no basta.
  */
 import type { Appointment, Status } from '@/lib/agenda/tiposAgenda'
 import { esEventoGenerico, esPorLigar } from '@/lib/agenda/tarjetasAgenda'
 import { horaEnTZ } from '@/lib/agenda/fechasAgenda'
 import { regionDeTimezone } from '@/lib/consultorios/zonas-mexico'
 
-export type AccionTarjeta = 'iniciar-consulta' | 'confirmar' | 'reagendar' | 'cancelar' | 'editar' | 'convertir' | 'eliminar'
+export type AccionTarjeta =
+  | 'iniciar-consulta' | 'ver-expediente' | 'confirmar' | 'reagendar' | 'reagendar-cita' | 'cancelar' | 'editar' | 'convertir' | 'eliminar'
 
 export const ETIQUETA_ACCION: Record<AccionTarjeta, string> = {
   'iniciar-consulta': 'Iniciar consulta',
+  'ver-expediente': 'Ver expediente',
   confirmar: 'Confirmar',
   reagendar: 'Reagendar',
+  'reagendar-cita': 'Reagendar cita',
   cancelar: 'Cancelar cita',
   editar: 'Editar',
   convertir: 'Convertir en cita',
   eliminar: 'Eliminar evento',
+}
+
+/** G3 · Una pieza de la rejilla de acciones: una acción o el aviso por WhatsApp (su propio componente). */
+export type PiezaTarjeta = AccionTarjeta | 'whatsapp'
+
+/**
+ * G3 · Cómo se pinta la tarjeta: la acción PRINCIPAL a todo el ancho, las
+ * SECUNDARIAS en dos columnas iguales (si quedan impares, la última ocupa la
+ * fila entera: nada suelto) y la de PELIGRO aparte, al final.
+ */
+export interface DisposicionTarjeta {
+  principal: AccionTarjeta | null
+  secundarias: PiezaTarjeta[]
+  peligro: AccionTarjeta | null
+}
+
+/** Lo que la tarjeta sabe además de la cita. */
+export interface OpcionesDisposicion {
+  /** `false` mientras no haya con qué confirmar (`cambiarEstadoCita`). */
+  conConfirmar?: boolean
+  /** El aviso por WhatsApp aplica (`motivoSinWhatsApp`, la regla del servidor). */
+  conWhatsApp?: boolean
+  /** Quien mira puede abrir el expediente (médico) y la cita tiene paciente. */
+  puedeVerExpediente?: boolean
 }
 
 const VIVAS: readonly Status[] = ['scheduled', 'confirmed']
@@ -57,19 +91,45 @@ export function esConvertible(cita: CitaTarjeta): boolean {
     && Boolean(cita.medico_id) && VIVAS.includes(cita.status)
 }
 
+/** Evento sin paciente y cita por ligar: lo que ya tenían, en su orden (G3: con el engrane además). */
+function disposicionSinCambios(cita: CitaTarjeta, puedeIniciar: boolean, o: OpcionesDisposicion): DisposicionTarjeta {
+  if (esEventoGenerico(cita)) {
+    return { principal: null, secundarias: esConvertible(cita) ? ['editar', 'convertir'] : ['editar'], peligro: 'eliminar' }
+  }
+  const viva = VIVAS.includes(cita.status)
+  const secundarias: PiezaTarjeta[] = []
+  if (o.conConfirmar !== false && cita.status === 'scheduled') secundarias.push('confirmar')
+  if (viva) secundarias.push('reagendar')
+  secundarias.push('editar')
+  if (o.conWhatsApp) secundarias.push('whatsapp')
+  return { principal: puedeIniciar ? 'iniciar-consulta' : null, secundarias, peligro: viva ? 'cancelar' : null }
+}
+
 /**
- * Las acciones de la cita, en el orden en que se pintan (la principal primero).
- * `conConfirmar: false` la quita aunque la cita esté agendada: el enchufe la
- * apaga mientras `guardadoCitas` no exponga `cambiarEstadoCita` (`contratosV2.ts`).
+ * G3 · Las acciones de la tarjeta, por estado (ver la cabecera). Sólo se
+ * devuelven las que aplican a ESA cita.
  */
-export function accionesDeTarjeta(cita: CitaTarjeta, puedeIniciarConsulta: boolean, conConfirmar = true): AccionTarjeta[] {
-  if (esEventoGenerico(cita)) return esConvertible(cita) ? ['editar', 'convertir', 'eliminar'] : ['editar', 'eliminar']
-  const acciones: AccionTarjeta[] = []
-  if (puedeIniciarConsulta) acciones.push('iniciar-consulta')
-  if (conConfirmar && cita.status === 'scheduled') acciones.push('confirmar')
-  if (VIVAS.includes(cita.status)) acciones.push('reagendar', 'cancelar')
-  acciones.push('editar')
-  return acciones
+export function disposicionDeTarjeta(cita: CitaTarjeta, puedeIniciar: boolean, o: OpcionesDisposicion = {}): DisposicionTarjeta {
+  if (esEventoGenerico(cita) || esPorLigar(cita)) return disposicionSinCambios(cita, puedeIniciar, o)
+  if (cita.status === 'attended') return { principal: o.puedeVerExpediente ? 'ver-expediente' : null, secundarias: [], peligro: null }
+  if (cita.status === 'cancelled' || cita.status === 'no_show') return { principal: 'reagendar-cita', secundarias: [], peligro: null }
+  const secundarias: PiezaTarjeta[] = []
+  if (o.conConfirmar !== false && cita.status === 'scheduled') secundarias.push('confirmar')
+  secundarias.push('reagendar')
+  if (o.conWhatsApp) secundarias.push('whatsapp')
+  return { principal: puedeIniciar ? 'iniciar-consulta' : null, secundarias, peligro: 'cancelar' }
+}
+
+/**
+ * Las acciones de la cita en el orden en que se recorren (principal,
+ * secundarias, peligro), sin el aviso por WhatsApp. `conConfirmar: false` la
+ * quita aunque la cita esté agendada: el enchufe la apaga mientras
+ * `guardadoCitas` no exponga `cambiarEstadoCita` (`contratosV2.ts`).
+ */
+export function accionesDeTarjeta(cita: CitaTarjeta, puedeIniciarConsulta: boolean, conConfirmar = true, puedeVerExpediente = false): AccionTarjeta[] {
+  const d = disposicionDeTarjeta(cita, puedeIniciarConsulta, { conConfirmar, puedeVerExpediente })
+  const secundarias = d.secundarias.filter((p): p is AccionTarjeta => p !== 'whatsapp')
+  return [...(d.principal ? [d.principal] : []), ...secundarias, ...(d.peligro ? [d.peligro] : [])]
 }
 
 /** Quién mira, para decidir «Iniciar consulta». */
@@ -112,6 +172,30 @@ export function nombreDeTarjeta(cita: Pick<Appointment, 'title' | 'pacientes' | 
 /** El teléfono de contacto: el de la ficha o el que dejó quien reservó. */
 export function telefonoDeTarjeta(cita: Pick<Appointment, 'pacientes' | 'reserva_telefono'>): string | null {
   return cita.pacientes?.telefono ?? cita.reserva_telefono ?? null
+}
+
+/**
+ * G3 (punto 17) · La fecha y la hora juntas, como dato principal de la
+ * tarjeta, en la zona de quien mira: «Lun 14 nov · 08:00 – 09:00», y la
+ * duración aparte («60 min»). La etiqueta del consultorio en otra zona sigue
+ * siendo `horarioDeTarjeta(…).enConsultorio`.
+ */
+export function cuandoDeTarjeta(
+  cita: Pick<Appointment, 'start_time' | 'end_time'>, zonaVisor: string,
+): { fechaHora: string; duracion: string | null } {
+  let dia = ''
+  try {
+    const partes = new Intl.DateTimeFormat('es-MX', { weekday: 'short', day: 'numeric', month: 'short', timeZone: zonaVisor })
+      .formatToParts(new Date(cita.start_time))
+    const parte = (t: string): string => (partes.find(p => p.type === t)?.value ?? '').replace('.', '')
+    const semana = parte('weekday')
+    dia = `${semana.charAt(0).toUpperCase()}${semana.slice(1)} ${parte('day')} ${parte('month')}`
+  } catch {
+    dia = ''
+  }
+  const tramo = `${horaEnTZ(cita.start_time, zonaVisor)} – ${horaEnTZ(cita.end_time, zonaVisor)}`
+  const min = Math.round((new Date(cita.end_time).getTime() - new Date(cita.start_time).getTime()) / 60000)
+  return { fechaHora: dia ? `${dia} · ${tramo}` : tramo, duracion: min > 0 ? `${min} min` : null }
 }
 
 /**

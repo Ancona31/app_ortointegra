@@ -6090,6 +6090,106 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
   overflow: hidden;
 }
 
+/* ── G3 (puntos 15, 17 y 19 de la tanda de diseño) · tarjeta de la cita y
+   burbuja tras agendar, con la maqueta «Burbuja y tarjeta» como referencia:
+   cabecera con la píldora en la línea del nombre y el engrane y la ✕ arriba;
+   la fecha y la hora juntas como dato principal; y las acciones en una
+   REJILLA PAREJA: la principal a todo el ancho, las demás en dos columnas
+   iguales (si quedan impares, la última a todo el ancho: nada suelto), todas
+   del MISMO alto, y la de peligro aparte, al final. Sin animaciones nuevas.
+   Sólo tokens con contraparte oscura. */
+.ag-capa--tarjeta { width: 360px; }   /* el ancho de la maqueta */
+.ag-lectura-cab { align-items: flex-start; gap: var(--ag-1-5); }
+/* Como la maqueta: el nombre en una línea, con puntos suspensivos si no cabe
+   (el nombre entero sigue siendo el nombre accesible del diálogo). */
+.ag-lectura-cab .ag-capa-titulo {
+  padding-top: 6px;
+  font-size: 16px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  overflow-wrap: normal;
+}
+.ag-lectura-cab .ag-capa-cerrar { width: 32px; height: 32px; }
+.ag-hoja .ag-lectura-cab .ag-capa-cerrar { width: 44px; height: 44px; }
+.ag-lectura-pildoras {
+  flex: none;
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--ag-1);
+  max-width: 45%;
+  padding-top: 7px;
+}
+.ag-lectura-cuando {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.3;
+  font-variant-numeric: tabular-nums;
+  color: var(--ag-ink);
+}
+.ag-lectura-cuando small { display: block; margin-top: 2px; font-size: 12.5px; font-weight: 500; color: var(--ag-muted); }
+.ag-lectura-cuando .ag-lectura-huso { font-weight: 600; }
+.ag-lectura-acciones {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--ag-2);
+}
+.ag-lectura-acciones > * { min-width: 0; }
+.ag-lectura-acciones .ag-capa-boton {
+  width: 100%;
+  height: auto;
+  min-height: 48px;
+  padding: var(--ag-1) var(--ag-2-5);
+  line-height: 1.2;
+}
+.ag-lectura-ancho { grid-column: 1 / -1; }
+.ag-lectura-celda { display: flex; }
+.ag-capa-dos-lineas { display: flex; flex-direction: column; align-items: flex-start; text-align: left; }
+.ag-lectura-sep { grid-column: 1 / -1; height: 1px; margin: var(--ag-1) 0 0; background: var(--ag-hairline); }
+.ag-lectura-peligro {
+  grid-column: 1 / -1;
+  justify-self: center;
+  min-height: 36px;
+  padding: 0 var(--ag-3);
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ag-status-cancelled-text);
+  background: transparent;
+  border: 0;
+  border-radius: var(--ag-r-btn);
+  transition: background-color var(--ag-dur-micro) var(--ag-ease);
+}
+.ag-lectura-peligro:hover { background: var(--ag-btn-ghost-hover); }
+.ag-hoja .ag-lectura-peligro { min-height: 44px; }
+.ag-lectura-mensaje { margin: 0; font-size: 12px; line-height: 1.4; color: var(--ag-muted); }
+.ag-capa-acuse { display: flex; align-items: center; gap: var(--ag-2-5); }
+.ag-capa-acuse-icono {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  color: var(--ag-success-text);
+  background: var(--ag-success-bg);
+  border: 1px solid var(--ag-success-border);
+}
+.ag-capa-acuse .ag-lectura-cuando { font-size: 15.5px; }
+.ag-capa-enlace {
+  align-self: center;
+  min-height: 32px;
+  padding: 0 var(--ag-2-5);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ag-brand-legible);
+  background: transparent;
+  border: 0;
+  border-radius: var(--ag-r-btn);
+}
+.ag-capa-enlace:hover { background: var(--ag-btn-ghost-hover); }
+
 /* La ayuda de atajos. */
 .ag-atajos {
   margin: 0;

@@ -210,6 +210,7 @@ function CapaBurbuja({ capa, medicos, p, cerrar }: PropsCapaBurbuja): ReactEleme
       puedeInvitar={p.puedeInvitar}
       alInvitar={(cita) => { cerrar(capa.id); p.invitar(cita) }}
       alEditar={(cita) => { cerrar(capa.id); p.setModal({ mode: 'edit', appointment: cita }) }}
+      zonaVisor={p.zonaVisor}
       alCerrar={() => cerrar(capa.id)}
     />
   )
@@ -241,6 +242,15 @@ function ejecutarAccion(a: AccionTarjeta, cita: Appointment, x: ContextoAccion):
       case 'editar': editar(); return
       case 'convertir': x.convertir(); return
       case 'reagendar': editar('fecha'); return
+      /* G3 · Cancelada o no asistió: reabre ESTA cita (lo que menos cambia lo
+         de hoy, donde se reactivaba en el modal), con la fecha enfocada y el
+         estado «Agendada» ya puesto. */
+      case 'reagendar-cita': x.p.setModal({ mode: 'edit', appointment: cita, enfocar: 'fecha', reabrir: true }); return
+      /* G3 · Atendida: sólo ver el expediente (la atención concluyó). */
+      case 'ver-expediente':
+        if (cita.pacientes) x.navegar(`/expediente/${cita.pacientes.id}`)
+        else editar()
+        return
       case 'confirmar': void guardado.cambiarEstadoCita?.(cita.id, 'confirmed'); return
       case 'cancelar': void guardado.handleCancelar(cita.id); return
       /* B3: borrar sólo un evento sin paciente, aunque la tarjeta ya no ofrezca
@@ -298,10 +308,14 @@ function CapaTarjeta({ capa, p, cerrar, vigia, fijar, abrirConvertir }: PropsCap
       alAccion={alAccion} alCerrar={() => cerrar(capa.id)}
       alPasar={capa.alPasar} sinEntrada={capa.sinEntrada} alFijar={fijar}
       alEntrarPuntero={() => vigia.current?.entrarTarjeta()} alSalirPuntero={() => vigia.current?.salirTarjeta()}
+      puedeVerExpediente={p.quien.esMedico && Boolean(cita.pacientes)}
       /* E7 · el WhatsApp manual, con la regla del modal y del servidor (T1).
-         Montarlo no emite nada: sólo al pulsar. */
-      extra={conWhatsApp
-        ? <BotonWhatsAppCita citaId={cita.id} tipo="enlace" marcadoEn={cita.whatsapp_sent_at ?? null} compacto />
+         Montarlo no emite nada: sólo al pulsar. G3: una pieza más de la
+         rejilla de la tarjeta («Enviar confirmación» / «Enviar recordatorio»). */
+      whatsapp={conWhatsApp
+        ? (o) => <BotonWhatsAppCita citaId={cita.id} tipo="enlace" marcadoEn={cita.whatsapp_sent_at ?? null} enCapa
+            confirmada={capa.vista.status === 'confirmed'} dosLineas={o.dosLineas} claseCelda={o.claseCelda}
+            tabIndex={o.tabIndex} onFocus={o.onFocus} alMensaje={o.alMensaje} />
         : undefined}
     />
   )

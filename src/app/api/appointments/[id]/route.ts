@@ -14,6 +14,7 @@ import { comprobarTopeDuracion } from '@/lib/agenda/topeDuracion'
 import { agendaV2Encendida } from '@/lib/agenda/ajustesAgenda'
 import { comprobarEmpalmes, type VeredictoEmpalme } from '@/lib/agenda/empalmesServidor'
 import { ESTADOS_SIN_EMPALME } from '@/lib/agenda/empalmesCita'
+import { vetoPorEstado } from '@/lib/agenda/estadoCita'
 import { comprobarTipoDelPut, leerTipoCitaId, CUERPO_TIPO_INVALIDO } from '@/lib/agenda/tipoCitaServidor'
 import { auditarLigado, estaPorLigar, pacienteParaGoogle, pacienteVisible, vetoDeConversion } from '@/lib/agenda/porLigarServidor'
 import {
@@ -366,6 +367,16 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
     if (convirtiendo) {
       const veto = await vetoDeConversion(supabase, profile.clinica_id, paciente_id, consultorio_id)
       if (veto) return NextResponse.json(veto.cuerpo, { status: veto.estado })
+    }
+
+    /* G3 (punto 17.3 de la tanda de diseño): con v2, el servidor rechaza lo
+       que no corresponde al ESTADO aunque la tarjeta ya no lo ofrezca. Una
+       atendida no se confirma, no se cancela y no se mueve (también por
+       arrastre); se puede corregir su estado a «Agendada» o «No asistió» desde
+       el formulario. Ver `vetoPorEstado`. Apagada, como siempre. */
+    if (v2) {
+      const vetoEstado = vetoPorEstado(existing, { status, start_time, end_time, all_day })
+      if (vetoEstado) return NextResponse.json({ error: 'estado_no_admite', message: vetoEstado }, { status: 409 })
     }
 
     if (clientUpdatedAt && existing.updated_at !== clientUpdatedAt) {

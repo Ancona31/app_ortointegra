@@ -14,7 +14,8 @@ import { fechaHoraLocalAInstante } from '../src/lib/dates'
  *   · Confirmar → PUT `confirmed` (`cambiarEstadoCita`, de `guardadoCitas`);
  *   · Cancelar → aviso y PUT `cancelled`, NUNCA un DELETE (B3);
  *   · Eliminar → sólo en un evento sin paciente, con aviso y DELETE;
- *   · Editar → el modal de hoy; Reagendar → el modal con el foco en la fecha;
+ *   · el engrane «Configuración de la cita» (G3: sustituye a «Editar») → el
+ *     modal de hoy; Reagendar → el modal con el foco en la fecha;
  *   · Iniciar consulta → `/expediente/<paciente>/nueva-nota?cita=<id>`; en una
  *     por ligar, el modal (donde vive D7).
  * En el teléfono es una hoja inferior.
@@ -181,14 +182,17 @@ test('encendido: Cancelar pregunta y manda PUT cancelled; NINGÚN DELETE (B3)', 
   expect(sqlLocal(`select status from public.appointments where id = :'id'`, { id })).toBe('cancelled')
 })
 
-test('encendido: Editar abre el modal de hoy', async ({ page }) => {
+/* G3 (punto 17): «Editar» ya no es un botón de una cita; el formulario completo
+   se abre con el engrane «Configuración de la cita» de la cabecera. */
+test('encendido: el engrane «Configuración de la cita» abre el modal de hoy (y no hay «Editar»)', async ({ page }) => {
   soloEn('escritorio')
   interruptorAgenda('A', true)
   await alta(page, '15:50', 'Prueba 18')
   await abrirAgendaV2(page)
   await aLaSemanaMasDos(page)
   await citaEnRejilla(page, 'Prueba 18').click()
-  await tarjetaLectura(page).getByRole('button', { name: 'Editar', exact: true }).click()
+  await expect(tarjetaLectura(page).getByRole('button', { name: 'Editar', exact: true })).toHaveCount(0)
+  await tarjetaLectura(page).getByRole('button', { name: 'Configuración de la cita', exact: true }).click()
   await expect(modalCita(page, 'Editar cita')).toBeVisible()
   await expect(tarjetaLectura(page)).toHaveCount(0)
 })
