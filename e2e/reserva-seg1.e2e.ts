@@ -99,10 +99,49 @@ test('punto 6: el bloqueo manual por teléfono corta el fijo y también el enlac
   expect(unico).toMatchObject({ status: 403, cuerpo: { error: 'autoservicio_cerrado' } })
 })
 
+/** ¿Cuántas citas activas (no canceladas ni «no asistió») tiene el médico ese día de pared en Mérida?
+    Los mismos criterios que `reserva_ocupacion` (clínica, médico, estados, solape). */
+function citasDelDia(dia: string): number {
+  return Number(sqlLocal(`
+    select count(*) from public.appointments
+     where clinica_id = :'clinica' and medico_id = :'medico' and status not in ('cancelled', 'no_show')
+       and start_time < ((:'dia'::date) + 1)::timestamp at time zone 'America/Merida'
+       and end_time > (:'dia'::date)::timestamp at time zone 'America/Merida';`, { clinica: e.clinicaId, medico: e.medicoId, dia }))
+}
+
+/**
+ * Un turno de un día en que el médico NO tiene ninguna otra cita, buscando
+ * semana a semana desde la cuarta (lejos de los turnos que gastan las demás
+ * pruebas y dentro del horizonte de 60 días de la semilla).
+ *
+ * ⚠️ POR QUÉ NO SIRVE «el último turno libre» (la versión anterior, que fallaba
+ * según el día): la ruta, ANTES de la RPC, exige que el turno se haya podido
+ * ofrecer (`turnoValido`): con la ocupación del momento o, si no, con la
+ * jornada VACÍA. Con el evento de todo el día puesto sólo vale lo segundo, y
+ * por P9 los turnos arrancan en cada hueco: si ese día había una cita de 13:00
+ * a 13:15, el último turno libre era, p. ej., 17:15, que no está alineado a la
+ * jornada vacía (08:00, 08:30…) → 400 `turno_invalido` antes de llegar a la
+ * RPC. Qué día caía y qué citas tenía dependía de la fecha de la siembra y de
+ * hoy. En un día sin citas todos los turnos están alineados, así que la
+ * petición llega a la RPC y la prueba vuelve a medir lo que quiere: que el
+ * evento de todo el día OCUPA dentro de la RPC (409 `turno_ocupado`).
+ */
+async function turnoDeDiaSinCitas(codigo: string): Promise<{ turno: Turno; desde: number }> {
+  for (let desde = 21; desde <= 49; desde += 7) {
+    const vistos = new Map<string, boolean>()
+    const vacio = (dia: string): boolean => {
+      if (!vistos.has(dia)) vistos.set(dia, citasDelDia(dia) === 0)
+      return vistos.get(dia) === true
+    }
+    const turno = (await turnosLibres(e, codigo, desde)).find(t => vacio(diaEnMerida(t.inicio)))
+    if (turno) return { turno, desde }
+  }
+  throw new Error('No hay ningún día sin citas del médico en el horizonte de la reserva')
+}
+
 test('punto 5: un evento de todo el día del médico tapa ese día en el enlace; cancelado, vuelve', async () => {
   const { codigo } = emitirEnlace(e, 'unico')
-  const elegido = libres[libres.length - 1]
-  if (!elegido) throw new Error('sin turnos')
+  const { turno: elegido, desde } = await turnoDeDiaSinCitas(codigo)
   const dia = diaEnMerida(elegido.inicio)
   const id = sqlLocal(`
     insert into public.appointments (clinica_id, medico_id, title, start_time, end_time, status, origen, all_day, consultorio_timezone)
@@ -110,12 +149,12 @@ test('punto 5: un evento de todo el día del médico tapa ese día en el enlace;
             ((:'dia'::date) + 1)::timestamp at time zone 'America/Merida', 'scheduled', 'spinus', true, 'America/Merida')
     returning id;`, { clinica: e.clinicaId, medico: e.medicoId, dia })
   try {
-    const delDia = (await turnosLibres(e, codigo, 21)).filter(t => diaEnMerida(t.inicio) === dia)
+    const delDia = (await turnosLibres(e, codigo, desde)).filter(t => diaEnMerida(t.inicio) === dia)
     expect(delDia).toEqual([])
     const r = await reservar(e, codigo, { inicio: elegido.inicio, persona: personaNueva() })
     expect(r).toMatchObject({ status: 409, cuerpo: { error: 'turno_ocupado' } })
     sqlLocal(`update public.appointments set status = 'cancelled' where id = :'id';`, { id })
-    expect((await turnosLibres(e, codigo, 21)).map(t => t.inicio)).toContain(elegido.inicio)
+    expect((await turnosLibres(e, codigo, desde)).map(t => t.inicio)).toContain(elegido.inicio)
   } finally {
     sqlLocal(`delete from public.appointments where id = :'id';`, { id })
   }
