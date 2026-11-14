@@ -24,23 +24,33 @@
  * citas, reserva por enlace y este dispositivo— con la retícula `--ag-*`
  * (`TarjetaSeccion`), y arriba «Para empezar» mientras al médico le falte un
  * paso. La lista de enlaces se pide aquí una vez y la leen las dos.
+ *
+ * G2 (puntos 5, 7, 8, 10 y 20 de Angel; la maqueta): «Primeros pasos» con su
+ * avance (horario de cada consultorio → duración de la consulta → enlace), un
+ * menú de secciones (columna en escritorio, apilado arriba en el teléfono), y
+ * SIN la sección «Horario de la clínica» ni su «Editar horario»: cada
+ * consultorio tiene el suyo (la herencia única del de la clínica es de G4).
+ * El enlace de reserva de cada médico se queda aquí (punto 20), no en el
+ * perfil. Con la v2 apagada esta pantalla no existe (B4), así que la agenda
+ * apagada sigue abriendo el `HorarioModal` de siempre desde su engrane.
  */
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from 'react'
 import useSWR, { useSWRConfig } from 'swr'
 import { ChevronLeft } from 'lucide-react'
-import { CLAVE_CONFIG, CONFIG_DEDUPE_MS, fetcherConfig, revalidarConfigAlMontar, type ConfigApp } from '@/lib/configApp'
+import { CLAVE_CONFIG, CONFIG_DEDUPE_MS, fetcherConfig, revalidarConfigAlMontar, type ConfigApp, type MedicoConfig } from '@/lib/configApp'
 import type { AjustesAgenda } from '@/lib/agenda/ajustesAgenda'
 import type { TipoCita } from '@/lib/agenda/tiposCita'
 import type { FuenteHorario } from '@/components/agenda/HorarioModal'
-import SeccionHorarioClinica from '@/components/agenda/configuracion/SeccionHorarioClinica'
+import MenuConfiguracion, { type EntradaMenu } from '@/components/agenda/configuracion/MenuConfiguracion'
+import type { Consultorio } from '@/types'
 import SeccionAjustesReserva from '@/components/agenda/configuracion/SeccionAjustesReserva'
 import SeccionDisponibilidad from '@/components/agenda/configuracion/SeccionDisponibilidad'
 import SeccionTiposCita from '@/components/agenda/configuracion/SeccionTiposCita'
 import SeccionEnlacesReserva from '@/components/agenda/configuracion/SeccionEnlacesReserva'
 import SeccionContactosBloqueados from '@/components/agenda/configuracion/SeccionContactosBloqueados'
-import PasosConfiguracion, { pasosDe } from '@/components/agenda/configuracion/PasosConfiguracion'
+import PasosConfiguracion, { pasosDe, type ClavePaso } from '@/components/agenda/configuracion/PasosConfiguracion'
 import { cargarListaEnlaces, type EstadoLista } from '@/components/agenda/configuracion/listaEnlaces'
 import PreferenciaTarjetaAlPasar from '@/components/agenda/configuracion/PreferenciaTarjetaAlPasar'
 import TarjetaSeccion from '@/components/agenda/configuracion/TarjetaSeccion'
@@ -96,22 +106,49 @@ function useListaEnlaces(activa: boolean): { lista: EstadoLista; recargar: () =>
 }
 
 /**
- * La guía de la pantalla (puntos 7 y 8): la lista de enlaces, «Para empezar»
- * del médico que mira y qué hacer tras crear el tipo por defecto.
+ * La guía de la pantalla (puntos 7 y 8): la lista de enlaces, «Primeros pasos»
+ * del médico que mira y qué hacer tras guardar una duración.
  */
-function useGuiaEnlaces(o: { conEnlaces: boolean; esMedico: boolean; usuarioId: string; puedeAdministrar: boolean }) {
+function useGuiaEnlaces(o: { conEnlaces: boolean; esMedico: boolean; usuarioId: string }) {
   const { lista, recargar } = useListaEnlaces(o.conEnlaces)
   const router = useRouter()
   const [, startTransition] = useTransition()
-  /* Tras crear el tipo por defecto desde un enlace: los tipos vienen del servidor
+  /* Tras guardar una duración o un tipo: los tipos vienen del servidor
      (`router.refresh()`) y la preparación de los enlaces, de la lista. */
   const alCrearTipo = useCallback(() => {
     startTransition(() => router.refresh())
     void recargar()
   }, [router, recargar])
-  const pasos = o.esMedico && lista && lista !== 'error' ? pasosDe(lista, o.usuarioId, o.puedeAdministrar) : null
+  const listaBuena = lista && lista !== 'error' ? lista : null
+  const pasos = o.esMedico && listaBuena ? pasosDe(listaBuena, o.usuarioId) : null
   const pendientes = pasos?.some(p => !p.hecho) ? pasos : null
-  return { lista, recargar, alCrearTipo, pendientes }
+  const motivos = listaBuena?.preparacion?.[o.usuarioId] ?? []
+  return { lista, recargar, alCrearTipo, pendientes, motivos, puedeEmitir: listaBuena?.secreto ?? false }
+}
+
+/** La línea de cada paso hecho: tus consultorios, tu duración (o tus tipos), tu enlace. */
+function resumenPasos(usuarioId: string, consultorios: readonly Consultorio[] | null, tipos: readonly TipoCita[] | null): Partial<Record<ClavePaso, string>> {
+  const nombres = (consultorios ?? []).filter(c => c.medico_id === usuarioId && c.activo !== false).map(c => c.nombre)
+  const aplican = (tipos ?? []).filter(t => t.activo && !t.consultorio_id && (t.medico_id === null || t.medico_id === usuarioId))
+  const mia = aplican.find(t => t.principal && t.medico_id === usuarioId)
+  return {
+    horario: nombres.length ? nombres.join(' y ') : undefined,
+    duracion: mia ? `${mia.duracion_min} min` : aplican.map(t => `${t.nombre} · ${t.duracion_min} min`).join(', ') || undefined,
+    enlace: 'Creado',
+  }
+}
+
+/** Las entradas del menú, en el orden de la página; sin las secciones que quien mira no tiene. */
+function entradasMenu(pendientes: number | null, conEnlaces: boolean): EntradaMenu[] {
+  return [
+    ...(pendientes ? [{ destino: 'config-pasos', texto: 'Primeros pasos', nota: `${pendientes} ${pendientes === 1 ? 'pendiente' : 'pendientes'}` }] : []),
+    { destino: 'config-disponibilidad', texto: 'Horario y disponibilidad' },
+    { destino: 'config-tipos', texto: 'Duración y tipos de cita' },
+    ...(conEnlaces ? [{ destino: 'config-enlaces', texto: 'Enlaces de reserva' }] : []),
+    { destino: 'config-ajustes', texto: 'Plazos y recordatorios' },
+    ...(conEnlaces ? [{ destino: 'config-bloqueados', texto: 'Contactos bloqueados' }] : []),
+    { destino: 'config-dispositivo', texto: 'Este dispositivo' },
+  ]
 }
 
 /** El encabezado: volver a la agenda, el título y para qué sirve la pantalla. */
@@ -124,8 +161,8 @@ function Encabezado({ puedeAdministrar }: { puedeAdministrar: boolean }) {
       <h1 className="text-2xl font-semibold text-[var(--ag-text)]">Configuración del calendario</h1>
       <p className="text-sm text-[var(--ag-muted)]">
         {puedeAdministrar
-          ? 'Horario, tipos de cita y reserva por enlace de la clínica.'
-          : 'El horario de la clínica, los ajustes y los tipos de cita los cambia quien administra la clínica; aquí los ves en solo lectura.'}
+          ? 'Horario de cada consultorio, duración de la consulta y reserva por enlace.'
+          : 'Los ajustes de la clínica y los cambios a los tipos de cita los hace quien administra la clínica; aquí los ves en solo lectura.'}
       </p>
     </header>
   )
@@ -155,48 +192,81 @@ function useConfigAgregada() {
   return { config, fuente, actualizarConfig }
 }
 
+/** «Preferencias de este dispositivo». Integración T2+T3: en su tarjeta, para que el grupo siga la retícula de las demás. */
+function GrupoDispositivo() {
+  return (
+    <Grupo titulo="Preferencias de este dispositivo" nota="Valen sólo en este navegador; no cambian nada para los demás.">
+      <TarjetaSeccion id="config-dispositivo" titulo="Tarjeta de la cita">
+        <PreferenciaTarjetaAlPasar />
+      </TarjetaSeccion>
+    </Grupo>
+  )
+}
+
+/** «Reserva por enlace»: los enlaces de cada médico, los plazos y los contactos bloqueados. */
+function GrupoReserva(p: {
+  lista: EstadoLista; recargar: () => Promise<void>; medicos: MedicoConfig[]; usuarioId: string; ajustes: AjustesAgenda | null
+  gestionaTodos: boolean; esMedico: boolean; puedeAdministrar: boolean; alCrearTipo: () => void; conPrimerosPasos: boolean
+}) {
+  const conEnlaces = p.gestionaTodos || p.esMedico
+  return (
+    <Grupo titulo="Reserva por enlace">
+      {conEnlaces && (
+        <SeccionEnlacesReserva lista={p.lista} recargar={p.recargar} medicos={p.medicos} usuarioId={p.usuarioId}
+          gestionaTodos={p.gestionaTodos} vigenciaDias={p.ajustes?.vigencia_enlace_unico_dias ?? null}
+          puedeCrearTipos={p.puedeAdministrar} alCrearTipo={p.alCrearTipo} conPrimerosPasos={p.conPrimerosPasos} />
+      )}
+      <SeccionAjustesReserva inicial={p.ajustes} puedeEditar={p.puedeAdministrar} />
+      {conEnlaces && <SeccionContactosBloqueados medicos={p.medicos} gestionaTodos={p.gestionaTodos} />}
+    </Grupo>
+  )
+}
+
 export default function ConfiguracionCalendario({ ajustes, tipos, puedeAdministrar, usuarioId, gestionaReservasDeTodos, esMedico }: Props) {
   const { config, fuente, actualizarConfig } = useConfigAgregada()
   const conEnlaces = gestionaReservasDeTodos || esMedico
-  const { lista, recargar, alCrearTipo, pendientes } = useGuiaEnlaces({ conEnlaces, esMedico, usuarioId, puedeAdministrar })
+  const guia = useGuiaEnlaces({ conEnlaces, esMedico, usuarioId })
+  const { lista, recargar, alCrearTipo, pendientes } = guia
   const alCambiar = conEnlaces ? () => void recargar() : undefined
   const medicos = config?.medicos ?? []
+  const consultorios = config?.consultorios ?? null
+  const faltan = pendientes ? pendientes.filter(p => !p.hecho).length : null
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-[var(--ag-6)] pb-[var(--ag-8)]">
+    <div className="mx-auto flex max-w-5xl flex-col gap-[var(--ag-6)] pb-[var(--ag-8)]">
       <Encabezado puedeAdministrar={puedeAdministrar} />
-      {pendientes && <PasosConfiguracion pasos={pendientes} />}
-      <Grupo titulo="Horario y disponibilidad"
-        nota="El horario de la clínica es la plantilla; un consultorio con horario propio manda en su agenda y en su enlace de reserva.">
-        <SeccionHorarioClinica fuente={fuente} puedeEditar={puedeAdministrar} actualizarConfig={actualizarConfig} />
-        <SeccionDisponibilidad
-          consultorios={config?.consultorios ?? null}
-          fallo={fuente.estado === 'error'}
-          horarioClinica={config?.horario ?? null}
-          medicos={medicos}
-          usuarioId={usuarioId}
-          actualizarConfig={actualizarConfig}
-          alCambiar={alCambiar}
-        />
-      </Grupo>
-      <Grupo titulo="Citas">
-        <SeccionTiposCita tipos={tipos} puedeEditar={puedeAdministrar} medicos={medicos} alCambiar={alCambiar} />
-      </Grupo>
-      <Grupo titulo="Reserva por enlace">
-        {conEnlaces && (
-          <SeccionEnlacesReserva lista={lista} recargar={recargar} medicos={medicos} usuarioId={usuarioId}
-            gestionaTodos={gestionaReservasDeTodos} vigenciaDias={ajustes?.vigencia_enlace_unico_dias ?? null}
-            puedeCrearTipos={puedeAdministrar} alCrearTipo={alCrearTipo} />
-        )}
-        <SeccionAjustesReserva inicial={ajustes} puedeEditar={puedeAdministrar} />
-        {conEnlaces && <SeccionContactosBloqueados medicos={medicos} gestionaTodos={gestionaReservasDeTodos} />}
-      </Grupo>
-      <Grupo titulo="Preferencias de este dispositivo" nota="Valen sólo en este navegador; no cambian nada para los demás.">
-        {/* Integración T2+T3: en su tarjeta, para que el grupo siga la retícula de las demás. */}
-        <TarjetaSeccion id="config-dispositivo" titulo="Tarjeta de la cita">
-          <PreferenciaTarjetaAlPasar />
-        </TarjetaSeccion>
-      </Grupo>
+      <div className="flex flex-col gap-[var(--ag-6)] lg:grid lg:grid-cols-[12.5rem_minmax(0,1fr)] lg:items-start">
+        <MenuConfiguracion entradas={entradasMenu(faltan, conEnlaces)} />
+        <div className="flex min-w-0 flex-col gap-[var(--ag-6)]">
+          {pendientes && (
+            <PasosConfiguracion pasos={pendientes} motivos={guia.motivos} medicoId={usuarioId} puedeEmitir={guia.puedeEmitir}
+              resumen={resumenPasos(usuarioId, consultorios, tipos)} alCambiar={alCrearTipo} />
+          )}
+          <Grupo titulo="Horario y disponibilidad">
+            <SeccionDisponibilidad
+              consultorios={consultorios}
+              fallo={fuente.estado === 'error'}
+              horarioClinica={config?.horario ?? null}
+              medicos={medicos}
+              usuarioId={usuarioId}
+              actualizarConfig={actualizarConfig}
+              alCambiar={alCambiar}
+              tipos={tipos}
+              puedeAdministrar={puedeAdministrar}
+              alCambiarTipos={esMedico ? alCrearTipo : undefined}
+            />
+          </Grupo>
+          <Grupo titulo="Citas">
+            <SeccionTiposCita tipos={tipos} puedeEditar={puedeAdministrar} medicos={medicos} alCambiar={alCambiar}
+              usuarioId={usuarioId} esMedico={esMedico} consultorios={consultorios}
+              preguntarDuracion={!pendientes?.some(p => p.clave === 'duracion' && !p.hecho)} />
+          </Grupo>
+          <GrupoReserva lista={lista} recargar={recargar} medicos={medicos} usuarioId={usuarioId} ajustes={ajustes}
+            gestionaTodos={gestionaReservasDeTodos} esMedico={esMedico} puedeAdministrar={puedeAdministrar}
+            alCrearTipo={alCrearTipo} conPrimerosPasos={pendientes !== null} />
+          <GrupoDispositivo />
+        </div>
+      </div>
     </div>
   )
 }

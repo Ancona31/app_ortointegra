@@ -48,10 +48,16 @@ export interface TipoCita {
   activo: boolean
   created_at: string
   updated_at: string
+  /** G2: la duración de la consulta del médico (su tipo principal). */
+  principal: boolean
+  /** G2: sólo en un principal; su duración distinta en ESE consultorio. */
+  consultorio_id: string | null
 }
 
-/** Las columnas que piden las rutas: las de `TipoCita`, ni una más. */
-export const COLUMNAS_TIPO_CITA = 'id, clinica_id, medico_id, nombre, duracion_min, color, activo, created_at, updated_at'
+/** Las columnas que piden las rutas: las de `TipoCita`, ni una más.
+ *  ⚠️ G2: `principal` y `consultorio_id` exigen la migración 20261119120000
+ *  (sólo se piden con la v2 encendida, como el resto de `tipos_cita`). */
+export const COLUMNAS_TIPO_CITA = 'id, clinica_id, medico_id, nombre, duracion_min, color, activo, created_at, updated_at, principal, consultorio_id'
 
 const nombreSchema = z.string().trim().min(1, 'El nombre es obligatorio')
   .max(LIMITES_TIPO_CITA.nombreMax, `El nombre tiene como máximo ${LIMITES_TIPO_CITA.nombreMax} caracteres`)
@@ -71,7 +77,13 @@ export const CrearTipoCitaSchema = z.strictObject({
   duracion_min: duracionSchema,
   color: colorSchema.optional(),
   medico_id: z.guid('Médico inválido').nullable().optional(),
-})
+  /* G2: la duración de la consulta de un médico (necesita `medico_id`) y,
+     con `consultorio_id`, la suya distinta en ese consultorio. Los mismos
+     CHECK que `tipos_cita_principal_check` y `tipos_cita_consultorio_check`. */
+  principal: z.boolean().optional(),
+  consultorio_id: z.guid('Consultorio inválido').nullable().optional(),
+}).refine(o => !o.principal || Boolean(o.medico_id), { message: 'La duración de la consulta es de un médico' })
+  .refine(o => !o.consultorio_id || o.principal === true, { message: 'Sólo la duración de la consulta va por consultorio' })
 
 /**
  * Edición parcial. El ÁMBITO (`medico_id`) no se edita: cambiarlo dejaría
@@ -157,6 +169,8 @@ export function validarTipoParaCita(args: {
  * otro, el 400 deja de decir `medico_invalido` y dice `datos_invalidos`.
  */
 const MENSAJE_PG_MEDICO_AJENO = 'médico del tipo de cita'
+/** El mismo cuidado con `validar_tipo_cita_consultorio()` (migración 20261119120000). */
+const MENSAJE_PG_CONSULTORIO_AJENO = 'consultorio del tipo de cita'
 
 /**
  * Traduce el error de Postgres de un alta o edición de `tipos_cita` a la
@@ -166,8 +180,14 @@ export function respuestaErrorTipoCita(error: { code?: string; message?: string 
   status: number
   body: { error: string; mensaje: string }
 } {
+  if (error.code === '23505' && error.message?.includes('tipos_cita_principal_unico')) {
+    return { status: 409, body: { error: 'duracion_repetida', mensaje: 'Ya hay una duración de consulta para ese médico en ese ámbito' } }
+  }
   if (error.code === '23505') {
     return { status: 409, body: { error: 'nombre_repetido', mensaje: 'Ya hay un tipo de cita activo con ese nombre' } }
+  }
+  if (error.code === '23514' && error.message?.includes(MENSAJE_PG_CONSULTORIO_AJENO)) {
+    return { status: 400, body: { error: 'consultorio_invalido', mensaje: 'El consultorio no es de ese médico' } }
   }
   if (error.code === '23514' && error.message?.includes(MENSAJE_PG_MEDICO_AJENO)) {
     return { status: 400, body: { error: 'medico_invalido', mensaje: 'El médico elegido no es de esta clínica' } }

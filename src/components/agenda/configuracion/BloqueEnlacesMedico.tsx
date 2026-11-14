@@ -11,23 +11,32 @@
  * de la página pública) y, si al médico le falta algo, la caja que lo pide ahí
  * mismo (`FaltaParaEnlace`). Crear el enlace se sigue pudiendo: el aviso dice
  * que no abrirá, no lo impide (la opción que menos cambia lo de hoy).
+ * G2 (punto 5): con un enlace ya creado, la caja la abre «Completar» en su
+ * fila (la maqueta); sin enlace, sale sola encima de «Crear enlace fijo», para
+ * que crearlo nunca deje un callejón sin salida.
  */
 import { useState, type FormEvent } from 'react'
 import FilaEnlaceReserva from '@/components/agenda/configuracion/FilaEnlaceReserva'
 import FaltaParaEnlace from '@/components/agenda/configuracion/FaltaParaEnlace'
-import { BOTON_PRIMARIO, BOTON_SECUNDARIO, CAMPO, TEXTO_SUAVE } from '@/components/agenda/configuracion/clasesConfig'
+import { BOTON_FILA, BOTON_PRIMARIO, BOTON_SECUNDARIO, CAMPO, TEXTO_SUAVE } from '@/components/agenda/configuracion/clasesConfig'
 import { avisoDeEnlace, type MotivoApertura } from '@/lib/reserva/aperturaEnlace'
+
+/** Lo que se arregla desde la ficha (lo demás lo decide la base o ya pasó). */
+const ARREGLABLES: readonly MotivoApertura[] = ['sin_consultorio', 'sin_tipos', 'sin_disponibilidad']
 import type { EnlaceReserva } from '@/lib/reserva/gestionReserva'
 
 const FECHA = new Intl.DateTimeFormat('es-MX', { dateStyle: 'medium', timeStyle: 'short' })
 
 interface Props {
+  medicoId: string
   /** `null` = sin título (quien mira sólo ve los suyos). */
   nombre: string | null
   enlaces: EnlaceReserva[]
   /** Por qué el enlace de este médico no abriría; `null` si no se pudo calcular. */
   motivos: MotivoApertura[] | null
   esPropio: boolean
+  /** Lo que le falta a quien mira ya lo pide «Primeros pasos»: aquí, sólo a petición. */
+  faltaEnPasos?: boolean
   puedeCrearTipos: boolean
   alCrearTipo: () => void
   /** La dirección completa de cada enlace cuyo código ya se pidió. */
@@ -42,53 +51,74 @@ interface Props {
   onRevocar: (e: EnlaceReserva) => void
 }
 
-export default function BloqueEnlacesMedico(p: Props) {
+/** El alta de un enlace de un solo uso, con su etiqueta interna opcional. */
+function FormUnico(p: { ocupado: boolean; vigenciaDias: number | null; onEmitir: (etiqueta: string | null) => Promise<void> }) {
   const [etiqueta, setEtiqueta] = useState('')
-  const fijo = p.enlaces.find(e => e.clase === 'fijo') ?? null
-  const unicos = p.enlaces.filter(e => e.clase === 'unico')
-  const aviso = p.motivos ? avisoDeEnlace(p.motivos) : null
   async function emitirUnico(ev: FormEvent): Promise<void> {
     ev.preventDefault()
-    await p.onEmitirUnico(etiqueta.trim() || null)
+    await p.onEmitir(etiqueta.trim() || null)
     setEtiqueta('')
   }
   return (
+    <form onSubmit={ev => void emitirUnico(ev)} className="flex flex-wrap items-end gap-[var(--ag-3)]">
+      <label className="flex min-w-0 flex-1 basis-56 flex-col gap-[var(--ag-1)] text-sm text-[var(--ag-text)]">Etiqueta (opcional)
+        <input className={CAMPO} value={etiqueta} maxLength={60} onChange={ev => setEtiqueta(ev.target.value)}
+          placeholder="Para uso interno" />
+      </label>
+      <button type="submit" className={BOTON_SECUNDARIO} disabled={p.ocupado}>Emitir enlace de un solo uso</button>
+      {p.vigenciaDias !== null && (
+        <span className={`basis-full ${TEXTO_SUAVE}`}>
+          Uno de un solo uso vale {p.vigenciaDias} {p.vigenciaDias === 1 ? 'día' : 'días'} y una sola reserva.
+        </span>
+      )}
+    </form>
+  )
+}
+
+/** Sin enlace fijo: la frase, «Ver qué falta» si «Primeros pasos» ya lo pide, y «Crear enlace fijo». */
+function SinFijo(p: { verFalta: boolean; onVerFalta?: () => void; puedeEmitir: boolean; ocupado: boolean; onCrearFijo: () => void }) {
+  return (
+    <li className="flex flex-wrap items-center justify-between gap-[var(--ag-3)] py-[var(--ag-2)]">
+      <span className={TEXTO_SUAVE}>Aún no hay enlace fijo: se comparte una vez y sirve siempre.</span>
+      {p.verFalta && <button type="button" className={`${BOTON_FILA} underline underline-offset-2`} onClick={p.onVerFalta}>Ver qué falta</button>}
+      {p.puedeEmitir && <button type="button" className={BOTON_PRIMARIO} disabled={p.ocupado} onClick={p.onCrearFijo}>Crear enlace fijo</button>}
+    </li>
+  )
+}
+
+export default function BloqueEnlacesMedico(p: Props) {
+  const [completando, setCompletando] = useState(false)
+  const fijo = p.enlaces.find(e => e.clase === 'fijo') ?? null
+  const unicos = p.enlaces.filter(e => e.clase === 'unico')
+  const aviso = p.motivos ? avisoDeEnlace(p.motivos) : null
+  const arreglable = p.motivos?.some(m => ARREGLABLES.includes(m)) ?? false
+  const completar = arreglable ? () => setCompletando(c => !c) : undefined
+  const verFalta = Boolean(p.motivos) && (completando || (p.enlaces.length === 0 && !p.faltaEnPasos))
+  return (
     <div className="flex flex-col gap-[var(--ag-3)] border-t border-[var(--ag-border-card)] pt-[var(--ag-4)]">
       {p.nombre && <h4 className="text-sm font-semibold text-[var(--ag-text)]">{p.nombre}</h4>}
-      {p.motivos && (
-        <FaltaParaEnlace motivos={p.motivos} esPropio={p.esPropio} puedeCrearTipos={p.puedeCrearTipos} alResolver={p.alCrearTipo} />
+      {verFalta && p.motivos && (
+        <FaltaParaEnlace motivos={p.motivos} medicoId={p.medicoId} esPropio={p.esPropio} puedeCrearTipos={p.puedeCrearTipos}
+          alResolver={() => { setCompletando(false); p.alCrearTipo() }} />
       )}
       <ul className="divide-y divide-[var(--ag-border-card)]">
         {fijo ? (
           <FilaEnlaceReserva titulo="Enlace fijo" detalle={`desde el ${FECHA.format(new Date(fijo.created_at))}`} aviso={aviso}
+            textoAbre="Activo" onCompletar={completar}
             url={p.urls[fijo.id] ?? null} ocupado={p.ocupado} onMostrar={() => p.onMostrar(fijo.id)}
             onRevocar={() => p.onRevocar(fijo)} onRegenerar={p.puedeEmitir ? p.onRegenerar : undefined} />
         ) : (
-          <li className="flex flex-wrap items-center justify-between gap-[var(--ag-3)] py-[var(--ag-2)]">
-            <span className={TEXTO_SUAVE}>Aún no hay enlace fijo: se comparte una vez y sirve siempre.</span>
-            {p.puedeEmitir && <button type="button" className={BOTON_PRIMARIO} disabled={p.ocupado} onClick={p.onCrearFijo}>Crear enlace fijo</button>}
-          </li>
+          <SinFijo verFalta={p.faltaEnPasos === true && completar !== undefined && !completando} onVerFalta={completar}
+            puedeEmitir={p.puedeEmitir} ocupado={p.ocupado} onCrearFijo={p.onCrearFijo} />
         )}
         {unicos.map(e => (
           <FilaEnlaceReserva key={e.id} titulo={e.etiqueta ? `Un solo uso · ${e.etiqueta}` : 'Un solo uso'} aviso={aviso}
+            textoAbre="Sin usar" onCompletar={completar}
             detalle={e.caduca_en ? `caduca el ${FECHA.format(new Date(e.caduca_en))}` : ''} url={p.urls[e.id] ?? null}
             ocupado={p.ocupado} onMostrar={() => p.onMostrar(e.id)} onRevocar={() => p.onRevocar(e)} />
         ))}
       </ul>
-      {p.puedeEmitir && (
-        <form onSubmit={ev => void emitirUnico(ev)} className="flex flex-wrap items-end gap-[var(--ag-3)]">
-          <label className="flex min-w-0 flex-1 basis-56 flex-col gap-[var(--ag-1)] text-sm text-[var(--ag-text)]">Etiqueta (opcional)
-            <input className={CAMPO} value={etiqueta} maxLength={60} onChange={ev => setEtiqueta(ev.target.value)}
-              placeholder="Para uso interno" />
-          </label>
-          <button type="submit" className={BOTON_SECUNDARIO} disabled={p.ocupado}>Emitir enlace de un solo uso</button>
-          {p.vigenciaDias !== null && (
-            <span className={`basis-full ${TEXTO_SUAVE}`}>
-              Uno de un solo uso vale {p.vigenciaDias} {p.vigenciaDias === 1 ? 'día' : 'días'} y una sola reserva.
-            </span>
-          )}
-        </form>
-      )}
+      {p.puedeEmitir && <FormUnico ocupado={p.ocupado} vigenciaDias={p.vigenciaDias} onEmitir={p.onEmitirUnico} />}
     </div>
   )
 }

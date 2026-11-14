@@ -1,5 +1,6 @@
 /**
- * pasosConfiguracion.test.ts — «Para empezar» (tanda T2, punto 7): el estado
+ * pasosConfiguracion.test.ts — «Primeros pasos» (T2, punto 7; G2, punto 8:
+ * horario de cada consultorio → duración de la consulta → enlace): el estado
  * de cada paso sale de los datos (la `preparacion` del servidor y los enlaces
  * vigentes), no de una marca guardada; con los tres hechos no queda nada
  * pendiente y la lista desaparece.
@@ -15,12 +16,12 @@ const FIJO: EnlaceReserva = {
 }
 const lista = (preparacion: ListaEnlaces['preparacion'], enlaces: EnlaceReserva[] = []): ListaEnlaces =>
   ({ enlaces, secreto: true, aviso: true, preparacion })
-const estados = (l: ListaEnlaces) => pasosDe(l, 'yo', true)?.map(p => p.hecho)
+const estados = (l: ListaEnlaces) => pasosDe(l, 'yo')?.map(p => p.hecho)
 
 describe('pasosDe', () => {
   it('sin datos de preparación no decide nada (la lista no se enseña)', () => {
-    expect(pasosDe(lista(null), 'yo', true)).toBeNull()
-    expect(pasosDe(lista({ otro: [] }), 'yo', true)).toBeNull()
+    expect(pasosDe(lista(null), 'yo')).toBeNull()
+    expect(pasosDe(lista({ otro: [] }), 'yo')).toBeNull()
   })
 
   it('cada paso sale de su motivo: disponibilidad, tipos y enlace', () => {
@@ -37,9 +38,8 @@ describe('pasosDe', () => {
     expect(estados(lista({ yo: ['no_abre'] }, [{ ...FIJO, medico_id: 'otro' }]))).toEqual([true, true, false])
   })
 
-  it('sin consultorio manda al perfil; quien no crea tipos lo pide a quien administra', () => {
-    const p = pasosDe(lista({ yo: ['sin_consultorio', 'sin_tipos'] }), 'yo', false)
-    expect(p?.[0].destino).toBe('/perfil')
-    expect(p?.[1].ayuda).toMatch(/quien administra/)
+  it('G2 · el orden es horario, duración y enlace (las claves que usa la tarjeta)', () => {
+    expect(pasosDe(lista({ yo: [] }), 'yo')?.map(p => `${p.clave}:${p.titulo}`)).toEqual([
+      'horario:Horario de cada consultorio', 'duracion:Duración de la consulta', 'enlace:Enlace de reserva'])
   })
 })

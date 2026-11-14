@@ -65,10 +65,12 @@ interface Props {
   gestionaTodos: boolean
   /** Vigencia del ajuste de la clínica, sólo para decirla; la congela el servidor. */
   vigenciaDias: number | null
-  /** Quien administra la clínica: puede crear el tipo por defecto. */
+  /** Quien administra la clínica: contesta la duración de cualquier médico. */
   puedeCrearTipos: boolean
-  /** Tras crear el tipo por defecto: releer los tipos (servidor) y la lista. */
+  /** Tras guardar una duración: releer los tipos (servidor) y la lista. */
   alCrearTipo: () => void
+  /** «Primeros pasos» a la vista: ya pide lo que le falta a quien mira. */
+  conPrimerosPasos: boolean
 }
 
 /** Las fichas: el propio médico primero («Tu enlace»), después los demás por nombre. */
@@ -121,9 +123,9 @@ export default function SeccionEnlacesReserva(p: Props) {
             <p className={CAJA_AVISO}>Ningún enlace abre todavía: el aviso de privacidad de la reserva está pendiente de revisión.</p>
           )}
           {fichas(medicos, usuarioId, gestionaTodos).map(m => (
-            <BloqueEnlacesMedico key={m.id} nombre={m.nombre} enlaces={lista.enlaces.filter(e => e.medico_id === m.id)}
+            <BloqueEnlacesMedico key={m.id} medicoId={m.id} nombre={m.nombre} enlaces={lista.enlaces.filter(e => e.medico_id === m.id)}
               motivos={lista.preparacion?.[m.id] ?? null} esPropio={m.id === usuarioId} puedeCrearTipos={p.puedeCrearTipos}
-              alCrearTipo={p.alCrearTipo}
+              alCrearTipo={p.alCrearTipo} faltaEnPasos={p.conPrimerosPasos && m.id === usuarioId}
               urls={urls} ocupado={ocupado} puedeEmitir={lista.secreto} vigenciaDias={vigenciaDias}
               onCrearFijo={() => void emitir(m.id, { clase: 'fijo' }, 'Enlace fijo creado')}
               onRegenerar={() => setPregunta({ mensaje: MSJ_REGENERAR, seguir: () => void emitir(m.id, { clase: 'fijo' }, 'Enlace fijo regenerado') })}

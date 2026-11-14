@@ -14,7 +14,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
-import { canManageClinica } from '@/lib/permissions'
+import { canManageClinica, isMedico } from '@/lib/permissions'
 import { agendaV2Encendida } from '@/lib/agenda/ajustesAgenda'
 import { COLUMNAS_TIPO_CITA, CrearTipoCitaSchema, respuestaErrorTipoCita } from '@/lib/agenda/tiposCita'
 import { logger } from '@/lib/logger'
@@ -74,17 +74,21 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 }
 
 /**
- * POST /api/agenda/tipos-cita — crea un tipo. Sólo el administrador de la
- * clínica (403), con la agenda v2 encendida (404). `clinica_id` sale del
- * perfil, nunca del cuerpo. 409 si el nombre ya está activo en ese ámbito; 400
- * si el médico no es de la clínica (lo comprueba `validar_tipo_cita_medico`).
+ * POST /api/agenda/tipos-cita — crea un tipo, con la agenda v2 encendida
+ * (404). El administrador de la clínica, de toda la clínica o de cualquier
+ * médico; G2 (punto 9 de Angel, policy `tipos_cita_insert` de
+ * 20261119120000): cualquier médico, SÓLO para sí mismo (`medico_id` = él;
+ * su duración de la consulta, la de un consultorio suyo y tipos de más).
+ * Lo demás, 403 (la secretaria, como antes). `clinica_id` sale del perfil,
+ * nunca del cuerpo. 409 si el nombre o la duración ya está activa en ese
+ * ámbito; 400 si el médico o el consultorio no casan (disparadores de la base).
  */
 export async function POST(req: NextRequest): Promise<NextResponse> {
   try {
     const supabase = await createClient()
     const profile = await perfilDeSesion(supabase)
     if (!profile) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-    if (!profile.clinica_id || !canManageClinica(profile)) {
+    if (!profile.clinica_id || !(canManageClinica(profile) || isMedico(profile))) {
       return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
     }
     if (!(await agendaV2Encendida(supabase, profile.clinica_id))) {
@@ -94,10 +98,18 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Datos inválidos' }, { status: 400 })
     }
-    const { nombre, duracion_min, color, medico_id } = parsed.data
+    const { nombre, duracion_min, color, medico_id, principal, consultorio_id } = parsed.data
+    // G2: quien no administra sólo crea los SUYOS (lo mismo exige la policy).
+    if (!canManageClinica(profile) && medico_id !== profile.userId) {
+      return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
+    }
 
     const { data, error } = await supabase.from('tipos_cita')
-      .insert({ clinica_id: profile.clinica_id, medico_id: medico_id ?? null, nombre, duracion_min, color: color ?? null })
+      .insert({
+        clinica_id: profile.clinica_id, medico_id: medico_id ?? null, nombre, duracion_min, color: color ?? null,
+        // Sólo si vienen: un alta sin ellas no nombra las columnas de G2.
+        ...(principal ? { principal: true } : {}), ...(consultorio_id ? { consultorio_id } : {}),
+      })
       .select(COLUMNAS_TIPO_CITA)
       .single()
     if (error) {
