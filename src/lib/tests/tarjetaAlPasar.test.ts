@@ -28,7 +28,12 @@ beforeEach(() => { vi.useFakeTimers() })
 afterEach(() => { vi.useRealTimers() })
 
 describe('crearVigiaAlPasar', () => {
-  it('abre tras un segundo de quietud sobre la cita, no antes', () => {
+  /* G3 (punto 18): 0,5 s, no 1. Mutación: volver a 1000 → rojo. */
+  it('la espera es de medio segundo', () => {
+    expect(ESPERA_ABRIR_MS).toBe(500)
+  })
+
+  it('abre tras la espera de quietud sobre la cita, no antes', () => {
     const { v, abrir } = montar()
     v.mover('a', 0)
     vi.advanceTimersByTime(ESPERA_ABRIR_MS - 1)
@@ -40,18 +45,18 @@ describe('crearVigiaAlPasar', () => {
   it('la quietud se reinicia con cada movimiento', () => {
     const { v, abrir } = montar()
     v.mover('a', 0)
-    vi.advanceTimersByTime(800)
+    vi.advanceTimersByTime(ESPERA_ABRIR_MS * 0.8)
     v.mover('a', 0)
-    vi.advanceTimersByTime(800)
+    vi.advanceTimersByTime(ESPERA_ABRIR_MS * 0.8)
     expect(abrir).not.toHaveBeenCalled()
-    vi.advanceTimersByTime(200)
+    vi.advanceTimersByTime(ESPERA_ABRIR_MS * 0.2)
     expect(abrir).toHaveBeenCalledTimes(1)
   })
 
-  it('salir antes del segundo no abre nada', () => {
+  it('salir antes de la espera no abre nada', () => {
     const { v, abrir } = montar()
     v.mover('a', 0)
-    vi.advanceTimersByTime(500)
+    vi.advanceTimersByTime(ESPERA_ABRIR_MS - 100)
     v.mover(null, 0)
     vi.advanceTimersByTime(2000)
     expect(abrir).not.toHaveBeenCalled()

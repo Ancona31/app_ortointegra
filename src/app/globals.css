@@ -193,6 +193,10 @@
   /* Sombra tarjeta (claro) */
   --ag-shadow-card: 0 1px 2px rgba(16, 32, 64, .05);
   --ag-shadow-pop: 0 12px 28px rgba(16, 32, 64, .14);
+  /* G3 · La cita bajo el ratón (agenda v2): sombra suave y un anillo de 1 px
+     pegado al borde, que lo deja «un poco más marcado» sin tocar su color (el
+     color del borde va en línea, por estado). */
+  --ag-shadow-elevada: 0 0 0 1px rgba(16, 32, 64, .12), 0 6px 14px rgba(16, 32, 64, .16);
   /* Chip de médico (neutro, sin color de médico) */
   --ag-chip-bg: #eef1f6;
   --ag-chip-text: #7c8aa0;
@@ -3563,11 +3567,16 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
 .fc .fc-event:not(.fc-list-event):hover {
   z-index:   10 !important;
 }
-/* T3 · ELEVACIÓN DE 1 px AL PASAR EL RATÓN, SÓLO CON LA AGENDA V2 (petición
-   de Angel, punto 16 de la tanda tras sus pruebas a mano). Manda sobre la nota
-   de arriba («nada de `transform` en el hover»), que era del diseño y no suya:
-   se quedó en 1 px —lo mínimo que pidió— para que la cita no parezca cambiar de
-   franja. Las reglas que la acotan, y ninguna sobra:
+/* T3 · ELEVACIÓN AL PASAR EL RATÓN, SÓLO CON LA AGENDA V2 (petición de Angel,
+   punto 16 de la tanda tras sus pruebas a mano). Manda sobre la nota de arriba
+   («nada de `transform` en el hover»), que era del diseño y no suya.
+   G3 (punto 18 de la tanda de diseño): de 1 px pasa a 3 px, con una sombra
+   suave y el borde un poco más marcado (`--ag-shadow-elevada`), sólo en la
+   cita bajo el cursor. ⚠️ LA SOMBRA NO SE ANIMA: la regla de movimiento del
+   bloque F prohíbe transicionar `box-shadow`, así que la transición sigue
+   siendo SÓLO de `transform` y la sombra aparece en seco con el hover (la caja
+   de la cita lleva `overflow: hidden`, así que un pseudo-elemento con la sombra
+   y `opacity` quedaría recortado). Las reglas que la acotan, y ninguna sobra:
    · SOBRE LA CAJA DE DENTRO (`.ag-tarjeta`, `.ag-mes`, `.ag-banda`), NUNCA sobre
      el `.fc-event`: ése lo posiciona FullCalendar y lo anima el FLIP de F2.6
      (`flipTarjetas.ts`, WAAPI sobre `transform`) y lo mide `getBoundingClientRect`;
@@ -3580,13 +3589,16 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
    · ni las filas de lista (`<tr>`, la nota de arriba) ni los bloques de Google
      de solo lectura (no se abren: levantarlos diría que sí);
    · una TRANSICIÓN de `transform` en `--ag-dur-micro`: nada de rebote ni de
-     `box-shadow` (regla de movimiento del bloque F). */
+     `box-shadow` (regla de movimiento del bloque F). La prueba
+     (`agenda-f-pasar-raton`) se pone en rojo si `box-shadow` entra en la
+     transición. */
 @media (hover: hover) and (prefers-reduced-motion: no-preference) {
   .agenda-raiz[data-agenda-v2="encendida"] .fc .fc-event:not(.fc-list-event) :is(.ag-tarjeta, .ag-mes:not(.ag-mes--gcal), .ag-banda:not(.ag-banda--gcal)) {
     transition: transform var(--ag-dur-micro) var(--ag-ease);
   }
   .agenda-raiz[data-agenda-v2="encendida"] .fc .fc-event:not(.fc-list-event):not(.fc-event-mirror):not(.fc-event-dragging):not(.fc-event-resizing):hover :is(.ag-tarjeta, .ag-mes:not(.ag-mes--gcal), .ag-banda:not(.ag-banda--gcal)) {
-    transform: translateY(-1px);
+    transform: translateY(-3px);
+    box-shadow: var(--ag-shadow-elevada);
   }
 }
 
@@ -6245,6 +6257,7 @@ html.dark {
   --ag-offhours-bg: rgba(0, 0, 0, .14);
   --ag-shadow-card: 0 1px 3px rgba(0, 0, 0, .45);
   --ag-shadow-pop: 0 12px 28px rgba(0, 0, 0, .55);
+  --ag-shadow-elevada: 0 0 0 1px rgba(255, 255, 255, .14), 0 6px 14px rgba(0, 0, 0, .55);
   /* Chip médico */
   --ag-chip-bg: #16233a;
   --ag-chip-text: #cdd8e6;                    /* ◆ ≈ dark.text */

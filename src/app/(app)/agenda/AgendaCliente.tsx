@@ -561,9 +561,12 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
     return m ? componerInicialesMedico(m) : undefined
   }, [isSingleDoctor, medicos, filtroEfectivo])
 
+  /* G3 (punto 16): con la v2, sin el `title` de la cita (lo sustituye la
+     tarjeta al pasar el ratón). Repinta las tarjetas una vez, al leerse el
+     interruptor. */
   const renderEC = useCallback(
-    (arg: EventContentArg) => renderEventContent(arg, navegadorTZ, inicialesDeCita),
-    [navegadorTZ, inicialesDeCita]
+    (arg: EventContentArg) => renderEventContent(arg, navegadorTZ, inicialesDeCita, agendaV2),
+    [navegadorTZ, inicialesDeCita, agendaV2]
   )
 
   const {

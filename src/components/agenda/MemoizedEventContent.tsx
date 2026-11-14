@@ -162,7 +162,13 @@ export const FORMATO_HORA_INICIO = new Intl.DateTimeFormat('es-MX', {
 export const MemoizedEventContent = memo(function MemoizedEventContent({
   timeText, horaInicio, title, pacNombre, status, doctorInitial, tzDiff, icono, color, descriptor,
   esEvento, enRejilla, marca = null, marcaTitulo = null, citaId, telefono = null, consultorio = null, nombreCorto = null,
+  sinAvisoFlotante = false,
 }: {
+  /* G3 (punto 16 de Angel) · Con la agenda v2 la cita NO lleva `title`: el
+     aviso negro del navegador al pasar el ratón sobraba, para eso está la
+     tarjeta. Lo que el `title` decía («Nombre · Agendada») pasa a la etiqueta
+     accesible (`role="group"` + `aria-label`). Apagada, como siempre. */
+  sinAvisoFlotante?: boolean
   /* F1.7 · «Hugo I.»: lo enseña una consulta de contenedor en una tarjeta de
      96 px o menos (globals.css). `null` = el mismo nombre. */
   nombreCorto?: string | null
@@ -336,7 +342,10 @@ export const MemoizedEventContent = memo(function MemoizedEventContent({
     /* F1.8 · En Semana la palabra del estado ya no se escribe: queda el glifo
        delante de la hora (decisión 9 corregida, el color nunca es la única
        señal) y el estado entero en el `title`. */
-    <div ref={rootRef} data-cita-id={citaId} title={`${name} · ${etiquetaEstado}`}
+    <div ref={rootRef} data-cita-id={citaId}
+      {...(sinAvisoFlotante
+        ? { role: 'group', 'aria-label': `${name} · ${etiquetaEstado}${marcaTitulo ? ` · ${marcaTitulo}` : ''}` }
+        : { title: `${name} · ${etiquetaEstado}` })}
       className={tier ? `ag-tarjeta ag-tarjeta--${tier}` : 'ag-tarjeta'} style={root}>
       <div className="ag-tarjeta-cab">
         {/* ⚠️ LA HORA DE UN EVENTO GENÉRICO VA EN NEUTRO, NUNCA EN EL COLOR DEL
@@ -397,7 +406,7 @@ export const MemoizedEventContent = memo(function MemoizedEventContent({
         >{name}</span>
         <span className="ag-tarjeta-nombre-corto"
           style={isCancelled ? { textDecoration: 'line-through' } : undefined}>{nombreCorto ?? name}</span>
-        {marca && <span className="ag-tarjeta-marca" title={marcaTitulo ?? undefined}>{marca}</span>}
+        {marca && <span className="ag-tarjeta-marca" title={sinAvisoFlotante ? undefined : marcaTitulo ?? undefined}>{marca}</span>}
       </div>
       {tzDiff && <span className="ag-tarjeta-tz">{tzDiff}</span>}
       {/* Tercera línea: «Consulta de seguimiento · atendida». El estado va en su
