@@ -35,7 +35,13 @@ export const ContextoSchema = z.object({
     id: z.guid(), nombre: z.string(), direccion: z.string().nullable(), telefono: z.string().nullable(),
     timezone: z.string(), horario: HorarioCrudo, horario_propio: z.boolean().nullable().optional(),
   })),
-  tipos: z.array(z.object({ id: z.guid(), nombre: z.string(), duracion_min: z.number().int() })),
+  /* G2: `consultorio_id` y `principal` (migración 20261119120000); sin ella
+     no llegan y cada tipo vale en todos los consultorios, como antes. Qué
+     tipos valen en cada consultorio: `tiposDelConsultorio`. */
+  tipos: z.array(z.object({
+    id: z.guid(), nombre: z.string(), duracion_min: z.number().int(),
+    consultorio_id: z.guid().nullable().optional(), principal: z.boolean().optional(),
+  })),
   ajustes: z.object({ anticipacion_min_horas: z.number().int(), horizonte_dias: z.number().int() }),
 })
 export type ContextoReserva = z.infer<typeof ContextoSchema>

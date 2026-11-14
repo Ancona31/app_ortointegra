@@ -9,9 +9,11 @@
  *   3. límite por enlace fijo (429; necesita saber la clase del enlace);
  *   4. teléfono de México y correo con forma (400);
  *   5. consultorio y tipo del enlace (400);
- *   6. CONVENIO DE D3: `inicio` tiene que ser un turno ofrecido —horario del
- *      consultorio, alineación al paso del tipo, anticipación y horizonte—
- *      (400 si no lo es; `turnoValido`). Si sigue libre lo decide la RPC (409);
+ *   6. CONVENIO DE D3: `inicio` tiene que ser un turno de la rejilla fija
+ *      (G2: desde la apertura, con paso igual a la duración) en horario, con
+ *      la anticipación y dentro del horizonte (400 si no lo es;
+ *      `turnoValido`). Si sigue libre lo decide la RPC (409), con la misma
+ *      regla de ocupación que la lista de turnos;
  *   6-bis. D11 (decisión de Angel): sincronizar con Google JUSTO ANTES de la
  *      RPC, siempre y sin el mínimo de 60 s (`sincronizarAntesDeReservar`,
  *      fuera de la transacción: la RPC no cambia). Lo importado ocupa y la
@@ -30,7 +32,7 @@ import { ReservarSchema } from '@/lib/reserva/esquemasReserva'
 import {
   abrirEnlace, codigoAbrible, cuerpoJson, noEncontrado, nombreDelMedico, responder, telefonoDeContacto,
 } from '@/lib/reserva/puertaReserva'
-import { ocupacionDeEnlace, reagendar, reservar } from '@/lib/reserva/servidorReserva'
+import { reagendar, reservar } from '@/lib/reserva/servidorReserva'
 import {
   COOKIE_DISPOSITIVO, OPCIONES_COOKIE, dentroDeLimites, dispositivoDe, ipDe, seudonimoRed,
 } from '@/lib/reserva/limitesReserva'
@@ -39,7 +41,8 @@ import { hashDeCodigo, hmacContacto, hmacFicha } from '@/lib/reserva/secretos'
 import { AVISO_VERSION, hashAviso } from '@/lib/reserva/avisoReserva'
 import { respuestaErrorRpc, respuestaNoPorAhora, respuestaReserva } from '@/lib/reserva/respuestasReserva'
 import { sincronizarAntesDeReservar } from '@/lib/reserva/sincronizarReserva'
-import { fechaEnZona, ocupacionSinEstado, rangoDeConsulta, reglasDe, turnoValido } from '@/lib/reserva/turnosReserva'
+import { tiposDelConsultorio } from '@/lib/agenda/tiposPorConsultorio'
+import { reglasDe, turnoValido } from '@/lib/reserva/turnosReserva'
 import { crearEventoReserva } from '@/lib/reserva/googleReserva'
 import { enviarComprobante } from '@/lib/reserva/comprobanteReserva'
 import type { ContextoReserva, ResultadoReservaRpc } from '@/lib/reserva/servidorReserva'
@@ -80,19 +83,15 @@ export async function POST(req: NextRequest, rctx: RouteContext<'/api/reservar/[
   if (!correoHmac) return MAL('correo_invalido')
 
   const consultorio = ctx.consultorios.find(c => c.id === b.consultorio_id)
-  const tipo = ctx.tipos.find(t => t.id === b.tipo_cita_id)
+  // G2: sólo los tipos que valen en ESE consultorio. `reservar_por_enlace`
+  // no mira el consultorio del tipo: este filtro es la única puerta.
+  const tipo = consultorio ? tiposDelConsultorio(ctx.tipos, consultorio.id).find(t => t.id === b.tipo_cita_id) : undefined
   if (!consultorio || !tipo) return MAL('consultorio_o_tipo_invalido')
 
-  const ahora = new Date()
   const reglas = reglasDe(consultorio, ctx.clinica?.horario, tipo.duracion_min, ctx.ajustes)
-  // Ver `turnoValido`: con la ocupación del día (P9: los turnos arrancan en
-  // cada hueco) sin la cita idéntica, para que un reenvío del mismo client_id
-  // llegue a la RPC y salga `repetida`. Lo libre lo decide la RPC (409).
-  const dia = Number.isNaN(Date.parse(b.inicio)) ? null : rangoDeConsulta(fechaEnZona(new Date(b.inicio), reglas.tz), reglas.tz, 1)
-  if (!dia) return MAL('turno_invalido')
-  const ocupacion = await ocupacionDeEnlace(ctx, dia.desde, dia.hasta)
-  if (!ocupacion) return responder({ status: 500, cuerpo: { error: 'no_disponible' } })
-  const turno = turnoValido(reglas, b.inicio, ocupacionSinEstado(ocupacion), ahora)
+  // G2: la rejilla fija no depende de la ocupación (ver `turnoValido`): lo
+  // libre lo decide la RPC bajo su candado (409), con la regla de la lista.
+  const turno = turnoValido(reglas, b.inicio, new Date())
   if (!turno) return MAL('turno_invalido')
 
   const args = {

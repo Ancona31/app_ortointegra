@@ -66,28 +66,54 @@ describe('turnosDeDias / turnoOfrecido', () => {
   })
 })
 
-describe('turnoValido (P9: los turnos arrancan en cada hueco)', () => {
-  const r = reglasDe({ horario: { lunes: { activo: true, inicio: '08:00', fin: '10:00' }, martes: { activo: true, inicio: '08:00', fin: '10:00' },
-    miercoles: { activo: false, inicio: '08:00', fin: '10:00' }, jueves: { activo: false, inicio: '08:00', fin: '10:00' },
-    viernes: { activo: false, inicio: '08:00', fin: '10:00' }, sabado: { activo: false, inicio: '08:00', fin: '10:00' },
-    domingo: { activo: false, inicio: '08:00', fin: '10:00' } }, horario_propio: true, timezone: 'America/Merida' }, null, 30, AJ)
-  const AHORA2 = new Date('2031-05-05T12:00:00Z')
-  // Martes 2031-05-06: cita de 08:00 a 08:20 → turnos 08:20, 08:50, 09:20.
-  const ocup = ocupacionSinEstado([{ start_time: '2031-05-06T14:00:00Z', end_time: '2031-05-06T14:20:00Z' }])
+describe('rejilla fija (G2, punto 9): la lista y la comprobación al reservar usan la misma regla', () => {
+  // Martes 2031-05-06 en Mérida (UTC-6), jornada 09:00–13:00, consulta de 45 min.
+  const dia = { activo: true, inicio: '09:00', fin: '13:00' }
+  const cerrado = { activo: false, inicio: '09:00', fin: '13:00' }
+  const h: Horario = { lunes: dia, martes: dia, miercoles: cerrado, jueves: cerrado, viernes: cerrado, sabado: cerrado, domingo: cerrado }
+  const r = reglasDe({ horario: h, horario_propio: true, timezone: MERIDA }, null, 45, AJ)
+  const Z = (hhmm: string) => {
+    const [hh = '0', mm = '0'] = hhmm.split(':')
+    return new Date(Date.UTC(2031, 4, 6, Number(hh) + 6, Number(mm))).toISOString()
+  }
+  const lista = (ocup: ReturnType<typeof ocupacionSinEstado>) =>
+    turnosDeDias(r, '2031-05-06', ocup, AHORA, 1)[0]?.turnos.map(t => t.inicio) ?? []
 
-  it('un turno que arranca en el hueco (08:20) vale aunque no esté alineado a la jornada', () => {
-    expect(turnoValido(r, '2031-05-06T14:20:00Z', ocup, AHORA2)?.fin).toBe('2031-05-06T14:50:00.000Z')
+  it('con 45 min desde las 9:00 son 9:00, 9:45, 10:30, 11:15 y 12:00 (el resto no llega a un turno)', () => {
+    expect(lista([])).toEqual(['09:00', '09:45', '10:30', '11:15', '12:00'].map(Z))
   })
-  it('alineado a la jornada también vale (la RPC dirá si está ocupado)', () => {
-    expect(turnoValido(r, '2031-05-06T14:30:00Z', ocup, AHORA2)).not.toBeNull()
+
+  it('si algo ocupa PARTE de un turno, ese turno no se ofrece y los demás no se corren', () => {
+    // Cita de 10:00 a 10:20: tapa la de 9:45 (en parte). Antes (P9) salía 10:20.
+    const ocup = ocupacionSinEstado([{ start_time: Z('10:00'), end_time: Z('10:20') }])
+    expect(lista(ocup)).toEqual(['09:00', '10:30', '11:15', '12:00'].map(Z))
+    // Tocar el extremo no ocupa: una cita de 9:45 a 10:30 sólo quita la de 9:45.
+    expect(lista(ocupacionSinEstado([{ start_time: Z('09:45'), end_time: Z('10:30') }]))).toEqual(['09:00', '10:30', '11:15', '12:00'].map(Z))
   })
-  it('el reenvío: la cita idéntica (la propia) no lo invalida', () => {
-    const propia = ocupacionSinEstado([{ start_time: '2031-05-06T14:20:00Z', end_time: '2031-05-06T14:50:00Z' }, ...ocup])
-    expect(turnoValido(r, '2031-05-06T14:20:00Z', propia, AHORA2)).not.toBeNull()
+
+  it('lo de todo el día (sus puntas son las medianoches de la zona) tapa el día entero', () => {
+    const todoElDia = ocupacionSinEstado([{ start_time: '2031-05-06T06:00:00Z', end_time: '2031-05-07T06:00:00Z' }])
+    expect(lista(todoElDia)).toEqual([])
   })
-  it('desalineado o fuera de horario: no', () => {
-    expect(turnoValido(r, '2031-05-06T14:25:00Z', ocup, AHORA2)).toBeNull()
-    expect(turnoValido(r, '2031-05-06T16:00:00Z', ocup, AHORA2)).toBeNull()
-    expect(turnoValido(r, 'x', ocup, AHORA2)).toBeNull()
+
+  it('turnoValido es la rejilla: alineada sí aunque esté ocupada (la RPC dirá «ocupado»); fuera de la rejilla, nunca', () => {
+    const ocup = ocupacionSinEstado([{ start_time: Z('10:00'), end_time: Z('10:20') }])
+    for (const t of ['09:00', '09:45', '10:30', '12:00']) expect(turnoValido(r, Z(t), AHORA)?.inicio).toBe(Z(t))
+    expect(turnoValido(r, Z('10:20'), AHORA)).toBeNull()      // el turno de P9 tras la cita: ya no
+    expect(turnoValido(r, Z('12:45'), AHORA)).toBeNull()      // no cabe entero antes de las 13:00
+    expect(turnoValido(r, Z('08:15'), AHORA)).toBeNull()      // antes de abrir
+    expect(turnoValido(r, 'x', AHORA)).toBeNull()
+    // Lo que la lista ofrece con cualquier ocupación es válido, y lo único que la
+    // lista quita es lo que la RPC rechazaría (algo que toca el turno).
+    for (const t of lista(ocup)) expect(turnoValido(r, t, AHORA)).not.toBeNull()
+  })
+
+  it('husos: la rejilla se cuenta en la zona del consultorio (Tijuana en horario de verano)', () => {
+    const tj = reglasDe({ horario: h, horario_propio: true, timezone: 'America/Tijuana' }, null, 45, AJ)
+    const [d] = turnosDeDias(tj, '2031-05-06', [], AHORA, 1)
+    expect(d?.turnos[0]?.inicio).toBe('2031-05-06T16:00:00.000Z')   // 09:00 PDT
+    expect(d?.turnos[1]?.inicio).toBe('2031-05-06T16:45:00.000Z')
+    expect(turnoValido(tj, '2031-05-06T16:45:00.000Z', AHORA)).not.toBeNull()
+    expect(turnoValido(tj, '2031-05-06T15:45:00.000Z', AHORA)).toBeNull()  // 9:45 de Mérida, no de Tijuana
   })
 })

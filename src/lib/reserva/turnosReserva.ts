@@ -6,8 +6,9 @@
  * Reglas, todas con valores del SERVIDOR (nunca del navegador):
  *   · horario: `horarioEfectivo` (el propio del consultorio si lo tiene; si
  *     no, el de la clínica; sin ninguno, HORARIO_DEFAULT, como la rejilla);
- *   · paso y tamaño: la duración del tipo de cita (P9), desde el inicio de
- *     cada hueco;
+ *   · paso y tamaño: la duración del tipo de cita, en la REJILLA FIJA desde
+ *     la hora de apertura (G2, punto 9; sustituye a P9, que contaba desde el
+ *     inicio de cada hueco). Un turno que algo ocupa en parte no se ofrece;
  *   · anticipación mínima y horizonte: los de `agenda_ajustes`;
  *   · ocupación (P3): `reserva_ocupacion` ya quita `cancelled` y `no_show`;
  *     llega sin estado (`status: null`) y sin `all_day`, así que aquí todo
@@ -16,11 +17,16 @@
  *     son las medianoches de su zona) y tapa esos días enteros; en la agenda
  *     interna no cambia nada (ahí el empalme sólo alerta).
  *
- * `turnoOfrecido` es el CONVENIO que pide el COMMENT de
- * `reservar_por_enlace` (D3): la base no conoce el horario ni la alineación;
- * la ruta de reservar llama a `turnoValido` ANTES de la RPC (¿es un turno
- * que se pudo ofrecer? si no, 400). Si sigue libre lo decide la RPC bajo su
- * candado (`ocupado`), que además resuelve la carrera entre dos personas.
+ * `turnoValido` es el CONVENIO que pide el COMMENT de `reservar_por_enlace`
+ * (D3): la base no conoce el horario ni la alineación; la ruta de reservar
+ * lo llama ANTES de la RPC (¿es un turno de la rejilla, en horario y en la
+ * ventana? si no, 400). Si sigue libre lo decide la RPC bajo su candado
+ * (`ocupado`) con el MISMO criterio que la lista: algo que toque el turno
+ * aunque sea en parte (`start_time < fin AND end_time > inicio`), sin
+ * `cancelled` ni `no_show`, con lo de todo el día. La lista es «rejilla menos
+ * lo ocupado»; la comprobación, «rejilla» + «nada ocupado» bajo el candado:
+ * la misma regla partida en dos, y la parte que depende de la ocupación sólo
+ * la decide la RPC, que es la que ve la carrera.
  */
 import type { Horario } from '@/lib/configApp'
 import { desplazarFecha, fechaHoraLocalAInstante } from '@/lib/dates'
@@ -110,22 +116,16 @@ export function turnoOfrecido(r: ReglasReserva, inicio: string, ocupacion: reado
 }
 
 /**
- * EL CONVENIO DE D3 PARA RESERVAR: ¿`inicio` es un turno que la página pudo
- * ofrecer? Por P9 los turnos van desde el inicio de CADA HUECO, así que
- * dependen de la ocupación (con una cita de 10:00 a 10:20, el turno es
- * 10:20). Vale si es un turno con la ocupación de ahora QUITANDO las citas
- * que coinciden exactamente con él —la propia, en un reenvío del mismo
- * `client_id`, o la de otra persona, que la RPC rechazará con `ocupado`—, o
- * si lo es con la jornada vacía (alineado al inicio del día). Lo que no
- * cumple ninguna de las dos no está en horario o no está alineado: 400.
- * Que siga libre lo decide la RPC bajo su candado.
+ * EL CONVENIO DE D3 PARA RESERVAR: ¿`inicio` es un turno de la rejilla fija
+ * (G2) de ese día, en horario, con la anticipación y dentro del horizonte?
+ * Es `turnoOfrecido` con la jornada vacía: la rejilla no depende de la
+ * ocupación, así que un turno que la lista ofrecía sigue siendo válido aunque
+ * alguien lo tome entretanto (lo rechaza la RPC con `ocupado`, 409), y uno
+ * fuera de la rejilla no lo es nunca (400). Un reenvío del mismo `client_id`
+ * llega igual a la RPC y sale `repetida`.
  */
-export function turnoValido(r: ReglasReserva, inicio: string, ocupacion: readonly OcupacionCita[], ahora: Date): Turno | null {
-  const ms = Date.parse(inicio)
-  if (Number.isNaN(ms)) return null
-  const finMs = ms + r.duracionMin * 60_000
-  const sinLaMisma = ocupacion.filter(o => !(Date.parse(o.start_time) === ms && Date.parse(o.end_time) === finMs))
-  return turnoOfrecido(r, inicio, sinLaMisma, ahora) ?? turnoOfrecido(r, inicio, [], ahora)
+export function turnoValido(r: ReglasReserva, inicio: string, ahora: Date): Turno | null {
+  return turnoOfrecido(r, inicio, [], ahora)
 }
 
 /** La ocupación de la RPC, en la forma de `turnosAgenda` (sin estado: ocupa). */
