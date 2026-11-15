@@ -2,7 +2,7 @@ import { test, expect, request } from '@playwright/test'
 import { randomInt } from 'node:crypto'
 import { resolve } from 'node:path'
 import { config } from 'dotenv'
-import { interruptorAgenda, sqlLocal, soloEscritorio } from './ayudas'
+import { SESION, interruptorAgenda, sqlLocal, soloEscritorio } from './ayudas'
 import { contarCorreos, esperarCorreo } from './mailpit'
 
 /**
@@ -40,7 +40,8 @@ function prepararPaciente(): Fixture {
     select (select id from c), (select id from m), (select id from p);`)
   const [clinicaId = '', medicoId = '', pacienteId = ''] = fila.split('|')
   sqlLocal(`update public.pacientes set email = :'correo' where id = :'id';`, { correo, id: pacienteId })
-  sqlLocal(`update public.agenda_ajustes set recordatorio_horas = 24 where clinica_id = :'c';`, { c: clinicaId })
+  /* Tanda H, punto 9: el recordatorio tiene su interruptor, APAGADO de fábrica; estas pruebas lo encienden. */
+  sqlLocal(`update public.agenda_ajustes set recordatorio_horas = 24, recordatorio_encendido = true where clinica_id = :'c';`, { c: clinicaId })
   return { clinicaId, medicoId, pacienteId, correo }
 }
 
@@ -82,6 +83,7 @@ test.afterAll(() => {
       delete from public.cita_confirmaciones where appointment_id = any (string_to_array(:'ids', ',')::uuid[]);
       delete from public.appointments where id = any (string_to_array(:'ids', ',')::uuid[]);`, { ids: citas.join(',') })
   }
+  sqlLocal(`update public.agenda_ajustes set recordatorio_encendido = false where clinica_id = :'c';`, { c: f.clinicaId })
   interruptorAgenda('A', false)
 })
 
@@ -129,4 +131,34 @@ test('con el interruptor apagado no sale nada', async () => {
   expect(await contarCorreos(f.correo, ASUNTO)).toBe(previos)
   expect(sqlLocal(`select count(*) from public.cita_correos where appointment_id = :'id';`, { id })).toBe('0')
   interruptorAgenda('A', true)
+})
+
+/* ── Tanda H, punto 9: el interruptor del RECORDATORIO, apagado de fábrica ── */
+
+test('H2 · con el recordatorio apagado la tarea no manda nada a esa clínica; al encenderlo, sí', async () => {
+  sqlLocal(`update public.agenda_ajustes set recordatorio_encendido = false where clinica_id = :'c';`, { c: f.clinicaId })
+  const id = cita(8)
+  const previos = await contarCorreos(f.correo, ASUNTO)
+  await dispararTarea()
+  await new Promise(r => setTimeout(r, 1500))
+  expect(await contarCorreos(f.correo, ASUNTO)).toBe(previos)
+  expect(sqlLocal(`select count(*) from public.cita_correos where appointment_id = :'id';`, { id })).toBe('0')
+  sqlLocal(`update public.agenda_ajustes set recordatorio_encendido = true where clinica_id = :'c';`, { c: f.clinicaId })
+  await dispararTarea()
+  await esperarCorreo(f.correo, ASUNTO, previos)
+  expect(sqlLocal(`select estado from public.cita_correos where appointment_id = :'id' and tipo = 'recordatorio';`, { id })).toBe('enviado')
+})
+
+test('H2 · con el recordatorio apagado, la confirmación que manda el personal con su botón sigue saliendo', async ({ browser }) => {
+  sqlLocal(`update public.agenda_ajustes set recordatorio_encendido = false where clinica_id = :'c';`, { c: f.clinicaId })
+  const id = cita(30)
+  const ctx = await browser.newContext({ baseURL: BASE_URL, storageState: SESION.adminA })
+  try {
+    const previos = await contarCorreos(f.correo, 'Confirma tu cita')
+    const r = await ctx.request.post('/api/agenda/correo', { data: { cita_id: id } })
+    expect(r.status(), await r.text()).toBe(200)
+    await esperarCorreo(f.correo, 'Confirma tu cita', previos)
+  } finally {
+    await ctx.close()
+  }
 })

@@ -55,6 +55,18 @@ export const ETIQUETAS_AJUSTES_AGENDA: Record<CampoAjusteAgenda, { nombre: strin
   vigencia_enlace_unico_dias: { nombre: 'Vigencia del enlace de un solo uso', unidad: 'días' },
 }
 
+/**
+ * Qué hace cada ajuste, en UNA línea (tanda H, punto 8 de Angel). Lo pinta la
+ * pantalla de configuración debajo de cada campo. El del recordatorio dice
+ * qué ES el recordatorio: un correo que Spinus manda al paciente.
+ */
+export const EXPLICACION_AJUSTES_AGENDA: Record<CampoAjusteAgenda, string> = {
+  recordatorio_horas: 'El recordatorio es un correo que Spinus manda al paciente antes de su cita; aquí eliges cuántas horas antes.',
+  anticipacion_min_horas: 'Lo mínimo que tiene que faltar para una cita para que un paciente la pueda reservar con un enlace.',
+  horizonte_dias: 'Hasta cuántos días adelante ve horarios un paciente que reserva con un enlace.',
+  vigencia_enlace_unico_dias: 'Cuántos días sirve un enlace de un solo uso antes de caducar si nadie lo usa.',
+}
+
 /** El orden en que se pintan y se validan. */
 export const CAMPOS_AJUSTES_AGENDA: readonly CampoAjusteAgenda[] = [
   'recordatorio_horas', 'anticipacion_min_horas', 'horizonte_dias', 'vigencia_enlace_unico_dias',
@@ -121,6 +133,34 @@ export async function leerAjustesAgenda(supabase: ClienteSesion, clinicaId: stri
   } catch (err: unknown) {
     logger.warn('agenda', `ajustes de la agenda sin leer: ${err instanceof Error ? err.message : 'error'}`)
     return { ...FABRICA_AJUSTES_AGENDA }
+  }
+}
+
+/**
+ * El interruptor del recordatorio automático por correo (tanda H, punto 9;
+ * columna `recordatorio_encendido`, migración `20261120120000`), lo único que
+ * acepta `PATCH /api/me/ajustes-agenda`. `strictObject`: ninguna otra clave.
+ */
+export const RecordatorioEncendidoSchema = z.strictObject({ recordatorio_encendido: z.boolean() })
+
+/**
+ * ¿Tiene esta clínica encendido el recordatorio automático? `null` = no se
+ * pudo saber (la columna no existe todavía —base sin la migración—, error o
+ * sin fila): la pantalla lo enseña como no disponible y no deja cambiarlo. La
+ * tarea programada no usa esto: decide la base en su listado.
+ */
+export async function leerRecordatorioEncendido(supabase: ClienteSesion, clinicaId: string): Promise<boolean | null> {
+  try {
+    const { data, error } = await supabase
+      .from('agenda_ajustes').select('recordatorio_encendido').eq('clinica_id', clinicaId).maybeSingle()
+    if (error) {
+      logger.warn('agenda', `interruptor del recordatorio sin leer: ${error.code ?? ''}`)
+      return null
+    }
+    return typeof data?.recordatorio_encendido === 'boolean' ? data.recordatorio_encendido : null
+  } catch (err: unknown) {
+    logger.warn('agenda', `interruptor del recordatorio sin leer: ${err instanceof Error ? err.message : 'error'}`)
+    return null
   }
 }
 

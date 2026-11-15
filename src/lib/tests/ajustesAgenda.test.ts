@@ -36,6 +36,7 @@ vi.mock('@/lib/logger', () => ({ logger: { warn: vi.fn() } }))
 const { createClient } = await import('@/lib/supabase/server')
 const {
   FABRICA_AJUSTES_AGENDA, LIMITES_AJUSTES_AGENDA, AjustesAgendaSchema, leerAjustesAgenda, agendaV2Encendida,
+  leerRecordatorioEncendido, RecordatorioEncendidoSchema, EXPLICACION_AJUSTES_AGENDA, CAMPOS_AJUSTES_AGENDA,
 } = await import('@/lib/agenda/ajustesAgenda')
 
 const CLINICA = '00000000-0000-4000-8000-0000000000c1'
@@ -133,5 +134,40 @@ describe('agendaV2Encendida (falla cerrado)', () => {
   ])('apagado cuando %s', async (_caso, respuesta) => {
     h.respuesta = respuesta
     expect(await agendaV2Encendida(await createClient(), CLINICA)).toBe(false)
+  })
+})
+
+describe('el recordatorio automático (tanda H, punto 9): apagado de fábrica, y «no disponible» ante la duda', () => {
+  it('lee SÓLO la columna del interruptor, por clínica', async () => {
+    h.respuesta = { data: { recordatorio_encendido: true }, error: null }
+    expect(await leerRecordatorioEncendido(await createClient(), CLINICA)).toBe(true)
+    expect(h.llamadas).toContainEqual(['select', 'recordatorio_encendido'])
+    expect(h.llamadas).toContainEqual(['eq', 'clinica_id', CLINICA])
+  })
+
+  it.each<[string, Respuesta | Error]>([
+    ['la columna no existe (base sin la migración)', { data: null, error: { message: 'column agenda_ajustes.recordatorio_encendido does not exist' } }],
+    ['no hay fila', { data: null, error: null }],
+    ['la promesa rechaza', new Error('red caída')],
+    ['el valor no es booleano', { data: { recordatorio_encendido: 'true' }, error: null }],
+  ])('null cuando %s (la pantalla no deja cambiarlo)', async (_caso, respuesta) => {
+    h.respuesta = respuesta
+    expect(await leerRecordatorioEncendido(await createClient(), CLINICA)).toBeNull()
+  })
+
+  it('el PATCH sólo acepta el interruptor: ni el de la v2, ni el candado, ni un texto', () => {
+    expect(RecordatorioEncendidoSchema.safeParse({ recordatorio_encendido: true }).success).toBe(true)
+    for (const malo of [{ recordatorio_encendido: true, agenda_v2_encendida: true }, { recordatorio_encendido: 'true' },
+      { candado_citas_activas: 9 }, {}]) {
+      expect(RecordatorioEncendidoSchema.safeParse(malo).success).toBe(false)
+    }
+  })
+
+  it('punto 8: una línea por ajuste, y la del recordatorio dice que es un correo que Spinus manda al paciente', () => {
+    for (const c of CAMPOS_AJUSTES_AGENDA) {
+      expect(EXPLICACION_AJUSTES_AGENDA[c].length).toBeGreaterThan(20)
+      expect(EXPLICACION_AJUSTES_AGENDA[c]).not.toContain('\n')
+    }
+    expect(EXPLICACION_AJUSTES_AGENDA.recordatorio_horas).toMatch(/correo que Spinus manda al paciente antes de su cita/)
   })
 })
