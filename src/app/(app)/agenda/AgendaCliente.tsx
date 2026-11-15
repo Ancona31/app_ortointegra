@@ -83,7 +83,7 @@ import {
   periodoDeLaVista, ANCHO_TABLETA,
 } from '@/lib/agenda/vistasAgenda'
 import { clasesDelEvento } from '@/lib/agenda/tarjetasAgenda'
-import { desplazarListaAHoyEstable, diaLocalISO } from '@/lib/agenda/listaHoy'
+import { desplazarListaAHoyEstable, diaLocalISO, type DestinoLista } from '@/lib/agenda/listaHoy'
 import { podarMarcas } from '@/lib/agenda/marcasMovimiento'
 import { duracionMovimiento, esCambioDeFecha, fundirNavegacion, type MarcaDeVista } from '@/lib/agenda/movimientoAgenda'
 
@@ -340,16 +340,22 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
   /* Una sola vuelta a la vez: `datesSet` y `eventsSet` pueden pedirla seguidas
      y la repetición dura hasta 10 cuadros (`desplazarListaAHoyEstable`). */
   const listaHoyEnVueloRef = useRef(false)
+  /* H5 (AG-DT-69) · «Al fondo» (ningún día de hoy en adelante, p. ej. el domingo)
+     sólo se hace cuando ya no falta nada por llegar: Google contesta DESPUÉS que
+     las citas y puede traer la cabecera de hoy. Mientras, la lista no se toca y
+     queda pendiente; el `eventsSet` siguiente o el efecto de abajo (cuando las
+     fuentes acaban) vuelven a intentarlo. Así el fondo se escribe una sola vez. */
+  const listaFuentesCompletasRef = useRef(false)
   const intentarListaHoy = (): void => {
     if (!listaHoyPendienteRef.current || listaHoyEnVueloRef.current) return
     listaHoyEnVueloRef.current = true
     requestAnimationFrame(() => {
       const raiz = raizRef.current
-      const terminar = (llego: boolean): void => {
+      const terminar = (llego: DestinoLista): void => {
         listaHoyEnVueloRef.current = false
         if (llego) listaHoyPendienteRef.current = false
       }
-      if (raiz) desplazarListaAHoyEstable(raiz, diaLocalISO(new Date()), terminar)
+      if (raiz) desplazarListaAHoyEstable(raiz, diaLocalISO(new Date()), terminar, undefined, listaFuentesCompletasRef.current)
       else terminar(false)
     })
   }
@@ -710,6 +716,12 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
     eventSourcesStable, refetch, alEmpezarGesto, alTerminarGesto, programarPrecarga, ultimaTraidaRef,
     errorCitas, citasIncompletas, estadoGoogle, googlePendiente,
   } = useFuentesAgenda({ semillaCitas, calendarRef, profile, filtroEfectivo, filtroSincronoRef })
+
+  /* H5 · las fuentes de la lista, completas: entonces «al fondo» ya es definitivo. */
+  useEffect(() => {
+    listaFuentesCompletasRef.current = !cargando && !googlePendiente
+    if (listaFuentesCompletasRef.current) intentarListaHoy()
+  }, [cargando, googlePendiente])
 
   /* ⚠️⚠️ CAMBIAR DE VISTA NO VUELVE A PEDIR NADA, Y CON LA TRAÍDA RECORTADA ESO
      DEJABA A LA BANDA ROJA OFRECIENDO UNA SALIDA QUE NO LO ERA.

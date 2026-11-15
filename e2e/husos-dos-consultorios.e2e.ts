@@ -156,9 +156,17 @@ test('comprobante y recordatorio con la hora de Tijuana; la confirmación dice �
 test('la agenda (dispositivo en Mérida) la dibuja a las 11:00 con la etiqueta «09:00 hora Baja California»', async ({ page }) => {
   await irAAgenda(page)
   const dia = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Merida' }).format(new Date(turno.inicio))
+  /* AG-DT-69 · el turno es MAÑANA (el de la reserva real del primer caso), que el
+     domingo cae en la semana siguiente. Este paso sólo corría en domingo y
+     pulsaba «Periodo siguiente», que es la flecha de la banda del TELÉFONO: en
+     escritorio (este archivo es `soloEscritorio`) la flecha es la nativa de
+     FullCalendar. No se fija el reloj del navegador: el día lo pone el turno,
+     que es del servidor, y llevarlo a mañana adelantaría el reloj (ver
+     `fijarDia` en `agenda-f-pulido.e2e.ts`). */
   if (!(await page.locator(`.fc-timegrid-col[data-date="${dia}"]`).count())) {
-    await page.getByRole('button', { name: 'Periodo siguiente' }).click()
+    await page.locator('.fc-next-button').click()
   }
+  await expect(page.locator(`.fc-timegrid-col[data-date="${dia}"]`)).toHaveCount(1)
   const tarjeta = page.locator('.fc-timegrid-event', { hasText: '09:00 hora Baja California' })
   await expect(tarjeta).toBeVisible()
   await expect(tarjeta).toContainText('11:00')

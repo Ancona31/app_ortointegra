@@ -28,10 +28,26 @@ function semanasDelMes(iso: string): number {
   return Math.ceil((desfase + dias) / 7)
 }
 
+/**
+ * AG-DT-69 · Las pruebas que miran «hoy» fijan su día con el reloj del
+ * navegador, en vez de depender del día en que se corren (el domingo está
+ * cerrado en la semilla y la semana visible ya pasó entera). El lunes de la
+ * semana visible tiene siempre la cita de las 10:00 del Dr. Admin.
+ * NUNCA en el futuro (por eso el `min`): con el reloj adelantado más que la vida
+ * del JWT (1 h en local), el navegador daría el token por caducado y lo
+ * renovaría, y la rotación del refresh token de la sesión compartida
+ * (`e2e/.auth/`) dejaría a la siguiente prueba con uno ya usado.
+ */
+const LUNES = diaDeLaSemana(0, 0)
+async function fijarDia(page: Page, fecha: string): Promise<void> {
+  await page.clock.setFixedTime(new Date(Math.min(Date.now(), Date.parse(`${fecha}T09:00:00-06:00`))))
+}
+
 test.describe('escritorio', () => {
   soloEn('escritorio')
 
   test('F1.4 · Día enseña teléfono y consultorio; Semana no', async ({ page }) => {
+    await fijarDia(page, LUNES)
     await irAAgenda(page)
     const cita = eventoConTexto(page, 'Paciente')
     await expect(cita.locator('.ag-tarjeta-telefono')).toBeHidden()
@@ -58,19 +74,24 @@ test.describe('escritorio', () => {
 
   /* Integración G1–G4: la prueba ya no depende de que la semilla (al azar) deje
      una cita CONFIRMADA del Dr. Admin en la semana visible: pone la suya, el
-     jueves a las 12:00, y la borra al terminar. La agendada de las 10:00 sí es
-     fija en la semilla. */
+     jueves a las 12:00, y la borra al terminar.
+     AG-DT-69: tampoco de que la de las 10:00 siga AGENDADA: la semilla marca
+     atendidas, faltas o canceladas las que ya pasaron, y el domingo (o el
+     sábado por la tarde) la semana entera ya pasó. Pone también su agendada,
+     el jueves a las 15:00, y fija el día (el lunes) para la vista Día. */
   test('F1.8 · en Semana no se escribe el estado; queda el glifo, distinto para agendada y confirmada', async ({ page }) => {
     const confirmada = citaSql(CORREO.adminA, 'F1.8 glifo', `${DIA_LABORABLE_LIBRE}T12:00:00-06:00`, 30, 0)
+    const agendada = citaSql(CORREO.adminA, 'F1.8 agendada', `${DIA_LABORABLE_LIBRE}T15:00:00-06:00`, 45, 1)
     sqlLocal(`update public.appointments set status = 'confirmed' where id = :'id'`, { id: confirmada })
     try {
       await glifosDeSemana(page)
     } finally {
-      sqlLocal(`delete from public.appointments where id = :'id'`, { id: confirmada })
+      sqlLocal(`delete from public.appointments where id in (:'c', :'a')`, { c: confirmada, a: agendada })
     }
   })
 
   async function glifosDeSemana(page: Page): Promise<void> {
+    await fijarDia(page, LUNES)
     await irAAgenda(page)
     await expect(page.locator('.fc-timeGridWeek-view .ag-tarjeta-desc-estado:visible')).toHaveCount(0)
     /* `innerText` y no `hasText`: éste lee también lo que está en `display: none`. */
@@ -212,6 +233,7 @@ test.describe('teléfono', () => {
   })
 
   test('F1.14 · la lista de Día en dos líneas: cada fila con paciente mide 72 px o menos', async ({ page }) => {
+    await fijarDia(page, LUNES)
     await irAAgenda(page)
     await page.getByRole('tab', { name: 'Día' }).click()
     const filas = page.locator('.fc-listDay-view .fc-list-event', { hasText: 'Paciente' })
@@ -374,11 +396,20 @@ test.describe('escritorio · paso 2', () => {
 test.describe('teléfono · paso 2', () => {
   soloEn('telefono')
 
-  test('F1.12 · la lista de Semana abre con la cabecera de hoy en lo alto', async ({ page }) => {
+  /* AG-DT-69 · el día lo fija el reloj, en la semana ANTERIOR a la visible (la
+     semilla la llena igual, lunes a viernes, y así el reloj nunca va adelantado:
+     ver `fijarDia`). El viernes la cabecera queda cerca del final, que es lo que
+     pone a prueba la repetición; el domingo no hay cabecera de hoy ni posterior. */
+  async function posicionDeLaLista(page: Page, dia: string): Promise<void> {
+    await fijarDia(page, dia)
     await irAAgenda(page)
     await expect(page.locator('.fc-listWeek-view')).toBeVisible()
-    const hoy = hoyEnTZ('America/Merida')
     await expect(page.locator('.fc-listWeek-view tr.fc-list-day[data-date]').first()).toBeAttached()
+  }
+
+  test('F1.12 · la lista de Semana abre con la cabecera de hoy en lo alto', async ({ page }) => {
+    const hoy = diaDeLaSemana(-1, 4)
+    await posicionDeLaLista(page, hoy)
     /* La cabecera de hoy (o la del primer día posterior con citas) queda en lo
        alto del desplazador, salvo que la lista ya no dé para más (fondo). */
     await expect.poll(() => page.evaluate((iso) => {
@@ -390,5 +421,21 @@ test.describe('teléfono · paso 2', () => {
       const alFondo = sc.scrollTop >= sc.scrollHeight - sc.clientHeight - 1
       return Math.abs(d) <= 2 || (alFondo && d > 0 && sc.scrollTop > 0) ? 'en hoy' : `a ${Math.round(d)} px`
     }, hoy)).toBe('en hoy')
+  })
+
+  /* H5 · el defecto de AG-DT-69: el domingo, con la semana ya pasada, la lista
+     abría en el LUNES. Ahora, al fondo (lo más cerca de hoy).
+     MUTACIÓN: en `desplazarListaAHoy`, devolver `false` sin mover cuando no hay
+     cabecera de hoy ni posterior → «arriba» (rojo). */
+  test('F1.12 · el domingo, sin citas de hoy en adelante, la lista abre al fondo y no en el lunes', async ({ page }) => {
+    const domingo = diaDeLaSemana(-1, 6)
+    await posicionDeLaLista(page, domingo)
+    await expect.poll(() => page.evaluate((iso) => {
+      const sc = document.querySelector<HTMLElement>('.fc-listWeek-view .fc-scroller')
+      if (!sc) return 'sin lista'
+      if (document.querySelector(`.fc-listWeek-view tr.fc-list-day[data-date="${iso}"]`)) return 'el domingo tiene citas'
+      if (sc.scrollHeight <= sc.clientHeight) return 'la lista cabe sin desplazar'
+      return sc.scrollTop >= sc.scrollHeight - sc.clientHeight - 1 ? 'al fondo' : sc.scrollTop === 0 ? 'arriba' : `a ${sc.scrollTop} px`
+    }, domingo)).toBe('al fondo')
   })
 })
