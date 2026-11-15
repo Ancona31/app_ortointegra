@@ -26,8 +26,11 @@ export interface DatosPagina {
 
 type Paso = 'que' | 'turno' | 'datos' | 'codigo' | 'listo'
 
-/** Los cuatro pasos visibles (tanda G1, punto 1). «Tus datos» incluye el código del correo. */
-const PASOS = ['Qué y dónde', 'Día y hora', 'Tus datos', 'Listo'] as const
+/**
+ * Los cuatro pasos visibles (tanda G1, punto 1). «Tus datos» incluye el código
+ * del correo. El primero se llama «Lugar» (tanda H, punto 3 de Angel).
+ */
+const PASOS = ['Lugar', 'Día y hora', 'Tus datos', 'Listo'] as const
 const INDICE: Record<Paso, number> = { que: 0, turno: 1, datos: 2, codigo: 2, listo: 3 }
 
 /** El cuerpo de POST /api/reservar/[codigo]. */
@@ -80,7 +83,9 @@ function useReserva(datos: DatosPagina) {
   const [consultorioId, setConsultorioId] = useState(datos.consultorios[0]?.id ?? '')
   const [tipoId, setTipoId] = useState(() => tipoDeOficio(tiposDe(consultorioId)))
   const [turno, setTurno] = useState<TurnoPagina | null>(null)
-  const [paso, setPaso] = useState<Paso>(datos.consultorios.length > 1 || tiposDe(consultorioId).length > 1 ? 'que' : 'turno')
+  /* Tanda H, punto 3: SIEMPRE se empieza en «Lugar», también con un solo
+     consultorio (sale ya elegido, con su dirección). G1 lo saltaba. */
+  const [paso, setPaso] = useState<Paso>('que')
   const [persona, setPersona] = useState<Datos | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [ocupado, setOcupado] = useState(false)
@@ -126,7 +131,7 @@ function VistaTurno({ datos, r, consultorio, tipos, zona, semana }: Vista & { se
   const cuando = r.turno ? cuandoEnZona(r.turno.inicio, zona) : null
   return (
     <>
-      <Encabezado titulo="Elige día y hora" volver={datos.consultorios.length > 1 || tipos.length > 1 ? () => r.ir('que') : null} />
+      <Encabezado titulo="Elige día y hora" volver={() => r.ir('que')} />
       <ResumenCita consultorio={consultorio} tipo={tipos.length > 1 ? tipos.find(t => t.id === r.tipoId) : null} />
       <SelectorTurno codigo={datos.codigo} consultorioId={r.consultorioId} tipoId={r.tipoId} zona={zona} desde={semana.desde}
         onDesde={semana.setDesde} dia={semana.dia} onDia={d => { semana.setDia(d); r.setTurno(null) }} elegido={r.turno}
@@ -157,7 +162,7 @@ function VistaDatos({ datos, r, consultorio, tipos, zona }: Vista): ReactElement
 
 interface Semana { desde: string; setDesde: (d: string) => void; dia: string | null; setDia: (d: string | null) => void }
 
-/** Paso 1: consultorio y, si hay más de uno, tipo. Cambiar cualquiera de los dos olvida la hora elegida. */
+/** Paso 1, «Lugar»: consultorio (con uno solo, ya elegido) y, si hay más de uno, tipo. Cambiar cualquiera de los dos olvida la hora elegida. */
 function VistaQueDonde({ datos, r, tipos, semana, zona }: Vista & { semana: Semana }): ReactElement {
   const cambiar = (f: () => void) => { f(); r.setTurno(null); semana.setDia(null); semana.setDesde(hoyEn(zona)) }
   return (

@@ -167,7 +167,6 @@ body:has(.rp) {
 .rp-op__txt b { font-size: 15px; font-weight: 600; color: var(--ag-ink); }
 .rp-op__txt span { font-size: 13.5px; color: var(--ag-ink-600); overflow-wrap: anywhere; }
 .rp-op__dur { font-size: 13px; font-weight: 600; color: var(--ag-text); white-space: nowrap; }
-.rp-fijo { cursor: default; }
 
 /* ── Resumen de lo elegido ──────────────────────────────────────────────── */
 

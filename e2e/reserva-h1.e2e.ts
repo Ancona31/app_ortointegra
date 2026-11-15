@@ -11,6 +11,9 @@ import { emitirEnlace, ipAlAzar, personaNueva, prepararEscenario, reservar, turn
  *   · Punto 2 · siempre en claro: ni el oscuro del sistema (`colorScheme:
  *     'dark'`) ni el guardado en la app (`html.dark`, que se queda puesta al
  *     llegar desde la app sin recargar) oscurecen estas páginas.
+ *   · Punto 3 · el primer paso se llama «Lugar» y SIEMPRE sale, también con
+ *     un solo consultorio (ya elegido, con su dirección); la dirección sigue a
+ *     la vista hasta «Listo».
  *
  * Las pruebas de los correos (sin oscuro, `color-scheme: light`) son de Vitest
  * (`plantillaCita.test.ts`). La seguridad, los límites, los turnos y la RPC no
@@ -86,3 +89,72 @@ for (const origen of ['el sistema en oscuro', 'el oscuro guardado en la app (htm
     expect(await pintado(page)).toEqual(CLARO)
   })
 }
+
+/* ── Punto 3 · el primer paso es «Lugar», también con un solo consultorio ─── */
+
+const pasos = (page: Page) => page.getByRole('list', { name: 'Pasos de la reserva' }).locator('li')
+const pasoActual = (page: Page) => page.getByRole('list', { name: 'Pasos de la reserva' }).locator('li[aria-current="step"]')
+
+/** La Dra. Invitada de la semilla (medico.a): UN solo consultorio, «Rehabilitación (ficticio)». */
+function escenarioUnConsultorio(): Escenario & { direccion: string } {
+  const fila = sqlLocal(`select p.id, k.id, coalesce(k.direccion, '') from public.profiles p join auth.users u on u.id = p.id
+                           join public.consultorios k on k.medico_id = p.id and k.activo
+                          where u.email = 'medico.a@semilla.spinus.test'`)
+  const filas = fila.split('\n').filter(Boolean)
+  expect(filas, 'la Dra. Invitada de la semilla tiene un solo consultorio activo').toHaveLength(1)
+  const [medicoId = '', consultorioId = '', direccion = ''] = (filas[0] ?? '').split('|')
+  return { ...e, medicoId, consultorioId, direccion }
+}
+
+/** Aparca los demás tipos activos de la clínica (para que sólo quede el del escenario) y devuelve cómo deshacerlo. */
+function soloElTipoDelEscenario(): () => void {
+  const aparcados = sqlLocal(`update public.tipos_cita set activo = false where clinica_id = :'c' and activo and id <> :'t' returning id`,
+    { c: e.clinicaId, t: e.tipoId }).split('\n').filter(Boolean)
+  return () => {
+    if (aparcados.length) sqlLocal(`update public.tipos_cita set activo = true where id = any (string_to_array(:'ids', ',')::uuid[])`, { ids: aparcados.join(',') })
+  }
+}
+
+test('punto 3: con varios consultorios el primer paso es «Lugar», con todos y su dirección', async ({ page }) => {
+  await page.goto(`/reservar/${emitirEnlace(e, 'unico').codigo}`)
+  await expect(pasos(page)).toHaveText(['Lugar', 'Día y hora', 'Tus datos', 'Listo'])
+  await expect(pasoActual(page)).toHaveText('Lugar')
+  const radios = page.getByRole('group', { name: 'Consultorio' }).getByRole('radio')
+  expect(await radios.count()).toBeGreaterThan(1)
+  await expect(page.locator(`label:has(input[name="consultorio"][value="${e.consultorioId}"])`))
+    .toContainText(sqlLocal(`select direccion from public.consultorios where id = :'id'`, { id: e.consultorioId }))
+})
+
+test('punto 3: con UN consultorio, «Lugar» sale con él ya elegido y su dirección a la vista en todo el recorrido', async ({ page }) => {
+  const uno = escenarioUnConsultorio()
+  const devolver = soloElTipoDelEscenario()
+  try {
+    await page.goto(`/reservar/${emitirEnlace(uno, 'unico').codigo}`)
+    // No se salta: arranca en «Lugar», con el único consultorio marcado y su dirección completa.
+    await expect(pasoActual(page)).toHaveText('Lugar')
+    const radio = page.getByRole('group', { name: 'Consultorio' }).getByRole('radio')
+    await expect(radio).toHaveCount(1)
+    await expect(radio).toBeChecked()
+    await expect(page.locator(`label:has(input[name="consultorio"][value="${uno.consultorioId}"])`)).toContainText(uno.direccion)
+    // Con un solo tipo no hay selector (integración G, punto 5) y se puede seguir.
+    await expect(page.getByRole('group', { name: 'Tipo de cita' })).toHaveCount(0)
+    await page.getByRole('button', { name: 'Elegir día y hora' }).click()
+
+    await expect(pasoActual(page)).toHaveText('Día y hora')
+    await expect(page.locator('[data-direccion]')).toHaveText(uno.direccion)
+    await page.locator('button[data-inicio]').first().click()
+    await page.getByRole('button', { name: 'Continuar' }).click()
+    await expect(pasoActual(page)).toHaveText(/Tus datos/)
+    await expect(page.locator('[data-direccion]')).toHaveText(uno.direccion)
+    const p = personaNueva()
+    await page.getByLabel('Nombre completo').fill(p.nombre)
+    await page.getByLabel('Teléfono (10 dígitos)').fill(p.telefono)
+    await page.getByLabel('Correo electrónico').fill(p.correo)
+    await page.getByRole('checkbox').check()
+    await page.getByRole('button', { name: 'Reservar cita' }).click()
+    await expect(page.getByRole('heading', { name: 'Tu cita quedó agendada' })).toBeVisible()
+    await expect(page.locator('[data-direccion]')).toHaveText(uno.direccion)
+  } finally {
+    devolver()
+  }
+})
