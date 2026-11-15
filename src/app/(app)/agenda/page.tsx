@@ -7,6 +7,7 @@ import { ventanaDeLaSemilla, type SemillaCitas } from '@/lib/agenda/semillaCitas
 import { agendaV2Encendida } from '@/lib/agenda/ajustesAgenda'
 import { leerConsultoriosAgenda } from '@/lib/agenda/consultoriosAgendaServidor'
 import type { ConsultorioRejilla } from '@/lib/agenda/horarioRejilla'
+import { COLUMNAS_TIPO_CITA, type TipoCita } from '@/lib/agenda/tiposCita'
 import { hoyEnTZ, TZ_CLINICA } from '@/lib/dates'
 import { logger } from '@/lib/logger'
 
@@ -99,6 +100,36 @@ async function leerConsultoriosRejilla(interruptor: Promise<boolean>): Promise<C
 }
 
 /**
+ * Los tipos de cita del ajuste al turno (G2, `useAjusteTurno`): sólo con el
+ * interruptor encendido, con el cliente de SESIÓN (la RLS de `tipos_cita`, la
+ * misma que `GET /api/agenda/tipos-cita`) y la clínica explícita. Viajan con la
+ * página, como la semilla (integración G1–G4, presupuesto de A): pedirlos desde
+ * el navegador costaba una validación más contra Auth al abrir la agenda.
+ * Cualquier fallo es `null` (la agenda no ajusta). Sólo rechaza con los errores
+ * internos de Next.
+ */
+async function leerTiposAjuste(interruptor: Promise<boolean>): Promise<TipoCita[] | null> {
+  try {
+    if (!(await interruptor)) return null
+    const { supabase, profile } = await sesionServidor()
+    const perfil = analizarPerfilSesion(profile)
+    if (!perfil?.clinica_id) return null
+    const { data, error } = await supabase.from('tipos_cita').select(COLUMNAS_TIPO_CITA)
+      .eq('clinica_id', perfil.clinica_id).eq('activo', true)
+    if (error) {
+      logger.warn('agenda', `tipos del ajuste al turno sin leer: ${error.code ?? ''} ${error.message}`)
+      return null
+    }
+    const tipos: TipoCita[] = data ?? []
+    return tipos
+  } catch (err: unknown) {
+    unstable_rethrow(err)
+    logger.warn('agenda', `tipos del ajuste al turno sin leer: ${err instanceof Error ? err.message : 'error'}`)
+    return null
+  }
+}
+
+/**
  * Server component. NO ESPERA a la semilla: la promesa viaja a `AgendaCliente`
  * (`node_modules/next/dist/docs/01-app/01-getting-started/06-fetching-data.md`,
  * «Streaming data with the `use` API»), que no la lee con `use()` —no
@@ -119,6 +150,7 @@ export default function AgendaPage() {
   return (
     <AgendaCliente
       semillaCitas={sembrarCitas()} interruptor={interruptor} consultoriosRejilla={leerConsultoriosRejilla(interruptor)}
+      tiposAjuste={leerTiposAjuste(interruptor)}
     />
   )
 }

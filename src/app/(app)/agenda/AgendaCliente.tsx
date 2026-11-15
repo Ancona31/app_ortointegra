@@ -74,6 +74,7 @@ import {
   consultoriosDeLaRejilla, crearAvisosHorario, fuenteDeLaRejilla, type ConsultorioRejilla, type FuenteRejilla,
 } from '@/lib/agenda/horarioRejilla'
 import { useAjusteTurno } from '@/app/(app)/agenda/useAjusteTurno'
+import type { TipoCita } from '@/lib/agenda/tiposCita'
 import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
 import { rangosDeLaVista, partirFechaHora } from '@/lib/agenda/fechasAgenda'
 import { frasearConteo, frasearConteoBreve } from '@/lib/agenda/conteoAgenda'
@@ -221,12 +222,14 @@ export interface AgendaClienteProps {
   /** Con la v2, los consultorios con los que se dibuja la rejilla (todos los de
    *  la clínica si quien mira ve todas las citas). `null`: los de la sesión. */
   consultoriosRejilla?: Promise<ConsultorioRejilla[] | null>
+  /** Con la v2, los tipos de cita del ajuste al turno (G2), leídos en el servidor. */
+  tiposAjuste?: Promise<TipoCita[] | null>
 }
 
 /** Sin consultorios: la misma constante siempre, para que las memos no cambien de identidad. */
 const SIN_CONSULTORIOS: readonly ConsultorioRejilla[] = []
 
-export default function AgendaCliente({ semillaCitas, interruptor, consultoriosRejilla }: AgendaClienteProps) {
+export default function AgendaCliente({ semillaCitas, interruptor, consultoriosRejilla, tiposAjuste }: AgendaClienteProps) {
   const calendarRef = useRef<InstanceType<typeof FullCalendar>>(null)
   /* ⚠️ `agendaV2` ES `false` HASTA QUE LA PROMESA DEL SERVIDOR DIGA `true`:
      falla cerrado, como `agendaV2Encendida`. Se lee con `.then()` y no con
@@ -590,7 +593,7 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
      rejilla de G4 (`consultoriosV2`, `seleccion`): en un clic, el único de la
      selección con un médico a la vista. Apagada la v2, no hace nada. */
   const ajustarTurno = useAjusteTurno({
-    agendaV2, consultorios: consultoriosV2, seleccion, horarioClinica: horarioClinicaConfig, medicoMostrado,
+    agendaV2, consultorios: consultoriosV2, seleccion, horarioClinica: horarioClinicaConfig, medicoMostrado, tipos: tiposAjuste,
   })
 
   /* Iniciales del chip de médico. Se calculan AL PINTAR, no al traer las citas.

@@ -21,9 +21,12 @@
  *   · sin duración conocida (`duracionDeConsulta`: sin principal y con más de
  *     un tipo, o ninguno), fuera de la jornada o con la lista sin llegar.
  *
- * Los tipos salen de `GET /api/agenda/tipos-cita` (sesión y RLS: el invitado
- * ve los de la clínica y los suyos), una vez por montaje; un fallo deja la
- * agenda sin ajuste, nunca la rompe.
+ * Los tipos los lee la página en el SERVIDOR (`leerTiposAjuste` de
+ * `agenda/page.tsx`: sesión y RLS, el invitado ve los de la clínica y los
+ * suyos) y llegan como promesa, como la semilla; una vez por montaje. Antes se
+ * pedían a `GET /api/agenda/tipos-cita` al montar: una validación más contra
+ * Auth al abrir (integración G1–G4, presupuesto de A). Un fallo deja la agenda
+ * sin ajuste, nunca la rompe.
  *
  * ⚠️ VAN A UNA REFERENCIA, NO A UN ESTADO: su llegada no debe pintar la agenda
  * otra vez. Con `useSWR` (la primera versión) el render de su llegada movía
@@ -37,7 +40,6 @@ import type { ConsultorioRejilla } from '@/lib/agenda/horarioRejilla'
 import { ajustarATurno } from '@/lib/agenda/turnosAgenda'
 import type { TipoCita } from '@/lib/agenda/tiposCita'
 import { duracionDeConsulta } from '@/lib/agenda/tiposPorConsultorio'
-import { cancelarOcioso, enOcioso } from '@/lib/agenda/ocioso'
 
 /** Dónde cae el gesto: el médico y el consultorio de la cita que se arrastra. */
 export type DondeTurno = { medicoId: string | null; consultorioId: string | null }
@@ -51,43 +53,32 @@ interface Entrada {
   seleccion: readonly ConsultorioRejilla[]
   horarioClinica: Horario | null | undefined
   medicoMostrado: string | null
-}
-
-async function leerTipos(url: string): Promise<TipoCita[]> {
-  const res = await fetch(url, { cache: 'no-store' })
-  if (!res.ok) throw new Error(`tipos ${res.status}`)
-  const j: { tipos?: TipoCita[] } = await res.json()
-  return j.tipos ?? []
+  /** Los tipos de cita activos de la clínica que la sesión ve (servidor), o `undefined`. */
+  tipos: Promise<TipoCita[] | null> | undefined
 }
 
 /** El consultorio del gesto: el de la cita, o el de la rejilla en un clic. */
-function consultorioDelGesto(e: Entrada, donde: DondeTurno | undefined): ConsultorioRejilla | null {
+function consultorioDelGesto(e: Pick<Entrada, 'consultorios' | 'seleccion' | 'medicoMostrado'>, donde: DondeTurno | undefined): ConsultorioRejilla | null {
   if (donde) return e.consultorios.find(c => c.id === donde.consultorioId && c.medico_id === donde.medicoId) ?? null
   return e.medicoMostrado && e.seleccion.length === 1 ? e.seleccion[0] : null
 }
 
 export function useAjusteTurno(e: Entrada): AjustarTurno {
-  const { agendaV2, consultorios, seleccion, horarioClinica, medicoMostrado } = e
+  const { agendaV2, consultorios, seleccion, horarioClinica, medicoMostrado, tipos } = e
   const tiposRef = useRef<TipoCita[] | null>(null)
   useEffect(() => {
-    if (!agendaV2) return
+    if (!agendaV2 || !tipos) return
     let vivo = true
-    /* Integración G1–G4 (presupuesto de A): EN OCIOSO, como la precarga de
-       semanas. Pedidos al montar competían con las citas al abrir y al volver
-       del dashboard (+10 ms medidos con la v2); el ajuste sólo se lee en el
-       gesto, y un gesto antes de que lleguen se queda con su hora. */
-    const h = enOcioso(() => {
-      leerTipos('/api/agenda/tipos-cita').then(t => { if (vivo) tiposRef.current = t }).catch(() => { /* sin ajuste */ })
-    })
-    return () => { vivo = false; cancelarOcioso(h) }
-  }, [agendaV2])
+    tipos.then(t => { if (vivo && t) tiposRef.current = t }, () => { /* sin ajuste */ })
+    return () => { vivo = false }
+  }, [agendaV2, tipos])
   return useCallback<AjustarTurno>((instante, donde) => {
-    const tipos = tiposRef.current
-    if (!agendaV2 || !tipos) return null
-    const c = consultorioDelGesto({ agendaV2, consultorios, seleccion, horarioClinica, medicoMostrado }, donde)
+    const lista = tiposRef.current
+    if (!agendaV2 || !lista) return null
+    const c = consultorioDelGesto({ consultorios, seleccion, medicoMostrado }, donde)
     /* Sin zona no hay rejilla clara (la columna es NOT NULL; un resto sin ella no se ajusta). */
     if (!c || c.activo === false || !c.timezone) return null
-    const duracion = duracionDeConsulta(tipos.filter(t => t.activo && (t.medico_id === null || t.medico_id === c.medico_id)), c.id)
+    const duracion = duracionDeConsulta(lista.filter(t => t.activo && (t.medico_id === null || t.medico_id === c.medico_id)), c.id)
     if (!duracion) return null
     return ajustarATurno({ instante, tz: c.timezone, horario: horarioEfectivo(c, horarioClinica ?? null), duracionMin: duracion })
   }, [agendaV2, consultorios, seleccion, horarioClinica, medicoMostrado])
