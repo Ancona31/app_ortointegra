@@ -16,7 +16,8 @@ export interface DatosPagina {
   medico: string
   especialidad: string | null
   consultorios: ConsultorioPagina[]
-  tipos: TipoPagina[]
+  /** Los tipos que valen en cada consultorio (`tiposDelConsultorio`, en page.tsx). */
+  tiposPorConsultorio: Record<string, TipoPagina[]>
   aviso: string
   casilla: string
   /** E6: la cita cancelada que se reagenda (su código de confirmación y su fecha), o null. */
@@ -69,14 +70,17 @@ function useFocoAlCambiar(paso: Paso): RefObject<HTMLDivElement | null> {
   return ref
 }
 
+/** Con un solo tipo, ése; con varios NO se preselecciona ninguno (como el «Elige…» de antes). */
+const tipoDeOficio = (tipos: TipoPagina[]): string => (tipos.length === 1 ? tipos[0]?.id ?? '' : '')
+
 /** El estado de la reserva y sus llamadas a la API: las mismas que antes del rediseño. */
 function useReserva(datos: DatosPagina) {
   const base = `/api/reservar/${encodeURIComponent(datos.codigo)}`
+  const tiposDe = (id: string): TipoPagina[] => datos.tiposPorConsultorio[id] ?? []
   const [consultorioId, setConsultorioId] = useState(datos.consultorios[0]?.id ?? '')
-  // Con varios tipos NO se preselecciona ninguno (como el «Elige…» de antes): que lo decida la persona.
-  const [tipoId, setTipoId] = useState(datos.tipos.length === 1 ? datos.tipos[0]?.id ?? '' : '')
+  const [tipoId, setTipoId] = useState(() => tipoDeOficio(tiposDe(consultorioId)))
   const [turno, setTurno] = useState<TurnoPagina | null>(null)
-  const [paso, setPaso] = useState<Paso>(datos.consultorios.length > 1 || datos.tipos.length > 1 ? 'que' : 'turno')
+  const [paso, setPaso] = useState<Paso>(datos.consultorios.length > 1 || tiposDe(consultorioId).length > 1 ? 'que' : 'turno')
   const [persona, setPersona] = useState<Datos | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [ocupado, setOcupado] = useState(false)
@@ -105,7 +109,13 @@ function useReserva(datos: DatosPagina) {
     else setError(mensajeDeError(r))
   })
   const ir = (p: Paso) => { setError(null); setPaso(p) }
-  return { consultorioId, setConsultorioId, tipoId, setTipoId, turno, setTurno, paso, ir, persona, error, ocupado, pedirCodigo, alEnviarDatos, alVerificar }
+  /* Punto 5 de Angel: al cambiar de consultorio, el tipo elegido se reinicia si no vale en el nuevo. */
+  const elegirConsultorio = (id: string) => {
+    setConsultorioId(id)
+    if (!tiposDe(id).some(t => t.id === tipoId)) setTipoId(tipoDeOficio(tiposDe(id)))
+  }
+  const tipos = tiposDe(consultorioId)
+  return { consultorioId, elegirConsultorio, tipos, tipoId, setTipoId, turno, setTurno, paso, ir, persona, error, ocupado, pedirCodigo, alEnviarDatos, alVerificar }
 }
 type Reserva = ReturnType<typeof useReserva>
 
@@ -154,7 +164,7 @@ function VistaQueDonde({ datos, r, tipos, semana, zona }: Vista & { semana: Sema
     <>
       <Encabezado titulo={tipos.length > 1 ? '¿Qué necesitas y dónde?' : '¿Dónde quieres tu cita?'} />
       <PasoQueDonde consultorios={datos.consultorios} consultorioId={r.consultorioId} tipos={tipos} tipoId={r.tipoId}
-        onConsultorio={id => cambiar(() => r.setConsultorioId(id))} onTipo={id => cambiar(() => r.setTipoId(id))} />
+        onConsultorio={id => cambiar(() => r.elegirConsultorio(id))} onTipo={id => cambiar(() => r.setTipoId(id))} />
       <div className="rp-pie">
         {!r.tipoId && <small>Elige el tipo de cita para continuar</small>}
         <button type="button" className="rp-btn" disabled={!r.tipoId} onClick={() => r.ir('turno')}>Elegir día y hora</button>
@@ -171,9 +181,9 @@ export default function ReservaCliente({ datos }: { datos: DatosPagina }): React
   const [dia, setDia] = useState<string | null>(null)
   const foco = useFocoAlCambiar(r.paso)
   if (!consultorio) return <></>
-  /* Tipos del consultorio elegido (punto 7). Hoy un tipo no se ata a un
-     consultorio (es de la clínica o del médico): es la lista del médico. */
-  const vista: Vista = { datos, r, consultorio, tipos: datos.tipos, zona }
+  /* Tipos del consultorio elegido (punto 7 de G1; punto 5 de Angel con los
+     tipos por consultorio de G2): con uno solo no hay selector. */
+  const vista: Vista = { datos, r, consultorio, tipos: r.tipos, zona }
   const semana: Semana = { desde, setDesde, dia, setDia }
   return (
     <>

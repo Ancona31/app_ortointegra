@@ -7,6 +7,7 @@ import { resolverEnlaceConfirmacion } from '@/lib/confirmacion/enlaceConfirmacio
 import { fechaHoraEnZona } from '@/lib/reserva/correosReserva'
 import { esCodigoDeEnlace } from '@/lib/reserva/secretos'
 import { cierraLaPagina, motivosApertura } from '@/lib/reserva/aperturaEnlace'
+import { tiposDelConsultorio } from '@/lib/agenda/tiposPorConsultorio'
 import type { EnlaceAbierto } from '@/lib/reserva/puertaReserva'
 import ReservaCliente, { type DatosPagina } from './ReservaCliente'
 import MarcoPublico from '@/components/agendaPublica/MarcoPublico'
@@ -67,6 +68,23 @@ async function origenDe(valor: string | string[] | undefined, enlace: EnlaceAbie
   return { codigo: valor, cuando: fechaHoraEnZona(c.inicio, c.zona ?? 'America/Mexico_City') }
 }
 
+/**
+ * Punto 5 de Angel (integración G1/G2): los tipos que valen en CADA
+ * consultorio, con la MISMA regla que /turnos y el POST
+ * (`tiposDelConsultorio`): una duración propia de un consultorio sustituye
+ * allí a la general, así que nunca salen dos «Consulta» juntas. Se calcula
+ * aquí para no mandar al navegador `principal` ni `consultorio_id`. Un
+ * consultorio sin ningún tipo que valga no entra (su /turnos daría 400).
+ */
+function tiposPorConsultorioDe(ctx: EnlaceAbierto['ctx']): DatosPagina['tiposPorConsultorio'] {
+  const porConsultorio: DatosPagina['tiposPorConsultorio'] = {}
+  for (const c of ctx.consultorios) {
+    const tipos = tiposDelConsultorio(ctx.tipos, c.id).map(t => ({ id: t.id, nombre: t.nombre, duracionMin: t.duracion_min }))
+    if (tipos.length > 0) porConsultorio[c.id] = tipos
+  }
+  return porConsultorio
+}
+
 export default async function Page({ params, searchParams }: PageProps<'/reservar/[codigo]'>): Promise<ReactElement> {
   const { codigo } = await params
   const enlace = await abrirEnlace(codigo)
@@ -78,17 +96,19 @@ export default async function Page({ params, searchParams }: PageProps<'/reserva
   const motivos = motivosApertura({
     estado: ctx.estado, consultorios: ctx.consultorios, tipos: ctx.tipos.length, horarioClinica: ctx.clinica?.horario ?? null,
   })
-  if (motivos.some(cierraLaPagina)) return <NoDisponible telefono={telefonoDeContacto(ctx)} />
+  const tiposPorConsultorio = tiposPorConsultorioDe(ctx)
+  const consultorios = ctx.consultorios.filter(c => tiposPorConsultorio[c.id])
+  if (motivos.some(cierraLaPagina) || consultorios.length === 0) return <NoDisponible telefono={telefonoDeContacto(ctx)} />
 
   const medico = nombreDelMedico(ctx)
-  const principal = ctx.consultorios[0]
+  const principal = consultorios[0]
   const datos: DatosPagina = {
     codigo,
     clase: ctx.clase,
     medico,
     especialidad: ctx.medico.especialidad,
-    consultorios: ctx.consultorios.map(c => ({ id: c.id, nombre: c.nombre, direccion: c.direccion, telefono: c.telefono, zona: c.timezone })),
-    tipos: ctx.tipos.map(t => ({ id: t.id, nombre: t.nombre, duracionMin: t.duracion_min })),
+    consultorios: consultorios.map(c => ({ id: c.id, nombre: c.nombre, direccion: c.direccion, telefono: c.telefono, zona: c.timezone })),
+    tiposPorConsultorio,
     aviso: textoAviso({
       medico,
       consultorio: principal?.nombre ?? '',
