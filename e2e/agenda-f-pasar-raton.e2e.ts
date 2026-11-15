@@ -85,8 +85,8 @@ test.describe('con el interruptor encendido', () => {
 
   /* G3 (punto 16): sin el aviso negro del navegador (`title`) en ninguna cita,
      y con la etiqueta accesible («Nombre · Estado») en su lugar. Mutación: no
-     pasar el interruptor a `renderEventContent` (`sinAvisoFlotante` siempre
-     `false`) → rojo. FullCalendar no pone `title` propio en los eventos (sólo
+     fijar el interruptor en las cajas (`fijarSinAvisoFlotante` sin llamar en
+     `AgendaCliente`, o `useSinAvisoFlotante` siempre `false`) → rojo. FullCalendar no pone `title` propio en los eventos (sólo
      en el «+N» del Mes y en los enlaces de día, que no son citas). */
   test('punto 16: ninguna cita lleva title; sí su etiqueta accesible', async ({ page }) => {
     await abrirAgendaV2(page)

@@ -11,6 +11,7 @@ import type { Appointment } from '@/lib/agenda/tiposAgenda'
 import { STATUS_CONFIG, esEventoGenerico, marcaPorLigar, tintasDelChipDeMes } from '@/lib/agenda/tarjetasAgenda'
 import { GoogleGIcon } from './GoogleGIcon'
 import { IconoDelEvento } from './IconoDelEvento'
+import { useSinAvisoFlotante } from './MemoizedEventContent'
 
 /* Chip de una línea para la Vista Mes (dayGridMonth). Branch DEDICADO: NO
    comparte caja con `MemoizedEventContent` (Semana/Día). Una sola fila:
@@ -22,8 +23,10 @@ import { IconoDelEvento } from './IconoDelEvento'
    de aquí es la única superficie que se ve. */
 /* G3 (punto 16) · `sinAvisoFlotante`: con la agenda v2, ningún `title` en la
    cita (el de la marca «Por ligar» incluido); lo dice la etiqueta accesible
-   de la caja, como en `MemoizedEventContent`. */
-export const MonthChip = memo(function MonthChip({ arg, sinAvisoFlotante = false }: { arg: EventContentArg; sinAvisoFlotante?: boolean }) {
+   de la caja, como en `MemoizedEventContent` (y por el mismo camino,
+   `useSinAvisoFlotante`, para no cambiar `eventContent` de FullCalendar). */
+export const MonthChip = memo(function MonthChip({ arg }: { arg: EventContentArg }) {
+  const sinAvisoFlotante = useSinAvisoFlotante()
   const ext = arg.event.extendedProps as Appointment & { isGcalBlock?: boolean }
   // Todo lo que llega marcado como bloque de Google es un evento del calendario
   // de Spinus sin cita ligada. La distinción con los bloques anónimos de

@@ -7,7 +7,7 @@
  * comentarios; sólo cambiaron los `import`/`export` que hacían falta.
  */
 
-import { memo, useEffect, useRef, useState, type CSSProperties } from 'react'
+import { memo, useEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from 'react'
 import type { IconoEvento, ColorEvento } from '@/lib/appointments'
 import type { Status } from '@/lib/agenda/tiposAgenda'
 import { STATUS_CONFIG } from '@/lib/agenda/tarjetasAgenda'
@@ -159,16 +159,35 @@ export const FORMATO_HORA_INICIO = new Intl.DateTimeFormat('es-MX', {
      viaja como CLASE, no como estilo. Tiene que ser así — ver la nota de
      `tier` abajo. */
 
+/* ── ¿La cita lleva `title` o etiqueta accesible? (G3, punto 16) ──────────
+   Depende del interruptor, que llega DESPUÉS de pintar. Pasarlo como argumento
+   de `renderEventContent` cambiaba la función `eventContent` de FullCalendar
+   al leerse el interruptor, y FullCalendar volvía a pintar TODAS las citas:
+   +8 ms al volver del dashboard y +6 ms al abrir, con la v2 (integración
+   G1–G4, presupuesto de A). Va por aquí: al cambiar sólo se repintan las cajas
+   memorizadas (esta y `MonthChip`), nunca la rejilla. Lo fija `AgendaCliente`
+   al leer el interruptor y lo devuelve a `false` al desmontarse (falla
+   cerrado: sin saberlo, como con la v2 apagada). */
+let sinAvisoFlotanteActual = false
+const oyentesAvisoFlotante = new Set<() => void>()
+export function fijarSinAvisoFlotante(valor: boolean): void {
+  if (valor === sinAvisoFlotanteActual) return
+  sinAvisoFlotanteActual = valor
+  for (const oyente of oyentesAvisoFlotante) oyente()
+}
+function suscribirAvisoFlotante(oyente: () => void): () => void {
+  oyentesAvisoFlotante.add(oyente)
+  return () => { oyentesAvisoFlotante.delete(oyente) }
+}
+/** `true` con la v2 encendida: sin `title`, con `role="group"` y `aria-label`. */
+export function useSinAvisoFlotante(): boolean {
+  return useSyncExternalStore(suscribirAvisoFlotante, () => sinAvisoFlotanteActual, () => false)
+}
+
 export const MemoizedEventContent = memo(function MemoizedEventContent({
   timeText, horaInicio, title, pacNombre, status, doctorInitial, tzDiff, icono, color, descriptor,
   esEvento, enRejilla, marca = null, marcaTitulo = null, citaId, telefono = null, consultorio = null, nombreCorto = null,
-  sinAvisoFlotante = false,
 }: {
-  /* G3 (punto 16 de Angel) · Con la agenda v2 la cita NO lleva `title`: el
-     aviso negro del navegador al pasar el ratón sobraba, para eso está la
-     tarjeta. Lo que el `title` decía («Nombre · Agendada») pasa a la etiqueta
-     accesible (`role="group"` + `aria-label`). Apagada, como siempre. */
-  sinAvisoFlotante?: boolean
   /* F1.7 · «Hugo I.»: lo enseña una consulta de contenedor en una tarjeta de
      96 px o menos (globals.css). `null` = el mismo nombre. */
   nombreCorto?: string | null
@@ -222,6 +241,11 @@ export const MemoizedEventContent = memo(function MemoizedEventContent({
   marca?: string | null
   marcaTitulo?: string | null
 }) {
+  /* G3 (punto 16 de Angel) · Con la agenda v2 la cita NO lleva `title`: el
+     aviso negro del navegador al pasar el ratón sobraba, para eso está la
+     tarjeta. Lo que el `title` decía («Nombre · Agendada») pasa a la etiqueta
+     accesible (`role="group"` + `aria-label`). Apagada, como siempre. */
+  const sinAvisoFlotante = useSinAvisoFlotante()
   const rootRef = useRef<HTMLDivElement>(null)
   const [height, setHeight] = useState<number | null>(null)
   const [pisoFranja, setPisoFranja] = useState(PISO_FRANJA_FALLBACK)

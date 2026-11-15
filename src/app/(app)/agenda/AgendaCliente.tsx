@@ -38,6 +38,7 @@ import type { ModalState, PacienteBusqueda } from '@/components/agenda/Appointme
 import type { FuenteHorario } from '@/components/agenda/HorarioModal'
 import ConfirmModal from '@/components/agenda/ConfirmModal'
 import { renderEventContent, type InicialesDeCita } from '@/components/agenda/renderEventContent'
+import { fijarSinAvisoFlotante } from '@/components/agenda/MemoizedEventContent'
 import { renderNowIndicator } from '@/components/agenda/renderNowIndicator'
 import { CabeceraDiaLista } from '@/components/agenda/CabeceraDiaLista'
 import { BandaMovil } from '@/components/agenda/BandaMovil'
@@ -612,11 +613,14 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
   }, [isSingleDoctor, medicos, filtroEfectivo])
 
   /* G3 (punto 16): con la v2, sin el `title` de la cita (lo sustituye la
-     tarjeta al pasar el ratón). Repinta las tarjetas una vez, al leerse el
-     interruptor. */
+     tarjeta al pasar el ratón). NO por `renderEC`: cambiar `eventContent` al
+     leerse el interruptor repintaba la rejilla entera (+8 ms al volver del
+     dashboard, integración G1–G4). Lo leen las cajas (`useSinAvisoFlotante`). */
+  useEffect(() => { fijarSinAvisoFlotante(agendaV2) }, [agendaV2])
+  useEffect(() => () => fijarSinAvisoFlotante(false), [])
   const renderEC = useCallback(
-    (arg: EventContentArg) => renderEventContent(arg, navegadorTZ, inicialesDeCita, agendaV2),
-    [navegadorTZ, inicialesDeCita, agendaV2]
+    (arg: EventContentArg) => renderEventContent(arg, navegadorTZ, inicialesDeCita),
+    [navegadorTZ, inicialesDeCita]
   )
 
   const {

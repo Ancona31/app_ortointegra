@@ -22,11 +22,14 @@ import { nombreCortoDeTexto, nombreCortoPaciente } from '@/lib/agenda/nombresTar
 /** Resuelve las iniciales del chip de médico de una cita ya pintada. */
 export type InicialesDeCita = (ext: Appointment) => string | undefined
 
-/* G3 (punto 16) · `sinAvisoFlotante` = agenda v2 encendida: las cajas de la
-   cita no llevan `title` (sí su etiqueta accesible). Apagada, como siempre. */
-export function renderEventContent(arg: EventContentArg, navegadorTZ: string, inicialesDeCita: InicialesDeCita, sinAvisoFlotante = false) {
+/* G3 (punto 16) · con la agenda v2 las cajas de la cita no llevan `title` (sí
+   su etiqueta accesible). No viaja por aquí: lo leen las cajas con
+   `useSinAvisoFlotante` (ver `MemoizedEventContent.tsx`), para que esta
+   función —el `eventContent` de FullCalendar— no cambie al leerse el
+   interruptor. */
+export function renderEventContent(arg: EventContentArg, navegadorTZ: string, inicialesDeCita: InicialesDeCita) {
   // Vista Mes: chip plano dedicado. El camino de Semana/Día (abajo) queda intacto.
-  if (arg.view.type === 'dayGridMonth') return <MonthChip arg={arg} sinAvisoFlotante={sinAvisoFlotante} />
+  if (arg.view.type === 'dayGridMonth') return <MonthChip arg={arg} />
   /* La misma pregunta que la línea de arriba, en la otra dirección: allí «¿es
      Mes?», aquí «¿es rejilla?». Las dos piezas que la usan están abajo. */
   const enRejilla = esVistaDeRejilla(arg.view.type)
@@ -176,7 +179,6 @@ export function renderEventContent(arg: EventContentArg, navegadorTZ: string, in
       enRejilla={enRejilla}
       marca={marca?.texto ?? null}
       marcaTitulo={marca?.titulo ?? null}
-      sinAvisoFlotante={sinAvisoFlotante}
     />
   )
 }

@@ -37,6 +37,7 @@ import type { ConsultorioRejilla } from '@/lib/agenda/horarioRejilla'
 import { ajustarATurno } from '@/lib/agenda/turnosAgenda'
 import type { TipoCita } from '@/lib/agenda/tiposCita'
 import { duracionDeConsulta } from '@/lib/agenda/tiposPorConsultorio'
+import { cancelarOcioso, enOcioso } from '@/lib/agenda/ocioso'
 
 /** Dónde cae el gesto: el médico y el consultorio de la cita que se arrastra. */
 export type DondeTurno = { medicoId: string | null; consultorioId: string | null }
@@ -71,8 +72,14 @@ export function useAjusteTurno(e: Entrada): AjustarTurno {
   useEffect(() => {
     if (!agendaV2) return
     let vivo = true
-    leerTipos('/api/agenda/tipos-cita').then(t => { if (vivo) tiposRef.current = t }).catch(() => { /* sin ajuste */ })
-    return () => { vivo = false }
+    /* Integración G1–G4 (presupuesto de A): EN OCIOSO, como la precarga de
+       semanas. Pedidos al montar competían con las citas al abrir y al volver
+       del dashboard (+10 ms medidos con la v2); el ajuste sólo se lee en el
+       gesto, y un gesto antes de que lleguen se queda con su hora. */
+    const h = enOcioso(() => {
+      leerTipos('/api/agenda/tipos-cita').then(t => { if (vivo) tiposRef.current = t }).catch(() => { /* sin ajuste */ })
+    })
+    return () => { vivo = false; cancelarOcioso(h) }
   }, [agendaV2])
   return useCallback<AjustarTurno>((instante, donde) => {
     const tipos = tiposRef.current
