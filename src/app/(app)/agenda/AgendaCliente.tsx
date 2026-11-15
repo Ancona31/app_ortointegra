@@ -69,7 +69,9 @@ import {
 import type { Appointment } from '@/lib/agenda/tiposAgenda'
 export type { Appointment }
 import { DIAS, horarioToBusinessHours } from '@/lib/agenda/horarioAgenda'
-import { horarioDeLaRejilla } from '@/lib/agenda/horarioRejilla'
+import {
+  consultoriosDeLaRejilla, crearAvisosHorario, fuenteDeLaRejilla, type ConsultorioRejilla, type FuenteRejilla,
+} from '@/lib/agenda/horarioRejilla'
 import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
 import { rangosDeLaVista, partirFechaHora } from '@/lib/agenda/fechasAgenda'
 import { frasearConteo, frasearConteoBreve } from '@/lib/agenda/conteoAgenda'
@@ -214,9 +216,15 @@ export interface AgendaClienteProps {
   /** El interruptor de la agenda v2 de la clínica, leído en el servidor por
    *  `page.tsx` (plan del bloque B §1). Sin él, o si rechaza: apagado. */
   interruptor?: Promise<boolean>
+  /** Con la v2, los consultorios con los que se dibuja la rejilla (todos los de
+   *  la clínica si quien mira ve todas las citas). `null`: los de la sesión. */
+  consultoriosRejilla?: Promise<ConsultorioRejilla[] | null>
 }
 
-export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClienteProps) {
+/** Sin consultorios: la misma constante siempre, para que las memos no cambien de identidad. */
+const SIN_CONSULTORIOS: readonly ConsultorioRejilla[] = []
+
+export default function AgendaCliente({ semillaCitas, interruptor, consultoriosRejilla }: AgendaClienteProps) {
   const calendarRef = useRef<InstanceType<typeof FullCalendar>>(null)
   /* ⚠️ `agendaV2` ES `false` HASTA QUE LA PROMESA DEL SERVIDOR DIGA `true`:
      falla cerrado, como `agendaV2Encendida`. Se lee con `.then()` y no con
@@ -236,6 +244,26 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
     )
     return () => { vigente = false }
   }, [interruptor])
+  /* Puntos 10-13: los consultorios del servidor. Sólo con la v2 encendida se
+     escribe estado, y las dos piezas a la vez (un render): apagada no cuesta
+     ninguno. Con la v2 tapan a los de la sesión. */
+  const [consultoriosServidor, setConsultoriosServidor] = useState<readonly ConsultorioRejilla[] | null>(null)
+  /* Ya contestó (con datos, con `null` o con error): hasta entonces no se decide la hora de apertura. */
+  const [consultoriosListos, setConsultoriosListos] = useState(false)
+  useEffect(() => {
+    if (!consultoriosRejilla || !interruptor) return
+    let vigente = true
+    const listos = (c: ConsultorioRejilla[] | null): void => {
+      if (!vigente) return
+      if (c) setConsultoriosServidor(c)
+      setConsultoriosListos(true)
+    }
+    interruptor.then(
+      (v) => { if (v === true) consultoriosRejilla.then(listos, () => listos(null)) },
+      () => {},
+    )
+    return () => { vigente = false }
+  }, [consultoriosRejilla, interruptor])
   const [modal,        setModal]        = useState<ModalState>({ mode: 'closed' })
   /* F3: el chunk de interacciones se monta en ocioso y sólo con v2; mientras
      no está, `interaccionesRef` es null y los gestos abren el modal de hoy. */
@@ -523,24 +551,38 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
     filtroEfectivo, filtroSincronoRef, aplicarFiltro, forzarMedicoParaElMes, revertirMedicoForzado,
   } = useFiltroMedico({ profile, cargandoPerfil, isSecretaria, defaultMedicoId, medicos, isSingleDoctor })
 
-  /* ── EL HORARIO DE LA REJILLA (tanda T2, punto 10) ─────────────────────
-     Con la v2, el del consultorio activo cuando tiene horario propio; si no,
-     el de la clínica (la plantilla). Lo usan la rejilla (`businessHours`,
-     «Compactar», la banda de fuera de horario, el resumen) y los avisos de
-     fuera de horario del alta, el arrastre y el modal: TODOS leen esta
-     variable, así que no pueden contradecirse. Apagada, es
-     `config?.horario ?? HORARIO_DEFAULT`, el MISMO objeto de antes
-     (`horarioDeLaRejilla`), y la memo conserva su identidad entre renders
-     (invariante A1-bis: `horasHabilesFc` y la ventana dependen de ella).
-     `horario` lleva `HORARIO_DEFAULT` aplicado: ver la nota de `fuenteHorario`. */
+  /* ── EL HORARIO DE LA AGENDA (puntos 10 a 13 y 19 de Angel) ─────────────
+     Con la v2, la agenda se dibuja con los CONSULTORIOS (`horarioRejilla.ts`):
+     el del consultorio activo si quien mira es el médico de la rejilla, la
+     unión de los del médico filtrado, o la de todos con «Todos los médicos»;
+     en otra zona, convertido a la hora del dispositivo con el desfase del
+     inicio del rango visible. `horario` (un tramo por día) lo leen la ventana,
+     «Compactar», la hora de apertura, el Mes y el panel de huecos;
+     `horasHabilesFc`, el gris; `avisosHorario`, los avisos del alta, el
+     arrastre, la burbuja y el formulario, en la hora del consultorio de la cita.
+     Apagada: `config?.horario ?? HORARIO_DEFAULT`, el MISMO objeto de antes, y
+     los avisos de siempre (invariante A1-bis). `horario` lleva
+     `HORARIO_DEFAULT` aplicado: ver la nota de `fuenteHorario`. */
   const { consultorioActivo } = useConsultorioActivo()
   const medicoMostrado = filtroEfectivo || (isSingleDoctor ? medicos[0]?.id ?? null : null)
-  const consultoriosConfig = config?.consultorios
   const horarioClinicaConfig = config?.horario
-  const horario = useMemo(() => horarioDeLaRejilla({
-    agendaV2, horarioClinica: horarioClinicaConfig, consultorios: consultoriosConfig ?? [],
-    consultorioActivo, medicoMostrado,
-  }), [agendaV2, horarioClinicaConfig, consultoriosConfig, consultorioActivo, medicoMostrado])
+  const consultoriosV2 = agendaV2 ? consultoriosServidor ?? config?.consultorios ?? SIN_CONSULTORIOS : SIN_CONSULTORIOS
+  const activoV2 = agendaV2 && isDoctor ? consultorioActivo : null
+  const seleccion = useMemo(() => agendaV2 ? consultoriosDeLaRejilla({
+    consultorios: consultoriosV2, consultorioActivo: activoV2, medicoMostrado,
+  }) : SIN_CONSULTORIOS, [agendaV2, consultoriosV2, activoV2, medicoMostrado])
+  /* El desfase de cada zona se mide al mediodía del primer día visible (0 antes del primer `datesSet`: ahora). */
+  const referenciaHusos = rangoVisible ? new Date(`${rangoVisible.slice(0, 10)}T12:00:00`).getTime() : 0
+  /* La salida anterior viaja de vuelta: con el mismo contenido, el MISMO objeto (A1-bis). */
+  const fuenteRef = useRef<FuenteRejilla | null>(null)
+  const fuente = useMemo(() => fuenteDeLaRejilla({
+    agendaV2, horarioClinica: horarioClinicaConfig, seleccion, zonaDispositivo: navegadorTZ, referencia: referenciaHusos,
+  }, fuenteRef.current), [agendaV2, horarioClinicaConfig, seleccion, navegadorTZ, referenciaHusos])
+  fuenteRef.current = fuente
+  const horario = fuente.horario
+  const avisosHorario = useMemo(() => crearAvisosHorario({
+    agendaV2, horarioClinica: horarioClinicaConfig, consultorios: consultoriosV2, seleccion,
+  }), [agendaV2, horarioClinicaConfig, consultoriosV2, seleccion])
 
   /* Iniciales del chip de médico. Se calculan AL PINTAR, no al traer las citas.
      Al montar, `medicos` viene vacío, así que `isSingleDoctor` vale true y el
@@ -569,7 +611,7 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
   const {
     compactar, setCompactar, ventana, diasOcultos, scrollTime, horarioRef,
     aplicarVentana, rangoDeVista, avisoRecorte, compactaElMes,
-  } = useVentanaRejilla({ calendarRef, horario, currentView })
+  } = useVentanaRejilla({ calendarRef, horario, currentView, corregirApertura: agendaV2 && consultoriosListos })
 
   const { conteo, aplicarConteo } = useConteoVisible({ calendarRef, diasOcultos, rangoDeVista })
 
@@ -842,13 +884,13 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
   /* F3: el objeto entero viaja también a las interacciones v2, que leen de él
      `cambiarEstadoCita` cuando Movimiento lo añada (ver `contratosV2.ts`). */
   const guardado = crearGuardadoCitas({
-    calendarRef, horario, profile, toast, setConfirm, setCitaCreada, setInvitacion, closeModal,
+    calendarRef, avisosHorario, profile, toast, setConfirm, setCitaCreada, setInvitacion, closeModal,
     refetch, firmarEscritura, aplicarAppointmentAlEvento, agendaV2,
   })
   const { handleEventDrop, handleEventResize, handleSave, handleDelete, handleCancelar } = guardado
 
   const { handleDateClick, handleSelect, handleEventClick, abrirCita, abrirHueco } = crearAltaCitas({
-    calendarRef, isMobile, setDiaSel, subState, openBloqueoModal, horario, setModal, setConfirm,
+    calendarRef, isMobile, setDiaSel, subState, openBloqueoModal, avisosHorario, setModal, setConfirm,
     resumenDia, citasIncompletas, agendaV2, interacciones: interaccionesRef, seleccionDesdeHueco,
   })
 
@@ -1176,8 +1218,12 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
   const eventResizeFc = useCallback((arg: EventResizeDoneArg) => { void manejadoresFcRef.current.handleEventResize(arg) }, [])
 
   /* `businessHours` era `horarioToBusinessHours(horario)` en el JSX: un array
-     nuevo en cada render. Sólo cambia cuando cambia el horario. */
-  const horasHabilesFc = useMemo(() => horarioToBusinessHours(horario), [horario])
+     nuevo en cada render. Sólo cambia cuando cambia el horario. Con la v2 lo
+     da la fuente, un tramo por consultorio (y con la misma identidad para el
+     mismo contenido); apagada, `null` y el de siempre. */
+  const horasHabilesFuente = fuente.businessHours
+  const horasHabilesFc = useMemo(
+    () => horasHabilesFuente ?? horarioToBusinessHours(horario), [horasHabilesFuente, horario])
 
   return (
     /* ⚠️⚠️ LA ALTURA DE ESTE `<div>` ES LO QUE PARTE LA PÁGINA EN DOS ZONAS: la
@@ -1951,7 +1997,7 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
           puedeAgendar={() => { if (subState.isBlocked) { openBloqueoModal(); return false } return true }}
           medicos={medicos}
           filtroMedico={filtroEfectivo || ((isSingleDoctor || isMedicoSinAdmin) && defaultMedicoId ? defaultMedicoId : null)}
-          horario={horario}
+          avisosHorario={avisosHorario}
           guardado={guardado}
           /* T1 · La invitación tras agendar desde la burbuja: el mismo modal
              que «Agregar invitados»; espera al evento de Google si aún no hay. */
@@ -2007,7 +2053,7 @@ export default function AgendaCliente({ semillaCitas, interruptor }: AgendaClien
             return api ? empalmesPintados(cita, api.getEvents()) : []
           } : undefined}
           medicos={medicos}
-          horario={horario}
+          avisosHorario={avisosHorario}
           defaultMedicoId={defaultMedicoId}
           hideMedicoDropdown={isSingleDoctor || isMedicoSinAdmin}
           medicoDropdownRequired={isSecretaria || isMedicoConAdmin}

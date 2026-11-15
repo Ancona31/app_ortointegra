@@ -14,6 +14,7 @@ import type { DateClickArg } from '@fullcalendar/interaction'
 import type { DateSelectArg, EventApi, EventClickArg } from '@fullcalendar/core'
 import { crearAltaCitas } from '@/app/(app)/agenda/altaCitas'
 import { HORARIO_DEFAULT } from '@/lib/agenda/horarioAgenda'
+import { crearAvisosHorario } from '@/lib/agenda/horarioRejilla'
 import type { ApiInteraccionesV2, SeleccionDesdeHueco } from '@/lib/agenda/contratosV2'
 import type { SubscriptionState } from '@/lib/subscription'
 import type { ResumenDia } from '@/lib/agenda/huecosAgenda'
@@ -56,7 +57,7 @@ function montar(o: { agendaV2: boolean; conChunk?: boolean; bloqueada?: boolean 
     calendarRef: calendarRef as unknown as Parameters<typeof crearAltaCitas>[0]['calendarRef'],
     isMobile: false, setDiaSel: vi.fn(),
     subState: { isBlocked: o.bloqueada === true } as unknown as SubscriptionState,
-    openBloqueoModal, horario: HORARIO_DEFAULT, setModal, setConfirm,
+    openBloqueoModal, avisosHorario: crearAvisosHorario({ agendaV2: false, horarioClinica: HORARIO_DEFAULT, consultorios: [], seleccion: [] }), setModal, setConfirm,
     resumenDia: { dia: D(0) } as unknown as ResumenDia, citasIncompletas: false,
     agendaV2: o.agendaV2,
     interacciones: { current: o.conChunk === false ? null : (api satisfies ApiInteraccionesV2) },

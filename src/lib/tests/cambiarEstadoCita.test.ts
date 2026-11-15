@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { crearGuardadoCitas } from '@/app/(app)/agenda/guardadoCitas'
 import { HORARIO_DEFAULT } from '@/lib/agenda/horarioAgenda'
+import { crearAvisosHorario } from '@/lib/agenda/horarioRejilla'
 import type { Status } from '@/lib/agenda/tiposAgenda'
 
 /**
@@ -24,7 +25,7 @@ function montar(respuesta: { ok: boolean; cuerpo: unknown }) {
   const aplicarAppointmentAlEvento = vi.fn()
   const g = crearGuardadoCitas({
     calendarRef: { current: null },
-    horario: HORARIO_DEFAULT,
+    avisosHorario: crearAvisosHorario({ agendaV2: false, horarioClinica: HORARIO_DEFAULT, consultorios: [], seleccion: [] }),
     profile: null,
     toast,
     setConfirm: vi.fn(),

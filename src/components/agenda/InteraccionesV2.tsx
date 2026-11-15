@@ -41,13 +41,13 @@ import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
 import { useToast } from '@/components/ui/Toast'
 import { useConsultorios } from '@/hooks/useConsultorios'
 import type { Consultorio } from '@/types'
-import type { Horario, MedicoConfig } from '@/lib/configApp'
+import type { MedicoConfig } from '@/lib/configApp'
 import { componerNombreMedicoCompleto } from '@/lib/nombreMedico'
 import type { AltaGuardada, Appointment, DatosGuardado, OpcionesGuardado } from '@/lib/agenda/tiposAgenda'
 import type { ApiInteraccionesV2, AperturaAltaV2, AperturaEdicionV2, CambiarEstadoCita, GestoAlta, SitioCita } from '@/lib/agenda/contratosV2'
 import type { Caja, Punto } from '@/lib/agenda/posicionCapa'
 import { guardarAltaRapida, horasDelGesto, type DependenciasGuardado } from '@/lib/agenda/altaRapida'
-import { avisoFueraDeHorario, avisoFinFueraDeHorario } from '@/lib/agenda/horarioAgenda'
+import type { AvisosHorario } from '@/lib/agenda/horarioRejilla'
 import { empalmesPintados, mensajeEmpalme } from '@/lib/agenda/empalmesCita'
 import { esEventoGenerico } from '@/lib/agenda/tarjetasAgenda'
 import { vistaEnElOtroFormato } from '@/lib/agenda/vistasAgenda'
@@ -113,7 +113,8 @@ export interface PropsInteraccionesV2 {
   medicos: readonly MedicoConfig[]
   /** El médico de la burbuja: el del filtro, o el único; `null` = «Todos». */
   filtroMedico: string | null
-  horario: Horario
+  /** Los avisos de fuera de horario: con la v2, en la hora del consultorio de la cita (`horarioRejilla.ts`). */
+  avisosHorario: AvisosHorario
   guardado: GuardadoV2
   /** T1 · Quien mira puede invitar a una cita (`canVerAgendaCompleta`, la regla de `handleSave`). */
   puedeInvitar: boolean
@@ -169,9 +170,10 @@ function aperturaDesdeBurbuja(v: MasOpcionesBurbuja): AperturaAltaV2 {
 
 /** Los avisos y el guardado de la burbuja, con las piezas de la agenda (B7c, P3). */
 function useDependenciasGuardado(p: PropsInteraccionesV2): DependenciasGuardado {
-  const { calendarRef, horario, guardado, setConfirm } = p
+  const { calendarRef, avisosHorario, guardado, setConfirm } = p
   return {
-    avisoHorario: (inicio, fin) => avisoFueraDeHorario(inicio, horario, 'Vas a agendar a las') ?? avisoFinFueraDeHorario(fin, horario),
+    avisoHorario: (inicio, fin, datos) => avisosHorario.hora(inicio, fin, 'Vas a agendar a las',
+      { consultorioId: datos.consultorio_id ?? null, medicoId: datos.medico_id ?? null }),
     buscarEmpalmes: (tramo) => {
       const api = calendarRef.current?.getApi()
       return api ? empalmesPintados(tramo, api.getEvents()) : []

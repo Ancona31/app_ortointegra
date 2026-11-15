@@ -18,6 +18,11 @@
  *
  *     horario de la clínica  ∪  eventos visibles  ∪  suelo fijo 07:00–21:00
  *
+ * (Con la agenda v2, «el horario» que llega aquí ya no es el de la clínica:
+ * es el de los consultorios de la rejilla, un tramo por día y en la hora del
+ * dispositivo, que arma `horarioRejilla.ts`. Este módulo no cambia: sigue
+ * recibiendo un `Horario`.)
+ *
  * ⚠️  TODAS LAS CITAS A `@fullcalendar/core` DE ESTA CABECERA SON DE LA
  * VERSIÓN 6.1.20, la instalada al escribirlas. Los números de línea se van a
  * desplazar en la primera actualización del paquete: si no cuadran, comprueba

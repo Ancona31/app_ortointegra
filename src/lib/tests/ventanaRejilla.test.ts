@@ -1,6 +1,6 @@
 /**
  * ─────────────────────────────────────────────────────────────────────
- * RECUENTO DE CASOS — 63 EN TOTAL
+ * RECUENTO DE CASOS — 69 EN TOTAL
  * ─────────────────────────────────────────────────────────────────────
  *
  * ⚠️ ESTA TABLA NO ES ADORNO: ES UN DETECTOR DE BORRADOS ACCIDENTALES, y está
@@ -34,6 +34,7 @@
  *   diasOcultables — eventos que cruzan de día               3
  *   diasOcultables — sólo se pliega lo que el rango cubre    2
  *   avisoDeRecorte                                           8
+ *   ventana y columnas con varios consultorios (fuente única) 6
  */
 
 /**
@@ -65,6 +66,7 @@ import {
   type EventoParaVentana,
   type RangoVisible,
 } from '@/lib/agenda/ventanaRejilla'
+import { fuenteDeLaRejilla } from '@/lib/agenda/horarioRejilla'
 import type { DiaSemana, Horario } from '@/lib/configApp'
 
 /** Semana del lunes 24/08/2026 al lunes 31/08/2026, como la da `datesSet`. */
@@ -653,5 +655,56 @@ describe('avisoDeRecorte', () => {
     // `diasOcultables` los devuelve recorriendo DIAS, pero el filtro es de la
     // constante y no del array de entrada: da igual cómo llegue ordenado.
     expect(avisoDeRecorte(AMPLIA, [0, 6], DIAS_LABEL)).toBe('sábado y domingo ocultos')
+  })
+})
+
+/* ── Tanda «diseño, duración y horarios», puntos 10 a 13 ────────────────────
+   La ventana y las columnas plegables YA NO salen del horario de la clínica:
+   salen de `fuenteDeLaRejilla` (varios consultorios, cada uno en su zona,
+   convertidos a la hora del dispositivo). Estas pruebas encadenan las dos
+   piezas, como hace la agenda. La semana es la de SEMANA (agosto: Tijuana
+   UTC-7, Mérida UTC-6, desfase +1 h). */
+describe('ventana y columnas con varios consultorios (fuente única)', () => {
+  const C = (id: string, medico: string, h: Horario, timezone = 'America/Merida') =>
+    ({ id, medico_id: medico, timezone, horario: h, horario_propio: true, activo: true })
+  const AGOSTO = new Date(2026, 7, 26, 12, 0).getTime()
+  const fuente = (seleccion: ReturnType<typeof C>[]) => fuenteDeLaRejilla({
+    agendaV2: true, horarioClinica: HORARIO_NORMAL, seleccion, zonaDispositivo: 'America/Merida', referencia: AGOSTO,
+  })
+  const centro = C('centro', 'admin', horarioDe('08:00', '12:00'))
+  const norte = C('norte', 'admin', horarioDe('15:00', '19:00'))
+  const rehab = C('rehab', 'invitada', { ...horarioDe('10:00', '14:00'), sabado: { activo: true, inicio: '09:00', fin: '13:00' } })
+
+  it('«Todos» compactado: de la apertura más temprana (08:00) al cierre más tardío (19:00)', () => {
+    expect(calcularVentanaRejilla([], SEMANA, fuente([centro, norte, rehab]).horario, { compacta: true }))
+      .toEqual({ slotMinTime: '08:00:00', slotMaxTime: '19:00:00' })
+  })
+
+  it('un médico concreto compactado: sólo su unión (la invitada: 10:00–14:00, y el sábado desde las 09:00)', () => {
+    expect(calcularVentanaRejilla([], SEMANA, fuente([rehab]).horario, { compacta: true }))
+      .toEqual({ slotMinTime: '09:00:00', slotMaxTime: '14:00:00' })
+  })
+
+  it('el consultorio activo compactado: sólo el suyo (Norte, 15:00–19:00); sin compactar, el suelo de siempre', () => {
+    expect(calcularVentanaRejilla([], SEMANA, fuente([norte]).horario, { compacta: true }))
+      .toEqual({ slotMinTime: '15:00:00', slotMaxTime: '19:00:00' })
+    expect(calcularVentanaRejilla([], SEMANA, fuente([norte]).horario))
+      .toEqual({ slotMinTime: '07:00:00', slotMaxTime: '21:00:00' })
+  })
+
+  it('un consultorio en Tijuana abre la ventana en la hora del DISPOSITIVO (19–22 de Tijuana → hasta 23:00)', () => {
+    const tarde = C('tj', 'admin', horarioDe('19:00', '22:00'), 'America/Tijuana')
+    expect(calcularVentanaRejilla([], SEMANA, fuente([centro, tarde]).horario))
+      .toEqual({ slotMinTime: '07:00:00', slotMaxTime: '23:00:00' })
+  })
+
+  it('las columnas: el sábado sólo se pliega si NINGUNO de los consultorios lo abre', () => {
+    expect(diasOcultables([], SEMANA, fuente([centro, norte]).horario, DIAS_FC)).toEqual([6, 0])
+    expect(diasOcultables([], SEMANA, fuente([centro, rehab]).horario, DIAS_FC)).toEqual([0])
+  })
+
+  it('una cita fuera del horario de todos sigue abriendo la ventana compactada', () => {
+    expect(calcularVentanaRejilla([evento([6, 30], [7, 0])], SEMANA, fuente([norte]).horario, { compacta: true }))
+      .toEqual({ slotMinTime: '06:00:00', slotMaxTime: '19:00:00' })
   })
 })

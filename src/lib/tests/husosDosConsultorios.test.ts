@@ -11,9 +11,9 @@
  *   · la agenda: FullCalendar dibuja en la hora del DISPOSITIVO; la tarjeta de
  *     la cita de Tijuana vista desde Mérida cae a las 11:00 y lleva la etiqueta
  *     «09:00 hora Baja California» (la misma cuenta que `renderEventContent`).
- *     La banda gris del horario propio (`horarioDeLaRejilla`) también se
- *     dibuja en la hora del dispositivo: NO se cambió (documentado en las
- *     notas de la tanda).
+ *     Desde la tanda «diseño, duración y horarios» (punto 19): la banda gris
+ *     del horario de Tijuana se CONVIERTE a la hora del dispositivo, y el aviso
+ *     de fuera de horario se mide en la hora de Tijuana (`horarioRejilla.ts`).
  */
 import { afterAll, beforeAll, describe, it, expect } from 'vitest'
 import { reglasDe } from '@/lib/reserva/turnosReserva'
@@ -22,7 +22,7 @@ import { correoRecordatorio } from '@/lib/confirmacion/correosCita'
 import { citaPintada } from '@/lib/confirmacion/vistaConfirmacion'
 import { horaEnTZ } from '@/lib/agenda/fechasAgenda'
 import { regionDeTimezone } from '@/lib/consultorios/zonas-mexico'
-import { horarioDeLaRejilla } from '@/lib/agenda/horarioRejilla'
+import { consultoriosDeLaRejilla, crearAvisosHorario, fuenteDeLaRejilla } from '@/lib/agenda/horarioRejilla'
 import { avisoFueraDeHorario } from '@/lib/agenda/horarioAgenda'
 import type { ContextoConfirmacion } from '@/lib/confirmacion/enlaceConfirmacion'
 import type { Horario } from '@/lib/configApp'
@@ -82,11 +82,14 @@ describe('un médico, dos consultorios en zonas distintas', () => {
     expect(`${horaEnTZ(CITA_TIJUANA, 'America/Tijuana')} hora ${regionDeTimezone('America/Tijuana')}`).toBe('09:00 hora Baja California')
   })
 
-  it('la banda del horario propio de Tijuana se dibuja en la hora del dispositivo (resto conocido, sin cambiar)', () => {
-    const h = horarioDeLaRejilla({
-      agendaV2: true, horarioClinica: null, consultorios: [MERIDA, TIJUANA], consultorioActivo: TIJUANA, medicoMostrado: 'medico',
-    })
-    // La cita de las 09:00 de Tijuana se pinta a las 11:00 de Mérida: la rejilla (09–11) la ve FUERA de horario.
-    expect(avisoFueraDeHorario(new Date(CITA_TIJUANA), h, 'Vas a agendar a las')).not.toBeNull()
+  it('con Tijuana como consultorio activo, el gris va de 11:00 a 13:00 de Mérida y la cita de las 09:00 no avisa', () => {
+    const seleccion = consultoriosDeLaRejilla({ consultorios: [MERIDA, TIJUANA], consultorioActivo: TIJUANA, medicoMostrado: 'medico' })
+    const f = fuenteDeLaRejilla({ agendaV2: true, horarioClinica: null, seleccion, zonaDispositivo: 'America/Merida', referencia: Date.parse(CITA_TIJUANA) })
+    expect(f.horario.lunes).toEqual({ activo: true, inicio: '11:00', fin: '13:00' })
+    const avisos = crearAvisosHorario({ agendaV2: true, horarioClinica: null, consultorios: [MERIDA, TIJUANA], seleccion })
+    const fin = new Date(Date.parse(CITA_TIJUANA) + 30 * 60_000)
+    expect(avisos.hora(new Date(CITA_TIJUANA), fin, 'Vas a agendar a las', { consultorioId: 'tijuana' })).toBeNull()
+    // La regla anterior (el horario de Tijuana leído en la hora del dispositivo) avisaba en falso.
+    expect(avisoFueraDeHorario(new Date(CITA_TIJUANA), LUNES_9_11, 'Vas a agendar a las')).not.toBeNull()
   })
 })
