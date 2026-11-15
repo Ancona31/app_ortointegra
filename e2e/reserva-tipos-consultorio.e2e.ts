@@ -73,7 +73,7 @@ test('con una «Consulta» por consultorio no hay selector, nunca salen las dos 
   await expect(page.getByRole('button', { name: 'Elegir día y hora' })).toBeEnabled()
   expect(await tipoPedido(page)).toBe(general)
 
-  await page.getByRole('button', { name: '‹ Volver' }).click()
+  await page.getByRole('button', { name: 'Volver', exact: true }).click()
   await consultorio(page, norte).check()
   await expect(selectorTipo(page)).toHaveCount(0)
   // El tipo se reinició al del Norte: con la lista plana seguiría el de 30 min (y /turnos daría 400).

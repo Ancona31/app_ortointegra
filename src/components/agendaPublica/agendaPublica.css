@@ -14,53 +14,58 @@
    `ThemeProvider`, así que `--cp`/`--cs` no existen aquí y los tokens caen a
    su respaldo de fábrica. Es lo que se quiere (como `/r/[folio]`).
 
-   ⚠️ EL TEMA OSCURO LO DECIDE EL TELÉFONO DEL PACIENTE. Sin `ScriptTema` no hay
-   `html.dark` (y no debe haberlo: ver la cabecera de ScriptTema.tsx), así que
-   el bloque `@media (prefers-color-scheme: dark)` de abajo REDECLARA, sólo
-   dentro de estas páginas, los `--ag-*` que usan, con los MISMOS valores que
-   `html.dark` de globals.css. La prueba `agendaPublicaTokens.test.ts`
-   compara uno a uno: si cambias un valor oscuro en globals.css, cámbialo aquí
-   o la prueba falla. Va en `body:has(.rp)` para que también el fondo del
-   documento (lo que asoma al estirar la página) sea el oscuro.
+   ⚠️ SIEMPRE EN CLARO (tanda H, punto 2 de Angel): estas páginas NO siguen el
+   modo oscuro del sistema NI el guardado en la app. Sin `ScriptTema` no hay
+   `html.dark` al cargarlas, pero puede quedar colgada si el médico llega desde
+   la app sin recargar (misma raíz de documento). Por eso el bloque de abajo
+   REDECLARA en `body:has(.rp)`, con los valores CLAROS (los del `:root` de
+   globals.css), cada `--ag-*` que esta hoja usa y que `html.dark` cambia: así
+   gana a la herencia de `html.dark` sin tocar globals.css. No hay ningún
+   `@media (prefers-color-scheme: dark)` y no debe volver.
+   `agendaPublicaTokens.test.ts` lo exige token a token (también los que se
+   usen en el futuro): si cambias un valor claro en globals.css o empiezas a
+   usar aquí otro token que el oscuro cambia, la prueba falla hasta copiarlo.
+   `color-scheme: light` (en el documento, y la meta `color-scheme` del
+   `viewport` de cada página) para que los controles nativos, el autorrelleno
+   y las barras de desplazamiento tampoco salgan oscuros. El navy va LITERAL
+   (#163250, el de fábrica): el cromo es el de Spinus, como el resto.
 
    ⚠️ MOVIMIENTO: sólo `opacity` y `transform`, con `--ag-dur-*` (≤ 240 ms) y
    `--ag-ease-*`; nada con `prefers-reduced-motion: reduce`. */
 
-@media (prefers-color-scheme: dark) {
-  body:has(.rp) {
-    --ag-bg-app: #0c1420;
-    --ag-surface: #1b2a40;
-    --ag-surface-sunken: #16233a;
-    --ag-border-card: #2a3b57;
-    --ag-hairline: rgba(255, 255, 255, .08);
-    --ag-line-dash: rgba(255, 255, 255, .16);
-    --ag-ink: #e8eef6;
-    --ag-text: #cdd8e6;
-    --ag-ink-600: #a8b4c2;
-    --ag-shadow-card: 0 1px 3px rgba(0, 0, 0, .45);
-    --ag-brand-legible: color-mix(in srgb, var(--ag-brand-secondary) 55%, white);
-    --ag-primary-bg-faint: rgba(91, 140, 255, .10);
-    --ag-navy: #2f4f73;
-    --ag-navy-ink-strong: rgba(255,255,255,.88);
-    --ag-input-bg: #16233a;
-    --ag-input-border: #2a3b57;
-    --ag-input-focus-ring: rgba(91, 140, 255, .30);
-    --ag-input-focus-border: #5b8cff;
-    --ag-success-text: #7eecb4;
-    --ag-success-bg: rgba(22, 163, 74, .18);
-    --ag-success-border: rgba(52, 211, 153, .34);
-    --ag-aviso-text: #fcd38a;
-    --ag-aviso-bg: rgba(217, 119, 6, .16);
-    --ag-aviso-border: rgba(251, 191, 36, .34);
-    --ag-status-cancelled-text: #fca5a5;
-    --ag-status-cancelled-bg: rgba(192, 57, 43, .18);
-    --ag-status-cancelled-border: rgba(239, 68, 68, .36);
-    --ag-status-confirmed-text: #a9c8ff;
-    --ag-status-confirmed-bg: rgba(30, 95, 168, .20);
-    --ag-status-confirmed-border: rgba(107, 155, 255, .36);
-    background: var(--ag-bg-app);
-    color-scheme: dark;
-  }
+html:has(.rp) { color-scheme: light; }
+
+body:has(.rp) {
+  --ag-bg-app: #eef1f5;
+  --ag-surface: #ffffff;
+  --ag-surface-sunken: #f7f9fb;
+  --ag-border-card: #e7ecf3;
+  --ag-line-dash: #c3ccd8;
+  --ag-ink: #15243e;
+  --ag-text: #27364f;
+  --ag-ink-600: #52627a;
+  --ag-shadow-card: 0 1px 2px rgba(16, 32, 64, .05);
+  --ag-brand-legible: var(--ag-brand-secondary);
+  --ag-primary-bg-faint: #f5f8fc;
+  --ag-navy: #163250;
+  --ag-navy-ink-strong: rgba(255,255,255,.80);
+  --ag-input-bg: #ffffff;
+  --ag-input-border: #e2e8f0;
+  --ag-input-focus-ring: rgba(30, 95, 168, .30);
+  --ag-input-focus-border: #93b4d8;
+  --ag-success-text: #157e3c;
+  --ag-success-bg: #e7f6ec;
+  --ag-success-border: #bfe6cb;
+  --ag-aviso-text: #92400e;
+  --ag-aviso-bg: #fff7e8;
+  --ag-aviso-border: #f2d9a6;
+  --ag-status-cancelled-text: #c0392b;
+  --ag-status-cancelled-bg: #fdf2f2;
+  --ag-status-cancelled-border: #f3c9c9;
+  --ag-status-confirmed-bg: #eaf1f9;
+  --ag-status-confirmed-border: #c7dcef;
+  background: var(--ag-bg-app);
+  color-scheme: light;
 }
 
 /* ── Raíz y columna ──────────────────────────────────────────────────────── */
@@ -141,11 +146,6 @@
 .rp-titulo { margin: 0; font-size: 18px; font-weight: 700; color: var(--ag-ink); line-height: 1.3; outline: none; }
 .rp-sub { margin: 0; font-size: 14px; color: var(--ag-ink-600); }
 
-.rp-atras {
-  align-self: flex-start; background: none; border: 0; padding: 0; min-height: 32px;
-  font: inherit; font-size: 14px; font-weight: 600; color: var(--ag-brand-legible); cursor: pointer;
-}
-
 .rp-grupo { display: flex; flex-direction: column; gap: var(--ag-2); margin: 0; padding: 0; border: 0; min-width: 0; }
 .rp-etiqueta { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ag-ink-600); padding: 0; }
 
@@ -162,7 +162,6 @@
 .rp-op__txt b { font-size: 15px; font-weight: 600; color: var(--ag-ink); }
 .rp-op__txt span { font-size: 13.5px; color: var(--ag-ink-600); overflow-wrap: anywhere; }
 .rp-op__dur { font-size: 13px; font-weight: 600; color: var(--ag-text); white-space: nowrap; }
-.rp-fijo { cursor: default; }
 
 /* ── Resumen de lo elegido ──────────────────────────────────────────────── */
 
@@ -247,7 +246,7 @@
 .rp-btn--sec { background: transparent; border-color: var(--ag-border-card); color: var(--ag-ink); }
 .rp-btn--peligro { background: transparent; border-color: var(--ag-status-cancelled-border); color: var(--ag-status-cancelled-text); }
 .rp-enlace { align-self: center; min-height: 40px; display: inline-flex; align-items: center; background: none; border: 0; font: inherit; font-size: 14px; font-weight: 600; color: var(--ag-brand-legible); cursor: pointer; }
-.rp-btn:focus-visible, .rp-atras:focus-visible, .rp-enlace:focus-visible, .rp-flecha:focus-visible,
+.rp-btn:focus-visible, .rp-enlace:focus-visible, .rp-flecha:focus-visible,
 .rp-dia:focus-visible, .rp-hora:focus-visible, .rp-acepto input:focus-visible {
   outline: 3px solid var(--ag-input-focus-ring); outline-offset: 2px;
 }
@@ -266,6 +265,13 @@
   display: flex; flex-direction: column; gap: var(--ag-2);
 }
 .rp-pie small { font-size: 13.5px; color: var(--ag-ink-600); text-align: center; }
+
+/* «Volver» y el botón principal en la misma fila (tanda H, punto 1): misma
+   altura y radio; «Volver» toma lo que mide y el principal, el resto. Sin
+   «Volver» (el primer paso), el principal ocupa la fila entera. */
+.rp-pie__fila { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--ag-2); }
+.rp-pie__fila > :only-child { grid-column: 1 / -1; }
+.rp-volver { gap: var(--ag-1-5); padding-inline: var(--ag-3-5); }
 .rp-pie small b { color: var(--ag-ink); }
 
 /* ── Avisos y estados ───────────────────────────────────────────────────── */

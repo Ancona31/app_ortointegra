@@ -12,7 +12,7 @@ import { codigoDeEnlace, hashDeCodigo } from '../src/lib/reserva/secretos'
  * presentación; la lógica de turnos, límites y reserva no cambió y la prueban
  * reserva-enlace, reserva-seg1 y confirmacion-enlace.
  *
- *   · cuatro pasos visibles; «Tipo de cita» sólo con más de un tipo (punto 7);
+ *   · cuatro pasos visibles (el primero, «Lugar» desde la tanda H); «Tipo de cita» sólo con más de un tipo (punto 7);
  *   · el consultorio con su dirección COMPLETA al elegir, en el resumen de cada
  *     paso, en la pantalla final, en la confirmación y en el comprobante (2);
  *   · la tira de fechas con los días sin horario atenuados, y debajo sólo los
@@ -81,8 +81,8 @@ function semanaFingida(): { dias: { fecha: string; turnos: { inicio: string; fin
 test('cuatro pasos, «Tipo de cita» con más de un tipo y la dirección completa en cada paso y al final', async ({ page }) => {
   const { codigo } = emitirEnlace(e, 'unico')
   await page.goto(`/reservar/${codigo}`)
-  await expect(page.getByRole('list', { name: 'Pasos de la reserva' }).locator('li')).toHaveText(['Qué y dónde', 'Día y hora', 'Tus datos', 'Listo'])
-  await expect(pasoActual(page)).toHaveText('Qué y dónde')
+  await expect(page.getByRole('list', { name: 'Pasos de la reserva' }).locator('li')).toHaveText(['Lugar', 'Día y hora', 'Tus datos', 'Listo'])
+  await expect(pasoActual(page)).toHaveText('Lugar')
   await expect(page.getByRole('group', { name: 'Tipo de cita' })).toBeVisible()
   // Con varios tipos no hay ninguno elegido de antemano: hasta elegir, no se avanza.
   await expect(page.locator('input[name="tipo"]:checked')).toHaveCount(0)
@@ -241,7 +241,7 @@ test('el correo del código: marca, código en grande, sin imágenes', async ({ 
 async function peoresContrastes(page: Page): Promise<string[]> {
   return page.evaluate(() => {
     const SEL = '.rp-titulo, .rp-sub, .rp-etiqueta, .rp-resumen dt, .rp-resumen dd, .rp-pasos li, .rp-hora, .rp-dia:not(:disabled) small, '
-      + '.rp-dia:not(:disabled) b, .rp-btn:not(:disabled), .rp-atras, .rp-nota, .rp-vacio, .rp-op__txt b, .rp-op__txt span, .rp-medico__nombre, '
+      + '.rp-dia:not(:disabled) b, .rp-btn:not(:disabled), .rp-nota, .rp-vacio, .rp-op__txt b, .rp-op__txt span, .rp-medico__nombre, '
       + '.rp-medico__esp, .rp-marca, .rp-pie small, .rp-semana span, .rp-fecha, .rp-fecha small, .rp-enlace'
     const lienzo = document.createElement('canvas').getContext('2d', { willReadFrequently: true })
     if (!lienzo) return ['sin canvas']

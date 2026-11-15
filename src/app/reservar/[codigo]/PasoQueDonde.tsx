@@ -31,23 +31,17 @@ function Opciones({ nombre, etiqueta, opciones, elegida, onElegir }: { nombre: s
 }
 
 /**
- * Paso 1, «Qué y dónde»: tarjetas con la dirección COMPLETA del consultorio
- * (antes era un desplegable que la cortaba) y, si hay más de uno, el tipo con
- * su duración. Con un solo consultorio se enseña como tarjeta fija.
+ * Paso 1, «Lugar» (tanda H, punto 3 de Angel; antes «Qué y dónde»): tarjetas
+ * con la dirección COMPLETA del consultorio (antes era un desplegable que la
+ * cortaba) y, si hay más de uno, el tipo con su duración. Con un solo
+ * consultorio sale IGUAL que con varios, ya elegido (su radio marcado): la
+ * persona ve dónde es antes de elegir la hora.
  */
 export default function PasoQueDonde(p: Props): ReactElement {
-  const unico = p.consultorios.length === 1 ? p.consultorios[0] : undefined
   return (
     <>
-      {unico ? (
-        <div className="rp-grupo">
-          <span className="rp-etiqueta">Consultorio</span>
-          <div className="rp-op rp-fijo"><span className="rp-op__txt"><b>{unico.nombre}</b>{unico.direccion && <span>{unico.direccion}</span>}</span></div>
-        </div>
-      ) : (
-        <Opciones nombre="consultorio" etiqueta="Consultorio" elegida={p.consultorioId} onElegir={p.onConsultorio}
-          opciones={p.consultorios.map(c => ({ id: c.id, titulo: c.nombre, detalle: c.direccion }))} />
-      )}
+      <Opciones nombre="consultorio" etiqueta="Consultorio" elegida={p.consultorioId} onElegir={p.onConsultorio}
+        opciones={p.consultorios.map(c => ({ id: c.id, titulo: c.nombre, detalle: c.direccion }))} />
       {p.tipos.length > 1 && (
         <Opciones nombre="tipo" etiqueta="Tipo de cita" elegida={p.tipoId} onElegir={p.onTipo}
           opciones={p.tipos.map(t => ({ id: t.id, titulo: t.nombre, detalle: null, extra: `${t.duracionMin} min` }))} />
