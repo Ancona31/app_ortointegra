@@ -84,3 +84,22 @@ describe('cada correo', () => {
     expect(html).not.toContain('href=')
   })
 })
+
+/* Tanda H, punto 2 de Angel: los correos se muestran en claro, sin seguir el oscuro del sistema. */
+describe('los correos, siempre en claro', () => {
+  const htmls = () => [...Object.values(TODOS()).map(c => c.html), recordatorio(true).html, htmlCorreoCita({ preencabezado: 'p', titulo: 't' })]
+  it('declaran color-scheme y supported-color-schemes en light', () => {
+    for (const html of htmls()) {
+      expect(html).toContain('<meta name="color-scheme" content="light">')
+      expect(html).toContain('<meta name="supported-color-schemes" content="light">')
+      expect(html).toMatch(/<style>:root\{color-scheme:light;supported-color-schemes:light\}<\/style>/)
+      expect(html).toMatch(/<body style="[^"]*color-scheme:light/)
+    }
+  })
+  it('no tienen ninguna regla para el modo oscuro', () => {
+    for (const html of htmls()) {
+      expect(html).not.toMatch(/prefers-color-scheme|color-scheme:\s*dark|content="[^"]*dark/i)
+    }
+  })
+})
+

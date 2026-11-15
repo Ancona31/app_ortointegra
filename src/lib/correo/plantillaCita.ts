@@ -23,6 +23,15 @@
  *     notas, motivo ni especialidad. No se lo añadas.
  *   · ⚠️ DETERMINISTA: nada de «ahora». Resend exige el MISMO cuerpo con la
  *     misma llave de idempotencia (recordatorio y comprobante).
+ *   · ⚠️ SIEMPRE EN CLARO (tanda H, punto 2 de Angel): `color-scheme` y
+ *     `supported-color-schemes` en `light` (metas, `:root` y `body`) y NINGÚN
+ *     `@media (prefers-color-scheme: dark)`. LÍMITE CONOCIDO: algunos buzones
+ *     oscurecen por su cuenta sin preguntar (Gmail de Android y de iOS, Outlook
+ *     de escritorio y de móvil invierten o atenúan los colores en su modo
+ *     oscuro). Eso no se puede impedir desde el HTML; las metas sólo lo evitan
+ *     donde se respetan (Apple Mail, el correo de iOS). Por eso la marca y los
+ *     botones llevan su color de fondo explícito y el texto encima contrasta en
+ *     las dos lecturas.
  */
 import { escapeHtml } from '@/lib/htmlEscape'
 
@@ -124,9 +133,11 @@ function cuerpo(x: PartesCorreo): string {
 /** El HTML completo: documento, preencabezado oculto, cabecera de marca y tarjeta de 560 px como máximo. */
 export function htmlCorreoCita(x: PartesCorreo): string {
   return '<!doctype html><html lang="es"><head><meta charset="utf-8">'
-    + '<meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light">'
+    + '<meta name="viewport" content="width=device-width,initial-scale=1">'
+    + '<meta name="color-scheme" content="light"><meta name="supported-color-schemes" content="light">'
+    + '<style>:root{color-scheme:light;supported-color-schemes:light}</style>'
     + `<title>${escapeHtml(x.titulo)}</title></head>`
-    + `<body style="margin:0;padding:0;background:${C.fondo}">`
+    + `<body style="margin:0;padding:0;background:${C.fondo};color-scheme:light">`
     + `<div style="display:none;max-height:0;overflow:hidden;opacity:0">${escapeHtml(x.preencabezado)}</div>`
     + `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="${C.fondo}" style="background:${C.fondo}"><tr><td align="center" style="padding:16px 12px">`
     + `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px">${cabecera()}`

@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import type { ReactElement } from 'react'
 import { notFound } from 'next/navigation'
 import { AVISO_CASILLA, textoAviso } from '@/lib/reserva/avisoReserva'
@@ -34,6 +34,11 @@ export const metadata: Metadata = {
 }
 
 export const dynamic = 'force-dynamic'
+
+/* Tanda H, punto 2: siempre en claro. `<meta name="color-scheme" content="light">`
+   y la barra del navegador con el navy claro de la cabecera, aunque el sistema
+   esté en oscuro (el `themeColor` del layout raíz tiene variante oscura). */
+export const viewport: Viewport = { colorScheme: 'light', themeColor: '#163250' }
 
 /** Usado o caducado (y sin consultorio o sin tipos): sólo la marca, sin el médico, como antes. */
 function NoDisponible({ telefono }: { telefono: string | null }): ReactElement {

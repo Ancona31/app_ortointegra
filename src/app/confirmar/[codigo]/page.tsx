@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import type { ReactElement } from 'react'
 import { notFound } from 'next/navigation'
 import { resolverEnlaceConfirmacion } from '@/lib/confirmacion/enlaceConfirmacion'
@@ -37,8 +37,8 @@ import MarcoPublico from '@/components/agendaPublica/MarcoPublico'
    origen. 'same-origin' tampoco deja salir el código a terceros.
    TEXTOS: PENDIENTES DE REVISIÓN (ver vistaConfirmacion.ts).
 
-   Tanda G1: el lenguaje visual de la reserva (`MarcoPublico`, `--ag-*`, claro
-   y oscuro según el teléfono). La fecha es lo más grande; cada estado y cada
+   Tanda G1: el lenguaje visual de la reserva (`MarcoPublico`, `--ag-*`;
+   siempre en claro desde la tanda H). La fecha es lo más grande; cada estado y cada
    resultado tienen su color además de su texto. Los textos, los nombres de
    los botones y el orden de las puertas NO cambiaron. */
 
@@ -49,6 +49,11 @@ export const metadata: Metadata = {
 }
 
 export const dynamic = 'force-dynamic'
+
+/* Tanda H, punto 2: siempre en claro. `<meta name="color-scheme" content="light">`
+   y la barra del navegador con el navy claro de la cabecera, aunque el sistema
+   esté en oscuro (el `themeColor` del layout raíz tiene variante oscura). */
+export const viewport: Viewport = { colorScheme: 'light', themeColor: '#163250' }
 
 /** El color de la nota según lo que dice: verde lo confirmado, rojo lo cancelado, ámbar lo que pide llamar. */
 function claseDeEstado(estado: ContextoConfirmacion['estado']): string {
