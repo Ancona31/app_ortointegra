@@ -50,6 +50,7 @@ import { guardarAltaRapida, horasDelGesto, type DependenciasGuardado } from '@/l
 import { avisoFueraDeHorario, avisoFinFueraDeHorario } from '@/lib/agenda/horarioAgenda'
 import { empalmesPintados, mensajeEmpalme } from '@/lib/agenda/empalmesCita'
 import { esEventoGenerico } from '@/lib/agenda/tarjetasAgenda'
+import { partirFechaHora } from '@/lib/agenda/fechasAgenda'
 import { vistaEnElOtroFormato } from '@/lib/agenda/vistasAgenda'
 import { guardarAtajosEncendidos, leerAtajosEncendidos, type AccionAtajo, type AlmacenPreferencia } from '@/lib/agenda/atajosAgenda'
 import type { CitaEncontrada } from '@/lib/agenda/buscarCitasPaciente'
@@ -216,6 +217,24 @@ function CapaBurbuja({ capa, medicos, p, cerrar }: PropsCapaBurbuja): ReactEleme
   )
 }
 
+/**
+ * G3 · «Reagendar cita»: el alta de una cita nueva con el mismo paciente,
+ * médico, consultorio y duración. Fecha: la de la original si aún no pasó; si
+ * pasó, hoy, a la misma hora (en la hora de quien mira, como el formulario).
+ */
+export function altaParaReagendar(cita: Appointment, ahora: number): AperturaAltaV2 {
+  const inicio = partirFechaHora(cita.start_time)
+  const fin = partirFechaHora(cita.end_time)
+  const pasada = new Date(cita.start_time).getTime() <= ahora
+  const fecha = pasada ? partirFechaHora(new Date(ahora).toISOString()).fecha : inicio.fecha
+  return {
+    mode: 'create', fecha, hora: inicio.hora, horaFin: fin.hora, tipo: 'cita', todoElDia: 'no', enfocar: 'fecha',
+    ...(cita.pacientes ? { paciente: cita.pacientes } : {}),
+    ...(cita.medico_id ? { medicoId: cita.medico_id } : {}),
+    ...(cita.consultorio_id ? { consultorioId: cita.consultorio_id } : {}),
+  }
+}
+
 /** Lo que una acción de la tarjeta necesita además de la cita. */
 interface ContextoAccion {
   p: PropsInteraccionesV2
@@ -242,10 +261,10 @@ function ejecutarAccion(a: AccionTarjeta, cita: Appointment, x: ContextoAccion):
       case 'editar': editar(); return
       case 'convertir': x.convertir(); return
       case 'reagendar': editar('fecha'); return
-      /* G3 · Cancelada o no asistió: reabre ESTA cita (lo que menos cambia lo
-         de hoy, donde se reactivaba en el modal), con la fecha enfocada y el
-         estado «Agendada» ya puesto. */
-      case 'reagendar-cita': x.p.setModal({ mode: 'edit', appointment: cita, enfocar: 'fecha', reabrir: true }); return
+      /* G3 · Cancelada o no asistió (decisión de Angel): el alta de una cita
+         NUEVA con el mismo paciente, médico y consultorio; la original se queda
+         como estaba. Con la puerta de suscripción de «Agendar». */
+      case 'reagendar-cita': if (x.p.puedeAgendar()) x.p.setModal(altaParaReagendar(cita, Date.now())); return
       /* G3 · Atendida: sólo ver el expediente (la atención concluyó). */
       case 'ver-expediente':
         if (cita.pacientes) x.navegar(`/expediente/${cita.pacientes.id}`)

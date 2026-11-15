@@ -15,7 +15,8 @@ import { fechaHoraLocalAInstante } from '../src/lib/dates'
  *     «Configuración de la cita» de la cabecera abre el formulario).
  *   · Confirmada: «Reagendar» | «Enviar recordatorio» (en DOS líneas).
  *   · Atendida: SÓLO «Ver expediente». Cancelada / No asistió: SÓLO «Reagendar
- *     cita», que reabre la MISMA cita (estado «Agendada», fecha enfocada).
+ *     cita», que abre el alta de una cita NUEVA (mismo paciente, médico y
+ *     consultorio, fecha enfocada) y deja la original como estaba.
  *   · La píldora del estado en la línea del nombre; fecha y hora juntas.
  *   · El logo de WhatsApp es el de `BotonWhatsAppCita` (los mismos trazos).
  *   · 19: la etiqueta de la hora y región del consultorio cuando difieren.
@@ -29,7 +30,7 @@ import { fechaHoraLocalAInstante } from '../src/lib/dates'
  * regla de la impar a todo el ancho (`claseDePieza`) → «agendada» (rejilla);
  * `dosLineas` siempre `false` → «confirmada»; quitar `enConsultorio` de
  * `Cuando` → «etiqueta de huso»; quitar `vetoPorEstado` de la ruta → «17.3»;
- * quitar `reabrir` del modal → «reagendar cita»;
+ * volver a editar la misma cita en «Reagendar cita» → «crea una cita NUEVA»;
  * `pideComprobarNota` siempre `false` → «nota ligada».
  */
 test.use({ storageState: SESION.adminA })
@@ -157,10 +158,16 @@ test('atendida: ÚNICAMENTE «Ver expediente», que lleva al expediente', async 
   await page.waitForURL(`**/expediente/${paciente}`)
 })
 
-test('cancelada y no asistió: ÚNICAMENTE «Reagendar cita», que reabre la MISMA cita como agendada en otra fecha', async ({ page }) => {
+/* Decisión de Angel: «Reagendar cita» CREA una cita nueva (mismo paciente,
+   médico y consultorio) y deja la original como estaba: su estado, y con él lo
+   que cuenta para el candado. MUTACIÓN: volver a abrir la edición de la misma
+   cita (`setModal({ mode: 'edit', … })`) → rojo («Nueva cita» no aparece). */
+test('cancelada y no asistió: ÚNICAMENTE «Reagendar cita», que crea una cita NUEVA y deja la original como estaba', async ({ page }) => {
   test.skip(test.info().project.name !== 'escritorio', 'escritorio')
-  const { id } = cita(MARTES, '15:00', 'Prueba 24', 'cancelled')
-  cita(MARTES, '16:30', 'Prueba 25', 'no_show')
+  const { id, paciente } = cita(MARTES, '15:00', 'Prueba 24', 'cancelled')
+  const { id: falta } = cita(MARTES, '16:30', 'Prueba 25', 'no_show')
+  const original = (x: string): string => sqlLocal(`select status || '|' || start_time || '|' || updated_at from public.appointments where id = :'x'`, { x })
+  const [antesCancelada, antesFalta] = [original(id), original(falta)]
   let t = await abrirTarjeta(page, 'Prueba 25')
   expect(await acciones(t)).toEqual(['Reagendar cita'])
   await page.keyboard.press('Escape')
@@ -170,22 +177,31 @@ test('cancelada y no asistió: ÚNICAMENTE «Reagendar cita», que reabre la MIS
   await expect(t).toHaveAccessibleName('Paciente Prueba 24')
   await expect.poll(() => acciones(t)).toEqual(['Reagendar cita'])
   await t.getByRole('button', { name: 'Reagendar cita' }).click()
-  const modal = modalCita(page, 'Editar cita')
+  const modal = modalCita(page, 'Nueva cita')
   await expect(modal).toBeVisible()
+  await expect(modal).toContainText('Paciente Prueba 24')
   const fecha = modal.locator('input[type="date"]').first()
   await expect(fecha).toBeFocused()
   await fecha.fill(MIERCOLES)
-  const put = page.waitForResponse(r => r.url().includes(`/api/appointments/${id}`) && r.request().method() === 'PUT')
+  const post = page.waitForResponse(r => r.url().endsWith('/api/appointments') && r.request().method() === 'POST' && r.ok())
   await modal.getByRole('button', { name: 'Guardar', exact: true }).click()
   /* Si sale un aviso (empalme u horario), se acepta: aquí no se prueba. */
   const aviso = page.getByRole('dialog', { name: /Se empalma|fuera de/i })
-  const res = await Promise.race([put, aviso.waitFor({ timeout: 4000 }).then(async () => {
+  const res = await Promise.race([post, aviso.waitFor({ timeout: 4000 }).then(async () => {
     await aviso.getByRole('button', { name: 'Aceptar' }).click()
-    return put
-  }).catch(() => put)])
-  expect(res.request().postDataJSON()).toMatchObject({ status: 'scheduled' })
-  await expect.poll(() => sqlLocal(`select status || '|' || to_char(start_time at time zone 'America/Merida', 'YYYY-MM-DD') from public.appointments where id = :'id'`, { id }))
-    .toBe(`scheduled|${MIERCOLES}`)
+    return post
+  }).catch(() => post)])
+  const enviado = res.request().postDataJSON() as Record<string, unknown>
+  const [medico, consultorio] = sqlLocal(`select medico_id || '|' || consultorio_id from public.appointments where id = :'id'`, { id }).split('|')
+  expect(enviado).toMatchObject({ paciente_id: paciente, medico_id: medico, consultorio_id: consultorio, status: 'scheduled' })
+  const nueva = ((await res.json()) as { appointment: { id: string } }).appointment.id
+  creadas.push(nueva)
+  expect(nueva).not.toBe(id)
+  expect(sqlLocal(`select to_char(start_time at time zone 'America/Merida', 'YYYY-MM-DD HH24:MI') || '|' || to_char(end_time at time zone 'America/Merida', 'HH24:MI')
+                     from public.appointments where id = :'n'`, { n: nueva })).toBe(`${MIERCOLES} 15:00|16:00`)
+  // La original, intacta (también la de «no asistió», que no se tocó).
+  expect(original(id)).toBe(antesCancelada)
+  expect(original(falta)).toBe(antesFalta)
 })
 
 test('punto 19: la etiqueta de la hora y la región del consultorio, cuando difieren de las del dispositivo', async ({ page }) => {

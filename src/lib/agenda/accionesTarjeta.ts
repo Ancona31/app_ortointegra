@@ -19,8 +19,10 @@
  *       – Confirmada: igual, sin «Confirmar» (el aviso pasa a recordatorio).
  *       – Atendida: SÓLO «Ver expediente» (la atención concluyó): ni iniciar,
  *         ni reagendar, ni avisos, ni cancelar.
- *       – Cancelada o No asistió: SÓLO «Reagendar cita» (reabre la MISMA cita
- *         en el formulario, con la fecha enfocada y el estado «Agendada»).
+ *       – Cancelada o No asistió: SÓLO «Reagendar cita» (decisión de Angel:
+ *         abre el alta de una cita NUEVA con el mismo paciente, médico y
+ *         consultorio; la original se queda como estaba, con su estado, su
+ *         auditoría y lo que cuenta para el candado).
  *   · Cita por ligar y evento sin paciente: conservan lo que tenían, en su
  *     orden (incluido «Editar»), con el engrane. Evento: «Editar», T3
  *     «Convertir en cita» si nació en Google (§2, AG-DT-29), y «Eliminar»

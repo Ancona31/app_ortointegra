@@ -142,11 +142,13 @@ export type ModalState =
      `medicoId` los trae «Más opciones» de la burbuja de alta rápida —el fin
      arrastrado y el médico ya elegido—; `enfocar: 'fecha'` lo trae «Reagendar»
      de la tarjeta de lectura. Opcionales: ninguna ruta de hoy los pone. */
-  | { mode: 'create'; fecha: string; hora: string | null; tipo: TipoFila; todoElDia: TodoElDiaInicial; fechaFin?: string; paciente?: PacienteBusqueda; horaFin?: string; medicoId?: string }
-  /* G3 · `reabrir`: «Reagendar cita» de una cita cancelada o con inasistencia
-     (la única acción de su tarjeta) reabre ESA cita: el estado arranca en
-     «Agendada» (se ve y se puede cambiar) y la fecha enfocada. */
-  | { mode: 'edit';   appointment: Appointment; enfocar?: 'fecha'; reabrir?: true }
+  /* G3 · `consultorioId` y `enfocar` los trae «Reagendar cita» de una cita
+     cancelada o con inasistencia (decisión de Angel): el alta de una cita NUEVA
+     con el mismo paciente, médico y consultorio, la fecha enfocada; la original
+     no se toca (su estado, su auditoría y lo que cuenta para el candado). */
+  | { mode: 'create'; fecha: string; hora: string | null; tipo: TipoFila; todoElDia: TodoElDiaInicial; fechaFin?: string; paciente?: PacienteBusqueda; horaFin?: string; medicoId?: string;
+      consultorioId?: string; enfocar?: 'fecha' }
+  | { mode: 'edit';   appointment: Appointment; enfocar?: 'fecha' }
 
 /**
  * Con qué interruptor de «todo el día» abre el alta, y si se puede tocar.
@@ -455,7 +457,7 @@ export default function AppointmentModal({
   const [horaFin,   setHoraFin]   = useState(inicial.horaFin)
   const [todoElDia, setTodoElDia] = useState(todoElDiaInicial)
   const [notes,       setNotes]       = useState(apt?.notes ?? '')
-  const [status,      setStatus]      = useState<Status>(modal.mode === 'edit' && modal.reabrir ? 'scheduled' : apt?.status ?? 'scheduled')
+  const [status,      setStatus]      = useState<Status>(apt?.status ?? 'scheduled')
   /* Dos siembras, una por modo. En EDICIÓN sale de la fila; en ALTA sale de
      `modal.paciente`, que sólo trae el enlace profundo y en los demás casos es
      `undefined` → `null`, o sea el buscador en blanco de siempre.
@@ -565,8 +567,11 @@ export default function AppointmentModal({
   // State del consultorio seleccionado.
   // Pre-selección cascada: apt (edición) → activo del sidebar si está en lista
   // → default del target → vacío.
+  /* G3 · El consultorio que trae «Reagendar cita» (alta de una cita nueva). */
+  const consultorioPrecargado = modal.mode === 'create' ? modal.consultorioId : undefined
   const [consultorioId, setConsultorioId] = useState<string>(() => {
     if (apt?.consultorio_id) return apt.consultorio_id
+    if (modal.mode === 'create' && modal.consultorioId) return modal.consultorioId
     if (consultorioActivo && consultoriosList.some(c => c.id === consultorioActivo.id)) {
       return consultorioActivo.id
     }
@@ -579,9 +584,11 @@ export default function AppointmentModal({
   useEffect(() => {
     if (apt && medicoId === apt.medico_id) return
     if (consultoriosList.some(c => c.id === consultorioId)) return
+    /* G3 · El consultorio precargado («Reagendar cita») espera a que llegue la lista del médico. */
+    if (consultorioPrecargado === consultorioId && consultoriosList.length === 0) return
     const next = consultorioDefaultDelTarget?.id ?? ''
     setConsultorioId(next)
-  }, [medicoId, consultoriosList, consultorioDefaultDelTarget?.id, apt, consultorioId])
+  }, [medicoId, consultoriosList, consultorioDefaultDelTarget?.id, apt, consultorioId, consultorioPrecargado])
 
   // Sincronizar default cuando profile carga después del mount inicial.
   // Solo aplica para creación de cita (no para edición de cita existente).
@@ -1432,7 +1439,7 @@ export default function AppointmentModal({
                 value={fecha}
                 /* F3 · «Reagendar» abre la edición con el foco aquí. `useDialogoModal`
                    no se lo quita: sólo enfoca el panel si el foco no está dentro. */
-                autoFocus={modal.mode === 'edit' && modal.enfocar === 'fecha'}
+                autoFocus={modal.mode !== 'closed' && modal.enfocar === 'fecha'}
                 onChange={e => todoElDia ? moverFechaDeTodoElDia(e.target.value) : moverInicio(e.target.value, hora)}
                 className="w-full px-3 py-2.5 max-md:py-3 text-sm rounded-xl border border-[var(--ag-input-border)] bg-[var(--ag-input-bg)] text-[var(--ag-text)] focus:outline-none focus:ring-2 focus:ring-[var(--ag-input-focus-ring)] focus:border-[var(--ag-input-focus-border)] ag-transicion-color"
               />

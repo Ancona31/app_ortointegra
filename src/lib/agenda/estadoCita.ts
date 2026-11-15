@@ -13,8 +13,9 @@
  * (notas, consultorio…) y su estado se puede CORREGIR a «Agendada» o «No
  * asistió» —lo que hoy se hace en el modal cuando se marcó por error—; desde
  * ahí vuelve a valer todo (si no tiene nota clínica: `vetoPorNotaLigada`).
- * Cancelada y No asistió no se cierran: «Reagendar cita» es justo cambiarles
- * fecha y estado. `null` = se deja pasar.
+ * Cancelada y No asistió no se cierran aquí: el formulario ya permitía antes
+ * de G3 corregir su estado; «Reagendar cita» crea otra cita y no las toca.
+ * `null` = se deja pasar.
  */
 export function vetoPorEstado(
   antes: { status: string; start_time: string; end_time: string; all_day: boolean | null },
