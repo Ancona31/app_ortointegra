@@ -252,7 +252,6 @@ export default function ConfiguracionCalendario({ ajustes, tipos, puedeAdministr
               actualizarConfig={actualizarConfig}
               alCambiar={alCambiar}
               tipos={tipos}
-              puedeAdministrar={puedeAdministrar}
               alCambiarTipos={esMedico ? alCrearTipo : undefined}
             />
           </Grupo>

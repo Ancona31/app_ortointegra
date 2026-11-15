@@ -148,7 +148,7 @@ test('G2 · 7 y 8 · «Primeros pasos» en orden con su avance; «Crear enlace»
   await expect(pasos(page)).toHaveCount(0)
 })
 
-test('G2 · 9 · la médica invitada contesta SU duración (sólo suya) y no la puede cambiar sin quien administra', async ({ browser }) => {
+test('G2 · 9 · la médica invitada contesta SU duración (sólo suya), la cambia y archiva sus tipos', async ({ browser }) => {
   await enContextoNuevo(browser, SESION.medicoA, async (p) => {
     await p.goto(RUTA)
     const paso = pasos(p).getByRole('listitem', { name: 'Duración de la consulta: pendiente' })
@@ -157,12 +157,20 @@ test('G2 · 9 · la médica invitada contesta SU duración (sólo suya) y no la 
     await expect(pasos(p).getByRole('listitem', { name: 'Duración de la consulta: hecho' })).toBeVisible()
     const seccion = p.getByRole('region', { name: 'Duración y tipos de cita' })
     await expect(seccion).toContainText('Tu consulta dura 60 min')
-    await expect(seccion.getByRole('button', { name: 'Cambiar duración' })).toHaveCount(0)
-    await expect(seccion).toContainText('Para cambiarla, pídele a quien administra la clínica.')
+    await expect(seccion).not.toContainText('pídele a quien administra')
+    /* G2b (20261119121000): la cambia ella misma… */
+    await seccion.getByRole('button', { name: 'Cambiar duración' }).click()
+    await seccion.getByText('45 min', { exact: true }).click()
+    await seccion.getByRole('button', { name: 'Guardar', exact: true }).click()
+    await expect(seccion).toContainText('Tu consulta dura 45 min')
+    /* …y archiva su tipo (la fila es suya: Editar y Archivar). */
+    const fila = seccion.getByRole('listitem').filter({ hasText: 'Consulta' }).filter({ hasText: 'Duración de la consulta' })
+    await fila.getByRole('button', { name: 'Archivar Consulta' }).click()
+    await expect(fila).toContainText('Archivado')
   })
-  expect(sqlLocal(`select t.duracion_min || '|' || t.principal || '|' || (t.medico_id = u.id) from public.tipos_cita t
-                    join auth.users u on u.email = :'c' where t.clinica_id = :'cl' and t.activo and t.principal`,
-  { c: CORREO.medicoA, cl: clinicaA() })).toBe('60|true|true')
+  expect(sqlLocal(`select t.duracion_min || '|' || t.principal || '|' || (t.medico_id = u.id) || '|' || t.activo from public.tipos_cita t
+                    join auth.users u on u.email = :'c' where t.clinica_id = :'cl' and t.principal`,
+  { c: CORREO.medicoA, cl: clinicaA() })).toBe('45|true|true|false')
 })
 
 test('G2 · 7 · duración distinta en un consultorio: opción discreta en su horario, sólo ahí', async ({ browser }) => {

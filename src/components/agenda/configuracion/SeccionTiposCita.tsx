@@ -4,13 +4,14 @@
  * La duración de la consulta y los tipos de cita (P5) en la pantalla de
  * configuración (B4): lista, alta, edición y archivo, con
  * `/api/agenda/tipos-cita`. Los edita y archiva quien administra la clínica
- * (`tipos_cita_update`); los demás ven los activos que la RLS les deja ver (el
- * invitado no ve los personales de otros médicos). No se borran: se archivan.
+ * (`tipos_cita_update`) y, desde G2b, cada médico los SUYOS; los demás ven
+ * los activos que la RLS les deja ver (el invitado no ve los personales de
+ * otros médicos). No se borran: se archivan.
  *
  * G2 (puntos 7 y 9 de Angel): arriba, la duración de la consulta del médico
  * que mira (su tipo principal; si no la tiene, se le pregunta aquí). Cualquier
  * médico CREA tipos suyos («Quien quiera ofrecer más de una duración, las
- * agrega después»); cambiarlos sigue siendo del administrador.
+ * agrega después») y, desde G2b (20261119121000), los cambia y archiva.
  *
  * La lista sale del servidor (`page.tsx`) y, tras cada escritura, se vuelve a
  * pedir con `router.refresh()` en vez de mantener una copia aquí: así lo que
@@ -78,7 +79,7 @@ function SinDuracionPropia(p: { tipos: readonly TipoCita[]; usuarioId: string; p
   )
 }
 
-function MiDuracion(p: { tipos: readonly TipoCita[]; usuarioId: string; puedeEditar: boolean; preguntar: boolean; alGuardar: (texto: string) => void }) {
+function MiDuracion(p: { tipos: readonly TipoCita[]; usuarioId: string; preguntar: boolean; alGuardar: (texto: string) => void }) {
   const [cambiando, setCambiando] = useState(false)
   const mia = p.tipos.find(t => t.activo && t.principal && t.medico_id === p.usuarioId && !t.consultorio_id)
   if (!mia) return <SinDuracionPropia tipos={p.tipos} usuarioId={p.usuarioId} preguntar={p.preguntar} alGuardar={p.alGuardar} />
@@ -93,9 +94,7 @@ function MiDuracion(p: { tipos: readonly TipoCita[]; usuarioId: string; puedeEdi
   return (
     <div className="flex flex-wrap items-center gap-x-[var(--ag-3)] gap-y-[var(--ag-1)]">
       <p className="text-sm text-[var(--ag-text)]">Tu consulta dura <strong className="tabular-nums">{mia.duracion_min} min</strong>, en todos tus consultorios.</p>
-      {p.puedeEditar
-        ? <button type="button" className={BOTON_FILA} onClick={() => setCambiando(true)}>Cambiar duración</button>
-        : <span className={TEXTO_SUAVE}>Para cambiarla, pídele a quien administra la clínica.</span>}
+      <button type="button" className={BOTON_FILA} onClick={() => setCambiando(true)}>Cambiar duración</button>
     </div>
   )
 }
@@ -122,7 +121,7 @@ function AltaTipo(p: { puedeEditar: boolean; medicos: readonly MedicoConfig[]; u
       <h4 className="text-sm font-semibold text-[var(--ag-text)]">Nuevo tipo de cita</h4>
       <FormTipoCita inicial={p.puedeEditar ? VACIO : { ...VACIO, medicoId: p.usuarioId }}
         medicos={p.puedeEditar ? p.medicos : null} textoBoton="Crear tipo" onGuardar={p.crear} />
-      {!p.puedeEditar && <p className={TEXTO_SUAVE}>Los que crees son sólo tuyos. Para cambiarlos o archivarlos, pídeselo a quien administra la clínica.</p>}
+      {!p.puedeEditar && <p className={TEXTO_SUAVE}>Los que crees son sólo tuyos.</p>}
     </div>
   )
 }
@@ -167,13 +166,15 @@ export default function SeccionTiposCita({ tipos, puedeEditar, medicos, alCambia
     if (motivo) toast.error(motivo)
     else guardado(activo ? 'Tipo de cita reactivado' : 'Tipo de cita archivado')
   }
-  const visibles = (tipos ?? []).filter(t => puedeEditar || t.activo)
+  /* G2b: el médico edita y archiva los suyos (los archivados suyos, para reactivarlos). */
+  const esSuyo = (t: TipoCita) => esMedico && t.medico_id === usuarioId
+  const visibles = (tipos ?? []).filter(t => puedeEditar || t.activo || esSuyo(t))
   const puedeCrear = puedeEditar || esMedico
 
   return (
     <TarjetaSeccion id="config-tipos" titulo="Duración y tipos de cita"
       ayuda="Con la duración de la consulta se cuentan los horarios del enlace de reserva. Si ofreces más de una, agrega otro tipo.">
-      {tipos && esMedico && <MiDuracion tipos={tipos} usuarioId={usuarioId} puedeEditar={puedeEditar} preguntar={preguntarDuracion} alGuardar={guardado} />}
+      {tipos && esMedico && <MiDuracion tipos={tipos} usuarioId={usuarioId} preguntar={preguntarDuracion} alGuardar={guardado} />}
       {!tipos ? <p className={TEXTO_SUAVE}>No se pudieron leer los tipos de cita. Recarga la página.</p>
         : visibles.length === 0 ? <p className={TEXTO_SUAVE}>Aún no hay tipos de cita.</p>
         : (
@@ -184,7 +185,7 @@ export default function SeccionTiposCita({ tipos, puedeEditar, medicos, alCambia
                   onGuardar={d => editar(t, d)} />
               </li>
             ) : (
-              <FilaTipoCita key={t.id} tipo={t} ambito={ambitoDe(t, medicos, consultorios)} acciones={puedeEditar
+              <FilaTipoCita key={t.id} tipo={t} ambito={ambitoDe(t, medicos, consultorios)} acciones={puedeEditar || esSuyo(t)
                 ? { onEditar: () => setEditando(t.id), onActivo: a => void cambiarActivo(t, a), ocupado: ocupado === t.id } : null} />
             ))}
           </ul>

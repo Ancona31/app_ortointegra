@@ -38,7 +38,6 @@ interface Props {
   alCambiar?: () => void
   /** G2: para la duración distinta en este consultorio (sólo el dueño la ve). */
   tipos?: readonly TipoCita[] | null
-  puedeAdministrar?: boolean
   /** Tras crear o cambiar la duración: releer los tipos. */
   alCambiarTipos?: () => void
 }
@@ -124,7 +123,7 @@ export default function FilaDisponibilidad(props: Props) {
       )}
       {esDueno && props.alCambiarTipos && (
         <DuracionEnConsultorio consultorioId={consultorio.id} consultorioNombre={consultorio.nombre} medicoId={consultorio.medico_id}
-          tipos={props.tipos ?? null} puedeAdministrar={props.puedeAdministrar === true} alCambiar={props.alCambiarTipos} />
+          tipos={props.tipos ?? null} alCambiar={props.alCambiarTipos} />
       )}
       {modal && (
         <HorarioModal fuente={{ estado: 'listo', horario: base }} onClose={() => setModal(false)}

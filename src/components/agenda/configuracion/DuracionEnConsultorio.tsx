@@ -10,13 +10,12 @@
  * Por dentro es otro tipo principal del médico con `consultorio_id` (migración
  * 20261119120000): allí sustituye al general en el enlace, en el selector del
  * modal y en el ajuste al turno (`tiposDelConsultorio`). Crearlo lo puede el
- * médico (`tipos_cita_insert`); CAMBIARLO o quitarlo es un UPDATE, que hoy
- * sólo deja `tipos_cita_update` a quien administra la clínica (cambiar esa
- * policy no está autorizado: propuesto aparte). Al invitado se le dice.
+ * médico (`tipos_cita_insert`) y, desde G2b, también cambiarlo o quitarlo
+ * (un UPDATE: `tipos_cita_update` de 20261119121000 deja al médico los suyos).
  */
 import { useState } from 'react'
 import DuracionConsulta from '@/components/agenda/configuracion/DuracionConsulta'
-import { BOTON_FILA, TEXTO_SUAVE } from '@/components/agenda/configuracion/clasesConfig'
+import { BOTON_FILA } from '@/components/agenda/configuracion/clasesConfig'
 import { leerMotivoError } from '@/components/agenda/configuracion/leerMotivoError'
 import type { TipoCita } from '@/lib/agenda/tiposCita'
 import { useToast } from '@/components/ui/Toast'
@@ -26,8 +25,6 @@ interface Props {
   consultorioNombre: string
   medicoId: string
   tipos: readonly TipoCita[] | null
-  /** Quien administra la clínica: cambia y quita (UPDATE). */
-  puedeAdministrar: boolean
   alCambiar: () => void
 }
 
@@ -78,12 +75,10 @@ export default function DuracionEnConsultorio(p: Props) {
         Aquí la consulta dura <strong className="tabular-nums">{aqui.duracion_min} min</strong>
         {general ? <span className="text-[var(--ag-muted)]"> (en los demás, {general.duracion_min} min)</span> : null}
       </span>
-      {p.puedeAdministrar ? (
-        <span className="flex gap-[var(--ag-1)]">
-          <button type="button" className={BOTON_FILA} onClick={() => setAbierto(true)}>Cambiar</button>
-          <button type="button" className={BOTON_FILA} onClick={() => void alQuitar(aqui.id)}>Usar la general</button>
-        </span>
-      ) : <span className={TEXTO_SUAVE}>Para cambiarla, pídele a quien administra la clínica.</span>}
+      <span className="flex gap-[var(--ag-1)]">
+        <button type="button" className={BOTON_FILA} onClick={() => setAbierto(true)}>Cambiar</button>
+        <button type="button" className={BOTON_FILA} onClick={() => void alQuitar(aqui.id)}>Usar la general</button>
+      </span>
     </div>
   )
 }

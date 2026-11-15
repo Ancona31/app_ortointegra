@@ -32,7 +32,6 @@ interface Props {
   alCambiar?: () => void
   /** G2: la duración distinta por consultorio vive en su fila. */
   tipos?: readonly TipoCita[] | null
-  puedeAdministrar?: boolean
   alCambiarTipos?: () => void
 }
 
@@ -57,7 +56,7 @@ export default function SeccionDisponibilidad(props: Props) {
           {consultorios.map(c => (
             <FilaDisponibilidad key={c.id} consultorio={c} horarioClinica={horarioClinica} esDueno={c.medico_id === usuarioId}
               nombreMedico={nombreDe(c.medico_id)} actualizarConfig={actualizarConfig} alCambiar={alCambiar}
-              tipos={props.tipos} puedeAdministrar={props.puedeAdministrar} alCambiarTipos={props.alCambiarTipos} />
+              tipos={props.tipos} alCambiarTipos={props.alCambiarTipos} />
           ))}
         </ul>
       )}

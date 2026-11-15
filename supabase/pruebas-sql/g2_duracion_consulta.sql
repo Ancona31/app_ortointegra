@@ -123,17 +123,17 @@ select pg_temp.esperar('caso 5 consultorio en un tipo que no es principal',
   pg_temp.alta('00000000-0000-4000-8000-0000000062b1', '00000000-0000-4000-8000-0000000062c1',
                '00000000-0000-4000-8000-0000000062b1', 'Suelta', 30, false, '00000000-0000-4000-8000-00000062cc01'), '23514');
 
--- Caso 6 (lo que NO cambió, a propósito): el invitado no edita ni archiva sus tipos
--- (tipos_cita_update sigue siendo sólo del administrador; ver la cabecera de la migración).
+-- Caso 6: desde G2b (20261119121000, decisión de Angel) el invitado SÍ edita sus tipos: los
+-- tres suyos (principal general, el de su consultorio y el de más). Lo demás, en g2b_tipos_cita_update.sql.
 do $$
 declare v_n integer;
 begin
   perform pg_temp.como('00000000-0000-4000-8000-0000000062b1');
   set local role authenticated;
-  update public.tipos_cita set duracion_min = 30 where medico_id = '00000000-0000-4000-8000-0000000062b1';
+  update public.tipos_cita set color = color where medico_id = '00000000-0000-4000-8000-0000000062b1';  -- sin cambiar nada (lo usa el caso 8)
   get diagnostics v_n = row_count;
   reset role;
-  perform pg_temp.esperar('caso 6 el invitado editó sus tipos', v_n::text, '0');
+  perform pg_temp.esperar('caso 6 el invitado edita sus tipos', v_n::text, '3');
 end $$;
 
 -- Caso 7: lo ve quien debe (SELECT de B6 sin cambios): b2 no ve los de b1.
