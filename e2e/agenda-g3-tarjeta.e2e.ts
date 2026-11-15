@@ -29,7 +29,8 @@ import { fechaHoraLocalAInstante } from '../src/lib/dates'
  * regla de la impar a todo el ancho (`claseDePieza`) → «agendada» (rejilla);
  * `dosLineas` siempre `false` → «confirmada»; quitar `enConsultorio` de
  * `Cuando` → «etiqueta de huso»; quitar `vetoPorEstado` de la ruta → «17.3»;
- * quitar `reabrir` del modal → «reagendar cita».
+ * quitar `reabrir` del modal → «reagendar cita»;
+ * `pideComprobarNota` siempre `false` → «nota ligada».
  */
 test.use({ storageState: SESION.adminA })
 
@@ -229,6 +230,38 @@ test('17.3: el servidor rechaza confirmar, cancelar o mover una atendida; correg
   expect(sqlLocal(`select status from public.appointments where id = :'id'`, { id })).toBe('attended')
   expect((await put({ status: 'scheduled' })).status()).toBe(200)
   expect(sqlLocal(`select status from public.appointments where id = :'id'`, { id })).toBe('scheduled')
+})
+
+/* G3 · Decisión de Angel: una atendida CON nota clínica ligada no cambia de
+   estado ni se borra, con la v2 encendida o apagada; sin nota, sí (la prueba de
+   arriba). La nota de prueba se crea y se BORRA aquí como `postgres` (dato de
+   prueba en la base local: la semilla se niega a borrar expediente).
+   MUTACIÓN: `pideComprobarNota` siempre `false` → rojo. */
+test('nota ligada: una atendida con nota no cambia de estado ni se borra, con o sin v2', async ({ page }) => {
+  test.skip(test.info().project.name !== 'escritorio', 'escritorio')
+  const { id, paciente } = cita(MIERCOLES, '17:00', 'Prueba 14', 'attended')
+  const medico = sqlLocal(`select medico_id from public.appointments where id = :'id'`, { id })
+  const nota = sqlLocal(`insert into public.consultas (paciente_id, medico_id, motivo_consulta, nota_origen, appointment_id)
+    values (:'p', :'m', 'NOTA DE PRUEBA G3', 'manual', :'id') returning id`, { p: paciente, m: medico, id })
+  try {
+    for (const encendida of [true, false]) {
+      interruptorAgenda('A', encendida)
+      for (const estado of ['scheduled', 'no_show', 'cancelled', 'confirmed']) {
+        const r = await page.request.put(`/api/appointments/${id}`, { data: { status: estado } })
+        expect(r.status(), `${estado} con v2 ${encendida}`).toBe(409)
+        expect(await r.json()).toMatchObject({ error: 'nota_ligada' })
+      }
+      const d = await page.request.delete(`/api/appointments/${id}`)
+      expect(d.status()).toBe(409)
+      expect(await d.json()).toMatchObject({ error: 'nota_ligada' })
+      // Las notas y la hora sí se pueden tocar con la v2 apagada (como hoy): sólo el estado está cerrado.
+      expect((await page.request.put(`/api/appointments/${id}`, { data: { notes: 'otra nota de agenda', status: 'attended' } })).status()).toBe(200)
+    }
+    expect(sqlLocal(`select status from public.appointments where id = :'id'`, { id })).toBe('attended')
+  } finally {
+    sqlLocal(`begin; set local session_replication_role = replica;
+      delete from public.audit_log where registro_id = :'n'; delete from public.consultas where id = :'n'; commit;`, { n: nota })
+  }
 })
 
 test('teléfono: la hoja lleva el mismo orden y el engrane', async ({ page }) => {

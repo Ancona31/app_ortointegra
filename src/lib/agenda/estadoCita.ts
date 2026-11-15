@@ -12,8 +12,9 @@
  * Lo demás de una atendida se sigue pudiendo editar desde el formulario
  * (notas, consultorio…) y su estado se puede CORREGIR a «Agendada» o «No
  * asistió» —lo que hoy se hace en el modal cuando se marcó por error—; desde
- * ahí vuelve a valer todo. Cancelada y No asistió no se cierran: «Reagendar
- * cita» es justo cambiarles fecha y estado. `null` = se deja pasar.
+ * ahí vuelve a valer todo (si no tiene nota clínica: `vetoPorNotaLigada`).
+ * Cancelada y No asistió no se cierran: «Reagendar cita» es justo cambiarles
+ * fecha y estado. `null` = se deja pasar.
  */
 export function vetoPorEstado(
   antes: { status: string; start_time: string; end_time: string; all_day: boolean | null },
@@ -28,4 +29,22 @@ export function vetoPorEstado(
     return 'Una cita atendida ya concluyó: no se puede cambiar de fecha ni de hora.'
   }
   return null
+}
+
+/**
+ * G3 · Decisión de Angel (2026-11-14): una cita ATENDIDA con una nota clínica
+ * ligada (`consultas.appointment_id`) no puede pasar a NINGÚN otro estado; sin
+ * nota sí, para corregir un error. Aplica SIEMPRE, con la v2 encendida o
+ * apagada: la nota es expediente (NOM-004, integridad) y ningún flujo de hoy
+ * necesita desmarcar una atendida que ya tiene nota. Pura: quien llama dice si
+ * hay nota (`notaLigadaServidor.ts`) y sólo lo pregunta cuando hace falta
+ * (`pideComprobarNota`). `null` = se deja pasar.
+ */
+export function pideComprobarNota(antes: { status: string }, cuerpo: { status?: unknown }): boolean {
+  return antes.status === 'attended' && typeof cuerpo.status === 'string' && cuerpo.status !== 'attended'
+}
+
+export function vetoPorNotaLigada(antes: { status: string }, cuerpo: { status?: unknown }, tieneNota: boolean): string | null {
+  if (!tieneNota || !pideComprobarNota(antes, cuerpo)) return null
+  return 'Esta cita ya tiene una nota clínica: sigue como atendida y no puede cambiar de estado.'
 }

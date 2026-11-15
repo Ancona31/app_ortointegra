@@ -14,7 +14,8 @@ import { comprobarTopeDuracion } from '@/lib/agenda/topeDuracion'
 import { agendaV2Encendida } from '@/lib/agenda/ajustesAgenda'
 import { comprobarEmpalmes, type VeredictoEmpalme } from '@/lib/agenda/empalmesServidor'
 import { ESTADOS_SIN_EMPALME } from '@/lib/agenda/empalmesCita'
-import { vetoPorEstado } from '@/lib/agenda/estadoCita'
+import { pideComprobarNota, vetoPorEstado, vetoPorNotaLigada } from '@/lib/agenda/estadoCita'
+import { tieneNotaLigada } from '@/lib/agenda/notaLigadaServidor'
 import { comprobarTipoDelPut, leerTipoCitaId, CUERPO_TIPO_INVALIDO } from '@/lib/agenda/tipoCitaServidor'
 import { auditarLigado, estaPorLigar, pacienteParaGoogle, pacienteVisible, vetoDeConversion } from '@/lib/agenda/porLigarServidor'
 import {
@@ -374,6 +375,14 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
        atendida no se confirma, no se cancela y no se mueve (también por
        arrastre); se puede corregir su estado a «Agendada» o «No asistió» desde
        el formulario. Ver `vetoPorEstado`. Apagada, como siempre. */
+    /* G3 · Decisión de Angel: una atendida CON NOTA CLÍNICA ligada no cambia de
+       estado (con o sin v2: la nota es expediente). Sin nota, sí (corregir un
+       error). Sólo se pregunta a la base cuando el cuerpo cambia el estado de
+       una atendida. Ver `vetoPorNotaLigada` y `notaLigadaServidor.ts`. */
+    if (pideComprobarNota(existing, { status })) {
+      const vetoNota = vetoPorNotaLigada(existing, { status }, await tieneNotaLigada(profile.clinica_id, id))
+      if (vetoNota) return NextResponse.json({ error: 'nota_ligada', message: vetoNota }, { status: 409 })
+    }
     if (v2) {
       const vetoEstado = vetoPorEstado(existing, { status, start_time, end_time, all_day })
       if (vetoEstado) return NextResponse.json({ error: 'estado_no_admite', message: vetoEstado }, { status: 409 })
@@ -1415,12 +1424,22 @@ export async function DELETE(_req: NextRequest, ctx: RouteContext<'/api/appointm
     const [{ data: existing }, v2] = await Promise.all([
       supabase
         .from('appointments')
-        .select('id, google_event_id, paciente_id')
+        .select('id, google_event_id, paciente_id, status')
         .eq('id', id)
         .single(),
       agendaV2Encendida(supabase, profile.clinica_id),
     ])
     if (!existing) return NextResponse.json({ error: 'Cita no encontrada' }, { status: 404 })
+
+    /* G3 · Decisión de Angel: una atendida CON NOTA CLÍNICA no deja de serlo, y
+       borrarla sería lo extremo (la FK de `consultas.appointment_id` es SET
+       NULL: la nota perdería su cita). Con o sin v2, como en el PUT. */
+    if (existing.status === 'attended' && await tieneNotaLigada(profile.clinica_id, id)) {
+      return NextResponse.json(
+        { error: 'nota_ligada', message: 'Esta cita ya tiene una nota clínica: no se puede eliminar.' },
+        { status: 409 }
+      )
+    }
 
     /* ── B3: UNA CITA CON PACIENTE NO SE BORRA, SE CANCELA ──────────────────
        Sólo con el interruptor encendido (P2, P4). Va ANTES del borrado y antes

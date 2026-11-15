@@ -3,7 +3,7 @@ import {
   accionesDeTarjeta, cuandoDeTarjeta, disposicionDeTarjeta, esConvertible, horarioDeTarjeta, nombreDeTarjeta, pideConfirmacion,
   puedeIniciarConsulta, telefonoDeTarjeta, textoDeConfirmacion,
 } from '@/lib/agenda/accionesTarjeta'
-import { vetoPorEstado } from '@/lib/agenda/estadoCita'
+import { pideComprobarNota, vetoPorEstado, vetoPorNotaLigada } from '@/lib/agenda/estadoCita'
 
 const CITA = { paciente_id: 'p1', reserva_canal: null } as const
 
@@ -74,6 +74,20 @@ describe('vetoPorEstado (G3, 17.3: el servidor)', () => {
     for (const status of ['cancelled', 'no_show', 'scheduled', 'confirmed']) {
       expect(vetoPorEstado({ ...at, status }, { status: 'scheduled', start_time: '2026-11-19T15:00:00.000Z' })).toBeNull()
     }
+  })
+})
+
+describe('vetoPorNotaLigada (G3, decisión de Angel)', () => {
+  const at = { status: 'attended' }
+  it('con nota, una atendida no pasa a ningún otro estado', () => {
+    for (const status of ['scheduled', 'confirmed', 'cancelled', 'no_show']) expect(vetoPorNotaLigada(at, { status }, true)).toMatch(/nota clínica/)
+  })
+  it('sin nota, sí (corregir un error); y sin cambio de estado no se pregunta', () => {
+    expect(vetoPorNotaLigada(at, { status: 'scheduled' }, false)).toBeNull()
+    expect(pideComprobarNota(at, { status: 'attended' })).toBe(false)
+    expect(pideComprobarNota(at, {})).toBe(false)
+    expect(pideComprobarNota({ status: 'scheduled' }, { status: 'cancelled' })).toBe(false)
+    expect(pideComprobarNota(at, { status: 'scheduled' })).toBe(true)
   })
 })
 
