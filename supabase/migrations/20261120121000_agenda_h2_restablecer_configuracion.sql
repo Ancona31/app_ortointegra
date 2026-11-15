@@ -16,7 +16,7 @@
 --   Pruebas: supabase/pruebas-sql/h2_restablecer_configuracion.sql.
 --   Comprobación:
 --     select md5(prosrc) from pg_proc where oid = 'public.agenda_restablecer_configuracion(uuid,uuid)'::regprocedure;
---     → 5f2facc1f452bd81dafe6b823855dc04
+--     → 6c99e553177ba42d0f3723468b39f241
 -- ESTADO · PRODUCCIÓN: PENDIENTE DE APLICAR (después de
 --   20261120120000_agenda_h2_recordatorio_interruptor.sql).
 --
@@ -42,13 +42,16 @@
 --    consultorio quedan en audit_log ('agenda_horario_restablecido', una
 --    fila por consultorio, descripcion = jsonb de los dos valores). Así el
 --    reinicio se puede deshacer a mano (hallazgo 1 de la auditoría).
--- 1. Consultorios de la clínica (activos y archivados): `horario` y
---    `horario_propio` a su DEFAULT de columna (todos los días cerrados y
---    false). Es el estado con el que NACE un consultorio: con
---    horario_propio = false manda el horario de la clínica
---    (horarioEfectivo), así que la agenda no se queda en gris; y «Primeros
---    pasos» lo reconoce como «horario sin configurar» (paso 1 pendiente).
---    `clinicas.horario_consulta` no se toca (spinus-consola).
+-- 1. Consultorios de la clínica (activos y archivados): `horario` = una
+--    COPIA de `clinicas.horario_consulta` y `horario_propio` = true. Es la
+--    MISMA herencia de una vez de G4 (20261119130000), el estado de partida
+--    de todo consultorio con la agenda v2: la agenda, sus avisos y la
+--    reserva leen sólo el horario del consultorio («la única fuente es el
+--    horario de cada consultorio», regla de Angel en la tanda G), que vale
+--    lo que valía al estrenar la v2. `clinicas.horario_consulta` sólo se lee.
+--    (Integración de la tanda H: H2 lo dejaba en el DEFAULT de columna con
+--    horario_propio = false, que pinta el horario de la clínica en tiempo de
+--    ejecución; decisión pendiente de Angel, §6-bis.)
 -- 2. tipos_cita de la clínica: TODOS los activos se archivan (activo =
 --    false). Nada se borra (tampoco hay DELETE en tipos_cita): un tipo con
 --    citas sigue apuntado por ellas con su instantánea.
@@ -67,7 +70,7 @@
 --    (usuario 'system', como toda escritura de service_role).
 -- NO TOCA: appointments, pacientes, audit_log (salvo añadir), reserva_
 --    contactos / bloqueos, reserva_verificaciones, cita_confirmaciones,
---    cita_correos, la conexión con Google, clinicas, profiles.
+--    cita_correos, la conexión con Google, clinicas (sólo la lee), profiles.
 --
 -- ═══ APLICACIÓN ════════════════════════════════════════════════════════
 -- EJECUTAR EN EL SQL EDITOR DE SUPABASE, DE UNA SOLA VEZ, COMPLETO.
@@ -100,6 +103,11 @@
 --        AND l.created_at = '<instante del reinicio>';
 --
 -- ═══ AUDITORÍA ═════════════════════════════════════════════════════════
+-- INTEGRACIÓN 2026-11-15 (feature/agenda-v2): cambiado el paso 1 (el horario
+--   de partida, ver «Qué hace») y su pre-vuelo; sin aplicar en ningún sitio
+--   salvo la base local, por eso se edita aquí y no con otra migración (el
+--   conjunto queda en 32). Re-auditada con el conjunto
+--   (supabase/AUDITORIA-CONJUNTO-AGENDA-V2.md §10).
 -- AUDITORÍA INDEPENDIENTE 2026-11-15 (otro modelo —sonnet—, las 18
 --   dimensiones de supabase/AUDITORIA-MIGRACIONES.md, con el catálogo local en
 --   vivo): APTA CON CAMBIOS. Atendidos los dos hallazgos: (1) el horario de
@@ -121,7 +129,7 @@ SET LOCAL lock_timeout = '5s';
 -- ---------------------------------------------------------------------
 DO $$
 DECLARE
-  c_md5_h2 CONSTANT text := '5f2facc1f452bd81dafe6b823855dc04';
+  c_md5_h2 CONSTANT text := '6c99e553177ba42d0f3723468b39f241';
   v_md5    text;
 BEGIN
   IF to_regclass('public.agenda_ajustes') IS NULL OR to_regclass('public.tipos_cita') IS NULL
@@ -138,10 +146,14 @@ BEGIN
   END IF;
   -- Los DEFAULT que la función usa como «valor de fábrica» tienen que existir.
   IF (SELECT count(*) FROM pg_attrdef d JOIN pg_attribute a ON a.attrelid = d.adrelid AND a.attnum = d.adnum
-       WHERE (d.adrelid = 'public.agenda_ajustes'::regclass AND a.attname IN
-               ('recordatorio_horas', 'anticipacion_min_horas', 'horizonte_dias', 'vigencia_enlace_unico_dias', 'recordatorio_encendido'))
-          OR (d.adrelid = 'public.consultorios'::regclass AND a.attname IN ('horario', 'horario_propio'))) <> 7 THEN
-    RAISE EXCEPTION 'PRE-VUELO FALLÓ: falta el DEFAULT de algún ajuste o de consultorios.horario/horario_propio.';
+       WHERE d.adrelid = 'public.agenda_ajustes'::regclass AND a.attname IN
+               ('recordatorio_horas', 'anticipacion_min_horas', 'horizonte_dias', 'vigencia_enlace_unico_dias', 'recordatorio_encendido')) <> 5 THEN
+    RAISE EXCEPTION 'PRE-VUELO FALLÓ: falta el DEFAULT de algún ajuste de agenda_ajustes.';
+  END IF;
+  -- El horario de partida se copia de la clínica, como en G4: jsonb NOT NULL.
+  IF NOT EXISTS (SELECT 1 FROM pg_attribute WHERE attrelid = 'public.clinicas'::regclass AND attname = 'horario_consulta'
+                  AND atttypid = 'jsonb'::regtype AND attnotnull AND NOT attisdropped) THEN
+    RAISE EXCEPTION 'PRE-VUELO FALLÓ: falta clinicas.horario_consulta como jsonb NOT NULL.';
   END IF;
   -- El revocado lo hace el disparador de la corrección de seguridad (fija la hora y deja a service_role).
   IF to_regprocedure('public.proteger_reserva_enlaces()') IS NULL
@@ -204,8 +216,11 @@ BEGIN
     FROM public.consultorios c
    WHERE c.clinica_id = p_clinica_id;
 
-  UPDATE public.consultorios c SET horario = DEFAULT, horario_propio = DEFAULT
-   WHERE c.clinica_id = p_clinica_id;
+  -- El horario de partida de la v2: el de la clínica COPIADO y propio, la
+  -- herencia de G4 (20261119130000). La única fuente sigue siendo el consultorio.
+  UPDATE public.consultorios c SET horario = cl.horario_consulta, horario_propio = true
+    FROM public.clinicas cl
+   WHERE cl.id = c.clinica_id AND c.clinica_id = p_clinica_id;
   GET DIAGNOSTICS v_cons = ROW_COUNT;
 
   UPDATE public.tipos_cita t SET activo = false
@@ -239,7 +254,7 @@ REVOKE EXECUTE ON FUNCTION public.agenda_restablecer_configuracion(uuid, uuid) F
 GRANT  EXECUTE ON FUNCTION public.agenda_restablecer_configuracion(uuid, uuid) TO service_role;
 
 COMMENT ON FUNCTION public.agenda_restablecer_configuracion(uuid, uuid) IS
-  'Restablece la configuración de la agenda v2 de UNA clínica (tanda H, punto 10): consultorios al horario de fábrica (DEFAULT, sin horario propio), tipos de cita archivados, enlaces de reserva vigentes revocados, plazos de fábrica y recordatorio apagado; una fila en audit_log. No toca citas, pacientes, auditoría ni contactos bloqueados. Sólo service_role; la llama POST /api/agenda/restablecer tras comprobar que p_actor es el administrador de p_clinica_id (y la función lo vuelve a comprobar).';
+  'Restablece la configuración de la agenda v2 de UNA clínica (tanda H, punto 10): consultorios al horario de partida de la v2 (el de la clínica copiado como horario propio, la herencia de G4), tipos de cita archivados, enlaces de reserva vigentes revocados, plazos de fábrica y recordatorio apagado; una fila en audit_log. No toca citas, pacientes, auditoría ni contactos bloqueados. Sólo service_role; la llama POST /api/agenda/restablecer tras comprobar que p_actor es el administrador de p_clinica_id (y la función lo vuelve a comprobar).';
 
 COMMIT;
 
@@ -251,7 +266,7 @@ SELECT t.n, t.comprobacion, t.valor, t.esperado,
 FROM (
   SELECT 1 AS n, 'agenda_restablecer_configuracion: cuerpo de esta migración (md5)' AS comprobacion,
          coalesce((SELECT md5(prosrc) FROM pg_proc WHERE oid = to_regprocedure('public.agenda_restablecer_configuracion(uuid, uuid)')), 'AUSENTE') AS valor,
-         '5f2facc1f452bd81dafe6b823855dc04' AS esperado
+         '6c99e553177ba42d0f3723468b39f241' AS esperado
   UNION ALL
   SELECT 2, 'INVOKER / search_path vacío / VOLATILE',
          coalesce((SELECT (NOT prosecdef)::text || ' / ' || (proconfig @> ARRAY['search_path=""'])::text || ' / ' || provolatile::text

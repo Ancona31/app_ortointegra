@@ -14,7 +14,10 @@ import { CORREO, SESION, enContextoNuevo, interruptorAgenda, pestanaConfig, solo
  *        administrador). La tarea programada con él apagado/encendido está en
  *        `recordatorios.e2e.ts`;
  *   · 10 «Restablecer configuración de la agenda»: sólo el administrador, con
- *        la palabra escrita; deja «Primeros pasos» en 0 de 3 y no toca citas.
+ *        la palabra escrita; deja «Primeros pasos» en 1 de 3 (duración y enlace
+ *        pendientes; el horario de cada consultorio vuelve al de partida de la
+ *        v2: el de la clínica copiado como suyo, integración de la tanda H) y
+ *        no toca citas.
  * Cada prueba devuelve la clínica A como estaba (la semilla la recrea igual
  * al empezar cada corrida).
  */
@@ -272,7 +275,7 @@ test('10 · la invitada y la secretaria no ven «Restablecer» y la ruta les da 
   }
 })
 
-test('10 · el administrador restablece con la palabra escrita: «Primeros pasos» en 0 de 3, citas intactas', async ({ page }) => {
+test('10 · el administrador restablece con la palabra escrita: «Primeros pasos» en 1 de 3, el horario de partida, citas intactas', async ({ page }) => {
   const foto = guardarConfig()
   const deshacer = adminSinPendientes()
   const citas = () => sqlLocal(`select md5(string_agg(a::text, '|' order by a.id)) from public.appointments a where a.clinica_id = ${CL}`)
@@ -291,12 +294,14 @@ test('10 · el administrador restablece con la palabra escrita: «Primeros pasos
     await dialogo.getByLabel(/Para confirmar, escribe/).fill('RESTABLECER')
     await boton.click()
     await expect(toastConTexto(page, 'Configuración de la agenda restablecida')).toBeVisible()
-    await expect(page.getByRole('tab', { name: /^Primeros pasos.*3 pendientes/ })).toHaveAttribute('aria-selected', 'true')
-    await expect(page.getByRole('region', { name: 'Primeros pasos' })).toContainText('0 de 3 listos')
-    await expect(page.getByRole('region', { name: 'Primeros pasos' }).getByRole('listitem').first()).toHaveAccessibleName('Horario de cada consultorio: pendiente')
+    await expect(page.getByRole('tab', { name: /^Primeros pasos.*2 pendientes/ })).toHaveAttribute('aria-selected', 'true')
+    await expect(page.getByRole('region', { name: 'Primeros pasos' })).toContainText('1 de 3 listos')
+    await expect(page.getByRole('region', { name: 'Primeros pasos' }).getByRole('listitem').first()).toHaveAccessibleName('Horario de cada consultorio: hecho')
     expect(sqlLocal(`select count(*) from public.tipos_cita where clinica_id = ${CL} and activo`)).toBe('0')
     expect(sqlLocal(`select count(*) from public.reserva_enlaces where clinica_id = ${CL} and revocado_en is null`)).toBe('0')
-    expect(sqlLocal(`select bool_or(horario_propio)::text from public.consultorios where clinica_id = ${CL}`)).toBe('false')
+    /* El horario de partida de la v2: el de la clínica, COPIADO a cada consultorio y como propio (la herencia de G4). */
+    expect(sqlLocal(`select bool_and(k.horario_propio and k.horario = c.horario_consulta)::text
+                       from public.consultorios k join public.clinicas c on c.id = k.clinica_id where k.clinica_id = ${CL}`)).toBe('true')
     expect(sqlLocal(`select recordatorio_encendido || '|' || recordatorio_horas from public.agenda_ajustes where clinica_id = ${CL}`)).toBe('false|24')
     expect(citas()).toBe(antes)
     expect(sqlLocal(`select count(*) from public.audit_log where accion = 'agenda_configuracion_restablecida'

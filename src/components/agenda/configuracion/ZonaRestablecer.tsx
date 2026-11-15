@@ -9,7 +9,10 @@
  * Confirmación fuerte: un diálogo que dice qué se borra y qué NO, avisa de que
  * los enlaces ya compartidos con pacientes dejarán de funcionar, y no deja
  * seguir hasta escribir la palabra `RESTABLECER` (la misma que exige la ruta).
- * Al terminar, `alRestablecer` relee todo: «Primeros pasos» vuelve al paso 1.
+ * Al terminar, `alRestablecer` relee todo: «Primeros pasos» vuelve a pedir la
+ * duración y el enlace. El horario de cada consultorio vuelve al de partida de
+ * la agenda v2 (el de la clínica, copiado como suyo: la herencia de G4; ver
+ * §6-bis, integración de la tanda H). Texto PENDIENTE DE REVISIÓN de Angel.
  */
 import { useId, useState, type FormEvent } from 'react'
 import Portal from '@/components/ui/Portal'
@@ -22,7 +25,7 @@ import { useToast } from '@/components/ui/Toast'
 const PALABRA = 'RESTABLECER'
 
 const SE_RESTABLECE = [
-  'El horario de cada consultorio vuelve al de fábrica: sin horario propio.',
+  'El horario de cada consultorio vuelve al de partida: el horario de la clínica, copiado a cada consultorio.',
   'La duración de la consulta y los tipos de cita se archivan.',
   'Los plazos vuelven a sus valores de fábrica y el recordatorio por correo se apaga.',
   'Los enlaces de reserva se revocan.',

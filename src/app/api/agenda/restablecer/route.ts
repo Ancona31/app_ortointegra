@@ -2,7 +2,8 @@
  * POST /api/agenda/restablecer — «Restablecer configuración de la agenda»
  * (tanda H, punto 10 de Angel). Deja la configuración de la agenda v2 de la
  * clínica como si nunca se hubiera configurado: horario de cada consultorio
- * de fábrica, tipos de cita archivados, enlaces de reserva revocados, plazos
+ * el de partida de la v2 (el de la clínica copiado como suyo, la herencia de
+ * G4), tipos de cita archivados, enlaces de reserva revocados, plazos
  * de fábrica y recordatorio apagado. NO toca citas, pacientes, auditoría ni
  * contactos bloqueados. Todo lo hace UNA función transaccional de la base,
  * `agenda_restablecer_configuracion` (migración `20261120121000`), sólo

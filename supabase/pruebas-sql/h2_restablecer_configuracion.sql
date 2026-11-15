@@ -8,7 +8,9 @@
 -- MUTACIONES (comprobadas en rojo): quitar el `WHERE c.clinica_id = …` de los
 -- consultorios → «caso 1 resultado» (ok:8 en vez de ok:3); borrar los tipos en vez de archivarlos
 -- → la FK RESTRICT de la cita da 23503; quitar la comprobación de
--- administrador → «caso 4»; GRANT a authenticated → «caso 5».
+-- administrador → «caso 4»; GRANT a authenticated → «caso 5»; el horario de
+-- partida en el DEFAULT de columna y sin horario propio (lo que dejaba H2 antes
+-- de la integración) → «caso 2 consultorios».
 begin;
 
 -- c1: la clínica que se restablece (v2 encendida). c2: otra clínica, con lo mismo, que NO se toca.
@@ -29,6 +31,11 @@ insert into public.agenda_ajustes (clinica_id, agenda_v2_encendida, recordatorio
                                    vigencia_enlace_unico_dias, recordatorio_encendido) values
   ('00000000-0000-4000-8000-0000000073c1', true, 48, 5, 90, 14, true),
   ('00000000-0000-4000-8000-0000000073c2', true, 48, 5, 90, 14, true);
+-- El horario de cada clínica, distinto: el reinicio copia a sus consultorios el de SU clínica.
+update public.clinicas set horario_consulta = '{"miercoles":{"activo":true,"inicio":"10:00","fin":"14:00"}}'::jsonb
+ where id = '00000000-0000-4000-8000-0000000073c1';
+update public.clinicas set horario_consulta = '{"jueves":{"activo":true,"inicio":"07:00","fin":"09:00"}}'::jsonb
+ where id = '00000000-0000-4000-8000-0000000073c2';
 -- Candado distinto del de fábrica en c1 (como postgres): el reinicio no lo toca.
 update public.agenda_ajustes set candado_cancelaciones = 5 where clinica_id = '00000000-0000-4000-8000-0000000073c1';
 
@@ -117,12 +124,14 @@ select pg_temp.esperar('caso 1 resultado',
 -- ── Caso 2: lo que SÍ toca ──
 do $$
 begin
-  -- Consultorios (también el archivado) al DEFAULT de columna: sin horario propio y todos los días cerrados.
+  -- Consultorios (también el archivado) al horario de partida de la v2: el de SU
+  -- clínica copiado y como horario propio (la herencia de G4); la única fuente
+  -- sigue siendo el consultorio (integración de la tanda H).
   perform pg_temp.esperar('caso 2 consultorios',
-    (select string_agg(nombre || '=' || horario_propio::text || '/' ||
-       (select count(*) from jsonb_each(horario) e where (e.value ->> 'activo')::boolean)::text, ',' order by nombre)
-       from public.consultorios where clinica_id = '00000000-0000-4000-8000-0000000073c1'),
-    'Dos=false/0,Uno=false/0,Viejo=false/0');
+    (select string_agg(k.nombre || '=' || k.horario_propio::text || '/' || (k.horario = c.horario_consulta)::text, ',' order by k.nombre)
+       from public.consultorios k join public.clinicas c on c.id = k.clinica_id
+      where k.clinica_id = '00000000-0000-4000-8000-0000000073c1'),
+    'Dos=true/true,Uno=true/true,Viejo=true/true');
   -- Tipos: archivados, NO borrados (el de la cita sigue ahí, la cita lo sigue apuntando).
   perform pg_temp.esperar('caso 2 tipos',
     (select string_agg(nombre || '=' || activo::text, ',' order by nombre) from public.tipos_cita
