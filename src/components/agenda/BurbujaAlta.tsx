@@ -573,7 +573,7 @@ export default function BurbujaAlta(props: Props): ReactElement {
         </div>
       </Portal>
       {registro.nombre !== null && (
-        <QuickPatientModal nombreInicial={registro.nombre} onCreated={registro.alCreado} onClose={registro.alCancelar} />
+        <QuickPatientModal nombreInicial={registro.nombre} conTelefono onCreated={registro.alCreado} onClose={registro.alCancelar} />
       )}
     </>
   )

@@ -11,6 +11,10 @@ import { abrirAgendaV2, burbuja, clicEnFranja } from './interaccionesAyudas'
  *     sigue abierta con su horario, aunque el clic sobre el botón del modal sea
  *     DOBLE: el segundo clic, que cae ya sobre la rejilla, no la cierra ni abre
  *     otra (la causa, en `useEscudoTrasRegistro` de `BurbujaAlta.tsx`).
+ *   · 13: el registro rápido pide «Teléfono celular o WhatsApp» (opcional, con
+ *     el formato y la validación de la ficha) y lo guarda en `pacientes.telefono`;
+ *     la leyenda va debajo del correo y el teléfono. Con la v2 apagada, el
+ *     registro rápido del formulario completo sigue sin teléfono.
  *
  * Todo en la SEMANA +3 (como `agenda-t1-burbuja`), miércoles.
  *
@@ -19,6 +23,8 @@ import { abrirAgendaV2, burbuja, clicEnFranja } from './interaccionesAyudas'
  *     fondo de la señalada, quitar su `background`).
  *   · 12: en `BurbujaAlta`, que `escudo.activar` no haga nada (el comportamiento
  *     de antes: el segundo clic cierra la burbuja y abre otra vacía).
+ *   · 13: en `QuickPatientModal`, no mandar `telefono` en el cuerpo; y, para la
+ *     prueba de la v2 apagada, `conTelefono={true}` en `AppointmentModal`.
  */
 soloEscritorio()
 test.use({ storageState: SESION.adminA })
@@ -152,4 +158,47 @@ test('punto 12: al cancelar el registro (también con doble clic), la burbuja si
   // Pasado el escudo, tocar fuera vuelve a cerrar la burbuja (como antes).
   await page.mouse.click(5, 5)
   await expect(burbuja(page)).toHaveCount(0)
+})
+
+const LEYENDA = 'Sin teléfono ni correo no se podrán enviar confirmaciones ni recordatorios de cita.'
+
+test('punto 13: el registro rápido pide teléfono (opcional, validado) y lo guarda en la ficha; la leyenda va debajo de correo y teléfono', async ({ page }) => {
+  interruptorAgenda('A', true)
+  const { b, registrar } = await burbujaConRegistrar(page)
+  await registrar.click()
+  const qpm = page.locator('div.fixed', { has: page.getByRole('heading', { name: 'Registrar paciente' }) }).last()
+  const tel = qpm.getByLabel('Teléfono celular o WhatsApp')
+  const leyenda = qpm.getByText(LEYENDA)
+  await expect(tel).toBeVisible()
+  await expect(leyenda).toBeVisible()
+  // Debajo de los dos campos: el correo, luego el teléfono, luego la leyenda.
+  const [yCorreo, yTel, yLeyenda] = await Promise.all([qpm.locator('input[type="email"]'), tel, leyenda].map(async l => (await l.boundingBox())?.y ?? -1))
+  expect(yCorreo < yTel && yTel < yLeyenda).toBe(true)
+  await qpm.getByRole('checkbox').check()
+  // Un teléfono incompleto no deja crear (la regla de la ficha: 10 dígitos).
+  await tel.fill('99912')
+  await qpm.getByRole('button', { name: 'Crear y continuar' }).click()
+  await expect(qpm.getByText('El teléfono debe tener 10 dígitos').first()).toBeVisible()
+  expect(sqlLocal(`select count(*) from public.pacientes where apellidos = :'ap'`, { ap: NUEVO.apellidos })).toBe('0')
+  await tel.fill('9991234567')
+  await expect(tel).toHaveValue('999 123 4567')
+  await qpm.getByRole('button', { name: 'Crear y continuar' }).click()
+  await expect(page.getByRole('heading', { name: 'Registrar paciente' })).toHaveCount(0)
+  await expect(b.getByRole('combobox', { name: 'Paciente' })).toHaveValue('Zoila Burbujah Tres')
+  expect(sqlLocal(`select telefono || '|' || coalesce(email, '') || '|' || consentimiento_otorgado from public.pacientes where apellidos = :'ap'`,
+    { ap: NUEVO.apellidos })).toBe('999 123 4567||true')
+})
+
+test('punto 13: con la v2 apagada, el registro rápido del formulario completo sigue sin teléfono ni leyenda', async ({ page }) => {
+  interruptorAgenda('A', false)
+  await page.goto('/agenda')
+  await expect(page.locator('.agenda-raiz')).toHaveAttribute('data-agenda-v2', 'apagada')
+  await page.getByRole('button', { name: 'Agendar' }).first().click()
+  const buscar = page.getByPlaceholder('Buscar paciente por nombre o apellido...')
+  await buscar.fill(`${NUEVO.nombre} ${NUEVO.apellidos}`)
+  await page.getByText(`Registrar "${NUEVO.nombre} ${NUEVO.apellidos}"`).click()
+  const qpm = page.locator('div.fixed', { has: page.getByRole('heading', { name: 'Registrar paciente' }) }).last()
+  await expect(qpm.locator('input[type="email"]')).toBeVisible()
+  await expect(qpm.getByLabel('Teléfono celular o WhatsApp')).toHaveCount(0)
+  await expect(qpm.getByText(LEYENDA)).toHaveCount(0)
 })

@@ -1891,6 +1891,8 @@ export default function AppointmentModal({
            reservó; el consentimiento lo sigue exigiendo el modal. */
         nombreInicial={reserva && ligar ? (reserva.reserva_nombre ?? reserva.title) : search}
         emailInicial={reserva && ligar ? (reserva.reserva_correo ?? '') : ''}
+        /* H3 (punto 13): el teléfono del registro rápido, sólo con la v2. */
+        conTelefono={agendaV2}
         onCreated={p => {
           setQuickCreate(false)
           if (reserva && ligar) { void ligarYConsultar(p); return }
