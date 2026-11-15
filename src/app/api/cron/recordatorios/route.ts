@@ -24,7 +24,10 @@
  *   quedaría `fallido`/`omitido` y gastaría intentos que tienen que estar
  *   enteros cuando se encienda (plan_E lista A 6).
  * · Sin las migraciones de E4: el listado no existe y no pasa nada.
- * · Interruptor apagado o clínica sin acceso: lo decide la base.
+ * · Interruptor de la v2 apagado, RECORDATORIO apagado (tanda H, punto 9;
+ *   `agenda_ajustes.recordatorio_encendido`, false de fábrica) o clínica sin
+ *   acceso: lo decide la base en el listado. Sin la migración del
+ *   recordatorio (20261120120000) el listado no existe y no sale nada.
  */
 import { randomUUID } from 'node:crypto'
 import { NextResponse, type NextRequest } from 'next/server'
@@ -41,7 +44,7 @@ export const maxDuration = 60
 
 /** Presupuesto de la ejecución, en ms. */
 const PRESUPUESTO_MS = 45_000
-/** Citas por ejecución (el tope de `cita_correos_pendientes` es 500). */
+/** Citas por ejecución (el tope de `cita_recordatorios_pendientes` es 500). */
 const LIMITE_LISTADO = 200
 /**
  * Pausa entre envíos. ⚠️ POR VERIFICAR contra el límite por segundo de la

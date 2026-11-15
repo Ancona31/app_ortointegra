@@ -2,7 +2,9 @@ import { notFound } from 'next/navigation'
 import { sesionServidor } from '@/lib/supabase/sesionServidor'
 import { analizarPerfilSesion } from '@/lib/perfil/perfilSesion'
 import { canManageClinica, canVerAgendaCompleta, isMedico } from '@/lib/permissions'
-import { AjustesAgendaSchema, CAMPOS_AJUSTES_AGENDA, COLUMNAS_AJUSTES, type AjustesAgenda } from '@/lib/agenda/ajustesAgenda'
+import {
+  AjustesAgendaSchema, CAMPOS_AJUSTES_AGENDA, COLUMNAS_AJUSTES, leerRecordatorioEncendido, type AjustesAgenda,
+} from '@/lib/agenda/ajustesAgenda'
 import { COLUMNAS_TIPO_CITA, type TipoCita } from '@/lib/agenda/tiposCita'
 import { logger } from '@/lib/logger'
 import ConfiguracionCalendario from '@/components/agenda/configuracion/ConfiguracionCalendario'
@@ -25,8 +27,8 @@ import ConfiguracionCalendario from '@/components/agenda/configuracion/Configura
  * «Status Codes»). Lo que importa aquí —que la pantalla no exista con el
  * interruptor apagado— se cumple en los dos casos.
  *
- * ⚠️ CLIENTE DE SESIÓN y `clinica_id` explícito en las dos lecturas. Nada de
- * `createAdminClient()`.
+ * ⚠️ CLIENTE DE SESIÓN y `clinica_id` explícito en todas las lecturas. Nada
+ * de `createAdminClient()`.
  */
 
 type ClienteSesion = Awaited<ReturnType<typeof sesionServidor>>['supabase']
@@ -68,16 +70,42 @@ async function leerTipos(supabase: ClienteSesion, clinicaId: string): Promise<Ti
   }
 }
 
+/**
+ * Los médicos ADMINISTRADORES de la clínica (tanda H, punto 6): sus enlaces se
+ * ven abiertos; los de los médicos invitados van plegados. Cliente de sesión
+ * (la misma lectura de `profiles` de la clínica que el agregado de
+ * configuración). Ante un fallo, lista vacía: todo plegado salvo lo propio.
+ */
+async function leerAdministradores(supabase: ClienteSesion, clinicaId: string): Promise<string[]> {
+  try {
+    const { data, error } = await supabase.from('profiles').select('id')
+      .eq('clinica_id', clinicaId).eq('role', 'medico').eq('es_admin_de_clinica', true)
+    if (error) {
+      logger.warn('agenda', `administradores sin leer en la configuración: ${error.code ?? ''}`)
+      return []
+    }
+    return (data ?? []).map(f => String(f.id))
+  } catch {
+    return []
+  }
+}
+
 export default async function ConfiguracionCalendarioPage() {
   const { supabase, profile } = await sesionServidor()
   const perfil = analizarPerfilSesion(profile)
   if (!perfil?.clinica_id) notFound()
   const lectura = await leerAjustes(supabase, perfil.clinica_id)
   if (lectura === 'apagado') notFound()
-  const tipos = await leerTipos(supabase, perfil.clinica_id)
+  const [tipos, recordatorio, administradores] = await Promise.all([
+    leerTipos(supabase, perfil.clinica_id),
+    leerRecordatorioEncendido(supabase, perfil.clinica_id),
+    leerAdministradores(supabase, perfil.clinica_id),
+  ])
   return (
     <ConfiguracionCalendario
       ajustes={lectura.ajustes}
+      recordatorio={recordatorio}
+      administradores={administradores}
       tipos={tipos}
       puedeAdministrar={canManageClinica(perfil)}
       usuarioId={perfil.id}

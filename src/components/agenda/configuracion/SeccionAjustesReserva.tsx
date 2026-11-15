@@ -5,11 +5,16 @@
  * pantalla de configuración (B4). Sólo los edita quien administra la clínica;
  * los demás los ven deshabilitados (P7). El candado no se muestra (§2).
  *
+ * Tanda H: arriba, el interruptor del recordatorio automático por correo
+ * (punto 9, `InterruptorRecordatorio`, apagado de fábrica); y cada ajuste con
+ * una línea que dice qué hace (punto 8, `CampoAjuste`).
+ *
  * El formulario avisa antes de enviar con el MISMO esquema que la ruta
  * (`ajustesDesdeFormulario`), pero quien decide es `PUT /api/me/ajustes-agenda`.
  */
 import { useState, type FormEvent } from 'react'
 import CampoAjuste from '@/components/agenda/configuracion/CampoAjuste'
+import InterruptorRecordatorio from '@/components/agenda/configuracion/InterruptorRecordatorio'
 import TarjetaSeccion from '@/components/agenda/configuracion/TarjetaSeccion'
 import { BOTON_PRIMARIO, TEXTO_SUAVE } from '@/components/agenda/configuracion/clasesConfig'
 import { leerMotivoError } from '@/components/agenda/configuracion/leerMotivoError'
@@ -46,8 +51,16 @@ async function enviar(ajustes: AjustesAgenda): Promise<{ ok: true; ajustes: Ajus
   }
 }
 
-export default function SeccionAjustesReserva({ inicial, puedeEditar }: { inicial: AjustesAgenda | null; puedeEditar: boolean }) {
+interface Props {
+  inicial: AjustesAgenda | null
+  puedeEditar: boolean
+  /** El interruptor del recordatorio; `null` = no se pudo leer. */
+  recordatorio: boolean | null
+}
+
+export default function SeccionAjustesReserva({ inicial, puedeEditar, recordatorio }: Props) {
   const [valores, setValores] = useState<Valores | null>(() => (inicial ? aTexto(inicial) : null))
+  const [horasGuardadas, setHorasGuardadas] = useState<number | null>(inicial?.recordatorio_horas ?? null)
   const [error, setError] = useState<string | null>(null)
   const [guardando, setGuardando] = useState(false)
   const toast = useToast()
@@ -63,12 +76,14 @@ export default function SeccionAjustesReserva({ inicial, puedeEditar }: { inicia
     if (!res.ok) { setError(res.error); return }
     setError(null)
     setValores(aTexto(res.ajustes))
+    setHorasGuardadas(res.ajustes.recordatorio_horas)
     toast.success('Ajustes guardados')
   }
 
   return (
     <TarjetaSeccion id="config-ajustes" titulo="Plazos y recordatorios"
-      ayuda="Valen hacia adelante: un enlace de un solo uso ya emitido conserva la vigencia con la que nació.">
+      ayuda="Valen para toda la clínica y hacia adelante: un enlace de un solo uso ya emitido conserva la vigencia con la que nació.">
+      <InterruptorRecordatorio inicial={recordatorio} puedeEditar={puedeEditar} horas={horasGuardadas} />
       {!valores ? (
         <p className={TEXTO_SUAVE}>No se pudieron leer los ajustes. Recarga la página.</p>
       ) : (

@@ -582,6 +582,14 @@
   --ag-input-focus-border: #93b4d8;
   --ag-modal-icon-bg: #eff4f9;           /* azul muy suave (~blue-50) */
   --ag-btn-ghost-hover: #f1f5f9;         /* ~slate-100 */
+  /* Botones de la configuración de la agenda en REPOSO (tanda H, punto 7 de
+     Angel: «borde y fondo visibles, no sólo al pasar el ratón»). El borde
+     tiene ≥ 3:1 (WCAG 1.4.11) contra el blanco de la tarjeta, el azul suave de
+     «Primeros pasos» y el ámbar del aviso. Los usa `clasesConfig.ts`. */
+  --ag-control-bg: #f3f6fa;
+  --ag-control-bg-hover: #e6ebf2;
+  --ag-control-border: #76849a;
+  --ag-control-primario-border: #1e5fa8;
   --ag-patient-card-bg: #eff4f9;         /* azul suave (~blue-50) */
   --ag-patient-card-border: #c9dcfb;     /* azul (~blue-200), a juego con el bg de arriba */
 
@@ -6532,6 +6540,13 @@ html.dark {
   --ag-input-focus-border: #5b8cff;                   /* ◆ */
   --ag-modal-icon-bg: #1f2f48;                        /* ◆ ≈ dark.rowIconBg */
   --ag-btn-ghost-hover: #1f2f48;                      /* ◆ */
+  /* Botones de la configuración en reposo (tanda H, punto 7): borde ≥ 3:1
+     contra --ag-surface (#1b2a40) y contra el propio fondo del botón; el
+     primario lleva borde claro porque #1e5fa8 sobre #1b2a40 da 2,2:1. */
+  --ag-control-bg: #23344f;
+  --ag-control-bg-hover: #2b3e5c;
+  --ag-control-border: #7388a6;
+  --ag-control-primario-border: #5b8fd6;
   /* Tarjeta de paciente: azul tenue sobre el fondo oscuro, hermana del
      #eff4f9/#c9dcfb de la variante clara. Fondo = azul de la familia al 12 %,
      borde = el mismo azul aclarado al 36 %.

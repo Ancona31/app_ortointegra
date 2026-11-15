@@ -441,3 +441,16 @@ export function ventanasVecinasDeLaSemilla(): [RangoISO, RangoISO] {
 export function esUnaDeEstasVentanas(url: string, ventanas: RangoISO[]): boolean {
   return ventanas.some(v => url.includes(`from=${v.startStr}`) && url.includes(`to=${v.endStr}`))
 }
+
+/**
+ * Tanda H, punto 5: la configuración de la agenda va en PESTAÑAS y sólo se ve
+ * la elegida. Abre la pestaña cuyo nombre empieza por `nombre` (la de
+ * «Primeros pasos» lleva además «N pendientes») y espera a que se vea su panel.
+ * La usan todas las e2e que tocan una sección de `/agenda/configuracion`.
+ */
+export async function pestanaConfig(page: Page, nombre: string): Promise<void> {
+  const pestana = page.getByRole('tablist', { name: 'Secciones de la configuración' })
+    .getByRole('tab', { name: new RegExp(`^${nombre.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`) })
+  await pestana.click()
+  await test.expect(pestana).toHaveAttribute('aria-selected', 'true')
+}

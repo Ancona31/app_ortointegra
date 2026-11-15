@@ -10,6 +10,16 @@
  * (ahora+1 h, ahora+N h], interruptor, puerta S3, destinatario, que no haya
  * salido ya el comprobante para ese inicio y los 3 intentos.
  *
+ * ⚠️ TANDA H (punto 9 de Angel): el recordatorio tiene su PROPIO interruptor
+ * por clínica, `agenda_ajustes.recordatorio_encendido`, APAGADO de fábrica.
+ * Lo aplica el listado (`cita_recordatorios_pendientes`, migración
+ * `20261120120000`) en la misma consulta que elige a las clínicas: una
+ * clínica apagada no da ninguna cita. Sin esa migración la función no existe
+ * (PGRST202) y no se manda NADA: «apagado de fábrica» también sin la columna.
+ * No vuelvas a llamar a `cita_correos_pendientes` (la de E4, sin interruptor).
+ * El comprobante y la confirmación manual no pasan por aquí y no dependen
+ * de este interruptor.
+ *
  * ⚠️ CLIENTE DE SERVICIO SÓLO PARA `.rpc()`, NUNCA `.from()` (pendiente
  * prioritario de CLAUDE.md). El listado es la única lectura entre clínicas y
  * devuelve sólo (clínica, cita); tomar y marcar llevan `p_clinica_id`, que la
@@ -54,9 +64,9 @@ async function llamar(rpc: string, args: Record<string, unknown>): Promise<unkno
 const PendienteSchema = z.object({ r_clinica_id: UUID, r_cita_id: UUID })
 export interface Pendiente { clinicaId: string; citaId: string }
 
-/** Las citas que tocan ahora, de todas las clínicas encendidas. Sólo ids. */
+/** Las citas que tocan ahora, de todas las clínicas con la v2 Y el recordatorio encendidos. Sólo ids. */
 export async function listarRecordatoriosPendientes(limite: number): Promise<Pendiente[]> {
-  const data = await llamar('cita_correos_pendientes', { p_limite: limite })
+  const data = await llamar('cita_recordatorios_pendientes', { p_limite: limite })
   return z.array(PendienteSchema).parse(data ?? []).map((f) => ({ clinicaId: f.r_clinica_id, citaId: f.r_cita_id }))
 }
 

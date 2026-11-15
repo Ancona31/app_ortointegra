@@ -29,16 +29,39 @@ import { leerMotivoError } from '@/components/agenda/configuracion/leerMotivoErr
 import type { ListaEnlaces } from '@/components/agenda/configuracion/listaEnlaces'
 import type { MotivoApertura } from '@/lib/reserva/aperturaEnlace'
 import { useToast } from '@/components/ui/Toast'
+import { DIAS } from '@/lib/agenda/horarioAgenda'
+import type { Consultorio } from '@/types'
 
 export type ClavePaso = 'horario' | 'duracion' | 'enlace'
 export interface Paso { clave: ClavePaso; titulo: string; hecho: boolean }
 
-/** Los tres pasos de `medicoId`, o `null` si no hay datos para decidir. */
-export function pasosDe(lista: ListaEnlaces, medicoId: string): Paso[] | null {
+/** Lo que `pasosDe` necesita de un consultorio para saber si su horario se configuró alguna vez. */
+type ConsultorioPaso = Pick<Consultorio, 'medico_id' | 'activo' | 'horario' | 'horario_propio'>
+
+/**
+ * ¿Este consultorio está como NACE, sin que nadie haya tocado su horario?
+ * (tanda H, punto 10): sin horario propio y con su `horario` de columna todo
+ * cerrado —el DEFAULT de la tabla, que es justo lo que deja «Restablecer
+ * configuración»—. Un consultorio así hereda el de la clínica (la agenda no se
+ * queda en gris), pero su médico nunca dijo qué días atiende: el paso 1 queda
+ * pendiente. Uno que se creó con su horario, o que tiene horario propio, no.
+ */
+function horarioSinTocar(c: ConsultorioPaso): boolean {
+  return c.horario_propio !== true && !DIAS.some(d => c.horario?.[d.key]?.activo === true)
+}
+
+/**
+ * Los tres pasos de `medicoId`, o `null` si no hay datos para decidir.
+ * `consultorios` (los del agregado de configuración): si alguno ACTIVO de este
+ * médico está sin tocar, el paso del horario queda pendiente aunque abra con
+ * el de la clínica. Sin ellos (`null`), la regla de antes.
+ */
+export function pasosDe(lista: ListaEnlaces, medicoId: string, consultorios: readonly ConsultorioPaso[] | null = null): Paso[] | null {
   const motivos = lista.preparacion?.[medicoId]
   if (!motivos) return null
+  const sinTocar = (consultorios ?? []).some(c => c.medico_id === medicoId && c.activo !== false && horarioSinTocar(c))
   return [
-    { clave: 'horario', titulo: 'Horario de cada consultorio', hecho: !motivos.includes('sin_consultorio') && !motivos.includes('sin_disponibilidad') },
+    { clave: 'horario', titulo: 'Horario de cada consultorio', hecho: !motivos.includes('sin_consultorio') && !motivos.includes('sin_disponibilidad') && !sinTocar },
     { clave: 'duracion', titulo: 'Duración de la consulta', hecho: !motivos.includes('sin_tipos') },
     { clave: 'enlace', titulo: 'Enlace de reserva', hecho: lista.enlaces.some(e => e.medico_id === medicoId) },
   ]
@@ -108,7 +131,7 @@ function FaltaAntesDelEnlace(p: { motivos: readonly MotivoApertura[]; medicoId: 
             onHecho={p.alResolverDuracion} />
         </div>
       )}
-      <button type="button" className={`${BOTON_SECUNDARIO} w-fit bg-[var(--ag-surface)]`} disabled={p.ocupado} onClick={p.crearIgual}>
+      <button type="button" className={`${BOTON_SECUNDARIO} w-fit`} disabled={p.ocupado} onClick={p.crearIgual}>
         Crear el enlace igualmente
       </button>
     </div>

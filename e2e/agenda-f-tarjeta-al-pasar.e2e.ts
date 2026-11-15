@@ -1,5 +1,5 @@
 import { test, expect, type Locator, type Page } from '@playwright/test'
-import { SESION, interruptorAgenda } from './ayudas'
+import { SESION, interruptorAgenda, pestanaConfig } from './ayudas'
 import { abrirAgendaApagada, abrirAgendaV2, tarjetaLectura } from './interaccionesAyudas'
 
 /**
@@ -152,6 +152,7 @@ test.describe('escritorio, con el interruptor encendido', () => {
 
   test('con la preferencia apagada en la configuración no se abre', async ({ page }) => {
     await page.goto('/agenda/configuracion')
+    await pestanaConfig(page, 'Este dispositivo')
     const casilla = page.getByRole('checkbox', { name: 'Abrir la tarjeta al pasar el ratón' })
     await expect(casilla).toBeChecked()
     await casilla.uncheck()

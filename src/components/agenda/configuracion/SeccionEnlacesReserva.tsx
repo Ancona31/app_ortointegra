@@ -14,16 +14,22 @@
  * servidor en cada ruta y la RLS; aquí sólo se pinta lo que devuelve. La monta
  * `ConfiguracionCalendario` sólo con la agenda v2 encendida.
  *
+ * Tanda H, punto 6 de Angel: los enlaces de los médicos INVITADOS van
+ * plegados bajo «Enlaces de los demás médicos», que sólo se abre al pulsarlo
+ * (`aria-expanded`). A la vista quedan el de quien mira («(tú)», primero) y,
+ * para la secretaria, los de los médicos administradores.
+ *
  * Tanda T2, punto 8: la lista la pide `ConfiguracionCalendario` (la comparte
  * con «Para empezar»). Cada enlace que no abrirá lleva su aviso, y cada médico
  * al que le falta algo, la caja que lo pide ahí mismo (`FaltaParaEnlace`).
  */
-import { useState } from 'react'
+import { useId, useState, type ReactNode } from 'react'
+import { ChevronRight } from 'lucide-react'
 import ConfirmModal from '@/components/agenda/ConfirmModal'
 import BloqueEnlacesMedico from '@/components/agenda/configuracion/BloqueEnlacesMedico'
 import TarjetaSeccion from '@/components/agenda/configuracion/TarjetaSeccion'
 import { leerMotivoError } from '@/components/agenda/configuracion/leerMotivoError'
-import { CAJA_AVISO, TEXTO_SUAVE } from '@/components/agenda/configuracion/clasesConfig'
+import { BOTON_SECUNDARIO, CAJA_AVISO, TEXTO_SUAVE } from '@/components/agenda/configuracion/clasesConfig'
 import type { EstadoLista } from '@/components/agenda/configuracion/listaEnlaces'
 import { componerNombreMedicoCompleto } from '@/lib/nombreMedico'
 import { useToast } from '@/components/ui/Toast'
@@ -71,13 +77,39 @@ interface Props {
   alCrearTipo: () => void
   /** «Primeros pasos» a la vista: ya pide lo que le falta a quien mira. */
   conPrimerosPasos: boolean
+  /** Punto 6: los médicos administradores de la clínica. */
+  administradores: readonly string[]
 }
 
-/** Las fichas: el propio médico primero («Tu enlace»), después los demás por nombre. */
-function fichas(medicos: readonly MedicoConfig[], usuarioId: string, gestionaTodos: boolean): { id: string; nombre: string | null }[] {
-  if (!gestionaTodos) return [{ id: usuarioId, nombre: null }]
+interface Ficha { id: string; nombre: string | null }
+
+/**
+ * Las fichas: a la vista, la del propio médico primero («(tú)») y, si quien
+ * mira no tiene ficha propia (la secretaria), las de los administradores;
+ * plegadas, las de los médicos invitados (punto 6).
+ */
+export function fichas(medicos: readonly MedicoConfig[], usuarioId: string, gestionaTodos: boolean, administradores: readonly string[]): { vistas: Ficha[]; plegadas: Ficha[] } {
+  if (!gestionaTodos) return { vistas: [{ id: usuarioId, nombre: null }], plegadas: [] }
   const todas = medicos.map(m => ({ id: m.id, nombre: componerNombreMedicoCompleto(m) }))
-  return [...todas.filter(m => m.id === usuarioId).map(m => ({ ...m, nombre: `${m.nombre} (tú)` })), ...todas.filter(m => m.id !== usuarioId)]
+  const propia = todas.filter(m => m.id === usuarioId).map(m => ({ ...m, nombre: `${m.nombre} (tú)` }))
+  const resto = todas.filter(m => m.id !== usuarioId)
+  const admins = propia.length ? [] : resto.filter(m => administradores.includes(m.id))
+  return { vistas: [...propia, ...admins], plegadas: resto.filter(m => !admins.includes(m)) }
+}
+
+/** El apartado plegado de los enlaces de los demás médicos: cerrado hasta que se pulsa. */
+function Plegado({ cuantos, children }: { cuantos: number; children: ReactNode }) {
+  const [abierto, setAbierto] = useState(false)
+  const id = useId()
+  return (
+    <div className="flex flex-col gap-[var(--ag-3)] border-t border-[var(--ag-border-card)] pt-[var(--ag-4)]">
+      <button type="button" aria-expanded={abierto} aria-controls={id} onClick={() => setAbierto(a => !a)} className={`${BOTON_SECUNDARIO} self-start`}>
+        <ChevronRight size={16} aria-hidden="true" className={`transition-transform duration-[var(--ag-dur-micro)] motion-reduce:transition-none ${abierto ? 'rotate-90' : ''}`} />
+        Enlaces de los demás médicos ({cuantos})
+      </button>
+      <div id={id} hidden={!abierto} className="flex flex-col gap-[var(--ag-3)]">{children}</div>
+    </div>
+  )
 }
 
 export default function SeccionEnlacesReserva(p: Props) {
@@ -109,6 +141,19 @@ export default function SeccionEnlacesReserva(p: Props) {
     if (r.ok) setUrls(u => ({ ...u, [id]: urlDe(r.valor.codigo) }))
     else { toast.error(r.motivo); await recargar() }
   }
+  const reparto = fichas(medicos, usuarioId, gestionaTodos, p.administradores)
+  const bloque = (m: Ficha) => (
+    <BloqueEnlacesMedico key={m.id} medicoId={m.id} nombre={m.nombre} enlaces={lista && lista !== 'error' ? lista.enlaces.filter(e => e.medico_id === m.id) : []}
+      motivos={lista && lista !== 'error' ? lista.preparacion?.[m.id] ?? null : null} esPropio={m.id === usuarioId} puedeCrearTipos={p.puedeCrearTipos}
+      alCrearTipo={p.alCrearTipo} faltaEnPasos={p.conPrimerosPasos && m.id === usuarioId}
+      urls={urls} ocupado={ocupado} puedeEmitir={lista && lista !== 'error' ? lista.secreto : false} vigenciaDias={vigenciaDias}
+      onCrearFijo={() => void emitir(m.id, { clase: 'fijo' }, 'Enlace fijo creado')}
+      onRegenerar={() => setPregunta({ mensaje: MSJ_REGENERAR, seguir: () => void emitir(m.id, { clase: 'fijo' }, 'Enlace fijo regenerado') })}
+      onEmitirUnico={et => emitir(m.id, { clase: 'unico', etiqueta: et }, 'Enlace de un solo uso emitido')}
+      onMostrar={id => void mostrar(id)}
+      onRevocar={e => setPregunta({ mensaje: MSJ_REVOCAR, seguir: () => void escribir(`/api/agenda/enlaces/${e.id}`,
+        { method: 'PATCH', body: JSON.stringify({ accion: 'revocar' }) }, 'Enlace revocado', false) })} />
+  )
   const ayuda = gestionaTodos
     ? 'Cada médico tiene los suyos. Quien tenga un enlace puede agendar en un horario libre; sólo lo tiene a quien se lo mandes.'
     : 'Quien tenga tu enlace puede agendar contigo en un horario libre; sólo lo tiene a quien se lo mandes.'
@@ -122,18 +167,8 @@ export default function SeccionEnlacesReserva(p: Props) {
           {lista.secreto && !lista.aviso && (
             <p className={CAJA_AVISO}>Ningún enlace abre todavía: el aviso de privacidad de la reserva está pendiente de revisión.</p>
           )}
-          {fichas(medicos, usuarioId, gestionaTodos).map(m => (
-            <BloqueEnlacesMedico key={m.id} medicoId={m.id} nombre={m.nombre} enlaces={lista.enlaces.filter(e => e.medico_id === m.id)}
-              motivos={lista.preparacion?.[m.id] ?? null} esPropio={m.id === usuarioId} puedeCrearTipos={p.puedeCrearTipos}
-              alCrearTipo={p.alCrearTipo} faltaEnPasos={p.conPrimerosPasos && m.id === usuarioId}
-              urls={urls} ocupado={ocupado} puedeEmitir={lista.secreto} vigenciaDias={vigenciaDias}
-              onCrearFijo={() => void emitir(m.id, { clase: 'fijo' }, 'Enlace fijo creado')}
-              onRegenerar={() => setPregunta({ mensaje: MSJ_REGENERAR, seguir: () => void emitir(m.id, { clase: 'fijo' }, 'Enlace fijo regenerado') })}
-              onEmitirUnico={et => emitir(m.id, { clase: 'unico', etiqueta: et }, 'Enlace de un solo uso emitido')}
-              onMostrar={id => void mostrar(id)}
-              onRevocar={e => setPregunta({ mensaje: MSJ_REVOCAR, seguir: () => void escribir(`/api/agenda/enlaces/${e.id}`,
-                { method: 'PATCH', body: JSON.stringify({ accion: 'revocar' }) }, 'Enlace revocado', false) })} />
-          ))}
+          {reparto.vistas.map(bloque)}
+          {reparto.plegadas.length > 0 && <Plegado cuantos={reparto.plegadas.length}>{reparto.plegadas.map(bloque)}</Plegado>}
         </>}
       {pregunta && (
         <ConfirmModal message={pregunta.mensaje}

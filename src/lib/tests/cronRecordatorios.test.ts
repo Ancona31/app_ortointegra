@@ -62,7 +62,7 @@ const TOMA = {
 
 /** Respuestas por omisión: dos pendientes, la toma prende y marcar devuelve true. */
 function responderNormal(rpc: string): Respuesta {
-  if (rpc === 'cita_correos_pendientes') return { data: [{ r_clinica_id: C1, r_cita_id: A1 }, { r_clinica_id: C2, r_cita_id: A2 }], error: null }
+  if (rpc === 'cita_recordatorios_pendientes') return { data: [{ r_clinica_id: C1, r_cita_id: A1 }, { r_clinica_id: C2, r_cita_id: A2 }], error: null }
   if (rpc === 'cita_correo_tomar') return { data: [TOMA], error: null }
   if (rpc === 'cita_correo_marcar') return { data: true, error: null }
   return { data: null, error: { code: 'XX', message: 'inesperada' } }
@@ -143,7 +143,7 @@ describe('GET /api/cron/recordatorios — cuándo no hace nada', () => {
     const res = await GET(peticion(BUENA))
     expect(res.status).toBe(200)
     expect(await res.json()).toEqual({ ok: true })
-    expect(rpcs()).toEqual(['cita_correos_pendientes'])
+    expect(rpcs()).toEqual(['cita_recordatorios_pendientes'])
   })
 
   it('si el listado falla por otra causa: 500 sin cuerpo y sin el mensaje de Postgres', async () => {
@@ -162,7 +162,7 @@ describe('GET /api/cron/recordatorios — el recorrido', () => {
     const texto = await res.text()
     expect(JSON.parse(texto)).toEqual({ ok: true })
     expect(res.headers.get('cache-control')).toBe('no-store')
-    expect(h.llamadas[0]).toEqual({ rpc: 'cita_correos_pendientes', args: { p_limite: 200 } })
+    expect(h.llamadas[0]).toEqual({ rpc: 'cita_recordatorios_pendientes', args: { p_limite: 200 } })
     const tomas = h.llamadas.filter((l) => l.rpc === 'cita_correo_tomar').map((l) => l.args)
     expect(tomas.map((t) => [t.p_clinica_id, t.p_cita_id, t.p_tipo])).toEqual([[C1, A1, 'recordatorio'], [C2, A2, 'recordatorio']])
     expect(new Set(tomas.map((t) => t.p_testigo)).size).toBe(1)
@@ -231,7 +231,7 @@ describe('GET /api/cron/recordatorios — el recorrido', () => {
 
 describe('recorrerRecordatorios — presupuesto y pausa', () => {
   it('deja de empezar citas al agotar el presupuesto y duerme sólo tras un envío', async () => {
-    h.responder = (rpc) => (rpc === 'cita_correos_pendientes'
+    h.responder = (rpc) => (rpc === 'cita_recordatorios_pendientes'
       ? { data: Array.from({ length: 10 }, (_, i) => ({ r_clinica_id: C1, r_cita_id: `00000000-0000-4000-8000-0000000e4a${String(i).padStart(2, '0')}` })), error: null }
       : responderNormal(rpc))
     let t = 0

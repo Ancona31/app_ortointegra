@@ -20,9 +20,10 @@ import { CrearTipoCitaSchema, EditarTipoCitaSchema, LIMITES_TIPO_CITA } from '@/
 /** Las tres de Angel; «Otra» abre el campo. */
 const OPCIONES = [{ min: 30, texto: '30 min' }, { min: 45, texto: '45 min' }, { min: 60, texto: '1 hora' }] as const
 
-/** Una opción: botón de dos estados hecho con el radio (marcado = borde y tinta de marca). */
-const OPCION = 'inline-flex h-11 min-w-[4.5rem] cursor-pointer items-center justify-center rounded-[var(--ag-r-btn)] border border-[var(--ag-border-card)] '
-  + 'bg-[var(--ag-surface)] px-[var(--ag-3)] text-sm font-medium text-[var(--ag-text)] '
+/** Una opción: botón de dos estados hecho con el radio (marcado = borde y tinta de marca). En reposo,
+ *  borde y fondo de botón (tanda H, punto 7). */
+const OPCION = 'inline-flex h-11 min-w-[4.5rem] cursor-pointer items-center justify-center rounded-[var(--ag-r-btn)] border border-[var(--ag-control-border)] '
+  + 'bg-[var(--ag-control-bg)] px-[var(--ag-3)] text-sm font-medium text-[var(--ag-text)] '
   + 'has-[:checked]:border-[var(--ag-brand-secondary)] has-[:checked]:bg-[var(--ag-primary-bg-faint)] has-[:checked]:text-[var(--ag-brand-legible)] '
   + 'has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-[var(--ag-brand-secondary)]'
 

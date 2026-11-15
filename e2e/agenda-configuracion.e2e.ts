@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 import {
-  CORREO, SESION, enContextoNuevo, interruptorAgenda, irAAgenda, soloEscritorio, sqlLocal, toastConTexto, tituloUnico,
+  CORREO, SESION, enContextoNuevo, interruptorAgenda, irAAgenda, pestanaConfig, soloEscritorio, sqlLocal, toastConTexto, tituloUnico,
 } from './ayudas'
 
 /**
@@ -122,6 +122,7 @@ test.describe('con el interruptor encendido', () => {
   test('el administrador edita los ajustes: persisten y quedan en audit_log', async ({ page }) => {
     const desde = sqlLocal('select now()')
     await page.goto(RUTA)
+    await pestanaConfig(page, 'Plazos y recordatorios')
     await page.getByLabel('Recordatorio por correo').fill('12')
     await page.getByLabel('Vigencia del enlace de un solo uso').fill('14')
     const guardado = page.waitForResponse(r => r.url().includes(API_AJUSTES) && r.request().method() === 'PUT')
@@ -130,6 +131,7 @@ test.describe('con el interruptor encendido', () => {
     await expect(toastConTexto(page, 'Ajustes guardados')).toBeVisible()
 
     await page.reload()
+    await pestanaConfig(page, 'Plazos y recordatorios')
     await expect(page.getByLabel('Recordatorio por correo')).toHaveValue('12')
     await expect(page.getByLabel('Vigencia del enlace de un solo uso')).toHaveValue('14')
     expect(ajustesA()).toBe('12|2|60|14|true')
@@ -146,6 +148,7 @@ test.describe('con el interruptor encendido', () => {
 
   test('un ajuste fuera de rango da error y no se guarda', async ({ page }) => {
     await page.goto(RUTA)
+    await pestanaConfig(page, 'Plazos y recordatorios')
     let enviados = 0
     page.on('request', r => { if (r.url().includes(API_AJUSTES)) enviados += 1 })
     await page.getByLabel('Recordatorio por correo').fill('73')
@@ -166,11 +169,13 @@ test.describe('con el interruptor encendido', () => {
       await irAAgenda(p)
       await p.getByRole('button', { name: 'Configuración de la agenda' }).click()
       await p.waitForURL(`**${RUTA}`)
+      await pestanaConfig(p, 'Plazos y recordatorios')
       await expect(p.getByLabel('Recordatorio por correo')).toBeDisabled()
       await expect(p.getByLabel('Recordatorio por correo')).toHaveValue('24')
       await expect(p.getByRole('button', { name: 'Guardar ajustes' })).toHaveCount(0)
       await expect(p.getByRole('button', { name: 'Editar horario' })).toHaveCount(0)
       await expect(p.getByRole('button', { name: 'Crear tipo' })).toHaveCount(0)
+      await pestanaConfig(p, 'Horario y disponibilidad')
       const disponibilidad = p.getByRole('region', { name: 'Disponibilidad por consultorio' })
       await expect(disponibilidad.getByRole('listitem', { name: CONSULTORIO_INVITADO })).toBeVisible()
       await expect(disponibilidad.getByRole('button')).toHaveCount(0)
@@ -183,6 +188,7 @@ test.describe('con el interruptor encendido', () => {
     const nombre = tituloUnico('Tipo e2e')
     try {
       await page.goto(RUTA)
+      await pestanaConfig(page, 'Duración y tipos de cita')
       const tipos = page.getByRole('region', { name: 'Duración y tipos de cita' })
       await tipos.getByLabel('Nombre').fill(nombre)
       await tipos.getByLabel('Duración (min)').fill('45')
@@ -205,6 +211,7 @@ test.describe('con el interruptor encendido', () => {
     try {
       await enContextoNuevo(browser, SESION.medicoA, async (p) => {
         await p.goto(RUTA)
+        await pestanaConfig(p, 'Horario y disponibilidad')
         const consultorio = p.getByRole('region', { name: 'Disponibilidad por consultorio' })
           .getByRole('listitem', { name: CONSULTORIO_INVITADO })
         await expect(consultorio).toContainText('Usa el horario de la clínica')

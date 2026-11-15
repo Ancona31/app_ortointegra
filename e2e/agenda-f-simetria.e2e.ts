@@ -132,17 +132,26 @@ test('T2 · configuración: tarjetas alineadas, títulos a la misma sangría y b
   interruptorAgenda('A', true)
   try {
     await page.goto('/agenda/configuracion')
-    await expect(page.getByRole('heading', { name: 'Enlaces de reserva' })).toBeVisible()
-    await expect(page.getByText('Cargando', { exact: false })).toHaveCount(0)
-    const m = await page.evaluate(() => {
-      const tarjetas = Array.from(document.querySelectorAll<HTMLElement>('.ag-config-tarjeta'))
-      return {
-        cajas: tarjetas.map(t => { const r = t.getBoundingClientRect(); return { left: r.left, width: r.width } }),
-        sangrias: tarjetas.map(t => (t.querySelector('h3')?.getBoundingClientRect().left ?? 0) - t.getBoundingClientRect().left),
-        altos: tarjetas.flatMap(t => Array.from(t.querySelectorAll('button')))
-          .filter(b => b.offsetParent !== null).map(b => Math.round(b.getBoundingClientRect().height)),
-      }
-    })
+    /* Tanda H, punto 5: una pestaña por sección. Se mide cada panel visible y
+       se juntan: las tarjetas de TODOS comparten borde izquierdo y ancho. */
+    const pestanas = page.getByRole('tablist', { name: 'Secciones de la configuración' }).getByRole('tab')
+    await expect(pestanas.first()).toBeVisible()
+    const m: { cajas: { left: number; width: number }[]; sangrias: number[]; altos: number[] } = { cajas: [], sangrias: [], altos: [] }
+    for (let i = 0; i < await pestanas.count(); i++) {
+      await pestanas.nth(i).click()
+      await expect(page.getByText('Cargando', { exact: false })).toHaveCount(0)
+      const parte = await page.evaluate(() => {
+        const tarjetas = Array.from(document.querySelectorAll<HTMLElement>('.ag-config-tarjeta')).filter(t => t.offsetParent !== null)
+        return {
+          cajas: tarjetas.map(t => { const r = t.getBoundingClientRect(); return { left: r.left, width: r.width } }),
+          sangrias: tarjetas.map(t => (t.querySelector('h3')?.getBoundingClientRect().left ?? 0) - t.getBoundingClientRect().left),
+          // El interruptor del recordatorio (`role="switch"`, punto 9) no es un botón de la retícula.
+          altos: tarjetas.flatMap(t => Array.from(t.querySelectorAll('button:not([role="switch"])')))
+            .filter(b => b instanceof HTMLElement && b.offsetParent !== null).map(b => Math.round(b.getBoundingClientRect().height)),
+        }
+      })
+      m.cajas.push(...parte.cajas); m.sangrias.push(...parte.sangrias); m.altos.push(...parte.altos)
+    }
     expect(m.cajas.length).toBeGreaterThanOrEqual(6)
     for (const c of m.cajas) {
       expect(Math.abs(c.left - m.cajas[0].left)).toBeLessThanOrEqual(1)
