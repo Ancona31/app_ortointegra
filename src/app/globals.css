@@ -6052,6 +6052,15 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
 .ag-capa-rejilla > * { min-width: 0; }
 .ag-capa-pila { display: flex; flex-direction: column; gap: var(--ag-2); }
 .ag-opcion--registrar { margin-top: var(--ag-1); border-top: 1px solid var(--ag-hairline); border-radius: 0 0 var(--ag-r-btn-sm) var(--ag-r-btn-sm); }
+/* H3 (punto 11) · «Registrar «…»» en VERDE, como el «Registrar "…"» del
+   formulario completo y el resto de la app (esmeralda). Aquí con el verde de la
+   agenda, `--ag-success-*`, que ya pasa AA en las dos paletas (la e2e
+   `agenda-h3-burbuja` mide el contraste con el fondo pintado). La línea de
+   debajo, en el mismo verde (no en gris). */
+.ag-opcion--registrar,
+.ag-opcion--registrar .ag-opcion-meta { color: var(--ag-success-text); }
+.ag-opcion--registrar:hover,
+.ag-opcion--registrar[aria-selected="true"] { background: var(--ag-success-bg); }
 
 /* La tarjeta de lectura. */
 .ag-lectura-pildora {
