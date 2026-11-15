@@ -33,17 +33,23 @@
  * El enlace de reserva de cada médico se queda aquí (punto 20), no en el
  * perfil. Con la v2 apagada esta pantalla no existe (B4), así que la agenda
  * apagada sigue abriendo el `HorarioModal` de siempre desde su engrane.
+ *
+ * Tanda H (puntos 5 a 10 de Angel): las secciones son PESTAÑAS
+ * (`MenuConfiguracion`, patrón de la APG) y sólo se ve la elegida; abre en
+ * «Primeros pasos» mientras falte algo y, si no, en la primera. Los enlaces
+ * internos `#config-…` cambian de pestaña (`usePestana`). Al final, sólo para
+ * quien administra, «Restablecer» (`ZonaRestablecer`, punto 10).
  */
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type MouseEvent, type ReactNode } from 'react'
 import useSWR, { useSWRConfig } from 'swr'
 import { ChevronLeft } from 'lucide-react'
 import { CLAVE_CONFIG, CONFIG_DEDUPE_MS, fetcherConfig, revalidarConfigAlMontar, type ConfigApp, type MedicoConfig } from '@/lib/configApp'
 import type { AjustesAgenda } from '@/lib/agenda/ajustesAgenda'
 import type { TipoCita } from '@/lib/agenda/tiposCita'
 import type { FuenteHorario } from '@/components/agenda/HorarioModal'
-import MenuConfiguracion, { type EntradaMenu } from '@/components/agenda/configuracion/MenuConfiguracion'
+import MenuConfiguracion, { idPanel, idPestana, type ClavePestana, type Pestana } from '@/components/agenda/configuracion/MenuConfiguracion'
 import type { Consultorio } from '@/types'
 import SeccionAjustesReserva from '@/components/agenda/configuracion/SeccionAjustesReserva'
 import SeccionDisponibilidad from '@/components/agenda/configuracion/SeccionDisponibilidad'
@@ -54,6 +60,8 @@ import PasosConfiguracion, { pasosDe, type ClavePaso } from '@/components/agenda
 import { cargarListaEnlaces, type EstadoLista } from '@/components/agenda/configuracion/listaEnlaces'
 import PreferenciaTarjetaAlPasar from '@/components/agenda/configuracion/PreferenciaTarjetaAlPasar'
 import TarjetaSeccion from '@/components/agenda/configuracion/TarjetaSeccion'
+import ZonaRestablecer from '@/components/agenda/configuracion/ZonaRestablecer'
+import { TEXTO_SUAVE } from '@/components/agenda/configuracion/clasesConfig'
 
 /** Reescribe la rebanada del agregado que acaba de guardarse, sin volver a pedirlo. */
 export type ActualizarConfig = (cambio: (config: ConfigApp) => ConfigApp) => void
@@ -61,6 +69,10 @@ export type ActualizarConfig = (cambio: (config: ConfigApp) => ConfigApp) => voi
 interface Props {
   /** `null` = la fila no cuadra: la sección lo dice y no deja guardar. */
   ajustes: AjustesAgenda | null
+  /** Tanda H, punto 9: el interruptor del recordatorio automático; `null` = no se pudo leer. */
+  recordatorio: boolean | null
+  /** Tanda H, punto 6: los médicos administradores (sus enlaces se ven abiertos). */
+  administradores: readonly string[]
   /** `null` = no se pudieron leer. */
   tipos: TipoCita[] | null
   puedeAdministrar: boolean
@@ -70,19 +82,6 @@ interface Props {
   gestionaReservasDeTodos: boolean
   /** Un médico (dueño o invitado) gestiona los suyos; la secretaria no tiene. */
   esMedico: boolean
-}
-
-/** Un grupo de secciones: su rótulo y, si hace falta, una línea que lo explica. */
-function Grupo({ titulo, nota, children }: { titulo: string; nota?: string; children?: ReactNode }) {
-  return (
-    <div className="flex flex-col gap-[var(--ag-3)]">
-      <div className="flex flex-col gap-[var(--ag-1)] px-[var(--ag-1)]">
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--ag-muted)]">{titulo}</h2>
-        {nota && <p className="text-sm text-[var(--ag-muted)]">{nota}</p>}
-      </div>
-      {children}
-    </div>
-  )
 }
 
 /** La lista de enlaces, pedida una vez para «Para empezar» y la sección de enlaces. */
@@ -109,7 +108,7 @@ function useListaEnlaces(activa: boolean): { lista: EstadoLista; recargar: () =>
  * La guía de la pantalla (puntos 7 y 8): la lista de enlaces, «Primeros pasos»
  * del médico que mira y qué hacer tras guardar una duración.
  */
-function useGuiaEnlaces(o: { conEnlaces: boolean; esMedico: boolean; usuarioId: string }) {
+function useGuiaEnlaces(o: { conEnlaces: boolean; esMedico: boolean; usuarioId: string; consultorios: readonly Consultorio[] | null }) {
   const { lista, recargar } = useListaEnlaces(o.conEnlaces)
   const router = useRouter()
   const [, startTransition] = useTransition()
@@ -120,7 +119,7 @@ function useGuiaEnlaces(o: { conEnlaces: boolean; esMedico: boolean; usuarioId: 
     void recargar()
   }, [router, recargar])
   const listaBuena = lista && lista !== 'error' ? lista : null
-  const pasos = o.esMedico && listaBuena ? pasosDe(listaBuena, o.usuarioId) : null
+  const pasos = o.esMedico && listaBuena ? pasosDe(listaBuena, o.usuarioId, o.consultorios) : null
   const pendientes = pasos?.some(p => !p.hecho) ? pasos : null
   const motivos = listaBuena?.preparacion?.[o.usuarioId] ?? []
   return { lista, recargar, alCrearTipo, pendientes, motivos, puedeEmitir: listaBuena?.secreto ?? false }
@@ -138,17 +137,63 @@ function resumenPasos(usuarioId: string, consultorios: readonly Consultorio[] | 
   }
 }
 
-/** Las entradas del menú, en el orden de la página; sin las secciones que quien mira no tiene. */
-function entradasMenu(pendientes: number | null, conEnlaces: boolean): EntradaMenu[] {
+const DISPOSITIVO_NOTA = 'Valen sólo en este navegador; no cambian nada para los demás.'
+
+/**
+ * Las pestañas, en el orden de la página; sin las secciones que quien mira no
+ * tiene (tanda H, punto 5). «Restablecer» (punto 10), al final y sólo para
+ * quien administra la clínica.
+ */
+function pestanasDe(o: { faltan: number | null; conEnlaces: boolean; puedeAdministrar: boolean }): Pestana[] {
   return [
-    ...(pendientes ? [{ destino: 'config-pasos', texto: 'Primeros pasos', nota: `${pendientes} ${pendientes === 1 ? 'pendiente' : 'pendientes'}` }] : []),
-    { destino: 'config-disponibilidad', texto: 'Horario y disponibilidad' },
-    { destino: 'config-tipos', texto: 'Duración y tipos de cita' },
-    ...(conEnlaces ? [{ destino: 'config-enlaces', texto: 'Enlaces de reserva' }] : []),
-    { destino: 'config-ajustes', texto: 'Plazos y recordatorios' },
-    ...(conEnlaces ? [{ destino: 'config-bloqueados', texto: 'Contactos bloqueados' }] : []),
-    { destino: 'config-dispositivo', texto: 'Este dispositivo' },
+    ...(o.faltan ? [{ clave: 'pasos' as const, texto: 'Primeros pasos', nota: `${o.faltan} ${o.faltan === 1 ? 'pendiente' : 'pendientes'}` }] : []),
+    { clave: 'horario', texto: 'Horario y disponibilidad' },
+    { clave: 'tipos', texto: 'Duración y tipos de cita' },
+    ...(o.conEnlaces ? [{ clave: 'enlaces' as const, texto: 'Enlaces de reserva' }] : []),
+    { clave: 'plazos', texto: 'Plazos y recordatorios' },
+    ...(o.conEnlaces ? [{ clave: 'bloqueados' as const, texto: 'Contactos bloqueados' }] : []),
+    { clave: 'dispositivo', texto: 'Este dispositivo' },
+    ...(o.puedeAdministrar ? [{ clave: 'restablecer' as const, texto: 'Restablecer' }] : []),
   ]
+}
+
+/** Los `#id` que las secciones usan para mandarse a otra (`href="#config-…"`) → la pestaña que lo tiene. */
+const PESTANA_DE_ANCLA: Record<string, ClavePestana> = {
+  'config-pasos': 'pasos', 'config-disponibilidad': 'horario', 'config-tipos': 'tipos', 'config-enlaces': 'enlaces',
+  'config-ajustes': 'plazos', 'config-bloqueados': 'bloqueados', 'config-dispositivo': 'dispositivo',
+  'config-restablecer': 'restablecer',
+}
+
+/**
+ * Qué pestaña se ve (punto 5): la que eligió quien mira; si no, «Primeros
+ * pasos» mientras falte algo y, si no, la primera. `null` mientras no se
+ * puede decidir (al médico aún no le llega la lista de enlaces): así no se
+ * enseña otra sección y salta a «Primeros pasos» un instante después.
+ */
+function usePestana(pestanas: readonly Pestana[], porDefecto: ClavePestana | null) {
+  const [elegida, setElegida] = useState<ClavePestana | null>(null)
+  const activa = elegida && pestanas.some(p => p.clave === elegida) ? elegida : porDefecto
+  /* Un enlace interno («Abrir horario», «Revisar», «Ir a la disponibilidad»)
+     cambia de pestaña en vez de saltar a un ancla que está escondida. */
+  const alPulsar = useCallback((e: MouseEvent<HTMLDivElement>) => {
+    const ancla = e.target instanceof Element ? e.target.closest('a[href^="#config-"]') : null
+    const destino = ancla ? PESTANA_DE_ANCLA[ancla.getAttribute('href')?.slice(1) ?? ''] : undefined
+    if (!destino) return
+    e.preventDefault()
+    setElegida(destino)
+    requestAnimationFrame(() => document.getElementById(idPanel(destino))?.focus())
+  }, [])
+  return { activa, elegir: setElegida, volverAlInicio: () => setElegida(null), alPulsar }
+}
+
+/** Un panel de pestaña. Todos se montan (no pierden lo escrito al cambiar); sólo se ve el elegido. */
+function Panel({ clave, activa, children }: { clave: ClavePestana; activa: ClavePestana | null; children: ReactNode }) {
+  return (
+    <div role="tabpanel" id={idPanel(clave)} aria-labelledby={idPestana(clave)} hidden={activa !== clave} tabIndex={0}
+      className="flex min-w-0 flex-col gap-[var(--ag-6)] rounded-[var(--ag-r-card)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--ag-brand-secondary)]">
+      {children}
+    </div>
+  )
 }
 
 /** El encabezado: volver a la agenda, el título y para qué sirve la pantalla. */
@@ -189,81 +234,108 @@ function useConfigAgregada() {
     if (error) return { estado: 'error' }
     return { estado: 'cargando' }
   }, [config, error])
-  return { config, fuente, actualizarConfig }
+  /* Tras restablecer la configuración (punto 10): los consultorios cambiaron en la base. */
+  const revalidar = useCallback(() => { void mutate() }, [mutate])
+  return { config, fuente, actualizarConfig, revalidar }
 }
 
-/** «Preferencias de este dispositivo». Integración T2+T3: en su tarjeta, para que el grupo siga la retícula de las demás. */
-function GrupoDispositivo() {
-  return (
-    <Grupo titulo="Preferencias de este dispositivo" nota="Valen sólo en este navegador; no cambian nada para los demás.">
-      <TarjetaSeccion id="config-dispositivo" titulo="Tarjeta de la cita">
-        <PreferenciaTarjetaAlPasar />
-      </TarjetaSeccion>
-    </Grupo>
-  )
-}
-
-/** «Reserva por enlace»: los enlaces de cada médico, los plazos y los contactos bloqueados. */
-function GrupoReserva(p: {
+/** Lo que reparte la pantalla a los paneles de enlaces, plazos y contactos. */
+interface DatosReserva {
   lista: EstadoLista; recargar: () => Promise<void>; medicos: MedicoConfig[]; usuarioId: string; ajustes: AjustesAgenda | null
-  gestionaTodos: boolean; esMedico: boolean; puedeAdministrar: boolean; alCrearTipo: () => void; conPrimerosPasos: boolean
-}) {
-  const conEnlaces = p.gestionaTodos || p.esMedico
+  recordatorio: boolean | null; administradores: readonly string[]; gestionaTodos: boolean; puedeAdministrar: boolean
+  alCrearTipo: () => void; conPrimerosPasos: boolean
+}
+
+/** Los paneles de la reserva por enlace: enlaces de cada médico, plazos y recordatorio, contactos bloqueados. */
+function PanelesReserva({ d, activa, conEnlaces }: { d: DatosReserva; activa: ClavePestana | null; conEnlaces: boolean }) {
   return (
-    <Grupo titulo="Reserva por enlace">
+    <>
       {conEnlaces && (
-        <SeccionEnlacesReserva lista={p.lista} recargar={p.recargar} medicos={p.medicos} usuarioId={p.usuarioId}
-          gestionaTodos={p.gestionaTodos} vigenciaDias={p.ajustes?.vigencia_enlace_unico_dias ?? null}
-          puedeCrearTipos={p.puedeAdministrar} alCrearTipo={p.alCrearTipo} conPrimerosPasos={p.conPrimerosPasos} />
+        <Panel clave="enlaces" activa={activa}>
+          <SeccionEnlacesReserva lista={d.lista} recargar={d.recargar} medicos={d.medicos} usuarioId={d.usuarioId}
+            gestionaTodos={d.gestionaTodos} vigenciaDias={d.ajustes?.vigencia_enlace_unico_dias ?? null} administradores={d.administradores}
+            puedeCrearTipos={d.puedeAdministrar} alCrearTipo={d.alCrearTipo} conPrimerosPasos={d.conPrimerosPasos} />
+        </Panel>
       )}
-      <SeccionAjustesReserva inicial={p.ajustes} puedeEditar={p.puedeAdministrar} />
-      {conEnlaces && <SeccionContactosBloqueados medicos={p.medicos} gestionaTodos={p.gestionaTodos} />}
-    </Grupo>
+      <Panel clave="plazos" activa={activa}>
+        {/* La clave es lo que llegó del servidor: tras restablecer, la sección vuelve a nacer con los valores de fábrica. */}
+        <SeccionAjustesReserva key={`${JSON.stringify(d.ajustes)}|${String(d.recordatorio)}`} inicial={d.ajustes}
+          recordatorio={d.recordatorio} puedeEditar={d.puedeAdministrar} />
+      </Panel>
+      {conEnlaces && (
+        <Panel clave="bloqueados" activa={activa}>
+          <SeccionContactosBloqueados medicos={d.medicos} gestionaTodos={d.gestionaTodos} />
+        </Panel>
+      )}
+    </>
   )
 }
 
-export default function ConfiguracionCalendario({ ajustes, tipos, puedeAdministrar, usuarioId, gestionaReservasDeTodos, esMedico }: Props) {
-  const { config, fuente, actualizarConfig } = useConfigAgregada()
+/** Tras restablecer (punto 10): todo se relee y la pantalla vuelve a abrir donde toca («Primeros pasos»). */
+function useAlRestablecer(o: { revalidar: () => void; recargar: () => Promise<void>; volverAlInicio: () => void }) {
+  const router = useRouter()
+  const [, startTransition] = useTransition()
+  const { revalidar, recargar, volverAlInicio } = o
+  return useCallback(() => {
+    revalidar()
+    startTransition(() => router.refresh())
+    void recargar()
+    volverAlInicio()
+  }, [revalidar, recargar, volverAlInicio, router])
+}
+
+export default function ConfiguracionCalendario(props: Props) {
+  const { ajustes, tipos, puedeAdministrar, usuarioId, gestionaReservasDeTodos, esMedico } = props
+  const { config, fuente, actualizarConfig, revalidar } = useConfigAgregada()
   const conEnlaces = gestionaReservasDeTodos || esMedico
-  const guia = useGuiaEnlaces({ conEnlaces, esMedico, usuarioId })
-  const { lista, recargar, alCrearTipo, pendientes } = guia
-  const alCambiar = conEnlaces ? () => void recargar() : undefined
   const medicos = config?.medicos ?? []
   const consultorios = config?.consultorios ?? null
+  const guia = useGuiaEnlaces({ conEnlaces, esMedico, usuarioId, consultorios })
+  const { lista, recargar, alCrearTipo, pendientes } = guia
+  const alCambiar = conEnlaces ? () => void recargar() : undefined
   const faltan = pendientes ? pendientes.filter(p => !p.hecho).length : null
+  const pestanas = pestanasDe({ faltan, conEnlaces, puedeAdministrar })
+  const porDefecto = faltan ? 'pasos' : esMedico && lista === null ? null : pestanas[0]?.clave ?? null
+  const { activa, elegir, volverAlInicio, alPulsar } = usePestana(pestanas, porDefecto)
+  const alRestablecer = useAlRestablecer({ revalidar, recargar, volverAlInicio })
+  const reserva: DatosReserva = { lista, recargar, medicos, usuarioId, ajustes, recordatorio: props.recordatorio,
+    administradores: props.administradores, gestionaTodos: gestionaReservasDeTodos, puedeAdministrar, alCrearTipo,
+    conPrimerosPasos: pendientes !== null }
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-[var(--ag-6)] pb-[var(--ag-8)]">
       <Encabezado puedeAdministrar={puedeAdministrar} />
-      <div className="flex flex-col gap-[var(--ag-6)] lg:grid lg:grid-cols-[12.5rem_minmax(0,1fr)] lg:items-start">
-        <MenuConfiguracion entradas={entradasMenu(faltan, conEnlaces)} />
-        <div className="flex min-w-0 flex-col gap-[var(--ag-6)]">
+      <div onClick={alPulsar} className="flex flex-col gap-[var(--ag-5)] lg:grid lg:grid-cols-[15rem_minmax(0,1fr)] lg:items-start lg:gap-[var(--ag-6)]">
+        <MenuConfiguracion pestanas={pestanas} activa={activa} elegir={elegir} />
+        <div className="min-w-0">
+          {activa === null && <p className={TEXTO_SUAVE}>Cargando…</p>}
           {pendientes && (
-            <PasosConfiguracion pasos={pendientes} motivos={guia.motivos} medicoId={usuarioId} puedeEmitir={guia.puedeEmitir}
-              resumen={resumenPasos(usuarioId, consultorios, tipos)} alCambiar={alCrearTipo} />
+            <Panel clave="pasos" activa={activa}>
+              <PasosConfiguracion pasos={pendientes} motivos={guia.motivos} medicoId={usuarioId} puedeEmitir={guia.puedeEmitir}
+                resumen={resumenPasos(usuarioId, consultorios, tipos)} alCambiar={alCrearTipo} />
+            </Panel>
           )}
-          <Grupo titulo="Horario y disponibilidad">
-            <SeccionDisponibilidad
-              consultorios={consultorios}
-              fallo={fuente.estado === 'error'}
-              horarioClinica={config?.horario ?? null}
-              medicos={medicos}
-              usuarioId={usuarioId}
-              actualizarConfig={actualizarConfig}
-              alCambiar={alCambiar}
-              tipos={tipos}
-              alCambiarTipos={esMedico ? alCrearTipo : undefined}
-            />
-          </Grupo>
-          <Grupo titulo="Citas">
+          <Panel clave="horario" activa={activa}>
+            <SeccionDisponibilidad consultorios={consultorios} fallo={fuente.estado === 'error'} horarioClinica={config?.horario ?? null}
+              medicos={medicos} usuarioId={usuarioId} actualizarConfig={actualizarConfig} alCambiar={alCambiar}
+              tipos={tipos} alCambiarTipos={esMedico ? alCrearTipo : undefined} />
+          </Panel>
+          <Panel clave="tipos" activa={activa}>
             <SeccionTiposCita tipos={tipos} puedeEditar={puedeAdministrar} medicos={medicos} alCambiar={alCambiar}
               usuarioId={usuarioId} esMedico={esMedico} consultorios={consultorios}
               preguntarDuracion={!pendientes?.some(p => p.clave === 'duracion' && !p.hecho)} />
-          </Grupo>
-          <GrupoReserva lista={lista} recargar={recargar} medicos={medicos} usuarioId={usuarioId} ajustes={ajustes}
-            gestionaTodos={gestionaReservasDeTodos} esMedico={esMedico} puedeAdministrar={puedeAdministrar}
-            alCrearTipo={alCrearTipo} conPrimerosPasos={pendientes !== null} />
-          <GrupoDispositivo />
+          </Panel>
+          <PanelesReserva d={reserva} activa={activa} conEnlaces={conEnlaces} />
+          <Panel clave="dispositivo" activa={activa}>
+            <TarjetaSeccion id="config-dispositivo" titulo="Tarjeta de la cita" ayuda={DISPOSITIVO_NOTA}>
+              <PreferenciaTarjetaAlPasar />
+            </TarjetaSeccion>
+          </Panel>
+          {puedeAdministrar && (
+            <Panel clave="restablecer" activa={activa}>
+              <ZonaRestablecer alRestablecer={alRestablecer} />
+            </Panel>
+          )}
         </div>
       </div>
     </div>

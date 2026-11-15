@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
-import { CORREO, SESION, diaDeLaSemana, enContextoNuevo, interruptorAgenda, irAAgenda, soloEscritorio, sqlLocal, toastConTexto } from './ayudas'
+import { CORREO, SESION, diaDeLaSemana, enContextoNuevo, interruptorAgenda, irAAgenda, pestanaConfig, soloEscritorio, sqlLocal, toastConTexto } from './ayudas'
 import { aparcarEnlacesVigentes, devolverEnlaces, limpiarReservasE2e, marcaE2e } from './reservaAyudas'
 import { aprobarAviso, emitirEnlace, type Escenario } from './reservaPublicaAyudas'
 
@@ -113,6 +113,12 @@ test.afterEach(() => {
 
 const enlaces = (page: Page) => page.getByRole('region', { name: 'Enlaces de reserva' })
 const pasos = (page: Page) => page.getByRole('region', { name: 'Primeros pasos' })
+/** Tanda H, punto 6: los enlaces de los médicos invitados van plegados; esto los despliega. */
+async function abrirDemas(page: Page): Promise<void> {
+  await pestanaConfig(page, 'Enlaces de reserva')
+  const boton = enlaces(page).getByRole('button', { name: /Enlaces de los demás médicos/ })
+  if ((await boton.getAttribute('aria-expanded')) !== 'true') await boton.click()
+}
 
 test('G2 · 7 y 8 · «Primeros pasos» en orden con su avance; «Crear enlace» pide la duración ahí mismo y crea el enlace', async ({ page }) => {
   await page.goto(RUTA)
@@ -123,8 +129,8 @@ test('G2 · 7 y 8 · «Primeros pasos» en orden con su avance; «Crear enlace»
   await expect(items.nth(2)).toHaveAccessibleName('Enlace de reserva: pendiente')
   await expect(pasos(page).getByRole('progressbar')).toHaveAttribute('aria-valuenow', '1')
   await expect(pasos(page)).toContainText('1 de 3 listos')
-  // El menú de secciones dice cuántos faltan.
-  await expect(page.getByRole('navigation', { name: 'Secciones de la configuración' }).getByRole('link', { name: /Primeros pasos.*2 pendientes/ })).toBeVisible()
+  // La pestaña dice cuántos faltan, y la pantalla abre en ella (tanda H, punto 5).
+  await expect(page.getByRole('tab', { name: /Primeros pasos.*2 pendientes/ })).toHaveAttribute('aria-selected', 'true')
   // Ningún tipo nace con un valor fijo: no hay botón «Crear «Consulta», 30 min».
   await expect(page.getByRole('button', { name: /Consulta», 30 min/ })).toHaveCount(0)
 
@@ -144,7 +150,8 @@ test('G2 · 7 y 8 · «Primeros pasos» en orden con su avance; «Crear enlace»
                     where u.email = :'c' and e.clase = 'fijo' and e.revocado_en is null`, { c: CORREO.adminA })).toBe('1')
   /* Calculado, no guardado: al recargar sigue sin salir. */
   await page.reload()
-  await expect(page.getByRole('heading', { name: 'Enlaces de reserva' })).toBeVisible()
+  await expect(page.getByRole('tab', { name: 'Horario y disponibilidad' })).toHaveAttribute('aria-selected', 'true')
+  await expect(page.getByRole('tab', { name: /Primeros pasos/ })).toHaveCount(0)
   await expect(pasos(page)).toHaveCount(0)
 })
 
@@ -155,6 +162,7 @@ test('G2 · 9 · la médica invitada contesta SU duración (sólo suya), la camb
     await paso.getByText('1 hora', { exact: true }).click()
     await paso.getByRole('button', { name: 'Guardar', exact: true }).click()
     await expect(pasos(p).getByRole('listitem', { name: 'Duración de la consulta: hecho' })).toBeVisible()
+    await pestanaConfig(p, 'Duración y tipos de cita')
     const seccion = p.getByRole('region', { name: 'Duración y tipos de cita' })
     await expect(seccion).toContainText('Tu consulta dura 60 min')
     await expect(seccion).not.toContainText('pídele a quien administra')
@@ -178,6 +186,7 @@ test('G2 · 7 · duración distinta en un consultorio: opción discreta en su ho
             select :'cl', id, 'Consulta', 45, true from auth.users where email = :'c'`, { cl: clinicaA(), c: CORREO.medicoA })
   await enContextoNuevo(browser, SESION.medicoA, async (p) => {
     await p.goto(RUTA)
+    await pestanaConfig(p, 'Horario y disponibilidad')
     const fila = p.getByRole('region', { name: 'Disponibilidad por consultorio' }).getByRole('listitem', { name: REHAB })
     await fila.getByRole('button', { name: 'Otra duración en este consultorio' }).click()
     await fila.getByText('1 hora', { exact: true }).click()
@@ -196,6 +205,7 @@ test('8 · el enlace que no abrirá lo dice con la regla de la página pública'
   }
   const { codigo } = emitirEnlace(e, 'fijo')
   await page.goto(RUTA)
+  await abrirDemas(page)
   const fila = enlaces(page).getByRole('listitem').filter({ hasText: 'Enlace fijodesde el' })
   await expect(fila).toContainText('No abrirá: falta la duración de la consulta del médico.')
   /* G2 · la píldora de estado y «Completar», que abre lo que falta ahí mismo. */
@@ -222,21 +232,28 @@ test('8 · el enlace que no abrirá lo dice con la regla de la página pública'
   sqlLocal(`update public.consultorios set horario_propio = true,
               horario = jsonb_set(${LUNES_SOLO_MANANA}, '{lunes,activo}', 'false') where nombre = :'n'`, { n: REHAB })
   await page.reload()
+  await abrirDemas(page)
   await expect(fila).toContainText('Abrirá sin horarios: ningún consultorio del médico tiene días abiertos.')
 
   /* El aviso de privacidad sin aprobar: la página da 404 y la ficha, «No abrirá». */
   aprobarAviso(false)
   await page.reload()
+  await abrirDemas(page)
   await expect(fila).toContainText('No abrirá: la clínica no puede recibir reservas ahora')
 })
 
 test('9 · el administrador ve la ficha de cada médico, la suya primero; la invitada sólo la suya', async ({ page, browser }) => {
   await page.goto(RUTA)
+  await pestanaConfig(page, 'Enlaces de reserva')
   const titulos = enlaces(page).getByRole('heading', { level: 4 })
   await expect(titulos.first()).toHaveText('Dr. Admin Semilla Uno (tú)')
+  // Tanda H, punto 6: la de la invitada, plegada hasta pulsar.
+  await expect(titulos).toHaveCount(1)
+  await abrirDemas(page)
   await expect(titulos).toHaveCount(2)
   await enContextoNuevo(browser, SESION.medicoA, async (p) => {
     await p.goto(RUTA)
+    await pestanaConfig(p, 'Enlaces de reserva')
     await expect(p.getByRole('heading', { name: 'Enlaces de reserva' })).toBeVisible()
     await expect(enlaces(p).getByRole('heading', { level: 4 })).toHaveCount(0)
     await expect(enlaces(p).getByRole('button', { name: 'Crear enlace fijo' })).toHaveCount(1)

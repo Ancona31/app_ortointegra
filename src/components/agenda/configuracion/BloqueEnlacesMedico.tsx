@@ -80,7 +80,7 @@ function SinFijo(p: { verFalta: boolean; onVerFalta?: () => void; puedeEmitir: b
   return (
     <li className="flex flex-wrap items-center justify-between gap-[var(--ag-3)] py-[var(--ag-2)]">
       <span className={TEXTO_SUAVE}>Aún no hay enlace fijo: se comparte una vez y sirve siempre.</span>
-      {p.verFalta && <button type="button" className={`${BOTON_FILA} underline underline-offset-2`} onClick={p.onVerFalta}>Ver qué falta</button>}
+      {p.verFalta && <button type="button" className={BOTON_FILA} onClick={p.onVerFalta}>Ver qué falta</button>}
       {p.puedeEmitir && <button type="button" className={BOTON_PRIMARIO} disabled={p.ocupado} onClick={p.onCrearFijo}>Crear enlace fijo</button>}
     </li>
   )

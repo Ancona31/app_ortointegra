@@ -59,7 +59,7 @@ export default function DuracionEnConsultorio(p: Props) {
   }
   if (!aqui) {
     return (
-      <button type="button" className={`${BOTON_FILA} w-fit px-0 text-[var(--ag-muted)] underline underline-offset-2`} onClick={() => setAbierto(true)}>
+      <button type="button" className={`${BOTON_FILA} w-fit`} onClick={() => setAbierto(true)}>
         Otra duración en este consultorio
       </button>
     )

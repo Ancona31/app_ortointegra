@@ -42,4 +42,19 @@ describe('pasosDe', () => {
     expect(pasosDe(lista({ yo: [] }), 'yo')?.map(p => `${p.clave}:${p.titulo}`)).toEqual([
       'horario:Horario de cada consultorio', 'duracion:Duración de la consulta', 'enlace:Enlace de reserva'])
   })
+
+  it('H2 (punto 10) · un consultorio activo «como nace» (sin horario propio y todo cerrado) deja pendiente el horario', () => {
+    const cerrado = { activo: false, inicio: '09:00', fin: '14:00' }
+    const todoCerrado = { lunes: cerrado, martes: cerrado, miercoles: cerrado, jueves: cerrado, viernes: cerrado, sabado: cerrado, domingo: cerrado }
+    const abierto = { ...todoCerrado, lunes: { activo: true, inicio: '08:00', fin: '14:00' } }
+    const virgen = { medico_id: 'yo', activo: true, horario_propio: false, horario: todoCerrado }
+    const l = lista({ yo: [] }, [FIJO])
+    expect(pasosDe(l, 'yo', [virgen])?.map(p => p.hecho)).toEqual([false, true, true])
+    // Con horario propio, o creado con días abiertos, o archivado, o de otro médico: hecho, como antes.
+    expect(pasosDe(l, 'yo', [{ ...virgen, horario_propio: true }])?.[0]?.hecho).toBe(true)
+    expect(pasosDe(l, 'yo', [{ ...virgen, horario: abierto }])?.[0]?.hecho).toBe(true)
+    expect(pasosDe(l, 'yo', [{ ...virgen, activo: false }])?.[0]?.hecho).toBe(true)
+    expect(pasosDe(l, 'yo', [{ ...virgen, medico_id: 'otro' }])?.[0]?.hecho).toBe(true)
+    expect(pasosDe(l, 'yo', null)?.[0]?.hecho).toBe(true)
+  })
 })

@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
-import { CORREO, SESION, interruptorAgenda, soloEscritorio, sqlLocal, enContextoNuevo } from './ayudas'
+import { CORREO, SESION, interruptorAgenda, pestanaConfig, soloEscritorio, sqlLocal, enContextoNuevo } from './ayudas'
 import { bloquearContactoE2e, crearCitaPorLigar, aparcarEnlacesVigentes, devolverEnlaces, limpiarReservasE2e, marcaE2e } from './reservaAyudas'
 
 /**
@@ -40,9 +40,11 @@ function enlacesDe(medicoId: string): string[] {
                      from public.reserva_enlaces where medico_id = :'m' and created_at >= :'d'::timestamptz order by created_at`,
   { m: medicoId, d: desde }).split('\n').filter(Boolean)
 }
-async function abrir(page: Page): Promise<void> {
+/** Tanda H, punto 5: la sección va en su pestaña. */
+async function abrir(page: Page, pestana = 'Enlaces de reserva'): Promise<void> {
   await page.goto(RUTA)
-  await expect(page.getByRole('heading', { name: 'Enlaces de reserva' })).toBeVisible()
+  await pestanaConfig(page, pestana)
+  await expect(page.getByRole('heading', { name: pestana })).toBeVisible()
 }
 
 test.afterEach(() => {
@@ -65,13 +67,13 @@ test('con el interruptor apagado, las rutas de gestión dan 404', async ({ page 
 test('el administrador crea, muestra, regenera y revoca el enlace fijo de un médico', async ({ page }) => {
   interruptorAgenda('A', true)
   await abrir(page)
-  /* El administrador ve un bloque por médico (él y el invitado); se usa el primero. */
+  /* El administrador ve primero su bloque (el de la invitada va plegado, tanda H punto 6); se usa el suyo. */
   await page.getByRole('button', { name: 'Crear enlace fijo' }).first().click()
   const direccion = page.getByRole('textbox', { name: 'Dirección de Enlace fijo' })
   await expect(direccion).toHaveValue(/\/reservar\/[A-Za-z0-9_-]{22}$/)
   const primera = await direccion.inputValue()
 
-  await page.reload()
+  await abrir(page)
   await page.getByRole('button', { name: 'Mostrar Enlace fijo' }).first().click()
   await expect(page.getByRole('textbox', { name: 'Dirección de Enlace fijo' }).first()).toHaveValue(primera)
 
@@ -117,8 +119,7 @@ test('el médico invitado sólo gestiona sus enlaces', async ({ browser }) => {
     expect(ajeno.status()).toBe(403)
     const lista = await (await page.request.get('/api/agenda/enlaces')).json() as { enlaces: { medico_id: string }[] }
     expect(lista.enlaces.every(e => e.medico_id === idDe(CORREO.medicoA))).toBe(true)
-    await page.goto(RUTA)
-    await expect(page.getByRole('heading', { name: 'Enlaces de reserva' })).toBeVisible()
+    await abrir(page)
     /* Acotado a la sección: «un solo uso» también sale en la de ajustes
        («Vigencia del enlace de un solo uso»). */
     await expect(page.getByRole('region', { name: 'Enlaces de reserva' }).getByText('Un solo uso', { exact: true })).toBeVisible()
@@ -131,7 +132,7 @@ test('un contacto bloqueado sale en la lista y se desbloquea a mano', async ({ p
   inicio.setUTCHours(16, 0, 0, 0)
   const c = crearCitaPorLigar({ correo: CORREO.medicoA, inicio: inicio.toISOString(), minutos: 30, nombre: 'Persona Bloqueada E2E', canal: 'fijo' })
   bloquearContactoE2e(c)
-  await abrir(page)
+  await abrir(page, 'Contactos bloqueados')
   const fila = page.locator('li', { hasText: 'Persona Bloqueada E2E' })
   await expect(fila).toContainText('Bloqueado a mano')
   await fila.getByRole('button', { name: /Desbloquear/ }).click()
