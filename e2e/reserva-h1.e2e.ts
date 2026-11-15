@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test'
 import { interruptorAgenda, sqlLocal } from './ayudas'
 import { esperarCorreo } from './mailpit'
 import { marcaE2e, limpiarReservasE2e } from './reservaAyudas'
-import { emitirEnlace, ipAlAzar, personaNueva, prepararEscenario, reservar, turnosLibres, type Escenario } from './reservaPublicaAyudas'
+import { api, emitirEnlace, ipAlAzar, personaNueva, prepararEscenario, reservar, turnosLibres, type Escenario } from './reservaPublicaAyudas'
 
 /**
  * Tanda H1 (2026-11-15): cuatro puntos de Angel sobre /reservar, /confirmar y
@@ -18,6 +18,10 @@ import { emitirEnlace, ipAlAzar, personaNueva, prepararEscenario, reservar, turn
  *     paso después del primero, también en el del código, y al regresar se
  *     conserva todo: consultorio, tipo, día, hora, datos y correo. Si el
  *     horario ya no está, se avisa sin perder los datos.
+ *   · Punto 4 · no cambia nada: el correo sigue siendo obligatorio en el
+ *     enlace fijo, y verificado con código. Ojo: HOY el enlace de un solo uso
+ *     también pide un correo con forma (sin código); la prueba fija eso tal
+ *     cual, no lo que Angel suponía («sin correo»).
  *
  * Las pruebas de los correos (sin oscuro, `color-scheme: light`) son de Vitest
  * (`plantillaCita.test.ts`). La seguridad, los límites, los turnos y la RPC no
@@ -263,4 +267,41 @@ test('punto 1: si al volver desde «Tus datos» el horario ya no está, se avisa
   await page.getByRole('button', { name: 'Continuar' }).click()
   await expect(page.getByLabel('Nombre completo')).toHaveValue(p.nombre)
   await expect(page.getByLabel('Correo electrónico')).toHaveValue(p.correo)
+})
+
+/* ── Punto 4 · el correo sigue siendo obligatorio (no cambia nada; esto lo fija) ─ */
+
+test('punto 4: el enlace fijo exige un correo VERIFICADO; el de un solo uso pide correo pero no código', async ({ page }) => {
+  const sinCorreo = { ...personaNueva(), correo: '' }
+  const fijo = emitirEnlace(e, 'fijo').codigo
+  const unico = emitirEnlace(e, 'unico').codigo
+  const [a, b] = await turnosLibres(e, unico, 28)
+  // Fijo: sin correo no hay código ni reserva; con correo pero sin la ficha del código, 403.
+  const ctx = await api()
+  try {
+    expect((await ctx.post(`/api/reservar/${fijo}/codigo`, { data: {} })).status()).toBe(400)
+  } finally {
+    await ctx.dispose()
+  }
+  expect(await reservar(e, fijo, { inicio: a?.inicio ?? '', persona: sinCorreo })).toMatchObject({ status: 400 })
+  expect(await reservar(e, fijo, { inicio: a?.inicio ?? '', persona: personaNueva() }))
+    .toMatchObject({ status: 403, cuerpo: { error: 'correo_sin_verificar' } })
+  // Único: HOY también pide un correo con forma (400 sin él), aunque no lo verifica con código. Lo
+  // exigen el esquema (ReservarSchema, correo ≥ 3) Y la base (reservar_por_enlace: p_correo con «@»),
+  // así que atenderlo «sin correo» pediría cambiar las dos cosas, migración incluida.
+  expect(await reservar(e, unico, { inicio: b?.inicio ?? '', persona: sinCorreo })).toMatchObject({ status: 400 })
+  expect((await reservar(e, unico, { inicio: b?.inicio ?? '', persona: personaNueva() })).status).toBe(201)
+
+  // En la página: el campo es obligatorio en los dos; el fijo manda código, el único reserva directo.
+  for (const [codigo, boton] of [[fijo, 'Enviar código a mi correo'], [emitirEnlace(e, 'unico').codigo, 'Reservar cita']] as const) {
+    await page.goto(`/reservar/${codigo}`)
+    await page.locator(`input[name="consultorio"][value="${e.consultorioId}"]`).check()
+    const tipo = page.locator(`input[name="tipo"][value="${e.tipoId}"]`)
+    if (await tipo.count()) await tipo.check()
+    await page.getByRole('button', { name: 'Elegir día y hora' }).click()
+    await page.locator('button[data-inicio]').first().click()
+    await page.getByRole('button', { name: 'Continuar' }).click()
+    await expect(page.getByLabel('Correo electrónico')).toHaveAttribute('required', '')
+    await expect(page.getByRole('button', { name: boton })).toBeVisible()
+  }
 })
