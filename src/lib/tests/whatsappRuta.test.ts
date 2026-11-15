@@ -10,6 +10,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { NextRequest, NextResponse } from 'next/server'
+import { desplazarFecha, fechaHoraLocalAInstante, hoyEnTZ } from '@/lib/dates'
 
 type Llamada = { op: string; args: unknown[] }
 const h = vi.hoisted(() => ({
@@ -177,12 +178,34 @@ describe('GET /api/agenda/por-confirmar', () => {
     const { citas } = await res.json()
     // `manana` es de mañana salvo justo alrededor de medianoche: se comprueba la forma, no el conteo exacto.
     for (const c of citas) {
-      expect(Object.keys(c).sort()).toEqual(['id', 'inicio', 'tiene_telefono', 'titulo', 'whatsapp_reminder_sent_at', 'zona'])
+      expect(Object.keys(c).sort()).toEqual(['con_correo', 'con_whatsapp', 'consultorio', 'id', 'inicio', 'titulo', 'whatsapp_reminder_sent_at', 'zona'])
       expect(JSON.stringify(c)).not.toContain('5512345678')
     }
     expect(citas.find((c: { id: string }) => c.id === 'x3')).toBeUndefined()
     const eqs = h.llamadas.filter((l) => l.op === 'eq').map((l) => l.args)
     expect(eqs.slice(0, 3)).toEqual([['clinica_id', 'clinica-1'], ['status', 'scheduled'], ['all_day', false]])
+  })
+
+  /* H4 (punto 17) · Los medios de cada fila son las reglas de los botones, en
+     booleanos; ni el teléfono ni el correo viajan. MUTACIÓN: `con_correo`
+     desde `motivoSinWhatsApp` (o `true` fijo) → la fila sin correo dice que sí. */
+  it('H4: con_whatsapp / con_correo por las reglas de los botones, sin teléfono ni correo en la respuesta', async () => {
+    const tz = 'America/Mexico_City'
+    const manana = fechaHoraLocalAInstante(desplazarFecha(hoyEnTZ(tz), { dias: 1 }), '12:00', tz)
+    const c = (id: string, tel: string | null, correo: string | null, reservaCorreo: string | null = null) => cita({
+      id, start_time: manana, pacientes: { telefono: tel }, correo: { email: correo }, reserva_correo: reservaCorreo,
+    })
+    h.filas = [c('ambos', '5512345678', 'a@b.mx'), c('tel', '5512345678', null), c('correo', null, 'a@b.mx'),
+      c('ninguno', null, null), c('invalido', '123', null), c('reserva', null, null, 'r@b.mx')]
+    const { citas } = await (await GET()).json()
+    const medios = Object.fromEntries(citas.map((f: { id: string; con_whatsapp: boolean; con_correo: boolean; consultorio: string }) =>
+      [f.id, `${f.con_whatsapp}|${f.con_correo}|${f.consultorio}`]))
+    expect(medios).toEqual({
+      ambos: 'true|true|Consultorio Uno', tel: 'true|false|Consultorio Uno', correo: 'false|true|Consultorio Uno',
+      ninguno: 'false|false|Consultorio Uno', invalido: 'false|false|Consultorio Uno', reserva: 'false|true|Consultorio Uno',
+    })
+    const texto = JSON.stringify(citas)
+    for (const dato of ['5512345678', 'a@b.mx', 'r@b.mx']) expect(texto).not.toContain(dato)
   })
 
   it('con la entrada cerrada responde lo de la entrada', async () => {

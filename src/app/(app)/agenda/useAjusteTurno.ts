@@ -32,18 +32,26 @@
  * otra vez. Con `useSWR` (la primera versión) el render de su llegada movía
  * las tarjetas a media medición (e2e `husos-dos-consultorios`, 43 px), y el
  * ajuste sólo se lee en el momento del gesto.
+ *
+ * H4 (punto 20) · La MISMA rejilla parte los huecos del panel de Día en turnos
+ * (`turnosDelHueco`, con el consultorio de un clic). El panel no lee la
+ * referencia al pintar: recibe la MISMA promesa (`tiposPanel`) y guarda la
+ * lista en SU estado, así que su llegada vuelve a pintar el panel, no la agenda.
  */
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 import type { Horario } from '@/lib/configApp'
+import { renderEnTZ } from '@/lib/dates'
 import { horarioEfectivo } from '@/lib/agenda/disponibilidad'
 import type { ConsultorioRejilla } from '@/lib/agenda/horarioRejilla'
-import { ajustarATurno } from '@/lib/agenda/turnosAgenda'
+import { ajustarATurno, turnosEnTramo, type Turno } from '@/lib/agenda/turnosAgenda'
 import type { TipoCita } from '@/lib/agenda/tiposCita'
 import { duracionDeConsulta } from '@/lib/agenda/tiposPorConsultorio'
 
 /** Dónde cae el gesto: el médico y el consultorio de la cita que se arrastra. */
 export type DondeTurno = { medicoId: string | null; consultorioId: string | null }
 export type AjustarTurno = (instante: Date, donde?: DondeTurno) => Date | null
+/** H4 · Los turnos de la rejilla que caben enteros en un hueco, o `null` = sin rejilla clara (el hueco, como hoy). */
+export type TurnosDelHueco = (desde: Date, hasta: Date, tipos: readonly TipoCita[]) => Turno[] | null
 
 interface Entrada {
   agendaV2: boolean
@@ -63,7 +71,18 @@ function consultorioDelGesto(e: Pick<Entrada, 'consultorios' | 'seleccion' | 'me
   return e.medicoMostrado && e.seleccion.length === 1 ? e.seleccion[0] : null
 }
 
-export function useAjusteTurno(e: Entrada): AjustarTurno {
+/** La rejilla del gesto: zona, horario y duración de la consulta del médico en ese consultorio; `null` si no está clara. */
+function rejillaDelGesto(e: Omit<Entrada, 'agendaV2' | 'tipos'>, lista: readonly TipoCita[], donde: DondeTurno | undefined) {
+  const c = consultorioDelGesto(e, donde)
+  /* Sin zona no hay rejilla clara (la columna es NOT NULL; un resto sin ella no se ajusta). */
+  if (!c || c.activo === false || !c.timezone) return null
+  const duracion = duracionDeConsulta(lista.filter(t => t.activo && (t.medico_id === null || t.medico_id === c.medico_id)), c.id)
+  return duracion ? { tz: c.timezone, horario: horarioEfectivo(c, e.horarioClinica ?? null), duracionMin: duracion } : null
+}
+
+export function useAjusteTurno(e: Entrada): {
+  ajustar: AjustarTurno; turnosDelHueco: TurnosDelHueco; tiposPanel: Promise<TipoCita[] | null> | undefined
+} {
   const { agendaV2, consultorios, seleccion, horarioClinica, medicoMostrado, tipos } = e
   const tiposRef = useRef<TipoCita[] | null>(null)
   useEffect(() => {
@@ -72,14 +91,23 @@ export function useAjusteTurno(e: Entrada): AjustarTurno {
     tipos.then(t => { if (vivo && t) tiposRef.current = t }, () => { /* sin ajuste */ })
     return () => { vivo = false }
   }, [agendaV2, tipos])
-  return useCallback<AjustarTurno>((instante, donde) => {
+  /* H4 · Para el panel: la misma promesa, sin rechazo (un fallo = sin turnos).
+     `Promise.resolve` y no `tipos.catch`: la de Flight (servidor → cliente) es
+     un «thenable» cuyo `then` NO devuelve otra promesa, así que encadenar
+     sobre ella da `undefined`; `Promise.resolve` la adopta en una de verdad. */
+  const tiposPanel = useMemo(() => (agendaV2 && tipos ? Promise.resolve(tipos).catch(() => null) : undefined), [agendaV2, tipos])
+  const ajustar = useCallback<AjustarTurno>((instante, donde) => {
     const lista = tiposRef.current
     if (!agendaV2 || !lista) return null
-    const c = consultorioDelGesto({ consultorios, seleccion, medicoMostrado }, donde)
-    /* Sin zona no hay rejilla clara (la columna es NOT NULL; un resto sin ella no se ajusta). */
-    if (!c || c.activo === false || !c.timezone) return null
-    const duracion = duracionDeConsulta(lista.filter(t => t.activo && (t.medico_id === null || t.medico_id === c.medico_id)), c.id)
-    if (!duracion) return null
-    return ajustarATurno({ instante, tz: c.timezone, horario: horarioEfectivo(c, horarioClinica ?? null), duracionMin: duracion })
+    const r = rejillaDelGesto({ consultorios, seleccion, horarioClinica, medicoMostrado }, lista, donde)
+    return r ? ajustarATurno({ instante, ...r }) : null
   }, [agendaV2, consultorios, seleccion, horarioClinica, medicoMostrado])
+  const turnosDelHueco = useCallback<TurnosDelHueco>((desde, hasta, lista) => {
+    if (!agendaV2) return null
+    const r = rejillaDelGesto({ consultorios, seleccion, horarioClinica, medicoMostrado }, lista, undefined)
+    if (!r) return null
+    const fecha = renderEnTZ(desde.toISOString(), 'yyyy-MM-dd', r.tz)
+    return turnosEnTramo({ fecha, ...r }, desde.getTime(), hasta.getTime())
+  }, [agendaV2, consultorios, seleccion, horarioClinica, medicoMostrado])
+  return { ajustar, turnosDelHueco, tiposPanel }
 }

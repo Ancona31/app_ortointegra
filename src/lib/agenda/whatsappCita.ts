@@ -21,6 +21,8 @@
  * ⚠️ El teléfono y el texto viajan a Meta en la URL que abre el navegador del
  * personal (plan_E lista B 1); §2 lo aprueba como envío manual.
  */
+import { formatInTimeZone } from 'date-fns-tz'
+import { desplazarFecha } from '@/lib/dates'
 import { normalizarTelefonoMx } from '@/lib/reserva/contacto'
 
 /** `521` + los 10 dígitos de un número de México, o null si no se puede normalizar. */
@@ -155,12 +157,43 @@ export function enlaceWaMe(telefono: string | null | undefined, texto: string): 
   return numero ? `https://wa.me/${numero}?text=${encodeURIComponent(texto)}` : null
 }
 
-/** Una fila de «citas de mañana por confirmar» (`GET /api/agenda/por-confirmar`). Sin teléfono. */
+/** Zona por omisión de una cita sin `consultorio_timezone` (la de la clínica). */
+export const ZONA_CITA_POR_OMISION = 'America/Mexico_City'
+
+/**
+ * ¿La cita es de MAÑANA en la zona de su consultorio? (plan_E lista A 13:
+ * «mañana» se calcula en la zona del consultorio, no en la del navegador ni
+ * en la del servidor). `ahora` en ms. H4: vive aquí (puro) y no en
+ * `whatsappServidor.ts` porque la lista «Por confirmar» la vuelve a aplicar en
+ * el navegador a lo que llega por tiempo real (`efectoEnPorConfirmar`).
+ */
+export function esDeManana(inicio: string, zona: string | null | undefined, ahora: number): boolean {
+  const tz = zona || ZONA_CITA_POR_OMISION
+  try {
+    const manana = desplazarFecha(formatInTimeZone(new Date(ahora), tz, 'yyyy-MM-dd'), { dias: 1 })
+    return formatInTimeZone(new Date(inicio), tz, 'yyyy-MM-dd') === manana
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Una fila de «citas de mañana por confirmar» (`GET /api/agenda/por-confirmar`).
+ * H4 (punto 17): sólo nombre, hora, consultorio y QUÉ medios hay, como
+ * booleanos de las MISMAS reglas que pintan los botones y deciden las rutas
+ * (`motivoSinWhatsApp`, `motivoSinCorreo`). Ni el teléfono ni el correo viajan:
+ * los botones los piden al pulsar (`/api/agenda/whatsapp`, `/api/agenda/correo`).
+ */
 export interface FilaPorConfirmar {
   id: string
   inicio: string
   zona: string
   titulo: string
-  tiene_telefono: boolean
+  /** Nombre del consultorio de la cita, o ''. */
+  consultorio: string
+  /** Se le puede mandar el WhatsApp (teléfono de México válido). */
+  con_whatsapp: boolean
+  /** Se le puede mandar el correo de confirmación (tiene correo). */
+  con_correo: boolean
   whatsapp_reminder_sent_at: string | null
 }

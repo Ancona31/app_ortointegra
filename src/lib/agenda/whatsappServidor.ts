@@ -9,8 +9,6 @@
  * por `entradaGestion()` (interruptor encendido): nombra columnas `reserva_*`.
  */
 import { z } from 'zod'
-import { formatInTimeZone } from 'date-fns-tz'
-import { desplazarFecha } from '@/lib/dates'
 import type { ClienteSesion } from '@/lib/reserva/gestionServidor'
 import { motivoCitaSinWhatsApp, telefonoParaWhatsApp } from '@/lib/agenda/whatsappCita'
 
@@ -72,20 +70,7 @@ export function citaAdmiteWhatsApp(c: CitaWhatsApp, ahora: number): boolean {
   return motivoCitaSinWhatsApp(c, ahora) === null
 }
 
-/** Zona por omisión de una cita sin `consultorio_timezone` (la de la clínica). */
-export const ZONA_CITA_POR_OMISION = 'America/Mexico_City'
-
-/**
- * ¿La cita es de MAÑANA en la zona de su consultorio? (plan_E lista A 13:
- * «mañana» se calcula en la zona del consultorio, no en la del navegador ni
- * en la del servidor). `ahora` en ms.
- */
-export function esDeManana(inicio: string, zona: string | null, ahora: number): boolean {
-  const tz = zona || ZONA_CITA_POR_OMISION
-  try {
-    const manana = desplazarFecha(formatInTimeZone(new Date(ahora), tz, 'yyyy-MM-dd'), { dias: 1 })
-    return formatInTimeZone(new Date(inicio), tz, 'yyyy-MM-dd') === manana
-  } catch {
-    return false
-  }
-}
+/* H4: `esDeManana` y `ZONA_CITA_POR_OMISION` pasaron a `whatsappCita.ts`
+   (puro: la lista los vuelve a aplicar en el navegador). Se reexportan para
+   que nada de lo que ya los importaba de aquí cambie. */
+export { esDeManana, ZONA_CITA_POR_OMISION } from '@/lib/agenda/whatsappCita'

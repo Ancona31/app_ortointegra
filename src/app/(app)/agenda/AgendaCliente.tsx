@@ -23,6 +23,7 @@ import { BarraAgendarMovil } from '@/components/agenda/BarraAgendarMovil'
 import { LeyendaEstados } from '@/components/agenda/LeyendaEstados'
 import { AvisosAgenda } from '@/components/agenda/AvisosAgenda'
 import { PanelPorConfirmar } from '@/components/agenda/PanelPorConfirmar'
+import type { CambioCita } from '@/lib/agenda/porConfirmarTiempoReal'
 import { esRespuestaReciente, leerRespuesta, textoAvisoCancelacion } from '@/lib/agenda/avisoCancelacion'
 import {
   VISTAS_FC, VISTAS_FC_MOVIL, VISTAS_FC_TABLETA, TOOLBAR_ESCRITORIO, PLUGINS_FC, TEXTO_BOTONES_FC, FORMATO_HORA_FC,
@@ -598,7 +599,8 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
      rejilla del médico en ese consultorio. Lee los MISMOS consultorios que la
      rejilla de G4 (`consultoriosV2`, `seleccion`): en un clic, el único de la
      selección con un médico a la vista. Apagada la v2, no hace nada. */
-  const ajustarTurno = useAjusteTurno({
+  /* H4 (punto 20): la misma rejilla parte los huecos del panel de Día en turnos. */
+  const { ajustar: ajustarTurno, turnosDelHueco, tiposPanel } = useAjusteTurno({
     agendaV2, consultorios: consultoriosV2, seleccion, horarioClinica: horarioClinicaConfig, medicoMostrado, tipos: tiposAjuste,
   })
 
@@ -904,8 +906,13 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
       .catch(() => undefined)
   } : undefined
 
+  /* H4 (punto 18) · La lista «Por confirmar» escucha el MISMO canal: el panel
+     deja aquí su oyente y el gancho le pasa cada cambio. Un `ref`, no estado:
+     un cambio del canal no vuelve a pintar la agenda. Apagada, ni se pasa. */
+  const cambiosPorConfirmarRef = useRef<((c: CambioCita) => void) | null>(null)
   const { firmarEscritura, aplicarAppointmentAlEvento } = useTiempoRealAgenda({
     calendarRef, filtroEfectivo, refetch, ultimaTraidaRef, onCanceladaAjena: avisarCancelacionPaciente,
+    onCambioCita: agendaV2 ? (c: CambioCita): void => { cambiosPorConfirmarRef.current?.(c) } : undefined,
   })
 
   /* A2.5.7: no es un hook — ver la nota de cabecera de `guardadoCitas.ts`—, así
@@ -1605,7 +1612,9 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
             onIntencionAgendar={precargarModalesAgenda}
             /* E7: la lista de mañana por confirmar (WhatsApp manual). Sólo con
                la v2 encendida: apagada no se monta y no sale ninguna petición. */
-            porConfirmar={agendaV2 ? <PanelPorConfirmar recarga={recargaPanel} /> : undefined}
+            porConfirmar={agendaV2
+              ? <PanelPorConfirmar recarga={recargaPanel} confirmar={guardado.cambiarEstadoCita} cambiosRef={cambiosPorConfirmarRef} />
+              : undefined}
             /* F3 · Las herramientas v2 en sus ranuras; apagado, ni se descargan. */
             selectorFecha={agendaV2 && montarV2 ? <SelectorFechaV2 rango={rangoVisible} alIrAFecha={irAFecha} /> : undefined}
             buscar={agendaV2 && montarV2 ? <BuscarV2 apiRef={interaccionesRef} atajos={atajos} /> : undefined}
@@ -1949,6 +1958,8 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
           resumen={resumenDia}
           unMedico={unMedico}
           onHueco={abrirHueco}
+          /* H4 (punto 20) · Con la v2 y una rejilla clara, cada hueco en turnos. */
+          turnos={agendaV2 ? { delHueco: turnosDelHueco, tipos: tiposPanel } : undefined}
           miniMes={agendaV2 && montarV2 ? <MiniMesPanelV2 rango={rangoVisible} alIrAFecha={irAFecha} /> : undefined}
           /* La MISMA bandera que levanta la banda roja de arriba. Sin esto el
              panel afirmaba horas y ofrecía huecos sobre un día recortado. */

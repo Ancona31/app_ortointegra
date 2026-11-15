@@ -741,11 +741,13 @@ export function crearGuardadoCitas({
      caché de rangos vaciada antes y después.
      ⚠️ NUNCA BORRA (B3): cancelar es un PUT y la tarjeta se queda, en
      cancelada y de golpe (spec §8: el cambio de estado no se anima); no pasa
-     por `salirConAnimacion`. Un estado fuera de los cinco no sale a la red. */
-  async function cambiarEstadoCita(id: string, estado: Status): Promise<void> {
+     por `salirConAnimacion`. Un estado fuera de los cinco no sale a la red.
+     H4 · Devuelve si el servidor lo aceptó: la lista «Por confirmar» quita la
+     fila al instante y la devuelve si no (los demás llamadores lo ignoran). */
+  async function cambiarEstadoCita(id: string, estado: Status): Promise<boolean> {
     if (!ESTADOS_CITA.includes(estado)) {
       toast.error('Estado de cita no válido')
-      return
+      return false
     }
     const textos = estado === 'cancelled'
       ? { hecho: 'Se canceló la cita', fallo: 'No se pudo cancelar' }
@@ -767,10 +769,11 @@ export function crearGuardadoCitas({
       refetch()
       const cuerpo: { error?: string; message?: string } | null = await res.json().catch(() => null)
       toast.error(cuerpo?.message || cuerpo?.error || textos.fallo)
-      return
+      return false
     }
     const json: { appointment?: Partial<Appointment> & { id?: string } } | null = await res.json().catch(() => null)
     if (json?.appointment) aplicarAppointmentAlEvento(json.appointment)
+    return true
   }
 
   return { handleEventDrop, handleEventResize, handleSave, handleDelete, handleCancelar, cambiarEstadoCita }
