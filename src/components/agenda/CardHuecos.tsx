@@ -4,7 +4,7 @@ import { useEffect, useState, type ReactElement } from 'react'
 import { Calendar } from 'lucide-react'
 import {
   type Tramo, HUECO_MINIMO, etiquetaDeRango, etiquetaDeDuracion, medianocheDe, relojDeMinutos,
-  type ResumenDia,
+  type ResumenDia, huecosDelPanel,
 } from '@/lib/agenda/huecosAgenda'
 import type { Turno } from '@/lib/agenda/turnosAgenda'
 import type { TipoCita } from '@/lib/agenda/tiposCita'
@@ -23,6 +23,8 @@ import type { TipoCita } from '@/lib/agenda/tiposCita'
  */
 export interface TurnosHuecos {
   delHueco: (desde: Date, hasta: Date, tipos: readonly TipoCita[]) => Turno[] | null
+  /** La duración de la consulta de esa rejilla: con ella, el hueco mínimo es esa duración y no `HUECO_MINIMO`. */
+  duracion: (tipos: readonly TipoCita[]) => number | null
   tipos: Promise<TipoCita[] | null> | undefined
 }
 
@@ -43,7 +45,7 @@ function useTiposDelPanel(tipos: Promise<TipoCita[] | null> | undefined): TipoCi
 }
 
 /** Un hueco partido en turnos: el tramo de cabecera y un botón por turno, que abre el alta a esa hora exacta. */
-function HuecoEnTurnos({ h, turnos, base, onHueco }: { h: Tramo; turnos: Turno[]; base: number; onHueco: (t: Tramo) => void }): ReactElement {
+function HuecoEnTurnos({ h, turnos, base, onHueco }: { h: Tramo; turnos: Turno[]; base: number; onHueco: (t: Tramo, esTurno?: boolean) => void }): ReactElement {
   return (
     <div className="ag-hueco-grupo" role="group" aria-label={`Hueco ${etiquetaDeRango(h)}`} data-hueco-turnos>
       <p className="ag-hueco-cab">
@@ -57,7 +59,7 @@ function HuecoEnTurnos({ h, turnos, base, onHueco }: { h: Tramo; turnos: Turno[]
             const hora = relojDeMinutos(tramo.desde)
             return (
               <button key={t.inicio} type="button" className="ag-turno" data-turno={hora}
-                aria-label={`Agendar a las ${hora} (${etiquetaDeDuracion(tramo.hasta - tramo.desde)})`} onClick={() => onHueco(tramo)}>
+                aria-label={`Agendar a las ${hora} (${etiquetaDeDuracion(tramo.hasta - tramo.desde)})`} onClick={() => onHueco(tramo, true)}>
                 {hora}
               </button>
             )
@@ -94,7 +96,7 @@ function HuecoEnTurnos({ h, turnos, base, onHueco }: { h: Tramo; turnos: Turno[]
 export function CardHuecos(
   { resumen, onHueco, incompleto, turnos }: {
     resumen: ResumenDia | null
-    onHueco: (t: Tramo) => void
+    onHueco: (t: Tramo, esTurno?: boolean) => void
     /** La traída vino recortada: no hay huecos que ofrecer, sólo el motivo. */
     incompleto: boolean
     /** H4 (punto 20): sólo con la v2. Sin él, o sin rejilla clara, el hueco de siempre. */
@@ -103,7 +105,11 @@ export function CardHuecos(
 ): ReactElement {
   const tipos = useTiposDelPanel(turnos?.tipos)
   const jornada = resumen?.jornada ?? null
-  const huecos = incompleto ? [] : (resumen?.huecos ?? [])
+  /* H4 · Con la duración de la consulta conocida, un tramo libre de esa
+     duración ya es hueco (uno de 45 min con consulta de 45 ofrece su turno). */
+  const duracion = turnos && tipos ? turnos.duracion(tipos) : null
+  const minimo = duracion ?? HUECO_MINIMO
+  const huecos = incompleto || !resumen ? [] : huecosDelPanel(resumen, duracion)
   const base = resumen ? medianocheDe(resumen.dia).getTime() : 0
   const enTurnos = (h: Tramo): Turno[] | null => (turnos && tipos
     ? turnos.delHueco(new Date(base + h.desde * 60_000), new Date(base + h.hasta * 60_000), tipos)
@@ -129,7 +135,7 @@ export function CardHuecos(
           {incompleto
             ? 'Faltan citas por cargar · No se pueden calcular los huecos de este día'
             : jornada
-              ? `Día completo · No queda ningún tramo de ${HUECO_MINIMO} min libre entre ${etiquetaDeRango(jornada)}`
+              ? `Día completo · No queda ningún tramo de ${etiquetaDeDuracion(minimo)} libre entre ${etiquetaDeRango(jornada)}`
               : 'Consultorio cerrado · No hay horario de consulta este día'}
         </p>
       )}

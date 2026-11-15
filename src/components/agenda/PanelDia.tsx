@@ -49,7 +49,7 @@ export function PanelDia(
     eventos: number
     resumen: ResumenDia | null
     unMedico: boolean
-    onHueco: (t: Tramo) => void
+    onHueco: (t: Tramo, esTurno?: boolean) => void
     /** `citasIncompletas` de la página. Ver las cabeceras de las dos tarjetas. */
     incompleto: boolean
     /** F3: el minicalendario de mes, sólo con la agenda v2. */

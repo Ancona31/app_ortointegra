@@ -198,16 +198,29 @@ export type ResumenDia = {
   ocupadas: number
   libres: number
   huecos: readonly Tramo[]
+  /** H4 · Todos los tramos libres de la jornada, de cualquier largo. Con la
+      duración de la consulta conocida, el panel los filtra por ESA duración
+      (`huecosDelPanel`) en vez de por `HUECO_MINIMO`. */
+  tramosLibres: readonly Tramo[]
+}
+
+/** H4 · Los huecos que ofrece el panel: con la duración de la consulta
+ *  conocida, todo tramo libre que la alcance; sin ella, los de siempre
+ *  (`HUECO_MINIMO`). */
+export function huecosDelPanel(r: ResumenDia, duracionConsulta: number | null): readonly Tramo[] {
+  if (!duracionConsulta || duracionConsulta <= 0) return r.huecos
+  return r.tramosLibres.filter(t => t.hasta - t.desde >= duracionConsulta)
 }
 
 export function resumenDelDia(eventos: readonly EventApi[], dia: Date, horario: Horario): ResumenDia {
   const porEstado = desgloseDeEstados(eventos, dia)
   const todoElDia = contarTodoElDia(eventos, dia)
   const jornada = jornadaDelDia(dia, horario)
-  if (!jornada) return { dia, porEstado, todoElDia, jornada: null, ocupadas: 0, libres: 0, huecos: [] }
+  if (!jornada) return { dia, porEstado, todoElDia, jornada: null, ocupadas: 0, libres: 0, huecos: [], tramosLibres: [] }
 
   const ocupados = recortarATramo(fusionarTramos(tramosDeOcupacion(eventos, dia)), jornada)
   const ocupadas = ocupados.reduce((suma, t) => suma + (t.hasta - t.desde), 0)
+  const tramosLibres = huecosDe(jornada, ocupados, 1)
   return {
     dia,
     porEstado,
@@ -215,7 +228,8 @@ export function resumenDelDia(eventos: readonly EventApi[], dia: Date, horario: 
     jornada,
     ocupadas,
     libres: (jornada.hasta - jornada.desde) - ocupadas,
-    huecos: huecosDe(jornada, ocupados, HUECO_MINIMO),
+    huecos: tramosLibres.filter(t => t.hasta - t.desde >= HUECO_MINIMO),
+    tramosLibres,
   }
 }
 
@@ -229,7 +243,13 @@ export function firmaDelResumen(r: ResumenDia | null): string {
     r.dia.getTime(), r.todoElDia, r.ocupadas, r.libres,
     r.jornada ? `${r.jornada.desde}-${r.jornada.hasta}` : 'cerrado',
     r.porEstado.map(e => `${e.estado}:${e.n}`).join(','),
-    r.huecos.map(h => `${h.desde}-${h.hasta}`).join(','),
+    /* H4 · `tramosLibres` y no `huecos`: con la duración de la consulta un tramo
+       de menos de 60 min también es hueco, y el panel tiene que enterarse de que
+       cambió. Es un superconjunto (no se pierde ningún cambio de antes); a
+       cambio, con la v2 apagada, mover una cita sin cambiar la ocupación ni
+       ningún hueco de 60 vuelve a pintar el panel lateral una vez (barato; el
+       presupuesto de A1-bis de la integración de la tanda H lo midió). */
+    r.tramosLibres.map(h => `${h.desde}-${h.hasta}`).join(','),
   ].join('|')
 }
 

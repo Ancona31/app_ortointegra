@@ -600,7 +600,7 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
      rejilla de G4 (`consultoriosV2`, `seleccion`): en un clic, el único de la
      selección con un médico a la vista. Apagada la v2, no hace nada. */
   /* H4 (punto 20): la misma rejilla parte los huecos del panel de Día en turnos. */
-  const { ajustar: ajustarTurno, turnosDelHueco, tiposPanel } = useAjusteTurno({
+  const { ajustar: ajustarTurno, turnosDelHueco, duracionDelPanel, tiposPanel } = useAjusteTurno({
     agendaV2, consultorios: consultoriosV2, seleccion, horarioClinica: horarioClinicaConfig, medicoMostrado, tipos: tiposAjuste,
   })
 
@@ -1959,7 +1959,7 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
           unMedico={unMedico}
           onHueco={abrirHueco}
           /* H4 (punto 20) · Con la v2 y una rejilla clara, cada hueco en turnos. */
-          turnos={agendaV2 ? { delHueco: turnosDelHueco, tipos: tiposPanel } : undefined}
+          turnos={agendaV2 ? { delHueco: turnosDelHueco, duracion: duracionDelPanel, tipos: tiposPanel } : undefined}
           miniMes={agendaV2 && montarV2 ? <MiniMesPanelV2 rango={rangoVisible} alIrAFecha={irAFecha} /> : undefined}
           /* La MISMA bandera que levanta la banda roja de arriba. Sin esto el
              panel afirmaba horas y ofrecía huecos sobre un día recortado. */

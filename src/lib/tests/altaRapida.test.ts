@@ -118,6 +118,12 @@ describe('horasDelGesto', () => {
     expect(horasDelGesto({ hora: '10:00', inicio: D(10), fin: null, desdeHueco: false }).fin).toBe(sumarMinutos('10:00', DEFAULT_DURATION))
     expect(horasDelGesto({ hora: '10:00', inicio: D(10), fin: D(13), desdeHueco: true }).fin).toBe(sumarMinutos('10:00', DEFAULT_DURATION))
   })
+  it('MUTACIÓN H4: un TURNO de «Huecos disponibles» abre con la duración de la consulta, no con 60 min', () => {
+    expect(duracionDeSeleccion(D(11, 15), D(12), true, 45)).toBe(45)
+    expect(horasDelGesto({ hora: '11:15', inicio: D(11, 15), fin: D(12), desdeHueco: true, duracionTurno: 45 })).toEqual({ inicio: '11:15', fin: '12:00' })
+    /* Una consulta de 30 min (una sola franja) también: no cae a la de omisión. */
+    expect(horasDelGesto({ hora: '09:00', inicio: D(9), fin: D(9, 30), desdeHueco: true, duracionTurno: 30 }).fin).toBe('09:30')
+  })
   it('una celda del Mes abre sin horas (no se inventa una)', () => {
     expect(horasDelGesto({ hora: null, inicio: D(0), fin: null, desdeHueco: false })).toEqual({ inicio: '', fin: '' })
   })

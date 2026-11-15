@@ -52,6 +52,8 @@ export type DondeTurno = { medicoId: string | null; consultorioId: string | null
 export type AjustarTurno = (instante: Date, donde?: DondeTurno) => Date | null
 /** H4 · Los turnos de la rejilla que caben enteros en un hueco, o `null` = sin rejilla clara (el hueco, como hoy). */
 export type TurnosDelHueco = (desde: Date, hasta: Date, tipos: readonly TipoCita[]) => Turno[] | null
+/** H4 · La duración de la consulta de esa rejilla (el mínimo de un hueco del panel), o `null` sin rejilla clara. */
+export type DuracionDelPanel = (tipos: readonly TipoCita[]) => number | null
 
 interface Entrada {
   agendaV2: boolean
@@ -81,7 +83,8 @@ function rejillaDelGesto(e: Omit<Entrada, 'agendaV2' | 'tipos'>, lista: readonly
 }
 
 export function useAjusteTurno(e: Entrada): {
-  ajustar: AjustarTurno; turnosDelHueco: TurnosDelHueco; tiposPanel: Promise<TipoCita[] | null> | undefined
+  ajustar: AjustarTurno; turnosDelHueco: TurnosDelHueco; duracionDelPanel: DuracionDelPanel
+  tiposPanel: Promise<TipoCita[] | null> | undefined
 } {
   const { agendaV2, consultorios, seleccion, horarioClinica, medicoMostrado, tipos } = e
   const tiposRef = useRef<TipoCita[] | null>(null)
@@ -109,5 +112,8 @@ export function useAjusteTurno(e: Entrada): {
     const fecha = renderEnTZ(desde.toISOString(), 'yyyy-MM-dd', r.tz)
     return turnosEnTramo({ fecha, ...r }, desde.getTime(), hasta.getTime())
   }, [agendaV2, consultorios, seleccion, horarioClinica, medicoMostrado])
-  return { ajustar, turnosDelHueco, tiposPanel }
+  const duracionDelPanel = useCallback<DuracionDelPanel>((lista) => (agendaV2
+    ? rejillaDelGesto({ consultorios, seleccion, horarioClinica, medicoMostrado }, lista, undefined)?.duracionMin ?? null
+    : null), [agendaV2, consultorios, seleccion, horarioClinica, medicoMostrado])
+  return { ajustar, turnosDelHueco, duracionDelPanel, tiposPanel }
 }

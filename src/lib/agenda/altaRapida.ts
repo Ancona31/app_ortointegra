@@ -32,8 +32,13 @@ export const MINUTOS_FRANJA = 30
  * dan la duración por omisión (decisión 19). `desdeHueco` es la bandera
  * `seleccionDesdeHueco` que levanta `abrirHueco` antes de `api.select()`: sin
  * ella, un hueco de tres horas propondría tres horas.
+ *
+ * H4 · Un TURNO de «Huecos disponibles» propone su propia duración
+ * (`duracionTurno`), que es la de la consulta del médico en ese consultorio:
+ * la misma que parte el hueco. Un hueco sin turnos sigue con la de omisión.
  */
-export function duracionDeSeleccion(inicio: Date, fin: Date | null, desdeHueco: boolean): number {
+export function duracionDeSeleccion(inicio: Date, fin: Date | null, desdeHueco: boolean, duracionTurno?: number): number {
+  if (duracionTurno && duracionTurno > 0) return duracionTurno
   if (desdeHueco || !fin) return DEFAULT_DURATION
   const minutos = Math.round((fin.getTime() - inicio.getTime()) / 60_000)
   /* En Semana se puede arrastrar de una columna a otra y la selección cruza la
@@ -59,9 +64,9 @@ const HORA = /^\d{2}:\d{2}$/
  * agenda dejó de hacer (ver `ModalState`). Con hora, el fin es el inicio más
  * `duracionDeSeleccion`.
  */
-export function horasDelGesto(g: Pick<GestoAlta, 'hora' | 'inicio' | 'fin' | 'desdeHueco'>): { inicio: string; fin: string } {
+export function horasDelGesto(g: Pick<GestoAlta, 'hora' | 'inicio' | 'fin' | 'desdeHueco' | 'duracionTurno'>): { inicio: string; fin: string } {
   if (g.hora === null) return { inicio: '', fin: '' }
-  return { inicio: g.hora, fin: sumarMinutos(g.hora, duracionDeSeleccion(g.inicio, g.fin, g.desdeHueco)) }
+  return { inicio: g.hora, fin: sumarMinutos(g.hora, duracionDeSeleccion(g.inicio, g.fin, g.desdeHueco, g.duracionTurno)) }
 }
 
 /**

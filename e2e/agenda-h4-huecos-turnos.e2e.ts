@@ -19,6 +19,13 @@ import { fechaHoraLocalAInstante } from '../src/lib/dates'
  * `null` (el panel enseña los tramos de hoy); `turnosEnTramo` sin el filtro de
  * «cabe entero» (sale el 9:45); el botón del turno pasando el hueco entero a
  * `onHueco` (la burbuja abre a las 10:20).
+ *
+ * Integración de la tanda H (dos ajustes): el turno abre la burbuja con la
+ * DURACIÓN DE LA CONSULTA (11:15–12:00), no con 60 min; y con la duración
+ * conocida un tramo libre de 55 min (10:20–11:15) ya es hueco y ofrece su
+ * turno de 10:30. MUTACIONES (comprobadas en rojo sobre el build): `abrirHueco`
+ * sin `duracionTurno` (la burbuja dice 11:15–12:15); `CardHuecos` llamando a
+ * `huecosDelPanel` sin la duración (el tramo de 55 min no sale: 1 grupo, no 2).
  */
 test.describe.configure({ mode: 'serial' })
 soloEscritorio()
@@ -118,5 +125,22 @@ test('con la consulta de 45 min: cada hueco en turnos de la rejilla desde las 9:
   await expect(huecos(page).getByRole('button', { name: 'Agendar a las 11:15 (45 min)' })).toBeVisible()
 
   await huecos(page).locator('[data-turno="11:15"]').click()
-  await expect(burbuja(page)).toHaveAccessibleName(/ 11:15–/)
+  await expect(burbuja(page)).toHaveAccessibleName(/, 11:15–12:00$/)
+})
+
+test('con la consulta de 45 min, un tramo libre de 55 min (menos de 60) es hueco y su turno abre 10:30–11:15', async ({ page }) => {
+  sqlLocal(`
+    insert into public.appointments (clinica_id, medico_id, consultorio_id, consultorio_nombre, consultorio_timezone, title,
+                                     start_time, end_time, status, all_day, origen)
+    select p.clinica_id, p.id, c.id, c.nombre, c.timezone, 'H4 e2e ocupa', :'i'::timestamptz, :'f'::timestamptz, 'scheduled', false, 'spinus'
+      from public.profiles p join auth.users u on u.id = p.id join public.consultorios c on c.medico_id = p.id and c.nombre = :'n'
+     where u.email = :'c'`,
+  { c: CORREO.medicoA, n: REHAB, i: fechaHoraLocalAInstante(dia, '11:15', TZ), f: fechaHoraLocalAInstante(dia, '13:00', TZ) })
+  await abrirDia(page)
+  const grupos = huecos(page).locator('[data-hueco-turnos]')
+  await expect(grupos).toHaveCount(2)
+  await expect(grupos.nth(1).locator('.ag-hueco-rango')).toHaveText('10:20 – 11:15')
+  await expect(grupos.nth(1).locator('[data-turno]')).toHaveText(['10:30'])
+  await grupos.nth(1).locator('[data-turno="10:30"]').click()
+  await expect(burbuja(page)).toHaveAccessibleName(/, 10:30–11:15$/)
 })

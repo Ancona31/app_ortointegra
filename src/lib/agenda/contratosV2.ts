@@ -68,6 +68,9 @@ export interface GestoAlta {
   fin: Date | null
   /** `seleccionDesdeHueco`: vino de un hueco del panel de Día, no de un arrastre. */
   desdeHueco: boolean
+  /** H4 · Vino de un TURNO de «Huecos disponibles»: los minutos de ese turno,
+      que son la duración de la consulta del médico en ese consultorio. */
+  duracionTurno?: number
   /** Dónde se pulsó, en coordenadas de ventana. */
   ancla: Caja
   punto?: Punto
@@ -94,4 +97,4 @@ export interface SitioCita { ancla: Caja | null; punto?: Punto; alPasar?: boolea
  * dispara `select` de forma síncrona (`triggerDateSelect` dentro de
  * `CalendarImpl.select`, `@fullcalendar/core/internal-common.js:5066-5070`).
  */
-export type SeleccionDesdeHueco = { current: { ancla: Caja | null } | null }
+export type SeleccionDesdeHueco = { current: { ancla: Caja | null; duracionTurno?: number } | null }

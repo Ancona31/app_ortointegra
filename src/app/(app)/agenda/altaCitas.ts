@@ -125,14 +125,16 @@ function anclaDelHueco(): Element | null {
 }
 
 /** Lo que la burbuja necesita del gesto, además de fecha y hora. `null`: no hay sitio, va al modal. */
-type SitioDelGesto = { fin: Date | null; desdeHueco: boolean; ancla: Caja; punto?: Punto }
+type SitioDelGesto = { fin: Date | null; desdeHueco: boolean; duracionTurno?: number; ancla: Caja; punto?: Punto }
 
 function sitioDelGesto(
-  celda: Element | null | undefined, jsEvent: Event | null | undefined, fin: Date | null, hueco: { ancla: Caja | null } | null,
+  celda: Element | null | undefined, jsEvent: Event | null | undefined, fin: Date | null,
+  hueco: SeleccionDesdeHueco['current'],
 ): SitioDelGesto | null {
   const punto = puntoDe(jsEvent)
   const ancla = hueco?.ancla ?? anclaDelGesto(celda, punto)
-  return ancla ? { fin, desdeHueco: hueco !== null, ancla, ...(punto ? { punto } : {}) } : null
+  const turno = hueco?.duracionTurno ? { duracionTurno: hueco.duracionTurno } : {}
+  return ancla ? { fin, desdeHueco: hueco !== null, ...turno, ancla, ...(punto ? { punto } : {}) } : null
 }
 
 interface Params {
@@ -376,7 +378,7 @@ export function crearAltaCitas({
      fuera de horario, mismo `tipo: 'cita'`—. Dos puertas al mismo sitio tienen
      que hacer lo mismo, y ésta lo consigue no siendo una segunda puerta.
      Requiere `selectable`, que en escritorio está encendido. */
-  function abrirHueco(t: Tramo) {
+  function abrirHueco(t: Tramo, esTurno = false) {
     const api = calendarRef.current?.getApi()
     if (!api || !resumenDia) return
     /* ⚠️ EL CIERRE DE SEGURIDAD, Y NO SOBRA POR MUCHO QUE `CardHuecos` YA NO
@@ -390,7 +392,9 @@ export function crearAltaCitas({
     /* F3 · `seleccionDesdeHueco`: un hueco de tres horas no propone tres horas
        (decisión 19). La burbuja se ancla al botón del hueco si tiene el foco
        y, si no (Safari no enfoca un botón al pulsarlo), al panel entero. */
-    seleccionDesdeHueco.current = { ancla: cajaDe(anclaDelHueco()) }
+    /* H4 · Un TURNO del panel lleva su duración (la de la consulta): la burbuja
+       la propone en vez de los 60 min de un hueco. */
+    seleccionDesdeHueco.current = { ancla: cajaDe(anclaDelHueco()), ...(esTurno ? { duracionTurno: t.hasta - t.desde } : {}) }
     api.select(new Date(base + t.desde * 60_000), new Date(base + t.hasta * 60_000))
   }
 
