@@ -146,7 +146,7 @@ export default function ConvertirEnCita({ cita, perfilId, zonaVisor, alConvertir
         </div>
       </div>
       {nuevo !== null && (
-        <QuickPatientModal nombreInicial={nuevo} onClose={() => { setNuevo(null); campo.current?.focus() }}
+        <QuickPatientModal nombreInicial={nuevo} conTelefono onClose={() => { setNuevo(null); campo.current?.focus() }}
           onCreated={p => { setNuevo(null); setPaciente(p) }} />
       )}
     </Portal>

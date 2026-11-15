@@ -6108,6 +6108,15 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
 .ag-capa-rejilla > * { min-width: 0; }
 .ag-capa-pila { display: flex; flex-direction: column; gap: var(--ag-2); }
 .ag-opcion--registrar { margin-top: var(--ag-1); border-top: 1px solid var(--ag-hairline); border-radius: 0 0 var(--ag-r-btn-sm) var(--ag-r-btn-sm); }
+/* H3 (punto 11) · «Registrar «…»» en VERDE, como el «Registrar "…"» del
+   formulario completo y el resto de la app (esmeralda). Aquí con el verde de la
+   agenda, `--ag-success-*`, que ya pasa AA en las dos paletas (la e2e
+   `agenda-h3-burbuja` mide el contraste con el fondo pintado). La línea de
+   debajo, en el mismo verde (no en gris). */
+.ag-opcion--registrar,
+.ag-opcion--registrar .ag-opcion-meta { color: var(--ag-success-text); }
+.ag-opcion--registrar:hover,
+.ag-opcion--registrar[aria-selected="true"] { background: var(--ag-success-bg); }
 
 /* La tarjeta de lectura. */
 .ag-lectura-pildora {
@@ -6245,6 +6254,33 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
   border-radius: var(--ag-r-btn);
 }
 .ag-capa-enlace:hover { background: var(--ag-btn-ghost-hover); }
+/* H3 (punto 14) · «Añadir observaciones» de la burbuja: el mismo enlace, pero
+   discreto (a la izquierda, sin negrita) y con el «+» delante. */
+.ag-capa-enlace--discreto {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ag-1);
+  margin-inline-start: calc(-1 * var(--ag-2-5));
+  font-weight: 500;
+}
+/* Abiertas, un área de dos líneas que crece con el texto hasta seis (donde el
+   navegador sabe, `field-sizing`; donde no, dos líneas con desplazamiento). */
+.ag-capa-campo textarea {
+  min-height: calc(2lh + 2 * var(--ag-1-5) + 2px);
+  max-height: calc(6lh + 2 * var(--ag-1-5) + 2px);
+  padding: var(--ag-1-5) var(--ag-2-5);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--ag-ink);
+  background: var(--ag-surface);
+  border: 1px solid var(--ag-input-border);
+  border-radius: var(--ag-r-btn);
+  resize: none;
+  field-sizing: content;
+}
 
 /* La ayuda de atajos. */
 .ag-atajos {

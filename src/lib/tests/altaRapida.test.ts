@@ -95,6 +95,11 @@ describe('datosDeAltaRapida', () => {
   it('sin paciente no arma nada (nunca un evento ni una cita por ligar)', () => {
     expect(datosDeAltaRapida({ ...BASE, paciente: null })).toBeNull()
   })
+  it('H3 (punto 14): las observaciones van a `notes`, recortadas; en blanco, `null`', () => {
+    expect(datosDeAltaRapida({ ...BASE, notas: '  Trae estudios previos \n' })?.notes).toBe('Trae estudios previos')
+    expect(datosDeAltaRapida({ ...BASE, notas: '   ' })?.notes).toBeNull()
+    expect(datosDeAltaRapida({ ...BASE, notas: '' })?.notes).toBeNull()
+  })
 })
 
 describe('etiquetaBurbuja', () => {

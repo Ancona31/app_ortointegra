@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useId, type ReactElement } from 'react'
 import { useRouter } from 'next/navigation'
 import { User, X, Loader2 } from 'lucide-react'
 import Portal from '@/components/ui/Portal'
@@ -8,6 +8,7 @@ import { useProfile } from '@/hooks/useProfile'
 import { secureStorage } from '@/lib/secureStorage'
 import { toTitleCase, calcularEdad, fechaHoyISO, FECHA_MIN_NACIMIENTO, edadAFechaFicticia } from '@/lib/patientUtils'
 import { componerNombreMedicoCompleto } from '@/lib/nombreMedico'
+import { validarTelefono, formatearTelefono } from '@/lib/validaciones'
 import type { DuplicatePatientResponse } from '@/types'
 
 type PacienteBusqueda = { id: string; nombre: string; apellidos: string; telefono: string | null }
@@ -15,9 +16,37 @@ type Medico = { id: string; titulo: string | null; nombres: string | null; apell
 
 const MEDICOS_CACHE_KEY = 'cache_medicos_clinica'
 
+const claseCampo = 'w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 transition-all'
+
+/**
+ * H3 (punto 13, agenda v2) · «Teléfono celular o WhatsApp», opcional, con el
+ * formato y la validación de la ficha del paciente (`formatearTelefono`,
+ * `validarTelefono`: 10 dígitos, «999 123 4567»), y debajo de correo y
+ * teléfono la leyenda de por qué conviene darlos. Va al mismo campo de la
+ * ficha (`pacientes.telefono`) por el mismo camino que el correo.
+ */
+function CampoTelefono({ valor, alCambiar }: { valor: string; alCambiar: (v: string) => void }): ReactElement {
+  const id = useId()
+  const error = valor ? validarTelefono(valor) : null
+  return (
+    <>
+      <div>
+        <label htmlFor={id} className="block text-[11px] font-semibold text-[#86868b] uppercase tracking-wider mb-1.5">Teléfono celular o WhatsApp</label>
+        <input id={id} type="tel" inputMode="numeric" autoComplete="tel" value={valor} maxLength={12}
+          onChange={e => alCambiar(formatearTelefono(e.target.value))} placeholder="opcional · 999 123 4567" className={claseCampo} />
+        {error && <p className="text-[11px] text-red-600 mt-1">{error}</p>}
+      </div>
+      <p className="text-[11px] text-slate-500 leading-snug">
+        Sin teléfono ni correo no se podrán enviar confirmaciones ni recordatorios de cita.
+      </p>
+    </>
+  )
+}
+
 export default function QuickPatientModal({
   nombreInicial,
   emailInicial = '',
+  conTelefono = false,
   onCreated,
   onClose,
 }: {
@@ -25,6 +54,9 @@ export default function QuickPatientModal({
   /* D7 de la agenda: el correo de quien reservó por enlace, al ligar su cita.
      Sólo precarga el campo; se puede borrar y no salta el consentimiento. */
   emailInicial?: string
+  /* H3 (punto 13): el teléfono y su leyenda. Sólo la agenda v2 lo enciende;
+     el resto de la app (Documentos, la agenda apagada) sigue como estaba. */
+  conTelefono?: boolean
   onCreated: (p: PacienteBusqueda) => void
   onClose: () => void
 }) {
@@ -38,6 +70,7 @@ export default function QuickPatientModal({
   const [fechaNac,  setFechaNac]  = useState('')
   const [edad,      setEdad]      = useState('')
   const [email,     setEmail]     = useState(emailInicial)
+  const [telefono,  setTelefono]  = useState('')
   const [saving,    setSaving]    = useState(false)
   const [error,     setError]     = useState('')
   const [consentimiento, setConsentimiento] = useState(false)
@@ -92,6 +125,12 @@ export default function QuickPatientModal({
       setError('Debes seleccionar un médico para asignar el paciente')
       return
     }
+    const telefonoLimpio = conTelefono ? telefono.trim() : ''
+    const errorTelefono = validarTelefono(telefonoLimpio)
+    if (errorTelefono) {
+      setError(errorTelefono)
+      return
+    }
     setSaving(true)
     setError('')
 
@@ -118,6 +157,7 @@ export default function QuickPatientModal({
           apellidos: apellidosLimpio,
           fecha_nacimiento,
           email: email.trim() || null,
+          ...(telefonoLimpio ? { telefono: telefonoLimpio } : {}),
           consentimiento_otorgado: true,
           ...(isSecretaria ? { medico_id: medicoSeleccionado } : {}),
           ...(forceCreateRef.current ? { forceCreate: true } : {}),
@@ -139,7 +179,7 @@ export default function QuickPatientModal({
       }
 
       if (!res.ok) { setError((data.message as string) ?? (data.error as string) ?? 'Error al crear paciente'); setSaving(false); return }
-      onCreated({ id: (data.id as string) ?? '', nombre: nombreLimpio, apellidos: apellidosLimpio, telefono: null })
+      onCreated({ id: (data.id as string) ?? '', nombre: nombreLimpio, apellidos: apellidosLimpio, telefono: telefonoLimpio || null })
     } catch {
       setError('Error de conexión. Intenta de nuevo.')
       setSaving(false)
@@ -329,6 +369,8 @@ export default function QuickPatientModal({
               placeholder="opcional"
               className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 transition-all" />
           </div>
+
+          {conTelefono && <CampoTelefono valor={telefono} alCambiar={setTelefono} />}
 
           <p className="text-[11px] text-[#86868b]">El expediente completo se puede editar después desde Pacientes.</p>
 

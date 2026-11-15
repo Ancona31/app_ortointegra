@@ -2,7 +2,7 @@ import { test, expect, type Browser, type Page } from '@playwright/test'
 import { spawn, type ChildProcess } from 'node:child_process'
 import { closeSync, mkdirSync, openSync, readFileSync } from 'node:fs'
 import { SESION, CORREO, DIA_LABORABLE_LIBRE, interruptorAgenda, sqlLocal, eventoConTexto, modalCita, tituloUnico } from './ayudas'
-import { editarDesdeTarjeta, tarjetaLectura } from './interaccionesAyudas'
+import { burbuja, clicEnFranja, editarDesdeTarjeta, elegirPaciente, tarjetaLectura } from './interaccionesAyudas'
 import { arrancarGoogleFalso, CALENDARIO, type EventoFalso, type GoogleFalso } from './google-falso/servidor'
 import { fechaHoraLocalAInstante } from '../src/lib/dates'
 import { encrypt } from '../src/lib/encrypt'
@@ -328,6 +328,35 @@ test('encendido: un evento creado en Google se convierte en cita; a Google va el
   expect(columna('title')).toBe('Paciente Prueba 20')
   expect(columna('notes')).toBe('NOTAS-GOOGLE-T3')
   await expect.poll(() => g().eventos.get(creado.id)?.summary, { timeout: 30_000 }).toBe('Cita médica: Paciente Prueba 20')
+})
+
+/* H3 · punto 14: las observaciones escritas en la burbuja de alta rápida se
+   guardan en la cita y NO viajan a Google (S1): el evento lleva la descripción
+   fija de `eventoParaGoogle`. Mutación en rojo: en el `after()` del POST de
+   `/api/appointments`, añadir `notes` a la descripción. */
+test('encendido: las observaciones de la burbuja se guardan en la cita y no viajan a Google (H3, S1)', async ({ page }) => {
+  interruptorAgenda('A', true)
+  const obs = `OBS-BURBUJA-H3-${Date.now()}`
+  await page.goto('/agenda')
+  await expect(page.locator('.agenda-raiz')).toHaveAttribute('data-interacciones-v2', 'listas', { timeout: 120_000 })
+  await clicEnFranja(page, DIA_LABORABLE_LIBRE, '15:00')
+  const b = burbuja(page)
+  const avisoHorario = page.getByRole('dialog').filter({ has: page.getByRole('button', { name: 'Aceptar' }) })
+  await expect(b.or(avisoHorario).first()).toBeVisible({ timeout: 30_000 })
+  if (await avisoHorario.count()) await avisoHorario.getByRole('button', { name: 'Aceptar' }).click()
+  await elegirPaciente(b, 'Prueba 22')
+  await b.getByRole('button', { name: 'Añadir observaciones' }).click()
+  await b.getByRole('textbox', { name: 'Observaciones' }).fill(obs)
+  const post = page.waitForResponse(r => r.request().method() === 'POST' && r.url().endsWith('/api/appointments') && r.status() === 200, { timeout: 60_000 })
+  await b.getByRole('button', { name: 'Guardar', exact: true }).click()
+  const aviso = page.getByRole('dialog', { name: /Se empalma/ })
+  await expect(aviso.or(b.getByText('Cita agendada', { exact: true })).first()).toBeVisible({ timeout: 60_000 })
+  if (await aviso.count()) await aviso.getByRole('button', { name: 'Aceptar' }).click()
+  const id = ((await (await post).json()) as { appointment: { id: string } }).appointment.id
+  expect(sqlLocal(`select notes from public.appointments where id = :'id'`, { id })).toBe(obs)
+  const ev = await esperarLigada(id)
+  expect(ev.description ?? '').toContain('Paciente Prueba 22')
+  expect(JSON.stringify(ev)).not.toContain(obs)
 })
 
 test('encendido: un recurrente creado en Google sigue en solo lectura (no se importa)', async ({ page }) => {

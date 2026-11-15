@@ -116,6 +116,8 @@ export interface EntradaAltaRapida {
   paciente: PacienteBusqueda | null
   medicoId: string | null
   consultorioId: string | null
+  /** H3 (punto 14) · Las observaciones de la cita (opcionales): van a `notes`, como en el modal. */
+  notas?: string
 }
 
 /** Por qué no se puede guardar todavía, en una frase; `null` si se puede. */
@@ -143,7 +145,7 @@ export function datosDeAltaRapida(e: EntradaAltaRapida): DatosGuardado | null {
     all_day: false,
     start_time: componerIso(e.fecha, e.horaInicio),
     end_time: componerIso(e.fecha, e.horaFin),
-    notes: null,
+    notes: e.notas?.trim() || null,
     status: 'scheduled',
     paciente_id: e.paciente.id,
     pacientes: e.paciente,

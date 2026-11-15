@@ -43,8 +43,8 @@
  * F3). «Más opciones» e «Invitar por correo» NO animan la salida: lo que abren
  * la tapa al instante. Lo nuevo de T1 no añade ninguna animación.
  */
-import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent, type ReactElement } from 'react'
-import { Check, Mail, X } from 'lucide-react'
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactElement } from 'react'
+import { Check, Mail, Plus, X } from 'lucide-react'
 import Portal from '@/components/ui/Portal'
 import QuickPatientModal from '@/components/ui/QuickPatientModal'
 import { BotonWhatsAppCita } from '@/components/agenda/BotonWhatsAppCita'
@@ -71,6 +71,8 @@ export interface MasOpcionesBurbuja {
   horaFin: string
   paciente?: PacienteBusqueda
   medicoId: string | null
+  /** H3 (punto 14) · Lo escrito en «Observaciones», para que «Más opciones» no lo pierda. */
+  notas?: string
 }
 
 interface Props {
@@ -191,6 +193,69 @@ function useCerrarAlTocarFuera(panel: { current: HTMLElement | null }, salir: ()
 }
 
 /**
+ * H3 (punto 12) · El escudo tras cerrar `QuickPatientModal`.
+ *
+ * LA CAUSA de «tras registrar, la burbuja se cierra y hay que volver a elegir
+ * el horario y teclear el nombre»: el modal se pinta centrado SOBRE la rejilla
+ * y el alta del paciente contesta en decenas de milisegundos, así que el modal
+ * desaparece entre los dos clics de un doble clic (o antes de un segundo clic
+ * de «¿lo tomó?»). Ese segundo clic ya no cae en el modal sino en una franja:
+ * para la burbuja es «tocar fuera» (se cierra) y para FullCalendar un clic en
+ * la franja (abre OTRA burbuja, con otra hora y el paciente vacío). Igual con
+ * «Cancelar», que cierra el modal al instante.
+ *
+ * Por eso, mientras el modal está abierto se apunta dónde se pulsó por última
+ * vez y, al cerrarse (creado o cancelado), durante `GRACIA_TRAS_REGISTRO_MS`
+ * (más que el intervalo de doble clic de los sistemas, 500 ms por omisión) se
+ * tragan en captura los eventos del clic que caen A MENOS DE `RADIO_DOBLE_CLIC_PX`
+ * de ese punto y fuera de un diálogo: el segundo clic del mismo gesto. Un clic
+ * en otro sitio (la barra, otra cita) pasa. El «tocar fuera» de la burbuja
+ * sigue pausado durante la gracia. Con `useLayoutEffect`: el oyente queda
+ * puesto en el mismo commit que quita el modal, antes de que el navegador
+ * pueda entregar el segundo clic. Cada cierre reinicia la gracia (`vez`).
+ */
+const GRACIA_TRAS_REGISTRO_MS = 600
+const RADIO_DOBLE_CLIC_PX = 24
+const EVENTOS_DEL_CLIC = ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click', 'dblclick', 'touchstart', 'touchend'] as const
+type PuntoPantalla = { x: number; y: number }
+
+function puntoDelEvento(e: Event): PuntoPantalla | null {
+  if (e instanceof MouseEvent) return { x: e.clientX, y: e.clientY }
+  const t = typeof TouchEvent !== 'undefined' && e instanceof TouchEvent ? e.changedTouches[0] : undefined
+  return t ? { x: t.clientX, y: t.clientY } : null
+}
+
+function useEscudoTrasRegistro(modalAbierto: boolean): { activo: boolean; activar: () => void } {
+  const [estado, setEstado] = useState({ activo: false, vez: 0 })
+  const ultimo = useRef<PuntoPantalla | null>(null)
+  useEffect(() => {
+    if (!modalAbierto) return
+    const apuntar = (e: PointerEvent): void => { ultimo.current = { x: e.clientX, y: e.clientY } }
+    document.addEventListener('pointerdown', apuntar, true)
+    return () => document.removeEventListener('pointerdown', apuntar, true)
+  }, [modalAbierto])
+  useLayoutEffect(() => {
+    const origen = ultimo.current
+    if (!estado.activo || !origen) return
+    const tragar = (e: Event): void => {
+      if (e.target instanceof Element && e.target.closest('[role="dialog"]')) return
+      const p = puntoDelEvento(e)
+      if (!p || Math.hypot(p.x - origen.x, p.y - origen.y) > RADIO_DOBLE_CLIC_PX) return
+      e.stopImmediatePropagation()
+      if (e.cancelable) e.preventDefault()
+    }
+    for (const t of EVENTOS_DEL_CLIC) document.addEventListener(t, tragar, { capture: true, passive: false })
+    const fin = setTimeout(() => setEstado(s => ({ ...s, activo: false })), GRACIA_TRAS_REGISTRO_MS)
+    return () => {
+      clearTimeout(fin)
+      for (const t of EVENTOS_DEL_CLIC) document.removeEventListener(t, tragar, { capture: true })
+    }
+  }, [estado])
+  const activar = useCallback(() => setEstado(s => ({ activo: true, vez: s.vez + 1 })), [])
+  return { activo: estado.activo, activar }
+}
+
+/**
  * Los pacientes que casan con el texto, con la espera de 300 ms del modal.
  * T1: `listo` dice si la lista ya es la de ESE texto (aunque venga vacía): sólo
  * entonces se ofrece «Registrar».
@@ -298,6 +363,31 @@ function SelectorMedico({ medicos, valor, alCambiar }: PropsMedico): ReactElemen
         <option value="">Elige el médico…</option>
         {medicos.map(m => <option key={m.id} value={m.id}>{m.nombre}</option>)}
       </select>
+    </label>
+  )
+}
+
+interface PropsObservaciones { valor: string; alCambiar: (v: string) => void }
+
+/**
+ * H3 (punto 14) · Las observaciones de la cita, discretas y opcionales: plegadas
+ * tras «Añadir observaciones» y, abiertas, un área que crece con el texto. Van
+ * al mismo `notes` que las «Notas» del formulario completo, y como ellas NO
+ * viajan a Google (S1: la descripción del evento es fija, `eventoParaGoogle`).
+ */
+function CampoObservaciones({ valor, alCambiar }: PropsObservaciones): ReactElement {
+  const [abierto, setAbierto] = useState(valor !== '')
+  if (!abierto) {
+    return (
+      <button type="button" className="ag-capa-enlace ag-capa-enlace--discreto" aria-expanded={false} onClick={() => setAbierto(true)}>
+        <Plus size={14} aria-hidden="true" /> Añadir observaciones
+      </button>
+    )
+  }
+  return (
+    <label className="ag-capa-campo">
+      Observaciones
+      <textarea rows={2} autoFocus value={valor} onChange={e => alCambiar(e.target.value)} placeholder="Opcional" />
     </label>
   )
 }
@@ -439,6 +529,28 @@ function useGuardadoBurbuja(alGuardar: Props['alGuardar'], salir: () => void) {
   return { estado, creada, guardar }
 }
 
+type RefFoco = { current: HTMLElement | null }
+const enfocar = (r: RefFoco): void => { requestAnimationFrame(() => r.current?.focus({ preventScroll: true })) }
+
+/**
+ * T1 (punto 2) · «Registrar «…»»: el `QuickPatientModal` abierto con lo escrito
+ * (`nombre`; `null` = cerrado). Creado, el paciente queda elegido y el foco en
+ * «Guardar»; cancelado, el foco vuelve al buscador. H3 (punto 12): los dos
+ * cierres activan el escudo del doble clic, y mientras el modal o el escudo
+ * están, tocar fuera no cierra la burbuja.
+ */
+function useRegistroEnBurbuja(elegir: (p: PacienteBusqueda) => void, campo: RefFoco, botonGuardar: RefFoco) {
+  const [nombre, setNombre] = useState<string | null>(null)
+  const escudo = useEscudoTrasRegistro(nombre !== null)
+  return {
+    nombre,
+    abrir: setNombre,
+    pausaTocarFuera: nombre !== null || escudo.activo,
+    alCreado: (p: PacienteBusqueda): void => { setNombre(null); escudo.activar(); elegir(p); enfocar(botonGuardar) },
+    alCancelar: (): void => { setNombre(null); escudo.activar(); enfocar(campo) },
+  }
+}
+
 /**
  * T1 · `role="status"` SIEMPRE en el DOM (vacío antes de agendar): una región
  * viva que aparece ya con texto no se anuncia en todos los lectores.
@@ -451,17 +563,16 @@ export default function BurbujaAlta(props: Props): ReactElement {
   const [horas, setHoras] = useState({ inicio: props.horaInicio, fin: props.horaFin })
   const [paciente, setPaciente] = useState<PacienteBusqueda | null>(null)
   const [medicoId, setMedicoId] = useState(() => medicoPropuesto(filtroMedico, medicos))
-  const [registrando, setRegistrando] = useState<string | null>(null)
-  const { saliendo, salir, alTerminar, alPulsarTecla, montar } = usePanelBurbuja(ancla, punto, alCerrar, registrando !== null)
-  const { estado, creada, guardar } = useGuardadoBurbuja(props.alGuardar, salir)
-  const idTitulo = useId()
+  const [notas, setNotas] = useState('')
   const campo = useRef<HTMLInputElement | null>(null)
   const botonGuardar = useRef<HTMLButtonElement | null>(null)
+  const registro = useRegistroEnBurbuja(setPaciente, campo, botonGuardar)
+  const { saliendo, salir, alTerminar, alPulsarTecla, montar } = usePanelBurbuja(ancla, punto, alCerrar, registro.pausaTocarFuera)
+  const { estado, creada, guardar } = useGuardadoBurbuja(props.alGuardar, salir)
+  const idTitulo = useId()
   const entrada = { fecha, horaInicio: horas.inicio, horaFin: horas.fin, paciente, medicoId,
-    consultorioId: consultorioPropuesto(consultorioActivo, medicoId) }
-  const masOpciones = (): void => alMasOpciones({ fecha, hora: horas.inicio, horaFin: horas.fin, paciente: paciente ?? undefined, medicoId })
-  const enfocar = (r: { current: HTMLElement | null }): void => { requestAnimationFrame(() => r.current?.focus({ preventScroll: true })) }
-  const alCreado = (p: PacienteBusqueda): void => { setRegistrando(null); setPaciente(p); enfocar(botonGuardar) }
+    consultorioId: consultorioPropuesto(consultorioActivo, medicoId), notas }
+  const masOpciones = (): void => alMasOpciones({ fecha, hora: horas.inicio, horaFin: horas.fin, paciente: paciente ?? undefined, medicoId, notas })
 
   return (
     <>
@@ -480,18 +591,18 @@ export default function BurbujaAlta(props: Props): ReactElement {
               alInvitar={props.alInvitar} alEditar={props.alEditar} />
           ) : (
             <>
-              <CampoPaciente paciente={paciente} alElegir={setPaciente} alRegistrar={setRegistrando} campo={campo} />
+              <CampoPaciente paciente={paciente} alElegir={setPaciente} alRegistrar={registro.abrir} campo={campo} />
               <CamposHorario inicio={horas.inicio} fin={horas.fin} alCambiar={(inicio, fin) => setHoras({ inicio, fin })} />
               {necesitaElegirMedico(filtroMedico, medicos) && <SelectorMedico medicos={medicos} valor={medicoId} alCambiar={setMedicoId} />}
+              <CampoObservaciones valor={notas} alCambiar={setNotas} />
               {estado.error && <p className="ag-capa-error" role="alert">{estado.error}</p>}
               <PieBurbuja guardando={estado.guardando} alGuardar={() => void guardar(entrada)} alMasOpciones={masOpciones} boton={botonGuardar} />
             </>
           )}
         </div>
       </Portal>
-      {registrando !== null && (
-        <QuickPatientModal nombreInicial={registrando} onCreated={alCreado}
-          onClose={() => { setRegistrando(null); enfocar(campo) }} />
+      {registro.nombre !== null && (
+        <QuickPatientModal nombreInicial={registro.nombre} conTelefono onCreated={registro.alCreado} onClose={registro.alCancelar} />
       )}
     </>
   )

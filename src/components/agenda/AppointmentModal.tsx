@@ -148,7 +148,9 @@ export type ModalState =
      con el mismo paciente, médico y consultorio, la fecha enfocada; la original
      no se toca (su estado, su auditoría y lo que cuenta para el candado). */
   | { mode: 'create'; fecha: string; hora: string | null; tipo: TipoFila; todoElDia: TodoElDiaInicial; fechaFin?: string; paciente?: PacienteBusqueda; horaFin?: string; medicoId?: string;
-      consultorioId?: string; enfocar?: 'fecha' }
+      consultorioId?: string; enfocar?: 'fecha'
+      /* H3 (punto 14) · Las observaciones escritas en la burbuja («Más opciones»). */
+      notas?: string }
   | { mode: 'edit';   appointment: Appointment; enfocar?: 'fecha' }
 
 /**
@@ -459,7 +461,7 @@ export default function AppointmentModal({
   const [fechaFin,  setFechaFin]  = useState(inicial.fechaFin)
   const [horaFin,   setHoraFin]   = useState(inicial.horaFin)
   const [todoElDia, setTodoElDia] = useState(todoElDiaInicial)
-  const [notes,       setNotes]       = useState(apt?.notes ?? '')
+  const [notes,       setNotes]       = useState(apt?.notes ?? (modal.mode === 'create' ? modal.notas : undefined) ?? '')
   const [status,      setStatus]      = useState<Status>(apt?.status ?? 'scheduled')
   /* Dos siembras, una por modo. En EDICIÓN sale de la fila; en ALTA sale de
      `modal.paciente`, que sólo trae el enlace profundo y en los demás casos es
@@ -1891,6 +1893,8 @@ export default function AppointmentModal({
            reservó; el consentimiento lo sigue exigiendo el modal. */
         nombreInicial={reserva && ligar ? (reserva.reserva_nombre ?? reserva.title) : search}
         emailInicial={reserva && ligar ? (reserva.reserva_correo ?? '') : ''}
+        /* H3 (punto 13): el teléfono del registro rápido, sólo con la v2. */
+        conTelefono={agendaV2}
         onCreated={p => {
           setQuickCreate(false)
           if (reserva && ligar) { void ligarYConsultar(p); return }
