@@ -56,7 +56,21 @@ test.describe('escritorio', () => {
     expect(mes.filter(id => !UUID.test(id ?? '')), 'data-cita-id del mes que no son uuid').toEqual([])
   })
 
+  /* Integración G1–G4: la prueba ya no depende de que la semilla (al azar) deje
+     una cita CONFIRMADA del Dr. Admin en la semana visible: pone la suya, el
+     jueves a las 12:00, y la borra al terminar. La agendada de las 10:00 sí es
+     fija en la semilla. */
   test('F1.8 · en Semana no se escribe el estado; queda el glifo, distinto para agendada y confirmada', async ({ page }) => {
+    const confirmada = citaSql(CORREO.adminA, 'F1.8 glifo', `${DIA_LABORABLE_LIBRE}T12:00:00-06:00`, 30, 0)
+    sqlLocal(`update public.appointments set status = 'confirmed' where id = :'id'`, { id: confirmada })
+    try {
+      await glifosDeSemana(page)
+    } finally {
+      sqlLocal(`delete from public.appointments where id = :'id'`, { id: confirmada })
+    }
+  })
+
+  async function glifosDeSemana(page: Page): Promise<void> {
     await irAAgenda(page)
     await expect(page.locator('.fc-timeGridWeek-view .ag-tarjeta-desc-estado:visible')).toHaveCount(0)
     /* `innerText` y no `hasText`: éste lee también lo que está en `display: none`. */
@@ -71,7 +85,7 @@ test.describe('escritorio', () => {
     expect(titulo).toMatch(/· (Agendada|Confirmada|Atendida|No asistió|Cancelada)$/)
     await page.getByRole('tab', { name: 'Día' }).click()
     await expect(page.locator('.fc-timeGridDay-view .ag-tarjeta-pildora').first()).toBeVisible()
-  })
+  }
 
   test('F1.5 · con el domingo cerrado, «Compactar» abre encendido y la banda lo dice', async ({ page }) => {
     test.skip(!COMPACTAR_AL_ABRIR, 'F1.5 apagado en el cierre de F (COMPACTAR_AL_ABRIR), pendiente de Angel')

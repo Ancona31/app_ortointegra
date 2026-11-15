@@ -162,7 +162,17 @@ test('la agenda (dispositivo en Mérida) la dibuja a las 11:00 con la etiqueta �
   const tarjeta = page.locator('.fc-timegrid-event', { hasText: '09:00 hora Baja California' })
   await expect(tarjeta).toBeVisible()
   await expect(tarjeta).toContainText('11:00')
-  const lane = await page.locator('td.fc-timegrid-slot-lane[data-time="11:00:00"]').boundingBox()
-  const caja = await tarjeta.boundingBox()
-  expect(Math.abs((caja?.y ?? 0) - (lane?.y ?? -100))).toBeLessThanOrEqual(3)
+  /* Integración G1–G4 · la tarjeta salía «43 px por debajo de la fila» una vez
+     de cada muchas. No era la tarjeta: hacia el medio segundo se montan las
+     herramientas v2 de la barra («Ir a una fecha», «Buscar», «Atajos»), la
+     barra pasa de 61 a 105 px y TODA la rejilla baja 44 px (igual en la base
+     `dd634b9`; AG-DT-68). Las dos `boundingBox` eran dos viajes: si la barra
+     crecía entre una y otra, comparaban dos maquetaciones. Ahora se espera a la
+     barra completa y se mide la fila y la tarjeta en el MISMO cuadro. */
+  await expect(page.getByRole('button', { name: 'Buscar citas de un paciente' })).toBeVisible()
+  const desfase = () => tarjeta.evaluate(el => {
+    const fila = document.querySelector('td.fc-timegrid-slot-lane[data-time="11:00:00"]')
+    return fila ? Math.abs(el.getBoundingClientRect().y - fila.getBoundingClientRect().y) : Infinity
+  })
+  expect(await desfase()).toBeLessThanOrEqual(3)
 })

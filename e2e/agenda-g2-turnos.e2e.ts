@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 import { randomUUID } from 'node:crypto'
-import { CORREO, SESION, diaDeLaSemana, enContextoNuevo, interruptorAgenda, soloEscritorio, sqlLocal, arrastrarEventoPorMinutos } from './ayudas'
+import { CORREO, SESION, diaDeLaSemana, enContextoNuevo, interruptorAgenda, selectFiltroMedico, soloEscritorio, sqlLocal, arrastrarEventoPorMinutos } from './ayudas'
 import { abrirAgendaV2, arrastrarFranjas, burbuja, clicEnFranja } from './interaccionesAyudas'
 import { limpiarReservasE2e, marcaE2e } from './reservaAyudas'
 import { api, cerrarEscenario, emitirEnlace, personaNueva, prepararEscenario, type Escenario, type Turno } from './reservaPublicaAyudas'
@@ -182,6 +182,36 @@ test('agenda: arrastrar una cita la deja en el turno más cercano de su consulto
     const evento = p.locator(`.fc-timegrid-col[data-date="${dia}"] .fc-timegrid-event`, { hasText: 'G2 e2e arrastre' })
     const put = p.waitForResponse(r => r.url().includes(`/api/appointments/${id}`) && r.request().method() === 'PUT')
     /* 13:00 + 60 = 14:00 → 14:15 (a 15 min; 13:30 queda a 30). */
+    await arrastrarEventoPorMinutos(p, evento, 60)
+    expect((await put).status()).toBe(200)
+  })
+  expect(sqlLocal(`select to_char(start_time at time zone :'tz', 'HH24:MI') || '-' || to_char(end_time at time zone :'tz', 'HH24:MI')
+                     from public.appointments where id = :'id'`, { id, tz: TZ })).toBe('14:15-15:00')
+})
+
+/* Integración G1–G4 · el ajuste al turno lee los MISMOS consultorios que la
+   rejilla de G4 (los del servidor): el administrador, con «Todos los médicos»,
+   también ve el consultorio de la invitada y su arrastre cae en la rejilla de
+   ELLA (antes no se ajustaba: la RLS de `consultorios` no le enseñaba los de
+   otros médicos). MUTACIÓN: `useAjusteTurno` con los consultorios de la sesión
+   (`config.consultorios`) en vez de `consultoriosV2` → la cita queda a las
+   14:00. */
+test('agenda: el administrador arrastra la cita de la invitada y cae en el turno de SU rejilla', async ({ browser }) => {
+  prepararInvitada()
+  const { dia, semana } = diaLibreDeLaInvitada()
+  const id = sqlLocal(`
+    insert into public.appointments (clinica_id, medico_id, consultorio_id, consultorio_nombre, consultorio_timezone, title,
+                                     start_time, end_time, status, all_day, origen)
+    select p.clinica_id, p.id, c.id, c.nombre, c.timezone, 'G2 e2e arrastre admin', :'i'::timestamptz, :'f'::timestamptz, 'scheduled', false, 'spinus'
+      from public.profiles p join auth.users u on u.id = p.id join public.consultorios c on c.medico_id = p.id and c.nombre = :'n'
+     where u.email = :'c' returning id`,
+  { c: CORREO.medicoA, n: REHAB, i: fechaHoraLocalAInstante(dia, '13:00', TZ), f: fechaHoraLocalAInstante(dia, '13:45', TZ) })
+  await enContextoNuevo(browser, SESION.adminA, async (p) => {
+    await abrirAgendaV2(p)
+    await selectFiltroMedico(p).selectOption('')
+    await aLaSemana(p, semana, dia)
+    const evento = p.locator(`.fc-timegrid-col[data-date="${dia}"] .fc-timegrid-event`, { hasText: 'G2 e2e arrastre admin' })
+    const put = p.waitForResponse(r => r.url().includes(`/api/appointments/${id}`) && r.request().method() === 'PUT')
     await arrastrarEventoPorMinutos(p, evento, 60)
     expect((await put).status()).toBe(200)
   })

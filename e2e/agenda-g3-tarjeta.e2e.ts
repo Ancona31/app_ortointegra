@@ -82,6 +82,11 @@ async function abrirTarjeta(page: Page, apellidos: string): Promise<Locator> {
   await enRejilla.click({ position: { x: 8, y: 8 } })
   const t = tarjetaLectura(page)
   await expect(t).toBeVisible()
+  /* Integración G1–G4 · la tarjeta entra con `ag-capa-entra` (`scale(.97)` →
+     1, `--ag-dur-base`). Medir anchos con varias `boundingBox` a mitad de la
+     entrada compara cuadros con escalas distintas (en la batería salió 1,46 px
+     en «agendada»). Se mide cuando la entrada terminó. */
+  await t.evaluate(el => Promise.all(el.getAnimations({ subtree: true }).map(a => a.finished.then(() => true, () => true))))
   return t
 }
 

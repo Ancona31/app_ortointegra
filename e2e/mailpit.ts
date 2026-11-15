@@ -25,7 +25,24 @@ async function buscar(para: string, asunto: string): Promise<Resumen[]> {
   if (!r.ok) throw new Error(`Mailpit search ${r.status}`)
   const datos: unknown = await r.json()
   const lista = typeof datos === 'object' && datos !== null && 'messages' in datos && Array.isArray(datos.messages) ? datos.messages : []
-  return lista.filter(esResumen).sort((a, b) => b.Created.localeCompare(a.Created))
+  return masRecientesPrimero(lista.filter(esResumen))
+}
+
+/* ⚠️ POR INSTANTE, NUNCA POR TEXTO. Mailpit recorta los ceros de los
+   milisegundos («…:26.65Z», «…:26.807Z», «…:26.5Z»), así que comparar las
+   cadenas pone «.5Z» por DELANTE de «.53Z» (la «Z» va después del «3»): dos
+   correos del mismo segundo salían al revés y `esperarCorreo` devolvía el
+   VIEJO. Con el código de reservar, eso es el código ya canjeado y
+   `/verificar` contesta 400 (`reserva-candado` «ya_tiene_cita», una vez de
+   cada muchas). */
+function instante(creado: string): number {
+  const t = Date.parse(creado)
+  return Number.isNaN(t) ? 0 : t
+}
+
+/** Los correos del más reciente al más viejo, por el instante de `Created` (lo prueba `mailpitOrden.test.ts`). */
+export function masRecientesPrimero<T extends { Created: string }>(lista: readonly T[]): T[] {
+  return [...lista].sort((a, b) => instante(b.Created) - instante(a.Created))
 }
 
 async function leer(id: string): Promise<CorreoCapturado> {
