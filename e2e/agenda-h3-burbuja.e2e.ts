@@ -1,6 +1,6 @@
 import { test, expect, type Locator, type Page } from '@playwright/test'
-import { SESION, diaDeLaSemana, interruptorAgenda, soloEscritorio, sqlLocal } from './ayudas'
-import { abrirAgendaV2, burbuja, clicEnFranja } from './interaccionesAyudas'
+import { SESION, diaDeLaSemana, interruptorAgenda, modalCita, soloEscritorio, sqlLocal } from './ayudas'
+import { abrirAgendaV2, burbuja, clicEnFranja, elegirPaciente } from './interaccionesAyudas'
 
 /**
  * H3 · Puntos 11 a 14 de Angel (escritorio, interruptor encendido).
@@ -15,6 +15,9 @@ import { abrirAgendaV2, burbuja, clicEnFranja } from './interaccionesAyudas'
  *     el formato y la validación de la ficha) y lo guarda en `pacientes.telefono`;
  *     la leyenda va debajo del correo y el teléfono. Con la v2 apagada, el
  *     registro rápido del formulario completo sigue sin teléfono.
+ *   · 14: «Añadir observaciones» (plegado) en la burbuja; lo escrito se guarda
+ *     en `appointments.notes` y pasa al formulario completo con «Más opciones».
+ *     Que NO viajan a Google (S1) lo prueba `agenda-google-dos-sentidos`.
  *
  * Todo en la SEMANA +3 (como `agenda-t1-burbuja`), miércoles.
  *
@@ -25,6 +28,8 @@ import { abrirAgendaV2, burbuja, clicEnFranja } from './interaccionesAyudas'
  *     de antes: el segundo clic cierra la burbuja y abre otra vacía).
  *   · 13: en `QuickPatientModal`, no mandar `telefono` en el cuerpo; y, para la
  *     prueba de la v2 apagada, `conTelefono={true}` en `AppointmentModal`.
+ *   · 14: en `datosDeAltaRapida`, volver a `notes: null`; y en
+ *     `aperturaDesdeBurbuja`, no pasar `notas`.
  */
 soloEscritorio()
 test.use({ storageState: SESION.adminA })
@@ -201,4 +206,55 @@ test('punto 13: con la v2 apagada, el registro rápido del formulario completo s
   await expect(qpm.locator('input[type="email"]')).toBeVisible()
   await expect(qpm.getByLabel('Teléfono celular o WhatsApp')).toHaveCount(0)
   await expect(qpm.getByText(LEYENDA)).toHaveCount(0)
+})
+
+const OBS = 'Trae estudios de laboratorio previos (H3)'
+
+function borrarCitasConObs(): void {
+  sqlLocal(`begin; set local session_replication_role = replica;
+    delete from public.cita_confirmaciones where appointment_id in (select id from public.appointments where notes = :'obs');
+    delete from public.appointments where notes = :'obs'; commit;`, { obs: OBS })
+}
+
+test('punto 14: las observaciones de la burbuja son discretas, opcionales y se guardan en la cita', async ({ page }) => {
+  interruptorAgenda('A', true)
+  borrarCitasConObs()
+  try {
+    await abrirAgendaV2(page)
+    await aLaSemanaMasTres(page)
+    await clicEnFranja(page, MIERCOLES, '15:30')
+    const b = burbuja(page)
+    // Plegadas: sólo el enlace, sin área de texto.
+    const enlace = b.getByRole('button', { name: 'Añadir observaciones' })
+    await expect(enlace).toHaveAttribute('aria-expanded', 'false')
+    await expect(b.getByRole('textbox', { name: 'Observaciones' })).toHaveCount(0)
+    await elegirPaciente(b, 'Prueba 21')
+    await enlace.click()
+    const area = b.getByRole('textbox', { name: 'Observaciones' })
+    await expect(area).toBeFocused()
+    await area.fill(OBS)
+    const post = page.waitForResponse(r => r.request().method() === 'POST' && r.url().endsWith('/api/appointments') && r.status() === 200)
+    await b.getByRole('button', { name: 'Guardar', exact: true }).click()
+    const aviso = page.getByRole('dialog', { name: /Se empalma/ })
+    await expect(aviso.or(b.getByText('Cita agendada', { exact: true })).first()).toBeVisible()
+    if (await aviso.count()) await aviso.getByRole('button', { name: 'Aceptar' }).click()
+    const id = ((await (await post).json()) as { appointment: { id: string } }).appointment.id
+    expect(sqlLocal(`select notes from public.appointments where id = :'id'`, { id })).toBe(OBS)
+  } finally {
+    borrarCitasConObs()
+  }
+})
+
+test('punto 14: «Más opciones» lleva las observaciones de la burbuja a las «Notas» del formulario completo', async ({ page }) => {
+  interruptorAgenda('A', true)
+  await abrirAgendaV2(page)
+  await aLaSemanaMasTres(page)
+  await clicEnFranja(page, MIERCOLES, '15:30')
+  const b = burbuja(page)
+  await b.getByRole('button', { name: 'Añadir observaciones' }).click()
+  await b.getByRole('textbox', { name: 'Observaciones' }).fill(OBS)
+  await b.getByRole('button', { name: 'Más opciones' }).click()
+  const modal = modalCita(page, 'Nueva cita')
+  await expect(modal).toBeVisible()
+  await expect(modal.getByPlaceholder('Instrucciones, observaciones...')).toHaveValue(OBS)
 })

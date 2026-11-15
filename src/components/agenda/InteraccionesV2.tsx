@@ -166,6 +166,8 @@ function aperturaDesdeBurbuja(v: MasOpcionesBurbuja): AperturaAltaV2 {
     ...(v.paciente ? { paciente: v.paciente } : {}),
     ...(v.horaFin ? { horaFin: v.horaFin } : {}),
     ...(v.medicoId ? { medicoId: v.medicoId } : {}),
+    /* H3 (punto 14): las observaciones escritas en la burbuja pasan al modal. */
+    ...(v.notas?.trim() ? { notas: v.notas } : {}),
   }
 }
 

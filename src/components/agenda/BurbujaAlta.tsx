@@ -44,7 +44,7 @@
  * la tapa al instante. Lo nuevo de T1 no añade ninguna animación.
  */
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactElement } from 'react'
-import { Check, Mail, X } from 'lucide-react'
+import { Check, Mail, Plus, X } from 'lucide-react'
 import Portal from '@/components/ui/Portal'
 import QuickPatientModal from '@/components/ui/QuickPatientModal'
 import { BotonWhatsAppCita } from '@/components/agenda/BotonWhatsAppCita'
@@ -71,6 +71,8 @@ export interface MasOpcionesBurbuja {
   horaFin: string
   paciente?: PacienteBusqueda
   medicoId: string | null
+  /** H3 (punto 14) · Lo escrito en «Observaciones», para que «Más opciones» no lo pierda. */
+  notas?: string
 }
 
 interface Props {
@@ -365,6 +367,31 @@ function SelectorMedico({ medicos, valor, alCambiar }: PropsMedico): ReactElemen
   )
 }
 
+interface PropsObservaciones { valor: string; alCambiar: (v: string) => void }
+
+/**
+ * H3 (punto 14) · Las observaciones de la cita, discretas y opcionales: plegadas
+ * tras «Añadir observaciones» y, abiertas, un área que crece con el texto. Van
+ * al mismo `notes` que las «Notas» del formulario completo, y como ellas NO
+ * viajan a Google (S1: la descripción del evento es fija, `eventoParaGoogle`).
+ */
+function CampoObservaciones({ valor, alCambiar }: PropsObservaciones): ReactElement {
+  const [abierto, setAbierto] = useState(valor !== '')
+  if (!abierto) {
+    return (
+      <button type="button" className="ag-capa-enlace ag-capa-enlace--discreto" aria-expanded={false} onClick={() => setAbierto(true)}>
+        <Plus size={14} aria-hidden="true" /> Añadir observaciones
+      </button>
+    )
+  }
+  return (
+    <label className="ag-capa-campo">
+      Observaciones
+      <textarea rows={2} autoFocus value={valor} onChange={e => alCambiar(e.target.value)} placeholder="Opcional" />
+    </label>
+  )
+}
+
 interface PropsPie { guardando: boolean; alGuardar: () => void; alMasOpciones: () => void; boton: { current: HTMLButtonElement | null } }
 
 /* G3 (punto 17, «Alta rápida» de la maqueta): «Más opciones» y «Guardar» en dos
@@ -536,6 +563,7 @@ export default function BurbujaAlta(props: Props): ReactElement {
   const [horas, setHoras] = useState({ inicio: props.horaInicio, fin: props.horaFin })
   const [paciente, setPaciente] = useState<PacienteBusqueda | null>(null)
   const [medicoId, setMedicoId] = useState(() => medicoPropuesto(filtroMedico, medicos))
+  const [notas, setNotas] = useState('')
   const campo = useRef<HTMLInputElement | null>(null)
   const botonGuardar = useRef<HTMLButtonElement | null>(null)
   const registro = useRegistroEnBurbuja(setPaciente, campo, botonGuardar)
@@ -543,8 +571,8 @@ export default function BurbujaAlta(props: Props): ReactElement {
   const { estado, creada, guardar } = useGuardadoBurbuja(props.alGuardar, salir)
   const idTitulo = useId()
   const entrada = { fecha, horaInicio: horas.inicio, horaFin: horas.fin, paciente, medicoId,
-    consultorioId: consultorioPropuesto(consultorioActivo, medicoId) }
-  const masOpciones = (): void => alMasOpciones({ fecha, hora: horas.inicio, horaFin: horas.fin, paciente: paciente ?? undefined, medicoId })
+    consultorioId: consultorioPropuesto(consultorioActivo, medicoId), notas }
+  const masOpciones = (): void => alMasOpciones({ fecha, hora: horas.inicio, horaFin: horas.fin, paciente: paciente ?? undefined, medicoId, notas })
 
   return (
     <>
@@ -566,6 +594,7 @@ export default function BurbujaAlta(props: Props): ReactElement {
               <CampoPaciente paciente={paciente} alElegir={setPaciente} alRegistrar={registro.abrir} campo={campo} />
               <CamposHorario inicio={horas.inicio} fin={horas.fin} alCambiar={(inicio, fin) => setHoras({ inicio, fin })} />
               {necesitaElegirMedico(filtroMedico, medicos) && <SelectorMedico medicos={medicos} valor={medicoId} alCambiar={setMedicoId} />}
+              <CampoObservaciones valor={notas} alCambiar={setNotas} />
               {estado.error && <p className="ag-capa-error" role="alert">{estado.error}</p>}
               <PieBurbuja guardando={estado.guardando} alGuardar={() => void guardar(entrada)} alMasOpciones={masOpciones} boton={botonGuardar} />
             </>

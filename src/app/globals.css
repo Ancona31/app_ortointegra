@@ -6198,6 +6198,33 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
   border-radius: var(--ag-r-btn);
 }
 .ag-capa-enlace:hover { background: var(--ag-btn-ghost-hover); }
+/* H3 (punto 14) · «Añadir observaciones» de la burbuja: el mismo enlace, pero
+   discreto (a la izquierda, sin negrita) y con el «+» delante. */
+.ag-capa-enlace--discreto {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ag-1);
+  margin-inline-start: calc(-1 * var(--ag-2-5));
+  font-weight: 500;
+}
+/* Abiertas, un área de dos líneas que crece con el texto hasta seis (donde el
+   navegador sabe, `field-sizing`; donde no, dos líneas con desplazamiento). */
+.ag-capa-campo textarea {
+  min-height: calc(2lh + 2 * var(--ag-1-5) + 2px);
+  max-height: calc(6lh + 2 * var(--ag-1-5) + 2px);
+  padding: var(--ag-1-5) var(--ag-2-5);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--ag-ink);
+  background: var(--ag-surface);
+  border: 1px solid var(--ag-input-border);
+  border-radius: var(--ag-r-btn);
+  resize: none;
+  field-sizing: content;
+}
 
 /* La ayuda de atajos. */
 .ag-atajos {
