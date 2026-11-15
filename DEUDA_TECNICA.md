@@ -4017,7 +4017,13 @@ tanda (sólo burbuja, buscador y formulario de la agenda).
 
 ### AG-DT-31 — La rejilla dibuja en la hora del dispositivo aunque el consultorio esté en otra zona
 
-**Estado:** 🟡 abierta, anterior a v2 (T2, punto 11; no se cambió) · Un
+**Estado:** 🟢 **parcialmente resuelta (G4, punto 19, 2026-11-14)**: el gris y el
+aviso de fuera de horario de un consultorio en otra zona ya van en la hora del
+consultorio (con Tijuana activo, el blanco es 11:00–13:00 de Mérida, la tarjeta
+de las 11:00 cae dentro y arrastrarla a su sitio no avisa; `agenda-g4-husos`).
+Lo que queda: las citas siguen dibujadas en la hora del dispositivo (con su
+etiqueta «09:00 hora Baja California»), y la semana del cambio de horario de
+verano (AG-DT-65). Texto original: 🟡 abierta, anterior a v2 (T2, punto 11) · Un
 médico con consultorios en dos zonas ve las citas de la otra zona desplazadas
 (con la etiqueta de su hora local en la tarjeta), y la banda gris del horario
 propio de ese consultorio se pinta en horas del dispositivo, no del
@@ -4044,7 +4050,9 @@ una RPC que devuelva la preparación de todos de una vez.
 
 ### AG-DT-33 — El aviso de fuera de horario del formulario mira el consultorio de la rejilla, no el elegido
 
-**Estado:** 🟡 abierta (T2, punto 10) · Si la rejilla enseña el consultorio A
+**Estado:** ✅ **resuelta (G4, punto 11, 2026-11-14)**: el formulario compara
+contra el consultorio elegido, en su zona (`crearAvisosHorario`, `donde = {
+consultorioId, medicoId }`). Texto original: 🟡 abierta (T2, punto 10) · Si la rejilla enseña el consultorio A
 (horario propio) y en el formulario se elige el consultorio B del mismo
 médico, el aviso mira el horario de A. Arreglo: que `AppointmentModal`
 resuelva el horario con `horarioEfectivo` del consultorio elegido (con la v2).
@@ -4150,6 +4158,187 @@ corren sus `afterAll`), lo que dejó se trata como «de antes» en los archivos
 siguientes de esa corrida (se aparca y se devuelve, no se borra) hasta la
 siguiente siembra; algunas cuentas de `reserva_contactos` por médico de
 `agenda-por-ligar` y `agenda-enlaces-reserva` dan por hecho que no hay otros.
+
+### AG-DT-47 — Los colores de los correos de cita son copia de los tokens
+
+**Estado:** 🟡 abierta, aceptada (G1, punto 4) · `src/lib/correo/plantillaCita.ts`
+lleva en hex los valores de fábrica de `--ag-navy`, `--cs` y la tinta y las
+superficies de la agenda, porque un correo no lee variables CSS. Si la paleta
+cambia en `globals.css`, los correos no la siguen solos. Tampoco siguen la marca
+de la clínica (a propósito: el cromo es el de Spinus, como en `/r/[folio]`).
+
+### AG-DT-48 — El oscuro de las páginas públicas es copia del de la agenda
+
+**Estado:** 🟡 abierta, aceptada (G1) · `agendaPublica.css` redeclara 29 `--ag-*`
+de `html.dark` dentro de `@media (prefers-color-scheme: dark)` (las páginas
+públicas no montan `ScriptTema`). `agendaPublicaTokens.test.ts` falla si
+divergen, pero un token NUEVO que estas páginas empiecen a usar hay que añadirlo
+a mano al bloque oscuro.
+
+### AG-DT-49 — El correo del código para reservar no dice el consultorio
+
+**Estado:** 🟡 abierta, aceptada (G1) · La maqueta lo ponía al pie; `POST
+/api/reservar/[codigo]/codigo` sólo recibe el correo y añadirlo pediría cambiar
+la API pública (regla de la tanda: sólo presentación).
+
+### AG-DT-50 — Ni Playwright ni la semilla pueden resembrar con una nota o un documento clínico sobre un paciente de la semilla
+
+**Estado:** 🟡 abierta, aceptada (G1, G3) · `agenda-semilla.ts` se niega a
+borrar expediente clínico (correcto: NOM-004) y `global-setup` aborta, así que
+ninguna e2e corre. Le pasó a G1 con una `solicitud_lab` hecha a mano sobre
+«Hugo Interián Canché», y la prueba G3-7 de la guía deja a propósito una
+nota real. Salida: P5 de la guía (reiniciar la base) y P6 a P8.
+
+### AG-DT-51 — El administrador no puede poner la duración por consultorio de OTRO médico
+
+**Estado:** 🟡 abierta, aceptada (G2) · El disparador
+`validar_tipo_cita_consultorio()` (INVOKER) lee `consultorios` con la RLS de
+quien escribe y el administrador no ve los consultorios de otros médicos
+(`consultorios_select`): falla cerrado con 23514. La opción sale sólo en la fila
+del consultorio, para su dueño. Abrirlo pediría que el disparador lea como
+definer o abrir la policy de `consultorios` al administrador.
+
+### AG-DT-52 — Con un tipo «Consulta» de toda la clínica y la duración propia del médico, su enlace ofrece dos
+
+**Estado:** 🟡 abierta, aceptada (G2) · Un tipo de toda la clínica
+(`medico_id` nulo) vale para todos; la duración propia del médico es otro tipo.
+En su enlace salen los dos («Consulta» de la clínica y la suya). No se ocultan
+los de la clínica (lo que menos cambia).
+
+### AG-DT-53 — El redimensionado de una cita no se ajusta a la rejilla
+
+**Estado:** 🟡 abierta, aceptada (G2, punto 9) · Sólo el clic, la selección y el
+arrastre caen en el turno más cercano; estirar una cita conserva la hora del
+gesto (no lo pidió Angel).
+
+### AG-DT-54 — Los cuatro ajustes de la clínica no tienen los controles de más y menos de la maqueta
+
+**Estado:** 🟡 abierta, aceptada (G2, punto 5) · Siguen como campos numéricos.
+
+### AG-DT-55 — El ajuste al turno usa los tipos leídos al abrir la agenda
+
+**Estado:** 🟡 abierta, aceptada (G2) · `useAjusteTurno` recibe los tipos que
+lee la página en el servidor (`leerTiposAjuste`, una vez por montaje; desde la
+integración, no del navegador) y los guarda en una referencia (no en estado,
+para no repintar la rejilla). Un cambio
+de duración hecho en otra pestaña se nota al recargar.
+
+### AG-DT-56 — Un médico puede archivar su duración de la consulta sin dejar otra
+
+**Estado:** 🟡 abierta, aceptada (G2b) · Su enlace pasa a «No abrirá: falta la
+duración de la consulta» y «Primeros pasos» vuelve a preguntarla. No hay mínimo,
+a propósito.
+
+### AG-DT-57 — La confirmación por correo de la misma hora no se puede reenviar
+
+**Estado:** 🟡 abierta, aceptada (G3, punto 14) · Una por hora de inicio (la
+llave de E4), salvo que el envío falle o quede colgado (hasta 3 veces);
+reagendar permite otra. Si el paciente dice que no le llegó, sólo queda el
+WhatsApp o reagendar. Abrirlo pide que la Idempotency-Key lleve el intento
+(`confirmacion/<envío>/<n>`) y una regla de espera en la base.
+
+### AG-DT-58 — `motivoSinCorreo` no mira `pacientes.activo`
+
+**Estado:** 🟡 abierta, aceptada (G3) · La base sí lo mira. Para médico y
+secretaria no cambia nada (la RLS les oculta el correo de un paciente inactivo y
+sale «sin correo»); un administrador ve el botón en la cita de un paciente
+inactivo y recibe «El correo no está disponible ahora…» (409 `no_disponible`).
+Nunca se manda.
+
+### AG-DT-59 — Dos pulsaciones de «Por correo» desde dos pestañas
+
+**Estado:** 🟡 abierta, aceptada (G3) · La segunda contesta «Ya se envió por
+correo.» mientras el primero aún sale. En una misma pestaña el botón se
+deshabilita al pulsar.
+
+### AG-DT-60 — Un fallo de plantilla del correo se contesta como uno de transporte
+
+**Estado:** 🟡 abierta, aceptada (G3) · 502 «Inténtalo de nuevo», heredado de
+`recordatorios.ts`.
+
+### AG-DT-61 — Por PostgREST directo se puede mover o cambiar el estado de una cita atendida, también con nota clínica, y con la v2 apagada borrarla
+
+**Estado:** 🟡 abierta (G3, punto 17.3 y decisión 3 de Angel) · El veto por
+estado (`vetoPorEstado`) y el de la nota ligada (`vetoPorNotaLigada`,
+`notaLigadaServidor.ts`) son de la API (`PUT` y `DELETE
+/api/appointments/[id]`), no de la base. Con la sesión de la app y sin pasar por
+`/api`, la RLS de `appointments_update` deja mover una atendida o cambiar su
+estado aunque tenga nota, y con la v2 apagada `cita_proteger_borrado` no impide
+borrarla (la FK de la nota es `SET NULL`: la nota se quedaría sin cita).
+Cerrarlo del todo pide un disparador `BEFORE UPDATE OR DELETE` en
+`appointments` que mire `consultas` (migración con su auditoría; no es una
+policy).
+
+### AG-DT-62 — El chip del Mes sin `status` no lleva etiqueta accesible propia
+
+**Estado:** 🟡 abierta, anterior (visto en G3) · La fila salvavidas sin estado
+nunca la tuvo.
+
+### AG-DT-63 — El 409 `nota_ligada` le dice a la secretaria que la cita tiene nota
+
+**Estado:** 🟡 abierta, **decisión de Angel** (G3, decisión 3) · Sólo la
+existencia, nunca el contenido; ya ve que la cita está atendida. Si se prefiere,
+unificarlo con `estado_no_admite` es cambiar una cadena.
+
+### AG-DT-64 — Con varios consultorios con hueco entre ellos, el panel de huecos ofrece la hora gris
+
+**Estado:** 🟡 abierta, aceptada (G4, punto 11) · Con «Todos» o un médico con
+dos consultorios (Centro 08–12 y Norte 15–19), el gris marca 12–15, pero el
+panel de huecos de Día usa un tramo por día (08–19) y puede ofrecer 12:00–15:00
+como hueco. Con el consultorio activo (uno solo) es exacto. Arreglo: que
+`resumenDelDia` reciba los tramos por consultorio (`businessHours`) en vez de
+`jornadaDelDia`.
+
+### AG-DT-65 — El gris de la semana en que un consultorio de otra zona cambia de horario de verano
+
+**Estado:** 🟡 abierta, aceptada (G4, punto 19) · El desfase se mide una vez, al
+mediodía del primer día visible: en esa semana los días posteriores al cambio
+pintan el gris una hora corrido. Dos semanas al año y sólo con consultorios en
+otra zona. El aviso de fuera de horario no tiene el defecto (se mide en el
+instante de la cita).
+
+### AG-DT-66 — La semilla deja los consultorios «sin heredar» el horario
+
+**Estado:** 🟡 abierta (G4) · `scripts/agenda-semilla.ts` crea los consultorios
+con `horario_propio = false`; tras sembrar, la base local no refleja la
+migración `20261119130000` para las clínicas Semilla A y B. Inocuo
+(`horarioEfectivo` da lo mismo), pero la configuración enseña «Usa el horario de
+la clínica» donde producción enseñará un horario propio. Arreglo: que la semilla
+cree los consultorios con `horario_propio = true` y el horario de la clínica.
+
+### AG-DT-67 — La configuración no avisa de un consultorio sin ningún tipo que valga allí
+
+**Estado:** 🟡 abierta, aceptada (integración G1–G4, punto 5) · La página de
+reserva deja fuera el consultorio sin ningún tipo que valga (sólo pasa si el
+médico archivó su duración general y conserva la de otro consultorio), pero
+`motivosApertura` cuenta los tipos del médico entero y la ficha del enlace dice
+«Activo». Arreglo: que la preparación del enlace cuente por consultorio.
+
+### AG-DT-68 — Con la v2, la barra de la agenda crece 44 px medio segundo después de pintarse
+
+**Estado:** 🟡 abierta, anterior a la tanda (visto en la integración G1–G4; igual
+en la base `dd634b9`) · `HerramientasV2` («Ir a una fecha», «Buscar citas de un
+paciente», «Atajos de teclado») se carga con `next/dynamic` y se monta hacia los
+530 ms; en escritorio (1440 px) la barra pasa de una fila (61 px) a dos (105 px):
+«Por confirmar» y «Agendar» bajan a la segunda y TODA la rejilla baja 44 px con
+la agenda ya a la vista (un salto de maquetación). Con la v2 apagada no pasa
+(no hay herramientas). Era lo que hacía fallar a ratos
+`husos-dos-consultorios` «la dibuja a las 11:00» (la prueba medía la fila y la
+tarjeta en dos viajes; ya mide en uno, tras la barra completa). Arreglo
+posible: reservar el hueco de las herramientas desde el primer render (un
+marcador del mismo ancho) o dejar que la barra no envuelva.
+
+### AG-DT-69 — Cinco e2e fallan los domingos
+
+**Estado:** 🟡 abierta, anterior a la tanda (visto en la integración G1–G4, el
+domingo 2026-11-15; fallan igual en la base `dd634b9`) · `agenda-f-pulido` F1.4,
+F1.8 y F1.14 (vista Día de hoy: el domingo está cerrado en la semilla y no hay
+citas), F1.12 (la lista de Semana del teléfono: «sin lista») y
+`husos-dos-consultorios` «la agenda» (no encuentra «Periodo siguiente»). Dependen
+del día en que se corre, como F1.12 los sábados (arreglado en la tanda
+anterior). Los otros seis días pasan. F1.12 conviene mirarlo primero: puede ser
+un defecto de la lista y no de la prueba. Arreglo: que cada prueba fije su día
+(el lunes de la semana visible) en vez de «hoy».
 
 ---
 

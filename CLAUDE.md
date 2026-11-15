@@ -447,11 +447,12 @@ Plan, decisiones y avance: `mejora_agendaV2.md` (§6-bis decisiones, §7 lo que
 le toca a Angel, §10 lo que no se probó en local). Auditoría del conjunto de
 migraciones: `supabase/AUDITORIA-CONJUNTO-AGENDA-V2.md`. Guía local:
 `GUIA_AUDITORIA_AGENDA_V2.md`; pruebas a mano: `GUIA_PRUEBAS_AGENDA_V2.md`.
-Deuda abierta: `DEUDA_TECNICA.md`, AG-DT-13 a AG-DT-46.
+Deuda abierta: `DEUDA_TECNICA.md`, AG-DT-13 a AG-DT-69.
 
-**Estado:** el código y las 20 migraciones (`20261111120000` a
-`20261117130000`: las 16 del cierre y las 4 de las correcciones de seguridad)
-están en `feature/agenda-v2`, probados sólo en local. En producción no hay nada
+**Estado:** el código y las 24 migraciones (`20261111120000` a
+`20261119140000`: las 16 del cierre, las 4 de las correcciones de seguridad y
+las 4 de la tanda de diseño, duración y horarios) están en `feature/agenda-v2`,
+probados sólo en local. En producción no hay nada
 aplicado ni encendido hasta que Angel lo haga (§7).
 
 **Reglas que un editor futuro no debe romper:**
@@ -573,11 +574,10 @@ migraciones).** Además de lo de arriba:
   sesión»** de la gestión de enlaces: lee con `createAdminClient()` sólo
   `medico_id, horario, horario_propio` de `consultorios`, filtrado por
   `clinica_id` y con el alcance del rol; del navegador sólo sale el motivo.
-* **La rejilla y TODOS los avisos de fuera de horario leen una sola variable**
-  (`horario` de `AgendaCliente`, `horarioDeLaRejilla` en `horarioRejilla.ts`).
-  Con la v2 apagada debe ser el MISMO objeto `config?.horario ??
-  HORARIO_DEFAULT` (A1-bis). No pases a un aviso un horario distinto del que
-  pinta la rejilla.
+* ~~La rejilla y los avisos leen una sola variable `horario`
+  (`horarioDeLaRejilla`)~~: **sustituido por la regla de G4, abajo** (la agenda
+  se dibuja con los consultorios). Lo que sigue en pie: con la v2 apagada, el
+  MISMO objeto `config?.horario ?? HORARIO_DEFAULT` (A1-bis).
 * **Convertir en cita (AG-DT-29) es un alta:** con la v2, colgarle un paciente
   a una fila sin paciente que no está por ligar pasa por `vetoDeConversion`
   (`porLigarServidor.ts`): las tres funciones de `appointments_gates_insert`
@@ -596,6 +596,103 @@ migraciones).** Además de lo de arriba:
   devuelven). No vuelvas a un `delete` de todo lo de una clínica en una
   prueba. Pero la semilla, y por tanto cada corrida de Playwright, recrea las
   clínicas Semilla A y B enteras (AG-DT-46).
+
+**Tanda de diseño, duración y horarios (2026-11-14, ramas G1-G4; 4 migraciones,
+el conjunto pasa a 24 del proyecto).** Además de lo de arriba:
+
+* **Páginas públicas de la agenda (G1):** `/reservar` y `/confirmar` van dentro
+  de `MarcoPublico` (`src/components/agendaPublica/`) con `agendaPublica.css`
+  (prefijo `rp-`, sólo tokens `--ag-*`). Sin `ScriptTema`: el oscuro lo pone
+  `prefers-color-scheme` redeclarando los `--ag-*` de `html.dark`; si cambias un
+  valor oscuro en `globals.css`, cámbialo también ahí
+  (`agendaPublicaTokens.test.ts` falla si no). Fechas con `mayusculaInicial`,
+  nunca con la clase `capitalize` («13 De Noviembre»).
+* **Todo correo de cita se arma con `src/lib/correo/plantillaCita.ts`**
+  (`htmlCorreoCita`/`textoCorreoCita`): tablas y estilos en línea, marca en
+  texto, SIN imágenes, botones «a prueba de balas», todo escapado ahí y nada
+  clínico. No vuelvas a un `envolver` propio. Los colores son copia de los
+  tokens de fábrica (AG-DT-47). **El recordatorio y la confirmación comparten
+  cuerpo** (`correoDeCita` en `correosCita.ts`) y cada uno pone SUS palabras
+  (`PalabrasCorreo`: asunto y título): la confirmación puede salir días antes y
+  no dice «Recordatorio» ni «mañana». No metas palabras de uno en el cuerpo
+  común.
+* **La duración de la consulta es un tipo de cita** `principal` del médico; la
+  de un consultorio, otro principal con `consultorio_id` (`20261119120000`).
+  Qué tipos valen en un consultorio lo decide `tiposDelConsultorio`
+  (`src/lib/agenda/tiposPorConsultorio.ts`), UNA regla para la página de
+  reserva (en el servidor, `tiposPorConsultorio`), `/turnos`, el POST, el modal
+  y el ajuste de la agenda. `reservar_por_enlace` NO mira el consultorio del
+  tipo: no la llames sin filtrar antes. A la página pública no viajan
+  `principal` ni `consultorio_id`.
+* **`tipos_cita_insert` y `tipos_cita_update` dejan al médico crear, cambiar y
+  archivar SUS tipos** (`20261119120000`, `20261119121000`; decisión de Angel),
+  sin reasignarlos (WITH CHECK = USING); el administrador, como en B6; la
+  secretaria, nada. Archivar es UPDATE: no hay DELETE en `tipos_cita` y no debe
+  haberlo.
+* **Turnos en rejilla fija** (`turnosDeJornada`): desde la apertura con paso
+  igual a la duración; un turno tocado en parte no se ofrece. `turnoValido` es
+  SÓLO la rejilla; lo libre lo decide la RPC con la misma condición de empalme.
+  No vuelvas a contar turnos desde cada hueco ni a validar con la ocupación.
+* **El ajuste al turno de la agenda** (`useAjusteTurno`) sólo actúa con la v2 y
+  con consultorio y duración claros; nunca toca la hora escrita a mano. Lee los
+  MISMOS consultorios que la rejilla (`consultoriosV2` y `seleccion` de
+  `AgendaCliente`): en un clic, el único de la selección con un médico a la
+  vista. Los tipos los lee la PÁGINA en el servidor (`leerTiposAjuste`,
+  sesión y RLS) y llegan como promesa: no los pidas desde el navegador al montar
+  (era una validación más contra Auth al abrir). Van a una referencia: si los
+  pasas a estado, su llegada vuelve a pintar la rejilla.
+* **La agenda v2 se dibuja con los consultorios, no con la clínica (G4;
+  sustituye a la regla de T2 de «una sola variable `horario`»)**
+  (`src/lib/agenda/horarioRejilla.ts`: `consultoriosDeLaRejilla`,
+  `fuenteDeLaRejilla`, `crearAvisosHorario`). Rejilla, «Compactar», hora de
+  apertura, Mes y panel de huecos leen `fuente.horario` (en la hora del
+  dispositivo, con los consultorios de otra zona convertidos) y el gris
+  `fuente.businessHours`; los avisos de fuera de horario del alta, el arrastre,
+  la burbuja y el formulario, `avisosHorario`, que compara en la hora del
+  consultorio de la cita. No pases a un aviso un horario «convertido». Apagada,
+  `config?.horario ?? HORARIO_DEFAULT`, el MISMO objeto, y los avisos de
+  siempre (A1-bis). Con la v2 el botón dice «Compactar la rejilla al horario de
+  los consultorios» (`etiquetaCompactar(vista, agendaV2)`).
+* **`clinicas.horario_consulta` no se borra ni se cambia** (spinus-consola): con
+  la v2 sólo lo heredan los consultorios con `horario_propio = false`. La
+  migración `20261119130000` copió una vez el de la clínica a cada consultorio
+  sin horario propio, con respaldo en `respaldos.consultorios_horario_20261119`
+  (esquema sin privilegios para `anon`, `authenticated` ni `service_role`).
+  La configuración con la v2 no tiene «Horario de la clínica»; el engrane
+  apagado sigue abriendo `HorarioModal`.
+* **Tercera excepción a «sólo cliente de sesión»:**
+  `consultoriosAgendaServidor.ts` lee con `createAdminClient()` `id, medico_id,
+  timezone, horario, horario_propio, activo` de `consultorios`, filtrado por
+  `clinica_id` y por el alcance de `appointments_select` (administrador y
+  secretaria: todos; médico: los suyos), sólo con la v2.
+* **El correo de confirmación de Spinus** (`POST /api/agenda/correo`,
+  `confirmacionCita.ts`) va por `cita_correo_tomar` con `tipo:
+  'confirmacion'` (`20261119140000`): el destinatario lo da la base, una por
+  hora de inicio, y no quita el recordatorio. Lo manda cualquier rol que vea la
+  cita (decisión de Angel). La regla de cuándo se ofrece es `motivoSinCorreo`
+  (`whatsappCita.ts`), la misma en la ruta y en los botones.
+* **Las acciones de la tarjeta dependen del estado** (`disposicionDeTarjeta`,
+  `accionesTarjeta.ts`): no añadas una acción en un componente; y lo que la
+  tarjeta no ofrece, el servidor lo rechaza (`vetoPorEstado`, `estadoCita.ts`):
+  una atendida no se confirma, ni se cancela, ni se mueve. «Editar» es el
+  engrane «Configuración de la cita»; las e2e lo pulsan con
+  `editarDesdeTarjeta`.
+* **Una cita atendida con nota clínica ligada no cambia de estado ni se borra**
+  (`vetoPorNotaLigada`, `notaLigadaServidor.ts`), con o sin v2. Es regla de la
+  API; en la base falta el disparador (AG-DT-61).
+* **«Reagendar cita» (cancelada, no asistió) crea OTRA cita**
+  (`altaParaReagendar`): nunca reabras la cancelada o la falta; cuentan para el
+  candado y para la agenda.
+* **Con la v2, ninguna cita lleva `title`**: su caja lleva `role="group"` y
+  `aria-label`. No vuelvas a ponerlo (el aviso negro lo quitó Angel). **El
+  interruptor llega a las cajas por `useSinAvisoFlotante`**
+  (`MemoizedEventContent.tsx`, lo fija `AgendaCliente`), **nunca como argumento
+  de `renderEventContent`**: si `renderEC` depende del interruptor, al leerse
+  cambia `eventContent` y FullCalendar repinta todas las citas (+8 ms al volver
+  del dashboard, medido). Es un valor de módulo: vale porque sólo hay una
+  `AgendaCliente` montada a la vez. La sombra
+  del hover no se anima: la transición de la caja de la cita es sólo de
+  `transform` (3 px); la tarjeta al pasar abre a los 0,5 s.
 
 ---
 

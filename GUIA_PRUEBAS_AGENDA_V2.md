@@ -2,7 +2,8 @@
 
 Para Angel. Sirve para probar a mano, en tu computadora y con datos inventados,
 todo lo que se hizo en la mejora de la agenda: bloques A, B, C, D, D11, E y F,
-y la tanda tras tus primeras pruebas a mano (§8-bis).
+la tanda tras tus primeras pruebas a mano (§8-bis) y la tanda de diseño,
+duración y horarios (§8-ter).
 No hace falta leer código. Todo pasa en tu máquina: la base de datos, los
 correos (que no salen a internet) y un Google de mentira. Nada toca producción.
 
@@ -48,6 +49,49 @@ cambiaron o tocan algo que cambió:
 - **Seguridad:** SEG-A2 (ya decidido).
 - **Apagado:** X1 (la búsqueda del formulario sale también apagada) y X2.
 
+**Al día con la tanda de diseño, duración y horarios (2026-11-14).** Tus
+puntos de ese día y tus cinco respuestas están hechos (§8-ter). La base pasa a
+**29 migraciones**. Queda UNA decisión tuya: si la secretaria puede saber que una
+cita atendida tiene nota clínica (G3-7).
+
+**Qué repetir tras la tanda del 2026-11-14 (diseño, duración y horarios).**
+Antes de nada, P5 a P8 (la base pasa a **29** migraciones). Después, en este
+orden:
+
+1. Las nuevas de §8-ter: G1-1 a G1-8, G2-1 a G2-9, G3-1 a G3-10 y G4-1 a G4-6
+   (G3-7 al final: deja una nota real y obliga a P5).
+2. **D0, D1, D2 y D3** (reservar por enlace): el consultorio es una tarjeta, el
+   tipo sólo sale con más de uno (y sólo los del consultorio elegido) y tras
+   elegir hora hay que pulsar «Continuar». Recién sembrado no hay tipos: antes,
+   contesta la duración de la consulta (G2-1).
+3. **D5, D12 y SEG-A5** (turnos): ahora en rejilla fija desde la apertura (G2-6).
+4. **E1 a E4 y E7** (la página de confirmación y reagendar desde el enlace):
+   mismos botones y mensajes, con el aspecto nuevo; «Volver» es un enlace
+   centrado; el «Estás reagendando…» sale como aviso azul encima de los pasos.
+5. **E8** (el recordatorio): dos botones; «No podré asistir» abre directo el
+   «¿Seguro?». Y todas las que miran un correo (D4, E1, E5, E8): ahora empiezan
+   con «Spinus».
+6. **E10, T1-6, T1-7 y T1-8** (WhatsApp): el botón se llama «Enviar
+   confirmación» («Enviar recordatorio» si está confirmada); tras agendar desde
+   la burbuja, «Enviar confirmación» y «Por correo».
+7. **F21 y F22** (burbuja y tarjeta): la tarjeta cambia por estado (G3-4, G3-5)
+   y «Editar» es el engrane «Configuración de la cita»; «Reagendar cita» de una
+   cancelada crea una cita nueva.
+8. **T3-5 y T3-8** (al pasar el ratón): 0,5 s, no 1; la cita sube 3 px con
+   sombra, no 1 px.
+9. **B4, B5 y B6** (tipos y disponibilidad): la sección se llama «Duración y
+   tipos de cita», la invitada crea, cambia y archiva los suyos, y no hay
+   «Horario de la clínica» (cada consultorio dice su horario en una línea).
+10. **T2-1, T2-2, T2-5 y T2-6** (configuración guiada y horario en la agenda):
+    «Primeros pasos» en lugar de «Para empezar»; T2-2 ya no es una decisión
+    pendiente (la invitada sí crea su duración); el gris y los avisos dicen
+    «este consultorio»; con Tijuana activo la tarjeta de las 11:00 cae en
+    blanco y no avisa.
+11. **B7, F5 y F11** («Compactar»): con la v2 el botón se llama «Compactar la
+    rejilla al horario de los consultorios» y usa el de los consultorios.
+12. **X1, X2 y X5** (v2 apagada): todo como antes, el engrane abre «Horario de
+    consulta» y las páginas públicas no existen.
+
 **Cómo leer los comandos.** Cada recuadro gris es un comando. Cópialo entero,
 pégalo en la terminal de Ubuntu y pulsa Enter. Debajo de cada uno se dice qué
 hace y qué debe responder. Están pensados para la terminal normal de Ubuntu
@@ -77,6 +121,7 @@ cd ~/proyectos/app_ortointegra-agenda
 7. Bloque E — Recordatorios y confirmación
 8. Bloque F — Interfaz, movimiento y orden visual
 8-bis. Tanda tras tus primeras pruebas a mano (2026-11-13)
+8-ter. Tanda de diseño, duración y horarios (2026-11-14)
 9. Seguridad
 10. Con el interruptor APAGADO
 11. Lista de casillas
@@ -223,8 +268,9 @@ Comprueba cuántas migraciones quedaron:
 docker exec supabase_db_app_ortointegra psql -U postgres -Atc "select count(*), max(version) from supabase_migrations.schema_migrations"
 ```
 
-Debe responder `25|20261117130000`: las 5 de `main` más las 20 de la agenda
-(las 16 de los bloques A a F y las 4 de las correcciones de seguridad).
+Debe responder `29|20261119140000`: las 5 de `main` más las 24 de la agenda
+(las 16 de los bloques A a F, las 4 de las correcciones de seguridad y las 4 de
+la tanda de diseño, duración y horarios).
 
 > Este reinicio deja fuera las tres migraciones `20261014…` de la otra rama
 > (`feature/limites-ajustables`). Para probar la agenda no hacen falta. Si
@@ -684,8 +730,9 @@ el botón «Agendar» abre «Nueva cita». El filtro «Filtrar por médico» fun
 Entra como **Dr. Admin**.
 
 > Con la v2 encendida, **pulsar una cita** ya no abre directo la edición: abre
-> una tarjeta pequeña de lectura con botones (F22). Para editar, pulsa
-> «Editar» en esa tarjeta. Y **pulsar un hueco** abre una burbuja de alta
+> una tarjeta pequeña de lectura con botones (F22). Para editar, pulsa el
+> engrane «Configuración de la cita» (arriba, junto a la ✕; en una cita «Por
+> ligar» o un evento sin paciente sigue también «Editar»). Y **pulsar un hueco** abre una burbuja de alta
 > rápida (F21); para el formulario completo, «Más opciones».
 
 ### B1. La pantalla de configuración
@@ -753,6 +800,8 @@ configuración de la clínica.
 
 ### B4. Crear y archivar tipos de cita
 
+> **Cambió el 2026-11-14:** la sección se llama «Duración y tipos de cita» y arriba pregunta «¿Cuánto dura tu consulta?» (G2-1); la Dra. Invitada también crea, cambia y archiva los SUYOS (G2-3, G2-9), nunca los de toda la clínica. La duración de la consulta de cada médico es un tipo «Consulta» suyo: si el Dr. Admin ya contestó la duración, su «Consulta» de 30 min aparece en la lista.
+
 **Qué hago:** como **Dr. Admin**, en «Tipos de cita» → «Nuevo tipo de cita»:
 1. Nombre «Consulta», Duración 30, Para «Toda la clínica». «Crear tipo».
 2. Nombre «Revisión», Duración 20, «Toda la clínica». «Crear tipo».
@@ -789,6 +838,8 @@ eventos.
 
 ### B6. Disponibilidad por consultorio
 
+> **Cambió el 2026-11-14:** con la v2 la configuración ya no tiene «Horario de la clínica»: cada consultorio dice su horario en una línea (G2-8), y la agenda se dibuja con el horario de TODOS los consultorios a la vista, no sólo el activo (G4-2 a G4-4). «Usar horario propio» / «Usar el de la clínica» siguen.
+
 **Qué hago:** como **Dra. Invitada**, en «Disponibilidad por consultorio», en
 «Rehabilitación (ficticio)» pulso «Usar horario propio». Pongo el lunes de
 08:00 a 12:00 y «Guardar horario». Después «Usar el de la clínica» para
@@ -806,8 +857,9 @@ Los turnos del enlace de reserva también lo usan.
 
 ### B7. El horario de la clínica no acepta horas al revés
 
-**Qué hago:** como **Dr. Admin**, «Horario de la clínica» → «Editar horario».
-Pongo el cierre del lunes a las 07:00 (antes de la apertura). «Guardar
+**Qué hago:** como **Dr. Admin**, con la v2 **apagada** (P8 con `false`; desde
+el 2026-11-14 la configuración con la v2 ya no tiene «Horario de la clínica»),
+engrane de la agenda → «Horario de consulta». Pongo el cierre del lunes a las 07:00 (antes de la apertura). «Guardar
 horario».
 
 **Qué debo ver:** el error «Lunes: la hora de cierre tiene que ir después de
@@ -875,7 +927,7 @@ vuelve a las 16:05 sin guardar; con «Aceptar» se queda arriba.
 
 **Qué hago:**
 1. Pulso una cita con paciente; en la tarjeta, «Cancelar cita». Acepto.
-2. Pulso otra cita con paciente → «Editar». Busco la papelera.
+2. Pulso otra cita con paciente → engrane «Configuración de la cita». Busco la papelera.
 3. En «Editar cita» de otra, pulso la X junto al nombre del paciente.
 4. Pulso un evento sin paciente → «Eliminar evento».
 
@@ -1162,6 +1214,8 @@ Responde `INSERT 0 1` (lo creó) o `INSERT 0 0` (ya estaba).
 
 ### D0. Crear el enlace fijo del Dr. Admin
 
+> **Cambió el 2026-11-14:** sin duración de la consulta, el recuadro ámbar dice «Para que tu enlace abra, falta:» con la pregunta «¿Cuánto dura tu consulta?» ahí mismo (G2-2), no «Un tipo de cita». Cada enlace lleva una píldora (Activo / Sin usar / No abrirá / Sin horarios), G2-5.
+
 **Qué hago:** como **Dr. Admin**, engrane → «Enlaces de reserva». En su bloque,
 «Crear enlace fijo». Pulso «Copiar».
 
@@ -1180,6 +1234,8 @@ por enlace no está configurada en este servidor: no se pueden emitir
 enlaces.», falta `RESERVA_SECRETO` en `.env.local`.
 
 ### D1. Reservar con el enlace fijo, eligiendo consultorio
+
+> **Cambió el 2026-11-14:** la página va por pasos («Qué y dónde», «Día y hora», «Tus datos», «Listo»): el consultorio es una tarjeta con su dirección (no un desplegable), «Tipo de cita» sólo sale con más de un tipo válido en ESE consultorio (G1-3), los horarios van por día en «Mañana» y «Tarde», y tras elegir hora hay que pulsar «Continuar». Los textos de los botones son los mismos (G1-1 a G1-5).
 
 **Qué hago:** abro el enlace en una ventana de **incógnito** (soy el paciente).
 1. En «Consultorio» elijo «Consultorio Centro (ficticio)».
@@ -1257,6 +1313,8 @@ probar.», es el límite por hora: §1.6.)
 **Si falla, significa que…** alguien podría adivinar el código probando.
 
 ### D5. Dos personas eligen el mismo horario
+
+> **Cambió el 2026-11-14:** los turnos van en rejilla fija desde la apertura (G2-6), y quien llega segundo vuelve a «Día y hora» con «Ese horario se acaba de ocupar. Elige otro.» (G1-5).
 
 **Qué hago:** abro el enlace fijo en **dos navegadores distintos** (Chrome
 incógnito y, por ejemplo, Edge o Firefox en privado). En los dos elijo el mismo
@@ -1370,6 +1428,8 @@ ella, se crea y se abre la nota (no la guardes).
 **Si falla, significa que…** se crean pacientes sin consentimiento (prohibido).
 
 ### D12. Los horarios respetan la disponibilidad y los ajustes
+
+> **Cambió el 2026-11-14:** los turnos salen de la apertura del consultorio con paso igual a la duración de la consulta; uno tocado en parte por otra cita no se ofrece (G2-6).
 
 **Qué hago:** como Dra. Invitada, crea su enlace fijo y pon a «Rehabilitación
 (ficticio)» un horario propio con el lunes de 08:00 a 12:00 (B6). Abre su
@@ -1508,6 +1568,8 @@ el personal **no** mandan comprobante.
 
 ### E2. Abrir el enlace no cambia nada
 
+> **Cambió el 2026-11-14:** la página de confirmación lleva el marco de Spinus (G1-6): mismos botones y mensajes, con la fecha en grande; vale también para E3.
+
 **Qué hago:** pulso el enlace del correo de E1. Miro la página y la cierro sin
 pulsar nada. Como Dr. Admin miro esa cita en la agenda.
 
@@ -1531,6 +1593,8 @@ de la hora). En la auditoría, `cita_editada` hecha por `system` con
 **Si falla, significa que…** el paciente no puede confirmar.
 
 ### E4. «No podré asistir», en dos pasos, y el horario se libera
+
+> **Cambió el 2026-11-14:** el «¿Seguro?» sale como aviso ámbar y «Volver» es un enlace centrado; «Sí, cancelar mi cita», en rojo (G1-6).
 
 **Qué hago:** con la agenda del Dr. Admin abierta en escritorio en esa semana,
 en otra ventana abro el enlace del correo y pulso «No podré asistir». Luego
@@ -1576,6 +1640,8 @@ enlace (decidiste que no).
 
 ### E7. Reagendar, con un tope de dos veces
 
+> **Cambió el 2026-11-14:** «Estás reagendando tu cita del …» sale como aviso azul encima de los pasos de la reserva.
+
 **Qué hago:** desde la página cancelada de E4 pulso «Elegir otro horario».
 Reservo otro horario (pide el código del correo). En el nuevo comprobante,
 cancelo y vuelvo a «Elegir otro horario» y reservo (segunda vez). En el tercer
@@ -1593,6 +1659,8 @@ bloqueados».
 **Si falla, significa que…** se puede reagendar sin fin.
 
 ### E8. El recordatorio por correo
+
+> **Cambió el 2026-11-14:** el correo empieza con la franja «Spinus», se titula «Recordatorio de tu cita» y trae dos botones; «No podré asistir» abre directo el «¿Seguro?» (G1-7). El correo de confirmación que se manda desde la agenda (G3-1) es otro: se titula «Confirma tu cita» y no quita este recordatorio.
 
 **Qué hago:**
 1. Como Dr. Admin agendo una cita de «Paciente Prueba 05» **hoy, dentro de
@@ -1646,8 +1714,9 @@ recordatorio para la misma hora. Deja el ajuste en 24 al final.
 ### E10. WhatsApp manual desde la cita
 
 **Qué hago:** como Dr. Admin, pulso una cita futura de «Paciente Prueba 05»
-(agendada). En la tarjeta (o en «Editar»), pulso «Enviar por WhatsApp» (el
-botón lleva el logo verde de WhatsApp).
+(agendada). En la tarjeta (o en el engrane «Configuración de la cita»), pulso
+«Enviar confirmación» (desde el 2026-11-14 se llama así; «Enviar recordatorio»
+si la cita ya está confirmada; lleva el logo verde de WhatsApp).
 
 **Qué debo ver:** se abre una pestaña de WhatsApp (`wa.me/5219990000005…`) con
 el mensaje ya escrito: «Hola. Le escribimos del consultorio de Dr. Admin Semilla
@@ -1755,6 +1824,8 @@ mes» (sólo con la v2: F23).
 **Si falla, significa que…** el ancho de la vista Día sigue desaprovechado.
 
 ### F5. «Compactar» al abrir — APAGADO, decidido por ti
+
+> **Cambió el 2026-11-14:** con la v2 el botón se llama «Compactar la rejilla al horario de los consultorios» y compacta al horario de los consultorios a la vista (G4-2); apagada, como siempre.
 
 **Qué hago:** abro la agenda. Luego pulso «Compactar» a mano.
 
@@ -1887,7 +1958,7 @@ desplazar.
 
 ### F18. El formulario de edición ordenado
 
-**Qué hago:** abro una cita con paciente («Editar» desde la tarjeta con la v2).
+**Qué hago:** abro una cita con paciente (con la v2, el engrane «Configuración de la cita» de su tarjeta).
 
 **Qué debo ver:** los cinco estados en una sola fila, iguales, con el punto
 encima de la palabra. «Iniciar consulta» con fondo azul suave y la misma altura
@@ -1948,8 +2019,9 @@ viendo movimiento.
 1. Una burbuja pequeña junto al punto: «Nueva cita · jue {día}, 16:00–…», con
    «Paciente» ya enfocado, «Inicio», «Fin», «Guardar» y «Más opciones».
 2. «Se agendó correctamente» y, **desde el 2026-11-13, la burbuja no se
-   cierra**: dice «Cita agendada» y ofrece «Enviar por WhatsApp», «Invitar por
-   correo» (sólo con Google conectado), «Listo» y «Más opciones» (T1-8).
+   cierra**: dice «Cita agendada» y ofrece «Enviar confirmación» (WhatsApp),
+   «Por correo» (el correo de Spinus, G3-1), «Invitar por correo» (sólo con
+   Google conectado), «Listo» y «Más opciones» (T1-8).
    «Listo» la cierra.
 3. La burbuja respeta la duración arrastrada (11:00–12:30).
 4. Se abre el formulario completo con el paciente, la hora de fin y el médico ya
@@ -1972,7 +2044,14 @@ instante después).
 **Qué hago:** pulso una cita agendada de «Paciente Prueba 01». Pruebo cada
 botón en citas distintas. Luego pulso un evento sin paciente y un evento
 «Evento» de Google (si tienes alguno de C9). Desde el 2026-11-13, además, dejar
-el ratón quieto un segundo sobre una cita abre su tarjeta sola (T3-5).
+el ratón quieto sobre una cita abre su tarjeta sola (T3-5; 0,5 s desde el
+2026-11-14).
+
+> **Cambió el 2026-11-14:** los botones dependen del estado de la cita y ya no
+> hay «Editar» en una cita con paciente (el engrane «Configuración de la cita»
+> abre el formulario): ver G3-4 y G3-5. «Reagendar cita» de una cancelada o
+> «no asistió» crea una cita NUEVA. Lo de abajo vale para la por ligar y el
+> evento sin paciente, que conservan «Editar».
 
 **Qué debo ver:** una tarjeta con el paciente, el estado, la hora, el médico, el
 consultorio, el teléfono y la nota, y los botones «Iniciar consulta» (sólo el
@@ -2150,6 +2229,8 @@ hoja de abajo, sin cortarse). (`agenda-t1-capas`)
 
 ### T1-6. WhatsApp sólo cuando aplica
 
+> **Cambió el 2026-11-14:** el botón se llama «Enviar confirmación» («Enviar recordatorio» si la cita está confirmada), y si falla el motivo sale debajo de las acciones.
+
 **Qué hago:** abro una cita de la semana PASADA (agendada), una atendida, una
 cancelada y una futura de un paciente con teléfono (p. ej. «Paciente Prueba
 05» la semana que viene).
@@ -2171,6 +2252,8 @@ pasó.» si pasó). No se abre WhatsApp. (`agenda-t1-burbuja`)
 
 ### T1-8. Después de agendar desde la burbuja
 
+> **Cambió el 2026-11-14:** «Cita agendada» ofrece «Enviar confirmación» (WhatsApp) y «Por correo» lado a lado, «Invitar por correo» a todo el ancho si hay Google, y «Más opciones» | «Guardar» abajo; debajo de la hora, la de la zona del consultorio si difiere (G3-1, G3-3, G3-10).
+
 **Qué hago:** clic en un hueco, elijo «Paciente Prueba 05» y «Guardar».
 
 **Qué debo ver:** la burbuja **no se cierra**: dice «Cita agendada»; debajo
@@ -2185,6 +2268,8 @@ formulario completo, sí, como antes). (`agenda-t1-burbuja`)
 **Si falla, significa que…** la burbuja no recibe la cita creada.
 
 ### T2-1. «Para empezar» y lo que falta para el enlace
+
+> **Cambió el 2026-11-14:** ahora es «Primeros pasos», con barra y «N de 3 listos» (horario de cada consultorio, duración de la consulta, enlace), y ya no existe «Crear «Consulta», 30 min»: la duración se contesta con «¿Cuánto dura tu consulta?». Haz G2-1 y G2-2 en su lugar.
 
 **Qué hago:** recién sembrado, como **Dr. Admin**, abro el engrane.
 
@@ -2203,6 +2288,8 @@ tarjeta «Para empezar» desaparece. Recargo: sigue sin salir.
 abre sin decirlo, o la lista guía no se calcula de los datos.
 
 ### T2-2. La Dra. Invitada no puede crear el tipo — **te toca decidir**
+
+> **Cambió el 2026-11-14:** **ya lo decidiste**: la invitada crea, cambia y archiva SUS tipos y su duración (G2-3, G2-9). Esta prueba ya no aplica.
 
 **Qué hago:** sin tipos de cita (recién sembrado, o archívalos), entro como
 **Dra. Invitada** y abro el engrane.
@@ -2249,6 +2336,8 @@ ser administrador ni secretaria.
 
 ### T2-5. La agenda pinta el horario propio del consultorio
 
+> **Cambió el 2026-11-14:** lo sustituye G4: el gris y los avisos dicen «este consultorio atiende…», y con «Todos los médicos» el gris es la unión de los consultorios, no el de la clínica (G4-2 a G4-4).
+
 **Qué hago:** como **Dra. Invitada**, pongo «Rehabilitación (ficticio)» con
 horario propio, lunes de 08:00 a 12:00. Voy a la agenda. Intento agendar el
 lunes a las 13:00.
@@ -2262,6 +2351,8 @@ médicos», el gris es el de la clínica. (`agenda-configuracion-guiada`)
 **Si falla, significa que…** la rejilla y el enlace vuelven a contradecirse.
 
 ### T2-6. Un médico con un consultorio en otra zona (qué se ve; sin cambio)
+
+> **Cambió el 2026-11-14:** lo que aquí era «resto conocido» ya no ocurre: con Tijuana activo, el blanco es 11:00–13:00 de Mérida y la tarjeta de las 11:00 cae dentro, sin aviso al arrastrarla a su sitio (G4-5).
 
 **Qué hago:** creo para el Dr. Admin un consultorio en Tijuana con horario
 propio de 09:00 a 11:00 (en Mi perfil, zona «Baja California») y reservo por su
@@ -2349,7 +2440,7 @@ no se acepta desde Google no se aplica a las convertidas.
 ### T3-5. La tarjeta al dejar el ratón quieto
 
 **Qué hago:** en una computadora con ratón, dejo el ratón quieto sobre una cita
-más de un segundo, sin pulsar.
+medio segundo, sin pulsar (desde el 2026-11-14: 0,5 s, antes 1 s).
 
 **Qué debo ver:** se abre su tarjeta junto a la cita. Si muevo el ratón dentro
 de la cita antes del segundo, tarda otro segundo. Si quito el ratón, se cierra;
@@ -2385,12 +2476,494 @@ otra computadora sigue encendida (es de este dispositivo).
 
 **Qué hago:** paso el ratón despacio por varias citas en Semana y en Mes.
 
-**Qué debo ver:** cada una sube apenas (1 px), sin rebote ni sombra, y baja al
-salir. Los bloques grises de Google de sólo lectura no suben. Con «Reducir
+**Qué debo ver:** cada una sube 3 px (desde el 2026-11-14; antes 1 px) con una
+sombra suave y el borde un poco más marcado, sin rebote, y baja al salir; la
+sombra aparece sin animarse. Nunca el recuadro negro del navegador (G3-9). Los bloques grises de Google de sólo lectura no suben. Con «Reducir
 movimiento» del sistema activado, nada se mueve. Con la v2 apagada, nada se
 mueve. (`agenda-f-pasar-raton`)
 
 **Si falla, significa que…** la elevación se salió de lo pedido.
+
+---
+
+## 8-ter. Tanda de diseño, duración y horarios (2026-11-14)
+
+Lo que se hizo con tu mensaje del 2026-11-14, en cuatro grupos: **G1** el
+aspecto de las páginas públicas (reservar y confirmar) y de los correos; **G2**
+la duración de la consulta, los turnos en rejilla fija y la configuración;
+**G3** el correo de confirmación de Spinus, los botones de aviso y la tarjeta
+por estados; **G4** los consultorios heredan el horario de la clínica y la
+agenda se dibuja con el horario de cada consultorio. Todo detrás del
+interruptor de la v2.
+
+**Antes de empezar:** base con las **29** migraciones (P5), sembrada (P6),
+aviso aprobado (P7), v2 encendida en la Clínica A (P8), la app del 3000 (P11).
+Recién sembrado no hay tipos de cita ni enlaces. Cada prueba se comprobó con
+una prueba automática que hace lo mismo (entre paréntesis, su archivo en
+`e2e/`).
+
+### G1 · Las páginas públicas y los correos
+
+#### G1-1. La reserva por pasos, con la dirección siempre a la vista
+
+**Qué hago:** como Dr. Admin, en la configuración contesto «¿Cuánto dura tu
+consulta?» con 30 min y agrego un tipo «Primera vez» de 45 min; copio mi
+enlace fijo y lo abro en el teléfono (o en el navegador muy estrecho, §1.7).
+
+**Qué debo ver:** arriba, la banda azul oscuro con el logo de Spinus y mi
+tarjeta (iniciales, nombre y especialidad). Debajo, cuatro rayitas: «Qué y
+dónde», «Día y hora», «Tus datos», «Listo». En el primer paso, cada
+consultorio es una tarjeta con su dirección entera («Calle Ficticia 1, Centro,
+Mérida»), y abajo los dos tipos con su duración, sin ninguno marcado: «Elegir
+día y hora» no se puede pulsar hasta elegir uno («Elige el tipo de cita para
+continuar»). Al pulsarlo, arriba queda un resumen con el consultorio y su
+dirección; sigue ahí en «Tus datos» y en la pantalla final.
+(`reserva-g1-diseno`)
+
+**Si falla, significa que…** el paciente podría ir al consultorio equivocado o
+no sabe en qué paso va.
+
+#### G1-2. Un solo tipo de cita: el bloque no aparece
+
+**Qué hago:** archivo «Primera vez» y vuelvo a abrir el enlace.
+
+**Qué debo ver:** en el primer paso ya no sale «Tipo de cita»; sólo los
+consultorios. (Si además dejo un solo consultorio activo, la página empieza
+directamente en «Elige día y hora», con el consultorio y su dirección en el
+resumen.) (`reserva-g1-diseno`)
+
+**Si falla, significa que…** el paciente tiene que «elegir» algo que no tiene
+alternativa.
+
+#### G1-3. Sólo los tipos del consultorio elegido (tu punto 5)
+
+**Qué hago:** como Dr. Admin, con su duración de 30 min, en «Disponibilidad
+por consultorio», fila «Hospital Norte (ficticio)», pulso «Otra duración en
+este consultorio», elijo 45 min y guardo. Abro su enlace. Elijo «Consultorio
+Centro (ficticio)» y luego «Hospital Norte (ficticio)».
+
+**Qué debo ver:** en ningún momento salen dos «Consulta». Con sólo la duración
+(sin tipos de más), no hay bloque «Tipo de cita» en ninguno de los dos, y al
+pasar a «Día y hora» los turnos del Centro van de 30 en 30 y los del Norte de
+45 en 45. Si agrego «Primera vez» y la vuelvo a abrir: en el Centro, «Consulta
+· 30 min» y «Primera vez»; en el Norte, «Consulta · 45 min» y «Primera vez». Si
+elijo la «Consulta» del Centro y cambio al Norte, no queda ninguna marcada; si
+elijo «Primera vez», sigue marcada al cambiar. (`reserva-tipos-consultorio`)
+
+**Si falla, significa que…** la página ofrece un tipo que no vale en ese
+consultorio (y el paciente acabaría en un error).
+
+#### G1-4. Día y hora: tira de fechas, mañana y tarde
+
+**Qué hago:** en «Día y hora» miro la tira de siete días.
+
+**Qué debo ver:** los días sin horario (el domingo, por ejemplo) se ven
+apagados y no se pueden pulsar; los demás llevan un puntito verde. Al tocar un
+día sólo salen sus horarios, separados en «Mañana» y «Tarde», en cuadros del
+mismo tamaño. Las fechas dicen «Lunes, 16 de noviembre» con «de» en minúscula
+(nunca «16 De Noviembre»). Abajo, lo elegido y «Continuar».
+(`reserva-g1-diseno`)
+
+**Si falla, significa que…** el paciente se pierde en una lista larga o elige
+un día sin horario.
+
+#### G1-5. Estados de la reserva
+
+**Qué hago:** (a) abro el enlace con la red muy lenta (§1.7, «Slow 3G»); (b)
+pruebo un enlace de un solo uso ya usado; (c) reservo el mismo horario desde
+dos pestañas.
+
+**Qué debo ver:** (a) mientras carga, la tira y los cuadros en gris que laten;
+(b) «Este enlace ya no está disponible» con el teléfono y «Llamar al
+consultorio»; (c) la segunda vuelve a «Día y hora» con el aviso rojo «Ese
+horario se acaba de ocupar. Elige otro.» y la lista ya sin ese horario.
+(`reserva-g1-diseno`)
+
+**Si falla, significa que…** el paciente no sabe qué pasó o vuelve a intentar
+un horario ocupado.
+
+#### G1-6. La página de confirmación con el mismo aspecto
+
+**Qué hago:** abro el enlace de confirmación de un comprobante.
+
+**Qué debo ver:** la misma banda azul con el logo y mi nombre (sin
+especialidad). «Tu cita», el día en azul y la fecha en grande («16 de
+noviembre · 08:00 h»), y un recuadro con Consultorio, Dirección completa y
+Teléfono. «Confirmo mi asistencia» (azul) y «No podré asistir» (con borde). Al
+pulsar «No podré asistir», un aviso ámbar «¿Seguro…?» y «Sí, cancelar mi
+cita» en rojo, y «Volver» como enlace centrado. Tras confirmar, un aviso
+verde; tras cancelar, uno rojo y «Elegir otro horario». (`reserva-g1-diseno`)
+
+**Si falla, significa que…** el paciente duda de que la página sea del
+consultorio, o cancela sin querer.
+
+#### G1-7. Los correos con la marca
+
+**Qué hago:** en Mailpit (§1.5) abro el código, el comprobante, un
+recordatorio y una confirmación (G3-1), en ancho de teléfono y con las
+imágenes bloqueadas.
+
+**Qué debo ver:** los cuatro empiezan con la franja azul oscuro y «Spinus» en
+blanco (texto, no imagen); un título claro, la fecha en grande, un recuadro con
+médico, consultorio, dirección completa y teléfono, y botones anchos que se
+pueden tocar con el dedo. El código va en grande. El recordatorio se titula
+«Recordatorio de tu cita» y trae «Confirmo mi asistencia» y «No podré
+asistir»; la confirmación se titula «Confirma tu cita» (o «Tu cita» si ya está
+confirmada) y **no dice «Recordatorio»**. Nada cambia con las imágenes
+bloqueadas. Ninguno dice el tipo de cita ni nada clínico.
+(`reserva-g1-diseno`, `agenda-g3-correo`, `correosCita.test`)
+
+**Si falla, significa que…** el correo parece sospechoso, no se lee bien en el
+teléfono, o la confirmación de días antes habla de un recordatorio.
+
+#### G1-8. Modo oscuro y movimiento reducido
+
+**Qué hago:** pongo el teléfono en modo oscuro y abro el enlace; luego activo
+«Reducir movimiento».
+
+**Qué debo ver:** la reserva y la confirmación en oscuro, legibles. Al pasar de
+paso, un fundido corto; con «Reducir movimiento», sin animación.
+(`reserva-g1-diseno`)
+
+**Si falla, significa que…** la página deslumbra de noche o marea a quien
+pidió menos movimiento.
+
+### G2 · Duración de la consulta, turnos y configuración
+
+#### G2-1. Primeros pasos en orden, con avance
+
+**Qué hago:** recién sembrado, entro como Dr. Admin y abro «Configuración de
+la agenda».
+
+**Qué debo ver:** arriba «Primeros pasos» con una barra y «1 de 3 listos»: 1
+Horario de cada consultorio (con palomita y los nombres de sus consultorios),
+2 «Duración de la consulta» con «¿Cuánto dura tu consulta?» (30 min, 45 min,
+1 hora, Otra), 3 «Enlace de reserva» con «Crear enlace». A la izquierda (en el
+teléfono, arriba) el menú de secciones con «Primeros pasos · 2 pendientes». En
+ningún sitio «Crear «Consulta», 30 min». (`agenda-configuracion-guiada`)
+
+**Si falla, significa que…** el orden o el avance no salen de los datos.
+
+#### G2-2. Crear el enlace sin haber contestado la duración
+
+**Qué hago:** pulso «Crear enlace» del paso 3.
+
+**Qué debo ver:** en la misma tarjeta «Para que tu enlace abra, falta:» con UNA
+sola pregunta de duración; elijo 45 min y «Guardar y crear el enlace»: aviso
+«Enlace fijo creado» y la tarjeta desaparece. (`agenda-configuracion-guiada`)
+
+**Si falla, significa que…** crear el enlace vuelve a ser un callejón sin
+salida.
+
+#### G2-3. La invitada pone su duración
+
+**Qué hago:** entro como medico.a (Dra. Invitada Semilla Dos), en el paso 2
+elijo «1 hora» y «Guardar».
+
+**Qué debo ver:** el paso queda hecho; en «Duración y tipos de cita»: «Tu
+consulta dura 60 min, en todos tus consultorios», con «Cambiar duración».
+(`agenda-configuracion-guiada`)
+
+**Si falla, significa que…** la base no deja a la invitada crear lo suyo (o le
+deja más).
+
+#### G2-4. Otra duración sólo en un consultorio
+
+**Qué hago:** como medico.a, con su duración general de 1 hora (G2-3), en
+«Disponibilidad por consultorio», fila «Rehabilitación (ficticio)», pulso
+«Otra duración en este consultorio», elijo «45 min» y Guardar.
+
+**Qué debo ver:** «Aquí la consulta dura 45 min (en los demás, 60 min)», con
+«Cambiar» y «Usar la general». (`agenda-configuracion-guiada`)
+
+**Si falla, significa que…** la duración por consultorio no se guarda o se ve
+en otro sitio.
+
+#### G2-5. Cada enlace dice si funciona
+
+**Qué hago:** como Dr. Admin, creo un enlace fijo para la Dra. Invitada cuando
+ella aún no tiene duración.
+
+**Qué debo ver:** su fila con la píldora «No abrirá», «No abrirá: falta la
+duración de la consulta del médico.» y «Completar»; al pulsarlo, la pregunta
+«¿Cuánto dura su consulta?» ahí mismo. (`agenda-configuracion-guiada`)
+
+**Si falla, significa que…** la clínica no se entera de que un enlace no abre.
+
+#### G2-6. Turnos de 45 minutos desde la apertura
+
+**Qué hago:** con duración de 45 min y el consultorio de 9:00 a 13:00, abro el
+enlace de reserva en un día libre.
+
+**Qué debo ver:** 9:00, 9:45, 10:30, 11:15 y 12:00. Si creo una cita de 10:00
+a 10:20 ese día, desaparece sólo 9:45 (no aparece un 10:20). (`agenda-g2-turnos`)
+
+**Si falla, significa que…** los turnos se cuentan otra vez desde cada hueco.
+
+#### G2-7. El clic en la agenda cae en el turno
+
+**Qué hago:** como medico.a (duración 45 min; Rehabilitación de 9:00 a 17:00,
+con horario propio), en Semana hago clic a las 10:00 de un día libre. Luego
+arrastro una cita suya de las 13:00 una hora abajo.
+
+**Qué debo ver:** la burbuja dice 09:45 (el turno más cercano: 9:00, 9:45,
+10:30…); si escribo 10:00 a mano en «Inicio», se queda 10:00. La cita
+arrastrada queda a las 14:15. Como Dr. Admin con «Todos los médicos»,
+arrastrar esa misma cita de la Dra. Invitada también la deja a las 14:15 (la
+rejilla de ELLA); un clic con «Todos» no se ajusta (no hay un consultorio
+claro). Con la v2 apagada, todo como antes (10:00 y 14:00).
+(`agenda-g2-turnos`)
+
+**Si falla, significa que…** el ajuste no se aplica, o se aplica también a lo
+escrito a mano.
+
+#### G2-8. Ya no está el horario de la clínica
+
+**Qué hago:** abro la configuración con la v2 encendida.
+
+**Qué debo ver:** no hay «Horario de la clínica» ni «Editar horario»; cada
+consultorio dice su horario en una línea («Lun–vie 08:00 – 18:00 · Sáb 08:00 –
+13:00»). Con la v2 apagada, el engrane de la agenda abre el «Horario de
+consulta» de siempre. (`agenda-configuracion`)
+
+**Si falla, significa que…** volvió el acceso que pediste quitar.
+
+#### G2-9. La invitada cambia su duración y archiva sus tipos
+
+**Qué hago:** como medico.a, en «Duración y tipos de cita», pulso «Cambiar
+duración», elijo 45 min y Guardar; luego «Archivar» en su «Consulta».
+
+**Qué debo ver:** «Tu consulta dura 45 min» y después la fila «Archivado» con
+«Reactivar»; ningún aviso de «pídele a quien administra». En la duración de su
+consultorio, «Cambiar» y «Usar la general». No ve «Editar» en los tipos de toda
+la clínica. (`agenda-configuracion-guiada`, `g2b_tipos_cita_update.sql`)
+
+**Si falla, significa que…** la invitada sigue en sólo lectura o puede tocar lo
+que no es suyo.
+
+### G3 · Correo de confirmación, avisos y tarjeta
+
+#### G3-1. Confirmación por correo sin Google
+
+**Qué hago:** sin Google conectado, agendo desde la burbuja una cita futura de
+«Paciente Prueba 13» (tiene correo). En «Cita agendada» pulso «Por correo».
+Abro Mailpit.
+
+**Qué debo ver:** un correo a `paciente.13@semilla.spinus.test` con asunto
+«Confirma tu cita del …»: la franja «Spinus», el título «Confirma tu cita», día,
+hora (con la zona), «Dr. Admin Semilla Uno», el consultorio con su dirección y
+los botones «Confirmo mi asistencia» y «No podré asistir» (el enlace empieza
+por `http://localhost:3000/confirmar/`). Nada del motivo, las notas ni el nombre
+del paciente. En la burbuja, debajo de los botones: «Enviado por correo
+hh:mm». (`agenda-g3-correo`, `agenda-t1-burbuja`)
+
+**Si falla, significa que…** el correo propio de Spinus no sale sin Google o
+lleva algo de más.
+
+#### G3-2. No se manda dos veces
+
+**Qué hago:** abro esa misma cita → engrane «Configuración de la cita» →
+«Enviar confirmación por correo».
+
+**Qué debo ver:** «Ya se envió por correo a las hh:mm.» y ningún correo nuevo
+en Mailpit. Si la reagendo a otro día, sí puedo volver a mandarlo.
+(`agenda-g3-correo`)
+
+**Si falla, significa que…** el límite de envíos no está puesto.
+
+#### G3-3. Con Google, el correo y la invitación
+
+**Qué hago:** con Google (simulado, C0) conectado, agendo desde la burbuja.
+
+**Qué debo ver:** «Enviar confirmación», «Por correo» e «Invitar por correo»
+(esta última a todo el ancho). «Por correo» manda el correo de Spinus;
+«Invitar por correo» abre la invitación de Google como antes.
+(`agenda-t1-burbuja`)
+
+**Si falla, significa que…** se perdió una de las dos formas de avisar.
+
+#### G3-4. La tarjeta de una cita agendada
+
+**Qué hago:** pulso una cita agendada futura de «Paciente Prueba 05».
+
+**Qué debo ver:** arriba el nombre con la píldora «Agendada» en la misma línea,
+el engrane y la ✕; debajo el día y la hora y la duración; Médico y Consultorio;
+«Iniciar consulta» (azul, a todo el ancho); «Confirmar» y «Reagendar» lado a
+lado, del mismo tamaño; «Enviar confirmación» con el logo de WhatsApp a todo
+el ancho; una raya y «Cancelar cita» en rojo, al centro. No hay «Editar»: el
+engrane abre el formulario. (`agenda-g3-tarjeta`)
+
+**Si falla, significa que…** la tarjeta no sigue tu maqueta.
+
+#### G3-5. Confirmada, atendida, cancelada, no asistió
+
+**Qué hago:** pulso una cita confirmada, una atendida, una cancelada y una
+«no asistió».
+
+**Qué debo ver:** confirmada: «Reagendar» y «Enviar recordatorio» (en dos
+líneas) lado a lado. Atendida: sólo «Ver expediente» (lleva al expediente; la
+secretaria no lo ve). Cancelada y no asistió: sólo «Reagendar cita», que abre
+**«Nueva cita»** con el paciente, el médico, el consultorio y la duración ya
+puestos y el cursor en la fecha; al guardar aparece una cita nueva y la
+cancelada (o la falta) sigue en la agenda tal cual. (`agenda-g3-tarjeta`)
+
+**Si falla, significa que…** se está reabriendo la cita vieja y se pierde el
+registro de la falta.
+
+#### G3-6. Una atendida ya no se mueve
+
+**Qué hago:** arrastro una cita atendida a otra hora.
+
+**Qué debo ver:** vuelve a su sitio con el aviso «Una cita atendida ya
+concluyó: no se puede cambiar de fecha ni de hora.» En el formulario puedo
+cambiar sus notas, o su estado a «Agendada» si se marcó por error (sólo si no
+tiene nota clínica, G3-7). (`agenda-g3-tarjeta`)
+
+**Si falla, significa que…** el servidor acepta lo que la tarjeta ya no ofrece.
+
+#### G3-7. Una atendida con nota no se desmarca
+
+**Qué hago:** como Dr. Admin inicio la consulta de una cita de «Paciente
+Prueba 05», guardo la nota, vuelvo a la agenda y, en el formulario de esa
+cita, la pongo en «Agendada».
+
+**Qué debo ver:** «Esta cita ya tiene una nota clínica: sigue como atendida y
+no puede cambiar de estado.»; con la v2 apagada, lo mismo; tampoco se puede
+eliminar. Una atendida SIN nota (marcada a mano) sí se puede corregir.
+(`agenda-g3-tarjeta`)
+
+> ⚠️ Esta prueba deja una **nota real** sobre un paciente de la semilla: la
+> siguiente siembra (y la siguiente corrida de pruebas automáticas) se negará a
+> borrarla. Hazla al final, y después P5.
+
+**Si falla, significa que…** se puede desmarcar o borrar una cita cuya nota ya
+es expediente.
+
+#### G3-8. El formulario con los dos avisos
+
+**Qué hago:** engrane de una cita agendada futura de un paciente con teléfono
+y correo.
+
+**Qué debo ver:** bajo «Avisar al paciente», «Enviar confirmación» (logo de
+WhatsApp) y «Enviar confirmación por correo» (sobre). En una confirmada:
+«Enviar recordatorio» y «Enviar recordatorio por correo».
+(`agenda-g3-tarjeta`)
+
+**Si falla, significa que…** falta uno de los dos avisos donde se edita la
+cita.
+
+#### G3-9. Sin el aviso negro al pasar el ratón
+
+**Qué hago:** dejo el ratón quieto sobre varias citas (Semana y Mes).
+
+**Qué debo ver:** a los 0,5 s se abre la tarjeta de Spinus; nunca el recuadro
+negro del navegador con «Nombre · Agendada». Al pasar, la cita sube 3 px con
+una sombra suave (la sombra aparece sin animarse). Con la v2 apagada, el
+recuadro negro sigue como antes y nada sube. (`agenda-f-pasar-raton`,
+`agenda-f-tarjeta-al-pasar`)
+
+**Si falla, significa que…** volvió el aviso del navegador o el movimiento no
+es el pedido.
+
+#### G3-10. La hora del consultorio en otra zona
+
+**Qué hago:** pulso una cita en un consultorio de otra zona (G4-5) y agendo una
+desde la burbuja en ese consultorio.
+
+**Qué debo ver:** en la tarjeta y en «Cita agendada», debajo de la hora,
+«09:00–09:30 hora Baja California». (`agenda-g3-tarjeta`, `capasAgenda.test`)
+
+**Si falla, significa que…** el personal confunde la hora del paciente con la
+suya.
+
+### G4 · La agenda con el horario de los consultorios
+
+**Preparación de G4:** en la configuración, Consultorio Centro (Dr. Admin) de
+lunes a viernes 08:00–12:00; Hospital Norte (Dr. Admin) de lunes a viernes
+15:00–19:00; Rehabilitación (Dra. Invitada) de lunes a viernes 10:00–14:00 y
+sábado 09:00–13:00. Ve a una semana sin citas (cinco o seis semanas adelante).
+
+#### G4-1. Cada consultorio que no tenía horario propio arranca con el de la clínica
+
+**Qué hago:** antes de aplicar la migración 23 (§13.2), apunto el horario de la
+clínica. La aplico (en tu base local la aplica P5). Abro la configuración con la
+v2 encendida.
+
+**Qué debo ver:** cada consultorio que decía «Usa el horario de la clínica»
+tiene ahora un horario propio igual al de la clínica; el que ya tenía uno
+propio, el mismo de antes. La rejilla del SQL Editor sale toda en OK (y una
+fila INFO con cuántos se copiaron). Si la vuelvo a pegar, sale igual y no
+cambia nada. (`agenda-g4-herencia-horario`)
+
+> En tu base local, **después de sembrar** los consultorios de la semilla
+> vuelven a decir «Usa el horario de la clínica» (AG-DT-66): la semilla los crea
+> así. Da lo mismo para la agenda.
+
+**Si falla, significa que…** la copia pisó un horario elegido o no se hizo.
+
+#### G4-2. «Todos los médicos»: de la apertura más temprana al cierre más tardío
+
+**Qué hago:** como Dr. Admin, filtro «Todos los médicos» en Semana y miro el
+lunes. Pulso «Compactar la rejilla al horario de los consultorios».
+
+**Qué debo ver:** blanco de 08:00 a 14:00 y de 15:00 a 19:00, gris entre 14:00
+y 15:00 y fuera de eso (ya no el 08:00–18:00 de la clínica). Con «Compactar»,
+la rejilla va de 08:00 a 19:00, el sábado se queda (Rehabilitación abre) y el
+domingo se oculta. (`agenda-g4-rejilla-consultorios`)
+
+**Si falla, significa que…** la agenda sigue leyendo el horario de la clínica.
+
+#### G4-3. Un médico concreto: sus consultorios
+
+**Qué hago:** filtro a la Dra. Invitada. Pulso «Compactar».
+
+**Qué debo ver:** blanco de 10:00 a 14:00 entre semana; con «Compactar», de
+09:00 (por el sábado) a 14:00, con el sábado y sin el domingo. Como Dr. Admin
+filtrado a sí mismo y SIN consultorio activo elegido: la unión de Centro y
+Norte (blanco 08–12 y 15–19). (`agenda-g4-rejilla-consultorios`)
+
+**Si falla, significa que…** la rejilla mezcla médicos o toma uno solo.
+
+#### G4-4. El consultorio activo manda en el gris, los huecos y la hora de apertura
+
+**Qué hago:** como Dr. Admin elijo «Hospital Norte» como consultorio activo en
+el menú lateral. Abro la agenda; luego paso a Día en un lunes sin citas.
+
+**Qué debo ver:** la rejilla abre mostrando las 15:00 arriba; blanco sólo de
+15:00 a 19:00; en Día, el panel «Huecos disponibles» ofrece un solo hueco
+«15:00 – 19:00». (`agenda-g4-rejilla-consultorios`)
+
+**Si falla, significa que…** el consultorio activo no llega a la rejilla.
+
+#### G4-5. Un consultorio en otra zona: gris y aviso en la hora del consultorio
+
+**Qué hago:** en una computadora con la hora de Mérida, creo para el Dr. Admin
+un consultorio en Tijuana (zona «Baja California») con horario propio
+09:00–11:00 todos los días y lo elijo como activo. Agendo una cita de 09:00 a
+09:30 hora de Tijuana (o reservo ese turno por su enlace). Arrastro la cita una
+hora abajo; luego otra hora más.
+
+**Qué debo ver:** la tarjeta a las 11:00 con «09:00 hora Baja California»;
+blanco de 11:00 a 13:00 (hora de Mérida) y la cita DENTRO del blanco. Al
+moverla una hora (10:00 de Tijuana) no sale aviso. Al moverla a las 11:00 de
+Tijuana sale «Vas a moverlo a las 11:00 hora Baja California, y este
+consultorio atiende de 09:00 a 11:00. ¿Es correcto?». Pulsar en la rejilla a
+las 11:30 de Mérida para agendar no da aviso. (`agenda-g4-husos`,
+`husos-dos-consultorios`)
+
+**Si falla, significa que…** el gris o el aviso vuelven a medirse en la hora
+de la computadora (avisos falsos).
+
+#### G4-6. Con la v2 apagada, todo como antes
+
+**Qué hago:** apago la v2 (P8 con `false`) y abro la agenda.
+
+**Qué debo ver:** el gris es el de la clínica (08:00–18:00), los avisos dicen
+«esta clínica atiende…», el botón se llama «Compactar la rejilla al horario de
+la clínica» y el engrane abre «Horario de consulta». (`agenda-vistas`,
+`agenda-configuracion-guiada`)
+
+**Si falla, significa que…** lo nuevo se coló sin el interruptor.
 
 ---
 
@@ -2831,7 +3404,7 @@ sigue apagado.
 Marca cada una al pasarla. Si una falla, anota el número y qué viste.
 
 **Preparación**
-- [ ] P1–P11. Base reiniciada (25 migraciones), sembrada, aviso aprobado, app en el 3000
+- [ ] P1–P11. Base reiniciada (29 migraciones), sembrada, aviso aprobado, app en el 3000
 
 **Bloque A (v2 apagada)**
 - [ ] A1. Abrir la agenda
@@ -2970,6 +3543,41 @@ Marca cada una al pasarla. Si una falla, anota el número y qué viste.
 - [ ] T3-7. En el teléfono, sólo el toque
 - [ ] T3-8. Las citas suben un pelo
 
+**Tanda del 2026-11-14 (§8-ter)**
+- [ ] G1-1. La reserva por pasos, con la dirección a la vista
+- [ ] G1-2. Un solo tipo: sin bloque «Tipo de cita»
+- [ ] G1-3. Sólo los tipos del consultorio elegido
+- [ ] G1-4. Tira de fechas, mañana y tarde
+- [ ] G1-5. Estados de la reserva
+- [ ] G1-6. La confirmación con el mismo aspecto
+- [ ] G1-7. Los correos con la marca (la confirmación sin «Recordatorio»)
+- [ ] G1-8. Modo oscuro y movimiento reducido
+- [ ] G2-1. Primeros pasos en orden, con avance
+- [ ] G2-2. Crear el enlace sin la duración
+- [ ] G2-3. La invitada pone su duración
+- [ ] G2-4. Otra duración en un consultorio
+- [ ] G2-5. Cada enlace dice si funciona
+- [ ] G2-6. Turnos de 45 min desde la apertura
+- [ ] G2-7. El clic y el arrastre caen en el turno
+- [ ] G2-8. Ya no está el horario de la clínica
+- [ ] G2-9. La invitada cambia y archiva lo suyo
+- [ ] G3-1. Confirmación por correo sin Google
+- [ ] G3-2. No se manda dos veces
+- [ ] G3-3. Con Google, el correo y la invitación
+- [ ] G3-4. La tarjeta de una agendada
+- [ ] G3-5. Confirmada, atendida, cancelada, no asistió
+- [ ] G3-6. Una atendida ya no se mueve
+- [ ] G3-7. Una atendida con nota no se desmarca (al final; deja una nota)
+- [ ] G3-8. El formulario con los dos avisos
+- [ ] G3-9. Sin el aviso negro; 0,5 s y 3 px
+- [ ] G3-10. La hora del consultorio en otra zona
+- [ ] G4-1. Los consultorios heredan el horario de la clínica
+- [ ] G4-2. «Todos los médicos»: la unión de los consultorios
+- [ ] G4-3. Un médico concreto: sus consultorios
+- [ ] G4-4. El consultorio activo manda
+- [ ] G4-5. Consultorio en otra zona: gris y aviso en su hora
+- [ ] G4-6. Con la v2 apagada, todo como antes
+
 **Seguridad**
 - [ ] S1. La Clínica B no ve la A
 - [ ] S2. Lo mismo, directo a la base
@@ -3089,12 +3697,18 @@ Marca cada una al pasarla. Si una falla, anota el número y qué viste.
 | 18 | `20261117121000_agenda_seg_columnas_reserva.sql` | Corrección de seguridad: los datos de quien reservó y de su consentimiento sólo los escribe el servidor (SEG-A4) |
 | 19 | `20261117122000_agenda_seg_emision_enlaces.sql` | Corrección de seguridad: los enlaces de reserva sólo los crea el servidor, con un código que nadie elige a mano (SEG-A7) |
 | 20 | `20261117130000_agenda_seg1_candado_correo.sql` | Corrección de seguridad: el candado decide por el correo verificado, el bloqueo manual corta también el enlace de un solo uso y un evento de todo el día ocupa ese día en el enlace (SEG-A1, A2, A5, A6) |
+| 21 | `20261119120000_agenda_g2_duracion_consulta.sql` | La duración de la consulta de cada médico (y otra distinta en un consultorio), el médico crea SUS tipos de cita, y la reserva recibe de qué consultorio es cada tipo (G2) |
+| 22 | `20261119121000_agenda_g2_tipos_cita_update.sql` | El médico cambia y archiva SUS tipos de cita y su duración, sin pasárselos a otro (G2-9) |
+| 23 | `20261119130000_agenda_g4_herencia_horario_consultorios.sql` | Cada consultorio sin horario propio copia UNA vez el horario de la clínica, con respaldo de lo de antes (G4-1). **Después de B5 (la 4)** |
+| 24 | `20261119140000_agenda_g3_correo_confirmacion.sql` | El correo de confirmación de Spinus queda registrado como los demás correos de cita (G3-1, G3-2). Mejor en la misma sesión que la 14 |
 
-Son **20**, y van en este orden aunque las cuatro últimas se escribieron
+Son **24**. Las cuatro de la tanda del 2026-11-14 (21 a 24) van al final y en ese orden; las 17 a 20 van en este orden aunque se escribieron
 después: las 17 y 18 añaden reglas a la tabla de citas, la 19 reemplaza
 la protección de los enlaces que puso la 8, y la 20 reemplaza tres funciones de
 las 9 y 10. Por eso, una vez más: **nunca vuelvas a correr la 8, la 9 ni la 10
-después de éstas** (desharías las correcciones).
+después de éstas** (desharías las correcciones). Lo mismo con la tanda del 2026-11-14: la 21
+reemplaza `reserva_contexto` (de la 10) y la 24 `cita_correo_tomar` (de la 14):
+**nunca vuelvas a correr la 10 ni la 14 después de ellas**.
 
 ### 13.3 Variables en Vercel (Production)
 
@@ -3114,7 +3728,7 @@ Sólo los nombres y para qué sirven; los valores los generas tú.
 ### 13.4 El orden recomendado
 
 1. `select version()` y lo de 13.1.
-2. **Las 20 migraciones**, una por una, en el orden de 13.2.
+2. **Las 24 migraciones**, una por una, en el orden de 13.2.
 3. Las variables de 13.3 (menos `AGENDA_RSVP_GOOGLE`).
 4. `git merge` local de la rama sobre `main` y `git push` (despliega el código).
    Si despliegas el código antes que las migraciones no se rompe nada, pero

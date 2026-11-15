@@ -476,3 +476,185 @@ con el nombre de la función. Sin cambio.
 Fuera de la base, pero encontrado en la misma pasada: no hay camino en la
 interfaz para convertir en cita un evento nacido en Google (§2 del plan lo
 pide). `DEUDA_TECNICA.md` AG-DT-29.
+
+## 9. Tanda de diseño, duración y horarios (2026-11-14)
+
+Cuatro ramas escritas en paralelo sobre la misma base local
+(`feature/agenda-v2-g1` a `-g4`), fusionadas en `feature/agenda-v2` en el
+orden G4, G2, G1, G3 (`91e7794`, `e67df4b`, `5b4c1cb`, `a301b08`). G1 no trae
+migraciones; las otras tres, cuatro. Aquí se auditan juntas, sobre la base
+reiniciada desde cero. Un revisor independiente en otro modelo (Sonnet) hizo
+la misma auditoría en paralelo, sin ver estas conclusiones; abajo se dice qué
+vio cada uno.
+
+### 9.1 El conjunto, desde cero
+
+`git diff --name-only main...HEAD -- supabase/migrations` = **24 migraciones**
+del proyecto (las 20 de antes + `20261119120000`, `20261119121000`,
+`20261119130000` y `20261119140000`). `supabase db reset --local` (CLI 2.117.0)
+aplicó las **29** (5 de `main` + 24) en orden y sin un error, en 29 s;
+`schema_migrations` = 29, última `20261119140000`. Semilla en 2 s.
+
+### 9.2 Veredicto de las cuatro
+
+| # | Archivo | Qué hace | Auditoría previa (cabecera) | Integración | Veredicto |
+|---|---|---|---|---|---|
+| G2 | `20261119120000_agenda_g2_duracion_consulta.sql` | `tipos_cita.principal` y `consultorio_id` (FK, dos CHECK, dos índices únicos parciales), el disparador `validar_tipo_cita_consultorio()`, la policy `tipos_cita_insert` (autorizada) y `reserva_contexto` con el consultorio y el principal de cada tipo | APTA | `reserva_contexto` = cuerpo de D3 + dos claves en `tipos` (diff de una línea); nadie lo reemplazó entre D3 y G2 | APTA |
+| G2b | `20261119121000_agenda_g2_tipos_cita_update.sql` | la policy `tipos_cita_update` (autorizada): el médico cambia y archiva SUS tipos | APTA | Sólo esa policy; USING = WITH CHECK | APTA |
+| G4 | `20261119130000_agenda_g4_herencia_horario_consultorios.sql` | copia UNA vez `clinicas.horario_consulta` a cada consultorio sin horario propio, con respaldo en `respaldos.consultorios_horario_20261119` | APTA CON CAMBIOS (aplicado) | Sólo datos y una tabla de respaldo; ningún objeto de `public` cambia de forma | APTA |
+| G3 | `20261119140000_agenda_g3_correo_confirmacion.sql` | `confirmacion` en el CHECK de `cita_correos.tipo` y en `cita_correo_tomar` (la ventana del recordatorio, sólo al recordatorio) | APTA | `cita_correo_tomar` = cuerpo de E4 salvo dos condiciones; mismos permisos | APTA |
+
+### 9.3 Conflictos entre ellas y con las anteriores
+
+**A · Las dos policies nuevas de `tipos_cita` contra las puertas de
+suscripción.** `tipos_cita` no lleva puerta RESTRICTIVE desde B6, a propósito
+(§3 de este documento y `CLAUDE.md`): no es un dato de paciente y la barrera
+de la reserva está en otra parte. Las dos policies reemplazadas siguen siendo
+PERMISSIVE, `TO authenticated`, con `clinica_id = get_clinica_id()`; lo único
+que añaden es el médico sobre las filas con `medico_id = auth.uid()` y rol
+`medico`. Consecuencia (por lectura de las policies; nada la contradice en las pruebas): en una clínica en sólo lectura (free
+degradada) un médico puede ahora crear o cambiar SUS tipos, como ya podía el
+administrador desde B6. **No abre ninguna reserva:** `reserva_contexto` sigue
+devolviendo NULL a una clínica sin acceso (`gcal_sync_clinica_habilitada`,
+la puerta S3 de C1, que lee el cuerpo vigente de `clinica_tiene_acceso()` y
+`clinica_no_suspendida()`), y las 7 RESTRICTIVE de INSERT de `main` (pacientes,
+consultas, documentos, appointments, addendums, mediciones, consultorios) no
+cambian. Ninguna policy de `main` cambia (huella, §9.4). Las dos son idénticas
+a las de B6 para el administrador, y la secretaria sigue sin INSERT ni UPDATE.
+
+**B · Las dos policies contra `reserva_contexto`.** `reserva_contexto` es
+INVOKER y sólo la ejecuta `service_role` (que se salta la RLS): las policies no
+la alcanzan. Lo que la reserva ve de los tipos lo decide su propio `WHERE`
+(clínica del enlace, activos, de toda la clínica o del médico del enlace), que
+G2 no cambió; G2 sólo añadió `consultorio_id` y `principal` al objeto de cada
+tipo (diff de una línea contra el cuerpo de D3, y nadie lo reemplazó entre D3
+y G2). Qué tipos valen en cada consultorio lo filtra la ruta con
+`tiposDelConsultorio` antes de `reservar_por_enlace`, que no mira el
+consultorio del tipo (convenio escrito en los COMMENT). La garantía atómica de
+`reservar_por_enlace` no cambia (su cuerpo es el de seg1). El disparador
+`validar_tipo_cita_consultorio()` (INVOKER, lee `consultorios` con la RLS de
+quien escribe) impide que un médico ponga un principal en el consultorio de
+otro; con el administrador falla cerrado (AG-DT-51).
+
+**C · El CHECK de `cita_correos` contra E4.** G3 rehace
+`cita_correos_tipo_check` con `confirmacion` añadido y `cita_correo_tomar` con
+dos cambios: acepta `confirmacion` y la ventana del recordatorio se exige sólo
+al recordatorio (`p_tipo <> 'recordatorio' OR …`; antes, `p_tipo =
+'comprobante' OR …`, que es lo mismo para los dos tipos de antes). La llave
+única de E4 es `(cita, tipo, inicio_cita)`: una confirmación por hora de
+inicio, sin tocar las de los otros tipos. `cita_correos_pendientes` (la tarea
+de recordatorios) sólo mira filas `comprobante` y `recordatorio`, así que una
+confirmación **no** suprime el recordatorio. El resto de CHECK de E4
+(estado, motivo, intentos, coherencia) no cambia. Mismos permisos
+(`service_role`), INVOKER, `search_path=''`.
+
+**D · El esquema `respaldos` y la tabla nueva de G4.** El esquema ya existía en
+`main` (`20260912190416_remote_schema.sql` lo crea con
+`appointments_gcal_20260815`); G4 sólo añade
+`respaldos.consultorios_horario_20261119` (`id, clinica_id, horario,
+horario_propio, respaldado_en`, con su llave). Privilegios: sólo `postgres`
+(`REVOKE ALL … FROM PUBLIC, anon, authenticated, service_role`), RLS activada
+y sin policies; `anon`, `authenticated` y `service_role` no tienen ni USAGE del
+esquema (comprobado con `has_schema_privilege` y `has_table_privilege`).
+PostgREST no lo expone (no está en los esquemas de la API). **spinus-consola**
+lee `public` con vistas propias: no ve `respaldos` y nada de lo que lee cambia
+(`clinicas.ajuste_*`, `limite_efectivo`, `clinica_tiene_acceso()` intactos;
+`clinicas.horario_consulta` no se borra ni se cambia; en `consultorios` sólo
+cambian VALORES de `horario` y `horario_propio`, no columnas). El disparador
+`audit_consultorios` deja una fila UPDATE por consultorio copiado.
+
+**E · EXECUTE a PUBLIC.** Ninguna de las tres funciones creadas o
+reemplazadas lo tiene: `validar_tipo_cita_consultorio()` (de disparador; los
+tres roles, con `REVOKE … FROM PUBLIC` explícito), `reserva_contexto` y
+`cita_correo_tomar` (sólo `service_role`, como antes). G4 no crea funciones
+(un bloque `DO`). Las demás funciones de `public` con PUBLIC en esta base son
+las de `main` sin P1 (las arregla `feature/limites-ajustables`; I2 del §8.7).
+
+### 9.4 Catálogo: qué cambió de verdad
+
+Huella md5 por objeto de `public` (la consulta del §3: definición y `proacl` de
+cada función, cada policy, disparador, tabla y constraint) de la base recién
+reiniciada con las 29, contra las de `main` (cierre) y contra la de las 25
+(integración de las correcciones, §8):
+
+- **Contra `main` (355 huellas): 0 objetos cambiados o quitados.**
+  `clinica_tiene_acceso()`, `clinica_no_suspendida()`, `limite_efectivo` (no
+  está en esta rama) y todas las policies de `main` siguen idénticas.
+- **Contra las 25 (543 huellas): exactamente** 2 policies reemplazadas
+  (`tipos_cita_insert`, `tipos_cita_update`: las dos de B6, autorizadas por
+  Angel), 2 funciones reemplazadas con los mismos permisos
+  (`reserva_contexto`, `cita_correo_tomar`), 1 constraint rehecha
+  (`cita_correos_tipo_check`), y nuevos: 1 función
+  (`validar_tipo_cita_consultorio()`), 1 disparador
+  (`trg_tipos_cita_consultorio`) y 3 constraints de `tipos_cita` (la FK
+  `consultorio_id` y los dos CHECK). Ninguna tabla de `public` cambia de
+  permisos ni de RLS; ninguna se quita. (Los índices no entran en la huella:
+  G2 rehace `tipos_cita_nombre_activo_unico` para no mirar las filas con
+  consultorio y crea `tipos_cita_principal_unico` y `tipos_cita_consultorio`.)
+- Fuera de `public`: la tabla `respaldos.consultorios_horario_20261119` (G4).
+
+### 9.5 La base combinada con `feature/limites-ajustables`
+
+Reinicio con las **32** migraciones (5 de `main`, las tres `20261014*` y las 24
+del proyecto, en orden de nombre): todas aplican sin fallo (el primer intento
+de la CLI abortó en «Initialising schema» con `LegacyDbSetupError`; el segundo,
+igual, pasó: del contenedor, no de las migraciones). Los 210 objetos de la
+agenda (funciones, policies, disparadores y constraints) quedan **idénticos**
+a los de la rama; ninguna función de `public` queda con EXECUTE a PUBLIC.
+
+- **`p1_permisos_funciones.sql`, caso 3: en rojo, como se esperaba (H2).** La
+  lista de la base combinada son **las mismas 41 funciones del §8.5, carácter
+  por carácter**: la tanda no la cambia (`validar_tipo_cita_consultorio()`, la
+  única función nueva, la ejecutan los tres roles; `reserva_contexto` y
+  `cita_correo_tomar` ya estaban, sólo `service_role`). La lista para pegar al
+  fusionar las dos ramas sigue siendo la del §8.5.
+- `p1` (resto de casos), `p1b`, `p2`, `p3` y las **24** pruebas del proyecto
+  (las 21 de antes, `g2_duracion_consulta`, `g2b_tipos_cita_update` y
+  `g3_correo_confirmacion`), en verde.
+
+### 9.6 Pruebas, antes y después del reinicio
+
+| | Sobre la fusión (antes) | Desde cero (después) |
+|---|---|---|
+| `npm run build` | limpio | (no depende de la base) |
+| `npm run lint` | 96 errores (sin subir) | igual |
+| Vitest | 1860 pruebas en 127 archivos | 1860 en 127 |
+| SQL (`pruebas-sql.sh`) | 24 archivos en verde | 24 en verde |
+| Playwright completo | 358 pasan, 1 falla (`agenda-g3-tarjeta` «agendada», 1,46 px: era la prueba, §6-bis), 291 saltadas, 10.2 min | 355 pasan, 5 fallan, 292 saltadas, 11.0 min: las 5 dependen de que hoy es **domingo** y fallan igual en la base `dd634b9` (AG-DT-69) |
+| e2e del Google falso y de seguridad | dentro de la batería, en verde | en verde |
+| `reserva-carrera.sh` | verde | verde |
+| `confirmacion-carrera.sh` | verde | verde |
+
+### 9.7 Hallazgos de la integración y del revisor
+
+El revisor (Sonnet, sin ver esto) llegó a los **mismos cuatro veredictos
+(APTA)**, a la misma lista del caso 3 (sin cambios) y a «ningún objeto de
+`main` cambia». Además señaló, y se recoge:
+
+- **J1 · Las dos policies reemplazadas son de B6, no de `main`.** `main` no
+  tiene `tipos_cita`. Cierto: la frase «la huella de main sin cambios salvo las
+  dos policies autorizadas» se entiende como «sin cambios» a secas en `main`;
+  las dos policies cambian respecto de las 25 (§9.4).
+- **J2 · Volver a correr E4 después de G3 aborta** (su pre-vuelo encuentra el
+  CHECK de `tipo` ya ensanchado). Es lo esperado y lo dice la guía §13.2 («nunca
+  vuelvas a correr la 10 ni la 14 después de la 21 y la 24»).
+- **J3 · El convenio «el tipo vale en ese consultorio» no lo impone la base**
+  (`reservar_por_enlace` no mira `consultorio_id`). No es regresión: la RPC sólo
+  la ejecuta `service_role` y las dos rutas filtran antes; lo dicen los COMMENT
+  (dimensión 16).
+- **J4 · Las cuatro llevan `lock_timeout = 5s`** y ninguna bloquea
+  `appointments` ni `pacientes`.
+
+Lo que vio el coordinador y el revisor no:
+
+- **J5 · En una clínica en sólo lectura un médico puede crear o cambiar SUS
+  tipos** (§9.3 A). Lo podía el administrador desde B6; `tipos_cita` no lleva
+  puerta RESTRICTIVE a propósito y la reserva sigue cerrada por la puerta S3.
+  Sin cambio.
+
+**Dimensión propuesta para `AUDITORIA-MIGRACIONES.md`** (del auditor de
+`20261119130000`; el archivo no se tocó, decide Angel): «pre-vuelos que
+reimplementan la condición de un disparador sobre un universo más amplio que el
+de las filas que la sentencia va a tocar» — un pre-vuelo que anticipa que «el
+disparador X abortaría» se acota al `WHERE` de la sentencia, no a la tabla
+entera.
