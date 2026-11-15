@@ -3,7 +3,7 @@
 import { type ReactElement, type ReactNode } from 'react'
 import { type Tramo, type ResumenDia } from '@/lib/agenda/huecosAgenda'
 import { CardResumen } from '@/components/agenda/CardResumen'
-import { CardHuecos } from '@/components/agenda/CardHuecos'
+import { CardHuecos, type TurnosHuecos } from '@/components/agenda/CardHuecos'
 
 /* ═══ BLOQUE 8 · EL PANEL LATERAL DE LA VISTA DÍA ══════════════════════════
    Dos tarjetas a la derecha de la rejilla, SÓLO en `timeGridDay` y SÓLO en
@@ -43,7 +43,7 @@ import { CardHuecos } from '@/components/agenda/CardHuecos'
    (lo decide `AgendaCliente`). Sin él, el panel es el de siempre. Va al final,
    en el hueco inferior que la auditoría visual (punto 4) vio vacío. */
 export function PanelDia(
-  { titulo, citas, eventos, resumen, unMedico, onHueco, incompleto, miniMes }: {
+  { titulo, citas, eventos, resumen, unMedico, onHueco, incompleto, miniMes, turnos }: {
     titulo: string
     citas: number
     eventos: number
@@ -54,6 +54,8 @@ export function PanelDia(
     incompleto: boolean
     /** F3: el minicalendario de mes, sólo con la agenda v2. */
     miniMes?: ReactNode
+    /** H4 (punto 20): partir cada hueco en turnos de la rejilla fija, sólo con la v2. */
+    turnos?: TurnosHuecos
   },
 ): ReactElement {
   return (
@@ -66,7 +68,7 @@ export function PanelDia(
         horasVisibles={unMedico}
         incompleto={incompleto}
       />
-      {unMedico && <CardHuecos resumen={resumen} onHueco={onHueco} incompleto={incompleto} />}
+      {unMedico && <CardHuecos resumen={resumen} onHueco={onHueco} incompleto={incompleto} turnos={turnos} />}
       {miniMes && (
         <section className="ag-panelcard" aria-label="Calendario del mes">
           {miniMes}

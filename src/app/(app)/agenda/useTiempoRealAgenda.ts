@@ -26,6 +26,7 @@ import type { Appointment } from '@/lib/agenda/tiposAgenda'
 import { esCancelacionAjena } from '@/lib/agenda/avisoCancelacion'
 import { registrarNuevo, salirConAnimacion } from '@/lib/agenda/marcasMovimiento'
 import { animarFlip } from '@/lib/agenda/flipTarjetas'
+import type { CambioCita } from '@/lib/agenda/porConfirmarTiempoReal'
 
 type CalRef = RefObject<InstanceType<typeof FullCalendar> | null>
 
@@ -43,6 +44,13 @@ type FilaRealtime = Omit<Appointment, 'pacientes' | 'medico'> & {
   client_id: string | null
 }
 
+/** H4 · El cambio, reducido a lo que mira la lista «Por confirmar». */
+function cambioDelPayload(p: RealtimePostgresChangesPayload<FilaRealtime>): CambioCita | null {
+  if (p.eventType === 'DELETE') return p.old?.id ? { tipo: 'DELETE', id: p.old.id } : null
+  const fila = p.new
+  return fila?.id && fila.start_time ? { tipo: p.eventType, fila } : null
+}
+
 /* Antigüedad a partir de la cual volver a la pestaña sí pide datos otra vez.
    Ver el efecto de `visibilitychange`, que es quien lo justifica. */
 const UMBRAL_REFETCH_FOCO_MS = 120_000
@@ -55,9 +63,13 @@ interface Params {
   /** E8: una cita PINTADA pasó a cancelada por un cambio ajeno (no eco propio).
    *  Sólo con la agenda v2 encendida; apagada, el padre no lo pasa. */
   onCanceladaAjena?: (id: string) => void
+  /** H4 (punto 18): CADA cambio del canal, también el eco propio y las citas
+   *  fuera de la vista, para la lista «Por confirmar». Sólo con la v2: apagada,
+   *  el padre no lo pasa. No abre otro canal: es este mismo. */
+  onCambioCita?: (c: CambioCita) => void
 }
 
-export function useTiempoRealAgenda({ calendarRef, filtroEfectivo, refetch, ultimaTraidaRef, onCanceladaAjena }: Params) {
+export function useTiempoRealAgenda({ calendarRef, filtroEfectivo, refetch, ultimaTraidaRef, onCanceladaAjena, onCambioCita }: Params) {
   /**
    * Re-hidrata un evento del calendario con la fila canónica que devolvió el
    * servidor. Recorre `extendedProps` y FUSIONA clave por clave: no sustituye
@@ -221,6 +233,13 @@ export function useTiempoRealAgenda({ calendarRef, filtroEfectivo, refetch, ulti
 
   /** Aplica UN cambio llegado por el canal al evento que le corresponde. */
   async function aplicarCambioRealtime(payload: RealtimePostgresChangesPayload<FilaRealtime>) {
+    /* H4 · Antes de todo (de la firma y de la vista): la lista de mañana
+       quiere también el eco propio («Confirmar» de la tarjeta) y las citas de
+       mañana que no están pintadas. Sólo avisa; no pide nada. */
+    if (onCambioCita) {
+      const cambio = cambioDelPayload(payload)
+      if (cambio) onCambioCita(cambio)
+    }
     const api = calendarRef.current?.getApi()
     if (!api) return
 

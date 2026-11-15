@@ -52,9 +52,10 @@ export type AperturaEdicionV2 = Extract<ModalState, { mode: 'edit' }> & {
  * La firma que la tarjeta espera de `cambiarEstadoCita` (`guardadoCitas.ts`):
  * el mismo PUT, la misma firma de escritura (`client_id`) y la misma auditoría
  * que `handleCancelar`, generalizado al estado. La tarjeta sólo la llama con
- * `'confirmed'`.
+ * `'confirmed'`. H4: devuelve si el servidor lo aceptó (la lista «Por
+ * confirmar» lo usa para devolver la fila si falla).
  */
-export type CambiarEstadoCita = (id: string, estado: Status) => Promise<void>
+export type CambiarEstadoCita = (id: string, estado: Status) => Promise<boolean>
 
 /** El gesto de alta tal como lo ve `altaCitas`, antes de proponer duración. */
 export interface GestoAlta {

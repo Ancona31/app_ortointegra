@@ -5,9 +5,12 @@
  * Citas de MAÑANA (en la zona de cada consultorio, plan_E lista A 13), sólo
  * `scheduled` (las confirmadas por correo, WhatsApp, RSVP o el personal SALEN),
  * con paciente o por ligar, con hora. Devuelve lo justo para pintar la fila:
- * `{ id, inicio, zona, titulo, tiene_telefono, whatsapp_reminder_sent_at }`.
- * NO devuelve el teléfono: el botón de la fila lo pide a `/api/agenda/whatsapp`
- * (`preparar`), que vuelve a comprobar todo.
+ * `{ id, inicio, zona, titulo, consultorio, con_whatsapp, con_correo,
+ * whatsapp_reminder_sent_at }`. H4 (punto 17): `con_whatsapp` y `con_correo`
+ * son las MISMAS reglas de los botones y de sus rutas (`motivoSinWhatsApp`,
+ * `motivoSinCorreo`), en booleanos. NO devuelve ni el teléfono ni el correo:
+ * los botones de la fila los piden a `/api/agenda/whatsapp` (`preparar`) y a
+ * `/api/agenda/correo`, que vuelven a comprobar todo.
  *
  * E8 añade `canceladas` y D11 `empalmes` (reservas por enlace a las que una
  * sincronización con Google les metió encima un evento importado o movido).
@@ -22,7 +25,7 @@ import { entradaGestion, type ClienteSesion } from '@/lib/reserva/gestionServido
 import {
   citaAdmiteWhatsApp, citasWhatsApp, esDeManana, SELECT_CITA_WHATSAPP, telefonoDeCita, ZONA_CITA_POR_OMISION,
 } from '@/lib/agenda/whatsappServidor'
-import type { FilaPorConfirmar } from '@/lib/agenda/whatsappCita'
+import { correoParaConfirmacion, motivoSinCorreo, motivoSinWhatsApp, type FilaPorConfirmar } from '@/lib/agenda/whatsappCita'
 import { VENTANA_CANCELADAS_MS, type FilaCancelada } from '@/lib/agenda/avisoCancelacion'
 import { empalmesVigentes, VENTANA_EMPALMES_MS, type FilaEmpalme } from '@/lib/agenda/avisoEmpalmeReserva'
 import { logger } from '@/lib/logger'
@@ -37,6 +40,14 @@ const VENTANA_MS = 50 * 3_600_000
 /** E1 sin aplicar: la tabla o sus columnas no existen. La sección sale vacía. */
 const AUSENTE = new Set(['42P01', 'PGRST205', '42703', 'PGRST204'])
 const Respuesta = z.object({ appointment_id: z.string(), respondido_en: z.string() })
+/* H4: el correo, en un alias propio (`correo:pacientes(email)`) para no tocar
+   la forma compartida con `POST /api/agenda/whatsapp` (`SELECT_CITA_WHATSAPP`).
+   Sólo se usa para el booleano `con_correo`; no sale en la respuesta. */
+const SELECT_POR_CONFIRMAR = `${SELECT_CITA_WHATSAPP}, reserva_correo, correo:pacientes(email)`
+const CorreoDeCita = z.object({
+  id: z.string(), reserva_correo: z.string().nullable().optional(), correo: z.object({ email: z.string().nullable() }).nullable().optional(),
+})
+
 const CitaCancelada = z.object({
   id: z.string(), title: z.string().nullable(), start_time: z.string(), consultorio_timezone: z.string().nullable(), status: z.string(),
 })
@@ -101,12 +112,26 @@ async function empalmesConReservas(supabase: ClienteSesion, clinicaId: string, a
   return empalmesVigentes(pares, z.array(CitaDelPar).parse(filas ?? []), ahora)
 }
 
+/** Las filas de mañana con sus medios, por las reglas de los botones (H4, punto 17). */
+function filasDeManana(data: unknown, ahora: number): FilaPorConfirmar[] {
+  const correos = new Map(z.array(CorreoDeCita).parse(data ?? []).map((c) => [c.id, correoParaConfirmacion(c.correo?.email, c.reserva_correo)]))
+  return citasWhatsApp(data)
+    .filter((c) => citaAdmiteWhatsApp(c, ahora) && esDeManana(c.start_time, c.consultorio_timezone, ahora))
+    .map((c) => ({
+      id: c.id, inicio: c.start_time, zona: c.consultorio_timezone || ZONA_CITA_POR_OMISION, titulo: c.title ?? '',
+      consultorio: c.consultorio_nombre ?? '',
+      con_whatsapp: motivoSinWhatsApp(c, telefonoDeCita(c), ahora) === null,
+      con_correo: motivoSinCorreo(c, correos.get(c.id) ?? null, ahora) === null,
+      whatsapp_reminder_sent_at: c.whatsapp_reminder_sent_at,
+    }))
+}
+
 export async function GET(): Promise<NextResponse> {
   const e = await entradaGestion()
   if (!e.ok) return e.respuesta
   try {
     const ahora = Date.now()
-    const { data, error } = await e.supabase.from('appointments').select(SELECT_CITA_WHATSAPP)
+    const { data, error } = await e.supabase.from('appointments').select(SELECT_POR_CONFIRMAR)
       .eq('clinica_id', e.clinicaId).eq('status', 'scheduled').eq('all_day', false)
       .gt('start_time', new Date(ahora).toISOString()).lt('start_time', new Date(ahora + VENTANA_MS).toISOString())
       .order('start_time').limit(TOPE)
@@ -114,12 +139,7 @@ export async function GET(): Promise<NextResponse> {
       logger.error('agenda', `por confirmar sin leer: ${error.code ?? ''}`)
       return NextResponse.json({ error: 'Error interno' }, { status: 500 })
     }
-    const citas: FilaPorConfirmar[] = citasWhatsApp(data)
-      .filter((c) => citaAdmiteWhatsApp(c, ahora) && esDeManana(c.start_time, c.consultorio_timezone, ahora))
-      .map((c) => ({
-        id: c.id, inicio: c.start_time, zona: c.consultorio_timezone || ZONA_CITA_POR_OMISION, titulo: c.title ?? '',
-        tiene_telefono: telefonoDeCita(c) !== null, whatsapp_reminder_sent_at: c.whatsapp_reminder_sent_at,
-      }))
+    const citas = filasDeManana(data, ahora)
     const canceladas = await canceladasRecientes(e.supabase, e.clinicaId, ahora)
     const empalmes = await empalmesConReservas(e.supabase, e.clinicaId, ahora)
     return NextResponse.json({ citas, canceladas, empalmes }, { headers: { 'Cache-Control': 'no-store' } })

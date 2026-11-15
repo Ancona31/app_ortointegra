@@ -214,6 +214,18 @@ export function turnosDelDia(e: EntradaTurnos): Turno[] {
 }
 
 /**
+ * H4 (punto 20 de Angel) · Los turnos de la rejilla fija de un día (LA MISMA
+ * de `turnosDelDia`, la del enlace de reserva) que caben ENTEROS en el tramo
+ * libre `[desde, hasta)` (instantes en ms). Lo usa el panel «Huecos
+ * disponibles» de Día para partir cada hueco: lo que está libre ya lo dice el
+ * hueco, así que un turno que algo toca aunque sea en parte no cabe entero y
+ * no sale.
+ */
+export function turnosEnTramo(e: Omit<EntradaTurnos, 'citas'>, desde: number, hasta: number): Turno[] {
+  return turnosDelDia({ ...e, citas: [] }).filter(t => Date.parse(t.inicio) >= desde && Date.parse(t.fin) <= hasta)
+}
+
+/**
  * G2 · Ajusta un instante al turno más cercano de la rejilla de ESE día en
  * `tz` (apertura del día + múltiplos de la duración). `null` si no se ajusta:
  * el día no abre, el instante cae fuera de la jornada, la duración no vale o
