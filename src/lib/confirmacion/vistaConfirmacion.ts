@@ -76,9 +76,26 @@ export function etiquetaDeZona(zona: string | null): string {
   }
 }
 
+/**
+ * La fecha grande de la página (tanda G1): «Martes» arriba y «6 de mayo ·
+ * 10:00 h» debajo, en la zona del consultorio (sin el año, como la maqueta:
+ * cabe en un renglón del teléfono). Sólo la primera letra
+ * del día en mayúscula: la página ya NO usa la clase CSS `capitalize`, que
+ * subía también la preposición («6 De Mayo»).
+ */
+export function partesCuando(inicio: string, zona: string): { dia: string; fecha: string } {
+  const instante = new Date(inicio)
+  const dia = new Intl.DateTimeFormat('es-MX', { weekday: 'long', timeZone: zona }).format(instante)
+  const fecha = new Intl.DateTimeFormat('es-MX', { day: 'numeric', month: 'long', timeZone: zona }).format(instante)
+  const hora = new Intl.DateTimeFormat('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: zona }).format(instante)
+  return { dia: dia.charAt(0).toLocaleUpperCase('es-MX') + dia.slice(1), fecha: `${fecha} · ${hora} h` }
+}
+
 /** Lo que se pinta de la cita, ya compuesto. Sin ids ni clínica. */
 export interface CitaPintada {
   cuando: string
+  /** La misma fecha que `cuando`, partida para la fecha grande. */
+  partes: { dia: string; fecha: string }
   zona: string
   medico: string
   consultorio: string | null
@@ -90,6 +107,7 @@ export function citaPintada(ctx: ContextoConfirmacion): CitaPintada {
   const zona = ctx.zona ?? ZONA_SIN_ETIQUETA
   return {
     cuando: fechaHoraEnZona(ctx.inicio, zona),
+    partes: partesCuando(ctx.inicio, zona),
     zona: etiquetaDeZona(ctx.zona),
     medico: ctx.medico ? componerNombreMedicoCompleto(ctx.medico) : '',
     consultorio: ctx.consultorio.nombre,

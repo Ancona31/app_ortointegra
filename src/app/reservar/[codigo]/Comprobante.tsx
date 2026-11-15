@@ -1,22 +1,31 @@
 import type { ReactElement } from 'react'
-import { etiquetaDia, fechaEnZona, horaEnZona } from './clienteReserva'
+import ResumenCita from './ResumenCita'
+import { etiquetaDia, fechaEnZona, horaEnZona, type ConsultorioPagina } from './clienteReserva'
 
 interface Props {
   medico: string
-  consultorio: { nombre: string; direccion: string | null; telefono: string | null; zona: string }
+  consultorio: ConsultorioPagina
   inicio: string
 }
 
-/** El comprobante en pantalla. Sin tipo de cita (lista A, 10). */
+/** «Viernes, 13 de noviembre · 10:45» en la zona del consultorio. */
+export function cuandoEnZona(inicio: string, zona: string): string {
+  return `${etiquetaDia(fechaEnZona(inicio, zona))} · ${horaEnZona(inicio, zona)}`
+}
+
+/** El comprobante en pantalla. Sin tipo de cita (lista A, 10); con la dirección completa (punto 2). */
 export default function Comprobante({ medico, consultorio, inicio }: Props): ReactElement {
   return (
-    <section aria-label="Cita reservada" className="space-y-2 text-sm text-slate-700">
-      <h2 className="text-lg font-semibold text-slate-800">Tu cita quedó agendada</h2>
-      <p><span className="capitalize">{etiquetaDia(fechaEnZona(inicio, consultorio.zona))}</span>, {horaEnZona(inicio, consultorio.zona)} h</p>
-      <p>{medico}</p>
-      <p>{consultorio.nombre}{consultorio.direccion ? ` · ${consultorio.direccion}` : ''}</p>
-      {consultorio.telefono && <p>Teléfono: {consultorio.telefono}</p>}
-      <p className="text-slate-500">Te enviamos el comprobante por correo. Para cambiar o cancelar, comunícate con el consultorio.</p>
+    <section aria-label="Cita reservada" className="rp-paso">
+      <div className="rp-exito">
+        <span className="rp-exito__icono" aria-hidden="true">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5" /></svg>
+        </span>
+        <h2 className="rp-titulo" tabIndex={-1} data-titulo-paso>Tu cita quedó agendada</h2>
+        <p className="rp-sub">Te enviamos el comprobante por correo.</p>
+      </div>
+      <ResumenCita consultorio={consultorio} cuando={cuandoEnZona(inicio, consultorio.zona)} medico={medico} telefono />
+      <p className="rp-nota">Para cambiar o cancelar, comunícate con el consultorio.</p>
     </section>
   )
 }

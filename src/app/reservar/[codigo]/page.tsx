@@ -9,6 +9,7 @@ import { esCodigoDeEnlace } from '@/lib/reserva/secretos'
 import { cierraLaPagina, motivosApertura } from '@/lib/reserva/aperturaEnlace'
 import type { EnlaceAbierto } from '@/lib/reserva/puertaReserva'
 import ReservaCliente, { type DatosPagina } from './ReservaCliente'
+import MarcoPublico from '@/components/agendaPublica/MarcoPublico'
 
 /* ═══ /reservar/[codigo] — RESERVA POR ENLACE (agenda D5) ═══
    Pública y sin sesión. NO llama a getUser() ni redirige a ningún sitio: la
@@ -33,16 +34,23 @@ export const metadata: Metadata = {
 
 export const dynamic = 'force-dynamic'
 
+/** Usado o caducado (y sin consultorio o sin tipos): sólo la marca, sin el médico, como antes. */
 function NoDisponible({ telefono }: { telefono: string | null }): ReactElement {
   return (
-    <main className="min-h-screen bg-[#f0f4f8] flex items-center justify-center px-4">
-      <div className="w-full max-w-md bg-white rounded-2xl border border-slate-200 p-8 text-center space-y-3">
-        <h1 className="text-lg font-semibold text-slate-800">Este enlace ya no está disponible</h1>
-        <p className="text-sm text-slate-600">
-          {telefono ? <>Para agendar, comunícate con el consultorio: <strong>{telefono}</strong>.</> : 'Para agendar, comunícate con el consultorio.'}
-        </p>
+    <MarcoPublico>
+      <div className="rp-tarjeta">
+        <div className="rp-exito">
+          <span className="rp-exito__icono rp-exito__icono--neutro" aria-hidden="true">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="9" /><path d="M12 7.5v5M12 16h.01" /></svg>
+          </span>
+          <h1 className="rp-titulo">Este enlace ya no está disponible</h1>
+          <p className="rp-sub">
+            {telefono ? <>Para agendar, comunícate con el consultorio: <strong style={{ color: 'var(--ag-ink)' }}>{telefono}</strong>.</> : 'Para agendar, comunícate con el consultorio.'}
+          </p>
+          {telefono && <a className="rp-btn rp-btn--sec" href={`tel:${telefono.replace(/[^0-9+]/g, '')}`}>Llamar al consultorio</a>}
+        </div>
       </div>
-    </main>
+    </MarcoPublico>
   )
 }
 
@@ -91,5 +99,5 @@ export default async function Page({ params, searchParams }: PageProps<'/reserva
     casilla: AVISO_CASILLA,
     origen: ctx.clase === 'fijo' ? await origenDe((await searchParams).origen, enlace) : null,
   }
-  return <ReservaCliente datos={datos} />
+  return <MarcoPublico medico={{ nombre: medico, especialidad: ctx.medico.especialidad }}><ReservaCliente datos={datos} /></MarcoPublico>
 }

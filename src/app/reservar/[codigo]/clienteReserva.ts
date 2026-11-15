@@ -67,10 +67,54 @@ export function mensajeDeError(r: RespuestaApi): string {
   return textos[error] ?? 'No se pudo completar. Intenta de nuevo.'
 }
 
-/** «lunes 16 de noviembre» de una fecha de pared. */
+/**
+ * Sólo la primera letra en mayúscula. Antes la página usaba la clase CSS
+ * `capitalize`, que sube TODAS las palabras: «Viernes, 13 De Noviembre»
+ * (tanda G1, punto 1). La preposición va en minúscula.
+ */
+export function mayusculaInicial(texto: string): string {
+  return texto.charAt(0).toLocaleUpperCase('es-MX') + texto.slice(1)
+}
+
+function formatoDia(fecha: string, opciones: Intl.DateTimeFormatOptions): string {
+  return new Intl.DateTimeFormat('es-MX', { ...opciones, timeZone: 'UTC' }).format(new Date(`${fecha}T12:00:00Z`))
+}
+
+/** «Viernes, 13 de noviembre» de una fecha de pared (sólo la primera letra en mayúscula). */
 export function etiquetaDia(fecha: string): string {
-  return new Intl.DateTimeFormat('es-MX', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' })
-    .format(new Date(`${fecha}T12:00:00Z`))
+  return mayusculaInicial(formatoDia(fecha, { weekday: 'long', day: 'numeric', month: 'long' }))
+}
+
+/** «Vie» y «13» para la tira de fechas. */
+export function partesDia(fecha: string): { semana: string; numero: string } {
+  return { semana: mayusculaInicial(formatoDia(fecha, { weekday: 'short' }).replace('.', '')), numero: formatoDia(fecha, { day: 'numeric' }) }
+}
+
+/** «14 – 20 de noviembre», o «28 de noviembre – 4 de diciembre» si cruza de mes. */
+export function rangoSemana(dias: readonly DiaPagina[]): string {
+  const primero = dias[0]?.fecha
+  const ultimo = dias[dias.length - 1]?.fecha
+  if (!primero || !ultimo) return ''
+  const fin = formatoDia(ultimo, { day: 'numeric', month: 'long' })
+  const mismoMes = primero.slice(0, 7) === ultimo.slice(0, 7)
+  return `${mismoMes ? formatoDia(primero, { day: 'numeric' }) : formatoDia(primero, { day: 'numeric', month: 'long' })} – ${fin}`
+}
+
+/**
+ * Los turnos de un día en «Mañana» (antes de las 12:00 en la zona del
+ * consultorio) y «Tarde» (de las 12:00 en adelante), en el orden recibido.
+ */
+export function agruparTurnos(turnos: readonly TurnoPagina[], zona: string): { manana: TurnoPagina[]; tarde: TurnoPagina[] } {
+  const hora = new Intl.DateTimeFormat('es-MX', { hour: 'numeric', hourCycle: 'h23', timeZone: zona })
+  const manana: TurnoPagina[] = []
+  const tarde: TurnoPagina[] = []
+  for (const t of turnos) (Number(hora.format(new Date(t.inicio))) < 12 ? manana : tarde).push(t)
+  return { manana, tarde }
+}
+
+/** El primer día con algún turno, o null si la semana está vacía. */
+export function primerDiaConTurnos(dias: readonly DiaPagina[]): string | null {
+  return dias.find(d => d.turnos.length > 0)?.fecha ?? null
 }
 
 /** «10:30» de un instante en la zona del consultorio. */
