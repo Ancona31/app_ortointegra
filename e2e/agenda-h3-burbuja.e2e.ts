@@ -7,12 +7,18 @@ import { abrirAgendaV2, burbuja, clicEnFranja } from './interaccionesAyudas'
  *
  *   · 11: «Registrar «…»» de la burbuja en verde (`--ag-success-text`), con
  *     contraste AA contra el fondo pintado, en claro y en oscuro.
+ *   · 12: tras registrar el paciente (y tras cancelar el registro), la burbuja
+ *     sigue abierta con su horario, aunque el clic sobre el botón del modal sea
+ *     DOBLE: el segundo clic, que cae ya sobre la rejilla, no la cierra ni abre
+ *     otra (la causa, en `useEscudoTrasRegistro` de `BurbujaAlta.tsx`).
  *
  * Todo en la SEMANA +3 (como `agenda-t1-burbuja`), miércoles.
  *
  * MUTACIONES (cada una pone en rojo su prueba):
  *   · 11: quitar el `color` de `.ag-opcion--registrar` en `globals.css` (y, para el
  *     fondo de la señalada, quitar su `background`).
+ *   · 12: en `BurbujaAlta`, que `escudo.activar` no haga nada (el comportamiento
+ *     de antes: el segundo clic cierra la burbuja y abre otra vacía).
  */
 soloEscritorio()
 test.use({ storageState: SESION.adminA })
@@ -102,3 +108,48 @@ for (const tema of ['claro', 'oscuro'] as const) {
     for (const l of await coloresYContraste(registrar)) expect(l.ratio).toBeGreaterThanOrEqual(4.5)
   })
 }
+
+/** Clic en el centro de `boton` y, en cuanto se va el modal, otro clic en el mismo sitio (el doble clic). */
+async function dobleClicQueCierraElModal(page: Page, boton: Locator): Promise<void> {
+  const caja = await boton.boundingBox()
+  if (!caja) throw new Error('sin botón')
+  const x = caja.x + caja.width / 2
+  const y = caja.y + caja.height / 2
+  await page.mouse.click(x, y)
+  await expect(page.getByRole('heading', { name: 'Registrar paciente' })).toHaveCount(0)
+  await page.mouse.click(x, y)
+}
+
+test('punto 12: tras registrar con doble clic, la burbuja sigue abierta con su horario, el paciente elegido y el foco en Guardar', async ({ page }) => {
+  interruptorAgenda('A', true)
+  const { b, registrar } = await burbujaConRegistrar(page)
+  const titulo = await b.getByRole('heading').innerText()
+  await registrar.click()
+  const qpm = page.locator('div.fixed', { has: page.getByRole('heading', { name: 'Registrar paciente' }) }).last()
+  await qpm.getByRole('checkbox').check()
+  await dobleClicQueCierraElModal(page, qpm.getByRole('button', { name: 'Crear y continuar' }))
+  await page.waitForTimeout(800)
+  await expect(burbuja(page)).toHaveCount(1)
+  await expect(b.getByRole('heading')).toHaveText(titulo)
+  await expect(b.getByRole('combobox', { name: 'Paciente' })).toHaveValue('Zoila Burbujah Tres')
+  await expect(b.getByRole('button', { name: 'Guardar', exact: true })).toBeFocused()
+  expect(sqlLocal(`select count(*) from public.pacientes where apellidos = :'ap'`, { ap: NUEVO.apellidos })).toBe('1')
+})
+
+test('punto 12: al cancelar el registro (también con doble clic), la burbuja sigue abierta con su horario y lo escrito', async ({ page }) => {
+  interruptorAgenda('A', true)
+  const { b, registrar } = await burbujaConRegistrar(page)
+  const titulo = await b.getByRole('heading').innerText()
+  await registrar.click()
+  const qpm = page.locator('div.fixed', { has: page.getByRole('heading', { name: 'Registrar paciente' }) }).last()
+  await dobleClicQueCierraElModal(page, qpm.getByRole('button', { name: 'Cancelar' }))
+  await page.waitForTimeout(800)
+  await expect(burbuja(page)).toHaveCount(1)
+  await expect(b.getByRole('heading')).toHaveText(titulo)
+  await expect(b.getByRole('combobox', { name: 'Paciente' })).toHaveValue('Zoila Burbujah Tres')
+  await expect(b.getByRole('combobox', { name: 'Paciente' })).toBeFocused()
+  expect(sqlLocal(`select count(*) from public.pacientes where apellidos = :'ap'`, { ap: NUEVO.apellidos })).toBe('0')
+  // Pasado el escudo, tocar fuera vuelve a cerrar la burbuja (como antes).
+  await page.mouse.click(5, 5)
+  await expect(burbuja(page)).toHaveCount(0)
+})
