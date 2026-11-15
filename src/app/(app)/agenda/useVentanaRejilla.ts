@@ -46,6 +46,8 @@ interface Params {
   calendarRef: CalRef
   horario: Horario
   currentView: string
+  /** Con la agenda v2: la vista abre en la apertura de los consultorios (ver `aperturaRef`). */
+  corregirApertura?: boolean
 }
 
 /** F1.5 · ¿El horario tiene algún día cerrado? Decide el «Compactar» inicial. */
@@ -68,7 +70,7 @@ function sesionDeCompactar(
   return ref.current
 }
 
-export function useVentanaRejilla({ calendarRef, horario, currentView }: Params) {
+export function useVentanaRejilla({ calendarRef, horario, currentView, corregirApertura = false }: Params) {
   /* ── Ventana vertical de la rejilla ──────────────────────
      Antes `slotMinTime`/`slotMaxTime` eran dos cadenas clavadas en 07:00–21:00
      y una cita a las 23:00 —hay cinco en producción— existía sin poder verse.
@@ -155,6 +157,24 @@ export function useVentanaRejilla({ calendarRef, horario, currentView }: Params)
     const aperturas = DIAS.map(d => horario[d.key]).filter(h => h?.activo).map(h => h.inicio)
     return aperturas.length ? `${aperturas.sort()[0]}:00` : ventana.slotMinTime
   }, [horario, ventana.slotMinTime])
+
+  /* ── PUNTOS 10-13 · LA HORA DE APERTURA CON LA V2 ──────────────────────
+     `scrollTime` sólo se lee al montar (nota de arriba), y el interruptor —y
+     con él el horario de los consultorios— llega DESPUÉS del montaje: sin esto
+     la vista abriría siempre en la apertura de la clínica. UNA sola vez, en el
+     primer render con la v2 Y con los consultorios del servidor ya contestados
+     (`corregirApertura`; si no, el disparo se gastaría con el horario
+     provisional): si la apertura ya no es la del montaje, se lleva
+     la rejilla a ella con `scrollToTime`. Después, filtrar o cambiar de
+     consultorio NO mueve el scroll, como hasta ahora. Apagada no corre nunca:
+     la agenda se queda como estaba. */
+  const aperturaRef = useRef({ hecha: false, inicial: scrollTime })
+  useEffect(() => {
+    const a = aperturaRef.current
+    if (!corregirApertura || a.hecha) return
+    a.hecha = true
+    if (scrollTime !== a.inicial) calendarRef.current?.getApi().scrollToTime(scrollTime)
+  }, [corregirApertura, scrollTime, calendarRef])
 
   /** Índices `fc` de los días plegados. Vacío = la semana entera a la vista. */
   const [diasOcultos, setDiasOcultos] = useState<number[]>([])

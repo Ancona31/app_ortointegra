@@ -50,6 +50,17 @@ export function horaDeReloj(date: Date): string {
   return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
 }
 
+/** El sujeto de siempre de los avisos («esta clínica»). */
+export const SUJETO_CLINICA = 'esta clínica'
+
+/**
+ * Cómo se redacta un aviso cuando el horario es el de un CONSULTORIO (agenda
+ * v2, `horarioRejilla.ts`): `sujeto` sustituye a «esta clínica» y `sufijoHora`
+ * va pegado a la hora (« hora Baja California») cuando la hora de pared del
+ * consultorio no es la del dispositivo. Sin `forma`, el texto de siempre.
+ */
+export interface FormaAviso { sufijoHora?: string; sujeto?: string }
+
 /**
  * El aviso de que una hora cae fuera del horario de consulta, YA REDACTADO, o
  * `null` si cae dentro.
@@ -65,16 +76,17 @@ export function horaDeReloj(date: Date): string {
  *
  * `encabezado` es la frase hasta la hora, sin ella: «Vas a agendar a las».
  */
-export function avisoFueraDeHorario(date: Date, h: Horario, encabezado: string): string | null {
+export function avisoFueraDeHorario(date: Date, h: Horario, encabezado: string, forma?: FormaAviso): string | null {
   const dia = DIAS.find(d => d.fc === date.getDay())
   if (!dia) return null
   const horarioDia = h[dia.key]
   const hhmm = horaDeReloj(date)
+  const { sufijoHora = '', sujeto = SUJETO_CLINICA } = forma ?? {}
   if (!horarioDia?.activo) {
-    return `${encabezado} ${hhmm} del ${dia.label.toLowerCase()}, y esta clínica no atiende ${dia.plural}. ¿Es correcto?`
+    return `${encabezado} ${hhmm}${sufijoHora} del ${dia.label.toLowerCase()}, y ${sujeto} no atiende ${dia.plural}. ¿Es correcto?`
   }
   if (hhmm >= horarioDia.inicio && hhmm < horarioDia.fin) return null
-  return `${encabezado} ${hhmm}, y esta clínica atiende de ${horarioDia.inicio} a ${horarioDia.fin}. ¿Es correcto?`
+  return `${encabezado} ${hhmm}${sufijoHora}, y ${sujeto} atiende de ${horarioDia.inicio} a ${horarioDia.fin}. ¿Es correcto?`
 }
 
 /**
@@ -89,18 +101,19 @@ export function avisoFueraDeHorario(date: Date, h: Horario, encabezado: string):
  * Devuelve `null` en un día no atendido: de eso ya avisa la hora de inicio, y
  * dos ventanas seguidas para el mismo error son una de más.
  */
-export function avisoFinFueraDeHorario(fin: Date, h: Horario): string | null {
+export function avisoFinFueraDeHorario(fin: Date, h: Horario, forma?: FormaAviso): string | null {
   const dia = DIAS.find(d => d.fc === fin.getDay())
   if (!dia) return null
   const horarioDia = h[dia.key]
   if (!horarioDia?.activo) return null
   const hhmm = horaDeReloj(fin)
   if (hhmm > horarioDia.inicio && hhmm <= horarioDia.fin) return null
+  const { sufijoHora = '', sujeto = SUJETO_CLINICA } = forma ?? {}
   /* «Terminaría» y no «La cita terminaría»: esto lo disparan también el modal de
      un EVENTO genérico y el redimensionado de su tarjeta, y ahí «la cita» nombra
      algo que no existe. Sin sujeto la frase vale para los dos y no hace falta
      pasarle el tipo de fila, que este ayudante no tiene ni necesita. */
-  return `Terminaría a las ${hhmm}, y esta clínica atiende de ${horarioDia.inicio} a ${horarioDia.fin}. ¿Es correcto?`
+  return `Terminaría a las ${hhmm}${sufijoHora}, y ${sujeto} atiende de ${horarioDia.inicio} a ${horarioDia.fin}. ¿Es correcto?`
 }
 
 /**
@@ -123,9 +136,9 @@ export function avisoFinFueraDeHorario(fin: Date, h: Horario): string | null {
  * quitó: inventarla hacía que el médico viera «07:00» donde quería las 10:00 y
  * cancelara creyendo que el sistema le había entendido mal.
  */
-export function avisoDiaCerrado(date: Date, h: Horario): string | null {
+export function avisoDiaCerrado(date: Date, h: Horario, forma?: FormaAviso): string | null {
   const dia = DIAS.find(d => d.fc === date.getDay())
   if (!dia || h[dia.key]?.activo) return null
-  return `Vas a agendar un ${dia.label.toLowerCase()}, y esta clínica no atiende ${dia.plural}. ¿Es correcto?`
+  return `Vas a agendar un ${dia.label.toLowerCase()}, y ${forma?.sujeto ?? SUJETO_CLINICA} no atiende ${dia.plural}. ¿Es correcto?`
 }
 

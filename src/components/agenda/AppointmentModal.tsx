@@ -37,9 +37,8 @@ import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
 import { ICONOS_EVENTO, COLORES_EVENTO, type IconoEvento, type ColorEvento } from '@/lib/appointments'
 import { IconoDelEvento } from '@/components/agenda/IconoDelEvento'
 import { desplazarFecha } from '@/lib/dates'
-import type { Horario } from '@/lib/configApp'
 import type { Status, Appointment, DatosGuardado } from '@/lib/agenda/tiposAgenda'
-import { avisoFueraDeHorario, avisoFinFueraDeHorario, avisoDiaCerrado } from '@/lib/agenda/horarioAgenda'
+import type { AvisosHorario } from '@/lib/agenda/horarioRejilla'
 import {
   addMinutes, partirFechaHora, componerIso, diasEntreFechas, duracionEscrita, fechasDeTodoElDia,
 } from '@/lib/agenda/fechasAgenda'
@@ -337,7 +336,7 @@ function useTiposCita(medicoId: string): TipoCita[] | null {
 export default function AppointmentModal({
   modal, onClose, onSave, onDelete, medicos, defaultMedicoId,
   hideMedicoDropdown, medicoDropdownRequired, canVerExpediente, canInvitar, onInvitar,
-  onCambiarTipo, horario, agendaV2 = false, onCancelarCita, buscarEmpalmes, saliendo = false,
+  onCambiarTipo, avisosHorario, agendaV2 = false, onCancelarCita, buscarEmpalmes, saliendo = false,
 }: {
   modal: ModalState
   /* F2.7 · El modal sigue montado mientras sale (lo decide la página, rama de
@@ -364,8 +363,10 @@ export default function AppointmentModal({
   /* El horario de consulta, para el aviso de fuera de horario. Hasta ahora ese
      aviso sólo existía en el GESTO sobre la rejilla (pulsar un hueco,
      arrastrar), donde la hora la pone el sitio donde caes; por el formulario se
-     tecleaba cualquier hora y nadie decía nada. Ver `avisoFueraDeHorario`. */
-  horario: Horario
+     tecleaba cualquier hora y nadie decía nada. Ver `avisoFueraDeHorario`.
+     Con la agenda v2 se compara contra el horario del CONSULTORIO elegido, en su
+     zona (`horarioRejilla.ts`, punto 11 de Angel; cierra AG-DT-33). */
+  avisosHorario: AvisosHorario
   hideMedicoDropdown: boolean
   medicoDropdownRequired: boolean
   canVerExpediente: boolean
@@ -733,10 +734,10 @@ export default function AppointmentModal({
        eligió. Lo que sí tiene sentido preguntar es por el DÍA, y de eso se
        ocupa `avisoDiaCerrado`, que no menciona ninguna hora. Es el mismo reparto
        que ya hace `abrirAlta` en la ruta sin hora. */
+    const donde = { consultorioId, medicoId }
     const aviso = todoElDia
-      ? avisoDiaCerrado(new Date(componerIso(fecha, '12:00')), horario)
-      : (avisoFueraDeHorario(new Date(componerIso(fecha, hora)), horario, 'Vas a agendar a las')
-         ?? avisoFinFueraDeHorario(new Date(componerIso(fechaFin, horaFin)), horario))
+      ? avisosHorario.dia(new Date(componerIso(fecha, '12:00')), donde)
+      : avisosHorario.hora(new Date(componerIso(fecha, hora)), new Date(componerIso(fechaFin, horaFin)), 'Vas a agendar a las', donde)
     if (aviso) { setAvisoHorario(aviso); return }
 
     await seguirTrasHorario()

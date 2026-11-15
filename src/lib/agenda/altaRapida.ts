@@ -166,8 +166,8 @@ export function etiquetaBurbuja(fecha: string, horaInicio: string, horaFin: stri
 
 /** Lo que `guardarAltaRapida` necesita de la agenda, inyectado para probarlo sin DOM. */
 export interface DependenciasGuardado {
-  /** El aviso de fuera de horario de esas puntas (`avisoFueraDeHorario` ?? `avisoFinFueraDeHorario`). */
-  avisoHorario: (inicio: Date, fin: Date) => string | null
+  /** El aviso de fuera de horario de esas puntas; con la v2, contra el consultorio de `datos` (`horarioRejilla.ts`). */
+  avisoHorario: (inicio: Date, fin: Date, datos: DatosGuardado) => string | null
   /** B7c: los empalmes contra lo pintado (`empalmesPintados`). */
   buscarEmpalmes: (tramo: TramoCita) => Empalme[]
   mensajeEmpalme: (lista: readonly Empalme[]) => string
@@ -211,7 +211,7 @@ export async function guardarAltaRapida(
   const inicio = new Date(datos.start_time)
   const fin = new Date(datos.end_time)
   const tocadas = horas.inicio !== horasDeApertura.inicio || horas.fin !== horasDeApertura.fin
-  const aviso = tocadas ? d.avisoHorario(inicio, fin) : null
+  const aviso = tocadas ? d.avisoHorario(inicio, fin, datos) : null
   if (aviso && !(await d.confirmar(aviso))) return no
   const lista = d.buscarEmpalmes({
     id: '', medicoId: datos.medico_id ?? null, inicio, fin, todoElDia: false, noOcupa: false, deGoogle: false, titulo: '',

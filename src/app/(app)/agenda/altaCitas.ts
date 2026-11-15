@@ -21,11 +21,10 @@ import type FullCalendar from '@fullcalendar/react'
 import type { DateClickArg } from '@fullcalendar/interaction'
 import type { DateSelectArg, EventApi, EventClickArg } from '@fullcalendar/core'
 import type { ModalState, TodoElDiaInicial } from '@/components/agenda/AppointmentModal'
-import type { Horario } from '@/lib/configApp'
 import type { SubscriptionState } from '@/lib/subscription'
 import type { Tramo, ResumenDia } from '@/lib/agenda/huecosAgenda'
 import { medianocheDe } from '@/lib/agenda/huecosAgenda'
-import { avisoFueraDeHorario, avisoFinFueraDeHorario, avisoDiaCerrado } from '@/lib/agenda/horarioAgenda'
+import type { AvisosHorario } from '@/lib/agenda/horarioRejilla'
 import { partirFechaHora, ultimoDiaIncluido } from '@/lib/agenda/fechasAgenda'
 import type { Appointment } from '@/lib/agenda/tiposAgenda'
 /* F3 (interacciones v2): SÓLO TIPOS. La burbuja y la tarjeta viven en un chunk
@@ -141,7 +140,8 @@ interface Params {
   setDiaSel: Dispatch<SetStateAction<Date | null>>
   subState: SubscriptionState
   openBloqueoModal: () => void
-  horario: Horario
+  /** Los avisos de fuera de horario (`horarioRejilla.ts`). Sin consultorio todavía, contra los de la rejilla. */
+  avisosHorario: AvisosHorario
   setModal: Dispatch<SetStateAction<ModalState>>
   setConfirm: Dispatch<SetStateAction<ConfirmState>>
   resumenDia: ResumenDia | null
@@ -153,7 +153,7 @@ interface Params {
 }
 
 export function crearAltaCitas({
-  calendarRef, isMobile, setDiaSel, subState, openBloqueoModal, horario, setModal, setConfirm,
+  calendarRef, isMobile, setDiaSel, subState, openBloqueoModal, avisosHorario, setModal, setConfirm,
   resumenDia, citasIncompletas, agendaV2, interacciones, seleccionDesdeHueco,
 }: Params) {
   /* ── Handlers ────────────────────────────────────────── */
@@ -243,9 +243,8 @@ export function crearAltaCitas({
     todoElDia: TodoElDiaInicial, finParaAvisar?: Date, ultimoDia?: string, sitio?: SitioDelGesto | null,
   ) {
     const aviso = hora === null
-      ? avisoDiaCerrado(instante, horario)
-      : (avisoFueraDeHorario(instante, horario, 'Vas a agendar a las')
-         ?? (finParaAvisar ? avisoFinFueraDeHorario(finParaAvisar, horario) : null))
+      ? avisosHorario.dia(instante)
+      : avisosHorario.hora(instante, finParaAvisar ?? null, 'Vas a agendar a las')
     const capas = agendaV2 && sitio ? interacciones.current : null
     const abrir = capas && sitio
       ? () => capas.abrirBurbuja({ fecha, hora, inicio: instante, ...sitio })

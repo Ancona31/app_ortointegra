@@ -32,14 +32,13 @@ import type { Dispatch, RefObject, SetStateAction } from 'react'
 import type FullCalendar from '@fullcalendar/react'
 import { Calendar as CalendarioFC, type EventApi, type EventDropArg } from '@fullcalendar/core'
 import type { EventResizeDoneArg } from '@fullcalendar/interaction'
-import type { Horario } from '@/lib/configApp'
 import type { Profile } from '@/hooks/useProfile'
 import type { useToast } from '@/components/ui/Toast'
 import { canVerAgendaCompleta } from '@/lib/permissions'
 import { vaciarCacheCitas } from '@/lib/agenda/cacheRangosCitas'
 import { buildEventInput, FUENTE_APPOINTMENTS, PREFIJO_OPTIMISTA } from '@/lib/agenda/eventosDeCita'
 import { addMinutes, ultimoDiaIncluido } from '@/lib/agenda/fechasAgenda'
-import { avisoFueraDeHorario, avisoFinFueraDeHorario } from '@/lib/agenda/horarioAgenda'
+import type { AvisosHorario, DondeCita } from '@/lib/agenda/horarioRejilla'
 import { DEFAULT_DURATION } from '@/lib/agenda/duracionCita'
 import { registrarNuevo, salirConAnimacion } from '@/lib/agenda/marcasMovimiento'
 import { animarFlip } from '@/lib/agenda/flipTarjetas'
@@ -77,7 +76,8 @@ export function pacienteParaInvitacion(cita: Partial<Appointment>) {
 
 interface Params {
   calendarRef: CalRef
-  horario: Horario
+  /** Los avisos de fuera de horario (`horarioRejilla.ts`): con la v2, en la hora del consultorio de la cita. */
+  avisosHorario: AvisosHorario
   profile: Profile | null
   toast: ReturnType<typeof useToast>
   setConfirm: Dispatch<SetStateAction<ConfirmState>>
@@ -95,9 +95,14 @@ interface Params {
 type CuerpoDeError = { error?: string; message?: string; empalmes?: unknown } | null
 
 export function crearGuardadoCitas({
-  calendarRef, horario, profile, toast, setConfirm, setCitaCreada, setInvitacion, closeModal,
+  calendarRef, avisosHorario, profile, toast, setConfirm, setCitaCreada, setInvitacion, closeModal,
   refetch, firmarEscritura, aplicarAppointmentAlEvento, agendaV2,
 }: Params) {
+  /** El consultorio y el médico del evento: el aviso se compara contra el horario de SU consultorio. */
+  const dondeDe = (ev: EventApi): DondeCita => {
+    const ext: Partial<Appointment> = ev.extendedProps
+    return { consultorioId: ext.consultorio_id ?? null, medicoId: ext.medico_id ?? null }
+  }
   /**
    * ¿Hay que REVERTIR este gesto? Devuelve `true` —y ya ha revertido— sólo en
    * una de las dos conversiones posibles. Los dos manejadores salen sin tocar
@@ -257,8 +262,7 @@ export function crearGuardadoCitas({
        El fin se mira desde `end_time` y no desde `arg.event.end`, que en la
        conversión es `null` por lo explicado arriba: con el getter, el aviso del
        fin se saltaba justo en el único caso donde el fin es nuevo. */
-    const aviso = avisoFueraDeHorario(arg.event.start!, horario, 'Vas a moverlo a las')
-      ?? (end_time ? avisoFinFueraDeHorario(new Date(end_time), horario) : null)
+    const aviso = avisosHorario.hora(arg.event.start!, end_time ? new Date(end_time) : null, 'Vas a moverlo a las', dondeDe(arg.event))
     /* B7b: el empalme va DESPUÉS del aviso de horario, y si los dos aplican
        salen seguidos, no uno combinado (P3). */
     const seguir = () => seguirSiNoSeEmpalma(arg, start_time, end_time, (aceptados) => ejecutarDrop(id, puntas, arg, aceptados))
@@ -455,8 +459,7 @@ export function crearGuardadoCitas({
        18:00-21:00 con horario hasta las 19:00 deja el inicio intacto. Por eso
        aquí el FIN importa tanto como el inicio — `eventResizableFromStart`
        está puesto, así que se puede arrastrar cualquiera de los dos bordes. */
-    const aviso = avisoFueraDeHorario(arg.event.start!, horario, 'Empezaría a las')
-      ?? (arg.event.end ? avisoFinFueraDeHorario(arg.event.end, horario) : null)
+    const aviso = avisosHorario.hora(arg.event.start!, arg.event.end, 'Empezaría a las', dondeDe(arg.event))
     // B7b: como en el arrastre, el empalme después del aviso de horario.
     const seguir = () => seguirSiNoSeEmpalma(arg, start_time, end_time, (aceptados) => ejecutarDrop(id, { start_time, end_time }, arg, aceptados))
     if (aviso) {

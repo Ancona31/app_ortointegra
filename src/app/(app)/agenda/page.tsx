@@ -5,6 +5,8 @@ import { analizarPerfilSesion } from '@/lib/perfil/perfilSesion'
 import { consultaCitas } from '@/lib/agenda/consultaCitas'
 import { ventanaDeLaSemilla, type SemillaCitas } from '@/lib/agenda/semillaCitas'
 import { agendaV2Encendida } from '@/lib/agenda/ajustesAgenda'
+import { leerConsultoriosAgenda } from '@/lib/agenda/consultoriosAgendaServidor'
+import type { ConsultorioRejilla } from '@/lib/agenda/horarioRejilla'
 import { hoyEnTZ, TZ_CLINICA } from '@/lib/dates'
 import { logger } from '@/lib/logger'
 
@@ -74,6 +76,29 @@ async function leerInterruptorAgenda(): Promise<boolean> {
 }
 
 /**
+ * Los consultorios con los que se dibuja la agenda v2 (puntos 10-13 de Angel,
+ * `horarioRejilla.ts`): sólo con el interruptor encendido; apagada, `null` y la
+ * agenda no los mira. Cliente de servicio filtrado por clínica y por alcance:
+ * ver `consultoriosAgendaServidor.ts`. Cualquier fallo es `null` (la agenda
+ * sigue con los de la sesión). Sólo rechaza con los errores internos de Next.
+ */
+async function leerConsultoriosRejilla(interruptor: Promise<boolean>): Promise<ConsultorioRejilla[] | null> {
+  try {
+    if (!(await interruptor)) return null
+    const { profile } = await sesionServidor()
+    const perfil = analizarPerfilSesion(profile)
+    if (!perfil?.clinica_id) return null
+    return await leerConsultoriosAgenda({
+      id: perfil.id, role: perfil.role, clinica_id: perfil.clinica_id, es_admin_de_clinica: perfil.es_admin_de_clinica === true,
+    })
+  } catch (err: unknown) {
+    unstable_rethrow(err)
+    logger.warn('agenda', `consultorios de la rejilla sin leer: ${err instanceof Error ? err.message : 'error'}`)
+    return null
+  }
+}
+
+/**
  * Server component. NO ESPERA a la semilla: la promesa viaja a `AgendaCliente`
  * (`node_modules/next/dist/docs/01-app/01-getting-started/06-fetching-data.md`,
  * «Streaming data with the `use` API»), que no la lee con `use()` —no
@@ -90,5 +115,10 @@ async function leerInterruptorAgenda(): Promise<boolean> {
 export default function AgendaPage() {
   /* El interruptor viaja igual que la semilla: promesa sin esperar, así que no
      añade nada al TTFB; el cliente arranca en apagado hasta que resuelve. */
-  return <AgendaCliente semillaCitas={sembrarCitas()} interruptor={leerInterruptorAgenda()} />
+  const interruptor = leerInterruptorAgenda()
+  return (
+    <AgendaCliente
+      semillaCitas={sembrarCitas()} interruptor={interruptor} consultoriosRejilla={leerConsultoriosRejilla(interruptor)}
+    />
+  )
 }
