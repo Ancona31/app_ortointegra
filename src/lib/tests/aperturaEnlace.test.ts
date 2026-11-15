@@ -66,8 +66,8 @@ describe('motivosApertura', () => {
 describe('avisoDeEnlace', () => {
   it('dice «No abrirá» con los motivos que cierran, «Abrirá sin horarios» sin días abiertos, y nada si abre', () => {
     expect(avisoDeEnlace([])).toBeNull()
-    expect(avisoDeEnlace(['sin_tipos'])).toBe('No abrirá: no hay un tipo de cita para este médico.')
-    expect(avisoDeEnlace(['no_abre', 'sin_tipos'])).toMatch(/^No abrirá: la clínica no puede recibir reservas.*; no hay un tipo de cita/)
+    expect(avisoDeEnlace(['sin_tipos'])).toBe('No abrirá: falta la duración de la consulta del médico.')
+    expect(avisoDeEnlace(['no_abre', 'sin_tipos'])).toMatch(/^No abrirá: la clínica no puede recibir reservas.*; falta la duración de la consulta/)
     expect(avisoDeEnlace(['sin_disponibilidad'])).toBe('Abrirá sin horarios: ningún consultorio del médico tiene días abiertos.')
   })
 })

@@ -18,7 +18,7 @@ import { tzDispositivo } from '@/lib/dates'
 import { resumenDelDia } from '@/lib/agenda/huecosAgenda'
 import {
   diaDeSemanaDeFecha, jornadaDeFecha, citaOcupa, tramosDeCitasEnZona,
-  huecosDeFechaEnZona, turnosDeHueco, turnosDelDia, type OcupacionCita,
+  huecosDeFechaEnZona, turnosDeJornada, turnosDelDia, minutoDeTurnoCercano, ajustarATurno, type OcupacionCita,
 } from '@/lib/agenda/turnosAgenda'
 
 const TODOS: DiaSemana[] = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo']
@@ -96,23 +96,48 @@ describe('tramosDeCitasEnZona', () => {
   })
 })
 
-describe('turnosDeHueco (P9)', () => {
-  it('turnos de 45 min consecutivos desde el inicio; el resto se pierde', () => {
-    expect(turnosDeHueco({ desde: 540, hasta: 660 }, 45)).toEqual([
+describe('turnosDeJornada (rejilla fija, G2)', () => {
+  it('turnos de 45 min desde la apertura; el resto se pierde', () => {
+    expect(turnosDeJornada({ desde: 540, hasta: 660 }, 45)).toEqual([
       { desde: 540, hasta: 585 },
       { desde: 585, hasta: 630 },
     ])
   })
 
-  it('una duración mayor que el hueco no deja turnos', () => {
-    expect(turnosDeHueco({ desde: 540, hasta: 570 }, 45)).toEqual([])
+  it('una duración mayor que la jornada no deja turnos', () => {
+    expect(turnosDeJornada({ desde: 540, hasta: 570 }, 45)).toEqual([])
   })
 
   it('una duración no válida no da turnos (ni cuelga)', () => {
-    expect(turnosDeHueco({ desde: 540, hasta: 660 }, 0)).toEqual([])
-    expect(turnosDeHueco({ desde: 540, hasta: 660 }, -30)).toEqual([])
-    expect(turnosDeHueco({ desde: 540, hasta: 660 }, 7.5)).toEqual([])
-    expect(turnosDeHueco({ desde: 540, hasta: 660 }, Number.NaN)).toEqual([])
+    expect(turnosDeJornada({ desde: 540, hasta: 660 }, 0)).toEqual([])
+    expect(turnosDeJornada({ desde: 540, hasta: 660 }, -30)).toEqual([])
+    expect(turnosDeJornada({ desde: 540, hasta: 660 }, 7.5)).toEqual([])
+    expect(turnosDeJornada({ desde: 540, hasta: 660 }, Number.NaN)).toEqual([])
+  })
+})
+
+describe('minutoDeTurnoCercano / ajustarATurno (el ajuste de la agenda, G2)', () => {
+  const J = { desde: 540, hasta: 780 }   // 09:00–13:00
+  it('al turno más cercano de la rejilla; empate → el de después', () => {
+    expect(minutoDeTurnoCercano(J, 45, 540 + 20)).toBe(540)        // 9:20 → 9:00
+    expect(minutoDeTurnoCercano(J, 45, 540 + 30)).toBe(585)        // 9:30 → 9:45
+    expect(minutoDeTurnoCercano(J, 30, 540 + 15)).toBe(570)        // a la mitad → 9:30
+    expect(minutoDeTurnoCercano(J, 45, 770)).toBe(720)             // 12:50 → 12:00 (el último que cabe)
+  })
+  it('fuera de la jornada, o sin turno que quepa, no ajusta', () => {
+    expect(minutoDeTurnoCercano(J, 45, 500)).toBeNull()
+    expect(minutoDeTurnoCercano(J, 45, 780)).toBeNull()
+    expect(minutoDeTurnoCercano({ desde: 540, hasta: 560 }, 45, 545)).toBeNull()
+  })
+  it('ajustarATurno trabaja en la hora de pared de la zona del consultorio', () => {
+    process.env.TZ = 'UTC'
+    const h = horarioDe('09:00', '13:00')
+    // 10:40 en Ciudad de México (16:40Z) con 45 min → 10:30 (16:30Z).
+    expect(ajustarATurno({ instante: new Date('2026-11-11T16:40:00Z'), tz: 'America/Mexico_City', horario: h, duracionMin: 45 })?.toISOString())
+      .toBe('2026-11-11T16:30:00.000Z')
+    // El mismo instante en Tijuana (08:40 PST) cae antes de abrir: no se ajusta.
+    expect(ajustarATurno({ instante: new Date('2026-11-11T16:40:00Z'), tz: 'America/Tijuana', horario: h, duracionMin: 45 })).toBeNull()
+    expect(ajustarATurno({ instante: new Date('2026-11-11T16:40:00Z'), tz: 'America/Mexico_City', horario: horarioDe('09:00', '13:00', ['lunes']), duracionMin: 45 })).toBeNull()
   })
 })
 

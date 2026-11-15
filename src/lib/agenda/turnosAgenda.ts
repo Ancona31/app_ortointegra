@@ -68,7 +68,7 @@ export interface EntradaDia {
 }
 
 export interface EntradaTurnos extends EntradaDia {
-  /** Duración del tipo de cita, en minutos: tamaño y paso del turno (P9). */
+  /** Duración del tipo de cita, en minutos: tamaño y paso de la rejilla fija (G2). */
   duracionMin: number
   /** Con `anticipacionMinHoras`, descarta los turnos que empiezan antes de
    *  `ahora + anticipación`. Sin `ahora` no se recorta nada. */
@@ -144,16 +144,43 @@ export function huecosDeFechaEnZona(e: EntradaDia, minimo: number): Tramo[] {
   return huecosDe(jornada, ocupados, minimo)
 }
 
-/** Turnos consecutivos desde el inicio del hueco, con paso igual a la
- *  duración (P9). El resto que no llega a un turno entero se pierde. Una
- *  duración que no es un entero positivo no da turnos (y no cuelga el bucle). */
-export function turnosDeHueco(hueco: Tramo, duracionMin: number): Tramo[] {
+/**
+ * LA REJILLA FIJA (G2, punto 9 de Angel; sustituye a P9): los turnos de una
+ * jornada se cuentan desde la HORA DE APERTURA, con paso igual a la duración.
+ * Con 45 min desde las 9:00: 9:00, 9:45, 10:30… El resto que no llega a un
+ * turno entero se pierde. Una duración que no es un entero positivo no da
+ * turnos (y no cuelga el bucle). No mira la ocupación: la rejilla es la misma
+ * con la agenda vacía o llena, y por eso la lista y la comprobación al
+ * reservar no pueden dar respuestas distintas.
+ */
+export function turnosDeJornada(jornada: Tramo, duracionMin: number): Tramo[] {
   if (!Number.isInteger(duracionMin) || duracionMin <= 0) return []
   const turnos: Tramo[] = []
-  for (let t = hueco.desde; t + duracionMin <= hueco.hasta; t += duracionMin) {
+  for (let t = jornada.desde; t + duracionMin <= jornada.hasta; t += duracionMin) {
     turnos.push({ desde: t, hasta: t + duracionMin })
   }
   return turnos
+}
+
+/** ¿Algo ocupa PARTE de este turno? Semiabierto: tocar extremos no ocupa
+ *  (10:00–10:30 y 10:30–11:00), la misma regla que el empalme de
+ *  `reservar_por_enlace` (`start_time < fin AND end_time > inicio`). */
+function tocaAlgo(t: Tramo, ocupados: readonly Tramo[]): boolean {
+  return ocupados.some(o => o.desde < t.hasta && o.hasta > t.desde)
+}
+
+/**
+ * G2 · El minuto del turno de la rejilla MÁS CERCANO a `minuto`, o `null` si
+ * `minuto` cae fuera de la jornada o no cabe ningún turno entero. Empate a la
+ * mitad → el de después. Es la ayuda de la agenda (clic, burbuja, arrastre):
+ * no ofrece nada, sólo propone la hora.
+ */
+export function minutoDeTurnoCercano(jornada: Tramo, duracionMin: number, minuto: number): number | null {
+  const turnos = turnosDeJornada(jornada, duracionMin)
+  const ultimo = turnos[turnos.length - 1]
+  if (!ultimo || minuto < jornada.desde || minuto >= jornada.hasta) return null
+  const k = Math.min(Math.round((minuto - jornada.desde) / duracionMin), turnos.length - 1)
+  return jornada.desde + k * duracionMin
 }
 
 /** El instante de un minuto de pared de `fecha` en `tz`, o `null` si esa hora
@@ -165,20 +192,40 @@ function instanteDeMinuto(fecha: string, minuto: number, tz: string): string | n
   return renderEnTZ(instante, 'yyyy-MM-dd HH:mm', tz) === `${dia} ${reloj}` ? instante : null
 }
 
-/** Los turnos ofrecibles del día, en instantes. `[]` si el consultorio no abre,
- *  si la duración no es válida o si no cabe ninguno. */
+/** Los turnos ofrecibles del día, en instantes: los de la rejilla fija que
+ *  nada ocupa ni en parte, desde `ahora + anticipación`. `[]` si el
+ *  consultorio no abre, si la duración no es válida o si no cabe ninguno. */
 export function turnosDelDia(e: EntradaTurnos): Turno[] {
+  const jornada = jornadaDeFecha(e.fecha, e.horario)
+  if (!jornada) return []
+  const ocupados = fusionarTramos(tramosDeCitasEnZona(e.citas, e.fecha, e.tz))
   const limite = e.ahora
     ? e.ahora.getTime() + (e.anticipacionMinHoras ?? 0) * 3_600_000
     : Number.NEGATIVE_INFINITY
   const turnos: Turno[] = []
-  for (const hueco of huecosDeFechaEnZona(e, Math.max(1, e.duracionMin))) {
-    for (const t of turnosDeHueco(hueco, e.duracionMin)) {
-      const inicio = instanteDeMinuto(e.fecha, t.desde, e.tz)
-      const fin = instanteDeMinuto(e.fecha, t.hasta, e.tz)
-      if (!inicio || !fin || Date.parse(inicio) < limite) continue
-      turnos.push({ inicio, fin })
-    }
+  for (const t of turnosDeJornada(jornada, e.duracionMin)) {
+    if (tocaAlgo(t, ocupados)) continue
+    const inicio = instanteDeMinuto(e.fecha, t.desde, e.tz)
+    const fin = instanteDeMinuto(e.fecha, t.hasta, e.tz)
+    if (!inicio || !fin || Date.parse(inicio) < limite) continue
+    turnos.push({ inicio, fin })
   }
   return turnos
+}
+
+/**
+ * G2 · Ajusta un instante al turno más cercano de la rejilla de ESE día en
+ * `tz` (apertura del día + múltiplos de la duración). `null` si no se ajusta:
+ * el día no abre, el instante cae fuera de la jornada, la duración no vale o
+ * la hora resultante no existe (adelanto del reloj). Lo usa la agenda; el
+ * llamador decide qué hacer con `null` (dejar la hora tal cual).
+ */
+export function ajustarATurno(a: { instante: Date; tz: string; horario: Horario; duracionMin: number }): Date | null {
+  const iso = a.instante.toISOString()
+  const [fecha = ''] = renderEnTZ(iso, 'yyyy-MM-dd HH:mm', a.tz).split(' ')
+  const jornada = RE_FECHA.test(fecha) ? jornadaDeFecha(fecha, a.horario) : null
+  if (!jornada) return null
+  const minuto = minutoDeTurnoCercano(jornada, a.duracionMin, minutoDePared(iso, fecha, a.tz))
+  const instante = minuto === null ? null : instanteDeMinuto(fecha, minuto, a.tz)
+  return instante ? new Date(instante) : null
 }

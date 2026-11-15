@@ -183,7 +183,7 @@ test.describe('con el interruptor encendido', () => {
     const nombre = tituloUnico('Tipo e2e')
     try {
       await page.goto(RUTA)
-      const tipos = page.getByRole('region', { name: 'Tipos de cita' })
+      const tipos = page.getByRole('region', { name: 'Duración y tipos de cita' })
       await tipos.getByLabel('Nombre').fill(nombre)
       await tipos.getByLabel('Duración (min)').fill('45')
       await tipos.getByRole('button', { name: 'Crear tipo' }).click()

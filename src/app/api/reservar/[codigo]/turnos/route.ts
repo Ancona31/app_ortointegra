@@ -19,6 +19,7 @@ import { TurnosQuerySchema } from '@/lib/reserva/esquemasReserva'
 import { abrirEnlace, codigoAbrible, noEncontrado, responder, respuestaEstado, telefonoDeContacto } from '@/lib/reserva/puertaReserva'
 import { respuestaNoPorAhora } from '@/lib/reserva/respuestasReserva'
 import { sincronizarAntesDeReservar } from '@/lib/reserva/sincronizarReserva'
+import { tiposDelConsultorio } from '@/lib/agenda/tiposPorConsultorio'
 import { ocupacionDeEnlace } from '@/lib/reserva/servidorReserva'
 import { dentroDeLimites, ipDe, seudonimoRed } from '@/lib/reserva/limitesReserva'
 import { ocupacionSinEstado, primerDia, rangoDeConsulta, reglasDe, turnosDeDias } from '@/lib/reserva/turnosReserva'
@@ -39,7 +40,8 @@ export async function GET(req: NextRequest, ctx: RouteContext<'/api/reservar/[co
   const q = TurnosQuerySchema.safeParse(Object.fromEntries(req.nextUrl.searchParams))
   if (!q.success) return responder({ status: 400, cuerpo: { error: 'solicitud_invalida' } })
   const consultorio = enlace.ctx.consultorios.find(c => c.id === q.data.consultorio)
-  const tipo = enlace.ctx.tipos.find(t => t.id === q.data.tipo)
+  // G2: sólo los tipos que valen en ESE consultorio (la misma regla que el POST).
+  const tipo = consultorio ? tiposDelConsultorio(enlace.ctx.tipos, consultorio.id).find(t => t.id === q.data.tipo) : undefined
   if (!consultorio || !tipo) return responder({ status: 400, cuerpo: { error: 'consultorio_o_tipo_invalido' } })
 
   const ahora = new Date()

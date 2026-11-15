@@ -72,6 +72,7 @@ import { DIAS, horarioToBusinessHours } from '@/lib/agenda/horarioAgenda'
 import {
   consultoriosDeLaRejilla, crearAvisosHorario, fuenteDeLaRejilla, type ConsultorioRejilla, type FuenteRejilla,
 } from '@/lib/agenda/horarioRejilla'
+import { useAjusteTurno } from '@/app/(app)/agenda/useAjusteTurno'
 import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
 import { rangosDeLaVista, partirFechaHora } from '@/lib/agenda/fechasAgenda'
 import { frasearConteo, frasearConteoBreve } from '@/lib/agenda/conteoAgenda'
@@ -583,6 +584,13 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
   const avisosHorario = useMemo(() => crearAvisosHorario({
     agendaV2, horarioClinica: horarioClinicaConfig, consultorios: consultoriosV2, seleccion,
   }), [agendaV2, horarioClinicaConfig, consultoriosV2, seleccion])
+  /* G2 (punto 9): clic, burbuja y arrastre caen en el turno más cercano de la
+     rejilla del médico en ese consultorio. Lee los MISMOS consultorios que la
+     rejilla de G4 (`consultoriosV2`, `seleccion`): en un clic, el único de la
+     selección con un médico a la vista. Apagada la v2, no hace nada. */
+  const ajustarTurno = useAjusteTurno({
+    agendaV2, consultorios: consultoriosV2, seleccion, horarioClinica: horarioClinicaConfig, medicoMostrado,
+  })
 
   /* Iniciales del chip de médico. Se calculan AL PINTAR, no al traer las citas.
      Al montar, `medicos` viene vacío, así que `isSingleDoctor` vale true y el
@@ -885,13 +893,13 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
      `cambiarEstadoCita` cuando Movimiento lo añada (ver `contratosV2.ts`). */
   const guardado = crearGuardadoCitas({
     calendarRef, avisosHorario, profile, toast, setConfirm, setCitaCreada, setInvitacion, closeModal,
-    refetch, firmarEscritura, aplicarAppointmentAlEvento, agendaV2,
+    refetch, firmarEscritura, aplicarAppointmentAlEvento, agendaV2, ajustarTurno,
   })
   const { handleEventDrop, handleEventResize, handleSave, handleDelete, handleCancelar } = guardado
 
   const { handleDateClick, handleSelect, handleEventClick, abrirCita, abrirHueco } = crearAltaCitas({
     calendarRef, isMobile, setDiaSel, subState, openBloqueoModal, avisosHorario, setModal, setConfirm,
-    resumenDia, citasIncompletas, agendaV2, interacciones: interaccionesRef, seleccionDesdeHueco,
+    resumenDia, citasIncompletas, agendaV2, interacciones: interaccionesRef, seleccionDesdeHueco, ajustarTurno,
   })
 
   /* Header de día apilado para Semana/Día. Mes conserva su header por defecto

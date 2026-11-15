@@ -81,7 +81,9 @@ begin
   end loop;
 end $$;
 
--- Caso 3: ni el invitado, ni la secretaria, ni otra clínica crean o editan (42501 / 0 filas)
+-- Caso 3: ni el invitado, ni la secretaria, ni otra clínica crean o editan (42501 / 0 filas).
+-- G2b (20261119121000, decisión de Angel): el médico edita los SUYOS; aquí se prueba que no
+-- toca nada que no sea suyo (eso lo prueba entero supabase/pruebas-sql/g2b_tipos_cita_update.sql).
 do $$
 declare
   v_quien uuid;
@@ -99,7 +101,7 @@ begin
     exception when insufficient_privilege then
       null;
     end;
-    update public.tipos_cita set duracion_min = 5;
+    update public.tipos_cita set duracion_min = 5 where medico_id is distinct from v_quien;
     get diagnostics v_n = row_count;
     reset role;
     if v_n <> 0 then

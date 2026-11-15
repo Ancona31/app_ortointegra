@@ -33,6 +33,7 @@ import type { Appointment } from '@/lib/agenda/tiposAgenda'
    gesto abre el modal como siempre. Ver `contratosV2.ts`. */
 import type { ApiInteraccionesV2, SeleccionDesdeHueco, SitioCita } from '@/lib/agenda/contratosV2'
 import type { Caja, Punto } from '@/lib/agenda/posicionCapa'
+import type { AjustarTurno } from '@/app/(app)/agenda/useAjusteTurno'
 
 type CalRef = RefObject<InstanceType<typeof FullCalendar> | null>
 
@@ -150,12 +151,19 @@ interface Params {
   agendaV2: boolean
   interacciones: { current: ApiInteraccionesV2 | null }
   seleccionDesdeHueco: SeleccionDesdeHueco
+  /** G2 (punto 9): ajusta la hora del gesto al turno más cercano de la rejilla
+   *  del médico en el consultorio de la rejilla; `null` = no se ajusta. */
+  ajustarTurno?: AjustarTurno
 }
 
 export function crearAltaCitas({
   calendarRef, isMobile, setDiaSel, subState, openBloqueoModal, avisosHorario, setModal, setConfirm,
-  resumenDia, citasIncompletas, agendaV2, interacciones, seleccionDesdeHueco,
+  resumenDia, citasIncompletas, agendaV2, interacciones, seleccionDesdeHueco, ajustarTurno,
 }: Params) {
+  /* G2 · El instante del gesto, ajustado al turno ANTES de abrir la burbuja o
+     el modal (y antes del aviso de fuera de horario, que habla de esa hora).
+     Sólo con hora: lo de todo el día y la celda del Mes no se tocan. */
+  const ajustar = (d: Date): Date => (agendaV2 ? ajustarTurno?.(d) ?? d : d)
   /* ── Handlers ────────────────────────────────────────── */
   /* ⚠️ `tipo: 'cita'` DE AQUÍ ABAJO ES EL VALOR DE PARTIDA, NO UN CIERRE.
      Pulsar un hueco o arrastrar sobre el calendario siguen abriendo CITA, que es
@@ -197,13 +205,14 @@ export function crearAltaCitas({
        abre un evento de todo el día convertía el clic del mes —que es como se
        agenda— en un alta de evento. Esa pregunta la contesta el DOM, en
        `cayoEnLaBandaDeTodoElDia`; la de si hay hora se queda aquí. */
-    const { fecha, hora } = partirFechaHora(arg.date.toISOString())
+    const instante = arg.allDay ? arg.date : ajustar(arg.date)
+    const { fecha, hora } = partirFechaHora(instante.toISOString())
     const enLaBanda = cayoEnLaBandaDeTodoElDia(arg.dayEl, arg.allDay)
     /* F3: la banda de todo el día sigue yendo al modal (decisión 18); la
        rejilla horaria y la celda del Mes llevan su sitio, y con v2 abren la
        burbuja. Un clic no trae fin: la burbuja propone la duración por omisión. */
     const sitio = enLaBanda ? null : sitioDelGesto(arg.dayEl, arg.jsEvent, null, null)
-    abrirAlta(arg.date, fecha, arg.allDay ? null : hora, enLaBanda ? 'fijo' : 'no', undefined, undefined, sitio)
+    abrirAlta(instante, fecha, arg.allDay ? null : hora, enLaBanda ? 'fijo' : 'no', undefined, undefined, sitio)
   }
 
   /* El alta desde la rejilla, con o sin hora, y el aviso que corresponda a cada
@@ -276,7 +285,7 @@ export function crearAltaCitas({
        mirando sólo el inicio. El fin sólo se pasa cuando hay hora — arrastrar
        sobre las celdas del MES selecciona días enteros (`allDay`), y ahí el fin
        es medianoche del día siguiente, que no dice nada de la cita. */
-    const { fecha, hora } = partirFechaHora(arg.start.toISOString())
+    const { fecha } = partirFechaHora(arg.start.toISOString())
     /* Mismo reparto que en `handleDateClick`, y por el mismo motivo: `allDay`
        dice si hay hora, el DOM dice si fue la banda. Aquí el objetivo sale de
        `jsEvent`, que `DateSelectArg` declara OPCIONAL —`MouseEvent | null`,
@@ -311,8 +320,12 @@ export function crearAltaCitas({
       return
     }
     /* F3: el fin del arrastre viaja a la burbuja, que respeta la duración
-       arrastrada (más de una franja); desde un hueco del panel, no. */
-    abrirAlta(arg.start, fecha, hora, 'no', arg.end, undefined, sitioDelGesto(celdaDe(arg.jsEvent), arg.jsEvent, arg.end, hueco))
+       arrastrada (más de una franja); desde un hueco del panel, no.
+       G2: el tramo entero se corre al turno más cercano (misma duración). */
+    const inicio = ajustar(arg.start)
+    const fin = new Date(arg.end.getTime() + (inicio.getTime() - arg.start.getTime()))
+    const t = partirFechaHora(inicio.toISOString())
+    abrirAlta(inicio, t.fecha, t.hora, 'no', fin, undefined, sitioDelGesto(celdaDe(arg.jsEvent), arg.jsEvent, fin, hueco))
   }
 
   /* ⚠️ LA ÚNICA PUERTA A LA EDICIÓN DE UNA CITA, Y POR ESO ESTÁ SUELTA. Nació

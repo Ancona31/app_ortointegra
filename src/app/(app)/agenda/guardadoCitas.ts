@@ -31,6 +31,7 @@
 import type { Dispatch, RefObject, SetStateAction } from 'react'
 import type FullCalendar from '@fullcalendar/react'
 import { Calendar as CalendarioFC, type EventApi, type EventDropArg } from '@fullcalendar/core'
+import type { AjustarTurno } from '@/app/(app)/agenda/useAjusteTurno'
 import type { EventResizeDoneArg } from '@fullcalendar/interaction'
 import type { Profile } from '@/hooks/useProfile'
 import type { useToast } from '@/components/ui/Toast'
@@ -89,6 +90,9 @@ interface Params {
   aplicarAppointmentAlEvento: (appointment: Partial<Appointment> & { id?: string }) => void
   /** El interruptor de la agenda v2: decide si se avisa de empalmes (B7). */
   agendaV2: boolean
+  /** G2 (punto 9): ajusta el inicio del arrastre al turno más cercano de la
+   *  rejilla del médico de la cita en SU consultorio; `null` = no se ajusta. */
+  ajustarTurno?: AjustarTurno
 }
 
 /** El cuerpo de error de la API de citas, sin creerle la forma a `res.json()`. */
@@ -96,7 +100,7 @@ type CuerpoDeError = { error?: string; message?: string; empalmes?: unknown } | 
 
 export function crearGuardadoCitas({
   calendarRef, avisosHorario, profile, toast, setConfirm, setCitaCreada, setInvitacion, closeModal,
-  refetch, firmarEscritura, aplicarAppointmentAlEvento, agendaV2,
+  refetch, firmarEscritura, aplicarAppointmentAlEvento, agendaV2, ajustarTurno,
 }: Params) {
   /** El consultorio y el médico del evento: el aviso se compara contra el horario de SU consultorio. */
   const dondeDe = (ev: EventApi): DondeCita => {
@@ -191,6 +195,23 @@ export function crearGuardadoCitas({
     return { desde, hasta: evento.endStr ? ultimoDiaIncluido(evento.endStr) : desde }
   }
 
+  /* G2 · El arrastre cae en el turno más cercano de la rejilla del médico de
+     la cita en su consultorio: se corre la cita entera (misma duración) ANTES
+     de los avisos y del PUT, así que lo pintado, lo avisado y lo guardado son
+     la misma hora. Sin consultorio claro o sin duración conocida, `null` y la
+     hora del gesto se queda. Con la v2 apagada no hay `ajustarTurno`. */
+  function ajustarArrastre(arg: EventDropArg): void {
+    const inicio = arg.event.start
+    const props = arg.event.extendedProps
+    if (!agendaV2 || !ajustarTurno || !inicio) return
+    const medicoId = typeof props.medico_id === 'string' ? props.medico_id : null
+    const consultorioId = typeof props.consultorio_id === 'string' ? props.consultorio_id : null
+    const nuevo = consultorioId ? ajustarTurno(inicio, { medicoId, consultorioId }) : null
+    if (!nuevo || nuevo.getTime() === inicio.getTime()) return
+    const fin = arg.event.end
+    arg.event.setDates(nuevo, fin ? new Date(fin.getTime() + nuevo.getTime() - inicio.getTime()) : null)
+  }
+
   async function handleEventDrop(arg: EventDropArg) {
     if (arg.event.extendedProps.isGcalBlock) { arg.revert(); return }
     if (esGestoDeTodoElDia(arg)) return
@@ -215,8 +236,9 @@ export function crearGuardadoCitas({
       return
     }
 
-    const start_time = arg.event.start?.toISOString()
-    if (!start_time) { arg.revert(); return }
+    if (!arg.event.start) { arg.revert(); return }
+    ajustarArrastre(arg)
+    const start_time = arg.event.start.toISOString()
 
     /* ── SACAR UN EVENTO DE TODO EL DÍA A LA REJILLA ─────────────────────────
        Llegar aquí con `all_day` en `true` sólo puede significar eso: la guarda

@@ -6,12 +6,13 @@ import { aprobarAviso, emitirEnlace, type Escenario } from './reservaPublicaAyud
 /**
  * Tanda T2 · la configuración guiada de la agenda (puntos 7 a 10 de Angel):
  *
- *   · 7 · «Para empezar»: tres pasos con su estado calculado de los datos;
- *     desaparece al completarse;
- *   · 8 · al crear un enlace sin tipo de cita, la ficha lo pide ahí mismo con
- *     «Consulta, 30 min» en un clic; el enlace que no abrirá lleva su aviso,
- *     con la MISMA regla con la que la página pública dice «Este enlace ya no
- *     está disponible»;
+ *   · 7 · «Primeros pasos»: tres pasos con su estado calculado de los datos;
+ *     desaparece al completarse (G2: horario → duración → enlace, con avance);
+ *   · 8 · al crear un enlace sin duración de la consulta, se PREGUNTA ahí mismo
+ *     (G2: ya no se crea «Consulta, 30 min» con un valor fijo) y el enlace se
+ *     crea a continuación; el enlace que no abrirá lleva su aviso y su
+ *     píldora, con la MISMA regla con la que la página pública dice «Este
+ *     enlace ya no está disponible»;
  *   · 9 · cada médico ve su ficha; el administrador, la de todos (la suya
  *     primero, «(tú)»);
  *   · 10 · la rejilla pinta el horario propio del consultorio activo.
@@ -111,29 +112,81 @@ test.afterEach(() => {
 })
 
 const enlaces = (page: Page) => page.getByRole('region', { name: 'Enlaces de reserva' })
-const pasos = (page: Page) => page.getByRole('region', { name: 'Para empezar' })
+const pasos = (page: Page) => page.getByRole('region', { name: 'Primeros pasos' })
 
-test('7 y 8 · sin tipo de cita: «Para empezar» lo marca, la ficha lo pide y un clic lo resuelve; al completar, la lista se va', async ({ page }) => {
+test('G2 · 7 y 8 · «Primeros pasos» en orden con su avance; «Crear enlace» pide la duración ahí mismo y crea el enlace', async ({ page }) => {
   await page.goto(RUTA)
-  await expect(pasos(page).getByRole('listitem', { name: 'Horario y disponibilidad: hecho' })).toBeVisible()
-  await expect(pasos(page).getByRole('listitem', { name: 'Tipos de cita: pendiente' })).toBeVisible()
-  await expect(pasos(page).getByRole('listitem', { name: 'Enlace de reserva: pendiente' })).toBeVisible()
+  const items = pasos(page).getByRole('listitem')
+  await expect(items).toHaveCount(3)
+  await expect(items.nth(0)).toHaveAccessibleName('Horario de cada consultorio: hecho')
+  await expect(items.nth(1)).toHaveAccessibleName('Duración de la consulta: pendiente')
+  await expect(items.nth(2)).toHaveAccessibleName('Enlace de reserva: pendiente')
+  await expect(pasos(page).getByRole('progressbar')).toHaveAttribute('aria-valuenow', '1')
+  await expect(pasos(page)).toContainText('1 de 3 listos')
+  // El menú de secciones dice cuántos faltan.
+  await expect(page.getByRole('navigation', { name: 'Secciones de la configuración' }).getByRole('link', { name: /Primeros pasos.*2 pendientes/ })).toBeVisible()
+  // Ningún tipo nace con un valor fijo: no hay botón «Crear «Consulta», 30 min».
+  await expect(page.getByRole('button', { name: /Consulta», 30 min/ })).toHaveCount(0)
 
-  const ficha = enlaces(page).getByRole('note', { name: 'Falta para que el enlace abra' }).first()
-  await expect(ficha).toContainText('Un tipo de cita.')
-  await ficha.getByRole('button', { name: 'Crear «Consulta», 30 min' }).click()
-  await expect(toastConTexto(page, 'Tipo de cita «Consulta» creado')).toBeVisible()
-  await expect(enlaces(page).getByRole('note', { name: 'Falta para que el enlace abra' })).toHaveCount(0)
-  await expect(pasos(page).getByRole('listitem', { name: 'Tipos de cita: hecho' })).toBeVisible()
-  expect(sqlLocal(`select duracion_min || '|' || (medico_id is null) from public.tipos_cita where nombre = 'Consulta' and activo`)).toBe('30|true')
-
-  await enlaces(page).getByRole('button', { name: 'Crear enlace fijo' }).first().click()
+  /* El paso 3 antes que el 2: no es un callejón sin salida, pide la duración ahí mismo. */
+  await items.nth(2).getByRole('button', { name: 'Crear enlace' }).click()
+  const falta = pasos(page).getByRole('note', { name: 'Falta para crear el enlace' })
+  await expect(falta).toContainText('Para que tu enlace abra, falta:')
+  // Una sola pregunta en la tarjeta (la del paso 2 se esconde mientras tanto).
+  await expect(pasos(page).getByRole('group', { name: '¿Cuánto dura tu consulta?' })).toHaveCount(1)
+  await falta.getByText('45 min', { exact: true }).click()
+  await falta.getByRole('button', { name: 'Guardar y crear el enlace' }).click()
   await expect(toastConTexto(page, 'Enlace fijo creado')).toBeVisible()
   await expect(pasos(page)).toHaveCount(0)
+  expect(sqlLocal(`select t.duracion_min || '|' || t.principal || '|' || (t.consultorio_id is null) from public.tipos_cita t
+                    join auth.users u on u.id = t.medico_id where u.email = :'c' and t.activo`, { c: CORREO.adminA })).toBe('45|true|true')
+  expect(sqlLocal(`select count(*) from public.reserva_enlaces e join auth.users u on u.id = e.medico_id
+                    where u.email = :'c' and e.clase = 'fijo' and e.revocado_en is null`, { c: CORREO.adminA })).toBe('1')
   /* Calculado, no guardado: al recargar sigue sin salir. */
   await page.reload()
   await expect(page.getByRole('heading', { name: 'Enlaces de reserva' })).toBeVisible()
   await expect(pasos(page)).toHaveCount(0)
+})
+
+test('G2 · 9 · la médica invitada contesta SU duración (sólo suya), la cambia y archiva sus tipos', async ({ browser }) => {
+  await enContextoNuevo(browser, SESION.medicoA, async (p) => {
+    await p.goto(RUTA)
+    const paso = pasos(p).getByRole('listitem', { name: 'Duración de la consulta: pendiente' })
+    await paso.getByText('1 hora', { exact: true }).click()
+    await paso.getByRole('button', { name: 'Guardar', exact: true }).click()
+    await expect(pasos(p).getByRole('listitem', { name: 'Duración de la consulta: hecho' })).toBeVisible()
+    const seccion = p.getByRole('region', { name: 'Duración y tipos de cita' })
+    await expect(seccion).toContainText('Tu consulta dura 60 min')
+    await expect(seccion).not.toContainText('pídele a quien administra')
+    /* G2b (20261119121000): la cambia ella misma… */
+    await seccion.getByRole('button', { name: 'Cambiar duración' }).click()
+    await seccion.getByText('45 min', { exact: true }).click()
+    await seccion.getByRole('button', { name: 'Guardar', exact: true }).click()
+    await expect(seccion).toContainText('Tu consulta dura 45 min')
+    /* …y archiva su tipo (la fila es suya: Editar y Archivar). */
+    const fila = seccion.getByRole('listitem').filter({ hasText: 'Consulta' }).filter({ hasText: 'Duración de la consulta' })
+    await fila.getByRole('button', { name: 'Archivar Consulta' }).click()
+    await expect(fila).toContainText('Archivado')
+  })
+  expect(sqlLocal(`select t.duracion_min || '|' || t.principal || '|' || (t.medico_id = u.id) || '|' || t.activo from public.tipos_cita t
+                    join auth.users u on u.email = :'c' where t.clinica_id = :'cl' and t.principal`,
+  { c: CORREO.medicoA, cl: clinicaA() })).toBe('45|true|true|false')
+})
+
+test('G2 · 7 · duración distinta en un consultorio: opción discreta en su horario, sólo ahí', async ({ browser }) => {
+  sqlLocal(`insert into public.tipos_cita (clinica_id, medico_id, nombre, duracion_min, principal)
+            select :'cl', id, 'Consulta', 45, true from auth.users where email = :'c'`, { cl: clinicaA(), c: CORREO.medicoA })
+  await enContextoNuevo(browser, SESION.medicoA, async (p) => {
+    await p.goto(RUTA)
+    const fila = p.getByRole('region', { name: 'Disponibilidad por consultorio' }).getByRole('listitem', { name: REHAB })
+    await fila.getByRole('button', { name: 'Otra duración en este consultorio' }).click()
+    await fila.getByText('1 hora', { exact: true }).click()
+    await fila.getByRole('button', { name: 'Guardar', exact: true }).click()
+    await expect(fila).toContainText('Aquí la consulta dura 60 min (en los demás, 45 min)')
+  })
+  expect(sqlLocal(`select string_agg(t.duracion_min || ':' || coalesce(c.nombre, '-'), ',' order by t.duracion_min)
+                     from public.tipos_cita t left join public.consultorios c on c.id = t.consultorio_id
+                     join auth.users u on u.id = t.medico_id where u.email = :'c' and t.activo`, { c: CORREO.medicoA })).toBe(`45:-,60:${REHAB}`)
 })
 
 test('8 · el enlace que no abrirá lo dice con la regla de la página pública', async ({ page, browser }) => {
@@ -144,7 +197,16 @@ test('8 · el enlace que no abrirá lo dice con la regla de la página pública'
   const { codigo } = emitirEnlace(e, 'fijo')
   await page.goto(RUTA)
   const fila = enlaces(page).getByRole('listitem').filter({ hasText: 'Enlace fijodesde el' })
-  await expect(fila).toContainText('No abrirá: no hay un tipo de cita para este médico.')
+  await expect(fila).toContainText('No abrirá: falta la duración de la consulta del médico.')
+  /* G2 · la píldora de estado y «Completar», que abre lo que falta ahí mismo. */
+  await expect(fila).toContainText('No abrirá')
+  // Lo de la ficha propia ya lo pide «Primeros pasos» (una pregunta, no tres); «Completar» abre lo de la invitada.
+  const notas = enlaces(page).getByRole('note', { name: 'Falta para que el enlace abra' })
+  await expect(notas).toHaveCount(0)
+  await fila.getByRole('button', { name: 'Completar Enlace fijo' }).click()
+  await expect(notas).toHaveCount(1)
+  await expect(notas).toContainText('La duración de la consulta.')
+  await expect(notas).toContainText('¿Cuánto dura su consulta?')
   /* La misma regla, del lado del paciente: el mensaje genérico. */
   const anonimo = await browser.newContext()
   try {

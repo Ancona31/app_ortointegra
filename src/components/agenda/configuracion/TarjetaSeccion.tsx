@@ -25,7 +25,7 @@ export default function TarjetaSeccion({ id, titulo, ayuda, acciones, children }
       className="ag-config-tarjeta scroll-mt-[var(--ag-6)] rounded-[var(--ag-r-card)] border border-[var(--ag-border-card)] bg-[var(--ag-surface)] p-[var(--ag-5)] flex flex-col gap-[var(--ag-4)]">
       <div className="flex flex-col gap-[var(--ag-3)] sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 flex-1 flex flex-col gap-[var(--ag-1)]">
-          <h3 id={id} className="text-base font-semibold text-[var(--ag-text)]">{titulo}</h3>
+          <h3 id={id} className="scroll-mt-[var(--ag-8)] text-base font-semibold text-[var(--ag-text)]">{titulo}</h3>
           {ayuda && <p className="text-sm text-[var(--ag-muted)]">{ayuda}</p>}
         </div>
         {acciones && <div className="flex shrink-0 flex-wrap gap-[var(--ag-2)]">{acciones}</div>}

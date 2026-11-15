@@ -5,15 +5,19 @@
  * los privilegios conceden borrar). El ámbito (`medico_id`) no se edita: ver
  * `EditarTipoCitaSchema`.
  *
- * Sólo el administrador de la clínica (403), con la agenda v2 encendida (404).
- * Cliente de SESIÓN: la RLS de `tipos_cita` limita la escritura a su clínica,
- * y el `eq('clinica_id')` es explícito aunque ya filtre. La auditoría la da el
+ * El administrador de la clínica, cualquiera de su clínica; G2b (decisión de
+ * Angel, policy `tipos_cita_update` de 20261119121000): un médico, SÓLO los
+ * suyos (`medico_id` = él). Lo demás, 403 (la secretaria, como antes). Con la
+ * agenda v2 encendida (404). Cliente de SESIÓN: la RLS decide qué filas toca
+ * (un tipo ajeno sale 404, como uno que no existe) y que nadie lo reasigne
+ * (el ámbito tampoco viaja: `EditarTipoCitaSchema`); el `eq('clinica_id')` es
+ * explícito aunque ya filtre. La auditoría la da el
  * disparador `audit_tipos_cita` (log_tabla_change).
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
-import { canManageClinica } from '@/lib/permissions'
+import { canManageClinica, isMedico } from '@/lib/permissions'
 import { agendaV2Encendida } from '@/lib/agenda/ajustesAgenda'
 import { COLUMNAS_TIPO_CITA, EditarTipoCitaSchema, respuestaErrorTipoCita } from '@/lib/agenda/tiposCita'
 import { logger } from '@/lib/logger'
@@ -40,7 +44,7 @@ export async function PATCH(
     const supabase = await createClient()
     const profile = await perfilDeSesion(supabase)
     if (!profile) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-    if (!profile.clinica_id || !canManageClinica(profile)) {
+    if (!profile.clinica_id || !(canManageClinica(profile) || isMedico(profile))) {
       return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
     }
     if (!(await agendaV2Encendida(supabase, profile.clinica_id))) {

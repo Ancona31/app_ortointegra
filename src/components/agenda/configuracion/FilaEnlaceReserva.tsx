@@ -8,6 +8,9 @@
  *
  * Tanda T2, punto 8: `aviso` = por qué no abrirá (o abrirá sin horarios),
  * con la regla de la página pública; va debajo del título, a la vista.
+ * G2 (punto 5, la maqueta): cada enlace lleva su ESTADO en una píldora
+ * («Activo» / «Sin usar» / «No abrirá» / «Sin horarios») y, si no va a abrir
+ * por algo que se arregla aquí, «Completar», que abre lo que falta en la ficha.
  */
 import { useState } from 'react'
 import { AlertTriangle } from 'lucide-react'
@@ -27,9 +30,25 @@ interface Props {
   onRevocar: () => void
   /** Sólo el enlace fijo se regenera. */
   onRegenerar?: () => void
+  /** «Activo» (fijo) o «Sin usar» (único) cuando abre. */
+  textoAbre: string
+  /** G2: abre lo que falta en la ficha; sólo si se puede arreglar aquí. */
+  onCompletar?: () => void
 }
 
-export default function FilaEnlaceReserva({ titulo, detalle, aviso, url, ocupado, onMostrar, onRevocar, onRegenerar }: Props) {
+const PILDORA = 'shrink-0 rounded-[var(--ag-r-pill)] border px-[var(--ag-2)] py-px text-xs font-semibold whitespace-nowrap'
+
+/** El estado del enlace, en la píldora de la maqueta: verde si abre; ámbar si no o si abre sin horarios. */
+function Pildora({ aviso, textoAbre }: { aviso: string | null; textoAbre: string }) {
+  if (!aviso) return <span className={`${PILDORA} border-[var(--ag-success-border)] bg-[var(--ag-success-bg)] text-[var(--ag-success-text)]`}>{textoAbre}</span>
+  return (
+    <span className={`${PILDORA} border-[var(--ag-aviso-border)] bg-[var(--ag-aviso-bg)] text-[var(--ag-aviso-text)]`}>
+      {aviso.startsWith('No abrirá') ? 'No abrirá' : 'Sin horarios'}
+    </span>
+  )
+}
+
+export default function FilaEnlaceReserva({ titulo, detalle, aviso, url, ocupado, onMostrar, onRevocar, onRegenerar, textoAbre, onCompletar }: Props) {
   const [copiado, setCopiado] = useState(false)
   async function copiar(): Promise<void> {
     if (!url) return
@@ -45,7 +64,10 @@ export default function FilaEnlaceReserva({ titulo, detalle, aviso, url, ocupado
       <div className="flex flex-wrap items-center gap-x-[var(--ag-3)] gap-y-[var(--ag-1)]">
         <span className="text-sm font-medium text-[var(--ag-text)]">{titulo}</span>
         <span className="text-sm text-[var(--ag-muted)]">{detalle}</span>
+        <Pildora aviso={aviso} textoAbre={textoAbre} />
         <span className="ml-auto flex flex-wrap gap-[var(--ag-1)]">
+          {onCompletar && <button type="button" className={`${BOTON} font-semibold text-[var(--ag-brand-legible)]`} disabled={ocupado} onClick={onCompletar}
+            aria-label={`Completar ${titulo}`}>Completar</button>}
           {!url && <button type="button" className={BOTON} disabled={ocupado} onClick={onMostrar} aria-label={`Mostrar ${titulo}`}>Mostrar enlace</button>}
           {onRegenerar && <button type="button" className={BOTON} disabled={ocupado} onClick={onRegenerar} aria-label={`Regenerar ${titulo}`}>Regenerar</button>}
           <button type="button" className={BOTON} disabled={ocupado} onClick={onRevocar} aria-label={`Revocar ${titulo}`}>Revocar</button>
