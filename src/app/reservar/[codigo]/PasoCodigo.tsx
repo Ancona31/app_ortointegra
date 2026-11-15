@@ -1,16 +1,18 @@
 'use client'
 
-import { useState, type FormEvent, type ReactElement } from 'react'
+import { useState, type FormEvent, type ReactElement, type ReactNode } from 'react'
 
 interface Props {
   correo: string
   ocupado: boolean
   onVerificar: (codigo: string) => void
   onReenviar: () => void
+  /** El botón «Volver» a «Tus datos» (tanda H, punto 1), con lo escrito allí intacto. */
+  volver?: ReactNode
 }
 
 /** El código de 6 dígitos que llegó al correo (sólo el enlace fijo). */
-export default function PasoCodigo({ correo, ocupado, onVerificar, onReenviar }: Props): ReactElement {
+export default function PasoCodigo({ correo, ocupado, onVerificar, onReenviar, volver }: Props): ReactElement {
   const [codigo, setCodigo] = useState('')
   const enviar = (e: FormEvent) => { e.preventDefault(); if (/^[0-9]{6}$/.test(codigo)) onVerificar(codigo) }
   return (
@@ -21,7 +23,10 @@ export default function PasoCodigo({ correo, ocupado, onVerificar, onReenviar }:
           onChange={e => setCodigo(e.target.value.replace(/\D/g, ''))} />
       </label>
       <div className="rp-pie">
-        <button type="submit" className="rp-btn" disabled={ocupado || codigo.length !== 6}>{ocupado ? 'Un momento…' : 'Verificar y reservar'}</button>
+        <div className="rp-pie__fila">
+          {volver}
+          <button type="submit" className="rp-btn" disabled={ocupado || codigo.length !== 6}>{ocupado ? 'Un momento…' : 'Verificar y reservar'}</button>
+        </div>
         <button type="button" className="rp-enlace" disabled={ocupado} onClick={onReenviar}>Enviar otro código</button>
       </div>
     </form>

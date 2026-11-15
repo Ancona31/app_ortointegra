@@ -241,7 +241,7 @@ test('el correo del código: marca, código en grande, sin imágenes', async ({ 
 async function peoresContrastes(page: Page): Promise<string[]> {
   return page.evaluate(() => {
     const SEL = '.rp-titulo, .rp-sub, .rp-etiqueta, .rp-resumen dt, .rp-resumen dd, .rp-pasos li, .rp-hora, .rp-dia:not(:disabled) small, '
-      + '.rp-dia:not(:disabled) b, .rp-btn:not(:disabled), .rp-atras, .rp-nota, .rp-vacio, .rp-op__txt b, .rp-op__txt span, .rp-medico__nombre, '
+      + '.rp-dia:not(:disabled) b, .rp-btn:not(:disabled), .rp-nota, .rp-vacio, .rp-op__txt b, .rp-op__txt span, .rp-medico__nombre, '
       + '.rp-medico__esp, .rp-marca, .rp-pie small, .rp-semana span, .rp-fecha, .rp-fecha small, .rp-enlace'
     const lienzo = document.createElement('canvas').getContext('2d', { willReadFrequently: true })
     if (!lienzo) return ['sin canvas']

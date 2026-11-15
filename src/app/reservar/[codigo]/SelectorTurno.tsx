@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type ReactElement } from 'react'
 import {
-  agruparTurnos, etiquetaDia, horaEnZona, hoyEn, leerDias, mensajeDeError, partesDia, pedir, primerDiaConTurnos, rangoSemana,
+  agruparTurnos, etiquetaDia, fechaEnZona, horaEnZona, hoyEn, leerDias, mensajeDeError, partesDia, pedir, primerDiaConTurnos, rangoSemana,
   sumarDias, type DiaPagina, type TurnoPagina,
 } from './clienteReserva'
 
@@ -19,6 +19,8 @@ interface Props {
   onDia: (dia: string | null) => void
   elegido: TurnoPagina | null
   onElegir: (t: TurnoPagina) => void
+  /** El horario elegido (al volver a este paso) ya no está entre los libres de su semana (tanda H, punto 1). */
+  onPerdido?: () => void
 }
 
 type Estado = { tipo: 'cargando' } | { tipo: 'error'; texto: string } | { tipo: 'listo'; dias: DiaPagina[] }
@@ -73,12 +75,22 @@ function Grupo({ titulo, turnos, zona, elegido, onElegir }: PropsGrupo): ReactEl
 }
 
 /**
+ * ¿El horario elegido cae en esta semana y ya no está libre? Si cae en otra
+ * semana (la persona cambió de semana tras elegirlo) no se dice nada: eso ya
+ * lo resuelve el cambio de día.
+ */
+function turnoYaNoEsta(dias: readonly DiaPagina[], elegido: TurnoPagina, zona: string): boolean {
+  const suDia = dias.find(d => d.fecha === fechaEnZona(elegido.inicio, zona))
+  return !!suDia && !suDia.turnos.some(t => t.inicio === elegido.inicio)
+}
+
+/**
  * Una semana de turnos libres: tira de fechas y, debajo, sólo los del día
  * elegido en Mañana y Tarde. Se monta al entrar al paso 2, así que volver a él
  * (también tras un 409 «ocupado») vuelve a pedir la semana.
  */
 export default function SelectorTurno(props: Props): ReactElement {
-  const { codigo, consultorioId, tipoId, zona, desde, onDesde, dia, onDia, elegido, onElegir } = props
+  const { codigo, consultorioId, tipoId, zona, desde, onDesde, dia, onDia, elegido, onElegir, onPerdido } = props
   const [estado, setEstado] = useState<Estado>({ tipo: 'cargando' })
   const [intento, setIntento] = useState(0)
 
@@ -90,10 +102,11 @@ export default function SelectorTurno(props: Props): ReactElement {
       if (r.status !== 200) { setEstado({ tipo: 'error', texto: mensajeDeError(r) }); return }
       const dias = leerDias(r.cuerpo)
       setEstado({ tipo: 'listo', dias })
+      if (elegido && turnoYaNoEsta(dias, elegido, zona)) onPerdido?.()
       if (!dias.some(d => d.fecha === dia && d.turnos.length > 0)) onDia(primerDiaConTurnos(dias))
     })
     return () => { vivo = false }
-    // `dia` y `onDia` no van: elegir otro día no vuelve a pedir la semana.
+    // `dia`, `onDia`, `elegido` y `onPerdido` no van: elegir otro día u hora no vuelve a pedir la semana.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [codigo, consultorioId, tipoId, desde, intento])
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, type FormEvent, type ReactElement } from 'react'
+import { useState, type FormEvent, type ReactElement, type ReactNode } from 'react'
 
 export interface Datos { nombre: string; telefono: string; correo: string }
 
@@ -10,13 +10,22 @@ interface Props {
   ocupado: boolean
   textoBoton: string
   onEnviar: (d: Datos) => void
-  /** Lo ya escrito, al volver del paso del código. La casilla vuelve desmarcada. */
+  /**
+   * Lo ya escrito, al volver a este paso desde cualquier otro (tanda H, punto
+   * 1). La casilla del aviso vuelve DESMARCADA: es el consentimiento y se da
+   * al enviar (D5), no se arrastra.
+   */
   inicial?: Datos | null
+  /** Cada cambio, para que quien monta el formulario lo guarde mientras la persona va y viene. */
+  onCambio?: (d: Datos) => void
+  /** El botón «Volver» del pie (lo pone la página). */
+  volver?: ReactNode
 }
 
 /** Nombre, teléfono y correo, y el aviso con su casilla (nace desmarcada). El texto del aviso NO se toca. */
-export default function FormularioDatos({ aviso, casilla, ocupado, textoBoton, onEnviar, inicial }: Props): ReactElement {
-  const [d, setD] = useState<Datos>(inicial ?? { nombre: '', telefono: '', correo: '' })
+export default function FormularioDatos({ aviso, casilla, ocupado, textoBoton, onEnviar, inicial, onCambio, volver }: Props): ReactElement {
+  const [d, setDatos] = useState<Datos>(inicial ?? { nombre: '', telefono: '', correo: '' })
+  const setD = (nuevos: Datos) => { setDatos(nuevos); onCambio?.(nuevos) }
   const [acepta, setAcepta] = useState(false)
   const enviar = (e: FormEvent) => { e.preventDefault(); if (acepta) onEnviar(d) }
 
@@ -44,7 +53,10 @@ export default function FormularioDatos({ aviso, casilla, ocupado, textoBoton, o
         <span>{casilla}</span>
       </label>
       <div className="rp-pie">
-        <button type="submit" className="rp-btn" disabled={!acepta || ocupado}>{ocupado ? 'Un momento…' : textoBoton}</button>
+        <div className="rp-pie__fila">
+          {volver}
+          <button type="submit" className="rp-btn" disabled={!acepta || ocupado}>{ocupado ? 'Un momento…' : textoBoton}</button>
+        </div>
       </div>
     </form>
   )

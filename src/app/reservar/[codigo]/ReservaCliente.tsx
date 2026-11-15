@@ -53,14 +53,29 @@ function Pasos({ paso }: { paso: Paso }): ReactElement {
 }
 
 /** El título de cada paso; al cambiar de paso recibe el foco (ver `useFocoAlCambiar`). */
-function Encabezado({ titulo, volver }: { titulo: string; volver?: (() => void) | null }): ReactElement {
+function Encabezado({ titulo }: { titulo: string }): ReactElement {
+  return <h2 className="rp-titulo" tabIndex={-1} data-titulo-paso>{titulo}</h2>
+}
+
+/**
+ * «Volver» (tanda H, punto 1 de Angel): un botón de verdad, secundario y con
+ * borde, en el pie de CADA paso después del primero (también en el del
+ * código), junto al botón principal y con su misma altura. Antes era un
+ * enlace azul arriba que no se notaba, y en «Día y hora» sólo salía con más
+ * de un consultorio o tipo. Volver no borra nada: lo elegido y lo escrito
+ * viven en `useReserva`.
+ */
+function BotonVolver({ onClick }: { onClick: () => void }): ReactElement {
   return (
-    <>
-      {volver && <button type="button" className="rp-atras" onClick={volver}>‹ Volver</button>}
-      <h2 className="rp-titulo" tabIndex={-1} data-titulo-paso>{titulo}</h2>
-    </>
+    <button type="button" className="rp-btn rp-btn--sec rp-volver" onClick={onClick}>
+      <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
+      Volver
+    </button>
   )
 }
+
+/** El aviso al volver a «Día y hora» si el horario elegido ya no está libre: el MISMO texto que el `turno_invalido` de la API. */
+const TURNO_PERDIDO = mensajeDeError({ status: 400, cuerpo: { error: 'turno_invalido' } })
 
 /** Al cambiar de paso (no al cargar), el foco va al título del paso nuevo: un lector de pantalla lo anuncia. */
 function useFocoAlCambiar(paso: Paso): RefObject<HTMLDivElement | null> {
@@ -87,6 +102,8 @@ function useReserva(datos: DatosPagina) {
      consultorio (sale ya elegido, con su dirección). G1 lo saltaba. */
   const [paso, setPaso] = useState<Paso>('que')
   const [persona, setPersona] = useState<Datos | null>(null)
+  /* Lo escrito en «Tus datos», también sin enviar: vuelve tal cual al regresar (punto 1). */
+  const [borrador, setBorrador] = useState<Datos | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [ocupado, setOcupado] = useState(false)
   const [clientId] = useState(() => crypto.randomUUID())
@@ -106,7 +123,7 @@ function useReserva(datos: DatosPagina) {
     const r = await pedir(`${base}/codigo`, 'POST', { correo: d.correo })
     if (r.status === 200) setPaso('codigo'); else setError(mensajeDeError(r))
   })
-  const alEnviarDatos = (d: Datos) => { setPersona(d); return datos.clase === 'fijo' ? pedirCodigo(d) : conEspera(() => reservar(d, null)) }
+  const alEnviarDatos = (d: Datos) => { setPersona(d); setBorrador(d); return datos.clase === 'fijo' ? pedirCodigo(d) : conEspera(() => reservar(d, null)) }
   const alVerificar = (codigo: string) => conEspera(async () => {
     if (!persona) return
     const r = await pedir(`${base}/verificar`, 'POST', { correo: persona.correo, codigo })
@@ -114,31 +131,40 @@ function useReserva(datos: DatosPagina) {
     else setError(mensajeDeError(r))
   })
   const ir = (p: Paso) => { setError(null); setPaso(p) }
+  const turnoPerdido = () => { setTurno(null); setError(TURNO_PERDIDO) }
   /* Punto 5 de Angel: al cambiar de consultorio, el tipo elegido se reinicia si no vale en el nuevo. */
   const elegirConsultorio = (id: string) => {
     setConsultorioId(id)
     if (!tiposDe(id).some(t => t.id === tipoId)) setTipoId(tipoDeOficio(tiposDe(id)))
   }
   const tipos = tiposDe(consultorioId)
-  return { consultorioId, elegirConsultorio, tipos, tipoId, setTipoId, turno, setTurno, paso, ir, persona, error, ocupado, pedirCodigo, alEnviarDatos, alVerificar }
+  return { consultorioId, elegirConsultorio, tipos, tipoId, setTipoId, turno, setTurno, paso, ir, persona, borrador, setBorrador,
+    turnoPerdido, error, ocupado, pedirCodigo, alEnviarDatos, alVerificar }
 }
 type Reserva = ReturnType<typeof useReserva>
 
 interface Vista { datos: DatosPagina; r: Reserva; consultorio: ConsultorioPagina; tipos: TipoPagina[]; zona: string }
 
-/** Paso 2: el resumen, la semana y el pie con lo elegido. Guarda semana y día para volver a ellos. */
+/**
+ * Paso 2: el resumen, la semana y el pie con lo elegido. Guarda semana y día
+ * para volver a ellos; si al volver el horario elegido ya no está libre, se
+ * avisa (`turnoPerdido`) y lo escrito en «Tus datos» se conserva.
+ */
 function VistaTurno({ datos, r, consultorio, tipos, zona, semana }: Vista & { semana: Semana }): ReactElement {
   const cuando = r.turno ? cuandoEnZona(r.turno.inicio, zona) : null
   return (
     <>
-      <Encabezado titulo="Elige día y hora" volver={() => r.ir('que')} />
+      <Encabezado titulo="Elige día y hora" />
       <ResumenCita consultorio={consultorio} tipo={tipos.length > 1 ? tipos.find(t => t.id === r.tipoId) : null} />
       <SelectorTurno codigo={datos.codigo} consultorioId={r.consultorioId} tipoId={r.tipoId} zona={zona} desde={semana.desde}
         onDesde={semana.setDesde} dia={semana.dia} onDia={d => { semana.setDia(d); r.setTurno(null) }} elegido={r.turno}
-        onElegir={r.setTurno} />
+        onElegir={r.setTurno} onPerdido={r.turnoPerdido} />
       <div className="rp-pie">
         <small aria-live="polite">{cuando ? <b>{cuando}</b> : 'Elige un horario para continuar'}</small>
-        <button type="button" className="rp-btn" disabled={!r.turno} onClick={() => r.ir('datos')}>Continuar</button>
+        <div className="rp-pie__fila">
+          <BotonVolver onClick={() => r.ir('que')} />
+          <button type="button" className="rp-btn" disabled={!r.turno} onClick={() => r.ir('datos')}>Continuar</button>
+        </div>
       </div>
     </>
   )
@@ -147,15 +173,17 @@ function VistaTurno({ datos, r, consultorio, tipos, zona, semana }: Vista & { se
 /** Paso 3: los datos y, con el enlace fijo, el código del correo. */
 function VistaDatos({ datos, r, consultorio, tipos, zona }: Vista): ReactElement {
   const enCodigo = r.paso === 'codigo'
+  const volver = <BotonVolver onClick={() => r.ir(enCodigo ? 'datos' : 'turno')} />
   return (
     <>
-      <Encabezado titulo={enCodigo ? 'Revisa tu correo' : 'Tus datos'} volver={() => r.ir(enCodigo ? 'datos' : 'turno')} />
+      <Encabezado titulo={enCodigo ? 'Revisa tu correo' : 'Tus datos'} />
       <ResumenCita consultorio={consultorio} tipo={tipos.length > 1 ? tipos.find(t => t.id === r.tipoId) : null}
         cuando={r.turno ? cuandoEnZona(r.turno.inicio, zona) : null} />
       {!enCodigo && <FormularioDatos aviso={datos.aviso} casilla={datos.casilla} ocupado={r.ocupado}
-        textoBoton={datos.clase === 'fijo' ? 'Enviar código a mi correo' : 'Reservar cita'} onEnviar={r.alEnviarDatos} inicial={r.persona} />}
+        textoBoton={datos.clase === 'fijo' ? 'Enviar código a mi correo' : 'Reservar cita'} onEnviar={r.alEnviarDatos}
+        inicial={r.borrador} onCambio={r.setBorrador} volver={volver} />}
       {enCodigo && r.persona && <PasoCodigo correo={r.persona.correo} ocupado={r.ocupado} onVerificar={r.alVerificar}
-        onReenviar={() => { if (r.persona) void r.pedirCodigo(r.persona) }} />}
+        onReenviar={() => { if (r.persona) void r.pedirCodigo(r.persona) }} volver={volver} />}
     </>
   )
 }

@@ -14,6 +14,10 @@ import { emitirEnlace, ipAlAzar, personaNueva, prepararEscenario, reservar, turn
  *   · Punto 3 · el primer paso se llama «Lugar» y SIEMPRE sale, también con
  *     un solo consultorio (ya elegido, con su dirección); la dirección sigue a
  *     la vista hasta «Listo».
+ *   · Punto 1 · «Volver» es un botón visible (con borde, en el pie) en cada
+ *     paso después del primero, también en el del código, y al regresar se
+ *     conserva todo: consultorio, tipo, día, hora, datos y correo. Si el
+ *     horario ya no está, se avisa sin perder los datos.
  *
  * Las pruebas de los correos (sin oscuro, `color-scheme: light`) son de Vitest
  * (`plantillaCita.test.ts`). La seguridad, los límites, los turnos y la RPC no
@@ -157,4 +161,106 @@ test('punto 3: con UN consultorio, «Lugar» sale con él ya elegido y su direcc
   } finally {
     devolver()
   }
+})
+
+/* ── Punto 1 · «Volver» visible en cada paso después del primero, sin perder nada ─ */
+
+const volver = (page: Page) => page.getByRole('button', { name: 'Volver', exact: true })
+const titulo = (page: Page) => page.locator('[data-titulo-paso]')
+
+/** Un botón de verdad, visible, con borde y en la pantalla (en el teléfono, en el pie pegado abajo). */
+async function volverSeNota(page: Page): Promise<void> {
+  await expect(volver(page)).toBeVisible()
+  await expect(volver(page)).toBeInViewport()
+  const borde = await volver(page).evaluate(el => parseFloat(getComputedStyle(el).borderTopWidth))
+  expect(borde).toBeGreaterThanOrEqual(1)
+  const alto = await volver(page).evaluate(el => el.getBoundingClientRect().height)
+  expect(alto).toBeGreaterThanOrEqual(44)
+}
+
+test('punto 1: «Volver» se ve en cada paso después del primero (también en el del código) y conserva todo', async ({ page }) => {
+  const { codigo } = emitirEnlace(e, 'fijo')
+  await page.goto(`/reservar/${codigo}`)
+  await expect(volver(page)).toHaveCount(0) // en «Lugar» no hay a dónde volver
+  await page.locator(`input[name="consultorio"][value="${e.consultorioId}"]`).check()
+  const tipo = page.locator(`input[name="tipo"][value="${e.tipoId}"]`)
+  if (await tipo.count()) await tipo.check()
+  await page.getByRole('button', { name: 'Elegir día y hora' }).click()
+
+  // «Día y hora» → «Lugar»: consultorio y tipo siguen elegidos; el foco, en el título.
+  await volverSeNota(page)
+  await volver(page).click()
+  await expect(pasoActual(page)).toHaveText('Lugar')
+  await expect(titulo(page)).toBeFocused()
+  await expect(page.locator(`input[name="consultorio"][value="${e.consultorioId}"]`)).toBeChecked()
+  if (await tipo.count()) await expect(tipo).toBeChecked()
+  await page.getByRole('button', { name: 'Elegir día y hora' }).click()
+
+  const hora = page.locator('button[data-inicio]').first()
+  const inicio = await hora.getAttribute('data-inicio')
+  await hora.click()
+  await page.getByRole('button', { name: 'Continuar' }).click()
+
+  // «Tus datos» → «Día y hora»: la hora sigue elegida y lo escrito (sin enviar) vuelve tal cual.
+  const p = personaNueva()
+  await page.getByLabel('Nombre completo').fill(p.nombre)
+  await page.getByLabel('Teléfono (10 dígitos)').fill(p.telefono)
+  await page.getByLabel('Correo electrónico').fill(p.correo)
+  await volverSeNota(page)
+  await volver(page).click()
+  await expect(pasoActual(page)).toHaveText(/Día y hora/)
+  await expect(titulo(page)).toBeFocused()
+  await expect(page.locator(`button[data-inicio="${inicio}"]`)).toHaveAttribute('aria-pressed', 'true')
+  await page.getByRole('button', { name: 'Continuar' }).click()
+  await expect(page.getByLabel('Nombre completo')).toHaveValue(p.nombre)
+  await expect(page.getByLabel('Teléfono (10 dígitos)')).toHaveValue(p.telefono)
+  await expect(page.getByLabel('Correo electrónico')).toHaveValue(p.correo)
+
+  // El código del correo → «Tus datos»: también con «Volver», y los datos intactos.
+  await page.getByRole('checkbox').check()
+  await page.getByRole('button', { name: 'Enviar código a mi correo' }).click()
+  await expect(page.getByLabel('Código')).toBeVisible()
+  await volverSeNota(page)
+  await volver(page).click()
+  await expect(pasoActual(page)).toHaveText(/Tus datos/)
+  await expect(titulo(page)).toBeFocused()
+  await expect(page.getByLabel('Nombre completo')).toHaveValue(p.nombre)
+  await expect(page.getByLabel('Correo electrónico')).toHaveValue(p.correo)
+  // La casilla del aviso es el consentimiento: vuelve desmarcada y hay que darlo otra vez (D5).
+  await expect(page.getByRole('checkbox')).not.toBeChecked()
+})
+
+/** Una semana fingida: mañana con 09:00 y 13:00 (o sólo 13:00), hora de Mérida. */
+function semanaFingida(sin0900: boolean): { dias: { fecha: string; turnos: { inicio: string; fin: string }[] }[] } {
+  const fecha = (n: number) => new Date(Date.now() + n * 864e5).toLocaleDateString('en-CA', { timeZone: 'America/Merida' })
+  const t = (f: string, h: string) => ({ inicio: `${f}T${h}:00-06:00`, fin: `${f}T${h}:30-06:00` })
+  return { dias: Array.from({ length: 7 }, (_, i) => {
+    const f = fecha(i)
+    return { fecha: f, turnos: i === 1 ? [...(sin0900 ? [] : [t(f, '09:00')]), t(f, '13:00')] : [] }
+  }) }
+}
+
+test('punto 1: si al volver desde «Tus datos» el horario ya no está, se avisa y lo escrito se conserva', async ({ page }) => {
+  let sin0900 = false
+  await page.route('**/turnos?*', r => r.fulfill({ json: semanaFingida(sin0900) }))
+  await page.goto(`/reservar/${emitirEnlace(e, 'unico').codigo}`)
+  await page.locator(`input[name="consultorio"][value="${e.consultorioId}"]`).check()
+  const tipo = page.locator(`input[name="tipo"][value="${e.tipoId}"]`)
+  if (await tipo.count()) await tipo.check()
+  await page.getByRole('button', { name: 'Elegir día y hora' }).click()
+  await page.locator('button[data-inicio]').first().click() // las 09:00
+  await page.getByRole('button', { name: 'Continuar' }).click()
+  const p = personaNueva()
+  await page.getByLabel('Nombre completo').fill(p.nombre)
+  await page.getByLabel('Correo electrónico').fill(p.correo)
+
+  sin0900 = true // mientras escribía, alguien tomó las 09:00
+  await volver(page).click()
+  await expect(page.locator('.rp-tarjeta').getByRole('alert')).toHaveText('Ese horario ya no está disponible. Elige otro.')
+  await expect(page.locator('button[data-inicio]')).toHaveText(['13:00'])
+  await expect(page.getByRole('button', { name: 'Continuar' })).toBeDisabled()
+  await page.locator('button[data-inicio]').click()
+  await page.getByRole('button', { name: 'Continuar' }).click()
+  await expect(page.getByLabel('Nombre completo')).toHaveValue(p.nombre)
+  await expect(page.getByLabel('Correo electrónico')).toHaveValue(p.correo)
 })
