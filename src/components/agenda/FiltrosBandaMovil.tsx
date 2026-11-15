@@ -70,7 +70,7 @@ export function FiltrosBandaMovil(
         <button type="button"
           className={`ag-banda-movil-ctrl ag-banda-movil-ctrl--marco${compactado ? ' ag-banda-movil-ctrl--on' : ''}`}
           onClick={onCompactar} aria-pressed={compactado}
-          aria-label={etiquetaCompactar(vista)}>
+          aria-label={etiquetaCompactar(vista, engraneConfiguracion)}>
           <ChevronsDownUp size={18} />
         </button>
       )}

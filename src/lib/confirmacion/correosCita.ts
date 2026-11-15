@@ -72,8 +72,25 @@ function botonesRecordatorio(url: string, confirmada: boolean): BotonCorreo[] {
     : [{ texto: 'Confirmo mi asistencia', url }, { texto: 'No podré asistir', url: cancelar, secundario: true }]
 }
 
+/**
+ * Las palabras propias de CADA correo: el asunto y el título. El resto del
+ * cuerpo (fecha, datos, botones, plazo) es el mismo y no dice «recordatorio»:
+ * la confirmación puede salir días antes y no debe decirlo (integración G1/G3).
+ */
+interface PalabrasCorreo { asunto: (fecha: string) => string; titulo: string }
+
+const PALABRAS_RECORDATORIO: PalabrasCorreo = {
+  asunto: fecha => `Recordatorio: tu cita del ${fecha}`,
+  titulo: 'Recordatorio de tu cita',
+}
+
 /** El recordatorio N horas antes. Lanza sólo si `inicio` no es una fecha. */
 export function correoRecordatorio(d: DatosRecordatorio): CorreoRecordatorio {
+  return correoDeCita(d, PALABRAS_RECORDATORIO)
+}
+
+/** El cuerpo común del recordatorio y de la confirmación, con sus palabras. */
+function correoDeCita(d: DatosRecordatorio, palabras: PalabrasCorreo): CorreoRecordatorio {
   if (Number.isNaN(new Date(d.inicio).getTime())) throw new Error('correoRecordatorio: inicio inválido')
   const zona = zonaValida(d.zona)
   const { fecha, hora } = fechaYHora(d.inicio, zona)
@@ -91,7 +108,7 @@ export function correoRecordatorio(d: DatosRecordatorio): CorreoRecordatorio {
   const plazo = `Puedes avisar que no asistirás desde ese enlace hasta 1 hora antes de tu cita. ${despues}`
   const cierre = 'Si no reconoces esta cita, ignora este correo.'
 
-  const asunto = `Recordatorio: tu cita del ${fecha}`
+  const asunto = palabras.asunto(fecha)
   const texto = [
     `Tienes una cita ${cuando}${conQuien} en ${donde}.`,
     `${llamada}: ${d.url}`,
@@ -100,7 +117,7 @@ export function correoRecordatorio(d: DatosRecordatorio): CorreoRecordatorio {
   ]
   const partes = {
     preencabezado: `Tienes una cita ${cuando}.`,
-    titulo: 'Recordatorio de tu cita',
+    titulo: palabras.titulo,
     fecha: { ...fechaDeCorreo(d.inicio, zona), zona: region ? `Zona horaria: ${region}` : null },
     datos: [
       { etiqueta: 'Médico', valor: medico }, { etiqueta: 'Consultorio', valor: d.consultorio.nombre },
@@ -110,4 +127,20 @@ export function correoRecordatorio(d: DatosRecordatorio): CorreoRecordatorio {
     pie: [plazo, cierre],
   }
   return { asunto, texto: textoCorreoCita(partes, texto), html: htmlCorreoCita(partes) }
+}
+
+/**
+ * G3 (punto 14) · El correo de CONFIRMACIÓN que manda el personal desde la
+ * agenda, con o sin Google. Es el MISMO cuerpo que el recordatorio (fecha,
+ * hora con su zona, médico, consultorio con su dirección y teléfono, y el
+ * enlace de confirmar o avisar que no asistirá; nada clínico), armado con
+ * `plantillaCita.ts` (G1), con su propio asunto y su propio título: puede salir
+ * días antes, así que no dice «Recordatorio». Determinista, como el
+ * recordatorio (misma Idempotency-Key, mismo cuerpo).
+ * ⚠️ TEXTO PENDIENTE DE REVISIÓN, como el del recordatorio.
+ */
+export function correoConfirmacion(d: DatosRecordatorio): CorreoRecordatorio {
+  return correoDeCita(d, d.confirmada
+    ? { asunto: fecha => `Tu cita del ${fecha}`, titulo: 'Tu cita' }
+    : { asunto: fecha => `Confirma tu cita del ${fecha}`, titulo: 'Confirma tu cita' })
 }

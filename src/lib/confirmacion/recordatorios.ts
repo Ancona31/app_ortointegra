@@ -78,13 +78,18 @@ export type Toma = z.infer<typeof TomaSchema>
 
 export type Cierre = { estado: 'enviado'; motivo: null } | { estado: 'fallido' | 'omitido'; motivo: 'transporte' | 'duplicado' | 'sin_enlace' | 'plantilla' }
 
+/** Los tipos de `cita_correos`. `confirmacion` es de G3 (migración 20261119140000). */
+export type TipoEnvio = 'recordatorio' | 'comprobante' | 'confirmacion'
+
 /**
  * Toma UN envío de `tipo` (`cita_correo_tomar`). null = la base dice que no
  * toca. Lanza `RecordatoriosNoDisponibles` sin las RPC de E4 y Error ante otro
  * fallo. La usa también el comprobante de la reserva por enlace (E5,
- * `comprobanteReserva.ts`), con `tipo: 'comprobante'`.
+ * `comprobanteReserva.ts`), con `tipo: 'comprobante'`, y el correo de
+ * confirmación que manda el personal (G3, `confirmacionCita.ts`), con
+ * `tipo: 'confirmacion'`.
  */
-export async function tomarEnvio(clinicaId: string, citaId: string, tipo: 'recordatorio' | 'comprobante', testigo: string): Promise<Toma | null> {
+export async function tomarEnvio(clinicaId: string, citaId: string, tipo: TipoEnvio, testigo: string): Promise<Toma | null> {
   const data = await llamar('cita_correo_tomar', { p_clinica_id: clinicaId, p_cita_id: citaId, p_tipo: tipo, p_testigo: testigo })
   const filas = z.array(TomaSchema).parse(data ?? [])
   return filas[0] ?? null

@@ -9,9 +9,10 @@ import { fechaHoraLocalAInstante } from '../src/lib/dates'
  *   · 2: la burbuja ofrece «Registrar "…"» si el paciente no existe y abre
  *     `QuickPatientModal` (consentimiento obligatorio); el creado queda elegido.
  *   · 13 y 14: tras Guardar, la burbuja enseña «Cita agendada», el foco va a
- *     «Listo» (la principal) y ofrece «Enviar por WhatsApp» (con el logo en su
- *     verde) e «Invitar por correo» (sólo si habrá evento de Google), con «Más
- *     opciones» junto a «Listo».
+ *     «Listo» (la principal) y ofrece «Enviar confirmación» (WhatsApp, con el
+ *     logo en su verde; G3, punto 15), «Por correo» (el correo de Spinus, con o
+ *     sin Google; G3, punto 14) e «Invitar por correo» (sólo si habrá evento de
+ *     Google), con «Más opciones» al pie.
  *   · 4: el botón de WhatsApp no sale en una cita pasada, atendida o de todo el
  *     día; y si aun así se llega al error (la cita cambió con la tarjeta
  *     abierta), el motivo se dice en llano.
@@ -115,7 +116,10 @@ test('punto 2: un paciente que no existe se registra desde la burbuja (con conse
   expect(sqlLocal(`select count(*) from public.pacientes where apellidos = :'ap' and consentimiento_otorgado is true`, { ap: NUEVO.apellidos })).toBe('1')
 })
 
-test('puntos 13 y 14: tras Guardar, «Cita agendada» con «Listo» (foco) y WhatsApp con su logo; sin Google, sin invitar', async ({ page }) => {
+/* G3 (puntos 14, 15 y 17): «Listo» a todo el ancho; debajo, en dos columnas
+   iguales, «Enviar confirmación» (WhatsApp) y «Por correo» (el correo de
+   Spinus, que sale SIN Google); «Más opciones» al pie. */
+test('puntos 13 y 14: tras Guardar, «Cita agendada» con «Listo» (foco), WhatsApp con su logo y el correo de Spinus; sin Google, sin invitar', async ({ page }) => {
   interruptorAgenda('A', true)
   await abrirAgendaV2(page)
   await aLaSemanaMasTres(page)
@@ -130,13 +134,16 @@ test('puntos 13 y 14: tras Guardar, «Cita agendada» con «Listo» (foco) y Wha
   const listo = b.getByRole('button', { name: 'Listo', exact: true })
   await expect(listo).toBeFocused()
   await expect(listo).toHaveClass(/ag-capa-boton--principal/)
-  const wa = b.getByRole('button', { name: 'Enviar por WhatsApp' })
+  const wa = b.getByRole('button', { name: 'Enviar confirmación', exact: true })
   await expect(wa).toBeVisible()
   await expect(wa.locator('svg path[fill="#25D366"]')).toHaveCount(1)
+  const correo = b.getByRole('button', { name: 'Enviar confirmación por correo', exact: true })
+  await expect(correo).toBeVisible()
   await expect(b.getByRole('button', { name: 'Invitar por correo' })).toHaveCount(0)
-  // Simetría: «Listo» y «Más opciones» en la misma fila y del mismo ancho.
-  const [l, m] = [await listo.boundingBox(), await b.getByRole('button', { name: 'Más opciones' }).boundingBox()]
-  expect(l && m && Math.abs(l.y - m.y) < 1 && Math.abs(l.width - m.width) < 1).toBe(true)
+  // Simetría: WhatsApp y correo en la misma fila, del mismo ancho y alto; «Listo» a todo el ancho encima.
+  const [l, w, c] = [await listo.boundingBox(), await wa.boundingBox(), await correo.boundingBox()]
+  expect(l && w && c && Math.abs(w.y - c.y) < 1 && Math.abs(w.width - c.width) < 1 && Math.abs(w.height - c.height) < 1).toBe(true)
+  expect(l && w && c && Math.abs(l.width - (c.x + c.width - w.x)) < 1 && l.y < w.y).toBe(true)
   await b.getByRole('button', { name: 'Más opciones' }).click()
   await expect(modalCita(page, 'Editar cita')).toBeVisible()
   await expect(b).toHaveCount(0)
@@ -162,6 +169,8 @@ test('punto 13: con el evento de Google en camino, «Invitar por correo» abre l
   await expect(b.getByText('Cita agendada', { exact: true })).toBeVisible()
   // Desde la burbuja la invitación NO se abre sola: es un botón.
   await expect(page.getByRole('dialog', { name: 'Invitar por correo' })).toHaveCount(0)
+  // G3: con Google, el correo de Spinus sigue ahí y la invitación es un extra.
+  await expect(b.getByRole('button', { name: 'Enviar confirmación por correo', exact: true })).toBeVisible()
   await b.getByRole('button', { name: 'Invitar por correo' }).click()
   await expect(page.getByRole('dialog', { name: 'Invitar por correo' })).toBeVisible()
   await expect(b).toHaveCount(0)
@@ -202,7 +211,7 @@ test('punto 4: si la cita cambió con la tarjeta abierta, el error dice el motiv
   await expect(t.locator(`[data-whatsapp-cita="${id}"]`)).toBeVisible()
   sqlLocal(`update public.appointments set status = 'cancelled' where id = :'id'`, { id })
   const pestana = context.waitForEvent('page')
-  await t.getByRole('button', { name: 'Enviar por WhatsApp' }).click()
+  await t.getByRole('button', { name: 'Enviar confirmación', exact: true }).click()
   await (await pestana).waitForEvent('close')
   await expect(t.getByRole('alert')).toHaveText('La cita está cancelada.')
   expect(sqlLocal(`select count(*) from public.cita_confirmaciones where appointment_id = :'id'`, { id })).toBe('0')

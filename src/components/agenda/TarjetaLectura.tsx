@@ -33,7 +33,7 @@
  * sitio y sin volver a entrar, `sinEntrada`).
  */
 import { Fragment, useCallback, useEffect, useId, useRef, useState, type KeyboardEvent, type PointerEvent as EventoPuntero, type ReactElement, type ReactNode } from 'react'
-import { X } from 'lucide-react'
+import { Settings, X } from 'lucide-react'
 import Portal from '@/components/ui/Portal'
 import { useDialogoModal } from '@/hooks/useDialogoModal'
 import type { Appointment } from '@/lib/agenda/tiposAgenda'
@@ -42,7 +42,8 @@ import { posicionCapa, ventanaVisible, type Caja, type Punto } from '@/lib/agend
 import { duracionToken, prefiereMenosMovimiento } from '@/lib/agenda/movimientoAgenda'
 import { indiceTrasTecla } from '@/lib/agenda/opcionesLista'
 import {
-  accionesDeTarjeta, ETIQUETA_ACCION, horarioDeTarjeta, nombreDeTarjeta, telefonoDeTarjeta, type AccionTarjeta,
+  cuandoDeTarjeta, disposicionDeTarjeta, ETIQUETA_ACCION, horarioDeTarjeta, nombreDeTarjeta, telefonoDeTarjeta,
+  type AccionTarjeta, type PiezaTarjeta,
 } from '@/lib/agenda/accionesTarjeta'
 
 interface Props {
@@ -59,9 +60,18 @@ interface Props {
   /** `false` mientras no haya con qué confirmar (ver `accionesDeTarjeta`). */
   conConfirmar?: boolean
   nombreMedico?: string | null
+  /** G3 · Quien mira puede abrir el expediente (médico): «Ver expediente» de una atendida. */
+  puedeVerExpediente?: boolean
   alAccion: (accion: AccionTarjeta) => void
   alCerrar: () => void
-  extra?: ReactNode
+  /**
+   * G3 · El aviso por WhatsApp de E7 (`BotonWhatsAppCita`), como una pieza más
+   * de la rejilla: la tarjeta le dice su `tabIndex` (foco itinerante), si va en
+   * dos líneas (comparte fila) y dónde dejar su mensaje («Abierto en WhatsApp
+   * hh:mm» o el motivo de un error), que se pinta debajo de las acciones para
+   * que la rejilla no tenga nada suelto. Sin él (no aplica), no hay hueco.
+   */
+  whatsapp?: (o: PiezaWhatsApp) => ReactNode
   /** T3 · Abierta al pasar el ratón: no modal, sin robar el foco. */
   alPasar?: boolean
   /** T3 · La de siempre que sustituye a una abierta al pasar: sin animación de entrada. */
@@ -72,6 +82,20 @@ interface Props {
   /** T3 · Sólo con `alPasar`: un clic dentro (fuera de un control) la fija. */
   alFijar?: () => void
 }
+
+/** G3 · Lo que la tarjeta le pasa a la pieza del WhatsApp. */
+export interface PiezaWhatsApp {
+  tabIndex: number
+  onFocus: () => void
+  /** Comparte fila con otra acción: «Enviar» arriba y la palabra abajo. */
+  dosLineas: boolean
+  /** La clase de su celda (a todo el ancho si va sola). */
+  claseCelda: string
+  alMensaje: (m: MensajeAccion | null) => void
+}
+
+/** G3 · Un mensaje de una acción (aviso enviado, o el motivo de un error). */
+export interface MensajeAccion { texto: string; alerta: boolean }
 
 /* ⚠️ `colocar`, `seguirColocacion`, `useSalida` y `useCerrarAlTocarFuera` SON
    COPIA DELIBERADA de `BurbujaAlta.tsx`: dos usos no justifican un gancho
@@ -166,9 +190,11 @@ function useCerrarAlTocarFuera(panel: { current: HTMLElement | null }, salir: ()
   }, [panel, salir, citaPropia])
 }
 
+/* G3 (punto 17) · Médico y consultorio en dos renglones con etiqueta discreta,
+   en dos columnas alineadas; detrás, lo que la tarjeta ya enseñaba (teléfono y
+   nota), en la misma rejilla. El tipo de cita va junto a la duración. */
 function Datos({ cita, nombreMedico }: { cita: Appointment; nombreMedico?: string | null }): ReactElement | null {
   const filas: [string, string][] = []
-  if (cita.tipo_cita_nombre) filas.push(['Tipo', cita.tipo_cita_nombre])
   if (nombreMedico) filas.push(['Médico', nombreMedico])
   if (cita.consultorio_nombre) filas.push(['Consultorio', cita.consultorio_nombre])
   const tel = telefonoDeTarjeta(cita)
@@ -191,7 +217,7 @@ function Pildora({ cita }: { cita: Appointment }): ReactElement {
   const s = cita.status
   const marca = marcaPorLigar(cita)
   return (
-    <span className="ag-capa-acciones">
+    <span className="ag-lectura-pildoras">
       <span className="ag-lectura-pildora" style={{
         color: `var(--ag-status-${s}-text)`, background: `var(--ag-status-${s}-bg)`, borderColor: `var(--ag-status-${s}-border)`,
       }}>{STATUS_CONFIG[s].label}</span>
@@ -200,28 +226,77 @@ function Pildora({ cita }: { cita: Appointment }): ReactElement {
   )
 }
 
-interface PropsBarra { acciones: AccionTarjeta[]; alAccion: (a: AccionTarjeta) => void; autoFoco: boolean }
+/** G3 · La fecha y la hora juntas (dato principal), la duración y, si difiere, la hora del consultorio (punto 19). */
+function Cuando({ cita, zonaVisor }: { cita: Appointment; zonaVisor: string }): ReactElement {
+  const { fechaHora, duracion } = cuandoDeTarjeta(cita, zonaVisor)
+  const { enConsultorio } = horarioDeTarjeta(cita, zonaVisor)
+  const detalle = [duracion, cita.tipo_cita_nombre].filter(Boolean).join(' · ')
+  return (
+    <p className="ag-lectura-cuando">
+      {fechaHora}
+      {detalle && <small>{detalle}</small>}
+      {enConsultorio && <small className="ag-lectura-huso">{enConsultorio}</small>}
+    </p>
+  )
+}
 
-/** La barra de acciones: `role="toolbar"` con foco itinerante y flechas (APG). */
-function BarraAcciones({ acciones, alAccion, autoFoco }: PropsBarra): ReactElement {
+interface PropsBarra {
+  disposicion: ReturnType<typeof disposicionDeTarjeta>
+  alAccion: (a: AccionTarjeta) => void
+  autoFoco: boolean
+  whatsapp?: (o: PiezaWhatsApp) => ReactNode
+  alMensaje: (m: MensajeAccion | null) => void
+}
+
+/** Las piezas en el orden en que se recorren: principal, secundarias, peligro. */
+function piezasEnOrden(d: PropsBarra['disposicion']): PiezaTarjeta[] {
+  return [...(d.principal ? [d.principal] : []), ...d.secundarias, ...(d.peligro ? [d.peligro] : [])]
+}
+
+/** La clase de cada pieza: la principal y la secundaria que queda sola, a todo el ancho. */
+function claseDePieza(p: PiezaTarjeta, d: PropsBarra['disposicion']): string {
+  if (p === d.principal) return 'ag-capa-boton ag-capa-boton--principal ag-lectura-ancho'
+  if (p === d.peligro) return 'ag-lectura-peligro'
+  const i = d.secundarias.indexOf(p)
+  const sola = d.secundarias.length % 2 === 1 && i === d.secundarias.length - 1
+  return sola ? 'ag-capa-boton ag-lectura-ancho' : 'ag-capa-boton'
+}
+
+/**
+ * La barra de acciones: `role="toolbar"` con foco itinerante y flechas (APG),
+ * pintada como rejilla pareja (G3, punto 17): la principal a todo el ancho, las
+ * secundarias en dos columnas iguales y la de peligro aparte, al final.
+ */
+function BarraAcciones({ disposicion, alAccion, autoFoco, whatsapp, alMensaje }: PropsBarra): ReactElement | null {
   const [activa, setActiva] = useState(0)
   const barra = useRef<HTMLDivElement>(null)
+  const piezas = piezasEnOrden(disposicion)
   function alTeclear(e: KeyboardEvent<HTMLDivElement>): void {
-    const i = indiceTrasTecla(activa, acciones.length, e.key, 'horizontal')
+    const i = indiceTrasTecla(activa, piezas.length, e.key, 'horizontal')
     if (i === null) return
     e.preventDefault()
     setActiva(i)
-    barra.current?.querySelectorAll<HTMLButtonElement>('button')[i]?.focus()
+    barra.current?.querySelectorAll<HTMLElement>('button, a[href]')[i]?.focus()
   }
+  if (piezas.length === 0) return null
   return (
-    <div ref={barra} role="toolbar" aria-label="Acciones de la cita" className="ag-capa-acciones" onKeyDown={alTeclear}>
-      {acciones.map((a, i) => (
-        <button key={a} type="button" tabIndex={i === activa ? 0 : -1} autoFocus={autoFoco && i === 0}
-          className={i === 0 ? 'ag-capa-boton ag-capa-boton--principal' : 'ag-capa-boton'}
-          onFocus={() => setActiva(i)} onClick={() => alAccion(a)}>
-          {ETIQUETA_ACCION[a]}
-        </button>
-      ))}
+    <div ref={barra} role="toolbar" aria-label="Acciones de la cita" className="ag-lectura-acciones" onKeyDown={alTeclear}>
+      {piezas.map((p, i) => {
+        if (p === 'whatsapp') {
+          const ancho = claseDePieza(p, disposicion).includes('ag-lectura-ancho')
+          return <Fragment key={p}>{whatsapp?.({ tabIndex: i === activa ? 0 : -1, onFocus: () => setActiva(i),
+            dosLineas: !ancho, claseCelda: ancho ? 'ag-lectura-ancho' : '', alMensaje })}</Fragment>
+        }
+        return (
+          <Fragment key={p}>
+            {p === disposicion.peligro && i > 0 && <span className="ag-lectura-sep" aria-hidden="true" />}
+            <button type="button" tabIndex={i === activa ? 0 : -1} autoFocus={autoFoco && i === 0}
+              className={claseDePieza(p, disposicion)} onFocus={() => setActiva(i)} onClick={() => alAccion(p)}>
+              {ETIQUETA_ACCION[p]}
+            </button>
+          </Fragment>
+        )
+      })}
     </div>
   )
 }
@@ -265,22 +340,27 @@ function usePanelTarjeta(ancla: Caja | null, punto: Punto | undefined, comoHoja:
 
 /** Lo de dentro, igual en las dos variantes. */
 function Contenido({ props, idTitulo, salir, autoFoco }: { props: Props; idTitulo: string; salir: () => void; autoFoco: boolean }): ReactElement {
-  const { cita, zonaVisor, puedeIniciarConsulta, conConfirmar = true, nombreMedico, alAccion, extra } = props
-  const horario = horarioDeTarjeta(cita, zonaVisor)
+  const { cita, zonaVisor, puedeIniciarConsulta, conConfirmar = true, nombreMedico, alAccion, whatsapp, puedeVerExpediente = false } = props
+  const [mensaje, setMensaje] = useState<MensajeAccion | null>(null)
+  const disposicion = disposicionDeTarjeta(cita, puedeIniciarConsulta, { conConfirmar, conWhatsApp: Boolean(whatsapp), puedeVerExpediente })
   return (
     <>
-      <div className="ag-capa-cab">
+      {/* G3 (punto 17): nombre y, en la misma línea, la píldora del estado; el
+          engrane (el formulario completo, que sustituye a «Editar») y la ✕
+          arriba a la derecha. */}
+      <div className="ag-capa-cab ag-lectura-cab">
         <h2 id={idTitulo} className="ag-capa-titulo">{nombreDeTarjeta(cita)}</h2>
+        <Pildora cita={cita} />
+        <button type="button" className="ag-capa-cerrar" aria-label="Configuración de la cita" title="Configuración de la cita"
+          onClick={() => alAccion('editar')}><Settings size={16} aria-hidden="true" /></button>
         <button type="button" className="ag-capa-cerrar" aria-label="Cerrar" onClick={salir}><X size={16} aria-hidden="true" /></button>
       </div>
-      <Pildora cita={cita} />
-      <p className="ag-lectura-hora">
-        {horario.tramo}
-        {horario.enConsultorio && <small>{horario.enConsultorio}</small>}
-      </p>
+      <Cuando cita={cita} zonaVisor={zonaVisor} />
       <Datos cita={cita} nombreMedico={nombreMedico} />
-      <BarraAcciones acciones={accionesDeTarjeta(cita, puedeIniciarConsulta, conConfirmar)} alAccion={alAccion} autoFoco={autoFoco} />
-      {extra}
+      <BarraAcciones disposicion={disposicion} alAccion={alAccion} autoFoco={autoFoco} whatsapp={whatsapp} alMensaje={setMensaje} />
+      {mensaje && (
+        <p className="ag-lectura-mensaje" role={mensaje.alerta ? 'alert' : undefined}>{mensaje.texto}</p>
+      )}
     </>
   )
 }
@@ -322,7 +402,7 @@ function TarjetaAlPasar(props: Props): ReactElement {
       <div ref={montar} role="dialog" aria-labelledby={idTitulo} data-al-pasar=""
         onPointerEnter={alEntrarPuntero} onPointerLeave={alSalirPuntero} onPointerDown={alPulsar}
         onAnimationEnd={e => { if (e.target === e.currentTarget) alTerminar() }}
-        className="ag-capa" data-estado={saliendo ? 'saliendo' : 'abierta'}>
+        className="ag-capa ag-capa--tarjeta" data-estado={saliendo ? 'saliendo' : 'abierta'}>
         <Contenido props={props} idTitulo={idTitulo} salir={salir} autoFoco={false} />
       </div>
     </Portal>
@@ -335,7 +415,7 @@ function TarjetaModal(props: Props): ReactElement {
   const { saliendo, salir, alTerminar, alPulsarTecla, montar } = usePanelTarjeta(ancla, punto, comoHoja, alCerrar)
   const idTitulo = useId()
   /* Sin ancla en escritorio (se abrió desde el buscador): centrada, como la ayuda. */
-  const clase = (comoHoja ? 'ag-hoja' : ancla ? 'ag-capa' : 'ag-capa ag-capa--centro') + (sinEntrada ? ' ag-capa--sin-entrada' : '')
+  const clase = (comoHoja ? 'ag-hoja' : ancla ? 'ag-capa ag-capa--tarjeta' : 'ag-capa ag-capa--centro') + (sinEntrada ? ' ag-capa--sin-entrada' : '')
 
   return (
     <Portal>

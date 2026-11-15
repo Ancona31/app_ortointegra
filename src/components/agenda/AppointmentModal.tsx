@@ -56,7 +56,8 @@ import type { TipoCita } from '@/lib/agenda/tiposCita'
 /* G2: la regla de qué tipos valen en un consultorio (módulo sin Zod). */
 import { tiposDelConsultorio } from '@/lib/agenda/tiposPorConsultorio'
 import { BotonWhatsAppCita } from '@/components/agenda/BotonWhatsAppCita'
-import { motivoSinWhatsApp, telefonoParaWhatsApp } from '@/lib/agenda/whatsappCita'
+import { BotonCorreoCita } from '@/components/agenda/BotonCorreoCita'
+import { correoParaConfirmacion, motivoSinCorreo, motivoSinWhatsApp, telefonoParaWhatsApp } from '@/lib/agenda/whatsappCita'
 
 export type PacienteBusqueda = { id: string; nombre: string; apellidos: string; telefono: string | null }
 
@@ -142,7 +143,12 @@ export type ModalState =
      `medicoId` los trae «Más opciones» de la burbuja de alta rápida —el fin
      arrastrado y el médico ya elegido—; `enfocar: 'fecha'` lo trae «Reagendar»
      de la tarjeta de lectura. Opcionales: ninguna ruta de hoy los pone. */
-  | { mode: 'create'; fecha: string; hora: string | null; tipo: TipoFila; todoElDia: TodoElDiaInicial; fechaFin?: string; paciente?: PacienteBusqueda; horaFin?: string; medicoId?: string }
+  /* G3 · `consultorioId` y `enfocar` los trae «Reagendar cita» de una cita
+     cancelada o con inasistencia (decisión de Angel): el alta de una cita NUEVA
+     con el mismo paciente, médico y consultorio, la fecha enfocada; la original
+     no se toca (su estado, su auditoría y lo que cuenta para el candado). */
+  | { mode: 'create'; fecha: string; hora: string | null; tipo: TipoFila; todoElDia: TodoElDiaInicial; fechaFin?: string; paciente?: PacienteBusqueda; horaFin?: string; medicoId?: string;
+      consultorioId?: string; enfocar?: 'fecha' }
   | { mode: 'edit';   appointment: Appointment; enfocar?: 'fecha' }
 
 /**
@@ -393,6 +399,9 @@ export default function AppointmentModal({
   /* T1 · El instante en que se abrió, para la regla del WhatsApp (una cita que
      ya pasó no lo ofrece). Fijo mientras el modal esté abierto. */
   const [abiertoEn] = useState(() => Date.now())
+  /* G3 · Los dos avisos al paciente, con las reglas del servidor. */
+  const avisoWhatsApp = apt ? motivoSinWhatsApp(apt, telefonoParaWhatsApp(apt.pacientes?.telefono, apt.reserva_telefono), abiertoEn) === null : false
+  const avisoCorreo = apt ? motivoSinCorreo(apt, correoParaConfirmacion(apt.pacientes?.email, apt.reserva_correo), abiertoEn) === null : false
 
   /* CITA o EVENTO GENÉRICO. Al editar NO se elige: se deduce de la fila, porque
      el tipo es fijo tras crear (ver `TipoFila`). Al crear lo trae `modal`, y lo
@@ -561,8 +570,11 @@ export default function AppointmentModal({
   // State del consultorio seleccionado.
   // Pre-selección cascada: apt (edición) → activo del sidebar si está en lista
   // → default del target → vacío.
+  /* G3 · El consultorio que trae «Reagendar cita» (alta de una cita nueva). */
+  const consultorioPrecargado = modal.mode === 'create' ? modal.consultorioId : undefined
   const [consultorioId, setConsultorioId] = useState<string>(() => {
     if (apt?.consultorio_id) return apt.consultorio_id
+    if (modal.mode === 'create' && modal.consultorioId) return modal.consultorioId
     if (consultorioActivo && consultoriosList.some(c => c.id === consultorioActivo.id)) {
       return consultorioActivo.id
     }
@@ -575,9 +587,11 @@ export default function AppointmentModal({
   useEffect(() => {
     if (apt && medicoId === apt.medico_id) return
     if (consultoriosList.some(c => c.id === consultorioId)) return
+    /* G3 · El consultorio precargado («Reagendar cita») espera a que llegue la lista del médico. */
+    if (consultorioPrecargado === consultorioId && consultoriosList.length === 0) return
     const next = consultorioDefaultDelTarget?.id ?? ''
     setConsultorioId(next)
-  }, [medicoId, consultoriosList, consultorioDefaultDelTarget?.id, apt, consultorioId])
+  }, [medicoId, consultoriosList, consultorioDefaultDelTarget?.id, apt, consultorioId, consultorioPrecargado])
 
   // Sincronizar default cuando profile carga después del mount inicial.
   // Solo aplica para creación de cita (no para edición de cita existente).
@@ -1431,7 +1445,7 @@ export default function AppointmentModal({
                 value={fecha}
                 /* F3 · «Reagendar» abre la edición con el foco aquí. `useDialogoModal`
                    no se lo quita: sólo enfoca el panel si el foco no está dentro. */
-                autoFocus={modal.mode === 'edit' && modal.enfocar === 'fecha'}
+                autoFocus={modal.mode !== 'closed' && modal.enfocar === 'fecha'}
                 onChange={e => todoElDia ? moverFechaDeTodoElDia(e.target.value) : moverInicio(e.target.value, hora)}
                 className="w-full px-3 py-2.5 max-md:py-3 text-sm rounded-xl border border-[var(--ag-input-border)] bg-[var(--ag-input-bg)] text-[var(--ag-text)] focus:outline-none focus:ring-2 focus:ring-[var(--ag-input-focus-ring)] focus:border-[var(--ag-input-focus-border)] ag-transicion-color"
               />
@@ -1687,13 +1701,20 @@ export default function AppointmentModal({
               MISMA regla del servidor (`motivoSinWhatsApp`): con paciente o por
               ligar, agendada o confirmada, con hora, futura y con teléfono de
               México. Si aun así el servidor la rechaza, el botón dice el motivo. */}
-          {isEdit && agendaV2 && apt && !esEvento
-            && motivoSinWhatsApp(apt, telefonoParaWhatsApp(apt.pacientes?.telefono, apt.reserva_telefono), abiertoEn) === null && (
+          {/* G3 (puntos 14 y 15): «Enviar confirmación» (WhatsApp, una línea a
+              todo el ancho; «Enviar recordatorio» si ya está confirmada) y el
+              correo PROPIO de Spinus, «Enviar confirmación por correo», con o
+              sin Google (`motivoSinCorreo`, la regla de la ruta). La invitación
+              de Google sigue arriba, en «Invitados», como un extra. */}
+          {isEdit && agendaV2 && apt && !esEvento && (avisoWhatsApp || avisoCorreo) && (
             <div>
               <label className="block text-[11px] font-bold uppercase tracking-[.06em] mb-2" style={{ color: 'var(--ag-muted2)' }}>
-                WhatsApp
+                Avisar al paciente
               </label>
-              <BotonWhatsAppCita citaId={apt.id} tipo="enlace" marcadoEn={apt.whatsapp_sent_at ?? null} />
+              <div className="flex flex-col gap-2">
+                {avisoWhatsApp && <BotonWhatsAppCita citaId={apt.id} tipo="enlace" marcadoEn={apt.whatsapp_sent_at ?? null} confirmada={apt.status === 'confirmed'} />}
+                {avisoCorreo && <BotonCorreoCita citaId={apt.id} confirmada={apt.status === 'confirmed'} />}
+              </div>
             </div>
           )}
         </div>

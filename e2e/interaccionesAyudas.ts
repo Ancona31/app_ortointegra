@@ -34,20 +34,23 @@ export function burbuja(page: Page): Locator {
   return page.getByRole('dialog', { name: /^Nueva cita · / })
 }
 
-/** La tarjeta de lectura: el diálogo que lleva la barra «Acciones de la cita». */
+/** La tarjeta de lectura: el diálogo con el engrane «Configuración de la cita»
+    (G3: toda tarjeta lo lleva; una atendida vista por quien no abre
+    expedientes no tiene ninguna acción en su barra). */
 export function tarjetaLectura(page: Page): Locator {
-  return page.getByRole('dialog').filter({ has: page.getByRole('toolbar', { name: 'Acciones de la cita' }) })
+  return page.getByRole('dialog').filter({ has: page.getByRole('button', { name: 'Configuración de la cita', exact: true }) })
 }
 
 /**
  * Con el interruptor encendido, un clic en una cita abre la TARJETA y la
- * edición está a un clic más, en «Editar». Las e2e de B–E que abrían el modal
- * con un clic pasan por aquí.
+ * edición está a un clic más, en el engrane «Configuración de la cita» (G3:
+ * sustituye al botón «Editar», que hacía lo mismo que «Reagendar»). Las e2e de
+ * B–E que abrían el modal con un clic pasan por aquí.
  */
 export async function editarDesdeTarjeta(page: Page): Promise<void> {
   const t = tarjetaLectura(page)
   await expect(t).toBeVisible()
-  await t.getByRole('button', { name: 'Editar', exact: true }).click()
+  await t.getByRole('button', { name: 'Configuración de la cita', exact: true }).click()
 }
 
 /** El centro de la franja de media hora `hora` (`HH:MM`) del día `fecha`, ya a la vista. */

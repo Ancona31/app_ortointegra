@@ -1,37 +1,100 @@
 import { describe, expect, it } from 'vitest'
 import {
-  accionesDeTarjeta, esConvertible, horarioDeTarjeta, nombreDeTarjeta, pideConfirmacion, puedeIniciarConsulta, telefonoDeTarjeta,
-  textoDeConfirmacion,
+  accionesDeTarjeta, cuandoDeTarjeta, disposicionDeTarjeta, esConvertible, horarioDeTarjeta, nombreDeTarjeta, pideConfirmacion,
+  puedeIniciarConsulta, telefonoDeTarjeta, textoDeConfirmacion,
 } from '@/lib/agenda/accionesTarjeta'
+import { pideComprobarNota, vetoPorEstado, vetoPorNotaLigada } from '@/lib/agenda/estadoCita'
 
 const CITA = { paciente_id: 'p1', reserva_canal: null } as const
 
-describe('accionesDeTarjeta', () => {
-  it('cita agendada: iniciar (si se puede), confirmar, reagendar, cancelar y editar', () => {
-    expect(accionesDeTarjeta({ ...CITA, status: 'scheduled' }, true))
-      .toEqual(['iniciar-consulta', 'confirmar', 'reagendar', 'cancelar', 'editar'])
+describe('accionesDeTarjeta (G3: por estado)', () => {
+  it('agendada: iniciar (si se puede), confirmar, reagendar y cancelar; sin «Editar» (va en el engrane)', () => {
+    expect(accionesDeTarjeta({ ...CITA, status: 'scheduled' }, true)).toEqual(['iniciar-consulta', 'confirmar', 'reagendar', 'cancelar'])
   })
   it('confirmada: ya no ofrece confirmar', () => {
-    expect(accionesDeTarjeta({ ...CITA, status: 'confirmed' }, false)).toEqual(['reagendar', 'cancelar', 'editar'])
+    expect(accionesDeTarjeta({ ...CITA, status: 'confirmed' }, false)).toEqual(['reagendar', 'cancelar'])
   })
-  it('atendida, cancelada o no asistió: sólo iniciar (si se puede) y editar', () => {
-    for (const status of ['attended', 'cancelled', 'no_show'] as const) {
-      expect(accionesDeTarjeta({ ...CITA, status }, false)).toEqual(['editar'])
+  it('atendida: sólo «Ver expediente» (si quien mira lo puede abrir); ni iniciar, ni reagendar, ni cancelar', () => {
+    expect(accionesDeTarjeta({ ...CITA, status: 'attended' }, true, true, true)).toEqual(['ver-expediente'])
+    expect(accionesDeTarjeta({ ...CITA, status: 'attended' }, true, true, false)).toEqual([])
+  })
+  it('cancelada o no asistió: sólo «Reagendar cita»', () => {
+    for (const status of ['cancelled', 'no_show'] as const) {
+      expect(accionesDeTarjeta({ ...CITA, status }, true)).toEqual(['reagendar-cita'])
     }
   })
   it('una cita con paciente NUNCA se puede eliminar desde la tarjeta', () => {
     expect(accionesDeTarjeta({ ...CITA, status: 'scheduled' }, true)).not.toContain('eliminar')
   })
-  it('un evento sin paciente se edita o se elimina, y nada más', () => {
+  it('un evento sin paciente se edita o se elimina, y nada más (lo de antes)', () => {
     expect(accionesDeTarjeta({ paciente_id: null, reserva_canal: null, status: 'scheduled' }, true)).toEqual(['editar', 'eliminar'])
   })
-  it('una por ligar es una cita, no un evento', () => {
-    expect(accionesDeTarjeta({ paciente_id: null, reserva_canal: 'fijo', status: 'scheduled' }, true)).toContain('iniciar-consulta')
+  it('una por ligar conserva lo suyo, en su orden (con «Editar»), y cancelar aparte', () => {
+    expect(accionesDeTarjeta({ paciente_id: null, reserva_canal: 'fijo', status: 'scheduled' }, true))
+      .toEqual(['iniciar-consulta', 'confirmar', 'reagendar', 'editar', 'cancelar'])
   })
   it('cancelar y eliminar piden confirmación; el resto no', () => {
     expect(pideConfirmacion('cancelar')).toBe(true)
     expect(pideConfirmacion('eliminar')).toBe(true)
     expect(pideConfirmacion('confirmar')).toBe(false)
+  })
+})
+
+describe('disposicionDeTarjeta (G3: la rejilla)', () => {
+  it('agendada con WhatsApp: principal, Confirmar | Reagendar, el aviso solo (impar) y cancelar aparte', () => {
+    expect(disposicionDeTarjeta({ ...CITA, status: 'scheduled' }, true, { conWhatsApp: true }))
+      .toEqual({ principal: 'iniciar-consulta', secundarias: ['confirmar', 'reagendar', 'whatsapp'], peligro: 'cancelar' })
+  })
+  it('confirmada con WhatsApp: Reagendar | aviso', () => {
+    expect(disposicionDeTarjeta({ ...CITA, status: 'confirmed' }, true, { conWhatsApp: true }).secundarias).toEqual(['reagendar', 'whatsapp'])
+  })
+  it('atendida o cancelada: nunca el aviso, aunque aplique', () => {
+    expect(disposicionDeTarjeta({ ...CITA, status: 'attended' }, true, { conWhatsApp: true, puedeVerExpediente: true }))
+      .toEqual({ principal: 'ver-expediente', secundarias: [], peligro: null })
+    expect(disposicionDeTarjeta({ ...CITA, status: 'cancelled' }, true, { conWhatsApp: true }))
+      .toEqual({ principal: 'reagendar-cita', secundarias: [], peligro: null })
+  })
+})
+
+describe('vetoPorEstado (G3, 17.3: el servidor)', () => {
+  const at = { status: 'attended', start_time: '2026-11-18T15:00:00.000Z', end_time: '2026-11-18T16:00:00.000Z', all_day: false }
+  it('una atendida no se confirma, no se cancela ni se mueve', () => {
+    expect(vetoPorEstado(at, { status: 'confirmed' })).toMatch(/atendida/)
+    expect(vetoPorEstado(at, { status: 'cancelled' })).toMatch(/atendida/)
+    expect(vetoPorEstado(at, { start_time: '2026-11-18T16:00:00.000Z' })).toMatch(/fecha/)
+    expect(vetoPorEstado(at, { end_time: '2026-11-18T16:30:00.000Z' })).toMatch(/fecha/)
+    expect(vetoPorEstado(at, { all_day: true })).toMatch(/fecha/)
+  })
+  it('una atendida sí: las mismas puntas (otra forma del mismo instante), notas, y corregir su estado', () => {
+    expect(vetoPorEstado(at, { start_time: '2026-11-18T09:00:00-06:00', end_time: at.end_time, all_day: false, status: 'attended' })).toBeNull()
+    expect(vetoPorEstado(at, { status: 'scheduled' })).toBeNull()
+    expect(vetoPorEstado(at, { status: 'no_show' })).toBeNull()
+  })
+  it('cancelada, no asistió, agendada: nada (Reagendar cita las mueve)', () => {
+    for (const status of ['cancelled', 'no_show', 'scheduled', 'confirmed']) {
+      expect(vetoPorEstado({ ...at, status }, { status: 'scheduled', start_time: '2026-11-19T15:00:00.000Z' })).toBeNull()
+    }
+  })
+})
+
+describe('vetoPorNotaLigada (G3, decisión de Angel)', () => {
+  const at = { status: 'attended' }
+  it('con nota, una atendida no pasa a ningún otro estado', () => {
+    for (const status of ['scheduled', 'confirmed', 'cancelled', 'no_show']) expect(vetoPorNotaLigada(at, { status }, true)).toMatch(/nota clínica/)
+  })
+  it('sin nota, sí (corregir un error); y sin cambio de estado no se pregunta', () => {
+    expect(vetoPorNotaLigada(at, { status: 'scheduled' }, false)).toBeNull()
+    expect(pideComprobarNota(at, { status: 'attended' })).toBe(false)
+    expect(pideComprobarNota(at, {})).toBe(false)
+    expect(pideComprobarNota({ status: 'scheduled' }, { status: 'cancelled' })).toBe(false)
+    expect(pideComprobarNota(at, { status: 'scheduled' })).toBe(true)
+  })
+})
+
+describe('cuandoDeTarjeta (G3)', () => {
+  it('«Lun 16 nov · 09:00 – 10:00» en la zona de quien mira, y la duración', () => {
+    expect(cuandoDeTarjeta({ start_time: '2026-11-16T15:00:00Z', end_time: '2026-11-16T16:00:00Z' }, 'America/Merida'))
+      .toEqual({ fechaHora: 'Lun 16 nov · 09:00 – 10:00', duracion: '60 min' })
   })
 })
 
@@ -69,7 +132,7 @@ describe('horarioDeTarjeta', () => {
 
 describe('accionesDeTarjeta sin `cambiarEstadoCita`', () => {
   it('no ofrece «Confirmar» aunque la cita esté agendada', () => {
-    expect(accionesDeTarjeta({ ...CITA, status: 'scheduled' }, false, false)).toEqual(['reagendar', 'cancelar', 'editar'])
+    expect(accionesDeTarjeta({ ...CITA, status: 'scheduled' }, false, false)).toEqual(['reagendar', 'cancelar'])
   })
 })
 

@@ -50,6 +50,7 @@ import { guardarAltaRapida, horasDelGesto, type DependenciasGuardado } from '@/l
 import type { AvisosHorario } from '@/lib/agenda/horarioRejilla'
 import { empalmesPintados, mensajeEmpalme } from '@/lib/agenda/empalmesCita'
 import { esEventoGenerico } from '@/lib/agenda/tarjetasAgenda'
+import { partirFechaHora } from '@/lib/agenda/fechasAgenda'
 import { vistaEnElOtroFormato } from '@/lib/agenda/vistasAgenda'
 import { guardarAtajosEncendidos, leerAtajosEncendidos, type AccionAtajo, type AlmacenPreferencia } from '@/lib/agenda/atajosAgenda'
 import type { CitaEncontrada } from '@/lib/agenda/buscarCitasPaciente'
@@ -212,9 +213,28 @@ function CapaBurbuja({ capa, medicos, p, cerrar }: PropsCapaBurbuja): ReactEleme
       puedeInvitar={p.puedeInvitar}
       alInvitar={(cita) => { cerrar(capa.id); p.invitar(cita) }}
       alEditar={(cita) => { cerrar(capa.id); p.setModal({ mode: 'edit', appointment: cita }) }}
+      zonaVisor={p.zonaVisor}
       alCerrar={() => cerrar(capa.id)}
     />
   )
+}
+
+/**
+ * G3 · «Reagendar cita»: el alta de una cita nueva con el mismo paciente,
+ * médico, consultorio y duración. Fecha: la de la original si aún no pasó; si
+ * pasó, hoy, a la misma hora (en la hora de quien mira, como el formulario).
+ */
+export function altaParaReagendar(cita: Appointment, ahora: number): AperturaAltaV2 {
+  const inicio = partirFechaHora(cita.start_time)
+  const fin = partirFechaHora(cita.end_time)
+  const pasada = new Date(cita.start_time).getTime() <= ahora
+  const fecha = pasada ? partirFechaHora(new Date(ahora).toISOString()).fecha : inicio.fecha
+  return {
+    mode: 'create', fecha, hora: inicio.hora, horaFin: fin.hora, tipo: 'cita', todoElDia: 'no', enfocar: 'fecha',
+    ...(cita.pacientes ? { paciente: cita.pacientes } : {}),
+    ...(cita.medico_id ? { medicoId: cita.medico_id } : {}),
+    ...(cita.consultorio_id ? { consultorioId: cita.consultorio_id } : {}),
+  }
 }
 
 /** Lo que una acción de la tarjeta necesita además de la cita. */
@@ -243,6 +263,15 @@ function ejecutarAccion(a: AccionTarjeta, cita: Appointment, x: ContextoAccion):
       case 'editar': editar(); return
       case 'convertir': x.convertir(); return
       case 'reagendar': editar('fecha'); return
+      /* G3 · Cancelada o no asistió (decisión de Angel): el alta de una cita
+         NUEVA con el mismo paciente, médico y consultorio; la original se queda
+         como estaba. Con la puerta de suscripción de «Agendar». */
+      case 'reagendar-cita': if (x.p.puedeAgendar()) x.p.setModal(altaParaReagendar(cita, Date.now())); return
+      /* G3 · Atendida: sólo ver el expediente (la atención concluyó). */
+      case 'ver-expediente':
+        if (cita.pacientes) x.navegar(`/expediente/${cita.pacientes.id}`)
+        else editar()
+        return
       case 'confirmar': void guardado.cambiarEstadoCita?.(cita.id, 'confirmed'); return
       case 'cancelar': void guardado.handleCancelar(cita.id); return
       /* B3: borrar sólo un evento sin paciente, aunque la tarjeta ya no ofrezca
@@ -300,10 +329,14 @@ function CapaTarjeta({ capa, p, cerrar, vigia, fijar, abrirConvertir }: PropsCap
       alAccion={alAccion} alCerrar={() => cerrar(capa.id)}
       alPasar={capa.alPasar} sinEntrada={capa.sinEntrada} alFijar={fijar}
       alEntrarPuntero={() => vigia.current?.entrarTarjeta()} alSalirPuntero={() => vigia.current?.salirTarjeta()}
+      puedeVerExpediente={p.quien.esMedico && Boolean(cita.pacientes)}
       /* E7 · el WhatsApp manual, con la regla del modal y del servidor (T1).
-         Montarlo no emite nada: sólo al pulsar. */
-      extra={conWhatsApp
-        ? <BotonWhatsAppCita citaId={cita.id} tipo="enlace" marcadoEn={cita.whatsapp_sent_at ?? null} compacto />
+         Montarlo no emite nada: sólo al pulsar. G3: una pieza más de la
+         rejilla de la tarjeta («Enviar confirmación» / «Enviar recordatorio»). */
+      whatsapp={conWhatsApp
+        ? (o) => <BotonWhatsAppCita citaId={cita.id} tipo="enlace" marcadoEn={cita.whatsapp_sent_at ?? null} enCapa
+            confirmada={capa.vista.status === 'confirmed'} dosLineas={o.dosLineas} claseCelda={o.claseCelda}
+            tabIndex={o.tabIndex} onFocus={o.onFocus} alMensaje={o.alMensaje} />
         : undefined}
     />
   )

@@ -195,8 +195,8 @@ export function CabeceraEscritorio({
              horario que nombrar: lo único que se pliega son las columnas de
              los días sin nada dentro. Decirlo igual que en Semana prometería
              un recorte de horas que esa vista no puede hacer. */
-          aria-label={etiquetaCompactar(currentView)}
-          title={etiquetaCompactar(currentView)}
+          aria-label={etiquetaCompactar(currentView, engraneConfiguracion)}
+          title={etiquetaCompactar(currentView, engraneConfiguracion)}
           className="flex flex-none items-center gap-2 h-9 px-3 rounded-[var(--ag-r-btn)] text-sm font-medium"
           /* ENCENDIDO SE MARCA CON EL BORDE, NO CON RELLENO. Compartía los
              tokens del segmentado activo, o sea que se pintaba como un

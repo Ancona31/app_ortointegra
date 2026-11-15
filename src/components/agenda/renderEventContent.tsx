@@ -22,9 +22,11 @@ import { nombreCortoDeTexto, nombreCortoPaciente } from '@/lib/agenda/nombresTar
 /** Resuelve las iniciales del chip de médico de una cita ya pintada. */
 export type InicialesDeCita = (ext: Appointment) => string | undefined
 
-export function renderEventContent(arg: EventContentArg, navegadorTZ: string, inicialesDeCita: InicialesDeCita) {
+/* G3 (punto 16) · `sinAvisoFlotante` = agenda v2 encendida: las cajas de la
+   cita no llevan `title` (sí su etiqueta accesible). Apagada, como siempre. */
+export function renderEventContent(arg: EventContentArg, navegadorTZ: string, inicialesDeCita: InicialesDeCita, sinAvisoFlotante = false) {
   // Vista Mes: chip plano dedicado. El camino de Semana/Día (abajo) queda intacto.
-  if (arg.view.type === 'dayGridMonth') return <MonthChip arg={arg} />
+  if (arg.view.type === 'dayGridMonth') return <MonthChip arg={arg} sinAvisoFlotante={sinAvisoFlotante} />
   /* La misma pregunta que la línea de arriba, en la otra dirección: allí «¿es
      Mes?», aquí «¿es rejilla?». Las dos piezas que la usan están abajo. */
   const enRejilla = esVistaDeRejilla(arg.view.type)
@@ -174,6 +176,7 @@ export function renderEventContent(arg: EventContentArg, navegadorTZ: string, in
       enRejilla={enRejilla}
       marca={marca?.texto ?? null}
       marcaTitulo={marca?.titulo ?? null}
+      sinAvisoFlotante={sinAvisoFlotante}
     />
   )
 }

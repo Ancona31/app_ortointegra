@@ -26,8 +26,10 @@
  * COMPONENTE POR LA MAYÚSCULA (CLAUDE.md, «Estilo de código»).
  */
 
-/** Segundos de quietud antes de abrir (Angel: «más de 1 segundo»). */
-export const ESPERA_ABRIR_MS = 1000
+/** Quietud antes de abrir. Era 1 s (T3, «más de 1 segundo»); G3 (punto 18 de
+    la tanda de diseño): «la tarjeta se abre al dejar el ratón quieto 0,5
+    segundos, no 1». Las demás condiciones no cambian. */
+export const ESPERA_ABRIR_MS = 500
 /** Lo que se espera al salir antes de cerrar: da tiempo a cruzar el hueco de 8 px hasta la tarjeta. */
 export const MARGEN_CERRAR_MS = 300
 

@@ -4,7 +4,7 @@
  * aunque cambie el reloj (Resend exige el mismo cuerpo con la misma llave).
  */
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { correoRecordatorio, type DatosRecordatorio } from '@/lib/confirmacion/correosCita'
+import { correoConfirmacion, correoRecordatorio, type DatosRecordatorio } from '@/lib/confirmacion/correosCita'
 
 const URL_ENLACE = 'https://spinus.prueba/confirmar/AbCdEfGhIjKlMnOpQrStUv'
 const BASE: DatosRecordatorio = {
@@ -77,5 +77,34 @@ describe('correoRecordatorio', () => {
 
   it('lanza con un inicio que no es fecha (quien llama lo marca omitido/plantilla)', () => {
     expect(() => correoRecordatorio({ ...BASE, inicio: 'mañana' })).toThrow()
+  })
+})
+
+/* Integración G1/G3: la confirmación usa el armado de G1 con el cuerpo del
+   recordatorio, pero puede salir DÍAS antes: no puede decir «Recordatorio». */
+describe('correoConfirmacion', () => {
+  it('mismo cuerpo que el recordatorio, con su asunto y su título, y sin la palabra «Recordatorio»', () => {
+    const c = correoConfirmacion(BASE)
+    expect(c.asunto).toMatch(/^Confirma tu cita del martes,? 17 de noviembre$/)
+    for (const parte of [c.texto, c.html]) {
+      expect(parte).toContain('Confirma tu cita')
+      expect(parte).not.toMatch(/recordatorio|es mañana/i)
+    }
+    expect(c.texto.startsWith('Spinus\n\nConfirma tu cita')).toBe(true)
+    expect(c.texto).toContain(URL_ENLACE)
+    expect(c.html).toContain(`href="${URL_ENLACE}"`)
+    expect(c.html).toContain('Calle &quot;1&quot; &amp; 2')
+  })
+
+  it('ya confirmada: «Tu cita», sin «Confirmo» y sin «Recordatorio»', () => {
+    const c = correoConfirmacion({ ...BASE, confirmada: true })
+    expect(c.asunto).toMatch(/^Tu cita del /)
+    expect(c.texto.startsWith('Spinus\n\nTu cita')).toBe(true)
+    expect(c.html).not.toContain('Confirmo mi asistencia')
+    expect(`${c.texto}\n${c.html}`).not.toMatch(/recordatorio/i)
+  })
+
+  it('el recordatorio sigue diciendo «Recordatorio de tu cita»', () => {
+    expect(correoRecordatorio(BASE).texto.startsWith('Spinus\n\nRecordatorio de tu cita')).toBe(true)
   })
 })

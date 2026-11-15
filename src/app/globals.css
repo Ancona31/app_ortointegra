@@ -193,6 +193,10 @@
   /* Sombra tarjeta (claro) */
   --ag-shadow-card: 0 1px 2px rgba(16, 32, 64, .05);
   --ag-shadow-pop: 0 12px 28px rgba(16, 32, 64, .14);
+  /* G3 · La cita bajo el ratón (agenda v2): sombra suave y un anillo de 1 px
+     pegado al borde, que lo deja «un poco más marcado» sin tocar su color (el
+     color del borde va en línea, por estado). */
+  --ag-shadow-elevada: 0 0 0 1px rgba(16, 32, 64, .12), 0 6px 14px rgba(16, 32, 64, .16);
   /* Chip de médico (neutro, sin color de médico) */
   --ag-chip-bg: #eef1f6;
   --ag-chip-text: #7c8aa0;
@@ -3563,11 +3567,16 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
 .fc .fc-event:not(.fc-list-event):hover {
   z-index:   10 !important;
 }
-/* T3 · ELEVACIÓN DE 1 px AL PASAR EL RATÓN, SÓLO CON LA AGENDA V2 (petición
-   de Angel, punto 16 de la tanda tras sus pruebas a mano). Manda sobre la nota
-   de arriba («nada de `transform` en el hover»), que era del diseño y no suya:
-   se quedó en 1 px —lo mínimo que pidió— para que la cita no parezca cambiar de
-   franja. Las reglas que la acotan, y ninguna sobra:
+/* T3 · ELEVACIÓN AL PASAR EL RATÓN, SÓLO CON LA AGENDA V2 (petición de Angel,
+   punto 16 de la tanda tras sus pruebas a mano). Manda sobre la nota de arriba
+   («nada de `transform` en el hover»), que era del diseño y no suya.
+   G3 (punto 18 de la tanda de diseño): de 1 px pasa a 3 px, con una sombra
+   suave y el borde un poco más marcado (`--ag-shadow-elevada`), sólo en la
+   cita bajo el cursor. ⚠️ LA SOMBRA NO SE ANIMA: la regla de movimiento del
+   bloque F prohíbe transicionar `box-shadow`, así que la transición sigue
+   siendo SÓLO de `transform` y la sombra aparece en seco con el hover (la caja
+   de la cita lleva `overflow: hidden`, así que un pseudo-elemento con la sombra
+   y `opacity` quedaría recortado). Las reglas que la acotan, y ninguna sobra:
    · SOBRE LA CAJA DE DENTRO (`.ag-tarjeta`, `.ag-mes`, `.ag-banda`), NUNCA sobre
      el `.fc-event`: ése lo posiciona FullCalendar y lo anima el FLIP de F2.6
      (`flipTarjetas.ts`, WAAPI sobre `transform`) y lo mide `getBoundingClientRect`;
@@ -3580,13 +3589,16 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
    · ni las filas de lista (`<tr>`, la nota de arriba) ni los bloques de Google
      de solo lectura (no se abren: levantarlos diría que sí);
    · una TRANSICIÓN de `transform` en `--ag-dur-micro`: nada de rebote ni de
-     `box-shadow` (regla de movimiento del bloque F). */
+     `box-shadow` (regla de movimiento del bloque F). La prueba
+     (`agenda-f-pasar-raton`) se pone en rojo si `box-shadow` entra en la
+     transición. */
 @media (hover: hover) and (prefers-reduced-motion: no-preference) {
   .agenda-raiz[data-agenda-v2="encendida"] .fc .fc-event:not(.fc-list-event) :is(.ag-tarjeta, .ag-mes:not(.ag-mes--gcal), .ag-banda:not(.ag-banda--gcal)) {
     transition: transform var(--ag-dur-micro) var(--ag-ease);
   }
   .agenda-raiz[data-agenda-v2="encendida"] .fc .fc-event:not(.fc-list-event):not(.fc-event-mirror):not(.fc-event-dragging):not(.fc-event-resizing):hover :is(.ag-tarjeta, .ag-mes:not(.ag-mes--gcal), .ag-banda:not(.ag-banda--gcal)) {
-    transform: translateY(-1px);
+    transform: translateY(-3px);
+    box-shadow: var(--ag-shadow-elevada);
   }
 }
 
@@ -6078,6 +6090,106 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
   overflow: hidden;
 }
 
+/* ── G3 (puntos 15, 17 y 19 de la tanda de diseño) · tarjeta de la cita y
+   burbuja tras agendar, con la maqueta «Burbuja y tarjeta» como referencia:
+   cabecera con la píldora en la línea del nombre y el engrane y la ✕ arriba;
+   la fecha y la hora juntas como dato principal; y las acciones en una
+   REJILLA PAREJA: la principal a todo el ancho, las demás en dos columnas
+   iguales (si quedan impares, la última a todo el ancho: nada suelto), todas
+   del MISMO alto, y la de peligro aparte, al final. Sin animaciones nuevas.
+   Sólo tokens con contraparte oscura. */
+.ag-capa--tarjeta { width: 360px; }   /* el ancho de la maqueta */
+.ag-lectura-cab { align-items: flex-start; gap: var(--ag-1-5); }
+/* Como la maqueta: el nombre en una línea, con puntos suspensivos si no cabe
+   (el nombre entero sigue siendo el nombre accesible del diálogo). */
+.ag-lectura-cab .ag-capa-titulo {
+  padding-top: 6px;
+  font-size: 16px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  overflow-wrap: normal;
+}
+.ag-lectura-cab .ag-capa-cerrar { width: 32px; height: 32px; }
+.ag-hoja .ag-lectura-cab .ag-capa-cerrar { width: 44px; height: 44px; }
+.ag-lectura-pildoras {
+  flex: none;
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--ag-1);
+  max-width: 45%;
+  padding-top: 7px;
+}
+.ag-lectura-cuando {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.3;
+  font-variant-numeric: tabular-nums;
+  color: var(--ag-ink);
+}
+.ag-lectura-cuando small { display: block; margin-top: 2px; font-size: 12.5px; font-weight: 500; color: var(--ag-muted); }
+.ag-lectura-cuando .ag-lectura-huso { font-weight: 600; }
+.ag-lectura-acciones {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--ag-2);
+}
+.ag-lectura-acciones > * { min-width: 0; }
+.ag-lectura-acciones .ag-capa-boton {
+  width: 100%;
+  height: auto;
+  min-height: 48px;
+  padding: var(--ag-1) var(--ag-2-5);
+  line-height: 1.2;
+}
+.ag-lectura-ancho { grid-column: 1 / -1; }
+.ag-lectura-celda { display: flex; }
+.ag-capa-dos-lineas { display: flex; flex-direction: column; align-items: flex-start; text-align: left; }
+.ag-lectura-sep { grid-column: 1 / -1; height: 1px; margin: var(--ag-1) 0 0; background: var(--ag-hairline); }
+.ag-lectura-peligro {
+  grid-column: 1 / -1;
+  justify-self: center;
+  min-height: 36px;
+  padding: 0 var(--ag-3);
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ag-status-cancelled-text);
+  background: transparent;
+  border: 0;
+  border-radius: var(--ag-r-btn);
+  transition: background-color var(--ag-dur-micro) var(--ag-ease);
+}
+.ag-lectura-peligro:hover { background: var(--ag-btn-ghost-hover); }
+.ag-hoja .ag-lectura-peligro { min-height: 44px; }
+.ag-lectura-mensaje { margin: 0; font-size: 12px; line-height: 1.4; color: var(--ag-muted); }
+.ag-capa-acuse { display: flex; align-items: center; gap: var(--ag-2-5); }
+.ag-capa-acuse-icono {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  color: var(--ag-success-text);
+  background: var(--ag-success-bg);
+  border: 1px solid var(--ag-success-border);
+}
+.ag-capa-acuse .ag-lectura-cuando { font-size: 15.5px; }
+.ag-capa-enlace {
+  align-self: center;
+  min-height: 32px;
+  padding: 0 var(--ag-2-5);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ag-brand-legible);
+  background: transparent;
+  border: 0;
+  border-radius: var(--ag-r-btn);
+}
+.ag-capa-enlace:hover { background: var(--ag-btn-ghost-hover); }
+
 /* La ayuda de atajos. */
 .ag-atajos {
   margin: 0;
@@ -6245,6 +6357,7 @@ html.dark {
   --ag-offhours-bg: rgba(0, 0, 0, .14);
   --ag-shadow-card: 0 1px 3px rgba(0, 0, 0, .45);
   --ag-shadow-pop: 0 12px 28px rgba(0, 0, 0, .55);
+  --ag-shadow-elevada: 0 0 0 1px rgba(255, 255, 255, .14), 0 6px 14px rgba(0, 0, 0, .55);
   /* Chip médico */
   --ag-chip-bg: #16233a;
   --ag-chip-text: #cdd8e6;                    /* ◆ ≈ dark.text */

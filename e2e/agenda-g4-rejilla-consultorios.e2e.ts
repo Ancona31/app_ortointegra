@@ -102,9 +102,13 @@ async function semanaVacia(page: Page): Promise<void> {
   await expect(page.locator('.fc-event')).toHaveCount(0)
 }
 
+/* Con la v2 el rótulo dice «de los consultorios» (integración G1–G4): la
+   rejilla ya no se compacta al horario de la clínica. Apagada, `agenda-vistas`
+   sigue buscando el de la clínica. */
 async function compactar(page: Page): Promise<void> {
-  await page.getByRole('button', { name: /Compactar la rejilla/ }).click()
-  await expect(page.getByRole('button', { name: /Compactar la rejilla/ })).toHaveAttribute('aria-pressed', 'true')
+  const boton = page.getByRole('button', { name: 'Compactar la rejilla al horario de los consultorios', exact: true })
+  await boton.click()
+  await expect(boton).toHaveAttribute('aria-pressed', 'true')
 }
 
 test('«Todos los médicos»: el gris es el de los tres consultorios, y «Compactar» va de la apertura más temprana al cierre más tardío', async ({ page }) => {

@@ -28,7 +28,7 @@
  *
  * Sólo se monta con la agenda v2 encendida (quien lo usa lo decide).
  */
-import { useState, type ReactElement } from 'react'
+import { useEffect, useState, type ReactElement } from 'react'
 import { TEXTO_SIN_WHATSAPP, type MotivoSinWhatsApp } from '@/lib/agenda/whatsappCita'
 
 type Estado = { tipo: 'inicial' } | { tipo: 'preparando' } | { tipo: 'listo'; url: string } | { tipo: 'error'; motivo: string }
@@ -89,11 +89,25 @@ interface Props {
   tipo: 'enlace' | 'recordatorio'
   /** La marca que ya tenía la cita (`whatsapp_sent_at` o `whatsapp_reminder_sent_at`). */
   marcadoEn: string | null
-  /** Etiqueta del botón. */
+  /** Etiqueta del botón. Sin ella (G3, punto 15): «Enviar confirmación», o
+      «Enviar recordatorio» si la cita ya está confirmada. */
   etiqueta?: string
+  /** G3 · La cita ya está confirmada: el aviso es un recordatorio. */
+  confirmada?: boolean
   compacto?: boolean
   /** T1: con la pinta de los botones de las capas (`.ag-capa-boton`), a todo el ancho de su celda. */
   enCapa?: boolean
+  /** G3 · Comparte fila con otra acción: «Enviar» arriba y la palabra abajo. A todo el ancho, en una. */
+  dosLineas?: boolean
+  /** G3 · La clase de su celda en la rejilla de la tarjeta o de la burbuja. */
+  claseCelda?: string
+  /** G3 · Foco itinerante de la barra de la tarjeta. */
+  tabIndex?: number
+  onFocus?: () => void
+  /** G3 · Dónde dejar el mensaje («Abierto en WhatsApp hh:mm» o el motivo de un
+      error) cuando el botón vive en una rejilla: así no queda nada suelto en
+      ella. Sin esto, el mensaje va debajo del botón, como antes. */
+  alMensaje?: (m: { texto: string; alerta: boolean } | null) => void
 }
 
 /** `paso:'abierto'`: la marca de que se abrió WhatsApp. `keepalive`: la pestaña puede irse. */
@@ -111,9 +125,29 @@ function pestanaEnBlanco(): Window | null {
   return w
 }
 
-export function BotonWhatsAppCita({ citaId, tipo, marcadoEn, etiqueta = 'Enviar por WhatsApp', compacto = false, enCapa = false }: Props) {
+/** G3 (punto 15) · El rótulo: «Enviar confirmación» / «Enviar recordatorio», en una o dos líneas. */
+function Rotulo({ texto, dosLineas }: { texto: string; dosLineas: boolean }): ReactElement {
+  const [primera, ...resto] = texto.split(' ')
+  if (!dosLineas || resto.length === 0) return <span>{texto}</span>
+  return <span className="ag-capa-dos-lineas"><span>{primera}</span> <span>{resto.join(' ')}</span></span>
+}
+
+/** G3 · El mensaje del botón: arriba (`alMensaje`) o debajo, como antes. */
+function useMensaje(estado: Estado, abierto: string | null, alMensaje: Props['alMensaje']): { texto: string; alerta: boolean } | null {
+  const mensaje = estado.tipo === 'error' ? { texto: estado.motivo, alerta: true }
+    : abierto ? { texto: `Abierto en WhatsApp ${horaCorta(abierto)}`, alerta: false } : null
+  const texto = mensaje?.texto ?? null
+  const alerta = mensaje?.alerta ?? false
+  useEffect(() => { alMensaje?.(texto === null ? null : { texto, alerta }) }, [texto, alerta, alMensaje])
+  return alMensaje ? null : mensaje
+}
+
+export function BotonWhatsAppCita(props: Props) {
+  const { citaId, tipo, marcadoEn, confirmada = false, compacto = false, enCapa = false, dosLineas = false } = props
+  const etiqueta = props.etiqueta ?? (confirmada ? 'Enviar recordatorio' : 'Enviar confirmación')
   const [estado, setEstado] = useState<Estado>({ tipo: 'inicial' })
   const [abierto, setAbierto] = useState<string | null>(marcadoEn)
+  const mensajeDebajo = useMensaje(estado, abierto, props.alMensaje)
 
   function marcar(): void {
     setAbierto(new Date().toISOString())
@@ -136,24 +170,23 @@ export function BotonWhatsAppCita({ citaId, tipo, marcadoEn, etiqueta = 'Enviar 
     : `${compacto ? 'px-2.5 py-1.5 text-[12px]' : 'w-full px-3 py-2.5 text-sm'} flex items-center justify-center gap-1.5 rounded-xl font-bold border transition-colors`
   const estilo = enCapa ? undefined : { color: 'var(--ag-text)', borderColor: 'var(--ag-input-border)' }
   const hover = enCapa ? '' : 'hover:bg-[var(--ag-btn-ghost-hover)]'
+  const logo = <LogoWhatsApp size={enCapa ? 20 : 16} />
+  const foco = { tabIndex: props.tabIndex, onFocus: props.onFocus }
   return (
-    <div data-whatsapp-cita={citaId}>
+    <div data-whatsapp-cita={citaId} className={props.claseCelda ? `ag-lectura-celda ${props.claseCelda}` : undefined}>
       {estado.tipo === 'listo' ? (
         <a href={estado.url} target="_blank" rel="noopener noreferrer" onClick={() => { marcar(); setEstado({ tipo: 'inicial' }) }}
-          className={`${clase} ${hover}`} style={estilo}>
-          <LogoWhatsApp /> Abrir WhatsApp
+          className={`${clase} ${hover}`} style={estilo} {...foco}>
+          {logo} Abrir WhatsApp
         </a>
       ) : (
         <button type="button" disabled={estado.tipo === 'preparando'} onClick={() => { void alPulsar() }}
-          className={`${clase} ${estado.tipo === 'preparando' ? 'opacity-60 cursor-wait' : hover}`} style={estilo}>
-          <LogoWhatsApp /> {estado.tipo === 'preparando' ? 'Preparando…' : etiqueta}
+          className={`${clase} ${estado.tipo === 'preparando' ? 'opacity-60 cursor-wait' : hover}`} style={estilo} {...foco}>
+          {logo} {estado.tipo === 'preparando' ? 'Preparando…' : <Rotulo texto={etiqueta} dosLineas={dosLineas} />}
         </button>
       )}
-      {estado.tipo === 'error' && (
-        <p role="alert" className="text-[12px] mt-1 leading-relaxed" style={{ color: 'var(--ag-muted)' }}>{estado.motivo}</p>
-      )}
-      {abierto && (
-        <p className="text-[12px] mt-1" style={{ color: 'var(--ag-muted)' }}>Abierto en WhatsApp {horaCorta(abierto)}</p>
+      {mensajeDebajo && (
+        <p role={mensajeDebajo.alerta ? 'alert' : undefined} className="text-[12px] mt-1 leading-relaxed" style={{ color: 'var(--ag-muted)' }}>{mensajeDebajo.texto}</p>
       )}
     </div>
   )

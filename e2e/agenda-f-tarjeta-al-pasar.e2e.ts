@@ -4,7 +4,8 @@ import { abrirAgendaApagada, abrirAgendaV2, tarjetaLectura } from './interaccion
 
 /**
  * T3 · punto 15: la tarjeta de lectura se abre también al DEJAR EL RATÓN QUIETO
- * más de 1 s sobre una cita (detrás del interruptor de la agenda v2):
+ * sobre una cita (detrás del interruptor de la agenda v2); G3 (punto 18 de la
+ * tanda de diseño): 0,5 s, no 1:
  *   · no es modal y no roba el foco; Escape la cierra;
  *   · se cierra al retirar el ratón, salvo que se cruce a la tarjeta o que un
  *     clic la haya fijado (entonces es la de siempre, modal);
@@ -15,7 +16,8 @@ import { abrirAgendaApagada, abrirAgendaV2, tarjetaLectura } from './interaccion
  * MUTACIONES (comprobadas en rojo al escribirlas): quitar de `puedeAbrir` las
  * guardas de ratón fino y de la hoja (`MEDIO_RATON`, `desactivada`) → «el
  * teléfono…»; quitar `leerTarjetaAlPasar` → «preferencia apagada»;
- * `aria-modal` en la variante al pasar → «1 s de quietud…» (no modal).
+ * `aria-modal` en la variante al pasar → «0,5 s de quietud…» (no modal);
+ * `ESPERA_ABRIR_MS = 1000` → «0,5 s de quietud…» (tarda de más).
  */
 test.use({ storageState: SESION.adminA })
 
@@ -43,15 +45,19 @@ test.describe('escritorio, con el interruptor encendido', () => {
   test.beforeEach(() => { interruptorAgenda('A', true) })
   test.afterEach(() => { interruptorAgenda('A', false) })
 
-  test('1 s de quietud la abre, no modal y sin robar el foco; salir la cierra', async ({ page }) => {
+  /* G3 (punto 18): medio segundo de quietud, no uno. Mutación: volver
+     `ESPERA_ABRIR_MS` a 1000 → la tarjeta tarda más de 900 ms y esto da rojo. */
+  test('0,5 s de quietud la abre, no modal y sin robar el foco; salir la cierra', async ({ page }) => {
     await abrirAgendaV2(page)
     const agendar = page.getByRole('button', { name: 'Agendar', exact: true })
     await agendar.focus()
     await posarSobre(page, citas(page).first())
+    const quieto = Date.now()
     const tarjeta = tarjetaLectura(page)
-    await page.waitForTimeout(300)
+    await page.waitForTimeout(250)
     await expect(tarjeta).toHaveCount(0)
     await expect(tarjeta).toBeVisible({ timeout: 3000 })
+    expect(Date.now() - quieto, 'la tarjeta se abre a los 0,5 s, no al segundo').toBeLessThan(900)
     await expect(tarjeta).not.toHaveAttribute('aria-modal', /.*/)
     await expect(agendar).toBeFocused()
     await page.mouse.move(5, 300, { steps: 5 })
@@ -62,7 +68,7 @@ test.describe('escritorio, con el interruptor encendido', () => {
     await abrirAgendaV2(page)
     const p = await posarSobre(page, citas(page).first())
     for (let i = 0; i < 4; i += 1) {
-      await page.waitForTimeout(400)
+      await page.waitForTimeout(300)
       await page.mouse.move(p.x + (i % 2 ? 2 : -2), p.y)
     }
     await expect(tarjetaLectura(page)).toHaveCount(0)

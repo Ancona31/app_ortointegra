@@ -80,10 +80,11 @@ export const ANCHO_TABLETA = 768
  * salida de la banda; los tres cambian juntos o el botón promete una cosa, la
  * banda otra y la pantalla una tercera.
  */
-export function etiquetaCompactar(viewType: string): string {
-  return viewType === 'dayGridMonth'
-    ? 'Ocultar los días de la semana sin actividad'
-    : 'Compactar la rejilla al horario de la clínica'
+export function etiquetaCompactar(viewType: string, agendaV2 = false): string {
+  if (viewType === 'dayGridMonth') return 'Ocultar los días de la semana sin actividad'
+  /* G4: con la v2 la rejilla se dibuja con el horario de los consultorios
+     (`horarioRejilla.ts`); apagada, con el de la clínica, como siempre. */
+  return agendaV2 ? 'Compactar la rejilla al horario de los consultorios' : 'Compactar la rejilla al horario de la clínica'
 }
 
 /**

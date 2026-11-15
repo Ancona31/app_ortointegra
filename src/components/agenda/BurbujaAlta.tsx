@@ -48,6 +48,7 @@ import { Check, Mail, X } from 'lucide-react'
 import Portal from '@/components/ui/Portal'
 import QuickPatientModal from '@/components/ui/QuickPatientModal'
 import { BotonWhatsAppCita } from '@/components/agenda/BotonWhatsAppCita'
+import { BotonCorreoCita } from '@/components/agenda/BotonCorreoCita'
 import { useDialogoModal } from '@/hooks/useDialogoModal'
 import type { PacienteBusqueda } from '@/components/agenda/AppointmentModal'
 import type { AltaGuardada, Appointment, DatosGuardado } from '@/lib/agenda/tiposAgenda'
@@ -55,7 +56,8 @@ import { posicionCapa, ventanaVisible, type Caja, type Punto } from '@/lib/agend
 import { duracionToken, prefiereMenosMovimiento } from '@/lib/agenda/movimientoAgenda'
 import { idDeOpcion, indiceTrasTecla } from '@/lib/agenda/opcionesLista'
 import { buscarPacientes, limpiarTextoBusqueda } from '@/lib/agenda/buscarCitasPaciente'
-import { motivoSinWhatsApp, telefonoParaWhatsApp } from '@/lib/agenda/whatsappCita'
+import { correoParaConfirmacion, motivoSinCorreo, motivoSinWhatsApp, telefonoParaWhatsApp } from '@/lib/agenda/whatsappCita'
+import { cuandoDeTarjeta, horarioDeTarjeta, nombreDeTarjeta } from '@/lib/agenda/accionesTarjeta'
 import {
   consultorioPropuesto, datosDeAltaRapida, etiquetaBurbuja, finTrasMoverInicio, medicoPropuesto, motivoParaNoGuardar,
   necesitaElegirMedico, type ConsultorioAlta, type EntradaAltaRapida, type SalidaAltaRapida,
@@ -92,6 +94,8 @@ interface Props {
   /** T1 · «Más opciones» tras agendar: el modal de edición de la cita creada. */
   alEditar: (cita: Appointment) => void
   alCerrar: () => void
+  /** G3 · La zona de quien mira, para el resumen de la cita creada y su etiqueta de huso (punto 19). */
+  zonaVisor?: string
 }
 
 /* ⚠️ `colocar` y `seguirColocacion` SON COPIA DELIBERADA en `TarjetaLectura.tsx`
@@ -300,13 +304,15 @@ function SelectorMedico({ medicos, valor, alCambiar }: PropsMedico): ReactElemen
 
 interface PropsPie { guardando: boolean; alGuardar: () => void; alMasOpciones: () => void; boton: { current: HTMLButtonElement | null } }
 
+/* G3 (punto 17, «Alta rápida» de la maqueta): «Más opciones» y «Guardar» en dos
+   columnas iguales y del mismo alto, la principal a la derecha. */
 function PieBurbuja({ guardando, alGuardar, alMasOpciones, boton }: PropsPie): ReactElement {
   return (
-    <div className="ag-capa-acciones">
+    <div className="ag-lectura-acciones">
+      <button type="button" className="ag-capa-boton" onClick={alMasOpciones}>Más opciones</button>
       <button ref={boton} type="button" className="ag-capa-boton ag-capa-boton--principal" disabled={guardando} onClick={alGuardar}>
         {guardando ? 'Guardando…' : 'Guardar'}
       </button>
-      <button type="button" className="ag-capa-boton" onClick={alMasOpciones}>Más opciones</button>
     </div>
   )
 }
@@ -317,45 +323,75 @@ interface Creada { alta: AltaGuardada; en: number }
 interface PropsAgendada {
   creada: Creada
   puedeInvitar: boolean
+  zonaVisor: string
   alInvitar: (cita: Appointment) => void
   alEditar: (cita: Appointment) => void
   alListo: () => void
 }
 
+type Mensaje = { texto: string; alerta: boolean } | null
+
+/** G3 · El acuse: ✓ «Cita agendada» y debajo quién y cuándo, con la hora del consultorio si difiere (punto 19). */
+export function AcuseAgendada({ cita, zonaVisor }: { cita: Appointment; zonaVisor: string }): ReactElement {
+  const { enConsultorio } = horarioDeTarjeta(cita, zonaVisor)
+  return (
+    <div className="ag-capa-acuse">
+      <span className="ag-capa-acuse-icono" aria-hidden="true"><Check size={18} /></span>
+      <p className="ag-lectura-cuando">
+        <span>Cita agendada</span>
+        <small>{nombreDeTarjeta(cita)} · {cuandoDeTarjeta(cita, zonaVisor).fechaHora}</small>
+        {enConsultorio && <small className="ag-lectura-huso">{enConsultorio}</small>}
+      </p>
+    </div>
+  )
+}
+
 /**
- * T1 · Lo que enseña la burbuja tras agendar (puntos 13 y 14). «Listo» es la
- * acción principal y se lleva el foco. Las dos de enviar, una debajo de otra a
- * todo el ancho (con 140 px de columna sus rótulos no caben en una línea); el
- * pie, «Listo» y «Más opciones» en dos columnas iguales, donde estaban
- * «Guardar» y «Más opciones».
+ * T1 · Lo que enseña la burbuja tras agendar (puntos 13 y 14). G3 (puntos 14,
+ * 15 y 17, «Después de agendar» de la maqueta): «Listo» es la acción principal,
+ * a todo el ancho, y se lleva el foco; debajo, en dos columnas iguales, «Enviar
+ * confirmación» (WhatsApp, en dos líneas) y «Por correo» (el correo de Spinus,
+ * con o sin Google); la invitación de Google («Invitar por correo») sólo si
+ * habrá evento y quien agenda puede invitar — si queda impar, la última va a
+ * todo el ancho. «Más opciones» (el modal de edición) al pie, como enlace.
  */
-function PanelAgendada({ creada, puedeInvitar, alInvitar, alEditar, alListo }: PropsAgendada): ReactElement {
+function PanelAgendada({ creada, puedeInvitar, zonaVisor, alInvitar, alEditar, alListo }: PropsAgendada): ReactElement {
   const { cita, gcalSync } = creada.alta
   const listo = useRef<HTMLButtonElement | null>(null)
+  /* Un mensaje por aviso: mandar los dos no borra el del primero. */
+  const [mensajeWa, setMensajeWa] = useState<Mensaje>(null)
+  const [mensajeCorreo, setMensajeCorreo] = useState<Mensaje>(null)
   useEffect(() => { listo.current?.focus({ preventScroll: true }) }, [])
-  const telefono = telefonoParaWhatsApp(cita.pacientes?.telefono, cita.reserva_telefono)
-  const conWhatsApp = motivoSinWhatsApp(cita, telefono, creada.en) === null
+  const conWhatsApp = motivoSinWhatsApp(cita, telefonoParaWhatsApp(cita.pacientes?.telefono, cita.reserva_telefono), creada.en) === null
+  const conCorreo = motivoSinCorreo(cita, correoParaConfirmacion(cita.pacientes?.email, cita.reserva_correo), creada.en) === null
   /* La invitación es un `patch` sobre el evento de Google: sólo si lo habrá
      (`pending`) y quien agenda puede invitar — la misma regla con la que
      `handleSave` la abría sola. */
-  const conCorreo = puedeInvitar && gcalSync === 'pending'
+  const conInvitacion = puedeInvitar && gcalSync === 'pending'
+  const piezas = [conWhatsApp && 'whatsapp', conCorreo && 'correo', conInvitacion && 'invitar'].filter(Boolean)
+  const celda = (p: string): string => (piezas.length % 2 === 1 && piezas[piezas.length - 1] === p ? 'ag-lectura-ancho' : '')
   return (
     <>
-      <p className="ag-capa-hecho"><Check size={16} aria-hidden="true" /> Cita agendada</p>
-      {(conWhatsApp || conCorreo) && (
-        <div className="ag-capa-pila">
-          {conWhatsApp && <BotonWhatsAppCita citaId={cita.id} tipo="enlace" marcadoEn={cita.whatsapp_sent_at ?? null} enCapa />}
-          {conCorreo && (
-            <button type="button" className="ag-capa-boton w-full" onClick={() => alInvitar(cita)}>
-              <Mail size={15} aria-hidden="true" /> Invitar por correo
-            </button>
-          )}
-        </div>
-      )}
-      <div className="ag-capa-rejilla">
-        <button ref={listo} type="button" className="ag-capa-boton ag-capa-boton--principal" onClick={alListo}>Listo</button>
-        <button type="button" className="ag-capa-boton" onClick={() => alEditar(cita)}>Más opciones</button>
+      <AcuseAgendada cita={cita} zonaVisor={zonaVisor} />
+      <div className="ag-lectura-acciones">
+        <button ref={listo} type="button" className="ag-capa-boton ag-capa-boton--principal ag-lectura-ancho" onClick={alListo}>Listo</button>
+        {conWhatsApp && (
+          <BotonWhatsAppCita citaId={cita.id} tipo="enlace" marcadoEn={cita.whatsapp_sent_at ?? null} enCapa
+            confirmada={cita.status === 'confirmed'} dosLineas={!celda('whatsapp')} claseCelda={celda('whatsapp')} alMensaje={setMensajeWa} />
+        )}
+        {conCorreo && (
+          <BotonCorreoCita citaId={cita.id} confirmada={cita.status === 'confirmed'} enCapa claseCelda={celda('correo')} alMensaje={setMensajeCorreo} />
+        )}
+        {conInvitacion && (
+          <button type="button" className={`ag-capa-boton ${celda('invitar')}`} onClick={() => alInvitar(cita)}>
+            <Mail size={15} aria-hidden="true" /> Invitar por correo
+          </button>
+        )}
       </div>
+      {[mensajeWa, mensajeCorreo].map((m, i) => m && (
+        <p key={i} className="ag-lectura-mensaje" role={m.alerta ? 'alert' : undefined}>{m.texto}</p>
+      ))}
+      <button type="button" className="ag-capa-enlace" onClick={() => alEditar(cita)}>Más opciones</button>
     </>
   )
 }
@@ -432,7 +468,7 @@ export default function BurbujaAlta(props: Props): ReactElement {
       <Portal>
         <div ref={montar} role="dialog" aria-modal="true" aria-labelledby={idTitulo} tabIndex={-1}
           onKeyDown={alPulsarTecla} onAnimationEnd={e => { if (e.target === e.currentTarget) alTerminar() }}
-          className="ag-capa" data-estado={saliendo ? 'saliendo' : 'abierta'}>
+          className="ag-capa ag-capa--tarjeta" data-estado={saliendo ? 'saliendo' : 'abierta'}>
           <div className="ag-capa-cab">
             <h2 id={idTitulo} className="ag-capa-titulo">{etiquetaBurbuja(fecha, horas.inicio, horas.fin)}</h2>
             <button type="button" className="ag-capa-cerrar" aria-label="Cerrar" onClick={salir}><X size={16} aria-hidden="true" /></button>
@@ -440,6 +476,7 @@ export default function BurbujaAlta(props: Props): ReactElement {
           <p role="status" className="sr-only">{creada ? `Cita agendada: ${etiquetaBurbuja(fecha, horas.inicio, horas.fin)}` : ''}</p>
           {creada ? (
             <PanelAgendada creada={creada} puedeInvitar={props.puedeInvitar} alListo={salir}
+              zonaVisor={props.zonaVisor ?? Intl.DateTimeFormat().resolvedOptions().timeZone}
               alInvitar={props.alInvitar} alEditar={props.alEditar} />
           ) : (
             <>
