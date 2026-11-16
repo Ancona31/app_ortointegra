@@ -4258,7 +4258,16 @@ deshabilita al pulsar.
 
 ### AG-DT-61 — Por PostgREST directo se puede mover o cambiar el estado de una cita atendida, también con nota clínica, y con la v2 apagada borrarla
 
-**Estado:** 🟡 abierta (G3, punto 17.3 y decisión 3 de Angel) · El veto por
+**Estado:** ✅ **cerrada en local para las citas CON nota** (tanda H, H5, punto
+22; pendiente de producción) por `20261120130000_agenda_h5_atendida_con_nota.sql`:
+el disparador `trg_appointments_proteger_atendida` (`cita_proteger_atendida()`,
+con `cita_tiene_nota_ligada()` SECURITY DEFINER) rechaza con 42501 cambiar el
+estado y borrar una atendida con nota, con la v2 encendida y apagada, y moverla
+(inicio, fin, todo el día) con la v2 encendida; también a `service_role` (prueba
+`h5_atendida_con_nota.sql`). **Queda abierto:** una atendida SIN nota se sigue
+moviendo y cambiando de estado por PostgREST con la v2 encendida (AG-DT-88), y
+mover una con nota con la v2 apagada (decisión de H5, pendiente de Angel, §6-bis
+«Tanda H»). Texto original: 🟡 abierta (G3, punto 17.3 y decisión 3 de Angel) · El veto por
 estado (`vetoPorEstado`) y el de la nota ligada (`vetoPorNotaLigada`,
 `notaLigadaServidor.ts`) son de la API (`PUT` y `DELETE
 /api/appointments/[id]`), no de la base. Con la sesión de la app y sin pasar por
@@ -4276,7 +4285,9 @@ nunca la tuvo.
 
 ### AG-DT-63 — El 409 `nota_ligada` le dice a la secretaria que la cita tiene nota
 
-**Estado:** 🟡 abierta, **decisión de Angel** (G3, decisión 3) · Sólo la
+**Estado:** ✅ **decidida por Angel (2026-11-15, punto 21 de la tanda H): se queda
+como está.** No se unifica con `estado_no_admite`. Texto original: 🟡 abierta,
+**decisión de Angel** (G3, decisión 3) · Sólo la
 existencia, nunca el contenido; ya ve que la cita está atendida. Si se prefiere,
 unificarlo con `estado_no_admite` es cambiar una cadena.
 
@@ -4330,7 +4341,13 @@ marcador del mismo ancho) o dejar que la barra no envuelva.
 
 ### AG-DT-69 — Cinco e2e fallan los domingos
 
-**Estado:** 🟡 abierta, anterior a la tanda (visto en la integración G1–G4, el
+**Estado:** ✅ **cerrada (tanda H, H5, punto 23, 2026-11-15).** F1.12 era un
+defecto real de la lista (`desplazarListaAHoy`: sin días de hoy en adelante no
+movía nada y la lista abría en el lunes; ahora va al fondo cuando ya llegaron
+todas las fuentes). F1.4, F1.8 y F1.14 fijan el reloj del navegador en el lunes
+de la semana visible (`fijarDia`, nunca en el futuro); `husos-dos-consultorios`
+«la agenda» pulsa la flecha de escritorio (`.fc-next-button`). Pasan en domingo
+real y simulando lunes y sábado. Texto original: 🟡 abierta, anterior a la tanda (visto en la integración G1–G4, el
 domingo 2026-11-15; fallan igual en la base `dd634b9`) · `agenda-f-pulido` F1.4,
 F1.8 y F1.14 (vista Día de hoy: el domingo está cerrado en la semilla y no hay
 citas), F1.12 (la lista de Semana del teléfono: «sin lista») y
@@ -4339,6 +4356,151 @@ del día en que se corre, como F1.12 los sábados (arreglado en la tanda
 anterior). Los otros seis días pasan. F1.12 conviene mirarlo primero: puede ser
 un defecto de la lista y no de la prueba. Arreglo: que cada prueba fije su día
 (el lunes de la semana visible) en vez de «hoy».
+
+### Agenda v2 — tanda H (2026-11-15)
+
+Lo que dejaron abierto las cinco ramas de la tanda H (`feature/agenda-v2-h1` a
+`-h5`) y su integración. Decisiones en `mejora_agendaV2.md` §6-bis, «Tanda H».
+
+### AG-DT-70 — El enlace de un solo uso también exige correo
+
+**Estado:** 🟡 abierta, **decisión de Angel** (H1, punto 4) · «Quien no tiene
+correo se atiende con un enlace de un solo uso» no es cierto hoy:
+`ReservarSchema` (≥ 3 caracteres) y `reservar_por_enlace` (`p_correo` con «@»)
+piden un correo también al único, sin verificarlo. Permitirlo cambia la
+validación de una ruta pública y la RPC (esquema + ruta + migración), y hay que
+revisar el candado, el comprobante y el recordatorio, que cuelgan del correo.
+No se tocó (regla de la tanda: la seguridad de las rutas públicas no cambia).
+
+### AG-DT-71 — `.rp-pie__fila > :only-child` sin uso
+
+**Estado:** 🟡 abierta, menor (H1) · Red de seguridad de la hoja pública: hoy
+todo pie con fila lleva «Volver».
+
+### AG-DT-72 — `useReserva` en 49 líneas
+
+**Estado:** 🟡 abierta, menor (H1) · Al borde del límite de 50 del Protocolo 3:
+lo próximo que se le añada, en otra función.
+
+### AG-DT-73 — Gmail y Outlook pueden oscurecer los correos de cita
+
+**Estado:** 🟡 abierta, límite de los buzones (H1) · El HTML pide claro
+(`color-scheme`, `supported-color-schemes`), pero Gmail (Android/iOS) y Outlook
+invierten o atenúan en su modo oscuro sin preguntar. Sólo Apple Mail respeta las
+metas.
+
+### AG-DT-74 — La base local acumula tipos «Tipo E2E …»
+
+**Estado:** 🟡 abierta, de las pruebas (H1) · `prepararEscenario` de
+`reserva-enlace` y `confirmacion-enlace` no borra su tipo; salen en el paso
+«Lugar» y en algunas capturas. Se limpia con la semilla tras un reinicio (P5).
+
+### AG-DT-75 — `cita_correos_pendientes` (E4) quedó sin llamadores
+
+**Estado:** 🟡 abierta (H2, punto 9) · La tarea usa
+`cita_recordatorios_pendientes` (la de E4 con el interruptor). Retirarla en una
+migración posterior junto con su uso en `supabase/pruebas-sql/e4_correos_cita.sql`.
+
+### AG-DT-76 — Apagar el recordatorio no frena una pasada ya en curso
+
+**Estado:** 🟡 abierta, aceptada (H2) · El interruptor está en el listado, no
+en `cita_correo_tomar`: lo ya listado en esa pasada (≤ 45 s) sale.
+
+### AG-DT-77 — «Cancelar» de `ConfirmModal` y `HorarioModal`, texto gris sin borde
+
+**Estado:** 🟡 abierta (H2, punto 7) · Los abre la configuración pero son de
+toda la agenda; tocarlos cambia también los modales de la agenda.
+
+### AG-DT-78 — Los campos de la configuración con borde de 1,2:1
+
+**Estado:** 🟡 abierta (H2) · `CAMPO` sigue con `--ag-border-card`; el punto 7
+hablaba de botones.
+
+### AG-DT-79 — El reinicio cuenta todos los consultorios
+
+**Estado:** 🟡 abierta, menor (H2) · Repetir «Restablecer» da `ok:N,0,0`
+aunque ya estuvieran como de partida. Un enlace revocado por el reinicio no
+vuelve (por diseño, como «Revocar»).
+
+### AG-DT-80 — El escudo del doble clic sólo está en la burbuja
+
+**Estado:** 🟡 abierta (H3, punto 12) · `AppointmentModal` y `ConvertirEnCita`
+también abren `QuickPatientModal`; ahí el segundo clic cae en su propio
+formulario (no se vio el defecto), pero no está probado.
+
+### AG-DT-81 — La franja marcada se pierde al abrir el registro rápido
+
+**Estado:** 🟡 abierta, menor (H3) · `unselectAuto` de FullCalendar (el modal no
+es `.ag-capa`). La burbuja conserva su horario y el título lo dice.
+
+### AG-DT-82 — La secretaria elige médico dos veces
+
+**Estado:** 🟡 abierta (H3) · El médico del registro rápido no pasa al selector
+de la burbuja.
+
+### AG-DT-83 — «Añadir observaciones» con `aria-expanded` siempre en `false`
+
+**Estado:** 🟡 abierta, menor (H3) · El botón se sustituye por el campo; no
+alterna. Sin `aria-controls`.
+
+### AG-DT-84 — El verde de «Registrar» señalado pasa AA con poco margen
+
+**Estado:** 🟡 abierta, menor (H3) · 4,60:1 en claro. La e2e lo detecta si
+alguien retoca los hex.
+
+### AG-DT-85 — «Por confirmar» sigue sin existir en el teléfono
+
+**Estado:** 🟡 abierta, anterior (E7; H4) · La leyenda, los medios, «Marcar como
+confirmada», el tiempo real y el punto rojo son de la cabecera de escritorio.
+
+### AG-DT-86 — Un hueco que cruza la medianoche del consultorio se parte con la rejilla del primer día
+
+**Estado:** 🟡 abierta, aceptada (H4) · Sólo con un consultorio de otra zona;
+los turnos del segundo día no salen. El correo desde «Por confirmar» es el de
+confirmación de G3 (uno por hora de inicio), no un «recordatorio manual».
+
+### AG-DT-87 — El invitado al que le reasignan una cita de mañana no ve el cambio en «Por confirmar»
+
+**Estado:** 🟡 abierta, límite del canal (H4) · La RLS no le manda el cambio por
+Realtime; la fila se queda hasta la siguiente recarga del panel.
+
+### AG-DT-88 — Por PostgREST, una atendida SIN nota se sigue moviendo con la v2
+
+**Estado:** 🟡 abierta (H5; resto de AG-DT-61) · `vetoPorEstado` es de la API.
+Cerrarlo es ensanchar la condición de `cita_proteger_atendida` a toda atendida
+con la v2 encendida, sin `cita_tiene_nota_ligada`.
+
+### AG-DT-89 — Con el reloj del navegador ~19 h adelantado, `/agenda` manda a `/inicio`
+
+**Estado:** 🟡 abierta, sin investigar (visto en H5 al simular en Playwright) ·
+Probablemente la sesión local se da por caducada. Un equipo con la hora mal
+puesta podría verlo. No es de la tanda.
+
+### AG-DT-90 — El `PUT` de una cita no traduce un 42501 a 409
+
+**Estado:** 🟡 abierta, anterior (H5) · Si el disparador de H5 saltara en una
+carrera entre la comprobación de la API y su UPDATE, saldría un 500 con el texto
+de Postgres (falla cerrado; el `DELETE` sí lo traduce).
+
+### AG-DT-91 — `cita_tiene_nota_ligada` con `auth.uid()` nulo no filtra por clínica
+
+**Estado:** 🟡 abierta, aceptada (H5) · Es para `service_role`. Un JWT
+«authenticated» sin `sub` exigiría el secreto de firma.
+
+### AG-DT-92 — «Hoy» desde otra semana podría ir al fondo antes de que llegue Google
+
+**Estado:** 🟡 sospecha sin confirmar (revisor de H5) · Con el rango en caché,
+`listaFuentesCompletasRef` podría leerse en `true` antes de que React confirme
+el `cargando` nuevo. Peor caso: la lista de Semana del teléfono baja al fondo y
+Google llega después; no es un tirón.
+
+### AG-DT-93 — El resumen del panel de Día se repinta al mover una cita sin cambiar los huecos de 60
+
+**Estado:** 🟡 abierta, aceptada (integración de la tanda H, revisor) ·
+`firmaDelResumen` firma ahora `tramosLibres` (todo tramo libre), porque con la
+duración de la consulta un tramo de menos de 60 min también es hueco. Con la v2
+apagada, mover una cita sin cambiar la ocupación ni ningún hueco de 60 vuelve a
+pintar el panel lateral una vez. Barato (A1-bis igual que la base, §9).
 
 ---
 

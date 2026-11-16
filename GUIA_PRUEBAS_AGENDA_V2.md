@@ -2,8 +2,8 @@
 
 Para Angel. Sirve para probar a mano, en tu computadora y con datos inventados,
 todo lo que se hizo en la mejora de la agenda: bloques A, B, C, D, D11, E y F,
-la tanda tras tus primeras pruebas a mano (§8-bis) y la tanda de diseño,
-duración y horarios (§8-ter).
+la tanda tras tus primeras pruebas a mano (§8-bis), la tanda de diseño,
+duración y horarios (§8-ter) y la tanda H (§8-quater).
 No hace falta leer código. Todo pasa en tu máquina: la base de datos, los
 correos (que no salen a internet) y un Google de mentira. Nada toca producción.
 
@@ -92,6 +92,39 @@ orden:
 12. **X1, X2 y X5** (v2 apagada): todo como antes, el engrane abre «Horario de
     consulta» y las páginas públicas no existen.
 
+**Al día con la tanda H (2026-11-15).** Tus 23 puntos están hechos (§8-quater).
+Ya decidiste uno: AG-DT-63 se queda como está (el aviso a la secretaria de que
+una cita atendida tiene nota). La base pasa a **32 migraciones**. Quedan TRES
+decisiones tuyas (§6-bis de `mejora_agendaV2.md`, «Tanda H»): si mover una
+atendida con nota se cierra también con la v2 apagada (H5-1); si el enlace de un
+solo uso debe atender a quien no tiene correo, que hoy no puede (H1-5); y cómo
+queda el horario de cada consultorio tras «Restablecer» (H2-7).
+
+**Qué repetir tras la tanda H (2026-11-15).** Antes de nada, P5 a P8 (la base
+pasa a **32** migraciones; el recordatorio viene apagado). Después, en este
+orden:
+
+1. Las nuevas de §8-quater: H1-1 a H1-5, H2-1 a H2-8, H3-1 a H3-4, H4-1 a
+   H4-7 y H5-2. **H5-1 al final** (usa la nota real de G3-7 y obliga a P5).
+2. **D1, D3 y D4** (reservar por enlace): el paso 1 se llama «Lugar» y la
+   página siempre empieza ahí; «Volver» abajo en cada paso; el único también
+   pide correo. Y **G1-1, G1-2, G1-5, G1-6, G1-7 y G1-8**: «Lugar», volver sin
+   perder lo escrito y todo en claro aunque el teléfono esté en oscuro.
+3. **B1, B2, B3, G2-1, G2-5, G2-6, T2-1, T2-2, T2-7 y T3-6** (configuración):
+   ahora va en pestañas, con las fichas de los invitados plegadas y la casilla
+   de la tarjeta en «Este dispositivo».
+4. **E8, E9 y X6** (recordatorio): enciende antes el recordatorio; apagado no
+   sale ninguno.
+5. **E11, E5 y G5** («Por confirmar»): leyenda arriba, cada fila con lo que se
+   puede mandar o «Marcar como confirmada», y el contador rojo de siempre.
+6. **A10, F21 y G4-4** (huecos de Día): con duración de la consulta, el hueco
+   es una fila de turnos y la burbuja propone esa duración.
+7. **T1-3, T3-2, D11 y F21** (registro rápido): con teléfono, la leyenda y sin
+   cerrarse con doble clic; «+ Añadir observaciones» en la burbuja.
+8. **F12** (la lista de Semana del teléfono): el domingo abre al final.
+9. **G3-6, G3-7 y SEG-A3** (atendida con nota): mismo resultado en pantalla.
+10. **X1** (v2 apagada): nada de lo de arriba se ve.
+
 **Cómo leer los comandos.** Cada recuadro gris es un comando. Cópialo entero,
 pégalo en la terminal de Ubuntu y pulsa Enter. Debajo de cada uno se dice qué
 hace y qué debe responder. Están pensados para la terminal normal de Ubuntu
@@ -122,6 +155,7 @@ cd ~/proyectos/app_ortointegra-agenda
 8. Bloque F — Interfaz, movimiento y orden visual
 8-bis. Tanda tras tus primeras pruebas a mano (2026-11-13)
 8-ter. Tanda de diseño, duración y horarios (2026-11-14)
+8-quater. Tanda H (2026-11-15)
 9. Seguridad
 10. Con el interruptor APAGADO
 11. Lista de casillas
@@ -268,9 +302,9 @@ Comprueba cuántas migraciones quedaron:
 docker exec supabase_db_app_ortointegra psql -U postgres -Atc "select count(*), max(version) from supabase_migrations.schema_migrations"
 ```
 
-Debe responder `29|20261119140000`: las 5 de `main` más las 24 de la agenda
-(las 16 de los bloques A a F, las 4 de las correcciones de seguridad y las 4 de
-la tanda de diseño, duración y horarios).
+Debe responder `32|20261120130000`: las 5 de `main` más las 27 de la agenda
+(las 16 de los bloques A a F, las 4 de las correcciones de seguridad, las 4 de
+la tanda de diseño, duración y horarios y las 3 de la tanda H).
 
 > Este reinicio deja fuera las tres migraciones `20261014…` de la otra rama
 > (`feature/limites-ajustables`). Para probar la agenda no hacen falta. Si
@@ -636,6 +670,8 @@ médicos» sigue filtrando (era un defecto viejo que se arregló).
 
 ### A10. Las tres vistas
 
+> **Cambió el 2026-11-15 (tanda H):** con la v2 y una duración de la consulta clara, el hueco del panel de Día es una fila de turnos: se pulsa un turno, no el tramo, y la burbuja propone la duración de la consulta (H4-6, H4-7). Apagada, igual que antes.
+
 **Qué hago:** pulso «Mes», «Día» y «Semana». En «Día» voy al miércoles con ‹ ›.
 
 **Qué debo ver:** la agenda abre en «Semana». En «Día» hay un panel a la derecha
@@ -737,6 +773,8 @@ Entra como **Dr. Admin**.
 
 ### B1. La pantalla de configuración
 
+> **Cambió el 2026-11-15 (tanda H):** la pantalla va en **pestañas** (Primeros pasos, Horario y disponibilidad, Duración y tipos de cita, Enlaces de reserva, Plazos y recordatorios, Contactos bloqueados, Este dispositivo y, para el administrador, Restablecer): ya no hay grupos con rótulo; sólo se ve la sección de la pestaña elegida (H2-1). Los botones llevan borde y fondo sin pasar el ratón (H2-3).
+
 **Qué hago:** pulso el engrane de la barra de la agenda (sólo el dibujo, sin
 texto; al pasar el ratón dice «Configuración de la agenda»).
 
@@ -755,6 +793,8 @@ empezar» (T2-1). Debajo, cuatro grupos con su rótulo:
 modal viejo «Horario de consulta») o la pantalla nueva no carga.
 
 ### B2. Los cuatro ajustes de la clínica
+
+> **Cambió el 2026-11-15 (tanda H):** abre antes la pestaña «Plazos y recordatorios». Arriba está el interruptor «Recordatorio automático por correo», APAGADO de fábrica, y debajo de cada ajuste una línea que explica qué hace (H2-4).
 
 **Qué hago:** en «Plazos y recordatorios» cambio «Recordatorio por
 correo» a 12 y «Anticipación mínima para reservar por enlace» a 14. Pulso
@@ -783,6 +823,8 @@ fábrica: **24, 2, 60 y 7**, y guardo.
 valores fuera de rango (debe rechazarlos aunque la pantalla se equivoque).
 
 ### B3. Sólo el administrador cambia la configuración
+
+> **Cambió el 2026-11-15 (tanda H):** además, la Dra. Invitada y la secretaria ven el interruptor del recordatorio deshabilitado y no tienen la pestaña «Restablecer» (H2-5, H2-8).
 
 **Qué hago:** entro como **secretaria** y abro el engrane. Luego como **Dra.
 Invitada**.
@@ -1235,6 +1277,8 @@ enlaces.», falta `RESERVA_SECRETO` en `.env.local`.
 
 ### D1. Reservar con el enlace fijo, eligiendo consultorio
 
+> **Cambió el 2026-11-15 (tanda H):** los pasos se llaman **«Lugar»**, «Día y hora», «Tus datos» y «Listo»; la página siempre empieza en «Lugar»; «Volver» es un botón con borde abajo, junto al botón azul, en cada paso después del primero, y al volver no se pierde nada salvo la casilla del aviso (H1-1). Las páginas y los correos van siempre en claro (H1-3).
+
 > **Cambió el 2026-11-14:** la página va por pasos («Qué y dónde», «Día y hora», «Tus datos», «Listo»): el consultorio es una tarjeta con su dirección (no un desplegable), «Tipo de cita» sólo sale con más de un tipo válido en ESE consultorio (G1-3), los horarios van por día en «Mañana» y «Tarde», y tras elegir hora hay que pulsar «Continuar». Los textos de los botones son los mismos (G1-1 a G1-5).
 
 **Qué hago:** abro el enlace en una ventana de **incógnito** (soy el paciente).
@@ -1286,6 +1330,8 @@ distingue en la agenda.
 
 ### D3. Enlace de un solo uso
 
+> **Cambió el 2026-11-15 (tanda H):** el enlace de un solo uso no pide código, pero **sí pide correo**: sin él no se puede reservar (H1-5).
+
 **Qué hago:** como Dr. Admin, en «Enlaces de reserva», escribo en «Etiqueta
 (opcional)» «Para Beto» y pulso «Emitir enlace de un solo uso». Copio la
 dirección. En incógnito nueva reservo con «Beto Reserva Dos», 5512345602,
@@ -1300,6 +1346,8 @@ no está disponible» con «Para agendar, comunícate con el consultorio:
 **Si falla, significa que…** un enlace de un solo uso sirve dos veces.
 
 ### D4. El código del correo
+
+> **Cambió el 2026-11-15 (tanda H):** en «Revisa tu correo» hay «Volver» (H1-1).
 
 **Qué hago:** con el enlace fijo, en incógnito nueva, llego al paso del código
 con `caro3@prueba.test`. Escribo un código equivocado. Luego cinco
@@ -1415,6 +1463,8 @@ secretaria no ve ese botón; sólo el médico de la cita.
 **Si falla, significa que…** no se puede convertir la reserva en consulta.
 
 ### D11. Ligar creando un paciente nuevo
+
+> **Cambió el 2026-11-15 (tanda H):** el registro rápido trae «Teléfono celular o WhatsApp», vacío: no se precarga el teléfono de quien reservó (H3-3).
 
 **Qué hago:** en otra cita «Por ligar» → «Editar» → «Iniciar consulta» →
 «Registrar paciente nuevo». Intento «Crear y continuar» sin marcar el aviso.
@@ -1660,6 +1710,8 @@ bloqueados».
 
 ### E8. El recordatorio por correo
 
+> **Cambió el 2026-11-15 (tanda H):** el recordatorio viene **APAGADO de fábrica**: antes de disparar la tarea, enciéndelo (H2-5). Apagado no sale ninguno (H2-6).
+
 > **Cambió el 2026-11-14:** el correo empieza con la franja «Spinus», se titula «Recordatorio de tu cita» y trae dos botones; «No podré asistir» abre directo el «¿Seguro?» (G1-7). El correo de confirmación que se manda desde la agenda (G3-1) es otro: se titula «Confirma tu cita» y no quita este recordatorio.
 
 **Qué hago:**
@@ -1698,6 +1750,8 @@ tarea se puede disparar sin la clave.
 
 ### E9. Cuándo NO sale el recordatorio
 
+> **Cambió el 2026-11-15 (tanda H):** añade un caso: con el interruptor del recordatorio apagado (H2-6), tampoco sale.
+
 **Qué hago:** agendo (personal) una cita de «Paciente Prueba 06» para dentro
 de 30 horas, otra de «Paciente Prueba 07» dentro de 5 horas y la cancelo, y un
 evento sin paciente dentro de 4 horas. Corro la tarea (E8, paso 2). Luego bajo
@@ -1732,6 +1786,8 @@ día, que ya pasó o sin teléfono (T1-6); y si aun así falla, dice el motivo
 mandar.
 
 ### E11. WhatsApp desde «Por confirmar»
+
+> **Cambió el 2026-11-15 (tanda H):** «Sin teléfono» ya no existe. Arriba sale «Estos pacientes están pendientes de confirmar su cita. Envía un recordatorio.» y cada fila dice hora y consultorio y ofrece lo que se puede mandar: «WhatsApp», «Correo», o «Marcar como confirmada» si no hay ninguno (H4-1 a H4-3). La lista se actualiza sola (H4-4).
 
 **Qué hago:** en escritorio pulso «Por confirmar (N)».
 
@@ -1901,6 +1957,8 @@ un defecto, el desajuste era de 1 píxel.)
 
 ### F12. La lista de Semana del teléfono abre en hoy
 
+> **Cambió el 2026-11-15 (tanda H):** si ya no quedan citas de hoy en adelante esa semana (el domingo, por ejemplo), la lista abre **al final**, no en el lunes (H5-2).
+
 **Qué hago:** a 390×844, pestaña «Semana».
 
 **Qué debo ver:** arriba queda el día de hoy (o el siguiente día con citas), no
@@ -2006,6 +2064,8 @@ Todo sigue funcionando.
 viendo movimiento.
 
 ### F21. La burbuja de alta rápida (v2)
+
+> **Cambió el 2026-11-15 (tanda H):** (1) un hueco del panel de Día con duración clara es una fila de turnos y la burbuja propone la duración de la consulta (H4-6); (2) entre el horario y los botones aparece «+ Añadir observaciones» (H3-4); (3) «Registrar «…»» sale en verde y el registro rápido trae teléfono (H3-1, H3-3); (4) un doble clic en «Crear y continuar» ya no cierra la burbuja (H3-2).
 
 **Qué hago:** con la v2 encendida, como Dr. Admin, en Semana:
 1. Clic en un hueco libre del jueves a las 16:00.
@@ -2191,6 +2251,8 @@ en el campo. (`agenda-t1-busqueda`)
 
 ### T1-3. Registrar un paciente nuevo desde la burbuja
 
+> **Cambió el 2026-11-15 (tanda H):** el registro rápido trae «Teléfono celular o WhatsApp» y la leyenda «Sin teléfono ni correo no se podrán enviar confirmaciones ni recordatorios de cita.»; repítela también con doble clic en «Crear y continuar» (H3-2, H3-3).
+
 **Qué hago:** en la burbuja escribo un nombre que no exista («Zoila Prueba
 Nueva») y elijo «Registrar «Zoila Prueba Nueva»», al final de la lista. En la
 ventana «Registrar paciente» pulso «Crear y continuar» SIN marcar el aviso de
@@ -2269,6 +2331,8 @@ formulario completo, sí, como antes). (`agenda-t1-burbuja`)
 
 ### T2-1. «Para empezar» y lo que falta para el enlace
 
+> **Cambió el 2026-11-15 (tanda H):** la configuración va en pestañas; la ficha de la Dra. Invitada está plegada bajo «Enlaces de los demás médicos» (H2-1, H2-2).
+
 > **Cambió el 2026-11-14:** ahora es «Primeros pasos», con barra y «N de 3 listos» (horario de cada consultorio, duración de la consulta, enlace), y ya no existe «Crear «Consulta», 30 min»: la duración se contesta con «¿Cuánto dura tu consulta?». Haz G2-1 y G2-2 en su lugar.
 
 **Qué hago:** recién sembrado, como **Dr. Admin**, abro el engrane.
@@ -2288,6 +2352,8 @@ tarjeta «Para empezar» desaparece. Recargo: sigue sin salir.
 abre sin decirlo, o la lista guía no se calcula de los datos.
 
 ### T2-2. La Dra. Invitada no puede crear el tipo — **te toca decidir**
+
+> **Cambió el 2026-11-15 (tanda H):** la ficha de la Dra. Invitada está plegada: pulsa antes «Enlaces de los demás médicos» (H2-2).
 
 > **Cambió el 2026-11-14:** **ya lo decidiste**: la invitada crea, cambia y archiva SUS tipos y su duración (G2-3, G2-9). Esta prueba ya no aplica.
 
@@ -2372,6 +2438,8 @@ consultorio.
 
 ### T2-7. La pantalla, ordenada (escritorio y teléfono, claro y oscuro)
 
+> **Cambió el 2026-11-15 (tanda H):** la pantalla va en pestañas: repítela recorriendo cada pestaña, en claro y oscuro (H2-1, H2-3).
+
 **Qué hago:** abro la configuración en la computadora y en el teléfono (§1.7),
 en claro y en oscuro.
 
@@ -2396,6 +2464,8 @@ formulario «Horario de consulta» (X2). (`agenda-configuracion`)
 **Si falla, significa que…** el botón no se enteró de que la v2 está encendida.
 
 ### T3-2. Convertir en cita un evento que creé en Google
+
+> **Cambió el 2026-11-15 (tanda H):** su registro rápido trae el teléfono (H3-3).
 
 **Qué hago:** con el Google simulado arrancado (C0), creo en él un evento
 «Junta con representante» para mañana a las 13:00 con la descripción «traer
@@ -2455,6 +2525,8 @@ quedaron como pediste.
 
 ### T3-6. Apagar la tarjeta al pasar el ratón
 
+> **Cambió el 2026-11-15 (tanda H):** la casilla está en la pestaña «Este dispositivo» (H2-1).
+
 **Qué hago:** en «Configuración del calendario» → «Preferencias de este
 dispositivo» → «Tarjeta de la cita», desmarco «Abrir la tarjeta al pasar el
 ratón». Vuelvo a la agenda y dejo el ratón quieto sobre una cita.
@@ -2506,6 +2578,8 @@ una prueba automática que hace lo mismo (entre paréntesis, su archivo en
 
 #### G1-1. La reserva por pasos, con la dirección siempre a la vista
 
+> **Cambió el 2026-11-15 (tanda H):** la primera rayita dice **«Lugar»**, no «Qué y dónde» (H1).
+
 **Qué hago:** como Dr. Admin, en la configuración contesto «¿Cuánto dura tu
 consulta?» con 30 min y agrego un tipo «Primera vez» de 45 min; copio mi
 enlace fijo y lo abro en el teléfono (o en el navegador muy estrecho, §1.7).
@@ -2524,6 +2598,8 @@ dirección; sigue ahí en «Tus datos» y en la pantalla final.
 no sabe en qué paso va.
 
 #### G1-2. Un solo tipo de cita: el bloque no aparece
+
+> **Cambió el 2026-11-15 (tanda H):** con un solo consultorio la página **ya no empieza en «Día y hora»**: empieza en «Lugar» con él marcado y «Elegir día y hora» listo (H1-4).
 
 **Qué hago:** archivo «Primera vez» y vuelvo a abrir el enlace.
 
@@ -2569,6 +2645,8 @@ un día sin horario.
 
 #### G1-5. Estados de la reserva
 
+> **Cambió el 2026-11-15 (tanda H):** tras el aviso rojo del 409, al volver a «Tus datos» lo escrito sigue ahí (H1-2).
+
 **Qué hago:** (a) abro el enlace con la red muy lenta (§1.7, «Slow 3G»); (b)
 pruebo un enlace de un solo uso ya usado; (c) reservo el mismo horario desde
 dos pestañas.
@@ -2584,6 +2662,8 @@ un horario ocupado.
 
 #### G1-6. La página de confirmación con el mismo aspecto
 
+> **Cambió el 2026-11-15 (tanda H):** la confirmación sale en claro también con el teléfono en modo oscuro (H1-3).
+
 **Qué hago:** abro el enlace de confirmación de un comprobante.
 
 **Qué debo ver:** la misma banda azul con el logo y mi nombre (sin
@@ -2598,6 +2678,8 @@ verde; tras cancelar, uno rojo y «Elegir otro horario». (`reserva-g1-diseno`)
 consultorio, o cancela sin querer.
 
 #### G1-7. Los correos con la marca
+
+> **Cambió el 2026-11-15 (tanda H):** los correos piden ir en claro (H1-3); Gmail y Outlook del teléfono pueden oscurecerlos por su cuenta.
 
 **Qué hago:** en Mailpit (§1.5) abro el código, el comprobante, un
 recordatorio y una confirmación (G3-1), en ancho de teléfono y con las
@@ -2618,6 +2700,8 @@ teléfono, o la confirmación de días antes habla de un recordatorio.
 
 #### G1-8. Modo oscuro y movimiento reducido
 
+> **Cambió el 2026-11-15 (tanda H):** con el teléfono en modo oscuro, la reserva y la confirmación se ven **en claro** (H1-3); el movimiento reducido no cambia.
+
 **Qué hago:** pongo el teléfono en modo oscuro y abro el enlace; luego activo
 «Reducir movimiento».
 
@@ -2631,6 +2715,8 @@ pidió menos movimiento.
 ### G2 · Duración de la consulta, turnos y configuración
 
 #### G2-1. Primeros pasos en orden, con avance
+
+> **Cambió el 2026-11-15 (tanda H):** la configuración va en pestañas: al abrir está elegida «Primeros pasos · 2 pendientes» (H2-1).
 
 **Qué hago:** recién sembrado, entro como Dr. Admin y abro «Configuración de
 la agenda».
@@ -2681,6 +2767,8 @@ en otro sitio.
 
 #### G2-5. Cada enlace dice si funciona
 
+> **Cambió el 2026-11-15 (tanda H):** la ficha de la Dra. Invitada está plegada: pulsa antes «Enlaces de los demás médicos (1)» (H2-2).
+
 **Qué hago:** como Dr. Admin, creo un enlace fijo para la Dra. Invitada cuando
 ella aún no tiene duración.
 
@@ -2691,6 +2779,8 @@ duración de la consulta del médico.» y «Completar»; al pulsarlo, la pregunt
 **Si falla, significa que…** la clínica no se entera de que un enlace no abre.
 
 #### G2-6. Turnos de 45 minutos desde la apertura
+
+> **Cambió el 2026-11-15 (tanda H):** la ficha de la Dra. Invitada está plegada: pulsa antes «Enlaces de los demás médicos (1)» (H2-2).
 
 **Qué hago:** con duración de 45 min y el consultorio de 9:00 a 13:00, abro el
 enlace de reserva en un día libre.
@@ -2926,6 +3016,8 @@ Norte (blanco 08–12 y 15–19). (`agenda-g4-rejilla-consultorios`)
 
 #### G4-4. El consultorio activo manda en el gris, los huecos y la hora de apertura
 
+> **Cambió el 2026-11-15 (tanda H):** si el Dr. Admin tiene su duración de la consulta puesta, el hueco «15:00 – 19:00» sale partido en turnos (H4-6); el tramo es el mismo.
+
 **Qué hago:** como Dr. Admin elijo «Hospital Norte» como consultorio activo en
 el menú lateral. Abro la agenda; luego paso a Día en un lunes sin citas.
 
@@ -2964,6 +3056,414 @@ la clínica» y el engrane abre «Horario de consulta». (`agenda-vistas`,
 `agenda-configuracion-guiada`)
 
 **Si falla, significa que…** lo nuevo se coló sin el interruptor.
+
+---
+
+## 8-quater. Tanda H (2026-11-15)
+
+Lo que se hizo con tus 23 puntos del 2026-11-15, en cinco grupos: **H1** la
+reserva por enlace y la confirmación (volver en cada paso, siempre en claro, el
+paso «Lugar», y el correo); **H2** la configuración en pestañas, los botones,
+el recordatorio apagado de fábrica y «Restablecer»; **H3** la burbuja de alta
+(«Registrar» en verde, ya no se cierra tras registrar, teléfono y
+observaciones); **H4** «Por confirmar» en vivo y los huecos de Día en turnos;
+**H5** una atendida con nota protegida también en la base, y la lista de Semana
+del teléfono el domingo. Tu punto 21 ya está: AG-DT-63 se queda como está.
+Todo detrás del interruptor de la v2, salvo H5-1 (también con la v2 apagada).
+
+**Antes de empezar:** base con las **32** migraciones (P5), sembrada (P6),
+aviso aprobado (P7), v2 encendida en la Clínica A (P8), la app del 3000 (P11).
+Cada prueba se comprobó con una prueba automática que hace lo mismo (entre
+paréntesis o en `e2e/agenda-h*` y `e2e/reserva-h1`), recorrida sobre la
+integración.
+
+### H1 · La reserva por enlace y la confirmación
+
+#### H1-1. «Volver» en cada paso, sin perder nada
+
+**Qué hago:** abro el enlace fijo del Dr. Admin en incógnito, en el teléfono. Elijo «Consultorio
+Centro (ficticio)» y «Elegir día y hora». Pulso «Volver». Vuelvo a «Elegir día y hora», elijo una
+hora y «Continuar». Escribo nombre, teléfono y correo, y pulso «Volver». «Continuar» otra vez. Marco
+la casilla, «Enviar código a mi correo», y en «Revisa tu correo» pulso «Volver».
+
+**Qué debo ver:** en «Lugar» no hay «Volver». En «Día y hora», «Tus datos» y «Revisa tu correo» hay un
+botón «Volver» con borde, abajo a la izquierda junto al botón azul, siempre a la vista. Cada vez que
+vuelvo, lo que había elegido sigue igual: el consultorio, el tipo, el día y la hora marcados, y mi
+nombre, teléfono y correo escritos. La casilla del aviso vuelve sin marcar (hay que aceptarlo otra
+vez).
+
+**Si falla, significa que…** el paciente tiene que volver a escribir todo por equivocarse de hora, o
+no encuentra cómo regresar.
+
+#### H1-2. Al volver, el horario ya lo tomó otro
+
+**Qué hago:** en una pestaña llego a «Tus datos» con una hora elegida y escribo mis datos. En otra
+pestaña (otro enlace de un solo uso) reservo esa misma hora. En la primera pulso «Volver».
+
+**Qué debo ver:** arriba, en rojo, «Ese horario ya no está disponible. Elige otro.»; la hora ya no
+sale en la lista y «Continuar» está gris. Elijo otra hora, «Continuar», y mis datos siguen escritos.
+
+**Si falla, significa que…** el paciente llega a enviar un horario que ya no existe, o pierde lo que
+escribió.
+
+#### H1-3. Siempre en claro
+
+**Qué hago:** pongo el teléfono (o la computadora) en modo oscuro y abro mi enlace de reserva y el
+enlace de confirmación de un comprobante. Luego, ya dentro de Spinus con el modo oscuro de la app
+encendido, abro mi enlace desde «Configuración de la agenda» en la misma pestaña. Abro el comprobante
+en Mailpit con el sistema en oscuro.
+
+**Qué debo ver:** las páginas de reserva y de confirmación, y el correo, siempre en claro: fondo gris
+muy claro, tarjeta blanca, letras oscuras, la banda azul oscuro arriba. Los campos del formulario,
+blancos. (En Gmail del teléfono en modo oscuro el correo puede verse oscurecido: eso lo hace Gmail.)
+
+**Si falla, significa que…** el paciente ve la página distinta según su teléfono o según cómo dejó el
+médico su app.
+
+#### H1-4. «Lugar» con un solo consultorio
+
+**Qué hago:** como Dra. Invitada (un solo consultorio, «Rehabilitación (ficticio)»), con un solo tipo
+de cita, copio mi enlace y lo abro en incógnito. Sigo hasta «Listo».
+
+**Qué debo ver:** la primera rayita dice «Lugar» y la página empieza ahí (no salta a «Día y hora»): la
+tarjeta «Rehabilitación (ficticio)» con «Calle Ficticia 3, Mérida», ya marcada, sin bloque «Tipo de
+cita», y «Elegir día y hora» listo. En «Día y hora», «Tus datos» y «Listo», el consultorio y su
+dirección siguen en el resumen.
+
+**Si falla, significa que…** el paciente no ve a dónde va antes de elegir la hora.
+
+#### H1-5. El correo sigue siendo obligatorio
+
+**Qué hago:** con el enlace fijo intento reservar sin correo; luego emito un enlace de un solo uso
+(«Para Beto») e intento lo mismo.
+
+**Qué debo ver:** en los dos, el campo «Correo electrónico» es obligatorio: sin él no se puede
+enviar. El fijo manda un código al correo; el de un solo uso reserva directo («Reservar cita») pero
+**también pide un correo**.
+
+**Si falla, significa que…** se puede reservar por el enlace fijo sin verificar el correo (reservas
+falsas).
+
+### H2 · La configuración de la agenda
+
+#### H2-1. La configuración abre en «Primeros pasos» y va por pestañas
+
+**Qué hago:** recién sembrado, entro como Dr. Admin y abro el engrane «Configuración de la agenda». Pulso las pestañas
+de la izquierda una por una; con el teclado, me pongo en una pestaña y uso las flechas, Inicio y Fin.
+
+**Qué debo ver:** a la izquierda (en el teléfono, arriba, en una fila que se desliza de lado) las pestañas «Primeros
+pasos · 2 pendientes», «Horario y disponibilidad», «Duración y tipos de cita», «Enlaces de reserva», «Plazos y
+recordatorios», «Contactos bloqueados», «Este dispositivo» y «Restablecer». Abre en «Primeros pasos» y sólo se ve esa
+sección; al pulsar otra, sólo se ve la otra. Las flechas pasan de una a otra; Inicio y Fin, a la primera y la última.
+«Revisar» o «Abrir horario» dentro de un paso me llevan a la pestaña de horario. Cuando ya no falta nada, la pestaña
+«Primeros pasos» desaparece y la pantalla abre en «Horario y disponibilidad».
+
+**Si falla, significa que…** las pestañas no cambian de sección, abren en la equivocada o no se manejan con el teclado.
+
+#### H2-2. Los enlaces de los médicos invitados, plegados
+
+**Qué hago:** como Dr. Admin, pestaña «Enlaces de reserva». Pulso «Enlaces de los demás médicos (1)». Después entro como
+secretaria y abro la misma pestaña.
+
+**Qué debo ver:** primero «Dr. Admin Semilla Uno (tú)» con su enlace; debajo, cerrado, «Enlaces de los demás médicos
+(1)». Al pulsarlo aparece la ficha de la Dra. Invitada Semilla Dos. La secretaria ve abierta la del Dr. Admin y
+plegada la de la Dra. Invitada. La Dra. Invitada ve sólo la suya, sin apartado plegado.
+
+**Si falla, significa que…** las fichas de los invitados vuelven a salir todas abiertas, o la del administrador no va
+primero.
+
+#### H2-3. Los botones se ven como botones sin pasar el ratón
+
+**Qué hago:** recorro todas las pestañas sin pasar el ratón por encima, en modo claro y en modo oscuro, como Dr. Admin
+y como Dra. Invitada.
+
+**Qué debo ver:** cada botón («Revisar», «Usar horario propio», «Editar», «Archivar», «Mostrar enlace», «Revocar»,
+«Copiar», «Desbloquear», «30 min / 45 min / 1 hora / Otra», «Ver qué falta», «Enlaces de los demás médicos»…) tiene
+borde y fondo propios, distintos de la tarjeta, también en claro. Los enlaces dentro de una frase («Mi perfil») siguen
+subrayados.
+
+**Si falla, significa que…** algún botón vuelve a verse como texto suelto hasta pasar el ratón.
+
+#### H2-4. «Plazos y recordatorios» explica cada ajuste
+
+**Qué hago:** pestaña «Plazos y recordatorios».
+
+**Qué debo ver:** arriba el interruptor «Recordatorio automático por correo», APAGADO, con «Si lo enciendes, se
+enviará un correo a cada paciente con correo registrado, 24 horas antes de su cita. Apagado (como viene de fábrica),
+no se envía ninguno.» y «No cambia los demás correos: el código y el comprobante de la reserva por enlace, y la
+confirmación que se manda con su botón, salen siempre.». Debajo de cada ajuste, una línea: el recordatorio («El
+recordatorio es un correo que Spinus manda al paciente antes de su cita; aquí eliges cuántas horas antes.»), la
+anticipación, hasta cuándo se puede reservar y la vigencia del enlace de un solo uso.
+
+**Si falla, significa que…** falta la explicación de algún ajuste o el interruptor no está.
+
+#### H2-5. Encender el recordatorio
+
+**Qué hago:** como Dr. Admin pulso el interruptor. Recargo. Después entro como Dra. Invitada y como secretaria.
+
+**Qué debo ver:** aviso «Recordatorio automático encendido» y el interruptor encendido también tras recargar. La Dra.
+Invitada y la secretaria lo ven, pero deshabilitado.
+
+**Si falla, significa que…** no se guarda, o alguien que no administra la clínica lo puede cambiar.
+
+#### H2-6. Con el recordatorio apagado no sale ningún recordatorio; los demás correos sí
+
+**Qué hago:** con el interruptor APAGADO, repito E8 (cita de «Paciente Prueba 05» dentro de unas 3 horas y la tarea a
+mano). Luego reservo con un enlace (D) y, desde la tarjeta de una cita, mando «Enviar confirmación» (G3-1). Por último
+enciendo el interruptor y vuelvo a correr la tarea.
+
+**Qué debo ver:** apagado, la tarea responde `{"ok":true}` y en Mailpit NO llega «Recordatorio: tu cita del…»; el
+código de la reserva, el comprobante y «Confirma tu cita» sí llegan. Encendido, llega el recordatorio.
+
+**Si falla, significa que…** la tarea manda recordatorios a una clínica que no los encendió, o el interruptor apagó
+también los otros correos.
+
+#### H2-7. Restablecer la configuración
+
+**Qué hago:** como Dr. Admin, con la duración de la consulta contestada, un enlace fijo y el recordatorio encendido,
+pestaña «Restablecer» → «Restablecer configuración de la agenda». En el diálogo escribo «restablecer» en minúsculas;
+luego «RESTABLECER» y pulso «Restablecer». Después miro la agenda.
+
+**Qué debo ver:** el diálogo dice qué se restablece, en rojo «Los enlaces que ya compartiste con pacientes dejarán de
+funcionar.» y «Las citas, sus pacientes, la auditoría y los contactos bloqueados no se tocan.»; el botón sólo se activa
+con «RESTABLECER» exacto. Al confirmar: aviso «Configuración de la agenda restablecida», la pantalla vuelve a
+«Primeros pasos · 2 pendientes» con «1 de 3 listos» (la duración y el enlace pendientes; el horario, hecho); en «Plazos y
+recordatorios», 24/2/60/7 y el recordatorio apagado; en «Enlaces de reserva», sin enlaces (el que tenías ya no abre:
+«Este enlace ya no está disponible»); en «Duración y tipos de cita», los tipos archivados. Las citas de la agenda
+siguen todas igual. En «Horario y disponibilidad», cada consultorio dice «Horario propio» con el horario de la clínica
+(lunes a viernes de 08:00 a 18:00 y sábado de 08:00 a 13:00 en la semilla): es el horario con el que arranca todo
+consultorio en la agenda nueva, copiado a cada uno. La agenda pinta ese horario, no todo gris. *(Cómo queda el horario
+tras restablecer es una decisión tuya pendiente: §6-bis de `mejora_agendaV2.md`, «Integración de la tanda H».)*
+
+**Si falla, significa que…** el reinicio no deja la configuración de fábrica, toca citas, o se puede hacer sin escribir
+la palabra.
+
+#### H2-8. Sólo el administrador restablece
+
+**Qué hago:** entro como Dra. Invitada y como secretaria.
+
+**Qué debo ver:** no tienen la pestaña «Restablecer».
+
+**Si falla, significa que…** alguien que no administra la clínica podría borrar su configuración.
+
+### H3 · La burbuja de alta
+
+#### H3-1. «Registrar» en verde
+
+**Qué hago:** Clínica Semilla A, v2 encendida, Semana. Clic en una franja vacía; en la burbuja
+escribo «Zoila Prueba Verde». Repito en modo oscuro.
+
+**Qué debo ver:** al final de la lista, «Registrar «Zoila Prueba Verde»» y «Crear paciente
+nuevo y continuar» en verde (no en gris ni azul); al bajar a ella con la flecha, el fondo se
+pone verde claro y el texto se sigue leyendo bien. En oscuro, verde claro sobre azul oscuro.
+(`agenda-h3-burbuja`)
+
+**Si falla, significa que…** el estilo de la opción no cargó.
+
+#### H3-2. La burbuja sigue abierta tras registrar, aunque haga doble clic
+
+**Qué hago:** clic en el miércoles a las 14:30; escribo «Zoila Doble Clic» y elijo «Registrar…».
+Marco el aviso de privacidad y hago DOBLE CLIC en «Crear y continuar».
+
+**Qué debo ver:** la ventana se cierra y la MISMA burbuja sigue abierta, con «Nueva cita · mié …,
+14:30–…», «Zoila Doble Clic» elegida y el cursor en «Guardar». No aparece otra burbuja a otra
+hora. Repito con «Registrar…» y doble clic en «Cancelar»: la burbuja sigue, con lo que escribí
+y el cursor en el campo de paciente. (`agenda-h3-burbuja`)
+
+**Si falla, significa que…** el segundo clic se coló a la rejilla. Si se cierra con UN solo
+clic, avísame: es otra causa.
+
+#### H3-3. Teléfono en el registro rápido
+
+**Qué hago:** desde la burbuja, «Registrar «Zoila Con Teléfono»». Escribo «99912» en «Teléfono
+celular o WhatsApp», marco el aviso y pulso «Crear y continuar»; luego lo corrijo a 9991234567.
+
+**Qué debo ver:** debajo del correo y el teléfono, «Sin teléfono ni correo no se podrán enviar
+confirmaciones ni recordatorios de cita.». Con «99912», «El teléfono debe tener 10 dígitos» y no
+se crea. Al teclear 9991234567 se ve «999 123 4567»; se crea y en su ficha (Pacientes) aparece
+ese teléfono. Sin teléfono ni correo también se crea. Con la v2 apagada (Clínica Semilla B), el
+registro rápido desde «Agendar» NO tiene teléfono ni leyenda; tampoco el de Documentos.
+(`agenda-h3-burbuja`)
+
+**Si falla, significa que…** el teléfono no se manda o el interruptor no lo esconde.
+
+#### H3-4. Observaciones en la burbuja
+
+**Qué hago:** clic en una franja vacía; elijo «Paciente Prueba 21»; pulso «Añadir observaciones»
+y escribo «Trae estudios previos»; Guardar. En otra franja, escribo observaciones y pulso «Más
+opciones».
+
+**Qué debo ver:** al abrir la burbuja sólo se ve el enlace discreto «+ Añadir observaciones»; al
+pulsarlo, el campo con el cursor dentro. La cita guardada muestra la nota en su tarjeta
+(«Nota: Trae estudios previos»). Con «Más opciones», el formulario completo trae el texto en
+«Notas». Con Google conectado, el evento de Google NO lleva el texto. (`agenda-h3-burbuja`,
+`agenda-google-dos-sentidos`)
+
+**Si falla, significa que…** las observaciones no se guardan o (grave: avísame) viajan a Google.
+
+### H4 · «Por confirmar» y los huecos de Día
+
+#### H4-1. La lista de mañana y su leyenda
+
+**Qué hago:** como Dr. Admin, en escritorio, con la v2 encendida, pulso «Por
+confirmar (N)».
+
+**Qué debo ver:** arriba, «Estos pacientes están pendientes de confirmar su
+cita. Envía un recordatorio.». Debajo, sólo las citas agendadas de mañana (no
+las confirmadas): el nombre, la hora y el consultorio («09:00 · Consultorio
+Centro (ficticio)»). Si no hay ninguna, «No hay citas de mañana sin
+confirmar.» y sin leyenda.
+
+**Si falla, significa que…** la lista no enseña lo que pidió Angel o enseña
+citas que no tocan.
+
+#### H4-2. Los avisos según lo que tenga el paciente
+
+**Qué hago:** creo cuatro pacientes de prueba: uno con teléfono y correo, uno
+sólo con teléfono, uno sólo con correo y uno sin ninguno, y a cada uno una cita
+mañana. Abro «Por confirmar».
+
+**Qué debo ver:** el primero con «WhatsApp» y «Correo»; el segundo, sólo
+«WhatsApp»; el tercero, sólo «Correo»; el cuarto dice «Sin teléfono válido ni
+correo.» y ofrece «Marcar como confirmada». Pulso «Correo» del tercero: «Enviado
+por correo hh:mm» y el correo «Confirma tu cita del…» llega a Mailpit
+(127.0.0.1:54324), sin nada clínico.
+
+**Si falla, significa que…** la fila ofrece un aviso que no se puede mandar,
+o esconde uno que sí.
+
+#### H4-3. Marcar como confirmada a mano, sin cerrar el menú
+
+**Qué hago:** en el cuarto paciente de H4-2 pulso «Marcar como confirmada».
+
+**Qué debo ver:** la fila desaparece al momento y el menú sigue abierto; sale
+«Estado cambiado a «Confirmada»». Si busco la cita en la agenda, ya está
+confirmada, y en la auditoría hay un cambio de estado a mi nombre.
+
+**Si falla, significa que…** la confirmación a mano no pasa por el mismo
+camino que «Confirmar» de la tarjeta.
+
+#### H4-4. El paciente confirma o cancela y la fila sale sola
+
+**Qué hago:** con «Por confirmar» abierto, mando el WhatsApp a «Prueba 21»
+(si tiene cita mañana) y, en otra ventana sin sesión, abro el enlace que trae
+el mensaje y pulso «Confirmo mi asistencia». Con otra cita, abro su enlace y
+cancelo («Sí, cancelar mi cita»). Luego, desde la sesión de la secretaria,
+cancelo otra cita de mañana; y agendo una cita nueva para mañana.
+
+**Qué debo ver:** sin cerrar ni volver a abrir el menú: la confirmada y las
+canceladas desaparecen de la lista en uno o dos segundos; la cancelada por el
+paciente aparece en «Canceladas por el paciente (48 h)» y el botón lleva el
+contador rojo; la cita nueva aparece en la lista.
+
+**Si falla, significa que…** la lista no escucha el tiempo real de la agenda.
+
+#### H4-5. El punto rojo con pendientes
+
+**Qué hago:** abro la agenda con al menos una cita agendada para mañana y sin
+cancelaciones del paciente en las últimas 48 h. Luego confirmo todas las de
+mañana.
+
+**Qué debo ver:** junto a «Por confirmar (N)», un punto rojo pequeño sin número.
+Al no quedar ninguna, «Por confirmar (0)» sin punto. Con una cancelada por el
+paciente, el contador rojo con su número, como antes.
+
+**Si falla, significa que…** la alerta no avisa de los pendientes o se perdió
+la de las cancelaciones.
+
+#### H4-6. Los huecos de Día en turnos
+
+**Qué hago:** como la Dra. Invitada (un solo consultorio, «Rehabilitación»),
+pongo su duración de la consulta en 45 min (configuración, «Duración de la
+consulta») y el horario de Rehabilitación de 09:00 a 13:00. Agendo una cita de
+10:00 a 10:20 un día libre. Paso a «Día» en ese día.
+
+**Qué debo ver:** en «Huecos disponibles», dos huecos: «09:00 – 10:00» con un
+botón «09:00», y «10:20 – 13:00» con «10:30», «11:15» y «12:00». No hay
+«09:45» (la cita de 10:00 lo toca). Pulso «11:15»: se abre la burbuja «Nueva
+cita · …, 11:15–12:00» (los 45 min de la consulta, no una hora). Como Dr. Admin, con «Todos los médicos», la tarjeta de
+huecos no sale (como siempre); y sin duración de la consulta, los huecos son
+los de antes (un botón por tramo).
+
+**Si falla, significa que…** el panel no usa la rejilla del enlace de reserva.
+
+#### H4-7. Un hueco de menos de una hora también sale si cabe la consulta
+
+**Qué hago:** sigo con H4-6 (la Dra. Invitada con consulta de 45 min, la cita
+de 10:00 a 10:20) y agendo otra cita ese mismo día de 11:15 a 13:00. Vuelvo a
+«Día» en ese día.
+
+**Qué debo ver:** en «Huecos disponibles», «10:20 – 11:15» (55 min, menos de
+una hora) con un botón «10:30»; al pulsarlo, la burbuja «Nueva cita · …,
+10:30–11:15». Sin duración de la consulta (o con «Todos los médicos»), ese
+tramo de 55 min no sale, como antes: el mínimo es una hora. Un tramo de 45 min
+que no casa con los turnos (por ejemplo de 09:15 a 10:00, con turnos a las 9:00
+y 9:45) sale con «No cabe un turno entero en este hueco.» y sin botón.
+
+**Si falla, significa que…** el panel sigue pidiendo una hora libre aunque la
+consulta dure menos.
+
+### H5 · La atendida con nota y el domingo
+
+#### H5-1. Una atendida con nota no se mueve ni cambia de estado, ni saltándose la pantalla
+
+**Qué hago:** primero hago G3-7 (deja una cita atendida de «Paciente Prueba 05» con
+su nota). Con la v2 encendida (P8), entro a la base como la **secretaria** (ella no
+ve las notas, y aun así la base tiene que frenarla). Los comandos `entrar` y `pg` son los
+de S2 (§9.1): si abriste otra terminal, pégalos antes:
+
+```bash
+entrar secretaria.a@semilla.spinus.test
+```
+
+Debe decir «Sesión lista: secretaria.a@semilla.spinus.test». Busco esa cita (este
+comando sólo lee y guarda su código en `ID`):
+
+```bash
+ID=$(docker exec supabase_db_app_ortointegra psql -U postgres -Atc "select a.id from public.appointments a join public.consultas n on n.appointment_id = a.id join public.clinicas c on c.id = a.clinica_id where c.nombre = 'Clínica Semilla A' and a.status = 'attended' limit 1"); echo "$ID"
+```
+
+Imprime un código largo. Intento devolverla a «Agendada» por fuera de la pantalla:
+
+```bash
+pg "appointments?id=eq.$ID" -X PATCH -d '{"status":"scheduled"}'
+```
+
+Y luego moverla una hora (el mismo comando, con otra hora de inicio):
+
+```bash
+pg "appointments?id=eq.$ID" -X PATCH -d "{\"start_time\":\"$(docker exec supabase_db_app_ortointegra psql -U postgres -Atc "select to_char((start_time + interval '1 hour') at time zone 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') from public.appointments where id = '$ID'")\"}"
+```
+
+Por último, apago la v2 (P8 al revés) y repito el primero (`"status":"scheduled"`) y
+un borrado: `pg "appointments?id=eq.$ID" -X DELETE`.
+
+**Qué debo ver:** los dos primeros se **rechazan** con `HTTP 403` y este texto:
+
+```
+"message":"Una cita atendida con nota clínica no cambia de estado ni de fecha u hora"
+```
+
+Con la v2 apagada, el cambio de estado igual (`HTTP 403`) y el borrado con
+`"message":"Una cita atendida con nota clínica no se borra"`. Al final la cita
+sigue «Atendida», a su hora, y en la agenda. (Con la v2 apagada, moverla sí se
+puede, como en la pantalla.) Con una atendida SIN nota (marcada a mano), los
+cambios de estado pasan (`HTTP 200`).
+
+**Si falla, significa que…** alguien de la clínica puede desmarcar, mover o borrar
+una cita cuya nota ya es expediente, saltándose la pantalla.
+
+#### H5-2. El domingo, la lista de Semana abre al final y no en el lunes
+
+**Qué hago:** un domingo (o cualquier día en que ya no queden citas en lo que resta
+de la semana), a 390×844, pestaña «Semana».
+
+**Qué debo ver:** la lista abre **al final** (las citas del último día con citas, el
+sábado o el viernes), no en el lunes. Si la lista es corta y cabe entera, se ve
+completa.
+
+**Si falla, significa que…** el teléfono vuelve a abrir la semana por el lunes y hay
+que desplazar hasta el final.
 
 ---
 
@@ -3404,7 +3904,7 @@ sigue apagado.
 Marca cada una al pasarla. Si una falla, anota el número y qué viste.
 
 **Preparación**
-- [ ] P1–P11. Base reiniciada (29 migraciones), sembrada, aviso aprobado, app en el 3000
+- [ ] P1–P11. Base reiniciada (32 migraciones), sembrada, aviso aprobado, app en el 3000
 
 **Bloque A (v2 apagada)**
 - [ ] A1. Abrir la agenda
@@ -3578,6 +4078,34 @@ Marca cada una al pasarla. Si una falla, anota el número y qué viste.
 - [ ] G4-5. Consultorio en otra zona: gris y aviso en su hora
 - [ ] G4-6. Con la v2 apagada, todo como antes
 
+**Tanda H (§8-quater)**
+- [ ] H1-1. «Volver» en cada paso, sin perder nada
+- [ ] H1-2. Al volver, el horario ya lo tomó otro
+- [ ] H1-3. Siempre en claro
+- [ ] H1-4. «Lugar» con un solo consultorio
+- [ ] H1-5. El correo sigue siendo obligatorio
+- [ ] H2-1. La configuración en pestañas
+- [ ] H2-2. Los enlaces de los invitados, plegados
+- [ ] H2-3. Los botones se ven como botones
+- [ ] H2-4. «Plazos y recordatorios» explica cada ajuste
+- [ ] H2-5. Encender el recordatorio
+- [ ] H2-6. Recordatorio apagado: no sale; los demás correos sí
+- [ ] H2-7. Restablecer la configuración
+- [ ] H2-8. Sólo el administrador restablece
+- [ ] H3-1. «Registrar» en verde
+- [ ] H3-2. La burbuja sigue abierta tras registrar (doble clic)
+- [ ] H3-3. Teléfono en el registro rápido
+- [ ] H3-4. Observaciones en la burbuja
+- [ ] H4-1. La lista de mañana y su leyenda
+- [ ] H4-2. Los avisos según lo que tenga el paciente
+- [ ] H4-3. Marcar como confirmada a mano
+- [ ] H4-4. El paciente confirma o cancela y la fila sale sola
+- [ ] H4-5. El punto rojo con pendientes
+- [ ] H4-6. Los huecos de Día en turnos
+- [ ] H4-7. Un hueco de menos de una hora, si cabe la consulta
+- [ ] H5-1. Una atendida con nota no se mueve ni cambia de estado (al final; luego P5)
+- [ ] H5-2. El domingo, la lista de Semana abre al final
+
 **Seguridad**
 - [ ] S1. La Clínica B no ve la A
 - [ ] S2. Lo mismo, directo a la base
@@ -3648,9 +4176,9 @@ Marca cada una al pasarla. Si una falla, anota el número y qué viste.
    dos ramas**: cambiar la lista de funciones de la prueba
    `p1_permisos_funciones.sql` (su «caso 3»). Esa prueba tiene escrita a mano
    la lista de las funciones de la base que no pueden usar todos los roles; hoy
-   tiene 10 y, con la agenda, son **41** (las 10 de siempre y 31 de la agenda).
-   La lista completa, lista para pegar, está en
-   `supabase/AUDITORIA-CONJUNTO-AGENDA-V2.md`, §8.5. **No es un hueco de
+   tiene 10 y, con la agenda, son **44** (las 10 de siempre y 34 de la agenda;
+   la tanda H añadió 3). La lista completa, lista para pegar, está en
+   `supabase/AUDITORIA-CONJUNTO-AGENDA-V2.md`, §10.5. **No es un hueco de
    seguridad**: si no se cambia, esa prueba sale en rojo, nada más. Se probó
    en tu computadora con las dos ramas juntas: con la lista nueva, todas las
    pruebas pasan.
@@ -3701,8 +4229,11 @@ Marca cada una al pasarla. Si una falla, anota el número y qué viste.
 | 22 | `20261119121000_agenda_g2_tipos_cita_update.sql` | El médico cambia y archiva SUS tipos de cita y su duración, sin pasárselos a otro (G2-9) |
 | 23 | `20261119130000_agenda_g4_herencia_horario_consultorios.sql` | Cada consultorio sin horario propio copia UNA vez el horario de la clínica, con respaldo de lo de antes (G4-1). **Después de B5 (la 4)** |
 | 24 | `20261119140000_agenda_g3_correo_confirmacion.sql` | El correo de confirmación de Spinus queda registrado como los demás correos de cita (G3-1, G3-2). Mejor en la misma sesión que la 14 |
+| 25 | `20261120120000_agenda_h2_recordatorio_interruptor.sql` | El interruptor del recordatorio por correo, APAGADO de fábrica para todas las clínicas, y la lista de la tarea que lo respeta (H2-5, H2-6). **Desde que se aplique, ninguna clínica recibe recordatorios hasta que su administrador lo encienda** |
+| 26 | `20261120121000_agenda_h2_restablecer_configuracion.sql` | «Restablecer configuración de la agenda», sólo para el administrador (H2-7). Después de la 25 |
+| 27 | `20261120130000_agenda_h5_atendida_con_nota.sql` | Una cita atendida con nota clínica no cambia de estado ni se borra, y con la v2 no se mueve, ni saltándose la pantalla (H5-1). Actúa también con la v2 apagada |
 
-Son **24**. Las cuatro de la tanda del 2026-11-14 (21 a 24) van al final y en ese orden; las 17 a 20 van en este orden aunque se escribieron
+Son **27**. Las tres de la tanda H (25 a 27) van al final y en ese orden. Las cuatro de la tanda del 2026-11-14 (21 a 24) van al final y en ese orden; las 17 a 20 van en este orden aunque se escribieron
 después: las 17 y 18 añaden reglas a la tabla de citas, la 19 reemplaza
 la protección de los enlaces que puso la 8, y la 20 reemplaza tres funciones de
 las 9 y 10. Por eso, una vez más: **nunca vuelvas a correr la 8, la 9 ni la 10
@@ -3728,7 +4259,7 @@ Sólo los nombres y para qué sirven; los valores los generas tú.
 ### 13.4 El orden recomendado
 
 1. `select version()` y lo de 13.1.
-2. **Las 24 migraciones**, una por una, en el orden de 13.2.
+2. **Las 27 migraciones**, una por una, en el orden de 13.2.
 3. Las variables de 13.3 (menos `AGENDA_RSVP_GOOGLE`).
 4. `git merge` local de la rama sobre `main` y `git push` (despliega el código).
    Si despliegas el código antes que las migraciones no se rompe nada, pero

@@ -658,3 +658,190 @@ reimplementan la condición de un disparador sobre un universo más amplio que e
 de las filas que la sentencia va a tocar» — un pre-vuelo que anticipa que «el
 disparador X abortaría» se acota al `WHERE` de la sentencia, no a la tabla
 entera.
+
+## 10. Tanda H (2026-11-15)
+
+Cinco ramas escritas en paralelo sobre la misma base local
+(`feature/agenda-v2-h1` a `-h5`), fusionadas en `feature/agenda-v2` en el orden
+H5, H2, H4, H3, H1 (`00ba7c3`, `4d023a7`, `e3c3519`, `182944f`, `1f39c4e`). H1,
+H3 y H4 no traen migraciones; H2 trae dos y H5 una. En la integración se editó
+`20261120121000` (el horario de partida de «Restablecer», §10.3 F). Aquí se
+auditan juntas sobre la base reiniciada desde cero. Un revisor independiente en
+otro modelo (Sonnet) hizo la misma auditoría en paralelo, sin ver estas
+conclusiones; abajo se dice qué vio cada uno (§10.7).
+
+### 10.1 El conjunto, desde cero
+
+`git diff --name-only main...HEAD -- supabase/migrations` = **27 migraciones**
+del proyecto (las 24 de antes + `20261120120000`, `20261120121000` y
+`20261120130000`). `supabase db reset --local` (CLI 2.117.0) aplicó las **32**
+(5 de `main` + 27) en orden y sin un error, en 27–29 s; `schema_migrations` = 32,
+última `20261120130000`. Semilla en 2 s.
+
+### 10.2 Veredicto de las tres
+
+| # | Archivo | Qué hace | Auditoría previa (cabecera) | Integración | Veredicto |
+|---|---|---|---|---|---|
+| H2a | `20261120120000_agenda_h2_recordatorio_interruptor.sql` | `agenda_ajustes.recordatorio_encendido boolean NOT NULL DEFAULT false` y `cita_recordatorios_pendientes(integer)` (sólo `service_role`) | APTA | Cuerpo = `cita_correos_pendientes` de E4 + `AND j.recordatorio_encendido` (diff de `pg_get_functiondef`: el nombre y esa línea); la tarea llama a la nueva | APTA |
+| H2b | `20261120121000_agenda_h2_restablecer_configuracion.sql` | `agenda_restablecer_configuracion(uuid,uuid)`, INVOKER, sólo `service_role` | APTA CON CAMBIOS (aplicados) | Editada en su sitio: el horario de partida (§10.3 F); md5 `6c99e553…`; rejilla 5 × OK en dos pasadas | APTA |
+| H5 | `20261120130000_agenda_h5_atendida_con_nota.sql` | `trg_appointments_proteger_atendida` → `cita_proteger_atendida()` (INVOKER) y `cita_tiene_nota_ligada(uuid,uuid)` (DEFINER) | APTA CON CAMBIOS (sólo la cabecera) | Sin cambios | APTA |
+
+### 10.3 Conflictos entre ellas y con las anteriores
+
+**A · El disparador de H5 frente a los de seg2.** En `appointments` hay seis
+disparadores; los tres `BEFORE` de protección corren en orden de nombre:
+`trg_appointments_proteger_atendida` < `…_proteger_borrado` < `…_proteger_reserva`.
+Ninguno cambia `NEW`, así que el orden sólo decide qué mensaje sale. Borrar una
+atendida con nota con la v2 encendida lo rechazan los dos primeros (42501 los
+dos; sale el de H5, «…no se borra», y la API ya veta antes con su 409); con la
+v2 apagada sólo H5 (el de seg2 sólo actúa encendida: era el hueco de AG-DT-61).
+El de columnas `reserva_*` vigila otras columnas: no se pisan. Los de auditoría
+(`log_cita_change`) son `AFTER`: lo rechazado no deja fila.
+
+**B · H5 frente a `gcal_aplicar_evento`.** C2 sólo reescribe hora, fin, todo el
+día y estado cuando `status IN ('scheduled','confirmed')`; a una atendida le
+escribe los MISMOS valores, y `cita_proteger_atendida()` compara con `IS
+DISTINCT FROM`: pasa sin error (lo cubre también `c2_gcal_aplicar.sql`, en
+verde). `cita_confirmacion_responder` devuelve «cerrada» a una atendida;
+`cita_rsvp_google` sólo `scheduled → confirmed`; `reagendar_por_enlace` sólo
+desde una cancelada: ninguna llega al disparador con una atendida.
+
+**C · H5 frente a `agenda_restablecer_configuracion`.** La función no nombra
+`appointments` (`prosrc ~* 'appointments'` = falso) y ningún disparador de
+`consultorios`, `tipos_cita`, `reserva_enlaces` ni `agenda_ajustes` escribe en
+citas (catálogo: auditoría, tope de 10, predeterminado, `updated_at`,
+`validar_tipo_cita_*`, `proteger_*`). La prueba `h2_restablecer_configuracion`
+compara la huella de las citas de las dos clínicas antes y después: idéntica.
+
+**D · `cita_recordatorios_pendientes` frente a E4 y a la confirmación de G3.**
+Misma consulta que E4 más el interruptor en la selección de clínicas: no se
+pierde ni se duplica ningún correo respecto de E4 cuando está encendido; apagado
+no lista nada. La exclusión por `cita_correos` (comprobante o recordatorio ya
+enviado de esa hora) es la misma; la confirmación de G3 (`tipo =
+'confirmacion'`, por `cita_correo_tomar`) no la mira y no depende del
+interruptor: sigue sin quitar el recordatorio, como en G3. `cita_correo_tomar`
+no cambió. La tarea (`src/lib/confirmacion/recordatorios.ts`) sólo llama a la
+nueva; sin la migración recibe PGRST202 y no manda nada. `cita_correos_pendientes`
+queda sin llamadores en `src/` (sólo la usa `e4_correos_cita.sql`; AG-DT-75).
+Hueco aceptado: apagar el interruptor no frena lo ya listado en una pasada
+(≤ 45 s; AG-DT-76).
+
+**E · `cita_tiene_nota_ligada` como SECURITY DEFINER.** `LANGUAGE sql STABLE
+SECURITY DEFINER SET search_path = ''`, devuelve sólo `boolean`
+(`coalesce(…, false)`): con sesión, sólo responde si `p_clinica =
+get_clinica_id()` (otra clínica → `false`), y mira notas de pacientes de esa
+clínica ligadas a esa cita. EXECUTE: `authenticated` y `service_role`; ni
+`anon` ni PUBLIC (cierre justificado en su cabecera). Lo que deja saber a una
+sesión de la clínica es lo mismo que el 409 `nota_ligada` (AG-DT-63, decidido por
+Angel: se queda). Con `auth.uid()` nulo salta el filtro de clínica: sólo
+`service_role` llega así, y ya lee `consultas` (AG-DT-91). El disparador es
+INVOKER a propósito (necesita `current_user` para dejar fuera a
+`postgres`/`supabase_admin`).
+
+**F · El horario de partida de «Restablecer» (integración).** El `UPDATE` de
+los consultorios es ahora `SET horario = cl.horario_consulta, horario_propio =
+true FROM public.clinicas cl WHERE cl.id = c.clinica_id AND c.clinica_id =
+p_clinica_id`: cada consultorio toma el horario de SU clínica (el JOIN no puede
+copiar el de otra) y sólo los de la clínica pedida. Es la misma sentencia de
+herencia de G4 (`20261119130000`) acotada a una clínica. Los disparadores de
+`consultorios` no miran `horario` ni `horario_propio`. `service_role` lee
+`clinicas`. Decisión de producto pendiente de Angel (`mejora_agendaV2.md`
+§6-bis, «Integración de la tanda H»).
+
+**G · EXECUTE a PUBLIC.** Ninguna función de la agenda lo tiene: las 69
+funciones de `public` con PUBLIC en la base de 32 son exactamente las 69 de
+`main` (las cierra P1 en `feature/limites-ajustables`). Las cuatro nuevas:
+`cita_recordatorios_pendientes` y `agenda_restablecer_configuracion` sólo
+`service_role`; `cita_tiene_nota_ligada`, `authenticated` y `service_role`;
+`cita_proteger_atendida()`, los tres roles (es de disparador).
+
+### 10.4 Catálogo: qué cambió de verdad
+
+Huella md5 por objeto de `public` (la consulta del §3) de la base recién
+reiniciada con las 32, contra `main` y contra la de las 29 (§9):
+
+- **Contra `main` (355 huellas): 0 objetos cambiados o quitados.**
+- **Contra las 29 (548 huellas): 0 objetos cambiados o quitados**, y 5 nuevos:
+  las funciones `agenda_restablecer_configuracion(uuid,uuid)`,
+  `cita_recordatorios_pendientes(integer)`, `cita_tiene_nota_ligada(uuid,uuid)` y
+  `cita_proteger_atendida()`, y el disparador
+  `appointments.trg_appointments_proteger_atendida` (553 en total). Ninguna
+  policy nueva ni cambiada; ninguna tabla cambia de permisos ni de RLS. (La
+  columna `agenda_ajustes.recordatorio_encendido` no entra en la huella.)
+
+### 10.5 La base combinada con `feature/limites-ajustables`
+
+Reinicio con las **35** migraciones (5 de `main`, las tres `20261014*` y las 27
+del proyecto, en orden de nombre): todas aplican sin fallo. Los objetos de la
+agenda (definiciones de funciones, policies, disparadores y constraints) quedan
+**idénticos** a los de la rama; sólo cambian los `proacl` que P1 cierra y las
+cuatro `sa_*` de P1b. Ninguna función de `public` queda con EXECUTE a PUBLIC.
+
+- **`p1_permisos_funciones.sql`, caso 3: en rojo, como se esperaba.** La lista
+  de la base combinada son **44 funciones**: las 41 del §8.5 más
+  `agenda_restablecer_configuracion(uuid,uuid)`,
+  `cita_recordatorios_pendientes(integer)` y `cita_tiene_nota_ligada(uuid,uuid)`
+  (las tres sin EXECUTE para alguno de los tres roles; `cita_proteger_atendida()`
+  sí lo tiene y no entra). Con esta lista pegada en el caso 3, `p1` pasa entero
+  en la combinada. **Ésta es la lista para pegar al fusionar las dos ramas**
+  (sustituye a la del §8.5):
+
+  ```
+  agenda_restablecer_configuracion(uuid,uuid), alta_conexion_google(uuid,uuid,text,text,text,text,text,bigint), cita_confirmacion_contexto(text), cita_confirmacion_emitir(uuid,uuid,uuid,text,uuid), cita_confirmacion_responder(uuid,text,text), cita_confirmacion_revocar(uuid,uuid), cita_correo_marcar(uuid,uuid,uuid,text,text), cita_correo_tomar(uuid,uuid,text,uuid), cita_correos_pendientes(integer), cita_reagendar_oferta(uuid,text), cita_recordatorios_pendientes(integer), cita_rsvp_google(uuid,uuid,text,text,text[]), cita_tiene_nota_ligada(uuid,uuid), crear_paciente_con_medico(jsonb,uuid), enforce_limite_documentos_paciente(), gcal_aplicar_evento(uuid,uuid,timestamp with time zone,text,text,timestamp with time zone,text,boolean,timestamp with time zone,timestamp with time zone,boolean,text,boolean,text,boolean), gcal_citas_por_evento(uuid,text[],uuid[]), gcal_importar_evento(uuid,text,text,text,timestamp with time zone,text,timestamp with time zone,timestamp with time zone,boolean,text,text,uuid), gcal_sync_avanzar(uuid,uuid,text,text,timestamp with time zone,integer), gcal_sync_clinica_habilitada(uuid), gcal_sync_clinicas_pendientes(integer), gcal_sync_frescura(uuid), gcal_sync_reiniciar(uuid,uuid), gcal_sync_soltar(uuid,uuid,text), gcal_sync_tomar(uuid,uuid,text,integer,integer), generar_folio(text), guardar_secretos_conexion(uuid,uuid,text,text,bigint), leer_conexion_google_con_secretos(uuid,uuid), rate_limit_intento(text,text,integer,integer), rate_limit_reset(text), reagendar_por_enlace(text,uuid,text,uuid,uuid,timestamp with time zone,text,text,text,text,text,text,text,text,uuid), reserva_codigo_emitir(uuid,uuid,text,text), reserva_codigo_verificar(uuid,uuid,text,text,text), reserva_contacto_estado(uuid,uuid,text,text), reserva_contacto_marcar(uuid,text), reserva_contactos_bloqueados(), reserva_contexto(text,text,text), reserva_empalmes_registrar(uuid,uuid[]), reserva_enlace_emitir(uuid,uuid,uuid,uuid,text,text,text), reserva_enlace_regenerar_fijo(uuid,uuid,text), reserva_ocupacion(uuid,uuid,timestamp with time zone,timestamp with time zone), reservar_por_enlace(uuid,text,uuid,uuid,timestamp with time zone,text,text,text,text,text,text,text,text,uuid), sync_antropometria_paciente(uuid), trg_mediciones_antropometria()
+  ```
+- `p1` (resto de casos), `p1b`, `p2`, `p3` y las **27** pruebas del proyecto (las
+  24 de antes, `h2_recordatorio_interruptor`, `h2_restablecer_configuracion` y
+  `h5_atendida_con_nota`), en verde.
+
+### 10.6 Pruebas, antes y después del reinicio
+
+El reinicio desde cero se hizo ANTES de la verificación completa, así que la
+batería entera corrió una sola vez, sobre la base de 32 recién sembrada.
+
+| | Desde cero (las 32, semilla recién aplicada) |
+|---|---|
+| `npm run build` | limpio |
+| `npm run lint` | 96 errores (sin subir) |
+| Vitest | 1913 pruebas en 131 archivos |
+| SQL (`pruebas-sql.sh`) | 27 archivos en verde |
+| Playwright completo (escritorio, teléfono, tableta, con el Google falso) | 394 pasan, 3 fallan, 323 saltadas, 8 sin correr (las series tras su fallo), 11.8 min. Las 3 eran la prueba, no el código (§10.7 K7); arregladas, sus 4 archivos repetidos: 26 pasan, 0 fallan |
+| e2e del Google falso y de seguridad | dentro de la batería; `agenda-google-dos-sentidos` en verde en la repetición |
+| `reserva-carrera.sh` | verde (3 citas, las esperadas) |
+| `confirmacion-carrera.sh` | verde |
+
+### 10.7 Hallazgos de la integración y del revisor
+
+El revisor (Sonnet, sin ver esto) llegó a los **mismos tres veredictos
+(APTA)**, a la misma lista del caso 3 (41 → 44, tres altas y ninguna baja), a
+«ningún objeto de `main` cambia» y a «ninguna función de la tanda con PUBLIC».
+Coincidimos en A (orden de los disparadores), B (`gcal_aplicar_evento` reescribe
+lo mismo), C (la función de restablecer no nombra citas), D (diff de una línea
+y el cron con la nueva) y E (sólo booleano y la clínica de la sesión). Además
+señaló, y se recoge:
+
+- **K1 · «Restablecer» aplica una decisión marcada pendiente de Angel.** Cierto
+  y a propósito: se toma la opción coherente con su regla de la tanda G y se
+  deja escrita la vuelta atrás (una sentencia). Si Angel confirma, se quitan las
+  marcas «pendiente» de la cabecera y de §6-bis.
+- **K2 · `cita_correos_pendientes` sigue viva sin llamadores.** AG-DT-75.
+- **K3 · Las tres dependen de migraciones que tampoco están en producción.** Se
+  aplican las 27 del proyecto en orden de nombre (guía §13.2), no sólo éstas.
+- **K4 · `auth.uid()` nulo en `cita_tiene_nota_ligada`.** AG-DT-91; sin cambio.
+
+Lo que vio el coordinador y el revisor no:
+
+- **K5 · `20261120120000` apaga el recordatorio en TODAS las clínicas** desde que
+  se aplique, también en las que ya tuvieran la v2 encendida (sin backfill: es
+  lo que pidió Angel). Lo dicen §7 y la guía §13.2 (fila 25).
+- **K7 · Tres e2e que fallaban por las fusiones, y las tres eran la prueba.**
+  `husos-dos-consultorios` (y, sin fallar, `confirmacion-enlace` «lista A 4»)
+  disparaban la tarea de recordatorios sin encender el interruptor que H2 dejó
+  apagado de fábrica: ahora lo encienden y lo apagan al terminar (la de
+  confirmación pasaba sin probar nada). `recordatorios` elegía un paciente con
+  una cita de la semilla dentro de la ventana y leía el recordatorio de ésa
+  (dependía de la hora): ahora elige uno sin citas en 31 h.
+  `agenda-google-dos-sentidos` (H3) pulsaba una franja donde `agenda-cancelar`
+  deja sus canceladas: ahora 13:00. Ninguna toca SQL.
+- **K6 · El revisor del paso 3 de la integración** (Sonnet, aparte) confirmó en
+  vivo el md5, los permisos, que el JOIN no cruza clínicas y que los disparadores
+  de `consultorios` no interfieren: APTA CON CAMBIOS, sólo documentales.
