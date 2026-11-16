@@ -67,7 +67,8 @@ test.beforeAll(() => {
          t as (insert into public.tipos_cita (clinica_id, nombre, duracion_min, activo) select c.id, 'Consulta T2 husos', 30, true from c returning id)
     select (select id from c), (select id from m), (select id from k), (select id from t);`, { n: NOMBRE, tz: TIJUANA, h: HORARIO })
   const [clinicaId = '', medicoId = '', consultorioId = '', tipoId = ''] = fila.split('|')
-  sqlLocal(`update public.agenda_ajustes set recordatorio_horas = 72 where clinica_id = :'c'`, { c: clinicaId })
+  /* Tanda H (H2): el recordatorio viene APAGADO de fábrica; esta prueba lo necesita encendido (se apaga al terminar). */
+  sqlLocal(`update public.agenda_ajustes set recordatorio_horas = 72, recordatorio_encendido = true where clinica_id = :'c'`, { c: clinicaId })
   e = { clinicaId, medicoId, consultorioId, consultorioTelefono: null, consultorioOtraClinica: '', tipoId, tipoNombre: 'Consulta T2 husos' }
   codigo = emitirEnlace(e, 'unico').codigo
   /* Uno sin citas en los próximos 4 días: así el único recordatorio que recibe es el de esta prueba. */
@@ -95,7 +96,8 @@ test.afterAll(() => {
     commit;`, { k: e.consultorioId, t: e.tipoId })
   try { limpiarReservasE2e(desde) } finally { devolverEnlaces(aparcados) }
   if (paciente.id) sqlLocal(`update public.pacientes set email = nullif(:'e', '') where id = :'p'`, { e: paciente.email, p: paciente.id })
-  sqlLocal(`update public.agenda_ajustes set recordatorio_horas = :'h'::int where clinica_id = :'c'`, { h: ajustesAntes || '24', c: e.clinicaId })
+  sqlLocal(`update public.agenda_ajustes set recordatorio_horas = :'h'::int, recordatorio_encendido = false where clinica_id = :'c'`,
+    { h: ajustesAntes || '24', c: e.clinicaId })
   interruptorAgenda('A', false)
 })
 

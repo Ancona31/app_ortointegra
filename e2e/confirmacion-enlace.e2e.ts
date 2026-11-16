@@ -330,7 +330,8 @@ test('lista A 4: una reserva dentro de la ventana recibe UN correo (el comproban
   const cron = process.env.CRON_SECRET ?? ''
   test.skip(cron === '', 'Falta CRON_SECRET (sólo de prueba) en .env.local')
   // Ventana de 72 h para tener turnos dentro sin depender del día de la semana; se restablece al terminar.
-  sqlLocal(`update public.agenda_ajustes set recordatorio_horas = 72 where clinica_id = :'c';`, { c: e.clinicaId })
+  // Tanda H (H2): el recordatorio encendido, o la prueba pasaría sin probar nada (apagado no sale ninguno).
+  sqlLocal(`update public.agenda_ajustes set recordatorio_horas = 72, recordatorio_encendido = true where clinica_id = :'c';`, { c: e.clinicaId })
   try {
     const { codigo } = emitirEnlace(e, 'unico')
     const ahora = Date.now()
@@ -357,6 +358,6 @@ test('lista A 4: una reserva dentro de la ventana recibe UN correo (el comproban
     expect(await contarCorreos(p.correo, 'Recordatorio')).toBe(0)
     expect(sqlLocal(`select count(*) from public.cita_correos where appointment_id = :'id' and tipo = 'recordatorio';`, { id: citaId })).toBe('0')
   } finally {
-    sqlLocal(`update public.agenda_ajustes set recordatorio_horas = 24 where clinica_id = :'c';`, { c: e.clinicaId })
+    sqlLocal(`update public.agenda_ajustes set recordatorio_horas = 24, recordatorio_encendido = false where clinica_id = :'c';`, { c: e.clinicaId })
   }
 })

@@ -36,7 +36,13 @@ function prepararPaciente(): Fixture {
   const fila = sqlLocal(`
     with c as (select id from public.clinicas where nombre = 'Clínica Semilla A'),
          m as (select p.id from public.profiles p where p.clinica_id = (select id from c) and p.es_admin_de_clinica limit 1),
-         p as (select id from public.pacientes where clinica_id = (select id from c) and activo order by created_at limit 1)
+         /* Uno SIN citas en las próximas 31 h (la ventana es de 24 y la cita «fuera» va a +30): si no, la
+            tarea también le recuerda las suyas de la semilla y el correo que llega puede ser otro
+            (dependía de la hora a la que se corría; visto en la integración de la tanda H). */
+         p as (select x.id from public.pacientes x where x.clinica_id = (select id from c) and x.activo
+                 and not exists (select 1 from public.appointments a where a.paciente_id = x.id
+                                   and a.start_time between now() and now() + interval '31 hours')
+               order by x.created_at limit 1)
     select (select id from c), (select id from m), (select id from p);`)
   const [clinicaId = '', medicoId = '', pacienteId = ''] = fila.split('|')
   sqlLocal(`update public.pacientes set email = :'correo' where id = :'id';`, { correo, id: pacienteId })

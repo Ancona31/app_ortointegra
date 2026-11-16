@@ -339,7 +339,14 @@ test('encendido: las observaciones de la burbuja se guardan en la cita y no viaj
   const obs = `OBS-BURBUJA-H3-${Date.now()}`
   await page.goto('/agenda')
   await expect(page.locator('.agenda-raiz')).toHaveAttribute('data-interacciones-v2', 'listas', { timeout: 120_000 })
-  await clicEnFranja(page, DIA_LABORABLE_LIBRE, '15:00')
+  /* 13:00 y no 15:00: en la batería completa `agenda-cancelar` (corre antes)
+     deja ese jueves sus citas canceladas de las 15:05 y las 15:40, y el clic
+     abría la tarjeta de una de ellas (integración de la tanda H). A las 13:00
+     ese jueves sólo está la «Comida» de la semilla, que es de la Dra. Invitada:
+     el Dr. Admin abre filtrado a SU agenda y no se pinta (y `agenda-arrastre`,
+     que corre antes, la mueve a las 18:00). Si esta prueba pasa a «Todos los
+     médicos», elige otra hora. */
+  await clicEnFranja(page, DIA_LABORABLE_LIBRE, '13:00')
   const b = burbuja(page)
   const avisoHorario = page.getByRole('dialog').filter({ has: page.getByRole('button', { name: 'Aceptar' }) })
   await expect(b.or(avisoHorario).first()).toBeVisible({ timeout: 30_000 })
