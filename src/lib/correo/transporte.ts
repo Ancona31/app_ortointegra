@@ -46,6 +46,14 @@ export interface Correo {
    * Mailpit la ignora. Nunca va al logger.
    */
   idempotencia?: string
+  /**
+   * Tanda I, punto 21 de Angel: el NOMBRE del remitente (el del médico, para
+   * que el paciente reconozca el correo). La DIRECCIÓN no cambia nunca
+   * (`REMITENTE_CORREO`). Se sanea en `nombreRemitente` (cabecera `From`:
+   * sin saltos, sin controles, sin comillas ni ángulos). Ausente o vacío,
+   * «Spinus», como siempre.
+   */
+  remitente?: string
 }
 
 export type ResultadoEnvio =
@@ -62,6 +70,34 @@ const ESPERA_MS = 10_000
 const TAG = 'correo'
 
 const IPV4 = /^\d{1,3}(\.\d{1,3}){3}$/
+
+const NOMBRE_REMITENTE_MAX = 64
+/** Lo que no puede ir en un nombre de cabecera: controles, formato, separadores de línea, lo que cierra o rompe la comilla o el ángulo, y `@` (un nombre no finge otra dirección). */
+const NO_EN_CABECERA = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}"\\<>@]/gu
+
+/**
+ * El nombre visible del remitente, a salvo de inyección de cabeceras: fuera
+ * saltos de línea y todo carácter de control o de formato (un CR/LF partiría
+ * la cabecera `From` y metería otras), fuera comillas, barra invertida y
+ * ángulos (cerrarían el nombre entrecomillado o fingirían otra dirección),
+ * fuera `@` (que «Dr. x@banco.mx» no se lea como otra dirección), espacios
+ * juntos en uno y como mucho 64 caracteres, contados por punto de código para
+ * no partir un emoji en dos mitades. Vacío → «Spinus».
+ */
+export function nombreRemitente(nombre: string | undefined): string {
+  const unido = (nombre ?? '').replace(NO_EN_CABECERA, ' ').replace(/\s+/g, ' ').trim()
+  const limpio = Array.from(unido).slice(0, NOMBRE_REMITENTE_MAX).join('').trim()
+  return limpio || 'Spinus'
+}
+
+/**
+ * `"Nombre" <noreply@…>`: el nombre saneado entre comillas y la dirección de
+ * siempre. Sin nombre, exactamente el `REMITENTE` de antes.
+ */
+export function cabeceraFrom(nombre: string | undefined): string {
+  const n = nombreRemitente(nombre)
+  return n === 'Spinus' ? REMITENTE : `"${n}" <${REMITENTE_CORREO}>`
+}
 
 function esLoopback(host: string): boolean {
   return host === 'localhost' || host === '[::1]' || (IPV4.test(host) && host.startsWith('127.'))
@@ -131,7 +167,7 @@ async function enviarPorMailpit(c: Correo, env: Entorno, etiqueta: string): Prom
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      From: { Email: REMITENTE_CORREO, Name: 'Spinus' },
+      From: { Email: REMITENTE_CORREO, Name: nombreRemitente(c.remitente) },
       To: [{ Email: c.para }],
       Subject: c.asunto,
       Text: c.texto,
@@ -157,7 +193,7 @@ async function enviarPorResend(c: Correo, llave: string, etiqueta: string): Prom
     ? { idempotencyKey: c.idempotencia }
     : undefined
   const { error } = await resend.emails.send({
-    from: REMITENTE, to: c.para, subject: c.asunto, html: c.html, text: c.texto,
+    from: cabeceraFrom(c.remitente), to: c.para, subject: c.asunto, html: c.html, text: c.texto,
   }, opciones)
   if (!error) return 'ok'
   // Sólo el código del error: su mensaje puede repetir la dirección.

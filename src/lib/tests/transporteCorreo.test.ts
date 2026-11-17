@@ -27,7 +27,7 @@ vi.mock('@/lib/logger', () => ({
   },
 }))
 
-const { decidirTransporte, modoTransporte, supabaseEsRemota, urlEnvioMailpit, enviarCorreo, REMITENTE } =
+const { decidirTransporte, modoTransporte, supabaseEsRemota, urlEnvioMailpit, enviarCorreo, REMITENTE, nombreRemitente, cabeceraFrom } =
   await import('@/lib/correo/transporte')
 
 const PROD = 'https://abcdefghijklmnopqrst.supabase.co'
@@ -235,5 +235,36 @@ describe('enviarCorreo: llave de idempotencia (agenda E4)', () => {
     await enviarCorreo({ ...CORREO, idempotencia: 'recordatorio/x' }, { EMAIL_TRANSPORT: 'captura' })
     const cuerpo = JSON.parse(String(fetchFalso.mock.calls[0][1].body))
     expect(Object.keys(cuerpo).sort()).toEqual(['From', 'HTML', 'Subject', 'Tags', 'Text', 'To'])
+  })
+})
+
+/* Tanda I, punto 21: el remitente se presenta con el nombre del MÉDICO; la
+   dirección no cambia. El nombre lo escribe la clínica, así que no puede
+   romper la cabecera `From` (inyección de cabeceras). */
+describe('remitente a nombre del médico (I, punto 21)', () => {
+  it('nombreRemitente: fuera saltos de línea, controles, comillas, barra, ángulos y @; tope de 64 puntos de código; vacío → Spinus', () => {
+    expect(nombreRemitente('Dr. Ana Pérez')).toBe('Dr. Ana Pérez')
+    expect(nombreRemitente('Dr. Ana\r\nBcc: x@y.z')).toBe('Dr. Ana Bcc: x y.z')
+    expect(nombreRemitente('Ana" <otro@malo.mx>')).toBe('Ana otro malo.mx')
+    expect(nombreRemitente('Dr. x@banco.mx')).toBe('Dr. x banco.mx')
+    // 63 letras y un emoji (dos unidades UTF-16): entra entero, sin mitades sueltas.
+    expect(nombreRemitente(`${'x'.repeat(63)}😀extra`)).toBe(`${'x'.repeat(63)}😀`)
+    expect(nombreRemitente('A\\B\u2028C\u200bD\u0000E')).toBe('A B C D E')
+    expect(nombreRemitente('x'.repeat(80))).toHaveLength(64)
+    for (const vacio of [undefined, '', '  ', '\r\n', '"<>"']) expect(nombreRemitente(vacio)).toBe('Spinus')
+  })
+  it('cabeceraFrom: el nombre entrecomillado y la dirección de siempre; sin nombre, exactamente REMITENTE', () => {
+    expect(cabeceraFrom('Dr. Ana Pérez, Ortopedia')).toBe('"Dr. Ana Pérez, Ortopedia" <noreply@mail.spinus.com.mx>')
+    expect(cabeceraFrom('Ana\n"x" <a@b.c>')).toBe('"Ana x a b.c" <noreply@mail.spinus.com.mx>')
+    expect(cabeceraFrom(undefined)).toBe(REMITENTE)
+    expect(cabeceraFrom('Spinus')).toBe(REMITENTE)
+  })
+  it('captura (Mailpit) y resend llevan el nombre del médico; la dirección no cambia', async () => {
+    await enviarCorreo({ ...CORREO, remitente: 'Dr. Ana\r\nPérez' }, { EMAIL_TRANSPORT: 'captura' })
+    expect(JSON.parse(String(fetchFalso.mock.calls[0][1].body)).From).toEqual({ Email: 'noreply@mail.spinus.com.mx', Name: 'Dr. Ana Pérez' })
+    await enviarCorreo({ ...CORREO, remitente: 'Dr. Ana Pérez' }, {
+      EMAIL_TRANSPORT: 'resend', NEXT_PUBLIC_SUPABASE_URL: PROD, RESEND_API_KEY: 're_prod',
+    })
+    expect(h.envios).toEqual([{ from: '"Dr. Ana Pérez" <noreply@mail.spinus.com.mx>', to: PARA, subject: 'Asunto de prueba', html: '<p>Hola</p>', text: 'Hola' }])
   })
 })
