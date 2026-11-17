@@ -18,9 +18,9 @@
 import { useEffect, useRef, type RefObject } from 'react'
 import type FullCalendar from '@fullcalendar/react'
 import { Calendar as CalendarioFC, type CalendarApi } from '@fullcalendar/core'
-import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
+import type { RealtimeChannel, RealtimePostgresChangesPayload } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/client'
-import { vaciarCacheCitas } from '@/lib/agenda/cacheRangosCitas'
+import { VIGENCIA_CITAS_MS, vaciarCacheCitas } from '@/lib/agenda/cacheRangosCitas'
 import { buildEventInput, FUENTE_APPOINTMENTS } from '@/lib/agenda/eventosDeCita'
 import type { Appointment } from '@/lib/agenda/tiposAgenda'
 import { esCancelacionAjena } from '@/lib/agenda/avisoCancelacion'
@@ -67,6 +67,86 @@ interface Params {
    *  fuera de la vista, para la lista «Por confirmar». Sólo con la v2: apagada,
    *  el padre no lo pasa. No abre otro canal: es este mismo. */
   onCambioCita?: (c: CambioCita) => void
+}
+
+/** Lo que el canal necesita de la agenda montada. */
+interface MontajeCanal {
+  aplicar: (p: RealtimePostgresChangesPayload<FilaRealtime>) => void
+  refetch: (forzarGoogle?: boolean) => void
+}
+
+interface CanalAgenda {
+  canal: RealtimeChannel
+  /** La agenda montada, o null: sin ella, un cambio sólo vacía la caché. */
+  montaje: MontajeCanal | null
+  /** El cierre programado al desmontar; se cancela si la agenda vuelve antes. */
+  cierre: ReturnType<typeof setTimeout> | null
+}
+
+/** El único canal de la agenda (A1-bis: uno solo), vivo o null. */
+let canalAgenda: CanalAgenda | null = null
+
+/**
+ * Abre el canal de `appointments` (E12).
+ *
+ * ⚠️ I1 (puntos 4–6) · POR QUÉ VIVE FUERA DEL COMPONENTE Y SOBREVIVE AL
+ * DESMONTAJE. La caché de rangos (`cacheRangosCitas`, A1.5) es de módulo:
+ * sobrevive a la agenda, y al volver a ella se pinta desde ahí sin pedir nada
+ * (el presupuesto de «volver del dashboard»: 0 peticiones bloqueantes). Pero
+ * lo único que la invalidaba desde fuera era este canal, y moría con la
+ * agenda: lo que cambiara mientras tanto —la reserva por enlace hecha con la
+ * agenda en Configuración, la nota que marca la cita atendida, la
+ * confirmación del paciente— no vaciaba nada, y al volver se pintaba la
+ * semana vieja. Así que el canal vive mientras pueda servirse una entrada de
+ * la caché: toda entrada es anterior al desmontaje y caduca a los
+ * `VIGENCIA_CITAS_MS`, así que cerrarlo ese tiempo después del desmontaje
+ * nunca deja una entrada vigente sin quien la invalide. No cuesta ninguna
+ * petición: si nada cambió, al volver la caché sigue sirviendo; si algo
+ * cambió, la vuelta pide la semana (o la trae la semilla del servidor).
+ *
+ * Sin agenda montada, un cambio sólo vacía la caché (no hay nada pintado) y
+ * una reconexión tras una caída, lo mismo: se perdió el hilo.
+ */
+function abrirCanalAgenda(): CanalAgenda {
+  const supabase = createClient()
+
+  /* Ciclo de vida de la conexión. Un websocket se cae al dormir el equipo o
+     al perder la red, y mientras estuvo caído los cambios no llegaron a
+     ninguna parte: no hay eventos que aplicar, hay un hueco. Ése es el
+     ÚNICO lugar donde un refetch del rango está justificado.
+     El callback de `subscribe` vuelve a dispararse con SUBSCRIBED en cada
+     reenganche automático (`rejoin()` reenvía el joinPush y sus hooks
+     sobreviven al reset), así que sirve de aviso de "ya volví". La caída se
+     detecta cuando falla el latido del socket, no al instante: tras
+     despertar el equipo la puesta al día puede tardar unos segundos. */
+  let huboCaida = false
+
+  const vivo: CanalAgenda = { canal: supabase.channel('appointments-realtime'), montaje: null, cierre: null }
+  vivo.canal
+    // El tipo va en el parámetro y no como argumento de tipo de `.on()`:
+    // `createClient()` no lleva el genérico `Database`, así que el cliente
+    // llega sin tipar y `.on<T>()` no acepta argumentos de tipo.
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'appointments' },
+      (payload: RealtimePostgresChangesPayload<FilaRealtime>) => {
+        // A1.5a: cualquier cambio, propio o ajeno, de cualquier semana.
+        vaciarCacheCitas()
+        vivo.montaje?.aplicar(payload)
+      },
+    )
+    .subscribe((estado: string) => {
+      if (estado === 'SUBSCRIBED') {
+        if (!huboCaida) return
+        huboCaida = false
+        if (vivo.montaje) vivo.montaje.refetch(true)
+        else vaciarCacheCitas()
+        return
+      }
+      // CHANNEL_ERROR / TIMED_OUT / CLOSED: se perdió el hilo de los cambios.
+      huboCaida = true
+    })
+  return vivo
 }
 
 export function useTiempoRealAgenda({ calendarRef, filtroEfectivo, refetch, ultimaTraidaRef, onCanceladaAjena, onCambioCita }: Params) {
@@ -358,44 +438,29 @@ export function useTiempoRealAgenda({ calendarRef, filtroEfectivo, refetch, ulti
   // eslint-disable-next-line react-hooks/refs -- patrón último valor: el canal se suscribe UNA vez (E12) y llama al manejador del último render por este ref; movido tal cual
   aplicarCambioRef.current = aplicarCambioRealtime
 
+  /* I1 (puntos 4–6) · El canal es de módulo y sobrevive al desmontaje: ver
+     `abrirCanalAgenda`. Al montar se reutiliza si sigue vivo (sin otro
+     `join`) y se le cuelga esta agenda; al desmontar se descuelga y se
+     programa su cierre para cuando ya no quede caché que servir. */
   useEffect(() => {
-    const supabase = createClient()
-
-    /* Ciclo de vida de la conexión. Un websocket se cae al dormir el equipo o
-       al perder la red, y mientras estuvo caído los cambios no llegaron a
-       ninguna parte: no hay eventos que aplicar, hay un hueco. Ése es el
-       ÚNICO lugar donde un refetch del rango está justificado.
-       El callback de `subscribe` vuelve a dispararse con SUBSCRIBED en cada
-       reenganche automático (`rejoin()` reenvía el joinPush y sus hooks
-       sobreviven al reset), así que sirve de aviso de "ya volví". La caída se
-       detecta cuando falla el latido del socket, no al instante: tras
-       despertar el equipo la puesta al día puede tardar unos segundos. */
-    let huboCaida = false
-
-    const channel = supabase
-      .channel('appointments-realtime')
-      // El tipo va en el parámetro y no como argumento de tipo de `.on()`:
-      // `createClient()` no lleva el genérico `Database`, así que el cliente
-      // llega sin tipar y `.on<T>()` no acepta argumentos de tipo.
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'appointments' },
-        (payload: RealtimePostgresChangesPayload<FilaRealtime>) => {
-          // A1.5a: cualquier cambio, propio o ajeno, de cualquier semana.
-          vaciarCacheCitas()
-          void aplicarCambioRef.current(payload)
-        },
-      )
-      .subscribe((estado: string) => {
-        if (estado === 'SUBSCRIBED') {
-          if (huboCaida) { huboCaida = false; refetch(true) }
-          return
-        }
-        // CHANNEL_ERROR / TIMED_OUT / CLOSED: se perdió el hilo de los cambios.
-        huboCaida = true
-      })
-
-    return () => { supabase.removeChannel(channel) }
+    const vivo = canalAgenda ?? abrirCanalAgenda()
+    canalAgenda = vivo
+    if (vivo.cierre) { clearTimeout(vivo.cierre); vivo.cierre = null }
+    vivo.montaje = { aplicar: p => { void aplicarCambioRef.current(p) }, refetch }
+    return () => {
+      vivo.montaje = null
+      /* Al vencer, `removeChannel` saca el canal de la lista del cliente en el
+         acto (el `leave` de phoenix pasa a «leaving» y, como ya no puede
+         empujar, se da por respondido y lo cierra sin esperar al servidor):
+         una agenda que se monte justo después abre uno nuevo con el mismo
+         topic, no recibe el saliente. Comprobado en @supabase/phoenix
+         (`Channel.leave` → `canPush()`) y en el socket: con el acuse del
+         `phx_leave` retenido, el `phx_join` del canal nuevo sale y se une. */
+      vivo.cierre = setTimeout(() => {
+        if (canalAgenda === vivo) canalAgenda = null
+        void createClient().removeChannel(vivo.canal)
+      }, VIGENCIA_CITAS_MS)
+    }
   }, [refetch])
 
   /* ── Refetch al recuperar el foco la pestaña ────────────
