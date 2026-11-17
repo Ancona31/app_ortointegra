@@ -18,6 +18,7 @@ import ReactMarkdown from 'react-markdown'
 import Breadcrumbs from '@/components/layout/Breadcrumbs'
 import { generarPdf } from '@/lib/mobileShare'
 import { secureStorage } from '@/lib/secureStorage'
+import { vaciarCacheCitas } from '@/lib/agenda/cacheRangosCitas'
 import { useAuditAccess } from '@/hooks/useAudit'
 import DiagnosticosEditor from '@/components/documentos/DiagnosticosEditor'
 import dynamic from 'next/dynamic'
@@ -729,6 +730,12 @@ export default function NuevaNotaPage() {
         return
       }
 
+      /* El servidor acaba de pasar la cita a «Atendida» y la agenda, desmontada,
+         la tiene en su caché como estaba: sin esto, al volver la pintaría aún
+         «Agendada» (I1, punto 4). Su canal de tiempo real sigue vivo un rato y
+         traería el cambio, pero es una escritura de ESTA pestaña: no se espera
+         al eco para invalidar. Como `ligarCita.ts`. */
+      if (citaOrigen) vaciarCacheCitas()
       secureStorage.remove(draftKey)
       setNotaSaved(true)
       setEstadoModal('exito')
