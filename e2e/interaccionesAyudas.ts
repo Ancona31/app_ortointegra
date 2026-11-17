@@ -21,6 +21,20 @@ export async function abrirAgendaV2(page: Page): Promise<void> {
   await expect(raiz).toHaveAttribute('data-interacciones-v2', 'listas')
 }
 
+/** Tanda I (punto 11) · La ventana «¿Asistió el paciente?» que sale al abrir la agenda v2.
+    Su nombre accesible es el título de `PreguntaAsistencia.tsx`. */
+export function preguntaAsistencia(page: Page): Locator {
+  return page.getByRole('dialog', { name: '¿Asistió el paciente?' })
+}
+
+/** Cierra la ventana de asistencia SIN cambiar nada («Decidir después»): para una prueba que sembró
+    una cita agendada de hace más de 48 horas y no prueba esa ventana. Espera a que salga. */
+export async function decidirDespues(page: Page): Promise<void> {
+  const v = preguntaAsistencia(page)
+  await v.getByRole('button', { name: 'Decidir después' }).click()
+  await expect(v).toHaveCount(0)
+}
+
 /** Abre /agenda con el interruptor apagado (el estado del `globalSetup`) y comprueba que no hay chunk. */
 export async function abrirAgendaApagada(page: Page): Promise<void> {
   await irAAgenda(page)

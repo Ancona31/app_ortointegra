@@ -55,14 +55,27 @@ function devolverConfig(foto: string): void {
       from f where a.clinica_id = ${CL};`, { foto })
 }
 
-/** Deja al administrador sin nada pendiente: su duración y su enlace fijo (se borran al terminar). */
+/** Deja al administrador sin nada pendiente: su duración, su enlace fijo (se borran al terminar) y, desde la
+    tanda I (punto 3), sus consultorios con el horario confirmado (la marca se devuelve a como estaba). */
 function adminSinPendientes(): () => void {
   const tipo = sqlLocal(`insert into public.tipos_cita (clinica_id, medico_id, nombre, duracion_min, principal)
     select ${CL}, id, 'Consulta', 30, true from auth.users where email = :'c' returning id`, { c: CORREO.adminA })
-  const enlace = sqlLocal(`insert into public.reserva_enlaces (id, clinica_id, medico_id, clase, codigo_hash)
-    select gen_random_uuid(), ${CL}, id, 'fijo', encode(sha256(gen_random_uuid()::text::bytea), 'hex') from auth.users where email = :'c' returning id`, { c: CORREO.adminA })
+  let enlace: string
+  try {
+    enlace = sqlLocal(`insert into public.reserva_enlaces (id, clinica_id, medico_id, clase, codigo_hash)
+      select gen_random_uuid(), ${CL}, id, 'fijo', encode(sha256(gen_random_uuid()::text::bytea), 'hex') from auth.users where email = :'c' returning id`, { c: CORREO.adminA })
+  } catch (e) { // sin esto, el tipo de arriba se queda y la siguiente prueba choca con él
+    sqlLocal(`begin; set local session_replication_role = replica; delete from public.tipos_cita where id = :'t'; commit;`, { t: tipo })
+    throw e
+  }
+  // La marca, al final: si una inserción de arriba falla, no queda nada marcado sin deshacer.
+  const revisados = sqlLocal(`update public.consultorios k set horario_revisado_en = now()
+    from auth.users u where u.email = :'c' and k.medico_id = u.id and k.horario_revisado_en is null returning k.id`, { c: CORREO.adminA })
+    .split('\n').filter(Boolean).join(',')
   return () => sqlLocal(`begin; set local session_replication_role = replica;
-    delete from public.reserva_enlaces where id = :'e'; delete from public.tipos_cita where id = :'t'; commit;`, { e: enlace, t: tipo })
+    delete from public.reserva_enlaces where id = :'e'; delete from public.tipos_cita where id = :'t';
+    update public.consultorios set horario_revisado_en = null where id = any (string_to_array(:'r', ',')::uuid[]); commit;`,
+  { e: enlace, t: tipo, r: revisados })
 }
 
 /* ── Punto 5 · pestañas ─────────────────────────────────────────────── */
@@ -275,7 +288,9 @@ test('10 · la invitada y la secretaria no ven «Restablecer» y la ruta les da 
   }
 })
 
-test('10 · el administrador restablece con la palabra escrita: «Primeros pasos» en 1 de 3, el horario de partida, citas intactas', async ({ page }) => {
+/* Tanda I (punto 3): tras restablecer, el horario de partida queda «por revisar» (0 de 3), no hecho.
+   MUTACIÓN: quitar `horario_revisado_en = NULL` de agenda_restablecer_configuracion() → rojo («hecho»). */
+test('10 · el administrador restablece con la palabra escrita: «Primeros pasos» en 0 de 3 (horario por revisar), el horario de partida, citas intactas', async ({ page }) => {
   const foto = guardarConfig()
   const deshacer = adminSinPendientes()
   const citas = () => sqlLocal(`select md5(string_agg(a::text, '|' order by a.id)) from public.appointments a where a.clinica_id = ${CL}`)
@@ -294,9 +309,10 @@ test('10 · el administrador restablece con la palabra escrita: «Primeros pasos
     await dialogo.getByLabel(/Para confirmar, escribe/).fill('RESTABLECER')
     await boton.click()
     await expect(toastConTexto(page, 'Configuración de la agenda restablecida')).toBeVisible()
-    await expect(page.getByRole('tab', { name: /^Primeros pasos.*2 pendientes/ })).toHaveAttribute('aria-selected', 'true')
-    await expect(page.getByRole('region', { name: 'Primeros pasos' })).toContainText('1 de 3 listos')
-    await expect(page.getByRole('region', { name: 'Primeros pasos' }).getByRole('listitem').first()).toHaveAccessibleName('Horario de cada consultorio: hecho')
+    await expect(page.getByRole('tab', { name: /^Primeros pasos.*3 pendientes/ })).toHaveAttribute('aria-selected', 'true')
+    await expect(page.getByRole('region', { name: 'Primeros pasos' })).toContainText('0 de 3 listos')
+    await expect(page.getByRole('region', { name: 'Primeros pasos' }).getByRole('listitem').first()).toHaveAccessibleName('Horario de cada consultorio: por revisar')
+    expect(sqlLocal(`select count(*) from public.consultorios where clinica_id = ${CL} and horario_revisado_en is not null`)).toBe('0')
     expect(sqlLocal(`select count(*) from public.tipos_cita where clinica_id = ${CL} and activo`)).toBe('0')
     expect(sqlLocal(`select count(*) from public.reserva_enlaces where clinica_id = ${CL} and revocado_en is null`)).toBe('0')
     /* El horario de partida de la v2: el de la clínica, COPIADO a cada consultorio y como propio (la herencia de G4). */
