@@ -216,6 +216,48 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:3px solid var(-
 .cita--arriba,.cita:hover{transform:translateY(-3px);box-shadow:0 8px 18px rgba(20,52,92,.18);border-color:#d97706}
 @media (prefers-reduced-motion:no-preference){.cita{transition:transform .12s cubic-bezier(0,0,.2,1),box-shadow .12s cubic-bezier(0,0,.2,1),border-color .12s}}
 .pieza p{font-size:13px;color:var(--ink3)}
+/* ── barra de la agenda ── */
+.bar-marco{min-width:940px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:12px}
+.bar{display:flex;align-items:center;gap:8px}
+.bar .esp{flex:1}
+.bar h4{margin:0;font-size:20px;font-weight:800;color:var(--ink);line-height:1.1}
+.bar h4 small{display:block;font-size:12.5px;font-weight:500;color:var(--ink3)}
+.ib{display:grid;place-items:center;width:40px;height:40px;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--ink);position:relative;flex:none}
+.ib i{position:absolute;top:7px;right:7px;width:9px;height:9px;border-radius:50%;background:var(--bad);border:2px solid var(--panel)}
+.tb{display:flex;align-items:center;gap:6px;height:40px;padding:0 12px;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--ink);font-weight:600;font-size:13.5px;white-space:nowrap;flex:none}
+.tb--pri{background:var(--brand);border-color:var(--brand);color:var(--on-brand);font-weight:700}
+.tb--fecha{border-color:transparent;font-size:16px;font-weight:700;padding:0 8px}
+.tb--hoy{background:var(--brand-bg);border-color:var(--brand-brd);color:var(--brand)}
+.vistas{display:flex;background:var(--muted);border-radius:10px;padding:4px;gap:2px;flex:none}
+.vistas span{padding:6px 12px;border-radius:7px;font-size:13.5px;font-weight:600;color:var(--ink3)}
+.vistas span[data-on]{background:var(--brand);color:var(--on-brand)}
+.sobra{outline:2px dashed var(--bad);outline-offset:2px}
+.ley{display:flex;gap:14px;font-size:12px;color:var(--ink3);border-top:1px solid var(--line2);padding-top:10px}
+.ley span{display:inline-flex;align-items:center;gap:5px}.ley b{width:8px;height:8px;border-radius:50%;display:inline-block}
+.desp{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:22px;align-items:start}
+.menu{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:0 10px 30px rgba(20,52,92,.14);padding:8px;display:flex;flex-direction:column;max-width:340px;width:100%}
+.menu__i{display:flex;align-items:center;gap:10px;padding:10px;border-radius:8px;font-size:14px;color:var(--ink);font-weight:500}
+.menu__i small{margin-left:auto;font-size:12px;color:var(--ink3);font-weight:500}
+.menu hr{border:0;border-top:1px solid var(--line2);margin:6px 4px;width:auto}
+.pest{display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid var(--line2);margin:-8px -8px 8px}
+.pest span{text-align:center;padding:12px 0;font-size:13.5px;font-weight:600;color:var(--ink3)}
+.pest span[data-on]{color:var(--brand);box-shadow:inset 0 -2px 0 var(--brand)}
+.pc{display:grid;grid-template-columns:1fr auto;gap:4px 10px;padding:10px;border-radius:8px;align-items:center}
+.pc + .pc{border-top:1px solid var(--line2);border-radius:0}
+.pc b{font-size:14px;color:var(--ink);font-weight:600}
+.pc span{font-size:12.5px;color:var(--ink3)}
+.pc .ac{display:flex;gap:6px;grid-row:1/3;grid-column:2}
+.pc .ac .ib{width:38px;height:38px}
+.pc em{grid-column:1/-1;font-style:normal;font-size:12px;color:var(--ink3)}
+.av{display:flex;gap:10px;padding:10px;font-size:13.5px;color:var(--ink)}
+.av + .av{border-top:1px solid var(--line2)}
+.av i{width:8px;height:8px;border-radius:50%;margin-top:6px;flex:none;background:var(--brand)}
+.av span{display:block;font-size:12px;color:var(--ink3)}
+.mes{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center;font-size:12.5px;padding:4px}
+.mes b{font-size:10.5px;color:var(--ink3);font-weight:700;padding:4px 0}
+.mes span{padding:7px 0;border-radius:7px;color:var(--ink)}
+.mes span[data-h]{background:var(--brand);color:var(--on-brand);font-weight:700}
+.mes span[data-o]{color:var(--ink3);opacity:.5}
 .nota-pie{font-size:13px;color:var(--ink3);border-top:1px solid var(--line);padding-top:14px}
 @media (prefers-reduced-motion:no-preference){.op,.dia,.hora,.nav button{transition:background-color .12s,border-color .12s,color .12s}}
 </style>
@@ -224,7 +266,7 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:3px solid var(-
   <div style="display:flex;flex-direction:column;gap:8px">
     <span class="tag">Agenda Spinus · propuesta de diseño para aprobar</span>
     <h1>Las páginas nuevas, con la identidad de Spinus</h1>
-    <p>Cinco pantallas rediseñadas. La reserva y la confirmación se pueden recorrer tocando; las demás son estáticas. Todos los datos son ficticios.</p>
+    <p>Seis pantallas rediseñadas. La reserva y la confirmación se pueden recorrer tocando; las demás son estáticas. Todos los datos son ficticios.</p>
   </div>
 
   <div class="nav" role="tablist" aria-label="Pantallas">
@@ -233,6 +275,7 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:3px solid var(-
     <button role="tab" data-v="correos" aria-selected="false">Correos</button>
     <button role="tab" data-v="configuracion" aria-selected="false">Configuración</button>
     <button role="tab" data-v="tarjetas" aria-selected="false">Burbuja y tarjeta</button>
+    <button role="tab" data-v="barra" aria-selected="false">Barra de la agenda</button>
   </div>
 
   <!-- ═════════ RESERVA ═════════ -->
@@ -495,6 +538,110 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:3px solid var(-
         <li>«Enviar confirmación» lleva el logo de WhatsApp; el de correo, un sobre.</li>
         <li>Las acciones cambian con el estado: atendida solo ofrece ver el expediente; cancelada o no asistió, reagendar.</li>
         <li>«Editar» y «Reagendar» hacían lo mismo: queda «Reagendar», y el formulario completo se abre con el engrane.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ═════════ BARRA ═════════ -->
+  <section class="vista vista--ancha" id="v-barra" hidden>
+    <div class="pieza">
+      <span class="tag">Hoy · 12 controles en dos filas, más la leyenda</span>
+      <div class="scroll"><div class="bar-marco">
+        <div class="bar">
+          <h4>Agenda<small>34 citas · 3 eventos</small></h4><span class="esp"></span>
+          <div class="vistas"><span>Mes</span><span data-on>Semana</span><span>Día</span></div>
+          <span class="ib sobra" title="Compactar"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 5 4 4 4-4M8 19l4-4 4 4"/></svg></span>
+          <span class="tb">Dr. Admin Semilla Uno <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg></span>
+          <span class="ib"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.900 4.900l2.100 2.100M17 17l2.100 2.100M4.900 19.100 7 17M17 7l2.100-2.100"/></svg></span>
+          <span class="ib"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></span>
+          <span class="ib sobra" title="Atajos"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.500" y="6" width="19" height="12" rx="2"/><path d="M6.500 10h.01M10 10h.01M13.500 10h.01M17 10h.01M7 14h10"/></svg></span>
+          <span class="tb sobra"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12a8 8 0 0 1-11.800 7L4 20l1-4.200A8 8 0 1 1 20 12Z"/></svg> Por confirmar (4)</span>
+          <span class="tb tb--pri">+ Agendar</span>
+        </div>
+        <div class="bar">
+          <span class="ib"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m14 6-6 6 6 6"/></svg></span><span class="ib"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m10 6 6 6-6 6"/></svg></span><span class="tb tb--hoy">Hoy</span>
+          <span class="tb tb--fecha">14 – 20 dic 2026</span>
+          <span class="ib sobra" title="Ir a una fecha"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.500" y="5" width="17" height="15" rx="2"/><path d="M3.500 10h17M8 3v4M16 3v4"/></svg></span>
+        </div>
+        <div class="ley"><span><b style="background:#d97706"></b>Agendada</span><span><b style="background:#1e5fa8"></b>Confirmada</span><span><b style="background:#c0392b"></b>Cancelada</span><span><b style="background:#64748b"></b>No asistió</span><span><b style="background:#16a34a"></b>Atendida</span></div>
+      </div></div>
+      <p>Con línea roja punteada, los cuatro controles que salen de la barra.</p>
+    </div>
+
+    <div class="pieza">
+      <span class="tag">Propuesta · 10 controles en una fila</span>
+      <div class="scroll"><div class="bar-marco">
+        <div class="bar">
+          <span class="ib"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m14 6-6 6 6 6"/></svg></span><span class="ib"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m10 6 6 6-6 6"/></svg></span><span class="tb tb--hoy">Hoy</span>
+          <span class="tb tb--fecha">14 – 20 dic 2026 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg></span>
+          <span class="esp"></span>
+          <div class="vistas"><span>Mes</span><span data-on>Semana</span><span>Día</span></div>
+          <span class="tb">Dr. Admin Semilla Uno <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg></span>
+          <span class="ib"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></span>
+          <span class="ib" title="Pendientes"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9a6 6 0 1 1 12 0c0 6 2.500 7 2.500 7h-17S6 15 6 9Z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg><i></i></span>
+          <span class="ib" title="Configuración"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.900 4.900l2.100 2.100M17 17l2.100 2.100M4.900 19.100 7 17M17 7l2.100-2.100"/></svg></span>
+          <span class="tb tb--pri">+ Agendar</span>
+        </div>
+      </div></div>
+      <p>La fecha es el propio botón para saltar a otro día. La campana reúne «Por confirmar» y los avisos. El título «Agenda» y el conteo desaparecen: ya lo dice el menú lateral.</p>
+    </div>
+
+    <div class="desp">
+      <div class="pieza">
+        <span class="tag">Al pulsar la fecha</span>
+        <div class="menu">
+          <div class="bar" style="padding:4px 6px 8px"><span class="ib" style="width:32px;height:32px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m14 6-6 6 6 6"/></svg></span><b style="flex:1;text-align:center;color:var(--ink);font-size:14px">Diciembre 2026</b><span class="ib" style="width:32px;height:32px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m10 6 6 6-6 6"/></svg></span></div>
+          <div class="mes"><b>L</b><b>M</b><b>X</b><b>J</b><b>V</b><b>S</b><b>D</b><span data-o>26</span><span data-o>27</span><span data-o>28</span><span data-o>29</span><span data-o>30</span><span data-o>31</span><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span><span>11</span><span>12</span><span>13</span><span>14</span><span>15</span><span data-h>16</span><span>17</span><span>18</span><span>19</span><span>20</span><span>21</span><span>22</span><span>23</span><span>24</span><span>25</span><span>26</span><span>27</span><span>28</span><span>29</span><span>30</span><span data-o>1</span><span data-o>2</span><span data-o>3</span><span data-o>4</span><span data-o>5</span><span data-o>6</span></div>
+        </div>
+        <p>Sustituye al botón «Ir a una fecha».</p>
+      </div>
+
+      <div class="pieza">
+        <span class="tag">Al pulsar la campana</span>
+        <div class="menu">
+          <div class="pest"><span data-on>Por confirmar · 4</span><span>Avisos · 2</span></div>
+          <div class="pc"><b>Paciente Prueba 02</b><span>Mañana 10:00 · Consultorio Centro</span>
+            <div class="ac"><span class="ib"><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path fill="#25D366" d="M12 2.2a9.8 9.8 0 0 0-8.5 14.7L2.2 21.8l5-1.3A9.8 9.8 0 1 0 12 2.2z"/><path fill="#fff" d="M9.1 6.9c-.3-.6-.5-.6-.8-.6h-.6c-.2 0-.6.1-.9.4-.3.3-1.1 1.1-1.1 2.7s1.2 3.1 1.3 3.3c.2.2 2.3 3.6 5.6 4.9 2.8 1.1 3.3.9 3.9.8.6-.1 1.9-.8 2.2-1.5.3-.8.3-1.4.2-1.5-.1-.1-.3-.2-.6-.4l-2.1-1c-.3-.1-.5-.2-.7.1-.2.3-.8 1-1 1.2-.2.2-.4.2-.6.1-.3-.1-1.3-.5-2.5-1.5-.9-.8-1.5-1.8-1.7-2.1-.2-.3 0-.5.1-.6l.5-.5c.1-.2.2-.3.3-.5.1-.2 0-.4 0-.5l-1-2.3z"/></svg></span><span class="ib"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2.500"/><path d="m4 7 8 6 8-6"/></svg></span></div><em>Correo enviado 00:35</em></div>
+          <div class="pc"><b>Paciente Prueba 25</b><span>Mañana 10:00 · Rehabilitación</span>
+            <div class="ac"><span class="ib"><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path fill="#25D366" d="M12 2.2a9.8 9.8 0 0 0-8.5 14.7L2.2 21.8l5-1.3A9.8 9.8 0 1 0 12 2.2z"/><path fill="#fff" d="M9.1 6.9c-.3-.6-.5-.6-.8-.6h-.6c-.2 0-.6.1-.9.4-.3.3-1.1 1.1-1.1 2.7s1.2 3.1 1.3 3.3c.2.2 2.3 3.6 5.6 4.9 2.8 1.1 3.3.9 3.9.8.6-.1 1.9-.8 2.2-1.5.3-.8.3-1.4.2-1.5-.1-.1-.3-.2-.6-.4l-2.1-1c-.3-.1-.5-.2-.7.1-.2.3-.8 1-1 1.2-.2.2-.4.2-.6.1-.3-.1-1.3-.5-2.5-1.5-.9-.8-1.5-1.8-1.7-2.1-.2-.3 0-.5.1-.6l.5-.5c.1-.2.2-.3.3-.5.1-.2 0-.4 0-.5l-1-2.3z"/></svg></span><span class="ib"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2.500"/><path d="m4 7 8 6 8-6"/></svg></span></div><em>WhatsApp abierto 00:35 · Correo enviado 00:35</em></div>
+          <div class="pc"><b>Paciente Prueba 04</b><span>Mañana 12:00 · Consultorio Centro</span>
+            <div class="ac"><span class="ib"><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path fill="#25D366" d="M12 2.2a9.8 9.8 0 0 0-8.5 14.7L2.2 21.8l5-1.3A9.8 9.8 0 1 0 12 2.2z"/><path fill="#fff" d="M9.1 6.9c-.3-.6-.5-.6-.8-.6h-.6c-.2 0-.6.1-.9.4-.3.3-1.1 1.1-1.1 2.7s1.2 3.1 1.3 3.3c.2.2 2.3 3.6 5.6 4.9 2.8 1.1 3.3.9 3.9.8.6-.1 1.9-.8 2.2-1.5.3-.8.3-1.4.2-1.5-.1-.1-.3-.2-.6-.4l-2.1-1c-.3-.1-.5-.2-.7.1-.2.3-.8 1-1 1.2-.2.2-.4.2-.6.1-.3-.1-1.3-.5-2.5-1.5-.9-.8-1.5-1.8-1.7-2.1-.2-.3 0-.5.1-.6l.5-.5c.1-.2.2-.3.3-.5.1-.2 0-.4 0-.5l-1-2.3z"/></svg></span><span class="ib"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2.500"/><path d="m4 7 8 6 8-6"/></svg></span></div></div>
+        </div>
+        <p>Los dos botones quedan siempre en el mismo sitio, y el estado va en una sola línea debajo.</p>
+      </div>
+
+      <div class="pieza">
+        <span class="tag">La pestaña «Avisos»</span>
+        <div class="menu">
+          <div class="pest"><span>Por confirmar · 4</span><span data-on>Avisos · 2</span></div>
+          <div class="av"><i></i><div>María Ejemplo reservó por tu enlace<span>Jue 17 dic · 10:45 · hace 5 min</span></div></div>
+          <div class="av"><i style="background:var(--bad)"></i><div>Luis Pech canceló su cita<span>Vie 18 dic · 09:00 · hace 1 h</span></div></div>
+        </div>
+        <p>Lo que pasó sin que nadie de la clínica lo hiciera: reservas, cancelaciones y cambios desde Google.</p>
+      </div>
+
+      <div class="pieza">
+        <span class="tag">Al pulsar el engrane</span>
+        <div class="menu">
+          <div class="menu__i"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.900 4.900l2.100 2.100M17 17l2.100 2.100M4.900 19.100 7 17M17 7l2.100-2.100"/></svg> Configuración de la agenda</div>
+          <hr>
+          <div class="menu__i"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 5 4 4 4-4M8 19l4-4 4 4"/></svg> Compactar la rejilla <small>Apagado</small></div>
+          <div class="menu__i"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.500" y="5" width="17" height="15" rx="2"/><path d="M3.500 10h17M8 3v4M16 3v4"/></svg> Densidad <small>Normal</small></div>
+          <div class="menu__i"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.500" y="6" width="19" height="12" rx="2"/><path d="M6.500 10h.01M10 10h.01M13.500 10h.01M17 10h.01M7 14h10"/></svg> Atajos de teclado</div>
+          <hr>
+          <div class="menu__i">Leyenda de estados</div>
+        </div>
+        <p>Lo que se ajusta una vez y no se toca a diario. La leyenda de colores también se va aquí y libera una fila.</p>
+      </div>
+    </div>
+
+    <div class="notas">
+      <h2>Qué cambia</h2>
+      <ul>
+        <li>De doce controles en dos filas a diez en una, aun sumando las notificaciones.</li>
+        <li>Se gana una fila de alto para la rejilla, y otra más si la leyenda pasa al engrane.</li>
+        <li>Un solo punto rojo, en la campana, para todo lo que pide atención.</li>
+        <li>«Agendar» sigue siendo el único botón de color.</li>
       </ul>
     </div>
   </section>
