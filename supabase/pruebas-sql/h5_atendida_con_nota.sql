@@ -1,6 +1,6 @@
 -- Tanda H, punto 22 (20261120130000_agenda_h5_atendida_con_nota.sql): una cita ATENDIDA con nota
 -- clínica ligada no cambia de estado ni se borra (con la v2 encendida o apagada) y no se mueve
--- (con la v2 encendida), ni con la sesión (PostgREST directo, sin la API) ni como service_role.
+-- (con la v2 encendida; desde la tanda I, 20261121140000, también apagada), ni con la sesión (PostgREST directo, sin la API) ni como service_role.
 -- Sin nota, todo como antes. postgres queda fuera (editor SQL, ayudantes de las e2e).
 -- Mutaciones comprobadas en rojo:
 --   · quitar los RAISE de cita_proteger_atendida() → «caso 1: admin cambió el estado…»;
@@ -177,7 +177,8 @@ begin
 end $$;
 
 -- Caso 5: v2 apagada. La atendida con nota no cambia de estado ni se borra (cita_proteger_borrado
--- no la cubre apagada: esto es sólo de este disparador), pero se mueve, como hoy en la app.
+-- no la cubre apagada: esto es sólo de este disparador). Tanda I (punto 1, 20261121140000): tampoco
+-- se mueve (antes, con la v2 apagada, se movía como en la app; lo amplía i4_atendida_movida.sql).
 do $$
 begin
   perform pg_temp.como('00000000-0000-4000-8000-000000a5a002');
@@ -192,13 +193,15 @@ begin
     raise exception 'H5 caso 5: con la v2 apagada la sesión borró una atendida con nota';
   exception when insufficient_privilege then null;
   end;
-  update public.appointments set start_time = start_time + interval '1 hour', end_time = end_time + interval '1 hour'
-   where id = '00000000-0000-4000-8000-000000a5d006';
+  begin
+    update public.appointments set start_time = start_time + interval '1 hour', end_time = end_time + interval '1 hour'
+     where id = '00000000-0000-4000-8000-000000a5d006';
+    raise exception 'H5 caso 5: con la v2 apagada la sesión movió una atendida con nota (tanda I, punto 1)';
+  exception when insufficient_privilege then null;
+  end;
   reset role;
-  if (select status from public.appointments where id = '00000000-0000-4000-8000-000000a5d006') <> 'attended'
-     or (select start_time from public.appointments where id = '00000000-0000-4000-8000-000000a5d006')
-        < now() - interval '2 days' + interval '59 minutes' then
-    raise exception 'H5 caso 5: con la v2 apagada la atendida con nota no se movió, o cambió de estado';
+  if (select status from public.appointments where id = '00000000-0000-4000-8000-000000a5d006') <> 'attended' then
+    raise exception 'H5 caso 5: con la v2 apagada la atendida con nota cambió de estado';
   end if;
 end $$;
 

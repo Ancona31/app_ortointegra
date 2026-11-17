@@ -9,7 +9,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { APPOINTMENT_SELECT } from '@/lib/appointments'
 
-interface Respuesta { data: { id: string }[] | null; count: number | null; error: { message: string } | null }
+interface Respuesta { data: { id: string; cerrada_en?: string | null }[] | null; count: number | null; error: { message: string } | null }
 
 const h = vi.hoisted(() => {
   const estado: { llamadas: unknown[][]; respuesta: Respuesta } = {
@@ -85,5 +85,13 @@ describe('consultaCitas', () => {
     h.respuesta = { data: null, count: null, error: { message: 'boom' } }
     expect(await consultaCitas(await createClient(), { clinicaId: 'c1', from: DESDE, to: HASTA, medicoId: null }))
       .toEqual({ ok: false, error: 'boom' })
+  })
+})
+
+describe('Tanda I (punto 12) · la cancelada cerrada no se pinta', () => {
+  it('quita las filas con `cerrada_en`; sin la columna, ninguna; `incompleta` cuenta las crudas', async () => {
+    h.respuesta = { data: [{ id: 'a' }, { id: 'b', cerrada_en: '2026-11-17T10:00:00.000Z' }, { id: 'c', cerrada_en: null }], count: 3, error: null }
+    expect(await consultaCitas(await createClient(), { clinicaId: 'c1', from: DESDE, to: HASTA, medicoId: null }))
+      .toEqual({ ok: true, appointments: [{ id: 'a' }, { id: 'c', cerrada_en: null }], incompleta: false })
   })
 })

@@ -146,7 +146,7 @@ export async function PATCH(
     // handler se comporta como antes: `horario_propio` se ignora y el horario
     // no se valida en orden. El interruptor sólo se lee si el cuerpo toca el
     // horario, para no añadir una consulta a las demás ediciones.
-    const tocaDisponibilidad = input.horario_propio !== undefined || input.horario !== undefined
+    const tocaDisponibilidad = input.horario_propio !== undefined || input.horario !== undefined || input.horario_revisado === true
     const v2 = tocaDisponibilidad && profile.clinica_id
       ? await agendaV2Encendida(supabase, profile.clinica_id)
       : false
@@ -166,6 +166,11 @@ export async function PATCH(
     if (input.timezone !== undefined) updatePayload.timezone = input.timezone
     if (input.horario !== undefined) updatePayload.horario = input.horario
     if (v2 && input.horario_propio !== undefined) updatePayload.horario_propio = input.horario_propio
+    /* Tanda I (punto 3): con la v2, una persona confirmó o guardó el horario de
+       este consultorio desde la configuración: deja de estar «por revisar» en
+       «Primeros pasos» (`horario_revisado_en`, 20261121141000). Apagada no se
+       nombra la columna (puede no existir). */
+    if (v2) updatePayload.horario_revisado_en = new Date().toISOString()
 
     if (Object.keys(updatePayload).length === 0) {
       return NextResponse.json({ error: 'Nada que actualizar' }, { status: 400 })

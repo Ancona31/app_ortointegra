@@ -41,6 +41,10 @@ import { teclasDeAccion } from '@/lib/agenda/atajosAgenda'
 /** `'YYYY-MM-DD/YYYY-MM-DD'`: el periodo que pinta el calendario, `[desde, hasta)`. Lo escribe `datesSet`. */
 export type RangoVisibleV2 = string
 
+/* Tanda I (punto 11) · La pregunta de asistencia viaja en ESTE chunk (el de
+   las herramientas v2, ya descargado en ocioso): ni un archivo más al abrir. */
+export { default as PreguntaAsistenciaV2 } from '@/components/agenda/PreguntaAsistencia'
+
 function partirRango(rango: RangoVisibleV2): { desde: string; hasta: string } {
   const [desde = '', hasta = ''] = rango.split('/')
   return { desde, hasta }

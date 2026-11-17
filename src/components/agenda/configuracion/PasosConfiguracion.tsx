@@ -33,10 +33,11 @@ import { DIAS } from '@/lib/agenda/horarioAgenda'
 import type { Consultorio } from '@/types'
 
 export type ClavePaso = 'horario' | 'duracion' | 'enlace'
-export interface Paso { clave: ClavePaso; titulo: string; hecho: boolean }
+/** Tanda I (punto 3): `porRevisar` = el paso estaría hecho, pero nadie confirmó el horario (no cuenta como hecho). */
+export interface Paso { clave: ClavePaso; titulo: string; hecho: boolean; porRevisar?: boolean }
 
 /** Lo que `pasosDe` necesita de un consultorio para saber si su horario se configuró alguna vez. */
-type ConsultorioPaso = Pick<Consultorio, 'medico_id' | 'activo' | 'horario' | 'horario_propio'>
+type ConsultorioPaso = Pick<Consultorio, 'medico_id' | 'activo' | 'horario' | 'horario_propio' | 'horario_revisado_en'>
 
 /**
  * ¿Este consultorio está como NACE, sin que nadie haya tocado su horario?
@@ -59,9 +60,15 @@ function horarioSinTocar(c: ConsultorioPaso): boolean {
 export function pasosDe(lista: ListaEnlaces, medicoId: string, consultorios: readonly ConsultorioPaso[] | null = null): Paso[] | null {
   const motivos = lista.preparacion?.[medicoId]
   if (!motivos) return null
-  const sinTocar = (consultorios ?? []).some(c => c.medico_id === medicoId && c.activo !== false && horarioSinTocar(c))
+  const suyos = (consultorios ?? []).filter(c => c.medico_id === medicoId && c.activo !== false)
+  const sinTocar = suyos.some(horarioSinTocar)
+  const listo = !motivos.includes('sin_consultorio') && !motivos.includes('sin_disponibilidad') && !sinTocar
+  /* Tanda I (punto 3): heredado de la clínica (G4) o dejado por «Restablecer», y
+     nadie lo ha confirmado: «por revisar», no hecho. `undefined` = la columna no
+     existe (sin la migración): como antes. */
+  const porRevisar = listo && suyos.some(c => c.horario_revisado_en === null)
   return [
-    { clave: 'horario', titulo: 'Horario de cada consultorio', hecho: !motivos.includes('sin_consultorio') && !motivos.includes('sin_disponibilidad') && !sinTocar },
+    { clave: 'horario', titulo: 'Horario de cada consultorio', hecho: listo && !porRevisar, ...(porRevisar ? { porRevisar } : {}) },
     { clave: 'duracion', titulo: 'Duración de la consulta', hecho: !motivos.includes('sin_tipos') },
     { clave: 'enlace', titulo: 'Enlace de reserva', hecho: lista.enlaces.some(e => e.medico_id === medicoId) },
   ]
@@ -90,24 +97,36 @@ async function crearEnlaceFijo(medicoId: string): Promise<string | null> {
   }
 }
 
+/** Tanda I (punto 3): la línea del paso 1 cuando está por revisar. */
+const AYUDA_POR_REVISAR = 'Viene del horario de la clínica: revísalo y confírmalo en cada consultorio.'
+
 const AYUDA: Record<ClavePaso, string> = {
   horario: 'Qué días y horas atiendes en cada consultorio.',
   duracion: 'Con ella se cuentan los horarios que ofrece tu enlace.',
   enlace: 'Para que tus pacientes agenden por su cuenta.',
 }
 
+/** El círculo del paso: hecho (verde), por revisar (los colores del aviso, tanda I) o pendiente (su número). */
+function claseCirculo(paso: Paso): string {
+  if (paso.hecho) return 'border-[var(--ag-success-text)] bg-[var(--ag-success-text)] text-white'
+  if (paso.porRevisar) return 'border-[var(--ag-aviso-border)] bg-[var(--ag-aviso-bg)] text-[var(--ag-aviso-text)]'
+  return 'border-[var(--ag-border-card)] bg-[var(--ag-surface)] text-[var(--ag-muted)]'
+}
+
 /** Un paso: el círculo (número o palomita), el título con su línea y la acción a la derecha. */
 function FilaPaso({ paso, n, detalle, accion, children }: { paso: Paso; n: number; detalle: string; accion?: ReactNode; children?: ReactNode }) {
+  const estado = paso.hecho ? 'hecho' : paso.porRevisar ? 'por revisar' : 'pendiente'
   return (
-    <li aria-label={`${paso.titulo}: ${paso.hecho ? 'hecho' : 'pendiente'}`} className="flex flex-col gap-[var(--ag-3)]">
+    <li aria-label={`${paso.titulo}: ${estado}`} className="flex flex-col gap-[var(--ag-3)]">
       <div className="grid grid-cols-[1.5rem_minmax(0,1fr)] items-center gap-x-[var(--ag-3)] gap-y-[var(--ag-2)] sm:grid-cols-[1.5rem_minmax(0,1fr)_auto]">
-        <span aria-hidden="true" className={`grid h-6 w-6 place-items-center rounded-full border-2 text-xs font-bold ${paso.hecho
-          ? 'border-[var(--ag-success-text)] bg-[var(--ag-success-text)] text-white'
-          : 'border-[var(--ag-border-card)] bg-[var(--ag-surface)] text-[var(--ag-muted)]'}`}>
-          {paso.hecho ? <Check size={14} strokeWidth={3} /> : n}
+        <span aria-hidden="true" className={`grid h-6 w-6 place-items-center rounded-full border-2 text-xs font-bold ${claseCirculo(paso)}`}>
+          {paso.hecho ? <Check size={14} strokeWidth={3} /> : paso.porRevisar ? '!' : n}
         </span>
         <div className="min-w-0">
-          <p className="text-sm font-semibold text-[var(--ag-text)]">{paso.titulo}</p>
+          <p className="text-sm font-semibold text-[var(--ag-text)]">
+            {paso.titulo}
+            {paso.porRevisar && <span className="ml-[var(--ag-2)] font-medium text-[var(--ag-aviso-text)]">· Por revisar</span>}
+          </p>
           <p className="text-sm text-[var(--ag-muted)]">{detalle}</p>
         </div>
         {accion && <div className="col-start-2 flex flex-wrap gap-[var(--ag-2)] sm:col-start-3">{accion}</div>}
@@ -170,7 +189,7 @@ export default function PasosConfiguracion({ pasos, motivos, medicoId, resumen, 
       </div>
       <ol className="flex flex-col gap-[var(--ag-4)]">
         {pasos.map((p, i) => (
-          <FilaPaso key={p.clave} paso={p} n={i + 1} detalle={p.hecho ? resumen[p.clave] ?? 'Listo' : AYUDA[p.clave]} accion={accionDe(p)}>
+          <FilaPaso key={p.clave} paso={p} n={i + 1} detalle={p.hecho ? resumen[p.clave] ?? 'Listo' : p.porRevisar ? AYUDA_POR_REVISAR : AYUDA[p.clave]} accion={accionDe(p)}>
             {/* Con «Crear enlace» abierto la pregunta va ahí (una sola vez en la tarjeta). */}
             {p.clave === 'duracion' && !p.hecho && !pidiendo && (
               <div className="ml-0 rounded-[var(--ag-r-btn)] border border-[var(--ag-border-card)] bg-[var(--ag-surface)] p-[var(--ag-3)] sm:ml-9">
@@ -192,7 +211,7 @@ export default function PasosConfiguracion({ pasos, motivos, medicoId, resumen, 
 function accionDelPaso(p: Paso, o: { motivos: readonly MotivoApertura[]; puedeEmitir: boolean; ocupado: boolean; pedir: () => void }): ReactNode {
   if (p.clave === 'horario') {
     if (!p.hecho && o.motivos.includes('sin_consultorio')) return <Link href="/perfil" className={BOTON_PRIMARIO}>Dar de alta</Link>
-    return <a href="#config-disponibilidad" className={p.hecho ? BOTON_SECUNDARIO : BOTON_PRIMARIO}>{p.hecho ? 'Revisar' : 'Abrir horario'}</a>
+    return <a href="#config-disponibilidad" className={p.hecho ? BOTON_SECUNDARIO : BOTON_PRIMARIO}>{p.hecho ? 'Revisar' : p.porRevisar ? 'Revisar horario' : 'Abrir horario'}</a>
   }
   if (p.clave === 'duracion') return p.hecho ? <a href="#config-tipos" className={BOTON_SECUNDARIO}>Revisar</a> : null
   if (p.hecho) return <a href="#config-enlaces" className={BOTON_SECUNDARIO}>Revisar</a>

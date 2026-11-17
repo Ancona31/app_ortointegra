@@ -42,6 +42,9 @@ let desde = ''
 let tiposAparcados: string[] = []
 /** Lo mismo con los enlaces vigentes (un enlace fijo hecho a mano chocaría con «Crear enlace fijo»). */
 let enlacesAparcados: string[] = []
+/** Tanda I (punto 3): los consultorios de la clínica A que nadie había confirmado; aquí se dan por
+    revisados (lo que se prueba es lo de G2) y al terminar vuelven a «por revisar». Ver agenda-i4. */
+let revisadosAqui = ''
 
 /**
  * CENTINELAS · lo que alguien hizo A MANO en la Clínica A antes de la prueba
@@ -86,6 +89,8 @@ test.beforeAll(() => {
   tiposAparcados = sqlLocal(`update public.tipos_cita set activo = false where clinica_id = :'c' and activo returning id`, { c: clinicaA() })
     .split('\n').filter(Boolean)
   enlacesAparcados = aparcarEnlacesVigentes()
+  revisadosAqui = sqlLocal(`update public.consultorios set horario_revisado_en = now()
+    where clinica_id = :'c' and horario_revisado_en is null returning id`, { c: clinicaA() }).split('\n').filter(Boolean).join(',')
   desde = marcaE2e()
 })
 test.afterAll(() => {
@@ -96,7 +101,11 @@ test.afterAll(() => {
         if (tiposAparcados.length) {
           sqlLocal(`update public.tipos_cita set activo = true where id = any (string_to_array(:'ids', ',')::uuid[])`, { ids: tiposAparcados.join(',') })
         }
-      } finally { borrarCentinelas() }
+      } finally {
+        try { borrarCentinelas() } finally {
+          sqlLocal(`update public.consultorios set horario_revisado_en = null where id = any (string_to_array(:'r', ',')::uuid[])`, { r: revisadosAqui })
+        }
+      }
     }
   }
 })

@@ -155,7 +155,10 @@ export type ModalState =
   | { mode: 'create'; fecha: string; hora: string | null; tipo: TipoFila; todoElDia: TodoElDiaInicial; fechaFin?: string; paciente?: PacienteBusqueda; horaFin?: string; medicoId?: string;
       consultorioId?: string; enfocar?: 'fecha'
       /* H3 (punto 14) · Las observaciones escritas en la burbuja («Más opciones»). */
-      notas?: string }
+      notas?: string
+      /* Tanda I (punto 12) · La cancelada que esta alta sustituye («Reagendar
+         cita» o «Reasignar»): viaja como `sustituye_a` y el servidor la cierra. */
+      sustituyeA?: string }
   | { mode: 'edit';   appointment: Appointment; enfocar?: 'fecha' }
 
 /**
@@ -878,6 +881,8 @@ export default function AppointmentModal({
          alta, si hay tipo). Un evento sin paciente que arrastre un tipo viejo
          manda `null` y lo limpia. */
       ...(agendaV2 && tipoEfectivo !== (apt?.tipo_cita_id ?? null) ? { tipo_cita_id: tipoEfectivo } : {}),
+      /* Tanda I (punto 12): sólo en un alta de CITA que sustituye a una cancelada. */
+      ...(modal.mode === 'create' && modal.sustituyeA && !esEvento ? { sustituye_a: modal.sustituyeA } : {}),
     })
     setSaving(false)
   }

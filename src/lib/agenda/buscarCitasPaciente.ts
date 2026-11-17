@@ -140,6 +140,9 @@ export async function buscarCitasDePaciente(pacienteId: string, ahora: Date = ne
     .from('appointments')
     .select(COLUMNAS_CITA)
     .eq('paciente_id', pacienteId)
+    /* Tanda I (punto 12): la cancelada que se sustituyó no se ve en la agenda,
+       tampoco aquí (sólo con v2, como todo este archivo; la columna es de I4). */
+    .is('cerrada_en', null)
     .gte('start_time', desde)
     .lt('start_time', hasta)
     .order('start_time')
@@ -163,6 +166,7 @@ export async function buscarCitasPorLigar(texto: string, ahora: Date = new Date(
     .is('paciente_id', null)
     .not('reserva_canal', 'is', null)
     .ilike('reserva_nombre', `%${q}%`)
+    .is('cerrada_en', null)
     .gte('start_time', desde)
     .lt('start_time', hasta)
     .order('start_time')

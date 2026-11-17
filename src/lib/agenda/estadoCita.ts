@@ -23,29 +23,48 @@ export function vetoPorEstado(
 ): string | null {
   if (antes.status !== 'attended') return null
   if (cuerpo.status === 'confirmed' || cuerpo.status === 'cancelled') return 'Una cita atendida ya concluyó: no se puede confirmar ni cancelar.'
+  if (mueveCita(antes, cuerpo)) return 'Una cita atendida ya concluyó: no se puede cambiar de fecha ni de hora.'
+  return null
+}
+
+/** ¿El cuerpo mueve la cita (inicio, fin, o entrar o salir de todo el día)? Comparado por instante. */
+export function mueveCita(
+  antes: { start_time: string; end_time: string; all_day: boolean | null },
+  cuerpo: { start_time?: unknown; end_time?: unknown; all_day?: unknown },
+): boolean {
   const mueve = (nuevo: unknown, viejo: string): boolean =>
     typeof nuevo === 'string' && new Date(nuevo).getTime() !== new Date(viejo).getTime()
   const cambiaDia = cuerpo.all_day !== undefined && (cuerpo.all_day === true) !== (antes.all_day === true)
-  if (mueve(cuerpo.start_time, antes.start_time) || mueve(cuerpo.end_time, antes.end_time) || cambiaDia) {
-    return 'Una cita atendida ya concluyó: no se puede cambiar de fecha ni de hora.'
-  }
-  return null
+  return mueve(cuerpo.start_time, antes.start_time) || mueve(cuerpo.end_time, antes.end_time) || cambiaDia
+}
+
+/** El HINT del 42501 de `cita_proteger_atendida()` (20261120130000 y 20261121140000), tal cual. */
+export const HINT_ATENDIDA_CON_NOTA = 'La nota es expediente: la cita se queda como atendida'
+
+type AntesNota = { status: string; start_time: string; end_time: string; all_day: boolean | null }
+type CuerpoNota = { status?: unknown; start_time?: unknown; end_time?: unknown; all_day?: unknown }
+
+function cambiaEstado(antes: { status: string }, cuerpo: { status?: unknown }): boolean {
+  return typeof cuerpo.status === 'string' && cuerpo.status !== antes.status
+}
+
+/** ¿Hay que mirar si tiene nota? Sólo si es atendida y el cuerpo cambia su estado o la mueve. */
+export function pideComprobarNota(antes: AntesNota, cuerpo: CuerpoNota): boolean {
+  return antes.status === 'attended' && (cambiaEstado(antes, cuerpo) || mueveCita(antes, cuerpo))
 }
 
 /**
  * G3 · Decisión de Angel (2026-11-14): una cita ATENDIDA con una nota clínica
  * ligada (`consultas.appointment_id`) no puede pasar a NINGÚN otro estado; sin
- * nota sí, para corregir un error. Aplica SIEMPRE, con la v2 encendida o
- * apagada: la nota es expediente (NOM-004, integridad) y ningún flujo de hoy
- * necesita desmarcar una atendida que ya tiene nota. Pura: quien llama dice si
- * hay nota (`notaLigadaServidor.ts`) y sólo lo pregunta cuando hace falta
- * (`pideComprobarNota`). `null` = se deja pasar.
+ * nota sí, para corregir un error. Tanda I (punto 1 de Angel): tampoco se MUEVE
+ * de fecha u hora (ni entra o sale de todo el día). Aplica SIEMPRE, con la v2
+ * encendida o apagada: la nota es expediente (NOM-004, integridad); la base
+ * dice lo mismo (`cita_proteger_atendida`, 20261121140000). Pura: quien llama
+ * dice si hay nota (`notaLigadaServidor.ts`) y sólo lo pregunta cuando hace
+ * falta (`pideComprobarNota`). `null` = se deja pasar.
  */
-export function pideComprobarNota(antes: { status: string }, cuerpo: { status?: unknown }): boolean {
-  return antes.status === 'attended' && typeof cuerpo.status === 'string' && cuerpo.status !== 'attended'
-}
-
-export function vetoPorNotaLigada(antes: { status: string }, cuerpo: { status?: unknown }, tieneNota: boolean): string | null {
+export function vetoPorNotaLigada(antes: AntesNota, cuerpo: CuerpoNota, tieneNota: boolean): string | null {
   if (!tieneNota || !pideComprobarNota(antes, cuerpo)) return null
-  return 'Esta cita ya tiene una nota clínica: sigue como atendida y no puede cambiar de estado.'
+  if (cambiaEstado(antes, cuerpo)) return 'Esta cita ya tiene una nota clínica: sigue como atendida y no puede cambiar de estado.'
+  return 'Esta cita ya tiene una nota clínica: sigue como atendida y no se puede cambiar de fecha ni de hora.'
 }

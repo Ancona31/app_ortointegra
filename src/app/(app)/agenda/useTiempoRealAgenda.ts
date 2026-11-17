@@ -336,6 +336,9 @@ export function useTiempoRealAgenda({ calendarRef, filtroEfectivo, refetch, ulti
 
     const fila = payload.new
     if (!fila?.id || !fila.start_time) return
+    /* Tanda I (punto 12): una cancelada que se sustituyó (`cerrada_en`) deja de
+       pintarse, como en `consultaCitas`: el hueco queda libre para el clic. */
+    if (fila.cerrada_en) { quitarConSalida(api, fila.id); return }
 
     // E8 · ANTES de consumir la firma y de fusionar: hace falta el estado que
     // estaba pintado. Sólo avisa al padre; quien decide si fue el paciente es él.

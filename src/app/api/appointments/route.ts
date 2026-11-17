@@ -15,6 +15,7 @@ import { consultaCitas } from '@/lib/agenda/consultaCitas'
 import { agendaV2Encendida } from '@/lib/agenda/ajustesAgenda'
 import { comprobarEmpalmes } from '@/lib/agenda/empalmesServidor'
 import { comprobarTipoDeCita, leerTipoCitaId, CUERPO_TIPO_INVALIDO } from '@/lib/agenda/tipoCitaServidor'
+import { cerrarSustituida, comprobarSustituible, leerSustituyeA } from '@/lib/agenda/sustitucionServidor'
 
 /* Una fecha-solo `YYYY-MM-DD`, que es lo que manda el modal para un evento de
    todo el día. NO acepta un instante ISO: si llegara uno, `AT TIME ZONE` de la
@@ -394,6 +395,19 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    /* Tanda I (punto 12): «Reagendar cita» o «Reasignar» de una CANCELADA. Sólo
+       con la v2 (apagada, el campo se ignora y no se nombran las columnas). La
+       cancelada tiene que verla quien pide, de esta clínica, y seguir cancelada
+       y abierta; si no, 409 sin crear nada. Se cierra DESPUÉS del alta (abajo). */
+    const sustituyeA = v2 ? leerSustituyeA(body.sustituye_a) : undefined
+    if (sustituyeA === false) {
+      return NextResponse.json({ error: 'sustituye_a_invalida', message: 'La cita a sustituir no es válida.' }, { status: 400 })
+    }
+    if (sustituyeA) {
+      const veto = await comprobarSustituible(supabase, profile.clinica_id, sustituyeA, typeof client_id === 'string' ? client_id : null)
+      if (veto) return NextResponse.json(veto.cuerpo, { status: veto.estado })
+    }
+
     /* ── B7: EL EMPALME, CON EL INTERRUPTOR ENCENDIDO ────────────────────────
        Después de todas las validaciones y con las puntas ya compuestas, que es
        lo que se va a guardar. Un evento de todo el día no se empalma (P3). Sin
@@ -465,11 +479,22 @@ export async function POST(req: NextRequest) {
           .eq('clinica_id', profile.clinica_id)
           .maybeSingle()
         if (yaExiste) {
-          return NextResponse.json({ appointment: yaExiste, gcalSync: 'skipped' })
+          /* Tanda I (punto 12): el reintento también cierra la cancelada si el primero no llegó (idempotente). */
+          const sustituida = sustituyeA && yaExiste.paciente_id
+            ? await cerrarSustituida({ clinicaId: profile.clinica_id, viejaId: sustituyeA, nuevaId: yaExiste.id, userId: profile.userId })
+            : null
+          return NextResponse.json({ appointment: yaExiste, gcalSync: 'skipped', ...(sustituyeA ? { sustituida } : {}) })
         }
       }
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
+
+    /* Tanda I (punto 12): la cancelada queda cerrada y ligada a ésta, en la misma
+       petición. Sólo si la nueva es una CITA (con paciente): la sustituta queda
+       sostenida por la FK RESTRICT, y una cita con paciente ya no se borra con la v2. */
+    const sustituida = sustituyeA && apt.paciente_id
+      ? await cerrarSustituida({ clinicaId: profile.clinica_id, viejaId: sustituyeA, nuevaId: apt.id, userId: profile.userId })
+      : null
 
     // Google Calendar sync en background con el cliente admin.
     //
@@ -690,6 +715,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       appointment: apt,
       gcalSync:    conexion ? 'pending' : 'disconnected',
+      // Tanda I (punto 12): la cancelada que se cerró (la agenda la quita), o `null`.
+      ...(sustituyeA ? { sustituida } : {}),
     })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Error interno'

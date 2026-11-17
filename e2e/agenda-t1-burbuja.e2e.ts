@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 import { SESION, diaDeLaSemana, interruptorAgenda, modalCita, soloEscritorio, sqlLocal } from './ayudas'
-import { abrirAgendaV2, burbuja, clicEnFranja, elegirPaciente, tarjetaLectura } from './interaccionesAyudas'
+import { abrirAgendaV2, burbuja, clicEnFranja, decidirDespues, elegirPaciente, tarjetaLectura } from './interaccionesAyudas'
 import { fechaHoraLocalAInstante } from '../src/lib/dates'
 
 /**
@@ -181,6 +181,7 @@ test('punto 4: en una cita PASADA, atendida o de todo el día la tarjeta no ofre
   const pasada = await alta(page, VIERNES_PASADO, '14:40', 'Prueba 23')
   const futura = await alta(page, JUEVES, '15:20', 'Prueba 24')
   await abrirAgendaV2(page)
+  await decidirDespues(page)
   for (let i = 0; i < 3; i++) await page.locator('.fc-prev-button').click()
   await page.locator('.fc-event', { hasText: 'Prueba 23' }).first().click()
   await expect(tarjetaLectura(page)).toBeVisible()
@@ -195,6 +196,7 @@ test('punto 4: en una cita PASADA, atendida o de todo el día la tarjeta no ofre
   sqlLocal(`update public.appointments set status = 'attended' where id = :'id'`, { id: futura })
   await page.reload()
   await abrirAgendaV2(page)
+  await decidirDespues(page)
   await aLaSemanaMasTres(page)
   await page.locator('.fc-event', { hasText: 'Prueba 24' }).first().click()
   await expect(tarjetaLectura(page)).toBeVisible()

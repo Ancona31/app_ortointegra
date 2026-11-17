@@ -24,7 +24,7 @@ import { DIAS, HORARIO_DEFAULT } from '@/lib/agenda/horarioAgenda'
 import { INICIALES_DIAS, lineaHorario } from '@/lib/agenda/lineaHorario'
 import type { TipoCita } from '@/lib/agenda/tiposCita'
 import { useToast } from '@/components/ui/Toast'
-import { BOTON_SECUNDARIO } from '@/components/agenda/configuracion/clasesConfig'
+import { BOTON_PRIMARIO, BOTON_SECUNDARIO } from '@/components/agenda/configuracion/clasesConfig'
 import type { Horario } from '@/lib/configApp'
 import type { Consultorio } from '@/types'
 
@@ -42,7 +42,17 @@ interface Props {
   alCambiarTipos?: () => void
 }
 
-type Cambios = { horario_propio: boolean; horario?: Horario }
+/* Tanda I (punto 3): `horario_revisado` = «Confirmar horario» sin cambiarlo. Guardar el horario
+   también lo marca (el servidor pone `horario_revisado_en`, sólo con la v2). */
+type Cambios = { horario_propio: boolean; horario?: Horario } | { horario_revisado: true }
+
+/** La marca que devolvió el servidor (la fila entera de `PATCH`), o `undefined` si no vino. */
+function revisadoDe(json: unknown): string | null | undefined {
+  if (typeof json !== 'object' || json === null || !('consultorio' in json)) return undefined
+  const c: unknown = json.consultorio
+  if (typeof c !== 'object' || c === null || !('horario_revisado_en' in c)) return undefined
+  return typeof c.horario_revisado_en === 'string' ? c.horario_revisado_en : null
+}
 
 const BOTON = BOTON_SECUNDARIO
 
@@ -92,7 +102,10 @@ export default function FilaDisponibilidad(props: Props) {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cambios),
       })
       if (!res.ok) { toast.error(await leerMotivoError(res, 'No se pudo guardar la disponibilidad')); return }
-      actualizarConfig(c => ({ ...c, consultorios: c.consultorios.map(x => (x.id === consultorio.id ? { ...x, ...cambios } : x)) }))
+      const revisado = revisadoDe(await res.json().catch(() => null))
+      const columnas = 'horario_revisado' in cambios ? {} : cambios
+      actualizarConfig(c => ({ ...c, consultorios: c.consultorios.map(x => (x.id === consultorio.id
+        ? { ...x, ...columnas, ...(revisado !== undefined ? { horario_revisado_en: revisado } : {}) } : x)) }))
       setModal(false)
       toast.success(hecho)
       alCambiar?.()
@@ -104,12 +117,20 @@ export default function FilaDisponibilidad(props: Props) {
   }
 
   const efectivo = horarioEfectivo(consultorio, horarioClinica)
+  /* Tanda I (punto 3): nadie lo ha confirmado (heredado o restablecido). `undefined` = sin la migración. */
+  const porRevisar = consultorio.horario_revisado_en === null
   return (
     <li className="flex flex-col gap-[var(--ag-3)] py-[var(--ag-4)] first:pt-0 last:pb-0" aria-label={consultorio.nombre}>
-      <Cabecera nombre={consultorio.nombre} detalle={`${nombreMedico && !esDueno ? `${nombreMedico} · ` : ''}${propio ? 'Horario propio' : 'Usa el horario de la clínica'}`}
+      <Cabecera nombre={consultorio.nombre} detalle={`${nombreMedico && !esDueno ? `${nombreMedico} · ` : ''}${propio ? 'Horario propio' : 'Usa el horario de la clínica'}${porRevisar ? ' · Por revisar' : ''}`}
         horario={efectivo} />
       {esDueno && (
         <div className="flex flex-wrap gap-[var(--ag-2)]">
+          {porRevisar && (
+            <button type="button" className={BOTON_PRIMARIO} disabled={guardando}
+              onClick={() => void enviar({ horario_revisado: true }, 'Horario confirmado')}>
+              Confirmar horario
+            </button>
+          )}
           <button type="button" className={BOTON} disabled={guardando} onClick={() => setModal(true)}>
             {propio ? 'Editar horario propio' : 'Usar horario propio'}
           </button>

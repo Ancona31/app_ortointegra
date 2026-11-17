@@ -23,6 +23,10 @@
  *         abre el alta de una cita NUEVA con el mismo paciente, médico y
  *         consultorio; la original se queda como estaba, con su estado, su
  *         auditoría y lo que cuenta para el candado).
+ *       – Cancelada, además (tanda I, punto 12): «Reasignar», la burbuja de
+ *         alta en ESE horario, sin paciente, para dar el hueco a otro. Con
+ *         cualquiera de las dos, al guardar, el servidor cierra la cancelada
+ *         (`cerrada_en`, `sustituida_por`): deja de pintarse, no se borra.
  *   · Cita por ligar y evento sin paciente: conservan lo que tenían, en su
  *     orden (incluido «Editar»), con el engrane. I3: un evento de Google «por
  *     asignar» es una por ligar con «¿No es una cita?» al final. Evento: «Editar», T3
@@ -39,7 +43,7 @@ import { horaEnTZ } from '@/lib/agenda/fechasAgenda'
 import { regionDeTimezone } from '@/lib/consultorios/zonas-mexico'
 
 export type AccionTarjeta =
-  | 'iniciar-consulta' | 'ver-expediente' | 'confirmar' | 'reagendar' | 'reagendar-cita' | 'cancelar' | 'editar' | 'convertir' | 'eliminar'
+  | 'iniciar-consulta' | 'ver-expediente' | 'confirmar' | 'reagendar' | 'reagendar-cita' | 'reasignar' | 'cancelar' | 'editar' | 'convertir' | 'eliminar'
   | 'no-es-cita'
 
 export const ETIQUETA_ACCION: Record<AccionTarjeta, string> = {
@@ -48,6 +52,7 @@ export const ETIQUETA_ACCION: Record<AccionTarjeta, string> = {
   confirmar: 'Confirmar',
   reagendar: 'Reagendar',
   'reagendar-cita': 'Reagendar cita',
+  reasignar: 'Reasignar',
   cancelar: 'Cancelar cita',
   editar: 'Editar',
   convertir: 'Convertir en cita',
@@ -120,7 +125,8 @@ function disposicionSinCambios(cita: CitaTarjeta, puedeIniciar: boolean, o: Opci
 export function disposicionDeTarjeta(cita: CitaTarjeta, puedeIniciar: boolean, o: OpcionesDisposicion = {}): DisposicionTarjeta {
   if (esEventoGenerico(cita) || esPorLigar(cita)) return disposicionSinCambios(cita, puedeIniciar, o)
   if (cita.status === 'attended') return { principal: o.puedeVerExpediente ? 'ver-expediente' : null, secundarias: [], peligro: null }
-  if (cita.status === 'cancelled' || cita.status === 'no_show') return { principal: 'reagendar-cita', secundarias: [], peligro: null }
+  if (cita.status === 'cancelled') return { principal: 'reagendar-cita', secundarias: ['reasignar'], peligro: null }
+  if (cita.status === 'no_show') return { principal: 'reagendar-cita', secundarias: [], peligro: null }
   const secundarias: PiezaTarjeta[] = []
   if (o.conConfirmar !== false && cita.status === 'scheduled') secundarias.push('confirmar')
   secundarias.push('reagendar')

@@ -166,8 +166,10 @@ test('atendida: ÚNICAMENTE «Ver expediente», que lleva al expediente', async 
 /* Decisión de Angel: «Reagendar cita» CREA una cita nueva (mismo paciente,
    médico y consultorio) y deja la original como estaba: su estado, y con él lo
    que cuenta para el candado. MUTACIÓN: volver a abrir la edición de la misma
-   cita (`setModal({ mode: 'edit', … })`) → rojo («Nueva cita» no aparece). */
-test('cancelada y no asistió: ÚNICAMENTE «Reagendar cita», que crea una cita NUEVA y deja la original como estaba', async ({ page }) => {
+   cita (`setModal({ mode: 'edit', … })`) → rojo («Nueva cita» no aparece).
+   Tanda I (punto 12): la cancelada ofrece además «Reasignar», y al reagendarla
+   queda CERRADA y ligada a la nueva (sin cambiar de estado); la no asistida, no. */
+test('cancelada y no asistió: «Reagendar cita» (y «Reasignar» la cancelada) crea una cita NUEVA; la original conserva su estado', async ({ page }) => {
   test.skip(test.info().project.name !== 'escritorio', 'escritorio')
   const { id, paciente } = cita(MARTES, '15:00', 'Prueba 24', 'cancelled')
   const { id: falta } = cita(MARTES, '16:30', 'Prueba 25', 'no_show')
@@ -180,7 +182,7 @@ test('cancelada y no asistió: ÚNICAMENTE «Reagendar cita», que crea una cita
   await expect(t).toHaveCount(0)
   await page.locator('.fc-timegrid-event', { hasText: 'Prueba 24' }).first().click({ position: { x: 8, y: 8 } })
   await expect(t).toHaveAccessibleName('Paciente Prueba 24')
-  await expect.poll(() => acciones(t)).toEqual(['Reagendar cita'])
+  await expect.poll(() => acciones(t)).toEqual(['Reagendar cita', 'Reasignar'])
   await t.getByRole('button', { name: 'Reagendar cita' }).click()
   const modal = modalCita(page, 'Nueva cita')
   await expect(modal).toBeVisible()
@@ -204,8 +206,10 @@ test('cancelada y no asistió: ÚNICAMENTE «Reagendar cita», que crea una cita
   expect(nueva).not.toBe(id)
   expect(sqlLocal(`select to_char(start_time at time zone 'America/Merida', 'YYYY-MM-DD HH24:MI') || '|' || to_char(end_time at time zone 'America/Merida', 'HH24:MI')
                      from public.appointments where id = :'n'`, { n: nueva })).toBe(`${MIERCOLES} 15:00|16:00`)
-  // La original, intacta (también la de «no asistió», que no se tocó).
-  expect(original(id)).toBe(antesCancelada)
+  // La cancelada sigue cancelada, ahora cerrada y ligada a la nueva; la de «no asistió», intacta.
+  expect(antesCancelada.startsWith('cancelled|')).toBe(true)
+  expect(sqlLocal(`select status || '|' || (cerrada_en is not null) || '|' || sustituida_por from public.appointments where id = :'id'`, { id }))
+    .toBe(`cancelled|true|${nueva}`)
   expect(original(falta)).toBe(antesFalta)
 })
 
@@ -275,7 +279,7 @@ test('nota ligada: una atendida con nota no cambia de estado ni se borra, con o 
       const d = await page.request.delete(`/api/appointments/${id}`)
       expect(d.status()).toBe(409)
       expect(await d.json()).toMatchObject({ error: 'nota_ligada' })
-      // Las notas y la hora sí se pueden tocar con la v2 apagada (como hoy): sólo el estado está cerrado.
+      // Las notas sí se pueden tocar con la v2 apagada (como hoy); el estado no, y la hora tampoco (tanda I, punto 1).
       expect((await page.request.put(`/api/appointments/${id}`, { data: { notes: 'otra nota de agenda', status: 'attended' } })).status()).toBe(200)
     }
     expect(sqlLocal(`select status from public.appointments where id = :'id'`, { id })).toBe('attended')

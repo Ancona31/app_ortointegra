@@ -89,6 +89,19 @@ function construirConsulta(supabase: ClienteSesion, { clinicaId, from, to, medic
 }
 
 /**
+ * Tanda I (punto 12) · Una cancelada CERRADA (sustituida por otra cita,
+ * `cerrada_en`, 20261121142000) no se pinta: el hueco queda libre para el clic
+ * y la sustituta ocupa su lugar. Se quita AQUÍ, tras leer, y no con un filtro
+ * en la consulta, por lo mismo que el aviso de B6 de abajo: esta consulta corre
+ * con el interruptor apagado y en una base sin la migración la columna no
+ * existe (llega por el `*`; ausente = ninguna cerrada). El conteo de
+ * `incompleta` se compara con las filas CRUDAS: lo que se quita aquí no falta.
+ */
+function noCerrada(fila: unknown): boolean {
+  return !(typeof fila === 'object' && fila !== null && 'cerrada_en' in fila && fila.cerrada_en)
+}
+
+/**
  * ⚠️ `F` NO SE COMPRUEBA: la forma la fija `APPOINTMENT_SELECT`. El cliente de
  * Supabase no lleva el genérico `Database` (ver `(app)/layout.tsx`), así que las
  * filas llegan sin tipo y quien llama dice qué espera, igual que el cliente lo
@@ -108,7 +121,8 @@ export async function consultaCitas<F = unknown>(
   const { data, error, count } = await construirConsulta(supabase, parametros)
   if (error) return { ok: false, error: error.message }
 
-  const filas: F[] = data ?? []
+  const crudas: F[] = data ?? []
+  const filas = crudas.filter(noCerrada)
 
   /* ⚠️⚠️ `incompleta` ES LO ÚNICO QUE SEPARA «no hay citas» DE «no llegaron
      las citas», Y NO SE PUEDE DEDUCIR DESDE EL CLIENTE.
@@ -136,7 +150,7 @@ export async function consultaCitas<F = unknown>(
      El coste de equivocarse hacia aquí es una banda visible que alguien
      reporta el primer día; el de equivocarse hacia el otro lado es la agenda
      en blanco de arriba. */
-  const incompleta = count === null || count > filas.length
+  const incompleta = count === null || count > crudas.length
   if (incompleta) {
     logger.warn(
       'agenda',
