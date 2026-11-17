@@ -30,6 +30,7 @@ import { useRouter } from 'next/navigation'
 import { buscarPacientes } from '@/lib/agenda/buscarCitasPaciente'
 import Portal from '@/components/ui/Portal'
 import QuickPatientModal from '@/components/ui/QuickPatientModal'
+import { useEscudoTrasRegistro } from '@/hooks/useEscudoTrasRegistro'
 import { useConsultorios } from '@/hooks/useConsultorios'
 import { useConsultoriosDeMedico } from '@/hooks/useConsultoriosDeMedico'
 import { componerNombreMedicoCompleto } from '@/lib/nombreMedico'
@@ -488,6 +489,10 @@ export default function AppointmentModal({
   const [search,      setSearch]      = useState('')
   const [showSearch,  setShowSearch]  = useState(false)
   const [quickCreate, setQuickCreate] = useState(false)
+  /* I3 (punto 22) · El escudo de H3 tras cerrar `QuickPatientModal`: sin él, el
+     segundo clic de un doble clic sobre «Crear y continuar» cae en este
+     formulario (un chip de «Tipo de cita», o el velo, que lo cierra). */
+  const escudo = useEscudoTrasRegistro(quickCreate, { dentroDeDialogos: true })
   const [medicoId,    setMedicoId]    = useState<string>(
     apt?.medico_id ?? (modal.mode === 'create' && modal.medicoId ? modal.medicoId : defaultMedicoId))
   /* B6c: el tipo ELEGIDO. Lo que se guarda es `tipoEfectivo`, de más abajo. */
@@ -1897,10 +1902,11 @@ export default function AppointmentModal({
         conTelefono={agendaV2}
         onCreated={p => {
           setQuickCreate(false)
+          escudo.activar()
           if (reserva && ligar) { void ligarYConsultar(p); return }
           setPaciente(p); setSearch('')
         }}
-        onClose={() => setQuickCreate(false)}
+        onClose={() => { setQuickCreate(false); escudo.activar() }}
       />
     )}
 

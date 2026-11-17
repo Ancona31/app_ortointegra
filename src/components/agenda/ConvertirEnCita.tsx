@@ -27,6 +27,7 @@ import QuickPatientModal from '@/components/ui/QuickPatientModal'
 import { CampoPaciente } from '@/components/agenda/BurbujaAlta'
 import type { PacienteBusqueda } from '@/components/agenda/AppointmentModal'
 import { useDialogoModal } from '@/hooks/useDialogoModal'
+import { useEscudoTrasRegistro } from '@/hooks/useEscudoTrasRegistro'
 import { useConsultorios } from '@/hooks/useConsultorios'
 import { useConsultoriosDeMedico } from '@/hooks/useConsultoriosDeMedico'
 import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
@@ -116,6 +117,9 @@ export default function ConvertirEnCita({ cita, perfilId, zonaVisor, alConvertir
      la lista) o vacío («Registrar paciente nuevo»). `null`: cerrado. */
   const [nuevo, setNuevo] = useState<string | null>(null)
   const campo = useRef<HTMLInputElement | null>(null)
+  /* I3 (punto 22) · El escudo de H3: el segundo clic de un doble clic sobre
+     «Crear y continuar» no cae en este diálogo («Convertir en cita») ni en el velo. */
+  const escudo = useEscudoTrasRegistro(nuevo !== null, { dentroDeDialogos: true })
   const { montarPanel, alPulsarTecla } = useDialogoModal(alCerrar)
   const idTitulo = useId()
   const consultorioId = elegido ?? consultorioInicial(consultorios, consultorioActivo?.id ?? null)
@@ -146,8 +150,8 @@ export default function ConvertirEnCita({ cita, perfilId, zonaVisor, alConvertir
         </div>
       </div>
       {nuevo !== null && (
-        <QuickPatientModal nombreInicial={nuevo} conTelefono onClose={() => { setNuevo(null); campo.current?.focus() }}
-          onCreated={p => { setNuevo(null); setPaciente(p) }} />
+        <QuickPatientModal nombreInicial={nuevo} conTelefono onClose={() => { setNuevo(null); escudo.activar(); campo.current?.focus() }}
+          onCreated={p => { setNuevo(null); escudo.activar(); setPaciente(p) }} />
       )}
     </Portal>
   )
