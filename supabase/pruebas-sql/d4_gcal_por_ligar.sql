@@ -83,32 +83,42 @@ begin
   end if;
 end $$;
 
--- Caso 2: un título que llega de Google sobre la cita por ligar se ignora; la
--- hora sí entra (como en una cita con paciente).
+-- Caso 2: un título que llega de Google sobre la cita por ligar se ignora.
+-- Tanda I (punto 9, 20261121121000): la HORA ya no entra en una cita por enlace
+-- que no ha empezado con la v2 encendida — la base la rechaza (42501,
+-- cita_proteger_eleccion) y la sincronización restablece Google (C5). Antes de
+-- I, este caso comprobaba que sí entraba.
 do $$
 declare
   v record;
+  v_rechazo text;
 begin
-  if pg_temp.aplicar('00000000-0000-4000-8000-000000d4a001', '"1b"', 'Título de Google',
-                     '2031-05-06 11:00-06', '2031-05-06 11:30-06') <> 1 then
+  if pg_temp.aplicar('00000000-0000-4000-8000-000000d4a001', '"1b"', 'Título de Google') <> 1 then
     raise exception 'D4 caso 2: no prendió';
   end if;
+  begin
+    perform pg_temp.aplicar('00000000-0000-4000-8000-000000d4a001', '"1x"', null, '2031-05-06 11:00-06', '2031-05-06 11:30-06', null,
+                            (select updated_at from public.appointments where id = '00000000-0000-4000-8000-000000d4a001'));
+  exception when sqlstate '42501' then v_rechazo := sqlerrm;
+  end;
   select title, start_time, gcal_etag into v from public.appointments where id = '00000000-0000-4000-8000-000000d4a001';
-  if v.title <> 'Ana Reserva López' or v.start_time <> '2031-05-06 11:00-06' or v.gcal_etag <> '"1b"' then
-    raise exception 'D4 caso 2: quedó %', row_to_json(v);
+  if v.title <> 'Ana Reserva López' or v.start_time <> '2031-05-06 10:00-06' or v.gcal_etag <> '"1b"'
+     or v_rechazo is null or v_rechazo not like '%reservada por enlace%' then
+    raise exception 'D4 caso 2: quedó % (rechazo: %)', row_to_json(v), v_rechazo;
   end if;
 end $$;
 
--- Caso 3: tampoco pasa a todo el día (aunque tenga zona).
+-- Caso 3: tampoco pasa a todo el día (aunque tenga zona). Con las mismas puntas:
+-- moverlas lo rechaza el candado de I (caso 2).
 do $$
 declare
   v record;
 begin
   perform pg_temp.aplicar('00000000-0000-4000-8000-000000d4a001', '"1c"', null,
-                          '2031-05-06 00:00-06', '2031-05-07 00:00-06', true,
+                          '2031-05-06 10:00-06', '2031-05-06 10:30-06', true,
                           (select updated_at from public.appointments where id = '00000000-0000-4000-8000-000000d4a001'));
   select all_day, start_time into v from public.appointments where id = '00000000-0000-4000-8000-000000d4a001';
-  if v.all_day or v.start_time <> '2031-05-06 11:00-06' then
+  if v.all_day or v.start_time <> '2031-05-06 10:00-06' then
     raise exception 'D4 caso 3: quedó %', row_to_json(v);
   end if;
 end $$;
@@ -140,7 +150,7 @@ declare
   v_antes timestamptz := (select updated_at from public.appointments where id = '00000000-0000-4000-8000-000000d4a001');
 begin
   perform pg_temp.aplicar('00000000-0000-4000-8000-000000d4a001', '"1d"', 'Título de Google',
-                          '2031-05-06 11:00-06', '2031-05-06 11:30-06', null, v_antes);
+                          '2031-05-06 10:00-06', '2031-05-06 10:30-06', null, v_antes);
   if (select updated_at from public.appointments where id = '00000000-0000-4000-8000-000000d4a001') <> v_antes
      or (select title from public.appointments where id = '00000000-0000-4000-8000-000000d4a001') <> 'Ana Reserva López' then
     raise exception 'D4 caso 6: el segundo pase cambió algo';
