@@ -43,7 +43,9 @@ import type { AvisosHorario } from '@/lib/agenda/horarioRejilla'
 import {
   addMinutes, partirFechaHora, componerIso, diasEntreFechas, duracionEscrita, fechasDeTodoElDia,
 } from '@/lib/agenda/fechasAgenda'
-import { ESTADOS_CITA, ICONO_ETIQUETA, COLOR_ETIQUETA, STATUS_CONFIG, esEventoGenerico, esPorLigar } from '@/lib/agenda/tarjetasAgenda'
+import { ESTADOS_CITA, ICONO_ETIQUETA, COLOR_ETIQUETA, STATUS_CONFIG, esEventoGenerico, esPorAsignar, esPorLigar } from '@/lib/agenda/tarjetasAgenda'
+import BotonNoEsCita from '@/components/agenda/BotonNoEsCita'
+import { BOTON_SECUNDARIO } from '@/components/agenda/configuracion/clasesConfig'
 import BloqueReservaPorLigar from '@/components/agenda/BloqueReservaPorLigar'
 import PanelLigarCita from '@/components/agenda/PanelLigarCita'
 import { ligarCitaAPaciente, type PacienteParaLigar } from '@/lib/agenda/ligarCita'
@@ -424,6 +426,10 @@ export default function AppointmentModal({
      el paciente. Se edita sin él: conserva su título (el nombre de quien
      reservó) y no manda `paciente_id`. Se liga al iniciar la consulta (D7). */
   const reserva = apt && esPorLigar(apt) ? apt : null
+  /* I3 (punto 10) · Un evento de Google «por asignar» es una por ligar SIN
+     reserva: ni contacto ni historial ni tipo (el PUT lo trata como una
+     conversión, `vetoDeConversion`, que exige consultorio). */
+  const porAsignar = reserva !== null && esPorAsignar(reserva)
 
   /* EL INTERRUPTOR DE TODO EL DÍA, y la guarda que impide que exista fuera de un
      evento. `esEvento &&` no es defensa de más: al cambiar de rama el modal
@@ -552,7 +558,7 @@ export default function AppointmentModal({
      primero ligarla (`ligar`, abajo). */
   const showLigarYConsultar = Boolean(
     isEdit && canVerExpediente && reserva && !paciente && agendaV2 &&
-    defaultMedicoId === apt?.medico_id && citaConsultorio,
+    defaultMedicoId === apt?.medico_id && (citaConsultorio || (porAsignar && consultoriosList.length > 0)),
   )
   const router = useRouter()
   /* `null` = el bloque de la reserva; con valor, el panel «Ligar a un paciente». */
@@ -565,11 +571,18 @@ export default function AppointmentModal({
   /* Liga y, con 200, abre la nota con `?cita=` (así `/api/consultas` la pasa
      a atendida). Si falla, el panel lo dice y la cita sigue por ligar. */
   async function ligarYConsultar(p: PacienteParaLigar): Promise<void> {
-    if (!apt || !citaConsultorio) return
+    /* I3 · Sin consultorio en la cita (por asignar), el elegido en el formulario. */
+    const consultorioLigado = citaConsultorio ?? (porAsignar ? consultoriosList.find(c => c.id === consultorioId) : undefined)
+    if (!apt || !consultorioLigado) {
+      if (porAsignar) setLigar({ enviando: false, error: 'Elige el consultorio antes de iniciar la consulta.' })
+      return
+    }
     setLigar({ enviando: true, error: null })
-    const r = await ligarCitaAPaciente({ citaId: apt.id, updatedAt: apt.updated_at, paciente: p })
+    const r = await ligarCitaAPaciente({
+      citaId: apt.id, updatedAt: apt.updated_at, paciente: p, ...(porAsignar ? { consultorioId: consultorioLigado.id } : {}),
+    })
     if (!r.ok) { setLigar({ enviando: false, error: r.motivo }); return }
-    cambiarActivo(citaConsultorio)
+    cambiarActivo(consultorioLigado)
     onClose()
     router.push(`/expediente/${p.id}/nueva-nota?cita=${apt.id}`)
   }
@@ -625,7 +638,7 @@ export default function AppointmentModal({
   const tiposDelMedico = useTiposCita(conTipos ? medicoId : '')
   const tiposCita = tiposDelMedico ? tiposDelConsultorio(tiposDelMedico, consultorioId || null) : null
   const tipoConservable = apt && medicoId === apt.medico_id ? (apt.tipo_cita_id ?? null) : null
-  const tipoEfectivo: string | null = conTipos && (paciente || reserva) && tipoCitaId
+  const tipoEfectivo: string | null = conTipos && (paciente || (reserva && !porAsignar)) && tipoCitaId
     && (tipoCitaId === tipoConservable || tiposCita?.some(t => t.id === tipoCitaId)) ? tipoCitaId : null
   /* Las opciones del selector: «Sin tipo», el que la cita ya tenía si no viene
      en la lista (archivado, u oculto por la RLS), y la lista. Elegir uno de la
@@ -1296,6 +1309,13 @@ export default function AppointmentModal({
                 onNuevo={() => setQuickCreate(true)}
                 onVolver={() => setLigar(null)}
               />
+            ) : reserva && porAsignar ? (
+              /* I3 · Evento nuevo de Google: sin datos de contacto; «¿No es una
+                 cita?» lo deja como evento (y el formulario se cierra). */
+              <div className="flex flex-wrap items-center justify-between gap-2 text-sm" style={{ color: 'var(--ag-muted)' }}>
+                <span>Evento nuevo de Google, por asignar: se liga a un paciente al iniciar la consulta.</span>
+                <BotonNoEsCita citaId={reserva.id} alHecho={onClose} className={BOTON_SECUNDARIO} />
+              </div>
             ) : reserva ? (
               <BloqueReservaPorLigar
                 citaId={reserva.id}
@@ -1513,7 +1533,7 @@ export default function AppointmentModal({
               paciente y si hay algún tipo que ofrecer. Opcional: «Sin tipo»
               siempre está. El color es SÓLO la marca de la lista; la tarjeta
               sigue con el color del estado y sin el nombre del tipo. */}
-          {conTipos && (paciente || reserva) && opcionesTipo.length > 1 && (
+          {conTipos && (paciente || (reserva && !porAsignar)) && opcionesTipo.length > 1 && (
             <div>
               <label id={`${tituloId}-tipo`} className="block text-[11px] font-bold uppercase tracking-[.06em] mb-2" style={{ color: 'var(--ag-muted2)' }}>Tipo de cita</label>
               <div role="radiogroup" aria-labelledby={`${tituloId}-tipo`} className="flex flex-wrap gap-2">

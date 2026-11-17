@@ -239,6 +239,12 @@ export type AuditAccion =
      reservó). El disparador de citas deja además su `cita_editada`. Sin
      migración (`accion` es `text` sin CHECK). */
   | 'cita_ligada'
+  /* I3 de la agenda (punto 10): «¿No es una cita?» sobre un evento de Google
+     «por asignar», que pasa a evento sin paciente para siempre
+     (`POST /api/appointments/[id]/no-es-cita`). `registro_id` es la cita;
+     `descripcion`, la clínica y el NOMBRE del campo. El disparador de citas
+     deja además su `cita_editada`. Sin migración. */
+  | 'cita_no_es_cita'
 
 interface AuditParams {
   userId?: string | null

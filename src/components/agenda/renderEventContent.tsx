@@ -163,8 +163,9 @@ export function renderEventContent(arg: EventContentArg, navegadorTZ: string, in
          la ficha y, en una cita por ligar, el que dejó al reservar. */
       telefono={pac?.telefono ?? ext.reserva_telefono ?? null}
       consultorio={ext.consultorio_nombre_corto ?? null}
-      /* F1.7 · Sólo personas: un evento genérico conserva su título entero. */
-      nombreCorto={pac ? nombreCortoPaciente(pac.nombre, pac.apellidos) : marca ? nombreCortoDeTexto(ext.title) : null}
+      /* F1.7 · Sólo personas: un evento genérico conserva su título entero.
+         I3: un evento de Google «por asignar» también (su título no es un nombre). */
+      nombreCorto={pac ? nombreCortoPaciente(pac.nombre, pac.apellidos) : marca && ext.reserva_canal ? nombreCortoDeTexto(ext.title) : null}
       timeText={arg.timeText}
       horaInicio={arg.event.start ? FORMATO_HORA_INICIO.format(arg.event.start) : arg.timeText}
       title={ext.title}

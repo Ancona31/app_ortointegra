@@ -49,7 +49,8 @@ import type { Caja, Punto } from '@/lib/agenda/posicionCapa'
 import { guardarAltaRapida, horasDelGesto, type DependenciasGuardado } from '@/lib/agenda/altaRapida'
 import type { AvisosHorario } from '@/lib/agenda/horarioRejilla'
 import { empalmesPintados, mensajeEmpalme } from '@/lib/agenda/empalmesCita'
-import { esEventoGenerico } from '@/lib/agenda/tarjetasAgenda'
+import { esEventoGenerico, esPorAsignar } from '@/lib/agenda/tarjetasAgenda'
+import { marcarNoEsCita } from '@/lib/agenda/noEsCita'
 import { partirFechaHora } from '@/lib/agenda/fechasAgenda'
 import { vistaEnElOtroFormato } from '@/lib/agenda/vistasAgenda'
 import { guardarAtajosEncendidos, leerAtajosEncendidos, type AccionAtajo, type AlmacenPreferencia } from '@/lib/agenda/atajosAgenda'
@@ -247,6 +248,8 @@ interface ContextoAccion {
   navegar: (url: string) => void
   /** T3 · Abre el diálogo de convertir en cita. */
   convertir: () => void
+  /** I3 · «¿No es una cita?» de un evento de Google por asignar. */
+  noEsCita: () => void
 }
 
 /**
@@ -264,6 +267,7 @@ function ejecutarAccion(a: AccionTarjeta, cita: Appointment, x: ContextoAccion):
     switch (a) {
       case 'editar': editar(); return
       case 'convertir': x.convertir(); return
+      case 'no-es-cita': x.noEsCita(); return
       case 'reagendar': editar('fecha'); return
       /* G3 · Cancelada o no asistió (decisión de Angel): el alta de una cita
          NUEVA con el mismo paciente, médico y consultorio; la original se queda
@@ -305,12 +309,27 @@ interface PropsCapaTarjeta {
   abrirConvertir: (cita: Appointment) => void
 }
 
+/**
+ * I3 · «¿No es una cita?» desde la tarjeta: la ruta y, con 200, la marca en el
+ * evento pintado (sin esperar al eco del tiempo real, que llega igual y pisa
+ * con la fila entera). Un fallo se dice en un aviso.
+ */
+async function noEsCitaDesdeTarjeta(cita: Appointment, p: PropsInteraccionesV2, avisar: (m: string) => void): Promise<void> {
+  const r = await marcarNoEsCita(cita.id)
+  if (!r.ok) { avisar(r.motivo); return }
+  p.calendarRef.current?.getApi().getEventById(cita.id)?.setExtendedProp('google_asignacion', 'evento')
+}
+
 function CapaTarjeta({ capa, p, cerrar, vigia, fijar, abrirConvertir }: PropsCapaTarjeta): ReactElement {
   const { consultorios } = useConsultorios()
-  const { cambiarActivo } = useConsultorioActivo()
+  const { consultorioActivo, cambiarActivo } = useConsultorioActivo()
+  const toast = useToast()
   const router = useRouter()
   const { cita } = capa
-  const consultorio = consultorios.find(c => c.id === cita.consultorio_id) ?? null
+  /* I3 · Un evento de Google por asignar no trae consultorio: para «Iniciar
+     consulta» cuenta el activo de quien mira (el modal deja elegir otro). */
+  const consultorio = consultorios.find(c => c.id === cita.consultorio_id)
+    ?? (esPorAsignar(cita) && consultorioActivo && consultorios.some(c => c.id === consultorioActivo.id) ? consultorioActivo : null)
   const medico = !p.isSingleDoctor && cita.medico_id ? p.medicos.find(m => m.id === cita.medico_id) : undefined
   /* T1 · La regla del servidor (`motivoSinWhatsApp`), con la hora VIVA de la
      tarjeta y el instante en que se abrió: ni pasada, ni atendida, ni
@@ -320,7 +339,10 @@ function CapaTarjeta({ capa, p, cerrar, vigia, fijar, abrirConvertir }: PropsCap
      aviso) la tapa, y el foco vuelve a la cita antes de que lo tome lo nuevo. */
   const alAccion = (a: AccionTarjeta): void => {
     cerrar(capa.id)
-    ejecutarAccion(a, cita, { p, consultorio, cambiarActivo, navegar: url => router.push(url), convertir: () => abrirConvertir(cita) })
+    ejecutarAccion(a, cita, {
+      p, consultorio, cambiarActivo, navegar: url => router.push(url), convertir: () => abrirConvertir(cita),
+      noEsCita: () => void noEsCitaDesdeTarjeta(cita, p, m => toast.error(m)),
+    })
   }
   return (
     <TarjetaLectura
