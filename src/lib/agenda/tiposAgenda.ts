@@ -85,6 +85,10 @@ export type Appointment = {
      de `APPOINTMENT_SELECT` sólo si la columna existe. La lee la tarjeta para
      ofrecer «Convertir en cita» (§2, AG-DT-29). */
   origen?: 'spinus' | 'google' | null
+  /* I3 · Evento NUEVO de Google (migración 20261121130000): `por_asignar` se
+     trata como cita por ligar (`esPorLigar`/`esPorAsignar`); `evento`, la
+     respuesta a «¿No es una cita?». OPCIONAL por lo mismo que `origen`. */
+  google_asignacion?: 'por_asignar' | 'evento' | null
   /* E7 · La marca del WhatsApp manual (columna del baseline, vacía hasta E7):
      cuándo se ABRIÓ el mensaje desde el botón de la cita. Llega por el `*`. */
   whatsapp_sent_at?: string | null

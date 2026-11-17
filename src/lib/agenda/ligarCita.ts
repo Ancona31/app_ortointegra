@@ -30,6 +30,9 @@ export async function ligarCitaAPaciente(a: {
   citaId: string
   updatedAt: string | undefined
   paciente: PacienteParaLigar
+  /** I3 · Un evento de Google por asignar no trae consultorio: el servidor lo
+      trata como una conversión (`vetoDeConversion`) y lo exige. */
+  consultorioId?: string
 }): Promise<ResultadoLigar> {
   try {
     const res = await fetch(`/api/appointments/${a.citaId}`, {
@@ -38,6 +41,7 @@ export async function ligarCitaAPaciente(a: {
       body: JSON.stringify({
         paciente_id: a.paciente.id,
         title: `${a.paciente.nombre} ${a.paciente.apellidos}`,
+        ...(a.consultorioId ? { consultorio_id: a.consultorioId } : {}),
         ...(a.updatedAt ? { updated_at: a.updatedAt } : {}),
       }),
     })

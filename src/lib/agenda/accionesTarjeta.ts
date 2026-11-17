@@ -24,7 +24,8 @@
  *         consultorio; la original se queda como estaba, con su estado, su
  *         auditoría y lo que cuenta para el candado).
  *   · Cita por ligar y evento sin paciente: conservan lo que tenían, en su
- *     orden (incluido «Editar»), con el engrane. Evento: «Editar», T3
+ *     orden (incluido «Editar»), con el engrane. I3: un evento de Google «por
+ *     asignar» es una por ligar con «¿No es una cita?» al final. Evento: «Editar», T3
  *     «Convertir en cita» si nació en Google (§2, AG-DT-29), y «Eliminar»
  *     aparte (eliminar SÓLO aquí: una cita con paciente se cancela — P2).
  *   · Los bloques de Google no abren nada (los filtra `abrirCita` antes).
@@ -33,12 +34,13 @@
  * con `motivoSinWhatsApp`/`motivoSinCorreo`): ocultar el botón no basta.
  */
 import type { Appointment, Status } from '@/lib/agenda/tiposAgenda'
-import { esEventoGenerico, esPorLigar } from '@/lib/agenda/tarjetasAgenda'
+import { esEventoGenerico, esPorAsignar, esPorLigar } from '@/lib/agenda/tarjetasAgenda'
 import { horaEnTZ } from '@/lib/agenda/fechasAgenda'
 import { regionDeTimezone } from '@/lib/consultorios/zonas-mexico'
 
 export type AccionTarjeta =
   | 'iniciar-consulta' | 'ver-expediente' | 'confirmar' | 'reagendar' | 'reagendar-cita' | 'cancelar' | 'editar' | 'convertir' | 'eliminar'
+  | 'no-es-cita'
 
 export const ETIQUETA_ACCION: Record<AccionTarjeta, string> = {
   'iniciar-consulta': 'Iniciar consulta',
@@ -50,6 +52,7 @@ export const ETIQUETA_ACCION: Record<AccionTarjeta, string> = {
   editar: 'Editar',
   convertir: 'Convertir en cita',
   eliminar: 'Eliminar evento',
+  'no-es-cita': '¿No es una cita?',
 }
 
 /** G3 · Una pieza de la rejilla de acciones: una acción o el aviso por WhatsApp (su propio componente). */
@@ -80,7 +83,7 @@ const VIVAS: readonly Status[] = ['scheduled', 'confirmed']
 
 /** Lo que mira la tarjeta de la fila. */
 export type CitaTarjeta = Pick<Appointment, 'status' | 'paciente_id' | 'reserva_canal'>
-  & Partial<Pick<Appointment, 'origen' | 'all_day' | 'medico_id'>>
+  & Partial<Pick<Appointment, 'origen' | 'all_day' | 'medico_id' | 'google_asignacion'>>
 
 /**
  * T3 · ¿Se puede convertir en cita? Un evento sin paciente NACIDO EN GOOGLE
@@ -104,6 +107,9 @@ function disposicionSinCambios(cita: CitaTarjeta, puedeIniciar: boolean, o: Opci
   if (viva) secundarias.push('reagendar')
   secundarias.push('editar')
   if (o.conWhatsApp) secundarias.push('whatsapp')
+  /* I3 (punto 10) · Un evento de Google por asignar: «¿No es una cita?» lo
+     deja como evento sin paciente, en el momento y sin preguntar. */
+  if (esPorAsignar(cita)) secundarias.push('no-es-cita')
   return { principal: puedeIniciar ? 'iniciar-consulta' : null, secundarias, peligro: viva ? 'cancelar' : null }
 }
 
@@ -145,7 +151,7 @@ export interface QuienMira { esMedico: boolean; perfilId: string | null; consult
  * cambia sus condiciones, éstas cambian con él.
  */
 export function puedeIniciarConsulta(
-  cita: Pick<Appointment, 'pacientes' | 'paciente_id' | 'reserva_canal' | 'medico_id'>, quien: QuienMira,
+  cita: Pick<Appointment, 'pacientes' | 'paciente_id' | 'reserva_canal' | 'medico_id' | 'google_asignacion'>, quien: QuienMira,
 ): boolean {
   if (!quien.esMedico || !quien.perfilId || cita.medico_id !== quien.perfilId || !quien.consultorioExiste) return false
   return Boolean(cita.pacientes) || esPorLigar(cita)

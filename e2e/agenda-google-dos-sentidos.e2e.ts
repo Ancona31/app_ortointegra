@@ -275,11 +275,48 @@ test('encendido: un evento creado en Google aparece como fila editable y una sol
   expect(importada.split('|').slice(1)).toEqual(['google', 'Notas escritas en Google'])
   // Una sola tarjeta: la fila; el bloque de solo lectura ya no sale.
   await expect(page.locator('.fc-event', { hasText: titulo })).toHaveCount(1, { timeout: 30_000 })
-  /* F3: con v2 el clic abre la tarjeta de lectura; la edición está en «Editar». */
+  /* F3: con v2 el clic abre la tarjeta de lectura; la edición está en «Editar».
+     I3 (punto 10): un evento NUEVO de Google entra «por asignar», una cita por
+     ligar, así que el formulario se abre como «Editar cita» (antes, «Editar evento»). */
   await expect(page.locator('.agenda-raiz')).toHaveAttribute('data-interacciones-v2', 'listas')
   await eventoConTexto(page, titulo).click()
   await editarDesdeTarjeta(page)
-  await expect(modalCita(page, 'Editar evento')).toBeVisible({ timeout: 30_000 })
+  await expect(modalCita(page, 'Editar cita')).toBeVisible({ timeout: 30_000 })
+})
+
+/* I3 · punto 10: un evento NUEVO creado en Google entra SIEMPRE «por asignar»
+   (marca en la agenda); «¿No es una cita?» lo deja en evento al momento y una
+   edición posterior en Google no lo devuelve (el título sí viaja: ya es un
+   evento). Mutación en rojo: quitar la rama INSERT de `cita_asignacion_google`
+   (el sondeo lo deja NULL, un evento como antes). */
+test('encendido (I3): un evento nuevo de Google entra «Por asignar»; tras «¿No es una cita?» una edición en Google no lo devuelve', async ({ page }) => {
+  interruptorAgenda('A', true)
+  const titulo = tituloUnico('Revisión nueva en Google')
+  const inicio = fechaHoraLocalAInstante(DIA_LABORABLE_LIBRE, '19:15', TZ)
+  const creado = g().crear({
+    summary: titulo, start: { dateTime: inicio, timeZone: TZ },
+    end: { dateTime: new Date(Date.parse(inicio) + 1_800_000).toISOString(), timeZone: TZ },
+  })
+  permitirSondeo()
+  await abrirYSondear(page)
+  const id = sqlLocal(`select id from public.appointments where google_event_id = :'ev'`, { ev: creado.id })
+  const columna = (c: 'title' | 'google_asignacion'): string =>
+    sqlLocal(`select coalesce(${c}, 'NULL') from public.appointments where id = :'id'`, { id })
+  expect(columna('google_asignacion')).toBe('por_asignar')
+  await expect(page.locator('.agenda-raiz')).toHaveAttribute('data-interacciones-v2', 'listas')
+  const filaPintada = page.locator(`.fc-event:has([data-cita-id="${id}"])`)
+  await expect(filaPintada).toContainText('Por asignar', { timeout: 30_000 })
+  await filaPintada.click()
+  await tarjetaLectura(page).getByRole('button', { name: '¿No es una cita?' }).click()
+  await expect.poll(() => columna('google_asignacion'), { timeout: 15_000 }).toBe('evento')
+
+  g().modificar(creado.id, { summary: `${titulo} editado` })
+  permitirSondeo()
+  await abrirYSondear(page)
+  await expect.poll(() => columna('title'), { timeout: 30_000 }).toBe(`${titulo} editado`)
+  expect(columna('google_asignacion')).toBe('evento')
+  await expect(filaPintada).toContainText('editado', { timeout: 30_000 })
+  await expect(filaPintada).not.toContainText('Por asignar')
 })
 
 /* T3 · punto 6 (AG-DT-29): convertir en cita un evento nacido en Google, desde
@@ -305,6 +342,12 @@ test('encendido: un evento creado en Google se convierte en cita; a Google va el
      Google que la caché pudo pintar antes del sondeo. */
   const filaPintada = page.locator(`.fc-event:has([data-cita-id="${id}"])`)
   await expect(filaPintada).toHaveCount(1, { timeout: 30_000 })
+  /* I3 (punto 10): recién importado está «por asignar»; «¿No es una cita?» lo deja en
+     evento y «Convertir en cita» es el camino de vuelta (el que prueba esto). */
+  await filaPintada.click()
+  await tarjetaLectura(page).getByRole('button', { name: '¿No es una cita?' }).click()
+  await expect.poll(() => sqlLocal(`select coalesce(google_asignacion, '') from public.appointments where id = :'id'`, { id })).toBe('evento')
+  await page.keyboard.press('Escape')
   await filaPintada.click()
   await tarjetaLectura(page).getByRole('button', { name: 'Convertir en cita' }).click()
   const dialogo = page.getByRole('dialog', { name: 'Convertir en cita' })

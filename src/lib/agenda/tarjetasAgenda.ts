@@ -51,22 +51,37 @@ export const COLOR_ETIQUETA: Record<ColorEvento, string> = {
 }
 
 /** Lo que deciden las dos funciones de abajo, y nada más. */
-type FilaParaTipo = { paciente_id?: string | null; reserva_canal?: string | null }
+type FilaParaTipo = { paciente_id?: string | null; reserva_canal?: string | null; google_asignacion?: string | null }
+
+/**
+ * I3 (punto 10) · Un evento NUEVO de Google que aún espera paciente: se trata
+ * como una cita por ligar (marca, «Próximas citas», ligar al iniciar la
+ * consulta), pero NO es una reserva: no tiene `reserva_*`. Sin la columna
+ * (migración 20261121130000) llega `undefined` y nunca lo es.
+ */
+export function esPorAsignar(apt: FilaParaTipo): boolean {
+  return !apt.paciente_id && !apt.reserva_canal && apt.google_asignacion === 'por_asignar'
+}
 
 /**
  * True si la fila es un evento genérico y no una cita: lo decide el paciente
  * o, desde D6, que la fila haya nacido de una reserva por enlace (lista A,
- * punto 7: una cita POR LIGAR es una cita en tarjetas, conteos, huecos y B3).
+ * punto 7: una cita POR LIGAR es una cita en tarjetas, conteos, huecos y B3);
+ * desde I3, también que sea un evento de Google «por asignar».
  * Sin las columnas de D1 `reserva_canal` llega `undefined` y esto vuelve a ser
  * exactamente `!paciente_id`.
  */
 export function esEventoGenerico(apt: FilaParaTipo): boolean {
-  return !apt.paciente_id && !apt.reserva_canal
+  return !apt.paciente_id && !apt.reserva_canal && !esPorAsignar(apt)
 }
 
-/** True si es una cita por ligar: nació de una reserva por enlace y aún no tiene paciente. */
+/**
+ * True si es una cita por ligar: nació de una reserva por enlace y aún no
+ * tiene paciente, o (I3) es un evento de Google «por asignar». Lo propio de
+ * la reserva (contacto, historial, candado) se pide aparte con `reserva_canal`.
+ */
 export function esPorLigar(apt: FilaParaTipo): boolean {
-  return !apt.paciente_id && Boolean(apt.reserva_canal)
+  return !apt.paciente_id && (Boolean(apt.reserva_canal) || esPorAsignar(apt))
 }
 
 /**
@@ -75,10 +90,12 @@ export function esPorLigar(apt: FilaParaTipo): boolean {
  * médico al reservar (`reserva_historial_previo`, la instantánea; el historial
  * en vivo sólo está en el modal). `null` si no está por ligar.
  * `titulo` es la frase entera para `title`: el número suelto no dice qué cuenta.
+ * I3 · Un evento de Google por asignar lleva «Por asignar», sin número.
  */
 export function marcaPorLigar(
   apt: FilaParaTipo & { reserva_historial_previo?: number | null },
 ): { texto: string; titulo: string } | null {
+  if (esPorAsignar(apt)) return { texto: 'Por asignar', titulo: 'Por asignar: evento nuevo de Google, aún sin paciente' }
   if (!esPorLigar(apt)) return null
   const n = apt.reserva_historial_previo ?? 0
   if (n <= 0) return { texto: 'Por ligar', titulo: 'Por ligar: reservada por enlace, aún sin paciente' }

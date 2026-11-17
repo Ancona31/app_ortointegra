@@ -228,9 +228,11 @@ export function contarVisibles(
        es lo que estrecha el `unknown` de `extendedProps` sin un `as`. */
     const pacienteId = ext.paciente_id
     const canal = ext.reserva_canal
+    const asignacion = ext.google_asignacion
     if (esEventoGenerico({
       paciente_id: typeof pacienteId === 'string' ? pacienteId : null,
       reserva_canal: typeof canal === 'string' ? canal : null,
+      google_asignacion: typeof asignacion === 'string' ? asignacion : null,
     })) genericos += 1
     else citas += 1
   }
