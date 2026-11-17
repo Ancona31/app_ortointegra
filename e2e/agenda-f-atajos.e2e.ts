@@ -94,7 +94,9 @@ test('encendido: `?` abre la ayuda; apagar los atajos se recuerda al recargar (W
   await page.keyboard.press('m')
   await expect(vista(page, 'timeGridWeek')).toBeVisible()
   // La ayuda sigue a mano con su botón, para volver a encenderlos.
-  await page.getByRole('button', { name: 'Atajos de teclado' }).click()
+  // I5 (punto 15): la ayuda de los atajos está en el menú del engrane.
+  await page.getByRole('button', { name: 'Opciones de la agenda' }).click()
+  await page.getByRole('menuitem', { name: 'Atajos de teclado' }).click()
   await page.getByRole('dialog', { name: 'Atajos de teclado' }).getByRole('switch').check()
   await page.keyboard.press('Escape')
   await page.keyboard.press('m')
@@ -117,7 +119,9 @@ test('`aria-keyshortcuts` en Hoy, las vistas y la lupa sólo con los atajos ence
   await expect(page.getByRole('tab', { name: 'Semana' })).toHaveAttribute('aria-keyshortcuts', 'S')
   await expect(page.getByRole('button', { name: 'Buscar citas de un paciente' })).toHaveAttribute('aria-keyshortcuts', '/')
 
-  await page.getByRole('button', { name: 'Atajos de teclado' }).click()
+  // I5 (punto 15): la ayuda de los atajos está en el menú del engrane.
+  await page.getByRole('button', { name: 'Opciones de la agenda' }).click()
+  await page.getByRole('menuitem', { name: 'Atajos de teclado' }).click()
   await page.getByRole('dialog', { name: 'Atajos de teclado' }).getByRole('switch').uncheck()
   await page.keyboard.press('Escape')
   await expect(page.locator('.fc-today-button')).not.toHaveAttribute('aria-keyshortcuts', /.*/)

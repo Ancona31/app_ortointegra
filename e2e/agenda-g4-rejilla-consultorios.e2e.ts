@@ -106,9 +106,12 @@ async function semanaVacia(page: Page): Promise<void> {
    rejilla ya no se compacta al horario de la clínica. Apagada, `agenda-vistas`
    sigue buscando el de la clínica. */
 async function compactar(page: Page): Promise<void> {
-  const boton = page.getByRole('button', { name: 'Compactar la rejilla al horario de los consultorios', exact: true })
-  await boton.click()
-  await expect(boton).toHaveAttribute('aria-pressed', 'true')
+  // I5 (punto 15): «Compactar» es una casilla del menú del engrane (no lo cierra).
+  await page.getByRole('button', { name: 'Opciones de la agenda' }).click()
+  const opcion = page.getByRole('menuitemcheckbox', { name: 'Compactar la rejilla al horario de los consultorios', exact: true })
+  await opcion.click()
+  await expect(opcion).toHaveAttribute('aria-checked', 'true')
+  await page.keyboard.press('Escape')
 }
 
 test('«Todos los médicos»: el gris es el de los tres consultorios, y «Compactar» va de la apertura más temprana al cierre más tardío', async ({ page }) => {

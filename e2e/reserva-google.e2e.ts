@@ -21,7 +21,8 @@ import { encrypt } from '../src/lib/encrypt'
  *      verdad (la respuesta llega mucho antes que el Google lento).
  *   4. Un evento importado que se empalma con una reserva por enlace: un
  *      registro y una fila de auditoría, sin repetir al resincronizar, y el
- *      aviso en el panel «Por confirmar» de la agenda.
+ *      aviso en la pestaña «Avisos» de la campana (I5), junto al del evento
+ *      importado por asignar; pulsar el del empalme lleva a la cita.
  *   +. Dos reservas simultáneas con Google conectado: la segunda espera el
  *      candado de la sincronización y hace su propia pasada (sin solapes del
  *      syncToken); una sola cita.
@@ -314,10 +315,28 @@ test('4 · un evento de Google que se empalma con una reserva por enlace: un avi
   expect(avisos()).toBe('1')
   expect(auditadas()).toBe('1')
 
-  // El aviso, en el panel «Por confirmar» (canal de E8).
+  // I5 (punto 19): con la v2 encendida (`prepararEscenario`), los dos avisos
+  // en la pestaña «Avisos» de la campana: el empalme sobre la reserva y el
+  // evento importado, por asignar. Uno por par, aunque se resincronizó.
+  const importada = sqlLocal(`select id from public.appointments where google_event_id = :'ev'`, { ev })
+  const filas = (tipo: string, cita: string): string =>
+    sqlLocal(`select count(*) || '|' || count(*) filter (where revisado_en is null) from public.avisos_clinica
+               where tipo = :'t' and cita_id = :'c'`, { t: tipo, c: cita })
+  expect(filas('empalme_google', reserva)).toBe('1|1')
+  expect(filas('google_por_asignar', importada)).toBe('1|1')
   await page.goto('/agenda')
-  await page.locator('[data-por-confirmar]').click({ timeout: 120_000 })
-  await expect(page.locator(`[data-fila-empalme="${reserva}"]`)).toBeVisible({ timeout: 30_000 })
+  await page.locator('[data-campana]').click({ timeout: 120_000 })
+  const panel = page.getByRole('dialog', { name: 'Por confirmar y avisos' })
+  await panel.getByRole('tab', { name: /^Avisos/ }).click()
+  const empalme = panel.locator(`[data-aviso-tipo="empalme_google"][data-aviso-cita="${reserva}"]`)
+  await expect(empalme).toContainText('se empalma con un evento de Google', { timeout: 30_000 })
+  await expect(panel.locator(`[data-aviso-tipo="google_por_asignar"][data-aviso-cita="${importada}"]`)).toBeVisible()
+  // Pulsarlo lleva a su cita y lo da por revisado; el otro se queda.
+  await empalme.click()
+  await expect(page.getByRole('dialog').filter({ has: page.getByRole('button', { name: 'Configuración de la cita', exact: true }) }))
+    .toBeVisible({ timeout: 30_000 })
+  await expect.poll(() => filas('empalme_google', reserva)).toBe('1|0')
+  expect(filas('google_por_asignar', importada)).toBe('1|1')
 })
 
 test('+ · dos reservas simultáneas con Google conectado: la segunda espera el candado y hace SU pasada; una sola cita', async () => {

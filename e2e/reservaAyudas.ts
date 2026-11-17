@@ -161,6 +161,11 @@ export function limpiarReservasE2e(desde: string): void {
       if to_regclass('public.cita_correos') is not null then
         delete from public.cita_correos where appointment_id in (select id from _citas);
       end if;
+      -- I5: los avisos de esas citas (sin FK a la cita: quedarían huérfanos) y su rastro de auditoría.
+      if to_regclass('public.avisos_clinica') is not null then
+        delete from public.audit_log where registro_id in (select id from public.avisos_clinica where cita_id in (select id from _citas));
+        delete from public.avisos_clinica where cita_id in (select id from _citas);
+      end if;
       if to_regclass('public.cita_confirmaciones') is not null then
         delete from public.audit_log where registro_id in (select id from public.cita_confirmaciones
           where clinica_id in (select id from _cl) and (created_at >= current_setting('e2e.desde')::timestamptz or appointment_id in (select id from _citas)));
