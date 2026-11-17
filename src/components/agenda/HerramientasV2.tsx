@@ -143,7 +143,10 @@ function SelectorFecha({ rango, alIrAFecha }: { rango: RangoVisibleV2; alIrAFech
     <>
       <button type="button" className="ag-herramienta" data-selector-fecha=""
         aria-label="Ir a una fecha" title="Ir a una fecha" aria-haspopup="dialog" aria-expanded={ancla !== null}
-        onClick={e => setAncla(a => (a ? null : cajaDe(e.currentTarget)))}>
+        /* La caja se lee en el clic, FUERA del actualizador: React pone `currentTarget`
+           a null al acabar el despacho, y el actualizador puede correr después, en el
+           render (reabrir tras Escape tumbaba la pantalla; I1, punto 7). */
+        onClick={e => { const caja = cajaDe(e.currentTarget); setAncla(a => (a ? null : caja)) }}>
         <CalendarDays size={16} aria-hidden="true" />
       </button>
       {ancla && (
@@ -172,7 +175,8 @@ function BotonBuscar({ apiRef, clase, icono, atajos }: {
       <button type="button" className={clase} data-buscar-citas=""
         aria-label="Buscar citas de un paciente" title={atajos ? 'Buscar citas de un paciente (/)' : 'Buscar citas de un paciente'}
         aria-keyshortcuts={atajos ? teclasDeAccion('buscar') : undefined} aria-haspopup="dialog" aria-expanded={ancla !== null}
-        onClick={e => setAncla(a => (a ? null : cajaDe(e.currentTarget)))}>
+        /* Fuera del actualizador, como en `SelectorFecha` (I1, punto 7). */
+        onClick={e => { const caja = cajaDe(e.currentTarget); setAncla(a => (a ? null : caja)) }}>
         <Search size={icono} aria-hidden="true" />
       </button>
       {ancla && (
