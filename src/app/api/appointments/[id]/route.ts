@@ -18,6 +18,8 @@ import { pideComprobarNota, vetoPorEstado, vetoPorNotaLigada } from '@/lib/agend
 import { tieneNotaLigada } from '@/lib/agenda/notaLigadaServidor'
 import { comprobarTipoDelPut, leerTipoCitaId, CUERPO_TIPO_INVALIDO } from '@/lib/agenda/tipoCitaServidor'
 import { auditarLigado, estaPorLigar, pacienteParaGoogle, pacienteVisible, vetoDeConversion } from '@/lib/agenda/porLigarServidor'
+import { vetoPorEleccion } from '@/lib/agenda/eleccionPaciente'
+import { filaEleccion } from '@/lib/agenda/eleccionServidor'
 import {
   auditarConflictoEdicion, camposEditados, descripcionV2, parchearConEtag, releerUpdatedAt,
   type CampoEdicion, type EventoGoogle, type ResultadoParche,
@@ -386,6 +388,18 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
     if (v2) {
       const vetoEstado = vetoPorEstado(existing, { status, start_time, end_time, all_day })
       if (vetoEstado) return NextResponse.json({ error: 'estado_no_admite', message: vetoEstado }, { status: 409 })
+    }
+    /* Tanda I, punto 9: en una cita reservada por enlace que aún no empieza, el
+       médico no cambia y consultorio, día y hora sólo con «Reagendar»
+       (`POST …/[id]/reagendar`); la duración sí. Ver `eleccionPaciente.ts`. Sólo
+       con v2 y sólo si el cuerpo nombra esos campos (una lectura más). La base
+       lo cierra también (`cita_proteger_eleccion`). */
+    if (v2 && [start_time, medico_id, consultorio_id, all_day].some(v => v !== undefined)) {
+      const fila = await filaEleccion(supabase, profile.clinica_id, id)
+      if (!fila) return NextResponse.json({ error: 'Error interno' }, { status: 500 })
+      const veto = vetoPorEleccion({ ...fila, start_time: existing.start_time, medico_id: existing.medico_id, all_day: existing.all_day },
+        { start_time, medico_id, consultorio_id, all_day }, Date.now())
+      if (veto) return NextResponse.json({ error: 'eleccion_paciente', campo: veto.campo, message: veto.mensaje }, { status: 409 })
     }
 
     if (clientUpdatedAt && existing.updated_at !== clientUpdatedAt) {

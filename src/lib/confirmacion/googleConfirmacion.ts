@@ -34,15 +34,19 @@ export interface CitaRespondida {
   etag: string | null
 }
 
-/** Escribe en Google el estado nuevo de la cita. Nunca lanza. */
-export async function reflejarEnGoogle(c: CitaRespondida): Promise<void> {
+/**
+ * Escribe en Google el estado nuevo de la cita. Nunca lanza. `actorId`, sólo
+ * para los logs de `conCalendarioSpinus` (tanda I: también lo usa «Reagendar»
+ * de la clínica, con el perfil de quien reagendó).
+ */
+export async function reflejarEnGoogle(c: CitaRespondida, actorId = 'enlace_paciente'): Promise<void> {
   try {
     const admin = createAdminClient()
     const conexion = await resolverConexionClinica(admin, c.clinicaId)
     if (!conexion) return
     const r = await conCalendarioSpinus(conexion, admin,
       (calendar, calendarId) => restablecerEnGoogle(c.clinicaId, calendar, calendarId, [{ citaId: c.citaId, eventId: c.eventId, etag: c.etag }]),
-      { puedeReparar: false, actorId: 'enlace_paciente' })
+      { puedeReparar: false, actorId })
     if (r && r.errores > 0) logger.warn('confirmacion', 'Google: la respuesta del paciente no se escribió; lo hará el sondeo')
   } catch (err) {
     logger.warn('confirmacion', `Google: reflejo fallido (${err instanceof Error ? err.name : 'desconocido'})`)

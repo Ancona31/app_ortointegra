@@ -117,6 +117,8 @@ const db = vi.hoisted(() => ({
   aplicadas: [] as Aplicacion[],
   importadas: [] as DatosImportar[],
   fallarAplicar: new Set<string>(),
+  /** Tanda I, punto 9: la base rechaza (candado de la cita por enlace) lo que cambia contenido. */
+  rechazarAplicar: new Set<string>(),
   aplicarDevuelve: 1,
   /** E9: las llamadas a `confirmarPorRsvp` y lo que devuelve (o lanza). */
   rsvps: [] as Array<{ citaId: string; eventId: string; aceptaron: string[] }>,
@@ -160,6 +162,7 @@ vi.mock('@/lib/gcalSincronizacionBase', async (importOriginal) => {
     },
     aplicarEvento: async (_c: string, _cal: string, a: Aplicacion) => {
       if (db.fallarAplicar.has(a.citaId)) throw new Error('la base falló')
+      if (db.rechazarAplicar.has(a.citaId) && Object.keys(a.cambios).length > 0) throw new real.CambioRechazadoPorLaBase('gcal_aplicar_evento')
       db.aplicadas.push(a)
       return db.aplicarDevuelve
     },
@@ -216,7 +219,7 @@ const llamadas = (): Params[] => h.estado.llamadas as Params[]
 beforeEach(() => {
   Object.assign(db, {
     fase: 'completa', syncToken: null, pageToken: null, ventana: null, candado: null, ocupado: false, habilitada: true,
-    noDisponible: false, noDisponibleC2: false, soltados: [], reinicios: 0, filas: [fila()], aplicadas: [], importadas: [], fallarAplicar: new Set(),
+    noDisponible: false, noDisponibleC2: false, soltados: [], reinicios: 0, filas: [fila()], aplicadas: [], importadas: [], fallarAplicar: new Set(), rechazarAplicar: new Set(),
     aplicarDevuelve: 1, rsvps: [], rsvpDevuelve: true, empalmes: [], empalmesFalla: null,
   })
   Object.assign(h.estado, { guion: [], llamadas: [], opcionesLista: [], calendarioRegistrado: CAL, insertCalendario: 0, parches: [], patchFalla: null })
@@ -397,6 +400,18 @@ describe('cada decisión llega a su RPC', () => {
     expect(vi.mocked(logAudit)).not.toHaveBeenCalled()
   })
 
+  it('I, punto 9: lo que la BASE rechaza (cita por enlace movida en Google) se audita y se restablece, sin contar error', async () => {
+    db.filas = [fila({ conPaciente: true, tituloSinPaciente: null, paciente: { nombre: 'Ana', apellidos: 'Pérez' } })]
+    db.rechazarAplicar.add(CITA)
+    h.estado.guion = [pagina([evento({ summary: 'Ana Pérez' })], { nextSyncToken: 't' })]
+    const r = await sincronizarClinica(conexion, op)
+    expect(r).toMatchObject({ estado: 'ok', errores: 0, cambios: 0 })
+    expect(r.restablecer).toEqual([CITA])
+    expect(h.estado.parches).toHaveLength(1)
+    const desc = JSON.parse(vi.mocked(logAudit).mock.calls.find(c => c[0].accion === 'gcal_cambio_rechazado')?.[0].descripcion ?? '{}')
+    expect(desc).toMatchObject({ gana: 'spinus', motivo: 'eleccion_paciente', campos: ['hora'] })
+  })
+
   it('un evento que falla no tumba la página', async () => {
     db.fallarAplicar.add(CITA)
     h.estado.guion = [pagina([evento(), nuevo], { nextSyncToken: 't' })]
@@ -427,6 +442,10 @@ describe('la capa de base real', () => {
       .rejects.toBeInstanceOf(real.SincronizacionNoDisponible)
     h.estado.rpc.error = { code: '42501', message: 'permission denied' }
     await expect(real.citasDeEventos(CLINICA, ['ev1'], [])).rejects.toThrow(/42501/)
+    await expect(real.citasDeEventos(CLINICA, ['ev1'], [])).rejects.not.toBeInstanceOf(real.CambioRechazadoPorLaBase)
+    // Tanda I, punto 9: SÓLO el 42501 del candado de la cita por enlace es un cambio rechazado.
+    h.estado.rpc.error = { code: '42501', message: 'El consultorio, el día y la hora de una cita reservada por enlace sólo cambian con «Reagendar»' }
+    await expect(real.citasDeEventos(CLINICA, ['ev1'], [])).rejects.toBeInstanceOf(real.CambioRechazadoPorLaBase)
   })
 
   it('valida con Zod lo que devuelve el espejo', async () => {

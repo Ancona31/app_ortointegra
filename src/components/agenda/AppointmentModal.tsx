@@ -57,6 +57,8 @@ import type { TipoCita } from '@/lib/agenda/tiposCita'
 import { tiposDelConsultorio } from '@/lib/agenda/tiposPorConsultorio'
 import { BotonWhatsAppCita } from '@/components/agenda/BotonWhatsAppCita'
 import { BotonCorreoCita } from '@/components/agenda/BotonCorreoCita'
+import PanelReagendar from '@/components/agenda/PanelReagendar'
+import { eleccionFija, TEXTO_ELECCION } from '@/lib/agenda/eleccionPaciente'
 import { correoParaConfirmacion, motivoSinCorreo, motivoSinWhatsApp, telefonoParaWhatsApp } from '@/lib/agenda/whatsappCita'
 
 export type PacienteBusqueda = { id: string; nombre: string; apellidos: string; telefono: string | null }
@@ -346,7 +348,7 @@ function useTiposCita(medicoId: string): TipoCita[] | null {
 export default function AppointmentModal({
   modal, onClose, onSave, onDelete, medicos, defaultMedicoId,
   hideMedicoDropdown, medicoDropdownRequired, canVerExpediente, canInvitar, onInvitar,
-  onCambiarTipo, avisosHorario, agendaV2 = false, onCancelarCita, buscarEmpalmes, saliendo = false,
+  onCambiarTipo, avisosHorario, agendaV2 = false, onCancelarCita, buscarEmpalmes, saliendo = false, onReagendada,
 }: {
   modal: ModalState
   /* F2.7 · El modal sigue montado mientras sale (lo decide la página, rama de
@@ -364,6 +366,9 @@ export default function AppointmentModal({
      apagado— la papelera y la X borran como siempre. */
   agendaV2?: boolean
   onCancelarCita?: (id: string) => Promise<void>
+  /* Tanda I, punto 9: «Reagendar» de una cita reservada por enlace ya escribió
+     (`PanelReagendar`); la página vuelve a traer la agenda y cierra. */
+  onReagendada?: () => void
   /* B7c: los empalmes de una cita contra lo PINTADO en la rejilla. Sólo llega
      con el interruptor encendido; sin él no se pregunta nada. Lo que no está
      pintado lo dice el servidor con un 409 (ver `handleSave` de la página). */
@@ -423,6 +428,13 @@ export default function AppointmentModal({
      el paciente. Se edita sin él: conserva su título (el nombre de quien
      reservó) y no manda `paciente_id`. Se liga al iniciar la consulta (D7). */
   const reserva = apt && esPorLigar(apt) ? apt : null
+  /* Tanda I, punto 9: lo que el paciente ELIGIÓ al reservar por enlace
+     (médico, consultorio, día y hora) no se cambia desde aquí mientras la cita
+     no haya empezado; consultorio, día y hora, con «Reagendar», que avisa. La
+     duración sí. El servidor y la base lo cierran también (`eleccionPaciente.ts`).
+     «Reagendar» de la tarjeta (`enfocar: 'fecha'`) abre el panel directamente. */
+  const eleccion = agendaV2 && apt !== null && !esEvento && eleccionFija(apt, abiertoEn)
+  const [reagendando, setReagendando] = useState(eleccion && modal.mode === 'edit' && modal.enfocar === 'fecha')
 
   /* EL INTERRUPTOR DE TODO EL DÍA, y la guarda que impide que exista fuera de un
      evento. `esEvento &&` no es defensa de más: al cambiar de rama el modal
@@ -1437,6 +1449,19 @@ export default function AppointmentModal({
               ve desde aquí a propósito: «hasta el 20» para un evento que termina
               el 19 es la clase de dato que nadie corrige porque nadie se lo
               cree. */}
+          {eleccion && apt && (reagendando
+            ? <PanelReagendar cita={apt} consultorios={consultoriosList} alVolver={() => setReagendando(false)}
+                alTerminar={() => (onReagendada ? onReagendada() : onClose())} />
+            : (
+              <div data-testid="eleccion-paciente" className="flex flex-col gap-2">
+                <p className="text-[12.5px] leading-relaxed" style={{ color: 'var(--ag-muted)' }}>{TEXTO_ELECCION.formulario}</p>
+                <button type="button" onClick={() => setReagendando(true)}
+                  className="w-full flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-bold border transition-colors hover:bg-[var(--ag-btn-ghost-hover)]"
+                  style={{ color: 'var(--ag-text)', borderColor: 'var(--ag-input-border)' }}>
+                  <CalendarPlus size={15} /> Reagendar
+                </button>
+              </div>
+            ))}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-[11px] font-bold uppercase tracking-[.06em] mb-2" style={{ color: 'var(--ag-muted2)' }}>
@@ -1447,9 +1472,10 @@ export default function AppointmentModal({
                 value={fecha}
                 /* F3 · «Reagendar» abre la edición con el foco aquí. `useDialogoModal`
                    no se lo quita: sólo enfoca el panel si el foco no está dentro. */
-                autoFocus={modal.mode !== 'closed' && modal.enfocar === 'fecha'}
+                autoFocus={modal.mode !== 'closed' && modal.enfocar === 'fecha' && !eleccion}
+                disabled={eleccion}
                 onChange={e => todoElDia ? moverFechaDeTodoElDia(e.target.value) : moverInicio(e.target.value, hora)}
-                className="w-full px-3 py-2.5 max-md:py-3 text-sm rounded-xl border border-[var(--ag-input-border)] bg-[var(--ag-input-bg)] text-[var(--ag-text)] focus:outline-none focus:ring-2 focus:ring-[var(--ag-input-focus-ring)] focus:border-[var(--ag-input-focus-border)] ag-transicion-color"
+                className="w-full px-3 py-2.5 max-md:py-3 text-sm rounded-xl border border-[var(--ag-input-border)] bg-[var(--ag-input-bg)] text-[var(--ag-text)] focus:outline-none focus:ring-2 focus:ring-[var(--ag-input-focus-ring)] focus:border-[var(--ag-input-focus-border)] ag-transicion-color disabled:opacity-50 disabled:cursor-not-allowed"
               />
             </div>
             {!todoElDia && (
@@ -1461,8 +1487,9 @@ export default function AppointmentModal({
                   type="time"
                   value={hora}
                   step={900}
+                  disabled={eleccion}
                   onChange={e => moverInicio(fecha, e.target.value)}
-                  className="w-full px-3 py-2.5 max-md:py-3 text-sm rounded-xl border border-[var(--ag-input-border)] bg-[var(--ag-input-bg)] text-[var(--ag-text)] focus:outline-none focus:ring-2 focus:ring-[var(--ag-input-focus-ring)] focus:border-[var(--ag-input-focus-border)] ag-transicion-color"
+                  className="w-full px-3 py-2.5 max-md:py-3 text-sm rounded-xl border border-[var(--ag-input-border)] bg-[var(--ag-input-bg)] text-[var(--ag-text)] focus:outline-none focus:ring-2 focus:ring-[var(--ag-input-focus-ring)] focus:border-[var(--ag-input-focus-border)] ag-transicion-color disabled:opacity-50 disabled:cursor-not-allowed"
                 />
               </div>
             )}
@@ -1607,7 +1634,8 @@ export default function AppointmentModal({
                   value={medicoId}
                   onChange={e => setMedicoId(e.target.value)}
                   required={medicoDropdownRequired}
-                  className="w-full pl-3 pr-9 py-2.5 max-md:py-3 text-sm rounded-xl border border-[var(--ag-input-border)] bg-[var(--ag-input-bg)] text-[var(--ag-text)] focus:outline-none focus:ring-2 focus:ring-[var(--ag-input-focus-ring)] focus:border-[var(--ag-input-focus-border)] ag-transicion-color appearance-none cursor-pointer"
+                  disabled={eleccion}
+                  className="w-full pl-3 pr-9 py-2.5 max-md:py-3 text-sm rounded-xl border border-[var(--ag-input-border)] bg-[var(--ag-input-bg)] text-[var(--ag-text)] focus:outline-none focus:ring-2 focus:ring-[var(--ag-input-focus-ring)] focus:border-[var(--ag-input-focus-border)] ag-transicion-color appearance-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {!medicoDropdownRequired && <option value="">Sin asignar</option>}
                   {medicos.map(m => (
@@ -1629,7 +1657,7 @@ export default function AppointmentModal({
                 value={consultorioId}
                 onChange={e => setConsultorioId(e.target.value)}
                 required
-                disabled={consultoriosList.length === 0}
+                disabled={consultoriosList.length === 0 || eleccion}
                 className="w-full pl-3 pr-9 py-2.5 max-md:py-3 text-sm rounded-xl border border-[var(--ag-input-border)] bg-[var(--ag-input-bg)] text-[var(--ag-text)] focus:outline-none focus:ring-2 focus:ring-[var(--ag-input-focus-ring)] focus:border-[var(--ag-input-focus-border)] ag-transicion-color appearance-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {consultoriosList.length === 0 ? (

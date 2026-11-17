@@ -130,7 +130,9 @@ export async function reservar(e: Escenario, codigo: string, envio: Envio, ctx?:
   try {
     const r = await propio.post(`/api/reservar/${codigo}`, { data: {
       consultorio_id: e.consultorioId, tipo_cita_id: e.tipoId, inicio: envio.inicio, nombre: envio.persona.nombre,
-      telefono: envio.persona.telefono, correo: envio.persona.correo, acepta_aviso: true, client_id: envio.clientId ?? randomUUID(),
+      telefono: envio.persona.telefono, acepta_aviso: true, client_id: envio.clientId ?? randomUUID(),
+      // Tanda I, punto 2: correo vacío = sin correo (la página tampoco manda «''»).
+      ...(envio.persona.correo ? { correo: envio.persona.correo } : {}),
       ...(envio.ficha ? { ficha: envio.ficha } : {}),
     } })
     return { status: r.status(), cuerpo: await r.json().catch(() => ({})) }

@@ -4,7 +4,7 @@
  * aunque cambie el reloj (Resend exige el mismo cuerpo con la misma llave).
  */
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { correoConfirmacion, correoRecordatorio, type DatosRecordatorio } from '@/lib/confirmacion/correosCita'
+import { correoCambio, correoConfirmacion, correoRecordatorio, type DatosRecordatorio } from '@/lib/confirmacion/correosCita'
 
 const URL_ENLACE = 'https://spinus.prueba/confirmar/AbCdEfGhIjKlMnOpQrStUv'
 const BASE: DatosRecordatorio = {
@@ -90,7 +90,7 @@ describe('correoConfirmacion', () => {
       expect(parte).toContain('Confirma tu cita')
       expect(parte).not.toMatch(/recordatorio|es mañana/i)
     }
-    expect(c.texto.startsWith('Spinus\n\nConfirma tu cita')).toBe(true)
+    expect(c.texto.startsWith('Dr. Ana Pérez\nConsultorio <Uno>\n\nConfirma tu cita')).toBe(true)
     expect(c.texto).toContain(URL_ENLACE)
     expect(c.html).toContain(`href="${URL_ENLACE}"`)
     expect(c.html).toContain('Calle &quot;1&quot; &amp; 2')
@@ -99,12 +99,37 @@ describe('correoConfirmacion', () => {
   it('ya confirmada: «Tu cita», sin «Confirmo» y sin «Recordatorio»', () => {
     const c = correoConfirmacion({ ...BASE, confirmada: true })
     expect(c.asunto).toMatch(/^Tu cita del /)
-    expect(c.texto.startsWith('Spinus\n\nTu cita')).toBe(true)
+    expect(c.texto.startsWith('Dr. Ana Pérez\nConsultorio <Uno>\n\nTu cita')).toBe(true)
     expect(c.html).not.toContain('Confirmo mi asistencia')
     expect(`${c.texto}\n${c.html}`).not.toMatch(/recordatorio/i)
   })
 
   it('el recordatorio sigue diciendo «Recordatorio de tu cita»', () => {
-    expect(correoRecordatorio(BASE).texto.startsWith('Spinus\n\nRecordatorio de tu cita')).toBe(true)
+    expect(correoRecordatorio(BASE).texto.startsWith('Dr. Ana Pérez\nConsultorio <Uno>\n\nRecordatorio de tu cita')).toBe(true)
+  })
+})
+
+/* Tanda I, punto 21: a nombre del MÉDICO (cabecera, remitente y texto), con el
+   consultorio debajo y «Enviado con Spinus» pequeño al pie. Punto 9: el aviso de
+   cambio es el mismo armado, con los datos nuevos y el enlace. */
+describe('a nombre del médico (I, punto 21) y el aviso de cambio (I, punto 9)', () => {
+  it('remitente, cabecera y pie: el médico arriba, el consultorio debajo, Spinus sólo al pie', () => {
+    for (const c of [correoRecordatorio(BASE), correoConfirmacion(BASE), correoCambio(BASE)]) {
+      expect(c.remitente).toBe('Dr. Ana Pérez')
+      expect(c.texto.endsWith('\n\nEnviado con Spinus')).toBe(true)
+      expect(c.texto.split('Spinus').length - 1).toBe(1)
+      const cabecera = c.html.indexOf('Dr. Ana Pérez')
+      expect(cabecera).toBeGreaterThan(-1)
+      expect(c.html.indexOf('Consultorio &lt;Uno&gt;')).toBeGreaterThan(cabecera)
+      expect(c.html).toMatch(/font:400 11px[^>]*>Enviado con Spinus</)
+    }
+  })
+  it('el aviso de cambio dice la fecha nueva en el asunto y lleva el enlace', () => {
+    const c = correoCambio(BASE)
+    expect(c.asunto).toMatch(/^Cambio en tu cita: ahora es el martes,? 17 de noviembre/)
+    expect(c.texto).toContain('Tu cita cambió')
+    expect(c.texto).toContain('10:00')
+    expect(c.html).toContain(`href="${URL_ENLACE}"`)
+    expect(`${c.texto}\n${c.html}`).not.toMatch(/recordatorio/i)
   })
 })

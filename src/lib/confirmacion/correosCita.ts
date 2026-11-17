@@ -44,7 +44,8 @@ export interface DatosRecordatorio {
   url: string
 }
 
-export interface CorreoRecordatorio { asunto: string; texto: string; html: string }
+/** `remitente`: el NOMBRE con que sale (el del médico, tanda I punto 21; '' = «Spinus»). La dirección no cambia. */
+export interface CorreoRecordatorio { asunto: string; texto: string; html: string; remitente: string }
 
 function zonaValida(zona: string | null): string {
   if (!zona) return ZONA_POR_OMISION
@@ -116,6 +117,8 @@ function correoDeCita(d: DatosRecordatorio, palabras: PalabrasCorreo): CorreoRec
     cierre,
   ]
   const partes = {
+    // Tanda I, punto 21: a nombre del médico, con el consultorio debajo.
+    marca: { medico, consultorio: d.consultorio.nombre },
     preencabezado: `Tienes una cita ${cuando}.`,
     titulo: palabras.titulo,
     fecha: { ...fechaDeCorreo(d.inicio, zona), zona: region ? `Zona horaria: ${region}` : null },
@@ -126,7 +129,7 @@ function correoDeCita(d: DatosRecordatorio, palabras: PalabrasCorreo): CorreoRec
     botones: botonesRecordatorio(d.url, d.confirmada),
     pie: [plazo, cierre],
   }
-  return { asunto, texto: textoCorreoCita(partes, texto), html: htmlCorreoCita(partes) }
+  return { asunto, texto: textoCorreoCita(partes, texto), html: htmlCorreoCita(partes), remitente: medico }
 }
 
 /**
@@ -143,4 +146,16 @@ export function correoConfirmacion(d: DatosRecordatorio): CorreoRecordatorio {
   return correoDeCita(d, d.confirmada
     ? { asunto: fecha => `Tu cita del ${fecha}`, titulo: 'Tu cita' }
     : { asunto: fecha => `Confirma tu cita del ${fecha}`, titulo: 'Confirma tu cita' })
+}
+
+/**
+ * Tanda I, punto 9 · El AVISO DE CAMBIO que sale cuando la clínica reagenda
+ * una cita reservada por enlace (`POST /api/appointments/[id]/reagendar`): el
+ * mismo cuerpo que la confirmación (fecha y hora NUEVAS, médico, consultorio
+ * con su dirección y teléfono, y el enlace de confirmar o avisar que no
+ * asistirá), con sus palabras: dice que la cita cambió. Determinista.
+ * ⚠️ TEXTO PENDIENTE DE REVISIÓN, como el de la confirmación.
+ */
+export function correoCambio(d: DatosRecordatorio): CorreoRecordatorio {
+  return correoDeCita(d, { asunto: fecha => `Cambio en tu cita: ahora es el ${fecha}`, titulo: 'Tu cita cambió' })
 }

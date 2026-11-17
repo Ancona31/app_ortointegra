@@ -15,11 +15,16 @@
  */
 import { fechaDeCorreo, htmlCorreoCita, textoCorreoCita, urlSegura, type PartesCorreo } from '@/lib/correo/plantillaCita'
 
-export interface CorreoListo { asunto: string; texto: string; html: string }
+/** `remitente`: el NOMBRE con que sale (el del médico, tanda I punto 21); la dirección no cambia (`transporte.ts`). */
+export interface CorreoListo { asunto: string; texto: string; html: string; remitente: string }
 
-/** El código de 6 dígitos para verificar el correo antes de reservar. */
-export function correoCodigo(medico: string, codigo: string): CorreoListo {
+/**
+ * El código de 6 dígitos para verificar el correo antes de reservar. Tanda I,
+ * punto 21: a nombre del médico, con el consultorio elegido debajo si se sabe.
+ */
+export function correoCodigo(medico: string, codigo: string, opciones: { consultorio?: string | null } = {}): CorreoListo {
   const partes: PartesCorreo = {
+    marca: { medico, consultorio: opciones.consultorio ?? null },
     preencabezado: `Tu código es ${codigo}. Vence en 10 minutos.`,
     titulo: 'Tu código para reservar',
     parrafos: [`Escríbelo en la página de reserva de ${medico}.`],
@@ -30,6 +35,7 @@ export function correoCodigo(medico: string, codigo: string): CorreoListo {
     asunto: `Tu código para reservar: ${codigo}`,
     texto: textoCorreoCita(partes, [`Tu código para reservar con ${medico} es ${codigo}. Vence en 10 minutos.`, 'Si no lo pediste, ignora este correo.']),
     html: htmlCorreoCita(partes),
+    remitente: medico,
   }
 }
 
@@ -77,6 +83,7 @@ export function correoComprobante(d: DatosComprobante): CorreoListo {
     ? 'Para confirmar tu asistencia o avisar que no podrás ir, usa este enlace:'
     : 'Para cambiar o cancelar, comunícate con el consultorio.'
   const partes: PartesCorreo = {
+    marca: { medico: d.medico, consultorio: d.consultorio },
     preencabezado: `Tu cita con ${d.medico}: ${cuando}.`,
     titulo: 'Cita agendada',
     fecha: fechaDeCorreo(d.inicio, d.zona),
@@ -91,5 +98,6 @@ export function correoComprobante(d: DatosComprobante): CorreoListo {
     asunto: `Tu cita con ${d.medico}`,
     texto: textoCorreoCita(partes, [renglones.join('\n'), [cierre, ...(url ? [url] : [])].join('\n')]),
     html: htmlCorreoCita(partes),
+    remitente: d.medico,
   }
 }

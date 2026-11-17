@@ -81,3 +81,20 @@ describe('nombre de quien reserva (seg1, punto 7b: llega al título de Google)',
   })
 })
 
+
+/* Tanda I, punto 2: el correo es opcional en el esquema (el único no lo pide);
+   el fijo lo sigue exigiendo en la ruta. Si llega, con su forma de siempre. */
+describe('correo opcional (I, punto 2)', () => {
+  it('sin correo pasa; con correo vacío o demasiado largo, no', () => {
+    const { correo: _sinCorreo, ...sin } = BASE
+    expect(_sinCorreo).toBe('ana@x.mx')
+    expect(ReservarSchema.safeParse(sin).success).toBe(true)
+    expect(ReservarSchema.safeParse({ ...BASE, correo: '' }).success).toBe(false)
+    expect(ReservarSchema.safeParse({ ...BASE, correo: `${'a'.repeat(250)}@x.mx` }).success).toBe(false)
+    expect(ReservarSchema.safeParse({ ...BASE, correo: null }).success).toBe(false)
+  })
+  it('pedir el código acepta el consultorio (sólo para la cabecera del correo) y nada más', () => {
+    expect(PedirCodigoSchema.safeParse({ correo: 'a@b.mx', consultorio_id: ID }).success).toBe(true)
+    expect(PedirCodigoSchema.safeParse({ correo: 'a@b.mx', consultorio_id: 'no-uuid' }).success).toBe(false)
+  })
+})
