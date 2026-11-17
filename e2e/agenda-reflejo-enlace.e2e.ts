@@ -188,7 +188,9 @@ async function fueraYVolver(page: Page, ir: 'configuracion' | 'dashboard', cambi
   await irAAgenda(page)
   await prepararCache(page)
   if (ir === 'configuracion') {
-    await page.getByRole('button', { name: 'Configuración de la agenda' }).first().click()
+    // Integración I (I5, punto 15): la configuración es la primera opción del menú del engrane.
+    await page.getByRole('button', { name: 'Opciones de la agenda' }).first().click()
+    await page.getByRole('menuitem', { name: 'Configuración de la agenda' }).click()
     await page.waitForURL('**/agenda/configuracion')
   } else {
     await page.getByRole('link', { name: 'Dashboard', exact: true }).click()

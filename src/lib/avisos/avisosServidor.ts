@@ -28,7 +28,22 @@ const FilaCita = z.object({
   status: z.enum(['scheduled', 'confirmed', 'cancelled', 'no_show', 'attended']),
   medico_id: z.string().nullable(), paciente_id: z.string().nullable(),
   reserva_nombre: z.string().nullable(), consultorio_timezone: z.string().nullable(),
+  /* Integración I: para «¿No es una cita?» en el aviso (I3, `esPorAsignar`). */
+  reserva_canal: z.string().nullable().optional(), google_asignacion: z.string().nullable().optional(),
 })
+
+const COLUMNAS_CITA = 'id, title, start_time, end_time, status, medico_id, paciente_id, reserva_nombre, consultorio_timezone'
+
+/**
+ * Las citas de los avisos, con `reserva_canal` y `google_asignacion` (I3). Sin
+ * la columna de I3 (42703 / PGRST204), la lectura de antes: el aviso se pinta
+ * igual, sin el botón.
+ */
+async function leerCitasDeAvisos(supabase: ClienteSesion, clinicaId: string, ids: string[]) {
+  const pedir = (columnas: string) => supabase.from('appointments').select(columnas).eq('clinica_id', clinicaId).in('id', ids)
+  const r = await pedir(`${COLUMNAS_CITA}, reserva_canal, google_asignacion`)
+  return r.error?.code && AUSENTE.has(r.error.code) ? pedir(COLUMNAS_CITA) : r
+}
 
 /** Los avisos sin revisar de la clínica, los más nuevos primero, con su cita. Nunca lanza. */
 export async function leerAvisosClinica(supabase: ClienteSesion, clinicaId: string): Promise<RespuestaAvisos> {
@@ -42,9 +57,7 @@ export async function leerAvisosClinica(supabase: ClienteSesion, clinicaId: stri
     }
     const filas = z.array(FilaAviso).parse(data ?? [])
     if (filas.length === 0) return { disponible: true, avisos: [] }
-    const { data: citas, error: e2 } = await supabase.from('appointments')
-      .select('id, title, start_time, end_time, status, medico_id, paciente_id, reserva_nombre, consultorio_timezone')
-      .eq('clinica_id', clinicaId).in('id', [...new Set(filas.map(f => f.cita_id))])
+    const { data: citas, error: e2 } = await leerCitasDeAvisos(supabase, clinicaId, [...new Set(filas.map(f => f.cita_id))])
     if (e2) {
       logger.error('avisos', `citas de los avisos sin leer: ${e2.code ?? ''}`)
       return { disponible: false, avisos: [] }
@@ -56,6 +69,7 @@ export async function leerAvisosClinica(supabase: ClienteSesion, clinicaId: stri
       return [{ id: f.id, tipo: f.tipo, creado_en: f.creado_en, cita: {
         id: c.id, title: c.title ?? '', start_time: c.start_time, end_time: c.end_time, status: c.status,
         medico_id: c.medico_id, paciente_id: c.paciente_id, reserva_nombre: c.reserva_nombre, zona: c.consultorio_timezone,
+        reserva_canal: c.reserva_canal ?? null, google_asignacion: c.google_asignacion ?? null,
       } }]
     }) }
   } catch (err: unknown) {

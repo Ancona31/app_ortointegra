@@ -412,6 +412,32 @@ test('20: el correo a la clínica por cada reserva: apagado de fábrica no sale;
   }
 })
 
+/* Integración I (I2 + I5): una reserva con el enlace de UN SOLO USO y SIN
+   correo no lleva comprobante (I2), pero la clínica se entera igual (I5).
+   MUTACIÓN: volver al `if (b.correo === null) return` de I2 antes del aviso,
+   en `programarDespues` de `api/reservar/[codigo]` → rojo. */
+test('20 · el único sin correo también avisa a la clínica, aunque no haya correo del paciente', async () => {
+  const admin = CORREO.adminA
+  sqlLocal(`update public.agenda_ajustes set correo_reserva_clinica = true where clinica_id = ${CL}`)
+  const unico = emitirEnlace(e, 'unico').codigo
+  const p = personaNueva()
+  const previos = await contarCorreos(admin, 'Reserva nueva')
+  const ctx = await api(ipAlAzar())
+  try {
+    const r = await ctx.post(`/api/reservar/${unico}`, { data: {
+      consultorio_id: e.consultorioId, tipo_cita_id: e.tipoId, inicio: turno().inicio, nombre: p.nombre, telefono: p.telefono,
+      acepta_aviso: true, client_id: randomUUID(),
+    } })
+    expect(r.status()).toBe(201)
+  } finally {
+    await ctx.dispose()
+  }
+  const c = await esperarCorreo(admin, 'Reserva nueva', previos, 15000)
+  expect(c.asunto).toContain(p.nombre)
+  expect(c.texto).not.toContain(p.telefono)
+  expect(sqlLocal(`select reserva_correo is null from public.appointments where reserva_nombre = :'n'`, { n: p.nombre })).toBe('t')
+})
+
 /* ── Apagada: lo de siempre ────────────────────────────────────────────── */
 
 test('apagada: la barra de siempre (conteo, Compactar, leyenda), sin campana ni engrane de menú', async ({ page }) => {

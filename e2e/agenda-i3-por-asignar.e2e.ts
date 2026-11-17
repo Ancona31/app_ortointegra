@@ -31,6 +31,7 @@ import { fechaHoraLocalAInstante } from '../src/lib/dates'
  *     (deja pasar el evento) → «punto 10 · fila».
  *   · 10, tarjeta: la ruta `no-es-cita` contesta 200 sin escribir → «punto 10 · tarjeta».
  *   · 10, formulario: quitar `<BotonNoEsCita>` de `AppointmentModal` → «punto 10 · formulario».
+ *   · 10, campana (integración I): quitar `<BotonNoEsCita>` de `ListaAvisos` → «punto 10 · campana».
  *   · 22: quitar `escudo.activar()` del cierre de `QuickPatientModal` en
  *     `AppointmentModal` → «punto 22 · formulario»; y en `ConvertirEnCita` →
  *     «punto 22 · convertir».
@@ -70,6 +71,7 @@ function filaGoogle(titulo: string, inicio: string, asignacion: 'por_asignar' | 
 
 function borrarFilasGoogle(): void {
   sqlLocal(`begin; set local session_replication_role = replica;
+    delete from public.avisos_clinica where cita_id in (select id from public.appointments where google_event_id like 'falso-i3-e2e-%');
     delete from public.audit_log where registro_id in (select id from public.appointments where google_event_id like 'falso-i3-e2e-%');
     delete from public.appointments where google_event_id like 'falso-i3-e2e-%'; commit;`)
 }
@@ -163,6 +165,30 @@ test('punto 10 · formulario: «¿No es una cita?» desde «Editar» quita la ma
   await expect(formulario).toHaveCount(0)
   await expect(eventoConTexto(page, titulo)).not.toContainText('Por asignar', { timeout: 1_500 })
   expect(asignacion(id)).toBe('evento')
+})
+
+/* Integración I (I3 + I5): el aviso «Evento nuevo de Google por asignar» de la
+   campana lleva «¿No es una cita?» al lado; pulsarlo deja el evento y revisa
+   el aviso. MUTACIÓN: quitar `<BotonNoEsCita>` de `ListaAvisos` → rojo. */
+test('punto 10 · campana: «¿No es una cita?» en el aviso de Google lo deja en evento y revisa el aviso', async ({ page }) => {
+  interruptorAgenda('A', true)
+  const titulo = tituloUnico('Aviso Google I3')
+  const id = filaGoogle(titulo, fechaHoraLocalAInstante(DIA_LABORABLE_LIBRE, '18:30', TZ), 'por_asignar')
+  const pendiente = (): string => sqlLocal(`select count(*) from public.avisos_clinica
+    where cita_id = :'id' and tipo = 'google_por_asignar' and revisado_en is null`, { id })
+  expect(pendiente()).toBe('1')
+  await abrirAgendaV2(page)
+  await page.locator('[data-campana]').first().click()
+  const capa = page.getByRole('dialog', { name: 'Por confirmar y avisos' })
+  await capa.getByRole('tab', { name: /^Avisos/ }).click()
+  const junto = capa.locator(`[data-aviso-no-es-cita="${id}"]`)
+  await expect(junto).toBeVisible()
+  const post = page.waitForResponse(r => r.url().endsWith(`/api/appointments/${id}/no-es-cita`) && r.request().method() === 'POST')
+  await junto.getByRole('button', { name: '¿No es una cita?' }).click()
+  expect((await post).status()).toBe(200)
+  await expect(capa.locator(`[data-aviso-cita="${id}"]`)).toHaveCount(0)
+  expect(asignacion(id)).toBe('evento')
+  await expect.poll(pendiente, { timeout: 10_000 }).toBe('0')
 })
 
 /**

@@ -54,11 +54,11 @@
 --   · appointments AFTER INSERT con `reserva_enlace_id` → 'reserva_enlace'
 --     (reservar_por_enlace, D3/seg1; la única que la rellena: el disparador
 --     de seg protege las columnas reserva_*).
---   · appointments AFTER INSERT con `origen = 'google'`, sin paciente, sin
---     reserva, con hora y por venir → 'google_por_asignar'
---     (gcal_importar_evento, C2; el criterio de `cita_asignacion_google()`). El agente I3
---     añade el botón «¿No es una cita?»; marcarlo como no-cita debería
---     marcar también el aviso revisado (lo cablea el integrador).
+--   · appointments AFTER INSERT con `google_asignacion = 'por_asignar'`
+--     → 'google_por_asignar' (gcal_importar_evento, C2). INTEGRACIÓN I: la
+--     marca la pone `cita_asignacion_google()` (I3, 20261121130000) en su
+--     BEFORE INSERT, así que el aviso usa la MISMA decisión, no una copia del
+--     criterio. «¿No es una cita?» en el aviso lo revisa (ListaAvisos).
 --   · cita_confirmaciones AFTER UPDATE OF respuesta a 'cancelo' →
 --     'cancelacion_paciente' (cita_confirmacion_responder, E1).
 --   · cita_reagendos AFTER INSERT → 'reagendado_paciente' sobre la cita
@@ -76,7 +76,8 @@
 --
 -- ═══ APLICACIÓN ════════════════════════════════════════════════════════
 -- EJECUTAR EN EL SQL EDITOR DE SUPABASE, DE UNA SOLA VEZ, COMPLETO.
--- Requiere B1, D1 (reserva_enlace_id), C2 (origen), D11, E1 y E6. PG ≥ 14.
+-- Requiere B1, D1 (reserva_enlace_id), C2 (origen), I3 (google_asignacion,
+-- 20261121130000: va ANTES), D11, E1 y E6. PG ≥ 14.
 -- Bloqueos (lock_timeout 5 s): ALTER TABLE agenda_ajustes ADD COLUMN →
 --   ACCESS EXCLUSIVE un instante (sin reescritura); CREATE TRIGGER → SHARE
 --   ROW EXCLUSIVE un instante sobre appointments, cita_confirmaciones,
@@ -128,6 +129,11 @@
 --   · (baja) el pre-vuelo comprueba que existan las tablas de D11, E1 y E6,
 --     no sus columnas: si faltase una, aborta a mitad pero el BEGIN lo
 --     revierte entero. Se deja así (como D11).
+--   · INTEGRACIÓN I (2026-11-17): el WHEN de Google pasa a
+--     `NEW.google_asignacion = 'por_asignar'` (la decisión de I3, no una
+--     copia); el pre-vuelo exige la columna. Caso nuevo en la prueba SQL
+--     (postgres y la sesión con origen google no avisan), en rojo con el WHEN
+--     anterior. Revisión en AUDITORIA-CONJUNTO-AGENDA-V2.md §11.
 --
 -- ═══ APLICACIÓN LOCAL ══════════════════════════════════════════════════
 -- 2026-11-17, base local (docker), dentro del candado de las e2e: en seco
@@ -158,9 +164,9 @@ BEGIN
   END IF;
   SELECT count(*) INTO v_n FROM pg_attribute
    WHERE attrelid = 'public.appointments'::regclass AND NOT attisdropped
-     AND attname IN ('reserva_enlace_id', 'origen', 'paciente_id', 'all_day', 'clinica_id');
-  IF v_n <> 5 THEN
-    RAISE EXCEPTION 'PRE-VUELO FALLÓ: a appointments le faltan columnas de D1/C2 (encontradas % de 5).', v_n;
+     AND attname IN ('reserva_enlace_id', 'origen', 'paciente_id', 'all_day', 'clinica_id', 'google_asignacion');
+  IF v_n <> 6 THEN
+    RAISE EXCEPTION 'PRE-VUELO FALLÓ: a appointments le faltan columnas de D1/C2/I3 (encontradas % de 6).', v_n;
   END IF;
   IF to_regprocedure('public.get_clinica_id()') IS NULL OR to_regprocedure('public.log_tabla_change()') IS NULL THEN
     RAISE EXCEPTION 'PRE-VUELO FALLÓ: falta get_clinica_id() o log_tabla_change().';
@@ -375,13 +381,12 @@ CREATE OR REPLACE TRIGGER audit_avisos_clinica
 CREATE OR REPLACE TRIGGER trg_appointments_aviso_clinica
   AFTER INSERT ON public.appointments
   FOR EACH ROW
-  -- Google: el MISMO criterio con el que `cita_asignacion_google()` (I3) la
-  -- marca por asignar —sin paciente, sin reserva, con hora y por venir—, con
-  -- columnas que existen sin I3: un evento PASADO que trae la primera
-  -- sincronización no deja aviso (auditoría I5, hallazgo 1).
-  WHEN (NEW.reserva_enlace_id IS NOT NULL
-        OR (NEW.origen = 'google' AND NEW.paciente_id IS NULL AND NEW.reserva_canal IS NULL
-            AND NEW.all_day IS NOT TRUE AND NEW.end_time > now()))
+  -- Google: la marca que puso el BEFORE INSERT de I3 (`cita_asignacion_google()`:
+  -- sólo el sondeo —service_role con spinus.via = google—, sin paciente, sin
+  -- reserva, con hora y por venir). Integración I: antes era una copia del
+  -- criterio sin el «quién», y un INSERT de `postgres` o de la sesión con
+  -- origen google avisaba de un «por asignar» que la agenda no marcaba.
+  WHEN (NEW.reserva_enlace_id IS NOT NULL OR NEW.google_asignacion = 'por_asignar')
   EXECUTE FUNCTION public.aviso_clinica_de_cita();
 CREATE OR REPLACE TRIGGER trg_cita_confirmaciones_aviso_clinica
   AFTER UPDATE OF respuesta ON public.cita_confirmaciones

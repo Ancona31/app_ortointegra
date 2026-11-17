@@ -14,10 +14,16 @@
  * Se pinta con lo que ya hay (tokens `--ag-*`, mismas letras que las filas de
  * «Por confirmar»): nada de estética nueva.
  */
-import { useState } from 'react'
+import { useState, type CSSProperties } from 'react'
+import BotonNoEsCita from '@/components/agenda/BotonNoEsCita'
+import { esPorAsignar } from '@/lib/agenda/tarjetasAgenda'
 import {
   cuandoDeLaCita, enlaceDeAviso, haceCuanto, textoAviso, type AvisoClinica,
 } from '@/lib/avisos/avisosClinica'
+
+/* El botón de siempre de esta lista («Marcar todos como revisados»), también para «¿No es una cita?». */
+const CLASE_BOTON = 'px-2.5 py-1.5 text-[12px] rounded-xl font-bold border transition-colors hover:bg-[var(--ag-btn-ghost-hover)]'
+const ESTILO_BOTON: CSSProperties = { color: 'var(--ag-text)', borderColor: 'var(--ag-input-border)' }
 
 interface Props {
   avisos: AvisoClinica[]
@@ -41,11 +47,6 @@ function Contenido({ a, ahora }: { a: AvisoClinica; ahora: number }) {
   )
 }
 
-/* ⚠️ PARA QUIEN INTEGRE I3: en un aviso `google_por_asignar`, «¿No es una
-   cita?» (`BotonNoEsCita`, contrato en `notas_i3.md`) va AL LADO de la fila,
-   no dentro (un botón no puede ir dentro de otro), con
-   `alHecho={() => revisar([a.id])}`: decidir que no es una cita también
-   revisa el aviso. Esta rama sale de `0349221`, sin I3, y no lo monta. */
 function FilaAviso({ a, ahora, revisar, alAbrir }: { a: AvisoClinica; ahora: number } & Pick<Props, 'revisar' | 'alAbrir'>) {
   const comun = {
     className: 'ag-aviso-fila',
@@ -75,12 +76,20 @@ export function ListaAvisos({ avisos, revisar, revisarTodos, alAbrir }: Props) {
     <div data-lista-avisos>
       <ul className="flex flex-col">
         {avisos.map(a => (
-          <li key={a.id}><FilaAviso a={a} ahora={ahora} revisar={revisar} alAbrir={alAbrir} /></li>
+          <li key={a.id}>
+            <FilaAviso a={a} ahora={ahora} revisar={revisar} alAbrir={alAbrir} />
+            {/* I3 + I5 (integración): en un aviso de Google que SIGUE por asignar,
+                «¿No es una cita?» AL LADO de la fila, no dentro (un botón no va
+                dentro de otro). Decidir que no es una cita también revisa el aviso. */}
+            {a.tipo === 'google_por_asignar' && esPorAsignar(a.cita) && (
+              <span className="flex justify-end pb-2" data-aviso-no-es-cita={a.cita.id}>
+                <BotonNoEsCita citaId={a.cita.id} alHecho={() => revisar([a.id])} className={CLASE_BOTON} style={ESTILO_BOTON} />
+              </span>
+            )}
+          </li>
         ))}
       </ul>
-      <button type="button" data-revisar-todos onClick={revisarTodos}
-        className="mt-3 px-2.5 py-1.5 text-[12px] rounded-xl font-bold border transition-colors hover:bg-[var(--ag-btn-ghost-hover)]"
-        style={{ color: 'var(--ag-text)', borderColor: 'var(--ag-input-border)' }}>
+      <button type="button" data-revisar-todos onClick={revisarTodos} className={`mt-3 ${CLASE_BOTON}`} style={ESTILO_BOTON}>
         Marcar todos como revisados
       </button>
     </div>

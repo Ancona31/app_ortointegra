@@ -31,6 +31,9 @@ export interface CitaDelAviso {
   reserva_nombre: string | null
   /** Zona del consultorio de la cita; null = la del dispositivo. */
   zona: string | null
+  /** Integración I · para `esPorAsignar` (I3): «¿No es una cita?» en el aviso. Ausentes sin la columna. */
+  reserva_canal?: string | null
+  google_asignacion?: string | null
 }
 
 export interface AvisoClinica {

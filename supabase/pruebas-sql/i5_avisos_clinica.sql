@@ -67,6 +67,10 @@ select pg_temp.esperar('caso 1', (select string_agg(tipo || '@' || right(clinica
 -- ── Caso 2: Google por asignar, sólo sin paciente y con hora ──────────
 -- g1 sí; g2 todo el día no; g3 con paciente no; s1 (origen spinus, sin paciente) no;
 -- g5 ya pasada (la primera sincronización trae el pasado) no: el criterio de cita_asignacion_google().
+-- Integración I: g1, g2, g3 y g5 entran como el sondeo (service_role con spinus.via = google, lo que
+-- hace gcal_importar_evento); el aviso sigue la marca de I3 (google_asignacion), no una copia.
+set local role service_role;
+select set_config('spinus.via', 'google', true);
 insert into public.appointments (id, clinica_id, paciente_id, medico_id, title, start_time, end_time, all_day, status, origen, consultorio_timezone)
 values
   ('00000000-0000-4000-8000-000000150a11', '00000000-0000-4000-8000-000000150c01', null, '00000000-0000-4000-8000-000000150b02', 'Evento I5',
@@ -76,10 +80,20 @@ values
    (date_trunc('day', now() at time zone 'America/Merida') + interval '5 days') at time zone 'America/Merida', true, 'scheduled', 'google', 'America/Merida'),
   ('00000000-0000-4000-8000-000000150a13', '00000000-0000-4000-8000-000000150c01', '00000000-0000-4000-8000-000000150f01', '00000000-0000-4000-8000-000000150b01', 'Con paciente I5',
    date_trunc('day', now()) + interval '3 days 11 hours', date_trunc('day', now()) + interval '3 days 12 hours', false, 'scheduled', 'google', 'America/Merida'),
-  ('00000000-0000-4000-8000-000000150a14', '00000000-0000-4000-8000-000000150c01', null, '00000000-0000-4000-8000-000000150b01', 'Junta I5',
-   date_trunc('day', now()) + interval '3 days 13 hours', date_trunc('day', now()) + interval '3 days 14 hours', false, 'scheduled', 'spinus', 'America/Merida'),
   ('00000000-0000-4000-8000-000000150a15', '00000000-0000-4000-8000-000000150c01', null, '00000000-0000-4000-8000-000000150b02', 'Pasado I5',
    date_trunc('day', now()) - interval '3 days', date_trunc('day', now()) - interval '3 days' + interval '1 hour', false, 'scheduled', 'google', 'America/Merida');
+select set_config('spinus.via', '', true);
+reset role;
+-- s1 (origen spinus) y g6: un evento de Google por venir y sin paciente que NO trae el sondeo
+-- (aquí postgres, como la semilla o el SQL Editor): I3 no lo marca y el aviso tampoco salta.
+insert into public.appointments (id, clinica_id, paciente_id, medico_id, title, start_time, end_time, all_day, status, origen, consultorio_timezone)
+values
+  ('00000000-0000-4000-8000-000000150a14', '00000000-0000-4000-8000-000000150c01', null, '00000000-0000-4000-8000-000000150b01', 'Junta I5',
+   date_trunc('day', now()) + interval '3 days 13 hours', date_trunc('day', now()) + interval '3 days 14 hours', false, 'scheduled', 'spinus', 'America/Merida'),
+  ('00000000-0000-4000-8000-000000150a16', '00000000-0000-4000-8000-000000150c01', null, '00000000-0000-4000-8000-000000150b02', 'Sin sondeo I5',
+   date_trunc('day', now()) + interval '3 days 15 hours', date_trunc('day', now()) + interval '3 days 16 hours', false, 'scheduled', 'google', 'America/Merida');
+select pg_temp.esperar('caso 2 marca', (select string_agg(right(id::text, 4) || '=' || coalesce(google_asignacion, '-'), ',' order by id)
+  from public.appointments where id::text like '%150a1_'), '0a11=por_asignar,0a12=-,0a13=-,0a14=-,0a15=-,0a16=-');
 select pg_temp.esperar('caso 2', (select string_agg(tipo || '>' || right(cita_id::text, 4), ',' order by cita_id) from public.avisos_clinica
   where cita_id::text like '%150a1_'), 'google_por_asignar>0a11');
 

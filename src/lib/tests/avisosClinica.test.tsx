@@ -100,7 +100,9 @@ describe('cambioPuedeAvisar (qué cambio del canal recarga la campana)', () => {
   const c = (tipo: 'INSERT' | 'UPDATE', extra: Partial<FilaCambioCita>): CambioCita => ({ tipo, fila: fila(extra) })
   it('alta de una reserva por enlace o de un evento de Google sin paciente', () => {
     expect(cambioPuedeAvisar(c('INSERT', { paciente_id: null, reserva_canal: 'fijo' }))).toBe(true)
-    expect(cambioPuedeAvisar(c('INSERT', { paciente_id: null, origen: 'google' }))).toBe(true)
+    expect(cambioPuedeAvisar(c('INSERT', { paciente_id: null, origen: 'google', google_asignacion: 'por_asignar' }))).toBe(true)
+    // Integración I: sin la marca de I3 (todo el día, pasado, o no lo trajo el sondeo) no hay aviso que recargar.
+    expect(cambioPuedeAvisar(c('INSERT', { paciente_id: null, origen: 'google', google_asignacion: null }))).toBe(false)
     expect(cambioPuedeAvisar(c('INSERT', { origen: 'spinus' }))).toBe(false)
   })
   it('una cancelación de cita con paciente o por ligar; nada más', () => {
@@ -123,6 +125,21 @@ describe('ListaAvisos (pieza para toda la app)', () => {
   })
   it('vacía lo dice', () => {
     expect(renderToStaticMarkup(<ListaAvisos avisos={[]} revisar={nada} revisarTodos={nada} />)).toContain('No hay avisos sin revisar.')
+  })
+  it('integración I3 + I5: «¿No es una cita?» al lado del aviso de Google que SIGUE por asignar, y en ningún otro', () => {
+    const conCita = (tipo: TipoAviso, cita: Partial<AvisoClinica['cita']>): AvisoClinica => {
+      const a = aviso(tipo)
+      return { ...a, id: `${a.id}-${cita.google_asignacion ?? cita.paciente_id ?? cita.reserva_canal ?? 'x'}`, cita: { ...a.cita, ...cita } }
+    }
+    const html = renderToStaticMarkup(<ListaAvisos avisos={[
+      conCita('google_por_asignar', { google_asignacion: 'por_asignar' }),
+      conCita('google_por_asignar', { google_asignacion: 'evento' }),
+      conCita('google_por_asignar', { google_asignacion: 'por_asignar', paciente_id: 'p1' }),
+      conCita('reserva_enlace', { reserva_canal: 'fijo' }),
+    ]} revisar={nada} revisarTodos={nada} alAbrir={nada} />)
+    expect(html.split('¿No es una cita?').length - 1).toBe(1)
+    // Fuera del botón de la fila (un botón no va dentro de otro): el de la fila se cierra antes.
+    expect(html.indexOf('</button>')).toBeLessThan(html.indexOf('data-aviso-no-es-cita'))
   })
 })
 
