@@ -2,6 +2,8 @@
  * plantillaCita.ts — EL armado compartido de los correos de cita de la agenda
  * (tanda G1, punto 4): código para reservar, comprobante, recordatorio y
  * cualquier correo de cita nuevo (p. ej. el de confirmación propio de Spinus).
+ * Tanda I, punto 21: con `marca`, a nombre del médico (cabecera con su nombre
+ * y el consultorio; «Enviado con Spinus» pequeño al pie). Misma estética.
  * Pura: recibe las partes en texto llano y devuelve el HTML y el texto plano.
  *
  * Cómo está hecho, y por qué:
@@ -44,6 +46,14 @@ const FUENTE = "system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-s
 
 export interface BotonCorreo { texto: string; url: string; secundario?: boolean }
 
+/**
+ * Tanda I, punto 21 de Angel: de QUIÉN es el correo. La cabecera lleva el
+ * nombre del médico y, debajo, el consultorio, para que el paciente lo
+ * reconozca; «Enviado con Spinus» queda pequeño al pie. Sin marca (o con el
+ * médico vacío), la cabecera de siempre: «Spinus».
+ */
+export interface MarcaCorreo { medico: string; consultorio?: string | null }
+
 export interface PartesCorreo {
   /** Texto oculto que el buzón enseña junto al asunto. */
   preencabezado: string
@@ -62,6 +72,8 @@ export interface PartesCorreo {
   botones?: BotonCorreo[]
   /** Letra pequeña al final. */
   pie?: string[]
+  /** Tanda I, punto 21: médico y consultorio en la cabecera (ver `MarcaCorreo`). */
+  marca?: MarcaCorreo
 }
 
 /** Sólo `http(s)://` y sin espacios ni comillas: lo único que entra a un `href`. */
@@ -71,14 +83,33 @@ export function urlSegura(url: string | null | undefined): string | null {
 
 const p = (estilo: string, html: string): string => `<p style="margin:0 0 12px;${estilo}">${html}</p>`
 
+/** El médico y el consultorio de la marca, recortados; `null` si no hay médico (va «Spinus»). */
+function deQuien(marca: MarcaCorreo | undefined): { medico: string; consultorio: string | null } | null {
+  const medico = marca?.medico.trim() ?? ''
+  return medico ? { medico, consultorio: marca?.consultorio?.trim() || null } : null
+}
+
 /**
- * La marca, en texto y color: «Spinus» en blanco sobre el navy. Sin imagen: con
- * las imágenes bloqueadas (lo normal en muchos buzones) un símbolo saldría como
- * un cuadro roto, y el nombre ya dice de quién es el correo.
+ * La marca, en texto y color, en blanco sobre el navy: el nombre del médico y,
+ * debajo, el consultorio (tanda I, punto 21); sin médico, «Spinus». Sin
+ * imagen: con las imágenes bloqueadas (lo normal en muchos buzones) un símbolo
+ * saldría como un cuadro roto, y el nombre ya dice de quién es el correo.
  */
-function cabecera(): string {
+function cabecera(marca: MarcaCorreo | undefined): string {
+  const quien = deQuien(marca)
+  const sub = quien?.consultorio
+    ? `<span style="display:block;margin-top:4px;font:500 14px ${FUENTE};color:${C.borde}">${escapeHtml(quien.consultorio)}</span>`
+    : ''
   return `<tr><td bgcolor="${C.navy}" style="background:${C.navy};padding:18px 24px;border-radius:12px 12px 0 0">`
-    + `<span style="font:800 19px ${FUENTE};color:#ffffff;letter-spacing:.01em">Spinus</span></td></tr>`
+    + `<span style="display:block;font:800 19px ${FUENTE};color:#ffffff;letter-spacing:.01em">${escapeHtml(quien?.medico ?? 'Spinus')}</span>`
+    + `${sub}</td></tr>`
+}
+
+/** «Enviado con Spinus», pequeño y fuera de la tarjeta; sólo cuando la cabecera es del médico. */
+function piePlataforma(marca: MarcaCorreo | undefined): string {
+  return deQuien(marca)
+    ? `<tr><td align="center" style="padding:12px 8px 0;font:400 11px ${FUENTE};color:${C.suave}">Enviado con Spinus</td></tr>`
+    : ''
 }
 
 function bloqueFecha(f: NonNullable<PartesCorreo['fecha']>): string {
@@ -140,15 +171,17 @@ export function htmlCorreoCita(x: PartesCorreo): string {
     + `<body style="margin:0;padding:0;background:${C.fondo};color-scheme:light">`
     + `<div style="display:none;max-height:0;overflow:hidden;opacity:0">${escapeHtml(x.preencabezado)}</div>`
     + `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="${C.fondo}" style="background:${C.fondo}"><tr><td align="center" style="padding:16px 12px">`
-    + `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px">${cabecera()}`
+    + `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px">${cabecera(x.marca)}`
     + `<tr><td bgcolor="${C.tarjeta}" style="background:${C.tarjeta};padding:24px;border:1px solid ${C.borde};border-top:0;border-radius:0 0 12px 12px">`
-    + `${cuerpo(x)}</td></tr></table></td></tr></table></body></html>`
+    + `${cuerpo(x)}</td></tr>${piePlataforma(x.marca)}</table></td></tr></table></body></html>`
 }
 
 /**
- * El texto plano: «Spinus», el título y, debajo, los `renglones` que quien
- * llama ya tenía (así el texto de antes no cambia) o, sin ellos, lo mismo que
- * el HTML en el mismo orden, con cada botón seguido de su URL completa.
+ * El texto plano: la marca (el médico y su consultorio; sin médico,
+ * «Spinus»), el título y, debajo, los `renglones` que quien llama ya tenía
+ * (así el texto de antes no cambia) o, sin ellos, lo mismo que el HTML en el
+ * mismo orden, con cada botón seguido de su URL completa. Con médico, cierra
+ * «Enviado con Spinus» (tanda I, punto 21).
  */
 export function textoCorreoCita(x: PartesCorreo, renglones?: string[]): string {
   const datos = (x.datos ?? []).filter(d => d.valor?.trim()).map(d => `${d.etiqueta}: ${d.valor}`)
@@ -162,7 +195,9 @@ export function textoCorreoCita(x: PartesCorreo, renglones?: string[]): string {
     ...botones,
     ...(x.pie ?? []),
   ]
-  return ['Spinus', x.titulo, ...cuerpoTexto].join('\n\n')
+  const quien = deQuien(x.marca)
+  const encabezado = quien ? [quien.medico, ...(quien.consultorio ? [quien.consultorio] : [])].join('\n') : 'Spinus'
+  return [encabezado, x.titulo, ...cuerpoTexto, ...(quien ? ['Enviado con Spinus'] : [])].join('\n\n')
 }
 
 /**

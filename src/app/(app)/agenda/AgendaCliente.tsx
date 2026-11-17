@@ -2087,6 +2087,9 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
           onDelete={handleDelete}
           agendaV2={agendaV2}
           onCancelarCita={handleCancelar}
+          /* Tanda I, punto 9: «Reagendar» de una cita por enlace ya escribió en
+             la base; se cierra y se vuelve a traer (la caché de rangos, fuera). */
+          onReagendada={agendaV2 ? () => { closeModal(); vaciarCacheCitas(); refetch() } : undefined}
           /* B7c: sólo con el interruptor encendido; lee lo pintado en el
              momento de guardar, sin traer nada. */
           buscarEmpalmes={agendaV2 ? (cita) => {

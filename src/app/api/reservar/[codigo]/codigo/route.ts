@@ -54,7 +54,9 @@ export async function POST(req: NextRequest, ctx: RouteContext<'/api/reservar/[c
   if (emitido === 'enlace_invalido') return noEncontrado()
   if (emitido !== 'ok') return responder({ status: 500, cuerpo: { error: 'no_disponible' } })
 
-  const plantilla = correoCodigo(nombreDelMedico(enlace.ctx), digitos)
+  // Tanda I, punto 21: el consultorio de la cabecera, sólo si es uno de ESTE enlace (si no, sin él).
+  const consultorio = enlace.ctx.consultorios.find(c => c.id === cuerpo.data?.consultorio_id)?.nombre ?? null
+  const plantilla = correoCodigo(nombreDelMedico(enlace.ctx), digitos, { consultorio })
   const envio = await enviarCorreo({ para: destinatario, ...plantilla, etiqueta: 'reserva_codigo' })
   if (!envio.ok) return responder({ status: 503, cuerpo: { error: 'correo_no_enviado' } })
   return responder({ status: 200, cuerpo: { estado: 'enviado' } })

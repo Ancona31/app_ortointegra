@@ -26,11 +26,28 @@ const TODOS = () => ({ codigo: correoCodigo('Dr. Admin Semilla Uno', '482913'), 
 const leible = (html: string) => html.replace(/<img[^>]*>/g, '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ')
 
 describe('los tres correos comparten el armado', () => {
-  it('llevan la marca en el HTML (como texto) y en el texto plano', () => {
+  /* Tanda I, punto 21: la marca de arriba es el MÉDICO (y el consultorio, si
+     lo hay); Spinus sólo queda pequeño al pie. */
+  it('llevan arriba el nombre del médico, en el HTML (como texto) y en el texto plano, y Spinus al pie', () => {
     for (const c of Object.values(TODOS())) {
-      expect(leible(c.html)).toContain('Spinus')
-      expect(c.texto.startsWith('Spinus\n')).toBe(true)
+      // Lo primero que se lee del cuerpo (tras el preencabezado oculto) es el médico.
+      const cuerpo = c.html.slice(c.html.indexOf('</div>', c.html.indexOf('<body')) + 6)
+      expect(leible(cuerpo).trim().startsWith('Dr. Admin Semilla Uno')).toBe(true)
+      expect(c.texto.startsWith('Dr. Admin Semilla Uno\n')).toBe(true)
+      expect(c.texto.endsWith('Enviado con Spinus')).toBe(true)
+      expect(c.remitente).toBe('Dr. Admin Semilla Uno')
     }
+  })
+  it('sin médico, la cabecera vuelve a ser «Spinus» y no hay pie', () => {
+    const html = htmlCorreoCita({ preencabezado: 'pre', titulo: 'T', parrafos: ['p'] })
+    expect(leible(html)).toContain('Spinus')
+    expect(html).not.toContain('Enviado con Spinus')
+  })
+  it('el nombre del médico va escapado en la cabecera', () => {
+    const c = correoCodigo('Dr. <b>Raro</b> & "Cía"', '482913', { consultorio: 'Sala <1>' })
+    expect(c.html).toContain('Dr. &lt;b&gt;Raro&lt;/b&gt; &amp; &quot;Cía&quot;')
+    expect(c.html).toContain('Sala &lt;1&gt;')
+    expect(c.html).not.toContain('<b>Raro</b>')
   })
   it('se leen sin imágenes: no llevan ninguna y caben en el teléfono', () => {
     for (const c of Object.values(TODOS())) {

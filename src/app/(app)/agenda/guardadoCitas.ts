@@ -45,6 +45,7 @@ import { registrarNuevo, salirConAnimacion } from '@/lib/agenda/marcasMovimiento
 import { animarFlip } from '@/lib/agenda/flipTarjetas'
 import type { AltaGuardada, Appointment, DatosGuardado, OpcionesGuardado, Status } from '@/lib/agenda/tiposAgenda'
 import { ESTADOS_CITA, STATUS_CONFIG } from '@/lib/agenda/tarjetasAgenda'
+import { eleccionFija, TEXTO_ELECCION } from '@/lib/agenda/eleccionPaciente'
 import {
   empalmesPintados, esListaDeEmpalmes, mensajeEmpalme, unirAceptados, ESTADOS_SIN_EMPALME, type Empalme,
 } from '@/lib/agenda/empalmesCita'
@@ -212,8 +213,20 @@ export function crearGuardadoCitas({
     arg.event.setDates(nuevo, fin ? new Date(fin.getTime() + nuevo.getTime() - inicio.getTime()) : null)
   }
 
+  /* Tanda I, punto 9: una cita reservada por enlace que aún no empieza no se
+     arrastra (día y hora sólo con «Reagendar», que avisa al paciente). Se
+     decide con la posición de ANTES del gesto; el servidor y la base lo
+     rechazan igual (409 `eleccion_paciente`). Estirar el FIN es libre (la
+     duración); estirar desde el borde de ARRIBA mueve el inicio y se veta igual. */
+  function arrastreVetadoPorEleccion(arg: EventDropArg | EventResizeDoneArg): boolean {
+    const antes = arg.oldEvent.start
+    const canal = arg.oldEvent.extendedProps.reserva_canal
+    return agendaV2 && antes !== null && eleccionFija({ reserva_canal: typeof canal === 'string' ? canal : null, start_time: antes.toISOString() }, Date.now())
+  }
+
   async function handleEventDrop(arg: EventDropArg) {
     if (arg.event.extendedProps.isGcalBlock) { arg.revert(); return }
+    if (arrastreVetadoPorEleccion(arg)) { arg.revert(); toast.error(TEXTO_ELECCION.reagendar); return }
     if (esGestoDeTodoElDia(arg)) return
     const id         = arg.event.id
 
@@ -452,6 +465,8 @@ export function crearGuardadoCitas({
 
   async function handleEventResize(arg: EventResizeDoneArg) {
     if (arg.event.extendedProps.isGcalBlock) { arg.revert(); return }
+    const mueveInicio = arg.startDelta.years !== 0 || arg.startDelta.months !== 0 || arg.startDelta.days !== 0 || arg.startDelta.milliseconds !== 0
+    if (mueveInicio && arrastreVetadoPorEleccion(arg)) { arg.revert(); toast.error(TEXTO_ELECCION.reagendar); return }
     if (esGestoDeTodoElDia(arg)) return
     const id         = arg.event.id
 

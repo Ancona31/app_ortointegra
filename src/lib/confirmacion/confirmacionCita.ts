@@ -25,7 +25,7 @@ import { randomUUID } from 'node:crypto'
 import { logger } from '@/lib/logger'
 import { enviarCorreo } from '@/lib/correo/transporte'
 import { emitirEnlaceConfirmacion } from '@/lib/confirmacion/enlaceConfirmacion'
-import { correoConfirmacion } from '@/lib/confirmacion/correosCita'
+import { correoCambio, correoConfirmacion } from '@/lib/confirmacion/correosCita'
 import { RecordatoriosNoDisponibles, marcarEnvio, tomarEnvio, type Cierre, type Toma } from '@/lib/confirmacion/recordatorios'
 import { componerNombreMedicoCompleto } from '@/lib/nombreMedico'
 
@@ -53,12 +53,12 @@ async function tomar(clinicaId: string, citaId: string, testigo: string): Promis
 }
 
 /** Compone y manda la confirmación ya tomada. Devuelve cómo cerrarla. */
-async function mandar(clinicaId: string, citaId: string, perfilId: string, t: Toma): Promise<Cierre> {
+async function mandar(clinicaId: string, citaId: string, perfilId: string, t: Toma, cambio: boolean): Promise<Cierre> {
   const enlace = await emitirEnlaceConfirmacion(clinicaId, citaId, perfilId)
   if (!enlace) return { estado: 'omitido', motivo: 'sin_enlace' }
   let correo
   try {
-    correo = correoConfirmacion({
+    correo = (cambio ? correoCambio : correoConfirmacion)({
       inicio: t.r_inicio, zona: t.r_zona,
       medico: t.r_medico ? componerNombreMedicoCompleto(t.r_medico) : '',
       consultorio: t.r_consultorio, confirmada: t.r_estado === 'confirmed', url: enlace.url,
@@ -86,14 +86,19 @@ async function cerrar(clinicaId: string, envioId: string, testigo: string, cierr
   }
 }
 
-/** Manda la confirmación de UNA cita. `perfilId`: quien la manda (queda en el enlace emitido). Nunca lanza. */
-export async function enviarConfirmacionCita(clinicaId: string, citaId: string, perfilId: string): Promise<ResultadoConfirmacion> {
+/**
+ * Manda la confirmación de UNA cita. `perfilId`: quien la manda (queda en el
+ * enlace emitido). Con `cambio` (tanda I, punto 9: «Reagendar» de una cita por
+ * enlace), las palabras del aviso de cambio (`correoCambio`); el registro es el
+ * mismo (`tipo: 'confirmacion'` del NUEVO inicio). Nunca lanza.
+ */
+export async function enviarConfirmacionCita(clinicaId: string, citaId: string, perfilId: string, opciones: { cambio?: boolean } = {}): Promise<ResultadoConfirmacion> {
   try {
     const testigo = randomUUID()
     const t = await tomar(clinicaId, citaId, testigo)
     if (t === 'no_disponible') return { tipo: 'no_disponible' }
     if (!t) return { tipo: 'no_toca' }
-    const cierre = await mandar(clinicaId, citaId, perfilId, t)
+    const cierre = await mandar(clinicaId, citaId, perfilId, t, opciones.cambio === true)
     await cerrar(clinicaId, t.r_envio_id, testigo, cierre)
     return resultadoDe(cierre)
   } catch (e) {

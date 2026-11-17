@@ -6,6 +6,8 @@ interface Props {
   medico: string
   consultorio: ConsultorioPagina
   inicio: string
+  /** Tanda I, punto 2: sin correo (enlace de un solo uso) no se manda comprobante y no se dice que sí. */
+  conCorreo: boolean
 }
 
 /** «Viernes, 13 de noviembre · 10:45» en la zona del consultorio. */
@@ -14,7 +16,7 @@ export function cuandoEnZona(inicio: string, zona: string): string {
 }
 
 /** El comprobante en pantalla. Sin tipo de cita (lista A, 10); con la dirección completa (punto 2). */
-export default function Comprobante({ medico, consultorio, inicio }: Props): ReactElement {
+export default function Comprobante({ medico, consultorio, inicio, conCorreo }: Props): ReactElement {
   return (
     <section aria-label="Cita reservada" className="rp-paso">
       <div className="rp-exito">
@@ -22,7 +24,7 @@ export default function Comprobante({ medico, consultorio, inicio }: Props): Rea
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5" /></svg>
         </span>
         <h2 className="rp-titulo" tabIndex={-1} data-titulo-paso>Tu cita quedó agendada</h2>
-        <p className="rp-sub">Te enviamos el comprobante por correo.</p>
+        {conCorreo && <p className="rp-sub">Te enviamos el comprobante por correo.</p>}
       </div>
       <ResumenCita consultorio={consultorio} cuando={cuandoEnZona(inicio, consultorio.zona)} medico={medico} telefono />
       <p className="rp-nota">Para cambiar o cancelar, comunícate con el consultorio.</p>

@@ -20,10 +20,16 @@ interface Props {
   onCambio?: (d: Datos) => void
   /** El botón «Volver» del pie (lo pone la página). */
   volver?: ReactNode
+  /**
+   * Tanda I, punto 2 de Angel: en el enlace de UN SOLO USO el correo es
+   * opcional (basta el teléfono) y no hay paso de código. En el fijo sigue
+   * siendo obligatorio.
+   */
+  correoOpcional?: boolean
 }
 
 /** Nombre, teléfono y correo, y el aviso con su casilla (nace desmarcada). El texto del aviso NO se toca. */
-export default function FormularioDatos({ aviso, casilla, ocupado, textoBoton, onEnviar, inicial, onCambio, volver }: Props): ReactElement {
+export default function FormularioDatos({ aviso, casilla, ocupado, textoBoton, onEnviar, inicial, onCambio, volver, correoOpcional = false }: Props): ReactElement {
   const [d, setDatos] = useState<Datos>(inicial ?? { nombre: '', telefono: '', correo: '' })
   const setD = (nuevos: Datos) => { setDatos(nuevos); onCambio?.(nuevos) }
   const [acepta, setAcepta] = useState(false)
@@ -40,8 +46,8 @@ export default function FormularioDatos({ aviso, casilla, ocupado, textoBoton, o
         <input required inputMode="tel" autoComplete="tel" maxLength={20} value={d.telefono}
           onChange={e => setD({ ...d, telefono: e.target.value })} />
       </label>
-      <label className="rp-campo">Correo electrónico
-        <input required type="email" autoComplete="email" maxLength={254} value={d.correo}
+      <label className="rp-campo">{correoOpcional ? 'Correo electrónico (opcional)' : 'Correo electrónico'}
+        <input required={!correoOpcional} type="email" autoComplete="email" maxLength={254} value={d.correo}
           onChange={e => setD({ ...d, correo: e.target.value })} />
       </label>
       <details className="rp-aviso-legal">

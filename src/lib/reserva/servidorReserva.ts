@@ -108,7 +108,8 @@ export type ResultadoReservaRpc = z.infer<typeof ReservaSchema>
 
 export interface ArgsReserva {
   codigoHash: string; consultorioId: string; tipoCitaId: string; inicio: string
-  nombre: string; telefono: string; correo: string; telHmac: string; correoHmac: string
+  /** Tanda I, punto 2: `null` los dos juntos = el único sin correo (la base le pone un seudónimo propio). */
+  nombre: string; telefono: string; correo: string | null; telHmac: string; correoHmac: string | null
   fichaHmac: string | null; avisoVersion: string; avisoSha: string; clientId: string
 }
 

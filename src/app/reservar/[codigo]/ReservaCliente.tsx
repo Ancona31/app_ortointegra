@@ -33,10 +33,11 @@ type Paso = 'que' | 'turno' | 'datos' | 'codigo' | 'listo'
 const PASOS = ['Lugar', 'Día y hora', 'Tus datos', 'Listo'] as const
 const INDICE: Record<Paso, number> = { que: 0, turno: 1, datos: 2, codigo: 2, listo: 3 }
 
-/** El cuerpo de POST /api/reservar/[codigo]. */
+/** El cuerpo de POST /api/reservar/[codigo]. Sin correo (sólo en el único, tanda I punto 2), la clave no va. */
 function cuerpoReserva(c: string, t: string, turno: TurnoPagina, d: Datos, clientId: string, ficha: string | null, origen: string | null) {
-  return { consultorio_id: c, tipo_cita_id: t, inicio: turno.inicio, nombre: d.nombre, telefono: d.telefono, correo: d.correo,
-    acepta_aviso: true, client_id: clientId, ...(ficha ? { ficha } : {}), ...(origen ? { origen } : {}) }
+  const correo = d.correo.trim()
+  return { consultorio_id: c, tipo_cita_id: t, inicio: turno.inicio, nombre: d.nombre, telefono: d.telefono,
+    ...(correo ? { correo } : {}), acepta_aviso: true, client_id: clientId, ...(ficha ? { ficha } : {}), ...(origen ? { origen } : {}) }
 }
 
 function Pasos({ paso }: { paso: Paso }): ReactElement {
@@ -120,7 +121,8 @@ function useReserva(datos: DatosPagina) {
     try { await f() } finally { setOcupado(false) }
   }
   const pedirCodigo = (d: Datos) => conEspera(async () => {
-    const r = await pedir(`${base}/codigo`, 'POST', { correo: d.correo })
+    // Tanda I, punto 21: el consultorio elegido, sólo para la cabecera del correo del código.
+    const r = await pedir(`${base}/codigo`, 'POST', { correo: d.correo, consultorio_id: consultorioId })
     if (r.status === 200) setPaso('codigo'); else setError(mensajeDeError(r))
   })
   const alEnviarDatos = (d: Datos) => { setPersona(d); setBorrador(d); return datos.clase === 'fijo' ? pedirCodigo(d) : conEspera(() => reservar(d, null)) }
@@ -181,7 +183,7 @@ function VistaDatos({ datos, r, consultorio, tipos, zona }: Vista): ReactElement
         cuando={r.turno ? cuandoEnZona(r.turno.inicio, zona) : null} />
       {!enCodigo && <FormularioDatos aviso={datos.aviso} casilla={datos.casilla} ocupado={r.ocupado}
         textoBoton={datos.clase === 'fijo' ? 'Enviar código a mi correo' : 'Reservar cita'} onEnviar={r.alEnviarDatos}
-        inicial={r.borrador} onCambio={r.setBorrador} volver={volver} />}
+        inicial={r.borrador} onCambio={r.setBorrador} volver={volver} correoOpcional={datos.clase === 'unico'} />}
       {enCodigo && r.persona && <PasoCodigo correo={r.persona.correo} ocupado={r.ocupado} onVerificar={r.alVerificar}
         onReenviar={() => { if (r.persona) void r.pedirCodigo(r.persona) }} volver={volver} />}
     </>
@@ -230,7 +232,8 @@ export default function ReservaCliente({ datos }: { datos: DatosPagina }): React
           {r.paso === 'que' && <VistaQueDonde {...vista} semana={semana} />}
           {r.paso === 'turno' && <VistaTurno {...vista} semana={semana} />}
           {(r.paso === 'datos' || r.paso === 'codigo') && <VistaDatos {...vista} />}
-          {r.paso === 'listo' && r.turno && <Comprobante medico={datos.medico} consultorio={consultorio} inicio={r.turno.inicio} />}
+          {r.paso === 'listo' && r.turno && <Comprobante medico={datos.medico} consultorio={consultorio} inicio={r.turno.inicio}
+            conCorreo={Boolean(r.persona?.correo.trim())} />}
         </div>
       </div>
     </>

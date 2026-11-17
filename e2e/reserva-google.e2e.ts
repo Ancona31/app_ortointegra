@@ -320,6 +320,28 @@ test('4 · un evento de Google que se empalma con una reserva por enlace: un avi
   await expect(page.locator(`[data-fila-empalme="${reserva}"]`)).toBeVisible({ timeout: 30_000 })
 })
 
+/* Tanda I, punto 9: lo que el paciente eligió no se cambia moviendo el evento en Google. La base
+   rechaza la hora nueva (cita_proteger_eleccion), la pasada lo audita como cambio rechazado y
+   Spinus vuelve a escribir su hora en Google (C5), como con una atendida (C-e). */
+test('I9 · una reserva por enlace movida en Google: la base la rechaza, se audita y Google vuelve a la hora de Spinus', async ({ page }) => {
+  const t = turnoNuevo()
+  ultimaBuenaHace(0)
+  const r = await reservarEn(emitirEnlace(e, 'unico').codigo, t.inicio)
+  expect(r.status, JSON.stringify(r.cuerpo)).toBe(201)
+  const reserva = citaPorCorreo(r.correo)
+  const evento = (): string => sqlLocal(`select coalesce(google_event_id, '') from public.appointments where id = :'r'`, { r: reserva })
+  await expect.poll(evento, { timeout: 60_000 }).not.toBe('')
+  const ev = evento()
+  const hora = Date.parse(t.inicio) + 60 * 60_000
+  g().modificar(ev, { start: { dateTime: new Date(hora).toISOString(), timeZone: TZ }, end: { dateTime: new Date(hora + 30 * 60_000).toISOString(), timeZone: TZ } })
+  ultimaBuenaHace(120)
+  expect(((await (await page.request.post('/api/google/sync')).json()) as { estado: string }).estado).toBe('ok')
+  expect(sqlLocal(`select (start_time = :'i'::timestamptz)::text from public.appointments where id = :'r'`, { r: reserva, i: t.inicio })).toBe('true')
+  expect(sqlLocal(`select count(*) from public.audit_log where accion = 'gcal_cambio_rechazado' and registro_id = :'r'
+                     and descripcion::jsonb ->> 'motivo' = 'eleccion_paciente'`, { r: reserva })).toBe('1')
+  expect(Date.parse(g().eventos.get(ev)?.start?.dateTime ?? '')).toBe(Date.parse(t.inicio))
+})
+
 test('+ · dos reservas simultáneas con Google conectado: la segunda espera el candado y hace SU pasada; una sola cita', async () => {
   // Google tarda 1 s: la primera tiene el candado mientras la segunda llega.
   // Con la última buena de hace 40 min, si la segunda no esperase y no

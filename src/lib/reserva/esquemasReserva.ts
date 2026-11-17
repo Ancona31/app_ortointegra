@@ -44,6 +44,12 @@ export const TurnosQuerySchema = z.strictObject({
 /** POST /api/reservar/[codigo]/codigo */
 export const PedirCodigoSchema = z.strictObject({
   correo: z.string().trim().min(3).max(254),
+  /**
+   * Tanda I, punto 21: el consultorio que la persona eligió en «Lugar», sólo
+   * para la cabecera del correo del código (médico y, debajo, consultorio).
+   * Si no es uno de los del enlace, se ignora; nunca decide nada.
+   */
+  consultorio_id: UUID.optional(),
 })
 
 /** POST /api/reservar/[codigo]/verificar */
@@ -60,7 +66,13 @@ export const ReservarSchema = z.strictObject({
   inicio: z.iso.datetime({ offset: true }),
   nombre: z.string().trim().min(1).max(NOMBRE_MAX).refine(nombreSeguro),
   telefono: z.string().trim().min(10).max(20),
-  correo: z.string().trim().min(3).max(254),
+  /**
+   * Tanda I, punto 2 de Angel: opcional SÓLO en el enlace de un solo uso (lo
+   * emite la clínica para una persona concreta; basta el teléfono). En el fijo
+   * la ruta lo sigue exigiendo (400 `solicitud_invalida`, como antes) y lo
+   * verifica con la ficha. Ausente = sin correo; la página no manda «''».
+   */
+  correo: z.string().trim().min(3).max(254).optional(),
   /** Sólo el enlace fijo: la ficha que devolvió /verificar. */
   ficha: z.string().regex(/^[A-Za-z0-9_-]{43}$/).optional(),
   /** La casilla del aviso. Sin `true` no se reserva. */

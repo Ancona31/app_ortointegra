@@ -36,6 +36,20 @@ export class SincronizacionNoDisponible extends Error {
 
 const CODIGOS_AUSENTE = new Set(['PGRST202', '42883', '42P01'])
 
+/**
+ * Tanda I, punto 9: la BASE rechazó la escritura con el 42501 del candado de
+ * `cita_proteger_eleccion` (consultorio, día y hora de una cita reservada por
+ * enlace sólo cambian con «Reagendar»; se reconoce por su texto). No es un fallo de
+ * la pasada: quien aplica lo trata como un cambio rechazado y Spinus vuelve a
+ * escribir en Google lo suyo (C5), como C-e.
+ */
+export class CambioRechazadoPorLaBase extends Error {
+  constructor(rpc: string) {
+    super(`${rpc}: la base rechazó el cambio (42501)`)
+    this.name = 'CambioRechazadoPorLaBase'
+  }
+}
+
 interface ErrorRpc { code?: string; message: string }
 
 function comprobarClinica(clinicaId: string): string {
@@ -51,6 +65,8 @@ async function llamar(rpc: string, clinicaId: string, args: Record<string, unkno
   if (error) {
     const e: ErrorRpc = error
     if (e.code && CODIGOS_AUSENTE.has(e.code)) throw new SincronizacionNoDisponible(rpc)
+    // Sólo el candado de la reserva por enlace (su texto): otro 42501 (un permiso que falta) sigue siendo un fallo.
+    if (e.code === '42501' && e.message.includes('reservada por enlace')) throw new CambioRechazadoPorLaBase(rpc)
     throw new Error(`${rpc}: ${e.code ?? 'sin código'} ${e.message.slice(0, 200)}`)
   }
   return data

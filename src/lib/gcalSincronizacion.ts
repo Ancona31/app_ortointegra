@@ -42,7 +42,7 @@ import {
 } from '@/lib/gcalSincronizacionDecidir'
 import {
   aplicarEvento, avanzarPagina, citasDeEventos, clinicaHabilitada, confirmarPorRsvp, importarEvento, registrarEmpalmesReserva,
-  reiniciarToken, soltarCandado, SincronizacionNoDisponible, tomarCandado, type Candado,
+  reiniciarToken, soltarCandado, SincronizacionNoDisponible, tomarCandado, CambioRechazadoPorLaBase, type Candado,
 } from '@/lib/gcalSincronizacionBase'
 import { restablecerEnGoogle, type PorRestablecer } from '@/lib/gcalSincronizacionRestablecer'
 import { aceptaronDe, rsvpGoogleEncendido } from '@/lib/gcalRsvp'
@@ -370,7 +370,8 @@ async function ejecutar(pasada: Pasada, calendarId: string, d: Decision): Promis
         { gana: 'spinus', motivo: d.motivo, campos: d.campos })
       return true
     case 'aplicar': {
-      const n = await aplicarEvento(conexion.clinicaId, calendarId, d)
+      const n = await aplicarORechazar(pasada, calendarId, d)
+      if (n === 'rechazado') return true
       if (n > 0 && d.campos.length > 0) r.cambios += 1
       if (n > 0 && d.cambios.puntas) pasada.movidas.push(d.citaId)
       // n = 0: Spinus escribió entre la lectura y el aplicar; es el más
@@ -384,6 +385,24 @@ async function ejecutar(pasada: Pasada, calendarId: string, d: Decision): Promis
       }
       return n > 0 && d.restablecer.length > 0
     }
+  }
+}
+
+/**
+ * Tanda I, punto 9: si la BASE rechaza lo que Google cambió (el candado de una
+ * cita reservada por enlace: consultorio, día y hora sólo con «Reagendar»), es
+ * un cambio rechazado como los de C-e: se audita y Spinus vuelve a escribir lo
+ * suyo en Google (C5). La transacción de `gcal_aplicar_evento` se deshizo
+ * entera (ni el etag nuevo): el restablecimiento usa el etag del evento.
+ */
+async function aplicarORechazar(pasada: Pasada, calendarId: string, d: Extract<Decision, { tipo: 'aplicar' }>): Promise<number | 'rechazado'> {
+  try {
+    return await aplicarEvento(pasada.conexion.clinicaId, calendarId, d)
+  } catch (err) {
+    if (!(err instanceof CambioRechazadoPorLaBase)) throw err
+    pasada.r.restablecer.push(d.citaId)
+    await auditar(pasada.conexion, d.citaId, 'gcal_cambio_rechazado', { gana: 'spinus', motivo: 'eleccion_paciente', campos: d.campos })
+    return 'rechazado'
   }
 }
 

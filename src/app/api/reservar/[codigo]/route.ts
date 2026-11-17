@@ -25,6 +25,8 @@
  *      persona, e inserta la cita. Con `origen` (E6, reagendar), la misma
  *      llamada envuelta por `reagendar_por_enlace`.
  * Después de responder (`after()`, D8): el evento de Google y el comprobante.
+ * Tanda I, punto 2: en el enlace de UN SOLO USO el correo es opcional (sin
+ * código en los dos casos); sin correo no hay comprobante. El fijo no cambia.
  */
 import { cookies } from 'next/headers'
 import { after, type NextRequest } from 'next/server'
@@ -71,16 +73,22 @@ export async function POST(req: NextRequest, rctx: RouteContext<'/api/reservar/[
   const cuerpo = ReservarSchema.safeParse(await cuerpoJson(req))
   if (!cuerpo.success) return MAL('solicitud_invalida')
   const b = cuerpo.data
+  /* Tanda I, punto 2: el correo es opcional SÓLO en el único (basta el
+     teléfono). En el fijo, sin correo, el mismo 400 de antes y en el mismo
+     punto (lo daba el esquema, antes del límite por enlace). Con correo, en
+     los dos, la misma validación de siempre. */
+  const correo = b.correo ?? null
+  if (correo === null && ctx.clase !== 'unico') return MAL('solicitud_invalida')
   if (ctx.clase === 'fijo' && !(await dentroDeLimites('reservar', { enlace: codigoHash }))) {
     return responder({ status: 429, cuerpo: { error: 'demasiados_intentos' } })
   }
 
   const telefono = normalizarTelefonoMx(b.telefono)
-  const correoLlave = normalizarCorreo(b.correo)
+  const correoLlave = correo === null ? null : normalizarCorreo(correo)
   const telHmac = telefono ? hmacContacto('telefono', telefono) : null
   const correoHmac = correoLlave ? hmacContacto('correo', correoLlave) : null
   if (!telefono || !telHmac) return MAL('telefono_invalido')
-  if (!correoHmac) return MAL('correo_invalido')
+  if (correo !== null && !correoHmac) return MAL('correo_invalido')
 
   const consultorio = ctx.consultorios.find(c => c.id === b.consultorio_id)
   // G2: sólo los tipos que valen en ESE consultorio. `reservar_por_enlace`
@@ -96,7 +104,7 @@ export async function POST(req: NextRequest, rctx: RouteContext<'/api/reservar/[
 
   const args = {
     codigoHash, consultorioId: consultorio.id, tipoCitaId: tipo.id, inicio: turno.inicio,
-    nombre: b.nombre, telefono, correo: b.correo, telHmac, correoHmac,
+    nombre: b.nombre, telefono, correo, telHmac, correoHmac,
     fichaHmac: b.ficha ? hmacFicha(b.ficha) : null, avisoVersion: AVISO_VERSION, avisoSha: hashAviso(), clientId: b.client_id,
   }
   if (await sincronizarAntesDeReservar(ctx.clinica_id, 'reservar') === 'no_por_ahora') {
@@ -105,7 +113,7 @@ export async function POST(req: NextRequest, rctx: RouteContext<'/api/reservar/[
   const r = b.origen ? await reagendar(ctx, args, hashDeCodigo(b.origen)) : await reservar(ctx, args)
   if (!r.ok) return responder(respuestaErrorRpc(r.ausente, r.codigo))
   // D8, sólo con una reserva NUEVA (una `repetida` ya los programó la primera vez).
-  if (r.data.r_resultado === 'ok') programarDespues(ctx, consultorio, b, r.data)
+  if (r.data.r_resultado === 'ok') programarDespues(ctx, consultorio, { nombre: b.nombre, correo }, r.data)
   return responder(respuestaReserva(r.data.r_resultado, telefonoDeContacto(ctx, consultorio.id)))
 }
 
@@ -121,7 +129,7 @@ type ConsultorioCtx = ContextoReserva['consultorios'][number]
  * salga otra vez para ese inicio (lista A 4): `comprobanteReserva.ts`. Las
  * citas que agenda el personal siguen sin correo al agendar.
  */
-function programarDespues(ctx: ContextoReserva, consultorio: ConsultorioCtx, b: { nombre: string; correo: string }, fila: ResultadoReservaRpc): void {
+function programarDespues(ctx: ContextoReserva, consultorio: ConsultorioCtx, b: { nombre: string; correo: string | null }, fila: ResultadoReservaRpc): void {
   const { r_cita_id: citaId, r_inicio: inicio, r_fin: fin } = fila
   if (!citaId || !inicio || !fin) return
   const nombre = b.nombre.trim()
@@ -130,6 +138,9 @@ function programarDespues(ctx: ContextoReserva, consultorio: ConsultorioCtx, b: 
       clinicaId: ctx.clinica_id, citaId, medicoId: ctx.medico_id, nombre, inicio, fin, zona: consultorio.timezone,
       clinica: ctx.clinica ? { nombre: ctx.clinica.nombre ?? '', nombre_display: ctx.clinica.nombre_display } : null,
     })
+    // Tanda I, punto 2: sin correo (único) no hay comprobante; la clínica ve el
+    // teléfono y tiene el WhatsApp manual. No es un fallo: no se intenta.
+    if (b.correo === null) return
     await enviarComprobante({
       clinicaId: ctx.clinica_id, citaId, correoEscrito: b.correo,
       datos: {
