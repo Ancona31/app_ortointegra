@@ -3,6 +3,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { CalendarDays, RotateCw } from 'lucide-react'
+import type { createClient as ClienteNavegador } from '@/lib/supabase/client'
+import { marcaPorLigar } from '@/lib/agenda/tarjetasAgenda'
+import BotonNoEsCita from '@/components/agenda/BotonNoEsCita'
 import { createClient } from '@/lib/supabase/client'
 import { useProfile } from '@/hooks/useProfile'
 import { partesCitaHora, fechaCitaCompacta } from '@/app/(app)/dashboard/utils'
@@ -40,6 +43,12 @@ type Cita = {
   paciente_id: string | null
   consultorio_id: string | null
   pacientes: { nombre: string; apellidos: string } | null
+  /* I3 (punto 8 y 10) · Sólo con la agenda v2 encendida (las columnas pueden no
+     existir): una cita POR LIGAR (reserva por enlace) o un evento de Google
+     «por asignar», sin paciente todavía. */
+  reserva_canal?: string | null
+  reserva_nombre?: string | null
+  google_asignacion?: string | null
   /* Sólo llega cuando `medicoId` es null, o sea cuando la lista es de toda la
      clínica: ahí el nombre del paciente no dice de quién es la cita. */
   medico?: { id: string; titulo: string | null; nombres: string | null; apellido_paterno: string | null; apellido_materno: string | null } | null
@@ -47,6 +56,54 @@ type Cita = {
 
 /** El alto exacto del renglón, compartido con su esqueleto para que no salte. */
 const ALTO_FILA = 'min-h-[57px]'
+
+type Supabase = ReturnType<typeof ClienteNavegador>
+
+const COLUMNAS = 'id, title, start_time, end_time, created_at, status, paciente_id, consultorio_id, pacientes(nombre, apellidos)'
+const COLUMNAS_MEDICO = ', medico:profiles!appointments_medico_id_fkey(id, titulo, nombres, apellido_paterno, apellido_materno)'
+/* I3 · Con la v2: las columnas de la marca y el nombre de quien reservó. */
+const COLUMNAS_V2 = ', reserva_canal, reserva_nombre, google_asignacion'
+/* I3 · Con la v2 entran también las POR LIGAR y las «por asignar» de Google;
+   un evento (sin paciente, sin reserva, que no está por asignar) sigue fuera. */
+const CON_PACIENTE_O_POR_LIGAR = 'paciente_id.not.is.null,reserva_canal.not.is.null,google_asignacion.eq.por_asignar'
+
+/**
+ * I3 (punto 8) · El interruptor de la agenda v2 de la clínica, con la sesión
+ * (la RLS de `agenda_ajustes` deja leer a sus miembros). FALLA CERRADO, como
+ * `agendaV2Encendida`: sin tabla, sin fila o con error, apagado. `null` = no se
+ * pudo leer (no se recuerda: se vuelve a preguntar en la próxima traída).
+ */
+async function leerAgendaV2(supabase: Supabase, clinicaId: string): Promise<boolean | null> {
+  try {
+    const { data, error } = await supabase.from('agenda_ajustes').select('agenda_v2_encendida').eq('clinica_id', clinicaId).maybeSingle()
+    if (error) return error.code === '42P01' || error.code === 'PGRST205' ? false : null
+    return data?.agenda_v2_encendida === true
+  } catch {
+    return null
+  }
+}
+
+/** La consulta de la región (ver los filtros en `cargar`). `v2` añade las citas por ligar y por asignar. */
+function consultaProximas(supabase: Supabase, o: { clinicaId: string; medicoId: string | null; v2: boolean }) {
+  let consulta = supabase
+    .from('appointments')
+    .select(`${COLUMNAS}${o.medicoId === null ? COLUMNAS_MEDICO : ''}${o.v2 ? COLUMNAS_V2 : ''}`)
+    .eq('clinica_id', o.clinicaId)
+  consulta = o.v2 ? consulta.or(CON_PACIENTE_O_POR_LIGAR) : consulta.not('paciente_id', 'is', null)
+  consulta = consulta
+    .gt('end_time', new Date().toISOString())
+    .in('status', ['scheduled', 'confirmed'])
+    .order('start_time', { ascending: true })
+    .order('created_at', { ascending: true })
+    .order('id', { ascending: true })
+    .limit(LIMITE_CONSULTA)
+  return o.medicoId !== null ? consulta.eq('medico_id', o.medicoId) : consulta
+}
+
+/** La columna aún no existe (la v2 encendida sin la migración de I3): se cae a la consulta de siempre. */
+function sinColumna(code: string | undefined): boolean {
+  return code === '42703' || code === 'PGRST204' || code === 'PGRST100'
+}
 
 /* La geometría de las acciones del renglón, en un solo sitio.
    ⚠️ SE EXPORTA PORQUE LAS ACCIONES LAS PINTAN LOS LLAMADORES, y es lo que
@@ -171,6 +228,32 @@ function Chasis({ children }: { children: React.ReactNode }) {
 }
 
 /**
+ * I3 (puntos 8 y 10) · Las acciones de una fila SIN paciente: «Ver en la
+ * agenda» (allí se liga al iniciar la consulta) y, en un evento de Google «por
+ * asignar», «¿No es una cita?», que la quita de la lista en el momento. Viven
+ * aquí y no en el llamador porque no llevan a ninguna URL clínica.
+ */
+function AccionesSinPaciente({ cita, alQuitar }: { cita: Cita; alQuitar: () => void }) {
+  const porAsignar = cita.google_asignacion === 'por_asignar' && !cita.reserva_canal
+  const contorno = { ...GEOMETRIA_ACCION, background: 'var(--sp-surface)', color: 'var(--sp-primary-text)', borderColor: 'var(--sp-primary-border)' }
+  return (
+    <>
+      {porAsignar && (
+        <BotonNoEsCita citaId={cita.id} alHecho={alQuitar}
+          className="inline-flex items-center justify-center whitespace-nowrap border font-bold transition-colors" style={contorno} />
+      )}
+      <Link href="/agenda" prefetch={false} aria-label={`Ver «${cita.reserva_nombre ?? cita.title}» en la agenda`}
+        className={porAsignar
+          ? 'inline-flex items-center justify-center w-[34px] h-[34px] shrink-0 rounded-[var(--sp-r-btn-sm)] border border-[color:var(--sp-line-control)] bg-[var(--sp-surface)] text-[var(--sp-ink-500)] transition-colors hover:bg-[var(--sp-surface-muted)] hover:text-[var(--sp-ink-700)]'
+          : 'inline-flex items-center justify-center whitespace-nowrap border font-bold transition-colors'}
+        style={porAsignar ? undefined : contorno}>
+        {porAsignar ? <CalendarDays size={16} /> : <><span className="xl:hidden">Agenda</span><span className="hidden xl:inline">Ver en la agenda</span></>}
+      </Link>
+    </>
+  )
+}
+
+/**
  * La card en su estado de carga, entera.
  *
  * La pintan los DOS momentos de espera de esta pantalla: esta misma región
@@ -239,7 +322,6 @@ export default function ProximasCitas({ medicoId, acciones }: {
   const [ahora, setAhora] = useState(() => Date.now())
 
   const clinicaId = profile?.clinica_id ?? null
-  const conMedico = medicoId === null
 
   /* Gana la última petición LANZADA, no la última en responder. Mismo criterio
      que tenía el efecto en la página, con contador en vez de bandera porque
@@ -253,6 +335,9 @@ export default function ProximasCitas({ medicoId, acciones }: {
      no debe martillear. Para eso está «Reintentar», que no pasa por el tope. */
   const ultimaTraidaRef = useRef(0)
 
+  /* I3 · El interruptor de la v2, leído una vez por montaje (`null` = sin leer). */
+  const v2Ref = useRef<boolean | null>(null)
+
   const cargar = useCallback(async () => {
     if (!clinicaId) return
     const mia = ++peticionRef.current
@@ -262,7 +347,9 @@ export default function ProximasCitas({ medicoId, acciones }: {
       const supabase = createClient()
       /* SÓLO CITAS DE PACIENTE, NUNCA EVENTOS GENÉRICOS: la fila sin paciente
          es un evento (§12.14) y gastaría uno de los cuatro sitios. Se filtra en
-         la consulta y no al pintar, que es donde de verdad recorta.
+         la consulta y no al pintar, que es donde de verdad recorta. (I3: con la
+         v2, una por ligar o «por asignar» es una cita sin paciente todavía, y
+         entra; un evento sigue fuera.)
 
          SÓLO LAS DEL MÉDICO QUE MIRA. Su dashboard es su resumen; la clínica
          entera está en /agenda. Ese `.eq('medico_id')` es lo que garantiza que
@@ -279,24 +366,20 @@ export default function ProximasCitas({ medicoId, acciones }: {
          ⚠️ Y EL ORDEN LLEVA DESEMPATE. Con sólo `start_time`, dos citas a la
          misma hora salen en orden arbitrario y el temporizador puede
          reordenarlas solas entre dos tics. `created_at` y luego `id` lo fijan. */
-      let consulta = supabase
-        .from('appointments')
-        .select(conMedico
-          ? 'id, title, start_time, end_time, created_at, status, paciente_id, consultorio_id, pacientes(nombre, apellidos), medico:profiles!appointments_medico_id_fkey(id, titulo, nombres, apellido_paterno, apellido_materno)'
-          : 'id, title, start_time, end_time, created_at, status, paciente_id, consultorio_id, pacientes(nombre, apellidos)')
-        .eq('clinica_id', clinicaId)
-        .not('paciente_id', 'is', null)
-        .gt('end_time', new Date().toISOString())
-        .in('status', ['scheduled', 'confirmed'])
-        .order('start_time', { ascending: true })
-        .order('created_at', { ascending: true })
-        .order('id', { ascending: true })
-        .limit(LIMITE_CONSULTA)
       /* El filtro por médico es lo ÚNICO que separa las dos vistas en la
-         consulta. Sin él manda la RLS, que ya recorta a la clínica de quien
-         mira; con él, el dashboard del médico sigue siendo su resumen. */
-      if (medicoId !== null) consulta = consulta.eq('medico_id', medicoId)
-      const { data, error: errConsulta } = await consulta
+         consulta (`consultaProximas`). Sin él manda la RLS, que ya recorta a la
+         clínica de quien mira; con él, el dashboard del médico sigue siendo su
+         resumen.
+         I3 (punto 8) · Con la agenda v2 encendida entran también las citas POR
+         LIGAR y las «por asignar» de Google (`CON_PACIENTE_O_POR_LIGAR`); el
+         interruptor se lee una vez por montaje (`v2Ref`). Apagada, la consulta
+         es la de siempre, byte a byte. */
+      if (v2Ref.current === null) v2Ref.current = await leerAgendaV2(supabase, clinicaId)
+      const v2 = v2Ref.current === true
+      let { data, error: errConsulta } = await consultaProximas(supabase, { clinicaId, medicoId, v2 })
+      if (v2 && errConsulta && sinColumna(errConsulta.code)) {
+        ({ data, error: errConsulta } = await consultaProximas(supabase, { clinicaId, medicoId, v2: false }))
+      }
 
       if (mia !== peticionRef.current) return
       if (errConsulta) throw errConsulta
@@ -310,7 +393,7 @@ export default function ProximasCitas({ medicoId, acciones }: {
     } finally {
       if (mia === peticionRef.current) setCargando(false)
     }
-  }, [clinicaId, medicoId, conMedico])
+  }, [clinicaId, medicoId])
 
   useEffect(() => { void cargar() }, [cargar])
 
@@ -403,9 +486,12 @@ export default function ProximasCitas({ medicoId, acciones }: {
            volvería a perder la corrección de Sonora en uno de los dos sitios. */
         const { hora } = partesCitaHora(cita.start_time)
         const fecha = fechaCitaCompacta(cita.start_time)
+        /* I3 (punto 8) · Una por ligar se nombra con lo que dio quien reservó;
+           una «por asignar» de Google, con su título (el de Google). */
         const nombre = cita.pacientes
           ? `${cita.pacientes.nombre} ${cita.pacientes.apellidos}`
-          : cita.title
+          : (cita.reserva_canal && cita.reserva_nombre) || cita.title
+        const marca = cita.paciente_id ? null : marcaPorLigar(cita)
         /* ⚠️ LAS INICIALES CAEN SOBRE `nombre`, NUNCA A CADENA VACÍA. Sin este
            respaldo, una fila cuyo `join` de `pacientes` viniera vacío pintaba el
            círculo del avatar CON SU COLOR DE FONDO Y SIN NINGUNA LETRA: un punto
@@ -486,7 +572,15 @@ export default function ProximasCitas({ medicoId, acciones }: {
             </div>
 
             <div className="flex-1 min-w-0 xl:min-w-[150px]">
-              <p className="truncate text-[length:var(--sp-fs-body-sm)] font-bold text-[var(--sp-ink-800)]">{nombre}</p>
+              <p className="flex min-w-0 items-center gap-[var(--sp-1-5)]">
+                <span className="truncate text-[length:var(--sp-fs-body-sm)] font-bold text-[var(--sp-ink-800)]">{nombre}</span>
+                {/* I3 · La marca de la agenda, en palabra: «Por ligar» / «Por asignar». */}
+                {marca && (
+                  <span title={marca.titulo} className="shrink-0 whitespace-nowrap rounded-[var(--sp-r-pill)] border border-current px-1.5 text-[10px] font-bold uppercase leading-[1.5] text-[var(--sp-ink-500)]">
+                    {marca.texto}
+                  </span>
+                )}
+              </p>
               {/* Sólo en la vista sin filtro de médico. Trunca con elipsis, como
                   todo texto secundario de esta pantalla. */}
               {cita.medico && (
@@ -502,7 +596,12 @@ export default function ProximasCitas({ medicoId, acciones }: {
             <div className="hidden xl:flex shrink-0"><StatusChip status={cita.status} /></div>
 
             <div className="ml-auto flex items-center gap-[var(--sp-1-5)] shrink-0">
-              {acciones(cita, enCurso)}
+              {/* I3 · Sin paciente (por ligar o por asignar) no hay expediente ni
+                  nota a los que ir: se liga en la agenda, al iniciar la consulta.
+                  Las acciones del llamador sólo para las citas con paciente. */}
+              {cita.paciente_id
+                ? acciones(cita, enCurso)
+                : <AccionesSinPaciente cita={cita} alQuitar={() => { setCitas(cs => cs.filter(c => c.id !== cita.id)); void cargar() }} />}
             </div>
           </div>
         )
