@@ -106,8 +106,12 @@ interface Props {
   onFocus?: () => void
   /** G3 · Dónde dejar el mensaje («Abierto en WhatsApp hh:mm» o el motivo de un
       error) cuando el botón vive en una rejilla: así no queda nada suelto en
-      ella. Sin esto, el mensaje va debajo del botón, como antes. */
-  alMensaje?: (m: { texto: string; alerta: boolean } | null) => void
+      ella. Sin esto, el mensaje va debajo del botón, como antes.
+      I5 · `breve`: la forma corta del estado («WhatsApp abierto 00:35») para la
+      línea única de la fila de «Por confirmar»; un error no la lleva. */
+  alMensaje?: (m: { texto: string; alerta: boolean; breve?: string } | null) => void
+  /** I5 · punto 17: un cuadrado con el logo (la fila de «Por confirmar»); el nombre accesible es el completo. */
+  soloIcono?: boolean
 }
 
 /** `paso:'abierto'`: la marca de que se abrió WhatsApp. `keepalive`: la pestaña puede irse. */
@@ -138,7 +142,8 @@ function useMensaje(estado: Estado, abierto: string | null, alMensaje: Props['al
     : abierto ? { texto: `Abierto en WhatsApp ${horaCorta(abierto)}`, alerta: false } : null
   const texto = mensaje?.texto ?? null
   const alerta = mensaje?.alerta ?? false
-  useEffect(() => { alMensaje?.(texto === null ? null : { texto, alerta }) }, [texto, alerta, alMensaje])
+  const breve = !alerta && abierto ? `WhatsApp abierto ${horaCorta(abierto)}` : undefined
+  useEffect(() => { alMensaje?.(texto === null ? null : { texto, alerta, breve }) }, [texto, alerta, breve, alMensaje])
   return alMensaje ? null : mensaje
 }
 
@@ -165,24 +170,30 @@ export function BotonWhatsAppCita(props: Props) {
     marcar()
   }
 
-  const clase = enCapa
+  const soloIcono = props.soloIcono === true
+  const clase = soloIcono ? 'ag-boton-icono'
+    : enCapa
     ? 'ag-capa-boton w-full'
     : `${compacto ? 'px-2.5 py-1.5 text-[12px]' : 'w-full px-3 py-2.5 text-sm'} flex items-center justify-center gap-1.5 rounded-xl font-bold border transition-colors`
   const estilo = enCapa ? undefined : { color: 'var(--ag-text)', borderColor: 'var(--ag-input-border)' }
   const hover = enCapa ? '' : 'hover:bg-[var(--ag-btn-ghost-hover)]'
-  const logo = <LogoWhatsApp size={enCapa ? 20 : 16} />
+  const logo = <LogoWhatsApp size={enCapa || soloIcono ? 20 : 16} />
+  const nombreIcono = tipo === 'recordatorio' ? 'Enviar recordatorio por WhatsApp' : 'Enviar confirmación por WhatsApp'
   const foco = { tabIndex: props.tabIndex, onFocus: props.onFocus }
   return (
     <div data-whatsapp-cita={citaId} className={props.claseCelda ? `ag-lectura-celda ${props.claseCelda}` : undefined}>
       {estado.tipo === 'listo' ? (
         <a href={estado.url} target="_blank" rel="noopener noreferrer" onClick={() => { marcar(); setEstado({ tipo: 'inicial' }) }}
-          className={`${clase} ${hover}`} style={estilo} {...foco}>
-          {logo} Abrir WhatsApp
+          className={`${clase} ${hover}`} style={soloIcono ? undefined : estilo} {...foco}
+          aria-label={soloIcono ? 'Abrir WhatsApp' : undefined} title={soloIcono ? 'Abrir WhatsApp' : undefined}>
+          {logo}{soloIcono ? null : ' Abrir WhatsApp'}
         </a>
       ) : (
         <button type="button" disabled={estado.tipo === 'preparando'} onClick={() => { void alPulsar() }}
-          className={`${clase} ${estado.tipo === 'preparando' ? 'opacity-60 cursor-wait' : hover}`} style={estilo} {...foco}>
-          {logo} {estado.tipo === 'preparando' ? 'Preparando…' : <Rotulo texto={etiqueta} dosLineas={dosLineas} />}
+          className={`${clase} ${estado.tipo === 'preparando' ? 'opacity-60 cursor-wait' : hover}`} style={soloIcono ? undefined : estilo} {...foco}
+          aria-label={soloIcono ? nombreIcono : undefined} title={soloIcono ? nombreIcono : undefined}
+          aria-busy={soloIcono && estado.tipo === 'preparando' ? true : undefined}>
+          {logo}{soloIcono ? null : <> {estado.tipo === 'preparando' ? 'Preparando…' : <Rotulo texto={etiqueta} dosLineas={dosLineas} />}</>}
         </button>
       )}
       {mensajeDebajo && (

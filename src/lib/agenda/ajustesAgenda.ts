@@ -164,6 +164,30 @@ export async function leerRecordatorioEncendido(supabase: ClienteSesion, clinica
   }
 }
 
+/**
+ * I5 (punto 20) · El interruptor del correo a la clínica por cada reserva
+ * nueva por enlace (columna `correo_reserva_clinica`, migración
+ * `20261121150000`, APAGADO de fábrica). La otra forma que acepta
+ * `PATCH /api/me/ajustes-agenda`; `strictObject`: ninguna otra clave.
+ */
+export const CorreoReservaClinicaSchema = z.strictObject({ correo_reserva_clinica: z.boolean() })
+
+/** Copia de `leerRecordatorioEncendido` para la otra columna: `null` = no se pudo saber (base sin la migración). */
+export async function leerCorreoReservaClinica(supabase: ClienteSesion, clinicaId: string): Promise<boolean | null> {
+  try {
+    const { data, error } = await supabase
+      .from('agenda_ajustes').select('correo_reserva_clinica').eq('clinica_id', clinicaId).maybeSingle()
+    if (error) {
+      logger.warn('agenda', `interruptor del correo a la clínica sin leer: ${error.code ?? ''}`)
+      return null
+    }
+    return typeof data?.correo_reserva_clinica === 'boolean' ? data.correo_reserva_clinica : null
+  } catch (err: unknown) {
+    logger.warn('agenda', `interruptor del correo a la clínica sin leer: ${err instanceof Error ? err.message : 'error'}`)
+    return null
+  }
+}
+
 /** ¿Está encendida la agenda v2 para esta clínica? Sólo `true` si la base lo dice sin duda. */
 export async function agendaV2Encendida(supabase: ClienteSesion, clinicaId: string): Promise<boolean> {
   try {

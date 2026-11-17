@@ -3,7 +3,7 @@ import { sesionServidor } from '@/lib/supabase/sesionServidor'
 import { analizarPerfilSesion } from '@/lib/perfil/perfilSesion'
 import { canManageClinica, canVerAgendaCompleta, isMedico } from '@/lib/permissions'
 import {
-  AjustesAgendaSchema, CAMPOS_AJUSTES_AGENDA, COLUMNAS_AJUSTES, leerRecordatorioEncendido, type AjustesAgenda,
+  AjustesAgendaSchema, CAMPOS_AJUSTES_AGENDA, COLUMNAS_AJUSTES, leerRecordatorioEncendido, leerCorreoReservaClinica, type AjustesAgenda,
 } from '@/lib/agenda/ajustesAgenda'
 import { COLUMNAS_TIPO_CITA, type TipoCita } from '@/lib/agenda/tiposCita'
 import { logger } from '@/lib/logger'
@@ -96,15 +96,17 @@ export default async function ConfiguracionCalendarioPage() {
   if (!perfil?.clinica_id) notFound()
   const lectura = await leerAjustes(supabase, perfil.clinica_id)
   if (lectura === 'apagado') notFound()
-  const [tipos, recordatorio, administradores] = await Promise.all([
+  const [tipos, recordatorio, correoClinica, administradores] = await Promise.all([
     leerTipos(supabase, perfil.clinica_id),
     leerRecordatorioEncendido(supabase, perfil.clinica_id),
+    leerCorreoReservaClinica(supabase, perfil.clinica_id),
     leerAdministradores(supabase, perfil.clinica_id),
   ])
   return (
     <ConfiguracionCalendario
       ajustes={lectura.ajustes}
       recordatorio={recordatorio}
+      correoClinica={correoClinica}
       administradores={administradores}
       tipos={tipos}
       puedeAdministrar={canManageClinica(perfil)}

@@ -86,20 +86,27 @@ test.describe('con el interruptor encendido', () => {
 
   test('el engrane lleva a la pantalla', async ({ page }) => {
     await irAAgenda(page)
-    await page.getByRole('button', { name: 'Configuración de la agenda' }).click()
+    // I5 (punto 15): la configuración es la primera opción del menú del engrane.
+    await page.getByRole('button', { name: 'Opciones de la agenda' }).click()
+    await page.getByRole('menuitem', { name: 'Configuración de la agenda' }).click()
     await page.waitForURL(`**${RUTA}`)
     await expect(page.getByRole('heading', { name: 'Configuración del calendario' })).toBeVisible()
   })
 
   /* T3 · punto 5: con la v2 el engrane es SÓLO icono a cualquier ancho (también
-     a `2xl`, donde apagada se ve «Horario»), con nombre y `title` «Configuración
-     de la agenda»; en el teléfono, el mismo nombre y 44 px de toque. */
-  test('el engrane es sólo icono, se llama «Configuración de la agenda» y no dice «Horario»', async ({ page, browser }) => {
+     a `2xl`, donde apagada se ve «Horario»); en el teléfono, 44 px de toque.
+     I5 (punto 15): el engrane es ahora el menú «Opciones de la agenda» y
+     «Configuración de la agenda» es su primera opción. */
+  test('el engrane es sólo icono, abre el menú con «Configuración de la agenda» y no dice «Horario»', async ({ page, browser }) => {
     await page.setViewportSize({ width: 1700, height: 900 })
     await irAAgenda(page)
-    const engrane = page.getByRole('button', { name: 'Configuración de la agenda' })
-    await expect(engrane).toHaveAttribute('title', 'Configuración de la agenda')
+    const engrane = page.getByRole('button', { name: 'Opciones de la agenda' })
+    await expect(engrane).toHaveAttribute('title', 'Opciones de la agenda')
+    await expect(engrane).toHaveAttribute('aria-haspopup', 'menu')
     await expect(engrane).toHaveText('')
+    await engrane.click()
+    await expect(page.getByRole('menu', { name: 'Opciones de la agenda' }).getByRole('menuitem').first()).toHaveText('Configuración de la agenda')
+    await page.keyboard.press('Escape')
     await expect(page.getByRole('button', { name: 'Configurar horario de consulta' })).toHaveCount(0)
 
     const ctx = await browser.newContext({
@@ -109,7 +116,7 @@ test.describe('con el interruptor encendido', () => {
     try {
       const movil = await ctx.newPage()
       await irAAgenda(movil)
-      const engraneMovil = movil.getByRole('button', { name: 'Configuración de la agenda' })
+      const engraneMovil = movil.getByRole('button', { name: 'Opciones de la agenda' })
       await expect(engraneMovil).toHaveText('')
       const caja = await engraneMovil.boundingBox()
       // Redondeado: el navegador da 43.99999… por subpíxeles.
@@ -167,7 +174,8 @@ test.describe('con el interruptor encendido', () => {
   test('la secretaria lo ve en solo lectura y su PUT da 403', async ({ browser }) => {
     await enContextoNuevo(browser, SESION.secretariaA, async (p) => {
       await irAAgenda(p)
-      await p.getByRole('button', { name: 'Configuración de la agenda' }).click()
+      await p.getByRole('button', { name: 'Opciones de la agenda' }).click()
+      await p.getByRole('menuitem', { name: 'Configuración de la agenda' }).click()
       await p.waitForURL(`**${RUTA}`)
       await pestanaConfig(p, 'Plazos y recordatorios')
       await expect(p.getByLabel('Recordatorio por correo')).toBeDisabled()

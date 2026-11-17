@@ -22,6 +22,9 @@
  * por correo, `{ recordatorio_encendido: boolean }`. Mismas puertas y misma
  * RLS que el PUT (lo cambia quien cambia los plazos). Sin la migración
  * `20261120120000` la columna no existe: 503 sin tocar nada.
+ * I5 (punto 20): o, con la misma forma, SÓLO el del correo a la clínica por
+ * cada reserva, `{ correo_reserva_clinica: boolean }` (migración
+ * `20261121150000`; sin ella, 503). Una clave por petición.
  *
  * Auditoría: el disparador `audit_agenda_ajustes` (`log_tabla_change`) deja
  * una fila `UPDATE` en `audit_log` por cada guardado, con quien lo hizo
@@ -31,7 +34,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { canManageClinica } from '@/lib/permissions'
-import { AjustesAgendaSchema, COLUMNAS_AJUSTES, RecordatorioEncendidoSchema, agendaV2Encendida } from '@/lib/agenda/ajustesAgenda'
+import {
+  AjustesAgendaSchema, COLUMNAS_AJUSTES, CorreoReservaClinicaSchema, RecordatorioEncendidoSchema, agendaV2Encendida,
+} from '@/lib/agenda/ajustesAgenda'
 import { logger } from '@/lib/logger'
 
 type ClienteSesion = Awaited<ReturnType<typeof createClient>>
@@ -94,11 +99,26 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
   }
 }
 
+/** I5 · El interruptor del correo a la clínica: el mismo UPDATE de una columna que el del recordatorio. */
+async function guardarCorreoClinica(supabase: ClienteSesion, clinicaId: string, valor: boolean): Promise<NextResponse> {
+  const { data, error } = await supabase.from('agenda_ajustes')
+    .update({ correo_reserva_clinica: valor })
+    .eq('clinica_id', clinicaId)
+    .select('correo_reserva_clinica')
+    .maybeSingle()
+  if (error) return respuestaError(error)
+  if (!data) return NextResponse.json({ error: 'no_disponible' }, { status: 404 })
+  return NextResponse.json({ correo_reserva_clinica: data.correo_reserva_clinica === true })
+}
+
 export async function PATCH(req: NextRequest): Promise<NextResponse> {
   try {
     const p = await puertas()
     if (!p.ok) return p.respuesta
-    const parsed = RecordatorioEncendidoSchema.safeParse(await req.json().catch(() => null))
+    const cuerpo: unknown = await req.json().catch(() => null)
+    const correo = CorreoReservaClinicaSchema.safeParse(cuerpo)
+    if (correo.success) return await guardarCorreoClinica(p.supabase, p.clinicaId, correo.data.correo_reserva_clinica)
+    const parsed = RecordatorioEncendidoSchema.safeParse(cuerpo)
     if (!parsed.success) return NextResponse.json({ error: 'Datos inválidos' }, { status: 400 })
     const { data, error } = await p.supabase.from('agenda_ajustes')
       .update(parsed.data)

@@ -14,7 +14,9 @@ import { codigoDeConfirmacion, hashDeCodigo } from '../src/lib/reserva/secretos'
  *   18. al confirmar o cancelar (a mano o el paciente por /confirmar), la fila
  *       sale sin cerrar el menú, por el canal ÚNICO de tiempo real (un join);
  *   19. el punto rojo del botón también con pendientes, y el contador de
- *       canceladas y empalmes de siempre.
+ *       canceladas y empalmes de siempre. I5: el botón es la campana (panel
+ *       «Por confirmar y avisos»), las canceladas y los empalmes son avisos de
+ *       su pestaña «Avisos» y el contador es el punto rojo.
  *
  * MUTACIONES que lo ponen en rojo (comprobadas): sin la leyenda; `con_correo`
  * siempre `true` en la ruta; sin `onCambioCita` en `AgendaCliente` (las filas no
@@ -86,7 +88,8 @@ test.afterAll(() => {
   interruptorAgenda('A', false) // como el resto de las e2e: quien lo enciende, lo apaga (global-setup)
 })
 
-const panel = (page: Page) => page.getByRole('dialog', { name: 'Citas de mañana por confirmar' })
+// I5 (punto 16): la campana sustituye al botón; su capa lleva dos pestañas y abre en «Por confirmar».
+const panel = (page: Page) => page.getByRole('dialog', { name: 'Por confirmar y avisos' })
 const fila = (page: Page, f: Fila) => page.locator(`[data-fila-por-confirmar="${f.cita}"]`)
 
 async function abrirPanel(page: Page): Promise<void> {
@@ -128,7 +131,8 @@ test('15-17: sólo agendadas de mañana; la leyenda; cada fila con sus medios; s
   const post = page.waitForResponse(r => r.url().endsWith('/api/agenda/correo') && r.request().method() === 'POST')
   await fila(page, filas.correo).getByRole('button', { name: 'Enviar confirmación por correo' }).click()
   expect((await post).status()).toBe(200)
-  await expect(fila(page, filas.correo)).toContainText('Enviado por correo')
+  // I5 (punto 17): el estado va en una línea debajo de la fila, en forma corta.
+  await expect(fila(page, filas.correo).locator('[data-estado-fila]')).toHaveText(/^Correo enviado \d\d:\d\d$/)
 })
 
 test('18: «Marcar como confirmada» la saca al instante, sin cerrar el menú, por el PUT de «Confirmar» (firma y auditoría)', async ({ page }) => {
@@ -181,8 +185,11 @@ test('18 y 19: cancelar (el paciente y el personal) la saca; una cita nueva para
     await p.waitForURL(/\?r=cancelada$/)
   } finally { await paciente.close() }
   await expect(fila(page, filas.correo)).toHaveCount(0, { timeout: 10000 })
-  await expect(page.locator(`[data-fila-cancelada="${filas.correo.cita}"]`)).toBeVisible({ timeout: 10000 })
-  await expect(page.locator('[data-alerta-por-confirmar="avisos"]')).toBeVisible()
+  // I5 (punto 19): la cancelación del paciente es un aviso de la pestaña «Avisos», con el punto rojo.
+  await panel(page).getByRole('tab', { name: /^Avisos/ }).click()
+  await expect(page.locator(`[data-aviso-tipo="cancelacion_paciente"][data-aviso-cita="${filas.correo.cita}"]`)).toBeVisible({ timeout: 10000 })
+  await expect(page.locator('[data-campana] [data-punto-rojo]')).toBeVisible()
+  await panel(page).getByRole('tab', { name: /^Por confirmar/ }).click()
 
   // El personal, desde otra sesión: el mismo PUT que «Cancelar» de la tarjeta.
   const secretaria = await browser.newContext({ storageState: SESION.secretariaA })
@@ -200,22 +207,23 @@ test('18 y 19: cancelar (el paciente y el personal) la saca; una cita nueva para
   await expect(panel(page)).toBeVisible()
 })
 
-test('19: el punto rojo — vacío, nada; sólo pendientes, un punto; con canceladas o empalmes, el contador de siempre', async ({ page }) => {
-  const fila0 = { id: 'x', inicio: new Date(Date.now() + 26 * 3_600_000).toISOString(), zona: TZ, titulo: 'X', consultorio: 'C',
-    con_whatsapp: false, con_correo: false, whatsapp_reminder_sent_at: null }
-  const cancelada = { id: 'y', inicio: fila0.inicio, zona: TZ, titulo: 'Y', respondido_en: new Date().toISOString() }
-  const casos: [string, unknown, string | null][] = [
-    ['vacío', { citas: [], canceladas: [], empalmes: [] }, null],
-    ['pendientes', { citas: [fila0], canceladas: [], empalmes: [] }, 'pendientes'],
-    ['avisos', { citas: [fila0], canceladas: [cancelada], empalmes: [] }, 'avisos'],
+test('19 (I5): el punto rojo de la campana — vacío, nada; con pendientes o con avisos sin revisar, el punto', async ({ page }) => {
+  const inicio = new Date(Date.now() + 26 * 3_600_000).toISOString()
+  const fila0 = { id: 'x', inicio, zona: TZ, titulo: 'X', consultorio: 'C', con_whatsapp: false, con_correo: false, whatsapp_reminder_sent_at: null }
+  const aviso = { id: randomUUID(), tipo: 'reserva_enlace', creado_en: new Date(Date.now() - 3_600_000).toISOString(),
+    cita: { id: randomUUID(), title: 'Y', start_time: inicio, end_time: inicio, status: 'scheduled', medico_id: null, paciente_id: null,
+      reserva_nombre: 'Y', zona: TZ } }
+  const vacio = { citas: [], canceladas: [], empalmes: [], avisos: [], avisos_disponibles: true }
+  const casos: [string, unknown, boolean, string][] = [
+    ['vacío', vacio, false, 'Por confirmar (0) y avisos (0)'],
+    ['pendientes', { ...vacio, citas: [fila0] }, true, 'Por confirmar (1) y avisos (0)'],
+    ['avisos', { ...vacio, avisos: [aviso] }, true, 'Por confirmar (0) y avisos (1)'],
   ]
-  for (const [, json, alerta] of casos) {
+  for (const [caso, json, punto, etiqueta] of casos) {
     await page.route('**/api/agenda/por-confirmar', r => r.fulfill({ json }))
     await abrirAgendaV2(page)
-    await expect(page.locator('[data-por-confirmar]')).toContainText(/Por confirmar \(\d+\)/)
-    if (alerta) await expect(page.locator(`[data-alerta-por-confirmar="${alerta}"]`)).toBeVisible()
-    else await expect(page.locator('[data-alerta-por-confirmar]')).toHaveCount(0)
-    if (alerta === 'avisos') await expect(page.locator('[data-alerta-por-confirmar="avisos"]')).toHaveText('1')
+    await expect(page.locator('[data-campana]'), caso).toHaveAttribute('aria-label', etiqueta)
+    await expect(page.locator('[data-campana] [data-punto-rojo]'), caso).toHaveCount(punto ? 1 : 0)
     await page.unroute('**/api/agenda/por-confirmar')
   }
 })

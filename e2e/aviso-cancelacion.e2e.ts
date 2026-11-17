@@ -66,8 +66,10 @@ test('el paciente cancela por el enlace: aviso en la agenda abierta y fila en el
   { clinica: clinicaId, hash: HASH })
   await expect(page.getByText(/Un paciente canceló su cita del/)).toBeVisible({ timeout: 10000 })
   expect(await page.getByText(/Un paciente canceló su cita del/).first().textContent()).not.toContain(titulo)
+  // I5 (punto 19): la cancelación es un aviso de la pestaña «Avisos» de la campana.
   await page.locator('[data-por-confirmar]').click()
-  await expect(page.locator(`[data-fila-cancelada="${citaId}"]`)).toBeVisible()
+  await page.getByRole('dialog', { name: 'Por confirmar y avisos' }).getByRole('tab', { name: /^Avisos/ }).click()
+  await expect(page.locator(`[data-aviso-tipo="cancelacion_paciente"][data-aviso-cita="${citaId}"]`)).toBeVisible()
 })
 
 test('una cancelación del personal no avisa', async ({ page }) => {

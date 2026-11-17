@@ -1,19 +1,20 @@
 'use client'
 
 /**
- * src/components/agenda/PanelPorConfirmar.tsx — «Por confirmar (N)» en la
- * cabecera de escritorio de la agenda (agenda E7): las citas de MAÑANA aún
- * agendadas (no confirmadas), cada una con su botón de WhatsApp manual
- * (`tipo:'recordatorio'`, marca `whatsapp_reminder_sent_at`).
+ * src/components/agenda/PanelPorConfirmar.tsx — los DATOS y las LISTAS de
+ * «Por confirmar» (agenda E7): las citas de MAÑANA aún agendadas (no
+ * confirmadas), cada una con sus medios de aviso. Desde la tanda I los pinta
+ * la campana de la barra (`CampanaAgenda`, punto 16 de Angel), en su pestaña
+ * «Por confirmar»; la pestaña «Avisos» recibe de aquí los avisos de la clínica
+ * (I5, punto 19), que viajan en la MISMA respuesta (ninguna petición de más).
  *
  * Sólo lo monta la agenda con la v2 encendida. Pide la lista en tiempo ocioso
- * al montarse y otra vez al abrir el panel (lo confirmado mientras tanto, por
- * el enlace del correo o por el personal, ya no sale). Un fallo deja el
- * botón sin número; no es un aviso.
+ * al montarse y otra vez al abrir la campana. Un fallo deja la campana sin
+ * número; no es un aviso.
  *
- * D11: también «Reservas por enlace empalmadas con Google» (el mismo canal
- * que E8), con aviso emergente si la recarga trae uno detectado hace menos
- * de 2 min y esta pestaña aún no lo avisó.
+ * D11: también «Reservas por enlace empalmadas con Google», con aviso
+ * emergente si la recarga trae uno detectado hace menos de 2 min y esta
+ * pestaña aún no lo avisó.
  *
  * H4 (puntos 15 a 19 de Angel):
  *   · la leyenda «Estos pacientes están pendientes de confirmar su cita…»;
@@ -23,22 +24,26 @@
  *     PUT, firma de eco y auditoría que «Confirmar» de la tarjeta—;
  *   · se actualiza con el canal ÚNICO de la agenda (`cambiosRef`, que alimenta
  *     `useTiempoRealAgenda`): no abre otro. Lo que sale, sale sin pedir nada;
- *     lo que entra recarga la lista una vez (`efectoEnPorConfirmar`);
- *   · el punto rojo del botón se enciende también con pendientes de mañana
- *     (sin número: el número ya va en «Por confirmar (N)»); con canceladas o
- *     empalmes, el contador de siempre.
+ *     lo que entra recarga la lista una vez (`efectoEnPorConfirmar`). I5: lo
+ *     que puede traer un aviso (`cambioPuedeAvisar`) también recarga una vez.
+ *
+ * I5 · punto 17: cada fila es una REJILLA de columnas fijas —nombre y hora,
+ * WhatsApp, correo—: los dos botones quedan en el mismo sitio y del mismo
+ * tamaño en todas las filas (una celda vacía si falta uno), y el estado de los
+ * dos («WhatsApp abierto 00:35 · Correo enviado 00:35») va en UNA línea debajo
+ * de la fila, no debajo de cada botón.
  */
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
-import { Check, MessageCircle, X } from 'lucide-react'
+import { Check } from 'lucide-react'
 import { enOcioso, cancelarOcioso } from '@/lib/agenda/ocioso'
 import type { FilaPorConfirmar } from '@/lib/agenda/whatsappCita'
 import type { FilaCancelada } from '@/lib/agenda/avisoCancelacion'
-import type { CambiarEstadoCita } from '@/lib/agenda/contratosV2'
-import { efectoEnPorConfirmar, type CambioCita } from '@/lib/agenda/porConfirmarTiempoReal'
+import { cambioPuedeAvisar, efectoEnPorConfirmar, type CambioCita } from '@/lib/agenda/porConfirmarTiempoReal'
 import { BotonWhatsAppCita } from '@/components/agenda/BotonWhatsAppCita'
 import { BotonCorreoCita } from '@/components/agenda/BotonCorreoCita'
 import { useToast } from '@/components/ui/Toast'
 import { esEmpalmeReciente, textoAvisoEmpalme, type FilaEmpalme } from '@/lib/agenda/avisoEmpalmeReserva'
+import { leerRespuestaAvisos, type RespuestaAvisos } from '@/lib/avisos/avisosClinica'
 
 function esFila(x: unknown): x is FilaPorConfirmar {
   return typeof x === 'object' && x !== null
@@ -63,9 +68,15 @@ function esEmpalme(x: unknown): x is FilaEmpalme {
     && 'detectado_en' in x && typeof x.detectado_en === 'string'
 }
 
-interface Listas { citas: FilaPorConfirmar[]; canceladas: FilaCancelada[]; empalmes: FilaEmpalme[] }
+export interface ListasPorConfirmar {
+  citas: FilaPorConfirmar[]
+  canceladas: FilaCancelada[]
+  empalmes: FilaEmpalme[]
+  /** I5 · Los avisos de la clínica; null si la ruta no los trajo (servidor anterior). */
+  avisos: RespuestaAvisos | null
+}
 
-async function pedirPorConfirmar(): Promise<Listas | null> {
+async function pedirPorConfirmar(): Promise<ListasPorConfirmar | null> {
   try {
     const res = await fetch('/api/agenda/por-confirmar')
     if (!res.ok) return null
@@ -73,7 +84,7 @@ async function pedirPorConfirmar(): Promise<Listas | null> {
     if (typeof datos !== 'object' || datos === null || !('citas' in datos) || !Array.isArray(datos.citas)) return null
     const canceladas = 'canceladas' in datos && Array.isArray(datos.canceladas) ? datos.canceladas.filter(esCancelada) : []
     const empalmes = 'empalmes' in datos && Array.isArray(datos.empalmes) ? datos.empalmes.filter(esEmpalme) : []
-    return { citas: datos.citas.filter(esFila), canceladas, empalmes }
+    return { citas: datos.citas.filter(esFila), canceladas, empalmes, avisos: leerRespuestaAvisos(datos) }
   } catch {
     return null
   }
@@ -90,11 +101,11 @@ function horaEnZona(iso: string, zona: string, conDia = false): string {
   }
 }
 
-/** E8 · «Canceladas por el paciente (48 h)»: el aviso que queda para quien no tenía la agenda abierta. */
-function SeccionCanceladas({ canceladas }: { canceladas: FilaCancelada[] }) {
+/** E8 · «Canceladas por el paciente (48 h)»: sólo sin la tabla de avisos (base sin la migración de I5). */
+export function SeccionCanceladas({ canceladas }: { canceladas: FilaCancelada[] }) {
   if (canceladas.length === 0) return null
   return (
-    <div className="mt-4 pt-3 border-t" style={{ borderColor: 'var(--ag-hairline)' }} data-canceladas-paciente>
+    <div className="mt-4 pt-3 border-t first:mt-0 first:pt-0 first:border-t-0" style={{ borderColor: 'var(--ag-hairline)' }} data-canceladas-paciente>
       <p className="text-[13px] font-bold mb-2" style={{ color: 'var(--ag-text)' }}>Canceladas por el paciente (48 h)</p>
       <ul className="flex flex-col gap-2">
         {canceladas.map((c) => (
@@ -108,11 +119,11 @@ function SeccionCanceladas({ canceladas }: { canceladas: FilaCancelada[] }) {
   )
 }
 
-/** D11 · «Reservas por enlace empalmadas con Google»: siguen ahí mientras el empalme siga en pie. */
-function SeccionEmpalmes({ empalmes }: { empalmes: FilaEmpalme[] }) {
+/** D11 · «Reservas por enlace empalmadas con Google»: sólo sin la tabla de avisos. */
+export function SeccionEmpalmes({ empalmes }: { empalmes: FilaEmpalme[] }) {
   if (empalmes.length === 0) return null
   return (
-    <div className="mt-4 pt-3 border-t" style={{ borderColor: 'var(--ag-hairline)' }} data-empalmes-reserva>
+    <div className="mt-4 pt-3 border-t first:mt-0 first:pt-0 first:border-t-0" style={{ borderColor: 'var(--ag-hairline)' }} data-empalmes-reserva>
       <p className="text-[13px] font-bold mb-2" style={{ color: 'var(--ag-text)' }}>Reservas por enlace empalmadas con Google</p>
       <ul className="flex flex-col gap-2">
         {empalmes.map((c) => (
@@ -129,40 +140,63 @@ function SeccionEmpalmes({ empalmes }: { empalmes: FilaEmpalme[] }) {
 /** H4 · La leyenda del punto 16 (texto literal de Angel). */
 export const LEYENDA_POR_CONFIRMAR = 'Estos pacientes están pendientes de confirmar su cita. Envía un recordatorio.'
 
-/** Una fila de mañana: nombre, hora y consultorio; los avisos que tenga, o «Marcar como confirmada». */
+type Mensaje = { texto: string; alerta: boolean; breve?: string } | null
+
+/** I5 · punto 17: la línea de estado de la fila, una sola, con lo de los dos botones. */
+function LineaEstado({ whatsapp, correo }: { whatsapp: Mensaje; correo: Mensaje }) {
+  const partes = [whatsapp, correo].filter((m): m is NonNullable<Mensaje> => m !== null)
+  if (partes.length === 0) return null
+  const alerta = partes.some(m => m.alerta)
+  const texto = partes.map(m => m.breve ?? m.texto).join(' · ')
+  return (
+    <p data-estado-fila role={alerta ? 'alert' : undefined} title={texto}
+      className={`ag-pc-estado text-[12px] ${alerta ? 'ag-pc-estado--alerta' : ''}`}>{texto}</p>
+  )
+}
+
+/** Una fila de mañana: nombre, hora y consultorio; WhatsApp y correo en sus celdas fijas; el estado debajo. */
 function FilaManana({ c, alConfirmar }: { c: FilaPorConfirmar; alConfirmar?: (id: string) => void }) {
+  const [whatsapp, setWhatsapp] = useState<Mensaje>(null)
+  const [correo, setCorreo] = useState<Mensaje>(null)
   const sinMedios = !c.con_whatsapp && !c.con_correo
   return (
-    <li data-fila-por-confirmar={c.id} className="flex items-start justify-between gap-3">
-      <div className="min-w-0">
+    <li data-fila-por-confirmar={c.id} className="ag-pc-fila">
+      <div className="ag-pc-datos min-w-0">
         <p className="text-[13px] font-semibold truncate" style={{ color: 'var(--ag-text)' }}>{c.titulo || 'Cita'}</p>
         <p className="text-[12px] truncate" style={{ color: 'var(--ag-muted)' }}>
           {horaEnZona(c.inicio, c.zona)}{c.consultorio ? ` · ${c.consultorio}` : ''}
         </p>
-        {sinMedios && <p className="text-[12px]" style={{ color: 'var(--ag-muted)' }} data-sin-medios>Sin teléfono válido ni correo.</p>}
       </div>
-      <div className="flex flex-wrap justify-end items-start gap-1.5 flex-none max-w-[60%]">
-        {c.con_whatsapp && <BotonWhatsAppCita citaId={c.id} tipo="recordatorio" marcadoEn={c.whatsapp_reminder_sent_at} etiqueta="WhatsApp" compacto />}
-        {c.con_correo && <BotonCorreoCita citaId={c.id} compacto />}
-        {sinMedios && alConfirmar && (
-          <button type="button" data-marcar-confirmada={c.id} onClick={() => alConfirmar(c.id)}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 text-[12px] rounded-xl font-bold border transition-colors hover:bg-[var(--ag-btn-ghost-hover)]"
-            style={{ color: 'var(--ag-text)', borderColor: 'var(--ag-input-border)' }}>
-            <Check size={14} aria-hidden="true" /> Marcar como confirmada
-          </button>
-        )}
+      <div className="ag-pc-celda ag-pc-celda--whatsapp">
+        {c.con_whatsapp && <BotonWhatsAppCita citaId={c.id} tipo="recordatorio" marcadoEn={c.whatsapp_reminder_sent_at} soloIcono alMensaje={setWhatsapp} />}
       </div>
+      <div className="ag-pc-celda ag-pc-celda--correo">
+        {c.con_correo && <BotonCorreoCita citaId={c.id} soloIcono alMensaje={setCorreo} />}
+      </div>
+      <LineaEstado whatsapp={whatsapp} correo={correo} />
+      {sinMedios && (
+        <div className="ag-pc-sin-medios">
+          <p className="text-[12px]" style={{ color: 'var(--ag-muted)' }} data-sin-medios>Sin teléfono válido ni correo.</p>
+          {alConfirmar && (
+            <button type="button" data-marcar-confirmada={c.id} onClick={() => alConfirmar(c.id)}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 text-[12px] rounded-xl font-bold border transition-colors hover:bg-[var(--ag-btn-ghost-hover)]"
+              style={{ color: 'var(--ag-text)', borderColor: 'var(--ag-input-border)' }}>
+              <Check size={14} aria-hidden="true" /> Marcar como confirmada
+            </button>
+          )}
+        </div>
+      )}
     </li>
   )
 }
 
 /** Las filas de mañana, con la leyenda arriba cuando hay alguna. */
-function ListaPorConfirmar({ citas, alConfirmar }: { citas: FilaPorConfirmar[]; alConfirmar?: (id: string) => void }) {
+export function ListaPorConfirmar({ citas, alConfirmar }: { citas: FilaPorConfirmar[]; alConfirmar?: (id: string) => void }) {
   if (citas.length === 0) return null
   return (
     <>
       <p className="text-[12px] mb-3 leading-relaxed" style={{ color: 'var(--ag-muted)' }} data-leyenda-por-confirmar>{LEYENDA_POR_CONFIRMAR}</p>
-      <ul className="flex flex-col gap-3">
+      <ul className="flex flex-col">
         {citas.map((c) => <FilaManana key={c.id} c={c} alConfirmar={alConfirmar} />)}
       </ul>
     </>
@@ -177,13 +211,13 @@ const ESPERA_RECARGA_MS = 250
  * se repite al terminar (la que estaba en vuelo puede traer una fila que el
  * canal ya quitó).
  */
-function useListas(recarga: number, cambiosRef: Props['cambiosRef']) {
-  const [listas, setListas] = useState<Listas | null>(null)
+export function usePorConfirmar(recarga: number, cambiosRef: RefObject<((c: CambioCita) => void) | null> | undefined) {
+  const [listas, setListas] = useState<ListasPorConfirmar | null>(null)
   const toast = useToast()
   /** D11: los empalmes ya avisados en esta pestaña (el aviso emergente sale una vez). */
   const avisados = useRef(new Set<string>())
   const vuelo = useRef({ enVuelo: false, otraVez: false })
-  const listasRef = useRef<Listas | null>(null)
+  const listasRef = useRef<ListasPorConfirmar | null>(null)
   useEffect(() => { listasRef.current = listas }, [listas])
 
   const recargar = useCallback((): void => {
@@ -229,7 +263,8 @@ function avisarEmpalmes(empalmes: FilaEmpalme[], avisados: Set<string>, avisar: 
 
 /** H4 (punto 18) · Se engancha al canal de la agenda por `cambiosRef` (no abre otro). */
 function useCambiosEnVivo(
-  cambiosRef: Props['cambiosRef'], listasRef: RefObject<Listas | null>, quitar: (id: string) => void, recargar: () => void,
+  cambiosRef: RefObject<((c: CambioCita) => void) | null> | undefined, listasRef: RefObject<ListasPorConfirmar | null>,
+  quitar: (id: string) => void, recargar: () => void,
 ): void {
   useEffect(() => {
     if (!cambiosRef) return
@@ -239,7 +274,7 @@ function useCambiosEnVivo(
       if (!l) return // la primera traída aún no llegó: traerá lo de ahora
       const efecto = efectoEnPorConfirmar(new Map(l.citas.map((f) => [f.id, f.inicio])), c, Date.now())
       if (efecto === 'quitar' || efecto === 'quitar_y_recargar') quitar(c.tipo === 'DELETE' ? c.id : c.fila.id)
-      if (efecto === 'recargar' || efecto === 'quitar_y_recargar') {
+      if (efecto === 'recargar' || efecto === 'quitar_y_recargar' || cambioPuedeAvisar(c)) {
         if (espera) clearTimeout(espera)
         espera = setTimeout(() => { espera = null; recargar() }, ESPERA_RECARGA_MS)
       }
@@ -250,69 +285,4 @@ function useCambiosEnVivo(
       if (cambiosRef.current === alCambio) cambiosRef.current = null
     }
   }, [cambiosRef, listasRef, quitar, recargar])
-}
-
-interface Props {
-  /** `recarga`: cambia cuando la agenda se entera de una cancelación por el enlace (E8). */
-  recarga?: number
-  /** H4 · «Marcar como confirmada»: `cambiarEstadoCita` de la agenda (el camino de «Confirmar»). */
-  confirmar?: CambiarEstadoCita
-  /** H4 · Dónde dejar el oyente de los cambios del canal de tiempo real de la agenda. */
-  cambiosRef?: RefObject<((c: CambioCita) => void) | null>
-}
-
-/** H4 (punto 19) · El aviso del botón: el contador de siempre (canceladas y empalmes) o, sin ellos, un punto si hay pendientes. */
-function AlertaBoton({ pendientes, avisos }: { pendientes: number; avisos: number }) {
-  if (avisos > 0) {
-    return (
-      <span data-alerta-por-confirmar="avisos" className="ml-1 px-1.5 rounded-full text-[11px] font-bold text-white"
-        style={{ background: 'var(--ag-status-cancelled-dot)' }}
-        title="Canceladas por el paciente (48 h) y reservas por enlace empalmadas con Google">{avisos}</span>
-    )
-  }
-  if (pendientes === 0) return null
-  return (
-    <span data-alerta-por-confirmar="pendientes" aria-hidden="true" title="Pacientes pendientes de confirmar su cita de mañana"
-      className="ml-0.5 inline-block w-2 h-2 rounded-full" style={{ background: 'var(--ag-status-cancelled-dot)' }} />
-  )
-}
-
-export function PanelPorConfirmar({ recarga = 0, confirmar, cambiosRef }: Props) {
-  const { listas, recargar, quitar } = useListas(recarga, cambiosRef)
-  const [abierto, setAbierto] = useState(false)
-  const alConfirmar = confirmar ? (id: string): void => {
-    quitar(id)
-    void confirmar(id, 'confirmed').then((ok) => { if (!ok) recargar() })
-  } : undefined
-
-  const citas = listas?.citas ?? null
-  const n = citas?.length ?? null
-  const m = (listas?.canceladas.length ?? 0) + (listas?.empalmes.length ?? 0)
-  return (
-    <div className="relative">
-      <button type="button" data-por-confirmar
-        onClick={() => { setAbierto((v) => !v); if (!abierto) recargar() }}
-        className="flex items-center gap-1.5 px-3 py-2.5 rounded-[var(--ag-r-btn)] text-sm font-semibold border transition-colors hover:bg-[var(--ag-btn-ghost-hover)] whitespace-nowrap"
-        style={{ color: 'var(--ag-text)', borderColor: 'var(--ag-input-border)' }}
-        aria-expanded={abierto}>
-        <MessageCircle size={15} /> Por confirmar{n !== null ? ` (${n})` : ''}
-        <AlertaBoton pendientes={n ?? 0} avisos={m} />
-      </button>
-      {abierto && (
-        <div role="dialog" aria-label="Citas de mañana por confirmar"
-          className="absolute right-0 top-full mt-2 z-40 w-[380px] max-h-[60vh] overflow-y-auto rounded-2xl border shadow-lg p-4"
-          style={{ background: 'var(--ag-modal-bg)', borderColor: 'var(--ag-hairline)' }}>
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-[13px] font-bold" style={{ color: 'var(--ag-text)' }}>Citas de mañana por confirmar</p>
-            <button type="button" onClick={() => setAbierto(false)} aria-label="Cerrar"><X size={16} /></button>
-          </div>
-          {citas === null && <p className="text-[12px]" style={{ color: 'var(--ag-muted)' }}>Cargando…</p>}
-          {citas?.length === 0 && <p className="text-[12px]" style={{ color: 'var(--ag-muted)' }}>No hay citas de mañana sin confirmar.</p>}
-          <ListaPorConfirmar citas={citas ?? []} alConfirmar={alConfirmar} />
-          <SeccionCanceladas canceladas={listas?.canceladas ?? []} />
-          <SeccionEmpalmes empalmes={listas?.empalmes ?? []} />
-        </div>
-      )}
-    </div>
-  )
 }

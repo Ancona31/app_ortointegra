@@ -22,7 +22,9 @@ import { CabeceraEscritorio } from '@/components/agenda/CabeceraEscritorio'
 import { BarraAgendarMovil } from '@/components/agenda/BarraAgendarMovil'
 import { LeyendaEstados } from '@/components/agenda/LeyendaEstados'
 import { AvisosAgenda } from '@/components/agenda/AvisosAgenda'
-import { PanelPorConfirmar } from '@/components/agenda/PanelPorConfirmar'
+import { CampanaAgenda } from '@/components/agenda/CampanaAgenda'
+import { MenuEngraneAgenda } from '@/components/agenda/MenuEngraneAgenda'
+import type { CitaDelAviso } from '@/lib/avisos/avisosClinica'
 import type { CambioCita } from '@/lib/agenda/porConfirmarTiempoReal'
 import { esRespuestaReciente, leerRespuesta, textoAvisoCancelacion } from '@/lib/agenda/avisoCancelacion'
 import {
@@ -53,6 +55,7 @@ import { enOcioso, cancelarOcioso } from '@/lib/agenda/ocioso'
 import { useFiltroMedico } from '@/app/(app)/agenda/useFiltroMedico'
 import { useFuentesAgenda } from '@/app/(app)/agenda/useFuentesAgenda'
 import { useTiempoRealAgenda } from '@/app/(app)/agenda/useTiempoRealAgenda'
+import { useEnlaceACita } from '@/app/(app)/agenda/useEnlaceACita'
 import { useVentanaRejilla } from '@/app/(app)/agenda/useVentanaRejilla'
 import { useConteoVisible, usePanelDelMes, useResumenDelDia } from '@/app/(app)/agenda/useResumenVisible'
 import { crearGuardadoCitas, pacienteParaInvitacion } from '@/app/(app)/agenda/guardadoCitas'
@@ -81,7 +84,7 @@ import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
 import { rangosDeLaVista, partirFechaHora } from '@/lib/agenda/fechasAgenda'
 import { frasearConteo, frasearConteoBreve } from '@/lib/agenda/conteoAgenda'
 import {
-  esVistaDeRejilla, vistaEnElOtroFormato, vistaAdmiteCompactar,
+  esVistaDeRejilla, vistaEnElOtroFormato, vistaAdmiteCompactar, etiquetaCompactar,
   periodoDeLaVista, ANCHO_TABLETA,
 } from '@/lib/agenda/vistasAgenda'
 import { clasesDelEvento } from '@/lib/agenda/tarjetasAgenda'
@@ -1269,6 +1272,34 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
   const horasHabilesFc = useMemo(
     () => horasHabilesFuente ?? horarioToBusinessHours(horario), [horasHabilesFuente, horario])
 
+  /* ── I5 · LA CAMPANA Y EL ENGRANE (puntos 13 a 19 de Angel) ─────────────
+     Sólo con la v2; apagada, la barra y la banda de siempre (`undefined`). La
+     campana sustituye a «Por confirmar» en escritorio y en el teléfono; el
+     menú del engrane reúne configuración, Compactar, Densidad, atajos y la
+     leyenda. Un aviso pulsado abre su cita con `irACita` (la puerta del
+     buscador); si la capa de interacciones aún no montó, al menos va a su día.
+     `/agenda?cita=<uuid>` (un aviso pulsado fuera de la agenda): `useEnlaceACita`. */
+  useEnlaceACita(interaccionesListas, interaccionesRef)
+  const abrirCitaDeAviso = (c: CitaDelAviso): void => {
+    if (interaccionesRef.current) interaccionesRef.current.irACita(c)
+    else irAFecha(partirFechaHora(c.start_time).fecha)
+  }
+  const campanaV2 = (enBanda: boolean) => agendaV2 ? (
+    <CampanaAgenda recarga={recargaPanel} confirmar={guardado.cambiarEstadoCita} cambiosRef={cambiosPorConfirmarRef}
+      alAbrirCita={abrirCitaDeAviso} enBanda={enBanda} />
+  ) : undefined
+  const engraneV2 = (enBanda: boolean) => agendaV2 ? (
+    <MenuEngraneAgenda enBanda={enBanda}
+      onConfiguracion={verEngrane ? abrirConfiguracion : null}
+      compactar={vistaAdmiteCompactar(currentView) ? {
+        encendida: compactar, alternar: () => setCompactar(v => !v), etiqueta: etiquetaCompactar(currentView, true),
+        corta: currentView === 'dayGridMonth' ? etiquetaCompactar(currentView, true) : 'Compactar la rejilla',
+      } : null}
+      densidad={!isMobile && currentView.startsWith('timeGrid')
+        ? { encendida: densidadCompacta, alternar: () => guardarDensidad(!densidadCompacta) } : null}
+      atajos={isMobile ? null : { abrir: () => interaccionesRef.current?.abrirAyuda(), listos: interaccionesListas, encendidos: atajos }} />
+  ) : undefined
+
   return (
     /* ⚠️⚠️ LA ALTURA DE ESTE `<div>` ES LO QUE PARTE LA PÁGINA EN DOS ZONAS: la
        de arriba fija (título, controles, barra de navegación y cabecera de
@@ -1358,6 +1389,9 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
              la ayuda, que no cabe con el filtro a 360 px). */
           buscar={agendaV2 && montarV2 ? <BuscarV2 apiRef={interaccionesRef} atajos={atajos} enBanda /> : undefined}
           atajos={atajos}
+          /* I5 (puntos 15 y 18) · La campana y el menú del engrane, también aquí. */
+          campana={campanaV2(true)}
+          engrane={engraneV2(true)}
         />
       )}
 
@@ -1619,11 +1653,11 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
             onIntencionAgendar={precargarModalesAgenda}
             /* E7: la lista de mañana por confirmar (WhatsApp manual). Sólo con
                la v2 encendida: apagada no se monta y no sale ninguna petición. */
-            porConfirmar={agendaV2
-              ? <PanelPorConfirmar recarga={recargaPanel} confirmar={guardado.cambiarEstadoCita} cambiosRef={cambiosPorConfirmarRef} />
-              : undefined}
+            porConfirmar={campanaV2(false)}
+            /* I5 · Con el engrane, la fila de la v2 (punto 13). */
+            engrane={engraneV2(false)}
             /* F3 · Las herramientas v2 en sus ranuras; apagado, ni se descargan. */
-            selectorFecha={agendaV2 && montarV2 ? <SelectorFechaV2 rango={rangoVisible} alIrAFecha={irAFecha} /> : undefined}
+            selectorFecha={agendaV2 && montarV2 ? <SelectorFechaV2 rango={rangoVisible} titulo={tituloVista} alIrAFecha={irAFecha} /> : undefined}
             buscar={agendaV2 && montarV2 ? <BuscarV2 apiRef={interaccionesRef} atajos={atajos} /> : undefined}
             atajos={atajos}
           />
@@ -1670,7 +1704,8 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
             En escritorio no cambia nada: sale en las tres. */}
         {/* F1.16 · En la tableta, Día es la rejilla (`timeGridDay`) con su
             píldora de estado, igual que la lista de Día del teléfono. */}
-        {(!isMobile || currentView === 'listDay' || currentView === 'timeGridDay') && <LeyendaEstados />}
+        {/* I5 (punto 15) · Con la v2 la leyenda vive en el menú del engrane y su fila se libera. */}
+        {!agendaV2 && (!isMobile || currentView === 'listDay' || currentView === 'timeGridDay') && <LeyendaEstados />}
         {/* Va PRIMERA en el DOM aunque se pinte segunda, y es a propósito: el
             `order` de la hoja la coloca bajo el toolbar, y así el lector de
             pantalla oye el aviso antes que los controles y la rejilla que

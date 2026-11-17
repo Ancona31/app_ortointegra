@@ -15,6 +15,7 @@
 import { useState, type FormEvent } from 'react'
 import CampoAjuste from '@/components/agenda/configuracion/CampoAjuste'
 import InterruptorRecordatorio from '@/components/agenda/configuracion/InterruptorRecordatorio'
+import InterruptorCorreoClinica from '@/components/agenda/configuracion/InterruptorCorreoClinica'
 import TarjetaSeccion from '@/components/agenda/configuracion/TarjetaSeccion'
 import { BOTON_PRIMARIO, TEXTO_SUAVE } from '@/components/agenda/configuracion/clasesConfig'
 import { leerMotivoError } from '@/components/agenda/configuracion/leerMotivoError'
@@ -56,9 +57,11 @@ interface Props {
   puedeEditar: boolean
   /** El interruptor del recordatorio; `null` = no se pudo leer. */
   recordatorio: boolean | null
+  /** I5 (punto 20) · El interruptor del correo a la clínica por cada reserva; `null` = no se pudo leer. */
+  correoClinica: boolean | null
 }
 
-export default function SeccionAjustesReserva({ inicial, puedeEditar, recordatorio }: Props) {
+export default function SeccionAjustesReserva({ inicial, puedeEditar, recordatorio, correoClinica }: Props) {
   const [valores, setValores] = useState<Valores | null>(() => (inicial ? aTexto(inicial) : null))
   const [horasGuardadas, setHorasGuardadas] = useState<number | null>(inicial?.recordatorio_horas ?? null)
   const [error, setError] = useState<string | null>(null)
@@ -84,6 +87,7 @@ export default function SeccionAjustesReserva({ inicial, puedeEditar, recordator
     <TarjetaSeccion id="config-ajustes" titulo="Plazos y recordatorios"
       ayuda="Valen para toda la clínica y hacia adelante: un enlace de un solo uso ya emitido conserva la vigencia con la que nació.">
       <InterruptorRecordatorio inicial={recordatorio} puedeEditar={puedeEditar} horas={horasGuardadas} />
+      <InterruptorCorreoClinica inicial={correoClinica} puedeEditar={puedeEditar} />
       {!valores ? (
         <p className={TEXTO_SUAVE}>No se pudieron leer los ajustes. Recarga la página.</p>
       ) : (

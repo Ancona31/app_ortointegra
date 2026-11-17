@@ -14,6 +14,10 @@
  *
  * E8 añade `canceladas` y D11 `empalmes` (reservas por enlace a las que una
  * sincronización con Google les metió encima un evento importado o movido).
+ * I5 (punto 19) añade `avisos` y `avisos_disponibles` (`leerAvisosClinica`):
+ * van aquí y no en una petición propia para que la campana de la agenda no
+ * pida nada de más al abrir. Sin la tabla, `avisos_disponibles: false` y la
+ * campana enseña `canceladas` y `empalmes` como antes.
  *
  * Puertas: `entradaGestion()` (401 / 403 / 404 con el interruptor apagado).
  * Cliente de SESIÓN: la RLS de `appointments` decide (el invitado, sólo las
@@ -28,6 +32,7 @@ import {
 import { correoParaConfirmacion, motivoSinCorreo, motivoSinWhatsApp, type FilaPorConfirmar } from '@/lib/agenda/whatsappCita'
 import { VENTANA_CANCELADAS_MS, type FilaCancelada } from '@/lib/agenda/avisoCancelacion'
 import { empalmesVigentes, VENTANA_EMPALMES_MS, type FilaEmpalme } from '@/lib/agenda/avisoEmpalmeReserva'
+import { leerAvisosClinica } from '@/lib/avisos/avisosServidor'
 import { logger } from '@/lib/logger'
 
 export const dynamic = 'force-dynamic'
@@ -140,9 +145,13 @@ export async function GET(): Promise<NextResponse> {
       return NextResponse.json({ error: 'Error interno' }, { status: 500 })
     }
     const citas = filasDeManana(data, ahora)
-    const canceladas = await canceladasRecientes(e.supabase, e.clinicaId, ahora)
-    const empalmes = await empalmesConReservas(e.supabase, e.clinicaId, ahora)
-    return NextResponse.json({ citas, canceladas, empalmes }, { headers: { 'Cache-Control': 'no-store' } })
+    const [canceladas, empalmes, avisos] = await Promise.all([
+      canceladasRecientes(e.supabase, e.clinicaId, ahora),
+      empalmesConReservas(e.supabase, e.clinicaId, ahora),
+      leerAvisosClinica(e.supabase, e.clinicaId),
+    ])
+    return NextResponse.json({ citas, canceladas, empalmes, avisos: avisos.avisos, avisos_disponibles: avisos.disponible },
+      { headers: { 'Cache-Control': 'no-store' } })
   } catch (err: unknown) {
     logger.error('agenda', `GET por confirmar: ${err instanceof Error ? err.name : 'error'}`)
     return NextResponse.json({ error: 'Error interno' }, { status: 500 })

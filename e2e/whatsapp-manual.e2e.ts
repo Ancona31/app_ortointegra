@@ -94,7 +94,8 @@ test('la lista de mañana: wa.me/521 + 10 dígitos, texto sin título; pulsar ma
   expect(texto).not.toContain(titulo)
   expect(enlacesDeLaCita().split('|')[0]).toBe('1') // pulsar sí lo emite
   await popup.close()
-  await expect(fila.getByText(/Abierto en WhatsApp/)).toBeVisible()
+  // I5 (punto 17): el estado va en una línea debajo de la fila, en forma corta.
+  await expect(fila.locator('[data-estado-fila]')).toHaveText(/^WhatsApp abierto \d\d:\d\d$/)
   await expect.poll(() => sqlLocal(`select whatsapp_reminder_sent_at is not null from public.appointments where id = :'id';`, { id: citaId })).toBe('t')
   expect(sqlLocal(`select updated_at from public.appointments where id = :'id';`, { id: citaId })).toBe(antes)
 })
@@ -103,7 +104,7 @@ test('confirmada sale de la lista', async ({ page }) => {
   sqlLocal(`update public.appointments set status = 'confirmed' where id = :'id';`, { id: citaId })
   await page.goto('/agenda')
   await page.locator('[data-por-confirmar]').click()
-  await expect(page.getByText(/Citas de mañana por confirmar/)).toBeVisible()
+  await expect(page.getByRole('dialog', { name: 'Por confirmar y avisos' })).toBeVisible() // I5: la capa de la campana
   await expect(page.locator(`[data-fila-por-confirmar="${citaId}"]`)).toHaveCount(0)
 })
 
