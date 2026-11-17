@@ -24,18 +24,22 @@ const h = vi.hoisted(() => ({
   /** D11: lo que devuelve `reserva_empalmes_google` (o su error). */
   empalmes: [] as Array<Record<string, unknown>>,
   errorEmpalmes: null as { code: string } | null,
+  /** I5: lo que devuelve `avisos_clinica` (o su error). */
+  avisos: [] as Array<Record<string, unknown>>,
+  errorAvisos: null as { code: string } | null,
   enlace: { id: 'e', codigo: 'c', url: 'https://spinus.prueba/confirmar/AbCdEfGhIjKlMnOpQrStUv' } as { id: string; codigo: string; url: string } | null,
   emisiones: [] as unknown[][],
 }))
 
 function cadena(tabla: string): Record<string, unknown> {
   const c: Record<string, unknown> = {}
-  for (const op of ['select', 'update', 'eq', 'gt', 'gte', 'lt', 'in', 'not', 'order', 'limit']) {
+  for (const op of ['select', 'update', 'eq', 'gt', 'gte', 'lt', 'in', 'not', 'is', 'order', 'limit']) {
     c[op] = (...args: unknown[]) => { h.llamadas.push({ op, args }); return c }
   }
   c.maybeSingle = async () => ({ data: h.fila, error: null })
   const resultado = tabla === 'cita_confirmaciones' ? { data: h.respuestas, error: h.errorRespuestas }
     : tabla === 'reserva_empalmes_google' ? { data: h.empalmes, error: h.errorEmpalmes }
+      : tabla === 'avisos_clinica' ? { data: h.avisos, error: h.errorAvisos }
       : { data: h.filas, error: null }
   c.then = (ok: (r: unknown) => unknown) => Promise.resolve(resultado).then(ok)
   return c
@@ -81,6 +85,8 @@ beforeEach(() => {
   h.respuestas = []
   h.errorRespuestas = null
   h.empalmes = []
+  h.avisos = []
+  h.errorAvisos = null
   h.errorEmpalmes = null
   h.emisiones = []
   h.enlace = { id: 'e', codigo: 'c', url: 'https://spinus.prueba/confirmar/AbCdEfGhIjKlMnOpQrStUv' }
@@ -228,8 +234,8 @@ describe('GET /api/agenda/por-confirmar — canceladas por el paciente (E8)', ()
     const { canceladas } = await (await GET()).json()
     expect(canceladas).toEqual([{ id: 'c1', inicio: FUTURO, zona: 'America/Mexico_City', titulo: 'Cita uno', respondido_en: '2026-11-12T10:00:00+00:00' }])
     const deClinica = h.llamadas.filter((l) => l.op === 'eq' && l.args[0] === 'clinica_id')
-    // Lista de mañana, respuestas, sus citas y (D11) los empalmes, vacíos aquí.
-    expect(deClinica).toHaveLength(4)
+    // Lista de mañana, respuestas, sus citas, (D11) los empalmes y (I5) los avisos, vacíos aquí.
+    expect(deClinica).toHaveLength(5)
     expect(h.llamadas.some((l) => l.op === 'eq' && l.args[0] === 'respuesta' && l.args[1] === 'cancelo')).toBe(true)
   })
 
@@ -258,9 +264,9 @@ describe('GET /api/agenda/por-confirmar — reservas empalmadas con Google (D11)
     expect(empalmes).toEqual([{ id: 'r1', inicio: FUTURO, zona: 'America/Mexico_City', titulo: 'Persona Reserva', detectado_en: '2026-11-12T10:00:00+00:00' }])
     expect(JSON.stringify(empalmes)).not.toContain('5512345678')
     expect(h.llamadas.some((l) => l.op === 'from' && l.args[0] === 'reserva_empalmes_google')).toBe(true)
-    // Lista de mañana, respuestas (vacías), los pares y sus citas.
+    // Lista de mañana, respuestas (vacías), los pares, sus citas y (I5) los avisos.
     const deClinica = h.llamadas.filter((l) => l.op === 'eq' && l.args[0] === 'clinica_id')
-    expect(deClinica).toHaveLength(4)
+    expect(deClinica).toHaveLength(5)
   })
 
   it('sin la tabla de D11 (42P01): la sección sale vacía y la lista sigue', async () => {
@@ -268,5 +274,27 @@ describe('GET /api/agenda/por-confirmar — reservas empalmadas con Google (D11)
     const res = await GET()
     expect(res.status).toBe(200)
     expect((await res.json()).empalmes).toEqual([])
+  })
+})
+
+describe('GET /api/agenda/por-confirmar — avisos de la clínica (I5, punto 19)', () => {
+  it('viajan en la MISMA respuesta (ninguna petición de más), sin revisar y con clinica_id', async () => {
+    h.avisos = [{ id: 'av1', tipo: 'reserva_enlace', cita_id: 'r1', creado_en: '2026-11-12T10:00:00+00:00' }]
+    h.filas = [cita({ id: 'r1', title: 'Persona Reserva', reserva_nombre: 'Persona Reserva', consultorio_timezone: 'America/Merida', end_time: FUTURO, medico_id: 'm1' })]
+    const cuerpo = await (await GET()).json()
+    expect(cuerpo.avisos_disponibles).toBe(true)
+    expect(cuerpo.avisos).toHaveLength(1)
+    expect(cuerpo.avisos[0]).toMatchObject({ id: 'av1', tipo: 'reserva_enlace', cita: { id: 'r1', zona: 'America/Merida' } })
+    expect(h.llamadas.some((l) => l.op === 'is' && l.args[0] === 'revisado_en' && l.args[1] === null)).toBe(true)
+  })
+
+  it('sin la tabla (42P01, base sin la migración): avisos_disponibles=false y lo demás sigue', async () => {
+    h.errorAvisos = { code: '42P01' }
+    const res = await GET()
+    expect(res.status).toBe(200)
+    const cuerpo = await res.json()
+    expect(cuerpo.avisos_disponibles).toBe(false)
+    expect(cuerpo.avisos).toEqual([])
+    expect(cuerpo.citas).toBeDefined()
   })
 })

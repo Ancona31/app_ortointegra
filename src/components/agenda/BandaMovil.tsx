@@ -78,7 +78,7 @@ export const VIEWS = [
 export function BandaMovil(
   { conteo, vistaActual, onVista, titulo, onPrev, onNext, onHoy, hoyDeshabilitado, tableta = false, onMenu,
     medicos, filtroMedico, onFiltroMedico, onHorario, onCompactar, compactado,
-    mesSinTodos, selectorFecha, buscar, atajos = false, engraneConfiguracion = false }: {
+    mesSinTodos, selectorFecha, buscar, atajos = false, engraneConfiguracion = false, campana, engrane }: {
     conteo: string; vistaActual: string; onVista: (tipo: string) => void
     titulo: string; onPrev: () => void; onNext: () => void
     /** F1.10 · «Hoy» del teléfono; deshabilitado (aria) si el rango ya lo contiene. */
@@ -98,8 +98,15 @@ export function BandaMovil(
     selectorFecha?: ReactNode
     buscar?: ReactNode
     atajos?: boolean
+    /** I5 (puntos 13, 15 y 18) · La banda de la v2: la campana va en la fila
+        del título, junto a ‹ Hoy ›, y el menú del engrane sustituye en la
+        segunda a «Compactar» y al engrane de configuración. Con `engrane`, el
+        conteo sale del subtítulo. Sin ellos, la banda de siempre. */
+    campana?: ReactNode
+    engrane?: ReactNode
   },
 ) {
+  const bandaV2 = engrane !== undefined
   return (
     <header className="ag-banda-movil">
       <h1 className="sr-only">Agenda</h1>
@@ -109,9 +116,10 @@ export function BandaMovil(
         </button>
         <span className="ag-banda-movil-titulo">
           <span className="ag-banda-movil-fecha">{titulo}</span>
-          <span className="ag-banda-movil-sub">{conteo}</span>
+          {!bandaV2 && <span className="ag-banda-movil-sub">{conteo}</span>}
         </span>
         {selectorFecha}
+        {campana}
         <NavegacionBandaMovil onPrev={onPrev} onNext={onNext} onHoy={onHoy} hoyDeshabilitado={hoyDeshabilitado} atajos={atajos} />
       </div>
       <div className="ag-banda-movil-filtros">
@@ -131,10 +139,12 @@ export function BandaMovil(
         {buscar}
         <FiltrosBandaMovil
           medicos={medicos} filtroMedico={filtroMedico}
-          onFiltroMedico={onFiltroMedico} onHorario={onHorario}
-          onCompactar={onCompactar} compactado={compactado}
+          onFiltroMedico={onFiltroMedico}
+          onCompactar={bandaV2 ? null : onCompactar} compactado={compactado}
+          onHorario={bandaV2 ? null : onHorario}
           mesSinTodos={mesSinTodos} vista={vistaActual} engraneConfiguracion={engraneConfiguracion}
         />
+        {engrane}
       </div>
     </header>
   )

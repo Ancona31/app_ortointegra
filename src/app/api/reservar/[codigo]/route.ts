@@ -45,6 +45,7 @@ import { tiposDelConsultorio } from '@/lib/agenda/tiposPorConsultorio'
 import { reglasDe, turnoValido } from '@/lib/reserva/turnosReserva'
 import { crearEventoReserva } from '@/lib/reserva/googleReserva'
 import { enviarComprobante } from '@/lib/reserva/comprobanteReserva'
+import { avisarReservaAClinica } from '@/lib/reserva/correoClinicaReserva'
 import type { ContextoReserva, ResultadoReservaRpc } from '@/lib/reserva/servidorReserva'
 
 export const dynamic = 'force-dynamic'
@@ -105,7 +106,7 @@ export async function POST(req: NextRequest, rctx: RouteContext<'/api/reservar/[
   const r = b.origen ? await reagendar(ctx, args, hashDeCodigo(b.origen)) : await reservar(ctx, args)
   if (!r.ok) return responder(respuestaErrorRpc(r.ausente, r.codigo))
   // D8, sólo con una reserva NUEVA (una `repetida` ya los programó la primera vez).
-  if (r.data.r_resultado === 'ok') programarDespues(ctx, consultorio, b, r.data)
+  if (r.data.r_resultado === 'ok') programarDespues(ctx, consultorio, b, r.data, !!b.origen)
   return responder(respuestaReserva(r.data.r_resultado, telefonoDeContacto(ctx, consultorio.id)))
 }
 
@@ -120,8 +121,12 @@ type ConsultorioCtx = ContextoReserva['consultorios'][number]
  * y queda registrado en `cita_correos` (E4), para que el recordatorio no
  * salga otra vez para ese inicio (lista A 4): `comprobanteReserva.ts`. Las
  * citas que agenda el personal siguen sin correo al agendar.
+ * I5 (punto 20): y, si la clínica lo encendió en la configuración (apagado de
+ * fábrica), un correo a sus administradores (`correoClinicaReserva.ts`).
  */
-function programarDespues(ctx: ContextoReserva, consultorio: ConsultorioCtx, b: { nombre: string; correo: string }, fila: ResultadoReservaRpc): void {
+function programarDespues(
+  ctx: ContextoReserva, consultorio: ConsultorioCtx, b: { nombre: string; correo: string }, fila: ResultadoReservaRpc, reagendada: boolean,
+): void {
   const { r_cita_id: citaId, r_inicio: inicio, r_fin: fin } = fila
   if (!citaId || !inicio || !fin) return
   const nombre = b.nombre.trim()
@@ -136,6 +141,11 @@ function programarDespues(ctx: ContextoReserva, consultorio: ConsultorioCtx, b: 
         medico: nombreDelMedico(ctx), consultorio: consultorio.nombre, direccion: consultorio.direccion,
         telefono: consultorio.telefono ?? ctx.medico.telefono, inicio, zona: consultorio.timezone,
       },
+    })
+    // I5 (punto 20): el aviso a la clínica, si lo encendió; detrás del comprobante y sin datos clínicos.
+    await avisarReservaAClinica({
+      clinicaId: ctx.clinica_id, citaId, nombre, medico: nombreDelMedico(ctx), consultorio: consultorio.nombre,
+      inicio, zona: consultorio.timezone, reagendada,
     })
   })
 }

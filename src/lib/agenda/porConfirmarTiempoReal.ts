@@ -27,6 +27,8 @@ import { esDeManana, motivoCitaSinWhatsApp, type CitaParaWhatsApp } from './what
 export interface FilaCambioCita extends CitaParaWhatsApp {
   id: string
   consultorio_timezone?: string | null
+  /** I5 · `'google'` en lo importado de Google (el payload trae la fila entera). */
+  origen?: string | null
 }
 
 /** Un cambio del canal, ya reducido: un borrado sólo trae el id. */
@@ -53,4 +55,23 @@ export function efectoEnPorConfirmar(listadas: ReadonlyMap<string, string>, c: C
   if (inicioListado === undefined) return entra ? 'recargar' : 'nada'
   if (!entra) return c.fila.status === 'cancelled' ? 'quitar_y_recargar' : 'quitar'
   return Date.parse(inicioListado) === Date.parse(c.fila.start_time) ? 'nada' : 'recargar'
+}
+
+/**
+ * I5 (punto 19) · ¿Pudo este cambio dejar un aviso de la clínica? Los avisos
+ * los escribe la BASE en la misma transacción que la cita (disparadores de
+ * `20261121150000`), así que cuando el cambio llega por el canal el aviso ya
+ * está: basta con recargar una vez (coalescida) la lista de la campana.
+ *   · INSERT de una reserva por enlace (también la cita nueva de un reagendado)
+ *     o de un evento importado de Google sin paciente;
+ *   · UPDATE a cancelada de una cita con paciente o por ligar (puede ser el
+ *     paciente por su enlace; si fue el personal, la recarga no trae nada).
+ * Un empalme con Google que mueve una cita de Spinus no se distingue aquí: lo
+ * trae el sondeo de la agenda (`recargaPanel`) o la siguiente recarga.
+ */
+export function cambioPuedeAvisar(c: CambioCita): boolean {
+  if (c.tipo === 'DELETE') return false
+  const f = c.fila
+  if (c.tipo === 'INSERT') return !!f.reserva_canal || (f.origen === 'google' && f.paciente_id === null)
+  return f.status === 'cancelled' && (f.paciente_id !== null || !!f.reserva_canal)
 }

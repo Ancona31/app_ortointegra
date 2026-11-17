@@ -71,6 +71,8 @@ interface Props {
   ajustes: AjustesAgenda | null
   /** Tanda H, punto 9: el interruptor del recordatorio automático; `null` = no se pudo leer. */
   recordatorio: boolean | null
+  /** I5 (punto 20): el interruptor del correo a la clínica por cada reserva; `null` = no se pudo leer. */
+  correoClinica: boolean | null
   /** Tanda H, punto 6: los médicos administradores (sus enlaces se ven abiertos). */
   administradores: readonly string[]
   /** `null` = no se pudieron leer. */
@@ -242,7 +244,8 @@ function useConfigAgregada() {
 /** Lo que reparte la pantalla a los paneles de enlaces, plazos y contactos. */
 interface DatosReserva {
   lista: EstadoLista; recargar: () => Promise<void>; medicos: MedicoConfig[]; usuarioId: string; ajustes: AjustesAgenda | null
-  recordatorio: boolean | null; administradores: readonly string[]; gestionaTodos: boolean; puedeAdministrar: boolean
+  recordatorio: boolean | null; correoClinica: boolean | null
+  administradores: readonly string[]; gestionaTodos: boolean; puedeAdministrar: boolean
   alCrearTipo: () => void; conPrimerosPasos: boolean
 }
 
@@ -259,8 +262,8 @@ function PanelesReserva({ d, activa, conEnlaces }: { d: DatosReserva; activa: Cl
       )}
       <Panel clave="plazos" activa={activa}>
         {/* La clave es lo que llegó del servidor: tras restablecer, la sección vuelve a nacer con los valores de fábrica. */}
-        <SeccionAjustesReserva key={`${JSON.stringify(d.ajustes)}|${String(d.recordatorio)}`} inicial={d.ajustes}
-          recordatorio={d.recordatorio} puedeEditar={d.puedeAdministrar} />
+        <SeccionAjustesReserva key={`${JSON.stringify(d.ajustes)}|${String(d.recordatorio)}|${String(d.correoClinica)}`} inicial={d.ajustes}
+          recordatorio={d.recordatorio} correoClinica={d.correoClinica} puedeEditar={d.puedeAdministrar} />
       </Panel>
       {conEnlaces && (
         <Panel clave="bloqueados" activa={activa}>
@@ -298,7 +301,7 @@ export default function ConfiguracionCalendario(props: Props) {
   const porDefecto = faltan ? 'pasos' : esMedico && lista === null ? null : pestanas[0]?.clave ?? null
   const { activa, elegir, volverAlInicio, alPulsar } = usePestana(pestanas, porDefecto)
   const alRestablecer = useAlRestablecer({ revalidar, recargar, volverAlInicio })
-  const reserva: DatosReserva = { lista, recargar, medicos, usuarioId, ajustes, recordatorio: props.recordatorio,
+  const reserva: DatosReserva = { lista, recargar, medicos, usuarioId, ajustes, recordatorio: props.recordatorio, correoClinica: props.correoClinica,
     administradores: props.administradores, gestionaTodos: gestionaReservasDeTodos, puedeAdministrar, alCrearTipo,
     conPrimerosPasos: pendientes !== null }
 

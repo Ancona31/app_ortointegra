@@ -23,12 +23,17 @@
  * queda a 360 px. Hasta el cierre de F estuvieron juntas en el hueco
  * `porConfirmar`, provisionales.
  *
+ * I5 (puntos 14 y 15 de Angel): la fecha de la barra ES el botón del
+ * minicalendario (ya no hay botón «Ir a una fecha» aparte) y la ayuda de
+ * atajos se abre desde el menú del engrane (`MenuEngraneAgenda`); en la ranura
+ * `buscar` queda sólo la lupa.
+ *
  * El desplegable sigue el patrón «Date Picker Dialog» de APG: botón con
  * `aria-haspopup="dialog"` y `aria-expanded`, diálogo modal con el foco en el
  * día activo, Escape cierra y el foco vuelve al botón.
  */
 import { useCallback, useEffect, useRef, useState, type ReactElement, type ReactNode, type RefObject } from 'react'
-import { CalendarDays, Keyboard, Search } from 'lucide-react'
+import { ChevronDown, Search } from 'lucide-react'
 import Portal from '@/components/ui/Portal'
 import MiniMes from '@/components/agenda/MiniMes'
 import BuscadorCitas from '@/components/agenda/BuscadorCitas'
@@ -133,18 +138,28 @@ function Desplegable({ ancla, etiqueta, disparador, enfocar, clase, alCerrar, ch
   )
 }
 
-/** El botón «Ir a una fecha» y su minicalendario (APG: el foco va al día activo al abrir). */
-function SelectorFecha({ rango, alIrAFecha }: { rango: RangoVisibleV2; alIrAFecha: (fecha: string) => void }): ReactElement {
+/**
+ * La fecha de la barra y su minicalendario (APG: el foco va al día activo al
+ * abrir). I5 (punto 14 de Angel): la FECHA ES EL BOTÓN —el texto del periodo
+ * que antes pintaba FullCalendar, con su flecha— y sustituye al botón
+ * «Ir a una fecha», que sale de la barra. El título nativo se oculta por CSS
+ * en cuanto este botón existe (`.agenda-fc:has([data-selector-fecha])`).
+ */
+function SelectorFecha({ rango, titulo, alIrAFecha }: {
+  rango: RangoVisibleV2; titulo: string; alIrAFecha: (fecha: string) => void
+}): ReactElement {
   const [ancla, setAncla] = useState<Caja | null>(null)
   const cerrar = useCallback(() => setAncla(null), [])
   const { desde, hasta } = partirRango(rango)
   const hoy = hoyLocal()
   return (
     <>
-      <button type="button" className="ag-herramienta" data-selector-fecha=""
-        aria-label="Ir a una fecha" title="Ir a una fecha" aria-haspopup="dialog" aria-expanded={ancla !== null}
+      <button type="button" className="ag-fecha-boton" data-selector-fecha=""
+        aria-label={titulo ? `Ir a una fecha: ${titulo}` : 'Ir a una fecha'} title="Ir a una fecha"
+        aria-haspopup="dialog" aria-expanded={ancla !== null}
         onClick={e => setAncla(a => (a ? null : cajaDe(e.currentTarget)))}>
-        <CalendarDays size={16} aria-hidden="true" />
+        <span className="ag-fecha-boton-texto">{titulo}</span>
+        <ChevronDown size={16} aria-hidden="true" />
       </button>
       {ancla && (
         <Desplegable ancla={ancla} etiqueta="Elegir fecha" disparador="[data-selector-fecha]" clase="ag-capa--fecha"
@@ -184,13 +199,15 @@ function BotonBuscar({ apiRef, clase, icono, atajos }: {
   )
 }
 
-/** Ranura `selectorFecha` de la barra de escritorio: «Ir a una fecha» y su minicalendario. */
-export function SelectorFechaV2({ rango, alIrAFecha }: {
+/** Ranura `selectorFecha` de la barra de escritorio: la fecha, que abre el minicalendario. */
+export function SelectorFechaV2({ rango, titulo, alIrAFecha }: {
   rango: RangoVisibleV2
+  /** I5 · El texto del periodo (`view.title`, el mismo que pintaba FullCalendar). */
+  titulo: string
   /** `api.gotoDate(fecha)`: conserva la vista. */
   alIrAFecha: (fecha: string) => void
 }): ReactElement {
-  return <SelectorFecha rango={rango} alIrAFecha={alIrAFecha} />
+  return <SelectorFecha rango={rango} titulo={titulo} alIrAFecha={alIrAFecha} />
 }
 
 export interface PropsBuscarV2 {
@@ -202,23 +219,17 @@ export interface PropsBuscarV2 {
   enBanda?: boolean
 }
 
-/** Ranura `buscar`: la lupa y, en escritorio, el botón de la ayuda de atajos. */
+/**
+ * Ranura `buscar`: la lupa. I5 (punto 15): el botón de la ayuda de atajos salió
+ * de la barra al menú del engrane (`MenuEngraneAgenda`, «Atajos de teclado»),
+ * que sigue abriéndola SIN el atajo (WCAG 2.1.4: es donde se vuelven a encender
+ * cuando alguien los apagó); `?` la sigue abriendo.
+ */
 export function BuscarV2({ apiRef, atajos, enBanda = false }: PropsBuscarV2): ReactElement {
   if (enBanda) {
     return <BotonBuscar apiRef={apiRef} atajos={atajos} icono={18} clase="ag-banda-movil-ctrl ag-banda-movil-ctrl--marco" />
   }
-  return (
-    <div className="ag-herramientas" role="group" aria-label="Herramientas de la agenda">
-      <BotonBuscar apiRef={apiRef} atajos={atajos} icono={16} clase="ag-herramienta" />
-      {/* WCAG 2.1.4: la ayuda tiene que poder abrirse SIN el atajo, porque es
-          donde se vuelven a encender cuando alguien los apagó. */}
-      <button type="button" className="ag-herramienta"
-        aria-label="Atajos de teclado" title={atajos ? 'Atajos de teclado (?)' : 'Atajos de teclado'}
-        aria-keyshortcuts={atajos ? teclasDeAccion('ayuda') : undefined} onClick={() => apiRef.current?.abrirAyuda()}>
-        <Keyboard size={16} aria-hidden="true" />
-      </button>
-    </div>
-  )
+  return <BotonBuscar apiRef={apiRef} atajos={atajos} icono={16} clase="ag-herramienta" />
 }
 
 /** El minicalendario del hueco inferior del panel de Día (`PanelDia`, ranura `miniMes`). */

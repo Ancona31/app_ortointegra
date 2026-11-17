@@ -55,6 +55,11 @@ interface Props {
   /** F3: con los atajos de una tecla activos, `aria-keyshortcuts` en ‹ › Hoy
       y en las vistas. Lo decide quien gestiona los atajos; sin él, nada. */
   atajos?: boolean
+  /** I5 (puntos 13 y 15) · La barra de la v2: el menú del engrane. Con él, salen
+      de la fila el conteo, «Compactar», «Densidad» y el botón de configuración
+      (todo eso vive en el menú) y la fila queda: fecha · vistas · médico ·
+      buscar · campana · engrane · Agendar. Sin él, la barra de siempre. */
+  engrane?: ReactNode
 }
 
 /* La acción de atajo de cada segmento de vista (por su tipo ancho). */
@@ -71,8 +76,9 @@ export function CabeceraEscritorio({
   resumenConteo, currentView, isMobile, onVista, compactar, onCompactar, isSingleDoctor,
   filtroEfectivo, mesSinTodos, medicos, onFiltroMedico, canEditHorario, onHorario, onAgendar,
   onIntencionAgendar, porConfirmar, densidadCompacta, onDensidad, selectorFecha, buscar, atajos = false,
-  engraneConfiguracion = false,
+  engraneConfiguracion = false, engrane,
 }: Props) {
+  const barraV2 = engrane !== undefined
   const rotuloEngrane = engraneConfiguracion ? 'Configuración de la agenda' : 'Configurar horario de consulta'
   /* F3 · `aria-keyshortcuts` en los tres botones de la barra nativa. Va sobre el
      DOM porque FullCalendar no deja poner atributos en sus botones; se repite al
@@ -108,7 +114,7 @@ export function CabeceraEscritorio({
       {/* F3 · La ranura del minicalendario va la PRIMERA: la fecha de
           FullCalendar queda justo a su izquierda, al final de la barra nativa. */}
       {selectorFecha}
-      <p className="ag-controles-conteo" title={resumenConteo || undefined}>{resumenConteo}</p>
+      {!barraV2 && <p className="ag-controles-conteo" title={resumenConteo || undefined}>{resumenConteo}</p>}
       {/* Segmented control de vistas. Sincronizado con la vista real vía
           `datesSet`.
 
@@ -186,7 +192,7 @@ export function CabeceraEscritorio({
           control existe también allí — lo pinta la banda azul, no esta fila.
           Lo que decide hoy es la VISTA y sólo la vista: rejilla (los dos
           ejes) o Mes (sólo columnas). Ver `vistaAdmiteCompactar`. */}
-      {!isMobile && vistaAdmiteCompactar(currentView) && (
+      {!barraV2 && !isMobile && vistaAdmiteCompactar(currentView) && (
         <button
           type="button"
           onClick={onCompactar}
@@ -242,7 +248,7 @@ export function CabeceraEscritorio({
           hora) para ver la jornada entera sin desplazar. Sólo en la rejilla de
           horas: en Mes no hay franjas. Misma pinta de interruptor que
           «Compactar» (encendido = marco). Preferencia del navegador. */}
-      {!isMobile && currentView.startsWith('timeGrid') && (
+      {!barraV2 && !isMobile && currentView.startsWith('timeGrid') && (
         <button type="button" onClick={onDensidad} aria-pressed={densidadCompacta}
           aria-label="Densidad compacta" title="Densidad compacta: 48 px por hora"
           className="flex flex-none items-center gap-2 h-9 px-3 rounded-[var(--ag-r-btn)] text-sm font-medium"
@@ -316,7 +322,7 @@ export function CabeceraEscritorio({
           />
         </div>
       )}
-      {canEditHorario && (
+      {!barraV2 && canEditHorario && (
         <button
           onClick={onHorario}
           className="flex flex-none items-center gap-2 h-9 px-3 rounded-[var(--ag-r-btn)] text-sm font-medium bg-[var(--ag-surface)] border border-[var(--ag-border-card)] text-[var(--ag-text)] hover:bg-[var(--ag-bg-app)]"
@@ -379,6 +385,7 @@ export function CabeceraEscritorio({
           ocupa menos. El `title` dice el resto. */}
       {buscar}
       {porConfirmar}
+      {engrane}
       <button
         onClick={onAgendar}
         /* A2.6: red de seguridad de la precarga en ocioso — si el puntero

@@ -68,28 +68,31 @@ interface Props {
   /** La clase de su celda en la rejilla. */
   claseCelda?: string
   /** Dónde dejar el mensaje (enviado o el motivo de un error) para no dejar nada suelto en la rejilla. */
-  alMensaje?: (m: { texto: string; alerta: boolean } | null) => void
-  /** H4 · Pequeño, con «Correo» visible (la fila de «Por confirmar»). */
+  alMensaje?: (m: { texto: string; alerta: boolean; breve?: string } | null) => void
+  /** H4 · Pequeño, con «Correo» visible. */
   compacto?: boolean
+  /** I5 · punto 17: un cuadrado con el sobre (la fila de «Por confirmar»); el nombre accesible es el completo. */
+  soloIcono?: boolean
 }
 
-export function BotonCorreoCita({ citaId, confirmada = false, enCapa = false, claseCelda, alMensaje, compacto = false }: Props): ReactElement {
+export function BotonCorreoCita({ citaId, confirmada = false, enCapa = false, claseCelda, alMensaje, compacto = false, soloIcono = false }: Props): ReactElement {
   const [estado, setEstado] = useState<Estado>({ tipo: 'inicial' })
   const nombre = confirmada ? 'Enviar recordatorio por correo' : 'Enviar confirmación por correo'
   const texto = estado.tipo === 'error' ? estado.motivo : estado.tipo === 'enviado' ? `Enviado por correo ${horaCorta(estado.en)}` : null
   const alerta = estado.tipo === 'error'
-  useEffect(() => { alMensaje?.(texto === null ? null : { texto, alerta }) }, [texto, alerta, alMensaje])
-  const clase = enCapa
+  const breve = estado.tipo === 'enviado' ? `Correo enviado ${horaCorta(estado.en)}` : undefined
+  useEffect(() => { alMensaje?.(texto === null ? null : { texto, alerta, breve }) }, [texto, alerta, breve, alMensaje])
+  const clase = soloIcono ? 'ag-boton-icono' : enCapa
     ? 'ag-capa-boton w-full'
     : `${compacto ? 'px-2.5 py-1.5 text-[12px]' : 'w-full px-3 py-2.5 text-sm'} flex items-center justify-center gap-1.5 rounded-xl font-bold border transition-colors hover:bg-[var(--ag-btn-ghost-hover)] disabled:opacity-60`
-  const estilo = enCapa ? undefined : { color: 'var(--ag-text)', borderColor: 'var(--ag-input-border)' }
+  const estilo = enCapa || soloIcono ? undefined : { color: 'var(--ag-text)', borderColor: 'var(--ag-input-border)' }
   return (
     <div data-correo-cita={citaId} className={claseCelda ? `ag-lectura-celda ${claseCelda}` : undefined}>
-      <button type="button" aria-label={nombre} className={clase} style={estilo}
-        disabled={estado.tipo === 'enviando' || estado.tipo === 'enviado'}
+      <button type="button" aria-label={nombre} className={clase} style={estilo} title={soloIcono ? nombre : undefined}
+        disabled={estado.tipo === 'enviando' || estado.tipo === 'enviado'} aria-busy={soloIcono && estado.tipo === 'enviando' ? true : undefined}
         onClick={() => { setEstado({ tipo: 'enviando' }); void enviar(citaId).then(setEstado) }}>
-        <Mail size={enCapa ? 18 : 15} aria-hidden="true" className="flex-none" />
-        {estado.tipo === 'enviando' ? 'Enviando…' : enCapa ? 'Por correo' : compacto ? 'Correo' : nombre}
+        <Mail size={enCapa || soloIcono ? 18 : 15} aria-hidden="true" className="flex-none" />
+        {soloIcono ? null : estado.tipo === 'enviando' ? 'Enviando…' : enCapa ? 'Por correo' : compacto ? 'Correo' : nombre}
       </button>
       {!alMensaje && texto && (
         <p role={alerta ? 'alert' : undefined} className="text-[12px] mt-1 leading-relaxed" style={{ color: 'var(--ag-muted)' }}>{texto}</p>

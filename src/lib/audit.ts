@@ -239,6 +239,11 @@ export type AuditAccion =
      reservó). El disparador de citas deja además su `cita_editada`. Sin
      migración (`accion` es `text` sin CHECK). */
   | 'cita_ligada'
+  /* I5 de la agenda (punto 20): el correo a la clínica por una reserva nueva
+     por enlace, con la opción encendida. `registro_id` es la cita;
+     `descripcion` lleva la clínica y cuántos destinatarios y envíos, nunca el
+     correo ni el nombre. Sin migración (`accion` es `text` sin CHECK). */
+  | 'correo_reserva_clinica'
 
 interface AuditParams {
   userId?: string | null

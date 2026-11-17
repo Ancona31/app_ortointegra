@@ -19,9 +19,10 @@ const nada = (): void => undefined
 const RANGO = '2026-11-09/2026-11-16'
 
 describe('SelectorFechaV2 (ranura `selectorFecha`)', () => {
-  const html = renderToStaticMarkup(<SelectorFechaV2 rango={RANGO} alIrAFecha={nada} />)
-  it('el botón «Ir a una fecha» anuncia su diálogo y empieza cerrado', () => {
-    expect(html).toContain('aria-label="Ir a una fecha"')
+  const html = renderToStaticMarkup(<SelectorFechaV2 rango={RANGO} titulo="9 – 15 nov 2026" alIrAFecha={nada} />)
+  it('I5 (punto 14): la fecha ES el botón; anuncia su diálogo y empieza cerrado', () => {
+    expect(html).toContain('aria-label="Ir a una fecha: 9 – 15 nov 2026"')
+    expect(html).toContain('>9 – 15 nov 2026</span>')
     expect(html).toContain('aria-haspopup="dialog"')
     expect(html).toContain('aria-expanded="false"')
   })
@@ -37,17 +38,15 @@ describe('BuscarV2 (ranura `buscar`)', () => {
     expect(html).toContain('aria-keyshortcuts="/"')
     expect(html).toContain('data-buscar-citas=""')
   })
-  it('F3.5: la ayuda tiene su botón (para reencender los atajos sin atajo) con `?`', () => {
-    expect(html).toContain('aria-label="Atajos de teclado"')
-    expect(html).toContain('aria-keyshortcuts="?"')
+  it('I5 (punto 15): la ayuda de atajos salió de la barra (vive en el menú del engrane)', () => {
+    expect(html).not.toContain('aria-label="Atajos de teclado"')
   })
   it('cerrado no pinta ningún diálogo', () => {
     expect(html).not.toContain('role="dialog"')
   })
-  it('con los atajos apagados no anuncia teclas, pero la ayuda sigue ahí', () => {
+  it('con los atajos apagados no anuncia teclas', () => {
     const sin = renderToStaticMarkup(<BuscarV2 apiRef={{ current: null }} atajos={false} />)
     expect(sin).not.toContain('aria-keyshortcuts')
-    expect(sin).toContain('aria-label="Atajos de teclado"')
   })
   it('en la banda del teléfono: sólo la lupa, con la pinta de la banda', () => {
     const banda = renderToStaticMarkup(<BuscarV2 apiRef={{ current: null }} atajos enBanda />)
