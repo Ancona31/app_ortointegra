@@ -88,6 +88,12 @@ export type Appointment = {
   /* E7 · La marca del WhatsApp manual (columna del baseline, vacía hasta E7):
      cuándo se ABRIÓ el mensaje desde el botón de la cita. Llega por el `*`. */
   whatsapp_sent_at?: string | null
+  /* Tanda I (punto 12) · Una cancelada sustituida por otra cita («Reagendar
+     cita» o «Reasignar»): cuándo y por cuál (migración 20261121142000).
+     OPCIONALES por lo mismo que `reserva_*`: llegan por el `*`. La agenda no
+     pinta las cerradas (`consultaCitas`, tiempo real). */
+  cerrada_en?: string | null
+  sustituida_por?: string | null
   /* `email` viaja desde `APPOINTMENT_SELECT` para un solo consumidor: el botón
      de invitación. Que esté aquí es lo que evita una petición por cita abierta
      sólo para saber si la ficha tiene correo.
@@ -127,4 +133,7 @@ export type DatosGuardado = Partial<Appointment> & {
   /** B7: los ids de las citas con las que el usuario ACEPTÓ empalmarse. Sólo
    *  viaja si hay alguno, y el servidor lo ignora con el interruptor apagado. */
   empalmes_aceptados?: string[]
+  /** Tanda I (punto 12): en un ALTA, la cita CANCELADA que ésta sustituye («Reagendar cita» o
+   *  «Reasignar»). El servidor la cierra al crear la nueva; sólo con la v2. */
+  sustituye_a?: string
 }

@@ -117,6 +117,12 @@ export const EditarConsultorioSchema = z.object({
    * `src/lib/agenda/disponibilidad.ts`.
    */
   horario_propio: z.boolean().optional(),
+  /**
+   * Tanda I (punto 3): «Confirmar horario» — su médico revisó el horario de
+   * este consultorio sin cambiarlo. Sólo con la v2 (lo decide el handler, que
+   * pone `horario_revisado_en`); guardar el horario también lo marca.
+   */
+  horario_revisado: z.literal(true).optional(),
 })
 
 export type EditarConsultorioInput = z.infer<typeof EditarConsultorioSchema>

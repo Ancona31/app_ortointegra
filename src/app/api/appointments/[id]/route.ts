@@ -14,7 +14,7 @@ import { comprobarTopeDuracion } from '@/lib/agenda/topeDuracion'
 import { agendaV2Encendida } from '@/lib/agenda/ajustesAgenda'
 import { comprobarEmpalmes, type VeredictoEmpalme } from '@/lib/agenda/empalmesServidor'
 import { ESTADOS_SIN_EMPALME } from '@/lib/agenda/empalmesCita'
-import { pideComprobarNota, vetoPorEstado, vetoPorNotaLigada } from '@/lib/agenda/estadoCita'
+import { HINT_ATENDIDA_CON_NOTA, pideComprobarNota, vetoPorEstado, vetoPorNotaLigada } from '@/lib/agenda/estadoCita'
 import { tieneNotaLigada } from '@/lib/agenda/notaLigadaServidor'
 import { comprobarTipoDelPut, leerTipoCitaId, CUERPO_TIPO_INVALIDO } from '@/lib/agenda/tipoCitaServidor'
 import { auditarLigado, estaPorLigar, pacienteParaGoogle, pacienteVisible, vetoDeConversion } from '@/lib/agenda/porLigarServidor'
@@ -377,14 +377,17 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
        el formulario. Ver `vetoPorEstado`. Apagada, como siempre. */
     /* G3 · Decisión de Angel: una atendida CON NOTA CLÍNICA ligada no cambia de
        estado (con o sin v2: la nota es expediente). Sin nota, sí (corregir un
-       error). Sólo se pregunta a la base cuando el cuerpo cambia el estado de
-       una atendida. Ver `vetoPorNotaLigada` y `notaLigadaServidor.ts`. */
-    if (pideComprobarNota(existing, { status })) {
-      const vetoNota = vetoPorNotaLigada(existing, { status }, await tieneNotaLigada(profile.clinica_id, id))
+       error). Tanda I (punto 1): tampoco se mueve de fecha u hora, también con
+       la v2 apagada (la base lo cierra igual, 20261121140000). Sólo se pregunta
+       a la base cuando el cuerpo cambia el estado o mueve una atendida. Ver
+       `vetoPorNotaLigada` y `notaLigadaServidor.ts`. */
+    const cuerpoVeto = { status, start_time, end_time, all_day }
+    if (pideComprobarNota(existing, cuerpoVeto)) {
+      const vetoNota = vetoPorNotaLigada(existing, cuerpoVeto, await tieneNotaLigada(profile.clinica_id, id))
       if (vetoNota) return NextResponse.json({ error: 'nota_ligada', message: vetoNota }, { status: 409 })
     }
     if (v2) {
-      const vetoEstado = vetoPorEstado(existing, { status, start_time, end_time, all_day })
+      const vetoEstado = vetoPorEstado(existing, cuerpoVeto)
       if (vetoEstado) return NextResponse.json({ error: 'estado_no_admite', message: vetoEstado }, { status: 409 })
     }
 
@@ -844,6 +847,16 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
           message: 'La base rechazó estos datos por incoherentes. Si es un evento de todo el día, revisa las fechas y el consultorio; si no, vuelve a intentarlo.',
         },
         { status: 400 }
+      )
+    }
+    /* Tanda I (punto 1) · 42501 de `cita_proteger_atendida` (20261121140000):
+       sólo llega en una carrera (la nota se escribió entre el veto de arriba y
+       este UPDATE). El mismo 409 legible que el veto; se reconoce por su HINT,
+       que es nuestro, para no disfrazar otro 42501 (la RLS) de nota ligada. */
+    if (error?.code === '42501' && error.hint === HINT_ATENDIDA_CON_NOTA) {
+      return NextResponse.json(
+        { error: 'nota_ligada', message: 'Esta cita ya tiene una nota clínica: sigue como atendida y no se puede cambiar de estado, de fecha ni de hora.' },
+        { status: 409 }
       )
     }
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })

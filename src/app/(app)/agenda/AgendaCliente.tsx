@@ -76,6 +76,7 @@ import {
 } from '@/lib/agenda/horarioRejilla'
 import { useAjusteTurno } from '@/app/(app)/agenda/useAjusteTurno'
 import type { TipoCita } from '@/lib/agenda/tiposCita'
+import type { CitaPorAsistir } from '@/lib/agenda/asistenciaServidor'
 import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
 import { rangosDeLaVista, partirFechaHora } from '@/lib/agenda/fechasAgenda'
 import { frasearConteo, frasearConteoBreve } from '@/lib/agenda/conteoAgenda'
@@ -133,6 +134,10 @@ const BuscarV2 = dynamic(() => import('@/components/agenda/HerramientasV2').then
   ssr: false, loading: () => null,
 })
 const MiniMesPanelV2 = dynamic(() => import('@/components/agenda/HerramientasV2').then(m => m.MiniMesPanelV2), {
+  ssr: false, loading: () => null,
+})
+/* Tanda I (punto 11) · La pregunta de asistencia: mismo módulo, mismo chunk. */
+const PreguntaAsistenciaV2 = dynamic(() => import('@/components/agenda/HerramientasV2').then(m => m.PreguntaAsistenciaV2), {
   ssr: false, loading: () => null,
 })
 
@@ -225,12 +230,14 @@ export interface AgendaClienteProps {
   consultoriosRejilla?: Promise<ConsultorioRejilla[] | null>
   /** Con la v2, los tipos de cita del ajuste al turno (G2), leídos en el servidor. */
   tiposAjuste?: Promise<TipoCita[] | null>
+  /** Tanda I (punto 11) · Con la v2, las citas por las que preguntar si el paciente asistió. */
+  asistencia?: Promise<CitaPorAsistir[] | null>
 }
 
 /** Sin consultorios: la misma constante siempre, para que las memos no cambien de identidad. */
 const SIN_CONSULTORIOS: readonly ConsultorioRejilla[] = []
 
-export default function AgendaCliente({ semillaCitas, interruptor, consultoriosRejilla, tiposAjuste }: AgendaClienteProps) {
+export default function AgendaCliente({ semillaCitas, interruptor, consultoriosRejilla, tiposAjuste, asistencia }: AgendaClienteProps) {
   const calendarRef = useRef<InstanceType<typeof FullCalendar>>(null)
   /* ⚠️ `agendaV2` ES `false` HASTA QUE LA PROMESA DEL SERVIDOR DIGA `true`:
      falla cerrado, como `agendaV2Encendida`. Se lee con `.then()` y no con
@@ -2008,6 +2015,11 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
           }}
           onIntencionAgendar={precargarModalesAgenda}
         />
+      )}
+
+      {/* ── Tanda I (punto 11) · ¿Asistió? Una ventana al abrir, sólo con v2 ── */}
+      {agendaV2 && montarV2 && asistencia && (
+        <PreguntaAsistenciaV2 pendientes={asistencia} cambiarEstado={guardado.cambiarEstadoCita} zonaVisor={navegadorTZ} />
       )}
 
       {/* ── F3 · Interacciones v2 (chunk diferido, sólo con el interruptor) ── */}

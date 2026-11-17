@@ -239,6 +239,12 @@ export type AuditAccion =
      reservó). El disparador de citas deja además su `cita_editada`. Sin
      migración (`accion` es `text` sin CHECK). */
   | 'cita_ligada'
+  /* Tanda I (punto 12): una cita CANCELADA se sustituyó por otra («Reagendar
+     cita» o «Reasignar» de su tarjeta) y quedó cerrada. `registro_id` es la
+     cancelada; `descripcion`, sólo el id de la sustituta. A nombre de quien
+     pulsó (el disparador de citas deja su `cita_editada` como `system`, porque
+     el cierre lo escribe el servidor). Sin migración (`accion` es `text`). */
+  | 'cita_sustituida'
 
 interface AuditParams {
   userId?: string | null

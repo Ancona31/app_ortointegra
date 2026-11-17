@@ -18,10 +18,12 @@ describe('accionesDeTarjeta (G3: por estado)', () => {
     expect(accionesDeTarjeta({ ...CITA, status: 'attended' }, true, true, true)).toEqual(['ver-expediente'])
     expect(accionesDeTarjeta({ ...CITA, status: 'attended' }, true, true, false)).toEqual([])
   })
-  it('cancelada o no asistió: sólo «Reagendar cita»', () => {
-    for (const status of ['cancelled', 'no_show'] as const) {
-      expect(accionesDeTarjeta({ ...CITA, status }, true)).toEqual(['reagendar-cita'])
-    }
+  it('cancelada: «Reagendar cita» y «Reasignar» (tanda I, punto 12); no asistió: sólo «Reagendar cita»', () => {
+    expect(accionesDeTarjeta({ ...CITA, status: 'cancelled' }, true)).toEqual(['reagendar-cita', 'reasignar'])
+    expect(accionesDeTarjeta({ ...CITA, status: 'no_show' }, true)).toEqual(['reagendar-cita'])
+  })
+  it('una cancelada POR LIGAR no ofrece «Reasignar»: conserva lo de antes', () => {
+    expect(accionesDeTarjeta({ paciente_id: null, reserva_canal: 'fijo', status: 'cancelled' }, true)).not.toContain('reasignar')
   })
   it('una cita con paciente NUNCA se puede eliminar desde la tarjeta', () => {
     expect(accionesDeTarjeta({ ...CITA, status: 'scheduled' }, true)).not.toContain('eliminar')
@@ -52,7 +54,7 @@ describe('disposicionDeTarjeta (G3: la rejilla)', () => {
     expect(disposicionDeTarjeta({ ...CITA, status: 'attended' }, true, { conWhatsApp: true, puedeVerExpediente: true }))
       .toEqual({ principal: 'ver-expediente', secundarias: [], peligro: null })
     expect(disposicionDeTarjeta({ ...CITA, status: 'cancelled' }, true, { conWhatsApp: true }))
-      .toEqual({ principal: 'reagendar-cita', secundarias: [], peligro: null })
+      .toEqual({ principal: 'reagendar-cita', secundarias: ['reasignar'], peligro: null })
   })
 })
 
@@ -77,16 +79,24 @@ describe('vetoPorEstado (G3, 17.3: el servidor)', () => {
   })
 })
 
-describe('vetoPorNotaLigada (G3, decisión de Angel)', () => {
-  const at = { status: 'attended' }
+describe('vetoPorNotaLigada (G3, decisión de Angel; tanda I, punto 1)', () => {
+  const at = { status: 'attended', start_time: '2026-11-18T15:00:00.000Z', end_time: '2026-11-18T16:00:00.000Z', all_day: false }
   it('con nota, una atendida no pasa a ningún otro estado', () => {
-    for (const status of ['scheduled', 'confirmed', 'cancelled', 'no_show']) expect(vetoPorNotaLigada(at, { status }, true)).toMatch(/nota clínica/)
+    for (const status of ['scheduled', 'confirmed', 'cancelled', 'no_show']) expect(vetoPorNotaLigada(at, { status }, true)).toMatch(/cambiar de estado/)
   })
-  it('sin nota, sí (corregir un error); y sin cambio de estado no se pregunta', () => {
+  it('tanda I · con nota, tampoco se mueve (inicio, fin o todo el día); la misma hora escrita de otra forma, sí', () => {
+    expect(vetoPorNotaLigada(at, { start_time: '2026-11-19T15:00:00.000Z', end_time: '2026-11-19T16:00:00.000Z' }, true)).toMatch(/fecha ni de hora/)
+    expect(vetoPorNotaLigada(at, { end_time: '2026-11-18T16:30:00.000Z' }, true)).toMatch(/fecha ni de hora/)
+    expect(vetoPorNotaLigada(at, { all_day: true }, true)).toMatch(/fecha ni de hora/)
+    expect(pideComprobarNota(at, { start_time: '2026-11-18T09:00:00-06:00', end_time: at.end_time, all_day: false, status: 'attended' })).toBe(false)
+    expect(vetoPorNotaLigada(at, { start_time: '2026-11-19T15:00:00.000Z' }, false)).toBeNull()
+  })
+  it('sin nota, sí (corregir un error); y sin cambio de estado ni de hora no se pregunta', () => {
     expect(vetoPorNotaLigada(at, { status: 'scheduled' }, false)).toBeNull()
     expect(pideComprobarNota(at, { status: 'attended' })).toBe(false)
     expect(pideComprobarNota(at, {})).toBe(false)
-    expect(pideComprobarNota({ status: 'scheduled' }, { status: 'cancelled' })).toBe(false)
+    expect(pideComprobarNota({ ...at, status: 'scheduled' }, { status: 'cancelled' })).toBe(false)
+    expect(pideComprobarNota({ ...at, status: 'scheduled' }, { start_time: '2026-11-19T15:00:00.000Z' })).toBe(false)
     expect(pideComprobarNota(at, { status: 'scheduled' })).toBe(true)
   })
 })

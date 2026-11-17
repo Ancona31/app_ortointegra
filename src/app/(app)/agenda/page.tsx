@@ -8,6 +8,7 @@ import { agendaV2Encendida } from '@/lib/agenda/ajustesAgenda'
 import { leerConsultoriosAgenda } from '@/lib/agenda/consultoriosAgendaServidor'
 import type { ConsultorioRejilla } from '@/lib/agenda/horarioRejilla'
 import { COLUMNAS_TIPO_CITA, type TipoCita } from '@/lib/agenda/tiposCita'
+import { leerAsistenciaPendiente, type CitaPorAsistir } from '@/lib/agenda/asistenciaServidor'
 import { hoyEnTZ, TZ_CLINICA } from '@/lib/dates'
 import { logger } from '@/lib/logger'
 
@@ -130,6 +131,29 @@ async function leerTiposAjuste(interruptor: Promise<boolean>): Promise<TipoCita[
 }
 
 /**
+ * Tanda I (punto 11) · Las citas por las que preguntar si el paciente asistió
+ * (`asistenciaServidor.ts`): sólo con el interruptor encendido, y viajan con la
+ * página como los tipos del ajuste (presupuesto de A: ni una petición más al
+ * abrir). Cualquier fallo es `null` (no se pregunta). Sólo rechaza con los
+ * errores internos de Next.
+ */
+async function leerAsistencia(interruptor: Promise<boolean>): Promise<CitaPorAsistir[] | null> {
+  try {
+    if (!(await interruptor)) return null
+    const { supabase, profile } = await sesionServidor()
+    const perfil = analizarPerfilSesion(profile)
+    if (!perfil?.clinica_id) return null
+    return await leerAsistenciaPendiente(supabase, {
+      id: perfil.id, role: perfil.role, clinica_id: perfil.clinica_id, es_admin_de_clinica: perfil.es_admin_de_clinica === true,
+    })
+  } catch (err: unknown) {
+    unstable_rethrow(err)
+    logger.warn('agenda', `asistencia sin leer: ${err instanceof Error ? err.message : 'error'}`)
+    return null
+  }
+}
+
+/**
  * Server component. NO ESPERA a la semilla: la promesa viaja a `AgendaCliente`
  * (`node_modules/next/dist/docs/01-app/01-getting-started/06-fetching-data.md`,
  * «Streaming data with the `use` API»), que no la lee con `use()` —no
@@ -150,7 +174,7 @@ export default function AgendaPage() {
   return (
     <AgendaCliente
       semillaCitas={sembrarCitas()} interruptor={interruptor} consultoriosRejilla={leerConsultoriosRejilla(interruptor)}
-      tiposAjuste={leerTiposAjuste(interruptor)}
+      tiposAjuste={leerTiposAjuste(interruptor)} asistencia={leerAsistencia(interruptor)}
     />
   )
 }

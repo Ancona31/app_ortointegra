@@ -126,7 +126,9 @@ export interface PropsInteraccionesV2 {
 }
 
 type Capa =
-  | { id: number; tipo: 'burbuja'; gesto: GestoAlta; horas: { inicio: string; fin: string } }
+  /* Tanda I (punto 12) · `sustituyeA`: la burbuja de «Reasignar», en el hueco
+     de una cancelada; al guardar, el servidor la cierra (`sustituye_a`). */
+  | { id: number; tipo: 'burbuja'; gesto: GestoAlta; horas: { inicio: string; fin: string }; sustituyeA?: string }
   /* `cita` es la fila tal como la tiene el evento (la que recibe el modal, como
      hoy); `vista`, la misma con las puntas VIVAS del evento, que es lo que se
      lee en la tarjeta justo después de un arrastre. */
@@ -207,8 +209,11 @@ function CapaBurbuja({ capa, medicos, p, cerrar }: PropsCapaBurbuja): ReactEleme
       fecha={capa.gesto.fecha} horaInicio={capa.horas.inicio} horaFin={capa.horas.fin}
       ancla={capa.gesto.ancla} punto={capa.gesto.punto}
       medicos={medicos} filtroMedico={p.filtroMedico} consultorioActivo={consultorioActivo}
-      alGuardar={(datos, horas) => guardarAltaRapida(datos, capa.horas, horas, deps)}
-      alMasOpciones={(v) => { cerrar(capa.id); p.setModal(aperturaDesdeBurbuja(v)) }}
+      alGuardar={(datos, horas) => guardarAltaRapida(capa.sustituyeA && datos.paciente_id ? { ...datos, sustituye_a: capa.sustituyeA } : datos, capa.horas, horas, deps)}
+      alMasOpciones={(v) => {
+        cerrar(capa.id)
+        p.setModal({ ...aperturaDesdeBurbuja(v), ...(capa.sustituyeA ? { sustituyeA: capa.sustituyeA } : {}) })
+      }}
       /* T1 · Tras agendar. Las dos cierran la burbuja SIN salida animada (lo
          que abren la tapa): la invitación no se ofrece dos veces seguidas
          (`ModalInvitacionCita` explica por qué) y el modal es el de editar. */
@@ -236,6 +241,31 @@ export function altaParaReagendar(cita: Appointment, ahora: number): AperturaAlt
     ...(cita.pacientes ? { paciente: cita.pacientes } : {}),
     ...(cita.medico_id ? { medicoId: cita.medico_id } : {}),
     ...(cita.consultorio_id ? { consultorioId: cita.consultorio_id } : {}),
+    /* Tanda I (punto 12): de una CANCELADA con paciente, al guardar se cierra
+       (deja de pintarse; se conserva). La no asistida se queda como está. */
+    ...(cita.status === 'cancelled' && cita.paciente_id ? { sustituyeA: cita.id } : {}),
+  }
+}
+
+/**
+ * Tanda I (punto 12) · «Reasignar»: la burbuja de alta en ESE horario, sin
+ * paciente, como el clic sobre el hueco. Sin ancla (tarjeta centrada u hoja),
+ * en el centro de la ventana. Al guardar, el servidor cierra la cancelada.
+ */
+export function burbujaParaReasignar(
+  cita: Pick<Appointment, 'id' | 'start_time' | 'end_time'>, ancla: Caja | null, punto?: Punto,
+): { gesto: GestoAlta; horas: { inicio: string; fin: string }; sustituyeA: string } {
+  const inicio = partirFechaHora(cita.start_time)
+  const fin = partirFechaHora(cita.end_time)
+  const centro: Caja = typeof window === 'undefined' ? { left: 0, top: 0, width: 0, height: 0 }
+    : { left: window.innerWidth / 2, top: window.innerHeight / 3, width: 0, height: 0 }
+  return {
+    gesto: {
+      fecha: inicio.fecha, hora: inicio.hora, inicio: new Date(cita.start_time), fin: new Date(cita.end_time),
+      desdeHueco: false, ancla: ancla ?? centro, ...(punto ? { punto } : {}),
+    },
+    horas: { inicio: inicio.hora, fin: fin.hora },
+    sustituyeA: cita.id,
   }
 }
 
@@ -247,6 +277,8 @@ interface ContextoAccion {
   navegar: (url: string) => void
   /** T3 · Abre el diálogo de convertir en cita. */
   convertir: () => void
+  /** Tanda I (punto 12) · Abre la burbuja de «Reasignar» en el hueco de la cancelada. */
+  reasignar: () => void
 }
 
 /**
@@ -269,6 +301,8 @@ function ejecutarAccion(a: AccionTarjeta, cita: Appointment, x: ContextoAccion):
          NUEVA con el mismo paciente, médico y consultorio; la original se queda
          como estaba. Con la puerta de suscripción de «Agendar». */
       case 'reagendar-cita': if (x.p.puedeAgendar()) x.p.setModal(altaParaReagendar(cita, Date.now())); return
+      /* Tanda I (punto 12) · Cancelada: el hueco a otro paciente, con la misma puerta. */
+      case 'reasignar': if (x.p.puedeAgendar()) x.reasignar(); return
       /* G3 · Atendida: sólo ver el expediente (la atención concluyó). */
       case 'ver-expediente':
         if (cita.pacientes) x.navegar(`/expediente/${cita.pacientes.id}`)
@@ -303,9 +337,11 @@ interface PropsCapaTarjeta {
   fijar: () => void
   /** T3 · «Convertir en cita»: la capa del diálogo (tras la puerta de suscripción). */
   abrirConvertir: (cita: Appointment) => void
+  /** Tanda I (punto 12) · «Reasignar»: la burbuja en el hueco de la cancelada. */
+  abrirReasignar: (cita: Appointment, ancla: Caja | null, punto?: Punto) => void
 }
 
-function CapaTarjeta({ capa, p, cerrar, vigia, fijar, abrirConvertir }: PropsCapaTarjeta): ReactElement {
+function CapaTarjeta({ capa, p, cerrar, vigia, fijar, abrirConvertir, abrirReasignar }: PropsCapaTarjeta): ReactElement {
   const { consultorios } = useConsultorios()
   const { cambiarActivo } = useConsultorioActivo()
   const router = useRouter()
@@ -320,7 +356,10 @@ function CapaTarjeta({ capa, p, cerrar, vigia, fijar, abrirConvertir }: PropsCap
      aviso) la tapa, y el foco vuelve a la cita antes de que lo tome lo nuevo. */
   const alAccion = (a: AccionTarjeta): void => {
     cerrar(capa.id)
-    ejecutarAccion(a, cita, { p, consultorio, cambiarActivo, navegar: url => router.push(url), convertir: () => abrirConvertir(cita) })
+    ejecutarAccion(a, cita, {
+      p, consultorio, cambiarActivo, navegar: url => router.push(url), convertir: () => abrirConvertir(cita),
+      reasignar: () => abrirReasignar(cita, capa.ancla, capa.punto),
+    })
   }
   return (
     <TarjetaLectura
@@ -546,6 +585,9 @@ export default function InteraccionesV2(p: PropsInteraccionesV2): ReactElement |
   const abrirConvertir = useCallback((cita: Appointment) => {
     if (p.puedeAgendar()) abrir({ tipo: 'convertir', cita })
   }, [abrir, p])
+  const abrirReasignar = useCallback((cita: Appointment, ancla: Caja | null, punto?: Punto) => {
+    abrir({ tipo: 'burbuja', ...burbujaParaReasignar(cita, ancla, punto) })
+  }, [abrir])
   const atajos = useAtajosV2(p, capa !== null && !esAlPasar(capa), abrirAyuda)
   const { vigia, fijar } = useAlPasarV2(p, capaRef, cerrar, abrirTarjeta)
   /* La tarjeta al pasar dejó de serlo (se fijó, se cerró o la tapó otra capa): el vigía la suelta. */
@@ -578,7 +620,10 @@ export default function InteraccionesV2(p: PropsInteraccionesV2): ReactElement |
 
   if (capa?.tipo === 'burbuja') return <CapaBurbuja key={capa.id} capa={capa} medicos={medicosBurbuja} p={p} cerrar={cerrar} />
   if (capa?.tipo === 'tarjeta') {
-    return <CapaTarjeta key={capa.id} capa={capa} p={p} cerrar={cerrar} vigia={vigia} fijar={fijar} abrirConvertir={abrirConvertir} />
+    return (
+      <CapaTarjeta key={capa.id} capa={capa} p={p} cerrar={cerrar} vigia={vigia} fijar={fijar}
+        abrirConvertir={abrirConvertir} abrirReasignar={abrirReasignar} />
+    )
   }
   if (capa?.tipo === 'convertir') return <CapaConvertir key={capa.id} capa={capa} p={p} cerrar={cerrar} />
   if (capa?.tipo === 'ayuda') {

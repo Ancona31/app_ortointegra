@@ -57,4 +57,21 @@ describe('pasosDe', () => {
     expect(pasosDe(l, 'yo', [{ ...virgen, medico_id: 'otro' }])?.[0]?.hecho).toBe(true)
     expect(pasosDe(l, 'yo', null)?.[0]?.hecho).toBe(true)
   })
+  it('tanda I (punto 3) · un horario que nadie confirmó (`horario_revisado_en` null) queda «por revisar», no hecho', () => {
+    const cerrado = { activo: false, inicio: '09:00', fin: '14:00' }
+    const abierto = { lunes: { activo: true, inicio: '08:00', fin: '14:00' }, martes: cerrado, miercoles: cerrado, jueves: cerrado,
+      viernes: cerrado, sabado: cerrado, domingo: cerrado }
+    const heredado = { medico_id: 'yo', activo: true, horario_propio: true, horario: abierto, horario_revisado_en: null }
+    const l = lista({ yo: [] }, [FIJO])
+    expect(pasosDe(l, 'yo', [heredado])?.[0]).toMatchObject({ hecho: false, porRevisar: true })
+    // Confirmado, sin la columna (base sin la migración) o de otro médico: hecho, como antes.
+    expect(pasosDe(l, 'yo', [{ ...heredado, horario_revisado_en: '2026-11-17T10:00:00Z' }])?.[0]).toEqual(
+      { clave: 'horario', titulo: 'Horario de cada consultorio', hecho: true })
+    const sinColumna = { medico_id: 'yo', activo: true, horario_propio: true, horario: abierto }
+    expect(pasosDe(l, 'yo', [sinColumna])?.[0]?.hecho).toBe(true)
+    expect(pasosDe(l, 'yo', [{ ...heredado, medico_id: 'otro' }])?.[0]?.hecho).toBe(true)
+    // Falta otra cosa (sin disponibilidad): pendiente, no «por revisar».
+    expect(pasosDe(lista({ yo: ['sin_disponibilidad'] }), 'yo', [heredado])?.[0]).toMatchObject({ hecho: false })
+    expect(pasosDe(lista({ yo: ['sin_disponibilidad'] }), 'yo', [heredado])?.[0]).not.toHaveProperty('porRevisar')
+  })
 })

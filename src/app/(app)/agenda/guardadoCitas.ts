@@ -640,6 +640,9 @@ export function crearGuardadoCitas({
          `batchRendering` anidado no repinta hasta el último `resume`. */
       const sustituir = () => {
         optimisticEvent?.remove()
+        /* Tanda I (punto 12): la cancelada que esta alta cerró deja de
+           pintarse aquí mismo (el eco de Realtime hace lo mismo, idempotente). */
+        if (typeof json.sustituida === 'string') api?.getEventById(json.sustituida)?.remove()
         const yaPresente = api?.getEventById(json.appointment.id)
         if (yaPresente) {
           aplicarAppointmentAlEvento(json.appointment)
