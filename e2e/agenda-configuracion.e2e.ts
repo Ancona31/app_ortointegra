@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 import {
-  CORREO, SESION, enContextoNuevo, interruptorAgenda, irAAgenda, pestanaConfig, soloEscritorio, sqlLocal, toastConTexto, tituloUnico,
+  CORREO, SESION, enContextoNuevo, interruptorAgenda, irAAgenda, pestanaConfig, sinPendientesAgenda, soloEscritorio, sqlLocal, tituloUnico,
 } from './ayudas'
 
 /**
@@ -14,6 +14,11 @@ import {
  *     ve en solo lectura y su PUT da 403; un ajuste fuera de rango da error; el
  *     administrador crea y archiva un tipo de cita; un médico edita la
  *     disponibilidad de su consultorio.
+ *
+ * Tanda J (J5): la pantalla es la de las maquetas. Quien tiene algo pendiente
+ * entra al funnel de primera vez, así que las pruebas de las pestañas dejan
+ * antes al médico sin pendientes (`sinPendientesAgenda`); los ajustes se
+ * guardan SOLOS («Guardado»), sin botón; «Archivar» es «Quitar».
  *
  * ⚠️ EL 404 SE COMPRUEBA POR EL CONTENIDO, NO POR EL ESTADO HTTP. La ruta
  * cuelga de fronteras de `Suspense` (`loading.tsx`): si el cuerpo ya empezó a
@@ -40,7 +45,7 @@ async function esperarNoEncontrada(page: Page): Promise<void> {
   const r = await page.goto(RUTA)
   expect([200, 404]).toContain(r?.status())
   await expect(page.getByText('This page could not be found')).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'Configuración del calendario' })).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: /^(Configuración de la agenda|¿Cuándo das consulta\?)$/ })).toHaveCount(0)
 }
 
 function restaurarAjustesA(): void {
@@ -90,7 +95,8 @@ test.describe('con el interruptor encendido', () => {
     await page.getByRole('button', { name: 'Opciones de la agenda' }).click()
     await page.getByRole('menuitem', { name: 'Configuración de la agenda' }).click()
     await page.waitForURL(`**${RUTA}`)
-    await expect(page.getByRole('heading', { name: 'Configuración del calendario' })).toBeVisible()
+    // J5: con algo pendiente abre el funnel de primera vez; sin nada, las pestañas.
+    await expect(page.getByRole('heading', { name: /^(Configuración de la agenda|¿Cuándo das consulta\?)$/ })).toBeVisible()
   })
 
   /* T3 · punto 5: con la v2 el engrane es SÓLO icono a cualquier ancho (también
@@ -126,42 +132,60 @@ test.describe('con el interruptor encendido', () => {
     }
   })
 
-  test('el administrador edita los ajustes: persisten y quedan en audit_log', async ({ page }) => {
-    const desde = sqlLocal('select now()')
-    await page.goto(RUTA)
-    await pestanaConfig(page, 'Plazos y recordatorios')
-    await page.getByLabel('Recordatorio por correo').fill('12')
-    await page.getByLabel('Vigencia del enlace de un solo uso').fill('14')
-    const guardado = page.waitForResponse(r => r.url().includes(API_AJUSTES) && r.request().method() === 'PUT')
-    await page.getByRole('button', { name: 'Guardar ajustes' }).click()
-    expect((await guardado).status()).toBe(200)
-    await expect(toastConTexto(page, 'Ajustes guardados')).toBeVisible()
+  test('el administrador edita los ajustes: se guardan solos, persisten y quedan en audit_log', async ({ page }) => {
+    const deshacer = sinPendientesAgenda(CORREO.adminA)
+    // El recordatorio encendido (como postgres, antes de `desde`): sólo así sale su selector de horas.
+    sqlLocal(`update public.agenda_ajustes set recordatorio_encendido = true
+               where clinica_id = (select id from public.clinicas where nombre = :'clinica')`, { clinica: CLINICA_A })
+    try {
+      const desde = sqlLocal('select now()')
+      await page.goto(RUTA)
+      await pestanaConfig(page, 'Avisos')
+      const guardado = page.waitForResponse(r => r.url().includes(API_AJUSTES) && r.request().method() === 'PUT')
+      await page.getByRole('combobox').selectOption('12')
+      expect((await guardado).status()).toBe(200)
+      await expect(page.locator('[data-aviso-config]')).toHaveText('Guardado')
+      const vigencia = page.getByLabel('Un enlace de una vez deja de servir a los')
+      await vigencia.fill('14')
+      await vigencia.blur()
+      await expect.poll(() => ajustesA()).toBe('12|2|60|14|true')
 
-    await page.reload()
-    await pestanaConfig(page, 'Plazos y recordatorios')
-    await expect(page.getByLabel('Recordatorio por correo')).toHaveValue('12')
-    await expect(page.getByLabel('Vigencia del enlace de un solo uso')).toHaveValue('14')
-    expect(ajustesA()).toBe('12|2|60|14|true')
+      await page.reload()
+      await pestanaConfig(page, 'Avisos')
+      await expect(page.getByRole('combobox')).toHaveValue('12')
+      await expect(page.getByLabel('Un enlace de una vez deja de servir a los')).toHaveValue('14')
 
-    /* La fila es la de `log_tabla_change` (disparador `audit_agenda_ajustes`),
-       con el uuid del administrador: la de `interruptorAgenda` es de `system`. */
-    const filas = sqlLocal(`select count(*) from public.audit_log
-       where tabla = 'agenda_ajustes' and accion = 'UPDATE' and created_at >= :'desde'::timestamptz
-         and registro_id = (select a.id from public.agenda_ajustes a join public.clinicas c on c.id = a.clinica_id where c.nombre = :'clinica')
-         and user_id = (select id::text from auth.users where email = :'correo')`,
-    { desde, clinica: CLINICA_A, correo: CORREO.adminA })
-    expect(Number(filas)).toBe(1)
+      /* Una fila por guardado (dos: el selector y el campo), de `log_tabla_change` (disparador
+         `audit_agenda_ajustes`), con el uuid del administrador: la de `interruptorAgenda` es de `system`. */
+      const filas = sqlLocal(`select count(*) from public.audit_log
+         where tabla = 'agenda_ajustes' and accion = 'UPDATE' and created_at >= :'desde'::timestamptz
+           and registro_id = (select a.id from public.agenda_ajustes a join public.clinicas c on c.id = a.clinica_id where c.nombre = :'clinica')
+           and user_id = (select id::text from auth.users where email = :'correo')`,
+      { desde, clinica: CLINICA_A, correo: CORREO.adminA })
+      expect(Number(filas)).toBe(2)
+    } finally {
+      sqlLocal(`update public.agenda_ajustes set recordatorio_encendido = false
+                 where clinica_id = (select id from public.clinicas where nombre = :'clinica')`, { clinica: CLINICA_A })
+      deshacer()
+    }
   })
 
   test('un ajuste fuera de rango da error y no se guarda', async ({ page }) => {
-    await page.goto(RUTA)
-    await pestanaConfig(page, 'Plazos y recordatorios')
-    let enviados = 0
-    page.on('request', r => { if (r.url().includes(API_AJUSTES)) enviados += 1 })
-    await page.getByLabel('Recordatorio por correo').fill('73')
-    await page.getByRole('button', { name: 'Guardar ajustes' }).click()
-    await expect(page.getByRole('alert').filter({ hasText: 'Recordatorio por correo' })).toHaveText('Recordatorio por correo: de 1 a 72 horas antes de la cita')
-    expect(enviados).toBe(0)
+    const deshacer = sinPendientesAgenda(CORREO.adminA)
+    try {
+      await page.goto(RUTA)
+      await pestanaConfig(page, 'Avisos')
+      let enviados = 0
+      page.on('request', r => { if (r.url().includes(API_AJUSTES) && r.method() === 'PUT') enviados += 1 })
+      const horas = page.getByLabel('No pueden apartar si faltan menos de')
+      await horas.fill('73')
+      await horas.blur()
+      await expect(page.getByRole('alert').filter({ hasText: 'Anticipación mínima' }))
+        .toHaveText('Anticipación mínima para reservar por enlace: de 0 a 72 horas')
+      expect(enviados).toBe(0)
+    } finally {
+      deshacer()
+    }
 
     // El servidor dice lo mismo, y rechaza el interruptor y el candado.
     const fuera = await page.request.put(API_AJUSTES, { data: { ...FABRICA, horizonte_dias: 366 } })
@@ -177,67 +201,77 @@ test.describe('con el interruptor encendido', () => {
       await p.getByRole('button', { name: 'Opciones de la agenda' }).click()
       await p.getByRole('menuitem', { name: 'Configuración de la agenda' }).click()
       await p.waitForURL(`**${RUTA}`)
-      await pestanaConfig(p, 'Plazos y recordatorios')
-      await expect(p.getByLabel('Recordatorio por correo')).toBeDisabled()
-      await expect(p.getByLabel('Recordatorio por correo')).toHaveValue('24')
-      await expect(p.getByRole('button', { name: 'Guardar ajustes' })).toHaveCount(0)
-      await expect(p.getByRole('button', { name: 'Editar horario' })).toHaveCount(0)
-      await expect(p.getByRole('button', { name: 'Crear tipo' })).toHaveCount(0)
-      await pestanaConfig(p, 'Horario y disponibilidad')
-      const disponibilidad = p.getByRole('region', { name: 'Disponibilidad por consultorio' })
-      await expect(disponibilidad.getByRole('listitem', { name: CONSULTORIO_INVITADO })).toBeVisible()
-      await expect(disponibilidad.getByRole('button')).toHaveCount(0)
+      await pestanaConfig(p, 'Avisos')
+      await expect(p.getByLabel('Pueden ver horarios de los próximos')).toBeDisabled()
+      await expect(p.getByLabel('Pueden ver horarios de los próximos')).toHaveValue('60')
+      await expect(p.getByText('Estos avisos los cambia quien administra la clínica.')).toBeVisible()
+      await pestanaConfig(p, 'Tipos de cita')
+      await expect(p.getByRole('button', { name: 'Agregar tipo de cita' })).toHaveCount(0)
+      await pestanaConfig(p, 'Cuándo dan consulta')
+      const consultorio = p.getByRole('group', { name: CONSULTORIO_INVITADO })
+      await expect(consultorio).toBeVisible()
+      await expect(consultorio.getByRole('button')).toHaveCount(0)
       expect((await p.request.put(API_AJUSTES, { data: { ...FABRICA, recordatorio_horas: 1 } })).status()).toBe(403)
     })
     expect(ajustesA()).toBe('24|2|60|7|true')
   })
 
-  test('el administrador crea y archiva un tipo de cita', async ({ page }) => {
+  test('el administrador crea y archiva (quita) un tipo de cita', async ({ page }) => {
     const nombre = tituloUnico('Tipo e2e')
+    const deshacer = sinPendientesAgenda(CORREO.adminA)
     try {
       await page.goto(RUTA)
-      await pestanaConfig(page, 'Duración y tipos de cita')
-      const tipos = page.getByRole('region', { name: 'Duración y tipos de cita' })
+      await pestanaConfig(page, 'Tu consulta')
+      const tipos = page.getByRole('tabpanel', { name: 'Tu consulta' })
+      await tipos.getByRole('button', { name: 'Agregar tipo de cita' }).click()
       await tipos.getByLabel('Nombre').fill(nombre)
       await tipos.getByLabel('Duración (min)').fill('45')
-      await tipos.getByRole('button', { name: 'Crear tipo' }).click()
-      await expect(toastConTexto(page, 'Tipo de cita creado')).toBeVisible()
-      const fila = tipos.getByRole('listitem').filter({ hasText: nombre })
-      await expect(fila).toContainText('45 min')
+      await tipos.getByLabel('Para').selectOption({ label: 'Toda la clínica' })
+      await tipos.getByRole('button', { name: 'Agregar', exact: true }).click()
+      await expect(page.locator('[data-aviso-config]')).toHaveText('Guardado')
+      const fila = tipos.getByRole('group', { name: nombre })
+      await expect(fila).toContainText('45 minutos')
       await expect(fila).toContainText('Toda la clínica')
 
-      await fila.getByRole('button', { name: `Archivar ${nombre}` }).click()
-      await expect(toastConTexto(page, 'Tipo de cita archivado')).toBeVisible()
-      await expect(fila).toContainText('Archivado')
+      await fila.getByRole('button', { name: `Quitar ${nombre}` }).click()
+      // «Archivado» es ahora «Quitados (N)», plegado: se abre y ahí está, con «Reactivar».
+      await tipos.getByText(/^Quitados \(\d+\)$/).click()
+      await expect(fila.getByRole('button', { name: `Reactivar ${nombre}` })).toBeVisible()
       expect(sqlLocal(`select activo || '|' || duracion_min from public.tipos_cita where nombre = :'n'`, { n: nombre })).toBe('false|45')
     } finally {
       sqlLocal(`delete from public.tipos_cita where nombre = :'n'`, { n: nombre })
+      deshacer()
     }
   })
 
   test('un médico edita la disponibilidad de su consultorio', async ({ browser }) => {
+    const deshacer = sinPendientesAgenda(CORREO.medicoA)
+    const antes = sqlLocal(`select json_build_object('h', horario, 'p', horario_propio)::text from public.consultorios where nombre = :'n'`,
+      { n: CONSULTORIO_INVITADO })
     try {
+      sqlLocal(`update public.consultorios set horario_propio = false where nombre = :'n'`, { n: CONSULTORIO_INVITADO })
       await enContextoNuevo(browser, SESION.medicoA, async (p) => {
         await p.goto(RUTA)
-        await pestanaConfig(p, 'Horario y disponibilidad')
-        const consultorio = p.getByRole('region', { name: 'Disponibilidad por consultorio' })
-          .getByRole('listitem', { name: CONSULTORIO_INVITADO })
-        await expect(consultorio).toContainText('Usa el horario de la clínica')
-        await consultorio.getByRole('button', { name: 'Usar horario propio' }).click()
-        const dialogo = p.getByRole('dialog', { name: 'Horario de consulta' })
-        await dialogo.locator('input[type="time"]').nth(1).fill('12:00')
+        await pestanaConfig(p, 'Cuándo das consulta')
+        const consultorio = p.getByRole('group', { name: CONSULTORIO_INVITADO })
+        await expect(consultorio).toContainText('Igual que la clínica')
+        await consultorio.getByRole('button', { name: `Cambiar horario de ${CONSULTORIO_INVITADO}` }).click()
+        const dialogo = p.getByRole('dialog', { name: `Horario en ${CONSULTORIO_INVITADO}` })
+        await dialogo.getByRole('button', { name: 'Otro horario' }).click()
+        await dialogo.getByRole('group', { name: 'Lunes' }).getByLabel('Sales').fill('12:00')
         const guardado = p.waitForResponse(r => r.url().includes('/api/consultorios/') && r.request().method() === 'PATCH')
         await dialogo.getByRole('button', { name: 'Guardar horario' }).click()
         expect((await guardado).status()).toBe(200)
-        await expect(toastConTexto(p, 'Disponibilidad guardada')).toBeVisible()
+        await expect(p.locator('[data-aviso-config]')).toHaveText('Guardado')
         await expect(consultorio).toContainText('Horario propio')
-        await expect(consultorio).toContainText('08:00 – 12:00')
+        await expect(consultorio).toContainText('Lun · 8:00 – 12:00')
       })
       expect(sqlLocal(`select horario_propio || '|' || (horario -> 'lunes' ->> 'fin') from public.consultorios where nombre = :'n'`,
         { n: CONSULTORIO_INVITADO })).toBe('true|12:00')
     } finally {
-      sqlLocal(`update public.consultorios set horario_propio = false, horario = jsonb_set(horario, '{lunes,fin}', '"18:00"')
-                 where nombre = :'n'`, { n: CONSULTORIO_INVITADO })
+      sqlLocal(`update public.consultorios set horario_propio = (:'a'::jsonb ->> 'p')::boolean, horario = :'a'::jsonb -> 'h'
+                 where nombre = :'n'`, { n: CONSULTORIO_INVITADO, a: antes })
+      deshacer()
     }
   })
 })

@@ -454,3 +454,34 @@ export async function pestanaConfig(page: Page, nombre: string): Promise<void> {
   await pestana.click()
   await test.expect(pestana).toHaveAttribute('aria-selected', 'true')
 }
+
+/**
+ * Tanda J (J5, punto 13): a un médico con algo pendiente (duración, enlace fijo
+ * o un consultorio «por revisar») `/agenda/configuracion` le abre el FUNNEL de
+ * primera vez, no las pestañas. Esto lo deja sin nada pendiente —su duración
+ * principal (30), un enlace fijo y sus consultorios confirmados— y devuelve
+ * con qué deshacerlo (como postgres: borra lo creado, que la FK RESTRICT
+ * impediría volver a sembrar, y devuelve la marca a NULL donde la puso).
+ * Si ya tenía duración o enlace, no crea otro. `conEnlace: false`: sin enlace
+ * (la «primera vez» es sólo duración y horario: sin enlace abre en pestañas).
+ */
+export function sinPendientesAgenda(correo: string, { conEnlace = true }: { conEnlace?: boolean } = {}): () => void {
+  const fila = sqlLocal(`with u as (select id, (select clinica_id from public.profiles where id = auth.users.id) cl from auth.users where email = :'c')
+    , t as (insert into public.tipos_cita (clinica_id, medico_id, nombre, duracion_min, principal)
+        select cl, id, 'Consulta', 30, true from u where not exists (select 1 from public.tipos_cita x
+          where x.medico_id = u.id and x.principal and x.activo and x.consultorio_id is null) returning id)
+    , e as (insert into public.reserva_enlaces (id, clinica_id, medico_id, clase, codigo_hash)
+        select gen_random_uuid(), cl, id, 'fijo', encode(sha256(gen_random_uuid()::text::bytea), 'hex') from u
+         where :'conEnlace' = 'si'
+           and not exists (select 1 from public.reserva_enlaces x where x.medico_id = u.id and x.clase = 'fijo' and x.revocado_en is null) returning id)
+    , r as (update public.consultorios k set horario_revisado_en = now() from u
+         where k.medico_id = u.id and k.horario_revisado_en is null returning k.id)
+    select coalesce((select string_agg(id::text, ',') from t), '') || '|' || coalesce((select string_agg(id::text, ',') from e), '')
+      || '|' || coalesce((select string_agg(id::text, ',') from r), '')`, { c: correo, conEnlace: conEnlace ? 'si' : 'no' })
+  const [t, e, r] = fila.split('|')
+  return () => sqlLocal(`begin; set local session_replication_role = replica;
+    delete from public.reserva_enlaces where id = any (string_to_array(nullif(:'e', ''), ',')::uuid[]);
+    delete from public.tipos_cita where id = any (string_to_array(nullif(:'t', ''), ',')::uuid[]);
+    update public.consultorios set horario_revisado_en = null where id = any (string_to_array(nullif(:'r', ''), ',')::uuid[]); commit;`,
+  { t, e, r })
+}

@@ -1,5 +1,5 @@
 import { test, expect, type Locator, type Page } from '@playwright/test'
-import { interruptorAgenda, irAAgenda, modalCita, SESION } from './ayudas'
+import { CORREO, interruptorAgenda, irAAgenda, modalCita, SESION, sinPendientesAgenda } from './ayudas'
 
 /**
  * Bloque F · orden y simetría (diseño en `e2e/resultados/plan_F.md` §1, filas
@@ -124,44 +124,53 @@ test('F1.19 · los iconos van centrados en su botón', async ({ page }, info) =>
 })
 
 /* ── Tanda T2 · punto 12: la configuración de la agenda en la misma retícula ──
-   Con la v2 encendida (la pantalla sólo existe así). Las tarjetas de sección
-   comparten borde izquierdo y ancho; su título, la misma sangría (`--ag-5`);
-   y cada botón mide uno de los dos altos de la retícula (`h-8` en las filas,
-   `h-9` en el resto: `clasesConfig.ts`). */
-test('T2 · configuración: tarjetas alineadas, títulos a la misma sangría y botones en dos altos', async ({ page }) => {
+   Con la v2 encendida (la pantalla sólo existe así). Tanda J (J5): la pantalla
+   es la de la maqueta. Los paneles de las cinco pestañas comparten borde
+   izquierdo y ancho; su título, la misma sangría; los botones de la retícula
+   vieja que siguen dentro (`clasesConfig.ts`: `h-8` en las filas, `h-9` en el
+   resto) miden uno de esos dos altos, y los nuevos, al menos 44 px (maqueta). */
+test('T2 · configuración: paneles alineados, títulos a la misma sangría y botones en sus altos', async ({ page }) => {
   interruptorAgenda('A', true)
+  const deshacer = sinPendientesAgenda(CORREO.adminA)
   try {
     await page.goto('/agenda/configuracion')
-    /* Tanda H, punto 5: una pestaña por sección. Se mide cada panel visible y
-       se juntan: las tarjetas de TODOS comparten borde izquierdo y ancho. */
     const pestanas = page.getByRole('tablist', { name: 'Secciones de la configuración' }).getByRole('tab')
-    await expect(pestanas.first()).toBeVisible()
-    const m: { cajas: { left: number; width: number }[]; sangrias: number[]; altos: number[] } = { cajas: [], sangrias: [], altos: [] }
+    await expect(pestanas).toHaveCount(5)
+    const m: { cajas: { left: number; width: number }[]; sangrias: number[]; viejos: number[]; nuevos: number[] } = { cajas: [], sangrias: [], viejos: [], nuevos: [] }
     for (let i = 0; i < await pestanas.count(); i++) {
       await pestanas.nth(i).click()
       await expect(page.getByText('Cargando', { exact: false })).toHaveCount(0)
       const parte = await page.evaluate(() => {
-        const tarjetas = Array.from(document.querySelectorAll<HTMLElement>('.ag-config-tarjeta')).filter(t => t.offsetParent !== null)
+        const panel = Array.from(document.querySelectorAll<HTMLElement>('[role="tabpanel"]')).find(t => !t.hidden)
+        const tarjeta = panel?.firstElementChild as HTMLElement | null
+        if (!panel || !tarjeta) return null
+        const r = tarjeta.getBoundingClientRect()
+        const botones = Array.from(panel.querySelectorAll<HTMLElement>('button:not([role="switch"])')).filter(b => b.offsetParent !== null)
+        const viejo = (b: HTMLElement) => /\bh-(8|9)\b/.test(b.className)
         return {
-          cajas: tarjetas.map(t => { const r = t.getBoundingClientRect(); return { left: r.left, width: r.width } }),
-          sangrias: tarjetas.map(t => (t.querySelector('h3')?.getBoundingClientRect().left ?? 0) - t.getBoundingClientRect().left),
-          // El interruptor del recordatorio (`role="switch"`, punto 9) no es un botón de la retícula.
-          altos: tarjetas.flatMap(t => Array.from(t.querySelectorAll('button:not([role="switch"])')))
-            .filter(b => b instanceof HTMLElement && b.offsetParent !== null).map(b => Math.round(b.getBoundingClientRect().height)),
+          caja: { left: r.left, width: r.width },
+          sangria: (tarjeta.querySelector('h2')?.getBoundingClientRect().left ?? 0) - r.left,
+          viejos: botones.filter(viejo).map(b => Math.round(b.getBoundingClientRect().height)),
+          nuevos: botones.filter(b => !viejo(b)).map(b => Math.round(b.getBoundingClientRect().height)),
         }
       })
-      m.cajas.push(...parte.cajas); m.sangrias.push(...parte.sangrias); m.altos.push(...parte.altos)
+      expect(parte).not.toBeNull()
+      if (!parte) continue
+      m.cajas.push(parte.caja); m.sangrias.push(parte.sangria); m.viejos.push(...parte.viejos); m.nuevos.push(...parte.nuevos)
     }
-    expect(m.cajas.length).toBeGreaterThanOrEqual(6)
+    expect(m.cajas.length).toBe(5)
     for (const c of m.cajas) {
       expect(Math.abs(c.left - m.cajas[0].left)).toBeLessThanOrEqual(1)
       expect(Math.abs(c.width - m.cajas[0].width)).toBeLessThanOrEqual(1)
     }
-    // 20 px de relleno (`--ag-5`) más el borde de 1 px.
-    for (const s of m.sangrias) expect(Math.abs(s - 21)).toBeLessThanOrEqual(1)
-    expect(m.altos.length).toBeGreaterThan(3)
-    for (const a of m.altos) expect([32, 36]).toContain(a)
+    const sangria = m.sangrias.find(x => x > 0) ?? 0
+    expect(sangria).toBeGreaterThan(0)
+    for (const s of m.sangrias.filter(x => x > 0)) expect(Math.abs(s - sangria)).toBeLessThanOrEqual(1)
+    expect(m.nuevos.length).toBeGreaterThan(3)
+    for (const a of m.viejos) expect([32, 36]).toContain(a)
+    for (const a of m.nuevos) expect(a).toBeGreaterThanOrEqual(44)
   } finally {
+    deshacer()
     interruptorAgenda('A', false)
   }
 })
