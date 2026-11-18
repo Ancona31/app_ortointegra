@@ -149,7 +149,7 @@ export default function SeccionEnlacesReserva(p: Props) {
       urls={urls} ocupado={ocupado} puedeEmitir={lista && lista !== 'error' ? lista.secreto : false} vigenciaDias={vigenciaDias}
       onCrearFijo={() => void emitir(m.id, { clase: 'fijo' }, 'Enlace fijo creado')}
       onRegenerar={() => setPregunta({ mensaje: MSJ_REGENERAR, seguir: () => void emitir(m.id, { clase: 'fijo' }, 'Enlace fijo regenerado') })}
-      onEmitirUnico={et => emitir(m.id, { clase: 'unico', etiqueta: et }, 'Enlace de un solo uso emitido')}
+      onEmitirUnico={(et, correo) => emitir(m.id, { clase: 'unico', etiqueta: et, correo }, 'Enlace de un solo uso emitido')}
       onMostrar={id => void mostrar(id)}
       onRevocar={e => setPregunta({ mensaje: MSJ_REVOCAR, seguir: () => void escribir(`/api/agenda/enlaces/${e.id}`,
         { method: 'PATCH', body: JSON.stringify({ accion: 'revocar' }) }, 'Enlace revocado', false) })} />

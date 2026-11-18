@@ -46,7 +46,7 @@ language plpgsql as $$
 begin
   perform set_config('request.jwt.claims', json_build_object('role', 'service_role')::text, true);
   set local role service_role;
-  perform public.reserva_enlace_emitir('00000000-0000-4000-8000-000000d1c001', p_actor, p_id, p_medico, p_clase, p_hash, null);
+  perform public.reserva_enlace_emitir('00000000-0000-4000-8000-000000d1c001', p_actor, p_id, p_medico, p_clase, p_hash, null, null, null);  -- j2: + p_correo, p_correo_hmac
   reset role;
 exception when others then
   reset role;

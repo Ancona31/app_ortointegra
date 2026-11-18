@@ -183,7 +183,7 @@ function VistaDatos({ datos, r, consultorio, tipos, zona }: Vista): ReactElement
         cuando={r.turno ? cuandoEnZona(r.turno.inicio, zona) : null} />
       {!enCodigo && <FormularioDatos aviso={datos.aviso} casilla={datos.casilla} ocupado={r.ocupado}
         textoBoton={datos.clase === 'fijo' ? 'Enviar código a mi correo' : 'Reservar cita'} onEnviar={r.alEnviarDatos}
-        inicial={r.borrador} onCambio={r.setBorrador} volver={volver} correoOpcional={datos.clase === 'unico'} />}
+        inicial={r.borrador} onCambio={r.setBorrador} volver={volver} sinCorreo={datos.clase === 'unico'} />}
       {enCodigo && r.persona && <PasoCodigo correo={r.persona.correo} ocupado={r.ocupado} onVerificar={r.alVerificar}
         onReenviar={() => { if (r.persona) void r.pedirCodigo(r.persona) }} volver={volver} />}
     </>
@@ -233,7 +233,7 @@ export default function ReservaCliente({ datos }: { datos: DatosPagina }): React
           {r.paso === 'turno' && <VistaTurno {...vista} semana={semana} />}
           {(r.paso === 'datos' || r.paso === 'codigo') && <VistaDatos {...vista} />}
           {r.paso === 'listo' && r.turno && <Comprobante medico={datos.medico} consultorio={consultorio} inicio={r.turno.inicio}
-            conCorreo={Boolean(r.persona?.correo.trim())} />}
+            conCorreo={datos.clase === 'fijo' && Boolean(r.persona?.correo.trim())} />}
         </div>
       </div>
     </>

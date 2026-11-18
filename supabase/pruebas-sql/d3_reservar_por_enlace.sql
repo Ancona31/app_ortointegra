@@ -278,10 +278,15 @@ begin
     ('00000000-0000-4000-8000-000000d3f006', '00000000-0000-4000-8000-000000d3c001', '00000000-0000-4000-8000-000000d3b001',
      'unico', pg_temp.h('u3'), 7, now() + interval '7 days'),
     ('00000000-0000-4000-8000-000000d3f007', '00000000-0000-4000-8000-000000d3c001', '00000000-0000-4000-8000-000000d3b001',
-     'unico', pg_temp.h('u4'), 7, now() + interval '7 days');
+     'unico', pg_temp.h('u4'), 7, now() + interval '7 days'),
+    -- j2 (tanda J, punto 3): «bloqueado» agota el único, así que el caso sin bloqueo va en otro.
+    ('00000000-0000-4000-8000-000000d3f0a2', '00000000-0000-4000-8000-000000d3c001', '00000000-0000-4000-8000-000000d3b001',
+     'unico', pg_temp.h('u5'), 7, now() + interval '7 days');
   perform pg_temp.esperar('caso 5 único con bloqueo manual', pg_temp.res(pg_temp.h('u3'), '00000000-0000-4000-8000-00000d3cc001',
           '00000000-0000-4000-8000-000000d3a001', pg_temp.t(18), '5500000004', 'fede', null), 'bloqueado');
-  perform pg_temp.esperar('caso 5 único sin bloqueo manual', pg_temp.res(pg_temp.h('u3'), '00000000-0000-4000-8000-00000d3cc001',
+  perform pg_temp.esperar('caso 5 único bloqueado queda agotado', pg_temp.res(pg_temp.h('u3'), '00000000-0000-4000-8000-00000d3cc001',
+          '00000000-0000-4000-8000-000000d3a001', pg_temp.t(18), '5500000005', 'fede', null), 'enlace_agotado');
+  perform pg_temp.esperar('caso 5 único sin bloqueo manual', pg_temp.res(pg_temp.h('u5'), '00000000-0000-4000-8000-00000d3cc001',
           '00000000-0000-4000-8000-000000d3a001', pg_temp.t(18), '5500000005', 'fede', null), 'ok');
   perform pg_temp.esperar('caso 5 único salta 1 activa', pg_temp.res(pg_temp.h('u4'), '00000000-0000-4000-8000-00000d3cc001',
           '00000000-0000-4000-8000-000000d3a001', pg_temp.t(20), '5500000005', 'fede', null), 'ok');
@@ -378,6 +383,9 @@ begin
           '00000000-0000-4000-8000-000000d3a003', pg_temp.t(50), '5500000018', 'g8', null), 'tipo_invalido');
   perform pg_temp.esperar('caso 7 tipo de otra clínica', pg_temp.res(pg_temp.h('o8'), '00000000-0000-4000-8000-00000d3cc001',
           '00000000-0000-4000-8000-000000d3a009', pg_temp.t(50), '5500000018', 'g8', null), 'tipo_invalido');
+  -- j2 (tanda J, punto 3): el único «o8» lleva aquí más de 5 intentos (tope); como postgres se le
+  -- devuelven, sólo para seguir probando con él lo demás.
+  update public.reserva_enlaces set intentos = 0, agotado_en = null where codigo_hash = pg_temp.h('o8');
   perform pg_temp.esperar('caso 7 anticipación', pg_temp.res(pg_temp.h('o8'), '00000000-0000-4000-8000-00000d3cc001',
           '00000000-0000-4000-8000-000000d3a001', date_trunc('minute', now()) + interval '1 hour', '5500000018', 'g8', null),
           'fuera_de_ventana');
@@ -399,6 +407,9 @@ begin
   perform pg_temp.esperar('caso 7 apagada', v.r_resultado, 'apagado');
   -- Suspendida: la puerta S3 también la cierra.
   update public.clinicas set suspendida = true where id = '00000000-0000-4000-8000-000000d3c001';
+  -- j2 (tanda J, punto 3): el único «o8» lleva aquí más de 5 intentos (tope); como postgres se le
+  -- devuelven, sólo para seguir probando con él lo demás.
+  update public.reserva_enlaces set intentos = 0, agotado_en = null where codigo_hash = pg_temp.h('o8');
   perform pg_temp.esperar('caso 7 suspendida', pg_temp.res(pg_temp.h('o8'), '00000000-0000-4000-8000-00000d3cc001',
           '00000000-0000-4000-8000-000000d3a001', pg_temp.t(50), '5500000018', 'g8', null), 'clinica_sin_acceso');
   update public.clinicas set suspendida = false where id = '00000000-0000-4000-8000-000000d3c001';

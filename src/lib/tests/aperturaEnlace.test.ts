@@ -34,6 +34,9 @@ describe('motivosApertura', () => {
     expect(motivosApertura({ ...BIEN, estado: 'caducado' })).toEqual(['enlace_caducado'])
     expect(motivosApertura({ ...BIEN, consultorios: [] })).toEqual(['sin_consultorio'])
     expect(motivosApertura({ ...BIEN, tipos: 0 })).toEqual(['sin_tipos'])
+    // J, punto 3: el único que agotó sus intentos también cierra (al paciente, el mensaje genérico).
+    expect(motivosApertura({ ...BIEN, estado: 'agotado' })).toEqual(['enlace_agotado'])
+    expect(cierra({ ...BIEN, estado: 'agotado' })).toBe(true)
     for (const d of [{ ...BIEN, estado: 'usado' as const }, { ...BIEN, consultorios: [] }, { ...BIEN, tipos: 0 }]) {
       expect(cierra(d)).toBe(true)
     }

@@ -57,6 +57,16 @@ describe('CrearEnlaceSchema', () => {
     expect(CrearEnlaceSchema.safeParse({ clase: 'unico', medico_id: YO, etiqueta: '   ' }).success).toBe(false)
     expect(CrearEnlaceSchema.safeParse({ clase: 'unico', medico_id: YO, etiqueta: 'x'.repeat(61) }).success).toBe(false)
   })
+  it('J, punto 3: el único admite el correo del paciente (opcional, recortado; vacío = sin correo); el fijo no', () => {
+    const r = CrearEnlaceSchema.safeParse({ clase: 'unico', medico_id: YO, correo: '  ana@x.mx ' })
+    expect(r.success && r.data.clase === 'unico' && r.data.correo).toBe('ana@x.mx')
+    const vacio = CrearEnlaceSchema.safeParse({ clase: 'unico', medico_id: YO, correo: '   ' })
+    expect(vacio.success && vacio.data.clase === 'unico' && vacio.data.correo).toBeNull()
+    expect(CrearEnlaceSchema.safeParse({ clase: 'unico', medico_id: YO, correo: null }).success).toBe(true)
+    expect(CrearEnlaceSchema.safeParse({ clase: 'unico', medico_id: YO, correo: 'no-es-correo' }).success).toBe(false)
+    expect(CrearEnlaceSchema.safeParse({ clase: 'unico', medico_id: YO, correo: `${'a'.repeat(250)}@x.mx` }).success).toBe(false)
+    expect(CrearEnlaceSchema.safeParse({ clase: 'fijo', medico_id: YO, correo: 'ana@x.mx' }).success).toBe(false)
+  })
 })
 
 describe('RevocarEnlaceSchema y MarcarContactoSchema', () => {

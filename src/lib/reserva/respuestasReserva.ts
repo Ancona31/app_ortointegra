@@ -44,6 +44,10 @@ export function respuestaReserva(resultado: string, telefono: string | null): Re
     case 'correo_sin_verificar': return { status: 403, cuerpo: { error: 'correo_sin_verificar' } }
     case 'enlace_usado': return { status: 410, cuerpo: { error: 'enlace_usado' } }
     case 'enlace_caducado': return { status: 410, cuerpo: { error: 'enlace_caducado' } }
+    // j2 (tanda J, punto 3): el único agotado, neutro (no dice por qué).
+    case 'enlace_agotado': return { status: 410, cuerpo: { error: 'enlace_no_disponible' } }
+    // j2 (auditoría H1): el client_id ya es de otra cita; el mismo 400 que daba el 23505 (respuestaErrorRpc).
+    case 'client_id_en_uso': return { status: 400, cuerpo: { error: 'solicitud_invalida' } }
     case 'fuera_de_ventana': return { status: 400, cuerpo: { error: 'fuera_de_ventana' } }
     case 'consultorio_invalido': return { status: 400, cuerpo: { error: 'consultorio_invalido' } }
     case 'tipo_invalido': return { status: 400, cuerpo: { error: 'tipo_invalido' } }

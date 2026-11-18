@@ -12,6 +12,7 @@
  */
 import { z } from 'zod'
 import { canVerAgendaCompleta, isMedico } from '@/lib/permissions'
+import { correoValido } from '@/lib/reserva/contacto'
 import type { Role } from '@/hooks/useProfile'
 
 /** Lo mínimo del perfil para decidir permisos. */
@@ -42,6 +43,15 @@ const etiquetaSchema = z.string().trim().min(1, 'La etiqueta no puede quedar en 
   .max(60, 'La etiqueta tiene como máximo 60 caracteres')
 
 /**
+ * Tanda J, punto 3: el correo del paciente que la clínica escribe al emitir un
+ * único (opcional). El comprobante y todos los correos de esa cita van sólo
+ * ahí; el que teclee quien reserva no se usa. Vacío = sin correo.
+ */
+const correoUnicoSchema = z.string().trim().max(254, 'El correo es demasiado largo')
+  .transform(c => c === '' ? null : c)
+  .refine(c => c === null || correoValido(c), 'Revisa el correo del paciente')
+
+/**
  * POST /api/agenda/enlaces. `fijo` crea el enlace fijo del médico o lo
  * REGENERA (revoca el vigente y emite otro en una transacción); `unico` emite
  * uno de un solo uso, con la vigencia que la base congela al emitir
@@ -50,7 +60,9 @@ const etiquetaSchema = z.string().trim().min(1, 'La etiqueta no puede quedar en 
  */
 export const CrearEnlaceSchema = z.discriminatedUnion('clase', [
   z.strictObject({ clase: z.literal('fijo'), medico_id: z.guid('Médico inválido') }),
-  z.strictObject({ clase: z.literal('unico'), medico_id: z.guid('Médico inválido'), etiqueta: etiquetaSchema.nullish() }),
+  z.strictObject({
+    clase: z.literal('unico'), medico_id: z.guid('Médico inválido'), etiqueta: etiquetaSchema.nullish(), correo: correoUnicoSchema.nullish(),
+  }),
 ])
 
 /** PATCH /api/agenda/enlaces/[id]: lo único que se hace con un enlace emitido. */

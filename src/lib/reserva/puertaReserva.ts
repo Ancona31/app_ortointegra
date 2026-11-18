@@ -45,14 +45,21 @@ export function responder(r: Respuesta): NextResponse {
   return NextResponse.json(r.cuerpo, { status: r.status, headers: { 'Cache-Control': 'no-store' } })
 }
 
+/** j2: el único que agotó sus intentos. Sin la causa (ni «intentos» ni «bloqueado»). */
+export const ENLACE_NO_DISPONIBLE: Respuesta = { status: 410, cuerpo: { error: 'enlace_no_disponible' } }
+
 export function noEncontrado(): NextResponse {
   return responder(NO_ENCONTRADO)
 }
 
-/** El enlace ya no sirve (único usado o caducado): 410 con su causa. */
+/**
+ * El enlace ya no sirve (único usado o caducado): 410 con su causa. j2 (tanda
+ * J, punto 3): el único agotado da un 410 NEUTRO, que no dice por qué.
+ */
 export function respuestaEstado(ctx: ContextoReserva): Respuesta | null {
   if (ctx.estado === 'usado') return { status: 410, cuerpo: { error: 'enlace_usado' } }
   if (ctx.estado === 'caducado') return { status: 410, cuerpo: { error: 'enlace_caducado' } }
+  if (ctx.estado === 'agotado') return ENLACE_NO_DISPONIBLE
   return null
 }
 

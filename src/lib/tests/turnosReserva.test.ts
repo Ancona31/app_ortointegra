@@ -117,3 +117,74 @@ describe('rejilla fija (G2, punto 9): la lista y la comprobación al reservar us
     expect(turnoValido(tj, '2031-05-06T15:45:00.000Z', AHORA)).toBeNull()  // 9:45 de Mérida, no de Tijuana
   })
 })
+
+/**
+ * Tanda J, J2 (punto 5 de Angel): las dos caras de la anticipación, con el
+ * reloj fijado (`ahora`). Un turno a menos de la anticipación NO se ofrece;
+ * uno a la anticipación o más SÍ, el mismo día. Es la misma regla que
+ * `reservar_por_enlace` (`p_inicio < now() + anticipación` → fuera de
+ * ventana): lo compara con la base `e2e/reserva-anticipacion.e2e.ts`.
+ */
+describe('anticipación con el reloj fijado (J2, punto 5)', () => {
+  const abierto = { activo: true, inicio: '08:00', fin: '18:00' }
+  const todos: Horario = { lunes: abierto, martes: abierto, miercoles: abierto, jueves: abierto, viernes: abierto, sabado: abierto, domingo: abierto }
+  const reglas = (tz: string, horas: number, dur = 60) =>
+    reglasDe({ horario: todos, horario_propio: true, timezone: tz }, null, dur, { anticipacion_min_horas: horas, horizonte_dias: 60 })
+  /** Los inicios ofrecidos en la semana que empieza el día de hoy de la zona. */
+  const ofrecidos = (tz: string, horas: number, ahora: Date, dur = 60): string[] =>
+    turnosDeDias(reglas(tz, horas, dur), primerDia('2000-01-01', tz, ahora), [], ahora).flatMap(d => d.turnos.map(t => t.inicio))
+  // Martes 2031-05-06 en Mérida (UTC-6): las 12:00 locales son las 18:00Z.
+  const DOCE = '2031-05-06T18:00:00.000Z'
+
+  it('turno a 1 h 59 min: NO; a 2 h 00 min: SÍ; a 2 h 01 min: SÍ (el mismo día)', () => {
+    expect(ofrecidos(MERIDA, 2, new Date('2031-05-06T16:01:00Z'))).not.toContain(DOCE)
+    expect(ofrecidos(MERIDA, 2, new Date('2031-05-06T16:00:00Z'))[0]).toBe(DOCE)
+    expect(ofrecidos(MERIDA, 2, new Date('2031-05-06T15:59:00Z'))[0]).toBe(DOCE)
+    // Un segundo de más ya es «menos de 2 h».
+    expect(ofrecidos(MERIDA, 2, new Date('2031-05-06T16:00:01Z'))[0]).toBe('2031-05-06T19:00:00.000Z')
+    expect(turnoValido(reglas(MERIDA, 2), DOCE, new Date('2031-05-06T16:00:00Z'))).not.toBeNull()
+    expect(turnoValido(reglas(MERIDA, 2), DOCE, new Date('2031-05-06T16:00:01Z'))).toBeNull()
+  })
+
+  it('anticipación 0: se ofrece el turno que empieza ahora mismo; 24 h: nada de hoy y mañana desde la misma hora', () => {
+    const diez = new Date('2031-05-06T16:00:00Z')   // 10:00 en Mérida
+    expect(ofrecidos(MERIDA, 0, diez)[0]).toBe('2031-05-06T16:00:00.000Z')
+    const dia = ofrecidos(MERIDA, 24, diez)
+    expect(dia[0]).toBe('2031-05-07T16:00:00.000Z')            // miércoles 10:00
+    expect(dia).not.toContain('2031-05-07T15:00:00.000Z')      // miércoles 09:00: a 23 h
+  })
+
+  it('cerca de medianoche: a las 23:30 se ofrece mañana temprano (a 8 h 30 min), y nada de hoy', () => {
+    const tarde = new Date('2031-05-07T05:30:00Z')   // martes 23:30 en Mérida
+    expect(primerDia('2031-05-06', MERIDA, tarde)).toBe('2031-05-06')
+    const lista = ofrecidos(MERIDA, 2, tarde)
+    expect(lista[0]).toBe('2031-05-07T14:00:00.000Z')          // miércoles 08:00
+    expect(turnosDeDias(reglas(MERIDA, 2), '2031-05-06', [], tarde, 1)[0]?.turnos).toEqual([])
+  })
+
+  it('huso del consultorio ≠ huso del servidor: Tijuana a las 23:30 con el servidor en UTC (ya es otro día)', () => {
+    // Martes 23:30 en Tijuana (UTC-7 en mayo) = miércoles 06:30Z: en UTC ya es miércoles.
+    const ahora = new Date('2031-05-07T06:30:00Z')
+    expect(primerDia('2031-05-06', 'America/Tijuana', ahora)).toBe('2031-05-06')
+    expect(ofrecidos('America/Tijuana', 2, ahora)[0]).toBe('2031-05-07T15:00:00.000Z')   // miércoles 08:00 PDT
+    // Las 10:00 de Tijuana con anticipación 2: el de las 12:00 PDT sí, el de las 11:00 no.
+    const diez = new Date('2031-05-07T17:00:00Z')
+    expect(ofrecidos('America/Tijuana', 2, diez)[0]).toBe('2031-05-07T19:00:00.000Z')
+  })
+
+  it('el huso del PROCESO no cambia nada (servidor en UTC frente a la máquina en Mérida)', () => {
+    const antes = process.env.TZ
+    const casos = [new Date('2031-05-06T16:00:00Z'), new Date('2031-05-07T05:30:00Z'), new Date('2031-05-07T06:30:00Z')]
+    const con = (tz: string) => {
+      process.env.TZ = tz
+      return casos.map(a => [ofrecidos(MERIDA, 2, a, 45), ofrecidos('America/Tijuana', 2, a, 45)])
+    }
+    try {
+      expect(con('UTC')).toEqual(con('America/Merida'))
+      expect(con('Pacific/Kiritimati')).toEqual(con('America/Merida'))
+    } finally {
+      if (antes === undefined) delete process.env.TZ
+      else process.env.TZ = antes
+    }
+  })
+})

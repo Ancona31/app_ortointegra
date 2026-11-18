@@ -6,7 +6,11 @@ interface Props {
   medico: string
   consultorio: ConsultorioPagina
   inicio: string
-  /** Tanda I, punto 2: sin correo (enlace de un solo uso) no se manda comprobante y no se dice que sí. */
+  /**
+   * Tanda I, punto 2: sin correo no se dice que se mandó. Tanda J, punto 3: en
+   * el único tampoco se dice nada (el correo, si lo hay, lo escribió la clínica
+   * y la página no lo conoce); sólo el fijo, con su correo verificado.
+   */
   conCorreo: boolean
 }
 

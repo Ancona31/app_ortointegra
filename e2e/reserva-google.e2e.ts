@@ -4,7 +4,7 @@ import { closeSync, mkdirSync, openSync, readFileSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import { SESION, CORREO, sqlLocal } from './ayudas'
 import { arrancarGoogleFalso, CALENDARIO, type GoogleFalso } from './google-falso/servidor'
-import { cerrarEscenario, emitirEnlace, ipAlAzar, personaNueva, prepararEscenario, type Escenario, type Turno } from './reservaPublicaAyudas'
+import { cerrarEscenario, correoDelEnlace, emitirEnlace, ipAlAzar, personaNueva, prepararEscenario, type Escenario, type Turno } from './reservaPublicaAyudas'
 import { desplazarFecha, hoyEnTZ } from '../src/lib/dates'
 import { encrypt } from '../src/lib/encrypt'
 
@@ -148,6 +148,9 @@ async function turnos(codigo: string, desde: string): Promise<{ status: number; 
 async function reservarEn(codigo: string, inicio: string): Promise<{ status: number; cuerpo: Record<string, unknown>; ms: number; correo: string }> {
   const ctx = await publico()
   const p = personaNueva()
+  // J2, punto 3: en el único el correo de la cita es el que escribió la clínica
+  // al emitir, no el tecleado; se pone en el enlace para poder buscar la cita.
+  correoDelEnlace(codigo, p.correo)
   try {
     const t0 = Date.now()
     const r = await ctx.post(`/api/reservar/${codigo}`, { timeout: 120_000, data: {

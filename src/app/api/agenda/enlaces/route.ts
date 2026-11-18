@@ -30,7 +30,9 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import {
   COLUMNAS_ENLACE, CrearEnlaceSchema, gestionaTodos, puedeGestionarDelMedico, respuestaErrorEnlace,
 } from '@/lib/reserva/gestionReserva'
-import { codigoDeEnlace, hashDeCodigo, secretoDisponible } from '@/lib/reserva/secretos'
+import { codigoDeEnlace, hashDeCodigo, hmacContacto, secretoDisponible } from '@/lib/reserva/secretos'
+import { normalizarCorreo } from '@/lib/reserva/contacto'
+import type { z } from 'zod'
 import { avisoPublicable } from '@/lib/reserva/avisoReserva'
 import { preparacionDe } from '@/lib/reserva/preparacionServidor'
 import { logger } from '@/lib/logger'
@@ -58,7 +60,8 @@ export async function GET(): Promise<NextResponse> {
     let q = e.supabase.from('reserva_enlaces').select(COLUMNAS_ENLACE)
       .eq('clinica_id', e.clinicaId)
       .is('revocado_en', null)
-      .or(`clase.eq.fijo,and(usado_en.is.null,caduca_en.gt."${new Date().toISOString()}")`)
+      // j2 (tanda J, punto 3): tampoco el único que agotó sus intentos (ya no sirve).
+      .or(`clase.eq.fijo,and(usado_en.is.null,agotado_en.is.null,caduca_en.gt."${new Date().toISOString()}")`)
       .order('created_at', { ascending: false })
       .limit(200)
     if (!gestionaTodos(e.perfil)) q = q.eq('medico_id', e.perfil.id)
@@ -78,7 +81,18 @@ export async function GET(): Promise<NextResponse> {
   }
 }
 
-/** POST — `{clase:'fijo', medico_id}` crea o regenera; `{clase:'unico', medico_id, etiqueta?}` emite. */
+/**
+ * Tanda J, punto 3: el correo opcional del único, recortado, con su seudónimo
+ * (el MISMO HMAC que el fijo calcula al verificar). `null` = sin correo.
+ */
+function correoDelUnico(cuerpo: z.output<typeof CrearEnlaceSchema>): { correo: string; hmac: string } | null | 'invalido' {
+  if (cuerpo.clase !== 'unico' || !cuerpo.correo) return null
+  const llave = normalizarCorreo(cuerpo.correo)
+  const hmac = llave ? hmacContacto('correo', llave) : null
+  return hmac ? { correo: cuerpo.correo.trim(), hmac } : 'invalido'
+}
+
+/** POST — `{clase:'fijo', medico_id}` crea o regenera; `{clase:'unico', medico_id, etiqueta?, correo?}` emite. */
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const e = await entradaGestion()
   if (!e.ok) return e.respuesta
@@ -96,12 +110,15 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const codigo = codigoDeEnlace(id)
     if (!codigo) return NextResponse.json(SIN_SECRETO, { status: 503 })
     const codigoHash = hashDeCodigo(codigo)
+    const correo = correoDelUnico(cuerpo)
+    if (correo === 'invalido') return NextResponse.json({ error: 'Revisa el correo del paciente' }, { status: 400 })
 
     // Fijo: revoca el vigente y emite otro en una transacción. Único: emite.
     const { error } = await createAdminClient().rpc('reserva_enlace_emitir', {
       p_clinica_id: e.clinicaId, p_actor: e.perfil.id, p_id: id, p_medico_id: cuerpo.medico_id,
       p_clase: cuerpo.clase, p_codigo_hash: codigoHash,
       p_etiqueta: cuerpo.clase === 'unico' ? (cuerpo.etiqueta ?? null) : null,
+      p_correo: correo?.correo ?? null, p_correo_hmac: correo?.hmac ?? null,
     })
     if (error) {
       const r = respuestaErrorEnlace(error)

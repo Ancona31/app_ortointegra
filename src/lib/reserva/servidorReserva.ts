@@ -25,7 +25,8 @@ export const ContextoSchema = z.object({
   enlace_id: z.guid(),
   medico_id: z.guid(),
   clase: z.enum(['fijo', 'unico']),
-  estado: z.enum(['vigente', 'usado', 'caducado']),
+  /* j2 (tanda J, punto 3): 'agotado' = el único gastó su tope de intentos (migración 20261122120000). */
+  estado: z.enum(['vigente', 'usado', 'caducado', 'agotado']),
   medico: z.object({
     titulo: z.string().nullable(), nombres: z.string().nullable(), apellido_paterno: z.string().nullable(),
     apellido_materno: z.string().nullable(), especialidad: z.string().nullable(), telefono: z.string().nullable(),

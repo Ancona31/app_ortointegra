@@ -158,7 +158,6 @@ test('punto 3: con UN consultorio, «Lugar» sale con él ya elegido y su direcc
     const p = personaNueva()
     await page.getByLabel('Nombre completo').fill(p.nombre)
     await page.getByLabel('Teléfono (10 dígitos)').fill(p.telefono)
-    await page.getByLabel('Correo electrónico').fill(p.correo)
     await page.getByRole('checkbox').check()
     await page.getByRole('button', { name: 'Reservar cita' }).click()
     await expect(page.getByRole('heading', { name: 'Tu cita quedó agendada' })).toBeVisible()
@@ -256,8 +255,9 @@ test('punto 1: si al volver desde «Tus datos» el horario ya no está, se avisa
   await page.locator('button[data-inicio]').first().click() // las 09:00
   await page.getByRole('button', { name: 'Continuar' }).click()
   const p = personaNueva()
+  // Tanda J, punto 3: el único ya no pide correo; lo escrito que se conserva es el nombre y el teléfono.
   await page.getByLabel('Nombre completo').fill(p.nombre)
-  await page.getByLabel('Correo electrónico').fill(p.correo)
+  await page.getByLabel('Teléfono (10 dígitos)').fill(p.telefono)
 
   sin0900 = true // mientras escribía, alguien tomó las 09:00
   await volver(page).click()
@@ -267,7 +267,7 @@ test('punto 1: si al volver desde «Tus datos» el horario ya no está, se avisa
   await page.locator('button[data-inicio]').click()
   await page.getByRole('button', { name: 'Continuar' }).click()
   await expect(page.getByLabel('Nombre completo')).toHaveValue(p.nombre)
-  await expect(page.getByLabel('Correo electrónico')).toHaveValue(p.correo)
+  await expect(page.getByLabel('Teléfono (10 dígitos)')).toHaveValue(p.telefono)
 })
 
 /* ── Punto 4 · el correo en el fijo (verificado) y, desde la tanda I (punto 2), opcional en el único ─ */
@@ -290,7 +290,7 @@ test('punto 4: el enlace fijo exige un correo VERIFICADO; el de un solo uso, des
   // Único: tanda I, punto 2 de Angel — basta el teléfono (antes de I, 400 sin correo).
   expect((await reservar(e, unico, { inicio: b?.inicio ?? '', persona: sinCorreo })).status).toBe(201)
 
-  // En la página: obligatorio en el fijo (manda código); opcional en el único (reserva directo). Ver reserva-i2.
+  // En la página: obligatorio en el fijo (manda código); en el único, desde J (punto 3), no se pide (reserva directo). Ver reserva-i2.
   for (const [codigo, boton, obligatorio] of [[fijo, 'Enviar código a mi correo', true],
     [emitirEnlace(e, 'unico').codigo, 'Reservar cita', false]] as const) {
     await page.goto(`/reservar/${codigo}`)
@@ -302,7 +302,7 @@ test('punto 4: el enlace fijo exige un correo VERIFICADO; el de un solo uso, des
     await page.getByRole('button', { name: 'Continuar' }).click()
     const campo = page.getByLabel(/Correo electrónico/)
     if (obligatorio) await expect(campo).toHaveAttribute('required', '')
-    else await expect(campo).not.toHaveAttribute('required', '')
+    else await expect(campo).toHaveCount(0)
     await expect(page.getByRole('button', { name: boton })).toBeVisible()
   }
 })
