@@ -78,6 +78,25 @@ function borrarConexion(): void {
  * Sólo los que reparte ESTE falso (`falso<N>x`): otras pruebas siembran ids
  * propios con otro formato (`falso-j3-…`) y no son de aquí.
  */
+/**
+ * J4: los intentos que dejan I9, J9 y J10 en `gcal_movimientos_rechazados`
+ * (FK RESTRICT a la clínica): sin borrarlos, `agenda-semilla.ts` no puede
+ * borrar la Clínica A. Sus avisos (`avisos_clinica`, tipo
+ * `google_movimiento_rechazado`) también se van: sin la fila del intento, el
+ * aviso pendiente no tendría de dónde venir. Si la tabla no existe (base sin la
+ * migración de J4), no hace nada.
+ */
+function borrarMovimientosRechazados(): void {
+  sqlLocal(`do $$ begin
+    if to_regclass('public.gcal_movimientos_rechazados') is not null then
+      delete from public.gcal_movimientos_rechazados m using public.clinicas c
+       where m.clinica_id = c.id and c.nombre = '${CLINICA_A}';
+      delete from public.avisos_clinica a using public.clinicas c
+       where a.clinica_id = c.id and c.nombre = '${CLINICA_A}' and a.tipo = 'google_movimiento_rechazado';
+    end if;
+  end $$;`)
+}
+
 function soltarEventosFalsos(): void {
   sqlLocal(`update public.appointments a set google_event_id = null, gcal_etag = null
               from public.clinicas c
@@ -226,6 +245,7 @@ test.afterAll(async ({}, info) => {
   if (info.project.name !== ESCRITORIO) return
   cerrarEscenario()
   soltarEventosFalsos()
+  borrarMovimientosRechazados()
   borrarConexion()
   if (servidor?.pid) {
     try { process.kill(-servidor.pid, 'SIGTERM') } catch { /* ya no estaba */ }

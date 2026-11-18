@@ -197,6 +197,11 @@ function limpiarReserva(clinicas: string[], cuando: 'antes' | 'despues'): void {
     -- I5: los avisos de la clínica (FK RESTRICT a la clínica; sin DELETE para nadie más que postgres).
     if to_regclass('public.avisos_clinica') is not null then
       delete from public.avisos_clinica where clinica_id = any (v_c);
+    end if;
+    -- J4: los intentos de mover en Google una reserva por enlace (FK RESTRICT a la clínica;
+    -- sólo SELECT/INSERT para el rol de servicio).
+    if to_regclass('public.gcal_movimientos_rechazados') is not null then
+      delete from public.gcal_movimientos_rechazados where clinica_id = any (v_c);
     end if;`
   const despues = `
     if to_regclass('public.reserva_enlaces') is not null then
