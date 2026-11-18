@@ -3,7 +3,8 @@
 Para Angel. Sirve para probar a mano, en tu computadora y con datos inventados,
 todo lo que se hizo en la mejora de la agenda: bloques A, B, C, D, D11, E y F,
 la tanda tras tus primeras pruebas a mano (§8-bis), la tanda de diseño,
-duración y horarios (§8-ter) y la tanda H (§8-quater).
+duración y horarios (§8-ter), la tanda H (§8-quater), la tanda I (§8-quinquies)
+y la tanda J (§8-sexies).
 No hace falta leer código. Todo pasa en tu máquina: la base de datos, los
 correos (que no salen a internet) y un Google de mentira. Nada toca producción.
 
@@ -303,9 +304,10 @@ Comprueba cuántas migraciones quedaron:
 docker exec supabase_db_app_ortointegra psql -U postgres -Atc "select count(*), max(version) from supabase_migrations.schema_migrations"
 ```
 
-Debe responder `32|20261120130000`: las 5 de `main` más las 27 de la agenda
+Debe responder `42|20261122140000`: las 5 de `main` más las 37 de la agenda
 (las 16 de los bloques A a F, las 4 de las correcciones de seguridad, las 4 de
-la tanda de diseño, duración y horarios y las 3 de la tanda H).
+la tanda de diseño, duración y horarios, las 3 de la tanda H, las 7 de la tanda
+I y las 3 de la tanda J).
 
 > Este reinicio deja fuera las tres migraciones `20261014…` de la otra rama
 > (`feature/limites-ajustables`). Para probar la agenda no hacen falta. Si
@@ -4124,6 +4126,521 @@ abrir la agenda sale «¿Asistió el paciente?»: «Decidir después» y sigue (
 
 ---
 
+## 8-sexies. Tanda J (2026-11-18)
+
+Lo que se hizo con tus puntos de la tanda J, en cinco grupos: **J1** el menú del
+engrane con interruptores, «Pop-up de eventos» en el engrane y la campana y el
+engrane fuera del JavaScript de la agenda apagada (puntos 1, 2, 4, 18 y 19);
+**J2** el enlace de un solo uso con el correo que pone la clínica y un tope de
+intentos, y la anticipación de 2 horas (puntos 3 y 5); **J3** la ventana «Ligar e
+iniciar consulta» desde «Próximas citas», la tarjeta y la campana, sin botones de
+duración en una reserva y la duración real de cada cita (puntos 6, 7, 8 y 12);
+**J4** lo que se mueve en Google de una cita reservada por enlace y lo de Google
+sin morado (puntos 9, 10 y 11); **J5** la configuración nueva: la primera vez y
+las cinco pestañas (sección F, puntos 13 a 17). Todo detrás del interruptor de
+la v2.
+
+**Antes de empezar:** base con las **42** migraciones (P5: las 39 de antes más
+las 3 `20261122…` de la tanda J; la consulta de P5 debe responder
+`42|20261122140000`), sembrada (P6), aviso aprobado (P7), v2 encendida en la
+Clínica A (P8), la app del 3000 (P11). El Google simulado (C0) para J3-3 y J4-1 a
+J4-4. Si al abrir la agenda sale «¿Asistió el paciente?», es la ventana de I4-3:
+«Decidir después» y sigue (I4-5). **No guardes ninguna nota** en J3: se abren,
+pero guardar una deja una nota real y obliga a P5.
+
+### J1 · El menú del engrane y la carga de la agenda (puntos 1, 2, 4, 18 y 19)
+
+#### J1-1. «Pop-up de eventos» en el engrane
+
+**Qué hago:** como **Dr. Admin Semilla Uno**, en la agenda (escritorio) pulso el
+engrane. Busco «Pop-up de eventos» y lo apago. Cierro el menú y dejo el ratón
+quieto medio segundo sobre la cita de **Paciente Prueba 01**. Luego pulso la cita.
+
+**Qué debo ver:** a la derecha de «Pop-up de eventos» hay un interruptor que pasa
+de encendido (azul) a apagado (gris), y el menú no se cierra. Con él apagado, el
+ratón quieto no abre nada; el clic sí abre la tarjeta. Si vuelvo a la agenda más
+tarde, sigue apagado. En otro navegador sigue encendido, porque es una
+preferencia de este dispositivo. La configuración de la agenda ya no tiene la
+pestaña «Este dispositivo».
+
+**Si falla, significa que…** la opción no guarda la preferencia, la tarjeta no la
+lee, o la opción se quedó también en la configuración.
+
+#### J1-2. Interruptores en el menú del engrane
+
+**Qué hago:** en la vista Semana pulso el engrane. Miro cada opción. Con el
+teclado, voy con las flechas hasta «Compactar la rejilla» y pulso Espacio; luego
+lo mismo en «Densidad compacta» y en «Pop-up de eventos». Al final pulso Escape.
+
+**Qué debo ver:** «Compactar la rejilla», «Densidad compacta» y «Pop-up de
+eventos» llevan un interruptor a la derecha que dice cómo están. Con Espacio
+cambian y la rejilla cambia con ellos, sin cerrar el menú. «Configuración de la
+agenda», «Atajos de teclado» y «Leyenda de estados» son filas normales, sin
+interruptor. Escape cierra el menú y el foco vuelve al engrane. En el teléfono
+salen «Configuración de la agenda», «Compactar» (en las vistas que lo admiten),
+«Pop-up de eventos» y «Leyenda de estados».
+
+**Si falla, significa que…** el menú perdió el interruptor de una opción o el
+teclado.
+
+#### J1-3. Con la v2 apagada, la agenda no carga lo de la v2
+
+**Qué hago:** con la v2 apagada en la Clínica Semilla B, entro como **Dr. Admin
+Semilla Dos** y abro la agenda.
+
+**Qué debo ver:** la agenda de siempre, sin campana ni engrane nuevo, y tan
+rápida como antes de la tanda I.
+
+**Si falla, significa que…** la campana o el menú del engrane volvieron a entrar
+en el JavaScript de la página.
+
+### J2 · El enlace de un solo uso y la anticipación (puntos 3 y 5)
+
+#### J2-1. El enlace de un solo uso lleva el correo que escribo yo
+
+**Qué hago:** como **Dr. Admin Semilla Uno**, en Agenda › engrane ›
+«Configuración de la agenda» › pestaña «Tu enlace» (si sale «Paso 1 de 3»,
+termina antes J5-1), en «Enlaces de una vez» pulso «Crear uno». Escribo en
+«¿Para quién es?» `Beto` y en «Correo del paciente (opcional)»
+`beto@prueba.test`, y pulso «Crear enlace de una vez». Copio la dirección. En una
+ventana de incógnito la abro y reservo con «Beto Reserva», 5512345690.
+
+**Qué debo ver:**
+- debajo del campo del correo, la nota «El comprobante y los avisos de la cita
+  irán sólo a este correo; sin él, no se manda ninguno.»;
+- en «Tus datos» sólo hay «Nombre completo» y «Teléfono (10 dígitos)»: no se pide
+  correo ni código;
+- sale «Tu cita quedó agendada» SIN la línea «Te enviamos el comprobante por
+  correo.»;
+- en Mailpit (http://127.0.0.1:54324), el comprobante «Tu cita con…» llega a
+  `beto@prueba.test`.
+
+**Si falla, significa que…** el comprobante no va al correo que puso la clínica,
+o la página pide un correo que no se usa.
+
+#### J2-2. Sin correo de la clínica no sale ningún correo
+
+**Qué hago:** creo otro enlace de una vez SIN correo y reservo con «Ceci
+Reserva», 5512345691.
+
+**Qué debo ver:** la cita queda agendada y en Mailpit no llega nada por esa
+reserva. En la tarjeta de la cita no hay correo.
+
+**Si falla, significa que…** un único sin correo escribe a alguien.
+
+#### J2-3. Un enlace de un solo uso agotado no dice por qué
+
+**Qué hago:**
+1. Creo un enlace de una vez.
+2. Abro la página y elijo un día y hora.
+3. Antes de reservar, en otra pestaña con OTRO enlace de una vez, reservo ese
+   mismo horario.
+4. En la primera pestaña pulso «Reservar cita»: sale «Ese horario se acaba de
+   ocupar. Elige otro.».
+5. Repito el paso 4 hasta 5 veces, eligiendo siempre una hora que acabo de ocupar
+   desde otro enlace.
+6. Recargo la página del primer enlace.
+
+**Qué debo ver:** al recargar, «Este enlace ya no está disponible» con el
+teléfono del consultorio. No se menciona «intentos» ni «bloqueado».
+
+**Si falla, significa que…** el enlace de un solo uso no tiene tope.
+
+#### J2-4. Bloquear a alguien también gasta su enlace
+
+**Qué hago:**
+1. Bloqueo el contacto de la cita de J2-2 («Bloquear contacto»).
+2. Creo un enlace de una vez nuevo y reservo con el teléfono de Ceci
+   (5512345691): la página no deja reservar y da el teléfono del consultorio.
+3. En ese MISMO enlace pruebo con otro teléfono, 5512345692.
+
+**Qué debo ver:** con el segundo teléfono, «Este enlace ya no está disponible».
+
+**Si falla, significa que…** con un solo enlace se puede probar qué teléfonos
+bloqueó la clínica.
+
+#### J2-5. La anticipación de 2 horas se cumple por las dos caras
+
+**Qué hago:** con la anticipación de fábrica (2 h), abro el enlace fijo con un
+consultorio que atienda ahora. Miro la primera hora que ofrece hoy. Si ese médico
+tiene algo de todo el día hoy, uso otro día.
+
+**Qué debo ver:**
+- ninguna hora a menos de 2 h de ahora;
+- la primera es la primera de la rejilla (desde la apertura, de duración en
+  duración) que queda a 2 h o más;
+- reservar esa hora funciona.
+
+Si una hora que esperabas no sale, mira primero si el médico tiene ese rato
+ocupado en CUALQUIERA de sus consultorios, o un evento de todo el día (en la
+semilla, la «Guardia» del miércoles bloquea el miércoles entero).
+
+**Si falla, significa que…** la página y la base no aplican la misma
+anticipación.
+
+### J3 · «Ligar e iniciar consulta» y la duración de las citas (puntos 6, 7, 8 y 12)
+
+#### J3-1. «Ligar e iniciar consulta» en Próximas citas
+
+**Qué hago:** reservo por enlace a nombre de «Lucía Reserva» para hoy, más tarde.
+Como **Dr. Admin** abro el Dashboard y, en la fila de «Lucía Reserva», pulso
+«Ligar e iniciar consulta» («Ligar» en pantallas angostas). Luego entro como
+**Secretaria A** y abro su Dashboard.
+
+**Qué debo ver:**
+- una ventana pequeña «Ligar e iniciar consulta» con Nombre, Teléfono, Correo,
+  Día y hora, y Consultorio de quien reservó. Nada de duración, tipo ni
+  observaciones;
+- al pulsar «Ligar e iniciar consulta», el buscador de pacientes ya escrito con
+  «Lucía Reserva»;
+- al elegir «Paciente Prueba 07», se abre su nota nueva. **No guardes la nota.**
+  Al volver, la cita ya es de «Paciente Prueba 07»;
+- la secretaria, en cambio, ve en esa fila «Ver en la agenda», sin «Ligar».
+
+**Si falla, significa que…** desde el resumen no se puede convertir una reserva
+en consulta, o la secretaria ve un botón que no le toca.
+
+#### J3-2. La misma ventana desde la tarjeta, con paciente nuevo
+
+**Qué hago:** en la agenda, pulso otra cita «Por ligar» y, en su tarjeta, «Ligar e
+iniciar consulta» → «Ligar e iniciar consulta» → «Registrar paciente nuevo».
+Intento «Crear y continuar» sin marcar el aviso; luego lo marco.
+
+**Qué debo ver:**
+- la tarjeta ya no ofrece «Iniciar consulta» en una cita por ligar. Lo que se
+  abre es la ventana pequeña, no «Editar cita»;
+- «Registrar paciente» viene con el nombre, los apellidos, el correo y el
+  teléfono de quien reservó ya puestos;
+- sin la casilla del aviso: «Debes marcar el consentimiento del aviso de
+  privacidad.», y no se crea;
+- con la casilla, se crea y se abre la nota (no la guardes).
+
+**Si falla, significa que…** se crean pacientes sin consentimiento (prohibido), o
+la tarjeta sigue llevando al formulario completo.
+
+#### J3-3. Desde el aviso de la campana, y «¿No es una cita?» de Google
+
+**Qué hago:** en la agenda, abro la campana → «Avisos» y pulso el aviso «…
+reservó por enlace» de una cita que sigue por ligar. Cancelo. Con el Google
+simulado (C0), creo «Valoración hombro» para mañana, `/ya`, y pulso su aviso
+«por asignar». En la ventana, pulso «¿No es una cita?».
+
+**Qué debo ver:**
+- el aviso de la reserva abre la ventana pequeña con los datos de quien reservó;
+- el de Google abre la misma ventana, con «¿No es una cita?»;
+- al pulsar «¿No es una cita?», la ventana se cierra y el evento queda como
+  evento, sin marca «Por asignar»;
+- el aviso de una cancelación sigue llevando a la tarjeta de la cita, como antes.
+
+**Si falla, significa que…** la campana no lleva a ligar, o lleva a ligar algo
+que ya no se puede ligar.
+
+#### J3-4. Doble clic en la ventana
+
+**Qué hago:** en la ventana, hago DOBLE CLIC en «Ligar e iniciar consulta». Luego
+pulso «Registrar paciente nuevo» y hago DOBLE CLIC en «Cancelar».
+
+**Qué debo ver:** el doble clic deja el buscador abierto sin elegir ningún
+paciente. Al cancelar el alta, la ventana sigue abierta: el segundo clic no la
+cierra ni pulsa nada debajo.
+
+**Si falla, significa que…** un doble clic liga a un paciente al azar o cierra la
+ventana.
+
+#### J3-5. Sin botones de duración en una reserva por enlace
+
+**Qué hago:** en la agenda, abro una cita «Por ligar» → engrane «Configuración de
+la cita». Después, «Agendar» una cita nueva.
+
+**Qué debo ver:** en «Editar cita» de la reserva, la fila de botones «Duración»
+(15 min … 2 horas) ya no está; «Hora de fin» sí, y se puede cambiar. En «Nueva
+cita», los botones de duración siguen ahí.
+
+**Si falla, significa que…** los botones invitan a cambiar la duración de una
+cita que eligió el paciente.
+
+#### J3-6. La duración es la del fin real, no la del tipo
+
+**Qué hago:** como Dr. Admin, en la configuración › «Tu consulta» › «Agregar tipo
+de cita», creo «Revisión corta» de 30 min. Agendo a «Paciente Prueba 07» con ese
+tipo y, en «Hora de fin», pongo 50 minutos después del inicio. Guardo y abro su
+tarjeta.
+
+**Qué debo ver:** la tarjeta dice «50 min» (no 30). Al editar, la hora de fin es
+la que puse. En el enlace de reserva de ese día, los turnos que tocan esos 50
+minutos no se ofrecen.
+
+**Si falla, significa que…** la agenda mide las citas con la duración del tipo y
+no con la real.
+
+### J4 · Google y las citas reservadas por enlace (puntos 9, 10 y 11)
+
+#### J4-1. Mover en Google una cita reservada por enlace
+
+**Qué hago:** con el Google simulado (C0), reservo una cita por el enlace de Dr.
+Admin Semilla Uno para la semana que entra. En el Google simulado la muevo a otra
+hora. Abro la agenda de Spinus.
+
+**Qué debo ver:** en Spinus sigue a su hora. Al poco, en Google vuelve sola a su
+hora. En la campana, pestaña «Avisos»: «Desde Google no se pueden mover las citas
+reservadas por enlace. Para cambiarla, usa Reagendar: se le avisará al
+paciente.»
+
+**Si falla, significa que…** si en Spinus cambió la hora, el candado de la
+reserva no funciona (grave); si Google no vuelve, el restablecimiento no se
+repite; si no hay aviso, falta la migración 37.
+
+#### J4-2. Un aviso por intento
+
+**Qué hago:** con el aviso de J4-1 sin pulsar, cierro y abro la agenda dos veces.
+Luego vuelvo a mover la cita en Google y abro la agenda.
+
+**Qué debo ver:** un solo aviso de esa cita todo el tiempo; tras moverla otra
+vez, el mismo aviso sube arriba («hace un momento»). Si lo habías pulsado antes,
+aparece uno nuevo.
+
+**Si falla, significa que…** dos avisos iguales tras abrir la agenda: la
+deduplicación no funciona.
+
+#### J4-3. Pulsar el aviso
+
+**Qué hago:** pulso el aviso de J4-1.
+
+**Qué debo ver:** la agenda va al día de la cita y abre su tarjeta con
+«Reagendar» como botón grande de arriba, ya seleccionado (Enter lo pulsa). El
+aviso deja de contar.
+
+**Si falla, significa que…** si la tarjeta sale con «Iniciar consulta» arriba, no
+llega el destacado.
+
+#### J4-4. Lo de Google sin morado
+
+**Qué hago:** en el Google simulado creo un evento suelto («Junta de hospital») y
+uno que se repite dos días («Sesión académica»). Abro la agenda en Semana, Mes y
+en el teléfono.
+
+**Qué debo ver:** ninguno en morado: los dos con los colores de «Agendada». Los
+dos llevan la «G» de colores. La tarjeta de «Junta de hospital» también la lleva
+junto al nombre. En el engrane, «Leyenda de estados»: los cinco estados y «G · Se
+agendó en Google», sin «GCal» ni morado.
+
+**Si falla, significa que…** algo morado: la reasignación de colores no llega a
+esa vista.
+
+### J5 · La configuración nueva (sección F, puntos 13 a 17)
+
+#### J5-1. La primera vez
+
+**Qué hago:** recién sembrado (o tras «Empezar de nuevo», J5-6), entro como **Dr.
+Admin Semilla Uno** a Agenda › engrane › «Configuración de la agenda».
+
+**Qué debo ver:** «¿Cuándo das consulta?», «Paso 1 de 3», una tarjeta por
+consultorio (Consultorio Centro, Hospital Norte) con «Igual que la clínica / Otro
+horario». Elijo «Otro horario» en Hospital Norte, apago el sábado, «Continuar»;
+45 min y la línea «En un día de 8:00 a 18:00 te caben 13 consultas…»,
+«Continuar»; prendo el recordatorio, «Terminar». Veo «Tu agenda ya está lista»
+con una dirección `…/reservar/…`, «Copiar enlace», «Mandar por WhatsApp» y el
+resumen con «Cambiar».
+
+**Si falla, significa que…** la primera vez no se guarda paso a paso o no crea el
+enlace.
+
+#### J5-2. Terminar después
+
+**Qué hago:** en el paso 2 elijo 20 min y pulso «Terminar después». Vuelvo a la
+configuración.
+
+**Qué debo ver:** abre otra vez en el paso 2 con 20 min marcado (en este
+navegador; en otro, en el primer paso pendiente).
+
+**Si falla, significa que…** no recuerda en qué paso me quedé.
+
+#### J5-3. Cambiar desde el resumen
+
+**Qué hago:** en «Tu agenda ya está lista», «Cambiar» junto a «Cuánto dura tu
+consulta».
+
+**Qué debo ver:** el paso 2 con mi duración marcada.
+
+**Si falla, significa que…** el resumen no lleva al paso.
+
+#### J5-4. Las pestañas se guardan solas
+
+**Qué hago:** ya terminada la primera vez, vuelvo a la configuración, pestaña
+«Avisos», cambio «Pueden ver horarios de los próximos» a 90 y salgo del campo.
+Luego escribo 400.
+
+**Qué debo ver:** abajo, «Guardado»; al recargar sigue 90. Con 400 sale «de 1 a
+365» y no se guarda.
+
+**Si falla, significa que…** el autoguardado no llega al servidor o guarda
+valores inválidos.
+
+#### J5-5. Horario de la clínica
+
+**Qué hago:** como Dr. Admin, «Cuándo das consulta» › abajo «Cambiar el horario
+de la clínica», apago el sábado, «Guardar horario». Después entro como **Dra.
+Invitada Semilla Dos** y como la secretaria.
+
+**Qué debo ver:** «Guardado» y «Horario de la clínica: Lun a vie 8:00 – 18:00».
+La invitada y la secretaria no ven «Cambiar el horario de la clínica»: dice «Lo
+cambia quien administra la clínica.».
+
+**Si falla, significa que…** alguien que no administra puede cambiar el horario
+de todos.
+
+#### J5-6. Empezar de nuevo
+
+**Qué hago:** Dr. Admin, «Más opciones» › «Empezar de nuevo», escribo RESTABLECER,
+«Restablecer».
+
+**Qué debo ver:** la primera vez desde el paso 1; las citas siguen. La invitada y
+la secretaria no ven «Empezar de nuevo».
+
+**Si falla, significa que…** se puede reiniciar sin ser administrador o el
+reinicio no vuelve a preguntar.
+
+#### J5-7. Nada se pierde
+
+**Qué hago:** Dra. Invitada, «Tu consulta» › «En cada consultorio» ›
+Rehabilitación › «Otra duración en este consultorio» › 1 hora. Luego «Cuándo das
+consulta» › «Cambiar horario» de Rehabilitación, cambio un día, «Guardar
+horario». Si el recordatorio de la clínica tiene un número de horas que no está
+entre 2, 12, 24 y 48 (por ejemplo 6, puesto con la configuración de antes), abro
+«Avisos» y cambio otro plazo.
+
+**Qué debo ver:** Rehabilitación sigue con 60 min y en su huso. «Avisos» enseña
+«6 horas» y no lo cambia al guardar el otro plazo.
+
+**Si falla, significa que…** la pantalla nueva pisa algo que la vieja respetaba.
+
+#### J5-8. Apagada
+
+**Qué hago:** con la v2 apagada en la clínica, abro `/agenda/configuracion`.
+
+**Qué debo ver:** página de no encontrado; el engrane abre el horario de siempre.
+
+**Si falla, significa que…** lo nuevo se ve sin el interruptor.
+
+### Integración de la tanda J
+
+#### J-INT-1. El correo del enlace de una vez, en la pantalla nueva
+
+J2 (el correo) y J5 (la pantalla) se escribieron a la vez: el campo «Correo del
+paciente (opcional)» lo puso la integración en «Crear uno». Es la prueba J2-1;
+hazla también desde «Enlaces de los demás médicos» (abre la ficha de la Dra.
+Invitada Semilla Dos y crea uno de una vez con correo): el comprobante llega a
+ese correo.
+
+**Si falla, significa que…** una de las dos maneras de crear el enlace no manda
+el correo.
+
+### Qué repetir tras la tanda J
+
+Antes de nada, P5 a P8 (la base pasa a **42** migraciones). Después, las nuevas
+de esta sección y estas, que ya existían y cambian o hay que repetir:
+
+**Bloque B (configuración)**
+- **B1. La pantalla de configuración:** ahora es la primera vez (J5-1) o cinco
+  pestañas: «Tu enlace», «Cuándo das consulta», «Tu consulta», «Avisos» y «Más
+  opciones» (la secretaria: «Enlaces», «Cuándo dan consulta», «Tipos de cita»,
+  «Avisos», «Más opciones»). Ya no hay «Este dispositivo».
+- **B2 y B3** (los ajustes de la clínica y quién los cambia): en «Avisos», sin
+  botón «Guardar ajustes» (se guardan solos, J5-4); quien no administra lee
+  «Lo cambia quien administra la clínica.».
+- **B4. Crear y archivar tipos de cita:** «Tu consulta» › «Otros tipos de cita»;
+  archivar se llama «Quitar» y los quitados están en «Quitados (N)» con
+  «Reactivar».
+- **B6. Disponibilidad por consultorio:** «Cuándo das consulta» › «Cambiar
+  horario» (diálogo «Horario en …», «Igual que la clínica / Otro horario»).
+
+**Bloque C (Google)**
+- **C9. Series que se repiten:** siguen sin poder moverse desde Spinus; ahora se
+  pintan con los colores de «Agendada» y la «G», no en morado (J4-4).
+
+**Bloque D (reserva por enlace)**
+- **D3. Enlace de un solo uso:** se crea en «Tu enlace» › «Enlaces de una vez» ›
+  «Crear uno», con correo opcional; la página ya no pide correo y el comprobante
+  sólo llega si la clínica lo puso (J2-1, J2-2).
+- **D10 y D11** (ligar desde el formulario): sin cambios; es el segundo camino. La
+  nota de D11 («no se precarga el teléfono») sigue siendo cierta en ese camino;
+  en la ventana nueva sí se precarga (J3-2).
+
+**Bloque E**
+- **E1. El comprobante al reservar:** en el enlace de un solo uso va al correo
+  que puso la clínica (J2-1).
+
+**Bloque F**
+- **F3 (Densidad), F5 y F11 («Compactar»):** desde el engrane, con interruptor;
+  la densidad se llama «Densidad compacta».
+- **F17. El formulario de alta:** los botones de duración siguen al dar de alta;
+  al EDITAR una reserva por enlace ya no salen (J3-5).
+- **F22. La tarjeta de lectura:** en una cita por ligar, la acción principal es
+  «Ligar e iniciar consulta», no «Iniciar consulta».
+
+**§8-bis (tanda T)**
+- **T2-1, T2-3, T2-4 y T2-7** (lo que falta para el enlace, cada médico su
+  ficha, la pantalla): el aviso «No abrirá…» va encima de «Tu enlace»; el enlace
+  fijo es un interruptor Prendido/Apagado (apagar = revocar, con confirmación) y
+  «Cambiar por uno nuevo»; las fichas de los demás médicos, en «Enlaces de los
+  demás médicos (N)».
+- **T3-1. El engrane ya no dice «Horario»:** repetir; sin cambios esperados.
+- **T3-6. Apagar la tarjeta al pasar el ratón:** ahora es el engrane › «Pop-up de
+  eventos» (J1-1).
+
+**§8-ter (tanda G)**
+- **G1-1. La reserva por pasos:** en el enlace de un solo uso, «Tus datos» ya no
+  tiene correo.
+- **G2-1, G2-2 y G2-5** (primeros pasos, crear el enlace sin duración, cada enlace
+  dice si funciona): ahora es la primera vez (J5-1), que crea el enlace al
+  terminar; lo que falta se avisa en «Tu enlace».
+- **G2-3, G2-4 y G2-9** (la duración de la invitada, otra duración en un
+  consultorio, archivar sus tipos): en «Tu consulta» y «En cada consultorio».
+- **G2-8. Ya no está el horario de la clínica:** cambia: vuelve, en «Cuándo das
+  consulta», sólo para quien administra (J5-5).
+
+**§8-quater (tanda H)**
+- **H1-5. El correo sigue siendo obligatorio:** en el fijo, sin cambios.
+- **H2-1 a H2-4** (pestañas, invitados plegados, botones, «Plazos y
+  recordatorios»): con las pestañas nuevas; «Plazos y recordatorios» es «Avisos».
+- **H2-5 y H2-6** (el recordatorio): el interruptor está en «Avisos»
+  («Recordarle su cita al paciente») y se guarda solo.
+- **H2-7 y H2-8** (restablecer): es «Más opciones» › «Empezar de nuevo»; al
+  terminar, la primera vez desde el paso 1 (J5-6).
+
+**§8-quinquies (tanda I)**
+- **I2-1. La reserva con enlace de un solo uso no pide correo:** el campo
+  «Correo electrónico (opcional)» ya no existe; la sustituyen J2-1 y J2-2.
+- **I2-2. El enlace fijo no cambió:** repetir.
+- **I2-3. Bloquear a alguien que reservó sin correo:** repetir; ahora además
+  gasta el enlace (J2-4).
+- **I2-9. Google no mueve una cita reservada por enlace:** además sale el aviso
+  de J4-1.
+- **I3-1. La reserva por enlace en «Próximas citas»:** el Dr. Admin ve «Ligar» /
+  «Ligar e iniciar consulta» en la fila por ligar; la secretaria sigue viendo
+  «Ver en la agenda».
+- **I3-2, I3-4 e I3-5** (por asignar de Google): la tarjeta y la fila de
+  «Próximas citas» ofrecen «Ligar e iniciar consulta» (en la fila, «Ligar») en
+  vez de «Iniciar consulta» o el cuadrito; «¿No es una cita?» sigue en la fila.
+- **I4-2. El horario por revisar:** «Por revisar» y «Confirmar horario» están en
+  la tarjeta del consultorio, en «Cuándo das consulta».
+- **I5-1, I5-2 e I5-4:** repetir, sin cambios esperados: la campana y el engrane
+  se cargan aparte, pero salen igual y a la vez.
+- **I5-3. El menú del engrane:** interruptores en lugar de
+  «Encendido/Apagado» y «Normal/Compacta»; «Densidad compacta»; una opción más,
+  «Pop-up de eventos» (seis en escritorio con Semana o Día). La leyenda ya no
+  dice «GCal».
+- **I5-6. Los avisos llevan a su cita:** el de una reserva o un reagendo aún por
+  ligar abre la ventana «Ligar e iniciar consulta» (J3-3).
+- **I5-7. Avisos de Google:** hay un tipo más (J4-1).
+- **I5-9 e I-INT-2** (correo a la clínica por cada reserva): el interruptor es
+  «Avisarme cuando alguien aparte cita», en «Avisos».
+
+**Apagado**
+- **X1:** nada de lo de arriba se ve (J1-3, J5-8).
+
+---
+
 ## 9. Seguridad
 
 ### 9.1 Aislamiento entre clínicas y entre médicos
@@ -4803,6 +5320,33 @@ Marca cada una al pasarla. Si una falla, anota el número y qué viste.
 - [ ] I5-10. Apagada, la barra de siempre
 - [ ] I-INT-1. «¿No es una cita?» desde la campana
 - [ ] I-INT-2. Único sin correo avisa a la clínica
+- [ ] J1-1. «Pop-up de eventos» en el engrane
+- [ ] J1-2. Interruptores en el menú del engrane
+- [ ] J1-3. Con la v2 apagada, la agenda no carga lo de la v2
+- [ ] J2-1. El enlace de un solo uso lleva el correo que escribo yo
+- [ ] J2-2. Sin correo de la clínica no sale ningún correo
+- [ ] J2-3. Un enlace de un solo uso agotado no dice por qué
+- [ ] J2-4. Bloquear a alguien también gasta su enlace
+- [ ] J2-5. La anticipación de 2 horas por las dos caras
+- [ ] J3-1. «Ligar e iniciar consulta» en Próximas citas (sin guardar la nota)
+- [ ] J3-2. La ventana desde la tarjeta, con paciente nuevo (sin guardar la nota)
+- [ ] J3-3. Desde la campana, y «¿No es una cita?» de Google
+- [ ] J3-4. Doble clic en la ventana
+- [ ] J3-5. Sin botones de duración en una reserva por enlace
+- [ ] J3-6. La duración es la del fin real
+- [ ] J4-1. Mover en Google una cita reservada por enlace
+- [ ] J4-2. Un aviso por intento
+- [ ] J4-3. Pulsar el aviso: «Reagendar» destacado
+- [ ] J4-4. Lo de Google sin morado
+- [ ] J5-1. La primera vez
+- [ ] J5-2. Terminar después
+- [ ] J5-3. Cambiar desde el resumen
+- [ ] J5-4. Las pestañas se guardan solas
+- [ ] J5-5. Horario de la clínica
+- [ ] J5-6. Empezar de nuevo
+- [ ] J5-7. Nada se pierde
+- [ ] J5-8. Apagada
+- [ ] J-INT-1. El correo del enlace de una vez, también desde otro médico
 
 **Seguridad**
 - [ ] S1. La Clínica B no ve la A
@@ -4937,8 +5481,11 @@ Marca cada una al pasarla. Si una falla, anota el número y qué viste.
 | 32 | `20261121141000_agenda_i4_horario_revisado.sql` | El horario de cada consultorio, «por revisar» hasta que alguien lo confirma (I4-2). **Todos los consultorios existentes quedan «por revisar»**. Después de la 26 |
 | 33 | `20261121142000_agenda_i4_cancelada_cerrada.sql` | La cancelada que se sustituye queda cerrada, no borrada (I4-4) |
 | 34 | `20261121150000_agenda_i5_avisos_clinica.sql` | Los avisos de la clínica en la campana y el correo a la clínica por cada reserva, APAGADO de fábrica (I5-6 a I5-9). **Después de la 30** (su pre-vuelo lo exige) |
+| 35 | `20261122120000_agenda_j2_unico_tope_correo.sql` | El enlace de un solo uso lleva el correo que pone la clínica y se agota a los 5 intentos o al primer «bloqueado» (J2-1 a J2-4). **Antes del código** |
+| 36 | `20261122120100_agenda_j2_unico_carrera_client_id.sql` | Dos reservas a la vez con el mismo envío no deshacen el conteo de intentos. **Después de la 35** (su pre-vuelo lo exige) |
+| 37 | `20261122140000_agenda_j4_aviso_google_reserva.sql` | El aviso «Desde Google no se pueden mover las citas reservadas por enlace» (J4-1 a J4-3). **Después de la 34** |
 
-Son **34**. Las siete de la tanda I (28 a 34) van al final y en ese orden. Antes de la tanda I eran 27: Las tres de la tanda H (25 a 27) van al final y en ese orden. Las cuatro de la tanda del 2026-11-14 (21 a 24) van al final y en ese orden; las 17 a 20 van en este orden aunque se escribieron
+Son **37**. Las tres de la tanda J (35 a 37) van al final y en ese orden; **nunca vuelvas a correr la 35 después de la 36** (se detiene sin hacer nada: no reconoce lo que dejó la 36). Antes de la tanda J eran 34. Las siete de la tanda I (28 a 34) van al final y en ese orden. Antes de la tanda I eran 27: Las tres de la tanda H (25 a 27) van al final y en ese orden. Las cuatro de la tanda del 2026-11-14 (21 a 24) van al final y en ese orden; las 17 a 20 van en este orden aunque se escribieron
 después: las 17 y 18 añaden reglas a la tabla de citas, la 19 reemplaza
 la protección de los enlaces que puso la 8, y la 20 reemplaza tres funciones de
 las 9 y 10. Por eso, una vez más: **nunca vuelvas a correr la 8, la 9 ni la 10

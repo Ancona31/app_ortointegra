@@ -447,11 +447,12 @@ Plan, decisiones y avance: `mejora_agendaV2.md` (§6-bis decisiones, §7 lo que
 le toca a Angel, §10 lo que no se probó en local). Auditoría del conjunto de
 migraciones: `supabase/AUDITORIA-CONJUNTO-AGENDA-V2.md`. Guía local:
 `GUIA_AUDITORIA_AGENDA_V2.md`; pruebas a mano: `GUIA_PRUEBAS_AGENDA_V2.md`.
-Deuda abierta: `DEUDA_TECNICA.md`, AG-DT-13 a AG-DT-93.
+Deuda abierta: `DEUDA_TECNICA.md`, AG-DT-13 a AG-DT-166.
 
-**Estado:** el código y las 27 migraciones (`20261111120000` a
-`20261120130000`: las 16 del cierre, las 4 de las correcciones de seguridad,
-las 4 de la tanda de diseño, duración y horarios y las 3 de la tanda H) están en `feature/agenda-v2`,
+**Estado:** el código y las 37 migraciones (`20261111120000` a
+`20261122140000`: las 16 del cierre, las 4 de las correcciones de seguridad,
+las 4 de la tanda de diseño, duración y horarios, las 3 de la tanda H, las 7 de
+la tanda I y las 3 de la tanda J) están en `feature/agenda-v2`,
 probados sólo en local. En producción no hay nada
 aplicado ni encendido hasta que Angel lo haga (§7).
 
@@ -867,6 +868,94 @@ proyecto, 32 con las de `main`).** Además de lo de arriba:
 * **El correo a la clínica por cada reserva** está APAGADO de fábrica
   (`agenda_ajustes.correo_reserva_clinica`) y no lleva nada clínico: no le
   añadas tipo de cita, motivo ni datos de contacto del paciente.
+* **Tanda J (2026-11-18).** Lo que sigue es de J1 a J5 y de su integración.
+* **La campana y el menú del engrane NO van en el chunk de la página**
+  (AG-DT-136, J1). `AgendaCliente` los importa con `import()` SOLO cuando el
+  interruptor está encendido, y los guarda ya resueltos en estado en el mismo
+  callback que da el interruptor por leído (`leerInterruptorYBarra`). **No los
+  pases a `dynamic()`:** su `React.lazy` suspende un fotograma al montar aunque el
+  chunk ya esté descargado, y la barra v2 sale sin engrane ni campana (lo cuenta
+  `agenda-j1-engrane`). **Tampoco los importes en estático:** vuelven a bajar con
+  la v2 apagada. Si el chunk falla, la v2 se queda apagada (falla cerrado).
+* **«Pop-up de eventos» (la tarjeta al pasar el ratón) vive en el menú del
+  engrane**, no en la configuración. La clave es la misma:
+  `spinus.agenda.tarjeta-al-pasar`. En ese menú, lo de dos estados es
+  `menuitemcheckbox` con interruptor a la derecha; lo que abre algo es `menuitem`
+  sin interruptor. Una opción con más de dos valores no lleva interruptor.
+* **Enlace de un solo uso: el correo es el de la clínica, nunca el tecleado**
+  (J2). `reservar_por_enlace` ignora `p_correo` y `p_correo_hmac` en el único y
+  usa `reserva_enlaces.correo` y `correo_hmac`, que la clínica escribe al emitir
+  (`reserva_enlace_emitir` de 9 argumentos; el HMAC lo calcula el servidor). La
+  página del único no pide correo. No reintroduzcas el correo tecleado en el
+  único (era AG-DT-100). El campo está en «Crear uno» de «Tu enlace» y en las
+  fichas de los demás médicos (`emitirEnlace(…, correo)`).
+* **Tope del único: 5 intentos en la base** (`reserva_enlaces.intentos` y
+  `agotado_en`, bajo el `FOR UPDATE` del enlace). «Bloqueado» lo agota en el
+  acto. Agotado = 410 `enlace_no_disponible`, sin la causa. Lo que se compruebe
+  DESPUÉS del contador no puede lanzar una excepción provocable por quien
+  reserva: desharía el conteo. Por eso `client_id_en_uso` se comprueba antes y
+  el INSERT de la cita va en su propio `BEGIN … EXCEPTION WHEN unique_violation`
+  (`20261122120100`): no lo «simplifiques» quitando el bloque (el EXISTS no ve
+  las transacciones sin confirmar; escenario 5 de `reserva-carrera.sh`).
+* **`proteger_reserva_enlace_unico()`** guarda las columnas del único (correo
+  inmutable; intentos sólo hacia arriba y sólo por `service_role`).
+  `proteger_reserva_enlaces()` sigue intacto (md5 `acd4128b`, lo exigen
+  pre-vuelos).
+* **`reserva_enlace_emitir` tiene dos firmas:** la de 7 argumentos se conserva
+  por compatibilidad durante el despliegue (AG-DT-137). La ruta usa la de 9 y,
+  si falta (PGRST202) y el único va SIN correo, cae en la de 7; con correo, no
+  emite. La lista reintenta sin `agotado_en` si la columna no existe (42703).
+  No quites esa tolerancia mientras la migración de J2 no esté en producción
+  (integración J, `7a1e831`).
+* **«Ligar e iniciar consulta» es UNA ventana** (`VentanaLigarCita.tsx`, J3),
+  siempre con `next/dynamic` desde sus tres sitios: la fila de «Próximas citas»
+  del dashboard del médico, la acción `ligar` de la tarjeta y el aviso de la
+  campana (`avisoSeLiga`). Liga por el PUT de siempre (`ligarCitaAPaciente`). No
+  le añadas los campos del formulario (duración, tipo, observaciones): Angel la
+  pidió sin ellos. El D7 del modal sigue vivo como segundo camino.
+  `ProximasCitas` no conoce rutas clínicas: el botón lo inyecta el dashboard del
+  médico por la prop `ligar`; la secretaria no la pasa.
+* **El tipo de cita sólo PROPONE la duración.** Todo lo que muestra o calcula la
+  duración de una cita existente usa `end_time`
+  (`src/lib/tests/duracionRealCita.test.ts`).
+* **Restablecer en Google lo que la base rechaza** (C5/I9, J4): un fallo
+  PASAJERO de Google (red, 429, 5xx, 403 de cuota) detiene la página
+  (`RestablecimientoPendiente`) y la pasada siguiente lo repite; cualquier otro
+  fallo NO, o la clínica entera deja de sincronizar.
+* **Aviso `google_movimiento_rechazado`:** uno por intento = (cita, `updated` del
+  evento). Lo escribe `cita_movimiento_google_registrar` (sólo `service_role`,
+  `20261122140000`); pulsarlo abre la tarjeta con «Reagendar» de principal
+  (`destacar`). `leerAvisosClinica` pide sólo los tipos conocidos y salta fila a
+  fila el que no conoce: así una migración que añade un tipo puede ir antes que
+  su código. No vuelvas a validar la lista entera de una vez.
+* **Con la v2, lo de Google no es morado:** `--ag-gcal-*` valen los de
+  «Agendada» dentro de `.fc`; la «G» de las filas nacidas en Google es
+  `.ag-g-origen`, visible sólo con la v2.
+* **La configuración de la agenda** (`/agenda/configuracion`, v2, J5) es la de las
+  maquetas `docs/spec/Main.dc.html` y `Configuracion.dc.html`: la primera vez
+  (`PrimeraVez.tsx`) o cinco pestañas (`PestanasConfiguracion.tsx`), montados por
+  `ConfiguracionAgenda.tsx`. La página vieja (`ConfiguracionCalendario.tsx`)
+  sigue en disco sin montar (AG-DT-162).
+* «Primera vez» se calcula de los datos (`esPrimeraVez`: sin duración propia o con
+  TODOS sus consultorios por revisar). No reabras la primera vez por un enlace
+  apagado o un consultorio nuevo: eso va en las pestañas.
+* Las pestañas se guardan solas con las rutas de siempre; «Guardado» sólo tras la
+  respuesta buena. No metas un botón «Guardar» ni guardes sin serializar (un
+  `PUT` de ajustes en vuelo). El horario de la clínica se cambia sólo por
+  `PUT /api/me/horario` (administrador, `audit_log`). «Empezar de nuevo» es
+  `POST /api/agenda/restablecer`, el mismo diálogo de H.
+* Los botones con borde de la configuración usan `--ag-control-border`; los que
+  la maqueta pinta como texto siguen siendo texto.
+* **Nunca arranques un servidor dentro del `flock`** de
+  `e2e/resultados/reglas/e2e.lock`: el hijo hereda el descriptor y retiene el
+  lock mientras vive (pasó dos veces en la tanda J). Arráncalo fuera del lock, o
+  corre con `flock -o` lo que pueda arrancar uno (Playwright con las e2e de
+  Google, que levantan `next dev` desde la prueba).
+* **La semilla (`scripts/agenda-semilla.ts`) borra toda tabla nueva que cuelgue
+  de `clinicas`** antes de borrar las clínicas Semilla. Con la FK RESTRICT (regla
+  del proyecto), una fila olvidada aborta «borrar clínicas» y deja la base
+  compartida sin datos para todos (pasó con `gcal_movimientos_rechazados`). Quien
+  cree una tabla así la añade a la semilla en el mismo commit.
 
 ---
 

@@ -4558,6 +4558,11 @@ cliente: `channel()` lo devuelve y se le añade otro manejador.
 
 ### AG-DT-100 — Un único sin correo admite el correo de un tercero
 
+**Cerrada en la tanda J (J2, punto 3; integrada 2026-11-18):** el correo del
+único lo escribe la clínica al emitirlo (`reserva_enlaces.correo`,
+`20261122120000`) y `reservar_por_enlace` ignora el tecleado; la página ya no lo
+pide. Queda el texto de abajo como historia.
+
 **Estado:** abierta, seguridad MEDIA, ya existía (I2, punto 2; ver AG-DT-70) ·
 Como el único no verifica el correo, quien lo tenga puede escribir el de otra
 persona: a ese tercero le llega el comprobante (ahora a nombre del médico) y su
@@ -4568,6 +4573,12 @@ aceptar el riesgo por escrito.
 
 ### AG-DT-101 — El enlace único no tiene tope por enlace
 
+**Cerrada en la tanda J (J2, punto 3; integrada 2026-11-18):** 5 intentos por
+único en la base y «bloqueado» lo agota en el acto (`reserva_enlaces.intentos` y
+`agotado_en`, `20261122120000` y `…120100`). Queda «bloqueado» como oráculo de un
+bit por enlace emitido, no por teléfono (AG-DT-28). Queda el texto de abajo como
+historia.
+
 **Estado:** abierta, seguridad BAJA, ya existía (I2, punto 2; ver AG-DT-28) ·
 Con un único se pueden probar teléfonos y distinguir «bloqueado a mano» (403) de
 «ok»: un 403 no gasta el enlace, y sólo limitan la IP (6/h) y el dispositivo
@@ -4575,6 +4586,9 @@ Con un único se pueden probar teléfonos y distinguir «bloqueado a mano» (403
 «bloqueado» gaste el único.
 
 ### AG-DT-102 — `correo: ""` en el único da 400
+
+**Tanda J:** ya no aplica al único (la ruta no mira `correo` ahí); en el fijo
+sigue como estaba.
 
 **Estado:** abierta, seguridad BAJA, aceptada (I2, punto 2) · La página omite el
 campo vacío, pero otro cliente que mande `""` falla. Se dejó así porque falla
@@ -4865,6 +4879,242 @@ menú del engrane y, si sólo los usa la v2, cargarlos con `dynamic()`, como ya 
 hizo con las herramientas de F. ASUMIENDO QUE son la mayor parte, cosa que no se
 midió módulo a módulo. **No se tocó:** cambia cómo se monta la barra y pide
 su propia e2e y su medición.
+
+**Tras la tanda J (integración, 2026-11-18): sigue abierta, con un residuo.** J1
+sacó la campana y el menú del engrane a sus propios chunks (lo que pedía «Qué
+haría falta»). Medido contra `0349221` y contra `ccb9087` en 4 rondas
+intercaladas (`mejora_agendaV2.md` §9, «Tanda J», paso 6):
+
+- **Con la v2 apagada:** 559 239 (`ccb9087`) → **554 826 bytes** (−4,4 KB), 34
+  chunks en los dos. Contra `0349221` (548 981, 31 chunks) quedan **+5,8 KB y +3
+  chunks**.
+- **Con la v2 encendida:** 581 179 → **591 639** (+10,5 KB) y 36 → **38
+  chunks**; contra `0349221` (572 467, 33), +19 KB. El chunk de la página baja
+  de 43 238 a 34 964 bytes, pero la campana (7 393) y el engrane (4 413) llegan
+  aparte, `InteraccionesV2` crece 2,6 KB (de 15 039 a 17 590: lo que le
+  añaden J3 y J4; la ventana de ligar va en su propio `dynamic()`), el chunk que comparte con el modal y la campana crece
+  2 KB y `HerramientasV2`, 0,5 KB (de `react-loadable-manifest.json` de cada
+  build).
+- **Todo llega antes del primer evento**: en local, el corte «primer evento» y
+  el de «red en reposo» dan los mismos bytes en los tres árboles. El diferido de
+  J1 no saca esos chunks del camino de la apertura; tampoco suma tiempo.
+- **Tiempo:** apertura en frío 266,5 ms (267,5 y 269,5 en los de antes); con
+  red limitada, **776** con la v2 apagada y encendida, igual que `ccb9087` (776 y
+  778) y **+17 ms sobre `0349221`** (759 y 762). Las medianas por corrida no se
+  solapan con `0349221` (757–761 frente a 775–779).
+- **«Volver del dashboard»:** 83 ms apagada, como `ccb9087` (82); `0349221`,
+  78,5 (corridas de 70 a 81).
+
+El residuo es el de la tanda I: +17 ms con red limitada y +5,8 KB con la v2
+apagada contra `0349221`. Causa no aislada más allá del peso.
+
+### AG-DT-137 — `reserva_enlace_emitir` de 7 argumentos sigue viva
+
+**Estado:** abierta, menor (J2, punto 3) · J2 añadió la de 9 (con el correo del
+único) y conservó idéntica la de 7, para que el código de antes siga emitiendo
+durante el despliegue. La integración la usa además como respaldo cuando falta
+la migración de J2 y el único va sin correo (`7a1e831`). **Qué haría falta:**
+cuando ninguna instancia del código anterior siga en pie, `grep -rn
+"reserva_enlace_emitir" src supabase`, quitar el respaldo de
+`src/app/api/agenda/enlaces/route.ts` (`emitirEnBase`) y una migración con el
+DROP de esa firma (y su fila en la tabla de migraciones).
+
+### AG-DT-138 — El aviso de privacidad del único habla de un correo que ya no se pide
+
+**Estado:** abierta, legal, necesita el texto de Angel (J2) · La casilla dice
+«…asociado a mi teléfono y a mi correo» aunque la página del enlace de un solo
+uso ya no pide correo (el correo, si lo hay, lo pone la clínica). El texto del
+aviso no se toca sin revisión legal.
+
+### AG-DT-139 — La API distingue «agotado» de «usado» o «caducado»
+
+**Estado:** abierta, seguridad BAJA, opcional (J2) · La página dice lo mismo en
+los tres casos, pero la API devuelve 410 `enlace_no_disponible` para el agotado y
+sus códigos de siempre para usado o caducado: no dice la causa, pero un tercero
+ve que «es otro caso». Opción: una sola respuesta neutra para los tres.
+
+### AG-DT-140 — Errores de la base después del contador del único deshacen el conteo
+
+**Estado:** abierta, seguridad BAJA (revisión de j2-b) · Un deadlock, un
+statement/lock timeout o el borrado concurrente del consultorio o del tipo
+(23503) después de contar el intento deshacen la transacción y con ella el
+conteo. Quien reserva no los provoca con los datos de la ruta, y atraparlos
+escondería errores reales. El escenario 5 de `scripts/reserva-carrera.sh` no
+cubre la rama `RAISE` (otra violación única) ni el enlace fijo.
+
+### AG-DT-141 — Un único agotado desaparece de la lista sin aviso
+
+**Estado:** abierta, UX menor (J2) · Como el usado, el agotado deja de listarse
+en «Enlaces de una vez». La clínica sólo lo sabe si lo abre (`aperturaEnlace`:
+«agotó sus intentos de reserva»). Opciones: una marca «agotado» en la lista o un
+aviso en la campana.
+
+### AG-DT-142 — Un correo bloqueado agota el único en el primer intento
+
+**Estado:** abierta, UX menor (J2) · Si la clínica pone al emitir un correo que
+el candado tiene bloqueado, la primera reserva es «bloqueado» y gasta el enlace.
+Es lo esperado, pero la clínica no lo sabe al emitir. Avisar al emitir sería otro
+oráculo, ahora hacia dentro: decidirlo antes de hacerlo.
+
+### AG-DT-143 — Dimensión de auditoría propuesta: contadores dentro de una transacción que puede fallar
+
+**Estado:** propuesta (J2), sin aplicar · `supabase/AUDITORIA-MIGRACIONES.md` no
+se edita sin Angel. Si una función cuenta (intentos, cupos) y después hace algo
+que quien llama puede hacer fallar con una excepción, el ROLLBACK deshace el
+conteo. Así nacieron el hallazgo H1 de `20261122120000` y la carrera que cerró
+`20261122120100`: comprobar antes no basta si otra transacción se adelanta; sí
+basta un bloque `EXCEPTION` alrededor de la sentencia que puede chocar.
+
+### AG-DT-144 — Sin e2e del fallo del chunk de la barra
+
+**Estado:** abierta, pruebas (J1) · Si el chunk de la campana y el engrane no
+llega, la v2 se queda apagada (falla cerrado). Está cubierto por lectura de
+código y por la revisión, no por una e2e: bloquear el chunk por URL es frágil,
+porque el nombre lleva hash.
+
+### AG-DT-145 — «Pop-up de eventos» se lee al montar el menú
+
+**Estado:** abierta, cosmético (J1) · Si otra pestaña cambia la preferencia con
+el menú abierto, el interruptor se queda desfasado hasta reabrirlo. La tarjeta
+lee la preferencia en cada disparo, así que el comportamiento es el bueno.
+
+### AG-DT-146 — Guardar una cita tarda ~150 ms más hasta que se va el modal
+
+**Estado:** aceptada, deliberada (J1); NO se ve en el alta (integración J) · J1
+midió ~146 ms más hasta que se iba el modal al GUARDAR UNA CITA YA EXISTENTE
+(«Editar cita», con su script `reglas/tmp/j1/medir-cita.mjs`) y lo atribuyó a la
+salida animada del modal (F2.7, `--ag-dur-base`, 180 ms); no es el servidor.
+
+La integración midió el ALTA («Nueva cita», un evento y una cita con paciente)
+en los tres árboles con el mismo script (4 rondas, 20 guardados por columna): el
+modal se va a los **183,5–184,4 ms** en `0349221`, en `ccb9087` y en la
+integración, con la v2 apagada y encendida, y la tarjeta se pinta a los
+**31,1–31,3 ms** en todos. En el alta no hay diferencia. El camino de J1 (editar)
+no se volvió a medir en la integración. Ver `mejora_agendaV2.md` §9, «Tanda J»,
+paso 6.
+
+### AG-DT-147 — `no_show` ocupa en la agenda y no en la reserva pública
+
+**Estado:** abierta, a decidir (J3, inventario del punto 12) · `citaOcupa` cuenta
+una inasistencia como tiempo ocupado; `reserva_ocupacion` no. Un turno con una
+inasistencia se ofrece por enlace y en la agenda sale ocupado.
+
+### AG-DT-148 — «Reagendar cita» pasa sólo la hora de fin
+
+**Estado:** abierta, SIN reproducir (J3) · `InteraccionesV2.tsx` (≈ línea 240)
+manda `horaFin`; una cita que cruce la medianoche podría reagendarse mal.
+
+### AG-DT-149 — «Reservó X» también en un evento de Google por asignar
+
+**Estado:** abierta, texto (J3) · En el paso 2, `PanelLigarCita` dice «Reservó X»
+aunque el evento venga de Google. Ya pasaba en el modal (D7/I3).
+
+### AG-DT-150 — El alta de paciente desde la ventana queda fuera de su atrapado de Tab
+
+**Estado:** abierta, accesibilidad (J3) · `QuickPatientModal` abierto desde
+`VentanaLigarCita` es hermano del panel en el DOM. Igual que en D7.
+
+### AG-DT-151 — El dashboard monta un oyente de más con la v2 apagada
+
+**Estado:** abierta, menor (J3) · `useEscudoTrasRegistro` (un `pointerdown` en
+captura) se monta también con la v2 apagada. No cambia el comportamiento.
+
+### AG-DT-152 — Ligar sin tiempo límite
+
+**Estado:** abierta, menor (J3) · `ligarCitaAPaciente` no tiene tiempo límite y la
+ventana no se cierra con el PUT en vuelo: un PUT colgado la deja sin cerrar hasta
+recargar. El D7 del modal tiene la misma llamada.
+
+### AG-DT-153 — Sin consultorios por error, la ventana dice «no está entre los tuyos»
+
+**Estado:** abierta, texto (J3) · Si `useConsultorios` falla sin respaldo, la lista
+llega vacía y la ventana da ese motivo en vez de un error de lectura.
+
+### AG-DT-154 — Restablecer en Google no tiene tope de reintentos
+
+**Estado:** abierta, menor (J4, punto 9) · Si Google falla siempre al escribir
+(pero no al leer), la página se repite una vez por hora para siempre y la clínica
+no avanza su sincronización. Falta un contador de intentos de la misma página (o
+avanzar tras N con `logger.error`).
+
+### AG-DT-155 — Restablecer con `sendUpdates: 'none'`
+
+**Estado:** abierta, a decidir (J4; decisión de C5) · Si quien movió el evento en
+Google avisó a los invitados y el paciente es invitado, le llega la hora
+equivocada; al devolverla, nada.
+
+### AG-DT-156 — Sin prueba de una página con citas restablecidas y pendientes
+
+**Estado:** abierta, pruebas (J4) · La regla es «si alguna quedó pendiente, se
+repite la página»; las ya escritas dan 412 al repetir y no se tocan. No hay
+prueba de la página mixta.
+
+### AG-DT-157 — `gcal_movimientos_rechazados` crece sin límite
+
+**Estado:** abierta, menor (J4, auditoría de su migración) · Sin nada clínico,
+pesa poco. Una purga futura debe saber que borrar un renglón deja que una
+repetición tardía del mismo `updated` vuelva a avisar.
+
+### AG-DT-158 — El aviso de Google fuera de la agenda no destaca «Reagendar»
+
+**Estado:** abierta, menor (J4) · `ListaAvisos` sin `alAbrir` (enlace
+`/agenda?cita=`) abre la tarjeta sin destacar. Hoy la campana sólo se monta en la
+agenda, que sí lo destaca.
+
+### AG-DT-159 — Tablas con FK RESTRICT a `clinicas` que la semilla no borra
+
+**Estado:** abierta, pruebas (J4; la de J4 ya la borra la semilla) ·
+`clinica_conexiones_google` y `gcal_sync_estado` las borran `borrarConexion()` de
+las e2e y el cierre de `google-falso-manual.ts`; si una corrida muere sin
+`afterAll`, la semilla falla en «borrar clínicas» y la base compartida queda sin
+datos. Regla para lo nuevo (CLAUDE.md): la semilla borra toda tabla nueva que
+cuelgue de `clinicas`.
+
+### AG-DT-160 — `FilaCita` de `avisosServidor` sigue estricta
+
+**Estado:** abierta, menor (revisión de J4) · Un `status` nuevo en `appointments`
+vaciaría la campana igual que lo hacía un tipo de aviso desconocido (que J4 ya
+salta fila a fila). Hoy lo impide la CHECK de la base.
+
+### AG-DT-161 — Las e2e de Google arrancan `next dev` dentro del flock
+
+**Estado:** abierta, pruebas (J1, J4) · `reserva-google.e2e.ts` y las demás de
+Google arrancan su servidor desde la prueba: el hijo hereda el descriptor y, si la
+corrida muere sin `afterAll`, retiene el lock. Hoy se evita corriéndolas con
+`flock -o`. Arreglo de raíz: que la prueba cierre el descriptor al arrancar el
+servidor.
+
+### AG-DT-162 — La configuración vieja sigue en disco sin montar
+
+**Estado:** abierta, a borrar cuando Angel dé por buena la nueva (J5) ·
+`ConfiguracionCalendario.tsx`, `PasosConfiguracion.tsx`, `SeccionAjustesAgenda`,
+etc. `pasosDe` se sigue importando de `PasosConfiguracion.tsx`. Se borran con el
+protocolo de eliminación.
+
+### AG-DT-163 — Lógica duplicada a propósito en la configuración nueva
+
+**Estado:** aceptada (J5, Protocolo 4) · `useConfigAgregada` y `useListaEnlaces`
+copiados en `ConfiguracionAgenda.tsx`; los contactos bloqueados, en
+`PestanaMasOpciones.tsx`. Se unifican al borrar la vieja (AG-DT-162).
+
+### AG-DT-164 — Las fichas de los demás médicos son de la retícula vieja
+
+**Estado:** abierta, visual (J5) · `BloqueEnlacesMedico`, `DuracionEnConsultorio`
+y `FormTipoCita` (32/36 px) dentro de una pantalla de 44/48 px. Se aceptó para no
+perder función.
+
+### AG-DT-165 — «Terminar después» vive en el navegador
+
+**Estado:** aceptada (J5) · El paso guardado está en `localStorage` por usuario;
+en otro equipo la primera vez abre en el primer paso pendiente. Lo ya contestado
+sí está en la base.
+
+### AG-DT-166 — La migración 35 no se puede volver a correr después de la 36
+
+**Estado:** aceptada (integración J, `AUDITORIA-CONJUNTO-AGENDA-V2.md` §12.8 M1) ·
+El pre-vuelo de `20261122120000` acepta el cuerpo de `reservar_por_enlace` de I2
+o el suyo, no el de `20261122120100`: si alguien reaplica la carpeta sobre una base
+que ya las tiene, aborta limpio (sin daño). En el despliegue normal no ocurre.
 
 ---
 
