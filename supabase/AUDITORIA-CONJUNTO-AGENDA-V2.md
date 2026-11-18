@@ -1344,3 +1344,216 @@ en orden de nombre, ANTES del código; la v2 se enciende después.
   lista de 47 (las 45 del §11.5 más exactamente las dos nuevas) cotejándola con
   los GRANT/REVOKE de las tres, los disparadores, los permisos y el contrato con
   la consola.
+
+## 13. Tanda K (2026-11-18)
+
+Cinco ramas en paralelo desde `0cce313` (`feature/agenda-v2-b56`, `-menores`,
+`-t3`, `-t4`, `-t5`), fusionadas con `--no-ff` en `feature/agenda-v2` en el
+orden K1, K2, K3, K4, K5. K4 y K5 no traen migraciones. K1 trae una, K2 traía
+dos y K3 una. **En la integración se rehicieron las tres que quedan**
+(`77a5b22`): la segunda de K2 se fundió en la primera, y K1 y K3 dejaron de
+sustituir fragmentos de texto en los cuerpos vigentes.
+
+### 13.1 El conjunto, desde cero
+
+`ls supabase/migrations/*.sql` = **45**: las 5 de `main` y 40 del proyecto (las
+37 hasta la tanda J y las 3 de K). Antes de reiniciar se contaron las filas
+clínicas que no eran de la semilla: **0** `consultas`, **0** `documentos`,
+**0** `addendums`, así que no hubo nada que respaldar. `supabase db reset
+--local` (CLI 2.117.0) aplicó las 45 en orden y sin un error (el único aviso es
+«no files matched pattern: supabase/seed.sql»). `schema_migrations` = 45, la
+última `20261123140000`. Semilla, 1.2 s.
+
+**Pasadas sueltas** de las tres versiones finales, sobre la base de J (42)
+reiniciada aparte:
+
+- K3 sin K1 **aborta** en el pre-vuelo.
+- K1: ensayo con ROLLBACK, y luego dos pasadas reales, 13/13 OK cada una.
+- K2: ensayo, y luego dos pasadas, 11/11 OK cada una.
+- K3: ensayo, y luego dos pasadas, 9/9 OK cada una.
+- K1 otra vez, ya con K3 puesta: **aborta** («ya tiene la guarda de "pausado"
+  de K3»), sin cambiar nada.
+
+### 13.2 Veredicto de las tres
+
+| # | Archivo | Qué hace | Integración | Auditoría (sonnet, versión final) |
+|---|---|---|---|---|
+| K1 | `20261123120000_agenda_k1_bloqueos.sql` | tabla `agenda_bloqueos` (RLS propia, FK RESTRICT a `clinicas` y `profiles`, auditoría `log_tabla_change`, `trg_agenda_bloqueos_preparar` → `agenda_bloqueo_preparar()` con el candado 1790); `reserva_ocupacion` y `reservar_por_enlace` cuentan los bloqueos y dejan de contar lo de todo el día; `gcal_bloqueo_aplicar` nueva | De la sustitución de fragmentos (`k1_sustituciones` + `replace` + `EXECUTE`) a **cuerpos completos** con `CREATE OR REPLACE`. Pre-vuelo por md5 de `prosrc`: el cuerpo de J (`50a89d85…` / `1a448df0…`), el suyo (`e7cf1c34…` / `eb5ec46c…`) o **aborto** si ya tiene la guarda de K3. El post-vuelo aborta si no quedan el md5, INVOKER, la volatilidad, `search_path` vacío y sólo `service_role` | APTA con observaciones (todas de cabecera, más el post-vuelo ampliado): aplicadas |
+| K2 | `20261123130000_agenda_k2_espera_codigo.sql` | `rate_limit_espera` y `reserva_espera_reenvio` (nuevas, INVOKER, STABLE, de sólo lectura), y `reserva_codigo_verificar` con la rama `reemplazado` | **Fundida aquí** la que era `20261123130100_agenda_k2_reenvio_por_enlace` (borrada). Pre-vuelo con las comprobaciones de las dos y una rejilla de 11 filas. La 5c de `k2_espera_codigo.sql` sigue en rojo sin el filtro por enlace («dio 30, esperaba 0») | APTA con observaciones (la fusión no perdió nada): aplicadas |
+| K3 | `20261123140000_agenda_k3_huso_clinica_pausa_enlace.sql` | `clinicas.timezone` y `reserva_enlaces.pausado_en` (NULL; CHECK `reserva_enlaces_pausado_check`: sólo el fijo), y la guarda «no pausado» en seis funciones | De la sustitución (`k3_sustituciones` + `pg_temp.k3_veces`) a **cuerpos completos** construidos sobre los de K1. **Orden fijo K1 → K3.** Pre-vuelo y post-vuelo por md5 de las seis, más `proteger_reserva_enlaces` (`acd4128b…`, sin tocar). Se conserva el caso 6 de `k3_enlace_pausado.sql` | APTA con observaciones; la falta de CHECK de forma en `clinicas.timezone` queda como deuda (AG-DT) |
+
+Los cuerpos finales son **idénticos en md5** a los que daba la sustitución:
+reprodujimos los doce md5 que citaban K1 y K3 (J, K1, J+K3 y K1+K3).
+
+Mutaciones en rojo sobre la base reiniciada:
+
+- K1 sin el EXISTS sobre `agenda_bloqueos`, y K1 con lo de todo el día contado
+  otra vez: caso 4 de `k1_bloqueos`.
+- `reserva_codigo_emitir` sin la guarda de K3: caso 3 de `k3_enlace_pausado`.
+- `reservar_por_enlace` sin la guarda de K3: también el caso 3.
+- `cita_reagendar_oferta` y `reagendar_por_enlace` sin la guarda de K3: caso 4.
+- Control sin mutar: en verde.
+
+### 13.3 Disparadores de `appointments`, `agenda_bloqueos` y `reserva_enlaces`
+
+- **`appointments`:** ninguna de las tres crea, cambia ni quita disparadores.
+  Siguen los mismos diez de J: dos de auditoría, los cinco `proteger_*`,
+  `asignacion_google`, `aviso_clinica` y `reserva_incidencia`.
+  `reservar_por_enlace` sigue insertando como `service_role`, y la fila pasa
+  por ellos igual que antes.
+- **`agenda_bloqueos`** (nueva): un BEFORE INSERT OR UPDATE,
+  `trg_agenda_bloqueos_preparar` (`agenda_bloqueo_preparar()`, INVOKER), y el
+  AFTER `audit_agenda_bloqueos` (`log_tabla_change`, que sólo apunta id, tabla
+  y operación: el `motivo` no llega a `audit_log`).
+- **`reserva_enlaces`:** ningún disparador nuevo. `pausado_en` no está en la
+  tupla que vigila `proteger_reserva_enlaces` (md5 `acd4128b…`, sin tocar):
+  pausar es un UPDATE permitido a quien ya podía revocar (policy
+  `reserva_enlaces_update`). El CHECK impide pausar un único, y
+  `audit_reserva_enlaces` apunta cada pausa y cada reanudación.
+
+### 13.4 El candado 1790
+
+Lo toman tres funciones, todas con `pg_advisory_xact_lock(1790,
+hashtext(medico_id))`:
+
+- `reservar_por_enlace`, igual que desde D3;
+- `agenda_bloqueo_preparar()`: al cambiar de médico toma los dos, en orden
+  (`least`/`greatest`), para no cruzarse;
+- `gcal_bloqueo_aplicar`: primero lee sin bloquear, toma el candado y después
+  relee con `FOR UPDATE`.
+
+`reagendar_por_enlace` lo hereda, porque llama a `reservar_por_enlace`. Por eso
+un bloqueo y una reserva del mismo médico se serializan. En `reserva-carrera.sh`:
+
+- escenario 6: B=ocupado tras esperar 1869 ms;
+- 6b, el control sin el disparador: B=ok;
+- 1 a 5 como en J;
+- quedaron 5 citas, como se esperaba.
+
+`confirmacion-carrera.sh` sigue en verde. Las citas que agenda la clínica
+desde Spinus no toman el candado ni consultan los bloqueos en la base: allí el
+bloqueo es una pregunta de interfaz. Tras la integración la hacen todos los
+caminos que crean o mueven una cita: el alta rápida, el modal, el arrastre y,
+nuevo, «Reagendar».
+
+### 13.5 Permisos de funciones
+
+Las funciones nuevas o recreadas, todas con REVOKE/GRANT explícitos:
+
+- `reserva_ocupacion`, `reservar_por_enlace`, `gcal_bloqueo_aplicar`,
+  `rate_limit_espera`, `reserva_espera_reenvio`, `reserva_codigo_verificar`,
+  `reserva_contexto`, `reagendar_por_enlace`, `cita_reagendar_oferta` y
+  `reserva_codigo_emitir` son **sólo `service_role`**.
+- `agenda_bloqueo_preparar()` es función de disparador y tiene los tres roles,
+  según la regla: no se invoca sola.
+- **Ninguna de las nuevas o recreadas por K** tiene EXECUTE a PUBLIC. En la
+  base de 45 siguen con PUBLIC las 34 heredadas de `main` (`get_clinica_id`,
+  `log_tabla_change`, `sa_*`…), que cierra P1 de `feature/limites-ajustables`.
+
+**`p1_permisos_funciones.sql`, caso 3, en la base combinada.** Reiniciamos con
+**48 migraciones**: las 45 y las tres `20261014*` de
+`feature/limites-ajustables`. Todas aplican sin fallo, y **0 funciones** quedan
+con EXECUTE a PUBLIC (sin contar las de extensiones). El caso 3 da rojo, como
+se esperaba.
+
+La lista son ahora **50 funciones**: las 47 del §12.5 más
+`gcal_bloqueo_aplicar(…)`, `rate_limit_espera(text,integer,integer)` y
+`reserva_espera_reenvio(uuid,uuid,text,integer)`. No hay ninguna baja.
+`agenda_bloqueo_preparar()` no entra, porque tiene los tres roles.
+
+Con esta lista pegada pasan **las 43 pruebas SQL** de la combinada: `p1`,
+`p1b`, `p2`, `p3` y las 39 del proyecto. **Ésta es la lista para pegar al
+fusionar las dos ramas** (sustituye a la del §12.5):
+
+  ```
+  agenda_restablecer_configuracion(uuid,uuid), alta_conexion_google(uuid,uuid,text,text,text,text,text,bigint), cita_confirmacion_contexto(text), cita_confirmacion_emitir(uuid,uuid,uuid,text,uuid), cita_confirmacion_responder(uuid,text,text), cita_confirmacion_revocar(uuid,uuid), cita_correo_marcar(uuid,uuid,uuid,text,text), cita_correo_tomar(uuid,uuid,text,uuid), cita_correos_pendientes(integer), cita_movimiento_google_registrar(uuid,uuid,timestamp with time zone), cita_reagendar_clinica(uuid,uuid,uuid,uuid,timestamp with time zone,timestamp with time zone,timestamp with time zone), cita_reagendar_oferta(uuid,text), cita_recordatorios_pendientes(integer), cita_rsvp_google(uuid,uuid,text,text,text[]), cita_tiene_nota_ligada(uuid,uuid), crear_paciente_con_medico(jsonb,uuid), enforce_limite_documentos_paciente(), gcal_aplicar_evento(uuid,uuid,timestamp with time zone,text,text,timestamp with time zone,text,boolean,timestamp with time zone,timestamp with time zone,boolean,text,boolean,text,boolean), gcal_bloqueo_aplicar(uuid,text,text,uuid,text,timestamp with time zone,boolean,timestamp with time zone,timestamp with time zone,date,date), gcal_citas_por_evento(uuid,text[],uuid[]), gcal_importar_evento(uuid,text,text,text,timestamp with time zone,text,timestamp with time zone,timestamp with time zone,boolean,text,text,uuid), gcal_sync_avanzar(uuid,uuid,text,text,timestamp with time zone,integer), gcal_sync_clinica_habilitada(uuid), gcal_sync_clinicas_pendientes(integer), gcal_sync_frescura(uuid), gcal_sync_reiniciar(uuid,uuid), gcal_sync_soltar(uuid,uuid,text), gcal_sync_tomar(uuid,uuid,text,integer,integer), generar_folio(text), guardar_secretos_conexion(uuid,uuid,text,text,bigint), leer_conexion_google_con_secretos(uuid,uuid), rate_limit_espera(text,integer,integer), rate_limit_intento(text,text,integer,integer), rate_limit_reset(text), reagendar_por_enlace(text,uuid,text,uuid,uuid,timestamp with time zone,text,text,text,text,text,text,text,text,uuid), reserva_codigo_emitir(uuid,uuid,text,text), reserva_codigo_verificar(uuid,uuid,text,text,text), reserva_contacto_estado(uuid,uuid,text,text), reserva_contacto_marcar(uuid,text), reserva_contactos_bloqueados(), reserva_contexto(text,text,text), reserva_empalmes_registrar(uuid,uuid[]), reserva_enlace_emitir(uuid,uuid,uuid,uuid,text,text,text,text,text), reserva_enlace_emitir(uuid,uuid,uuid,uuid,text,text,text), reserva_enlace_regenerar_fijo(uuid,uuid,text), reserva_espera_reenvio(uuid,uuid,text,integer), reserva_ocupacion(uuid,uuid,timestamp with time zone,timestamp with time zone), reservar_por_enlace(uuid,text,uuid,uuid,timestamp with time zone,text,text,text,text,text,text,text,text,uuid), sync_antropometria_paciente(uuid), trg_mediciones_antropometria()
+  ```
+
+### 13.6 Contrato con spinus-consola
+
+- `clinicas.timezone` es una **columna nueva** (text, NULL = «aún no eligió»,
+  sin DEFAULT). No se renombra ni cambia nada de lo que la consola lee.
+- Ninguna de las tres nombra `ajuste_*` ni `limite_efectivo`. K1 **llama** a
+  `clinica_tiene_acceso()`, `clinica_no_suspendida()` y `perfil_completo()`
+  desde las policies de INSERT y UPDATE de `agenda_bloqueos`, y comprueba en su
+  pre-vuelo y post-vuelo que existen, pero no las redefine.
+- Ninguna hace `ALTER` de columnas existentes de `clinicas` (sólo `ADD COLUMN
+  IF NOT EXISTS`) ni `UPDATE` sobre la tabla.
+- No hay ningún `CASCADE`, y las FK nuevas son RESTRICT.
+- La escribe sólo `PUT /api/me/horario` (el horario de la clínica, con
+  `timezoneSchema` contra `Intl`), con `createAdminClient()` filtrado por
+  `.eq('id', profile.clinica_id)`, porque `clinicas` no tiene policy de UPDATE
+  para `authenticated`. La lee `GET /api/me/clinica`, con el cliente de sesión
+  y tolerando el 42703. No la lee la rejilla, ni la reserva, ni los correos.
+- No comprobamos qué vistas de la consola leen `clinicas`, porque su
+  repositorio no está aquí. Ninguna columna existente cambia, y eso es lo que el
+  contrato exige.
+
+### 13.7 Orden de despliegue y tolerancia
+
+| Migración | Orden | Sin la migración y con el código nuevo |
+|---|---|---|
+| K1 | después de toda la J, **antes de K3** | con la v2 apagada, nada la pide. Con la v2 encendida, la lectura de bloqueos devuelve `[]` (`BLOQUEOS_AUSENTES`) y la agenda pinta como en J. Crear un bloqueo no se puede. En el enlace, lo de todo el día sigue cerrando el día, como antes de K1 |
+| K2 | cualquiera respecto a K1 y K3 | sin `reserva_espera_reenvio`, reenviar no espera 30 s en el servidor: el tope de 3/h por correo y los de red y navegador siguen. Sin `rate_limit_espera`, el mensaje no dice cuánto falta («Espera un rato…», el de antes). Sin la rama `reemplazado`, un código viejo cuenta como equivocado, como antes |
+| K3 | **después de K1** (si no, su pre-vuelo aborta), antes del código | con la v2 apagada, la ruta de enlaces es 404 y la configuración es la de antes. Con la v2 encendida, apagar «Tu enlace» responde 409 `sin_pausa` y **no hace nada** (decisión de K3: no lo revoca a escondidas), y la página enseña «No se pudo guardar el enlace». El huso de la clínica no se guarda. Lo público funciona con los cuerpos de K1/J |
+
+**Prueba de tolerancia.** Reiniciamos la base local SÓLO con las 42 de J (`db
+reset --local --workdir`, desde un `git archive 0cce313`) y la sembramos con la
+semilla nueva, que tolera la tabla ausente. Usamos el `next start` :3001 con el
+build integrado (`fe17b4f`).
+
+- **v2 apagada:** `agenda-interruptor`, `-citas`, `-secretaria`,
+  `-tipos-cita`, `-cancelar`, `-avisos`, `-tiempo-real`, `-panel-dia` y
+  `agenda-k-salida-modal` dieron **29 pasan, 0 fallan**. Varias encienden la v2
+  a mitad de la prueba.
+- **v2 encendida, con los archivos de K y los flujos públicos:** fallan
+  exactamente las pruebas de lo que trae cada migración, y nada más:
+  - la pregunta del bloqueo al reagendar y `agenda-k1-bloqueos` (sin tabla, la
+    prueba no puede insertar el bloqueo);
+  - las ocho de `agenda-k3-configuracion`, porque su `foto()` lee
+    `clinicas.timezone` por SQL;
+  - el apagado de `agenda-enlaces-reserva` (el 409 de arriba);
+  - en `reserva-k2-codigo`, el reenvío (200 en vez de 429) y el «dice cuánto
+    falta», que sale con el mensaje de antes;
+  - el punto 5 de `reserva-seg1`.
+
+  En la segunda tanda pasan 19, entre ellas `confirmacion-k2-al-cargar`,
+  `agenda-k5-*` y `agenda-k4-leyenda-husos`. Ninguna falla es un error de la
+  app; son funciones que todavía no existen.
+
+Orden de despliegue recomendado: las 40 del proyecto en orden de nombre (K1,
+K2, K3 al final), ANTES del código. La v2 se enciende después.
+
+### 13.8 Hallazgos
+
+- **K-M1 · K1 y K3 tienen orden fijo.** K1 aborta si K3 ya está, y K3 aborta sin
+  K1. En el orden de nombre no pasa nada. Reaplicar la carpeta entera sobre una
+  base que ya las tiene hace abortar limpio a K1, igual que J2a en J (§12.8 M1).
+- **K-M2 · Sin la migración de K3, apagar el enlace fijo da un error visible**
+  en vez de revocarlo (§13.7). Es deliberado, y sólo ocurre si el código va
+  antes que la migración con la v2 encendida.
+- **K-M3 · `clinicas.timezone` sin CHECK de forma.** La escribe sólo el
+  servidor (`/api/me/horario`) tras Zod contra `Intl`, porque `clinicas` no
+  tiene policy de UPDATE para `authenticated`. Queda como AG-DT.
+- **K-M4 · Revisión de seguridad** (sonnet, sólo lectura, de la superficie
+  pública y las RPC del conjunto): ningún hallazgo alto.
+  - Media: confirmar al abrir (K2, punto 8) lo puede ejecutar un escáner de
+    correo con navegador real. Ya era riesgo aceptado en la cabecera de
+    `ConfirmarAlCargar.tsx`; va a «PARA REVISIÓN DE ANGEL» con la mitigación
+    que propone, esperar un gesto `isTrusted` antes del POST.
+  - Bajas: el bit de «ese correo pidió código en este enlace hace < 30 s»
+    (aceptado y documentado); el bombardeo de códigos a un correo (ya
+    existía); `reserva_enlace_regenerar_fijo` deja abierto el enlace nuevo
+    aunque el viejo estuviera pausado (AG-DT); el `motivo` del bloqueo viaja a
+    Google en el título (decisión de Angel; el riesgo es que alguien escriba un
+    nombre de paciente: AG-DT y «PARA REVISIÓN DE ANGEL»).
+  - Limpio: la pausa en las seis rutas públicas, los bloqueos en la reserva
+    bajo el candado, el aislamiento por clínica en `/api/agenda/bloqueos/**` y
+    `/api/agenda/enlaces/**`, Zod, `sessionStorage` sin nombre, teléfono ni
+    código, y las redirecciones de `ConfirmarAlCargar`.
+- **Revisor del §13** (sonnet, contra los archivos y el catálogo): APTA con
+  cambios menores, de redacción (el PUBLIC heredado de `main` en la base de 45,
+  y las funciones que K1 llama desde sus policies). Corregidos. Confirmó la
+  lista de 50 contra `lista-caso3.txt`, los disparadores, el candado 1790, los
+  permisos, el contrato con la consola y la tolerancia leyendo el código.
+
