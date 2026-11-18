@@ -7,7 +7,7 @@ import {
 } from '@/lib/agenda/ajustesAgenda'
 import { COLUMNAS_TIPO_CITA, type TipoCita } from '@/lib/agenda/tiposCita'
 import { logger } from '@/lib/logger'
-import ConfiguracionCalendario from '@/components/agenda/configuracion/ConfiguracionCalendario'
+import ConfiguracionAgenda from '@/components/agenda/configuracion/ConfiguracionAgenda'
 
 /**
  * /agenda/configuracion — la pantalla de configuración del calendario (plan
@@ -29,6 +29,11 @@ import ConfiguracionCalendario from '@/components/agenda/configuracion/Configura
  *
  * ⚠️ CLIENTE DE SESIÓN y `clinica_id` explícito en todas las lecturas. Nada
  * de `createAdminClient()`.
+ *
+ * Tanda J (J5, puntos 13 y 14): pinta `ConfiguracionAgenda` —el funnel de
+ * primera vez o las cinco pestañas de las maquetas— en vez de
+ * `ConfiguracionCalendario` (las ocho pestañas de la tanda H), que se queda en
+ * disco. Las lecturas no cambian.
  */
 
 type ClienteSesion = Awaited<ReturnType<typeof sesionServidor>>['supabase']
@@ -103,7 +108,7 @@ export default async function ConfiguracionCalendarioPage() {
     leerAdministradores(supabase, perfil.clinica_id),
   ])
   return (
-    <ConfiguracionCalendario
+    <ConfiguracionAgenda
       ajustes={lectura.ajustes}
       recordatorio={recordatorio}
       correoClinica={correoClinica}
