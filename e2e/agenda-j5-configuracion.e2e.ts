@@ -376,18 +376,20 @@ test('14 · tras crear un enlace de una vez se puede crear otro sin recargar', a
 
 /* ── 15 · el horario de la clínica ──────────────────────────────────── */
 
-test('15 · el administrador cambia el horario de la clínica (base y audit_log); la invitada y la secretaria no ven «Cambiar el horario de la clínica» y su PUT da 403', async ({ page, browser }) => {
+test('15 · el administrador cambia el horario de la clínica (base y audit_log); la invitada y la secretaria no ven «Cambiar horario de la clínica» y su PUT da 403', async ({ page, browser }) => {
   adminSinPendientes()
   const desde = sqlLocal('select now()')
   await page.goto(RUTA)
   await pestanaConfig(page, 'Cuándo das consulta')
-  await page.getByRole('button', { name: 'Cambiar el horario de la clínica' }).click()
+  // K3 (punto 11): la tarjeta va arriba y su botón es «Cambiar horario» («… de la clínica» para el lector).
+  await page.getByRole('button', { name: 'Cambiar horario de la clínica' }).click()
   const dialogo = page.getByRole('dialog', { name: 'Horario de la clínica' })
   await dialogo.getByRole('switch', { name: 'Sábado' }).click()
   await dialogo.getByRole('button', { name: 'Guardar horario' }).click()
   await expect(dialogo).toHaveCount(0)
   await expect(aviso(page)).toHaveText('Guardado')
-  await expect(page.locator('[data-horario-clinica]')).toContainText('Horario de la clínica: Lun a vie 8:00 – 18:00. Lo usan')
+  await expect(page.locator('[data-horario-clinica]')).toContainText('Lun a vie · 8:00 – 18:00')
+  await expect(page.locator('[data-horario-clinica]')).not.toContainText('Sáb')
   expect(sqlLocal(`select horario_consulta -> 'sabado' ->> 'activo' from public.clinicas where id = ${CL}`)).toBe('false')
   expect(sqlLocal(`select count(*) from public.audit_log where accion = 'horario_clinica_editado' and created_at >= :'d'::timestamptz
     and user_id = (select id::text from auth.users where email = :'c')`, { d: desde, c: CORREO.adminA })).toBe('1')
@@ -402,7 +404,7 @@ test('15 · el administrador cambia el horario de la clínica (base y audit_log)
     await p.goto(RUTA)
     await pestanaConfig(p, 'Cuándo dan consulta')
     await expect(p.locator('[data-horario-clinica]')).toContainText('Lo cambia quien administra la clínica.')
-    await expect(p.getByRole('button', { name: 'Cambiar el horario de la clínica' })).toHaveCount(0)
+    await expect(p.getByRole('button', { name: 'Cambiar horario de la clínica' })).toHaveCount(0)
   })
 })
 

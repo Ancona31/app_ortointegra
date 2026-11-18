@@ -8,8 +8,8 @@
  * dueño: la RLS). Nunca manda `timezone`: el huso de cada consultorio sigue
  * siendo el suyo (punto 17).
  *
- * Abajo, el horario de la clínica y, SÓLO para quien administra, «Cambiar el horario de la clínica»
- * (punto 15): el mismo control de días, guardado con `PUT /api/me/horario`,
+ * Arriba, antes de los consultorios, el horario de la clínica en su tarjeta (K3, punto 11) y, SÓLO
+ * para quien administra, su «Cambiar horario»: el mismo control de días, guardado con `PUT /api/me/horario`,
  * que ya valida el rol en el servidor (`canManageClinica`), el horario
  * (`HorarioEnOrdenSchema`), filtra por `clinica_id` y lo apunta en `audit_log`.
  * Y, para los médicos, «Agrega más consultorios en tu perfil» (punto 16).
@@ -91,16 +91,28 @@ function useGuardarConsultorio(p: Props) {
   }
 }
 
-function PieClinica({ p, alAbrir }: { p: Props; alAbrir: () => void }) {
-  const texto = p.horarioClinica ? textoHorario(p.horarioClinica) || 'sin días de consulta' : '…'
+/**
+ * K3 (punto 11 de Angel): el horario de la clínica en su tarjeta, al INICIO de la pestaña y antes de
+ * los consultorios, con sus días y horas a la vista. «Cambiar horario» sólo para quien administra
+ * (`canManageClinica`, el mismo criterio que `PUT /api/me/horario`); los demás lo ven sin botón.
+ */
+function TarjetaClinica({ p, alAbrir }: { p: Props; alAbrir: () => void }) {
+  const lineas = p.horarioClinica ? lineasHorario(p.horarioClinica) : null
   return (
-    <div className="flex flex-col items-start gap-[10px]">
-      <p className="m-0 text-[14px] leading-[1.5] text-[var(--ag-ink-600)]" data-horario-clinica>
-        Horario de la clínica: {texto}. Lo usan los consultorios que no tienen horario propio.{' '}
-        {p.puedeAdministrar && p.horarioClinica ? 'Sólo quien administra la clínica puede cambiarlo.' : 'Lo cambia quien administra la clínica.'}
-      </p>
-      {/* Un botón de 44 px y no un enlace dentro de la frase: es lo que miden los botones nuevos (maqueta). */}
-      {p.puedeAdministrar && p.horarioClinica && <button type="button" onClick={alAbrir} className={BOTON_CHICO}>Cambiar el horario de la clínica</button>}
+    <div role="group" aria-label="Horario de la clínica" data-horario-clinica
+      className="flex flex-wrap items-start justify-between gap-[16px] rounded-[12px] border border-[var(--ag-border-card)] px-[20px] py-[18px]">
+      <div className="flex flex-col gap-[6px]">
+        <span className="text-[17px] font-bold text-[var(--ag-ink)]">Horario de la clínica</span>
+        {!lineas ? <span className="text-[15px] text-[var(--ag-ink-600)]">{p.fallo ? 'No se pudo cargar. Recarga la página.' : '…'}</span>
+          : lineas.length ? lineas.map(l => <span key={l} className="text-[15px] text-[var(--ag-text)]">{l}</span>)
+          : <span className="text-[15px] italic text-[var(--ag-muted)]">Sin días de consulta</span>}
+        <span className="text-[14px] leading-[1.5] text-[var(--ag-ink-600)]">
+          Lo usan los consultorios que dicen «Igual que la clínica».{p.puedeAdministrar ? '' : ' Lo cambia quien administra la clínica.'}
+        </span>
+      </div>
+      {p.puedeAdministrar && p.horarioClinica && (
+        <button type="button" onClick={alAbrir} className={BOTON_CHICO} aria-label="Cambiar horario de la clínica">Cambiar horario</button>
+      )}
     </div>
   )
 }
@@ -133,6 +145,7 @@ export default function PestanaHorario(p: Props) {
         <h2 className={TITULO_PANEL}>Cuándo das consulta</h2>
         <p className={SUB_PANEL}>Tus pacientes solo pueden pedir cita en estos días y horas.</p>
       </div>
+      <TarjetaClinica p={p} alAbrir={() => setAbierto({ tipo: 'clinica' })} />
       {!p.consultorios || !clinica ? <p className={AYUDA}>{p.fallo ? 'No se pudieron cargar los consultorios. Recarga la página.' : 'Cargando los consultorios…'}</p>
         : p.consultorios.length === 0 ? <p className={AYUDA}>Aún no hay consultorios activos.</p>
         : p.consultorios.map(c => (
@@ -141,7 +154,6 @@ export default function PestanaHorario(p: Props) {
       {p.esMedico && (
         <p className="m-0 text-[15px] text-[var(--ag-ink-600)]">Agrega más consultorios en tu <Link href="/perfil" className={ENLACE}>perfil</Link>.</p>
       )}
-      <PieClinica p={p} alAbrir={() => setAbierto({ tipo: 'clinica' })} />
       {abierto && clinica && (
         <DialogoHorario
           titulo={abierto.tipo === 'clinica' ? 'Horario de la clínica' : `Horario en ${abierto.c.nombre}`}
