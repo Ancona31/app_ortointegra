@@ -15,7 +15,9 @@ import { hmacContacto } from '../src/lib/reserva/secretos'
  *      dan la MISMA respuesta, sin correo verificado y con él;
  *   2. lo automático del candado decide por el correo verificado (el teléfono
  *      ajeno ni bloquea ni deja «ya tiene cita»);
- *   5. un evento de todo el día del médico tapa ese día en el enlace;
+ *   5. (invertido por K1, tanda K punto 4) un evento de todo el día del médico
+ *      YA NO tapa ese día en el enlace; un BLOQUEO sí (punto 2), y la RPC lo
+ *      rechaza (409);
  *   6. el bloqueo MANUAL por teléfono corta el fijo y también el único;
  *   7b. el nombre con una URL o un salto de línea es el 400 genérico.
  * El trabajo idéntico de la base (no sólo la respuesta) lo prueba
@@ -139,7 +141,7 @@ async function turnoDeDiaSinCitas(codigo: string): Promise<{ turno: Turno; desde
   throw new Error('No hay ningún día sin citas del médico en el horizonte de la reserva')
 }
 
-test('punto 5: un evento de todo el día del médico tapa ese día en el enlace; cancelado, vuelve', async () => {
+test('punto 5 (K1): un evento de todo el día ya no tapa el día; un bloqueo sí, también en la RPC; quitado, vuelve', async () => {
   const { codigo } = emitirEnlace(e, 'unico')
   const { turno: elegido, desde } = await turnoDeDiaSinCitas(codigo)
   const dia = diaEnMerida(elegido.inicio)
@@ -148,14 +150,23 @@ test('punto 5: un evento de todo el día del médico tapa ese día en el enlace;
     values (:'clinica', :'medico', 'Congreso E2E seg1', (:'dia'::date)::timestamp at time zone 'America/Merida',
             ((:'dia'::date) + 1)::timestamp at time zone 'America/Merida', 'scheduled', 'spinus', true, 'America/Merida')
     returning id;`, { clinica: e.clinicaId, medico: e.medicoId, dia })
+  let bloqueo: string | null = null
   try {
+    expect((await turnosLibres(e, codigo, desde)).map(t => t.inicio)).toContain(elegido.inicio)
+    bloqueo = sqlLocal(`
+      insert into public.agenda_bloqueos (clinica_id, medico_id, inicio, fin, todo_el_dia, zona, motivo)
+      values (:'clinica', :'medico', (:'dia'::date)::timestamp at time zone 'America/Merida',
+              ((:'dia'::date) + 1)::timestamp at time zone 'America/Merida', true, 'America/Merida', 'Bloqueo E2E seg1')
+      returning id;`, { clinica: e.clinicaId, medico: e.medicoId, dia })
     const delDia = (await turnosLibres(e, codigo, desde)).filter(t => diaEnMerida(t.inicio) === dia)
     expect(delDia).toEqual([])
     const r = await reservar(e, codigo, { inicio: elegido.inicio, persona: personaNueva() })
     expect(r).toMatchObject({ status: 409, cuerpo: { error: 'turno_ocupado' } })
-    sqlLocal(`update public.appointments set status = 'cancelled' where id = :'id';`, { id })
+    sqlLocal(`delete from public.agenda_bloqueos where id = :'b';`, { b: bloqueo })
+    bloqueo = null
     expect((await turnosLibres(e, codigo, desde)).map(t => t.inicio)).toContain(elegido.inicio)
   } finally {
+    if (bloqueo) sqlLocal(`delete from public.agenda_bloqueos where id = :'b';`, { b: bloqueo })
     sqlLocal(`delete from public.appointments where id = :'id';`, { id })
   }
 })

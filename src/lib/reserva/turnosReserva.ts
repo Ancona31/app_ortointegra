@@ -13,9 +13,11 @@
  *   · ocupación (P3): `reserva_ocupacion` ya quita `cancelled` y `no_show`;
  *     llega sin estado (`status: null`) y sin `all_day`, así que aquí todo
  *     ocupa y `turnosAgenda.citaOcupa` (que cuenta `no_show`) no cambia nada.
- *     seg1 (punto 5): un evento de TODO EL DÍA del médico sí llega (sus puntas
- *     son las medianoches de su zona) y tapa esos días enteros; en la agenda
- *     interna no cambia nada (ahí el empalme sólo alerta).
+ *     k1 (tanda K, puntos 2 y 4): los BLOQUEOS del médico (`agenda_bloqueos`)
+ *     llegan como filas más, con sus dos puntas y nada más, y tapan lo que
+ *     tocan; un evento de TODO EL DÍA ya NO llega (seg1 lo hacía ocupar; un
+ *     «Congreso» de todo el día no significa que no consulte). En la agenda
+ *     interna el bloqueo sólo pide confirmación.
  *
  * `turnoValido` es el CONVENIO que pide el COMMENT de `reservar_por_enlace`
  * (D3): la base no conoce el horario ni la alineación; la ruta de reservar
@@ -23,7 +25,7 @@
  * ventana? si no, 400). Si sigue libre lo decide la RPC bajo su candado
  * (`ocupado`) con el MISMO criterio que la lista: algo que toque el turno
  * aunque sea en parte (`start_time < fin AND end_time > inicio`), sin
- * `cancelled` ni `no_show`, con lo de todo el día. La lista es «rejilla menos
+ * `cancelled` ni `no_show`, sin lo de todo el día y con los bloqueos. La lista es «rejilla menos
  * lo ocupado»; la comprobación, «rejilla» + «nada ocupado» bajo el candado:
  * la misma regla partida en dos, y la parte que depende de la ocupación sólo
  * la decide la RPC, que es la que ve la carrera.

@@ -6,7 +6,8 @@
 --      dependen del teléfono (contadores de pg_stat_xact_user_tables);
 --   2. lo automático del candado (1 activa, cancelaciones, bloqueo) decide
 --      por el correo: un teléfono ajeno ni bloquea ni deja «ya tiene cita»;
---   5. un evento de todo el día del médico ocupa esos días en el enlace;
+--   5. un evento de todo el día del médico ocupaba esos días en el enlace (k1, tanda K
+--      punto 4: ya NO ocupa; el caso 6 lo comprueba al revés);
 --   6. el bloqueo manual (teléfono o correo) corta también el enlace único.
 -- Se corre con scripts/pruebas-sql.sh. Crea sus propios datos y termina en
 -- rollback: no deja nada en la base ni depende de la semilla.
@@ -249,8 +250,9 @@ begin
           'otro5', null), 'ok');
 end $$;
 
--- ── Caso 6 (punto 5): un evento de todo el día del médico ocupa esos días en el enlace (de
---    Spinus o de Google); cancelado o no_show, no (P3); el día siguiente, libre ──
+-- ── Caso 6 (punto 5, invertido por k1 — tanda K, punto 4): un evento de todo el día del médico
+--    YA NO ocupa esos días en el enlace (de Spinus o de Google), tampoco cancelado o no_show;
+--    el día siguiente, libre. Lo que cierra un periodo ahora es un bloqueo (k1_bloqueos.sql) ──
 create function pg_temp.dia(p_horas integer) returns timestamptz language sql as $$
   select (date_trunc('day', pg_temp.t(p_horas) at time zone 'America/Mexico_City') at time zone 'America/Mexico_City');
 $$;
@@ -271,25 +273,25 @@ insert into public.appointments (clinica_id, medico_id, title, start_time, end_t
 do $$
 declare v_n integer;
 begin
-  perform pg_temp.esperar('caso 6 todo el día (Spinus), por la mañana', pg_temp.res(pg_temp.unico('d1'),
-          pg_temp.dia(200) + interval '9 hours', '5511110101', 'dia1', null), 'ocupado');
-  perform pg_temp.esperar('caso 6 todo el día (Spinus), por la noche', pg_temp.res(pg_temp.unico('d2'),
-          pg_temp.dia(200) + interval '23 hours', '5511110102', 'dia2', null), 'ocupado');
-  perform pg_temp.esperar('caso 6 todo el día (Google)', pg_temp.res(pg_temp.unico('d3'),
-          pg_temp.dia(272) + interval '12 hours', '5511110103', 'dia3', null), 'ocupado');
+  perform pg_temp.esperar('caso 6 todo el día (Spinus) no ocupa, por la mañana', pg_temp.res(pg_temp.unico('d1'),
+          pg_temp.dia(200) + interval '9 hours', '5511110101', 'dia1', null), 'ok');
+  perform pg_temp.esperar('caso 6 todo el día (Spinus) no ocupa, por la noche', pg_temp.res(pg_temp.unico('d2'),
+          pg_temp.dia(200) + interval '23 hours', '5511110102', 'dia2', null), 'ok');
+  perform pg_temp.esperar('caso 6 todo el día (Google) no ocupa', pg_temp.res(pg_temp.unico('d3'),
+          pg_temp.dia(272) + interval '12 hours', '5511110103', 'dia3', null), 'ok');
   perform pg_temp.esperar('caso 6 el día siguiente, libre', pg_temp.res(pg_temp.unico('d4'),
           pg_temp.dia(200) + interval '1 day 9 hours', '5511110104', 'dia4', null), 'ok');
   perform pg_temp.esperar('caso 6 todo el día cancelado no ocupa', pg_temp.res(pg_temp.unico('d5'),
           pg_temp.dia(320) + interval '10 hours', '5511110105', 'dia5', null), 'ok');
   perform pg_temp.esperar('caso 6 todo el día no_show no ocupa', pg_temp.res(pg_temp.unico('d6'),
           pg_temp.dia(368) + interval '10 hours', '5511110106', 'dia6', null), 'ok');
-  -- reserva_ocupacion lo devuelve (es lo que la página usa para no ofrecer turnos ese día).
+  -- reserva_ocupacion ya no lo devuelve (la página ofrece los turnos de ese día).
   set local role service_role;
   select count(*) into v_n from public.reserva_ocupacion('00000000-0000-4000-8000-0000005e1c01',
          '00000000-0000-4000-8000-0000005e1f01', pg_temp.dia(200), pg_temp.dia(200) + interval '1 day')
    where start_time = pg_temp.dia(200) and end_time = pg_temp.dia(200) + interval '1 day';
   reset role;
-  perform pg_temp.esperar('caso 6 ocupación del día de vacaciones', v_n::text, '1');
+  perform pg_temp.esperar('caso 6 ocupación del día de vacaciones', v_n::text, '0');
 end $$;
 
 rollback;

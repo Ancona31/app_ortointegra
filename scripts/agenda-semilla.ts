@@ -157,6 +157,7 @@ async function exigirSinExpediente(pacientes: string[]): Promise<void> {
  *     están; su FK a médico y clínica es RESTRICT).
  * Cada tabla se mira con `to_regclass`: sin las migraciones de D no hace nada.
  * Los avisos (`reserva_avisos`) no son de ninguna clínica y se quedan.
+ * K1: `agenda_bloqueos` (FK RESTRICT a clínica y a médico), también antes.
  * Bloque E, también antes y en este orden: `cita_reagendos` (E6: FK RESTRICT a
  * las dos citas y al enlace de confirmación), `cita_correos` (E4, el registro
  * de envíos) y `cita_confirmaciones` (E1: FK RESTRICT a la cita y a la
@@ -202,6 +203,10 @@ function limpiarReserva(clinicas: string[], cuando: 'antes' | 'despues'): void {
     -- sólo SELECT/INSERT para el rol de servicio).
     if to_regclass('public.gcal_movimientos_rechazados') is not null then
       delete from public.gcal_movimientos_rechazados where clinica_id = any (v_c);
+    end if;
+    -- K1: los bloqueos de horario (FK RESTRICT a la clínica y al médico).
+    if to_regclass('public.agenda_bloqueos') is not null then
+      delete from public.agenda_bloqueos where clinica_id = any (v_c);
     end if;`
   const despues = `
     if to_regclass('public.reserva_enlaces') is not null then

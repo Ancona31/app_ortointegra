@@ -19,6 +19,12 @@
 #      comprobación `client_id_en_uso`, cuenta el intento y choca con el
 #      índice único al insertar. Sale «client_id_en_uso» y el intento QUEDA
 #      contado (intentos = 1): la excepción del índice no deshace el conteo.
+#   6. (k1) Un bloqueo y una reserva del mismo médico a la vez, sobre el mismo
+#      turno: A crea el bloqueo (su disparador toma el candado 1790) y retiene;
+#      B reserva, espera al candado y sale «ocupado». Control (6b): con los
+#      disparadores apagados en A (session_replication_role = replica, sólo
+#      en ESA transacción) B no espera y reserva encima del bloqueo. Es el
+#      candado del disparador lo que lo impide.
 #
 # Orden: B arranca cuando A ya tiene el candado 1790 (se mira en pg_locks; nadie
 # más usa esa clave), no tras una espera fija.
@@ -52,6 +58,7 @@ AV=carrera-d3                             # versión del aviso
 E1=00000000-0000-4000-8000-0000ca7e0f01; E2=00000000-0000-4000-8000-0000ca7e0f02
 E3=00000000-0000-4000-8000-0000ca7e0f03; E4=00000000-0000-4000-8000-0000ca7e0f04
 E5=00000000-0000-4000-8000-0000ca7e0f05; E6=00000000-0000-4000-8000-0000ca7e0f06
+E7=00000000-0000-4000-8000-0000ca7e0f07; E8=00000000-0000-4000-8000-0000ca7e0f08
 CID5=00000000-0000-4000-8000-0000ca7e0c55  # client_id del escenario 5
 FIRMA="public.reservar_por_enlace(uuid, text, uuid, uuid, timestamptz, text, text, text, text, text, text, text, text, uuid)"
 
@@ -63,11 +70,13 @@ create temp table _ids on commit drop as
   select id from public.appointments where clinica_id = '$C'
   union all select id from public.reserva_enlaces where clinica_id = '$C'
   union all select id from public.reserva_avisos where version = '$AV'
+  union all select id from public.agenda_bloqueos where clinica_id = '$C'
   union all select unnest(array['$C', '$U', '$K', '$T', '$J']::uuid[]);
 delete from public.audit_log where registro_id in (select id from _ids) or descripcion like '%$C%';
 delete from public.reserva_incidencias where clinica_id = '$C';
 delete from public.reserva_verificaciones where clinica_id = '$C';
 delete from public.reserva_contactos where clinica_id = '$C';
+delete from public.agenda_bloqueos where clinica_id = '$C';
 update public.reserva_enlaces set usado_en = null, usado_cita_id = null where clinica_id = '$C';
 delete from public.appointments where clinica_id = '$C';
 delete from public.reserva_enlaces where clinica_id = '$C';
@@ -82,12 +91,13 @@ commit;
 SQL
   local resto
   resto="$(sql -c "select (select count(*) from public.audit_log where descripcion like '%$C%'
-                             or registro_id in ('$C', '$U', '$K', '$T', '$J', '$E1', '$E2', '$E3', '$E4', '$E5', '$E6'))
+                             or registro_id in ('$C', '$U', '$K', '$T', '$J', '$E1', '$E2', '$E3', '$E4', '$E5', '$E6', '$E7', '$E8'))
                     + (select count(*) from public.appointments where clinica_id = '$C')
                     + (select count(*) from public.reserva_enlaces where clinica_id = '$C')
                     + (select count(*) from public.reserva_incidencias where clinica_id = '$C')
                     + (select count(*) from public.reserva_verificaciones where clinica_id = '$C')
                     + (select count(*) from public.reserva_contactos where clinica_id = '$C')
+                    + (select count(*) from public.agenda_bloqueos where clinica_id = '$C')
                     + (select count(*) from public.tipos_cita where clinica_id = '$C')
                     + (select count(*) from public.consultorios where clinica_id = '$C')
                     + (select count(*) from public.agenda_ajustes where clinica_id = '$C')
@@ -115,7 +125,7 @@ insert into public.reserva_avisos (version, texto_sha256, aprobado, aprobado_en)
 values ('$AV', encode(sha256('aviso'), 'hex'), true, now());
 insert into public.reserva_enlaces (id, clinica_id, medico_id, clase, codigo_hash, vigencia_dias, caduca_en)
 select e, '$C', '$U', 'unico', encode(sha256(convert_to(e::text, 'UTF8')), 'hex'), 7, now() + interval '7 days'
-  from unnest(array['$E1', '$E2', '$E3', '$E4', '$E5', '$E6']::uuid[]) e;
+  from unnest(array['$E1', '$E2', '$E3', '$E4', '$E5', '$E6', '$E7', '$E8']::uuid[]) e;
 SQL
 
 cronometro() { date +%s%N; }
@@ -207,7 +217,42 @@ intentos="$(sql -c "select intentos || '/' || (usado_en is null) || '/' || (agot
 echo "5 · client_id en carrera: B=$(printf '%s' "$b" | head -1)  intentos/sin usar/sin agotar del único=$intentos"
 [ "$b" = client_id_en_uso ] && [ "$intentos" = 1/true/true ] || falla "escenario 5: el intento debió quedar contado con client_id_en_uso"
 
+# ── 6 · (k1) Bloqueo contra reserva, mismo médico y mismo turno ────────
+bloqueo_a() {  # $1 = turno, $2 = sí/no disparadores; crea el bloqueo, retiene 2 s y confirma
+  { echo "set application_name = 'carrera-k1-6';"; echo "begin;"
+    [ "$2" = no ] && echo "set local session_replication_role = replica;"
+    echo "insert into public.agenda_bloqueos (clinica_id, medico_id, inicio, fin, motivo)
+          values ('$C', '$U', '$1'::timestamptz - interval '1 hour', '$1'::timestamptz + interval '1 hour', 'Carrera k1');"
+    echo "select pg_sleep(2);"; echo "commit;"; } | sql > "$tmp/a6.out" &
+  pid_a=$!
+  local i
+  for i in $(seq 1 100); do  # hasta 10 s: A ya insertó y duerme sin confirmar
+    [ "$(sql -c "select count(*) from pg_stat_activity where application_name = 'carrera-k1-6' and query like 'select pg_sleep%'")" = 1 ] && return 0
+    sleep 0.1
+  done
+  falla "la sesión A del escenario 6 no llegó a su espera"
+}
+V="$(turno 24)"
+bloqueo_a "$V" si
+[ "$(sql -c "select count(*) from pg_locks where locktype = 'advisory' and classid = 1790 and granted")" = 1 ] \
+  || falla "escenario 6: el bloqueo no tomó el candado 1790"
+t0="$(cronometro)"
+b="$( { echo "set role service_role;"; llamada public.reservar_por_enlace "$E7" "$V" 5500000009; } | sql || echo error)"
+t1="$(cronometro)"
+wait "$pid_a" || falla "la sesión A del escenario 6 terminó con error: $(cat "$tmp/a6.out")"
+espera_ms=$(( (t1 - t0) / 1000000 ))
+echo "6 · bloqueo contra reserva: B=$b  (B esperó ${espera_ms} ms)"
+[ "$b" = ocupado ] || falla "escenario 6: la reserva debió salir ocupado"
+[ "$espera_ms" -ge 1000 ] || falla "escenario 6: B no esperó al candado del bloqueo (${espera_ms} ms)"
+
+V2="$(turno 28)"
+bloqueo_a "$V2" no
+b="$( { echo "set role service_role;"; llamada public.reservar_por_enlace "$E8" "$V2" 5500000010; } | sql || echo error)"
+wait "$pid_a" || falla "la sesión A del escenario 6b terminó con error: $(cat "$tmp/a6.out")"
+echo "6b · control sin el disparador: B=$b (reserva encima del bloqueo sin confirmar)"
+[ "$b" = ok ] || falla "escenario 6b: sin el candado del disparador la reserva debió entrar"
+
 total="$(sql -c "select count(*) from public.appointments where clinica_id = '$C'")"
-echo "Citas que quedaron: $total (esperadas 4: escenarios 1, 2-A, 3-A y 5-A)"
-[ "$total" = 4 ] || falla "quedaron $total citas"
+echo "Citas que quedaron: $total (esperadas 5: escenarios 1, 2-A, 3-A, 5-A y 6b-B)"
+[ "$total" = 5 ] || falla "quedaron $total citas"
 echo "Carrera en verde. Limpiando…"
