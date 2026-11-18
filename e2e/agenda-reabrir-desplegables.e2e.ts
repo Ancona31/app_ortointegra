@@ -22,6 +22,12 @@ import { abrirAgendaV2 } from './interaccionesAyudas'
  */
 test.use({ storageState: SESION.adminA })
 test.beforeEach(() => { interruptorAgenda('A', true) })
+test.afterAll(() => {
+  // Integración I: cada archivo deja la v2 APAGADA al terminar (la convención de la batería: el
+  // global-setup la apaga y sólo la prueba que la necesita la enciende). Encendida, las e2e que
+  // la suponen apagada (agenda-secretaria, agenda-tipos-cita) caían en el aviso de empalme B7.
+  interruptorAgenda('A', false)
+})
 
 /** Abre, cierra con Escape y vuelve a abrir: el diálogo está y la pantalla no se cayó. */
 async function abrirCerrarAbrir(page: Page, boton: string, dialogo: string): Promise<void> {

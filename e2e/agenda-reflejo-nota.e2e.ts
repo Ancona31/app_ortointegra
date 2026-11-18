@@ -44,6 +44,12 @@ const VIERNES = diaDeLaSemana(0, 4)
 let citaId = ''
 
 test.beforeEach(() => { interruptorAgenda('A', true) })
+test.afterAll(() => {
+  // Integración I: cada archivo deja la v2 APAGADA al terminar (la convención de la batería: el
+  // global-setup la apaga y sólo la prueba que la necesita la enciende). Encendida, las e2e que
+  // la suponen apagada (agenda-secretaria, agenda-tipos-cita) caían en el aviso de empalme B7.
+  interruptorAgenda('A', false)
+})
 test.afterEach(() => {
   if (citaId) sqlLocal(`delete from public.appointments where id = :'id';`, { id: citaId })
   citaId = ''

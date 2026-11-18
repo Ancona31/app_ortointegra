@@ -33,8 +33,10 @@ test.beforeAll(() => {
 test.afterAll(() => {
   limpiarReservasE2e(desde)
   sqlLocal(`delete from public.tipos_cita where id = :'t'`, { t: e.tipoId })
-  // Las reglas de la tanda: la v2 queda ENCENDIDA en la Clínica Semilla A.
-  interruptorAgenda('A', true)
+  // Integración I: cada archivo deja la v2 APAGADA al terminar (la convención de la batería: el
+  // global-setup la apaga y sólo la prueba que la necesita la enciende). Encendida, las e2e que
+  // la suponen apagada (agenda-secretaria, agenda-tipos-cita) caían en el aviso de empalme B7.
+  interruptorAgenda('A', false)
 })
 
 const MAILPIT = 'http://127.0.0.1:54324'

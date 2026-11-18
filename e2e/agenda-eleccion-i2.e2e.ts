@@ -42,7 +42,10 @@ test.afterEach(() => { limpiarReservasE2e(desde) })
 test.afterAll(() => {
   limpiarReservasE2e(desde)
   sqlLocal(`delete from public.appointments where paciente_id = :'p'; delete from public.pacientes where id = :'p'`, { p: pacienteId })
-  interruptorAgenda('A', true) // las reglas de la tanda: la v2 queda encendida en A
+  // Integración I: cada archivo deja la v2 APAGADA al terminar (la convención de la batería: el
+  // global-setup la apaga y sólo la prueba que la necesita la enciende). Encendida, las e2e que
+  // la suponen apagada (agenda-secretaria, agenda-tipos-cita) caían en el aviso de empalme B7.
+  interruptorAgenda('A', false)
 })
 
 function cita(hora: string, correo: string | null): CitaPorLigar {
@@ -156,6 +159,10 @@ test('estirar: el fin se estira y se guarda; desde arriba se rechaza con el avis
   expect(puts).toEqual([])
   expect(inicioDe(c.citaId)).toBe(segundos('17:00'))
   // El fin sí: la duración es libre (si se empalma con algo de la base compartida, B7 sólo avisa).
+  // Integración I: la tarjeta de las 17:00 queda pegada al borde inferior de la rejilla (1440×900)
+  // y estirar 30 min llevaba el ratón fuera de la ventana: FullCalendar no veía franja y no
+  // redimensionaba. Se centra antes en su contenedor.
+  await tarjeta(page).evaluate(el => el.scrollIntoView({ block: 'center' }))
   await redimensionarFinEvento(page, tarjeta(page), 30)
   const empalme = page.getByRole('button', { name: 'Aceptar', exact: true })
   await expect.poll(async () => (await empalme.isVisible().catch(() => false)) || duracionDe(c.citaId) !== '30').toBe(true)

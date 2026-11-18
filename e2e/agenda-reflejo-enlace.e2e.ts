@@ -78,8 +78,10 @@ test.afterAll(() => {
     delete from public.appointments where id in (select id from _a);
     commit;`, { c: e.clinicaId, t: TITULO })
   limpiarReservasE2e(desde)
-  // El estado de partida de la tanda: v2 encendida en A, aviso aprobado.
-  interruptorAgenda('A', true)
+  // Integración I: cada archivo deja la v2 APAGADA al terminar (la convención de la batería: el
+  // global-setup la apaga y sólo la prueba que la necesita la enciende). Encendida, las e2e que
+  // la suponen apagada (agenda-secretaria, agenda-tipos-cita) caían en el aviso de empalme B7.
+  interruptorAgenda('A', false)
   aprobarAviso(true)
 })
 

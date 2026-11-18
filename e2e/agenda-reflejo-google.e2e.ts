@@ -143,7 +143,10 @@ test.afterAll(async ({}, info) => {
     try { process.kill(-servidor.pid, 'SIGTERM') } catch { /* ya no estaba */ }
   }
   await google?.cerrar()
-  interruptorAgenda('A', true)
+  // Integración I: cada archivo deja la v2 APAGADA al terminar (la convención de la batería: el
+  // global-setup la apaga y sólo la prueba que la necesita la enciende). Encendida, las e2e que
+  // la suponen apagada (agenda-secretaria, agenda-tipos-cita) caían en el aviso de empalme B7.
+  interruptorAgenda('A', false)
 })
 
 test.beforeEach(({}, info) => {

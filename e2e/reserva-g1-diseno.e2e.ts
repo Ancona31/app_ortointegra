@@ -229,7 +229,10 @@ test('el correo del código: marca, código en grande, sin imágenes', async ({ 
   expect((await request.post(`/api/reservar/${codigo}/codigo`, { data: { correo } })).status()).toBe(200)
   const m = await esperarCorreo(correo, 'Tu código para reservar', previos)
   const cifra = /\b(\d{6})\b/.exec(m.texto)?.[1] ?? ''
-  expect(m.texto.startsWith('Spinus')).toBe(true)
+  // Tanda I (I2, punto 21): el correo va a nombre del médico; «Spinus» queda al pie
+  // («Enviado con Spinus»). Antes empezaba por «Spinus».
+  expect(m.texto.startsWith('Spinus')).toBe(false)
+  expect(m.texto.trim().endsWith('Enviado con Spinus')).toBe(true)
   expect(m.html).toMatch(new RegExp(`font:800 32px[^>]*>${cifra}<`))
   expect(m.html.replace(/<[^>]+>/g, ' ')).toContain('Spinus')
   expect(m.html).not.toMatch(/<img/i)

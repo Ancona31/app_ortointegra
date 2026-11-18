@@ -49,7 +49,12 @@ test.afterEach(() => {
   limpiarReservasE2e(desde)
   sqlLocal(`delete from public.paciente_medico where paciente_id in (select id from public.pacientes where apellidos = :'ap');
     delete from public.pacientes where apellidos = :'ap';`, { ap: APELLIDOS_NUEVO })
-  interruptorAgenda('A', true)
+})
+test.afterAll(() => {
+  // Integración I: cada archivo deja la v2 APAGADA al terminar (la convención de la batería: el
+  // global-setup la apaga y sólo la prueba que la necesita la enciende). Encendida, las e2e que
+  // la suponen apagada (agenda-secretaria, agenda-tipos-cita) caían en el aviso de empalme B7.
+  interruptorAgenda('A', false)
 })
 
 /** Dentro de `minutos`, redondeado al minuto: la primera de «Próximas citas» del Dr. Admin. */

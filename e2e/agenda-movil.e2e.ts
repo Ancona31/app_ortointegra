@@ -57,7 +57,14 @@ test('teléfono: el Mes lleva el panel del día debajo', async ({ page }) => {
    la semilla llena de citas, así que `irAAgenda` no se queda esperando un
    `.fc-event` que no va a llegar. */
 test('teléfono: el panel del Mes abre en HOY, no en el día 1; «siguiente» avanza al día 1 del mes nuevo', async ({ page }) => {
-  const diaFijo = DIA_LABORABLE_FIJO.endsWith('-01') ? DIA_LABORABLE_LIBRE : DIA_LABORABLE_FIJO
+  // Integración I: el reloj NUNCA en el futuro (CLAUDE.md, «Agenda v2»): un martes, el miércoles
+  // de la semana visible es mañana, el navegador renueva el token y la agenda sale a /inicio.
+  // Si el día fijo cae después de hoy, se usa hoy (en Mérida).
+  const hoyMerida = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Merida' }).format(new Date())
+  const candidato = DIA_LABORABLE_FIJO.endsWith('-01') ? DIA_LABORABLE_LIBRE : DIA_LABORABLE_FIJO
+  // Hoy día 1 con el miércoles aún por venir: no hay día pasado que no sea el 1; la prueba no aplica.
+  test.skip(candidato > hoyMerida && hoyMerida.endsWith('-01'), 'hoy es día 1 y el día fijo aún no llega')
+  const diaFijo = candidato > hoyMerida ? hoyMerida : candidato
   const [anio, mes] = diaFijo.split('-').map(Number)
   const mesSiguiente = mes === 12 ? `${anio + 1}-01-01` : `${anio}-${String(mes + 1).padStart(2, '0')}-01`
 
@@ -69,7 +76,8 @@ test('teléfono: el panel del Mes abre en HOY, no en el día 1; «siguiente» av
   const textoHoy = `${FMT.format(new Date(`${diaFijo}T12:00:00-06:00`))} · hoy`
   const textoDia1DelMesNuevo = FMT.format(new Date(`${mesSiguiente}T12:00:00-06:00`))
 
-  await page.clock.setFixedTime(new Date(`${diaFijo}T09:00:00-06:00`))
+  // Antes de las 09:00 de hoy, las 09:00 aún serían futuro: entonces, ahora mismo.
+  await page.clock.setFixedTime(new Date(Math.min(Date.now(), Date.parse(`${diaFijo}T09:00:00-06:00`))))
   await irAAgenda(page)
   await page.getByRole('tab', { name: 'Mes' }).click()
   const titulo = page.locator('section[aria-label="Citas del día seleccionado"] h2')
