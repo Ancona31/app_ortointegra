@@ -1,11 +1,15 @@
 -- ═══════════════════════════════════════════════════════════════════════
 -- Agenda · tanda K, agente K2 (punto 10 de Angel) — cuánto falta para
--- volver a pedir el código, y el código de un correo anterior no cuenta
--- como equivocado
--- Rama: feature/agenda-v2-k2 · Escrita: 2026-11-18
--- Riesgo estimado: BAJO (una función nueva de sólo lectura, sólo
+-- volver a pedir el código, 30 s entre dos códigos POR ENLACE, y el código
+-- de un correo anterior no cuenta como equivocado
+-- Rama: feature/agenda-v2-k2 · Escrita: 2026-11-18 · Integración de la
+--   tanda K (2026-11-18): lleva fundida la que era 20261123130100
+--   (reserva_espera_reenvio), que corregía a ésta en la misma tanda (regla de
+--   Angel: «si un cambio corrige una migración de esta misma tanda, corrígela
+--   en su archivo en lugar de añadir otra»).
+-- Riesgo estimado: BAJO (dos funciones nuevas de sólo lectura, sólo
 -- service_role; CREATE OR REPLACE de reserva_codigo_verificar con UNA rama
--- más, que no escribe. Ninguna tabla, columna, fila ni policy cambia).
+-- más, que no escribe. Ninguna tabla, columna, fila, índice ni policy cambia).
 -- ───────────────────────────────────────────────────────────────────────
 -- ESTADO · LOCAL: ver «APLICACIÓN LOCAL» al pie de esta cabecera.
 -- ESTADO · PRODUCCIÓN: PENDIENTE DE APLICAR (después de D3, 20261114140000;
@@ -25,11 +29,16 @@
 --     que hace falta una RPC: `rate_limit_espera`.
 --   · Los 30 s entre dos códigos al mismo correo los IMPONE el servidor, y
 --     la página los cuenta hacia atrás con el número que le da el servidor.
---     Es un límite MÁS, no uno relajado. (Se escribió con esta misma RPC sobre
---     la llave GLOBAL del correo; una revisión de seguridad lo marcó como fuga
---     entre clínicas y la cuenta pasó a ser por enlace en
---     20261123130100_agenda_k2_reenvio_por_enlace. La función sigue sirviendo
---     a los Retry-After.)
+--     Es un límite MÁS, no uno relajado. Se cuentan POR ENLACE Y CORREO
+--     (`reserva_espera_reenvio`, sobre reserva_verificaciones, que ya está
+--     atada a clinica_id, enlace_id y correo_hmac), NO sobre la llave del
+--     límite por correo (`reserva:codigo:correo:<hmac>`), que es GLOBAL: la
+--     primera versión lo hacía así y una revisión de seguridad lo marcó (MEDIA,
+--     fuga entre clínicas: con el enlace de OTRA clínica, pedir un código con
+--     el correo de alguien y leer la espera decía si esa persona había pedido
+--     un código en cualquier enlace en los últimos 30 s). Desde otro enlace la
+--     espera es 0. `rate_limit_espera` sirve sólo a los Retry-After de los
+--     límites por red, navegador y enlace.
 --   · Reenviar invalida el código anterior (`reserva_codigo_emitir` lo deja
 --     en intentos = 5, D3, sin cambios). Si la persona escribía después el
 --     código del correo ANTERIOR, `reserva_codigo_verificar` lo comparaba con
@@ -47,6 +56,11 @@
 --   createAdminClient(); ip_rate_limits no es dato de clínica, no hay
 --   clinica_id). No escribe: es la cuenta de rate_limit_intento sin el
 --   INSERT, con la ventana en segundos.
+-- public.reserva_espera_reenvio(p_clinica_id uuid, p_enlace_id uuid,
+--   p_correo_hmac text, p_segundos integer) → integer (segundos que faltan
+--   para poder emitir otro código a ese correo EN ESE ENLACE; 0 si ya).
+--   NUEVA. STABLE, INVOKER, search_path vacío, SÓLO service_role. Filtra
+--   SIEMPRE por clinica_id y enlace_id (CLAUDE.md, aislamiento). No escribe.
 -- public.reserva_codigo_verificar(uuid, uuid, text, text, text): CREATE OR
 --   REPLACE con el cuerpo de D3 y una rama nueva ('reemplazado') antes de
 --   sumar el equivocado. La firma, la seguridad (INVOKER), el search_path y
@@ -55,25 +69,28 @@
 --
 -- ═══ APLICACIÓN ════════════════════════════════════════════════════════
 -- EJECUTAR EN EL SQL EDITOR DE SUPABASE, DE UNA SOLA VEZ, COMPLETO.
--- Requiere D3 (reserva_verificaciones y su función) y auth_02
--- (ip_rate_limits). Bloqueos: ninguno sobre tablas (sólo funciones).
+-- Requiere D3 (reserva_verificaciones, su índice reserva_verificaciones_busqueda
+-- y su función) y auth_02 (ip_rate_limits). Bloqueos: ninguno sobre tablas
+-- (sólo funciones).
 -- Orden respecto al código: MIGRACIÓN PRIMERO.
 --   · Código nuevo, base sin esto: `rate_limit_espera` no existe → la ruta
 --     no sabe la espera: los 429 salen como antes («Demasiados intentos», sin
---     cuánto falta) y el reenvío dentro de los 30 s NO se frena en el
---     servidor (sólo en la página). 'reemplazado' no sale nunca: el código
+--     cuánto falta) y, sin `reserva_espera_reenvio`, la espera es «no se
+--     sabe»: el reenvío dentro de los 30 s NO se frena en el servidor (sólo
+--     en la página) y el tope de 3 por hora sigue igual. 'reemplazado' no sale nunca: el código
 --     anterior cuenta como equivocado, como antes. Nada falla.
 --   · Código viejo, base con esto: nadie llama a la función nueva; si
 --     verificar devuelve 'reemplazado', la ruta vieja lo da como 500
 --     «no_disponible» (respuestaVerificacion: valor desconocido). Por eso,
 --     migración primero y código en la misma ventana.
 -- Alcance de los roles:
---   gana — service_role: leer cuánto falta (sólo por la RPC).
+--   gana — service_role: leer cuánto falta (sólo por las dos RPC).
 --   pierde — nada.
--- Contrato con spinus-consola: función nueva; la otra conserva firma, tipo
---   y significado de sus valores de siempre (añade uno).
+-- Contrato con spinus-consola: dos funciones nuevas; la otra conserva firma,
+--   tipo y significado de sus valores de siempre (añade uno).
 --
 -- ═══ VUELTA ATRÁS ══════════════════════════════════════════════════════
+--   DROP FUNCTION IF EXISTS public.reserva_espera_reenvio(uuid, uuid, text, integer);
 --   DROP FUNCTION IF EXISTS public.rate_limit_espera(text, integer, integer);
 --   -- y reserva_codigo_verificar con el cuerpo de 20261114140000 (md5 de
 --   -- prosrc 321e36cc30ea234340aa87b49a0b0c54), copiado tal cual.
@@ -85,16 +102,35 @@
 -- `<=` en el borde de la ventana; H4 y H5 anotados en el COMMENT (consulta no
 -- atómica; la ventana no puede exceder la de rate_limit_intento); H7 la prueba
 -- cubre otro enlace y la coincidencia con rate_limit_intento real. H6 (la
--- llave del correo no lleva enlace ni clínica: la espera delata que ese correo
--- pidió un código hace poco en cualquier enlace) queda como deuda: cambiarla
--- cambia el contrato de la llave del límite. Sin relajación del tope:
+-- llave del correo no lleva enlace ni clínica: la espera delataba que ese
+-- correo pidió un código hace poco en cualquier enlace) quedó CERRADO con la
+-- versión por enlace de la que era 130100: los 30 s salen de
+-- reserva_espera_reenvio (por clínica, enlace y correo) y el 429 del tope
+-- global por correo va sin espera. Queda el bit de «ese correo pidió ≥ 3
+-- códigos en la última hora», que ya daba el 429 antes de K2. Sin relajación del tope:
 -- 'reemplazado' sólo responde a valores ya muertos, después de agotado y
 -- caducado, y no escribe.
+-- La que era 20261123130100 (reserva_espera_reenvio), auditada aparte el mismo
+-- día: APTA, sin cambios obligatorios; sus tres observaciones leves,
+-- aplicadas: `least(p_segundos, …)` (created_at lo sella clock_timestamp() y
+-- podía dar 31 s); el COMMENT dice lo que sí revela en el MISMO enlace (un bit,
+-- 30 s; aceptado); índice comprobado con EXPLAIN (Index Only Scan de
+-- reserva_verificaciones_busqueda). Revisión de seguridad aparte de la ruta
+-- /codigo: APROBADO (fuga entre clínicas cerrada, sin límites relajados).
+-- Integración (fundidas en este archivo): ver «APLICACIÓN LOCAL».
+-- Auditoría independiente del archivo fundido (subagente sonnet, 2026-11-18):
+-- APTA con observaciones, sin bloqueantes; la fusión no perdió nada. Aplicadas:
+-- el COMMENT de rate_limit_espera (ya no habla de los 30 s), H6 marcado como
+-- cerrado, esta sección rehecha y la fila 11 (md5 de rate_limit_espera).
 --
 -- ═══ APLICACIÓN LOCAL (2026-11-18, base de Docker, nunca producción) ═══
--- Ensayo con ROLLBACK en lugar de COMMIT: nada quedó (1, 2, 3 y 5 REVISAR; 4,
--- 6 y 7 OK). Después, dos pasadas reales: las dos con 1-7 OK (la segunda,
--- replay sin cambios). Prueba: supabase/pruebas-sql/k2_espera_codigo.sql.
+-- Las dos de antes de fundirse, cada una por su lado: ensayo con ROLLBACK y
+-- dos pasadas reales (130000: filas 1-7 OK; 130100: sus filas OK).
+-- El archivo fundido (integración): sobre la base de la tanda J más K1, ensayo
+-- con ROLLBACK (nada quedó) y dos pasadas reales con todas las filas OK (la
+-- segunda, replay sin cambios); después, db reset con todo el conjunto en
+-- orden. Prueba: supabase/pruebas-sql/k2_espera_codigo.sql, en verde, y su 5c
+-- en rojo sin el filtro por enlace («dio 30, esperaba 0»).
 -- ═══════════════════════════════════════════════════════════════════════
 
 BEGIN;
@@ -131,6 +167,21 @@ BEGIN
   IF EXISTS (SELECT 1 FROM pg_proc WHERE oid = to_regprocedure('public.rate_limit_espera(text, integer, integer)') AND prosecdef) THEN
     RAISE EXCEPTION 'PRE-VUELO FALLÓ: rate_limit_espera ya existe como SECURITY DEFINER.';
   END IF;
+  -- Lo que necesita reserva_espera_reenvio (sección 3).
+  IF (SELECT count(*) FROM pg_attribute WHERE attrelid = 'public.reserva_verificaciones'::regclass AND NOT attisdropped
+        AND (attname, atttypid::regtype) IN (('clinica_id', 'uuid'::regtype), ('enlace_id', 'uuid'::regtype),
+                                             ('correo_hmac', 'text'::regtype), ('created_at', 'timestamptz'::regtype))) <> 4 THEN
+    RAISE EXCEPTION 'PRE-VUELO FALLÓ: reserva_verificaciones sin clinica_id/enlace_id uuid, correo_hmac text o created_at timestamptz.';
+  END IF;
+  IF to_regclass('public.reserva_verificaciones_busqueda') IS NULL THEN
+    RAISE EXCEPTION 'PRE-VUELO FALLÓ: falta el índice reserva_verificaciones_busqueda (D3).';
+  END IF;
+  IF NOT has_table_privilege('service_role', 'public.reserva_verificaciones', 'SELECT') THEN
+    RAISE EXCEPTION 'PRE-VUELO FALLÓ: service_role sin SELECT en reserva_verificaciones.';
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_proc WHERE oid = to_regprocedure('public.reserva_espera_reenvio(uuid, uuid, text, integer)') AND prosecdef) THEN
+    RAISE EXCEPTION 'PRE-VUELO FALLÓ: reserva_espera_reenvio ya existe como SECURITY DEFINER.';
+  END IF;
 END $$;
 
 -- ---------------------------------------------------------------------
@@ -166,10 +217,45 @@ END
 $fn$;
 
 COMMENT ON FUNCTION public.rate_limit_espera(text, integer, integer) IS
-  'Tanda K (K2, punto 10): segundos que faltan para que `p_ruta` vuelva a tener sitio con un tope de `p_limite` en `p_ventana_seg` segundos (0 = ya cabe). Cuenta como rate_limit_intento (renglones de ip_rate_limits de esa ruta dentro de la ventana) y no escribe. Sólo service_role (rutas públicas de la reserva: Retry-After y los 30 s entre códigos al mismo correo). Consulta NO atómica: informa, no sustituye a rate_limit_intento (dos peticiones simultáneas pueden pasar las dos). p_ventana_seg no debe exceder la ventana con la que rate_limit_intento cuenta esa ruta: lo que sale de ella ya se borró.';
+  'Tanda K (K2, punto 10): segundos que faltan para que `p_ruta` vuelva a tener sitio con un tope de `p_limite` en `p_ventana_seg` segundos (0 = ya cabe). Cuenta como rate_limit_intento (renglones de ip_rate_limits de esa ruta dentro de la ventana) y no escribe. Sólo service_role (rutas públicas de la reserva: Retry-After de los límites por red, navegador y enlace; los 30 s entre códigos los da reserva_espera_reenvio). Consulta NO atómica: informa, no sustituye a rate_limit_intento (dos peticiones simultáneas pueden pasar las dos). p_ventana_seg no debe exceder la ventana con la que rate_limit_intento cuenta esa ruta: lo que sale de ella ya se borró.';
 
 -- ---------------------------------------------------------------------
--- 3 · Verificar: el cuerpo de D3 y, antes de sumar un equivocado, la rama
+-- 3 · Los 30 s entre dos códigos, POR ENLACE Y CORREO: el último código
+--     EMITIDO a ese correo EN ESE ENLACE (reserva_verificaciones, índice
+--     reserva_verificaciones_busqueda). Desde otro enlace, 0.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.reserva_espera_reenvio(
+  p_clinica_id uuid, p_enlace_id uuid, p_correo_hmac text, p_segundos integer)
+RETURNS integer
+LANGUAGE plpgsql
+STABLE
+SECURITY INVOKER
+SET search_path = ''
+AS $fn$
+DECLARE
+  v_sale timestamptz;
+BEGIN
+  IF p_clinica_id IS NULL OR p_enlace_id IS NULL OR p_correo_hmac IS NULL OR p_segundos IS NULL OR p_segundos < 1 THEN
+    RAISE EXCEPTION 'reserva_espera_reenvio: argumentos inválidos' USING ERRCODE = '22023';
+  END IF;
+  SELECT r.created_at + make_interval(secs => p_segundos) INTO v_sale
+    FROM public.reserva_verificaciones r
+   WHERE r.clinica_id = p_clinica_id AND r.enlace_id = p_enlace_id AND r.correo_hmac = p_correo_hmac
+   ORDER BY r.created_at DESC
+   LIMIT 1;
+  IF v_sale IS NULL OR v_sale <= now() THEN
+    RETURN 0;
+  END IF;
+  -- `least`: created_at lo sella clock_timestamp() en otra transacción y puede ir por delante de now() (auditoría 1).
+  RETURN least(p_segundos, greatest(1, ceil(extract(epoch FROM v_sale - now()))::integer));
+END
+$fn$;
+
+COMMENT ON FUNCTION public.reserva_espera_reenvio(uuid, uuid, text, integer) IS
+  'Tanda K (K2, punto 10): segundos que faltan para poder emitir otro código a ese correo EN ESE ENLACE (p_segundos desde el último emitido; 0 = ya). Filtra por clinica_id y enlace_id: desde otro enlace no revela nada; desde ESE enlace sí dice, durante 30 s, que ese correo pidió un código ahí (aceptado: un bit, una ventana de 30 s, tras los límites de IP y dispositivo, y sondear sin espera manda un código al titular). No escribe; consulta NO atómica (dos peticiones simultáneas pueden pasar las dos; el tope de 3 por correo por hora, en rate_limit_intento, sí lo es). Sólo service_role.';
+
+-- ---------------------------------------------------------------------
+-- 4 · Verificar: el cuerpo de D3 y, antes de sumar un equivocado, la rama
 --     'reemplazado' (un código anterior de ESTE enlace y ESTE correo, sin
 --     verificar y sin vencer). No escribe nada en esa rama.
 -- ---------------------------------------------------------------------
@@ -217,17 +303,19 @@ $fn$;
 COMMENT ON FUNCTION public.reserva_codigo_verificar(uuid, uuid, text, text, text) IS
   'Reserva por enlace (D3; K2): comprueba el código del correo (5 equivocados por código, 10 min) y, si vale, deja la ficha de un uso (30 min). Devuelve ok | sin_codigo | agotado | caducado | incorrecto | reemplazado. reemplazado (K2, punto 10): el código es el de un correo ANTERIOR de este enlace y correo (lo invalidó un reenvío), todavía sin vencer; NO suma equivocado. Sólo service_role.';
 
--- Permisos de funciones (CLAUDE.md). Las dos, SÓLO service_role: las llaman
+-- Permisos de funciones (CLAUDE.md). Las tres, SÓLO service_role: las llaman
 -- las rutas públicas con createAdminClient(); ni la consola ni las sesiones.
 REVOKE EXECUTE ON FUNCTION public.rate_limit_espera(text, integer, integer) FROM public, anon, authenticated;
 GRANT  EXECUTE ON FUNCTION public.rate_limit_espera(text, integer, integer) TO service_role;
+REVOKE EXECUTE ON FUNCTION public.reserva_espera_reenvio(uuid, uuid, text, integer) FROM public, anon, authenticated;
+GRANT  EXECUTE ON FUNCTION public.reserva_espera_reenvio(uuid, uuid, text, integer) TO service_role;
 REVOKE EXECUTE ON FUNCTION public.reserva_codigo_verificar(uuid, uuid, text, text, text) FROM public, anon, authenticated;
 GRANT  EXECUTE ON FUNCTION public.reserva_codigo_verificar(uuid, uuid, text, text, text) TO service_role;
 
 COMMIT;
 
 -- ---------------------------------------------------------------------
--- 4 · Veredicto en la rejilla. UN SOLO SELECT, y nada detrás.
+-- 5 · Veredicto en la rejilla. UN SOLO SELECT, y nada detrás.
 -- ---------------------------------------------------------------------
 SELECT t.n, t.comprobacion, t.valor, t.esperado,
        CASE WHEN t.esperado IS NULL THEN 'INFO' WHEN t.valor = t.esperado THEN 'OK' ELSE 'REVISAR' END AS estado
@@ -253,20 +341,41 @@ FROM (
                      FROM pg_proc p WHERE p.oid = to_regprocedure('public.reserva_codigo_verificar(uuid, uuid, text, text, text)')), 'AUSENTE'),
          'false / false / true; true'
   UNION ALL
-  SELECT 5, 'ninguna de las 2 con EXECUTE a PUBLIC',
+  SELECT 5, 'ninguna de las 3 con EXECUTE a PUBLIC',
          (SELECT count(*)::text FROM pg_proc p
            WHERE p.oid IN (to_regprocedure('public.rate_limit_espera(text, integer, integer)'),
+                           to_regprocedure('public.reserva_espera_reenvio(uuid, uuid, text, integer)'),
                            to_regprocedure('public.reserva_codigo_verificar(uuid, uuid, text, text, text)'))
              AND NOT EXISTS (SELECT 1 FROM aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) x
                               WHERE x.grantee = 0 AND x.privilege_type = 'EXECUTE')),
-         '2'
+         '3'
   UNION ALL
   SELECT 6, 'rate_limit_intento, intacta (md5 de prosrc)',
          coalesce((SELECT md5(p.prosrc) FROM pg_proc p WHERE p.oid = to_regprocedure('public.rate_limit_intento(text, text, integer, integer)')), 'AUSENTE'),
          'f931c333c05d036bf683759f7a0aaa32'
   UNION ALL
-  SELECT 7, 'reserva_codigo_emitir, intacta (md5 de prosrc)',
-         coalesce((SELECT md5(p.prosrc) FROM pg_proc p WHERE p.oid = to_regprocedure('public.reserva_codigo_emitir(uuid, uuid, text, text)')), 'AUSENTE'),
-         '31171bf5d00cc49bc6dc57afbdb82f66'
+  SELECT 7, 'reserva_codigo_emitir: la de D3 (o ya con «no pausado» de K3, 20261123140000, en una segunda pasada)',
+         coalesce((SELECT (md5(p.prosrc) IN ('31171bf5d00cc49bc6dc57afbdb82f66', 'd24c01e93ce43ae8b75013010a7cb1fd'))::text
+                     FROM pg_proc p WHERE p.oid = to_regprocedure('public.reserva_codigo_emitir(uuid, uuid, text, text)')), 'AUSENTE'),
+         'true'
+  UNION ALL
+  SELECT 8, 'reserva_espera_reenvio: INVOKER / STABLE / search_path vacío',
+         coalesce((SELECT (NOT p.prosecdef)::text || ' / ' || (p.provolatile = 's')::text || ' / ' || (p.proconfig @> ARRAY['search_path=""'])::text
+                     FROM pg_proc p WHERE p.oid = to_regprocedure('public.reserva_espera_reenvio(uuid, uuid, text, integer)')), 'AUSENTE'),
+         'true / true / true'
+  UNION ALL
+  SELECT 9, 'EXECUTE de reserva_espera_reenvio: anon / authenticated / service_role',
+         coalesce((SELECT has_function_privilege('anon', p.oid, 'EXECUTE')::text || ' / ' || has_function_privilege('authenticated', p.oid, 'EXECUTE')::text
+                          || ' / ' || has_function_privilege('service_role', p.oid, 'EXECUTE')::text
+                     FROM pg_proc p WHERE p.oid = to_regprocedure('public.reserva_espera_reenvio(uuid, uuid, text, integer)')), 'AUSENTE'),
+         'false / false / true'
+  UNION ALL
+  SELECT 10, 'reserva_espera_reenvio: md5 de prosrc (el de esta migración)',
+         coalesce((SELECT md5(p.prosrc) FROM pg_proc p WHERE p.oid = to_regprocedure('public.reserva_espera_reenvio(uuid, uuid, text, integer)')), 'AUSENTE'),
+         'ed76045debb85b01643cb5ae78c1687d'
+  UNION ALL
+  SELECT 11, 'rate_limit_espera: md5 de prosrc (el de esta migración)',
+         coalesce((SELECT md5(p.prosrc) FROM pg_proc p WHERE p.oid = to_regprocedure('public.rate_limit_espera(text, integer, integer)')), 'AUSENTE'),
+         '621e753f4f6665766aba699fdb684f9d'
 ) t
 ORDER BY t.n;

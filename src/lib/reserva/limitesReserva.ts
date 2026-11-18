@@ -161,7 +161,7 @@ export async function esperaDeLimites(accion: Accion, seudonimos: Partial<Record
  * K2: segundos que faltan para mandar OTRO código a ese correo EN ESE ENLACE
  * (0 = ya): `REENVIO_CODIGO_S` desde el último emitido, leído de
  * `reserva_verificaciones` por clínica, enlace y correo
- * (`reserva_espera_reenvio`, 20261123130100). Por enlace y no por correo a
+ * (`reserva_espera_reenvio`, 20261123130000). Por enlace y no por correo a
  * secas: con la llave global del correo, otro enlace (de otra clínica) leía
  * en la espera si esa persona había pedido un código en cualquier sitio.
  * null = no se sabe: sin la migración no se frena aquí (sí en la página), y

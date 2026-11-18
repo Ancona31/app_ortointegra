@@ -1,6 +1,6 @@
 -- Agenda tanda K (K2, punto 10) — cuánto falta para volver a pedir el código y
--- el código de un correo anterior (20261123130000_agenda_k2_espera_codigo.sql
--- y 20261123130100_agenda_k2_reenvio_por_enlace.sql).
+-- el código de un correo anterior (20261123130000_agenda_k2_espera_codigo.sql,
+-- que lleva fundida la que era 20261123130100: los 30 s por enlace).
 -- Se corre con scripts/pruebas-sql.sh. Crea sus propios datos y termina en rollback.
 -- MUTACIONES (comprobadas en rojo): sin la rama 'reemplazado' de
 -- reserva_codigo_verificar (caso 2 da 'incorrecto' y suma un equivocado);
@@ -128,7 +128,7 @@ select pg_temp.esperar('5b intento 3', pg_temp.intento('k2:real')::text, 'false'
 select pg_temp.esperar('5b intento 4 bloquea', pg_temp.intento('k2:real')::text, 'true');
 select pg_temp.esperar('5b y la espera lo dice (1 h)', pg_temp.espera('k2:real', 3, 3600), '3600');
 
--- 5c · Los 30 s entre códigos son POR ENLACE (20261123130100, revisión de seguridad): pedir con el mismo correo
+-- 5c · Los 30 s entre códigos son POR ENLACE (20261123130000, revisión de seguridad): pedir con el mismo correo
 --      en el enlace f1 no revela nada desde f2, ni desde otra clínica, ni para otro correo.
 create function pg_temp.reenvio(p_clinica uuid, p_enlace uuid, p_correo text) returns text language plpgsql as $$
 declare v integer;
