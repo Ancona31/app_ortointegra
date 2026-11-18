@@ -1128,3 +1128,219 @@ del proyecto en orden de nombre, ANTES del código; la v2 se enciende después.
   Confirmó la lista de 45 contando desde los GRANT de los archivos y que la única
   alta frente a las 44 es `cita_reagendar_clinica`. Sus R1–R6 son L6–L9 y la
   fila de I4b (todos «por revisar»).
+
+## 12. Tanda J (2026-11-18)
+
+Cinco ramas escritas en paralelo sobre la base local (`feature/agenda-v2-j1` a
+`-j5`, todas desde `ccb9087`), fusionadas con `--no-ff` en `feature/agenda-v2`
+en el orden J1, J2, J3, J4, J5. J1, J3 y J5 no traen migraciones; J2 trae dos y
+J4 una. Ninguna migración se editó en la integración; sí una ruta, para tolerar
+la base sin la de J2 (§12.7). Aquí se auditan juntas sobre la base reiniciada
+desde cero.
+
+### 12.1 El conjunto, desde cero
+
+`ls supabase/migrations/*.sql` = **42**: las 5 de `main` y 37 del proyecto (las
+34 hasta la tanda I y las 3 nuevas). Antes de reiniciar se contaron las filas
+clínicas que no fueran de la semilla: **0** `consultas`, **0** `documentos`, **0**
+`addendums`; no hubo nada que respaldar. `supabase db reset --local` (CLI
+2.117.0) aplicó las 42 en orden y sin un error (el único aviso es «no files
+matched pattern: supabase/seed.sql», el de siempre), en 26–27 s;
+`schema_migrations` = 42, última `20261122140000`. Semilla en 1.3 s.
+
+**Segunda pasada** de las 3 nuevas sobre esa base: `20261122120100` y
+`20261122140000` sin error y **huella idéntica**. `20261122120000` **aborta en su
+pre-vuelo** («reservar_por_enlace no es el cuerpo de i2 ni el de j2», md5
+`1a448df0…`): su pre-vuelo acepta el cuerpo de I2 o el suyo propio, y en la base
+completa el cuerpo ya es el de `…120100`. Aborto limpio (transacción revertida,
+huella idéntica), así que no daña nada, pero j2-a **no es reejecutable** después
+de j2-b (§12.8 M1).
+
+### 12.2 Veredicto de las tres
+
+| # | Archivo | Qué hace | Auditoría previa (cabecera) | Integración | Veredicto |
+|---|---|---|---|---|---|
+| J2a | `20261122120000_agenda_j2_unico_tope_correo.sql` | `reserva_enlaces`: `correo`, `correo_hmac`, `intentos` (NOT NULL DEFAULT 0) y `agotado_en`, con `reserva_enlaces_correo_check` (correo y HMAC juntos, sólo en el único) y `reserva_enlaces_intentos_check`; `trg_reserva_enlaces_unico` → `proteger_reserva_enlace_unico()`; `reserva_enlace_emitir` de 9 argumentos (nueva; la de 7 se vuelve a pegar idéntica); `reservar_por_enlace` usa el correo de la clínica en el único, cuenta intentos (tope 5, «bloqueado» lo agota) y `reserva_contexto` da el único agotado por no disponible | Rejilla de veredicto en la propia migración (§8) | Sin cambios | APTA |
+| J2b | `20261122120100_agenda_j2_unico_carrera_client_id.sql` | `reservar_por_enlace` con el INSERT de la cita en su propio `BEGIN … EXCEPTION WHEN unique_violation`: si la restricción es `idx_appointments_client_id`, `client_id_en_uso` sin deshacer el conteo; si es otra, `RAISE` | Rejilla de veredicto (§4), todo «OK» | Sin cambios | APTA |
+| J4 | `20261122140000_agenda_j4_aviso_google_reserva.sql` | tabla `gcal_movimientos_rechazados` (RLS, sin policies), `cita_movimiento_google_registrar` (sólo `service_role`), `trg_gcal_movimientos_aviso_clinica` → `aviso_clinica_de_movimiento_google()` (DEFINER) y el tipo `google_movimiento_rechazado` en `avisos_clinica_tipo_check` | Ensayada con ROLLBACK; corregida la fila 10 de su rejilla | Sin cambios | APTA |
+
+### 12.3 Interacción con los disparadores de `reserva_enlaces` y `appointments`
+
+**A · Los BEFORE de `reserva_enlaces`.** Son dos y corren por nombre:
+`trg_reserva_enlaces_proteger` (`proteger_reserva_enlaces()`, seg 7a, **md5
+`acd4128b` sin tocar**) < `trg_reserva_enlaces_unico`
+(`proteger_reserva_enlace_unico()`, nueva). Los dos INVOKER, `search_path=''`, y
+los dos dejan pasar a `postgres`/`supabase_admin`. No se pisan: el primero vigila
+la tupla de identidad (id, clínica, médico, clase, hash, etiqueta, vigencia,
+caducidad, autor, alta), la revocación y el «usado»; el segundo, sólo las cuatro
+columnas nuevas (correo inmutable; `intentos`/`agotado_en` sólo los mueve
+`service_role`, sólo hacia arriba y sin desagotar). En INSERT, el primero exige
+`service_role` y el segundo pone `intentos = 0` y `agotado_en = NULL`, lo mande
+quien lo mande. El correo no entra en la tupla del primero a propósito: lo
+guarda el segundo. El AFTER `audit_reserva_enlaces` (`log_tabla_change`) sólo
+apunta id, tabla y operación: **el correo del paciente no llega a `audit_log`**.
+Cada intento contado es un UPDATE, así que deja una fila de auditoría (como mucho
+5 por enlace, más la del uso).
+
+**B · `appointments`.** Ninguna de las tres crea, cambia ni quita disparadores
+de `appointments`; los seis BEFORE y los AFTER del §11.3 A siguen igual (huella).
+`reservar_por_enlace` sigue insertando la cita como `service_role` y la fila
+pasa por los mismos seis BEFORE y por `trg_appointments_aviso_clinica` (el aviso
+`reserva_enlace`). Con J2b, el INSERT corre dentro de una subtransacción: si un
+BEFORE o un AFTER lanza otra excepción, `RAISE` la sube igual que antes; si choca
+`idx_appointments_client_id`, se deshace el INSERT **con** el aviso que su AFTER
+hubiera dejado, y el conteo del único (hecho antes, fuera del bloque) queda. La
+`unique_violation` se distingue por `CONSTRAINT_NAME`, así que la del índice
+parcial de `avisos_clinica` (que, además, su disparador evita con `ON CONFLICT`)
+no se confunde con la del `client_id`.
+
+**C · J4 frente a I2 e I5.** `cita_movimiento_google_registrar` repite el
+criterio de `cita_proteger_eleccion` (de esa clínica, por enlace y sin empezar),
+y sólo con la v2 encendida; inserta en `gcal_movimientos_rechazados` con `ON
+CONFLICT ON CONSTRAINT gcal_movimientos_rechazados_intento_key DO NOTHING`
+(única sobre `(cita_id, google_updated)`), así que el
+mismo movimiento rechazado en dos pasadas avisa una vez. El AFTER INSERT de esa
+tabla (DEFINER) inserta el aviso en `avisos_clinica` con `ON CONFLICT (tipo,
+cita_id) WHERE revisado_en IS NULL DO UPDATE SET creado_en = now()`: un aviso
+pendiente se reaviva en vez de duplicarse; uno ya revisado no se reabre (nace
+otro). Ese `DO UPDATE` pasa por `aviso_clinica_revisar()` (BEFORE UPDATE de I5),
+que conserva `revisado_en`/`revisado_por`. `gcal_aplicar_evento` y el 42501 de I2
+no cambian: J4 sólo añade, en código, la llamada a la RPC después del rechazo.
+
+### 12.4 Catálogo: qué cambió de verdad
+
+Huella md5 por objeto de `public` de la base recién reiniciada con las 42 contra
+la de I (39), reiniciada igual desde `git archive ccb9087`:
+
+- **0 quitados, 3 cambiados**, los tres a propósito con `CREATE OR REPLACE`
+  (mismo `proacl`): `reservar_por_enlace` (J2a y J2b), `reserva_contexto` (J2a) y
+  `avisos_clinica_tipo_check` (J4, DROP + ADD con un tipo más: más amplia).
+- **12 nuevos** (574 en total; más el índice `gcal_movimientos_rechazados_clinica_idx`, que la huella no cuenta): 4 funciones (`proteger_reserva_enlace_unico()`,
+  `reserva_enlace_emitir` de 9 argumentos, `cita_movimiento_google_registrar`,
+  `aviso_clinica_de_movimiento_google()`), 2 disparadores
+  (`trg_reserva_enlaces_unico`, `trg_gcal_movimientos_aviso_clinica`), 5
+  constraints (`reserva_enlaces_correo_check`, `_intentos_check`,
+  `gcal_movimientos_rechazados_pkey`, `_intento_key`, `_clinica_id_fkey`) y la
+  tabla `gcal_movimientos_rechazados`.
+- `reserva_enlace_emitir` de 7 argumentos y `proteger_reserva_enlaces()`:
+  **idénticas** a I. Ninguna policy previa cambia; ninguna tabla previa cambia de
+  permisos ni de RLS.
+
+### 12.5 Permisos de funciones
+
+Ninguna función de la tanda tiene EXECUTE a PUBLIC; todas `search_path=''` y de
+dueño `postgres`.
+
+| Función | DEFINER | anon | authenticated | service_role |
+|---|---|---|---|---|
+| `reserva_enlace_emitir(uuid,uuid,uuid,uuid,text,text,text,text,text)` (nueva) | no | — | — | sí |
+| `reserva_enlace_emitir(uuid,uuid,uuid,uuid,text,text,text)` (se conserva) | no | — | — | sí |
+| `cita_movimiento_google_registrar(uuid,uuid,timestamptz)` (nueva) | no | — | — | sí |
+| `reservar_por_enlace(…)`, `reserva_contexto(text,text,text)` (cambiadas) | no | — | — | sí |
+| `proteger_reserva_enlace_unico()` (de disparador) | no | sí | sí | sí |
+| `aviso_clinica_de_movimiento_google()` (de disparador) | **sí** | sí | sí | sí |
+
+La única DEFINER es de disparador (devuelve `trigger`: no se llama por
+PostgREST) y sólo inserta o reaviva en `avisos_clinica`, con `clinica_id` y
+`cita_id` de la fila que la dispara; es DEFINER porque nadie más que los
+disparadores escribe en `avisos_clinica` (§11.6). Ninguna necesita
+`supabase_auth_admin` ni `supabase_storage_admin`.
+
+**`gcal_movimientos_rechazados`.** RLS activada, **sin policies**; privilegios:
+`service_role` SELECT e INSERT, nadie más (ni `anon` ni `authenticated`). FK
+`clinica_id → clinicas` RESTRICT; **sin FK a `appointments`** a propósito (como
+`avisos_clinica` y `reserva_empalmes_google`). La semilla la borra antes de las
+clínicas (`scripts/agenda-semilla.ts`): sin eso, la FK RESTRICT abortaba
+«borrar clínicas» y dejaba la base compartida sin datos (pasó una vez en la
+tanda; notas de J1).
+
+**`p1_permisos_funciones.sql`, caso 3, en la base combinada.** Reinicio con las
+**45 migraciones** (5 de `main`, las tres `20261014*` de `feature/limites-ajustables` y las 37
+del proyecto): todas aplican sin fallo y **ninguna función de `public` queda con
+EXECUTE a PUBLIC** (0). La lista del caso 3 son ahora **47 funciones**: las 45
+del §11.5 más `cita_movimiento_google_registrar(uuid,uuid,timestamp with time
+zone)` y `reserva_enlace_emitir(uuid,uuid,uuid,uuid,text,text,text,text,text)`;
+ninguna baja. Con esta lista pegada, **las 40 pruebas SQL** de la combinada
+(`p1`, `p1b`, `p2`, `p3` y las 36 del proyecto) pasan. **Ésta es la lista para
+pegar al fusionar las dos ramas** (sustituye a la del §11.5):
+
+  ```
+  agenda_restablecer_configuracion(uuid,uuid), alta_conexion_google(uuid,uuid,text,text,text,text,text,bigint), cita_confirmacion_contexto(text), cita_confirmacion_emitir(uuid,uuid,uuid,text,uuid), cita_confirmacion_responder(uuid,text,text), cita_confirmacion_revocar(uuid,uuid), cita_correo_marcar(uuid,uuid,uuid,text,text), cita_correo_tomar(uuid,uuid,text,uuid), cita_correos_pendientes(integer), cita_movimiento_google_registrar(uuid,uuid,timestamp with time zone), cita_reagendar_clinica(uuid,uuid,uuid,uuid,timestamp with time zone,timestamp with time zone,timestamp with time zone), cita_reagendar_oferta(uuid,text), cita_recordatorios_pendientes(integer), cita_rsvp_google(uuid,uuid,text,text,text[]), cita_tiene_nota_ligada(uuid,uuid), crear_paciente_con_medico(jsonb,uuid), enforce_limite_documentos_paciente(), gcal_aplicar_evento(uuid,uuid,timestamp with time zone,text,text,timestamp with time zone,text,boolean,timestamp with time zone,timestamp with time zone,boolean,text,boolean,text,boolean), gcal_citas_por_evento(uuid,text[],uuid[]), gcal_importar_evento(uuid,text,text,text,timestamp with time zone,text,timestamp with time zone,timestamp with time zone,boolean,text,text,uuid), gcal_sync_avanzar(uuid,uuid,text,text,timestamp with time zone,integer), gcal_sync_clinica_habilitada(uuid), gcal_sync_clinicas_pendientes(integer), gcal_sync_frescura(uuid), gcal_sync_reiniciar(uuid,uuid), gcal_sync_soltar(uuid,uuid,text), gcal_sync_tomar(uuid,uuid,text,integer,integer), generar_folio(text), guardar_secretos_conexion(uuid,uuid,text,text,bigint), leer_conexion_google_con_secretos(uuid,uuid), rate_limit_intento(text,text,integer,integer), rate_limit_reset(text), reagendar_por_enlace(text,uuid,text,uuid,uuid,timestamp with time zone,text,text,text,text,text,text,text,text,uuid), reserva_codigo_emitir(uuid,uuid,text,text), reserva_codigo_verificar(uuid,uuid,text,text,text), reserva_contacto_estado(uuid,uuid,text,text), reserva_contacto_marcar(uuid,text), reserva_contactos_bloqueados(), reserva_contexto(text,text,text), reserva_empalmes_registrar(uuid,uuid[]), reserva_enlace_emitir(uuid,uuid,uuid,uuid,text,text,text,text,text), reserva_enlace_emitir(uuid,uuid,uuid,uuid,text,text,text), reserva_enlace_regenerar_fijo(uuid,uuid,text), reserva_ocupacion(uuid,uuid,timestamp with time zone,timestamp with time zone), reservar_por_enlace(uuid,text,uuid,uuid,timestamp with time zone,text,text,text,text,text,text,text,text,uuid), sync_antropometria_paciente(uuid), trg_mediciones_antropometria()
+  ```
+
+Contra la combinada (huella de 581): los 12 objetos de la tanda y los 3
+cambiados, idénticos en definición a la base de 42; sólo cambian los `proacl`
+que P1 cierra (las mismas 41 funciones del §11.5) y se añaden los 7 objetos de
+limites.
+
+### 12.6 Contrato con spinus-consola
+
+Ninguna de las tres nombra `ajuste_*`, `limite_efectivo` ni
+`clinica_tiene_acceso()`, ni hace `ALTER`/`UPDATE` sobre `clinicas` (grep sobre
+los tres archivos: 0; el único «CASCADE» es el comentario «sin CASCADE» de la
+vuelta atrás de J4). Las columnas nuevas son de `reserva_enlaces`; ninguna se
+renombra ni cambia de tipo. Las FK nuevas son RESTRICT. El CHECK de
+`avisos_clinica` sólo se amplía: toda fila que lo cumplía lo sigue cumpliendo.
+No se comprobó qué vistas de la consola leen estas tablas (su repositorio no
+está aquí); ninguna columna existente cambia, que es lo que el contrato exige.
+
+### 12.7 Orden de despliegue y tolerancia
+
+| Migración | Orden | Sin la migración y con el código nuevo |
+|---|---|---|
+| J2a | migración primero | **Arreglado en la integración** (`7a1e831`): la lista de enlaces daba 500 (42703, `agotado_en`) y emitir también (PGRST202, la firma de 9), con la v2 encendida. Ahora la lista se lee con el filtro de antes y, **sin correo**, se emite con la firma de 7 (la misma emisión); **con correo no se emite** (500 «No se pudo guardar el enlace»): un único que perdiera su correo no mandaría el comprobante a nadie. La página del único, que ya no pide correo, reserva con el cuerpo de I2 (que acepta el único sin correo) y sin comprobante; no hay tope |
+| J2b | después de J2a (lo exige su pre-vuelo); respecto al código, indiferente | el código ya trata `client_id_en_uso`; sin ella, la carrera de `client_id` da 500 como antes de la tanda |
+| J4 | cualquiera | la pasada de Google rechaza el movimiento como en I (reescribe Google) y no avisa: la RPC no existe (PGRST202 → `SincronizacionNoDisponible`), el código lo ignora en silencio y la pasada sigue; otro error distinto se anota con `logger.warn` y cuenta en `errores` (`gcalSincronizacion.ts`, por lectura). Con la base nueva y el código viejo nadie llama a la RPC: no nace ningún aviso del tipo nuevo |
+
+**La sobrecarga de 7 argumentos de `reserva_enlace_emitir`** se conserva para
+que el código de antes siga emitiendo durante el despliegue (y, ahora, para la
+tolerancia del código nuevo sin correo). Se retira con otra migración cuando no
+quede ninguna instancia del código anterior; hasta entonces, la de 9 no tiene
+`DEFAULT` en ningún parámetro, así que PostgREST no tiene ambigüedad: elige por
+los nombres enviados.
+
+**Prueba de tolerancia** (base local reiniciada SÓLO con las 39 de I, `db reset
+--local --workdir` desde un `git archive ccb9087`; el `next start` :3001 con el
+build integrado):
+- **Con la v2 apagada:** `/agenda` y `/agenda/configuracion` 200; las rutas nuevas
+  y `/api/agenda/enlaces` (GET y POST), 404 `no_disponible`. Es la agenda de antes.
+- **Con la v2 encendida, primera pasada:** las sondas dieron `GET
+  /api/agenda/enlaces` 500 y `POST` 500 (con y sin correo); 12 e2e de escritorio
+  (`agenda-interruptor`, `-citas`, `-avisos`, `-cancelar`, `-secretaria`,
+  `-tiempo-real`, `-panel-dia`, `-tipos-cita`, `-f-tarjeta`, `-j1-engrane`,
+  `-j3-ligar-ventana`, `-i5-barra-avisos`): **54 pasan, 1 falla, 1 saltada, 1 sin
+  correr**. La que falla es la de J1 que abre la configuración: «Tu enlace» se
+  quedaba en «No se pudieron leer los enlaces».
+- **Tras `7a1e831`** (Vitest `enlacesSinMigracionJ2.test.ts`, en rojo con cada
+  una de sus dos mutaciones; revisor Sonnet APTO CON CAMBIOS, de texto,
+  aplicados): `GET` 200, `POST` sin correo 201, `POST` con correo 500; las 12 e2e
+  más `agenda-enlaces-reserva`: **61 pasan, 1 saltada, 0 fallan**.
+
+Orden de despliegue recomendado (la guía §13.2, ampliada): las 37 del proyecto
+en orden de nombre, ANTES del código; la v2 se enciende después.
+
+### 12.8 Hallazgos
+
+- **M1 · J2a no es reejecutable después de J2b** (§12.1). Su pre-vuelo acepta el
+  cuerpo de I2 o el suyo, no el de J2b. En el orden normal no pasa nada; si
+  alguien reaplicara la carpeta entera sobre una base que ya las tiene, J2a
+  aborta limpio. No se tocó (editar una migración ya ensayada por su autor por un
+  caso que no ocurre en el despliegue no compensa); se anota aquí y en la tabla
+  de `mejora_agendaV2.md` §7.1.
+- **M2 · La ruta de enlaces no toleraba la base sin J2a** (§12.7). Corregida.
+- **M3 · Emitir un único con correo sin J2a da 500 genérico**, no un 503 «no
+  disponible». Es deliberado (el servidor no puede guardar lo que la persona
+  escribió) y sólo ocurre si se despliega el código antes que la migración.
+- **M4 · Cada intento contado deja una fila en `audit_log`** (UPDATE de
+  `reserva_enlaces`). Sin PII (sólo el id). A lo sumo 5 por enlace.
+- **M5 · No se ejecutó la página pública del único contra la base sin J2a** con
+  la v2 encendida; lo de la tabla del §12.7 sobre la reserva es por lectura del
+  cuerpo de I2 y de la ruta.
+- **Revisor del §12** (Sonnet, contra los archivos y el catálogo): APTA CON
+  CAMBIOS, sólo de texto. Corrigió la restricción del `ON CONFLICT` de J4
+  (§12.3 C: es `(cita_id, google_updated)`, sin `clinica_id`), la fila de J4 del
+  §12.7 (sin la migración el código calla, no anota) y pidió nombrar el índice
+  nuevo y distinguir «45 migraciones» de «47 funciones»: corregidos. Confirmó la
+  lista de 47 (las 45 del §11.5 más exactamente las dos nuevas) cotejándola con
+  los GRANT/REVOKE de las tres, los disparadores, los permisos y el contrato con
+  la consola.
