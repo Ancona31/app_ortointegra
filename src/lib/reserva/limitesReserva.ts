@@ -158,12 +158,22 @@ export async function esperaDeLimites(accion: Accion, seudonimos: Partial<Record
 }
 
 /**
- * K2: segundos que faltan para mandar OTRO código a ese correo (0 = ya). Mira
- * la misma llave que cuenta el límite por correo de `codigo`, sin consumirla.
+ * K2: segundos que faltan para mandar OTRO código a ese correo EN ESE ENLACE
+ * (0 = ya): `REENVIO_CODIGO_S` desde el último emitido, leído de
+ * `reserva_verificaciones` por clínica, enlace y correo
+ * (`reserva_espera_reenvio`, 20261123130100). Por enlace y no por correo a
+ * secas: con la llave global del correo, otro enlace (de otra clínica) leía
+ * en la espera si esa persona había pedido un código en cualquier sitio.
  * null = no se sabe: sin la migración no se frena aquí (sí en la página), y
- * el tope de 3 por hora sigue fallando cerrado como siempre.
+ * el tope de 3 por correo por hora sigue fallando cerrado como siempre.
  */
-export async function esperaReenvio(correoHmac: string): Promise<number | null> {
-  const llave = llaveLimite('codigo', 'correo', correoHmac)
-  return llave ? espera(llave, 1, REENVIO_CODIGO_S) : null
+export async function esperaReenvio(ctx: { clinica_id: string; enlace_id: string }, correoHmac: string): Promise<number | null> {
+  const { data, error } = await createAdminClient().rpc('reserva_espera_reenvio', {
+    p_clinica_id: ctx.clinica_id, p_enlace_id: ctx.enlace_id, p_correo_hmac: correoHmac, p_segundos: REENVIO_CODIGO_S,
+  })
+  if (error || typeof data !== 'number' || !Number.isInteger(data) || data < 0) {
+    logger.warn('reserva', `reserva_espera_reenvio falló: ${error?.code ?? 'sin datos'}`)
+    return null
+  }
+  return data
 }

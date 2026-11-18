@@ -23,10 +23,13 @@
 --     ventana el renglón que hace tope en `ip_rate_limits`. La ruta pública
 --     no puede leer la tabla (cliente de servicio sólo `.rpc()`, D5), así
 --     que hace falta una RPC: `rate_limit_espera`.
---   · Los 30 s entre dos códigos al mismo correo los IMPONE el servidor con
---     esa misma RPC (límite 1 en 30 s sobre la llave del correo, la que ya
---     cuenta `rate_limit_intento`), y la página los cuenta hacia atrás con el
---     número que le da el servidor. Es un límite MÁS, no uno relajado.
+--   · Los 30 s entre dos códigos al mismo correo los IMPONE el servidor, y
+--     la página los cuenta hacia atrás con el número que le da el servidor.
+--     Es un límite MÁS, no uno relajado. (Se escribió con esta misma RPC sobre
+--     la llave GLOBAL del correo; una revisión de seguridad lo marcó como fuga
+--     entre clínicas y la cuenta pasó a ser por enlace en
+--     20261123130100_agenda_k2_reenvio_por_enlace. La función sigue sirviendo
+--     a los Retry-After.)
 --   · Reenviar invalida el código anterior (`reserva_codigo_emitir` lo deja
 --     en intentos = 5, D3, sin cambios). Si la persona escribía después el
 --     código del correo ANTERIOR, `reserva_codigo_verificar` lo comparaba con

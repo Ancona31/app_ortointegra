@@ -50,12 +50,13 @@ export async function POST(req: NextRequest, ctx: RouteContext<'/api/reservar/[c
   const correo = destinatario ? normalizarCorreo(destinatario) : null
   const correoHmac = correo ? hmacContacto('correo', correo) : null
   if (!destinatario || !correoHmac) return responder({ status: 400, cuerpo: { error: 'correo_invalido' } })
-  // K2 (punto 10): 30 s entre dos códigos al mismo correo, ANTES de contar (así no gasta el límite por correo).
-  const reenvio = await esperaReenvio(correoHmac)
+  // K2 (punto 10): 30 s entre dos códigos al mismo correo EN ESTE ENLACE, ANTES de contar (así no gasta el
+  // límite por correo). Por enlace: la espera no dice nada de lo pedido en otros enlaces ni otras clínicas.
+  const reenvio = await esperaReenvio(enlace.ctx, correoHmac)
   if (reenvio) return demasiadosIntentos(reenvio, 'espera_reenvio')
-  if (!(await dentroDeLimites('codigo', { correo: correoHmac }))) {
-    return demasiadosIntentos(await esperaDeLimites('codigo', { correo: correoHmac }))
-  }
+  // El tope por correo es GLOBAL (todos los enlaces): su 429 va SIN cuánto falta, porque ese plazo saldría de
+  // lo pedido en otros enlaces y otras clínicas. Los de IP y dispositivo sí lo llevan: son de quien pregunta.
+  if (!(await dentroDeLimites('codigo', { correo: correoHmac }))) return demasiadosIntentos(null)
 
   const digitos = String(randomInt(0, 1_000_000)).padStart(6, '0')
   const codigoHmac = hmacCodigoCorreo(enlace.ctx.enlace_id, correoHmac, digitos)

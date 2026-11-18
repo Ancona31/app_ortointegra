@@ -4,18 +4,20 @@
  * ventana que cuenta `rate_limit_intento`; los 30 s entre códigos al mismo
  * correo, con la llave del límite por correo y `REENVIO_CODIGO_S`.
  * MUTACIONES (comprobadas en rojo): la ventana en minutos en vez de segundos
- * (`regla[1]` sin `* 60`); `esperaReenvio` con la llave de la IP; `Math.min`
+ * (`regla[1]` sin `* 60`); `esperaReenvio` sin el enlace o por la llave global del correo; `Math.min`
  * en vez de `Math.max`; aceptar una espera negativa de la RPC.
  */
 import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest'
 
 const h = vi.hoisted(() => ({
   llamadas: [] as { p_ruta: string; p_limite: number; p_ventana_seg: number }[],
+  reenvios: [] as Record<string, unknown>[],
   respuesta: (_ruta: string): { data: unknown; error: { code: string } | null } => ({ data: 0, error: null }),
 }))
 vi.mock('@/lib/supabase/admin', () => ({
   createAdminClient: () => ({
     rpc: async (nombre: string, args: { p_ruta: string; p_limite: number; p_ventana_seg: number }) => {
+      if (nombre === 'reserva_espera_reenvio') { h.reenvios.push(args); return h.respuesta('') }
       if (nombre !== 'rate_limit_espera') throw new Error(`RPC inesperada: ${nombre}`)
       h.llamadas.push(args)
       return h.respuesta(args.p_ruta)
@@ -24,7 +26,7 @@ vi.mock('@/lib/supabase/admin', () => ({
 }))
 
 beforeAll(() => { process.env.RESERVA_SECRETO = 'ab'.repeat(32) })
-beforeEach(() => { h.llamadas = []; h.respuesta = () => ({ data: 0, error: null }) })
+beforeEach(() => { h.llamadas = []; h.reenvios = []; h.respuesta = () => ({ data: 0, error: null }) })
 
 const { REENVIO_CODIGO_S, esperaDeLimites, esperaReenvio } = await import('@/lib/reserva/limitesReserva')
 const { demasiadosIntentos } = await import('@/lib/reserva/puertaReserva')
@@ -54,12 +56,18 @@ describe('esperaDeLimites', () => {
   })
 })
 
-describe('esperaReenvio (30 s entre códigos al mismo correo)', () => {
-  it('mira la llave del límite por correo, con límite 1 en REENVIO_CODIGO_S segundos', async () => {
+describe('esperaReenvio (30 s entre códigos al mismo correo EN ESE ENLACE)', () => {
+  const ctx = { clinica_id: '00000000-0000-4000-8000-00000000c001', enlace_id: '00000000-0000-4000-8000-00000000e001' }
+  it('pregunta por clínica, enlace y correo, con REENVIO_CODIGO_S segundos; nunca por la llave global del correo', async () => {
     h.respuesta = () => ({ data: 22, error: null })
     expect(REENVIO_CODIGO_S).toBe(30)
-    expect(await esperaReenvio(CORREO)).toBe(22)
-    expect(h.llamadas).toEqual([{ p_ruta: `reserva:codigo:correo:${CORREO}`, p_limite: 1, p_ventana_seg: 30 }])
+    expect(await esperaReenvio(ctx, CORREO)).toBe(22)
+    expect(h.reenvios).toEqual([{ p_clinica_id: ctx.clinica_id, p_enlace_id: ctx.enlace_id, p_correo_hmac: CORREO, p_segundos: 30 }])
+    expect(h.llamadas).toEqual([])
+  })
+  it('si la RPC falla: null (no se sabe)', async () => {
+    h.respuesta = () => ({ data: null, error: { code: 'PGRST202' } })
+    expect(await esperaReenvio(ctx, CORREO)).toBeNull()
   })
 })
 

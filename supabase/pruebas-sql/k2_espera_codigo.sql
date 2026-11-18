@@ -1,10 +1,12 @@
 -- Agenda tanda K (K2, punto 10) — cuánto falta para volver a pedir el código y
--- el código de un correo anterior (20261123130000_agenda_k2_espera_codigo.sql).
+-- el código de un correo anterior (20261123130000_agenda_k2_espera_codigo.sql
+-- y 20261123130100_agenda_k2_reenvio_por_enlace.sql).
 -- Se corre con scripts/pruebas-sql.sh. Crea sus propios datos y termina en rollback.
 -- MUTACIONES (comprobadas en rojo): sin la rama 'reemplazado' de
 -- reserva_codigo_verificar (caso 2 da 'incorrecto' y suma un equivocado);
 -- `OFFSET p_limite - 1` cambiado por `OFFSET 0` en rate_limit_espera (caso 5
--- da la espera del renglón más reciente, no la del que hace tope).
+-- da la espera del renglón más reciente, no la del que hace tope); sin el
+-- filtro por enlace_id en reserva_espera_reenvio (caso 5c: f2 ve la espera de f1).
 begin;
 
 -- ── Datos: c1 VIP encendida, médico b1, enlace fijo f1 ──
@@ -126,6 +128,28 @@ select pg_temp.esperar('5b intento 3', pg_temp.intento('k2:real')::text, 'false'
 select pg_temp.esperar('5b intento 4 bloquea', pg_temp.intento('k2:real')::text, 'true');
 select pg_temp.esperar('5b y la espera lo dice (1 h)', pg_temp.espera('k2:real', 3, 3600), '3600');
 
+-- 5c · Los 30 s entre códigos son POR ENLACE (20261123130100, revisión de seguridad): pedir con el mismo correo
+--      en el enlace f1 no revela nada desde f2, ni desde otra clínica, ni para otro correo.
+create function pg_temp.reenvio(p_clinica uuid, p_enlace uuid, p_correo text) returns text language plpgsql as $$
+declare v integer;
+begin
+  set local role service_role;
+  v := public.reserva_espera_reenvio(p_clinica, p_enlace, pg_temp.h('c:' || p_correo), 30);
+  reset role;
+  return v::text;
+end $$;
+select pg_temp.esperar('5c emitir fer en f1', pg_temp.emitir('fer', '888888'), 'ok');
+-- emitir sella con clock_timestamp(); la cuenta usa now() (inicio de esta transacción): se iguala para un número exacto.
+update public.reserva_verificaciones set created_at = now()
+ where enlace_id = '00000000-0000-4000-8000-0000000b2f01' and correo_hmac = pg_temp.h('c:fer');
+select pg_temp.esperar('5c f1: faltan 30 s', pg_temp.reenvio('00000000-0000-4000-8000-0000000b2c01', '00000000-0000-4000-8000-0000000b2f01', 'fer'), '30');
+select pg_temp.esperar('5c f2 (otro enlace): nada', pg_temp.reenvio('00000000-0000-4000-8000-0000000b2c01', '00000000-0000-4000-8000-0000000b2f02', 'fer'), '0');
+select pg_temp.esperar('5c otra clínica: nada', pg_temp.reenvio('00000000-0000-4000-8000-0000000b2c99', '00000000-0000-4000-8000-0000000b2f01', 'fer'), '0');
+select pg_temp.esperar('5c otro correo: nada', pg_temp.reenvio('00000000-0000-4000-8000-0000000b2c01', '00000000-0000-4000-8000-0000000b2f01', 'gil'), '0');
+update public.reserva_verificaciones set created_at = now() - interval '31 seconds'
+ where enlace_id = '00000000-0000-4000-8000-0000000b2f01' and correo_hmac = pg_temp.h('c:fer');
+select pg_temp.esperar('5c pasados 31 s: ya', pg_temp.reenvio('00000000-0000-4000-8000-0000000b2c01', '00000000-0000-4000-8000-0000000b2f01', 'fer'), '0');
+
 -- 6 · Argumentos inválidos: 22023; y sin permiso para anon ni authenticated.
 do $$
 begin
@@ -139,6 +163,11 @@ select pg_temp.esperar('6 permisos anon/authenticated/service_role',
   has_function_privilege('anon', 'public.rate_limit_espera(text, integer, integer)', 'EXECUTE')::text || '/' ||
   has_function_privilege('authenticated', 'public.rate_limit_espera(text, integer, integer)', 'EXECUTE')::text || '/' ||
   has_function_privilege('service_role', 'public.rate_limit_espera(text, integer, integer)', 'EXECUTE')::text,
+  'false/false/true');
+select pg_temp.esperar('6 permisos de reserva_espera_reenvio anon/authenticated/service_role',
+  has_function_privilege('anon', 'public.reserva_espera_reenvio(uuid, uuid, text, integer)', 'EXECUTE')::text || '/' ||
+  has_function_privilege('authenticated', 'public.reserva_espera_reenvio(uuid, uuid, text, integer)', 'EXECUTE')::text || '/' ||
+  has_function_privilege('service_role', 'public.reserva_espera_reenvio(uuid, uuid, text, integer)', 'EXECUTE')::text,
   'false/false/true');
 
 rollback;

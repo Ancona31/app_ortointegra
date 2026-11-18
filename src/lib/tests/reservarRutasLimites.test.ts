@@ -53,7 +53,7 @@ vi.mock('@/lib/reserva/limitesReserva', async (original) => {
       return !Object.keys(s).some(k => h.bloquea.has(k))
     },
     esperaDeLimites: async (accion: string, s: object) => { h.orden.push(`espera:${accion}:${Object.keys(s).join(',')}`); return h.espera },
-    esperaReenvio: async () => { h.orden.push('reenvio'); return h.reenvio },
+    esperaReenvio: async (ctx: { clinica_id: string; enlace_id: string }) => { h.orden.push(`reenvio:${ctx.enlace_id === ID}`); return h.reenvio },
   }
 })
 vi.mock('@/lib/reserva/servidorReserva', () => ({
@@ -120,7 +120,7 @@ describe('rutas públicas de la reserva: límite antes de la base (seg1, punto 8
   it('código: red antes de la base; el del correo, después de abrir el enlace (429 sin emitir)', async () => {
     h.bloquea = new Set(['correo'])
     expect((await codigoRuta.POST(req('/codigo', { correo: 'ana@x.mx' }), params)).status).toBe(429)
-    expect(h.orden).toEqual(['limites:codigo:ip,disp', 'contexto', 'reenvio', 'limites:codigo:correo', 'espera:codigo:correo'])
+    expect(h.orden).toEqual(['limites:codigo:ip,disp', 'contexto', 'reenvio:true', 'limites:codigo:correo'])
   })
 
   it('reservar con el fijo: red antes de la base; el tope del enlace, después (429 sin RPC)', async () => {
@@ -139,7 +139,8 @@ describe('rutas públicas de la reserva: límite antes de la base (seg1, punto 8
 /**
  * K2 (punto 10 de Angel). MUTACIONES (comprobadas en rojo): sin la comprobación
  * de `esperaReenvio` (el segundo código dentro de los 30 s sale y gasta el
- * límite por correo); `reenviar_en` fijo en otra cifra; el 429 sin `espera_s`.
+ * límite por correo); `reenviar_en` fijo en otra cifra; el 429 sin `espera_s`;
+ * el 429 del tope por correo con `esperaDeLimites` (fuga entre enlaces).
  */
 describe('rutas públicas de la reserva: cuánto falta (K2, punto 10)', () => {
   it('código enviado: 200 con reenviar_en = los 30 s que impone el servidor', async () => {
@@ -153,14 +154,24 @@ describe('rutas públicas de la reserva: cuánto falta (K2, punto 10)', () => {
     expect(r.status).toBe(429)
     expect(r.headers.get('retry-after')).toBe('18')
     expect(await r.json()).toEqual({ error: 'espera_reenvio', espera_s: 18 })
-    expect(h.orden).toEqual(['limites:codigo:ip,disp', 'contexto', 'reenvio'])
+    // La espera de reenvío se pide con el enlace abierto (por enlace, no por correo global).
+    expect(h.orden).toEqual(['limites:codigo:ip,disp', 'contexto', 'reenvio:true'])
   })
-  it('un límite que topa: 429 con espera_s y Retry-After de la base', async () => {
-    h.bloquea = new Set(['correo'])
+  it('un límite de red que topa: 429 con espera_s y Retry-After de la base', async () => {
+    h.bloquea = new Set(['disp'])
     h.espera = 2400
     const r = await codigoRuta.POST(req('/codigo', { correo: 'ana@x.mx' }), params)
     expect(r.headers.get('retry-after')).toBe('2400')
     expect(await r.json()).toEqual({ error: 'demasiados_intentos', espera_s: 2400 })
+  })
+  it('el tope GLOBAL por correo: 429 SIN cuánto falta (el plazo saldría de lo pedido en otros enlaces y clínicas)', async () => {
+    h.bloquea = new Set(['correo'])
+    h.espera = 2400
+    const r = await codigoRuta.POST(req('/codigo', { correo: 'ana@x.mx' }), params)
+    expect(r.status).toBe(429)
+    expect(r.headers.get('retry-after')).toBeNull()
+    expect(await r.json()).toEqual({ error: 'demasiados_intentos' })
+    expect(h.orden).not.toContain('espera:codigo:correo')
   })
   it('verificar y reservar también: el 429 lleva espera_s y Retry-After', async () => {
     h.bloquea = new Set(['ip'])
