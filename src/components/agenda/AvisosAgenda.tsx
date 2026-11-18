@@ -23,7 +23,7 @@
 
 import { useEffect, useState, type ReactElement, type ReactNode } from 'react'
 import Link from 'next/link'
-import { Calendar, ChevronsDownUp, TriangleAlert } from 'lucide-react'
+import { Calendar, ChevronsDownUp, Globe, TriangleAlert } from 'lucide-react'
 import { Banda } from '@/components/agenda/Banda'
 import { GoogleGIcon } from '@/components/agenda/GoogleGIcon'
 import { componerNombreMedicoCompleto } from '@/lib/nombreMedico'
@@ -92,12 +92,14 @@ interface Props {
   avisoRecorte: string | null
   compactaElMes: boolean
   onSalirCompacta: () => void
+  /** Tanda K (punto 15): «Mostrando el horario de tu ubicación actual (…)», o `null` (`leyendaHusos.ts`). */
+  leyendaHusos?: string | null
 }
 
 export function AvisosAgenda({
   cargaVisible, errorCitas, onReintentar, citasIncompletas, currentView, onVerPorSemana,
   googleFallo, vacioReal, vacioFiltrado, medicoFiltrado, periodoVacio, mesSinTodos, onVerTodos,
-  onAgendar, avisoRecorte, compactaElMes, onSalirCompacta,
+  onAgendar, avisoRecorte, compactaElMes, onSalirCompacta, leyendaHusos,
 }: Props) {
   return (
     <div className="ag-avisos">
@@ -226,6 +228,17 @@ export function AvisosAgenda({
           </button>
         </div>
       )}</ConSalida>
+
+      {/* 5 · Tanda K (punto 15) · La leyenda de husos: la última, porque sólo informa. Con la geometría y el tono de
+          la banda de vista compacta (lo que ya hay), sin acción y sin `role`: no avisa de un cambio, describe la
+          rejilla. El texto puede partirse en dos renglones (en 390 px no cabe en uno y el recorte se comería el
+          lugar), por eso NO lleva `ag-banda-compacta-texto`, que lo corta con puntos suspensivos. */}
+      {leyendaHusos && (
+        <div className="ag-banda-compacta" data-leyenda-husos>
+          <Globe size={14} className="ag-banda-compacta-icono" aria-hidden />
+          <p className="m-0 min-w-0">{leyendaHusos}</p>
+        </div>
+      )}
     </div>
   )
 }
