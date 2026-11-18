@@ -6388,7 +6388,7 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
 .ag-burbuja-fin { height: 20px; flex: none; }
 /* Los tres puntos: encima, bajo su botón (dentro de la burbuja, que es su caja). */
 .ag-burbuja-mas {
-  position: absolute; top: 60px; right: 10px; z-index: 3; width: 252px;
+  position: absolute; top: 60px; right: 10px; z-index: 3; width: 280px;
   display: flex; flex-direction: column; padding: 6px;
   background: var(--ag-surface); border: 1px solid var(--ag-border-card); border-radius: var(--ag-r-card); box-shadow: var(--ag-shadow-pop);
 }

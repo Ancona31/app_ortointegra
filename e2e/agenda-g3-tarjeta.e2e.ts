@@ -31,7 +31,8 @@ import { fechaHoraLocalAInstante } from '../src/lib/dates'
  * `'no_show'` cambiado por `'cancelled'` → «confirmada»; quitar `enConsultorio`
  * de `Info` → «etiqueta de huso»; sin el `else` que enfoca «Confirmar» al cerrar con Escape,
  * o `enColumna` siempre `false` → «agendada»; el panel de los tres puntos sin cerrarse al
- * recibir un mensaje (`alMensaje={setMensaje}`) → «confirmada»; quitar `vetoPorEstado` de la ruta → «17.3»;
+ * recibir un mensaje (`alMensaje={setMensaje}`) → «confirmada»; `.ag-burbuja-mas` de vuelta a
+ * `width: 252px` → «confirmada» (el recordatorio en dos líneas); quitar `vetoPorEstado` de la ruta → «17.3»;
  * volver a editar la misma cita en «Darle otra cita» → «crea una cita NUEVA»;
  * `pideComprobarNota` siempre `false` → «nota ligada».
  */
@@ -170,6 +171,13 @@ test('confirmada: Reagendar | Editar | No asistió, los recordatorios en los tre
   await t.getByRole('button', { name: 'Más opciones de la cita' }).click()
   const mas = t.getByRole('group', { name: 'Más opciones de la cita' })
   await expect(mas.getByRole('button', { name: 'Recordatorio por WhatsApp' })).toBeVisible()
+  // En los tres puntos el rótulo va en UNA línea (a 252 px de ancho, «WhatsApp» bajaba sola).
+  const lineas = await mas.getByRole('button', { name: 'Recordatorio por WhatsApp' }).evaluate(el => {
+    const r = document.createRange()
+    r.selectNodeContents(el.querySelector('span:last-of-type') ?? el)
+    return new Set([...r.getClientRects()].map(x => Math.round(x.top))).size
+  })
+  expect(lineas).toBe(1)
   await expect(mas.getByRole('button', { name: 'Recordatorio por correo' })).toBeVisible()
   await expect(mas.getByRole('button', { name: 'No asistió' })).toHaveCount(0)
   // Lo que dice el envío no queda tapado: el panel se cierra y el mensaje sale bajo las casillas.
