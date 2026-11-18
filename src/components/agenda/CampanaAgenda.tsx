@@ -23,10 +23,14 @@
  * atrapado, Escape, el foco vuelve a la campana).
  */
 import { useCallback, useState, type KeyboardEvent, type ReactElement, type RefObject } from 'react'
+import dynamic from 'next/dynamic'
 import { Bell, X } from 'lucide-react'
 import type { CambiarEstadoCita } from '@/lib/agenda/contratosV2'
 import type { CambioCita } from '@/lib/agenda/porConfirmarTiempoReal'
-import type { CitaDelAviso, TipoAviso } from '@/lib/avisos/avisosClinica'
+import type { AvisoClinica, CitaDelAviso, TipoAviso } from '@/lib/avisos/avisosClinica'
+import { esPorLigar } from '@/lib/agenda/tarjetasAgenda'
+import { useProfile } from '@/hooks/useProfile'
+import { useEscudoTrasRegistro } from '@/hooks/useEscudoTrasRegistro'
 import { useDialogoModal } from '@/hooks/useDialogoModal'
 import { useAvisosClinica, type EstadoAvisos } from '@/hooks/useAvisosClinica'
 import { ListaAvisos } from '@/components/avisos/ListaAvisos'
@@ -42,6 +46,25 @@ import {
 const EMERGENTES: readonly TipoAviso[] = ['reserva_enlace', 'reagendado_paciente', 'google_por_asignar']
 
 type Pestana = 'por-confirmar' | 'avisos'
+
+/* Tanda J (punto 7) · La ventana de «Ligar e iniciar consulta», en su propio
+   chunk: sólo se descarga al pulsar un aviso de una cita por ligar. */
+const VentanaLigarCita = dynamic(() => import('@/components/agenda/VentanaLigarCita'), { ssr: false })
+
+/** Los avisos de una cita que llegó sin paciente: reserva, reagendado por el paciente y Google por asignar. */
+const AVISOS_DE_LIGAR: readonly TipoAviso[] = ['reserva_enlace', 'reagendado_paciente', 'google_por_asignar']
+
+/**
+ * Tanda J (punto 7) · ¿Pulsar el aviso abre la ventana de ligar en vez de la
+ * cita? Sólo para el médico de la cita, si sigue por ligar y viva. Lo demás
+ * (otro rol, otro médico, ya ligada, cancelada, un empalme) abre la cita, como
+ * hasta ahora. La ventana vuelve a comprobarlo con la fila fresca.
+ */
+export function avisoSeLiga(a: AvisoClinica, quien: { esMedico: boolean; perfilId: string | null }): boolean {
+  const c = a.cita
+  return quien.esMedico && quien.perfilId !== null && c.medico_id === quien.perfilId && AVISOS_DE_LIGAR.includes(a.tipo)
+    && (c.status === 'scheduled' || c.status === 'confirmed') && esPorLigar(c)
+}
 
 interface Props {
   /** Cambia cuando la agenda se entera de algo por su sondeo (E8, D11). */
@@ -67,6 +90,10 @@ function cuentaAvisos(listas: ListasPorConfirmar | null, estado: EstadoAvisos): 
 
 export function CampanaAgenda({ recarga, confirmar, cambiosRef, alAbrirCita, enBanda = false }: Props): ReactElement {
   const { listas, recargar, quitar } = usePorConfirmar(recarga, cambiosRef)
+  const { profile, isDoctor } = useProfile()
+  const [ligando, setLigando] = useState<CitaDelAviso | null>(null)
+  /* El escudo de siempre: el segundo clic de un doble clic sobre el aviso no cae en la ventana. */
+  const escudo = useEscudoTrasRegistro(ligando === null, { dentroDeDialogos: true })
   const avisos = useAvisosClinica({ datos: listas?.avisos ?? null, emergentes: EMERGENTES })
   const [boton, setBoton] = useState<HTMLElement | null>(null)
   const cerrar = useCallback(() => setBoton(null), [])
@@ -92,7 +119,15 @@ export function CampanaAgenda({ recarga, confirmar, cambiosRef, alAbrirCita, enB
       </button>
       {boton && (
         <PanelCampana boton={boton} alCerrar={cerrar} listas={listas} n={n} m={m} avisos={avisos}
-          alConfirmar={alConfirmar} alAbrirCita={(c) => { cerrar(); alAbrirCita(c) }} />
+          alConfirmar={alConfirmar} alAbrirAviso={(a) => {
+            cerrar()
+            if (avisoSeLiga(a, { esMedico: isDoctor, perfilId: profile?.id ?? null })) { escudo.activar(); setLigando(a.cita) }
+            else alAbrirCita(a.cita)
+          }} />
+      )}
+      {ligando && (
+        <VentanaLigarCita citaId={ligando.id} alCerrar={() => setLigando(null)} alNoEsCita={recargar}
+          alVerCita={() => { setLigando(null); alAbrirCita(ligando) }} />
       )}
     </>
   )
@@ -106,10 +141,10 @@ interface PropsPanel {
   m: number
   avisos: EstadoAvisos
   alConfirmar?: (id: string) => void
-  alAbrirCita: (c: CitaDelAviso) => void
+  alAbrirAviso: (a: AvisoClinica) => void
 }
 
-function PanelCampana({ boton, alCerrar, listas, n, m, avisos, alConfirmar, alAbrirCita }: PropsPanel): ReactElement {
+function PanelCampana({ boton, alCerrar, listas, n, m, avisos, alConfirmar, alAbrirAviso }: PropsPanel): ReactElement {
   const { montarPanel, alPulsarTecla } = useDialogoModal(alCerrar)
   const [pestana, setPestana] = useState<Pestana>('por-confirmar')
   return (
@@ -126,13 +161,13 @@ function PanelCampana({ boton, alCerrar, listas, n, m, avisos, alConfirmar, alAb
         <ListaPorConfirmar citas={listas?.citas ?? []} alConfirmar={alConfirmar} />
       </div>
       <div role="tabpanel" id="campana-avisos" aria-labelledby="campana-tab-avisos" hidden={pestana !== 'avisos'} data-pestana-avisos="">
-        <ContenidoAvisos listas={listas} avisos={avisos} alAbrirCita={alAbrirCita} />
+        <ContenidoAvisos listas={listas} avisos={avisos} alAbrirAviso={alAbrirAviso} />
       </div>
     </CapaBarra>
   )
 }
 
-function ContenidoAvisos({ listas, avisos, alAbrirCita }: Pick<PropsPanel, 'listas' | 'avisos' | 'alAbrirCita'>): ReactElement {
+function ContenidoAvisos({ listas, avisos, alAbrirAviso }: Pick<PropsPanel, 'listas' | 'avisos' | 'alAbrirAviso'>): ReactElement {
   if (listas === null) return <p className="text-[12px]" style={{ color: 'var(--ag-muted)' }}>Cargando…</p>
   if (!avisos.disponible) {
     const vacio = listas.canceladas.length + listas.empalmes.length === 0
@@ -146,7 +181,7 @@ function ContenidoAvisos({ listas, avisos, alAbrirCita }: Pick<PropsPanel, 'list
   }
   return (
     <ListaAvisos avisos={avisos.avisos ?? []} revisar={avisos.revisar} revisarTodos={avisos.revisarTodos}
-      alAbrir={(a) => alAbrirCita(a.cita)} />
+      alAbrir={alAbrirAviso} />
   )
 }
 

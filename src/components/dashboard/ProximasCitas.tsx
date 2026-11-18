@@ -227,14 +227,21 @@ function Chasis({ children }: { children: React.ReactNode }) {
   )
 }
 
+/** Tanda J (punto 6) · La acción de «Ligar e iniciar consulta» de una fila sin paciente, si el llamador la da. */
+type AccionLigar = (cita: Cita, enCurso: boolean, alQuitar: () => void) => React.ReactNode
+
 /**
  * I3 (puntos 8 y 10) · Las acciones de una fila SIN paciente: «Ver en la
  * agenda» (allí se liga al iniciar la consulta) y, en un evento de Google «por
  * asignar», «¿No es una cita?», que la quita de la lista en el momento. Viven
  * aquí y no en el llamador porque no llevan a ninguna URL clínica.
+ * Tanda J (punto 6) · Si el llamador pasa `ligar` (el dashboard del médico) y
+ * devuelve un botón, ése sustituye a «Ver en la agenda»: la ventana de ligar,
+ * que sí lleva a la nota, la monta el llamador, nunca este archivo.
  */
-function AccionesSinPaciente({ cita, alQuitar }: { cita: Cita; alQuitar: () => void }) {
+function AccionesSinPaciente({ cita, enCurso, alQuitar, ligar }: { cita: Cita; enCurso: boolean; alQuitar: () => void; ligar?: AccionLigar }) {
   const porAsignar = cita.google_asignacion === 'por_asignar' && !cita.reserva_canal
+  const boton = ligar?.(cita, enCurso, alQuitar) ?? null
   const contorno = { ...GEOMETRIA_ACCION, background: 'var(--sp-surface)', color: 'var(--sp-primary-text)', borderColor: 'var(--sp-primary-border)' }
   return (
     <>
@@ -242,13 +249,13 @@ function AccionesSinPaciente({ cita, alQuitar }: { cita: Cita; alQuitar: () => v
         <BotonNoEsCita citaId={cita.id} alHecho={alQuitar}
           className="inline-flex items-center justify-center whitespace-nowrap border font-bold transition-colors" style={contorno} />
       )}
-      <Link href="/agenda" prefetch={false} aria-label={`Ver «${cita.reserva_nombre ?? cita.title}» en la agenda`}
+      {boton ?? <Link href="/agenda" prefetch={false} aria-label={`Ver «${cita.reserva_nombre ?? cita.title}» en la agenda`}
         className={porAsignar
           ? 'inline-flex items-center justify-center w-[34px] h-[34px] shrink-0 rounded-[var(--sp-r-btn-sm)] border border-[color:var(--sp-line-control)] bg-[var(--sp-surface)] text-[var(--sp-ink-500)] transition-colors hover:bg-[var(--sp-surface-muted)] hover:text-[var(--sp-ink-700)]'
           : 'inline-flex items-center justify-center whitespace-nowrap border font-bold transition-colors'}
         style={porAsignar ? undefined : contorno}>
         {porAsignar ? <CalendarDays size={16} /> : <><span className="xl:hidden">Agenda</span><span className="hidden xl:inline">Ver en la agenda</span></>}
-      </Link>
+      </Link>}
     </>
   )
 }
@@ -292,7 +299,7 @@ export function ProximasCitasCargando() {
  * Si vuelves aquí desde el spec creyendo que falta algo, esto es lo que falta:
  * nada. Añadirlo es una decisión de producto, no la corrección de un defecto.
  */
-export default function ProximasCitas({ medicoId, acciones }: {
+export default function ProximasCitas({ medicoId, acciones, ligar }: {
   /* `null` = todas las citas de la clínica (vista de la secretaria). Un id =
      sólo las de ese médico. Cuando es `null` la consulta trae además el médico
      de cada fila y el renglón lo pinta: sin filtro, el nombre del paciente no
@@ -308,6 +315,10 @@ export default function ProximasCitas({ medicoId, acciones }: {
          eso revierte entero el ahorro medido de `fcb2169`.
      Usa `GEOMETRIA_ACCION` para el tamaño; ver su nota. */
   acciones: (cita: Cita, enCurso: boolean) => React.ReactNode
+  /* Tanda J (punto 6) · Sólo el dashboard del médico: en una fila por ligar o
+     por asignar, el botón de «Ligar e iniciar consulta» (o `null`, y queda
+     «Ver en la agenda»). La vista de la secretaria no lo pasa. */
+  ligar?: AccionLigar
 }) {
   const { profile, loading: loadingProfile } = useProfile()
 
@@ -601,7 +612,8 @@ export default function ProximasCitas({ medicoId, acciones }: {
                   Las acciones del llamador sólo para las citas con paciente. */}
               {cita.paciente_id
                 ? acciones(cita, enCurso)
-                : <AccionesSinPaciente cita={cita} alQuitar={() => { setCitas(cs => cs.filter(c => c.id !== cita.id)); void cargar() }} />}
+                : <AccionesSinPaciente cita={cita} enCurso={enCurso} ligar={ligar}
+                    alQuitar={() => { setCitas(cs => cs.filter(c => c.id !== cita.id)); void cargar() }} />}
             </div>
           </div>
         )

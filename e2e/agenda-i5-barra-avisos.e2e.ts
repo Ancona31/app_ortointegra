@@ -354,11 +354,13 @@ test('19: reserva, cancelación y reagendado del paciente → avisos con aviso e
   await page.unroute('**/api/avisos')
   await page.keyboard.press('Escape')
 
-  // Pulsar uno: se revisa y lleva a su cita (la tarjeta, en su día).
+  // Pulsar uno: se revisa y lleva a su cita. Tanda J (punto 7): la reagendada sigue POR LIGAR y es del
+  // médico que mira, así que lleva a la ventana «Ligar e iniciar consulta» (antes, la tarjeta). La de
+  // `primera`, cancelada, sigue llevando a la tarjeta (arriba).
   await abrirAvisos(page)
   await aviso(page, 'reagendado_paciente', nueva.id).click()
   await expect(panel(page)).toHaveCount(0)
-  await expect(tarjetaLectura(page)).toBeVisible({ timeout: 10000 })
+  await expect(page.getByRole('dialog', { name: 'Ligar e iniciar consulta' })).toBeVisible({ timeout: 10000 })
   await expect.poll(() => revisado('reagendado_paciente', nueva.id)).toBe('true')
   await page.keyboard.press('Escape')
   await abrirAgendaV2(page)

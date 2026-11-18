@@ -46,6 +46,7 @@ function CampoTelefono({ valor, alCambiar }: { valor: string; alCambiar: (v: str
 export default function QuickPatientModal({
   nombreInicial,
   emailInicial = '',
+  telefonoInicial = '',
   conTelefono = false,
   onCreated,
   onClose,
@@ -54,6 +55,10 @@ export default function QuickPatientModal({
   /* D7 de la agenda: el correo de quien reservó por enlace, al ligar su cita.
      Sólo precarga el campo; se puede borrar y no salta el consentimiento. */
   emailInicial?: string
+  /* Tanda J (punto 7): el teléfono que dejó quien reservó, al registrarlo desde
+     «Ligar e iniciar consulta». Sólo precarga el campo (con `conTelefono`), con
+     el formato de la ficha; se puede cambiar o borrar. */
+  telefonoInicial?: string
   /* H3 (punto 13): el teléfono y su leyenda. Sólo la agenda v2 lo enciende;
      el resto de la app (Documentos, la agenda apagada) sigue como estaba. */
   conTelefono?: boolean
@@ -70,7 +75,7 @@ export default function QuickPatientModal({
   const [fechaNac,  setFechaNac]  = useState('')
   const [edad,      setEdad]      = useState('')
   const [email,     setEmail]     = useState(emailInicial)
-  const [telefono,  setTelefono]  = useState('')
+  const [telefono,  setTelefono]  = useState(() => (conTelefono ? formatearTelefono(telefonoInicial) : ''))
   const [saving,    setSaving]    = useState(false)
   const [error,     setError]     = useState('')
   const [consentimiento, setConsentimiento] = useState(false)

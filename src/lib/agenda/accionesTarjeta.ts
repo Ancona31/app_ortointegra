@@ -28,7 +28,8 @@
  *         cualquiera de las dos, al guardar, el servidor cierra la cancelada
  *         (`cerrada_en`, `sustituida_por`): deja de pintarse, no se borra.
  *   · Cita por ligar y evento sin paciente: conservan lo que tenían, en su
- *     orden (incluido «Editar»), con el engrane. I3: un evento de Google «por
+ *     orden (incluido «Editar»), con el engrane. Tanda J: la principal de una
+ *     por ligar es «Ligar e iniciar consulta» (`ligar`), la ventana pequeña. I3: un evento de Google «por
  *     asignar» es una por ligar con «¿No es una cita?» al final. Evento: «Editar», T3
  *     «Convertir en cita» si nació en Google (§2, AG-DT-29), y «Eliminar»
  *     aparte (eliminar SÓLO aquí: una cita con paciente se cancela — P2).
@@ -44,7 +45,7 @@ import { regionDeTimezone } from '@/lib/consultorios/zonas-mexico'
 
 export type AccionTarjeta =
   | 'iniciar-consulta' | 'ver-expediente' | 'confirmar' | 'reagendar' | 'reagendar-cita' | 'reasignar' | 'cancelar' | 'editar' | 'convertir' | 'eliminar'
-  | 'no-es-cita'
+  | 'no-es-cita' | 'ligar'
 
 export const ETIQUETA_ACCION: Record<AccionTarjeta, string> = {
   'iniciar-consulta': 'Iniciar consulta',
@@ -58,6 +59,7 @@ export const ETIQUETA_ACCION: Record<AccionTarjeta, string> = {
   convertir: 'Convertir en cita',
   eliminar: 'Eliminar evento',
   'no-es-cita': '¿No es una cita?',
+  ligar: 'Ligar e iniciar consulta',
 }
 
 /** G3 · Una pieza de la rejilla de acciones: una acción o el aviso por WhatsApp (su propio componente). */
@@ -115,7 +117,10 @@ function disposicionSinCambios(cita: CitaTarjeta, puedeIniciar: boolean, o: Opci
   /* I3 (punto 10) · Un evento de Google por asignar: «¿No es una cita?» lo
      deja como evento sin paciente, en el momento y sin preguntar. */
   if (esPorAsignar(cita)) secundarias.push('no-es-cita')
-  return { principal: puedeIniciar ? 'iniciar-consulta' : null, secundarias, peligro: viva ? 'cancelar' : null }
+  /* Tanda J (punto 7) · En una por ligar la principal es «Ligar e iniciar
+     consulta»: abre la ventana pequeña de ligar (`VentanaLigarCita`), no el
+     formulario completo. */
+  return { principal: puedeIniciar ? 'ligar' : null, secundarias, peligro: viva ? 'cancelar' : null }
 }
 
 /**

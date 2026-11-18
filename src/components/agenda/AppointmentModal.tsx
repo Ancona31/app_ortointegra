@@ -441,6 +441,9 @@ export default function AppointmentModal({
      «Reagendar» de la tarjeta (`enfocar: 'fecha'`) abre el panel directamente. */
   const eleccion = agendaV2 && apt !== null && !esEvento && eleccionFija(apt, abiertoEn)
   const [reagendando, setReagendando] = useState(eleccion && modal.mode === 'edit' && modal.enfocar === 'fecha')
+  /* Tanda J (punto 8) · Editando una cita reservada por enlace no salen los
+     botones de duración: la duración se sigue cambiando con la hora de fin. */
+  const sinBotonesDuracion = agendaV2 && modal.mode === 'edit' && Boolean(apt?.reserva_canal)
   /* I3 (punto 10) · Un evento de Google «por asignar» es una por ligar SIN
      reserva: ni contacto ni historial ni tipo (el PUT lo trata como una
      conversión, `vetoDeConversion`, que exige consultorio). */
@@ -1590,7 +1593,7 @@ export default function AppointmentModal({
 
           {/* Duración — un ATAJO para escribir el fin, no un dato aparte. En todo
               el día no se pinta: no hay horas que abreviar. */}
-          {!todoElDia && (
+          {!todoElDia && !sinBotonesDuracion && (
             <div>
               <label className="block text-[11px] font-bold uppercase tracking-[.06em] mb-2" style={{ color: 'var(--ag-muted2)' }}>Duración</label>
               {/* El blanco del chip marcado sale de `text-white` y no de un

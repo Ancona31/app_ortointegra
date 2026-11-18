@@ -17,7 +17,8 @@ import { fechaHoraLocalAInstante } from '../src/lib/dates'
  *   · el engrane «Configuración de la cita» (G3: sustituye a «Editar») → el
  *     modal de hoy; Reagendar → el modal con el foco en la fecha;
  *   · Iniciar consulta → `/expediente/<paciente>/nueva-nota?cita=<id>`; en una
- *     por ligar, el modal (donde vive D7).
+ *     por ligar, «Ligar e iniciar consulta» abre la ventana pequeña de ligar
+ *     (tanda J, punto 7; antes abría el modal).
  * En el teléfono es una hoja inferior.
  *
  * ⚠️ DOS PRUEBAS DEPENDEN DE ARCHIVOS AJENOS (`contratosV2.ts`): «Confirmar»
@@ -222,7 +223,7 @@ test('encendido: Iniciar consulta lleva a la nota con ?cita=', async ({ page }) 
   await page.waitForURL(`**/expediente/${paciente}/nueva-nota?cita=${id}`)
 })
 
-test('encendido: en una por ligar, Iniciar consulta abre el modal (donde vive D7), no la nota', async ({ page }) => {
+test('encendido: en una por ligar, «Ligar e iniciar consulta» abre la ventana de ligar (tanda J), ni el modal ni la nota', async ({ page }) => {
   soloEn('escritorio')
   interruptorAgenda('A', true)
   const nombre = tituloUnico('Persona F3')
@@ -230,8 +231,10 @@ test('encendido: en una por ligar, Iniciar consulta abre el modal (donde vive D7
   await abrirAgendaV2(page)
   await aLaSemanaMasDos(page)
   await citaEnRejilla(page, nombre).click({ position: { x: 8, y: 8 } })
-  await tarjetaLectura(page).getByRole('button', { name: 'Iniciar consulta', exact: true }).click()
-  await expect(modalCita(page, 'Editar cita')).toBeVisible()
+  await expect(tarjetaLectura(page).getByRole('button', { name: 'Iniciar consulta', exact: true })).toHaveCount(0)
+  await tarjetaLectura(page).getByRole('button', { name: 'Ligar e iniciar consulta', exact: true }).click()
+  await expect(page.getByRole('dialog', { name: 'Ligar e iniciar consulta' })).toBeVisible()
+  await expect(modalCita(page, 'Editar cita')).toHaveCount(0)
   expect(page.url()).toContain('/agenda')
 })
 

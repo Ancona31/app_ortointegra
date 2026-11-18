@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import dynamic from 'next/dynamic'
 import { useProfile } from '@/hooks/useProfile'
 import AsistenteDashboard from './AsistenteDashboard'
 import { DashboardSkeleton } from '@/components/ui/Skeleton'
@@ -19,6 +20,12 @@ import TarjetaHoy from '@/components/dashboard/TarjetaHoy'
 import AtendidosRecientemente from '@/components/dashboard/AtendidosRecientemente'
 import DocumentosRecientes from '@/components/dashboard/DocumentosRecientes'
 import BuscadorPaciente, { ALTO_CONTROL } from '@/components/dashboard/BuscadorPaciente'
+import { useEscudoTrasRegistro } from '@/hooks/useEscudoTrasRegistro'
+import { esPorAsignar, esPorLigar } from '@/lib/agenda/tarjetasAgenda'
+
+/* Tanda J (punto 6) · La ventana de «Ligar e iniciar consulta», en su propio
+   chunk: sólo se descarga al pulsar el botón de una fila por ligar. */
+const VentanaLigarCita = dynamic(() => import('@/components/agenda/VentanaLigarCita'), { ssr: false })
 
 /* ─── Helpers ─────────────────────────────────────────────── */
 
@@ -46,6 +53,10 @@ export default function DashboardPage() {
      botones son independientes y así ninguno puede heredar el destino del
      otro por un reset olvidado. */
   const [modalDocumento, setModalDocumento] = useState(false)
+  /* Tanda J (punto 6) · La fila por ligar cuya ventana está abierta, y cómo quitarla si «¿No es una cita?». */
+  const [ligando, setLigando] = useState<{ id: string; alQuitar: () => void } | null>(null)
+  /* El escudo de siempre: el segundo clic de un doble clic sobre el botón no cae en la ventana. */
+  const escudoLigar = useEscudoTrasRegistro(ligando === null, { dentroDeDialogos: true })
 
 
   /* ⚠️ ESTA DECLARACIÓN VA ANTES DE LOS GUARDAS, y no es orden estético: el
@@ -220,6 +231,11 @@ export default function DashboardPage() {
         rotuloCrear="Crear y continuar"
       />
 
+      {/* Tanda J (punto 6) · «Ligar e iniciar consulta» de una fila por ligar. */}
+      {ligando && (
+        <VentanaLigarCita citaId={ligando.id} alCerrar={() => setLigando(null)} alNoEsCita={ligando.alQuitar} />
+      )}
+
       {/* ── Banda 1 · Próximas citas (flexible) · columna fija ── */}
       {/* ⚠️ `items-start`: LAS DOS COLUMNAS SE ALINEAN ARRIBA Y NINGUNA SE
           ESTIRA. Por defecto una retícula estira sus hijos al alto de la fila,
@@ -248,6 +264,28 @@ export default function DashboardPage() {
               región: sólo la fila en curso. */}
           <ProximasCitas
             medicoId={profile?.id ?? null}
+            /* Tanda J (punto 6) · Una fila por ligar o por asignar: «Ligar e
+               iniciar consulta» (la ventana pequeña), con las condiciones de la
+               agenda (las de `puedeIniciarConsulta`: médico de la
+               cita, con su consultorio). Si no, `null` y queda «Ver en la agenda». */
+            ligar={(cita, enCurso, alQuitar) => {
+              const conConsultorio = cita.consultorio_id ? consultorios.some(c => c.id === cita.consultorio_id)
+                : esPorAsignar(cita) && consultorios.length > 0
+              /* Las filas de esta lista son todas del médico que mira (`medicoId`). */
+              const puede = profile?.role === 'medico' && esPorLigar(cita) && conConsultorio
+              if (!puede) return null
+              return (
+                <button type="button" onClick={() => { escudoLigar.activar(); setLigando({ id: cita.id, alQuitar }) }}
+                  aria-label={`Ligar e iniciar consulta de ${cita.reserva_nombre ?? cita.title}`}
+                  className={enCurso ? 'sp-btn sp-btn--primary whitespace-nowrap' : 'inline-flex items-center justify-center whitespace-nowrap border font-bold transition-colors'}
+                  style={enCurso ? GEOMETRIA_ACCION
+                    : { ...GEOMETRIA_ACCION, background: 'var(--sp-surface)', color: 'var(--sp-primary-text)', borderColor: 'var(--sp-primary-border)' }}>
+                  {/* En la de Google comparte la fila con «¿No es una cita?»: el rótulo largo no cabe ni a 1280. */}
+                  <span className={esPorAsignar(cita) ? '' : 'xl:hidden'}>Ligar</span>
+                  {!esPorAsignar(cita) && <span className="hidden xl:inline">Ligar e iniciar consulta</span>}
+                </button>
+              )
+            }}
             acciones={(cita, enCurso) => {
               const precarga = enCurso ? undefined : false
               return (
