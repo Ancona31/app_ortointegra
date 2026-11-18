@@ -704,8 +704,9 @@ proyecto, 32 con las de `main`).** Además de lo de arriba:
 * **La reserva siempre empieza en «Lugar»**, también con un consultorio (ya elegido). **«Volver» es
   `BotonVolver`, en el pie de cada paso después del primero**; lo escrito vive en `useReserva`
   (`borrador`), la casilla del aviso vuelve desmarcada a propósito. No vuelvas a un enlace arriba.
-* **El correo es obligatorio en los dos enlaces** (esquema y `reservar_por_enlace`); el fijo además lo
-  verifica con código. El único NO atiende a quien no tiene correo (decisión pendiente de Angel).
+* **El correo es obligatorio en el enlace FIJO** (esquema y `reservar_por_enlace`), que además lo
+  verifica con código. **El único lo admite vacío** (tanda I, `20261121120000`): sin correo no hay
+  comprobante ni recordatorio, pero sí el aviso a la clínica. (Sustituye a «obligatorio en los dos».)
 * **La configuración va en pestañas** (`MenuConfiguracion.tsx`, patrón APG): abre en «Primeros pasos» mientras falte
   algo y si no en la primera; todos los paneles montados, sólo uno visible. Un enlace interno a otra sección va con
   `href="#config-…"` y `PESTANA_DE_ANCLA` lo convierte en cambio de pestaña: si añades una sección, añádela ahí. Los
@@ -779,10 +780,93 @@ proyecto, 32 con las de `main`).** Además de lo de arriba:
   apagado no sale ninguno y la prueba pasaría sin probar nada
   (`confirmacion-enlace` «lista A 4») o fallaría (`husos-dos-consultorios`).
 * **Al fusionar con `feature/limites-ajustables`, la lista del caso 3 de
-  `p1_permisos_funciones.sql` es de 44 funciones** (las 41 de antes +
-  `agenda_restablecer_configuracion`, `cita_recordatorios_pendientes` y
-  `cita_tiene_nota_ligada`), escrita entera en
-  `supabase/AUDITORIA-CONJUNTO-AGENDA-V2.md` §10.
+  `p1_permisos_funciones.sql` es de 45 funciones** (las 44 de la tanda H +
+  `cita_reagendar_clinica`; `cita_proteger_cierre()` y las demás de disparador
+  tienen los tres roles y NO entran), escrita entera en
+  `supabase/AUDITORIA-CONJUNTO-AGENDA-V2.md` §11.5. Las pruebas SQL que llamen
+  a una función de `pg_temp` como otro rol le dan GRANT explícito: con P1 nacen
+  sin EXECUTE a PUBLIC.
+* **Cada migración nueva añade su fila a la tabla de migraciones de
+  `mejora_agendaV2.md` §7 («Todas las migraciones, una por una») en el mismo
+  commit.** Las de `supabase/archivo-migraciones-historicas/` ya están en
+  producción y no entran.
+
+**Tanda I (2026-11-17):**
+
+* **Cada archivo de e2e deja la v2 APAGADA al terminar** (`afterAll` con
+  `interruptorAgenda('A', false)`); quien la necesita la enciende en su
+  `beforeEach` o en la propia prueba. Encendida, las e2e que la suponen apagada
+  (`agenda-secretaria`, `agenda-tipos-cita`) caen en el aviso de empalme
+  (integración I, `067972c`).
+* El canal de Realtime de la agenda vive en el módulo y **sobrevive 2 min**
+  (`VIGENCIA_CITAS_MS`) al desmontaje: es lo que mantiene honesta la caché de
+  rangos mientras la agenda no está. No lo cierres al desmontar ni acortes ese
+  plazo «para ahorrar»: sin él, lo que cambie fuera de la agenda no invalida la
+  caché y al volver se pinta lo viejo. Sigue siendo **un solo canal**
+  (`appointments-realtime`).
+* Toda escritura de citas hecha FUERA de la agenda en la misma pestaña llama a
+  `vaciarCacheCitas()` al responder el servidor (`ligarCita.ts`, nota nueva).
+* En un `onClick`, lo que se lea de `e.currentTarget` se lee **fuera** del
+  actualizador de `setState`: el actualizador puede correr en el render, con
+  `currentTarget` ya en `null` («Algo salió mal» al reabrir «Ir a una fecha»).
+* **Una cita reservada por enlace que no ha pasado tiene candado**
+  (`cita_proteger_eleccion`, `20261121121000`): médico, consultorio, día y hora
+  no se cambian por PUT, arrastre, PostgREST ni Google. Consultorio, día y hora,
+  sólo con «Reagendar» (`POST /api/appointments/[id]/reagendar` →
+  `cita_reagendar_clinica`), que avisa al paciente. El médico, nunca. No relajes
+  el disparador para un caso nuevo: que pase por `cita_reagendar_clinica`.
+* **El único sin correo lleva un seudónimo por reserva**
+  (`sha256('reserva-sin-correo:'||id)`) en `reserva_correo_hmac`. No es un HMAC
+  de nada: no lo uses para buscar a la persona; para eso está el teléfono.
+* **Los correos de la agenda al paciente salen a nombre del médico**
+  (`cabeceraFrom` en `src/lib/correo/transporte.ts`); el aviso a la clínica sale
+  como «Spinus» (`remitente: ''`). El nombre pasa siempre por `nombreRemitente`:
+  nunca concatenes un nombre sin sanear en la cabecera `From`.
+* **«Por asignar» es `appointments.google_asignacion`** (`20261121130000`):
+  `'por_asignar'` lo pone SÓLO `cita_asignacion_google` al importar el sondeo
+  (`service_role` + `spinus.via = 'google'`); `'evento'`, la ruta
+  `POST /api/appointments/[id]/no-es-cita`; no se vuelve de `'evento'` a
+  `'por_asignar'` (el camino es «Convertir en cita»). No lo confundas con «por
+  ligar» (`reserva_canal`); las dos son «por ligar» en `esPorLigar`, y
+  `esEventoGenerico` excluye las por asignar. Quien separe citas de eventos con
+  `paciente_id` a secas las cuenta como eventos (AG-DT-109: `/inicio`,
+  `TarjetaHoy`, `HoyEnConsultorio`).
+* «¿No es una cita?» se monta con `BotonNoEsCita.tsx`, sólo en filas
+  `esPorAsignar`: en el formulario, en «Próximas citas» y en el aviso
+  `google_por_asignar` de la campana (al lado del aviso, nunca dentro de su
+  botón). El aviso de Google (`trg_appointments_aviso_clinica`) usa la MISMA
+  marca (`NEW.google_asignacion = 'por_asignar'`), y `cambioPuedeAvisar`
+  también: si cambias quién queda por asignar, cámbialo en los tres.
+* El escudo contra el doble clic tras `QuickPatientModal` es
+  `useEscudoTrasRegistro`; en los diálogos, `dentroDeDialogos: true`.
+* **Una cita ATENDIDA con nota ligada no cambia de estado NI de fecha/hora, con
+  la v2 encendida o APAGADA** (`vetoPorNotaLigada` + `cita_proteger_atendida`,
+  `20261121140000`). El PUT traduce su 42501 (`HINT_ATENDIDA_CON_NOTA`) a 409
+  `nota_ligada`. (Amplía la línea de H5: «no se mueve (con la v2)».)
+* `consultorios.horario_revisado_en`: NULL = «por revisar» en «Primeros pasos».
+  La pone el PATCH de consultorios con la v2 (confirmar o guardar
+  disponibilidad); «Restablecer» la vuelve a NULL. Sin la columna, el PATCH
+  reintenta sin ella.
+* Pregunta de asistencia: `asistenciaServidor.ts` (servidor, viaja con la
+  página; `createAdminClient` sólo para saber qué citas tienen nota, filtrado por
+  clínica). Más de 48 h desde el inicio, sin nota. Nada marca `no_show` solo. La
+  e2e que siembre una agendada de hace más de 48 h y abra la agenda v2 cierra la
+  ventana (`decidirDespues` de `e2e/interaccionesAyudas.ts`).
+* **Cancelada cerrada:** `appointments.cerrada_en` + `sustituida_por` (FK
+  RESTRICT), sólo `service_role` (`cita_proteger_cierre`, `20261121142000`),
+  sólo sobre una cancelada y con una sustituta viva de la misma clínica; no se
+  reabre. La agenda (`consultaCitas`), el tiempo real y el buscador no la pintan;
+  NO se borra. `POST /api/appointments` con `sustituye_a` (v2) la cierra en la
+  misma petición.
+* **Avisos de la clínica (`avisos_clinica`, `20261121150000`):** sólo los
+  escriben los disparadores `aviso_clinica_de_*` (DEFINER, dueño postgres); el
+  personal sólo marca revisado, y un revisado no se reabre. Para mostrarlos en
+  otra página: `useAvisosClinica()` sin `datos` + `<ListaAvisos>` sin `alAbrir`
+  (cada aviso enlaza a `/agenda?cita=<id>`). En la agenda viajan en
+  `GET /api/agenda/por-confirmar`: no añadas otra petición al abrirla.
+* **El correo a la clínica por cada reserva** está APAGADO de fábrica
+  (`agenda_ajustes.correo_reserva_clinica`) y no lleva nada clínico: no le
+  añadas tipo de cita, motivo ni datos de contacto del paciente.
 
 ---
 

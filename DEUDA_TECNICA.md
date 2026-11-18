@@ -4364,6 +4364,8 @@ Lo que dejaron abierto las cinco ramas de la tanda H (`feature/agenda-v2-h1` a
 
 ### AG-DT-70 — El enlace de un solo uso también exige correo
 
+**Cerrada en la tanda I (2026-11-17, I2, `20261121120000`):** el único admite el correo vacío. Lo que queda abierto de aquí (el correo de un tercero, sin tope por enlace) es AG-DT-100 y AG-DT-101. Queda el texto de abajo como historia.
+
 **Estado:** 🟡 abierta, **decisión de Angel** (H1, punto 4) · «Quien no tiene
 correo se atiende con un enlace de un solo uso» no es cierto hoy:
 `ReservarSchema` (≥ 3 caracteres) y `reservar_por_enlace` (`p_correo` con «@»)
@@ -4424,6 +4426,8 @@ vuelve (por diseño, como «Revocar»).
 
 ### AG-DT-80 — El escudo del doble clic sólo está en la burbuja
 
+**Cerrada en la tanda I (2026-11-17, I3, punto 22):** `useEscudoTrasRegistro` también en el formulario completo y en «Convertir en cita», con e2e. Queda el texto de abajo como historia.
+
 **Estado:** 🟡 abierta (H3, punto 12) · `AppointmentModal` y `ConvertirEnCita`
 también abren `QuickPatientModal`; ahí el segundo clic cae en su propio
 formulario (no se vio el defecto), pero no está probado.
@@ -4449,6 +4453,8 @@ alterna. Sin `aria-controls`.
 alguien retoca los hex.
 
 ### AG-DT-85 — «Por confirmar» sigue sin existir en el teléfono
+
+**Cerrada en la tanda I (2026-11-17, I5):** la campana de la agenda, también en el teléfono, lleva la pestaña «Por confirmar» (`CampanaAgenda.tsx`). Queda el texto de abajo como historia.
 
 **Estado:** 🟡 abierta, anterior (E7; H4) · La leyenda, los medios, «Marcar como
 confirmada», el tiempo real y el punto rojo son de la cabecera de escritorio.
@@ -4478,6 +4484,8 @@ puesta podría verlo. No es de la tanda.
 
 ### AG-DT-90 — El `PUT` de una cita no traduce un 42501 a 409
 
+**Cerrada en la tanda I (2026-11-17, I4, punto 1) para el disparador de la atendida:** el PUT traduce el 42501 con `HINT_ATENDIDA_CON_NOTA` a 409 `nota_ligada` (`src/app/api/appointments/[id]/route.ts`); cualquier otro 42501 sigue sin traducir, a propósito. Queda el texto de abajo como historia.
+
 **Estado:** 🟡 abierta, anterior (H5) · Si el disparador de H5 saltara en una
 carrera entre la comprobación de la API y su UPDATE, saldría un 500 con el texto
 de Postgres (falla cerrado; el `DELETE` sí lo traduce).
@@ -4501,6 +4509,362 @@ Google llega después; no es un tirón.
 duración de la consulta un tramo de menos de 60 min también es hueco. Con la v2
 apagada, mover una cita sin cambiar la ocupación ni ningún hueco de 60 vuelve a
 pintar el panel lateral una vez. Barato (A1-bis igual que la base, §9).
+
+### Agenda v2 — tanda I (2026-11-17)
+
+Lo que dejaron abierto las cinco ramas de la tanda I (`feature/agenda-v2-i1` a
+`-i5`) y su integración. Origen: las notas de cada agente en
+`e2e/resultados/reglas/notas/notas_i1.md` … `notas_i5.md`, sección «(b)
+Deuda»; las dos de la integración las vio el integrador.
+
+### AG-DT-94 — El WebSocket de tiempo real sigue abierto 2 min fuera de la agenda
+
+**Estado:** abierta, aceptada (I1, puntos 5 y 6) · Es lo que compra el arreglo:
+el canal de Realtime de la agenda vive en el módulo y sobrevive 2 min
+(`VIGENCIA_CITAS_MS`) a su desmontaje, para que un cambio hecho fuera de la
+agenda vacíe la caché de rangos. Antes se cerraba al salir. Sin peticiones HTTP
+añadidas y siempre un solo canal. No acortar el plazo «para ahorrar»: sin él, al
+volver se pinta lo viejo.
+
+### AG-DT-95 — Con la agenda desmontada, «Por confirmar» y la campana no se enteran
+
+**Estado:** abierta, anterior (I1) · Mientras la agenda no está, un evento del
+canal sólo vacía la caché de citas; «Por confirmar» y la campana se ponen al día
+cuando la agenda vuelve. Igual que antes (antes ni eso).
+
+### AG-DT-96 — Una semilla prefetchada antes de montar la agenda puede llegar con segundos de atraso
+
+**Estado:** abierta, anterior (I1) · La semilla del servidor puede venir de un
+RSC prefetchado que el router reutiliza hasta 30 s (`staleTimes.dynamic`). No es
+nuevo y la tanda no lo toca.
+
+### AG-DT-97 — Al remontar la agenda desde la caché, el primer foco hace un refetch
+
+**Estado:** abierta, anterior (I1) · `ultimaTraidaRef` vale 0 al remontar.
+Comportamiento previo, sin cambios.
+
+### AG-DT-98 — Tras cerrar sesión el canal sigue hasta 2 min
+
+**Estado:** abierta, inocua por SUPOSICIÓN (I1) · La caché se vacía, pero el
+canal no; supabase-js cambia su token en SIGNED_OUT/SIGNED_IN y la RLS filtra
+por el token vigente. SUPOSICIÓN no verificada: que Realtime re-evalúe la RLS
+tras el cambio de token.
+
+### AG-DT-99 — En `next dev`, un Fast Refresh puede añadir un segundo manejador al canal
+
+**Estado:** abierta, sólo desarrollo, SUPOSICIÓN no probada (I1) · El Fast
+Refresh del módulo pone `canalAgenda` a null con el canal viejo aún en el
+cliente: `channel()` lo devuelve y se le añade otro manejador.
+
+### AG-DT-100 — Un único sin correo admite el correo de un tercero
+
+**Estado:** abierta, seguridad MEDIA, ya existía (I2, punto 2; ver AG-DT-70) ·
+Como el único no verifica el correo, quien lo tenga puede escribir el de otra
+persona: a ese tercero le llega el comprobante (ahora a nombre del médico) y su
+HMAC real queda en la cita y le activa «ya_tiene_cita» en el fijo. Angel pidió
+el correo opcional, no quitarlo, así que no se tocó. Opciones: ignorar el correo
+escrito en el único, mandar el comprobante sólo a un correo verificado, o
+aceptar el riesgo por escrito.
+
+### AG-DT-101 — El enlace único no tiene tope por enlace
+
+**Estado:** abierta, seguridad BAJA, ya existía (I2, punto 2; ver AG-DT-28) ·
+Con un único se pueden probar teléfonos y distinguir «bloqueado a mano» (403) de
+«ok»: un 403 no gasta el enlace, y sólo limitan la IP (6/h) y el dispositivo
+(4/h). Opciones: aplicar también al único el tope por enlace del fijo, o que
+«bloqueado» gaste el único.
+
+### AG-DT-102 — `correo: ""` en el único da 400
+
+**Estado:** abierta, seguridad BAJA, aceptada (I2, punto 2) · La página omite el
+campo vacío, pero otro cliente que mande `""` falla. Se dejó así porque falla
+cerrado.
+
+### AG-DT-103 — El seudónimo del único sin correo no tiene `COMMENT ON COLUMN`
+
+**Estado:** abierta (I2, punto 2) · `sha256('reserva-sin-correo:' || id)` sólo
+lo explica el COMMENT de `reservar_por_enlace`. Añadir el de
+`appointments.reserva_correo_hmac` en una migración futura (lo pidió la
+auditoría de `20261121120000`).
+
+### AG-DT-104 — «Bloquear contacto» desde una reserva sin correo deja una fila de correo que no sirve
+
+**Estado:** abierta, menor (I2, punto 2) · Además del teléfono, se bloquea el
+seudónimo de esa reserva, que ninguna reserva futura llevará. El bloqueo que
+cuenta es el del teléfono.
+
+### AG-DT-105 — `p_esperado` NULL en `cita_reagendar_clinica` no comprueba la versión
+
+**Estado:** abierta, aceptada (I2, punto 9) · NULL significa «sin comprobar la
+versión». La ruta lo manda siempre que la pantalla tiene `updated_at`.
+
+### AG-DT-106 — Reagendar A→B→A dice que el correo no salió
+
+**Estado:** abierta, BAJA (I2, punto 9) · El correo de cambio de la vuelta es
+«duplicado» por (cita, tipo, inicio): la respuesta es `no_enviado` y el panel
+dice «el correo no salió», aunque el paciente sí recibió el de la primera vez.
+Opción: otro texto para `no_toca`.
+
+### AG-DT-107 — `PanelReagendar` interpreta la hora en la zona del navegador
+
+**Estado:** abierta, BAJA, no es regresión (I2, punto 9) · Es lo mismo que hace
+el formulario de siempre.
+
+### AG-DT-108 — El remitente entre comillas no se probó contra Resend real
+
+**Estado:** abierta, sin comprobar (I2, punto 21) · El `From` va como `"Dr.
+Nombre" <noreply@mail.spinus.com.mx>`. La documentación de Resend muestra `Name
+<email@example.com>`, sin comillas; sólo se probó contra Mailpit. ASUMIENDO QUE
+Resend acepta un display-name entrecomillado (RFC 5322) igual que Mailpit.
+Comprobarlo con un envío de prueba real en la integración; si no lo acepta,
+quitar las comillas (el saneamiento de `nombreRemitente` ya quita lo peligroso).
+
+### AG-DT-109 — Los recuentos de «hoy» no cuentan las «por ligar» ni las «por asignar»
+
+**Estado:** abierta (I3, puntos 8 y 10) · Tres sitios cuentan las citas de hoy
+separando por `paciente_id`: `/inicio` («Hoy tienes N citas») y
+`HoyEnConsultorio` las omiten, y `TarjetaHoy` las cuenta como «eventos» (en la
+captura, «3 citas · 2 eventos», con una por ligar y una por asignar dentro de los
+eventos). Arreglarlo exige leer el interruptor de la v2 en los tres y que los
+tres sigan coincidiendo (está anotado en su código); por eso no se tocaron.
+`esEventoGenerico` ya excluye las por asignar.
+
+### AG-DT-110 — «Próximas citas» no enlaza a la cita, sólo a `/agenda`
+
+**Estado:** abierta (I3, punto 8) · I3 lo dejó así porque no existía un
+parámetro de la agenda para abrir una cita concreta. I5 lo añadió después
+(`/agenda?cita=<id>`, `useEnlaceACita`): falta usarlo en las filas de
+`ProximasCitas.tsx`, que siguen enlazando a `/agenda`.
+
+### AG-DT-111 — Ligar una «por asignar» queda auditado como `via: 'convertir'`
+
+**Estado:** abierta, menor (I3, punto 10) · Pasa por el camino de conversión de
+T3 (`vetoDeConversion`); no hay un `via` propio de Google.
+
+### AG-DT-112 — La historia del escudo de H3 vive ahora en el gancho
+
+**Estado:** abierta, documental (I3, punto 22) · El escudo del doble clic se
+movió a `src/hooks/useEscudoTrasRegistro.ts` (burbuja, formulario completo y
+«Convertir en cita»); el comentario de `BurbujaAlta.tsx` remite al gancho.
+Quien busque la historia de H3 en la burbuja tiene que ir allí.
+
+### AG-DT-113 — «¿No es una cita?» en el formulario completo cierra sin preguntar
+
+**Estado:** abierta, aceptada (I3, punto 10) · Se pierde lo que se hubiera
+editado sin guardar. Es lo pedido («en el momento y sin más pasos»). La marca se
+va de la rejilla sola, por el refresco que ya existe (< 1,5 s medido).
+
+### AG-DT-114 — Apagar la v2 con filas «por asignar» deja la marca y un botón que contesta 404
+
+**Estado:** abierta, caso de borde (I3, punto 10) · Si la v2 se apaga después de
+tener filas por asignar, la agenda sigue pintando la marca y «¿No es una cita?»
+responde 404. No se gatea en el cliente.
+
+### AG-DT-115 — Sin la migración de I3, «Próximas citas» pierde también las por ligar
+
+**Estado:** abierta, improbable (I3, punto 8) · Con la v2 encendida y sin
+`google_asignacion`, el respaldo vuelve a la consulta de siempre y pierde
+también las por ligar de enlace, que no dependen de la columna. La migración va
+antes que el código.
+
+### AG-DT-116 — Una «por asignar» que Google cambia después sigue marcada
+
+**Estado:** abierta, aceptada (I3, punto 10) · La marca sólo se decide al
+importar: si Google la pasa a todo el día, al pasado o la cancela, sigue
+`por_asignar`. Los lectores filtran por estado y fecha («Próximas citas» ya lo
+hace: `end_time > ahora` y scheduled/confirmed).
+
+### AG-DT-117 — Una «por asignar» hereda «Confirmar», «Reagendar» y «Cancelar cita»
+
+**Estado:** abierta, anotada (I3, punto 10) · Es coherente con «como una por
+ligar»; queda anotado por si sorprende.
+
+### AG-DT-118 — Las canceladas cerradas no tienen pantalla donde verlas
+
+**Estado:** abierta (I4, punto 12) · Una cancelada sustituida con «Reasignar» o
+«Reagendar cita» deja de verse en la agenda, en el buscador y en tiempo real. Se
+conserva en `appointments` (`status = 'cancelled'`, `cerrada_en`,
+`sustituida_por` = la cita nueva) y en `audit_log` (`cita_editada` con `campos
+["cerrada_en","sustituida_por"]` y `cita_sustituida` con quién lo hizo). Hoy
+sólo se ve por SQL: `select * from appointments where sustituida_por is not
+null`. Propuesta (no hecha): una línea en la tarjeta de la sustituta («Sustituye
+a la cita cancelada del …») o en la lista de citas del paciente.
+
+### AG-DT-119 — Una cancelada cerrada sin paciente ni reserva se puede borrar
+
+**Estado:** abierta, aceptada (I4, punto 12) · Por ejemplo, una nacida en
+Google: `appointments_delete` la deja borrar, como a cualquier cancelada sin
+paciente hoy (auditoría de la migración, nota 5).
+
+### AG-DT-120 — «Hoy en el consultorio» cuenta las canceladas
+
+**Estado:** abierta, anterior (I4, punto 12) · `HoyEnConsultorio.tsx` cuenta
+todas las citas del día con paciente, también las canceladas (ya era así); una
+cancelada cerrada y su sustituta el mismo día cuentan dos. Es el mismo
+componente que AG-DT-109.
+
+### AG-DT-121 — El respaldo de «Restablecer» no guarda `horario_revisado_en`
+
+**Estado:** abierta, menor (I4, punto 3) · La fila de `audit_log` no lleva el
+valor previo de la marca. Añadirlo cambia el md5 de la función; no se hizo.
+
+### AG-DT-122 — La ventana «¿Asistió el paciente?» sin trampa de foco
+
+**Estado:** abierta, anterior (I4, punto 11) · Es la de `ModalShell` (FN-DT-5,
+deuda 2 de CLAUDE.md).
+
+### AG-DT-123 — `leerAsistenciaPendiente` y `comprobarSustituible` sólo tienen e2e
+
+**Estado:** abierta (I4, puntos 11 y 12) · Vitest cubre sus partes puras.
+
+### AG-DT-124 — Una «por asignar» de Google nunca recibe la pregunta de asistencia
+
+**Estado:** abierta, aceptada (integración de la tanda I) · La consulta de la
+pregunta de asistencia de I4 filtra
+`.or('paciente_id.not.is.null,reserva_canal.not.is.null')`: una por asignar no
+tiene paciente ni `reserva_canal`, así que nunca sale en la ventana aunque se
+haya quedado sin atender. Se dejó así por ser el menor cambio.
+
+### AG-DT-125 — Sin las migraciones de I4, dos caminos responden bien sin hacer nada
+
+**Estado:** abierta, aceptada (integración de la tanda I) · Sin
+`20261121141000`, «Confirmar horario» de «Primeros pasos» responde éxito pero no
+guarda nada: la ruta reintenta sin la columna (aceptable, porque sin la columna
+no hay «Primeros pasos»). Sin `20261121142000`, un alta con
+`sustituye_a` entra pero la cancelada no se cierra, y cada alta deja un
+`logger.warn` («cancelada sin cerrar tras sustituirla»). Las dos tolerancias
+existen para no dar 500 si el código llega antes que la migración.
+
+### AG-DT-126 — En el teléfono, la campana añade una petición al abrir la agenda
+
+**Estado:** abierta, aceptada (I5) · Pide `por-confirmar` en ocioso (antes no
+había panel en el teléfono). En escritorio, ninguna petición más.
+
+### AG-DT-127 — La campana, el engrane y las listas van estáticos en el chunk de la agenda
+
+**Estado:** abierta, aceptada (I5) · Medición intercalada contra `0349221` (7
+rondas, escritorio a 1440, v2 encendida, mediana): apertura en frío 232 → 234 ms; peticiones
+al abrir 9 → 9; JS transferido 544 → 549 KB (+5 KB); vuelta desde el dashboard
+167 → 164 ms.
+
+### AG-DT-128 — El pre-vuelo de la migración de I5 comprueba tablas, no columnas
+
+**Estado:** abierta, BAJA (I5; auditoría de `20261121150000`) · Mira que existan
+las tablas de D11/E1/E6, no sus columnas.
+
+### AG-DT-129 — «Atajos de teclado», deshabilitado mientras carga, queda fuera del recorrido con flechas
+
+**Estado:** abierta, de la revisión (I5) · Va con `aria-disabled` hasta que el
+chunk de interacciones está listo; APG sugiere que siga en el recorrido. Sin
+hacer.
+
+### AG-DT-130 — Una cancelación hecha por el personal recarga «Por confirmar»
+
+**Estado:** abierta, de la revisión (I5, punto 17) · Con la agenda abierta, una
+vez y coalescida; no al abrirla. Sin hacer.
+
+### AG-DT-131 — El aviso emergente de «Google por asignar» no tiene e2e propia
+
+**Estado:** abierta (I5) · La sincronización la dispara una petición del
+servidor, no el navegador. La regla está en Vitest (`avisosParaEmergente`) y el
+aviso, en `reserva-google` 4.
+
+### AG-DT-132 — La e2e `agenda-g4-rejilla-consultorios` busca `.ag-hueco`
+
+**Estado:** abierta, fallo previo (visto en I5) · «El consultorio activo del
+menú lateral…» busca `.ag-hueco` en «Huecos disponibles», pero desde H4
+(`CardHuecos`) un hueco con turnos se pinta como `.ag-hueco-grupo`: el selector
+ya estaba viejo en `0349221` (la captura enseña el hueco 15:00–19:00 correcto).
+Arreglo: cambiar el selector de la prueba.
+
+### AG-DT-133 — La semilla local no se puede rehacer
+
+**Cerrada en la integración de la tanda I (2026-11-17):** las dos notas se respaldaron (con sus pacientes, sus dos citas y su auditoría) en `e2e/resultados/respaldo_consultas_angel_2026-11-15.json`, sin seguimiento, y la base se reinició desde cero con las 39 migraciones y la semilla. Queda el texto de abajo como historia.
+
+**Estado:** abierta, del entorno (I1 a I5) · `scripts/agenda-semilla.ts` (y el
+`global-setup` de la batería) se niega a resembrar porque hay 2 consultas sobre
+pacientes sembrados de la Clínica Semilla A («Paciente Prueba 13» y «15», del
+2026-11-16 02:18 UTC, que es el 15 en hora local; hechas a mano). Son notas clínicas y nadie las borró. Los cinco
+agentes corrieron sus e2e sin resembrar, con la semilla de la semana del 9 de
+noviembre, y por eso fallan sin ser regresión, entre otras, `agenda-cache-rangos`,
+`agenda-semilla`, `agenda-convertir-google` («Cirugía programada» quedó el 11/11,
+fuera de la semana visible), G2-9 y H2-5/H2-10 (chocan con un tipo «Consulta»
+60 min y un enlace fijo del Dr. Admin que quedaron en la base). La batería de
+integración tiene que resembrar: en local, P5 (reiniciar la base) lo resuelve.
+
+### AG-DT-134 — Varias e2e no limpian lo suyo y dependen de la resiembra
+
+**Estado:** abierta, de las pruebas (I1 a I5) · Con la semilla bloqueada
+(AG-DT-133) se acumulan restos entre corridas y rompen pruebas ajenas:
+- las e2e de Google no borran las filas importadas, y el Google simulado
+  reinicia sus ids (`google1`, `falsoN…`) en cada arranque: chocan con filas
+  viejas de la Clínica A (23505 o `ON CONFLICT DO NOTHING`, 0 cambios);
+- `agenda-enlaces-reserva` «interruptor apagado → 404» supone la v2 apagada al
+  empezar, y «No hay contactos bloqueados» falla con un bloqueo que dejó
+  `reserva-seg1`;
+- `reserva-enlace` «una sola cita en el turno»: `citasEnTurno` cuenta las
+  canceladas que quedan en el mismo turno;
+- `agenda-t1-burbuja` «puntos 13 y 14» falla si el hueco lo ocupan restos
+  «Reserva E2E» de otras ramas;
+- 46 enlaces de la Clínica A que «Restablecer» no revoca rompen la línea 317 de
+  H2-10;
+- quedan avisos `google_por_asignar` de eventos pasados, de antes de corregir el
+  WHEN de I5.
+
+La semilla los limpia; arreglarlo de raíz es que cada prueba borre lo que crea.
+
+### AG-DT-135 — `pruebas-sql` en rojo en la base compartida durante la tanda
+
+**Cerrada en la integración de la tanda I (2026-11-17):** `bash scripts/pruebas-sql.sh` sobre la base reiniciada con las 39, 34 archivos en verde (con `d4` y `h5` adaptadas en sus ramas). Queda el texto de abajo como historia.
+
+**Estado:** abierta, a comprobar en la integración (I1 a I5) · Con las
+migraciones de todas las ramas aplicadas en la base local y las pruebas de una
+sola rama, `d4_gcal_por_ligar.sql` chocaba con `cita_proteger_eleccion` (I2,
+`20261121121000`) y `h5_atendida_con_nota.sql` con `cita_proteger_atendida`
+endurecida por I4 (`20261121140000`), y `pruebas-sql.sh` se paraba en d4. Cada
+una se adaptó en su rama (d4 en el commit de I2 `8e220fa`, h5 en el de I4
+`ef52d2e`). Falta comprobar que en la rama integrada `bash
+scripts/pruebas-sql.sh` pasa entero.
+
+### AG-DT-136 — La tanda I añade 12 KB de JS a `/agenda` con la v2 APAGADA, y la apertura con red limitada tarda 18 ms más
+
+**Estado:** abierta, menor · **Detectado:** integración de la tanda I
+(2026-11-17), paso de rendimiento (`mejora_agendaV2.md` §9, «Tanda I»).
+
+Medido contra `0349221` en 4 rondas intercaladas, con 20 muestras por columna:
+
+- **JS transferido al abrir `/agenda`.**
+  - Con la v2 apagada: 547 499 → **559 482 bytes** (+12 KB) y 31 → **34
+    chunks**.
+  - Con la v2 encendida: 570 991 → 581 335 (+10 KB) y 33 → 36 chunks.
+  - El de la página crece 5,6 KB. Hay tres chunks nuevos, uno de ellos con
+    `src/lib/consultorios/schemas.ts`, el esquema del consultorio.
+  - Todo baja también con la v2 apagada. `CampanaAgenda` (con `ListaAvisos`) y
+    `MenuEngraneAgenda`, de I5, entran con `import` estático en
+    `src/app/(app)/agenda/AgendaCliente.tsx:25-26`. La pregunta de asistencia y
+    el panel de reagendar ya van detrás de `dynamic()`.
+- **Apertura con red limitada** (60 ms y 10 Mbps): 759,5 → **777 ms** con la v2
+  apagada y 762 → 781 encendida.
+  - Las medianas por corrida no se solapan: base de 758 a 764, integración de
+    774 a 783.
+  - Es lo que tardan en bajar esos bytes y esos chunks.
+  - La apertura sin límite de red no cambia: 269 → 268 ms.
+- **«Volver del dashboard»**: 71 → **80,5 ms** con la v2 apagada (medianas por
+  corrida de 68 a 73 frente a 79 a 84) y 76 → 82,5 encendida.
+  - Causa **no aislada**.
+  - Una sonda aparte, que mide sólo esa vuelta tras la red en reposo (2 × 15
+    por árbol), no ve diferencia: base 79 y 81, integración 80 y 81, y cada rama
+    sola entre 79 y 84.
+  - Ninguna petición más, ninguna bloqueante, y A1-bis da los mismos renders
+    en la vuelta.
+  - Lo más probable es que el método de `medir-carga` suelte el reloj mientras
+    aún se ejecuta algo de la carga anterior.
+
+**Qué haría falta:** comprobar qué parte de esos 12 KB son la campana y el
+menú del engrane y, si sólo los usa la v2, cargarlos con `dynamic()`, como ya se
+hizo con las herramientas de F. ASUMIENDO QUE son la mayor parte, cosa que no se
+midió módulo a módulo. **No se tocó:** cambia cómo se monta la barra y pide
+su propia e2e y su medición.
 
 ---
 

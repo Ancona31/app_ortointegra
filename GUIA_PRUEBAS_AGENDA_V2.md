@@ -156,6 +156,7 @@ cd ~/proyectos/app_ortointegra-agenda
 8-bis. Tanda tras tus primeras pruebas a mano (2026-11-13)
 8-ter. Tanda de diseño, duración y horarios (2026-11-14)
 8-quater. Tanda H (2026-11-15)
+8-quinquies. Tanda I (2026-11-17)
 9. Seguridad
 10. Con el interruptor APAGADO
 11. Lista de casillas
@@ -3467,6 +3468,662 @@ que desplazar hasta el final.
 
 ---
 
+## 8-quinquies. Tanda I (2026-11-17)
+
+Lo que se hizo con tus 22 puntos de la tanda I, en cinco grupos: **I1** los
+defectos de la agenda (puntos 4 a 7: la cita no pasaba a «Atendida» al volver
+de guardar la nota, lo que cambiaba mientras estabas en otra pantalla no
+llegaba, y reabrir «Ir a una fecha» o la lupa tumbaba la pantalla); **I2** la
+reserva con enlace de un solo uso sin correo, el candado sobre lo que eligió el
+paciente («Reagendar») y los correos a nombre del médico; **I3** las reservas
+por enlace en «Próximas citas», lo nuevo de Google entra «Por asignar» con
+«¿No es una cita?», y el escudo del doble clic en el formulario completo y en
+«Convertir en cita»; **I4** una atendida con nota que no se mueve ni con la v2
+apagada, el horario «por revisar», la pregunta «¿Asistió el paciente?» y
+«Reasignar» el hueco de una cancelada; **I5** la barra en una fila, el menú del
+engrane, la campana con «Por confirmar» y «Avisos», y el correo a la clínica
+por cada reserva. Todo detrás del interruptor de la v2, salvo los arreglos de
+I1 (también con la v2 apagada) e I4-1 (se prueba con la v2 apagada).
+
+**Antes de empezar:** base con las **39** migraciones (P5: las 32 de antes más
+las 7 `20261121…` de la tanda I; la consulta de P5 debe responder
+`39|20261121150000`), sembrada (P6), aviso aprobado (P7), v2 encendida en la
+Clínica A (P8), la app del 3000 (P11). El Google simulado (C0) para I1-5,
+I2-9, I3-2 a I3-4b, I5-7 e I-INT-1. **I1-1 al final**, como G3-7 y H5-1:
+guarda una nota clínica real y después hay que hacer P5. Si al abrir la agenda
+sale «¿Asistió el paciente?», es la ventana de I4-3: «Decidir después» y sigue
+(I4-5).
+
+### I1 · Defectos de la agenda (puntos 4 a 7)
+
+#### I1-1. Terminar una consulta y volver a la agenda
+
+> **Ojo:** crea una nota clínica real en la base local: después hay que recrear la
+> base (P5) para volver a sembrar. Hazla al final.
+
+**Qué hago:** como Dr. Admin, en la agenda pulso una cita de hoy o de esta
+semana de «Paciente Prueba 19» (créala si no hay), «Iniciar consulta»,
+«Prefiero escribirla yo», lleno la nota y «Guardar nota». Cierro el aviso y
+pulso «Agenda» en el menú (sin F5).
+
+**Qué debo ver:** la tarjeta ya dice «Atendida».
+
+**Si falla, significa que…** la agenda pinta lo que tenía guardado de antes de
+la consulta.
+
+#### I1-2. Alguien reserva por el enlace mientras estoy en otra pantalla
+
+**Qué hago:** como Dr. Admin abro la agenda, voy a «Configuración de la agenda»
+y, en una ventana de incógnito, reservo con el enlace fijo («Ana Reserva Uno»).
+Vuelvo a «Agenda» por el menú antes de 2 minutos.
+
+**Qué debo ver:** la reserva ya está en la agenda, sin F5.
+
+**Si falla, significa que…** el tiempo real se perdió al salir de la agenda.
+
+#### I1-3. Alguien reserva por el enlace con la agenda abierta
+
+**Qué hago:** igual que I1-2, pero con la agenda abierta en la semana de la
+reserva.
+
+**Qué debo ver:** la tarjeta aparece sola en pocos segundos.
+
+**Si falla, significa que…** el tiempo real de la agenda no funciona.
+
+#### I1-4. El paciente confirma, cancela o reagenda por el enlace del correo
+
+**Qué hago:** con la agenda abierta (o en el tablero, y vuelvo antes de 2 min),
+abro en incógnito el enlace del correo de una cita de «Paciente Prueba 18» y
+pulso «Confirmar». Otra vez, «No podré asistir». Otra, «Reagendar» y elijo
+otro horario.
+
+**Qué debo ver:** la tarjeta pasa a «Confirmada» / «Cancelada»; al reagendar,
+la vieja queda «Cancelada» y la nueva aparece «Agendada». Todo sin F5.
+
+**Si falla, significa que…** la agenda no se entera de lo que hace el paciente.
+
+#### I1-5. Un cambio de Google llega a la agenda abierta (Google simulado, C0)
+
+**Qué hago:** con la agenda abierta en la semana siguiente, creo un evento en
+el Google simulado y lanzo la sincronización desde otra ventana. Luego, en una
+cita ligada, marco que el paciente acepta la invitación (E9 del plan: la
+respuesta a la invitación de Google).
+
+**Qué debo ver:** el evento aparece y la cita pasa a «Confirmada», sin F5.
+
+**Si falla, significa que…** lo que entra de Google no llega por tiempo real.
+
+#### I1-6. Reabrir «Ir a una fecha» y la lupa
+
+**Qué hago:** pulso «Ir a una fecha» (desde I5 es la fecha de la barra; ya no
+hay icono de calendario aparte, ver I5-2), Escape, y lo vuelvo a pulsar. Lo
+mismo con la lupa, también en el teléfono.
+
+**Qué debo ver:** se vuelve a abrir el cuadro. Nunca «Algo salió mal».
+
+**Si falla, significa que…** el botón tumba la pantalla al reabrirse.
+
+### I2 · Reserva sin correo, candado de lo elegido y correos a nombre del médico
+
+#### I2-1. La reserva con enlace de un solo uso no pide correo
+
+**Qué hago:** como Admin Semilla Uno, emito un enlace de un solo uso. Lo abro
+en otro navegador, elijo consultorio, día y hora, y en «Tus datos» escribo
+sólo nombre y teléfono. Acepto el aviso y pulso «Reservar cita».
+
+**Qué debo ver:**
+- el campo dice «Correo electrónico (opcional)»;
+- no aparece «Enviar código a mi correo»;
+- sale «Tu cita quedó agendada», sin la línea «Te enviamos el comprobante por
+  correo.»;
+- en la agenda está la cita por ligar.
+
+**Si falla, significa que…** el único sigue exigiendo correo, o la página
+ofrece un comprobante que nunca sale.
+
+#### I2-2. El enlace fijo no cambió
+
+**Qué hago:** abro el enlace fijo de Admin Semilla Uno y llego a «Tus datos».
+
+**Qué debo ver:** «Correo electrónico» obligatorio y el botón «Enviar código a
+mi correo». Sin el código no se reserva.
+
+**Si falla, significa que…** el cambio del único alcanzó al fijo.
+
+#### I2-3. Bloquear a alguien que reservó sin correo
+
+**Qué hago:** en la tarjeta de la cita de I2-1 pulso «Bloquear contacto».
+Emito otro único y reservo con el mismo teléfono.
+
+**Qué debo ver:** la página no deja reservar y da el teléfono del consultorio.
+
+**Si falla, significa que…** el bloqueo manual no corta a quien no dejó correo.
+
+#### I2-4. El formulario no deja cambiar lo que eligió el paciente
+
+**Qué hago:** con la agenda v2 encendida, abro «Configuración de la cita» de
+una cita reservada por enlace que todavía no ocurre.
+
+**Qué debo ver:**
+- médico, consultorio, fecha y hora de inicio aparecen grises;
+- encima hay una nota que dice que el paciente los eligió, con un botón
+  «Reagendar»;
+- la hora de fin sí cambia y se guarda; la cita empieza a la misma hora.
+
+**Si falla, significa que…** se puede mover la cita sin avisar al paciente.
+
+#### I2-5. Arrastrar una cita reservada por enlace
+
+**Qué hago:** arrastro esa cita a otra hora. Después la estiro desde abajo y,
+por último, desde arriba.
+
+**Qué debo ver:**
+- al arrastrarla, regresa a su lugar;
+- sale el aviso «El consultorio, el día y la hora de una cita reservada por
+  enlace sólo se cambian con «Reagendar», que avisa al paciente.»;
+- estirarla desde abajo sí funciona; desde arriba sale el mismo aviso y no se
+  mueve.
+
+**Si falla, significa que…** el arrastre la mueve sin avisar.
+
+#### I2-6. Reagendar con correo
+
+**Qué hago:** en el formulario de una cita por enlace con correo pulso
+«Reagendar», cambio la hora y pulso «Revisar cambio» y luego «Sí, reagendar y
+avisar».
+
+**Qué debo ver:**
+- antes de confirmar, la pregunta «¿Reagendar la cita con estos datos?…»;
+- después, «Listo: la cita se reagendó y le enviamos el correo con los datos
+  nuevos.»;
+- la cita se mueve en la agenda;
+- en Mailpit, «Cambio en tu cita»: a nombre del médico, con la hora nueva, el
+  enlace para confirmar o cancelar y «Enviado con Spinus» al pie.
+
+**Si falla, significa que…** el paciente no se entera del cambio.
+
+#### I2-7. Reagendar sin correo
+
+**Qué hago:** lo mismo que I2-6, con la cita de I2-1.
+
+**Qué debo ver:**
+- antes de confirmar: «Esta cita no tiene correo: no se le avisará solo…»;
+- al terminar: «La cita se reagendó. No tiene correo: avísale por WhatsApp.»,
+  con el botón de WhatsApp.
+
+**Si falla, significa que…** la clínica cree que avisó al paciente sin haberlo
+hecho.
+
+#### I2-8. Ligada a un paciente, sigue el candado
+
+**Qué hago:**
+1. Ligo la cita a un paciente.
+2. En su tarjeta pulso «Reagendar».
+
+**Qué debo ver:** se abre el formulario directamente en el panel «Reagendar»,
+con los campos grises.
+
+**Si falla, significa que…** ligar la cita la libera del candado.
+
+#### I2-9. Google no mueve una cita reservada por enlace
+
+**Qué hago:** con Google conectado (aquí, el simulado de C0), muevo en Google
+el evento de una cita por enlace a otra hora y espero la sincronización.
+
+**Qué debo ver:** en Spinus la cita sigue a su hora, y en Google el evento
+vuelve a esa hora.
+
+**Si falla, significa que…** un cambio en Google mueve al paciente sin
+avisarle.
+
+#### I2-10. Los correos llevan el nombre del médico
+
+**Qué hago:** reservo con el fijo (código) y con un único con correo, y abro
+los dos correos en Mailpit.
+
+**Qué debo ver:**
+- el remitente es «Dr. Admin Semilla Uno», con la misma dirección `noreply@…`;
+- arriba, el nombre del médico y debajo «Consultorio Centro (ficticio)»;
+- abajo, pequeño, «Enviado con Spinus».
+
+**Si falla, significa que…** el paciente no reconoce de quién es el correo.
+
+### I3 · «Por asignar» de Google y «Próximas citas»
+
+#### I3-1. La reserva por enlace sale en «Próximas citas»
+
+**Qué hago:** con la agenda v2 encendida en la Clínica Semilla A, reservo por
+enlace con el nombre «Lucía Reserva» para hoy, más tarde. Como **Dr. Admin**
+abro el Dashboard; luego entro como **Secretaria A** y abro el suyo. Después
+apago la v2 y recargo.
+
+**Qué debo ver:** en «Próximas citas» de los dos aparece «Lucía Reserva» con la
+marca **POR LIGAR** y el botón «Agenda» / «Ver en la agenda», sin «Iniciar
+consulta». Con la v2 apagada, ya no sale.
+
+**Si falla, significa que…** las reservas sin paciente siguen fuera del
+resumen, o se cuelan con la v2 apagada.
+
+#### I3-2. Un evento nuevo de Google entra «Por asignar»
+
+**Qué hago:** con el Google simulado (C0), creo «Revisión rodilla» para mañana
+a las 13:00. `/ya` y recargo la agenda.
+
+**Qué debo ver:**
+- la tarjeta dice «Revisión rodilla» con la píldora **POR ASIGNAR**;
+- al pulsarla, ofrece «Iniciar consulta», «Confirmar», «Reagendar», «Editar»,
+  «¿No es una cita?» y «Cancelar cita», y no ofrece «Convertir en cita»;
+- si el evento es para hoy, también sale en «Próximas citas» del Dashboard con
+  su título y **POR ASIGNAR**.
+
+**Si falla, significa que…** lo de Google sigue entrando como evento suelto.
+
+#### I3-3. «¿No es una cita?» lo deja como evento, para siempre
+
+**Qué hago:** en la tarjeta de I3-2 pulso «¿No es una cita?». Después, en el
+Google simulado, le cambio el título a «Revisión rodilla (otra)» (`/titulo`),
+`/ya` y recargo.
+
+**Qué debo ver:**
+- al momento, sin más pasos, la tarjeta pierde la píldora;
+- al volver a abrirla ofrece «Convertir en cita» y ya no «¿No es una cita?»;
+- en «Próximas citas» ya no sale;
+- tras el cambio en Google, el título se actualiza y **no** vuelve a «Por
+  asignar»;
+- en la auditoría (§1.8) hay una fila `cita_no_es_cita`.
+
+**Si falla, significa que…** el evento vuelve a pedir que se ligue o el cambio
+no quedó registrado.
+
+#### I3-4. «¿No es una cita?» desde «Próximas citas»
+
+**Qué hago:** con otro evento de Google para hoy (por asignar), en el Dashboard
+pulso «¿No es una cita?» en su fila.
+
+**Qué debo ver:** la fila desaparece al instante y no vuelve al recargar; en la
+agenda el evento ya no tiene la píldora.
+
+**Si falla, significa que…** el botón de la fila no llega a la base.
+
+#### I3-4b. «¿No es una cita?» desde el formulario
+
+**Qué hago:** pulso un evento por asignar → engrane «Configuración de la cita»
+→ en «Editar cita» pulso «¿No es una cita?».
+
+**Qué debo ver:** el formulario se cierra al momento y, sin recargar, la
+tarjeta ya no dice «POR ASIGNAR».
+
+**Si falla, significa que…** el botón del formulario no llega a la base o la
+agenda no se entera.
+
+#### I3-5. Iniciar la consulta de un «Por asignar»
+
+**Qué hago:** en un evento por asignar pulso «Editar», y en el formulario
+«Iniciar consulta». Elijo «Paciente Prueba 22» (o registro uno nuevo).
+
+**Qué debo ver:** se abre la consulta del paciente y la tarjeta ya es su cita.
+En Google, el título pasa a «Cita médica: Paciente Prueba 22». Si no hay
+consultorio elegido, el formulario dice «Elige el consultorio antes de iniciar
+la consulta.».
+
+**Si falla, significa que…** el «por asignar» no se liga al iniciar.
+
+#### I3-6. Doble clic al registrar desde el formulario completo y desde «Convertir en cita»
+
+**Qué hago:**
+1. Pulso «Agendar», escribo «Zoila Doble Clic», elijo «Registrar…», marco el
+   aviso y hago DOBLE CLIC en «Crear y continuar».
+2. Repito desde un evento de Google ya marcado con «¿No es una cita?»:
+   «Convertir en cita» → «Registrar paciente nuevo» → doble clic en «Crear y
+   continuar».
+
+**Qué debo ver:** el formulario (o «Convertir en cita») sigue abierto con Zoila
+elegida. No se eligió solo ningún «Tipo de cita», no cambió la duración, no se
+cerró y no se convirtió nada sin pulsarlo.
+
+**Si falla, significa que…** el segundo clic se coló al formulario de debajo.
+
+### I4 · Atendida, horario por revisar, asistencia y reasignar una cancelada
+
+#### I4-1. Una atendida con nota no se mueve, ni con la agenda nueva apagada
+
+**Qué hago:** con la agenda nueva APAGADA en la Clínica Semilla A (P8), hago
+G3-7 (deja una cita atendida de «Paciente Prueba 05» con nota) y arrastro esa
+cita a otra hora. Después arrastro una atendida SIN nota.
+
+**Qué debo ver:** la de la nota vuelve a su sitio con «Esta cita ya tiene una
+nota clínica: sigue como atendida y no se puede cambiar de fecha ni de hora.»
+Una atendida SIN nota sí se mueve (como antes).
+
+**Si falla, significa que…** la nota clínica (expediente) quedó colgando de una
+cita en otra fecha.
+
+#### I4-2. El horario que nadie confirmó sale «por revisar»
+
+**Qué hago:** recién sembrado, como Dr. Admin abro «Configuración de la
+agenda». En «Horario y disponibilidad» pulso «Confirmar horario» en los dos
+consultorios. Luego hago H2-7 (Restablecer).
+
+**Qué debo ver:**
+- en «Primeros pasos», el paso 1 con un «!» y «· Por revisar», la línea «Viene
+  del horario de la clínica: revísalo y confírmalo en cada consultorio.» y el
+  botón «Revisar horario»; «0 de 3 listos»;
+- en «Horario y disponibilidad», «Consultorio Centro» y «Hospital Norte» dicen
+  «· Por revisar» con «Confirmar horario»;
+- al pulsar «Confirmar horario» en los dos: aviso «Horario confirmado» y el
+  paso 1 queda con palomita;
+- tras Restablecer, el paso 1 vuelve a «por revisar».
+
+**Si falla, significa que…** se da por bueno un horario que ninguna persona
+eligió.
+
+#### I4-3. ¿Asistió el paciente?
+
+**Qué hago:** en la base, pongo una cita de «Paciente Prueba 21» del Dr. Admin
+de hace tres días como «Agendada» (o espero a que pasen 48 h de una cita sin
+atender). Abro la agenda como Dr. Admin. Pruebo cada botón. Repito como Dra.
+Invitada, como secretaria y con la agenda nueva apagada.
+
+**Qué debo ver:**
+- una ventana «¿Asistió el paciente?» con esa cita (nombre, día y hora) y «Sí
+  asistió» / «No asistió», y abajo «Decidir después»;
+- ninguna cita de hace menos de 48 h; ninguna con nota;
+- «Sí asistió» la deja atendida; «No asistió», no asistió (y, si vino de un
+  enlace, cuenta para el candado);
+- «Decidir después» cierra sin tocar nada, y la ventana vuelve a salir al
+  recargar con las que queden;
+- la Dra. Invitada sólo ve las suyas; la secretaria, las de la clínica;
+- con la agenda nueva apagada no sale.
+
+**Si falla, significa que…** el ciclo de la cita se queda abierto, o algo
+cambia de estado solo.
+
+#### I4-4. Reasignar el hueco de una cancelada
+
+**Qué hago:** cancelo una cita de «Paciente Prueba 21»; en su tarjeta pulso
+«Reasignar». Elijo «Paciente Prueba 22» y guardo. Recargo. Repito con
+«Reagendar cita» de otra cancelada. Por último, con una tercera cancelada, no
+hago nada.
+
+**Qué debo ver:**
+- la burbuja de alta en ESE día y hora, sin paciente;
+- al guardar, la cancelada desaparece y en su lugar está la nueva; al recargar
+  sigue sin verse;
+- con «Reagendar cita» de una cancelada pasa lo mismo al guardar la nueva;
+- si no hago nada, la cancelada se queda como está.
+
+**Si falla, significa que…** el hueco sigue ocupado por una cancelada que ya se
+sustituyó, o se perdió.
+
+#### I4-5. La ventana de asistencia y otras pruebas
+
+Si una prueba de la guía siembra una cita agendada de hace más de 48 h, al
+abrir la agenda sale la ventana de asistencia: «Decidir después» y sigo.
+
+### I5 · La barra, la campana y los avisos
+
+#### I5-1. Una sola fila en escritorio
+
+**Qué hago:** con la v2, abro la agenda en una ventana de 1280 px o más (menú
+lateral abierto), en Semana.
+
+**Qué debo ver:** en UNA fila: ‹ › «Hoy», la fecha (con una flechita),
+Mes/Semana/Día, el médico, la lupa, la campana, el engrane y «Agendar». No
+están el título «Agenda», el conteo de citas, «Compactar», el botón de atajos,
+«Ir a una fecha» ni la fila de la leyenda bajo la rejilla.
+
+**Si falla, significa que…** la regla de una fila de `globals.css` (bloque de
+`.ag-fecha-boton`) no se aplica o algún control nuevo es más ancho de lo
+medido.
+
+#### I5-2. La fecha abre el calendario
+
+**Qué hago:** pulso la fecha. Elijo un día del mes que viene. Vuelvo a abrirlo y
+pulso Escape.
+
+**Qué debo ver:** se abre «Elegir fecha»; al elegir, la agenda salta a ese día y
+conserva la vista. Con Escape se cierra y el foco vuelve a la fecha.
+
+**Si falla, significa que…** el botón no está cableado a `MiniMes` (o falta el
+arreglo de I1 si la página se rompe al abrirlo).
+
+#### I5-3. El menú del engrane
+
+**Qué hago:** pulso el engrane. Recorro con las flechas, pulso Espacio sobre
+«Compactar la rejilla» y sobre «Densidad», Escape. Repito y pulso «Leyenda de
+estados», luego «Atajos de teclado», luego «Configuración de la agenda».
+
+**Qué debo ver:**
+- cinco opciones;
+- «Compactar» y «Densidad» cambian «Encendido/Apagado» y «Normal/Compacta» sin
+  cerrar el menú, y la rejilla cambia;
+- Escape cierra y el foco vuelve al engrane;
+- la leyenda abre su ventanita con los cinco estados; atajos abre la ayuda;
+  configuración lleva a su pantalla.
+
+**Si falla, significa que…** `MenuEngraneAgenda` perdió una opción o su
+teclado.
+
+#### I5-4. La campana y sus dos pestañas (escritorio y teléfono)
+
+**Qué hago:** con citas de mañana sin confirmar, miro la campana; la pulso; paso
+a «Avisos». Repito en el teléfono.
+
+**Qué debo ver:** un punto rojo en la campana; la capa abre en «Por confirmar ·
+N» con la leyenda y las filas; «Avisos · M» enseña los avisos sin revisar. En el
+teléfono, igual, dentro de la pantalla.
+
+**Si falla, significa que…** la campana no recibe la lista o las pestañas no
+alternan.
+
+#### I5-5. Botones alineados en «Por confirmar»
+
+**Qué hago:** con pacientes que tienen sólo teléfono, sólo correo y los dos,
+abro «Por confirmar». Mando WhatsApp y correo a uno.
+
+**Qué debo ver:** el icono de WhatsApp y el del correo en la misma columna y del
+mismo tamaño en todas las filas (si falta uno, hueco); debajo de la fila, una
+sola línea «WhatsApp abierto 00:35 · Correo enviado 00:35».
+
+**Si falla, significa que…** la rejilla `.ag-pc-fila` o `LineaEstado` cambió.
+
+#### I5-6. Los avisos se quedan hasta revisarlos y llevan a su cita
+
+**Qué hago:** con la agenda abierta, reservo por enlace desde otra ventana;
+luego cancelo esa cita como paciente; luego reagendo con el mismo enlace.
+Recargo. Pulso un aviso.
+
+**Qué debo ver:**
+- un aviso emergente breve, sin nombre, al reservar y al reagendar;
+- en «Avisos», «… reservó por enlace», «Un paciente canceló…» y «… reagendó su
+  cita»; siguen ahí al recargar;
+- al pulsar uno, la capa se cierra y se abre la cita en su día; ese aviso ya no
+  sale, los demás sí.
+
+**Si falla, significa que…** un disparador de `avisos_clinica` no escribe, o el
+PATCH de revisar no llega.
+
+#### I5-7. Avisos de Google (Google simulado)
+
+**Qué hago:** con Google conectado al simulado, creo en Google un evento por
+venir y otro encima de una reserva por enlace; sincronizo; abro «Avisos».
+Sincronizo otra vez. Creo también un evento PASADO.
+
+**Qué debo ver:** «Evento nuevo de Google por asignar: …» y «La reserva de … se
+empalma con un evento de Google»; uno por evento, aunque sincronice otra vez.
+El evento PASADO no avisa.
+
+**Si falla, significa que…** el WHEN de `trg_appointments_aviso_clinica` o el
+de empalmes no dispara.
+
+#### I5-8. Un aviso desde otra página
+
+**Qué hago:** abro `/agenda?cita=<id de una cita>`.
+
+**Qué debo ver:** la agenda abre esa cita en su día y la dirección queda en
+`/agenda`.
+
+**Si falla, significa que…** `useEnlaceACita` no corre o la RLS no deja ver la
+cita (entonces sale «No se encontró esa cita.»).
+
+#### I5-9. Correo a la clínica por cada reserva
+
+**Qué hago:** en Configuración → «Plazos y recordatorios», miro «Avisar por
+correo de cada reserva». Reservo por enlace. Lo enciendo y reservo otra vez.
+Miro Mailpit (http://127.0.0.1:54324).
+
+**Qué debo ver:** apagado de fábrica, con su línea de explicación; apagado no
+llega nada; encendido, un correo «Reserva nueva: {nombre}, {fecha y hora}» a los
+administradores, con médico y consultorio, sin teléfono, correo ni tipo de
+cita.
+
+**Si falla, significa que…** la opción no se guarda (503: falta la migración) o
+`avisarReservaAClinica` no mira la columna.
+
+#### I5-10. Apagada, la de siempre
+
+**Qué hago:** apago la v2 y abro la agenda.
+
+**Qué debo ver:** la barra de antes: título, conteo, «Compactar», engrane de
+configuración, leyenda debajo; sin campana ni menú.
+
+### Integración de la tanda I
+
+#### I-INT-1. «¿No es una cita?» desde la campana
+
+**Qué hago:** con un evento de Google por asignar (Google simulado, como en
+I3-2), abro la campana → pestaña «Avisos». Pulso «¿No es una cita?» en el aviso
+«Por asignar». Recargo.
+
+**Qué debo ver:** el botón «¿No es una cita?» está al lado del aviso, no dentro
+de él. Al pulsarlo, la cita queda como evento de Google y el aviso desaparece de
+la lista; al recargar no vuelve.
+
+**Si falla, significa que…** la campana no lleva el botón de I3, o pulsarlo no
+revisa el aviso.
+
+#### I-INT-2. Reserva con enlace único sin correo avisa a la clínica
+
+**Qué hago:** con «Avisar por correo de cada reserva» encendido en la
+configuración («Plazos y recordatorios», I5-9), reservo con un enlace de un solo
+uso sin escribir correo (como en I2-1). Miro Mailpit (http://127.0.0.1:54324).
+
+**Qué debo ver:** la clínica recibe el correo «Reserva nueva: …»; el paciente
+no recibe comprobante.
+
+**Si falla, significa que…** el aviso a la clínica cuelga del correo del
+paciente, o se intenta un comprobante sin correo.
+
+### Qué repetir tras la tanda I
+
+Antes de nada, P5 a P8 (la base pasa a **39** migraciones). Después, las nuevas
+de esta sección (I1-1 al final) y estas, que ya existían y cambian o hay que
+repetir:
+
+**Bloque A**
+- **A3. Volver desde otra pantalla:** además, si mientras tanto cambió una cita
+  (otra persona, el paciente por su enlace o mi propia nota), al volver ya se ve
+  cambiada.
+- **A5, A7 y B9** (editar, arrastrar y estirar): en una cita reservada por
+  enlace que todavía no ocurre sólo cambia la duración (I2-4, I2-5); las demás
+  citas, igual.
+- **A12. Iniciar consulta desde la cita:** sin cambios; sigue sin guardarse la
+  nota en esa prueba. El caso de guardarla es I1-1.
+- **A14. Tiempo real entre dos personas:** repetir saliendo del Dr. Admin al
+  tablero mientras la secretaria mueve el evento, y volviendo antes de 2
+  minutos: ya está movido.
+
+**Bloque C (Google)**
+- **C3 y C10:** repetir; un evento de Google que bloquea un turno sigue
+  bloqueándolo aunque esté por asignar.
+- **C6. Un evento creado en Google entra a Spinus y se edita desde Spinus:**
+  ahora se abre «Editar cita» (no «Editar evento»), porque lo nuevo de Google
+  entra «Por asignar». El resto, igual.
+- **Google sobre una cita por ligar** (D4 del plan, no la D4 «El código del
+  correo» de esta guía): el título sigue entrando, pero la hora ya no; Google
+  vuelve a la hora de Spinus (I2-9).
+
+**Bloque D (reserva por enlace)**
+- **D2. La reserva aparece «Por ligar» en la agenda:** repetir; la marca «Por
+  ligar» de la tarjeta no cambia.
+- **D6 y D7 (candado):** repetir con un «No asistió» respondido en la ventana
+  de I4-3.
+
+**Bloque D11 (Google antes de reservar)**
+- **G1 a G5:** repetir; un evento de Google que bloquea un turno sigue
+  bloqueándolo aunque esté por asignar.
+- **G5. Un evento de Google que se empalma con una reserva avisa a la
+  clínica:** el aviso está ahora en la pestaña «Avisos» de la campana.
+
+**Bloque E y todos los correos**
+- **E5. Aviso a la clínica cuando un paciente cancela:** la cancelación está en
+  la pestaña «Avisos» de la campana.
+- **E11. WhatsApp desde «Por confirmar»:** el botón es la campana (capa «Por
+  confirmar y avisos»); «Abierto en WhatsApp» / «Enviado por correo» son ahora
+  la línea única de la fila (I5-5).
+- **Todas las de correos** (código D4, comprobante E1, recordatorio E8 y
+  H2-5/H2-6, confirmación G3-1 a G3-3, los correos con la marca G1-7): el
+  remitente y la cabecera son ahora del médico, y «Enviado con Spinus» va al
+  pie (I2-10).
+
+**Bloque F**
+- **F1. Una sola barra arriba:** ya no hay conteo ni «Compactar» en la barra; la
+  fecha es un botón; hay campana y engrane con menú (I5-1).
+- **F3 (Densidad), F5 y F11 («Compactar»):** ahora desde el menú del engrane
+  (I5-3).
+- **F15. La banda azul del teléfono:** sin el conteo debajo de la fecha;
+  campana arriba; sin «Compactar» ni configuración sueltos (van en el engrane).
+- **F23. El minicalendario:** se abre pulsando la fecha, no un icono aparte; y
+  ciérralo con Escape y vuelve a abrirlo: se abre otra vez, sin «Algo salió
+  mal» (I1-6, I5-2).
+- **F24. El buscador:** lo mismo con la lupa (Escape y reabrir), en escritorio y
+  teléfono (I1-6).
+- **F25. Atajos de teclado:** la ayuda se abre desde el engrane → «Atajos de
+  teclado».
+
+**§8-bis (tanda T)**
+- **T3-1. El engrane ya no dice «Horario»:** «Configuración de la agenda» es
+  ahora la primera opción del menú «Opciones de la agenda».
+- **T3-2. Convertir en cita un evento que creé en Google:** un evento recién
+  creado en Google ya no ofrece «Convertir en cita»; antes hay que pulsar «¿No
+  es una cita?» y, después, sí (es el camino de vuelta). Lo demás, igual.
+- **T3-3 y T3-4:** repetir, sin cambios esperados.
+
+**§8-ter (tanda G)**
+- **G2-1. Primeros pasos en orden:** el paso 1 sale «por revisar», «0 de 3
+  listos» y «3 pendientes» hasta confirmar el horario (I4-2).
+- **G3-5. Confirmada, atendida, cancelada, no asistió:** la cancelada ofrece
+  «Reagendar cita» y «Reasignar»; la no asistida, sólo «Reagendar cita».
+- **G3-6. Una atendida ya no se mueve:** con nota, el aviso es el de I4-1; sin
+  nota, el de siempre.
+- **G3-7. Una atendida con nota no se desmarca:** repetir; mover también está
+  cerrado con la v2 apagada.
+- **G4 («Compactar la rejilla al horario de los consultorios»):** ahora desde
+  el menú del engrane.
+
+**§8-quater (tanda H)**
+- **H1-5. El correo sigue siendo obligatorio:** ahora sólo el fijo lo exige; el
+  único lo marca «(opcional)» y reserva sin él (I2-1, I2-2).
+- **H2-1. La configuración abre en «Primeros pasos»:** «Primeros pasos · 3
+  pendientes», el paso 1 «por revisar» y «0 de 3 listos» hasta confirmar. En
+  todas las H2, «Configuración de la agenda» es la primera opción del menú del
+  engrane.
+- **H2-7. Restablecer la configuración:** tras restablecer, «Primeros pasos · 3
+  pendientes», «0 de 3 listos» y el horario «por revisar».
+- **H3-2. La burbuja sigue abierta tras registrar:** repetir; el escudo se movió
+  de archivo y su comportamiento no cambia.
+- **H4-1 a H4-5 («Por confirmar»):** el botón es la campana (capa «Por
+  confirmar y avisos»); las canceladas y los empalmes están en la pestaña
+  «Avisos»; el contador rojo es el punto rojo; «Abierto en WhatsApp» / «Enviado
+  por correo» son la línea única de la fila.
+- **H5-1. Una atendida con nota no se mueve:** repetir; con la v2 apagada,
+  moverla por la base **tampoco** se puede (antes esta prueba decía que sí).
+
+**En cualquier prueba:** si siembra una cita agendada de hace más de 48 h, al
+abrir la agenda sale «¿Asistió el paciente?»: «Decidir después» y sigue (I4-5).
+
+---
+
 ## 9. Seguridad
 
 ### 9.1 Aislamiento entre clínicas y entre médicos
@@ -4106,6 +4763,47 @@ Marca cada una al pasarla. Si una falla, anota el número y qué viste.
 - [ ] H5-1. Una atendida con nota no se mueve ni cambia de estado (al final; luego P5)
 - [ ] H5-2. El domingo, la lista de Semana abre al final
 
+**Tanda I (§8-quinquies)**
+- [ ] I1-1. Terminar una consulta y volver: «Atendida» (al final; deja una nota, luego P5)
+- [ ] I1-2. Reservan por el enlace mientras estoy en otra pantalla
+- [ ] I1-3. Reservan por el enlace con la agenda abierta
+- [ ] I1-4. El paciente confirma, cancela o reagenda por su enlace
+- [ ] I1-5. Un cambio de Google llega a la agenda abierta
+- [ ] I1-6. Reabrir «Ir a una fecha» y la lupa
+- [ ] I2-1. El único no pide correo
+- [ ] I2-2. El fijo no cambió
+- [ ] I2-3. Bloquear a quien reservó sin correo
+- [ ] I2-4. El formulario no deja cambiar lo que eligió el paciente
+- [ ] I2-5. Arrastrar una cita reservada por enlace
+- [ ] I2-6. Reagendar con correo
+- [ ] I2-7. Reagendar sin correo
+- [ ] I2-8. Ligada a un paciente, sigue el candado
+- [ ] I2-9. Google no mueve una cita reservada por enlace
+- [ ] I2-10. Los correos llevan el nombre del médico
+- [ ] I3-1. La reserva por enlace en «Próximas citas»
+- [ ] I3-2. Un evento nuevo de Google entra «Por asignar»
+- [ ] I3-3. «¿No es una cita?» lo deja como evento, para siempre
+- [ ] I3-4. «¿No es una cita?» desde «Próximas citas»
+- [ ] I3-4b. «¿No es una cita?» desde el formulario
+- [ ] I3-5. Iniciar la consulta de un «Por asignar»
+- [ ] I3-6. Doble clic al registrar (formulario completo y «Convertir en cita»)
+- [ ] I4-1. Una atendida con nota no se mueve, ni con la v2 apagada
+- [ ] I4-2. El horario sin confirmar sale «por revisar»
+- [ ] I4-3. ¿Asistió el paciente?
+- [ ] I4-4. Reasignar el hueco de una cancelada
+- [ ] I5-1. Una sola fila en escritorio
+- [ ] I5-2. La fecha abre el calendario
+- [ ] I5-3. El menú del engrane
+- [ ] I5-4. La campana y sus dos pestañas
+- [ ] I5-5. Botones alineados en «Por confirmar»
+- [ ] I5-6. Los avisos se quedan hasta revisarlos y llevan a su cita
+- [ ] I5-7. Avisos de Google
+- [ ] I5-8. Un aviso desde otra página
+- [ ] I5-9. Correo a la clínica por cada reserva
+- [ ] I5-10. Apagada, la barra de siempre
+- [ ] I-INT-1. «¿No es una cita?» desde la campana
+- [ ] I-INT-2. Único sin correo avisa a la clínica
+
 **Seguridad**
 - [ ] S1. La Clínica B no ve la A
 - [ ] S2. Lo mismo, directo a la base
@@ -4232,8 +4930,15 @@ Marca cada una al pasarla. Si una falla, anota el número y qué viste.
 | 25 | `20261120120000_agenda_h2_recordatorio_interruptor.sql` | El interruptor del recordatorio por correo, APAGADO de fábrica para todas las clínicas, y la lista de la tarea que lo respeta (H2-5, H2-6). **Desde que se aplique, ninguna clínica recibe recordatorios hasta que su administrador lo encienda** |
 | 26 | `20261120121000_agenda_h2_restablecer_configuracion.sql` | «Restablecer configuración de la agenda», sólo para el administrador (H2-7). Después de la 25 |
 | 27 | `20261120130000_agenda_h5_atendida_con_nota.sql` | Una cita atendida con nota clínica no cambia de estado ni se borra, y con la v2 no se mueve, ni saltándose la pantalla (H5-1). Actúa también con la v2 apagada |
+| 28 | `20261121120000_agenda_i2_unico_sin_correo.sql` | El enlace de un solo uso admite reservar sin correo (I2-1). **Antes del código** |
+| 29 | `20261121121000_agenda_i2_candado_eleccion.sql` | Una cita por enlace que no ha pasado no se mueve ni cambia de médico salvo con «Reagendar» (I2-4 a I2-9). **Antes del código** |
+| 30 | `20261121130000_agenda_i3_por_asignar_google.sql` | Lo que entra de Google sale «Por asignar» y «¿No es una cita?» lo deja como evento (I3-2, I3-3). **Antes del código** |
+| 31 | `20261121140000_agenda_i4_atendida_no_se_mueve.sql` | La atendida con nota tampoco se mueve con la v2 apagada (I4-1). Después de la 27 |
+| 32 | `20261121141000_agenda_i4_horario_revisado.sql` | El horario de cada consultorio, «por revisar» hasta que alguien lo confirma (I4-2). **Todos los consultorios existentes quedan «por revisar»**. Después de la 26 |
+| 33 | `20261121142000_agenda_i4_cancelada_cerrada.sql` | La cancelada que se sustituye queda cerrada, no borrada (I4-4) |
+| 34 | `20261121150000_agenda_i5_avisos_clinica.sql` | Los avisos de la clínica en la campana y el correo a la clínica por cada reserva, APAGADO de fábrica (I5-6 a I5-9). **Después de la 30** (su pre-vuelo lo exige) |
 
-Son **27**. Las tres de la tanda H (25 a 27) van al final y en ese orden. Las cuatro de la tanda del 2026-11-14 (21 a 24) van al final y en ese orden; las 17 a 20 van en este orden aunque se escribieron
+Son **34**. Las siete de la tanda I (28 a 34) van al final y en ese orden. Antes de la tanda I eran 27: Las tres de la tanda H (25 a 27) van al final y en ese orden. Las cuatro de la tanda del 2026-11-14 (21 a 24) van al final y en ese orden; las 17 a 20 van en este orden aunque se escribieron
 después: las 17 y 18 añaden reglas a la tabla de citas, la 19 reemplaza
 la protección de los enlaces que puso la 8, y la 20 reemplaza tres funciones de
 las 9 y 10. Por eso, una vez más: **nunca vuelvas a correr la 8, la 9 ni la 10
