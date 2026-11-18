@@ -1280,8 +1280,8 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
      buscador); si la capa de interacciones aún no montó, al menos va a su día.
      `/agenda?cita=<uuid>` (un aviso pulsado fuera de la agenda): `useEnlaceACita`. */
   useEnlaceACita(interaccionesListas, interaccionesRef)
-  const abrirCitaDeAviso = (c: CitaDelAviso): void => {
-    if (interaccionesRef.current) interaccionesRef.current.irACita(c)
+  const abrirCitaDeAviso = (c: CitaDelAviso, destacar?: 'reagendar'): void => {
+    if (interaccionesRef.current) interaccionesRef.current.irACita(c, destacar)
     else irAFecha(partirFechaHora(c.start_time).fecha)
   }
   const campanaV2 = (enBanda: boolean) => agendaV2 ? (

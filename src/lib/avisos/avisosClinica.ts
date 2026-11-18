@@ -16,6 +16,9 @@
 
 export const TIPOS_AVISO = [
   'reserva_enlace', 'cancelacion_paciente', 'reagendado_paciente', 'google_por_asignar', 'empalme_google',
+  /* Tanda J, punto 10: alguien movió en Google una reservada por enlace (la base lo rechazó y
+     Spinus la devolvió). Lo escribe la pasada de sincronización (`20261122140000`). */
+  'google_movimiento_rechazado',
 ] as const
 export type TipoAviso = typeof TIPOS_AVISO[number]
 
@@ -82,6 +85,16 @@ export function leerRespuestaAvisos(d: unknown): RespuestaAvisos | null {
   return { disponible: Reflect.get(d, 'avisos_disponibles') === true, avisos: lista.filter(esAvisoClinica) }
 }
 
+const MOVIMIENTO_RECHAZADO = 'Desde Google no se pueden mover las citas reservadas por enlace. Para cambiarla, usa Reagendar: se le avisará al paciente.'
+
+/**
+ * Tanda J, punto 10 · La acción que la tarjeta pone de principal al abrir la
+ * cita desde el aviso («Reagendar» en el de Google); los demás, ninguna.
+ */
+export function destacarDeAviso(a: Pick<AvisoClinica, 'tipo'>): 'reagendar' | undefined {
+  return a.tipo === 'google_movimiento_rechazado' ? 'reagendar' : undefined
+}
+
 /** Quién: el nombre que escribió quien reservó o, si no, el título de la cita. */
 function quien(c: CitaDelAviso): string {
   return (c.reserva_nombre?.trim() || c.title.trim() || 'Un paciente')
@@ -96,6 +109,8 @@ export function textoAviso(a: AvisoClinica): string {
     case 'reagendado_paciente': return `${n} reagendó su cita`
     case 'google_por_asignar': return `Evento nuevo de Google por asignar: ${a.cita.title.trim() || 'sin título'}`
     case 'empalme_google': return `La reserva de ${n} se empalma con un evento de Google`
+    /* El texto literal de Angel (tanda J, punto 10); la cita va en la línea de debajo. */
+    case 'google_movimiento_rechazado': return MOVIMIENTO_RECHAZADO
   }
 }
 
@@ -136,6 +151,7 @@ export function textoEmergente(a: AvisoClinica): string {
     case 'reagendado_paciente': return `Un paciente reagendó su cita${cuando}.`
     case 'google_por_asignar': return `Evento nuevo de Google por asignar${fecha && hora ? ` el ${fecha} a las ${hora}` : ''}.`
     case 'empalme_google': return 'Una reserva por enlace se empalma con un evento de Google.'
+    case 'google_movimiento_rechazado': return MOVIMIENTO_RECHAZADO
   }
 }
 

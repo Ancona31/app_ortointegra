@@ -81,6 +81,8 @@ interface Props {
   alSalirPuntero?: () => void
   /** T3 · Sólo con `alPasar`: un clic dentro (fuera de un control) la fija. */
   alFijar?: () => void
+  /** Tanda J, punto 10 · Abierta desde un aviso: esta acción de principal (`disposicionDeTarjeta`). */
+  destacar?: 'reagendar'
 }
 
 /** G3 · Lo que la tarjeta le pasa a la pieza del WhatsApp. */
@@ -340,9 +342,9 @@ function usePanelTarjeta(ancla: Caja | null, punto: Punto | undefined, comoHoja:
 
 /** Lo de dentro, igual en las dos variantes. */
 function Contenido({ props, idTitulo, salir, autoFoco }: { props: Props; idTitulo: string; salir: () => void; autoFoco: boolean }): ReactElement {
-  const { cita, zonaVisor, puedeIniciarConsulta, conConfirmar = true, nombreMedico, alAccion, whatsapp, puedeVerExpediente = false } = props
+  const { cita, zonaVisor, puedeIniciarConsulta, conConfirmar = true, nombreMedico, alAccion, whatsapp, puedeVerExpediente = false, destacar } = props
   const [mensaje, setMensaje] = useState<MensajeAccion | null>(null)
-  const disposicion = disposicionDeTarjeta(cita, puedeIniciarConsulta, { conConfirmar, conWhatsApp: Boolean(whatsapp), puedeVerExpediente })
+  const disposicion = disposicionDeTarjeta(cita, puedeIniciarConsulta, { conConfirmar, conWhatsApp: Boolean(whatsapp), puedeVerExpediente, destacar })
   return (
     <>
       {/* G3 (punto 17): nombre y, en la misma línea, la píldora del estado; el

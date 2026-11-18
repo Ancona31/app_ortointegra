@@ -26,7 +26,7 @@ import { useCallback, useState, type KeyboardEvent, type ReactElement, type RefO
 import { Bell, X } from 'lucide-react'
 import type { CambiarEstadoCita } from '@/lib/agenda/contratosV2'
 import type { CambioCita } from '@/lib/agenda/porConfirmarTiempoReal'
-import type { CitaDelAviso, TipoAviso } from '@/lib/avisos/avisosClinica'
+import { destacarDeAviso, type CitaDelAviso, type TipoAviso } from '@/lib/avisos/avisosClinica'
 import { useDialogoModal } from '@/hooks/useDialogoModal'
 import { useAvisosClinica, type EstadoAvisos } from '@/hooks/useAvisosClinica'
 import { ListaAvisos } from '@/components/avisos/ListaAvisos'
@@ -51,7 +51,7 @@ interface Props {
   /** H4 · El oyente del canal único de la agenda. */
   cambiosRef?: RefObject<((c: CambioCita) => void) | null>
   /** Pulsar un aviso: la agenda abre su cita. */
-  alAbrirCita: (c: CitaDelAviso) => void
+  alAbrirCita: (c: CitaDelAviso, destacar?: 'reagendar') => void
   /** En la banda azul del teléfono y la tableta (44 px, la pinta de la banda). */
   enBanda?: boolean
 }
@@ -92,7 +92,7 @@ export function CampanaAgenda({ recarga, confirmar, cambiosRef, alAbrirCita, enB
       </button>
       {boton && (
         <PanelCampana boton={boton} alCerrar={cerrar} listas={listas} n={n} m={m} avisos={avisos}
-          alConfirmar={alConfirmar} alAbrirCita={(c) => { cerrar(); alAbrirCita(c) }} />
+          alConfirmar={alConfirmar} alAbrirCita={(c, destacar) => { cerrar(); alAbrirCita(c, destacar) }} />
       )}
     </>
   )
@@ -106,7 +106,7 @@ interface PropsPanel {
   m: number
   avisos: EstadoAvisos
   alConfirmar?: (id: string) => void
-  alAbrirCita: (c: CitaDelAviso) => void
+  alAbrirCita: (c: CitaDelAviso, destacar?: 'reagendar') => void
 }
 
 function PanelCampana({ boton, alCerrar, listas, n, m, avisos, alConfirmar, alAbrirCita }: PropsPanel): ReactElement {
@@ -146,7 +146,7 @@ function ContenidoAvisos({ listas, avisos, alAbrirCita }: Pick<PropsPanel, 'list
   }
   return (
     <ListaAvisos avisos={avisos.avisos ?? []} revisar={avisos.revisar} revisarTodos={avisos.revisarTodos}
-      alAbrir={(a) => alAbrirCita(a.cita)} />
+      alAbrir={(a) => alAbrirCita(a.cita, destacarDeAviso(a))} />
   )
 }
 

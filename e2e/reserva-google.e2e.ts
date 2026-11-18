@@ -430,6 +430,69 @@ test('J9 · reserva movida en Google y Google no responde al restablecer: la pas
   expect(rechazos()).toBe(rechazosTrasRestablecer)
 })
 
+/* Tanda J, punto 10: el aviso de la campana, UNO POR INTENTO. Intento = la versión del evento
+   de Google (su `updated`): dos sondeos que leen el mismo cambio (Google sin responder al
+   restablecer, la página se repite) dejan un aviso; moverlo otra vez es otro intento (el aviso
+   sin revisar sube; en la base, dos renglones). Pulsarlo abre la tarjeta con «Reagendar» de
+   principal y con el foco. Mutaciones en rojo: la RPC sin ON CONFLICT (el segundo sondeo
+   revienta y no restablece) y `destacarDeAviso` devolviendo undefined (la principal es otra). */
+test('J10 · reserva movida en Google: un aviso por intento; pulsarlo abre la tarjeta con «Reagendar» destacado', async ({ page }) => {
+  const t = turnoNuevo()
+  ultimaBuenaHace(0)
+  const r = await reservarEn(emitirEnlace(e, 'unico').codigo, t.inicio)
+  expect(r.status, JSON.stringify(r.cuerpo)).toBe(201)
+  const reserva = citaPorNombre(r.nombre)
+  const evento = (): string => sqlLocal(`select coalesce(google_event_id, '') from public.appointments where id = :'r'`, { r: reserva })
+  await expect.poll(evento, { timeout: 60_000 }).not.toBe('')
+  const ev = evento()
+  const avisos = (): string => sqlLocal(`select count(*) || '|' || count(*) filter (where revisado_en is null) from public.avisos_clinica
+                                          where tipo = 'google_movimiento_rechazado' and cita_id = :'r'`, { r: reserva })
+  const intentos = (): string => sqlLocal(`select count(*) from public.gcal_movimientos_rechazados where cita_id = :'r'`, { r: reserva })
+  const creado = (): string => sqlLocal(`select creado_en from public.avisos_clinica where tipo = 'google_movimiento_rechazado' and cita_id = :'r'
+                                          and revisado_en is null`, { r: reserva })
+  const sondeo = async (): Promise<string> => {
+    ultimaBuenaHace(120)
+    return ((await (await page.request.post('/api/google/sync')).json()) as { estado: string }).estado
+  }
+  const mover = (min: number): void => {
+    const h = Date.parse(t.inicio) + min * 60_000
+    g().modificar(ev, { start: { dateTime: new Date(h).toISOString(), timeZone: TZ }, end: { dateTime: new Date(h + 30 * 60_000).toISOString(), timeZone: TZ } })
+  }
+
+  mover(60)
+  g().parche = { falla: 503 }
+  expect(await sondeo()).toBe('error')
+  expect(avisos()).toBe('1|1')
+  const primero = creado()
+  // El mismo cambio, leído otra vez (la página no avanzó): el mismo intento, ningún aviso más.
+  expect(await sondeo()).toBe('error')
+  expect([avisos(), intentos(), creado()]).toEqual(['1|1', '1', primero])
+  g().parche = { falla: null }
+  expect(await sondeo()).toBe('ok')
+  expect([avisos(), intentos()]).toEqual(['1|1', '1'])
+
+  // Otro intento con el aviso sin revisar: el mismo aviso sube; en la base, dos intentos.
+  mover(90)
+  expect(await sondeo()).toBe('ok')
+  expect([avisos(), intentos()]).toEqual(['1|1', '2'])
+  expect(Date.parse(creado())).toBeGreaterThan(Date.parse(primero))
+
+  await page.goto('/agenda')
+  await page.locator('[data-campana]').click({ timeout: 120_000 })
+  const panel = page.getByRole('dialog', { name: 'Por confirmar y avisos' })
+  await panel.getByRole('tab', { name: /^Avisos/ }).click()
+  const fila = panel.locator(`[data-aviso-tipo="google_movimiento_rechazado"][data-aviso-cita="${reserva}"]`)
+  await expect(fila).toContainText('Desde Google no se pueden mover las citas reservadas por enlace. Para cambiarla, usa Reagendar: se le avisará al paciente.',
+    { timeout: 30_000 })
+  await fila.click()
+  const tarjeta = page.getByRole('dialog').filter({ has: page.getByRole('button', { name: 'Configuración de la cita', exact: true }) })
+  await expect(tarjeta).toBeVisible({ timeout: 30_000 })
+  const reagendar = tarjeta.getByRole('button', { name: 'Reagendar', exact: true })
+  await expect(reagendar).toHaveClass(/ag-capa-boton--principal/)
+  await expect(reagendar).toBeFocused()
+  await expect.poll(avisos).toBe('1|0')
+})
+
 test('+ · dos reservas simultáneas con Google conectado: la segunda espera el candado y hace SU pasada; una sola cita', async () => {
   // Google tarda 1 s: la primera tiene el candado mientras la segunda llega.
   // Con la última buena de hace 40 min, si la segunda no esperase y no

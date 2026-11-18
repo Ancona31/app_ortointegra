@@ -128,6 +128,9 @@ const db = vi.hoisted(() => ({
   /** D11: las llamadas a `registrarEmpalmesReserva` y su comportamiento. */
   empalmes: [] as string[][],
   empalmesFalla: null as null | 'lanza' | 'ausente',
+  /** Tanda J, punto 10: las llamadas a `registrarMovimientoRechazado` y su comportamiento. */
+  movimientos: [] as { citaId: string; actualizado: string }[],
+  movimientosFalla: null as null | 'lanza' | 'ausente',
 }))
 
 vi.mock('@/lib/gcalSincronizacionBase', async (importOriginal) => {
@@ -179,6 +182,12 @@ vi.mock('@/lib/gcalSincronizacionBase', async (importOriginal) => {
       if (db.empalmesFalla === 'lanza') throw new Error('la base falló')
       return 1
     },
+    registrarMovimientoRechazado: async (_c: string, citaId: string, actualizado: string) => {
+      db.movimientos.push({ citaId, actualizado })
+      if (db.movimientosFalla === 'ausente') throw new real.SincronizacionNoDisponible('cita_movimiento_google_registrar')
+      if (db.movimientosFalla === 'lanza') throw new Error('la base falló')
+      return true
+    },
     importarEvento: async (_c: string, _cal: string, d: DatosImportar) => {
       db.importadas.push(d)
       return '55555555-5555-4555-8555-555555555555'
@@ -222,7 +231,7 @@ beforeEach(() => {
   Object.assign(db, {
     fase: 'completa', syncToken: null, pageToken: null, ventana: null, candado: null, ocupado: false, habilitada: true,
     noDisponible: false, noDisponibleC2: false, soltados: [], reinicios: 0, filas: [fila()], aplicadas: [], importadas: [], fallarAplicar: new Set(), rechazarAplicar: new Set(),
-    aplicarDevuelve: 1, rsvps: [], rsvpDevuelve: true, empalmes: [], empalmesFalla: null,
+    aplicarDevuelve: 1, rsvps: [], rsvpDevuelve: true, empalmes: [], empalmesFalla: null, movimientos: [], movimientosFalla: null,
   })
   Object.assign(h.estado, { guion: [], llamadas: [], opcionesLista: [], calendarioRegistrado: CAL, insertCalendario: 0, parches: [], patchFalla: null })
   h.estado.rpc = { data: null, error: null, args: [] }
@@ -414,6 +423,33 @@ describe('cada decisión llega a su RPC', () => {
     expect(desc).toMatchObject({ gana: 'spinus', motivo: 'eleccion_paciente', campos: ['hora'] })
   })
 
+  /* Tanda J, punto 10 · el rechazo deja el aviso de la campana con el `updated` del evento
+     (la base deduplica por él). Mutación en rojo: quitar la llamada a
+     `avisarMovimientoRechazado` de `aplicarORechazar`. */
+  it('J, punto 10: el rechazo registra el intento con el `updated` del evento; lo aplicado no', async () => {
+    db.filas = [fila({ conPaciente: true, tituloSinPaciente: null, paciente: { nombre: 'Ana', apellidos: 'Pérez' } })]
+    db.rechazarAplicar.add(CITA)
+    h.estado.guion = [pagina([evento({ summary: 'Ana Pérez' })], { nextSyncToken: 't' })]
+    await sincronizarClinica(conexion, op)
+    expect(db.movimientos).toEqual([{ citaId: CITA, actualizado: '2031-05-20T00:00:00Z' }])
+    db.rechazarAplicar.clear()
+    h.estado.guion = [pagina([evento({ summary: 'Ana Pérez', updated: '2031-05-21T00:00:00Z' })], { nextSyncToken: 't2' })]
+    await sincronizarClinica(conexion, op)
+    expect(db.movimientos).toHaveLength(1)
+  })
+
+  it('J, punto 10: si el aviso falla, cuenta un error y la página avanza; sin la migración, nada', async () => {
+    db.filas = [fila({ conPaciente: true, tituloSinPaciente: null, paciente: { nombre: 'Ana', apellidos: 'Pérez' } })]
+    db.rechazarAplicar.add(CITA)
+    db.movimientosFalla = 'lanza'
+    h.estado.guion = [pagina([evento({ summary: 'Ana Pérez' })], { nextSyncToken: 't' })]
+    expect(await sincronizarClinica(conexion, op)).toMatchObject({ estado: 'ok', errores: 1, restablecer: [CITA] })
+    expect(db.syncToken).toBe('t')
+    db.movimientosFalla = 'ausente'
+    h.estado.guion = [pagina([evento({ summary: 'Ana Pérez' })], { nextSyncToken: 't2' })]
+    expect(await sincronizarClinica(conexion, op)).toMatchObject({ estado: 'ok', errores: 0 })
+  })
+
   it('un evento que falla no tumba la página', async () => {
     db.fallarAplicar.add(CITA)
     h.estado.guion = [pagina([evento(), nuevo], { nextSyncToken: 't' })]
@@ -432,6 +468,17 @@ describe('cada decisión llega a su RPC', () => {
 })
 
 describe('la capa de base real', () => {
+  it('J, punto 10: registrarMovimientoRechazado manda clínica, cita y `updated`, y valida lo que vuelve', async () => {
+    const real = await vi.importActual<typeof import('@/lib/gcalSincronizacionBase')>('@/lib/gcalSincronizacionBase')
+    await expect(real.registrarMovimientoRechazado(CLINICA, CITA, 'no-es-fecha')).rejects.toThrow()
+    h.estado.rpc.data = true
+    await expect(real.registrarMovimientoRechazado(CLINICA, CITA, '2031-05-20T00:00:00Z')).resolves.toBe(true)
+    expect(h.estado.rpc.args.at(-1)).toEqual({ nombre: 'cita_movimiento_google_registrar',
+      args: { p_clinica_id: CLINICA, p_cita_id: CITA, p_google_updated: '2031-05-20T00:00:00Z' } })
+    h.estado.rpc.error = { code: 'PGRST202', message: 'Could not find the function' }
+    await expect(real.registrarMovimientoRechazado(CLINICA, CITA, '2031-05-20T00:00:00Z')).rejects.toBeInstanceOf(real.SincronizacionNoDisponible)
+  })
+
   it('valida la clínica, manda p_clinica_id y traduce una RPC ausente', async () => {
     const real = await vi.importActual<typeof import('@/lib/gcalSincronizacionBase')>('@/lib/gcalSincronizacionBase')
     await expect(real.clinicaHabilitada('no-es-uuid')).rejects.toThrow(/uuid/)

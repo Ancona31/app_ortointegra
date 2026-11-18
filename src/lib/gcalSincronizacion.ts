@@ -42,7 +42,7 @@ import {
 } from '@/lib/gcalSincronizacionDecidir'
 import {
   aplicarEvento, avanzarPagina, citasDeEventos, clinicaHabilitada, confirmarPorRsvp, importarEvento, registrarEmpalmesReserva,
-  reiniciarToken, soltarCandado, SincronizacionNoDisponible, tomarCandado, CambioRechazadoPorLaBase, type Candado,
+  reiniciarToken, soltarCandado, SincronizacionNoDisponible, tomarCandado, CambioRechazadoPorLaBase, registrarMovimientoRechazado, type Candado,
 } from '@/lib/gcalSincronizacionBase'
 import { restablecerEnGoogle, RestablecimientoPendiente, type PorRestablecer } from '@/lib/gcalSincronizacionRestablecer'
 import { aceptaronDe, rsvpGoogleEncendido } from '@/lib/gcalRsvp'
@@ -408,7 +408,27 @@ async function aplicarORechazar(pasada: Pasada, calendarId: string, d: Extract<D
     if (!(err instanceof CambioRechazadoPorLaBase)) throw err
     pasada.r.restablecer.push(d.citaId)
     await auditar(pasada.conexion, d.citaId, 'gcal_cambio_rechazado', { gana: 'spinus', motivo: 'eleccion_paciente', campos: d.campos })
+    await avisarMovimientoRechazado(pasada, d.citaId, d.actualizado)
     return 'rechazado'
+  }
+}
+
+/**
+ * Tanda J, punto 10 · el aviso de la campana («Desde Google no se pueden
+ * mover…»). Un aviso por INTENTO: la base deduplica por (cita, `updated` del
+ * evento), así que repetir la página no avisa otra vez. Sin `updated` no hay
+ * con qué distinguir intentos y no se avisa. Un fallo cuenta en `errores` y no
+ * tumba la página (el rechazo y el restablecimiento siguen); sin la migración
+ * de J4, no hace nada.
+ */
+async function avisarMovimientoRechazado(pasada: Pasada, citaId: string, actualizado: string | null): Promise<void> {
+  if (!actualizado) return
+  try {
+    await registrarMovimientoRechazado(pasada.conexion.clinicaId, citaId, actualizado)
+  } catch (err) {
+    if (err instanceof SincronizacionNoDisponible) return
+    pasada.r.errores += 1
+    logger.warn('GCalSync', `aviso de movimiento rechazado sin registrar ${JSON.stringify({ clinica: pasada.conexion.clinicaId })}`)
   }
 }
 
