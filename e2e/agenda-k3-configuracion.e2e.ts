@@ -5,6 +5,8 @@ import { CORREO, SESION, enContextoNuevo, interruptorAgenda, pestanaConfig, sinP
  * Tanda K, agente K3 — la configuración de la agenda (puntos 11 a 14 de Angel):
  *   · 11 el horario de la clínica en su tarjeta, al INICIO de «Cuándo das consulta», con sus días y
  *        horas; «Cambiar horario» sólo para el médico administrador (y el PUT da 403 a los demás).
+ *   · 13 en el teléfono las cinco pestañas son iconos con su nombre accesible, sin desplazamiento
+ *        lateral a 390 ni a 320 px, y el nombre de la elegida va de título debajo; en computadora, texto.
  *
  * Cada prueba deja la clínica A como estaba (`foto`/`devolver`, como postgres; copia de las de
  * `agenda-j5-configuracion`, que viven dentro de ese archivo).
@@ -74,4 +76,51 @@ test('11 · el horario de la clínica va primero, con sus días; sólo el admini
     })
   }
 })
+
+/* ── 13 · las pestañas en computadora: texto, sin título aparte ──────── */
+
+test('13 · en computadora las pestañas llevan su texto y no hay título debajo', async ({ page }) => {
+  limpiezas.push(sinPendientesAgenda(CORREO.adminA))
+  await page.goto(RUTA)
+  const lista = page.getByRole('tablist', { name: 'Secciones de la configuración' })
+  await expect(lista.getByRole('tab', { name: 'Cuándo das consulta' })).toHaveText('Cuándo das consulta')
+  await expect(page.locator('[data-titulo-pestana]')).toBeHidden()
+})
+})
+
+/* ── 13 · las pestañas en el teléfono ───────────────────────────────── */
+
+const NOMBRES = ['Tu enlace', 'Cuándo das consulta', 'Tu consulta', 'Avisos', 'Más opciones']
+
+test.describe('teléfono', () => {
+  test.beforeEach(({}, testInfo) => { test.skip(testInfo.project.name !== 'telefono', 'específica del teléfono') })
+
+  for (const ancho of [390, 320]) {
+    test(`13 · a ${ancho} px las cinco pestañas son iconos con nombre, caben sin desplazamiento y el título dice la elegida`, async ({ page }) => {
+      limpiezas.push(sinPendientesAgenda(CORREO.adminA))
+      await page.setViewportSize({ width: ancho, height: 800 })
+      await page.goto(RUTA)
+      const lista = page.getByRole('tablist', { name: 'Secciones de la configuración' })
+      const pestanas = lista.getByRole('tab')
+      await expect(pestanas).toHaveCount(5)
+      for (const [i, nombre] of NOMBRES.entries()) {
+        await expect(pestanas.nth(i)).toHaveAccessibleName(nombre)
+        await expect(pestanas.nth(i).locator('svg')).toBeVisible()
+        await expect(pestanas.nth(i)).not.toContainText(nombre, { useInnerText: true })
+      }
+      expect(await lista.evaluate(el => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(0)
+      expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0)
+      const titulo = page.locator('[data-titulo-pestana]')
+      await expect(titulo).toHaveText('Tu enlace')
+      // Teclado intacto: la flecha pasa a la siguiente, con el foco, y el título la sigue.
+      await pestanas.nth(0).focus()
+      await page.keyboard.press('ArrowRight')
+      await expect(pestanas.nth(1)).toBeFocused()
+      await expect(pestanas.nth(1)).toHaveAttribute('aria-selected', 'true')
+      await expect(titulo).toHaveText('Cuándo das consulta')
+      await pestanas.nth(3).click()
+      await expect(titulo).toHaveText('Avisos')
+      await expect(page.locator('#config-panel-avisos')).toBeVisible()
+    })
+  }
 })
