@@ -49,7 +49,7 @@ describe('clasificación', () => {
 describe('tarjeta', () => {
   const cita = { ...POR_ASIGNAR, status: 'scheduled' as const, origen: 'google' as const, all_day: false, medico_id: 'm1' }
   it('la tarjeta ofrece «¿No es una cita?», sin «Convertir en cita»', () => {
-    expect(accionesDeTarjeta(cita, true)).toEqual(['iniciar-consulta', 'confirmar', 'reagendar', 'editar', 'no-es-cita', 'cancelar'])
+    expect(accionesDeTarjeta(cita, true)).toEqual(['ligar', 'confirmar', 'reagendar', 'editar', 'no-es-cita', 'cancelar'])
     expect(disposicionDeTarjeta(cita, false).secundarias).toContain('no-es-cita')
     expect(esConvertible(cita)).toBe(false)
   })

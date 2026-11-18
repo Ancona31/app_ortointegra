@@ -25,6 +25,7 @@
  */
 import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type Dispatch, type ReactElement, type Ref, type RefObject, type SetStateAction } from 'react'
 import { useRouter } from 'next/navigation'
+import dynamic from 'next/dynamic'
 import type FullCalendar from '@fullcalendar/react'
 import type { EventApi } from '@fullcalendar/core'
 import type { ModalState } from '@/components/agenda/AppointmentModal'
@@ -38,6 +39,7 @@ import { useTarjetaAlPasar } from '@/app/(app)/agenda/useTarjetaAlPasar'
 import type { VigiaAlPasar } from '@/lib/agenda/tarjetaAlPasar'
 import { BotonWhatsAppCita } from '@/components/agenda/BotonWhatsAppCita'
 import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
+import { useEscudoTrasRegistro } from '@/hooks/useEscudoTrasRegistro'
 import { useToast } from '@/components/ui/Toast'
 import { useConsultorios } from '@/hooks/useConsultorios'
 import type { Consultorio } from '@/types'
@@ -59,6 +61,10 @@ import {
   pideConfirmacion, puedeIniciarConsulta, textoDeConfirmacion, type AccionTarjeta, type QuienMira,
 } from '@/lib/agenda/accionesTarjeta'
 import { motivoSinWhatsApp, telefonoParaWhatsApp } from '@/lib/agenda/whatsappCita'
+
+/* Tanda J (punto 7) · La ventana de «Ligar e iniciar consulta», en su propio
+   chunk: sólo se descarga al pulsar el botón (no suma nada a este chunk). */
+const VentanaLigarCita = dynamic(() => import('@/components/agenda/VentanaLigarCita'), { ssr: false })
 
 type CalRef = RefObject<InstanceType<typeof FullCalendar> | null>
 export type CalendarApiV2 = ReturnType<InstanceType<typeof FullCalendar>['getApi']>
@@ -140,6 +146,8 @@ type Capa =
   | { id: number; tipo: 'ayuda' }
   /* T3 · «Convertir en cita» de un evento nacido en Google (§2, AG-DT-29). */
   | { id: number; tipo: 'convertir'; cita: Appointment }
+  /* Tanda J (punto 7) · «Ligar e iniciar consulta» de una por ligar. */
+  | { id: number; tipo: 'ligar'; cita: Appointment }
 
 type SinId<T> = T extends unknown ? Omit<T, 'id'> : never
 
@@ -280,6 +288,8 @@ interface ContextoAccion {
   convertir: () => void
   /** I3 · «¿No es una cita?» de un evento de Google por asignar. */
   noEsCita: () => void
+  /** Tanda J (punto 7) · Abre la ventana de ligar e iniciar la consulta. */
+  ligar: () => void
   /** Tanda I (punto 12) · Abre la burbuja de «Reasignar» en el hueco de la cancelada. */
   reasignar: () => void
 }
@@ -300,6 +310,7 @@ function ejecutarAccion(a: AccionTarjeta, cita: Appointment, x: ContextoAccion):
       case 'editar': editar(); return
       case 'convertir': x.convertir(); return
       case 'no-es-cita': x.noEsCita(); return
+      case 'ligar': x.ligar(); return
       case 'reagendar': editar('fecha'); return
       /* G3 · Cancelada o no asistió (decisión de Angel): el alta de una cita
          NUEVA con el mismo paciente, médico y consultorio; la original se queda
@@ -318,7 +329,8 @@ function ejecutarAccion(a: AccionTarjeta, cita: Appointment, x: ContextoAccion):
          otra cosa: dos puertas al mismo daño (el servidor contesta 409 igual). */
       case 'eliminar': if (esEventoGenerico(cita)) void guardado.handleDelete(cita.id); return
       case 'iniciar-consulta':
-        /* Por ligar (o sin consultorio): el modal, donde vive el ligado (D7). */
+        /* Sin paciente o sin consultorio: el modal. (Tanda J: una por ligar ya
+           no llega aquí, su principal es `ligar`.) */
         if (!cita.pacientes || !x.consultorio) { editar(); return }
         x.cambiarActivo(x.consultorio)
         x.navegar(`/expediente/${cita.pacientes.id}/nueva-nota?cita=${cita.id}`)
@@ -343,6 +355,8 @@ interface PropsCapaTarjeta {
   abrirConvertir: (cita: Appointment) => void
   /** Tanda I (punto 12) · «Reasignar»: la burbuja en el hueco de la cancelada. */
   abrirReasignar: (cita: Appointment, ancla: Caja | null, punto?: Punto) => void
+  /** Tanda J (punto 7) · «Ligar e iniciar consulta»: la ventana de ligar. */
+  abrirLigar: (cita: Appointment) => void
 }
 
 /**
@@ -356,7 +370,7 @@ async function noEsCitaDesdeTarjeta(cita: Appointment, p: PropsInteraccionesV2, 
   p.calendarRef.current?.getApi().getEventById(cita.id)?.setExtendedProp('google_asignacion', 'evento')
 }
 
-function CapaTarjeta({ capa, p, cerrar, vigia, fijar, abrirConvertir, abrirReasignar }: PropsCapaTarjeta): ReactElement {
+function CapaTarjeta({ capa, p, cerrar, vigia, fijar, abrirConvertir, abrirReasignar, abrirLigar }: PropsCapaTarjeta): ReactElement {
   const { consultorios } = useConsultorios()
   const { consultorioActivo, cambiarActivo } = useConsultorioActivo()
   const toast = useToast()
@@ -379,6 +393,7 @@ function CapaTarjeta({ capa, p, cerrar, vigia, fijar, abrirConvertir, abrirReasi
       p, consultorio, cambiarActivo, navegar: url => router.push(url), convertir: () => abrirConvertir(cita),
       noEsCita: () => void noEsCitaDesdeTarjeta(cita, p, m => toast.error(m)),
       reasignar: () => abrirReasignar(cita, capa.ancla, capa.punto),
+      ligar: () => abrirLigar(cita),
     })
   }
   return (
@@ -608,6 +623,11 @@ export default function InteraccionesV2(p: PropsInteraccionesV2): ReactElement |
   const abrirReasignar = useCallback((cita: Appointment, ancla: Caja | null, punto?: Punto) => {
     abrir({ tipo: 'burbuja', ...burbujaParaReasignar(cita, ancla, punto) })
   }, [abrir])
+  /* Tanda J · El escudo de siempre: el segundo clic de un doble clic sobre
+     «Ligar e iniciar consulta» de la tarjeta no cae en la ventana que se abre. */
+  const escudoLigar = useEscudoTrasRegistro(capa?.tipo !== 'ligar', { dentroDeDialogos: true })
+  const activarEscudo = escudoLigar.activar
+  const abrirLigar = useCallback((cita: Appointment) => { activarEscudo(); abrir({ tipo: 'ligar', cita }) }, [abrir, activarEscudo])
   const atajos = useAtajosV2(p, capa !== null && !esAlPasar(capa), abrirAyuda)
   const { vigia, fijar } = useAlPasarV2(p, capaRef, cerrar, abrirTarjeta)
   /* La tarjeta al pasar dejó de serlo (se fijó, se cerró o la tapó otra capa): el vigía la suelta. */
@@ -642,10 +662,15 @@ export default function InteraccionesV2(p: PropsInteraccionesV2): ReactElement |
   if (capa?.tipo === 'tarjeta') {
     return (
       <CapaTarjeta key={capa.id} capa={capa} p={p} cerrar={cerrar} vigia={vigia} fijar={fijar}
-        abrirConvertir={abrirConvertir} abrirReasignar={abrirReasignar} />
+        abrirConvertir={abrirConvertir} abrirReasignar={abrirReasignar} abrirLigar={abrirLigar} />
     )
   }
   if (capa?.tipo === 'convertir') return <CapaConvertir key={capa.id} capa={capa} p={p} cerrar={cerrar} />
+  if (capa?.tipo === 'ligar') {
+    /* «¿No es una cita?» desde la ventana: la marca en el evento pintado, como desde la tarjeta. */
+    const marcarEvento = (): void => { p.calendarRef.current?.getApi().getEventById(capa.cita.id)?.setExtendedProp('google_asignacion', 'evento') }
+    return <VentanaLigarCita key={capa.id} citaId={capa.cita.id} alCerrar={() => cerrar(capa.id)} alNoEsCita={marcarEvento} />
+  }
   if (capa?.tipo === 'ayuda') {
     return <AyudaAtajos key={capa.id} encendidos={atajos.encendidos} alCambiarEncendidos={atajos.cambiarEncendidos} alCerrar={() => cerrar(capa.id)} />
   }

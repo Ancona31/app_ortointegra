@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  accionesDeTarjeta, cuandoDeTarjeta, disposicionDeTarjeta, esConvertible, horarioDeTarjeta, nombreDeTarjeta, pideConfirmacion,
+  accionesDeTarjeta, cuandoDeTarjeta, disposicionDeTarjeta, esConvertible, ETIQUETA_ACCION, horarioDeTarjeta, nombreDeTarjeta, pideConfirmacion,
   puedeIniciarConsulta, telefonoDeTarjeta, textoDeConfirmacion,
 } from '@/lib/agenda/accionesTarjeta'
 import { pideComprobarNota, vetoPorEstado, vetoPorNotaLigada } from '@/lib/agenda/estadoCita'
@@ -33,7 +33,14 @@ describe('accionesDeTarjeta (G3: por estado)', () => {
   })
   it('una por ligar conserva lo suyo, en su orden (con «Editar»), y cancelar aparte', () => {
     expect(accionesDeTarjeta({ paciente_id: null, reserva_canal: 'fijo', status: 'scheduled' }, true))
-      .toEqual(['iniciar-consulta', 'confirmar', 'reagendar', 'editar', 'cancelar'])
+      .toEqual(['ligar', 'confirmar', 'reagendar', 'editar', 'cancelar'])
+  })
+  /* Tanda J (punto 7) · MUTACIÓN: principal `'iniciar-consulta'` en `disposicionSinCambios` → rojo. */
+  it('tanda J · la principal de una por ligar es «Ligar e iniciar consulta» (la ventana), no «Iniciar consulta»', () => {
+    const d = disposicionDeTarjeta({ paciente_id: null, reserva_canal: 'unico', status: 'confirmed' }, true)
+    expect(d.principal).toBe('ligar')
+    expect(ETIQUETA_ACCION.ligar).toBe('Ligar e iniciar consulta')
+    expect(disposicionDeTarjeta({ paciente_id: null, reserva_canal: 'unico', status: 'confirmed' }, false).principal).toBeNull()
   })
   it('cancelar y eliminar piden confirmación; el resto no', () => {
     expect(pideConfirmacion('cancelar')).toBe(true)
