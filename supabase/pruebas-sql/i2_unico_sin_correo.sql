@@ -61,6 +61,14 @@ create function pg_temp.unico(p_nombre text) returns text language sql as $$
   values (gen_random_uuid(), '00000000-0000-4000-8000-00000a12c001', '00000000-0000-4000-8000-00000a12b001', 'unico', pg_temp.h(p_nombre), 7, now() + interval '7 days')
   returning codigo_hash;
 $$;
+-- j2 (tanda J, punto 3): en el único el correo es el que escribió la clínica en el ENLACE, no el
+-- tecleado; los casos con correo emiten el único con ese correo.
+create function pg_temp.unico_con(p_nombre text, p_correo text) returns text language sql as $$
+  insert into public.reserva_enlaces (id, clinica_id, medico_id, clase, codigo_hash, vigencia_dias, caduca_en, correo, correo_hmac)
+  values (gen_random_uuid(), '00000000-0000-4000-8000-00000a12c001', '00000000-0000-4000-8000-00000a12b001', 'unico', pg_temp.h(p_nombre), 7,
+          now() + interval '7 days', p_correo || '@prueba.local', pg_temp.h('c:' || p_correo))
+  returning codigo_hash;
+$$;
 create function pg_temp.esperar(p_caso text, p_obtenido text, p_esperado text) returns void language plpgsql as $$
 begin
   if p_obtenido is distinct from p_esperado then
@@ -69,7 +77,7 @@ begin
 end $$;
 -- Integración I: también pg_temp.unico, que llama service_role. Con feature/limites-ajustables (P1) las
 -- funciones de postgres nacen sin EXECUTE a PUBLIC, también las de pg_temp.
-grant execute on function pg_temp.h(text), pg_temp.t(integer), pg_temp.unico(text), pg_temp.esperar(text, text, text) to anon, authenticated, service_role;
+grant execute on function pg_temp.h(text), pg_temp.t(integer), pg_temp.unico(text), pg_temp.unico_con(text, text), pg_temp.esperar(text, text, text) to anon, authenticated, service_role;
 
 -- ── Caso 1: el ÚNICO sin correo reserva; la fila no tiene correo y sí su seudónimo
 --    propio; el enlace queda usado y la reserva auditada ──
@@ -137,7 +145,7 @@ insert into public.reserva_contactos (clinica_id, medico_id, clave_hmac, clase, 
 do $$
 begin
   perform pg_temp.esperar('caso 5 único sin correo, teléfono bloqueado', pg_temp.res(pg_temp.unico('u5'), pg_temp.t(22), '5533330009', null), 'bloqueado');
-  perform pg_temp.esperar('caso 5 único con correo bloqueado', pg_temp.res(pg_temp.unico('u6'), pg_temp.t(22), '5533330010', 'bloq'), 'bloqueado');
+  perform pg_temp.esperar('caso 5 único con correo bloqueado', pg_temp.res(pg_temp.unico_con('u6', 'bloq'), pg_temp.t(22), '5533330010', null), 'bloqueado');
   perform pg_temp.esperar('caso 5 único sin correo, teléfono libre', pg_temp.res(pg_temp.unico('u7'), pg_temp.t(22), '5533330010', null), 'ok');
 end $$;
 
@@ -168,7 +176,7 @@ declare v uuid; v_ctl uuid; n integer; v_conf uuid;
 begin
   select r_cita_id into v from pg_temp.r(pg_temp.unico('u8'), pg_temp.t(30), '5533330012', null);
   -- Testigo: la misma reserva CON correo sí tiene a quién escribir.
-  select r_cita_id into v_ctl from pg_temp.r(pg_temp.unico('u9'), pg_temp.t(32), '5533330013', 'testigo7');
+  select r_cita_id into v_ctl from pg_temp.r(pg_temp.unico_con('u9', 'testigo7'), pg_temp.t(32), '5533330013', null);
   set local role service_role;
   select count(*) into n from public.cita_correo_tomar('00000000-0000-4000-8000-00000a12c001', v_ctl, 'confirmacion', gen_random_uuid());
   perform pg_temp.esperar('caso 7 testigo con correo', n::text, '1');

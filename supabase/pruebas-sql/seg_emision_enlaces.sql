@@ -41,7 +41,7 @@ create function pg_temp.emitir(p_clinica uuid, p_actor uuid, p_id uuid, p_medico
 begin
   perform set_config('request.jwt.claims', json_build_object('role', 'service_role')::text, true);
   set local role service_role;
-  perform public.reserva_enlace_emitir(p_clinica, p_actor, p_id, p_medico, p_clase, p_hash, p_etiqueta);
+  perform public.reserva_enlace_emitir(p_clinica, p_actor, p_id, p_medico, p_clase, p_hash, p_etiqueta, null, null);  -- j2: + p_correo, p_correo_hmac
   reset role;
 exception when others then
   reset role;
@@ -78,7 +78,7 @@ begin
     end;
     begin
       perform public.reserva_enlace_emitir('00000000-0000-4000-8000-0000007ac001', v_quien, gen_random_uuid(),
-                '00000000-0000-4000-8000-0000007ab001', 'unico', pg_temp.h('rpc-elegido'), null);
+                '00000000-0000-4000-8000-0000007ab001', 'unico', pg_temp.h('rpc-elegido'), null, null, null);
       raise exception 'Seg7a caso 1: la sesión ejecutó reserva_enlace_emitir (%)', v_quien;
     exception when insufficient_privilege then null;
     end;
@@ -174,7 +174,7 @@ begin
   set local role anon;
   begin
     perform public.reserva_enlace_emitir('00000000-0000-4000-8000-0000007ac001', '00000000-0000-4000-8000-0000007aa001',
-              gen_random_uuid(), '00000000-0000-4000-8000-0000007ab001', 'unico', repeat('a', 64), null);
+              gen_random_uuid(), '00000000-0000-4000-8000-0000007ab001', 'unico', repeat('a', 64), null, null, null);
     raise exception 'Seg7a caso 6: anon ejecutó reserva_enlace_emitir';
   exception when insufficient_privilege then null;
   end;

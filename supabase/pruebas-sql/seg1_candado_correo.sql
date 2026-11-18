@@ -79,10 +79,13 @@ begin
   if v <> 'ok' then raise exception 'seg1: no se pudo verificar el correo % (%)', p_correo, v; end if;
   return 'ficha-' || p_correo;
 end $$;
--- Un enlace único nuevo de b1 (como postgres, vigencia a mano). Devuelve su hash.
-create function pg_temp.unico(p_nombre text) returns text language sql as $$
-  insert into public.reserva_enlaces (id, clinica_id, medico_id, clase, codigo_hash, vigencia_dias, caduca_en)
-  values (gen_random_uuid(), '00000000-0000-4000-8000-0000005e1c01', '00000000-0000-4000-8000-0000005e1b01', 'unico', pg_temp.h(p_nombre), 7, now() + interval '7 days')
+-- Un enlace único nuevo de b1 (como postgres, vigencia a mano). Devuelve su hash. j2 (tanda J,
+-- punto 3): con `p_correo`, el correo que la clínica escribió al emitirlo (en el único el tecleado
+-- ya no cuenta: el candado y el bloqueo por correo miran el del enlace).
+create function pg_temp.unico(p_nombre text, p_correo text default null) returns text language sql as $$
+  insert into public.reserva_enlaces (id, clinica_id, medico_id, clase, codigo_hash, vigencia_dias, caduca_en, correo, correo_hmac)
+  values (gen_random_uuid(), '00000000-0000-4000-8000-0000005e1c01', '00000000-0000-4000-8000-0000005e1b01', 'unico', pg_temp.h(p_nombre), 7, now() + interval '7 days',
+          p_correo || '@prueba.local', pg_temp.h('c:' || p_correo))
   returning codigo_hash;
 $$;
 -- Una cita por enlace a mano (como postgres), activa y futura.
@@ -232,12 +235,12 @@ begin
           'otro5', null), 'bloqueado');
   insert into public.reserva_contactos (clinica_id, medico_id, clave_hmac, clase, bloqueado_en) values
     ('00000000-0000-4000-8000-0000005e1c01', '00000000-0000-4000-8000-0000005e1b01', pg_temp.h('c:manualc'), 'correo', now());
-  perform pg_temp.esperar('caso 5 único, correo bloqueado a mano', pg_temp.res(pg_temp.unico('u-c'), pg_temp.t(20), '5511110006',
+  perform pg_temp.esperar('caso 5 único, correo bloqueado a mano', pg_temp.res(pg_temp.unico('u-c', 'manualc'), pg_temp.t(20), '5511110006',
           'manualc', null), 'bloqueado');
   -- Lo automático no corta el único: 3 cancelaciones del correo y una cita activa del correo.
-  perform pg_temp.esperar('caso 5 único con bloqueo automático', pg_temp.res(pg_temp.unico('u-r'), pg_temp.t(22), '5511110007',
+  perform pg_temp.esperar('caso 5 único con bloqueo automático', pg_temp.res(pg_temp.unico('u-r', 'reinc'), pg_temp.t(22), '5511110007',
           'reinc', null), 'ok');
-  perform pg_temp.esperar('caso 5 único con cita activa', pg_temp.res(pg_temp.unico('u-a'), pg_temp.t(24), '5511110007',
+  perform pg_temp.esperar('caso 5 único con cita activa', pg_temp.res(pg_temp.unico('u-a', 'atac3'), pg_temp.t(24), '5511110007',
           'atac3', null), 'ok');
   -- Desbloqueado (después del bloqueo), el teléfono vuelve a servir en el único.
   update public.reserva_contactos set perdonado_en = now(), bloqueado_en = now() - interval '1 hour'
