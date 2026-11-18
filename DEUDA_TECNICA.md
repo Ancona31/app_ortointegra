@@ -4980,19 +4980,40 @@ lee la preferencia en cada disparo, así que el comportamiento es el bueno.
 
 ### AG-DT-146 — Guardar una cita tarda ~150 ms más hasta que se va el modal
 
-**Estado:** aceptada, deliberada (J1); NO se ve en el alta (integración J) · J1
-midió ~146 ms más hasta que se iba el modal al GUARDAR UNA CITA YA EXISTENTE
-(«Editar cita», con su script `medir-cita.mjs`, hoy en
-`/home/spinus/proyectos/tanda-J-temporales/reglas-tmp/j1/`) y lo atribuyó a la
-salida animada del modal (F2.7, `--ag-dur-base`, 180 ms); no es el servidor.
+**Estado:** ✅ CERRADA como explicada (tanda K: K4 lo midió, y la integración K
+puso la salida animada detrás del interruptor). La causa es la salida animada
+del modal (F2.7, `closeModal` de `AgendaCliente.tsx`), y no el servidor. Pasa
+igual al crear que al editar.
 
-La integración midió el ALTA («Nueva cita», un evento y una cita con paciente)
-en los tres árboles con el mismo script (4 rondas, 20 guardados por columna): el
-modal se va a los **183,5–184,4 ms** en `0349221`, en `ccb9087` y en la
-integración, con la v2 apagada y encendida, y la tarjeta se pinta a los
-**31,1–31,3 ms** en todos. En el alta no hay diferencia. El camino de J1 (editar)
-no se volvió a medir en la integración. Ver `mejora_agendaV2.md` §9, «Tanda J»,
-paso 6.
+K4 lo midió contra `a58419f`, de antes del proyecto, con bases aisladas: 4
+rondas intercaladas y 24 muestras por celda, con 0 errores. Datos en
+`/home/spinus/proyectos/tanda-K-temporales/k4/p22/`.
+
+- **Al editar.** Antes, el modal salía del DOM a los ~42 ms, al responder el
+  PUT. En `0cce313` se cierra al instante y queda montado 180 ms mientras se
+  desvanece: sale a los **~184 ms**. Con movimiento reducido sale a los ~12 ms.
+- **Al crear.** Antes, ~27 ms; en `0cce313`, ~184 ms.
+- **La tarjeta con el cambio se pinta antes que antes:** ~31–33 ms frente a
+  ~45–47 ms, porque no espera al PUT. Ésa es la medida que importa al usuario.
+
+J1 dio 195 ms porque esperaba un fotograma más con `raf`. La integración J no lo
+vio al crear porque comparó sólo árboles que ya tenían F2.7.
+
+**Lo que quedaba y se arregló en la integración K (`fe17b4f`):** la salida
+animada no iba detrás del interruptor, así que con la v2 APAGADA el modal
+también tardaba ~184 ms. Ahora `closeModal` sólo la hace con `agendaV2`. Lo
+prueba la e2e `agenda-k-salida-modal`, que se pone roja sin `agendaV2 &&`.
+
+**Celda re-medida (hoy, v2 apagada).** Con el script de K4 sobre la integración,
+contra `0cce313`, el modal sale del DOM:
+- al editar, a los **10,1 ms** el evento y a los **9,9 ms** la cita con
+  paciente (antes, 183,9 y 183,6);
+- al crear, a los **10,4 ms** y a los **10,3 ms** (antes, 183,8 y 183,4).
+
+La tarjeta sigue igual, ~31 ms. Detalle en `mejora_agendaV2.md` §9, «Tanda K»,
+paso 6. El pintado optimista
+de la tarjeta, que con la v2 apagada sigue llegando antes que antes del
+proyecto, **no se tocó**: es AG-DT-198, pendiente de Angel.
 
 ### AG-DT-147 — `no_show` ocupa en la agenda y no en la reserva pública
 
@@ -5116,6 +5137,226 @@ sí está en la base.
 El pre-vuelo de `20261122120000` acepta el cuerpo de `reservar_por_enlace` de I2
 o el suyo, no el de `20261122120100`: si alguien reaplica la carpeta sobre una base
 que ya las tiene, aborta limpio (sin daño). En el despliegue normal no ocurre.
+
+### AG-DT-167 — Los bloqueos no tienen tiempo real
+
+**Estado:** aceptada (K1). El canal `appointments-realtime` sigue siendo el único.
+Un bloqueo que crea otra persona aparece en la siguiente traída: cambio de
+semana, foco, reconexión o una escritura propia. Mientras tanto, la pregunta de
+«horario bloqueado» decide con lo que está pintado.
+
+### AG-DT-168 — Una lectura más en cada `GET /api/appointments`
+
+**Estado:** aceptada (K1). Los bloqueos viajan en la misma respuesta (lectura en
+paralelo, `limit 500`). Sin la tabla responde vacío y sin ruido (42P01/PGRST205).
+
+### AG-DT-169 — Bloqueos y Google: casos de borde
+
+**Estado:** aceptada (K1).
+
+- Si el evento se borra a mano en Google y luego se edita el bloqueo en Spinus,
+  el `patch` da 404 y queda en el log: no se recrea.
+- Si cambia el calendario de Spinus, el evento viejo se queda en el anterior.
+- Un cambio en Spinus más nuevo que uno de Google no se vuelve a empujar en la
+  sincronización.
+- Un PATCH en el mismo segundo que el POST puede dejar dos eventos en Google:
+  uno queda huérfano.
+
+### AG-DT-170 — «Hay N citas en este horario» no cuenta las por asignar
+
+**Estado:** aceptada (K1). El servidor no cuenta las `google_asignacion =
+'por_asignar'`, pero la pregunta del cliente sí las trata como cita. En ese caso
+las dos cifras pueden diferir.
+
+### AG-DT-171 — Editar un bloqueo desde otro huso
+
+**Estado:** aceptada (K1). El modal enseña las horas en la zona de quien creó el
+bloqueo, no en la de la rejilla.
+
+### AG-DT-172 — `procesarPagina` pasa de 50 líneas
+
+**Estado:** aceptada (K1). Está en `gcalSincronizacion.ts`: creció 5 líneas con el
+apartado de los bloqueos, y ya rondaba el tope.
+
+### AG-DT-173 — El rótulo del bloqueo queda bajo una cita a la misma hora
+
+**Estado:** aceptada (K1). Las citas se pintan encima del fondo. «Bloqueado ·
+motivo», y con él el clic para editar, queda tapado mientras dura esa cita. En la
+lista del teléfono no pasa. Se arregla moviendo el rótulo a una esquina libre.
+
+### AG-DT-174 — El rótulo del bloqueo en pantallas táctiles, sin probar
+
+**Estado:** sin verificar (K1). La limpieza del aviso del `pointerdown` va con
+`setTimeout(0)` en el `pointerup`. Está probada con ratón, no en un teléfono real.
+
+### AG-DT-175 — Confirmar al abrir: un revisor de correo con JavaScript confirmaría
+
+**Estado:** riesgo aceptado, **PENDIENTE DE ANGEL** (K2 H1; revisión de seguridad
+de la integración K, media). Un filtro que «detone» enlaces con un navegador real
+(`navigator.webdriver` enmascarado, pestaña visible) manda el POST y confirma la
+cita sin el paciente.
+
+Mitigación propuesta, sin aplicar: esperar un gesto de confianza
+(`pointerdown`/`keydown`/`touchstart` con `isTrusted`) antes del POST. Otra salida
+es volver al clic. La cabecera de `ConfirmarAlCargar.tsx` lo documenta.
+
+### AG-DT-176 — `#codigo=` sin filtrar en Sentry
+
+**Estado:** propuesta sin aplicar (K2 H3). Si una página del enlace manda un
+evento a Sentry, la URL podría llevar el código; la página lo quita al cargar.
+La línea que falta, `.replace(/#codigo=\d{6}/g, '#codigo=[REDACTADO]')`, va en
+`src/lib/sentryPiiFilter.ts`, que esta tanda no puede tocar.
+
+### AG-DT-177 — Outlook Safe Links y el fragmento
+
+**Estado:** aceptada (K2). La reescritura de enlaces puede dejar el `#codigo=` en
+los registros de Microsoft. No se controla desde Spinus.
+
+### AG-DT-178 — Los 30 s entre códigos no son atómicos
+
+**Estado:** aceptada (K2). Dos pedidos simultáneos pueden pasar los dos. El tope
+atómico de 3 por hora por correo sigue mandando.
+
+### AG-DT-179 — El tope por correo es global entre clínicas
+
+**Estado:** previa a K2 (H6). Tres pedidos en la clínica A agotan el tope del
+correo en la B, y el 429 revela que ese correo pidió 3 o más en la última hora.
+Tampoco evita que alguien gaste los códigos de otro correo desde un enlace fijo
+público. La espera de 30 s ya es por enlace y no filtra.
+
+### AG-DT-180 — Con el turno nulo, recargar no restaura lo elegido
+
+**Estado:** aceptada (K2). El paciente vuelve al inicio, aunque no pierde nada de
+lo que pidió.
+
+### AG-DT-181 — La guarda de «pausado» no la impone la base
+
+**Estado:** aceptada (K3). La regla «toda función que abra un enlace para el
+público mira `pausado_en`» la vigila el caso 6 de
+`supabase/pruebas-sql/k3_enlace_pausado.sql`, pero sólo si alguien lo corre. Una
+migración posterior que vuelva a pegar una de las seis funciones con otro cuerpo
+pierde la guarda sin error.
+
+### AG-DT-182 — `pausado_en` no se normaliza
+
+**Estado:** aceptada (K3). Quien tenga UPDATE puede escribir cualquier fecha, y a
+la puerta (`IS NOT NULL`) le da igual. La ruta sólo escribe `now()` o `null`.
+
+### AG-DT-183 — `clinicas.timezone` sin CHECK de forma
+
+**Estado:** aceptada (K3; auditoría de la integración K, K-M3). NULL significa
+«aún no eligió», y la escribe sólo `PUT /api/me/horario`, tras Zod contra `Intl`.
+Hoy es sólo el huso «de fábrica»: no lo leen la rejilla, la reserva ni los
+correos. Si se cambia el huso con el alta de un consultorio abierta y el perfil
+recarga, el formulario se limpia.
+
+### AG-DT-184 — «Cambiar por uno nuevo» de un fijo pausado deja el nuevo abierto
+
+**Estado:** aceptada (revisión de seguridad de la integración K, baja).
+`reserva_enlace_regenerar_fijo` revoca el pausado y emite uno nuevo con
+`pausado_en` NULL. Lo pidió el médico y es otra dirección, así que no es una
+fuga, pero contradice la pausa. Se arregla copiando `pausado_en` o avisando en
+la interfaz.
+
+### AG-DT-185 — El foco tras guardar sólo vuelve a la cita con la v2
+
+**Estado:** aceptada (K4). Con la v2 apagada (y antes del proyecto), al editar el
+foco acaba en `<body>`. Con la v2 vuelve a la caja de la cita (`useDialogoModal`).
+
+### AG-DT-186 — La leyenda de husos empuja la rejilla una vez
+
+**Estado:** aceptada (K4). Al llegar los consultorios, unos 33 px en escritorio y
+45 en el teléfono. Es el mismo salto que cualquier banda de `AvisosAgenda`: el
+bloque F decidió no animar el alto.
+
+### AG-DT-187 — Clases `.ag-lectura-*` de la tarjeta vieja sin dueño
+
+**Estado:** aceptada (K5-DT-1). Siguen en `globals.css` porque `BurbujaAlta`,
+`VentanaLigarCita`, `ConvertirEnCita` y los botones de envío usan parte de ellas.
+Separar las huérfanas es una limpieza aparte.
+
+### AG-DT-188 — «Ver la consulta» abre el expediente, no la nota
+
+**Estado:** aceptada (K5-DT-2). Abrir la nota exige su id
+(`consultas.appointment_id`), y eso es una petición más por cada burbuja abierta.
+
+### AG-DT-189 — El expediente tachado de la burbuja es un botón que no hace nada
+
+**Estado:** aceptada (K5-DT-3). Sólo enseña «Aún no tiene expediente», como la
+maqueta, pero un lector de pantalla lo anuncia como botón.
+
+### AG-DT-190 — Una cita de todo el día con paciente enseña «00:00 – 00:00»
+
+**Estado:** aceptada (K5-DT-4). Igual que la tarjeta de antes. El servidor no
+permite ese caso, así que sólo lo ve un evento.
+
+### AG-DT-191 — Los tres puntos en una burbuja baja
+
+**Estado:** aceptada (K5-DT-5). El panel va en posición absoluta dentro de la
+burbuja. En una ventana corta puede hacer falta desplazar la burbuja para verlo
+entero.
+
+### AG-DT-192 — «No asistió» de un toque
+
+**Estado:** **PENDIENTE DE ANGEL** (K5-DT-6). No pregunta y se puede pulsar antes
+de la hora de la cita, aunque se deshace desde el formulario. Si en la práctica
+se pulsa por error, la salida corta es pedir confirmación, como en «Cancelar
+cita».
+
+### AG-DT-193 — «No es una cita» sólo en las por asignar
+
+**Estado:** aceptada (K5-DT-7). La maqueta lo pinta en toda cita de Google, pero
+la ruta sólo lo acepta en las por asignar.
+
+### AG-DT-194 — La maqueta de la burbuja usa un `support.js` que no está en el repo
+
+**Estado:** aceptada (K5-DT-8). Para la comparativa se usó un sustituto mínimo
+(`e2e/resultados/K/k5/maqueta/support.js`).
+
+### AG-DT-195 — El motivo del bloqueo viaja a Google
+
+**Estado:** decisión de Angel (K1), con riesgo anotado (revisión de seguridad de
+la integración K, baja). El motivo va en el título del evento de Google
+(«Bloqueado — motivo»). Si alguien escribe un nombre de paciente, ese nombre
+llega a Google, contra la regla del proyecto. El modal ya avisa: «No escribas
+datos de pacientes». Alternativa: no mandar el motivo por omisión.
+
+### AG-DT-196 — Dos avisos de lint nuevos
+
+**Estado:** aceptada (integración K). Los errores siguen en 96, pero los avisos
+pasan de 66 a 68: `_ruta` sin usar en `src/lib/tests/esperaReserva.test.ts` (K2)
+y `t` sin usar en `e2e/agenda-g3-tarjeta.e2e.ts:270` (K5).
+
+### AG-DT-197 — K1 y K3 tienen orden fijo
+
+**Estado:** aceptada (integración K, `AUDITORIA-CONJUNTO-AGENDA-V2.md` §13.8
+K-M1). K3 aborta sin K1, y K1 aborta si K3 ya está. En el orden de nombre no pasa
+nada; reaplicar la carpeta entera sobre una base que ya las tiene hace abortar
+limpio a K1, como AG-DT-166.
+
+### AG-DT-198 — El pintado optimista de la tarjeta también va con la v2 apagada
+
+**Estado:** **PENDIENTE DE ANGEL** (integración K; números de K4). Con la v2
+apagada, la tarjeta editada o creada se pinta a los ~32–35 ms. Antes del
+proyecto (`a58419f`) se pintaba al responder el PUT, a los ~45–47 ms. Es un
+cambio de comportamiento con la v2 apagada, aunque a mejor. No se tocó por orden
+expresa.
+
+### AG-DT-199 — Sin la migración de K3, apagar el enlace fijo da error
+
+**Estado:** aceptada (K3; `AUDITORIA-CONJUNTO-AGENDA-V2.md` §13.7). Con la v2
+encendida y el código antes que la migración, el PATCH responde 409 `sin_pausa` y
+la página enseña «No se pudo guardar el enlace». No lo revoca a escondidas. En el
+orden de despliegue (migración primero) no ocurre.
+
+### AG-DT-200 — «Mover la cita dentro del bloqueo» es inestable
+
+**Estado:** aceptada (integración K). La e2e de `agenda-k1-bloqueos.e2e.ts` (la de
+la línea 105) falló una vez de seis corridas: el arrastre de
+`arrastrarEventoPorMinutos` no movió la cita, y la pregunta no llegó a salir.
+Pasó en las otras cinco, tres de ellas seguidas. Es la inestabilidad conocida de
+arrastrar en FullCalendar con Playwright, no la pregunta. Si se repite, conviene
+esperar a que la tarjeta esté quieta antes de arrastrarla.
 
 ---
 

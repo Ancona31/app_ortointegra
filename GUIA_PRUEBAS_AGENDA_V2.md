@@ -304,10 +304,10 @@ Comprueba cuántas migraciones quedaron:
 docker exec supabase_db_app_ortointegra psql -U postgres -Atc "select count(*), max(version) from supabase_migrations.schema_migrations"
 ```
 
-Debe responder `42|20261122140000`: las 5 de `main` más las 37 de la agenda
+Debe responder `45|20261123140000`: las 5 de `main` más las 40 de la agenda
 (las 16 de los bloques A a F, las 4 de las correcciones de seguridad, las 4 de
 la tanda de diseño, duración y horarios, las 3 de la tanda H, las 7 de la tanda
-I y las 3 de la tanda J).
+I, las 3 de la tanda J y las 3 de la tanda K).
 
 > Este reinicio deja fuera las tres migraciones `20261014…` de la otra rama
 > (`feature/limites-ajustables`). Para probar la agenda no hacen falta. Si
@@ -4641,6 +4641,590 @@ de esta sección y estas, que ya existían y cambian o hay que repetir:
 
 ---
 
+## 8-septies. Tanda K (2026-11-18)
+
+Lo que se hizo con tus puntos de la tanda K, en cinco grupos. Todo lo que se ve
+va detrás del interruptor de la v2 (las columnas nuevas de la base no cambian
+nada con la v2 apagada):
+
+- **K1:** el bloqueo de horario (puntos 1 a 7).
+- **K2:** confirmar al abrir el correo, «Continuar mi reserva» y reenviar el
+  código sin quedar bloqueado (puntos 8, 9 y 10).
+- **K3:** la configuración: el horario de la clínica primero, su huso de
+  fábrica, las pestañas del teléfono y apagar «Tu enlace» sin perderlo (puntos
+  11 a 14).
+- **K4:** la leyenda de la hora de tu ubicación y el gris de cada consultorio, y
+  por qué el modal tardaba en irse (puntos 15, 16 y 22).
+- **K5:** las marcas de procedencia y la burbuja nueva de la cita (puntos 17 a
+  21).
+
+**Antes de empezar:**
+
+- La base con las **45** migraciones (P5: las 42 de antes más las 3
+  `20261123…` de la tanda K). La consulta de P5 debe responder
+  `45|20261123140000`.
+- Sembrada (P6), con el aviso aprobado (P7) y la v2 encendida en la Clínica A
+  (P8).
+- La app del 3000 (P11).
+- El Google simulado (C0) para K1 (Google) y K5-1/K5-8.
+- Mailpit para K2.
+
+Si al abrir la agenda sale «¿Asistió el paciente?», es la ventana de I4-3: pulsa
+«Decidir después» y sigue (I4-5).
+
+### K1 · El bloqueo de horario (puntos 1 a 7)
+
+#### K1-1. Crear un bloqueo desde «Agendar»
+
+**Qué hago:** con la v2 encendida, pulso «Agendar» y elijo «Bloqueo». Pongo un
+día, de 15:00 a 17:00, con el motivo «Congreso», y guardo.
+
+**Qué debo ver:**
+- se cierra el modal;
+- en la rejilla, una franja rayada de 15:00 a 17:00 con «Bloqueado · Congreso»;
+- sale el aviso «Horario bloqueado».
+
+**Si falla, significa que…** el alta del bloqueo o su pintado no funcionan.
+
+#### K1-2. Agendar encima pregunta (burbuja, modal y arrastre)
+
+**Qué hago:**
+1. Pulso un hueco dentro de la franja, elijo un paciente y «Guardar».
+2. Luego abro «Agendar» › «Cita» con una hora dentro de la franja y guardo.
+3. Por último arrastro una cita a la franja.
+
+**Qué debo ver:**
+- las tres veces, «Este horario está bloqueado. ¿Agendar de todos modos?»;
+- en la burbuja, «Cancelar» la deja abierta y «Aceptar» agenda;
+- en el arrastre, «Cancelar» devuelve la cita a su sitio;
+- un evento propio sin paciente («Comida») no pregunta.
+
+**Si falla, significa que…** falta la pregunta en uno de los caminos.
+
+#### K1-3. Editar y quitar desde el rótulo
+
+**Qué hago:**
+1. Pulso el rótulo «Bloqueado · Congreso», cambio el motivo y guardo.
+2. Después pulso otra vez el rótulo › «Quitar bloqueo» › «Sí, quitar».
+
+**Qué debo ver:**
+- la franja cambia de texto;
+- si había citas, el aviso «Hay N citas en este horario. Se quedan como
+  están.», y las citas siguen igual;
+- al quitarlo, la franja desaparece.
+
+**Si falla, significa que…** la edición, el aviso del punto 5 o quitar no
+funcionan.
+
+#### K1-4. Días completos desde la burbuja
+
+**Qué hago:** en una burbuja de alta pulso «Bloquear este horario» y marco «Días
+completos».
+
+**Qué debo ver:** una franja rayada en la banda de todo el día y en toda la
+columna.
+
+**Si falla, significa que…** el bloqueo de días no se pinta.
+
+#### K1-5. El enlace de reserva respeta el bloqueo, y lo de todo el día ya no cierra el día
+
+**Qué hago:**
+1. En el enlace de reserva de ese médico voy al día bloqueado.
+2. Luego creo un EVENTO de todo el día («Congreso») SIN bloqueo en otro día y
+   abro ese día en el enlace.
+
+**Qué debo ver:**
+- en el día bloqueado, ningún turno dentro del periodo (todo el día si es de
+  días completos);
+- en el día del evento de todo el día, el día SÍ ofrece turnos;
+- un evento o una cita CON hora siguen quitando su hora.
+
+**Si falla, significa que…** la reserva no respeta el bloqueo, o lo de todo el
+día volvió a cerrar el día.
+
+#### K1-6. Google
+
+**Qué hago:**
+1. Con Google (simulado) conectado, creo un bloqueo con motivo.
+2. Muevo ese evento en Google y borro allí otro bloqueo.
+3. Abro la agenda.
+4. Creo en Google un evento llamado «Bloqueado».
+
+**Qué debo ver:**
+- en el calendario de Spinus de Google, «Bloqueado — motivo», como ocupado;
+- en Spinus, el primero se movió y el segundo desapareció;
+- el evento «Bloqueado» creado en Google entra como evento de Google, igual que
+  hoy, nunca como franja.
+
+**Si falla, significa que…** el envío o la vuelta desde Google fallan, o un
+evento de Google se convirtió en bloqueo.
+
+#### K1-7. Permisos y apagada
+
+**Qué hago:**
+1. Como Dra. Invitada intento bloquear el horario de otro médico.
+2. Luego apago la v2.
+
+**Qué debo ver:**
+- la invitada no puede: no elige médico y la API responde 403;
+- con la v2 apagada no hay posición «Bloqueo» ni franja, y todo es como antes.
+
+**Si falla, significa que…** el permiso es más amplio que el de agendar, o el
+interruptor no aísla el cambio.
+
+### K2 · Confirmar, continuar la reserva y reenviar el código (puntos 8, 9 y 10)
+
+#### K2-1. «Confirmo mi asistencia» confirma al abrirlo
+
+**Qué hago:**
+1. Agendo una cita para mañana en el Consultorio Centro, con el correo
+   `caro3@prueba.test`, y le mando la confirmación.
+2. Con la agenda abierta en esa semana, abro el correo en Mailpit y pulso
+   «Confirmo mi asistencia».
+
+**Qué debo ver:**
+- un momento «Confirmando tu asistencia…»;
+- después, «Gracias. Tu asistencia quedó confirmada.», sin pulsar nada más;
+- en la agenda, la cita confirmada sin recargar;
+- en la auditoría, una sola `cita_editada` por `system` con `enlace_paciente`.
+
+**Si falla, significa que…** hay que pulsar dos veces, o se confirma dos veces.
+
+#### K2-2. Sin una persona, abrir no confirma
+
+**Qué hago:** con JavaScript desactivado para el sitio, abro el «Confirmo» de
+otra cita y luego pulso el botón.
+
+**Qué debo ver:**
+- al abrir, la cita sigue sin confirmar y está el botón de siempre;
+- al pulsarlo, confirma.
+
+**Si falla, significa que…** un programa que revisa correos podría confirmar por
+el paciente.
+
+**Ojo:** un revisor de correo que SÍ ejecute JavaScript confirmaría (riesgo
+aceptado, pendiente de tu decisión, AG-DT-175).
+
+#### K2-3. «No podré asistir» sigue en dos pasos
+
+**Qué hago:** desde el correo de otra cita, pulso «No podré asistir».
+
+**Qué debo ver:** el «¿Seguro…?» de siempre. Nada se cancela hasta «Sí, cancelar
+mi cita».
+
+**Si falla, significa que…** un clic en el correo cancela sin preguntar.
+
+#### K2-4. «Continuar mi reserva» desde el correo del código
+
+**Qué hago:**
+1. Con el enlace fijo, en incógnito, elijo hora, escribo `dani4@prueba.test` y
+   pido el código.
+2. En Mailpit pulso «Continuar mi reserva».
+
+**Qué debo ver:**
+- el código visible en el correo y, debajo, el botón;
+- la reserva abre en «Revisa tu correo» con el código ya escrito;
+- en la barra no queda `#codigo=`;
+- nada se reserva hasta «Verificar y reservar».
+
+**Si falla, significa que…** el paciente tiene que copiar el código a mano, o
+abrir el enlace reserva por él.
+
+#### K2-5. Reenviar el código: cuenta atrás y sin castigo
+
+**Qué hago:**
+1. Borro los contadores (§1.6).
+2. Llego al código con `eli5@prueba.test` y pulso enseguida «Enviar otro
+   código».
+3. Cuando se pueda, lo pulso y escribo el código del PRIMER correo.
+4. Después escribo el del último.
+
+**Qué debo ver:**
+- «Enviar otro código en N s», bajando desde 30 y sin poder pulsarse;
+- con el primero, «Ese código es de un correo anterior. Escribe el del correo
+  más reciente.»;
+- con el último, reserva.
+
+**Si falla, significa que…** reenviar castiga como si el paciente se hubiera
+equivocado.
+
+#### K2-6. Recargar, atrás o volver no piden otro código
+
+**Qué hago:**
+1. Llego al código con `flor6@prueba.test`.
+2. Recargo.
+3. Pulso «Atrás» y «Adelante».
+4. Pulso «Volver» y «Continuar».
+
+**Qué debo ver:**
+- siempre «Revisa tu correo» con lo elegido;
+- en Mailpit, UN solo correo de código, y ese código sirve.
+
+**Si falla, significa que…** el paciente pide códigos sin querer hasta quedar
+bloqueado.
+
+#### K2-7. Cuando hay que esperar, dice cuánto
+
+**Qué hago:** con el código de K2-5 recién pedido, abro el mismo enlace en otra
+pestaña y llego al código con el mismo correo.
+
+**Qué debo ver:**
+- «Espera N s para pedir otro código.» y la página pasa a escribir el código;
+- no llega otro correo;
+- pasado el límite de una hora: «Demasiados intentos. Podrás volver a probar en
+  N min.».
+
+**Si falla, significa que…** el paciente no sabe cuánto esperar.
+
+### K3 · La configuración (puntos 11 a 14)
+
+#### K3-11. El horario de la clínica, primero
+
+**Qué hago:** como Dr. Admin, «Configuración de la agenda» › «Cuándo das
+consulta». Luego lo mismo como Dra. Invitada y como secretaria.
+
+**Qué debo ver:**
+- como Dr. Admin, arriba de todo, la tarjeta «Horario de la clínica» con «Lun a
+  vie · 8:00 – 18:00» y «Sáb · 8:00 – 13:00», y «Cambiar horario»;
+- como Dra. Invitada y como secretaria, la misma tarjeta sin botón y con «Lo
+  cambia quien administra la clínica.».
+
+**Si falla, significa que…** el horario de la clínica volvió a quedar escondido,
+o cualquiera puede cambiarlo.
+
+#### K3-12. El primer paso es la clínica (sólo el administrador)
+
+**Qué hago:**
+1. Como Dr. Admin, «Más opciones» › «Empezar de nuevo» › RESTABLECER.
+2. En «Horario de la clínica» apago el sábado, elijo «Quintana Roo» en el huso
+   y pulso «Continuar».
+3. Pulso «Atrás», luego «Terminar después», y vuelvo a la configuración.
+
+**Qué debo ver:**
+- «Paso 1 de 4», con el texto «Este horario se usará de fábrica en todos los
+  consultorios que se creen…»;
+- al continuar, «¿Cuándo das consulta?», «Paso 2 de 4»;
+- «Atrás» vuelve con Quintana Roo elegido, y «Terminar después» vuelve a abrir
+  ahí;
+- en el resumen, «Horario de la clínica» con el huso y «Cambiar»;
+- la Dra. Invitada, en su primera vez, empieza en «Paso 1 de 3», sin este paso.
+
+**Si falla, significa que…** el paso no se guarda, o lo ve quien no debe.
+
+#### K3-12b. El huso de fábrica
+
+**Qué hago:** después de K3-12, en Perfil › «Agregar consultorio».
+
+**Qué debo ver:**
+- la zona ya en Quintana Roo;
+- los consultorios que ya existían, con su huso de siempre.
+
+**Si falla, significa que…** el huso no llega al alta, o pisó el de un
+consultorio.
+
+#### K3-13. Las pestañas en el teléfono
+
+**Qué hago:** abro la configuración ya terminada a 390 y a 320 px, y luego en la
+computadora.
+
+**Qué debo ver:**
+- a 390 y a 320 px, cinco iconos en una fila sin deslizar, y debajo el nombre
+  de la elegida;
+- en la computadora, las pestañas con texto y sin título debajo.
+
+**Si falla, significa que…** las pestañas no caben, o un lector de pantalla no
+sabe cuál es cuál.
+
+#### K3-14. Apagar «Tu enlace» lo pausa
+
+**Qué hago:**
+1. Copio la dirección de «Tu enlace» y apago el interruptor.
+2. La abro en incógnito.
+3. Lo prendo y la abro otra vez.
+4. Pulso «Cambiar por uno nuevo» › «Aceptar» y abro la vieja.
+
+**Qué debo ver:**
+- al apagar, sin pregunta: «Apagado: nadie puede apartar con él» y «Al
+  prenderlo vuelve a servir la misma dirección…»;
+- en incógnito, la página de no encontrado;
+- al prenderlo, la MISMA dirección, y abre;
+- tras cambiarlo, una dirección nueva, y la vieja ya no abre.
+
+**Si falla, significa que…** apagar volvió a revocar, o un enlace pausado deja
+apartar.
+
+### K4 · La hora de tu ubicación y el gris de cada consultorio (puntos 15, 16 y 22)
+
+#### K4-1. La leyenda de la hora de tu ubicación
+
+**Qué hago:**
+1. Como Dr. Admin, en Mi perfil cambio «Hospital Norte (ficticio)» a «Sonora —
+   Hermosillo».
+2. Abro la agenda con la computadora en hora de Mérida.
+3. Cambio la zona del sistema a Hermosillo y la vuelvo a abrir.
+4. Devuelvo «Hospital Norte» a Yucatán.
+
+**Qué debo ver:**
+- encima de la agenda, en gris y con un globito, «Mostrando el horario de tu
+  ubicación actual (UTC−6, Mérida)»;
+- en Hermosillo, «(UTC−7, Hermosillo)», y todo una hora antes;
+- con los dos consultorios otra vez en Yucatán, ya no sale;
+- en el teléfono se parte en dos renglones y se lee entera;
+- con la v2 apagada, nunca.
+
+**Si falla, significa que…** la agenda no avisa de que las horas son las de la
+computadora, o avisa sin hacer falta.
+
+#### K4-2. El gris es el de cada consultorio, en su hora
+
+**Qué hago:**
+1. Pongo «Hospital Norte» en Sonora con horario propio de 08:00 a 12:00 y
+   «Consultorio Centro» (Yucatán) de 10:00 a 14:00.
+2. Con la computadora en Mérida, elijo «Hosp Norte» como activo.
+3. Paso a «Centro» y vuelvo, sin recargar.
+4. Elijo «Todos los médicos».
+5. Al terminar, lo devuelvo todo como estaba.
+
+**Qué debo ver:**
+- con «Hosp Norte», el blanco de 09:00 a 13:00; con «Centro», de 10:00 a 14:00,
+  y cambia en el acto;
+- con «Todos los médicos», de la apertura más temprana al cierre más tardío;
+- un consultorio en Sonora SIN horario propio usa el de la clínica en hora de
+  Sonora: 08:00–18:00 se ve de 09:00 a 19:00.
+
+**Si falla, significa que…** el gris sale del horario de la clínica, o no
+convierte la hora.
+
+#### K4-3. Guardar ya no se queda esperando con la v2 apagada
+
+**Qué hago:** con la v2 APAGADA (Clínica B), edito una cita y pulso «Guardar».
+Luego lo mismo con la v2 encendida (Clínica A).
+
+**Qué debo ver:**
+- apagada, la ventana desaparece en el acto, como antes del proyecto;
+- encendida, se desvanece en una fracción de segundo (la salida animada del
+  bloque F);
+- en las dos, la tarjeta cambia en el acto.
+
+**Si falla, significa que…** la animación de la v2 se coló en la agenda
+apagada. La integración K la puso detrás del interruptor (AG-DT-146).
+
+### K5 · Las marcas de procedencia y la burbuja de la cita (puntos 17 a 21)
+
+#### K5-1. Un solo icono para «sin expediente»
+
+**Qué hago:** con la v2 encendida, abro en Semana una reserva por enlace sin
+ligar y un evento «por asignar» de Google (C0). Luego el Mes y la lista del día
+del teléfono.
+
+**Qué debo ver:**
+- ninguna dice «Por ligar» ni «Por asignar»: las dos llevan el mismo
+  expediente tachado en rojo;
+- la caja dice «… · Sin expediente» (y, si traía cancelaciones, «Al reservar
+  traía N…»);
+- con la v2 apagada, las píldoras de siempre.
+
+**Si falla, significa que…** quedaron dos marcas para lo mismo, o la v2 apagada
+cambió.
+
+#### K5-2. El eslabón se queda después de ligar
+
+**Qué hago:** ligo la reserva de K5-1 (J3) y vuelvo a la agenda.
+
+**Qué debo ver:**
+- el tachado desaparece;
+- el eslabón se queda en la caja, en la burbuja («La apartó con tu enlace») y
+  en «Próximas citas» («Por enlace»).
+
+**Si falla, significa que…** se pierde de dónde vino la cita.
+
+#### K5-3. La leyenda con las tres marcas
+
+**Qué hago:** engrane › «Leyenda de estados», con la v2 encendida y luego
+apagada.
+
+**Qué debo ver:**
+- encendida: «Bloqueo», la «G» de colores «Se agendó en Google», el eslabón «Se
+  agendó por enlace» y el tachado «Sin expediente»;
+- apagada: la de siempre.
+
+**Si falla, significa que…** la leyenda no explica la rejilla.
+
+#### K5-4. La burbuja de una agendada, como la maqueta
+
+**Qué hago:** pulso una agendada futura de «Paciente Prueba 05», en escritorio y
+en teléfono.
+
+**Qué debo ver:**
+- arriba, la píldora «Agendada», los tres puntos y la ✕, y el nombre grande;
+- el bloque gris con la hora, la duración, el día y, con más de un médico, sus
+  iniciales y su nombre;
+- «Iniciar consulta» azul a todo el ancho;
+- tres casillas: «Confirmar», «Reagendar» y «Editar»;
+- abajo, «Cancelar cita» en rojo;
+- sin engrane.
+
+**Si falla, significa que…** la burbuja no sigue la maqueta.
+
+#### K5-5. «Confirmar» abre tres opciones
+
+**Qué hago:** pulso «Confirmar». Luego lo mismo en una cita sin teléfono y en
+otra sin correo.
+
+**Qué debo ver:**
+- «Enviar por WhatsApp», «Enviar por correo» y «Marcar como confirmada»;
+- sin teléfono no sale el WhatsApp, y sin correo no sale el correo;
+- Escape cierra las opciones y deja la burbuja abierta.
+
+**Si falla, significa que…** las opciones no siguen la regla de cada paciente.
+
+#### K5-6. Los tres puntos
+
+**Qué hago:** pulso los tres puntos de una agendada y luego los de una
+confirmada.
+
+**Qué debo ver:**
+- en la agendada: «Observaciones», «Tipo de cita», «No asistió», y el
+  consultorio y el teléfono como datos;
+- en la confirmada, además, «Recordatorio por WhatsApp» y «Recordatorio por
+  correo»; su «No asistió» va en las casillas;
+- «No asistió» marca sin preguntar (pendiente de tu decisión, AG-DT-192);
+- Escape devuelve el foco a los tres puntos.
+
+**Si falla, significa que…** se perdió una acción de la tarjeta de antes.
+
+#### K5-7. Cancelada y no asistió
+
+**Qué hago:** pulso una cancelada y una «no asistió».
+
+**Qué debo ver:**
+- en la cancelada, «Esta cita se canceló. Su horario quedó libre.», «Darle otra
+  cita» y «Reasignar el horario»;
+- en la no asistió, «El paciente no llegó a esta cita.» y «Darle otra cita»;
+- ninguna tiene «Cancelar cita».
+
+**Si falla, significa que…** las puertas cambiaron.
+
+#### K5-8. Sin expediente, Google y enlace en la burbuja
+
+**Qué hago:** pulso una por asignar de Google, una reserva sin ligar y una ya
+ligada.
+
+**Qué debo ver:**
+- en la de Google: «Llegó de Google Calendar» con la «G», el tachado, «Ligar
+  expediente e iniciar» y, en el pie, «No es una cita» y «Cancelar cita»;
+- en la reserva sin ligar: el eslabón y el tachado;
+- en la ligada: el eslabón, sin el tachado.
+
+**Si falla, significa que…** las marcas de la burbuja no son las de la rejilla.
+
+### Integración de la tanda K
+
+#### K-INT-1. «Reagendar» a un horario bloqueado pregunta
+
+**Qué hago:**
+1. Bloqueo de 18:00 a 19:00 el día de una cita reservada por enlace (la de
+   I2-6).
+2. Abro la cita › «Reagendar» y pongo 18:00 › «Revisar cambio».
+3. Pulso «Corregir»; luego «Revisar cambio» otra vez y «Aceptar».
+
+**Qué debo ver:**
+- «Este horario está bloqueado. ¿Agendar de todos modos?»;
+- «Corregir» vuelve a los datos;
+- «Aceptar» lleva a «¿Reagendar la cita con estos datos?», y nada cambia hasta
+  confirmar;
+- a una hora sin bloqueo, la pregunta no sale.
+
+**Si falla, significa que…** «Reagendar» se salta el bloqueo, que los demás
+caminos sí preguntan.
+
+#### K-INT-2. La burbuja nueva conserva lo de antes
+
+**Qué hago:** en la burbuja nueva (K5) pruebo:
+- «Reagendar» de una reserva con candado, que debe abrir el panel de I2-6 e
+  I2-8;
+- «Ligar expediente e iniciar», que abre la ventana de J3;
+- «No es una cita» (I3-3);
+- la burbuja que llega desde un aviso de la campana, con «Reagendar» destacado
+  (J4-3);
+- la pregunta de asistencia (I4-3);
+- y una atendida con nota, que no se puede cambiar.
+
+**Qué debo ver:** cada una se comporta como en su prueba original.
+
+**Si falla, significa que…** la burbuja nueva perdió una puerta.
+
+### Qué repetir tras la tanda K
+
+Antes de nada, P5 a P8: la base pasa a **45** migraciones. Después, las nuevas
+de esta sección, y éstas, que ya existían y cambian o hay que repetir.
+
+**Bloque B y tanda J (configuración)**
+- **J5-1 y J5-6:** para Dr. Admin, primero «Horario de la clínica» («Paso 1 de
+  4»). «¿Cuándo das consulta?» pasa a «Paso 2 de 4», y el resumen tiene una
+  fila más.
+- **J5-2:** la duración es el «Paso 3 de 4».
+- **J5-3:** una fila más en el resumen.
+- **J5-5:** la tarjeta está arriba de todo y deja cambiar el huso.
+- **J2-1:** «Paso 1 de 4» en lugar de «Paso 1 de 3».
+- **T2-3 y las de «Tu enlace» de J5:** apagar ya no pide confirmación ni
+  revoca, y prender devuelve la misma dirección (K3-14).
+- **H2 «5»:** las pestañas del teléfono ya no se desplazan: caben (K3-13).
+
+**Bloque D (reserva)**
+- **D4:** tras «Enviar otro código», la cuenta atrás de 30 s. El código anterior
+  dice «Ese código es de un correo anterior…» y no cuenta.
+- **H1-1:** «Volver» y «Continuar» desde «Revisa tu correo» ya no piden otro
+  código.
+- **SEG-A5:** **cambia al revés.** Un evento de todo el día ya NO cierra el día
+  en el enlace; lo cierra un bloqueo (K1-5).
+- **SEG-A8:**
+  - los pedidos 2 a 4 dentro de los 30 s dicen «Espera N s…» y no gastan el
+    tope;
+  - el límite por red y por navegador dice «Podrás volver a probar en N min.»;
+  - la tabla gana la fila «Pedir otro código al mismo correo en ese enlace: 1
+    cada 30 s».
+- **§1.6:** el texto puede ser «Podrás volver a probar en N min.».
+- **D2, D8, D10 y D11:** la cita «Por ligar» se reconoce por el expediente
+  tachado y el eslabón.
+
+**Bloque E**
+- **E3, G3-1 e I1-4:** «Confirmo mi asistencia» del correo confirma al abrir.
+- **E4:** repetirla; «No podré asistir» no cambia.
+- **E10:** el WhatsApp está dentro de «Confirmar» (agendada) o en los tres
+  puntos (confirmada).
+
+**Bloque F, G, T e I (la tarjeta pasa a ser la burbuja de K5)**
+- **F22, G3-2 e I2-4:** «Editar» (casilla) en vez del engrane «Configuración de
+  la cita». Consultorio, teléfono y nota están en los tres puntos.
+- **G3-4:** la sustituyen K5-4 y K5-5.
+- **G3-5:**
+  - confirmada: «Reagendar | Editar | No asistió»;
+  - atendida: «Ver la consulta»;
+  - cancelada: «Darle otra cita» y «Reasignar el horario»;
+  - no asistió: «Darle otra cita».
+- **T1-6 y T1-7:** «Enviar por WhatsApp» tras «Confirmar», o en los tres
+  puntos.
+- **I3-2 e I3-3:**
+  - sin la píldora «POR ASIGNAR»: el tachado;
+  - «No es una cita», sin signos, en el pie de la burbuja;
+  - en Próximas, el formulario y la campana sigue «¿No es una cita?».
+- **I4-4:** «Reasignar» pasa a «Reasignar el horario», y «Reagendar cita» a
+  «Darle otra cita».
+- **J3-2:** «Ligar expediente e iniciar» en la burbuja (la ventana se sigue
+  llamando «Ligar e iniciar consulta»).
+- **J4-4:** la «G» va en «Llegó de Google Calendar». La leyenda suma «Bloqueo»,
+  el eslabón y el tachado.
+- **G4-5 y T2-6** (consultorio en Tijuana): sale además la leyenda de la hora
+  de tu ubicación (K4-1).
+- **A5:** con la v2 apagada, la ventana se va en el acto (K4-3).
+
+**Apagado**
+- **X1 y X7:** nada de lo de arriba se ve, ni la franja ni la burbuja nueva, y
+  la ventana se va sin animación.
+
+---
+
 ## 9. Seguridad
 
 ### 9.1 Aislamiento entre clínicas y entre médicos
@@ -5348,6 +5932,40 @@ Marca cada una al pasarla. Si una falla, anota el número y qué viste.
 - [ ] J5-8. Apagada
 - [ ] J-INT-1. El correo del enlace de una vez, también desde otro médico
 
+**Tanda K**
+- [ ] K1-1. Crear un bloqueo desde «Agendar»
+- [ ] K1-2. Agendar encima pregunta
+- [ ] K1-3. Editar y quitar desde el rótulo
+- [ ] K1-4. Días completos desde la burbuja
+- [ ] K1-5. El enlace respeta el bloqueo; lo de todo el día ya no cierra
+- [ ] K1-6. Google
+- [ ] K1-7. Permisos y apagada
+- [ ] K2-1. Confirmar al abrir
+- [ ] K2-2. Sin una persona no confirma
+- [ ] K2-3. «No podré asistir» en dos pasos
+- [ ] K2-4. «Continuar mi reserva»
+- [ ] K2-5. Reenviar sin castigo
+- [ ] K2-6. Recargar no pide otro código
+- [ ] K2-7. Dice cuánto esperar
+- [ ] K3-11. El horario de la clínica, primero
+- [ ] K3-12. El paso de la clínica
+- [ ] K3-12b. El huso de fábrica
+- [ ] K3-13. Las pestañas en el teléfono
+- [ ] K3-14. Apagar «Tu enlace» lo pausa
+- [ ] K4-1. La leyenda de tu ubicación
+- [ ] K4-2. El gris de cada consultorio
+- [ ] K4-3. Guardar sin esperar con la v2 apagada
+- [ ] K5-1. Un solo icono «sin expediente»
+- [ ] K5-2. El eslabón se queda
+- [ ] K5-3. La leyenda con las marcas
+- [ ] K5-4. La burbuja de una agendada
+- [ ] K5-5. «Confirmar» con tres opciones
+- [ ] K5-6. Los tres puntos
+- [ ] K5-7. Cancelada y no asistió
+- [ ] K5-8. Google y enlace en la burbuja
+- [ ] K-INT-1. «Reagendar» a un horario bloqueado
+- [ ] K-INT-2. La burbuja conserva lo de antes
+
 **Seguridad**
 - [ ] S1. La Clínica B no ve la A
 - [ ] S2. Lo mismo, directo a la base
@@ -5418,9 +6036,9 @@ Marca cada una al pasarla. Si una falla, anota el número y qué viste.
    dos ramas**: cambiar la lista de funciones de la prueba
    `p1_permisos_funciones.sql` (su «caso 3»). Esa prueba tiene escrita a mano
    la lista de las funciones de la base que no pueden usar todos los roles; hoy
-   tiene 10 y, con la agenda, son **44** (las 10 de siempre y 34 de la agenda;
-   la tanda H añadió 3). La lista completa, lista para pegar, está en
-   `supabase/AUDITORIA-CONJUNTO-AGENDA-V2.md`, §10.5. **No es un hueco de
+   tiene 10 y, con la agenda, son **50** (tras la tanda K; la tanda H añadió 3,
+   la I, 1, la J, 2 y la K, 3). La lista completa, lista para pegar, está en
+   `supabase/AUDITORIA-CONJUNTO-AGENDA-V2.md`, §13.5. **No es un hueco de
    seguridad**: si no se cambia, esa prueba sale en rojo, nada más. Se probó
    en tu computadora con las dos ramas juntas: con la lista nueva, todas las
    pruebas pasan.
@@ -5484,8 +6102,11 @@ Marca cada una al pasarla. Si una falla, anota el número y qué viste.
 | 35 | `20261122120000_agenda_j2_unico_tope_correo.sql` | El enlace de un solo uso lleva el correo que pone la clínica y se agota a los 5 intentos o al primer «bloqueado» (J2-1 a J2-4). **Antes del código** |
 | 36 | `20261122120100_agenda_j2_unico_carrera_client_id.sql` | Dos reservas a la vez con el mismo envío no deshacen el conteo de intentos. **Después de la 35** (su pre-vuelo lo exige) |
 | 37 | `20261122140000_agenda_j4_aviso_google_reserva.sql` | El aviso «Desde Google no se pueden mover las citas reservadas por enlace» (J4-1 a J4-3). **Después de la 34** |
+| 38 | `20261123120000_agenda_k1_bloqueos.sql` | El bloqueo de horario: su tabla, y que la reserva por enlace no ofrezca un horario bloqueado; lo de todo el día deja de cerrar el día (K1-1 a K1-7). **Antes de la 40** |
+| 39 | `20261123130000_agenda_k2_espera_codigo.sql` | Reenviar el código: los 30 s por enlace, cuánto falta cuando hay que esperar, y el código de un correo anterior no cuenta como equivocado (K2-5 a K2-7) |
+| 40 | `20261123140000_agenda_k3_huso_clinica_pausa_enlace.sql` | El huso de fábrica de la clínica y apagar «Tu enlace» sin perderlo (K3-12, K3-14). **Después de la 38** (si no, se detiene sin hacer nada) |
 
-Son **37**. Las tres de la tanda J (35 a 37) van al final y en ese orden; **nunca vuelvas a correr la 35 después de la 36** (se detiene sin hacer nada: no reconoce lo que dejó la 36). Antes de la tanda J eran 34. Las siete de la tanda I (28 a 34) van al final y en ese orden. Antes de la tanda I eran 27: Las tres de la tanda H (25 a 27) van al final y en ese orden. Las cuatro de la tanda del 2026-11-14 (21 a 24) van al final y en ese orden; las 17 a 20 van en este orden aunque se escribieron
+Son **40**. Las tres de la tanda K (38 a 40) van al final y en ese orden: **la 38 antes que la 40, siempre** (la 40 sin la 38 se detiene; la 38 después de la 40, también). Antes de la tanda K eran 37. Las tres de la tanda J (35 a 37) van al final y en ese orden; **nunca vuelvas a correr la 35 después de la 36** (se detiene sin hacer nada: no reconoce lo que dejó la 36). Antes de la tanda J eran 34. Las siete de la tanda I (28 a 34) van al final y en ese orden. Antes de la tanda I eran 27: Las tres de la tanda H (25 a 27) van al final y en ese orden. Las cuatro de la tanda del 2026-11-14 (21 a 24) van al final y en ese orden; las 17 a 20 van en este orden aunque se escribieron
 después: las 17 y 18 añaden reglas a la tabla de citas, la 19 reemplaza
 la protección de los enlaces que puso la 8, y la 20 reemplaza tres funciones de
 las 9 y 10. Por eso, una vez más: **nunca vuelvas a correr la 8, la 9 ni la 10
@@ -5511,7 +6132,7 @@ Sólo los nombres y para qué sirven; los valores los generas tú.
 ### 13.4 El orden recomendado
 
 1. `select version()` y lo de 13.1.
-2. **Las 27 migraciones**, una por una, en el orden de 13.2.
+2. **Las 40 migraciones**, una por una, en el orden de 13.2.
 3. Las variables de 13.3 (menos `AGENDA_RSVP_GOOGLE`).
 4. `git merge` local de la rama sobre `main` y `git push` (despliega el código).
    Si despliegas el código antes que las migraciones no se rompe nada, pero

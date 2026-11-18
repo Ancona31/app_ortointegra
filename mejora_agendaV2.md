@@ -725,7 +725,7 @@ reducido.
 
 ## 7. Lo que le toca a Angel
 
-Al día con la integración de la tanda J (2026-11-18, §6-bis «Tanda J»). **Cerradas por la tanda J:** el correo de un tercero en el único (AG-DT-100) y la enumeración de teléfonos con un único (AG-DT-101). **Cerradas por la tanda I:** mover una atendida con nota, sin condición (pendiente (1) de H, punto 1); el enlace de un solo uso sin correo (pendiente (2) de H, AG-DT-70, punto 2). **Decidida por Angel el 2026-11-15:** AG-DT-63 se queda como está (punto 21). **Decididas por Angel el 2026-11-14:** el invitado crea, cambia y archiva SUS tipos y su duración (cierra el punto 9 de la tanda anterior); cualquier rol que vea la cita manda el correo de confirmación; una atendida con nota no cambia de estado ni se borra; «Reagendar cita» crea una cita nueva; la reserva ofrece sólo los tipos del consultorio elegido. **Ya decididas por Angel el 2026-11-13:** el bloqueo manual por teléfono se queda (AG-DT-28) y «Compactar» al abrir se queda apagado (F1.5). **Resuelta:** convertir en cita un evento de Google (AG-DT-29). Guía
+Al día con la integración de la tanda K (2026-11-18, §6-bis «Tanda K»). **Cerradas por la tanda K:** el tiempo hasta que se va el modal al guardar (AG-DT-146, explicada; con la v2 apagada vuelve a irse en el acto); apagar «Tu enlace» ya no lo revoca (lo pausa, K3). **Cerradas por la tanda J:** el correo de un tercero en el único (AG-DT-100) y la enumeración de teléfonos con un único (AG-DT-101). **Cerradas por la tanda I:** mover una atendida con nota, sin condición (pendiente (1) de H, punto 1); el enlace de un solo uso sin correo (pendiente (2) de H, AG-DT-70, punto 2). **Decidida por Angel el 2026-11-15:** AG-DT-63 se queda como está (punto 21). **Decididas por Angel el 2026-11-14:** el invitado crea, cambia y archiva SUS tipos y su duración (cierra el punto 9 de la tanda anterior); cualquier rol que vea la cita manda el correo de confirmación; una atendida con nota no cambia de estado ni se borra; «Reagendar cita» crea una cita nueva; la reserva ofrece sólo los tipos del consultorio elegido. **Ya decididas por Angel el 2026-11-13:** el bloqueo manual por teléfono se queda (AG-DT-28) y «Compactar» al abrir se queda apagado (F1.5). **Resuelta:** convertir en cita un evento de Google (AG-DT-29). Guía
 para levantarlo todo en local: `GUIA_AUDITORIA_AGENDA_V2.md`; **guía de
 pruebas a mano, paso a paso y sin código: `GUIA_PRUEBAS_AGENDA_V2.md`** (el
 Google simulado se arranca con un comando, `npx tsx
@@ -736,9 +736,9 @@ pudo probar: §10.
 | Momento | Qué |
 |---|---|
 | Durante el proyecto | Nada obligatorio: los reportes de bloque son informativos |
-| Al final, en local | Auditar con lo que se entrega: el conjunto de **37** migraciones del proyecto (las 16 del cierre, las 4 de las correcciones, las 4 de la tanda del 2026-11-14, las 3 de la tanda H, las 7 de la tanda I y las 3 de la tanda J; con las 5 de `main`, las **42** de §7.1, una por una) con sus auditorías (cabeceras y `supabase/AUDITORIA-CONJUNTO-AGENDA-V2.md`), datos inventados sembrados (`scripts/agenda-semilla.ts`), la guía corta, §6-bis y §10. Decidir las propuestas de dimensión nueva para `AUDITORIA-MIGRACIONES.md` (§6-bis, «Cierre del proyecto»; no se tocó el archivo) |
-| Decisiones pendientes | **De la tanda J (§6-bis «Tanda J»):** **los turnos dobles (punto 17), DECISIÓN PENDIENTE**: hoy un día admite una sola entrada y una sola salida, y la propuesta de J5 toca la rejilla, los turnos, la reserva y su función en la base y el horario de la clínica; las marcadas «PARA REVISIÓN DE ANGEL» y su resumen al final de la tanda (apagar «Tu enlace» lo revoca, los bordes de contraste en modo oscuro, el tope de 5 intentos y «bloqueado» que agota el único, las series de Google con el color de «Agendada», «Densidad compacta»); el texto del aviso de privacidad del único, que aún menciona el correo (AG-DT-138); cuándo borrar la configuración vieja (AG-DT-162). **De la tanda I (§6-bis «Tanda I»):** las decisiones marcadas «— PARA REVISIÓN DE ANGEL» en cada rama y su resumen al final de la tanda (entre ellas: el canal de tiempo real que sobrevive 2 min, el encabezado del correo a nombre del médico, lo que entra «por asignar» y lo que no, las citas de más de 48 h «por revisar», el correo a la clínica APAGADO de fábrica); los textos nuevos PENDIENTE DE REVISIÓN; **la cabecera de `20260919230000_auth_02` dice «PENDIENTE DE APLICAR»** y §7 la da por aplicada: comprobarlo en producción (§7.1, fila 4). **De la tanda H (§6-bis «Tanda H»):** (1) y (2), cerradas por la tanda I; (3) el horario de cada consultorio tras «Restablecer»: se eligió el de la clínica copiado como horario propio (la herencia de G4), en vez del DEFAULT sin horario propio de H2; (4) los textos nuevos PENDIENTE DE REVISIÓN. De antes: la dimensión nueva que propone el auditor de `20261119130000` para `AUDITORIA-MIGRACIONES.md` (pre-vuelos acotados a las filas que toca la sentencia; `AUDITORIA-CONJUNTO-AGENDA-V2.md` §9); AG-DT-26 (límite en las páginas públicas) y AG-DT-27 (todo el día en los avisos de empalme); proponer o no un módulo común para `colocar` y para «hay un diálogo modal» (AG-DT-38, AG-DT-39); **S3**: quedarse con la puerta que lee `pg_proc` (C1) o la copia con huella; las «NO aplicado, para revisar por Angel» de las auditorías de E1, E4, E6 y D11 (cabeceras y §6-bis); si E9 debe cerrar la clínica suspendida también dentro de la función (H4); el plazo de conservación del historial del candado (propuesto 12 meses) |
-| Antes de aplicar | `select version()` en producción (≥ 14). **Comprobar también que el PostgREST de producción admite `imatch`** (≥ 10; en local hay 14.5): la búsqueda de pacientes del punto 1 de la tanda del 2026-11-13 sale **sin interruptor** y lo usa (prueba: en la app, buscar «hugo interian» en «Agendar» devuelve el paciente y no un error 400 en la consola; o `GET /rest/v1/pacientes?nombre=imatch.x&limit=0` con sesión responde 200). Comprobar que producción tiene las 5 migraciones de `main` y decidir el orden con `feature/limites-ajustables` (sus `20261014*` van antes por fecha; al fusionar las dos, cambiar la lista fija del caso 3 de `p1_permisos_funciones.sql` por la de **47** funciones (las 45 de la tanda I, §11.5, más `cita_movimiento_google_registrar` y la `reserva_enlace_emitir` de 9 argumentos de la tanda J), escrita entera en la auditoría del conjunto §12.5 y comprobada con las dos ramas juntas (45 migraciones; las 40 pruebas SQL en verde); con ellas, `i2_unico_sin_correo.sql` necesita el GRANT de `pg_temp.unico(text)`, ya puesto; el resto de `p1`, `p1b`, `p2`, `p3` y las 21 pruebas del proyecto pasan con el conjunto combinado: hallazgos H2 e I1) |
+| Al final, en local | Auditar con lo que se entrega: el conjunto de **40** migraciones del proyecto (las 16 del cierre, las 4 de las correcciones, las 4 de la tanda del 2026-11-14, las 3 de la tanda H, las 7 de la tanda I, las 3 de la tanda J y las 3 de la tanda K; con las 5 de `main`, las **45** de §7.1, una por una) con sus auditorías (cabeceras y `supabase/AUDITORIA-CONJUNTO-AGENDA-V2.md`), datos inventados sembrados (`scripts/agenda-semilla.ts`), la guía corta, §6-bis y §10. Decidir las propuestas de dimensión nueva para `AUDITORIA-MIGRACIONES.md` (§6-bis, «Cierre del proyecto»; no se tocó el archivo) |
+| Decisiones pendientes | **De la tanda K (§6-bis «Tanda K», «Para revisión de Angel»):** confirmar al abrir el correo y el riesgo de un revisor de correo con JavaScript (AG-DT-175, con la mitigación `isTrusted` propuesta); la línea de `#codigo=` en `sentryPiiFilter.ts` (AG-DT-176, sin aplicar); el pintado optimista de la tarjeta con la v2 apagada (**PENDIENTE DE ANGEL**, AG-DT-198); «No asistió» de un toque (AG-DT-192); el motivo del bloqueo en el título de Google (AG-DT-195); «Bloquear este horario» como enlace; pausar «Tu enlace» sin confirmación y «Cambiar por uno nuevo» de un pausado (AG-DT-184); el huso de la clínica sólo de fábrica; la leyenda de husos con todos los consultorios conocidos; reenviar el código sigue gastando el tope de 3/h. **De la tanda J (§6-bis «Tanda J»):** **los turnos dobles (punto 17), DECISIÓN PENDIENTE**: hoy un día admite una sola entrada y una sola salida, y la propuesta de J5 toca la rejilla, los turnos, la reserva y su función en la base y el horario de la clínica; las marcadas «PARA REVISIÓN DE ANGEL» y su resumen al final de la tanda (apagar «Tu enlace» lo revoca, los bordes de contraste en modo oscuro, el tope de 5 intentos y «bloqueado» que agota el único, las series de Google con el color de «Agendada», «Densidad compacta»); el texto del aviso de privacidad del único, que aún menciona el correo (AG-DT-138); cuándo borrar la configuración vieja (AG-DT-162). **De la tanda I (§6-bis «Tanda I»):** las decisiones marcadas «— PARA REVISIÓN DE ANGEL» en cada rama y su resumen al final de la tanda (entre ellas: el canal de tiempo real que sobrevive 2 min, el encabezado del correo a nombre del médico, lo que entra «por asignar» y lo que no, las citas de más de 48 h «por revisar», el correo a la clínica APAGADO de fábrica); los textos nuevos PENDIENTE DE REVISIÓN; **la cabecera de `20260919230000_auth_02` dice «PENDIENTE DE APLICAR»** y §7 la da por aplicada: comprobarlo en producción (§7.1, fila 4). **De la tanda H (§6-bis «Tanda H»):** (1) y (2), cerradas por la tanda I; (3) el horario de cada consultorio tras «Restablecer»: se eligió el de la clínica copiado como horario propio (la herencia de G4), en vez del DEFAULT sin horario propio de H2; (4) los textos nuevos PENDIENTE DE REVISIÓN. De antes: la dimensión nueva que propone el auditor de `20261119130000` para `AUDITORIA-MIGRACIONES.md` (pre-vuelos acotados a las filas que toca la sentencia; `AUDITORIA-CONJUNTO-AGENDA-V2.md` §9); AG-DT-26 (límite en las páginas públicas) y AG-DT-27 (todo el día en los avisos de empalme); proponer o no un módulo común para `colocar` y para «hay un diálogo modal» (AG-DT-38, AG-DT-39); **S3**: quedarse con la puerta que lee `pg_proc` (C1) o la copia con huella; las «NO aplicado, para revisar por Angel» de las auditorías de E1, E4, E6 y D11 (cabeceras y §6-bis); si E9 debe cerrar la clínica suspendida también dentro de la función (H4); el plazo de conservación del historial del candado (propuesto 12 meses) |
+| Antes de aplicar | `select version()` en producción (≥ 14). **Comprobar también que el PostgREST de producción admite `imatch`** (≥ 10; en local hay 14.5): la búsqueda de pacientes del punto 1 de la tanda del 2026-11-13 sale **sin interruptor** y lo usa (prueba: en la app, buscar «hugo interian» en «Agendar» devuelve el paciente y no un error 400 en la consola; o `GET /rest/v1/pacientes?nombre=imatch.x&limit=0` con sesión responde 200). Comprobar que producción tiene las 5 migraciones de `main` y decidir el orden con `feature/limites-ajustables` (sus `20261014*` van antes por fecha; al fusionar las dos, cambiar la lista fija del caso 3 de `p1_permisos_funciones.sql` por la de **50** funciones (las 47 de la tanda J, §12.5, más `gcal_bloqueo_aplicar`, `rate_limit_espera` y `reserva_espera_reenvio` de la tanda K), escrita entera en la auditoría del conjunto §13.5 y comprobada con las dos ramas juntas (48 migraciones; las 43 pruebas SQL en verde); con ellas, `i2_unico_sin_correo.sql` necesita el GRANT de `pg_temp.unico(text)`, ya puesto; el resto de `p1`, `p1b`, `p2`, `p3` y las 21 pruebas del proyecto pasan con el conjunto combinado: hallazgos H2 e I1) |
 | Aplicar | **Antes de desplegar el código** (los dos órdenes son seguros, pero con el código primero cada petición deja un `warn` en el log: hallazgo H3). El conjunto, en orden de nombre de archivo, uno por uno, mirando la rejilla final de cada uno (todas las filas OK). `20261119130000` (G4) copia datos: su respaldo queda en `respaldos.consultorios_horario_20261119`; `20261119140000` (G3), mejor en la misma ventana que E4. **`20261120120000` (H2) deja el recordatorio APAGADO en todas las clínicas** hasta que su administrador lo encienda (también las que ya tengan la v2); `20261120130000` (H5) actúa también con la v2 apagada. **Tanda I:** las siete, migración primero (orden y tolerancia en la auditoría del conjunto §11.7); `20261121140000` (I4a) actúa también con la v2 apagada; `20261121141000` (I4b) deja **todas** las filas de horario «por revisar»; `20261121150000` (I5) deja el correo a la clínica APAGADO. **Tanda J:** `20261122120000` y luego `20261122120100`, migración primero (si el código llega antes, se emite sin correo y el único con correo da error; §12.7 de la auditoría del conjunto); `20261122140000`, en cualquier orden. **No vuelvas a correr `20261122120000` después de `20261122120100`** (aborta limpio). **Tanda K:** `20261123120000` (K1), `20261123130000` (K2) y `20261123140000` (K3), en ese orden y migración primero; **K1 antes que K3, fijo** (K3 sin K1 aborta limpio; K1 después de K3 también). La que era `20261123130100` ya no existe (fundida en `20261123130000`). Después, la línea `-- ESTADO · PRODUCCIÓN` de cada archivo con fecha y comprobación (`AUDITORIA-MIGRACIONES.md` §7) |
 | Vercel | Variables `RESERVA_SECRETO`, `EMAIL_TRANSPORT=resend`, `CRON_SECRET` (las tareas de `vercel.json` se activan con el despliegue y sin `CRON_SECRET` contestan 401); `AGENDA_RSVP_GOOGLE` sólo tras la prueba de RSVP |
 | Google real | Prueba con cuenta real: ida y vuelta (C), sincronización antes de reservar (D11), RSVP (E9). Cerrar o no LP-DT-6. Antes de encender: revisar el panel de auditoría (C-h, `user_id='system'`) |
@@ -5868,6 +5868,261 @@ configuración de antes y dónde queda cada uno (notas de J5); ninguno se pierde
 - **J5 · la configuración vieja sigue en disco** hasta que des la nueva por buena
   (AG-DT-162).
 
+### Tanda K (2026-11-18)
+
+La tanda K reúne los puntos 1 a 22 de Angel tras probar a mano la tanda J. El
+punto 23, los turnos dobles, queda fuera: sigue como DECISIÓN PENDIENTE de J5.
+
+**Ramas.** Cinco: `feature/agenda-v2-k1` a `-k5`, las cinco desde `0cce313`,
+con los worktrees `-agenda-b56`, `-agenda-menores`, `-agenda-t3`, `-agenda-t4` y
+`-agenda-t5`. Se fusionaron con `--no-ff` en `feature/agenda-v2` en el orden K1,
+K2, K3, K4, K5.
+
+| Rama | Puntos | Qué |
+|---|---|---|
+| K1 | 1 a 7 | El bloqueo de horario |
+| K2 | 8, 9 y 10 | Confirmar al abrir, «Continuar mi reserva», reenviar el código |
+| K3 | 11 a 14 | La configuración |
+| K4 | 15, 16 y 22 | La leyenda de husos, el gris por consultorio, la salida del modal |
+| K5 | 17 a 21 | Las marcas de procedencia y la burbuja de la cita |
+
+**Tres migraciones nuevas.** El conjunto pasa de 42 a **45**:
+`20261123120000` (K1), `20261123130000` (K2, con la antigua `…130100`
+fundida) y `20261123140000` (K3).
+
+Las reglas son las de la tanda J:
+- lo nuevo va detrás del interruptor de la v2;
+- sin dependencias nuevas;
+- nada clínico en páginas públicas ni en correos;
+- cada defecto, con su causa en una prueba en rojo;
+- la batería completa, una sola vez, al integrar.
+
+Con la v2 apagada o sin las tablas nuevas, la app se comporta como hoy.
+
+#### K1 · el bloqueo de horario (puntos 1 a 7)
+
+- **Una tabla propia, `agenda_bloqueos`, no una fila de `appointments`.**
+  - Lleva FK RESTRICT a `clinicas` y `profiles`, CHECK de puntas (400 días como
+    máximo, al minuto, medianoches en su zona si es de días) y la auditoría de
+    `log_tabla_change`.
+  - La RLS es la de quien hoy agenda para ese médico. El alta y la edición
+    llevan las puertas de suscripción y la v2; quitar no lleva puertas.
+  - No se tocó ninguna policy existente ni se creó ninguna RESTRICTIVE.
+- **La reserva (punto 2) aplica una sola regla.** Un bloqueo ocupa si se solapa
+  con el turno:
+  - `reservar_por_enlace` lo comprueba con un `OR EXISTS`, tras el candado 1790;
+  - `reserva_ocupacion` lo suma con un `UNION ALL`.
+
+  **Los eventos de todo el día dejan de ocupar** (`AND NOT a.all_day`); los de
+  hora siguen igual. El alta de un bloqueo toma el mismo candado 1790
+  (`agenda_bloqueo_preparar`), y el escenario 6 de la carrera lo prueba.
+- **Pintado.** Abrir la agenda no hace ninguna petición nueva: los bloqueos
+  viajan en `GET /api/appointments` (campo `bloqueos`) y en la semilla de la
+  página.
+  - Se pintan como fondo rayado en Semana y Día, y en el Mes si son de días.
+    En las listas, como fila.
+  - Los datos van anidados en `extendedProps.bloqueo`, así que ningún lector de
+    citas los confunde con una.
+- **Crear.** Pulsar o arrastrar sobre un hueco sigue abriendo la burbuja de
+  cita. Hay dos entradas nuevas:
+  - el enlace «Bloquear este horario» de la burbuja — **PARA REVISIÓN DE
+    ANGEL**: es un enlace y no un gesto propio, para no tocar el reparto de
+    gestos de FullCalendar;
+  - una tercera posición, «Bloqueo», en «Agendar».
+- **Editar.** Sólo el rótulo de la franja abre la edición. El resto de la franja
+  deja pasar el clic y el arrastre al hueco. Quitar pide un segundo clic.
+- **La pregunta (punto 3)** es «Este horario está bloqueado. ¿Agendar de todos
+  modos?».
+  - Sale sólo para CITAS: un evento propio sin paciente no pregunta.
+  - Se decide con lo que está pintado, y el servidor no la repite.
+- **Punto 5.** El POST y el PATCH devuelven las citas vivas del periodo, y la
+  agenda avisa «Hay N citas en este horario. Se quedan como están.». No toca
+  ninguna.
+- **Google (punto 6).** Al calendario de Spinus va como ocupado, con la marca
+  privada `spinus_bloqueo`, sin invitados y con `sendUpdates: 'none'`.
+  - El título es «Bloqueado» o «Bloqueado — motivo» — **PARA REVISIÓN DE
+    ANGEL**: el motivo viaja a Google porque lo pediste, y el modal avisa «No
+    escribas datos de pacientes» (AG-DT-195).
+  - De vuelta, la sincronización aparta esos eventos y sólo los mueve o borra
+    (`gcal_bloqueo_aplicar`). Un evento creado en Google entra como hoy.
+
+#### K2 · confirmar, continuar la reserva y reenviar el código (puntos 8, 9 y 10)
+
+**La causa del punto 10, reproducida en e2e antes de tocar nada.** La página no
+guardaba nada. Al recargar, ir atrás o abrir otra pestaña, el paciente volvía a
+«Lugar», y cada vuelta pedía otro código. Cada pedido:
+- gastaba el tope de 3 por correo cada hora;
+- invalidaba el código anterior, que al escribirlo contaba como equivocado.
+
+Así se llegaba a «Demasiados intentos», sin plazo. «Pide un código primero» salía
+porque, tras un fallo de la reserva, la página volvía a verificar un código ya
+gastado.
+
+- **La página guarda lo mínimo en `sessionStorage`**: por pestaña, 30 min y sólo
+  con la v2. Lo elegido, el `clientId`, el correo y la ficha de verificación, sin
+  nombre, teléfono ni código. Nada va a `localStorage`.
+  - Recargar, atrás y «Volver» no piden otro código.
+  - Tras un fallo de la reserva, se reusa la ficha.
+- **Los 30 s entre códigos los impone el servidor, por enlace**
+  (`reserva_espera_reenvio`, `REENVIO_CODIGO_S`).
+  - La primera versión contaba por el correo global, y eso filtraba actividad
+    entre clínicas. Se arregló, y la integración la fundió en
+    `20261123130000`.
+  - Dentro de los 30 s responde 429 `espera_reenvio`, con `Retry-After`, y no
+    gasta el tope. El tope global por correo no lleva plazo, a propósito.
+- **Reenviar sigue contando en el tope de 3 por correo cada hora:** no se
+  relajó, porque eso es cambiar un límite.
+  - El código de un correo anterior (mismo enlace y correo) responde
+    `reemplazado` y no suma como equivocado.
+- **«Continuar mi reserva» (punto 9).** El correo lleva
+  `/reservar/{código}?origen=…#codigo=NNNNNN`. El fragmento no llega al
+  servidor, y la página lo quita de la barra. Entre pestañas, `BroadcastChannel`
+  pasa sólo lo elegido.
+- **Confirmar al abrir (punto 8)** — **PARA REVISIÓN DE ANGEL** (AG-DT-175).
+  - «Confirmo mi asistencia» apunta a `?paso=confirmar`. Al cargar, la página
+    manda el MISMO POST del botón, una vez, nunca con `navigator.webdriver`,
+    durante el prerender ni en segundo plano. El GET no escribe.
+  - Un revisor de correo que ejecute JavaScript confirmaría (revisión de
+    seguridad de la integración K, riesgo medio). Mitigación propuesta: esperar
+    un gesto con `isTrusted` antes del POST.
+  - «No podré asistir» sigue en dos pasos.
+- **Sentry y `#codigo=`** — **PARA REVISIÓN DE ANGEL** (AG-DT-176). La línea
+  `.replace(/#codigo=\d{6}/g, '#codigo=[REDACTADO]')` va en
+  `src/lib/sentryPiiFilter.ts`, que esta tanda no puede tocar.
+
+#### K3 · la configuración (puntos 11 a 14)
+
+- **Punto 11.** La tarjeta «Horario de la clínica» va arriba de «Cuándo das
+  consulta». Su botón se llama, para el lector, «Cambiar horario de la clínica».
+  Quien no administra lee «Lo cambia quien administra la clínica.».
+- **Punto 12: el huso de la clínica es sólo «de fábrica»** — **PARA REVISIÓN DE
+  ANGEL**.
+  - Es una columna nueva, `clinicas.timezone`, NULL al empezar.
+  - Lo propone la configuración y lo preselecciona el alta de consultorios.
+  - No lo leen la rejilla, la reserva ni los correos, que siguen con el huso de
+    cada consultorio.
+  - Se guarda en el mismo `PUT /api/me/horario` (administrador, Zod contra
+    `Intl`, `audit_log`). Sin la migración, guarda sólo el horario.
+- **El paso de la clínica es el paso 0, sólo para el médico administrador**
+  («Paso 1 de 4»). Está pendiente cuando lo está el horario de los consultorios.
+- **Punto 13.** Las pestañas del teléfono son iconos de lucide con `aria-label`;
+  debajo va el título de la elegida, oculto al lector.
+- **Punto 14: apagar «Tu enlace» pausa** (`reserva_enlaces.pausado_en`, sólo
+  fijos), **sin pedir confirmación** — **PARA REVISIÓN DE ANGEL**. Se puede
+  deshacer y conserva la dirección. Sustituye al «lo revoca para siempre» de J5.
+  - Las seis funciones públicas exigen «no pausado» junto a «no revocado».
+  - `PATCH /api/agenda/enlaces/[id]` acepta `pausar` y `reanudar`; sin la
+    migración responde 409 `sin_pausa`.
+  - «Cambiar por uno nuevo» de un pausado emite uno nuevo ya prendido
+    (AG-DT-184).
+
+#### K4 · la hora de tu ubicación, el gris y la salida del modal (puntos 15, 16 y 22)
+
+- **Punto 15: «huso» es el desfase con UTC, no el nombre de la zona.** Mérida y
+  Ciudad de México no sacan la leyenda.
+  - Cuentan los consultorios que la agenda ya conoce: todos para el
+    administrador y la secretaria, los suyos para el invitado. Pedir más sería
+    una petición nueva al abrir.
+  - Con un consultorio en Sonora y «Centro» activo, la leyenda sale aunque la
+    rejilla sólo pinte Mérida — **PARA REVISIÓN DE ANGEL**. Si la quieres sólo
+    cuando lo pintado mezcla husos, es una línea en `AgendaCliente.tsx`.
+- **La leyenda va en la última banda de `AvisosAgenda`**: la geometría de la
+  banda de «Vista compacta», un globo y sin `role`. El texto es «Mostrando el
+  horario de tu ubicación actual (UTC−6, Mérida)».
+- **Punto 16: no había defecto.** La e2e nueva pasó con `0cce313` y se quedó
+  como prueba de regresión, en rojo con dos mutantes.
+- **Punto 22: explicado, no es el servidor** (AG-DT-146, cerrada).
+  - K4 midió contra `a58419f` con dos bases aparte (24 muestras por celda, 0
+    errores), y la causa es la salida animada del modal (F2.7).
+  - La tarjeta se pinta ANTES que antes del proyecto.
+  - Números y celda re-medida: §9, «Tanda K».
+
+#### K5 · las marcas de procedencia y la burbuja de la cita (puntos 17 a 21)
+
+- **Las marcas.**
+  - El expediente tachado (`esPorLigar`) sustituye a «Por ligar» y «Por
+    asignar».
+  - El eslabón depende de `reserva_canal` y es permanente.
+  - Los dos son dibujos propios (`MarcasCita.tsx`) con tokens existentes: el
+    rojo de cancelada y `--ag-brand-legible`.
+  - Van en la rejilla, el Mes, la banda, las listas, el panel del día, Próximas
+    citas («Por enlace») y el bloque de la reserva del formulario.
+- **La burbuja (`BurbujaCita.tsx`) se deriva de `disposicionDeTarjeta`**
+  (`burbujaDeTarjeta`), que sigue siendo la única regla de acciones. No se tocó
+  ninguna ruta ni regla de guardado.
+- **«No asistió» no pregunta** — **PARA REVISIÓN DE ANGEL** (AG-DT-192). Va por
+  el mismo PUT parcial, se deshace desde el formulario y se puede pulsar antes
+  de la hora. En la confirmada va en las casillas; en la agendada, en los tres
+  puntos.
+- **«Ver la consulta» abre el expediente**, no la nota, para no añadir una
+  petición (AG-DT-188).
+- **«No es una cita» del pie, sólo en las por asignar de Google**, que es lo que
+  acepta la ruta. Sin signos de interrogación sólo en la burbuja.
+- **«Confirmar» y los tres puntos despliegan; no son `role="menu"`**, porque los
+  tres puntos llevan datos. Escape cierra lo desplegado antes que la burbuja.
+- **Lo que se aplicó de la revisión independiente:**
+  - el foco vuelve a «Confirmar»;
+  - las flechas recorren sus opciones;
+  - el panel pasa a 280 px.
+
+  Lo que no se aplicó, y por qué, está en `notas_k5.md`.
+
+#### Integración de la tanda K (decisiones sin preguntar)
+
+- **Fusiones.** Cinco con `--no-ff`: `b367c04`, `0b094e8`, `0f17498`,
+  `5811802` y `c3a9616`. Sin conflictos de texto.
+
+  Choques de comportamiento, y cómo se resolvió cada uno:
+  - **La leyenda de husos (K4) usa `.ag-banda-compacta`.** Dos e2e que contaban
+    esa banda la contaban a ella. Se corrigió el selector:
+    `:not([data-leyenda-husos])`.
+  - **K1 y K3 sustituían fragmentos de las mismas funciones.** Se rehicieron
+    con cuerpos completos (abajo).
+  - **Las e2e de K1 no apagaban la v2 en `afterAll`.** Ya la apagan.
+  - **La burbuja de K5 conserva** el «Reagendar» de I2, la ventana de ligar de
+    J3, «No es una cita» de I3, el destacado de J4 y la pregunta de asistencia
+    de I4. Lo prueba la batería.
+- **Migraciones (`77a5b22`).**
+  - `20261123130100` se fundió en `20261123130000`: la antigua ya no existe.
+  - K1 y K3 dejaron de sustituir fragmentos: cada una pega el cuerpo COMPLETO
+    de las funciones que cambia, con pre-vuelo por md5 de `prosrc` y post-vuelo
+    que aborta. Eso fija el orden **K1 → K3**: K3 sin K1 aborta, y K1 después
+    de K3 también (AG-DT-197).
+  - Las tres pasaron la auditoría Sonnet y la revisión de seguridad.
+  - Detalle en `supabase/AUDITORIA-CONJUNTO-AGENDA-V2.md` §13 (`3a8c9f5`).
+- **El bloqueo en «Reagendar» (`fe17b4f`).** El panel de reagendar (I2) cambiaba
+  la hora de una cita sin la pregunta de K1. Ahora pregunta: «Corregir» vuelve,
+  «Aceptar» sigue a la confirmación. Hay e2e en `agenda-eleccion-i2`, en rojo
+  con `enBloqueo && false`.
+- **La salida del modal, detrás de la v2 (`fe17b4f`).** K4 dejó ver que la
+  salida animada (F2.7) corría también con la v2 apagada. `closeModal` sólo la
+  hace con `agendaV2`. Hay e2e `agenda-k-salida-modal`, en rojo sin `agendaV2
+  &&`.
+  - **El pintado optimista con la v2 apagada no se tocó** — **PENDIENTE DE
+    ANGEL** (AG-DT-198).
+- **La lista del caso 3** de `p1_permisos_funciones.sql`, al fusionar con
+  `feature/limites-ajustables`, pasa a **50 funciones** (§13.5 de la auditoría
+  del conjunto).
+
+#### Para revisión de Angel (resumen)
+
+- **K1:** «Bloquear este horario» como enlace en la burbuja, sin gesto propio.
+- **K1:** el motivo del bloqueo viaja al título de Google (AG-DT-195).
+- **K2:** confirmar al abrir el correo, y el riesgo de un revisor de correo con
+  JavaScript. Mitigación propuesta: esperar un gesto `isTrusted` (AG-DT-175).
+- **K2:** la línea de `#codigo=` en `sentryPiiFilter.ts`, sin aplicar
+  (AG-DT-176).
+- **K2:** reenviar sigue gastando el tope de 3 por correo cada hora.
+- **K3:** el huso de la clínica, sólo de fábrica.
+- **K3:** pausar «Tu enlace» sin confirmación. «Cambiar por uno nuevo» de un
+  pausado lo deja prendido (AG-DT-184).
+- **K4:** la leyenda cuenta todos los consultorios conocidos, no sólo los
+  pintados.
+- **K5:** «No asistió» de un toque (AG-DT-192).
+- **Integración: PENDIENTE DE ANGEL.** El pintado optimista de la tarjeta con la
+  v2 apagada (AG-DT-198).
+- **Sigue pendiente de J5:** los turnos dobles (punto 23).
+
 ---
 
 ## 8. Sin verificar — comprobar antes de apoyarse en ello
@@ -6935,6 +7190,137 @@ primero sin marcar.
       build` del worktree principal revisaba con `tsc` hasta quedarse sin
       memoria.
 
+- [x] Tanda K (2026-11-18). Son los puntos 1 a 22 de Angel tras probar a mano la
+  tanda J. El 23, los turnos dobles, queda fuera.
+  - **Ramas y worktrees:** `feature/agenda-v2-k1` a `-k5`, todas desde `0cce313`.
+    La integración va en `feature/agenda-v2`, compilada en un worktree aparte
+    (`-agenda-integ`, ya retirado).
+  - Decisiones en §6-bis, «Tanda K».
+  - **Tres migraciones nuevas:** el conjunto pasa a **45** (5 de `main` y 40
+    del proyecto; §7.1, filas 43 a 45).
+  - **Paso 1 · fusiones**, todas con `--no-ff`: K1 `b367c04`, K2 `0b094e8`, K3
+    `0f17498`, K4 `5811802` y K5 `c3a9616`.
+    - Sin conflictos de texto (`git merge-tree` limpio en las cinco).
+    - `tsc` limpio.
+  - **Paso 2 · ajustes de integración:**
+    - `77a5b22`: las migraciones rehechas. `…130100` se fundió en `…130000`, y
+      K1 y K3 pasaron de sustituir fragmentos a llevar cuerpos completos, con
+      pre-vuelo por md5. El orden queda fijo, K1 → K3.
+    - `fe17b4f`: la pregunta del bloqueo en «Reagendar», y la salida animada del
+      modal sólo con la v2.
+    - Cada cambio tiene su prueba en rojo con la mutación. Revisores Sonnet y
+      revisión de seguridad, con hallazgos en §6-bis y AG-DT.
+  - **Paso 3 · base desde cero:**
+    - No había notas clínicas que respaldar: 0 filas fuera de la semilla.
+    - `supabase db reset --local` (CLI 2.117.0) con las 45, sin un error, y la
+      semilla.
+  - **Paso 4 · auditoría del conjunto:** `supabase/AUDITORIA-CONJUNTO-AGENDA-V2.md`
+    §13 (`3a8c9f5`).
+    - La lista del caso 3 de `p1` con `limites-ajustables` pasa de 47 a **50**.
+      En la base combinada (48 migraciones), las 43 pruebas SQL en verde.
+    - Tolerancia: la base con las 42 de J y el build integrado. Sólo fallan las
+      pruebas de lo que necesita las tablas o columnas nuevas, como se esperaba
+      (§13.7).
+  - **Paso 5 · verificación, una sola vez, sobre la base reiniciada:**
+    - Build limpio. Lint: 96 errores y 68 avisos. Los errores no suben; los
+      avisos suben 2 (AG-DT-196).
+    - Vitest: **2153** pruebas en 151 archivos. SQL: **39 de 39**, también
+      repetidas al acabar la batería.
+    - Las dos carreras, en verde, también al acabar la batería:
+      - `reserva-carrera`: 5 citas; el escenario 6, bloqueo contra reserva,
+        `B=ocupado` tras ~1,9 s.
+      - `confirmacion-carrera`.
+    - **Playwright completo, 1020 pruebas en 17,4 min: 564 pasan, 5 fallan, 444
+      saltadas y 7 sin correr.** Las saltadas son las de otro tamaño.
+    - **Las 5 fallas eran de la prueba, no de la app.** Expectativas anteriores a
+      cambios deliberados de la tanda:
+      - `agenda-configuracion` y `agenda-j1-engrane`: el primer paso del
+        administrador es «Horario de la clínica», «de 4» (K3);
+      - `agenda-g3-correo`, ×2: el botón del correo lleva `?paso=confirmar`
+        (K2);
+      - `agenda-k1-bloqueos` en el teléfono: su limpieza chocaba con una reserva
+        que deja `reserva-google`.
+
+      Arregladas en `4b07280`.
+    - **Repetidos sólo esos cuatro archivos: 23 pasan, 23 saltadas, 0 fallan.**
+    - **Las 7 sin correr, una por una:**
+      - `agenda-j1-engrane.e2e.ts:122`, escritorio: en la repetición, **pasa**;
+      - `agenda-k1-bloqueos.e2e.ts:84`, `:101`, `:119`, `:133`, `:144` y `:158`,
+        teléfono: son de escritorio (`soloEscritorio`) y en la repetición
+        **saltan** como deben. En el escritorio pasan las siete.
+    - **Una inestable:** «mover la cita dentro del bloqueo» falló una vez en una
+      segunda repetición (el arrastre no movió la cita), y pasó en otras tres
+      seguidas. Queda en AG-DT-200.
+  - **Paso 6 · rendimiento.** **4 rondas intercaladas** contra `0349221` y
+    `0cce313`, con el orden rotado y la v2 apagada y encendida en la Clínica A
+    (UPSERT), con los scripts de J.
+    - La carga con la v2 encendida se repitió en sus propias 4 rondas: la
+      primera pasada no cargó su config.
+    - Cada celda es la mediana de 20 muestras (5 por corrida). 0 errores en las
+      240 de «Guardar».
+
+    | Medida (mediana) | `0349221` apagada | `0349221` encendida | `0cce313` apagada | `0cce313` encendida | integración apagada | integración encendida |
+    |---|---|---|---|---|---|---|
+    | Apertura en frío (ms) | 270.0 | 273.5 | 270.0 | 274.0 | 273.0 | 275.0 |
+    | Red limitada (ms) | 760.5 | 764.0 | 776.5 | 783.0 | 781.0 | 791.0 |
+    | Semana siguiente (ms) | 64.5 | 68.5 | 64.5 | 68.0 | 65.5 | 67.5 |
+    | Semana anterior (ms) | 61.5 | 64.0 | 64.5 | 66.0 | 62.5 | 69.0 |
+    | Semana ya vista (ms) | 53.0 | 57.5 | 57.0 | 58.0 | 54.5 | 57.0 |
+    | Tras precarga (ms) | 53.0 | 59.0 | 55.0 | 58.5 | 54.5 | 59.0 |
+    | Volver del dashboard (ms) | 71.0 | 72.0 | 84.0 | 79.5 | 85.0 | 85.0 |
+    | Validaciones contra Auth (máx.) | 2 | 4 | 2 | 4 | 2 | 4 |
+    | Peticiones bloqueantes al volver (máx.) | 0 | 0 | 0 | 0 | 0 | 0 |
+    | JS al abrir `/agenda` (bytes) | 548 981 | 572 467 | 555 645 | 592 435 | **559 436** | **600 548** |
+    | Chunks de JS al abrir | 31 | 33 | 34 | 38 | 34 | 39 (36–39) |
+    | Guardar un evento: clic → tarjeta pintada (ms) | 31.6 | 31.8 | 31.7 | 31.7 | 32.0 | 31.7 |
+    | Guardar un evento: clic → modal fuera (ms) | 184.0 | 184.1 | 183.9 | 184.2 | **10.2** | 184.4 |
+    | Guardar un evento: POST /api/appointments (ms) | 47.6 | 47.8 | 47.6 | 48.5 | 46.2 | 46.6 |
+    | Guardar cita con paciente: clic → tarjeta pintada (ms) | 31.6 | 31.6 | 31.4 | 31.7 | 32.1 | 31.6 |
+    | Guardar cita con paciente: clic → modal fuera (ms) | 183.7 | 184.0 | 183.3 | 183.8 | **10.1** | 183.7 |
+    | Guardar cita con paciente: POST /api/appointments (ms) | 41.8 | 46.6 | 47.1 | 46.5 | 45.0 | 43.1 |
+
+    - **El JS contra `0cce313`:** +3,8 KB con la v2 apagada y +8,1 KB con ella
+      encendida, con 1 chunk más en la mediana. Es el código de la tanda: la
+      burbuja, las marcas, los bloqueos y la leyenda.
+    - **Con la red limitada:** +4,5 ms apagada y +8 ms encendida. Las corridas
+      no se solapan del todo (780–783 frente a 775–777, y 784–794 frente a
+      780–786). Va con AG-DT-136.
+    - El resto, dentro del ruido. «Volver del dashboard» ya estaba en ~84 ms en
+      `0cce313`.
+    - **Ninguna petición nueva al abrir**, y las mismas validaciones contra
+      Auth. Los bloqueos viajan en la respuesta de la semana.
+    - **«Guardar»:** la tarjeta se pinta a los ~31–32 ms en todos los árboles.
+      Con la v2 apagada, el modal se va a los **~10 ms** (antes, ~184). Es el
+      arreglo `fe17b4f`.
+    - **Punto 22, la celda re-medida (hoy, v2 apagada).** Con el script de K4
+      (`medir-k4.mjs`, adaptado a la base compartida con el flock), 2 rondas
+      intercaladas contra `0cce313` y 12 muestras por celda, 0 errores.
+      «Modal fuera del DOM»:
+      - al editar: 183,9 → **10,1 ms** el evento y 183,6 → **9,9 ms** la cita
+        con paciente;
+      - al crear: 183,8 → **10,4 ms** y 183,4 → **10,3 ms**.
+
+      La tarjeta, igual (~31 ms) y la petición igual (~44–45 ms). Antes del
+      proyecto (`a58419f`, cifras de K4), el modal se iba a los 27–42 ms porque
+      esperaba al PUT; ahora se va antes, porque cierra al instante. Resultados
+      en `/home/spinus/proyectos/tanda-K-temporales/integrador/perf/p22/`.
+    - **A1-bis:** sólo la sesión de red (2 rondas). La de renders falla en los
+      tres árboles por `window.__agMed`, igual que en la tanda J.
+      - Las mismas peticiones que `0cce313`, ruta por ruta, en los dos estados:
+        53–56 en total.
+      - Latencias iguales: `GET /api/appointments/:id` 24–25 ms, la semana 24–26
+        y `GET /api/google/events` 22–24.
+  - **Paso 7 · documentos:**
+    - Esta sección, §6-bis, §7 y §10.
+    - `CLAUDE.md`, sección «Agenda v2».
+    - `DEUDA_TECNICA.md`: AG-DT-167 a AG-DT-200 nuevas, y AG-DT-146 cerrada
+      como explicada, con las cifras de K4 y la re-medida.
+    - La guía: §8-septies, «Qué repetir tras la tanda K», §13.2 (filas 38 a 40)
+      y las casillas.
+  - **Paso 8 · capturas** de la integración, a 390 y 1280, en
+    `e2e/resultados/K/integracion/`, con el índice en
+    `e2e/resultados/K/index.html` y las cinco comparativas.
+
 **Bitácora** (una línea por sesión: fecha, qué quedó hecho, qué quedó a medias):
 
 - 2026-11-10/11 — Rama y worktree creados; A0 cerrado (sembrador, red e2e
@@ -7013,6 +7399,22 @@ primero sin marcar.
   - Capturas de la integración a 390 y 1280.
   - Para Angel: los turnos dobles (DECISIÓN PENDIENTE) y las «PARA REVISIÓN DE
     ANGEL» de §6-bis.
+  - Nada a medias.
+- 2026-11-18 — Tanda K (K1–K5):
+  - Cinco fusiones sin conflictos de texto.
+  - Las migraciones de K1 y K3 se rehicieron con cuerpos completos, y la de K2
+    quedó fundida en una. Dos arreglos: el bloqueo en «Reagendar» y la salida
+    del modal sólo con la v2.
+  - Base desde cero con 45 migraciones (no había notas que respaldar).
+  - Auditoría del conjunto §13.
+  - Una sola batería completa: 564 pasan, 5 fallan (de la prueba, arregladas) y
+    7 sin correr. Repetidos esos cuatro archivos: 23 pasan.
+  - Rendimiento contra `0349221` y `0cce313`: +3,8 KB de JS apagada y +8,1 KB
+    encendida. Con la v2 apagada, el modal se va a los ~10 ms en vez de 184
+    (punto 22).
+  - Capturas de la integración a 390 y 1280.
+  - Para Angel: las «PARA REVISIÓN DE ANGEL» de §6-bis «Tanda K», el pintado
+    optimista con la v2 apagada (PENDIENTE DE ANGEL) y los turnos dobles.
   - Nada a medias.
 
 ---
@@ -7145,6 +7547,26 @@ contra producción, Google real, correo real ni Vercel).
 - **El disparador de H5 con los roles de producción** (el SQL Editor como
   `postgres` lo salta; la app y `service_role`, no) y con la credencial de
   `spinus-consola`, que no escribe en `appointments` según su contrato.
+
+**Tanda K (2026-11-18)**
+- **Confirmar al abrir con un revisor de correo real** (K2, punto 8): las guardas
+  (`navigator.webdriver`, prerender, pestaña en segundo plano) se probaron con
+  Playwright y Mailpit. Qué hacen Outlook Safe Links, Gmail o un filtro
+  corporativo al «detonar» el enlace, no (AG-DT-175, AG-DT-177).
+- **El bloqueo en un Google real** (K1, punto 6): ida y vuelta sólo con el
+  Google simulado. Tampoco se probaron los casos de borde de AG-DT-169.
+- **El rótulo del bloqueo en un teléfono real** (K1): con ratón y con la
+  emulación táctil de Playwright, no en un dispositivo (AG-DT-174).
+- **La leyenda de husos con la zona real del sistema** (K4): con
+  `timezoneId` de Playwright (Mérida y Hermosillo), no cambiando la zona de un
+  equipo.
+- **«Continuar mi reserva» con dos pestañas en un navegador real** (K2,
+  `BroadcastChannel`): sólo en Chromium de Playwright.
+- **La migración de K3 sin la de K1, en producción:** aborta limpio en local
+  (§13.7 de la auditoría del conjunto); en el SQL Editor de Supabase, no se
+  probó.
+- **A1-bis de renders:** como en la tanda J, no se puede correr
+  (`window.__agMed`); sólo la sesión de red.
 
 **Tanda J (2026-11-18)**
 - **Restablecer en Google con un Google real** (J4, punto 9): la repetición

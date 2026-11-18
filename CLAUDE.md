@@ -781,10 +781,11 @@ proyecto, 32 con las de `main`).** Además de lo de arriba:
   apagado no sale ninguno y la prueba pasaría sin probar nada
   (`confirmacion-enlace` «lista A 4») o fallaría (`husos-dos-consultorios`).
 * **Al fusionar con `feature/limites-ajustables`, la lista del caso 3 de
-  `p1_permisos_funciones.sql` es de 45 funciones** (las 44 de la tanda H +
-  `cita_reagendar_clinica`; `cita_proteger_cierre()` y las demás de disparador
-  tienen los tres roles y NO entran), escrita entera en
-  `supabase/AUDITORIA-CONJUNTO-AGENDA-V2.md` §11.5. Las pruebas SQL que llamen
+  `p1_permisos_funciones.sql` es de 50 funciones** (tras la tanda K: las 47 de J
+  más `gcal_bloqueo_aplicar`, `rate_limit_espera` y `reserva_espera_reenvio`;
+  `agenda_bloqueo_preparar()`, `cita_proteger_cierre()` y las demás de
+  disparador tienen los tres roles y NO entran), escrita entera en
+  `supabase/AUDITORIA-CONJUNTO-AGENDA-V2.md` §13.5. Las pruebas SQL que llamen
   a una función de `pg_temp` como otro rol le dan GRANT explícito: con P1 nacen
   sin EXECUTE a PUBLIC.
 * **Cada migración nueva añade su fila a la tabla de migraciones de
@@ -956,6 +957,81 @@ proyecto, 32 con las de `main`).** Además de lo de arriba:
   del proyecto), una fila olvidada aborta «borrar clínicas» y deja la base
   compartida sin datos para todos (pasó con `gcal_movimientos_rechazados`). Quien
   cree una tabla así la añade a la semilla en el mismo commit.
+
+**Tanda K (2026-11-18, ramas K1-K5; 3 migraciones, el conjunto pasa a 45):**
+
+* **El bloqueo de horario (K1) es la tabla `agenda_bloqueos`**, NO una fila de
+  `appointments`.
+  - En la reserva por enlace ocupa en `reservar_por_enlace` (bloque de solape,
+    tras el candado 1790) y en `reserva_ocupacion`, y por ella en los turnos de
+    la página. **Un evento de todo el día ya NO cierra el día en el enlace**; los
+    de hora sí ocupan.
+  - En Spinus no impide agendar: pregunta «Este horario está bloqueado. ¿Agendar
+    de todos modos?», sólo para citas, en **todos** los caminos que crean o
+    mueven una: burbuja, modal, arrastre y «Reagendar» (`PanelReagendar`,
+    integración K). Un camino nuevo que cambie la hora de una cita pregunta
+    igual (`tocaBloqueo` / `buscarBloqueo`).
+* **Las funciones de la reserva van en cuerpos completos** (integración K): K1
+  (`20261123120000`) y K3 (`20261123140000`) dejaron de sustituir fragmentos.
+  El orden es fijo, K1 → K3: K3 sin K1 aborta, y K1 después de K3 también. Quien
+  vuelva a pegar `reservar_por_enlace`, `reserva_ocupacion`, `reserva_contexto`,
+  `reagendar_por_enlace`, `cita_reagendar_oferta` o `reserva_codigo_emitir`
+  parte del cuerpo vigente y conserva el `OR EXISTS … agenda_bloqueos`, el `NOT
+  a.all_day` y `pausado_en IS NULL`. Pre-vuelo por md5 de `prosrc`, como ellas.
+* **Los bloqueos en el cliente** viajan en `GET /api/appointments` (campo
+  `bloqueos`) y en la semilla de la página. Abrir la agenda no hace ninguna
+  petición nueva.
+  - En la rejilla son eventos `bloqueo:<id>`, con los datos ANIDADOS en
+    `extendedProps.bloqueo`. Todo lector que cuente citas los quita con
+    `esBloqueo`. **No pongas `medico_id` ni `status` sueltos en ese evento.**
+  - En Google van como «Ocupado» con la marca privada `spinus_bloqueo`. La
+    sincronización los aparta antes de `decidirEvento` y sólo los mueve o borra
+    (`gcal_bloqueo_aplicar`, que nunca crea).
+* **Confirmar desde el correo (K2)** lleva `?paso=confirmar`.
+  `ConfirmarAlCargar.tsx` manda al cargar el MISMO POST del botón, una vez, y
+  nunca con `navigator.webdriver`, durante el prerender ni en segundo plano. El
+  GET y el HEAD **nunca** escriben. Riesgo aceptado, pendiente de Angel: un
+  revisor de correo que ejecute JavaScript confirmaría (AG-DT-175). No lo
+  «arregles» moviendo la escritura al GET.
+* **El código va en el fragmento** (`#codigo=`, nunca en `?`). La página lo lee
+  y lo borra con `replaceState`.
+* **Los 30 s entre códigos son POR ENLACE** (`reserva_espera_reenvio`,
+  `REENVIO_CODIGO_S`). Contarlos con la llave global del correo filtra actividad
+  entre clínicas, y el 429 del tope global por correo **no** lleva plazo.
+  `reserva_codigo_verificar` devuelve `reemplazado` para un código anterior del
+  mismo enlace y correo, sin sumar. La reserva pública guarda en
+  `sessionStorage` (`spinus.reserva.<enlace>`, 30 min) sin nombre, teléfono ni
+  código; nada va a `localStorage`.
+* **`clinicas.timezone` (K3) es sólo el huso «de fábrica»:** lo propone la
+  configuración y lo preselecciona el alta de consultorios. NO lo leen la
+  rejilla, la reserva ni los correos, que usan `consultorios.timezone`. Es
+  columna nueva: contrato con `spinus-consola` intacto.
+* **Un fijo pausado** (`reserva_enlaces.pausado_en`) es, hacia fuera, idéntico
+  a uno revocado o inexistente. Toda función nueva que abra un enlace para el
+  público mira `revocado_en IS NULL AND pausado_en IS NULL` (caso 6 de
+  `k3_enlace_pausado.sql`). Apagar «Tu enlace» PAUSA; sólo «Cambiar por uno
+  nuevo» y «Empezar de nuevo» revocan.
+* **La leyenda de husos** (`leyendaHusos.ts`, K4) se calcula con lo que la
+  agenda ya tiene (los consultorios de la página y la zona de `Intl`). Va en
+  `AvisosAgenda`, nunca dentro de `<FullCalendar>` ni con petición propia.
+  «Huso» = desfase con UTC, no el nombre de la zona. Usa la clase
+  `.ag-banda-compacta` con `data-leyenda-husos`: un selector de la banda de
+  «Vista compacta» lleva `:not([data-leyenda-husos])`.
+* **La salida animada del modal de la cita es de la v2** (integración K): con la
+  v2 apagada, `closeModal` lo desmonta al instante, como antes del proyecto
+  (e2e `agenda-k-salida-modal`). Lo que mide «guardar» es la tarjeta pintada
+  (~31 ms), no la salida del modal (AG-DT-146, cerrada). El pintado optimista
+  con la v2 apagada sigue y está pendiente de Angel (AG-DT-198).
+* **Marcas de procedencia (K5, sólo v2).** «Por ligar» y «Por asignar» son un
+  solo icono, el expediente tachado (`esPorLigar`). El eslabón depende de
+  `reserva_canal` y es permanente. Las dibuja `MarcasCita.tsx`. Con la v2
+  apagada, las píldoras de siempre.
+* **La burbuja de la cita (K5) es `BurbujaCita.tsx`**, y sale de
+  `burbujaDeTarjeta`, derivada de `disposicionDeTarjeta`. No metas reglas de
+  acción en la burbuja: la regla sigue siendo `disposicionDeTarjeta`, la que
+  refleja el servidor. «No es una cita» (sin signos) sólo va en el pie de la
+  burbuja; el formulario, «Próximas citas» y la campana dicen «¿No es una
+  cita?».
 
 ---
 
