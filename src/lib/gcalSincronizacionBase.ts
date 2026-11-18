@@ -216,6 +216,11 @@ export async function aplicarEvento(clinicaId: string, calendarId: string, a: Ap
   }))
 }
 
+/** K1 · Mueve o borra el bloqueo de horario de un evento de Google (nunca crea). Devuelve las filas tocadas. */
+export async function llamarBloqueo(clinicaId: string, args: Record<string, unknown>): Promise<unknown> {
+  return llamar('gcal_bloqueo_aplicar', clinicaId, args)
+}
+
 /** Importa un evento creado en Google. Devuelve el id nuevo o null (ya existía / no procede). */
 export async function importarEvento(clinicaId: string, calendarId: string, d: DatosImportar): Promise<string | null> {
   return z.guid().nullable().parse(await llamar('gcal_importar_evento', clinicaId, {

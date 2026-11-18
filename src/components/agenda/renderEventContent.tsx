@@ -5,6 +5,7 @@
  * comentarios; sólo cambiaron los `import`/`export` que hacían falta.
  */
 
+import { bloqueoDe } from '@/lib/agenda/bloqueosAgenda'
 import type { EventContentArg } from '@fullcalendar/core'
 import type { Appointment } from '@/lib/agenda/tiposAgenda'
 import { esVistaDeRejilla } from '@/lib/agenda/vistasAgenda'
@@ -28,6 +29,11 @@ export type InicialesDeCita = (ext: Appointment) => string | undefined
    función —el `eventContent` de FullCalendar— no cambie al leerse el
    interruptor. */
 export function renderEventContent(arg: EventContentArg, navegadorTZ: string, inicialesDeCita: InicialesDeCita) {
+  /* K1 · El bloqueo de horario va ANTES QUE TODO: no es una cita ni un evento
+     (sus datos van anidados en `extendedProps.bloqueo`), y en ninguna vista
+     debe caer en una tarjeta de cita. */
+  const bloqueo = bloqueoDe(arg.event)
+  if (bloqueo) return <ContenidoBloqueo id={bloqueo.id} rotulo={arg.event.title} fondo={arg.event.display === 'background'} />
   // Vista Mes: chip plano dedicado. El camino de Semana/Día (abajo) queda intacto.
   if (arg.view.type === 'dayGridMonth') return <MonthChip arg={arg} />
   /* La misma pregunta que la línea de arriba, en la otra dirección: allí «¿es
@@ -185,5 +191,19 @@ export function renderEventContent(arg: EventContentArg, navegadorTZ: string, in
       marcaTitulo={marca?.titulo ?? null}
       origenGoogle={ext.origen === 'google'}
     />
+  )
+}
+
+/**
+ * K1 · El rótulo del bloqueo. En la rejilla (fondo rayado) es lo ÚNICO que
+ * abre la edición —`data-bloqueo-abrir`, lo lee `AgendaCliente`—: el resto de
+ * la franja deja pasar el clic al hueco. En la lista y en el Mes con hora es
+ * la fila entera.
+ */
+function ContenidoBloqueo({ id, rotulo, fondo }: { id: string; rotulo: string; fondo: boolean }) {
+  return (
+    <span className={fondo ? 'ag-bloqueo-rotulo' : 'ag-bloqueo-fila'} data-bloqueo-abrir={id} title={rotulo}>
+      {rotulo}
+    </span>
   )
 }

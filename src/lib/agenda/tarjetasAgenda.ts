@@ -8,6 +8,7 @@
  * cambiaron los `import`/`export` que hacían falta.
  */
 
+import { esBloqueo } from '@/lib/agenda/bloqueosAgenda'
 import type { EventApi } from '@fullcalendar/core'
 import type { IconoEvento, ColorEvento } from '@/lib/appointments'
 import type { Status, Appointment } from './tiposAgenda'
@@ -258,6 +259,10 @@ export function tintasDelChipDeMes(
    cumple (FullCalendar sigue pudiendo llamarla tal cual desde
    `eventClassNames`), y así se puede probar sin montar un calendario. */
 export function clasesDelEvento(arg: { event: Pick<EventApi, 'id' | 'allDay' | 'extendedProps'> }): string[] {
+  /* K1 · Un bloqueo de horario no es una cita ni un evento: ninguna clase de
+     tarjeta (`ag-ev-evento` le pondría el fondo de un evento encima de la raya).
+     Su única clase, `ag-bloqueo`, la trae el propio evento (`bloqueoAEvento`). */
+  if (esBloqueo(arg.event)) return []
   const ext: Partial<Appointment> & { isGcalBlock?: boolean; saliendo?: unknown } = arg.event.extendedProps
   /* Bloque F (F2.4/F2.5): la entrada de la cita nueva, el anillo de la que
      llega por tiempo real y la salida. Las decide `marcasMovimiento.ts` por

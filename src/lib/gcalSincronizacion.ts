@@ -32,6 +32,7 @@
  * Migraciones ausentes → `SincronizacionNoDisponible` → `no_disponible`. En
  * ninguno de los dos casos se llama a Google ni se lanza.
  */
+import { aplicarBloqueosDePagina, tieneMarcaBloqueo } from '@/lib/gcalSincronizacionBloqueos'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { conCalendarioSpinus, esCredencialInvalida, type GCalCliente } from '@/lib/gcal'
 import type { ConexionGoogle } from '@/lib/gcalConexion'
@@ -263,10 +264,14 @@ function perdido(r: ResultadoSincronizacion): true {
 async function procesarPagina(
   pasada: Pasada,
   calendar: GCalCliente,
-  items: EventoGoogle[],
+  todos: EventoGoogle[],
   pagina: { calendarId: string; ventana: string | null; zona: string | null },
 ): Promise<void> {
   const { conexion } = pasada
+  /* K1 · lo de los bloqueos de horario va aparte (`gcalSincronizacionBloqueos.ts`):
+     nunca pasa por `decidirEvento`, que lo importaría como un evento nuevo. */
+  const deBloqueo = todos.filter(tieneMarcaBloqueo)
+  const items = todos.filter((e) => !tieneMarcaBloqueo(e))
   const ids = items.map((e) => e.id).filter((id): id is string => typeof id === 'string')
   const marcas = items.map(marcaSpinus).filter((m): m is string => m !== null)
   const filas = ids.length > 0 || marcas.length > 0 ? await citasDeEventos(conexion.clinicaId, ids, marcas) : []
@@ -281,6 +286,9 @@ async function procesarPagina(
     const fila: FilaEspejo | null = (evento.id ? porEvento.get(evento.id) : undefined) ?? (marca ? porId.get(marca) : undefined) ?? null
     return { evento, fila, decision: decidirEvento(evento, fila, ctx) }
   })
+  /* Un borrado llega SIN marca: el que no es de ninguna cita puede ser de un bloqueo. */
+  const borradosSinFila = tareas.filter((t) => t.evento.status === 'cancelled' && !t.fila).map((t) => t.evento)
+  pasada.r.errores += await aplicarBloqueosDePagina(conexion.clinicaId, pagina.calendarId, deBloqueo, borradosSinFila)
   const pendientes: PorRestablecer[] = []
   for (let i = 0; i < tareas.length; i += LOTE) {
     const lote = tareas.slice(i, i + LOTE)

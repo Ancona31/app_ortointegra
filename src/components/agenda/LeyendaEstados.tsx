@@ -50,6 +50,13 @@ export function LeyendaEstados({ clasica = false }: { clasica?: boolean }) {
           tokens de color y la exhaustividad que garantiza el compilador. La
           barra dice justo eso: lo de la izquierda es una escala, esto no. */}
       <span aria-hidden className="text-[11px] text-[var(--ag-faint)]">|</span>
+      {/* K1 · el bloqueo de horario: la misma raya que la franja (`.ag-bloqueo`). Sólo con la v2. */}
+      {!clasica && (
+        <div className="flex items-center gap-1.5" data-leyenda-bloqueo>
+          <span aria-hidden className="ag-leyenda-bloqueo w-3 h-2 rounded-sm flex-shrink-0" />
+          <span className="text-[11px] font-medium text-[var(--ag-muted)]">{ETIQUETA_LEYENDA_BLOQUEO}</span>
+        </div>
+      )}
       {clasica ? <MarcaGCal /> : (
         <div className="flex items-center gap-1.5" data-leyenda-google>
           <GoogleGIcon size={11} />
@@ -59,6 +66,9 @@ export function LeyendaEstados({ clasica = false }: { clasica?: boolean }) {
     </div>
   )
 }
+
+/** K1 · El bloqueo de horario en la leyenda. */
+export const ETIQUETA_LEYENDA_BLOQUEO = 'Bloqueo'
 
 /** Tanda J, punto 11 · Lo que la «G» quiere decir en la v2 (lo de Google lleva los colores de estado). */
 export const ETIQUETA_LEYENDA_GOOGLE = 'Se agendó en Google'

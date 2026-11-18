@@ -74,9 +74,11 @@ export async function GET(req: NextRequest) {
       clinicaId: profile.clinica_id, from, to, medicoId: medicoFilter,
     })
     if (!resultado.ok) return NextResponse.json({ error: resultado.error }, { status: 500 })
-    const { appointments: filas, incompleta } = resultado
+    const { appointments: filas, incompleta, bloqueos } = resultado
 
-    return NextResponse.json({ appointments: filas, incompleta })
+    /* K1: los bloqueos de horario viajan aparte de las citas (no son filas de
+       `appointments`); sin la migración llegan vacíos. */
+    return NextResponse.json({ appointments: filas, incompleta, bloqueos })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Error interno'
     return NextResponse.json({ error: message }, { status: 500 })

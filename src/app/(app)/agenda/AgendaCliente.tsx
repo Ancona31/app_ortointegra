@@ -9,7 +9,7 @@ import { useRouter } from 'next/navigation'
 import { logger } from '@/lib/logger'
 import FullCalendar from '@fullcalendar/react'
 import type { DateClickArg, EventResizeDoneArg } from '@fullcalendar/interaction'
-import type { DatesSetArg, EventClickArg, EventDropArg, DateSelectArg, EventApi, EventContentArg, DayHeaderContentArg } from '@fullcalendar/core'
+import type { DatesSetArg, EventClickArg, EventDropArg, DateSelectArg, EventApi, EventContentArg, DayHeaderContentArg, EventInput } from '@fullcalendar/core'
 import { Calendar as CalendarioFC } from '@fullcalendar/core'
 import esLocale from '@fullcalendar/core/locales/es'
 import { createClient } from '@/lib/supabase/client'
@@ -48,6 +48,8 @@ import { PanelDelDia } from '@/components/agenda/PanelDelDia'
 import { PanelDia } from '@/components/agenda/PanelDia'
 import { renderSinEventos } from '@/components/agenda/renderSinEventos'
 import { vaciarCacheCitas } from '@/lib/agenda/cacheRangosCitas'
+import { bloqueoDe, displayDeBloqueo, esBloqueo, mensajeCitasEnBloqueo, rotuloBloqueoPulsado, tocaBloqueo, type AperturaBloqueo } from '@/lib/agenda/bloqueosAgenda'
+import type { ModoBloqueo } from '@/components/agenda/ModalBloqueo'
 import { vaciarCacheGoogle } from '@/lib/agenda/cacheEventosGoogle'
 import type { SemillaCitas } from '@/lib/agenda/semillaCitas'
 import { enOcioso, cancelarOcioso } from '@/lib/agenda/ocioso'
@@ -114,6 +116,10 @@ const AppointmentModal = dynamic(() => import('@/components/agenda/AppointmentMo
   ssr: false, loading: () => null,
 })
 const HorarioModal = dynamic(() => import('@/components/agenda/HorarioModal'), {
+  ssr: false, loading: () => null,
+})
+/* K1 · El modal del bloqueo de horario: se abre poco, carga al abrirse. */
+const ModalBloqueo = dynamic(() => import('@/components/agenda/ModalBloqueo'), {
   ssr: false, loading: () => null,
 })
 const ModalInvitacionCita = dynamic(() => import('@/components/agenda/ModalInvitacionCita'), {
@@ -417,6 +423,8 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
      cerró (`closeModal()` corre antes del `fetch` en `handleSave`).
      `esperandoEvento` distingue las dos puertas: recién creada (hay que esperar
      a que Google conteste) o abierta a mano desde una cita que ya tiene evento. */
+  /* K1 · El bloqueo de horario abierto (crear o editar); `null` = cerrado. */
+  const [modalBloqueo, setModalBloqueo] = useState<ModoBloqueo | null>(null)
   const [invitacion, setInvitacion] = useState<
     { citaId: string; paciente: { id: string; nombre: string; correoFicha: string | null } | null; esperandoEvento: boolean } | null
   >(null)
@@ -1194,6 +1202,37 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
      FECHA (fundido) o el primero / un cambio de vista (lo hace `ag-vista`). */
   const vistaPreviaRef = useRef<MarcaDeVista | null>(null)
 
+  /* K1 · La vista en la que se parsean los bloqueos (`eventDataTransform`) y
+     el cambio de `display` al cambiar de vista: fondo rayado en la rejilla,
+     fila en la lista (que no pinta fondos) y en el Mes con hora. */
+  /* ⚠️ CON LA V2 APAGADA EL BLOQUEO NO SE PINTA (`display: 'none'`) y no se
+     descarta: el interruptor se resuelve DESPUÉS de la primera traída, y un
+     evento descartado no volvería sin otra petición. Al encenderse, el efecto
+     de abajo le pone su `display`. */
+  const vistaBloqueosRef = useRef('timeGridWeek')
+  const bloqueosVisiblesRef = useRef(false)
+  function displayVivo(vista: string, todoElDia: boolean): 'background' | 'auto' | 'none' {
+    return bloqueosVisiblesRef.current ? displayDeBloqueo(vista, todoElDia) : 'none'
+  }
+  function repintarBloqueos(todos: readonly EventApi[]) {
+    for (const ev of todos) {
+      const b = bloqueoDe(ev)
+      if (!b) continue
+      const display = displayVivo(vistaBloqueosRef.current, b.todo_el_dia)
+      if (ev.display !== display) ev.setProp('display', display)
+    }
+  }
+  function alCambiarVistaBloqueos(vista: string, todos: readonly EventApi[]) {
+    if (vistaBloqueosRef.current === vista) return
+    vistaBloqueosRef.current = vista
+    repintarBloqueos(todos)
+  }
+  useEffect(() => {
+    bloqueosVisiblesRef.current = agendaV2
+    repintarBloqueos(calendarRef.current?.getApi().getEvents() ?? [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sólo al cambiar el interruptor
+  }, [agendaV2])
+
   function alCambiarFechas(arg: DatesSetArg) {
     /* F2.3 · el fundido de navegación: el armazón de .7 a 1 en micro, SIN
        traslación (CONTRASTE §2.3). Va primero porque `datesSet` llega con el
@@ -1217,8 +1256,13 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
        resuelve DESPUÉS del primer `datesSet`. Una cadena más no repinta nada. */
     setRangoVisible(`${partirFechaHora(arg.view.currentStart.toISOString()).fecha}/${partirFechaHora(arg.view.currentEnd.toISOString()).fecha}`)
     setPeriodoVacio(periodoDeLaVista(arg.view))
-    const eventos = calendarRef.current?.getApi().getEvents() ?? []
+    const todos = calendarRef.current?.getApi().getEvents() ?? []
+    /* K1 · un bloqueo no es una cita: fuera de la ventana, el conteo y el panel.
+       El resumen (huecos) sí lo ve: es tiempo cerrado. */
+    const eventos = todos.filter(e => !esBloqueo(e))
+    const paraResumen = bloqueosVisiblesRef.current ? todos : eventos
     const rangos = rangosDeLaVista(arg.view)
+    alCambiarVistaBloqueos(arg.view.type, todos)
     aplicarVentana(eventos, rangos)
     aplicarConteo(eventos, rangos)
     /* El panel del mes va DETRÁS de los otros dos y de la misma llamada,
@@ -1233,7 +1277,7 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
        están resueltos aquí. La VISTA sale del `arg` y NUNCA de
        `currentView`: el `setCurrentView` de la primera línea de este
        handler todavía no ha llegado al render. */
-    aplicarResumen(eventos, rangos, arg.view.type)
+    aplicarResumen(paraResumen, rangos, arg.view.type)
     // A1.5b: última llamada, por lo mismo que las de arriba — sólo
     // que ésta no pinta nada, programa la precarga en ocioso.
     programarPrecarga(arg.view)
@@ -1244,15 +1288,17 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
      decide el registro explícito, nunca esta diferencia. */
   const idsPreviosRef = useRef<ReadonlySet<string>>(new Set())
 
-  function alCambiarEventos(eventos: EventApi[]) {
-    const ids = new Set(eventos.map(e => e.id))
+  function alCambiarEventos(todos: EventApi[]) {
+    const ids = new Set(todos.map(e => e.id))
     podarMarcas(ids, idsPreviosRef.current)
     idsPreviosRef.current = ids
     const rangos = rangoDeVista()
+    /* K1 · como en `alCambiarFechas`: el bloqueo sólo entra en el resumen. */
+    const eventos = todos.filter(e => !esBloqueo(e))
     aplicarVentana(eventos, rangos)
     aplicarConteo(eventos, rangos)
     aplicarPanel(eventos)
-    aplicarResumen(eventos, rangos, calendarRef.current?.getApi().view.type ?? '')
+    aplicarResumen(bloqueosVisiblesRef.current ? todos : eventos, rangos, calendarRef.current?.getApi().view.type ?? '')
     // A1.5b: `eventsSet` cubre lo que `datesSet` no — ver su nota
     // larga, junto al `<FullCalendar>`—, y la vista sale de la API
     // porque aquí no llega `arg.view`.
@@ -1276,14 +1322,64 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
     if (!estaCargando) setHuboTraida(true)
   }
 
+  /* K1 · El clic en el rótulo de un bloqueo abre su edición; el resto de la
+     franja deja pasar el clic y el arrastre al hueco (agendar encima pregunta). */
+  function abrirBloqueoPintado(id: string | null): boolean {
+    if (!id) return false
+    const ev = calendarRef.current?.getApi().getEventById(`bloqueo:${id}`)
+    const b = ev ? bloqueoDe(ev) : null
+    if (b) setModalBloqueo({ tipo: 'editar', bloqueo: b })
+    return b !== null
+  }
+  function abrirAltaBloqueo(desde: AperturaBloqueo) {
+    if (subState.isBlocked) { openBloqueoModal(); return }
+    setModalBloqueo({ tipo: 'crear', desde: { ...desde, medicoId: desde.medicoId || defaultMedicoId || null } })
+  }
+  /* ⚠️ EL ROTULO SE LEE EN EL `pointerdown` Y NO EN EL `jsEvent` del clic: al
+     soltar, FullCalendar ya pintó su `.fc-highlight` encima y el `target` del
+     `mouseup` es ese resaltado, no el rótulo. */
+  const rotuloAlBajarRef = useRef<string | null>(null)
+  useEffect(() => {
+    const raiz = raizRef.current
+    if (!raiz) return
+    /* Vale para TODO el gesto (FullCalendar emite `select` y `dateClick` del
+       mismo clic) y se olvida cuando ya respondieron los dos. */
+    const alBajar = (e: PointerEvent): void => { rotuloAlBajarRef.current = rotuloBloqueoPulsado(e) }
+    const alSoltar = (): void => { window.setTimeout(() => { rotuloAlBajarRef.current = null }, 0) }
+    raiz.addEventListener('pointerdown', alBajar, true)
+    window.addEventListener('pointerup', alSoltar, true)
+    return () => { raiz.removeEventListener('pointerdown', alBajar, true); window.removeEventListener('pointerup', alSoltar, true) }
+  }, [])
+  function rotuloDelGesto(): string | null {
+    return rotuloAlBajarRef.current
+  }
+  function alPulsarHueco(arg: DateClickArg) {
+    if (abrirBloqueoPintado(rotuloDelGesto())) return
+    handleDateClick(arg)
+  }
+  function alSeleccionar(arg: DateSelectArg) {
+    if (abrirBloqueoPintado(rotuloDelGesto())) { calendarRef.current?.getApi().unselect(); return }
+    handleSelect(arg)
+  }
+  function alPulsarEvento(arg: EventClickArg) {
+    const b = bloqueoDe(arg.event)
+    if (!b) { handleEventClick(arg); return }
+    if (arg.event.display !== 'background' || rotuloBloqueoPulsado(arg.jsEvent)) setModalBloqueo({ tipo: 'editar', bloqueo: b })
+  }
+
   const manejadoresFcRef = useRef({
     alCambiarFechas, alCambiarEventos, alPulsarNumeroDeDia, alCambiarCarga,
-    handleDateClick, handleSelect, handleEventClick, handleEventDrop, handleEventResize,
+    handleDateClick: alPulsarHueco, handleSelect: alSeleccionar, handleEventClick: alPulsarEvento, handleEventDrop, handleEventResize,
   })
   manejadoresFcRef.current = {
     alCambiarFechas, alCambiarEventos, alPulsarNumeroDeDia, alCambiarCarga,
-    handleDateClick, handleSelect, handleEventClick, handleEventDrop, handleEventResize,
+    handleDateClick: alPulsarHueco, handleSelect: alSeleccionar, handleEventClick: alPulsarEvento, handleEventDrop, handleEventResize,
   }
+  /* K1 · Estable: lee la vista de un ref, así la prop no cambia de identidad. */
+  const transformarEventoFc = useCallback((ev: EventInput): EventInput => {
+    const b = bloqueoDe({ extendedProps: ev.extendedProps ?? {} })
+    return b ? { ...ev, display: displayVivo(vistaBloqueosRef.current, b.todo_el_dia) } : ev
+  }, [])
   const datesSetFc = useCallback((arg: DatesSetArg) => manejadoresFcRef.current.alCambiarFechas(arg), [])
   const eventsSetFc = useCallback((eventos: EventApi[]) => manejadoresFcRef.current.alCambiarEventos(eventos), [])
   const navLinkDayClickFc = useCallback((fecha: Date) => manejadoresFcRef.current.alPulsarNumeroDeDia(fecha), [])
@@ -1928,6 +2024,7 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
           eventResizableFromStart
           businessHours={horasHabilesFc}
           eventSources={eventSourcesStable}
+          eventDataTransform={transformarEventoFc}
           /* ── LOS DOS GANCHOS DE ESTADO DE CARGA (bloque 9) ────────────────
              `loading` es el AGREGADO de las dos fuentes: FullCalendar lo emite
              en `true` cuando la primera empieza a traer y en `false` cuando la
@@ -2125,6 +2222,25 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
           })}
           setModal={setModal}
           setConfirm={setConfirm}
+          onBloquear={abrirAltaBloqueo}
+        />
+      )}
+
+      {/* ── K1 · Bloqueo de horario ─────────────────────── */}
+      {modalBloqueo && (
+        <ModalBloqueo
+          key={modalBloqueo.tipo === 'editar' ? modalBloqueo.bloqueo.id : 'nuevo'}
+          modo={modalBloqueo}
+          medicos={medicos}
+          ocultarMedico={isSingleDoctor || isMedicoSinAdmin}
+          zona={navegadorTZ}
+          onClose={() => setModalBloqueo(null)}
+          onGuardado={(citas) => {
+            setModalBloqueo(null); vaciarCacheCitas(); refetch()
+            toast.success('Horario bloqueado')
+            if (citas > 0) toast.info(mensajeCitasEnBloqueo(citas))
+          }}
+          onQuitado={() => { setModalBloqueo(null); vaciarCacheCitas(); refetch(); toast.success('Bloqueo quitado') }}
         />
       )}
 
@@ -2186,6 +2302,13 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
              `setModal` no pueda inventarse un estado de creación desde una
              edición si alguien cablea mal esto mañana. */
           onCambiarTipo={tipo => setModal(m => (m.mode === 'create' ? { ...m, tipo } : m))}
+          /* K1 · sólo con la v2: la posición «Bloqueo» del alta y la pregunta al
+             guardar una cita sobre un bloqueo pintado. */
+          onBloquear={agendaV2 ? (desde) => { closeModal(); abrirAltaBloqueo(desde) } : undefined}
+          buscarBloqueo={agendaV2 ? (inicio, fin, medicoId) => {
+            const api = calendarRef.current?.getApi()
+            return api ? tocaBloqueo(api.getEvents(), medicoId, inicio, fin) : false
+          } : undefined}
           onInvitar={() => {
             if (modal.mode !== 'edit') return
             setInvitacion({

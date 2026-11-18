@@ -11,6 +11,7 @@
  * `import`/`export` que hacían falta.
  */
 
+import { esBloqueo } from '@/lib/agenda/bloqueosAgenda'
 import type { EventApi } from '@fullcalendar/core'
 import type { Horario } from '@/lib/configApp'
 import type { Appointment, Status } from './tiposAgenda'
@@ -87,6 +88,10 @@ export function jornadaDelDia(dia: Date, horario: Horario): Tramo | null {
 /** Si un evento consume hora del día. Las reglas están arriba, en la cabecera
  *  del bloque; esto es su única implementación. */
 export function eventoOcupa(ev: EventApi): boolean {
+  /* K1 · un bloqueo de horario ocupa SIEMPRE, también el de días completos: es
+     justo el tiempo que el médico cerró, así que no es un hueco libre. Va antes
+     que la regla de `allDay`, que es para los eventos (un «Congreso» no cierra). */
+  if (esBloqueo(ev)) return true
   if (ev.allDay) return false
   /* ANOTADO Y NO CASTEADO, igual que en `filasDelDia`: `extendedProps` es
      `Dictionary` (`Record<string, any>`) y leerlo directo mete `any` en el
@@ -178,7 +183,7 @@ export function contarTodoElDia(eventos: readonly EventApi[], dia: Date): number
   const fin = base + MINUTOS_POR_DIA * 60_000
   let n = 0
   for (const ev of eventos) {
-    if (!ev.allDay || !ev.start) continue
+    if (!ev.allDay || !ev.start || esBloqueo(ev)) continue
     if (ev.start.getTime() < fin && (ev.end ?? ev.start).getTime() > base) n += 1
   }
   return n

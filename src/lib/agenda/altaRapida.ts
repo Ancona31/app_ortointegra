@@ -16,6 +16,7 @@
  * archivo: va en `buscarCitasPaciente.ts`, que la necesita también, y así éste
  * sigue sin red y se prueba sin simular Supabase.
  */
+import { TEXTO_CONFIRMAR_BLOQUEO } from '@/lib/agenda/bloqueosAgenda'
 import type { AltaGuardada, DatosGuardado } from '@/lib/agenda/tiposAgenda'
 import type { PacienteBusqueda } from '@/components/agenda/AppointmentModal'
 import type { GestoAlta } from '@/lib/agenda/contratosV2'
@@ -186,6 +187,8 @@ export interface DependenciasGuardado {
    * si sigue por el aviso de empalme del servidor).
    */
   guardar: (datos: DatosGuardado) => Promise<AltaGuardada | null>
+  /** K1 (punto 3) · ¿Cae en un bloqueo de horario de ese médico? Sin ella, no se pregunta. */
+  bloqueado?: (inicio: Date, fin: Date, medicoId: string | null) => boolean
 }
 
 /**
@@ -220,6 +223,8 @@ export async function guardarAltaRapida(
   const tocadas = horas.inicio !== horasDeApertura.inicio || horas.fin !== horasDeApertura.fin
   const aviso = tocadas ? d.avisoHorario(inicio, fin, datos) : null
   if (aviso && !(await d.confirmar(aviso))) return no
+  /* K1 · tras el horario y antes del empalme: pregunta, no impide. */
+  if (d.bloqueado?.(inicio, fin, datos.medico_id ?? null) && !(await d.confirmar(TEXTO_CONFIRMAR_BLOQUEO))) return no
   const lista = d.buscarEmpalmes({
     id: '', medicoId: datos.medico_id ?? null, inicio, fin, todoElDia: false, noOcupa: false, deGoogle: false, titulo: '',
   })
