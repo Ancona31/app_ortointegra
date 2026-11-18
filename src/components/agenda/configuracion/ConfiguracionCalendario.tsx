@@ -22,7 +22,8 @@
  *
  * Tanda T2 (puntos 7 y 12): las secciones van en cuatro grupos —horario,
  * citas, reserva por enlace y este dispositivo— con la retícula `--ag-*`
- * (`TarjetaSeccion`), y arriba «Para empezar» mientras al médico le falte un
+ * (`TarjetaSeccion`). Tanda J (punto 18): «Este dispositivo» se fue con su
+ * única opción al menú del engrane («Pop-up de eventos»). Arriba «Para empezar» mientras al médico le falte un
  * paso. La lista de enlaces se pide aquí una vez y la leen las dos.
  *
  * G2 (puntos 5, 7, 8, 10 y 20 de Angel; la maqueta): «Primeros pasos» con su
@@ -58,8 +59,6 @@ import SeccionEnlacesReserva from '@/components/agenda/configuracion/SeccionEnla
 import SeccionContactosBloqueados from '@/components/agenda/configuracion/SeccionContactosBloqueados'
 import PasosConfiguracion, { pasosDe, type ClavePaso } from '@/components/agenda/configuracion/PasosConfiguracion'
 import { cargarListaEnlaces, type EstadoLista } from '@/components/agenda/configuracion/listaEnlaces'
-import PreferenciaTarjetaAlPasar from '@/components/agenda/configuracion/PreferenciaTarjetaAlPasar'
-import TarjetaSeccion from '@/components/agenda/configuracion/TarjetaSeccion'
 import ZonaRestablecer from '@/components/agenda/configuracion/ZonaRestablecer'
 import { TEXTO_SUAVE } from '@/components/agenda/configuracion/clasesConfig'
 
@@ -139,8 +138,6 @@ function resumenPasos(usuarioId: string, consultorios: readonly Consultorio[] | 
   }
 }
 
-const DISPOSITIVO_NOTA = 'Valen sólo en este navegador; no cambian nada para los demás.'
-
 /**
  * Las pestañas, en el orden de la página; sin las secciones que quien mira no
  * tiene (tanda H, punto 5). «Restablecer» (punto 10), al final y sólo para
@@ -154,7 +151,6 @@ function pestanasDe(o: { faltan: number | null; conEnlaces: boolean; puedeAdmini
     ...(o.conEnlaces ? [{ clave: 'enlaces' as const, texto: 'Enlaces de reserva' }] : []),
     { clave: 'plazos', texto: 'Plazos y recordatorios' },
     ...(o.conEnlaces ? [{ clave: 'bloqueados' as const, texto: 'Contactos bloqueados' }] : []),
-    { clave: 'dispositivo', texto: 'Este dispositivo' },
     ...(o.puedeAdministrar ? [{ clave: 'restablecer' as const, texto: 'Restablecer' }] : []),
   ]
 }
@@ -162,7 +158,7 @@ function pestanasDe(o: { faltan: number | null; conEnlaces: boolean; puedeAdmini
 /** Los `#id` que las secciones usan para mandarse a otra (`href="#config-…"`) → la pestaña que lo tiene. */
 const PESTANA_DE_ANCLA: Record<string, ClavePestana> = {
   'config-pasos': 'pasos', 'config-disponibilidad': 'horario', 'config-tipos': 'tipos', 'config-enlaces': 'enlaces',
-  'config-ajustes': 'plazos', 'config-bloqueados': 'bloqueados', 'config-dispositivo': 'dispositivo',
+  'config-ajustes': 'plazos', 'config-bloqueados': 'bloqueados',
   'config-restablecer': 'restablecer',
 }
 
@@ -329,11 +325,6 @@ export default function ConfiguracionCalendario(props: Props) {
               preguntarDuracion={!pendientes?.some(p => p.clave === 'duracion' && !p.hecho)} />
           </Panel>
           <PanelesReserva d={reserva} activa={activa} conEnlaces={conEnlaces} />
-          <Panel clave="dispositivo" activa={activa}>
-            <TarjetaSeccion id="config-dispositivo" titulo="Tarjeta de la cita" ayuda={DISPOSITIVO_NOTA}>
-              <PreferenciaTarjetaAlPasar />
-            </TarjetaSeccion>
-          </Panel>
           {puedeAdministrar && (
             <Panel clave="restablecer" activa={activa}>
               <ZonaRestablecer alRestablecer={alRestablecer} />

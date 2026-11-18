@@ -1,5 +1,5 @@
 import { test, expect, type Locator, type Page } from '@playwright/test'
-import { SESION, interruptorAgenda, pestanaConfig } from './ayudas'
+import { SESION, interruptorAgenda } from './ayudas'
 import { abrirAgendaApagada, abrirAgendaV2, tarjetaLectura } from './interaccionesAyudas'
 
 /**
@@ -10,12 +10,15 @@ import { abrirAgendaApagada, abrirAgendaV2, tarjetaLectura } from './interaccion
  *   · se cierra al retirar el ratón, salvo que se cruce a la tarjeta o que un
  *     clic la haya fijado (entonces es la de siempre, modal);
  *   · nunca mientras se arrastra, ni encima de otra capa, ni con la
- *     preferencia «Abrir la tarjeta al pasar el ratón» apagada (configuración),
+ *     preferencia apagada («Pop-up de eventos» del menú del engrane desde la
+ *     tanda J; antes, «Abrir la tarjeta al pasar el ratón» de la configuración),
  *     ni en el teléfono (sigue el toque), ni con el interruptor apagado.
  *
  * MUTACIONES (comprobadas en rojo al escribirlas): quitar de `puedeAbrir` las
  * guardas de ratón fino y de la hoja (`MEDIO_RATON`, `desactivada`) → «el
- * teléfono…»; quitar `leerTarjetaAlPasar` → «preferencia apagada»;
+ * teléfono…»; quitar `leerTarjetaAlPasar` → «preferencia apagada»; que
+ * «Pop-up de eventos» no la guarde (`guardarTarjetaAlPasar` fuera de
+ * `OpcionPopUp`) → «preferencia apagada» (tanda J, punto 18);
  * `aria-modal` en la variante al pasar → «0,5 s de quietud…» (no modal);
  * `ESPERA_ABRIR_MS = 1000` → «0,5 s de quietud…» (tarda de más).
  */
@@ -150,12 +153,16 @@ test.describe('escritorio, con el interruptor encendido', () => {
     await expect(tarjeta.getByRole('heading')).toHaveText(nombre ?? '')
   })
 
-  test('con la preferencia apagada en la configuración no se abre', async ({ page }) => {
-    await page.goto('/agenda/configuracion')
-    await pestanaConfig(page, 'Este dispositivo')
-    const casilla = page.getByRole('checkbox', { name: 'Abrir la tarjeta al pasar el ratón' })
-    await expect(casilla).toBeChecked()
-    await casilla.uncheck()
+  /* Tanda J (punto 18): la preferencia vive en el engrane, «Pop-up de eventos». */
+  test('con «Pop-up de eventos» apagado en el engrane no se abre', async ({ page }) => {
+    await abrirAgendaV2(page)
+    await page.getByRole('button', { name: 'Opciones de la agenda' }).click()
+    const popup = page.getByRole('menu', { name: 'Opciones de la agenda' }).getByRole('menuitemcheckbox', { name: 'Pop-up de eventos' })
+    await expect(popup).toHaveAttribute('aria-checked', 'true')
+    await popup.click()
+    await expect(popup).toHaveAttribute('aria-checked', 'false')
+    await page.keyboard.press('Escape')
+    // Se queda guardada en el dispositivo: también al volver a abrir la agenda.
     await abrirAgendaV2(page)
     await posarSobre(page, citas(page).first())
     await page.waitForTimeout(1800)

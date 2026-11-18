@@ -18,7 +18,7 @@
  */
 import { useEffect, useRef, type KeyboardEvent } from 'react'
 
-export type ClavePestana = 'pasos' | 'horario' | 'tipos' | 'enlaces' | 'plazos' | 'bloqueados' | 'dispositivo' | 'restablecer'
+export type ClavePestana = 'pasos' | 'horario' | 'tipos' | 'enlaces' | 'plazos' | 'bloqueados' | 'restablecer'
 export interface Pestana { clave: ClavePestana; texto: string; nota?: string }
 
 export const idPestana = (c: ClavePestana) => `config-pestana-${c}`
