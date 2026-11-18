@@ -38,7 +38,7 @@ const h = vi.hoisted(() => {
     insertCalendario: 0,
     /** C5: los `events.patch` del restablecimiento, con sus opciones (If-Match). */
     parches: [] as Array<{ params: unknown; opciones: unknown }>,
-    patchFalla: null as number | null,
+    patchFalla: null as number | Error | null,
     rpc: { data: null as unknown, error: null as { code: string; message: string } | null, args: [] as unknown[] },
   }
   return { estado }
@@ -63,7 +63,9 @@ vi.mock('googleapis', () => ({
         },
         patch: async (params: unknown, opciones: unknown) => {
           h.estado.parches.push({ params, opciones })
-          if (h.estado.patchFalla) throw Object.assign(new Error(`HTTP ${h.estado.patchFalla}`), { code: h.estado.patchFalla })
+          const f = h.estado.patchFalla
+          if (f instanceof Error) throw f
+          if (f) throw Object.assign(new Error(`HTTP ${f}`), { code: f })
           return { data: { etag: '"e3"' } }
         },
       },
@@ -514,9 +516,51 @@ describe('C5 · restablecer en Google lo rechazado', () => {
     expect(db.aplicadas).toHaveLength(0)
   })
 
-  it('otro fallo de Google al restablecer: cuenta un error y la página avanza igual', async () => {
+  /* Tanda J, punto 9 · Google no responde al restablecer (5xx): la página NO avanza y la
+     pasada siguiente la repite y restablece. Mutación en rojo: quitar el `throw new
+     RestablecimientoPendiente()` de `procesarPagina` (la página avanzaba y Google se quedaba
+     con la hora movida: la segunda pasada no veía el evento). */
+  it('Google no responde al restablecer (5xx): la página no avanza y la pasada siguiente restablece', async () => {
     db.filas = [fila({ status: 'attended' })]
     h.estado.patchFalla = 500
+    h.estado.guion = [pagina([evento()], { nextSyncToken: 't' })]
+    const r = await sincronizarClinica(conexion, op)
+    expect(r).toMatchObject({ estado: 'error', errores: 1 })
+    expect(db.syncToken).toBeNull()
+    expect(db.soltados).toEqual(['google_restablecer'])
+    h.estado.patchFalla = null
+    h.estado.guion = [pagina([evento()], { nextSyncToken: 't' })]
+    const r2 = await sincronizarClinica(conexion, op)
+    expect(r2).toMatchObject({ estado: 'ok', errores: 0 })
+    expect(h.estado.parches).toHaveLength(2)
+    expect(db.syncToken).toBe('t')
+  })
+
+  /* Revisión del punto 9: sólo lo pasajero detiene la página. Una excepción sin forma de red
+     (un dato raro, un fallo nuestro) avanzaba antes y avanza ahora: repetirla dejaría a la
+     clínica entera sin sincronizar. Mutación en rojo: `esFalloPasajero` con `s === null → true`
+     (la versión primera) — la del TypeError no avanza. */
+  it('la red cortada o un 403 de cuota detienen la página; una excepción sin forma de red, no', async () => {
+    const casos: [Error, 'error' | 'ok'][] = [
+      [Object.assign(new Error('socket hang up'), { code: 'ECONNRESET' }), 'error'],
+      [Object.assign(new Error('Rate Limit Exceeded'), { code: 403, errors: [{ reason: 'rateLimitExceeded' }] }), 'error'],
+      [Object.assign(new Error('Forbidden'), { code: 403, errors: [{ reason: 'forbidden' }] }), 'ok'],
+      [new TypeError('x is undefined'), 'ok'],
+    ]
+    for (const [err, estado] of casos) {
+      db.syncToken = null
+      db.soltados = []
+      db.filas = [fila({ status: 'attended' })]
+      h.estado.patchFalla = err
+      h.estado.guion = [pagina([evento()], { nextSyncToken: 't' })]
+      expect((await sincronizarClinica(conexion, op)).estado, err.message).toBe(estado)
+      expect(db.syncToken, err.message).toBe(estado === 'ok' ? 't' : null)
+    }
+  })
+
+  it('un 4xx al restablecer (no 412 ni 429): cuenta un error y la página avanza igual (repetirlo no lo arregla)', async () => {
+    db.filas = [fila({ status: 'attended' })]
+    h.estado.patchFalla = 400
     h.estado.guion = [pagina([evento()], { nextSyncToken: 't' })]
     const r = await sincronizarClinica(conexion, op)
     expect(r).toMatchObject({ estado: 'ok', errores: 1 })

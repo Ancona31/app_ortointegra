@@ -44,7 +44,7 @@ import {
   aplicarEvento, avanzarPagina, citasDeEventos, clinicaHabilitada, confirmarPorRsvp, importarEvento, registrarEmpalmesReserva,
   reiniciarToken, soltarCandado, SincronizacionNoDisponible, tomarCandado, CambioRechazadoPorLaBase, type Candado,
 } from '@/lib/gcalSincronizacionBase'
-import { restablecerEnGoogle, type PorRestablecer } from '@/lib/gcalSincronizacionRestablecer'
+import { restablecerEnGoogle, RestablecimientoPendiente, type PorRestablecer } from '@/lib/gcalSincronizacionRestablecer'
 import { aceptaronDe, rsvpGoogleEncendido } from '@/lib/gcalRsvp'
 
 /** C-b: la primera sincronización completa empieza hace 30 días, sin límite hacia adelante. */
@@ -105,6 +105,7 @@ function statusDe(err: unknown): number | null {
 /** Código corto y FIJO para `ultimo_error`: nunca texto que venga de Google. */
 function codigoDeError(err: unknown): string {
   if (esCredencialInvalida(err)) return 'credencial'
+  if (err instanceof RestablecimientoPendiente) return 'google_restablecer'
   const s = statusDe(err)
   if (s === 410) return 'google_410'
   if (s !== null && s >= 500) return 'google_5xx'
@@ -296,10 +297,15 @@ async function procesarPagina(
   }
   // C5: lo rechazado vuelve a Google con el estado de Spinus, ANTES de avanzar
   // el token (si esto no llegara a correr, la página no avanza y se repite).
-  const { errores } = await restablecerEnGoogle(conexion.clinicaId, calendar, pagina.calendarId, pendientes, pasada.op.senal)
-  pasada.r.errores += errores
+  const restablecido = await restablecerEnGoogle(conexion.clinicaId, calendar, pagina.calendarId, pendientes, pasada.op.senal)
+  pasada.r.errores += restablecido.errores
   await avisarEmpalmes(pasada)
   if (rsvpGoogleEncendido()) await confirmarPorRsvps(pasada, pagina.calendarId, tareas)
+  // Tanda J, punto 9: si Google no respondió al restablecer, la página NO
+  // avanza (la siguiente pasada la repite y vuelve a restablecer). Al final, y
+  // no antes: lo importado y lo movido ya registró sus empalmes, que repetir
+  // la página no volvería a detectar.
+  if (restablecido.pendientes > 0) throw new RestablecimientoPendiente()
 }
 
 /**

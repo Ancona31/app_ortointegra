@@ -69,6 +69,21 @@ function borrarConexion(): void {
   { clinica: CLINICA_A })
 }
 
+/**
+ * Tanda J (J4) · Las reservas de esta corrida se quedan (no se borran citas), pero
+ * ligadas a ids del Google falso, que los reparte desde cero en cada arranque
+ * (`falso1x`, `falso2x`…): la corrida siguiente chocaba con
+ * `appointments_clinica_google_event_id_uniq` al ligar su primera reserva y la
+ * prueba esperaba un evento que no llegaba nunca. Se sueltan los ids, nada más.
+ * Sólo los que reparte ESTE falso (`falso<N>x`): otras pruebas siembran ids
+ * propios con otro formato (`falso-j3-…`) y no son de aquí.
+ */
+function soltarEventosFalsos(): void {
+  sqlLocal(`update public.appointments a set google_event_id = null, gcal_etag = null
+              from public.clinicas c
+             where a.clinica_id = c.id and c.nombre = :'clinica' and a.google_event_id ~ '^falso[0-9]+x$'`, { clinica: CLINICA_A })
+}
+
 function sembrarConexion(): void {
   borrarConexion()
   const salida = sqlLocal(`
@@ -145,7 +160,7 @@ async function turnos(codigo: string, desde: string): Promise<{ status: number; 
   }
 }
 
-async function reservarEn(codigo: string, inicio: string): Promise<{ status: number; cuerpo: Record<string, unknown>; ms: number; correo: string }> {
+async function reservarEn(codigo: string, inicio: string): Promise<{ status: number; cuerpo: Record<string, unknown>; ms: number; correo: string; nombre: string }> {
   const ctx = await publico()
   const p = personaNueva()
   try {
@@ -154,7 +169,7 @@ async function reservarEn(codigo: string, inicio: string): Promise<{ status: num
       consultorio_id: e.consultorioId, tipo_cita_id: e.tipoId, inicio, nombre: p.nombre,
       telefono: p.telefono, correo: p.correo, acepta_aviso: true, client_id: randomUUID(),
     } })
-    return { status: r.status(), cuerpo: await r.json().catch(() => ({})), ms: Date.now() - t0, correo: p.correo }
+    return { status: r.status(), cuerpo: await r.json().catch(() => ({})), ms: Date.now() - t0, correo: p.correo, nombre: p.nombre }
   } finally {
     await ctx.dispose()
   }
@@ -175,6 +190,9 @@ function eventoEn(t: Turno, titulo: string): string {
 
 const importadas = (ev: string): string => sqlLocal(`select count(*) from public.appointments where google_event_id = :'ev'`, { ev })
 const citaPorCorreo = (correo: string): string => sqlLocal(`select id from public.appointments where reserva_correo = :'c'`, { c: correo })
+/* J9–J11: por el nombre (único por corrida), no por el correo: con J2 (punto 3) el enlace único
+   guarda el correo que puso la clínica al emitirlo, no el que escribe quien reserva. */
+const citaPorNombre = (nombre: string): string => sqlLocal(`select id from public.appointments where title = :'n'`, { n: nombre })
 
 /* ── Ciclo ────────────────────────────────────────────────────────────── */
 
@@ -207,6 +225,7 @@ test.beforeAll(async ({}, info) => {
 test.afterAll(async ({}, info) => {
   if (info.project.name !== ESCRITORIO) return
   cerrarEscenario()
+  soltarEventosFalsos()
   borrarConexion()
   if (servidor?.pid) {
     try { process.kill(-servidor.pid, 'SIGTERM') } catch { /* ya no estaba */ }
@@ -217,7 +236,7 @@ test.afterAll(async ({}, info) => {
 test.beforeEach(({}, info) => {
   test.skip(info.project.name !== ESCRITORIO, 'un solo next dev por corrida: sólo en escritorio')
   info.setTimeout(240_000)
-  if (google) google.lista = { demoraMs: 0, falla: null }
+  if (google) { google.lista = { demoraMs: 0, falla: null }; google.parche = { falla: null } }
 })
 
 /* ── Las pruebas ──────────────────────────────────────────────────────── */
@@ -359,6 +378,56 @@ test('I9 · una reserva por enlace movida en Google: la base la rechaza, se audi
   expect(sqlLocal(`select count(*) from public.audit_log where accion = 'gcal_cambio_rechazado' and registro_id = :'r'
                      and descripcion::jsonb ->> 'motivo' = 'eleccion_paciente'`, { r: reserva })).toBe('1')
   expect(Date.parse(g().eventos.get(ev)?.start?.dateTime ?? '')).toBe(Date.parse(t.inicio))
+})
+
+/* Tanda J, punto 9: la misma reserva movida en Google, ahora con Google SIN RESPONDER al
+   restablecer. La base nunca cambia; Google queda con la otra hora (desfasada) hasta la pasada
+   siguiente, que repite la página y la devuelve. Después, otra pasada no cambia nada (el eco no
+   se rechaza otra vez): las dos quedan iguales. Mutación en rojo: quitar el `throw new
+   RestablecimientoPendiente()` de `procesarPagina` (la página avanzaba y Google se quedaba con
+   la hora movida para siempre). */
+test('J9 · reserva movida en Google y Google no responde al restablecer: la pasada siguiente la devuelve; nada queda desfasado', async ({ page }) => {
+  const t = turnoNuevo()
+  ultimaBuenaHace(0)
+  const r = await reservarEn(emitirEnlace(e, 'unico').codigo, t.inicio)
+  expect(r.status, JSON.stringify(r.cuerpo)).toBe(201)
+  const reserva = citaPorNombre(r.nombre)
+  const evento = (): string => sqlLocal(`select coalesce(google_event_id, '') from public.appointments where id = :'r'`, { r: reserva })
+  await expect.poll(evento, { timeout: 60_000 }).not.toBe('')
+  const ev = evento()
+  const inicioGoogle = (): number => Date.parse(g().eventos.get(ev)?.start?.dateTime ?? '')
+  const enBase = (): string => sqlLocal(`select (start_time = :'i'::timestamptz)::text from public.appointments where id = :'r'`, { r: reserva, i: t.inicio })
+  const rechazos = (): string => sqlLocal(`select count(*) from public.audit_log where accion = 'gcal_cambio_rechazado' and registro_id = :'r'
+                                             and descripcion::jsonb ->> 'motivo' = 'eleccion_paciente'`, { r: reserva })
+  const sondeo = async (): Promise<{ estado: string; ms: number }> => {
+    ultimaBuenaHace(120)
+    const t0 = Date.now()
+    const { estado } = (await (await page.request.post('/api/google/sync')).json()) as { estado: string }
+    return { estado, ms: Date.now() - t0 }
+  }
+  const hora = Date.parse(t.inicio) + 60 * 60_000
+  g().modificar(ev, { start: { dateTime: new Date(hora).toISOString(), timeZone: TZ }, end: { dateTime: new Date(hora + 30 * 60_000).toISOString(), timeZone: TZ } })
+
+  g().parche = { falla: 503 }
+  const caido = await sondeo()
+  expect(caido.estado).toBe('error')
+  expect(enBase()).toBe('true')
+  expect(inicioGoogle()).toBe(hora) // desfasada: Google sigue con la hora que le pusieron
+
+  g().parche = { falla: null }
+  const bueno = await sondeo()
+  expect(bueno.estado).toBe('ok')
+  expect(enBase()).toBe('true')
+  expect(inicioGoogle()).toBe(Date.parse(t.inicio))
+  expect(sqlLocal(`select gcal_etag from public.appointments where id = :'r'`, { r: reserva })).toBe(g().eventos.get(ev)?.etag)
+  const rechazosTrasRestablecer = rechazos()
+  console.log(`J9: sondeo que restablece ${bueno.ms} ms; rechazos auditados ${rechazosTrasRestablecer}`)
+
+  // Una pasada más: el eco del restablecimiento no se rechaza otra vez y nada se mueve.
+  expect((await sondeo()).estado).toBe('ok')
+  expect(enBase()).toBe('true')
+  expect(inicioGoogle()).toBe(Date.parse(t.inicio))
+  expect(rechazos()).toBe(rechazosTrasRestablecer)
 })
 
 test('+ · dos reservas simultáneas con Google conectado: la segunda espera el candado y hace SU pasada; una sola cita', async () => {
