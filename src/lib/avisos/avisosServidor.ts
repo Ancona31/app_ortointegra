@@ -22,7 +22,26 @@ export const TOPE_AVISOS = 50
 /** Tabla o columna ausente (base sin la migración). */
 const AUSENTE = new Set(['42P01', 'PGRST205', '42703', 'PGRST204'])
 
-const FilaAviso = z.object({ id: z.string(), tipo: z.enum(TIPOS_AVISO), cita_id: z.string(), creado_en: z.string() })
+/* ⚠️ `tipo` SE LEE COMO TEXTO Y SE FILTRA DESPUÉS (`conTipoConocido`), NO CON `z.enum` EN EL
+   ESQUEMA DE LA FILA. La migración que añade un tipo puede llegar a la base antes que el código
+   que lo pinta (otra rama, el orden de despliegue): con `z.enum` aquí, UN aviso de un tipo
+   desconocido tiraba el `parse` del arreglo entero y la campana se quedaba vacía. */
+const FilaAvisoCruda = z.object({ id: z.string(), tipo: z.string(), cita_id: z.string(), creado_en: z.string() })
+const TipoAviso = z.enum(TIPOS_AVISO)
+type FilaAviso = Omit<z.infer<typeof FilaAvisoCruda>, 'tipo'> & { tipo: z.infer<typeof TipoAviso> }
+
+/** Las filas cuyo tipo conoce este código; las demás se saltan (con un aviso en el log, sin el id de nada). */
+function conTipoConocido(datos: unknown): FilaAviso[] {
+  const desconocidos = new Set<string>()
+  const filas = z.array(FilaAvisoCruda).parse(datos ?? []).flatMap((f): FilaAviso[] => {
+    const t = TipoAviso.safeParse(f.tipo)
+    if (t.success) return [{ ...f, tipo: t.data }]
+    desconocidos.add(f.tipo.slice(0, 40))
+    return []
+  })
+  if (desconocidos.size) logger.warn('avisos', `avisos de un tipo que este código no conoce, saltados: ${[...desconocidos].join(', ')}`)
+  return filas
+}
 const FilaCita = z.object({
   id: z.string(), title: z.string().nullable(), start_time: z.string(), end_time: z.string(),
   status: z.enum(['scheduled', 'confirmed', 'cancelled', 'no_show', 'attended']),
@@ -50,12 +69,15 @@ export async function leerAvisosClinica(supabase: ClienteSesion, clinicaId: stri
   try {
     const { data, error } = await supabase.from('avisos_clinica').select('id, tipo, cita_id, creado_en')
       .eq('clinica_id', clinicaId).is('revisado_en', null)
+      /* Sólo los tipos que este código conoce: si no, 50 sin revisar de un tipo nuevo taparían a
+         los demás (`limit`). `conTipoConocido` queda de red por si el filtro no llegara. */
+      .in('tipo', [...TIPOS_AVISO])
       .order('creado_en', { ascending: false }).limit(TOPE_AVISOS)
     if (error) {
       if (!(error.code && AUSENTE.has(error.code))) logger.error('avisos', `avisos sin leer: ${error.code ?? ''}`)
       return { disponible: false, avisos: [] }
     }
-    const filas = z.array(FilaAviso).parse(data ?? [])
+    const filas = conTipoConocido(data)
     if (filas.length === 0) return { disponible: true, avisos: [] }
     const { data: citas, error: e2 } = await leerCitasDeAvisos(supabase, clinicaId, [...new Set(filas.map(f => f.cita_id))])
     if (e2) {
