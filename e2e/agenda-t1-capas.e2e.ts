@@ -207,7 +207,9 @@ test('escritorio: la tarjeta de una cita al fondo sigue dentro cuando crece (el 
     // Crece con el motivo del error (la cita se canceló con la tarjeta abierta): sigue dentro.
     sqlLocal(`update public.appointments set status = 'cancelled' where id = :'id'`, { id })
     const pestana = context.waitForEvent('page')
-    await t.getByRole('button', { name: 'Enviar confirmación', exact: true }).click()
+    /* Tanda K, punto 21: el WhatsApp va dentro de «Confirmar». */
+    await t.getByRole('button', { name: 'Confirmar', exact: true }).click()
+    await t.getByRole('button', { name: 'Enviar por WhatsApp', exact: true }).click()
     await (await pestana).waitForEvent('close')
     await expect(t.getByRole('alert')).toBeVisible()
     await dentroDeLaVentana(page, t)

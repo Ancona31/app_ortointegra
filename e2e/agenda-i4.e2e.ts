@@ -261,7 +261,7 @@ test('12 · «Reasignar»: la burbuja en ESE hueco, otro paciente; la cancelada 
   await page.locator('.fc-timegrid-event', { hasText: 'Prueba 21' }).first().click({ position: { x: 8, y: 8 } })
   const t = tarjetaLectura(page)
   await expect(t).toBeVisible()
-  await t.getByRole('button', { name: 'Reasignar', exact: true }).click()
+  await t.getByRole('button', { name: 'Reasignar el horario', exact: true }).click()
   const b = burbuja(page)
   await expect(b).toBeVisible()
   await expect(b).toHaveAccessibleName(/10:00–10:30/)

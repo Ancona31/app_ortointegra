@@ -38,6 +38,7 @@ import { useDeslizarPeriodo } from '@/app/(app)/agenda/useDeslizarPeriodo'
 import { useTarjetaAlPasar } from '@/app/(app)/agenda/useTarjetaAlPasar'
 import type { VigiaAlPasar } from '@/lib/agenda/tarjetaAlPasar'
 import { BotonWhatsAppCita } from '@/components/agenda/BotonWhatsAppCita'
+import { BotonCorreoCita } from '@/components/agenda/BotonCorreoCita'
 import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
 import { useEscudoTrasRegistro } from '@/hooks/useEscudoTrasRegistro'
 import { useToast } from '@/components/ui/Toast'
@@ -60,7 +61,7 @@ import type { CitaEncontrada } from '@/lib/agenda/buscarCitasPaciente'
 import {
   pideConfirmacion, puedeIniciarConsulta, textoDeConfirmacion, type AccionTarjeta, type QuienMira,
 } from '@/lib/agenda/accionesTarjeta'
-import { motivoSinWhatsApp, telefonoParaWhatsApp } from '@/lib/agenda/whatsappCita'
+import { correoParaConfirmacion, motivoSinCorreo, motivoSinWhatsApp, telefonoParaWhatsApp } from '@/lib/agenda/whatsappCita'
 
 /* Tanda J (punto 7) · La ventana de «Ligar e iniciar consulta», en su propio
    chunk: sólo se descarga al pulsar el botón (no suma nada a este chunk). */
@@ -326,6 +327,9 @@ function ejecutarAccion(a: AccionTarjeta, cita: Appointment, x: ContextoAccion):
         else editar()
         return
       case 'confirmar': void guardado.cambiarEstadoCita?.(cita.id, 'confirmed'); return
+      /* Tanda K, punto 21 · «No asistió» de la burbuja: el mismo cambio de estado, sin preguntar
+         (como «Marcar como confirmada»; se deshace desde el formulario). */
+      case 'no-asistio': void guardado.cambiarEstadoCita?.(cita.id, 'no_show'); return
       case 'cancelar': void guardado.handleCancelar(cita.id); return
       /* B3: borrar sólo un evento sin paciente, aunque la tarjeta ya no ofrezca
          otra cosa: dos puertas al mismo daño (el servidor contesta 409 igual). */
@@ -387,6 +391,7 @@ function CapaTarjeta({ capa, p, cerrar, vigia, fijar, abrirConvertir, abrirReasi
      tarjeta y el instante en que se abrió: ni pasada, ni atendida, ni
      cancelada, ni de todo el día, ni sin teléfono. */
   const conWhatsApp = motivoSinWhatsApp(capa.vista, telefonoParaWhatsApp(cita.pacientes?.telefono, cita.reserva_telefono), capa.abiertaEn) === null
+  const conCorreo = motivoSinCorreo(capa.vista, correoParaConfirmacion(cita.pacientes?.email, cita.reserva_correo), capa.abiertaEn) === null
   /* La acción cierra la tarjeta SIN salida animada: lo que abre (el modal, el
      aviso) la tapa, y el foco vuelve a la cita antes de que lo tome lo nuevo. */
   const alAccion = (a: AccionTarjeta): void => {
@@ -413,9 +418,15 @@ function CapaTarjeta({ capa, p, cerrar, vigia, fijar, abrirConvertir, abrirReasi
          rejilla de la tarjeta («Enviar confirmación» / «Enviar recordatorio»). */
       whatsapp={conWhatsApp
         ? (o) => <BotonWhatsAppCita citaId={cita.id} tipo="enlace" marcadoEn={cita.whatsapp_sent_at ?? null} enCapa
-            confirmada={capa.vista.status === 'confirmed'} dosLineas={o.dosLineas} claseCelda={o.claseCelda}
+            confirmada={capa.vista.status === 'confirmed'} etiqueta={o.etiqueta}
             tabIndex={o.tabIndex} onFocus={o.onFocus} alMensaje={o.alMensaje} />
         : undefined}
+      /* Tanda K, punto 21 · el correo, con la regla del formulario y del servidor (`motivoSinCorreo`). */
+      correo={conCorreo
+        ? (o) => <BotonCorreoCita citaId={cita.id} confirmada={capa.vista.status === 'confirmed'} enCapa etiqueta={o.etiqueta}
+            tabIndex={o.tabIndex} onFocus={o.onFocus} alMensaje={o.alMensaje} />
+        : undefined}
+      enlacePropio={Boolean(cita.medico_id) && cita.medico_id === p.quien.perfilId}
     />
   )
 }

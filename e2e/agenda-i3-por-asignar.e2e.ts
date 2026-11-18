@@ -149,14 +149,15 @@ test('punto 10 · tarjeta: «Por asignar» en la agenda; «¿No es una cita?» l
   await eventoConTexto(page, titulo).click({ position: { x: 6, y: 6 } })
   const tarjeta = tarjetaLectura(page)
   await expect(tarjeta.getByRole('button', { name: 'Convertir en cita' })).toHaveCount(0)
-  await tarjeta.getByRole('button', { name: '¿No es una cita?' }).click()
+  /* Tanda K, punto 21: en la burbuja, «No es una cita», sin signos. */
+  await tarjeta.getByRole('button', { name: 'No es una cita', exact: true }).click()
   await expect.poll(() => asignacion(id), { timeout: 15_000 }).toBe('evento')
   expect(auditadas(id)).toBe('1')
   await page.keyboard.press('Escape')
   await expect(eventoConTexto(page, titulo).locator('.ag-icono-sin-exp')).toHaveCount(0)
   await eventoConTexto(page, titulo).click({ position: { x: 6, y: 6 } })
   await expect(tarjetaLectura(page).getByRole('button', { name: 'Convertir en cita' })).toBeVisible()
-  await expect(tarjetaLectura(page).getByRole('button', { name: '¿No es una cita?' })).toHaveCount(0)
+  await expect(tarjetaLectura(page).getByRole('button', { name: 'No es una cita', exact: true })).toHaveCount(0)
 })
 
 /* Desde el formulario completo, «¿No es una cita?» cierra el formulario y la

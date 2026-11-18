@@ -114,12 +114,12 @@ describe('BurbujaAlta tras agendar (G3, punto 19)', () => {
   })
 })
 
-describe('TarjetaLectura', () => {
+describe('TarjetaLectura (tanda K, punto 21: la burbuja de la maqueta)', () => {
   const props = { ancla: { left: 0, top: 0, width: 100, height: 40 }, comoHoja: false, zonaVisor: 'America/Merida', alAccion: nada, alCerrar: nada }
   const html = renderToStaticMarkup(<TarjetaLectura {...props} cita={CITA} puedeIniciarConsulta />)
   it('diálogo nombrado por el paciente, con el estado en palabra (no sólo color)', () => {
     expect(nombrado(html, 'Hugo Interián')).toBe(true)
-    expect(html).toContain('>Agendada<')
+    expect(html).toContain('Agendada</span>')
   })
   it('acciones en un toolbar con foco itinerante, la principal primero', () => {
     expect(html).toContain('role="toolbar"')
@@ -127,34 +127,23 @@ describe('TarjetaLectura', () => {
     expect(html.indexOf('Iniciar consulta')).toBeLessThan(html.indexOf('Confirmar'))
     expect(html).not.toContain('Eliminar')
   })
-  it('enseña fecha y hora juntas (G3), consultorio, teléfono y nota', () => {
-    expect(html).toContain('Mié 11 nov · 10:00 – 11:00')
-    expect(html).toContain('Centro')
-    expect(html).toContain('9991234567')
-    expect(html).toContain('ag-lectura-nota')
+  it('enseña la hora con la duración y el día largo; consultorio, teléfono y nota van en los tres puntos', () => {
+    expect(html).toContain('10:00 – 11:00<span class="ag-burbuja-duracion"> · 60 min</span>')
+    expect(html).toContain('Miércoles 11 de noviembre')
+    expect(html).not.toContain('9991234567')
   })
   it('en el teléfono es una hoja inferior', () => {
     const hoja = renderToStaticMarkup(<TarjetaLectura {...props} comoHoja ancla={null} cita={CITA} puedeIniciarConsulta={false} />)
-    expect(hoja).toContain('class="ag-hoja"')
+    expect(hoja).toContain('class="ag-hoja ag-burbuja"')
     expect(hoja).not.toContain('Iniciar consulta')
   })
   it('F3: sin ancla en escritorio (desde el buscador) va centrada', () => {
     const centrada = renderToStaticMarkup(<TarjetaLectura {...props} ancla={null} cita={CITA} puedeIniciarConsulta={false} />)
-    expect(centrada).toContain('class="ag-capa ag-capa--centro"')
+    expect(centrada).toContain('class="ag-capa ag-capa--centro ag-burbuja"')
   })
-  it('F3: sin `cambiarEstadoCita` no se ofrece Confirmar', () => {
+  it('F3: sin `cambiarEstadoCita` ni avisos no se ofrece Confirmar', () => {
     const sin = renderToStaticMarkup(<TarjetaLectura {...props} cita={CITA} puedeIniciarConsulta conConfirmar={false} />)
     expect(sin).not.toContain('>Confirmar<')
     expect(sin).toContain('Reagendar')
-  })
-  it('G3: el WhatsApp de E7 es una pieza de la rejilla (a todo el ancho y en una línea si va solo)', () => {
-    const conAviso = renderToStaticMarkup(<TarjetaLectura {...props} cita={CITA} puedeIniciarConsulta
-      whatsapp={o => <span data-whatsapp-cita="c" data-dos-lineas={String(o.dosLineas)} className={o.claseCelda} />} />)
-    expect(conAviso).toContain('data-whatsapp-cita="c"')
-    // Agendada: Confirmar | Reagendar, y el aviso solo, a todo el ancho y en una línea.
-    expect(conAviso).toContain('data-dos-lineas="false"')
-    const confirmada = renderToStaticMarkup(<TarjetaLectura {...props} cita={{ ...CITA, status: 'confirmed' }} puedeIniciarConsulta
-      whatsapp={o => <span data-whatsapp-cita="c" data-dos-lineas={String(o.dosLineas)} />} />)
-    expect(confirmada).toContain('data-dos-lineas="true"')
   })
 })

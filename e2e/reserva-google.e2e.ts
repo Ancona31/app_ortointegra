@@ -375,7 +375,7 @@ test('4 · un evento de Google que se empalma con una reserva por enlace: un avi
   await expect(panel.locator(`[data-aviso-tipo="google_por_asignar"][data-aviso-cita="${importada}"]`)).toBeVisible()
   // Pulsarlo lleva a su cita y lo da por revisado; el otro se queda.
   await empalme.click()
-  await expect(page.getByRole('dialog').filter({ has: page.getByRole('button', { name: 'Configuración de la cita', exact: true }) }))
+  await expect(page.getByRole('dialog').filter({ has: page.getByRole('button', { name: 'Más opciones de la cita', exact: true }) }))
     .toBeVisible({ timeout: 30_000 })
   await expect.poll(() => filas('empalme_google', reserva)).toBe('1|0')
   expect(filas('google_por_asignar', importada)).toBe('1|1')
@@ -508,10 +508,11 @@ test('J10 · reserva movida en Google: un aviso por intento; pulsarlo abre la ta
   await expect(fila).toContainText('Desde Google no se pueden mover las citas reservadas por enlace. Para cambiarla, usa Reagendar: se le avisará al paciente.',
     { timeout: 30_000 })
   await fila.click()
-  const tarjeta = page.getByRole('dialog').filter({ has: page.getByRole('button', { name: 'Configuración de la cita', exact: true }) })
+  const tarjeta = page.getByRole('dialog').filter({ has: page.getByRole('button', { name: 'Más opciones de la cita', exact: true }) })
   await expect(tarjeta).toBeVisible({ timeout: 30_000 })
   const reagendar = tarjeta.getByRole('button', { name: 'Reagendar', exact: true })
-  await expect(reagendar).toHaveClass(/ag-capa-boton--principal/)
+  /* Tanda K, punto 21: el botón ancho de la burbuja. */
+  await expect(reagendar).toHaveClass(/ag-burbuja-cta/)
   await expect(reagendar).toBeFocused()
   await expect.poll(avisos).toBe('1|0')
 })
@@ -535,8 +536,11 @@ test('J11 · lo de Google con los colores de estado y su «G»; la leyenda sin m
 
   // `?cita=` lleva a su día (vista Día) y abre su tarjeta de lectura: con la «G».
   await page.goto(`/agenda?cita=${importada}`)
-  const tarjeta = page.getByRole('dialog').filter({ has: page.getByRole('button', { name: 'Configuración de la cita', exact: true }) })
-  await expect(tarjeta.getByRole('img', { name: 'Agendada en Google' })).toBeVisible({ timeout: 120_000 })
+  const tarjeta = page.getByRole('dialog').filter({ has: page.getByRole('button', { name: 'Más opciones de la cita', exact: true }) })
+  /* Tanda K, punto 21: en la burbuja la «G» va en la línea «Llegó de Google Calendar», a color. */
+  const linea = tarjeta.locator('.ag-burbuja-origen', { hasText: 'Llegó de Google Calendar' })
+  await expect(linea).toBeVisible({ timeout: 120_000 })
+  await expect(linea.locator('path[fill="#4285F4"]')).toHaveCount(1)
   await page.keyboard.press('Escape')
   await expect(tarjeta).toBeHidden()
   // En la rejilla la «G» se ve y lo dice la etiqueta de la tarjeta (la marca es decorativa ahí).

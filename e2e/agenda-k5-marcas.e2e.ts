@@ -16,7 +16,7 @@ import { fechaHoraLocalAInstante } from '../src/lib/dates'
  *   · `MemoizedEventContent`: `{sinAvisoFlotante ? <MarcasCita…/> : …}` → siempre la píldora → «Semana»;
  *   · `MonthChip`: lo mismo con `.ag-mes-badge` → «Mes»;
  *   · `marcasDeCita` con `enlace: Boolean(apt.reserva_canal) && !apt.paciente_id` → «ligada»;
- *   · `LeyendaEstados` sin el bloque de `data-leyenda-enlace` → «leyenda»;
+ *   · `LeyendaEstados` sin el bloque del eslabón (`data-leyenda-enlace` renombrado) → «leyenda»;
  *   · `ProximasCitas` sin el `<span data-marca-enlace>` → «Próximas citas».
  */
 test.use({ storageState: SESION.adminA })
