@@ -9,7 +9,7 @@ import { bloqueoDe } from '@/lib/agenda/bloqueosAgenda'
 import type { EventContentArg } from '@fullcalendar/core'
 import type { Appointment } from '@/lib/agenda/tiposAgenda'
 import { esVistaDeRejilla } from '@/lib/agenda/vistasAgenda'
-import { esEventoGenerico, marcaPorLigar } from '@/lib/agenda/tarjetasAgenda'
+import { esEventoGenerico, marcaPorLigar, marcasDeCita } from '@/lib/agenda/tarjetasAgenda'
 import { horaEnTZ, duracionDeLaFila } from '@/lib/agenda/fechasAgenda'
 import { regionDeTimezone } from '@/lib/consultorios/zonas-mexico'
 import { MonthChip } from './MonthChip'
@@ -59,6 +59,8 @@ export function renderEventContent(arg: EventContentArg, navegadorTZ: string, in
      resolverlo. Es una lectura pura y la vista Mes ya ha devuelto más arriba,
      así que moverlo no cambia cuándo se evalúa para nadie. */
   const ext = arg.event.extendedProps as Appointment & { isGcalBlock?: boolean }
+  /* Tanda K, sección E · las marcas de procedencia (con la v2, por la hoja de estilos). */
+  const procedencia = marcasDeCita(ext ?? {})
   /* ⚠️ `allDay` NO BASTA DESDE EL BLOQUE 6, y por eso lleva la segunda mitad.
      Esa bandera dice QUÉ es el evento —uno de todo el día—, no DÓNDE se está
      pintando, y sigue llegando en `true` en una vista de lista. Sin esta
@@ -74,6 +76,8 @@ export function renderEventContent(arg: EventContentArg, navegadorTZ: string, in
         title={arg.event.title}
         esDeGoogle={ext?.isGcalBlock === true}
         origenGoogle={ext?.origen === 'google'}
+        deEnlace={procedencia.enlace}
+        sinExpediente={procedencia.sinExpediente}
         icono={ext?.icono ?? null}
         color={ext?.color ?? null}
         status={ext?.status}
@@ -105,6 +109,8 @@ export function renderEventContent(arg: EventContentArg, navegadorTZ: string, in
           nombre={nombreLista}
           esDeGoogle={ext?.isGcalBlock === true}
           origenGoogle={ext?.origen === 'google'}
+          deEnlace={procedencia.enlace}
+          sinExpediente={procedencia.sinExpediente}
           icono={ext?.icono ?? null}
           cancelada={ext?.status === 'cancelled'}
           /* Sin duración en un evento de todo el día: su tramo son días enteros
@@ -124,6 +130,8 @@ export function renderEventContent(arg: EventContentArg, navegadorTZ: string, in
         nombre={nombreLista}
         esDeGoogle={ext?.isGcalBlock === true}
         origenGoogle={ext?.origen === 'google'}
+        deEnlace={procedencia.enlace}
+        sinExpediente={procedencia.sinExpediente}
         icono={ext?.icono ?? null}
         /* La MISMA precedencia que la tarjeta de la rejilla y el chip del mes: el
            color elegido manda sobre el del estado cuando lo hay, y sólo lo hay en
@@ -190,6 +198,9 @@ export function renderEventContent(arg: EventContentArg, navegadorTZ: string, in
       marca={marca?.texto ?? null}
       marcaTitulo={marca?.titulo ?? null}
       origenGoogle={ext.origen === 'google'}
+      deEnlace={procedencia.enlace}
+      sinExpediente={procedencia.sinExpediente}
+      historial={procedencia.historial}
     />
   )
 }

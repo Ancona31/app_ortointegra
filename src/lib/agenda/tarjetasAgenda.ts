@@ -106,6 +106,28 @@ export function marcaPorLigar(
   }
 }
 
+/**
+ * Tanda K, sección E (puntos 17 y 18) · Las marcas de procedencia de la v2, que SUSTITUYEN a
+ * la píldora de `marcaPorLigar` con la v2 encendida (apagada, la píldora de siempre):
+ *   · `sinExpediente`: el expediente tachado, la MISMA regla que «Por ligar» y «Por asignar»
+ *     (`esPorLigar`), venga del enlace o de Google;
+ *   · `enlace`: el eslabón, PERMANENTE — sólo depende de que la fila naciera de una reserva
+ *     (`reserva_canal`), no de que ya esté ligada;
+ *   · `historial`: la frase de `reserva_historial_previo` que la píldora decía con «· N», sólo
+ *     mientras está por ligar (como la píldora).
+ */
+export function marcasDeCita(
+  apt: FilaParaTipo & { reserva_historial_previo?: number | null },
+): { enlace: boolean; sinExpediente: boolean; historial: string | null } {
+  const sinExpediente = esPorLigar(apt)
+  const n = sinExpediente && apt.reserva_canal ? apt.reserva_historial_previo ?? 0 : 0
+  return {
+    enlace: Boolean(apt.reserva_canal),
+    sinExpediente,
+    historial: n > 0 ? `Al reservar traía ${n} ${n === 1 ? 'cancelación o inasistencia' : 'cancelaciones o inasistencias'}.` : null,
+  }
+}
+
 /* Las tintas del chip de la BANDA, derivadas de la fila. Fuera del componente
    por el mismo motivo que `tintasDelChipDeMes`: para que quepa en su
    presupuesto de líneas.

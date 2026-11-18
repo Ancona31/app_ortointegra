@@ -73,9 +73,14 @@ interface Props {
   compacto?: boolean
   /** I5 · punto 17: un cuadrado con el sobre (la fila de «Por confirmar»); el nombre accesible es el completo. */
   soloIcono?: boolean
+  /** Tanda K, punto 21 · El texto visible en la burbuja («Enviar por correo»); es también su nombre. */
+  etiqueta?: string
+  /** Tanda K, punto 21 · El foco itinerante de la barra de la burbuja. */
+  tabIndex?: number
+  onFocus?: () => void
 }
 
-export function BotonCorreoCita({ citaId, confirmada = false, enCapa = false, claseCelda, alMensaje, compacto = false, soloIcono = false }: Props): ReactElement {
+export function BotonCorreoCita({ citaId, confirmada = false, enCapa = false, claseCelda, alMensaje, compacto = false, soloIcono = false, etiqueta, tabIndex, onFocus }: Props): ReactElement {
   const [estado, setEstado] = useState<Estado>({ tipo: 'inicial' })
   const nombre = confirmada ? 'Enviar recordatorio por correo' : 'Enviar confirmación por correo'
   const texto = estado.tipo === 'error' ? estado.motivo : estado.tipo === 'enviado' ? `Enviado por correo ${horaCorta(estado.en)}` : null
@@ -88,11 +93,12 @@ export function BotonCorreoCita({ citaId, confirmada = false, enCapa = false, cl
   const estilo = enCapa || soloIcono ? undefined : { color: 'var(--ag-text)', borderColor: 'var(--ag-input-border)' }
   return (
     <div data-correo-cita={citaId} className={claseCelda ? `ag-lectura-celda ${claseCelda}` : undefined}>
-      <button type="button" aria-label={nombre} className={clase} style={estilo} title={soloIcono ? nombre : undefined}
+      <button type="button" aria-label={etiqueta ? (estado.tipo === 'enviando' ? etiqueta : undefined) : nombre} className={clase} style={estilo} title={soloIcono ? nombre : undefined}
+        tabIndex={tabIndex} onFocus={onFocus}
         disabled={estado.tipo === 'enviando' || estado.tipo === 'enviado'} aria-busy={soloIcono && estado.tipo === 'enviando' ? true : undefined}
         onClick={() => { setEstado({ tipo: 'enviando' }); void enviar(citaId).then(setEstado) }}>
         <Mail size={enCapa || soloIcono ? 18 : 15} aria-hidden="true" className="flex-none" />
-        {soloIcono ? null : estado.tipo === 'enviando' ? 'Enviando…' : enCapa ? 'Por correo' : compacto ? 'Correo' : nombre}
+        {soloIcono ? null : estado.tipo === 'enviando' ? 'Enviando…' : etiqueta ?? (enCapa ? 'Por correo' : compacto ? 'Correo' : nombre)}
       </button>
       {!alMensaje && texto && (
         <p role={alerta ? 'alert' : undefined} className="text-[12px] mt-1 leading-relaxed" style={{ color: 'var(--ag-muted)' }}>{texto}</p>

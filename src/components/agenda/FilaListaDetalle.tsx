@@ -11,6 +11,7 @@ import type { Status } from '@/lib/agenda/tiposAgenda'
 import { STATUS_CONFIG } from '@/lib/agenda/tarjetasAgenda'
 import { GoogleGIcon } from './GoogleGIcon'
 import { MarcaOrigenGoogle } from './MarcaOrigenGoogle'
+import { MarcasCita } from './MarcasCita'
 import { IconoDelEvento } from './IconoDelEvento'
 
 /* El glifo de cada estado en la píldora de `listDay`. Sale del mockup, que dibuja
@@ -51,7 +52,7 @@ export const GLIFO_PILDORA: Record<Status, string> = {
    revocó en la tarjeta de la rejilla (ver el aviso de `descriptor` en
    `MemoizedEventContent`). No lo repongas. */
 export const FilaListaDetalle = memo(function FilaListaDetalle(
-  { citaId, nombre, esDeGoogle, origenGoogle = false, icono, cancelada, duracion, motivo, status, esEvento }: {
+  { citaId, nombre, esDeGoogle, origenGoogle = false, deEnlace = false, sinExpediente = false, icono, cancelada, duracion, motivo, status, esEvento }: {
     /** F1.4 · `data-cita-id`, el contrato del movimiento (bloque F §2). */
     citaId: string
     nombre: string; esDeGoogle: boolean; icono: IconoEvento | null
@@ -59,6 +60,8 @@ export const FilaListaDetalle = memo(function FilaListaDetalle(
     status: Status | undefined; esEvento: boolean
     /** Tanda J, punto 11 · fila de Spinus nacida en Google: su «G» (sólo con la v2). */
     origenGoogle?: boolean
+    /** Tanda K, sección E · el eslabón (reservada por enlace) y el expediente tachado (sólo con la v2). */
+    deEnlace?: boolean; sinExpediente?: boolean
   },
 ) {
   /* ⚠️ EL COLOR NO SE CALCULA AQUÍ Y NO ES UN OLVIDO: sale de `--ag-ev-marca`,
@@ -93,6 +96,7 @@ export const FilaListaDetalle = memo(function FilaListaDetalle(
               existe en un evento de todo el día sin motivo (y la «G» se perdía). */}
           {!esDeGoogle && origenGoogle && <MarcaOrigenGoogle size={12} />}
           {nombre}
+          {!esDeGoogle && <MarcasCita enlace={deEnlace} sinExpediente={sinExpediente} size={13} soloV2 />}
         </span>
         {(duracion || motivo || pildora) && (
           <span className="ag-listadia-linea2">

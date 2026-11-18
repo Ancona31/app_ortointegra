@@ -1,6 +1,6 @@
 import { test, expect, type Locator, type Page } from '@playwright/test'
 import { SESION, diaDeLaSemana, interruptorAgenda, modalCita, sqlLocal } from './ayudas'
-import { abrirAgendaV2, tarjetaLectura } from './interaccionesAyudas'
+import { abrirAgendaV2, editarDesdeTarjeta, tarjetaLectura } from './interaccionesAyudas'
 import { fechaHoraLocalAInstante } from '../src/lib/dates'
 
 /**
@@ -8,17 +8,17 @@ import { fechaHoraLocalAInstante } from '../src/lib/dates'
  * «las acciones dependen del estado de la cita»), con la maqueta «Burbuja y
  * tarjeta» de referencia. Interruptor encendido, semana +4 (nadie más la usa).
  *
- *   · Agendada: «Iniciar consulta» a todo el ancho; «Confirmar» | «Reagendar»
- *     en dos columnas iguales; «Enviar confirmación» (WhatsApp) a todo el ancho
- *     en UNA línea; «Cancelar cita» aparte, al final. Todos del mismo alto,
- *     márgenes iguales a izquierda y derecha, sin «Editar» (el engrane
- *     «Configuración de la cita» de la cabecera abre el formulario).
- *   · Confirmada: «Reagendar» | «Enviar recordatorio» (en DOS líneas).
- *   · Atendida: SÓLO «Ver expediente». Cancelada / No asistió: SÓLO «Reagendar
- *     cita», que abre el alta de una cita NUEVA (mismo paciente, médico y
- *     consultorio, fecha enfocada) y deja la original como estaba.
- *   · La píldora del estado en la línea del nombre; fecha y hora juntas.
- *   · El logo de WhatsApp es el de `BotonWhatsAppCita` (los mismos trazos).
+ *   TANDA K, PUNTO 21: la tarjeta es ahora la burbuja de `docs/spec/Burbuja.dc.html`. Lo que
+ *   esta prueba mira se conserva, en sus sitios nuevos:
+ *   · Agendada: «Iniciar consulta» a todo el ancho; «Confirmar» | «Reagendar» | «Editar» en
+ *     una rejilla pareja (mismos anchos y altos); «Cancelar cita» aparte, en el pie. Márgenes
+ *     iguales. «Confirmar» abre «Enviar por WhatsApp» (el logo de la app), «Enviar por correo» y
+ *     «Marcar como confirmada». Los tres puntos sustituyen al engrane.
+ *   · Confirmada: «Reagendar» | «Editar» | «No asistió»; los recordatorios en los tres puntos.
+ *   · Atendida: SÓLO «Ver la consulta». Cancelada: «Darle otra cita» y «Reasignar el horario»;
+ *     no asistió: sólo «Darle otra cita», que abre el alta de una cita NUEVA (mismo paciente,
+ *     médico y consultorio, fecha enfocada) y deja la original como estaba.
+ *   · La píldora del estado arriba; la hora con su duración y el día, juntos.
  *   · 19: la etiqueta de la hora y región del consultorio cuando difieren.
  *   · 15: en el formulario, «Enviar confirmación» y «Enviar confirmación por
  *     correo» («… recordatorio …» si está confirmada).
@@ -26,11 +26,14 @@ import { fechaHoraLocalAInstante } from '../src/lib/dates'
  *     no se confirma, no se cancela ni se mueve; se puede corregir a Agendada).
  *
  * MUTACIONES (comprobadas en rojo): `disposicionDeTarjeta` con las acciones de
- * antes (sin estado) → «atendida», «cancelada», «agendada» (orden); quitar la
- * regla de la impar a todo el ancho (`claseDePieza`) → «agendada» (rejilla);
- * `dosLineas` siempre `false` → «confirmada»; quitar `enConsultorio` de
- * `Cuando` → «etiqueta de huso»; quitar `vetoPorEstado` de la ruta → «17.3»;
- * volver a editar la misma cita en «Reagendar cita» → «crea una cita NUEVA»;
+ * antes (sin estado) → «atendida», «cancelada», «agendada» (orden); la rejilla
+ * sin `gridTemplateColumns` → «agendada» (rejilla pareja); `no-asistio` con
+ * `'no_show'` cambiado por `'cancelled'` → «confirmada»; quitar `enConsultorio`
+ * de `Info` → «etiqueta de huso»; sin el `else` que enfoca «Confirmar» al cerrar con Escape,
+ * o `enColumna` siempre `false` → «agendada»; el panel de los tres puntos sin cerrarse al
+ * recibir un mensaje (`alMensaje={setMensaje}`) → «confirmada»; `.ag-burbuja-mas` de vuelta a
+ * `width: 252px` → «confirmada» (el recordatorio en dos líneas); quitar `vetoPorEstado` de la ruta → «17.3»;
+ * volver a editar la misma cita en «Darle otra cita» → «crea una cita NUEVA»;
  * `pideComprobarNota` siempre `false` → «nota ligada».
  */
 test.use({ storageState: SESION.adminA })
@@ -102,88 +105,123 @@ async function caja(l: Locator): Promise<{ x: number; y: number; width: number; 
   return b
 }
 
-test('agendada: orden, rejilla pareja (mismos anchos y altos), márgenes iguales, WhatsApp a todo el ancho en una línea, cancelar aparte', async ({ page }) => {
+test('agendada: orden, rejilla pareja (mismos anchos y altos), márgenes iguales, «Confirmar» con sus tres opciones, cancelar en el pie', async ({ page }) => {
   test.skip(test.info().project.name !== 'escritorio', 'escritorio')
   cita(MARTES, '09:00', 'Prueba 21', 'scheduled')
   const t = await abrirTarjeta(page, 'Prueba 21')
-  expect(await acciones(t)).toEqual(['Iniciar consulta', 'Confirmar', 'Reagendar', 'Enviar confirmación', 'Cancelar cita'])
-  await expect(t.getByRole('button', { name: 'Editar', exact: true })).toHaveCount(0)
-  // Cabecera: el nombre y la píldora en la misma línea; engrane y ✕ arriba.
-  const [nombre, pildora, engrane, cerrar] = await Promise.all([
-    caja(t.getByRole('heading')), caja(t.locator('.ag-lectura-pildora').first()),
-    caja(t.getByRole('button', { name: 'Configuración de la cita' })), caja(t.getByRole('button', { name: 'Cerrar' }))])
-  expect(pildora.y).toBeLessThan(nombre.y + nombre.height)
-  expect(pildora.x).toBeGreaterThan(nombre.x + nombre.width - 1)
-  expect(Math.abs(engrane.y - cerrar.y)).toBeLessThan(1)
-  await expect(t.locator('.ag-lectura-cuando')).toContainText(/^(Lun|Mar|Mié|Jue|Vie|Sáb|Dom) \d{1,2} \w+ · 09:00 – 10:00/)
-  await expect(t.locator('.ag-lectura-datos')).toContainText('Médico')
-  await expect(t.locator('.ag-lectura-datos')).toContainText('Consultorio Centro (ficticio)')
+  expect(await acciones(t)).toEqual(['Iniciar consulta', 'Confirmar', 'Reagendar', 'Editar', 'Cancelar cita'])
+  await expect(t.getByRole('button', { name: 'Configuración de la cita' })).toHaveCount(0)
+  // Cabecera: la píldora arriba y el nombre debajo; los tres puntos y la ✕ en la línea de la píldora.
+  const [nombre, pildora, puntos, cerrar] = await Promise.all([
+    caja(t.getByRole('heading')), caja(t.locator('.ag-burbuja-estado')),
+    caja(t.getByRole('button', { name: 'Más opciones de la cita' })), caja(t.getByRole('button', { name: 'Cerrar' }))])
+  expect(pildora.y + pildora.height).toBeLessThanOrEqual(nombre.y + 1)
+  expect(Math.abs(puntos.y - cerrar.y)).toBeLessThan(1)
+  await expect(t.locator('.ag-burbuja-estado')).toHaveText('Agendada')
+  await expect(t.locator('.ag-burbuja-hora')).toHaveText('09:00 – 10:00 · 60 min')
+  await expect(t.locator('.ag-burbuja-dia')).toHaveText(/^(Lunes|Martes|Miércoles|Jueves|Viernes|Sábado|Domingo) \d{1,2} de \w+$/)
+  await expect(t.locator('.ag-burbuja-medico')).toContainText('Dr.')
   // Rejilla pareja.
   const b = (n: string): Locator => t.getByRole('button', { name: n, exact: true })
-  const [ini, con, rea, wa, can, dlg] = await Promise.all([caja(b('Iniciar consulta')), caja(b('Confirmar')), caja(b('Reagendar')),
-    caja(b('Enviar confirmación')), caja(b('Cancelar cita')), caja(t)])
-  expect(Math.abs(con.y - rea.y)).toBeLessThan(1)
-  expect(Math.abs(con.width - rea.width)).toBeLessThan(1)
-  for (const x of [con, rea, wa]) expect(Math.abs(x.height - ini.height)).toBeLessThan(1)
-  expect(Math.abs(ini.width - (rea.x + rea.width - con.x))).toBeLessThan(1)
-  expect(Math.abs(wa.width - ini.width)).toBeLessThan(1)
+  const [ini, con, rea, edi, can, dlg] = await Promise.all([caja(b('Iniciar consulta')), caja(b('Confirmar')), caja(b('Reagendar')),
+    caja(b('Editar')), caja(b('Cancelar cita')), caja(t)])
+  for (const x of [rea, edi]) {
+    expect(Math.abs(x.y - con.y)).toBeLessThan(1)
+    expect(Math.abs(x.width - con.width)).toBeLessThan(1)
+    expect(Math.abs(x.height - con.height)).toBeLessThan(1)
+  }
+  expect(con.height).toBeGreaterThanOrEqual(68)
+  expect(ini.height).toBeGreaterThanOrEqual(52)
+  expect(Math.abs(ini.width - (edi.x + edi.width - con.x))).toBeLessThan(1)
   expect(Math.abs((ini.x - dlg.x) - (dlg.x + dlg.width - (ini.x + ini.width)))).toBeLessThan(1.5)
-  // WhatsApp a todo el ancho: en UNA línea.
-  await expect(b('Enviar confirmación').locator('.ag-capa-dos-lineas')).toHaveCount(0)
-  // Cancelar aparte, al final y centrado.
-  expect(can.y).toBeGreaterThan(wa.y + wa.height)
-  expect(Math.abs((can.x + can.width / 2) - (dlg.x + dlg.width / 2))).toBeLessThan(1.5)
-  // El logo de WhatsApp de la app, tal cual.
-  const trazos = await b('Enviar confirmación').locator('svg path').evaluateAll(ps => ps.map(p => [p.getAttribute('fill'), p.getAttribute('d')]))
+  // Cancelar en el pie: debajo de la rejilla, a todo el ancho de la burbuja.
+  expect(can.y).toBeGreaterThan(con.y + con.height)
+  expect(Math.abs(can.width - (dlg.width - 2))).toBeLessThan(2)
+  // «Confirmar» abre sus tres opciones, en su orden; el WhatsApp con el logo de la app, tal cual.
+  await b('Confirmar').click()
+  await expect(b('Confirmar')).toHaveAttribute('aria-expanded', 'true')
+  const opciones = t.getByRole('group', { name: 'Confirmar la cita' })
+  await expect(opciones.getByRole('button')).toHaveText(['Enviar por WhatsApp', 'Enviar por correo', 'Marcar como confirmada'])
+  const trazos = await b('Enviar por WhatsApp').locator('svg path').evaluateAll(ps => ps.map(p => [p.getAttribute('fill'), p.getAttribute('d')]))
   expect(trazos).toEqual(LOGO)
+  // Las opciones son una columna: abajo y arriba las recorren.
+  await b('Enviar por WhatsApp').focus()
+  await page.keyboard.press('ArrowDown')
+  await expect(b('Enviar por correo')).toBeFocused()
+  // Escape cierra lo desplegado, no la burbuja, y el foco vuelve a «Confirmar».
+  await page.keyboard.press('Escape')
+  await expect(opciones).toHaveCount(0)
+  await expect(t).toBeVisible()
+  await expect(b('Confirmar')).toBeFocused()
+  // Los tres puntos: observaciones, tipo, «No asistió» y, como dato, el consultorio.
+  await b('Más opciones de la cita').click()
+  const mas = t.getByRole('group', { name: 'Más opciones de la cita' })
+  await expect(mas.getByRole('button')).toHaveText([/^Observaciones/, /^Tipo de cita/, 'No asistió'])
+  await expect(mas).toContainText('Consultorio Centro (ficticio)')
 })
 
-test('confirmada: «Reagendar» | «Enviar recordatorio» en dos líneas; cancelar aparte', async ({ page }) => {
+/* Tanda K, punto 21: «No asistió» de la rejilla de la confirmada manda el mismo PUT parcial
+   que «Marcar como confirmada», con `no_show`. MUTACIÓN: `'no_show'` → `'cancelled'` en
+   `ejecutarAccion` → rojo. */
+test('confirmada: Reagendar | Editar | No asistió, los recordatorios en los tres puntos, y «No asistió» manda PUT no_show', async ({ page }) => {
   test.skip(test.info().project.name !== 'escritorio', 'escritorio')
-  cita(MARTES, '11:00', 'Prueba 22', 'confirmed')
+  const { id } = cita(MARTES, '11:00', 'Prueba 22', 'confirmed')
   const t = await abrirTarjeta(page, 'Prueba 22')
-  expect(await acciones(t)).toEqual(['Iniciar consulta', 'Reagendar', 'Enviar recordatorio', 'Cancelar cita'])
-  const wa = t.getByRole('button', { name: 'Enviar recordatorio', exact: true })
-  const [r, w] = [await caja(t.getByRole('button', { name: 'Reagendar', exact: true })), await caja(wa)]
-  expect(Math.abs(r.y - w.y)).toBeLessThan(1)
-  expect(Math.abs(r.width - w.width)).toBeLessThan(1)
-  expect(Math.abs(r.height - w.height)).toBeLessThan(1)
-  const [arriba, abajo] = await wa.locator('.ag-capa-dos-lineas > span').evaluateAll(ss => ss.map(s => s.getBoundingClientRect().top))
-  expect(abajo).toBeGreaterThan((arriba ?? 0) + 5)
-  await expect(wa.locator('.ag-capa-dos-lineas > span').first()).toHaveText('Enviar')
-  await expect(wa.locator('.ag-capa-dos-lineas > span').last()).toHaveText('recordatorio')
+  expect(await acciones(t)).toEqual(['Iniciar consulta', 'Reagendar', 'Editar', 'No asistió', 'Cancelar cita'])
+  await t.getByRole('button', { name: 'Más opciones de la cita' }).click()
+  const mas = t.getByRole('group', { name: 'Más opciones de la cita' })
+  await expect(mas.getByRole('button', { name: 'Recordatorio por WhatsApp' })).toBeVisible()
+  // En los tres puntos el rótulo va en UNA línea (a 252 px de ancho, «WhatsApp» bajaba sola).
+  const lineas = await mas.getByRole('button', { name: 'Recordatorio por WhatsApp' }).evaluate(el => {
+    const r = document.createRange()
+    r.selectNodeContents(el.querySelector('span:last-of-type') ?? el)
+    return new Set([...r.getClientRects()].map(x => Math.round(x.top))).size
+  })
+  expect(lineas).toBe(1)
+  await expect(mas.getByRole('button', { name: 'Recordatorio por correo' })).toBeVisible()
+  await expect(mas.getByRole('button', { name: 'No asistió' })).toHaveCount(0)
+  // Lo que dice el envío no queda tapado: el panel se cierra y el mensaje sale bajo las casillas.
+  await mas.getByRole('button', { name: 'Recordatorio por correo' }).click()
+  await expect(mas).toHaveCount(0)
+  await expect(t.locator('.ag-lectura-mensaje')).not.toBeEmpty()
+  const put = page.waitForResponse(r => r.url().includes(`/api/appointments/${id}`) && r.request().method() === 'PUT')
+  await t.getByRole('toolbar').getByRole('button', { name: 'No asistió', exact: true }).click()
+  expect((await put).request().postDataJSON()).toMatchObject({ status: 'no_show' })
+  await expect.poll(() => sqlLocal(`select status from public.appointments where id = :'id'`, { id })).toBe('no_show')
 })
 
-test('atendida: ÚNICAMENTE «Ver expediente», que lleva al expediente', async ({ page }) => {
+test('atendida: ÚNICAMENTE «Ver la consulta», que lleva al expediente', async ({ page }) => {
   test.skip(test.info().project.name !== 'escritorio', 'escritorio')
   const { paciente } = cita(MARTES, '13:00', 'Prueba 23', 'attended')
   const t = await abrirTarjeta(page, 'Prueba 23')
-  expect(await acciones(t)).toEqual(['Ver expediente'])
-  await t.getByRole('button', { name: 'Ver expediente' }).click()
+  expect(await acciones(t)).toEqual(['Ver la consulta'])
+  await t.getByRole('button', { name: 'Ver la consulta' }).click()
   await page.waitForURL(`**/expediente/${paciente}`)
 })
 
-/* Decisión de Angel: «Reagendar cita» CREA una cita nueva (mismo paciente,
+/* Decisión de Angel: «Reagendar cita» (tanda K: «Darle otra cita») CREA una cita nueva (mismo paciente,
    médico y consultorio) y deja la original como estaba: su estado, y con él lo
    que cuenta para el candado. MUTACIÓN: volver a abrir la edición de la misma
    cita (`setModal({ mode: 'edit', … })`) → rojo («Nueva cita» no aparece).
-   Tanda I (punto 12): la cancelada ofrece además «Reasignar», y al reagendarla
+   Tanda I (punto 12): la cancelada ofrece además «Reasignar» (tanda K: «Reasignar el horario»), y al reagendarla
    queda CERRADA y ligada a la nueva (sin cambiar de estado); la no asistida, no. */
-test('cancelada y no asistió: «Reagendar cita» (y «Reasignar» la cancelada) crea una cita NUEVA; la original conserva su estado', async ({ page }) => {
+test('cancelada y no asistió: «Darle otra cita» (y «Reasignar el horario» la cancelada) crea una cita NUEVA; la original conserva su estado', async ({ page }) => {
   test.skip(test.info().project.name !== 'escritorio', 'escritorio')
   const { id, paciente } = cita(MARTES, '15:00', 'Prueba 24', 'cancelled')
   const { id: falta } = cita(MARTES, '16:30', 'Prueba 25', 'no_show')
   const original = (x: string): string => sqlLocal(`select status || '|' || start_time || '|' || updated_at from public.appointments where id = :'x'`, { x })
   const [antesCancelada, antesFalta] = [original(id), original(falta)]
   let t = await abrirTarjeta(page, 'Prueba 25')
-  expect(await acciones(t)).toEqual(['Reagendar cita'])
+  expect(await acciones(t)).toEqual(['Darle otra cita'])
+  await expect(t).toContainText('El paciente no llegó a esta cita.')
   await page.keyboard.press('Escape')
   t = tarjetaLectura(page)
   await expect(t).toHaveCount(0)
   await page.locator('.fc-timegrid-event', { hasText: 'Prueba 24' }).first().click({ position: { x: 8, y: 8 } })
   await expect(t).toHaveAccessibleName('Paciente Prueba 24')
-  await expect.poll(() => acciones(t)).toEqual(['Reagendar cita', 'Reasignar'])
-  await t.getByRole('button', { name: 'Reagendar cita' }).click()
+  await expect.poll(() => acciones(t)).toEqual(['Darle otra cita', 'Reasignar el horario'])
+  await expect(t).toContainText('Esta cita se canceló. Su horario quedó libre.')
+  await t.getByRole('button', { name: 'Darle otra cita' }).click()
   const modal = modalCita(page, 'Nueva cita')
   await expect(modal).toBeVisible()
   await expect(modal).toContainText('Paciente Prueba 24')
@@ -231,7 +269,7 @@ test('punto 15: el formulario ofrece «Enviar confirmación» y «Enviar confirm
   for (const [ap, palabra] of [['Prueba 18', 'confirmación'], ['Prueba 17', 'recordatorio']] as const) {
     const t = ap === 'Prueba 18' ? await abrirTarjeta(page, ap) : tarjetaLectura(page)
     if (ap === 'Prueba 17') await page.locator('.fc-timegrid-event', { hasText: ap }).first().click({ position: { x: 8, y: 8 } })
-    await t.getByRole('button', { name: 'Configuración de la cita' }).click()
+    await editarDesdeTarjeta(page)
     const modal = modalCita(page, 'Editar cita')
     await expect(modal.getByRole('button', { name: `Enviar ${palabra}`, exact: true })).toBeVisible()
     await expect(modal.getByRole('button', { name: `Enviar ${palabra} por correo`, exact: true })).toBeVisible()
@@ -289,13 +327,14 @@ test('nota ligada: una atendida con nota no cambia de estado ni se borra, con o 
   }
 })
 
-test('teléfono: la hoja lleva el mismo orden y el engrane', async ({ page }) => {
+test('teléfono: la hoja lleva el mismo orden y los tres puntos', async ({ page }) => {
   test.skip(test.info().project.name !== 'telefono', 'teléfono')
   cita(MARTES, '09:00', 'Prueba 15', 'scheduled')
   const t = await abrirTarjeta(page, 'Prueba 15')
   await expect(t).toHaveClass(/ag-hoja/)
-  expect(await acciones(t)).toEqual(['Iniciar consulta', 'Confirmar', 'Reagendar', 'Enviar confirmación', 'Cancelar cita'])
+  expect(await acciones(t)).toEqual(['Iniciar consulta', 'Confirmar', 'Reagendar', 'Editar', 'Cancelar cita'])
+  await expect(t.getByRole('button', { name: 'Más opciones de la cita' })).toBeVisible()
   const [ini, con] = [await caja(t.getByRole('button', { name: 'Iniciar consulta' })), await caja(t.getByRole('button', { name: 'Confirmar' }))]
   expect(ini.height).toBeGreaterThanOrEqual(44)
-  expect(Math.abs(ini.height - con.height)).toBeLessThan(1)
+  expect(con.height).toBeGreaterThanOrEqual(44)
 })

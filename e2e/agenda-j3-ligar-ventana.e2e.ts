@@ -144,7 +144,7 @@ test('punto 7 · tarjeta: abre la ventana; «Registrar paciente nuevo» con los 
   })
   await abrirAgendaV2(page)
   await eventoConTexto(page, nombre).click({ position: { x: 8, y: 8 } })
-  await tarjetaLectura(page).getByRole('button', { name: 'Ligar e iniciar consulta', exact: true }).click()
+  await tarjetaLectura(page).getByRole('button', { name: 'Ligar expediente e iniciar', exact: true }).click()
   const v = ventana(page)
   await expect(v).toBeVisible()
   await expect(modalCita(page, 'Editar cita')).toHaveCount(0)

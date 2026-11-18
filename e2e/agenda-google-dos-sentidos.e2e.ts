@@ -305,9 +305,9 @@ test('encendido (I3): un evento nuevo de Google entra «Por asignar»; tras «¿
   expect(columna('google_asignacion')).toBe('por_asignar')
   await expect(page.locator('.agenda-raiz')).toHaveAttribute('data-interacciones-v2', 'listas')
   const filaPintada = page.locator(`.fc-event:has([data-cita-id="${id}"])`)
-  await expect(filaPintada).toContainText('Por asignar', { timeout: 30_000 })
+  await expect(filaPintada.locator('.ag-icono-sin-exp')).toBeVisible({ timeout: 30_000 })
   await filaPintada.click()
-  await tarjetaLectura(page).getByRole('button', { name: '¿No es una cita?' }).click()
+  await tarjetaLectura(page).getByRole('button', { name: 'No es una cita', exact: true }).click()
   await expect.poll(() => columna('google_asignacion'), { timeout: 15_000 }).toBe('evento')
 
   g().modificar(creado.id, { summary: `${titulo} editado` })
@@ -316,7 +316,7 @@ test('encendido (I3): un evento nuevo de Google entra «Por asignar»; tras «¿
   await expect.poll(() => columna('title'), { timeout: 30_000 }).toBe(`${titulo} editado`)
   expect(columna('google_asignacion')).toBe('evento')
   await expect(filaPintada).toContainText('editado', { timeout: 30_000 })
-  await expect(filaPintada).not.toContainText('Por asignar')
+  await expect(filaPintada.locator('.ag-icono-sin-exp')).toHaveCount(0)
 })
 
 /* T3 · punto 6 (AG-DT-29): convertir en cita un evento nacido en Google, desde
@@ -345,7 +345,7 @@ test('encendido: un evento creado en Google se convierte en cita; a Google va el
   /* I3 (punto 10): recién importado está «por asignar»; «¿No es una cita?» lo deja en
      evento y «Convertir en cita» es el camino de vuelta (el que prueba esto). */
   await filaPintada.click()
-  await tarjetaLectura(page).getByRole('button', { name: '¿No es una cita?' }).click()
+  await tarjetaLectura(page).getByRole('button', { name: 'No es una cita', exact: true }).click()
   await expect.poll(() => sqlLocal(`select coalesce(google_asignacion, '') from public.appointments where id = :'id'`, { id })).toBe('evento')
   await page.keyboard.press('Escape')
   await filaPintada.click()

@@ -10,7 +10,7 @@
 import type { EventApi } from '@fullcalendar/core'
 import type { Appointment } from './tiposAgenda'
 import type { RangoVisible } from '@/lib/agenda/ventanaRejilla'
-import { esEventoGenerico, tintasDelChipDeMes } from './tarjetasAgenda'
+import { esEventoGenerico, marcasDeCita, tintasDelChipDeMes } from './tarjetasAgenda'
 import { horaDeReloj } from './horarioAgenda'
 
 /** Una fila del panel, ya resuelta: aquí no se vuelve a mirar el `EventApi`. */
@@ -24,6 +24,9 @@ export type FilaDelDia = {
   esDeGoogle: boolean
   /** Tanda J, punto 11 · fila de Spinus nacida en Google (`origen = 'google'`): su «G» con la v2. */
   origenGoogle: boolean
+  /** Tanda K, sección E · el eslabón y el expediente tachado (`marcasDeCita`), con la v2. */
+  deEnlace: boolean
+  sinExpediente: boolean
   esEvento: boolean
   cancelada: boolean
   tinta: string
@@ -62,6 +65,7 @@ export function filasDelDia(eventos: readonly EventApi[], dia: Date): FilaDelDia
     const esDeGoogle = ext?.isGcalBlock === true
     const esEvento = esEventoGenerico(ext)
     const pac = ext?.pacientes
+    const procedencia = marcasDeCita(ext ?? {})
     filas.push({
       id: ev.id,
       orden: ev.allDay ? -1 : ev.start.getTime(),
@@ -70,6 +74,8 @@ export function filasDelDia(eventos: readonly EventApi[], dia: Date): FilaDelDia
       nombre: pac ? `${pac.nombre} ${pac.apellidos}` : ev.title,
       esDeGoogle,
       origenGoogle: !esDeGoogle && ext?.origen === 'google',
+      deEnlace: procedencia.enlace,
+      sinExpediente: procedencia.sinExpediente,
       esEvento,
       cancelada: ext?.status === 'cancelled',
       tinta: tintasDelChipDeMes(ext, esDeGoogle, esEvento).tinta,
@@ -84,7 +90,7 @@ export function filasDelDia(eventos: readonly EventApi[], dia: Date): FilaDelDia
    cada llamada, o sea que la identidad no vale para nada. Con la firma, un
    `eventsSet` que no cambia nada del día muere en el bail-out de React. */
 export function firmaDeFilas(filas: readonly FilaDelDia[]): string {
-  return filas.map(f => `${f.id}|${f.hora}|${f.nombre}|${f.tinta}|${f.cancelada}`).join('\n')
+  return filas.map(f => `${f.id}|${f.hora}|${f.nombre}|${f.tinta}|${f.cancelada}|${f.sinExpediente}|${f.deEnlace}`).join('\n')
 }
 
 /** El conteo del día, en la MISMA forma que consume `frasearConteo`. */

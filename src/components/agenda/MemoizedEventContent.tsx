@@ -14,6 +14,7 @@ import { STATUS_CONFIG } from '@/lib/agenda/tarjetasAgenda'
 import { IconoDelEvento } from './IconoDelEvento'
 import { GLIFO_PILDORA } from './FilaListaDetalle'
 import { MarcaOrigenGoogle, ETIQUETA_ORIGEN_GOOGLE } from './MarcaOrigenGoogle'
+import { MarcasCita, ETIQUETA_ENLACE, ETIQUETA_SIN_EXPEDIENTE } from './MarcasCita'
 
 /* ─── Renderer de eventos (estilo Google) — memoizado ──── */
 
@@ -185,11 +186,34 @@ export function useSinAvisoFlotante(): boolean {
   return useSyncExternalStore(suscribirAvisoFlotante, () => sinAvisoFlotanteActual, () => false)
 }
 
+/**
+ * La etiqueta accesible de la caja de una cita con la v2 (G3, punto 16: sin `title`). Tanda K,
+ * sección E: las marcas de procedencia en palabras, en vez de la frase de «Por ligar».
+ * La comparte `MonthChip`, que dice lo mismo del mismo evento.
+ */
+export function etiquetaV2(
+  nombre: string, estado: string,
+  m: { sinExpediente: boolean; deEnlace: boolean; origenGoogle: boolean; historial?: string | null },
+): string {
+  const partes = [nombre, estado]
+  if (m.sinExpediente) partes.push(m.historial ? `${ETIQUETA_SIN_EXPEDIENTE}. ${m.historial}` : ETIQUETA_SIN_EXPEDIENTE)
+  if (m.deEnlace) partes.push(ETIQUETA_ENLACE)
+  if (m.origenGoogle) partes.push(ETIQUETA_ORIGEN_GOOGLE)
+  return partes.join(' · ')
+}
+
 export const MemoizedEventContent = memo(function MemoizedEventContent({
   timeText, horaInicio, title, pacNombre, status, doctorInitial, tzDiff, icono, color, descriptor,
   esEvento, enRejilla, marca = null, marcaTitulo = null, citaId, telefono = null, consultorio = null, nombreCorto = null,
-  origenGoogle = false,
+  origenGoogle = false, deEnlace = false, sinExpediente = false, historial = null,
 }: {
+  /* Tanda K, sección E (puntos 17 y 18) · Con la v2, el eslabón (reservada por enlace,
+     permanente) y el expediente tachado (sin expediente) SUSTITUYEN a la píldora de `marca`
+     (`marcasDeCita`). Primitivos, para que el `memo` siga comparando barato. */
+  deEnlace?: boolean
+  sinExpediente?: boolean
+  /** La frase del historial al reservar (lo que la píldora decía con «· N»), para la etiqueta. */
+  historial?: string | null
   /* Tanda J, punto 11 · Fila de Spinus nacida en Google (`origen = 'google'`):
      con la v2 lleva la «G» delante de la hora (la hoja de estilos la esconde
      con la v2 apagada, ver `MarcaOrigenGoogle`) y «Agendada en Google» en su
@@ -375,7 +399,7 @@ export const MemoizedEventContent = memo(function MemoizedEventContent({
        señal) y el estado entero en el `title`. */
     <div ref={rootRef} data-cita-id={citaId}
       {...(sinAvisoFlotante
-        ? { role: 'group', 'aria-label': `${name} · ${etiquetaEstado}${marcaTitulo ? ` · ${marcaTitulo}` : ''}${origenGoogle ? ` · ${ETIQUETA_ORIGEN_GOOGLE}` : ''}` }
+        ? { role: 'group', 'aria-label': etiquetaV2(name, etiquetaEstado, { sinExpediente, deEnlace, origenGoogle, historial }) }
         : { title: `${name} · ${etiquetaEstado}` })}
       className={tier ? `ag-tarjeta ag-tarjeta--${tier}` : 'ag-tarjeta'} style={root}>
       <div className="ag-tarjeta-cab">
@@ -438,7 +462,9 @@ export const MemoizedEventContent = memo(function MemoizedEventContent({
         >{name}</span>
         <span className="ag-tarjeta-nombre-corto"
           style={isCancelled ? { textDecoration: 'line-through' } : undefined}>{nombreCorto ?? name}</span>
-        {marca && <span className="ag-tarjeta-marca" title={sinAvisoFlotante ? undefined : marcaTitulo ?? undefined}>{marca}</span>}
+        {sinAvisoFlotante
+          ? <MarcasCita enlace={deEnlace} sinExpediente={sinExpediente} size={12} decorativa />
+          : marca && <span className="ag-tarjeta-marca" title={marcaTitulo ?? undefined}>{marca}</span>}
       </div>
       {tzDiff && <span className="ag-tarjeta-tz">{tzDiff}</span>}
       {/* Tercera línea: «Consulta de seguimiento · atendida». El estado va en su

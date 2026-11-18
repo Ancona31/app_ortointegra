@@ -48,23 +48,28 @@ export function burbuja(page: Page): Locator {
   return page.getByRole('dialog', { name: /^Nueva cita · / })
 }
 
-/** La tarjeta de lectura: el diálogo con el engrane «Configuración de la cita»
-    (G3: toda tarjeta lo lleva; una atendida vista por quien no abre
-    expedientes no tiene ninguna acción en su barra). */
+/** La tarjeta de lectura: el diálogo con los tres puntos «Más opciones de la cita»
+    (tanda K, punto 21: sustituyen al engrane de G3; toda tarjeta los lleva, también
+    una atendida vista por quien no abre expedientes, sin ninguna acción en su barra). */
 export function tarjetaLectura(page: Page): Locator {
-  return page.getByRole('dialog').filter({ has: page.getByRole('button', { name: 'Configuración de la cita', exact: true }) })
+  return page.getByRole('dialog').filter({ has: page.getByRole('button', { name: 'Más opciones de la cita', exact: true }) })
 }
 
 /**
  * Con el interruptor encendido, un clic en una cita abre la TARJETA y la
- * edición está a un clic más, en el engrane «Configuración de la cita» (G3:
- * sustituye al botón «Editar», que hacía lo mismo que «Reagendar»). Las e2e de
- * B–E que abrían el modal con un clic pasan por aquí.
+ * edición está a un clic más. Tanda K (punto 21): en la agendada, la
+ * confirmada y el evento, «Editar» de la rejilla; en las demás, «Editar» de
+ * los tres puntos (que sustituyen al engrane de G3). Las dos abren el
+ * formulario de siempre. Las e2e de B–E que abrían el modal con un clic pasan
+ * por aquí.
  */
 export async function editarDesdeTarjeta(page: Page): Promise<void> {
   const t = tarjetaLectura(page)
   await expect(t).toBeVisible()
-  await t.getByRole('button', { name: 'Configuración de la cita', exact: true }).click()
+  const enRejilla = t.getByRole('toolbar', { name: 'Acciones de la cita' }).getByRole('button', { name: 'Editar', exact: true })
+  if (await enRejilla.count() > 0) { await enRejilla.click(); return }
+  await t.getByRole('button', { name: 'Más opciones de la cita', exact: true }).click()
+  await t.getByRole('group', { name: 'Más opciones de la cita' }).getByRole('button', { name: 'Editar', exact: true }).click()
 }
 
 /** El centro de la franja de media hora `hora` (`HH:MM`) del día `fecha`, ya a la vista. */

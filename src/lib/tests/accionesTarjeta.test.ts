@@ -36,10 +36,11 @@ describe('accionesDeTarjeta (G3: por estado)', () => {
       .toEqual(['ligar', 'confirmar', 'reagendar', 'editar', 'cancelar'])
   })
   /* Tanda J (punto 7) · MUTACIÓN: principal `'iniciar-consulta'` en `disposicionSinCambios` → rojo. */
-  it('tanda J · la principal de una por ligar es «Ligar e iniciar consulta» (la ventana), no «Iniciar consulta»', () => {
+  it('tanda J · la principal de una por ligar es «Ligar expediente e iniciar» (la ventana), no «Iniciar consulta»', () => {
     const d = disposicionDeTarjeta({ paciente_id: null, reserva_canal: 'unico', status: 'confirmed' }, true)
     expect(d.principal).toBe('ligar')
-    expect(ETIQUETA_ACCION.ligar).toBe('Ligar e iniciar consulta')
+    /* Tanda K, punto 21 · el texto de la maqueta. */
+    expect(ETIQUETA_ACCION.ligar).toBe('Ligar expediente e iniciar')
     expect(disposicionDeTarjeta({ paciente_id: null, reserva_canal: 'unico', status: 'confirmed' }, false).principal).toBeNull()
   })
   it('cancelar y eliminar piden confirmación; el resto no', () => {

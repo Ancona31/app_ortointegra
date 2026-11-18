@@ -14,7 +14,8 @@ import { fechaHoraLocalAInstante } from '../src/lib/dates'
  *   · Confirmar → PUT `confirmed` (`cambiarEstadoCita`, de `guardadoCitas`);
  *   · Cancelar → aviso y PUT `cancelled`, NUNCA un DELETE (B3);
  *   · Eliminar → sólo en un evento sin paciente, con aviso y DELETE;
- *   · el engrane «Configuración de la cita» (G3: sustituye a «Editar») → el
+ *   · «Editar» (tanda K, punto 21: en la rejilla de la burbuja; los tres
+ *     puntos «Más opciones de la cita» sustituyen al engrane de G3) → el
  *     modal de hoy; Reagendar → el modal con el foco en la fecha;
  *   · Iniciar consulta → `/expediente/<paciente>/nueva-nota?cita=<id>`; en una
  *     por ligar, «Ligar e iniciar consulta» abre la ventana pequeña de ligar
@@ -152,7 +153,8 @@ test('encendido: tarjeta nombrada por el paciente, foco en la primera acción, f
 })
 
 /* Pendiente de `cambiarEstadoCita` en `guardadoCitas.ts` (movimiento): sin ella la tarjeta no ofrece Confirmar. */
-test('encendido: Confirmar manda PUT confirmed', async ({ page }) => {
+/* Tanda K, punto 21: «Confirmar» abre sus opciones; «Marcar como confirmada» hace lo de antes. */
+test('encendido: Confirmar → «Marcar como confirmada» manda PUT confirmed', async ({ page }) => {
   soloEn('escritorio')
   interruptorAgenda('A', true)
   const { id } = await alta(page, '14:40', 'Prueba 16')
@@ -161,6 +163,8 @@ test('encendido: Confirmar manda PUT confirmed', async ({ page }) => {
   await citaEnRejilla(page, 'Prueba 16').click()
   const put = page.waitForResponse(r => r.url().includes(`/api/appointments/${id}`) && r.request().method() === 'PUT')
   await tarjetaLectura(page).getByRole('button', { name: 'Confirmar', exact: true }).click()
+  await expect(tarjetaLectura(page).getByRole('button', { name: 'Confirmar', exact: true })).toHaveAttribute('aria-expanded', 'true')
+  await tarjetaLectura(page).getByRole('button', { name: 'Marcar como confirmada', exact: true }).click()
   const res = await put
   expect(res.ok()).toBeTruthy()
   expect(res.request().postDataJSON()).toMatchObject({ status: 'confirmed' })
@@ -186,17 +190,17 @@ test('encendido: Cancelar pregunta y manda PUT cancelled; NINGÚN DELETE (B3)', 
   expect(sqlLocal(`select status from public.appointments where id = :'id'`, { id })).toBe('cancelled')
 })
 
-/* G3 (punto 17): «Editar» ya no es un botón de una cita; el formulario completo
-   se abre con el engrane «Configuración de la cita» de la cabecera. */
-test('encendido: el engrane «Configuración de la cita» abre el modal de hoy (y no hay «Editar»)', async ({ page }) => {
+/* Tanda K, punto 21: la maqueta vuelve a poner «Editar» en la rejilla de la agendada, y los tres
+   puntos sustituyen al engrane de G3 (que ya no está). Las dos puertas abren el modal de hoy. */
+test('encendido: «Editar» de la rejilla abre el modal de hoy; no hay engrane', async ({ page }) => {
   soloEn('escritorio')
   interruptorAgenda('A', true)
   await alta(page, '15:50', 'Prueba 18')
   await abrirAgendaV2(page)
   await aLaSemanaMasDos(page)
   await citaEnRejilla(page, 'Prueba 18').click()
-  await expect(tarjetaLectura(page).getByRole('button', { name: 'Editar', exact: true })).toHaveCount(0)
-  await tarjetaLectura(page).getByRole('button', { name: 'Configuración de la cita', exact: true }).click()
+  await expect(tarjetaLectura(page).getByRole('button', { name: 'Configuración de la cita', exact: true })).toHaveCount(0)
+  await tarjetaLectura(page).getByRole('button', { name: 'Editar', exact: true }).click()
   await expect(modalCita(page, 'Editar cita')).toBeVisible()
   await expect(tarjetaLectura(page)).toHaveCount(0)
 })
@@ -226,7 +230,7 @@ test('encendido: Iniciar consulta lleva a la nota con ?cita=', async ({ page }) 
   await page.waitForURL(`**/expediente/${paciente}/nueva-nota?cita=${id}`)
 })
 
-test('encendido: en una por ligar, «Ligar e iniciar consulta» abre la ventana de ligar (tanda J), ni el modal ni la nota', async ({ page }) => {
+test('encendido: en una por ligar, «Ligar expediente e iniciar» abre la ventana de ligar (tanda J), ni el modal ni la nota', async ({ page }) => {
   soloEn('escritorio')
   interruptorAgenda('A', true)
   const nombre = tituloUnico('Persona F3')
@@ -235,7 +239,7 @@ test('encendido: en una por ligar, «Ligar e iniciar consulta» abre la ventana 
   await aLaSemanaMasDos(page)
   await citaEnRejilla(page, nombre).click({ position: { x: 8, y: 8 } })
   await expect(tarjetaLectura(page).getByRole('button', { name: 'Iniciar consulta', exact: true })).toHaveCount(0)
-  await tarjetaLectura(page).getByRole('button', { name: 'Ligar e iniciar consulta', exact: true }).click()
+  await tarjetaLectura(page).getByRole('button', { name: 'Ligar expediente e iniciar', exact: true }).click()
   await expect(page.getByRole('dialog', { name: 'Ligar e iniciar consulta' })).toBeVisible()
   await expect(modalCita(page, 'Editar cita')).toHaveCount(0)
   expect(page.url()).toContain('/agenda')
@@ -266,6 +270,8 @@ test('encendido: la tarjeta trae el botón de WhatsApp de E7 y abrirla no emite 
   await abrirAgendaV2(page)
   await aLaSemanaMasDos(page)
   await citaEnRejilla(page, 'Prueba 20').click()
+  /* Tanda K, punto 21: dentro de «Confirmar». */
+  await tarjetaLectura(page).getByRole('button', { name: 'Confirmar', exact: true }).click()
   await expect(tarjetaLectura(page).locator(`[data-whatsapp-cita="${id}"]`)).toBeVisible()
   expect(sqlLocal(`select count(*) from public.cita_confirmaciones where appointment_id = :'id'`, { id })).toBe('0')
 })

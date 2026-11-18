@@ -45,21 +45,26 @@ import { regionDeTimezone } from '@/lib/consultorios/zonas-mexico'
 
 export type AccionTarjeta =
   | 'iniciar-consulta' | 'ver-expediente' | 'confirmar' | 'reagendar' | 'reagendar-cita' | 'reasignar' | 'cancelar' | 'editar' | 'convertir' | 'eliminar'
-  | 'no-es-cita' | 'ligar'
+  | 'no-es-cita' | 'ligar' | 'no-asistio'
 
+/* Tanda K, punto 21 · Los textos de la burbuja nueva (`docs/spec/Burbuja.dc.html`): «Ver la
+   consulta», «Darle otra cita», «Reasignar el horario», «Ligar expediente e iniciar» y «No es
+   una cita», sin signos (las demás puertas de «¿No es una cita?» —el formulario, Próximas
+   citas, la campana— no son la burbuja y conservan su pregunta). */
 export const ETIQUETA_ACCION: Record<AccionTarjeta, string> = {
   'iniciar-consulta': 'Iniciar consulta',
-  'ver-expediente': 'Ver expediente',
-  confirmar: 'Confirmar',
+  'ver-expediente': 'Ver la consulta',
+  confirmar: 'Marcar como confirmada',
   reagendar: 'Reagendar',
-  'reagendar-cita': 'Reagendar cita',
-  reasignar: 'Reasignar',
+  'reagendar-cita': 'Darle otra cita',
+  reasignar: 'Reasignar el horario',
   cancelar: 'Cancelar cita',
   editar: 'Editar',
   convertir: 'Convertir en cita',
   eliminar: 'Eliminar evento',
-  'no-es-cita': '¿No es una cita?',
-  ligar: 'Ligar e iniciar consulta',
+  'no-es-cita': 'No es una cita',
+  ligar: 'Ligar expediente e iniciar',
+  'no-asistio': 'No asistió',
 }
 
 /** G3 · Una pieza de la rejilla de acciones: una acción o el aviso por WhatsApp (su propio componente). */
@@ -158,6 +163,104 @@ function disposicionPorEstado(cita: CitaTarjeta, puedeIniciar: boolean, o: Opcio
   secundarias.push('reagendar')
   if (o.conWhatsApp) secundarias.push('whatsapp')
   return { principal: puedeIniciar ? 'iniciar-consulta' : null, secundarias, peligro: 'cancelar' }
+}
+
+/**
+ * Tanda K, punto 21 · La burbuja de la maqueta (`docs/spec/Burbuja.dc.html`), DERIVADA de
+ * `disposicionDeTarjeta`, que sigue siendo la única regla de qué acción tiene cada cita (y la
+ * que el servidor refleja). Sólo reparte las piezas en los sitios de la maqueta:
+ *   · `principal`: el botón ancho; `ayuda`, la línea de debajo;
+ *   · `rejilla`: los botones con icono. Agendada: «Confirmar» (abre sus opciones), «Reagendar»,
+ *     «Editar»; confirmada: «Reagendar», «Editar», «No asistió»; cancelada: «Reasignar el
+ *     horario» (de Angel: secundario de «Darle otra cita»); evento: «Editar», «Convertir»;
+ *   · `confirmar`: lo que abre «Confirmar», cada una si aplica (como hoy);
+ *   · `pie`: «No es una cita» (sólo por asignar, como hoy) y «Cancelar cita» / «Eliminar evento»;
+ *   · `mas`: los tres puntos — «No asistió» en la agendada, «Editar» donde la rejilla no lo
+ *     lleva, y los recordatorios de la confirmada (`recordatorio`).
+ * Desde un aviso (J4, `destacar`), la principal que había encabeza la rejilla, como antes.
+ */
+export type CeldaBurbuja = AccionTarjeta | 'menu-confirmar'
+
+export interface DisposicionBurbuja {
+  principal: AccionTarjeta | null
+  ayuda: string | null
+  rejilla: CeldaBurbuja[]
+  confirmar: { whatsapp: boolean; correo: boolean; marcar: boolean }
+  pie: AccionTarjeta[]
+  mas: AccionTarjeta[]
+  recordatorio: { whatsapp: boolean; correo: boolean }
+}
+
+/** La línea de ayuda bajo el botón ancho (textos de la maqueta). */
+function ayudaDeBurbuja(cita: CitaTarjeta, principal: AccionTarjeta | null): string | null {
+  if (principal === 'ligar') return 'Primero buscas su expediente o le creas uno.'
+  if (esEventoGenerico(cita)) return null
+  if (cita.status === 'cancelled') return 'Esta cita se canceló. Su horario quedó libre.'
+  if (cita.status === 'no_show') return 'El paciente no llegó a esta cita.'
+  return null
+}
+
+function rejillaDeBurbuja(cita: CitaTarjeta, d: DisposicionTarjeta, o: OpcionesBurbuja, hayConfirmar: boolean): CeldaBurbuja[] {
+  const tiene = (p: PiezaTarjeta): boolean => d.secundarias.includes(p)
+  if (esEventoGenerico(cita)) return d.secundarias.filter((p): p is AccionTarjeta => p !== 'whatsapp')
+  if (cita.status === 'cancelled') return tiene('reasignar') ? ['reasignar'] : []
+  if (!VIVAS.includes(cita.status)) return []
+  /* J4 · la principal desplazada por `destacar` va primero, como antes. */
+  const subida = d.secundarias.filter((p): p is AccionTarjeta => p === 'iniciar-consulta' || p === 'ligar')
+  const reagendar: CeldaBurbuja[] = tiene('reagendar') ? ['reagendar'] : []
+  if (cita.status === 'scheduled') return [...subida, ...(hayConfirmar ? ['menu-confirmar' as const] : []), ...reagendar, 'editar']
+  /* «No asistió» no está en `disposicionDeTarjeta`: no es una acción nueva para el servidor, es
+     el mismo PUT parcial de estado que «Confirmar» (`cambiarEstadoCita`), y por eso pide lo mismo
+     que él (`conConfirmar`). El servidor lo admite en una viva sin nota (`vetoPorEstado`). */
+  return [...subida, ...reagendar, 'editar', ...(o.conConfirmar !== false ? ['no-asistio' as const] : [])]
+}
+
+/** Lo que la burbuja sabe además de lo de la tarjeta: si el correo aplica (`motivoSinCorreo`). */
+export interface OpcionesBurbuja extends OpcionesDisposicion { conCorreo?: boolean }
+
+export function burbujaDeTarjeta(cita: CitaTarjeta, puedeIniciar: boolean, o: OpcionesBurbuja = {}): DisposicionBurbuja {
+  const d = disposicionDeTarjeta(cita, puedeIniciar, o)
+  const evento = esEventoGenerico(cita)
+  const viva = VIVAS.includes(cita.status)
+  const confirmar = {
+    whatsapp: d.secundarias.includes('whatsapp') && cita.status === 'scheduled',
+    correo: Boolean(o.conCorreo) && viva && cita.status === 'scheduled' && !evento,
+    marcar: d.secundarias.includes('confirmar'),
+  }
+  const hayConfirmar = confirmar.whatsapp || confirmar.correo || confirmar.marcar
+  const rejilla = rejillaDeBurbuja(cita, d, o, hayConfirmar)
+  const mas: AccionTarjeta[] = []
+  if (cita.status === 'scheduled' && !evento && o.conConfirmar !== false) mas.push('no-asistio')
+  if (!rejilla.includes('editar')) mas.push('editar')
+  return {
+    principal: d.principal,
+    ayuda: ayudaDeBurbuja(cita, d.principal),
+    rejilla,
+    confirmar: hayConfirmar ? confirmar : { whatsapp: false, correo: false, marcar: false },
+    pie: [...(d.secundarias.includes('no-es-cita') ? ['no-es-cita' as const] : []), ...(d.peligro ? [d.peligro] : [])],
+    mas,
+    recordatorio: {
+      whatsapp: d.secundarias.includes('whatsapp') && cita.status === 'confirmed',
+      correo: Boolean(o.conCorreo) && cita.status === 'confirmed' && !evento,
+    },
+  }
+}
+
+/** Tanda K, punto 21 · El día de la burbuja, en la zona de quien mira: «Miércoles 18 de noviembre». */
+export function diaLargoDeTarjeta(cita: Pick<Appointment, 'start_time'>, zonaVisor: string): string {
+  try {
+    const t = new Intl.DateTimeFormat('es-MX', { weekday: 'long', day: 'numeric', month: 'long', timeZone: zonaVisor })
+      .format(new Date(cita.start_time)).replace(',', '')
+    return `${t.charAt(0).toUpperCase()}${t.slice(1)}`
+  } catch {
+    return ''
+  }
+}
+
+/** Tanda K, punto 21 · Las iniciales del médico (sin «Dr.»/«Dra.»): «Dr. Admin Semilla Uno» → «AS». */
+export function inicialesDeMedico(nombre: string): string {
+  const palabras = nombre.split(/\s+/).filter(p => p && !p.endsWith('.'))
+  return palabras.slice(0, 2).map(p => p.charAt(0).toUpperCase()).join('')
 }
 
 /**

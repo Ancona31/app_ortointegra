@@ -11,6 +11,7 @@ import type { Status } from '@/lib/agenda/tiposAgenda'
 import { tintasDelChipDeBanda } from '@/lib/agenda/tarjetasAgenda'
 import { GoogleGIcon } from './GoogleGIcon'
 import { MarcaOrigenGoogle } from './MarcaOrigenGoogle'
+import { MarcasCita } from './MarcasCita'
 import { IconoDelEvento } from './IconoDelEvento'
 
 /* ══════════════════════════════════════════════════════════════════════
@@ -87,10 +88,12 @@ import { IconoDelEvento } from './IconoDelEvento'
    la rejilla un segundo antes— en vez de con la de Google, que era lo que
    pasaba cuando la paleta vivía en la clase base. */
 export const BandaChip = memo(function BandaChip(
-  { title, esDeGoogle, origenGoogle = false, icono, color, status }: {
+  { title, esDeGoogle, origenGoogle = false, deEnlace = false, sinExpediente = false, icono, color, status }: {
     title: string; esDeGoogle: boolean; icono: IconoEvento | null
     /** Tanda J, punto 11 · fila de Spinus nacida en Google: su «G» (sólo con la v2). */
     origenGoogle?: boolean
+    /** Tanda K, sección E · el eslabón (reservada por enlace) y el expediente tachado (sólo con la v2). */
+    deEnlace?: boolean; sinExpediente?: boolean
     color: ColorEvento | null; status: Status | undefined
   },
 ) {
@@ -123,6 +126,7 @@ export const BandaChip = memo(function BandaChip(
         : icono && <IconoDelEvento nombre={icono} size={14} color={tinta} />}
       {!esDeGoogle && origenGoogle && <MarcaOrigenGoogle size={12} />}
       <span className="ag-banda-titulo">{title}</span>
+      {!esDeGoogle && <MarcasCita enlace={deEnlace} sinExpediente={sinExpediente} size={12} soloV2 />}
     </div>
   )
 })

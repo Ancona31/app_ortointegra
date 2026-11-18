@@ -58,12 +58,17 @@ async function abrirAgendaV2(page: Page): Promise<void> {
   await expect(page.locator('.agenda-raiz')).toHaveAttribute('data-interacciones-v2', 'listas')
 }
 
-test('encendido: la tarjeta dice «Por ligar · 3» y el modal enseña quién reservó, con su historial en vivo', async ({ page }) => {
+/* Tanda K, puntos 17 y 18: «Por ligar · 3» es ahora el expediente tachado y el eslabón; el
+   historial sigue en el nombre accesible de la caja. */
+test('encendido: la tarjeta lleva el expediente tachado y el eslabón, con el historial en su nombre, y el modal enseña quién reservó', async ({ page }) => {
   interruptorAgenda('A', true)
   cita('17:00', 'fijo', 3)
   await abrirAgendaV2(page)
   await expect(tarjeta(page)).toHaveCount(1)
-  await expect(tarjeta(page).locator('.ag-tarjeta-marca')).toHaveText(/Por ligar · 3/i)
+  await expect(tarjeta(page).locator('.ag-icono-sin-exp')).toBeVisible()
+  await expect(tarjeta(page).locator('.ag-icono-enlace')).toBeVisible()
+  await expect(tarjeta(page).locator('.ag-tarjeta-marca')).toHaveCount(0)
+  await expect(tarjeta(page).locator('[role="group"]')).toHaveAttribute('aria-label', /Sin expediente\. Al reservar traía 3 cancelaciones o inasistencias\./)
   await expect(tarjeta(page)).not.toHaveClass(/ag-ev-evento/)
   /* La píldora no hace oscilar el tier de la tarjeta (su `ResizeObserver`).
      Primero se deja asentar la entrada de la rejilla: TODAS las tarjetas,
@@ -98,6 +103,9 @@ test('encendido: la tarjeta dice «Por ligar · 3» y el modal enseña quién re
   await expect(modal).toBeVisible()
   expect((await historial).ok()).toBeTruthy()
   await expect(modal.getByText('Reservó por enlace')).toBeVisible()
+  /* Tanda K, punto 17 · con la v2, el expediente tachado en vez de la píldora «Por ligar». */
+  await expect(modal.locator('[data-marca-sin-expediente] .ag-icono-sin-exp')).toBeVisible()
+  await expect(modal.getByText('Por ligar', { exact: true })).toHaveCount(0)
   await expect(modal.getByText('5512345678 · persona.e2e@ejemplo.test')).toBeVisible()
   await expect(modal.getByText('Sin cancelaciones ni inasistencias recientes con este médico')).toBeVisible()
   await expect(modal.getByPlaceholder('Buscar paciente por nombre o apellido...')).toHaveCount(0)
