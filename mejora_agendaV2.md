@@ -6923,6 +6923,12 @@ primero sin marcar.
       y las casillas.
     - Capturas de la integración a 390 y 1280 en `e2e/resultados/J/integracion/`
       e índice en `e2e/resultados/J/index.html`, con las cinco comparativas.
+    - Los temporales de la tanda (los árboles de comparación de J1, J3, J4 y J5
+      y los scripts de medición de la integración) se movieron a
+      `/home/spinus/proyectos/tanda-J-temporales/reglas-tmp/`: dentro de
+      `e2e/resultados/reglas/tmp/` sumaban unos 4 700 `.ts` que el `npm run
+      build` del worktree principal revisaba con `tsc` hasta quedarse sin
+      memoria.
 
 **Bitácora** (una línea por sesión: fecha, qué quedó hecho, qué quedó a medias):
 

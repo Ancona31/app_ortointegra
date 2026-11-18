@@ -4982,7 +4982,8 @@ lee la preferencia en cada disparo, así que el comportamiento es el bueno.
 
 **Estado:** aceptada, deliberada (J1); NO se ve en el alta (integración J) · J1
 midió ~146 ms más hasta que se iba el modal al GUARDAR UNA CITA YA EXISTENTE
-(«Editar cita», con su script `reglas/tmp/j1/medir-cita.mjs`) y lo atribuyó a la
+(«Editar cita», con su script `medir-cita.mjs`, hoy en
+`/home/spinus/proyectos/tanda-J-temporales/reglas-tmp/j1/`) y lo atribuyó a la
 salida animada del modal (F2.7, `--ag-dur-base`, 180 ms); no es el servidor.
 
 La integración midió el ALTA («Nueva cita», un evento y una cita con paciente)
