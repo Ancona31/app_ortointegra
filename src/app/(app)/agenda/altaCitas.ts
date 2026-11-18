@@ -349,7 +349,12 @@ export function crearAltaCitas({
     /* T3 · Al pasar el ratón sólo hay tarjeta (no modal): nunca el modal, y sin
        la v2 nada (el oyente ni siquiera existe sin ella). */
     if (sitio?.alPasar) { capas?.abrirTarjeta(cita, sitio.ancla, sitio.punto, true); return }
-    if (capas) { capas.abrirTarjeta(cita, sitio?.ancla ?? null, sitio?.punto, false, sitio?.destacar); return }
+    if (capas) {
+      // Tanda J, punto 10: `destacar` sólo viene de un aviso; sin él, la llamada de siempre.
+      if (sitio?.destacar) capas.abrirTarjeta(cita, sitio.ancla ?? null, sitio.punto, false, sitio.destacar)
+      else capas.abrirTarjeta(cita, sitio?.ancla ?? null, sitio?.punto)
+      return
+    }
     setModal({ mode: 'edit', appointment: cita })
   }
 
