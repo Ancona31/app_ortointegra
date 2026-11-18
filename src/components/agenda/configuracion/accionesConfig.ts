@@ -108,9 +108,17 @@ const conCodigo = (j: unknown): { id: string | null; codigo: string | null } => 
   return { codigo: typeof codigo === 'string' ? codigo : null, id: typeof id === 'string' ? id : null }
 }
 
-/** Emite un enlace (`POST /api/agenda/enlaces`): el fijo de un médico (lo regenera si ya tenía) o uno de una vez. */
-export function emitirEnlace(medicoId: string, clase: 'fijo' | 'unico', etiqueta: string | null = null): Promise<Resultado<{ id: string | null; codigo: string | null }>> {
-  const cuerpo = clase === 'unico' ? { clase, medico_id: medicoId, ...(etiqueta ? { etiqueta } : {}) } : { clase, medico_id: medicoId }
+/**
+ * Emite un enlace (`POST /api/agenda/enlaces`): el fijo de un médico (lo regenera si ya tenía) o uno de una vez.
+ * El de una vez lleva, si la clínica lo escribió, el correo del paciente (tanda J, punto 3: el comprobante y los
+ * avisos de esa cita van sólo ahí; integración J2 ↔ J5).
+ */
+export function emitirEnlace(
+  medicoId: string, clase: 'fijo' | 'unico', etiqueta: string | null = null, correo: string | null = null,
+): Promise<Resultado<{ id: string | null; codigo: string | null }>> {
+  const cuerpo = clase === 'unico'
+    ? { clase, medico_id: medicoId, ...(etiqueta ? { etiqueta } : {}), ...(correo ? { correo } : {}) }
+    : { clase, medico_id: medicoId }
   return pedir('/api/agenda/enlaces', { method: 'POST', body: JSON.stringify(cuerpo) }, 'No se pudo crear el enlace', conCodigo)
 }
 

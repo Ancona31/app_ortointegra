@@ -56,7 +56,8 @@ function useGestion(p: Props) {
     const { id, codigo } = v
     if (id && codigo) setUrls(u => ({ ...u, [id]: urlReserva(codigo) }))
   }
-  const emitir = (medicoId: string, clase: 'fijo' | 'unico', etiqueta: string | null = null) => hacer(() => emitirEnlace(medicoId, clase, etiqueta), conUrl)
+  const emitir = (medicoId: string, clase: 'fijo' | 'unico', etiqueta: string | null = null, correo: string | null = null) =>
+    hacer(() => emitirEnlace(medicoId, clase, etiqueta, correo), conUrl)
   async function mostrar(id: string): Promise<void> {
     const r = await leerCodigo(id)
     if (r.ok) setUrls(u => ({ ...u, [id]: urlReserva(r.valor) }))
@@ -79,7 +80,7 @@ export default function EnlacesDeOtros(p: Props) {
       urls={g.urls} ocupado={g.ocupado} puedeEmitir={p.lista.secreto} vigenciaDias={p.vigenciaDias}
       onCrearFijo={() => void g.emitir(m.id, 'fijo')}
       onRegenerar={() => g.setPregunta({ mensaje: MSJ_REGENERAR, seguir: () => void g.emitir(m.id, 'fijo') })}
-      onEmitirUnico={et => g.emitir(m.id, 'unico', et)}
+      onEmitirUnico={(et, correo) => g.emitir(m.id, 'unico', et, correo)}
       onMostrar={x => void g.mostrar(x)}
       onRevocar={e => g.setPregunta({ mensaje: MSJ_REVOCAR, seguir: () => void g.revocar(e.id) })} />
   )

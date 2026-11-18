@@ -5,11 +5,16 @@
  * su dirección con «Copiar» (maqueta `Main.dc.html`, cierre). Lo usan el
  * cierre del funnel y «Enlaces de una vez» de la pestaña «Tu enlace».
  * Guarda con `POST /api/agenda/enlaces` (`clase:'unico'`), la ruta de siempre.
+ *
+ * Integración de la tanda J (J2 ↔ J5): también «Correo del paciente
+ * (opcional)», el de J2 (punto 3), que la maqueta no dibuja. Sin él, la
+ * pantalla nueva no tenía cómo darle correo a un único y la reserva por ese
+ * enlace no mandaba comprobante ni avisos a nadie.
  */
 import { useId, useState } from 'react'
 import BotonCopiar from '@/components/agenda/configuracion/BotonCopiar'
 import { emitirEnlace, urlReserva } from '@/components/agenda/configuracion/accionesConfig'
-import { CAMPO_NUEVO, ERROR } from '@/components/agenda/configuracion/estilosConfig'
+import { AYUDA, CAMPO_NUEVO, ERROR } from '@/components/agenda/configuracion/estilosConfig'
 
 interface Props {
   medicoId: string
@@ -25,12 +30,13 @@ const BOTON_CONTORNO =
 export default function CrearEnlaceUnaVez({ medicoId, alCrear, alCancelar }: Props) {
   const id = useId()
   const [etiqueta, setEtiqueta] = useState('')
+  const [correo, setCorreo] = useState('')
   const [url, setUrl] = useState<string | null>(null)
   const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState<string | null>(null)
   async function crear(): Promise<void> {
     setEnviando(true)
-    const r = await emitirEnlace(medicoId, 'unico', etiqueta.trim() || null)
+    const r = await emitirEnlace(medicoId, 'unico', etiqueta.trim() || null, correo.trim() || null)
     setEnviando(false)
     if (!r.ok) { setError(r.motivo); return }
     setError(null)
@@ -53,11 +59,16 @@ export default function CrearEnlaceUnaVez({ medicoId, alCrear, alCancelar }: Pro
           <input id={`${id}-q`} type="text" maxLength={60} placeholder="Ej.: Sra. López, revisión" className={`${CAMPO_NUEVO} px-[12px] py-[10px]`}
             value={etiqueta} onChange={e => setEtiqueta(e.target.value)} />
         </label>
+        <label htmlFor={`${id}-c`} className="flex flex-[1_1_260px] flex-col gap-[6px] text-[14px] text-[var(--ag-text)]">Correo del paciente (opcional)
+          <input id={`${id}-c`} type="email" autoComplete="off" maxLength={254} aria-describedby={`${id}-n`} className={`${CAMPO_NUEVO} px-[12px] py-[10px]`}
+            value={correo} onChange={e => setCorreo(e.target.value)} />
+        </label>
         <button type="button" className={BOTON_CONTORNO} disabled={enviando} onClick={() => void crear()}>
           {enviando ? 'Creando…' : 'Crear enlace de una vez'}
         </button>
         {alCancelar && <button type="button" className={BOTON_CONTORNO} onClick={alCancelar}>Cancelar</button>}
       </div>
+      <p id={`${id}-n`} className={`m-0 ${AYUDA}`}>El comprobante y los avisos de la cita irán sólo a este correo; sin él, no se manda ninguno.</p>
       {error && <p role="alert" className={ERROR}>{error}</p>}
     </div>
   )

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { SESION, interruptorAgenda, pestanaConfig, sqlLocal } from './ayudas'
+import { CORREO, SESION, interruptorAgenda, sinPendientesAgenda, sqlLocal } from './ayudas'
 import { contarCorreos, esperarCorreo } from './mailpit'
 import { limpiarReservasE2e, marcaE2e } from './reservaAyudas'
 import {
@@ -15,8 +15,12 @@ import {
  *   · 5 intentos que llegan a la base: el 6.º, y la página, dicen «ya no está
  *     disponible» sin decir por qué (410 `enlace_no_disponible`);
  *   · un «bloqueado» agota el único en el acto: no deja probar otro teléfono;
- *   · la clínica escribe el correo en «Emitir enlace de un solo uso» y no
- *     vuelve a salir hacia el navegador.
+ *   · la clínica escribe el correo al crear el enlace de una vez y no
+ *     vuelve a salir hacia el navegador. Con la v2 la configuración es la de
+ *     J5 («Tu enlace» › «Crear uno»); integración de la tanda J: el campo
+ *     «Correo del paciente (opcional)» pasó a `CrearEnlaceUnaVez`.
+ *     MUTACIÓN: no mandar `correo` en `emitirEnlace` (accionesConfig.ts) →
+ *     rojo (el enlace queda sin correo).
  *
  * Es la comprobación de punta a punta. Las mutaciones de cada regla (el
  * correo tecleado en el único, el tope a 6, «bloqueado» sin agotar, el
@@ -107,15 +111,22 @@ test.describe('emitir con el correo del paciente', () => {
   test.use({ storageState: SESION.adminA })
   test('la clínica escribe el correo al emitir el único; queda en el enlace y no vuelve al navegador', async ({ page }) => {
     const correo = personaNueva().correo
-    await page.goto('/agenda/configuracion')
-    await pestanaConfig(page, 'Enlaces de reserva')
-    const bloque = page.locator('form', { has: page.getByRole('button', { name: 'Emitir enlace de un solo uso' }) }).first()
-    await bloque.getByLabel('Correo del paciente (opcional)').fill(`  ${correo}  `)
-    const respuesta = page.waitForResponse(r => r.url().endsWith('/api/agenda/enlaces') && r.request().method() === 'POST')
-    await bloque.getByRole('button', { name: 'Emitir enlace de un solo uso' }).click()
-    const r = await respuesta
-    expect(r.status()).toBe(201)
-    expect(JSON.stringify(await r.json())).not.toContain(correo)
+    // Sin nada pendiente: si no, la configuración abre el funnel de primera vez (J5).
+    const deshacer = sinPendientesAgenda(CORREO.adminA)
+    try {
+      await page.goto('/agenda/configuracion')
+      await page.getByRole('button', { name: 'Crear uno' }).click()
+      // Por rol: la ficha plegada de «Enlaces de los demás médicos» lleva el mismo campo, oculto.
+      await page.getByRole('textbox', { name: 'Correo del paciente (opcional)' }).fill(`  ${correo}  `)
+      const respuesta = page.waitForResponse(x => x.url().endsWith('/api/agenda/enlaces') && x.request().method() === 'POST')
+      await page.getByRole('button', { name: 'Crear enlace de una vez' }).click()
+      const r = await respuesta
+      expect(r.status()).toBe(201)
+      expect(JSON.stringify(await r.json())).not.toContain(correo)
+      await expect(page.locator('[data-enlace-una-vez]')).toHaveText(/\/reservar\/[A-Za-z0-9_-]{8,}$/)
+    } finally {
+      deshacer()
+    }
     expect(sqlLocal(`select correo || '|' || (correo_hmac ~ '^[0-9a-f]{64}$')::text from public.reserva_enlaces
                       where clase = 'unico' and created_at >= :'d'::timestamptz order by created_at desc limit 1`, { d: desde }))
       .toBe(`${correo}|true`)
