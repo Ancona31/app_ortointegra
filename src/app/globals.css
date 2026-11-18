@@ -4444,6 +4444,41 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
   color: var(--ag-ink);
   cursor: pointer;
 }
+/* ── TANDA J, PUNTO 11 · CON LA V2, LO DE GOOGLE DEJA EL MORADO ──────────
+   Angel: «Las citas y eventos que vienen de Google dejan el color morado. Usan
+   los mismos colores de estado que las de Spinus y conservan el logo de la G».
+   Las filas importadas (`origen = 'google'`) ya iban con su estado; quedaba el
+   bloque de sólo lectura (`isGcalBlock`: serie, todo el día, sin fila en
+   Spinus), que no tiene estado. Lleva el de «Agendada», que es el estado con el
+   que entra todo lo que viene de Google (I3): lo que menos cambia.
+   SE REASIGNAN LOS TOKENS, NO LAS REGLAS: las seis reglas de Google de abajo
+   (tarjeta, banda, mes, lista, día) siguen leyendo `--ag-gcal-*` y ahora
+   resuelven a los de «Agendada», en claro y en oscuro (los `--ag-status-*` ya
+   tienen los dos). Sin tokens nuevos. Sólo dentro del calendario (`.fc`): el
+   aviso «No se pudo sincronizar con Google» (`.ag-aviso--gcal`) no es un
+   evento y se queda como está. Con la v2 apagada, nada cambia. */
+.agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .fc {
+  --ag-gcal-text: var(--ag-status-scheduled-text);
+  --ag-gcal-border: var(--ag-status-scheduled-border);
+  --ag-gcal-accent: var(--ag-status-scheduled-dot);
+  --ag-gcal-bg1: var(--ag-status-scheduled-bg);
+  --ag-gcal-bg2: var(--ag-status-scheduled-bg);
+}
+/* La «G» de una fila de Spinus nacida en Google (`MarcaOrigenGoogle`): sólo
+   con la v2. La tarjeta de lectura va en un portal, fuera de `.agenda-raiz`,
+   pero sólo existe con la v2. */
+.ag-g-origen { display: none; }
+.agenda-raiz[data-agenda-v2="encendida"] .ag-g-origen,
+.ag-lectura-cab .ag-g-origen {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+}
+/* 9px = el `padding-top` de 6px de `.ag-lectura-cab .ag-capa-titulo` más lo
+   que le falta a la «G» de 14px para quedar al centro de su renglón. */
+.ag-lectura-cab .ag-g-origen { padding-top: 9px; }
+.agenda-fc .fc-listDay-view .ag-listadia-nombre .ag-g-origen { margin-right: var(--ag-1); vertical-align: -1px; }
+
 /* El chip de Google es el único con paleta FIJA —no depende de estado ni de
    color elegido— así que sale de aquí y no de línea. Es el mismo par de tokens
    que usa `.ag-gcal` en Semana/Día, y el mismo reparto que `.ag-mes--gcal`. */

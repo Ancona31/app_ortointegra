@@ -1310,8 +1310,8 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
      buscador); si la capa de interacciones aún no montó, al menos va a su día.
      `/agenda?cita=<uuid>` (un aviso pulsado fuera de la agenda): `useEnlaceACita`. */
   useEnlaceACita(interaccionesListas, interaccionesRef)
-  const abrirCitaDeAviso = (c: CitaDelAviso): void => {
-    if (interaccionesRef.current) interaccionesRef.current.irACita(c)
+  const abrirCitaDeAviso = (c: CitaDelAviso, destacar?: 'reagendar'): void => {
+    if (interaccionesRef.current) interaccionesRef.current.irACita(c, destacar)
     else irAFecha(partirFechaHora(c.start_time).fecha)
   }
   const campanaV2 = (enBanda: boolean) => agendaV2 && barraV2 ? (
@@ -1735,7 +1735,7 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
         {/* F1.16 · En la tableta, Día es la rejilla (`timeGridDay`) con su
             píldora de estado, igual que la lista de Día del teléfono. */}
         {/* I5 (punto 15) · Con la v2 la leyenda vive en el menú del engrane y su fila se libera. */}
-        {!agendaV2 && (!isMobile || currentView === 'listDay' || currentView === 'timeGridDay') && <LeyendaEstados />}
+        {!agendaV2 && (!isMobile || currentView === 'listDay' || currentView === 'timeGridDay') && <LeyendaEstados clasica />}
         {/* Va PRIMERA en el DOM aunque se pinte segunda, y es a propósito: el
             `order` de la hoja la coloca bajo el toolbar, y así el lector de
             pantalla oye el aviso antes que los controles y la rejilla que

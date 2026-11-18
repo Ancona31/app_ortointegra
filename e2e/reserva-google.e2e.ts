@@ -69,6 +69,40 @@ function borrarConexion(): void {
   { clinica: CLINICA_A })
 }
 
+/**
+ * Tanda J (J4) · Las reservas de esta corrida se quedan (no se borran citas), pero
+ * ligadas a ids del Google falso, que los reparte desde cero en cada arranque
+ * (`falso1x`, `falso2x`…): la corrida siguiente chocaba con
+ * `appointments_clinica_google_event_id_uniq` al ligar su primera reserva y la
+ * prueba esperaba un evento que no llegaba nunca. Se sueltan los ids, nada más.
+ * Sólo los que reparte ESTE falso (`falso<N>x`): otras pruebas siembran ids
+ * propios con otro formato (`falso-j3-…`) y no son de aquí.
+ */
+/**
+ * J4: los intentos que dejan I9, J9 y J10 en `gcal_movimientos_rechazados`
+ * (FK RESTRICT a la clínica): sin borrarlos, `agenda-semilla.ts` no puede
+ * borrar la Clínica A. Sus avisos (`avisos_clinica`, tipo
+ * `google_movimiento_rechazado`) también se van: sin la fila del intento, el
+ * aviso pendiente no tendría de dónde venir. Si la tabla no existe (base sin la
+ * migración de J4), no hace nada.
+ */
+function borrarMovimientosRechazados(): void {
+  sqlLocal(`do $$ begin
+    if to_regclass('public.gcal_movimientos_rechazados') is not null then
+      delete from public.gcal_movimientos_rechazados m using public.clinicas c
+       where m.clinica_id = c.id and c.nombre = '${CLINICA_A}';
+      delete from public.avisos_clinica a using public.clinicas c
+       where a.clinica_id = c.id and c.nombre = '${CLINICA_A}' and a.tipo = 'google_movimiento_rechazado';
+    end if;
+  end $$;`)
+}
+
+function soltarEventosFalsos(): void {
+  sqlLocal(`update public.appointments a set google_event_id = null, gcal_etag = null
+              from public.clinicas c
+             where a.clinica_id = c.id and c.nombre = :'clinica' and a.google_event_id ~ '^falso[0-9]+x$'`, { clinica: CLINICA_A })
+}
+
 function sembrarConexion(): void {
   borrarConexion()
   const salida = sqlLocal(`
@@ -145,7 +179,7 @@ async function turnos(codigo: string, desde: string): Promise<{ status: number; 
   }
 }
 
-async function reservarEn(codigo: string, inicio: string): Promise<{ status: number; cuerpo: Record<string, unknown>; ms: number; correo: string }> {
+async function reservarEn(codigo: string, inicio: string): Promise<{ status: number; cuerpo: Record<string, unknown>; ms: number; correo: string; nombre: string }> {
   const ctx = await publico()
   const p = personaNueva()
   // J2, punto 3: en el único el correo de la cita es el que escribió la clínica
@@ -157,7 +191,7 @@ async function reservarEn(codigo: string, inicio: string): Promise<{ status: num
       consultorio_id: e.consultorioId, tipo_cita_id: e.tipoId, inicio, nombre: p.nombre,
       telefono: p.telefono, correo: p.correo, acepta_aviso: true, client_id: randomUUID(),
     } })
-    return { status: r.status(), cuerpo: await r.json().catch(() => ({})), ms: Date.now() - t0, correo: p.correo }
+    return { status: r.status(), cuerpo: await r.json().catch(() => ({})), ms: Date.now() - t0, correo: p.correo, nombre: p.nombre }
   } finally {
     await ctx.dispose()
   }
@@ -178,6 +212,9 @@ function eventoEn(t: Turno, titulo: string): string {
 
 const importadas = (ev: string): string => sqlLocal(`select count(*) from public.appointments where google_event_id = :'ev'`, { ev })
 const citaPorCorreo = (correo: string): string => sqlLocal(`select id from public.appointments where reserva_correo = :'c'`, { c: correo })
+/* J9–J11: por el nombre (único por corrida), no por el correo: con J2 (punto 3) el enlace único
+   guarda el correo que puso la clínica al emitirlo, no el que escribe quien reserva. */
+const citaPorNombre = (nombre: string): string => sqlLocal(`select id from public.appointments where title = :'n'`, { n: nombre })
 
 /* ── Ciclo ────────────────────────────────────────────────────────────── */
 
@@ -210,6 +247,8 @@ test.beforeAll(async ({}, info) => {
 test.afterAll(async ({}, info) => {
   if (info.project.name !== ESCRITORIO) return
   cerrarEscenario()
+  soltarEventosFalsos()
+  borrarMovimientosRechazados()
   borrarConexion()
   if (servidor?.pid) {
     try { process.kill(-servidor.pid, 'SIGTERM') } catch { /* ya no estaba */ }
@@ -220,7 +259,7 @@ test.afterAll(async ({}, info) => {
 test.beforeEach(({}, info) => {
   test.skip(info.project.name !== ESCRITORIO, 'un solo next dev por corrida: sólo en escritorio')
   info.setTimeout(240_000)
-  if (google) google.lista = { demoraMs: 0, falla: null }
+  if (google) { google.lista = { demoraMs: 0, falla: null }; google.parche = { falla: null } }
 })
 
 /* ── Las pruebas ──────────────────────────────────────────────────────── */
@@ -362,6 +401,168 @@ test('I9 · una reserva por enlace movida en Google: la base la rechaza, se audi
   expect(sqlLocal(`select count(*) from public.audit_log where accion = 'gcal_cambio_rechazado' and registro_id = :'r'
                      and descripcion::jsonb ->> 'motivo' = 'eleccion_paciente'`, { r: reserva })).toBe('1')
   expect(Date.parse(g().eventos.get(ev)?.start?.dateTime ?? '')).toBe(Date.parse(t.inicio))
+})
+
+/* Tanda J, punto 9: la misma reserva movida en Google, ahora con Google SIN RESPONDER al
+   restablecer. La base nunca cambia; Google queda con la otra hora (desfasada) hasta la pasada
+   siguiente, que repite la página y la devuelve. Después, otra pasada no cambia nada (el eco no
+   se rechaza otra vez): las dos quedan iguales. Mutación en rojo: quitar el `throw new
+   RestablecimientoPendiente()` de `procesarPagina` (la página avanzaba y Google se quedaba con
+   la hora movida para siempre). */
+test('J9 · reserva movida en Google y Google no responde al restablecer: la pasada siguiente la devuelve; nada queda desfasado', async ({ page }) => {
+  const t = turnoNuevo()
+  ultimaBuenaHace(0)
+  const r = await reservarEn(emitirEnlace(e, 'unico').codigo, t.inicio)
+  expect(r.status, JSON.stringify(r.cuerpo)).toBe(201)
+  const reserva = citaPorNombre(r.nombre)
+  const evento = (): string => sqlLocal(`select coalesce(google_event_id, '') from public.appointments where id = :'r'`, { r: reserva })
+  await expect.poll(evento, { timeout: 60_000 }).not.toBe('')
+  const ev = evento()
+  const inicioGoogle = (): number => Date.parse(g().eventos.get(ev)?.start?.dateTime ?? '')
+  const enBase = (): string => sqlLocal(`select (start_time = :'i'::timestamptz)::text from public.appointments where id = :'r'`, { r: reserva, i: t.inicio })
+  const rechazos = (): string => sqlLocal(`select count(*) from public.audit_log where accion = 'gcal_cambio_rechazado' and registro_id = :'r'
+                                             and descripcion::jsonb ->> 'motivo' = 'eleccion_paciente'`, { r: reserva })
+  const sondeo = async (): Promise<{ estado: string; ms: number }> => {
+    ultimaBuenaHace(120)
+    const t0 = Date.now()
+    const { estado } = (await (await page.request.post('/api/google/sync')).json()) as { estado: string }
+    return { estado, ms: Date.now() - t0 }
+  }
+  const hora = Date.parse(t.inicio) + 60 * 60_000
+  g().modificar(ev, { start: { dateTime: new Date(hora).toISOString(), timeZone: TZ }, end: { dateTime: new Date(hora + 30 * 60_000).toISOString(), timeZone: TZ } })
+
+  g().parche = { falla: 503 }
+  const caido = await sondeo()
+  expect(caido.estado).toBe('error')
+  expect(enBase()).toBe('true')
+  expect(inicioGoogle()).toBe(hora) // desfasada: Google sigue con la hora que le pusieron
+
+  g().parche = { falla: null }
+  const bueno = await sondeo()
+  expect(bueno.estado).toBe('ok')
+  expect(enBase()).toBe('true')
+  expect(inicioGoogle()).toBe(Date.parse(t.inicio))
+  expect(sqlLocal(`select gcal_etag from public.appointments where id = :'r'`, { r: reserva })).toBe(g().eventos.get(ev)?.etag)
+  const rechazosTrasRestablecer = rechazos()
+  console.log(`J9: sondeo que restablece ${bueno.ms} ms; rechazos auditados ${rechazosTrasRestablecer}`)
+
+  // Una pasada más: el eco del restablecimiento no se rechaza otra vez y nada se mueve.
+  expect((await sondeo()).estado).toBe('ok')
+  expect(enBase()).toBe('true')
+  expect(inicioGoogle()).toBe(Date.parse(t.inicio))
+  expect(rechazos()).toBe(rechazosTrasRestablecer)
+})
+
+/* Tanda J, punto 10: el aviso de la campana, UNO POR INTENTO. Intento = la versión del evento
+   de Google (su `updated`): dos sondeos que leen el mismo cambio (Google sin responder al
+   restablecer, la página se repite) dejan un aviso; moverlo otra vez es otro intento (el aviso
+   sin revisar sube; en la base, dos renglones). Pulsarlo abre la tarjeta con «Reagendar» de
+   principal y con el foco. Mutaciones en rojo: la RPC sin ON CONFLICT (el segundo sondeo
+   revienta y no restablece) y `destacarDeAviso` devolviendo undefined (la principal es otra). */
+test('J10 · reserva movida en Google: un aviso por intento; pulsarlo abre la tarjeta con «Reagendar» destacado', async ({ page }) => {
+  const t = turnoNuevo()
+  ultimaBuenaHace(0)
+  const r = await reservarEn(emitirEnlace(e, 'unico').codigo, t.inicio)
+  expect(r.status, JSON.stringify(r.cuerpo)).toBe(201)
+  const reserva = citaPorNombre(r.nombre)
+  const evento = (): string => sqlLocal(`select coalesce(google_event_id, '') from public.appointments where id = :'r'`, { r: reserva })
+  await expect.poll(evento, { timeout: 60_000 }).not.toBe('')
+  const ev = evento()
+  const avisos = (): string => sqlLocal(`select count(*) || '|' || count(*) filter (where revisado_en is null) from public.avisos_clinica
+                                          where tipo = 'google_movimiento_rechazado' and cita_id = :'r'`, { r: reserva })
+  const intentos = (): string => sqlLocal(`select count(*) from public.gcal_movimientos_rechazados where cita_id = :'r'`, { r: reserva })
+  const creado = (): string => sqlLocal(`select creado_en from public.avisos_clinica where tipo = 'google_movimiento_rechazado' and cita_id = :'r'
+                                          and revisado_en is null`, { r: reserva })
+  const sondeo = async (): Promise<string> => {
+    ultimaBuenaHace(120)
+    return ((await (await page.request.post('/api/google/sync')).json()) as { estado: string }).estado
+  }
+  const mover = (min: number): void => {
+    const h = Date.parse(t.inicio) + min * 60_000
+    g().modificar(ev, { start: { dateTime: new Date(h).toISOString(), timeZone: TZ }, end: { dateTime: new Date(h + 30 * 60_000).toISOString(), timeZone: TZ } })
+  }
+
+  mover(60)
+  g().parche = { falla: 503 }
+  expect(await sondeo()).toBe('error')
+  expect(avisos()).toBe('1|1')
+  const primero = creado()
+  // El mismo cambio, leído otra vez (la página no avanzó): el mismo intento, ningún aviso más.
+  expect(await sondeo()).toBe('error')
+  expect([avisos(), intentos(), creado()]).toEqual(['1|1', '1', primero])
+  g().parche = { falla: null }
+  expect(await sondeo()).toBe('ok')
+  expect([avisos(), intentos()]).toEqual(['1|1', '1'])
+
+  // Otro intento con el aviso sin revisar: el mismo aviso sube; en la base, dos intentos.
+  mover(90)
+  expect(await sondeo()).toBe('ok')
+  expect([avisos(), intentos()]).toEqual(['1|1', '2'])
+  expect(Date.parse(creado())).toBeGreaterThan(Date.parse(primero))
+
+  await page.goto('/agenda')
+  await page.locator('[data-campana]').click({ timeout: 120_000 })
+  const panel = page.getByRole('dialog', { name: 'Por confirmar y avisos' })
+  await panel.getByRole('tab', { name: /^Avisos/ }).click()
+  const fila = panel.locator(`[data-aviso-tipo="google_movimiento_rechazado"][data-aviso-cita="${reserva}"]`)
+  await expect(fila).toContainText('Desde Google no se pueden mover las citas reservadas por enlace. Para cambiarla, usa Reagendar: se le avisará al paciente.',
+    { timeout: 30_000 })
+  await fila.click()
+  const tarjeta = page.getByRole('dialog').filter({ has: page.getByRole('button', { name: 'Configuración de la cita', exact: true }) })
+  await expect(tarjeta).toBeVisible({ timeout: 30_000 })
+  const reagendar = tarjeta.getByRole('button', { name: 'Reagendar', exact: true })
+  await expect(reagendar).toHaveClass(/ag-capa-boton--principal/)
+  await expect(reagendar).toBeFocused()
+  await expect.poll(avisos).toBe('1|0')
+})
+
+/* Tanda J, punto 11: con la v2, lo que viene de Google deja el morado. El evento importado
+   (fila de Spinus, por asignar) lleva su «G» en la tarjeta de la rejilla y en la de lectura;
+   el bloque de sólo lectura (una serie, no se importa) usa el fondo de «Agendada» y no el
+   morado; la leyenda del engrane explica la «G» y ya no dice «GCal». Mutaciones en rojo: el
+   bloque de globals.css que reasigna `--ag-gcal-*` borrado (el bloque sale morado) y
+   `renderEventContent` sin `origenGoogle` (la tarjeta sin «G»). */
+test('J11 · lo de Google con los colores de estado y su «G»; la leyenda sin morado', async ({ page }) => {
+  const t = turnoNuevo()
+  const suelto = eventoEn(t, 'Junta J11')
+  const serie = Date.parse(t.inicio) + 2 * 3_600_000
+  g().crear({ summary: 'Serie J11', recurrence: ['RRULE:FREQ=DAILY;COUNT=2'],
+    start: { dateTime: new Date(serie).toISOString(), timeZone: TZ }, end: { dateTime: new Date(serie + 3_600_000).toISOString(), timeZone: TZ } })
+  ultimaBuenaHace(120)
+  expect((await (await page.request.post('/api/google/sync')).json()).estado).toBe('ok')
+  const importada = sqlLocal(`select id from public.appointments where google_event_id = :'ev'`, { ev: suelto })
+  expect(importada).not.toBe('')
+
+  // `?cita=` lleva a su día (vista Día) y abre su tarjeta de lectura: con la «G».
+  await page.goto(`/agenda?cita=${importada}`)
+  const tarjeta = page.getByRole('dialog').filter({ has: page.getByRole('button', { name: 'Configuración de la cita', exact: true }) })
+  await expect(tarjeta.getByRole('img', { name: 'Agendada en Google' })).toBeVisible({ timeout: 120_000 })
+  await page.keyboard.press('Escape')
+  await expect(tarjeta).toBeHidden()
+  // En la rejilla la «G» se ve y lo dice la etiqueta de la tarjeta (la marca es decorativa ahí).
+  const enRejilla = page.locator(`.fc [data-cita-id="${importada}"]`)
+  await expect(enRejilla.locator('.ag-g-origen')).toBeVisible()
+  await expect(enRejilla).toHaveAttribute('aria-label', /Agendada en Google/)
+
+  // El bloque de la serie: el fondo de «Agendada», no el morado de antes.
+  const bloque = page.locator('.fc .ag-gcal', { hasText: 'Serie J11' }).first()
+  await expect(bloque).toBeVisible()
+  const fondos = await bloque.evaluate((el) => {
+    const ref = document.createElement('div')
+    ref.style.background = 'var(--ag-status-scheduled-bg)'
+    el.parentElement?.appendChild(ref)
+    const agendada = getComputedStyle(ref).backgroundColor
+    ref.remove()
+    return { bloque: getComputedStyle(el).backgroundColor, agendada }
+  })
+  expect(fondos.bloque).toBe(fondos.agendada)
+  expect(fondos.bloque).not.toBe('rgb(243, 238, 252)') // --ag-gcal-bg1 en claro, el morado
+
+  await page.getByRole('button', { name: 'Opciones de la agenda' }).first().click()
+  await page.getByRole('menu', { name: 'Opciones de la agenda' }).getByRole('menuitem', { name: 'Leyenda de estados' }).click()
+  const leyenda = page.getByRole('dialog', { name: 'Leyenda de estados' })
+  await expect(leyenda).toContainText('Se agendó en Google')
+  await expect(leyenda).not.toContainText('GCal')
 })
 
 test('+ · dos reservas simultáneas con Google conectado: la segunda espera el candado y hace SU pasada; una sola cita', async () => {

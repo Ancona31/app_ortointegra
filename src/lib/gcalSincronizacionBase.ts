@@ -238,6 +238,19 @@ export async function registrarEmpalmesReserva(clinicaId: string, citaIds: strin
   return z.number().int().parse(await llamar('reserva_empalmes_registrar', clinicaId, { p_citas: ids }))
 }
 
+/**
+ * Tanda J, punto 10 · un intento de mover desde Google una cita reservada por
+ * enlace, ya rechazado por la base: deja el aviso de la campana
+ * (`20261122140000_agenda_j4_aviso_google_reserva.sql`). El intento es
+ * (cita, `updated` del evento): la base deduplica, así que repetir la misma
+ * página no avisa dos veces. true = intento nuevo.
+ */
+export async function registrarMovimientoRechazado(clinicaId: string, citaId: string, actualizado: string): Promise<boolean> {
+  return z.boolean().parse(await llamar('cita_movimiento_google_registrar', clinicaId, {
+    p_cita_id: z.guid().parse(citaId), p_google_updated: z.iso.datetime({ offset: true }).parse(actualizado),
+  })) === true
+}
+
 /* ── E9: RSVP de Google ────────────────────────────────────────────────── */
 
 /**

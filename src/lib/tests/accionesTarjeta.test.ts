@@ -65,6 +65,26 @@ describe('disposicionDeTarjeta (G3: la rejilla)', () => {
   })
 })
 
+/* Tanda J, punto 10 · Desde el aviso «Desde Google no se pueden mover…», «Reagendar» de
+   principal. Mutación en rojo: que `disposicionDeTarjeta` no aplique `conDestacada`. */
+describe('disposicionDeTarjeta con `destacar` (tanda J, punto 10)', () => {
+  const RESERVA = { paciente_id: 'p1', reserva_canal: 'fijo' } as const
+  it('una reservada por enlace: «Reagendar» de principal y lo que era principal encabeza las secundarias', () => {
+    expect(disposicionDeTarjeta({ ...RESERVA, status: 'scheduled' }, true, { conWhatsApp: true, destacar: 'reagendar' }))
+      .toEqual({ principal: 'reagendar', secundarias: ['iniciar-consulta', 'confirmar', 'whatsapp'], peligro: 'cancelar' })
+    expect(disposicionDeTarjeta({ ...RESERVA, status: 'confirmed' }, false, { destacar: 'reagendar' }))
+      .toEqual({ principal: 'reagendar', secundarias: [], peligro: 'cancelar' })
+  })
+  it('una por ligar también; sin «Reagendar» en la tarjeta (ya atendida, cancelada), nada cambia', () => {
+    expect(disposicionDeTarjeta({ paciente_id: null, reserva_canal: 'fijo', status: 'scheduled' }, false, { destacar: 'reagendar' }).principal)
+      .toBe('reagendar')
+    expect(disposicionDeTarjeta({ ...RESERVA, status: 'cancelled' }, true, { destacar: 'reagendar' }))
+      .toEqual(disposicionDeTarjeta({ ...RESERVA, status: 'cancelled' }, true))
+    expect(disposicionDeTarjeta({ ...RESERVA, status: 'attended' }, true, { destacar: 'reagendar', puedeVerExpediente: true }).principal)
+      .toBe('ver-expediente')
+  })
+})
+
 describe('vetoPorEstado (G3, 17.3: el servidor)', () => {
   const at = { status: 'attended', start_time: '2026-11-18T15:00:00.000Z', end_time: '2026-11-18T16:00:00.000Z', all_day: false }
   it('una atendida no se confirma, no se cancela ni se mueve', () => {

@@ -20,7 +20,7 @@ vi.mock('@/components/ui/Portal', () => ({ default: ({ children }: { children: R
 vi.mock('@/lib/supabase/admin', () => ({ createAdminClient: () => { throw new Error('sin red en pruebas') } }))
 
 import {
-  avisosParaEmergente, citaDelEnlace, enlaceDeAviso, leerRespuestaAvisos, textoAviso, textoEmergente,
+  avisosParaEmergente, citaDelEnlace, destacarDeAviso, enlaceDeAviso, leerRespuestaAvisos, textoAviso, textoEmergente,
   type AvisoClinica, type TipoAviso,
 } from '@/lib/avisos/avisosClinica'
 import { cambioPuedeAvisar, type CambioCita, type FilaCambioCita } from '@/lib/agenda/porConfirmarTiempoReal'
@@ -69,6 +69,24 @@ describe('textos', () => {
       const texto = textoEmergente(aviso(t))
       expect(texto).not.toContain('María')
       expect(texto).toContain('10:45') // 16:45 UTC = 10:45 en Mérida
+    }
+  })
+})
+
+/* Tanda J, punto 10 · el aviso de una reservada por enlace movida en Google: el texto literal
+   de Angel, lo acepta el lector y la tarjeta se abre con «Reagendar» destacado. Mutación en
+   rojo: `destacarDeAviso` devolviendo undefined (la tarjeta se abría como siempre). */
+describe('aviso «movida en Google» (tanda J, punto 10)', () => {
+  const LITERAL = 'Desde Google no se pueden mover las citas reservadas por enlace. Para cambiarla, usa Reagendar: se le avisará al paciente.'
+  it('el texto literal en la lista y en el emergente; el lector lo acepta', () => {
+    expect(textoAviso(aviso('google_movimiento_rechazado'))).toBe(LITERAL)
+    expect(textoEmergente(aviso('google_movimiento_rechazado'))).toBe(LITERAL)
+    expect(leerRespuestaAvisos({ avisos_disponibles: true, avisos: [aviso('google_movimiento_rechazado')] })?.avisos).toHaveLength(1)
+  })
+  it('abre la tarjeta con «Reagendar» destacado; los demás tipos, sin destacar nada', () => {
+    expect(destacarDeAviso(aviso('google_movimiento_rechazado'))).toBe('reagendar')
+    for (const t of ['reserva_enlace', 'cancelacion_paciente', 'reagendado_paciente', 'google_por_asignar', 'empalme_google'] as const) {
+      expect(destacarDeAviso(aviso(t))).toBeUndefined()
     }
   })
 })

@@ -35,6 +35,7 @@
 import { Fragment, useCallback, useEffect, useId, useRef, useState, type KeyboardEvent, type PointerEvent as EventoPuntero, type ReactElement, type ReactNode } from 'react'
 import { Settings, X } from 'lucide-react'
 import Portal from '@/components/ui/Portal'
+import { MarcaOrigenGoogle } from '@/components/agenda/MarcaOrigenGoogle'
 import { useDialogoModal } from '@/hooks/useDialogoModal'
 import type { Appointment } from '@/lib/agenda/tiposAgenda'
 import { STATUS_CONFIG, marcaPorLigar } from '@/lib/agenda/tarjetasAgenda'
@@ -81,6 +82,8 @@ interface Props {
   alSalirPuntero?: () => void
   /** T3 · Sólo con `alPasar`: un clic dentro (fuera de un control) la fija. */
   alFijar?: () => void
+  /** Tanda J, punto 10 · Abierta desde un aviso: esta acción de principal (`disposicionDeTarjeta`). */
+  destacar?: 'reagendar'
 }
 
 /** G3 · Lo que la tarjeta le pasa a la pieza del WhatsApp. */
@@ -340,15 +343,17 @@ function usePanelTarjeta(ancla: Caja | null, punto: Punto | undefined, comoHoja:
 
 /** Lo de dentro, igual en las dos variantes. */
 function Contenido({ props, idTitulo, salir, autoFoco }: { props: Props; idTitulo: string; salir: () => void; autoFoco: boolean }): ReactElement {
-  const { cita, zonaVisor, puedeIniciarConsulta, conConfirmar = true, nombreMedico, alAccion, whatsapp, puedeVerExpediente = false } = props
+  const { cita, zonaVisor, puedeIniciarConsulta, conConfirmar = true, nombreMedico, alAccion, whatsapp, puedeVerExpediente = false, destacar } = props
   const [mensaje, setMensaje] = useState<MensajeAccion | null>(null)
-  const disposicion = disposicionDeTarjeta(cita, puedeIniciarConsulta, { conConfirmar, conWhatsApp: Boolean(whatsapp), puedeVerExpediente })
+  const disposicion = disposicionDeTarjeta(cita, puedeIniciarConsulta, { conConfirmar, conWhatsApp: Boolean(whatsapp), puedeVerExpediente, destacar })
   return (
     <>
       {/* G3 (punto 17): nombre y, en la misma línea, la píldora del estado; el
           engrane (el formulario completo, que sustituye a «Editar») y la ✕
           arriba a la derecha. */}
       <div className="ag-capa-cab ag-lectura-cab">
+        {/* Tanda J, punto 11 · la «G» de lo que se agendó en Google (la tarjeta sólo existe con la v2). */}
+        {cita.origen === 'google' && <MarcaOrigenGoogle size={14} />}
         <h2 id={idTitulo} className="ag-capa-titulo">{nombreDeTarjeta(cita)}</h2>
         <Pildora cita={cita} />
         <button type="button" className="ag-capa-cerrar" aria-label="Configuración de la cita" title="Configuración de la cita"

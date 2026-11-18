@@ -3,6 +3,7 @@
 import { memo } from 'react'
 import { ChevronRight } from 'lucide-react'
 import { GoogleGIcon } from '@/components/agenda/GoogleGIcon'
+import { MarcaOrigenGoogle } from '@/components/agenda/MarcaOrigenGoogle'
 import { type FilaDelDia } from '@/lib/agenda/conteoAgenda'
 
 /* Una fila. Botón y no enlace: no navega, abre el modal de la cita — el mismo
@@ -25,6 +26,7 @@ export const FilaDelPanel = memo(function FilaDelPanel(
             className={`ag-mespanel-punto${fila.esEvento ? ' ag-mespanel-punto--cuadro' : ''}`}
             style={{ background: fila.tinta }}
           />}
+      {fila.origenGoogle && <MarcaOrigenGoogle size={11} />}
       <span className={`ag-mespanel-nombre${fila.cancelada ? ' ag-mespanel-nombre--cancelada' : ''}`}>
         {fila.nombre}
       </span>

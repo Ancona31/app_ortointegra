@@ -22,6 +22,8 @@ export type FilaDelDia = {
   todoElDia: boolean
   nombre: string
   esDeGoogle: boolean
+  /** Tanda J, punto 11 · fila de Spinus nacida en Google (`origen = 'google'`): su «G» con la v2. */
+  origenGoogle: boolean
   esEvento: boolean
   cancelada: boolean
   tinta: string
@@ -67,6 +69,7 @@ export function filasDelDia(eventos: readonly EventApi[], dia: Date): FilaDelDia
       todoElDia: ev.allDay,
       nombre: pac ? `${pac.nombre} ${pac.apellidos}` : ev.title,
       esDeGoogle,
+      origenGoogle: !esDeGoogle && ext?.origen === 'google',
       esEvento,
       cancelada: ext?.status === 'cancelled',
       tinta: tintasDelChipDeMes(ext, esDeGoogle, esEvento).tinta,

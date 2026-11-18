@@ -27,7 +27,7 @@ import dynamic from 'next/dynamic'
 import { Bell, X } from 'lucide-react'
 import type { CambiarEstadoCita } from '@/lib/agenda/contratosV2'
 import type { CambioCita } from '@/lib/agenda/porConfirmarTiempoReal'
-import type { AvisoClinica, CitaDelAviso, TipoAviso } from '@/lib/avisos/avisosClinica'
+import { destacarDeAviso, type AvisoClinica, type CitaDelAviso, type TipoAviso } from '@/lib/avisos/avisosClinica'
 import { esPorLigar } from '@/lib/agenda/tarjetasAgenda'
 import { useProfile } from '@/hooks/useProfile'
 import { useEscudoTrasRegistro } from '@/hooks/useEscudoTrasRegistro'
@@ -74,7 +74,7 @@ interface Props {
   /** H4 · El oyente del canal único de la agenda. */
   cambiosRef?: RefObject<((c: CambioCita) => void) | null>
   /** Pulsar un aviso: la agenda abre su cita. */
-  alAbrirCita: (c: CitaDelAviso) => void
+  alAbrirCita: (c: CitaDelAviso, destacar?: 'reagendar') => void
   /** En la banda azul del teléfono y la tableta (44 px, la pinta de la banda). */
   enBanda?: boolean
 }
@@ -122,7 +122,7 @@ export function CampanaAgenda({ recarga, confirmar, cambiosRef, alAbrirCita, enB
           alConfirmar={alConfirmar} alAbrirAviso={(a) => {
             cerrar()
             if (avisoSeLiga(a, { esMedico: isDoctor, perfilId: profile?.id ?? null })) { escudo.activar(); setLigando(a.cita) }
-            else alAbrirCita(a.cita)
+            else alAbrirCita(a.cita, destacarDeAviso(a))
           }} />
       )}
       {ligando && (

@@ -142,7 +142,9 @@ type Capa =
   | { id: number; tipo: 'tarjeta'; cita: Appointment; vista: Appointment; ancla: Caja | null; punto?: Punto; abiertaEn: number
       /* T3 · `alPasar`: abierta al dejar el ratón quieto (no modal); `sinEntrada`:
          la de siempre que la sustituye al fijarla con un clic, sin volver a entrar. */
-      alPasar?: boolean; sinEntrada?: boolean }
+      alPasar?: boolean; sinEntrada?: boolean
+      /* Tanda J, punto 10 · abierta desde un aviso: esta acción de principal. */
+      destacar?: 'reagendar' }
   | { id: number; tipo: 'ayuda' }
   /* T3 · «Convertir en cita» de un evento nacido en Google (§2, AG-DT-29). */
   | { id: number; tipo: 'convertir'; cita: Appointment }
@@ -403,7 +405,7 @@ function CapaTarjeta({ capa, p, cerrar, vigia, fijar, abrirConvertir, abrirReasi
       conConfirmar={p.guardado.cambiarEstadoCita !== undefined}
       nombreMedico={medico ? componerNombreMedicoCompleto(medico) : null}
       alAccion={alAccion} alCerrar={() => cerrar(capa.id)}
-      alPasar={capa.alPasar} sinEntrada={capa.sinEntrada} alFijar={fijar}
+      alPasar={capa.alPasar} sinEntrada={capa.sinEntrada} alFijar={fijar} destacar={capa.destacar}
       alEntrarPuntero={() => vigia.current?.entrarTarjeta()} alSalirPuntero={() => vigia.current?.salirTarjeta()}
       puedeVerExpediente={p.quien.esMedico && Boolean(cita.pacientes)}
       /* E7 · el WhatsApp manual, con la regla del modal y del servidor (T1).
@@ -514,13 +516,13 @@ function conPuntasVivas(cita: Appointment, calendarRef: CalRef): Appointment {
  * suyo, se va a su día en la vista Día y, cuando la cita está pintada, se abre
  * su tarjeta (sin ancla: centrada, u hoja en el teléfono).
  */
-function useIrACita(p: PropsInteraccionesV2): (c: CitaEncontrada) => void {
+function useIrACita(p: PropsInteraccionesV2): ApiInteraccionesV2['irACita'] {
   const toast = useToast()
   const pRef = useRef(p)
   useEffect(() => { pRef.current = p })
   const espera = useRef<(() => void) | null>(null)
   useEffect(() => () => espera.current?.(), [])
-  return useCallback((c: CitaEncontrada) => {
+  return useCallback((c: CitaEncontrada, destacar?: 'reagendar') => {
     const { calendarRef, filtroActivo, alFiltrarMedico, onVista, isMobile } = pRef.current
     const api = calendarRef.current?.getApi()
     if (!api) return
@@ -535,7 +537,7 @@ function useIrACita(p: PropsInteraccionesV2): (c: CitaEncontrada) => void {
       espera.current = null
       /* Por `abrirCita`, la única puerta (`altaCitas.ts`): la misma regla de
          Google y el mismo estrechamiento de `extendedProps` que un clic. */
-      if (ev) pRef.current.abrirCita(ev)
+      if (ev) pRef.current.abrirCita(ev, destacar ? { ancla: null, destacar } : undefined)
       else toast.info('No se pudo mostrar esa cita en la agenda.')
     })
     if (!resuelta) espera.current = limpiar
@@ -602,7 +604,7 @@ export default function InteraccionesV2(p: PropsInteraccionesV2): ReactElement |
     cerrarCapa(id)
   }, [capaRef, calendarRef, cerrarCapa])
 
-  const abrirTarjeta = useCallback<ApiInteraccionesV2['abrirTarjeta']>((cita, ancla, punto, alPasar = false) => {
+  const abrirTarjeta = useCallback<ApiInteraccionesV2['abrirTarjeta']>((cita, ancla, punto, alPasar = false, destacar) => {
     const c = capaRef.current
     /* T3 · Al pasar el ratón nunca encima de otra capa (burbuja, tarjeta fija, ayuda). */
     if (alPasar && c !== null && !esAlPasar(c)) return
@@ -613,7 +615,7 @@ export default function InteraccionesV2(p: PropsInteraccionesV2): ReactElement |
       abrir({ ...base, ancla: c.ancla, ...(c.punto ? { punto: c.punto } : {}), sinEntrada: true })
       return
     }
-    abrir({ ...base, ancla, ...(punto ? { punto } : {}), ...(alPasar ? { alPasar } : {}) })
+    abrir({ ...base, ancla, ...(punto ? { punto } : {}), ...(alPasar ? { alPasar } : {}), ...(destacar ? { destacar } : {}) })
   }, [abrir, calendarRef, capaRef])
   const irACita = useIrACita(p)
   const abrirAyuda = useCallback(() => abrir({ tipo: 'ayuda' }), [abrir])

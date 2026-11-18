@@ -10,6 +10,7 @@ import type { EventContentArg } from '@fullcalendar/core'
 import type { Appointment } from '@/lib/agenda/tiposAgenda'
 import { STATUS_CONFIG, esEventoGenerico, marcaPorLigar, tintasDelChipDeMes } from '@/lib/agenda/tarjetasAgenda'
 import { GoogleGIcon } from './GoogleGIcon'
+import { MarcaOrigenGoogle, ETIQUETA_ORIGEN_GOOGLE } from './MarcaOrigenGoogle'
 import { IconoDelEvento } from './IconoDelEvento'
 import { useSinAvisoFlotante } from './MemoizedEventContent'
 
@@ -40,12 +41,14 @@ export const MonthChip = memo(function MonthChip({ arg }: { arg: EventContentArg
   const pac = ext?.pacientes
   // D6: «Por ligar» con la misma píldora que «Evento» de Google; `null` en el resto.
   const marca = ext ? marcaPorLigar(ext) : null
+  /* Tanda J, punto 11 · una fila de Spinus nacida en Google: su «G» detrás del punto (sólo con la v2). */
+  const origenGoogle = !isGcal && ext?.origen === 'google'
 
   return (
     <div
       data-cita-id={arg.event.id}
       {...(sinAvisoFlotante && ext?.status && !isGcal
-        ? { role: 'group', 'aria-label': `${pac ? `${pac.nombre} ${pac.apellidos}` : arg.event.title} · ${STATUS_CONFIG[ext.status].label}${marca ? ` · ${marca.titulo}` : ''}` }
+        ? { role: 'group', 'aria-label': `${pac ? `${pac.nombre} ${pac.apellidos}` : arg.event.title} · ${STATUS_CONFIG[ext.status].label}${marca ? ` · ${marca.titulo}` : ''}${origenGoogle ? ` · ${ETIQUETA_ORIGEN_GOOGLE}` : ''}` }
         : {})}
       className={`ag-mes${isGcal ? ' ag-mes--gcal' : ''}${esEvento ? ' ag-mes--evento' : ''}${
         ext?.status === 'cancelled' ? ' ag-mes--cancelada' : ''}`}
@@ -60,6 +63,7 @@ export const MonthChip = memo(function MonthChip({ arg }: { arg: EventContentArg
             className={esEvento ? 'ag-mes-punto ag-mes-punto--cuadro' : 'ag-mes-punto'}
             style={{ background: tinta }}
           />}
+      {origenGoogle && <MarcaOrigenGoogle size={10} decorativa />}
       {arg.timeText && <span className="ag-mes-hora" style={{ color: hora }}>{arg.timeText}</span>}
       {ext?.icono && (
         <span className="ag-mes-icono">

@@ -84,6 +84,12 @@ export interface OpcionesDisposicion {
   conWhatsApp?: boolean
   /** Quien mira puede abrir el expediente (médico) y la cita tiene paciente. */
   puedeVerExpediente?: boolean
+  /**
+   * Tanda J, punto 10 · La tarjeta se abrió desde un aviso que pide esta
+   * acción («Desde Google no se pueden mover…» → «Reagendar»): si la cita la
+   * tiene, pasa a principal (a todo el ancho y con el foco, lo de siempre).
+   */
+  destacar?: 'reagendar'
 }
 
 const VIVAS: readonly Status[] = ['scheduled', 'confirmed']
@@ -128,6 +134,21 @@ function disposicionSinCambios(cita: CitaTarjeta, puedeIniciar: boolean, o: Opci
  * devuelven las que aplican a ESA cita.
  */
 export function disposicionDeTarjeta(cita: CitaTarjeta, puedeIniciar: boolean, o: OpcionesDisposicion = {}): DisposicionTarjeta {
+  return conDestacada(disposicionPorEstado(cita, puedeIniciar, o), o.destacar)
+}
+
+/**
+ * Tanda J, punto 10 · La acción pedida pasa de secundaria a principal; la
+ * principal que hubiera encabeza las secundarias. Sin ella en la tarjeta (ya
+ * empezó, se canceló…), nada cambia.
+ */
+function conDestacada(d: DisposicionTarjeta, destacar: OpcionesDisposicion['destacar']): DisposicionTarjeta {
+  if (!destacar || !d.secundarias.includes(destacar)) return d
+  const resto = d.secundarias.filter(p => p !== destacar)
+  return { ...d, principal: destacar, secundarias: d.principal ? [d.principal, ...resto] : resto }
+}
+
+function disposicionPorEstado(cita: CitaTarjeta, puedeIniciar: boolean, o: OpcionesDisposicion): DisposicionTarjeta {
   if (esEventoGenerico(cita) || esPorLigar(cita)) return disposicionSinCambios(cita, puedeIniciar, o)
   if (cita.status === 'attended') return { principal: o.puedeVerExpediente ? 'ver-expediente' : null, secundarias: [], peligro: null }
   if (cita.status === 'cancelled') return { principal: 'reagendar-cita', secundarias: ['reasignar'], peligro: null }
