@@ -25,7 +25,7 @@
  */
 import { randomUUID } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
-import { entradaGestion } from '@/lib/reserva/gestionServidor'
+import { entradaGestion, type EntradaGestion } from '@/lib/reserva/gestionServidor'
 import { createAdminClient } from '@/lib/supabase/admin'
 import {
   COLUMNAS_ENLACE, CrearEnlaceSchema, gestionaTodos, puedeGestionarDelMedico, respuestaErrorEnlace,
@@ -40,6 +40,24 @@ import { logger } from '@/lib/logger'
 export const dynamic = 'force-dynamic'
 
 const SIN_SECRETO = { error: 'sin_secreto', mensaje: 'La reserva por enlace no está configurada en este servidor' }
+
+type Gestion = Extract<EntradaGestion, { ok: true }>
+
+/**
+ * Los vigentes: el fijo y el único sin usar ni caducar y, con la migración de
+ * j2 (tanda J, punto 3), sin agotar. `conAgotado: false` es el filtro de antes:
+ * sin esa migración no existe `agotado_en` y ningún único está agotado.
+ */
+function consultaVigentes(e: Gestion, conAgotado: boolean) {
+  const vivo = `usado_en.is.null,${conAgotado ? 'agotado_en.is.null,' : ''}caduca_en.gt."${new Date().toISOString()}"`
+  const q = e.supabase.from('reserva_enlaces').select(COLUMNAS_ENLACE)
+    .eq('clinica_id', e.clinicaId)
+    .is('revocado_en', null)
+    .or(`clase.eq.fijo,and(${vivo})`)
+    .order('created_at', { ascending: false })
+    .limit(200)
+  return gestionaTodos(e.perfil) ? q : q.eq('medico_id', e.perfil.id)
+}
 
 /**
  * GET — los enlaces vigentes que quien llama puede gestionar: el fijo de cada
@@ -57,15 +75,9 @@ export async function GET(): Promise<NextResponse> {
   const e = await entradaGestion()
   if (!e.ok) return e.respuesta
   try {
-    let q = e.supabase.from('reserva_enlaces').select(COLUMNAS_ENLACE)
-      .eq('clinica_id', e.clinicaId)
-      .is('revocado_en', null)
-      // j2 (tanda J, punto 3): tampoco el único que agotó sus intentos (ya no sirve).
-      .or(`clase.eq.fijo,and(usado_en.is.null,agotado_en.is.null,caduca_en.gt."${new Date().toISOString()}")`)
-      .order('created_at', { ascending: false })
-      .limit(200)
-    if (!gestionaTodos(e.perfil)) q = q.eq('medico_id', e.perfil.id)
-    const { data, error } = await q
+    const primera = await consultaVigentes(e, true)
+    // Integración J (tolerancia): sin la migración de j2 la columna no existe (42703); se lee como antes.
+    const { data, error } = primera.error?.code === '42703' ? await consultaVigentes(e, false) : primera
     if (error) {
       logger.error('agenda', `enlaces de reserva sin leer: ${error.code ?? ''}`)
       return NextResponse.json({ error: 'No se pudieron leer los enlaces' }, { status: 500 })
@@ -92,6 +104,20 @@ function correoDelUnico(cuerpo: z.output<typeof CrearEnlaceSchema>): { correo: s
   return hmac ? { correo: cuerpo.correo.trim(), hmac } : 'invalido'
 }
 
+/**
+ * Emite con `reserva_enlace_emitir` de 9 argumentos (j2). Integración J
+ * (tolerancia): sin la migración de j2 esa firma no existe (PGRST202); SIN
+ * correo, la de 7 argumentos es la misma emisión y se usa ésa. CON correo, no:
+ * un único cuyo correo no se guardara no mandaría el comprobante a nadie.
+ */
+async function emitirEnBase(args: Record<string, string | null>, correo: { correo: string; hmac: string } | null) {
+  const admin = createAdminClient()
+  const r = await admin.rpc('reserva_enlace_emitir', { ...args, p_correo: correo?.correo ?? null, p_correo_hmac: correo?.hmac ?? null })
+  if (r.error?.code !== 'PGRST202' || correo) return r
+  logger.warn('agenda', 'reserva_enlace_emitir de 9 argumentos ausente: se emite con la de 7 (falta la migración de j2)')
+  return admin.rpc('reserva_enlace_emitir', args)
+}
+
 /** POST — `{clase:'fijo', medico_id}` crea o regenera; `{clase:'unico', medico_id, etiqueta?, correo?}` emite. */
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const e = await entradaGestion()
@@ -114,12 +140,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     if (correo === 'invalido') return NextResponse.json({ error: 'Revisa el correo del paciente' }, { status: 400 })
 
     // Fijo: revoca el vigente y emite otro en una transacción. Único: emite.
-    const { error } = await createAdminClient().rpc('reserva_enlace_emitir', {
+    const { error } = await emitirEnBase({
       p_clinica_id: e.clinicaId, p_actor: e.perfil.id, p_id: id, p_medico_id: cuerpo.medico_id,
       p_clase: cuerpo.clase, p_codigo_hash: codigoHash,
       p_etiqueta: cuerpo.clase === 'unico' ? (cuerpo.etiqueta ?? null) : null,
-      p_correo: correo?.correo ?? null, p_correo_hmac: correo?.hmac ?? null,
-    })
+    }, correo)
     if (error) {
       const r = respuestaErrorEnlace(error)
       if (r.status === 500) logger.error('agenda', `enlace de reserva sin emitir: ${error.code ?? ''}`)
