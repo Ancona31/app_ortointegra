@@ -8,9 +8,9 @@
  */
 import type { NextRequest } from 'next/server'
 import { VerificarCodigoSchema } from '@/lib/reserva/esquemasReserva'
-import { abrirEnlace, codigoAbrible, cuerpoJson, noEncontrado, responder } from '@/lib/reserva/puertaReserva'
+import { abrirEnlace, codigoAbrible, cuerpoJson, demasiadosIntentos, noEncontrado, responder } from '@/lib/reserva/puertaReserva'
 import { verificarCodigo } from '@/lib/reserva/servidorReserva'
-import { dentroDeLimites, ipDe, seudonimoRed } from '@/lib/reserva/limitesReserva'
+import { dentroDeLimites, esperaDeLimites, ipDe, seudonimoRed } from '@/lib/reserva/limitesReserva'
 import { normalizarCorreo } from '@/lib/reserva/contacto'
 import { hmacCodigoCorreo, hmacContacto, nuevaFicha } from '@/lib/reserva/secretos'
 import { respuestaVerificacion } from '@/lib/reserva/respuestasReserva'
@@ -20,9 +20,9 @@ export const dynamic = 'force-dynamic'
 export async function POST(req: NextRequest, ctx: RouteContext<'/api/reservar/[codigo]/verificar'>) {
   const { codigo } = await ctx.params
   if (!codigoAbrible(codigo)) return noEncontrado()
-  if (!(await dentroDeLimites('verificar', { ip: seudonimoRed('ip', ipDe(req.headers)) }))) {
-    return responder({ status: 429, cuerpo: { error: 'demasiados_intentos' } })
-  }
+  const red = { ip: seudonimoRed('ip', ipDe(req.headers)) }
+  // K2 (punto 10): el 429 dice cuánto falta.
+  if (!(await dentroDeLimites('verificar', red))) return demasiadosIntentos(await esperaDeLimites('verificar', red))
   const enlace = await abrirEnlace(codigo)
   if (!enlace) return noEncontrado()
   if (enlace.ctx.clase !== 'fijo') return responder({ status: 400, cuerpo: { error: 'no_aplica' } })

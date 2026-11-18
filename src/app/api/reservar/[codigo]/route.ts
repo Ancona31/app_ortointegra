@@ -37,11 +37,11 @@ import { cookies } from 'next/headers'
 import { after, type NextRequest } from 'next/server'
 import { ReservarSchema } from '@/lib/reserva/esquemasReserva'
 import {
-  abrirEnlace, codigoAbrible, cuerpoJson, noEncontrado, nombreDelMedico, responder, telefonoDeContacto,
+  abrirEnlace, codigoAbrible, cuerpoJson, demasiadosIntentos, noEncontrado, nombreDelMedico, responder, telefonoDeContacto,
 } from '@/lib/reserva/puertaReserva'
 import { reagendar, reservar } from '@/lib/reserva/servidorReserva'
 import {
-  COOKIE_DISPOSITIVO, OPCIONES_COOKIE, dentroDeLimites, dispositivoDe, ipDe, seudonimoRed,
+  COOKIE_DISPOSITIVO, OPCIONES_COOKIE, dentroDeLimites, dispositivoDe, esperaDeLimites, ipDe, seudonimoRed,
 } from '@/lib/reserva/limitesReserva'
 import { normalizarCorreo, normalizarTelefonoMx } from '@/lib/reserva/contacto'
 import { hashDeCodigo, hmacContacto, hmacFicha } from '@/lib/reserva/secretos'
@@ -65,9 +65,9 @@ export async function POST(req: NextRequest, rctx: RouteContext<'/api/reservar/[
   const almacen = await cookies()
   const disp = dispositivoDe(almacen.get(COOKIE_DISPOSITIVO)?.value)
   if (disp.nuevo) almacen.set(COOKIE_DISPOSITIVO, disp.id, OPCIONES_COOKIE)
-  if (!(await dentroDeLimites('reservar', { ip: seudonimoRed('ip', ipDe(req.headers)), disp: seudonimoRed('disp', disp.id) }))) {
-    return responder({ status: 429, cuerpo: { error: 'demasiados_intentos' } })
-  }
+  const red = { ip: seudonimoRed('ip', ipDe(req.headers)), disp: seudonimoRed('disp', disp.id) }
+  // K2 (punto 10): los 429 dicen cuánto falta.
+  if (!(await dentroDeLimites('reservar', red))) return demasiadosIntentos(await esperaDeLimites('reservar', red))
 
   const enlace = await abrirEnlace(codigo)
   if (!enlace) return noEncontrado()
@@ -86,7 +86,7 @@ export async function POST(req: NextRequest, rctx: RouteContext<'/api/reservar/[
   const correo = ctx.clase === 'unico' ? null : (b.correo ?? null)
   if (correo === null && ctx.clase !== 'unico') return MAL('solicitud_invalida')
   if (ctx.clase === 'fijo' && !(await dentroDeLimites('reservar', { enlace: codigoHash }))) {
-    return responder({ status: 429, cuerpo: { error: 'demasiados_intentos' } })
+    return demasiadosIntentos(await esperaDeLimites('reservar', { enlace: codigoHash }))
   }
 
   const telefono = normalizarTelefonoMx(b.telefono)

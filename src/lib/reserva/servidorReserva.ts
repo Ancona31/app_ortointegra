@@ -90,7 +90,7 @@ export async function emitirCodigo(ctx: ContextoReserva, correoHmac: string, cod
   return r.ok && TextoSchema.safeParse(r.data).success ? String(r.data) : null
 }
 
-/** Verifica el código. 'ok' | 'sin_codigo' | 'agotado' | 'caducado' | 'incorrecto' | null si falla. */
+/** Verifica el código. 'ok' | 'sin_codigo' | 'agotado' | 'caducado' | 'incorrecto' | 'reemplazado' (K2) | null si falla. */
 export async function verificarCodigo(ctx: ContextoReserva, correoHmac: string, codigoHmac: string, fichaHmac: string): Promise<string | null> {
   const r = await llamar('reserva_codigo_verificar', {
     p_clinica_id: ctx.clinica_id, p_enlace_id: ctx.enlace_id, p_correo_hmac: correoHmac, p_codigo_hmac: codigoHmac, p_ficha_hmac: fichaHmac,

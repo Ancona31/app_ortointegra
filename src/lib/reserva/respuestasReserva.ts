@@ -75,6 +75,8 @@ export function respuestaVerificacion(resultado: string): Respuesta {
     case 'caducado': return { status: 410, cuerpo: { error: 'codigo_caducado' } }
     case 'agotado': return { status: 429, cuerpo: { error: 'codigo_agotado' } }
     case 'sin_codigo': return { status: 400, cuerpo: { error: 'sin_codigo' } }
+    // K2 (punto 10): el código de un correo anterior (lo invalidó un reenvío); no contó como equivocado.
+    case 'reemplazado': return { status: 400, cuerpo: { error: 'codigo_reemplazado' } }
     default: return { status: 500, cuerpo: { error: 'no_disponible' } }
   }
 }

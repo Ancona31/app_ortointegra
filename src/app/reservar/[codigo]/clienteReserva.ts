@@ -42,11 +42,27 @@ export function leerDias(cuerpo: Record<string, unknown>): DiaPagina[] {
   })
 }
 
+/** «25 s» o «12 min» (hacia arriba). K2 (punto 10). */
+export function cuantoFalta(segundos: number): string {
+  const s = Math.max(1, Math.ceil(segundos))
+  return s < 60 ? `${s} s` : `${Math.ceil(s / 60)} min`
+}
+
+/** K2 (punto 10): los segundos que el servidor dijo que faltan (`espera_s` de un 429), o null. */
+export function esperaDe(r: RespuestaApi): number | null {
+  const s = r.cuerpo.espera_s
+  return typeof s === 'number' && Number.isFinite(s) && s > 0 ? s : null
+}
+
 /** Texto para la persona según el error de la API. */
 export function mensajeDeError(r: RespuestaApi): string {
   const error = typeof r.cuerpo.error === 'string' ? r.cuerpo.error : ''
   const mensaje = typeof r.cuerpo.mensaje === 'string' ? r.cuerpo.mensaje : null
   if (mensaje) return mensaje
+  // K2 (punto 10): cuando hay que esperar, cuánto falta, con lo que dijo el servidor (nunca inventado aquí).
+  const espera = esperaDe(r)
+  if (error === 'espera_reenvio') return espera ? `Espera ${cuantoFalta(espera)} para pedir otro código.` : 'Espera un momento para pedir otro código.'
+  if (error === 'demasiados_intentos' && espera) return `Demasiados intentos. Podrás volver a probar en ${cuantoFalta(espera)}.`
   const textos: Record<string, string> = {
     turno_ocupado: 'Ese horario se acaba de ocupar. Elige otro.',
     turno_invalido: 'Ese horario ya no está disponible. Elige otro.',
@@ -56,6 +72,7 @@ export function mensajeDeError(r: RespuestaApi): string {
     codigo_caducado: 'El código venció. Pide otro.',
     codigo_agotado: 'Demasiados intentos con ese código. Pide otro.',
     sin_codigo: 'Pide un código primero.',
+    codigo_reemplazado: 'Ese código es de un correo anterior. Escribe el del correo más reciente.',
     demasiados_intentos: 'Demasiados intentos. Espera un rato y vuelve a probar.',
     telefono_invalido: 'Escribe un teléfono de 10 dígitos.',
     correo_invalido: 'Revisa tu correo electrónico.',

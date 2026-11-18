@@ -4,11 +4,12 @@ import { notFound } from 'next/navigation'
 import { resolverEnlaceConfirmacion } from '@/lib/confirmacion/enlaceConfirmacion'
 import { ofertaReagendar, type OfertaReagendar } from '@/lib/confirmacion/reagendarConfirmacion'
 import {
-  citaPintada, comunicate, esPasoCancelar, leerResultado, mensajeDeResultado, textoDeEstado,
+  citaPintada, comunicate, esPasoCancelar, esPasoConfirmar, leerResultado, mensajeDeResultado, textoDeEstado,
   type CitaPintada, type ResultadoPagina,
 } from '@/lib/confirmacion/vistaConfirmacion'
 import type { ContextoConfirmacion } from '@/lib/confirmacion/enlaceConfirmacion'
 import MarcoPublico from '@/components/agendaPublica/MarcoPublico'
+import ConfirmarAlCargar from './ConfirmarAlCargar'
 
 /* ═══ /confirmar/[codigo] — CONFIRMACIÓN DE ASISTENCIA (agenda E3) ═══
    Pública y sin sesión. NO llama a getUser() ni redirige.
@@ -20,6 +21,10 @@ import MarcoPublico from '@/components/agendaPublica/MarcoPublico'
    pidiera. El estado cambia SÓLO con el POST de los botones
    (`/api/confirmar/[codigo]`). «No podré asistir» es otro GET
    (`?paso=cancelar`) que sólo pinta el «¿Seguro?» con su propio formulario.
+   K2 (punto 8): `?paso=confirmar` (el botón «Confirmo mi asistencia» del
+   correo) TAMPOCO escribe en el GET: pinta el mismo botón dentro de
+   `ConfirmarAlCargar`, que en el navegador manda el POST del botón al
+   cargarse. Sin JavaScript queda el botón.
 
    Cualquier causa de no abrir —código con mala forma o inexistente,
    revocado, interruptor apagado, clínica suspendida, paciente de la cita
@@ -109,13 +114,18 @@ function TarjetaCita({ cita }: { cita: CitaPintada }): ReactElement {
   )
 }
 
-interface Acciones { codigo: string; ctx: ContextoConfirmacion; cita: CitaPintada; resultado: ResultadoPagina | null; oferta: OfertaReagendar | null }
+interface Acciones {
+  codigo: string; ctx: ContextoConfirmacion; cita: CitaPintada; resultado: ResultadoPagina | null; oferta: OfertaReagendar | null
+  /** K2 (punto 8): vino del botón del correo y aún se puede confirmar: el navegador confirma al cargar. */
+  alCargar: boolean
+}
 
-function Botones({ codigo, ctx, cita, resultado, oferta }: Acciones): ReactElement {
+function Botones({ codigo, ctx, cita, resultado, oferta, alCargar }: Acciones): ReactElement {
+  const boton = <Formulario codigo={codigo} accion="confirmar" texto="Confirmo mi asistencia" clase="rp-btn" />
   return (
     <section className="rp-grupo" style={{ gap: 'var(--ag-3)' }}>
       {!resultado && <p className={claseDeEstado(ctx.estado)}>{textoDeEstado(ctx)}</p>}
-      {ctx.puede_confirmar && <Formulario codigo={codigo} accion="confirmar" texto="Confirmo mi asistencia" clase="rp-btn" />}
+      {ctx.puede_confirmar && (alCargar ? <ConfirmarAlCargar codigo={codigo}>{boton}</ConfirmarAlCargar> : boton)}
       {ctx.puede_cancelar && <a href={`/confirmar/${codigo}?paso=cancelar`} className="rp-btn rp-btn--sec">No podré asistir</a>}
       {!ctx.puede_cancelar && resultado !== 'fuera_de_plazo' && (ctx.estado === 'agendada' || ctx.estado === 'confirmada') && (
         <p className="rp-sub">Ya no es posible cancelar desde el enlace; {comunicate(cita.telefono)}.</p>
@@ -133,6 +143,7 @@ export default async function Page({ params, searchParams }: PageProps<'/confirm
   const resultado = leerResultado(consulta.r)
   const cita = citaPintada(ctx)
   const pidiendoCancelar = esPasoCancelar(consulta.paso) && ctx.puede_cancelar
+  const alCargar = esPasoConfirmar(consulta.paso) && ctx.puede_confirmar && !resultado
   const oferta = ctx.estado === 'cancelada' ? await ofertaReagendar(ctx, codigo) : null
 
   return (
@@ -147,7 +158,7 @@ export default async function Page({ params, searchParams }: PageProps<'/confirm
               <Formulario codigo={codigo} accion="cancelar" texto="Sí, cancelar mi cita" clase="rp-btn rp-btn--peligro" />
               <a href={`/confirmar/${codigo}`} className="rp-enlace">Volver</a>
             </section>
-          ) : <Botones codigo={codigo} ctx={ctx} cita={cita} resultado={resultado} oferta={oferta} />}
+          ) : <Botones codigo={codigo} ctx={ctx} cita={cita} resultado={resultado} oferta={oferta} alCargar={alCargar} />}
         </div>
       </div>
     </MarcoPublico>

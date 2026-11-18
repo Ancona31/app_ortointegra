@@ -43,5 +43,7 @@ describe('respuestaReserva', () => {
     expect(respuestaVerificacion('incorrecto').status).toBe(400)
     expect(respuestaVerificacion('agotado').status).toBe(429)
     expect(respuestaVerificacion('caducado').status).toBe(410)
+    // K2 (punto 10): el código de un correo anterior, con su propio error (no «incorrecto»).
+    expect(respuestaVerificacion('reemplazado')).toEqual({ status: 400, cuerpo: { error: 'codigo_reemplazado' } })
   })
 })

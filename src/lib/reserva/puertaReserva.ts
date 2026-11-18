@@ -45,6 +45,18 @@ export function responder(r: Respuesta): NextResponse {
   return NextResponse.json(r.cuerpo, { status: r.status, headers: { 'Cache-Control': 'no-store' } })
 }
 
+/**
+ * K2 (punto 10): un 429 que dice cuánto falta, si se sabe: `espera_s` en el
+ * cuerpo y `Retry-After` (segundos, RFC 9110 §10.2.3). Sin espera conocida, el
+ * 429 de siempre.
+ */
+export function demasiadosIntentos(espera: number | null, error = 'demasiados_intentos'): NextResponse {
+  const conEspera = espera !== null && espera > 0
+  return NextResponse.json({ error, ...(conEspera ? { espera_s: espera } : {}) }, {
+    status: 429, headers: { 'Cache-Control': 'no-store', ...(conEspera ? { 'Retry-After': String(espera) } : {}) },
+  })
+}
+
 /** j2: el único que agotó sus intentos. Sin la causa (ni «intentos» ni «bloqueado»). */
 export const ENLACE_NO_DISPONIBLE: Respuesta = { status: 410, cuerpo: { error: 'enlace_no_disponible' } }
 

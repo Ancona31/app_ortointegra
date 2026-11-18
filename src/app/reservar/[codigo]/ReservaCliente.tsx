@@ -7,7 +7,13 @@ import PasoCodigo from './PasoCodigo'
 import PasoQueDonde from './PasoQueDonde'
 import ResumenCita from './ResumenCita'
 import Comprobante, { cuandoEnZona } from './Comprobante'
-import { hoyEn, mensajeDeError, pedir, type ConsultorioPagina, type TipoPagina, type TurnoPagina } from './clienteReserva'
+import {
+  esperaDe, hoyEn, mensajeDeError, pedir, type ConsultorioPagina, type RespuestaApi, type TipoPagina, type TurnoPagina,
+} from './clienteReserva'
+import {
+  atenderTraspasos, codigoDelFragmento, codigoPendiente, correoLlave, fichaPara, guardar, olvidar, pasoAlRestaurar, pedirTraspaso, recuperar,
+  type Continuidad, type Traspaso,
+} from './continuidadReserva'
 
 /** Lo que la página de servidor le pasa: sólo lo que se pinta (ver page.tsx). */
 export interface DatosPagina {
@@ -92,6 +98,17 @@ function useFocoAlCambiar(paso: Paso): RefObject<HTMLDivElement | null> {
 /** Con un solo tipo, ése; con varios NO se preselecciona ninguno (como el «Elige…» de antes). */
 const tipoDeOficio = (tipos: TipoPagina[]): string => (tipos.length === 1 ? tipos[0]?.id ?? '' : '')
 
+const YA_VERIFICADO = 'Tu correo ya está verificado. Completa tus datos para reservar.'
+/** Los 30 s del servidor entre dos códigos (`REENVIO_CODIGO_S`): sólo para fechar un envío hecho en otra pestaña. */
+const REENVIO_S = 30
+/** La ficha vive 30 min en la base; aquí, un minuto menos para no mandarla al borde. */
+const VIDA_FICHA_MS = 29 * 60_000
+/** El número de `reenviar_en` (los 30 s que impone la ruta), o null. */
+function reenviarEn(r: RespuestaApi): number | null {
+  const s = r.cuerpo.reenviar_en
+  return typeof s === 'number' && Number.isFinite(s) && s > 0 ? s : null
+}
+
 /** El estado de la reserva y sus llamadas a la API: las mismas que antes del rediseño. */
 function useReserva(datos: DatosPagina) {
   const base = `/api/reservar/${encodeURIComponent(datos.codigo)}`
@@ -107,31 +124,29 @@ function useReserva(datos: DatosPagina) {
   const [borrador, setBorrador] = useState<Datos | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [ocupado, setOcupado] = useState(false)
-  const [clientId] = useState(() => crypto.randomUUID())
-
-  async function reservar(d: Datos, ficha: string | null): Promise<void> {
+  const [clientId, setClientId] = useState(() => crypto.randomUUID())
+  const c = useEstadoCodigo()
+  useContinuidad(datos, { continuidad: { consultorioId, tipoId, turno, clientId, ...c.guardable } }, paso, g => {
+    setConsultorioId(g.consultorioId); setTipoId(g.tipoId); setTurno(g.turno); setClientId(g.clientId); c.restaurar(g)
+    if (g.envio) setBorrador({ nombre: '', telefono: '', correo: g.envio.correo })
+    const r = pasoAlRestaurar(g) // con el correo ya verificado no hay código que escribir: a «Tus datos», diciéndolo
+    if (r.verificado) setError(YA_VERIFICADO); setPaso(r.paso)
+  }, c.setCodigoCorreo)
+  async function reservar(d: Datos, f: string | null): Promise<void> {
     if (!turno) return
-    const r = await pedir(base, 'POST', cuerpoReserva(consultorioId, tipoId, turno, d, clientId, ficha, datos.origen?.codigo ?? null))
+    const r = await pedir(base, 'POST', cuerpoReserva(consultorioId, tipoId, turno, d, clientId, f, datos.origen?.codigo ?? null))
     if (r.status === 201 || r.status === 200) { setPaso('listo'); return }
     setError(mensajeDeError(r))
+    // La ficha ya no vale: el código que la dio está gastado, así que el siguiente envío pide uno nuevo (no «Pide un código primero»).
+    if (r.cuerpo.error === 'correo_sin_verificar') { c.setFicha(null); c.setEnvio(null); c.setCodigoCorreo(null) }
     if (r.cuerpo.error === 'turno_ocupado' || r.cuerpo.error === 'turno_invalido') { setTurno(null); setPaso('turno') }
   }
   async function conEspera(f: () => Promise<void>): Promise<void> {
     setOcupado(true); setError(null)
     try { await f() } finally { setOcupado(false) }
   }
-  const pedirCodigo = (d: Datos) => conEspera(async () => {
-    // Tanda I, punto 21: el consultorio elegido, sólo para la cabecera del correo del código.
-    const r = await pedir(`${base}/codigo`, 'POST', { correo: d.correo, consultorio_id: consultorioId })
-    if (r.status === 200) setPaso('codigo'); else setError(mensajeDeError(r))
-  })
-  const alEnviarDatos = (d: Datos) => { setPersona(d); setBorrador(d); return datos.clase === 'fijo' ? pedirCodigo(d) : conEspera(() => reservar(d, null)) }
-  const alVerificar = (codigo: string) => conEspera(async () => {
-    if (!persona) return
-    const r = await pedir(`${base}/verificar`, 'POST', { correo: persona.correo, codigo })
-    if (r.status === 200 && typeof r.cuerpo.ficha === 'string') await reservar(persona, r.cuerpo.ficha)
-    else setError(mensajeDeError(r))
-  })
+  const flujo = flujoCodigo({ base, consultorioId, origen: datos.origen?.codigo ?? null, clase: datos.clase, persona, c, conEspera, reservar, setPaso, setError,
+    alDatos: d => { setPersona(d); setBorrador(d) } })
   const ir = (p: Paso) => { setError(null); setPaso(p) }
   const turnoPerdido = () => { setTurno(null); setError(TURNO_PERDIDO) }
   /* Punto 5 de Angel: al cambiar de consultorio, el tipo elegido se reinicia si no vale en el nuevo. */
@@ -141,8 +156,133 @@ function useReserva(datos: DatosPagina) {
   }
   const tipos = tiposDe(consultorioId)
   return { consultorioId, elegirConsultorio, tipos, tipoId, setTipoId, turno, setTurno, paso, ir, persona, borrador, setBorrador,
-    turnoPerdido, error, ocupado, pedirCodigo, alEnviarDatos, alVerificar }
+    turnoPerdido, error, ocupado, envio: c.envio, reenviarDesde: c.reenviarDesde, codigoCorreo: c.codigoCorreo, ...flujo,
+    /* K2: con la ficha vigente (recargó tras verificar), «Tus datos» ya reserva: no pide otro código. */
+    conFicha: borrador !== null && fichaPara(c.ficha, borrador.correo) !== null }
 }
+
+/** K2 (punto 10): el código pedido, la ficha y la cuenta regresiva; sobreviven a recargar (continuidadReserva.ts). */
+function useEstadoCodigo() {
+  const [envio, setEnvio] = useState<Continuidad['envio']>(null)
+  const [ficha, setFicha] = useState<Continuidad['ficha']>(null)
+  const [reenviarDesde, setReenviarDesde] = useState(0)
+  /* K2 (punto 9): el código que trajo «Continuar mi reserva» (`#codigo=`). Sólo en memoria: nunca se guarda. */
+  const [codigoCorreo, setCodigoCorreo] = useState<string | null>(null)
+  const restaurar = (g: Continuidad) => { setEnvio(g.envio); setFicha(g.ficha); setReenviarDesde(g.reenviarDesde) }
+  return { envio, setEnvio, ficha, setFicha, reenviarDesde, setReenviarDesde, restaurar, codigoCorreo, setCodigoCorreo,
+    guardable: { envio, ficha, reenviarDesde } }
+}
+
+interface CtxCodigo {
+  base: string
+  consultorioId: string
+  origen: string | null
+  clase: DatosPagina['clase']
+  persona: Datos | null
+  c: ReturnType<typeof useEstadoCodigo>
+  conEspera: (f: () => Promise<void>) => Promise<void>
+  reservar: (d: Datos, f: string | null) => Promise<void>
+  setPaso: (p: Paso) => void
+  setError: (e: string | null) => void
+  alDatos: (d: Datos) => void
+}
+
+/**
+ * Pedir el código, verificarlo y reservar (enlace fijo). K2 (punto 10): con la ficha vigente se reserva
+ * sin otro código; con un código pendiente para ese correo se vuelve a él en vez de pedir otro; y si la
+ * reserva falló DESPUÉS de verificar, se reusa la ficha (antes se volvía a verificar el código, ya
+ * gastado, y salía «Pide un código primero»).
+ */
+function flujoCodigo(x: CtxCodigo) {
+  const { c } = x
+  const pedirCodigo = (correo: string) => x.conEspera(async () => {
+    // Tanda I, punto 21: el consultorio elegido, sólo para la cabecera del correo del código.
+    // K2 (punto 9): el `origen` (E6), para que «Continuar mi reserva» del correo lo conserve.
+    const r = await pedir(`${x.base}/codigo`, 'POST', { correo, consultorio_id: x.consultorioId, ...(x.origen ? { origen: x.origen } : {}) })
+    // La cuenta regresiva con lo que dice el servidor (30 s, o lo que falte del tope).
+    const espera = r.status === 200 ? reenviarEn(r) : esperaDe(r)
+    if (espera) c.setReenviarDesde(Date.now() + espera * 1000)
+    if (r.status === 200) { c.setEnvio({ correo, en: Date.now() }); c.setCodigoCorreo(null); x.setPaso('codigo'); return }
+    x.setError(mensajeDeError(r))
+    /* Un código a ESTE correo en ESTE enlace salió hace menos de 30 s (otra pestaña, o la de antes de
+       recargar): sigue valiendo, así que se va a escribirlo en vez de quedarse en «Tus datos». */
+    if (r.cuerpo.error === 'espera_reenvio' && espera) {
+      c.setEnvio(e => e && correoLlave(e.correo) === correoLlave(correo) ? e : { correo, en: Date.now() - (REENVIO_S - espera) * 1000 })
+      x.setPaso('codigo')
+    }
+  })
+  const alEnviarDatos = (d: Datos): Promise<void> => {
+    x.alDatos(d)
+    if (x.clase !== 'fijo') return x.conEspera(() => x.reservar(d, null))
+    const f = fichaPara(c.ficha, d.correo)
+    if (f) return x.conEspera(() => x.reservar(d, f))
+    /* K2 (punto 9): con el código del correo en la mano (abrió «Continuar mi reserva» sin la pestaña de antes)
+       no se pide otro, que invalidaría ése: se va a escribirlo. Si el correo no es el suyo, verificar lo dirá. */
+    if (c.codigoCorreo && !codigoPendiente(c.envio, d.correo)) c.setEnvio({ correo: d.correo, en: Date.now() })
+    if (c.codigoCorreo || codigoPendiente(c.envio, d.correo)) { x.setError(null); x.setPaso('codigo'); return Promise.resolve() }
+    return pedirCodigo(d.correo)
+  }
+  async function verificarYReservar(codigo: string): Promise<void> {
+    const envio = c.envio
+    if (!envio) return
+    let f = fichaPara(c.ficha, envio.correo)
+    if (!f) {
+      const r = await pedir(`${x.base}/verificar`, 'POST', { correo: envio.correo, codigo })
+      // El código del correo (punto 9) ya se probó: si falló, no vuelve a adelantar el paso (se pide otro).
+      c.setCodigoCorreo(null)
+      if (r.status !== 200 || typeof r.cuerpo.ficha !== 'string') { x.setError(mensajeDeError(r)); return }
+      f = r.cuerpo.ficha
+      c.setFicha({ valor: f, correo: correoLlave(envio.correo), hasta: Date.now() + VIDA_FICHA_MS })
+    }
+    if (x.persona && correoLlave(x.persona.correo) === correoLlave(envio.correo)) await x.reservar(x.persona, f)
+    else { x.setError(YA_VERIFICADO); x.setPaso('datos') } // tras recargar no hay nombre ni teléfono guardados: se escriben otra vez
+  }
+  return { pedirCodigo, alEnviarDatos, alVerificar: (codigo: string) => x.conEspera(() => verificarYReservar(codigo)) }
+}
+
+/**
+ * K2 (puntos 9 y 10): guarda lo pedido en `sessionStorage` mientras haya un código o una ficha y lo borra
+ * al reservar. Al montar: lo de esta pestaña si casa con la página; si no y llegó `#codigo=` del correo,
+ * se lo pide a la pestaña que tenía la reserva a medias y, si ninguna contesta, sólo se guarda el código.
+ */
+function useContinuidad(datos: DatosPagina, actual: Traspaso, paso: Paso, aplicar: (g: Continuidad) => void,
+  alCodigo: (codigo: string) => void): void {
+  const ref = useRef({ aplicar, alCodigo, actual, paso })
+  useEffect(() => { ref.current = { aplicar, alCodigo, actual, paso } }) // lo último, para los avisos que llegan después
+  const fragmento = useRef<string | null | undefined>(undefined)
+  const tiposRef = useRef(datos.tiposPorConsultorio)
+  useEffect(() => {
+    const vale = (g: Continuidad) => g.turno !== null && (tiposRef.current[g.consultorioId] ?? []).some(t => t.id === g.tipoId)
+    // Una sola lectura: StrictMode corre el efecto dos veces y la primera ya limpió la barra de direcciones.
+    if (fragmento.current === undefined) fragmento.current = codigoDelFragmento()
+    const codigo = fragmento.current
+    if (codigo) ref.current.alCodigo(codigo)
+    const g = recuperar(datos.codigo)
+    if (g && vale(g)) { ref.current.aplicar(g); return }
+    if (!codigo) return
+    let vivo = true
+    void pedirTraspaso(datos.codigo).then(t => { if (vivo && t && vale(t.continuidad)) ref.current.aplicar(t.continuidad) })
+    return () => { vivo = false }
+  }, [datos.codigo]) // sólo al montar (o con otro enlace): un refresco del servidor no pisa lo que se está escribiendo
+  useEffect(() => {
+    // Otra pestaña abrió «Continuar mi reserva»: se le pasa la reserva a medias sólo mientras el código pedido aquí no vence.
+    const atender = atenderTraspasos(datos.codigo, () => {
+      const { actual: t, paso: p } = ref.current
+      const envio = t.continuidad.envio
+      return envio && p !== 'listo' && codigoPendiente(envio, envio.correo) ? t : null
+    })
+    const alHash = () => { const codigo = codigoDelFragmento(); if (codigo) ref.current.alCodigo(codigo) }
+    window.addEventListener('hashchange', alHash)
+    return () => { atender(); window.removeEventListener('hashchange', alHash) }
+  }, [datos.codigo])
+  const firma = JSON.stringify(actual.continuidad)
+  useEffect(() => {
+    if (paso === 'listo') { olvidar(datos.codigo); return }
+    const c = ref.current.actual.continuidad
+    if (c.envio || c.ficha) guardar(datos.codigo, c)
+  }, [firma, paso, datos.codigo])
+}
+
 type Reserva = ReturnType<typeof useReserva>
 
 interface Vista { datos: DatosPagina; r: Reserva; consultorio: ConsultorioPagina; tipos: TipoPagina[]; zona: string }
@@ -182,10 +322,10 @@ function VistaDatos({ datos, r, consultorio, tipos, zona }: Vista): ReactElement
       <ResumenCita consultorio={consultorio} tipo={tipos.length > 1 ? tipos.find(t => t.id === r.tipoId) : null}
         cuando={r.turno ? cuandoEnZona(r.turno.inicio, zona) : null} />
       {!enCodigo && <FormularioDatos aviso={datos.aviso} casilla={datos.casilla} ocupado={r.ocupado}
-        textoBoton={datos.clase === 'fijo' ? 'Enviar código a mi correo' : 'Reservar cita'} onEnviar={r.alEnviarDatos}
+        textoBoton={datos.clase === 'fijo' && !r.conFicha ? 'Enviar código a mi correo' : 'Reservar cita'} onEnviar={r.alEnviarDatos}
         inicial={r.borrador} onCambio={r.setBorrador} volver={volver} sinCorreo={datos.clase === 'unico'} />}
-      {enCodigo && r.persona && <PasoCodigo correo={r.persona.correo} ocupado={r.ocupado} onVerificar={r.alVerificar}
-        onReenviar={() => { if (r.persona) void r.pedirCodigo(r.persona) }} volver={volver} />}
+      {enCodigo && r.envio && <PasoCodigo key={r.codigoCorreo ?? ''} codigoInicial={r.codigoCorreo} correo={r.envio.correo} ocupado={r.ocupado} onVerificar={r.alVerificar}
+        reenviarDesde={r.reenviarDesde} onReenviar={() => { if (r.envio) void r.pedirCodigo(r.envio.correo) }} volver={volver} />}
     </>
   )
 }
