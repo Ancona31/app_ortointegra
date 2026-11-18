@@ -95,8 +95,9 @@ test.describe('con el interruptor encendido', () => {
     await page.getByRole('button', { name: 'Opciones de la agenda' }).click()
     await page.getByRole('menuitem', { name: 'Configuración de la agenda' }).click()
     await page.waitForURL(`**${RUTA}`)
-    // J5: con algo pendiente abre el funnel de primera vez; sin nada, las pestañas.
-    await expect(page.getByRole('heading', { name: /^(Configuración de la agenda|¿Cuándo das consulta\?)$/ })).toBeVisible()
+    // J5: con algo pendiente abre el funnel de primera vez; sin nada, las pestañas. K3: el primer paso del
+    // administrador es «Horario de la clínica».
+    await expect(page.getByRole('heading', { name: /^(Configuración de la agenda|¿Cuándo das consulta\?|Horario de la clínica)$/ })).toBeVisible()
   })
 
   /* T3 · punto 5: con la v2 el engrane es SÓLO icono a cualquier ancho (también

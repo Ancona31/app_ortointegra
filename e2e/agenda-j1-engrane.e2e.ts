@@ -106,7 +106,8 @@ test('puntos 18 y 19 · el menú: interruptores en lo de dos estados, filas norm
   // Y ya no está en la configuración. Integración J: con la v2 la configuración es la de J5, que abre el
   // funnel de primera vez a quien le falta algo y las pestañas al que no; no está en ninguna de las dos.
   await page.goto('/agenda/configuracion')
-  await expect(page.getByText(/^Paso [123] de 3/)).toBeVisible()
+  // K3: el administrador (esta prueba va como admin A) tiene un paso más, el horario de la clínica: «de 4».
+  await expect(page.getByText(/^Paso [1-4] de 4/)).toBeVisible()
   await expect(page.getByText(/tarjeta al pasar el ratón/i)).toHaveCount(0)
   const deshacer = sinPendientesAgenda(CORREO.adminA)
   try {

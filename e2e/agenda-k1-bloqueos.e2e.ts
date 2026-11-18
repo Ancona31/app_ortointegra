@@ -34,12 +34,16 @@ const JUEVES = diaDeLaSemana(3, 3)
 const TEXTO = 'Este horario está bloqueado. ¿Agendar de todos modos?'
 const MOTIVO = 'Congreso K1'
 
+/* Integración K: sin `reserva_canal is null`, borraba también las reservas por enlace que `reserva-google`
+   deja en ese día (no las limpia, a propósito) y la FK RESTRICT de `reserva_enlaces.usado_cita_id` lo
+   abortaba. Este archivo no crea reservas: sólo borra lo suyo. */
 function limpiar(): void {
   sqlLocal(`
     delete from public.agenda_bloqueos b using public.clinicas c
       where c.id = b.clinica_id and c.nombre = 'Clínica Semilla A' and (b.inicio at time zone 'America/Merida')::date = :'dia'::date;
     delete from public.appointments a using public.clinicas c
-      where c.id = a.clinica_id and c.nombre = 'Clínica Semilla A' and (a.start_time at time zone 'America/Merida')::date = :'dia'::date;`, { dia: JUEVES })
+      where c.id = a.clinica_id and c.nombre = 'Clínica Semilla A' and (a.start_time at time zone 'America/Merida')::date = :'dia'::date
+        and a.reserva_canal is null;`, { dia: JUEVES })
 }
 
 test.beforeAll(() => { limpiar(); interruptorAgenda('A', true) })
@@ -95,7 +99,7 @@ test('3 · la burbuja sobre el bloqueo pregunta; «Cancelar» no guarda, «Acept
   await b.getByRole('button', { name: 'Guardar' }).click()
   await page.getByRole('dialog', { name: TEXTO }).getByRole('button', { name: 'Aceptar' }).click()
   await expect.poll(() => sqlLocal(`select count(*) from public.appointments a join public.clinicas c on c.id = a.clinica_id
-    where c.nombre = 'Clínica Semilla A' and (a.start_time at time zone 'America/Merida')::date = :'dia'::date;`, { dia: JUEVES }).trim()).toBe('1')
+    where c.nombre = 'Clínica Semilla A' and (a.start_time at time zone 'America/Merida')::date = :'dia'::date and a.reserva_canal is null;`, { dia: JUEVES }).trim()).toBe('1')
 })
 
 test('3 · mover la cita dentro del bloqueo pregunta; «Cancelar» la devuelve', async ({ page }) => {
@@ -105,7 +109,7 @@ test('3 · mover la cita dentro del bloqueo pregunta; «Cancelar» la devuelve',
   await expect(cita).toBeVisible()
   const inicio = (): string => sqlLocal(`select to_char(a.start_time at time zone 'America/Merida', 'HH24:MI') from public.appointments a
     join public.clinicas c on c.id = a.clinica_id
-    where c.nombre = 'Clínica Semilla A' and (a.start_time at time zone 'America/Merida')::date = :'dia'::date;`, { dia: JUEVES }).trim()
+    where c.nombre = 'Clínica Semilla A' and (a.start_time at time zone 'America/Merida')::date = :'dia'::date and a.reserva_canal is null;`, { dia: JUEVES }).trim()
   expect(inicio()).toBe('15:30')
   await arrastrarEventoPorMinutos(page, cita, 30)
   const pregunta = page.getByRole('dialog', { name: TEXTO })
@@ -127,7 +131,7 @@ test('1 y 5 · editar desde el rótulo: la cita se queda y el aviso dice cuánta
   await expect(page.getByText('Hay 1 cita en este horario. Se queda como está.')).toBeVisible()
   await expect(franja(page)).toContainText('Bloqueado · Junta K1')
   expect(sqlLocal(`select string_agg(status, ',') from public.appointments a join public.clinicas c on c.id = a.clinica_id
-    where c.nombre = 'Clínica Semilla A' and (a.start_time at time zone 'America/Merida')::date = :'dia'::date;`, { dia: JUEVES }).trim()).toBe('scheduled')
+    where c.nombre = 'Clínica Semilla A' and (a.start_time at time zone 'America/Merida')::date = :'dia'::date and a.reserva_canal is null;`, { dia: JUEVES }).trim()).toBe('scheduled')
 })
 
 test('1 · quitar desde el rótulo: la franja se va y la fila también', async ({ page }) => {

@@ -74,10 +74,11 @@ async function comprobarEnvio(page: Page, id: string, apellidos: string): Promis
   expect(correo.texto).toMatch(/jueves,? \d+ de \w+ a las \d\d:\d\d/)
   expect(correo.texto).toContain('Dr. Admin Semilla Uno')
   expect(correo.texto).toContain('Hospital Norte (ficticio), Avenida Ficticia 2, Norte, Mérida')
-  // El enlace de confirmar o cancelar, absoluto, en el texto y en el botón del HTML.
+  // El enlace de confirmar o cancelar, absoluto, en el texto y en el botón del HTML. K2 (punto 8): el botón
+  // «Confirmo mi asistencia» lleva `?paso=confirmar` (confirma al abrir); el texto conserva la URL simple.
   const enlace = /(https?:\/\/[^\s/]+\/confirmar\/[A-Za-z0-9_-]{22})\b/.exec(correo.texto)?.[1]
   expect(enlace, 'enlace absoluto de /confirmar/').toBeTruthy()
-  expect(correo.html).toContain(`href="${enlace}"`)
+  expect(correo.html).toContain(`href="${enlace}?paso=confirmar"`)
   // Nada clínico: ni las notas, ni el título, ni el nombre del paciente.
   expect(`${correo.asunto}\n${correo.texto}\n${correo.html}`).not.toMatch(/DIAGNOSTICO|SECRETO|Paciente Prueba|Prueba \d\d/)
   // Registrado como los demás correos de cita, y auditado.
