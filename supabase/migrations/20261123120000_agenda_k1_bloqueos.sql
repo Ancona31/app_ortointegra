@@ -134,7 +134,15 @@
 -- aplicados.
 --
 -- ═══ APLICACIÓN LOCAL ══════════════════════════════════════════════════
--- (se completa al aplicar)
+-- 2026-11-18, base local compartida (supabase_db_app_ortointegra), bajo el
+-- flock de la tanda: ensayo en BEGIN … ROLLBACK, luego dos pasadas reales (la
+-- segunda, idempotente: el pre-vuelo reconoce las funciones ya sustituidas)
+-- y registro en supabase_migrations.schema_migrations. K3 (20261123140000)
+-- estaba aplicada antes: las funciones quedaron en los md5 «k1+K3»
+-- (reserva_ocupacion f1701599…, reservar_por_enlace be25c167…). Veredicto:
+-- 13/13 OK. Verde después: k1_bloqueos, seg1, d3 (salvo su caso 3, que rompe
+-- la migración de K2 y no ésta), i2_candado_eleccion, i2_unico_sin_correo,
+-- j2_unico_tope_correo, k3_enlace_pausado y scripts/reserva-carrera.sh.
 -- ═══════════════════════════════════════════════════════════════════════
 
 BEGIN;
