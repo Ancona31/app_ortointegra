@@ -13,6 +13,12 @@
 #   3. Dos reservas a la vez con el MISMO enlace único (turnos distintos): la
 #      segunda espera a la fila del enlace y sale «enlace_usado».
 #   4. En REPEATABLE READ la función se niega (25001) en vez de duplicar.
+#   5. (j2) El tope del único no se esquiva con un client_id en carrera: otra
+#      transacción (sin el candado: otro médico u otro camino) tiene sin
+#      confirmar una cita con ese client_id; B, con un único, pasa la
+#      comprobación `client_id_en_uso`, cuenta el intento y choca con el
+#      índice único al insertar. Sale «client_id_en_uso» y el intento QUEDA
+#      contado (intentos = 1): la excepción del índice no deshace el conteo.
 #
 # Orden: B arranca cuando A ya tiene el candado 1790 (se mira en pg_locks; nadie
 # más usa esa clave), no tras una espera fija.
@@ -45,7 +51,8 @@ J=00000000-0000-4000-8000-0000ca7e0aa1   # agenda_ajustes.id
 AV=carrera-d3                             # versión del aviso
 E1=00000000-0000-4000-8000-0000ca7e0f01; E2=00000000-0000-4000-8000-0000ca7e0f02
 E3=00000000-0000-4000-8000-0000ca7e0f03; E4=00000000-0000-4000-8000-0000ca7e0f04
-E5=00000000-0000-4000-8000-0000ca7e0f05
+E5=00000000-0000-4000-8000-0000ca7e0f05; E6=00000000-0000-4000-8000-0000ca7e0f06
+CID5=00000000-0000-4000-8000-0000ca7e0c55  # client_id del escenario 5
 FIRMA="public.reservar_por_enlace(uuid, text, uuid, uuid, timestamptz, text, text, text, text, text, text, text, text, uuid)"
 
 limpiar() {
@@ -75,7 +82,7 @@ commit;
 SQL
   local resto
   resto="$(sql -c "select (select count(*) from public.audit_log where descripcion like '%$C%'
-                             or registro_id in ('$C', '$U', '$K', '$T', '$J', '$E1', '$E2', '$E3', '$E4', '$E5'))
+                             or registro_id in ('$C', '$U', '$K', '$T', '$J', '$E1', '$E2', '$E3', '$E4', '$E5', '$E6'))
                     + (select count(*) from public.appointments where clinica_id = '$C')
                     + (select count(*) from public.reserva_enlaces where clinica_id = '$C')
                     + (select count(*) from public.reserva_incidencias where clinica_id = '$C')
@@ -108,16 +115,18 @@ insert into public.reserva_avisos (version, texto_sha256, aprobado, aprobado_en)
 values ('$AV', encode(sha256('aviso'), 'hex'), true, now());
 insert into public.reserva_enlaces (id, clinica_id, medico_id, clase, codigo_hash, vigencia_dias, caduca_en)
 select e, '$C', '$U', 'unico', encode(sha256(convert_to(e::text, 'UTF8')), 'hex'), 7, now() + interval '7 days'
-  from unnest(array['$E1', '$E2', '$E3', '$E4', '$E5']::uuid[]) e;
+  from unnest(array['$E1', '$E2', '$E3', '$E4', '$E5', '$E6']::uuid[]) e;
 SQL
 
 cronometro() { date +%s%N; }
 falla() { echo "FALLÓ: $*" >&2; exit 1; }
 turno() { sql -c "select date_trunc('hour', now()) + interval '3 days' + interval '$1 hours'"; }
-llamada() {  # $1 = función, $2 = enlace, $3 = inicio, $4 = teléfono
+llamada() {  # $1 = función, $2 = enlace, $3 = inicio, $4 = teléfono, $5 = client_id (opcional)
+  local cid="gen_random_uuid()"
+  [ -n "${5:-}" ] && cid="'$5'::uuid"
   echo "select r_resultado from $1('$C', encode(sha256(convert_to('$2', 'UTF8')), 'hex'), '$K', '$T', '$3'::timestamptz,
     'Persona Carrera', '$4', 'p$4@prueba.local', encode(sha256(convert_to('t$4', 'UTF8')), 'hex'),
-    encode(sha256(convert_to('c$4', 'UTF8')), 'hex'), null, '$AV', encode(sha256('aviso'), 'hex'), gen_random_uuid());"
+    encode(sha256(convert_to('c$4', 'UTF8')), 'hex'), null, '$AV', encode(sha256('aviso'), 'hex'), $cid);"
 }
 sesion_a() {  # reserva, retiene 2 s y confirma (en segundo plano); espera a que tenga el candado
   { echo "begin;"; echo "set local role service_role;"; llamada public.reservar_por_enlace "$1" "$2" "$3"
@@ -178,7 +187,27 @@ r="$( { echo "begin isolation level repeatable read;"; echo "set local role serv
 echo "4 · repeatable read: $(printf '%s' "$r" | grep -o 'requiere READ COMMITTED[^)]*)' || echo "$r")"
 printf '%s' "$r" | grep -q 'requiere READ COMMITTED' || falla "escenario 4"
 
+# ── 5 · (j2) client_id en carrera: el intento del único queda contado ───
+W="$(turno 20)"
+{ echo "set application_name = 'carrera-j2-5';"; echo "begin;"
+  echo "insert into public.appointments (clinica_id, medico_id, title, start_time, end_time, status, all_day, client_id)
+        values ('$C', '$U', 'Carrera j2 5', '$(turno 22)'::timestamptz, '$(turno 22)'::timestamptz + interval '30 minutes',
+                'scheduled', false, '$CID5');"
+  echo "select pg_sleep(2);"; echo "commit;"; } | sql > "$tmp/a5.out" &
+pid_a=$!
+for i in $(seq 1 100); do  # hasta 10 s: A ya insertó y duerme sin confirmar
+  [ "$(sql -c "select count(*) from pg_stat_activity where application_name = 'carrera-j2-5' and query like 'select pg_sleep%'")" = 1 ] && break
+  sleep 0.1
+  [ "$i" = 100 ] && falla "la sesión A del escenario 5 no llegó a su espera"
+done
+b="$( { echo "set role service_role;"; llamada public.reservar_por_enlace "$E6" "$W" 5500000008 "$CID5"; } \
+      | docker exec -i "$contenedor" psql -U postgres -d postgres -At -q -v ON_ERROR_STOP=1 2>&1 || true)"
+wait "$pid_a" || falla "la sesión A del escenario 5 terminó con error: $(cat "$tmp/a5.out")"
+intentos="$(sql -c "select intentos || '/' || (usado_en is null) || '/' || (agotado_en is null) from public.reserva_enlaces where id = '$E6'")"
+echo "5 · client_id en carrera: B=$(printf '%s' "$b" | head -1)  intentos/sin usar/sin agotar del único=$intentos"
+[ "$b" = client_id_en_uso ] && [ "$intentos" = 1/true/true ] || falla "escenario 5: el intento debió quedar contado con client_id_en_uso"
+
 total="$(sql -c "select count(*) from public.appointments where clinica_id = '$C'")"
-echo "Citas que quedaron: $total (esperadas 3: escenarios 1, 2-A y 3-A)"
-[ "$total" = 3 ] || falla "quedaron $total citas"
+echo "Citas que quedaron: $total (esperadas 4: escenarios 1, 2-A, 3-A y 5-A)"
+[ "$total" = 4 ] || falla "quedaron $total citas"
 echo "Carrera en verde. Limpiando…"
