@@ -23,12 +23,32 @@
  */
 import type { DiaSemana, Horario } from '@/lib/configApp'
 
-export type PasoPrimeraVez = 1 | 2 | 3
+/**
+ * 0 = el horario de la clínica, SÓLO para el médico administrador (K3, punto 12: el primer paso);
+ * 1 = el de cada consultorio; 2 = la duración; 3 = los avisos. Quien no administra empieza en el 1.
+ */
+export type PasoPrimeraVez = 0 | 1 | 2 | 3
 
-/** Lo que hace falta de un paso de `pasosDe`. */
-interface PasoCalculado { clave: 'horario' | 'duracion' | 'enlace'; hecho: boolean }
+/** Lo que hace falta de un paso de `pasosDe` (y, para quien administra, el de la clínica). */
+interface PasoCalculado { clave: 'clinica' | 'horario' | 'duracion' | 'enlace'; hecho: boolean }
 
-const ORDEN: Record<PasoCalculado['clave'], PasoPrimeraVez> = { horario: 1, duracion: 2, enlace: 3 }
+const ORDEN: Record<PasoCalculado['clave'], PasoPrimeraVez> = { clinica: 0, horario: 1, duracion: 2, enlace: 3 }
+
+/**
+ * El paso de la clínica, para añadirlo a los de `pasosDe` cuando quien entra administra (K3, punto 12).
+ * Pendiente cuando lo está el horario de los consultorios (la primera vez y tras «Empezar de nuevo»):
+ * el de la clínica es la base de «Igual que la clínica», así que se repasa antes. No depende de que la
+ * clínica tenga huso: un administrador al que sólo le falta la duración abre en ella, como antes, y
+ * el huso lo propone el paso (el del primer consultorio) cuando se pasa por él.
+ */
+export function pasoClinica(pasos: readonly PasoCalculado[]): PasoCalculado {
+  return { clave: 'clinica', hecho: pasos.find(p => p.clave === 'horario')?.hecho === true }
+}
+
+/** «Paso N de M»: el número que se enseña y el total, según si el funnel lleva el paso de la clínica. */
+export function numeroDePaso(paso: PasoPrimeraVez, conClinica: boolean): { n: number; de: number } {
+  return conClinica ? { n: paso + 1, de: 4 } : { n: paso, de: 3 }
+}
 
 /** El primer paso que falta, o `null` si no falta ninguno. */
 export function primerPendiente(pasos: readonly PasoCalculado[]): PasoPrimeraVez | null {
@@ -56,10 +76,10 @@ export function vistaInicial(o: {
   if (!o.esMedico || !o.conConsultorio) return 'pestanas'
   if (o.pasos === undefined) return 'cargando'
   if (o.pasos === null) return 'pestanas'
-  if (o.guardado) return { paso: o.guardado }
+  if (o.guardado !== null) return { paso: o.guardado }
   if (!o.primeraVez) return 'pestanas'
   const paso = primerPendiente(o.pasos)
-  return paso ? { paso } : 'pestanas'
+  return paso !== null ? { paso } : 'pestanas'
 }
 
 const clave = (usuarioId: string) => `spinus-agenda-primera-vez:${usuarioId}`
@@ -68,7 +88,7 @@ const clave = (usuarioId: string) => `spinus-agenda-primera-vez:${usuarioId}`
 export function pasoGuardado(usuarioId: string): PasoPrimeraVez | null {
   try {
     const v = typeof window === 'undefined' ? null : window.localStorage.getItem(clave(usuarioId))
-    return v === '1' ? 1 : v === '2' ? 2 : v === '3' ? 3 : null
+    return v === '0' ? 0 : v === '1' ? 1 : v === '2' ? 2 : v === '3' ? 3 : null
   } catch {
     return null
   }

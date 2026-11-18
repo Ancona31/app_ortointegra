@@ -27,7 +27,7 @@ import PrimeraVez from '@/components/agenda/configuracion/PrimeraVez'
 import { pasosDe } from '@/components/agenda/configuracion/PasosConfiguracion'
 import { cargarListaEnlaces, type EstadoLista } from '@/components/agenda/configuracion/listaEnlaces'
 import { useAvisos } from '@/components/agenda/configuracion/estadoAvisos'
-import { esPrimeraVez, olvidarPaso, pasoGuardado, vistaInicial, type PasoPrimeraVez } from '@/lib/agenda/primeraVez'
+import { esPrimeraVez, olvidarPaso, pasoClinica, pasoGuardado, vistaInicial, type PasoPrimeraVez } from '@/lib/agenda/primeraVez'
 import { horarioEfectivo } from '@/lib/agenda/disponibilidad'
 import { CLAVE_CONFIG, CONFIG_DEDUPE_MS, fetcherConfig, revalidarConfigAlMontar, type ConfigApp } from '@/lib/configApp'
 import { FABRICA_AJUSTES_AGENDA, type AjustesAgenda } from '@/lib/agenda/ajustesAgenda'
@@ -38,6 +38,8 @@ interface Props {
   recordatorio: boolean | null
   correoClinica: boolean | null
   administradores: readonly string[]
+  /** `clinicas.timezone` (K3, punto 12), o `null` si la clínica no tiene o la columna aún no existe. */
+  husoClinica: string | null
   tipos: TipoCita[] | null
   puedeAdministrar: boolean
   usuarioId: string
@@ -74,17 +76,25 @@ function useListaEnlaces(activa: boolean): { lista: EstadoLista; recargar: () =>
 
 type Vista = 'cargando' | 'pestanas' | { paso: PasoPrimeraVez }
 
-/** Qué se ve, decidido una vez con los datos (patrón «estado derivado» de React: setState durante el render). */
-function useVista(o: { esMedico: boolean; usuarioId: string; config: ConfigApp | undefined; fallo: boolean; lista: EstadoLista }): Vista {
+/**
+ * Qué se ve, decidido una vez con los datos (patrón «estado derivado» de React: setState durante el render).
+ * K3 (punto 12): quien administra lleva además el paso de la clínica (`pasoClinica`), el primero; los demás
+ * empiezan en el de sus consultorios, y un «Terminar después» en el de la clínica no les cuenta.
+ */
+function useVista(o: {
+  esMedico: boolean; administra: boolean; usuarioId: string; config: ConfigApp | undefined; fallo: boolean; lista: EstadoLista
+}): Vista {
   const [fijada, setFijada] = useState<Vista>('cargando')
   if (fijada !== 'cargando') return fijada
   const suyos = o.config?.consultorios.filter(c => c.medico_id === o.usuarioId && c.activo !== false) ?? null
   const lista = o.lista && o.lista !== 'error' ? o.lista : null
   const pasos = o.lista === null ? undefined : lista ? pasosDe(lista, o.usuarioId, suyos) : null
   /* Sin el secreto de la reserva no se puede crear el enlace: ese paso no cuenta (si no, el funnel no acabaría nunca). */
-  const cuentan = pasos && lista && !lista.secreto ? pasos.filter(x => x.clave !== 'enlace') : pasos
+  const sinClinica = pasos && lista && !lista.secreto ? pasos.filter(x => x.clave !== 'enlace') : pasos
+  const cuentan = sinClinica && o.administra ? [pasoClinica(sinClinica), ...sinClinica] : sinClinica
+  const guardado = o.esMedico ? pasoGuardado(o.usuarioId) : null
   const v = o.esMedico && !suyos && !o.fallo ? 'cargando'
-    : vistaInicial({ esMedico: o.esMedico, conConsultorio: (suyos?.length ?? 0) > 0, pasos: cuentan, guardado: o.esMedico ? pasoGuardado(o.usuarioId) : null,
+    : vistaInicial({ esMedico: o.esMedico, conConsultorio: (suyos?.length ?? 0) > 0, pasos: cuentan, guardado: guardado === 0 && !o.administra ? 1 : guardado,
       primeraVez: cuentan ? esPrimeraVez(cuentan, suyos ?? []) : false })
   if (v !== 'cargando') setFijada(v)
   return v
@@ -96,7 +106,8 @@ export default function ConfiguracionAgenda(props: Props) {
   const { lista, recargar } = useListaEnlaces(conEnlaces)
   const { aviso, avisar } = useAvisoGuardado()
   const avisos = useAvisos({ ajustes: props.ajustes, recordatorio: props.recordatorio, correoClinica: props.correoClinica }, avisar)
-  const vista = useVista({ esMedico: props.esMedico, usuarioId: props.usuarioId, config, fallo, lista })
+  const administra = props.esMedico && props.puedeAdministrar
+  const vista = useVista({ esMedico: props.esMedico, administra, usuarioId: props.usuarioId, config, fallo, lista })
   const router = useRouter()
   const [, startTransition] = useTransition()
   const alCambiarDatos = useCallback(() => { startTransition(() => router.refresh()); void recargar() }, [router, recargar])
@@ -111,6 +122,7 @@ export default function ConfiguracionAgenda(props: Props) {
     return (
       <>
         <PrimeraVez usuarioId={props.usuarioId} consultorios={suyos} horarioClinica={horarioEfectivo(null, config.horario)} tipos={props.tipos}
+          conClinica={administra} husoClinica={props.husoClinica} actualizarHorarioClinica={h => actualizarConfig(c => ({ ...c, horario: h }))}
           motivos={listaBuena?.preparacion?.[props.usuarioId] ?? []} avisos={avisos} puedeAdministrar={props.puedeAdministrar}
           vigenciaDias={vigencia ?? FABRICA_AJUSTES_AGENDA.vigencia_enlace_unico_dias} pasoInicial={vista.paso}
           actualizarConfig={actualizarConfig} alCambiarDatos={alCambiarDatos} />
@@ -120,7 +132,8 @@ export default function ConfiguracionAgenda(props: Props) {
   }
   return (
     <PestanasConfiguracion lista={lista} recargar={recargar} medicos={config?.medicos ?? []} consultorios={config?.consultorios ?? null}
-      falloConfig={fallo} horarioClinica={config ? horarioEfectivo(null, config.horario) : null} tipos={props.tipos} usuarioId={props.usuarioId} esMedico={props.esMedico}
+      falloConfig={fallo} horarioClinica={config ? horarioEfectivo(null, config.horario) : null} husoClinica={props.husoClinica}
+      tipos={props.tipos} usuarioId={props.usuarioId} esMedico={props.esMedico}
       gestionaTodos={props.gestionaReservasDeTodos} puedeAdministrar={props.puedeAdministrar} administradores={props.administradores}
       vigenciaDias={vigencia} avisos={avisos} aviso={aviso} avisar={avisar} actualizarConfig={actualizarConfig}
       alCambiarDatos={alCambiarDatos} alEmpezarDeNuevo={alEmpezarDeNuevo} />

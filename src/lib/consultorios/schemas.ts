@@ -8,8 +8,9 @@ const ZONAS_IANA_VALIDAS = new Set(Intl.supportedValuesOf('timeZone'))
 
 /**
  * Validador de zona IANA: rechaza cualquier string que no sea zona válida.
+ * Exportado para el huso de la clínica (`PUT /api/me/horario`, K3 punto 12).
  */
-const timezoneSchema = z
+export const timezoneSchema = z
   .string()
   .trim()
   .min(1, 'Zona horaria requerida')

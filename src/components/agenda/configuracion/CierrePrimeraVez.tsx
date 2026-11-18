@@ -17,6 +17,7 @@ import { Check, Copy, MessageCircle } from 'lucide-react'
 import BotonCopiar from '@/components/agenda/configuracion/BotonCopiar'
 import CrearEnlaceUnaVez from '@/components/agenda/configuracion/CrearEnlaceUnaVez'
 import { urlWhatsApp } from '@/components/agenda/configuracion/accionesConfig'
+import type { PasoPrimeraVez } from '@/lib/agenda/primeraVez'
 import { AYUDA, BOTON_AZUL, BOTON_BLANCO, BOTON_TEXTO, DIRECCION, ERROR, SUB_PASO, TARJETA, TITULO_BLOQUE, TITULO_PASO } from '@/components/agenda/configuracion/estilosConfig'
 
 export type EnlaceCierre = { estado: 'cargando' } | { estado: 'listo'; url: string } | { estado: 'error'; motivo: string }
@@ -27,8 +28,9 @@ interface Props {
   aviso: string | null
   medicoId: string
   vigenciaDias: number
-  resumen: { consultorios: { id: string; nombre: string; texto: string }[]; minutos: number; avisos: string }
-  irAPaso: (p: 1 | 2 | 3) => void
+  /** `clinica`: el horario de la clínica y su huso, sólo si el funnel llevó ese paso (quien administra; K3). */
+  resumen: { consultorios: { id: string; nombre: string; texto: string }[]; minutos: number; avisos: string; clinica: { texto: string; huso: string } | null }
+  irAPaso: (p: PasoPrimeraVez) => void
   alCrearUnaVez: () => void
 }
 
@@ -70,6 +72,12 @@ function FilaResumen({ titulo, children, alCambiar, ultima }: { titulo: string; 
 function Resumen({ resumen, irAPaso }: Pick<Props, 'resumen' | 'irAPaso'>) {
   return (
     <div className={`${TARJETA} px-[24px] py-[8px]`}>
+      {resumen.clinica && (
+        <FilaResumen titulo="Horario de la clínica" alCambiar={() => irAPaso(0)}>
+          <span className="text-[15px] text-[var(--ag-ink)]">{resumen.clinica.texto}</span>
+          <span className="text-[15px] text-[var(--ag-ink-600)]">Huso horario: {resumen.clinica.huso}</span>
+        </FilaResumen>
+      )}
       <FilaResumen titulo="Cuándo das consulta" alCambiar={() => irAPaso(1)}>
         {resumen.consultorios.map(c => (
           <span key={c.id} className="text-[15px] text-[var(--ag-ink)]"><strong>{c.nombre}:</strong> {c.texto}</span>

@@ -203,6 +203,8 @@ export default function PerfilPage() {
      `nombre_display ?? nombre` del repositorio resuelve a éste y editarlo se ve
      en toda la app —recetas, hoja frontal, títulos de evento de Google—. */
   const [nombreClinica, setNombreClinica] = useState('')
+  /* K3 (punto 12): el huso de la clínica, con el que sale propuesto el de un consultorio nuevo. */
+  const [husoClinica, setHusoClinica] = useState<string | null>(null)
   const [logoPreview, setLogoPreview] = useState<string | null>(null)
   const [logoFile, setLogoFile] = useState<File | null>(null)
   const [loading, setLoading] = useState(true)
@@ -468,6 +470,7 @@ export default function PerfilPage() {
       }
       if (clinicaData.clinica) {
         nombreCargado = clinicaData.clinica.nombre ?? ''
+        setHusoClinica(typeof clinicaData.clinica.timezone === 'string' ? clinicaData.clinica.timezone : null)
         aparienciaCargada = {
           color_primario: clinicaData.clinica.color_primario || COLOR_DEFECTO.primario,
           color_secundario: clinicaData.clinica.color_secundario || COLOR_DEFECTO.secundario,
@@ -1378,6 +1381,7 @@ export default function PerfilPage() {
         open={showAdd}
         onClose={() => setShowAdd(false)}
         onSuccess={handleConsultorioCreado}
+        husoDeFabrica={husoClinica}
       />
 
       {deletingConsultorio && (

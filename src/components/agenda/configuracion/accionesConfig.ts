@@ -70,9 +70,13 @@ export function guardarHorarioConsultorio(id: string, cambios: CambiosConsultori
   })
 }
 
-/** El horario de la clínica (`PUT /api/me/horario`: sólo quien administra, validado y auditado en el servidor). */
-export function guardarHorarioClinica(horario: Horario): Promise<Resultado<null>> {
-  return pedir('/api/me/horario', { method: 'PUT', body: JSON.stringify({ horario }) }, 'No se pudo guardar el horario de la clínica', () => null)
+/**
+ * El horario de la clínica y, si se da, su huso «de fábrica» (`PUT /api/me/horario`: sólo quien
+ * administra, validado y auditado en el servidor; K3 punto 12). El huso de cada consultorio no se toca.
+ */
+export function guardarHorarioClinica(horario: Horario, timezone?: string): Promise<Resultado<null>> {
+  return pedir('/api/me/horario', { method: 'PUT', body: JSON.stringify(timezone ? { horario, timezone } : { horario }) },
+    'No se pudo guardar el horario de la clínica', () => null)
 }
 
 /** La duración de la consulta del médico: crea su tipo principal o cambia el que tiene. Devuelve el id del tipo. */

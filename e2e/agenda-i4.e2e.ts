@@ -157,8 +157,11 @@ test('3 · el horario que nadie confirmó sale «por revisar»; «Continuar» en
     // Todos por revisar: primera vez, el funnel en el paso 1; «Continuar» los confirma.
     sinMarca()
     await page.goto('/agenda/configuracion')
+    // K3 (punto 12): quien administra pasa antes por el horario de la clínica.
+    await expect(page.getByRole('heading', { name: 'Horario de la clínica' })).toBeVisible()
+    await expect(page.getByText('Paso 1 de 4 · menos de 2 minutos')).toBeVisible()
+    await page.getByRole('button', { name: 'Continuar' }).click()
     await expect(page.getByRole('heading', { name: '¿Cuándo das consulta?' })).toBeVisible()
-    await expect(page.getByText('Paso 1 de 3 · menos de 2 minutos')).toBeVisible()
     await page.getByRole('button', { name: 'Continuar' }).click()
     await expect(page.getByRole('heading', { name: '¿Cuánto dura tu consulta?' })).toBeVisible()
     expect(marca()).toBe(`${total}/${total}`)

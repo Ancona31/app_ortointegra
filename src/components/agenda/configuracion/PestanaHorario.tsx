@@ -20,6 +20,7 @@
 import Link from 'next/link'
 import { useState } from 'react'
 import DialogoHorario from '@/components/agenda/configuracion/DialogoHorario'
+import { nombreHuso } from '@/components/agenda/configuracion/SelectorHuso'
 import { guardarHorarioClinica, guardarHorarioConsultorio, type CambiosConsultorio } from '@/components/agenda/configuracion/accionesConfig'
 import type { Avisar } from '@/components/agenda/configuracion/estadoAvisos'
 import { AYUDA, BOTON_CHICO, PANEL, SUB_PANEL, TITULO_PANEL } from '@/components/agenda/configuracion/estilosConfig'
@@ -34,6 +35,8 @@ interface Props {
   consultorios: readonly Consultorio[] | null
   fallo: boolean
   horarioClinica: Horario | null
+  /** `clinicas.timezone` (K3, punto 12), o `null` si la clínica aún no eligió. */
+  husoClinica: string | null
   medicos: readonly MedicoConfig[]
   usuarioId: string
   esMedico: boolean
@@ -106,6 +109,7 @@ function TarjetaClinica({ p, alAbrir }: { p: Props; alAbrir: () => void }) {
         {!lineas ? <span className="text-[15px] text-[var(--ag-ink-600)]">{p.fallo ? 'No se pudo cargar. Recarga la página.' : '…'}</span>
           : lineas.length ? lineas.map(l => <span key={l} className="text-[15px] text-[var(--ag-text)]">{l}</span>)
           : <span className="text-[15px] italic text-[var(--ag-muted)]">Sin días de consulta</span>}
+        {p.husoClinica && <span className="text-[15px] text-[var(--ag-text)]">Huso horario: {nombreHuso(p.husoClinica)}</span>}
         <span className="text-[14px] leading-[1.5] text-[var(--ag-ink-600)]">
           Lo usan los consultorios que dicen «Igual que la clínica».{p.puedeAdministrar ? '' : ' Lo cambia quien administra la clínica.'}
         </span>
@@ -123,9 +127,10 @@ export default function PestanaHorario(p: Props) {
   const [abierto, setAbierto] = useState<Abierto>(null)
   const guardar = useGuardarConsultorio(p)
   const clinica = p.horarioClinica
-  async function guardarDialogo(modo: ModoHorario, h: Horario): Promise<string | null> {
+  async function guardarDialogo(modo: ModoHorario, h: Horario, huso?: string): Promise<string | null> {
     if (abierto?.tipo === 'clinica') {
-      const r = await guardarHorarioClinica(h)
+      /* El huso sólo viaja si cambió: sin la migración de K3 el PUT con huso da 409 y el horario solo sigue guardándose. */
+      const r = await guardarHorarioClinica(h, huso && huso !== p.husoClinica ? huso : undefined)
       p.avisar(r.ok ? { ok: true } : r)
       if (!r.ok) return r.motivo
       p.actualizarConfig(cfg => ({ ...cfg, horario: h }))
@@ -159,8 +164,9 @@ export default function PestanaHorario(p: Props) {
           titulo={abierto.tipo === 'clinica' ? 'Horario de la clínica' : `Horario en ${abierto.c.nombre}`}
           modos={abierto.tipo === 'clinica' ? null : { inicial: abierto.c.horario_propio === true ? 'propio' : 'clinica', textoClinica: textoHorario(clinica) }}
           horario={abierto.tipo === 'clinica' ? clinica : horarioEfectivo(abierto.c, clinica)}
+          huso={abierto.tipo === 'clinica' ? p.husoClinica ?? p.consultorios?.[0]?.timezone ?? 'America/Mexico_City' : undefined}
           nota={abierto.tipo === 'clinica'
-            ? 'Cambia el horario de todos los consultorios que dicen «Igual que la clínica». Las citas que ya están apartadas no se mueven.'
+            ? 'Cambia el horario de todos los consultorios que dicen «Igual que la clínica». El huso de cada consultorio no cambia. Las citas que ya están apartadas no se mueven.'
             : 'Las citas que ya tienes apartadas no se mueven.'}
           alGuardar={guardarDialogo} alCerrar={() => setAbierto(null)} />
       )}

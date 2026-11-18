@@ -4,13 +4,18 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { canManageClinica } from '@/lib/permissions'
 import { z } from 'zod'
 import { HorarioEnOrdenSchema } from '@/lib/agenda/disponibilidad'
+import { timezoneSchema } from '@/lib/consultorios/schemas'
 import { logAudit } from '@/lib/audit'
 
 /* P8 (`mejora_agendaV2.md` §6-bis), fuera del interruptor de la agenda v2:
    antes se guardaba lo que llegara, sin mirar forma ni orden, y un día con el
    cierre antes de la apertura llegaba a la rejilla y a los huecos. `strict`:
-   el cuerpo es `{ horario }` y nada más. */
-const CuerpoHorarioSchema = z.strictObject({ horario: HorarioEnOrdenSchema })
+   el cuerpo es `{ horario }` y nada más.
+   K3 (punto 12): y, opcional, `timezone`, el huso «de fábrica» de la clínica
+   (`clinicas.timezone`, migración 20261123140000), validado contra Intl. Sin
+   él, la ruta hace exactamente lo de antes (el `HorarioModal` de la v2
+   apagada no lo manda). NO toca el huso de ningún consultorio. */
+const CuerpoHorarioSchema = z.strictObject({ horario: HorarioEnOrdenSchema, timezone: timezoneSchema.optional() })
 
 async function getProfileAndClinica(supabase: Awaited<ReturnType<typeof createClient>>) {
   const { data: { user } } = await supabase.auth.getUser()
@@ -58,18 +63,21 @@ export async function PUT(req: NextRequest) {
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Horario inválido' }, { status: 400 })
     }
-    const { horario } = parsed.data
+    const { horario, timezone } = parsed.data
 
     // clinicas no tiene política UPDATE para authenticated — necesita admin client (service role)
     const admin = createAdminClient()
-    const { error } = await admin
-      .from('clinicas')
-      .update({ horario_consulta: horario })
+    const guardar = (conHuso: boolean) => admin.from('clinicas')
+      .update({ horario_consulta: horario, ...(conHuso && timezone ? { timezone } : {}) })
       .eq('id', profile.clinica_id)
-
+    const primero = await guardar(true)
+    /* 42703: el código llegó antes que la migración del huso. Nada se guardó (una sola sentencia):
+       se guarda el horario solo, como antes, para que el administrador no se quede trabado. */
+    const sinHuso = primero.error?.code === '42703' && timezone !== undefined
+    const { error } = sinHuso ? await guardar(false) : primero
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-    /* Sólo el hecho: quién, qué clínica, cuándo. Sin el horario, ni el de
+    /* Sólo el hecho: quién, qué clínica, cuándo (y si llevaba huso). Sin el horario, ni el de
        antes ni el de después (el `audit_log` es inmutable). Con `await`
        (LOG-DT-1): en Vercel una promesa suelta puede morir con la función.
        `clinicas` no tiene disparador de auditoría y esta escritura va con el
@@ -79,6 +87,7 @@ export async function PUT(req: NextRequest) {
       accion: 'horario_clinica_editado',
       tabla: 'clinicas',
       registroId: profile.clinica_id,
+      ...(timezone && !sinHuso ? { descripcion: 'horario y huso horario' } : {}),
     })
     return NextResponse.json({ ok: true })
   } catch (err: unknown) {

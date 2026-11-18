@@ -42,6 +42,8 @@ export interface DatosPestanas {
   consultorios: readonly Consultorio[] | null
   falloConfig: boolean
   horarioClinica: Horario | null
+  /** `clinicas.timezone` (K3, punto 12), o `null`. */
+  husoClinica: string | null
   tipos: readonly TipoCita[] | null
   usuarioId: string
   esMedico: boolean
@@ -139,7 +141,7 @@ export default function PestanasConfiguracion(d: DatosPestanas) {
           gestionaTodos={d.gestionaTodos} administradores={d.administradores} vigenciaDias={d.vigenciaDias} avisar={d.avisar} alCrearTipo={d.alCambiarDatos} />
       </Panel>
       <Panel clave="horario" activa={activa}>
-        <PestanaHorario consultorios={d.consultorios?.filter(c => c.activo !== false) ?? null} fallo={d.falloConfig} horarioClinica={d.horarioClinica} medicos={d.medicos} usuarioId={d.usuarioId}
+        <PestanaHorario consultorios={d.consultorios?.filter(c => c.activo !== false) ?? null} fallo={d.falloConfig} horarioClinica={d.horarioClinica} husoClinica={d.husoClinica} medicos={d.medicos} usuarioId={d.usuarioId}
           esMedico={d.esMedico} puedeAdministrar={d.puedeAdministrar} actualizarConfig={d.actualizarConfig} avisar={d.avisar} alCambiar={d.alCambiarDatos} />
       </Panel>
       <Panel clave="consulta" activa={activa}>

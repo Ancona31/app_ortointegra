@@ -71,8 +71,9 @@ const adminSinPendientes = () => sinPendientesAgenda(CORREO.adminA)
 
 test('5 · con algo pendiente abre el funnel de primera vez, sin pestañas', async ({ page }) => {
   await page.goto(RUTA)
-  await expect(page.getByRole('heading', { name: '¿Cuándo das consulta?' })).toBeVisible()
-  await expect(page.getByText('Paso 1 de 3 · menos de 2 minutos')).toBeVisible()
+  // K3 (punto 12): quien administra empieza en el horario de la clínica, «Paso 1 de 4».
+  await expect(page.getByRole('heading', { name: 'Horario de la clínica' })).toBeVisible()
+  await expect(page.getByText('Paso 1 de 4 · menos de 2 minutos')).toBeVisible()
   await expect(page.getByRole('tablist', { name: 'Secciones de la configuración' })).toHaveCount(0)
 })
 
@@ -108,7 +109,8 @@ test('5 · sin nada pendiente: pestañas con su rol, abre en la primera, flechas
   }
 })
 
-test('5 · en el teléfono la fila de pestañas se desplaza de lado, sin envolver', async ({ browser }) => {
+/* K3 (punto 13): en el teléfono las pestañas son iconos y CABEN: ya no se desplazan de lado (detalle en agenda-k3-configuracion). */
+test('5 · en el teléfono la fila de pestañas cabe en una sola fila, sin desplazarse ni envolver', async ({ browser }) => {
   const ctx = await browser.newContext({ storageState: SESION.adminA, viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true,
     locale: 'es-MX', timezoneId: 'America/Merida' })
   const deshacer = adminSinPendientes()
@@ -122,7 +124,7 @@ test('5 · en el teléfono la fila de pestañas se desplaza de lado, sin envolve
       filas: new Set(Array.from(el.children).map(c => Math.round(c.getBoundingClientRect().top))).size,
       pagina: document.documentElement.scrollWidth <= window.innerWidth + 1,
     }))
-    expect(m).toEqual({ desborda: true, overflow: 'auto', filas: 1, pagina: true })
+    expect(m).toEqual({ desborda: false, overflow: 'auto', filas: 1, pagina: true })
     // Elegir la última la trae a la vista.
     await lista.getByRole('tab', { name: 'Más opciones' }).click()
     await expect(lista.getByRole('tab', { name: 'Más opciones' })).toBeInViewport()
@@ -359,8 +361,8 @@ test('10 · el administrador «Empieza de nuevo» con la palabra escrita: vuelve
     await dialogo.getByLabel(/Para confirmar, escribe/).fill('RESTABLECER')
     await boton.click()
     // Lo que antes era «Primeros pasos» en 0 de 3: el funnel desde su primer paso.
-    await expect(page.getByRole('heading', { name: '¿Cuándo das consulta?' })).toBeVisible()
-    await expect(page.getByText('Paso 1 de 3 · menos de 2 minutos')).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Horario de la clínica' })).toBeVisible() // K3: primero el de la clínica
+    await expect(page.getByText('Paso 1 de 4 · menos de 2 minutos')).toBeVisible()
     expect(sqlLocal(`select count(*) from public.consultorios where clinica_id = ${CL} and horario_revisado_en is not null`)).toBe('0')
     expect(sqlLocal(`select count(*) from public.tipos_cita where clinica_id = ${CL} and activo`)).toBe('0')
     expect(sqlLocal(`select count(*) from public.reserva_enlaces where clinica_id = ${CL} and revocado_en is null`)).toBe('0')
