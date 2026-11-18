@@ -493,6 +493,55 @@ test('J10 · reserva movida en Google: un aviso por intento; pulsarlo abre la ta
   await expect.poll(avisos).toBe('1|0')
 })
 
+/* Tanda J, punto 11: con la v2, lo que viene de Google deja el morado. El evento importado
+   (fila de Spinus, por asignar) lleva su «G» en la tarjeta de la rejilla y en la de lectura;
+   el bloque de sólo lectura (una serie, no se importa) usa el fondo de «Agendada» y no el
+   morado; la leyenda del engrane explica la «G» y ya no dice «GCal». Mutaciones en rojo: el
+   bloque de globals.css que reasigna `--ag-gcal-*` borrado (el bloque sale morado) y
+   `renderEventContent` sin `origenGoogle` (la tarjeta sin «G»). */
+test('J11 · lo de Google con los colores de estado y su «G»; la leyenda sin morado', async ({ page }) => {
+  const t = turnoNuevo()
+  const suelto = eventoEn(t, 'Junta J11')
+  const serie = Date.parse(t.inicio) + 2 * 3_600_000
+  g().crear({ summary: 'Serie J11', recurrence: ['RRULE:FREQ=DAILY;COUNT=2'],
+    start: { dateTime: new Date(serie).toISOString(), timeZone: TZ }, end: { dateTime: new Date(serie + 3_600_000).toISOString(), timeZone: TZ } })
+  ultimaBuenaHace(120)
+  expect((await (await page.request.post('/api/google/sync')).json()).estado).toBe('ok')
+  const importada = sqlLocal(`select id from public.appointments where google_event_id = :'ev'`, { ev: suelto })
+  expect(importada).not.toBe('')
+
+  // `?cita=` lleva a su día (vista Día) y abre su tarjeta de lectura: con la «G».
+  await page.goto(`/agenda?cita=${importada}`)
+  const tarjeta = page.getByRole('dialog').filter({ has: page.getByRole('button', { name: 'Configuración de la cita', exact: true }) })
+  await expect(tarjeta.getByRole('img', { name: 'Agendada en Google' })).toBeVisible({ timeout: 120_000 })
+  await page.keyboard.press('Escape')
+  await expect(tarjeta).toBeHidden()
+  // En la rejilla la «G» se ve y lo dice la etiqueta de la tarjeta (la marca es decorativa ahí).
+  const enRejilla = page.locator(`.fc [data-cita-id="${importada}"]`)
+  await expect(enRejilla.locator('.ag-g-origen')).toBeVisible()
+  await expect(enRejilla).toHaveAttribute('aria-label', /Agendada en Google/)
+
+  // El bloque de la serie: el fondo de «Agendada», no el morado de antes.
+  const bloque = page.locator('.fc .ag-gcal', { hasText: 'Serie J11' }).first()
+  await expect(bloque).toBeVisible()
+  const fondos = await bloque.evaluate((el) => {
+    const ref = document.createElement('div')
+    ref.style.background = 'var(--ag-status-scheduled-bg)'
+    el.parentElement?.appendChild(ref)
+    const agendada = getComputedStyle(ref).backgroundColor
+    ref.remove()
+    return { bloque: getComputedStyle(el).backgroundColor, agendada }
+  })
+  expect(fondos.bloque).toBe(fondos.agendada)
+  expect(fondos.bloque).not.toBe('rgb(243, 238, 252)') // --ag-gcal-bg1 en claro, el morado
+
+  await page.getByRole('button', { name: 'Opciones de la agenda' }).first().click()
+  await page.getByRole('menu', { name: 'Opciones de la agenda' }).getByRole('menuitem', { name: 'Leyenda de estados' }).click()
+  const leyenda = page.getByRole('dialog', { name: 'Leyenda de estados' })
+  await expect(leyenda).toContainText('Se agendó en Google')
+  await expect(leyenda).not.toContainText('GCal')
+})
+
 test('+ · dos reservas simultáneas con Google conectado: la segunda espera el candado y hace SU pasada; una sola cita', async () => {
   // Google tarda 1 s: la primera tiene el candado mientras la segunda llega.
   // Con la última buena de hace 40 min, si la segunda no esperase y no

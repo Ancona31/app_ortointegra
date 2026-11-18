@@ -35,6 +35,7 @@
 import { Fragment, useCallback, useEffect, useId, useRef, useState, type KeyboardEvent, type PointerEvent as EventoPuntero, type ReactElement, type ReactNode } from 'react'
 import { Settings, X } from 'lucide-react'
 import Portal from '@/components/ui/Portal'
+import { MarcaOrigenGoogle } from '@/components/agenda/MarcaOrigenGoogle'
 import { useDialogoModal } from '@/hooks/useDialogoModal'
 import type { Appointment } from '@/lib/agenda/tiposAgenda'
 import { STATUS_CONFIG, marcaPorLigar } from '@/lib/agenda/tarjetasAgenda'
@@ -351,6 +352,8 @@ function Contenido({ props, idTitulo, salir, autoFoco }: { props: Props; idTitul
           engrane (el formulario completo, que sustituye a «Editar») y la ✕
           arriba a la derecha. */}
       <div className="ag-capa-cab ag-lectura-cab">
+        {/* Tanda J, punto 11 · la «G» de lo que se agendó en Google (la tarjeta sólo existe con la v2). */}
+        {cita.origen === 'google' && <MarcaOrigenGoogle size={14} />}
         <h2 id={idTitulo} className="ag-capa-titulo">{nombreDeTarjeta(cita)}</h2>
         <Pildora cita={cita} />
         <button type="button" className="ag-capa-cerrar" aria-label="Configuración de la cita" title="Configuración de la cita"

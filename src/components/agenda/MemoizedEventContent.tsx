@@ -13,6 +13,7 @@ import type { Status } from '@/lib/agenda/tiposAgenda'
 import { STATUS_CONFIG } from '@/lib/agenda/tarjetasAgenda'
 import { IconoDelEvento } from './IconoDelEvento'
 import { GLIFO_PILDORA } from './FilaListaDetalle'
+import { MarcaOrigenGoogle, ETIQUETA_ORIGEN_GOOGLE } from './MarcaOrigenGoogle'
 
 /* ─── Renderer de eventos (estilo Google) — memoizado ──── */
 
@@ -187,7 +188,13 @@ export function useSinAvisoFlotante(): boolean {
 export const MemoizedEventContent = memo(function MemoizedEventContent({
   timeText, horaInicio, title, pacNombre, status, doctorInitial, tzDiff, icono, color, descriptor,
   esEvento, enRejilla, marca = null, marcaTitulo = null, citaId, telefono = null, consultorio = null, nombreCorto = null,
+  origenGoogle = false,
 }: {
+  /* Tanda J, punto 11 · Fila de Spinus nacida en Google (`origen = 'google'`):
+     con la v2 lleva la «G» delante de la hora (la hoja de estilos la esconde
+     con la v2 apagada, ver `MarcaOrigenGoogle`) y «Agendada en Google» en su
+     etiqueta. */
+  origenGoogle?: boolean
   /* F1.7 · «Hugo I.»: lo enseña una consulta de contenedor en una tarjeta de
      96 px o menos (globals.css). `null` = el mismo nombre. */
   nombreCorto?: string | null
@@ -368,7 +375,7 @@ export const MemoizedEventContent = memo(function MemoizedEventContent({
        señal) y el estado entero en el `title`. */
     <div ref={rootRef} data-cita-id={citaId}
       {...(sinAvisoFlotante
-        ? { role: 'group', 'aria-label': `${name} · ${etiquetaEstado}${marcaTitulo ? ` · ${marcaTitulo}` : ''}` }
+        ? { role: 'group', 'aria-label': `${name} · ${etiquetaEstado}${marcaTitulo ? ` · ${marcaTitulo}` : ''}${origenGoogle ? ` · ${ETIQUETA_ORIGEN_GOOGLE}` : ''}` }
         : { title: `${name} · ${etiquetaEstado}` })}
       className={tier ? `ag-tarjeta ag-tarjeta--${tier}` : 'ag-tarjeta'} style={root}>
       <div className="ag-tarjeta-cab">
@@ -400,6 +407,7 @@ export const MemoizedEventContent = memo(function MemoizedEventContent({
             El color del evento sigue vivo donde no tiene este problema: la barra
             izquierda (gráfico, umbral 3:1), el icono, el punto del mes, la
             píldora —fondo opaco— y el tinte del fondo. */}
+        {origenGoogle && <MarcaOrigenGoogle size={11} decorativa />}
         <span className="ag-tarjeta-hora" style={{ color: esEvento ? 'var(--ag-ink-600)' : txt }}>
           {/* Fuera de `-rango` y de `-inicio`: las e2e leen esas dos tal cual. */}
           <span className="ag-tarjeta-glifo" aria-hidden="true">{GLIFO_PILDORA[status]}</span>

@@ -1705,7 +1705,7 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
         {/* F1.16 · En la tableta, Día es la rejilla (`timeGridDay`) con su
             píldora de estado, igual que la lista de Día del teléfono. */}
         {/* I5 (punto 15) · Con la v2 la leyenda vive en el menú del engrane y su fila se libera. */}
-        {!agendaV2 && (!isMobile || currentView === 'listDay' || currentView === 'timeGridDay') && <LeyendaEstados />}
+        {!agendaV2 && (!isMobile || currentView === 'listDay' || currentView === 'timeGridDay') && <LeyendaEstados clasica />}
         {/* Va PRIMERA en el DOM aunque se pinte segunda, y es a propósito: el
             `order` de la hoja la coloca bajo el toolbar, y así el lector de
             pantalla oye el aviso antes que los controles y la rejilla que

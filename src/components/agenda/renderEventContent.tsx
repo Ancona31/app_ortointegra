@@ -67,6 +67,7 @@ export function renderEventContent(arg: EventContentArg, navegadorTZ: string, in
       <BandaChip
         title={arg.event.title}
         esDeGoogle={ext?.isGcalBlock === true}
+        origenGoogle={ext?.origen === 'google'}
         icono={ext?.icono ?? null}
         color={ext?.color ?? null}
         status={ext?.status}
@@ -97,6 +98,7 @@ export function renderEventContent(arg: EventContentArg, navegadorTZ: string, in
           citaId={arg.event.id}
           nombre={nombreLista}
           esDeGoogle={ext?.isGcalBlock === true}
+          origenGoogle={ext?.origen === 'google'}
           icono={ext?.icono ?? null}
           cancelada={ext?.status === 'cancelled'}
           /* Sin duración en un evento de todo el día: su tramo son días enteros
@@ -115,6 +117,7 @@ export function renderEventContent(arg: EventContentArg, navegadorTZ: string, in
         citaId={arg.event.id}
         nombre={nombreLista}
         esDeGoogle={ext?.isGcalBlock === true}
+        origenGoogle={ext?.origen === 'google'}
         icono={ext?.icono ?? null}
         /* La MISMA precedencia que la tarjeta de la rejilla y el chip del mes: el
            color elegido manda sobre el del estado cuando lo hay, y sólo lo hay en
@@ -180,6 +183,7 @@ export function renderEventContent(arg: EventContentArg, navegadorTZ: string, in
       enRejilla={enRejilla}
       marca={marca?.texto ?? null}
       marcaTitulo={marca?.titulo ?? null}
+      origenGoogle={ext.origen === 'google'}
     />
   )
 }

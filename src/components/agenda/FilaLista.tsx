@@ -8,6 +8,7 @@
 import { memo } from 'react'
 import type { IconoEvento } from '@/lib/appointments'
 import { GoogleGIcon } from './GoogleGIcon'
+import { MarcaOrigenGoogle } from './MarcaOrigenGoogle'
 import { IconoDelEvento } from './IconoDelEvento'
 
 /* La fila de una vista de lista, variante COMPACTA (`listWeek`, y `listDay`
@@ -31,16 +32,19 @@ import { IconoDelEvento } from './IconoDelEvento'
    del nombre, exactamente en el sitio donde un evento genérico lleva su icono.
    El componente es el mismo que ya usan `MonthChip` y `GoogleEventCard`. */
 export const FilaLista = memo(function FilaLista(
-  { citaId, nombre, esDeGoogle, icono, tinta, cancelada }: {
+  { citaId, nombre, esDeGoogle, origenGoogle = false, icono, tinta, cancelada }: {
     /** F1.4 · `data-cita-id`, el contrato del movimiento (bloque F §2). */
     citaId: string
     nombre: string; esDeGoogle: boolean; icono: IconoEvento | null
     tinta: string | null; cancelada: boolean
+    /** Tanda J, punto 11 · fila de Spinus nacida en Google: su «G» (sólo con la v2). */
+    origenGoogle?: boolean
   },
 ) {
   return (
     <span className="ag-listafila" data-cita-id={citaId}>
       {esDeGoogle && <GoogleGIcon size={11} />}
+      {!esDeGoogle && origenGoogle && <MarcaOrigenGoogle size={11} />}
       {/* 13 px es el `.ico--sm` del mockup, el tamaño del icono cuando acompaña
           al nombre en vez de ocupar su propio cuadro. El color es el del evento,
           igual que en la tarjeta de la rejilla y en el chip del mes. */}
