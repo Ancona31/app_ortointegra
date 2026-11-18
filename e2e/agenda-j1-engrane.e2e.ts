@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
-import { SESION, interruptorAgenda, soloEscritorio } from './ayudas'
+import { CORREO, SESION, interruptorAgenda, sinPendientesAgenda, soloEscritorio } from './ayudas'
 import { abrirAgendaApagada, abrirAgendaV2 } from './interaccionesAyudas'
 
 /**
@@ -103,11 +103,20 @@ test('puntos 18 y 19 · el menú: interruptores en lo de dos estados, filas norm
   await page.keyboard.press('Escape')
   await expect(menu).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Opciones de la agenda' })).toBeFocused()
-  // Y ya no está en la configuración.
+  // Y ya no está en la configuración. Integración J: con la v2 la configuración es la de J5, que abre el
+  // funnel de primera vez a quien le falta algo y las pestañas al que no; no está en ninguna de las dos.
   await page.goto('/agenda/configuracion')
-  await expect(page.getByRole('tablist', { name: 'Secciones de la configuración' })).toBeVisible()
-  await expect(page.getByRole('tab', { name: /^Este dispositivo/ })).toHaveCount(0)
-  await expect(page.getByText('Abrir la tarjeta al pasar el ratón')).toHaveCount(0)
+  await expect(page.getByText(/^Paso [123] de 3/)).toBeVisible()
+  await expect(page.getByText(/tarjeta al pasar el ratón/i)).toHaveCount(0)
+  const deshacer = sinPendientesAgenda(CORREO.adminA)
+  try {
+    await page.goto('/agenda/configuracion')
+    await expect(page.getByRole('tablist', { name: 'Secciones de la configuración' })).toBeVisible()
+    await expect(page.getByRole('tab', { name: /^(Este dispositivo|Esta computadora)/ })).toHaveCount(0)
+    await expect(page.getByText(/tarjeta al pasar el ratón/i)).toHaveCount(0)
+  } finally {
+    deshacer()
+  }
 })
 
 test('puntos 18 y 19 · teléfono: «Pop-up de eventos» también está, con su interruptor', async ({ page }) => {

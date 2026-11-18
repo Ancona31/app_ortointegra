@@ -115,6 +115,9 @@ function soloEn(proyecto: 'escritorio' | 'telefono'): void {
 
 test('apagado: un clic en una cita abre «Editar cita» directo, sin tarjeta', async ({ page }) => {
   soloEn('escritorio')
+  /* Integración J: la fija ella, no la hereda del archivo de antes (J3 la vio
+     en rojo con la v2 de A encendida; las demás de aquí la encienden). */
+  interruptorAgenda('A', false)
   await alta(page, '14:05', 'Prueba 15')
   await abrirAgendaApagada(page)
   await aLaSemanaMasDos(page)

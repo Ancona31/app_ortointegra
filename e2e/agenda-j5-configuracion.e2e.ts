@@ -76,7 +76,13 @@ const aviso = (page: Page) => page.locator('[data-aviso-config]')
 let instantanea = ''
 // Primero el interruptor: crea la fila de `agenda_ajustes` si la semilla no la trae, y la foto la necesita.
 test.beforeEach(() => { interruptorAgenda('A', true); instantanea = foto() })
-test.afterEach(() => { devolver(instantanea); interruptorAgenda('A', false) })
+/* Integración J: en el teléfono `soloEscritorio()` salta la prueba antes de la foto; sin foto no hay nada que
+   devolver (antes, `devolver('')` reventaba en cada prueba del proyecto telefono). */
+test.afterEach(() => {
+  if (instantanea) devolver(instantanea)
+  instantanea = ''
+  interruptorAgenda('A', false)
+})
 
 /* ── 13 · el funnel ─────────────────────────────────────────────────── */
 
