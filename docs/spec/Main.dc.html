@@ -1,0 +1,507 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Configura tu agenda</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#1D5BA6}a:hover{color:#164A87}
+</style>
+</helmet>
+<div style="min-height: 100vh; background: #F6F8FB; font-family: 'Noto Sans', system-ui, sans-serif; color: #1E293B; box-sizing: border-box; padding: 32px 24px 64px">
+<div style="max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 28px">
+
+<div style="display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap">
+<a href="#" style="display: inline-flex; align-items: center; gap: 6px; color: #5B6B80; text-decoration: none; font-size: 15px; min-height: 44px">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg>
+Agenda
+</a>
+<sc-if value="{{notDone}}" hint-placeholder-val="{{ true }}">
+<button type="button" onClick="{{later}}" style="background: none; border: none; font: inherit; font-size: 15px; color: #5B6B80; text-decoration: underline; cursor: pointer; min-height: 44px; padding: 0 4px">Terminar después</button>
+</sc-if>
+</div>
+
+<sc-if value="{{notDone}}" hint-placeholder-val="{{ true }}">
+<div style="display: flex; flex-direction: column; gap: 10px">
+<div style="font-size: 14px; color: #5B6B80; font-weight: 600">Paso {{step}} de 3 · menos de 2 minutos</div>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px">
+<sc-for list="{{progress}}" as="p" hint-placeholder-count="3">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<div style="{{p.barStyle}}"></div>
+<div style="{{p.labelStyle}}">{{p.label}}</div>
+</div>
+</sc-for>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{isStep1}}" hint-placeholder-val="{{ true }}">
+<section style="display: flex; flex-direction: column; gap: 20px">
+<div style="display: flex; flex-direction: column; gap: 8px">
+<h1 style="margin: 0; font-size: 30px; line-height: 1.2; font-weight: 700">¿Cuándo das consulta?</h1>
+<p style="margin: 0; font-size: 17px; line-height: 1.5; color: #5B6B80">Tus pacientes solo podrán pedir cita en estos días y horas.</p>
+</div>
+<sc-for list="{{consultorios}}" as="c" hint-placeholder-count="2">
+<div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 14px; padding: 24px; display: flex; flex-direction: column; gap: 14px">
+<h2 style="margin: 0; font-size: 19px; font-weight: 700">{{c.name}}</h2>
+<div style="display: flex; flex-direction: column; gap: 8px">
+<sc-for list="{{c.opts}}" as="o" hint-placeholder-count="3">
+<button type="button" onClick="{{o.pick}}" aria-pressed="{{o.pressed}}" style="{{o.style}}">
+<span style="{{o.dotStyle}}"></span>
+<span style="display: flex; flex-direction: column; gap: 2px; text-align: left">
+<span style="font-size: 16px; font-weight: 600; color: #1E293B">{{o.title}}</span>
+<span style="font-size: 14px; color: #5B6B80">{{o.sub}}</span>
+</span>
+</button>
+</sc-for>
+</div>
+<sc-if value="{{c.showRows}}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; flex-direction: column; gap: 8px">
+<p style="margin: 0 0 4px; font-size: 15px; color: #334155">Prende los días que vienes y pon a qué hora entras y sales.</p>
+<sc-for list="{{c.days}}" as="d" hint-placeholder-count="7">
+<div style="{{d.rowStyle}}">
+<div style="display: flex; align-items: center; gap: 14px; min-width: 160px">
+<button type="button" role="switch" aria-checked="{{d.on}}" aria-label="{{d.full}}" onClick="{{d.toggle}}" style="{{d.track}}"><span style="{{d.knob}}"></span></button>
+<span style="{{d.nameStyle}}">{{d.full}}</span>
+</div>
+<sc-if value="{{d.on}}" hint-placeholder-val="{{ true }}">
+<div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap">
+<label style="display: flex; align-items: center; gap: 6px; font-size: 15px; color: #334155">Entras
+<input type="time" value="{{d.from}}" onChange="{{d.onFrom}}" style="font: inherit; font-size: 16px; padding: 8px 10px; min-height: 44px; box-sizing: border-box; border: 1px solid #CBD5E1; border-radius: 8px; background: #FFFFFF; color: #1E293B">
+</label>
+<label style="display: flex; align-items: center; gap: 6px; font-size: 15px; color: #334155">Sales
+<input type="time" value="{{d.to}}" onChange="{{d.onTo}}" style="font: inherit; font-size: 16px; padding: 8px 10px; min-height: 44px; box-sizing: border-box; border: 1px solid #CBD5E1; border-radius: 8px; background: #FFFFFF; color: #1E293B">
+</label>
+</div>
+</sc-if>
+<sc-if value="{{d.off}}" hint-placeholder-val="{{ false }}">
+<span style="margin-left: auto; font-size: 14px; font-style: italic; color: #64748B">Sin consulta</span>
+</sc-if>
+</div>
+</sc-for>
+<sc-if value="{{c.noDays}}" hint-placeholder-val="{{ false }}">
+<p role="alert" style="margin: 0; font-size: 15px; color: #B91C1C; font-weight: 600">Prende al menos un día.</p>
+</sc-if>
+</div>
+</sc-if>
+</div>
+</sc-for>
+</section>
+</sc-if>
+
+<sc-if value="{{isStep2}}" hint-placeholder-val="{{ false }}">
+<section style="display: flex; flex-direction: column; gap: 20px">
+<div style="display: flex; flex-direction: column; gap: 8px">
+<h1 style="margin: 0; font-size: 30px; line-height: 1.2; font-weight: 700">¿Cuánto dura tu consulta?</h1>
+<p style="margin: 0; font-size: 17px; line-height: 1.5; color: #5B6B80">Con esto sabemos cuántas citas caben en tu día.</p>
+</div>
+<div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 14px; padding: 24px; display: flex; flex-direction: column; gap: 16px">
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px">
+<sc-for list="{{durs}}" as="u" hint-placeholder-count="6">
+<button type="button" onClick="{{u.pick}}" aria-pressed="{{u.pressed}}" style="{{u.style}}">{{u.label}}</button>
+</sc-for>
+</div>
+<sc-if value="{{otherDur}}" hint-placeholder-val="{{ false }}">
+<label style="display: flex; align-items: center; gap: 10px; font-size: 16px; color: #334155">Mi consulta dura
+<input type="number" min="5" max="240" step="5" value="{{otherVal}}" onChange="{{onOther}}" style="width: 96px; font: inherit; font-size: 16px; padding: 8px 10px; min-height: 44px; box-sizing: border-box; border: 1px solid #CBD5E1; border-radius: 8px; color: #1E293B">
+minutos</label>
+</sc-if>
+<sc-if value="{{hasFit}}" hint-placeholder-val="{{ true }}">
+<div style="display: flex; align-items: center; gap: 12px; padding: 16px; background: #EAF1FB; border-radius: 12px; font-size: 16px; line-height: 1.5; color: #1E293B">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1D5BA6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none"><rect x="3" y="4" width="18" height="17" rx="2"></rect><path d="M8 2v4M16 2v4M3 10h18"></path></svg>
+<span>En un día de {{fitFrom}} a {{fitTo}} te caben <strong>{{fitN}} consultas</strong> de {{curDur}} minutos.</span>
+</div>
+</sc-if>
+</div>
+<p style="margin: 0; font-size: 15px; color: #5B6B80">Si en algún consultorio dura distinto, lo cambias después en Configuración.</p>
+</section>
+</sc-if>
+
+<sc-if value="{{isStep3}}" hint-placeholder-val="{{ false }}">
+<section style="display: flex; flex-direction: column; gap: 20px">
+<div style="display: flex; flex-direction: column; gap: 8px">
+<h1 style="margin: 0; font-size: 30px; line-height: 1.2; font-weight: 700">¿Mandamos avisos por correo?</h1>
+<p style="margin: 0; font-size: 17px; line-height: 1.5; color: #5B6B80">Ya dejamos lo más útil listo. Puedes cambiarlo cuando quieras.</p>
+</div>
+
+<div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 14px; padding: 22px 24px; display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 20px">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap">
+<span id="lbl-remind" style="font-size: 17px; font-weight: 700">Recordarle su cita al paciente</span>
+<span style="font-size: 13px; font-weight: 600; color: #166534; background: #E8F5EC; padding: 3px 10px; border-radius: 999px">Recomendado</span>
+</div>
+<span style="font-size: 15px; line-height: 1.5; color: #5B6B80">Le llega un correo antes de su cita para que no se le olvide. Solo a pacientes que tengan correo.</span>
+</div>
+<button type="button" role="switch" aria-checked="{{remind}}" aria-labelledby="lbl-remind" onClick="{{toggleRemind}}" style="{{remindTrack}}"><span style="{{remindKnob}}"></span></button>
+</div>
+<sc-if value="{{remind}}" hint-placeholder-val="{{ true }}">
+<label style="display: flex; align-items: center; gap: 10px; font-size: 16px; color: #334155; flex-wrap: wrap">Mandarlo
+<select value="{{remindH}}" onChange="{{onRemindH}}" style="font: inherit; font-size: 16px; padding: 8px 10px; min-height: 44px; border: 1px solid #CBD5E1; border-radius: 8px; background: #FFFFFF; color: #1E293B">
+<option value="2">2 horas</option>
+<option value="12">12 horas</option>
+<option value="24">1 día (24 horas)</option>
+<option value="48">2 días (48 horas)</option>
+</select>
+antes de la cita</label>
+</sc-if>
+</div>
+
+<div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 14px; padding: 22px 24px; display: flex; align-items: flex-start; justify-content: space-between; gap: 20px">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<span id="lbl-notify" style="font-size: 17px; font-weight: 700">Avisarme cuando alguien aparte cita</span>
+<span style="font-size: 15px; line-height: 1.5; color: #5B6B80">Te llega un correo cada vez que un paciente aparta o cambia su cita con tu enlace.</span>
+</div>
+<button type="button" role="switch" aria-checked="{{notify}}" aria-labelledby="lbl-notify" onClick="{{toggleNotify}}" style="{{notifyTrack}}"><span style="{{notifyKnob}}"></span></button>
+</div>
+
+<div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 14px; padding: 22px 24px; display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 20px">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<span style="font-size: 17px; font-weight: 700">Hasta cuándo pueden apartar</span>
+<span style="font-size: 15px; line-height: 1.5; color: #5B6B80">Pueden apartar cita para los próximos <strong style="color: #1E293B">{{maxD}} días</strong>. La cita más pronto que pueden tomar es dentro de <strong style="color: #1E293B">{{minH}} horas</strong>.</span>
+</div>
+<button type="button" onClick="{{toggleRules}}" aria-expanded="{{rulesOpen}}" style="flex: none; background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 10px; font: inherit; font-size: 15px; font-weight: 600; color: #1E293B; padding: 0 16px; min-height: 44px; cursor: pointer">{{rulesBtn}}</button>
+</div>
+<sc-if value="{{rulesOpen}}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; flex-direction: column; gap: 12px; padding: 16px; background: #F6F8FB; border-radius: 12px">
+<label style="display: flex; align-items: center; gap: 10px; font-size: 16px; color: #334155; flex-wrap: wrap">Pueden ver horarios de los próximos
+<input type="number" min="1" max="365" value="{{maxD}}" onChange="{{onMaxD}}" style="width: 88px; font: inherit; font-size: 16px; padding: 8px 10px; min-height: 44px; box-sizing: border-box; border: 1px solid #CBD5E1; border-radius: 8px; color: #1E293B">
+días</label>
+<label style="display: flex; align-items: center; gap: 10px; font-size: 16px; color: #334155; flex-wrap: wrap">No pueden apartar si faltan menos de
+<input type="number" min="0" max="72" value="{{minH}}" onChange="{{onMinH}}" style="width: 88px; font: inherit; font-size: 16px; padding: 8px 10px; min-height: 44px; box-sizing: border-box; border: 1px solid #CBD5E1; border-radius: 8px; color: #1E293B">
+horas</label>
+<p style="margin: 0; font-size: 14px; color: #5B6B80">Esto cambia para todos los médicos de la clínica.</p>
+</div>
+</sc-if>
+</div>
+</section>
+</sc-if>
+
+<sc-if value="{{isDone}}" hint-placeholder-val="{{ false }}">
+<section style="display: flex; flex-direction: column; gap: 20px">
+<div style="display: flex; flex-direction: column; align-items: flex-start; gap: 12px">
+<div style="width: 56px; height: 56px; border-radius: 999px; background: #E8F5EC; display: flex; align-items: center; justify-content: center">
+<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#15803D" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg>
+</div>
+<h1 style="margin: 0; font-size: 30px; line-height: 1.2; font-weight: 700">Tu agenda ya está lista</h1>
+<p style="margin: 0; font-size: 17px; line-height: 1.5; color: #5B6B80">Comparte tu enlace. Quien lo abra puede apartar cita en tus horas libres, sin llamarte.</p>
+</div>
+
+<div style="background: #FFFFFF; border: 2px solid #1D5BA6; border-radius: 14px; padding: 24px; display: flex; flex-direction: column; gap: 14px">
+<span style="font-size: 15px; font-weight: 700; color: #1D5BA6">Tu enlace para pacientes</span>
+<div style="font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace; font-size: 17px; padding: 14px 16px; background: #F6F8FB; border: 1px solid #E2E8F0; border-radius: 10px; overflow-wrap: anywhere">spinus.com.mx/agenda/[tu-enlace]</div>
+<div style="display: flex; gap: 10px; flex-wrap: wrap">
+<button type="button" onClick="{{copy}}" style="display: inline-flex; align-items: center; gap: 8px; background: #1D5BA6; color: #FFFFFF; border: none; border-radius: 10px; font: inherit; font-size: 16px; font-weight: 600; padding: 0 22px; min-height: 48px; cursor: pointer">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"></rect><path d="M5 15V5a1 1 0 0 1 1-1h10"></path></svg>
+{{copyLabel}}</button>
+<button type="button" style="display: inline-flex; align-items: center; gap: 8px; background: #FFFFFF; color: #1E293B; border: 1px solid #CBD5E1; border-radius: 10px; font: inherit; font-size: 16px; font-weight: 600; padding: 0 22px; min-height: 48px; cursor: pointer">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8.5 8.5 0 0 1-12.6 7.4L3 21l1.6-5.2A8.5 8.5 0 1 1 21 12z"></path></svg>
+Mandar por WhatsApp</button>
+</div>
+<p style="margin: 0; font-size: 15px; line-height: 1.5; color: #5B6B80">Es el mismo para todos. Ponlo en tu WhatsApp, tu Instagram o tu tarjeta.</p>
+</div>
+
+<div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 14px; padding: 22px 24px; display: flex; flex-direction: column; gap: 12px">
+<span style="font-size: 17px; font-weight: 700">¿Es para un solo paciente?</span>
+<span style="font-size: 15px; line-height: 1.5; color: #5B6B80">Crea un enlace de una vez: sirve para una sola cita y deja de funcionar en 7 días.</span>
+<sc-if value="{{oneNotMade}}" hint-placeholder-val="{{ true }}">
+<div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end">
+<label style="display: flex; flex-direction: column; gap: 6px; font-size: 14px; color: #334155; flex: 1 1 260px">¿Para quién es? (solo lo ves tú)
+<input type="text" placeholder="Ej.: Sra. López, revisión" value="{{oneLabel}}" onChange="{{onOneLabel}}" style="font: inherit; font-size: 16px; padding: 10px 12px; min-height: 44px; box-sizing: border-box; border: 1px solid #CBD5E1; border-radius: 8px; color: #1E293B">
+</label>
+<button type="button" onClick="{{makeOne}}" style="background: #FFFFFF; color: #1D5BA6; border: 1px solid #1D5BA6; border-radius: 10px; font: inherit; font-size: 16px; font-weight: 600; padding: 0 20px; min-height: 44px; cursor: pointer">Crear enlace de una vez</button>
+</div>
+</sc-if>
+<sc-if value="{{oneMade}}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center; padding: 12px 14px; background: #F6F8FB; border: 1px solid #E2E8F0; border-radius: 10px">
+<span style="font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace; font-size: 15px; flex: 1 1 260px; overflow-wrap: anywhere">spinus.com.mx/agenda/[enlace-de-una-vez]</span>
+<button type="button" onClick="{{copyOne}}" style="background: #1D5BA6; color: #FFFFFF; border: none; border-radius: 10px; font: inherit; font-size: 15px; font-weight: 600; padding: 0 18px; min-height: 44px; cursor: pointer">{{copyOneLabel}}</button>
+</div>
+</sc-if>
+</div>
+
+<div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 14px; padding: 8px 24px; display: flex; flex-direction: column">
+<div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; padding: 14px 0; border-bottom: 1px solid #EEF2F6">
+<div style="display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 14px; color: #5B6B80; font-weight: 600">Cuándo das consulta</span>
+<sc-for list="{{summaryCons}}" as="s" hint-placeholder-count="2">
+<span style="font-size: 15px; color: #1E293B"><strong>{{s.name}}:</strong> {{s.text}}</span>
+</sc-for>
+</div>
+<button type="button" onClick="{{go1}}" style="background: none; border: none; font: inherit; font-size: 15px; font-weight: 600; color: #1D5BA6; cursor: pointer; min-height: 44px; padding: 0 4px">Cambiar</button>
+</div>
+<div style="display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 14px 0; border-bottom: 1px solid #EEF2F6">
+<div style="display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 14px; color: #5B6B80; font-weight: 600">Cuánto dura tu consulta</span>
+<span style="font-size: 15px; color: #1E293B">{{curDur}} minutos</span>
+</div>
+<button type="button" onClick="{{go2}}" style="background: none; border: none; font: inherit; font-size: 15px; font-weight: 600; color: #1D5BA6; cursor: pointer; min-height: 44px; padding: 0 4px">Cambiar</button>
+</div>
+<div style="display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 14px 0">
+<div style="display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 14px; color: #5B6B80; font-weight: 600">Avisos por correo</span>
+<span style="font-size: 15px; color: #1E293B">{{avisosText}}</span>
+</div>
+<button type="button" onClick="{{go3}}" style="background: none; border: none; font: inherit; font-size: 15px; font-weight: 600; color: #1D5BA6; cursor: pointer; min-height: 44px; padding: 0 4px">Cambiar</button>
+</div>
+</div>
+
+<a href="#" style="align-self: flex-start; display: inline-flex; align-items: center; background: #1D5BA6; color: #FFFFFF; border-radius: 10px; font-size: 16px; font-weight: 600; padding: 0 28px; min-height: 48px; text-decoration: none">Ir a mi agenda</a>
+</section>
+</sc-if>
+
+<sc-if value="{{notDone}}" hint-placeholder-val="{{ true }}">
+<div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; padding-top: 8px; flex-wrap: wrap">
+<div>
+<sc-if value="{{canBack}}" hint-placeholder-val="{{ false }}">
+<button type="button" onClick="{{back}}" style="background: #FFFFFF; color: #1E293B; border: 1px solid #CBD5E1; border-radius: 10px; font: inherit; font-size: 16px; font-weight: 600; padding: 0 22px; min-height: 48px; cursor: pointer">Atrás</button>
+</sc-if>
+</div>
+<button type="button" onClick="{{next}}" disabled="{{nextDisabled}}" style="{{nextStyle}}">{{nextLabel}}</button>
+</div>
+</sc-if>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"startStep":{"editor":"int","default":1,"min":1,"max":4},"demo":{"editor":null},"$preview":{"width":1280,"height":1060}}'>
+var CLINIC_DAYS = [
+  { on: true, from: '08:00', to: '18:00' }, { on: true, from: '08:00', to: '18:00' },
+  { on: true, from: '08:00', to: '18:00' }, { on: true, from: '08:00', to: '18:00' },
+  { on: true, from: '08:00', to: '18:00' }, { on: true, from: '08:00', to: '13:00' },
+  { on: false, from: '08:00', to: '13:00' }
+];
+var D_FULL = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+var D_SHORT = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+
+function cloneDays(days) {
+  return days.map(function (d) { return { on: d.on, from: d.from, to: d.to }; });
+}
+function daysToRows(days) {
+  var rows = [];
+  days.forEach(function (d, i) {
+    if (!d.on) return;
+    var r = rows.filter(function (x) { return x.from === d.from && x.to === d.to; })[0];
+    if (!r) { r = { days: [0, 0, 0, 0, 0, 0, 0], from: d.from, to: d.to }; rows.push(r); }
+    r.days[i] = 1;
+  });
+  return rows;
+}
+function hhmm(t) {
+  if (!t) return '';
+  var p = t.split(':');
+  return String(Number(p[0])) + ':' + (p[1] || '00');
+}
+function mins(t) {
+  if (!t) return 0;
+  var p = t.split(':');
+  return Number(p[0]) * 60 + Number(p[1] || 0);
+}
+function fmtDays(days) {
+  var runs = [], i = 0;
+  while (i < 7) {
+    if (days[i]) {
+      var j = i;
+      while (j + 1 < 7 && days[j + 1]) j++;
+      runs.push(j - i >= 2 ? D_SHORT[i] + ' a ' + D_SHORT[j].toLowerCase() : (j > i ? D_SHORT[i] + ', ' + D_SHORT[j] : D_SHORT[i]));
+      i = j + 1;
+    } else { i++; }
+  }
+  return runs.join(', ');
+}
+function rowsText(rows) {
+  return rows.filter(function (r) { return r.days.some(Boolean); })
+    .map(function (r) { return fmtDays(r.days) + ' ' + hhmm(r.from) + ' – ' + hhmm(r.to); })
+    .join(' · ');
+}
+
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    var s = Number(props.startStep) || 1;
+    var demo = props.demo === 'propio';
+    this.state = {
+      step: Math.min(4, Math.max(1, s)),
+      cons: [
+        { name: 'Consultorio Centro (ficticio)', mode: demo ? 'propio' : 'clinica', days: demo ? [
+          { on: true, from: '16:00', to: '20:00' }, { on: false, from: '16:00', to: '20:00' },
+          { on: true, from: '16:00', to: '20:00' }, { on: false, from: '16:00', to: '20:00' },
+          { on: true, from: '16:00', to: '20:00' }, { on: true, from: '09:00', to: '13:00' },
+          { on: false, from: '09:00', to: '13:00' }
+        ] : cloneDays(CLINIC_DAYS) },
+        { name: 'Hospital Norte (ficticio)', mode: 'clinica', days: cloneDays(CLINIC_DAYS) }
+      ],
+      dur: 30, otherDur: false, otherVal: '25',
+      remind: true, remindH: '24', notify: false,
+      rulesOpen: false, minH: '2', maxD: '30',
+      copied: false, oneLabel: '', oneMade: false, oneCopied: false
+    };
+  }
+
+  setCons(i, fn) {
+    this.setState(function (st) {
+      return { cons: st.cons.map(function (c, j) { return j === i ? fn(c) : c; }) };
+    });
+  }
+
+  renderVals() {
+    var self = this;
+    var st = this.state;
+    var step = st.step;
+    var clinicText = rowsText(daysToRows(CLINIC_DAYS));
+    function track(on) {
+      return 'flex: none; width: 52px; height: 30px; padding: 3px; box-sizing: border-box; border-radius: 999px; border: none; cursor: pointer; display: flex; justify-content: ' + (on ? 'flex-end' : 'flex-start') + '; background: ' + (on ? '#1D5BA6' : '#94A3B8');
+    }
+    var knob = 'width: 24px; height: 24px; border-radius: 999px; background: #FFFFFF; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.25)';
+
+    var progress = ['Horario', 'Consulta', 'Avisos'].map(function (label, i) {
+      var n = i + 1;
+      var active = n <= step;
+      return {
+        label: label,
+        barStyle: 'height: 6px; border-radius: 3px; background: ' + (active ? '#1D5BA6' : '#E2E8F0'),
+        labelStyle: 'font-size: 14px; font-weight: ' + (n === step ? '700' : '400') + '; color: ' + (n === step ? '#1D5BA6' : '#5B6B80')
+      };
+    });
+
+    var optDefs = [
+      { id: 'clinica', title: 'Igual que la clínica', sub: clinicText },
+      { id: 'propio', title: 'Otro horario', sub: 'Tú eliges qué días vienes y a qué hora' }
+    ];
+
+    var consultorios = st.cons.map(function (c, i) {
+      return {
+        name: c.name,
+        showRows: c.mode === 'propio',
+        opts: optDefs.map(function (o) {
+          var sel = c.mode === o.id;
+          return {
+            title: o.title, sub: o.sub, pressed: sel,
+            pick: function () { self.setCons(i, function (x) { return Object.assign({}, x, { mode: o.id }); }); },
+            style: 'display: flex; align-items: center; gap: 14px; width: 100%; padding: 12px 16px; min-height: 56px; box-sizing: border-box; border-radius: 12px; cursor: pointer; font: inherit; text-align: left; background: ' + (sel ? '#EAF1FB' : '#FFFFFF') + '; border: 2px solid ' + (sel ? '#1D5BA6' : '#E2E8F0'),
+            dotStyle: 'flex: none; width: 20px; height: 20px; box-sizing: border-box; border-radius: 999px; background: #FFFFFF; border: ' + (sel ? '6px solid #1D5BA6' : '2px solid #94A3B8')
+          };
+        }),
+        noDays: c.mode === 'propio' && !c.days.some(function (d) { return d.on; }),
+        days: c.days.map(function (d, k) {
+          function upd(patch) {
+            self.setCons(i, function (x) {
+              return Object.assign({}, x, { days: x.days.map(function (dd, kk) { return kk === k ? Object.assign({}, dd, patch) : dd; }) });
+            });
+          }
+          return {
+            full: D_FULL[k], on: d.on, off: !d.on, from: d.from, to: d.to,
+            onFrom: function (e) { upd({ from: e.target.value }); },
+            onTo: function (e) { upd({ to: e.target.value }); },
+            toggle: function () {
+              if (d.on) { upd({ on: false }); return; }
+              var prev = null;
+              for (var p = k - 1; p >= 0 && !prev; p--) { if (c.days[p].on) prev = c.days[p]; }
+              upd(prev ? { on: true, from: prev.from, to: prev.to } : { on: true });
+            },
+            track: track(d.on), knob: knob,
+            rowStyle: 'display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; padding: 12px 16px; min-height: 68px; box-sizing: border-box; border-radius: 12px; background: ' + (d.on ? '#EEF4FC' : '#F8FAFC'),
+            nameStyle: 'font-size: 17px; font-weight: 600; color: ' + (d.on ? '#1E293B' : '#64748B')
+          };
+        })
+      };
+    });
+
+    function consDays(c) { return c.mode === 'clinica' ? CLINIC_DAYS : c.days; }
+    var noneActive = st.cons.some(function (c) { return c.mode === 'propio' && !c.days.some(function (d) { return d.on; }); });
+
+    var curDur = st.otherDur ? (Number(st.otherVal) || 0) : st.dur;
+    var durs = [15, 20, 30, 45, 60].map(function (m) {
+      var sel = !st.otherDur && st.dur === m;
+      return {
+        label: m + ' min', pressed: sel,
+        pick: function () { self.setState({ dur: m, otherDur: false }); },
+        style: 'min-height: 56px; border-radius: 12px; font: inherit; font-size: 17px; font-weight: 600; cursor: pointer; ' + (sel ? 'background: #EAF1FB; color: #1D5BA6; border: 2px solid #1D5BA6' : 'background: #FFFFFF; color: #1E293B; border: 2px solid #E2E8F0')
+      };
+    });
+    durs.push({
+      label: 'Otra', pressed: st.otherDur,
+      pick: function () { self.setState({ otherDur: true }); },
+      style: 'min-height: 56px; border-radius: 12px; font: inherit; font-size: 17px; font-weight: 600; cursor: pointer; ' + (st.otherDur ? 'background: #EAF1FB; color: #1D5BA6; border: 2px solid #1D5BA6' : 'background: #FFFFFF; color: #1E293B; border: 2px solid #E2E8F0')
+    });
+
+    var fitRow = null;
+    for (var a = 0; a < st.cons.length && !fitRow; a++) {
+      var ds = consDays(st.cons[a]);
+      for (var b = 0; b < ds.length; b++) {
+        if (ds[b].on && mins(ds[b].to) > mins(ds[b].from)) { fitRow = ds[b]; break; }
+      }
+    }
+    var fitN = fitRow && curDur >= 5 ? Math.floor((mins(fitRow.to) - mins(fitRow.from)) / curDur) : 0;
+
+    var hLabel = { '2': '2 horas', '12': '12 horas', '24': '1 día', '48': '2 días' }[st.remindH] || (st.remindH + ' horas');
+    var avisos = [];
+    avisos.push(st.remind ? 'Recordatorio al paciente ' + hLabel + ' antes' : 'Sin recordatorio al paciente');
+    if (st.notify) avisos.push('te avisamos de cada cita nueva');
+
+    var nextDisabled = step === 1 && noneActive;
+
+    return {
+      step: step,
+      isStep1: step === 1, isStep2: step === 2, isStep3: step === 3, isDone: step === 4,
+      notDone: step < 4,
+      canBack: step > 1,
+      progress: progress,
+      later: function () {},
+      consultorios: consultorios,
+      noneActive: noneActive,
+      durs: durs,
+      otherDur: st.otherDur,
+      otherVal: st.otherVal,
+      onOther: function (e) { self.setState({ otherVal: e.target.value }); },
+      curDur: curDur,
+      hasFit: fitN > 0,
+      fitFrom: fitRow ? hhmm(fitRow.from) : '',
+      fitTo: fitRow ? hhmm(fitRow.to) : '',
+      fitN: fitN,
+      remind: st.remind, notify: st.notify,
+      remindH: st.remindH,
+      onRemindH: function (e) { self.setState({ remindH: e.target.value }); },
+      toggleRemind: function () { self.setState({ remind: !st.remind }); },
+      toggleNotify: function () { self.setState({ notify: !st.notify }); },
+      remindTrack: track(st.remind), remindKnob: knob,
+      notifyTrack: track(st.notify), notifyKnob: knob,
+      rulesOpen: st.rulesOpen,
+      rulesBtn: st.rulesOpen ? 'Listo' : 'Cambiar',
+      toggleRules: function () { self.setState({ rulesOpen: !st.rulesOpen }); },
+      minH: st.minH, maxD: st.maxD,
+      onMinH: function (e) { self.setState({ minH: e.target.value }); },
+      onMaxD: function (e) { self.setState({ maxD: e.target.value }); },
+      copy: function () { self.setState({ copied: true }); },
+      copyLabel: st.copied ? 'Copiado' : 'Copiar enlace',
+      oneLabel: st.oneLabel,
+      onOneLabel: function (e) { self.setState({ oneLabel: e.target.value }); },
+      oneMade: st.oneMade, oneNotMade: !st.oneMade,
+      makeOne: function () { self.setState({ oneMade: true }); },
+      copyOne: function () { self.setState({ oneCopied: true }); },
+      copyOneLabel: st.oneCopied ? 'Copiado' : 'Copiar',
+      summaryCons: st.cons.map(function (c) {
+        return { name: c.name, text: c.mode === 'clinica' ? clinicText : (rowsText(daysToRows(c.days)) || 'Sin días') };
+      }),
+      avisosText: avisos.join(' · '),
+      go1: function () { self.setState({ step: 1 }); },
+      go2: function () { self.setState({ step: 2 }); },
+      go3: function () { self.setState({ step: 3 }); },
+      back: function () { self.setState({ step: Math.max(1, step - 1) }); },
+      next: function () { if (!nextDisabled) self.setState({ step: Math.min(4, step + 1) }); },
+      nextDisabled: nextDisabled,
+      nextLabel: step === 3 ? 'Terminar' : 'Continuar',
+      nextStyle: 'border: none; border-radius: 10px; font: inherit; font-size: 16px; font-weight: 600; padding: 0 32px; min-height: 48px; cursor: ' + (nextDisabled ? 'not-allowed' : 'pointer') + '; background: ' + (nextDisabled ? '#E2E8F0' : '#1D5BA6') + '; color: ' + (nextDisabled ? '#5B6B80' : '#FFFFFF')
+    };
+  }
+}
+</script>
+</body>
+</html>

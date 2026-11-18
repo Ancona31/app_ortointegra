@@ -1,0 +1,538 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Configuración de la agenda</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#1D5BA6}a:hover{color:#164A87}
+</style>
+</helmet>
+<div style="min-height: 100vh; background: #F6F8FB; font-family: 'Noto Sans', system-ui, sans-serif; color: #1E293B; box-sizing: border-box; padding: 32px 24px 80px">
+<div style="max-width: 860px; margin: 0 auto; display: flex; flex-direction: column; gap: 24px">
+
+<div style="display: flex; flex-direction: column; gap: 8px">
+<a href="#" style="display: inline-flex; align-items: center; gap: 6px; color: #5B6B80; text-decoration: none; font-size: 15px; min-height: 44px; align-self: flex-start">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg>
+Agenda
+</a>
+<h1 style="margin: 0; font-size: 32px; line-height: 1.2; font-weight: 700">Configuración de la agenda</h1>
+<p style="margin: 0; font-size: 17px; line-height: 1.5; color: #5B6B80">Esto es lo que elegiste al empezar. Cambia lo que quieras: se guarda solo.</p>
+</div>
+
+<div role="tablist" aria-label="Secciones de la configuración" style="display: flex; gap: 4px; border-bottom: 1px solid #E2E8F0; overflow-x: auto; margin-bottom: -4px">
+<sc-for list="{{tabs}}" as="t" hint-placeholder-count="5">
+<button type="button" role="tab" id="{{t.tabId}}" aria-selected="{{t.sel}}" onClick="{{t.pick}}" style="{{t.style}}">{{t.label}}</button>
+</sc-for>
+</div>
+
+<sc-if value="{{tabEnlace}}" hint-placeholder-val="{{ true }}">
+<section id="enlace" role="tabpanel" style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 16px; padding: 28px; display: flex; flex-direction: column; gap: 18px">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<h2 style="margin: 0; font-size: 22px; font-weight: 700">Tu enlace</h2>
+<p style="margin: 0; font-size: 16px; line-height: 1.5; color: #5B6B80">Quien lo abra puede apartar cita en tus horas libres. Es el mismo para todos.</p>
+</div>
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 16px; background: #F6F8FB; border-radius: 12px; flex-wrap: wrap">
+<span id="lbl-link" style="font-size: 16px; font-weight: 600">{{linkStateText}}</span>
+<button type="button" role="switch" aria-checked="{{linkOn}}" aria-labelledby="lbl-link" onClick="{{toggleLink}}" style="{{linkTrack}}"><span style="{{knob}}"></span></button>
+</div>
+<sc-if value="{{linkOn}}" hint-placeholder-val="{{ true }}">
+<div style="display: flex; flex-direction: column; gap: 12px">
+<div style="font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace; font-size: 17px; padding: 14px 16px; background: #F6F8FB; border: 1px solid #E2E8F0; border-radius: 10px; overflow-wrap: anywhere">spinus.com.mx/agenda/[tu-enlace]</div>
+<div style="display: flex; gap: 10px; flex-wrap: wrap">
+<button type="button" onClick="{{copy}}" style="display: inline-flex; align-items: center; gap: 8px; background: #1D5BA6; color: #FFFFFF; border: none; border-radius: 10px; font: inherit; font-size: 16px; font-weight: 600; padding: 0 22px; min-height: 48px; cursor: pointer">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"></rect><path d="M5 15V5a1 1 0 0 1 1-1h10"></path></svg>
+{{copyLabel}}</button>
+<button type="button" style="display: inline-flex; align-items: center; gap: 8px; background: #FFFFFF; color: #1E293B; border: 1px solid #CBD5E1; border-radius: 10px; font: inherit; font-size: 16px; font-weight: 600; padding: 0 22px; min-height: 48px; cursor: pointer">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8.5 8.5 0 0 1-12.6 7.4L3 21l1.6-5.2A8.5 8.5 0 1 1 21 12z"></path></svg>
+Mandar por WhatsApp</button>
+</div>
+</div>
+</sc-if>
+
+<div style="border-top: 1px solid #EEF2F6; padding-top: 18px; display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap">
+<div style="display: flex; flex-direction: column; gap: 4px; flex: 1 1 360px">
+<span style="font-size: 17px; font-weight: 700">Enlaces de una vez</span>
+<span style="font-size: 15px; line-height: 1.5; color: #5B6B80">Para un solo paciente. Sirve para una cita y deja de funcionar en 7 días.</span>
+</div>
+<button type="button" onClick="{{makeOne}}" style="background: #FFFFFF; color: #1D5BA6; border: 1px solid #1D5BA6; border-radius: 10px; font: inherit; font-size: 15px; font-weight: 600; padding: 0 18px; min-height: 44px; cursor: pointer">Crear uno</button>
+</div>
+<sc-for list="{{oneTimes}}" as="o" hint-placeholder-count="2">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; background: #F6F8FB; border-radius: 10px; flex-wrap: wrap">
+<div style="display: flex; flex-direction: column; gap: 2px">
+<span style="font-size: 15px; font-weight: 600">{{o.label}}</span>
+<span style="font-size: 14px; color: #5B6B80">{{o.status}}</span>
+</div>
+<div style="display: flex; gap: 6px">
+<button type="button" style="background: none; border: none; font: inherit; font-size: 15px; font-weight: 600; color: #1D5BA6; cursor: pointer; min-height: 44px; padding: 0 8px">Copiar</button>
+<button type="button" onClick="{{o.remove}}" style="background: none; border: none; font: inherit; font-size: 15px; font-weight: 600; color: #B91C1C; cursor: pointer; min-height: 44px; padding: 0 8px">Apagar</button>
+</div>
+</div>
+</sc-for>
+</div>
+
+<div style="border-top: 1px solid #EEF2F6; padding-top: 18px; display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap">
+<div style="display: flex; flex-direction: column; gap: 4px; flex: 1 1 360px">
+<span style="font-size: 17px; font-weight: 700">¿Tu enlace llegó a quien no debía?</span>
+<span style="font-size: 15px; line-height: 1.5; color: #5B6B80">Cámbialo por uno nuevo. El de antes deja de servir y tendrás que volver a compartirlo.</span>
+</div>
+<button type="button" style="background: #FFFFFF; color: #1E293B; border: 1px solid #CBD5E1; border-radius: 10px; font: inherit; font-size: 15px; font-weight: 600; padding: 0 18px; min-height: 44px; cursor: pointer">Cambiar por uno nuevo</button>
+</div>
+
+<button type="button" onClick="{{toggleOthers}}" aria-expanded="{{othersOpen}}" style="align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; background: none; border: none; font: inherit; font-size: 15px; font-weight: 600; color: #1D5BA6; cursor: pointer; min-height: 44px; padding: 0">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg>
+Enlaces de los demás médicos (1)</button>
+<sc-if value="{{othersOpen}}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; background: #F6F8FB; border-radius: 10px; flex-wrap: wrap">
+<span style="font-size: 15px"><strong>Dra. Ejemplo Dos (ficticia)</strong> · enlace prendido</span>
+<button type="button" style="background: none; border: none; font: inherit; font-size: 15px; font-weight: 600; color: #1D5BA6; cursor: pointer; min-height: 44px; padding: 0 8px">Copiar</button>
+</div>
+</sc-if>
+</section>
+</sc-if>
+
+<sc-if value="{{tabHorario}}" hint-placeholder-val="{{ false }}">
+<section id="horario" role="tabpanel" style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 16px; padding: 28px; display: flex; flex-direction: column; gap: 18px">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<h2 style="margin: 0; font-size: 22px; font-weight: 700">Cuándo das consulta</h2>
+<p style="margin: 0; font-size: 16px; line-height: 1.5; color: #5B6B80">Tus pacientes solo pueden pedir cita en estos días y horas.</p>
+</div>
+<sc-for list="{{consultorios}}" as="c" hint-placeholder-count="2">
+<div style="display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 16px 18px; border: 1px solid #E2E8F0; border-radius: 12px; flex-wrap: wrap">
+<div style="display: flex; flex-direction: column; gap: 6px; flex: 1 1 360px">
+<div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap">
+<span style="font-size: 17px; font-weight: 700">{{c.name}}</span>
+<span style="{{c.badgeStyle}}">{{c.badge}}</span>
+</div>
+<sc-for list="{{c.lines}}" as="l" hint-placeholder-count="2">
+<span style="font-size: 15px; color: #334155">{{l.text}}</span>
+</sc-for>
+</div>
+<button type="button" onClick="{{c.open}}" style="background: #FFFFFF; color: #1E293B; border: 1px solid #CBD5E1; border-radius: 10px; font: inherit; font-size: 15px; font-weight: 600; padding: 0 18px; min-height: 44px; cursor: pointer">Cambiar horario</button>
+</div>
+</sc-for>
+<p style="margin: 0; font-size: 14px; line-height: 1.5; color: #5B6B80">Horario de la clínica: {{clinicText}}. Lo usan los consultorios que no tienen horario propio. <a href="#">Cambiarlo</a> (solo administradores).</p>
+</section>
+</sc-if>
+
+<sc-if value="{{tabConsulta}}" hint-placeholder-val="{{ false }}">
+<section id="consulta" role="tabpanel" style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 16px; padding: 28px; display: flex; flex-direction: column; gap: 18px">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<h2 style="margin: 0; font-size: 22px; font-weight: 700">Tu consulta</h2>
+<p style="margin: 0; font-size: 16px; line-height: 1.5; color: #5B6B80">Tu consulta dura <strong style="color: #1E293B">{{dur}} minutos</strong>. Con esto sabemos cuántas citas caben en tu día.</p>
+</div>
+<div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px">
+<sc-for list="{{durs}}" as="u" hint-placeholder-count="5">
+<button type="button" onClick="{{u.pick}}" aria-pressed="{{u.pressed}}" style="{{u.style}}">{{u.label}}</button>
+</sc-for>
+</div>
+
+<div style="border-top: 1px solid #EEF2F6; padding-top: 18px; display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 17px; font-weight: 700">Otros tipos de cita</span>
+<span style="font-size: 15px; line-height: 1.5; color: #5B6B80">Si también das citas de otra duración, como primera vez o curación, agrégalas. El paciente elige cuál al apartar.</span>
+</div>
+<sc-for list="{{types}}" as="t" hint-placeholder-count="1">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; background: #F6F8FB; border-radius: 10px; flex-wrap: wrap">
+<span style="font-size: 15px"><strong>{{t.name}}</strong> · {{t.min}} minutos</span>
+<button type="button" onClick="{{t.remove}}" style="background: none; border: none; font: inherit; font-size: 15px; font-weight: 600; color: #B91C1C; cursor: pointer; min-height: 44px; padding: 0 8px">Quitar</button>
+</div>
+</sc-for>
+<sc-if value="{{adding}}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; padding: 16px; background: #F6F8FB; border-radius: 12px">
+<label style="display: flex; flex-direction: column; gap: 6px; font-size: 14px; color: #334155; flex: 2 1 220px">Nombre
+<input type="text" placeholder="Ej.: Primera vez" value="{{newName}}" onChange="{{onNewName}}" style="font: inherit; font-size: 16px; padding: 10px 12px; min-height: 44px; box-sizing: border-box; border: 1px solid #CBD5E1; border-radius: 8px; background: #FFFFFF; color: #1E293B">
+</label>
+<label style="display: flex; flex-direction: column; gap: 6px; font-size: 14px; color: #334155; flex: 1 1 120px">Minutos
+<input type="number" min="5" max="240" step="5" value="{{newMin}}" onChange="{{onNewMin}}" style="font: inherit; font-size: 16px; padding: 10px 12px; min-height: 44px; box-sizing: border-box; border: 1px solid #CBD5E1; border-radius: 8px; background: #FFFFFF; color: #1E293B">
+</label>
+<button type="button" onClick="{{saveType}}" style="background: #1D5BA6; color: #FFFFFF; border: none; border-radius: 10px; font: inherit; font-size: 15px; font-weight: 600; padding: 0 20px; min-height: 44px; cursor: pointer">Agregar</button>
+<button type="button" onClick="{{cancelType}}" style="background: none; border: none; font: inherit; font-size: 15px; font-weight: 600; color: #5B6B80; cursor: pointer; min-height: 44px; padding: 0 8px">Cancelar</button>
+</div>
+</sc-if>
+<sc-if value="{{notAdding}}" hint-placeholder-val="{{ true }}">
+<button type="button" onClick="{{startType}}" style="align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; background: none; border: none; font: inherit; font-size: 15px; font-weight: 600; color: #1D5BA6; cursor: pointer; min-height: 44px; padding: 0">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+Agregar tipo de cita</button>
+</sc-if>
+</div>
+</section>
+</sc-if>
+
+<sc-if value="{{tabAvisos}}" hint-placeholder-val="{{ false }}">
+<section id="avisos" role="tabpanel" style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 16px; padding: 28px; display: flex; flex-direction: column; gap: 18px">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<h2 style="margin: 0; font-size: 22px; font-weight: 700">Avisos por correo</h2>
+<p style="margin: 0; font-size: 16px; line-height: 1.5; color: #5B6B80">Prende o apaga cada uno. El cambio cuenta desde ahora.</p>
+</div>
+<div style="display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 20px">
+<div style="display: flex; flex-direction: column; gap: 4px">
+<span id="lbl-remind" style="font-size: 17px; font-weight: 700">Recordarle su cita al paciente</span>
+<span style="font-size: 15px; line-height: 1.5; color: #5B6B80">Le llega un correo antes de su cita. Solo a pacientes que tengan correo.</span>
+</div>
+<button type="button" role="switch" aria-checked="{{remind}}" aria-labelledby="lbl-remind" onClick="{{toggleRemind}}" style="{{remindTrack}}"><span style="{{knob}}"></span></button>
+</div>
+<sc-if value="{{remind}}" hint-placeholder-val="{{ true }}">
+<label style="display: flex; align-items: center; gap: 10px; font-size: 16px; color: #334155; flex-wrap: wrap">Mandarlo
+<select value="{{remindH}}" onChange="{{onRemindH}}" style="font: inherit; font-size: 16px; padding: 8px 10px; min-height: 44px; border: 1px solid #CBD5E1; border-radius: 8px; background: #FFFFFF; color: #1E293B">
+<option value="2">2 horas</option>
+<option value="12">12 horas</option>
+<option value="24">1 día (24 horas)</option>
+<option value="48">2 días (48 horas)</option>
+</select>
+antes de la cita</label>
+</sc-if>
+</div>
+<div style="border-top: 1px solid #EEF2F6; padding-top: 18px; display: flex; align-items: flex-start; justify-content: space-between; gap: 20px">
+<div style="display: flex; flex-direction: column; gap: 4px">
+<span id="lbl-notify" style="font-size: 17px; font-weight: 700">Avisarme cuando alguien aparte cita</span>
+<span style="font-size: 15px; line-height: 1.5; color: #5B6B80">Te llega un correo cada vez que un paciente aparta o cambia su cita con tu enlace.</span>
+</div>
+<button type="button" role="switch" aria-checked="{{notify}}" aria-labelledby="lbl-notify" onClick="{{toggleNotify}}" style="{{notifyTrack}}"><span style="{{knob}}"></span></button>
+</div>
+<div style="border-top: 1px solid #EEF2F6; padding-top: 18px; display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 17px; font-weight: 700">Hasta cuándo pueden apartar</span>
+<span style="font-size: 14px; color: #5B6B80">Esto cambia para todos los médicos de la clínica.</span>
+</div>
+<label style="display: flex; align-items: center; gap: 10px; font-size: 16px; color: #334155; flex-wrap: wrap">Pueden ver horarios de los próximos
+<input type="number" min="1" max="365" value="{{maxD}}" onChange="{{onMaxD}}" style="width: 88px; font: inherit; font-size: 16px; padding: 8px 10px; min-height: 44px; box-sizing: border-box; border: 1px solid #CBD5E1; border-radius: 8px; color: #1E293B">
+días</label>
+<label style="display: flex; align-items: center; gap: 10px; font-size: 16px; color: #334155; flex-wrap: wrap">No pueden apartar si faltan menos de
+<input type="number" min="0" max="72" value="{{minH}}" onChange="{{onMinH}}" style="width: 88px; font: inherit; font-size: 16px; padding: 8px 10px; min-height: 44px; box-sizing: border-box; border: 1px solid #CBD5E1; border-radius: 8px; color: #1E293B">
+horas</label>
+</div>
+</section>
+</sc-if>
+
+<sc-if value="{{tabMas}}" hint-placeholder-val="{{ false }}">
+<section id="mas" role="tabpanel" style="display: flex; flex-direction: column; gap: 12px">
+<div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 16px; padding: 4px 28px; display: flex; flex-direction: column">
+<a href="#" style="display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 0; border-bottom: 1px solid #EEF2F6; text-decoration: none; color: #1E293B">
+<span style="display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 17px; font-weight: 700">Personas bloqueadas</span>
+<span style="font-size: 15px; color: #5B6B80">Teléfonos o correos que no pueden apartar cita con tu enlace. Ahora: ninguno.</span>
+</span>
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5B6B80" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none"><path d="M9 6l6 6-6 6"></path></svg>
+</a>
+<a href="#" style="display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 0; border-bottom: 1px solid #EEF2F6; text-decoration: none; color: #1E293B">
+<span style="display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 17px; font-weight: 700">Esta computadora</span>
+<span style="font-size: 15px; color: #5B6B80">Ajustes que solo cambian aquí, no en tus otros aparatos.</span>
+</span>
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5B6B80" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none"><path d="M9 6l6 6-6 6"></path></svg>
+</a>
+<a href="#" style="display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 0; text-decoration: none; color: #1E293B">
+<span style="display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 17px; font-weight: 700">Empezar de nuevo</span>
+<span style="font-size: 15px; color: #5B6B80">Regresa todo a como venía y vuelve a hacer las 3 preguntas. Tus citas no se borran.</span>
+</span>
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5B6B80" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none"><path d="M9 6l6 6-6 6"></path></svg>
+</a>
+</div>
+</section>
+</sc-if>
+
+</div>
+
+<sc-if value="{{toast}}" hint-placeholder-val="{{ false }}">
+<div role="status" style="position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); display: inline-flex; align-items: center; gap: 8px; background: #1E293B; color: #FFFFFF; font-size: 15px; font-weight: 600; padding: 12px 20px; border-radius: 999px; box-shadow: 0 6px 20px rgba(15, 23, 42, 0.25)">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg>
+Guardado</div>
+</sc-if>
+
+<sc-if value="{{modalOpen}}" hint-placeholder-val="{{ false }}">
+<div style="position: fixed; inset: 0; background: rgba(15, 23, 42, 0.45); display: flex; align-items: center; justify-content: center; padding: 24px; box-sizing: border-box">
+<div role="dialog" aria-modal="true" aria-labelledby="modal-title" style="width: 100%; max-width: 680px; max-height: 100%; overflow: auto; background: #FFFFFF; border-radius: 20px; box-shadow: 0 20px 50px rgba(15, 23, 42, 0.3); display: flex; flex-direction: column">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 22px 28px; border-bottom: 1px solid #EEF2F6">
+<h2 id="modal-title" style="margin: 0; font-size: 21px; font-weight: 700">Horario en {{draftName}}</h2>
+<button type="button" onClick="{{closeModal}}" aria-label="Cerrar" style="width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; background: none; border: none; color: #5B6B80; cursor: pointer; border-radius: 8px">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+</button>
+</div>
+<div style="padding: 22px 28px; display: flex; flex-direction: column; gap: 16px">
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 4px; background: #F1F5F9; border-radius: 12px">
+<button type="button" onClick="{{draftClinica}}" aria-pressed="{{draftIsClinica}}" style="{{segClinica}}">Igual que la clínica</button>
+<button type="button" onClick="{{draftPropio}}" aria-pressed="{{draftIsPropio}}" style="{{segPropio}}">Otro horario</button>
+</div>
+<sc-if value="{{draftIsClinica}}" hint-placeholder-val="{{ false }}">
+<p style="margin: 0; padding: 16px; background: #EEF4FC; border-radius: 12px; font-size: 16px; line-height: 1.5">Aquí darás consulta en el horario de la clínica: <strong>{{clinicText}}</strong>. Si la clínica cambia su horario, el tuyo cambia también.</p>
+</sc-if>
+<sc-if value="{{draftIsPropio}}" hint-placeholder-val="{{ true }}">
+<div style="display: flex; flex-direction: column; gap: 8px">
+<sc-for list="{{draftDays}}" as="d" hint-placeholder-count="7">
+<div style="{{d.rowStyle}}">
+<div style="display: flex; align-items: center; gap: 14px; min-width: 160px">
+<button type="button" role="switch" aria-checked="{{d.on}}" aria-label="{{d.full}}" onClick="{{d.toggle}}" style="{{d.track}}"><span style="{{knob}}"></span></button>
+<span style="{{d.nameStyle}}">{{d.full}}</span>
+</div>
+<sc-if value="{{d.on}}" hint-placeholder-val="{{ true }}">
+<div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap">
+<label style="display: flex; align-items: center; gap: 6px; font-size: 15px; color: #334155">Entras
+<input type="time" value="{{d.from}}" onChange="{{d.onFrom}}" style="font: inherit; font-size: 16px; padding: 8px 10px; min-height: 44px; box-sizing: border-box; border: 1px solid #CBD5E1; border-radius: 8px; background: #FFFFFF; color: #1E293B">
+</label>
+<label style="display: flex; align-items: center; gap: 6px; font-size: 15px; color: #334155">Sales
+<input type="time" value="{{d.to}}" onChange="{{d.onTo}}" style="font: inherit; font-size: 16px; padding: 8px 10px; min-height: 44px; box-sizing: border-box; border: 1px solid #CBD5E1; border-radius: 8px; background: #FFFFFF; color: #1E293B">
+</label>
+</div>
+</sc-if>
+<sc-if value="{{d.off}}" hint-placeholder-val="{{ false }}">
+<span style="margin-left: auto; font-size: 14px; font-style: italic; color: #64748B">Sin consulta</span>
+</sc-if>
+</div>
+</sc-for>
+<sc-if value="{{draftNoDays}}" hint-placeholder-val="{{ false }}">
+<p role="alert" style="margin: 0; font-size: 15px; color: #B91C1C; font-weight: 600">Prende al menos un día.</p>
+</sc-if>
+</div>
+</sc-if>
+<p style="margin: 0; font-size: 14px; line-height: 1.5; color: #5B6B80">Las citas que ya tienes apartadas no se mueven.</p>
+</div>
+<div style="display: flex; justify-content: flex-end; align-items: center; gap: 12px; padding: 18px 28px; border-top: 1px solid #EEF2F6">
+<button type="button" onClick="{{closeModal}}" style="background: none; border: none; font: inherit; font-size: 16px; font-weight: 600; color: #5B6B80; cursor: pointer; min-height: 48px; padding: 0 16px">Cancelar</button>
+<button type="button" onClick="{{saveModal}}" disabled="{{draftNoDays}}" style="{{saveStyle}}">Guardar horario</button>
+</div>
+</div>
+</div>
+</sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"openModal":{"editor":"boolean","default":false},"tab":{"editor":"enum","options":["enlace","horario","consulta","avisos","mas"],"default":"enlace"},"$preview":{"width":1280,"height":1180}}'>
+var CLINIC_DAYS = [
+  { on: true, from: '08:00', to: '18:00' }, { on: true, from: '08:00', to: '18:00' },
+  { on: true, from: '08:00', to: '18:00' }, { on: true, from: '08:00', to: '18:00' },
+  { on: true, from: '08:00', to: '18:00' }, { on: true, from: '08:00', to: '13:00' },
+  { on: false, from: '08:00', to: '13:00' }
+];
+var D_FULL = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+var D_SHORT = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+
+function cloneDays(days) {
+  return days.map(function (d) { return { on: d.on, from: d.from, to: d.to }; });
+}
+function hhmm(t) {
+  if (!t) return '';
+  var p = t.split(':');
+  return String(Number(p[0])) + ':' + (p[1] || '00');
+}
+function fmtDays(days) {
+  var runs = [], i = 0;
+  while (i < 7) {
+    if (days[i]) {
+      var j = i;
+      while (j + 1 < 7 && days[j + 1]) j++;
+      runs.push(j - i >= 2 ? D_SHORT[i] + ' a ' + D_SHORT[j].toLowerCase() : (j > i ? D_SHORT[i] + ', ' + D_SHORT[j] : D_SHORT[i]));
+      i = j + 1;
+    } else { i++; }
+  }
+  return runs.join(', ');
+}
+function daysToLines(days) {
+  var rows = [];
+  days.forEach(function (d, i) {
+    if (!d.on) return;
+    var r = rows.filter(function (x) { return x.from === d.from && x.to === d.to; })[0];
+    if (!r) { r = { days: [0, 0, 0, 0, 0, 0, 0], from: d.from, to: d.to }; rows.push(r); }
+    r.days[i] = 1;
+  });
+  return rows.map(function (r) { return fmtDays(r.days) + ' · ' + hhmm(r.from) + ' – ' + hhmm(r.to); });
+}
+
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    var cons = [
+      { name: 'Consultorio Centro (ficticio)', mode: 'propio', days: [
+        { on: true, from: '16:00', to: '20:00' }, { on: false, from: '16:00', to: '20:00' },
+        { on: true, from: '16:00', to: '20:00' }, { on: false, from: '16:00', to: '20:00' },
+        { on: true, from: '16:00', to: '20:00' }, { on: true, from: '09:00', to: '13:00' },
+        { on: false, from: '09:00', to: '13:00' }
+      ] },
+      { name: 'Hospital Norte (ficticio)', mode: 'clinica', days: cloneDays(CLINIC_DAYS) }
+    ];
+    var open = props.openModal === true || props.openModal === 'true' || props.openModal === '1';
+    this.state = {
+      tab: props.tab || (open ? 'horario' : 'enlace'),
+      cons: cons,
+      modal: open ? 0 : null,
+      draft: open ? { name: cons[0].name, mode: cons[0].mode, days: cloneDays(cons[0].days) } : null,
+      dur: 30,
+      types: [{ name: 'Primera vez', min: 45 }],
+      adding: false, newName: '', newMin: '45',
+      remind: true, remindH: '24', notify: false, minH: '2', maxD: '30',
+      linkOn: true, copied: false, othersOpen: false,
+      oneTimes: [{ label: 'Sra. López, revisión (ficticio)', status: 'Sin usar · deja de servir el 24 nov' }],
+      toast: false
+    };
+  }
+
+  componentWillUnmount() { clearTimeout(this.tt); }
+
+  saved(patch) {
+    var self = this;
+    this.setState(Object.assign({}, patch, { toast: true }));
+    clearTimeout(this.tt);
+    this.tt = setTimeout(function () { self.setState({ toast: false }); }, 1800);
+  }
+
+  setDraftDay(k, patch) {
+    this.setState(function (st) {
+      return { draft: Object.assign({}, st.draft, { days: st.draft.days.map(function (d, i) { return i === k ? Object.assign({}, d, patch) : d; }) }) };
+    });
+  }
+
+  renderVals() {
+    var self = this;
+    var st = this.state;
+    var clinicText = daysToLines(CLINIC_DAYS).join(' · ').replace(/ · (\d)/g, ' $1');
+
+    function track(on) {
+      return 'flex: none; width: 52px; height: 30px; padding: 3px; box-sizing: border-box; border-radius: 999px; border: none; cursor: pointer; display: flex; justify-content: ' + (on ? 'flex-end' : 'flex-start') + '; background: ' + (on ? '#1D5BA6' : '#94A3B8');
+    }
+    var knob = 'width: 24px; height: 24px; border-radius: 999px; background: #FFFFFF; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.25)';
+    function seg(sel) {
+      return 'min-height: 44px; border-radius: 9px; border: none; font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; ' + (sel ? 'background: #FFFFFF; color: #1D5BA6; box-shadow: 0 1px 3px rgba(15, 23, 42, 0.15)' : 'background: transparent; color: #475569');
+    }
+
+    var consultorios = st.cons.map(function (c, i) {
+      var propio = c.mode === 'propio';
+      return {
+        name: c.name,
+        badge: propio ? 'Horario propio' : 'Igual que la clínica',
+        badgeStyle: 'font-size: 13px; font-weight: 600; padding: 3px 10px; border-radius: 999px; ' + (propio ? 'background: #EEF4FC; color: #1D5BA6' : 'background: #F1F5F9; color: #475569'),
+        lines: daysToLines(propio ? c.days : CLINIC_DAYS).map(function (t) { return { text: t }; }),
+        open: function () {
+          self.setState({ modal: i, draft: { name: c.name, mode: c.mode, days: cloneDays(c.mode === 'propio' ? c.days : CLINIC_DAYS) } });
+        }
+      };
+    });
+
+    var draft = st.draft;
+    var draftDays = [];
+    var draftNoDays = false;
+    if (draft) {
+      draftNoDays = draft.mode === 'propio' && !draft.days.some(function (d) { return d.on; });
+      draftDays = draft.days.map(function (d, k) {
+        return {
+          full: D_FULL[k], on: d.on, off: !d.on, from: d.from, to: d.to,
+          onFrom: function (e) { self.setDraftDay(k, { from: e.target.value }); },
+          onTo: function (e) { self.setDraftDay(k, { to: e.target.value }); },
+          toggle: function () {
+            if (d.on) { self.setDraftDay(k, { on: false }); return; }
+            var prev = null;
+            for (var p = k - 1; p >= 0 && !prev; p--) { if (draft.days[p].on) prev = draft.days[p]; }
+            self.setDraftDay(k, prev ? { on: true, from: prev.from, to: prev.to } : { on: true });
+          },
+          track: track(d.on),
+          rowStyle: 'display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; padding: 12px 16px; min-height: 68px; box-sizing: border-box; border-radius: 12px; background: ' + (d.on ? '#EEF4FC' : '#F8FAFC'),
+          nameStyle: 'font-size: 17px; font-weight: 600; color: ' + (d.on ? '#1E293B' : '#64748B')
+        };
+      });
+    }
+
+    var durs = [15, 20, 30, 45, 60].map(function (m) {
+      var sel = st.dur === m;
+      return {
+        label: m + ' min', pressed: sel,
+        pick: function () { self.saved({ dur: m }); },
+        style: 'min-height: 52px; border-radius: 12px; font: inherit; font-size: 16px; font-weight: 600; cursor: pointer; ' + (sel ? 'background: #EAF1FB; color: #1D5BA6; border: 2px solid #1D5BA6' : 'background: #FFFFFF; color: #1E293B; border: 2px solid #E2E8F0')
+      };
+    });
+
+    var TABS = [
+      { id: 'enlace', label: 'Tu enlace' },
+      { id: 'horario', label: 'Cuándo das consulta' },
+      { id: 'consulta', label: 'Tu consulta' },
+      { id: 'avisos', label: 'Avisos' },
+      { id: 'mas', label: 'Más opciones' }
+    ];
+    var tabs = TABS.map(function (t) {
+      var sel = st.tab === t.id;
+      return {
+        label: t.label, sel: sel, tabId: 'tab-' + t.id,
+        pick: function () { self.setState({ tab: t.id }); },
+        style: 'flex: none; background: none; border: none; border-bottom: 3px solid ' + (sel ? '#1D5BA6' : 'transparent') + '; font: inherit; font-size: 16px; font-weight: ' + (sel ? '700' : '600') + '; color: ' + (sel ? '#1D5BA6' : '#5B6B80') + '; padding: 0 16px; min-height: 52px; cursor: pointer; white-space: nowrap'
+      };
+    });
+
+    return {
+      tabs: tabs,
+      tabEnlace: st.tab === 'enlace',
+      tabHorario: st.tab === 'horario',
+      tabConsulta: st.tab === 'consulta',
+      tabAvisos: st.tab === 'avisos',
+      tabMas: st.tab === 'mas',
+      knob: knob,
+      clinicText: clinicText,
+      linkOn: st.linkOn,
+      linkStateText: st.linkOn ? 'Prendido: tus pacientes pueden apartar con él' : 'Apagado: nadie puede apartar con él',
+      linkTrack: track(st.linkOn),
+      toggleLink: function () { self.saved({ linkOn: !st.linkOn }); },
+      copy: function () { self.setState({ copied: true }); },
+      copyLabel: st.copied ? 'Copiado' : 'Copiar enlace',
+      oneTimes: st.oneTimes.map(function (o, i) {
+        return { label: o.label, status: o.status, remove: function () { self.saved({ oneTimes: st.oneTimes.filter(function (_, j) { return j !== i; }) }); } };
+      }),
+      makeOne: function () { self.saved({ oneTimes: st.oneTimes.concat([{ label: 'Sin nombre', status: 'Sin usar · deja de servir en 7 días' }]) }); },
+      othersOpen: st.othersOpen,
+      toggleOthers: function () { self.setState({ othersOpen: !st.othersOpen }); },
+      consultorios: consultorios,
+      dur: st.dur,
+      durs: durs,
+      types: st.types.map(function (t, i) {
+        return { name: t.name, min: t.min, remove: function () { self.saved({ types: st.types.filter(function (_, j) { return j !== i; }) }); } };
+      }),
+      adding: st.adding, notAdding: !st.adding,
+      newName: st.newName, newMin: st.newMin,
+      onNewName: function (e) { self.setState({ newName: e.target.value }); },
+      onNewMin: function (e) { self.setState({ newMin: e.target.value }); },
+      startType: function () { self.setState({ adding: true }); },
+      cancelType: function () { self.setState({ adding: false, newName: '' }); },
+      saveType: function () {
+        if (!st.newName.trim()) return;
+        self.saved({ types: st.types.concat([{ name: st.newName.trim(), min: Number(st.newMin) || 30 }]), adding: false, newName: '' });
+      },
+      remind: st.remind, notify: st.notify, remindH: st.remindH,
+      remindTrack: track(st.remind), notifyTrack: track(st.notify),
+      toggleRemind: function () { self.saved({ remind: !st.remind }); },
+      toggleNotify: function () { self.saved({ notify: !st.notify }); },
+      onRemindH: function (e) { self.saved({ remindH: e.target.value }); },
+      minH: st.minH, maxD: st.maxD,
+      onMinH: function (e) { self.saved({ minH: e.target.value }); },
+      onMaxD: function (e) { self.saved({ maxD: e.target.value }); },
+      toast: st.toast,
+      modalOpen: st.modal !== null && !!draft,
+      draftName: draft ? draft.name : '',
+      draftIsClinica: !!draft && draft.mode === 'clinica',
+      draftIsPropio: !!draft && draft.mode === 'propio',
+      draftClinica: function () { self.setState({ draft: Object.assign({}, draft, { mode: 'clinica' }) }); },
+      draftPropio: function () { self.setState({ draft: Object.assign({}, draft, { mode: 'propio' }) }); },
+      segClinica: seg(!!draft && draft.mode === 'clinica'),
+      segPropio: seg(!!draft && draft.mode === 'propio'),
+      draftDays: draftDays,
+      draftNoDays: draftNoDays,
+      closeModal: function () { self.setState({ modal: null, draft: null }); },
+      saveModal: function () {
+        if (draftNoDays) return;
+        var idx = st.modal;
+        self.saved({
+          modal: null, draft: null,
+          cons: st.cons.map(function (c, j) { return j === idx ? Object.assign({}, c, { mode: draft.mode, days: draft.mode === 'propio' ? cloneDays(draft.days) : c.days }) : c; })
+        });
+      },
+      saveStyle: 'border: none; border-radius: 10px; font: inherit; font-size: 16px; font-weight: 600; padding: 0 24px; min-height: 48px; cursor: ' + (draftNoDays ? 'not-allowed' : 'pointer') + '; background: ' + (draftNoDays ? '#E2E8F0' : '#1D5BA6') + '; color: ' + (draftNoDays ? '#5B6B80' : '#FFFFFF')
+    };
+  }
+}
+</script>
+</body>
+</html>
