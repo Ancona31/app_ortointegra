@@ -6,7 +6,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import {
-  CrearEnlaceSchema, MarcarContactoSchema, RevocarEnlaceSchema, estadoEnlace, frasearHistorial,
+  AccionEnlaceSchema, CrearEnlaceSchema, MarcarContactoSchema, estadoEnlace, frasearHistorial,
   gestionaTodos, puedeGestionarDelMedico, respuestaErrorEnlace, type PerfilGestion,
 } from '@/lib/reserva/gestionReserva'
 
@@ -69,11 +69,15 @@ describe('CrearEnlaceSchema', () => {
   })
 })
 
-describe('RevocarEnlaceSchema y MarcarContactoSchema', () => {
+describe('AccionEnlaceSchema y MarcarContactoSchema', () => {
   it('revocar es lo único que admite el PATCH', () => {
-    expect(RevocarEnlaceSchema.safeParse({ accion: 'revocar' }).success).toBe(true)
-    expect(RevocarEnlaceSchema.safeParse({ accion: 'reactivar' }).success).toBe(false)
-    expect(RevocarEnlaceSchema.safeParse({ accion: 'revocar', revocado_en: null }).success).toBe(false)
+    expect(AccionEnlaceSchema.safeParse({ accion: 'revocar' }).success).toBe(true)
+    expect(AccionEnlaceSchema.safeParse({ accion: 'reactivar' }).success).toBe(false)
+    expect(AccionEnlaceSchema.safeParse({ accion: 'revocar', revocado_en: null }).success).toBe(false)
+    // K3 (punto 14): pausar y reanudar, sin fecha del navegador.
+    expect(AccionEnlaceSchema.safeParse({ accion: 'pausar' }).success).toBe(true)
+    expect(AccionEnlaceSchema.safeParse({ accion: 'reanudar' }).success).toBe(true)
+    expect(AccionEnlaceSchema.safeParse({ accion: 'pausar', pausado_en: '2099-01-01' }).success).toBe(false)
   })
   it('bloquear o desbloquear, por cita', () => {
     expect(MarcarContactoSchema.safeParse({ cita_id: YO, accion: 'bloquear' }).success).toBe(true)

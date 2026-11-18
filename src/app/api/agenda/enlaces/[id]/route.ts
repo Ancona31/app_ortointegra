@@ -4,6 +4,9 @@
  *   · GET   vuelve a enseñar su código mientras esté VIGENTE (lista A, 15).
  *   · PATCH `{accion:'revocar'}` lo revoca. No hay DELETE ni otra edición: un
  *     enlace emitido no se modifica (lo impone `proteger_reserva_enlaces`).
+ *     K3 (punto 14): `{accion:'pausar'|'reanudar'}` apaga o prende el FIJO
+ *     vigente sin revocarlo (`pausado_en`): al prenderlo, la misma dirección.
+ *     La fecha la pone el servidor (`now()` o `null`), nunca el navegador.
  *
  * Puertas comunes en `entradaGestion()` (401/403/404 con el interruptor
  * apagado). Cliente de SESIÓN y `clinica_id` explícito; el médico invitado
@@ -12,9 +15,9 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { entradaGestion, type ClienteSesion } from '@/lib/reserva/gestionServidor'
+import { entradaGestion, type ClienteSesion, type EntradaGestion } from '@/lib/reserva/gestionServidor'
 import {
-  COLUMNAS_ENLACE, RevocarEnlaceSchema, estadoEnlace, gestionaTodos, respuestaErrorEnlace,
+  AccionEnlaceSchema, COLUMNAS_ENLACE, estadoEnlace, gestionaTodos, respuestaErrorEnlace,
   type EnlaceReserva, type PerfilGestion,
 } from '@/lib/reserva/gestionReserva'
 import { codigoDeEnlace } from '@/lib/reserva/secretos'
@@ -55,24 +58,39 @@ export async function GET(_req: NextRequest, ctx: RouteContext<'/api/agenda/enla
   }
 }
 
+type Accion = z.output<typeof AccionEnlaceSchema>['accion']
+
+/**
+ * El UPDATE de cada acción, acotado a la clínica, a lo vigente y, si quien llama no gestiona todos,
+ * a sus enlaces. `revocado_en` lo reescribe la protección con `now()` y pone `revocado_por =
+ * auth.uid()`; el valor de aquí sólo dice «revócalo». Pausar y reanudar, sólo el fijo (el CHECK
+ * `reserva_enlaces_pausado_check` lo repite en la base).
+ */
+function actualizar(e: Extract<EntradaGestion, { ok: true }>, id: string, accion: Accion) {
+  const cambio = accion === 'revocar' ? { revocado_en: new Date().toISOString() }
+    : { pausado_en: accion === 'pausar' ? new Date().toISOString() : null }
+  let q = e.supabase.from('reserva_enlaces').update(cambio).eq('id', id).eq('clinica_id', e.clinicaId).is('revocado_en', null)
+  if (accion !== 'revocar') q = q.eq('clase', 'fijo')
+  if (!gestionaTodos(e.perfil)) q = q.eq('medico_id', e.perfil.id)
+  return q.select(accion === 'revocar' ? COLUMNAS_ENLACE : `${COLUMNAS_ENLACE}, pausado_en`).maybeSingle<EnlaceReserva>()
+}
+
 export async function PATCH(req: NextRequest, ctx: RouteContext<'/api/agenda/enlaces/[id]'>): Promise<NextResponse> {
   const e = await entradaGestion()
   if (!e.ok) return e.respuesta
   try {
     const { id } = await ctx.params
     if (!z.guid().safeParse(id).success) return NextResponse.json(NO_ENCONTRADO, { status: 404 })
-    if (!RevocarEnlaceSchema.safeParse(await req.json().catch(() => null)).success) {
-      return NextResponse.json({ error: 'Datos inválidos' }, { status: 400 })
+    const cuerpo = AccionEnlaceSchema.safeParse(await req.json().catch(() => null))
+    if (!cuerpo.success) return NextResponse.json({ error: 'Datos inválidos' }, { status: 400 })
+    const { data, error } = await actualizar(e, id, cuerpo.data.accion)
+    /* 42703: el código llegó antes que la migración de K3; no se pausó nada. */
+    if (error?.code === '42703') {
+      return NextResponse.json({ error: 'sin_pausa', mensaje: 'Falta una actualización de la base para apagar el enlace sin cambiarlo' }, { status: 409 })
     }
-    /* `revocado_en` lo reescribe la protección con `now()` y pone
-       `revocado_por = auth.uid()`; el valor de aquí sólo dice «revócalo». */
-    let q = e.supabase.from('reserva_enlaces').update({ revocado_en: new Date().toISOString() })
-      .eq('id', id).eq('clinica_id', e.clinicaId).is('revocado_en', null)
-    if (!gestionaTodos(e.perfil)) q = q.eq('medico_id', e.perfil.id)
-    const { data, error } = await q.select(COLUMNAS_ENLACE).maybeSingle()
     if (error) {
       const r = respuestaErrorEnlace(error)
-      if (r.status === 500) logger.error('agenda', `enlace sin revocar: ${error.code ?? ''}`)
+      if (r.status === 500) logger.error('agenda', `enlace sin ${cuerpo.data.accion === 'revocar' ? 'revocar' : 'pausar'}: ${error.code ?? ''}`)
       return NextResponse.json(r.body, { status: r.status })
     }
     if (!data) return NextResponse.json(NO_ENCONTRADO, { status: 404 })

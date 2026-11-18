@@ -65,8 +65,12 @@ export const CrearEnlaceSchema = z.discriminatedUnion('clase', [
   }),
 ])
 
-/** PATCH /api/agenda/enlaces/[id]: lo único que se hace con un enlace emitido. */
-export const RevocarEnlaceSchema = z.strictObject({ accion: z.literal('revocar') })
+/**
+ * PATCH /api/agenda/enlaces/[id]: lo único que se hace con un enlace emitido. `revocar` es para
+ * siempre; K3 (punto 14) `pausar`/`reanudar` apagan y prenden el FIJO sin cambiarle la dirección
+ * (`reserva_enlaces.pausado_en`, migración 20261123140000). La fecha nunca viaja del navegador.
+ */
+export const AccionEnlaceSchema = z.strictObject({ accion: z.enum(['revocar', 'pausar', 'reanudar']) })
 
 /** POST /api/agenda/reservas/contactos. */
 export const MarcarContactoSchema = z.strictObject({
@@ -88,6 +92,8 @@ export interface EnlaceReserva {
   usado_en: string | null
   revocado_en: string | null
   created_at: string
+  /** K3 (punto 14): el fijo apagado sin revocar; sólo lo lee la lista (sin la migración, ausente). */
+  pausado_en?: string | null
 }
 
 export type EstadoEnlace = 'vigente' | 'usado' | 'caducado' | 'revocado'

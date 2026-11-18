@@ -89,6 +89,8 @@ async function enlaceFijo(medicoId: string): Promise<EnlaceCierre> {
   /* Sin la lista no se sabe si ya hay uno: emitir regeneraría y mataría el que ya se compartió. */
   if (lista === 'error') return { estado: 'error', motivo: 'No se pudo leer tu enlace. Recarga la página.' }
   const fijo = lista.enlaces.find(e => e.medico_id === medicoId && e.clase === 'fijo') ?? null
+  /* K3 (punto 14): apagado a propósito; no se prende solo ni se enseña una dirección que no abre. */
+  if (fijo?.pausado_en) return { estado: 'error', motivo: 'Tu enlace está apagado. Préndelo en «Tu enlace» y volverá a servir la misma dirección.' }
   const r: Resultado<string | null> = fijo
     ? await leerCodigo(fijo.id)
     : await emitirEnlace(medicoId, 'fijo').then(x => (x.ok ? { ok: true as const, valor: x.valor.codigo } : x))

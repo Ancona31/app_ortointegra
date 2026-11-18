@@ -89,8 +89,12 @@ test.afterEach(() => {
 test('13 · primera vez: tres pasos que se guardan al continuar, el cierre con /reservar/{código} y «Cambiar» desde el resumen', async ({ page }) => {
   await empezarDeNuevo(page)
   await page.goto(RUTA)
+  // K3 (punto 12): para quien administra, el primer paso es el horario de la clínica, «Paso 1 de 4».
+  await expect(page.getByRole('heading', { name: 'Horario de la clínica' })).toBeVisible()
+  await expect(page.getByText('Paso 1 de 4 · menos de 2 minutos')).toBeVisible()
+  await page.getByRole('button', { name: 'Continuar' }).click()
   await expect(page.getByRole('heading', { name: '¿Cuándo das consulta?' })).toBeVisible()
-  await expect(page.getByText('Paso 1 de 3 · menos de 2 minutos')).toBeVisible()
+  await expect(page.getByText('Paso 2 de 4 · menos de 2 minutos')).toBeVisible()
   // Hospital Norte: «Otro horario», sin sábado.
   const norte = page.getByRole('group', { name: 'Hospital Norte (ficticio)' })
   await norte.getByRole('button', { name: /Otro horario/ }).click()
@@ -131,6 +135,8 @@ test('13 · primera vez: tres pasos que se guardan al continuar, el cierre con /
 test('13 · «Terminar después» guarda el paso en que estás y, al volver, abre en el mismo', async ({ page }) => {
   await empezarDeNuevo(page)
   await page.goto(RUTA)
+  await page.getByRole('button', { name: 'Continuar' }).click() // K3: el horario de la clínica
+  await expect(page.getByRole('heading', { name: '¿Cuándo das consulta?' })).toBeVisible()
   await page.getByRole('button', { name: 'Continuar' }).click()
   await expect(page.getByRole('heading', { name: '¿Cuánto dura tu consulta?' })).toBeVisible()
   await page.getByRole('button', { name: '20 min' }).click()
@@ -152,7 +158,7 @@ test('13 y 17 · «Empezar de nuevo» es «Restablecer»: palabra escrita, sólo
   await expect(dialogo.getByRole('button', { name: 'Restablecer', exact: true })).toBeDisabled()
   await dialogo.getByLabel(/Para confirmar, escribe/).fill('RESTABLECER')
   await dialogo.getByRole('button', { name: 'Restablecer', exact: true }).click()
-  await expect(page.getByRole('heading', { name: '¿Cuándo das consulta?' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Horario de la clínica' })).toBeVisible() // K3: el primer paso de quien administra
   expect(sqlLocal(`select count(*) from public.tipos_cita where clinica_id = ${CL} and activo`)).toBe('0')
 
   sinPendientes(CORREO.medicoA) // la invitada, con las pestañas (en el funnel tampoco hay «Empezar de nuevo»)
@@ -263,17 +269,19 @@ test('14 · Tu consulta: la duración se guarda al pulsar; un tipo se agrega y s
   expect(sqlLocal(`select activo from public.tipos_cita where nombre = 'Primera vez J5'`)).toBe('f')
 })
 
-test('14 y 17 · Tu enlace: apagarlo pide confirmación y lo revoca; prenderlo da uno nuevo en /reservar/{código}; el de una vez se crea y se apaga', async ({ page }) => {
+/* K3 (punto 14): apagar ya no pide confirmación ni revoca: PAUSA, y prender devuelve el MISMO enlace
+   (detalle en agenda-k3-configuracion, «14 · …»). Aquí, que el interruptor ida y vuelta deja un solo fijo vigente. */
+test('14 y 17 · Tu enlace: apagarlo lo pausa sin preguntar; prenderlo lo devuelve en /reservar/{código}; el de una vez se crea y se apaga', async ({ page }) => {
   adminSinPendientes()
   await page.goto(RUTA)
   const interruptor = page.getByRole('switch', { name: /Prendido: tus pacientes pueden apartar con él/ })
   await interruptor.click()
-  await page.getByRole('dialog').getByRole('button', { name: 'Aceptar' }).click()
   await expect(page.getByRole('switch', { name: /Apagado: nadie puede apartar con él/ })).toHaveAttribute('aria-checked', 'false')
+  await expect(page.getByRole('dialog')).toHaveCount(0)
   await page.getByRole('switch', { name: /Apagado/ }).click()
   await expect(page.locator('[data-enlace-fijo]')).toHaveText(/\/reservar\/[A-Za-z0-9_-]{8,}$/)
   expect(sqlLocal(`select count(*) from public.reserva_enlaces e join auth.users u on u.id = e.medico_id
-    where u.email = :'c' and e.clase = 'fijo' and e.revocado_en is null`, { c: CORREO.adminA })).toBe('1')
+    where u.email = :'c' and e.clase = 'fijo' and e.revocado_en is null and e.pausado_en is null`, { c: CORREO.adminA })).toBe('1')
 
   await page.getByRole('button', { name: 'Crear uno' }).click()
   await page.getByLabel('¿Para quién es? (solo lo ves tú)').fill('Paciente de prueba J5')
@@ -312,7 +320,10 @@ test('14 · si el primer guardado entra y el siguiente falla, el campo vuelve al
 test('13 · un plazo inválido en el paso 3 no se pliega: se ve por qué «Terminar» no deja seguir', async ({ page }) => {
   await empezarDeNuevo(page)
   await page.goto(RUTA)
+  await page.getByRole('button', { name: 'Continuar' }).click() // K3: el horario de la clínica
+  await expect(page.getByRole('heading', { name: '¿Cuándo das consulta?' })).toBeVisible()
   await page.getByRole('button', { name: 'Continuar' }).click()
+  await expect(page.getByRole('heading', { name: '¿Cuánto dura tu consulta?' })).toBeVisible()
   await page.getByRole('button', { name: 'Continuar' }).click()
   await expect(page.getByRole('heading', { name: '¿Mandamos avisos por correo?' })).toBeVisible()
   await page.getByRole('button', { name: 'Cambiar', exact: true }).click()
@@ -326,7 +337,10 @@ test('13 · un plazo inválido en el paso 3 no se pliega: se ve por qué «Termi
 test('13 · si al cerrar no se puede leer la lista de enlaces, no se emite ninguno (no se mata el que ya se compartió)', async ({ page }) => {
   await empezarDeNuevo(page)
   await page.goto(RUTA)
+  await page.getByRole('button', { name: 'Continuar' }).click() // K3: el horario de la clínica
+  await expect(page.getByRole('heading', { name: '¿Cuándo das consulta?' })).toBeVisible()
   await page.getByRole('button', { name: 'Continuar' }).click()
+  await expect(page.getByRole('heading', { name: '¿Cuánto dura tu consulta?' })).toBeVisible()
   await page.getByRole('button', { name: 'Continuar' }).click()
   await expect(page.getByRole('heading', { name: '¿Mandamos avisos por correo?' })).toBeVisible()
   let emitidos = 0
@@ -344,6 +358,8 @@ test('13 · si al cerrar no se puede leer la lista de enlaces, no se emite ningu
 test('13 · un doble clic en «Continuar» guarda la duración una sola vez', async ({ page }) => {
   await empezarDeNuevo(page)
   await page.goto(RUTA)
+  await page.getByRole('button', { name: 'Continuar' }).click() // K3: el horario de la clínica
+  await expect(page.getByRole('heading', { name: '¿Cuándo das consulta?' })).toBeVisible()
   await page.getByRole('button', { name: 'Continuar' }).click()
   await expect(page.getByRole('heading', { name: '¿Cuánto dura tu consulta?' })).toBeVisible()
   let altas = 0

@@ -31,10 +31,12 @@ class Consulta implements PromiseLike<unknown> {
   is(): this { return this }
   order(): this { return this }
   limit(): this { return this }
+  /* K3 (punto 14): la consulta aparte de los fijos pausados (`.not('pausado_en', 'is', null)`); no lleva `or`. */
+  not(): this { return this }
   or(f: string): this { this.filtro = f; return this }
   maybeSingle(): Promise<unknown> { return Promise.resolve({ data: { id: 'e1', clase: 'unico' }, error: null }) }
   then<A = unknown, B = never>(ok?: ((v: unknown) => A | PromiseLike<A>) | null, ko?: ((e: unknown) => B | PromiseLike<B>) | null): PromiseLike<A | B> {
-    h.filtros.push(this.filtro)
+    if (this.filtro) h.filtros.push(this.filtro)
     const r = !h.conJ2 && this.filtro.includes('agotado_en')
       ? { data: null, error: { code: '42703' } }
       : { data: [], error: null }

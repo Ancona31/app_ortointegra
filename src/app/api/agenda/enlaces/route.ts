@@ -60,6 +60,18 @@ function consultaVigentes(e: Gestion, conAgotado: boolean) {
 }
 
 /**
+ * K3 (punto 14): los fijos de la clínica apagados sin revocar (`pausado_en`). Consulta aparte para
+ * no multiplicar la tolerancia de `consultaVigentes`: sin la migración (42703) o si falla, ninguno.
+ */
+async function pausados(e: Gestion): Promise<Map<string, string>> {
+  const { data, error } = await e.supabase.from('reserva_enlaces').select('id, pausado_en')
+    .eq('clinica_id', e.clinicaId).eq('clase', 'fijo').is('revocado_en', null).not('pausado_en', 'is', null)
+  if (error && error.code !== '42703') logger.warn('agenda', `enlaces pausados sin leer: ${error.code ?? ''}`)
+  const filas: { id: unknown; pausado_en: unknown }[] = error ? [] : data ?? []
+  return new Map(filas.flatMap(f => typeof f.id === 'string' && typeof f.pausado_en === 'string' ? [[f.id, f.pausado_en] as const] : []))
+}
+
+/**
  * GET — los enlaces vigentes que quien llama puede gestionar: el fijo de cada
  * médico y los de un solo uso sin usar ni caducar. Sin códigos. Los usados,
  * caducados y revocados se quedan en la base (no se borran nunca) pero no se
@@ -75,17 +87,18 @@ export async function GET(): Promise<NextResponse> {
   const e = await entradaGestion()
   if (!e.ok) return e.respuesta
   try {
-    const primera = await consultaVigentes(e, true)
+    const [primera, apagados] = await Promise.all([consultaVigentes(e, true), pausados(e)])
     // Integración J (tolerancia): sin la migración de j2 la columna no existe (42703); se lee como antes.
     const { data, error } = primera.error?.code === '42703' ? await consultaVigentes(e, false) : primera
     if (error) {
       logger.error('agenda', `enlaces de reserva sin leer: ${error.code ?? ''}`)
       return NextResponse.json({ error: 'No se pudieron leer los enlaces' }, { status: 500 })
     }
-    const enlaces = data ?? []
+    const enlaces = (data ?? []).map(x => ({ ...x, pausado_en: apagados.get(x.id) ?? null }))
     const secreto = secretoDisponible()
     const aviso = avisoPublicable()
-    const preparacion = await preparacionDe(e.supabase, e.clinicaId, e.perfil, enlaces, secreto && aviso)
+    /* Un fijo pausado no abre, a propósito: no se prueba como paciente (daría «no abre»); cuentan las tablas. */
+    const preparacion = await preparacionDe(e.supabase, e.clinicaId, e.perfil, enlaces.filter(x => !x.pausado_en), secreto && aviso)
     return NextResponse.json({ enlaces, secreto, aviso, preparacion })
   } catch (err: unknown) {
     logger.error('agenda', `GET enlaces: ${err instanceof Error ? err.message : 'error'}`)

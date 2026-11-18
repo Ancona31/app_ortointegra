@@ -131,6 +131,15 @@ export function revocarEnlace(id: string): Promise<Resultado<null>> {
   return pedir(`/api/agenda/enlaces/${id}`, { method: 'PATCH', body: JSON.stringify({ accion: 'revocar' }) }, 'No se pudo apagar el enlace', () => null)
 }
 
+/**
+ * K3 (punto 14): apaga (`pausar`) o prende (`reanudar`) el enlace fijo SIN cambiarle la dirección.
+ * Sólo «Cambiar por uno nuevo» (regenerar) o revocar lo dejan sin servir para siempre.
+ */
+export function pausarEnlace(id: string, pausar: boolean): Promise<Resultado<null>> {
+  return pedir(`/api/agenda/enlaces/${id}`, { method: 'PATCH', body: JSON.stringify({ accion: pausar ? 'pausar' : 'reanudar' }) },
+    pausar ? 'No se pudo apagar el enlace' : 'No se pudo prender el enlace', () => null)
+}
+
 /** El código de un enlace vigente, para enseñar su dirección. */
 export async function leerCodigo(id: string): Promise<Resultado<string>> {
   const r = await pedir(`/api/agenda/enlaces/${id}`, { method: 'GET' }, 'No se pudo leer el enlace', j => conCodigo(j).codigo)
