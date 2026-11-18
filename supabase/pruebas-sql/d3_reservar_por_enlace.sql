@@ -207,7 +207,8 @@ begin
        where enlace_id = '00000000-0000-4000-8000-000000d3f001' and correo_hmac = pg_temp.h('c:carla') and intentos < 5) <> 1 then
     raise exception 'D3 caso 3: pedir un código nuevo no invalidó el anterior';
   end if;
-  perform pg_temp.esperar('caso 3 viejo', pg_temp.verificar('00000000-0000-4000-8000-000000d3f001', 'carla', '222222', 'x7'), 'incorrecto');
+  -- K2 (punto 10, 20261123130000): el código anterior sigue sin valer, pero lo dice ('reemplazado') y no suma equivocado.
+  perform pg_temp.esperar('caso 3 viejo', pg_temp.verificar('00000000-0000-4000-8000-000000d3f001', 'carla', '222222', 'x7'), 'reemplazado');
   perform pg_temp.esperar('caso 3 bueno', pg_temp.verificar('00000000-0000-4000-8000-000000d3f001', 'carla', '333333', 'ficha-carla'), 'ok');
   -- Vencido: 10 minutos.
   perform pg_temp.emitir('00000000-0000-4000-8000-000000d3f001', 'dora', '444444');

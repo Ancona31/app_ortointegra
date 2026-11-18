@@ -29,6 +29,7 @@ import { normalizarCorreo } from '@/lib/reserva/contacto'
 import { hmacCodigoCorreo, hmacContacto } from '@/lib/reserva/secretos'
 import { correoCodigo } from '@/lib/reserva/correosReserva'
 import { enviarCorreo } from '@/lib/correo/transporte'
+import { urlDeReservaConCodigo } from '@/lib/confirmacion/enlaceConfirmacion'
 
 export const dynamic = 'force-dynamic'
 
@@ -67,7 +68,9 @@ export async function POST(req: NextRequest, ctx: RouteContext<'/api/reservar/[c
 
   // Tanda I, punto 21: el consultorio de la cabecera, sólo si es uno de ESTE enlace (si no, sin él).
   const consultorio = enlace.ctx.consultorios.find(c => c.id === cuerpo.data?.consultorio_id)?.nombre ?? null
-  const plantilla = correoCodigo(nombreDelMedico(enlace.ctx), digitos, { consultorio })
+  // K2 (punto 9): el botón «Continuar mi reserva», con el código en el fragmento.
+  const url = urlDeReservaConCodigo(codigo, digitos, cuerpo.data?.origen ?? null)
+  const plantilla = correoCodigo(nombreDelMedico(enlace.ctx), digitos, { consultorio, url })
   const envio = await enviarCorreo({ para: destinatario, ...plantilla, etiqueta: 'reserva_codigo' })
   if (!envio.ok) return responder({ status: 503, cuerpo: { error: 'correo_no_enviado' } })
   // K2: cuándo se puede pedir otro (la cuenta regresiva de la página sale de aquí).

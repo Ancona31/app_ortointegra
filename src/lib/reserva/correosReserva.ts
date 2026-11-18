@@ -22,18 +22,27 @@ export interface CorreoListo { asunto: string; texto: string; html: string; remi
  * El código de 6 dígitos para verificar el correo antes de reservar. Tanda I,
  * punto 21: a nombre del médico, con el consultorio elegido debajo si se sabe.
  */
-export function correoCodigo(medico: string, codigo: string, opciones: { consultorio?: string | null } = {}): CorreoListo {
+export function correoCodigo(
+  medico: string, codigo: string, opciones: { consultorio?: string | null; url?: string | null } = {},
+): CorreoListo {
+  // K2 (punto 9): «Continuar mi reserva» abre la página con el código ya puesto; el código sigue visible.
+  const url = urlSegura(opciones.url)
   const partes: PartesCorreo = {
     marca: { medico, consultorio: opciones.consultorio ?? null },
     preencabezado: `Tu código es ${codigo}. Vence en 10 minutos.`,
     titulo: 'Tu código para reservar',
-    parrafos: [`Escríbelo en la página de reserva de ${medico}.`],
+    parrafos: [`Escríbelo en la página de reserva de ${medico}${url ? ', o vuelve a ella con el botón' : ''}.`],
     codigo,
+    ...(url ? { botones: [{ texto: 'Continuar mi reserva', url }] } : {}),
     pie: ['Vence en 10 minutos.', 'Si no lo pediste, ignora este correo.'],
   }
   return {
     asunto: `Tu código para reservar: ${codigo}`,
-    texto: textoCorreoCita(partes, [`Tu código para reservar con ${medico} es ${codigo}. Vence en 10 minutos.`, 'Si no lo pediste, ignora este correo.']),
+    texto: textoCorreoCita(partes, [
+      `Tu código para reservar con ${medico} es ${codigo}. Vence en 10 minutos.`,
+      ...(url ? [`Continuar mi reserva: ${url}`] : []),
+      'Si no lo pediste, ignora este correo.',
+    ]),
     html: htmlCorreoCita(partes),
     remitente: medico,
   }

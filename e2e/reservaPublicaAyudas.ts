@@ -169,7 +169,19 @@ export async function reservar(e: Escenario, codigo: string, envio: Envio, ctx?:
 }
 
 /** Pide el código, lo lee de MAILPIT y lo verifica. Devuelve la ficha. */
+/**
+ * K2 (punto 10): el servidor deja 30 s entre dos códigos al MISMO correo en el mismo enlace. Las pruebas
+ * que piden dos seguidos para la misma persona (reservar dos veces, el candado) hacen como si ya hubieran
+ * pasado: los códigos anteriores de ese correo se fechan 31 s antes. El tope de 3 por hora no se toca.
+ */
+export function pasarReenvio(correo: string): void {
+  const normal = normalizarCorreo(correo)
+  const hmac = normal ? hmacContacto('correo', normal) : null
+  if (hmac) sqlLocal(`update public.reserva_verificaciones set created_at = created_at - interval '31 seconds' where correo_hmac = :'h'`, { h: hmac })
+}
+
 export async function verificarCorreo(codigo: string, correo: string): Promise<string> {
+  pasarReenvio(correo)
   const ctx = await api()
   try {
     const previos = await contarCorreos(correo, 'Tu código para reservar')

@@ -106,6 +106,20 @@ export function urlDeConfirmacion(codigo: string): string | null {
   return base && esCodigoDeEnlace(codigo) ? `${base}/confirmar/${codigo}` : null
 }
 
+/**
+ * K2 (punto 9 de Angel): «Continuar mi reserva» del correo del código. El
+ * código de 6 dígitos va en el FRAGMENTO (`#codigo=`), que el navegador no
+ * manda al servidor: no queda en registros. Abrirlo no reserva nada (la página
+ * sólo rellena el campo). Misma base de URL que la confirmación. `origen` (E6)
+ * se conserva si viene con forma; la página lo vuelve a validar.
+ */
+export function urlDeReservaConCodigo(enlace: string, digitos: string, origen: string | null): string | null {
+  const base = baseUrl()
+  if (!base || !esCodigoDeEnlace(enlace) || !/^[0-9]{6}$/.test(digitos)) return null
+  const consulta = origen && esCodigoDeEnlace(origen) ? `?origen=${origen}` : ''
+  return `${base}/reservar/${enlace}${consulta}#codigo=${digitos}`
+}
+
 async function emitirUnaVez(clinicaId: string, citaId: string, creadoPor: string | null): Promise<{ id: string; hash: string } | null> {
   const id = randomUUID()
   const codigo = codigoDeConfirmacion(id)

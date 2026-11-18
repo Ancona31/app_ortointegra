@@ -50,6 +50,8 @@ export const PedirCodigoSchema = z.strictObject({
    * Si no es uno de los del enlace, se ignora; nunca decide nada.
    */
   consultorio_id: UUID.optional(),
+  /** K2 (punto 9): el `?origen=` (E6) de la página, para que «Continuar mi reserva» lo conserve. Nunca decide nada aquí. */
+  origen: z.string().regex(/^[A-Za-z0-9_-]{22}$/).optional(),
 })
 
 /** POST /api/reservar/[codigo]/verificar */
