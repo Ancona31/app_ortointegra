@@ -845,3 +845,286 @@ Lo que vio el coordinador y el revisor no:
 - **K6 · El revisor del paso 3 de la integración** (Sonnet, aparte) confirmó en
   vivo el md5, los permisos, que el JOIN no cruza clínicas y que los disparadores
   de `consultorios` no interfieren: APTA CON CAMBIOS, sólo documentales.
+
+## 11. Tanda I (2026-11-17)
+
+Cinco ramas escritas en paralelo sobre la base local (`feature/agenda-v2-i1` a
+`-i5`), fusionadas con `--no-ff` en `feature/agenda-v2` en el orden I1, I2, I3,
+I4, I5. I1 no trae migraciones; I2 trae dos, I3 una, I4 tres e I5 una. En la
+integración se editó `20261121150000` (el WHEN del aviso de Google, §11.3 C).
+Aquí se auditan juntas sobre la base reiniciada desde cero.
+
+### 11.1 El conjunto, desde cero
+
+`ls supabase/migrations/*.sql` = **39**: las 5 de `main`, las 27 del proyecto
+hasta la tanda H y las 7 nuevas. (`git diff --name-only main...HEAD --
+supabase/migrations` da 34: las 5 de `main` no salen en el diff. El encargo
+decía «33 + 8 = 41»; el número que hay en el disco es 39.)
+`supabase db reset --local` (CLI 2.117.0) aplicó las 39 en orden y sin un error,
+en 27–28 s; `schema_migrations` = 39, última `20261121150000`. Semilla en 1.4 s.
+Segunda pasada de las 7 nuevas sobre esa base: todas sin error y **huella
+idéntica** (idempotentes). Los pre-vuelos que exigen md5 de un cuerpo anterior
+(`cita_proteger_atendida` de `20261120130000`, `agenda_restablecer_configuracion`
+de `20261120121000`, las funciones de seg1 y D3 de `reservar_por_enlace`)
+pasaron en el reinicio, así que esos md5 son los de los archivos del repo.
+
+### 11.2 Veredicto de las siete
+
+| # | Archivo | Qué hace | Auditoría previa (cabecera) | Integración | Veredicto |
+|---|---|---|---|---|---|
+| I2a | `20261121120000_agenda_i2_unico_sin_correo.sql` | `reservar_por_enlace` acepta `p_correo` NULL con un enlace ÚNICO (el fijo sigue exigiéndolo); sin correo guarda un seudónimo `sha256('reserva-sin-correo:'‖id)` en `reserva_correo_hmac` para cumplir el CHECK de seg1 | APTA | Sin cambios | APTA |
+| I2b | `20261121121000_agenda_i2_candado_eleccion.sql` | `trg_appointments_proteger_eleccion` → `cita_proteger_eleccion()` (INVOKER): en una cita por enlace futura con la v2 encendida el médico no cambia y consultorio/día/hora sólo los cambia `cita_reagendar_clinica` (sólo `service_role`, con el GUC `spinus.reagendar_cita`) | APTA CON OBSERVACIONES | Sin cambios | APTA |
+| I3 | `20261121130000_agenda_i3_por_asignar_google.sql` | `appointments.google_asignacion` (`por_asignar`/`evento`, NULL) con su CHECK; `trg_appointments_asignacion_google` → `cita_asignacion_google()` marca `por_asignar` sólo lo que importa el sondeo (`service_role` + `spinus.via=google`) y deja a la sesión sólo `por_asignar → evento` | APTA CON OBSERVACIONES | Sin cambios | APTA |
+| I4a | `20261121140000_agenda_i4_atendida_no_se_mueve.sql` | `cita_proteger_atendida()` (de H5) también veta mover una atendida con nota con la v2 APAGADA | APTA | Sin cambios | APTA |
+| I4b | `20261121141000_agenda_i4_horario_revisado.sql` | `consultorios.horario_revisado_en timestamptz` NULL y `agenda_restablecer_configuracion` la vuelve a NULL. Todos los consultorios existentes nacen «por revisar» (a propósito, cabecera) | APTA CON CAMBIOS (menores, aplicados) | Sin cambios | APTA |
+| I4c | `20261121142000_agenda_i4_cancelada_cerrada.sql` | `appointments.cerrada_en` y `sustituida_por` (FK a `appointments`, RESTRICT), CHECK de coherencia, `trg_appointments_proteger_cierre` → `cita_proteger_cierre()`: sólo `service_role` cierra, sólo una cancelada, con una sustituta viva de la misma clínica; nadie reabre | APTA CON CAMBIOS (menores, aplicados) | Sin cambios | APTA |
+| I5 | `20261121150000_agenda_i5_avisos_clinica.sql` | tabla `avisos_clinica` (RLS), `agenda_ajustes.correo_reserva_clinica`, cinco funciones `aviso_clinica_*` y sus disparadores en `appointments`, `cita_confirmaciones`, `cita_reagendos` y `reserva_empalmes_google`; arrastre de lo ya pendiente | APTA CON OBSERVACIONES | **Editada en su sitio:** WHEN del disparador de citas y pre-vuelo (§11.3 C) | APTA |
+
+### 11.3 Conflictos entre ellas y con las anteriores
+
+**A · Los BEFORE de `appointments`.** Son ahora seis (catálogo de la base reiniciada; en los archivos no hay otro
+BEFORE sobre `appointments`) y corren en orden de nombre: `trg_appointments_asignacion_google` < `…_proteger_atendida` <
+`…_proteger_borrado` < `…_proteger_cierre` < `…_proteger_eleccion` <
+`…_proteger_reserva`. Todos INVOKER con `search_path=''`. Sólo
+`asignacion_google` cambia `NEW` (la columna `google_asignacion`, que ningún otro
+mira); los demás sólo aceptan o rechazan, así que el orden decide qué mensaje
+sale, no qué se escribe. No se solapan:
+- `proteger_eleccion` sólo actúa con `OLD.reserva_canal IS NOT NULL`; una cita
+  de Google por asignar tiene `reserva_canal` NULL.
+- `proteger_atendida` sólo con `OLD.status = 'attended'` y cambios de estado u
+  horas; ni «¿No es una cita?» (sólo `google_asignacion`) ni el cierre de I4
+  (sólo `cerrada_en`/`sustituida_por`) tocan esas columnas.
+- `proteger_cierre` exige `service_role`, una cancelada y una sustituta viva de
+  la misma clínica: no coincide con una atendida ni con una elegida viva.
+- En INSERT, `asignacion_google` pone NULL a todo salvo al sondeo: una sesión no
+  puede sembrar `por_asignar` ni `evento`.
+Los AFTER (`audit_appointments*`, `trg_appointments_reserva_incidencia`,
+`trg_appointments_aviso_clinica`) no escriben en `appointments`:
+`aviso_clinica_de_cita()` es DEFINER y sólo inserta en `avisos_clinica`; no hay
+recursión. Las pruebas `d4_gcal_por_ligar` y `h5_atendida_con_nota`, que I2 e I4
+adaptaron en sus ramas, pasan sobre el conjunto.
+
+**B · Google: I2 frente a I3.** I2 mapea el 42501 «reservada por enlace» de
+`gcal_aplicar_evento` a `CambioRechazadoPorLaBase` (auditado
+`gcal_cambio_rechazado`, motivo `eleccion_paciente`) y Spinus reescribe Google.
+I3 no tocó `gcalSincronizacion*.ts`: su marca vive entera en el BEFORE INSERT.
+`gcal_importar_evento` (INVOKER, llamada por `service_role`) pone
+`spinus.via=google` antes de su INSERT, que es lo que `cita_asignacion_google()`
+reconoce. Sin choque de código ni de base.
+
+**C · El aviso de Google de I5 con la marca de I3 (editado en la integración).**
+I5 se escribió sin I3 y su WHEN copiaba el criterio «sin paciente, sin canal,
+`origen = 'google'`», sin el «quién». Con I3 delante, un INSERT de `postgres`
+(semilla, SQL Editor) o de la sesión con `origen = 'google'` dejaba un aviso
+«por asignar» de una cita que la agenda no marcaba así (y en la que no hay botón
+«¿No es una cita?»). El WHEN es ahora `NEW.reserva_enlace_id IS NOT NULL OR
+NEW.google_asignacion = 'por_asignar'`: un AFTER ROW evalúa su WHEN con la fila
+final, después de los BEFORE, así que ve la marca que puso
+`cita_asignacion_google()`. El pre-vuelo exige ahora 6 columnas (con
+`google_asignacion`), así que **I5 aborta limpio sin I3** (y va después por
+nombre: 130000 < 150000). Los cuerpos de las cinco `aviso_clinica_*` no cambian:
+el md5 de su pre-vuelo sigue valiendo. La prueba `i5_avisos_clinica` (caso 2)
+inserta ahora las filas de Google como `service_role` con `spinus.via=google`,
+comprueba la marca fila a fila y añade `0a16` (Google insertado por `postgres`:
+sin aviso); con el WHEN viejo da rojo (`google_por_asignar>0a11,
+google_por_asignar>0a16`). Nada de esto está aplicado en producción: editar en
+sitio no deja dos versiones del mismo archivo.
+
+**D · `reservar_por_enlace` (I2) frente a seg1, D3 y el CHECK de D1.** El CHECK
+`appointments_reserva_check` de `20261114120000` exige `reserva_correo_hmac` NOT NULL en las citas de
+reserva; I2 lo cumple sin correo con un seudónimo que no coincide con nadie (no
+cuenta para el tope por correo ni para el bloqueo por correo; el bloqueo MANUAL
+por teléfono sigue cortando). El fijo sigue exigiendo correo (`i2_unico_sin_correo`
+caso 4). El correo a la clínica de I5 (`avisarReservaAClinica`) sale también
+sin correo del paciente: se arregló en la fusión de la ruta, que hacía `return`
+antes de avisar (e2e «20 · el único sin correo también avisa a la clínica»).
+
+**E · `agenda_restablecer_configuracion` (H2 → I4b).** I4b sólo añade
+`horario_revisado_en = NULL` al UPDATE de consultorios ya acotado a la clínica
+(§10.3 F). La huella muestra que es uno de los tres objetos previos cambiados
+(§11.4), y el único cambio es ése.
+
+**F · Un solo canal de tiempo real** (`appointments-realtime`), que I1 hace
+sobrevivir 2 min fuera de la agenda; I4 le añade «si viene cerrada, se quita» e
+I5 lo reutiliza para recargar la campana con `cambioPuedeAvisar` (que ahora
+mira `google_asignacion = 'por_asignar'`, la misma marca que el WHEN). No es de
+base, se anota aquí porque decide qué avisos ve el personal sin recargar.
+
+### 11.4 Catálogo: qué cambió de verdad
+
+Huella md5 por objeto de `public` (definición y `proacl` de cada función, cada
+policy, cada disparador con su estado, `relacl`/RLS de cada tabla y cada
+constraint) de la base recién reiniciada con las 39, contra `main` (5) y contra
+la de H (32), reiniciadas igual desde `git archive` de cada una:
+
+- **Contra `main` (336 huellas): 0 objetos cambiados o quitados**, 226 nuevos.
+- **Contra H (534 huellas): 0 quitados, 3 cambiados** — `reservar_por_enlace`
+  (I2a), `cita_proteger_atendida()` (I4a) y `agenda_restablecer_configuracion`
+  (I4b), los tres a propósito y con su `CREATE OR REPLACE` (mismo `proacl`) — y
+  **28 nuevos**: 9 funciones (`aviso_clinica_de_cita/_de_empalme/_de_reagendo/
+  _de_respuesta/_revisar`, `cita_asignacion_google`, `cita_proteger_cierre`,
+  `cita_proteger_eleccion`, `cita_reagendar_clinica`), 9 disparadores (cuatro en
+  `appointments`, dos en `avisos_clinica`, uno en `cita_confirmaciones`,
+  `cita_reagendos` y `reserva_empalmes_google`), 7 constraints
+  (`appointments_cierre_check`, `appointments_google_asignacion_check`,
+  `appointments_sustituida_por_fkey`, y las cuatro de `avisos_clinica`), 2
+  policies y la tabla `avisos_clinica` (562 en total). Ninguna policy previa
+  cambia; ninguna tabla previa cambia de permisos ni de RLS. (Las columnas
+  nuevas no entran en la huella.)
+
+### 11.5 Permisos de funciones
+
+Ninguna función de la tanda tiene EXECUTE a PUBLIC; todas `search_path=''`.
+
+| Función | DEFINER | anon | authenticated | service_role |
+|---|---|---|---|---|
+| `cita_reagendar_clinica(uuid,uuid,uuid,uuid,timestamptz,timestamptz,timestamptz)` | no | — | — | sí |
+| `reservar_por_enlace(…)` (cambiada) | no | — | — | sí |
+| `agenda_restablecer_configuracion(uuid,uuid)` (cambiada) | no | — | — | sí |
+| `cita_asignacion_google()`, `cita_proteger_cierre()`, `cita_proteger_eleccion()`, `cita_proteger_atendida()` (de disparador) | no | sí | sí | sí |
+| `aviso_clinica_de_cita()`, `_de_empalme()`, `_de_reagendo()`, `_de_respuesta()` (de disparador) | **sí** | sí | sí | sí |
+| `aviso_clinica_revisar()` (de disparador) | no | sí | sí | sí |
+
+Las cuatro DEFINER son de disparador (no se llaman por PostgREST: devuelven
+`trigger`), su dueño es `postgres` y sólo escriben en `avisos_clinica` (insertan;
+`aviso_clinica_de_reagendo` además reetiqueta con un UPDATE el aviso
+`reserva_enlace` pendiente de la cita a `reagendado_paciente`), con `clinica_id`
+y `cita_id` tomados de la fila que las dispara. Son DEFINER para
+no depender de quién escribe (la sesión no tiene INSERT en `avisos_clinica`, y
+las RPC de `service_role` de siempre tampoco). Ninguna necesita
+`supabase_auth_admin` ni `supabase_storage_admin`: no las alcanza Auth ni
+Storage.
+
+**`p1_permisos_funciones.sql`, caso 3, en la base combinada.** Reinicio con las
+**42** (5 de `main`, las tres `20261014*` de `feature/limites-ajustables` y las
+34 del proyecto): todas aplican sin fallo y **ninguna función de `public` queda
+con EXECUTE a PUBLIC**. El caso 3 da rojo, como se esperaba: la lista son ahora
+**45 funciones**, las 44 del §10.5 más
+`cita_reagendar_clinica(uuid,uuid,uuid,uuid,timestamp with time zone,timestamp with time zone,timestamp with time zone)`;
+ninguna baja. (`cita_proteger_cierre()` y las demás de disparador tienen los
+tres roles y no entran.) Con esta lista pegada, `p1` pasa entero en la
+combinada. **Ésta es la lista para pegar al fusionar las dos ramas** (sustituye
+a la del §10.5):
+
+  ```
+  agenda_restablecer_configuracion(uuid,uuid), alta_conexion_google(uuid,uuid,text,text,text,text,text,bigint), cita_confirmacion_contexto(text), cita_confirmacion_emitir(uuid,uuid,uuid,text,uuid), cita_confirmacion_responder(uuid,text,text), cita_confirmacion_revocar(uuid,uuid), cita_correo_marcar(uuid,uuid,uuid,text,text), cita_correo_tomar(uuid,uuid,text,uuid), cita_correos_pendientes(integer), cita_reagendar_clinica(uuid,uuid,uuid,uuid,timestamp with time zone,timestamp with time zone,timestamp with time zone), cita_reagendar_oferta(uuid,text), cita_recordatorios_pendientes(integer), cita_rsvp_google(uuid,uuid,text,text,text[]), cita_tiene_nota_ligada(uuid,uuid), crear_paciente_con_medico(jsonb,uuid), enforce_limite_documentos_paciente(), gcal_aplicar_evento(uuid,uuid,timestamp with time zone,text,text,timestamp with time zone,text,boolean,timestamp with time zone,timestamp with time zone,boolean,text,boolean,text,boolean), gcal_citas_por_evento(uuid,text[],uuid[]), gcal_importar_evento(uuid,text,text,text,timestamp with time zone,text,timestamp with time zone,timestamp with time zone,boolean,text,text,uuid), gcal_sync_avanzar(uuid,uuid,text,text,timestamp with time zone,integer), gcal_sync_clinica_habilitada(uuid), gcal_sync_clinicas_pendientes(integer), gcal_sync_frescura(uuid), gcal_sync_reiniciar(uuid,uuid), gcal_sync_soltar(uuid,uuid,text), gcal_sync_tomar(uuid,uuid,text,integer,integer), generar_folio(text), guardar_secretos_conexion(uuid,uuid,text,text,bigint), leer_conexion_google_con_secretos(uuid,uuid), rate_limit_intento(text,text,integer,integer), rate_limit_reset(text), reagendar_por_enlace(text,uuid,text,uuid,uuid,timestamp with time zone,text,text,text,text,text,text,text,text,uuid), reserva_codigo_emitir(uuid,uuid,text,text), reserva_codigo_verificar(uuid,uuid,text,text,text), reserva_contacto_estado(uuid,uuid,text,text), reserva_contacto_marcar(uuid,text), reserva_contactos_bloqueados(), reserva_contexto(text,text,text), reserva_empalmes_registrar(uuid,uuid[]), reserva_enlace_emitir(uuid,uuid,uuid,uuid,text,text,text), reserva_enlace_regenerar_fijo(uuid,uuid,text), reserva_ocupacion(uuid,uuid,timestamp with time zone,timestamp with time zone), reservar_por_enlace(uuid,text,uuid,uuid,timestamp with time zone,text,text,text,text,text,text,text,text,uuid), sync_antropometria_paciente(uuid), trg_mediciones_antropometria()
+  ```
+
+En la combinada, además, `i2_unico_sin_correo.sql` daba `permission denied for
+function unico`: con P1 las funciones que crea `postgres` nacen sin EXECUTE a
+PUBLIC, también las de `pg_temp`, y la prueba llama a `pg_temp.unico` como
+`service_role`. Se añadió al GRANT de la prueba (`e409396`); el resto de las 38
+pruebas (`p1` con la lista nueva, `p1b`, `p2`, `p3` y las 34 del proyecto), en
+verde en la combinada. Contra la combinada (huella de 569): los objetos del
+proyecto, idénticos en definición; sólo cambian los `proacl` que P1 cierra
+(41 funciones de `main`), y se añaden los 7 objetos de limites.
+
+### 11.6 Contrato con spinus-consola y RLS de `avisos_clinica`
+
+**Consola.** Ninguna de las siete nombra `ajuste_*`, `limite_efectivo` ni
+`clinica_tiene_acceso()`, ni hace `ALTER`/`UPDATE` sobre `clinicas` (grep sobre
+los siete archivos: 0). Las columnas nuevas son de `appointments`,
+`consultorios` y `agenda_ajustes`; ninguna se renombra ni cambia de tipo. Sin
+CASCADE: la única FK nueva entre tablas existentes es
+`appointments.sustituida_por → appointments(id)` RESTRICT, y la de
+`avisos_clinica.clinica_id → clinicas` es RESTRICT.
+
+**`avisos_clinica`.** RLS activada. Privilegios: `authenticated` sólo SELECT y
+UPDATE de columna (`revisado_en`, `revisado_por`); `anon` y `service_role`
+nada (el servidor lee con la sesión). Sin policies de INSERT ni DELETE: sólo la
+escriben los disparadores DEFINER de dueño `postgres`. Policies (PERMISSIVE,
+`authenticated`):
+- `avisos_clinica_select`: `clinica_id = get_clinica_id()` **y** existe la cita
+  en `appointments` de esa clínica. El EXISTS corre con la RLS de
+  `appointments` de quien lee, así que cada uno ve los avisos de las citas que ya
+  ve (el médico las suyas; el administrador y la secretaria, las de la clínica).
+- `avisos_clinica_update`: lo mismo y `revisado_en IS NULL` en USING; en WITH
+  CHECK, `revisado_por = auth.uid()`. Un aviso revisado no se reabre ni
+  cambia de autor: `aviso_clinica_revisar()` (BEFORE UPDATE) conserva
+  `revisado_en`/`revisado_por` si ya estaban y, al revisar, sella `revisado_en`
+  con `now()` (no con la hora que mande el cliente).
+Sin FK a `appointments` a propósito (como `reserva_empalmes_google`): una cita
+borrada deja su aviso, que deja de verse porque el EXISTS falla. CHECK de tipo
+con los cinco tipos y CHECK `revisado_por IS NULL OR revisado_en IS NOT NULL`.
+
+### 11.7 Orden de despliegue y tolerancia
+
+Cada cabecera trae su orden respecto al código; juntas:
+
+| Migración | Orden | Sin la migración y con el código nuevo |
+|---|---|---|
+| I2a | migración primero | el código viejo siempre manda correo; con el nuevo y sin ella, un único sin correo lo rechaza el cuerpo de seg1 (22023 → 400 `solicitud_invalida`; por lectura de `respuestasReserva.ts` y del cuerpo, no ejecutado): la página del único, que ya no pide correo, falla al reservar sin él. Por eso va primero |
+| I2b | migración primero | «Reagendar» responde 503 (RPC ausente); la API ya vetaba por su cuenta (409). Con ella y el código VIEJO, editar o arrastrar una cita por enlace futura da 500 de la base (no escribe nada) |
+| I3 | migración antes | el código sólo nombra la columna con la v2 y trata 42703/PGRST204 como «no disponible» (`no-es-cita` → 503) |
+| I4a | cualquiera | sin ella, con la v2 apagada, PostgREST directo aún movería una atendida (la API no) |
+| I4b | migración primero si la v2 está encendida | **arreglado en la integración:** daba 500 al guardar un horario; ahora el PATCH reintenta sin la columna |
+| I4c | migración primero si la v2 está encendida | **arreglado en la integración:** el alta con `sustituye_a` daba 500; ahora entra sin cerrar la cancelada |
+| I5 | cualquiera | la campana enseña lo de antes (`avisos_disponibles: false`), el interruptor del correo «no disponible» (503) |
+
+**Prueba de tolerancia** (base local reiniciada SÓLO con las 32 de H,
+`db reset --local --workdir` desde un `git archive 0349221`; el `next start`
+:3001 con el build de la rama; v2 encendida en A):
+- 13 e2e de antes que tocan los caminos que la tanda cambió (`agenda-cancelar`,
+  `-avisos`, `-citas`, `-por-ligar`, `-tiempo-real`, `reserva-enlace`,
+  `agenda-f-tarjeta`, `-interruptor`, `-horario-validacion`, `-secretaria`,
+  `-panel-dia`, `-cache-rangos`, `-ligar-consulta`), escritorio: **71 pasan, 2
+  saltadas, 0 fallan**.
+- Sondas con la sesión de admin.a: `/agenda` 200; `GET /api/avisos` 200
+  `{"avisos":[],"avisos_disponibles":false}`; `/api/agenda/por-confirmar` 200;
+  `PATCH /api/me/ajustes-agenda {correo_reserva_clinica}` 503 `no_disponible`;
+  `POST …/reagendar` de una cita sin enlace 409 `no_aplica`; `POST …/no-es-cita`
+  503 `no_disponible`. Con la v2 APAGADA, las rutas nuevas dan 404
+  `no_disponible`.
+- **Dos 500, arreglados** (`e409396`, revisor Sonnet APTO):
+  `PATCH /api/consultorios/[id]` («Could not find the 'horario_revisado_en'
+  column») y `POST /api/appointments` con `sustituye_a` («cita a sustituir sin
+  leer: 42703»). Tras el arreglo: 200 y 409 `empalme` (el flujo normal). El
+  primero se probó en rojo con el build anterior y en verde con el nuevo sobre la
+  misma base; el segundo, además, con una Vitest en rojo por mutación.
+
+Orden de despliegue recomendado (sin cambios respecto de la guía §13.2): las 34
+del proyecto en orden de nombre, ANTES del código; la v2 se enciende después.
+
+### 11.8 Hallazgos
+
+- **L1 · El WHEN de I5 (§11.3 C).** Corregido en la integración.
+- **L2 · Dos rutas sin tolerancia a columna ausente (§11.7).** Corregidas.
+- **L3 · El número de migraciones del encargo (41) no es el del disco (39).**
+- **L4 · Pre-vuelos que comparan texto deparseado y no md5** (del revisor de la
+  tabla del punto 24): las policies de `tipos_cita` en
+  `20261119120000`/`20261119121000`, `appointments_update` en `20261121121000`,
+  los WHEN de los disparadores de B0 en `20261113130000`/`20261115120000` y la
+  forma de `clinica_tiene_acceso()`/`clinica_no_suspendida()` en
+  `20261113120000`. Pueden abortar en producción por una diferencia de versión de Postgres o
+  de `search_path`, no sólo por un cambio real. Aborto limpio (transacción
+  revertida), no daño. Se recoge en la tabla de `mejora_agendaV2.md` §7.
+- **L5 · `20260919230000_auth_02_reasentar_grants_rate_limit.sql` dice en su
+  cabecera «PRODUCCIÓN: PENDIENTE DE APLICAR»**, mientras §7 cuenta las 5 de
+  `main` como aplicadas. No se comprobó en producción (prohibido en esta tanda):
+  a mirar en `schema_migrations` antes del ensayo.
+- **L6 · El candado de lo elegido sólo protege lo que no ha empezado** (revisor
+  del §11): `cita_proteger_eleccion` deja libre una cita por enlace con
+  `OLD.start_time <= now()`, así que una que ya empezó se puede mover a una hora
+  futura sin «Reagendar» ni correo. Es el diseño de I2 (las pasadas se corrigen
+  desde el formulario; `cita_reagendar_clinica` responde `pasada`), no un hueco
+  nuevo; se anota para que nadie lo lea como garantía de «nunca se mueve».
+- **L7 · Una cancelada cerrada no se reactiva por ningún camino** (CHECK
+  `appointments_cierre_check` + `cita_proteger_cierre`): un PUT que intentara
+  cambiarle el estado acabaría en un error de la base. Hoy no hay pantalla que
+  la enseñe (deuda de I4), así que nadie llega a ella por la interfaz.
+- **L8 · FK nuevas RESTRICT que frenan limpiezas como `postgres`:**
+  `avisos_clinica.clinica_id → clinicas` (borrar una clínica de prueba con
+  avisos) y `appointments.sustituida_por → appointments` (borrar una sustituta
+  antes que su cerrada). SUPONGO, sin comprobar, que borrar las dos en la misma
+  sentencia puede fallar según el orden de filas. Sólo afecta a la semilla y a
+  las e2e que limpian; la API traduce el 23503 a 409.
+- **L9 · Cosmético en las rejillas de I3, I4a e I4c:** el renglón de PUBLIC usa
+  `aclexplode(p.proacl)` sin `coalesce(…, acldefault(…))`. Con `proacl` NULL
+  diría «sin PUBLIC» aunque lo tuviera; no pasa porque el REVOKE acaba de
+  ejecutarse y deja `proacl` no nulo.
+- **Revisor del §11** (Sonnet, sin ver estas conclusiones): APTA CON CAMBIOS,
+  sólo de texto. Pidió corregir tres celdas de «Auditoría previa» de §11.2, la
+  frase «sólo insertan» de §11.5 y la atribución D1/D2 de §11.3 D: corregidas.
+  Confirmó la lista de 45 contando desde los GRANT de los archivos y que la única
+  alta frente a las 44 es `cita_reagendar_clinica`. Sus R1–R6 son L6–L9 y la
+  fila de I4b (todos «por revisar»).
