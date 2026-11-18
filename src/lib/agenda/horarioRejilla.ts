@@ -120,7 +120,7 @@ function paredEnZona(t: number, zona: string): Record<string, number> | null {
 }
 
 /** Minutos de desfase de `zona` respecto de UTC en el instante `t`, o `null` si la zona no vale. */
-function desfaseUtc(zona: string, t: number): number | null {
+export function desfaseUtc(zona: string, t: number): number | null {
   const p = paredEnZona(t, zona)
   if (!p) return null
   const minuto = Math.floor(t / 60_000) * 60_000

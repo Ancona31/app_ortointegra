@@ -78,6 +78,7 @@ import { DIAS, horarioToBusinessHours } from '@/lib/agenda/horarioAgenda'
 import {
   consultoriosDeLaRejilla, crearAvisosHorario, fuenteDeLaRejilla, type ConsultorioRejilla, type FuenteRejilla,
 } from '@/lib/agenda/horarioRejilla'
+import { leyendaHusos } from '@/lib/agenda/leyendaHusos'
 import { useAjusteTurno } from '@/app/(app)/agenda/useAjusteTurno'
 import type { TipoCita } from '@/lib/agenda/tiposCita'
 import type { CitaPorAsistir } from '@/lib/agenda/asistenciaServidor'
@@ -640,6 +641,12 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
   }, fuenteRef.current), [agendaV2, horarioClinicaConfig, seleccion, navegadorTZ, referenciaHusos])
   fuenteRef.current = fuente
   const horario = fuente.horario
+  /* Tanda K (punto 15) · La rejilla va en la hora del dispositivo; la leyenda lo dice cuando hay más de un huso en
+     juego (`leyendaHusos.ts`). Con lo que ya hay: los consultorios que trajo la página y la zona de `Intl`; sin
+     peticiones, y fuera de `<FullCalendar>` (va en `AvisosAgenda`). Sólo con la v2 y con los consultorios leídos. */
+  const leyendaDeHusos = useMemo(() => agendaV2 && consultoriosListos ? leyendaHusos({
+    consultorios: consultoriosV2, medicoMostrado, zonaDispositivo: navegadorTZ, referencia: referenciaHusos,
+  }) : null, [agendaV2, consultoriosListos, consultoriosV2, medicoMostrado, navegadorTZ, referenciaHusos])
   const avisosHorario = useMemo(() => crearAvisosHorario({
     agendaV2, horarioClinica: horarioClinicaConfig, consultorios: consultoriosV2, seleccion,
   }), [agendaV2, horarioClinicaConfig, consultoriosV2, seleccion])
@@ -1888,6 +1895,7 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
           avisoRecorte={avisoRecorte}
           compactaElMes={compactaElMes}
           onSalirCompacta={() => setCompactar(false)}
+          leyendaHusos={leyendaDeHusos}
         />
         <FullCalendar
           ref={calendarRef}
