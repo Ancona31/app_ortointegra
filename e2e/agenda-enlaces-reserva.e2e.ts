@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
-import { CORREO, SESION, interruptorAgenda, pestanaConfig, soloEscritorio, sqlLocal, enContextoNuevo } from './ayudas'
+import { CORREO, SESION, interruptorAgenda, pestanaConfig, sinPendientesAgenda, soloEscritorio, sqlLocal, enContextoNuevo } from './ayudas'
 import { bloquearContactoE2e, crearCitaPorLigar, aparcarEnlacesVigentes, devolverEnlaces, limpiarReservasE2e, marcaE2e } from './reservaAyudas'
 
 /**
@@ -16,6 +16,13 @@ import { bloquearContactoE2e, crearCitaPorLigar, aparcarEnlacesVigentes, devolve
  * ⚠️ NECESITA `RESERVA_SECRETO` en el servidor que sirve las pruebas: sin él
  * el alta contesta 503 (se comprueba aparte, en Vitest, que nada se escribe).
  * Lo que se crea se borra al terminar (`limpiarReservasE2e`, ver su nota).
+ *
+ * Tanda J (J5): la pantalla es la de las maquetas. El enlace fijo propio es el
+ * interruptor de «Tu enlace» (prenderlo = crearlo; la dirección se enseña sola
+ * = «Mostrar»; «Cambiar por uno nuevo» = «Regenerar»; apagarlo = «Revocar»);
+ * los de una vez, «Enlaces de una vez»; los bloqueados, «Más opciones ›
+ * Personas bloqueadas». Para ver las pestañas y no el funnel, el médico tiene
+ * antes su duración y su horario confirmado (`sinPendientesAgenda`).
  */
 soloEscritorio()
 test.use({ storageState: SESION.adminA })
@@ -41,15 +48,20 @@ function enlacesDe(medicoId: string): string[] {
   { m: medicoId, d: desde }).split('\n').filter(Boolean)
 }
 /** Tanda H, punto 5: la sección va en su pestaña. */
-async function abrir(page: Page, pestana = 'Enlaces de reserva'): Promise<void> {
+async function abrir(page: Page, pestana = 'Tu enlace'): Promise<void> {
   await page.goto(RUTA)
   await pestanaConfig(page, pestana)
-  await expect(page.getByRole('heading', { name: pestana })).toBeVisible()
+  await expect(page.getByRole('tabpanel', { name: pestana })).toBeVisible()
 }
 
+/** Lo de `sinPendientesAgenda`, deshecho al terminar cada prueba. */
+let deshacer: Array<() => void> = []
 test.afterEach(() => {
-  limpiarReservasE2e(desde)
-  interruptorAgenda('A', false)
+  try { for (const d of deshacer) d() } finally {
+    deshacer = []
+    limpiarReservasE2e(desde)
+    interruptorAgenda('A', false)
+  }
 })
 
 test('con el interruptor apagado, las rutas de gestión dan 404', async ({ page }) => {
@@ -66,26 +78,33 @@ test('con el interruptor apagado, las rutas de gestión dan 404', async ({ page 
 
 test('el administrador crea, muestra, regenera y revoca el enlace fijo de un médico', async ({ page }) => {
   interruptorAgenda('A', true)
+  deshacer.push(sinPendientesAgenda(CORREO.adminA, { conEnlace: false }))
   await abrir(page)
-  /* El administrador ve primero su bloque (el de la invitada va plegado, tanda H punto 6); se usa el suyo. */
-  await page.getByRole('button', { name: 'Crear enlace fijo' }).first().click()
-  const direccion = page.getByRole('textbox', { name: 'Dirección de Enlace fijo' })
-  await expect(direccion).toHaveValue(/\/reservar\/[A-Za-z0-9_-]{22}$/)
-  const primera = await direccion.inputValue()
+  const panel = page.getByRole('tabpanel', { name: 'Tu enlace' })
+  const direccion = panel.locator('[data-enlace-fijo]')
+  /* Crear: prender el interruptor. */
+  await panel.getByRole('switch', { name: /^Apagado/ }).click()
+  await expect(direccion).toHaveText(/\/reservar\/[A-Za-z0-9_-]{22}$/)
+  const primera = await direccion.textContent()
 
+  /* Mostrar: al volver, la misma dirección, sin pedirla. */
   await abrir(page)
-  await page.getByRole('button', { name: 'Mostrar Enlace fijo' }).first().click()
-  await expect(page.getByRole('textbox', { name: 'Dirección de Enlace fijo' }).first()).toHaveValue(primera)
+  await expect(direccion).toHaveText(primera ?? '')
 
-  await page.getByRole('button', { name: 'Regenerar Enlace fijo' }).first().click()
+  /* Regenerar: «Cambiar por uno nuevo», con confirmación. */
+  await panel.getByRole('button', { name: 'Cambiar por uno nuevo' }).click()
   await page.getByRole('button', { name: 'Aceptar' }).click()
-  await expect(page.getByRole('textbox', { name: 'Dirección de Enlace fijo' }).first()).not.toHaveValue(primera)
+  await expect(direccion).toHaveText(/\/reservar\/[A-Za-z0-9_-]{22}$/)
+  await expect(direccion).not.toHaveText(primera ?? '')
   const todos = [...enlacesDe(idDe(CORREO.medicoA)), ...enlacesDe(idDe(CORREO.adminA))]
   expect(todos.filter(e => e.startsWith('fijo:'))).toEqual(expect.arrayContaining(['fijo:false:-', 'fijo:true:-']))
 
-  await page.getByRole('button', { name: 'Revocar Enlace fijo' }).first().click()
+  /* Revocar: apagar el interruptor, con confirmación. */
+  await panel.getByRole('switch', { name: /^Prendido/ }).click()
   await page.getByRole('button', { name: 'Aceptar' }).click()
-  await expect(page.getByText('Enlace revocado')).toBeVisible()
+  await expect(panel.getByRole('switch', { name: /^Apagado/ })).toHaveAttribute('aria-checked', 'false')
+  await expect(page.locator('[data-aviso-config]')).toHaveText('Guardado')
+  expect(enlacesDe(idDe(CORREO.adminA))).toEqual(['fijo:false:-', 'fijo:false:-'])
   expect(todos.length).toBe(2)
 })
 
@@ -102,8 +121,9 @@ test('un enlace de un solo uso nace con la vigencia del ajuste y se revoca', asy
   /* Un cuerpo con la vigencia o la clínica se rechaza: las pone la base. */
   expect((await page.request.post('/api/agenda/enlaces', { data: { clase: 'unico', medico_id: idDe(CORREO.adminA), vigencia_dias: 30 } })).status()).toBe(400)
 
+  deshacer.push(sinPendientesAgenda(CORREO.adminA))
   await abrir(page)
-  await expect(page.getByText('Un solo uso · Sra. Prueba')).toBeVisible()
+  await expect(page.getByRole('group', { name: 'Sra. Prueba' })).toContainText('Sin usar · deja de servir el')
   expect((await page.request.get(`/api/agenda/enlaces/${enlace.id}`)).ok()).toBeTruthy()
   expect((await page.request.patch(`/api/agenda/enlaces/${enlace.id}`, { data: { accion: 'revocar' } })).ok()).toBeTruthy()
   expect((await page.request.get(`/api/agenda/enlaces/${enlace.id}`)).status()).toBe(410)
@@ -119,10 +139,12 @@ test('el médico invitado sólo gestiona sus enlaces', async ({ browser }) => {
     expect(ajeno.status()).toBe(403)
     const lista = await (await page.request.get('/api/agenda/enlaces')).json() as { enlaces: { medico_id: string }[] }
     expect(lista.enlaces.every(e => e.medico_id === idDe(CORREO.medicoA))).toBe(true)
+    deshacer.push(sinPendientesAgenda(CORREO.medicoA))
     await abrir(page)
-    /* Acotado a la sección: «un solo uso» también sale en la de ajustes
-       («Vigencia del enlace de un solo uso»). */
-    await expect(page.getByRole('region', { name: 'Enlaces de reserva' }).getByText('Un solo uso', { exact: true })).toBeVisible()
+    /* El suyo, sin etiqueta, en «Enlaces de una vez»; ni rastro de los de los demás. */
+    const panel = page.getByRole('tabpanel', { name: 'Tu enlace' })
+    await expect(panel.getByRole('group', { name: 'Sin nombre' })).toContainText('Sin usar')
+    await expect(panel.getByRole('button', { name: /Enlaces de los demás médicos/ })).toHaveCount(0)
   })
 })
 
@@ -132,10 +154,12 @@ test('un contacto bloqueado sale en la lista y se desbloquea a mano', async ({ p
   inicio.setUTCHours(16, 0, 0, 0)
   const c = crearCitaPorLigar({ correo: CORREO.medicoA, inicio: inicio.toISOString(), minutos: 30, nombre: 'Persona Bloqueada E2E', canal: 'fijo' })
   bloquearContactoE2e(c)
-  await abrir(page, 'Contactos bloqueados')
-  const fila = page.locator('li', { hasText: 'Persona Bloqueada E2E' })
+  deshacer.push(sinPendientesAgenda(CORREO.adminA))
+  await abrir(page, 'Más opciones')
+  await page.getByRole('button', { name: /^Personas bloqueadas/ }).click()
+  const fila = page.getByRole('tabpanel', { name: 'Más opciones' }).locator('div', { hasText: 'Persona Bloqueada E2E' }).last()
   await expect(fila).toContainText('Bloqueado a mano')
   await fila.getByRole('button', { name: /Desbloquear/ }).click()
-  await expect(page.getByText('No hay contactos bloqueados.')).toBeVisible()
+  await expect(page.getByText('Nadie está bloqueado.')).toBeVisible()
   expect(sqlLocal(`select count(*) from public.reserva_contactos where medico_id = :'m' and perdonado_en is not null`, { m: c.medicoId })).toBe('2')
 })

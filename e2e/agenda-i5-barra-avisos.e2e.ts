@@ -1,6 +1,6 @@
 import { test, expect, type Locator, type Page } from '@playwright/test'
 import { randomUUID } from 'node:crypto'
-import { SESION, CORREO, interruptorAgenda, pestanaConfig, soloEscritorio, sqlLocal, tituloUnico, toastConTexto } from './ayudas'
+import { SESION, CORREO, interruptorAgenda, pestanaConfig, sinPendientesAgenda, soloEscritorio, sqlLocal, tituloUnico, toastConTexto } from './ayudas'
 import { abrirAgendaV2, tarjetaLectura } from './interaccionesAyudas'
 import { contarCorreos, esperarCorreo } from './mailpit'
 import {
@@ -390,15 +390,20 @@ test('20: el correo a la clínica por cada reserva: apagado de fábrica no sale;
   await reservarFijo(fijo, personaNueva()) // espera al comprobante: el `after()` ya corrió
   expect(await contarCorreos(admin, 'Reserva nueva')).toBe(previos)
 
-  // Se enciende desde la configuración, con su línea de explicación.
-  await page.goto('/agenda/configuracion')
-  await pestanaConfig(page, 'Plazos y recordatorios')
-  const interruptor = page.getByRole('switch', { name: 'Avisar por correo de cada reserva' })
-  await expect(interruptor).toHaveAttribute('aria-checked', 'false')
-  await expect(page.getByText(/reciben un correo cada vez que un paciente reserva o reagenda por enlace/)).toBeVisible()
-  await interruptor.click()
-  await expect(interruptor).toHaveAttribute('aria-checked', 'true')
-  await expect.poll(() => sqlLocal(`select correo_reserva_clinica from public.agenda_ajustes where clinica_id = ${CL}`)).toBe('t')
+  // Se enciende desde la configuración, con su línea de explicación (J5: «Avisos», sin pendientes → pestañas).
+  const deshacer = sinPendientesAgenda(admin)
+  try {
+    await page.goto('/agenda/configuracion')
+    await pestanaConfig(page, 'Avisos')
+    const interruptor = page.getByRole('switch', { name: 'Avisarme cuando alguien aparte cita' })
+    await expect(interruptor).toHaveAttribute('aria-checked', 'false')
+    await expect(page.getByText(/Te llega un correo cada vez que un paciente aparta o cambia su cita con tu enlace/)).toBeVisible()
+    await interruptor.click()
+    await expect(interruptor).toHaveAttribute('aria-checked', 'true')
+    await expect.poll(() => sqlLocal(`select correo_reserva_clinica from public.agenda_ajustes where clinica_id = ${CL}`)).toBe('t')
+  } finally {
+    deshacer()
+  }
 
   const p = personaNueva()
   await reservarFijo(fijo, p)

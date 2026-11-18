@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process'
 import { test, expect, type Locator, type Page } from '@playwright/test'
 import {
   CORREO, SESION, arrastrarEventoPorMinutos, diaDeLaSemana, enContextoNuevo, interruptorAgenda, irAAgenda,
-  pestanaConfig, soloEscritorio, sqlLocal, toastConTexto,
+  pestanaConfig, sinPendientesAgenda, soloEscritorio, sqlLocal, toastConTexto,
 } from './ayudas'
 import { abrirAgendaV2, burbuja, elegirPaciente, preguntaAsistencia, tarjetaLectura } from './interaccionesAyudas'
 import { crearCitaPorLigar, limpiarReservasE2e, marcaE2e } from './reservaAyudas'
@@ -135,41 +135,51 @@ test('1 · v2 apagada: la nota que entra a mitad del cambio la para la base, y l
   expect(sqlLocal(`select start_time = :'i'::timestamptz from public.appointments where id = :'id'`, { id, i: ini })).toBe('t')
 })
 
-/* ── Punto 3 · «por revisar» en «Primeros pasos» ────────────────────────── */
+/* ── Punto 3 · «por revisar» (J5: en el funnel y en la tarjeta del consultorio) ── */
 
-/* MUTACIÓN: `porRevisar` siempre `false` en `pasosDe` → rojo («hecho» de entrada). */
-test('3 · el horario que nadie confirmó sale «por revisar»; «Confirmar horario» en cada consultorio lo deja hecho', async ({ page }) => {
+/* Tanda J (J5): «Primeros pasos» ya no existe. Con TODOS los consultorios por revisar es «primera vez»:
+   el funnel abre en el paso 1 y «Continuar» los confirma. Con UNO por revisar (uno nuevo, p. ej.), las
+   pestañas: su tarjeta dice «Por revisar» y «Confirmar horario» lo deja hecho.
+   MUTACIONES: `porRevisar` siempre `false` en `pasosDe` → rojo (con todo por revisar abre en pestañas,
+   no en el paso 1); el botón «Confirmar horario» fuera de `PestanaHorario` → rojo. */
+test('3 · el horario que nadie confirmó sale «por revisar»; «Continuar» en el funnel o «Confirmar horario» en su tarjeta lo deja hecho', async ({ page }) => {
   const mios = sqlLocal(`select string_agg(k.id::text, ',') from public.consultorios k join auth.users u on u.id = k.medico_id
     where u.email = :'c' and k.activo`, { c: CORREO.adminA })
   const marca = (): string => sqlLocal(`select count(*) filter (where horario_revisado_en is not null) || '/' || count(*)
     from public.consultorios where id = any (string_to_array(:'m', ',')::uuid[])`, { m: mios })
-  sqlLocal(`update public.consultorios set horario_revisado_en = null where id = any (string_to_array(:'m', ',')::uuid[])`, { m: mios })
+  const sinMarca = () => sqlLocal(`update public.consultorios set horario_revisado_en = null where id = any (string_to_array(:'m', ',')::uuid[])`, { m: mios })
+  // «Continuar» puede copiar el horario de la clínica a la columna: se devuelve como estaba.
+  const horarios = sqlLocal(`select json_agg(json_build_object('id', id, 'h', horario, 'p', horario_propio))::text from public.consultorios
+    where id = any (string_to_array(:'m', ',')::uuid[])`, { m: mios })
+  const deshacer = sinPendientesAgenda(CORREO.adminA)
+  const total = Number(marca().split('/')[1])
   try {
+    // Todos por revisar: primera vez, el funnel en el paso 1; «Continuar» los confirma.
+    sinMarca()
     await page.goto('/agenda/configuracion')
-    const pasos = page.getByRole('region', { name: 'Primeros pasos' })
-    const horario = pasos.getByRole('listitem').first()
-    await expect(horario).toHaveAccessibleName('Horario de cada consultorio: por revisar')
-    await expect(horario).toContainText('Por revisar')
-    await expect(horario.getByRole('link', { name: 'Revisar horario' })).toBeVisible()
-    await pestanaConfig(page, 'Horario y disponibilidad')
-    const filas = page.getByRole('region', { name: 'Disponibilidad por consultorio' })
-    const botones = filas.getByRole('button', { name: 'Confirmar horario' })
-    const total = Number(marca().split('/')[1])
-    await expect(botones).toHaveCount(total)
-    for (let i = 0; i < total; i++) {
-      await botones.first().click()
-      await expect(botones).toHaveCount(total - i - 1)
-    }
+    await expect(page.getByRole('heading', { name: '¿Cuándo das consulta?' })).toBeVisible()
+    await expect(page.getByText('Paso 1 de 3 · menos de 2 minutos')).toBeVisible()
+    await page.getByRole('button', { name: 'Continuar' }).click()
+    await expect(page.getByRole('heading', { name: '¿Cuánto dura tu consulta?' })).toBeVisible()
     expect(marca()).toBe(`${total}/${total}`)
-    /* Si con eso ya no queda nada pendiente, la pestaña desaparece (G2); si queda, el horario está hecho. */
-    await page.reload()
-    if (await page.getByRole('tab', { name: /^Primeros pasos/ }).count()) {
-      await pestanaConfig(page, 'Primeros pasos')
-      await expect(page.getByRole('region', { name: 'Primeros pasos' }).getByRole('listitem').first())
-        .toHaveAccessibleName('Horario de cada consultorio: hecho')
-    }
+
+    // Uno por revisar: pestañas; su tarjeta lo dice y «Confirmar horario» lo deja hecho.
+    sqlLocal(`update public.consultorios set horario_revisado_en = null where id = (string_to_array(:'m', ','))[1]::uuid`, { m: mios })
+    await page.goto('/agenda/configuracion')
+    await pestanaConfig(page, 'Cuándo das consulta')
+    const panel = page.getByRole('tabpanel', { name: 'Cuándo das consulta' })
+    await expect(panel.getByText('Por revisar', { exact: true })).toHaveCount(1)
+    const botones = panel.getByRole('button', { name: 'Confirmar horario' })
+    await expect(botones).toHaveCount(1)
+    await botones.click()
+    await expect(botones).toHaveCount(0)
+    await expect(panel.getByText('Por revisar', { exact: true })).toHaveCount(0)
+    expect(marca()).toBe(`${total}/${total}`)
   } finally {
-    sqlLocal(`update public.consultorios set horario_revisado_en = null where id = any (string_to_array(:'m', ',')::uuid[])`, { m: mios })
+    deshacer()
+    sinMarca()
+    sqlLocal(`update public.consultorios k set horario = x.v -> 'h', horario_propio = (x.v ->> 'p')::boolean
+      from (select jsonb_array_elements(:'h'::jsonb) v) x where k.id = (x.v ->> 'id')::uuid`, { h: horarios })
   }
 })
 

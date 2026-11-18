@@ -1,5 +1,5 @@
 import { test, expect, type Browser, type Page } from '@playwright/test'
-import { CORREO, SESION, enContextoNuevo, interruptorAgenda, pestanaConfig, soloEscritorio, sqlLocal, toastConTexto } from './ayudas'
+import { CORREO, SESION, enContextoNuevo, interruptorAgenda, pestanaConfig, sinPendientesAgenda, soloEscritorio, sqlLocal } from './ayudas'
 
 /**
  * Tanda H, agente H2 — la configuración de la agenda (puntos 5 a 10 de Angel):
@@ -9,7 +9,7 @@ import { CORREO, SESION, enContextoNuevo, interruptorAgenda, pestanaConfig, solo
  *        primero;
  *   · 7  todo botón de la configuración con borde y fondo visibles EN REPOSO,
  *        en claro y en oscuro (estilos computados; borde ≥ 3:1);
- *   · 8  «Plazos y recordatorios»: una línea por ajuste;
+ *   · 8  «Plazos y recordatorios» (hoy «Avisos»): una línea por ajuste;
  *   · 9  el interruptor del recordatorio (apagado de fábrica; sólo el
  *        administrador). La tarea programada con él apagado/encendido está en
  *        `recordatorios.e2e.ts`;
@@ -20,6 +20,16 @@ import { CORREO, SESION, enContextoNuevo, interruptorAgenda, pestanaConfig, solo
  *        no toca citas.
  * Cada prueba devuelve la clínica A como estaba (la semilla la recrea igual
  * al empezar cada corrida).
+ *
+ * Tanda J (J5, puntos 13 y 14): la pantalla es la de las maquetas. Lo que
+ * falta ya no es una pestaña «Primeros pasos» sino el FUNNEL de primera vez
+ * (las pruebas de pestañas dejan antes al médico sin pendientes); las cinco
+ * pestañas son «Tu enlace», «Cuándo das consulta», «Tu consulta», «Avisos» y
+ * «Más opciones»; los ajustes se guardan solos («Guardado»); «Restablecer» es
+ * «Empezar de nuevo», en «Más opciones», y deja al médico en el funnel. El
+ * punto 7 (botones con borde) cede ante la sección F: la maqueta dibuja
+ * algunos botones como texto —«Cambiar», «Otra duración», «Editar», «Quitar»,
+ * «Agregar tipo de cita»—, que se miden aparte (`botonesDeTexto`).
  */
 soloEscritorio()
 test.use({ storageState: SESION.adminA })
@@ -55,66 +65,44 @@ function devolverConfig(foto: string): void {
       from f where a.clinica_id = ${CL};`, { foto })
 }
 
-/** Deja al administrador sin nada pendiente: su duración, su enlace fijo (se borran al terminar) y, desde la
-    tanda I (punto 3), sus consultorios con el horario confirmado (la marca se devuelve a como estaba). */
-function adminSinPendientes(): () => void {
-  const tipo = sqlLocal(`insert into public.tipos_cita (clinica_id, medico_id, nombre, duracion_min, principal)
-    select ${CL}, id, 'Consulta', 30, true from auth.users where email = :'c' returning id`, { c: CORREO.adminA })
-  let enlace: string
-  try {
-    enlace = sqlLocal(`insert into public.reserva_enlaces (id, clinica_id, medico_id, clase, codigo_hash)
-      select gen_random_uuid(), ${CL}, id, 'fijo', encode(sha256(gen_random_uuid()::text::bytea), 'hex') from auth.users where email = :'c' returning id`, { c: CORREO.adminA })
-  } catch (e) { // sin esto, el tipo de arriba se queda y la siguiente prueba choca con él
-    sqlLocal(`begin; set local session_replication_role = replica; delete from public.tipos_cita where id = :'t'; commit;`, { t: tipo })
-    throw e
-  }
-  // La marca, al final: si una inserción de arriba falla, no queda nada marcado sin deshacer.
-  const revisados = sqlLocal(`update public.consultorios k set horario_revisado_en = now()
-    from auth.users u where u.email = :'c' and k.medico_id = u.id and k.horario_revisado_en is null returning k.id`, { c: CORREO.adminA })
-    .split('\n').filter(Boolean).join(',')
-  return () => sqlLocal(`begin; set local session_replication_role = replica;
-    delete from public.reserva_enlaces where id = :'e'; delete from public.tipos_cita where id = :'t';
-    update public.consultorios set horario_revisado_en = null where id = any (string_to_array(:'r', ',')::uuid[]); commit;`,
-  { e: enlace, t: tipo, r: revisados })
-}
+const adminSinPendientes = () => sinPendientesAgenda(CORREO.adminA)
 
 /* ── Punto 5 · pestañas ─────────────────────────────────────────────── */
 
-test('5 · pestañas con su rol, abre en «Primeros pasos» mientras falte algo, y flechas e Inicio/Fin', async ({ page }) => {
+test('5 · con algo pendiente abre el funnel de primera vez, sin pestañas', async ({ page }) => {
   await page.goto(RUTA)
-  const lista = page.getByRole('tablist', { name: 'Secciones de la configuración' })
-  const pasos = lista.getByRole('tab', { name: /^Primeros pasos.*pendiente/ })
-  await expect(pasos).toHaveAttribute('aria-selected', 'true')
-  await expect(page.getByRole('tabpanel', { name: /Primeros pasos/ })).toBeVisible()
-  // Una sola pestaña en el orden de tabulación; las demás, -1.
-  await expect(lista.locator('[role="tab"][tabindex="0"]')).toHaveCount(1)
-  // Sólo se ve un panel: «Plazos y recordatorios» está, pero escondido.
-  await expect(page.getByRole('heading', { name: 'Plazos y recordatorios' })).toBeHidden()
-  await pasos.focus()
-  await page.keyboard.press('ArrowDown')
-  const horario = lista.getByRole('tab', { name: 'Horario y disponibilidad' })
-  await expect(horario).toHaveAttribute('aria-selected', 'true')
-  await expect(horario).toBeFocused()
-  await expect(page.getByRole('heading', { name: 'Disponibilidad por consultorio' })).toBeVisible()
-  await page.keyboard.press('End')
-  await expect(lista.getByRole('tab', { name: 'Restablecer' })).toHaveAttribute('aria-selected', 'true')
-  await page.keyboard.press('ArrowRight')
-  await expect(pasos).toHaveAttribute('aria-selected', 'true')
-  await page.keyboard.press('ArrowLeft')
-  await expect(lista.getByRole('tab', { name: 'Restablecer' })).toBeFocused()
-  await page.keyboard.press('Home')
-  await expect(pasos).toBeFocused()
-  // «Abrir horario»/«Revisar» de un paso cambian de pestaña en vez de saltar a un ancla escondida.
-  await page.getByRole('region', { name: 'Primeros pasos' }).getByRole('link', { name: 'Revisar' }).first().click()
-  await expect(horario).toHaveAttribute('aria-selected', 'true')
+  await expect(page.getByRole('heading', { name: '¿Cuándo das consulta?' })).toBeVisible()
+  await expect(page.getByText('Paso 1 de 3 · menos de 2 minutos')).toBeVisible()
+  await expect(page.getByRole('tablist', { name: 'Secciones de la configuración' })).toHaveCount(0)
 })
 
-test('5 · sin nada pendiente abre en la primera sección y no hay pestaña «Primeros pasos»', async ({ page }) => {
+test('5 · sin nada pendiente: pestañas con su rol, abre en la primera, flechas e Inicio/Fin', async ({ page }) => {
   const deshacer = adminSinPendientes()
   try {
     await page.goto(RUTA)
-    await expect(page.getByRole('tab', { name: 'Horario y disponibilidad' })).toHaveAttribute('aria-selected', 'true')
-    await expect(page.getByRole('tab', { name: /Primeros pasos/ })).toHaveCount(0)
+    const lista = page.getByRole('tablist', { name: 'Secciones de la configuración' })
+    const primera = lista.getByRole('tab', { name: 'Tu enlace' })
+    await expect(primera).toHaveAttribute('aria-selected', 'true')
+    await expect(lista.getByRole('tab', { name: /Primeros pasos/ })).toHaveCount(0)
+    await expect(page.getByRole('tabpanel', { name: 'Tu enlace' })).toBeVisible()
+    // Una sola pestaña en el orden de tabulación; las demás, -1.
+    await expect(lista.locator('[role="tab"][tabindex="0"]')).toHaveCount(1)
+    // Sólo se ve un panel: «Avisos por correo» está, pero escondido.
+    await expect(page.getByRole('heading', { name: 'Avisos por correo' })).toBeHidden()
+    await primera.focus()
+    await page.keyboard.press('ArrowRight')
+    const horario = lista.getByRole('tab', { name: 'Cuándo das consulta' })
+    await expect(horario).toHaveAttribute('aria-selected', 'true')
+    await expect(horario).toBeFocused()
+    await expect(page.getByRole('tabpanel', { name: 'Cuándo das consulta' })).toBeVisible()
+    await page.keyboard.press('End')
+    await expect(lista.getByRole('tab', { name: 'Más opciones' })).toHaveAttribute('aria-selected', 'true')
+    await page.keyboard.press('ArrowRight')
+    await expect(primera).toHaveAttribute('aria-selected', 'true')
+    await page.keyboard.press('ArrowLeft')
+    await expect(lista.getByRole('tab', { name: 'Más opciones' })).toBeFocused()
+    await page.keyboard.press('Home')
+    await expect(primera).toBeFocused()
   } finally {
     deshacer()
   }
@@ -123,6 +111,7 @@ test('5 · sin nada pendiente abre en la primera sección y no hay pestaña «Pr
 test('5 · en el teléfono la fila de pestañas se desplaza de lado, sin envolver', async ({ browser }) => {
   const ctx = await browser.newContext({ storageState: SESION.adminA, viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true,
     locale: 'es-MX', timezoneId: 'America/Merida' })
+  const deshacer = adminSinPendientes()
   try {
     const p = await ctx.newPage()
     await p.goto(RUTA)
@@ -135,9 +124,10 @@ test('5 · en el teléfono la fila de pestañas se desplaza de lado, sin envolve
     }))
     expect(m).toEqual({ desborda: true, overflow: 'auto', filas: 1, pagina: true })
     // Elegir la última la trae a la vista.
-    await lista.getByRole('tab', { name: 'Restablecer' }).click()
-    await expect(lista.getByRole('tab', { name: 'Restablecer' })).toBeInViewport()
+    await lista.getByRole('tab', { name: 'Más opciones' }).click()
+    await expect(lista.getByRole('tab', { name: 'Más opciones' })).toBeInViewport()
   } finally {
+    deshacer()
     await ctx.close()
   }
 })
@@ -145,20 +135,26 @@ test('5 · en el teléfono la fila de pestañas se desplaza de lado, sin envolve
 /* ── Punto 6 · enlaces de los invitados, plegados ───────────────────── */
 
 test('6 · el administrador ve primero el suyo; los de los invitados, plegados hasta pulsar (también la secretaria)', async ({ page, browser }) => {
-  await page.goto(RUTA)
-  await pestanaConfig(page, 'Enlaces de reserva')
-  const seccion = page.getByRole('region', { name: 'Enlaces de reserva' })
-  const titulos = seccion.getByRole('heading', { level: 4 })
-  await expect(titulos).toHaveText(['Dr. Admin Semilla Uno (tú)'])
-  const plegado = seccion.getByRole('button', { name: 'Enlaces de los demás médicos (1)' })
-  await expect(plegado).toHaveAttribute('aria-expanded', 'false')
-  await plegado.click()
-  await expect(plegado).toHaveAttribute('aria-expanded', 'true')
-  await expect(titulos).toHaveText(['Dr. Admin Semilla Uno (tú)', /Invitada Semilla Dos/])
+  const deshacer = adminSinPendientes()
+  try {
+    await page.goto(RUTA)
+    const seccion = page.getByRole('tabpanel', { name: 'Tu enlace' })
+    // El suyo, arriba y sin ficha: el interruptor y su dirección (J5, maqueta).
+    await expect(seccion.getByRole('heading', { name: 'Tu enlace', level: 2 })).toBeVisible()
+    await expect(seccion.getByRole('switch', { name: /^Prendido/ })).toBeVisible()
+    const titulos = seccion.getByRole('heading', { level: 4 })
+    await expect(titulos).toHaveCount(0)
+    const plegado = seccion.getByRole('button', { name: 'Enlaces de los demás médicos (1)' })
+    await expect(plegado).toHaveAttribute('aria-expanded', 'false')
+    await plegado.click()
+    await expect(plegado).toHaveAttribute('aria-expanded', 'true')
+    await expect(titulos).toHaveText([/Invitada Semilla Dos/])
+  } finally {
+    deshacer()
+  }
   await enContextoNuevo(browser, SESION.secretariaA, async (p) => {
     await p.goto(RUTA)
-    await pestanaConfig(p, 'Enlaces de reserva')
-    const s = p.getByRole('region', { name: 'Enlaces de reserva' })
+    const s = p.getByRole('tabpanel', { name: 'Enlaces' })
     await expect(s.getByRole('heading', { level: 4 })).toHaveText(['Dr. Admin Semilla Uno'])
     await expect(s.getByRole('button', { name: 'Enlaces de los demás médicos (1)' })).toHaveAttribute('aria-expanded', 'false')
   })
@@ -166,38 +162,63 @@ test('6 · el administrador ve primero el suyo; los de los invitados, plegados h
 
 /* ── Punto 7 · botones en reposo ────────────────────────────────────── */
 
-/** Cada botón VISIBLE de la pantalla: borde ≥ 1 px con ≥ 3:1 contra el fondo que lo rodea, y fondo propio. */
+/* J5 (sección F): la maqueta dibuja como TEXTO azul o rojo algunos botones. Ésos se aceptan sin borde
+   sólo si su nombre está en esta lista y su letra se lee (≥ 4,5:1); cualquier otro botón sin borde
+   sigue siendo un fallo. Las pestañas son subrayadas (maqueta) y los interruptores, una pista rellena o con borde
+   (≥ 3:1 contra el fondo, WCAG 1.4.11). */
+const BOTONES_DE_TEXTO = /^(Cambiar|Otra duración|Editar .+|Quitar .+|Reactivar .+|Agregar tipo de cita|Apagar el enlace de .+|Desbloquear a .+|Enlaces de los demás médicos \(\d+\)|Personas bloqueadas.*|Empezar de nuevo.*|Cancelar|Guardar)$/
+
+/** Cada botón VISIBLE de la pantalla: borde ≥ 1 px con ≥ 3:1 contra el fondo que lo rodea, y fondo propio
+    (o, si es de texto, su nombre y su contraste; ver arriba). */
 async function botonesEnReposo(page: Page): Promise<string[]> {
-  return page.evaluate(() => {
-    const rgb = (c: string) => (c.match(/[\d.]+/g) ?? []).map(Number)
+  const { malos, deTexto } = await page.evaluate(() => {
+    // `color-mix()` se serializa como `color(srgb r g b)` con canales de 0 a 1, no `rgb()` de 0 a 255.
+    const rgb = (c: string) => { const v = (c.match(/[\d.]+/g) ?? []).map(Number); return c.startsWith('color(srgb') ? v.map((x, i) => (i < 3 ? x * 255 : x)) : v }
     const lum = ([r = 0, g = 0, b = 0]: number[]) => {
       const f = (v: number) => { const x = v / 255; return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4 }
       return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b)
     }
+    const contraste = (a: string, b: string) => { const [l1 = 0, l2 = 0] = [lum(rgb(a)), lum(rgb(b))].sort((x, y) => y - x); return (l1 + 0.05) / (l2 + 0.05) }
     const opaco = (c: string) => { const v = rgb(c); return c !== 'transparent' && (v.length < 4 || (v[3] ?? 1) > 0) }
     const fondo = (el: Element | null): string => {
       for (let e = el; e; e = e.parentElement) { const c = getComputedStyle(e).backgroundColor; if (opaco(c)) return c }
       return 'rgb(255, 255, 255)'
     }
     const malos: string[] = []
+    const deTexto: string[] = []
     const main = document.querySelector('main') ?? document.body
     for (const b of Array.from(main.querySelectorAll<HTMLElement>('button, a[class*="h-9"], a[class*="h-8"]'))) {
-      if (b.offsetParent === null || b.closest('[role="dialog"], [role="alertdialog"]')) continue
+      if (b.offsetParent === null || b.closest('[role="dialog"], [role="alertdialog"]') || b.getAttribute('role') === 'tab') continue
       const cs = getComputedStyle(b)
-      const [l1, l2] = [lum(rgb(cs.borderTopColor)), lum(rgb(fondo(b.parentElement)))].sort((x, y) => y - x)
-      const contraste = ((l1 ?? 0) + 0.05) / ((l2 ?? 0) + 0.05)
+      const alrededor = fondo(b.parentElement)
       const nombre = (b.getAttribute('aria-label') ?? b.textContent ?? '').trim().slice(0, 40)
-      if (parseFloat(cs.borderTopWidth) < 1) malos.push(`${nombre}: sin borde`)
-      else if (contraste < 3) malos.push(`${nombre}: borde ${contraste.toFixed(2)}:1`)
+      if (b.getAttribute('role') === 'switch') {
+        // La pista se distingue por su relleno o por su borde (como el resto de botones).
+        const borde = parseFloat(cs.borderTopWidth) >= 1 ? contraste(cs.borderTopColor, alrededor) : 0
+        if (contraste(cs.backgroundColor, alrededor) < 3 && borde < 3) malos.push(`${nombre}: pista ${contraste(cs.backgroundColor, alrededor).toFixed(2)}:1`)
+        continue
+      }
+      if (parseFloat(cs.borderTopWidth) < 1 && !opaco(cs.backgroundColor)) {
+        deTexto.push(nombre)
+        if (contraste(cs.color, alrededor) < 4.5) malos.push(`${nombre}: letra ${contraste(cs.color, alrededor).toFixed(2)}:1`)
+        continue
+      }
+      if (parseFloat(cs.borderTopWidth) < 1) { if (!opaco(cs.backgroundColor) || contraste(cs.backgroundColor, alrededor) < 3) malos.push(`${nombre}: sin borde`) }
+      else if (contraste(cs.borderTopColor, alrededor) < 3 && contraste(cs.backgroundColor, alrededor) < 3) {
+        malos.push(`${nombre}: borde ${contraste(cs.borderTopColor, alrededor).toFixed(2)}:1`)
+      }
       if (!opaco(cs.backgroundColor)) malos.push(`${nombre}: sin fondo`)
     }
-    return malos
+    return { malos, deTexto }
   })
+  return [...malos, ...deTexto.filter(n => !BOTONES_DE_TEXTO.test(n)).map(n => `${n}: sin borde (no es de los de texto de la maqueta)`)]
 }
 
 async function revisarTodasLasPestanas(p: Page): Promise<string[]> {
   const malos: string[] = []
   const pestanas = p.getByRole('tablist', { name: 'Secciones de la configuración' }).getByRole('tab')
+  // `count()` no espera: sin esto, con la página aún en «Cargando…», el bucle no daría ni una vuelta.
+  await expect(pestanas).toHaveCount(5)
   for (let i = 0; i < await pestanas.count(); i++) {
     await pestanas.nth(i).click()
     await expect(p.getByText('Cargando', { exact: false })).toHaveCount(0)
@@ -217,88 +238,117 @@ async function enTema(browser: Browser, oscuro: boolean, sesion: string, fn: (p:
 
 for (const oscuro of [false, true]) {
   test(`7 · todos los botones se ven como botones en reposo (${oscuro ? 'oscuro' : 'claro'}), administrador e invitada`, async ({ browser }) => {
-    for (const sesion of [SESION.adminA, SESION.medicoA]) {
-      await enTema(browser, oscuro, sesion, async (p) => {
-        await p.goto(RUTA)
-        if (oscuro) await expect(p.locator('html')).toHaveClass(/dark/)
-        expect(await revisarTodasLasPestanas(p)).toEqual([])
-      })
+    for (const [sesion, correo] of [[SESION.adminA, CORREO.adminA], [SESION.medicoA, CORREO.medicoA]] as const) {
+      const deshacer = sinPendientesAgenda(correo)
+      try {
+        await enTema(browser, oscuro, sesion, async (p) => {
+          await p.goto(RUTA)
+          if (oscuro) await expect(p.locator('html')).toHaveClass(/dark/)
+          expect(await revisarTodasLasPestanas(p)).toEqual([])
+        })
+      } finally {
+        deshacer()
+      }
     }
   })
 }
 
 /* ── Punto 8 · una línea por ajuste ─────────────────────────────────── */
 
-test('8 · «Plazos y recordatorios» dice en una línea qué hace cada ajuste; el recordatorio es un correo al paciente', async ({ page }) => {
-  await page.goto(RUTA)
-  await pestanaConfig(page, 'Plazos y recordatorios')
-  const lineas: Record<string, RegExp> = {
-    'Recordatorio por correo': /correo que Spinus manda al paciente antes de su cita/,
-    'Anticipación mínima para reservar por enlace': /mínimo que tiene que faltar para una cita/,
-    'Hasta cuándo se puede reservar': /Hasta cuántos días adelante ve horarios un paciente/,
-    'Vigencia del enlace de un solo uso': /Cuántos días sirve un enlace de un solo uso/,
-  }
-  for (const [campo, texto] of Object.entries(lineas)) {
-    await expect(page.getByLabel(campo, { exact: true })).toHaveAccessibleDescription(texto)
+/* J5: en la maqueta cada plazo ES su frase («Pueden ver horarios de los próximos [60] días»), y el
+   recordatorio dice que es un correo al paciente. */
+test('8 · «Avisos» dice en una línea qué hace cada ajuste; el recordatorio es un correo al paciente', async ({ page }) => {
+  const deshacer = adminSinPendientes()
+  try {
+    await page.goto(RUTA)
+    await pestanaConfig(page, 'Avisos')
+    const panel = page.getByRole('tabpanel', { name: 'Avisos' })
+    for (const frase of ['Pueden ver horarios de los próximos', 'No pueden apartar si faltan menos de', 'Un enlace de una vez deja de servir a los']) {
+      await expect(panel.getByLabel(frase)).toHaveCount(1)
+    }
+    await expect(panel).toContainText('Le llega un correo antes de su cita. Solo a pacientes que tengan correo.')
+  } finally {
+    deshacer()
   }
 })
 
 /* ── Punto 9 · el interruptor del recordatorio ──────────────────────── */
 
 test('9 · el recordatorio viene APAGADO; el administrador lo enciende (queda en la base y en audit_log)', async ({ page }) => {
-  const desde = sqlLocal('select now()')
-  await page.goto(RUTA)
-  await pestanaConfig(page, 'Plazos y recordatorios')
-  const interruptor = page.getByRole('switch', { name: 'Recordatorio automático por correo' })
-  await expect(interruptor).toHaveAttribute('aria-checked', 'false')
-  await expect(interruptor).toHaveAccessibleDescription(/se enviará un correo a cada paciente con correo registrado, 24 horas antes de su cita/)
-  await interruptor.click()
-  await expect(toastConTexto(page, 'Recordatorio automático encendido')).toBeVisible()
-  await expect(interruptor).toHaveAttribute('aria-checked', 'true')
-  expect(sqlLocal(`select recordatorio_encendido from public.agenda_ajustes where clinica_id = ${CL}`)).toBe('t')
-  expect(sqlLocal(`select count(*) from public.audit_log where tabla = 'agenda_ajustes' and accion = 'UPDATE' and created_at >= :'d'::timestamptz
-                     and user_id = (select id::text from auth.users where email = :'c')`, { d: desde, c: CORREO.adminA })).toBe('1')
-  await page.reload()
-  await pestanaConfig(page, 'Plazos y recordatorios')
-  await expect(page.getByRole('switch', { name: 'Recordatorio automático por correo' })).toHaveAttribute('aria-checked', 'true')
+  const deshacer = adminSinPendientes()
+  try {
+    const desde = sqlLocal('select now()')
+    await page.goto(RUTA)
+    await pestanaConfig(page, 'Avisos')
+    const interruptor = page.getByRole('switch', { name: 'Recordarle su cita al paciente' })
+    await expect(interruptor).toHaveAttribute('aria-checked', 'false')
+    await interruptor.click()
+    await expect(page.locator('[data-aviso-config]')).toHaveText('Guardado')
+    await expect(interruptor).toHaveAttribute('aria-checked', 'true')
+    // Encendido, dice cuándo sale: 24 horas antes (el de fábrica).
+    await expect(page.getByRole('combobox')).toHaveValue('24')
+    expect(sqlLocal(`select recordatorio_encendido from public.agenda_ajustes where clinica_id = ${CL}`)).toBe('t')
+    expect(sqlLocal(`select count(*) from public.audit_log where tabla = 'agenda_ajustes' and accion = 'UPDATE' and created_at >= :'d'::timestamptz
+                       and user_id = (select id::text from auth.users where email = :'c')`, { d: desde, c: CORREO.adminA })).toBe('1')
+    await page.reload()
+    await pestanaConfig(page, 'Avisos')
+    await expect(page.getByRole('switch', { name: 'Recordarle su cita al paciente' })).toHaveAttribute('aria-checked', 'true')
+  } finally {
+    deshacer()
+  }
 })
 
 test('9 · la invitada y la secretaria no lo pueden cambiar (deshabilitado y 403)', async ({ browser }) => {
-  for (const sesion of [SESION.medicoA, SESION.secretariaA]) {
-    await enContextoNuevo(browser, sesion, async (p) => {
-      await p.goto(RUTA)
-      await pestanaConfig(p, 'Plazos y recordatorios')
-      await expect(p.getByRole('switch', { name: 'Recordatorio automático por correo' })).toBeDisabled()
-      expect((await p.request.patch('/api/me/ajustes-agenda', { data: { recordatorio_encendido: true } })).status()).toBe(403)
-    })
+  const deshacer = sinPendientesAgenda(CORREO.medicoA)
+  try {
+    for (const sesion of [SESION.medicoA, SESION.secretariaA]) {
+      await enContextoNuevo(browser, sesion, async (p) => {
+        await p.goto(RUTA)
+        await pestanaConfig(p, 'Avisos')
+        await expect(p.getByRole('switch', { name: 'Recordarle su cita al paciente' })).toBeDisabled()
+        await expect(p.getByText('Estos avisos los cambia quien administra la clínica.')).toBeVisible()
+        // El aviso a la clínica no le llega a ella: no se lo dice como si sí (J5).
+        await expect(p.getByRole('switch', { name: 'Avisar a la clínica cuando alguien aparte cita' })).toBeDisabled()
+        await expect(p.getByText('Te llega un correo cada vez que un paciente aparta')).toHaveCount(0)
+        expect((await p.request.patch('/api/me/ajustes-agenda', { data: { recordatorio_encendido: true } })).status()).toBe(403)
+      })
+    }
+  } finally {
+    deshacer()
   }
   expect(sqlLocal(`select recordatorio_encendido from public.agenda_ajustes where clinica_id = ${CL}`)).toBe('f')
 })
 
-/* ── Punto 10 · restablecer la configuración ────────────────────────── */
+/* ── Punto 10 · restablecer la configuración («Empezar de nuevo», J5) ─ */
 
-test('10 · la invitada y la secretaria no ven «Restablecer» y la ruta les da 403', async ({ browser }) => {
-  for (const sesion of [SESION.medicoA, SESION.secretariaA]) {
-    await enContextoNuevo(browser, sesion, async (p) => {
-      await p.goto(RUTA)
-      await expect(p.getByRole('tab').first()).toBeVisible()
-      await expect(p.getByRole('tab', { name: 'Restablecer' })).toHaveCount(0)
-      expect((await p.request.post('/api/agenda/restablecer', { data: { confirmacion: 'RESTABLECER' } })).status()).toBe(403)
-    })
+test('10 · la invitada y la secretaria no ven «Empezar de nuevo» y la ruta les da 403', async ({ browser }) => {
+  const deshacer = sinPendientesAgenda(CORREO.medicoA)
+  try {
+    for (const sesion of [SESION.medicoA, SESION.secretariaA]) {
+      await enContextoNuevo(browser, sesion, async (p) => {
+        await p.goto(RUTA)
+        await pestanaConfig(p, 'Más opciones')
+        await expect(p.getByRole('tabpanel', { name: 'Más opciones' })).toContainText('Personas bloqueadas')
+        await expect(p.getByRole('button', { name: /Empezar de nuevo/ })).toHaveCount(0)
+        expect((await p.request.post('/api/agenda/restablecer', { data: { confirmacion: 'RESTABLECER' } })).status()).toBe(403)
+      })
+    }
+  } finally {
+    deshacer()
   }
 })
 
 /* Tanda I (punto 3): tras restablecer, el horario de partida queda «por revisar» (0 de 3), no hecho.
    MUTACIÓN: quitar `horario_revisado_en = NULL` de agenda_restablecer_configuracion() → rojo («hecho»). */
-test('10 · el administrador restablece con la palabra escrita: «Primeros pasos» en 0 de 3 (horario por revisar), el horario de partida, citas intactas', async ({ page }) => {
+test('10 · el administrador «Empieza de nuevo» con la palabra escrita: vuelve al funnel (horario por revisar), el horario de partida, citas intactas', async ({ page }) => {
   const foto = guardarConfig()
   const deshacer = adminSinPendientes()
   const citas = () => sqlLocal(`select md5(string_agg(a::text, '|' order by a.id)) from public.appointments a where a.clinica_id = ${CL}`)
   const antes = citas()
   try {
     await page.goto(RUTA)
-    await pestanaConfig(page, 'Restablecer')
-    await page.getByRole('button', { name: 'Restablecer configuración de la agenda' }).click()
+    await pestanaConfig(page, 'Más opciones')
+    await page.getByRole('button', { name: /Empezar de nuevo/ }).click()
     const dialogo = page.getByRole('alertdialog', { name: '¿Restablecer la configuración de la agenda?' })
     await expect(dialogo).toContainText('Los enlaces que ya compartiste con pacientes dejarán de funcionar.')
     await expect(dialogo).toContainText('Las citas, sus pacientes, la auditoría y los contactos bloqueados no se tocan.')
@@ -308,10 +358,9 @@ test('10 · el administrador restablece con la palabra escrita: «Primeros pasos
     await expect(boton).toBeDisabled()
     await dialogo.getByLabel(/Para confirmar, escribe/).fill('RESTABLECER')
     await boton.click()
-    await expect(toastConTexto(page, 'Configuración de la agenda restablecida')).toBeVisible()
-    await expect(page.getByRole('tab', { name: /^Primeros pasos.*3 pendientes/ })).toHaveAttribute('aria-selected', 'true')
-    await expect(page.getByRole('region', { name: 'Primeros pasos' })).toContainText('0 de 3 listos')
-    await expect(page.getByRole('region', { name: 'Primeros pasos' }).getByRole('listitem').first()).toHaveAccessibleName('Horario de cada consultorio: por revisar')
+    // Lo que antes era «Primeros pasos» en 0 de 3: el funnel desde su primer paso.
+    await expect(page.getByRole('heading', { name: '¿Cuándo das consulta?' })).toBeVisible()
+    await expect(page.getByText('Paso 1 de 3 · menos de 2 minutos')).toBeVisible()
     expect(sqlLocal(`select count(*) from public.consultorios where clinica_id = ${CL} and horario_revisado_en is not null`)).toBe('0')
     expect(sqlLocal(`select count(*) from public.tipos_cita where clinica_id = ${CL} and activo`)).toBe('0')
     expect(sqlLocal(`select count(*) from public.reserva_enlaces where clinica_id = ${CL} and revocado_en is null`)).toBe('0')
