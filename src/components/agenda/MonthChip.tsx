@@ -8,11 +8,12 @@
 import { memo } from 'react'
 import type { EventContentArg } from '@fullcalendar/core'
 import type { Appointment } from '@/lib/agenda/tiposAgenda'
-import { STATUS_CONFIG, esEventoGenerico, marcaPorLigar, tintasDelChipDeMes } from '@/lib/agenda/tarjetasAgenda'
+import { STATUS_CONFIG, esEventoGenerico, marcaPorLigar, marcasDeCita, tintasDelChipDeMes } from '@/lib/agenda/tarjetasAgenda'
 import { GoogleGIcon } from './GoogleGIcon'
-import { MarcaOrigenGoogle, ETIQUETA_ORIGEN_GOOGLE } from './MarcaOrigenGoogle'
+import { MarcaOrigenGoogle } from './MarcaOrigenGoogle'
+import { MarcasCita } from './MarcasCita'
 import { IconoDelEvento } from './IconoDelEvento'
-import { useSinAvisoFlotante } from './MemoizedEventContent'
+import { etiquetaV2, useSinAvisoFlotante } from './MemoizedEventContent'
 
 /* Chip de una línea para la Vista Mes (dayGridMonth). Branch DEDICADO: NO
    comparte caja con `MemoizedEventContent` (Semana/Día). Una sola fila:
@@ -43,12 +44,15 @@ export const MonthChip = memo(function MonthChip({ arg }: { arg: EventContentArg
   const marca = ext ? marcaPorLigar(ext) : null
   /* Tanda J, punto 11 · una fila de Spinus nacida en Google: su «G» detrás del punto (sólo con la v2). */
   const origenGoogle = !isGcal && ext?.origen === 'google'
+  /* Tanda K, sección E · con la v2, el eslabón y el expediente tachado en vez de la píldora. */
+  const procedencia = marcasDeCita(ext ?? {})
 
   return (
     <div
       data-cita-id={arg.event.id}
       {...(sinAvisoFlotante && ext?.status && !isGcal
-        ? { role: 'group', 'aria-label': `${pac ? `${pac.nombre} ${pac.apellidos}` : arg.event.title} · ${STATUS_CONFIG[ext.status].label}${marca ? ` · ${marca.titulo}` : ''}${origenGoogle ? ` · ${ETIQUETA_ORIGEN_GOOGLE}` : ''}` }
+        ? { role: 'group', 'aria-label': etiquetaV2(pac ? `${pac.nombre} ${pac.apellidos}` : arg.event.title, STATUS_CONFIG[ext.status].label,
+            { sinExpediente: procedencia.sinExpediente, deEnlace: procedencia.enlace, origenGoogle, historial: procedencia.historial }) }
         : {})}
       className={`ag-mes${isGcal ? ' ag-mes--gcal' : ''}${esEvento ? ' ag-mes--evento' : ''}${
         ext?.status === 'cancelled' ? ' ag-mes--cancelada' : ''}`}
@@ -71,7 +75,9 @@ export const MonthChip = memo(function MonthChip({ arg }: { arg: EventContentArg
         </span>
       )}
       <span className="ag-mes-nombre">{pac ? `${pac.nombre} ${pac.apellidos}` : arg.event.title}</span>
-      {marca && <span className="ag-mes-badge" title={sinAvisoFlotante ? undefined : marca.titulo}>{marca.texto}</span>}
+      {sinAvisoFlotante
+        ? <MarcasCita enlace={procedencia.enlace} sinExpediente={procedencia.sinExpediente} size={11} decorativa />
+        : marca && <span className="ag-mes-badge" title={marca.titulo}>{marca.texto}</span>}
       {isGcal && (
         <span className="ag-mes-badge">
           {/* Mismo texto y mismo motivo que en GoogleEventCard, donde está

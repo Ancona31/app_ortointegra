@@ -2,7 +2,8 @@
  * src/components/agenda/LeyendaEstados.tsx
  *
  * La leyenda de colores de la tarjeta de citas: los cinco estados de
- * `STATUS_CONFIG` más la marca de Google Calendar. Movido tal cual desde
+ * `STATUS_CONFIG` más la marca de Google Calendar (y, con la v2, el eslabón y
+ * el expediente tachado: tanda K, punto 20). Movido tal cual desde
  * `AgendaCliente.tsx` (A2.5.10, movimiento puro, con sus comentarios).
  *
  * SIN PROPS: todo lo que pinta es estático —`STATUS_CONFIG` es una constante
@@ -14,6 +15,7 @@
  */
 
 import { GoogleGIcon } from '@/components/agenda/GoogleGIcon'
+import { ETIQUETA_SIN_EXPEDIENTE, IconoEnlace, IconoSinExpediente } from '@/components/agenda/MarcasCita'
 import { STATUS_CONFIG } from '@/lib/agenda/tarjetasAgenda'
 import type { Status } from '@/lib/agenda/tiposAgenda'
 
@@ -56,12 +58,27 @@ export function LeyendaEstados({ clasica = false }: { clasica?: boolean }) {
           <span className="text-[11px] font-medium text-[var(--ag-muted)]">{ETIQUETA_LEYENDA_GOOGLE}</span>
         </div>
       )}
+      {/* Tanda K, sección E (punto 20) · las otras dos marcas de procedencia, sólo en la de la v2. */}
+      {!clasica && (
+        <>
+          <div className="flex items-center gap-1.5" data-leyenda-enlace>
+            <IconoEnlace size={12} />
+            <span className="text-[11px] font-medium text-[var(--ag-muted)]">{ETIQUETA_LEYENDA_ENLACE}</span>
+          </div>
+          <div className="flex items-center gap-1.5" data-leyenda-sin-expediente>
+            <IconoSinExpediente size={12} />
+            <span className="text-[11px] font-medium text-[var(--ag-muted)]">{ETIQUETA_SIN_EXPEDIENTE}</span>
+          </div>
+        </>
+      )}
     </div>
   )
 }
 
 /** Tanda J, punto 11 · Lo que la «G» quiere decir en la v2 (lo de Google lleva los colores de estado). */
 export const ETIQUETA_LEYENDA_GOOGLE = 'Se agendó en Google'
+/** Tanda K, punto 20 · Lo que quiere decir el eslabón. */
+export const ETIQUETA_LEYENDA_ENLACE = 'Se agendó por enlace'
 
 /** La marca de siempre (v2 apagada): «GCal» en el morado de Google. */
 function MarcaGCal() {

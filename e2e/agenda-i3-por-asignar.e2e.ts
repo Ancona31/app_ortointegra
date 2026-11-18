@@ -100,16 +100,19 @@ async function abrirDashboard(page: Page): Promise<void> {
   await expect(proximas(page).locator('.skeleton')).toHaveCount(0, { timeout: 30_000 })
 }
 
-test('punto 8: con la v2, la por ligar sale en Próximas citas con el nombre de quien reservó y «Por ligar»; apagada, no', async ({ page, browser }) => {
+/* Tanda K, puntos 17 y 18: la palabra «Por ligar» es ahora el expediente tachado (nombre accesible
+   «Sin expediente») y el eslabón con su texto «Por enlace». */
+test('punto 8: con la v2, la por ligar sale en Próximas citas con el nombre de quien reservó, el expediente tachado y el eslabón; apagada, no', async ({ page, browser }) => {
   const nombre = tituloUnico('Lucía Reserva I3')
   crearCitaPorLigar({ correo: CORREO.adminA, inicio: pronto(3), minutos: 30, nombre, canal: 'unico' })
   interruptorAgenda('A', true)
   await abrirDashboard(page)
   await expect(renglon(page, nombre)).toBeVisible()
-  await expect(renglon(page, nombre).getByText('Por ligar', { exact: true })).toBeVisible()
+  await expect(renglon(page, nombre).getByRole('img', { name: 'Sin expediente' })).toBeVisible()
+  await expect(renglon(page, nombre).getByText('Por enlace', { exact: true })).toBeVisible()
   await enContextoNuevo(browser, SESION.secretariaA, async (p) => {
     await abrirDashboard(p)
-    await expect(renglon(p, nombre).getByText('Por ligar', { exact: true })).toBeVisible()
+    await expect(renglon(p, nombre).getByRole('img', { name: 'Sin expediente' })).toBeVisible()
   })
   interruptorAgenda('A', false)
   await abrirDashboard(page)
@@ -124,7 +127,8 @@ test('punto 10 · fila: la por asignar sale con el título de Google; «¿No es 
   filaGoogle(yaEvento, pronto(5), 'evento')
   await abrirDashboard(page)
   const fila = renglon(page, titulo)
-  await expect(fila.getByText('Por asignar', { exact: true })).toBeVisible()
+  await expect(fila.getByRole('img', { name: 'Sin expediente' })).toBeVisible()
+  await expect(fila.getByText('Por enlace', { exact: true })).toHaveCount(0)
   await expect(proximas(page).getByText(yaEvento)).toHaveCount(0)
   const post = page.waitForResponse(r => r.url().endsWith(`/api/appointments/${id}/no-es-cita`) && r.request().method() === 'POST')
   await fila.getByRole('button', { name: '¿No es una cita?' }).click()
@@ -141,7 +145,7 @@ test('punto 10 · tarjeta: «Por asignar» en la agenda; «¿No es una cita?» l
   const titulo = tituloUnico('Control Google I3')
   const id = filaGoogle(titulo, fechaHoraLocalAInstante(DIA_LABORABLE_LIBRE, '19:30', TZ), 'por_asignar')
   await abrirAgendaV2(page)
-  await expect(eventoConTexto(page, titulo)).toContainText('Por asignar')
+  await expect(eventoConTexto(page, titulo).locator('.ag-icono-sin-exp')).toBeVisible()
   await eventoConTexto(page, titulo).click({ position: { x: 6, y: 6 } })
   const tarjeta = tarjetaLectura(page)
   await expect(tarjeta.getByRole('button', { name: 'Convertir en cita' })).toHaveCount(0)
@@ -149,7 +153,7 @@ test('punto 10 · tarjeta: «Por asignar» en la agenda; «¿No es una cita?» l
   await expect.poll(() => asignacion(id), { timeout: 15_000 }).toBe('evento')
   expect(auditadas(id)).toBe('1')
   await page.keyboard.press('Escape')
-  await expect(eventoConTexto(page, titulo)).not.toContainText('Por asignar')
+  await expect(eventoConTexto(page, titulo).locator('.ag-icono-sin-exp')).toHaveCount(0)
   await eventoConTexto(page, titulo).click({ position: { x: 6, y: 6 } })
   await expect(tarjetaLectura(page).getByRole('button', { name: 'Convertir en cita' })).toBeVisible()
   await expect(tarjetaLectura(page).getByRole('button', { name: '¿No es una cita?' })).toHaveCount(0)
@@ -168,7 +172,7 @@ test('punto 10 · formulario: «¿No es una cita?» desde «Editar» quita la ma
   const formulario = page.getByRole('dialog', { name: 'Editar cita' })
   await formulario.getByRole('button', { name: '¿No es una cita?' }).click()
   await expect(formulario).toHaveCount(0)
-  await expect(eventoConTexto(page, titulo)).not.toContainText('Por asignar', { timeout: 1_500 })
+  await expect(eventoConTexto(page, titulo).locator('.ag-icono-sin-exp')).toHaveCount(0, { timeout: 1_500 })
   expect(asignacion(id)).toBe('evento')
 })
 

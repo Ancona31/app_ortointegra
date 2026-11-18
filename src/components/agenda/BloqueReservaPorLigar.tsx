@@ -16,6 +16,7 @@
  */
 import { useEffect, useState } from 'react'
 import { frasearHistorial, type HistorialContacto } from '@/lib/reserva/gestionReserva'
+import { ETIQUETA_SIN_EXPEDIENTE, IconoEnlace, IconoSinExpediente } from '@/components/agenda/MarcasCita'
 
 const FECHA = new Intl.DateTimeFormat('es-MX', { dateStyle: 'medium' })
 
@@ -97,8 +98,22 @@ export default function BloqueReservaPorLigar(p: Props) {
   return (
     <div className="px-3 py-2.5 rounded-xl border space-y-1.5" style={{ background: 'var(--ag-patient-card-bg)', borderColor: 'var(--ag-patient-card-border)' }}>
       <div className="flex items-center gap-2">
-        <span className="text-[10px] font-bold uppercase tracking-[.06em] px-1.5 rounded-full border" style={{ color: 'var(--ag-ink-600)', borderColor: 'currentColor' }}>Por ligar</span>
-        <span className="text-[11px]" style={{ color: 'var(--ag-muted)' }}>Reservó por enlace</span>
+        {/* Tanda K, puntos 17 y 18 · con la v2, el expediente tachado y el eslabón en vez de la píldora. */}
+        {p.enVivo ? (
+          <>
+            <span className="inline-flex items-center gap-1 text-[11px] font-semibold" style={{ color: 'var(--ag-ink-600)' }} data-marca-sin-expediente>
+              <IconoSinExpediente size={14} />{ETIQUETA_SIN_EXPEDIENTE}
+            </span>
+            <span className="inline-flex items-center gap-1 text-[11px]" style={{ color: 'var(--ag-muted)' }} data-marca-enlace>
+              <IconoEnlace size={13} />Reservó por enlace
+            </span>
+          </>
+        ) : (
+          <>
+            <span className="text-[10px] font-bold uppercase tracking-[.06em] px-1.5 rounded-full border" style={{ color: 'var(--ag-ink-600)', borderColor: 'currentColor' }}>Por ligar</span>
+            <span className="text-[11px]" style={{ color: 'var(--ag-muted)' }}>Reservó por enlace</span>
+          </>
+        )}
       </div>
       <p className="text-sm font-semibold" style={{ color: 'var(--ag-ink)' }}>{p.nombre}</p>
       {(p.telefono || p.correo) && (

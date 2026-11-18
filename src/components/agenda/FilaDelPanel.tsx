@@ -4,6 +4,7 @@ import { memo } from 'react'
 import { ChevronRight } from 'lucide-react'
 import { GoogleGIcon } from '@/components/agenda/GoogleGIcon'
 import { MarcaOrigenGoogle } from '@/components/agenda/MarcaOrigenGoogle'
+import { MarcasCita } from '@/components/agenda/MarcasCita'
 import { type FilaDelDia } from '@/lib/agenda/conteoAgenda'
 
 /* Una fila. Botón y no enlace: no navega, abre el modal de la cita — el mismo
@@ -30,6 +31,7 @@ export const FilaDelPanel = memo(function FilaDelPanel(
       <span className={`ag-mespanel-nombre${fila.cancelada ? ' ag-mespanel-nombre--cancelada' : ''}`}>
         {fila.nombre}
       </span>
+      {!fila.esDeGoogle && <MarcasCita enlace={fila.deEnlace} sinExpediente={fila.sinExpediente} size={12} soloV2 />}
       <ChevronRight size={15} className="ag-mespanel-chev" aria-hidden />
     </button>
   )

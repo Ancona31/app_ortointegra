@@ -4190,7 +4190,9 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
 .agenda-fc .ag-tarjeta--tiny .ag-tarjeta-nombre-corto,
 .agenda-fc .fc-timeGridDay-view .ag-tarjeta-nombre-corto,
 .agenda-fc .ag-tarjeta--tiny .ag-tarjeta-marca,
-.agenda-fc .fc-timeGridDay-view .ag-tarjeta-marca { order: 3; }
+.agenda-fc .fc-timeGridDay-view .ag-tarjeta-marca,
+.agenda-fc .ag-tarjeta--tiny .ag-tarjeta-tit > .ag-marcas,
+.agenda-fc .fc-timeGridDay-view .ag-tarjeta-tit > .ag-marcas { order: 3; }
 .agenda-fc .ag-tarjeta--tiny .ag-tarjeta-tz,
 .agenda-fc .fc-timeGridDay-view .ag-tarjeta-tz { order: 4; }
 .agenda-fc .ag-tarjeta--tiny .ag-tarjeta-desc,
@@ -4478,6 +4480,18 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
    que le falta a la «G» de 14px para quedar al centro de su renglón. */
 .ag-lectura-cab .ag-g-origen { padding-top: 9px; }
 .agenda-fc .fc-listDay-view .ag-listadia-nombre .ag-g-origen { margin-right: var(--ag-1); vertical-align: -1px; }
+
+/* Tanda K, sección E (puntos 17 y 18) · el eslabón y el expediente tachado
+   (`MarcasCita`), detrás del nombre. En la rejilla y el Mes los monta la caja
+   sólo con la v2; en listas, banda y panel del Mes van con `.ag-marcas-v2` y
+   los enseña esta hoja sólo con la v2, como la «G». No encogen: cede el nombre. */
+.ag-marcas { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 2px; }
+.ag-marca { display: inline-flex; }
+.ag-marcas-v2 { display: none; }
+.agenda-raiz[data-agenda-v2="encendida"] .ag-marcas-v2 { display: inline-flex; }
+.agenda-fc .fc-listDay-view .ag-listadia-nombre .ag-marcas { margin-left: var(--ag-1); vertical-align: -2px; }
+/* El Mes del teléfono sólo pinta el punto: las marcas se van con el nombre, como la píldora. */
+.agenda-fc.ag-cal-mes-movil .ag-mes .ag-marcas { display: none; }
 
 /* El chip de Google es el único con paleta FIJA —no depende de estado ni de
    color elegido— así que sale de aquí y no de línea. Es el mismo par de tokens

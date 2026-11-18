@@ -4,7 +4,8 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { CalendarDays, RotateCw } from 'lucide-react'
 import type { createClient as ClienteNavegador } from '@/lib/supabase/client'
-import { marcaPorLigar } from '@/lib/agenda/tarjetasAgenda'
+import { marcasDeCita } from '@/lib/agenda/tarjetasAgenda'
+import { ETIQUETA_SIN_EXPEDIENTE, IconoEnlace, IconoSinExpediente } from '@/components/agenda/MarcasCita'
 import BotonNoEsCita from '@/components/agenda/BotonNoEsCita'
 import { createClient } from '@/lib/supabase/client'
 import { useProfile } from '@/hooks/useProfile'
@@ -53,6 +54,9 @@ type Cita = {
      clínica: ahí el nombre del paciente no dice de quién es la cita. */
   medico?: { id: string; titulo: string | null; nombres: string | null; apellido_paterno: string | null; apellido_materno: string | null } | null
 }
+
+/** Tanda K, punto 18 · El texto que acompaña al eslabón en la fila (la leyenda dice «Se agendó por enlace»). */
+const TEXTO_ENLACE = 'Por enlace'
 
 /** El alto exacto del renglón, compartido con su esqueleto para que no salte. */
 const ALTO_FILA = 'min-h-[57px]'
@@ -502,7 +506,10 @@ export default function ProximasCitas({ medicoId, acciones, ligar }: {
         const nombre = cita.pacientes
           ? `${cita.pacientes.nombre} ${cita.pacientes.apellidos}`
           : (cita.reserva_canal && cita.reserva_nombre) || cita.title
-        const marca = cita.paciente_id ? null : marcaPorLigar(cita)
+        /* Tanda K, sección E (puntos 17 y 18) · las marcas de la agenda v2: el expediente tachado
+           (por ligar o por asignar) y el eslabón con su texto (reservada por enlace, también ya
+           ligada). Sin la v2 las columnas no llegan y no hay ninguna, como antes. */
+        const procedencia = marcasDeCita(cita)
         /* ⚠️ LAS INICIALES CAEN SOBRE `nombre`, NUNCA A CADENA VACÍA. Sin este
            respaldo, una fila cuyo `join` de `pacientes` viniera vacío pintaba el
            círculo del avatar CON SU COLOR DE FONDO Y SIN NINGUNA LETRA: un punto
@@ -585,10 +592,15 @@ export default function ProximasCitas({ medicoId, acciones, ligar }: {
             <div className="flex-1 min-w-0 xl:min-w-[150px]">
               <p className="flex min-w-0 items-center gap-[var(--sp-1-5)]">
                 <span className="truncate text-[length:var(--sp-fs-body-sm)] font-bold text-[var(--sp-ink-800)]">{nombre}</span>
-                {/* I3 · La marca de la agenda, en palabra: «Por ligar» / «Por asignar». */}
-                {marca && (
-                  <span title={marca.titulo} className="shrink-0 whitespace-nowrap rounded-[var(--sp-r-pill)] border border-current px-1.5 text-[10px] font-bold uppercase leading-[1.5] text-[var(--sp-ink-500)]">
-                    {marca.texto}
+                {procedencia.sinExpediente && (
+                  <span role="img" aria-label={procedencia.historial ? `${ETIQUETA_SIN_EXPEDIENTE}. ${procedencia.historial}` : ETIQUETA_SIN_EXPEDIENTE}
+                    title="Aún no tiene expediente" className="inline-flex shrink-0" data-marca-sin-expediente>
+                    <IconoSinExpediente size={15} />
+                  </span>
+                )}
+                {procedencia.enlace && (
+                  <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-[length:var(--sp-fs-legal)] font-semibold text-[var(--sp-ink-500)]" data-marca-enlace>
+                    <IconoEnlace size={13} />{TEXTO_ENLACE}
                   </span>
                 )}
               </p>
