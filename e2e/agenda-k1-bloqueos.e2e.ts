@@ -43,7 +43,7 @@ function limpiar(): void {
 }
 
 test.beforeAll(() => { limpiar(); interruptorAgenda('A', true) })
-test.afterAll(() => { limpiar(); interruptorAgenda('A', true); interruptorAgenda('B', false) })
+test.afterAll(() => { limpiar(); interruptorAgenda('A', false); interruptorAgenda('B', false) })
 
 async function aLaSemanaMasTres(page: Page): Promise<void> {
   for (let i = 0; i < 3; i++) await page.locator('.fc-next-button').click()

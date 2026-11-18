@@ -114,7 +114,7 @@ test.describe('escritorio', () => {
     const boton = page.getByRole('button', { name: /Compactar la rejilla al horario de la clínica/ })
     await expect(boton).toHaveAttribute('aria-pressed', 'true')
     await expect(page.locator('.fc-timegrid-col.fc-day-sun')).toHaveCount(0)
-    await expect(page.locator('.ag-banda-compacta')).toContainText(/domingo/i)
+    await expect(page.locator('.ag-banda-compacta:not([data-leyenda-husos])')).toContainText(/domingo/i)
     await boton.click()
     await expect(page.locator('.fc-timegrid-col.fc-day-sun')).toHaveCount(1)
   })
@@ -125,7 +125,7 @@ test.describe('escritorio', () => {
     const boton = page.getByRole('button', { name: /Compactar la rejilla al horario de la clínica/ })
     await expect(boton).toHaveAttribute('aria-pressed', 'false')
     await expect(page.locator('.fc-timegrid-col.fc-day-sun')).toHaveCount(1)
-    await expect(page.locator('.ag-banda-compacta')).toHaveCount(0)
+    await expect(page.locator('.ag-banda-compacta:not([data-leyenda-husos])')).toHaveCount(0)
   })
 
   /* Cierre de F · la sesión de «Compactar» sólo se ensancha: esta semana tiene

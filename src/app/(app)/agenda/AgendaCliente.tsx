@@ -215,7 +215,8 @@ const UMBRAL_SONDEO_FOCO_MS = 120_000
 
 /* F2.7: la salida animada del modal de la cita (ver la nota junto a
    `closeModal`). `AppointmentModal` ya recibe `saliendo`: `data-estado` en
-   velo y panel, e `inert` en su raíz. */
+   velo y panel, e `inert` en su raíz. Sólo con la v2 (integración de la
+   tanda K): apagada, el modal se va como antes del proyecto. */
 const SALIDA_DEL_MODAL: boolean = true
 
 /* ─── Página principal ─────────────────────────────────── */
@@ -758,7 +759,10 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
   const [modalSaliente, setModalSaliente] = useState<ModalState | null>(null)
 
   function closeModal() {
-    const espera = SALIDA_DEL_MODAL && modal.mode !== 'closed' ? duracionMovimiento('--ag-dur-base') : 0
+    /* Integración de la tanda K (defecto que destapó K4): la salida animada es de la v2. Apagada,
+       el modal se desmonta al cerrarse, como antes del proyecto (~184 ms → al instante; e2e
+       `agenda-k-salida-modal`). */
+    const espera = SALIDA_DEL_MODAL && agendaV2 && modal.mode !== 'closed' ? duracionMovimiento('--ag-dur-base') : 0
     if (espera > 0) {
       const saliente = modal
       setModalSaliente(saliente)

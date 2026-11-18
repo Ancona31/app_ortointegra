@@ -131,7 +131,7 @@ test.beforeAll(async ({ browser }, info) => {
 test.afterAll(async ({}, info) => {
   if (info.project.name !== ESCRITORIO) return
   borrarBloqueos()
-  interruptorAgenda('A', true)
+  interruptorAgenda('A', false) // integración K: cada archivo deja la v2 apagada
   interruptorAgenda('B', false)
   borrarConexion()
   if (servidor?.pid) {

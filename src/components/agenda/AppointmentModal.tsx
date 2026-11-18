@@ -1520,7 +1520,7 @@ export default function AppointmentModal({
               el 19 es la clase de dato que nadie corrige porque nadie se lo
               cree. */}
           {eleccion && apt && (reagendando
-            ? <PanelReagendar cita={apt} consultorios={consultoriosList} alVolver={() => setReagendando(false)}
+            ? <PanelReagendar cita={apt} consultorios={consultoriosList} alVolver={() => setReagendando(false)} buscarBloqueo={buscarBloqueo}
                 alTerminar={() => (onReagendada ? onReagendada() : onClose())} />
             : (
               <div data-testid="eleccion-paciente" className="flex flex-col gap-2">

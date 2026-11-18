@@ -83,7 +83,7 @@ test('modal de horario: abre y cierra sin guardar', async ({ page }) => {
 test('botón Compactar alterna aria-pressed y aparece la banda compacta', async ({ page }) => {
   await irAAgenda(page)
   const boton = page.getByRole('button', { name: /Compactar la rejilla al horario de la clínica/ })
-  const banda = page.locator('.ag-banda-compacta')
+  const banda = page.locator('.ag-banda-compacta:not([data-leyenda-husos])')
   const comprobar = async (encendido: boolean): Promise<void> => {
     await expect(boton).toHaveAttribute('aria-pressed', String(encendido))
     if (encendido) await expect(banda).toBeVisible()
