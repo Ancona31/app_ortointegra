@@ -70,7 +70,8 @@ function botonesRecordatorio(url: string, confirmada: boolean): BotonCorreo[] {
   const cancelar = `${url}?paso=cancelar`
   return confirmada
     ? [{ texto: 'Avisar que no podré asistir', url: cancelar }]
-    : [{ texto: 'Confirmo mi asistencia', url }, { texto: 'No podré asistir', url: cancelar, secundario: true }]
+    // K2 (punto 8): `?paso=confirmar` hace que la página confirme al cargar (con JS; el GET no escribe).
+    : [{ texto: 'Confirmo mi asistencia', url: `${url}?paso=confirmar` }, { texto: 'No podré asistir', url: cancelar, secundario: true }]
 }
 
 /**

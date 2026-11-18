@@ -168,7 +168,8 @@ describe('POST /api/agenda/correo — envío', () => {
     expect(c.texto).toContain('Dra. Ana Pérez')
     expect(c.texto).toContain('Consultorio Centro, Calle Ficticia 1, Centro, Mérida')
     expect(c.texto).toContain('https://spinus.prueba/confirmar/AbCdEfGhIjKlMnOpQrStUv')
-    expect(c.html).toContain('href="https://spinus.prueba/confirmar/AbCdEfGhIjKlMnOpQrStUv"')
+    // K2 (punto 8): «Confirmo» lleva ?paso=confirmar.
+    expect(c.html).toContain('href="https://spinus.prueba/confirmar/AbCdEfGhIjKlMnOpQrStUv?paso=confirmar"')
     expect(`${c.asunto} ${c.texto}`).not.toMatch(/Juana|juana@|diagn|motivo|nota/i)
     expect(h.rpc.find(r => r.fn === 'cita_correo_marcar')?.args).toMatchObject({ p_clinica_id: 'clinica-1', p_envio_id: ENVIO, p_estado: 'enviado' })
     expect(h.auditorias).toEqual([expect.objectContaining({ userId: 'perfil-1', accion: 'enviar_confirmacion_cita', registroId: CITA })])

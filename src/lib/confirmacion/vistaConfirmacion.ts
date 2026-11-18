@@ -34,6 +34,15 @@ export function esPasoCancelar(valor: string | string[] | undefined): boolean {
   return valor === 'cancelar'
 }
 
+/**
+ * K2 (punto 8): ¿viene del botón «Confirmo mi asistencia» del correo
+ * (`?paso=confirmar`)? El GET sigue sin escribir: confirma el navegador con el
+ * POST del botón (`ConfirmarAlCargar`).
+ */
+export function esPasoConfirmar(valor: string | string[] | undefined): boolean {
+  return valor === 'confirmar'
+}
+
 /** «Comunícate al 999…» o, sin teléfono, «comunícate con el consultorio». PENDIENTE DE REVISIÓN. */
 export function comunicate(telefono: string | null): string {
   return telefono ? `comunícate al ${telefono}` : 'comunícate con el consultorio'

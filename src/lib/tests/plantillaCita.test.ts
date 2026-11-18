@@ -88,7 +88,8 @@ describe('cada correo', () => {
   })
   it('el recordatorio: «Confirmo» al enlace y «No podré asistir» al paso de cancelar (un GET que no escribe)', () => {
     const c = recordatorio()
-    expect(c.html).toContain(`href="${URL_CONF}"`)
+    // K2 (punto 8): «Confirmo» lleva `?paso=confirmar` (la página confirma al cargar, con JS; el GET no escribe).
+    expect(c.html).toContain(`href="${URL_CONF}?paso=confirmar"`)
     expect(c.html).toContain(`href="${URL_CONF}?paso=cancelar"`)
     expect(leible(c.html)).toContain('Confirmo mi asistencia')
     const ya = recordatorio(true)

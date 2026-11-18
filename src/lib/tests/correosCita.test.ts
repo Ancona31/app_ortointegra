@@ -25,7 +25,7 @@ describe('correoRecordatorio', () => {
     expect(c.texto).toContain('5555555555')
     expect(c.texto).toContain(URL_ENLACE)
     expect(c.texto).toContain('Confirmar o avisar que no podré asistir')
-    expect(c.html).toContain(`href="${URL_ENLACE}"`)
+    expect(c.html).toContain(`href="${URL_ENLACE}?paso=confirmar"`)
   })
 
   it('el asunto no lleva el médico ni el consultorio', () => {
@@ -92,7 +92,7 @@ describe('correoConfirmacion', () => {
     }
     expect(c.texto.startsWith('Dr. Ana Pérez\nConsultorio <Uno>\n\nConfirma tu cita')).toBe(true)
     expect(c.texto).toContain(URL_ENLACE)
-    expect(c.html).toContain(`href="${URL_ENLACE}"`)
+    expect(c.html).toContain(`href="${URL_ENLACE}?paso=confirmar"`)
     expect(c.html).toContain('Calle &quot;1&quot; &amp; 2')
   })
 
@@ -129,7 +129,7 @@ describe('a nombre del médico (I, punto 21) y el aviso de cambio (I, punto 9)',
     expect(c.asunto).toMatch(/^Cambio en tu cita: ahora es el martes,? 17 de noviembre/)
     expect(c.texto).toContain('Tu cita cambió')
     expect(c.texto).toContain('10:00')
-    expect(c.html).toContain(`href="${URL_ENLACE}"`)
+    expect(c.html).toContain(`href="${URL_ENLACE}?paso=confirmar"`)
     expect(`${c.texto}\n${c.html}`).not.toMatch(/recordatorio/i)
   })
 })
