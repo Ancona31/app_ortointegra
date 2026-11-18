@@ -3021,6 +3021,8 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
    tres tarjetas. La «G» de cuatro colores va aparte, en el contenido — no cabe
    en este nodo, que no admite hijos. */
 .agenda-fc .fc-list-event.ag-ev-gcal              { --ag-ev-marca: var(--ag-gcal-accent); }
+/* K1 · El bloqueo de horario en la lista: su marca, en la tinta secundaria. */
+.agenda-fc .fc-list-event.ag-bloqueo              { --ag-ev-marca: var(--ag-ink-600); }
 /* Suelo, para una fila sin estado —hoy no llega ninguna, pero un `border-color`
    sin valor deja la marca invisible y eso no se ve venir. */
 .agenda-fc .fc-list-event                         { --ag-ev-marca: var(--ag-muted2); }
@@ -7529,3 +7531,52 @@ html.dark .bg-slate-300              { background-color: #444444 !important; }
 html.dark .border-slate-200\/70      { border-color: rgba(255,255,255,.12) !important; }
 html.dark .bg-purple-50              { background-color: rgba(168,85,247,.14) !important; }
 html.dark .bg-amber-50\/60           { background-color: rgba(245,158,11,.10) !important; }
+
+/* ── K1 (tanda K, sección A) · EL BLOQUEO DE HORARIO ─────────────────────────
+   Una franja RAYADA detrás de las citas, distinta de una cita (tarjeta) y de un
+   evento (cuadrado de color). El rayado es el mismo patrón que ya usa la
+   tarjeta de documentos (`CardDocumento.tsx`), con la tinta secundaria de la
+   agenda: sin tokens nuevos, así el modo oscuro sale de los que ya existen.
+   Sólo `background`, nada que mueva caja ni anime (reglas de la landing no
+   aplican aquí, pero la agenda sigue la misma disciplina).
+   ⚠️ `opacity: 1` deshace el `--fc-bg-event-opacity` (.3) de la librería, que
+   apagaría también el rótulo. */
+.agenda-fc .fc .fc-bg-event.ag-bloqueo,
+.agenda-fc .fc .fc-daygrid-event.ag-bloqueo {
+  opacity: 1;
+  /* ⚠️ `!important` PORQUE `.fc .fc-event` YA LO LLEVA (`background: transparent
+     !important`, la tarjeta pinta su fondo en el contenido) y el fondo rayado
+     es la franja misma: sin él, la raya no sale. Más específica, gana. */
+  background-color: color-mix(in srgb, var(--ag-ink-600) 6%, transparent) !important;
+  background-image: repeating-linear-gradient(45deg, color-mix(in srgb, var(--ag-ink-600) 16%, transparent) 0 6px, transparent 6px 14px) !important;
+  border: none;
+}
+.ag-leyenda-bloqueo {
+  background-color: color-mix(in srgb, var(--ag-ink-600) 10%, transparent);
+  background-image: repeating-linear-gradient(45deg, color-mix(in srgb, var(--ag-ink-600) 35%, transparent) 0 2px, transparent 2px 4px);
+}
+.agenda-fc .ag-bloqueo-rotulo {
+  display: inline-block;
+  max-width: calc(100% - 8px);
+  margin: 4px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ag-ink-600);
+  background: var(--ag-surface);
+  cursor: pointer;
+}
+.agenda-fc .ag-bloqueo-fila {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ag-ink-600);
+  cursor: pointer;
+}

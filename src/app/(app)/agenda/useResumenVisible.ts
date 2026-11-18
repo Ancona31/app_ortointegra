@@ -18,6 +18,7 @@ import type FullCalendar from '@fullcalendar/react'
 import type { EventApi, ViewApi, DayCellContentArg } from '@fullcalendar/core'
 import { differenceInCalendarDays } from 'date-fns'
 import type { RangosDeVista } from '@/lib/agenda/fechasAgenda'
+import { esBloqueo } from '@/lib/agenda/bloqueosAgenda'
 import {
   type FilaDelDia, filasDelDia, firmaDeFilas,
   type ConteoVisible,
@@ -76,9 +77,12 @@ export function useConteoVisible({
      Si algún día vuelve a hacer falta la vista aquí, el motivo de arriba sigue
      en pie: sácala del `arg` del handler, nunca de `currentView`. */
   const aplicarConteo = useCallback((
-    eventos: readonly EventoParaConteo[],
+    todos: readonly EventoParaConteo[],
     rangos: RangosDeVista | null,
   ) => {
+    /* K1 · un bloqueo de horario no es una cita: no cuenta. Aquí, y no en cada
+       llamador, porque los efectos de este hook leen `getEvents()` crudo. */
+    const eventos = todos.filter(e => !esBloqueo(e))
     const nuevo = contarVisibles(
       eventos,
       rangos?.activo ?? null,
@@ -126,8 +130,9 @@ export function usePanelDelMes({
   // eslint-disable-next-line react-hooks/refs -- patrón último valor: FullCalendar lee en componentDidMount/Update, antes de los efectos del padre
   diaSelRef.current = diaSel
 
-  const aplicarPanel = useCallback((eventos: readonly EventApi[]) => {
+  const aplicarPanel = useCallback((todos: readonly EventApi[]) => {
     const dia = diaSelRef.current
+    const eventos = todos.filter(e => !esBloqueo(e))
     const nuevas = dia ? filasDelDia(eventos, dia) : []
     setFilasDia(prev => (firmaDeFilas(prev) === firmaDeFilas(nuevas) ? prev : nuevas))
   }, [])
@@ -215,10 +220,13 @@ export function useResumenDelDia({
   const [resumenDia, setResumenDia] = useState<ResumenDia | null>(null)
 
   const aplicarResumen = useCallback((
-    eventos: readonly EventApi[],
+    todos: readonly EventApi[],
     rangos: RangosDeVista | null,
     vista: string,
   ) => {
+    /* K1 · el bloqueo PINTADO es tiempo cerrado (ocupa en los huecos); el oculto
+       (`display: 'none'`, v2 apagada) no existe para el resumen. */
+    const eventos = todos.filter(e => !esBloqueo(e) || e.display !== 'none')
     /* El día es `activeStart` y no `new Date()`: el panel sigue al calendario,
        no compite con él (§8.3). En `timeGridDay` el rango activo es ese único
        día, así que «el primer día del rango» y «el día pintado» son lo mismo y

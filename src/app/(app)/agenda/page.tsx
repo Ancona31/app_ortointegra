@@ -44,7 +44,7 @@ async function sembrarCitas(): Promise<SemillaCitas<Appointment> | null> {
     }
     return {
       id: crypto.randomUUID(), usuario: perfil.id, filtro, desde, hasta, salio,
-      appointments: r.appointments, incompleta: r.incompleta,
+      appointments: r.appointments, incompleta: r.incompleta, bloqueos: r.bloqueos,
     }
   } catch (err: unknown) {
     /* Los errores internos de Next —el de `cookies()` al intentar prerenderizar

@@ -293,8 +293,8 @@ begin
 end $$;
 
 -- ── Caso 6: ocupación. Cita del personal y fila de Google ocupan; no_show, cancelada y de todo
---    el día no (seg1, 20261117130000: lo de todo el día SÍ ocupa en el enlace; va en un día lejos
---    de los demás turnos para no taparlos según la hora a la que corra la prueba); tocar el
+--    el día no (seg1 lo hizo ocupar; k1, tanda K punto 4, 20261123120000: vuelve a NO ocupar; va
+--    en un día lejos de los demás turnos para no taparlos según la hora de la prueba); tocar el
 --    extremo no es empalme; otro médico no cuenta ──
 insert into public.appointments (id, clinica_id, medico_id, title, start_time, end_time, status, origen, all_day, consultorio_timezone) values
   ('00000000-0000-4000-8000-000000d3d001', '00000000-0000-4000-8000-000000d3c001', '00000000-0000-4000-8000-000000d3b001',
@@ -334,8 +334,8 @@ begin
           '00000000-0000-4000-8000-000000d3a001', pg_temp.t(36), '5500000015', 'g5', null), 'ok');
   perform pg_temp.esperar('caso 6 otro médico', pg_temp.res(pg_temp.h('o6'), '00000000-0000-4000-8000-00000d3cc001',
           '00000000-0000-4000-8000-000000d3a001', pg_temp.t(38), '5500000016', 'g6', null), 'ok');
-  perform pg_temp.esperar('caso 6 todo el día', pg_temp.res(pg_temp.h('o7'), '00000000-0000-4000-8000-00000d3cc001',
-          '00000000-0000-4000-8000-000000d3a001', pg_temp.t(120), '5500000017', 'g7', null), 'ocupado');
+  perform pg_temp.esperar('caso 6 todo el día no ocupa', pg_temp.res(pg_temp.h('o9'), '00000000-0000-4000-8000-00000d3cc001',
+          '00000000-0000-4000-8000-000000d3a001', pg_temp.t(120), '5500000019', 'g9', null), 'ok');
   perform pg_temp.esperar('caso 6 fuera del día de todo el día', pg_temp.res(pg_temp.h('o7'), '00000000-0000-4000-8000-00000d3cc001',
           '00000000-0000-4000-8000-000000d3a001', pg_temp.t(48), '5500000017', 'g7', null), 'ok');
   -- reserva_ocupacion: sólo dos columnas, sólo del médico del enlace, ≤ 15 días, apagada → nada.

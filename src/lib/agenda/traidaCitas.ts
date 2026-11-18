@@ -13,6 +13,7 @@ import type { Appointment } from '@/lib/agenda/tiposAgenda'
 import { claveCitas, generacionCitas, guardarCitas } from '@/lib/agenda/cacheRangosCitas'
 import { sembrarCacheCitas, type SemillaCitas } from '@/lib/agenda/semillaCitas'
 import { citaAEvento } from '@/lib/agenda/eventosDeCita'
+import { bloqueoAEvento, bloqueosDeRespuesta } from '@/lib/agenda/bloqueosAgenda'
 import { logger } from '@/lib/logger'
 
 /** Lo que `traerYGuardarCitas` entrega tras pedir y cachear un rango. */
@@ -46,9 +47,10 @@ export async function traerYGuardarCitas(
   if (filtro) url += `&medico_id=${filtro}`
   const res = await fetch(url)
   if (!res.ok) throw new Error(`El servidor respondió ${res.status}`)
-  const data: { appointments?: Appointment[]; incompleta?: boolean } = await res.json()
+  const data: { appointments?: Appointment[]; incompleta?: boolean; bloqueos?: unknown } = await res.json()
   if (!Array.isArray(data.appointments)) throw new Error('Respuesta de citas ilegible')
-  const eventos = data.appointments.map(citaAEvento)
+  /* K1: los bloqueos de horario del mismo rango, en el mismo viaje (sin la migración, ninguno). */
+  const eventos = [...data.appointments.map(citaAEvento), ...bloqueosDeRespuesta(data.bloqueos).map((b) => bloqueoAEvento(b))]
   const incompleta = data.incompleta === true
   if (profileId) guardarCitas(claveCitas(profileId, filtro, startStr, endStr), eventos, incompleta, salio, gen)
   return { eventos, incompleta }

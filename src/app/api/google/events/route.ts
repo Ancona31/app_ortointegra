@@ -276,6 +276,9 @@ export async function GET(req: NextRequest) {
           // Con `singleEvents` Google puede devolver instancias canceladas de
           // series recurrentes. No se pintan, así que no se copian.
           if (!e.id || e.status === 'cancelled') continue
+          // K1 · el evento «Ocupado» de un bloqueo de horario ya se pinta como
+          // bloqueo (viaja por /api/appointments): pintarlo aquí lo duplicaría.
+          if (e.extendedProperties?.private?.spinus_bloqueo) continue
           acumulados.push({
             id:      e.id,
             summary: e.summary ?? undefined,

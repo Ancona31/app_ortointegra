@@ -18,6 +18,7 @@
 import type { createClient } from '@/lib/supabase/server'
 import { APPOINTMENT_SELECT } from '@/lib/appointments'
 import { logger } from '@/lib/logger'
+import { BLOQUEO_SELECT, bloqueosDeRespuesta, type BloqueoAgenda } from '@/lib/agenda/bloqueosAgenda'
 
 type ClienteSesion = Awaited<ReturnType<typeof createClient>>
 
@@ -32,7 +33,7 @@ export interface ParametrosConsultaCitas {
 }
 
 export type ResultadoConsultaCitas<F> =
-  | { ok: true; appointments: F[]; incompleta: boolean }
+  | { ok: true; appointments: F[]; incompleta: boolean; bloqueos: BloqueoAgenda[] }
   | { ok: false; error: string }
 
 /** La consulta sin ejecutar: `select`, clínica, orden, médico y ventana.
@@ -118,7 +119,9 @@ export async function consultaCitas<F = unknown>(
   parametros: ParametrosConsultaCitas,
 ): Promise<ResultadoConsultaCitas<F>> {
   const { clinicaId, from, to } = parametros
-  const { data, error, count } = await construirConsulta(supabase, parametros)
+  const [{ data, error, count }, bloqueos] = await Promise.all([
+    construirConsulta(supabase, parametros), consultaBloqueos(supabase, parametros),
+  ])
   if (error) return { ok: false, error: error.message }
 
   const crudas: F[] = data ?? []
@@ -158,5 +161,36 @@ export async function consultaCitas<F = unknown>(
     )
   }
 
-  return { ok: true, appointments: filas, incompleta }
+  return { ok: true, appointments: filas, incompleta, bloqueos }
+}
+
+/* Tabla ausente (base sin 20261123120000, producción hoy): ninguno, sin ruido. */
+const BLOQUEOS_AUSENTES = new Set(['42P01', 'PGRST205'])
+
+/**
+ * K1 · Los bloqueos de horario del rango, EN PARALELO con las citas: la
+ * agenda no hace una petición más del navegador, sólo una lectura más del
+ * servidor en el mismo viaje. Mismo cliente de SESIÓN (RLS: el mismo predicado
+ * que las citas) y el mismo `eq('clinica_id')` explícito; la misma ventana por
+ * solape. Un fallo NO tumba las citas: sin bloqueos la agenda se pinta igual
+ * (el enlace de reserva los respeta en la base, no aquí).
+ */
+async function consultaBloqueos(
+  supabase: ClienteSesion, { clinicaId, from, to, medicoId }: ParametrosConsultaCitas,
+): Promise<BloqueoAgenda[]> {
+  let query = supabase.from('agenda_bloqueos').select(BLOQUEO_SELECT).eq('clinica_id', clinicaId)
+  if (medicoId) query = query.eq('medico_id', medicoId)
+  if (to) query = query.lt('inicio', to)
+  if (from) query = query.gt('fin', from)
+  try {
+    const { data, error } = await query.order('inicio', { ascending: true }).limit(500)
+    if (error) {
+      if (!(error.code && BLOQUEOS_AUSENTES.has(error.code))) logger.warn('agenda', `bloqueos sin leer: ${error.code ?? 'sin código'}`)
+      return []
+    }
+    return bloqueosDeRespuesta(data)
+  } catch {
+    logger.warn('agenda', 'bloqueos sin leer: excepción')
+    return []
+  }
 }

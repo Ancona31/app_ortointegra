@@ -41,6 +41,7 @@ import { buildEventInput, FUENTE_APPOINTMENTS, PREFIJO_OPTIMISTA } from '@/lib/a
 import { addMinutes, ultimoDiaIncluido } from '@/lib/agenda/fechasAgenda'
 import type { AvisosHorario, DondeCita } from '@/lib/agenda/horarioRejilla'
 import { DEFAULT_DURATION } from '@/lib/agenda/duracionCita'
+import { esCitaParaBloqueo, tocaBloqueo, TEXTO_CONFIRMAR_BLOQUEO } from '@/lib/agenda/bloqueosAgenda'
 import { registrarNuevo, salirConAnimacion } from '@/lib/agenda/marcasMovimiento'
 import { animarFlip } from '@/lib/agenda/flipTarjetas'
 import type { AltaGuardada, Appointment, DatosGuardado, OpcionesGuardado, Status } from '@/lib/agenda/tiposAgenda'
@@ -387,14 +388,27 @@ export function crearGuardadoCitas({
     if (!agendaV2 || !api) { despues([]); return }
     const finEfectivo = fin ?? addMinutes(inicio, DEFAULT_DURATION)
     const medico = arg.event.extendedProps.medico_id
-    const lista = empalmesPintados({
-      id: arg.event.id, medicoId: typeof medico === 'string' ? medico : null,
-      inicio: new Date(inicio), fin: new Date(finEfectivo), todoElDia: false,
-      noOcupa: ESTADOS_SIN_EMPALME.includes(String(arg.event.extendedProps.status)),
-      deGoogle: false, titulo: arg.event.title,
-    }, api.getEvents())
-    if (!lista.length) { despues([]); return }
-    preguntarEmpalme(lista, () => despues(lista.map(e => e.id)), () => restaurarPosicion(arg))
+    const medicoId = typeof medico === 'string' ? medico : null
+    const empalmes = (): void => {
+      const lista = empalmesPintados({
+        id: arg.event.id, medicoId,
+        inicio: new Date(inicio), fin: new Date(finEfectivo), todoElDia: false,
+        noOcupa: ESTADOS_SIN_EMPALME.includes(String(arg.event.extendedProps.status)),
+        deGoogle: false, titulo: arg.event.title,
+      }, api.getEvents())
+      if (!lista.length) { despues([]); return }
+      preguntarEmpalme(lista, () => despues(lista.map(e => e.id)), () => restaurarPosicion(arg))
+    }
+    /* K1 (punto 3) · mover una CITA a un horario bloqueado PREGUNTA, no lo
+       impide; después, el empalme de siempre. Un evento sin paciente no pregunta. */
+    if (!esCitaParaBloqueo(arg.event.extendedProps) || !tocaBloqueo(api.getEvents(), medicoId, new Date(inicio), new Date(finEfectivo))) {
+      empalmes(); return
+    }
+    setConfirm({
+      message: TEXTO_CONFIRMAR_BLOQUEO,
+      onConfirm: () => { setConfirm(null); empalmes() },
+      onCancel:  () => { setConfirm(null); restaurarPosicion(arg) },
+    })
   }
 
   async function ejecutarDrop(

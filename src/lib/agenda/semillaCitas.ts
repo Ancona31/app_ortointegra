@@ -22,6 +22,7 @@ import type { EventInput } from '@fullcalendar/core'
 import { desplazarFecha, fechaHoraLocalAInstante, TZ_CLINICA } from '@/lib/dates'
 import { rangoQuePedir } from '@/lib/agenda/rangoQuePedir'
 import { claveCitas, generacionCitas, guardarCitas, leerCitas } from '@/lib/agenda/cacheRangosCitas'
+import { bloqueoAEvento, type BloqueoAgenda } from '@/lib/agenda/bloqueosAgenda'
 
 /** Lo único que la partición mira de cada fila. */
 export interface FilaConPuntas { start_time: string; end_time: string }
@@ -40,6 +41,8 @@ export interface SemillaCitas<F extends FilaConPuntas> {
   salio: number
   appointments: F[]
   incompleta: boolean
+  /** K1 · Los bloqueos de horario de la misma ventana (ausente = ninguno). */
+  bloqueos?: BloqueoAgenda[]
 }
 
 /**
@@ -79,7 +82,7 @@ export function semanasAlrededor(hoy: Date): { startStr: string; endStr: string 
 export function partirSemilla<F extends FilaConPuntas>(
   semilla: SemillaCitas<F>,
   hoy: Date,
-): { clave: string; filas: F[] }[] {
+): { clave: string; filas: F[]; bloqueos: BloqueoAgenda[] }[] {
   const desde = Date.parse(semilla.desde)
   const hasta = Date.parse(semilla.hasta)
   const corte = semilla.incompleta
@@ -92,7 +95,9 @@ export function partirSemilla<F extends FilaConPuntas>(
     const filas = semilla.appointments.filter(
       (f) => Date.parse(f.start_time) < fin && Date.parse(f.end_time) >= inicio,
     )
-    return [{ clave: claveCitas(semilla.usuario, semilla.filtro, startStr, endStr), filas }]
+    /* K1 · los bloqueos, con el solape de su consulta (`consultaCitas.ts`). */
+    const bloqueos = (semilla.bloqueos ?? []).filter((b) => Date.parse(b.inicio) < fin && Date.parse(b.fin) > inicio)
+    return [{ clave: claveCitas(semilla.usuario, semilla.filtro, startStr, endStr), filas, bloqueos }]
   })
 }
 
@@ -160,10 +165,10 @@ export function sembrarCacheCitas<F extends FilaConPuntas>(
   recordarSemilla(semilla.id)
   if (gen !== generacionCitas()) return null
   const en = Math.min(semilla.salio, recibida)
-  for (const { clave, filas } of partirSemilla(semilla, hoy)) {
+  for (const { clave, filas, bloqueos } of partirSemilla(semilla, hoy)) {
     /* Lo que ya trajo la red —la semilla tardó más que el tope— es más nuevo. */
     if (leerCitas(clave)) continue
-    guardarCitas(clave, filas.map(traducir), false, en, gen)
+    guardarCitas(clave, [...filas.map(traducir), ...bloqueos.map((b) => bloqueoAEvento(b))], false, en, gen)
   }
   return en
 }

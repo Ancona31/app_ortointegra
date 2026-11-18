@@ -150,21 +150,22 @@ begin
 end $$;
 
 -- ── Caso 6: la ventana (anticipación y horizonte) y lo ocupado valen igual sin correo,
---    incluido un evento de TODO EL DÍA del médico ──
+--    incluido un BLOQUEO de días completos del médico (desde K1 un evento de todo el día ya
+--    no cierra el día; lo que lo cierra es el bloqueo) ──
 create function pg_temp.dia(p_horas integer) returns timestamptz language sql as $$
   select (date_trunc('day', pg_temp.t(p_horas) at time zone 'America/Mexico_City') at time zone 'America/Mexico_City');
 $$;
 grant execute on function pg_temp.dia(integer) to anon, authenticated, service_role;
-insert into public.appointments (clinica_id, medico_id, title, start_time, end_time, status, origen, all_day, consultorio_timezone) values
-  ('00000000-0000-4000-8000-00000a12c001', '00000000-0000-4000-8000-00000a12b001', 'Vacaciones',
-   pg_temp.dia(200), pg_temp.dia(200) + interval '1 day', 'scheduled', 'spinus', true, 'America/Mexico_City');
+insert into public.agenda_bloqueos (clinica_id, medico_id, inicio, fin, todo_el_dia, zona, motivo) values
+  ('00000000-0000-4000-8000-00000a12c001', '00000000-0000-4000-8000-00000a12b001',
+   pg_temp.dia(200), pg_temp.dia(200) + interval '1 day', true, 'America/Mexico_City', 'Vacaciones');
 do $$
 begin
   perform pg_temp.esperar('caso 6 antes de la anticipación', pg_temp.res(pg_temp.unico('w1'), date_trunc('hour', now()) + interval '1 hour',
           '5533330011', null), 'fuera_de_ventana');
   perform pg_temp.esperar('caso 6 más allá del horizonte', pg_temp.res(pg_temp.unico('w2'), date_trunc('hour', now()) + interval '400 days',
           '5533330011', null), 'fuera_de_ventana');
-  perform pg_temp.esperar('caso 6 todo el día', pg_temp.res(pg_temp.unico('w3'), pg_temp.dia(200) + interval '10 hours',
+  perform pg_temp.esperar('caso 6 bloqueo de días completos', pg_temp.res(pg_temp.unico('w3'), pg_temp.dia(200) + interval '10 hours',
           '5533330011', null), 'ocupado');
   perform pg_temp.esperar('caso 6 empalme con una reserva', pg_temp.res(pg_temp.unico('w4'), pg_temp.t(10), '5533330011', null), 'ocupado');
 end $$;

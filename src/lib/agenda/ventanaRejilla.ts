@@ -282,7 +282,8 @@ export function ventanaDeEventos(
 
   for (const ev of eventos) {
     if (ev.allDay) continue
-    if (ev.display === 'background' || ev.display === 'inverse-background') continue
+    /* K1: `none` es un bloqueo de horario con la v2 apagada (no se pinta). */
+    if (ev.display === 'background' || ev.display === 'inverse-background' || ev.display === 'none') continue
     if (!ev.start) continue
 
     // Solapamiento SEMIABIERTO: con `<=` entrarían los eventos que empiezan
