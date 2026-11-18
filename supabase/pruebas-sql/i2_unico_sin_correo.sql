@@ -67,7 +67,9 @@ begin
     raise exception 'i2 %: dio %, esperaba %', p_caso, p_obtenido, p_esperado;
   end if;
 end $$;
-grant execute on function pg_temp.h(text), pg_temp.t(integer), pg_temp.esperar(text, text, text) to anon, authenticated, service_role;
+-- Integración I: también pg_temp.unico, que llama service_role. Con feature/limites-ajustables (P1) las
+-- funciones de postgres nacen sin EXECUTE a PUBLIC, también las de pg_temp.
+grant execute on function pg_temp.h(text), pg_temp.t(integer), pg_temp.unico(text), pg_temp.esperar(text, text, text) to anon, authenticated, service_role;
 
 -- ── Caso 1: el ÚNICO sin correo reserva; la fila no tiene correo y sí su seudónimo
 --    propio; el enlace queda usado y la reserva auditada ──

@@ -54,6 +54,9 @@ export async function comprobarSustituible(
 ): Promise<VetoSustitucion> {
   const { data, error } = await supabase.from('appointments').select('id, status, cerrada_en, sustituida_por')
     .eq('id', citaId).eq('clinica_id', clinicaId).maybeSingle()
+  /* Sin la migración 20261121142000 (columnas ausentes): la cita nueva entra como antes de la
+     tanda I y la cancelada se queda como estaba (`cerrarSustituida` lo registra y devuelve null). */
+  if (error?.code === '42703' || error?.code === 'PGRST204') return null
   if (error) throw new Error(`cita a sustituir sin leer: ${error.code ?? ''}`)
   if (!data) return { estado: 404, cuerpo: { error: 'sustituye_a_invalida', message: 'No se encontró la cita cancelada que se iba a sustituir.' } }
   if (data.cerrada_en && await cerradaPorEsteReintento(supabase, clinicaId, data.sustituida_por, clientId)) return null

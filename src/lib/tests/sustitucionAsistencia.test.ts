@@ -9,7 +9,7 @@ vi.mock('@/lib/supabase/client', () => ({ createClient: () => { throw new Error(
 vi.mock('@/lib/supabase/admin', () => ({ createAdminClient: () => { throw new Error('sin red en pruebas') } }))
 
 import { alcanceDeAsistencia, corteDeAsistencia, HORAS_SIN_PREGUNTAR } from '@/lib/agenda/asistenciaServidor'
-import { leerSustituyeA } from '@/lib/agenda/sustitucionServidor'
+import { comprobarSustituible, leerSustituyeA } from '@/lib/agenda/sustitucionServidor'
 import { altaParaReagendar, burbujaParaReasignar } from '@/components/agenda/InteraccionesV2'
 import type { Appointment } from '@/lib/agenda/tiposAgenda'
 
@@ -58,5 +58,21 @@ describe('punto 12 · sustituir una cancelada', () => {
     expect(b.gesto.inicio.toISOString()).toBe(CITA.start_time)
     expect(b.horas.inicio < b.horas.fin).toBe(true)
     expect(burbujaParaReasignar(CITA, null).gesto.ancla).toBeDefined()
+  })
+})
+
+describe('integración I · sustituir sin la migración 20261121142000', () => {
+  /** Un cliente de sesión mínimo: la lectura de la cita a sustituir contesta `respuesta`. */
+  function cliente(respuesta: { data: unknown; error: { code: string } | null }): Parameters<typeof comprobarSustituible>[0] {
+    const cadena = { select: () => cadena, eq: () => cadena, maybeSingle: async () => respuesta }
+    return { from: () => cadena } as unknown as Parameters<typeof comprobarSustituible>[0]
+  }
+  it('columna ausente (42703 o PGRST204): no veta, el alta entra como antes de la tanda I', async () => {
+    for (const code of ['42703', 'PGRST204']) {
+      await expect(comprobarSustituible(cliente({ data: null, error: { code } }), 'c1', 'k1', null)).resolves.toBeNull()
+    }
+  })
+  it('cualquier otro error de lectura sigue siendo un error', async () => {
+    await expect(comprobarSustituible(cliente({ data: null, error: { code: '42501' } }), 'c1', 'k1', null)).rejects.toThrow('42501')
   })
 })

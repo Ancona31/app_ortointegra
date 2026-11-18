@@ -176,12 +176,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'Nada que actualizar' }, { status: 400 })
     }
 
-    const { data, error } = await supabase
-      .from('consultorios')
-      .update(updatePayload)
-      .eq('id', id)
-      .select('*')
-      .single()
+    const { data, error } = await actualizarConsultorio(supabase, id, updatePayload)
 
     if (error) {
       console.error('[PATCH /api/consultorios/[id]] error:', error)
@@ -207,6 +202,27 @@ export async function PATCH(
     const message = err instanceof Error ? err.message : 'Error interno'
     return NextResponse.json({ error: message }, { status: 500 })
   }
+}
+
+/** Columna ausente (42703 por SQL, PGRST204 por la caché de esquema de PostgREST). */
+const COLUMNA_AUSENTE = new Set(['42703', 'PGRST204'])
+
+/**
+ * El UPDATE del PATCH. Tanda I (integración): sin la migración 20261121141000
+ * la columna `horario_revisado_en` no existe y, con la v2 encendida, guardar un
+ * horario daría 500. Se reintenta UNA vez sin ella: el horario se guarda como
+ * antes de la tanda I y «Primeros pasos» no se entera (no hay dónde apuntarlo).
+ */
+async function actualizarConsultorio(
+  supabase: Awaited<ReturnType<typeof createClient>>, id: string, payload: Record<string, unknown>,
+): Promise<{ data: unknown; error: { code?: string; message: string } | null }> {
+  const pedir = (p: Record<string, unknown>) => supabase.from('consultorios').update(p).eq('id', id).select('*').single()
+  const r = await pedir(payload)
+  if (!r.error?.code || !COLUMNA_AUSENTE.has(r.error.code) || !('horario_revisado_en' in payload)) return r
+  const resto = { ...payload }
+  delete resto.horario_revisado_en
+  /* Sólo venía la marca («Confirmar horario»): nada que escribir; se devuelve la fila tal cual. */
+  return Object.keys(resto).length > 0 ? pedir(resto) : supabase.from('consultorios').select('*').eq('id', id).single()
 }
 
 /**
