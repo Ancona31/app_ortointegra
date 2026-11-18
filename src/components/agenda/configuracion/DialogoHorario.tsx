@@ -15,6 +15,7 @@ import { X } from 'lucide-react'
 import Portal from '@/components/ui/Portal'
 import { useDialogoModal } from '@/hooks/useDialogoModal'
 import EditorDias, { horarioGuardable } from '@/components/agenda/configuracion/EditorDias'
+import SelectorHuso from '@/components/agenda/configuracion/SelectorHuso'
 import { BOTON_AZUL, BOTON_BLANCO, ERROR } from '@/components/agenda/configuracion/estilosConfig'
 import type { ModoHorario } from '@/lib/agenda/primeraVez'
 import type { Horario } from '@/lib/configApp'
@@ -26,7 +27,9 @@ interface Props {
   horario: Horario
   /** Lo que se dice bajo el editor. */
   nota: string
-  alGuardar: (modo: ModoHorario, horario: Horario) => Promise<string | null>
+  /** K3 (punto 12): sólo en el de la clínica, su huso de partida; con él, el diálogo lo deja cambiar. */
+  huso?: string
+  alGuardar: (modo: ModoHorario, horario: Horario, huso?: string) => Promise<string | null>
   alCerrar: () => void
 }
 
@@ -44,17 +47,18 @@ function Segmento({ modo, alElegir }: { modo: ModoHorario; alElegir: (m: ModoHor
   )
 }
 
-export default function DialogoHorario({ titulo, modos, horario, nota, alGuardar, alCerrar }: Props) {
+export default function DialogoHorario({ titulo, modos, horario, nota, huso: husoInicial, alGuardar, alCerrar }: Props) {
   const id = useId()
   const { montarPanel, alPulsarTecla } = useDialogoModal(alCerrar)
   const [modo, setModo] = useState<ModoHorario>(modos?.inicial ?? 'propio')
   const [dias, setDias] = useState(horario)
+  const [huso, setHuso] = useState(husoInicial)
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const sePuede = modo === 'clinica' || horarioGuardable(dias)
   async function guardar(): Promise<void> {
     setGuardando(true)
-    const motivo = await alGuardar(modo, dias)
+    const motivo = await alGuardar(modo, dias, huso)
     setGuardando(false)
     setError(motivo)
   }
@@ -79,6 +83,7 @@ export default function DialogoHorario({ titulo, modos, horario, nota, alGuardar
                 Aquí darás consulta en el horario de la clínica: <strong>{modos.textoClinica || 'sin días de consulta'}</strong>. Si la clínica cambia su horario, el tuyo cambia también.
               </p>
             ) : <EditorDias horario={dias} alCambiar={setDias} />}
+            {huso !== undefined && <SelectorHuso valor={huso} alCambiar={setHuso} />}
             <p className="m-0 text-[14px] leading-[1.5] text-[var(--ag-ink-600)]">{nota}</p>
             {error && <p role="alert" className={ERROR}>{error}</p>}
           </div>

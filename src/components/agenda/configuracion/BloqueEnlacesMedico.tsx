@@ -96,6 +96,9 @@ function SinFijo(p: { verFalta: boolean; onVerFalta?: () => void; puedeEmitir: b
   )
 }
 
+/** K3 (punto 14): el fijo que su médico apagó sin revocar; al prenderlo, la misma dirección. */
+const AVISO_PAUSADO = 'No abrirá: el enlace está apagado. Al prenderlo vuelve a servir la misma dirección.'
+
 export default function BloqueEnlacesMedico(p: Props) {
   const [completando, setCompletando] = useState(false)
   const fijo = p.enlaces.find(e => e.clase === 'fijo') ?? null
@@ -113,8 +116,9 @@ export default function BloqueEnlacesMedico(p: Props) {
       )}
       <ul className="divide-y divide-[var(--ag-border-card)]">
         {fijo ? (
-          <FilaEnlaceReserva titulo="Enlace fijo" detalle={`desde el ${FECHA.format(new Date(fijo.created_at))}`} aviso={aviso}
-            textoAbre="Activo" onCompletar={completar}
+          <FilaEnlaceReserva titulo="Enlace fijo" detalle={`desde el ${FECHA.format(new Date(fijo.created_at))}`}
+            aviso={fijo.pausado_en ? AVISO_PAUSADO : aviso}
+            textoAbre={fijo.pausado_en ? 'Apagado' : 'Activo'} onCompletar={completar}
             url={p.urls[fijo.id] ?? null} ocupado={p.ocupado} onMostrar={() => p.onMostrar(fijo.id)}
             onRevocar={() => p.onRevocar(fijo)} onRegenerar={p.puedeEmitir ? p.onRegenerar : undefined} />
         ) : (

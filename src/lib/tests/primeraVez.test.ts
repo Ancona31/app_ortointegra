@@ -13,7 +13,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import {
-  cambiosPaso1, esPrimeraVez, mismoHorario, modoInicial, opcionesRecordatorio, primerPendiente, recordatorioCorto, vistaInicial,
+  cambiosPaso1, esPrimeraVez, mismoHorario, modoInicial, numeroDePaso, opcionesRecordatorio, pasoClinica, primerPendiente, recordatorioCorto, vistaInicial,
 } from '@/lib/agenda/primeraVez'
 import { consultasQueCaben, horaCorta, lineasHorario, textoHorario } from '@/lib/agenda/gruposHorario'
 import { horarioGuardable, prenderDia } from '@/components/agenda/configuracion/EditorDias'
@@ -37,6 +37,34 @@ const PROPIO: Horario = {
 const pasos = (horario: boolean, duracion: boolean, enlace: boolean) => [
   { clave: 'horario' as const, hecho: horario }, { clave: 'duracion' as const, hecho: duracion }, { clave: 'enlace' as const, hecho: enlace },
 ]
+
+describe('K3 (punto 12): el paso de la clínica, primero y sólo para quien administra', () => {
+  const conClinica = (horario: boolean, duracion: boolean, enlace: boolean) => {
+    const p = pasos(horario, duracion, enlace)
+    return [pasoClinica(p), ...p]
+  }
+  it('la primera vez y tras «Empezar de nuevo» (horario por revisar) abre en la clínica', () => {
+    expect(primerPendiente(conClinica(false, false, false))).toBe(0)
+    expect(primerPendiente(conClinica(false, true, true))).toBe(0)
+    expect(vistaInicial({ esMedico: true, conConsultorio: true, guardado: null, primeraVez: true, pasos: conClinica(false, false, false) }))
+      .toEqual({ paso: 0 })
+  })
+  it('con el horario hecho, la clínica no está pendiente: abre en lo que falta, como antes', () => {
+    expect(primerPendiente(conClinica(true, false, true))).toBe(2)
+    expect(vistaInicial({ esMedico: true, conConsultorio: true, guardado: null, primeraVez: true, pasos: conClinica(true, true, true) })).toBe('pestanas')
+  })
+  it('«Terminar después» en el paso de la clínica vuelve a él', () => {
+    expect(vistaInicial({ esMedico: true, conConsultorio: true, guardado: 0, primeraVez: false, pasos: conClinica(true, true, true) }))
+      .toEqual({ paso: 0 })
+  })
+  it('el contador: «Paso 1 de 4» para quien administra, «Paso 1 de 3» para los demás', () => {
+    expect(numeroDePaso(0, true)).toEqual({ n: 1, de: 4 })
+    expect(numeroDePaso(1, true)).toEqual({ n: 2, de: 4 })
+    expect(numeroDePaso(3, true)).toEqual({ n: 4, de: 4 })
+    expect(numeroDePaso(1, false)).toEqual({ n: 1, de: 3 })
+    expect(numeroDePaso(3, false)).toEqual({ n: 3, de: 3 })
+  })
+})
 
 describe('cuándo sale el funnel', () => {
   it('abre en el primer paso que falta', () => {

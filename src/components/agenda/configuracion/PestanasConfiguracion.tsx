@@ -12,10 +12,16 @@
  *
  * Pestañas con el patrón de la APG (flechas, Inicio, Fin). Todos los paneles
  * se montan y sólo se ve el elegido: lo escrito no se pierde al cambiar.
+ *
+ * K3 (punto 13 de Angel): en el teléfono (< `sm`) cada pestaña es un icono de
+ * `lucide-react` (la librería de la app) y las cinco reparten el ancho, sin
+ * desplazamiento lateral; debajo, el nombre de la elegida como título. En
+ * computadora, el texto de siempre. El nombre accesible es SIEMPRE el texto
+ * (`aria-label`), así que las pruebas y el lector de pantalla no cambian.
  */
 import Link from 'next/link'
 import { useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
-import { ChevronLeft } from 'lucide-react'
+import { Bell, CalendarClock, ChevronLeft, Ellipsis, Link2, Stethoscope, type LucideIcon } from 'lucide-react'
 import AvisoGuardado, { type EstadoAviso } from '@/components/agenda/configuracion/AvisoGuardado'
 import BloquesAvisos from '@/components/agenda/configuracion/BloquesAvisos'
 import PestanaConsulta from '@/components/agenda/configuracion/PestanaConsulta'
@@ -36,6 +42,8 @@ export interface DatosPestanas {
   consultorios: readonly Consultorio[] | null
   falloConfig: boolean
   horarioClinica: Horario | null
+  /** `clinicas.timezone` (K3, punto 12), o `null`. */
+  husoClinica: string | null
   tipos: readonly TipoCita[] | null
   usuarioId: string
   esMedico: boolean
@@ -54,13 +62,15 @@ export interface DatosPestanas {
 
 type Clave = 'enlace' | 'horario' | 'consulta' | 'avisos' | 'mas'
 
-const PESTANAS: readonly { clave: Clave; texto: string; textoSinMedico?: string }[] = [
-  { clave: 'enlace', texto: 'Tu enlace', textoSinMedico: 'Enlaces' },
-  { clave: 'horario', texto: 'Cuándo das consulta', textoSinMedico: 'Cuándo dan consulta' },
-  { clave: 'consulta', texto: 'Tu consulta', textoSinMedico: 'Tipos de cita' },
-  { clave: 'avisos', texto: 'Avisos' },
-  { clave: 'mas', texto: 'Más opciones' },
+const PESTANAS: readonly { clave: Clave; texto: string; textoSinMedico?: string; icono: LucideIcon }[] = [
+  { clave: 'enlace', texto: 'Tu enlace', textoSinMedico: 'Enlaces', icono: Link2 },
+  { clave: 'horario', texto: 'Cuándo das consulta', textoSinMedico: 'Cuándo dan consulta', icono: CalendarClock },
+  { clave: 'consulta', texto: 'Tu consulta', textoSinMedico: 'Tipos de cita', icono: Stethoscope },
+  { clave: 'avisos', texto: 'Avisos', icono: Bell },
+  { clave: 'mas', texto: 'Más opciones', icono: Ellipsis },
 ]
+
+const nombreDe = (p: (typeof PESTANAS)[number], esMedico: boolean): string => (esMedico ? p.texto : p.textoSinMedico ?? p.texto)
 
 const MOVER: Record<string, (i: number, n: number) => number> = {
   ArrowRight: (i, n) => (i + 1) % n, ArrowLeft: (i, n) => (i - 1 + n) % n, Home: () => 0, End: (_i, n) => n - 1,
@@ -82,12 +92,15 @@ function Pestanas({ activa, elegir, esMedico }: { activa: Clave; elegir: (c: Cla
       className="-mb-[4px] flex gap-[4px] overflow-x-auto border-b border-[var(--ag-border-card)]">
       {PESTANAS.map(p => {
         const sel = p.clave === activa
+        const nombre = nombreDe(p, esMedico)
+        const Icono = p.icono
         return (
           <button key={p.clave} type="button" role="tab" id={`config-tab-${p.clave}`} aria-selected={sel} aria-controls={`config-panel-${p.clave}`}
-            tabIndex={sel ? 0 : -1} onClick={() => elegir(p.clave)}
-            className={`min-h-[52px] flex-none cursor-pointer whitespace-nowrap border-0 border-b-[3px] bg-transparent px-[16px] text-[16px] ${sel
+            aria-label={nombre} tabIndex={sel ? 0 : -1} onClick={() => elegir(p.clave)}
+            className={`flex min-h-[52px] min-w-[44px] flex-1 cursor-pointer items-center justify-center whitespace-nowrap border-0 border-b-[3px] bg-transparent px-[8px] text-[16px] sm:flex-none sm:px-[16px] ${sel
               ? 'border-[var(--ag-brand-secondary)] font-bold text-[var(--ag-brand-legible)]' : 'border-transparent font-semibold text-[var(--ag-ink-600)]'}`}>
-            {esMedico ? p.texto : p.textoSinMedico ?? p.texto}
+            <Icono size={22} aria-hidden="true" className="sm:hidden" />
+            <span className="hidden sm:inline">{nombre}</span>
           </button>
         )
       })}
@@ -116,13 +129,19 @@ export default function PestanasConfiguracion(d: DatosPestanas) {
         <h1 className="m-0 text-[32px] font-bold leading-[1.2] text-[var(--ag-ink)]">Configuración de la agenda</h1>
         <p className="m-0 text-[17px] leading-[1.5] text-[var(--ag-ink-600)]">Esto es lo que elegiste al empezar. Cambia lo que quieras: se guarda solo.</p>
       </div>
-      <Pestanas activa={activa} elegir={setActiva} esMedico={d.esMedico} />
+      <div className="flex flex-col gap-[16px]">
+        <Pestanas activa={activa} elegir={setActiva} esMedico={d.esMedico} />
+        {/* El nombre de la elegida, sólo en el teléfono (allí las pestañas son iconos). Lo mismo que ya dice la pestaña: fuera del árbol accesible. */}
+        <p aria-hidden="true" data-titulo-pestana className="m-0 text-[20px] font-bold leading-[1.3] text-[var(--ag-ink)] sm:hidden">
+          {nombreDe(PESTANAS.find(p => p.clave === activa) ?? PESTANAS[0], d.esMedico)}
+        </p>
+      </div>
       <Panel clave="enlace" activa={activa}>
         <PestanaEnlace lista={d.lista} recargar={d.recargar} medicos={d.medicos} usuarioId={d.usuarioId} esMedico={d.esMedico}
           gestionaTodos={d.gestionaTodos} administradores={d.administradores} vigenciaDias={d.vigenciaDias} avisar={d.avisar} alCrearTipo={d.alCambiarDatos} />
       </Panel>
       <Panel clave="horario" activa={activa}>
-        <PestanaHorario consultorios={d.consultorios?.filter(c => c.activo !== false) ?? null} fallo={d.falloConfig} horarioClinica={d.horarioClinica} medicos={d.medicos} usuarioId={d.usuarioId}
+        <PestanaHorario consultorios={d.consultorios?.filter(c => c.activo !== false) ?? null} fallo={d.falloConfig} horarioClinica={d.horarioClinica} husoClinica={d.husoClinica} medicos={d.medicos} usuarioId={d.usuarioId}
           esMedico={d.esMedico} puedeAdministrar={d.puedeAdministrar} actualizarConfig={d.actualizarConfig} avisar={d.avisar} alCambiar={d.alCambiarDatos} />
       </Panel>
       <Panel clave="consulta" activa={activa}>

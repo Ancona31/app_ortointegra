@@ -135,9 +135,9 @@ async function abrirDemas(page: Page): Promise<void> {
 
 test('G2 · 7 y 8 · el funnel abre en el primer paso que falta (la duración); el enlace se crea después, al cerrar', async ({ page }) => {
   await page.goto(RUTA)
-  // El horario ya está (revisado en `beforeAll`): abre en el paso 2 de 3.
+  // El horario ya está (revisado en `beforeAll`): abre en la duración, «Paso 3 de 4» (K3: el de la clínica va antes).
   await expect(page.getByRole('heading', { name: '¿Cuánto dura tu consulta?' })).toBeVisible()
-  await expect(page.getByText('Paso 2 de 3 · menos de 2 minutos')).toBeVisible()
+  await expect(page.getByText('Paso 3 de 4 · menos de 2 minutos')).toBeVisible()
   await expect(page.getByRole('tablist')).toHaveCount(0)
   // Ningún tipo nace con un valor fijo: no hay botón «Crear «Consulta», 30 min».
   await expect(page.getByRole('button', { name: /Consulta», 30 min/ })).toHaveCount(0)

@@ -3,9 +3,10 @@
 /**
  * Pestaña «Tu enlace» de la configuración (tanda J, J5, punto 14; maqueta
  * `Configuracion.dc.html`). Con las rutas de siempre (`/api/agenda/enlaces`):
- *   · el interruptor PRENDE (emite el enlace fijo) o APAGA (lo revoca, con la
- *     confirmación de hoy: es para siempre y, al volver a prenderlo, la
- *     dirección es otra —la maqueta no lo dice; notas de J5—);
+ *   · el interruptor PRENDE o APAGA el enlace fijo. K3 (punto 14 de Angel):
+ *     apagarlo lo PAUSA, no lo revoca (`pausarEnlace`), así que no pide
+ *     confirmación y al prenderlo vuelve la MISMA dirección; sólo «Cambiar por
+ *     uno nuevo» deja el de antes sin servir. Sin fijo, prender lo emite;
  *   · la dirección es la real, `/reservar/{código}` (punto 17), con «Copiar
  *     enlace» y «Mandar por WhatsApp»;
  *   · «Enlaces de una vez»: crear (con su etiqueta), copiar y apagar;
@@ -24,7 +25,7 @@ import BotonCopiar from '@/components/agenda/configuracion/BotonCopiar'
 import CrearEnlaceUnaVez from '@/components/agenda/configuracion/CrearEnlaceUnaVez'
 import EnlacesDeOtros, { MSJ_REGENERAR, MSJ_REVOCAR } from '@/components/agenda/configuracion/EnlacesDeOtros'
 import Interruptor from '@/components/agenda/configuracion/Interruptor'
-import { emitirEnlace, leerCodigo, revocarEnlace, urlReserva, urlWhatsApp, type Resultado } from '@/components/agenda/configuracion/accionesConfig'
+import { emitirEnlace, leerCodigo, pausarEnlace, revocarEnlace, urlReserva, urlWhatsApp, type Resultado } from '@/components/agenda/configuracion/accionesConfig'
 import type { EstadoLista, ListaEnlaces } from '@/components/agenda/configuracion/listaEnlaces'
 import type { Avisar } from '@/components/agenda/configuracion/estadoAvisos'
 import {
@@ -51,7 +52,7 @@ type Pregunta = { mensaje: string; seguir: () => void } | null
 const CAJA = 'm-0 rounded-[10px] border border-[var(--ag-aviso-border)] bg-[var(--ag-aviso-bg)] px-[14px] py-[10px] text-[15px] text-[var(--ag-aviso-text)]'
 const FECHA = new Intl.DateTimeFormat('es-MX', { day: 'numeric', month: 'short' })
 
-/** La dirección del enlace fijo vigente: se pide su código cada vez que cambia de id. */
+/** La dirección del enlace fijo prendido: se pide su código cada vez que cambia de id. */
 function useDireccion(fijo: EnlaceReserva | null): string | null {
   const [url, setUrl] = useState<{ id: string; url: string } | null>(null)
   useEffect(() => {
@@ -63,18 +64,19 @@ function useDireccion(fijo: EnlaceReserva | null): string | null {
   return fijo && url?.id === fijo.id ? url.url : null
 }
 
-function EnlaceFijo({ fijo, ocupado, alPrender, alApagar }: { fijo: EnlaceReserva | null; ocupado: boolean; alPrender: () => void; alApagar: () => void }) {
+/** `prendido`: el fijo vigente sin pausar (K3, punto 14); el pausado sigue siendo `fijo`, con su dirección guardada. */
+function EnlaceFijo({ prendido, ocupado, alPrender, alApagar }: { prendido: EnlaceReserva | null; ocupado: boolean; alPrender: () => void; alApagar: () => void }) {
   const id = useId()
-  const url = useDireccion(fijo)
+  const url = useDireccion(prendido)
   return (
     <>
       <div className="flex items-center justify-between gap-[16px] rounded-[12px] bg-[var(--ag-surface-sunken)] px-[18px] py-[14px]">
         <span id={`${id}-l`} className="text-[16px] font-semibold text-[var(--ag-ink)]">
-          {fijo ? 'Prendido: tus pacientes pueden apartar con él' : 'Apagado: nadie puede apartar con él'}
+          {prendido ? 'Prendido: tus pacientes pueden apartar con él' : 'Apagado: nadie puede apartar con él'}
         </span>
-        <Interruptor encendido={fijo !== null} etiquetadoPor={`${id}-l`} deshabilitado={ocupado} alCambiar={fijo ? alApagar : alPrender} />
+        <Interruptor encendido={prendido !== null} etiquetadoPor={`${id}-l`} deshabilitado={ocupado} alCambiar={prendido ? alApagar : alPrender} />
       </div>
-      {fijo && (
+      {prendido && (
         <div className="flex flex-col gap-[12px]">
           <div className={DIRECCION} data-enlace-fijo>{url ?? 'Cargando la dirección…'}</div>
           {url && (
@@ -152,13 +154,17 @@ function Propio({ p, lista }: { p: Props; lista: ListaEnlaces }) {
   const [pregunta, setPregunta] = useState<Pregunta>(null)
   const mios = lista.enlaces.filter(e => e.medico_id === p.usuarioId)
   const fijo = mios.find(e => e.clase === 'fijo') ?? null
+  const prendido = fijo && !fijo.pausado_en ? fijo : null
   const hacer = async <T,>(accion: () => Promise<Resultado<T>>) => { setOcupado(true); await hacerYAvisar(p, accion); setOcupado(false) }
+  /* Pausado: prender lo reanuda (la misma dirección). Sin fijo: lo emite. */
+  const prender = () => void hacer(() => fijo ? pausarEnlace(fijo.id, false) : emitirEnlace(p.usuarioId, 'fijo'))
   const regenerar = () => setPregunta({ mensaje: MSJ_REGENERAR, seguir: () => void hacer(() => emitirEnlace(p.usuarioId, 'fijo')) })
   return (
     <>
       <Avisos lista={lista} motivos={avisoDeEnlace(lista.preparacion?.[p.usuarioId] ?? [])} />
-      <EnlaceFijo fijo={fijo} ocupado={ocupado || !lista.secreto && !fijo} alPrender={() => void hacer(() => emitirEnlace(p.usuarioId, 'fijo'))}
-        alApagar={() => fijo && setPregunta({ mensaje: MSJ_REVOCAR, seguir: () => void hacer(() => revocarEnlace(fijo.id)) })} />
+      <EnlaceFijo prendido={prendido} ocupado={ocupado || !lista.secreto && !fijo} alPrender={prender}
+        alApagar={() => prendido && void hacer(() => pausarEnlace(prendido.id, true))} />
+      {fijo && !prendido && <p className={AYUDA} data-enlace-pausado>Al prenderlo vuelve a servir la misma dirección que ya compartiste.</p>}
       <UnaVez p={p} unicos={mios.filter(e => e.clase === 'unico')} ocupado={ocupado} preguntar={setPregunta} />
       {fijo && (
         <div className={`${BLOQUE} sm:flex-row sm:items-center sm:justify-between`}>

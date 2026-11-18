@@ -99,12 +99,15 @@ test('el administrador crea, muestra, regenera y revoca el enlace fijo de un mé
   const todos = [...enlacesDe(idDe(CORREO.medicoA)), ...enlacesDe(idDe(CORREO.adminA))]
   expect(todos.filter(e => e.startsWith('fijo:'))).toEqual(expect.arrayContaining(['fijo:false:-', 'fijo:true:-']))
 
-  /* Revocar: apagar el interruptor, con confirmación. */
+  /* K3 (punto 14): apagar el interruptor PAUSA, sin confirmación: el fijo sigue sin revocar y al
+     prenderlo vuelve la misma dirección. Revocar es «Cambiar por uno nuevo» (arriba) o la ruta. */
+  const segunda = await direccion.textContent()
   await panel.getByRole('switch', { name: /^Prendido/ }).click()
-  await page.getByRole('button', { name: 'Aceptar' }).click()
   await expect(panel.getByRole('switch', { name: /^Apagado/ })).toHaveAttribute('aria-checked', 'false')
   await expect(page.locator('[data-aviso-config]')).toHaveText('Guardado')
-  expect(enlacesDe(idDe(CORREO.adminA))).toEqual(['fijo:false:-', 'fijo:false:-'])
+  expect(enlacesDe(idDe(CORREO.adminA))).toEqual(expect.arrayContaining(['fijo:false:-', 'fijo:true:-']))
+  await panel.getByRole('switch', { name: /^Apagado/ }).click()
+  await expect(direccion).toHaveText(segunda ?? '')
   expect(todos.length).toBe(2)
 })
 

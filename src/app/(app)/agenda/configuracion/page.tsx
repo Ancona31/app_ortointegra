@@ -95,17 +95,36 @@ async function leerAdministradores(supabase: ClienteSesion, clinicaId: string): 
   }
 }
 
+/**
+ * K3 (punto 12): el huso «de fábrica» de la clínica (`clinicas.timezone`), o `null` si no tiene, si la
+ * columna no existe todavía (42703, código antes que la migración) o si algo falla. Cliente de sesión
+ * (`clinicas_select_own_or_super_admin`) y `clinica_id` explícito.
+ */
+async function leerHusoClinica(supabase: ClienteSesion, clinicaId: string): Promise<string | null> {
+  try {
+    const { data, error } = await supabase.from('clinicas').select('timezone').eq('id', clinicaId).maybeSingle()
+    if (error) {
+      if (error.code !== '42703') logger.warn('agenda', `huso de la clínica sin leer: ${error.code ?? ''}`)
+      return null
+    }
+    return typeof data?.timezone === 'string' && data.timezone ? data.timezone : null
+  } catch {
+    return null
+  }
+}
+
 export default async function ConfiguracionCalendarioPage() {
   const { supabase, profile } = await sesionServidor()
   const perfil = analizarPerfilSesion(profile)
   if (!perfil?.clinica_id) notFound()
   const lectura = await leerAjustes(supabase, perfil.clinica_id)
   if (lectura === 'apagado') notFound()
-  const [tipos, recordatorio, correoClinica, administradores] = await Promise.all([
+  const [tipos, recordatorio, correoClinica, administradores, husoClinica] = await Promise.all([
     leerTipos(supabase, perfil.clinica_id),
     leerRecordatorioEncendido(supabase, perfil.clinica_id),
     leerCorreoReservaClinica(supabase, perfil.clinica_id),
     leerAdministradores(supabase, perfil.clinica_id),
+    leerHusoClinica(supabase, perfil.clinica_id),
   ])
   return (
     <ConfiguracionAgenda
@@ -113,6 +132,7 @@ export default async function ConfiguracionCalendarioPage() {
       recordatorio={recordatorio}
       correoClinica={correoClinica}
       administradores={administradores}
+      husoClinica={husoClinica}
       tipos={tipos}
       puedeAdministrar={canManageClinica(perfil)}
       usuarioId={perfil.id}

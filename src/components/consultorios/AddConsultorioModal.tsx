@@ -10,9 +10,11 @@ interface Props {
   open: boolean
   onClose: () => void
   onSuccess: (creado: Consultorio) => void
+  /** K3 (punto 12): el huso de la clínica (`clinicas.timezone`), que sale ya elegido; `null` = como antes, sin elegir. */
+  husoDeFabrica?: string | null
 }
 
-export default function AddConsultorioModal({ open, onClose, onSuccess }: Props) {
+export default function AddConsultorioModal({ open, onClose, onSuccess, husoDeFabrica = null }: Props) {
   const toast = useToast()
 
   const [nombre, setNombre] = useState('')
@@ -29,10 +31,10 @@ export default function AddConsultorioModal({ open, onClose, onSuccess }: Props)
       setNombreCorto('')
       setDireccion('')
       setTelefono('')
-      setTimezone('')
+      setTimezone(husoDeFabrica && ZONAS_MEXICO.some(z => z.value === husoDeFabrica) ? husoDeFabrica : '')
       setSubmitting(false)
     }
-  }, [open])
+  }, [open, husoDeFabrica])
 
   const requiereNombreCorto = nombre.trim().length > 12
   const canSubmit =
