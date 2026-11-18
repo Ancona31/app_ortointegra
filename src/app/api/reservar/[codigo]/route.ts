@@ -27,6 +27,11 @@
  * Después de responder (`after()`, D8): el evento de Google y el comprobante.
  * Tanda I, punto 2: en el enlace de UN SOLO USO el correo es opcional (sin
  * código en los dos casos); sin correo no hay comprobante. El fijo no cambia.
+ * Tanda J, punto 3: en el ÚNICO el correo que llegue en el cuerpo se IGNORA
+ * (sólo pasa la forma mínima del esquema; no se usa ni viaja a la base): el
+ * de la cita es el que escribió la clínica al emitir el enlace (`reservar_por_enlace` lo toma del enlace), y
+ * el comprobante va sólo ahí, nunca al tecleado. La base cuenta además los
+ * intentos del único (tope; agotado = 410 neutro).
  */
 import { cookies } from 'next/headers'
 import { after, type NextRequest } from 'next/server'
@@ -78,7 +83,7 @@ export async function POST(req: NextRequest, rctx: RouteContext<'/api/reservar/[
      teléfono). En el fijo, sin correo, el mismo 400 de antes y en el mismo
      punto (lo daba el esquema, antes del límite por enlace). Con correo, en
      los dos, la misma validación de siempre. */
-  const correo = b.correo ?? null
+  const correo = ctx.clase === 'unico' ? null : (b.correo ?? null)
   if (correo === null && ctx.clase !== 'unico') return MAL('solicitud_invalida')
   if (ctx.clase === 'fijo' && !(await dentroDeLimites('reservar', { enlace: codigoHash }))) {
     return responder({ status: 429, cuerpo: { error: 'demasiados_intentos' } })
@@ -114,7 +119,7 @@ export async function POST(req: NextRequest, rctx: RouteContext<'/api/reservar/[
   const r = b.origen ? await reagendar(ctx, args, hashDeCodigo(b.origen)) : await reservar(ctx, args)
   if (!r.ok) return responder(respuestaErrorRpc(r.ausente, r.codigo))
   // D8, sólo con una reserva NUEVA (una `repetida` ya los programó la primera vez).
-  if (r.data.r_resultado === 'ok') programarDespues(ctx, consultorio, { nombre: b.nombre, correo }, r.data, !!b.origen)
+  if (r.data.r_resultado === 'ok') programarDespues(ctx, consultorio, { nombre: b.nombre, correo, unico: ctx.clase === 'unico' }, r.data, !!b.origen)
   return responder(respuestaReserva(r.data.r_resultado, telefonoDeContacto(ctx, consultorio.id)))
 }
 
@@ -133,7 +138,7 @@ type ConsultorioCtx = ContextoReserva['consultorios'][number]
  * fábrica), un correo a sus administradores (`correoClinicaReserva.ts`).
  */
 function programarDespues(
-  ctx: ContextoReserva, consultorio: ConsultorioCtx, b: { nombre: string; correo: string | null }, fila: ResultadoReservaRpc, reagendada: boolean,
+  ctx: ContextoReserva, consultorio: ConsultorioCtx, b: { nombre: string; correo: string | null; unico: boolean }, fila: ResultadoReservaRpc, reagendada: boolean,
 ): void {
   const { r_cita_id: citaId, r_inicio: inicio, r_fin: fin } = fila
   if (!citaId || !inicio || !fin) return
@@ -143,13 +148,14 @@ function programarDespues(
       clinicaId: ctx.clinica_id, citaId, medicoId: ctx.medico_id, nombre, inicio, fin, zona: consultorio.timezone,
       clinica: ctx.clinica ? { nombre: ctx.clinica.nombre ?? '', nombre_display: ctx.clinica.nombre_display } : null,
     })
-    // Tanda I, punto 2: sin correo (único) no hay comprobante; la clínica ve el
-    // teléfono y tiene el WhatsApp manual. No es un fallo: no se intenta.
-    // Integración I: no es un `return`, porque el aviso a la clínica (I5) sale
-    // también por una reserva sin correo.
-    if (b.correo !== null) {
+    // Tanda J, punto 3: en el único el destinatario lo da SÓLO la base (el
+    // correo del enlace; sin él, no hay a quién y no sale nada): sin
+    // `correoEscrito`, así que tampoco hay respaldo al tecleado. En el fijo, el
+    // verificado, como siempre. Integración I: no es un `return`, porque el
+    // aviso a la clínica (I5) sale también por una reserva sin correo.
+    if (b.unico || b.correo !== null) {
       await enviarComprobante({
-        clinicaId: ctx.clinica_id, citaId, correoEscrito: b.correo,
+        clinicaId: ctx.clinica_id, citaId, correoEscrito: b.unico ? null : b.correo,
         datos: {
           medico: nombreDelMedico(ctx), consultorio: consultorio.nombre, direccion: consultorio.direccion,
           telefono: consultorio.telefono ?? ctx.medico.telefono, inicio, zona: consultorio.timezone,

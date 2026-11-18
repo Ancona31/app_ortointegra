@@ -63,12 +63,12 @@ const citaPorTelefono = (tel: string): string =>
   sqlLocal(`select coalesce(reserva_correo, '<sin correo>') || '|' || reserva_canal from public.appointments
              where reserva_telefono = :'tel' order by created_at desc limit 1`, { tel })
 
-test('punto 2: en el único, «Correo (opcional)», sin código; se reserva sólo con el teléfono y no sale ningún correo', async ({ page }) => {
+// Tanda J, punto 3: el único ya NO pide correo (antes, opcional); los correos van al que escribió la clínica.
+test('punto 2 (J3): en el único no se pide correo ni código; se reserva sólo con el teléfono y no sale ningún correo', async ({ page }) => {
   const p = personaNueva()
   await hastaTusDatos(page, emitirEnlace(e, 'unico').codigo)
-  const correo = page.getByLabel('Correo electrónico (opcional)')
-  await expect(correo).toBeVisible()
-  await expect(correo).not.toHaveAttribute('required', '')
+  await expect(page.getByLabel('Nombre completo')).toBeVisible()
+  await expect(page.getByLabel(/Correo electrónico/)).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Enviar código a mi correo' })).toHaveCount(0)
   await page.getByLabel('Nombre completo').fill(p.nombre)
   await page.getByLabel('Teléfono (10 dígitos)').fill(p.telefono)
@@ -79,15 +79,15 @@ test('punto 2: en el único, «Correo (opcional)», sin código; se reserva sól
   expect(citaPorTelefono(p.telefono)).toBe('<sin correo>|unico')
 })
 
-test('punto 2: con correo, el único reserva como antes (sin código) y el comprobante dice que se envió', async ({ page }) => {
+test('punto 2 (J3): con el correo que escribió la clínica en el único, el comprobante llega ahí (la página no lo dice)', async ({ page }) => {
   const p = personaNueva()
-  await hastaTusDatos(page, emitirEnlace(e, 'unico').codigo)
+  await hastaTusDatos(page, emitirEnlace(e, 'unico', p.correo).codigo)
   await page.getByLabel('Nombre completo').fill(p.nombre)
   await page.getByLabel('Teléfono (10 dígitos)').fill(p.telefono)
-  await page.getByLabel('Correo electrónico (opcional)').fill(p.correo)
   await page.getByRole('checkbox').check()
   await page.getByRole('button', { name: 'Reservar cita' }).click()
-  await expect(page.getByText('Te enviamos el comprobante por correo.')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Tu cita quedó agendada' })).toBeVisible()
+  await expect(page.getByText('Te enviamos el comprobante por correo.')).toHaveCount(0)
   await esperarCorreo(p.correo, 'Tu cita con')
 })
 

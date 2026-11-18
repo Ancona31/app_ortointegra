@@ -26,13 +26,13 @@ import { DIAS } from '@/lib/agenda/horarioAgenda'
 
 /** Por qué un enlace no abrirá (o abrirá sin turnos), en el orden en que se dicen. */
 export const MOTIVOS_APERTURA = [
-  'enlace_usado', 'enlace_caducado', 'no_abre', 'sin_consultorio', 'sin_tipos', 'sin_disponibilidad',
+  'enlace_usado', 'enlace_caducado', 'enlace_agotado', 'no_abre', 'sin_consultorio', 'sin_tipos', 'sin_disponibilidad',
 ] as const
 export type MotivoApertura = (typeof MOTIVOS_APERTURA)[number]
 
 /** Lo que la regla necesita: lo mismo que trae `reserva_contexto`. */
 export interface DatosApertura {
-  estado: 'vigente' | 'usado' | 'caducado'
+  estado: 'vigente' | 'usado' | 'caducado' | 'agotado'
   consultorios: readonly ConsultorioDisponibilidad[]
   tipos: number
   /** `clinicas.horario_consulta` crudo; `null` = la clínica no tiene (manda `HORARIO_DEFAULT`). */
@@ -53,6 +53,7 @@ export function motivosApertura(d: DatosApertura): MotivoApertura[] {
   const m: MotivoApertura[] = []
   if (d.estado === 'usado') m.push('enlace_usado')
   if (d.estado === 'caducado') m.push('enlace_caducado')
+  if (d.estado === 'agotado') m.push('enlace_agotado')
   if (d.consultorios.length === 0) m.push('sin_consultorio')
   if (d.tipos === 0) m.push('sin_tipos')
   if (d.consultorios.length > 0 && !d.consultorios.some(c => abreAlgunDia(c, d.horarioClinica))) m.push('sin_disponibilidad')
@@ -79,6 +80,8 @@ export function avisoDeEnlace(motivos: readonly MotivoApertura[]): string | null
 export const TEXTO_MOTIVO: Record<MotivoApertura, string> = {
   enlace_usado: 'ya se usó',
   enlace_caducado: 'ya caducó',
+  /* j2 (punto 3): sólo para la clínica; al paciente, el mensaje genérico, sin la causa. */
+  enlace_agotado: 'agotó sus intentos de reserva',
   no_abre: 'la clínica no puede recibir reservas ahora (aviso de privacidad sin aprobar o clínica sin acceso)',
   sin_consultorio: 'el médico no tiene un consultorio activo',
   /* G2 (punto 7): «tipo de cita» deja de ser un requisito visible; lo que falta es la duración. */

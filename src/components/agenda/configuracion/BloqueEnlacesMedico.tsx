@@ -46,18 +46,24 @@ interface Props {
   vigenciaDias: number | null
   onCrearFijo: () => void
   onRegenerar: () => void
-  onEmitirUnico: (etiqueta: string | null) => Promise<void>
+  onEmitirUnico: (etiqueta: string | null, correo: string | null) => Promise<void>
   onMostrar: (id: string) => void
   onRevocar: (e: EnlaceReserva) => void
 }
 
-/** El alta de un enlace de un solo uso, con su etiqueta interna opcional. */
-function FormUnico(p: { ocupado: boolean; vigenciaDias: number | null; onEmitir: (etiqueta: string | null) => Promise<void> }) {
+/**
+ * El alta de un enlace de un solo uso, con su etiqueta interna opcional y
+ * (tanda J, punto 3) el correo del paciente, opcional: el comprobante y los
+ * avisos de esa cita van sólo ahí, nunca al que teclee quien reserva.
+ */
+function FormUnico(p: { ocupado: boolean; vigenciaDias: number | null; onEmitir: (etiqueta: string | null, correo: string | null) => Promise<void> }) {
   const [etiqueta, setEtiqueta] = useState('')
+  const [correo, setCorreo] = useState('')
   async function emitirUnico(ev: FormEvent): Promise<void> {
     ev.preventDefault()
-    await p.onEmitir(etiqueta.trim() || null)
+    await p.onEmitir(etiqueta.trim() || null, correo.trim() || null)
     setEtiqueta('')
+    setCorreo('')
   }
   return (
     <form onSubmit={ev => void emitirUnico(ev)} className="flex flex-wrap items-end gap-[var(--ag-3)]">
@@ -65,12 +71,16 @@ function FormUnico(p: { ocupado: boolean; vigenciaDias: number | null; onEmitir:
         <input className={CAMPO} value={etiqueta} maxLength={60} onChange={ev => setEtiqueta(ev.target.value)}
           placeholder="Para uso interno" />
       </label>
+      <label className="flex min-w-0 flex-1 basis-56 flex-col gap-[var(--ag-1)] text-sm text-[var(--ag-text)]">Correo del paciente (opcional)
+        <input className={CAMPO} type="email" autoComplete="off" value={correo} maxLength={254} onChange={ev => setCorreo(ev.target.value)} />
+      </label>
       <button type="submit" className={BOTON_SECUNDARIO} disabled={p.ocupado}>Emitir enlace de un solo uso</button>
       {p.vigenciaDias !== null && (
         <span className={`basis-full ${TEXTO_SUAVE}`}>
           Uno de un solo uso vale {p.vigenciaDias} {p.vigenciaDias === 1 ? 'día' : 'días'} y una sola reserva.
         </span>
       )}
+      <span className={`basis-full ${TEXTO_SUAVE}`}>El comprobante y los avisos de la cita irán sólo a este correo; sin él, no se manda ninguno.</span>
     </form>
   )
 }

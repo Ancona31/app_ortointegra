@@ -15,6 +15,10 @@ describe('respuestaReserva', () => {
       expect(respuestaReserva(r, '9991234567')).toEqual(NO_ENCONTRADO)
     }
   })
+  it('J, punto 3: el único agotado es un 410 NEUTRO (no dice por qué); el client_id ajeno, el 400 de siempre', () => {
+    expect(respuestaReserva('enlace_agotado', '999')).toEqual({ status: 410, cuerpo: { error: 'enlace_no_disponible' } })
+    expect(respuestaReserva('client_id_en_uso', '999')).toEqual({ status: 400, cuerpo: { error: 'solicitud_invalida' } })
+  })
   it('bloqueado dice el mensaje de §2 con el teléfono', () => {
     const r = respuestaReserva('bloqueado', '9991234567')
     expect(r.cuerpo.error).toBe('autoservicio_cerrado')

@@ -21,15 +21,16 @@ interface Props {
   /** El botón «Volver» del pie (lo pone la página). */
   volver?: ReactNode
   /**
-   * Tanda I, punto 2 de Angel: en el enlace de UN SOLO USO el correo es
-   * opcional (basta el teléfono) y no hay paso de código. En el fijo sigue
-   * siendo obligatorio.
+   * Tanda J, punto 3 de Angel: en el enlace de UN SOLO USO no se pide correo
+   * (antes, tanda I, era opcional). Los correos de la cita van sólo al que
+   * escribió la clínica al emitir el enlace, y la página no lo enseña. En el
+   * fijo sigue siendo obligatorio, con su código.
    */
-  correoOpcional?: boolean
+  sinCorreo?: boolean
 }
 
 /** Nombre, teléfono y correo, y el aviso con su casilla (nace desmarcada). El texto del aviso NO se toca. */
-export default function FormularioDatos({ aviso, casilla, ocupado, textoBoton, onEnviar, inicial, onCambio, volver, correoOpcional = false }: Props): ReactElement {
+export default function FormularioDatos({ aviso, casilla, ocupado, textoBoton, onEnviar, inicial, onCambio, volver, sinCorreo = false }: Props): ReactElement {
   const [d, setDatos] = useState<Datos>(inicial ?? { nombre: '', telefono: '', correo: '' })
   const setD = (nuevos: Datos) => { setDatos(nuevos); onCambio?.(nuevos) }
   const [acepta, setAcepta] = useState(false)
@@ -46,10 +47,12 @@ export default function FormularioDatos({ aviso, casilla, ocupado, textoBoton, o
         <input required inputMode="tel" autoComplete="tel" maxLength={20} value={d.telefono}
           onChange={e => setD({ ...d, telefono: e.target.value })} />
       </label>
-      <label className="rp-campo">{correoOpcional ? 'Correo electrónico (opcional)' : 'Correo electrónico'}
-        <input required={!correoOpcional} type="email" autoComplete="email" maxLength={254} value={d.correo}
-          onChange={e => setD({ ...d, correo: e.target.value })} />
-      </label>
+      {!sinCorreo && (
+        <label className="rp-campo">Correo electrónico
+          <input required type="email" autoComplete="email" maxLength={254} value={d.correo}
+            onChange={e => setD({ ...d, correo: e.target.value })} />
+        </label>
+      )}
       <details className="rp-aviso-legal">
         <summary>Aviso de privacidad</summary>
         <div style={{ marginTop: 'var(--ag-2)', whiteSpace: 'pre-line' }}>{aviso}</div>

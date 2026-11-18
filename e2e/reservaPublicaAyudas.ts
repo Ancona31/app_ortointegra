@@ -26,7 +26,8 @@ import { resolve } from 'node:path'
 import { config } from 'dotenv'
 import { sqlLocal, interruptorAgenda } from './ayudas'
 import { desplazarFecha, hoyEnTZ } from '../src/lib/dates'
-import { codigoDeEnlace, hashDeCodigo } from '../src/lib/reserva/secretos'
+import { codigoDeEnlace, hashDeCodigo, hmacContacto } from '../src/lib/reserva/secretos'
+import { normalizarCorreo } from '../src/lib/reserva/contacto'
 import { AVISO_VERSION, hashAviso } from '../src/lib/reserva/avisoReserva'
 import { codigoDe, contarCorreos, esperarCorreo } from './mailpit'
 
@@ -94,7 +95,7 @@ export function aprobarAviso(aprobado: boolean): void {
 }
 
 /** Emite un enlace por SQL y devuelve su código. Un fijo nuevo revoca el anterior (índice único). */
-export function emitirEnlace(e: Escenario, clase: 'fijo' | 'unico'): { id: string; codigo: string } {
+export function emitirEnlace(e: Escenario, clase: 'fijo' | 'unico', correo?: string): { id: string; codigo: string } {
   const id = randomUUID()
   const codigo = codigoDeEnlace(id)
   if (!codigo) throw new Error('Falta RESERVA_SECRETO en .env.local')
@@ -105,7 +106,23 @@ export function emitirEnlace(e: Escenario, clase: 'fijo' | 'unico'): { id: strin
     values (:'id', :'clinica', :'medico', :'clase', :'hash',
             case when :'clase' = 'unico' then 7 end, case when :'clase' = 'unico' then now() + interval '7 days' end);`,
   { id, clinica: e.clinicaId, medico: e.medicoId, clase, hash: hashDeCodigo(codigo) })
+  if (correo) correoDelEnlace(codigo, correo)
   return { id, codigo }
+}
+
+/**
+ * Tanda J, punto 3: el correo que la clínica escribe al emitir un ÚNICO (el
+ * comprobante y los demás correos de la cita van sólo ahí). Como postgres, el
+ * mismo dato que guarda `reserva_enlace_emitir` (correo recortado y su HMAC);
+ * sólo si el único aún no tiene. En un fijo no hace nada.
+ */
+export function correoDelEnlace(codigo: string, correo: string): void {
+  const llave = normalizarCorreo(correo)
+  const hmac = llave ? hmacContacto('correo', llave) : null
+  if (!hmac) throw new Error(`correo sin forma o sin RESERVA_SECRETO: ${correo}`)
+  sqlLocal(`update public.reserva_enlaces set correo = :'c', correo_hmac = :'h'
+             where codigo_hash = :'hash' and clase = 'unico' and correo is null`,
+  { c: correo.trim(), h: hmac, hash: hashDeCodigo(codigo) })
 }
 
 /** Los turnos libres de 7 días desde dentro de una semana (lejos de la anticipación mínima). */
@@ -122,10 +139,20 @@ export async function turnosLibres(e: Escenario, codigo: string, desdeDias = 7):
   }
 }
 
-export interface Envio { inicio: string; persona: { nombre: string; telefono: string; correo: string }; ficha?: string; clientId?: string }
+export interface Envio {
+  inicio: string; persona: { nombre: string; telefono: string; correo: string }; ficha?: string; clientId?: string
+  /**
+   * Tanda J, punto 3: en un ÚNICO el correo tecleado ya no cuenta; por eso
+   * `reservar()` lo pone ANTES como el correo del enlace (lo que haría la
+   * clínica al emitirlo), y las pruebas de siempre siguen recibiendo el
+   * comprobante. `true` = sólo tecleado (lo que hace quien reserva).
+   */
+  soloTecleado?: boolean
+}
 
 /** POST de la reserva desde un contexto nuevo. */
 export async function reservar(e: Escenario, codigo: string, envio: Envio, ctx?: APIRequestContext): Promise<{ status: number; cuerpo: Record<string, unknown> }> {
+  if (envio.persona.correo && !envio.soloTecleado) correoDelEnlace(codigo, envio.persona.correo)
   const propio = ctx ?? await api()
   try {
     const r = await propio.post(`/api/reservar/${codigo}`, { data: {

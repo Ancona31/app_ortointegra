@@ -38,8 +38,12 @@ const ETIQUETA = 'reserva_comprobante'
 export interface Comprobante {
   clinicaId: string
   citaId: string
-  /** El correo que escribió la persona: sólo si no hay registro de E4. */
-  correoEscrito: string
+  /**
+   * El correo que escribió la persona: sólo si no hay registro de E4. `null`
+   * en el único (tanda J, punto 3): ahí sólo vale el de la clínica, que da la
+   * base; sin registro no se manda.
+   */
+  correoEscrito: string | null
   /** Lo que pinta la plantilla, salvo el enlace. */
   datos: Omit<DatosComprobante, 'urlConfirmacion'>
 }
@@ -70,6 +74,7 @@ export async function enviarComprobante(c: Comprobante): Promise<void> {
     if (t.tipo === 'no_toca') return
     const correo = await componer(c)
     if (t.tipo === 'sin_registro') {
+      if (c.correoEscrito === null) return
       await enviarCorreo({ para: c.correoEscrito, ...correo, etiqueta: ETIQUETA })
       return
     }

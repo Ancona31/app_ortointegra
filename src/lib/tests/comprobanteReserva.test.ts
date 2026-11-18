@@ -83,6 +83,17 @@ describe('enviarComprobante', () => {
     }
   })
 
+  it('único (J, punto 3), sin correo escrito: con registro va al de la base; sin registro, no sale nada', async () => {
+    await enviarComprobante({ ...ENTRADA, correoEscrito: null })
+    expect(h.correos.map(c => c.para)).toEqual(['persona@base.mx'])
+    for (const code of ['PGRST202', '40001']) {
+      h.correos = []; h.llamadas = []
+      h.responder = (rpc) => (rpc === 'cita_correo_tomar' ? { data: null, error: { code, message: 'x' } } : normal(rpc))
+      await enviarComprobante({ ...ENTRADA, correoEscrito: null })
+      expect(h.correos, code).toEqual([])
+    }
+  })
+
   it('el transporte falla: fallido (transporte o duplicado), sin lanzar', async () => {
     h.envio = { ok: false, modo: 'captura', motivo: 'fallo' }
     await enviarComprobante(ENTRADA)
