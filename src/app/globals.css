@@ -6550,7 +6550,6 @@ li + li > .ag-aviso-fila { border-top: 1px solid var(--ag-hairline); border-radi
 .ag-menu-opcion:is(:hover, :focus-visible) { background: var(--ag-btn-ghost-hover); }
 .ag-menu-opcion[aria-disabled="true"] { opacity: .6; cursor: default; }
 .ag-menu-icono { display: inline-grid; place-items: center; color: var(--ag-muted); }
-.ag-menu-estado { margin-left: auto; font-size: 12px; font-weight: 500; color: var(--ag-muted); }
 .ag-menu-sep { margin: var(--ag-1-5) var(--ag-1); border: 0; border-top: 1px solid var(--ag-hairline); }
 .ag-capa--leyenda { width: 260px; }
 .ag-capa--leyenda .ag-leyenda { display: flex; flex-direction: column; gap: var(--ag-2); }

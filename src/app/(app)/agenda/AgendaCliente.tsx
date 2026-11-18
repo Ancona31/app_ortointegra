@@ -6,6 +6,7 @@
 import { useEffect, useRef, useState, useCallback, useMemo, useSyncExternalStore } from 'react'
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
+import { logger } from '@/lib/logger'
 import FullCalendar from '@fullcalendar/react'
 import type { DateClickArg, EventResizeDoneArg } from '@fullcalendar/interaction'
 import type { DatesSetArg, EventClickArg, EventDropArg, DateSelectArg, EventApi, EventContentArg, DayHeaderContentArg } from '@fullcalendar/core'
@@ -22,8 +23,6 @@ import { CabeceraEscritorio } from '@/components/agenda/CabeceraEscritorio'
 import { BarraAgendarMovil } from '@/components/agenda/BarraAgendarMovil'
 import { LeyendaEstados } from '@/components/agenda/LeyendaEstados'
 import { AvisosAgenda } from '@/components/agenda/AvisosAgenda'
-import { CampanaAgenda } from '@/components/agenda/CampanaAgenda'
-import { MenuEngraneAgenda } from '@/components/agenda/MenuEngraneAgenda'
 import type { CitaDelAviso } from '@/lib/avisos/avisosClinica'
 import type { CambioCita } from '@/lib/agenda/porConfirmarTiempoReal'
 import { esRespuestaReciente, leerRespuesta, textoAvisoCancelacion } from '@/lib/agenda/avisoCancelacion'
@@ -143,6 +142,31 @@ const MiniMesPanelV2 = dynamic(() => import('@/components/agenda/HerramientasV2'
 const PreguntaAsistenciaV2 = dynamic(() => import('@/components/agenda/HerramientasV2').then(m => m.PreguntaAsistenciaV2), {
   ssr: false, loading: () => null,
 })
+/* Tanda J (punto 1, AG-DT-136) · La campana y el menú del engrane sólo los
+   pinta la v2: en diferido, para que con el interruptor apagado su JS (con
+   `ListaAvisos`, `PanelPorConfirmar` y la leyenda del menú) no baje al abrir la
+   agenda. Encendida, el interruptor NO se da por leído hasta que llegaron, y
+   se guardan YA RESUELTOS junto con él: así la barra v2 nunca se pinta con sus
+   dos huecos. Ojo: NO con `dynamic()` como los de arriba. Su `React.lazy`
+   suspende un fotograma al montar aunque el chunk ya esté descargado
+   (comprobado: la prueba de `agenda-j1-engrane` lo cuenta). */
+interface BarraV2 {
+  CampanaAgenda: typeof import('@/components/agenda/CampanaAgenda').CampanaAgenda
+  MenuEngraneAgenda: typeof import('@/components/agenda/MenuEngraneAgenda').MenuEngraneAgenda
+}
+interface InterruptorYBarra { leido: boolean; barra: BarraV2 | null }
+const V2_APAGADA: InterruptorYBarra = { leido: false, barra: null }
+/** Encendida, carga la barra; si su chunk no llega, falla cerrado (la agenda de antes). */
+function leerInterruptorYBarra(v: boolean | null): Promise<InterruptorYBarra> | InterruptorYBarra {
+  if (v !== true) return V2_APAGADA
+  return Promise.all([import('@/components/agenda/CampanaAgenda'), import('@/components/agenda/MenuEngraneAgenda')]).then(
+    ([c, m]) => ({ leido: true, barra: { CampanaAgenda: c.CampanaAgenda, MenuEngraneAgenda: m.MenuEngraneAgenda } }),
+    (err: unknown) => {
+      logger.warn('agenda', `barra v2 sin cargar, se queda la de antes: ${err instanceof Error ? err.message : 'error'}`)
+      return V2_APAGADA
+    },
+  )
+}
 
 /**
  * Descarga los chunks de los tres modales SIN montarlos. Misma ruta exacta de
@@ -250,12 +274,18 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
      una prueba pueda esperar a la respuesta de verdad. Lo leerán los pasos
      del bloque B que van detrás del interruptor. */
   const [interruptorLeido, setInterruptorLeido] = useState<boolean | null>(null)
+  const [barraV2, setBarraV2] = useState<BarraV2 | null>(null)
   const agendaV2 = interruptorLeido === true
   useEffect(() => {
     if (!interruptor) return
     let vigente = true
-    interruptor.then(
-      (v) => { if (vigente) setInterruptorLeido(v === true) },
+    /* Encendida, espera también a la campana y al engrane (arriba, punto 1 de
+       J), y los dos estados se fijan en el MISMO callback (un solo render). Si
+       su chunk no llega, FALLA CERRADO, como el interruptor: la agenda de antes.
+       `Promise.resolve`: la promesa llega por Flight y su `then` no devuelve
+       otra promesa (no se puede encadenar). */
+    Promise.resolve(interruptor).then(leerInterruptorYBarra).then(
+      (r) => { if (vigente) { setBarraV2(r.barra); setInterruptorLeido(r.leido) } },
       () => { if (vigente) setInterruptorLeido(false) },
     )
     return () => { vigente = false }
@@ -1284,12 +1314,12 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
     if (interaccionesRef.current) interaccionesRef.current.irACita(c)
     else irAFecha(partirFechaHora(c.start_time).fecha)
   }
-  const campanaV2 = (enBanda: boolean) => agendaV2 ? (
-    <CampanaAgenda recarga={recargaPanel} confirmar={guardado.cambiarEstadoCita} cambiosRef={cambiosPorConfirmarRef}
+  const campanaV2 = (enBanda: boolean) => agendaV2 && barraV2 ? (
+    <barraV2.CampanaAgenda recarga={recargaPanel} confirmar={guardado.cambiarEstadoCita} cambiosRef={cambiosPorConfirmarRef}
       alAbrirCita={abrirCitaDeAviso} enBanda={enBanda} />
   ) : undefined
-  const engraneV2 = (enBanda: boolean) => agendaV2 ? (
-    <MenuEngraneAgenda enBanda={enBanda}
+  const engraneV2 = (enBanda: boolean) => agendaV2 && barraV2 ? (
+    <barraV2.MenuEngraneAgenda enBanda={enBanda}
       onConfiguracion={verEngrane ? abrirConfiguracion : null}
       compactar={vistaAdmiteCompactar(currentView) ? {
         encendida: compactar, alternar: () => setCompactar(v => !v), etiqueta: etiquetaCompactar(currentView, true),
