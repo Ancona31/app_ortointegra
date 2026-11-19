@@ -43,9 +43,12 @@ describe('accionesDeTarjeta (G3: por estado)', () => {
     expect(ETIQUETA_ACCION.ligar).toBe('Ligar expediente e iniciar')
     expect(disposicionDeTarjeta({ paciente_id: null, reserva_canal: 'unico', status: 'confirmed' }, false).principal).toBeNull()
   })
-  it('cancelar y eliminar piden confirmación; el resto no', () => {
+  /* Tanda L, punto 2 (AG-DT-192): «No asistió» pregunta, como «Cancelar cita».
+     MUTACIÓN: quitar `|| accion === 'no-asistio'` de `pideConfirmacion` → rojo. */
+  it('cancelar, eliminar y «No asistió» piden confirmación; el resto no', () => {
     expect(pideConfirmacion('cancelar')).toBe(true)
     expect(pideConfirmacion('eliminar')).toBe(true)
+    expect(pideConfirmacion('no-asistio')).toBe(true)
     expect(pideConfirmacion('confirmar')).toBe(false)
   })
 })
@@ -199,6 +202,10 @@ describe('textoDeConfirmacion', () => {
   })
   it('eliminar nombra el evento', () => {
     expect(textoDeConfirmacion('eliminar', base)).toBe('¿Eliminar el evento «Junta»? No se puede deshacer.')
+  })
+  it('«No asistió» nombra al paciente y dice que la cita se queda (tanda L, punto 2)', () => {
+    expect(textoDeConfirmacion('no-asistio', { ...base, pacientes: { id: 'p', nombre: 'Ana', apellidos: 'Pech', telefono: null } }))
+      .toBe('¿Marcar que Ana Pech no asistió? La cita se queda en la agenda como «No asistió».')
   })
 })
 

@@ -292,16 +292,18 @@ export function puedeIniciarConsulta(
   return Boolean(cita.pacientes) || esPorLigar(cita)
 }
 
-/** ¿Pide confirmación antes de hacerse? Cancelar y eliminar, sí (decisión 20). */
+/** ¿Pide confirmación antes de hacerse? Cancelar y eliminar, sí (decisión 20). Tanda L, punto 2
+    (AG-DT-192): «No asistió» también, con el mismo aviso que «Cancelar cita». */
 export function pideConfirmacion(accion: AccionTarjeta): boolean {
-  return accion === 'cancelar' || accion === 'eliminar'
+  return accion === 'cancelar' || accion === 'eliminar' || accion === 'no-asistio'
 }
 
-/** El mensaje del aviso de las dos acciones que preguntan (`pideConfirmacion`). */
+/** El mensaje del aviso de las acciones que preguntan (`pideConfirmacion`). */
 export function textoDeConfirmacion(
   accion: AccionTarjeta, cita: Pick<Appointment, 'title' | 'pacientes' | 'reserva_nombre' | 'paciente_id' | 'reserva_canal'>,
 ): string {
   if (accion === 'eliminar') return `¿Eliminar el evento «${cita.title}»? No se puede deshacer.`
+  if (accion === 'no-asistio') return `¿Marcar que ${nombreDeTarjeta(cita)} no asistió? La cita se queda en la agenda como «No asistió».`
   return `¿Cancelar la cita de ${nombreDeTarjeta(cita)}? El horario queda libre y la cita se queda en la agenda como cancelada.`
 }
 

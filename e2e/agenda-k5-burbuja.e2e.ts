@@ -126,6 +126,9 @@ test('los tres puntos: Escape los cierra a ellos y devuelve el foco; «Observaci
   await t.getByRole('button', { name: 'Más opciones de la cita', exact: true }).click()
   const put = page.waitForResponse(r => r.url().includes(`/api/appointments/${id}`) && r.request().method() === 'PUT')
   await t.getByRole('group', { name: 'Más opciones de la cita' }).getByRole('button', { name: 'No asistió', exact: true }).click()
+  /* Tanda L, punto 2 (AG-DT-192): desde los tres puntos también pregunta antes. */
+  await page.getByRole('dialog', { name: '¿Marcar que Paciente Prueba 04 no asistió? La cita se queda en la agenda como «No asistió».' })
+    .getByRole('button', { name: 'Aceptar' }).click()
   expect((await put).request().postDataJSON()).toMatchObject({ status: 'no_show' })
   await expect.poll(() => sqlLocal(`select status from public.appointments where id = :'id'`, { id })).toBe('no_show')
 })
