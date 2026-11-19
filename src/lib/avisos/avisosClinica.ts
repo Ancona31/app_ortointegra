@@ -19,6 +19,9 @@ export const TIPOS_AVISO = [
   /* Tanda J, punto 10: alguien movió en Google una reservada por enlace (la base lo rechazó y
      Spinus la devolvió). Lo escribe la pasada de sincronización (`20261122140000`). */
   'google_movimiento_rechazado',
+  /* Tanda L, punto 13: el paciente confirmó su cita desde su enlace (correo o WhatsApp). Lo
+     escribe la base al guardar su respuesta (`20261124160000`); la confirmación del personal, no. */
+  'confirmacion_paciente',
 ] as const
 export type TipoAviso = typeof TIPOS_AVISO[number]
 
@@ -100,6 +103,23 @@ function quien(c: CitaDelAviso): string {
   return (c.reserva_nombre?.trim() || c.title.trim() || 'Un paciente')
 }
 
+/**
+ * Tanda L, punto 13 · Quién confirmó: el paciente ligado (con paciente, el
+ * título de la cita es su nombre: lo pone el alta y lo pone ligar) o, si sigue
+ * por ligar, el nombre que tecleó al reservar.
+ */
+function quienConfirmo(c: CitaDelAviso): string {
+  const ligado = c.paciente_id ? c.title.trim() : ''
+  return ligado || c.reserva_nombre?.trim() || c.title.trim() || 'Un paciente'
+}
+
+/** «del jueves, 17 de diciembre a las 10:45», en la zona del consultorio de la cita; '' si no se puede. */
+function delDiaALaHora(c: CitaDelAviso): string {
+  const fecha = enZona(c.start_time, c.zona, { weekday: 'long', day: 'numeric', month: 'long' })
+  const hora = enZona(c.start_time, c.zona, { hour: '2-digit', minute: '2-digit', hour12: false })
+  return fecha && hora ? ` del ${fecha} a las ${hora}` : ''
+}
+
 /** La línea principal de la lista (vista del personal: el nombre sí sale, como en «Por confirmar»). */
 export function textoAviso(a: AvisoClinica): string {
   const n = quien(a.cita)
@@ -111,6 +131,8 @@ export function textoAviso(a: AvisoClinica): string {
     case 'empalme_google': return `La reserva de ${n} se empalma con un evento de Google`
     /* El texto literal de Angel (tanda J, punto 10); la cita va en la línea de debajo. */
     case 'google_movimiento_rechazado': return MOVIMIENTO_RECHAZADO
+    /* El texto de Angel: «[Nombre] confirmó su cita del [día] a las [hora]». */
+    case 'confirmacion_paciente': return `${quienConfirmo(a.cita)} confirmó su cita${delDiaALaHora(a.cita)}`
   }
 }
 
@@ -152,6 +174,8 @@ export function textoEmergente(a: AvisoClinica): string {
     case 'google_por_asignar': return `Evento nuevo de Google por asignar${fecha && hora ? ` el ${fecha} a las ${hora}` : ''}.`
     case 'empalme_google': return 'Una reserva por enlace se empalma con un evento de Google.'
     case 'google_movimiento_rechazado': return MOVIMIENTO_RECHAZADO
+    /* Sin el nombre, como la cancelación (E8): el emergente se ve por encima del hombro. */
+    case 'confirmacion_paciente': return `Un paciente confirmó su cita${delDiaALaHora(a.cita)}.`
   }
 }
 

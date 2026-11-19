@@ -12,8 +12,12 @@
  *     Sin la tabla de avisos (base sin la migración de I5) muestra lo de antes:
  *     las canceladas por el paciente (48 h) y los empalmes con Google.
  *
- * Punto rojo: hay citas por confirmar o avisos sin revisar (sin la tabla, lo
- * que encendía el contador de antes: canceladas y empalmes).
+ * Burbuja roja con el número (tanda L, punto 14; antes, un punto rojo): lo
+ * pendiente de las DOS pestañas, la misma cuenta que dice cada una
+ * («Por confirmar · n» + «Avisos · m»): n = las citas de mañana sin confirmar
+ * que lista «Por confirmar»; m = los avisos sin revisar que lista «Avisos»
+ * (sin la tabla, lo de antes: canceladas y empalmes). Más de 9, «9+»; sin
+ * pendientes, nada. El número exacto va en el nombre accesible del botón.
  *
  * Cero peticiones de más: los avisos viajan en la respuesta de «Por
  * confirmar» (`usePorConfirmar`), que ya se pedía en ocioso y al abrir.
@@ -41,9 +45,27 @@ import {
 
 /**
  * Los que lanzan aviso emergente desde aquí. La cancelación (E8) y el empalme
- * (D11) ya tienen el suyo en la agenda y NO se repiten.
+ * (D11) ya tienen el suyo en la agenda y NO se repiten. Tanda L (punto 13):
+ * la confirmación del paciente por su enlace, que no tenía ninguno.
  */
-const EMERGENTES: readonly TipoAviso[] = ['reserva_enlace', 'reagendado_paciente', 'google_por_asignar']
+const EMERGENTES: readonly TipoAviso[] = ['reserva_enlace', 'reagendado_paciente', 'google_por_asignar', 'confirmacion_paciente']
+
+/** Tanda L (punto 14) · Lo que dice la burbuja: el número, o «9+» con más de 9. */
+export function textoBurbuja(pendientes: number): string {
+  return pendientes > 9 ? '9+' : String(pendientes)
+}
+
+/**
+ * Tanda L (punto 14) · El nombre accesible de la campana: el desglose de
+ * siempre y, con algo pendiente, «N pendiente(s)» con el número exacto.
+ * `null` = la primera traída no llegó.
+ */
+export function etiquetaCampana(cuentas: { n: number; m: number } | null): string {
+  if (!cuentas) return 'Por confirmar y avisos'
+  const total = cuentas.n + cuentas.m
+  const base = `Por confirmar (${cuentas.n}) y avisos (${cuentas.m})`
+  return total > 0 ? `${base}: ${total} ${total === 1 ? 'pendiente' : 'pendientes'}` : base
+}
 
 type Pestana = 'por-confirmar' | 'avisos'
 
@@ -99,7 +121,7 @@ export function CampanaAgenda({ recarga, confirmar, cambiosRef, alAbrirCita, enB
   const cerrar = useCallback(() => setBoton(null), [])
   const n = listas?.citas.length ?? 0
   const m = cuentaAvisos(listas, avisos)
-  const etiqueta = listas ? `Por confirmar (${n}) y avisos (${m})` : 'Por confirmar y avisos'
+  const etiqueta = etiquetaCampana(listas ? { n, m } : null)
   const alConfirmar = confirmar ? (id: string): void => {
     quitar(id)
     void confirmar(id, 'confirmed').then((ok) => { if (!ok) recargar() })
@@ -115,7 +137,9 @@ export function CampanaAgenda({ recarga, confirmar, cambiosRef, alAbrirCita, enB
           if (!boton) recargar()
         }}>
         <Bell size={enBanda ? 18 : 16} aria-hidden="true" />
-        {n + m > 0 && <span className="ag-campana-punto" data-punto-rojo="" aria-hidden="true" />}
+        {n + m > 0 && (
+          <span className="ag-campana-punto" data-punto-rojo="" data-pendientes={n + m} aria-hidden="true">{textoBurbuja(n + m)}</span>
+        )}
       </button>
       {boton && (
         <PanelCampana boton={boton} alCerrar={cerrar} listas={listas} n={n} m={m} avisos={avisos}
