@@ -16,6 +16,7 @@ import { fechaHoraLocalAInstante } from '../src/lib/dates'
  *     «Marcar como confirmada». Los tres puntos sustituyen al engrane (tanda M, punto 4: abren el
  *     formulario completo, sin menú).
  *   · Confirmada: «Reagendar» | «Editar» | «No asistió»; los recordatorios, en el formulario (15).
+ *   · Tanda M, punto 1: en computadora el botón ancho y las casillas miden 48 px (la tarjeta de J).
  *   · Atendida: SÓLO «Ver la consulta». Cancelada: «Darle otra cita» y «Reasignar el horario»;
  *     no asistió: sólo «Darle otra cita», que abre el alta de una cita NUEVA (mismo paciente,
  *     médico y consultorio, fecha enfocada) y deja la original como estaba.
@@ -129,8 +130,9 @@ test('agendada: orden, rejilla pareja (mismos anchos y altos), márgenes iguales
     expect(Math.abs(x.width - con.width)).toBeLessThan(1)
     expect(Math.abs(x.height - con.height)).toBeLessThan(1)
   }
-  expect(con.height).toBeGreaterThanOrEqual(68)
-  expect(ini.height).toBeGreaterThanOrEqual(52)
+  // Tanda M, punto 1: en computadora, 48 px (las medidas exactas, en `agenda-m1-burbuja`).
+  expect(con.height).toBeGreaterThanOrEqual(48)
+  expect(ini.height).toBeGreaterThanOrEqual(48)
   expect(Math.abs(ini.width - (edi.x + edi.width - con.x))).toBeLessThan(1)
   expect(Math.abs((ini.x - dlg.x) - (dlg.x + dlg.width - (ini.x + ini.width)))).toBeLessThan(1.5)
   // Cancelar en el pie: debajo de la rejilla, a todo el ancho de la burbuja.

@@ -12,7 +12,8 @@ import { fechaHoraLocalAInstante } from '../src/lib/dates'
  *     la leyenda de siempre (la del engrane, que sigue ahí); Escape la cierra y devuelve el foco.
  *     En el teléfono, como estaba (sin botón).
  *   · 12: la burbuja con la escala de la página de reserva (título 18, hora 15, texto 14) y las
- *     áreas de toque de 44 px o más.
+ *     áreas de toque de 44 px o más. Tanda M, punto 1: eso queda en el TELÉFONO; en computadora la
+ *     burbuja vuelve a las medidas de la tanda J (lo mide `agenda-m1-burbuja`).
  *
  * MUTACIONES (comprobadas en rojo, una por prueba):
  *   · `quitarCancelada` sin el `fetch` → «Eliminar cita» (la base no la cierra);
@@ -30,8 +31,8 @@ test.beforeEach(() => { interruptorAgenda('A', true) })
 test.afterAll(() => {
   try {
     if (creadas.length) {
+      /* Tanda M: la auditoría ya no se borra (reglas de la tanda M); sus filas se quedan. */
       sqlLocal(`begin; set local session_replication_role = replica;
-        delete from public.audit_log where tabla = 'appointments' and registro_id = any (string_to_array(:'ids', ',')::uuid[]);
         delete from public.appointments where id = any (string_to_array(:'ids', ',')::uuid[]); commit;`, { ids: creadas.join(',') })
     }
   } finally { interruptorAgenda('A', false) }
@@ -141,6 +142,7 @@ test('con la v2 apagada no hay botón de la leyenda', async ({ page }) => {
 })
 
 test('la burbuja con la escala de la reserva: título 18, hora 15, texto 14; toques de 44 px o más', async ({ page }) => {
+  test.skip(test.info().project.name !== 'telefono', 'tanda M, punto 1: en computadora, las medidas de la tanda J (agenda-m1-burbuja)')
   cita('12:00', 'Prueba 08', 'scheduled')
   cita('14:00', 'Prueba 09', 'cancelled')
   await aLaSemana(page)
