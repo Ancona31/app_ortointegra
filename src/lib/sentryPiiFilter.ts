@@ -59,6 +59,7 @@ const SENSITIVE_API_PATHS = [
 function redactString(text: string): string {
   if (!text || typeof text !== 'string') return text
   return text
+    .replace(/#codigo=\d{6}/g, '#codigo=[REDACTADO]') // el código del correo de la reserva (AG-DT-176)
     .replace(TOKEN_ACCION_RE, '[TOKEN-REDACTADO]')
     .replace(CURP_RE, '[CURP-REDACTADO]')
     .replace(RFC_RE, '[RFC-REDACTADO]')
