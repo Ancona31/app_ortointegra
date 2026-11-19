@@ -7,7 +7,8 @@
  * ⚠️ SÓLO LOCAL. Preparan la base como `postgres` (`sqlLocal`) lo que en
  * producción hace Angel o el personal: encender el interruptor, aprobar el
  * aviso, emitir enlaces. Lo que se prueba (la página y la API públicas) va
- * siempre por HTTP contra :3001, sin sesión.
+ * siempre por HTTP contra el `baseURL` del proyecto (`playwright.config.ts`,
+ * :3001), sin sesión.
  *
  * Los enlaces se emiten por SQL con el código que deriva `codigoDeEnlace`
  * del `RESERVA_SECRETO` de `.env.local` (el mismo que usa el servidor): la
@@ -20,7 +21,7 @@
  * una prueba no se coman los de la siguiente ni los de la corrida anterior
  * (`ip_rate_limits` sobrevive a la siembra).
  */
-import { request, type APIRequestContext } from '@playwright/test'
+import { request, test, type APIRequestContext } from '@playwright/test'
 import { randomUUID, randomInt } from 'node:crypto'
 import { resolve } from 'node:path'
 import { config } from 'dotenv'
@@ -33,7 +34,13 @@ import { codigoDe, contarCorreos, esperarCorreo } from './mailpit'
 
 config({ path: resolve(process.cwd(), '.env.local'), quiet: true })
 
-const BASE_URL = 'http://localhost:3001'
+/** El `baseURL` del PROYECTO (`playwright.config.ts`), no el de un `test.use` del archivo: las e2e de
+ *  Google van a su :3002 por su propio contexto y lo público sigue en el de la batería. Tanda L: antes
+ *  era `:3001` fijo, y correr contra otro puerto obligaba a tocar también este archivo. */
+export function baseUrlPublica(): string {
+  const b = test.info().project.use.baseURL
+  return typeof b === 'string' ? b : 'http://localhost:3001'
+}
 export const CORREO_ADMIN_A = 'admin.a@semilla.spinus.test'
 
 export interface Escenario {
@@ -55,7 +62,7 @@ export function ipAlAzar(): string {
 
 /** Un contexto de API nuevo, sin cookies, con su propia IP. */
 export async function api(ip: string = ipAlAzar()): Promise<APIRequestContext> {
-  return request.newContext({ baseURL: BASE_URL, extraHTTPHeaders: { 'x-forwarded-for': ip } })
+  return request.newContext({ baseURL: baseUrlPublica(), extraHTTPHeaders: { 'x-forwarded-for': ip } })
 }
 
 /** Una persona inventada y única por llamada. */

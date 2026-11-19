@@ -168,7 +168,9 @@ test('6 · el administrador ve primero el suyo; los de los invitados, plegados h
    sólo si su nombre está en esta lista y su letra se lee (≥ 4,5:1); cualquier otro botón sin borde
    sigue siendo un fallo. Las pestañas son subrayadas (maqueta) y los interruptores, una pista rellena o con borde
    (≥ 3:1 contra el fondo, WCAG 1.4.11). */
-const BOTONES_DE_TEXTO = /^(Cambiar|Otra duración|Editar .+|Quitar .+|Reactivar .+|Agregar tipo de cita|Apagar el enlace de .+|Desbloquear a .+|Enlaces de los demás médicos \(\d+\)|Personas bloqueadas.*|Empezar de nuevo.*|Cancelar|Guardar)$/
+/* Integración L: «Copiar el enlace de …» es el botón de texto de cada enlace de una vez de «Tu enlace» (J5,
+   `PestanaEnlace`, `BOTON_TEXTO`). Faltaba aquí y la prueba caía en cuanto el administrador tenía uno vigente. */
+const BOTONES_DE_TEXTO = /^(Cambiar|Otra duración|Editar .+|Quitar .+|Reactivar .+|Agregar tipo de cita|Apagar el enlace de .+|Copiar el enlace de .+|Desbloquear a .+|Enlaces de los demás médicos \(\d+\)|Personas bloqueadas.*|Empezar de nuevo.*|Cancelar|Guardar)$/
 
 /** Cada botón VISIBLE de la pantalla: borde ≥ 1 px con ≥ 3:1 contra el fondo que lo rodea, y fondo propio
     (o, si es de texto, su nombre y su contraste; ver arriba). */

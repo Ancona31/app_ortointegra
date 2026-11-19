@@ -4,7 +4,7 @@ import { SESION, CORREO, interruptorAgenda, pestanaConfig, sinPendientesAgenda, 
 import { abrirAgendaV2, tarjetaLectura } from './interaccionesAyudas'
 import { contarCorreos, esperarCorreo } from './mailpit'
 import {
-  api, cerrarEscenario, emitirEnlace, ipAlAzar, personaNueva, prepararEscenario, turnosLibres, verificarCorreo,
+  api, baseUrlPublica, cerrarEscenario, emitirEnlace, ipAlAzar, personaNueva, prepararEscenario, turnosLibres, verificarCorreo,
   type Escenario, type Turno,
 } from './reservaPublicaAyudas'
 import { limpiarReservasE2e, marcaE2e } from './reservaAyudas'
@@ -135,7 +135,7 @@ async function reservarFijo(fijo: string, p: ReturnType<typeof personaNueva>, or
 async function cancelarComoPaciente(codigo: string): Promise<void> {
   const ctx = await api(ipAlAzar())
   try {
-    const r = await ctx.post(`/api/confirmar/${codigo}`, { form: { accion: 'cancelar' }, headers: { origin: 'http://localhost:3001' }, maxRedirects: 0 })
+    const r = await ctx.post(`/api/confirmar/${codigo}`, { form: { accion: 'cancelar' }, headers: { origin: baseUrlPublica() }, maxRedirects: 0 })
     expect(r.status()).toBe(303)
   } finally {
     await ctx.dispose()
@@ -388,9 +388,12 @@ test('20: el correo a la clínica por cada reserva: apagado de fábrica no sale;
   const admin = CORREO.adminA
   sqlLocal(`update public.agenda_ajustes set correo_reserva_clinica = false where clinica_id = ${CL}`)
   const fijo = emitirEnlace(e, 'fijo').codigo
-  const previos = await contarCorreos(admin, 'Reserva nueva')
-  await reservarFijo(fijo, personaNueva()) // espera al comprobante: el `after()` ya corrió
-  expect(await contarCorreos(admin, 'Reserva nueva')).toBe(previos)
+  /* Tanda L · se busca por el NOMBRE de la persona (va en el asunto), no por «Reserva nueva» a secas:
+     la búsqueda de Mailpit devuelve 50 como mucho y el buzón compartido ya tiene más de 50 para admin.a,
+     así que la cuenta se quedaba en 50 y el correo nuevo no se veía aunque llegara. */
+  const apagada = personaNueva()
+  await reservarFijo(fijo, apagada) // espera al comprobante: el `after()` ya corrió
+  expect(await contarCorreos(admin, apagada.nombre)).toBe(0)
 
   // Se enciende desde la configuración, con su línea de explicación (J5: «Avisos», sin pendientes → pestañas).
   const deshacer = sinPendientesAgenda(admin)
@@ -409,8 +412,8 @@ test('20: el correo a la clínica por cada reserva: apagado de fábrica no sale;
 
   const p = personaNueva()
   await reservarFijo(fijo, p)
-  const c = await esperarCorreo(admin, 'Reserva nueva', previos, 15000)
-  expect(c.asunto).toContain(p.nombre)
+  const c = await esperarCorreo(admin, p.nombre, 0, 15000)
+  expect(c.asunto).toContain('Reserva nueva')
   for (const parte of [c.texto, c.html]) {
     expect(parte).toContain(p.nombre)
     expect(parte).not.toContain(p.telefono)
@@ -428,7 +431,6 @@ test('20 · el único sin correo también avisa a la clínica, aunque no haya co
   sqlLocal(`update public.agenda_ajustes set correo_reserva_clinica = true where clinica_id = ${CL}`)
   const unico = emitirEnlace(e, 'unico').codigo
   const p = personaNueva()
-  const previos = await contarCorreos(admin, 'Reserva nueva')
   const ctx = await api(ipAlAzar())
   try {
     const r = await ctx.post(`/api/reservar/${unico}`, { data: {
@@ -439,8 +441,8 @@ test('20 · el único sin correo también avisa a la clínica, aunque no haya co
   } finally {
     await ctx.dispose()
   }
-  const c = await esperarCorreo(admin, 'Reserva nueva', previos, 15000)
-  expect(c.asunto).toContain(p.nombre)
+  const c = await esperarCorreo(admin, p.nombre, 0, 15000) // por el nombre: ver la prueba anterior
+  expect(c.asunto).toContain('Reserva nueva')
   expect(c.texto).not.toContain(p.telefono)
   expect(sqlLocal(`select reserva_correo is null from public.appointments where reserva_nombre = :'n'`, { n: p.nombre })).toBe('t')
 })
