@@ -2328,6 +2328,9 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
              `setModal` no pueda inventarse un estado de creación desde una
              edición si alguien cablea mal esto mañana. */
           onCambiarTipo={tipo => setModal(m => (m.mode === 'create' ? { ...m, tipo } : m))}
+          /* M3 (punto 5) · sólo con la v2: la posición «Bloqueo» del alta abre el
+             MISMO modal que el candado, con el día y la hora del formulario. */
+          onBloquear={agendaV2 ? (desde) => { closeModal(); abrirAltaBloqueo(desde) } : undefined}
           /* L1 (punto 6) · sólo con la v2: no se guarda nada sobre un bloqueo pintado. */
           buscarBloqueo={agendaV2 ? (inicio, fin, medicoId) => {
             const api = calendarRef.current?.getApi()

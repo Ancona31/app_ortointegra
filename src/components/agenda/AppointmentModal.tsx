@@ -22,7 +22,7 @@
 
 import { useEffect, useId, useState } from 'react'
 import {
-  X, Calendar, Plus, Trash2, ChevronDown, FileText, Stethoscope, Loader2, Mail, CalendarPlus, CalendarX,
+  X, Calendar, Plus, Trash2, ChevronDown, FileText, Stethoscope, Loader2, Mail, CalendarPlus, CalendarX, Ban,
   type LucideIcon,
 } from 'lucide-react'
 import Link from 'next/link'
@@ -51,7 +51,7 @@ import PanelLigarCita from '@/components/agenda/PanelLigarCita'
 import { ligarCitaAPaciente, type PacienteParaLigar } from '@/lib/agenda/ligarCita'
 import { useDialogoModal } from '@/hooks/useDialogoModal'
 import ConfirmModal from '@/components/agenda/ConfirmModal'
-import { TEXTO_HORARIO_BLOQUEADO } from '@/lib/agenda/bloqueosAgenda'
+import { TEXTO_HORARIO_BLOQUEADO, type AperturaBloqueo } from '@/lib/agenda/bloqueosAgenda'
 import { DEFAULT_DURATION } from '@/lib/agenda/duracionCita'
 import { ESTADOS_SIN_EMPALME, mensajeEmpalme, type Empalme, type TramoCita } from '@/lib/agenda/empalmesCita'
 /* B6c: SÓLO EL TIPO. `tiposCita.ts` trae Zod en valor, y este modal se carga
@@ -355,7 +355,7 @@ function useTiposCita(medicoId: string): TipoCita[] | null {
 export default function AppointmentModal({
   modal, onClose, onSave, onDelete, medicos, defaultMedicoId,
   hideMedicoDropdown, medicoDropdownRequired, canVerExpediente, canInvitar, onInvitar,
-  onCambiarTipo, avisosHorario, agendaV2 = false, onCancelarCita, buscarEmpalmes, buscarBloqueo, saliendo = false, onReagendada,
+  onCambiarTipo, avisosHorario, agendaV2 = false, onCancelarCita, buscarEmpalmes, buscarBloqueo, onBloquear, saliendo = false, onReagendada,
 }: {
   modal: ModalState
   /* F2.7 · El modal sigue montado mientras sale (lo decide la página, rama de
@@ -382,6 +382,8 @@ export default function AppointmentModal({
   buscarEmpalmes?: (cita: TramoCita) => Empalme[]
   /** L1 (punto 6) · ¿Cae en un bloqueo de horario pintado de ese médico? Sin ella (v2 apagada), no se mira. */
   buscarBloqueo?: (inicio: Date, fin: Date, medicoId: string) => boolean
+  /** M3 (punto 5, la de K1 que L1 retiró) · La posición «Bloqueo» del alta (sólo con la v2): abre el modal del bloqueo con esto. */
+  onBloquear?: (desde: AperturaBloqueo) => void
   medicos: Medico[]
   defaultMedicoId: string
   /* El horario de consulta, para el aviso de fuera de horario. Hasta ahora ese
@@ -1184,6 +1186,26 @@ export default function AppointmentModal({
                     </button>
                   )
                 })}
+                {/* M3 (punto 5) · «Bloqueo» NO es un tipo de fila (no es una cita
+                    ni un evento, no es `appointments`): esta posición cierra el
+                    modal y abre el del bloqueo —el mismo del candado— con la
+                    fecha y la hora de aquí. Es la de K1 (`b13cb40`) que L1
+                    retiró; NO vuelve con ella la pregunta de K1 al guardar. */}
+                {onBloquear && (
+                  <button
+                    type="button" role="tab" aria-selected={false} data-alta-bloqueo
+                    onClick={() => onBloquear({ fecha, hora, fechaFin, horaFin, todoElDia, medicoId: medicoId || null })}
+                    className="flex-1 inline-flex items-center justify-center gap-1.5 bg-transparent hover:bg-[var(--ag-btn-ghost-hover)]"
+                    style={{
+                      border: 'none', cursor: 'pointer', borderRadius: 'var(--ag-r-btn)', padding: '7px 13px',
+                      transition: 'background-color var(--ag-dur-micro) var(--ag-ease), color var(--ag-dur-micro) var(--ag-ease)',
+                      fontSize: 13, fontWeight: 600, color: 'var(--ag-segment-text)',
+                    }}
+                  >
+                    <Ban size={14} />
+                    Bloqueo
+                  </button>
+                )}
               </div>
               <p className="text-[12px] mt-2 leading-relaxed" style={{ color: 'var(--ag-muted)' }}>
                 {esEvento
