@@ -6319,7 +6319,8 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
 .ag-burbuja-nombre { display: flex; align-items: flex-start; gap: 10px; padding-right: 10px; }
 .ag-burbuja-titulo {
   flex: 1; min-width: 0; margin: 0;
-  font-size: 21px; line-height: 1.25; font-weight: 700; color: var(--ag-ink); overflow-wrap: anywhere;
+  /* Tanda L, punto 12 · la escala de la página de reserva (`agendaPublica.css`): título = `.rp-titulo`. */
+  font-size: 18px; line-height: 1.3; font-weight: 700; color: var(--ag-ink); overflow-wrap: anywhere;
 }
 .ag-burbuja-titulo--cancelada { color: var(--ag-muted); }
 .ag-burbuja-sinexp { position: relative; flex: none; }
@@ -6347,12 +6348,13 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
 .ag-burbuja-cuando { display: flex; align-items: flex-start; gap: 12px; }
 .ag-burbuja-reloj { flex: none; margin-top: 2px; display: inline-flex; }
 .ag-burbuja-cuando-texto { display: flex; flex-direction: column; gap: 2px; }
-.ag-burbuja-hora { font-size: 18px; font-weight: 700; line-height: 1.3; color: var(--ag-ink); font-variant-numeric: tabular-nums; }
+/* Tanda L, punto 12 · hora = texto destacado de la reserva (`.rp-hora`, 15/600); duración, día y médico = texto (14). */
+.ag-burbuja-hora { font-size: 15px; font-weight: 600; line-height: 1.3; color: var(--ag-ink); font-variant-numeric: tabular-nums; }
 .ag-burbuja-hora--cancelada { text-decoration: line-through; color: var(--ag-muted); }
-.ag-burbuja-duracion { font-size: 15px; font-weight: 400; color: var(--ag-ink-600); }
-.ag-burbuja-dia { font-size: 15px; color: var(--ag-text); }
+.ag-burbuja-duracion { font-size: 14px; font-weight: 400; color: var(--ag-ink-600); }
+.ag-burbuja-dia { font-size: 14px; color: var(--ag-text); }
 .ag-burbuja-cuando-texto .ag-lectura-huso { font-size: 13px; color: var(--ag-ink-600); }
-.ag-burbuja-medico { display: flex; align-items: center; gap: 12px; font-size: 15px; color: var(--ag-text); }
+.ag-burbuja-medico { display: flex; align-items: center; gap: 12px; font-size: 14px; color: var(--ag-text); }
 .ag-burbuja-iniciales {
   flex: none; display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; margin-left: -2px;
   font-size: 11px; font-weight: 700; color: var(--ag-brand-legible); background: var(--ag-status-confirmed-bg); border-radius: var(--ag-r-pill);
