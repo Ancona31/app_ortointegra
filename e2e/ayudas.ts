@@ -249,7 +249,17 @@ async function esperarQueNoSeAnime(evento: Locator): Promise<void> {
     .map(a => a.finished.catch(() => undefined))))
 }
 
-export async function arrastrarEventoPorMinutos(page: Page, evento: Locator, deltaMinutos: number): Promise<void> {
+/**
+ * `agarre`: a qué altura de la tarjeta se coge (0 arriba, 1 abajo; por omisión,
+ * el centro, como siempre). ⚠️ AG-DT-200 (tanda L, L1): el centro de una cita de
+ * 60 minutos ES una raya de franja, y moverla justo una franja deja el destino
+ * en OTRA raya. FullCalendar elige la franja por posición con medidas
+ * subpíxel, así que a veces origen y destino caen en la misma, el delta sale 0,
+ * no hay `eventDrop` y la prueba falla sin pregunta ni PUT (1 de 20 en
+ * escritorio, traza en notas_l1.md). Coger la tarjeta lejos de una raya
+ * (p. ej. 0.25) lo evita.
+ */
+export async function arrastrarEventoPorMinutos(page: Page, evento: Locator, deltaMinutos: number, agarre = 0.5): Promise<void> {
   const porMinuto = await pxPorMinuto(page)
   await esperarQueNoSeAnime(evento)
   const margen = 70
@@ -281,7 +291,7 @@ export async function arrastrarEventoPorMinutos(page: Page, evento: Locator, del
   const caja = await evento.boundingBox()
   if (!caja) throw new Error('arrastrarEventoPorMinutos: coordenadas del evento no disponibles')
   const x = caja.x + caja.width / 2
-  const yOrigen = caja.y + caja.height / 2
+  const yOrigen = caja.y + caja.height * agarre
   const yDestino = yOrigen + deltaMinutos * porMinuto
   await page.mouse.move(x, yOrigen)
   await page.mouse.down()

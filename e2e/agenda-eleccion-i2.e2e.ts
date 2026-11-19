@@ -197,11 +197,13 @@ test('Reagendar con correo: confirmación explícita, la cita se mueve y el paci
   await expect(modal).toBeHidden()
 })
 
-/* Integración de la tanda K · «Reagendar» a un horario bloqueado pregunta lo mismo que el alta, el
-   modal y el arrastre (K1, punto 3), y sólo tras «Aceptar» llega a la confirmación de siempre.
-   MUTACIÓN (en rojo): en `PanelReagendar.revisar`, `setFase({ tipo: 'confirmar' })` sin mirar
-   `buscarBloqueo` → no sale la pregunta. */
-test('Reagendar a un horario bloqueado: pregunta como el alta (K1); «Corregir» vuelve, «Aceptar» sigue a la confirmación', async ({ page }) => {
+/* Tanda L (L1, punto 6) · «Reagendar» a un horario bloqueado NO se puede: el panel enseña el
+   mensaje de Angel y no llega a la confirmación; el servidor lo rechaza igual (409, mismo texto)
+   aunque la pantalla no lo viera. Sustituye a la pregunta de K1.
+   MUTACIONES (en rojo): en `PanelReagendar.revisar`, `setFase({ tipo: 'confirmar' })` sin mirar
+   `buscarBloqueo` → sale la confirmación; en la ruta, sin `caeEnBloqueo` → la base lo rechaza
+   igual, pero sin el veto ni la rama `bloqueado` de `reagendarCita` sería un 500. */
+test('Reagendar a un horario bloqueado: el mensaje de L1, sin confirmación, y el servidor responde 409', async ({ page }) => {
   interruptorAgenda('A', true)
   const c = cita('17:00', `bloqueo-${Date.now().toString(36)}@reserva.test`)
   const bloqueo = sqlLocal(`insert into public.agenda_bloqueos (clinica_id, medico_id, inicio, fin, zona, motivo)
@@ -214,20 +216,25 @@ test('Reagendar a un horario bloqueado: pregunta como el alta (K1); «Corregir»
     await modal.getByTestId('eleccion-paciente').getByRole('button', { name: 'Reagendar' }).click()
     const panel = modal.getByTestId('panel-reagendar')
     const revisar = panel.getByRole('button', { name: 'Revisar cambio' })
-    // Control: fuera del bloqueo no pregunta.
+    // Control: fuera del bloqueo, la confirmación de siempre.
     await panel.locator('#reagendar-hora').fill('19:30')
     await revisar.click()
     await expect(panel).toContainText('¿Reagendar la cita con estos datos?')
     await panel.getByRole('button', { name: 'Corregir' }).click()
     await panel.locator('#reagendar-hora').fill('18:00')
     await revisar.click()
-    await expect(panel).toContainText('Este horario está bloqueado. ¿Agendar de todos modos?')
-    await panel.getByRole('button', { name: 'Corregir' }).click()
+    await expect(panel.getByRole('alert')).toHaveText('Este horario está bloqueado. Quita el bloqueo para agendar aquí.')
+    await expect(panel).not.toContainText('¿Reagendar la cita con estos datos?')
+    await expect(panel.getByRole('button', { name: 'Aceptar' })).toHaveCount(0)
     await expect(revisar).toBeVisible()
-    await revisar.click()
-    await panel.getByRole('button', { name: 'Aceptar' }).click()
-    await expect(panel).toContainText('¿Reagendar la cita con estos datos?')
-    expect(inicioDe(c.citaId)).toBe(segundos('17:00')) // nada se escribe sin confirmar
+    // El servidor, sin la pantalla: el mismo texto, y nada escrito.
+    const r = await page.request.post(`/api/appointments/${c.citaId}/reagendar`, { data: {
+      consultorio_id: sqlLocal(`select consultorio_id from public.appointments where id = :'id'`, { id: c.citaId }), start_time: fechaHoraLocalAInstante(DIA_LABORABLE_LIBRE, '18:00', TZ),
+      end_time: fechaHoraLocalAInstante(DIA_LABORABLE_LIBRE, '18:30', TZ), confirmado: true,
+    } })
+    expect(r.status()).toBe(409)
+    expect(await r.json()).toEqual({ error: 'horario_bloqueado', message: 'Este horario está bloqueado. Quita el bloqueo para agendar aquí.' })
+    expect(inicioDe(c.citaId)).toBe(segundos('17:00'))
   } finally {
     sqlLocal(`delete from public.agenda_bloqueos where id = :'b'`, { b: bloqueo })
   }
