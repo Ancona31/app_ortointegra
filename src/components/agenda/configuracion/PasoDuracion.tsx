@@ -32,12 +32,12 @@ export default function PasoDuracion({ eleccion, horarios, alCambiar }: Props) {
   const minutos = minutosDe(eleccion)
   const cabe = consultasQueCaben(horarios, minutos)
   return (
-    <section className="flex flex-col gap-[20px]" aria-labelledby="primera-vez-titulo">
+    <section className="flex flex-col gap-[20px] sm:gap-[16px]" aria-labelledby="primera-vez-titulo">
       <div className="flex flex-col gap-[8px]">
         <h1 id="primera-vez-titulo" className={TITULO_PASO}>¿Cuánto dura tu consulta?</h1>
         <p className={SUB_PASO}>Con esto sabemos cuántas citas caben en tu día.</p>
       </div>
-      <div className={`${TARJETA} gap-[16px]`}>
+      <div className={`${TARJETA} gap-[16px] sm:gap-[14px]`}>
         <div className="grid grid-cols-3 gap-[10px]">
           {DURACIONES.map(d => (
             <button key={d} type="button" aria-pressed={!eleccion.otra && eleccion.minutos === d} className={opcion(!eleccion.otra && eleccion.minutos === d)}
@@ -52,13 +52,13 @@ export default function PasoDuracion({ eleccion, horarios, alCambiar }: Props) {
             minutos</label>
         )}
         {cabe && (
-          <div className="flex items-center gap-[12px] rounded-[12px] bg-[var(--ag-primary-bg-faint)] p-[16px] text-[14px] leading-[1.5] text-[var(--ag-ink)]">
+          <div className="flex items-center gap-[12px] rounded-[12px] bg-[var(--ag-primary-bg-faint)] p-[16px] sm:p-[14px] text-[14px] leading-[1.5] text-[var(--ag-ink)]">
             <CalendarDays size={22} className="flex-none text-[var(--ag-brand-legible)]" aria-hidden="true" />
             <span>En un día de {cabe.desde} a {cabe.hasta} te caben <strong>{cabe.cuantas} consultas</strong> de {minutos} minutos.</span>
           </div>
         )}
       </div>
-      <p className="m-0 text-[13.5px] text-[var(--ag-ink-600)]">Si en algún consultorio dura distinto, lo cambias después en Configuración.</p>
+      <p className="m-0 text-[13.5px] sm:text-[13px] text-[var(--ag-ink-600)]">Si en algún consultorio dura distinto, lo cambias después en Configuración.</p>
     </section>
   )
 }

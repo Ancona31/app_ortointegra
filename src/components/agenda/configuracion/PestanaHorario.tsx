@@ -23,7 +23,7 @@ import DialogoHorario from '@/components/agenda/configuracion/DialogoHorario'
 import { nombreHuso } from '@/components/agenda/configuracion/SelectorHuso'
 import { guardarHorarioClinica, guardarHorarioConsultorio, type CambiosConsultorio } from '@/components/agenda/configuracion/accionesConfig'
 import type { Avisar } from '@/components/agenda/configuracion/estadoAvisos'
-import { AYUDA, BOTON_CHICO, PANEL, SOLO_ADMIN, SUB_PANEL, TITULO_PANEL } from '@/components/agenda/configuracion/estilosConfig'
+import { AVISO_SOLO_ADMIN, AYUDA, BOTON_CHICO, PANEL, SOLO_ADMIN, SUB_PANEL, TITULO_PANEL } from '@/components/agenda/configuracion/estilosConfig'
 import { lineasHorario, textoHorario } from '@/lib/agenda/gruposHorario'
 import { horarioEfectivo } from '@/lib/agenda/disponibilidad'
 import type { ModoHorario } from '@/lib/agenda/primeraVez'
@@ -57,16 +57,16 @@ function Tarjeta({ c, p, alAbrir, alConfirmar }: { c: Consultorio; p: Props; alA
   const medico = esDueno ? null : p.medicos.find(m => m.id === c.medico_id)
   const lineas = lineasHorario(efectivo)
   return (
-    <div role="group" aria-label={c.nombre} className="flex flex-wrap items-start justify-between gap-[16px] rounded-[12px] border border-[var(--ag-border-card)] px-[20px] py-[18px]">
+    <div role="group" aria-label={c.nombre} className="flex flex-wrap items-start justify-between gap-[16px] sm:gap-[14px] rounded-[12px] border border-[var(--ag-border-card)] px-[20px] sm:px-[16px] py-[18px] sm:py-[16px]">
       <div className="flex flex-col gap-[6px]">
         <div className="flex flex-wrap items-center gap-[10px]">
-          <span className="text-[15px] font-semibold text-[var(--ag-ink)]">{c.nombre}</span>
+          <span className="text-[15px] sm:text-[14px] font-semibold text-[var(--ag-ink)]">{c.nombre}</span>
           <span className={`${INSIGNIA} ${propio ? 'bg-[var(--ag-primary-bg-faint)] text-[var(--ag-brand-legible)]' : 'bg-[var(--ag-segment-bg)] text-[var(--ag-ink-600)]'}`}>
             {propio ? 'Horario propio' : 'Igual que la clínica'}
           </span>
           {c.horario_revisado_en === null && <span className={`${INSIGNIA} bg-[var(--ag-aviso-bg)] text-[var(--ag-aviso-text)]`}>Por revisar</span>}
         </div>
-        {medico && <span className="text-[13.5px] text-[var(--ag-ink-600)]">{componerNombreMedicoCompleto(medico)}</span>}
+        {medico && <span className="text-[13.5px] sm:text-[13px] text-[var(--ag-ink-600)]">{componerNombreMedicoCompleto(medico)}</span>}
         {lineas.length ? lineas.map(l => <span key={l} className="text-[14px] text-[var(--ag-text)]">{l}</span>)
           : <span className="text-[14px] italic text-[var(--ag-muted)]">Sin días de consulta</span>}
       </div>
@@ -103,17 +103,18 @@ function TarjetaClinica({ p, alAbrir }: { p: Props; alAbrir: () => void }) {
   const lineas = p.horarioClinica ? lineasHorario(p.horarioClinica) : null
   return (
     <div role="group" aria-label="Horario de la clínica" data-horario-clinica
-      className="flex flex-wrap items-start justify-between gap-[16px] rounded-[12px] border border-[var(--ag-border-card)] px-[20px] py-[18px]">
+      className="flex flex-wrap items-start justify-between gap-[16px] sm:gap-[14px] rounded-[12px] border border-[var(--ag-border-card)] px-[20px] sm:px-[16px] py-[18px] sm:py-[16px]">
       <div className="flex flex-col gap-[6px]">
-        <span className="text-[15px] font-semibold text-[var(--ag-ink)]">Horario de la clínica</span>
+        <span className="text-[15px] sm:text-[14px] font-semibold text-[var(--ag-ink)]">Horario de la clínica</span>
         {!lineas ? <span className="text-[14px] text-[var(--ag-ink-600)]">{p.fallo ? 'No se pudo cargar. Recarga la página.' : '…'}</span>
           : lineas.length ? lineas.map(l => <span key={l} className="text-[14px] text-[var(--ag-text)]">{l}</span>)
           : <span className="text-[14px] italic text-[var(--ag-muted)]">Sin días de consulta</span>}
         {p.husoClinica && <span className="text-[14px] text-[var(--ag-text)]">Huso horario: {nombreHuso(p.husoClinica)}</span>}
-        <span className="text-[13.5px] leading-[1.5] text-[var(--ag-ink-600)]">
+        <span className="text-[13.5px] sm:text-[13px] leading-[1.5] text-[var(--ag-ink-600)]">
           Lo usan los consultorios que dicen «Igual que la clínica».
         </span>
-        {!p.puedeAdministrar && <span data-solo-admin className={AYUDA}>{SOLO_ADMIN}</span>}
+        {/* Tanda M (punto 15): en la tarjeta, sólo el médico invitado (sus consultorios sí los cambia); la secretaria lo lee al inicio. */}
+        {p.esMedico && !p.puedeAdministrar && <span data-solo-admin className={AVISO_SOLO_ADMIN}>{SOLO_ADMIN}</span>}
       </div>
       {p.puedeAdministrar && p.horarioClinica && (
         <button type="button" onClick={alAbrir} className={BOTON_CHICO} aria-label="Cambiar horario de la clínica">Cambiar horario</button>
@@ -151,6 +152,8 @@ export default function PestanaHorario(p: Props) {
         <h2 className={TITULO_PANEL}>Cuándo das consulta</h2>
         <p className={SUB_PANEL}>Tus pacientes solo pueden pedir cita en estos días y horas.</p>
       </div>
+      {/* Tanda M (punto 15): la secretaria no cambia nada de esta pestaña (`PUT /api/me/horario` 403; consultorios, 404). */}
+      {!p.esMedico && <p data-solo-admin className={AVISO_SOLO_ADMIN}>{SOLO_ADMIN}</p>}
       <TarjetaClinica p={p} alAbrir={() => setAbierto({ tipo: 'clinica' })} />
       {!p.consultorios || !clinica ? <p className={AYUDA}>{p.fallo ? 'No se pudieron cargar los consultorios. Recarga la página.' : 'Cargando los consultorios…'}</p>
         : p.consultorios.length === 0 ? <p className={AYUDA}>Aún no hay consultorios activos.</p>
@@ -158,7 +161,7 @@ export default function PestanaHorario(p: Props) {
           <Tarjeta key={c.id} c={c} p={p} alAbrir={() => setAbierto({ tipo: 'consultorio', c })} alConfirmar={() => void guardar(c, { horario_revisado: true })} />
         ))}
       {p.esMedico && (
-        <p className="m-0 text-[13.5px] text-[var(--ag-ink-600)]">Agrega más consultorios en tu <Link href="/perfil" className={ENLACE}>perfil</Link>.</p>
+        <p className="m-0 text-[13.5px] sm:text-[13px] text-[var(--ag-ink-600)]">Agrega más consultorios en tu <Link href="/perfil" className={ENLACE}>perfil</Link>.</p>
       )}
       {abierto && clinica && (
         <DialogoHorario

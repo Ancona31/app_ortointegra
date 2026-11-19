@@ -63,10 +63,10 @@ export default function FilaEnlaceReserva({ titulo, detalle, aviso, url, ocupado
     }
   }
   return (
-    <li className="flex flex-col gap-[8px] rounded-[10px] bg-[var(--ag-surface-sunken)] px-[16px] py-[10px]">
+    <li className="flex flex-col gap-[8px] rounded-[10px] bg-[var(--ag-surface-sunken)] px-[16px] sm:px-[14px] py-[10px]">
       <div className="flex flex-wrap items-center gap-x-[12px] gap-y-[4px]">
-        <span className="text-[15px] font-semibold text-[var(--ag-ink)]">{titulo}</span>
-        <span className="text-[13.5px] text-[var(--ag-ink-600)]">{detalle}</span>
+        <span className="text-[15px] sm:text-[14px] font-semibold text-[var(--ag-ink)]">{titulo}</span>
+        <span className="text-[13.5px] sm:text-[13px] text-[var(--ag-ink-600)]">{detalle}</span>
         <Pildora aviso={aviso} textoAbre={textoAbre} />
         <span className="ml-auto flex flex-wrap gap-[8px]">
           {onCompletar && <button type="button" className={BOTON} disabled={ocupado} onClick={onCompletar}

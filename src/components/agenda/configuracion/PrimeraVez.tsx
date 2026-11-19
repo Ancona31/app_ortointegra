@@ -104,7 +104,7 @@ function Avance({ paso, conClinica }: { paso: PasoPrimeraVez; conClinica: boolea
   const etapas = conClinica ? ETAPAS_CON_CLINICA : ETAPAS
   return (
     <div className="flex flex-col gap-[10px]">
-      <div className="text-[13.5px] font-semibold text-[var(--ag-ink-600)]">Paso {n} de {de} · menos de 2 minutos</div>
+      <div className="text-[13.5px] sm:text-[13px] font-semibold text-[var(--ag-ink-600)]">Paso {n} de {de} · menos de 2 minutos</div>
       <ol className={`m-0 grid list-none ${conClinica ? 'grid-cols-4' : 'grid-cols-3'} gap-[8px] p-0`}>
         {etapas.map((e, i) => (
           <li key={e} className="flex flex-col gap-[6px]" aria-current={i + 1 === n ? 'step' : undefined}>
@@ -188,13 +188,13 @@ function pasoValido(paso: Paso, f: ReturnType<typeof useFunnel>, a: EstadoAvisos
 function Cabecera({ paso, conClinica, guardando, alTerminarDespues }: { paso: Paso; conClinica: boolean; guardando: boolean; alTerminarDespues: () => void }) {
   return (
     <>
-      <div className="flex flex-wrap items-center justify-between gap-[16px]">
-        <Link href="/agenda" className="inline-flex min-h-[44px] items-center gap-[6px] text-[14px] text-[var(--ag-ink-600)] no-underline">
+      <div className="flex flex-wrap items-center justify-between gap-[16px] sm:gap-[14px]">
+        <Link href="/agenda" className="inline-flex min-h-[44px] sm:min-h-[40px] items-center gap-[6px] text-[14px] sm:text-[13px] text-[var(--ag-ink-600)] no-underline">
           <ChevronLeft size={18} aria-hidden="true" /> Agenda
         </Link>
         {paso < 4 && (
           <button type="button" disabled={guardando} onClick={alTerminarDespues}
-            className="min-h-[44px] cursor-pointer border-0 bg-transparent px-[4px] text-[14px] text-[var(--ag-ink-600)] underline">Terminar después</button>
+            className="min-h-[44px] sm:min-h-[40px] cursor-pointer border-0 bg-transparent px-[4px] text-[14px] sm:text-[13px] text-[var(--ag-ink-600)] underline">Terminar después</button>
         )}
       </div>
       {paso !== 4 && <Avance paso={paso} conClinica={conClinica} />}
@@ -209,7 +209,7 @@ function Pie({ paso, primero, valido, guardando, alAtras, alContinuar }: {
   return (
     <div className="flex flex-wrap items-center justify-between gap-[12px] pt-[8px]">
       <div>{paso > primero && <button type="button" className={BOTON_BLANCO} onClick={alAtras}>Atrás</button>}</div>
-      <button type="button" className={`${BOTON_AZUL} px-[32px] disabled:bg-[var(--ag-border-card)] disabled:text-[var(--ag-ink-600)] disabled:opacity-100`}
+      <button type="button" className={`${BOTON_AZUL} px-[32px] sm:px-[26px] disabled:bg-[var(--ag-border-card)] disabled:text-[var(--ag-ink-600)] disabled:opacity-100`}
         disabled={!valido || guardando} onClick={alContinuar}>
         {guardando ? 'Guardando…' : paso === 3 ? 'Terminar' : 'Continuar'}
       </button>
@@ -219,7 +219,7 @@ function Pie({ paso, primero, valido, guardando, alAtras, alContinuar }: {
 
 function PasoAvisos({ avisos, puedeAdministrar }: { avisos: EstadoAvisos; puedeAdministrar: boolean }) {
   return (
-    <section className="flex flex-col gap-[20px]" aria-labelledby="primera-vez-titulo">
+    <section className="flex flex-col gap-[20px] sm:gap-[16px]" aria-labelledby="primera-vez-titulo">
       <div className="flex flex-col gap-[8px]">
         <h1 id="primera-vez-titulo" className={TITULO_PASO}>¿Mandamos avisos por correo?</h1>
         <p className={SUB_PASO}>Ya dejamos lo más útil listo. Puedes cambiarlo cuando quieras.</p>
@@ -281,7 +281,7 @@ export default function PrimeraVez(p: Props) {
     return e?.modo === 'propio' ? e.propio : p.horarioClinica
   })
   return (
-    <div className="mx-auto flex w-full max-w-[760px] flex-col gap-[28px] pb-[64px] pt-[8px]" data-primera-vez={paso}>
+    <div className="mx-auto flex w-full max-w-[760px] flex-col gap-[28px] sm:gap-[24px] pb-[64px] sm:pb-[54px] pt-[8px]" data-primera-vez={paso}>
       <Cabecera paso={paso} conClinica={p.conClinica} guardando={n.guardando} alTerminarDespues={() => void n.terminarDespues()} />
       {paso === 0 && <PasoClinica eleccion={f.clinica} alCambiar={f.setClinica} />}
       {paso === 1 && (

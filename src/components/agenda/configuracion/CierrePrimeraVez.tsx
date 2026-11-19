@@ -36,9 +36,9 @@ interface Props {
 
 function TuEnlace({ enlace, aviso }: Pick<Props, 'enlace' | 'aviso'>) {
   return (
-    <div className={`${TARJETA} gap-[14px] border-2 border-[var(--ag-brand-secondary)]`}>
-      <span className="text-[15px] font-semibold text-[var(--ag-brand-legible)]">Tu enlace para pacientes</span>
-      {aviso && <p role="note" className="m-0 rounded-[10px] border border-[var(--ag-aviso-border)] bg-[var(--ag-aviso-bg)] px-[14px] py-[10px] text-[14px] text-[var(--ag-aviso-text)]">{aviso}</p>}
+    <div className={`${TARJETA} gap-[14px] sm:gap-[12px] border-2 border-[var(--ag-brand-secondary)]`}>
+      <span className="text-[15px] sm:text-[14px] font-semibold text-[var(--ag-brand-legible)]">Tu enlace para pacientes</span>
+      {aviso && <p role="note" className="m-0 rounded-[10px] border border-[var(--ag-aviso-border)] bg-[var(--ag-aviso-bg)] px-[14px] sm:px-[12px] py-[10px] text-[14px] text-[var(--ag-aviso-text)]">{aviso}</p>}
       {enlace.estado === 'cargando' && <div className={DIRECCION}>Preparando tu enlace…</div>}
       {enlace.estado === 'error' && <p role="alert" className={ERROR}>{enlace.motivo}</p>}
       {enlace.estado === 'listo' && (
@@ -59,9 +59,9 @@ function TuEnlace({ enlace, aviso }: Pick<Props, 'enlace' | 'aviso'>) {
 
 function FilaResumen({ titulo, children, alCambiar, ultima }: { titulo: string; children: ReactNode; alCambiar: () => void; ultima?: boolean }) {
   return (
-    <div className={`flex items-start justify-between gap-[16px] py-[14px] ${ultima ? '' : 'border-b border-[var(--ag-hairline)]'}`}>
+    <div className={`flex items-start justify-between gap-[16px] sm:gap-[14px] py-[14px] sm:py-[12px] ${ultima ? '' : 'border-b border-[var(--ag-hairline)]'}`}>
       <div className="flex flex-col gap-[4px]">
-        <span className="text-[13.5px] font-semibold text-[var(--ag-ink-600)]">{titulo}</span>
+        <span className="text-[13.5px] sm:text-[13px] font-semibold text-[var(--ag-ink-600)]">{titulo}</span>
         {children}
       </div>
       <button type="button" className={BOTON_TEXTO} onClick={alCambiar} aria-label={`Cambiar: ${titulo}`}>Cambiar</button>
@@ -71,11 +71,11 @@ function FilaResumen({ titulo, children, alCambiar, ultima }: { titulo: string; 
 
 function Resumen({ resumen, irAPaso }: Pick<Props, 'resumen' | 'irAPaso'>) {
   return (
-    <div className={`${TARJETA} px-[24px] py-[8px]`}>
+    <div className={`${TARJETA} px-[24px] sm:px-[20px] py-[8px] sm:py-[8px]`}>
       {resumen.clinica && (
         <FilaResumen titulo="Horario de la clínica" alCambiar={() => irAPaso(0)}>
           <span className="text-[14px] text-[var(--ag-ink)]">{resumen.clinica.texto}</span>
-          <span className="text-[13.5px] text-[var(--ag-ink-600)]">Huso horario: {resumen.clinica.huso}</span>
+          <span className="text-[13.5px] sm:text-[13px] text-[var(--ag-ink-600)]">Huso horario: {resumen.clinica.huso}</span>
         </FilaResumen>
       )}
       <FilaResumen titulo="Cuándo das consulta" alCambiar={() => irAPaso(1)}>
@@ -95,7 +95,7 @@ function Resumen({ resumen, irAPaso }: Pick<Props, 'resumen' | 'irAPaso'>) {
 
 export default function CierrePrimeraVez(p: Props) {
   return (
-    <section className="flex flex-col gap-[20px]" aria-labelledby="primera-vez-titulo">
+    <section className="flex flex-col gap-[20px] sm:gap-[16px]" aria-labelledby="primera-vez-titulo">
       <div className="flex flex-col items-start gap-[12px]">
         <div aria-hidden="true" className="flex h-[56px] w-[56px] items-center justify-center rounded-full bg-[var(--ag-success-bg)] text-[var(--ag-success-text)]">
           <Check size={30} strokeWidth={2.5} />
@@ -104,13 +104,13 @@ export default function CierrePrimeraVez(p: Props) {
         <p className={SUB_PASO}>Comparte tu enlace. Quien lo abra puede apartar cita en tus horas libres, sin llamarte.</p>
       </div>
       <TuEnlace enlace={p.enlace} aviso={p.aviso} />
-      <div className={`${TARJETA} gap-[12px] px-[24px] py-[22px]`}>
+      <div className={`${TARJETA} gap-[12px] px-[24px] sm:px-[20px] py-[22px] sm:py-[18px]`}>
         <span className={TITULO_BLOQUE}>¿Es para un solo paciente?</span>
         <span className={AYUDA}>Crea un enlace de una vez: sirve para una sola cita y deja de funcionar en {p.vigenciaDias} {p.vigenciaDias === 1 ? 'día' : 'días'}.</span>
         <CrearEnlaceUnaVez medicoId={p.medicoId} alCrear={p.alCrearUnaVez} />
       </div>
       <Resumen resumen={p.resumen} irAPaso={p.irAPaso} />
-      <Link href="/agenda" className={`${BOTON_AZUL} self-start px-[28px] no-underline`}>Ir a mi agenda</Link>
+      <Link href="/agenda" className={`${BOTON_AZUL} self-start px-[28px] sm:px-[24px] no-underline`}>Ir a mi agenda</Link>
     </section>
   )
 }

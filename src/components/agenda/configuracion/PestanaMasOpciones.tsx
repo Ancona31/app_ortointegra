@@ -20,7 +20,7 @@ import { ChevronRight } from 'lucide-react'
 import ConfirmacionRestablecer from '@/components/agenda/configuracion/ConfirmacionRestablecer'
 import { leerMotivoError } from '@/components/agenda/configuracion/leerMotivoError'
 import type { Avisar } from '@/components/agenda/configuracion/estadoAvisos'
-import { AYUDA, BOTON_TEXTO, PANEL } from '@/components/agenda/configuracion/estilosConfig'
+import { AVISO_SOLO_ADMIN, AYUDA, BOTON_TEXTO, PANEL, SOLO_ADMIN } from '@/components/agenda/configuracion/estilosConfig'
 import { frasearHistorial, type ContactoBloqueado } from '@/lib/reserva/gestionReserva'
 import { componerNombreMedicoCompleto } from '@/lib/nombreMedico'
 import type { MedicoConfig } from '@/lib/configApp'
@@ -64,12 +64,12 @@ interface Props {
   alEmpezarDeNuevo: () => void
 }
 
-const FILA = 'flex w-full min-h-[44px] cursor-pointer items-center justify-between gap-[16px] border-0 border-b border-[var(--ag-hairline)] bg-transparent py-[18px] text-left text-[var(--ag-ink)]'
+const FILA = 'flex w-full min-h-[44px] sm:min-h-[40px] cursor-pointer items-center justify-between gap-[16px] sm:gap-[14px] border-0 border-b border-[var(--ag-hairline)] bg-transparent py-[18px] sm:py-[16px] text-left text-[var(--ag-ink)]'
 
 function TextoFila({ titulo, ayuda }: { titulo: string; ayuda: string }) {
   return (
     <span className="flex flex-[1_1_360px] flex-col gap-[4px]">
-      <span className="text-[15px] font-semibold">{titulo}</span>
+      <span className="text-[15px] sm:text-[14px] font-semibold">{titulo}</span>
       <span className={AYUDA}>{ayuda}</span>
     </span>
   )
@@ -104,11 +104,11 @@ function Bloqueados({ p }: { p: Props }) {
         {contactos === 'error' && <p className={AYUDA}>No se pudo leer la lista. Recarga la página.</p>}
         {Array.isArray(contactos) && contactos.length === 0 && <p className={AYUDA}>Nadie está bloqueado.</p>}
         {Array.isArray(contactos) && contactos.map(c => (
-          <div key={`${c.medico_id}:${c.cita_id}`} className="flex flex-wrap items-center justify-between gap-[12px] rounded-[10px] bg-[var(--ag-surface-sunken)] px-[16px] py-[12px]">
+          <div key={`${c.medico_id}:${c.cita_id}`} className="flex flex-wrap items-center justify-between gap-[12px] rounded-[10px] bg-[var(--ag-surface-sunken)] px-[16px] sm:px-[14px] py-[12px]">
             <span className="flex flex-col gap-[2px] text-[14px] text-[var(--ag-ink)]">
               <strong>{c.nombre ?? 'Sin nombre'}</strong>
-              <span className="text-[13.5px] text-[var(--ag-ink-600)]">{[c.telefono, c.correo, p.gestionaTodos ? nombreMedico(c.medico_id) : null].filter(Boolean).join(' · ')}</span>
-              <span className="text-[13.5px] text-[var(--ag-ink-600)]">{motivo(c)}</span>
+              <span className="text-[13.5px] sm:text-[13px] text-[var(--ag-ink-600)]">{[c.telefono, c.correo, p.gestionaTodos ? nombreMedico(c.medico_id) : null].filter(Boolean).join(' · ')}</span>
+              <span className="text-[13.5px] sm:text-[13px] text-[var(--ag-ink-600)]">{motivo(c)}</span>
             </span>
             <button type="button" className={BOTON_TEXTO} disabled={ocupado} onClick={() => void quitar(c)} aria-label={`Desbloquear a ${c.nombre ?? 'este contacto'}`}>Desbloquear</button>
           </div>
@@ -129,7 +129,14 @@ export default function PestanaMasOpciones(p: Props) {
           <ChevronRight size={20} aria-hidden="true" className="flex-none text-[var(--ag-ink-600)]" />
         </button>
       )}
-      {!p.conEnlaces && !p.puedeAdministrar && <p className={`${AYUDA} py-[18px]`}>No hay más opciones para tu cuenta.</p>}
+      {/* Tanda M (punto 15): quien no administra no puede «Empezar de nuevo» (`POST /api/agenda/restablecer`: 403). Lo ve sin
+          botón y con el aviso encima; el aviso no va arriba de la pestaña porque «Personas bloqueadas» sí lo gestiona. */}
+      {!p.puedeAdministrar && (
+        <div data-empezar-sin-permiso className="flex flex-col gap-[10px] py-[18px] sm:py-[16px]">
+          <p data-solo-admin className={AVISO_SOLO_ADMIN}>{SOLO_ADMIN}</p>
+          <TextoFila titulo="Empezar de nuevo" ayuda="Regresa todo a como venía y vuelve a hacer las 3 preguntas. Tus citas no se borran." />
+        </div>
+      )}
       {confirmando && <ConfirmacionRestablecer onCancelar={() => setConfirmando(false)} onHecho={() => { setConfirmando(false); p.alEmpezarDeNuevo() }} />}
     </div>
   )

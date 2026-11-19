@@ -21,7 +21,7 @@ const PALABRA = 'RESTABLECER'
 
 /** El botón rojo de contorno, al alto y la letra de los botones de la configuración nueva (tanda L, punto 12: 48 px, 16 · 700). */
 const BOTON_PELIGRO =
-  'inline-flex min-h-[48px] cursor-pointer items-center justify-center gap-[8px] rounded-[10px] border border-[var(--ag-status-cancelled-text)] bg-[var(--ag-surface)] px-[22px] text-[16px] font-bold text-[var(--ag-status-cancelled-text)] hover:bg-[var(--ag-control-bg-hover)] disabled:cursor-not-allowed disabled:opacity-50'
+  'inline-flex min-h-[48px] sm:min-h-[40px] cursor-pointer items-center justify-center gap-[8px] rounded-[10px] border border-[var(--ag-status-cancelled-text)] bg-[var(--ag-surface)] px-[22px] sm:px-[18px] text-[16px] sm:text-[13px] font-bold text-[var(--ag-status-cancelled-text)] hover:bg-[var(--ag-control-bg-hover)] disabled:cursor-not-allowed disabled:opacity-50'
 
 export const SE_RESTABLECE = [
   'El horario de cada consultorio vuelve al de partida: el horario de la clínica, copiado a cada consultorio.',
@@ -72,7 +72,7 @@ export default function ConfirmacionRestablecer({ onCancelar, onHecho }: { onCan
             <p>Las citas, sus pacientes, la auditoría y los contactos bloqueados no se tocan.</p>
           </div>
           <form onSubmit={e => void confirmar(e)} className="flex flex-col gap-[var(--ag-3)]">
-            <label htmlFor={`${id}-p`} className="text-[13.5px] font-semibold text-[var(--ag-text)]">Para confirmar, escribe <strong>{PALABRA}</strong></label>
+            <label htmlFor={`${id}-p`} className="text-[13.5px] sm:text-[13px] font-semibold text-[var(--ag-text)]">Para confirmar, escribe <strong>{PALABRA}</strong></label>
             <input id={`${id}-p`} className={CAMPO_NUEVO} value={texto} onChange={e => setTexto(e.target.value)} autoComplete="off" spellCheck={false} />
             {error && <p role="alert" className="text-[14px] font-semibold text-[var(--ag-status-cancelled-text)]">{error}</p>}
             <div className="flex flex-wrap justify-end gap-[var(--ag-2)]">

@@ -45,11 +45,11 @@ function FilaDia({ dia, nombre, horario, alCambiar }: { dia: DiaSemana; nombre: 
   const poner = (cambio: Partial<Horario[DiaSemana]>) => alCambiar({ ...horario, [dia]: { ...d, ...cambio } })
   const alReves = d.activo && d.inicio >= d.fin
   return (
-    <div role="group" aria-label={nombre} className={`flex min-h-[68px] flex-wrap items-center gap-x-[16px] gap-y-[12px] rounded-[12px] px-[16px] py-[12px] ${d.activo
+    <div role="group" aria-label={nombre} className={`flex min-h-[68px] sm:min-h-[56px] flex-wrap items-center gap-x-[16px] sm:gap-x-[14px] gap-y-[12px] rounded-[12px] px-[16px] sm:px-[14px] py-[12px] ${d.activo
       ? 'bg-[var(--ag-primary-bg-faint)]' : 'bg-[var(--ag-surface-sunken)]'}`}>
-      <div className="flex min-w-[160px] items-center gap-[14px]">
+      <div className="flex min-w-[160px] items-center gap-[14px] sm:gap-[12px]">
         <Interruptor encendido={d.activo} etiqueta={nombre} alCambiar={() => alCambiar(d.activo ? { ...horario, [dia]: { ...d, activo: false } } : prenderDia(horario, dia))} />
-        <span className={`text-[15px] font-semibold ${d.activo ? 'text-[var(--ag-ink)]' : 'text-[var(--ag-muted)]'}`}>{nombre}</span>
+        <span className={`text-[15px] sm:text-[14px] font-semibold ${d.activo ? 'text-[var(--ag-ink)]' : 'text-[var(--ag-muted)]'}`}>{nombre}</span>
       </div>
       {d.activo ? (
         <div className="flex flex-wrap items-center gap-[10px]">

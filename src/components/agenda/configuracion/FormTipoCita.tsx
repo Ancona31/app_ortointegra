@@ -36,7 +36,7 @@ interface Props {
 
 const CAMPO = CAMPO_NUEVO
 /** Etiqueta encima de un campo (`.rp-campo` de la reserva: 13,5 px · 600). */
-const ETIQUETA = 'flex flex-col gap-[6px] text-[13.5px] font-semibold text-[var(--ag-text)]'
+const ETIQUETA = 'flex flex-col gap-[6px] text-[13.5px] sm:text-[13px] font-semibold text-[var(--ag-text)]'
 
 export default function FormTipoCita({ inicial, medicos, textoBoton, onGuardar, onCancelar }: Props) {
   const id = useId()

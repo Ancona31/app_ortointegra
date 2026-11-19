@@ -17,7 +17,7 @@
  */
 import { useId, useState } from 'react'
 import Interruptor from '@/components/agenda/configuracion/Interruptor'
-import { AYUDA, BLOQUE, BOTON_CHICO, CAMPO_NUEVO, ERROR, ETIQUETA, SOLO_ADMIN, TARJETA, TITULO_BLOQUE } from '@/components/agenda/configuracion/estilosConfig'
+import { AVISO_SOLO_ADMIN, AYUDA, BLOQUE, BOTON_CHICO, CAMPO_NUEVO, ERROR, ETIQUETA, SOLO_ADMIN, TARJETA, TITULO_BLOQUE } from '@/components/agenda/configuracion/estilosConfig'
 import type { EstadoAvisos } from '@/components/agenda/configuracion/estadoAvisos'
 import { opcionesRecordatorio } from '@/lib/agenda/primeraVez'
 import { LIMITES_AJUSTES_AGENDA, type CampoAjusteAgenda } from '@/lib/agenda/ajustesAgenda'
@@ -31,8 +31,8 @@ function Recordatorio({ estado, puedeEditar, variante }: Props) {
   const id = useId()
   const horas = estado.textos ? Number(estado.textos.recordatorio_horas) : null
   return (
-    <div className="flex flex-col gap-[14px]">
-      <div className="flex items-start justify-between gap-[20px]">
+    <div className="flex flex-col gap-[14px] sm:gap-[12px]">
+      <div className="flex items-start justify-between gap-[20px] sm:gap-[16px]">
         <div className="flex flex-col gap-[6px]">
           <div className="flex flex-wrap items-center gap-[10px]">
             <span id={`${id}-r`} className={TITULO_BLOQUE}>Recordarle su cita al paciente</span>
@@ -65,7 +65,7 @@ function Recordatorio({ estado, puedeEditar, variante }: Props) {
 function AvisoClinica({ estado, puedeEditar }: Props) {
   const id = useId()
   return (
-    <div className="flex items-start justify-between gap-[20px]">
+    <div className="flex items-start justify-between gap-[20px] sm:gap-[16px]">
       <div className="flex flex-col gap-[6px]">
         {/* Lo reciben quienes administran la clínica: a quien no administra, la maqueta («Avisarme», «Te llega») le mentiría. */}
         <span id={`${id}-n`} className={TITULO_BLOQUE}>{puedeEditar ? 'Avisarme cuando alguien aparte cita' : 'Avisar a la clínica cuando alguien aparte cita'}</span>
@@ -111,8 +111,8 @@ function PlazosPlegados(p: Props) {
   const abierto = pedido || p.estado.invalido !== null
   const t = p.estado.textos
   return (
-    <div className="flex flex-col gap-[14px]">
-      <div className="flex items-start justify-between gap-[20px]">
+    <div className="flex flex-col gap-[14px] sm:gap-[12px]">
+      <div className="flex items-start justify-between gap-[20px] sm:gap-[16px]">
         <div className="flex flex-col gap-[6px]">
           <span className={TITULO_BLOQUE}>Hasta cuándo pueden apartar</span>
           <span className={AYUDA}>
@@ -127,9 +127,9 @@ function PlazosPlegados(p: Props) {
         )}
       </div>
       {abierto && (
-        <div className="flex flex-col gap-[12px] rounded-[12px] bg-[var(--ag-surface-sunken)] p-[16px]">
+        <div className="flex flex-col gap-[12px] rounded-[12px] bg-[var(--ag-surface-sunken)] p-[16px] sm:p-[14px]">
           <Campos {...p} />
-          <p className="m-0 text-[13.5px] text-[var(--ag-ink-600)]">Esto cambia para todos los médicos de la clínica.</p>
+          <p className="m-0 text-[13.5px] sm:text-[13px] text-[var(--ag-ink-600)]">Esto cambia para todos los médicos de la clínica.</p>
         </div>
       )}
     </div>
@@ -152,16 +152,17 @@ export default function BloquesAvisos(p: Props) {
   if (p.variante === 'funnel') {
     return (
       <>
-        <div className={`${TARJETA} gap-[14px] px-[24px] py-[22px]`}><Recordatorio {...p} /></div>
-        <div className={`${TARJETA} px-[24px] py-[22px]`}><AvisoClinica {...p} /></div>
-        <div className={`${TARJETA} gap-[14px] px-[24px] py-[22px]`}><PlazosPlegados {...p} /></div>
-        {!p.puedeEditar && <p data-solo-admin className={`m-0 ${AYUDA}`}>{SOLO_ADMIN}</p>}
+        {/* Tanda M (punto 15): el aviso, al inicio y no al final, como en la pestaña. */}
+        {!p.puedeEditar && <p data-solo-admin className={AVISO_SOLO_ADMIN}>{SOLO_ADMIN}</p>}
+        <div className={`${TARJETA} gap-[14px] sm:gap-[12px] px-[24px] sm:px-[20px] py-[22px] sm:py-[18px]`}><Recordatorio {...p} /></div>
+        <div className={`${TARJETA} px-[24px] sm:px-[20px] py-[22px] sm:py-[18px]`}><AvisoClinica {...p} /></div>
+        <div className={`${TARJETA} gap-[14px] sm:gap-[12px] px-[24px] sm:px-[20px] py-[22px] sm:py-[18px]`}><PlazosPlegados {...p} /></div>
       </>
     )
   }
   return (
     <>
-      {!p.puedeEditar && <p data-solo-admin className={`m-0 ${AYUDA}`}>{SOLO_ADMIN}</p>}
+      {!p.puedeEditar && <p data-solo-admin className={AVISO_SOLO_ADMIN}>{SOLO_ADMIN}</p>}
       <div className={BLOQUE}><Recordatorio {...p} /></div>
       <div className={BLOQUE}><AvisoClinica {...p} /></div>
       <div className={BLOQUE}><PlazosAbiertos {...p} /></div>

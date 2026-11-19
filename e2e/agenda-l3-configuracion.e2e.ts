@@ -13,10 +13,13 @@ import { aprobarAviso, emitirEnlace } from './reservaPublicaAyudas'
  *        lo que su rol puede hacer; y NINGÚN permiso cambia: lo que hoy da 403/404 a la invitada y a la
  *        secretaria lo sigue dando.
  * Corre en los dos proyectos (teléfono y escritorio). Lo que crea lo deshace (`sinPendientesAgenda`).
+ *
+ * Tanda M (M2): en computadora la escala es la del punto 2 (h1 18, controles de 40 px; ver
+ * `agenda-m2-configuracion`), y la leyenda dice «Solo el médico administrador…» y va donde dice el punto 15.
  */
 
 const RUTA = '/agenda/configuracion'
-const LEYENDA = 'Solo el administrador de la clínica puede cambiar estas opciones.'
+const LEYENDA = 'Solo el médico administrador puede cambiar estas opciones.'
 /** Los tamaños de letra de `agendaPublica.css` que usa la configuración (ver `notas_l3.md`, escala). */
 const ESCALA = [11, 13, 13.5, 14, 15, 16, 18, 20]
 const PESTANAS_MEDICO = ['Tu enlace', 'Cuándo das consulta', 'Tu consulta', 'Avisos', 'Más opciones']
@@ -37,11 +40,13 @@ interface Medida { fuera: string[]; chicos: string[]; h1: number | null }
  * 44 × 44 (salvo un enlace dentro de una frase) y el tamaño del `h1`. Los interruptores (52 × 30 a la
  * vista) cuentan por su área de toque: el punto 6 px por encima y por debajo sigue siendo el interruptor.
  */
-async function medir(page: Page): Promise<Medida> {
+async function medir(page: Page, proyecto: string): Promise<Medida> {
+  // Tanda M (punto 2): en computadora los controles miden 40 y el interruptor toca 5 px por encima y por debajo.
+  const [minimo, margen] = proyecto === 'telefono' ? [43.5, 6] : [39.5, 4] as const
   // Que termine la entrada del paso o de la pestaña: a media animación las cajas aún están escaladas.
   await page.evaluate(() => Promise.all(document.getAnimations()
     .filter(a => a.effect?.getTiming().iterations !== Infinity).map(a => a.finished.catch(() => undefined))))
-  return page.evaluate((escala) => {
+  return page.evaluate(([escala, minimo, margen]) => {
     const fuera: string[] = []
     const chicos: string[] = []
     const texto = (el: Element) => (el.textContent ?? '').trim().slice(0, 40)
@@ -57,16 +62,16 @@ async function medir(page: Page): Promise<Medida> {
         el.scrollIntoView({ block: 'center' })
         const v = el.getBoundingClientRect()
         const x = v.left + v.width / 2
-        const toca = [v.top - 6, v.bottom + 6].every(y => document.elementFromPoint(x, y)?.closest('[role="switch"]') === el)
+        const toca = [v.top - margen, v.bottom + margen].every(y => document.elementFromPoint(x, y)?.closest('[role="switch"]') === el)
         if (!toca) chicos.push(`interruptor ${v.width}×${v.height}`)
       } else if (el.matches('button, a[href], select, textarea, input:not([type="radio"]):not([type="checkbox"]), [role="tab"]')
-        && !(el.tagName === 'A' && cs.display === 'inline') && (r.height < 43.5 || r.width < 43.5)) {
+        && !(el.tagName === 'A' && cs.display === 'inline') && (r.height < minimo || r.width < minimo)) {
         chicos.push(`${el.tagName.toLowerCase()} ${Math.round(r.width)}×${Math.round(r.height)} «${texto(el) || el.getAttribute('aria-label')}»`)
       }
     }
     const h1 = document.querySelector('main h1')
     return { fuera, chicos, h1: h1 ? parseFloat(getComputedStyle(h1).fontSize) : null }
-  }, ESCALA)
+  }, [ESCALA, minimo, margen] as const)
 }
 
 async function medirTodo(page: Page, pestanas: readonly string[], proyecto: string): Promise<void> {
@@ -76,10 +81,10 @@ async function medirTodo(page: Page, pestanas: readonly string[], proyecto: stri
     await page.waitForLoadState('networkidle')
     const plegado = page.locator('[role="tabpanel"]:visible button[aria-expanded="false"]')
     if (await plegado.count()) await plegado.first().click()
-    const m = await medir(page)
+    const m = await medir(page, proyecto)
     expect(m.fuera, `${nombre}: letra fuera de la escala`).toEqual([])
-    expect(m.chicos, `${nombre}: áreas de toque de menos de 44 px`).toEqual([])
-    expect(m.h1, `${nombre}: el título de la página`).toBe(proyecto === 'telefono' ? 18 : 20)
+    expect(m.chicos, `${nombre}: áreas de toque de menos de 44 px (40 en computadora)`).toEqual([])
+    expect(m.h1, `${nombre}: el título de la página`).toBe(18)
   }
 }
 
@@ -96,7 +101,7 @@ async function funnelEn(page: Page, paso: number): Promise<void> {
 test.describe('el administrador', () => {
   test.use({ storageState: SESION.adminA })
 
-  test('12 · las cinco pestañas en la escala de la reserva, con áreas de 44 px', async ({ page }, info) => {
+  test('12 · las cinco pestañas en la escala de la reserva, con áreas de 44 px (40 en computadora)', async ({ page }, info) => {
     limpiezas.push(sinPendientesAgenda(CORREO.adminA))
     await medirTodo(page, PESTANAS_MEDICO, info.project.name)
   })
@@ -124,37 +129,42 @@ test.describe('la invitada', () => {
   test('12 · las pestañas y los pasos del funnel en la escala de la reserva', async ({ page }, info) => {
     for (const paso of [1, 2, 3]) {
       await funnelEn(page, paso)
-      const m = await medir(page)
+      const m = await medir(page, info.project.name)
       expect(m.fuera, `paso ${paso}`).toEqual([])
       expect(m.chicos, `paso ${paso}`).toEqual([])
-      expect(m.h1, `paso ${paso}`).toBe(info.project.name === 'telefono' ? 18 : 20)
+      expect(m.h1, `paso ${paso}`).toBe(18)
     }
     await page.evaluate(() => window.localStorage.clear())
     limpiezas.push(sinPendientesAgenda(CORREO.medicoA))
     await medirTodo(page, PESTANAS_MEDICO, info.project.name)
   })
 
-  test('16 · la leyenda, una vez en el horario de la clínica y en los avisos; en el funnel, en el paso 1 y en el 3', async ({ page }) => {
+  test('16 · la leyenda, una vez en el horario de la clínica, en los avisos y sobre «Empezar de nuevo»; en el funnel, en el paso 1 y en el 3', async ({ page }) => {
     await funnelEn(page, 1)
     await expect(page.locator('[data-solo-admin]')).toHaveCount(1)
-    await expect(page.locator('[data-solo-admin]')).toHaveText(new RegExp(`${LEYENDA.replace('.', '\\.')}$`))
+    await expect(page.locator('[data-solo-admin]')).toHaveText(LEYENDA)
     await funnelEn(page, 3)
     await expect(page.locator('[data-solo-admin]')).toHaveCount(1)
     await expect(page.locator('[data-solo-admin]')).toHaveText(LEYENDA)
     await page.evaluate(() => window.localStorage.clear())
     limpiezas.push(sinPendientesAgenda(CORREO.medicoA))
-    await leyendaEnPestanas(page, 'Cuándo das consulta')
+    await leyendaEnPestanas(page, 'Cuándo das consulta', true)
   })
 })
 
-/** En las pestañas: una leyenda en la tarjeta del horario de la clínica, una en «Avisos» y ninguna más. */
-async function leyendaEnPestanas(page: Page, horario: string): Promise<void> {
+/**
+ * En las pestañas: la leyenda una vez en el horario (en la tarjeta de la clínica para la invitada, al inicio de
+ * la pestaña para la secretaria: tanda M, punto 15), una en «Avisos» y una sobre «Empezar de nuevo». La de
+ * «Tipos de cita» (secretaria) y la de los tipos de los demás (invitada) las cuenta `agenda-m2-configuracion`.
+ */
+async function leyendaEnPestanas(page: Page, horario: string, enLaTarjeta: boolean): Promise<void> {
   await page.goto(RUTA)
   await pestanaConfig(page, horario)
-  await expect(page.locator('[data-horario-clinica] [data-solo-admin]')).toHaveText(LEYENDA)
+  await expect(page.locator('#config-panel-horario [data-solo-admin]')).toHaveText(LEYENDA)
+  await expect(page.locator('[data-horario-clinica] [data-solo-admin]')).toHaveCount(enLaTarjeta ? 1 : 0)
   await pestanaConfig(page, 'Avisos')
   await expect(page.locator('#config-panel-avisos [data-solo-admin]')).toHaveText(LEYENDA)
-  await expect(page.locator('[data-solo-admin]')).toHaveCount(2)
+  await expect(page.locator('#config-panel-mas [data-solo-admin]')).toHaveText(LEYENDA)
   await expect(page.getByText('Lo cambia quien administra la clínica.')).toHaveCount(0)
   await expect(page.getByText('Estos avisos los cambia quien administra la clínica.')).toHaveCount(0)
 }
@@ -167,8 +177,8 @@ test.describe('la secretaria', () => {
     await medirTodo(page, PESTANAS_SECRETARIA, info.project.name)
   })
 
-  test('16 · la leyenda, una vez en el horario de la clínica y una en los avisos', async ({ page }) => {
-    await leyendaEnPestanas(page, 'Cuándo dan consulta')
+  test('16 · la leyenda, una vez al inicio del horario, una en los avisos y una sobre «Empezar de nuevo»', async ({ page }) => {
+    await leyendaEnPestanas(page, 'Cuándo dan consulta', false)
   })
 
   test('17 · «Completar» del enlace de la invitada no le ofrece contestar la duración (sólo el médico o el administrador)', async ({ page, browser }) => {

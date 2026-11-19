@@ -24,8 +24,8 @@ const OPCIONES = [{ min: 30, texto: '30 min' }, { min: 45, texto: '45 min' }, { 
 
 /** Una opción: botón de dos estados hecho con el radio (marcado = borde y tinta de marca). En reposo,
  *  borde y fondo de botón (tanda H, punto 7). */
-const OPCION = 'inline-flex min-h-[44px] min-w-[4.5rem] cursor-pointer items-center justify-center rounded-[10px] border border-[var(--ag-control-border)] '
-  + 'bg-[var(--ag-surface)] px-[14px] text-[15px] font-semibold text-[var(--ag-ink)] '
+const OPCION = 'inline-flex min-h-[44px] sm:min-h-[40px] min-w-[4.5rem] cursor-pointer items-center justify-center rounded-[10px] border border-[var(--ag-control-border)] '
+  + 'bg-[var(--ag-surface)] px-[14px] sm:px-[12px] text-[15px] sm:text-[13px] font-semibold text-[var(--ag-ink)] '
   + 'has-[:checked]:border-[var(--ag-brand-secondary)] has-[:checked]:bg-[var(--ag-primary-bg-faint)] has-[:checked]:text-[var(--ag-brand-legible)] '
   + 'has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-[var(--ag-brand-secondary)]'
 
@@ -67,7 +67,7 @@ type Eleccion = number | 'otra' | null
 function OpcionesDuracion(p: { nombre: string; pregunta: string; eleccion: Eleccion; elegir: (v: number | 'otra') => void }) {
   return (
     <fieldset className="flex flex-col gap-[var(--ag-2)]">
-      <legend className="mb-[8px] text-[13.5px] font-semibold text-[var(--ag-text)]">{p.pregunta}</legend>
+      <legend className="mb-[8px] text-[13.5px] sm:text-[13px] font-semibold text-[var(--ag-text)]">{p.pregunta}</legend>
       <div className="flex flex-wrap gap-[var(--ag-2)]">
         {[...OPCIONES.map(o => ({ v: o.min as number | 'otra', texto: o.texto })), { v: 'otra' as const, texto: 'Otra' }].map(o => (
           <label key={String(o.v)} className={OPCION}>
