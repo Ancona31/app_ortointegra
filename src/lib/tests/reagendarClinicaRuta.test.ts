@@ -14,7 +14,8 @@ const CLINICA = '00000000-0000-4000-8000-0000000000c1'
 const PERFIL = '00000000-0000-4000-8000-0000000000b1'
 
 interface FilaCita { id: string; medico_id: string | null; status: string; paciente_id: string | null; reserva_canal: string | null
-  reserva_correo: string | null; google_event_id: string | null; gcal_etag: string | null; pacientes: { email: string | null } | null }
+  reserva_correo: string | null; reserva_nombre?: string | null; google_event_id: string | null; gcal_etag: string | null
+  pacientes: { email: string | null; nombre?: string | null } | null }
 
 const h = vi.hoisted(() => ({
   entrada: true,
@@ -148,8 +149,16 @@ describe('POST /api/appointments/[id]/reagendar (I, punto 9)', () => {
     expect(await r.json()).toEqual({ updated_at: '2031-01-01T00:00:00Z', correo: 'enviado' })
     expect(h.rpc).toEqual([{ clinicaId: CLINICA, actorId: PERFIL, citaId: ID, consultorioId: ID,
       inicio: CUERPO.start_time, fin: CUERPO.end_time, esperado: CUERPO.updated_at }])
-    expect(h.correos).toEqual([{ cambio: true }])
+    expect(h.correos).toEqual([{ cambio: true, nombre: null }])
     expect(h.google).toBe(1)
+  })
+
+  it('integración M: el aviso de cambio saluda con el nombre del paciente ligado y, si no, el de la reserva', async () => {
+    h.cita = { ...POR_ENLACE, reserva_nombre: '  Ana Pech ' }
+    await ruta.POST(req(CUERPO), ctx())
+    h.cita = { ...POR_ENLACE, paciente_id: ID, reserva_nombre: 'Quien reservó', pacientes: { email: 'p@x.mx', nombre: 'Ana' } }
+    await ruta.POST(req(CUERPO), ctx())
+    expect(h.correos).toEqual([{ cambio: true, nombre: 'Ana Pech' }, { cambio: true, nombre: 'Ana' }])
   })
 
   it('sin correo (único sin correo y sin paciente con correo): reagenda y dice sin_correo, sin intentar el envío', async () => {

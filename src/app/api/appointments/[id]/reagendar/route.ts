@@ -59,7 +59,9 @@ const CitaSchema = z.object({
   reserva_correo: z.string().nullable(),
   google_event_id: z.string().nullable(),
   gcal_etag: z.string().nullable(),
-  pacientes: z.object({ email: z.string().nullable() }).nullable(),
+  /* Integración M: el nombre del saludo del aviso de cambio. Opcionales, como en `/api/agenda/correo`. */
+  reserva_nombre: z.string().nullable().optional(),
+  pacientes: z.object({ email: z.string().nullable(), nombre: z.string().nullable().optional() }).nullable(),
 })
 type CitaReagendar = z.infer<typeof CitaSchema>
 
@@ -70,7 +72,7 @@ function json(cuerpo: Record<string, unknown>, status = 200): NextResponse {
 /** La cita con la RLS de quien pide. null si no existe o no la deja ver; lanza si la lectura falla. */
 async function leerCita(supabase: ClienteSesion, clinicaId: string, citaId: string): Promise<CitaReagendar | null> {
   const { data, error } = await supabase.from('appointments')
-    .select('id, medico_id, status, paciente_id, reserva_canal, reserva_correo, google_event_id, gcal_etag, pacientes(email)')
+    .select('id, medico_id, status, paciente_id, reserva_canal, reserva_correo, reserva_nombre, google_event_id, gcal_etag, pacientes(email, nombre)')
     .eq('id', citaId).eq('clinica_id', clinicaId).maybeSingle()
   if (error) throw new Error(`cita para reagendar sin leer: ${error.code ?? ''}`)
   if (!data) return null
@@ -94,7 +96,9 @@ const MENSAJES: Readonly<Record<Exclude<ResultadoReagendar, 'ok'>, { status: num
 /** El aviso al paciente: correo si tiene; si no, `sin_correo` (la pantalla ofrece WhatsApp). Nunca lanza. */
 async function avisarAlPaciente(clinicaId: string, cita: CitaReagendar, perfilId: string): Promise<'enviado' | 'sin_correo' | 'no_enviado'> {
   if (!correoParaConfirmacion(cita.pacientes?.email, cita.reserva_correo)) return 'sin_correo'
-  const r = await enviarConfirmacionCita(clinicaId, cita.id, perfilId, { cambio: true })
+  // Integración M: el saludo con la misma regla que `/api/agenda/correo` (el paciente ligado y, si no, la reserva).
+  const nombre = cita.pacientes?.nombre?.trim() || cita.reserva_nombre?.trim() || null
+  const r = await enviarConfirmacionCita(clinicaId, cita.id, perfilId, { cambio: true, nombre })
   if (r.tipo !== 'enviado') return 'no_enviado'
   await logAudit({ userId: perfilId, accion: 'enviar_confirmacion_cita', tabla: 'appointments', registroId: cita.id,
     descripcion: 'Aviso de cambio de la cita por correo (reagendar)' })

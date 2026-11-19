@@ -19,8 +19,10 @@
  * tipo de cita, ni especialidad. Sólo fecha, hora (en la zona del consultorio),
  * médico, consultorio, su dirección y su teléfono, y el enlace. El asunto no
  * lleva ni el médico. El nombre del paciente sólo en el saludo de la
- * CONFIRMACIÓN (tanda L, punto 15) y nunca en el asunto; el recordatorio y el
- * aviso de cambio saludan «Hola:» (no tienen el nombre a mano).
+ * CONFIRMACIÓN (tanda L, punto 15), del RECORDATORIO y del AVISO DE CAMBIO
+ * (integración M, decisión de Angel), y nunca en el asunto. Los tres, con la
+ * misma regla (`saludoDe`) y la misma fuente: el nombre del paciente ligado y,
+ * si no, el que tecleó al reservar; sin nombre, «Hola:».
  *
  * ⚠️ DETERMINISTA: la misma entrada da exactamente el mismo correo, sin «ahora»
  * en ninguna parte (Resend exige el MISMO cuerpo con la misma Idempotency-Key).
@@ -129,8 +131,8 @@ function correoDeCita(d: DatosRecordatorio, p: PalabrasCorreo, saludo = 'Hola:')
 const PENDIENTE = { texto: 'Pendiente de confirmar' }
 const CONFIRMADA = { texto: 'Cita confirmada', hecho: true }
 
-/** El recordatorio N horas antes. */
-export function correoRecordatorio(d: DatosRecordatorio): CorreoRecordatorio {
+/** El recordatorio N horas antes. Con `nombre`, «Hola, <nombre>:» (integración M); sin él, «Hola:». */
+export function correoRecordatorio(d: DatosRecordatorio, nombre: string | null = null): CorreoRecordatorio {
   return correoDeCita(d, {
     asunto: fecha => `Recordatorio: tu cita del ${fecha}`, titulo: 'Recordatorio de tu cita',
     pildora: d.confirmada ? CONFIRMADA : PENDIENTE,
@@ -138,7 +140,7 @@ export function correoRecordatorio(d: DatosRecordatorio): CorreoRecordatorio {
       ? 'Te recordamos tu cita próxima; ya está confirmada. Aquí tienes los datos para que la tengas a la mano.'
       : 'Te recordamos tu cita próxima. Por favor confírmanos si vas a asistir; solo toma un clic.',
     vista: cuando => d.confirmada ? `Recordatorio: tu cita del ${cuando}.` : `Confirma tu cita del ${cuando}.`,
-  })
+  }, saludoDe(nombre))
 }
 
 /**
@@ -164,9 +166,10 @@ export function correoConfirmacion(d: DatosRecordatorio, nombre: string | null =
 /**
  * Tanda I, punto 9 · El AVISO DE CAMBIO cuando la clínica reagenda una cita
  * reservada por enlace (`POST /api/appointments/[id]/reagendar`): la fecha y
- * la hora NUEVAS, con sus botones. Determinista.
+ * la hora NUEVAS, con sus botones. Determinista. Con `nombre`, «Hola, <nombre>:»
+ * (integración M); sin él, «Hola:».
  */
-export function correoCambio(d: DatosRecordatorio): CorreoRecordatorio {
+export function correoCambio(d: DatosRecordatorio, nombre: string | null = null): CorreoRecordatorio {
   return correoDeCita(d, {
     asunto: fecha => `Cambio en tu cita: ahora es el ${fecha}`, titulo: 'Tu cita cambió',
     pildora: { texto: 'Cita reagendada' },
@@ -174,5 +177,5 @@ export function correoCambio(d: DatosRecordatorio): CorreoRecordatorio {
       ? 'Tu cita cambió. Esta es la nueva fecha y hora.'
       : 'Tu cita cambió. Esta es la nueva fecha y hora; por favor confírmanos si vas a asistir.',
     vista: cuando => `Tu cita cambió: ahora es el ${cuando}.`,
-  })
+  }, saludoDe(nombre))
 }

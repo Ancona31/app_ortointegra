@@ -119,6 +119,10 @@ export function opcion(elegida: boolean): string {
  * Una vez por sitio: si va al inicio de la pestaña, no se repite dentro.
  */
 export const SOLO_ADMIN = 'Solo el médico administrador puede cambiar estas opciones.'
+/* Integración M (decisión de Angel): a la secretaria, en dos pestañas el aviso dice quién cambia de verdad
+   (el horario de cada consultorio lo cambia su dueño; los tipos de un médico, ese médico o el administrador). */
+export const SOLO_ADMIN_HORARIO = 'Cada médico cambia el horario de sus consultorios.'
+export const SOLO_ADMIN_TIPOS = 'Cada médico cambia sus tipos de cita.'
 
 /** El aviso de `SOLO_ADMIN`: una caja azul claro con la letra en seminegrita, para que se vea (punto 15). */
 export const AVISO_SOLO_ADMIN =

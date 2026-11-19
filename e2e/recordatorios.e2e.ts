@@ -108,6 +108,11 @@ test('una cita a +5 h con paciente con correo: UN correo con el enlace y sin nad
   const correo = await esperarCorreo(f.correo, ASUNTO, previos)
   expect(correo.texto).toMatch(/\/confirmar\/[A-Za-z0-9_-]{22}/)
   expect(correo.texto).toContain('Consultorio E4')
+  // Integración M (decisión de Angel): saluda por el nombre del paciente ligado (cita_nombre_saludo).
+  const nombre = sqlLocal(`select btrim(nombre) from public.pacientes where id = :'id'`, { id: f.pacienteId })
+  expect(nombre).not.toBe('')
+  expect(correo.texto).toContain(`Hola, ${nombre.replace(/\s+/g, ' ')}:`)
+  expect(correo.asunto).not.toContain(nombre)
   for (const prohibido of ['TITULO CLINICO', 'NOTA CLINICA', 'Consulta:']) {
     expect(correo.texto).not.toContain(prohibido)
     expect(correo.html).not.toContain(prohibido)

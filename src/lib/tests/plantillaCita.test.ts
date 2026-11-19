@@ -169,6 +169,19 @@ describe('forma del correo', () => {
       expect(html(), maqueta).not.toContain(maqueta)
     }
   })
+  it('integración M: el pie «Enviado con Spinus» contrasta al menos 4,5:1 con el fondo de la página', () => {
+    const h = htmlCorreoCita(armado({}))
+    const fondo = /<body[^>]*background-color:(#[0-9a-f]{6})/i.exec(h)?.[1] ?? /bgcolor="(#[0-9a-f]{6})"/i.exec(h)?.[1] ?? ''
+    const pie = /color:(#[0-9a-f]{6})">[^<]*<br>Enviado con/i.exec(h)?.[1] ?? ''
+    expect(fondo).toBe('#eef1f5')
+    expect(pie).toBe('#52627a')
+    const luz = (x: string): number => {
+      const [r, g, b] = [1, 3, 5].map(i => parseInt(x.slice(i, i + 2), 16) / 255).map(c => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4))
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b
+    }
+    const [a1, b1] = [luz(fondo), luz(pie)].sort((x, y) => y - x)
+    expect((a1 + 0.05) / (b1 + 0.05)).toBeGreaterThanOrEqual(4.5)
+  })
   it('los botones son celdas con fondo y un enlace ancho; el secundario, blanco con borde', () => {
     const c = htmlCorreoCita(armado({ bloques: [{ tipo: 'botones', botones: [
       { texto: 'Sí', url: 'https://x.mx/a' }, { texto: 'No', url: 'https://x.mx/b', secundario: true },

@@ -190,6 +190,8 @@ test('Reagendar con correo: confirmación explícita, la cita se mueve y el paci
   expect(sqlLocal(`select count(*) from public.audit_log where accion = 'cita_reagendada_clinica' and registro_id = :'id'`, { id: c.citaId })).toBe('1')
   const aviso = await esperarCorreo(correo, 'Cambio en tu cita')
   expect(aviso.texto).toContain('Tu cita cambió')
+  // Integración M (decisión de Angel): el aviso de cambio saluda por el nombre de la reserva, como el comprobante.
+  expect(aviso.texto).toContain(`Hola, ${NOMBRE}:`)
   expect(aviso.texto).toContain('18:00')
   expect(aviso.texto).toMatch(/\/confirmar\/[A-Za-z0-9_-]+/)
   expect(aviso.texto.trim().endsWith('Enviado con Spinus')).toBe(true)

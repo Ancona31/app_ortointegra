@@ -247,7 +247,9 @@ export function htmlCorreoCita(c: CorreoArmado): string {
     + cabecera(c.marca) + c.bloques.map(bloqueHtml).join('')
     + '<tr><td style="height:36px;font-size:0;line-height:0">&nbsp;</td></tr></table>'
   const pie = `<table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;font-family:${FUENTE}">`
-    + `<tr><td align="center" style="padding:20px 24px 0 24px;font-size:12px;line-height:18px;color:${C.tenue}">`
+    // Integración M (decisión de Angel): el pie, con --ag-ink-600 y no --ag-muted. Sobre el fondo de la página
+    // (#eef1f5), --ag-muted daba 3,09:1; --ag-ink-600, 5,47:1 (AA pide 4,5:1 para letra de 12 px).
+    + `<tr><td align="center" style="padding:20px 24px 0 24px;font-size:12px;line-height:18px;color:${C.suave}">`
     + `${PIE_AUTOMATICO}<br>Enviado con <strong style="color:${C.navy}">Spinus</strong></td></tr></table>`
   return '<!doctype html><html lang="es"><head><meta charset="utf-8">'
     + '<meta name="viewport" content="width=device-width,initial-scale=1"><meta name="x-apple-disable-message-reformatting">'

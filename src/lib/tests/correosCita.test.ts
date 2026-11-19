@@ -87,12 +87,22 @@ describe('la píldora dice el estado', () => {
 })
 
 describe('reglas de los correos (punto 14)', () => {
-  it('saluda por el nombre sólo la confirmación; sin nombre (o vacío, o desmedido), «Hola:»', () => {
+  it('la confirmación saluda por el nombre; sin nombre (o vacío, o desmedido), «Hola:»', () => {
     const c = correoConfirmacion(BASE, 'Ana Sofía')
     expect(c.html).toMatch(/<h1[^>]*>Hola, Ana Sofía:<\/h1>/)
     expect(c.asunto).not.toContain('Ana')
     for (const n of [null, '', '   ', 'x'.repeat(121)]) expect(correoConfirmacion(BASE, n).html).toMatch(/<h1[^>]*>Hola:<\/h1>/)
     for (const otro of [correoRecordatorio(BASE), correoCambio(BASE)]) expect(otro.html).toMatch(/<h1[^>]*>Hola:<\/h1>/)
+  })
+  it('integración M: el recordatorio y el aviso de cambio también saludan por el nombre, con la misma regla', () => {
+    for (const armar of [(n: string | null) => correoRecordatorio(BASE, n), (n: string | null) => correoCambio(BASE, n),
+      (n: string | null) => correoRecordatorio({ ...BASE, confirmada: true }, n)]) {
+      const c = armar('  Ana   Sofía ')
+      expect(c.html).toMatch(/<h1[^>]*>Hola, Ana Sofía:<\/h1>/)
+      expect(c.texto).toContain('Hola, Ana Sofía:')
+      expect(c.asunto).not.toContain('Ana')
+      for (const n of [null, '', '   ', 'x'.repeat(121)]) expect(armar(n).html).toMatch(/<h1[^>]*>Hola:<\/h1>/)
+    }
   })
   it('el nombre va escapado en el HTML; en el texto, tal cual con los espacios juntados', () => {
     const c = correoConfirmacion(BASE, '  <b>Ana</b>\n & "Co" ')

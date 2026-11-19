@@ -23,7 +23,7 @@ import DialogoHorario from '@/components/agenda/configuracion/DialogoHorario'
 import { nombreHuso } from '@/components/agenda/configuracion/SelectorHuso'
 import { guardarHorarioClinica, guardarHorarioConsultorio, type CambiosConsultorio } from '@/components/agenda/configuracion/accionesConfig'
 import type { Avisar } from '@/components/agenda/configuracion/estadoAvisos'
-import { AVISO_SOLO_ADMIN, AYUDA, BOTON_CHICO, PANEL, SOLO_ADMIN, SUB_PANEL, TITULO_PANEL } from '@/components/agenda/configuracion/estilosConfig'
+import { AVISO_SOLO_ADMIN, AYUDA, BOTON_CHICO, PANEL, SOLO_ADMIN, SOLO_ADMIN_HORARIO, SUB_PANEL, TITULO_PANEL } from '@/components/agenda/configuracion/estilosConfig'
 import { lineasHorario, textoHorario } from '@/lib/agenda/gruposHorario'
 import { horarioEfectivo } from '@/lib/agenda/disponibilidad'
 import type { ModoHorario } from '@/lib/agenda/primeraVez'
@@ -153,7 +153,7 @@ export default function PestanaHorario(p: Props) {
         <p className={SUB_PANEL}>Tus pacientes solo pueden pedir cita en estos días y horas.</p>
       </div>
       {/* Tanda M (punto 15): la secretaria no cambia nada de esta pestaña (`PUT /api/me/horario` 403; consultorios, 404). */}
-      {!p.esMedico && <p data-solo-admin className={AVISO_SOLO_ADMIN}>{SOLO_ADMIN}</p>}
+      {!p.esMedico && <p data-solo-admin className={AVISO_SOLO_ADMIN}>{SOLO_ADMIN_HORARIO}</p>}
       <TarjetaClinica p={p} alAbrir={() => setAbierto({ tipo: 'clinica' })} />
       {!p.consultorios || !clinica ? <p className={AYUDA}>{p.fallo ? 'No se pudieron cargar los consultorios. Recarga la página.' : 'Cargando los consultorios…'}</p>
         : p.consultorios.length === 0 ? <p className={AYUDA}>Aún no hay consultorios activos.</p>

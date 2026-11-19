@@ -160,7 +160,8 @@ test.describe('la invitada', () => {
 async function leyendaEnPestanas(page: Page, horario: string, enLaTarjeta: boolean): Promise<void> {
   await page.goto(RUTA)
   await pestanaConfig(page, horario)
-  await expect(page.locator('#config-panel-horario [data-solo-admin]')).toHaveText(LEYENDA)
+  // Integración M (decisión de Angel): a la secretaria, en el horario, «Cada médico cambia el horario de sus consultorios.».
+  await expect(page.locator('#config-panel-horario [data-solo-admin]')).toHaveText(enLaTarjeta ? LEYENDA : 'Cada médico cambia el horario de sus consultorios.')
   await expect(page.locator('[data-horario-clinica] [data-solo-admin]')).toHaveCount(enLaTarjeta ? 1 : 0)
   await pestanaConfig(page, 'Avisos')
   await expect(page.locator('#config-panel-avisos [data-solo-admin]')).toHaveText(LEYENDA)

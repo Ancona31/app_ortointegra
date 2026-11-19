@@ -63,8 +63,8 @@ async function mandar(clinicaId: string, citaId: string, perfilId: string, t: To
       medico: t.r_medico ? componerNombreMedicoCompleto(t.r_medico) : '',
       consultorio: t.r_consultorio, confirmada: t.r_estado === 'confirmed', url: enlace.url,
     }
-    // Tanda L (punto 15): sólo la confirmación saluda por el nombre; el aviso de cambio, como antes.
-    correo = o.cambio === true ? correoCambio(datos) : correoConfirmacion(datos, o.nombre ?? null)
+    // Tanda L (punto 15) e integración M: la confirmación y el aviso de cambio saludan por el nombre.
+    correo = o.cambio === true ? correoCambio(datos, o.nombre ?? null) : correoConfirmacion(datos, o.nombre ?? null)
   } catch {
     return { estado: 'omitido', motivo: 'plantilla' }
   }

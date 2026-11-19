@@ -22,7 +22,7 @@ import DuracionEnConsultorio from '@/components/agenda/configuracion/DuracionEnC
 import FormTipoCita, { type DatosTipoCita } from '@/components/agenda/configuracion/FormTipoCita'
 import { crearTipo, editarTipo, guardarDuracion } from '@/components/agenda/configuracion/accionesConfig'
 import type { Avisar } from '@/components/agenda/configuracion/estadoAvisos'
-import { AVISO_SOLO_ADMIN, AYUDA, BLOQUE, BOTON_TEXTO, BOTON_TEXTO_ROJO, CAMPO_NUEVO, ERROR, FILA_GRIS, opcion, PANEL, SOLO_ADMIN, SUB_PANEL, TITULO_BLOQUE, TITULO_PANEL } from '@/components/agenda/configuracion/estilosConfig'
+import { AVISO_SOLO_ADMIN, AYUDA, BLOQUE, BOTON_TEXTO, BOTON_TEXTO_ROJO, CAMPO_NUEVO, ERROR, FILA_GRIS, opcion, PANEL, SOLO_ADMIN, SOLO_ADMIN_TIPOS, SUB_PANEL, TITULO_BLOQUE, TITULO_PANEL } from '@/components/agenda/configuracion/estilosConfig'
 import { DURACIONES } from '@/components/agenda/configuracion/PasoDuracion'
 import { componerNombreMedicoCompleto } from '@/lib/nombreMedico'
 import type { TipoCita } from '@/lib/agenda/tiposCita'
@@ -127,7 +127,7 @@ export default function PestanaConsulta(p: Props) {
         {!p.esMedico && <p className={SUB_PANEL}>La duración de la consulta de cada médico y los demás tipos de cita de la clínica.</p>}
       </div>
       {/* Tanda M (punto 15): la secretaria no cambia ningún tipo (`/api/agenda/tipos-cita`: 403). */}
-      {!p.esMedico && <p data-solo-admin className={AVISO_SOLO_ADMIN}>{SOLO_ADMIN}</p>}
+      {!p.esMedico && <p data-solo-admin className={AVISO_SOLO_ADMIN}>{SOLO_ADMIN_TIPOS}</p>}
       {!p.tipos ? <p className={AYUDA}>No se pudieron leer los tipos de cita. Recarga la página.</p> : (
         <>
           {p.esMedico && <MiDuracion p={p} mia={mia} />}

@@ -120,17 +120,32 @@ async function marcar(clinicaId: string, envioId: string, testigo: string, c: Ci
   }))
 }
 
+/**
+ * Integración M: el nombre del saludo (`cita_nombre_saludo`, migración
+ * `20261125180000`: el paciente ligado y, si no, la reserva). Nunca lanza: sin
+ * la función o con cualquier fallo, null y el recordatorio sale con «Hola:».
+ */
+async function nombreDelSaludo(clinicaId: string, citaId: string): Promise<string | null> {
+  try {
+    const n = z.string().nullable().safeParse(await llamar('cita_nombre_saludo', { p_clinica_id: clinicaId, p_cita_id: citaId }))
+    return n.success ? n.data : null
+  } catch {
+    return null
+  }
+}
+
 /** Compone y manda UN recordatorio ya tomado. Devuelve cómo cerrarlo. */
 async function mandar(clinicaId: string, citaId: string, t: Toma): Promise<Cierre> {
   const enlace = await emitirEnlaceConfirmacion(clinicaId, citaId, null)
   if (!enlace) return { estado: 'omitido', motivo: 'sin_enlace' }
+  const nombre = await nombreDelSaludo(clinicaId, citaId)
   let correo
   try {
     correo = correoRecordatorio({
       inicio: t.r_inicio, zona: t.r_zona,
       medico: t.r_medico ? componerNombreMedicoCompleto(t.r_medico) : '',
       consultorio: t.r_consultorio, confirmada: t.r_estado === 'confirmed', url: enlace.url,
-    })
+    }, nombre)
   } catch {
     return { estado: 'omitido', motivo: 'plantilla' }
   }

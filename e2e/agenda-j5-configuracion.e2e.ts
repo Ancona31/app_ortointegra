@@ -429,8 +429,8 @@ test('15 · el administrador cambia el horario de la clínica (base y audit_log)
   await enContextoNuevo(browser, SESION.secretariaA, async (p) => {
     await p.goto(RUTA)
     await pestanaConfig(p, 'Cuándo dan consulta')
-    // Tanda M (punto 15): a la secretaria, al inicio de la pestaña, no en la tarjeta.
-    await expect(p.locator('#config-panel-horario [data-solo-admin]')).toHaveText('Solo el médico administrador puede cambiar estas opciones.')
+    // Tanda M (punto 15): a la secretaria, al inicio de la pestaña, no en la tarjeta; con su texto (integración M).
+    await expect(p.locator('#config-panel-horario [data-solo-admin]')).toHaveText('Cada médico cambia el horario de sus consultorios.')
     await expect(p.getByRole('button', { name: 'Cambiar horario de la clínica' })).toHaveCount(0)
   })
 })

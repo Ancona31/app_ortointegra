@@ -205,6 +205,22 @@ describe('GET /api/cron/recordatorios — el recorrido', () => {
     expect(marcas()[0]).toMatchObject({ p_estado: 'omitido', p_motivo: 'plantilla' })
   })
 
+  it('integración M: saluda con el nombre de cita_nombre_saludo, pedido con su clínica; sin él o si falla, «Hola:»', async () => {
+    h.responder = (rpc, args) => (rpc === 'cita_nombre_saludo' ? { data: args.p_cita_id === A1 ? 'Ana' : null, error: null } : responderNormal(rpc))
+    await GET(peticion(BUENA))
+    const saludos = h.llamadas.filter((l) => l.rpc === 'cita_nombre_saludo').map((l) => [l.args.p_clinica_id, l.args.p_cita_id])
+    expect(saludos).toEqual([[C1, A1], [C2, A2]])
+    expect(h.correos[0].texto).toContain('Hola, Ana:')
+    expect(h.correos[0].asunto).not.toContain('Ana')
+    expect(h.correos[1].texto).toContain('Hola:')
+    h.llamadas = []; h.correos = []
+    h.responder = (rpc) => (rpc === 'cita_nombre_saludo' ? { data: null, error: { code: 'PGRST202', message: 'x' } } : responderNormal(rpc))
+    await GET(peticion(BUENA))
+    expect(h.correos).toHaveLength(2)
+    expect(h.correos[0].texto).toContain('Hola:')
+    expect(marcas()[0]).toMatchObject({ p_estado: 'enviado' })
+  })
+
   it('la versión confirmada no ofrece «Confirmar»', async () => {
     h.responder = (rpc) => (rpc === 'cita_correo_tomar' ? { data: [{ ...TOMA, r_estado: 'confirmed' }], error: null } : responderNormal(rpc))
     await GET(peticion(BUENA))

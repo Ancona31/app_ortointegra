@@ -15,6 +15,9 @@ import { CORREO, SESION, interruptorAgenda, pestanaConfig, sinPendientesAgenda, 
 
 const RUTA = '/agenda/configuracion'
 const AVISO = 'Solo el médico administrador puede cambiar estas opciones.'
+/* Integración M (decisión de Angel): a la secretaria, en dos pestañas, quién cambia de verdad. */
+const AVISO_HORARIO = 'Cada médico cambia el horario de sus consultorios.'
+const AVISO_TIPOS = 'Cada médico cambia sus tipos de cita.'
 
 const limpiezas: (() => void)[] = []
 test.beforeEach(() => { interruptorAgenda('A', true) })
@@ -24,11 +27,11 @@ test.afterAll(() => { interruptorAgenda('A', false) })
 const panel = (page: Page, clave: string): Locator => page.locator(`#config-panel-${clave}`)
 
 /** El aviso es el segundo hijo del panel: va justo debajo del título de la pestaña, antes que todo lo demás. */
-async function avisoAlInicio(page: Page, clave: string): Promise<void> {
+async function avisoAlInicio(page: Page, clave: string, texto = AVISO): Promise<void> {
   const aviso = panel(page, clave).locator('[data-solo-admin]')
   await expect(aviso).toHaveCount(1)
   await expect(aviso).toBeVisible()
-  await expect(aviso).toHaveText(AVISO)
+  await expect(aviso).toHaveText(texto)
   expect(await aviso.evaluate(el => [...(el.parentElement?.children ?? [])].indexOf(el)), `${clave}: el aviso al inicio`).toBe(1)
 }
 
@@ -46,9 +49,9 @@ test.describe('15 · la secretaria', () => {
     await page.goto(RUTA)
     await pestanaConfig(page, 'Enlaces')
     await expect(panel(page, 'enlace').locator('[data-solo-admin]')).toHaveCount(0)
-    for (const [nombre, clave] of [['Cuándo dan consulta', 'horario'], ['Tipos de cita', 'consulta'], ['Avisos', 'avisos']] as const) {
+    for (const [nombre, clave, texto] of [['Cuándo dan consulta', 'horario', AVISO_HORARIO], ['Tipos de cita', 'consulta', AVISO_TIPOS], ['Avisos', 'avisos', AVISO]] as const) {
       await pestanaConfig(page, nombre)
-      await avisoAlInicio(page, clave)
+      await avisoAlInicio(page, clave, texto)
       await seVe(panel(page, clave).locator('[data-solo-admin]'))
     }
     // Una vez por pestaña: la tarjeta del horario de la clínica ya no lo repite.
