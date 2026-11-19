@@ -232,7 +232,8 @@ test('el correo del código: marca, código en grande, sin imágenes', async ({ 
   // («Enviado con Spinus»). Antes empezaba por «Spinus».
   expect(m.texto.startsWith('Spinus')).toBe(false)
   expect(m.texto.trim().endsWith('Enviado con Spinus')).toBe(true)
-  expect(m.html).toMatch(new RegExp(`font:800 32px[^>]*>${cifra}<`))
+  // M5 (punto 10): el código grande y SIN espacios (el espaciado es CSS), para que se copie entero.
+  expect(m.html).toMatch(new RegExp(`font-size:40px[^>]*letter-spacing:12px[^>]*><span style="padding-left:12px">${cifra}</span>`))
   expect(m.html.replace(/<[^>]+>/g, ' ')).toContain('Spinus')
   expect(m.html).not.toMatch(/<img/i)
 })

@@ -54,11 +54,11 @@ describe('correoComprobante', () => {
   it('fecha y hora en la zona del consultorio, médico, lugar, teléfono; sin tipo ni clínica', () => {
     const c = correoComprobante({ medico: 'Dr. X', consultorio: 'Centro', direccion: 'Calle 1', telefono: '9991234567',
       inicio: '2031-05-06T16:00:00.000Z', zona: 'America/Merida' })
-    expect(c.texto).toContain('10:00')
-    expect(c.texto).toContain('6 de mayo de 2031')
+    expect(c.texto).toContain('Fecha: martes 6 de mayo a las 10:00 h, hora de Yucatán.')
+    expect(c.html).toContain('martes 6 de mayo de 2031 a las 10:00 h')
     expect(c.texto).toContain('Dr. X')
-    expect(c.texto).toContain('Centro, Calle 1')
-    expect(c.texto).toContain('9991234567')
+    expect(c.texto).toContain('Consultorio: Centro\nDirección: Calle 1')
+    expect(c.texto).toContain('999 123 4567')
     expect(c.texto).toContain('Para cambiar o cancelar, comunícate con el consultorio')
     expect(c.texto).not.toMatch(/Clínica|tipo/i)
   })

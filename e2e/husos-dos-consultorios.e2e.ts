@@ -145,7 +145,7 @@ test('comprobante y recordatorio con la hora de Tijuana; la confirmaciÃ³n dice Â
   const cron = await page.request.get('/api/cron/recordatorios', { headers: { authorization: `Bearer ${CRON}` } })
   expect(cron.status()).toBe(200)
   const recordatorio = await esperarCorreo(correoPaciente, 'Recordatorio: tu cita del', previos)
-  expect(recordatorio.texto).toContain('a las 09:30 (zona horaria: Baja California)')
+  expect(recordatorio.texto).toContain('a las 09:30 h, hora de Baja California') // M5: la zona como en la maqueta
 
   const enlace = recordatorio.texto.match(/\/confirmar\/([A-Za-z0-9_-]{22})/)?.[1]
   expect(enlace).toBeTruthy()

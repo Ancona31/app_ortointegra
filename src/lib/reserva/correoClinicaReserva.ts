@@ -28,7 +28,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { logger } from '@/lib/logger'
 import { logAudit } from '@/lib/audit'
 import { enviarCorreo } from '@/lib/correo/transporte'
-import { fechaDeCorreo, htmlCorreoCita, textoCorreoCita, type PartesCorreo } from '@/lib/correo/plantillaCita'
+import { fechaDeCorreo, htmlCorreoCita, textoCorreoCita, type CorreoArmado } from '@/lib/correo/plantillaCita'
 import { fechaHoraEnZona, type CorreoListo } from '@/lib/reserva/correosReserva'
 
 const TAG = 'reserva'
@@ -49,24 +49,31 @@ export interface ReservaParaClinica {
   reagendada: boolean
 }
 
-/** Puro: el correo, sin nada clínico. */
+/**
+ * Puro: el correo, sin nada clínico. Tanda M (M5, punto 13): el mismo esqueleto
+ * que los del paciente (cabecera con el consultorio y el médico, píldora,
+ * fecha grande con su zona, detalles, pie); el remitente sigue siendo Spinus.
+ */
 export function correoReservaClinica(r: Omit<ReservaParaClinica, 'clinicaId' | 'citaId'>): CorreoListo {
   const cuando = fechaHoraEnZona(r.inicio, r.zona)
   const quien = r.nombre.trim() || 'Un paciente'
   const titulo = r.reagendada ? 'Cita reagendada por el paciente' : 'Reserva nueva por enlace'
   const frase = r.reagendada ? `${quien} reagendó su cita para el ${cuando}.` : `${quien} reservó una cita para el ${cuando}.`
-  const partes: PartesCorreo = {
+  const armado: CorreoArmado = {
+    marca: { medico: r.medico, consultorio: r.consultorio },
     preencabezado: frase,
     titulo,
-    fecha: fechaDeCorreo(r.inicio, r.zona),
-    parrafos: [frase],
-    datos: [{ etiqueta: 'Nombre', valor: quien }, { etiqueta: 'Médico', valor: r.medico }, { etiqueta: 'Consultorio', valor: r.consultorio }],
-    pie: ['Recibes este correo porque la opción «Avisar por correo de cada reserva» está encendida en la configuración de la agenda.'],
+    bloques: [
+      { tipo: 'entrada', pildora: { texto: r.reagendada ? 'Cita reagendada' : 'Reserva nueva' }, encabezado: titulo, parrafos: [frase] },
+      { tipo: 'fecha', fecha: fechaDeCorreo(r.inicio, r.zona) },
+      { tipo: 'datos', filas: [{ etiqueta: 'Paciente', valor: quien }, { etiqueta: 'Médico', valor: r.medico }, { etiqueta: 'Consultorio', valor: r.consultorio }] },
+      { tipo: 'aviso', lineas: ['Recibes este correo porque la opción «Avisar por correo de cada reserva» está encendida en la configuración de la agenda.'] },
+    ],
   }
   return {
     asunto: r.reagendada ? `Cita reagendada: ${quien}, ${cuando}` : `Reserva nueva: ${quien}, ${cuando}`,
-    texto: textoCorreoCita(partes, [frase, `Médico: ${r.medico}.\nConsultorio: ${r.consultorio}.`]),
-    html: htmlCorreoCita(partes),
+    texto: textoCorreoCita(armado),
+    html: htmlCorreoCita(armado),
     /* Integración I: a la clínica escribe Spinus, no el médico (I2, punto 21,
        es el nombre con que el PACIENTE ve sus correos). '' = «Spinus», la
        cabecera `From` de siempre (`cabeceraFrom`). */

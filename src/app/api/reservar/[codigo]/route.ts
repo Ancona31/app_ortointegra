@@ -159,6 +159,8 @@ function programarDespues(
         datos: {
           medico: nombreDelMedico(ctx), consultorio: consultorio.nombre, direccion: consultorio.direccion,
           telefono: consultorio.telefono ?? ctx.medico.telefono, inicio, zona: consultorio.timezone,
+          // M5 (punto 11): el nombre que escribió, para el saludo y la fila «Paciente» del comprobante.
+          paciente: nombre,
         },
       })
     }

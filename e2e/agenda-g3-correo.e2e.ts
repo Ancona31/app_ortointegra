@@ -73,7 +73,8 @@ async function comprobarEnvio(page: Page, id: string, apellidos: string): Promis
   // Fecha, hora (en la zona del consultorio), médico, consultorio y su dirección.
   expect(correo.texto).toMatch(/jueves,? \d+ de \w+ a las \d\d:\d\d/)
   expect(correo.texto).toContain('Dr. Admin Semilla Uno')
-  expect(correo.texto).toContain('Hospital Norte (ficticio), Avenida Ficticia 2, Norte, Mérida')
+  // M5: con la maqueta, el consultorio y su dirección van en filas de detalles.
+  expect(correo.texto).toMatch(/Consultorio: Hospital Norte \(ficticio\)\r?\nDirección: Avenida Ficticia 2, Norte, Mérida/) // Mailpit guarda CRLF
   // El enlace de confirmar o cancelar, absoluto, en el texto y en el botón del HTML. K2 (punto 8): el botón
   // «Confirmo mi asistencia» lleva `?paso=confirmar` (confirma al abrir); el texto conserva la URL simple.
   const enlace = /(https?:\/\/[^\s/]+\/confirmar\/[A-Za-z0-9_-]{22})\b/.exec(correo.texto)?.[1]
@@ -82,7 +83,8 @@ async function comprobarEnvio(page: Page, id: string, apellidos: string): Promis
   // Nada clínico: ni las notas, ni el título, ni los apellidos del paciente. Tanda L (punto 15): sólo su
   // nombre, en el saludo (en rojo si la ruta no pasa `{ nombre }`).
   expect(`${correo.asunto}\n${correo.texto}\n${correo.html}`).not.toMatch(/DIAGNOSTICO|SECRETO|Paciente Prueba|Prueba \d\d/)
-  expect(correo.texto).toMatch(/Confirma tu cita\s+Hola, Paciente:\s+Tienes una cita/)
+  // M5 (punto 12): la píldora «Pendiente de confirmar» y, debajo, el saludo.
+  expect(correo.texto).toMatch(/Pendiente de confirmar\s+Hola, Paciente:\s+Tienes una cita/)
   expect(correo.html).toContain('Hola, Paciente:')
   expect(correo.asunto).not.toContain('Paciente')
   // Registrado como los demás correos de cita, y auditado.

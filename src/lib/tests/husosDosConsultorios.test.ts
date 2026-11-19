@@ -62,7 +62,7 @@ describe('un médico, dos consultorios en zonas distintas', () => {
       consultorio: { nombre: 'Consultorio Tijuana', direccion: null, telefono: null }, confirmada: false,
       url: 'http://localhost:3000/confirmar/AAAAAAAAAAAAAAAAAAAAAA',
     })
-    expect(correo.texto).toContain('lunes, 23 de noviembre a las 09:00 (zona horaria: Baja California)')
+    expect(correo.texto).toContain('lunes 23 de noviembre a las 09:00 h, hora de Baja California')
   })
 
   it('página de confirmación: «09:00 h» y la etiqueta de la zona del Pacífico', () => {
