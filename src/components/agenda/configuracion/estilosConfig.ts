@@ -72,9 +72,10 @@ export const BOTON_TEXTO =
 export const BOTON_TEXTO_ROJO =
   'inline-flex min-h-[44px] cursor-pointer items-center border-0 bg-transparent px-[8px] text-[14px] font-semibold text-[var(--ag-status-cancelled-text)] disabled:cursor-not-allowed disabled:opacity-60'
 
-/** Campo de texto, número, hora o selector (44 px, 16 px de letra: el teléfono no hace zoom). */
+/** Campo de texto, número, hora o selector (44 px, 16 px · 400 de letra: el teléfono no hace zoom; `font-normal` porque
+    hereda el peso de su etiqueta, que es seminegrita como `.rp-campo`). */
 export const CAMPO_NUEVO =
-  'min-h-[44px] rounded-[8px] border border-[var(--ag-input-border)] bg-[var(--ag-input-bg)] px-[10px] py-[8px] text-[16px] text-[var(--ag-ink)] focus:border-[var(--ag-input-focus-border)] focus:outline-none focus:ring-2 focus:ring-[var(--ag-input-focus-ring)] disabled:opacity-60'
+  'min-h-[44px] rounded-[8px] border border-[var(--ag-input-border)] bg-[var(--ag-input-bg)] px-[10px] py-[8px] text-[16px] font-normal text-[var(--ag-ink)] focus:border-[var(--ag-input-focus-border)] focus:outline-none focus:ring-2 focus:ring-[var(--ag-input-focus-ring)] disabled:opacity-60'
 
 /** La dirección del enlace, en letra de máquina. */
 export const DIRECCION =

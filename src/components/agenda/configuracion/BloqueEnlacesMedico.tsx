@@ -14,16 +14,23 @@
  * G2 (punto 5): con un enlace ya creado, la caja la abre «Completar» en su
  * fila (la maqueta); sin enlace, sale sola encima de «Crear enlace fijo», para
  * que crearlo nunca deje un callejón sin salida.
+ *
+ * Tanda L (punto 17 de Angel): con el diseño y la escala de la configuración nueva (`estilosConfig`):
+ * filas grises, botones de 44 px como mínimo. Sólo la presentación: lo que ofrece, a quién y con qué
+ * ruta sigue igual.
  */
 import { useState, type FormEvent } from 'react'
 import FilaEnlaceReserva from '@/components/agenda/configuracion/FilaEnlaceReserva'
 import FaltaParaEnlace from '@/components/agenda/configuracion/FaltaParaEnlace'
-import { BOTON_FILA, BOTON_PRIMARIO, BOTON_SECUNDARIO, CAMPO, TEXTO_SUAVE } from '@/components/agenda/configuracion/clasesConfig'
+import { AYUDA, BLOQUE, BOTON_AZUL, BOTON_CHICO, CAMPO_NUEVO, FILA_GRIS, TITULO_BLOQUE } from '@/components/agenda/configuracion/estilosConfig'
 import { avisoDeEnlace, type MotivoApertura } from '@/lib/reserva/aperturaEnlace'
 
 /** Lo que se arregla desde la ficha (lo demás lo decide la base o ya pasó). */
 const ARREGLABLES: readonly MotivoApertura[] = ['sin_consultorio', 'sin_tipos', 'sin_disponibilidad']
 import type { EnlaceReserva } from '@/lib/reserva/gestionReserva'
+
+/** Etiqueta encima de un campo (`.rp-campo` de la reserva: 13,5 px · 600). */
+const ETIQUETA_CAMPO = 'flex flex-col gap-[6px] text-[13.5px] font-semibold text-[var(--ag-text)]'
 
 const FECHA = new Intl.DateTimeFormat('es-MX', { dateStyle: 'medium', timeStyle: 'short' })
 
@@ -66,21 +73,21 @@ function FormUnico(p: { ocupado: boolean; vigenciaDias: number | null; onEmitir:
     setCorreo('')
   }
   return (
-    <form onSubmit={ev => void emitirUnico(ev)} className="flex flex-wrap items-end gap-[var(--ag-3)]">
-      <label className="flex min-w-0 flex-1 basis-56 flex-col gap-[var(--ag-1)] text-sm text-[var(--ag-text)]">Etiqueta (opcional)
-        <input className={CAMPO} value={etiqueta} maxLength={60} onChange={ev => setEtiqueta(ev.target.value)}
+    <form onSubmit={ev => void emitirUnico(ev)} className="flex flex-wrap items-end gap-[12px]">
+      <label className={`${ETIQUETA_CAMPO} min-w-0 flex-1 basis-56`}>Etiqueta (opcional)
+        <input className={CAMPO_NUEVO} value={etiqueta} maxLength={60} onChange={ev => setEtiqueta(ev.target.value)}
           placeholder="Para uso interno" />
       </label>
-      <label className="flex min-w-0 flex-1 basis-56 flex-col gap-[var(--ag-1)] text-sm text-[var(--ag-text)]">Correo del paciente (opcional)
-        <input className={CAMPO} type="email" autoComplete="off" value={correo} maxLength={254} onChange={ev => setCorreo(ev.target.value)} />
+      <label className={`${ETIQUETA_CAMPO} min-w-0 flex-1 basis-56`}>Correo del paciente (opcional)
+        <input className={CAMPO_NUEVO} type="email" autoComplete="off" value={correo} maxLength={254} onChange={ev => setCorreo(ev.target.value)} />
       </label>
-      <button type="submit" className={BOTON_SECUNDARIO} disabled={p.ocupado}>Emitir enlace de un solo uso</button>
+      <button type="submit" className={BOTON_CHICO} disabled={p.ocupado}>Emitir enlace de un solo uso</button>
       {p.vigenciaDias !== null && (
-        <span className={`basis-full ${TEXTO_SUAVE}`}>
+        <span className={`basis-full ${AYUDA}`}>
           Uno de un solo uso vale {p.vigenciaDias} {p.vigenciaDias === 1 ? 'día' : 'días'} y una sola reserva.
         </span>
       )}
-      <span className={`basis-full ${TEXTO_SUAVE}`}>El comprobante y los avisos de la cita irán sólo a este correo; sin él, no se manda ninguno.</span>
+      <span className={`basis-full ${AYUDA}`}>El comprobante y los avisos de la cita irán sólo a este correo; sin él, no se manda ninguno.</span>
     </form>
   )
 }
@@ -88,10 +95,10 @@ function FormUnico(p: { ocupado: boolean; vigenciaDias: number | null; onEmitir:
 /** Sin enlace fijo: la frase, «Ver qué falta» si «Primeros pasos» ya lo pide, y «Crear enlace fijo». */
 function SinFijo(p: { verFalta: boolean; onVerFalta?: () => void; puedeEmitir: boolean; ocupado: boolean; onCrearFijo: () => void }) {
   return (
-    <li className="flex flex-wrap items-center justify-between gap-[var(--ag-3)] py-[var(--ag-2)]">
-      <span className={TEXTO_SUAVE}>Aún no hay enlace fijo: se comparte una vez y sirve siempre.</span>
-      {p.verFalta && <button type="button" className={BOTON_FILA} onClick={p.onVerFalta}>Ver qué falta</button>}
-      {p.puedeEmitir && <button type="button" className={BOTON_PRIMARIO} disabled={p.ocupado} onClick={p.onCrearFijo}>Crear enlace fijo</button>}
+    <li className={FILA_GRIS}>
+      <span className={AYUDA}>Aún no hay enlace fijo: se comparte una vez y sirve siempre.</span>
+      {p.verFalta && <button type="button" className={BOTON_CHICO} onClick={p.onVerFalta}>Ver qué falta</button>}
+      {p.puedeEmitir && <button type="button" className={BOTON_AZUL} disabled={p.ocupado} onClick={p.onCrearFijo}>Crear enlace fijo</button>}
     </li>
   )
 }
@@ -108,13 +115,13 @@ export default function BloqueEnlacesMedico(p: Props) {
   const completar = arreglable ? () => setCompletando(c => !c) : undefined
   const verFalta = Boolean(p.motivos) && (completando || (p.enlaces.length === 0 && !p.faltaEnPasos))
   return (
-    <div className="flex flex-col gap-[var(--ag-3)] border-t border-[var(--ag-border-card)] pt-[var(--ag-4)]">
-      {p.nombre && <h4 className="text-sm font-semibold text-[var(--ag-text)]">{p.nombre}</h4>}
+    <div className={BLOQUE}>
+      {p.nombre && <h4 className={`m-0 ${TITULO_BLOQUE}`}>{p.nombre}</h4>}
       {verFalta && p.motivos && (
         <FaltaParaEnlace motivos={p.motivos} medicoId={p.medicoId} esPropio={p.esPropio} puedeCrearTipos={p.puedeCrearTipos}
           alResolver={() => { setCompletando(false); p.alCrearTipo() }} />
       )}
-      <ul className="divide-y divide-[var(--ag-border-card)]">
+      <ul className="m-0 flex list-none flex-col gap-[8px] p-0">
         {fijo ? (
           <FilaEnlaceReserva titulo="Enlace fijo" detalle={`desde el ${FECHA.format(new Date(fijo.created_at))}`}
             aviso={fijo.pausado_en ? AVISO_PAUSADO : aviso}

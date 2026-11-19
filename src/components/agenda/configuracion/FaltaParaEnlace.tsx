@@ -14,14 +14,16 @@
  * duración, el propio médico o quien administra la clínica
  * (`tipos_cita_insert`); la disponibilidad, el dueño del consultorio. A los
  * demás se les dice a quién pedírselo.
+ *
+ * Tanda L (punto 17): la caja ámbar de «Tu enlace» (`PestanaEnlace`), en la escala de la configuración nueva.
  */
 import Link from 'next/link'
 import DuracionConsulta from '@/components/agenda/configuracion/DuracionConsulta'
-import { CAJA_AVISO } from '@/components/agenda/configuracion/clasesConfig'
 import type { MotivoApertura } from '@/lib/reserva/aperturaEnlace'
 import { useToast } from '@/components/ui/Toast'
 
-const ENLACE = 'font-medium underline underline-offset-2'
+const ENLACE = 'font-semibold underline underline-offset-2'
+const CAJA_AVISO = 'rounded-[10px] border border-[var(--ag-aviso-border)] bg-[var(--ag-aviso-bg)] px-[14px] py-[10px] text-[14px] text-[var(--ag-aviso-text)]'
 
 interface Props {
   motivos: readonly MotivoApertura[]
@@ -42,9 +44,9 @@ export default function FaltaParaEnlace({ motivos, medicoId, esPropio, puedeCrea
   const contesta = esPropio || puedeCrearTipos
 
   return (
-    <div role="note" aria-label="Falta para que el enlace abra" className={`${CAJA_AVISO} flex flex-col gap-[var(--ag-2)]`}>
-      <p className="font-medium">Para que el enlace abra, falta:</p>
-      <ul className="flex flex-col gap-[var(--ag-2)]">
+    <div role="note" aria-label="Falta para que el enlace abra" className={`${CAJA_AVISO} flex flex-col gap-[8px]`}>
+      <p className="m-0 font-semibold">Para que el enlace abra, falta:</p>
+      <ul className="m-0 flex flex-col gap-[8px] pl-0">
         {falta('sin_consultorio') && (
           <li>Un consultorio activo.{' '}
             {esPropio ? <Link href="/perfil" className={ENLACE}>Dar de alta en Mi perfil</Link> : 'El médico lo da de alta en su perfil.'}
@@ -56,10 +58,10 @@ export default function FaltaParaEnlace({ motivos, medicoId, esPropio, puedeCrea
           </li>
         )}
         {falta('sin_tipos') && (
-          <li className="flex flex-col gap-[var(--ag-2)]">
+          <li className="flex flex-col gap-[8px]">
             <span>La duración de la consulta.</span>
             {contesta ? (
-              <div className="rounded-[var(--ag-r-btn)] bg-[var(--ag-surface)] p-[var(--ag-3)] text-[var(--ag-text)]">
+              <div className="rounded-[10px] bg-[var(--ag-surface)] p-[12px] text-[var(--ag-text)]">
                 <DuracionConsulta medicoId={medicoId} pregunta={esPropio ? '¿Cuánto dura tu consulta?' : '¿Cuánto dura su consulta?'}
                   onHecho={() => { toast.success('Duración de la consulta guardada'); alResolver() }} />
               </div>

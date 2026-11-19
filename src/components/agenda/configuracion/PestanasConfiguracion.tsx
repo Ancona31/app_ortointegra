@@ -138,7 +138,8 @@ export default function PestanasConfiguracion(d: DatosPestanas) {
       </div>
       <Panel clave="enlace" activa={activa}>
         <PestanaEnlace lista={d.lista} recargar={d.recargar} medicos={d.medicos} usuarioId={d.usuarioId} esMedico={d.esMedico}
-          gestionaTodos={d.gestionaTodos} administradores={d.administradores} vigenciaDias={d.vigenciaDias} avisar={d.avisar} alCrearTipo={d.alCambiarDatos} />
+          gestionaTodos={d.gestionaTodos} administradores={d.administradores} puedeAdministrar={d.puedeAdministrar} vigenciaDias={d.vigenciaDias}
+          avisar={d.avisar} alCrearTipo={d.alCambiarDatos} />
       </Panel>
       <Panel clave="horario" activa={activa}>
         <PestanaHorario consultorios={d.consultorios?.filter(c => c.activo !== false) ?? null} fallo={d.falloConfig} horarioClinica={d.horarioClinica} husoClinica={d.husoClinica} medicos={d.medicos} usuarioId={d.usuarioId}

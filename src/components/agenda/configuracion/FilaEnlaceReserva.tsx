@@ -11,12 +11,13 @@
  * G2 (punto 5, la maqueta): cada enlace lleva su ESTADO en una píldora
  * («Activo» / «Sin usar» / «No abrirá» / «Sin horarios») y, si no va a abrir
  * por algo que se arregla aquí, «Completar», que abre lo que falta en la ficha.
+ * Tanda L (punto 17): fila gris y botones de texto de 44 px de la configuración nueva; mismos nombres.
  */
 import { useState } from 'react'
 import { AlertTriangle } from 'lucide-react'
-import { BOTON_FILA, CAMPO } from '@/components/agenda/configuracion/clasesConfig'
+import { BOTON_TEXTO, BOTON_TEXTO_ROJO, CAMPO_NUEVO } from '@/components/agenda/configuracion/estilosConfig'
 
-const BOTON = BOTON_FILA
+const BOTON = BOTON_TEXTO
 
 interface Props {
   titulo: string
@@ -36,7 +37,7 @@ interface Props {
   onCompletar?: () => void
 }
 
-const PILDORA = 'shrink-0 rounded-[var(--ag-r-pill)] border px-[var(--ag-2)] py-px text-xs font-semibold whitespace-nowrap'
+const PILDORA = 'shrink-0 rounded-[var(--ag-r-pill)] border px-[var(--ag-2)] py-px text-[13px] font-semibold whitespace-nowrap'
 
 /** El estado del enlace, en la píldora de la maqueta: verde si abre; ámbar si no o si abre sin horarios. */
 function Pildora({ aviso, textoAbre }: { aviso: string | null; textoAbre: string }) {
@@ -60,28 +61,28 @@ export default function FilaEnlaceReserva({ titulo, detalle, aviso, url, ocupado
     }
   }
   return (
-    <li className="flex flex-col gap-[var(--ag-2)] py-[var(--ag-2-5)]">
-      <div className="flex flex-wrap items-center gap-x-[var(--ag-3)] gap-y-[var(--ag-1)]">
-        <span className="text-sm font-medium text-[var(--ag-text)]">{titulo}</span>
-        <span className="text-sm text-[var(--ag-muted)]">{detalle}</span>
+    <li className="flex flex-col gap-[8px] rounded-[10px] bg-[var(--ag-surface-sunken)] px-[16px] py-[10px]">
+      <div className="flex flex-wrap items-center gap-x-[12px] gap-y-[4px]">
+        <span className="text-[15px] font-semibold text-[var(--ag-ink)]">{titulo}</span>
+        <span className="text-[13.5px] text-[var(--ag-ink-600)]">{detalle}</span>
         <Pildora aviso={aviso} textoAbre={textoAbre} />
-        <span className="ml-auto flex flex-wrap gap-[var(--ag-1)]">
-          {onCompletar && <button type="button" className={`${BOTON} font-semibold text-[var(--ag-brand-legible)]`} disabled={ocupado} onClick={onCompletar}
+        <span className="ml-auto flex flex-wrap gap-x-[4px]">
+          {onCompletar && <button type="button" className={BOTON} disabled={ocupado} onClick={onCompletar}
             aria-label={`Completar ${titulo}`}>Completar</button>}
           {!url && <button type="button" className={BOTON} disabled={ocupado} onClick={onMostrar} aria-label={`Mostrar ${titulo}`}>Mostrar enlace</button>}
           {onRegenerar && <button type="button" className={BOTON} disabled={ocupado} onClick={onRegenerar} aria-label={`Regenerar ${titulo}`}>Regenerar</button>}
-          <button type="button" className={BOTON} disabled={ocupado} onClick={onRevocar} aria-label={`Revocar ${titulo}`}>Revocar</button>
+          <button type="button" className={BOTON_TEXTO_ROJO} disabled={ocupado} onClick={onRevocar} aria-label={`Revocar ${titulo}`}>Revocar</button>
         </span>
       </div>
       {aviso && (
-        <p role="status" className="flex items-start gap-[var(--ag-1-5)] text-sm font-medium text-[var(--ag-aviso-text)]">
+        <p role="status" className="m-0 flex items-start gap-[6px] text-[14px] text-[var(--ag-aviso-text)]">
           <AlertTriangle size={16} aria-hidden="true" className="mt-0.5 shrink-0" /><span>{aviso}</span>
         </p>
       )}
       {url && (
-        <div className="flex flex-wrap items-center gap-[var(--ag-2)]">
+        <div className="flex flex-wrap items-center gap-[8px]">
           <input readOnly value={url} aria-label={`Dirección de ${titulo}`} onFocus={e => e.currentTarget.select()}
-            className={`${CAMPO} min-w-0 flex-1 bg-[var(--ag-bg-app)]`} />
+            className={`${CAMPO_NUEVO} min-w-0 flex-1`} />
           <button type="button" className={BOTON} onClick={() => void copiar()}>{copiado ? 'Copiado' : 'Copiar'}</button>
         </div>
       )}

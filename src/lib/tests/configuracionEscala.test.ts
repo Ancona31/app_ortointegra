@@ -13,8 +13,9 @@ const CARPETA = 'src/components/agenda/configuracion'
 
 /** Lo que pinta la configuración nueva (no la pantalla vieja `ConfiguracionCalendario`, sin montar). */
 const MONTADOS = [
-  'AvisoGuardado.tsx', 'BloquesAvisos.tsx', 'BotonCopiar.tsx', 'CierrePrimeraVez.tsx', 'ConfiguracionAgenda.tsx',
-  'ConfirmacionRestablecer.tsx', 'CrearEnlaceUnaVez.tsx', 'DialogoHorario.tsx', 'EditorDias.tsx', 'EnlacesDeOtros.tsx',
+  'AvisoGuardado.tsx', 'BloqueEnlacesMedico.tsx', 'BloquesAvisos.tsx', 'BotonCopiar.tsx', 'CierrePrimeraVez.tsx', 'ConfiguracionAgenda.tsx',
+  'ConfirmacionRestablecer.tsx', 'CrearEnlaceUnaVez.tsx', 'DialogoHorario.tsx', 'DuracionConsulta.tsx', 'DuracionEnConsultorio.tsx', 'EditorDias.tsx', 'EnlacesDeOtros.tsx',
+  'FaltaParaEnlace.tsx', 'FilaEnlaceReserva.tsx', 'FormTipoCita.tsx',
   'Interruptor.tsx', 'PasoClinica.tsx', 'PasoDuracion.tsx', 'PasoHorario.tsx', 'PestanaConsulta.tsx', 'PestanaEnlace.tsx',
   'PestanaHorario.tsx', 'PestanaMasOpciones.tsx', 'PestanasConfiguracion.tsx', 'PrimeraVez.tsx', 'SelectorHuso.tsx',
   'estilosConfig.ts',

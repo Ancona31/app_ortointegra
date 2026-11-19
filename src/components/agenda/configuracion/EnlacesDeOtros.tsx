@@ -11,6 +11,10 @@
  * completa no tenía sitio y se queda dentro del plegado (inventario de J5,
  * fila 21). Plegado de inicio; la secretaria ve abiertas las fichas de los
  * administradores, como en la tanda H (`fichas`).
+ *
+ * Tanda L (punto 17): «Completar» sólo ofrece contestar la duración de otro médico a quien administra la
+ * clínica (`puedeAdministrar`), que es a quien `POST /api/agenda/tipos-cita` se lo deja; la secretaria lee
+ * «El médico la contesta en su configuración.» en vez de un formulario que acababa en 403.
  */
 import { useId, useState } from 'react'
 import { ChevronRight } from 'lucide-react'
@@ -32,6 +36,8 @@ interface Props {
   medicos: readonly MedicoConfig[]
   usuarioId: string
   administradores: readonly string[]
+  /** Quien administra la clínica (`canManageClinica`): contesta la duración de cualquier médico. */
+  puedeAdministrar: boolean
   vigenciaDias: number | null
   avisar: Avisar
   alCrearTipo: () => void
@@ -76,7 +82,7 @@ export default function EnlacesDeOtros(p: Props) {
   const plegadas = reparto.plegadas.filter(ajenas)
   const bloque = (m: Ficha) => (
     <BloqueEnlacesMedico key={m.id} medicoId={m.id} nombre={m.nombre} enlaces={p.lista.enlaces.filter(e => e.medico_id === m.id)}
-      motivos={p.lista.preparacion?.[m.id] ?? null} esPropio={false} puedeCrearTipos alCrearTipo={p.alCrearTipo}
+      motivos={p.lista.preparacion?.[m.id] ?? null} esPropio={false} puedeCrearTipos={p.puedeAdministrar} alCrearTipo={p.alCrearTipo}
       urls={g.urls} ocupado={g.ocupado} puedeEmitir={p.lista.secreto} vigenciaDias={p.vigenciaDias}
       onCrearFijo={() => void g.emitir(m.id, 'fijo')}
       onRegenerar={() => g.setPregunta({ mensaje: MSJ_REGENERAR, seguir: () => void g.emitir(m.id, 'fijo') })}

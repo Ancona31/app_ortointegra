@@ -11,9 +11,11 @@
  * Lo usan «Primeros pasos», la ficha del enlace que no abrirá, el horario de
  * cada consultorio y la sección de duración. Quién puede lo deciden la ruta y
  * la policy (`tipos_cita_insert`: el administrador, o el médico para sí mismo).
+ *
+ * Tanda L (puntos 12 y 17): botones y campos de la configuración nueva (`estilosConfig`), 44 px como mínimo.
  */
 import { useId, useState, type FormEvent } from 'react'
-import { BOTON_PRIMARIO, BOTON_SECUNDARIO, CAMPO } from '@/components/agenda/configuracion/clasesConfig'
+import { BOTON_AZUL, BOTON_BLANCO, CAMPO_NUEVO, ERROR } from '@/components/agenda/configuracion/estilosConfig'
 import { leerMotivoError } from '@/components/agenda/configuracion/leerMotivoError'
 import { CrearTipoCitaSchema, EditarTipoCitaSchema, LIMITES_TIPO_CITA } from '@/lib/agenda/tiposCita'
 
@@ -22,8 +24,8 @@ const OPCIONES = [{ min: 30, texto: '30 min' }, { min: 45, texto: '45 min' }, { 
 
 /** Una opción: botón de dos estados hecho con el radio (marcado = borde y tinta de marca). En reposo,
  *  borde y fondo de botón (tanda H, punto 7). */
-const OPCION = 'inline-flex h-11 min-w-[4.5rem] cursor-pointer items-center justify-center rounded-[var(--ag-r-btn)] border border-[var(--ag-control-border)] '
-  + 'bg-[var(--ag-control-bg)] px-[var(--ag-3)] text-sm font-medium text-[var(--ag-text)] '
+const OPCION = 'inline-flex min-h-[44px] min-w-[4.5rem] cursor-pointer items-center justify-center rounded-[10px] border border-[var(--ag-control-border)] '
+  + 'bg-[var(--ag-surface)] px-[14px] text-[15px] font-semibold text-[var(--ag-ink)] '
   + 'has-[:checked]:border-[var(--ag-brand-secondary)] has-[:checked]:bg-[var(--ag-primary-bg-faint)] has-[:checked]:text-[var(--ag-brand-legible)] '
   + 'has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-[var(--ag-brand-secondary)]'
 
@@ -65,7 +67,7 @@ type Eleccion = number | 'otra' | null
 function OpcionesDuracion(p: { nombre: string; pregunta: string; eleccion: Eleccion; elegir: (v: number | 'otra') => void }) {
   return (
     <fieldset className="flex flex-col gap-[var(--ag-2)]">
-      <legend className="mb-[var(--ag-2)] text-sm font-medium text-[var(--ag-text)]">{p.pregunta}</legend>
+      <legend className="mb-[8px] text-[13.5px] font-semibold text-[var(--ag-text)]">{p.pregunta}</legend>
       <div className="flex flex-wrap gap-[var(--ag-2)]">
         {[...OPCIONES.map(o => ({ v: o.min as number | 'otra', texto: o.texto })), { v: 'otra' as const, texto: 'Otra' }].map(o => (
           <label key={String(o.v)} className={OPCION}>
@@ -102,20 +104,20 @@ export default function DuracionConsulta(p: Props) {
     <form onSubmit={enviar} noValidate className="flex flex-col gap-[var(--ag-2)]">
       <OpcionesDuracion nombre={`${id}-dur`} pregunta={p.pregunta} eleccion={eleccion} elegir={v => { setEleccion(v); setError(null) }} />
       {eleccion === 'otra' && (
-        <label className="flex items-center gap-[var(--ag-2)] text-sm text-[var(--ag-text)]" htmlFor={`${id}-otra`}>
-          <input id={`${id}-otra`} className={`${CAMPO} w-24`} type="number" inputMode="numeric" value={otra}
+        <label className="flex items-center gap-[8px] text-[14px] text-[var(--ag-text)]" htmlFor={`${id}-otra`}>
+          <input id={`${id}-otra`} className={`${CAMPO_NUEVO} w-24`} type="number" inputMode="numeric" value={otra}
             min={LIMITES_TIPO_CITA.duracionMin} max={LIMITES_TIPO_CITA.duracionMax} step={LIMITES_TIPO_CITA.pasoDuracion}
             onChange={e => setOtra(e.target.value)} />
           minutos
         </label>
       )}
       <div className="flex flex-wrap items-center gap-[var(--ag-2)]">
-        <button type="submit" className={BOTON_PRIMARIO} disabled={guardando || minutos === null}>
+        <button type="submit" className={BOTON_AZUL} disabled={guardando || minutos === null}>
           {guardando ? 'Guardando…' : p.textoBoton ?? 'Guardar'}
         </button>
-        {p.onCancelar && <button type="button" className={BOTON_SECUNDARIO} onClick={p.onCancelar}>Cancelar</button>}
+        {p.onCancelar && <button type="button" className={BOTON_BLANCO} onClick={p.onCancelar}>Cancelar</button>}
       </div>
-      {error && <p role="alert" className="text-sm font-medium text-red-600">{error}</p>}
+      {error && <p role="alert" className={ERROR}>{error}</p>}
     </form>
   )
 }

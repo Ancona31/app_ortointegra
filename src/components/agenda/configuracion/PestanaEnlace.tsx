@@ -43,6 +43,8 @@ interface Props {
   esMedico: boolean
   gestionaTodos: boolean
   administradores: readonly string[]
+  /** Quien administra la clínica: contesta la duración de otro médico desde «Completar» (L3, punto 17). */
+  puedeAdministrar: boolean
   vigenciaDias: number | null
   avisar: Avisar
   alCrearTipo: () => void
@@ -200,7 +202,7 @@ export default function PestanaEnlace(p: Props) {
           {p.esMedico ? <Propio p={p} lista={lista} /> : <Avisos lista={lista} motivos={null} />}
           {p.gestionaTodos && (
             <EnlacesDeOtros lista={lista} recargar={p.recargar} medicos={p.medicos} usuarioId={p.usuarioId} administradores={p.administradores}
-              vigenciaDias={p.vigenciaDias} avisar={p.avisar} alCrearTipo={p.alCrearTipo} />
+              puedeAdministrar={p.puedeAdministrar} vigenciaDias={p.vigenciaDias} avisar={p.avisar} alCrearTipo={p.alCrearTipo} />
           )}
         </>
       )}
