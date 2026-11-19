@@ -27,6 +27,7 @@ import { z } from 'zod'
 import { entradaGestion, type ClienteSesion } from '@/lib/reserva/gestionServidor'
 import { comprobarTopeDuracion } from '@/lib/agenda/topeDuracion'
 import { comprobarEmpalmes } from '@/lib/agenda/empalmesServidor'
+import { caeEnBloqueo, CUERPO_HORARIO_BLOQUEADO } from '@/lib/agenda/bloqueoTotalServidor'
 import { reagendarCita, type ResultadoReagendar } from '@/lib/agenda/eleccionServidor'
 import { correoParaConfirmacion } from '@/lib/agenda/whatsappCita'
 import { enviarConfirmacionCita } from '@/lib/confirmacion/confirmacionCita'
@@ -109,6 +110,10 @@ async function vetoDelCuerpo(supabase: ClienteSesion, clinicaId: string, cita: C
   const tope = comprobarTopeDuracion(b.start_time, b.end_time, true)
   if (tope) return json({ ...tope }, 400)
   if (!cita.medico_id) return json({ error: 'no_aplica', message: MENSAJES.no_aplica.message }, 409)
+  // L1 (punto 6): tampoco con «Reagendar». Antes del empalme; la base lo repite.
+  if (await caeEnBloqueo(supabase, { clinicaId, medicoId: cita.medico_id, inicio: b.start_time, fin: b.end_time })) {
+    return json({ ...CUERPO_HORARIO_BLOQUEADO }, 409)
+  }
   const empalme = await comprobarEmpalmes(supabase,
     { clinicaId, medicoId: cita.medico_id, inicio: b.start_time, fin: b.end_time, excluirId: cita.id }, b.empalmes_aceptados ?? [])
   return empalme.ok ? null : json(empalme.cuerpo, empalme.status)
@@ -128,6 +133,7 @@ export async function POST(req: NextRequest, ctx: RouteContext<'/api/appointment
     const r = await reagendarCita({ clinicaId: e.clinicaId, actorId: e.perfil.id, citaId: id, consultorioId: p.data.consultorio_id,
       inicio: p.data.start_time, fin: p.data.end_time, esperado: p.data.updated_at ?? null })
     if (r.tipo === 'ausente') return json({ error: 'no_disponible' }, 503)
+    if (r.tipo === 'bloqueado') return json({ ...CUERPO_HORARIO_BLOQUEADO }, 409)
     if (r.tipo === 'error') return json({ error: 'Error interno' }, 500)
     if (r.resultado !== 'ok') return json({ error: r.resultado, message: MENSAJES[r.resultado].message }, MENSAJES[r.resultado].status)
     const eventId = cita.google_event_id

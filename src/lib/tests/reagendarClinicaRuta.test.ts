@@ -21,6 +21,9 @@ const h = vi.hoisted(() => ({
   cita: null as FilaCita | null,
   filtros: [] as string[],
   empalme: false,
+  bloqueado: false,
+  bloqueoConsultado: [] as Array<Record<string, unknown>>,
+  rpcBloqueada: false,
   rpc: [] as Array<Record<string, unknown>>,
   resultado: 'ok' as string,
   correos: [] as Array<{ cambio?: boolean }>,
@@ -49,8 +52,16 @@ vi.mock('@/lib/agenda/empalmesServidor', () => ({
     : { ok: true }),
 }))
 vi.mock('@/lib/agenda/eleccionServidor', () => ({
-  reagendarCita: async (r: Record<string, unknown>) => { h.rpc.push(r); return { tipo: 'hecho', resultado: h.resultado, updatedAt: '2031-01-01T00:00:00Z' } },
+  reagendarCita: async (r: Record<string, unknown>) => {
+    h.rpc.push(r)
+    return h.rpcBloqueada ? { tipo: 'bloqueado' } : { tipo: 'hecho', resultado: h.resultado, updatedAt: '2031-01-01T00:00:00Z' }
+  },
 }))
+/* L1 (punto 6): el veto del bloqueo, en doble (su consulta la prueba `bloqueoTotalServidor.test.ts`). */
+vi.mock('@/lib/agenda/bloqueoTotalServidor', async (original) => {
+  const real = await original<typeof import('@/lib/agenda/bloqueoTotalServidor')>()
+  return { ...real, caeEnBloqueo: async (_s: unknown, p: Record<string, unknown>) => { h.bloqueoConsultado.push(p); return h.bloqueado } }
+})
 vi.mock('@/lib/confirmacion/confirmacionCita', () => ({
   enviarConfirmacionCita: async (_c: string, _i: string, _p: string, o: { cambio?: boolean }) => { h.correos.push(o); return { tipo: 'enviado' } },
 }))
@@ -74,6 +85,7 @@ const POR_ENLACE: FilaCita = {
 
 beforeEach(() => {
   h.entrada = true; h.cita = { ...POR_ENLACE }; h.filtros = []; h.empalme = false; h.rpc = []; h.resultado = 'ok'
+  h.bloqueado = false; h.bloqueoConsultado = []; h.rpcBloqueada = false
   h.correos = []; h.google = 0; h.despues = []
 })
 
@@ -109,6 +121,24 @@ describe('POST /api/appointments/[id]/reagendar (I, punto 9)', () => {
     h.empalme = true
     expect((await ruta.POST(req(CUERPO), ctx())).status).toBe(409)
     expect(h.rpc).toEqual([])
+  })
+
+  it('L1 · en un bloqueo: 409 con el mensaje de Angel, sin RPC ni correo (MUTACIÓN: sin el veto)', async () => {
+    h.bloqueado = true
+    const r = await ruta.POST(req(CUERPO), ctx())
+    expect(r.status).toBe(409)
+    expect(await r.json()).toEqual({ error: 'horario_bloqueado', message: 'Este horario está bloqueado. Quita el bloqueo para agendar aquí.' })
+    expect(h.bloqueoConsultado).toEqual([{ clinicaId: CLINICA, medicoId: PERFIL, inicio: CUERPO.start_time, fin: CUERPO.end_time }])
+    expect(h.rpc).toEqual([])
+    expect(h.correos).toEqual([])
+  })
+
+  it('L1 · la base lo rechaza en la carrera (42501 del disparador): el mismo 409, sin correo (MUTACIÓN: sin la rama)', async () => {
+    h.rpcBloqueada = true
+    const r = await ruta.POST(req(CUERPO), ctx())
+    expect(r.status).toBe(409)
+    expect((await r.json()).message).toBe('Este horario está bloqueado. Quita el bloqueo para agendar aquí.')
+    expect(h.correos).toEqual([])
   })
 
   it('ok: la RPC con la clínica de la sesión y el actor; correo de CAMBIO; Google después', async () => {

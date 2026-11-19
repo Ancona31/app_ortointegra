@@ -17,6 +17,7 @@ import { z } from 'zod'
 import { createAdminClient } from '@/lib/supabase/admin'
 import type { ClienteSesion } from '@/lib/reserva/gestionServidor'
 import { logger } from '@/lib/logger'
+import { esErrorDeBloqueo } from '@/lib/agenda/bloqueoTotalServidor'
 
 const CODIGOS_AUSENTE = new Set(['PGRST202', '42883', '42P01', 'PGRST205'])
 
@@ -53,11 +54,13 @@ export interface Reagendo {
 
 /** «Reagendar» en la base. `ausente` = sin la migración; `error` = otro fallo (al log, sólo el código). */
 export async function reagendarCita(r: Reagendo):
-  Promise<{ tipo: 'hecho'; resultado: ResultadoReagendar; updatedAt: string | null } | { tipo: 'ausente' } | { tipo: 'error' }> {
+  Promise<{ tipo: 'hecho'; resultado: ResultadoReagendar; updatedAt: string | null } | { tipo: 'ausente' } | { tipo: 'bloqueado' } | { tipo: 'error' }> {
   const { data, error } = await createAdminClient().rpc('cita_reagendar_clinica', {
     p_clinica_id: r.clinicaId, p_actor: r.actorId, p_cita_id: r.citaId, p_consultorio_id: r.consultorioId,
     p_inicio: r.inicio, p_fin: r.fin, p_esperado: r.esperado,
   }).single()
+  // L1: el disparador del bloqueo (20261124120000), en la carrera con un bloqueo recién creado.
+  if (esErrorDeBloqueo(error)) return { tipo: 'bloqueado' }
   if (error) {
     logger.error('agenda', `cita_reagendar_clinica falló: ${error.code ?? 'sin código'}`)
     return error.code && CODIGOS_AUSENTE.has(error.code) ? { tipo: 'ausente' } : { tipo: 'error' }
