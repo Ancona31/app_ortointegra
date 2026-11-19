@@ -27,7 +27,9 @@ test.describe.configure({ mode: 'serial' })
 test.afterAll(() => { interruptorAgenda('A', false) })
 
 /** Lo que solo existe en el código de cada pieza (comprobado con grep en `src/`). */
-const MARCAS = { engrane: 'Opciones de la agenda', campana: 'Por confirmar y avisos' } as const
+/* Integración L: y el candado de L1 («Bloquear horario» también es el título del modal de bloqueo, que va en su
+   propio chunk; su atributo no). MUTACIÓN: volver al `import` estático de `BotonBloquearHorario` → «apagada…». */
+const MARCAS = { engrane: 'Opciones de la agenda', campana: 'Por confirmar y avisos', candado: 'data-bloquear-horario' } as const
 
 /** Registra el texto de cada JS que la página descarga; `todos()` espera a que se hayan leído TODOS los cuerpos. */
 function recogerJs(page: Page): { todos: () => Promise<string[]> } {

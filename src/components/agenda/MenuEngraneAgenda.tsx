@@ -34,6 +34,10 @@ import { LeyendaEstados } from '@/components/agenda/LeyendaEstados'
 import { teclasDeAccion } from '@/lib/agenda/atajosAgenda'
 import { guardarTarjetaAlPasar, leerTarjetaAlPasar } from '@/lib/agenda/tarjetaAlPasar'
 
+/* Integración L · el candado de L1 viaja en ESTE chunk (el de la barra v2, como `BotonLeyendaAgenda`): importado en
+   estático desde `AgendaCliente` bajaba también con la v2 apagada (regla de J1, AG-DT-136). */
+export { default as BotonBloquearHorario } from '@/components/agenda/BotonBloquearHorario'
+
 export interface PreferenciaMenu {
   encendida: boolean
   alternar: () => void

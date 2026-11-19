@@ -50,7 +50,6 @@ import { renderSinEventos } from '@/components/agenda/renderSinEventos'
 import { vaciarCacheCitas } from '@/lib/agenda/cacheRangosCitas'
 import { bloqueoDe, bloqueoEnInstante, displayDeBloqueo, esBloqueo, mensajeCitasEnBloqueo, tocaBloqueo, type AperturaBloqueo, type BloqueoAgenda } from '@/lib/agenda/bloqueosAgenda'
 import type { ModoBloqueo } from '@/components/agenda/ModalBloqueo'
-import BotonBloquearHorario from '@/components/agenda/BotonBloquearHorario'
 import { vaciarCacheGoogle } from '@/lib/agenda/cacheEventosGoogle'
 import type { SemillaCitas } from '@/lib/agenda/semillaCitas'
 import { enOcioso, cancelarOcioso } from '@/lib/agenda/ocioso'
@@ -163,6 +162,8 @@ interface BarraV2 {
   MenuEngraneAgenda: typeof import('@/components/agenda/MenuEngraneAgenda').MenuEngraneAgenda
   /** Tanda L, punto 11 · el botón de la leyenda en la barra de computadora (mismo chunk que el engrane). */
   BotonLeyendaAgenda: typeof import('@/components/agenda/MenuEngraneAgenda').BotonLeyendaAgenda
+  /** Tanda L (L1, punto 8) · el candado junto a la campana; mismo chunk que el engrane (integración L). */
+  BotonBloquearHorario: typeof import('@/components/agenda/MenuEngraneAgenda').BotonBloquearHorario
 }
 interface InterruptorYBarra { leido: boolean; barra: BarraV2 | null }
 const V2_APAGADA: InterruptorYBarra = { leido: false, barra: null }
@@ -170,7 +171,7 @@ const V2_APAGADA: InterruptorYBarra = { leido: false, barra: null }
 function leerInterruptorYBarra(v: boolean | null): Promise<InterruptorYBarra> | InterruptorYBarra {
   if (v !== true) return V2_APAGADA
   return Promise.all([import('@/components/agenda/CampanaAgenda'), import('@/components/agenda/MenuEngraneAgenda')]).then(
-    ([c, m]) => ({ leido: true, barra: { CampanaAgenda: c.CampanaAgenda, MenuEngraneAgenda: m.MenuEngraneAgenda, BotonLeyendaAgenda: m.BotonLeyendaAgenda } }),
+    ([c, m]) => ({ leido: true, barra: { CampanaAgenda: c.CampanaAgenda, MenuEngraneAgenda: m.MenuEngraneAgenda, BotonLeyendaAgenda: m.BotonLeyendaAgenda, BotonBloquearHorario: m.BotonBloquearHorario } }),
     (err: unknown) => {
       logger.warn('agenda', `barra v2 sin cargar, se queda la de antes: ${err instanceof Error ? err.message : 'error'}`)
       return V2_APAGADA
@@ -1433,7 +1434,7 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
     <>
       <barraV2.CampanaAgenda recarga={recargaPanel} confirmar={guardado.cambiarEstadoCita} cambiosRef={cambiosPorConfirmarRef}
         alAbrirCita={abrirCitaDeAviso} enBanda={enBanda} />
-      <BotonBloquearHorario enBanda={enBanda} alPulsar={abrirBloqueoDesdeBarra} />
+      <barraV2.BotonBloquearHorario enBanda={enBanda} alPulsar={abrirBloqueoDesdeBarra} />
     </>
   ) : undefined
   const engraneV2 = (enBanda: boolean) => agendaV2 && barraV2 ? (
