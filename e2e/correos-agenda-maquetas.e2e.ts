@@ -38,6 +38,10 @@ const ENLACE = /\/confirmar\/([A-Za-z0-9_-]{22})(?=[\s"<?]|$)/
 let e: Escenario
 let enlaceId = ''
 const porCancelar: string[] = []
+/* Integración M: las citas que crea `alta`, para borrarlas al final con sus correos y confirmaciones, como
+   `agenda-g3-correo` (el mismo jueves). Si se quedaban, la limpieza de `agenda-k1-bloqueos`, que borra las citas
+   de ese día, chocaba con la FK de `cita_confirmaciones` en el proyecto siguiente. No toca `audit_log`. */
+const creadas: string[] = []
 
 /** El texto oculto de la vista previa, el HTML leído sin etiquetas y el remitente. */
 const vistaPrevia = (html: string): string => /<div style="display:none[^"]*">([^<]*)<\/div>/.exec(html)?.[1]?.trim() ?? ''
@@ -59,7 +63,7 @@ test.beforeAll(() => {
   e = prepararEscenario()
 })
 test.afterAll(async () => {
-  // Cancela con el enlace de cada correo (la base audita la cancelación; nada se borra).
+  // Cancela con el enlace de cada correo (la base audita la cancelación); después borra las citas de `alta`.
   const ctx = await api()
   try {
     for (const codigo of porCancelar) {
@@ -67,6 +71,13 @@ test.afterAll(async () => {
     }
   } finally {
     await ctx.dispose()
+  }
+  if (creadas.length) {
+    sqlLocal(`
+      delete from public.cita_correos where appointment_id = any (string_to_array(:'ids', ',')::uuid[]);
+      delete from public.cita_confirmaciones where appointment_id = any (string_to_array(:'ids', ',')::uuid[]);
+      delete from public.appointments where id = any (string_to_array(:'ids', ',')::uuid[]);`, { ids: creadas.join(',') })
+    creadas.length = 0
   }
   if (enlaceId) sqlLocal(`update public.reserva_enlaces set revocado_en = now() where id = :'id' and revocado_en is null`, { id: enlaceId })
   sqlLocal(`update public.tipos_cita set activo = false where id = :'t'`, { t: e.tipoId })
@@ -161,7 +172,9 @@ async function alta(page: Page): Promise<string> {
     res = await page.request.post('/api/appointments', { data: { ...cuerpo, empalmes_aceptados: empalmes.map(x => x.id) } })
   }
   expect(res.ok(), await res.text()).toBeTruthy()
-  return ((await res.json()) as { appointment: { id: string } }).appointment.id
+  const id = ((await res.json()) as { appointment: { id: string } }).appointment.id
+  creadas.push(id)
+  return id
 }
 
 test('la confirmación que manda el personal, como la maqueta, con sus enlaces de siempre', async ({ page }) => {

@@ -128,8 +128,10 @@ test('F1.19 · los iconos van centrados en su botón', async ({ page }, info) =>
    es la de la maqueta. Los paneles de las cinco pestañas comparten borde
    izquierdo y ancho; su título, la misma sangría; los botones de la retícula
    vieja que siguen dentro (`clasesConfig.ts`: `h-8` en las filas, `h-9` en el
-   resto) miden uno de esos dos altos, y los nuevos, al menos 44 px (maqueta). */
-test('T2 · configuración: paneles alineados, títulos a la misma sangría y botones en sus altos', async ({ page }) => {
+   resto) miden uno de esos dos altos, y los nuevos, al menos 44 px (maqueta). Tanda M (M2, punto 2):
+   en computadora los controles de la configuración miden 40; en el teléfono siguen en 44. */
+test('T2 · configuración: paneles alineados, títulos a la misma sangría y botones en sus altos', async ({ page }, info) => {
+  const minimo = info.project.name === 'telefono' ? 44 : 40
   interruptorAgenda('A', true)
   const deshacer = sinPendientesAgenda(CORREO.adminA)
   try {
@@ -168,7 +170,7 @@ test('T2 · configuración: paneles alineados, títulos a la misma sangría y bo
     for (const s of m.sangrias.filter(x => x > 0)) expect(Math.abs(s - sangria)).toBeLessThanOrEqual(1)
     expect(m.nuevos.length).toBeGreaterThan(3)
     for (const a of m.viejos) expect([32, 36]).toContain(a)
-    for (const a of m.nuevos) expect(a).toBeGreaterThanOrEqual(44)
+    for (const a of m.nuevos) expect(a).toBeGreaterThanOrEqual(minimo)
   } finally {
     deshacer()
     interruptorAgenda('A', false)
