@@ -405,7 +405,7 @@ export default function ReservaCliente({ datos }: { datos: DatosPagina }): React
           {r.paso === 'turno' && <VistaTurno {...vista} semana={semana} />}
           {(r.paso === 'datos' || r.paso === 'codigo') && <VistaDatos {...vista} />}
           {r.paso === 'listo' && r.turno && <Comprobante medico={datos.medico} consultorio={consultorio} inicio={r.turno.inicio}
-            conCorreo={datos.clase === 'fijo' && Boolean(r.persona?.correo.trim())} />}
+            conCorreo={datos.clase === 'fijo' && Boolean(r.persona?.correo.trim())} alSalir={() => olvidar(datos.codigo)} />}
         </div>
       </div>
     </>

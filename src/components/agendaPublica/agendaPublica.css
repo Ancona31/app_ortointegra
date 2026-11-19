@@ -281,6 +281,8 @@ body:has(.rp) {
 /* Tanda M (punto 7): una nota con su icono delante (la palomita de «Tu correo ya está verificado»). */
 .rp-nota--icono { display: flex; align-items: flex-start; gap: var(--ag-2); }
 .rp-nota--icono svg { flex: none; margin-top: 1px; }
+/* Tanda M (punto 8): lo que sustituye a «Salir» cuando el navegador no deja cerrar la pestaña. */
+.rp-cerrar { text-align: center; }
 .rp-nota--atencion { border-color: var(--ag-aviso-border); background: var(--ag-aviso-bg); color: var(--ag-aviso-text); }
 .rp-nota--error { border-color: var(--ag-status-cancelled-border); background: var(--ag-status-cancelled-bg); color: var(--ag-status-cancelled-text); }
 
