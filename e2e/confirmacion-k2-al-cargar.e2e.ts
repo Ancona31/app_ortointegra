@@ -20,6 +20,13 @@ import { fechaHoraLocalAInstante } from '../src/lib/dates'
  * MUTACIONES (comprobadas en rojo con el servidor reconstruido): sin la guarda
  * de `navigator.webdriver` → «un navegador automatizado no confirma»; la
  * página sin `ConfirmarAlCargar` (el botón de siempre) → «confirma al cargar».
+ *
+ * Tanda L (punto 1 de Angel, AG-DT-175): la página ESPERA UN GESTO de la
+ * persona (un clic o una tecla fuera de los controles) antes del POST. Un
+ * gesto sobre «No podré asistir» (o sobre cualquier otro control) no confirma.
+ * MUTACIONES (L4, en rojo): sin la espera del gesto (el POST al verse) → «no
+ * hay POST hasta el gesto»; sin apartar los controles (`esControl` siempre
+ * false) → «un gesto sobre “No podré asistir” no confirma».
  */
 test.describe.configure({ mode: 'serial' })
 soloEscritorio()
@@ -78,6 +85,11 @@ async function paciente(browser: Browser, opciones: { js?: boolean; automatizado
   return { p, posts }
 }
 
+/** El gesto de la persona: un clic en la fecha (texto, fuera de cualquier control). */
+async function gesto(p: Page): Promise<void> {
+  await p.locator('.rp-fecha').click()
+}
+
 async function estadoEnTarjeta(page: Page, id: string): Promise<string> {
   const caja = page.locator(`.fc-timegrid-event [data-cita-id="${id}"]`)
   if (!(await caja.count())) return '(sin tarjeta)'
@@ -93,6 +105,12 @@ test('«Confirmo mi asistencia» del correo confirma al cargar: un POST, auditad
 
   const { p, posts } = await paciente(browser)
   await p.goto(`/confirmar/${codigo}?paso=confirmar`)
+  // Tanda L (punto 1): abrirla no basta; sin un gesto de la persona no sale ningún POST.
+  await p.waitForLoadState('networkidle')
+  await p.waitForTimeout(1500)
+  expect(posts).toEqual([])
+  expect(estado(citaId)).toBe('scheduled|-')
+  await gesto(p)
   await p.waitForURL(/\?r=confirmada$/)
   await expect(p.getByRole('status')).toHaveText('Gracias. Tu asistencia quedó confirmada.')
   expect(posts).toHaveLength(1)
@@ -151,6 +169,8 @@ test('si el POST falla, queda el botón de siempre; «No podré asistir» sigue 
   const { p, posts } = await paciente(browser)
   await p.route('**/api/confirmar/**', r => r.abort())
   await p.goto(`/confirmar/${codigo}?paso=confirmar`)
+  await gesto(p)
+  await expect.poll(() => posts.length).toBe(1)
   await expect(p.getByRole('button', { name: 'Confirmo mi asistencia' })).toBeVisible()
   expect(posts).toHaveLength(1)
   expect(estado(citaId)).toBe('scheduled|-')
@@ -159,6 +179,29 @@ test('si el POST falla, queda el botón de siempre; «No podré asistir» sigue 
   await expect(p.getByRole('button', { name: 'Sí, cancelar mi cita' })).toBeVisible()
   await p.waitForLoadState('networkidle')
   expect(posts).toHaveLength(1)
+  expect(estado(citaId)).toBe('scheduled|-')
+  await p.context().close()
+})
+
+test('tanda L · un gesto sobre «No podré asistir» no confirma: ni con el ratón ni con el teclado', async ({ browser }) => {
+  const { citaId, codigo } = citaDelPersonal('18:00')
+  const { p, posts } = await paciente(browser)
+  await p.goto(`/confirmar/${codigo}?paso=confirmar`)
+  await p.waitForLoadState('networkidle')
+  // Con el ratón: el clic va al enlace (el «¿Seguro?»), no a confirmar.
+  await p.getByRole('link', { name: 'No podré asistir' }).click()
+  await p.waitForURL(/\?paso=cancelar$/)
+  await expect(p.getByRole('button', { name: 'Sí, cancelar mi cita' })).toBeVisible()
+  // Con el teclado: Tab hasta el enlace y Enter. Tab sólo mueve el foco; Enter es del enlace.
+  await p.goto(`/confirmar/${codigo}?paso=confirmar`)
+  await p.waitForLoadState('networkidle')
+  const enlace = p.getByRole('link', { name: 'No podré asistir' })
+  for (let i = 0; i < 10 && !(await enlace.evaluate(el => el === document.activeElement)); i++) await p.keyboard.press('Tab')
+  await expect(enlace).toBeFocused()
+  await p.keyboard.press('Enter')
+  await p.waitForURL(/\?paso=cancelar$/)
+  await p.waitForLoadState('networkidle')
+  expect(posts).toEqual([])
   expect(estado(citaId)).toBe('scheduled|-')
   await p.context().close()
 })
