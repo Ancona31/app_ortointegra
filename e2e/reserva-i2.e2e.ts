@@ -145,6 +145,6 @@ test('punto 21: código y comprobante a nombre del médico (remitente y cabecera
     expect(await remitenteDe(c.id)).toEqual({ nombre: medico, direccion: 'noreply@mail.spinus.com.mx' })
     expect(c.texto.replace(/\r\n/g, '\n').startsWith(`${medico}\n`)).toBe(true) // Mailpit guarda CRLF
     expect(c.texto.trim().endsWith('Enviado con Spinus')).toBe(true)
-    expect(c.html).toContain('Enviado con Spinus')
+    expect(c.html.replace(/<[^>]+>/g, '')).toContain('Enviado con Spinus') // M5: «Spinus» en negritas, como la maqueta
   }
 })
