@@ -5314,7 +5314,8 @@ permite ese caso, así que sólo lo ve un evento.
 
 ### AG-DT-191 — Los tres puntos en una burbuja baja
 
-**Estado:** aceptada (K5-DT-5). El panel va en posición absoluta dentro de la
+**Estado:** ✅ cerrada por la tanda M (M1, punto 4): los tres puntos abren el
+formulario y el panel ya no existe. Antes: aceptada (K5-DT-5). El panel va en posición absoluta dentro de la
 burbuja. En una ventana corta puede hacer falta desplazar la burbuja para verlo
 entero.
 
@@ -5664,6 +5665,209 @@ abortar limpio a J4. En el orden de nombre no pasa nada.
 
 Mientras la batería corra contra :3001 no pasa nada. Con otro puerto, esas
 fallarían.
+
+### AG-DT-231 — `telefonoDeTarjeta` se quedó sin consumidores
+
+**Estado:** abierta, limpieza (M1, punto 4). Su único consumidor era `PanelMas`,
+el menú de los tres puntos, que se quitó. Sólo lo usa `accionesTarjeta.test.ts`
+(`src/lib/agenda/accionesTarjeta.ts`). Borrarlo con su prueba, o darle uso.
+
+### AG-DT-232 — CSS muerto de `.ag-lectura-*`
+
+**Estado:** abierta, limpieza (M1). Sin consumidores en `src`: `-pildora`,
+`-pildoras`, `-sep` y `-peligro` (éste sólo en un comentario de `MarcasCita.tsx`).
+`-cab` sólo lo mira una aserción de `origenGoogle.test.tsx`. Las demás clases
+siguen en uso (`BurbujaAlta`, `VentanaLigarCita`, `ConvertirEnCita`).
+
+### AG-DT-233 — Las observaciones recortadas de la burbuja
+
+**Estado:** aceptada (M1, punto 4). La línea «Observaciones: …» se recorta con
+«…» también en el teléfono. El texto completo va en `title` y en el DOM (lo leen
+los lectores de pantalla), pero con el teclado o con el dedo `title` no se
+alcanza: hay que abrir el formulario.
+
+### AG-DT-234 — Dos colocaciones de la burbuja sin medir
+
+**Estado:** abierta, pruebas (M1, punto 1). M1 comprobó que la burbuja no se sale
+de la ventana en cinco tamaños y en las cuatro esquinas, pero no midió la
+variante al pasar el ratón (`TarjetaAlPasar`) ni la burbuja centrada del buscador
+(`.ag-capa--centro`). Usan el mismo `posicionCapa`. Las medidas de computadora se
+tomaron sobre una agendada con observaciones; las casillas de la confirmada usan
+las mismas clases y no se midieron una por una.
+
+### AG-DT-235 — Dos avisos «Solo el médico administrador…» no son exactos
+
+**Estado:** PARA REVISIÓN DE ANGEL (M2, punto 15). Ningún permiso cambió.
+- «Cuándo dan consulta» (secretaria): el horario de **cada consultorio** lo cambia
+  sólo su dueño, ni siquiera el administrador (la ruta da 404 a los demás).
+- «Tipos de cita» (secretaria): los de un médico los cambia también ese médico.
+
+En los dos la secretaria no puede, que es lo que el aviso le dice; lo impreciso
+es «solo el médico administrador».
+
+### AG-DT-236 — El interruptor toca 40 px en computadora
+
+**Estado:** aceptada (M2, punto 2). Con la escala de computadora el área de toque
+del interruptor baja de 46 a 40 (`-inset-y-[6px]` sale 5 px fuera del borde).
+Por encima de los 24 de WCAG 2.2 (2.5.8) y por debajo de los 44 de 2.5.5 (AAA).
+Es la cifra que Angel pidió para todos los controles de escritorio.
+
+### AG-DT-237 — El `gap-0` de «Más opciones» en el teléfono no se aplica
+
+**Estado:** aceptada, previa a M (M2). Tailwind 4 emite `gap-0` antes que
+`gap-[18px]` y gana el de 18. No cambia nada a la vista; no se tocó.
+
+### AG-DT-238 — `configuracionEscala.test.ts` mira línea a línea
+
+**Estado:** aceptada, pruebas (M2). Una clase repartida en dos líneas (la `OPCION`
+de `DuracionConsulta`) se vigila por partes, y no detecta dos `sm:` de la misma
+propiedad entre una constante y la cadena que la compone. Hoy todos resuelven bien
+(Tailwind 4 los emite en orden ascendente; revisado en el CSS compilado).
+
+### AG-DT-239 — Con la v2 apagada, el filtro de médico corta el nombre largo
+
+**Estado:** aceptada (M3, punto 3). A 1024 (205 de 217 px) y a 1280 (155 de 217 en
+Semana), con «Dra. Invitada Semilla Dos». La barra apagada no envuelve, y el
+encargo pedía no tocarla.
+
+### AG-DT-240 — Los cortes de la barra v2 son de ventana
+
+**Estado:** aceptada (M3, punto 3).
+- Suponen la barra lateral desplegada: plegada (tarjeta +192 px) cabría una fila
+  antes de 1360 y no se aprovecha. No se usó una consulta de contenedor sobre
+  `.agenda-fc`, porque la contención afecta a sus descendientes fijos.
+- Medidos con las fuentes de Linux. Con una más ancha, lo primero que cede es la
+  fecha, con elipsis; en el Mes la holgura a 1360 y 1440 es de unos 15 px.
+- El Día con su panel, a 1024–1366, sigue en dos filas que pueden envolver por
+  dentro, como antes.
+
+### AG-DT-241 — Los límites de `tramosDelRayado`
+
+**Estado:** aceptada (M3, punto 6). Hoy no ocurren:
+- un tramo de `businessHours` que cruce la medianoche (`endTime < startTime`) se
+  descartaría (`horasHabiles` ya los parte);
+- un `slotMinTime` negativo con hora 0 (`-00:30`) se leería mal;
+- con `eventMinHeight`, una franja muy corta mide más que su tiempo y los trozos
+  se desplazarían unos píxeles.
+
+### AG-DT-242 — Una sola fila de la barra no cabe de 1024 a 1359
+
+**Estado:** PENDIENTE DE ANGEL (M3, punto 3). Con la barra lateral abierta, a 1024
+la tarjeta mide 704 px y la fila, con todo compactado, pide 894 (1120 con todo a
+su ancho natural). Se dejaron dos filas limpias de 1024 a 1359 y una fila desde
+1360. No se «arregló» de otro modo: es decisión de Angel.
+
+### AG-DT-243 — El sello del consentimiento, en la zona del equipo
+
+**Estado:** PENDIENTE DE ANGEL, defecto de la app sin tocar (M4, punto 16).
+`selloLegible` (`src/lib/pdf/v2/adaptadores/ConsentimientoInformado.tsx:60` y la de
+v1 en `src/lib/pdf/ConsentimientoInformadoPdf.tsx:238`) escribe la fecha y la hora
+del sello con `getDate`/`getHours`: en la zona del dispositivo que genera el PDF
+(en el navegador). Un consentimiento firmado en Mérida a las 12:41 y reimpreso
+desde un equipo en otra zona dice otra hora, o hasta otro día, aunque su comentario
+promete lo contrario. Es un documento legal (NOM-004). Su prueba
+(`adaptadoresV2.test.ts`, «II.7 · … sellado, cada firma va a su firmante con su
+hora») falla en `Asia/Tokyo` y `Pacific/Kiritimati`; pasa sin `TZ`, con `UTC` y con
+`America/Hermosillo`. Angel decide la zona (la del consultorio o una fija).
+
+### AG-DT-244 — «Tu correo ya está verificado» se distingue por su texto
+
+**Estado:** aceptada (M4, punto 7). `NotaDelPaso` pinta en verde sólo el texto
+`YA_VERIFICADO`, que viaja por el estado `error` de `useReserva`. Si alguien cambia
+la redacción en un solo sitio, vuelve a rojo. La e2e de K2 lo atrapa (texto
+exacto). La prueba del punto 16 (`arrastreBloqueoTotal.test.ts`) ya no ejercita
+el aviso de fuera de horario; lo cubren otras.
+
+### AG-DT-245 — El `audit_log` local crece con cada corrida de pruebas
+
+**Estado:** aceptada (orden de Angel, M4 punto 17). Las pruebas ya no borran
+auditoría: unas decenas de filas por archivo, que quedan huérfanas cuando la
+limpieza borra lo auditado (sin FK, no rompen nada). En la integración M pasó de
+65 036 a las cifras del §9. Ninguna prueba cuenta auditoría por ventana de tiempo
+(las dos últimas, k1 y h2, se arreglaron en la integración).
+
+### AG-DT-246 — La guarda de la auditoría lee sólo el primer nivel
+
+**Estado:** aceptada, pruebas (M4). `pruebasSinBorrarAuditoria.test.ts` lee el
+primer nivel de `e2e/`, `scripts/` y `supabase/pruebas-sql/` (`.ts .mjs .js .sh
+.sql`), no `src/`, y no ve un nombre de tabla armado en una variable. Desde la
+integración M deja a `m_audit_log_sin_truncate.sql` escribir TRUNCATE (y sólo
+TRUNCATE), si acaba en `rollback;` y no lleva `commit`.
+
+### AG-DT-247 — El contraste del pie de los correos
+
+**Estado:** PARA REVISIÓN DE ANGEL (M5). #7c8aa0 (`--ag-muted`) sobre #eef1f5 da
+3,09:1, por debajo de 4,5:1 (AA para letra de 12 px). La maqueta tenía casi lo
+mismo (#7a8597, ~3,2:1). Subirlo pide un token más oscuro: decisión de marca.
+
+### AG-DT-248 — El asunto del aviso a la clínica lleva el nombre del paciente
+
+**Estado:** abierta, minimización (M5; viene de I5). «Reserva nueva: Ana Pech, …»
+sale en la notificación del teléfono de los administradores. Un asunto sin nombre
+lo minimizaría.
+
+### AG-DT-249 — El plazo de cancelar es fijo: 1 hora
+
+**Estado:** PARA REVISIÓN DE ANGEL (M5, punto 12). No hay ajuste de clínica: la
+regla está en la base (E1, `cita_confirmacion_responder` acepta cancelar hasta
+`start_time - interval '1 hour'`) y los correos la repiten con `PLAZO_CANCELAR`
+(`correosCita.ts`). Si se vuelve ajuste, hay que cambiar los dos a la vez, con una
+migración.
+
+### AG-DT-250 — Los textos nuevos de los correos, sin revisión legal ni de tono
+
+**Estado:** PARA REVISIÓN DE ANGEL (M5). «Para tu consulta» (llegar 10 minutos
+antes, identificación, estudios previos o recetas), «¿No reconoces esta cita?…» y
+los demás textos nuevos están pendientes de revisión, como los anteriores
+(`mejora_agendaV2.md` §7).
+
+### AG-DT-251 — Detalles de los correos de M5
+
+**Estado:** aceptada (M5).
+- El recordatorio y el aviso de cambio saludan «Hola:», sin nombre: la tarea de
+  recordatorios no lo tiene a mano y traerlo costaría una consulta por correo.
+- `urlSegura` rechaza `HTTPS://` en mayúsculas: falla cerrado (sin botón); los
+  enlaces de Spinus siempre van en minúsculas.
+- Outlook de escritorio ignora `border-radius`: las esquinas salen rectas.
+
+### AG-DT-252 — `replica` se salta los tres disparadores de `audit_log`
+
+**Estado:** PARA REVISIÓN DE ANGEL (integración M, migración
+`20261125170000`). `prevent_audit_delete`, `prevent_audit_update` y el nuevo
+`prevent_audit_truncate` son disparadores normales (`tgenabled` `O`): con
+`session_replication_role = replica`, un rol que pueda fijarlo (en local,
+`supabase_admin`) borra o vacía la tabla. El encargo pedía uno igual al de borrado,
+así que no se pasaron a `ENABLE ALWAYS`. Ojo: la replicación lógica corre en
+`replica`.
+
+### AG-DT-253 — Otras 30 tablas de `public` con TRUNCATE para los tres roles
+
+**Estado:** PARA REVISIÓN DE ANGEL (integración M; el encargo: «no lo extiendas a
+otras tablas»). Tras la migración, 30 tablas de `public` conceden TRUNCATE a
+`anon`, `authenticated` o `service_role` (lista en
+`supabase/AUDITORIA-CONJUNTO-AGENDA-V2.md` §15.6). Con datos de pacientes:
+`addendums`, `appointments`, `calculadora_resultados`, `casos_clinicos`,
+`casos_clinicos_recursos`, `consultas`, `documentos`, `firmas_documento` (ésta ya
+tiene su disparador contra TRUNCATE), `mediciones_analitos`, `paciente_medico`,
+`pacientes` y `solicitudes_arco`; dudosa, `pdf_jobs`. TRUNCATE no pasa por la RLS
+ni por los disparadores de fila.
+
+### AG-DT-254 — Dimensión 19 propuesta para la auditoría de migraciones
+
+**Estado:** PARA REVISIÓN DE ANGEL (integración M). El auditor de la migración del
+TRUNCATE propone añadir a `supabase/AUDITORIA-MIGRACIONES.md` la dimensión
+«otorgante del privilegio que se revoca»: un `REVOKE` sólo quita lo concedido por
+quien lo ejecuta; mirar `aclexplode(relacl)` y su `grantor`, y abortar antes del
+`COMMIT` con `has_table_privilege`. No se añadió: ese archivo no lo edita la
+integración.
+
+### AG-DT-255 — El conjunto desde cero no se probó en la tanda M
+
+**Estado:** aceptada (integración M). Para no vaciar el `audit_log` local no se
+hizo `supabase db reset`: la migración nueva se aplicó sobre la base de la tanda L.
+Las 43 de la agenda no cambiaron desde la tanda L (probadas desde cero en su
+§14.1). Tampoco se rehízo la base combinada con `feature/limites-ajustables`
+(lista del caso 3 de `p1`, que sigue en 50 porque no hay funciones nuevas).
 
 ---
 

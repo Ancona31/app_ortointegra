@@ -5730,6 +5730,429 @@ de esta sección, y éstas, que ya existían y cambian o hay que repetir.
 
 ---
 
+## 8-nonies. Tanda M (2026-11-19)
+
+Lo que se hizo con tus puntos de la tanda M, en cinco grupos. Lo de la agenda va detrás del
+interruptor de la v2; los correos y la reserva son las páginas públicas de siempre:
+
+- **M1:** la burbuja de la cita en computadora, con las medidas de la tanda J, y los tres puntos que
+  abren el formulario (puntos 1 y 4).
+- **M2:** la configuración más compacta en computadora y el aviso «Solo el médico administrador…»
+  según quién entra (puntos 2 y 15).
+- **M3:** la barra sin trozos, «Bloqueo» de vuelta en «Nueva cita» y el rayado sólo en el horario
+  (puntos 3, 5 y 6).
+- **M4:** «Tu correo ya está verificado» en verde, «Salir» al terminar la reserva, las pruebas sin
+  depender del huso y sin borrar auditoría (puntos 7, 8, 16 y 17).
+- **M5:** los correos de la agenda con las maquetas (puntos 9 a 14).
+- **Integración:** la migración aparte que impide vaciar el `audit_log` (tu encargo).
+
+**Antes de empezar:**
+
+- **No hagas P5** (reiniciar la base): vaciaría el `audit_log` local, y pediste no volver a borrarlo.
+  La base ya tiene las **49** migraciones (las 48 de la tanda L más
+  `20261125170000_audit_log_sin_truncate.sql`, que no es de la agenda). La consulta de P5 debe
+  responder `49|20261125170000`.
+- Si tu base no la tuviera, aplícala sola (no borra nada):
+
+  ```bash
+  docker exec -i supabase_db_app_ortointegra psql -U postgres -d postgres -v ON_ERROR_STOP=1 < supabase/migrations/20261125170000_audit_log_sin_truncate.sql
+  ```
+
+  Al final, una tabla con «OK» en las filas 1 a 5.
+- Sembrada (P6), con el aviso aprobado (P7) y la v2 encendida en la Clínica A (P8). Sembrar no borra
+  auditoría.
+- La app del 3000 (P11) y Mailpit para M4 y M5.
+
+Si al abrir la agenda sale «¿Asistió el paciente?», es la ventana de I4-3: pulsa «Decidir después» y
+sigue (I4-5).
+
+### M1 · La burbuja de la cita (puntos 1 y 4)
+
+#### M1-1. La burbuja en computadora, del tamaño de antes
+
+**Qué hago:** en computadora, a pantalla completa (1920 y también 1366), pulso una agendada de
+«Paciente Prueba 05» y luego una confirmada.
+
+**Qué debo ver:**
+- el mismo diseño de K5: la franja de color, la píldora, el recuadro gris con la hora y el médico,
+  y los iconos en las casillas;
+- la burbuja más chica: más o menos del ancho de la columna de un día y medio, con el nombre
+  pequeño (16 px) y la píldora más chica;
+- en las casillas («Confirmar», «Reagendar», «Editar»), el icono **a la izquierda** del texto, no
+  encima;
+- la ✕ y los tres puntos más chicos que antes.
+
+**Si falla, significa que…** la computadora volvió a la burbuja grande o el cambio alcanzó al
+teléfono.
+
+#### M1-2. En el teléfono, igual que antes
+
+**Qué hago:** en el teléfono pulso la misma cita.
+
+**Qué debo ver:**
+- la hoja de abajo, como hasta ahora;
+- el nombre grande, el icono de las casillas encima del texto y botones del tamaño de un dedo.
+
+**Si falla, significa que…** el cambio de computadora se coló en el teléfono.
+
+#### M1-3. La burbuja nunca se sale
+
+**Qué hago:** en una ventana baja (por ejemplo 1366×650, o el navegador sin maximizar), pulso una
+cita del lunes a las 7:00, otra del domingo a las 20:00 y otra del lunes a las 20:00, y en cada una
+abro «Confirmar».
+
+**Qué debo ver:** la burbuja entera dentro de la ventana, con su «Cancelar cita» a la vista o
+alcanzable desplazando dentro de la burbuja.
+
+**Si falla, significa que…** la colocación dejó de acotarse a la ventana.
+
+#### M1-4. Los tres puntos abren el formulario
+
+**Qué hago:** en una agendada pulso los tres puntos.
+
+**Qué debo ver:**
+- se cierra la burbuja y se abre «Editar cita» directamente, sin menú chico;
+- ahí están las notas, el tipo de cita, el consultorio y, en el estado, «No asistió»;
+- si elijo «No asistió» y pulso «Guardar», la cita queda como «No asistió».
+
+**Si falla, significa que…** volvió el menú chico o el formulario no recibe la cita.
+
+#### M1-5. Las observaciones en una línea
+
+**Qué hago:**
+1. A una agendada le escribo en «Notas» un texto largo y guardo.
+2. Abro su burbuja y dejo el ratón sobre la línea.
+3. Abro también una cita sin notas.
+
+**Qué debo ver:**
+- en la cita con notas, «Observaciones: …» en una sola línea, cortada con «…»;
+- al dejar el ratón encima, el texto completo;
+- en la cita sin notas, ninguna línea de observaciones.
+
+**Si falla, significa que…** la línea crece y empuja las acciones, o aparece vacía.
+
+#### M1-6. La confirmada sigue preguntando
+
+**Qué hago:** en una confirmada pulso la casilla «No asistió» y luego «Cancelar».
+
+**Qué debo ver:** la pregunta «¿Marcar que … no asistió?» y, después de «Cancelar», la cita sigue
+confirmada.
+
+**Si falla, significa que…** se perdió la confirmación de L2.
+
+### M2 · La configuración (puntos 2 y 15)
+
+#### M2-1. La configuración en la computadora, más compacta
+
+**Qué hago:** entro como admin.a en una computadora, abro Agenda › Configuración y paso por las cinco
+pestañas; luego hago lo mismo en el teléfono.
+
+**Qué debo ver:**
+- en la computadora, el título «Configuración de la agenda» del tamaño de los títulos de las tarjetas
+  o poco más;
+- los botones («Cambiar horario», «Otra duración», las duraciones 15/20/30…) más bajos y con letra más
+  chica que antes, y las pestañas más bajas; nada se corta ni se encima;
+- en el teléfono, todo exactamente como antes (botones grandes, fáciles de tocar).
+
+**Si falla, significa que…** la escala de computadora no se aplicó, o se coló al teléfono.
+
+#### M2-2. Lo que ve la secretaria y no puede cambiar
+
+**Qué hago:** entro como secretaria.a (Clínica Semilla A) y abro Agenda › Configuración. Paso por
+«Cuándo dan consulta», «Tipos de cita», «Avisos» y «Más opciones».
+
+**Qué debo ver:**
+- al principio de las tres primeras, una caja azul claro con «Solo el médico administrador puede
+  cambiar estas opciones.»;
+- ningún botón para cambiar el horario de la clínica, los tipos ni los avisos;
+- en «Más opciones», primero «Personas bloqueadas» (que sí puede usar, sin aviso encima) y después la
+  caja azul sobre «Empezar de nuevo», que no es un botón;
+- en «Enlaces», ninguna caja.
+
+**Si falla, significa que…** el aviso no salió, salió dos veces, o salió encima de algo que ella sí
+puede hacer.
+
+#### M2-3. Lo que ve la médica invitada y no es suyo
+
+**Qué hago:** entro como medico.a. Paso por «Cuándo das consulta», «Tu consulta», «Avisos» y «Más
+opciones».
+
+**Qué debo ver:**
+- la caja azul dentro de la tarjeta «Horario de la clínica» (sus consultorios sí los puede cambiar, sin
+  caja);
+- en «Tu consulta», sus tipos y «Agregar tipo de cita» arriba; y sólo si la clínica tiene tipos «de
+  toda la clínica», la caja y debajo esos tipos, sin botones (en la semilla no hay ninguno);
+- la caja al inicio de «Avisos» y sobre «Empezar de nuevo».
+
+**Si falla, significa que…** el aviso tapa algo suyo o deja sin aviso algo que no es suyo.
+
+### M3 · La barra, «Bloqueo» y el rayado (puntos 3, 5 y 6)
+
+#### M3-1. La barra en una fila o en dos filas limpias
+
+**Qué hago:** con la barra lateral desplegada y «Dra. Invitada Semilla Dos» elegida en el filtro,
+pongo la ventana a 1024, 1280, 1366, 1440 y 1480 de ancho (o uso pantallas de esos anchos), en
+Semana y en Mes.
+
+**Qué debo ver:**
+- el nombre de la médica entero en el filtro, en todos los anchos;
+- de 1024 a 1359, dos filas sin controles sueltos: arriba ‹ › Hoy, la fecha, (i) y las vistas;
+  abajo, a la derecha, el filtro, buscar, la campana, el candado, el engrane y «Agendar»;
+- desde 1360, una sola fila;
+- a 1366, «Agendar» es un «+» (el lector de pantalla dice «Agendar»);
+- en el Mes a 1366, una fila con «noviembre de 2026» entero.
+
+**Si falla, significa que…** la barra vuelve a partirse en trozos o recorta el nombre.
+
+#### M3-2. «Bloqueo» vuelve a «Nueva cita»
+
+**Qué hago:** con la v2 encendida, pulso un hueco de la semana, abro «Nueva cita» y elijo la tercera
+posición, «Bloqueo». Después, Cancelar. Luego apago la v2 en la Clínica A y repito.
+
+**Qué debo ver:**
+- se cierra «Nueva cita» y se abre «Bloquear horario» con ese día y esa hora, sin «Días completos»
+  marcado;
+- Cancelar no crea nada;
+- con la v2 apagada, sólo «Cita» y «Evento».
+
+**Si falla, significa que…** el alta perdió el acceso al bloqueo o lo abre con otra hora.
+
+#### M3-3. El rayado sólo en el horario
+
+**Qué hago:** con el candado, bloqueo un día entero que tenga horario (por ejemplo un miércoles);
+pulso su parte gris (antes de abrir o después de cerrar). Después bloqueo de 12:00 a 18:30 un día
+que cierra antes, y un domingo cerrado.
+
+**Qué debo ver:**
+- el de todo el día, rayado sólo dentro del horario; la parte gris, sin rayas;
+- al pulsar la parte gris, «Bloqueo de horario», no la burbuja de una cita nueva;
+- el de 12:00 a 18:30, rayado hasta el cierre;
+- el domingo cerrado, rayado entero.
+
+**Si falla, significa que…** el rayado ya no sigue al gris del horario, o la parte gris dejó de ser
+del bloqueo.
+
+### M4 · La reserva: el aviso verde y «Salir» (puntos 7 y 8)
+
+#### M4-1. «Tu correo ya está verificado» sale en verde
+
+**Qué hago:**
+1. En incógnito, con el enlace fijo del Dr. Admin Semilla Uno, elijo hora, escribo mis datos y
+   `gael7@prueba.test`, marco el aviso y pido el código.
+2. En Mailpit abro el correo «Tu código para reservar» y pulso «Continuar mi reserva».
+3. En la pestaña nueva pulso «Verificar y reservar».
+
+**Qué debo ver:**
+- arriba de la tarjeta, «Tu correo ya está verificado. Completa tus datos para reservar.» en VERDE y con
+  una palomita delante;
+- mi nombre y mi teléfono ya escritos, y la casilla del aviso sin marcar.
+
+**Si falla, significa que…** el paciente cree que algo salió mal cuando todo va bien.
+
+#### M4-2. Los errores siguen en rojo
+
+**Qué hago:** repito M4-1 con `hugo8@prueba.test`, pero en la pestaña nueva, antes de pulsar
+«Verificar y reservar», borro el código y escribo `000000`.
+
+**Qué debo ver:** «El código no es correcto.» en ROJO, sin palomita.
+
+**Si falla, significa que…** un error de verdad se ve como si todo estuviera bien.
+
+#### M4-3. «Salir» cierra la pestaña o dice que ya se puede cerrar
+
+**Qué hago:**
+1. Termino una reserva hasta «Tu cita quedó agendada».
+2. Pulso «Salir».
+
+**Qué debo ver:**
+- si la pestaña se abrió desde el correo de Mailpit, normalmente se cierra;
+- si no se cierra, el botón cambia por «Ya puedes cerrar esta pestaña»;
+- al recargar esa pestaña (si sigue abierta), la reserva empieza de cero en «Lugar».
+
+**Si falla, significa que…** el paciente no sabe que ya terminó, o la pestaña guarda su reserva.
+
+### M5 · Los correos (puntos 9 a 14)
+
+**Antes de M5**: en la configuración de la agenda, deja encendidos la agenda v2 y el recordatorio.
+Ten Mailpit abierto (ver 1.5). Usa la Clínica Semilla A con `admin.a@semilla.spinus.test`.
+
+#### M5-1. El correo del código para reservar
+- **Qué hago:** abro un enlace fijo de reserva de Dr. Admin Semilla Uno, elijo consultorio, día y hora, escribo
+  un correo y pulso «Enviar código a mi correo». En Mailpit abro «Tu código para reservar: …».
+- **Qué debo ver:**
+  - Arriba, una franja azul oscuro con el consultorio en mayúsculas pequeñas y el nombre del médico.
+  - «Tu código para reservar» y, en un recuadro, el código de 6 cifras grande y separado, con «Vence en 10
+    minutos» debajo.
+  - Un botón azul ancho «Continuar mi reserva» y, debajo, «¿Cerraste la página? Este botón te regresa a tu
+    reserva.»
+  - Tras una raya, «No compartas este código con nadie…».
+  - Fuera de la tarjeta, «Enviado con Spinus».
+  - En la lista de Mailpit, la vista previa dice «Tu código es 123456. Vence en 10 minutos.», sin espacios en
+    el número.
+  - Si copio el código del correo y lo pego, se pegan las 6 cifras juntas.
+- **Si falla, significa que…** el correo no sigue la maqueta, o el código lleva espacios y no se copia entero.
+
+#### M5-2. El comprobante dice «Cita agendada», no «confirmada»
+- **Qué hago:** termino esa reserva con mi nombre completo. Abro «Tu cita con Dr. Admin Semilla Uno».
+- **Qué debo ver:**
+  - Una píldora azul clara «✓ Cita agendada» y luego «Hola, <mi nombre>:».
+  - La fecha en un recuadro con raya azul a la izquierda: el día de la semana en azul, la fecha grande y la
+    hora con «hora de Yucatán» al lado (u «hora del centro de México», según el consultorio).
+  - Los detalles: Médico, Consultorio, Dirección (si el consultorio la tiene) y Paciente con mi nombre.
+  - El botón «Confirmar o cancelar mi cita».
+  - «Para tu consulta» con sus tres puntos.
+  - Un recuadro «¿No puedes asistir? … Llámanos o escríbenos al 999 …».
+  - En ningún sitio el tipo de cita ni mi teléfono.
+- **Si falla, significa que…** el comprobante promete una confirmación que no ha ocurrido, o se cuela algo que
+  no debe ir.
+
+#### M5-3. El botón del comprobante sigue funcionando
+- **Qué hago:** en ese comprobante pulso «Confirmar o cancelar mi cita».
+- **Qué debo ver:** la página de mi cita, con las opciones de siempre (confirmar o «No podré asistir»).
+- **Si falla, significa que…** se rompió el enlace del comprobante.
+
+#### M5-4. La confirmación que mando desde la agenda
+- **Qué hago:** como admin.a, en una cita futura de «Paciente Prueba 13» en el Hospital Norte (ficticio), mando
+  el correo de confirmación. Lo abro en Mailpit («Confirma tu cita del …»).
+- **Qué debo ver:**
+  - La píldora «Pendiente de confirmar», «Hola, Paciente:» y la fecha con «hora de Yucatán».
+  - Dos botones a todo lo ancho: uno azul, «Confirmo mi asistencia», y otro blanco con borde, «No podré
+    asistir».
+  - Debajo, «Puedes cancelar con este botón hasta 1 hora antes de tu cita. Después, llámanos al …» (sólo si el
+    consultorio tiene teléfono).
+  - Los detalles (Médico, Consultorio, Dirección, Teléfono, que se puede pulsar en el celular) y «¿No reconoces
+    esta cita?…».
+  - Ni las notas ni el motivo de la cita.
+- **Si falla, significa que…** el correo no sigue la maqueta o se cuela algo clínico.
+
+#### M5-5. Los dos botones de la confirmación
+- **Qué hago:** en el correo de M5-4 pulso «Confirmo mi asistencia». En otra cita, pulso «No podré asistir».
+- **Qué debo ver:** el primero confirma al abrir (como K2-1). El segundo pregunta «¿Seguro?» antes de cancelar
+  (como K2-3).
+- **Si falla, significa que…** los botones perdieron sus enlaces de siempre.
+
+#### M5-6. Recordatorio, cita ya confirmada y aviso de cambio
+- **Qué hago:** dejo que salga el recordatorio de una cita sin confirmar y el de una ya confirmada. Reagendo
+  desde la agenda una cita que se reservó por enlace.
+- **Qué debo ver:**
+  - Las tres con el mismo aspecto, saludando «Hola:».
+  - El recordatorio sin confirmar: «Pendiente de confirmar» y los dos botones.
+  - La ya confirmada: «✓ Cita confirmada» y sólo «No podré asistir».
+  - El aviso de cambio: «Cita reagendada», «Tu cita cambió» y la fecha nueva.
+- **Si falla, significa que…** algún correo quedó con el diseño viejo o con la píldora equivocada.
+
+#### M5-7. Sin dirección ni teléfono, no quedan huecos
+- **Qué hago:** en un consultorio sin dirección ni teléfono, reservo o mando la confirmación.
+- **Qué debo ver:**
+  - No hay filas «Dirección» ni «Teléfono».
+  - No sale la frase «Después, llámanos al …», ni «Llámanos o escríbenos al …» en el comprobante.
+  - Nada vacío ni «undefined».
+- **Si falla, significa que…** el correo enseña filas vacías o frases a medias.
+
+#### M5-8. El aviso a la clínica, con el mismo aspecto
+- **Qué hago:** con «Avisar por correo de cada reserva» encendido, reservo por enlace. Abro en Mailpit el correo
+  que llega a admin.a.
+- **Qué debo ver:**
+  - La misma franja azul con el consultorio y el médico, y la píldora «Reserva nueva».
+  - La fecha con su zona y los detalles (Paciente, Médico, Consultorio).
+  - Al pie, «Recibes este correo porque…».
+  - Sin el teléfono ni el correo de quien reservó.
+  - El remitente sigue siendo «Spinus».
+- **Si falla, significa que…** el aviso a la clínica no usa el esqueleto común, o se cuela un dato de contacto.
+
+#### M5-9. En el teléfono y en modo oscuro
+- **Qué hago:** abro M5-2 y M5-4 en el correo del teléfono, también con el teléfono en modo oscuro.
+- **Qué debo ver:**
+  - La tarjeta ocupa el ancho, los botones son anchos y fáciles de pulsar, y no hay desplazamiento a los lados.
+  - El correo se sigue viendo claro.
+- **Si falla, significa que…** el correo no se adapta al teléfono, o el buzón lo oscurece.
+
+### Integración de la tanda M
+
+#### M-INT-1. El `audit_log` no se puede vaciar
+
+**Qué hago:** en la terminal, desde la carpeta de la agenda, corro la prueba de la migración nueva
+(no vacía nada: todo va en una transacción que se deshace):
+
+```bash
+docker exec -i supabase_db_app_ortointegra psql -U postgres -d postgres -v ON_ERROR_STOP=1 -q -o /dev/null < supabase/pruebas-sql/m_audit_log_sin_truncate.sql && echo VERDE
+```
+
+**Qué debo ver:** `VERDE`, sin ningún `ERROR`.
+
+**Si falla, significa que…** alguno de los tres roles, o el propio `postgres`, podría vaciar la
+auditoría (falta la migración `20261125170000` o se tocó).
+
+#### M-INT-2. La burbuja y «Nueva cita» conviven
+
+**Qué hago:** en computadora, pulso una agendada y luego sus tres puntos; cierro. Pulso un hueco y
+elijo «Bloqueo» en «Nueva cita».
+
+**Qué debo ver:** los tres puntos abren «Editar cita» (M1-4), sin menú chico; «Bloqueo» abre
+«Bloquear horario» (M3-2). Ninguno de los dos abre el otro.
+
+**Si falla, significa que…** el cambio de M1 en la burbuja y el de M3 en el alta se pisan.
+
+### Qué repetir tras la tanda M
+
+Antes de nada, **no hagas P5**: comprueba con su consulta que la base responde
+`49|20261125170000` (si no, aplica la migración sola, como dice el principio de esta sección), y
+después P6 a P8. Luego, las nuevas de esta sección, y éstas, que ya existían y cambian o hay que
+repetir.
+
+**La burbuja (tandas F, G, K y L)**
+- **K5-4:** repetir en computadora: la burbuja se ve más chica (M1-1). En el teléfono, igual.
+- **K5-5:** repetir. «Confirmar» se abre igual, ahora con opciones de 48 px en computadora.
+- **K5-6:** **cambia**, la sustituyen M1-4 y M1-5. Los tres puntos ya no abren menú: observaciones,
+  tipo y consultorio están en el formulario; «No asistió» de la agendada se elige como estado en el
+  formulario; los recordatorios de la confirmada, en «Avisar al paciente».
+- **K5-7 y K5-8:** repetir en computadora, con las medidas nuevas.
+- **L2-1:** **cambia** el paso 2. En la agendada, «No asistió» se hace desde los tres puntos (que
+  abren el formulario): estado «No asistió» y «Guardar», sin pregunta. El paso 1 (la confirmada) no
+  cambia.
+- **L2-5:** **cambia.** La escala de la reserva (18/15/14 y 44 px) vale sólo para el teléfono; en
+  computadora, M1-1.
+- **G3-4 y G3-5:** repetir. «Editar» de la casilla y los tres puntos abren el mismo formulario.
+- **F22, E10, T1-6 y T1-7:** repetir en computadora: tocan la burbuja y su posición.
+
+**La configuración (tandas B, H, J, K y L)**
+- **L3-16:** **cambia.** El texto es «Solo el médico administrador puede cambiar estas opciones.»,
+  en una caja azul; a la secretaria le sale al inicio de la pestaña y no dentro de la tarjeta (M2-2).
+- **L3-12:** **cambia.** En computadora el título ya no crece a 20 y los controles miden 40, no 44
+  (M2-1). En el teléfono, igual.
+- **K3-11, J5-5, B2, B3 y H2-5:** el texto y la caja nuevos donde antes salía la frase de la tanda L.
+- **El funnel de la Dra. Invitada** (J5-1 a J5-3, K3-13): en el paso de avisos la caja sale arriba,
+  no al final.
+- **«Más opciones» de la secretaria y de la invitada:** ahora ven «Empezar de nuevo» sin botón, con
+  la caja encima (M2-2, M2-3).
+
+**La barra, el bloqueo y el rayado (tandas F, I, K y L)**
+- **K1-1:** **cambia otra vez.** El bloqueo se crea con el candado y también desde «Nueva cita» ›
+  «Bloqueo» (M3-2).
+- **K1-3 y L1-3:** repetir: la parte gris de un bloqueo de todo el día también abre su edición
+  (M3-3).
+- **L1-2:** el rayado de un bloqueo de todo el día, sólo en el horario (M3-3).
+- **I5-1:** **cambia.** «Una sola fila» vale desde 1360 px; de 1024 a 1359 son dos filas limpias
+  (M3-1).
+- **F1 y L1-1** (la barra y el candado junto a la campana): repetir a 1024, 1280 y 1366 (M3-1).
+
+**La reserva y los correos (bloques D y E, tandas G, I, K y L)**
+- **L4-3:** **cambia.** El aviso del paso 4 sale en verde con palomita (M4-1).
+- **K2-4 y K2-6:** repetir: el mismo aviso, en verde.
+- **D4 y H1-1:** repetir: la pantalla final lleva «Salir» (M4-3), y el correo del código es el nuevo
+  (M5-1).
+- **G1-7:** **cambia.** La marca de arriba es la franja azul con el consultorio y el médico, el
+  código ya no va en «letra de 32» y el pie es «Este es un mensaje automático… Enviado con Spinus».
+- **E1, E3, E8, G3-1, I1-4, I2-10, I5-9, K2-1, K2-3 y L4-4:** repetir. Mismos pasos; sólo cambia el
+  aspecto del correo (M5-2 a M5-8).
+
+**Apagado**
+- **X1 y X7:** nada de M1 a M3 se ve: ni la burbuja nueva, ni «Bloqueo» en «Nueva cita», ni la barra
+  en dos filas, ni el rayado recortado. Los correos (M5) y la reserva (M4) son los mismos con la v2
+  apagada.
+
+---
+
 ## 9. Seguridad
 
 ### 9.1 Aislamiento entre clínicas y entre médicos
@@ -6498,6 +6921,34 @@ Marca cada una al pasarla. Si una falla, anota el número y qué viste.
 - [ ] L5-4. Google no mueve una reserva por enlace
 - [ ] L-INT-1. «Eliminar cita» dentro de un bloqueo
 
+**Tanda M**
+- [ ] M1-1. La burbuja en computadora, del tamaño de antes
+- [ ] M1-2. En el teléfono, igual que antes
+- [ ] M1-3. La burbuja nunca se sale
+- [ ] M1-4. Los tres puntos abren el formulario
+- [ ] M1-5. Las observaciones en una línea
+- [ ] M1-6. La confirmada sigue preguntando
+- [ ] M2-1. La configuración en la computadora, más compacta
+- [ ] M2-2. Lo que ve la secretaria
+- [ ] M2-3. Lo que ve la médica invitada
+- [ ] M3-1. La barra en una fila o en dos filas limpias
+- [ ] M3-2. «Bloqueo» en «Nueva cita»
+- [ ] M3-3. El rayado sólo en el horario
+- [ ] M4-1. «Tu correo ya está verificado» en verde
+- [ ] M4-2. Los errores siguen en rojo
+- [ ] M4-3. «Salir»
+- [ ] M5-1. El correo del código
+- [ ] M5-2. El comprobante dice «Cita agendada»
+- [ ] M5-3. El botón del comprobante
+- [ ] M5-4. La confirmación desde la agenda
+- [ ] M5-5. Los dos botones de la confirmación
+- [ ] M5-6. Recordatorio, ya confirmada y cambio
+- [ ] M5-7. Sin dirección ni teléfono
+- [ ] M5-8. El aviso a la clínica
+- [ ] M5-9. En el teléfono y en modo oscuro
+- [ ] M-INT-1. El `audit_log` no se puede vaciar
+- [ ] M-INT-2. La burbuja y «Nueva cita» conviven
+
 **Seguridad**
 - [ ] S1. La Clínica B no ve la A
 - [ ] S2. Lo mismo, directo a la base
@@ -6640,6 +7091,8 @@ Marca cada una al pasarla. Si una falla, anota el número y qué viste.
 | 41 | `20261124120000_agenda_l1_bloqueo_total.sql` | El bloqueo es total: con la v2, la base no deja agendar ni mover nada dentro de un bloqueo, aunque alguien se salte la pantalla; lo de Google y las reservas por enlace entran como hoy (L1-4 a L1-7). **Después de la 38** |
 | 42 | `20261124130000_agenda_l2_eliminar_cancelada.sql` | «Eliminar cita» quita una cancelada de la agenda sin borrarla: queda cerrada y en la auditoría (L2-2, L2-3). **Después de la 33** |
 | 43 | `20261124160000_agenda_l5_aviso_confirmacion_paciente.sql` | El aviso en la campana cuando el paciente confirma desde su enlace (L5-1, L5-2). **Después de la 37** |
+
+**Aparte, no es de la agenda:** `20261125170000_audit_log_sin_truncate.sql` (tanda M, tu encargo): quita TRUNCATE sobre `audit_log` a `anon`, `authenticated` y `service_role` y añade un disparador que lo impide. **Se aplica sola y puede ir antes que la 1**: sólo depende de lo que producción ya tiene. Al final, una tabla con «OK» en las filas 1 a 5 (M-INT-1).
 
 Son **43**. Las tres de la tanda L (41 a 43) van al final y en ese orden; no dependen entre sí. **Nunca vuelvas a correr la 37 después de la 43** (se detiene sin hacer nada: no reconoce los avisos que añade la 43). Antes de la tanda L eran 40. Las tres de la tanda K (38 a 40) van al final y en ese orden: **la 38 antes que la 40, siempre** (la 40 sin la 38 se detiene; la 38 después de la 40, también). Antes de la tanda K eran 37. Las tres de la tanda J (35 a 37) van al final y en ese orden; **nunca vuelvas a correr la 35 después de la 36** (se detiene sin hacer nada: no reconoce lo que dejó la 36). Antes de la tanda J eran 34. Las siete de la tanda I (28 a 34) van al final y en ese orden. Antes de la tanda I eran 27: Las tres de la tanda H (25 a 27) van al final y en ese orden. Las cuatro de la tanda del 2026-11-14 (21 a 24) van al final y en ese orden; las 17 a 20 van en este orden aunque se escribieron
 después: las 17 y 18 añaden reglas a la tabla de citas, la 19 reemplaza

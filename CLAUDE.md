@@ -447,14 +447,16 @@ Plan, decisiones y avance: `mejora_agendaV2.md` (§6-bis decisiones, §7 lo que
 le toca a Angel, §10 lo que no se probó en local). Auditoría del conjunto de
 migraciones: `supabase/AUDITORIA-CONJUNTO-AGENDA-V2.md`. Guía local:
 `GUIA_AUDITORIA_AGENDA_V2.md`; pruebas a mano: `GUIA_PRUEBAS_AGENDA_V2.md`.
-Deuda abierta: `DEUDA_TECNICA.md`, AG-DT-13 a AG-DT-230.
+Deuda abierta: `DEUDA_TECNICA.md`, AG-DT-13 a AG-DT-255.
 
 **Estado:** el código y las 43 migraciones (`20261111120000` a
 `20261124160000`: las 16 del cierre, las 4 de las correcciones de seguridad,
 las 4 de la tanda de diseño, duración y horarios, las 3 de la tanda H, las 7 de
 la tanda I, las 3 de la tanda J, las 3 de la tanda K y las 3 de la tanda L; 48
 con las 5 de `main`) están en `feature/agenda-v2`,
-probados sólo en local. En producción no hay nada
+probados sólo en local. Desde la tanda M hay además una migración que **no es
+de la agenda**, `20261125170000_audit_log_sin_truncate.sql` (49 en total): se
+aplica sola y puede ir antes que todas. En producción no hay nada
 aplicado ni encendido hasta que Angel lo haga (§7).
 
 **Reglas que un editor futuro no debe romper:**
@@ -1087,7 +1089,10 @@ proyecto, 32 con las de `main`).** Además de lo de arriba:
 * **«Solo el administrador de la clínica puede cambiar estas opciones.»**
   (`SOLO_ADMIN`, `data-solo-admin`) va sólo donde la ruta deja cambiar al
   administrador y a nadie más (`canManageClinica`). No la pongas en los tipos de
-  cita ni en el horario de un consultorio: ahí no es cierta.
+  cita ni en el horario de un consultorio: ahí no es cierta. *(Desde M2 el texto
+  es «Solo el médico administrador…» y va por rol, también a la secretaria en
+  «Tipos de cita» y «Cuándo dan consulta»: ahí no es exacto del todo, PARA
+  REVISIÓN DE ANGEL, AG-DT-235. Ver «Tanda M».)*
 * **`/confirmar/[codigo]` con «Confirmo mi asistencia» no confirma al cargar**
   (L4): espera un gesto de confianza fuera de un control
   (`esGestoParaConfirmar`: un `click`, o Enter o una tecla que escribe, en lista
@@ -1119,6 +1124,89 @@ proyecto, 32 con las de `main`).** Además de lo de arriba:
   los tres roles y NO entran.
 * **No vuelvas a correr J4 (`20261122140000`) después de L5:** su pre-vuelo
   admite 5 o 6 tipos de aviso y ahora hay 7 (aborta limpio, AG-DT-229).
+
+**Tanda M (2026-11-19, ramas M1-M5; sin migraciones de la agenda):**
+
+* **`audit_log` no se borra NUNCA, tampoco en local ni en pruebas** (orden de
+  Angel, literal: «No vuelvas a borrar filas de audit_log, tampoco en local ni
+  de pruebas»). Ni DELETE, ni TRUNCATE, ni `session_replication_role = replica`
+  para saltarse `prevent_audit_delete`, **ni `supabase db reset` de la base
+  local** (la vacía): una migración nueva se aplica sola sobre la base que hay.
+  Para contar auditoría, filtra por tus ids o por `created_at >=` una marca
+  (`clock_timestamp()` antes de la acción), nunca por una ventana de minutos.
+  Lo vigila `src/lib/tests/pruebasSinBorrarAuditoria.test.ts`; su única
+  excepción es `m_audit_log_sin_truncate.sql`, que INTENTA el TRUNCATE para
+  ver que falla, dentro de subbloques deshechos y con `rollback`.
+* **`20261125170000_audit_log_sin_truncate.sql`:** `anon`, `authenticated` y
+  `service_role` ya no tienen TRUNCATE sobre `audit_log`, y
+  `prevent_audit_truncate` (de sentencia, con `prevent_audit_modification()`)
+  para al dueño. No le devuelvas el privilegio. Las otras 30 tablas de `public`
+  con TRUNCATE siguen igual a propósito (AG-DT-253).
+* **La burbuja de la cita tiene dos tamaños,** según el ancho:
+  - computadora (`.ag-capa.ag-burbuja`, desde `ANCHO_MOVIL` = 1024 px): las
+    medidas de la tarjeta de J. Son 360 de ancho, letra de 16/15/13/12 y
+    acciones de 13 px y 48 de alto, con el icono a la izquierda;
+  - teléfono y tableta (`.ag-hoja.ag-burbuja`): la escala de L2, con toques de
+    44 px.
+
+  Toda regla nueva de computadora va acotada a `.ag-capa.ag-burbuja`.
+  `agenda-m1-burbuja.e2e.ts` mide la de computadora y `agenda-l2` la del
+  teléfono.
+* **Los tres puntos de la burbuja abren el formulario completo
+  (`alAccion('editar')`) y no tienen menú** (M1, punto 4). Lo que quede fuera de
+  la burbuja va al formulario: no se crea otro panel. Las observaciones son una
+  línea recortada, con el texto en `title`.
+* **«No asistió» de la agendada se hace en el formulario y no pregunta.** El de
+  la confirmada es casilla y pregunta (`pideConfirmacion`).
+* **La configuración de la agenda tiene DOS escalas:** teléfono (base) y
+  computadora (`sm:`, desde 640). En computadora: h1 18, títulos de sección 16,
+  texto 13–14, controles 13 px y 40 de alto, rellenos ≥ 14 × 5/6. Todo cambio de
+  tamaño ahí va en las dos y lo vigila `src/lib/tests/configuracionEscala.test.ts`.
+  El teléfono no baja de 44.
+* **El aviso de quien no administra es `SOLO_ADMIN` + `AVISO_SOLO_ADMIN`** de
+  `estilosConfig.ts` («Solo el médico administrador puede cambiar estas
+  opciones.»): una vez por pestaña, nunca encima de algo que ese rol sí puede
+  hacer (en «Más opciones» la secretaria desbloquea personas). Sustituye a la
+  frase de la tanda L.
+* **La barra v2 son dos ítems de rejilla** (`.ag-controles-nav` /
+  `.ag-controles-acciones`): una fila desde 1360 px («+» hasta 1439), dos filas
+  limpias de 1024 a 1359. El filtro mide el nombre elegido (`.ag-filtro-medida`)
+  y no encoge. Una sola fila de 1024 a 1359 no cabe: PENDIENTE DE ANGEL
+  (AG-DT-242), no la fuerces.
+* **«Bloqueo» vuelve como tercera posición de «Nueva cita»** (M3, sólo v2): abre
+  el MISMO modal del candado (`abrirAltaBloqueo`) con la hora del formulario. No
+  vuelve la pregunta de K1.
+* **El rayado de un bloqueo se pinta sólo en horario** (`tramosDelRayado`, la
+  misma `businessHours` que el gris), pero la franja de FullCalendar sigue
+  cubriéndolo entero (el clic se decide por el instante). Las horas llegan por
+  `fijarRayadoBloqueos`, nunca por `eventContent`.
+* **«Tu correo ya está verificado» no es un error** (M4, punto 7): viaja por el
+  estado `error` de `useReserva`, pero `NotaDelPaso` lo pinta verde
+  (`rp-nota--ok`) y con `role="status"`. Si cambias su texto, cámbialo en
+  `YA_VERIFICADO`, que es lo que lo distingue. Los errores, en rojo y
+  `role="alert"`.
+* **«Salir» del comprobante** (M4, punto 8): `olvidar` + `window.close()`; si a
+  los 300 ms `window.closed` sigue en falso, «Ya puedes cerrar esta pestaña». No
+  lo publiques por el `BroadcastChannel`.
+* **Las pruebas de Vitest no dependen de la zona del proceso.** Una fecha que la
+  app lee en la hora del dispositivo (los avisos con la v2 apagada, los sellos
+  de los PDF) se escribe en la prueba como hora de pared
+  (`new Date(a, m, d, h, min)`), no como instante UTC fijo. Antes de dar por
+  buena la batería, córrela sin `TZ`, con `TZ=UTC` y con
+  `TZ=America/Hermosillo`. El sello del consentimiento en la zona del equipo es
+  un defecto de la app, PENDIENTE DE ANGEL (AG-DT-243): su prueba falla en
+  Tokio y Kiritimati.
+* **Correos de la agenda (M5):** todos salen de `src/lib/correo/plantillaCita.ts`,
+  el esqueleto de las tres maquetas de `docs/spec/correo-*.html`.
+  - Tablas, estilos en línea, siempre en claro y todo escapado ahí.
+  - Los colores son hex de los tokens de la app, no de la maqueta: el acento es
+    `--cs` #1e5fa8 y la cabecera `--ag-navy` #163250. No cambies un hex sin su
+    token.
+  - Una fila o frase sin su dato desaparece entera.
+  - «hora de …» sale de `HORA_DE_ZONA`; cada zona nueva de `ZONAS_MEXICO`
+    necesita su frase (lo exige una prueba).
+  - El plazo de cancelar de los correos (`PLAZO_CANCELAR`, 1 hora) refleja la
+    regla fija de E1: si cambia una, cambia la otra (AG-DT-249).
 
 ---
 
