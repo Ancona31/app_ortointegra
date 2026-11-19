@@ -90,3 +90,11 @@ export function opcion(elegida: boolean): string {
     ? 'border-[var(--ag-brand-secondary)] bg-[var(--ag-primary-bg-faint)] text-[var(--ag-brand-legible)]'
     : 'border-[var(--ag-control-border)] bg-[var(--ag-surface)] text-[var(--ag-ink)]'}`
 }
+
+/**
+ * Tanda L, punto 16 de Angel: lo que ve quien NO administra la clínica en lo que no puede cambiar, una
+ * vez por bloque (`data-solo-admin`). Sólo donde la ruta deja cambiar al administrador y a nadie más
+ * (`canManageClinica`): el horario de la clínica y los avisos. No en los tipos de cita (cada médico
+ * cambia los suyos) ni en el horario de un consultorio (sólo su dueño, tampoco el administrador).
+ */
+export const SOLO_ADMIN = 'Solo el administrador de la clínica puede cambiar estas opciones.'

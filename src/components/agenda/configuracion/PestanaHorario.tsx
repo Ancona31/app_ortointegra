@@ -23,7 +23,7 @@ import DialogoHorario from '@/components/agenda/configuracion/DialogoHorario'
 import { nombreHuso } from '@/components/agenda/configuracion/SelectorHuso'
 import { guardarHorarioClinica, guardarHorarioConsultorio, type CambiosConsultorio } from '@/components/agenda/configuracion/accionesConfig'
 import type { Avisar } from '@/components/agenda/configuracion/estadoAvisos'
-import { AYUDA, BOTON_CHICO, PANEL, SUB_PANEL, TITULO_PANEL } from '@/components/agenda/configuracion/estilosConfig'
+import { AYUDA, BOTON_CHICO, PANEL, SOLO_ADMIN, SUB_PANEL, TITULO_PANEL } from '@/components/agenda/configuracion/estilosConfig'
 import { lineasHorario, textoHorario } from '@/lib/agenda/gruposHorario'
 import { horarioEfectivo } from '@/lib/agenda/disponibilidad'
 import type { ModoHorario } from '@/lib/agenda/primeraVez'
@@ -111,8 +111,9 @@ function TarjetaClinica({ p, alAbrir }: { p: Props; alAbrir: () => void }) {
           : <span className="text-[14px] italic text-[var(--ag-muted)]">Sin días de consulta</span>}
         {p.husoClinica && <span className="text-[14px] text-[var(--ag-text)]">Huso horario: {nombreHuso(p.husoClinica)}</span>}
         <span className="text-[13.5px] leading-[1.5] text-[var(--ag-ink-600)]">
-          Lo usan los consultorios que dicen «Igual que la clínica».{p.puedeAdministrar ? '' : ' Lo cambia quien administra la clínica.'}
+          Lo usan los consultorios que dicen «Igual que la clínica».
         </span>
+        {!p.puedeAdministrar && <span data-solo-admin className={AYUDA}>{SOLO_ADMIN}</span>}
       </div>
       {p.puedeAdministrar && p.horarioClinica && (
         <button type="button" onClick={alAbrir} className={BOTON_CHICO} aria-label="Cambiar horario de la clínica">Cambiar horario</button>

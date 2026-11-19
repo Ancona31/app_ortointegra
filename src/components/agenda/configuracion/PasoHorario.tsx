@@ -8,7 +8,7 @@
  * (`PrimeraVez`), que es quien tiene lo elegido.
  */
 import EditorDias from '@/components/agenda/configuracion/EditorDias'
-import { SUB_PASO, TARJETA, TITULO_PASO } from '@/components/agenda/configuracion/estilosConfig'
+import { AYUDA, SOLO_ADMIN, SUB_PASO, TARJETA, TITULO_PASO } from '@/components/agenda/configuracion/estilosConfig'
 import { textoHorario } from '@/lib/agenda/gruposHorario'
 import type { ModoHorario } from '@/lib/agenda/primeraVez'
 import type { Horario } from '@/lib/configApp'
@@ -19,6 +19,8 @@ interface Props {
   consultorios: readonly { id: string; nombre: string }[]
   elecciones: Readonly<Record<string, EleccionHorario>>
   horarioClinica: Horario
+  /** Tanda L (punto 16): quien no administra ve de qué horario parte «Igual que la clínica» y que no lo cambia él. */
+  puedeAdministrar: boolean
   alCambiar: (id: string, e: EleccionHorario) => void
 }
 
@@ -54,7 +56,7 @@ function TarjetaConsultorio({ nombre, eleccion, textoClinica, alCambiar }: { nom
   )
 }
 
-export default function PasoHorario({ consultorios, elecciones, horarioClinica, alCambiar }: Props) {
+export default function PasoHorario({ consultorios, elecciones, horarioClinica, puedeAdministrar, alCambiar }: Props) {
   const textoClinica = textoHorario(horarioClinica)
   return (
     <section className="flex flex-col gap-[20px]" aria-labelledby="primera-vez-titulo">
@@ -66,6 +68,12 @@ export default function PasoHorario({ consultorios, elecciones, horarioClinica, 
         const e = elecciones[c.id]
         return e ? <TarjetaConsultorio key={c.id} nombre={c.nombre} eleccion={e} textoClinica={textoClinica} alCambiar={x => alCambiar(c.id, x)} /> : null
       })}
+      {!puedeAdministrar && (
+        <p className={`m-0 ${AYUDA}`}>
+          El horario de la clínica es {textoClinica || 'sin días de consulta'}.{' '}
+          <span data-solo-admin>{SOLO_ADMIN}</span>
+        </p>
+      )}
     </section>
   )
 }

@@ -17,7 +17,7 @@
  */
 import { useId, useState } from 'react'
 import Interruptor from '@/components/agenda/configuracion/Interruptor'
-import { AYUDA, BLOQUE, BOTON_CHICO, CAMPO_NUEVO, ERROR, ETIQUETA, TARJETA, TITULO_BLOQUE } from '@/components/agenda/configuracion/estilosConfig'
+import { AYUDA, BLOQUE, BOTON_CHICO, CAMPO_NUEVO, ERROR, ETIQUETA, SOLO_ADMIN, TARJETA, TITULO_BLOQUE } from '@/components/agenda/configuracion/estilosConfig'
 import type { EstadoAvisos } from '@/components/agenda/configuracion/estadoAvisos'
 import { opcionesRecordatorio } from '@/lib/agenda/primeraVez'
 import { LIMITES_AJUSTES_AGENDA, type CampoAjusteAgenda } from '@/lib/agenda/ajustesAgenda'
@@ -148,8 +148,6 @@ function PlazosAbiertos(p: Props) {
   )
 }
 
-const SOLO_ADMIN = 'Estos avisos los cambia quien administra la clínica.'
-
 export default function BloquesAvisos(p: Props) {
   if (p.variante === 'funnel') {
     return (
@@ -157,13 +155,13 @@ export default function BloquesAvisos(p: Props) {
         <div className={`${TARJETA} gap-[14px] px-[24px] py-[22px]`}><Recordatorio {...p} /></div>
         <div className={`${TARJETA} px-[24px] py-[22px]`}><AvisoClinica {...p} /></div>
         <div className={`${TARJETA} gap-[14px] px-[24px] py-[22px]`}><PlazosPlegados {...p} /></div>
-        {!p.puedeEditar && <p className={AYUDA}>{SOLO_ADMIN}</p>}
+        {!p.puedeEditar && <p data-solo-admin className={`m-0 ${AYUDA}`}>{SOLO_ADMIN}</p>}
       </>
     )
   }
   return (
     <>
-      {!p.puedeEditar && <p className={AYUDA}>{SOLO_ADMIN}</p>}
+      {!p.puedeEditar && <p data-solo-admin className={`m-0 ${AYUDA}`}>{SOLO_ADMIN}</p>}
       <div className={BLOQUE}><Recordatorio {...p} /></div>
       <div className={BLOQUE}><AvisoClinica {...p} /></div>
       <div className={BLOQUE}><PlazosAbiertos {...p} /></div>

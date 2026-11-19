@@ -419,7 +419,7 @@ test('15 · el administrador cambia el horario de la clínica (base y audit_log)
   await enContextoNuevo(browser, SESION.secretariaA, async (p) => {
     await p.goto(RUTA)
     await pestanaConfig(p, 'Cuándo dan consulta')
-    await expect(p.locator('[data-horario-clinica]')).toContainText('Lo cambia quien administra la clínica.')
+    await expect(p.locator('[data-horario-clinica]')).toContainText('Solo el administrador de la clínica puede cambiar estas opciones.')
     await expect(p.getByRole('button', { name: 'Cambiar horario de la clínica' })).toHaveCount(0)
   })
 })

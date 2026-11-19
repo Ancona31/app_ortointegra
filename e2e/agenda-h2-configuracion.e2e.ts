@@ -308,7 +308,7 @@ test('9 · la invitada y la secretaria no lo pueden cambiar (deshabilitado y 403
         await p.goto(RUTA)
         await pestanaConfig(p, 'Avisos')
         await expect(p.getByRole('switch', { name: 'Recordarle su cita al paciente' })).toBeDisabled()
-        await expect(p.getByText('Estos avisos los cambia quien administra la clínica.')).toBeVisible()
+        await expect(p.locator('#config-panel-avisos').getByText('Solo el administrador de la clínica puede cambiar estas opciones.')).toBeVisible()
         // El aviso a la clínica no le llega a ella: no se lo dice como si sí (J5).
         await expect(p.getByRole('switch', { name: 'Avisar a la clínica cuando alguien aparte cita' })).toBeDisabled()
         await expect(p.getByText('Te llega un correo cada vez que un paciente aparta')).toHaveCount(0)

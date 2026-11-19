@@ -286,7 +286,7 @@ export default function PrimeraVez(p: Props) {
       {paso === 0 && <PasoClinica eleccion={f.clinica} alCambiar={f.setClinica} />}
       {paso === 1 && (
         <PasoHorario consultorios={p.consultorios} elecciones={f.elecciones} horarioClinica={p.horarioClinica}
-          alCambiar={(id, e) => f.setElecciones(x => ({ ...x, [id]: e }))} />
+          puedeAdministrar={p.puedeAdministrar} alCambiar={(id, e) => f.setElecciones(x => ({ ...x, [id]: e }))} />
       )}
       {paso === 2 && <PasoDuracion eleccion={f.duracion} horarios={horarios} alCambiar={f.setDuracion} />}
       {paso === 3 && <PasoAvisos avisos={p.avisos} puedeAdministrar={p.puedeAdministrar} />}

@@ -205,7 +205,7 @@ test.describe('con el interruptor encendido', () => {
       await pestanaConfig(p, 'Avisos')
       await expect(p.getByLabel('Pueden ver horarios de los próximos')).toBeDisabled()
       await expect(p.getByLabel('Pueden ver horarios de los próximos')).toHaveValue('60')
-      await expect(p.getByText('Estos avisos los cambia quien administra la clínica.')).toBeVisible()
+      await expect(p.locator('#config-panel-avisos').getByText('Solo el administrador de la clínica puede cambiar estas opciones.')).toBeVisible()
       await pestanaConfig(p, 'Tipos de cita')
       await expect(p.getByRole('button', { name: 'Agregar tipo de cita' })).toHaveCount(0)
       await pestanaConfig(p, 'Cuándo dan consulta')
