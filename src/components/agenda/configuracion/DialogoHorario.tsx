@@ -69,7 +69,7 @@ export default function DialogoHorario({ titulo, modos, horario, nota, huso: hus
         <div ref={montarPanel} onKeyDown={alPulsarTecla} role="dialog" aria-modal="true" aria-labelledby={`${id}-t`} tabIndex={-1}
           className="ag-modal-panel relative flex max-h-full w-full max-w-[680px] flex-col overflow-hidden rounded-[20px] bg-[var(--ag-modal-bg)] shadow-[var(--ag-shadow-pop)] focus:outline-none">
           <div className="flex items-center justify-between gap-[12px] border-b border-[var(--ag-hairline)] px-[20px] py-[16px] sm:px-[28px] sm:py-[20px]">
-            <h2 id={`${id}-t`} className="m-0 text-[21px] font-bold text-[var(--ag-ink)]">{titulo}</h2>
+            <h2 id={`${id}-t`} className="m-0 text-[16px] font-bold text-[var(--ag-ink)]">{titulo}</h2>
             <button type="button" onClick={alCerrar} aria-label="Cerrar"
               className="inline-flex h-[44px] w-[44px] cursor-pointer items-center justify-center rounded-[8px] border-0 bg-transparent text-[var(--ag-ink-600)]">
               <X size={22} aria-hidden="true" />
@@ -79,12 +79,12 @@ export default function DialogoHorario({ titulo, modos, horario, nota, huso: hus
           <div className="flex min-h-0 flex-1 flex-col gap-[16px] overflow-y-auto px-[20px] py-[22px] sm:px-[28px]">
             {modos && <Segmento modo={modo} alElegir={setModo} />}
             {modos && modo === 'clinica' ? (
-              <p className="m-0 rounded-[12px] bg-[var(--ag-primary-bg-faint)] p-[16px] text-[16px] leading-[1.5] text-[var(--ag-ink)]">
+              <p className="m-0 rounded-[12px] bg-[var(--ag-primary-bg-faint)] p-[16px] text-[14px] leading-[1.5] text-[var(--ag-ink)]">
                 Aquí darás consulta en el horario de la clínica: <strong>{modos.textoClinica || 'sin días de consulta'}</strong>. Si la clínica cambia su horario, el tuyo cambia también.
               </p>
             ) : <EditorDias horario={dias} alCambiar={setDias} />}
             {huso !== undefined && <SelectorHuso valor={huso} alCambiar={setHuso} />}
-            <p className="m-0 text-[14px] leading-[1.5] text-[var(--ag-ink-600)]">{nota}</p>
+            <p className="m-0 text-[13.5px] leading-[1.5] text-[var(--ag-ink-600)]">{nota}</p>
             {error && <p role="alert" className={ERROR}>{error}</p>}
           </div>
           <div className="flex flex-wrap justify-end gap-[10px] border-t border-[var(--ag-hairline)] px-[20px] py-[16px] sm:px-[28px]">

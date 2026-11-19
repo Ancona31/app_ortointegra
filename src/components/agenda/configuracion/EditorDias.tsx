@@ -49,14 +49,14 @@ function FilaDia({ dia, nombre, horario, alCambiar }: { dia: DiaSemana; nombre: 
       ? 'bg-[var(--ag-primary-bg-faint)]' : 'bg-[var(--ag-surface-sunken)]'}`}>
       <div className="flex min-w-[160px] items-center gap-[14px]">
         <Interruptor encendido={d.activo} etiqueta={nombre} alCambiar={() => alCambiar(d.activo ? { ...horario, [dia]: { ...d, activo: false } } : prenderDia(horario, dia))} />
-        <span className={`text-[17px] font-semibold ${d.activo ? 'text-[var(--ag-ink)]' : 'text-[var(--ag-muted)]'}`}>{nombre}</span>
+        <span className={`text-[15px] font-semibold ${d.activo ? 'text-[var(--ag-ink)]' : 'text-[var(--ag-muted)]'}`}>{nombre}</span>
       </div>
       {d.activo ? (
         <div className="flex flex-wrap items-center gap-[10px]">
-          <label htmlFor={`${id}-e`} className="flex items-center gap-[6px] text-[15px] text-[var(--ag-text)]">Entras
+          <label htmlFor={`${id}-e`} className="flex items-center gap-[6px] text-[14px] text-[var(--ag-text)]">Entras
             <input id={`${id}-e`} type="time" className={CAMPO_NUEVO} value={d.inicio} onChange={e => poner({ inicio: e.target.value })} />
           </label>
-          <label htmlFor={`${id}-s`} className="flex items-center gap-[6px] text-[15px] text-[var(--ag-text)]">Sales
+          <label htmlFor={`${id}-s`} className="flex items-center gap-[6px] text-[14px] text-[var(--ag-text)]">Sales
             <input id={`${id}-s`} type="time" className={CAMPO_NUEVO} value={d.fin} onChange={e => poner({ fin: e.target.value })} />
           </label>
           {alReves && <p role="alert" className={`${ERROR} basis-full`}>Sales antes de entrar: cambia una de las dos horas.</p>}
@@ -72,7 +72,7 @@ export default function EditorDias({ horario, alCambiar, conInstruccion }: Props
   const ninguno = !DIAS.some(d => horario[d.key].activo)
   return (
     <div className="flex flex-col gap-[8px]">
-      {conInstruccion && <p className="mb-[4px] mt-0 text-[15px] text-[var(--ag-text)]">Prende los días que vienes y pon a qué hora entras y sales.</p>}
+      {conInstruccion && <p className="mb-[4px] mt-0 text-[14px] text-[var(--ag-text)]">Prende los días que vienes y pon a qué hora entras y sales.</p>}
       {DIAS.map(d => <FilaDia key={d.key} dia={d.key} nombre={d.label} horario={horario} alCambiar={alCambiar} />)}
       {ninguno && <p role="alert" className={ERROR}>Prende al menos un día.</p>}
     </div>

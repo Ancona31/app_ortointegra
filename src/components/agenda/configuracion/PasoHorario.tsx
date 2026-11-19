@@ -30,8 +30,8 @@ function Opcion({ elegida, titulo, sub, alElegir }: { elegida: boolean; titulo: 
       <span aria-hidden="true" className={`h-[20px] w-[20px] flex-none rounded-full bg-[var(--ag-surface)] ${elegida
         ? 'border-[6px] border-[var(--ag-brand-secondary)]' : 'border-2 border-[var(--ag-muted2)]'}`} />
       <span className="flex flex-col gap-[2px]">
-        <span className="text-[16px] font-semibold text-[var(--ag-ink)]">{titulo}</span>
-        <span className="text-[14px] text-[var(--ag-ink-600)]">{sub}</span>
+        <span className="text-[15px] font-semibold text-[var(--ag-ink)]">{titulo}</span>
+        <span className="text-[13.5px] text-[var(--ag-ink-600)]">{sub}</span>
       </span>
     </button>
   )
@@ -40,7 +40,7 @@ function Opcion({ elegida, titulo, sub, alElegir }: { elegida: boolean; titulo: 
 function TarjetaConsultorio({ nombre, eleccion, textoClinica, alCambiar }: { nombre: string; eleccion: EleccionHorario; textoClinica: string; alCambiar: (e: EleccionHorario) => void }) {
   return (
     <div className={`${TARJETA} gap-[14px]`} aria-label={nombre} role="group">
-      <h2 className="m-0 text-[19px] font-bold text-[var(--ag-ink)]">{nombre}</h2>
+      <h2 className="m-0 text-[16px] font-bold text-[var(--ag-ink)]">{nombre}</h2>
       <div className="flex flex-col gap-[8px]">
         <Opcion elegida={eleccion.modo === 'clinica'} titulo="Igual que la clínica" sub={textoClinica || 'La clínica no tiene días de consulta'}
           alElegir={() => alCambiar({ ...eleccion, modo: 'clinica' })} />

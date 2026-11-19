@@ -60,15 +60,15 @@ function Tarjeta({ c, p, alAbrir, alConfirmar }: { c: Consultorio; p: Props; alA
     <div role="group" aria-label={c.nombre} className="flex flex-wrap items-start justify-between gap-[16px] rounded-[12px] border border-[var(--ag-border-card)] px-[20px] py-[18px]">
       <div className="flex flex-col gap-[6px]">
         <div className="flex flex-wrap items-center gap-[10px]">
-          <span className="text-[17px] font-bold text-[var(--ag-ink)]">{c.nombre}</span>
+          <span className="text-[15px] font-semibold text-[var(--ag-ink)]">{c.nombre}</span>
           <span className={`${INSIGNIA} ${propio ? 'bg-[var(--ag-primary-bg-faint)] text-[var(--ag-brand-legible)]' : 'bg-[var(--ag-segment-bg)] text-[var(--ag-ink-600)]'}`}>
             {propio ? 'Horario propio' : 'Igual que la clínica'}
           </span>
           {c.horario_revisado_en === null && <span className={`${INSIGNIA} bg-[var(--ag-aviso-bg)] text-[var(--ag-aviso-text)]`}>Por revisar</span>}
         </div>
-        {medico && <span className="text-[15px] text-[var(--ag-ink-600)]">{componerNombreMedicoCompleto(medico)}</span>}
-        {lineas.length ? lineas.map(l => <span key={l} className="text-[15px] text-[var(--ag-text)]">{l}</span>)
-          : <span className="text-[15px] italic text-[var(--ag-muted)]">Sin días de consulta</span>}
+        {medico && <span className="text-[13.5px] text-[var(--ag-ink-600)]">{componerNombreMedicoCompleto(medico)}</span>}
+        {lineas.length ? lineas.map(l => <span key={l} className="text-[14px] text-[var(--ag-text)]">{l}</span>)
+          : <span className="text-[14px] italic text-[var(--ag-muted)]">Sin días de consulta</span>}
       </div>
       {esDueno && (
         <div className="flex flex-wrap gap-[8px]">
@@ -105,12 +105,12 @@ function TarjetaClinica({ p, alAbrir }: { p: Props; alAbrir: () => void }) {
     <div role="group" aria-label="Horario de la clínica" data-horario-clinica
       className="flex flex-wrap items-start justify-between gap-[16px] rounded-[12px] border border-[var(--ag-border-card)] px-[20px] py-[18px]">
       <div className="flex flex-col gap-[6px]">
-        <span className="text-[17px] font-bold text-[var(--ag-ink)]">Horario de la clínica</span>
-        {!lineas ? <span className="text-[15px] text-[var(--ag-ink-600)]">{p.fallo ? 'No se pudo cargar. Recarga la página.' : '…'}</span>
-          : lineas.length ? lineas.map(l => <span key={l} className="text-[15px] text-[var(--ag-text)]">{l}</span>)
-          : <span className="text-[15px] italic text-[var(--ag-muted)]">Sin días de consulta</span>}
-        {p.husoClinica && <span className="text-[15px] text-[var(--ag-text)]">Huso horario: {nombreHuso(p.husoClinica)}</span>}
-        <span className="text-[14px] leading-[1.5] text-[var(--ag-ink-600)]">
+        <span className="text-[15px] font-semibold text-[var(--ag-ink)]">Horario de la clínica</span>
+        {!lineas ? <span className="text-[14px] text-[var(--ag-ink-600)]">{p.fallo ? 'No se pudo cargar. Recarga la página.' : '…'}</span>
+          : lineas.length ? lineas.map(l => <span key={l} className="text-[14px] text-[var(--ag-text)]">{l}</span>)
+          : <span className="text-[14px] italic text-[var(--ag-muted)]">Sin días de consulta</span>}
+        {p.husoClinica && <span className="text-[14px] text-[var(--ag-text)]">Huso horario: {nombreHuso(p.husoClinica)}</span>}
+        <span className="text-[13.5px] leading-[1.5] text-[var(--ag-ink-600)]">
           Lo usan los consultorios que dicen «Igual que la clínica».{p.puedeAdministrar ? '' : ' Lo cambia quien administra la clínica.'}
         </span>
       </div>
@@ -157,7 +157,7 @@ export default function PestanaHorario(p: Props) {
           <Tarjeta key={c.id} c={c} p={p} alAbrir={() => setAbierto({ tipo: 'consultorio', c })} alConfirmar={() => void guardar(c, { horario_revisado: true })} />
         ))}
       {p.esMedico && (
-        <p className="m-0 text-[15px] text-[var(--ag-ink-600)]">Agrega más consultorios en tu <Link href="/perfil" className={ENLACE}>perfil</Link>.</p>
+        <p className="m-0 text-[13.5px] text-[var(--ag-ink-600)]">Agrega más consultorios en tu <Link href="/perfil" className={ENLACE}>perfil</Link>.</p>
       )}
       {abierto && clinica && (
         <DialogoHorario

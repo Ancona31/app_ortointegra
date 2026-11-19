@@ -74,12 +74,12 @@ function MiDuracion({ p, mia }: { p: Props; mia: TipoCita | null }) {
       <div className="grid grid-cols-3 gap-[10px] sm:grid-cols-5">
         {DURACIONES.map(d => (
           <button key={d} type="button" aria-pressed={actual === d} disabled={ocupado} onClick={() => void elegir(d)}
-            className={`${opcion(actual === d)} min-h-[52px] text-[16px]`}>{d} min</button>
+            className={`${opcion(actual === d)} min-h-[52px]`}>{d} min</button>
         ))}
       </div>
       {otra ? (
         <div className="flex flex-wrap items-center gap-[10px]">
-          <label htmlFor={`${id}-o`} className="flex items-center gap-[10px] text-[16px] text-[var(--ag-text)]">Mi consulta dura
+          <label htmlFor={`${id}-o`} className="flex items-center gap-[10px] text-[14px] text-[var(--ag-text)]">Mi consulta dura
             <input id={`${id}-o`} type="number" inputMode="numeric" min={5} max={600} step={5} className={`${CAMPO_NUEVO} w-[96px]`}
               value={texto} onChange={e => setTexto(e.target.value)} />
             minutos</label>
@@ -206,7 +206,7 @@ function FilaTipo({ t, ambito, acciones, ocupado, alEditar, alActivar }: {
 }) {
   return (
     <div className={FILA_GRIS} role="group" aria-label={t.nombre}>
-      <span className="text-[15px] text-[var(--ag-ink)]">
+      <span className="text-[14px] text-[var(--ag-ink)]">
         <strong>{t.nombre}</strong> · {t.duracion_min} minutos{ambito ? <span className="text-[var(--ag-ink-600)]"> · {ambito}</span> : null}
       </span>
       {acciones && (
@@ -224,7 +224,7 @@ function FilaTipo({ t, ambito, acciones, ocupado, alEditar, alActivar }: {
 function Quitados({ tipos, fila }: { tipos: readonly TipoCita[]; fila: (t: TipoCita) => ReactNode }) {
   return (
     <details className="flex flex-col gap-[8px]">
-      <summary className="min-h-[44px] cursor-pointer content-center text-[15px] font-semibold text-[var(--ag-ink-600)]">Quitados ({tipos.length})</summary>
+      <summary className="min-h-[44px] cursor-pointer content-center text-[14px] font-semibold text-[var(--ag-ink-600)]">Quitados ({tipos.length})</summary>
       <div className="flex flex-col gap-[8px]">{tipos.map(fila)}</div>
     </details>
   )

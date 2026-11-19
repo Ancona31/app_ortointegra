@@ -49,7 +49,7 @@ interface Props {
 }
 
 type Pregunta = { mensaje: string; seguir: () => void } | null
-const CAJA = 'm-0 rounded-[10px] border border-[var(--ag-aviso-border)] bg-[var(--ag-aviso-bg)] px-[14px] py-[10px] text-[15px] text-[var(--ag-aviso-text)]'
+const CAJA = 'm-0 rounded-[10px] border border-[var(--ag-aviso-border)] bg-[var(--ag-aviso-bg)] px-[14px] py-[10px] text-[14px] text-[var(--ag-aviso-text)]'
 const FECHA = new Intl.DateTimeFormat('es-MX', { day: 'numeric', month: 'short' })
 
 /** La dirección del enlace fijo prendido: se pide su código cada vez que cambia de id. */
@@ -71,7 +71,7 @@ function EnlaceFijo({ prendido, ocupado, alPrender, alApagar }: { prendido: Enla
   return (
     <>
       <div className="flex items-center justify-between gap-[16px] rounded-[12px] bg-[var(--ag-surface-sunken)] px-[18px] py-[14px]">
-        <span id={`${id}-l`} className="text-[16px] font-semibold text-[var(--ag-ink)]">
+        <span id={`${id}-l`} className="text-[15px] font-semibold text-[var(--ag-ink)]">
           {prendido ? 'Prendido: tus pacientes pueden apartar con él' : 'Apagado: nadie puede apartar con él'}
         </span>
         <Interruptor encendido={prendido !== null} etiquetadoPor={`${id}-l`} deshabilitado={ocupado} alCambiar={prendido ? alApagar : alPrender} />
@@ -100,7 +100,7 @@ function FilaUnaVez({ e, ocupado, alApagar }: { e: EnlaceReserva; ocupado: boole
     <div className={FILA_GRIS} role="group" aria-label={nombre}>
       <div className="flex flex-col gap-[2px]">
         <span className="text-[15px] font-semibold text-[var(--ag-ink)]">{nombre}</span>
-        <span className="text-[14px] text-[var(--ag-ink-600)]">Sin usar{e.caduca_en ? ` · deja de servir el ${FECHA.format(new Date(e.caduca_en))}` : ''}</span>
+        <span className="text-[13.5px] text-[var(--ag-ink-600)]">Sin usar{e.caduca_en ? ` · deja de servir el ${FECHA.format(new Date(e.caduca_en))}` : ''}</span>
       </div>
       <div className="flex gap-[4px]">
         <BotonCopiar texto={copiar} className={BOTON_TEXTO} ariaLabel={`Copiar el enlace de ${nombre}`} />

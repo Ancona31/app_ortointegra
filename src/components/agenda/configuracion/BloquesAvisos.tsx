@@ -129,7 +129,7 @@ function PlazosPlegados(p: Props) {
       {abierto && (
         <div className="flex flex-col gap-[12px] rounded-[12px] bg-[var(--ag-surface-sunken)] p-[16px]">
           <Campos {...p} />
-          <p className="m-0 text-[14px] text-[var(--ag-ink-600)]">Esto cambia para todos los médicos de la clínica.</p>
+          <p className="m-0 text-[13.5px] text-[var(--ag-ink-600)]">Esto cambia para todos los médicos de la clínica.</p>
         </div>
       )}
     </div>
