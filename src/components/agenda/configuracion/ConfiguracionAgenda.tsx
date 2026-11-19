@@ -115,7 +115,7 @@ export default function ConfiguracionAgenda(props: Props) {
   const alEmpezarDeNuevo = useCallback(() => { olvidarPaso(props.usuarioId); window.location.assign('/agenda/configuracion') }, [props.usuarioId])
   const vigencia = avisos.guardados?.vigencia_enlace_unico_dias ?? props.ajustes?.vigencia_enlace_unico_dias ?? null
 
-  if (vista === 'cargando') return <p className="mx-auto max-w-[760px] pt-[24px] text-[14px] text-[var(--ag-ink-600)]">Cargando…</p>
+  if (vista === 'cargando') return <p className="mx-auto max-w-[760px] pt-[24px] sm:pt-[20px] text-[14px] text-[var(--ag-ink-600)]">Cargando…</p>
   if (vista !== 'pestanas' && config) {
     const suyos = config.consultorios.filter(c => c.medico_id === props.usuarioId && c.activo !== false)
     const listaBuena = lista && lista !== 'error' ? lista : null

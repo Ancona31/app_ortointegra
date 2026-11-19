@@ -13,6 +13,9 @@ import { aprobarAviso, emitirEnlace } from './reservaPublicaAyudas'
  *        lo que su rol puede hacer; y NINGÚN permiso cambia: lo que hoy da 403/404 a la invitada y a la
  *        secretaria lo sigue dando.
  * Corre en los dos proyectos (teléfono y escritorio). Lo que crea lo deshace (`sinPendientesAgenda`).
+ *
+ * Tanda M (M2): en computadora la escala es la del punto 2 (h1 18, controles de 40 px; ver
+ * `agenda-m2-configuracion`).
  */
 
 const RUTA = '/agenda/configuracion'
@@ -37,11 +40,13 @@ interface Medida { fuera: string[]; chicos: string[]; h1: number | null }
  * 44 × 44 (salvo un enlace dentro de una frase) y el tamaño del `h1`. Los interruptores (52 × 30 a la
  * vista) cuentan por su área de toque: el punto 6 px por encima y por debajo sigue siendo el interruptor.
  */
-async function medir(page: Page): Promise<Medida> {
+async function medir(page: Page, proyecto: string): Promise<Medida> {
+  // Tanda M (punto 2): en computadora los controles miden 40 y el interruptor toca 5 px por encima y por debajo.
+  const [minimo, margen] = proyecto === 'telefono' ? [43.5, 6] : [39.5, 4] as const
   // Que termine la entrada del paso o de la pestaña: a media animación las cajas aún están escaladas.
   await page.evaluate(() => Promise.all(document.getAnimations()
     .filter(a => a.effect?.getTiming().iterations !== Infinity).map(a => a.finished.catch(() => undefined))))
-  return page.evaluate((escala) => {
+  return page.evaluate(([escala, minimo, margen]) => {
     const fuera: string[] = []
     const chicos: string[] = []
     const texto = (el: Element) => (el.textContent ?? '').trim().slice(0, 40)
@@ -57,16 +62,16 @@ async function medir(page: Page): Promise<Medida> {
         el.scrollIntoView({ block: 'center' })
         const v = el.getBoundingClientRect()
         const x = v.left + v.width / 2
-        const toca = [v.top - 6, v.bottom + 6].every(y => document.elementFromPoint(x, y)?.closest('[role="switch"]') === el)
+        const toca = [v.top - margen, v.bottom + margen].every(y => document.elementFromPoint(x, y)?.closest('[role="switch"]') === el)
         if (!toca) chicos.push(`interruptor ${v.width}×${v.height}`)
       } else if (el.matches('button, a[href], select, textarea, input:not([type="radio"]):not([type="checkbox"]), [role="tab"]')
-        && !(el.tagName === 'A' && cs.display === 'inline') && (r.height < 43.5 || r.width < 43.5)) {
+        && !(el.tagName === 'A' && cs.display === 'inline') && (r.height < minimo || r.width < minimo)) {
         chicos.push(`${el.tagName.toLowerCase()} ${Math.round(r.width)}×${Math.round(r.height)} «${texto(el) || el.getAttribute('aria-label')}»`)
       }
     }
     const h1 = document.querySelector('main h1')
     return { fuera, chicos, h1: h1 ? parseFloat(getComputedStyle(h1).fontSize) : null }
-  }, ESCALA)
+  }, [ESCALA, minimo, margen] as const)
 }
 
 async function medirTodo(page: Page, pestanas: readonly string[], proyecto: string): Promise<void> {
@@ -76,10 +81,10 @@ async function medirTodo(page: Page, pestanas: readonly string[], proyecto: stri
     await page.waitForLoadState('networkidle')
     const plegado = page.locator('[role="tabpanel"]:visible button[aria-expanded="false"]')
     if (await plegado.count()) await plegado.first().click()
-    const m = await medir(page)
+    const m = await medir(page, proyecto)
     expect(m.fuera, `${nombre}: letra fuera de la escala`).toEqual([])
-    expect(m.chicos, `${nombre}: áreas de toque de menos de 44 px`).toEqual([])
-    expect(m.h1, `${nombre}: el título de la página`).toBe(proyecto === 'telefono' ? 18 : 20)
+    expect(m.chicos, `${nombre}: áreas de toque de menos de 44 px (40 en computadora)`).toEqual([])
+    expect(m.h1, `${nombre}: el título de la página`).toBe(18)
   }
 }
 
@@ -96,7 +101,7 @@ async function funnelEn(page: Page, paso: number): Promise<void> {
 test.describe('el administrador', () => {
   test.use({ storageState: SESION.adminA })
 
-  test('12 · las cinco pestañas en la escala de la reserva, con áreas de 44 px', async ({ page }, info) => {
+  test('12 · las cinco pestañas en la escala de la reserva, con áreas de 44 px (40 en computadora)', async ({ page }, info) => {
     limpiezas.push(sinPendientesAgenda(CORREO.adminA))
     await medirTodo(page, PESTANAS_MEDICO, info.project.name)
   })
@@ -124,10 +129,10 @@ test.describe('la invitada', () => {
   test('12 · las pestañas y los pasos del funnel en la escala de la reserva', async ({ page }, info) => {
     for (const paso of [1, 2, 3]) {
       await funnelEn(page, paso)
-      const m = await medir(page)
+      const m = await medir(page, info.project.name)
       expect(m.fuera, `paso ${paso}`).toEqual([])
       expect(m.chicos, `paso ${paso}`).toEqual([])
-      expect(m.h1, `paso ${paso}`).toBe(info.project.name === 'telefono' ? 18 : 20)
+      expect(m.h1, `paso ${paso}`).toBe(18)
     }
     await page.evaluate(() => window.localStorage.clear())
     limpiezas.push(sinPendientesAgenda(CORREO.medicoA))

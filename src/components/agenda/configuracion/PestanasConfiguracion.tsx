@@ -97,7 +97,7 @@ function Pestanas({ activa, elegir, esMedico }: { activa: Clave; elegir: (c: Cla
         return (
           <button key={p.clave} type="button" role="tab" id={`config-tab-${p.clave}`} aria-selected={sel} aria-controls={`config-panel-${p.clave}`}
             aria-label={nombre} tabIndex={sel ? 0 : -1} onClick={() => elegir(p.clave)}
-            className={`flex min-h-[52px] min-w-[44px] flex-1 cursor-pointer items-center justify-center whitespace-nowrap border-0 border-b-[3px] bg-transparent px-[8px] text-[15px] sm:flex-none sm:px-[16px] ${sel
+            className={`flex min-h-[52px] sm:min-h-[40px] min-w-[44px] flex-1 cursor-pointer items-center justify-center whitespace-nowrap border-0 border-b-[3px] bg-transparent px-[8px] text-[15px] sm:text-[13px] sm:flex-none sm:px-[14px] ${sel
               ? 'border-[var(--ag-brand-secondary)] font-bold text-[var(--ag-brand-legible)]' : 'border-transparent font-semibold text-[var(--ag-ink-600)]'}`}>
             <Icono size={22} aria-hidden="true" className="sm:hidden" />
             <span className="hidden sm:inline">{nombre}</span>
@@ -121,15 +121,15 @@ export default function PestanasConfiguracion(d: DatosPestanas) {
   const [activa, setActiva] = useState<Clave>('enlace')
   const misConsultorios = (d.consultorios ?? []).filter(c => c.medico_id === d.usuarioId && c.activo !== false)
   return (
-    <div className="mx-auto flex w-full max-w-[860px] flex-col gap-[24px] pb-[80px] pt-[8px]">
+    <div className="mx-auto flex w-full max-w-[860px] flex-col gap-[24px] sm:gap-[20px] pb-[80px] sm:pb-[66px] pt-[8px]">
       <div className="flex flex-col gap-[6px]">
-        <Link href="/agenda" className="inline-flex min-h-[44px] w-fit items-center gap-[6px] text-[14px] text-[var(--ag-ink-600)] no-underline">
+        <Link href="/agenda" className="inline-flex min-h-[44px] sm:min-h-[40px] w-fit items-center gap-[6px] text-[14px] sm:text-[13px] text-[var(--ag-ink-600)] no-underline">
           <ChevronLeft size={18} aria-hidden="true" /> Agenda
         </Link>
         <h1 className={TITULO_PASO}>Configuración de la agenda</h1>
         <p className={SUB_PASO}>Esto es lo que elegiste al empezar. Cambia lo que quieras: se guarda solo.</p>
       </div>
-      <div className="flex flex-col gap-[16px]">
+      <div className="flex flex-col gap-[16px] sm:gap-[14px]">
         <Pestanas activa={activa} elegir={setActiva} esMedico={d.esMedico} />
         {/* El nombre de la elegida, sólo en el teléfono (allí las pestañas son iconos). Lo mismo que ya dice la pestaña: fuera del árbol accesible. */}
         <p aria-hidden="true" data-titulo-pestana className="m-0 text-[16px] font-bold leading-[1.3] text-[var(--ag-ink)] sm:hidden">

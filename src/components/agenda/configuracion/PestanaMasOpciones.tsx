@@ -64,12 +64,12 @@ interface Props {
   alEmpezarDeNuevo: () => void
 }
 
-const FILA = 'flex w-full min-h-[44px] cursor-pointer items-center justify-between gap-[16px] border-0 border-b border-[var(--ag-hairline)] bg-transparent py-[18px] text-left text-[var(--ag-ink)]'
+const FILA = 'flex w-full min-h-[44px] sm:min-h-[40px] cursor-pointer items-center justify-between gap-[16px] sm:gap-[14px] border-0 border-b border-[var(--ag-hairline)] bg-transparent py-[18px] sm:py-[16px] text-left text-[var(--ag-ink)]'
 
 function TextoFila({ titulo, ayuda }: { titulo: string; ayuda: string }) {
   return (
     <span className="flex flex-[1_1_360px] flex-col gap-[4px]">
-      <span className="text-[15px] font-semibold">{titulo}</span>
+      <span className="text-[15px] sm:text-[14px] font-semibold">{titulo}</span>
       <span className={AYUDA}>{ayuda}</span>
     </span>
   )
@@ -104,11 +104,11 @@ function Bloqueados({ p }: { p: Props }) {
         {contactos === 'error' && <p className={AYUDA}>No se pudo leer la lista. Recarga la página.</p>}
         {Array.isArray(contactos) && contactos.length === 0 && <p className={AYUDA}>Nadie está bloqueado.</p>}
         {Array.isArray(contactos) && contactos.map(c => (
-          <div key={`${c.medico_id}:${c.cita_id}`} className="flex flex-wrap items-center justify-between gap-[12px] rounded-[10px] bg-[var(--ag-surface-sunken)] px-[16px] py-[12px]">
+          <div key={`${c.medico_id}:${c.cita_id}`} className="flex flex-wrap items-center justify-between gap-[12px] rounded-[10px] bg-[var(--ag-surface-sunken)] px-[16px] sm:px-[14px] py-[12px]">
             <span className="flex flex-col gap-[2px] text-[14px] text-[var(--ag-ink)]">
               <strong>{c.nombre ?? 'Sin nombre'}</strong>
-              <span className="text-[13.5px] text-[var(--ag-ink-600)]">{[c.telefono, c.correo, p.gestionaTodos ? nombreMedico(c.medico_id) : null].filter(Boolean).join(' · ')}</span>
-              <span className="text-[13.5px] text-[var(--ag-ink-600)]">{motivo(c)}</span>
+              <span className="text-[13.5px] sm:text-[13px] text-[var(--ag-ink-600)]">{[c.telefono, c.correo, p.gestionaTodos ? nombreMedico(c.medico_id) : null].filter(Boolean).join(' · ')}</span>
+              <span className="text-[13.5px] sm:text-[13px] text-[var(--ag-ink-600)]">{motivo(c)}</span>
             </span>
             <button type="button" className={BOTON_TEXTO} disabled={ocupado} onClick={() => void quitar(c)} aria-label={`Desbloquear a ${c.nombre ?? 'este contacto'}`}>Desbloquear</button>
           </div>
@@ -129,7 +129,7 @@ export default function PestanaMasOpciones(p: Props) {
           <ChevronRight size={20} aria-hidden="true" className="flex-none text-[var(--ag-ink-600)]" />
         </button>
       )}
-      {!p.conEnlaces && !p.puedeAdministrar && <p className={`${AYUDA} py-[18px]`}>No hay más opciones para tu cuenta.</p>}
+      {!p.conEnlaces && !p.puedeAdministrar && <p className={`${AYUDA} py-[18px] sm:py-[16px]`}>No hay más opciones para tu cuenta.</p>}
       {confirmando && <ConfirmacionRestablecer onCancelar={() => setConfirmando(false)} onHecho={() => { setConfirmando(false); p.alEmpezarDeNuevo() }} />}
     </div>
   )

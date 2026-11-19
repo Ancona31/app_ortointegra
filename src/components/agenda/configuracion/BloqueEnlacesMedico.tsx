@@ -30,7 +30,7 @@ const ARREGLABLES: readonly MotivoApertura[] = ['sin_consultorio', 'sin_tipos', 
 import type { EnlaceReserva } from '@/lib/reserva/gestionReserva'
 
 /** Etiqueta encima de un campo (`.rp-campo` de la reserva: 13,5 px · 600). */
-const ETIQUETA_CAMPO = 'flex flex-col gap-[6px] text-[13.5px] font-semibold text-[var(--ag-text)]'
+const ETIQUETA_CAMPO = 'flex flex-col gap-[6px] text-[13.5px] sm:text-[13px] font-semibold text-[var(--ag-text)]'
 
 const FECHA = new Intl.DateTimeFormat('es-MX', { dateStyle: 'medium', timeStyle: 'short' })
 

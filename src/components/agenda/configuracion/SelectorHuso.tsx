@@ -21,7 +21,7 @@ export default function SelectorHuso({ valor, alCambiar }: { valor: string; alCa
   const zonas = ZONAS_MEXICO.some(z => z.value === valor) ? ZONAS_MEXICO : [{ value: valor, label: valor }, ...ZONAS_MEXICO]
   return (
     <div className="flex flex-col gap-[6px]">
-      <label htmlFor={id} className="text-[13.5px] font-semibold text-[var(--ag-ink)]">Huso horario de la clínica</label>
+      <label htmlFor={id} className="text-[13.5px] sm:text-[13px] font-semibold text-[var(--ag-ink)]">Huso horario de la clínica</label>
       <select id={id} className={`${CAMPO_NUEVO} w-full`} value={valor} onChange={e => alCambiar(e.target.value)}>
         {zonas.map(z => <option key={z.value} value={z.value}>{z.label}</option>)}
       </select>

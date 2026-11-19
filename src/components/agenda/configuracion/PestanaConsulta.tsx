@@ -103,7 +103,7 @@ function EnCadaConsultorio({ p }: { p: Props }) {
       </div>
       {p.misConsultorios.map(c => (
         <div key={c.id} role="group" aria-label={c.nombre} className="flex flex-col gap-[6px]">
-          <span className="text-[15px] font-semibold text-[var(--ag-ink)]">{c.nombre}</span>
+          <span className="text-[15px] sm:text-[14px] font-semibold text-[var(--ag-ink)]">{c.nombre}</span>
           <DuracionEnConsultorio consultorioId={c.id} consultorioNombre={c.nombre} medicoId={p.usuarioId} tipos={p.tipos} alCambiar={p.alCambiar} />
         </div>
       ))}
@@ -224,7 +224,7 @@ function FilaTipo({ t, ambito, acciones, ocupado, alEditar, alActivar }: {
 function Quitados({ tipos, fila }: { tipos: readonly TipoCita[]; fila: (t: TipoCita) => ReactNode }) {
   return (
     <details className="flex flex-col gap-[8px]">
-      <summary className="min-h-[44px] cursor-pointer content-center text-[14px] font-semibold text-[var(--ag-ink-600)]">Quitados ({tipos.length})</summary>
+      <summary className="min-h-[44px] sm:min-h-[40px] cursor-pointer content-center text-[14px] sm:text-[13px] font-semibold text-[var(--ag-ink-600)]">Quitados ({tipos.length})</summary>
       <div className="flex flex-col gap-[8px]">{tipos.map(fila)}</div>
     </details>
   )

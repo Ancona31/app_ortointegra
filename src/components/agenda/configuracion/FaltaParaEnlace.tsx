@@ -23,7 +23,7 @@ import type { MotivoApertura } from '@/lib/reserva/aperturaEnlace'
 import { useToast } from '@/components/ui/Toast'
 
 const ENLACE = 'font-semibold underline underline-offset-2'
-const CAJA_AVISO = 'rounded-[10px] border border-[var(--ag-aviso-border)] bg-[var(--ag-aviso-bg)] px-[14px] py-[10px] text-[14px] text-[var(--ag-aviso-text)]'
+const CAJA_AVISO = 'rounded-[10px] border border-[var(--ag-aviso-border)] bg-[var(--ag-aviso-bg)] px-[14px] sm:px-[12px] py-[10px] text-[14px] text-[var(--ag-aviso-text)]'
 
 interface Props {
   motivos: readonly MotivoApertura[]

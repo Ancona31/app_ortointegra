@@ -27,13 +27,13 @@ interface Props {
 function Opcion({ elegida, titulo, sub, alElegir }: { elegida: boolean; titulo: string; sub: string; alElegir: () => void }) {
   return (
     <button type="button" aria-pressed={elegida} onClick={alElegir}
-      className={`flex min-h-[56px] w-full cursor-pointer items-center gap-[14px] rounded-[12px] border-2 px-[16px] py-[12px] text-left ${elegida
+      className={`flex min-h-[56px] sm:min-h-[40px] w-full cursor-pointer items-center gap-[14px] sm:gap-[12px] rounded-[12px] border-2 px-[16px] sm:px-[14px] py-[12px] text-left ${elegida
         ? 'border-[var(--ag-brand-secondary)] bg-[var(--ag-primary-bg-faint)]' : 'border-[var(--ag-border-card)] bg-[var(--ag-surface)]'}`}>
       <span aria-hidden="true" className={`h-[20px] w-[20px] flex-none rounded-full bg-[var(--ag-surface)] ${elegida
         ? 'border-[6px] border-[var(--ag-brand-secondary)]' : 'border-2 border-[var(--ag-muted2)]'}`} />
       <span className="flex flex-col gap-[2px]">
-        <span className="text-[15px] font-semibold text-[var(--ag-ink)]">{titulo}</span>
-        <span className="text-[13.5px] text-[var(--ag-ink-600)]">{sub}</span>
+        <span className="text-[15px] sm:text-[14px] font-semibold text-[var(--ag-ink)]">{titulo}</span>
+        <span className="text-[13.5px] sm:text-[13px] text-[var(--ag-ink-600)]">{sub}</span>
       </span>
     </button>
   )
@@ -41,7 +41,7 @@ function Opcion({ elegida, titulo, sub, alElegir }: { elegida: boolean; titulo: 
 
 function TarjetaConsultorio({ nombre, eleccion, textoClinica, alCambiar }: { nombre: string; eleccion: EleccionHorario; textoClinica: string; alCambiar: (e: EleccionHorario) => void }) {
   return (
-    <div className={`${TARJETA} gap-[14px]`} aria-label={nombre} role="group">
+    <div className={`${TARJETA} gap-[14px] sm:gap-[12px]`} aria-label={nombre} role="group">
       <h2 className="m-0 text-[16px] font-bold text-[var(--ag-ink)]">{nombre}</h2>
       <div className="flex flex-col gap-[8px]">
         <Opcion elegida={eleccion.modo === 'clinica'} titulo="Igual que la clínica" sub={textoClinica || 'La clínica no tiene días de consulta'}
@@ -59,7 +59,7 @@ function TarjetaConsultorio({ nombre, eleccion, textoClinica, alCambiar }: { nom
 export default function PasoHorario({ consultorios, elecciones, horarioClinica, puedeAdministrar, alCambiar }: Props) {
   const textoClinica = textoHorario(horarioClinica)
   return (
-    <section className="flex flex-col gap-[20px]" aria-labelledby="primera-vez-titulo">
+    <section className="flex flex-col gap-[20px] sm:gap-[16px]" aria-labelledby="primera-vez-titulo">
       <div className="flex flex-col gap-[8px]">
         <h1 id="primera-vez-titulo" className={TITULO_PASO}>¿Cuándo das consulta?</h1>
         <p className={SUB_PASO}>Tus pacientes solo podrán pedir cita en estos días y horas.</p>
