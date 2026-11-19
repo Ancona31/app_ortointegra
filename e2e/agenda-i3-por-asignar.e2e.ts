@@ -77,7 +77,6 @@ function filaGoogle(titulo: string, inicio: string, asignacion: 'por_asignar' | 
 function borrarFilasGoogle(): void {
   sqlLocal(`begin; set local session_replication_role = replica;
     delete from public.avisos_clinica where cita_id in (select id from public.appointments where google_event_id like 'falso-i3-e2e-%');
-    delete from public.audit_log where registro_id in (select id from public.appointments where google_event_id like 'falso-i3-e2e-%');
     delete from public.appointments where google_event_id like 'falso-i3-e2e-%'; commit;`)
 }
 

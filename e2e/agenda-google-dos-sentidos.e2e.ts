@@ -411,7 +411,6 @@ test('encendido: las observaciones de la burbuja se guardan en la cita y no viaj
      `agenda-tipos-cita` (corre después) da de alta 13:20–14:00 ese jueves: con
      la v2 encendida, el aviso de empalme tapaba su «Guardar». */
   sqlLocal(`begin; set local session_replication_role = replica;
-    delete from public.audit_log where registro_id = :'id';
     delete from public.cita_confirmaciones where appointment_id = :'id';
     delete from public.cita_correos where appointment_id = :'id';
     delete from public.avisos_clinica where cita_id = :'id';

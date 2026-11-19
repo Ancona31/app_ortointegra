@@ -335,7 +335,7 @@ test('nota ligada: una atendida con nota no cambia de estado ni se borra, con o 
     expect(sqlLocal(`select status from public.appointments where id = :'id'`, { id })).toBe('attended')
   } finally {
     sqlLocal(`begin; set local session_replication_role = replica;
-      delete from public.audit_log where registro_id = :'n'; delete from public.consultas where id = :'n'; commit;`, { n: nota })
+      delete from public.consultas where id = :'n'; commit;`, { n: nota })
   }
 })
 

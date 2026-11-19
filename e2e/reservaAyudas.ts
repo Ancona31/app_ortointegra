@@ -19,8 +19,9 @@ import { sqlLocal } from './ayudas'
  * tiene DELETE en `reserva_enlaces`: una fila que quede aquí rompe la
  * siguiente siembra de `scripts/agenda-semilla.ts`, que no conoce estas
  * tablas. La limpieza va como `postgres` con `session_replication_role =
- * replica` (sin disparadores: ni la protección de `audit_log` ni la de las
- * citas), y se lleva también las filas de `audit_log` de esos objetos.
+ * replica` (sin disparadores: ni la protección de las citas ni las FK). Las
+ * filas de `audit_log` de esos objetos se quedan: la auditoría no se borra,
+ * tampoco en local ni de pruebas (orden de Angel, tanda M).
  */
 
 export const AVISO_E2E = 'e2e-interno-d6'
@@ -117,8 +118,8 @@ export function devolverEnlaces(ids: readonly string[]): void {
 /**
  * Borra lo de reserva que se CREÓ DESDE `desde` (`marcaE2e()` del archivo) en
  * las dos clínicas de la semilla: citas por enlace, incidencias, contactos,
- * enlaces y los enlaces de confirmación y reagendados del bloque E, con sus
- * filas de `audit_log`, y el aviso de las e2e. Los enlaces de ANTES que una
+ * enlaces y los enlaces de confirmación y reagendados del bloque E (sin sus
+ * filas de `audit_log`, que se quedan), y el aviso de las e2e. Los enlaces de ANTES que una
  * prueba revocó (emitir un fijo revoca el vigente del médico) vuelven a quedar
  * vigentes. Ver la nota de la cabecera.
  *
@@ -147,7 +148,6 @@ export function limpiarReservasE2e(desde: string): void {
       union all select id from public.reserva_enlaces where clinica_id in (select id from _cl) and created_at >= :'desde'::timestamptz
       union all select id from public.reserva_contactos where clinica_id in (select id from _cl) and created_at >= :'desde'::timestamptz
       union all select id from public.reserva_incidencias where clinica_id in (select id from _cl) and created_at >= :'desde'::timestamptz;
-    delete from public.audit_log where registro_id in (select id from _obj);
     -- Bloque E (E1 y E6): FK RESTRICT a la cita; con replica no saltarían y quedarían huérfanos.
     do $e$ begin
       if to_regclass('public.cita_reagendos') is not null then
@@ -155,20 +155,16 @@ export function limpiarReservasE2e(desde: string): void {
           select id from public.cita_reagendos where clinica_id in (select id from _cl)
              and (created_at >= current_setting('e2e.desde')::timestamptz
                   or cita_origen_id in (select id from _citas) or cita_nueva_id in (select id from _citas));
-        delete from public.audit_log where registro_id in (select id from _reag);
         delete from public.cita_reagendos where id in (select id from _reag);
       end if;
       if to_regclass('public.cita_correos') is not null then
         delete from public.cita_correos where appointment_id in (select id from _citas);
       end if;
-      -- I5: los avisos de esas citas (sin FK a la cita: quedarían huérfanos) y su rastro de auditoría.
+      -- I5: los avisos de esas citas (sin FK a la cita: quedarían huérfanos); su auditoría se queda.
       if to_regclass('public.avisos_clinica') is not null then
-        delete from public.audit_log where registro_id in (select id from public.avisos_clinica where cita_id in (select id from _citas));
         delete from public.avisos_clinica where cita_id in (select id from _citas);
       end if;
       if to_regclass('public.cita_confirmaciones') is not null then
-        delete from public.audit_log where registro_id in (select id from public.cita_confirmaciones
-          where clinica_id in (select id from _cl) and (created_at >= current_setting('e2e.desde')::timestamptz or appointment_id in (select id from _citas)));
         delete from public.cita_confirmaciones where clinica_id in (select id from _cl)
           and (created_at >= current_setting('e2e.desde')::timestamptz or appointment_id in (select id from _citas));
       end if;
@@ -183,7 +179,6 @@ export function limpiarReservasE2e(desde: string): void {
     -- aparcar (un archivo que no lo haga), el fijo de antes que una prueba revocó.
     update public.reserva_enlaces set revocado_en = null
      where clinica_id in (select id from _cl) and created_at < :'desde'::timestamptz and revocado_en >= :'desde'::timestamptz;
-    delete from public.audit_log where tabla = 'reserva_avisos' and registro_id in (select id from public.reserva_avisos where version = '${AVISO_E2E}');
     delete from public.reserva_avisos where version = '${AVISO_E2E}';
     commit;`, { desde })
 }

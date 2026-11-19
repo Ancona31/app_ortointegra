@@ -33,7 +33,6 @@ test.afterAll(() => {
       sqlLocal(`
         begin;
         set local session_replication_role = replica;
-        delete from public.audit_log where registro_id = :'k'::uuid;
         delete from public.consultorios where id = :'k'::uuid;
         commit;`, { k: sonora })
     }
