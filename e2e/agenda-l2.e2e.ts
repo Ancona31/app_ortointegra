@@ -18,6 +18,7 @@ import { fechaHoraLocalAInstante } from '../src/lib/dates'
  *   · `quitarCancelada` sin el `fetch` → «Eliminar cita» (la base no la cierra);
  *   · sin `leyenda=` en `AgendaCliente` → «el botón de la leyenda»;
  *   · `.ag-burbuja-titulo` de vuelta a 21px → «la escala de la reserva».
+ *   · integración L: `.ag-burbuja-estado` de vuelta a 700, o `.ag-burbuja-ayuda` a 13px → la misma prueba.
  */
 test.use({ storageState: SESION.adminA })
 
@@ -141,6 +142,7 @@ test('con la v2 apagada no hay botón de la leyenda', async ({ page }) => {
 
 test('la burbuja con la escala de la reserva: título 18, hora 15, texto 14; toques de 44 px o más', async ({ page }) => {
   cita('12:00', 'Prueba 08', 'scheduled')
+  cita('14:00', 'Prueba 09', 'cancelled')
   await aLaSemana(page)
   const t = await abrir(page, 'Prueba 08')
   // La burbuja entra con `scale(.97)`: se mide quieta.
@@ -150,7 +152,15 @@ test('la burbuja con la escala de la reserva: título 18, hora 15, texto 14; toq
   expect(await px('.ag-burbuja-hora')).toBe('15px')
   expect(await px('.ag-burbuja-dia')).toBe('14px')
   expect(await px('.ag-burbuja-medico')).toBe('14px')
+  // Integración L: la píldora, con la tabla de L3 (`.rp-op__dur`: 13 · 600).
+  expect(await t.locator('.ag-burbuja-estado').first().evaluate(el => getComputedStyle(el).fontWeight)).toBe('600')
   const altos = await t.locator('button').evaluateAll(els => els.filter(e => (e as HTMLElement).offsetParent !== null)
     .map(e => Math.round(Math.min(e.getBoundingClientRect().height, e.getBoundingClientRect().width))))
   expect(Math.min(...altos)).toBeGreaterThanOrEqual(44)
+  // Integración L: la ayuda bajo el botón ancho (la de una cancelada) es `.rp-pie small`, 13,5 px.
+  await page.keyboard.press('Escape')
+  await expect(t).toHaveCount(0)
+  const c = await abrir(page, 'Prueba 09')
+  await expect(c.locator('.ag-burbuja-ayuda')).toHaveText('Esta cita se canceló. Su horario quedó libre.')
+  expect(await c.locator('.ag-burbuja-ayuda').evaluate(el => getComputedStyle(el).fontSize)).toBe('13.5px')
 })
