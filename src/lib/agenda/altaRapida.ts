@@ -16,7 +16,7 @@
  * archivo: va en `buscarCitasPaciente.ts`, que la necesita también, y así éste
  * sigue sin red y se prueba sin simular Supabase.
  */
-import { TEXTO_CONFIRMAR_BLOQUEO } from '@/lib/agenda/bloqueosAgenda'
+import { TEXTO_HORARIO_BLOQUEADO } from '@/lib/agenda/bloqueosAgenda'
 import type { AltaGuardada, DatosGuardado } from '@/lib/agenda/tiposAgenda'
 import type { PacienteBusqueda } from '@/components/agenda/AppointmentModal'
 import type { GestoAlta } from '@/lib/agenda/contratosV2'
@@ -187,7 +187,7 @@ export interface DependenciasGuardado {
    * si sigue por el aviso de empalme del servidor).
    */
   guardar: (datos: DatosGuardado) => Promise<AltaGuardada | null>
-  /** K1 (punto 3) · ¿Cae en un bloqueo de horario de ese médico? Sin ella, no se pregunta. */
+  /** L1 (punto 6) · ¿Cae en un bloqueo de horario de ese médico? Sin ella (v2 apagada), no se mira. */
   bloqueado?: (inicio: Date, fin: Date, medicoId: string | null) => boolean
 }
 
@@ -195,9 +195,10 @@ export interface DependenciasGuardado {
  * T1 · Lo que sale de `guardarAltaRapida`: si alguien dijo que no a un aviso
  * (`enviada: false`, la burbuja se queda como estaba) o si se mandó a guardar,
  * con la cita creada si entró (la burbuja enseña «Cita agendada») o `null` (se
- * cierra, como antes de T1).
+ * cierra, como antes de T1). L1: `error` es lo que la burbuja enseña sin
+ * guardar (el horario bloqueado).
  */
-export type SalidaAltaRapida = { enviada: false } | { enviada: true; alta: AltaGuardada | null }
+export type SalidaAltaRapida = { enviada: false; error?: string } | { enviada: true; alta: AltaGuardada | null }
 
 /**
  * El orden de los avisos al guardar desde la burbuja, el MISMO que el del
@@ -220,11 +221,11 @@ export async function guardarAltaRapida(
   if (!datos.start_time || !datos.end_time) return no
   const inicio = new Date(datos.start_time)
   const fin = new Date(datos.end_time)
+  /* L1 (punto 6) · el bloqueo es TOTAL: antes de cualquier aviso, y sin pregunta. */
+  if (d.bloqueado?.(inicio, fin, datos.medico_id ?? null)) return { enviada: false, error: TEXTO_HORARIO_BLOQUEADO }
   const tocadas = horas.inicio !== horasDeApertura.inicio || horas.fin !== horasDeApertura.fin
   const aviso = tocadas ? d.avisoHorario(inicio, fin, datos) : null
   if (aviso && !(await d.confirmar(aviso))) return no
-  /* K1 · tras el horario y antes del empalme: pregunta, no impide. */
-  if (d.bloqueado?.(inicio, fin, datos.medico_id ?? null) && !(await d.confirmar(TEXTO_CONFIRMAR_BLOQUEO))) return no
   const lista = d.buscarEmpalmes({
     id: '', medicoId: datos.medico_id ?? null, inicio, fin, todoElDia: false, noOcupa: false, deGoogle: false, titulo: '',
   })

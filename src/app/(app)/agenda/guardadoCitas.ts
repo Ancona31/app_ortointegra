@@ -41,7 +41,7 @@ import { buildEventInput, FUENTE_APPOINTMENTS, PREFIJO_OPTIMISTA } from '@/lib/a
 import { addMinutes, ultimoDiaIncluido } from '@/lib/agenda/fechasAgenda'
 import type { AvisosHorario, DondeCita } from '@/lib/agenda/horarioRejilla'
 import { DEFAULT_DURATION } from '@/lib/agenda/duracionCita'
-import { esCitaParaBloqueo, tocaBloqueo, TEXTO_CONFIRMAR_BLOQUEO } from '@/lib/agenda/bloqueosAgenda'
+import { tocaBloqueo, TEXTO_HORARIO_BLOQUEADO } from '@/lib/agenda/bloqueosAgenda'
 import { registrarNuevo, salirConAnimacion } from '@/lib/agenda/marcasMovimiento'
 import { animarFlip } from '@/lib/agenda/flipTarjetas'
 import type { AltaGuardada, Appointment, DatosGuardado, OpcionesGuardado, Status } from '@/lib/agenda/tiposAgenda'
@@ -225,6 +225,30 @@ export function crearGuardadoCitas({
     return agendaV2 && antes !== null && eleccionFija({ reserva_canal: typeof canal === 'string' ? canal : null, start_time: antes.toISOString() }, Date.now())
   }
 
+  /* Tanda L (L1, punto 6) · El bloqueo es TOTAL: arrastrar o estirar CUALQUIER
+     cosa (cita o evento sin paciente) hacia un periodo bloqueado de su médico
+     la devuelve a su sitio con el mensaje de Angel, sin pregunta. Contra lo
+     pintado; lo que no se ve lo rechaza el servidor (409, mismo texto) y la
+     base. Con la v2 apagada no se mira nada. */
+  function vetadoPorBloqueo(arg: EventDropArg | EventResizeDoneArg, inicio: string, fin: string | undefined): boolean {
+    const api = calendarRef.current?.getApi()
+    if (!agendaV2 || !api) return false
+    const medico = arg.event.extendedProps.medico_id
+    const finEfectivo = fin ?? addMinutes(inicio, DEFAULT_DURATION)
+    if (!tocaBloqueo(api.getEvents(), typeof medico === 'string' ? medico : null, new Date(inicio), new Date(finEfectivo))) return false
+    restaurarPosicion(arg)
+    toast.error(TEXTO_HORARIO_BLOQUEADO)
+    return true
+  }
+
+  /** L1 · Lo mismo para un evento de todo el día: medianoche a medianoche (fin
+   *  exclusivo de FullCalendar), con el reloj del navegador; el servidor decide
+   *  con el del consultorio. */
+  function vetadoTodoElDia(arg: EventDropArg | EventResizeDoneArg): boolean {
+    const dia = arg.event.start?.toISOString()
+    return Boolean(dia && vetadoPorBloqueo(arg, dia, arg.event.end?.toISOString() ?? addMinutes(dia, 24 * 60)))
+  }
+
   async function handleEventDrop(arg: EventDropArg) {
     if (arg.event.extendedProps.isGcalBlock) { arg.revert(); return }
     if (arrastreVetadoPorEleccion(arg)) { arg.revert(); toast.error(TEXTO_ELECCION.reagendar); return }
@@ -246,6 +270,7 @@ export function crearGuardadoCitas({
     if (arg.event.allDay) {
       const fechas = fechasDelGestoDeTodoElDia(arg.event)
       if (!fechas) { arg.revert(); return }
+      if (vetadoTodoElDia(arg)) return
       ejecutarDrop(id, { all_day: true, all_day_desde: fechas.desde, all_day_hasta: fechas.hasta }, arg)
       return
     }
@@ -298,6 +323,7 @@ export function crearGuardadoCitas({
        El fin se mira desde `end_time` y no desde `arg.event.end`, que en la
        conversión es `null` por lo explicado arriba: con el getter, el aviso del
        fin se saltaba justo en el único caso donde el fin es nuevo. */
+    if (vetadoPorBloqueo(arg, start_time, end_time)) return
     const aviso = avisosHorario.hora(arg.event.start!, end_time ? new Date(end_time) : null, 'Vas a moverlo a las', dondeDe(arg.event))
     /* B7b: el empalme va DESPUÉS del aviso de horario, y si los dos aplican
        salen seguidos, no uno combinado (P3). */
@@ -389,26 +415,15 @@ export function crearGuardadoCitas({
     const finEfectivo = fin ?? addMinutes(inicio, DEFAULT_DURATION)
     const medico = arg.event.extendedProps.medico_id
     const medicoId = typeof medico === 'string' ? medico : null
-    const empalmes = (): void => {
-      const lista = empalmesPintados({
-        id: arg.event.id, medicoId,
-        inicio: new Date(inicio), fin: new Date(finEfectivo), todoElDia: false,
-        noOcupa: ESTADOS_SIN_EMPALME.includes(String(arg.event.extendedProps.status)),
-        deGoogle: false, titulo: arg.event.title,
-      }, api.getEvents())
-      if (!lista.length) { despues([]); return }
-      preguntarEmpalme(lista, () => despues(lista.map(e => e.id)), () => restaurarPosicion(arg))
-    }
-    /* K1 (punto 3) · mover una CITA a un horario bloqueado PREGUNTA, no lo
-       impide; después, el empalme de siempre. Un evento sin paciente no pregunta. */
-    if (!esCitaParaBloqueo(arg.event.extendedProps) || !tocaBloqueo(api.getEvents(), medicoId, new Date(inicio), new Date(finEfectivo))) {
-      empalmes(); return
-    }
-    setConfirm({
-      message: TEXTO_CONFIRMAR_BLOQUEO,
-      onConfirm: () => { setConfirm(null); empalmes() },
-      onCancel:  () => { setConfirm(null); restaurarPosicion(arg) },
-    })
+    /* L1 · el bloqueo ya se vetó antes del aviso de horario (`vetadoPorBloqueo`). */
+    const lista = empalmesPintados({
+      id: arg.event.id, medicoId,
+      inicio: new Date(inicio), fin: new Date(finEfectivo), todoElDia: false,
+      noOcupa: ESTADOS_SIN_EMPALME.includes(String(arg.event.extendedProps.status)),
+      deGoogle: false, titulo: arg.event.title,
+    }, api.getEvents())
+    if (!lista.length) { despues([]); return }
+    preguntarEmpalme(lista, () => despues(lista.map(e => e.id)), () => restaurarPosicion(arg))
   }
 
   async function ejecutarDrop(
@@ -497,6 +512,7 @@ export function crearGuardadoCitas({
     if (arg.event.allDay) {
       const fechas = fechasDelGestoDeTodoElDia(arg.event)
       if (!fechas) { arg.revert(); return }
+      if (vetadoTodoElDia(arg)) return
       ejecutarDrop(id, { all_day: true, all_day_desde: fechas.desde, all_day_hasta: fechas.hasta }, arg)
       return
     }
@@ -510,6 +526,7 @@ export function crearGuardadoCitas({
        18:00-21:00 con horario hasta las 19:00 deja el inicio intacto. Por eso
        aquí el FIN importa tanto como el inicio — `eventResizableFromStart`
        está puesto, así que se puede arrastrar cualquiera de los dos bordes. */
+    if (vetadoPorBloqueo(arg, start_time, end_time)) return
     const aviso = avisosHorario.hora(arg.event.start!, arg.event.end, 'Empezaría a las', dondeDe(arg.event))
     // B7b: como en el arrastre, el empalme después del aviso de horario.
     const seguir = () => seguirSiNoSeEmpalma(arg, start_time, end_time, (aceptados) => ejecutarDrop(id, { start_time, end_time }, arg, aceptados))

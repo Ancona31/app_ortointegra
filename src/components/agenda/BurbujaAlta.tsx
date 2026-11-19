@@ -43,7 +43,6 @@
  * F3). «Más opciones» e «Invitar por correo» NO animan la salida: lo que abren
  * la tapa al instante. Lo nuevo de T1 no añade ninguna animación.
  */
-import type { AperturaBloqueo } from '@/lib/agenda/bloqueosAgenda'
 import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent, type ReactElement } from 'react'
 import { Check, Mail, Plus, X } from 'lucide-react'
 import Portal from '@/components/ui/Portal'
@@ -100,8 +99,6 @@ interface Props {
   alCerrar: () => void
   /** G3 · La zona de quien mira, para el resumen de la cita creada y su etiqueta de huso (punto 19). */
   zonaVisor?: string
-  /** K1 · «Bloquear este horario» (sólo con la v2): el modal del bloqueo con este tramo. */
-  alBloquear?: (desde: AperturaBloqueo) => void
 }
 
 /* ⚠️ `colocar` y `seguirColocacion` SON COPIA DELIBERADA en `TarjetaLectura.tsx`
@@ -468,7 +465,7 @@ function useGuardadoBurbuja(alGuardar: Props['alGuardar'], salir: () => void) {
     if (!datos) { setEstado({ guardando: false, error: motivoParaNoGuardar(entrada) }); return }
     setEstado({ guardando: true, error: null })
     const salida = await alGuardar(datos, { inicio: entrada.horaInicio, fin: entrada.horaFin })
-    if (!salida.enviada) { setEstado({ guardando: false, error: null }); return }
+    if (!salida.enviada) { setEstado({ guardando: false, error: salida.error ?? null }); return }
     if (salida.alta) setCreada({ alta: salida.alta, en: Date.now() })
     else salir()
   }
@@ -543,13 +540,6 @@ export default function BurbujaAlta(props: Props): ReactElement {
               <CampoObservaciones valor={notas} alCambiar={setNotas} />
               {estado.error && <p className="ag-capa-error" role="alert">{estado.error}</p>}
               <PieBurbuja guardando={estado.guardando} alGuardar={() => void guardar(entrada)} alMasOpciones={masOpciones} boton={botonGuardar} />
-              {/* K1 · el gesto de arrastrar sigue abriendo la CITA; el bloqueo es esta salida. */}
-              {props.alBloquear && (
-                <button type="button" className="ag-capa-enlace" data-burbuja-bloquear
-                  onClick={() => props.alBloquear?.({ fecha, hora: horas.inicio, horaFin: horas.fin, medicoId })}>
-                  Bloquear este horario
-                </button>
-              )}
             </>
           )}
         </div>
