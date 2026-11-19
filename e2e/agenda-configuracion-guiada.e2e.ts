@@ -75,8 +75,6 @@ function borrarCentinelas(): void {
   sqlLocal(`
     begin;
     set local session_replication_role = replica;
-    delete from public.audit_log where registro_id = :'e'::uuid
-       or registro_id in (select id from public.tipos_cita where nombre = :'n');
     delete from public.reserva_enlaces where id = :'e'::uuid;
     delete from public.tipos_cita where nombre = :'n';
     commit;`, { e: centinelaEnlace || '00000000-0000-0000-0000-000000000000', n: CENTINELA_TIPO })

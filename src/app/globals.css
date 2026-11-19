@@ -6297,7 +6297,7 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
    tokens de la agenda (sus colores de estado, la tinta, la superficie, el azul de marca y el
    rojo de error). La capa y la hoja de siempre ponen el sitio, la entrada y la salida; aquí
    sólo cambian su caja: sin relleno ni hueco (cada parte lleva el suyo, como la maqueta). */
-.ag-capa.ag-burbuja { width: 376px; border-radius: 18px; }
+.ag-capa.ag-burbuja { border-radius: 18px; }   /* el ancho, en el bloque de la tanda M (computadora) */
 .ag-capa.ag-burbuja, .ag-hoja.ag-burbuja { padding: 0; gap: 0; }
 .ag-hoja.ag-burbuja { padding-bottom: env(safe-area-inset-bottom); }
 .ag-burbuja-raiz { position: relative; display: flex; flex-direction: column; }
@@ -6315,7 +6315,7 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
   width: 44px; height: 44px; border-radius: var(--ag-r-btn); color: var(--ag-ink-600);
   transition: background-color var(--ag-dur-micro) var(--ag-ease);
 }
-.ag-burbuja-icono:hover, .ag-burbuja-icono[aria-expanded="true"] { background: var(--ag-btn-ghost-hover); }
+.ag-burbuja-icono:hover { background: var(--ag-btn-ghost-hover); }
 .ag-burbuja-nombre { display: flex; align-items: flex-start; gap: 10px; padding-right: 10px; }
 .ag-burbuja-titulo {
   flex: 1; min-width: 0; margin: 0;
@@ -6392,28 +6392,40 @@ body:has(.dash-barra-movil) .menu-flotante { display: none; }
 .ag-burbuja-pie-boton:hover { background: var(--ag-btn-ghost-hover); }
 .ag-burbuja-pie-boton--peligro { color: var(--ag-status-cancelled-text); }
 .ag-burbuja-fin { height: 20px; flex: none; }
-/* Los tres puntos: encima, bajo su botón (dentro de la burbuja, que es su caja). */
-.ag-burbuja-mas {
-  position: absolute; top: 60px; right: 10px; z-index: 3; width: 280px;
-  display: flex; flex-direction: column; padding: 6px;
-  background: var(--ag-surface); border: 1px solid var(--ag-border-card); border-radius: var(--ag-r-card); box-shadow: var(--ag-shadow-pop);
+/* Tanda M, punto 4 · las observaciones en UNA línea, recortada con «…» (el texto entero va en el DOM
+   y en `title`). Sin observaciones no se pinta. Teléfono: 14 px, el texto de la escala de L2. */
+.ag-burbuja-obs {
+  margin: 12px 20px 0; font-size: 14px; color: var(--ag-text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.ag-burbuja-mas-opcion {
-  display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-height: 44px; padding: 8px 10px;
-  font-size: 14px; font-weight: 600; text-align: left; color: var(--ag-ink); border-radius: var(--ag-r-btn);
-}
-.ag-burbuja-mas-opcion:hover { background: var(--ag-btn-ghost-hover); }
-.ag-burbuja-mas-opcion small {
-  font-size: 13px; font-weight: 400; color: var(--ag-ink-600);
-  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere;
-}
-.ag-burbuja-mas .ag-capa-boton { width: 100%; height: 44px; justify-content: flex-start; border: 0; font-size: 14px; font-weight: 600; }
-.ag-burbuja-mas-datos {
-  display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 10px; margin: 4px 0 0; padding: 8px 10px 4px;
-  font-size: 13px; border-top: 1px solid var(--ag-hairline);
-}
-.ag-burbuja-mas-datos dt { color: var(--ag-muted); font-weight: 600; }
-.ag-burbuja-mas-datos dd { margin: 0; color: var(--ag-text); overflow-wrap: anywhere; }
+.ag-burbuja-obs-rotulo { font-weight: 600; color: var(--ag-ink-600); }
+
+/* ── Tanda M, punto 1 de Angel · LA BURBUJA EN COMPUTADORA, con las medidas de la tarjeta de la
+   tanda J (`.ag-capa--tarjeta` y `.ag-lectura-*`, en `0cce313`) y el diseño de K5. Computadora es
+   la capa (`.ag-capa`, desde `ANCHO_MOVIL` = 1024 px); el teléfono y la tableta llevan la hoja
+   (`.ag-hoja`) y NO cambian (toques de 44 px, escala de L2). Lo vigila `agenda-m1-burbuja.e2e.ts`:
+     ancho 360 · nombre 16 · hora 15 · día, duración, médico, procedencia y observaciones 13 ·
+     píldora 12 · botón ancho, casillas y pie 13 px de letra y 48 de alto, casillas con el icono A
+     LA IZQUIERDA · ✕ y ⋮ de 32 · relleno 16 · 12 entre bloques · el recuadro de la hora, 10. */
+.ag-capa.ag-burbuja { width: 360px; }
+.ag-capa.ag-burbuja .ag-burbuja-cab { padding: 16px 16px 0; }
+.ag-capa.ag-burbuja .ag-burbuja-nombre { padding-right: 0; }
+.ag-capa.ag-burbuja .ag-burbuja-icono { width: 32px; height: 32px; }
+.ag-capa.ag-burbuja .ag-burbuja-estado { font-size: 12px; }
+.ag-capa.ag-burbuja .ag-burbuja-titulo { font-size: 16px; }
+.ag-capa.ag-burbuja .ag-burbuja-info { margin: 12px 16px 0; padding: 10px; }
+.ag-capa.ag-burbuja .ag-burbuja-duracion,
+.ag-capa.ag-burbuja .ag-burbuja-dia,
+.ag-capa.ag-burbuja .ag-burbuja-medico,
+.ag-capa.ag-burbuja .ag-burbuja-obs { font-size: 13px; }
+.ag-capa.ag-burbuja .ag-burbuja-obs { margin: 12px 16px 0; }
+.ag-capa.ag-burbuja .ag-burbuja-cuerpo { padding: 12px 16px 0; }
+.ag-capa.ag-burbuja .ag-burbuja-cta { min-height: 48px; font-size: 13px; }
+.ag-capa.ag-burbuja .ag-burbuja-celda { flex-direction: row; min-height: 48px; font-size: 13px; }
+.ag-capa.ag-burbuja .ag-burbuja-submenu .ag-capa-boton { height: 48px; font-size: 13px; }
+.ag-capa.ag-burbuja .ag-burbuja-pie { margin-top: 12px; }
+.ag-capa.ag-burbuja .ag-burbuja-pie-boton { min-height: 48px; font-size: 13px; }
+.ag-capa.ag-burbuja .ag-burbuja-fin { height: 16px; }
 .ag-capa-acuse { display: flex; align-items: center; gap: var(--ag-2-5); }
 .ag-capa-acuse-icono {
   flex: none;

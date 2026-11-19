@@ -58,10 +58,10 @@ export function tarjetaLectura(page: Page): Locator {
 /**
  * Con el interruptor encendido, un clic en una cita abre la TARJETA y la
  * edición está a un clic más. Tanda K (punto 21): en la agendada, la
- * confirmada y el evento, «Editar» de la rejilla; en las demás, «Editar» de
- * los tres puntos (que sustituyen al engrane de G3). Las dos abren el
- * formulario de siempre. Las e2e de B–E que abrían el modal con un clic pasan
- * por aquí.
+ * confirmada y el evento, «Editar» de la rejilla; en las demás, los tres
+ * puntos (tanda M, punto 4: abren el formulario directamente, sin menú). Los
+ * dos abren el formulario de siempre. Las e2e de B–E que abrían el modal con
+ * un clic pasan por aquí.
  */
 export async function editarDesdeTarjeta(page: Page): Promise<void> {
   const t = tarjetaLectura(page)
@@ -69,7 +69,6 @@ export async function editarDesdeTarjeta(page: Page): Promise<void> {
   const enRejilla = t.getByRole('toolbar', { name: 'Acciones de la cita' }).getByRole('button', { name: 'Editar', exact: true })
   if (await enRejilla.count() > 0) { await enRejilla.click(); return }
   await t.getByRole('button', { name: 'Más opciones de la cita', exact: true }).click()
-  await t.getByRole('group', { name: 'Más opciones de la cita' }).getByRole('button', { name: 'Editar', exact: true }).click()
 }
 
 /** El centro de la franja de media hora `hora` (`HH:MM`) del día `fecha`, ya a la vista. */

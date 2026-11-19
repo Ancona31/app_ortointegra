@@ -54,8 +54,8 @@ test.afterAll(() => {
  * Las citas «del personal» que siembra este archivo llevan un paciente de la
  * semilla y caen HOY (la carrera a T−1h, la pasada): sin borrarlas, otra e2e
  * que busque la tarjeta de ese paciente en la agenda de hoy podría dar con
- * ellas. Se borran como postgres con replica (audit_log es inmutable), con su
- * enlace y su auditoría. Las reservas por enlace las limpia la siembra.
+ * ellas. Se borran como postgres con replica, con su enlace; su auditoría se
+ * queda (no se borra, orden de Angel, tanda M). Las reservas por enlace las limpia la siembra.
  */
 function borrarCitasDelPersonal(): void {
   sqlLocal(`
@@ -63,8 +63,6 @@ function borrarCitasDelPersonal(): void {
     set local session_replication_role = replica;
     create temp table _a on commit drop as
       select id from public.appointments where clinica_id = :'c' and title = 'TITULO SECRETO E10';
-    delete from public.audit_log where registro_id in (select id from _a)
-       or registro_id in (select id from public.cita_confirmaciones where appointment_id in (select id from _a));
     delete from public.cita_confirmaciones where appointment_id in (select id from _a);
     delete from public.appointments where id in (select id from _a);
     commit;`, { c: e.clinicaId })

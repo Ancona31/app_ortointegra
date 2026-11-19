@@ -42,7 +42,6 @@ test.beforeAll(() => { desde = marcaE2e() })
 test.afterEach(() => {
   sqlLocal(`begin; set local session_replication_role = replica;
     delete from public.avisos_clinica where cita_id in (select id from public.appointments where google_event_id like 'falso-j3-e2e-%' or title like 'Tipo J3 %');
-    delete from public.audit_log where registro_id in (select id from public.appointments where google_event_id like 'falso-j3-e2e-%' or title like 'Tipo J3 %');
     delete from public.appointments where google_event_id like 'falso-j3-e2e-%' or title like 'Tipo J3 %';
     delete from public.tipos_cita where nombre like 'Tipo J3 %'; commit;`)
   limpiarReservasE2e(desde)

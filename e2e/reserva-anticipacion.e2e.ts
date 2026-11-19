@@ -58,7 +58,6 @@ test.beforeAll(() => {
 test.afterAll(() => {
   if (e?.consultorioId) {
     sqlLocal(`begin; set local session_replication_role = replica;
-      delete from public.audit_log where registro_id in (:'k'::uuid, :'t'::uuid);
       delete from public.consultorios where id = :'k'; delete from public.tipos_cita where id = :'t'; commit;`,
     { k: e.consultorioId, t: e.tipoId })
   }

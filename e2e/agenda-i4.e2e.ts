@@ -32,7 +32,6 @@ test.beforeEach(() => { interruptorAgenda('A', true) })
 test.afterEach(() => {
   if (creadas.length) {
     sqlLocal(`begin; set local session_replication_role = replica;
-      delete from public.audit_log where registro_id = any (string_to_array(:'ids', ',')::uuid[]);
       delete from public.consultas where appointment_id = any (string_to_array(:'ids', ',')::uuid[]);
       delete from public.cita_confirmaciones where appointment_id = any (string_to_array(:'ids', ',')::uuid[]);
       delete from public.appointments where id = any (string_to_array(:'ids', ',')::uuid[]); commit;`, { ids: creadas.join(',') })

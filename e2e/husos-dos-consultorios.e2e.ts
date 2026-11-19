@@ -21,7 +21,8 @@ import { hoyEnTZ, desplazarFecha } from '../src/lib/dates'
  *
  * Requiere CRON_SECRET (sólo de prueba) y RESERVA_SECRETO en `.env.local`.
  * Lo que crea se borra al terminar como `postgres` (citas, enlaces y el
- * consultorio de Tijuana, con sus filas de auditoría).
+ * consultorio de Tijuana). Sus filas de `audit_log` se quedan: la auditoría no
+ * se borra (orden de Angel, tanda M).
  */
 config({ path: resolve(process.cwd(), '.env.local'), quiet: true })
 const CRON = process.env.CRON_SECRET ?? ''
@@ -84,8 +85,6 @@ test.afterAll(() => {
     begin;
     set local session_replication_role = replica;
     create temp table _a on commit drop as select id from public.appointments where consultorio_id = :'k';
-    delete from public.audit_log where registro_id in (select id from _a) or registro_id = :'k'::uuid or registro_id = :'t'::uuid;
-    delete from public.audit_log where registro_id in (select id from public.cita_confirmaciones where appointment_id in (select id from _a));
     delete from public.cita_correos where appointment_id in (select id from _a);
     delete from public.cita_confirmaciones where appointment_id in (select id from _a);
     delete from public.reserva_incidencias where appointment_id in (select id from _a);

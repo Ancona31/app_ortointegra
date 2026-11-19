@@ -12,23 +12,29 @@
  *
  * Los cuatro ajustes de Angel sobre la maqueta: «Confirmar» abre WhatsApp, correo y «Marcar como
  * confirmada» (cada una si aplica); en la cancelada, «Darle otra cita» y «Reasignar el horario»;
- * los tres puntos sustituyen al engrane (observaciones, tipo, «No asistió»…); el pie dice «No es
- * una cita». Los iconos son los trazos de la maqueta; la «G», a color (`GoogleGIcon`).
+ * los tres puntos sustituyen al engrane; el pie dice «No es una cita». Los iconos son los trazos
+ * de la maqueta; la «G», a color (`GoogleGIcon`).
+ *
+ * Tanda M, punto 4 de Angel: «Los tres puntos de la burbuja abren directamente el formulario
+ * completo de la cita. Quita el menú chico. Las observaciones, si la cita las tiene, se muestran en
+ * una línea dentro de la burbuja.» El ⋮ es `alAccion('editar')`, la misma puerta que «Editar»; lo
+ * que tenía el menú (tipo, consultorio, teléfono, «No asistió» de la agendada, los recordatorios de
+ * la confirmada) está en ese formulario. Las medidas de computadora (punto 1) van en `globals.css`.
  *
  * Accesibilidad: las acciones en un `role="toolbar"` con foco itinerante (flechas, Inicio, Fin);
- * «Confirmar» y los tres puntos son botones que despliegan (`aria-expanded`); Escape cierra lo
- * desplegado antes que la burbuja; el expediente tachado es un botón con nombre y aviso.
+ * «Confirmar» despliega (`aria-expanded`); Escape cierra lo desplegado antes que la burbuja; el
+ * expediente tachado es un botón con nombre y aviso.
  */
 import { useId, useRef, useState, type KeyboardEvent, type PointerEvent as EventoPuntero, type ReactElement, type ReactNode, type RefObject } from 'react'
 import { ArrowRightLeft, UserPlus } from 'lucide-react'
 import type { Appointment } from '@/lib/agenda/tiposAgenda'
-import { STATUS_CONFIG, esEventoGenerico, marcasDeCita } from '@/lib/agenda/tarjetasAgenda'
+import { STATUS_CONFIG, marcasDeCita } from '@/lib/agenda/tarjetasAgenda'
 import { indiceTrasTecla } from '@/lib/agenda/opcionesLista'
 import { GoogleGIcon } from '@/components/agenda/GoogleGIcon'
 import { IconoEnlace, IconoSinExpediente } from '@/components/agenda/MarcasCita'
 import {
   burbujaDeTarjeta, cuandoDeTarjeta, diaLargoDeTarjeta, ETIQUETA_ACCION, horarioDeTarjeta, inicialesDeMedico, nombreDeTarjeta,
-  telefonoDeTarjeta, type AccionTarjeta, type CeldaBurbuja, type DisposicionBurbuja,
+  type AccionTarjeta, type CeldaBurbuja, type DisposicionBurbuja,
 } from '@/lib/agenda/accionesTarjeta'
 
 /** Un mensaje de una acción (aviso enviado, o el motivo de un error). */
@@ -134,11 +140,11 @@ function Procedencia({ cita, enlacePropio, historial }: { cita: Appointment; enl
 
 interface PropsCabecera {
   cita: Appointment; idTitulo: string; salir: () => void; enlacePropio: boolean
-  mas: { abierto: boolean; id: string; alternar: () => void }
-  refMas: RefObject<HTMLButtonElement | null>
+  /** Tanda M, punto 4 · el ⋮ abre el formulario completo (`alAccion('editar')`), sin menú. */
+  alEditar: () => void
 }
 
-function Cabecera({ cita, idTitulo, salir, enlacePropio, mas, refMas }: PropsCabecera): ReactElement {
+function Cabecera({ cita, idTitulo, salir, enlacePropio, alEditar }: PropsCabecera): ReactElement {
   const s = cita.status
   const marcas = marcasDeCita(cita)
   return (
@@ -148,8 +154,8 @@ function Cabecera({ cita, idTitulo, salir, enlacePropio, mas, refMas }: PropsCab
           <span className="ag-burbuja-punto" style={{ background: `var(--ag-status-${s}-dot)` }} />{STATUS_CONFIG[s].label}
         </span>
         <div className="ag-burbuja-botones">
-          <button ref={refMas} type="button" className="ag-burbuja-icono" aria-label="Más opciones de la cita" data-abre-submenu=""
-            aria-expanded={mas.abierto} aria-controls={mas.abierto ? mas.id : undefined} onClick={mas.alternar}><IconoPuntos /></button>
+          <button type="button" className="ag-burbuja-icono" aria-label="Más opciones de la cita" aria-haspopup="dialog"
+            onClick={alEditar}><IconoPuntos /></button>
           <button type="button" className="ag-burbuja-icono" aria-label="Cerrar" onClick={salir}><IconoCerrar /></button>
         </div>
       </div>
@@ -188,6 +194,18 @@ function Info({ cita, zonaVisor, nombreMedico }: { cita: Appointment; zonaVisor:
         </div>
       )}
     </div>
+  )
+}
+
+/** Tanda M, punto 4 · Las observaciones en UNA línea, recortada con «…» (CSS); el texto entero
+    queda en el DOM (lo lee el lector de pantalla) y en `title` (el ratón). Sin observaciones, nada. */
+function Observaciones({ notas }: { notas: string | null | undefined }): ReactElement | null {
+  const texto = notas?.replace(/\s+/g, ' ').trim()
+  if (!texto) return null
+  return (
+    <p className="ag-burbuja-obs" title={texto} data-burbuja-obs="">
+      <span className="ag-burbuja-obs-rotulo">Observaciones: </span>{texto}
+    </p>
   )
 }
 
@@ -307,56 +325,24 @@ function Acciones({ d, props, autoFoco, confirmar, mensaje, alMensaje }: PropsAc
   )
 }
 
-/* ── Los tres puntos ──────────────────────────────────────────────────── */
-function PanelMas({ d, props, id, alMensaje }: { d: DisposicionBurbuja; props: PropsBurbuja; id: string; alMensaje: (m: MensajeAccion | null) => void }): ReactElement {
-  const { cita, alAccion, whatsapp, correo } = props
-  const tel = telefonoDeTarjeta(cita)
-  const opcion = (texto: string, valor: string | null, a: AccionTarjeta): ReactElement => (
-    <button type="button" className="ag-burbuja-mas-opcion" onClick={() => alAccion(a)}>
-      <span>{texto}</span>{valor !== null && <small>{valor}</small>}
-    </button>
-  )
-  return (
-    <div id={id} className="ag-burbuja-mas" data-submenu="" role="group" aria-label="Más opciones de la cita">
-      {opcion('Observaciones', cita.notes?.trim() || 'Sin observaciones', 'editar')}
-      {!esEventoGenerico(cita) && opcion('Tipo de cita', cita.tipo_cita_nombre ?? 'Sin tipo', 'editar')}
-      {d.mas.includes('no-asistio') && opcion(ETIQUETA_ACCION['no-asistio'], null, 'no-asistio')}
-      {d.recordatorio.whatsapp && whatsapp?.({ etiqueta: 'Recordatorio por WhatsApp', alMensaje })}
-      {d.recordatorio.correo && correo?.({ etiqueta: 'Recordatorio por correo', alMensaje })}
-      {d.mas.includes('editar') && opcion(ETIQUETA_ACCION.editar, null, 'editar')}
-      {(cita.consultorio_nombre || tel) && (
-        <dl className="ag-burbuja-mas-datos">
-          {cita.consultorio_nombre && <><dt>Consultorio</dt><dd>{cita.consultorio_nombre}</dd></>}
-          {tel && <><dt>Teléfono</dt><dd>{tel}</dd></>}
-        </dl>
-      )}
-    </div>
-  )
-}
-
 /* ── Todo junto ───────────────────────────────────────────────────────── */
-type Desplegado = 'confirmar' | 'mas' | null
-
-/** Escape y el toque fuera cierran lo desplegado antes que la burbuja (y devuelven el foco). */
+/** Lo que despliega «Confirmar». Escape y el toque fuera lo cierran antes que la burbuja (y el foco
+    vuelve a «Confirmar»). Tanda M, punto 4: los tres puntos ya no despliegan nada. */
 function useDesplegado(): {
-  abierto: Desplegado; alternar: (q: Exclude<Desplegado, null>) => void; cerrar: () => void; botonMas: RefObject<HTMLButtonElement | null>
-  alTeclear: (e: KeyboardEvent) => void; alPulsar: (e: EventoPuntero) => void
+  abierto: boolean; alternar: () => void; alTeclear: (e: KeyboardEvent) => void; alPulsar: (e: EventoPuntero) => void
 } {
-  const [abierto, setAbierto] = useState<Desplegado>(null)
-  const botonMas = useRef<HTMLButtonElement | null>(null)
-  const alternar = (q: Exclude<Desplegado, null>): void => setAbierto(a => (a === q ? null : q))
+  const [abierto, setAbierto] = useState(false)
   function alTeclear(e: KeyboardEvent): void {
-    if (e.key !== 'Escape' || abierto === null) return
+    if (e.key !== 'Escape' || !abierto) return
     e.stopPropagation()
-    if (abierto === 'mas') botonMas.current?.focus()
-    else e.currentTarget.querySelector<HTMLElement>('[data-clave="r:menu-confirmar"]')?.focus()
-    setAbierto(null)
+    e.currentTarget.querySelector<HTMLElement>('[data-clave="r:menu-confirmar"]')?.focus()
+    setAbierto(false)
   }
   function alPulsar(e: EventoPuntero): void {
-    if (abierto === null || !(e.target instanceof Element) || e.target.closest('[data-submenu], [data-abre-submenu]')) return
-    setAbierto(null)
+    if (!abierto || !(e.target instanceof Element) || e.target.closest('[data-submenu], [data-abre-submenu]')) return
+    setAbierto(false)
   }
-  return { abierto, alternar, cerrar: () => setAbierto(null), botonMas, alTeclear, alPulsar }
+  return { abierto, alternar: () => setAbierto(a => !a), alTeclear, alPulsar }
 }
 
 export default function BurbujaCita({ props, idTitulo, salir, autoFoco }: {
@@ -365,7 +351,6 @@ export default function BurbujaCita({ props, idTitulo, salir, autoFoco }: {
   const { cita, zonaVisor, puedeIniciarConsulta, conConfirmar = true, nombreMedico, puedeVerExpediente = false, destacar } = props
   const [mensaje, setMensaje] = useState<MensajeAccion | null>(null)
   const desplegado = useDesplegado()
-  const idMas = useId()
   const idConfirmar = useId()
   const d = burbujaDeTarjeta(cita, puedeIniciarConsulta, {
     conConfirmar, conWhatsApp: Boolean(props.whatsapp), conCorreo: Boolean(props.correo), puedeVerExpediente, destacar,
@@ -373,13 +358,11 @@ export default function BurbujaCita({ props, idTitulo, salir, autoFoco }: {
   return (
     <div className="ag-burbuja-raiz" onKeyDown={desplegado.alTeclear} onPointerDown={desplegado.alPulsar}>
       <div className="ag-burbuja-franja" aria-hidden="true" style={{ background: `var(--ag-status-${cita.status}-dot)` }} />
-      <Cabecera cita={cita} idTitulo={idTitulo} salir={salir} enlacePropio={props.enlacePropio === true}
-        mas={{ abierto: desplegado.abierto === 'mas', id: idMas, alternar: () => desplegado.alternar('mas') }} refMas={desplegado.botonMas} />
-      {desplegado.abierto === 'mas' && <PanelMas d={d} props={props} id={idMas}
-        alMensaje={m => { setMensaje(m); if (m) desplegado.cerrar() }} />}
+      <Cabecera cita={cita} idTitulo={idTitulo} salir={salir} enlacePropio={props.enlacePropio === true} alEditar={() => props.alAccion('editar')} />
       <Info cita={cita} zonaVisor={zonaVisor} nombreMedico={nombreMedico} />
+      <Observaciones notas={cita.notes} />
       <Acciones d={d} props={props} autoFoco={autoFoco} mensaje={mensaje} alMensaje={setMensaje}
-        confirmar={{ abierto: desplegado.abierto === 'confirmar', alternar: () => desplegado.alternar('confirmar'), id: idConfirmar }} />
+        confirmar={{ abierto: desplegado.abierto, alternar: desplegado.alternar, id: idConfirmar }} />
     </div>
   )
 }
