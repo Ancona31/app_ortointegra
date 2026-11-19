@@ -30,7 +30,7 @@ import PestanaHorario from '@/components/agenda/configuracion/PestanaHorario'
 import PestanaMasOpciones from '@/components/agenda/configuracion/PestanaMasOpciones'
 import type { Avisar, EstadoAvisos } from '@/components/agenda/configuracion/estadoAvisos'
 import type { EstadoLista } from '@/components/agenda/configuracion/listaEnlaces'
-import { PANEL, SUB_PANEL, TITULO_PANEL } from '@/components/agenda/configuracion/estilosConfig'
+import { PANEL, SUB_PANEL, SUB_PASO, TITULO_PANEL, TITULO_PASO } from '@/components/agenda/configuracion/estilosConfig'
 import type { TipoCita } from '@/lib/agenda/tiposCita'
 import type { ConfigApp, Horario, MedicoConfig } from '@/lib/configApp'
 import type { Consultorio } from '@/types'
@@ -97,7 +97,7 @@ function Pestanas({ activa, elegir, esMedico }: { activa: Clave; elegir: (c: Cla
         return (
           <button key={p.clave} type="button" role="tab" id={`config-tab-${p.clave}`} aria-selected={sel} aria-controls={`config-panel-${p.clave}`}
             aria-label={nombre} tabIndex={sel ? 0 : -1} onClick={() => elegir(p.clave)}
-            className={`flex min-h-[52px] min-w-[44px] flex-1 cursor-pointer items-center justify-center whitespace-nowrap border-0 border-b-[3px] bg-transparent px-[8px] text-[16px] sm:flex-none sm:px-[16px] ${sel
+            className={`flex min-h-[52px] min-w-[44px] flex-1 cursor-pointer items-center justify-center whitespace-nowrap border-0 border-b-[3px] bg-transparent px-[8px] text-[15px] sm:flex-none sm:px-[16px] ${sel
               ? 'border-[var(--ag-brand-secondary)] font-bold text-[var(--ag-brand-legible)]' : 'border-transparent font-semibold text-[var(--ag-ink-600)]'}`}>
             <Icono size={22} aria-hidden="true" className="sm:hidden" />
             <span className="hidden sm:inline">{nombre}</span>
@@ -123,22 +123,23 @@ export default function PestanasConfiguracion(d: DatosPestanas) {
   return (
     <div className="mx-auto flex w-full max-w-[860px] flex-col gap-[24px] pb-[80px] pt-[8px]">
       <div className="flex flex-col gap-[6px]">
-        <Link href="/agenda" className="inline-flex min-h-[44px] w-fit items-center gap-[6px] text-[15px] text-[var(--ag-ink-600)] no-underline">
+        <Link href="/agenda" className="inline-flex min-h-[44px] w-fit items-center gap-[6px] text-[14px] text-[var(--ag-ink-600)] no-underline">
           <ChevronLeft size={18} aria-hidden="true" /> Agenda
         </Link>
-        <h1 className="m-0 text-[32px] font-bold leading-[1.2] text-[var(--ag-ink)]">Configuración de la agenda</h1>
-        <p className="m-0 text-[17px] leading-[1.5] text-[var(--ag-ink-600)]">Esto es lo que elegiste al empezar. Cambia lo que quieras: se guarda solo.</p>
+        <h1 className={TITULO_PASO}>Configuración de la agenda</h1>
+        <p className={SUB_PASO}>Esto es lo que elegiste al empezar. Cambia lo que quieras: se guarda solo.</p>
       </div>
       <div className="flex flex-col gap-[16px]">
         <Pestanas activa={activa} elegir={setActiva} esMedico={d.esMedico} />
         {/* El nombre de la elegida, sólo en el teléfono (allí las pestañas son iconos). Lo mismo que ya dice la pestaña: fuera del árbol accesible. */}
-        <p aria-hidden="true" data-titulo-pestana className="m-0 text-[20px] font-bold leading-[1.3] text-[var(--ag-ink)] sm:hidden">
+        <p aria-hidden="true" data-titulo-pestana className="m-0 text-[16px] font-bold leading-[1.3] text-[var(--ag-ink)] sm:hidden">
           {nombreDe(PESTANAS.find(p => p.clave === activa) ?? PESTANAS[0], d.esMedico)}
         </p>
       </div>
       <Panel clave="enlace" activa={activa}>
         <PestanaEnlace lista={d.lista} recargar={d.recargar} medicos={d.medicos} usuarioId={d.usuarioId} esMedico={d.esMedico}
-          gestionaTodos={d.gestionaTodos} administradores={d.administradores} vigenciaDias={d.vigenciaDias} avisar={d.avisar} alCrearTipo={d.alCambiarDatos} />
+          gestionaTodos={d.gestionaTodos} administradores={d.administradores} puedeAdministrar={d.puedeAdministrar} vigenciaDias={d.vigenciaDias}
+          avisar={d.avisar} alCrearTipo={d.alCambiarDatos} />
       </Panel>
       <Panel clave="horario" activa={activa}>
         <PestanaHorario consultorios={d.consultorios?.filter(c => c.activo !== false) ?? null} fallo={d.falloConfig} horarioClinica={d.horarioClinica} husoClinica={d.husoClinica} medicos={d.medicos} usuarioId={d.usuarioId}

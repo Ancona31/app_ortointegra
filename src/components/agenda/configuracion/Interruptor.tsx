@@ -10,6 +10,9 @@
  * viejos. Borde de 1 + relleno de 2 = los 3 px de la maqueta alrededor de la bola. `role="switch"` con
  * `aria-checked`; el nombre lo da `etiquetadoPor` (el id del texto que lo
  * explica) o `etiqueta`.
+ *
+ * Tanda L (punto 12): el dibujo mide 30 de alto, pero el área de toque llega a 46 con un `::before`
+ * invisible 8 px por encima y por debajo (el clic en él es clic en el botón). Sin cambio a la vista.
  */
 interface Props {
   encendido: boolean
@@ -23,7 +26,7 @@ export default function Interruptor({ encendido, alCambiar, etiquetadoPor, etiqu
   return (
     <button type="button" role="switch" aria-checked={encendido} aria-labelledby={etiquetadoPor} aria-label={etiquetadoPor ? undefined : etiqueta}
       onClick={alCambiar} disabled={deshabilitado}
-      className={`flex h-[30px] w-[52px] flex-none cursor-pointer rounded-full border p-[2px] transition-colors duration-[var(--ag-dur-micro)] disabled:cursor-not-allowed disabled:opacity-50 ${encendido
+      className={`relative flex h-[30px] w-[52px] flex-none cursor-pointer rounded-full border p-[2px] before:absolute before:inset-x-0 before:-inset-y-[9px] before:content-[''] transition-colors duration-[var(--ag-dur-micro)] disabled:cursor-not-allowed disabled:opacity-50 ${encendido
         ? 'justify-end border-[var(--ag-control-primario-border)] bg-[var(--ag-brand-secondary)]' : 'justify-start border-[var(--ag-control-border)] bg-[var(--ag-control-border)]'}`}>
       <span aria-hidden="true" className="h-[24px] w-[24px] rounded-full bg-white shadow-[0_1px_2px_rgba(15,23,42,0.25)]" />
     </button>

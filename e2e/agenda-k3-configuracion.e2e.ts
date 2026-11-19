@@ -107,7 +107,7 @@ test('11 · el horario de la clínica va primero, con sus días; sólo el admini
       const suya = p.getByRole('group', { name: 'Horario de la clínica' })
       await expect(tarjetasDelPanel(p).first()).toHaveAccessibleName('Horario de la clínica')
       await expect(suya).toContainText('Lun a vie · 8:00 – 18:00')
-      await expect(suya).toContainText('Lo cambia quien administra la clínica.')
+      await expect(suya).toContainText('Solo el administrador de la clínica puede cambiar estas opciones.')
       await expect(suya.getByRole('button')).toHaveCount(0)
     })
   }

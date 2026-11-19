@@ -69,7 +69,7 @@ const FILA = 'flex w-full min-h-[44px] cursor-pointer items-center justify-betwe
 function TextoFila({ titulo, ayuda }: { titulo: string; ayuda: string }) {
   return (
     <span className="flex flex-[1_1_360px] flex-col gap-[4px]">
-      <span className="text-[17px] font-bold">{titulo}</span>
+      <span className="text-[15px] font-semibold">{titulo}</span>
       <span className={AYUDA}>{ayuda}</span>
     </span>
   )
@@ -105,10 +105,10 @@ function Bloqueados({ p }: { p: Props }) {
         {Array.isArray(contactos) && contactos.length === 0 && <p className={AYUDA}>Nadie está bloqueado.</p>}
         {Array.isArray(contactos) && contactos.map(c => (
           <div key={`${c.medico_id}:${c.cita_id}`} className="flex flex-wrap items-center justify-between gap-[12px] rounded-[10px] bg-[var(--ag-surface-sunken)] px-[16px] py-[12px]">
-            <span className="flex flex-col gap-[2px] text-[15px] text-[var(--ag-ink)]">
+            <span className="flex flex-col gap-[2px] text-[14px] text-[var(--ag-ink)]">
               <strong>{c.nombre ?? 'Sin nombre'}</strong>
-              <span className="text-[14px] text-[var(--ag-ink-600)]">{[c.telefono, c.correo, p.gestionaTodos ? nombreMedico(c.medico_id) : null].filter(Boolean).join(' · ')}</span>
-              <span className="text-[14px] text-[var(--ag-ink-600)]">{motivo(c)}</span>
+              <span className="text-[13.5px] text-[var(--ag-ink-600)]">{[c.telefono, c.correo, p.gestionaTodos ? nombreMedico(c.medico_id) : null].filter(Boolean).join(' · ')}</span>
+              <span className="text-[13.5px] text-[var(--ag-ink-600)]">{motivo(c)}</span>
             </span>
             <button type="button" className={BOTON_TEXTO} disabled={ocupado} onClick={() => void quitar(c)} aria-label={`Desbloquear a ${c.nombre ?? 'este contacto'}`}>Desbloquear</button>
           </div>

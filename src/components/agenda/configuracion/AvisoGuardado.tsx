@@ -36,7 +36,7 @@ export default function AvisoGuardado({ aviso }: { aviso: EstadoAviso }) {
     <div role="status" aria-live="polite">
       {aviso && (
         <div role={error ? 'alert' : undefined} key={aviso.n} data-aviso-config={aviso.tipo}
-          className={`fixed bottom-[28px] left-1/2 z-[70] inline-flex max-w-[calc(100vw-32px)] -translate-x-1/2 items-center gap-[8px] rounded-full px-[20px] py-[12px] text-[15px] font-semibold shadow-[var(--ag-shadow-pop)] ${error
+          className={`fixed bottom-[28px] left-1/2 z-[70] inline-flex max-w-[calc(100vw-32px)] -translate-x-1/2 items-center gap-[8px] rounded-full px-[20px] py-[12px] text-[14px] font-semibold shadow-[var(--ag-shadow-pop)] ${error
             ? 'bg-[var(--ag-status-cancelled-text)] text-white' : 'bg-[var(--ag-ink)] text-[var(--ag-surface)]'}`}>
           {!error && <Check size={18} strokeWidth={2.5} aria-hidden="true" />}
           {aviso.tipo === 'error' ? aviso.texto : 'Guardado'}

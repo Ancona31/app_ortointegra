@@ -104,12 +104,12 @@ function Avance({ paso, conClinica }: { paso: PasoPrimeraVez; conClinica: boolea
   const etapas = conClinica ? ETAPAS_CON_CLINICA : ETAPAS
   return (
     <div className="flex flex-col gap-[10px]">
-      <div className="text-[14px] font-semibold text-[var(--ag-ink-600)]">Paso {n} de {de} · menos de 2 minutos</div>
+      <div className="text-[13.5px] font-semibold text-[var(--ag-ink-600)]">Paso {n} de {de} · menos de 2 minutos</div>
       <ol className={`m-0 grid list-none ${conClinica ? 'grid-cols-4' : 'grid-cols-3'} gap-[8px] p-0`}>
         {etapas.map((e, i) => (
           <li key={e} className="flex flex-col gap-[6px]" aria-current={i + 1 === n ? 'step' : undefined}>
             <div aria-hidden="true" className={`h-[6px] rounded-[3px] ${i + 1 <= n ? 'bg-[var(--ag-brand-secondary)]' : 'bg-[var(--ag-border-card)]'}`} />
-            <div className={`text-[14px] ${i + 1 === n ? 'font-bold text-[var(--ag-brand-legible)]' : 'text-[var(--ag-ink-600)]'}`}>{e}</div>
+            <div className={`text-[11px] ${i + 1 === n ? 'font-bold text-[var(--ag-brand-legible)]' : 'font-semibold text-[var(--ag-ink-600)]'}`}>{e}</div>
           </li>
         ))}
       </ol>
@@ -189,12 +189,12 @@ function Cabecera({ paso, conClinica, guardando, alTerminarDespues }: { paso: Pa
   return (
     <>
       <div className="flex flex-wrap items-center justify-between gap-[16px]">
-        <Link href="/agenda" className="inline-flex min-h-[44px] items-center gap-[6px] text-[15px] text-[var(--ag-ink-600)] no-underline">
+        <Link href="/agenda" className="inline-flex min-h-[44px] items-center gap-[6px] text-[14px] text-[var(--ag-ink-600)] no-underline">
           <ChevronLeft size={18} aria-hidden="true" /> Agenda
         </Link>
         {paso < 4 && (
           <button type="button" disabled={guardando} onClick={alTerminarDespues}
-            className="min-h-[44px] cursor-pointer border-0 bg-transparent px-[4px] text-[15px] text-[var(--ag-ink-600)] underline">Terminar después</button>
+            className="min-h-[44px] cursor-pointer border-0 bg-transparent px-[4px] text-[14px] text-[var(--ag-ink-600)] underline">Terminar después</button>
         )}
       </div>
       {paso !== 4 && <Avance paso={paso} conClinica={conClinica} />}
@@ -286,7 +286,7 @@ export default function PrimeraVez(p: Props) {
       {paso === 0 && <PasoClinica eleccion={f.clinica} alCambiar={f.setClinica} />}
       {paso === 1 && (
         <PasoHorario consultorios={p.consultorios} elecciones={f.elecciones} horarioClinica={p.horarioClinica}
-          alCambiar={(id, e) => f.setElecciones(x => ({ ...x, [id]: e }))} />
+          puedeAdministrar={p.puedeAdministrar} alCambiar={(id, e) => f.setElecciones(x => ({ ...x, [id]: e }))} />
       )}
       {paso === 2 && <PasoDuracion eleccion={f.duracion} horarios={horarios} alCambiar={f.setDuracion} />}
       {paso === 3 && <PasoAvisos avisos={p.avisos} puedeAdministrar={p.puedeAdministrar} />}

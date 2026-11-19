@@ -46,19 +46,19 @@ export default function PasoDuracion({ eleccion, horarios, alCambiar }: Props) {
           <button type="button" aria-pressed={eleccion.otra} className={opcion(eleccion.otra)} onClick={() => alCambiar({ ...eleccion, otra: true })}>Otra</button>
         </div>
         {eleccion.otra && (
-          <label htmlFor={`${id}-o`} className="flex items-center gap-[10px] text-[16px] text-[var(--ag-text)]">Mi consulta dura
+          <label htmlFor={`${id}-o`} className="flex items-center gap-[10px] text-[14px] text-[var(--ag-text)]">Mi consulta dura
             <input id={`${id}-o`} type="number" inputMode="numeric" min={5} max={240} step={5} className={`${CAMPO_NUEVO} w-[96px]`}
               value={eleccion.texto} onChange={e => alCambiar({ ...eleccion, texto: e.target.value })} />
             minutos</label>
         )}
         {cabe && (
-          <div className="flex items-center gap-[12px] rounded-[12px] bg-[var(--ag-primary-bg-faint)] p-[16px] text-[16px] leading-[1.5] text-[var(--ag-ink)]">
+          <div className="flex items-center gap-[12px] rounded-[12px] bg-[var(--ag-primary-bg-faint)] p-[16px] text-[14px] leading-[1.5] text-[var(--ag-ink)]">
             <CalendarDays size={22} className="flex-none text-[var(--ag-brand-legible)]" aria-hidden="true" />
             <span>En un día de {cabe.desde} a {cabe.hasta} te caben <strong>{cabe.cuantas} consultas</strong> de {minutos} minutos.</span>
           </div>
         )}
       </div>
-      <p className="m-0 text-[15px] text-[var(--ag-ink-600)]">Si en algún consultorio dura distinto, lo cambias después en Configuración.</p>
+      <p className="m-0 text-[13.5px] text-[var(--ag-ink-600)]">Si en algún consultorio dura distinto, lo cambias después en Configuración.</p>
     </section>
   )
 }

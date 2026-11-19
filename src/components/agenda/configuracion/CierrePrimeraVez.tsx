@@ -37,8 +37,8 @@ interface Props {
 function TuEnlace({ enlace, aviso }: Pick<Props, 'enlace' | 'aviso'>) {
   return (
     <div className={`${TARJETA} gap-[14px] border-2 border-[var(--ag-brand-secondary)]`}>
-      <span className="text-[15px] font-bold text-[var(--ag-brand-legible)]">Tu enlace para pacientes</span>
-      {aviso && <p role="note" className="m-0 rounded-[10px] border border-[var(--ag-aviso-border)] bg-[var(--ag-aviso-bg)] px-[14px] py-[10px] text-[15px] text-[var(--ag-aviso-text)]">{aviso}</p>}
+      <span className="text-[15px] font-semibold text-[var(--ag-brand-legible)]">Tu enlace para pacientes</span>
+      {aviso && <p role="note" className="m-0 rounded-[10px] border border-[var(--ag-aviso-border)] bg-[var(--ag-aviso-bg)] px-[14px] py-[10px] text-[14px] text-[var(--ag-aviso-text)]">{aviso}</p>}
       {enlace.estado === 'cargando' && <div className={DIRECCION}>Preparando tu enlace…</div>}
       {enlace.estado === 'error' && <p role="alert" className={ERROR}>{enlace.motivo}</p>}
       {enlace.estado === 'listo' && (
@@ -61,7 +61,7 @@ function FilaResumen({ titulo, children, alCambiar, ultima }: { titulo: string; 
   return (
     <div className={`flex items-start justify-between gap-[16px] py-[14px] ${ultima ? '' : 'border-b border-[var(--ag-hairline)]'}`}>
       <div className="flex flex-col gap-[4px]">
-        <span className="text-[14px] font-semibold text-[var(--ag-ink-600)]">{titulo}</span>
+        <span className="text-[13.5px] font-semibold text-[var(--ag-ink-600)]">{titulo}</span>
         {children}
       </div>
       <button type="button" className={BOTON_TEXTO} onClick={alCambiar} aria-label={`Cambiar: ${titulo}`}>Cambiar</button>
@@ -74,20 +74,20 @@ function Resumen({ resumen, irAPaso }: Pick<Props, 'resumen' | 'irAPaso'>) {
     <div className={`${TARJETA} px-[24px] py-[8px]`}>
       {resumen.clinica && (
         <FilaResumen titulo="Horario de la clínica" alCambiar={() => irAPaso(0)}>
-          <span className="text-[15px] text-[var(--ag-ink)]">{resumen.clinica.texto}</span>
-          <span className="text-[15px] text-[var(--ag-ink-600)]">Huso horario: {resumen.clinica.huso}</span>
+          <span className="text-[14px] text-[var(--ag-ink)]">{resumen.clinica.texto}</span>
+          <span className="text-[13.5px] text-[var(--ag-ink-600)]">Huso horario: {resumen.clinica.huso}</span>
         </FilaResumen>
       )}
       <FilaResumen titulo="Cuándo das consulta" alCambiar={() => irAPaso(1)}>
         {resumen.consultorios.map(c => (
-          <span key={c.id} className="text-[15px] text-[var(--ag-ink)]"><strong>{c.nombre}:</strong> {c.texto}</span>
+          <span key={c.id} className="text-[14px] text-[var(--ag-ink)]"><strong>{c.nombre}:</strong> {c.texto}</span>
         ))}
       </FilaResumen>
       <FilaResumen titulo="Cuánto dura tu consulta" alCambiar={() => irAPaso(2)}>
-        <span className="text-[15px] text-[var(--ag-ink)]">{resumen.minutos} minutos</span>
+        <span className="text-[14px] text-[var(--ag-ink)]">{resumen.minutos} minutos</span>
       </FilaResumen>
       <FilaResumen titulo="Avisos por correo" alCambiar={() => irAPaso(3)} ultima>
-        <span className="text-[15px] text-[var(--ag-ink)]">{resumen.avisos}</span>
+        <span className="text-[14px] text-[var(--ag-ink)]">{resumen.avisos}</span>
       </FilaResumen>
     </div>
   )

@@ -6,6 +6,7 @@
  * `EditarTipoCitaSchema`, que aplica quien lo monta antes de enviar, y la del
  * servidor. El ámbito (toda la clínica o un médico) sólo se elige en el alta:
  * no se edita (ver `EditarTipoCitaSchema`).
+ * Tanda L (puntos 12 y 17): campos, etiquetas y botones de la configuración nueva (`estilosConfig`).
  */
 import { useId, useState, type FormEvent } from 'react'
 import { COLORES_EVENTO, type ColorEvento } from '@/lib/appointments'
@@ -13,7 +14,7 @@ import { COLOR_ETIQUETA } from '@/lib/agenda/tarjetasAgenda'
 import { LIMITES_TIPO_CITA } from '@/lib/agenda/tiposCita'
 import { componerNombreMedicoCompleto } from '@/lib/nombreMedico'
 import type { MedicoConfig } from '@/lib/configApp'
-import { BOTON_FILA, BOTON_PRIMARIO, CAMPO as CAMPO_BASE } from '@/components/agenda/configuracion/clasesConfig'
+import { BOTON_AZUL, BOTON_BLANCO, CAMPO_NUEVO, ERROR } from '@/components/agenda/configuracion/estilosConfig'
 
 export interface DatosTipoCita {
   nombre: string
@@ -33,8 +34,9 @@ interface Props {
   onCancelar?: () => void
 }
 
-const CAMPO = CAMPO_BASE
-const ETIQUETA = 'flex flex-col gap-[var(--ag-1)] text-sm text-[var(--ag-text)]'
+const CAMPO = CAMPO_NUEVO
+/** Etiqueta encima de un campo (`.rp-campo` de la reserva: 13,5 px · 600). */
+const ETIQUETA = 'flex flex-col gap-[6px] text-[13.5px] font-semibold text-[var(--ag-text)]'
 
 export default function FormTipoCita({ inicial, medicos, textoBoton, onGuardar, onCancelar }: Props) {
   const id = useId()
@@ -52,7 +54,7 @@ export default function FormTipoCita({ inicial, medicos, textoBoton, onGuardar, 
   }
 
   return (
-    <form onSubmit={enviar} noValidate className="flex flex-wrap items-end gap-[var(--ag-3)]">
+    <form onSubmit={enviar} noValidate className="flex flex-wrap items-end gap-[12px]">
       <label className={ETIQUETA} htmlFor={`${id}-nombre`}>Nombre
         <input id={`${id}-nombre`} className={`${CAMPO} w-48`} value={datos.nombre} maxLength={LIMITES_TIPO_CITA.nombreMax}
           onChange={e => poner({ nombre: e.target.value })} />
@@ -77,17 +79,17 @@ export default function FormTipoCita({ inicial, medicos, textoBoton, onGuardar, 
           </select>
         </label>
       )}
-      <div className="flex gap-[var(--ag-2)]">
-        <button type="submit" disabled={guardando} className={BOTON_PRIMARIO}>
+      <div className="flex gap-[8px]">
+        <button type="submit" disabled={guardando} className={BOTON_AZUL}>
           {guardando ? 'Guardando…' : textoBoton}
         </button>
         {onCancelar && (
-          <button type="button" onClick={onCancelar} className={`${BOTON_FILA} h-9`}>
+          <button type="button" onClick={onCancelar} className={BOTON_BLANCO}>
             Cancelar
           </button>
         )}
       </div>
-      {error && <p role="alert" className="basis-full text-sm font-medium text-red-600">{error}</p>}
+      {error && <p role="alert" className={`basis-full ${ERROR}`}>{error}</p>}
     </form>
   )
 }
