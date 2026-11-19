@@ -361,6 +361,9 @@ test('10 · el administrador «Empieza de nuevo» con la palabra escrita: vuelve
     await dialogo.getByLabel(/Para confirmar, escribe/).fill('restablecer')
     await expect(boton).toBeDisabled()
     await dialogo.getByLabel(/Para confirmar, escribe/).fill('RESTABLECER')
+    /* Integración M: la auditoría se cuenta desde una marca tomada justo antes del clic, no por una ventana de
+       2 minutos que veía la fila de una corrida anterior. La auditoría no se borra nunca. */
+    const marca = sqlLocal('select clock_timestamp()').trim()
     await boton.click()
     // Lo que antes era «Primeros pasos» en 0 de 3: el funnel desde su primer paso.
     await expect(page.getByRole('heading', { name: 'Horario de la clínica' })).toBeVisible() // K3: primero el de la clínica
@@ -374,8 +377,8 @@ test('10 · el administrador «Empieza de nuevo» con la palabra escrita: vuelve
     expect(sqlLocal(`select recordatorio_encendido || '|' || recordatorio_horas from public.agenda_ajustes where clinica_id = ${CL}`)).toBe('false|24')
     expect(citas()).toBe(antes)
     expect(sqlLocal(`select count(*) from public.audit_log where accion = 'agenda_configuracion_restablecida'
-                       and user_id = (select id::text from auth.users where email = :'c') and created_at > now() - interval '2 minutes'`,
-    { c: CORREO.adminA })).toBe('1')
+                       and user_id = (select id::text from auth.users where email = :'c') and created_at >= :'marca'::timestamptz`,
+    { c: CORREO.adminA, marca })).toBe('1')
   } finally {
     deshacer()
     devolverConfig(foto)

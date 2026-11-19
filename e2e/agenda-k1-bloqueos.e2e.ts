@@ -143,7 +143,12 @@ test('8 · el candado junto a la campana crea; franja rayada con el motivo, en l
   const fondo = await franja(page).evaluate(e => getComputedStyle(e.querySelector('.ag-bloqueo-tramo') ?? e).backgroundImage)
   expect(fondo).toContain('repeating-linear-gradient')
   expect(filasBloqueo()).toBe(`${MOTIVO}|f`)
-  expect(sqlLocal(`select count(*) from public.audit_log where tabla = 'agenda_bloqueos' and accion = 'INSERT' and created_at > now() - interval '2 minutes';`).trim()).not.toBe('0')
+  /* Integración M: por el id del bloqueo que acaba de nacer (el `beforeAll` borra los de ese día), no por una
+     ventana de 2 minutos que veía las filas de una corrida anterior. La auditoría no se borra nunca. */
+  expect(sqlLocal(`select count(*) from public.audit_log l join public.agenda_bloqueos b on b.id = l.registro_id
+      join public.clinicas c on c.id = b.clinica_id
+    where l.tabla = 'agenda_bloqueos' and l.accion = 'INSERT' and c.nombre = 'Clínica Semilla A' and b.motivo = :'m'
+      and (b.inicio at time zone 'America/Merida')::date = :'dia'::date;`, { m: MOTIVO, dia: JUEVES }).trim()).toBe('1')
 })
 
 test('7 · pulsar en cualquier parte de la franja abre su edición con los datos, no la burbuja', async ({ page }) => {

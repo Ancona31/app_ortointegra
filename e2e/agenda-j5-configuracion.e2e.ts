@@ -72,6 +72,12 @@ async function empezarDeNuevo(page: Page): Promise<void> {
 
 const ajuste = (columna: string) => sqlLocal(`select ${columna} from public.agenda_ajustes where clinica_id = ${CL}`)
 const aviso = (page: Page) => page.locator('[data-aviso-config]')
+/* Integración M (inestable visto por M2): la píldora «Guardado» dura 1,8 s, así que la del guardado anterior
+   sigue a la vista cuando sale el siguiente y `toHaveText('Guardado')` pasaba antes de que llegara el PUT; la
+   lectura de la base veía el valor viejo. Se espera la respuesta del servidor antes de leer la base: PATCH el
+   interruptor (`InterruptorCorreoClinica`), PUT los plazos (`SeccionAjustesReserva`). */
+const guardadoDelServidor = (page: Page) => page.waitForResponse(r =>
+  r.url().endsWith('/api/me/ajustes-agenda') && ['PUT', 'PATCH'].includes(r.request().method()))
 
 let instantanea = ''
 // Primero el interruptor: crea la fila de `agenda_ajustes` si la semilla no la trae, y la foto la necesita.
@@ -202,13 +208,17 @@ test('14 · Avisos: interruptor y plazos se guardan solos con «Guardado»; si e
   adminSinPendientes()
   await page.goto(RUTA)
   await pestanaConfig(page, 'Avisos')
+  const primero = guardadoDelServidor(page)
   await page.getByRole('switch', { name: 'Avisarme cuando alguien aparte cita' }).click()
+  expect((await primero).ok()).toBe(true)
   await expect(aviso(page)).toHaveText('Guardado')
   expect(ajuste('correo_reserva_clinica')).toBe('t')
 
   const dias = page.getByLabel('Pueden ver horarios de los próximos')
+  const segundo = guardadoDelServidor(page)
   await dias.fill('90')
   await dias.blur()
+  expect((await segundo).ok()).toBe(true)
   await expect(aviso(page)).toHaveText('Guardado')
   expect(ajuste('horizonte_dias')).toBe('90')
 
