@@ -9,6 +9,8 @@
  * sus propios ids o por marca de tiempo (`created_at >= …`).
  *
  * MUTACIÓN (en rojo): volver a poner `delete from public.audit_log where …` en `e2e/reservaAyudas.ts`.
+ * Integración M: la prueba SQL del TRUNCATE puede intentarlo (ver `PRUEBA_DEL_TRUNCATE`); en rojo si
+ * pierde su `rollback;` final, si lleva un `delete from public.audit_log` o si otro archivo hace TRUNCATE.
  */
 import { readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
@@ -17,8 +19,23 @@ import { describe, expect, it } from 'vitest'
 const RAIZ = path.resolve(__dirname, '../../..')
 const CARPETAS = ['e2e', 'scripts', 'supabase/pruebas-sql'] as const
 const EXTENSIONES = /\.(ts|mjs|js|sh|sql)$/
-/** DELETE o TRUNCATE de `audit_log` (con o sin `public.`), y el `.from('audit_log').delete()` del cliente. */
-const BORRA_AUDITORIA = /delete\s+from\s+(only\s+)?("?public"?\.)?"?audit_log\b|truncate\b[^;]*\baudit_log\b|from\(\s*['"]audit_log['"]\s*\)\s*\.delete\(/i
+/** DELETE de `audit_log` (con o sin `public.`) y el `.from('audit_log').delete()` del cliente. */
+const BORRA_AUDITORIA = /delete\s+from\s+(only\s+)?("?public"?\.)?"?audit_log\b|from\(\s*['"]audit_log['"]\s*\)\s*\.delete\(/i
+/** TRUNCATE de `audit_log`. */
+const VACIA_AUDITORIA = /truncate\b[^;]*\baudit_log\b/i
+/**
+ * La única excepción al TRUNCATE (integración M, encargo de Angel): la prueba de
+ * `20261125170000_audit_log_sin_truncate.sql`, que INTENTA vaciar la tabla para comprobar que falla, dentro de
+ * subbloques que se deshacen siempre y de una transacción que termina en `rollback`. El DELETE le sigue
+ * prohibido, y si deja de terminar en `rollback;` o lleva un `commit`, la guarda la vuelve a señalar.
+ */
+const PRUEBA_DEL_TRUNCATE = 'supabase/pruebas-sql/m_audit_log_sin_truncate.sql'
+
+function borraAuditoria(archivo: string, texto: string): boolean {
+  if (BORRA_AUDITORIA.test(texto)) return true
+  if (!VACIA_AUDITORIA.test(texto)) return false
+  return !(archivo === PRUEBA_DEL_TRUNCATE && /\brollback;\s*$/i.test(texto) && !/\bcommit\b/i.test(texto))
+}
 
 /** Los archivos de primer nivel de cada carpeta (las capturas y resultados de `e2e/resultados/` no son código). */
 function archivos(): string[] {
@@ -33,9 +50,10 @@ describe('ninguna prueba ni guion borra filas de audit_log (orden de Angel, tand
     expect(todos).toContain('e2e/reservaAyudas.ts')
     expect(todos).toContain('scripts/reserva-carrera.sh')
     expect(todos).toContain('scripts/confirmacion-carrera.sh')
+    expect(todos).toContain(PRUEBA_DEL_TRUNCATE)
   })
   it('ninguno tiene un DELETE o TRUNCATE de audit_log', () => {
-    const culpables = archivos().filter(f => BORRA_AUDITORIA.test(readFileSync(path.join(RAIZ, f), 'utf8')))
+    const culpables = archivos().filter(f => borraAuditoria(f, readFileSync(path.join(RAIZ, f), 'utf8')))
     expect(culpables).toEqual([])
   })
 })
