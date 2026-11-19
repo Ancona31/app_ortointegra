@@ -11,13 +11,15 @@
  * G2 (punto 5, la maqueta): cada enlace lleva su ESTADO en una píldora
  * («Activo» / «Sin usar» / «No abrirá» / «Sin horarios») y, si no va a abrir
  * por algo que se arregla aquí, «Completar», que abre lo que falta en la ficha.
- * Tanda L (punto 17): fila gris y botones de texto de 44 px de la configuración nueva; mismos nombres.
+ * Tanda L (punto 17): fila gris y botones chicos de 44 px de la configuración nueva; mismos nombres.
+ * Con borde y fondo (tanda H, punto 7): la maqueta no los dibuja como texto, así que no van en la lista
+ * de botones de texto que acepta `agenda-h2-configuracion` 7.
  */
 import { useState } from 'react'
 import { AlertTriangle } from 'lucide-react'
-import { BOTON_TEXTO, BOTON_TEXTO_ROJO, CAMPO_NUEVO } from '@/components/agenda/configuracion/estilosConfig'
+import { BOTON_CHICO, CAMPO_NUEVO } from '@/components/agenda/configuracion/estilosConfig'
 
-const BOTON = BOTON_TEXTO
+const BOTON = BOTON_CHICO
 
 interface Props {
   titulo: string
@@ -66,12 +68,12 @@ export default function FilaEnlaceReserva({ titulo, detalle, aviso, url, ocupado
         <span className="text-[15px] font-semibold text-[var(--ag-ink)]">{titulo}</span>
         <span className="text-[13.5px] text-[var(--ag-ink-600)]">{detalle}</span>
         <Pildora aviso={aviso} textoAbre={textoAbre} />
-        <span className="ml-auto flex flex-wrap gap-x-[4px]">
+        <span className="ml-auto flex flex-wrap gap-[8px]">
           {onCompletar && <button type="button" className={BOTON} disabled={ocupado} onClick={onCompletar}
             aria-label={`Completar ${titulo}`}>Completar</button>}
           {!url && <button type="button" className={BOTON} disabled={ocupado} onClick={onMostrar} aria-label={`Mostrar ${titulo}`}>Mostrar enlace</button>}
           {onRegenerar && <button type="button" className={BOTON} disabled={ocupado} onClick={onRegenerar} aria-label={`Regenerar ${titulo}`}>Regenerar</button>}
-          <button type="button" className={BOTON_TEXTO_ROJO} disabled={ocupado} onClick={onRevocar} aria-label={`Revocar ${titulo}`}>Revocar</button>
+          <button type="button" className={BOTON} disabled={ocupado} onClick={onRevocar} aria-label={`Revocar ${titulo}`}>Revocar</button>
         </span>
       </div>
       {aviso && (

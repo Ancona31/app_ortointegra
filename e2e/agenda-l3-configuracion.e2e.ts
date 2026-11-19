@@ -186,13 +186,17 @@ test.describe('la secretaria', () => {
     { cl: clinicaId, m: idDe(CORREO.medicoA) })
     limpiezas.push(() => sqlLocal(`update public.tipos_cita set activo = true
       where id = any (string_to_array(nullif(:'ids', ''), ',')::uuid[])`, { ids: apagados }))
+    limpiezas.push(sinPendientesAgenda(CORREO.adminA)) // que el administrador vea las pestañas, no el funnel
     const admin = await browser.newContext({ storageState: SESION.adminA })
     try {
       for (const [p, contesta] of [[page, false], [await admin.newPage(), true]] as const) {
         await p.goto(RUTA)
         await p.getByRole('button', { name: /Enlaces de los demás médicos/ }).click()
-        await p.getByRole('button', { name: 'Completar Enlace fijo' }).last().click()
-        const nota = p.getByRole('note', { name: 'Falta para que el enlace abra' })
+        await p.waitForLoadState('networkidle')
+        // Con su fijo en la lista, la caja la abre «Completar»; si la lista no lo trae (en la base compartida
+        // puede quedar fuera por los muchos enlaces de otras pruebas), la caja sale sola en su ficha.
+        const nota = p.getByRole('note', { name: 'Falta para que el enlace abra' }).last()
+        if (!(await nota.isVisible())) await p.getByRole('button', { name: 'Completar Enlace fijo' }).last().click()
         await expect(nota).toContainText('La duración de la consulta.')
         await expect(nota.getByText('¿Cuánto dura su consulta?')).toHaveCount(contesta ? 1 : 0)
         if (!contesta) await expect(nota).toContainText('El médico la contesta en su configuración.')
