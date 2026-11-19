@@ -1557,3 +1557,228 @@ K2, K3 al final), ANTES del código. La v2 se enciende después.
   lista de 50 contra `lista-caso3.txt`, los disparadores, el candado 1790, los
   permisos, el contrato con la consola y la tolerancia leyendo el código.
 
+
+## 14. Tanda L (2026-11-19)
+
+Cinco ramas en paralelo desde `cf97bdb` (`feature/agenda-v2-l1` a `-l5`, en
+los worktrees `-agenda-b56`, `-agenda-t5`, `-agenda-t3`, `-agenda-menores` y
+`-agenda-t4`), fusionadas con `--no-ff` en `feature/agenda-v2` en el orden L1,
+L2, L3, L4, L5. Traen tres migraciones: L1, L2 y L5. L3 y L4 no traen ninguna.
+**La integración no añadió ni cambió ninguna migración.** Los ajustes de la
+integración son de pruebas, CSS y de qué chunk lleva el candado.
+
+### 14.1 El conjunto, desde cero
+
+`ls supabase/migrations/*.sql` = **48**: las 5 de `main` y 43 del proyecto (las
+40 hasta la tanda K y las 3 de L).
+
+Antes de reiniciar se contaron las filas que no eran de la semilla. Había **1
+`consulta`** y **1 bloqueo**, de las pruebas de las ramas en la base
+compartida, y la cita a la que iba ligada la consulta. Se respaldaron en JSON en
+`/home/spinus/proyectos/respaldos-angel/tanda-L-respaldo-2026-11-19.json`. Esa
+consulta es la que impedía resembrar durante la tanda (AG-DT-208).
+
+`supabase db reset --local` (CLI 2.117.0) aplicó las 48 en orden y sin un error.
+`schema_migrations` = 48, la última `20261124160000`. Después se sembró la
+Semilla (1,3 s).
+
+### 14.2 Las tres migraciones
+
+| # | Archivo | Qué hace | Riesgo (cabecera) |
+|---|---|---|---|
+| L1 | `20261124120000_agenda_l1_bloqueo_total.sql` | `cita_proteger_bloqueo()` (nueva, INVOKER, `search_path = ''`) y el disparador `trg_appointments_horario_bloqueado`, `BEFORE INSERT OR UPDATE OF start_time, end_time, medico_id`. Rechaza con 42501 y HINT `agenda_horario_bloqueado` el alta, o el cambio de inicio, fin o médico, que se solapa con un bloqueo del mismo médico, con la v2 encendida | MEDIO |
+| L2 | `20261124130000_agenda_l2_eliminar_cancelada.sql` | `appointments_cierre_check`, más ancho: cerrada sin sustituta, sólo si está cancelada. `cita_proteger_cierre()` con `CREATE OR REPLACE` acepta `sustituida_por` NULL al cerrar. Lo demás queda igual | BAJO |
+| L5 | `20261124160000_agenda_l5_aviso_confirmacion_paciente.sql` | `aviso_clinica_de_confirmacion()` (nueva, SECURITY DEFINER, `search_path = ''`) y el disparador AFTER `trg_cita_confirmaciones_aviso_confirmacion` (`UPDATE OF respuesta, respondido_en`). Salta cuando `respuesta` pasa a `'confirmo'`, o sigue en `'confirmo'` con un `respondido_en` nuevo: una reconfirmación. `ON CONFLICT` sólo junta los avisos sin revisar, así que una reconfirmación tras revisar el aviso da otro. `avisos_clinica_tipo_check` suma `confirmacion_paciente` | BAJO |
+
+Ninguna crea, cambia ni quita una policy. Ninguna añade, quita ni cambia de tipo
+una columna: sólo se recrean los dos CHECK, y los dos se amplían. L2 cambia
+además el `COMMENT ON COLUMN appointments.cerrada_en`, que es sólo metadato.
+
+Lo que L1 deja pasar sin consultar `agenda_bloqueos` (mira sólo `NEW`/`OLD`, el
+rol y la configuración):
+- **con la v2 apagada en la clínica, o sin fila en `agenda_ajustes`, nada se
+  rechaza**;
+- un UPDATE que no mueve inicio, fin ni médico;
+- una fila sin médico;
+- `postgres` y `supabase_admin`;
+- `service_role` con `spinus.via = 'google'`, porque lo de Google entra como hoy;
+- el alta de `service_role` con `reserva_canal`, porque `reservar_por_enlace` ya
+  rechaza los bloqueos bajo el candado 1790.
+
+`cita_reagendar_clinica` sí pasa por él: es INVOKER, la llama `service_role` y
+no pone `spinus.via`. **Salvedad para el futuro:** una función SECURITY DEFINER
+cuyo dueño sea `postgres` que escriba en `appointments` dejaría a L1 inerte, por
+el atajo de `current_user = 'postgres'`. Hoy no hay ninguna en ese camino.
+
+### 14.3 Disparadores de `appointments` y `cita_confirmaciones`
+
+**`appointments`.** Pasan de diez a **once**. Los BEFORE, en el orden en que
+Postgres los dispara (por nombre):
+
+1. `trg_appointments_asignacion_google`
+2. **`trg_appointments_horario_bloqueado`** (L1)
+3. `trg_appointments_proteger_atendida`
+4. `trg_appointments_proteger_borrado`
+5. `trg_appointments_proteger_cierre` (con el cuerpo de L2)
+6. `trg_appointments_proteger_eleccion`
+7. `trg_appointments_proteger_reserva`
+
+Los AFTER: `audit_appointments`, `audit_appointments_update`
+(`log_cita_change`), `trg_appointments_aviso_clinica` y
+`trg_appointments_reserva_incidencia`.
+
+El orden de los siete es la regla de Postgres, que dispara por nombre. La prueba
+sólo comprueba que existen tres de ellos (`horario_bloqueado`, `proteger_cierre`
+y `proteger_eleccion`), y el orden entre el 2 y el 6 por el HINT del rechazo.
+
+Lo comprobado en la base (`supabase/pruebas-sql/l_integracion_disparadores.sql`,
+nueva en la integración):
+
+- **«Eliminar cita» de una cancelada dentro de un bloqueo funciona.** El UPDATE de
+  `/quitar` sólo pone `cerrada_en`, así que `UPDATE OF …` ni dispara el
+  disparador de L1. `log_cita_change` apunta `cita_editada` con
+  `campos = ["cerrada_en"]`.
+- **«Reasignar el horario» hacia dentro del bloqueo, no.** La sustituta no nace
+  (HINT del bloqueo) y la cancelada sigue abierta.
+- **Una cita de enlace movida al bloqueo por la sesión choca primero con el
+  bloqueo** (2 va antes que 6). Las dos la rechazarían, y no cambia nada.
+- **Un PATCH que repite inicio, fin y médico pasa**, porque PostgREST manda la fila
+  entera. Ahí sí dispara, y lo deja pasar el atajo «no se mueve».
+- Mutaciones en rojo:
+  - sin lista de columnas y sin atajo → caso 1;
+  - sin el atajo → caso 4.
+
+**`cita_confirmaciones`.** Tres disparadores:
+- `audit_cita_confirmaciones`;
+- `trg_cita_confirmaciones_aviso_clinica` (I5, `cancelo`);
+- **`trg_cita_confirmaciones_aviso_confirmacion`** (L5, `confirmo`).
+
+Los dos de avisos insertan con `ON CONFLICT DO NOTHING` sobre el índice único
+parcial de `avisos_clinica`. Corren dentro de la transacción de
+`cita_confirmacion_responder`, que es el mismo riesgo que ya aceptaba I5.
+
+La carrera de confirmación sigue en verde: el candado espera 1887 ms, y A y B a la
+vez acaban en «cancelada».
+
+La carrera de reserva también:
+- el escenario 6 (un bloqueo contra una reserva) da B=ocupado tras esperar 1868 ms;
+- quedaron 5 citas, como se esperaba.
+
+### 14.4 Permisos de funciones
+
+Todas llevan `REVOKE … FROM PUBLIC` y `GRANT … TO anon, authenticated,
+service_role` explícitos:
+
+- `cita_proteger_bloqueo()`: nueva, función de disparador, INVOKER.
+- `cita_proteger_cierre()`: `CREATE OR REPLACE` conserva sus permisos, y aun así
+  se repiten.
+- `aviso_clinica_de_confirmacion()`: nueva, función de disparador, DEFINER.
+
+Por la regla, las tres tienen los tres roles: devuelven `trigger` y no se invocan
+solas. **Ninguna da EXECUTE a PUBLIC.**
+
+**`p1_permisos_funciones.sql`, caso 3, en la base combinada.** Reiniciamos con
+**51 migraciones**: las 48 y las tres `20261014*` de
+`feature/limites-ajustables`. Todas aplican sin fallo. El caso 2 pasa: 0
+funciones con EXECUTE a PUBLIC. El caso 3 da rojo, como se esperaba.
+
+La lista sigue siendo de **50 funciones**, idéntica una por una a la del §13.5:
+la tanda L no añade ni quita ninguna, porque sus tres funciones tienen los tres
+roles. Con esta lista pegada pasan **las 47 pruebas SQL** de la combinada (`p1`,
+`p1b`, `p2`, `p3` y las 43 del proyecto). Es la misma lista para pegar al
+fusionar las dos ramas:
+
+  ```
+  agenda_restablecer_configuracion(uuid,uuid), alta_conexion_google(uuid,uuid,text,text,text,text,text,bigint), cita_confirmacion_contexto(text), cita_confirmacion_emitir(uuid,uuid,uuid,text,uuid), cita_confirmacion_responder(uuid,text,text), cita_confirmacion_revocar(uuid,uuid), cita_correo_marcar(uuid,uuid,uuid,text,text), cita_correo_tomar(uuid,uuid,text,uuid), cita_correos_pendientes(integer), cita_movimiento_google_registrar(uuid,uuid,timestamp with time zone), cita_reagendar_clinica(uuid,uuid,uuid,uuid,timestamp with time zone,timestamp with time zone,timestamp with time zone), cita_reagendar_oferta(uuid,text), cita_recordatorios_pendientes(integer), cita_rsvp_google(uuid,uuid,text,text,text[]), cita_tiene_nota_ligada(uuid,uuid), crear_paciente_con_medico(jsonb,uuid), enforce_limite_documentos_paciente(), gcal_aplicar_evento(uuid,uuid,timestamp with time zone,text,text,timestamp with time zone,text,boolean,timestamp with time zone,timestamp with time zone,boolean,text,boolean,text,boolean), gcal_bloqueo_aplicar(uuid,text,text,uuid,text,timestamp with time zone,boolean,timestamp with time zone,timestamp with time zone,date,date), gcal_citas_por_evento(uuid,text[],uuid[]), gcal_importar_evento(uuid,text,text,text,timestamp with time zone,text,timestamp with time zone,timestamp with time zone,boolean,text,text,uuid), gcal_sync_avanzar(uuid,uuid,text,text,timestamp with time zone,integer), gcal_sync_clinica_habilitada(uuid), gcal_sync_clinicas_pendientes(integer), gcal_sync_frescura(uuid), gcal_sync_reiniciar(uuid,uuid), gcal_sync_soltar(uuid,uuid,text), gcal_sync_tomar(uuid,uuid,text,integer,integer), generar_folio(text), guardar_secretos_conexion(uuid,uuid,text,text,bigint), leer_conexion_google_con_secretos(uuid,uuid), rate_limit_espera(text,integer,integer), rate_limit_intento(text,text,integer,integer), rate_limit_reset(text), reagendar_por_enlace(text,uuid,text,uuid,uuid,timestamp with time zone,text,text,text,text,text,text,text,text,uuid), reserva_codigo_emitir(uuid,uuid,text,text), reserva_codigo_verificar(uuid,uuid,text,text,text), reserva_contacto_estado(uuid,uuid,text,text), reserva_contacto_marcar(uuid,text), reserva_contactos_bloqueados(), reserva_contexto(text,text,text), reserva_empalmes_registrar(uuid,uuid[]), reserva_enlace_emitir(uuid,uuid,uuid,uuid,text,text,text,text,text), reserva_enlace_emitir(uuid,uuid,uuid,uuid,text,text,text), reserva_enlace_regenerar_fijo(uuid,uuid,text), reserva_espera_reenvio(uuid,uuid,text,integer), reserva_ocupacion(uuid,uuid,timestamp with time zone,timestamp with time zone), reservar_por_enlace(uuid,text,uuid,uuid,timestamp with time zone,text,text,text,text,text,text,text,text,uuid), sync_antropometria_paciente(uuid), trg_mediciones_antropometria()
+  ```
+
+### 14.5 Contrato con spinus-consola
+
+- Ninguna de las tres nombra `clinicas`, `ajuste_*`, `limite_efectivo` ni
+  `clinica_tiene_acceso()`.
+- No se renombra ninguna columna ni cambia ningún tipo.
+- Los dos CHECK que se recrean se **amplían**:
+  - `appointments_cierre_check`: cerrada sin sustituta;
+  - `avisos_clinica_tipo_check`: un tipo más.
+
+  Una vista que lea esas columnas sigue leyendo los valores de antes. La única
+  novedad es que puede ver `tipo = 'confirmacion_paciente'` y una cita cerrada
+  con `sustituida_por` NULL.
+- No hay ningún `CASCADE` ni FK nueva.
+- El repositorio de la consola no está aquí, así que no comprobamos sus vistas.
+
+### 14.6 Orden de despliegue y tolerancia
+
+| Migración | Orden | Sin la migración y con el código nuevo |
+|---|---|---|
+| L1 | después de K1 (`agenda_bloqueos`) | Las rutas siguen dando 409 `horario_bloqueado` (POST/PUT de `/api/appointments` y `/reagendar`): leen `agenda_bloqueos` antes de escribir. El PUT sólo veta si mueve inicio, fin o médico. Falta la barrera de la base: PostgREST directo, `cita_reagendar_clinica`, y la carrera con un bloqueo recién creado entre la lectura y la escritura (`esErrorDeBloqueo` sólo actúa si existe L1) |
+| L2 | después de `20261121142000` | «Eliminar cita» responde 409 `no_aplica`, porque el CHECK viejo pide sustituta: la cita no sale de la agenda. No hay más efecto |
+| L5 | después de E1, I5 y J4 | No hay aviso `confirmacion_paciente`. La confirmación del paciente funciona igual. **No reaplicar J4 después**: su pre-vuelo aborta limpio (AG-DT-229) |
+
+Orden recomendado: las 43 del proyecto en orden de nombre (L1, L2 y L5 al final),
+ANTES del código. La v2 se enciende después.
+
+**Prueba de tolerancia.** Reiniciamos la base SÓLO con las 45 de K (`db reset
+--local --workdir`, desde un `git archive cf97bdb`) y la sembramos. Usamos el
+`next start` :3001 con el build integrado.
+
+- **v2 apagada:** 41 pasan, 0 fallan. Corrimos `agenda-interruptor`, `-citas`,
+  `-secretaria`, `-tipos-cita`, `-cancelar`, `-avisos`, `-tiempo-real`,
+  `-panel-dia`, `agenda-k-salida-modal` y `agenda-j1-engrane` (lo de «apagada,
+  no baja el JS de la campana, el engrane ni el candado»).
+- **v2 encendida, con los archivos de L:** corrimos `agenda-l1-bloqueo-telefono`,
+  `agenda-k1-bloqueos`, `agenda-l2`, `agenda-l3-configuracion`,
+  `agenda-l5-campana`, `confirmacion-k2-al-cargar` y `agenda-h4-por-confirmar`.
+  Dieron 40 pasan y 4 fallan. Tres de las cuatro son exactamente lo que traen las
+  migraciones:
+  - `agenda-l2` «Eliminar cita» da 409 en vez de 200 (L2);
+  - `agenda-l5-campana` 13 y 14, y `agenda-h4` 18: no aparece el aviso
+    `confirmacion_paciente` (L5).
+
+  Las del bloqueo pasan sin L1, como se esperaba.
+- La cuarta, `agenda-l3-configuracion` 17, **no era de la migración sino de la
+  prueba**: daba por hecho un tipo de cita principal y un enlace fijo de admin.a,
+  que la base recién sembrada no tiene. Con el id vacío, el PATCH iba a la
+  colección y respondía 405. Arreglada en la integración: la prueba crea los suyos
+  con `sinPendientesAgenda` y los quita. En rojo antes y en verde después, en la
+  base limpia.
+
+### 14.7 Hallazgos
+
+- **L-M1 · Reaplicar J4 después de L5 aborta** (AG-DT-229). En el orden de nombre
+  no pasa nada.
+- **L-M2 · Sin L1, las rutas ya bloquean.** Lo que falta sin la migración es la
+  barrera de la base. Por eso L1 va antes del código, como todas.
+- **L-M3 · El bloqueo total no toma el candado 1790** (AG-DT-201). Una cita que se
+  agenda desde Spinus y un bloqueo nuevo del mismo médico no se serializan. La
+  reserva por enlace sí, desde K1.
+- **L-M4 · Revisión de seguridad** (sonnet, sólo lectura, del diff `cf97bdb..HEAD`):
+  ningún hallazgo alto.
+  - Media-baja: el traspaso de nombre y teléfono por `BroadcastChannel` no está
+    atado al código (AG-DT-220). Es riesgo aceptado por Angel y va «PARA REVISIÓN
+    DE ANGEL» con la mitigación.
+  - Baja: la regex de Sentry no cubre `%23codigo=` (AG-DT-221). No se tocó,
+    porque en `sentryPiiFilter.ts` sólo está autorizada la línea de L4.
+  - Baja e informativa: el saludo del correo usa `reserva_nombre`, que teclea el
+    público. Va escapado y sin nada clínico (AG-DT-224).
+  - Limpio:
+    - `/api/appointments/[id]/quitar`: getUser, sesión con `clinica_id`,
+      `puedeGestionarDelMedico`, sólo canceladas, idempotente, audit_log, y su
+      único `createAdminClient()` filtrado por id, `clinica_id`, estado y
+      `cerrada_en`;
+    - los 409 `horario_bloqueado`, con un texto fijo, sesión con `clinica_id` y
+      el 42501 reconocido sólo por su HINT;
+    - las tres migraciones;
+    - `/api/reservar/**`, `/api/confirmar/**` y el middleware, sin cambios;
+    - el POST de `/confirmar`, que ahora espera un gesto `isTrusted`;
+    - nada de PII en `localStorage`.
+- **Revisor del §14** (sonnet, contra las migraciones, la prueba SQL, las rutas
+  y el catálogo): APTA con cambios, todos de redacción. Pedía:
+  - el atajo de la v2 apagada en la lista de L1;
+  - la reconfirmación de L5;
+  - el `COMMENT ON COLUMN` de L2;
+  - qué del orden prueba la prueba;
+  - la salvedad de las funciones DEFINER;
+  - la carrera sin L1.
+
+  Aplicados. Sin hallazgos sobre permisos ni contrato con la consola.

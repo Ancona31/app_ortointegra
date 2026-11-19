@@ -447,12 +447,13 @@ Plan, decisiones y avance: `mejora_agendaV2.md` (§6-bis decisiones, §7 lo que
 le toca a Angel, §10 lo que no se probó en local). Auditoría del conjunto de
 migraciones: `supabase/AUDITORIA-CONJUNTO-AGENDA-V2.md`. Guía local:
 `GUIA_AUDITORIA_AGENDA_V2.md`; pruebas a mano: `GUIA_PRUEBAS_AGENDA_V2.md`.
-Deuda abierta: `DEUDA_TECNICA.md`, AG-DT-13 a AG-DT-166.
+Deuda abierta: `DEUDA_TECNICA.md`, AG-DT-13 a AG-DT-230.
 
-**Estado:** el código y las 37 migraciones (`20261111120000` a
-`20261122140000`: las 16 del cierre, las 4 de las correcciones de seguridad,
+**Estado:** el código y las 43 migraciones (`20261111120000` a
+`20261124160000`: las 16 del cierre, las 4 de las correcciones de seguridad,
 las 4 de la tanda de diseño, duración y horarios, las 3 de la tanda H, las 7 de
-la tanda I y las 3 de la tanda J) están en `feature/agenda-v2`,
+la tanda I, las 3 de la tanda J, las 3 de la tanda K y las 3 de la tanda L; 48
+con las 5 de `main`) están en `feature/agenda-v2`,
 probados sólo en local. En producción no hay nada
 aplicado ni encendido hasta que Angel lo haga (§7).
 
@@ -966,11 +967,9 @@ proyecto, 32 con las de `main`).** Además de lo de arriba:
     tras el candado 1790) y en `reserva_ocupacion`, y por ella en los turnos de
     la página. **Un evento de todo el día ya NO cierra el día en el enlace**; los
     de hora sí ocupan.
-  - En Spinus no impide agendar: pregunta «Este horario está bloqueado. ¿Agendar
-    de todos modos?», sólo para citas, en **todos** los caminos que crean o
-    mueven una: burbuja, modal, arrastre y «Reagendar» (`PanelReagendar`,
-    integración K). Un camino nuevo que cambie la hora de una cita pregunta
-    igual (`tocaBloqueo` / `buscarBloqueo`).
+  - ~~En Spinus no impide agendar: pregunta «Este horario está bloqueado.
+    ¿Agendar de todos modos?»~~ **Sustituido por el bloqueo total de L1**
+    (abajo): ya no se pregunta en ningún camino.
 * **Las funciones de la reserva van en cuerpos completos** (integración K): K1
   (`20261123120000`) y K3 (`20261123140000`) dejaron de sustituir fragmentos.
   El orden es fijo, K1 → K3: K3 sin K1 aborta, y K1 después de K3 también. Quien
@@ -988,11 +987,11 @@ proyecto, 32 con las de `main`).** Además de lo de arriba:
     sincronización los aparta antes de `decidirEvento` y sólo los mueve o borra
     (`gcal_bloqueo_aplicar`, que nunca crea).
 * **Confirmar desde el correo (K2)** lleva `?paso=confirmar`.
-  `ConfirmarAlCargar.tsx` manda al cargar el MISMO POST del botón, una vez, y
+  `ConfirmarAlCargar.tsx` manda el MISMO POST del botón, una vez, y
   nunca con `navigator.webdriver`, durante el prerender ni en segundo plano. El
-  GET y el HEAD **nunca** escriben. Riesgo aceptado, pendiente de Angel: un
-  revisor de correo que ejecute JavaScript confirmaría (AG-DT-175). No lo
-  «arregles» moviendo la escritura al GET.
+  GET y el HEAD **nunca** escriben. No lo «arregles» moviendo la escritura al
+  GET. *(Desde L4 ya no lo manda al cargar: espera un gesto, ver abajo; cierra
+  AG-DT-175.)*
 * **El código va en el fragmento** (`#codigo=`, nunca en `?`). La página lo lee
   y lo borra con `replaceState`.
 * **Los 30 s entre códigos son POR ENLACE** (`reserva_espera_reenvio`,
@@ -1000,8 +999,9 @@ proyecto, 32 con las de `main`).** Además de lo de arriba:
   entre clínicas, y el 429 del tope global por correo **no** lleva plazo.
   `reserva_codigo_verificar` devuelve `reemplazado` para un código anterior del
   mismo enlace y correo, sin sumar. La reserva pública guarda en
-  `sessionStorage` (`spinus.reserva.<enlace>`, 30 min) sin nombre, teléfono ni
-  código; nada va a `localStorage`.
+  `sessionStorage` (`spinus.reserva.<enlace>`, 30 min) sin código; nada va a
+  `localStorage`. *(Desde L4 guarda también el nombre y el teléfono ENVIADOS,
+  ver abajo.)*
 * **`clinicas.timezone` (K3) es sólo el huso «de fábrica»:** lo propone la
   configuración y lo preselecciona el alta de consultorios. NO lo leen la
   rejilla, la reserva ni los correos, que usan `consultorios.timezone`. Es
@@ -1021,7 +1021,9 @@ proyecto, 32 con las de `main`).** Además de lo de arriba:
   v2 apagada, `closeModal` lo desmonta al instante, como antes del proyecto
   (e2e `agenda-k-salida-modal`). Lo que mide «guardar» es la tarjeta pintada
   (~31 ms), no la salida del modal (AG-DT-146, cerrada). El pintado optimista
-  con la v2 apagada sigue y está pendiente de Angel (AG-DT-198).
+  con la v2 apagada **no es un cambio del proyecto**: `a58419f` ya pintaba la
+  tarjeta antes de la respuesta (integración L, AG-DT-198 cerrada con los
+  números). Sólo el cambio de título espera al servidor, como siempre.
 * **Marcas de procedencia (K5, sólo v2).** «Por ligar» y «Por asignar» son un
   solo icono, el expediente tachado (`esPorLigar`). El eslabón depende de
   `reserva_canal` y es permanente. Las dibuja `MarcasCita.tsx`. Con la v2
@@ -1032,6 +1034,91 @@ proyecto, 32 con las de `main`).** Además de lo de arriba:
   refleja el servidor. «No es una cita» (sin signos) sólo va en el pie de la
   burbuja; el formulario, «Próximas citas» y la campana dicen «¿No es una
   cita?».
+
+**Tanda L (2026-11-19, ramas L1-L5; 3 migraciones, el conjunto pasa a 48):**
+
+* **El bloqueo es TOTAL (L1, `20261124120000`).** Con la v2, nada entra ni se
+  mueve a un bloqueo de su médico: ni citas ni eventos sin paciente, tampoco con
+  «Reagendar». Lo garantiza la base: el disparador
+  `trg_appointments_horario_bloqueado` (`cita_proteger_bloqueo()`, INVOKER),
+  BEFORE INSERT OR UPDATE OF `start_time`, `end_time`, `medico_id`; 42501 con
+  HINT `agenda_horario_bloqueado`.
+  - **Exentos:** lo que no mueve inicio, fin ni médico; Google (`service_role` +
+    `spinus.via='google'`, que ponen las `gcal_*`); las altas por enlace
+    (`reserva_canal`, que ya miran los bloqueos); `postgres` y `supabase_admin`.
+  - **Quien escriba `appointments` con `service_role`** y no sea uno de esos
+    caminos choca con el disparador.
+  - **No le quites la lista de columnas ni el atajo «no se mueve»:** son lo que
+    deja cerrar una cancelada dentro de un bloqueo («Eliminar cita») y editar
+    notas o estado de lo que ya estaba dentro (`l_integracion_disparadores.sql`).
+* **Las rutas dan 409 `horario_bloqueado` antes de escribir**
+  (`bloqueoTotalServidor.ts`: POST y PUT de `/api/appointments` y
+  `…/reagendar`), con el cliente de sesión y `clinica_id` explícito, y traducen
+  el 42501 por su HINT. **No lo traduzcas sólo por el código:** otro 42501 (la
+  RLS) sigue siendo 500.
+* **El texto del bloqueo es uno,** `TEXTO_HORARIO_BLOQUEADO`. **No vuelve
+  ninguna pregunta «¿… de todos modos?» por un bloqueo**; la del empalme
+  («¿Guardar/Reagendar de todos modos?») es otra cosa y se queda.
+* **Un bloqueo se crea sólo con el candado junto a la campana**
+  (`BotonBloquearHorario`), y **se edita con cualquier clic en la franja**,
+  decidido por el instante del gesto (`bloqueoEnInstante`), no por el DOM. El
+  candado viaja en el chunk de la barra v2 (`MenuEngraneAgenda` lo reexporta):
+  **no lo importes en estático** desde `AgendaCliente`, bajaría con la v2
+  apagada (regla de J1; lo cuenta `agenda-j1-engrane`).
+* **Una cancelada se «elimina» CERRÁNDOLA, nunca borrándola** (L2,
+  `20261124130000`). `POST /api/appointments/[id]/quitar` pone `cerrada_en` sin
+  sustituta, con `createAdminClient()` filtrado por `clinica_id`, y audita
+  `cita_quitada_de_agenda`. Cerrada CON sustituta = se reasignó o se le dio otra
+  cita; SIN sustituta = «Eliminar cita». Las dos se ocultan igual
+  (`consultaCitas`, el tiempo real, el buscador) y ninguna se reabre desde la
+  app; sólo `postgres`, en SQL. No uses `DELETE` para esto:
+  `cita_proteger_borrado` lo veta con la v2 y debe seguir así.
+* **Lo que pregunta antes de hacerse en la burbuja** es `pideConfirmacion`:
+  «Cancelar cita», «Eliminar evento», «No asistió» y «Eliminar cita». Una acción
+  destructiva nueva va ahí, con su texto en `textoDeConfirmacion`.
+* **La leyenda tiene dos puertas en computadora:** el botón (i) de la barra y el
+  engrane. Las dos abren `CapaLeyenda`. No dupliques la leyenda.
+* **La letra de la burbuja de la cita y de la configuración va en la escala de
+  la página de reserva** (`agendaPublica.css`), no en la de las maquetas, y sin
+  tokens nuevos. `configuracionEscala.test.ts` falla si un archivo de
+  `/agenda/configuracion` usa otro tamaño; `agenda-l2` mide la burbuja (la
+  píldora del estado, 600; la ayuda, 13,5 px). Si cambia la escala de la reserva,
+  cambian las dos.
+* **«Solo el administrador de la clínica puede cambiar estas opciones.»**
+  (`SOLO_ADMIN`, `data-solo-admin`) va sólo donde la ruta deja cambiar al
+  administrador y a nadie más (`canManageClinica`). No la pongas en los tipos de
+  cita ni en el horario de un consultorio: ahí no es cierta.
+* **`/confirmar/[codigo]` con «Confirmo mi asistencia» no confirma al cargar**
+  (L4): espera un gesto de confianza fuera de un control
+  (`esGestoParaConfirmar`: un `click`, o Enter o una tecla que escribe, en lista
+  blanca). No lo cambies a `pointerdown` (desplazar confirmaría) ni a una lista
+  negra de teclas.
+* **La reserva pública guarda en `sessionStorage` el nombre y el teléfono
+  ENVIADOS** (30 min, por pestaña, traspaso por `BroadcastChannel`). El código,
+  nunca. **Lo restaurado vuelve al formulario, no reserva solo:** el aviso se
+  marca en la pestaña que reserva. No lo hagas reservar solo: dejaría colar por
+  el canal los datos de otra persona (AG-DT-220).
+* **`sentryPiiFilter.redactString` redacta `#codigo=NNNNNN`.** No quites la
+  línea: el fragmento de «Continuar mi reserva» lleva el código.
+* **Sólo `correoConfirmacion` saluda** («Hola, <nombre>:», escapado). El
+  recordatorio y el aviso de cambio comparten cuerpo y no saludan.
+* **Aviso `confirmacion_paciente` (L5, `20261124160000`):** lo escribe el
+  disparador `trg_cita_confirmaciones_aviso_confirmacion` sobre
+  `cita_confirmaciones` (UPDATE OF `respuesta`, `respondido_en`), o sea sólo
+  cuando confirma el paciente por su enlace; el personal y Google no escriben
+  esa tabla. Emergente SIN nombre; en la lista, con nombre. **NO lo muevas a
+  `appointments`:** ahí no se distingue quién confirmó.
+* **La campana recarga en vivo cuando una cita pasa a «confirmada» SÓLO si antes
+  no lo estaba** (lista de mañana o estado pintado, `pintado` en `CambioCita`).
+  Recargar por toda confirmada sería una petición por cada eco de Google.
+* **La burbuja de la campana = «Por confirmar · n» + «Avisos · m»** (los números
+  de las pestañas), «9+» con más de 9, y el número exacto en el nombre del
+  botón. `[data-punto-rojo]` sigue siendo su selector.
+* **La lista del caso 3 de `p1_permisos_funciones.sql` sigue en 50:**
+  `cita_proteger_bloqueo()` y `aviso_clinica_de_confirmacion()` se conceden a
+  los tres roles y NO entran.
+* **No vuelvas a correr J4 (`20261122140000`) después de L5:** su pre-vuelo
+  admite 5 o 6 tipos de aviso y ahora hay 7 (aborta limpio, AG-DT-229).
 
 ---
 

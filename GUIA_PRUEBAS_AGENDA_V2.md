@@ -5225,6 +5225,511 @@ de esta sección, y éstas, que ya existían y cambian o hay que repetir.
 
 ---
 
+## 8-octies. Tanda L (2026-11-19)
+
+Lo que se hizo con tus puntos de la tanda L, en cinco grupos. Todo lo que se ve
+va detrás del interruptor de la v2:
+
+- **L1:** el bloqueo pasa a ser total, se edita pulsando en cualquier parte de
+  la franja y se crea con el candado junto a la campana (puntos 5 a 8).
+- **L2:** la burbuja de la cita: «No asistió» pregunta, «Eliminar cita» en las
+  canceladas, el botón de la leyenda y la letra (puntos 2, 3, 9, 11 y 12).
+- **L3:** la configuración: la letra de la reserva, «Solo el administrador…» y
+  la secretaria con el diseño nuevo (puntos 12, 16 y 17).
+- **L4:** confirmar con un gesto, el código fuera de Sentry, el nombre y el
+  teléfono al volver a la reserva y el saludo del correo (puntos 1, 4, 10 y
+  15).
+- **L5:** el aviso cuando el paciente confirma, el número en la campana y Google
+  con las reservas por enlace (puntos 13, 14 y 18).
+
+**Antes de empezar:**
+
+- La base con las **48** migraciones (P5: las 45 de antes más las 3
+  `20261124…` de la tanda L). La consulta de P5 debe responder
+  `48|20261124160000`.
+- Sembrada (P6), con el aviso aprobado (P7) y la v2 encendida en la Clínica A
+  (P8).
+- La app del 3000 (P11).
+- El Google simulado (C0) para L1-7 y L5-4.
+- Mailpit para L4 y L5.
+
+Si al abrir la agenda sale «¿Asistió el paciente?», es la ventana de I4-3: pulsa
+«Decidir después» y sigue (I4-5).
+
+### L1 · El bloqueo total (puntos 5 a 8)
+
+#### L1-1. El candado, junto a la campana
+
+**Qué hago:** con la v2 encendida, miro la barra de la agenda en computadora y
+en el teléfono.
+
+**Qué debo ver:**
+- junto a la campana, a su derecha, un candado («Bloquear horario» al pasar el
+  ratón);
+- en el teléfono, igual, en la banda de arriba.
+
+**Si falla, significa que…** falta el punto 8.
+
+#### L1-2. Crear un bloqueo con el candado
+
+**Qué hago:**
+1. Pulso el candado, desmarco «Días completos», pongo un día de 15:00 a 17:00
+   con el motivo «Congreso» y guardo.
+2. Pulso un hueco libre y luego abro «Agendar».
+
+**Qué debo ver:**
+- al abrir el candado, el día de hoy con «Días completos» marcado; al
+  desmarcarlo, 09:00–10:00;
+- la franja rayada de 15:00 a 17:00 con «Bloqueado · Congreso»;
+- la burbuja ya no tiene «Bloquear este horario» y «Agendar» ya no tiene la
+  posición «Bloqueo».
+
+**Si falla, significa que…** el alta desde el candado no funciona, o quedan las
+entradas viejas.
+
+#### L1-3. Pulsar en cualquier parte de la franja abre el bloqueo
+
+**Qué hago:**
+1. Pulso en la franja de L1-2, abajo (no en el rótulo).
+2. Pulso una cita que esté encima de la franja.
+3. Bloqueo un día completo con el candado y pulso esa columna.
+4. En el teléfono, en Semana, toco la fila del bloqueo (en el lado derecho).
+
+**Qué debo ver:**
+- en 1, «Bloqueo de horario» con 15:00, 17:00, «Congreso» y «Quitar bloqueo», y
+  ninguna burbuja;
+- en 2, la tarjeta de esa cita, no el bloqueo;
+- en 3, la edición con «Días completos» marcado y ese día;
+- en 4, su edición con los datos.
+
+**Si falla, significa que…** falta el punto 7, o el bloqueo se come los clics de
+las citas.
+
+**Ojo:** con «Todos los médicos», pulsar la franja de un médico abre SU bloqueo
+aunque quieras agendar a otro; para eso está «Agendar» (pendiente de tu
+decisión, §6-bis «Tanda L»).
+
+#### L1-4. Dentro del bloqueo no se agenda (burbuja y formulario)
+
+**Qué hago:**
+1. En una burbuja fuera de la franja elijo paciente, cambio la hora a 15:30 y
+   pulso «Guardar».
+2. Abro «Agendar» con hora 16:00–16:30 ese día. Luego cambio a 13:00.
+
+**Qué debo ver:**
+- en los dos, en rojo bajo las horas, «Este horario está bloqueado. Quita el
+  bloqueo para agendar aquí.»;
+- no se agenda y no sale ninguna pregunta;
+- en el formulario, «Guardar» apagado; con 13:00, encendido.
+
+**Si falla, significa que…** se deja agendar dentro, o volvió la pregunta «¿…
+de todos modos?».
+
+#### L1-5. Dentro del bloqueo no se mueve (arrastre y «Reagendar»)
+
+**Qué hago:**
+1. Arrastro una cita a la franja y recargo.
+2. En una cita reservada por enlace, «Reagendar» a una hora dentro de la
+   franja.
+
+**Qué debo ver:**
+- la cita vuelve a su sitio con el mismo texto; al recargar sigue donde estaba;
+- en «Reagendar», el texto en rojo, sin confirmación.
+
+**Si falla, significa que…** el arrastre o «Reagendar» dejan meter la cita en el
+bloqueo.
+
+**Ojo:** «Reagendar» también se niega si sólo cambias el consultorio a la misma
+hora dentro del bloqueo (pendiente de tu decisión, AG-DT-202).
+
+#### L1-6. Lo que ya estaba dentro se puede editar
+
+**Qué hago:** en una cita que ya estaba dentro de la franja antes de crear el
+bloqueo, pulso «Editar» y cambio sólo las notas. Luego le cambio la hora a otra
+dentro de la franja.
+
+**Qué debo ver:**
+- con las notas, se guarda;
+- con la hora, sale el texto en rojo.
+
+**Si falla, significa que…** lo que ya estaba dentro quedó atrapado, o se deja
+mover.
+
+#### L1-7. Google entra como hoy
+
+**Qué hago:** con Google (simulado) conectado, muevo en Google un evento a la
+hora bloqueada y abro la agenda.
+
+**Qué debo ver:** el evento entra en Spinus como hoy, a esa hora.
+
+**Si falla, significa que…** lo de Google quedó bloqueado, y no se puede
+rechazar.
+
+#### L1-8. Apagada
+
+**Qué hago:** apago la v2.
+
+**Qué debo ver:** sin candado ni franja; todo como antes.
+
+**Si falla, significa que…** el interruptor no aísla el cambio.
+
+### L2 · La burbuja de la cita (puntos 2, 3, 9, 11 y 12)
+
+#### L2-1. «No asistió» pregunta antes
+
+**Qué hago:**
+1. Con la v2 encendida, en una cita CONFIRMADA pulso «No asistió» en las
+   casillas de la burbuja y luego «Cancelar».
+2. En una AGENDADA abro los tres puntos › «No asistió» y pulso «Aceptar».
+
+**Qué debo ver:**
+- las dos veces, «¿Marcar que {paciente} no asistió? La cita se queda en la
+  agenda como «No asistió».», con «Cancelar» y «Aceptar»;
+- con «Cancelar», la cita sigue confirmada;
+- con «Aceptar», pasa a «No asistió»;
+- la ventana «¿Asistió el paciente?» al abrir la agenda NO pregunta dos veces.
+
+**Si falla, significa que…** «No asistió» volvió a ser de un toque (AG-DT-192).
+
+#### L2-2. «Eliminar cita» quita una cancelada de la agenda, también en otra pantalla
+
+**Qué hago:**
+1. Abro la agenda en dos navegadores, el del Dr. Admin y el de la secretaria,
+   en la misma semana.
+2. En el del Dr. Admin pulso una cita CANCELADA, luego «Eliminar cita» y luego
+   «Cancelar».
+3. Repito y pulso «Aceptar».
+
+**Qué debo ver:**
+- la burbuja de la cancelada tiene «Darle otra cita», «Reasignar el horario» y,
+  en el pie, «Eliminar cita»;
+- el aviso dice «¿Eliminar la cita cancelada de {paciente}? Sale de la agenda y
+  no se puede deshacer; queda guardada en el historial.»;
+- con «Cancelar» no pasa nada;
+- con «Aceptar», la cita desaparece en los DOS navegadores sin recargar, y al
+  recargar sigue sin estar;
+- el buscador por paciente ya no la encuentra;
+- una cancelada por ligar (de enlace, sin expediente) no tiene «Eliminar cita».
+
+**Si falla, significa que…** el cierre no llegó a la base, o el tiempo real no la
+quitó.
+
+#### L2-3. «Eliminar cita» no borra
+
+**Qué hago:** tras L2-2, en el editor SQL local:
+
+```sql
+select status, cerrada_en, sustituida_por from appointments where id = '…';
+select accion from audit_log where registro_id = '…' order by created_at;
+```
+
+**Qué debo ver:**
+- la cita sigue: `cancelled`, con `cerrada_en` y con `sustituida_por` vacío;
+- en `audit_log`, `cita_quitada_de_agenda` y `cita_editada`.
+
+**Si falla, significa que…** se borró o no se auditó: grave.
+
+#### L2-4. El botón de la leyenda (computadora)
+
+**Qué hago:** con la v2 encendida, en computadora, pulso el botón (i) a la
+izquierda de Mes/Semana/Día y luego Escape. Después, engrane › «Leyenda de
+estados». Por último, lo mismo en el teléfono y en la Clínica B (v2 apagada).
+
+**Qué debo ver:**
+- la misma leyenda de K5-3, colgada del botón; con Escape se cierra y el foco
+  vuelve al botón;
+- en el engrane sigue la opción;
+- en el teléfono y con la v2 apagada, no hay botón.
+
+**Si falla, significa que…** el botón no sale, o abre otra leyenda.
+
+#### L2-5. La letra de la burbuja
+
+**Qué hago:** abro la burbuja de una cita, en el teléfono y en computadora, y al
+lado abro `/reservar/{código}`.
+
+**Qué debo ver:**
+- el nombre a 18 px, la hora a 15 y el resto a 14, como los títulos, horas y
+  textos de la reserva;
+- la píldora del estado en seminegrita, como las píldoras de la reserva, y la
+  ayuda de una cancelada («Esta cita se canceló…») como las notas al pie de la
+  reserva;
+- los botones del mismo tamaño que antes: ninguno más chico que un dedo (44
+  px).
+
+**Si falla, significa que…** la escala se desvió de la reserva.
+
+### L3 · La configuración (puntos 12, 16 y 17)
+
+#### L3-12. La letra de la configuración, como la de la reserva
+
+**Qué hago:** abro un enlace de reserva en una pestaña y, en otra,
+«Configuración de la agenda» como Dr. Admin, en el teléfono y en la
+computadora. Recorro las cinco pestañas y, con la Dra. Invitada en su primera
+vez, los pasos.
+
+**Qué debo ver:**
+- el título «Configuración de la agenda» del mismo tamaño que el título de la
+  reserva, más chico que antes;
+- textos, etiquetas y botones del mismo tamaño que los de la reserva: nada se
+  ve más grande que allá;
+- los botones y los interruptores igual de fáciles de tocar que antes.
+
+**Si falla, significa que…** alguna parte volvió a los tamaños de las maquetas,
+o un control quedó demasiado chico para el dedo.
+
+#### L3-16. «Solo el administrador de la clínica puede cambiar estas opciones.»
+
+**Qué hago:** como Dra. Invitada y como secretaria, «Configuración de la agenda»
+› «Cuándo das/dan consulta» y «Avisos». Luego, como Dra. Invitada en su primera
+vez, los pasos 1 y 3. Por último, lo mismo como Dr. Admin.
+
+**Qué debo ver:**
+- en la tarjeta «Horario de la clínica», una vez, «Solo el administrador de la
+  clínica puede cambiar estas opciones.»;
+- en «Avisos», la misma frase una sola vez, arriba, aunque haya tres bloques;
+- en el paso 1, debajo de los consultorios, «El horario de la clínica es …» y la
+  frase; en el paso 3, la frase;
+- en ningún sitio «Lo cambia quien administra la clínica.» ni «Estos avisos los
+  cambia quien administra la clínica.»;
+- en «Tu consulta» / «Tipos de cita», ninguna frase;
+- como Dr. Admin, la frase en ningún sitio.
+
+**Si falla, significa que…** quien no administra no sabe por qué no puede
+cambiar algo, o la frase sale donde no es cierta.
+
+#### L3-17. La secretaria, con el diseño nuevo
+
+**Qué hago:** como secretaria, «Configuración de la agenda». Recorro las cinco
+pestañas, abro «Enlaces de los demás médicos» y, en el enlace de la Dra.
+Invitada (si dice «No abrirá» por la duración), pulso «Completar». Luego lo
+mismo como Dr. Admin.
+
+**Qué debo ver:**
+- las mismas cinco pestañas y la misma estética que el Dr. Admin: filas grises,
+  «Mostrar enlace», «Regenerar» y «Revocar» (en rojo) con borde, campos y
+  botones del mismo alto que los demás; ningún botón chiquito;
+- como secretaria, en «Completar», «La duración de la consulta.» y «El médico la
+  contesta en su configuración.», sin botones de duración;
+- como Dr. Admin, «¿Cuánto dura su consulta?» con 30 min / 45 min / 1 hora /
+  Otra, y al guardar el enlace deja de decir que le falta la duración.
+
+**Si falla, significa que…** la secretaria volvió a la versión anterior, o se le
+ofrece algo que al guardar falla.
+
+### L4 · Confirmar, la reserva y el saludo (puntos 1, 4, 10 y 15)
+
+#### L4-1. «Confirmo mi asistencia» espera a la persona
+
+**Qué hago:** desde el correo «Confirma tu cita», pulso «Confirmo mi
+asistencia». Cuando abre, toco o hago clic en la fecha o en el texto de la
+tarjeta (no en un botón).
+
+**Qué debo ver:**
+- al abrir, la cita y el botón; **no** dice «confirmada»;
+- tras el toque, «Gracias. Tu asistencia quedó confirmada.»;
+- la agenda abierta lo ve sin recargar.
+
+**Si falla, significa que…** vuelve a confirmar sola al abrir (AG-DT-175), o el
+gesto no basta.
+
+#### L4-2. Ir a «No podré asistir» no confirma
+
+**Qué hago:**
+1. Abro otro enlace «Confirmo mi asistencia» y pulso «No podré asistir» con el
+   ratón (o con el dedo).
+2. Repito con el teclado: Tab hasta «No podré asistir» y Enter.
+3. Repito pulsando Espacio, flechas o F11 en la página.
+
+**Qué debo ver:**
+- en 1 y 2, el paso de cancelar; la cita sigue agendada, **sin** confirmar;
+- en 3, nada se confirma.
+
+**Si falla, significa que…** llegar a «No podré asistir» confirma por el camino.
+
+#### L4-3. «Continuar mi reserva» conserva el nombre y el teléfono
+
+**Qué hago:**
+1. Reservo desde el enlace público hasta «Revisa tu correo».
+2. En el correo del código pulso «Continuar mi reserva»: se abre otra pestaña
+   con el código puesto. Pulso «Verificar y reservar».
+3. Marco la casilla y pulso «Reservar cita».
+4. Variante: en la pestaña nueva pulso «Volver» antes de verificar, marco la
+   casilla y pulso «Enviar código a mi correo».
+5. Variante: recargo dos veces en el paso del código y verifico.
+
+**Qué debo ver:**
+- en 2, «Tu correo ya está verificado. Completa tus datos para reservar.»,
+  nombre, teléfono y correo **ya escritos** y la casilla del aviso sin marcar;
+- en 3, «Tu cita quedó agendada», con mi nombre en la agenda y sin otro correo
+  de código;
+- en 4, nombre y teléfono ya escritos; vuelve al código **sin** mandar otro
+  correo, y verificar ya reserva;
+- en 5, el formulario con el nombre y el teléfono.
+
+**Si falla, significa que…** el paciente tiene que volver a teclear sus datos, o
+lo restaurado reserva sin su consentimiento.
+
+**Ojo:** no reserva solo a propósito: hay que marcar la casilla y pulsar otra
+vez (pendiente de tu decisión, AG-DT-220).
+
+#### L4-4. El correo de confirmación saluda por el nombre
+
+**Qué hago:**
+1. Desde la agenda mando la confirmación por correo de una cita con paciente.
+2. Lo mismo con una cita de reserva en línea sin paciente ligado.
+3. Miro también un recordatorio y un aviso de cambio.
+
+**Qué debo ver:**
+- en 1, «Hola, <nombre>:» bajo «Confirma tu cita», sólo con el nombre del
+  paciente, sin apellidos ni nada clínico; el asunto, sin nombre;
+- en 2, el nombre tal como se tecleó al reservar;
+- en 3, ningún saludo.
+
+**Si falla, significa que…** el saludo falta, lleva de más o salió en otros
+correos.
+
+### L5 · La campana (puntos 13, 14 y 18)
+
+#### L5-1. El paciente confirma desde su enlace
+
+**Qué hago:** con la agenda abierta, agendo para mañana a un paciente de la
+semilla que tenga correo y le mando la confirmación desde la campana («Por
+confirmar», el botón del sobre). En otra ventana sin sesión abro el enlace del
+correo (Mailpit) y pulso «Confirmo mi asistencia».
+
+**Qué debo ver:**
+- en uno o dos segundos, un emergente breve «Un paciente confirmó su cita del
+  [día] a las [hora].», sin nombre;
+- en la campana, la cita sale de «Por confirmar» y en «Avisos» aparece «[su
+  nombre] confirmó su cita del [día] a las [hora]»;
+- al pulsarlo se abre la cita.
+
+**Si falla, significa que…** sin aviso en «Avisos», falta la migración de L5;
+con aviso pero sin emergente ni cambio en vivo, la campana no recarga con el
+tiempo real.
+
+#### L5-2. Sólo uno, y el personal no avisa
+
+**Qué hago:** vuelvo a abrir el enlace de L5-1, pulso otra vez y recargo la
+agenda. Luego, a otra cita de mañana, le pulso yo «Confirmar» en su tarjeta.
+
+**Qué debo ver:** un solo aviso de la cita de L5-1. La que confirmé yo no da
+aviso ni emergente.
+
+**Si falla, significa que…** con dos avisos, la deduplicación no funciona; con
+aviso de la mía, el aviso no distingue al paciente del personal.
+
+#### L5-3. La burbuja con el número
+
+**Qué hago:** en escritorio y en el teléfono, miro la campana con citas de mañana
+sin confirmar y algún aviso sin revisar. Abro la campana y comparo con las
+pestañas. Marco los avisos como revisados. Confirmo todas las de mañana.
+
+**Qué debo ver:**
+- una burbuja roja con el número en blanco igual a «Por confirmar · n» +
+  «Avisos · m» (con más de 9, «9+»);
+- baja al revisar; sin pendientes, sin burbuja;
+- con lector de pantalla, la campana dice «… 3 pendientes» (o «1 pendiente»).
+
+**Si falla, significa que…** la burbuja no cuenta lo mismo que la campana.
+
+#### L5-4. Google mueve una cita reservada por enlace
+
+**Qué hago:** reservo por enlace para la semana que entra; en Google (simulado o
+el de verdad) la muevo una hora; abro la agenda.
+
+**Qué debo ver:**
+- en Spinus sigue en su hora, en el mismo sitio de la rejilla;
+- Google vuelve a su hora;
+- en la campana, el aviso «Desde Google no se pueden mover…»; al pulsarlo, la
+  tarjeta con «Reagendar» grande arriba y seleccionado.
+
+**Si falla, significa que…** si en Spinus cambió la hora, el candado de la
+reserva no funciona: grave.
+
+### Integración de la tanda L
+
+#### L-INT-1. «Eliminar cita» dentro de un bloqueo
+
+**Qué hago:** con el candado, bloqueo una hora en la que haya una cita CANCELADA
+con paciente. Pulso la cancelada › «Eliminar cita» › «Aceptar». Después pulso
+otra cancelada fuera del bloqueo › «Reasignar el horario» y elijo una hora
+dentro del bloqueo.
+
+**Qué debo ver:**
+- la cancelada sale de la agenda: el bloqueo no lo impide, porque cerrarla no la
+  mueve;
+- al reasignar dentro del bloqueo, no nace la cita nueva (sale el texto del
+  bloqueo) y la cancelada sigue en la agenda, sin cerrar.
+
+**Si falla, significa que…** el bloqueo y el cierre de L2 chocan en la base.
+
+### Qué repetir tras la tanda L
+
+Antes de nada, P5 a P8: la base pasa a **48** migraciones. Después, las nuevas
+de esta sección, y éstas, que ya existían y cambian o hay que repetir.
+
+**Tanda K (el bloqueo)**
+- **K1-1:** el bloqueo ya no se crea desde «Agendar» › «Bloqueo», sino con el
+  candado (L1-2).
+- **K1-2:** **cambia.** Ya no sale «Este horario está bloqueado. ¿Agendar de
+  todos modos?»: la burbuja y el formulario dicen el texto en rojo y no
+  agendan, y el arrastre devuelve la cita (L1-4, L1-5). Un evento sin paciente
+  tampoco entra.
+- **K1-3:** la edición se abre pulsando cualquier parte de la franja, no sólo el
+  rótulo (L1-3).
+- **K1-4:** «Bloquear este horario» de la burbuja ya no existe: días completos
+  con el candado.
+- **K-INT-1:** **cambia.** «Reagendar» a un horario bloqueado no pregunta: dice
+  el texto en rojo (L1-5).
+
+**Bloque B y tandas H, J y K (configuración)**
+- **K3-11 y J5-5:** la frase de quien no administra es ahora «Solo el
+  administrador de la clínica puede cambiar estas opciones.».
+- **B2 y B3** (quién cambia los ajustes): en «Avisos», la frase nueva en lugar
+  de «Lo cambia quien administra la clínica.».
+- **H2-2:** las fichas que ve la secretaria y las plegadas del Dr. Admin tienen
+  el diseño nuevo.
+- **H2-3:** los botones de las fichas de los demás médicos siguen con borde y
+  fondo, ahora de 44 px y sobre una fila gris.
+- **H2-5:** la Dra. Invitada y la secretaria ven el recordatorio deshabilitado
+  y, arriba de los avisos, la frase nueva.
+- **J5-1, J5-2, J5-3 y K3-13:** los mismos pasos y pestañas, con la letra más
+  chica.
+
+**Bloque D y E (reserva y confirmación)**
+- **K2-1:** **cambia.** «Confirmo mi asistencia» ya no confirma solo al abrir;
+  espera un toque en la página (L4-1).
+- **K2-2:** repetir.
+- **K2-4 y K2-6:** **cambian.** Tras verificar, «Tus datos» sale ya escrito y
+  hay que marcar la casilla y pulsar «Reservar cita» (L4-3).
+- **E3:** confirmar la asistencia ahora espera el toque y además avisa a la
+  clínica en la campana (L4-1, L5-1).
+- **G3-1, I1-4 y H1-1:** repetir.
+
+**Tandas G, H, I, J y K (la burbuja y la campana)**
+- **G3-5:** en la cancelada, además, «Eliminar cita» en el pie.
+- **K5-7:** **ojo**, la cancelada suma «Eliminar cita» en el pie. El resto
+  sigue igual, y sigue sin «Cancelar cita».
+- **K5-4 y K5-6:** la burbuja con la letra nueva, y «No asistió» de los tres
+  puntos pregunta antes (L2-1).
+- **K5-3 e I5-3:** la leyenda del engrane, igual; en computadora, además, el
+  botón (i) (L2-4).
+- **I4-3:** la ventana de asistencia, sin confirmación nueva.
+- **I4-4:** «Reasignar el horario» sigue cerrando con sustituta.
+- **K4-3:** guardar con la v2 apagada, sin cambio.
+- **H4-4:** al confirmar el paciente, además, el aviso en «Avisos».
+- **H4-5 e I5-4:** el punto rojo «sin número» pasa a burbuja CON número (L5-3).
+- **I5-6:** un tipo de aviso más, la confirmación del paciente.
+- **J4-1 y J4-3:** repetir; los cubre también la e2e nueva del punto 18 (L5-4).
+
+**Apagado**
+- **X1 y X7:** nada de lo de arriba se ve: ni el candado, ni el botón (i), ni
+  «Eliminar cita», ni el número de la campana.
+
+---
+
 ## 9. Seguridad
 
 ### 9.1 Aislamiento entre clínicas y entre médicos
@@ -5966,6 +6471,33 @@ Marca cada una al pasarla. Si una falla, anota el número y qué viste.
 - [ ] K-INT-1. «Reagendar» a un horario bloqueado
 - [ ] K-INT-2. La burbuja conserva lo de antes
 
+**Tanda L**
+- [ ] L1-1. El candado, junto a la campana
+- [ ] L1-2. Crear un bloqueo con el candado
+- [ ] L1-3. Cualquier parte de la franja abre el bloqueo
+- [ ] L1-4. Dentro no se agenda (burbuja y formulario)
+- [ ] L1-5. Dentro no se mueve (arrastre y «Reagendar»)
+- [ ] L1-6. Lo que ya estaba dentro se edita
+- [ ] L1-7. Google entra como hoy
+- [ ] L1-8. Apagada
+- [ ] L2-1. «No asistió» pregunta
+- [ ] L2-2. «Eliminar cita», también en otra pantalla
+- [ ] L2-3. «Eliminar cita» no borra
+- [ ] L2-4. El botón de la leyenda
+- [ ] L2-5. La letra de la burbuja
+- [ ] L3-12. La letra de la configuración
+- [ ] L3-16. «Solo el administrador…»
+- [ ] L3-17. La secretaria con el diseño nuevo
+- [ ] L4-1. Confirmar espera a la persona
+- [ ] L4-2. «No podré asistir» no confirma
+- [ ] L4-3. «Continuar mi reserva» con nombre y teléfono
+- [ ] L4-4. El saludo del correo de confirmación
+- [ ] L5-1. El paciente confirma: aviso
+- [ ] L5-2. Sólo uno, y el personal no avisa
+- [ ] L5-3. La burbuja con el número
+- [ ] L5-4. Google no mueve una reserva por enlace
+- [ ] L-INT-1. «Eliminar cita» dentro de un bloqueo
+
 **Seguridad**
 - [ ] S1. La Clínica B no ve la A
 - [ ] S2. Lo mismo, directo a la base
@@ -6037,7 +6569,7 @@ Marca cada una al pasarla. Si una falla, anota el número y qué viste.
    `p1_permisos_funciones.sql` (su «caso 3»). Esa prueba tiene escrita a mano
    la lista de las funciones de la base que no pueden usar todos los roles; hoy
    tiene 10 y, con la agenda, son **50** (tras la tanda K; la tanda H añadió 3,
-   la I, 1, la J, 2 y la K, 3). La lista completa, lista para pegar, está en
+   la I, 1, la J, 2 y la K, 3; la L, ninguna). La lista completa, lista para pegar, está en
    `supabase/AUDITORIA-CONJUNTO-AGENDA-V2.md`, §13.5. **No es un hueco de
    seguridad**: si no se cambia, esa prueba sale en rojo, nada más. Se probó
    en tu computadora con las dos ramas juntas: con la lista nueva, todas las
@@ -6105,8 +6637,11 @@ Marca cada una al pasarla. Si una falla, anota el número y qué viste.
 | 38 | `20261123120000_agenda_k1_bloqueos.sql` | El bloqueo de horario: su tabla, y que la reserva por enlace no ofrezca un horario bloqueado; lo de todo el día deja de cerrar el día (K1-1 a K1-7). **Antes de la 40** |
 | 39 | `20261123130000_agenda_k2_espera_codigo.sql` | Reenviar el código: los 30 s por enlace, cuánto falta cuando hay que esperar, y el código de un correo anterior no cuenta como equivocado (K2-5 a K2-7) |
 | 40 | `20261123140000_agenda_k3_huso_clinica_pausa_enlace.sql` | El huso de fábrica de la clínica y apagar «Tu enlace» sin perderlo (K3-12, K3-14). **Después de la 38** (si no, se detiene sin hacer nada) |
+| 41 | `20261124120000_agenda_l1_bloqueo_total.sql` | El bloqueo es total: con la v2, la base no deja agendar ni mover nada dentro de un bloqueo, aunque alguien se salte la pantalla; lo de Google y las reservas por enlace entran como hoy (L1-4 a L1-7). **Después de la 38** |
+| 42 | `20261124130000_agenda_l2_eliminar_cancelada.sql` | «Eliminar cita» quita una cancelada de la agenda sin borrarla: queda cerrada y en la auditoría (L2-2, L2-3). **Después de la 33** |
+| 43 | `20261124160000_agenda_l5_aviso_confirmacion_paciente.sql` | El aviso en la campana cuando el paciente confirma desde su enlace (L5-1, L5-2). **Después de la 37** |
 
-Son **40**. Las tres de la tanda K (38 a 40) van al final y en ese orden: **la 38 antes que la 40, siempre** (la 40 sin la 38 se detiene; la 38 después de la 40, también). Antes de la tanda K eran 37. Las tres de la tanda J (35 a 37) van al final y en ese orden; **nunca vuelvas a correr la 35 después de la 36** (se detiene sin hacer nada: no reconoce lo que dejó la 36). Antes de la tanda J eran 34. Las siete de la tanda I (28 a 34) van al final y en ese orden. Antes de la tanda I eran 27: Las tres de la tanda H (25 a 27) van al final y en ese orden. Las cuatro de la tanda del 2026-11-14 (21 a 24) van al final y en ese orden; las 17 a 20 van en este orden aunque se escribieron
+Son **43**. Las tres de la tanda L (41 a 43) van al final y en ese orden; no dependen entre sí. **Nunca vuelvas a correr la 37 después de la 43** (se detiene sin hacer nada: no reconoce los avisos que añade la 43). Antes de la tanda L eran 40. Las tres de la tanda K (38 a 40) van al final y en ese orden: **la 38 antes que la 40, siempre** (la 40 sin la 38 se detiene; la 38 después de la 40, también). Antes de la tanda K eran 37. Las tres de la tanda J (35 a 37) van al final y en ese orden; **nunca vuelvas a correr la 35 después de la 36** (se detiene sin hacer nada: no reconoce lo que dejó la 36). Antes de la tanda J eran 34. Las siete de la tanda I (28 a 34) van al final y en ese orden. Antes de la tanda I eran 27: Las tres de la tanda H (25 a 27) van al final y en ese orden. Las cuatro de la tanda del 2026-11-14 (21 a 24) van al final y en ese orden; las 17 a 20 van en este orden aunque se escribieron
 después: las 17 y 18 añaden reglas a la tabla de citas, la 19 reemplaza
 la protección de los enlaces que puso la 8, y la 20 reemplaza tres funciones de
 las 9 y 10. Por eso, una vez más: **nunca vuelvas a correr la 8, la 9 ni la 10
@@ -6132,7 +6667,7 @@ Sólo los nombres y para qué sirven; los valores los generas tú.
 ### 13.4 El orden recomendado
 
 1. `select version()` y lo de 13.1.
-2. **Las 40 migraciones**, una por una, en el orden de 13.2.
+2. **Las 43 migraciones**, una por una, en el orden de 13.2.
 3. Las variables de 13.3 (menos `AGENDA_RSVP_GOOGLE`).
 4. `git merge` local de la rama sobre `main` y `git push` (despliega el código).
    Si despliegas el código antes que las migraciones no se rompe nada, pero

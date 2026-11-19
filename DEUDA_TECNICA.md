@@ -5121,6 +5121,14 @@ copiados en `ConfiguracionAgenda.tsx`; los contactos bloqueados, en
 
 ### AG-DT-164 — Las fichas de los demás médicos son de la retícula vieja
 
+**Cerrada en la tanda L (L3, punto 17; integrada 2026-11-19):** las fichas
+(`BloqueEnlacesMedico`, `FilaEnlaceReserva`, `FaltaParaEnlace`,
+`DuracionConsulta`, `DuracionEnConsultorio`, `FormTipoCita`) se reestilaron en su
+sitio con las clases de `estilosConfig`, con botones de 44 px con borde y fondo y
+campos de 44 px, sin cambiar roles, nombres accesibles ni textos. La pantalla vieja
+sin montar que las comparte queda mezclada (AG-DT-216). Queda el texto de abajo
+como historia.
+
 **Estado:** abierta, visual (J5) · `BloqueEnlacesMedico`, `DuracionEnConsultorio`
 y `FormTipoCita` (32/36 px) dentro de una pantalla de 44/48 px. Se aceptó para no
 perder función.
@@ -5191,6 +5199,14 @@ lista del teléfono no pasa. Se arregla moviendo el rótulo a una esquina libre.
 
 ### AG-DT-175 — Confirmar al abrir: un revisor de correo con JavaScript confirmaría
 
+**Cerrada en la tanda L (L4, punto 1; integrada 2026-11-19):** `ConfirmarAlCargar.tsx`
+ya no confirma al cargar; espera un gesto de confianza fuera de un control
+(`esGestoParaConfirmar`): un `click` con `isTrusted`, o Enter o una tecla que
+escribe (lista blanca). Se eligió `click` y no `pointerdown`/`touchstart`, como
+proponía esta entrada, porque desplazar la página confirmaría. Lo que queda (un
+escáner que simule un clic de confianza, y el clic en la zona libre de la tarjeta)
+es AG-DT-223. Queda el texto de abajo como historia.
+
 **Estado:** riesgo aceptado, **PENDIENTE DE ANGEL** (K2 H1; revisión de seguridad
 de la integración K, media). Un filtro que «detone» enlaces con un navegador real
 (`navigator.webdriver` enmascarado, pestaña visible) manda el POST y confirma la
@@ -5201,6 +5217,12 @@ Mitigación propuesta, sin aplicar: esperar un gesto de confianza
 es volver al clic. La cabecera de `ConfirmarAlCargar.tsx` lo documenta.
 
 ### AG-DT-176 — `#codigo=` sin filtrar en Sentry
+
+**Cerrada en la tanda L (L4, punto 4; integrada 2026-11-19):** la línea va como la
+primera de la cadena de `redactString` (`src/lib/sentryPiiFilter.ts:62`), con Vitest
+(`sentryCodigoReserva.test.ts`). Ningún `replace` posterior la deshace. Lo que no
+cubre (`%23codigo=`, otras longitudes) es AG-DT-221; las transacciones, los spans y
+el replay, AG-DT-222. Queda el texto de abajo como historia.
 
 **Estado:** propuesta sin aplicar (K2 H3). Si una página del enlace manda un
 evento a Sentry, la URL podría llevar el código; la página lo quita al cargar.
@@ -5298,6 +5320,12 @@ entero.
 
 ### AG-DT-192 — «No asistió» de un toque
 
+**Cerrada en la tanda L (L2, punto 2; integrada 2026-11-19):** «No asistió» pregunta
+antes, en las casillas y en los tres puntos: «¿Marcar que {paciente} no asistió? La
+cita se queda en la agenda como «No asistió».» (`pideConfirmacion`). La ventana
+«¿Asistió el paciente?» de I4 no pregunta otra vez. Queda el texto de abajo como
+historia.
+
 **Estado:** **PENDIENTE DE ANGEL** (K5-DT-6). No pregunta y se puede pulsar antes
 de la hora de la cita, aunque se deshace desde el formulario. Si en la práctica
 se pulsa por error, la salida corta es pedir confirmación, como en «Cancelar
@@ -5336,7 +5364,20 @@ limpio a K1, como AG-DT-166.
 
 ### AG-DT-198 — El pintado optimista de la tarjeta también va con la v2 apagada
 
-**Estado:** **PENDIENTE DE ANGEL** (integración K; números de K4). Con la v2
+**Cerrada en la integración de la tanda L (2026-11-19): no había cambio que
+deshacer.** Medido otra vez con los dos métodos sobre `a58419f` (v2 apagada, 4
+rondas × 4, orden alterno, `mejora_agendaV2.md` §6-bis «Tanda L», punto 3):
+- en la semana llena de K4, la tarjeta editada sale a los 33,3 ms y la respuesta
+  del PUT llega a los 74,1: antes, 12 de 12;
+- con 400 ms de retraso en el servidor, la tarjeta sale a los 14–39 ms y la
+  respuesta a los ~460.
+
+Antes del proyecto la tarjeta ya se pintaba antes de responder. El «~44 ms» de K4
+era la DURACIÓN de la petición, no su fin contado desde el clic. Sólo el cambio
+de título espera al servidor, en los dos árboles, como siempre. Queda el texto de
+abajo como historia.
+
+**Estado (anterior):** **PENDIENTE DE ANGEL** (integración K; números de K4). Con la v2
 apagada, la tarjeta editada o creada se pinta a los ~32–35 ms. Antes del
 proyecto (`a58419f`) se pintaba al responder el PUT, a los ~45–47 ms. Es un
 cambio de comportamiento con la v2 apagada, aunque a mejor. No se tocó por orden
@@ -5351,12 +5392,278 @@ orden de despliegue (migración primero) no ocurre.
 
 ### AG-DT-200 — «Mover la cita dentro del bloqueo» es inestable
 
+**Diagnosticada y arreglada en la prueba en la tanda L (L1, punto 5; integrada
+2026-11-19): era la prueba, no el arrastre.**
+
+- La cita de 60 min mide 84 px (1,4 px/min). La prueba la agarraba por el
+  centro, y=756, justo en la raya de las 16:00; el destino (+42 px = 798) caía
+  justo en la raya de las 16:30.
+- FullCalendar resuelve la franja por posición, con medidas subpíxel y ajuste a
+  la franja de 30 min. Cuando el redondeo pone origen y destino en la misma
+  franja, el delta es 0 y no hay `eventDrop`: sin pregunta y sin PUT.
+- El arrastre sí empezó (`.fc-event-mirror` presente) y ninguna respuesta de
+  red llegó durante el gesto: no era una carrera con una traída.
+- Arreglo: `arrastrarEventoPorMinutos(page, evento, minutos, agarre = 0.5)` en
+  `e2e/ayudas.ts`, y la prueba agarra a 1/4 del alto, lejos de una raya. Si
+  falta el bloqueo (corrida con `-g`), lo siembra ella.
+- Con `--repeat-each=20` y los tipos de cita de la Semilla A aparcados: 19 de 20
+  antes y **20 de 20** después. Sin aparcarlos, las 20 fallaban en la
+  precondición: un tipo «Consulta» de 60 min activo en A hace que G2 ajuste el
+  alta al turno (AG-DT-208).
+
+Trazas en `tanda-L-temporales/l1/` (`p5-diagnostico.txt`, `p5-antes-aparcado/`,
+`p5-despues-20/`). Queda el texto de abajo como historia.
+
 **Estado:** aceptada (integración K). La e2e de `agenda-k1-bloqueos.e2e.ts` (la de
 la línea 105) falló una vez de seis corridas: el arrastre de
 `arrastrarEventoPorMinutos` no movió la cita, y la pregunta no llegó a salir.
 Pasó en las otras cinco, tres de ellas seguidas. Es la inestabilidad conocida de
 arrastrar en FullCalendar con Playwright, no la pregunta. Si se repite, conviene
 esperar a que la tarjeta esté quieta antes de arrastrarla.
+
+### AG-DT-201 — El bloqueo total no toma el candado 1790
+
+**Estado:** aceptada (L1). El disparador `trg_appointments_horario_bloqueado` lee
+`agenda_bloqueos` sin el candado consultivo de la reserva. Un bloqueo creado a la
+vez que una cita puede dejar la cita dentro: es la misma carrera que K1 ya aceptó
+para el empalme, y la cita queda «como está» (K, punto 5).
+
+### AG-DT-202 — «Reagendar» rechaza un cambio sólo de consultorio dentro de un bloqueo
+
+**Estado:** **PARA REVISIÓN DE ANGEL** (L1, decisión 4). La ruta
+`…/reagendar` y el panel vetan siempre que el tramo toque un bloqueo, también si
+sólo cambia el consultorio a la misma hora. El PUT y el disparador sí lo dejan
+pasar («no se mueve»). Se dejó por menos cambio: el panel es de citas de enlace, y
+el caso es raro. Arreglo: medir «se mueve» en la ruta como el PUT.
+
+### AG-DT-203 — El día completo del bloqueo lo decide el huso del navegador
+
+**Estado:** aceptada (L1). El modal y el arrastre deciden si un bloqueo de días
+completos toca una cita con el huso del navegador; el servidor, con el del
+consultorio. Con husos distintos, el cliente puede avisar de más o de menos. La
+barrera es el servidor.
+
+### AG-DT-204 — El reintento idempotente del POST tras un bloqueo da 409
+
+**Estado:** aceptada, muy rara (L1). Si un alta que sí entró se reintenta con el
+mismo `client_id` después de que alguien bloqueara esa hora, el veto de la ruta va
+antes de resolver el 23505 y responde 409 en vez de devolver la fila ya creada.
+
+### AG-DT-205 — Asignar médico a un evento de Google por asignar dentro de un bloqueo
+
+**Estado:** aceptada, sin caso real (L1). Pasar `medico_id` de NULL a un médico
+cuenta como mover, y el disparador lo rechazaría dentro de un bloqueo de ese
+médico. Las filas de Google nacen con médico (0 de 6 con NULL en local).
+
+### AG-DT-206 — `selectOverlap` sin e2e propia
+
+**Estado:** abierta, pruebas (L1). Una selección arrastrada sobre la franja no se
+prueba en la interfaz. La defensa de debajo (`alSeleccionar` con
+`bloqueoDelGesto`) es casi inalcanzable con `selectOverlap` puesto.
+
+### AG-DT-207 — `data-bloqueo-abrir` sin lector
+
+**Estado:** aceptada, limpieza (L1). El atributo sigue en el rótulo del bloqueo,
+pero desde el punto 7 ya no lo lee el código.
+
+### AG-DT-208 — La base local compartida no se podía resembrar
+
+**Estado:** abierta, entorno de pruebas (L1, L2, L3 y L5, las cuatro lo vieron).
+
+- Una consulta ajena (`2d979979-bd39-44fd-b052-cbd8dc775d7f`, creada el
+  2026-11-19 a las 03:37 UTC, de admin.a con su cita) sobre el paciente «Zamora»
+  de la Clínica Semilla A hace que `agenda-semilla.ts` se niegue a resembrar.
+  Nadie la borró: es expediente clínico.
+- Mientras siguió, las ramas corrieron sus e2e con un `globalSetup` que sólo
+  iniciaba sesión.
+- Además, varios tipos de cita activos en la Semilla A (entre ellos «Consulta»
+  de 60 min) hacen que G2 ajuste las altas al turno, y las pruebas que suponen
+  otra duración fallan en la precondición. L1 los aparcó sólo durante sus
+  corridas.
+- Lo que hizo la integración con los dos: §6-bis «Tanda L», «Integración»
+  (choque 8) y §9.
+
+### AG-DT-209 — `pruebas-sql.sh` se para en la primera roja
+
+**Estado:** abierta, pruebas (L1). `scripts/pruebas-sql.sh` corta la batería en el
+primer archivo rojo, así que una roja ajena esconde el estado de las demás; L1
+tuvo que correrlas archivo por archivo. En un worktree nuevo, además, el script
+no tiene bit de ejecución y hay que llamarlo con `bash`.
+
+### AG-DT-210 — Una cancelada sin médico no se puede quitar
+
+**Estado:** aceptada (L2). `puedeGestionarDelMedico` devuelve false sin
+`medico_id`, así que `POST …/quitar` da 403 incluso a un administrador (igual que
+`no-es-cita`). El cliente dice «No se pudo quitar» y la devuelve. En la semilla,
+toda cita con paciente tiene médico.
+
+### AG-DT-211 — El acuse optimista de «Eliminar cita»
+
+**Estado:** aceptada, baja (L2; revisión). «Se quitó de la agenda» sale antes de
+que responda el servidor; si falla, le sigue «No se pudo quitar de la agenda» y
+`refetch()` la devuelve. Es el patrón de `handleDelete`.
+
+### AG-DT-212 — `HoyEnConsultorio` cuenta canceladas y cerradas
+
+**Estado:** abierta, menor (L2). Cuenta las citas de hoy con paciente sin mirar el
+estado, así que suma también las canceladas y las cerradas. Ya pasaba con las
+sustituidas (tanda I).
+
+### AG-DT-213 — Dos funciones pasan de 50 líneas
+
+**Estado:** aceptada (L2 y L4; Protocolo 3).
+
+- `ejecutarAccion` (`InteraccionesV2.tsx`) ya pasaba de 50 antes de L2; L2 le
+  sumó 2 (un `case`).
+- `useReserva` pasa de 50 a 51 por el estado `restaurada` (L4). Lo demás de L4
+  fue a dos funciones pequeñas, `borradorRestaurado` y `personaGuardable`.
+
+### AG-DT-214 — Las e2e de la tarjeta comparten el interruptor de la Clínica A
+
+**Estado:** abierta, pruebas (L2; no es nuevo). Con `--workers=2`, el `afterEach`
+o el `afterAll` de un archivo apaga la v2 mientras otro corre, y fallan con
+«apagada». Hay que correrlas con `--workers=1`.
+
+### AG-DT-215 — `ConfirmModal` con botones de 36 px
+
+**Estado:** abierta, visual (L3). `src/components/agenda/ConfirmModal.tsx`, que la
+configuración abre para revocar o regenerar, tiene botones de unos 36 px y su
+propia escala de letra. Es compartido con la agenda, y L3 no lo tocó.
+
+### AG-DT-216 — La configuración vieja sin montar mezcla controles
+
+**Estado:** aceptada (L3; ver AG-DT-162). `ConfiguracionCalendario` y sus
+`Seccion*` usan los componentes compartidos que L3 reestiló, así que ahora mezclan
+controles nuevos con los suyos de 32/36 px. No compila distinto. Se va con
+AG-DT-162.
+
+### AG-DT-217 — `agenda-f-simetria` mide botones que ya no existen
+
+**Estado:** abierta, pruebas (L3). La e2e espera 32/36 px en los botones «viejos»
+(`h-8`/`h-9`). En la configuración ya no queda ninguno, así que esa parte pasa sin
+comprobar nada, y su comentario quedó desfasado.
+
+### AG-DT-218 — El área de toque del interruptor sobresale 9 px
+
+**Estado:** aceptada (L3). El `::before` que da 46 px de alto al interruptor
+sobresale 9 px por encima y por debajo de su dibujo. Un control a menos de 9 px en
+vertical perdería toques contra él. Hoy ninguno está tan cerca.
+
+### AG-DT-219 — La prueba de escala de Vitest sólo mira pertenencia
+
+**Estado:** abierta, pruebas (L3). `configuracionEscala.test.ts` comprueba que cada
+tamaño esté en la escala de la reserva, no que cada papel use el suyo. Eso lo miran
+la e2e `agenda-l3-configuracion` y la revisión.
+
+### AG-DT-220 — El traspaso de nombre y teléfono por `BroadcastChannel` no está atado al código
+
+**Estado:** riesgo aceptado por Angel, media-baja (L4, punto 10; revisión de
+seguridad de la integración L).
+
+- Cualquier pestaña del mismo navegador y origen que abra
+  `/reservar/<enlace>#codigo=` con 6 dígitos cualesquiera recibe, por
+  `BroadcastChannel`, el correo, el nombre y el teléfono de una reserva a medias.
+  Ya pasaba con el correo desde K2; ahora suma nombre y teléfono.
+- Hace falta que la pestaña de la reserva siga abierta, que el código se pidiera
+  hace menos de 10 min y que la reserva no haya terminado. En `sessionStorage`
+  quedan hasta 30 min o hasta cerrar la pestaña (el borrado es perezoso, al leer).
+- En un equipo compartido de consultorio, la siguiente persona podría verlos en
+  esa ventana.
+- `pedirTraspaso` acepta la primera respuesta del canal sin saber de quién viene.
+  Como lo restaurado ya no reserva solo, lo inyectado se ve en el formulario antes
+  de mandarse, pero sigue siendo un canal sin autenticar.
+- **Mitigación propuesta, sin aplicar:** que la pestaña que responde sólo comparta
+  si el traspaso llega poco después del envío del código.
+
+### AG-DT-221 — La regex de Sentry no cubre `%23codigo=` ni otras longitudes
+
+**Estado:** abierta, baja (revisión de seguridad de la integración L).
+`/#codigo=\d{6}/` en `src/lib/sentryPiiFilter.ts:62` no redacta el fragmento
+codificado (`%23codigo%3D…`), con otra caja (`#Codigo=`) ni con otro número de
+dígitos. Hoy el código sólo viaja como `#codigo=NNNNNN`. No se tocó porque en ese
+archivo sólo está autorizada la línea de L4.
+
+### AG-DT-222 — Transacciones, spans y replay de Sentry sin redactar
+
+**Estado:** abierta (L4; previa a L4, pero ahora hay un código en el fragmento).
+No hay `beforeSendTransaction` ni `beforeSendSpan`: si se encienden las trazas,
+`transaction` y `url.full` de los spans no pasan por `redactString`. El replay
+tampoco pasa por `beforeSend`.
+
+### AG-DT-223 — Confirmar con un gesto: lo que aún confirma
+
+**Estado:** aceptada, a decidir por Angel (L4, punto 1).
+
+- Un escáner que simule un clic de confianza (un navegador sin cabeza que oculte
+  `webdriver` y haga clic) sigue confirmando.
+- Un clic en cualquier zona libre de la tarjeta confirma, también un toque que
+  falle por poco «No podré asistir». Limitar el gesto a un elemento sería volver a
+  pedir un botón.
+- Si el POST falla, la página vuelve al botón del servidor y no reintenta con otro
+  gesto (como en K2).
+
+### AG-DT-224 — El saludo del correo de confirmación
+
+**Estado:** aceptada, a confirmar por Angel (L4, punto 15).
+
+- El nombre se lee en cada reintento. Si cambia entre dos intentos con la misma
+  clave de idempotencia, Resend da 409 y queda `duplicado`. Es improbable y falla
+  del lado seguro.
+- Un paciente ligado sin correo propio, cuya cita lleva el `reserva_correo` de otra
+  persona (un familiar), recibe el saludo con su nombre en el buzón del familiar.
+  Ya recibía la cita; el nombre es lo nuevo.
+- Sin paciente ligado, el saludo usa `reserva_nombre` completo, con apellidos si
+  los tecleó (§6-bis «Tanda L», L4).
+
+### AG-DT-225 — Una confirmación fuera de lo pintado no recarga la campana
+
+**Estado:** aceptada (L5). Si el paciente confirma una cita que no está pintada ni
+es de mañana (de otra semana, por ejemplo), la campana no recarga en vivo: el aviso
+llega con la siguiente traída (abrirla, el sondeo, volver a la pestaña). Y si el
+personal confirma desde OTRA sesión una cita pintada agendada, cuesta una traída
+que no trae nada: sin el aviso no se distingue del paciente.
+
+### AG-DT-226 — Recargar antes de 2 min vuelve a enseñar el emergente
+
+**Estado:** aceptada, diseño de I5 (L5). `vistos` es por pestaña, así que recargar
+la agenda antes de 2 min repite el emergente de los avisos recientes, de todos los
+tipos.
+
+### AG-DT-227 — El tope de 50 avisos en la burbuja de la campana
+
+**Estado:** aceptada (L5). La lista trae los 50 avisos más nuevos, así que con más
+la burbuja dice «9+» y la pestaña «Avisos · 50» aunque haya más. En la base local
+compartida ya había más de 50 sin revisar en la Clínica Semilla A.
+
+### AG-DT-228 — Las e2e que confirman como el paciente dejan avisos huérfanos
+
+**Estado:** abierta, pruebas (L5). Con la migración de L5, toda e2e que confirme
+como el paciente deja un aviso `confirmacion_paciente`. Las que no limpian avisos
+los dejan huérfanos (invisibles: el lector cruza con `appointments`):
+`confirmacion-enlace`, `agenda-g3-correo`, `agenda-reflejo-enlace`,
+`agenda-eleccion-i2`, `reserva-g1-diseno` y `confirmacion-k2-al-cargar`. Una e2e
+que cuente los avisos de la campana con una confirmación de por medio verá uno
+más. El `afterAll` de H4 ya los borra.
+
+### AG-DT-229 — Reaplicar J4 después de L5 aborta
+
+**Estado:** aceptada (L5; como AG-DT-166 y AG-DT-197). El pre-vuelo de
+`20261122140000` admite 5 o 6 tipos en `avisos_clinica_tipo_check`, y tras
+`20261124160000` hay 7: reaplicar la carpeta sobre una base que ya las tiene hace
+abortar limpio a J4. En el orden de nombre no pasa nada.
+
+### AG-DT-230 — Quedan e2e con `http://localhost:3001` fijo
+
+**Estado:** aceptada (integración L). `e2e/reservaPublicaAyudas.ts` ya lee el
+`baseURL` del proyecto (`baseUrlPublica()`). Siguen con el puerto escrito:
+- `agenda-cache-rangos`, `-candado-gesto`, `-tiempo-real`, `-f-movimiento` y
+  `-reflejo-enlace`;
+- `confirmacion-k2-al-cargar` y `confirmacion-enlace`;
+- `recordatorios` y `reserva-k2-codigo`;
+- los dos `global-setup` y las mediciones.
+
+Mientras la batería corra contra :3001 no pasa nada. Con otro puerto, esas
+fallarían.
 
 ---
 
