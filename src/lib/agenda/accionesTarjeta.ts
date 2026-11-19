@@ -177,9 +177,9 @@ function disposicionPorEstado(cita: CitaTarjeta, puedeIniciar: boolean, o: Opcio
  *     «Editar»; confirmada: «Reagendar», «Editar», «No asistió»; cancelada: «Reasignar el
  *     horario» (de Angel: secundario de «Darle otra cita»); evento: «Editar», «Convertir»;
  *   · `confirmar`: lo que abre «Confirmar», cada una si aplica (como hoy);
- *   · `pie`: «No es una cita» (sólo por asignar, como hoy) y «Cancelar cita» / «Eliminar evento»;
- *   · `mas`: los tres puntos — «No asistió» en la agendada, «Editar» donde la rejilla no lo
- *     lleva, y los recordatorios de la confirmada (`recordatorio`).
+ *   · `pie`: «No es una cita» (sólo por asignar, como hoy) y «Cancelar cita» / «Eliminar evento».
+ * Los tres puntos no salen de aquí: abren siempre el formulario completo (tanda M, punto 4), que es
+ * donde quedan «No asistió» de la agendada, los recordatorios de la confirmada, el tipo y el resto.
  * Desde un aviso (J4, `destacar`), la principal que había encabeza la rejilla, como antes.
  */
 export type CeldaBurbuja = AccionTarjeta | 'menu-confirmar'
@@ -190,8 +190,6 @@ export interface DisposicionBurbuja {
   rejilla: CeldaBurbuja[]
   confirmar: { whatsapp: boolean; correo: boolean; marcar: boolean }
   pie: AccionTarjeta[]
-  mas: AccionTarjeta[]
-  recordatorio: { whatsapp: boolean; correo: boolean }
 }
 
 /** La línea de ayuda bajo el botón ancho (textos de la maqueta). */
@@ -232,20 +230,12 @@ export function burbujaDeTarjeta(cita: CitaTarjeta, puedeIniciar: boolean, o: Op
   }
   const hayConfirmar = confirmar.whatsapp || confirmar.correo || confirmar.marcar
   const rejilla = rejillaDeBurbuja(cita, d, o, hayConfirmar)
-  const mas: AccionTarjeta[] = []
-  if (cita.status === 'scheduled' && !evento && o.conConfirmar !== false) mas.push('no-asistio')
-  if (!rejilla.includes('editar')) mas.push('editar')
   return {
     principal: d.principal,
     ayuda: ayudaDeBurbuja(cita, d.principal),
     rejilla,
     confirmar: hayConfirmar ? confirmar : { whatsapp: false, correo: false, marcar: false },
     pie: [...(d.secundarias.includes('no-es-cita') ? ['no-es-cita' as const] : []), ...(d.peligro ? [d.peligro] : [])],
-    mas,
-    recordatorio: {
-      whatsapp: d.secundarias.includes('whatsapp') && cita.status === 'confirmed',
-      correo: Boolean(o.conCorreo) && cita.status === 'confirmed' && !evento,
-    },
   }
 }
 

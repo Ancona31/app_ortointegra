@@ -13,8 +13,9 @@ import { fechaHoraLocalAInstante } from '../src/lib/dates'
  *   · Agendada: «Iniciar consulta» a todo el ancho; «Confirmar» | «Reagendar» | «Editar» en
  *     una rejilla pareja (mismos anchos y altos); «Cancelar cita» aparte, en el pie. Márgenes
  *     iguales. «Confirmar» abre «Enviar por WhatsApp» (el logo de la app), «Enviar por correo» y
- *     «Marcar como confirmada». Los tres puntos sustituyen al engrane.
- *   · Confirmada: «Reagendar» | «Editar» | «No asistió»; los recordatorios en los tres puntos.
+ *     «Marcar como confirmada». Los tres puntos sustituyen al engrane (tanda M, punto 4: abren el
+ *     formulario completo, sin menú).
+ *   · Confirmada: «Reagendar» | «Editar» | «No asistió»; los recordatorios, en el formulario (15).
  *   · Atendida: SÓLO «Ver la consulta». Cancelada: «Darle otra cita» y «Reasignar el horario»;
  *     no asistió: sólo «Darle otra cita», que abre el alta de una cita NUEVA (mismo paciente,
  *     médico y consultorio, fecha enfocada) y deja la original como estaba.
@@ -30,9 +31,7 @@ import { fechaHoraLocalAInstante } from '../src/lib/dates'
  * sin `gridTemplateColumns` → «agendada» (rejilla pareja); `no-asistio` con
  * `'no_show'` cambiado por `'cancelled'` → «confirmada»; quitar `enConsultorio`
  * de `Info` → «etiqueta de huso»; sin el `else` que enfoca «Confirmar» al cerrar con Escape,
- * o `enColumna` siempre `false` → «agendada»; el panel de los tres puntos sin cerrarse al
- * recibir un mensaje (`alMensaje={setMensaje}`) → «confirmada»; `.ag-burbuja-mas` de vuelta a
- * `width: 252px` → «confirmada» (el recordatorio en dos líneas); quitar `vetoPorEstado` de la ruta → «17.3»;
+ * o `enColumna` siempre `false` → «agendada»; quitar `vetoPorEstado` de la ruta → «17.3»;
  * volver a editar la misma cita en «Darle otra cita» → «crea una cita NUEVA»;
  * `pideComprobarNota` siempre `false` → «nota ligada».
  */
@@ -153,37 +152,25 @@ test('agendada: orden, rejilla pareja (mismos anchos y altos), márgenes iguales
   await expect(opciones).toHaveCount(0)
   await expect(t).toBeVisible()
   await expect(b('Confirmar')).toBeFocused()
-  // Los tres puntos: observaciones, tipo, «No asistió» y, como dato, el consultorio.
+  // Tanda M, punto 4: los tres puntos abren el formulario completo, con el consultorio de la cita.
   await b('Más opciones de la cita').click()
-  const mas = t.getByRole('group', { name: 'Más opciones de la cita' })
-  await expect(mas.getByRole('button')).toHaveText([/^Observaciones/, /^Tipo de cita/, 'No asistió'])
-  await expect(mas).toContainText('Consultorio Centro (ficticio)')
+  const modal = modalCita(page, 'Editar cita')
+  await expect(modal).toBeVisible()
+  const consultorio = modal.locator('select').filter({ has: page.locator('option', { hasText: '— Selecciona consultorio —' }) })
+  await expect(consultorio.locator('option:checked')).toHaveText(/^Consultorio Centro \(ficticio\)/)
 })
 
 /* Tanda K, punto 21: «No asistió» de la rejilla de la confirmada manda el mismo PUT parcial
    que «Marcar como confirmada», con `no_show`. MUTACIÓN: `'no_show'` → `'cancelled'` en
    `ejecutarAccion` → rojo. */
-test('confirmada: Reagendar | Editar | No asistió, los recordatorios en los tres puntos, y «No asistió» manda PUT no_show', async ({ page }) => {
+test('confirmada: Reagendar | Editar | No asistió, y «No asistió» pregunta y manda PUT no_show', async ({ page }) => {
   test.skip(test.info().project.name !== 'escritorio', 'escritorio')
   const { id } = cita(MARTES, '11:00', 'Prueba 22', 'confirmed')
   const t = await abrirTarjeta(page, 'Prueba 22')
   expect(await acciones(t)).toEqual(['Iniciar consulta', 'Reagendar', 'Editar', 'No asistió', 'Cancelar cita'])
-  await t.getByRole('button', { name: 'Más opciones de la cita' }).click()
-  const mas = t.getByRole('group', { name: 'Más opciones de la cita' })
-  await expect(mas.getByRole('button', { name: 'Recordatorio por WhatsApp' })).toBeVisible()
-  // En los tres puntos el rótulo va en UNA línea (a 252 px de ancho, «WhatsApp» bajaba sola).
-  const lineas = await mas.getByRole('button', { name: 'Recordatorio por WhatsApp' }).evaluate(el => {
-    const r = document.createRange()
-    r.selectNodeContents(el.querySelector('span:last-of-type') ?? el)
-    return new Set([...r.getClientRects()].map(x => Math.round(x.top))).size
-  })
-  expect(lineas).toBe(1)
-  await expect(mas.getByRole('button', { name: 'Recordatorio por correo' })).toBeVisible()
-  await expect(mas.getByRole('button', { name: 'No asistió' })).toHaveCount(0)
-  // Lo que dice el envío no queda tapado: el panel se cierra y el mensaje sale bajo las casillas.
-  await mas.getByRole('button', { name: 'Recordatorio por correo' }).click()
-  await expect(mas).toHaveCount(0)
-  await expect(t.locator('.ag-lectura-mensaje')).not.toBeEmpty()
+  /* Tanda M, punto 4: sin menú de los tres puntos; los recordatorios de la confirmada están en el
+     formulario («punto 15», abajo). */
+  await expect(t.getByRole('group', { name: 'Más opciones de la cita' })).toHaveCount(0)
   /* Tanda L, punto 2 (AG-DT-192): pregunta antes, como «Cancelar cita»; «Cancelar» no manda nada.
      MUTACIÓN: quitar `'no-asistio'` de `pideConfirmacion` → rojo (no sale el aviso). */
   await t.getByRole('toolbar').getByRole('button', { name: 'No asistió', exact: true }).click()
@@ -334,8 +321,9 @@ test('nota ligada: una atendida con nota no cambia de estado ni se borra, con o 
     }
     expect(sqlLocal(`select status from public.appointments where id = :'id'`, { id })).toBe('attended')
   } finally {
+    /* Tanda M: la auditoría ya no se borra (reglas de la tanda M); sus filas se quedan. */
     sqlLocal(`begin; set local session_replication_role = replica;
-      delete from public.audit_log where registro_id = :'n'; delete from public.consultas where id = :'n'; commit;`, { n: nota })
+      delete from public.consultas where id = :'n'; commit;`, { n: nota })
   }
 })
 

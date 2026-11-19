@@ -1,5 +1,5 @@
 import { test, expect, type Locator, type Page } from '@playwright/test'
-import { CORREO, SESION, diaDeLaSemana, interruptorAgenda, modalCita, sqlLocal, tituloUnico } from './ayudas'
+import { CORREO, SESION, diaDeLaSemana, interruptorAgenda, sqlLocal, tituloUnico } from './ayudas'
 import { abrirAgendaV2, tarjetaLectura } from './interaccionesAyudas'
 import { crearCitaPorLigar, aparcarEnlacesVigentes, devolverEnlaces, limpiarReservasE2e, marcaE2e } from './reservaAyudas'
 import { fechaHoraLocalAInstante } from '../src/lib/dates'
@@ -10,13 +10,12 @@ import { fechaHoraLocalAInstante } from '../src/lib/dates'
  * el orden de la barra, la rejilla pareja, Confirmar y la cancelada, en `agenda-g3-tarjeta`).
  *   · procedencia: la «G» a color en la de Google; el eslabón, permanente, en la ligada por
  *     enlace; el expediente tachado con su aviso en la que no tiene expediente;
- *   · los tres puntos: Escape los cierra a ellos (no a la burbuja) y devuelve el foco;
- *     «Observaciones» abre el formulario; «No asistió» (agendada) manda PUT no_show.
+ *   · los tres puntos: desde la tanda M (punto 4) abren el formulario completo, sin menú; lo prueba
+ *     `agenda-m1-burbuja` (también «No asistió» de la agendada, ahora en el formulario).
  * Semana +6 (nadie más la usa).
  *
  * MUTACIONES (comprobadas en rojo, una por prueba):
  *   · `Procedencia` con `enlace = Boolean(cita.reserva_canal) && !cita.paciente_id` → «procedencia»;
- *   · `useDesplegado` sin `botonMas.current?.focus()` → «los tres puntos».
  */
 test.use({ storageState: SESION.adminA })
 
@@ -34,25 +33,13 @@ test.beforeEach(({}, info) => {
 test.afterAll(() => {
   try {
     limpiarReservasE2e(desde)
+    /* Tanda M: la auditoría ya no se borra (reglas de la tanda M); sus filas se quedan. */
     sqlLocal(`begin; set local session_replication_role = replica;
-      delete from public.audit_log where registro_id in (select id from public.appointments where google_event_id like 'falso-k5b-e2e-%');
       delete from public.appointments where google_event_id like 'falso-k5b-e2e-%'
          or id = any (string_to_array(:'ids', ',')::uuid[]); commit;`, { ids: creadas.join(',') || '00000000-0000-0000-0000-000000000000' })
   } finally { devolverEnlaces(aparcados); interruptorAgenda('A', false) }
 })
 
-/** Una agendada de admin.a con paciente y observaciones, por SQL. */
-function agendada(hora: string, apellidos: string): string {
-  const id = sqlLocal(`
-    insert into public.appointments (clinica_id, paciente_id, medico_id, consultorio_id, title, start_time, end_time, status, notes,
-           consultorio_nombre, consultorio_timezone, origen, gcal_sync_status)
-    select co.clinica_id, pa.id, co.medico_id, co.id, 'Paciente ' || pa.apellidos, :'ini'::timestamptz, :'ini'::timestamptz + interval '30 min',
-           'scheduled', 'Observación K5B', co.nombre, :'tz', 'spinus', 'synced'
-      from public.consultorios co join public.pacientes pa on pa.clinica_id = co.clinica_id and pa.apellidos = :'ap'
-     where co.nombre = 'Consultorio Centro (ficticio)' returning id`, { ini: fechaHoraLocalAInstante(MARTES, hora, TZ), ap: apellidos, tz: TZ })
-  creadas.push(id)
-  return id
-}
 function deGoogle(titulo: string, hora: string): void {
   sqlLocal(`
     insert into public.appointments (clinica_id, title, start_time, end_time, all_day, status, google_event_id,
@@ -98,37 +85,4 @@ test('procedencia: la «G» a color en la de Google, el eslabón en la ligada po
   await expect(t.locator('[data-burbuja-enlace]')).toHaveText('La apartó con tu enlace')
   await expect(t.locator('[data-burbuja-enlace] .ag-icono-enlace')).toBeVisible()
   await expect(t.getByRole('button', { name: /^Sin expediente/ })).toHaveCount(0)
-})
-
-test('los tres puntos: Escape los cierra a ellos y devuelve el foco; «Observaciones» abre el formulario; «No asistió» manda PUT no_show', async ({ page }) => {
-  const id = agendada('13:00', 'Prueba 04')
-  await aLaSemana(page)
-  let t = await abrir(page, 'Prueba 04')
-  const puntos = t.getByRole('button', { name: 'Más opciones de la cita', exact: true })
-  const mas = t.getByRole('group', { name: 'Más opciones de la cita' })
-  await puntos.click()
-  await expect(puntos).toHaveAttribute('aria-expanded', 'true')
-  await expect(mas.getByRole('button', { name: /^Observaciones/ })).toContainText('Observación K5B')
-  await mas.getByRole('button', { name: /^Tipo de cita/ }).focus()
-  await page.keyboard.press('Escape')
-  await expect(mas).toHaveCount(0)
-  await expect(t).toBeVisible()
-  await expect(puntos).toBeFocused()
-
-  await puntos.click()
-  await mas.getByRole('button', { name: /^Observaciones/ }).click()
-  const modal = modalCita(page, 'Editar cita')
-  await expect(modal).toBeVisible()
-  await modal.getByRole('button', { name: 'Cerrar' }).first().click()
-  await expect(modal).toHaveCount(0)
-
-  t = await abrir(page, 'Prueba 04')
-  await t.getByRole('button', { name: 'Más opciones de la cita', exact: true }).click()
-  const put = page.waitForResponse(r => r.url().includes(`/api/appointments/${id}`) && r.request().method() === 'PUT')
-  await t.getByRole('group', { name: 'Más opciones de la cita' }).getByRole('button', { name: 'No asistió', exact: true }).click()
-  /* Tanda L, punto 2 (AG-DT-192): desde los tres puntos también pregunta antes. */
-  await page.getByRole('dialog', { name: '¿Marcar que Paciente Prueba 04 no asistió? La cita se queda en la agenda como «No asistió».' })
-    .getByRole('button', { name: 'Aceptar' }).click()
-  expect((await put).request().postDataJSON()).toMatchObject({ status: 'no_show' })
-  await expect.poll(() => sqlLocal(`select status from public.appointments where id = :'id'`, { id })).toBe('no_show')
 })

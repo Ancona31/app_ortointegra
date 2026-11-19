@@ -9,7 +9,8 @@
  *   · `'no-asistio'` fuera de la rejilla de la confirmada → «confirmada»;
  *   · cancelada con `rejilla: []` → «cancelada»;
  *   · `confirmar.correo: Boolean(o.conCorreo)` sin mirar el estado → «Confirmar: cada una si aplica»;
- *   · `mas` sin `'no-asistio'` → «los tres puntos»;
+ *   · tanda M, punto 4: el panel de los tres puntos de vuelta (`aria-expanded` en el ⋮) → «los tres
+ *     puntos abren el formulario»; `Observaciones` sin `title` o pintada sin observaciones → «observaciones».
  *   · `conDestacada` sin aplicar (`disposicionDeTarjeta` → `disposicionPorEstado`) → «desde un aviso»;
  *   · `'no-es-cita': '¿No es una cita?'` → «textos»;
  *   · `Procedencia` con `enlace = !cita.paciente_id && …` → «eslabón permanente»;
@@ -36,11 +37,9 @@ describe('burbujaDeTarjeta: qué va en cada sitio', () => {
     expect(d.rejilla).toEqual(['menu-confirmar', 'reagendar', 'editar'])
     expect(d.pie).toEqual(['cancelar'])
   })
-  it('confirmada: Reagendar | Editar | No asistió; los recordatorios en los tres puntos', () => {
+  it('confirmada: Reagendar | Editar | No asistió (los recordatorios, en el formulario: tanda M, punto 4)', () => {
     const d = burbujaDeTarjeta({ ...CON, status: 'confirmed' }, true, TODO)
     expect(d.rejilla).toEqual(['reagendar', 'editar', 'no-asistio'])
-    expect(d.recordatorio).toEqual({ whatsapp: true, correo: true })
-    expect(d.mas).toEqual([])
   })
   it('cancelada: «Darle otra cita» de principal, «Reasignar el horario» de secundario y «Eliminar cita» en el pie (tanda L, punto 9); no asistió: sólo «Darle otra cita»', () => {
     const c = burbujaDeTarjeta({ ...CON, status: 'cancelled' }, true, TODO)
@@ -48,9 +47,9 @@ describe('burbujaDeTarjeta: qué va en cada sitio', () => {
     const n = burbujaDeTarjeta({ ...CON, status: 'no_show' }, true, TODO)
     expect(n).toMatchObject({ principal: 'reagendar-cita', rejilla: [], pie: [], ayuda: 'El paciente no llegó a esta cita.' })
   })
-  it('atendida: «Ver la consulta» (si puede abrir expedientes); «Editar» en los tres puntos', () => {
+  it('atendida: «Ver la consulta» (si puede abrir expedientes); editar, con los tres puntos', () => {
     const d = burbujaDeTarjeta({ ...CON, status: 'attended' }, true, { ...TODO, puedeVerExpediente: true })
-    expect(d).toMatchObject({ principal: 'ver-expediente', rejilla: [], pie: [], mas: ['editar'] })
+    expect(d).toMatchObject({ principal: 'ver-expediente', rejilla: [], pie: [] })
     expect(burbujaDeTarjeta({ ...CON, status: 'attended' }, true, TODO).principal).toBeNull()
   })
   it('Confirmar: cada una si aplica (WhatsApp, correo, marcar) y, sin ninguna, no hay «Confirmar»', () => {
@@ -60,9 +59,9 @@ describe('burbujaDeTarjeta: qué va en cada sitio', () => {
     expect(nada.rejilla).toEqual(['reagendar', 'editar'])
     expect(burbujaDeTarjeta({ ...CON, status: 'confirmed' }, true, TODO).confirmar).toEqual({ whatsapp: false, correo: false, marcar: false })
   })
-  it('los tres puntos: «No asistió» en la agendada; nunca en un evento', () => {
-    expect(burbujaDeTarjeta({ ...CON, status: 'scheduled' }, true).mas).toEqual(['no-asistio'])
-    expect(burbujaDeTarjeta({ ...EVENTO, status: 'scheduled' }, true).mas).toEqual([])
+  it('agendada: «No asistió» no está en la burbuja (tanda M, punto 4: queda en el formulario)', () => {
+    const d = burbujaDeTarjeta({ ...CON, status: 'scheduled' }, true, TODO)
+    expect([...d.rejilla, ...d.pie, d.principal]).not.toContain('no-asistio')
   })
   it('sin expediente (Google por asignar): «Ligar expediente e iniciar» con su ayuda; pie «No es una cita» | «Cancelar cita»', () => {
     const d = burbujaDeTarjeta({ ...POR_ASIGNAR, status: 'scheduled' }, true, TODO)
@@ -129,6 +128,24 @@ describe('lo que pinta', () => {
     expect(html).not.toContain('Configuración de la cita')
     expect(html).toContain('aria-label="Más opciones de la cita"')
     expect(html).toContain('aria-label="Cerrar"')
+  })
+  it('los tres puntos abren el formulario: un botón sin menú (ni `aria-expanded` ni panel)', () => {
+    const html = pintar({ notes: 'Algo' })
+    const puntos = html.match(/<button[^>]*aria-label="Más opciones de la cita"[^>]*>/)?.[0] ?? ''
+    expect(puntos).not.toBe('')
+    expect(puntos).not.toContain('aria-expanded')
+    expect(puntos).toContain('aria-haspopup="dialog"')
+    expect(html).not.toContain('role="group" aria-label="Más opciones de la cita"')
+    expect(html).not.toContain('Sin observaciones')
+    expect(html).not.toContain('Tipo de cita')
+  })
+  it('observaciones: una línea con el texto entero en el DOM y en `title`; sin observaciones, no hay línea', () => {
+    const larga = 'Trae sus radiografías de rodilla y la receta anterior; pidió que se le llame antes'
+    const html = pintar({ notes: `  ${larga}\n ` })
+    expect(html).toContain(`<p class="ag-burbuja-obs" title="${larga}" data-burbuja-obs="">`)
+    expect(html).toContain(`Observaciones: </span>${larga}</p>`)
+    expect(pintar({ notes: null })).not.toContain('ag-burbuja-obs')
+    expect(pintar({ notes: '   ' })).not.toContain('ag-burbuja-obs')
   })
   it('el pie de una por asignar dice «No es una cita», sin signos', () => {
     const html = pintar({ paciente_id: null, pacientes: null, google_asignacion: 'por_asignar', origen: 'google' })
