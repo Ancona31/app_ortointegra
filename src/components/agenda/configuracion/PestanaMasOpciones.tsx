@@ -20,7 +20,7 @@ import { ChevronRight } from 'lucide-react'
 import ConfirmacionRestablecer from '@/components/agenda/configuracion/ConfirmacionRestablecer'
 import { leerMotivoError } from '@/components/agenda/configuracion/leerMotivoError'
 import type { Avisar } from '@/components/agenda/configuracion/estadoAvisos'
-import { AYUDA, BOTON_TEXTO, PANEL } from '@/components/agenda/configuracion/estilosConfig'
+import { AVISO_SOLO_ADMIN, AYUDA, BOTON_TEXTO, PANEL, SOLO_ADMIN } from '@/components/agenda/configuracion/estilosConfig'
 import { frasearHistorial, type ContactoBloqueado } from '@/lib/reserva/gestionReserva'
 import { componerNombreMedicoCompleto } from '@/lib/nombreMedico'
 import type { MedicoConfig } from '@/lib/configApp'
@@ -129,7 +129,14 @@ export default function PestanaMasOpciones(p: Props) {
           <ChevronRight size={20} aria-hidden="true" className="flex-none text-[var(--ag-ink-600)]" />
         </button>
       )}
-      {!p.conEnlaces && !p.puedeAdministrar && <p className={`${AYUDA} py-[18px] sm:py-[16px]`}>No hay más opciones para tu cuenta.</p>}
+      {/* Tanda M (punto 15): quien no administra no puede «Empezar de nuevo» (`POST /api/agenda/restablecer`: 403). Lo ve sin
+          botón y con el aviso encima; el aviso no va arriba de la pestaña porque «Personas bloqueadas» sí lo gestiona. */}
+      {!p.puedeAdministrar && (
+        <div data-empezar-sin-permiso className="flex flex-col gap-[10px] py-[18px] sm:py-[16px]">
+          <p data-solo-admin className={AVISO_SOLO_ADMIN}>{SOLO_ADMIN}</p>
+          <TextoFila titulo="Empezar de nuevo" ayuda="Regresa todo a como venía y vuelve a hacer las 3 preguntas. Tus citas no se borran." />
+        </div>
+      )}
       {confirmando && <ConfirmacionRestablecer onCancelar={() => setConfirmando(false)} onHecho={() => { setConfirmando(false); p.alEmpezarDeNuevo() }} />}
     </div>
   )

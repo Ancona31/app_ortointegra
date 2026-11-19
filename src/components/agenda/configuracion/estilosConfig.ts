@@ -109,9 +109,17 @@ export function opcion(elegida: boolean): string {
 }
 
 /**
- * Tanda L, punto 16 de Angel: lo que ve quien NO administra la clínica en lo que no puede cambiar, una
- * vez por bloque (`data-solo-admin`). Sólo donde la ruta deja cambiar al administrador y a nadie más
- * (`canManageClinica`): el horario de la clínica y los avisos. No en los tipos de cita (cada médico
- * cambia los suyos) ni en el horario de un consultorio (sólo su dueño, tampoco el administrador).
+ * Lo que ve quien NO es el médico administrador en lo que no puede cambiar (`data-solo-admin`). Tanda L,
+ * punto 16, con el texto unificado de la tanda M (punto 15 de Angel), el mismo en la página y en el funnel.
+ * Dónde va (punto 15; la ruta lo niega: 403/404):
+ *   · la secretaria: al inicio de «Cuándo dan consulta», «Tipos de cita» y «Avisos», y en «Más opciones»
+ *     sobre «Empezar de nuevo» y no arriba del todo, porque ahí SÍ desbloquea personas;
+ *   · el médico invitado, en lo que no es suyo: la tarjeta del horario de la clínica, los tipos de cita de
+ *     los demás, «Avisos» y «Empezar de nuevo»; en el funnel, pasos 1 y 3.
+ * Una vez por sitio: si va al inicio de la pestaña, no se repite dentro.
  */
-export const SOLO_ADMIN = 'Solo el administrador de la clínica puede cambiar estas opciones.'
+export const SOLO_ADMIN = 'Solo el médico administrador puede cambiar estas opciones.'
+
+/** El aviso de `SOLO_ADMIN`: una caja azul claro con la letra en seminegrita, para que se vea (punto 15). */
+export const AVISO_SOLO_ADMIN =
+  'm-0 rounded-[10px] bg-[var(--ag-primary-bg-faint)] px-[14px] sm:px-[12px] py-[10px] text-[14px] sm:text-[13px] font-semibold leading-[1.5] text-[var(--ag-ink)]'

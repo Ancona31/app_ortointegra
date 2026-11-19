@@ -168,7 +168,7 @@ test('G2 · 9 · la médica invitada contesta SU duración (sólo suya), la camb
     await p.getByRole('button', { name: 'Continuar' }).click()
     await expect(p.getByRole('heading', { name: '¿Mandamos avisos por correo?' })).toBeVisible()
     // Los avisos son de la clínica: ella los ve, no los cambia.
-    await expect(p.getByText('Solo el administrador de la clínica puede cambiar estas opciones.')).toBeVisible()
+    await expect(p.getByText('Solo el médico administrador puede cambiar estas opciones.')).toBeVisible()
     await p.getByRole('button', { name: 'Terminar', exact: true }).click()
     await expect(p.getByRole('heading', { name: 'Tu agenda ya está lista' })).toBeVisible()
     await p.reload()

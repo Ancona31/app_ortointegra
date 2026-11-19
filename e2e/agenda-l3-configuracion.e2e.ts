@@ -15,11 +15,11 @@ import { aprobarAviso, emitirEnlace } from './reservaPublicaAyudas'
  * Corre en los dos proyectos (teléfono y escritorio). Lo que crea lo deshace (`sinPendientesAgenda`).
  *
  * Tanda M (M2): en computadora la escala es la del punto 2 (h1 18, controles de 40 px; ver
- * `agenda-m2-configuracion`).
+ * `agenda-m2-configuracion`), y la leyenda dice «Solo el médico administrador…» y va donde dice el punto 15.
  */
 
 const RUTA = '/agenda/configuracion'
-const LEYENDA = 'Solo el administrador de la clínica puede cambiar estas opciones.'
+const LEYENDA = 'Solo el médico administrador puede cambiar estas opciones.'
 /** Los tamaños de letra de `agendaPublica.css` que usa la configuración (ver `notas_l3.md`, escala). */
 const ESCALA = [11, 13, 13.5, 14, 15, 16, 18, 20]
 const PESTANAS_MEDICO = ['Tu enlace', 'Cuándo das consulta', 'Tu consulta', 'Avisos', 'Más opciones']
@@ -139,27 +139,32 @@ test.describe('la invitada', () => {
     await medirTodo(page, PESTANAS_MEDICO, info.project.name)
   })
 
-  test('16 · la leyenda, una vez en el horario de la clínica y en los avisos; en el funnel, en el paso 1 y en el 3', async ({ page }) => {
+  test('16 · la leyenda, una vez en el horario de la clínica, en los avisos y sobre «Empezar de nuevo»; en el funnel, en el paso 1 y en el 3', async ({ page }) => {
     await funnelEn(page, 1)
     await expect(page.locator('[data-solo-admin]')).toHaveCount(1)
-    await expect(page.locator('[data-solo-admin]')).toHaveText(new RegExp(`${LEYENDA.replace('.', '\\.')}$`))
+    await expect(page.locator('[data-solo-admin]')).toHaveText(LEYENDA)
     await funnelEn(page, 3)
     await expect(page.locator('[data-solo-admin]')).toHaveCount(1)
     await expect(page.locator('[data-solo-admin]')).toHaveText(LEYENDA)
     await page.evaluate(() => window.localStorage.clear())
     limpiezas.push(sinPendientesAgenda(CORREO.medicoA))
-    await leyendaEnPestanas(page, 'Cuándo das consulta')
+    await leyendaEnPestanas(page, 'Cuándo das consulta', true)
   })
 })
 
-/** En las pestañas: una leyenda en la tarjeta del horario de la clínica, una en «Avisos» y ninguna más. */
-async function leyendaEnPestanas(page: Page, horario: string): Promise<void> {
+/**
+ * En las pestañas: la leyenda una vez en el horario (en la tarjeta de la clínica para la invitada, al inicio de
+ * la pestaña para la secretaria: tanda M, punto 15), una en «Avisos» y una sobre «Empezar de nuevo». La de
+ * «Tipos de cita» (secretaria) y la de los tipos de los demás (invitada) las cuenta `agenda-m2-configuracion`.
+ */
+async function leyendaEnPestanas(page: Page, horario: string, enLaTarjeta: boolean): Promise<void> {
   await page.goto(RUTA)
   await pestanaConfig(page, horario)
-  await expect(page.locator('[data-horario-clinica] [data-solo-admin]')).toHaveText(LEYENDA)
+  await expect(page.locator('#config-panel-horario [data-solo-admin]')).toHaveText(LEYENDA)
+  await expect(page.locator('[data-horario-clinica] [data-solo-admin]')).toHaveCount(enLaTarjeta ? 1 : 0)
   await pestanaConfig(page, 'Avisos')
   await expect(page.locator('#config-panel-avisos [data-solo-admin]')).toHaveText(LEYENDA)
-  await expect(page.locator('[data-solo-admin]')).toHaveCount(2)
+  await expect(page.locator('#config-panel-mas [data-solo-admin]')).toHaveText(LEYENDA)
   await expect(page.getByText('Lo cambia quien administra la clínica.')).toHaveCount(0)
   await expect(page.getByText('Estos avisos los cambia quien administra la clínica.')).toHaveCount(0)
 }
@@ -172,8 +177,8 @@ test.describe('la secretaria', () => {
     await medirTodo(page, PESTANAS_SECRETARIA, info.project.name)
   })
 
-  test('16 · la leyenda, una vez en el horario de la clínica y una en los avisos', async ({ page }) => {
-    await leyendaEnPestanas(page, 'Cuándo dan consulta')
+  test('16 · la leyenda, una vez al inicio del horario, una en los avisos y una sobre «Empezar de nuevo»', async ({ page }) => {
+    await leyendaEnPestanas(page, 'Cuándo dan consulta', false)
   })
 
   test('17 · «Completar» del enlace de la invitada no le ofrece contestar la duración (sólo el médico o el administrador)', async ({ page, browser }) => {

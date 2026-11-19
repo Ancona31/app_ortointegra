@@ -17,7 +17,7 @@
  */
 import { useId, useState } from 'react'
 import Interruptor from '@/components/agenda/configuracion/Interruptor'
-import { AYUDA, BLOQUE, BOTON_CHICO, CAMPO_NUEVO, ERROR, ETIQUETA, SOLO_ADMIN, TARJETA, TITULO_BLOQUE } from '@/components/agenda/configuracion/estilosConfig'
+import { AVISO_SOLO_ADMIN, AYUDA, BLOQUE, BOTON_CHICO, CAMPO_NUEVO, ERROR, ETIQUETA, SOLO_ADMIN, TARJETA, TITULO_BLOQUE } from '@/components/agenda/configuracion/estilosConfig'
 import type { EstadoAvisos } from '@/components/agenda/configuracion/estadoAvisos'
 import { opcionesRecordatorio } from '@/lib/agenda/primeraVez'
 import { LIMITES_AJUSTES_AGENDA, type CampoAjusteAgenda } from '@/lib/agenda/ajustesAgenda'
@@ -152,16 +152,17 @@ export default function BloquesAvisos(p: Props) {
   if (p.variante === 'funnel') {
     return (
       <>
+        {/* Tanda M (punto 15): el aviso, al inicio y no al final, como en la pestaña. */}
+        {!p.puedeEditar && <p data-solo-admin className={AVISO_SOLO_ADMIN}>{SOLO_ADMIN}</p>}
         <div className={`${TARJETA} gap-[14px] sm:gap-[12px] px-[24px] sm:px-[20px] py-[22px] sm:py-[18px]`}><Recordatorio {...p} /></div>
         <div className={`${TARJETA} px-[24px] sm:px-[20px] py-[22px] sm:py-[18px]`}><AvisoClinica {...p} /></div>
         <div className={`${TARJETA} gap-[14px] sm:gap-[12px] px-[24px] sm:px-[20px] py-[22px] sm:py-[18px]`}><PlazosPlegados {...p} /></div>
-        {!p.puedeEditar && <p data-solo-admin className={`m-0 ${AYUDA}`}>{SOLO_ADMIN}</p>}
       </>
     )
   }
   return (
     <>
-      {!p.puedeEditar && <p data-solo-admin className={`m-0 ${AYUDA}`}>{SOLO_ADMIN}</p>}
+      {!p.puedeEditar && <p data-solo-admin className={AVISO_SOLO_ADMIN}>{SOLO_ADMIN}</p>}
       <div className={BLOQUE}><Recordatorio {...p} /></div>
       <div className={BLOQUE}><AvisoClinica {...p} /></div>
       <div className={BLOQUE}><PlazosAbiertos {...p} /></div>

@@ -23,7 +23,7 @@ import DialogoHorario from '@/components/agenda/configuracion/DialogoHorario'
 import { nombreHuso } from '@/components/agenda/configuracion/SelectorHuso'
 import { guardarHorarioClinica, guardarHorarioConsultorio, type CambiosConsultorio } from '@/components/agenda/configuracion/accionesConfig'
 import type { Avisar } from '@/components/agenda/configuracion/estadoAvisos'
-import { AYUDA, BOTON_CHICO, PANEL, SOLO_ADMIN, SUB_PANEL, TITULO_PANEL } from '@/components/agenda/configuracion/estilosConfig'
+import { AVISO_SOLO_ADMIN, AYUDA, BOTON_CHICO, PANEL, SOLO_ADMIN, SUB_PANEL, TITULO_PANEL } from '@/components/agenda/configuracion/estilosConfig'
 import { lineasHorario, textoHorario } from '@/lib/agenda/gruposHorario'
 import { horarioEfectivo } from '@/lib/agenda/disponibilidad'
 import type { ModoHorario } from '@/lib/agenda/primeraVez'
@@ -113,7 +113,8 @@ function TarjetaClinica({ p, alAbrir }: { p: Props; alAbrir: () => void }) {
         <span className="text-[13.5px] sm:text-[13px] leading-[1.5] text-[var(--ag-ink-600)]">
           Lo usan los consultorios que dicen «Igual que la clínica».
         </span>
-        {!p.puedeAdministrar && <span data-solo-admin className={AYUDA}>{SOLO_ADMIN}</span>}
+        {/* Tanda M (punto 15): en la tarjeta, sólo el médico invitado (sus consultorios sí los cambia); la secretaria lo lee al inicio. */}
+        {p.esMedico && !p.puedeAdministrar && <span data-solo-admin className={AVISO_SOLO_ADMIN}>{SOLO_ADMIN}</span>}
       </div>
       {p.puedeAdministrar && p.horarioClinica && (
         <button type="button" onClick={alAbrir} className={BOTON_CHICO} aria-label="Cambiar horario de la clínica">Cambiar horario</button>
@@ -151,6 +152,8 @@ export default function PestanaHorario(p: Props) {
         <h2 className={TITULO_PANEL}>Cuándo das consulta</h2>
         <p className={SUB_PANEL}>Tus pacientes solo pueden pedir cita en estos días y horas.</p>
       </div>
+      {/* Tanda M (punto 15): la secretaria no cambia nada de esta pestaña (`PUT /api/me/horario` 403; consultorios, 404). */}
+      {!p.esMedico && <p data-solo-admin className={AVISO_SOLO_ADMIN}>{SOLO_ADMIN}</p>}
       <TarjetaClinica p={p} alAbrir={() => setAbierto({ tipo: 'clinica' })} />
       {!p.consultorios || !clinica ? <p className={AYUDA}>{p.fallo ? 'No se pudieron cargar los consultorios. Recarga la página.' : 'Cargando los consultorios…'}</p>
         : p.consultorios.length === 0 ? <p className={AYUDA}>Aún no hay consultorios activos.</p>

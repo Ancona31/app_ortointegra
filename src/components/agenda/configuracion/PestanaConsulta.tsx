@@ -22,7 +22,7 @@ import DuracionEnConsultorio from '@/components/agenda/configuracion/DuracionEnC
 import FormTipoCita, { type DatosTipoCita } from '@/components/agenda/configuracion/FormTipoCita'
 import { crearTipo, editarTipo, guardarDuracion } from '@/components/agenda/configuracion/accionesConfig'
 import type { Avisar } from '@/components/agenda/configuracion/estadoAvisos'
-import { AYUDA, BLOQUE, BOTON_TEXTO, BOTON_TEXTO_ROJO, CAMPO_NUEVO, ERROR, FILA_GRIS, opcion, PANEL, SUB_PANEL, TITULO_BLOQUE, TITULO_PANEL } from '@/components/agenda/configuracion/estilosConfig'
+import { AVISO_SOLO_ADMIN, AYUDA, BLOQUE, BOTON_TEXTO, BOTON_TEXTO_ROJO, CAMPO_NUEVO, ERROR, FILA_GRIS, opcion, PANEL, SOLO_ADMIN, SUB_PANEL, TITULO_BLOQUE, TITULO_PANEL } from '@/components/agenda/configuracion/estilosConfig'
 import { DURACIONES } from '@/components/agenda/configuracion/PasoDuracion'
 import { componerNombreMedicoCompleto } from '@/lib/nombreMedico'
 import type { TipoCita } from '@/lib/agenda/tiposCita'
@@ -126,6 +126,8 @@ export default function PestanaConsulta(p: Props) {
         <h2 className={TITULO_PANEL}>{p.esMedico ? 'Tu consulta' : 'Tipos de cita'}</h2>
         {!p.esMedico && <p className={SUB_PANEL}>La duración de la consulta de cada médico y los demás tipos de cita de la clínica.</p>}
       </div>
+      {/* Tanda M (punto 15): la secretaria no cambia ningún tipo (`/api/agenda/tipos-cita`: 403). */}
+      {!p.esMedico && <p data-solo-admin className={AVISO_SOLO_ADMIN}>{SOLO_ADMIN}</p>}
       {!p.tipos ? <p className={AYUDA}>No se pudieron leer los tipos de cita. Recarga la página.</p> : (
         <>
           {p.esMedico && <MiDuracion p={p} mia={mia} />}
@@ -166,7 +168,10 @@ function OtrosTipos({ p, tipos }: { p: Props; tipos: readonly TipoCita[] }) {
   const [error, setError] = useState<string | null>(null)
   const puedeCambiar = (t: TipoCita) => p.puedeAdministrar || (p.esMedico && t.medico_id === p.usuarioId)
   const otros = tipos.filter(t => !(t.principal && t.medico_id === p.usuarioId))
-  const activos = otros.filter(t => t.activo)
+  /* Tanda M (punto 15): el médico invitado ve primero los suyos y, tras el aviso, los de los demás, que no cambia
+     (la ruta da 404). El administrador los cambia todos; la secretaria lee el aviso al inicio de la pestaña. */
+  const activos = otros.filter(t => t.activo && puedeCambiar(t))
+  const ajenos = otros.filter(t => t.activo && !puedeCambiar(t))
   const quitados = otros.filter(t => !t.activo && puedeCambiar(t))
   async function activo(t: TipoCita, valor: boolean): Promise<void> {
     setOcupado(t.id)
@@ -196,6 +201,8 @@ function OtrosTipos({ p, tipos }: { p: Props; tipos: readonly TipoCita[] }) {
       {activos.map(fila)}
       {error && <p role="alert" className={ERROR}>{error}</p>}
       {(p.esMedico || p.puedeAdministrar) && <AgregarTipo p={p} />}
+      {p.esMedico && ajenos.length > 0 && <p data-solo-admin className={AVISO_SOLO_ADMIN}>{SOLO_ADMIN}</p>}
+      {ajenos.map(fila)}
       {quitados.length > 0 && <Quitados tipos={quitados} fila={fila} />}
     </div>
   )

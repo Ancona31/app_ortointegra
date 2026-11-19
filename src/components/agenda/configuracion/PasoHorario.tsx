@@ -8,7 +8,7 @@
  * (`PrimeraVez`), que es quien tiene lo elegido.
  */
 import EditorDias from '@/components/agenda/configuracion/EditorDias'
-import { AYUDA, SOLO_ADMIN, SUB_PASO, TARJETA, TITULO_PASO } from '@/components/agenda/configuracion/estilosConfig'
+import { AVISO_SOLO_ADMIN, AYUDA, SOLO_ADMIN, SUB_PASO, TARJETA, TITULO_PASO } from '@/components/agenda/configuracion/estilosConfig'
 import { textoHorario } from '@/lib/agenda/gruposHorario'
 import type { ModoHorario } from '@/lib/agenda/primeraVez'
 import type { Horario } from '@/lib/configApp'
@@ -68,12 +68,9 @@ export default function PasoHorario({ consultorios, elecciones, horarioClinica, 
         const e = elecciones[c.id]
         return e ? <TarjetaConsultorio key={c.id} nombre={c.nombre} eleccion={e} textoClinica={textoClinica} alCambiar={x => alCambiar(c.id, x)} /> : null
       })}
-      {!puedeAdministrar && (
-        <p className={`m-0 ${AYUDA}`}>
-          El horario de la clínica es {textoClinica || 'sin días de consulta'}.{' '}
-          <span data-solo-admin>{SOLO_ADMIN}</span>
-        </p>
-      )}
+      {!puedeAdministrar && <p className={`m-0 ${AYUDA}`}>El horario de la clínica es {textoClinica || 'sin días de consulta'}.</p>}
+      {/* Tanda M (punto 15): el aviso, en su caja, bajo el horario de la clínica que no puede cambiar. */}
+      {!puedeAdministrar && <p data-solo-admin className={AVISO_SOLO_ADMIN}>{SOLO_ADMIN}</p>}
     </section>
   )
 }
