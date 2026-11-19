@@ -82,6 +82,9 @@ test.afterAll(() => {
        or registro_id in (select id from public.cita_confirmaciones where appointment_id in (select id from _c));
     delete from public.cita_correos where appointment_id in (select id from _c);
     delete from public.cita_confirmaciones where appointment_id in (select id from _c);
+    -- Los avisos de la campana de estas citas (I5: la cancelación; tanda L: la confirmación del paciente).
+    delete from public.audit_log where registro_id in (select id from public.avisos_clinica where cita_id in (select id from _c));
+    delete from public.avisos_clinica where cita_id in (select id from _c);
     delete from public.appointments where id in (select id from _c);
     delete from public.pacientes where id = any(string_to_array(:'pacientes', ',')::uuid[]);
     commit;`, { citas: citas.join(','), pacientes: pacientes.join(',') })

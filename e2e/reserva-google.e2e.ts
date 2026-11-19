@@ -233,11 +233,13 @@ test.beforeAll(async ({}, info) => {
   await admin.dispose()
   ultimaBuenaHace(0)
   const { codigo } = emitirEnlace(e, 'unico')
-  // Un turno por día, de dos semanas a partir de dentro de dos semanas (D10 usa la tercera).
+  // Un turno por día, de tres semanas a partir de dentro de dos semanas (D10 usa la tercera).
   const r = await turnos(codigo, dentroDe(14))
   const r2 = await turnos(codigo, dentroDe(21))
+  // Tanda L (L5): una semana más, que con la prueba del punto 18 son 13 las que gastan turno.
+  const r3 = await turnos(codigo, dentroDe(28))
   const porDia = new Map<string, Turno>()
-  for (const t of [...r.turnos, ...r2.turnos]) {
+  for (const t of [...r.turnos, ...r2.turnos, ...r3.turnos]) {
     const dia = t.inicio.slice(0, 10)
     if (!porDia.has(dia)) porDia.set(dia, t)
   }
@@ -515,6 +517,121 @@ test('J10 · reserva movida en Google: un aviso por intento; pulsarlo abre la ta
   await expect(reagendar).toHaveClass(/ag-burbuja-cta/)
   await expect(reagendar).toBeFocused()
   await expect.poll(avisos).toBe('1|0')
+})
+
+/* Tanda L, punto 18 (L5): lo que Angel no había visto, de punta a punta EN PANTALLA. Una cita
+   reservada por enlace y movida en Google se queda en su hora EN LA REJILLA de Spinus (la misma
+   posición antes y después del sondeo, también tras recargar), Google vuelve a la hora de Spinus
+   y la campana trae el aviso con «Reagendar» destacado. Deja las capturas del antes y el después
+   en la carpeta de salida de la prueba (`p18-*.png`), y el evento movido del Google falso, que no
+   tiene pantalla, como una página con su JSON. Mutación en rojo (comprobada): el disparador
+   `trg_appointments_proteger_eleccion` apagado (la base acepta la hora de Google y la cita baja
+   en la rejilla: falla la comparación de la altura, que va antes que la de la base). */
+test('L5 · punto 18: reserva por enlace movida en Google, en pantalla: la cita se queda en su hora y el aviso trae «Reagendar» destacado', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 })
+  /* Las capturas, cuando la animación de abrir ya terminó (sólo para que se lean; no deciden nada). */
+  const foto = async (nombre: string): Promise<void> => {
+    await page.waitForTimeout(700)
+    try { await page.screenshot({ path: test.info().outputPath(`${nombre}.png`) }) } catch { /* captura de apoyo */ }
+  }
+  const fotoCita = async (nombre: string): Promise<void> => {
+    try { await enRejilla.screenshot({ path: test.info().outputPath(`${nombre}.png`) }) } catch { /* captura de apoyo */ }
+  }
+  const t = turnoNuevo()
+  ultimaBuenaHace(0)
+  const r = await reservarEn(emitirEnlace(e, 'unico').codigo, t.inicio)
+  expect(r.status, JSON.stringify(r.cuerpo)).toBe(201)
+  const reserva = citaPorNombre(r.nombre)
+  const evento = (): string => sqlLocal(`select coalesce(google_event_id, '') from public.appointments where id = :'r'`, { r: reserva })
+  await expect.poll(evento, { timeout: 60_000 }).not.toBe('')
+  const ev = evento()
+  const tarjeta = page.getByRole('dialog').filter({ has: page.getByRole('button', { name: 'Más opciones de la cita', exact: true }) })
+  const enRejilla = page.locator(`.fc-timegrid-event:has([data-cita-id="${reserva}"])`)
+  /* Revisión: la posición se mide contra la PRIMERA fila de la rejilla (las dos dentro del mismo
+     desplazamiento), no contra la ventana: así no depende de cuánto se haya desplazado. Y se lee
+     hasta que dos lecturas seguidas coinciden (la tarjeta puede estar a media animación). */
+  const relativa = async (): Promise<number> => {
+    const [c, fila0] = [await enRejilla.boundingBox(), await page.locator('.fc-timegrid-slots tr').first().boundingBox()]
+    if (!c || !fila0) throw new Error('la cita no está pintada en la rejilla')
+    return Math.round(c.y - fila0.y)
+  }
+  /** Abre la agenda en la semana de la cita (`?cita=` la abre en su sitio) y devuelve su altura en la rejilla. */
+  const verEnRejilla = async (): Promise<number> => {
+    await page.goto(`/agenda?cita=${reserva}`)
+    await expect(tarjeta).toBeVisible({ timeout: 120_000 })
+    await page.keyboard.press('Escape')
+    await expect(tarjeta).toHaveCount(0)
+    await enRejilla.scrollIntoViewIfNeeded()
+    let previa = Number.NaN
+    await expect.poll(async () => { const y = await relativa(); const igual = y === previa; previa = y; return igual }, { timeout: 10_000 }).toBe(true)
+    return previa
+  }
+
+  // Antes: la cita en su hora, en Spinus.
+  const yAntes = await verEnRejilla()
+  await foto('p18-1-spinus-antes-1280')
+  await fotoCita('p18-1b-la-cita-antes-1280')
+
+  // Google la mueve una hora. El Google falso no tiene pantalla: su evento, como página.
+  const movida = Date.parse(t.inicio) + 60 * 60_000
+  g().modificar(ev, { start: { dateTime: new Date(movida).toISOString(), timeZone: TZ }, end: { dateTime: new Date(movida + 30 * 60_000).toISOString(), timeZone: TZ } })
+  const hora = (iso: string | null | undefined): string =>
+    new Intl.DateTimeFormat('es-MX', { timeZone: TZ, dateStyle: 'full', timeStyle: 'short' }).format(new Date(iso ?? 0))
+  const verGoogle = async (titulo: string, nombre: string): Promise<void> => {
+    const g1 = g().eventos.get(ev)
+    const pg = await page.context().newPage()
+    try {
+      await pg.setViewportSize({ width: 1280, height: 800 })
+      const esc = (x: string): string => x.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c] ?? c)
+      await pg.setContent(`<meta charset="utf-8"><body style="font:16px system-ui;margin:24px"><h2>${esc(titulo)}</h2>
+        <p><b>Inicio:</b> ${esc(hora(g1?.start?.dateTime))}<br><b>Fin:</b> ${esc(hora(g1?.end?.dateTime))}</p>
+        <pre style="background:#f4f4f4;padding:12px;white-space:pre-wrap">${esc(JSON.stringify(g1, null, 2))}</pre></body>`)
+      await pg.screenshot({ path: test.info().outputPath(`${nombre}.png`) })
+    } catch { /* captura de apoyo */ } finally {
+      await pg.close()
+    }
+  }
+  await verGoogle('Google falso · el evento, movido una hora', 'p18-2-google-movido')
+
+  // La pasada. Primero LA PANTALLA (lo que pidió Angel, y lo que la mutación tiene que tumbar):
+  // la cita sigue en su hora, a la misma altura de la rejilla. Después, la base y Google.
+  ultimaBuenaHace(120)
+  expect(((await (await page.request.post('/api/google/sync')).json()) as { estado: string }).estado).toBe('ok')
+  expect(Math.abs((await verEnRejilla()) - yAntes)).toBeLessThan(2)
+  await foto('p18-4-spinus-despues-1280')
+  await fotoCita('p18-4b-la-cita-despues-1280')
+  expect(sqlLocal(`select (start_time = :'i'::timestamptz)::text from public.appointments where id = :'r'`, { r: reserva, i: t.inicio })).toBe('true')
+  expect(Date.parse(g().eventos.get(ev)?.start?.dateTime ?? '')).toBe(Date.parse(t.inicio))
+  await verGoogle('Google falso · tras la pasada, de vuelta a la hora de Spinus', 'p18-3-google-restablecido')
+
+  // Y la campana trae el aviso.
+  await page.locator('[data-campana]').first().click()
+  const panel = page.getByRole('dialog', { name: 'Por confirmar y avisos' })
+  await panel.getByRole('tab', { name: /^Avisos/ }).click()
+  const fila = panel.locator(`[data-aviso-tipo="google_movimiento_rechazado"][data-aviso-cita="${reserva}"]`)
+  await expect(fila).toBeVisible({ timeout: 30_000 })
+  await foto('p18-5-aviso-1280')
+  await fila.click()
+  const reagendar = tarjeta.getByRole('button', { name: 'Reagendar', exact: true })
+  await expect(reagendar).toHaveClass(/ag-burbuja-cta/)
+  await expect(reagendar).toBeFocused()
+  await foto('p18-6-reagendar-destacado-1280')
+
+  // En el teléfono, otro intento (revisado el aviso, no se puede «des-revisar»: nace otro, J4).
+  const otra = Date.parse(t.inicio) + 90 * 60_000
+  g().modificar(ev, { start: { dateTime: new Date(otra).toISOString(), timeZone: TZ }, end: { dateTime: new Date(otra + 30 * 60_000).toISOString(), timeZone: TZ } })
+  ultimaBuenaHace(120)
+  expect(((await (await page.request.post('/api/google/sync')).json()) as { estado: string }).estado).toBe('ok')
+  expect(sqlLocal(`select (start_time = :'i'::timestamptz)::text from public.appointments where id = :'r'`, { r: reserva, i: t.inicio })).toBe('true')
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/agenda')
+  await page.locator('.ag-banda-movil [data-campana]').click({ timeout: 120_000 })
+  await panel.getByRole('tab', { name: /^Avisos/ }).click()
+  await expect(fila).toBeVisible({ timeout: 30_000 })
+  await foto('p18-5-aviso-390')
+  await fila.click()
+  await expect(reagendar).toHaveClass(/ag-burbuja-cta/)
+  await foto('p18-6-reagendar-destacado-390')
 })
 
 /* Tanda J, punto 11: con la v2, lo que viene de Google deja el morado. El evento importado
