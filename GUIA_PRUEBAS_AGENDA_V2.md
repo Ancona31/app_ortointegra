@@ -5744,18 +5744,25 @@ interruptor de la v2; los correos y la reserva son las páginas públicas de sie
 - **M4:** «Tu correo ya está verificado» en verde, «Salir» al terminar la reserva, las pruebas sin
   depender del huso y sin borrar auditoría (puntos 7, 8, 16 y 17).
 - **M5:** los correos de la agenda con las maquetas (puntos 9 a 14).
-- **Integración:** la migración aparte que impide vaciar el `audit_log` (tu encargo).
+- **Integración:** la migración aparte que impide vaciar el `audit_log` (tu encargo), y tus
+  decisiones del 2026-11-19: los avisos de la secretaria con texto propio en dos pestañas, el
+  recordatorio y el aviso de cambio saludando por nombre, el pie del correo más oscuro (con una
+  migración pequeña de la agenda, `20261125180000`), la barra y el plazo de cancelar como estaban.
 
 **Antes de empezar:**
 
-- **No hagas P5** (reiniciar la base): vaciaría el `audit_log` local, y pediste no volver a borrarlo.
-  La base ya tiene las **49** migraciones (las 48 de la tanda L más
-  `20261125170000_audit_log_sin_truncate.sql`, que no es de la agenda). La consulta de P5 debe
-  responder `49|20261125170000`.
-- Si tu base no la tuviera, aplícala sola (no borra nada):
+- **P5 (reiniciar la base) ya se puede hacer**: dijiste que `supabase db reset --local` crea una
+  base de pruebas nueva y no es borrar auditoría. En esta integración **no se hizo** (el sistema de
+  permisos de la sesión lo bloqueó), así que la base que dejé es la de la tanda L más dos migraciones.
+  Si reinicias, P5 aplica las **50** y su consulta debe responder `50|20261125180000`.
+- Si no reinicias, la base ya tiene las **50** (las 48 de la tanda L,
+  `20261125170000_audit_log_sin_truncate.sql`, que no es de la agenda, y
+  `20261125180000_agenda_m_saludo_recordatorio.sql`): la consulta de P5 responde lo mismo. Si a tu
+  base le faltara alguna, aplícalas solas y en ese orden (no borran nada):
 
   ```bash
   docker exec -i supabase_db_app_ortointegra psql -U postgres -d postgres -v ON_ERROR_STOP=1 < supabase/migrations/20261125170000_audit_log_sin_truncate.sql
+  docker exec -i supabase_db_app_ortointegra psql -U postgres -d postgres -v ON_ERROR_STOP=1 < supabase/migrations/20261125180000_agenda_m_saludo_recordatorio.sql
   ```
 
   Al final, una tabla con «OK» en las filas 1 a 5.
@@ -5862,8 +5869,9 @@ pestañas; luego hago lo mismo en el teléfono.
 «Cuándo dan consulta», «Tipos de cita», «Avisos» y «Más opciones».
 
 **Qué debo ver:**
-- al principio de las tres primeras, una caja azul claro con «Solo el médico administrador puede
-  cambiar estas opciones.»;
+- al principio de «Cuándo dan consulta», una caja azul claro con «Cada médico cambia el horario de
+  sus consultorios.»; en «Tipos de cita», «Cada médico cambia sus tipos de cita.»; en «Avisos»,
+  «Solo el médico administrador puede cambiar estas opciones.» (tu decisión del 2026-11-19);
 - ningún botón para cambiar el horario de la clínica, los tipos ni los avisos;
 - en «Más opciones», primero «Personas bloqueadas» (que sí puede usar, sin aviso encima) y después la
   caja azul sobre «Empezar de nuevo», que no es un botón;
@@ -5903,6 +5911,9 @@ Semana y en Mes.
 - en el Mes a 1366, una fila con «noviembre de 2026» entero.
 
 **Si falla, significa que…** la barra vuelve a partirse en trozos o recorta el nombre.
+
+Esta es la forma que decidiste (2026-11-19): dos filas ordenadas hasta 1359 y una desde 1360. Ya no
+está pendiente.
 
 #### M3-2. «Bloqueo» vuelve a «Nueva cita»
 
@@ -6035,7 +6046,10 @@ Ten Mailpit abierto (ver 1.5). Usa la Clínica Semilla A con `admin.a@semilla.sp
 - **Qué hago:** dejo que salga el recordatorio de una cita sin confirmar y el de una ya confirmada. Reagendo
   desde la agenda una cita que se reservó por enlace.
 - **Qué debo ver:**
-  - Las tres con el mismo aspecto, saludando «Hola:».
+  - Las tres con el mismo aspecto, saludando por el nombre: «Hola, <nombre>:», con el nombre del
+    paciente ligado o, si la cita sigue por ligar, el que tecleó quien reservó. «Hola:» sólo si no
+    hay ninguno (tu decisión del 2026-11-19).
+  - Al pie, «Enviado con Spinus» se lee más oscuro que antes (#52627a; 5,47:1 sobre el fondo).
   - El recordatorio sin confirmar: «Pendiente de confirmar» y los dos botones.
   - La ya confirmada: «✓ Cita confirmada» y sólo «No podré asistir».
   - El aviso de cambio: «Cita reagendada», «Tu cita cambió» y la fecha nueva.
@@ -6093,11 +6107,25 @@ elijo «Bloqueo» en «Nueva cita».
 
 **Si falla, significa que…** el cambio de M1 en la burbuja y el de M3 en el alta se pisan.
 
+#### M-INT-3. El nombre del recordatorio no sale de otra clínica
+
+**Qué hago:** en la terminal, desde la carpeta de la agenda, corro la prueba de la migración del
+saludo (todo va en una transacción que se deshace):
+
+```bash
+docker exec -i supabase_db_app_ortointegra psql -U postgres -d postgres -v ON_ERROR_STOP=1 -q -o /dev/null < supabase/pruebas-sql/m_saludo_recordatorio.sql && echo VERDE
+```
+
+**Qué debo ver:** `VERDE`, sin ningún `ERROR`.
+
+**Si falla, significa que…** falta la migración `20261125180000`, o la función devuelve un nombre de
+otra clínica, o la puede llamar alguien con sesión.
+
 ### Qué repetir tras la tanda M
 
-Antes de nada, **no hagas P5**: comprueba con su consulta que la base responde
-`49|20261125170000` (si no, aplica la migración sola, como dice el principio de esta sección), y
-después P6 a P8. Luego, las nuevas de esta sección, y éstas, que ya existían y cambian o hay que
+Antes de nada, P5 (o, si no reinicias, sólo su consulta): la base debe responder
+`50|20261125180000` (si no, aplica las dos migraciones solas, como dice el principio de esta
+sección), y después P6 a P8. Luego, las nuevas de esta sección, y éstas, que ya existían y cambian o hay que
 repetir.
 
 **La burbuja (tandas F, G, K y L)**
@@ -6116,8 +6144,9 @@ repetir.
 - **F22, E10, T1-6 y T1-7:** repetir en computadora: tocan la burbuja y su posición.
 
 **La configuración (tandas B, H, J, K y L)**
-- **L3-16:** **cambia.** El texto es «Solo el médico administrador puede cambiar estas opciones.»,
-  en una caja azul; a la secretaria le sale al inicio de la pestaña y no dentro de la tarjeta (M2-2).
+- **L3-16:** **cambia.** A la secretaria, al inicio de «Cuándo dan consulta» y no dentro de la
+  tarjeta, en una caja azul, «Cada médico cambia el horario de sus consultorios.» (M2-2); en
+  «Avisos» y en lo de la invitada, «Solo el médico administrador puede cambiar estas opciones.».
 - **L3-12:** **cambia.** En computadora el título ya no crece a 20 y los controles miden 40, no 44
   (M2-1). En el teléfono, igual.
 - **K3-11, J5-5, B2, B3 y H2-5:** el texto y la caja nuevos donde antes salía la frase de la tanda L.
@@ -6145,6 +6174,8 @@ repetir.
   código ya no va en «letra de 32» y el pie es «Este es un mensaje automático… Enviado con Spinus».
 - **E1, E3, E8, G3-1, I1-4, I2-10, I5-9, K2-1, K2-3 y L4-4:** repetir. Mismos pasos; sólo cambia el
   aspecto del correo (M5-2 a M5-8).
+- **El recordatorio (E4) y el aviso de cambio (I2):** **cambia** el saludo: «Hola, <nombre>:» en vez
+  de «Hola:» (M5-6, tu decisión del 2026-11-19).
 
 **Apagado**
 - **X1 y X7:** nada de M1 a M3 se ve: ni la burbuja nueva, ni «Bloqueo» en «Nueva cita», ni la barra
@@ -6948,6 +6979,7 @@ Marca cada una al pasarla. Si una falla, anota el número y qué viste.
 - [ ] M5-9. En el teléfono y en modo oscuro
 - [ ] M-INT-1. El `audit_log` no se puede vaciar
 - [ ] M-INT-2. La burbuja y «Nueva cita» conviven
+- [ ] M-INT-3. El nombre del recordatorio no sale de otra clínica
 
 **Seguridad**
 - [ ] S1. La Clínica B no ve la A

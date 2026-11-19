@@ -1791,12 +1791,13 @@ los worktrees `-agenda-t5`, `-agenda-t3`, `-agenda-b56`, `-agenda-menores` y
 M2, M3, M4, M5 (`e88d928`, `87ca068`, `5e1c50d`, `3c23f39` y `108f80c`).
 **Ninguna de las cinco trae migración.** La integración añade una, por encargo
 de Angel, que **no es de la agenda**: `20261125170000_audit_log_sin_truncate.sql`
-(`8bd6ba8`).
+(`8bd6ba8`). Después, por las decisiones de Angel del mismo día, otra de la
+agenda: `20261125180000_agenda_m_saludo_recordatorio.sql` (`e86d1be`, §15.8).
 
 ### 15.1 El conjunto, sin reiniciar
 
-`ls supabase/migrations/*.sql` = **49**: las 5 de `main`, las 43 de la agenda
-(sin cambios desde la tanda L) y la del TRUNCATE.
+`ls supabase/migrations/*.sql` = **50**: las 5 de `main`, las 43 de la agenda
+de hasta la tanda L (sin cambios), la del TRUNCATE y la del saludo (§15.8).
 
 **Esta vez la base NO se reinició** (orden de Angel: «No vuelvas a borrar filas
 de audit_log, tampoco en local ni de pruebas»; `supabase db reset` vaciaría el
@@ -1810,6 +1811,13 @@ reinicio; sobre esa base se aplicó sólo la nueva, bajo el flock:
 3. tras la auditoría, una tercera con el post-vuelo nuevo: OK;
 4. registrada a mano en `supabase_migrations.schema_migrations`
    (`20261125170000`, `audit_log_sin_truncate`).
+
+Más tarde Angel aclaró, vía el coordinador, que el reinicio local está
+permitido («crea una base de pruebas nueva; no es borrar auditoría»). **Se
+intentó y el sistema de permisos de la sesión lo denegó**, así que la base sigue
+siendo la de la tanda L más estas dos. Las tablas que había que respaldar
+(`consultas`, `documentos`, `addendums` y `agenda_bloqueos`) tenían 0 filas.
+`schema_migrations`: **50**, la última `20261125180000`.
 
 `audit_log`: 65 036 filas antes de aplicarla y 65 036 después de cada pasada
 (al aplicarla, 2026-11-19 ~15:40 UTC; la cifra crece después con la actividad
@@ -1869,8 +1877,8 @@ necesita EXECUTE de quien hace el TRUNCATE: PostgreSQL lo comprueba al crear el
 disparador, no al dispararlo.
 
 La lista del caso 3 de `p1_permisos_funciones.sql` (`feature/limites-ajustables`)
-**sigue en 50**, idéntica a la del §14.4: ninguna de las cinco ramas de M ni la
-integración añade o quita funciones. **No se comprobó en una base combinada**:
+pasa a **51**: la del §14.4 más `cita_nombre_saludo(uuid,uuid)` (§15.8), que no
+tiene los tres roles. Ninguna de las cinco ramas de M añade o quita funciones. **No se comprobó en una base combinada**:
 exigía reiniciar la base, y esta tanda no reinicia (§15.1).
 
 ### 15.4 Contrato con spinus-consola
@@ -1884,6 +1892,7 @@ ahora fallaría.
 | Migración | Orden | Sin la migración |
 |---|---|---|
 | `20261125170000` | cualquiera; puede ir sola y la primera | Todo igual: ningún código hace TRUNCATE. Sólo sigue abierto el hueco |
+| `20261125180000` | cualquiera respecto al código; después de `20261114140000` (`reserva_nombre`) | El recordatorio saluda «Hola:»: `nombreDelSaludo` no lanza y el correo sale igual (`cronRecordatorios.test.ts`, caso PGRST202) |
 
 El código de la tanda M no necesita ninguna migración nueva: con la base de la
 tanda L, y con la v2 apagada o las tablas ausentes, se comporta como la tanda L
@@ -1957,3 +1966,40 @@ Las tablas de la agenda con datos de pacientes (`reserva_*`,
   función no se toca sea cual sea, y señalar `google_tokens`,
   `clinica_conexiones_google` e `invitaciones` como sensibles sin ser de
   pacientes. Aplicados. Confirmó una por una las 30 filas de la §15.6.
+- **M-M4 · Auditoría independiente de `20261125180000`** (sonnet, con
+  `AUDITORIA-MIGRACIONES.md`): **APTA CON CAMBIOS**, ninguno bloqueante.
+  Aplicados: el caso del paciente de otra clínica (antes ninguna prueba vigilaba
+  `p.clinica_id = a.clinica_id`) y la nota de la diferencia con la ruta de la
+  confirmación (un paciente dado de baja). Anotados: `BEGIN`/`COMMIT`
+  explícitos, como las vecinas.
+
+### 15.8 La migración del saludo (`20261125180000_agenda_m_saludo_recordatorio.sql`)
+
+- **Por qué:** decisión de Angel, el recordatorio saluda por nombre. La tarea
+  de recordatorios no tiene sesión y sólo usa `.rpc()` con el cliente de
+  servicio (nunca `.from()`, por el pendiente de `createAdminClient()`), y
+  ninguna RPC de E4 devolvía el nombre. No se reemplazó `cita_correo_tomar`,
+  cuyo cuerpo exigen por md5 otras migraciones.
+- **Qué crea:** `public.cita_nombre_saludo(p_clinica_id uuid, p_cita_id uuid)
+  returns text`, SQL, STABLE, SECURITY INVOKER, `search_path = ''`:
+  `coalesce(nullif(btrim(p.nombre),''), nullif(btrim(a.reserva_nombre),''))`
+  con `a.clinica_id = p_clinica_id` y `p.clinica_id = a.clinica_id` en el JOIN.
+  La regla de `api/agenda/correo/route.ts`.
+- **Permisos:** `revoke … from public, anon, authenticated` y `grant … to
+  service_role`; justificado en la cabecera (devuelve un nombre de paciente por
+  id de cita). INVOKER basta porque `service_role` salta la RLS.
+- **Pre-vuelo:** las columnas que usa; la función con otro cuerpo (md5 de
+  `prosrc`, `1b8ede6c…`) u otra sobrecarga aborta. **Post-vuelo:** aborta antes
+  del `COMMIT` si los permisos no quedaron así. Rejilla de 4 filas.
+- **Aplicada en local sin reiniciar**, bajo el flock: en seco con `ROLLBACK` (4
+  de 4 OK y la función ausente después), real y segunda pasada (4 de 4 OK);
+  registrada a mano en `schema_migrations`. `audit_log`: 82 069 antes y
+  después.
+- **Prueba:** `supabase/pruebas-sql/m_saludo_recordatorio.sql`, con su propia
+  cita por ligar y `rollback` final. Cubre el paciente ligado, la reserva, el
+  nombre vacío, otra clínica, un paciente ajeno, la cita inexistente, los tres
+  roles y la clínica A entera contra la regla de la ruta. En rojo con cada
+  mutación: sólo `reserva_nombre` → caso 1; sin la clínica de la cita → caso 4
+  (otra clínica); sin la del paciente → caso 4 (paciente ajeno); `grant` a
+  `authenticated` → caso 5.
+- **Contrato con spinus-consola:** sin cambios.

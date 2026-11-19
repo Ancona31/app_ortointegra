@@ -74,10 +74,23 @@
 --   (el recordatorio vuelve a «Hola:»).
 --
 -- ═══ AUDITORÍA INDEPENDIENTE ═══════════════════════════════════════════
--- (ver al pie, tras la auditoría)
+-- 2026-11-19, Sonnet, sólo lectura, con supabase/AUDITORIA-MIGRACIONES.md:
+-- APTA CON CAMBIOS, ninguno bloqueante. Aplicados: (1) un caso de prueba
+-- para el filtro `p.clinica_id = a.clinica_id` (el paciente de otra clínica),
+-- que antes no vigilaba nadie; (2) la nota de la diferencia aceptada con la
+-- ruta de la confirmación (arriba, «QUÉ CAMBIA»). Anotado sin cambio:
+-- BEGIN/COMMIT explícitos, como las migraciones vecinas. Recalculó el md5
+-- del cuerpo (coincide) y confirmó aislamiento, permisos y search_path.
 --
 -- ═══ APLICACIÓN LOCAL ══════════════════════════════════════════════════
--- (ver al pie)
+-- 2026-11-19, integración M, sobre la base de la tanda L (sin reiniciar: el
+-- reinicio, ya autorizado por Angel, lo denegó el sistema de permisos de la
+-- sesión), bajo el flock de e2e: ensayo en seco con COMMIT → ROLLBACK (4 de
+-- 4 OK y la función ausente después), real y segunda pasada (4 de 4 OK),
+-- registrada a mano en supabase_migrations.schema_migrations (50 filas, la
+-- última 20261125180000). Comprobado después: md5(prosrc) = 1b8ede6c…,
+-- has_function_privilege('authenticated', …) = false. audit_log: 82 069
+-- filas antes y después. Prueba: supabase/pruebas-sql/m_saludo_recordatorio.sql.
 -- ═══════════════════════════════════════════════════════════════════════
 
 BEGIN;

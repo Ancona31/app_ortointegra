@@ -455,8 +455,9 @@ las 4 de la tanda de diseño, duración y horarios, las 3 de la tanda H, las 7 d
 la tanda I, las 3 de la tanda J, las 3 de la tanda K y las 3 de la tanda L; 48
 con las 5 de `main`) están en `feature/agenda-v2`,
 probados sólo en local. Desde la tanda M hay además una migración que **no es
-de la agenda**, `20261125170000_audit_log_sin_truncate.sql` (49 en total): se
-aplica sola y puede ir antes que todas. En producción no hay nada
+de la agenda**, `20261125170000_audit_log_sin_truncate.sql`: se aplica sola y
+puede ir antes que todas. Y una de la agenda, de la integración M,
+`20261125180000_agenda_m_saludo_recordatorio.sql` (50 en total). En producción no hay nada
 aplicado ni encendido hasta que Angel lo haga (§7).
 
 **Reglas que un editor futuro no debe romper:**
@@ -784,8 +785,9 @@ proyecto, 32 con las de `main`).** Además de lo de arriba:
   apagado no sale ninguno y la prueba pasaría sin probar nada
   (`confirmacion-enlace` «lista A 4») o fallaría (`husos-dos-consultorios`).
 * **Al fusionar con `feature/limites-ajustables`, la lista del caso 3 de
-  `p1_permisos_funciones.sql` es de 50 funciones** (tras la tanda K: las 47 de J
+  `p1_permisos_funciones.sql` es de 51 funciones** (tras la tanda K: las 47 de J
   más `gcal_bloqueo_aplicar`, `rate_limit_espera` y `reserva_espera_reenvio`;
+  y desde la integración M, `cita_nombre_saludo(uuid,uuid)`, sólo `service_role`;
   `agenda_bloqueo_preparar()`, `cita_proteger_cierre()` y las demás de
   disparador tienen los tres roles y NO entran), escrita entera en
   `supabase/AUDITORIA-CONJUNTO-AGENDA-V2.md` §13.5. Las pruebas SQL que llamen
@@ -1090,9 +1092,9 @@ proyecto, 32 con las de `main`).** Además de lo de arriba:
   (`SOLO_ADMIN`, `data-solo-admin`) va sólo donde la ruta deja cambiar al
   administrador y a nadie más (`canManageClinica`). No la pongas en los tipos de
   cita ni en el horario de un consultorio: ahí no es cierta. *(Desde M2 el texto
-  es «Solo el médico administrador…» y va por rol, también a la secretaria en
-  «Tipos de cita» y «Cuándo dan consulta»: ahí no es exacto del todo, PARA
-  REVISIÓN DE ANGEL, AG-DT-235. Ver «Tanda M».)*
+  es «Solo el médico administrador…» y va por rol. A la secretaria, en
+  «Cuándo dan consulta» y «Tipos de cita», van textos propios por decisión de
+  Angel: AG-DT-235, cerrado. Ver «Tanda M».)*
 * **`/confirmar/[codigo]` con «Confirmo mi asistencia» no confirma al cargar**
   (L4): espera un gesto de confianza fuera de un control
   (`esGestoParaConfirmar`: un `click`, o Enter o una tecla que escribe, en lista
@@ -1125,13 +1127,15 @@ proyecto, 32 con las de `main`).** Además de lo de arriba:
 * **No vuelvas a correr J4 (`20261122140000`) después de L5:** su pre-vuelo
   admite 5 o 6 tipos de aviso y ahora hay 7 (aborta limpio, AG-DT-229).
 
-**Tanda M (2026-11-19, ramas M1-M5; sin migraciones de la agenda):**
+**Tanda M (2026-11-19, ramas M1-M5; la integración añade dos migraciones):**
 
 * **`audit_log` no se borra NUNCA, tampoco en local ni en pruebas** (orden de
   Angel, literal: «No vuelvas a borrar filas de audit_log, tampoco en local ni
   de pruebas»). Ni DELETE, ni TRUNCATE, ni `session_replication_role = replica`
-  para saltarse `prevent_audit_delete`, **ni `supabase db reset` de la base
-  local** (la vacía): una migración nueva se aplica sola sobre la base que hay.
+  para saltarse `prevent_audit_delete`, en una base viva. *(Aclaración de Angel
+  del 2026-11-19, vía el coordinador de M: «`supabase db reset --local` crea
+  una base de pruebas nueva; no es borrar auditoría». En M no se hizo: el
+  sistema de permisos de la sesión lo denegó. AG-DT-255.)*
   Para contar auditoría, filtra por tus ids o por `created_at >=` una marca
   (`clock_timestamp()` antes de la acción), nunca por una ventana de minutos.
   Lo vigila `src/lib/tests/pruebasSinBorrarAuditoria.test.ts`; su única
@@ -1167,12 +1171,15 @@ proyecto, 32 con las de `main`).** Además de lo de arriba:
   `estilosConfig.ts` («Solo el médico administrador puede cambiar estas
   opciones.»): una vez por pestaña, nunca encima de algo que ese rol sí puede
   hacer (en «Más opciones» la secretaria desbloquea personas). Sustituye a la
-  frase de la tanda L.
+  frase de la tanda L. **Excepción, decisión de Angel:** a la secretaria,
+  «Cuándo dan consulta» lleva `SOLO_ADMIN_HORARIO` («Cada médico cambia el
+  horario de sus consultorios.») y «Tipos de cita», `SOLO_ADMIN_TIPOS` («Cada
+  médico cambia sus tipos de cita.»).
 * **La barra v2 son dos ítems de rejilla** (`.ag-controles-nav` /
   `.ag-controles-acciones`): una fila desde 1360 px («+» hasta 1439), dos filas
   limpias de 1024 a 1359. El filtro mide el nombre elegido (`.ag-filtro-medida`)
-  y no encoge. Una sola fila de 1024 a 1359 no cabe: PENDIENTE DE ANGEL
-  (AG-DT-242), no la fuerces.
+  y no encoge. Una sola fila de 1024 a 1359 no cabe, y Angel decidió dejarlo
+  así (AG-DT-242): no la fuerces.
 * **«Bloqueo» vuelve como tercera posición de «Nueva cita»** (M3, sólo v2): abre
   el MISMO modal del candado (`abrirAltaBloqueo`) con la hora del formulario. No
   vuelve la pregunta de K1.
@@ -1194,8 +1201,9 @@ proyecto, 32 con las de `main`).** Además de lo de arriba:
   (`new Date(a, m, d, h, min)`), no como instante UTC fijo. Antes de dar por
   buena la batería, córrela sin `TZ`, con `TZ=UTC` y con
   `TZ=America/Hermosillo`. El sello del consentimiento en la zona del equipo es
-  un defecto de la app, PENDIENTE DE ANGEL (AG-DT-243): su prueba falla en
-  Tokio y Kiritimati.
+  un defecto de la app, **prioridad alta** (AG-DT-243): «el sello va en la zona
+  del consultorio donde se firmó. Se corrige en su propia rama» (Angel). Su
+  prueba falla en Tokio y Kiritimati y se queda así.
 * **Correos de la agenda (M5):** todos salen de `src/lib/correo/plantillaCita.ts`,
   el esqueleto de las tres maquetas de `docs/spec/correo-*.html`.
   - Tablas, estilos en línea, siempre en claro y todo escapado ahí.
@@ -1206,7 +1214,15 @@ proyecto, 32 con las de `main`).** Además de lo de arriba:
   - «hora de …» sale de `HORA_DE_ZONA`; cada zona nueva de `ZONAS_MEXICO`
     necesita su frase (lo exige una prueba).
   - El plazo de cancelar de los correos (`PLAZO_CANCELAR`, 1 hora) refleja la
-    regla fija de E1: si cambia una, cambia la otra (AG-DT-249).
+    regla fija de E1: si cambia una, cambia la otra (AG-DT-249; Angel decidió
+    dejarlo fijo).
+  - Todos saludan con `saludoDe(nombre)`: «Hola, <nombre>:» y «Hola:» sólo sin
+    nombre. La confirmación, el recordatorio y el cambio toman el nombre del
+    paciente ligado y, si no, `reserva_nombre`; el comprobante, el tecleado. El
+    recordatorio lo lee con `cita_nombre_saludo` (RPC sólo `service_role`; la
+    tarea nunca usa `.from()`), y si falla sale «Hola:» sin frenar el envío.
+  - El pie va en `--ag-ink-600` #52627a (5,47:1 sobre #eef1f5): no lo bajes a
+    `--ag-muted`, que da 3,09:1 (lo vigila `plantillaCita.test.ts`).
 
 ---
 

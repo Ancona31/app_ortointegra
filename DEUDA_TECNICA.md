@@ -5695,9 +5695,16 @@ variante al pasar el ratón (`TarjetaAlPasar`) ni la burbuja centrada del buscad
 tomaron sobre una agendada con observaciones; las casillas de la confirmada usan
 las mismas clases y no se midieron una por una.
 
-### AG-DT-235 — Dos avisos «Solo el médico administrador…» no son exactos
+### AG-DT-235 — ✅ Cerrado: dos avisos «Solo el médico administrador…» no eran exactos
 
-**Estado:** PARA REVISIÓN DE ANGEL (M2, punto 15). Ningún permiso cambió.
+**Cierre (integración M, 2026-11-19, decisión de Angel, `e86d1be`):** a la
+secretaria, «Cuándo dan consulta» dice «Cada médico cambia el horario de sus
+consultorios.» y «Tipos de cita», «Cada médico cambia sus tipos de cita.»
+(`SOLO_ADMIN_HORARIO` y `SOLO_ADMIN_TIPOS` en `estilosConfig.ts`). Los demás
+avisos, y los de la invitada, siguen con «Solo el médico administrador…». En rojo
+con `SOLO_ADMIN` en las dos pestañas: las e2e m2, k3, j5 y l3.
+
+**Estado previo:** PARA REVISIÓN DE ANGEL (M2, punto 15). Ningún permiso cambió.
 - «Cuándo dan consulta» (secretaria): el horario de **cada consultorio** lo cambia
   sólo su dueño, ni siquiera el administrador (la ruta da 404 a los demás).
 - «Tipos de cita» (secretaria): los de un médico los cambia también ese médico.
@@ -5752,15 +5759,26 @@ encargo pedía no tocarla.
 
 ### AG-DT-242 — Una sola fila de la barra no cabe de 1024 a 1359
 
-**Estado:** PENDIENTE DE ANGEL (M3, punto 3). Con la barra lateral abierta, a 1024
+**Estado:** ✅ decidido por Angel (integración M, 2026-11-19): se queda como lo
+dejó M3, dos filas ordenadas de 1024 a 1359 y una desde 1360. Ya no está
+pendiente.
+
+**Contexto:** con la barra lateral abierta, a 1024
 la tarjeta mide 704 px y la fila, con todo compactado, pide 894 (1120 con todo a
 su ancho natural). Se dejaron dos filas limpias de 1024 a 1359 y una fila desde
 1360. No se «arregló» de otro modo: es decisión de Angel.
 
 ### AG-DT-243 — El sello del consentimiento, en la zona del equipo
 
-**Estado:** PENDIENTE DE ANGEL, defecto de la app sin tocar (M4, punto 16).
-`selloLegible` (`src/lib/pdf/v2/adaptadores/ConsentimientoInformado.tsx:60` y la de
+**Estado:** 🔴 **PRIORIDAD ALTA**, defecto de la app **sin tocar en
+`feature/agenda-v2`** (M4, punto 16; decisión de Angel en la integración M,
+2026-11-19). Los dos archivos: `src/lib/pdf/v2/adaptadores/ConsentimientoInformado.tsx:60`
+y `src/lib/pdf/ConsentimientoInformadoPdf.tsx:238`. Angel: «el sello va en la
+zona del consultorio donde se firmó. Se corrige en su propia rama.» La prueba
+que falla en Tokio y Kiritimati (`adaptadoresV2.test.ts`) se queda como está:
+no es una de las tres zonas de la batería.
+
+**Detalle:** `selloLegible` (`src/lib/pdf/v2/adaptadores/ConsentimientoInformado.tsx:60` y la de
 v1 en `src/lib/pdf/ConsentimientoInformadoPdf.tsx:238`) escribe la fecha y la hora
 del sello con `getDate`/`getHours`: en la zona del dispositivo que genera el PDF
 (en el navegador). Un consentimiento firmado en Mérida a las 12:41 y reimpreso
@@ -5768,7 +5786,7 @@ desde un equipo en otra zona dice otra hora, o hasta otro día, aunque su coment
 promete lo contrario. Es un documento legal (NOM-004). Su prueba
 (`adaptadoresV2.test.ts`, «II.7 · … sellado, cada firma va a su firmante con su
 hora») falla en `Asia/Tokyo` y `Pacific/Kiritimati`; pasa sin `TZ`, con `UTC` y con
-`America/Hermosillo`. Angel decide la zona (la del consultorio o una fija).
+`America/Hermosillo`. Zona decidida: la del consultorio donde se firmó.
 
 ### AG-DT-244 — «Tu correo ya está verificado» se distingue por su texto
 
@@ -5794,9 +5812,15 @@ primer nivel de `e2e/`, `scripts/` y `supabase/pruebas-sql/` (`.ts .mjs .js .sh
 integración M deja a `m_audit_log_sin_truncate.sql` escribir TRUNCATE (y sólo
 TRUNCATE), si acaba en `rollback;` y no lleva `commit`.
 
-### AG-DT-247 — El contraste del pie de los correos
+### AG-DT-247 — ✅ Cerrado: el contraste del pie de los correos
 
-**Estado:** PARA REVISIÓN DE ANGEL (M5). #7c8aa0 (`--ag-muted`) sobre #eef1f5 da
+**Cierre (integración M, 2026-11-19, decisión de Angel, `e86d1be`):** el pie
+«Enviado con Spinus» usa `--ag-ink-600` (#52627a), **5,47:1** sobre #eef1f5. Lo
+vigila `plantillaCita.test.ts` (calcula el contraste; en rojo con `C.tenue`). Ningún
+token cambió de valor. La letra pequeña de otras líneas sigue con `--ag-muted`
+sobre blanco.
+
+**Estado previo:** PARA REVISIÓN DE ANGEL (M5). #7c8aa0 (`--ag-muted`) sobre #eef1f5 da
 3,09:1, por debajo de 4,5:1 (AA para letra de 12 px). La maqueta tenía casi lo
 mismo (#7a8597, ~3,2:1). Subirlo pide un token más oscuro: decisión de marca.
 
@@ -5808,8 +5832,10 @@ lo minimizaría.
 
 ### AG-DT-249 — El plazo de cancelar es fijo: 1 hora
 
-**Estado:** PARA REVISIÓN DE ANGEL (M5, punto 12). No hay ajuste de clínica: la
-regla está en la base (E1, `cita_confirmacion_responder` acepta cancelar hasta
+**Estado:** ✅ decidido por Angel (integración M, 2026-11-19): se queda fijo en
+1 hora, sin migración.
+
+**Contexto:** no hay ajuste de clínica: la regla está en la base (E1, `cita_confirmacion_responder` acepta cancelar hasta
 `start_time - interval '1 hour'`) y los correos la repiten con `PLAZO_CANCELAR`
 (`correosCita.ts`). Si se vuelve ajuste, hay que cambiar los dos a la vez, con una
 migración.
@@ -5824,8 +5850,16 @@ los demás textos nuevos están pendientes de revisión, como los anteriores
 ### AG-DT-251 — Detalles de los correos de M5
 
 **Estado:** aceptada (M5).
-- El recordatorio y el aviso de cambio saludan «Hola:», sin nombre: la tarea de
-  recordatorios no lo tiene a mano y traerlo costaría una consulta por correo.
+- ~~El recordatorio y el aviso de cambio saludan «Hola:», sin nombre.~~
+  **Cerrado en la integración M (decisión de Angel, `e86d1be`):** saludan por
+  nombre con `saludoDe`, y «Hola:» sólo sin nombre. La fuente es la de la
+  confirmación del personal (el paciente ligado y, si no, `reserva_nombre`),
+  distinta de la del comprobante (sólo el nombre tecleado, sin paciente
+  todavía). El recordatorio lo lee con `cita_nombre_saludo` (migración
+  `20261125180000`, sólo `service_role`): una llamada más por correo, que si
+  falla no frena el envío. Diferencia aceptada: a un paciente dado de baja, la
+  confirmación (con la RLS de quien no administra) lo saluda «Hola:» y el
+  recordatorio, por nombre.
 - `urlSegura` rechaza `HTTPS://` en mayúsculas: falla cerrado (sin botón); los
   enlaces de Spinus siempre van en minúsculas.
 - Outlook de escritorio ignora `border-radius`: las esquinas salen rectas.
@@ -5863,11 +5897,21 @@ integración.
 
 ### AG-DT-255 — El conjunto desde cero no se probó en la tanda M
 
-**Estado:** aceptada (integración M). Para no vaciar el `audit_log` local no se
-hizo `supabase db reset`: la migración nueva se aplicó sobre la base de la tanda L.
+**Estado:** abierta (integración M). Primero, para no vaciar el `audit_log`
+local, no se hizo `supabase db reset`. Después Angel lo autorizó vía el
+coordinador: «`supabase db reset --local` crea una base de pruebas nueva; no es
+borrar auditoría». **Pero el sistema de permisos de la sesión denegó el reset**,
+y no se buscó otra forma de hacerlo. Las dos migraciones nuevas (`20261125170000`
+y `20261125180000`) se aplicaron sobre la base de la tanda L. Las tablas que
+había que respaldar antes (`consultas`, `documentos`, `addendums` y
+`agenda_bloqueos`) tenían **0 filas**, así que no había nada que guardar en
+`respaldos-angel/`. **Para cerrarlo:** que Angel permita el reset en la sesión o
+lo corra él (`GUIA_PRUEBAS_AGENDA_V2.md`, P5), con las 50, la semilla y la
+batería.
 Las 43 de la agenda no cambiaron desde la tanda L (probadas desde cero en su
 §14.1). Tampoco se rehízo la base combinada con `feature/limites-ajustables`
-(lista del caso 3 de `p1`, que sigue en 50 porque no hay funciones nuevas).
+(lista del caso 3 de `p1`). Esa lista pasa a **51** al combinar: se suma
+`cita_nombre_saludo(uuid,uuid)`, sólo `service_role`.
 
 ---
 
