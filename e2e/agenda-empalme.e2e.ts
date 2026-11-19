@@ -14,10 +14,10 @@ import { fechaHoraLocalAInstante } from '../src/lib/dates'
  * `empalmes_aceptados` entra. Con el interruptor APAGADO (el estado del
  * `globalSetup`) no se comprueba nada y el campo se ignora.
  *
- * Las pruebas de la API van el MARTES de esta semana por la tarde; las de la
- * rejilla, el lunes, jueves y viernes, en tramos que no se pisan entre sí ni
- * con la Junta de los lunes o el «Pendiente administrativo» del viernes (que
- * `agenda-arrastre` estira hasta las 14:30: el viernes empieza a las 15:00). Cada
+ * Las pruebas de la API van el MARTES de la semana 7 por la tarde; las de la
+ * rejilla, el lunes, jueves y viernes de esa semana, en tramos que no se pisan entre sí. En la
+ * semana 7 la semilla no siembra nada (ni la Junta de los lunes ni el «Pendiente administrativo»
+ * del viernes, que eran los tramos que había que esquivar en la semana en curso). Cada
  * prueba crea sus propias citas por la API con la sesión del administrador, y
  * las tarjetas se buscan por columna de día, paciente y hora.
  */
@@ -29,7 +29,13 @@ test.afterEach(() => {
 })
 
 const TZ = 'America/Merida'
-const MARTES = diaDeLaSemana(0, 1)
+/* Integración L: SEMANA 7, no esta. En esta semana, desde el miércoles por la tarde, las citas que el archivo
+   crea el lunes y el martes ya pasaron hace más de 48 h: la v2 abre «¿Asistió el paciente?» (I4) al cargar la
+   agenda, tapa la rejilla y las pruebas caen por tiempo. Y como el archivo no las borra, la ventana salía
+   también en los archivos siguientes (`agenda-f-atajos`, `-f-burbuja`…). Ninguna otra e2e usa la semana 7, y
+   la semilla no siembra nada en ella (llega hasta la 4). */
+const SEMANA = 7
+const MARTES = diaDeLaSemana(SEMANA, 1)
 
 /** El médico de la cita: el administrador (Centro) o el invitado (Rehabilitación). */
 const MEDICOS = {
@@ -165,9 +171,9 @@ test('API apagado: el alta empalmada entra sin preguntar y empalmes_aceptados se
 
 /* ── La rejilla: arrastrar y redimensionar (B7b) ─────────────────────────── */
 
-const LUNES = diaDeLaSemana(0, 0)
-const JUEVES = diaDeLaSemana(0, 3)
-const VIERNES = diaDeLaSemana(0, 4)
+const LUNES = diaDeLaSemana(SEMANA, 0)
+const JUEVES = diaDeLaSemana(SEMANA, 3)
+const VIERNES = diaDeLaSemana(SEMANA, 4)
 
 /** La tarjeta de ese paciente, ese día, cuyo rango empieza a esa hora. */
 function tarjeta(page: Page, fecha: string, apellidos: string, hora: string) {
@@ -185,6 +191,10 @@ async function abrir(page: Page, estado: 'encendida' | 'apagada'): Promise<void>
   await expect(page.locator('.agenda-raiz')).toHaveAttribute('data-agenda-v2', estado)
   /* F3: con v2 las interacciones van en un chunk diferido; un clic antes de que llegue abriría el modal directo. */
   if (estado === 'encendida') await expect(page.locator('.agenda-raiz')).toHaveAttribute('data-interacciones-v2', 'listas')
+  for (let i = 1; i <= SEMANA; i++) {
+    await page.locator('.fc-next-button').click()
+    await expect(page.locator(`.fc-timegrid-col[data-date="${diaDeLaSemana(i, 0)}"]`)).toBeVisible()
+  }
 }
 
 function putsDe(page: Page, id: string): { cuantos: () => number } {
@@ -348,7 +358,9 @@ test('modal encendido: alta empalmada y fuera de horario da los dos avisos segui
 
 test('modal encendido: lo que no está pintado lo detecta el servidor (alta en otra semana) y se pregunta igual', async ({ page }) => {
   interruptorAgenda('A', true)
-  const lejos = diaDeLaSemana(3, 1)
+  /* Integración L: más allá de la semana 7, para que `abrir()` no pase por ella al avanzar (si la caché de
+     rangos la guardara, el empalme lo vería la pantalla y no el servidor). */
+  const lejos = diaDeLaSemana(SEMANA + 3, 1)
   await alta(page, 'Prueba 18', lejos, '14:05', 25)
   await abrir(page, 'encendida')
 
