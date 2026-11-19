@@ -6602,14 +6602,112 @@ td[aria-selected="true"] > .ag-minimes-dia { background: var(--ag-primary-bg-fai
    La barra nativa pierde 10 px de su relleno derecho: el botón de la fecha ya
    trae el suyo. Por debajo de 1280, o en Día con su panel, siguen las dos
    filas de siempre (la regla de `.ag-dia--con-panel` de abajo lo devuelve). */
-@media (min-width: 1280px) {
-  .agenda-fc:has([data-engrane-agenda]) .fc-toolbar { padding-right: var(--ag-2); }
-  .agenda-fc .ag-controles:has([data-engrane-agenda]) { flex-wrap: nowrap; }
-  .agenda-fc .ag-controles:has([data-engrane-agenda]) .ag-controles-filtro { min-width: 96px; }
-  .agenda-fc .ag-controles:has([data-engrane-agenda]) .ag-fecha-boton { flex: 0 1 auto; min-width: 0; }
-}
-.ag-dia--con-panel .agenda-fc .ag-controles:has([data-engrane-agenda]) { flex-wrap: wrap; }
 .ag-fecha-boton-texto { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+
+/* ── M3 (punto 3 de Angel) · LA BARRA DE LA V2 NO SE PARTE A TROZOS ────────
+   SUSTITUYE a la fila única de I5 desde 1280, que no cabía: a 1280 (tarjeta de
+   960) encogía los iconos a 31 px, recortaba la fecha y dejaba el filtro en 96
+   px con el nombre del médico cortado; y por debajo de 1280 los controles
+   envolvían y el candado, el engrane y «Agendar» caían a una tercera línea.
+   Con la v2, `CabeceraEscritorio` da DOS ítems: `.ag-controles-nav` (fecha,
+   leyenda, vistas) y `.ag-controles-acciones` (filtro … «Agendar»). Sólo dos
+   disposiciones, y ninguna parte un grupo:
+     · FILA ÚNICA desde 1360 px de ventana: ‹ › Hoy | nav | acciones, con 6 px
+       entre controles (eran 8). De 1360 a 1479 se aprieta: 5 px de hueco y los
+       segmentos de las vistas de 13 a 10 px de relleno; y de 1360 a 1439,
+       además, «Agendar» se queda en «+» (36 px; su nombre accesible sigue
+       siendo «Agendar»).
+     · DOS FILAS LIMPIAS de 1024 (el corte del diseño de teléfono) a 1359: ‹ ›
+       Hoy, fecha y vistas arriba; filtro … «Agendar» abajo, a la derecha.
+   MEDIDO (Linux, barra lateral desplegada —tarjeta = ventana − 320—, nombre
+   más largo de la semilla): holgura de la fila única a 1360 de 28 px en la
+   Semana y 4 en el Mes antes de apretar (≈ +29 al apretar); a 1460 con
+   «Agendar» entero y sin apretar, 31 y 7 —por eso se aprieta hasta 1479—. Una fila literal a 1024
+   (tarjeta de 704) no cabe ni con todo compactado (≈894): por eso dos filas.
+   El FILTRO mide lo que el nombre ELEGIDO (hasta 240, `.ag-filtro-medida`) y
+   no encoge: el nombre nunca se corta por falta de sitio. Si algo no cabe en
+   la fila única —una semana que cruza de año, el Día largo—, sólo recorta la
+   fecha, con elipsis; los demás no encogen.
+   Los cortes son de VENTANA y suponen la barra lateral desplegada: plegada
+   sobra sitio, nunca falta. En Día con su panel, siempre dos filas (como
+   antes), y ahí sí puede envolver dentro de cada una.
+   ⚠️ Las DOS disposiciones redeclaran el PAR entero (pistas ↔ áreas). */
+@media (min-width: 1024px) {
+  .agenda-fc:has(.ag-controles-nav) {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-rows: auto auto auto minmax(0, 1fr) auto;   /* 5 pistas ↔ 5 filas */
+    grid-template-areas: "toolbar nav" "acciones acciones" "banda banda" "rejilla rejilla" "pie pie";
+  }
+  .agenda-fc .ag-controles.ag-controles-nav { grid-area: nav; justify-content: flex-start; }
+  .agenda-fc .ag-controles.ag-controles-acciones { grid-area: acciones; justify-content: flex-end; }
+  /* Sin el conteo (v1) no hace falta la consulta de contenedor; y en una pista
+     `auto` la contención de tamaño dejaría a «acciones» en ancho cero. */
+  .agenda-fc .ag-controles:is(.ag-controles-nav, .ag-controles-acciones) { container-type: normal; flex-wrap: nowrap; }
+  /* Nadie encoge salvo la fecha (con elipsis), el último recurso. */
+  .agenda-fc .ag-controles:is(.ag-controles-nav, .ag-controles-acciones) > * { flex-shrink: 0; }
+  .agenda-fc .ag-controles-nav .ag-fecha-boton { flex: 0 1 auto; min-width: 0; }
+  /* El filtro, al ancho del nombre ELEGIDO (hasta 240): lo da `.ag-filtro-medida`,
+     con la letra y el relleno del `<select>`; el `<select>` no aporta ancho
+     (`width: 0`) y llena la celda (`min-width: 100%`). */
+  .agenda-fc .ag-controles-acciones .ag-controles-filtro { display: grid; flex: 0 0 auto; min-width: 0; }
+  .agenda-fc .ag-controles-acciones .ag-controles-filtro > select { grid-area: 1 / 1; width: 0; min-width: 100%; }
+  .agenda-fc .ag-controles-acciones .ag-filtro-medida {
+    grid-area: 1 / 1;
+    height: 0;
+    overflow: hidden;
+    visibility: hidden;
+    white-space: nowrap;
+    /* `pl-3 pr-9` + el borde de 1 px del `<select>`, y 2 px de holgura de redondeo. */
+    padding: 0 calc(2.25rem + 3px) 0 calc(0.75rem + 1px);
+    font-size: 0.875rem;
+    font-weight: 500;
+  }
+}
+/* Dos filas: como las de siempre por debajo de 1280 (la nativa sin línea ni
+   relleno de abajo), con la primera partida en dos ítems. */
+@media (min-width: 1024px) and (max-width: 1359px) {
+  .agenda-fc:has(.ag-controles-nav) .fc-toolbar { padding-bottom: var(--ag-1-5); border-bottom: 0; }
+  .agenda-fc .ag-controles.ag-controles-nav { padding: var(--ag-3) var(--ag-4-5) var(--ag-1-5) 0; border-bottom: 0; }
+  .agenda-fc .ag-controles.ag-controles-acciones { padding: var(--ag-1-5) var(--ag-4-5) var(--ag-3); }
+}
+@media (min-width: 1360px) {
+  .agenda-fc:has(.ag-controles-nav) {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-rows: auto auto minmax(0, 1fr) auto;   /* 4 pistas ↔ 4 filas */
+    grid-template-areas: "toolbar nav acciones" "banda banda banda" "rejilla rejilla rejilla" "pie pie pie";
+  }
+  /* La nativa pierde 10 px de su relleno derecho: el botón de la fecha ya trae el suyo (I5). */
+  .agenda-fc:has(.ag-controles-nav) .fc-toolbar { padding-right: var(--ag-2); }
+  .agenda-fc .ag-controles.ag-controles-nav { gap: 6px; padding: var(--ag-3) 6px var(--ag-3) 0; }
+  .agenda-fc .ag-controles.ag-controles-acciones { gap: 6px; padding: var(--ag-3) var(--ag-4-5) var(--ag-3) 0; }
+}
+/* Apretado, de 1360 a 1479: 5 px de hueco y los segmentos de las vistas de 13 a
+   10 px de relleno (`!important` porque va en línea en `CabeceraEscritorio`). */
+@media (min-width: 1360px) and (max-width: 1479px) {
+  .ag-dia:not(.ag-dia--con-panel) > .agenda-fc .ag-controles:is(.ag-controles-nav, .ag-controles-acciones) { gap: 5px; }
+  .ag-dia:not(.ag-dia--con-panel) > .agenda-fc .ag-controles-nav [role="tab"] { padding-inline: 10px !important; }
+}
+/* Y de 1360 a 1439, «Agendar» como «+»: el texto, oculto a la vista y no al lector. */
+@media (min-width: 1360px) and (max-width: 1439px) {
+  .ag-dia:not(.ag-dia--con-panel) > .agenda-fc .ag-controles-acciones [data-onboard="nueva-cita"] {
+    position: relative; width: 36px; padding: 0; justify-content: center;
+  }
+  .ag-dia:not(.ag-dia--con-panel) > .agenda-fc .ag-controles-acciones .ag-agendar-texto {
+    position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+  }
+}
+/* Día con su panel: las dos filas a cualquier ancho (como antes), y cada una puede envolver. */
+@media (min-width: 1024px) {
+  .ag-dia--con-panel .agenda-fc:has(.ag-controles-nav) {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-rows: auto auto auto minmax(0, 1fr) auto;   /* 5 pistas ↔ 5 filas */
+    grid-template-areas: "toolbar nav" "acciones acciones" "banda banda" "rejilla rejilla" "pie pie";
+  }
+  .ag-dia--con-panel .agenda-fc:has(.ag-controles-nav) .fc-toolbar { padding: var(--ag-3) var(--ag-4-5) var(--ag-1-5); border-bottom: 0; }
+  .ag-dia--con-panel .agenda-fc .ag-controles:is(.ag-controles-nav, .ag-controles-acciones) { flex-wrap: wrap; gap: var(--ag-2); }
+  .ag-dia--con-panel .agenda-fc .ag-controles.ag-controles-nav { padding: var(--ag-3) var(--ag-4-5) var(--ag-1-5) 0; border-bottom: 0; }
+  .ag-dia--con-panel .agenda-fc .ag-controles.ag-controles-acciones { padding: var(--ag-1-5) var(--ag-4-5) var(--ag-3); }
+}
 
 /* · La CAMPANA (punto 16): el botón de la lupa, con una marca roja —el color de
      «Cancelada», el mismo que llevaba el aviso de «Por confirmar»— cuando hay
