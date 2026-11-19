@@ -160,6 +160,8 @@ const PreguntaAsistenciaV2 = dynamic(() => import('@/components/agenda/Herramien
 interface BarraV2 {
   CampanaAgenda: typeof import('@/components/agenda/CampanaAgenda').CampanaAgenda
   MenuEngraneAgenda: typeof import('@/components/agenda/MenuEngraneAgenda').MenuEngraneAgenda
+  /** Tanda L, punto 11 · el botón de la leyenda en la barra de computadora (mismo chunk que el engrane). */
+  BotonLeyendaAgenda: typeof import('@/components/agenda/MenuEngraneAgenda').BotonLeyendaAgenda
 }
 interface InterruptorYBarra { leido: boolean; barra: BarraV2 | null }
 const V2_APAGADA: InterruptorYBarra = { leido: false, barra: null }
@@ -167,7 +169,7 @@ const V2_APAGADA: InterruptorYBarra = { leido: false, barra: null }
 function leerInterruptorYBarra(v: boolean | null): Promise<InterruptorYBarra> | InterruptorYBarra {
   if (v !== true) return V2_APAGADA
   return Promise.all([import('@/components/agenda/CampanaAgenda'), import('@/components/agenda/MenuEngraneAgenda')]).then(
-    ([c, m]) => ({ leido: true, barra: { CampanaAgenda: c.CampanaAgenda, MenuEngraneAgenda: m.MenuEngraneAgenda } }),
+    ([c, m]) => ({ leido: true, barra: { CampanaAgenda: c.CampanaAgenda, MenuEngraneAgenda: m.MenuEngraneAgenda, BotonLeyendaAgenda: m.BotonLeyendaAgenda } }),
     (err: unknown) => {
       logger.warn('agenda', `barra v2 sin cargar, se queda la de antes: ${err instanceof Error ? err.message : 'error'}`)
       return V2_APAGADA
@@ -1793,6 +1795,8 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
             porConfirmar={campanaV2(false)}
             /* I5 · Con el engrane, la fila de la v2 (punto 13). */
             engrane={engraneV2(false)}
+            /* Tanda L, punto 11 · la leyenda con su botón, sólo en computadora; también sigue en el engrane. */
+            leyenda={agendaV2 && barraV2 && !isMobile ? <barraV2.BotonLeyendaAgenda /> : undefined}
             /* F3 · Las herramientas v2 en sus ranuras; apagado, ni se descargan. */
             selectorFecha={agendaV2 && montarV2 ? <SelectorFechaV2 rango={rangoVisible} titulo={tituloVista} alIrAFecha={irAFecha} /> : undefined}
             buscar={agendaV2 && montarV2 ? <BuscarV2 apiRef={interaccionesRef} atajos={atajos} /> : undefined}

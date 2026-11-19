@@ -60,6 +60,9 @@ interface Props {
       (todo eso vive en el menú) y la fila queda: fecha · vistas · médico ·
       buscar · campana · engrane · Agendar. Sin él, la barra de siempre. */
   engrane?: ReactNode
+  /** Tanda L, punto 11 · El botón de la leyenda de estados, a la izquierda de las vistas
+      (sólo computadora y v2; sin él, la barra de siempre). */
+  leyenda?: ReactNode
 }
 
 /* La acción de atajo de cada segmento de vista (por su tipo ancho). */
@@ -76,7 +79,7 @@ export function CabeceraEscritorio({
   resumenConteo, currentView, isMobile, onVista, compactar, onCompactar, isSingleDoctor,
   filtroEfectivo, mesSinTodos, medicos, onFiltroMedico, canEditHorario, onHorario, onAgendar,
   onIntencionAgendar, porConfirmar, densidadCompacta, onDensidad, selectorFecha, buscar, atajos = false,
-  engraneConfiguracion = false, engrane,
+  engraneConfiguracion = false, engrane, leyenda,
 }: Props) {
   const barraV2 = engrane !== undefined
   const rotuloEngrane = engraneConfiguracion ? 'Configuración de la agenda' : 'Configurar horario de consulta'
@@ -130,6 +133,7 @@ export function CabeceraEscritorio({
           un bloque posterior. Hasta entonces comparte fila con el resto y la
           fila envuelve. No lo escondas otra vez «mientras tanto»: eso es
           volver a la vista única. */}
+      {leyenda}
       <div
         role="tablist"
         aria-label="Vista del calendario"

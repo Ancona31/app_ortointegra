@@ -23,10 +23,11 @@
  * compacta): es interruptor y su fila dice «Densidad compacta».
  *
  * La leyenda se abre en su propia capa, colgada del mismo engrane (diálogo,
- * `useDialogoModal`).
+ * `useDialogoModal`). Tanda L, punto 11: en computadora además tiene su botón
+ * en la barra (`BotonLeyendaAgenda`), que abre ESA MISMA capa colgada de él.
  */
 import { useCallback, useRef, useState, type KeyboardEvent, type ReactElement, type ReactNode } from 'react'
-import { ChevronsDownUp, Keyboard, MousePointer2, Rows4, Settings, X } from 'lucide-react'
+import { ChevronsDownUp, Info, Keyboard, MousePointer2, Rows4, Settings, X } from 'lucide-react'
 import { useDialogoModal } from '@/hooks/useDialogoModal'
 import { CapaBarra } from '@/components/agenda/CapaBarra'
 import { LeyendaEstados } from '@/components/agenda/LeyendaEstados'
@@ -183,6 +184,28 @@ function OpcionPopUp(): ReactElement {
     setEncendida(!encendida)
   }
   return <Opcion icono={<MousePointer2 size={16} />} texto="Pop-up de eventos" id="tarjeta-al-pasar" marcada={encendida} alPulsar={alternar} />
+}
+
+/**
+ * Tanda L, punto 11 · El botón de la leyenda en la barra de computadora, a la izquierda de
+ * Mes/Semana/Día (lo coloca `CabeceraEscritorio`). Abre la MISMA capa que la opción del
+ * engrane (`CapaLeyenda`, con `LeyendaEstados`), colgada de este botón; no la duplica. Vive
+ * en este módulo porque es el chunk de la barra v2: con la v2 apagada no se descarga.
+ */
+export function BotonLeyendaAgenda(): ReactElement {
+  const [abierta, setAbierta] = useState<HTMLElement | null>(null)
+  const botonRef = useRef<HTMLButtonElement | null>(null)
+  const cerrar = useCallback(() => setAbierta(null), [])
+  return (
+    <>
+      <button type="button" ref={botonRef} data-boton-leyenda="" className="ag-herramienta"
+        aria-label="Leyenda de estados" title="Leyenda de estados" aria-haspopup="dialog" aria-expanded={abierta !== null}
+        onClick={() => setAbierta(a => (a ? null : botonRef.current))}>
+        <Info size={16} aria-hidden="true" />
+      </button>
+      {abierta && <CapaLeyenda boton={abierta} alCerrar={cerrar} />}
+    </>
+  )
 }
 
 function CapaLeyenda({ boton, alCerrar }: { boton: HTMLElement; alCerrar: () => void }): ReactElement {
