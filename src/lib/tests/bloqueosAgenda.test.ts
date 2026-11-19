@@ -7,8 +7,8 @@
 import { describe, it, expect, vi } from 'vitest'
 import type { EventApi } from '@fullcalendar/core'
 import {
-  bloqueoAEvento, bloqueoDe, bloqueosDeRespuesta, displayDeBloqueo, esCitaParaBloqueo, mensajeCitasEnBloqueo,
-  rotuloBloqueo, tocaBloqueo, TEXTO_CONFIRMAR_BLOQUEO, type BloqueoAgenda,
+  bloqueoAEvento, bloqueoDe, bloqueoEnInstante, bloqueosDeRespuesta, displayDeBloqueo, mensajeCitasEnBloqueo,
+  rotuloBloqueo, tocaBloqueo, TEXTO_HORARIO_BLOQUEADO, type BloqueoAgenda,
 } from '@/lib/agenda/bloqueosAgenda'
 import { contarTodoElDia, eventoOcupa } from '@/lib/agenda/huecosAgenda'
 import { tramoDePintado, empalmesDe } from '@/lib/agenda/empalmesCita'
@@ -80,33 +80,66 @@ describe('punto 3 · cuándo pregunta', () => {
     expect(tocaBloqueo(d, 'm1', new Date('2026-11-20T05:00:00Z'), new Date('2026-11-20T05:30:00Z'))).toBe(true)
     expect(tocaBloqueo(d, 'm1', new Date('2026-11-20T06:00:00Z'), new Date('2026-11-20T06:30:00Z'))).toBe(false)
   })
-  it('sólo pregunta por una CITA (paciente, reserva o por asignar), no por un evento propio', () => {
-    expect(esCitaParaBloqueo({ paciente_id: 'p' })).toBe(true)
-    expect(esCitaParaBloqueo({ reserva_canal: 'enlace' })).toBe(true)
-    expect(esCitaParaBloqueo({ google_asignacion: 'por_asignar' })).toBe(true)
-    expect(esCitaParaBloqueo({ paciente_id: null })).toBe(false)
-  })
-  it('la burbuja pregunta con el texto literal; «Cancelar» no guarda (MUTACIÓN: sin la pregunta)', async () => {
+  it('L1 · la burbuja NO pregunta: no guarda y enseña el mensaje literal, antes que cualquier aviso (MUTACIÓN: la pregunta de K1)', async () => {
     const datos = datosDeAltaRapida({
       fecha: '2026-11-18', horaInicio: '10:00', horaFin: '11:00',
       paciente: { id: 'p', nombre: 'Ana', apellidos: 'Ruiz', telefono: null }, medicoId: 'm1', consultorioId: 'c',
     })
     if (!datos) throw new Error('sin datos')
-    const respuestas = [false]
     const d = {
-      avisoHorario: () => null, buscarEmpalmes: () => [], mensajeEmpalme: () => '',
-      confirmar: vi.fn(async () => respuestas.shift() ?? true), guardar: vi.fn(async () => null),
+      avisoHorario: vi.fn(() => 'fuera de horario'), buscarEmpalmes: () => [], mensajeEmpalme: () => '',
+      confirmar: vi.fn(async () => true), guardar: vi.fn(async () => null),
       bloqueado: vi.fn(() => true),
     }
     const abiertas = { inicio: '10:00', fin: '11:00' }
-    expect(await guardarAltaRapida(datos, abiertas, abiertas, d)).toEqual({ enviada: false })
-    expect(d.confirmar).toHaveBeenCalledWith(TEXTO_CONFIRMAR_BLOQUEO)
+    const tocadas = { inicio: '10:30', fin: '11:30' }
+    expect(await guardarAltaRapida(datos, abiertas, tocadas, d)).toEqual({ enviada: false, error: TEXTO_HORARIO_BLOQUEADO })
     expect(d.bloqueado).toHaveBeenCalledWith(expect.any(Date), expect.any(Date), 'm1')
+    expect(d.confirmar).not.toHaveBeenCalled()
+    expect(d.avisoHorario).not.toHaveBeenCalled()
     expect(d.guardar).not.toHaveBeenCalled()
-    expect(await guardarAltaRapida(datos, abiertas, abiertas, d)).toEqual({ enviada: true, alta: null })
   })
-  it('el texto es el de Angel', () => {
-    expect(TEXTO_CONFIRMAR_BLOQUEO).toBe('Este horario está bloqueado. ¿Agendar de todos modos?')
+  it('L1 · fuera del bloqueo, la burbuja guarda como siempre (MUTACIÓN: vetar siempre)', async () => {
+    const datos = datosDeAltaRapida({
+      fecha: '2026-11-18', horaInicio: '10:00', horaFin: '11:00',
+      paciente: { id: 'p', nombre: 'Ana', apellidos: 'Ruiz', telefono: null }, medicoId: 'm1', consultorioId: 'c',
+    })
+    if (!datos) throw new Error('sin datos')
+    const d = {
+      avisoHorario: () => null, buscarEmpalmes: () => [], mensajeEmpalme: () => '',
+      confirmar: vi.fn(async () => true), guardar: vi.fn(async () => null), bloqueado: vi.fn(() => false),
+    }
+    const abiertas = { inicio: '10:00', fin: '11:00' }
+    expect(await guardarAltaRapida(datos, abiertas, abiertas, d)).toEqual({ enviada: true, alta: null })
+    expect(d.guardar).toHaveBeenCalledTimes(1)
+  })
+  it('el texto es el de Angel (punto 6, literal)', () => {
+    expect(TEXTO_HORARIO_BLOQUEADO).toBe('Este horario está bloqueado. Quita el bloqueo para agendar aquí.')
+  })
+})
+
+describe('L1 · pulsar en cualquier parte de la franja (bloqueoEnInstante)', () => {
+  const visible = (b: BloqueoAgenda, display = 'background'): EventApi => ({ ...pintado(b), display } as EventApi)
+  it('cualquier instante dentro abre ESE bloqueo, no sólo el rótulo (MUTACIÓN: devolver null)', () => {
+    expect(bloqueoEnInstante([visible(B)], new Date('2026-11-18T16:00:00Z'))?.id).toBe(B.id)
+    expect(bloqueoEnInstante([visible(B)], new Date('2026-11-18T17:45:00Z'))?.id).toBe(B.id)
+  })
+  it('semiabierto: el fin ya es libre, y fuera no hay bloqueo (MUTACIÓN: `<=` en el fin)', () => {
+    expect(bloqueoEnInstante([visible(B)], new Date('2026-11-18T18:00:00Z'))).toBeNull()
+    expect(bloqueoEnInstante([visible(B)], new Date('2026-11-18T15:59:00Z'))).toBeNull()
+  })
+  it('un bloqueo de días cubre sus días pintados (hora o banda de todo el día)', () => {
+    expect(bloqueoEnInstante([visible(DIAS)], new Date(2026, 10, 19, 0, 0))?.id).toBe(DIAS.id)
+    expect(bloqueoEnInstante([visible(DIAS)], new Date(2026, 10, 19, 10, 30))?.id).toBe(DIAS.id)
+    expect(bloqueoEnInstante([visible(DIAS)], new Date(2026, 10, 20, 0, 0))).toBeNull()
+  })
+  it('apagado (v2 apagada: `display: none`) no abre nada, y una cita no es un bloqueo (MUTACIÓN: sin mirar `display`)', () => {
+    expect(bloqueoEnInstante([visible(B, 'none')], new Date('2026-11-18T17:00:00Z'))).toBeNull()
+    const cita = { start: new Date('2026-11-18T16:00:00Z'), end: new Date('2026-11-18T18:00:00Z'), display: 'auto', extendedProps: { paciente_id: 'p' } }
+    expect(bloqueoEnInstante([cita], new Date('2026-11-18T17:00:00Z'))).toBeNull()
+  })
+  it('una fila de la lista o del Mes (`auto`) también cuenta', () => {
+    expect(bloqueoEnInstante([visible(B, 'auto')], new Date('2026-11-18T17:00:00Z'))?.id).toBe(B.id)
   })
 })
 

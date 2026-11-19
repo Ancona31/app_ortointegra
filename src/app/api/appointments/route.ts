@@ -14,6 +14,7 @@ import { comprobarTopeDuracion } from '@/lib/agenda/topeDuracion'
 import { consultaCitas } from '@/lib/agenda/consultaCitas'
 import { agendaV2Encendida } from '@/lib/agenda/ajustesAgenda'
 import { comprobarEmpalmes } from '@/lib/agenda/empalmesServidor'
+import { caeEnBloqueo, CUERPO_HORARIO_BLOQUEADO, esErrorDeBloqueo } from '@/lib/agenda/bloqueoTotalServidor'
 import { comprobarTipoDeCita, leerTipoCitaId, CUERPO_TIPO_INVALIDO } from '@/lib/agenda/tipoCitaServidor'
 import { cerrarSustituida, comprobarSustituible, leerSustituyeA } from '@/lib/agenda/sustitucionServidor'
 
@@ -416,6 +417,13 @@ export async function POST(req: NextRequest) {
        el interruptor, `empalmes_aceptados` se ignora y no se consulta nada. El
        `client_id` sale de la búsqueda: un reintento del alta que YA entró no
        debe empalmarse consigo mismo (lo resuelve el 23505 de más abajo). */
+    /* Tanda L (L1, punto 6): el bloqueo es TOTAL —citas y eventos, también de
+       todo el día—, y va ANTES del empalme: no se pregunta por un empalme donde
+       no se puede agendar. La base lo repite (`trg_appointments_horario_bloqueado`). */
+    if (v2 && await caeEnBloqueo(supabase, { clinicaId: profile.clinica_id, medicoId: finalMedicoId, inicio: inicioFila, fin: finFila })) {
+      return NextResponse.json(CUERPO_HORARIO_BLOQUEADO, { status: 409 })
+    }
+
     if (v2 && !esTodoElDia) {
       const veredicto = await comprobarEmpalmes(supabase, {
         clinicaId: profile.clinica_id, medicoId: finalMedicoId, inicio: inicioFila, fin: finFila,
@@ -488,6 +496,8 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ appointment: yaExiste, gcalSync: 'skipped', ...(sustituyeA ? { sustituida } : {}) })
         }
       }
+      // L1: el disparador del bloqueo, en la carrera con un bloqueo recién creado.
+      if (esErrorDeBloqueo(error)) return NextResponse.json(CUERPO_HORARIO_BLOQUEADO, { status: 409 })
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 

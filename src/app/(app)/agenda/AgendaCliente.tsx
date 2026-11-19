@@ -48,8 +48,9 @@ import { PanelDelDia } from '@/components/agenda/PanelDelDia'
 import { PanelDia } from '@/components/agenda/PanelDia'
 import { renderSinEventos } from '@/components/agenda/renderSinEventos'
 import { vaciarCacheCitas } from '@/lib/agenda/cacheRangosCitas'
-import { bloqueoDe, displayDeBloqueo, esBloqueo, mensajeCitasEnBloqueo, rotuloBloqueoPulsado, tocaBloqueo, type AperturaBloqueo } from '@/lib/agenda/bloqueosAgenda'
+import { bloqueoDe, bloqueoEnInstante, displayDeBloqueo, esBloqueo, mensajeCitasEnBloqueo, tocaBloqueo, type AperturaBloqueo, type BloqueoAgenda } from '@/lib/agenda/bloqueosAgenda'
 import type { ModoBloqueo } from '@/components/agenda/ModalBloqueo'
+import BotonBloquearHorario from '@/components/agenda/BotonBloquearHorario'
 import { vaciarCacheGoogle } from '@/lib/agenda/cacheEventosGoogle'
 import type { SemillaCitas } from '@/lib/agenda/semillaCitas'
 import { enOcioso, cancelarOcioso } from '@/lib/agenda/ocioso'
@@ -1333,49 +1334,36 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
     if (!estaCargando) setHuboTraida(true)
   }
 
-  /* K1 · El clic en el rótulo de un bloqueo abre su edición; el resto de la
-     franja deja pasar el clic y el arrastre al hueco (agendar encima pregunta). */
-  function abrirBloqueoPintado(id: string | null): boolean {
-    if (!id) return false
-    const ev = calendarRef.current?.getApi().getEventById(`bloqueo:${id}`)
-    const b = ev ? bloqueoDe(ev) : null
-    if (b) setModalBloqueo({ tipo: 'editar', bloqueo: b })
-    return b !== null
+  /* L1 (punto 7) · Pulsar EN CUALQUIER PARTE de un periodo bloqueado abre su
+     edición (el mismo modal con el que se creó); ya no deja pasar el clic al
+     hueco ni abre la burbuja de cita. Se decide por el instante del gesto
+     (`bloqueoEnInstante`), no por el elemento bajo el puntero: una cita
+     pintada encima es un evento, recibe su propio `eventClick` y FullCalendar
+     no emite `dateClick` por ella, así que sigue abriendo su burbuja. */
+  function bloqueoDelGesto(t: Date): BloqueoAgenda | null {
+    const api = calendarRef.current?.getApi()
+    return api ? bloqueoEnInstante(api.getEvents(), t) : null
   }
   function abrirAltaBloqueo(desde: AperturaBloqueo) {
     if (subState.isBlocked) { openBloqueoModal(); return }
     setModalBloqueo({ tipo: 'crear', desde: { ...desde, medicoId: desde.medicoId || defaultMedicoId || null } })
   }
-  /* ⚠️ EL ROTULO SE LEE EN EL `pointerdown` Y NO EN EL `jsEvent` del clic: al
-     soltar, FullCalendar ya pintó su `.fc-highlight` encima y el `target` del
-     `mouseup` es ese resaltado, no el rótulo. */
-  const rotuloAlBajarRef = useRef<string | null>(null)
-  useEffect(() => {
-    const raiz = raizRef.current
-    if (!raiz) return
-    /* Vale para TODO el gesto (FullCalendar emite `select` y `dateClick` del
-       mismo clic) y se olvida cuando ya respondieron los dos. */
-    const alBajar = (e: PointerEvent): void => { rotuloAlBajarRef.current = rotuloBloqueoPulsado(e) }
-    const alSoltar = (): void => { window.setTimeout(() => { rotuloAlBajarRef.current = null }, 0) }
-    raiz.addEventListener('pointerdown', alBajar, true)
-    window.addEventListener('pointerup', alSoltar, true)
-    return () => { raiz.removeEventListener('pointerdown', alBajar, true); window.removeEventListener('pointerup', alSoltar, true) }
-  }, [])
-  function rotuloDelGesto(): string | null {
-    return rotuloAlBajarRef.current
-  }
   function alPulsarHueco(arg: DateClickArg) {
-    if (abrirBloqueoPintado(rotuloDelGesto())) return
+    /* En el Mes del teléfono un toque ELIGE el día del panel (una lectura,
+       `handleDateClick`): no agenda nada, así que el bloqueo no lo intercepta. */
+    const b = isMobile && arg.view.type === 'dayGridMonth' ? null : bloqueoDelGesto(arg.date)
+    if (b) { setModalBloqueo({ tipo: 'editar', bloqueo: b }); return }
     handleDateClick(arg)
   }
   function alSeleccionar(arg: DateSelectArg) {
-    if (abrirBloqueoPintado(rotuloDelGesto())) { calendarRef.current?.getApi().unselect(); return }
+    const b = bloqueoDelGesto(arg.start)
+    if (b) { calendarRef.current?.getApi().unselect(); setModalBloqueo({ tipo: 'editar', bloqueo: b }); return }
     handleSelect(arg)
   }
   function alPulsarEvento(arg: EventClickArg) {
     const b = bloqueoDe(arg.event)
-    if (!b) { handleEventClick(arg); return }
-    if (arg.event.display !== 'background' || rotuloBloqueoPulsado(arg.jsEvent)) setModalBloqueo({ tipo: 'editar', bloqueo: b })
+    if (b) setModalBloqueo({ tipo: 'editar', bloqueo: b })
+    else handleEventClick(arg)
   }
 
   const manejadoresFcRef = useRef({
@@ -1398,6 +1386,9 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
   const dateClickFc = useCallback((arg: DateClickArg) => manejadoresFcRef.current.handleDateClick(arg), [])
   const selectFc = useCallback((arg: DateSelectArg) => manejadoresFcRef.current.handleSelect(arg), [])
   const eventClickFc = useCallback((arg: EventClickArg) => manejadoresFcRef.current.handleEventClick(arg), [])
+  /* L1 (punto 7) · Una selección no puede pisar un bloqueo visible: ni se pinta
+     el resaltado ni nace la burbuja; el clic suelto lo atiende `alPulsarHueco`. */
+  const seleccionSinBloqueoFc = useCallback((ev: EventApi) => !(esBloqueo(ev) && ev.display !== 'none'), [])
   const eventDropFc = useCallback((arg: EventDropArg) => { void manejadoresFcRef.current.handleEventDrop(arg) }, [])
   const eventResizeFc = useCallback((arg: EventResizeDoneArg) => { void manejadoresFcRef.current.handleEventResize(arg) }, [])
 
@@ -1421,9 +1412,20 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
     if (interaccionesRef.current) interaccionesRef.current.irACita(c, destacar)
     else irAFecha(partirFechaHora(c.start_time).fecha)
   }
+  /* L1 (punto 8) · El candado, junto a la campana: la única entrada para crear
+     un bloqueo. Abre el modal con HOY y sin hora, y el médico del filtro (si no
+     hay, `abrirAltaBloqueo` pone el de siempre). Es la opción de MENOS CAMBIO:
+     la misma fecha de partida que «Agendar», y lo demás lo decide el propio
+     modal como ya hacía al abrirse sin hora (`camposIniciales`: «Días
+     completos» marcado, hoy; al desmarcarlo propone 09:00–10:00). */
+  const abrirBloqueoDesdeBarra = (): void =>
+    abrirAltaBloqueo({ fecha: partirFechaHora(new Date().toISOString()).fecha, hora: null, medicoId: filtroEfectivo || null })
   const campanaV2 = (enBanda: boolean) => agendaV2 && barraV2 ? (
-    <barraV2.CampanaAgenda recarga={recargaPanel} confirmar={guardado.cambiarEstadoCita} cambiosRef={cambiosPorConfirmarRef}
-      alAbrirCita={abrirCitaDeAviso} enBanda={enBanda} />
+    <>
+      <barraV2.CampanaAgenda recarga={recargaPanel} confirmar={guardado.cambiarEstadoCita} cambiosRef={cambiosPorConfirmarRef}
+        alAbrirCita={abrirCitaDeAviso} enBanda={enBanda} />
+      <BotonBloquearHorario enBanda={enBanda} alPulsar={abrirBloqueoDesdeBarra} />
+    </>
   ) : undefined
   const engraneV2 = (enBanda: boolean) => agendaV2 && barraV2 ? (
     <barraV2.MenuEngraneAgenda enBanda={enBanda}
@@ -2021,6 +2023,7 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
              resaltado azul de selección, que competía con el contorno del día
              elegido. En cualquier otra vista y en escritorio no cambia nada. */
           selectable={!esMesMovil}
+          selectOverlap={seleccionSinBloqueoFc}
           selectMirror
           /* F3: tocar dentro de una capa (la burbuja) no suelta el tramo
              marcado. Primitivo; sin capas en pantalla no casa con nada, así que
@@ -2234,7 +2237,6 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
           })}
           setModal={setModal}
           setConfirm={setConfirm}
-          onBloquear={abrirAltaBloqueo}
         />
       )}
 
@@ -2314,9 +2316,7 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
              `setModal` no pueda inventarse un estado de creación desde una
              edición si alguien cablea mal esto mañana. */
           onCambiarTipo={tipo => setModal(m => (m.mode === 'create' ? { ...m, tipo } : m))}
-          /* K1 · sólo con la v2: la posición «Bloqueo» del alta y la pregunta al
-             guardar una cita sobre un bloqueo pintado. */
-          onBloquear={agendaV2 ? (desde) => { closeModal(); abrirAltaBloqueo(desde) } : undefined}
+          /* L1 (punto 6) · sólo con la v2: no se guarda nada sobre un bloqueo pintado. */
           buscarBloqueo={agendaV2 ? (inicio, fin, medicoId) => {
             const api = calendarRef.current?.getApi()
             return api ? tocaBloqueo(api.getEvents(), medicoId, inicio, fin) : false

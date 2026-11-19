@@ -184,7 +184,7 @@ export default function ModalBloqueo(p: Props): ReactElement {
           className="ag-modal-panel relative focus:outline-none bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 flex flex-col gap-3">
           <h2 id={tituloId} className="text-base font-bold" style={{ color: 'var(--ag-ink)' }}>{editar ? 'Bloqueo de horario' : 'Bloquear horario'}</h2>
           <p className="text-[12px] leading-relaxed" style={{ color: 'var(--ag-muted)' }}>
-            En el enlace de reserva no se ofrecen turnos en este periodo. En la agenda se puede agendar igual, con un aviso.
+            En este periodo no se agenda ni se mueve nada, y el enlace de reserva no ofrece turnos.
           </p>
           {!p.ocultarMedico && !editar && <CampoMedico c={c} set={set} medicos={p.medicos} />}
           <CamposPeriodo c={c} set={set} />

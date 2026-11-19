@@ -30,7 +30,9 @@ export interface BloqueoAgenda {
   motivo: string | null
 }
 
-/** Con qué se abre el modal del bloqueo al crearlo (desde el alta o la burbuja). */
+/** Con qué se abre el modal del bloqueo al crearlo. Desde L1 (punto 8) sólo lo abre
+ *  el candado, con `{ fecha, hora: null, medicoId }`; el fin y `todoElDia` se
+ *  conservan porque `camposIniciales` los sabe leer (se retiran con su último uso). */
 export interface AperturaBloqueo {
   fecha: string
   hora: string | null
@@ -46,8 +48,13 @@ export const BLOQUEO_SELECT = 'id, medico_id, inicio, fin, todo_el_dia, zona, mo
 /** Prefijo del id del evento: nunca choca con el uuid de una cita. */
 export const PREFIJO_BLOQUEO = 'bloqueo:'
 
-/** La pregunta de Angel, literal (punto 3): en la burbuja, en el modal y al arrastrar. */
-export const TEXTO_CONFIRMAR_BLOQUEO = 'Este horario está bloqueado. ¿Agendar de todos modos?'
+/**
+ * Tanda L (L1, punto 6) · El bloqueo es TOTAL y la pregunta de K1 («¿Agendar
+ * de todos modos?») desapareció: éste es el mensaje de Angel, literal, en la
+ * burbuja, el formulario, el arrastre y «Reagendar». El servidor responde 409
+ * con este MISMO texto (`bloqueoTotalServidor.ts`).
+ */
+export const TEXTO_HORARIO_BLOQUEADO = 'Este horario está bloqueado. Quita el bloqueo para agendar aquí.'
 
 /** Lo que se escribe en la franja: «Bloqueado», con el motivo si lo hay. */
 export function rotuloBloqueo(motivo: string | null | undefined): string {
@@ -115,15 +122,6 @@ export function tocaBloqueo(
   })
 }
 
-/**
- * ¿Pregunta por el bloqueo? Sólo una CITA (con paciente, por ligar o por
- * asignar): Angel dice «agendar o mover una cita». Un evento propio sin
- * paciente («Comida») no pregunta — es el médico ocupando su propio tiempo.
- */
-export function esCitaParaBloqueo(ext: Record<string, unknown>): boolean {
-  return Boolean(ext.paciente_id) || Boolean(ext.reserva_canal) || ext.google_asignacion === 'por_asignar'
-}
-
 /** Punto 5 · El aviso tras guardar: las citas se quedan como están. */
 export function mensajeCitasEnBloqueo(n: number): string {
   return n === 1
@@ -131,11 +129,27 @@ export function mensajeCitasEnBloqueo(n: number): string {
     : `Hay ${n} citas en este horario. Se quedan como están.`
 }
 
-/** El id del bloqueo cuyo rótulo se pulsó (`data-bloqueo-abrir`), o `null`. */
-export function rotuloBloqueoPulsado(e: { target: EventTarget | null } | null | undefined): string | null {
-  const t = e?.target
-  if (!(t instanceof Element)) return null
-  return t.closest('[data-bloqueo-abrir]')?.getAttribute('data-bloqueo-abrir') ?? null
+/** Lo que hace falta de un evento pintado para saber si un punto cae en él. */
+interface PintadoConPuntas { start: Date | null; end: Date | null; display: string; extendedProps: Record<string, unknown> }
+
+/**
+ * Tanda L (L1, punto 7) · El bloqueo VISIBLE que cubre el instante pulsado
+ * (`dateClick`/`select` de la rejilla, la banda de todo el día o el Mes), o
+ * `null`. Se decide por la POSICIÓN del gesto y no por el elemento que hay
+ * debajo del puntero: así responde la franja entera, no sólo su rótulo, y no
+ * depende del orden de `pointerdown`/`mouseup` de FullCalendar. Con las
+ * puntas PINTADAS (`start`/`end` del evento), que son las que se ven: un
+ * bloqueo de días cubre de medianoche a medianoche del día pintado. Uno
+ * apagado (`display: 'none'`, v2 apagada) no cuenta. Semiabierto: el instante
+ * del fin ya es libre.
+ */
+export function bloqueoEnInstante(pintados: readonly PintadoConPuntas[], t: Date): BloqueoAgenda | null {
+  const ms = t.getTime()
+  for (const ev of pintados) {
+    const b = ev.display === 'none' ? null : bloqueoDe(ev)
+    if (b && ev.start && ev.end && ev.start.getTime() <= ms && ms < ev.end.getTime()) return b
+  }
+  return null
 }
 
 /** Lee la lista `bloqueos` de una respuesta de `/api/appointments` (ausente = ninguno). */

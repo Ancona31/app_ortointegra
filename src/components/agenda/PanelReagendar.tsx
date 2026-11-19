@@ -8,9 +8,9 @@
  * formulario los deja deshabilitados y el arrastre se rechaza. Esto es la
  * única forma de mover consultorio, día u hora, y en tres pasos:
  *   1. los datos nuevos (la DURACIÓN se conserva; el médico no se toca);
- *   2. la confirmación EXPLÍCITA, que dice cómo se avisará al paciente (antes,
- *      si la hora nueva cae en un bloqueo pintado, la pregunta de K1, la misma
- *      del alta, el modal y el arrastre: integración de la tanda K);
+ *   2. la confirmación EXPLÍCITA, que dice cómo se avisará al paciente (si la
+ *      hora nueva cae en un bloqueo pintado, no se llega aquí: el mensaje de
+ *      L1, el mismo del alta, el modal y el arrastre; el servidor lo repite);
  *   3. `POST /api/appointments/[id]/reagendar` con `confirmado: true`. Si se
  *      empalma (B7, 409 con la lista) se pregunta y se reenvía aceptándolos.
  * Hecho: si la cita tiene correo, el servidor le manda el aviso de cambio con
@@ -22,7 +22,7 @@ import { useState, type ReactElement } from 'react'
 import { componerIso, partirFechaHora } from '@/lib/agenda/fechasAgenda'
 import { esListaDeEmpalmes, mensajeEmpalme, type Empalme } from '@/lib/agenda/empalmesCita'
 import { correoParaConfirmacion } from '@/lib/agenda/whatsappCita'
-import { TEXTO_CONFIRMAR_BLOQUEO } from '@/lib/agenda/bloqueosAgenda'
+import { TEXTO_HORARIO_BLOQUEADO } from '@/lib/agenda/bloqueosAgenda'
 import type { Appointment } from '@/lib/agenda/tiposAgenda'
 import { BotonWhatsAppCita } from '@/components/agenda/BotonWhatsAppCita'
 
@@ -30,7 +30,6 @@ type Aviso = 'enviado' | 'sin_correo' | 'no_enviado'
 
 type Fase =
   | { tipo: 'datos'; error: string | null }
-  | { tipo: 'bloqueo' }
   | { tipo: 'confirmar' }
   | { tipo: 'empalme'; lista: Empalme[]; aceptados: string[] }
   | { tipo: 'enviando' }
@@ -84,7 +83,7 @@ interface Props {
   /** Reagendada y vista la respuesta: la página vuelve a traer la agenda y cierra. */
   alTerminar: () => void
   alVolver: () => void
-  /** K1 · ¿El tramo nuevo toca un bloqueo pintado de ese médico? (el mismo `buscarBloqueo` del formulario; sólo con la v2). */
+  /** L1 · ¿El tramo nuevo toca un bloqueo pintado de ese médico? (el mismo `buscarBloqueo` del formulario; sólo con la v2). */
   buscarBloqueo?: (inicio: Date, fin: Date, medicoId: string) => boolean
 }
 
@@ -105,7 +104,7 @@ export default function PanelReagendar({ cita, consultorios, alTerminar, alVolve
     }
     if (inicio <= Date.now()) { setFase({ tipo: 'datos', error: 'La hora nueva ya pasó.' }); return }
     const enBloqueo = Boolean(cita.medico_id && buscarBloqueo?.(new Date(inicio), new Date(inicio + duracion), cita.medico_id))
-    setFase({ tipo: enBloqueo ? 'bloqueo' : 'confirmar' })
+    setFase(enBloqueo ? { tipo: 'datos', error: TEXTO_HORARIO_BLOQUEADO } : { tipo: 'confirmar' })
   }
 
   async function enviar(aceptados: string[]): Promise<void> {
@@ -131,7 +130,6 @@ export default function PanelReagendar({ cita, consultorios, alTerminar, alVolve
               {conCorreo ? TEXTO_REAGENDAR.conCorreo : TEXTO_REAGENDAR.sinCorreo}
             </p>
             <Pasos fase={fase} revisar={revisar} alVolver={alVolver} confirmar={() => void enviar([])}
-              seguir={() => setFase({ tipo: 'confirmar' })}
               aceptar={(lista, previos) => void enviar([...previos, ...lista.map(e => e.id)])} corregir={() => setFase({ tipo: 'datos', error: null })} />
           </>}
     </div>
@@ -168,13 +166,11 @@ function CamposReagendar(p: PropsCampos): ReactElement {
 interface PropsPasos {
   fase: Exclude<Fase, { tipo: 'hecho' }>
   revisar: () => void; alVolver: () => void; confirmar: () => void
-  /** K1 · «Aceptar» de la pregunta del bloqueo: pasa a la confirmación de siempre. */
-  seguir: () => void
   /** Los empalmes nuevos y los ya aceptados: viajan juntos, como el reintento del PUT. */
   aceptar: (lista: Empalme[], previos: string[]) => void; corregir: () => void
 }
 
-function Pasos({ fase, revisar, alVolver, confirmar, seguir, aceptar, corregir }: PropsPasos): ReactElement {
+function Pasos({ fase, revisar, alVolver, confirmar, aceptar, corregir }: PropsPasos): ReactElement {
   const fantasma = { color: 'var(--ag-muted)' }
   if (fase.tipo === 'datos') {
     return (
@@ -183,17 +179,6 @@ function Pasos({ fase, revisar, alVolver, confirmar, seguir, aceptar, corregir }
         <div className="flex gap-2 justify-end">
           <button type="button" onClick={alVolver} className={CLASE_BOTON} style={fantasma}>Volver</button>
           <button type="button" onClick={revisar} className={CLASE_PRIMARIO}>Revisar cambio</button>
-        </div>
-      </>
-    )
-  }
-  if (fase.tipo === 'bloqueo') {
-    return (
-      <>
-        <p role="alert" className="text-[12.5px] font-semibold" style={{ color: 'var(--ag-text)' }}>{TEXTO_CONFIRMAR_BLOQUEO}</p>
-        <div className="flex gap-2 justify-end">
-          <button type="button" onClick={corregir} className={CLASE_BOTON} style={fantasma}>Corregir</button>
-          <button type="button" onClick={seguir} className={CLASE_PRIMARIO}>Aceptar</button>
         </div>
       </>
     )

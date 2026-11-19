@@ -22,7 +22,7 @@
 
 import { useEffect, useId, useState } from 'react'
 import {
-  X, Calendar, Plus, Trash2, ChevronDown, FileText, Stethoscope, Loader2, Mail, CalendarPlus, CalendarX, Ban,
+  X, Calendar, Plus, Trash2, ChevronDown, FileText, Stethoscope, Loader2, Mail, CalendarPlus, CalendarX,
   type LucideIcon,
 } from 'lucide-react'
 import Link from 'next/link'
@@ -51,7 +51,7 @@ import PanelLigarCita from '@/components/agenda/PanelLigarCita'
 import { ligarCitaAPaciente, type PacienteParaLigar } from '@/lib/agenda/ligarCita'
 import { useDialogoModal } from '@/hooks/useDialogoModal'
 import ConfirmModal from '@/components/agenda/ConfirmModal'
-import { TEXTO_CONFIRMAR_BLOQUEO, type AperturaBloqueo } from '@/lib/agenda/bloqueosAgenda'
+import { TEXTO_HORARIO_BLOQUEADO } from '@/lib/agenda/bloqueosAgenda'
 import { DEFAULT_DURATION } from '@/lib/agenda/duracionCita'
 import { ESTADOS_SIN_EMPALME, mensajeEmpalme, type Empalme, type TramoCita } from '@/lib/agenda/empalmesCita'
 /* B6c: SÓLO EL TIPO. `tiposCita.ts` trae Zod en valor, y este modal se carga
@@ -355,7 +355,7 @@ function useTiposCita(medicoId: string): TipoCita[] | null {
 export default function AppointmentModal({
   modal, onClose, onSave, onDelete, medicos, defaultMedicoId,
   hideMedicoDropdown, medicoDropdownRequired, canVerExpediente, canInvitar, onInvitar,
-  onCambiarTipo, avisosHorario, agendaV2 = false, onCancelarCita, buscarEmpalmes, buscarBloqueo, onBloquear, saliendo = false, onReagendada,
+  onCambiarTipo, avisosHorario, agendaV2 = false, onCancelarCita, buscarEmpalmes, buscarBloqueo, saliendo = false, onReagendada,
 }: {
   modal: ModalState
   /* F2.7 · El modal sigue montado mientras sale (lo decide la página, rama de
@@ -380,10 +380,8 @@ export default function AppointmentModal({
      con el interruptor encendido; sin él no se pregunta nada. Lo que no está
      pintado lo dice el servidor con un 409 (ver `handleSave` de la página). */
   buscarEmpalmes?: (cita: TramoCita) => Empalme[]
-  /** K1 (punto 3) · ¿Cae en un bloqueo de horario pintado de ese médico? Sin ella (v2 apagada), no se pregunta. */
+  /** L1 (punto 6) · ¿Cae en un bloqueo de horario pintado de ese médico? Sin ella (v2 apagada), no se mira. */
   buscarBloqueo?: (inicio: Date, fin: Date, medicoId: string) => boolean
-  /** K1 · La posición «Bloqueo» del alta (sólo con la v2): abre el modal del bloqueo con esto. */
-  onBloquear?: (desde: AperturaBloqueo) => void
   medicos: Medico[]
   defaultMedicoId: string
   /* El horario de consulta, para el aviso de fuera de horario. Hasta ahora ese
@@ -543,7 +541,6 @@ export default function AppointmentModal({
   const [avisoHorario, setAvisoHorario] = useState<string | null>(null)
   /* B7c: el aviso de empalme ya redactado y los ids que se aceptan con él. */
   const [avisoEmpalme, setAvisoEmpalme] = useState<{ mensaje: string; ids: string[] } | null>(null)
-  const [avisoBloqueo, setAvisoBloqueo] = useState(false)
 
   // F3-6: hook de consultorio activo (siempre disponible bajo el Provider).
   const { consultorioActivo, cambiarActivo } = useConsultorioActivo()
@@ -771,13 +768,33 @@ export default function AppointmentModal({
     setHoraFin(fin.hora)
   }
 
+  /* L1 (punto 6) · El bloqueo es TOTAL: cita o evento, de horas o de todo el
+     día, no se agenda ni se mueve a un periodo bloqueado pintado de ese médico.
+     Se dice aquí, en el formulario, y «Guardar» no se deja pulsar; lo que no
+     está pintado lo dice el servidor (409, mismo texto). Con la regla del
+     empalme: en una edición, sólo si cambian las puntas o el médico (lo que ya
+     estaba dentro se queda). Todo el día: de medianoche a medianoche, con el
+     reloj del navegador (el servidor decide con el del consultorio). */
+  const enBloqueo = ((): boolean => {
+    if (!buscarBloqueo || !medicoId || faltanPuntas || finAntesDelInicio) return false
+    const inicio = new Date(todoElDia ? componerIso(fecha, '00:00') : componerIso(fecha, hora))
+    const fin    = new Date(todoElDia ? componerIso(desplazarFecha(fechaFin, { dias: 1 }), '00:00') : componerIso(fechaFin, horaFin))
+    /* «No se mueve» se mide contra lo que el formulario ENSEÑÓ al abrir, no
+       contra los instantes de la fila: en todo el día la fila es medianoche del
+       consultorio y esto la del navegador, y con husos distintos «Guardar» se
+       quedaría apagado sin salida en algo que ya estaba dentro. */
+    if (apt && fecha === inicial.fecha && hora === inicial.hora && fechaFin === inicial.fechaFin
+      && horaFin === inicial.horaFin && todoElDia === todoElDiaInicial && medicoId === apt.medico_id) return false
+    return buscarBloqueo(inicio, fin, medicoId)
+  })()
+
   async function handleSave() {
     /* `faltanPuntas` es el caso NUEVO: la vista Mes abre con fecha y sin hora, y
        la banda de todo el día abre sin ninguna de las dos, así que este
        formulario ya no arranca siempre completo. `fecha` no debería faltar nunca
        —todas las rutas traen día— pero entra en la misma frase: el día que
        alguien abra el modal de otra forma, esto aguanta. */
-    if (faltaLoEsencial || faltanPuntas || finAntesDelInicio) return
+    if (faltaLoEsencial || faltanPuntas || finAntesDelInicio || enBloqueo) return
 
     // Defensa en profundidad: secretaria debe seleccionar médico
     // (el `required` HTML5 ya bloquea el submit, pero validamos aquí también)
@@ -826,22 +843,10 @@ export default function AppointmentModal({
     })
   }
 
-  /* K1 (punto 3) · ¿La CITA del formulario cae en un bloqueo? Con la regla del
-     empalme: en una edición, sólo si cambian las puntas o el médico. */
-  function caeEnBloqueo(): boolean {
-    if (!buscarBloqueo || tipo !== 'cita' || todoElDia || !medicoId) return false
-    const inicio = new Date(componerIso(fecha, hora))
-    const fin    = new Date(componerIso(fechaFin, horaFin))
-    if (apt && inicio.getTime() === new Date(apt.start_time).getTime()
-      && fin.getTime() === new Date(apt.end_time).getTime() && medicoId === apt.medico_id) return false
-    return buscarBloqueo(inicio, fin, medicoId)
-  }
-
-  /* Después del aviso de horario, el del bloqueo (K1) y luego el de empalme:
-     si aplican salen seguidos (P3). El modal sigue abierto detrás; «Cancelar»
-     vuelve a él. */
-  async function seguirTrasHorario(bloqueoAceptado = false) {
-    if (!bloqueoAceptado && caeEnBloqueo()) { setAvisoBloqueo(true); return }
+  /* Después del aviso de horario, el de empalme: si aplican salen seguidos
+     (P3). El modal sigue abierto detrás; «Cancelar» vuelve a él. El bloqueo
+     (L1) no pregunta: se dice en el formulario y no deja guardar. */
+  async function seguirTrasHorario() {
     const lista = empalmesDelFormulario()
     if (lista.length) { setAvisoEmpalme({ mensaje: mensajeEmpalme(lista), ids: lista.map(e => e.id) }); return }
     await guardar()
@@ -1179,28 +1184,10 @@ export default function AppointmentModal({
                     </button>
                   )
                 })}
-                {/* K1 · «Bloqueo» NO es un tipo de fila (no es una cita ni un
-                    evento, no es `appointments`): esta posición cierra el
-                    modal y abre el del bloqueo con la fecha y la hora de aquí. */}
-                {onBloquear && (
-                  <button
-                    type="button" role="tab" aria-selected={false} data-alta-bloqueo
-                    onClick={() => onBloquear({ fecha, hora, fechaFin, horaFin, todoElDia, medicoId: medicoId || null })}
-                    className="flex-1 inline-flex items-center justify-center gap-1.5 bg-transparent hover:bg-[var(--ag-btn-ghost-hover)]"
-                    style={{
-                      border: 'none', cursor: 'pointer', borderRadius: 'var(--ag-r-btn)', padding: '7px 13px',
-                      transition: 'background-color var(--ag-dur-micro) var(--ag-ease), color var(--ag-dur-micro) var(--ag-ease)',
-                      fontSize: 13, fontWeight: 600, color: 'var(--ag-segment-text)',
-                    }}
-                  >
-                    <Ban size={14} />
-                    Bloqueo
-                  </button>
-                )}
               </div>
               <p className="text-[12px] mt-2 leading-relaxed" style={{ color: 'var(--ag-muted)' }}>
                 {esEvento
-                  ? (onBloquear ? 'Un evento no lleva paciente ni expediente: cirugía, junta, congreso.' : 'Un evento no lleva paciente ni expediente: cirugía, junta, bloqueo de horario.')
+                  ? (agendaV2 ? 'Un evento no lleva paciente ni expediente: cirugía, junta, congreso.' : 'Un evento no lleva paciente ni expediente: cirugía, junta, bloqueo de horario.')
                   : 'Una cita va ligada a un paciente y a su expediente.'}
               </p>
             </div>
@@ -1600,6 +1587,9 @@ export default function AppointmentModal({
                 : 'La hora de fin tiene que ir después de la de inicio.'}
             </p>
           )}
+          {enBloqueo && (
+            <p role="alert" data-aviso-bloqueado className="text-[12.5px] font-semibold text-red-500">{TEXTO_HORARIO_BLOQUEADO}</p>
+          )}
 
           {/* B6c · Tipo de cita (P5). Sólo con el interruptor, en una cita con
               paciente y si hay algún tipo que ofrecer. Opcional: «Sin tipo»
@@ -1922,7 +1912,7 @@ export default function AppointmentModal({
                 arriba, así que el pie no estrena dos formas de decir «estoy
                 trabajando». El estado lo dicen también el `disabled` y el
                 `aria-label`. */}
-            <button onClick={handleSave} disabled={saving || faltaLoEsencial || faltanPuntas || finAntesDelInicio || !consultorioId}
+            <button onClick={handleSave} disabled={saving || faltaLoEsencial || faltanPuntas || finAntesDelInicio || enBloqueo || !consultorioId}
               aria-label={saving ? 'Guardando' : undefined}
               className="flex items-center justify-center h-10 px-5 rounded-xl text-sm font-bold text-white disabled:opacity-50 hover:brightness-95 shadow-sm bg-[linear-gradient(135deg,var(--ag-brand-primary),var(--ag-brand-secondary))] max-md:flex-1 max-md:min-w-0 max-md:h-11 max-md:px-2">
               {saving ? <Loader2 size={16} className="animate-spin" /> : 'Guardar'}
@@ -1971,15 +1961,6 @@ export default function AppointmentModal({
         message={avisoHorario}
         onConfirm={() => { setAvisoHorario(null); void seguirTrasHorario() }}
         onCancel={() => setAvisoHorario(null)}
-      />
-    )}
-
-    {/* K1 · el aviso del bloqueo de horario, con el texto literal de Angel. */}
-    {avisoBloqueo && (
-      <ConfirmModal
-        message={TEXTO_CONFIRMAR_BLOQUEO}
-        onConfirm={() => { setAvisoBloqueo(false); void seguirTrasHorario(true) }}
-        onCancel={() => setAvisoBloqueo(false)}
       />
     )}
 

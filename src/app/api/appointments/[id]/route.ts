@@ -13,6 +13,7 @@ import { TZ_CLINICA, desplazarFecha, fechaHoraLocalAInstante, renderEnTZ } from 
 import { comprobarTopeDuracion } from '@/lib/agenda/topeDuracion'
 import { agendaV2Encendida } from '@/lib/agenda/ajustesAgenda'
 import { comprobarEmpalmes, type VeredictoEmpalme } from '@/lib/agenda/empalmesServidor'
+import { bloqueoDelPut, CUERPO_HORARIO_BLOQUEADO, esErrorDeBloqueo } from '@/lib/agenda/bloqueoTotalServidor'
 import { ESTADOS_SIN_EMPALME } from '@/lib/agenda/empalmesCita'
 import { HINT_ATENDIDA_CON_NOTA, pideComprobarNota, vetoPorEstado, vetoPorNotaLigada } from '@/lib/agenda/estadoCita'
 import { tieneNotaLigada } from '@/lib/agenda/notaLigadaServidor'
@@ -826,6 +827,12 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
        de una cita que ya estaba empalmada no debe avisar. Una fila que queda
        `cancelled`, `no_show` o de todo el día no se empalma (P3). La propia
        cita queda fuera de la búsqueda. */
+    /* Tanda L (L1, punto 6): mover (inicio, fin o médico) a un periodo
+       bloqueado, no. Antes del empalme. Lo que ya estaba dentro y no se mueve,
+       pasa. La base lo repite (`trg_appointments_horario_bloqueado`). */
+    if (v2 && await bloqueoDelPut(supabase, profile.clinica_id, existing, updates)) {
+      return NextResponse.json(CUERPO_HORARIO_BLOQUEADO, { status: 409 })
+    }
     if (v2) {
       const veredicto = await empalmeDelPut(supabase, profile.clinica_id, id, existing, updates, todoElDiaEfectivo, body.empalmes_aceptados)
       if (!veredicto.ok) return NextResponse.json(veredicto.cuerpo, { status: veredicto.status })
@@ -873,6 +880,8 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
         { status: 409 }
       )
     }
+    // L1: el disparador del bloqueo, en la carrera con un bloqueo recién creado.
+    if (esErrorDeBloqueo(error)) return NextResponse.json(CUERPO_HORARIO_BLOQUEADO, { status: 409 })
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
     /* D7: el ligado, auditado sólo con NOMBRES de campo. Después de escribir:

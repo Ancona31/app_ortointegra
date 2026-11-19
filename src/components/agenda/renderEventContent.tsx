@@ -206,10 +206,10 @@ export function renderEventContent(arg: EventContentArg, navegadorTZ: string, in
 }
 
 /**
- * K1 · El rótulo del bloqueo. En la rejilla (fondo rayado) es lo ÚNICO que
- * abre la edición —`data-bloqueo-abrir`, lo lee `AgendaCliente`—: el resto de
- * la franja deja pasar el clic al hueco. En la lista y en el Mes con hora es
- * la fila entera.
+ * K1 · El rótulo del bloqueo. Desde L1 (punto 7) NO es lo que abre la
+ * edición: la abre un clic en cualquier parte de la franja (`bloqueoDelGesto`
+ * en `AgendaCliente`, por el instante), y en la lista y en el Mes, la fila
+ * entera. `data-bloqueo-abrir` queda como marca del rótulo: ya no lo lee el código.
  */
 function ContenidoBloqueo({ id, rotulo, fondo }: { id: string; rotulo: string; fondo: boolean }) {
   return (

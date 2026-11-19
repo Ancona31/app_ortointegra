@@ -37,6 +37,9 @@ const h = vi.hoisted(() => ({
   reparar: [] as boolean[],
   /** T3 · Lo que contestan las tres puertas del alta por RPC (convertir en cita). */
   puertas: true,
+  /** L1 · Cuántos bloqueos ve la consulta de `agenda_bloqueos`, y el error de la escritura (el disparador). */
+  bloqueos: 0,
+  errorEscritura: null as { code: string; hint: string; message: string } | null,
 }))
 
 class Consulta implements PromiseLike<unknown> {
@@ -71,7 +74,10 @@ class Consulta implements PromiseLike<unknown> {
       return Promise.resolve({ data: { id: 'c1', nombre: 'Centro', nombre_corto: null, direccion: null, telefono: null, timezone: 'America/Merida' }, error: null })
     }
     if (tabla === 'appointments' && verbo === 'select') return Promise.resolve({ data: h.fila, error: null })
-    if (tabla === 'appointments' && (verbo === 'update' || verbo === 'insert')) return Promise.resolve({ data: h.escrita, error: null })
+    if (tabla === 'agenda_bloqueos') return Promise.resolve({ data: null, count: h.bloqueos, error: null })
+    if (tabla === 'appointments' && (verbo === 'update' || verbo === 'insert')) {
+      return Promise.resolve(h.errorEscritura ? { data: null, error: h.errorEscritura } : { data: h.escrita, error: null })
+    }
     if (tabla === 'admin:appointments' && verbo === 'select') {
       return Promise.resolve({ data: h.vigente === null ? null : { updated_at: h.vigente }, error: null })
     }
@@ -174,6 +180,7 @@ const guardados = (): Array<Record<string, unknown>> =>
 beforeEach(() => {
   Object.assign(h, {
     ops: [], google: [], despues: [], interruptor: false, fila: CITA, vigente: null, gets: [], fallosPatch: [], reparar: [], puertas: true,
+    bloqueos: 0, errorEscritura: null,
     escrita: { ...CITA, status: 'confirmed', updated_at: DESPUES },
   })
   vi.mocked(logAudit).mockClear()
@@ -358,6 +365,60 @@ describe('PUT /api/appointments/[id] — apagado, como hoy', () => {
     await correrDespues()
     expect(cuerpo(h.google[0])).not.toHaveProperty('extendedProperties')
     expect(guardados()[0]).not.toHaveProperty('gcal_etag')
+  })
+})
+
+/* L1 (punto 6) · El bloqueo TOTAL en las dos rutas: 409 con el mensaje de Angel
+   antes de escribir, y el 42501 del disparador (la carrera) traducido igual. */
+describe('L1 · bloqueo total en POST y PUT', () => {
+  const MENSAJE = 'Este horario está bloqueado. Quita el bloqueo para agendar aquí.'
+  const escrituras = (): Op[] => h.ops.filter((o) => o.tabla === 'appointments' && o.verbo !== 'select')
+  const consultasBloqueo = (): Op[] => h.ops.filter((o) => o.tabla === 'agenda_bloqueos')
+  const DISPARADOR = { code: '42501', hint: 'agenda_horario_bloqueado', message: MENSAJE }
+
+  it('POST v2 en un bloqueo: 409 literal, sin insert ni Google (MUTACIÓN: sin el veto)', async () => {
+    h.interruptor = true
+    h.bloqueos = 1
+    const res = await crear()
+    expect(res.status).toBe(409)
+    expect(await res.json()).toEqual({ error: 'horario_bloqueado', message: MENSAJE })
+    expect(consultasBloqueo()[0].filtros).toEqual({ clinica_id: 'clinica-1', medico_id: 'u1' })
+    expect(escrituras()).toEqual([])
+    expect(h.despues).toEqual([])
+  })
+  it('POST apagado: ni se consulta (MUTACIÓN: sin `v2 &&`)', async () => {
+    h.bloqueos = 1
+    h.escrita = { ...CITA, id: ID }
+    expect((await crear()).status).toBe(200)
+    expect(consultasBloqueo()).toEqual([])
+  })
+  it('POST: el 42501 del disparador (carrera) es el mismo 409, no un 500 (MUTACIÓN: sin la rama)', async () => {
+    h.interruptor = true
+    h.errorEscritura = DISPARADOR
+    const res = await crear()
+    expect(res.status).toBe(409)
+    expect((await res.json()).message).toBe(MENSAJE)
+  })
+  it('PUT v2 que mueve a un bloqueo: 409 literal, sin update (MUTACIÓN: sin el veto)', async () => {
+    h.interruptor = true
+    h.bloqueos = 1
+    const res = await editar({ start_time: '2026-11-18T17:00:00.000Z', end_time: '2026-11-18T17:30:00.000Z' })
+    expect(res.status).toBe(409)
+    expect(await res.json()).toEqual({ error: 'horario_bloqueado', message: MENSAJE })
+    expect(escrituras()).toEqual([])
+  })
+  it('PUT v2 que NO mueve (confirmar una cita que ya estaba dentro): ni se consulta (K punto 5)', async () => {
+    h.interruptor = true
+    h.bloqueos = 1
+    expect((await editar({ status: 'confirmed' })).status).toBe(200)
+    expect(consultasBloqueo()).toEqual([])
+  })
+  it('PUT: el 42501 del disparador es el 409, y otro 42501 sigue siendo 500 (MUTACIÓN: mirar sólo el código)', async () => {
+    h.interruptor = true
+    h.errorEscritura = DISPARADOR
+    expect((await editar({ start_time: '2026-11-18T17:00:00.000Z', end_time: '2026-11-18T17:30:00.000Z' })).status).toBe(409)
+    h.errorEscritura = { code: '42501', hint: '', message: 'new row violates row-level security policy' }
+    expect((await editar({ start_time: '2026-11-18T17:00:00.000Z', end_time: '2026-11-18T17:30:00.000Z' })).status).toBe(500)
   })
 })
 

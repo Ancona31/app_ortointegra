@@ -50,7 +50,7 @@ import type { AltaGuardada, Appointment, DatosGuardado, OpcionesGuardado } from 
 import type { ApiInteraccionesV2, AperturaAltaV2, AperturaEdicionV2, CambiarEstadoCita, GestoAlta, SitioCita } from '@/lib/agenda/contratosV2'
 import type { Caja, Punto } from '@/lib/agenda/posicionCapa'
 import { guardarAltaRapida, horasDelGesto, type DependenciasGuardado } from '@/lib/agenda/altaRapida'
-import { tocaBloqueo, type AperturaBloqueo } from '@/lib/agenda/bloqueosAgenda'
+import { tocaBloqueo } from '@/lib/agenda/bloqueosAgenda'
 import type { AvisosHorario } from '@/lib/agenda/horarioRejilla'
 import { empalmesPintados, mensajeEmpalme } from '@/lib/agenda/empalmesCita'
 import { esEventoGenerico, esPorAsignar } from '@/lib/agenda/tarjetasAgenda'
@@ -132,8 +132,6 @@ export interface PropsInteraccionesV2 {
   invitar: (cita: Appointment) => void
   setModal: Dispatch<SetStateAction<ModalState>>
   setConfirm: Dispatch<SetStateAction<ConfirmState>>
-  /** K1 · Abre el modal del bloqueo de horario (crear) con ese tramo. */
-  onBloquear?: (desde: AperturaBloqueo) => void
 }
 
 type Capa =
@@ -206,7 +204,7 @@ function useDependenciasGuardado(p: PropsInteraccionesV2): DependenciasGuardado 
     })),
     /* T1: sin la invitación automática; la burbuja la ofrece como botón. */
     guardar: (datos) => guardado.handleSave(datos, false, { sinInvitacion: true }),
-    /* K1 · el alta rápida siempre es una cita: pregunta si cae en un bloqueo pintado. */
+    /* L1 (punto 6) · si cae en un bloqueo pintado de ese médico, no se guarda (sin pregunta). */
     bloqueado: (inicio, fin, medicoId) => {
       const api = calendarRef.current?.getApi()
       return api ? tocaBloqueo(api.getEvents(), medicoId, inicio, fin) : false
@@ -242,7 +240,6 @@ function CapaBurbuja({ capa, medicos, p, cerrar }: PropsCapaBurbuja): ReactEleme
       alEditar={(cita) => { cerrar(capa.id); p.setModal({ mode: 'edit', appointment: cita }) }}
       zonaVisor={p.zonaVisor}
       alCerrar={() => cerrar(capa.id)}
-      alBloquear={p.onBloquear && !capa.sustituyeA ? (v) => { cerrar(capa.id); p.onBloquear?.(v) } : undefined}
     />
   )
 }

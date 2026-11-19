@@ -7683,6 +7683,8 @@ html.dark .bg-amber-50\/60           { background-color: rgba(245,158,11,.10) !i
   background-color: color-mix(in srgb, var(--ag-ink-600) 6%, transparent) !important;
   background-image: repeating-linear-gradient(45deg, color-mix(in srgb, var(--ag-ink-600) 16%, transparent) 0 6px, transparent 6px 14px) !important;
   border: none;
+  /* L1 (punto 7): pulsar en cualquier parte de la franja abre su edición. */
+  cursor: pointer;
 }
 .ag-leyenda-bloqueo {
   background-color: color-mix(in srgb, var(--ag-ink-600) 10%, transparent);
