@@ -9,9 +9,9 @@ import { abrirAgendaApagada, abrirAgendaV2, burbuja, clicEnFranja, elegirPacient
  * `scripts/reserva-carrera.sh` y `reserva-seg1.e2e.ts`; «Reagendar»,
  * `agenda-eleccion-i2.e2e.ts`.
  *
- *   · L1 punto 8: se crea SÓLO con el candado junto a la campana (ni la
- *     posición «Bloqueo» de «Agendar» ni el enlace de la burbuja); franja
- *     rayada con el motivo.
+ *   · L1 punto 8: se crea con el candado junto a la campana (no con el enlace
+ *     de la burbuja; la posición «Bloqueo» del alta volvió con M3, punto 5,
+ *     y la prueba `agenda-m3-alta-bloqueo.e2e.ts`); franja rayada con el motivo.
  *   · L1 punto 6: el bloqueo es TOTAL. La burbuja, el formulario completo y el
  *     arrastre no guardan nada dentro y dicen «Este horario está bloqueado.
  *     Quita el bloqueo para agendar aquí.»; el servidor responde 409 con ese
@@ -109,18 +109,14 @@ function sembrarCita(desde: string, hasta: string): string {
     returning id;`, { dia: JUEVES, desde, hasta }).split('\n')[0]
 }
 
-test('8 · sólo el candado junto a la campana crea; franja rayada con el motivo, en la base y auditada', async ({ page }) => {
+test('8 · el candado junto a la campana crea; franja rayada con el motivo, en la base y auditada', async ({ page }) => {
   await abrirAgendaV2(page)
   await aLaSemanaMasTres(page)
   const candado = page.getByRole('button', { name: 'Bloquear horario', exact: true })
   await expect(candado).toHaveCount(1)
   // Hermano de la campana, a su derecha, en la misma barra.
   expect(await candado.evaluate(b => b.previousElementSibling?.hasAttribute('data-campana') ?? false)).toBe(true)
-  // Ya no hay otras entradas: ni la posición «Bloqueo» del alta ni el enlace de la burbuja.
-  await page.locator('[data-onboard="nueva-cita"]').click()
-  await expect(modalCita(page, 'Nueva cita')).toBeVisible()
-  await expect(modalCita(page, 'Nueva cita').getByRole('tab', { name: 'Bloqueo' })).toHaveCount(0)
-  await modalCita(page, 'Nueva cita').getByRole('button', { name: 'Cancelar' }).click()
+  // El enlace de la burbuja no vuelve. (La posición «Bloqueo» del alta, sí: M3, punto 5 —`agenda-m3-alta-bloqueo.e2e.ts`.)
   await clicEnFranja(page, JUEVES, '10:00')
   await expect(burbuja(page)).toBeVisible()
   await expect(burbuja(page).getByText('Bloquear este horario')).toHaveCount(0)
@@ -143,7 +139,8 @@ test('8 · sólo el candado junto a la campana crea; franja rayada con el motivo
   await expect(m).toBeHidden()
   await expect(franja(page)).toHaveCount(1)
   await expect(franja(page)).toContainText(`Bloqueado · ${MOTIVO}`)
-  const fondo = await franja(page).evaluate(e => getComputedStyle(e).backgroundImage)
+  /* M3 (punto 6): en horario, el rayado lo pintan los trozos `.ag-bloqueo-tramo` de la franja. */
+  const fondo = await franja(page).evaluate(e => getComputedStyle(e.querySelector('.ag-bloqueo-tramo') ?? e).backgroundImage)
   expect(fondo).toContain('repeating-linear-gradient')
   expect(filasBloqueo()).toBe(`${MOTIVO}|f`)
   expect(sqlLocal(`select count(*) from public.audit_log where tabla = 'agenda_bloqueos' and accion = 'INSERT' and created_at > now() - interval '2 minutes';`).trim()).not.toBe('0')

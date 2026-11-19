@@ -75,6 +75,12 @@ const ATAJO_NATIVO: ReadonlyArray<[string, AccionAtajo]> = [
   ['.fc-today-button', 'hoy'], ['.fc-prev-button', 'anterior'], ['.fc-next-button', 'siguiente'],
 ]
 
+/** El texto de la opción de ese médico, el que el `<select>` enseña elegido (M3, punto 3). */
+function textoDeMedico(medicos: readonly MedicoConfig[], id: string): string {
+  const m = medicos.find(x => x.id === id)
+  return m ? componerNombreMedicoCompleto(m) : ''
+}
+
 export function CabeceraEscritorio({
   resumenConteo, currentView, isMobile, onVista, compactar, onCompactar, isSingleDoctor,
   filtroEfectivo, mesSinTodos, medicos, onFiltroMedico, canEditHorario, onHorario, onAgendar,
@@ -100,7 +106,7 @@ export function CabeceraEscritorio({
     })
     return () => cancelAnimationFrame(id)
   }, [atajos, currentView])
-  return (
+  const nav = (
     /* ═══ F1.1 · UNA SOLA BARRA ════════════════════════════════════════════
        Desde F1.1 esto NO es un encabezado encima de la tarjeta: es un ítem más
        de la rejilla de `.agenda-fc` (`grid-area: controles`), en la misma fila
@@ -111,8 +117,14 @@ export function CabeceraEscritorio({
        la fecha y el lector de pantalla necesita el título.
        ⚠️ El CONTEO va el primero, en gris, con elipsis, y es lo PRIMERO que cede
        ancho: los demás controles no encogen. Se fue «Gestión de citas clínicas»,
-       que era decorativa (lo decía el título, que ya no se ve). */
-    <div className="ag-controles" ref={raizRef}>
+       que era decorativa (lo decía el título, que ya no se ve).
+       ⚠️ M3 (punto 3) · CON LA V2 SON DOS ÍTEMS DE LA REJILLA Y NO UNO: `nav`
+       (fecha, leyenda y vistas) y `acciones` (filtro, buscar, campana, candado,
+       engrane y «Agendar»), en ese orden de tabulación, el de siempre. Así, donde
+       la fila no cabe, la barra baja ENTERA a dos filas limpias —‹ › Hoy, fecha
+       y vistas arriba; el resto debajo— en vez de partirse a trozos. Apagada,
+       un solo `<div>` con todo, como siempre. Los anchos, en `globals.css`. */
+    <>
       <h1 className="sr-only">Agenda</h1>
       {/* F3 · La ranura del minicalendario va la PRIMERA: la fecha de
           FullCalendar queda justo a su izquierda, al final de la barra nativa. */}
@@ -263,9 +275,23 @@ export function CabeceraEscritorio({
           <span className="hidden 2xl:inline">Densidad</span>
         </button>
       )}
+    </>
+  )
+  const acciones = (
+    <>
       {/* Filtro por médico — solo en modo multi-doctor */}
       {!isSingleDoctor && (
         <div className="relative ag-controles-filtro">
+          {/* M3 (punto 3) · Con la v2 el filtro mide lo que el nombre ELEGIDO
+              (hasta 240 px), no lo que la opción más larga: en el Mes, la de
+              «Todos los médicos — el mes se ve por médico», que ni se puede
+              elegir, lo ensanchaba hasta el tope. Este texto invisible da el
+              ancho; el `<select>` no aporta ninguno (globals.css). */}
+          {barraV2 && (
+            <span className="ag-filtro-medida" aria-hidden="true">
+              {filtroEfectivo ? textoDeMedico(medicos, filtroEfectivo) : OPCION_TODOS(mesSinTodos)}
+            </span>
+          )}
           {/* ⚠️ F1.1 · DESDE LA BARRA ÚNICA EL ANCHO YA NO LO DECIDE LA OPCIÓN
               MÁS ANCHA: el envoltorio (`.ag-controles-filtro` en globals.css)
               va de 140 a 240 px y el `<select>` lo llena (`w-full`), así que
@@ -402,8 +428,19 @@ export function CabeceraEscritorio({
         className="flex flex-none items-center gap-2 h-9 px-4 rounded-[var(--ag-r-btn)] text-sm font-semibold text-white shadow-sm hover:brightness-95 bg-[linear-gradient(135deg,var(--ag-brand-primary),var(--ag-brand-secondary))]"
       >
         <Plus size={15} />
-        Agendar
+        {/* M3 (punto 3) · con la v2, en la banda estrecha de la fila única el
+            texto se oculta A LA VISTA (no al lector: el nombre sigue siendo
+            «Agendar») y queda el «+». */}
+        {barraV2 ? <span className="ag-agendar-texto">Agendar</span> : 'Agendar'}
       </button>
-    </div>
+    </>
+  )
+  return barraV2 ? (
+    <>
+      <div className="ag-controles ag-controles-nav" ref={raizRef}>{nav}</div>
+      <div className="ag-controles ag-controles-acciones">{acciones}</div>
+    </>
+  ) : (
+    <div className="ag-controles" ref={raizRef}>{nav}{acciones}</div>
   )
 }

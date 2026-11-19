@@ -13,7 +13,8 @@ import { codigoDeConfirmacion, hashDeCodigo } from '../src/lib/reserva/secretos'
 /**
  * I5 · la barra de la agenda v2, la campana y los «Avisos» (puntos 13 a 20 de
  * Angel), con el interruptor encendido en la Clínica Semilla A:
- *   13-15. una sola fila (desde 1280 px): sin conteo ni «Compactar», atajos,
+ *   13-15. una sola fila (desde 1360 px desde M3, punto 3; de 1024 a 1359, dos
+ *       filas limpias: `agenda-m3-barra.e2e.ts`): sin conteo ni «Compactar», atajos,
  *       «Ir a una fecha» ni fila de leyenda sueltos; la fecha es el botón del
  *       minicalendario; el engrane es un menú (APG) con las cinco opciones;
  *   16-18. la campana con punto rojo y dos pestañas, también en el teléfono y
@@ -157,8 +158,9 @@ function revisado(tipo: string, cita: string): string {
 
 /* ── 13 a 15: la barra de escritorio ───────────────────────────────────── */
 
-test('13-15 escritorio a 1280: una fila; la fecha abre el minicalendario; el engrane es un menú con sus cinco opciones', async ({ page }) => {
-  await page.setViewportSize({ width: 1280, height: 800 })
+test('13-15 escritorio a 1366: una fila; la fecha abre el minicalendario; el engrane es un menú con sus cinco opciones', async ({ page }) => {
+  /* M3 (punto 3): la fila única empieza en 1360; a 1280 la barra va en dos filas limpias. */
+  await page.setViewportSize({ width: 1366, height: 800 })
   await abrirAgendaV2(page)
   const fecha = page.locator('[data-selector-fecha]')
   await expect(fecha).toBeVisible()
