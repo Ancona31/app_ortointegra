@@ -166,7 +166,7 @@ describe('POST /api/agenda/correo — envío', () => {
     expect(c.idempotencia).toBe(`confirmacion/${ENVIO}`)
     expect(c.asunto).toMatch(/^Confirma tu cita del /)
     expect(c.texto).toContain('Dra. Ana Pérez')
-    expect(c.texto).toContain('Consultorio Centro, Calle Ficticia 1, Centro, Mérida')
+    expect(c.texto).toContain('Consultorio: Consultorio Centro\nDirección: Calle Ficticia 1, Centro, Mérida')
     expect(c.texto).toContain('https://spinus.prueba/confirmar/AbCdEfGhIjKlMnOpQrStUv')
     // K2 (punto 8): «Confirmo» lleva ?paso=confirmar.
     expect(c.html).toContain('href="https://spinus.prueba/confirmar/AbCdEfGhIjKlMnOpQrStUv?paso=confirmar"')
@@ -191,7 +191,9 @@ describe('POST /api/agenda/correo — envío', () => {
     h.correos = []
     h.fila = cita({ reserva_nombre: null, pacientes: { email: 'juana@prueba.local', nombre: null } })
     expect((await POST(post({ cita_id: CITA }))).status).toBe(200)
-    expect((h.correos[0] as { texto: string }).texto).not.toContain('Hola')
+    // M5 (punto 14): sin nombre, «Hola:».
+    expect((h.correos[0] as { texto: string }).texto).toContain('Hola:')
+    expect((h.correos[0] as { texto: string }).texto).not.toContain('Hola,')
   })
 
   it('una cita confirmada: asunto sin «Confirma» y el enlace sólo para avisar que no asistirá', async () => {

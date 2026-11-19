@@ -1,38 +1,33 @@
 /**
- * correosCita.ts — la plantilla del RECORDATORIO de cita (agenda E4). Pura:
- * devuelve asunto, texto y HTML; la manda `recordatorios.ts` por
- * `src/lib/correo/transporte.ts`.
+ * correosCita.ts — los correos de la cita que llevan el enlace de confirmar o
+ * cancelar: RECORDATORIO (E4), CONFIRMACIÓN (G3) y AVISO DE CAMBIO (I9). Puro:
+ * devuelve asunto, texto y HTML; los mandan `recordatorios.ts` y
+ * `confirmacionCita.ts` por `src/lib/correo/transporte.ts`.
  *
- * ⚠️ TEXTO PENDIENTE DE REVISIÓN (legal y de tono, mejora_agendaV2.md §7: «revisar
- * el texto legal … de los correos»). No citar artículos ni autoridad aquí.
+ * Tanda M (M5, puntos 12 y 13): los tres siguen la maqueta
+ * `docs/spec/correo-confirmar-cita.html` (píldora de estado, «Hola…:», fecha
+ * grande con «hora de …», los dos botones, la nota del plazo, detalles y el
+ * aviso de seguridad), armados por `plantillaCita.ts`. Los asuntos NO
+ * cambiaron. Los enlaces tampoco: «Confirmo mi asistencia» → `?paso=confirmar`
+ * (K2, confirma al cargar, con JS), «No podré asistir» → `?paso=cancelar` (sólo
+ * PINTA el «¿Seguro?»), y el texto plano lleva la URL simple (K2).
+ *
+ * ⚠️ TEXTO PENDIENTE DE REVISIÓN (legal y de tono, mejora_agendaV2.md §7). No
+ * citar artículos ni autoridad aquí.
  *
  * ⚠️ NADA CLÍNICO (§5 E, plan_E lista A 16): ni título de la cita, ni notas, ni
- * tipo de cita, ni especialidad, ni el nombre del paciente. Sólo fecha, hora
- * (en la zona del consultorio, con su etiqueta), médico, consultorio, su
- * dirección y su teléfono, y el enlace. El asunto no lleva ni el médico.
- * EXCEPCIÓN (tanda L, punto 15 de Angel): el correo de CONFIRMACIÓN
- * (`correoConfirmacion`) saluda por el nombre («Hola, Ana:»), SÓLO el nombre
- * y sólo en el cuerpo (nunca en el asunto). El recordatorio y el aviso de
- * cambio siguen sin él.
+ * tipo de cita, ni especialidad. Sólo fecha, hora (en la zona del consultorio),
+ * médico, consultorio, su dirección y su teléfono, y el enlace. El asunto no
+ * lleva ni el médico. El nombre del paciente sólo en el saludo de la
+ * CONFIRMACIÓN (tanda L, punto 15) y nunca en el asunto; el recordatorio y el
+ * aviso de cambio saludan «Hola:» (no tienen el nombre a mano).
  *
  * ⚠️ DETERMINISTA: la misma entrada da exactamente el mismo correo, sin «ahora»
- * en ninguna parte. Resend exige el MISMO cuerpo con la misma Idempotency-Key
- * (un reintento con otro cuerpo da 409), así que nada de aquí puede depender
- * del reloj.
- *
- * Todo valor interpolado en el HTML va escapado: el consultorio y su dirección
- * los escribe la clínica (lo hace `plantillaCita.ts`).
- *
- * Tanda G1: el HTML y el texto los arma `plantillaCita.ts`, el mismo armado de
- * todos los correos de cita. El asunto y las frases del texto plano NO
- * cambiaron. «No podré asistir» lleva a `?paso=cancelar`, que sólo PINTA el
- * «¿Seguro?» (un GET que no escribe, como el resto de la página).
+ * en ninguna parte (Resend exige el MISMO cuerpo con la misma Idempotency-Key).
  */
-import { fechaDeCorreo, htmlCorreoCita, textoCorreoCita, type BotonCorreo } from '@/lib/correo/plantillaCita'
-import { regionDeTimezone } from '@/lib/consultorios/zonas-mexico'
-
-/** Zona por omisión si la cita no la guardó (la de la clínica, `TZ_CLINICA`). */
-const ZONA_POR_OMISION = 'America/Mexico_City'
+import {
+  fechaDeCorreo, htmlCorreoCita, textoCorreoCita, zonaValida, type BloqueCorreo, type BotonCorreo, type CorreoArmado,
+} from '@/lib/correo/plantillaCita'
 
 export interface DatosRecordatorio {
   /** Instante de inicio (ISO). */
@@ -51,48 +46,20 @@ export interface DatosRecordatorio {
 /** `remitente`: el NOMBRE con que sale (el del médico, tanda I punto 21; '' = «Spinus»). La dirección no cambia. */
 export interface CorreoRecordatorio { asunto: string; texto: string; html: string; remitente: string }
 
-function zonaValida(zona: string | null): string {
-  if (!zona) return ZONA_POR_OMISION
-  try {
-    new Intl.DateTimeFormat('es-MX', { timeZone: zona })
-    return zona
-  } catch {
-    return ZONA_POR_OMISION
-  }
-}
+/**
+ * El plazo para cancelar por el enlace. NO es un ajuste de la clínica: es la
+ * regla fija de la base (`cita_confirmacion_responder`, E1: hasta
+ * `start_time - interval '1 hour'`). Si algún día se vuelve ajuste, cambia allí
+ * y aquí a la vez.
+ */
+export const PLAZO_CANCELAR = '1 hora'
 
-/** «martes 12 de noviembre» y «10:00», en la zona dada. */
+/** «martes 12 de noviembre» y «10:00», en la zona dada (también lo usa la ruta de WhatsApp). */
 export function fechaYHora(inicio: string, zona: string): { fecha: string; hora: string } {
   const instante = new Date(inicio)
   const fecha = new Intl.DateTimeFormat('es-MX', { weekday: 'long', day: 'numeric', month: 'long', timeZone: zona }).format(instante)
   const hora = new Intl.DateTimeFormat('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: zona }).format(instante)
   return { fecha, hora }
-}
-
-/** Los botones: «Confirmo» y «No podré asistir»; con la cita ya confirmada, sólo el segundo. */
-function botonesRecordatorio(url: string, confirmada: boolean): BotonCorreo[] {
-  const cancelar = `${url}?paso=cancelar`
-  return confirmada
-    ? [{ texto: 'Avisar que no podré asistir', url: cancelar }]
-    // K2 (punto 8): `?paso=confirmar` hace que la página confirme al cargar (con JS; el GET no escribe).
-    : [{ texto: 'Confirmo mi asistencia', url: `${url}?paso=confirmar` }, { texto: 'No podré asistir', url: cancelar, secundario: true }]
-}
-
-/**
- * Las palabras propias de CADA correo: el asunto y el título. El resto del
- * cuerpo (fecha, datos, botones, plazo) es el mismo y no dice «recordatorio»:
- * la confirmación puede salir días antes y no debe decirlo (integración G1/G3).
- */
-interface PalabrasCorreo { asunto: (fecha: string) => string; titulo: string }
-
-const PALABRAS_RECORDATORIO: PalabrasCorreo = {
-  asunto: fecha => `Recordatorio: tu cita del ${fecha}`,
-  titulo: 'Recordatorio de tu cita',
-}
-
-/** El recordatorio N horas antes. Lanza sólo si `inicio` no es una fecha. */
-export function correoRecordatorio(d: DatosRecordatorio): CorreoRecordatorio {
-  return correoDeCita(d, PALABRAS_RECORDATORIO)
 }
 
 /**
@@ -105,75 +72,107 @@ export function saludoDe(nombre: string | null | undefined): string | undefined 
   return limpio && limpio.length <= 120 ? `Hola, ${limpio}:` : undefined
 }
 
-/** El cuerpo común del recordatorio y de la confirmación, con sus palabras (y el saludo, sólo la confirmación). */
-function correoDeCita(d: DatosRecordatorio, palabras: PalabrasCorreo, saludo?: string): CorreoRecordatorio {
+/** Los botones de la maqueta; con la cita ya confirmada, sólo «No podré asistir». */
+function botonesCita(url: string, confirmada: boolean): BotonCorreo[] {
+  const cancelar: BotonCorreo = { texto: 'No podré asistir', url: `${url}?paso=cancelar`, secundario: true }
+  // K2 (punto 8): `?paso=confirmar` hace que la página confirme al cargar (con JS; el GET no escribe).
+  return confirmada ? [cancelar] : [{ texto: 'Confirmo mi asistencia', url: `${url}?paso=confirmar` }, cancelar]
+}
+
+/** Las palabras propias de CADA correo; el resto del cuerpo es el mismo. */
+interface PalabrasCorreo {
+  asunto: (fecha: string) => string
+  /** El `<title>`. */
+  titulo: string
+  pildora: { texto: string; hecho?: boolean }
+  parrafo: string
+  /** La vista previa, con «del viernes 20 de noviembre a las 08:00 h con Dr. X». */
+  vista: (cuando: string) => string
+}
+
+function bloquesCita(d: DatosRecordatorio, p: PalabrasCorreo, saludo: string, zona: string): BloqueCorreo[] {
+  const medico = d.medico.trim()
+  const texto = d.confirmada ? 'Avisar que no podré asistir' : 'Confirmar o avisar que no podré asistir'
+  return [
+    { tipo: 'entrada', pildora: p.pildora, encabezado: saludo, parrafos: [p.parrafo] },
+    { tipo: 'fecha', fecha: fechaDeCorreo(d.inicio, zona) },
+    {
+      tipo: 'botones', botones: botonesCita(d.url, d.confirmada),
+      nota: [`Puedes cancelar con este botón hasta ${PLAZO_CANCELAR} antes de tu cita.`],
+      llamada: { frase: 'Después, llámanos al', telefono: d.consultorio.telefono },
+      enTexto: [`${texto}: ${d.url}`, `Puedes cancelar desde ese enlace hasta ${PLAZO_CANCELAR} antes de tu cita.`],
+    },
+    { tipo: 'datos', arriba: 28, raya: true, filas: [
+      { etiqueta: 'Médico', valor: medico }, { etiqueta: 'Consultorio', valor: d.consultorio.nombre },
+      { etiqueta: 'Dirección', valor: d.consultorio.direccion }, { etiqueta: 'Teléfono', valor: d.consultorio.telefono, telefono: true },
+    ] },
+    { tipo: 'aviso', lineas: ['¿No reconoces esta cita? Ignora este correo; no se hará ningún cambio.'] },
+  ]
+}
+
+/** El cuerpo común de los tres, con sus palabras y su saludo. Lanza sólo si `inicio` no es una fecha. */
+function correoDeCita(d: DatosRecordatorio, p: PalabrasCorreo, saludo = 'Hola:'): CorreoRecordatorio {
   if (Number.isNaN(new Date(d.inicio).getTime())) throw new Error('correoRecordatorio: inicio inválido')
   const zona = zonaValida(d.zona)
-  const { fecha, hora } = fechaYHora(d.inicio, zona)
-  const region = regionDeTimezone(zona)
-  const consultorio = d.consultorio.nombre?.trim() || 'el consultorio'
-  const direccion = d.consultorio.direccion?.trim() || null
-  const telefono = d.consultorio.telefono?.trim() || null
+  const f = fechaDeCorreo(d.inicio, zona)
   const medico = d.medico.trim()
-
-  const cuando = `el ${fecha} a las ${hora}${region ? ` (zona horaria: ${region})` : ''}`
-  const conQuien = medico ? ` con ${medico}` : ''
-  const donde = direccion ? `${consultorio}, ${direccion}` : consultorio
-  const llamada = d.confirmada ? 'Avisar que no podré asistir' : 'Confirmar o avisar que no podré asistir'
-  const despues = telefono ? `Después, comunícate al ${telefono}.` : 'Después, comunícate con el consultorio.'
-  const plazo = `Puedes avisar que no asistirás desde ese enlace hasta 1 hora antes de tu cita. ${despues}`
-  const cierre = 'Si no reconoces esta cita, ignora este correo.'
-
-  const asunto = palabras.asunto(fecha)
-  const texto = [
-    `Tienes una cita ${cuando}${conQuien} en ${donde}.`,
-    `${llamada}: ${d.url}`,
-    plazo,
-    cierre,
-  ]
-  const partes = {
-    // Tanda I, punto 21: a nombre del médico, con el consultorio debajo.
+  const armado: CorreoArmado = {
+    // Tanda I, punto 21: a nombre del médico, con el consultorio encima.
     marca: { medico, consultorio: d.consultorio.nombre },
-    preencabezado: `Tienes una cita ${cuando}.`,
-    titulo: palabras.titulo,
-    saludo,
-    fecha: { ...fechaDeCorreo(d.inicio, zona), zona: region ? `Zona horaria: ${region}` : null },
-    datos: [
-      { etiqueta: 'Médico', valor: medico }, { etiqueta: 'Consultorio', valor: d.consultorio.nombre },
-      { etiqueta: 'Dirección', valor: direccion }, { etiqueta: 'Teléfono', valor: telefono },
-    ],
-    botones: botonesRecordatorio(d.url, d.confirmada),
-    pie: [plazo, cierre],
+    preencabezado: p.vista(`${f.completa} a las ${f.hora}${medico ? ` con ${medico}` : ''}`),
+    titulo: p.titulo,
+    bloques: bloquesCita(d, p, saludo, zona),
   }
-  return { asunto, texto: textoCorreoCita(partes, texto), html: htmlCorreoCita(partes), remitente: medico }
+  return { asunto: p.asunto(fechaYHora(d.inicio, zona).fecha), texto: textoCorreoCita(armado), html: htmlCorreoCita(armado), remitente: medico }
+}
+
+const PENDIENTE = { texto: 'Pendiente de confirmar' }
+const CONFIRMADA = { texto: 'Cita confirmada', hecho: true }
+
+/** El recordatorio N horas antes. */
+export function correoRecordatorio(d: DatosRecordatorio): CorreoRecordatorio {
+  return correoDeCita(d, {
+    asunto: fecha => `Recordatorio: tu cita del ${fecha}`, titulo: 'Recordatorio de tu cita',
+    pildora: d.confirmada ? CONFIRMADA : PENDIENTE,
+    parrafo: d.confirmada
+      ? 'Te recordamos tu cita próxima; ya está confirmada. Aquí tienes los datos para que la tengas a la mano.'
+      : 'Te recordamos tu cita próxima. Por favor confírmanos si vas a asistir; solo toma un clic.',
+    vista: cuando => d.confirmada ? `Recordatorio: tu cita del ${cuando}.` : `Confirma tu cita del ${cuando}.`,
+  })
 }
 
 /**
- * G3 (punto 14) · El correo de CONFIRMACIÓN que manda el personal desde la
- * agenda, con o sin Google. Es el MISMO cuerpo que el recordatorio (fecha,
- * hora con su zona, médico, consultorio con su dirección y teléfono, y el
- * enlace de confirmar o avisar que no asistirá; nada clínico), armado con
- * `plantillaCita.ts` (G1), con su propio asunto y su propio título: puede salir
- * días antes, así que no dice «Recordatorio». Determinista, como el
- * recordatorio (misma Idempotency-Key, mismo cuerpo).
- * ⚠️ TEXTO PENDIENTE DE REVISIÓN, como el del recordatorio.
- * Tanda L (punto 15): con `nombre` (el de pila del paciente ligado o el que
- * tecleó al reservar), «Hola, <nombre>:» bajo el título; sin él, como antes.
+ * G3 (punto 14) · La CONFIRMACIÓN que manda el personal desde la agenda, con o
+ * sin Google. Puede salir días antes, así que no dice «Recordatorio». Tanda L
+ * (punto 15): con `nombre` (el de pila del paciente ligado o el que tecleó al
+ * reservar), «Hola, <nombre>:»; sin él, «Hola:».
  */
 export function correoConfirmacion(d: DatosRecordatorio, nombre: string | null = null): CorreoRecordatorio {
   return correoDeCita(d, d.confirmada
-    ? { asunto: fecha => `Tu cita del ${fecha}`, titulo: 'Tu cita' }
-    : { asunto: fecha => `Confirma tu cita del ${fecha}`, titulo: 'Confirma tu cita' }, saludoDe(nombre))
+    ? {
+      asunto: fecha => `Tu cita del ${fecha}`, titulo: 'Tu cita', pildora: CONFIRMADA,
+      parrafo: 'Tu cita está confirmada. Aquí tienes los datos para que la tengas a la mano.',
+      vista: cuando => `Tu cita del ${cuando}.`,
+    }
+    : {
+      asunto: fecha => `Confirma tu cita del ${fecha}`, titulo: 'Confirma tu cita', pildora: PENDIENTE,
+      parrafo: 'Tienes una cita próxima. Por favor confírmanos si vas a asistir; solo toma un clic.',
+      vista: cuando => `Confirma tu cita del ${cuando}.`,
+    }, saludoDe(nombre))
 }
 
 /**
- * Tanda I, punto 9 · El AVISO DE CAMBIO que sale cuando la clínica reagenda
- * una cita reservada por enlace (`POST /api/appointments/[id]/reagendar`): el
- * mismo cuerpo que la confirmación (fecha y hora NUEVAS, médico, consultorio
- * con su dirección y teléfono, y el enlace de confirmar o avisar que no
- * asistirá), con sus palabras: dice que la cita cambió. Determinista.
- * ⚠️ TEXTO PENDIENTE DE REVISIÓN, como el de la confirmación.
+ * Tanda I, punto 9 · El AVISO DE CAMBIO cuando la clínica reagenda una cita
+ * reservada por enlace (`POST /api/appointments/[id]/reagendar`): la fecha y
+ * la hora NUEVAS, con sus botones. Determinista.
  */
 export function correoCambio(d: DatosRecordatorio): CorreoRecordatorio {
-  return correoDeCita(d, { asunto: fecha => `Cambio en tu cita: ahora es el ${fecha}`, titulo: 'Tu cita cambió' })
+  return correoDeCita(d, {
+    asunto: fecha => `Cambio en tu cita: ahora es el ${fecha}`, titulo: 'Tu cita cambió',
+    pildora: { texto: 'Cita reagendada' },
+    parrafo: d.confirmada
+      ? 'Tu cita cambió. Esta es la nueva fecha y hora.'
+      : 'Tu cita cambió. Esta es la nueva fecha y hora; por favor confírmanos si vas a asistir.',
+    vista: cuando => `Tu cita cambió: ahora es el ${cuando}.`,
+  })
 }
