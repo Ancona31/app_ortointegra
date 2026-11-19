@@ -240,10 +240,12 @@ test.describe('permisos', () => {
 
   test('17 · lo que hoy da 403/404 a la invitada y a la secretaria lo sigue dando (0 = la secretaria sí puede: no se prueba)', async ({ page, browser }, info) => {
     test.skip(info.project.name !== 'escritorio', 'las rutas no dependen del tamaño')
-    const lista = peticiones()
+    /* Integración L: el tipo principal y el enlace fijo de admin.a los crea la prueba (y los quita). En la base
+       recién sembrada no hay ninguno: con el id vacío, el PATCH iba a la ruta de la colección y daba 405. */
+    const deshacer = sinPendientesAgenda(CORREO.adminA)
     const secretaria = await browser.newContext({ storageState: SESION.secretariaA })
     try {
-      for (const { pet, invitada, secretaria: s } of lista) {
+      for (const { pet, invitada, secretaria: s } of peticiones()) {
         for (const [quien, req, esperado] of [['invitada', page.request, invitada], ['secretaria', secretaria.request, s]] as const) {
           if (esperado === 0) continue
           const r = await req.fetch(pet.url, { method: pet.metodo.toUpperCase(), data: pet.cuerpo })
@@ -252,6 +254,7 @@ test.describe('permisos', () => {
       }
     } finally {
       await secretaria.close()
+      deshacer()
     }
   })
 })
