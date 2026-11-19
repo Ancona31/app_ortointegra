@@ -9,17 +9,32 @@
  * (consultorio, tipo, turno: nada personal), el `client_id`, el correo al que
  * se mandó el código (sin él no se puede verificar), cuándo se mandó, desde
  * cuándo se puede pedir otro y la ficha del correo ya verificado (un uso, 30
- * min, atada a ese enlace y ese correo). NUNCA el nombre ni el teléfono, NUNCA
- * el código de 6 dígitos y NUNCA `localStorage` (CLAUDE.md: datos de pacientes
- * sólo con `secureStorage`). Caduca a los 30 min (la vida de la ficha) y se
- * borra al reservar.
+ * min, atada a ese enlace y ese correo). NUNCA el código de 6 dígitos y NUNCA
+ * `localStorage`. Caduca a los 30 min (la vida de la ficha) y se borra al
+ * reservar.
+ *
+ * TANDA L (punto 10 de Angel, orden expresa que REVIERTE la decisión H2 de la
+ * revisión de seguridad de K2): también el NOMBRE y el TELÉFONO que la persona
+ * ENVIÓ en «Tus datos» (no lo que está escribiendo), igual que lo demás: por
+ * pestaña, 30 min, y por el traspaso a la pestaña nueva del mismo navegador.
+ * Sin ellos, «Continuar mi reserva» pedía teclearlos otra vez tras verificar.
+ * Vuelven a «Tus datos» ya escritos, NO reservan solos: tras verificar se marca
+ * otra vez el aviso y se pulsa «Reservar cita» (revisión de seguridad de L4).
+ * Se borran al reservar y al quedarse sin código ni ficha.
+ * Riesgo que se acepta (`notas_l4.md` (b)): en un equipo compartido, quien abra
+ * el mismo enlace con un `#codigo=` inventado mientras el código de otra
+ * persona sigue vigente (10 min) recibe también su nombre y su teléfono, además
+ * del correo que ya recibía. `sessionStorage` no es `localStorage`: la regla de
+ * `secureStorage` de CLAUDE.md no aplica, y su cifrado tampoco protegería aquí
+ * (sin sesión de Supabase, `secureStorage` guarda en claro en `localStorage`).
  *
  * Punto 9: el correo del código lleva «Continuar mi reserva» con el código en
  * el FRAGMENTO (`#codigo=123456`, no llega al servidor ni a sus registros). Un
  * correo se abre casi siempre en OTRA pestaña, que no ve el `sessionStorage`
  * de la primera: la pestaña nueva pregunta por `BroadcastChannel` (mismo
  * origen y mismo navegador; nada se guarda) y la que tenía la reserva a medias
- * le pasa lo suyo (sin la ficha, sin nombre ni teléfono), en memoria.
+ * le pasa lo suyo (sin la ficha; con nombre y teléfono desde la tanda L), en
+ * memoria.
  */
 import type { TurnoPagina } from './clienteReserva'
 
@@ -35,13 +50,15 @@ export interface Continuidad {
   reenviarDesde: number
   /** La ficha de /verificar: se reusa si la reserva falla después (antes se tiraba: «Pide un código primero»). */
   ficha: { valor: string; correo: string; hasta: number } | null
+  /** Tanda L (punto 10): el nombre y el teléfono ENVIADOS en «Tus datos» (el correo es el de `envio`); null si aún no. */
+  persona: { nombre: string; telefono: string } | null
 }
 
 /**
- * Lo que una pestaña le pasa a otra (punto 9): lo mismo que se guarda, SIN la ficha y sin nombre ni
- * teléfono. Cualquier página del mismo origen y navegador puede pedirlo (basta un `#codigo=` inventado):
- * en un equipo compartido no debe salir de aquí nada con lo que reservar ni más datos de la persona que
- * el correo, que hace falta para verificar (revisión de seguridad de K2).
+ * Lo que una pestaña le pasa a otra (punto 9): lo mismo que se guarda, SIN la ficha. Cualquier página
+ * del mismo origen y navegador puede pedirlo (basta un `#codigo=` inventado): en un equipo compartido
+ * no debe salir de aquí nada con lo que reservar sin el código del correo (revisión de seguridad de
+ * K2). El nombre y el teléfono SÍ viajan desde la tanda L, por orden de Angel (ver la cabecera).
  */
 export interface Traspaso { continuidad: Continuidad }
 
@@ -57,6 +74,18 @@ function esTurno(x: unknown): x is TurnoPagina {
   return typeof x === 'object' && x !== null && 'inicio' in x && 'fin' in x && typeof x.inicio === 'string' && typeof x.fin === 'string'
 }
 
+/**
+ * El nombre y el teléfono guardados: null si no hay (o lo guardó una versión anterior, o están vacíos);
+ * undefined si no tienen forma o se pasan de largo (120 el nombre, el tope de la base; 20 el teléfono).
+ */
+function leerPersona(x: unknown): Continuidad['persona'] | undefined {
+  if (x === null || x === undefined) return null
+  if (typeof x !== 'object' || !('nombre' in x) || !('telefono' in x)) return undefined
+  const { nombre, telefono } = x
+  if (typeof nombre !== 'string' || typeof telefono !== 'string' || nombre.length > 120 || telefono.length > 20) return undefined
+  return nombre.trim() || telefono.trim() ? { nombre, telefono } : null
+}
+
 /** Valida por forma lo leído (puede venir de otra versión de la página o estar alterado). */
 function leerContinuidad(x: unknown): Continuidad | null {
   if (typeof x !== 'object' || x === null) return null
@@ -69,7 +98,10 @@ function leerContinuidad(x: unknown): Continuidad | null {
     && typeof ficha.valor === 'string' && typeof ficha.correo === 'string' && typeof ficha.hasta === 'number')
   if (typeof o.consultorioId !== 'string' || typeof o.tipoId !== 'string' || typeof o.clientId !== 'string'
     || typeof o.reenviarDesde !== 'number' || !(o.turno === null || esTurno(o.turno)) || !okEnvio || !okFicha) return null
+  const persona = leerPersona(o.persona)
+  if (persona === undefined) return null
   return {
+    persona,
     consultorioId: o.consultorioId, tipoId: o.tipoId, turno: o.turno, clientId: o.clientId, reenviarDesde: o.reenviarDesde,
     envio: envio === null ? null : { correo: String(Reflect.get(envio, 'correo')), en: Number(Reflect.get(envio, 'en')) },
     ficha: ficha === null ? null : { valor: String(Reflect.get(ficha, 'valor')), correo: String(Reflect.get(ficha, 'correo')), hasta: Number(Reflect.get(ficha, 'hasta')) },

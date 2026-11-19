@@ -2,11 +2,12 @@
  * K2 (puntos 8, 9 y 10 de Angel), lo que se puede probar sin navegador:
  * - punto 9: la URL de «Continuar mi reserva» (código en el FRAGMENTO, nunca en
  *   la consulta) y el botón en el correo, con el código aún visible;
- * - punto 10: lo que se guarda por pestaña (nunca nombre, teléfono ni código)
- *   y el código del fragmento, que se quita de la barra de direcciones;
+ * - punto 10: lo que se guarda por pestaña (nunca el código; nombre y
+ *   teléfono enviados sí desde la tanda L, punto 10 de Angel) y el código del
+ *   fragmento, que se quita de la barra de direcciones;
  * - punto 8: `?paso=confirmar` exacto.
  * MUTACIONES (comprobadas en rojo): el código en `?codigo=` en vez de
- * `#codigo=`; `guardar` con la persona; `codigoDelFragmento` sin
+ * `#codigo=`; `codigoDelFragmento` sin
  * `replaceState`; `esPasoConfirmar` que acepte cualquier valor; `fichaPara`
  * sin mirar el correo; `codigoPendiente` sin los 10 min; `pasoAlRestaurar`
  * que lleve al código con la ficha vigente.
@@ -58,13 +59,31 @@ describe('punto 10: lo que se guarda por pestaña', () => {
   afterEach(() => { vi.unstubAllGlobals() })
   const c: Continuidad = {
     consultorioId: 'c1', tipoId: 't1', turno: { inicio: '2026-12-01T15:00:00Z', fin: '2026-12-01T15:30:00Z' }, clientId: 'id',
-    envio: { correo: 'ana@x.mx', en: 1 }, reenviarDesde: 2, ficha: { valor: 'f', correo: 'ana@x.mx', hasta: 3 },
+    envio: { correo: 'ana@x.mx', en: 1 }, reenviarDesde: 2, ficha: { valor: 'f', correo: 'ana@x.mx', hasta: 3 }, persona: null,
   }
-  it('sólo lo mínimo: sin nombre, sin teléfono, sin el código; y vuelve igual', () => {
+  it('lo mínimo, sin el código; y vuelve igual', () => {
     guardar(ENLACE, c)
     const crudo = almacen.get(`spinus.reserva.${ENLACE}`) ?? ''
-    expect(Object.keys(JSON.parse(crudo)).sort()).toEqual(['clientId', 'consultorioId', 'envio', 'ficha', 'guardadoEn', 'reenviarDesde', 'tipoId', 'turno'])
+    expect(Object.keys(JSON.parse(crudo)).sort()).toEqual(['clientId', 'consultorioId', 'envio', 'ficha', 'guardadoEn', 'persona', 'reenviarDesde', 'tipoId', 'turno'])
+    expect(crudo).not.toMatch(/codigo|\b\d{6}\b/)
     expect(recuperar(ENLACE)).toEqual(c)
+  })
+  /* Tanda L (punto 10 de Angel): el nombre y el teléfono enviados se guardan y vuelven, como lo demás.
+     MUTACIÓN (en rojo): `leerContinuidad` que devuelva `persona: null`. */
+  it('tanda L: el nombre y el teléfono enviados vuelven; sin ellos (versión anterior) es null; con otra forma, nada', () => {
+    const conPersona: Continuidad = { ...c, persona: { nombre: 'Ana Sofía Pech', telefono: '9991234567' } }
+    guardar(ENLACE, conPersona)
+    expect(recuperar(ENLACE)).toEqual(conPersona)
+    const anterior: Record<string, unknown> = { ...conPersona }
+    delete anterior.persona
+    almacen.set(`spinus.reserva.${ENLACE}`, JSON.stringify({ ...anterior, guardadoEn: Date.now() }))
+    expect(recuperar(ENLACE)?.persona).toBeNull()
+    almacen.set(`spinus.reserva.${ENLACE}`, JSON.stringify({ ...conPersona, persona: { nombre: 5 }, guardadoEn: Date.now() }))
+    expect(recuperar(ENLACE)).toBeNull()
+    almacen.set(`spinus.reserva.${ENLACE}`, JSON.stringify({ ...conPersona, persona: { nombre: 'x'.repeat(121), telefono: '1' }, guardadoEn: Date.now() }))
+    expect(recuperar(ENLACE)).toBeNull()
+    almacen.set(`spinus.reserva.${ENLACE}`, JSON.stringify({ ...conPersona, persona: { nombre: ' ', telefono: '' }, guardadoEn: Date.now() }))
+    expect(recuperar(ENLACE)?.persona).toBeNull()
   })
   it('caduca a los 30 min y lo roto no se usa', () => {
     guardar(ENLACE, c)
@@ -104,7 +123,7 @@ describe('punto 10: cuándo se reusa lo pedido', () => {
   const T = 1_000_000_000_000
   const envio = { correo: 'Ana@X.mx', en: T - 60_000 }
   const ficha = { valor: 'f', correo: 'ana@x.mx', hasta: T + 60_000 }
-  const base: Continuidad = { consultorioId: 'c', tipoId: 't', turno: null, clientId: 'i', envio, reenviarDesde: 0, ficha: null }
+  const base: Continuidad = { consultorioId: 'c', tipoId: 't', turno: null, clientId: 'i', envio, reenviarDesde: 0, ficha: null, persona: null }
   it('la ficha vale sólo para su correo y mientras no vence', () => {
     expect(fichaPara(ficha, ' ana@x.mx ', T)).toBe('f')
     expect(fichaPara(ficha, 'otro@x.mx', T)).toBeNull()

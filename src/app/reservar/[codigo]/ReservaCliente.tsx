@@ -109,6 +109,21 @@ function reenviarEn(r: RespuestaApi): number | null {
   return typeof s === 'number' && Number.isFinite(s) && s > 0 ? s : null
 }
 
+/**
+ * Tanda L (punto 10): el nombre y el teléfono restaurados vuelven al FORMULARIO («Tus datos», ya escritos),
+ * no a la reserva: tras verificar se marca otra vez el aviso y se pulsa «Reservar cita» (revisión de
+ * seguridad de L4: el consentimiento se da en la pestaña que reserva, y lo que llegue por el traspaso se ve
+ * antes de mandarlo). Sin código pedido no hay nada que restaurar.
+ */
+function borradorRestaurado(g: Continuidad): Datos | null {
+  return g.envio ? { nombre: g.persona?.nombre ?? '', telefono: g.persona?.telefono ?? '', correo: g.envio.correo } : null
+}
+
+/** Tanda L (punto 10): se guardan los ENVIADOS (el código, nunca) o, si aún no, los restaurados: una 2.ª recarga no los pierde. */
+function personaGuardable(persona: Datos | null, restaurada: Continuidad['persona']): Continuidad['persona'] {
+  return persona ? { nombre: persona.nombre, telefono: persona.telefono } : restaurada
+}
+
 /** El estado de la reserva y sus llamadas a la API: las mismas que antes del rediseño. */
 function useReserva(datos: DatosPagina) {
   const base = `/api/reservar/${encodeURIComponent(datos.codigo)}`
@@ -126,9 +141,10 @@ function useReserva(datos: DatosPagina) {
   const [ocupado, setOcupado] = useState(false)
   const [clientId, setClientId] = useState(() => crypto.randomUUID())
   const c = useEstadoCodigo()
-  useContinuidad(datos, { continuidad: { consultorioId, tipoId, turno, clientId, ...c.guardable } }, paso, g => {
+  const [restaurada, setRestaurada] = useState<Continuidad['persona']>(null) // tanda L: hasta que se envíen otros
+  useContinuidad(datos, { continuidad: { consultorioId, tipoId, turno, clientId, ...c.guardable, persona: personaGuardable(persona, restaurada) } }, paso, g => {
     setConsultorioId(g.consultorioId); setTipoId(g.tipoId); setTurno(g.turno); setClientId(g.clientId); c.restaurar(g)
-    if (g.envio) setBorrador({ nombre: '', telefono: '', correo: g.envio.correo })
+    const b = borradorRestaurado(g); if (b) setBorrador(b); setRestaurada(g.persona)
     const r = pasoAlRestaurar(g) // con el correo ya verificado no hay código que escribir: a «Tus datos», diciéndolo
     if (r.verificado) setError(YA_VERIFICADO); setPaso(r.paso)
   }, c.setCodigoCorreo)
@@ -235,7 +251,7 @@ function flujoCodigo(x: CtxCodigo) {
       c.setFicha({ valor: f, correo: correoLlave(envio.correo), hasta: Date.now() + VIDA_FICHA_MS })
     }
     if (x.persona && correoLlave(x.persona.correo) === correoLlave(envio.correo)) await x.reservar(x.persona, f)
-    else { x.setError(YA_VERIFICADO); x.setPaso('datos') } // tras recargar no hay nombre ni teléfono guardados: se escriben otra vez
+    else { x.setError(YA_VERIFICADO); x.setPaso('datos') } // tras recargar o en la pestaña nueva: «Tus datos», ya escritos (tanda L)
   }
   return { pedirCodigo, alEnviarDatos, alVerificar: (codigo: string) => x.conEspera(() => verificarYReservar(codigo)) }
 }
@@ -280,6 +296,7 @@ function useContinuidad(datos: DatosPagina, actual: Traspaso, paso: Paso, aplica
     if (paso === 'listo') { olvidar(datos.codigo); return }
     const c = ref.current.actual.continuidad
     if (c.envio || c.ficha) guardar(datos.codigo, c)
+    else olvidar(datos.codigo) // sin código ni ficha (p. ej. `correo_sin_verificar`), nada que guardar: tampoco el nombre
   }, [firma, paso, datos.codigo])
 }
 
