@@ -5,7 +5,8 @@
  * comentarios; sólo cambiaron los `import`/`export` que hacían falta.
  */
 
-import { bloqueoDe } from '@/lib/agenda/bloqueosAgenda'
+import { useCallback, useState, useSyncExternalStore } from 'react'
+import { bloqueoDe, tramosDelRayado, type HoraHabilFc } from '@/lib/agenda/bloqueosAgenda'
 import type { EventContentArg } from '@fullcalendar/core'
 import type { Appointment } from '@/lib/agenda/tiposAgenda'
 import { esVistaDeRejilla } from '@/lib/agenda/vistasAgenda'
@@ -33,7 +34,10 @@ export function renderEventContent(arg: EventContentArg, navegadorTZ: string, in
      (sus datos van anidados en `extendedProps.bloqueo`), y en ninguna vista
      debe caer en una tarjeta de cita. */
   const bloqueo = bloqueoDe(arg.event)
-  if (bloqueo) return <ContenidoBloqueo id={bloqueo.id} rotulo={arg.event.title} fondo={arg.event.display === 'background'} />
+  if (bloqueo) {
+    return <ContenidoBloqueo id={bloqueo.id} rotulo={arg.event.title} fondo={arg.event.display === 'background'}
+      inicio={arg.event.start} fin={arg.event.end} />
+  }
   // Vista Mes: chip plano dedicado. El camino de Semana/Día (abajo) queda intacto.
   if (arg.view.type === 'dayGridMonth') return <MonthChip arg={arg} />
   /* La misma pregunta que la línea de arriba, en la otra dirección: allí «¿es
@@ -211,10 +215,56 @@ export function renderEventContent(arg: EventContentArg, navegadorTZ: string, in
  * en `AgendaCliente`, por el instante), y en la lista y en el Mes, la fila
  * entera. `data-bloqueo-abrir` queda como marca del rótulo: ya no lo lee el código.
  */
-function ContenidoBloqueo({ id, rotulo, fondo }: { id: string; rotulo: string; fondo: boolean }) {
+/* ── M3 (punto 6) · El rayado de un bloqueo, sólo sobre el horario activo ──
+   Lo que hace falta para recortarlo —las horas hábiles, la MISMA entrada
+   `businessHours` que pinta el gris, y la ventana `slotMinTime`/`slotMaxTime`—
+   llega por aquí y NO por `renderEC`, por lo mismo que `fijarSinAvisoFlotante`
+   (`MemoizedEventContent.tsx`): cambiar `eventContent` repinta la rejilla
+   entera; así, al cambiar el horario sólo se vuelven a pintar las franjas.
+   Lo fija `AgendaCliente` con la v2 encendida; `null` = rayado entero, lo de
+   siempre. */
+export interface RayadoBloqueos { horas: readonly HoraHabilFc[]; desde: string; hasta: string }
+let rayadoActual: RayadoBloqueos | null = null
+const oyentesRayado = new Set<() => void>()
+export function fijarRayadoBloqueos(valor: RayadoBloqueos | null): void {
+  if (valor === rayadoActual) return
+  rayadoActual = valor
+  for (const oyente of oyentesRayado) oyente()
+}
+function suscribirRayado(oyente: () => void): () => void {
+  oyentesRayado.add(oyente)
+  return () => { oyentesRayado.delete(oyente) }
+}
+
+interface PropsBloqueo { id: string; rotulo: string; fondo: boolean; inicio: Date | null; fin: Date | null }
+
+/**
+ * La franja de un bloqueo. En la rejilla (Semana y Día) el rayado se dibuja en
+ * trozos, sólo donde la columna está en horario (`tramosDelRayado`); el
+ * elemento de FullCalendar sigue cubriendo el bloqueo entero, así que pulsar
+ * fuera de horario abre su edición igual (y el gesto se decide por el instante,
+ * `bloqueoEnInstante`, no por lo pintado). La columna se lee del DOM una vez,
+ * al montar: el elemento de una franja no cambia de columna (al navegar,
+ * FullCalendar monta columnas nuevas). Fuera de la rejilla —banda de todo el
+ * día, Mes, lista— no hay gris: rayado entero.
+ */
+function ContenidoBloqueo({ id, rotulo, fondo, inicio, fin }: PropsBloqueo) {
+  const rayado = useSyncExternalStore(suscribirRayado, () => rayadoActual, () => null)
+  const [dia, setDia] = useState<string | null>(null)
+  const medirColumna = useCallback((el: HTMLSpanElement | null) => {
+    if (el) setDia(el.closest('.fc-timegrid-col')?.getAttribute('data-date') ?? null)
+  }, [])
+  const tramos = fondo && dia && rayado && inicio && fin
+    ? tramosDelRayado(dia, inicio, fin, rayado.horas, rayado.desde, rayado.hasta) : null
   return (
-    <span className={fondo ? 'ag-bloqueo-rotulo' : 'ag-bloqueo-fila'} data-bloqueo-abrir={id} title={rotulo}>
-      {rotulo}
-    </span>
+    <>
+      {tramos?.map(t => (
+        <span key={`${t.arriba}`} className="ag-bloqueo-tramo" aria-hidden="true" style={{ top: `${t.arriba}%`, height: `${t.alto}%` }} />
+      ))}
+      <span ref={fondo ? medirColumna : undefined} className={fondo ? 'ag-bloqueo-rotulo' : 'ag-bloqueo-fila'} data-bloqueo-abrir={id}
+        data-rayado={tramos ? 'recortado' : undefined} title={rotulo}>
+        {rotulo}
+      </span>
+    </>
   )
 }

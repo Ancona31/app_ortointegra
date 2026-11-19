@@ -156,3 +156,77 @@ export function bloqueoEnInstante(pintados: readonly PintadoConPuntas[], t: Date
 export function bloqueosDeRespuesta(valor: unknown): BloqueoAgenda[] {
   return Array.isArray(valor) ? valor.filter(esFilaBloqueo) : []
 }
+
+/* ── M3 (punto 6) · El rayado, sólo sobre el horario activo ──────────────── */
+
+/** Una entrada de `businessHours` de FullCalendar: la MISMA que pinta el gris de fuera de horario. */
+export interface HoraHabilFc { daysOfWeek?: readonly number[]; startTime?: string; endTime?: string }
+
+/** Un trozo rayado de la franja de un bloqueo, en % de su alto (0 = arriba). */
+export interface TramoRayado { arriba: number; alto: number }
+
+const MIN_DIA = 24 * 60
+
+/** `HH:MM` o `HH:MM:SS` (`slotMaxTime` puede pasar de 24 h) → minutos. */
+function aMinutos(hhmm: string): number {
+  const [h = 0, m = 0, s = 0] = hhmm.split(':').map(Number)
+  return h * 60 + m + s / 60
+}
+
+/** Minutos de PARED de `t` desde la medianoche de `dia` (`YYYY-MM-DD`), en la hora del dispositivo. */
+function minutosDesde(dia: string, t: Date): number {
+  const [y, m, d] = dia.split('-').map(Number)
+  return (Date.UTC(t.getFullYear(), t.getMonth(), t.getDate(), t.getHours(), t.getMinutes(), t.getSeconds()) - Date.UTC(y, m - 1, d)) / 60_000
+}
+
+/**
+ * Los tramos abiertos que tocan la columna `dia`, en minutos desde su medianoche,
+ * ordenados y fundidos; `null` si ese día de la semana no tiene ninguno.
+ */
+function abiertosDelDia(dia: string, horas: readonly HoraHabilFc[]): [number, number][] | null {
+  const [y, m, d] = dia.split('-').map(Number)
+  const dow = new Date(y, m - 1, d).getDay()
+  const crudos: [number, number][] = []
+  let delDia = false
+  for (const h of horas) {
+    if (!h.startTime || !h.endTime || !h.daysOfWeek) continue
+    delDia ||= h.daysOfWeek.includes(dow)
+    // La víspera y el día siguiente cuentan si la ventana pasa de medianoche.
+    for (const k of [-1, 0, 1]) {
+      if (h.daysOfWeek.includes((dow + k + 7) % 7)) crudos.push([aMinutos(h.startTime) + k * MIN_DIA, aMinutos(h.endTime) + k * MIN_DIA])
+    }
+  }
+  if (!delDia) return null
+  const fundidos: [number, number][] = []
+  for (const [a, b] of crudos.filter(([a, b]) => b > a).sort((x, y) => x[0] - y[0])) {
+    const ultimo = fundidos[fundidos.length - 1]
+    if (ultimo && a <= ultimo[1]) ultimo[1] = Math.max(ultimo[1], b)
+    else fundidos.push([a, b])
+  }
+  return fundidos
+}
+
+/**
+ * Los trozos rayados de la franja de un bloqueo en la columna `dia` de la
+ * rejilla: la franja (el bloqueo recortado a la columna y a la ventana
+ * `desde`–`hasta`, que es lo que FullCalendar pinta) cortada por las horas
+ * hábiles, con la MISMA entrada (`businessHours`) con la que FullCalendar pinta
+ * el gris. Sólo dibujo: el bloqueo sigue ocupando y respondiendo entero.
+ * `null` = rayado entero, como siempre: el día no tiene horario (todo gris) o
+ * no hay franja. `[]` = la franja cae entera fuera de horario.
+ */
+export function tramosDelRayado(
+  dia: string, inicio: Date, fin: Date, horas: readonly HoraHabilFc[], desde: string, hasta: string,
+): TramoRayado[] | null {
+  const abiertos = abiertosDelDia(dia, horas)
+  const a = Math.max(aMinutos(desde), minutosDesde(dia, inicio))
+  const b = Math.min(aMinutos(hasta), minutosDesde(dia, fin))
+  if (!abiertos || !(b > a)) return null
+  const tramos: TramoRayado[] = []
+  for (const [p, q] of abiertos) {
+    const de = Math.max(p, a)
+    const a2 = Math.min(q, b)
+    if (a2 > de) tramos.push({ arriba: ((de - a) / (b - a)) * 100, alto: ((a2 - de) / (b - a)) * 100 })
+  }
+  return tramos
+}

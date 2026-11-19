@@ -139,7 +139,8 @@ test('8 · el candado junto a la campana crea; franja rayada con el motivo, en l
   await expect(m).toBeHidden()
   await expect(franja(page)).toHaveCount(1)
   await expect(franja(page)).toContainText(`Bloqueado · ${MOTIVO}`)
-  const fondo = await franja(page).evaluate(e => getComputedStyle(e).backgroundImage)
+  /* M3 (punto 6): en horario, el rayado lo pintan los trozos `.ag-bloqueo-tramo` de la franja. */
+  const fondo = await franja(page).evaluate(e => getComputedStyle(e.querySelector('.ag-bloqueo-tramo') ?? e).backgroundImage)
   expect(fondo).toContain('repeating-linear-gradient')
   expect(filasBloqueo()).toBe(`${MOTIVO}|f`)
   expect(sqlLocal(`select count(*) from public.audit_log where tabla = 'agenda_bloqueos' and accion = 'INSERT' and created_at > now() - interval '2 minutes';`).trim()).not.toBe('0')

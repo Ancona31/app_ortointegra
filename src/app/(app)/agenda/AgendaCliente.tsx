@@ -3,7 +3,7 @@
 /* Hasta A1.4a este archivo era `agenda/page.tsx`; las referencias `page.tsx:NNNN`
    en comentarios y docs apuntan aquí. */
 
-import { useEffect, useRef, useState, useCallback, useMemo, useSyncExternalStore } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, useCallback, useMemo, useSyncExternalStore } from 'react'
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
 import { logger } from '@/lib/logger'
@@ -39,7 +39,7 @@ import {
 import type { ModalState, PacienteBusqueda } from '@/components/agenda/AppointmentModal'
 import type { FuenteHorario } from '@/components/agenda/HorarioModal'
 import ConfirmModal from '@/components/agenda/ConfirmModal'
-import { renderEventContent, type InicialesDeCita } from '@/components/agenda/renderEventContent'
+import { fijarRayadoBloqueos, renderEventContent, type InicialesDeCita } from '@/components/agenda/renderEventContent'
 import { fijarSinAvisoFlotante } from '@/components/agenda/MemoizedEventContent'
 import { renderNowIndicator } from '@/components/agenda/renderNowIndicator'
 import { CabeceraDiaLista } from '@/components/agenda/CabeceraDiaLista'
@@ -1409,6 +1409,15 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
   const horasHabilesFuente = fuente.businessHours
   const horasHabilesFc = useMemo(
     () => horasHabilesFuente ?? horarioToBusinessHours(horario), [horasHabilesFuente, horario])
+  /* M3 (punto 6) · El rayado de los bloqueos se recorta con ESTAS horas hábiles
+     —las del gris— y la ventana de la rejilla. Por un almacén y no por
+     `renderEC` (ver `fijarRayadoBloqueos`); `useLayoutEffect` para que gris y
+     rayado cambien en el mismo cuadro. Apagada no hay bloqueos pintados. */
+  const { slotMinTime, slotMaxTime } = ventana
+  useLayoutEffect(() => {
+    fijarRayadoBloqueos(agendaV2 ? { horas: horasHabilesFc, desde: slotMinTime, hasta: slotMaxTime } : null)
+  }, [agendaV2, horasHabilesFc, slotMinTime, slotMaxTime])
+  useEffect(() => () => fijarRayadoBloqueos(null), [])
 
   /* ── I5 · LA CAMPANA Y EL ENGRANE (puntos 13 a 19 de Angel) ─────────────
      Sólo con la v2; apagada, la barra y la banda de siempre (`undefined`). La

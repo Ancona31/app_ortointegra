@@ -7713,8 +7713,31 @@ html.dark .bg-amber-50\/60           { background-color: rgba(245,158,11,.10) !i
   background-color: color-mix(in srgb, var(--ag-ink-600) 10%, transparent);
   background-image: repeating-linear-gradient(45deg, color-mix(in srgb, var(--ag-ink-600) 35%, transparent) 0 2px, transparent 2px 4px);
 }
+/* M3 (punto 6 de Angel) · EN LA REJILLA, EL RAYADO SÓLO SOBRE EL HORARIO
+   ACTIVO. La franja de FullCalendar (`.fc-bg-event`) sigue cubriendo el
+   bloqueo ENTERO —ocupa, responde al clic, veta la selección—, pero deja de
+   pintarse: lo pintan los trozos `.ag-bloqueo-tramo` que `ContenidoBloqueo`
+   pone donde la columna está en horario, calculados con la misma
+   `businessHours` que el gris. Sin trozos calculados (día sin horario, banda de
+   todo el día, Mes) no hay `data-rayado` y se pinta entera, como siempre.
+   ⚠️ NO SE PUEDE TAPAR EL RAYADO CON EL GRIS: `--ag-offhours-bg` es
+   translúcido a propósito (deja ver las líneas de la hora). */
+.agenda-fc .fc .fc-bg-event.ag-bloqueo:has([data-rayado="recortado"]) {
+  background-color: transparent !important;
+  background-image: none !important;
+}
+.agenda-fc .ag-bloqueo-tramo {
+  position: absolute;
+  left: 0;
+  right: 0;
+  pointer-events: none;
+  background-color: color-mix(in srgb, var(--ag-ink-600) 6%, transparent);
+  background-image: repeating-linear-gradient(45deg, color-mix(in srgb, var(--ag-ink-600) 16%, transparent) 0 6px, transparent 6px 14px);
+}
 .agenda-fc .ag-bloqueo-rotulo {
   display: inline-block;
+  /* M3 · por encima de los trozos rayados (van antes en el DOM, absolutos). */
+  position: relative;
   max-width: calc(100% - 8px);
   margin: 4px;
   padding: 1px 6px;
