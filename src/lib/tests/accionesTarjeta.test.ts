@@ -18,8 +18,11 @@ describe('accionesDeTarjeta (G3: por estado)', () => {
     expect(accionesDeTarjeta({ ...CITA, status: 'attended' }, true, true, true)).toEqual(['ver-expediente'])
     expect(accionesDeTarjeta({ ...CITA, status: 'attended' }, true, true, false)).toEqual([])
   })
-  it('cancelada: «Reagendar cita» y «Reasignar» (tanda I, punto 12); no asistió: sólo «Reagendar cita»', () => {
-    expect(accionesDeTarjeta({ ...CITA, status: 'cancelled' }, true)).toEqual(['reagendar-cita', 'reasignar'])
+  /* Tanda L, punto 9: la cancelada suma «Eliminar cita» (aparte, como peligro). MUTACIÓN: `peligro: null`
+     en la cancelada de `disposicionPorEstado` → rojo. */
+  it('cancelada: «Reagendar cita», «Reasignar» (tanda I, punto 12) y «Eliminar cita» (tanda L, punto 9); no asistió: sólo «Reagendar cita»', () => {
+    expect(accionesDeTarjeta({ ...CITA, status: 'cancelled' }, true)).toEqual(['reagendar-cita', 'reasignar', 'eliminar-cita'])
+    expect(ETIQUETA_ACCION['eliminar-cita']).toBe('Eliminar cita')
     expect(accionesDeTarjeta({ ...CITA, status: 'no_show' }, true)).toEqual(['reagendar-cita'])
   })
   it('una cancelada POR LIGAR no ofrece «Reasignar»: conserva lo de antes', () => {
@@ -49,6 +52,7 @@ describe('accionesDeTarjeta (G3: por estado)', () => {
     expect(pideConfirmacion('cancelar')).toBe(true)
     expect(pideConfirmacion('eliminar')).toBe(true)
     expect(pideConfirmacion('no-asistio')).toBe(true)
+    expect(pideConfirmacion('eliminar-cita')).toBe(true)
     expect(pideConfirmacion('confirmar')).toBe(false)
   })
 })
@@ -65,7 +69,7 @@ describe('disposicionDeTarjeta (G3: la rejilla)', () => {
     expect(disposicionDeTarjeta({ ...CITA, status: 'attended' }, true, { conWhatsApp: true, puedeVerExpediente: true }))
       .toEqual({ principal: 'ver-expediente', secundarias: [], peligro: null })
     expect(disposicionDeTarjeta({ ...CITA, status: 'cancelled' }, true, { conWhatsApp: true }))
-      .toEqual({ principal: 'reagendar-cita', secundarias: ['reasignar'], peligro: null })
+      .toEqual({ principal: 'reagendar-cita', secundarias: ['reasignar'], peligro: 'eliminar-cita' })
   })
 })
 
@@ -202,6 +206,10 @@ describe('textoDeConfirmacion', () => {
   })
   it('eliminar nombra el evento', () => {
     expect(textoDeConfirmacion('eliminar', base)).toBe('¿Eliminar el evento «Junta»? No se puede deshacer.')
+  })
+  it('«Eliminar cita» nombra al paciente y dice que sale de la agenda sin borrarse (tanda L, punto 9)', () => {
+    expect(textoDeConfirmacion('eliminar-cita', { ...base, pacientes: { id: 'p', nombre: 'Ana', apellidos: 'Pech', telefono: null } }))
+      .toBe('¿Eliminar la cita cancelada de Ana Pech? Sale de la agenda y no se puede deshacer; queda guardada en el historial.')
   })
   it('«No asistió» nombra al paciente y dice que la cita se queda (tanda L, punto 2)', () => {
     expect(textoDeConfirmacion('no-asistio', { ...base, pacientes: { id: 'p', nombre: 'Ana', apellidos: 'Pech', telefono: null } }))

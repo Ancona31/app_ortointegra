@@ -129,9 +129,11 @@ begin
     raise exception 'I4C caso 3: el servidor cerró una cita consigo misma';
   exception when insufficient_privilege or check_violation then null;
   end;
+  -- Tanda L, punto 9 (20261124130000): cerrar SIN sustituta ya es válido («Eliminar cita»);
+  -- lo prueba l2_quitar_cancelada.sql. Lo que sigue sin valer es la sustituta SIN cierre.
   begin
-    update public.appointments set cerrada_en = now() where id = '00000000-0000-4000-8000-0000000a4d02';
-    raise exception 'I4C caso 3: el servidor cerró sin sustituta';
+    update public.appointments set sustituida_por = '00000000-0000-4000-8000-0000000a4d12' where id = '00000000-0000-4000-8000-0000000a4d02';
+    raise exception 'I4C caso 3: el servidor puso una sustituta sin cerrar';
   exception when insufficient_privilege or check_violation then null;
   end;
   -- Auditoría independiente: la sustituta tiene que estar VIVA (k1 está cancelada y ya cerrada; con

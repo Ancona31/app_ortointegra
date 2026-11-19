@@ -230,7 +230,8 @@ test('cancelada y no asistió: «Darle otra cita» (y «Reasignar el horario» l
   await expect(t).toHaveCount(0)
   await page.locator('.fc-timegrid-event', { hasText: 'Prueba 24' }).first().click({ position: { x: 8, y: 8 } })
   await expect(t).toHaveAccessibleName('Paciente Prueba 24')
-  await expect.poll(() => acciones(t)).toEqual(['Darle otra cita', 'Reasignar el horario'])
+  // Tanda L, punto 9: la cancelada suma «Eliminar cita» en el pie.
+  await expect.poll(() => acciones(t)).toEqual(['Darle otra cita', 'Reasignar el horario', 'Eliminar cita'])
   await expect(t).toContainText('Esta cita se canceló. Su horario quedó libre.')
   await t.getByRole('button', { name: 'Darle otra cita' }).click()
   const modal = modalCita(page, 'Nueva cita')
