@@ -36,7 +36,12 @@ import { hmacRed } from '../src/lib/reserva/secretos'
  */
 /** Tras verificar con lo restaurado: «Tus datos» con el nombre y el teléfono ya puestos; sólo el aviso y reservar. */
 async function reservarConLoRestaurado(p: Page, persona: { nombre: string; telefono: string }): Promise<void> {
-  await expect(alerta(p)).toHaveText('Tu correo ya está verificado. Completa tus datos para reservar.')
+  // Tanda M (punto 7): no es un error. Verde (`--ag-success-text`), con palomita y como estado, no como alerta.
+  const verificado = p.locator('.rp-tarjeta').getByRole('status')
+  await expect(verificado).toHaveText('Tu correo ya está verificado. Completa tus datos para reservar.')
+  await expect(verificado).toHaveCSS('color', 'rgb(21, 126, 60)')
+  await expect(verificado.locator('svg')).toHaveCount(1)
+  await expect(alerta(p)).toHaveCount(0)
   await expect(p.getByLabel('Nombre completo')).toHaveValue(persona.nombre)
   await expect(p.getByLabel('Teléfono (10 dígitos)')).toHaveValue(persona.telefono)
   await p.getByRole('checkbox').check()
@@ -151,6 +156,7 @@ test('tope del dispositivo: el mensaje dice cuánto falta, con lo que dijo el se
   await llenar(p, personaNueva())
   await p.getByRole('button', { name: 'Enviar código a mi correo' }).click()
   await expect(alerta(p)).toHaveText('Demasiados intentos. Podrás volver a probar en 60 min.')
+  await expect(alerta(p)).toHaveClass(/rp-nota--error/) // tanda M (punto 7): los errores de verdad siguen en rojo
   await p.context().close()
 })
 
