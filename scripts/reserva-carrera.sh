@@ -73,6 +73,10 @@ create temp table _ids on commit drop as
   union all select id from public.agenda_bloqueos where clinica_id = '$C'
   union all select unnest(array['$C', '$U', '$K', '$T', '$J']::uuid[]);
 delete from public.audit_log where registro_id in (select id from _ids) or descripcion like '%$C%';
+-- los avisos de I5 y L5 (sus disparadores AFTER), y antes su audit_log (registro_id = id del aviso)
+delete from public.audit_log where tabla = 'avisos_clinica'
+    and registro_id in (select id from public.avisos_clinica where clinica_id = '$C');
+delete from public.avisos_clinica where clinica_id = '$C';
 delete from public.reserva_incidencias where clinica_id = '$C';
 delete from public.reserva_verificaciones where clinica_id = '$C';
 delete from public.reserva_contactos where clinica_id = '$C';
@@ -94,6 +98,7 @@ SQL
                              or registro_id in ('$C', '$U', '$K', '$T', '$J', '$E1', '$E2', '$E3', '$E4', '$E5', '$E6', '$E7', '$E8'))
                     + (select count(*) from public.appointments where clinica_id = '$C')
                     + (select count(*) from public.reserva_enlaces where clinica_id = '$C')
+                    + (select count(*) from public.avisos_clinica where clinica_id = '$C')
                     + (select count(*) from public.reserva_incidencias where clinica_id = '$C')
                     + (select count(*) from public.reserva_verificaciones where clinica_id = '$C')
                     + (select count(*) from public.reserva_contactos where clinica_id = '$C')

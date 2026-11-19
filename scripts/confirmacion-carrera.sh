@@ -49,6 +49,10 @@ begin;
 set local session_replication_role = replica;
 delete from public.audit_log where registro_id in ('$C', '$U', '$P', '$X', '$Y', '$Z', '$LX', '$LY', '$LZ')
     or descripcion like '%$C%';
+-- los avisos de I5 y L5 (sus disparadores AFTER), y antes su audit_log (registro_id = id del aviso)
+delete from public.audit_log where tabla = 'avisos_clinica'
+    and registro_id in (select id from public.avisos_clinica where clinica_id = '$C');
+delete from public.avisos_clinica where clinica_id = '$C';
 delete from public.cita_confirmaciones where clinica_id = '$C';
 delete from public.appointments where clinica_id = '$C';
 delete from public.pacientes where clinica_id = '$C';
@@ -61,6 +65,7 @@ SQL
   local resto
   resto="$(sql -c "select (select count(*) from public.audit_log where descripcion like '%$C%'
                              or registro_id in ('$C', '$U', '$P', '$X', '$Y', '$Z', '$LX', '$LY', '$LZ'))
+                    + (select count(*) from public.avisos_clinica where clinica_id = '$C')
                     + (select count(*) from public.cita_confirmaciones where clinica_id = '$C')
                     + (select count(*) from public.appointments where clinica_id = '$C')
                     + (select count(*) from public.pacientes where clinica_id = '$C')
