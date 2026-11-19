@@ -1782,3 +1782,178 @@ ANTES del código. La v2 se enciende después.
   - la carrera sin L1.
 
   Aplicados. Sin hallazgos sobre permisos ni contrato con la consola.
+
+## 15. Tanda M (2026-11-19)
+
+Cinco ramas en paralelo desde `cb0e290` (`feature/agenda-v2-m1` a `-m5`, en
+los worktrees `-agenda-t5`, `-agenda-t3`, `-agenda-b56`, `-agenda-menores` y
+`-agenda-t4`), fusionadas con `--no-ff` en `feature/agenda-v2` en el orden M1,
+M2, M3, M4, M5 (`e88d928`, `87ca068`, `5e1c50d`, `3c23f39` y `108f80c`).
+**Ninguna de las cinco trae migración.** La integración añade una, por encargo
+de Angel, que **no es de la agenda**: `20261125170000_audit_log_sin_truncate.sql`
+(`8bd6ba8`).
+
+### 15.1 El conjunto, sin reiniciar
+
+`ls supabase/migrations/*.sql` = **49**: las 5 de `main`, las 43 de la agenda
+(sin cambios desde la tanda L) y la del TRUNCATE.
+
+**Esta vez la base NO se reinició** (orden de Angel: «No vuelvas a borrar filas
+de audit_log, tampoco en local ni de pruebas»; `supabase db reset` vaciaría el
+`audit_log` local). Las 48 de la tanda L ya estaban aplicadas desde su
+reinicio; sobre esa base se aplicó sólo la nueva, bajo el flock:
+
+1. en seco, con el `COMMIT` cambiado por `ROLLBACK`: veredicto OK en las 5
+   filas comprobables y la base sin cambios después (`TRUNCATE` de `anon`
+   seguía en `true`, 0 disparadores nuevos);
+2. real, y una segunda pasada: OK y OK, idempotente;
+3. tras la auditoría, una tercera con el post-vuelo nuevo: OK;
+4. registrada a mano en `supabase_migrations.schema_migrations`
+   (`20261125170000`, `audit_log_sin_truncate`).
+
+`audit_log`: 65 036 filas antes de aplicarla y 65 036 después de cada pasada
+(al aplicarla, 2026-11-19 ~15:40 UTC; la cifra crece después con la actividad
+de las pruebas, que ya no borran nada).
+
+Lo que esto no comprueba, y la tanda L sí: el conjunto **desde cero**. No se
+corrió; las 43 de la agenda no cambiaron desde la tanda L (§14.1), y la nueva
+sólo depende de objetos del baseline.
+
+### 15.2 La migración
+
+| Archivo | Qué hace | Riesgo (cabecera) |
+|---|---|---|
+| `20261125170000_audit_log_sin_truncate.sql` | `REVOKE TRUNCATE ON public.audit_log FROM anon, authenticated, service_role` y el disparador de sentencia `prevent_audit_truncate` (`BEFORE TRUNCATE … FOR EACH STATEMENT`) con la función de siempre, `prevent_audit_modification()`, que lanza «El audit_log es inmutable. No se permite UPDATE ni DELETE.». Pre-vuelo: dueño, el md5 de la función (`f1fe023a…`) y, en una repetición, el disparador por catálogo (`tgtype` 34, la misma función). Post-vuelo ANTES del `COMMIT`: aborta si algún rol conserva TRUNCATE | BAJO |
+
+- **No concede nada**, no toca la policy `audit_super_admin_select`, ni
+  `prevent_audit_delete` ni `prevent_audit_update`, ni la función, ni ninguna
+  otra tabla. Los demás privilegios de los tres roles sobre `audit_log`
+  (SELECT, INSERT, UPDATE, DELETE, REFERENCES, TRIGGER y, en PG 17, MAINTAIN)
+  siguen.
+- **Depende sólo del baseline**: la tabla, la función y, para el veredicto,
+  los dos disparadores de fila. Ninguna migración de la agenda la necesita ni
+  la toca. **Se puede aplicar sola y antes que el conjunto de la agenda**; el
+  timestamp va detrás de los rangos de M1–M5 sólo para no chocar.
+- **Antes de escribirla**, grep de `truncate` en `src`, `scripts`, `e2e` y
+  `supabase`: nada vacía `audit_log`. En `src` sólo la clase `truncate` de
+  Tailwind y `NOTAS_TRUNCATE`; en `supabase`, `REVOKE` de TRUNCATE en tablas de
+  la agenda y comentarios. La semilla sólo inserta en `audit_log`.
+- **Prueba:** `supabase/pruebas-sql/m_audit_log_sin_truncate.sql`, 5 casos (9
+  comprobaciones): los
+  tres roles reciben 42501; `postgres` (el dueño, que conserva el privilegio)
+  recibe P0001 con el mensaje; `service_role` con el privilegio devuelto dentro
+  del subbloque, también P0001; el disparador existe; el recuento no cambia.
+  Cada intento va en un subbloque que se deshace siempre (si el TRUNCATE
+  entrara, una excepción propia lo revierte) y el archivo acaba en `rollback`.
+  - En rojo antes de aplicar la migración: «AT caso 1 (anon): dio vació,
+    esperaba 42501».
+  - Mutaciones, dentro de la transacción: sin el REVOKE y sin el disparador →
+    caso 1; sólo sin el disparador → caso 2; sólo con el GRANT → caso 1 («dio
+    P0001…»).
+  - La guarda `pruebasSinBorrarAuditoria.test.ts` deja a ese archivo, y sólo a
+    él, escribir TRUNCATE de `audit_log`, si acaba en `rollback;` y no lleva
+    `commit`. El DELETE le sigue prohibido. En rojo: sin el `rollback` final,
+    con un `commit`, con un `delete from public.audit_log`, o con un TRUNCATE
+    en otro archivo.
+- **Lo que no cierra:** `postgres` con `session_replication_role = replica`
+  sigue pudiendo vaciarla, igual que puede borrar filas: los tres
+  disparadores son normales (`tgenabled` `O`). No se pasó a `ENABLE ALWAYS`
+  porque el encargo pide uno igual al de borrado. Queda para Angel (§6-bis).
+
+### 15.3 Permisos de funciones
+
+La migración **no crea ninguna función**: reutiliza `prevent_audit_modification()`
+(sea cual sea su ACL, no se toca: en el baseline y hoy en la base local lleva
+EXECUTE a PUBLIC; `feature/limites-ajustables` lo revoca). El disparador no
+necesita EXECUTE de quien hace el TRUNCATE: PostgreSQL lo comprueba al crear el
+disparador, no al dispararlo.
+
+La lista del caso 3 de `p1_permisos_funciones.sql` (`feature/limites-ajustables`)
+**sigue en 50**, idéntica a la del §14.4: ninguna de las cinco ramas de M ni la
+integración añade o quita funciones. **No se comprobó en una base combinada**:
+exigía reiniciar la base, y esta tanda no reinicia (§15.1).
+
+### 15.4 Contrato con spinus-consola
+
+No cambia ninguna columna, vista ni función de `public`. La consola usa su
+propia credencial; si alguna vez hiciera TRUNCATE de `audit_log` (no debe),
+ahora fallaría.
+
+### 15.5 Orden de despliegue y tolerancia
+
+| Migración | Orden | Sin la migración |
+|---|---|---|
+| `20261125170000` | cualquiera; puede ir sola y la primera | Todo igual: ningún código hace TRUNCATE. Sólo sigue abierto el hueco |
+
+El código de la tanda M no necesita ninguna migración nueva: con la base de la
+tanda L, y con la v2 apagada o las tablas ausentes, se comporta como la tanda L
+(las ramas lo comprobaron en sus áreas; la batería de la integración corrió con
+la migración aplicada, y nada de la app ni de las pruebas toca TRUNCATE).
+
+### 15.6 Tablas de `public` con TRUNCATE para `anon`, `authenticated` o `service_role`
+
+Después de la migración, en la base local (`has_table_privilege`, tablas `r` y
+`p` de `public`): **30 de 44**. Las que guardan datos de pacientes, en
+**negrita**. Sin negrita pero sensibles: `google_tokens`,
+`clinica_conexiones_google` e `invitaciones` guardan credenciales o datos del
+médico, no del paciente. **No se tocó ninguna** (el encargo: «no lo extiendas a otras
+tablas»).
+
+| Tabla | anon | authenticated | service_role |
+|---|---|---|---|
+| **addendums** (contenido de la nota) | sí | sí | sí |
+| agenda_ajustes | — | — | sí |
+| analitos_catalogo | sí | sí | sí |
+| **appointments** (paciente_id) | sí | sí | sí |
+| **calculadora_resultados** (paciente_id, resultado) | sí | sí | sí |
+| **casos_clinicos** (paciente_id, descripción) | sí | sí | sí |
+| **casos_clinicos_recursos** (imágenes y anotaciones de los casos) | sí | sí | sí |
+| cat_cie10 | sí | sí | sí |
+| clinica_conexiones_google | sí | — | sí |
+| clinicas | sí | sí | sí |
+| **consultas** | sí | sí | sí |
+| consultorios | sí | sí | sí |
+| **documentos** | sí | sí | sí |
+| **firmas_documento** (trazo de la firma; tiene su propio disparador contra TRUNCATE) | sí | — | sí |
+| folios_contador | sí | sí | sí |
+| google_tokens | sí | sí | sí |
+| invitaciones | sí | sí | sí |
+| ip_rate_limits | sí | sí | sí |
+| medicamentos | sí | sí | sí |
+| **mediciones_analitos** (paciente_id, valor) | sí | sí | sí |
+| **paciente_medico** | sí | sí | sí |
+| **pacientes** | sí | sí | sí |
+| pdf_jobs (el resultado puede ser un PDF de un paciente: dudosa) | sí | sí | sí |
+| plantillas_documento | sí | sí | sí |
+| plantillas_honorarios | sí | sí | sí |
+| profiles | sí | sí | sí |
+| rate_limits | sí | sí | sí |
+| **solicitudes_arco** (paciente_id) | sí | sí | sí |
+| stripe_webhook_events | sí | sí | sí |
+| tipos_cita | — | — | sí |
+
+Las tablas de la agenda con datos de pacientes (`reserva_*`,
+`cita_confirmaciones`, `cita_correos`, `avisos_clinica`, `agenda_bloqueos`,
+`gcal_*`) no aparecen: sus migraciones ya revocaron TRUNCATE.
+
+### 15.7 Hallazgos
+
+- **M-M1 · Auditoría independiente** (sonnet, sólo lectura, con
+  `supabase/AUDITORIA-MIGRACIONES.md`): **APTA**, sin hallazgos graves.
+  - Aplicado: el post-vuelo antes del `COMMIT` (un REVOKE sólo quita lo que
+    concedió quien lo ejecuta; con otro otorgante pasaría sin efecto).
+  - Anotados sin cambiar: el mensaje dice «UPDATE ni DELETE» ante un TRUNCATE
+    (lo pide el encargo); el recuento de la prueba en READ COMMITTED da un
+    falso rojo, nunca un falso verde, si alguien inserta a la vez.
+  - Propone una **dimensión 19** para `AUDITORIA-MIGRACIONES.md`, «otorgante
+    del privilegio que se revoca» (mirar `aclexplode(relacl)` y su `grantor`, y
+    abortar antes del `COMMIT` con `has_table_privilege`). **No se añadió:** ese
+    archivo no lo edita la integración. Queda para Angel.
+- **M-M2 · `replica` salta los tres disparadores de `audit_log`** (§15.2).
+- **M-M3 · Sin reinicio, el conjunto desde cero no se volvió a probar** (§15.1).
+- **Revisor del §15** (sonnet, contra la migración, la prueba, la guarda, el
+  `git log` y el catálogo): APTA con cambios, todos de redacción. Pedía MAINTAIN
+  en la lista de privilegios que siguen, la hora del recuento, que la ACL de la
+  función no se toca sea cual sea, y señalar `google_tokens`,
+  `clinica_conexiones_google` e `invitaciones` como sensibles sin ser de
+  pacientes. Aplicados. Confirmó una por una las 30 filas de la §15.6.

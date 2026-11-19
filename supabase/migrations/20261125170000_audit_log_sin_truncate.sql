@@ -27,7 +27,7 @@
 -- ═══ QUÉ CAMBIA ════════════════════════════════════════════════════════
 -- 1. REVOKE TRUNCATE ON public.audit_log FROM anon, authenticated, service_role.
 --    El resto de sus privilegios (SELECT, INSERT, UPDATE, DELETE, REFERENCES,
---    TRIGGER) NO se toca: UPDATE y DELETE ya los paran los disparadores de
+--    TRIGGER y, en PG 17, MAINTAIN) NO se toca: UPDATE y DELETE ya los paran los disparadores de
 --    fila, y quitarlos no es el encargo.
 -- 2. prevent_audit_truncate: BEFORE TRUNCATE ... FOR EACH STATEMENT EXECUTE
 --    FUNCTION public.prevent_audit_modification(). Reutiliza la función del
