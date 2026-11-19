@@ -53,16 +53,18 @@ async function tomar(clinicaId: string, citaId: string, testigo: string): Promis
 }
 
 /** Compone y manda la confirmación ya tomada. Devuelve cómo cerrarla. */
-async function mandar(clinicaId: string, citaId: string, perfilId: string, t: Toma, cambio: boolean): Promise<Cierre> {
+async function mandar(clinicaId: string, citaId: string, perfilId: string, t: Toma, o: OpcionesConfirmacion): Promise<Cierre> {
   const enlace = await emitirEnlaceConfirmacion(clinicaId, citaId, perfilId)
   if (!enlace) return { estado: 'omitido', motivo: 'sin_enlace' }
   let correo
   try {
-    correo = (cambio ? correoCambio : correoConfirmacion)({
+    const datos = {
       inicio: t.r_inicio, zona: t.r_zona,
       medico: t.r_medico ? componerNombreMedicoCompleto(t.r_medico) : '',
       consultorio: t.r_consultorio, confirmada: t.r_estado === 'confirmed', url: enlace.url,
-    })
+    }
+    // Tanda L (punto 15): sólo la confirmación saluda por el nombre; el aviso de cambio, como antes.
+    correo = o.cambio === true ? correoCambio(datos) : correoConfirmacion(datos, o.nombre ?? null)
   } catch {
     return { estado: 'omitido', motivo: 'plantilla' }
   }
@@ -87,18 +89,24 @@ async function cerrar(clinicaId: string, envioId: string, testigo: string, cierr
 }
 
 /**
+ * `cambio` (tanda I, punto 9): las palabras del aviso de cambio. `nombre` (tanda L, punto 15): el nombre
+ * con que saluda la confirmación; lo lee la ruta con la SESIÓN (RLS), nunca viene de la petición.
+ */
+export interface OpcionesConfirmacion { cambio?: boolean; nombre?: string | null }
+
+/**
  * Manda la confirmación de UNA cita. `perfilId`: quien la manda (queda en el
  * enlace emitido). Con `cambio` (tanda I, punto 9: «Reagendar» de una cita por
  * enlace), las palabras del aviso de cambio (`correoCambio`); el registro es el
  * mismo (`tipo: 'confirmacion'` del NUEVO inicio). Nunca lanza.
  */
-export async function enviarConfirmacionCita(clinicaId: string, citaId: string, perfilId: string, opciones: { cambio?: boolean } = {}): Promise<ResultadoConfirmacion> {
+export async function enviarConfirmacionCita(clinicaId: string, citaId: string, perfilId: string, opciones: OpcionesConfirmacion = {}): Promise<ResultadoConfirmacion> {
   try {
     const testigo = randomUUID()
     const t = await tomar(clinicaId, citaId, testigo)
     if (t === 'no_disponible') return { tipo: 'no_disponible' }
     if (!t) return { tipo: 'no_toca' }
-    const cierre = await mandar(clinicaId, citaId, perfilId, t, opciones.cambio === true)
+    const cierre = await mandar(clinicaId, citaId, perfilId, t, opciones)
     await cerrar(clinicaId, t.r_envio_id, testigo, cierre)
     return resultadoDe(cierre)
   } catch (e) {

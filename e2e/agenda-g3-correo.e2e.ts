@@ -79,8 +79,12 @@ async function comprobarEnvio(page: Page, id: string, apellidos: string): Promis
   const enlace = /(https?:\/\/[^\s/]+\/confirmar\/[A-Za-z0-9_-]{22})\b/.exec(correo.texto)?.[1]
   expect(enlace, 'enlace absoluto de /confirmar/').toBeTruthy()
   expect(correo.html).toContain(`href="${enlace}?paso=confirmar"`)
-  // Nada clínico: ni las notas, ni el título, ni el nombre del paciente.
+  // Nada clínico: ni las notas, ni el título, ni los apellidos del paciente. Tanda L (punto 15): sólo su
+  // nombre, en el saludo (en rojo si la ruta no pasa `{ nombre }`).
   expect(`${correo.asunto}\n${correo.texto}\n${correo.html}`).not.toMatch(/DIAGNOSTICO|SECRETO|Paciente Prueba|Prueba \d\d/)
+  expect(correo.texto).toMatch(/Confirma tu cita\s+Hola, Paciente:\s+Tienes una cita/)
+  expect(correo.html).toContain('Hola, Paciente:')
+  expect(correo.asunto).not.toContain('Paciente')
   // Registrado como los demás correos de cita, y auditado.
   expect(sqlLocal(`select tipo || '/' || estado from public.cita_correos where appointment_id = :'id'`, { id })).toBe('confirmacion/enviado')
   expect(sqlLocal(`select count(*) from public.audit_log where accion = 'enviar_confirmacion_cita' and registro_id = :'id'`, { id })).toBe('1')

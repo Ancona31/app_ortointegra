@@ -176,6 +176,24 @@ describe('POST /api/agenda/correo — envío', () => {
     expect(JSON.stringify(h.auditorias)).not.toContain('@')
   })
 
+  /* Tanda L (punto 15). MUTACIÓN (en rojo): la ruta sin pasar `{ nombre }` a `enviarConfirmacionCita`. */
+  it('tanda L: saluda con el nombre del paciente ligado (sin apellidos) o, sin él, con el tecleado al reservar', async () => {
+    h.fila = cita({ reserva_nombre: 'Juana Reserva', pacientes: { email: 'juana@prueba.local', nombre: 'Juana' } })
+    expect((await POST(post({ cita_id: CITA }))).status).toBe(200)
+    const a = h.correos[0] as { asunto: string; texto: string; html: string }
+    expect(a.texto).toContain('Hola, Juana:')
+    expect(a.html).toContain('Hola, Juana:')
+    expect(a.asunto).not.toContain('Juana')
+    h.correos = []
+    h.fila = cita({ paciente_id: null, reserva_canal: 'fijo', reserva_correo: 'r@prueba.local', reserva_nombre: ' Rosa  Pech ', pacientes: null })
+    expect((await POST(post({ cita_id: CITA }))).status).toBe(200)
+    expect((h.correos[0] as { texto: string }).texto).toContain('Hola, Rosa Pech:')
+    h.correos = []
+    h.fila = cita({ reserva_nombre: null, pacientes: { email: 'juana@prueba.local', nombre: null } })
+    expect((await POST(post({ cita_id: CITA }))).status).toBe(200)
+    expect((h.correos[0] as { texto: string }).texto).not.toContain('Hola')
+  })
+
   it('una cita confirmada: asunto sin «Confirma» y el enlace sólo para avisar que no asistirá', async () => {
     h.fila = cita({ status: 'confirmed' })
     h.toma = [{ ...TOMA, r_estado: 'confirmed' }]

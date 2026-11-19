@@ -2,7 +2,7 @@ import { test, expect, type Browser, type BrowserContext, type Page } from '@pla
 import { soloEscritorio, sqlLocal } from './ayudas'
 import { codigoDe, contarCorreos, esperarCorreo } from './mailpit'
 import { marcaE2e, limpiarReservasE2e } from './reservaAyudas'
-import { api, cerrarEscenario, emitirEnlace, ipAlAzar, personaNueva, prepararEscenario, type Escenario } from './reservaPublicaAyudas'
+import { api, cerrarEscenario, citaDe, emitirEnlace, ipAlAzar, personaNueva, prepararEscenario, type Escenario } from './reservaPublicaAyudas'
 import { hmacRed } from '../src/lib/reserva/secretos'
 
 /**
@@ -23,7 +23,26 @@ import { hmacRed } from '../src/lib/reserva/secretos'
  * adelante»; `alEnviarDatos` sin `codigoPendiente` → «volver y avanzar»; sin
  * reusar la ficha en `verificarYReservar` → «la reserva falla después de
  * verificar»; sin leer `#codigo=` → las dos de «Continuar mi reserva».
+ *
+ * Tanda L (punto 10 de Angel): el nombre y el teléfono ENVIADOS se guardan y
+ * pasan a la pestaña nueva como lo demás (el código, nunca): tras recargar o
+ * tras «Continuar mi reserva», al verificar vuelven ya escritos en «Tus datos»
+ * (se marca el aviso y se pulsa «Reservar cita»; no reservan solos).
+ * MUTACIONES (L4, en rojo): sin restaurar la persona en `useReserva`
+ * (`g.persona` ignorado) → «recargar», «atrás y adelante», «punto 9 · con la
+ * pestaña abierta» y «tanda L · verificar enseguida»; el traspaso sin la
+ * persona → las dos últimas; `enviada` sin `restaurada` → «recargar» (la
+ * segunda recarga).
  */
+/** Tras verificar con lo restaurado: «Tus datos» con el nombre y el teléfono ya puestos; sólo el aviso y reservar. */
+async function reservarConLoRestaurado(p: Page, persona: { nombre: string; telefono: string }): Promise<void> {
+  await expect(alerta(p)).toHaveText('Tu correo ya está verificado. Completa tus datos para reservar.')
+  await expect(p.getByLabel('Nombre completo')).toHaveValue(persona.nombre)
+  await expect(p.getByLabel('Teléfono (10 dígitos)')).toHaveValue(persona.telefono)
+  await p.getByRole('checkbox').check()
+  await p.getByRole('button', { name: 'Reservar cita' }).click()
+  await expect(listo(p)).toBeVisible()
+}
 test.describe.configure({ mode: 'serial' })
 soloEscritorio()
 
@@ -156,24 +175,27 @@ test('volver y avanzar: no pide otro código; el del primer correo sirve', async
   await p.context().close()
 })
 
-test('recargar: vuelve al código sin pedir otro; guarda lo mínimo (sin nombre, teléfono ni código)', async ({ browser }) => {
+test('recargar: vuelve al código sin pedir otro; guarda lo pedido y los datos enviados, nunca el código', async ({ browser }) => {
   const p = await pagina(browser)
   const persona = personaNueva()
   await hastaCodigo(p, persona)
   const primero = await codigoN(persona.correo, 0)
   const guardado = await p.evaluate(() => JSON.stringify(Object.entries(sessionStorage)))
-  expect(guardado).toContain(persona.correo)
-  for (const nunca of [persona.nombre, persona.telefono, primero]) expect(guardado).not.toContain(nunca)
+  // Tanda L (punto 10): el nombre y el teléfono enviados se guardan, como el correo; el código, nunca.
+  for (const si of [persona.correo, persona.nombre, persona.telefono]) expect(guardado).toContain(si)
+  expect(guardado).not.toContain(primero)
   expect(await p.evaluate(() => localStorage.length)).toBe(0)
+  await p.reload()
+  await expect(campoCodigo(p)).toBeVisible()
+  // Una segunda recarga tampoco los pierde (revisión de L4: lo restaurado se vuelve a guardar).
   await p.reload()
   await expect(campoCodigo(p)).toBeVisible()
   await expect(p.getByRole('button', { name: /^Enviar otro código en \d+ s$/ })).toBeDisabled()
   await campoCodigo(p).fill(primero)
   await p.getByRole('button', { name: 'Verificar y reservar' }).click()
-  // Tras recargar no hay nombre ni teléfono guardados: se escriben otra vez y reserva con el correo ya verificado.
-  await llenar(p, persona)
-  await p.getByRole('button', { name: 'Reservar cita' }).click()
-  await expect(listo(p)).toBeVisible()
+  // Con el nombre y el teléfono de antes de recargar, ya escritos: reserva sin volver a teclearlos.
+  await reservarConLoRestaurado(p, persona)
+  expect(citaDe(persona.correo)?.title).toBe(persona.nombre)
   expect(await contarCorreos(persona.correo, ASUNTO)).toBe(1)
   expect(await p.evaluate(() => sessionStorage.length)).toBe(0)
   await p.context().close()
@@ -189,9 +211,7 @@ test('atrás y adelante del navegador: vuelve al código', async ({ browser }) =
   await expect(campoCodigo(p)).toBeVisible()
   await campoCodigo(p).fill(await codigoN(persona.correo, 0))
   await p.getByRole('button', { name: 'Verificar y reservar' }).click()
-  await llenar(p, persona)
-  await p.getByRole('button', { name: 'Reservar cita' }).click()
-  await expect(listo(p)).toBeVisible()
+  await reservarConLoRestaurado(p, persona)
   await p.context().close()
 })
 
@@ -279,12 +299,33 @@ test('punto 9 · «Continuar mi reserva» con la pestaña abierta: el código ya
   // El código recién emitido (el último de la tabla) sigue sin verificar y sin intentos.
   expect(sqlLocal(`select (verificado_en is null) || '|' || intentos from public.reserva_verificaciones
                     where created_at >= :'d'::timestamptz order by created_at desc limit 1`, { d: desde })).toBe('true|0')
-  // El traspaso entre pestañas no lleva nombre ni teléfono (revisión de seguridad): se escriben tras verificar.
+  // Tanda L (punto 10): el traspaso lleva el nombre y el teléfono enviados; «Volver» los enseña ya puestos.
+  await b.getByRole('button', { name: 'Volver', exact: true }).click()
+  await expect(b.getByLabel('Nombre completo')).toHaveValue(persona.nombre)
+  await expect(b.getByLabel('Teléfono (10 dígitos)')).toHaveValue(persona.telefono)
+  await b.getByRole('checkbox').check()
+  await b.getByRole('button', { name: 'Enviar código a mi correo' }).click()
+  await expect(campoCodigo(b)).toHaveValue(codigo)
+  expect(llamadas).toEqual([])
+  // Los mandó en ESTA pestaña, con el aviso marcado: verificar ya reserva, con el nombre de la persona.
   await b.getByRole('button', { name: 'Verificar y reservar' }).click()
-  await expect(alerta(b)).toHaveText('Tu correo ya está verificado. Completa tus datos para reservar.')
-  await llenar(b, persona)
-  await b.getByRole('button', { name: 'Reservar cita' }).click()
   await expect(listo(b)).toBeVisible()
+  expect(citaDe(persona.correo)?.title).toBe(persona.nombre)
+  await a.context().close()
+})
+
+test('tanda L · «Continuar mi reserva» y verificar enseguida: «Tus datos» ya escritos, sólo marcar el aviso y reservar', async ({ browser }) => {
+  const a = await pagina(browser)
+  const persona = personaNueva()
+  await hastaCodigo(a, persona)
+  const correo = await esperarCorreo(persona.correo, ASUNTO)
+  const href = /href="([^"]*\/reservar\/[^"]*)"[^>]*>Continuar mi reserva</.exec(correo.html)?.[1]?.replace(/&amp;/g, '&') ?? ''
+  const b = await a.context().newPage()
+  await b.goto(href.replace(/^https?:\/\/[^/]+/, BASE))
+  await expect(campoCodigo(b)).toHaveValue(codigoDe(correo.texto))
+  await b.getByRole('button', { name: 'Verificar y reservar' }).click()
+  await reservarConLoRestaurado(b, persona)
+  expect(citaDe(persona.correo)?.title).toBe(persona.nombre)
   await a.context().close()
 })
 

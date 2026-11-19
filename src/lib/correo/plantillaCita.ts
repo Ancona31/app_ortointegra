@@ -59,6 +59,8 @@ export interface PartesCorreo {
   preencabezado: string
   /** Lo que pasó, en una línea («Tu cita quedó agendada»). */
   titulo: string
+  /** Tanda L (punto 15): «Hola, Ana:», justo bajo el título, en texto llano (se escapa aquí). Sólo el nombre; nada clínico. */
+  saludo?: string
   /** La fecha grande: «Viernes» y «13 de noviembre · 10:45 h». */
   fecha?: { dia: string; resto: string; zona?: string | null }
   /** El código de 6 dígitos, en grande. */
@@ -151,6 +153,7 @@ function boton(b: BotonCorreo): string {
 function cuerpo(x: PartesCorreo): string {
   return [
     `<h1 style="margin:0 0 14px;font:700 20px/1.3 ${FUENTE};color:${C.tinta}">${escapeHtml(x.titulo)}</h1>`,
+    x.saludo ? p(`font:400 15px/1.5 ${FUENTE};color:${C.texto}`, escapeHtml(x.saludo)) : '',
     x.fecha ? bloqueFecha(x.fecha) : '',
     x.codigo ? bloqueCodigo(x.codigo) : '',
     ...(x.parrafos ?? []).map(t => p(`font:400 15px/1.5 ${FUENTE};color:${C.texto}`, escapeHtml(t))),
@@ -178,7 +181,7 @@ export function htmlCorreoCita(x: PartesCorreo): string {
 
 /**
  * El texto plano: la marca (el médico y su consultorio; sin médico,
- * «Spinus»), el título y, debajo, los `renglones` que quien llama ya tenía
+ * «Spinus»), el título, el saludo si lo hay y, debajo, los `renglones` que quien llama ya tenía
  * (así el texto de antes no cambia) o, sin ellos, lo mismo que el HTML en el
  * mismo orden, con cada botón seguido de su URL completa. Con médico, cierra
  * «Enviado con Spinus» (tanda I, punto 21).
@@ -197,7 +200,7 @@ export function textoCorreoCita(x: PartesCorreo, renglones?: string[]): string {
   ]
   const quien = deQuien(x.marca)
   const encabezado = quien ? [quien.medico, ...(quien.consultorio ? [quien.consultorio] : [])].join('\n') : 'Spinus'
-  return [encabezado, x.titulo, ...cuerpoTexto, ...(quien ? ['Enviado con Spinus'] : [])].join('\n\n')
+  return [encabezado, x.titulo, ...(x.saludo ? [x.saludo] : []), ...cuerpoTexto, ...(quien ? ['Enviado con Spinus'] : [])].join('\n\n')
 }
 
 /**

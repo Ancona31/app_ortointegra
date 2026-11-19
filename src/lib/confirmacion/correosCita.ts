@@ -10,6 +10,10 @@
  * tipo de cita, ni especialidad, ni el nombre del paciente. Sólo fecha, hora
  * (en la zona del consultorio, con su etiqueta), médico, consultorio, su
  * dirección y su teléfono, y el enlace. El asunto no lleva ni el médico.
+ * EXCEPCIÓN (tanda L, punto 15 de Angel): el correo de CONFIRMACIÓN
+ * (`correoConfirmacion`) saluda por el nombre («Hola, Ana:»), SÓLO el nombre
+ * y sólo en el cuerpo (nunca en el asunto). El recordatorio y el aviso de
+ * cambio siguen sin él.
  *
  * ⚠️ DETERMINISTA: la misma entrada da exactamente el mismo correo, sin «ahora»
  * en ninguna parte. Resend exige el MISMO cuerpo con la misma Idempotency-Key
@@ -91,8 +95,18 @@ export function correoRecordatorio(d: DatosRecordatorio): CorreoRecordatorio {
   return correoDeCita(d, PALABRAS_RECORDATORIO)
 }
 
-/** El cuerpo común del recordatorio y de la confirmación, con sus palabras. */
-function correoDeCita(d: DatosRecordatorio, palabras: PalabrasCorreo): CorreoRecordatorio {
+/**
+ * Tanda L (punto 15): «Hola, Ana:» con el nombre tal como lo tenemos (espacios y saltos juntados), o
+ * nada sin nombre. Lo escapa la plantilla. Más de 120 caracteres (el tope del nombre de la reserva) no es
+ * un nombre: sin saludo.
+ */
+export function saludoDe(nombre: string | null | undefined): string | undefined {
+  const limpio = nombre?.replace(/\s+/g, ' ').trim() ?? ''
+  return limpio && limpio.length <= 120 ? `Hola, ${limpio}:` : undefined
+}
+
+/** El cuerpo común del recordatorio y de la confirmación, con sus palabras (y el saludo, sólo la confirmación). */
+function correoDeCita(d: DatosRecordatorio, palabras: PalabrasCorreo, saludo?: string): CorreoRecordatorio {
   if (Number.isNaN(new Date(d.inicio).getTime())) throw new Error('correoRecordatorio: inicio inválido')
   const zona = zonaValida(d.zona)
   const { fecha, hora } = fechaYHora(d.inicio, zona)
@@ -122,6 +136,7 @@ function correoDeCita(d: DatosRecordatorio, palabras: PalabrasCorreo): CorreoRec
     marca: { medico, consultorio: d.consultorio.nombre },
     preencabezado: `Tienes una cita ${cuando}.`,
     titulo: palabras.titulo,
+    saludo,
     fecha: { ...fechaDeCorreo(d.inicio, zona), zona: region ? `Zona horaria: ${region}` : null },
     datos: [
       { etiqueta: 'Médico', valor: medico }, { etiqueta: 'Consultorio', valor: d.consultorio.nombre },
@@ -142,11 +157,13 @@ function correoDeCita(d: DatosRecordatorio, palabras: PalabrasCorreo): CorreoRec
  * días antes, así que no dice «Recordatorio». Determinista, como el
  * recordatorio (misma Idempotency-Key, mismo cuerpo).
  * ⚠️ TEXTO PENDIENTE DE REVISIÓN, como el del recordatorio.
+ * Tanda L (punto 15): con `nombre` (el de pila del paciente ligado o el que
+ * tecleó al reservar), «Hola, <nombre>:» bajo el título; sin él, como antes.
  */
-export function correoConfirmacion(d: DatosRecordatorio): CorreoRecordatorio {
+export function correoConfirmacion(d: DatosRecordatorio, nombre: string | null = null): CorreoRecordatorio {
   return correoDeCita(d, d.confirmada
     ? { asunto: fecha => `Tu cita del ${fecha}`, titulo: 'Tu cita' }
-    : { asunto: fecha => `Confirma tu cita del ${fecha}`, titulo: 'Confirma tu cita' })
+    : { asunto: fecha => `Confirma tu cita del ${fecha}`, titulo: 'Confirma tu cita' }, saludoDe(nombre))
 }
 
 /**

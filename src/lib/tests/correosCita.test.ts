@@ -133,3 +133,30 @@ describe('a nombre del médico (I, punto 21) y el aviso de cambio (I, punto 9)',
     expect(`${c.texto}\n${c.html}`).not.toMatch(/recordatorio/i)
   })
 })
+
+/* Tanda L (punto 15 de Angel): la confirmación saluda por el nombre; nada más cambia.
+   MUTACIONES (en rojo): sin pasar `saludoDe(nombre)` a `correoDeCita` → «saluda»; sin `escapeHtml` en el
+   saludo de la plantilla → «escapado». */
+describe('tanda L: el saludo de la confirmación', () => {
+  it('saluda por el nombre bajo el título, en HTML y en texto, y nunca en el asunto', () => {
+    const c = correoConfirmacion(BASE, 'Ana Sofía')
+    expect(c.html).toMatch(/Confirma tu cita<\/h1><p[^>]*>Hola, Ana Sofía:<\/p>/)
+    expect(c.texto).toContain('Confirma tu cita\n\nHola, Ana Sofía:\n\nTienes una cita')
+    expect(c.asunto).not.toContain('Ana')
+    expect(correoConfirmacion({ ...BASE, confirmada: true }, 'Ana').texto).toContain('Tu cita\n\nHola, Ana:')
+  })
+  it('escapado en el HTML; en texto, tal cual con los espacios juntados', () => {
+    const c = correoConfirmacion(BASE, '  <b>Ana</b>\n & "Co" ')
+    expect(c.html).toContain('Hola, &lt;b&gt;Ana&lt;/b&gt; &amp; &quot;Co&quot;:')
+    expect(c.html).not.toContain('<b>Ana')
+    expect(c.texto).toContain('Hola, <b>Ana</b> & "Co":')
+  })
+  it('sin nombre (o vacío, o desmedido), el correo de antes, idéntico', () => {
+    const antes = correoConfirmacion(BASE)
+    for (const n of [null, '', '   ', 'x'.repeat(121)]) expect(correoConfirmacion(BASE, n)).toEqual(antes)
+    expect(antes.texto).not.toContain('Hola')
+  })
+  it('sólo la confirmación: el recordatorio y el aviso de cambio no saludan', () => {
+    expect(`${correoRecordatorio(BASE).texto}${correoCambio(BASE).texto}`).not.toContain('Hola')
+  })
+})

@@ -23,6 +23,10 @@
  * `no_aplica`; 422 `sin_correo`; 503 `sin_enlace` o `no_disponible` (sin la
  * migración); 502 `no_enviado` (el transporte falló; se puede reintentar).
  *
+ * Tanda L (punto 15): el correo saluda por el nombre (`pacientes.nombre`, sin
+ * apellidos, o el `reserva_nombre` tecleado al reservar), leído aquí con la
+ * SESIÓN junto con el correo. Sólo el nombre: nada clínico.
+ *
  * ⚠️ El cliente de servicio sólo entra por `enviarConfirmacionCita` (`.rpc()`
  * con la `clinica_id` de la SESIÓN, nunca de la petición). Auditoría: la fila
  * de `cita_correos` (disparador `log_tabla_change`) y `logAudit`
@@ -50,7 +54,9 @@ const CitaSchema = z.object({
   paciente_id: z.string().nullable(),
   reserva_canal: z.string().nullable(),
   reserva_correo: z.string().nullable(),
-  pacientes: z.object({ email: z.string().nullable() }).nullable(),
+  /* Tanda L (punto 15): el nombre del saludo. Opcionales: una fila sin ellos manda el correo sin saludo. */
+  reserva_nombre: z.string().nullable().optional(),
+  pacientes: z.object({ email: z.string().nullable(), nombre: z.string().nullable().optional() }).nullable(),
 })
 type CitaCorreo = z.infer<typeof CitaSchema>
 
@@ -61,7 +67,7 @@ function json(cuerpo: Record<string, unknown>, status = 200): NextResponse {
 /** La cita con la RLS de quien llama. null si no existe o no la deja ver; lanza si la lectura falla. */
 async function leerCita(supabase: ClienteSesion, clinicaId: string, citaId: string): Promise<CitaCorreo | null> {
   const { data, error } = await supabase.from('appointments')
-    .select('id, status, start_time, all_day, paciente_id, reserva_canal, reserva_correo, pacientes(email)')
+    .select('id, status, start_time, all_day, paciente_id, reserva_canal, reserva_correo, reserva_nombre, pacientes(email, nombre)')
     .eq('id', citaId).eq('clinica_id', clinicaId).maybeSingle()
   if (error) throw new Error(`cita para el correo sin leer: ${error.code ?? ''}`)
   if (!data) return null
@@ -92,7 +98,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const motivo = motivoSinCorreo(cita, correoParaConfirmacion(cita.pacientes?.email, cita.reserva_correo), Date.now())
     if (motivo === 'sin_correo') return json({ error: 'sin_correo' }, 422)
     if (motivo) return json({ error: 'no_aplica', motivo }, 409)
-    const r = await enviarConfirmacionCita(e.clinicaId, cita.id, e.perfil.id)
+    // Tanda L (punto 15): el saludo, con el MISMO orden que el destinatario (el paciente ligado y, si no, la reserva).
+    const nombre = cita.pacientes?.nombre?.trim() || cita.reserva_nombre?.trim() || null
+    const r = await enviarConfirmacionCita(e.clinicaId, cita.id, e.perfil.id, { nombre })
     if (r.tipo === 'enviado') {
       await logAudit({ userId: e.perfil.id, accion: 'enviar_confirmacion_cita', tabla: 'appointments', registroId: cita.id,
         descripcion: 'Confirmación de la cita por correo (Spinus)' })
