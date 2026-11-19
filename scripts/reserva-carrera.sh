@@ -31,9 +31,9 @@
 #
 # Limpieza: los datos son de una clínica de prueba con ids fijos. Al final (y si
 # algo falla, por trap) se borran como postgres con session_replication_role =
-# replica, que apaga los disparadores en ESA transacción: así se borran también
-# las filas de audit_log que esta prueba generó (registro_id de sus objetos), que
-# de otro modo protege prevent_audit_modification. Sólo filas de esta prueba.
+# replica, que apaga los disparadores en ESA transacción. Sólo filas de esta
+# prueba. Las filas de audit_log NO se borran (orden de Angel, tanda M): se
+# quedan, y ningún escenario las cuenta.
 # Como replica también apaga las FK, al final se cuenta lo que quede en TODAS
 # las tablas que la prueba toca, y se avisa si algo sobra.
 set -euo pipefail
@@ -66,16 +66,7 @@ limpiar() {
   sql <<SQL || echo "AVISO: la limpieza falló; revisar la clínica $C a mano." >&2
 begin;
 set local session_replication_role = replica;
-create temp table _ids on commit drop as
-  select id from public.appointments where clinica_id = '$C'
-  union all select id from public.reserva_enlaces where clinica_id = '$C'
-  union all select id from public.reserva_avisos where version = '$AV'
-  union all select id from public.agenda_bloqueos where clinica_id = '$C'
-  union all select unnest(array['$C', '$U', '$K', '$T', '$J']::uuid[]);
-delete from public.audit_log where registro_id in (select id from _ids) or descripcion like '%$C%';
--- los avisos de I5 y L5 (sus disparadores AFTER), y antes su audit_log (registro_id = id del aviso)
-delete from public.audit_log where tabla = 'avisos_clinica'
-    and registro_id in (select id from public.avisos_clinica where clinica_id = '$C');
+-- los avisos de I5 y L5 (sus disparadores AFTER); su audit_log se queda (no se borra, tanda M)
 delete from public.avisos_clinica where clinica_id = '$C';
 delete from public.reserva_incidencias where clinica_id = '$C';
 delete from public.reserva_verificaciones where clinica_id = '$C';
@@ -94,9 +85,7 @@ delete from public.clinicas where id = '$C';
 commit;
 SQL
   local resto
-  resto="$(sql -c "select (select count(*) from public.audit_log where descripcion like '%$C%'
-                             or registro_id in ('$C', '$U', '$K', '$T', '$J', '$E1', '$E2', '$E3', '$E4', '$E5', '$E6', '$E7', '$E8'))
-                    + (select count(*) from public.appointments where clinica_id = '$C')
+  resto="$(sql -c "select (select count(*) from public.appointments where clinica_id = '$C')
                     + (select count(*) from public.reserva_enlaces where clinica_id = '$C')
                     + (select count(*) from public.avisos_clinica where clinica_id = '$C')
                     + (select count(*) from public.reserva_incidencias where clinica_id = '$C')

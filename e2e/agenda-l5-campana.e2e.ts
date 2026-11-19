@@ -41,9 +41,6 @@ test.afterAll(() => {
     begin;
     set local session_replication_role = replica;
     create temp table _c on commit drop as select unnest(string_to_array(:'citas', ','))::uuid as id;
-    delete from public.audit_log where registro_id in (select id from _c)
-       or registro_id in (select id from public.cita_confirmaciones where appointment_id in (select id from _c))
-       or registro_id in (select id from public.avisos_clinica where cita_id in (select id from _c));
     delete from public.cita_confirmaciones where appointment_id in (select id from _c);
     delete from public.avisos_clinica where cita_id in (select id from _c);
     delete from public.appointments where id in (select id from _c);

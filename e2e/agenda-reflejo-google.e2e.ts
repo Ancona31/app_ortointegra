@@ -134,7 +134,6 @@ test.afterAll(async ({}, info) => {
     sqlLocal(`
       begin;
       set local session_replication_role = replica;
-      delete from public.audit_log where registro_id = any (string_to_array(:'ids', ',')::uuid[]);
       delete from public.appointments where id = any (string_to_array(:'ids', ',')::uuid[]);
       commit;`, { ids: creadas.join(',') })
   }

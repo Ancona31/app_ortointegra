@@ -19,9 +19,10 @@
 #
 # Limpieza: datos de una clínica de prueba con ids fijos. Al final (y si algo
 # falla, por trap) se borran como postgres con session_replication_role =
-# replica, que apaga los disparadores en ESA transacción: así se borran también
-# las filas de audit_log de esta prueba, que de otro modo protege
-# prevent_audit_modification. Sólo filas de esta prueba.
+# replica, que apaga los disparadores en ESA transacción. Sólo filas de esta
+# prueba. Las filas de audit_log NO se borran (orden de Angel, tanda M): se
+# quedan, y como los ids son fijos, el escenario 3 sólo cuenta las de ESTA
+# corrida (created_at >= la marca tomada al empezar).
 set -euo pipefail
 
 raiz="$(cd "$(dirname "$0")/.." && pwd)"
@@ -47,11 +48,7 @@ limpiar() {
   sql <<SQL || echo "AVISO: la limpieza falló; revisar la clínica $C a mano." >&2
 begin;
 set local session_replication_role = replica;
-delete from public.audit_log where registro_id in ('$C', '$U', '$P', '$X', '$Y', '$Z', '$LX', '$LY', '$LZ')
-    or descripcion like '%$C%';
--- los avisos de I5 y L5 (sus disparadores AFTER), y antes su audit_log (registro_id = id del aviso)
-delete from public.audit_log where tabla = 'avisos_clinica'
-    and registro_id in (select id from public.avisos_clinica where clinica_id = '$C');
+-- los avisos de I5 y L5 (sus disparadores AFTER); su audit_log se queda (no se borra, tanda M)
 delete from public.avisos_clinica where clinica_id = '$C';
 delete from public.cita_confirmaciones where clinica_id = '$C';
 delete from public.appointments where clinica_id = '$C';
@@ -63,9 +60,7 @@ delete from public.clinicas where id = '$C';
 commit;
 SQL
   local resto
-  resto="$(sql -c "select (select count(*) from public.audit_log where descripcion like '%$C%'
-                             or registro_id in ('$C', '$U', '$P', '$X', '$Y', '$Z', '$LX', '$LY', '$LZ'))
-                    + (select count(*) from public.avisos_clinica where clinica_id = '$C')
+  resto="$(sql -c "select (select count(*) from public.avisos_clinica where clinica_id = '$C')
                     + (select count(*) from public.cita_confirmaciones where clinica_id = '$C')
                     + (select count(*) from public.appointments where clinica_id = '$C')
                     + (select count(*) from public.pacientes where clinica_id = '$C')
@@ -81,6 +76,8 @@ trap limpiar EXIT
 # ── Datos (confirmados: la otra sesión tiene que verlos) ────────────────
 limpiar >/dev/null 2>&1 || true
 tmp="$(mktemp -d)"
+# Tanda M: la auditoría de corridas anteriores se queda (ids fijos); se cuenta sólo desde aquí.
+desde="$(sql -c "select clock_timestamp()")"
 sql <<SQL
 insert into public.clinicas (id, nombre, es_vip_grant) values ('$C', 'Carrera E1', true);
 insert into auth.users (id, instance_id, aud, role, email, created_at, updated_at)
@@ -162,7 +159,8 @@ final="$(sql -c "select a.status || ' ' || c.respuesta from public.appointments 
 audit="$(sql -c "select string_agg(accion || ':' || (descripcion::jsonb ->> 'via') || ':'
                                    || (descripcion::jsonb -> 'estado' ->> 'de') || '>' || (descripcion::jsonb -> 'estado' ->> 'a'),
                                    ' ' order by accion desc)
-                   from public.audit_log where registro_id = '$Z' and tabla = 'appointments' and accion <> 'cita_alta'")"
+                   from public.audit_log where registro_id = '$Z' and tabla = 'appointments' and accion <> 'cita_alta'
+                    and created_at >= '$desde'::timestamptz")"
 echo "3 · a la vez: A=$a  B=$b  final=$final  auditoría=$audit"
 [ "$a" = confirmada ] && [ "$b" = cancelada ] && [ "$final" = "cancelled cancelo" ] || falla "escenario 3"
 [ "$audit" = "cita_editada:enlace_paciente:scheduled>confirmed cita_cancelada:enlace_paciente:confirmed>cancelled" ] \

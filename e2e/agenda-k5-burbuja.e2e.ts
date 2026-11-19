@@ -35,7 +35,6 @@ test.afterAll(() => {
   try {
     limpiarReservasE2e(desde)
     sqlLocal(`begin; set local session_replication_role = replica;
-      delete from public.audit_log where registro_id in (select id from public.appointments where google_event_id like 'falso-k5b-e2e-%');
       delete from public.appointments where google_event_id like 'falso-k5b-e2e-%'
          or id = any (string_to_array(:'ids', ',')::uuid[]); commit;`, { ids: creadas.join(',') || '00000000-0000-0000-0000-000000000000' })
   } finally { devolverEnlaces(aparcados); interruptorAgenda('A', false) }
