@@ -85,6 +85,8 @@ export interface GuardadoV2 {
   handleDelete: (id: string) => Promise<void>
   /** De `guardadoCitas.ts` (Movimiento) cuando exista; sin ella, la tarjeta no ofrece «Confirmar». */
   cambiarEstadoCita?: CambiarEstadoCita
+  /** Tanda L, punto 9 · «Eliminar cita» de una cancelada: la quita de la agenda sin borrarla. */
+  quitarCancelada?: (id: string) => Promise<void>
 }
 
 export interface PropsInteraccionesV2 {
@@ -306,7 +308,7 @@ interface ContextoAccion {
 /**
  * Lo que HACE cada acción, siempre por las puertas de siempre (decisión 20):
  * el modal de hoy, `handleCancelar` (B3) y `handleDelete`, y
- * `cambiarEstadoCita` para confirmar. Cancelar y eliminar preguntan antes.
+ * `cambiarEstadoCita` para confirmar. Cancelar, eliminar, «No asistió» y «Eliminar cita» preguntan antes.
  */
 function ejecutarAccion(a: AccionTarjeta, cita: Appointment, x: ContextoAccion): void {
   const { setModal, setConfirm, guardado } = x.p
@@ -333,10 +335,12 @@ function ejecutarAccion(a: AccionTarjeta, cita: Appointment, x: ContextoAccion):
         else editar()
         return
       case 'confirmar': void guardado.cambiarEstadoCita?.(cita.id, 'confirmed'); return
-      /* Tanda K, punto 21 · «No asistió» de la burbuja: el mismo cambio de estado, sin preguntar
-         (como «Marcar como confirmada»; se deshace desde el formulario). */
+      /* Tanda K, punto 21 · «No asistió» de la burbuja: el mismo cambio de estado. Tanda L, punto 2
+         (AG-DT-192): pregunta antes, como «Cancelar cita» (`pideConfirmacion`). */
       case 'no-asistio': void guardado.cambiarEstadoCita?.(cita.id, 'no_show'); return
       case 'cancelar': void guardado.handleCancelar(cita.id); return
+      /* Tanda L, punto 9 · sólo una cancelada: sale de la agenda, no se borra. */
+      case 'eliminar-cita': if (cita.status === 'cancelled') void guardado.quitarCancelada?.(cita.id); return
       /* B3: borrar sólo un evento sin paciente, aunque la tarjeta ya no ofrezca
          otra cosa: dos puertas al mismo daño (el servidor contesta 409 igual). */
       case 'eliminar': if (esEventoGenerico(cita)) void guardado.handleDelete(cita.id); return

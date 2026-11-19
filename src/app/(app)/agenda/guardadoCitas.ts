@@ -773,6 +773,25 @@ export function crearGuardadoCitas({
     }
   }
 
+  /* Tanda L, punto 9 · «Eliminar cita» de una CANCELADA: sale de la agenda SIN
+     borrarse (`POST …/quitar` la CIERRA, como al reasignar). Como `handleDelete`:
+     la tarjeta se desvanece al instante y, si el servidor no la quita, el
+     `refetch()` la devuelve. El eco de Realtime trae `cerrada_en` y la quita en
+     las demás pantallas (`useTiempoRealAgenda`); aquí ya no encuentra nada. */
+  async function quitarCancelada(id: string) {
+    toast.success('Se quitó de la agenda')
+    const api = calendarRef.current?.getApi()
+    if (api instanceof CalendarioFC) salirConAnimacion(api, id)
+    else api?.getEventById(id)?.remove()
+    vaciarCacheCitas() // A1.5a: también al salir; ver `ejecutarDrop`.
+    const res = await fetch(`/api/appointments/${id}/quitar`, { method: 'POST' }).catch(() => null)
+    vaciarCacheCitas()
+    if (!res?.ok) {
+      refetch()
+      toast.error('No se pudo quitar de la agenda')
+    }
+  }
+
   /* B3: «eliminar» una cita con paciente, con el interruptor encendido, la
      CANCELA. Mismo camino que cambiar el estado en el modal —el PUT de
      siempre—, así que el `after()` de la ruta ya marca el evento de Google
@@ -825,5 +844,5 @@ export function crearGuardadoCitas({
     return true
   }
 
-  return { handleEventDrop, handleEventResize, handleSave, handleDelete, handleCancelar, cambiarEstadoCita }
+  return { handleEventDrop, handleEventResize, handleSave, handleDelete, handleCancelar, cambiarEstadoCita, quitarCancelada }
 }

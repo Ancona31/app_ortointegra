@@ -251,6 +251,13 @@ export type AuditAccion =
      pulsó (el disparador de citas deja su `cita_editada` como `system`, porque
      el cierre lo escribe el servidor). Sin migración (`accion` es `text`). */
   | 'cita_sustituida'
+  /* Tanda L (punto 9): «Eliminar cita» de una cita CANCELADA la quitó de la
+     agenda sin borrarla: quedó cerrada SIN sustituta
+     (`POST /api/appointments/[id]/quitar`). `registro_id` es la cita;
+     `descripcion`, la clínica y el NOMBRE del campo. A nombre de quien pulsó
+     (el disparador de citas deja además su `cita_editada`). Sin migración
+     (`accion` es `text`). */
+  | 'cita_quitada_de_agenda'
   /* I5 de la agenda (punto 20): el correo a la clínica por una reserva nueva
      por enlace, con la opción encendida. `registro_id` es la cita;
      `descripcion` lleva la clínica y cuántos destinatarios y envíos, nunca el

@@ -9,10 +9,11 @@ import { describe, expect, it } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { CabeceraEscritorio } from '@/components/agenda/CabeceraEscritorio'
 import { BandaMovil } from '@/components/agenda/BandaMovil'
+import { BotonLeyendaAgenda } from '@/components/agenda/MenuEngraneAgenda'
 
 const nada = (): void => undefined
 
-function cabecera(extra: { atajos?: boolean; selectorFecha?: string; buscar?: string }): string {
+function cabecera(extra: { atajos?: boolean; selectorFecha?: string; buscar?: string; leyenda?: boolean }): string {
   return renderToStaticMarkup(
     <CabeceraEscritorio
       resumenConteo="3 citas" currentView="timeGridWeek" isMobile={false} onVista={nada}
@@ -22,6 +23,7 @@ function cabecera(extra: { atajos?: boolean; selectorFecha?: string; buscar?: st
       atajos={extra.atajos}
       selectorFecha={extra.selectorFecha ? <span data-ranura="fecha">{extra.selectorFecha}</span> : undefined}
       buscar={extra.buscar ? <span data-ranura="buscar">{extra.buscar}</span> : undefined}
+      leyenda={extra.leyenda ? <BotonLeyendaAgenda /> : undefined}
     />,
   )
 }
@@ -49,6 +51,22 @@ describe('CabeceraEscritorio · contrato de F3', () => {
     expect(cabecera({ atajos: true })).toMatch(/aria-keyshortcuts="S"[^>]*>Semana/)
     expect(cabecera({ atajos: true })).toMatch(/aria-keyshortcuts="M"[^>]*>Mes/)
     expect(cabecera({})).not.toContain('aria-keyshortcuts')
+  })
+})
+
+/* Tanda L, punto 11: el botón de la leyenda, a la IZQUIERDA de Mes/Semana/Día, cerrado al pintarse;
+   sin la ranura (v2 apagada o teléfono), la barra de siempre. MUTACIÓN: `{leyenda}` después del
+   tablist en `CabeceraEscritorio` → rojo. */
+describe('CabeceraEscritorio · el botón de la leyenda (tanda L, punto 11)', () => {
+  it('va justo antes de las vistas, con su nombre y cerrado', () => {
+    const html = cabecera({ leyenda: true })
+    const boton = html.indexOf('data-boton-leyenda')
+    expect(boton).toBeGreaterThan(-1)
+    expect(boton).toBeLessThan(html.indexOf('aria-label="Vista del calendario"'))
+    expect(html).toMatch(/data-boton-leyenda=""[^>]*aria-label="Leyenda de estados"[^>]*aria-haspopup="dialog" aria-expanded="false"/)
+  })
+  it('sin la ranura, no hay botón', () => {
+    expect(cabecera({})).not.toContain('data-boton-leyenda')
   })
 })
 

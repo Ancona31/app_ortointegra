@@ -45,7 +45,7 @@ import { regionDeTimezone } from '@/lib/consultorios/zonas-mexico'
 
 export type AccionTarjeta =
   | 'iniciar-consulta' | 'ver-expediente' | 'confirmar' | 'reagendar' | 'reagendar-cita' | 'reasignar' | 'cancelar' | 'editar' | 'convertir' | 'eliminar'
-  | 'no-es-cita' | 'ligar' | 'no-asistio'
+  | 'no-es-cita' | 'ligar' | 'no-asistio' | 'eliminar-cita'
 
 /* Tanda K, punto 21 · Los textos de la burbuja nueva (`docs/spec/Burbuja.dc.html`): «Ver la
    consulta», «Darle otra cita», «Reasignar el horario», «Ligar expediente e iniciar» y «No es
@@ -65,6 +65,8 @@ export const ETIQUETA_ACCION: Record<AccionTarjeta, string> = {
   'no-es-cita': 'No es una cita',
   ligar: 'Ligar expediente e iniciar',
   'no-asistio': 'No asistió',
+  /* Tanda L, punto 9 · la de una CANCELADA: la quita de la agenda sin borrarla (queda cerrada). */
+  'eliminar-cita': 'Eliminar cita',
 }
 
 /** G3 · Una pieza de la rejilla de acciones: una acción o el aviso por WhatsApp (su propio componente). */
@@ -156,7 +158,8 @@ function conDestacada(d: DisposicionTarjeta, destacar: OpcionesDisposicion['dest
 function disposicionPorEstado(cita: CitaTarjeta, puedeIniciar: boolean, o: OpcionesDisposicion): DisposicionTarjeta {
   if (esEventoGenerico(cita) || esPorLigar(cita)) return disposicionSinCambios(cita, puedeIniciar, o)
   if (cita.status === 'attended') return { principal: o.puedeVerExpediente ? 'ver-expediente' : null, secundarias: [], peligro: null }
-  if (cita.status === 'cancelled') return { principal: 'reagendar-cita', secundarias: ['reasignar'], peligro: null }
+  /* Tanda L, punto 9 · la cancelada suma «Eliminar cita», aparte, como peligro. */
+  if (cita.status === 'cancelled') return { principal: 'reagendar-cita', secundarias: ['reasignar'], peligro: 'eliminar-cita' }
   if (cita.status === 'no_show') return { principal: 'reagendar-cita', secundarias: [], peligro: null }
   const secundarias: PiezaTarjeta[] = []
   if (o.conConfirmar !== false && cita.status === 'scheduled') secundarias.push('confirmar')
@@ -292,16 +295,19 @@ export function puedeIniciarConsulta(
   return Boolean(cita.pacientes) || esPorLigar(cita)
 }
 
-/** ¿Pide confirmación antes de hacerse? Cancelar y eliminar, sí (decisión 20). */
+/** ¿Pide confirmación antes de hacerse? Cancelar y eliminar, sí (decisión 20). Tanda L, punto 2
+    (AG-DT-192): «No asistió» también, con el mismo aviso que «Cancelar cita»; y punto 9, «Eliminar cita». */
 export function pideConfirmacion(accion: AccionTarjeta): boolean {
-  return accion === 'cancelar' || accion === 'eliminar'
+  return accion === 'cancelar' || accion === 'eliminar' || accion === 'no-asistio' || accion === 'eliminar-cita'
 }
 
-/** El mensaje del aviso de las dos acciones que preguntan (`pideConfirmacion`). */
+/** El mensaje del aviso de las acciones que preguntan (`pideConfirmacion`). */
 export function textoDeConfirmacion(
   accion: AccionTarjeta, cita: Pick<Appointment, 'title' | 'pacientes' | 'reserva_nombre' | 'paciente_id' | 'reserva_canal'>,
 ): string {
   if (accion === 'eliminar') return `¿Eliminar el evento «${cita.title}»? No se puede deshacer.`
+  if (accion === 'eliminar-cita') return `¿Eliminar la cita cancelada de ${nombreDeTarjeta(cita)}? Sale de la agenda y no se puede deshacer; queda guardada en el historial.`
+  if (accion === 'no-asistio') return `¿Marcar que ${nombreDeTarjeta(cita)} no asistió? La cita se queda en la agenda como «No asistió».`
   return `¿Cancelar la cita de ${nombreDeTarjeta(cita)}? El horario queda libre y la cita se queda en la agenda como cancelada.`
 }
 

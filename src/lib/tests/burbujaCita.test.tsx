@@ -42,9 +42,9 @@ describe('burbujaDeTarjeta: qué va en cada sitio', () => {
     expect(d.recordatorio).toEqual({ whatsapp: true, correo: true })
     expect(d.mas).toEqual([])
   })
-  it('cancelada: «Darle otra cita» de principal y «Reasignar el horario» de secundario; no asistió: sólo «Darle otra cita»', () => {
+  it('cancelada: «Darle otra cita» de principal, «Reasignar el horario» de secundario y «Eliminar cita» en el pie (tanda L, punto 9); no asistió: sólo «Darle otra cita»', () => {
     const c = burbujaDeTarjeta({ ...CON, status: 'cancelled' }, true, TODO)
-    expect(c).toMatchObject({ principal: 'reagendar-cita', rejilla: ['reasignar'], pie: [], ayuda: 'Esta cita se canceló. Su horario quedó libre.' })
+    expect(c).toMatchObject({ principal: 'reagendar-cita', rejilla: ['reasignar'], pie: ['eliminar-cita'], ayuda: 'Esta cita se canceló. Su horario quedó libre.' })
     const n = burbujaDeTarjeta({ ...CON, status: 'no_show' }, true, TODO)
     expect(n).toMatchObject({ principal: 'reagendar-cita', rejilla: [], pie: [], ayuda: 'El paciente no llegó a esta cita.' })
   })
