@@ -6609,21 +6609,40 @@ td[aria-selected="true"] > .ag-minimes-dia { background: var(--ag-primary-bg-fai
 .ag-dia--con-panel .agenda-fc .ag-controles:has([data-engrane-agenda]) { flex-wrap: wrap; }
 .ag-fecha-boton-texto { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 
-/* · La CAMPANA (punto 16): el botón de la lupa, con un punto rojo —el color de
+/* · La CAMPANA (punto 16): el botón de la lupa, con una marca roja —el color de
      «Cancelada», el mismo que llevaba el aviso de «Por confirmar»— cuando hay
-     algo pendiente. En la banda, el borde del punto es el navy de la banda. */
+     algo pendiente. En la banda, el borde de la marca es el navy de la banda.
+   · Tanda L (punto 14): el punto pasa a BURBUJA con el número en blanco, como
+     las de iOS: una píldora de 18 px de alto que crece con «9+», en la esquina
+     del botón y con el anillo del fondo alrededor. Sin animación. Blanco sobre
+     el rojo de «Cancelada»: 5.4:1 en claro; en oscuro ese rojo es más claro
+     (#ef4444, 3.8:1 con blanco) y la burbuja lo oscurece un 18 % para pasar de
+     4.5:1 (11 px en negrita no es texto grande), sin token nuevo. */
 .ag-campana { position: relative; }
 .ag-campana-punto {
   position: absolute;
-  top: 5px;
-  right: 5px;
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
+  top: -6px;
+  right: -6px;
+  box-sizing: border-box;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
   background: var(--ag-status-cancelled-dot);
   border: 2px solid var(--ag-surface);
+  pointer-events: none;
+  z-index: 1; /* sobresale del botón: por encima de un botón hermano que venga detrás */
 }
-.ag-banda-movil-ctrl .ag-campana-punto { top: 8px; right: 8px; border-color: var(--ag-navy); }
+html.dark .ag-campana-punto { background: color-mix(in srgb, var(--ag-status-cancelled-dot) 82%, #000); }
+.ag-banda-movil-ctrl .ag-campana-punto { top: -4px; right: -4px; border-color: var(--ag-navy); }
 .ag-capa--campana { width: 400px; gap: var(--ag-3); padding-top: 0; }
 .ag-campana-cab {
   display: flex;

@@ -272,9 +272,11 @@ function useCambiosEnVivo(
     const alCambio = (c: CambioCita): void => {
       const l = listasRef.current
       if (!l) return // la primera traída aún no llegó: traerá lo de ahora
-      const efecto = efectoEnPorConfirmar(new Map(l.citas.map((f) => [f.id, f.inicio])), c, Date.now())
+      const listadas = new Map(l.citas.map((f) => [f.id, f.inicio]))
+      const efecto = efectoEnPorConfirmar(listadas, c, Date.now())
       if (efecto === 'quitar' || efecto === 'quitar_y_recargar') quitar(c.tipo === 'DELETE' ? c.id : c.fila.id)
-      if (efecto === 'recargar' || efecto === 'quitar_y_recargar' || cambioPuedeAvisar(c)) {
+      const listada = c.tipo !== 'DELETE' && listadas.has(c.fila.id)
+      if (efecto === 'recargar' || efecto === 'quitar_y_recargar' || cambioPuedeAvisar(c, listada)) {
         if (espera) clearTimeout(espera)
         espera = setTimeout(() => { espera = null; recargar() }, ESPERA_RECARGA_MS)
       }

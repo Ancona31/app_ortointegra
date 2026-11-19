@@ -974,7 +974,14 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
   const cambiosPorConfirmarRef = useRef<((c: CambioCita) => void) | null>(null)
   const { firmarEscritura, aplicarAppointmentAlEvento } = useTiempoRealAgenda({
     calendarRef, filtroEfectivo, refetch, ultimaTraidaRef, onCanceladaAjena: avisarCancelacionPaciente,
-    onCambioCita: agendaV2 ? (c: CambioCita): void => { cambiosPorConfirmarRef.current?.(c) } : undefined,
+    /* Tanda L (punto 13): con el estado que la cita tenía PINTADO antes de este cambio (el gancho
+       llama aquí antes de aplicarlo), para que la campana sepa si «confirmada» es nueva. En línea y
+       no con una función de `porConfirmarTiempoReal`: importarla metería ese módulo (y el de
+       WhatsApp) en el chunk de la página, también con la v2 apagada. */
+    onCambioCita: agendaV2 ? (c: CambioCita): void => {
+      const pintado: unknown = c.tipo === 'DELETE' ? undefined : calendarRef.current?.getApi().getEventById(c.fila.id)?.extendedProps.status
+      cambiosPorConfirmarRef.current?.(c.tipo !== 'DELETE' && typeof pintado === 'string' ? { ...c, pintado } : c)
+    } : undefined,
   })
 
   /* A2.5.7: no es un hook — ver la nota de cabecera de `guardadoCitas.ts`—, así

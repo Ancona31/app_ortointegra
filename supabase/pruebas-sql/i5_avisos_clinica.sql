@@ -97,7 +97,9 @@ select pg_temp.esperar('caso 2 marca', (select string_agg(right(id::text, 4) || 
 select pg_temp.esperar('caso 2', (select string_agg(tipo || '>' || right(cita_id::text, 4), ',' order by cita_id) from public.avisos_clinica
   where cita_id::text like '%150a1_'), 'google_por_asignar>0a11');
 
--- ── Caso 3: cancelación por el paciente; confirmar no avisa ───────────
+-- ── Caso 3: cancelación por el paciente → su aviso. Tanda L (L5, punto 13):
+--    confirmar por el enlace TAMBIÉN avisa ('confirmacion_paciente',
+--    20261124160000; el detalle, en l5_aviso_confirmacion.sql) ────────────
 insert into public.appointments (id, clinica_id, paciente_id, medico_id, title, start_time, end_time, status)
 values ('00000000-0000-4000-8000-000000150a21', '00000000-0000-4000-8000-000000150c01', '00000000-0000-4000-8000-000000150f01', '00000000-0000-4000-8000-000000150b01',
         'Paciente Uno', date_trunc('day', now()) + interval '5 days 9 hours', date_trunc('day', now()) + interval '5 days 10 hours', 'scheduled'),
@@ -109,7 +111,7 @@ insert into public.cita_confirmaciones (id, clinica_id, appointment_id, codigo_h
 update public.cita_confirmaciones set respuesta = 'cancelo', respondido_en = now() where id = '00000000-0000-4000-8000-000000150d21';
 update public.cita_confirmaciones set respuesta = 'confirmo', respondido_en = now() where id = '00000000-0000-4000-8000-000000150d22';
 select pg_temp.esperar('caso 3', (select string_agg(tipo || '>' || right(cita_id::text, 4), ',' order by cita_id) from public.avisos_clinica
-  where cita_id::text like '%150a2_'), 'cancelacion_paciente>0a21');
+  where cita_id::text like '%150a2_'), 'cancelacion_paciente>0a21,confirmacion_paciente>0a22');
 
 -- ── Caso 4: reagendado por el paciente = UN aviso, no dos ─────────────
 -- La cita nueva entra como reserva (deja «reserva_enlace») y en la misma
@@ -137,7 +139,7 @@ select pg_temp.esperar('caso 5', (select count(*)::text from public.avisos_clini
 -- ── Caso 6: RLS. El administrador ve los de su clínica; el invitado, sólo
 --    los de SUS citas; otra clínica, ninguno; anon, permiso denegado ──────
 select pg_temp.esperar('caso 6 admin c1', pg_temp.ve('00000000-0000-4000-8000-000000150b01'),
-  'cancelacion_paciente>0a21,empalme_google>0a01,google_por_asignar>0a11,reagendado_paciente>0a31,reserva_enlace>0a01');
+  'cancelacion_paciente>0a21,confirmacion_paciente>0a22,empalme_google>0a01,google_por_asignar>0a11,reagendado_paciente>0a31,reserva_enlace>0a01');
 select pg_temp.esperar('caso 6 invitado c1', pg_temp.ve('00000000-0000-4000-8000-000000150b02'), 'google_por_asignar>0a11');
 select pg_temp.esperar('caso 6 otra clínica', pg_temp.ve('00000000-0000-4000-8000-000000150b03'), '-');
 do $$
@@ -170,7 +172,7 @@ begin
   reset role;
   perform pg_temp.esperar('caso 7 revisado no se reabre', v_n::text, '0');
   perform pg_temp.esperar('caso 7 sale de la lista', pg_temp.ve('00000000-0000-4000-8000-000000150b01'),
-    'empalme_google>0a01,google_por_asignar>0a11,reagendado_paciente>0a31,reserva_enlace>0a01');
+    'confirmacion_paciente>0a22,empalme_google>0a01,google_por_asignar>0a11,reagendado_paciente>0a31,reserva_enlace>0a01');
 end $$;
 
 -- ── Caso 8: lo que la sesión NO puede: a nombre de otro, otra columna,

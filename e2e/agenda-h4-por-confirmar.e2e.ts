@@ -82,6 +82,9 @@ test.afterAll(() => {
        or registro_id in (select id from public.cita_confirmaciones where appointment_id in (select id from _c));
     delete from public.cita_correos where appointment_id in (select id from _c);
     delete from public.cita_confirmaciones where appointment_id in (select id from _c);
+    -- Los avisos de la campana de estas citas (I5: la cancelación; tanda L: la confirmación del paciente).
+    delete from public.audit_log where registro_id in (select id from public.avisos_clinica where cita_id in (select id from _c));
+    delete from public.avisos_clinica where cita_id in (select id from _c);
     delete from public.appointments where id in (select id from _c);
     delete from public.pacientes where id = any(string_to_array(:'pacientes', ',')::uuid[]);
     commit;`, { citas: citas.join(','), pacientes: pacientes.join(',') })
@@ -170,7 +173,13 @@ test('18: el paciente confirma por /confirmar en otra pestaña y la fila sale si
   } finally { await paciente.close() }
   await expect(fila(page, filas.tel)).toHaveCount(0, { timeout: 10000 })
   await expect(panel(page)).toBeVisible()
-  expect(gets).toBe(getsTrasAbrir) // salir no pide nada
+  // La fila sale sin esperar a la red. Tanda L (punto 13): la confirmación del paciente es además un
+  // aviso de «Avisos», que llega por esta misma ruta: UNA traída (agrupada), como la de su cancelación.
+  await expect.poll(() => gets).toBe(getsTrasAbrir + 1)
+  await page.waitForTimeout(1500)
+  expect(gets).toBe(getsTrasAbrir + 1) // y nada más
+  await panel(page).getByRole('tab', { name: /^Avisos/ }).click()
+  await expect(page.locator(`[data-aviso-tipo="confirmacion_paciente"][data-aviso-cita="${filas.tel.cita}"]`)).toBeVisible()
   expect(joins()).toBe(1)
 })
 
@@ -207,23 +216,34 @@ test('18 y 19: cancelar (el paciente y el personal) la saca; una cita nueva para
   await expect(panel(page)).toBeVisible()
 })
 
-test('19 (I5): el punto rojo de la campana — vacío, nada; con pendientes o con avisos sin revisar, el punto', async ({ page }) => {
+test('19 (I5; tanda L, punto 14): la burbuja de la campana — vacío, nada; con pendientes, el número (más de 9, «9+») y «N pendientes»', async ({ page }) => {
   const inicio = new Date(Date.now() + 26 * 3_600_000).toISOString()
-  const fila0 = { id: 'x', inicio, zona: TZ, titulo: 'X', consultorio: 'C', con_whatsapp: false, con_correo: false, whatsapp_reminder_sent_at: null }
-  const aviso = { id: randomUUID(), tipo: 'reserva_enlace', creado_en: new Date(Date.now() - 3_600_000).toISOString(),
+  const fila = (i: number): Record<string, unknown> => ({ id: `x${i}`, inicio, zona: TZ, titulo: 'X', consultorio: 'C',
+    con_whatsapp: false, con_correo: false, whatsapp_reminder_sent_at: null })
+  const aviso = (i: number): Record<string, unknown> => ({ id: randomUUID(), tipo: 'reserva_enlace', creado_en: new Date(Date.now() - 3_600_000 - i).toISOString(),
     cita: { id: randomUUID(), title: 'Y', start_time: inicio, end_time: inicio, status: 'scheduled', medico_id: null, paciente_id: null,
-      reserva_nombre: 'Y', zona: TZ } }
+      reserva_nombre: 'Y', zona: TZ } })
+  const lista = <T,>(n: number, f: (i: number) => T): T[] => Array.from({ length: n }, (_, i) => f(i))
   const vacio = { citas: [], canceladas: [], empalmes: [], avisos: [], avisos_disponibles: true }
-  const casos: [string, unknown, boolean, string][] = [
-    ['vacío', vacio, false, 'Por confirmar (0) y avisos (0)'],
-    ['pendientes', { ...vacio, citas: [fila0] }, true, 'Por confirmar (1) y avisos (0)'],
-    ['avisos', { ...vacio, avisos: [aviso] }, true, 'Por confirmar (0) y avisos (1)'],
+  // [caso, respuesta, texto de la burbuja (null = no hay), nombre accesible]
+  const casos: [string, unknown, string | null, string][] = [
+    ['vacío', vacio, null, 'Por confirmar (0) y avisos (0)'],
+    ['pendientes', { ...vacio, citas: lista(1, fila) }, '1', 'Por confirmar (1) y avisos (0): 1 pendiente'],
+    ['avisos', { ...vacio, avisos: lista(1, aviso) }, '1', 'Por confirmar (0) y avisos (1): 1 pendiente'],
+    ['las dos', { ...vacio, citas: lista(2, fila), avisos: lista(1, aviso) }, '3', 'Por confirmar (2) y avisos (1): 3 pendientes'],
+    ['más de 9', { ...vacio, citas: lista(7, fila), avisos: lista(5, aviso) }, '9+', 'Por confirmar (7) y avisos (5): 12 pendientes'],
   ]
-  for (const [caso, json, punto, etiqueta] of casos) {
+  for (const [caso, json, burbuja, etiqueta] of casos) {
     await page.route('**/api/agenda/por-confirmar', r => r.fulfill({ json }))
     await abrirAgendaV2(page)
     await expect(page.locator('[data-campana]'), caso).toHaveAttribute('aria-label', etiqueta)
-    await expect(page.locator('[data-campana] [data-punto-rojo]'), caso).toHaveCount(punto ? 1 : 0)
+    const marca = page.locator('[data-campana] [data-punto-rojo]')
+    await expect(marca, caso).toHaveCount(burbuja ? 1 : 0)
+    if (burbuja) {
+      await expect(marca, caso).toHaveText(burbuja)
+      // El número lo dice el nombre del botón: la burbuja no se lee dos veces.
+      await expect(marca, caso).toHaveAttribute('aria-hidden', 'true')
+    }
     await page.unroute('**/api/agenda/por-confirmar')
   }
 })
