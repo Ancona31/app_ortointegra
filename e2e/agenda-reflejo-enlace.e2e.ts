@@ -72,8 +72,6 @@ test.afterAll(() => {
     begin;
     set local session_replication_role = replica;
     create temp table _a on commit drop as select id from public.appointments where clinica_id = :'c' and title = :'t';
-    delete from public.audit_log where registro_id in (select id from _a)
-       or registro_id in (select id from public.cita_confirmaciones where appointment_id in (select id from _a));
     delete from public.cita_confirmaciones where appointment_id in (select id from _a);
     delete from public.appointments where id in (select id from _a);
     commit;`, { c: e.clinicaId, t: TITULO })
