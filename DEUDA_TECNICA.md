@@ -5897,7 +5897,7 @@ integración.
 
 ### AG-DT-255 — El conjunto desde cero no se probó en la tanda M
 
-**Estado:** abierta (integración M). Primero, para no vaciar el `audit_log`
+**Estado:** reinicio hecho en el cierre M (ver abajo); sigue abierta sólo la base combinada. Primero, para no vaciar el `audit_log`
 local, no se hizo `supabase db reset`. Después Angel lo autorizó vía el
 coordinador: «`supabase db reset --local` crea una base de pruebas nueva; no es
 borrar auditoría». **Pero el sistema de permisos de la sesión denegó el reset**,
@@ -5912,6 +5912,73 @@ Las 43 de la agenda no cambiaron desde la tanda L (probadas desde cero en su
 §14.1). Tampoco se rehízo la base combinada con `feature/limites-ajustables`
 (lista del caso 3 de `p1`). Esa lista pasa a **51** al combinar: se suma
 `cita_nombre_saludo(uuid,uuid)`, sólo `service_role`.
+
+**Reinicio desde cero, hecho (2026-11-19, cierre de la tanda M).** Se corrió
+`supabase db reset --local` sobre la base local.
+* **Primer intento: falló.** Salida literal:
+  ```
+  Resetting local database...
+  Recreating database...
+  Initialising schema...
+  {"_tag":"Error","error":{"code":"LegacyDbSetupError","message":"error running container: exit 1"}}
+  ```
+  Causa no identificada.
+* **Segundo intento, con `--debug`: EXIT 0.** 50 migraciones, la última
+  `20261125180000` (`select count(*), max(version) from
+  supabase_migrations.schema_migrations` → `50|20261125180000`). Después, la
+  semilla (`scripts/agenda-semilla.ts`; v2 encendida en A y apagada en B).
+* **Sobre esa base:** Vitest 2363/2363 sin TZ, con `TZ=UTC` y con
+  `TZ=America/Hermosillo`; pruebas SQL 45/45; las dos carreras (reserva y
+  confirmación) en verde. Batería e2e completa del cierre (00:00–00:14 del
+  2026-11-20, con los arreglos del cierre): **634 pasan, 0 fallan, 490 se
+  saltan, 0 sin correr, 0 inestables**. La de las 22:18 había dado 617/2/497 y
+  6 sin correr; los dos fallos dependían de la hora (`agenda-google-dos-sentidos`)
+  y de un defecto de foco de la burbuja (`agenda-h3-burbuja`): ver AG-DT-256 y
+  los commits del cierre. El `audit_log` sólo creció (9975 → 31648 filas).
+Lo que queda abierto de este punto es la base combinada con
+`feature/limites-ajustables`, que no se rehízo.
+
+### AG-DT-256 — E2e que dependen de la hora o del día de la corrida
+
+**Estado:** abierta, parcialmente arreglada (cierre de la tanda M, 2026-11-19).
+Una prueba que se salta o cambia según la hora no prueba nada a esa hora.
+**Arreglado en el cierre M:** `agenda-google-dos-sentidos` (la fila editable,
+I3 y T3 pasan al jueves de la semana siguiente; prueba nueva de un evento ya
+pasado) y las 8 de `agenda-eleccion-i2` (ya no se saltan de noche). El reloj
+simulado de Playwright (`page.clock`) **no sirve** para casi ninguna: quien
+decide pasado/futuro es el servidor (`Date.now()`) o Postgres (`now()`), no el
+navegador. La técnica que sí sirve es la semana siguiente (`diaDeLaSemana(1, d)`
+y `.fc-next-button`) o borrar lo que se crea.
+
+**Pendiente (inventario, sin arreglar):**
+
+* **La ventana «¿Asistió el paciente?»** (`src/lib/agenda/asistenciaServidor.ts`,
+  `HORAS_SIN_PREGUNTAR = 48`, reloj del servidor) tapa la rejilla al abrir la
+  agenda v2 si hay citas agendadas/confirmadas con paciente o reserva que
+  empezaron hace más de 48 h. La alimentan citas que las e2e crean en la semana
+  visible y no borran: `agenda-citas.e2e.ts:27` y `:124` (miércoles 10:05 y
+  15:20), `agenda-cancelar.e2e.ts:159` (jueves 16:20), y además las propias de
+  `agenda-cancelar` (`:87`, `:122`), `agenda-por-ligar` (`:63`, `:114`, `:133`,
+  `:153`), `agenda-ligar-consulta` (`:69`, `:103`, `:128`),
+  `agenda-j3-ligar-ventana` (`:138`, `:170`, `:230`, `:247`),
+  `agenda-reflejo-nota` (`:94`, viernes 12:00) y la burbuja H3 de
+  `agenda-google-dos-sentidos` (jueves 13:00). **De viernes a domingo** caerían
+  casi todas las e2e de la v2 que corren después y no cierran esa ventana
+  (`agenda-i4.e2e.ts:194` cuenta filas exactas). Arreglo: mover esas altas a la
+  semana +1 o borrarlas al terminar; y, de red, que `abrirAgendaV2` pulse
+  «Decidir después» si la ventana sale. No se comprobó corriendo en fin de
+  semana: es lectura del código.
+* `aviso-cancelacion.e2e.ts:56` y `:75`: la cita va a `now() + 3 h`; el domingo
+  desde las 21:00 cae en la semana siguiente y no se ve (falta el
+  `.fc-next-button` que ya usa `whatsapp-manual.e2e.ts:65`).
+* `agenda-movil.e2e.ts:59`: `test.skip` el día 1 del mes si el miércoles aún no
+  llega. Ésta sí la decide el navegador (`useResumenVisible.ts`): se puede fijar
+  con `page.clock` en el último día del mes anterior (nunca en el futuro).
+* Sospechas de borde: `agenda-f-tableta.e2e.ts:55` (necesita una cita futura a
+  la vista), `agenda-h4-por-confirmar` (si el archivo cruza la medianoche),
+  `confirmacion-enlace.e2e.ts:345` (`test.skip` sin turnos en 3–70 h), y toda la
+  semana 0 si la batería cruza la medianoche del domingo (`LUNES_VISIBLE` se fija
+  al cargar `e2e/ayudas.ts`).
 
 ---
 

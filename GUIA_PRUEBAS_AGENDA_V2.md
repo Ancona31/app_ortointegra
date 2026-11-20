@@ -298,6 +298,20 @@ Docker; también es normal. Si en algún momento sale «ERROR», detente.
 
 > ⚠️ Escribe siempre `--local`. Nunca `--linked` ni `--db-url`.
 
+> **Si falla con `LegacyDbSetupError`.** Así pasó en el cierre de la tanda M
+> (2026-11-19). El primer intento terminó con:
+> ```
+> Resetting local database...
+> Recreating database...
+> Initialising schema...
+> {"_tag":"Error","error":{"code":"LegacyDbSetupError","message":"error running container: exit 1"}}
+> ```
+> La causa no se identificó. Repetirlo con `$SB db reset --local --debug` salió
+> bien (EXIT 0): 50 migraciones, la última `20261125180000`. Sobre esa base
+> pasaron Vitest (2363/2363 sin TZ, UTC y Hermosillo), SQL 45/45, las carreras y
+> la batería e2e completa (634 pasan, 0 fallan, 490 se saltan). Detalle en
+> `DEUDA_TECNICA.md`, AG-DT-255.
+
 Comprueba cuántas migraciones quedaron:
 
 ```bash

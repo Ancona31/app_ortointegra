@@ -447,7 +447,7 @@ Plan, decisiones y avance: `mejora_agendaV2.md` (§6-bis decisiones, §7 lo que
 le toca a Angel, §10 lo que no se probó en local). Auditoría del conjunto de
 migraciones: `supabase/AUDITORIA-CONJUNTO-AGENDA-V2.md`. Guía local:
 `GUIA_AUDITORIA_AGENDA_V2.md`; pruebas a mano: `GUIA_PRUEBAS_AGENDA_V2.md`.
-Deuda abierta: `DEUDA_TECNICA.md`, AG-DT-13 a AG-DT-255.
+Deuda abierta: `DEUDA_TECNICA.md`, AG-DT-13 a AG-DT-256.
 
 **Estado:** el código y las 43 migraciones (`20261111120000` a
 `20261124160000`: las 16 del cierre, las 4 de las correcciones de seguridad,
