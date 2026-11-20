@@ -1,0 +1,397 @@
+<!-- NOMBRE: Protocolo de suplementación | Tarjetas limpias con la prioridad en un chip, los criterios «Indicado cuando» separados y las notas clínicas como aviso; dos columnas en pantallas anchas -->
+<style>
+/* ===== Armazón común (navegación y piezas copiadas del dashboard de referencia, opción B). Todos los selectores empiezan por .su ===== */
+.su .su-app{display:flex;width:100%;height:100%}
+.su[data-vp="tel"] .su-app,.su[data-vp="iv"] .su-app{flex-direction:column}
+.su button{border:0;margin:0;padding:0;background:none;color:inherit}
+.su h1,.su h2,.su h3,.su p,.su ul,.su ol{margin:0;padding:0}
+.su h3{font:inherit}
+.su ul,.su ol{list-style:none}
+.su svg{flex:none}
+.su .su-flex{flex:1}
+/* Respuesta al toque y foco */
+.su .su-p{transition:transform 100ms ease-out}
+.su .su-p:active{transform:scale(.97)}
+.su .su-p:focus-visible{outline:3px solid var(--enlace);outline-offset:2px}
+.su .su-riel .su-p:focus-visible,.su .su-lat .su-p:focus-visible,.su .su-enc .su-p:focus-visible{outline-color:var(--nav-tinta)}
+/* ---- Contenido que se desplaza ---- */
+.su .su-cont{flex:1;min-width:0;min-height:0;overflow-x:hidden;overflow-y:auto;scrollbar-width:none;padding:14px 14px calc(var(--ib) + 16px) 16px}
+.su[data-vp="tel"] .su-cont{padding:18px 16px calc(var(--ib) + 16px)}
+.su[data-vp="ih"] .su-cont{padding:20px 24px calc(var(--ib) + 16px)}
+.su[data-vp="iv"] .su-cont{padding:22px 24px calc(var(--ib) + 16px)}
+.su[data-vp="esc"] .su-cont{padding:28px 24px calc(var(--ib) + 24px);scrollbar-width:thin;scrollbar-color:var(--borde) transparent}
+.su .su-in{display:flex;flex-direction:column;gap:12px;max-width:1000px}
+.su[data-vp="ih"] .su-in,.su[data-vp="iv"] .su-in{gap:14px}
+.su[data-vp="esc"] .su-in{gap:16px}
+/* ---- Encabezado de pantalla ---- */
+.su .su-cab{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 16px;align-items:center}
+.su .su-cab h1{grid-column:1/-1;font-size:26px;line-height:31px;font-weight:800;letter-spacing:-.6px}
+.su .su-sub{grid-column:1/-1;font-size:13px;line-height:18px;color:var(--tinta2)}
+.su .su-cab-a .su-sub{grid-column:1}
+.su[data-vp="ih"] .su-cab h1,.su[data-vp="iv"] .su-cab h1,.su[data-vp="esc"] .su-cab h1{font-size:32px;line-height:38px}
+.su[data-vp="ih"] .su-cab-a h1,.su[data-vp="iv"] .su-cab-a h1,.su[data-vp="esc"] .su-cab-a h1{grid-column:1}
+.su[data-vp="ih"] .su-cab-a .su-ton,.su[data-vp="iv"] .su-cab-a .su-ton,.su[data-vp="esc"] .su-cab-a .su-ton{grid-column:2;grid-row:1/3;align-self:end}
+/* ---- Botones (CALMA §2): sin sombra. En los marcos táctiles el área llega a 44 con un borde transparente; el DIBUJO es de 36 (tonal) y 40 (primario). ---- */
+.su .su-ton{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:44px;padding:0 14px;border:4px solid transparent;background-clip:padding-box;border-radius:16px;background-color:var(--tonal);color:var(--tonal-tinta);font-size:15px;line-height:20px;font-weight:600;white-space:nowrap}
+.su .su-prim{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:44px;padding:0 18px;border:2px solid transparent;background-clip:padding-box;border-radius:14px;background-color:var(--accion);color:#fff;font-size:15px;line-height:20px;font-weight:600;white-space:nowrap}
+.su[data-vp="ih"] .su-ton,.su[data-vp="esc"] .su-ton,.su[data-vp="ih"] .su-prim,.su[data-vp="esc"] .su-prim{height:36px;border:0;border-radius:12px;padding:0 16px;font-size:14px}
+.su .su-ton[aria-disabled="true"]{opacity:.55}
+/* ---- Controles de maqueta: tira FUERA del marco, en la cabecera de la sección (CALMA §7). No dependen de .marco. ---- */
+.su-tira{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.su-tira button{height:30px;padding:0 12px;border-radius:999px;border:1px dashed var(--tinta3);background:transparent;color:var(--tinta2);font:600 12px/16px var(--fuente);cursor:pointer}
+.su-tira button[aria-pressed="true"]{background:var(--sup2);color:var(--tinta);border-style:solid}
+.su-tira button:focus-visible{outline:3px solid var(--enlace);outline-offset:2px}
+/* ---- Riel (Duo cerrado) ---- */
+.su .su-riel{position:relative;z-index:1;flex:none;width:calc(56px + var(--ir));padding:16px calc(var(--ir) + 8px) calc(var(--ib) + 10px) 8px;background:var(--navy);border-radius:26px 0 0 26px;box-shadow:var(--sombra-nav-der);display:flex;flex-direction:column;align-items:center;gap:8px}
+.su .su-rb{width:48px;height:48px;flex:none;border-radius:999px;display:flex;align-items:center;justify-content:center;color:var(--nav-tinta)}
+.su .su-rb[aria-current="page"]{background:var(--accion);color:#fff}
+.su .su-mas{width:52px;height:52px;flex:none;border-radius:999px;background:#fff;color:var(--accion);display:flex;align-items:center;justify-content:center;box-shadow:var(--sombra-accion)}
+/* ---- Encabezado fundido (iPhone) ---- */
+.su .su-enc{position:relative;z-index:1;flex:none;display:flex;align-items:center;gap:12px;padding:calc(var(--it) + 8px) 16px 12px;background:var(--navy);border-radius:0 0 26px 26px;box-shadow:var(--sombra-nav-sup);color:#fff}
+.su .su-menu{width:44px;height:44px;flex:none;border-radius:12px;background:var(--nav-velo);color:#fff;display:flex;align-items:center;justify-content:center}
+.su .su-enc-t{font-size:17px;line-height:22px;font-weight:700;color:#fff}
+.su .su-av{display:flex;align-items:center;justify-content:center;flex:none;width:34px;height:34px;border-radius:999px;background:var(--nav-avatar);color:var(--navy);font-size:13px;font-weight:700}
+.su .su-av.su-av-g{width:44px;height:44px}
+/* ---- Encabezado fundido de Duo abierto vertical (CALMA §19), según la maqueta de referencia del dueño ---- */
+.su .su-ivn{position:relative;z-index:1;flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:calc(var(--it) + 0px) 16px 14px;background:var(--navy);border-radius:0 0 26px 26px;box-shadow:var(--sombra-nav-sup)}
+.su .su-ivb{width:44px;height:44px;flex:none;border-radius:999px;background:var(--nav-velo);color:#fff;display:flex;align-items:center;justify-content:center}
+/* Píldoras dibujadas de 40 (como la referencia) con área táctil de 44: borde transparente de 2 px. */
+.su .su-pista{display:flex;align-items:center;gap:0;padding:2px;border-radius:26px;background:var(--nav-velo)}
+.su .su-pil{height:44px;padding:0 12px;border:2px solid transparent;background-clip:padding-box;border-radius:22px;display:flex;align-items:center;color:var(--nav-tinta);font-size:15px;line-height:20px;font-weight:500;text-decoration:none}
+.su .su-pil[aria-current="page"]{background-color:var(--accion);color:#fff;font-weight:600;padding:0 14px}
+.su .su-ivn .su-p:focus-visible{outline-color:var(--nav-tinta)}
+/* ---- Barra lateral (Duo abierto a la derecha, computadora a la izquierda) ---- */
+.su .su-lat{position:relative;z-index:1;flex:none;display:flex;flex-direction:column;background:var(--navy);color:#fff}
+.su[data-vp="ih"] .su-lat{width:calc(218px + var(--ir));padding:16px calc(var(--ir) + 10px) calc(var(--ib) + 10px) 12px;border-radius:26px 0 0 26px;box-shadow:var(--sombra-nav-der)}
+.su[data-vp="esc"] .su-lat{width:248px;padding:16px 12px 14px;border-radius:0 26px 26px 0;box-shadow:var(--sombra-nav-izq)}
+.su .su-lat-cab{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:36px;padding:0 4px 0 8px}
+.su .su-logo{display:inline-flex;align-items:center;gap:8px;color:#fff}
+.su .su-logo-n{font-size:17px;line-height:22px;font-weight:700;letter-spacing:-.2px}
+.su .su-plan{display:inline-flex;align-items:center;height:24px;padding:0 10px;border-radius:999px;background:var(--nav-velo);color:var(--nav-tinta);font-size:12px;line-height:16px;font-weight:600;white-space:nowrap}
+.su .su-cons-b{margin-top:12px;display:flex;align-items:center;gap:10px;min-height:52px;padding:8px 10px;border-radius:14px;background:var(--nav-velo);color:#fff;text-align:left}
+.su .su-cons-b svg{color:var(--nav-tinta2)}
+.su .su-cons-t{flex:1;min-width:0;display:flex;flex-direction:column}
+.su .su-cons-t span{font-size:13px;line-height:16px;color:var(--nav-tinta2)}
+.su .su-cons-t b{font-size:15px;line-height:19px;font-weight:600}
+.su .su-lista{margin-top:14px;display:flex;flex-direction:column;gap:2px}
+.su .su-li{display:flex;align-items:center;gap:12px;height:44px;padding:0 12px;border-radius:12px;color:var(--nav-tinta);font-size:15px;line-height:20px;font-weight:500}
+.su[data-vp="esc"] .su-li{height:40px;font-size:14px}
+.su .su-li[aria-current="page"]{background:var(--accion);color:#fff;font-weight:600}
+.su .su-lat-pie{border-top:1px solid var(--nav-velo);padding-top:8px}
+.su .su-lat .su-yo{height:48px}
+.su .su-yo>span{display:flex;flex-direction:column;line-height:17px}
+.su .su-yo small{font-size:12px;line-height:16px;color:var(--nav-tinta2)}
+@media (prefers-reduced-motion:reduce){.su .su-p{transition:none}}
+
+/* ===== Protocolo de suplementación ===== */
+.su .su-grid{display:flex;flex-direction:column;gap:12px}
+.su[data-vp="ih"] .su-grid,.su[data-vp="iv"] .su-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:start}
+.su[data-vp="esc"] .su-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}
+.su[data-vp="ih"] .su-tar:not(.su-notas),.su[data-vp="iv"] .su-tar:not(.su-notas),.su[data-vp="esc"] .su-tar:not(.su-notas){align-self:stretch}
+.su .su-tar{min-width:0;background:var(--sup);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:8px}
+.su[data-vp="tel"] .su-tar{padding:16px}
+.su[data-vp="ih"] .su-tar,.su[data-vp="iv"] .su-tar{border-radius:18px;padding:16px}
+.su[data-vp="esc"] .su-tar{border-radius:20px;padding:20px}
+.su .su-tc{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.su .su-tc h2{flex:1;min-width:0}
+.su .su-tc .su-chip{margin-top:-1px}
+.su .su-tar h2{font-size:17px;line-height:22px;font-weight:700}
+/* Etiqueta de prioridad (CALMA §11): alto 24, radio 8, icono de 14 + texto 12/600, fondo tintado y tinta del mismo tono */
+.su .su-chip{display:inline-flex;align-items:center;gap:4px;height:24px;padding:0 8px 0 6px;border-radius:8px;font-size:12px;line-height:16px;font-weight:600;white-space:nowrap}
+.su .su-c-alta{background:var(--mal-fondo);color:var(--mal-tinta)}
+.su .su-c-media{background:var(--ag-fondo);color:var(--ag-tinta)}
+.su .su-c-baja{background:var(--tonal);color:var(--tonal-tinta)}
+.su .su-fn{font-size:15px;line-height:22px}
+.su[data-vp="esc"] .su-fn{font-size:14px;line-height:20px}
+.su .su-ind{display:flex;flex-direction:column;gap:6px;margin-top:auto;padding-top:4px}
+.su .su-et{font-size:13px;line-height:18px;font-weight:600;color:var(--tinta2)}
+.su .su-crit{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.su .su-crit li{display:flex;align-items:center;gap:6px}
+.su .su-cr{padding:4px 10px;border-radius:10px;background:var(--fondo);font-size:12px;line-height:16px;font-weight:600;font-variant-numeric:tabular-nums}
+.su .su-o{font-size:12px;line-height:16px;color:var(--tinta2)}
+.su .su-notas{background:var(--ag-fondo);gap:10px}
+.su .su-notas h2{color:var(--ag-tinta)}
+.su .su-nl{display:flex;flex-direction:column;gap:10px}
+.su .su-nl li{display:flex;flex-direction:column;padding-left:12px;border-left:3px solid var(--ag-punto)}
+.su .su-nl b{font-size:15px;line-height:20px;font-weight:600}
+.su .su-nl span{font-size:14px;line-height:20px}
+.su[data-vp="ih"] .su-tar:nth-last-child(2),.su[data-vp="iv"] .su-tar:nth-last-child(2),.su[data-vp="esc"] .su-tar:nth-last-child(2){align-self:start}
+</style>
+<div class="marco su" data-vp="ext">
+<div class="su-app">
+<main class="su-cont"><div class="su-in">
+<header class="su-cab">
+    <h1>Protocolo de suplementación</h1>
+    <p class="su-sub">Stack de suplementación osteomuscular — enfoque en densidad mineral, inflamación y tejidos blandos</p>
+  </header>
+  <!-- A15·1: tarjetas por suplemento, en el mismo orden que hoy. Solo lectura: no hay acciones. -->
+  <ul class="su-grid">
+    <li class="su-tar">
+        <div class="su-tc"><h2>Vitamina D3 + K2</h2><span class="su-chip su-c-alta"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 11 6-6 6 6M6 18l6-6 6 6"/></svg>Alta prioridad</span></div>
+        <p class="su-fn">Mineralización ósea y prevención de calcificación de tejidos blandos</p>
+        <div class="su-ind"><span class="su-et">Indicado cuando:</span><ul class="su-crit"><li><span class="su-cr">Vitamina D &lt; 40 ng/mL</span></li></ul></div>
+      </li><li class="su-tar">
+        <div class="su-tc"><h2>Omega-3 EPA/DHA</h2><span class="su-chip su-c-alta"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 11 6-6 6 6M6 18l6-6 6 6"/></svg>Alta prioridad</span></div>
+        <p class="su-fn">Resolución de inflamación crónica y viscosidad sinovial</p>
+        <div class="su-ind"><span class="su-et">Indicado cuando:</span><ul class="su-crit"><li><span class="su-cr">PCR-us &gt; 1.0 mg/L</span></li><li><span class=su-o>o</span><span class="su-cr">Triglicéridos &gt; 100 mg/dL</span></li></ul></div>
+      </li><li class="su-tar">
+        <div class="su-tc"><h2>Magnesio Glicinato / ZMA</h2><span class="su-chip su-c-media"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 15 6-6 6 6"/></svg>Media</span></div>
+        <p class="su-fn">+ 300 reacciones enzimáticas, relajante muscular, formación ósea</p>
+        <div class="su-ind"><span class="su-et">Indicado cuando:</span><ul class="su-crit"><li><span class="su-cr">Insulina &gt; 8 uIU/mL (resistencia insulina)</span></li></ul></div>
+      </li><li class="su-tar">
+        <div class="su-tc"><h2>Colágeno Hidrolizado + Vit C</h2><span class="su-chip su-c-media"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 15 6-6 6 6"/></svg>Media</span></div>
+        <p class="su-fn">Síntesis de matriz extracelular en cartílago y discos</p>
+        <div class="su-ind"><span class="su-et">Indicado cuando:</span><ul class="su-crit"><li><span class="su-cr">HbA1c &gt; 5.3%</span></li><li><span class=su-o>o</span><span class="su-cr">diagnóstico articular</span></li></ul></div>
+      </li><li class="su-tar">
+        <div class="su-tc"><h2>Creatina Monohidratada</h2><span class="su-chip su-c-alta"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 11 6-6 6 6M6 18l6-6 6 6"/></svg>Alta prioridad</span></div>
+        <p class="su-fn">Hidratación celular y prevención de atrofia en rehabilitación</p>
+        <div class="su-ind"><span class="su-et">Indicado cuando:</span><ul class="su-crit"><li><span class="su-cr">Post-operatorio / rehabilitación activa</span></li></ul></div>
+      </li><li class="su-tar">
+        <div class="su-tc"><h2>Ashwagandha KSM-66</h2><span class="su-chip su-c-baja"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6v12M6 12h12"/></svg>Complementario</span></div>
+        <p class="su-fn">Reduce cortisol por dolor crónico, mejora tolerancia al esfuerzo</p>
+        <div class="su-ind"><span class="su-et">Indicado cuando:</span><ul class="su-crit"><li><span class="su-cr">Dolor crónico &gt; 3 meses</span></li></ul></div>
+      </li><li class="su-tar">
+        <div class="su-tc"><h2>HMB</h2><span class="su-chip su-c-alta"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 11 6-6 6 6M6 18l6-6 6 6"/></svg>Alta prioridad</span></div>
+        <p class="su-fn">Previene degradación muscular en reposo/inmovilización</p>
+        <div class="su-ind"><span class="su-et">Indicado cuando:</span><ul class="su-crit"><li><span class="su-cr">Inmovilización / reposo prolongado</span></li></ul></div>
+      </li>
+    <!-- A15·2: «Notas clínicas clave» -->
+    <li class="su-tar su-notas">
+      <h2>Notas clínicas clave</h2>
+      <ul class="su-nl"><li><b>Albúmina baja</b><span>Riesgo de infección quirúrgica y no-unión ósea — optimizar antes de cualquier procedimiento</span></li><li><b>TSH fuera del rango óptimo (1.0–2.5)</b><span>Investigar hipotiroidismo subclínico como causa de síntomas osteomusculares</span></li><li><b>Cistatina C &gt; 0.9</b><span>Función renal comprometida — precaución con AINEs prolongados</span></li><li><b>Insulina &gt; 8 + HbA1c &gt; 5.3%</b><span>Resistencia a insulina activa — glicación de colágeno comprometida</span></li></ul>
+    </li>
+  </ul>
+</div></main><!-- Navegación (A0·3): riel a la derecha, fundido con la franja del sistema. Copiado del dashboard de referencia. -->
+<nav class="su-riel" aria-label="Navegación principal">
+  <a href="#" class="su-p su-rb" aria-label="Inicio"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg></a><a href="#" class="su-p su-rb" aria-label="Expediente" aria-current="page"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.9.7 3.1 2.4 3.5 5.2"/></svg></a><a href="#" class="su-p su-rb" aria-label="Agenda"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg></a><a href="#" class="su-p su-rb" aria-label="Documentos"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg></a><a href="#" class="su-p su-rb" aria-label="Más"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 12h.01M12 12h.01M18 12h.01"/></svg></a>
+  <span class="su-flex"></span>
+  <button type="button" class="su-p su-mas" aria-label="Nueva consulta"><svg aria-hidden="true" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg></button>
+</nav>
+</div>
+<!-- Capas globales no dibujadas aquí porque no cambian en esta pantalla (se definen en el dashboard de referencia): hoja «Nueva consulta» del «+», menú «Más», selector de consultorio, avisos emergentes arriba y centrados. -->
+</div>
+<div class="marco su" data-vp="tel">
+<div class="su-app">
+<!-- Navegación (A0·13): encabezado fundido con la barra de estado. Copiado del dashboard de referencia. -->
+<header class="su-enc">
+  <button type="button" class="su-p su-menu" aria-label="Menú"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+  <span class="su-enc-t">Expediente</span>
+  <span class="su-flex"></span>
+  <button type="button" class="su-p su-av su-av-g" aria-label="Mi perfil">AS</button>
+</header><main class="su-cont"><div class="su-in">
+<header class="su-cab">
+    <h1>Protocolo de suplementación</h1>
+    <p class="su-sub">Stack de suplementación osteomuscular — enfoque en densidad mineral, inflamación y tejidos blandos</p>
+  </header>
+  <!-- A15·1: tarjetas por suplemento, en el mismo orden que hoy. Solo lectura: no hay acciones. -->
+  <ul class="su-grid">
+    <li class="su-tar">
+        <div class="su-tc"><h2>Vitamina D3 + K2</h2><span class="su-chip su-c-alta"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 11 6-6 6 6M6 18l6-6 6 6"/></svg>Alta prioridad</span></div>
+        <p class="su-fn">Mineralización ósea y prevención de calcificación de tejidos blandos</p>
+        <div class="su-ind"><span class="su-et">Indicado cuando:</span><ul class="su-crit"><li><span class="su-cr">Vitamina D &lt; 40 ng/mL</span></li></ul></div>
+      </li><li class="su-tar">
+        <div class="su-tc"><h2>Omega-3 EPA/DHA</h2><span class="su-chip su-c-alta"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 11 6-6 6 6M6 18l6-6 6 6"/></svg>Alta prioridad</span></div>
+        <p class="su-fn">Resolución de inflamación crónica y viscosidad sinovial</p>
+        <div class="su-ind"><span class="su-et">Indicado cuando:</span><ul class="su-crit"><li><span class="su-cr">PCR-us &gt; 1.0 mg/L</span></li><li><span class=su-o>o</span><span class="su-cr">Triglicéridos &gt; 100 mg/dL</span></li></ul></div>
+      </li><li class="su-tar">
+        <div class="su-tc"><h2>Magnesio Glicinato / ZMA</h2><span class="su-chip su-c-media"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 15 6-6 6 6"/></svg>Media</span></div>
+        <p class="su-fn">+ 300 reacciones enzimáticas, relajante muscular, formación ósea</p>
+        <div class="su-ind"><span class="su-et">Indicado cuando:</span><ul class="su-crit"><li><span class="su-cr">Insulina &gt; 8 uIU/mL (resistencia insulina)</span></li></ul></div>
+      </li><li class="su-tar">
+        <div class="su-tc"><h2>Colágeno Hidrolizado + Vit C</h2><span class="su-chip su-c-media"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 15 6-6 6 6"/></svg>Media</span></div>
+        <p class="su-fn">Síntesis de matriz extracelular en cartílago y discos</p>
+        <div class="su-ind"><span class="su-et">Indicado cuando:</span><ul class="su-crit"><li><span class="su-cr">HbA1c &gt; 5.3%</span></li><li><span class=su-o>o</span><span class="su-cr">diagnóstico articular</span></li></ul></div>
+      </li><li class="su-tar">
+        <div class="su-tc"><h2>Creatina Monohidratada</h2><span class="su-chip su-c-alta"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 11 6-6 6 6M6 18l6-6 6 6"/></svg>Alta prioridad</span></div>
+        <p class="su-fn">Hidratación celular y prevención de atrofia en rehabilitación</p>
+        <div class="su-ind"><span class="su-et">Indicado cuando:</span><ul class="su-crit"><li><span class="su-cr">Post-operatorio / rehabilitación activa</span></li></ul></div>
+      </li><li class="su-tar">
+        <div class="su-tc"><h2>Ashwagandha KSM-66</h2><span class="su-chip su-c-baja"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6v12M6 12h12"/></svg>Complementario</span></div>
+        <p class="su-fn">Reduce cortisol por dolor crónico, mejora tolerancia al esfuerzo</p>
+        <div class="su-ind"><span class="su-et">Indicado cuando:</span><ul class="su-crit"><li><span class="su-cr">Dolor crónico &gt; 3 meses</span></li></ul></div>
+      </li><li class="su-tar">
+        <div class="su-tc"><h2>HMB</h2><span class="su-chip su-c-alta"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 11 6-6 6 6M6 18l6-6 6 6"/></svg>Alta prioridad</span></div>
+        <p class="su-fn">Previene degradación muscular en reposo/inmovilización</p>
+        <div class="su-ind"><span class="su-et">Indicado cuando:</span><ul class="su-crit"><li><span class="su-cr">Inmovilización / reposo prolongado</span></li></ul></div>
+      </li>
+    <!-- A15·2: «Notas clínicas clave» -->
+    <li class="su-tar su-notas">
+      <h2>Notas clínicas clave</h2>
+      <ul class="su-nl"><li><b>Albúmina baja</b><span>Riesgo de infección quirúrgica y no-unión ósea — optimizar antes de cualquier procedimiento</span></li><li><b>TSH fuera del rango óptimo (1.0–2.5)</b><span>Investigar hipotiroidismo subclínico como causa de síntomas osteomusculares</span></li><li><b>Cistatina C &gt; 0.9</b><span>Función renal comprometida — precaución con AINEs prolongados</span></li><li><b>Insulina &gt; 8 + HbA1c &gt; 5.3%</b><span>Resistencia a insulina activa — glicación de colágeno comprometida</span></li></ul>
+    </li>
+  </ul>
+</div></main>
+</div>
+<!-- Capas globales no dibujadas aquí porque no cambian en esta pantalla (se definen en el dashboard de referencia): hoja «Nueva consulta» del «+», menú «Más», selector de consultorio, avisos emergentes arriba y centrados. -->
+</div>
+<div class="marco su" data-vp="ih">
+<div class="su-app">
+<main class="su-cont"><div class="su-in">
+<header class="su-cab">
+    <h1>Protocolo de suplementación</h1>
+    <p class="su-sub">Stack de suplementación osteomuscular — enfoque en densidad mineral, inflamación y tejidos blandos</p>
+  </header>
+  <!-- A15·1: tarjetas por suplemento, en el mismo orden que hoy. Solo lectura: no hay acciones. -->
+  <ul class="su-grid">
+    <li class="su-tar">
+        <div class="su-tc"><h2>Vitamina D3 + K2</h2><span class="su-chip su-c-alta"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 11 6-6 6 6M6 18l6-6 6 6"/></svg>Alta prioridad</span></div>
+        <p class="su-fn">Mineralización ósea y prevención de calcificación de tejidos blandos</p>
+        <div class="su-ind"><span class="su-et">Indicado cuando:</span><ul class="su-crit"><li><span class="su-cr">Vitamina D &lt; 40 ng/mL</span></li></ul></div>
+      </li><li class="su-tar">
+        <div class="su-tc"><h2>Omega-3 EPA/DHA</h2><span class="su-chip su-c-alta"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 11 6-6 6 6M6 18l6-6 6 6"/></svg>Alta prioridad</span></div>
+        <p class="su-fn">Resolución de inflamación crónica y viscosidad sinovial</p>
+        <div class="su-ind"><span class="su-et">Indicado cuando:</span><ul class="su-crit"><li><span class="su-cr">PCR-us &gt; 1.0 mg/L</span></li><li><span class=su-o>o</span><span class="su-cr">Triglicéridos &gt; 100 mg/dL</span></li></ul></div>
+      </li><li class="su-tar">
+        <div class="su-tc"><h2>Magnesio Glicinato / ZMA</h2><span class="su-chip su-c-media"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 15 6-6 6 6"/></svg>Media</span></div>
+        <p class="su-fn">+ 300 reacciones enzimáticas, relajante muscular, formación ósea</p>
+        <div class="su-ind"><span class="su-et">Indicado cuando:</span><ul class="su-crit"><li><span class="su-cr">Insulina &gt; 8 uIU/mL (resistencia insulina)</span></li></ul></div>
+      </li><li class="su-tar">
+        <div class="su-tc"><h2>Colágeno Hidrolizado + Vit C</h2><span class="su-chip su-c-media"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 15 6-6 6 6"/></svg>Media</span></div>
+        <p class="su-fn">Síntesis de matriz extracelular en cartílago y discos</p>
+        <div class="su-ind"><span class="su-et">Indicado cuando:</span><ul class="su-crit"><li><span class="su-cr">HbA1c &gt; 5.3%</span></li><li><span class=su-o>o</span><span class="su-cr">diagnóstico articular</span></li></ul></div>
+      </li><li class="su-tar">
+        <div class="su-tc"><h2>Creatina Monohidratada</h2><span class="su-chip su-c-alta"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 11 6-6 6 6M6 18l6-6 6 6"/></svg>Alta prioridad</span></div>
+        <p class="su-fn">Hidratación celular y prevención de atrofia en rehabilitación</p>
+        <div class="su-ind"><span class="su-et">Indicado cuando:</span><ul class="su-crit"><li><span class="su-cr">Post-operatorio / rehabilitación activa</span></li></ul></div>
+      </li><li class="su-tar">
+        <div class="su-tc"><h2>Ashwagandha KSM-66</h2><span class="su-chip su-c-baja"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6v12M6 12h12"/></svg>Complementario</span></div>
+        <p class="su-fn">Reduce cortisol por dolor crónico, mejora tolerancia al esfuerzo</p>
+        <div class="su-ind"><span class="su-et">Indicado cuando:</span><ul class="su-crit"><li><span class="su-cr">Dolor crónico &gt; 3 meses</span></li></ul></div>
+      </li><li class="su-tar">
+        <div class="su-tc"><h2>HMB</h2><span class="su-chip su-c-alta"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 11 6-6 6 6M6 18l6-6 6 6"/></svg>Alta prioridad</span></div>
+        <p class="su-fn">Previene degradación muscular en reposo/inmovilización</p>
+        <div class="su-ind"><span class="su-et">Indicado cuando:</span><ul class="su-crit"><li><span class="su-cr">Inmovilización / reposo prolongado</span></li></ul></div>
+      </li>
+    <!-- A15·2: «Notas clínicas clave» -->
+    <li class="su-tar su-notas">
+      <h2>Notas clínicas clave</h2>
+      <ul class="su-nl"><li><b>Albúmina baja</b><span>Riesgo de infección quirúrgica y no-unión ósea — optimizar antes de cualquier procedimiento</span></li><li><b>TSH fuera del rango óptimo (1.0–2.5)</b><span>Investigar hipotiroidismo subclínico como causa de síntomas osteomusculares</span></li><li><b>Cistatina C &gt; 0.9</b><span>Función renal comprometida — precaución con AINEs prolongados</span></li><li><b>Insulina &gt; 8 + HbA1c &gt; 5.3%</b><span>Resistencia a insulina activa — glicación de colágeno comprometida</span></li></ul>
+    </li>
+  </ul>
+</div></main><!-- Navegación (A0·3): barra lateral. Copiada del dashboard de referencia. -->
+<nav class="su-lat" aria-label="Navegación principal">
+  <div class="su-lat-cab"><span class="su-logo"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.5"/><path d="M12 5.5v13M9.6 8h4.8M9 11h6M9 14h6M9.6 17h4.8"/></svg><span class="su-logo-n">Spinus</span></span><span class="su-plan">Plan VIP</span></div>
+  <button type="button" class="su-p su-cons-b"><span class="su-av">AS</span><span class="su-cons-t"><span>Consultorio</span><b>Centro</b></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 9 4-4 4 4M8 15l4 4 4-4"/></svg></button>
+  <div class="su-lista"><a href="#" class="su-p su-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Inicio</a><a href="#" class="su-p su-li" aria-current="page"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.9.7 3.1 2.4 3.5 5.2"/></svg>Expediente</a><a href="#" class="su-p su-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Agenda</a><a href="#" class="su-p su-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>Documentos</a><a href="#" class="su-p su-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20v-8M12 20V5M19 20v-9"/></svg>Administración</a></div>
+  <span class="su-flex"></span>
+  <div class="su-lat-pie"><a href="#" class="su-p su-li su-yo"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18.2c1.3-2 3.2-3 5.5-3s4.2 1 5.5 3"/></svg><span>Dr. Admin Semilla<small>Mi perfil · Ajustes</small></span></a></div>
+</nav>
+</div>
+<!-- Capas globales no dibujadas aquí porque no cambian en esta pantalla (se definen en el dashboard de referencia): hoja «Nueva consulta» del «+», menú «Más», selector de consultorio, avisos emergentes arriba y centrados. -->
+</div>
+<div class="marco su" data-vp="iv">
+<div class="su-app">
+<!-- Navegación de Duo abierto vertical (CALMA §19): encabezado fundido con la barra de estado. Administración, Mi perfil y Ayuda se alcanzan desde «Mostrar barra lateral» o desde el avatar. -->
+<header class="su-ivn">
+  <button type="button" class="su-p su-ivb" aria-label="Mostrar barra lateral"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="15" rx="3"/><path d="M9.5 4.5v15"/></svg></button>
+  <!-- CALMA §23.9: quinta píldora «Más»; abre el mismo menú que el «···» del riel de Duo cerrado (menú no dibujado aquí). Marcada en Estadísticas y Centro de ayuda. -->
+  <nav class="su-pista" aria-label="Secciones"><a href="#" class="su-p su-pil">Inicio</a><a href="#" class="su-p su-pil" aria-current="page">Expediente</a><a href="#" class="su-p su-pil">Agenda</a><a href="#" class="su-p su-pil">Documentos</a><a href="#" class="su-p su-pil">Más</a></nav>
+  <button type="button" class="su-p su-av su-av-g" aria-label="Mi perfil">AS</button>
+</header><main class="su-cont"><div class="su-in">
+<header class="su-cab">
+    <h1>Protocolo de suplementación</h1>
+    <p class="su-sub">Stack de suplementación osteomuscular — enfoque en densidad mineral, inflamación y tejidos blandos</p>
+  </header>
+  <!-- A15·1: tarjetas por suplemento, en el mismo orden que hoy. Solo lectura: no hay acciones. -->
+  <ul class="su-grid">
+    <li class="su-tar">
+        <div class="su-tc"><h2>Vitamina D3 + K2</h2><span class="su-chip su-c-alta"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 11 6-6 6 6M6 18l6-6 6 6"/></svg>Alta prioridad</span></div>
+        <p class="su-fn">Mineralización ósea y prevención de calcificación de tejidos blandos</p>
+        <div class="su-ind"><span class="su-et">Indicado cuando:</span><ul class="su-crit"><li><span class="su-cr">Vitamina D &lt; 40 ng/mL</span></li></ul></div>
+      </li><li class="su-tar">
+        <div class="su-tc"><h2>Omega-3 EPA/DHA</h2><span class="su-chip su-c-alta"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 11 6-6 6 6M6 18l6-6 6 6"/></svg>Alta prioridad</span></div>
+        <p class="su-fn">Resolución de inflamación crónica y viscosidad sinovial</p>
+        <div class="su-ind"><span class="su-et">Indicado cuando:</span><ul class="su-crit"><li><span class="su-cr">PCR-us &gt; 1.0 mg/L</span></li><li><span class=su-o>o</span><span class="su-cr">Triglicéridos &gt; 100 mg/dL</span></li></ul></div>
+      </li><li class="su-tar">
+        <div class="su-tc"><h2>Magnesio Glicinato / ZMA</h2><span class="su-chip su-c-media"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 15 6-6 6 6"/></svg>Media</span></div>
+        <p class="su-fn">+ 300 reacciones enzimáticas, relajante muscular, formación ósea</p>
+        <div class="su-ind"><span class="su-et">Indicado cuando:</span><ul class="su-crit"><li><span class="su-cr">Insulina &gt; 8 uIU/mL (resistencia insulina)</span></li></ul></div>
+      </li><li class="su-tar">
+        <div class="su-tc"><h2>Colágeno Hidrolizado + Vit C</h2><span class="su-chip su-c-media"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 15 6-6 6 6"/></svg>Media</span></div>
+        <p class="su-fn">Síntesis de matriz extracelular en cartílago y discos</p>
+        <div class="su-ind"><span class="su-et">Indicado cuando:</span><ul class="su-crit"><li><span class="su-cr">HbA1c &gt; 5.3%</span></li><li><span class=su-o>o</span><span class="su-cr">diagnóstico articular</span></li></ul></div>
+      </li><li class="su-tar">
+        <div class="su-tc"><h2>Creatina Monohidratada</h2><span class="su-chip su-c-alta"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 11 6-6 6 6M6 18l6-6 6 6"/></svg>Alta prioridad</span></div>
+        <p class="su-fn">Hidratación celular y prevención de atrofia en rehabilitación</p>
+        <div class="su-ind"><span class="su-et">Indicado cuando:</span><ul class="su-crit"><li><span class="su-cr">Post-operatorio / rehabilitación activa</span></li></ul></div>
+      </li><li class="su-tar">
+        <div class="su-tc"><h2>Ashwagandha KSM-66</h2><span class="su-chip su-c-baja"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6v12M6 12h12"/></svg>Complementario</span></div>
+        <p class="su-fn">Reduce cortisol por dolor crónico, mejora tolerancia al esfuerzo</p>
+        <div class="su-ind"><span class="su-et">Indicado cuando:</span><ul class="su-crit"><li><span class="su-cr">Dolor crónico &gt; 3 meses</span></li></ul></div>
+      </li><li class="su-tar">
+        <div class="su-tc"><h2>HMB</h2><span class="su-chip su-c-alta"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 11 6-6 6 6M6 18l6-6 6 6"/></svg>Alta prioridad</span></div>
+        <p class="su-fn">Previene degradación muscular en reposo/inmovilización</p>
+        <div class="su-ind"><span class="su-et">Indicado cuando:</span><ul class="su-crit"><li><span class="su-cr">Inmovilización / reposo prolongado</span></li></ul></div>
+      </li>
+    <!-- A15·2: «Notas clínicas clave» -->
+    <li class="su-tar su-notas">
+      <h2>Notas clínicas clave</h2>
+      <ul class="su-nl"><li><b>Albúmina baja</b><span>Riesgo de infección quirúrgica y no-unión ósea — optimizar antes de cualquier procedimiento</span></li><li><b>TSH fuera del rango óptimo (1.0–2.5)</b><span>Investigar hipotiroidismo subclínico como causa de síntomas osteomusculares</span></li><li><b>Cistatina C &gt; 0.9</b><span>Función renal comprometida — precaución con AINEs prolongados</span></li><li><b>Insulina &gt; 8 + HbA1c &gt; 5.3%</b><span>Resistencia a insulina activa — glicación de colágeno comprometida</span></li></ul>
+    </li>
+  </ul>
+</div></main>
+</div>
+<!-- Capas globales no dibujadas aquí porque no cambian en esta pantalla (se definen en el dashboard de referencia): hoja «Nueva consulta» del «+», menú «Más», selector de consultorio, avisos emergentes arriba y centrados. -->
+</div>
+<div class="marco su" data-vp="esc">
+<div class="su-app">
+<!-- Navegación (A0·3): barra lateral. Copiada del dashboard de referencia. -->
+<nav class="su-lat" aria-label="Navegación principal">
+  <div class="su-lat-cab"><span class="su-logo"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.5"/><path d="M12 5.5v13M9.6 8h4.8M9 11h6M9 14h6M9.6 17h4.8"/></svg><span class="su-logo-n">Spinus</span></span><span class="su-plan">Plan VIP</span></div>
+  <button type="button" class="su-p su-cons-b"><span class="su-av">AS</span><span class="su-cons-t"><span>Consultorio</span><b>Centro</b></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 9 4-4 4 4M8 15l4 4 4-4"/></svg></button>
+  <div class="su-lista"><a href="#" class="su-p su-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Inicio</a><a href="#" class="su-p su-li" aria-current="page"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.9.7 3.1 2.4 3.5 5.2"/></svg>Expediente</a><a href="#" class="su-p su-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Agenda</a><a href="#" class="su-p su-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>Documentos</a><a href="#" class="su-p su-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20v-8M12 20V5M19 20v-9"/></svg>Administración</a></div>
+  <span class="su-flex"></span>
+  <div class="su-lat-pie"><a href="#" class="su-p su-li su-yo"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18.2c1.3-2 3.2-3 5.5-3s4.2 1 5.5 3"/></svg><span>Dr. Admin Semilla<small>Mi perfil · Ajustes</small></span></a></div>
+</nav><main class="su-cont"><div class="su-in">
+<header class="su-cab">
+    <h1>Protocolo de suplementación</h1>
+    <p class="su-sub">Stack de suplementación osteomuscular — enfoque en densidad mineral, inflamación y tejidos blandos</p>
+  </header>
+  <!-- A15·1: tarjetas por suplemento, en el mismo orden que hoy. Solo lectura: no hay acciones. -->
+  <ul class="su-grid">
+    <li class="su-tar">
+        <div class="su-tc"><h2>Vitamina D3 + K2</h2><span class="su-chip su-c-alta"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 11 6-6 6 6M6 18l6-6 6 6"/></svg>Alta prioridad</span></div>
+        <p class="su-fn">Mineralización ósea y prevención de calcificación de tejidos blandos</p>
+        <div class="su-ind"><span class="su-et">Indicado cuando:</span><ul class="su-crit"><li><span class="su-cr">Vitamina D &lt; 40 ng/mL</span></li></ul></div>
+      </li><li class="su-tar">
+        <div class="su-tc"><h2>Omega-3 EPA/DHA</h2><span class="su-chip su-c-alta"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 11 6-6 6 6M6 18l6-6 6 6"/></svg>Alta prioridad</span></div>
+        <p class="su-fn">Resolución de inflamación crónica y viscosidad sinovial</p>
+        <div class="su-ind"><span class="su-et">Indicado cuando:</span><ul class="su-crit"><li><span class="su-cr">PCR-us &gt; 1.0 mg/L</span></li><li><span class=su-o>o</span><span class="su-cr">Triglicéridos &gt; 100 mg/dL</span></li></ul></div>
+      </li><li class="su-tar">
+        <div class="su-tc"><h2>Magnesio Glicinato / ZMA</h2><span class="su-chip su-c-media"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 15 6-6 6 6"/></svg>Media</span></div>
+        <p class="su-fn">+ 300 reacciones enzimáticas, relajante muscular, formación ósea</p>
+        <div class="su-ind"><span class="su-et">Indicado cuando:</span><ul class="su-crit"><li><span class="su-cr">Insulina &gt; 8 uIU/mL (resistencia insulina)</span></li></ul></div>
+      </li><li class="su-tar">
+        <div class="su-tc"><h2>Colágeno Hidrolizado + Vit C</h2><span class="su-chip su-c-media"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 15 6-6 6 6"/></svg>Media</span></div>
+        <p class="su-fn">Síntesis de matriz extracelular en cartílago y discos</p>
+        <div class="su-ind"><span class="su-et">Indicado cuando:</span><ul class="su-crit"><li><span class="su-cr">HbA1c &gt; 5.3%</span></li><li><span class=su-o>o</span><span class="su-cr">diagnóstico articular</span></li></ul></div>
+      </li><li class="su-tar">
+        <div class="su-tc"><h2>Creatina Monohidratada</h2><span class="su-chip su-c-alta"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 11 6-6 6 6M6 18l6-6 6 6"/></svg>Alta prioridad</span></div>
+        <p class="su-fn">Hidratación celular y prevención de atrofia en rehabilitación</p>
+        <div class="su-ind"><span class="su-et">Indicado cuando:</span><ul class="su-crit"><li><span class="su-cr">Post-operatorio / rehabilitación activa</span></li></ul></div>
+      </li><li class="su-tar">
+        <div class="su-tc"><h2>Ashwagandha KSM-66</h2><span class="su-chip su-c-baja"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6v12M6 12h12"/></svg>Complementario</span></div>
+        <p class="su-fn">Reduce cortisol por dolor crónico, mejora tolerancia al esfuerzo</p>
+        <div class="su-ind"><span class="su-et">Indicado cuando:</span><ul class="su-crit"><li><span class="su-cr">Dolor crónico &gt; 3 meses</span></li></ul></div>
+      </li><li class="su-tar">
+        <div class="su-tc"><h2>HMB</h2><span class="su-chip su-c-alta"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 11 6-6 6 6M6 18l6-6 6 6"/></svg>Alta prioridad</span></div>
+        <p class="su-fn">Previene degradación muscular en reposo/inmovilización</p>
+        <div class="su-ind"><span class="su-et">Indicado cuando:</span><ul class="su-crit"><li><span class="su-cr">Inmovilización / reposo prolongado</span></li></ul></div>
+      </li>
+    <!-- A15·2: «Notas clínicas clave» -->
+    <li class="su-tar su-notas">
+      <h2>Notas clínicas clave</h2>
+      <ul class="su-nl"><li><b>Albúmina baja</b><span>Riesgo de infección quirúrgica y no-unión ósea — optimizar antes de cualquier procedimiento</span></li><li><b>TSH fuera del rango óptimo (1.0–2.5)</b><span>Investigar hipotiroidismo subclínico como causa de síntomas osteomusculares</span></li><li><b>Cistatina C &gt; 0.9</b><span>Función renal comprometida — precaución con AINEs prolongados</span></li><li><b>Insulina &gt; 8 + HbA1c &gt; 5.3%</b><span>Resistencia a insulina activa — glicación de colágeno comprometida</span></li></ul>
+    </li>
+  </ul>
+</div></main>
+</div>
+<!-- Capas globales no dibujadas aquí porque no cambian en esta pantalla (se definen en el dashboard de referencia): hoja «Nueva consulta» del «+», menú «Más», selector de consultorio, avisos emergentes arriba y centrados. -->
+</div>
+<script>
+(function(){
+  document.querySelectorAll('.su.marco').forEach(function(m){
+    m.querySelectorAll('a[href="#"]').forEach(function(a){a.addEventListener('click',function(e){e.preventDefault()})});
+  });
+})();
+</script>

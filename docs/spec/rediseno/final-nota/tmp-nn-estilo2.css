@@ -1,0 +1,116 @@
+
+/* ================= SEGUNDA REVISIÓN DEL DUEÑO (CALMA §11–16): limpio con carácter ================= */
+/* ---- §11 · Etiquetas con color e icono: origen de la nota y sello ---- */
+.nn .nn-tag{display:inline-flex;align-items:center;gap:4px;height:24px;padding:0 8px;border-radius:8px;font-size:12px;line-height:16px;font-weight:600;white-space:nowrap}
+.nn .nn-t-ton{background:var(--tonal);color:var(--tonal-tinta)}
+.nn .nn-t-ok{background:var(--ok-fondo);color:var(--ok-tinta)}
+.nn .nn-origen{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px}
+.nn[data-vp] .nn-nota-ok{display:flex;align-items:flex-start;gap:6px}
+.nn .nn-nota-ok svg{color:var(--ok-tinta)}
+
+/* ---- §12 · La nota con jerarquía: rótulos de color, cuerpo justificado, diagnóstico destacado, medicamentos en lista, pares, firma ---- */
+.nn .nn-sec{margin-top:22px}
+.nn .nn-origen+.nn-prosa .nn-sec:first-child{margin-top:16px}
+.nn .nn-sec h3,.nn .nn-doc .nn-grp-t{font-size:13px;line-height:18px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--enlace)}
+.nn .nn-doc .nn-meds .nn-grp-t{font-weight:600;letter-spacing:0;text-transform:none;color:var(--tinta2)}
+.nn .nn-sec p{margin-top:6px;font-size:15px;line-height:22px;text-align:justify;-webkit-hyphens:auto;hyphens:auto;hyphenate-limit-chars:5 2 2;overflow-wrap:break-word}
+.nn .nn-dxs{margin-top:6px;display:flex;flex-direction:column;gap:6px}
+.nn .nn-dxs li{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px}
+.nn .nn-dxn,.nn .nn-sec p.nn-dxp{font-size:17px;line-height:22px;font-weight:700;letter-spacing:-.2px;text-align:left;-webkit-hyphens:manual;hyphens:manual}
+.nn .nn-sec p.nn-dx-nota{font-size:13px;line-height:18px;color:var(--tinta2);text-align:left}
+.nn .nn-doc .nn-cod{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:7px;background:var(--tonal);color:var(--tonal-tinta);font-size:12px;line-height:16px;font-weight:600}
+.nn .nn-doc .nn-dxr .nn-flex{font-weight:600}
+.nn .nn-rxl{margin-top:4px}
+.nn .nn-rxl li{display:flex;flex-direction:column;padding:8px 0}
+.nn .nn-rxl li+li{border-top:1px solid var(--linea)}
+.nn .nn-rxl b{font-size:15px;line-height:20px;font-weight:600}
+.nn .nn-rxl span{font-size:13px;line-height:18px;color:var(--tinta2)}
+.nn .nn-rxl+p{margin-top:4px}
+.nn.nn-dxen:not(.nn-ed) .nn-grp-dx{display:none}
+.nn .nn-kv{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px 16px;padding-top:10px}
+.nn .nn-kv2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.nn .nn-kv>div{display:flex;flex-direction:column;gap:1px;min-width:0}
+.nn .nn-kv dt{font-size:12px;line-height:16px;color:var(--tinta2)}
+.nn .nn-kv dd{font-size:15px;line-height:20px;font-weight:600;font-variant-numeric:tabular-nums}
+.nn .nn-kv dd small{font-size:12px;font-weight:400;color:var(--tinta2)}
+.nn .nn-kv dd.nn-kv-no{font-weight:400;color:var(--tinta2)}
+.nn .nn-kv dt,.nn .nn-kv dd{white-space:nowrap}
+.nn .nn-kv2 dd{white-space:normal}
+.nn .nn-vres2>div:first-child:not(:only-child){grid-column:span 2}
+.nn[data-vp="ih"] .nn-vres2{grid-template-columns:repeat(6,minmax(0,1fr))}
+.nn .nn-firma{display:flex;flex-direction:column;margin-top:28px;font-size:13px;line-height:18px;color:var(--tinta2)}
+.nn .nn-firma::before{content:"";width:132px;height:1px;margin-bottom:10px;background:var(--borde)}
+.nn .nn-firma b{font-size:15px;line-height:20px;font-weight:600;color:var(--tinta)}
+.nn[data-e="regen"] .nn-firma{opacity:.45}
+
+/* ---- «Nota guardada»: fila única y pareja de acciones de la nota (botones tonales, icono de color) ---- */
+.nn[data-vp] .nn-acc{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:12px 0 0}
+.nn .nn-ac{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-width:0;min-height:56px;padding:6px 4px;border-radius:12px;background:var(--tonal);color:var(--tonal-tinta);font-size:13px;line-height:16px;font-weight:600;text-align:center;white-space:nowrap}
+.nn .nn-ac svg{color:var(--enlace)}
+.nn[data-vp="ih"] .nn-ac,.nn[data-vp="esc"] .nn-ac{flex-direction:row;gap:8px;min-height:40px;padding:0 14px;font-size:14px;line-height:18px}
+.nn[data-vp="ih"] .nn-acc{margin-top:14px;gap:12px}
+.nn[data-vp="esc"] .nn-acc{display:flex;margin:0;gap:8px}
+.nn[data-vp="esc"] .nn-ac{min-height:36px;min-width:160px}
+.nn[data-vp="ext"] .nn-acc{margin-top:8px}
+.nn .nn-az-n{overflow-wrap:anywhere}
+
+/* ---- §13 · Capas: velo desenfocado, botones de verdad, alerta de patrón único ---- */
+.nn .nn-velo{-webkit-backdrop-filter:blur(10px) saturate(140%);backdrop-filter:blur(10px) saturate(140%)}
+@media (prefers-reduced-transparency:reduce){.nn .nn-velo{-webkit-backdrop-filter:none;backdrop-filter:none;background:color-mix(in srgb,var(--velo),var(--navy) 55%)}}
+.nn .nn-ton{display:inline-flex;align-items:center;justify-content:center;height:44px;padding:0 16px;border-radius:12px;background:var(--tonal);color:var(--tonal-tinta);font-size:15px;line-height:20px;font-weight:600;white-space:nowrap}
+.nn .nn-ton:disabled{background:var(--sup2);color:var(--tinta3)}
+.nn .nn-ton:disabled:active{transform:none}
+.nn[data-vp="ih"] .nn-ton,.nn[data-vp="esc"] .nn-ton{height:36px;font-size:14px}
+.nn[data-vp] .nn-alerta{top:calc(50% + (var(--it) - var(--ib)) / 2);left:calc((100% - var(--ir)) / 2 - 160px);width:320px;border-radius:20px;padding:24px;display:flex;flex-direction:column;align-items:center;text-align:center}
+.nn[data-vp="ih"] .nn-alerta{left:calc((100% - 218px - var(--ir)) / 2 - 150px);width:300px}
+.nn[data-vp="esc"] .nn-alerta{left:calc(248px + (100% - 248px) / 2 - 170px);width:340px;top:50%}
+.nn .nn-al-ic{display:flex;align-items:center;justify-content:center;flex:none;width:48px;height:48px;border-radius:999px;margin-bottom:12px}
+.nn .nn-al-ton{background:var(--tonal);color:var(--enlace)}
+.nn .nn-al-mal{background:var(--mal-fondo);color:var(--mal-tinta)}
+.nn .nn-al-ag{background:var(--ag-fondo);color:var(--ag-tinta)}
+.nn .nn-alerta h2{text-align:center;text-wrap:balance}
+.nn .nn-alerta .nn-al-m{margin-top:8px;align-self:stretch;font-size:14px;line-height:20px;color:var(--tinta2);text-align:justify;-webkit-hyphens:auto;hyphens:auto}
+.nn .nn-alerta .nn-al-m.nn-al-c{text-align:center}
+.nn .nn-alerta .nn-sinvit{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:10px;font-size:13px;line-height:18px;color:var(--tinta2)}
+.nn .nn-sinvit svg{color:var(--ag-tinta)}
+.nn[data-vp] .nn-al-p{display:flex;align-items:stretch;justify-content:center;gap:8px;align-self:stretch;margin-top:20px}
+.nn[data-vp] .nn-al-p .nn-bt{display:inline-flex;align-items:center;justify-content:center;flex:1 1 0;min-width:0;height:44px;padding:0 8px;border-radius:12px;font-size:15px;line-height:20px;font-weight:600;white-space:nowrap}
+.nn[data-vp] .nn-al-col{flex-direction:column-reverse;gap:8px}
+.nn[data-vp] .nn-al-col .nn-bt{flex:none}
+.nn .nn-bt-ton{background:var(--tonal);color:var(--tonal-tinta)}
+.nn .nn-bt-qui{background:var(--sup2);color:var(--tinta)}
+.nn[data-vp="ih"] .nn-al-p .nn-bt,.nn[data-vp="esc"] .nn-al-p .nn-bt{height:38px;border-radius:10px;font-size:14px}
+.nn[data-vp] .nn-al-p .nn-bt::after{content:none}
+/* Hojas en Duo abierto y computadora: centradas en el área de contenido, en horizontal y en vertical */
+.nn[data-vp="ih"] .nn-hoja,.nn[data-vp="esc"] .nn-hoja{top:50%;transform:translateY(calc(-50% + 12px)) scale(.97)}
+.nn[data-vp="ih"] .nn-hoja.nn-act,.nn[data-vp="esc"] .nn-hoja.nn-act{transform:translateY(-50%)}
+.nn[data-vp="ih"] .nn-hoja{top:calc(50% - var(--ib) / 2);left:calc((100% - 218px - var(--ir)) / 2 - 220px);width:440px;max-height:calc(100% - var(--ib) - 48px)}
+.nn[data-vp="esc"] .nn-hoja{max-height:calc(100% - 96px)}
+.nn[data-vp="esc"] .nn-hoja.nn-alta{top:50%;max-height:calc(100% - 96px)}
+.nn[data-vp="esc"] .nn-menu,.nn[data-vp="esc"] .nn-menu.nn-act{transform:none}
+.nn[data-vp="esc"] .nn-menu{transform:scale(.94)}
+/* En Duo abierto el pie de una hoja no deja un rótulo sobre la bisagra (x 455–496): el principal ocupa el ancho y su texto queda centrado a la izquierda de ella */
+.nn[data-vp="ih"] .nn-hj-p .nn-flex{display:none}
+.nn[data-vp="ih"] .nn-hj-p .nn-prim{flex:1}
+@media (prefers-reduced-motion:reduce){
+  .nn[data-vp="ih"] .nn-hoja,.nn[data-vp="esc"] .nn-hoja,.nn[data-vp="ih"] .nn-hoja.nn-act,.nn[data-vp="esc"] .nn-hoja.nn-act{transform:translateY(-50%)}
+  .nn[data-vp="esc"] .nn-menu,.nn[data-vp="esc"] .nn-menu.nn-act{transform:none}
+}
+/* ---- §11 · Menú «···»: cada opción con su icono de color; la destructiva en rojo, separada por una línea ---- */
+.nn .nn-mr{gap:12px}
+.nn .nn-mr>svg{color:var(--enlace)}
+.nn .nn-mr:disabled>svg{color:var(--tinta3)}
+.nn .nn-mr.nn-mr-mal,.nn .nn-mr.nn-mr-mal>svg{color:var(--mal-tinta)}
+.nn[data-vp="esc"] .nn-menu .nn-mr.nn-mr-mal{position:relative;margin-top:9px}
+.nn[data-vp="esc"] .nn-menu .nn-mr.nn-mr-mal::before{content:"";position:absolute;left:4px;right:4px;top:-5px;height:1px;background:var(--linea)}
+
+/* Acciones de «Nota guardada»: la flecha solo existe en la versión de lista (Duo cerrado) */
+.nn .nn-ac>svg:last-child{display:none}
+/* Duo cerrado: tres botones en fila quedarían apretados (93 px cada uno para «Ver expediente»): lista de tres filas con icono de color y flecha */
+.nn[data-vp="ext"] .nn-acc{display:flex;flex-direction:column;gap:0;padding:0 12px;border-radius:14px;background:var(--sup)}
+.nn[data-vp="ext"] .nn-ac{width:100%;flex-direction:row;justify-content:flex-start;gap:12px;min-height:44px;padding:0;border-radius:0;background:none;color:var(--tinta);font-size:15px;line-height:20px}
+.nn[data-vp="ext"] .nn-ac+.nn-ac{box-shadow:inset 0 1px 0 var(--linea)}
+.nn[data-vp="ext"] .nn-ac>span{flex:1;min-width:0;text-align:left}
+.nn[data-vp="ext"] .nn-ac>svg:last-child{display:block;color:var(--tinta3)}
+.nn[data-vp="esc"] .nn-menu{width:312px}
+.nn[data-vp="esc"] .nn-menu .nn-mr{min-height:38px}

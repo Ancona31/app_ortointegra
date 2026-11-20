@@ -1,0 +1,717 @@
+<!-- NOMBRE: Nota de consulta | La nota se lee como un documento con jerarquía: diagnósticos destacados con su CIE-10, signos vitales rotulados, secciones con título de color y texto justificado; «Nota manual/IA» y «Nota sellada» vuelven como etiquetas de color con icono, «Imprimir» es un botón tonal con impresora y cada nota aclaratoria lleva su «Sellado» -->
+<style>
+/* ===== Nota de consulta (lectura de una nota sellada) · CALMA, segunda revisión (§11–16). Todos los selectores empiezan por .nc2 ===== */
+.nc2 .nc2-app{display:flex;width:100%;height:100%}
+.nc2[data-vp="tel"] .nc2-app{flex-direction:column}
+.nc2 button{border:0;margin:0;padding:0;background:none;color:inherit}
+.nc2 h1,.nc2 h2,.nc2 h3,.nc2 p,.nc2 ul,.nc2 ol,.nc2 dl,.nc2 dt,.nc2 dd{margin:0;padding:0}
+.nc2 ul,.nc2 ol{list-style:none}
+.nc2 textarea{display:block;margin:0;border:0;outline:0;color:inherit;font:inherit;resize:none;-webkit-appearance:none;appearance:none}
+.nc2 ::placeholder{color:var(--tinta3);opacity:1}
+.nc2 svg{flex:none}
+.nc2 [hidden]{display:none!important}
+.nc2 .nc2-flex{flex:1;min-width:0}
+.nc2 .nc2-num{font-variant-numeric:tabular-nums}
+.nc2 .nc2-nw{white-space:nowrap}
+.nc2 .nc2-p{transition:transform 100ms ease-out}
+.nc2 .nc2-p:active{transform:scale(.97)}
+.nc2 .nc2-p:focus-visible{outline:3px solid var(--enlace);outline-offset:2px}
+.nc2 .nc2-riel .nc2-p:focus-visible,.nc2 .nc2-lat .nc2-p:focus-visible,.nc2 .nc2-enc .nc2-p:focus-visible{outline-color:var(--nav-tinta)}
+/* Estados de maqueta */
+.nc2:not(.nc2-ia) .nc2-o-ia,.nc2.nc2-ia .nc2-o-man{display:none}
+.nc2:not(.nc2-nf-on) .nc2-nf,.nc2.nc2-nf-on .nc2-pag{display:none}
+
+/* ---- Navegación (copiada del dashboard: riel, encabezado fundido, barras laterales) ---- */
+.nc2 .nc2-riel{position:relative;z-index:1;flex:none;width:calc(56px + var(--ir));padding:16px calc(var(--ir) + 8px) calc(var(--ib) + 10px) 8px;background:var(--navy);border-radius:26px 0 0 26px;box-shadow:var(--sombra-nav-der);display:flex;flex-direction:column;align-items:center;gap:8px}
+.nc2 .nc2-rb{width:48px;height:48px;flex:none;border-radius:999px;display:flex;align-items:center;justify-content:center;color:var(--nav-tinta)}
+.nc2 .nc2-rb[aria-current="page"]{background:var(--accion);color:#fff}
+.nc2 .nc2-mas{width:52px;height:52px;flex:none;border-radius:999px;background:#fff;color:var(--accion);display:flex;align-items:center;justify-content:center;box-shadow:var(--sombra-accion)}
+.nc2 .nc2-enc{position:relative;z-index:1;flex:none;display:flex;align-items:center;gap:12px;padding:calc(var(--it) + 8px) 16px 12px;background:var(--navy);border-radius:0 0 26px 26px;box-shadow:var(--sombra-nav-sup);color:#fff}
+.nc2 .nc2-menu-b{width:44px;height:44px;flex:none;border-radius:12px;background:var(--nav-velo);color:#fff;display:flex;align-items:center;justify-content:center}
+.nc2 .nc2-enc-t{font-size:17px;line-height:22px;font-weight:700;color:#fff}
+.nc2 .nc2-av{display:flex;align-items:center;justify-content:center;flex:none;width:34px;height:34px;border-radius:999px;background:var(--nav-avatar);color:var(--navy);font-size:13px;font-weight:700}
+.nc2 .nc2-av.nc2-av-g{width:44px;height:44px}
+.nc2 .nc2-lat{position:relative;z-index:1;flex:none;display:flex;flex-direction:column;background:var(--navy);color:#fff}
+.nc2[data-vp="ih"] .nc2-lat,.nc2[data-vp="iv"] .nc2-lat{width:calc(218px + var(--ir));padding:16px calc(var(--ir) + 10px) calc(var(--ib) + 10px) 12px;border-radius:26px 0 0 26px;box-shadow:var(--sombra-nav-der)}
+.nc2[data-vp="esc"] .nc2-lat{width:248px;padding:16px 12px 14px;border-radius:0 26px 26px 0;box-shadow:var(--sombra-nav-izq)}
+.nc2 .nc2-lat-cab{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:36px;padding:0 4px 0 8px}
+.nc2 .nc2-logo{display:inline-flex;align-items:center;gap:8px;color:#fff}
+.nc2 .nc2-logo-n{font-size:17px;line-height:22px;font-weight:700;letter-spacing:-.2px}
+.nc2 .nc2-plan{display:inline-flex;align-items:center;height:24px;padding:0 10px;border-radius:999px;background:var(--nav-velo);color:var(--nav-tinta);font-size:12px;line-height:16px;font-weight:600;white-space:nowrap}
+.nc2 .nc2-cons-b{margin-top:12px;display:flex;align-items:center;gap:10px;min-height:52px;padding:8px 10px;border-radius:14px;background:var(--nav-velo);color:#fff;text-align:left}
+.nc2 .nc2-cons-b svg{color:var(--nav-tinta2)}
+.nc2 .nc2-cons-t{flex:1;min-width:0;display:flex;flex-direction:column}
+.nc2 .nc2-cons-t span{font-size:13px;line-height:16px;color:var(--nav-tinta2)}
+.nc2 .nc2-cons-t b{font-size:15px;line-height:19px;font-weight:600}
+.nc2 .nc2-lista{margin-top:14px;display:flex;flex-direction:column;gap:2px}
+.nc2 .nc2-li{display:flex;align-items:center;gap:12px;height:44px;padding:0 12px;border-radius:12px;color:var(--nav-tinta);font-size:15px;line-height:20px;font-weight:500}
+.nc2[data-vp="esc"] .nc2-li{height:40px;font-size:14px}
+.nc2 .nc2-li[aria-current="page"]{background:var(--accion);color:#fff;font-weight:600}
+.nc2 .nc2-lat-pie{border-top:1px solid var(--nav-velo);padding-top:8px}
+.nc2 .nc2-lat .nc2-yo{height:48px}
+.nc2 .nc2-yo>span{display:flex;flex-direction:column;line-height:17px}
+.nc2 .nc2-yo small{font-size:12px;line-height:16px;color:var(--nav-tinta2)}
+
+
+
+/* ---- Columna de contenido: una sola columna de lectura (centrada en computadora, CALMA §14) ---- */
+.nc2 .nc2-col{position:relative;flex:1;min-width:0;min-height:0;display:flex;flex-direction:column}
+.nc2 .nc2-cont{flex:1;min-height:0;overflow-x:hidden;overflow-y:auto;scrollbar-width:none;padding:0 16px calc(var(--ib) + 28px)}
+.nc2[data-vp="tel"] .nc2-cont{padding-top:6px}
+.nc2[data-vp="ih"] .nc2-cont,.nc2[data-vp="esc"] .nc2-cont,.nc2[data-vp="iv"] .nc2-cont{padding:14px 24px calc(var(--ib) + 40px)}
+.nc2[data-vp="esc"] .nc2-cont{scrollbar-width:thin;scrollbar-color:var(--borde) transparent}
+.nc2 .nc2-pag{max-width:700px;margin:0 auto}
+
+/* ---- Etiquetas con color suave e icono (CALMA §11) ---- */
+.nc2 .nc2-etq{display:inline-flex;align-items:center;gap:5px;height:24px;padding:0 9px 0 7px;border-radius:8px;background:var(--tonal);color:var(--tonal-tinta);font-size:12px;line-height:16px;font-weight:600;white-space:nowrap}
+.nc2 .nc2-etq-ok{background:var(--ok-fondo);color:var(--ok-tinta)}
+.nc2 .nc2-etq-s{height:22px;gap:4px;padding:0 8px 0 6px}
+
+/* ---- Botón tonal pequeño (Imprimir, Abrir PDF, Agregar nota aclaratoria) ---- */
+.nc2 .nc2-ton{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:6px;height:32px;padding:0 12px 0 10px;border-radius:10px;background:var(--tonal);color:var(--tonal-tinta);font-size:13px;line-height:18px;font-weight:600;white-space:nowrap}
+.nc2 .nc2-ton::after{content:"";position:absolute;inset:-6px 0}
+.nc2 .nc2-ton[aria-disabled="true"]{background:var(--sup2);color:var(--tinta2)}
+.nc2 .nc2-ton[aria-disabled="true"]:active{transform:none}
+.nc2 .nc2-imp-i{display:inline-flex}
+.nc2 .nc2-imp[data-est="gen"] .nc2-imp-i{display:none}
+.nc2 .nc2-giro{width:14px;height:14px;border-radius:999px;border:2px solid currentColor;border-right-color:transparent;animation:nc2-giro 800ms linear infinite}
+@keyframes nc2-giro{to{transform:rotate(360deg)}}
+
+/* ---- Cabecera: volver · Imprimir, título, fecha y etiquetas ---- */
+.nc2 .nc2-top-f{display:flex;align-items:center;gap:4px;min-height:44px;margin-left:-4px}
+.nc2 .nc2-volver{display:inline-flex;align-items:center;gap:2px;min-height:44px;padding-right:8px;font-size:13px;line-height:18px;font-weight:600;color:var(--enlace);white-space:nowrap}
+.nc2 .nc2-top h1{font-size:26px;line-height:31px;font-weight:800;letter-spacing:-.6px}
+.nc2 .nc2-sub{margin-top:2px;font-size:13px;line-height:18px;color:var(--tinta2)}
+.nc2 .nc2-etqs{margin-top:10px;display:flex;flex-wrap:wrap;gap:6px}
+.nc2 .nc2-err{margin-top:12px;padding:8px 12px;border-radius:8px;background:var(--mal-fondo);color:var(--mal-tinta);font-size:13px;line-height:18px;font-weight:600}
+
+/* ---- La nota: una única superficie con jerarquía (CALMA §12) ---- */
+.nc2 .nc2-nota{margin-top:16px;padding:20px 16px 20px;border-radius:16px;background:var(--sup)}
+.nc2 .nc2-dx{display:flex;flex-direction:column;gap:8px}
+.nc2 .nc2-dx li{font-size:17px;line-height:22px;font-weight:700;letter-spacing:-.2px}
+.nc2 .nc2-cod{display:inline-block;vertical-align:2px;margin-left:4px;padding:0 6px;border-radius:6px;background:var(--tonal);color:var(--tonal-tinta);font-size:12px;line-height:18px;font-weight:600;letter-spacing:0;font-variant-numeric:tabular-nums;white-space:nowrap}
+.nc2 .nc2-datos{margin-top:16px;padding:14px 0 16px;border-top:1px solid var(--linea);border-bottom:1px solid var(--linea)}
+.nc2 .nc2-rot{font-size:12px;line-height:16px;font-weight:600;letter-spacing:.3px;text-transform:uppercase;color:var(--tinta2)}
+.nc2 .nc2-pares{display:flex;flex-wrap:wrap;gap:12px 22px;margin-top:14px}
+.nc2 .nc2-vit{margin-top:8px;display:grid;grid-template-columns:repeat(3,auto);justify-content:start}
+.nc2 .nc2-pares div{display:flex;flex-direction:column;gap:1px}
+.nc2 .nc2-pares dt{font-size:12px;line-height:16px;color:var(--tinta2)}
+.nc2 .nc2-pares dd{font-size:15px;line-height:20px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+.nc2 .nc2-pares dd span{font-size:13px;font-weight:400;color:var(--tinta2)}
+.nc2 .nc2-sec{margin-top:24px}
+.nc2 .nc2-datos+.nc2-sec{margin-top:20px}
+.nc2 .nc2-sec-c{display:flex;flex-wrap:wrap;align-items:baseline;gap:0 8px}
+.nc2 .nc2-sec h3{font-size:13px;line-height:18px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--enlace)}
+.nc2 .nc2-sec-c span{font-size:13px;line-height:18px;color:var(--tinta2)}
+.nc2 .nc2-sec p{margin-top:6px;font-size:15px;line-height:22px;text-align:justify;-webkit-hyphens:auto;hyphens:auto;-webkit-hyphenate-limit-before:3;-webkit-hyphenate-limit-after:3;hyphenate-limit-chars:7 3 3}
+.nc2 .nc2-sec p+p{margin-top:10px}
+.nc2 .nc2-sec .nc2-st{margin-top:14px;font-size:13px;line-height:18px;font-weight:600;color:var(--tinta2);text-align:left}
+.nc2 .nc2-items{margin-top:6px}
+.nc2 .nc2-items li{display:flex;gap:8px;margin-top:4px;font-size:15px;line-height:22px}
+.nc2 .nc2-items li::before{content:"";flex:none;width:5px;height:5px;margin-top:9px;border-radius:999px;background:var(--enlace);opacity:.55}
+.nc2 .nc2-meds{margin-top:2px}
+.nc2 .nc2-meds li{display:flex;flex-direction:column;padding:8px 0}
+.nc2 .nc2-meds li+li{border-top:1px solid var(--linea)}
+.nc2 .nc2-meds b{font-size:15px;line-height:20px;font-weight:600}
+.nc2 .nc2-meds span{font-size:13px;line-height:18px;color:var(--tinta2)}
+.nc2 .nc2-firma{margin-top:24px;padding-top:16px;border-top:1px solid var(--linea);display:flex;flex-direction:column}
+.nc2 .nc2-firma b{font-size:15px;line-height:20px;font-weight:600}
+.nc2 .nc2-firma span{font-size:13px;line-height:18px;color:var(--tinta2)}
+
+/* ---- Notas aclaratorias: firmante, fecha, «Sellado» y texto justificado ---- */
+.nc2 .nc2-acl{margin-top:28px}
+.nc2 .nc2-acl-cab{display:flex;flex-wrap:wrap;align-items:center;gap:10px 12px}
+.nc2 .nc2-acl-cab h2{flex:1 0 auto;font-size:17px;line-height:22px;font-weight:700}
+.nc2 .nc2-cnt{margin-left:6px;font-size:15px;font-weight:400;color:var(--tinta2);font-variant-numeric:tabular-nums}
+.nc2 .nc2-seq{margin-top:12px;padding:0 16px;border-radius:16px;background:var(--sup)}
+.nc2 .nc2-ad{padding:16px 0}
+.nc2 .nc2-ad+.nc2-ad{border-top:1px solid var(--linea)}
+.nc2 .nc2-ad-c{display:flex;align-items:center;gap:8px}
+.nc2 .nc2-ad-m{flex:1;min-width:0;display:flex;flex-wrap:wrap;align-items:baseline;gap:0 8px;font-size:13px;line-height:18px;color:var(--tinta2)}
+.nc2 .nc2-ad-m b{font-weight:600;color:var(--tinta)}
+.nc2 .nc2-ad-t{margin-top:8px;font-size:15px;line-height:22px;white-space:pre-line;text-align:justify;-webkit-hyphens:auto;hyphens:auto;-webkit-hyphenate-limit-before:3;-webkit-hyphenate-limit-after:3;hyphenate-limit-chars:7 3 3}
+.nc2 .nc2-nueva{animation:nc2-entra 320ms cubic-bezier(.32,.72,0,1)}
+@keyframes nc2-entra{from{opacity:0;transform:translateY(8px)}}
+
+/* ---- Consulta no encontrada (hoy es solo ese texto) ---- */
+.nc2 .nc2-nf{padding:48px 0;text-align:center;font-size:15px;line-height:20px;color:var(--tinta2)}
+
+/* ---- Capa (CALMA §13): hoja en teléfono / modal centrado en el área de contenido; velo desenfocado ---- */
+.nc2 .nc2-capa{position:absolute;inset:0;z-index:20;pointer-events:none;overflow:hidden}
+.nc2 .nc2-capa.nc2-on{pointer-events:auto}
+.nc2 .nc2-velo{position:absolute;inset:0;background:var(--velo);-webkit-backdrop-filter:blur(10px) saturate(140%);backdrop-filter:blur(10px) saturate(140%);opacity:0;transition:opacity 320ms cubic-bezier(.32,.72,0,1)}
+.nc2 .nc2-on .nc2-velo{opacity:1}
+.nc2 .nc2-area{position:absolute;inset:var(--it) var(--ir) 0 0;display:flex;align-items:flex-end;justify-content:center;pointer-events:none}
+.nc2 .nc2-hoja{position:relative;width:100%;display:flex;flex-direction:column;padding:0 16px calc(var(--ib) + 12px);border-radius:22px 22px 0 0;background:var(--sup);box-shadow:var(--sombra-capa);visibility:hidden;transform:translateY(100%);transition:transform 320ms cubic-bezier(.32,.72,0,1),opacity 320ms cubic-bezier(.32,.72,0,1),visibility 0s linear 320ms}
+.nc2 .nc2-on .nc2-hoja{pointer-events:auto;visibility:visible;transform:none;transition-delay:0s}
+.nc2 .nc2-asa{display:block;flex:none;width:36px;height:5px;border-radius:999px;background:var(--borde);margin:8px auto 0}
+.nc2 .nc2-hoja h2{margin-top:14px;font-size:17px;line-height:22px;font-weight:700}
+.nc2 .nc2-aviso{margin-top:6px;font-size:14px;line-height:20px;color:var(--tinta2);text-align:justify;-webkit-hyphens:auto;hyphens:auto;-webkit-hyphenate-limit-before:3;-webkit-hyphenate-limit-after:3;hyphenate-limit-chars:7 3 3}
+.nc2 .nc2-ta{width:100%;height:120px;margin-top:14px;padding:12px;border-radius:12px;background:var(--sup2);font-size:16px;line-height:24px}
+.nc2 .nc2-ta:focus-visible{outline:2px solid var(--enlace)}
+.nc2 .nc2-ferr{margin-top:8px;font-size:13px;line-height:18px;font-weight:600;color:var(--mal-tinta)}
+.nc2 .nc2-acc{display:flex;align-items:center;gap:10px;margin-top:14px}
+.nc2 .nc2-bot{flex:1 1 0;display:inline-flex;align-items:center;justify-content:center;gap:8px;height:44px;padding:0 16px;border-radius:12px;font-size:15px;line-height:20px;font-weight:600;white-space:nowrap}
+.nc2 .nc2-quieto{background:var(--sup2);color:var(--tinta)}
+.nc2 .nc2-prim{background:var(--accion);color:#fff}
+.nc2 .nc2-prim[aria-disabled="true"]{opacity:.6}
+.nc2 .nc2-prim[aria-disabled="true"]:active{transform:none}
+
+/* ---- Duo abierto y computadora ---- */
+.nc2[data-vp="ih"] .nc2-top-f,.nc2[data-vp="esc"] .nc2-top-f,.nc2[data-vp="ih"] .nc2-volver,.nc2[data-vp="esc"] .nc2-volver,.nc2[data-vp="iv"] .nc2-top-f,.nc2[data-vp="iv"] .nc2-volver{min-height:36px}
+.nc2[data-vp="ih"] .nc2-ton::after,.nc2[data-vp="esc"] .nc2-ton::after,.nc2[data-vp="iv"] .nc2-ton::after{inset:-2px 0}
+.nc2[data-vp="ih"] .nc2-top h1,.nc2[data-vp="esc"] .nc2-top h1,.nc2[data-vp="iv"] .nc2-top h1{margin-top:4px;font-size:32px;line-height:38px}
+.nc2[data-vp="ih"] .nc2-nota,.nc2[data-vp="iv"] .nc2-nota{margin-top:20px;padding:24px 24px;border-radius:18px}
+.nc2[data-vp="esc"] .nc2-nota{margin-top:20px;padding:28px 32px;border-radius:20px}
+.nc2[data-vp="ih"] .nc2-pares,.nc2[data-vp="esc"] .nc2-pares,.nc2[data-vp="iv"] .nc2-pares{display:flex;gap:12px 32px}
+.nc2[data-vp="ih"] .nc2-datos,.nc2[data-vp="esc"] .nc2-datos,.nc2[data-vp="iv"] .nc2-datos{padding:16px 0 18px}
+.nc2[data-vp="esc"] .nc2-datos{display:grid;grid-template-columns:auto 1fr;gap:8px 48px;align-items:start}
+.nc2[data-vp="esc"] .nc2-rot{grid-column:1/-1}
+.nc2[data-vp="esc"] .nc2-datos .nc2-pares{margin-top:0}
+.nc2[data-vp="ih"] .nc2-sec,.nc2[data-vp="esc"] .nc2-sec,.nc2[data-vp="iv"] .nc2-sec{margin-top:26px}
+.nc2[data-vp="ih"] .nc2-datos+.nc2-sec,.nc2[data-vp="esc"] .nc2-datos+.nc2-sec,.nc2[data-vp="iv"] .nc2-datos+.nc2-sec{margin-top:22px}
+.nc2[data-vp="ih"] .nc2-firma,.nc2[data-vp="esc"] .nc2-firma,.nc2[data-vp="iv"] .nc2-firma{margin-top:28px}
+.nc2[data-vp="ih"] .nc2-acl,.nc2[data-vp="esc"] .nc2-acl,.nc2[data-vp="iv"] .nc2-acl{margin-top:32px}
+.nc2[data-vp="ih"] .nc2-acl-cab h2,.nc2[data-vp="esc"] .nc2-acl-cab h2,.nc2[data-vp="iv"] .nc2-acl-cab h2{font-size:20px;line-height:25px}
+.nc2[data-vp="ih"] .nc2-seq,.nc2[data-vp="iv"] .nc2-seq{padding:0 24px;border-radius:18px}
+.nc2[data-vp="esc"] .nc2-seq{padding:4px 32px;border-radius:20px}
+.nc2[data-vp="ih"] .nc2-area,.nc2[data-vp="iv"] .nc2-area{right:calc(218px + var(--ir));bottom:var(--ib);align-items:center}
+.nc2[data-vp="esc"] .nc2-area{left:248px;align-items:center}
+.nc2[data-vp="ih"] .nc2-hoja,.nc2[data-vp="esc"] .nc2-hoja,.nc2[data-vp="iv"] .nc2-hoja{border-radius:20px;padding:8px 24px 24px;opacity:0;transform:translateY(12px) scale(.97)}
+.nc2[data-vp="ih"] .nc2-on .nc2-hoja,.nc2[data-vp="esc"] .nc2-on .nc2-hoja,.nc2[data-vp="iv"] .nc2-on .nc2-hoja{opacity:1;transform:none}
+.nc2[data-vp="ih"] .nc2-hoja,.nc2[data-vp="iv"] .nc2-hoja{width:420px}
+.nc2[data-vp="esc"] .nc2-hoja{width:480px}
+.nc2[data-vp="ih"] .nc2-asa,.nc2[data-vp="esc"] .nc2-asa,.nc2[data-vp="iv"] .nc2-asa{display:none}
+.nc2[data-vp="ih"] .nc2-acc,.nc2[data-vp="esc"] .nc2-acc,.nc2[data-vp="iv"] .nc2-acc{justify-content:flex-end;margin-top:16px}
+.nc2[data-vp="ih"] .nc2-bot,.nc2[data-vp="esc"] .nc2-bot,.nc2[data-vp="iv"] .nc2-bot{flex:none;height:38px;min-width:104px;padding:0 18px;border-radius:10px;font-size:14px}
+.nc2[data-vp="ih"] .nc2-guarda,.nc2[data-vp="esc"] .nc2-guarda,.nc2[data-vp="iv"] .nc2-guarda{min-width:160px}
+/* Duo abierto: el modal cruza la bisagra (preferencia del dueño), pero sus dos botones se centran a la izquierda de x 455 */
+.nc2[data-vp="ih"] .nc2-acc,.nc2[data-vp="iv"] .nc2-acc{justify-content:center}
+.nc2[data-vp="ih"] .nc2-bot,.nc2[data-vp="iv"] .nc2-bot{min-width:92px;padding:0 14px}
+.nc2[data-vp="ih"] .nc2-guarda,.nc2[data-vp="iv"] .nc2-guarda{min-width:148px}
+.nc2[data-vp="esc"] .nc2-ta{font-size:15px;line-height:22px}
+
+/* ---- Tira de controles de la maqueta (vive fuera del marco) ---- */
+.nc2-tira{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:10px;font:600 12px/16px var(--fuente);color:var(--tinta2)}
+.nc2-tira span{margin-right:2px;letter-spacing:.3px;text-transform:uppercase}
+.nc2-tira button{height:28px;padding:0 10px;border:1px dashed var(--tinta3);border-radius:999px;background:transparent;color:var(--tinta2);font:inherit;cursor:pointer}
+.nc2-tira button:hover{color:var(--tinta);border-color:var(--tinta2)}
+.nc2-tira button[aria-pressed="true"]{border-style:solid;border-color:var(--enlace);color:var(--enlace)}
+.nc2-tira button:focus-visible{outline:3px solid var(--enlace);outline-offset:2px}
+
+@media (prefers-reduced-transparency:reduce){.nc2 .nc2-velo{-webkit-backdrop-filter:none;backdrop-filter:none;background:rgba(8,14,26,.72)}}
+/* Movimiento reducido: fundido corto en lugar de deslizar; sin giro */
+@media (prefers-reduced-motion:reduce){
+  .nc2 .nc2-hoja,.nc2 .nc2-on .nc2-hoja{transform:none!important;opacity:0;transition:opacity 200ms ease,visibility 0s linear 200ms}
+  .nc2 .nc2-on .nc2-hoja{opacity:1!important;transition-delay:0s}
+  .nc2 .nc2-velo{transition:opacity 200ms ease}
+  .nc2 .nc2-p{transition:none}
+  .nc2 .nc2-giro,.nc2 .nc2-nueva{animation:none}
+}
+
+/* ================= TERCERA REVISIÓN DEL DUEÑO (CALMA §17–22): unificación =================
+   Las reglas de ih se extienden a iv en la misma regla al generar (tools/tmp-u4-iv.py). Aquí, solo lo que cambia. */
+
+/* ---- §19 · Duo abierto vertical: encabezado fundido con pista de secciones (maqueta de referencia del dueño) ---- */
+.nc2[data-vp="iv"] .nc2-app{flex-direction:column}
+.nc2 .nc2-fun{position:relative;z-index:1;flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:calc(var(--it) + 0px) 16px 14px;background:var(--navy);border-radius:0 0 26px 26px;box-shadow:var(--sombra-nav-sup)}
+.nc2 .nc2-fun-b{width:44px;height:44px;flex:none;border-radius:22px;background:var(--nav-velo);color:#fff;display:flex;align-items:center;justify-content:center}
+.nc2 .nc2-pista{display:flex;align-items:center;gap:2px;padding:4px;border-radius:26px;background:var(--nav-velo)}
+.nc2 .nc2-pl{position:relative;display:flex;align-items:center;height:40px;padding:0 14px;border-radius:20px;color:var(--nav-tinta);font-size:15px;line-height:20px;font-weight:500;white-space:nowrap}
+.nc2 .nc2-pl::after{content:"";position:absolute;inset:-2px 0}
+.nc2 .nc2-pl[aria-current="page"]{padding:0 16px;background:var(--accion);color:#fff;font-weight:600}
+.nc2 .nc2-fun .nc2-p:focus-visible{outline-color:var(--nav-tinta)}
+/* Contenido: margen 24 (621 útiles) y columna de lectura de 600 centrada */
+.nc2[data-vp="iv"] .nc2-cont{padding-top:22px}
+.nc2[data-vp="iv"] .nc2-pag{max-width:600px}
+/* Táctil: áreas ≥ 44 (gana a las reglas de ih copiadas, por especificidad) */
+.nc2.marco[data-vp="iv"] .nc2-top-f,.nc2.marco[data-vp="iv"] .nc2-volver{min-height:44px}
+.nc2.marco[data-vp="iv"] .nc2-ton::after{inset:-6px 0}
+.nc2.marco[data-vp="iv"] .nc2-bot{height:44px;font-size:15px}
+
+/* ---- §18 · Duo abierto: el modal usa el ancho y la disposición de computadora, sin maniobras por la bisagra ---- */
+.nc2[data-vp="ih"] .nc2-hoja,.nc2[data-vp="iv"] .nc2-hoja{width:480px}
+.nc2[data-vp="ih"] .nc2-acc,.nc2[data-vp="iv"] .nc2-acc{justify-content:flex-end}
+.nc2[data-vp="ih"] .nc2-bot,.nc2[data-vp="iv"] .nc2-bot{min-width:104px;padding:0 18px}
+.nc2[data-vp="ih"] .nc2-guarda,.nc2[data-vp="iv"] .nc2-guarda{min-width:160px}
+/* iv: modal centrado en el marco (entre la barra de estado y el indicador) */
+.nc2[data-vp="iv"] .nc2-area{top:var(--it);right:0;bottom:var(--ib)}
+
+/* (§23.14: el velo oscuro ya viene de base.css, rgba(0,0,0,.35); se retiró el aclarado propio) */
+
+/* ================= CUARTA PASADA (CALMA §23) ================= */
+/* §23.8 · Regreso con el nombre del paciente: si no cabe, puntos suspensivos; «Imprimir» nunca se desplaza ni se tapa */
+.nc2 .nc2-top-f .nc2-volver{flex:0 1 auto;min-width:0;overflow:hidden}
+.nc2 .nc2-volver svg{flex:none}
+.nc2 .nc2-volver-t{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nc2 .nc2-top-f>.nc2-flex{flex:1 1 0;min-width:4px}
+.nc2 .nc2-top-f>.nc2-ton{flex:none}
+</style>
+<div class="marco nc2" data-vp="ext">
+<div class="nc2-app">
+<div class="nc2-col"><main class="nc2-cont">
+<div class="nc2-pag">
+  <!-- F1 · Volver al expediente (la flecha lleva el nombre del paciente), título y fecha.
+     F2 · Etiquetas bajo el título, con color suave e icono (CALMA §11): origen «Nota manual» (lápiz) o «Nota IA» (destello) en tonal; «Nota sellada» (candado) en verde suave.
+     F3 · «Imprimir» es un botón tonal pequeño con impresora: «Imprimir» → «Generando...» (con giro) → se sustituye por el enlace «Abrir PDF» (ojo; en la app, <a href=blob:> que abre el visor). -->
+  <header class="nc2-top">
+    <div class="nc2-top-f">
+      <a href="#" class="nc2-p nc2-volver" aria-label="Volver al expediente de Paciente Prueba 01"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"/></svg><span class="nc2-volver-t">Paciente Prueba 01</span></a>
+      <span class="nc2-flex"></span>
+      <button type="button" class="nc2-p nc2-ton nc2-imp" data-est="listo" aria-disabled="false"><span class="nc2-imp-i"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M7 9V3.5h10V9"/><rect x="3.5" y="9" width="17" height="8" rx="2"/><path d="M7 14.5h10v6H7z"/></svg></span><span class="nc2-giro" aria-hidden="true" hidden></span><span class="nc2-imp-t" aria-live="polite">Imprimir</span></button>
+      <a href="#" class="nc2-p nc2-ton nc2-pdf" hidden><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></svg>Abrir PDF</a>
+    </div>
+    <h1>Nota de Consulta</h1>
+    <p class="nc2-sub nc2-num">17 de noviembre de 2026</p>
+    <p class="nc2-etqs"><span class="nc2-etq nc2-o-man"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19.5 8.5a2.1 2.1 0 0 0-3-3L5 17z"/><path d="m14.5 7.5 3 3"/></svg>Nota manual</span><span class="nc2-etq nc2-o-ia"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 3.5 12.8 9a2 2 0 0 0 1.3 1.3l5.4 1.7-5.4 1.8a2 2 0 0 0-1.3 1.3L11 20.5l-1.8-5.4a2 2 0 0 0-1.3-1.3L2.5 12l5.4-1.7A2 2 0 0 0 9.2 9z"/><path d="M19 3v4M17 5h4"/></svg>Nota IA</span><span class="nc2-etq nc2-etq-ok"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9.5" rx="2.2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Nota sellada</span></p>
+  </header>
+  <!-- F7 · Banner de error (el mismo texto de hoy). Se limpia al volver a pulsar «Imprimir». -->
+  <p class="nc2-err" role="alert" hidden>No se pudo generar el PDF. Intenta de nuevo.</p>
+  <!-- F4 · Cuerpo de la nota (el contenido de CuerpoNota), con jerarquía (CALMA §12): diagnósticos 17/700 con su CIE-10 en etiqueta tonal; signos vitales, próxima cita y consultorio
+       como pares rótulo/valor (rótulos de hoy: TA, FC, FR, Temp., SpO₂, «Próxima cita», «Atendido en»); secciones con título de color y el subtítulo que hoy da SUBTITULO_SECCION;
+       cuerpo justificado con partición silábica (lang="es"); medicamentos como lista; bloque del médico. No hay «editar» ni «borrar»: la nota está sellada. -->
+  <article class="nc2-nota" lang="es" aria-label="Nota de consulta, sellada">
+    <ul class="nc2-dx" aria-label="Diagnósticos">
+      <li><span>Lumbago no especificado</span> <span class="nc2-cod">M54.5</span></li>
+      <li><span>Otros trastornos especificados de los músculos</span> <span class="nc2-cod">M62.8</span></li>
+    </ul>
+    <div class="nc2-datos">
+      <p class="nc2-rot">Signos vitales</p>
+      <dl class="nc2-pares nc2-vit"><div><dt>TA</dt><dd>120/80 <span>mmHg</span></dd></div><div><dt>FC</dt><dd>72 <span>lpm</span></dd></div><div><dt>FR</dt><dd>16 <span>rpm</span></dd></div><div><dt>Temp.</dt><dd>36.5 <span>°C</span></dd></div><div><dt>SpO₂</dt><dd>98 <span>%</span></dd></div></dl>
+      <dl class="nc2-pares"><div><dt>Próxima cita</dt><dd>en 15 días</dd></div><div><dt>Atendido en</dt><dd>Centro</dd></div></dl>
+    </div>
+    <section class="nc2-sec"><div class="nc2-sec-c"><h3>Subjetivo</h3><span>Motivo y síntomas</span></div><p>Dolor lumbar de una semana de evolución, de inicio posterior a esfuerzo al cargar peso. Sin irradiación a miembros inferiores. Mejora parcialmente con el reposo.</p></section>
+    <section class="nc2-sec"><div class="nc2-sec-c"><h3>Objetivo</h3><span>Exploración física</span></div><p>Marcha conservada. Contractura paravertebral lumbar bilateral, dolorosa a la palpación. Arcos de movilidad limitados por dolor en flexión.</p><p>Fuerza y sensibilidad conservadas en miembros inferiores. Reflejos osteotendinosos normales. Lasègue negativo derecho.</p></section>
+    <section class="nc2-sec"><div class="nc2-sec-c"><h3>Auxiliares diagnósticos</h3><span>Estudios</span></div><p>No se solicitaron.</p></section>
+    <section class="nc2-sec"><div class="nc2-sec-c"><h3>Análisis</h3><span>Impresión dx</span></div><p>Cuadro de características mecánicas, sin datos de compromiso neurológico. Contractura muscular paravertebral asociada.</p></section>
+    <section class="nc2-sec"><div class="nc2-sec-c"><h3>Diagnóstico</h3></div><p>Lumbago mecánico agudo.</p></section>
+    <section class="nc2-sec"><div class="nc2-sec-c"><h3>Plan</h3><span>Tratamiento</span></div><ul class="nc2-items"><li>Reposo relativo por 3 días; evitar cargar peso.</li><li>Calor local 15 minutos, tres veces al día.</li><li>Ejercicios de estiramiento lumbar al ceder el dolor.</li></ul><p class="nc2-st">Farmacológico:</p><ul class="nc2-meds"><li><b>Paracetamol 500 mg</b><span>1 tableta cada 8 horas por 5 días.</span></li><li><b>Naproxeno 250 mg</b><span>1 tableta cada 12 horas por 5 días, con alimentos.</span></li><li><b>Metocarbamol 500 mg</b><span>1 tableta cada 8 horas por 5 días.</span></li></ul></section>
+    <section class="nc2-sec"><div class="nc2-sec-c"><h3>Pronóstico</h3><span>Evolución esperada</span></div><p>Bueno para la vida y la función.</p></section>
+    <footer class="nc2-firma">
+      <b>Dr. Admin Semilla</b>
+      <span>Traumatología y Ortopedia</span>
+      <span class="nc2-num">Cédula Prof. 00000001</span>
+    </footer>
+  </article>
+  <!-- F5 · Notas aclaratorias ya guardadas: firmante y fecha (dd/MM/yyyy HH:mm, como hoy), la etiqueta «Sellado» de hoy (ahora verde suave con candado) y el texto justificado; orden cronológico ascendente.
+       F6 · «Agregar nota aclaratoria (addendum)» (rótulo de hoy) como botón tonal pequeño junto al título; abre la hoja / el modal.
+       Sin aclaratorias, hoy no se pinta el título: quedaría solo el botón. -->
+  <section class="nc2-acl" aria-label="Notas aclaratorias">
+    <div class="nc2-acl-cab"><h2>Notas aclaratorias<span class="nc2-cnt">1</span></h2><button type="button" class="nc2-p nc2-ton nc2-abre"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>Agregar nota aclaratoria (addendum)</button></div>
+    <ol class="nc2-seq" lang="es">
+      <li class="nc2-ad"><div class="nc2-ad-c"><p class="nc2-ad-m"><b>Dr. Admin Semilla</b><span class="nc2-num">18/11/2026 09:14</span></p><span class="nc2-etq nc2-etq-ok nc2-etq-s"><svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9.5" rx="2.2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Sellado</span></div><p class="nc2-ad-t">En la exploración física debe decir «Lasègue negativo bilateral». El resto de la nota no cambia y se mantiene el plan de tratamiento indicado en la consulta.</p></li>
+    </ol>
+  </section>
+</div>
+  <!-- F7 · «Consulta no encontrada»: hoy es solo ese texto, sin cabecera ni salida. «Cargando...» es un estado de sistema (el mismo texto centrado); no se dibuja. -->
+  <p class="nc2-nf">Consulta no encontrada</p>
+</main></div>
+<nav class="nc2-riel" aria-label="Navegación principal"><a href="#" class="nc2-p nc2-rb" aria-label="Inicio"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg></a><a href="#" class="nc2-p nc2-rb" aria-label="Expediente" aria-current="page"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.9.7 3.1 2.4 3.5 5.2"/></svg></a><a href="#" class="nc2-p nc2-rb" aria-label="Agenda"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg></a><a href="#" class="nc2-p nc2-rb" aria-label="Documentos"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg></a><a href="#" class="nc2-p nc2-rb" aria-label="Más"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 12h.01M12 12h.01M18 12h.01"/></svg></a><span class="nc2-flex"></span><button type="button" class="nc2-p nc2-mas" aria-label="Nueva consulta"><svg aria-hidden="true" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg></button></nav>
+</div>
+<!-- F6 · Nueva nota aclaratoria (CALMA §13): hoja desde abajo en teléfono; en Duo abierto y computadora, modal CENTRADO en el área de contenido. Velo desenfocado, uno solo.
+     Dos botones de verdad: «Cancelar» (quieto) y «Guardar addendum» (relleno). Textos de hoy.
+     Animación de maqueta: transform/opacity, 320 ms cubic-bezier(.32,.72,0,1), mismo camino al entrar y al salir; en la app será un resorte
+     (amortiguación 1.0, respuesta ~0.3), interrumpible y arrastrable desde el asa. -->
+<div class="nc2-capa" aria-hidden="true">
+  <div class="nc2-velo"></div>
+  <div class="nc2-area">
+  <form class="nc2-hoja" role="dialog" aria-modal="true" aria-label="Nueva nota aclaratoria" novalidate>
+    <span class="nc2-asa" aria-hidden="true"></span>
+    <h2>Nueva nota aclaratoria</h2>
+    <p class="nc2-aviso" lang="es">Este addendum se adjuntará a la nota original y no podrá modificarse una vez guardado.</p>
+    <textarea class="nc2-ta" aria-label="Nueva nota aclaratoria" placeholder="Escriba la aclaración, corrección o nota adicional..."></textarea>
+    <p class="nc2-ferr" role="alert" hidden>El addendum no puede estar vacío</p>
+    <div class="nc2-acc">
+      <button type="button" class="nc2-p nc2-bot nc2-quieto nc2-cierra">Cancelar</button>
+      <button type="submit" class="nc2-p nc2-bot nc2-prim nc2-guarda" aria-disabled="false">Guardar addendum</button>
+    </div>
+  </form>
+  </div>
+</div>
+</div>
+<div class="marco nc2" data-vp="tel">
+<div class="nc2-app">
+<header class="nc2-enc"><button type="button" class="nc2-p nc2-menu-b" aria-label="Menú"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button><span class="nc2-enc-t">Expediente</span><span class="nc2-flex"></span><button type="button" class="nc2-p nc2-av nc2-av-g" aria-label="Mi perfil">AS</button></header>
+<div class="nc2-col"><main class="nc2-cont">
+<div class="nc2-pag">
+  <!-- F1 · Volver al expediente (la flecha lleva el nombre del paciente), título y fecha.
+     F2 · Etiquetas bajo el título, con color suave e icono (CALMA §11): origen «Nota manual» (lápiz) o «Nota IA» (destello) en tonal; «Nota sellada» (candado) en verde suave.
+     F3 · «Imprimir» es un botón tonal pequeño con impresora: «Imprimir» → «Generando...» (con giro) → se sustituye por el enlace «Abrir PDF» (ojo; en la app, <a href=blob:> que abre el visor). -->
+  <header class="nc2-top">
+    <div class="nc2-top-f">
+      <a href="#" class="nc2-p nc2-volver" aria-label="Volver al expediente de Paciente Prueba 01"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"/></svg><span class="nc2-volver-t">Paciente Prueba 01</span></a>
+      <span class="nc2-flex"></span>
+      <button type="button" class="nc2-p nc2-ton nc2-imp" data-est="listo" aria-disabled="false"><span class="nc2-imp-i"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M7 9V3.5h10V9"/><rect x="3.5" y="9" width="17" height="8" rx="2"/><path d="M7 14.5h10v6H7z"/></svg></span><span class="nc2-giro" aria-hidden="true" hidden></span><span class="nc2-imp-t" aria-live="polite">Imprimir</span></button>
+      <a href="#" class="nc2-p nc2-ton nc2-pdf" hidden><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></svg>Abrir PDF</a>
+    </div>
+    <h1>Nota de Consulta</h1>
+    <p class="nc2-sub nc2-num">17 de noviembre de 2026</p>
+    <p class="nc2-etqs"><span class="nc2-etq nc2-o-man"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19.5 8.5a2.1 2.1 0 0 0-3-3L5 17z"/><path d="m14.5 7.5 3 3"/></svg>Nota manual</span><span class="nc2-etq nc2-o-ia"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 3.5 12.8 9a2 2 0 0 0 1.3 1.3l5.4 1.7-5.4 1.8a2 2 0 0 0-1.3 1.3L11 20.5l-1.8-5.4a2 2 0 0 0-1.3-1.3L2.5 12l5.4-1.7A2 2 0 0 0 9.2 9z"/><path d="M19 3v4M17 5h4"/></svg>Nota IA</span><span class="nc2-etq nc2-etq-ok"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9.5" rx="2.2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Nota sellada</span></p>
+  </header>
+  <!-- F7 · Banner de error (el mismo texto de hoy). Se limpia al volver a pulsar «Imprimir». -->
+  <p class="nc2-err" role="alert" hidden>No se pudo generar el PDF. Intenta de nuevo.</p>
+  <!-- F4 · Cuerpo de la nota (el contenido de CuerpoNota), con jerarquía (CALMA §12): diagnósticos 17/700 con su CIE-10 en etiqueta tonal; signos vitales, próxima cita y consultorio
+       como pares rótulo/valor (rótulos de hoy: TA, FC, FR, Temp., SpO₂, «Próxima cita», «Atendido en»); secciones con título de color y el subtítulo que hoy da SUBTITULO_SECCION;
+       cuerpo justificado con partición silábica (lang="es"); medicamentos como lista; bloque del médico. No hay «editar» ni «borrar»: la nota está sellada. -->
+  <article class="nc2-nota" lang="es" aria-label="Nota de consulta, sellada">
+    <ul class="nc2-dx" aria-label="Diagnósticos">
+      <li><span>Lumbago no especificado</span> <span class="nc2-cod">M54.5</span></li>
+      <li><span>Otros trastornos especificados de los músculos</span> <span class="nc2-cod">M62.8</span></li>
+    </ul>
+    <div class="nc2-datos">
+      <p class="nc2-rot">Signos vitales</p>
+      <dl class="nc2-pares nc2-vit"><div><dt>TA</dt><dd>120/80 <span>mmHg</span></dd></div><div><dt>FC</dt><dd>72 <span>lpm</span></dd></div><div><dt>FR</dt><dd>16 <span>rpm</span></dd></div><div><dt>Temp.</dt><dd>36.5 <span>°C</span></dd></div><div><dt>SpO₂</dt><dd>98 <span>%</span></dd></div></dl>
+      <dl class="nc2-pares"><div><dt>Próxima cita</dt><dd>en 15 días</dd></div><div><dt>Atendido en</dt><dd>Centro</dd></div></dl>
+    </div>
+    <section class="nc2-sec"><div class="nc2-sec-c"><h3>Subjetivo</h3><span>Motivo y síntomas</span></div><p>Dolor lumbar de una semana de evolución, de inicio posterior a esfuerzo al cargar peso. Sin irradiación a miembros inferiores. Mejora parcialmente con el reposo.</p></section>
+    <section class="nc2-sec"><div class="nc2-sec-c"><h3>Objetivo</h3><span>Exploración física</span></div><p>Marcha conservada. Contractura paravertebral lumbar bilateral, dolorosa a la palpación. Arcos de movilidad limitados por dolor en flexión.</p><p>Fuerza y sensibilidad conservadas en miembros inferiores. Reflejos osteotendinosos normales. Lasègue negativo derecho.</p></section>
+    <section class="nc2-sec"><div class="nc2-sec-c"><h3>Auxiliares diagnósticos</h3><span>Estudios</span></div><p>No se solicitaron.</p></section>
+    <section class="nc2-sec"><div class="nc2-sec-c"><h3>Análisis</h3><span>Impresión dx</span></div><p>Cuadro de características mecánicas, sin datos de compromiso neurológico. Contractura muscular paravertebral asociada.</p></section>
+    <section class="nc2-sec"><div class="nc2-sec-c"><h3>Diagnóstico</h3></div><p>Lumbago mecánico agudo.</p></section>
+    <section class="nc2-sec"><div class="nc2-sec-c"><h3>Plan</h3><span>Tratamiento</span></div><ul class="nc2-items"><li>Reposo relativo por 3 días; evitar cargar peso.</li><li>Calor local 15 minutos, tres veces al día.</li><li>Ejercicios de estiramiento lumbar al ceder el dolor.</li></ul><p class="nc2-st">Farmacológico:</p><ul class="nc2-meds"><li><b>Paracetamol 500 mg</b><span>1 tableta cada 8 horas por 5 días.</span></li><li><b>Naproxeno 250 mg</b><span>1 tableta cada 12 horas por 5 días, con alimentos.</span></li><li><b>Metocarbamol 500 mg</b><span>1 tableta cada 8 horas por 5 días.</span></li></ul></section>
+    <section class="nc2-sec"><div class="nc2-sec-c"><h3>Pronóstico</h3><span>Evolución esperada</span></div><p>Bueno para la vida y la función.</p></section>
+    <footer class="nc2-firma">
+      <b>Dr. Admin Semilla</b>
+      <span>Traumatología y Ortopedia</span>
+      <span class="nc2-num">Cédula Prof. 00000001</span>
+    </footer>
+  </article>
+  <!-- F5 · Notas aclaratorias ya guardadas: firmante y fecha (dd/MM/yyyy HH:mm, como hoy), la etiqueta «Sellado» de hoy (ahora verde suave con candado) y el texto justificado; orden cronológico ascendente.
+       F6 · «Agregar nota aclaratoria (addendum)» (rótulo de hoy) como botón tonal pequeño junto al título; abre la hoja / el modal.
+       Sin aclaratorias, hoy no se pinta el título: quedaría solo el botón. -->
+  <section class="nc2-acl" aria-label="Notas aclaratorias">
+    <div class="nc2-acl-cab"><h2>Notas aclaratorias<span class="nc2-cnt">1</span></h2><button type="button" class="nc2-p nc2-ton nc2-abre"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>Agregar nota aclaratoria (addendum)</button></div>
+    <ol class="nc2-seq" lang="es">
+      <li class="nc2-ad"><div class="nc2-ad-c"><p class="nc2-ad-m"><b>Dr. Admin Semilla</b><span class="nc2-num">18/11/2026 09:14</span></p><span class="nc2-etq nc2-etq-ok nc2-etq-s"><svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9.5" rx="2.2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Sellado</span></div><p class="nc2-ad-t">En la exploración física debe decir «Lasègue negativo bilateral». El resto de la nota no cambia y se mantiene el plan de tratamiento indicado en la consulta.</p></li>
+    </ol>
+  </section>
+</div>
+  <!-- F7 · «Consulta no encontrada»: hoy es solo ese texto, sin cabecera ni salida. «Cargando...» es un estado de sistema (el mismo texto centrado); no se dibuja. -->
+  <p class="nc2-nf">Consulta no encontrada</p>
+</main></div>
+</div>
+<!-- F6 · Nueva nota aclaratoria (CALMA §13): hoja desde abajo en teléfono; en Duo abierto y computadora, modal CENTRADO en el área de contenido. Velo desenfocado, uno solo.
+     Dos botones de verdad: «Cancelar» (quieto) y «Guardar addendum» (relleno). Textos de hoy.
+     Animación de maqueta: transform/opacity, 320 ms cubic-bezier(.32,.72,0,1), mismo camino al entrar y al salir; en la app será un resorte
+     (amortiguación 1.0, respuesta ~0.3), interrumpible y arrastrable desde el asa. -->
+<div class="nc2-capa" aria-hidden="true">
+  <div class="nc2-velo"></div>
+  <div class="nc2-area">
+  <form class="nc2-hoja" role="dialog" aria-modal="true" aria-label="Nueva nota aclaratoria" novalidate>
+    <span class="nc2-asa" aria-hidden="true"></span>
+    <h2>Nueva nota aclaratoria</h2>
+    <p class="nc2-aviso" lang="es">Este addendum se adjuntará a la nota original y no podrá modificarse una vez guardado.</p>
+    <textarea class="nc2-ta" aria-label="Nueva nota aclaratoria" placeholder="Escriba la aclaración, corrección o nota adicional..."></textarea>
+    <p class="nc2-ferr" role="alert" hidden>El addendum no puede estar vacío</p>
+    <div class="nc2-acc">
+      <button type="button" class="nc2-p nc2-bot nc2-quieto nc2-cierra">Cancelar</button>
+      <button type="submit" class="nc2-p nc2-bot nc2-prim nc2-guarda" aria-disabled="false">Guardar addendum</button>
+    </div>
+  </form>
+  </div>
+</div>
+</div>
+<div class="marco nc2" data-vp="ih">
+<div class="nc2-app">
+<div class="nc2-col"><main class="nc2-cont">
+<div class="nc2-pag">
+  <!-- F1 · Volver al expediente (la flecha lleva el nombre del paciente), título y fecha.
+     F2 · Etiquetas bajo el título, con color suave e icono (CALMA §11): origen «Nota manual» (lápiz) o «Nota IA» (destello) en tonal; «Nota sellada» (candado) en verde suave.
+     F3 · «Imprimir» es un botón tonal pequeño con impresora: «Imprimir» → «Generando...» (con giro) → se sustituye por el enlace «Abrir PDF» (ojo; en la app, <a href=blob:> que abre el visor). -->
+  <header class="nc2-top">
+    <div class="nc2-top-f">
+      <a href="#" class="nc2-p nc2-volver" aria-label="Volver al expediente de Paciente Prueba 01"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"/></svg><span class="nc2-volver-t">Paciente Prueba 01</span></a>
+      <span class="nc2-flex"></span>
+      <button type="button" class="nc2-p nc2-ton nc2-imp" data-est="listo" aria-disabled="false"><span class="nc2-imp-i"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M7 9V3.5h10V9"/><rect x="3.5" y="9" width="17" height="8" rx="2"/><path d="M7 14.5h10v6H7z"/></svg></span><span class="nc2-giro" aria-hidden="true" hidden></span><span class="nc2-imp-t" aria-live="polite">Imprimir</span></button>
+      <a href="#" class="nc2-p nc2-ton nc2-pdf" hidden><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></svg>Abrir PDF</a>
+    </div>
+    <h1>Nota de Consulta</h1>
+    <p class="nc2-sub nc2-num">17 de noviembre de 2026</p>
+    <p class="nc2-etqs"><span class="nc2-etq nc2-o-man"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19.5 8.5a2.1 2.1 0 0 0-3-3L5 17z"/><path d="m14.5 7.5 3 3"/></svg>Nota manual</span><span class="nc2-etq nc2-o-ia"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 3.5 12.8 9a2 2 0 0 0 1.3 1.3l5.4 1.7-5.4 1.8a2 2 0 0 0-1.3 1.3L11 20.5l-1.8-5.4a2 2 0 0 0-1.3-1.3L2.5 12l5.4-1.7A2 2 0 0 0 9.2 9z"/><path d="M19 3v4M17 5h4"/></svg>Nota IA</span><span class="nc2-etq nc2-etq-ok"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9.5" rx="2.2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Nota sellada</span></p>
+  </header>
+  <!-- F7 · Banner de error (el mismo texto de hoy). Se limpia al volver a pulsar «Imprimir». -->
+  <p class="nc2-err" role="alert" hidden>No se pudo generar el PDF. Intenta de nuevo.</p>
+  <!-- F4 · Cuerpo de la nota (el contenido de CuerpoNota), con jerarquía (CALMA §12): diagnósticos 17/700 con su CIE-10 en etiqueta tonal; signos vitales, próxima cita y consultorio
+       como pares rótulo/valor (rótulos de hoy: TA, FC, FR, Temp., SpO₂, «Próxima cita», «Atendido en»); secciones con título de color y el subtítulo que hoy da SUBTITULO_SECCION;
+       cuerpo justificado con partición silábica (lang="es"); medicamentos como lista; bloque del médico. No hay «editar» ni «borrar»: la nota está sellada. -->
+  <article class="nc2-nota" lang="es" aria-label="Nota de consulta, sellada">
+    <ul class="nc2-dx" aria-label="Diagnósticos">
+      <li><span>Lumbago no especificado</span> <span class="nc2-cod">M54.5</span></li>
+      <li><span>Otros trastornos especificados de los músculos</span> <span class="nc2-cod">M62.8</span></li>
+    </ul>
+    <div class="nc2-datos">
+      <p class="nc2-rot">Signos vitales</p>
+      <dl class="nc2-pares nc2-vit"><div><dt>TA</dt><dd>120/80 <span>mmHg</span></dd></div><div><dt>FC</dt><dd>72 <span>lpm</span></dd></div><div><dt>FR</dt><dd>16 <span>rpm</span></dd></div><div><dt>Temp.</dt><dd>36.5 <span>°C</span></dd></div><div><dt>SpO₂</dt><dd>98 <span>%</span></dd></div></dl>
+      <dl class="nc2-pares"><div><dt>Próxima cita</dt><dd>en 15 días</dd></div><div><dt>Atendido en</dt><dd>Centro</dd></div></dl>
+    </div>
+    <section class="nc2-sec"><div class="nc2-sec-c"><h3>Subjetivo</h3><span>Motivo y síntomas</span></div><p>Dolor lumbar de una semana de evolución, de inicio posterior a esfuerzo al cargar peso. Sin irradiación a miembros inferiores. Mejora parcialmente con el reposo.</p></section>
+    <section class="nc2-sec"><div class="nc2-sec-c"><h3>Objetivo</h3><span>Exploración física</span></div><p>Marcha conservada. Contractura paravertebral lumbar bilateral, dolorosa a la palpación. Arcos de movilidad limitados por dolor en flexión.</p><p>Fuerza y sensibilidad conservadas en miembros inferiores. Reflejos osteotendinosos normales. Lasègue negativo derecho.</p></section>
+    <section class="nc2-sec"><div class="nc2-sec-c"><h3>Auxiliares diagnósticos</h3><span>Estudios</span></div><p>No se solicitaron.</p></section>
+    <section class="nc2-sec"><div class="nc2-sec-c"><h3>Análisis</h3><span>Impresión dx</span></div><p>Cuadro de características mecánicas, sin datos de compromiso neurológico. Contractura muscular paravertebral asociada.</p></section>
+    <section class="nc2-sec"><div class="nc2-sec-c"><h3>Diagnóstico</h3></div><p>Lumbago mecánico agudo.</p></section>
+    <section class="nc2-sec"><div class="nc2-sec-c"><h3>Plan</h3><span>Tratamiento</span></div><ul class="nc2-items"><li>Reposo relativo por 3 días; evitar cargar peso.</li><li>Calor local 15 minutos, tres veces al día.</li><li>Ejercicios de estiramiento lumbar al ceder el dolor.</li></ul><p class="nc2-st">Farmacológico:</p><ul class="nc2-meds"><li><b>Paracetamol 500 mg</b><span>1 tableta cada 8 horas por 5 días.</span></li><li><b>Naproxeno 250 mg</b><span>1 tableta cada 12 horas por 5 días, con alimentos.</span></li><li><b>Metocarbamol 500 mg</b><span>1 tableta cada 8 horas por 5 días.</span></li></ul></section>
+    <section class="nc2-sec"><div class="nc2-sec-c"><h3>Pronóstico</h3><span>Evolución esperada</span></div><p>Bueno para la vida y la función.</p></section>
+    <footer class="nc2-firma">
+      <b>Dr. Admin Semilla</b>
+      <span>Traumatología y Ortopedia</span>
+      <span class="nc2-num">Cédula Prof. 00000001</span>
+    </footer>
+  </article>
+  <!-- F5 · Notas aclaratorias ya guardadas: firmante y fecha (dd/MM/yyyy HH:mm, como hoy), la etiqueta «Sellado» de hoy (ahora verde suave con candado) y el texto justificado; orden cronológico ascendente.
+       F6 · «Agregar nota aclaratoria (addendum)» (rótulo de hoy) como botón tonal pequeño junto al título; abre la hoja / el modal.
+       Sin aclaratorias, hoy no se pinta el título: quedaría solo el botón. -->
+  <section class="nc2-acl" aria-label="Notas aclaratorias">
+    <div class="nc2-acl-cab"><h2>Notas aclaratorias<span class="nc2-cnt">1</span></h2><button type="button" class="nc2-p nc2-ton nc2-abre"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>Agregar nota aclaratoria (addendum)</button></div>
+    <ol class="nc2-seq" lang="es">
+      <li class="nc2-ad"><div class="nc2-ad-c"><p class="nc2-ad-m"><b>Dr. Admin Semilla</b><span class="nc2-num">18/11/2026 09:14</span></p><span class="nc2-etq nc2-etq-ok nc2-etq-s"><svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9.5" rx="2.2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Sellado</span></div><p class="nc2-ad-t">En la exploración física debe decir «Lasègue negativo bilateral». El resto de la nota no cambia y se mantiene el plan de tratamiento indicado en la consulta.</p></li>
+    </ol>
+  </section>
+</div>
+  <!-- F7 · «Consulta no encontrada»: hoy es solo ese texto, sin cabecera ni salida. «Cargando...» es un estado de sistema (el mismo texto centrado); no se dibuja. -->
+  <p class="nc2-nf">Consulta no encontrada</p>
+</main></div>
+<nav class="nc2-lat" aria-label="Navegación principal"><div class="nc2-lat-cab"><span class="nc2-logo"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.5"/><path d="M12 5.5v13M9.6 8h4.8M9 11h6M9 14h6M9.6 17h4.8"/></svg><span class="nc2-logo-n">Spinus</span></span><span class="nc2-plan">Plan VIP</span></div><button type="button" class="nc2-p nc2-cons-b"><span class="nc2-av">AS</span><span class="nc2-cons-t"><span>Consultorio</span><b>Centro</b></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 9 4-4 4 4M8 15l4 4 4-4"/></svg></button><div class="nc2-lista"><a href="#" class="nc2-p nc2-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Inicio</a><a href="#" class="nc2-p nc2-li" aria-current="page"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.9.7 3.1 2.4 3.5 5.2"/></svg>Expediente</a><a href="#" class="nc2-p nc2-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Agenda</a><a href="#" class="nc2-p nc2-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>Documentos</a><a href="#" class="nc2-p nc2-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20v-8M12 20V5M19 20v-9"/></svg>Administración</a></div><span class="nc2-flex"></span><div class="nc2-lat-pie"><a href="#" class="nc2-p nc2-li nc2-yo"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18.2c1.3-2 3.2-3 5.5-3s4.2 1 5.5 3"/></svg><span>Dr. Admin Semilla<small>Mi perfil · Ajustes</small></span></a></div></nav>
+</div>
+<!-- F6 · Nueva nota aclaratoria (CALMA §13): hoja desde abajo en teléfono; en Duo abierto y computadora, modal CENTRADO en el área de contenido. Velo desenfocado, uno solo.
+     Dos botones de verdad: «Cancelar» (quieto) y «Guardar addendum» (relleno). Textos de hoy.
+     Animación de maqueta: transform/opacity, 320 ms cubic-bezier(.32,.72,0,1), mismo camino al entrar y al salir; en la app será un resorte
+     (amortiguación 1.0, respuesta ~0.3), interrumpible y arrastrable desde el asa. -->
+<div class="nc2-capa" aria-hidden="true">
+  <div class="nc2-velo"></div>
+  <div class="nc2-area">
+  <form class="nc2-hoja" role="dialog" aria-modal="true" aria-label="Nueva nota aclaratoria" novalidate>
+    <span class="nc2-asa" aria-hidden="true"></span>
+    <h2>Nueva nota aclaratoria</h2>
+    <p class="nc2-aviso" lang="es">Este addendum se adjuntará a la nota original y no podrá modificarse una vez guardado.</p>
+    <textarea class="nc2-ta" aria-label="Nueva nota aclaratoria" placeholder="Escriba la aclaración, corrección o nota adicional..."></textarea>
+    <p class="nc2-ferr" role="alert" hidden>El addendum no puede estar vacío</p>
+    <div class="nc2-acc">
+      <button type="button" class="nc2-p nc2-bot nc2-quieto nc2-cierra">Cancelar</button>
+      <button type="submit" class="nc2-p nc2-bot nc2-prim nc2-guarda" aria-disabled="false">Guardar addendum</button>
+    </div>
+  </form>
+  </div>
+</div>
+</div>
+<div class="marco nc2" data-vp="iv">
+<div class="nc2-app">
+<!-- Duo abierto vertical (CALMA §19): encabezado fundido con la pista de secciones. Administración, Mi perfil y Ayuda: desde «Mostrar barra lateral» o el avatar. -->
+<header class="nc2-fun"><button type="button" class="nc2-p nc2-fun-b" aria-label="Mostrar barra lateral"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="15" rx="3"/><path d="M9.5 4.5v15"/></svg></button><nav class="nc2-pista" aria-label="Navegación principal"><a href="#" class="nc2-p nc2-pl">Inicio</a><a href="#" class="nc2-p nc2-pl" aria-current="page">Expediente</a><a href="#" class="nc2-p nc2-pl">Agenda</a><a href="#" class="nc2-p nc2-pl">Documentos</a><a href="#" class="nc2-p nc2-pl">Más</a></nav><button type="button" class="nc2-p nc2-av nc2-av-g" aria-label="Mi perfil">AS</button></header>
+<div class="nc2-col"><main class="nc2-cont">
+<div class="nc2-pag">
+  <!-- F1 · Volver al expediente (la flecha lleva el nombre del paciente), título y fecha.
+     F2 · Etiquetas bajo el título, con color suave e icono (CALMA §11): origen «Nota manual» (lápiz) o «Nota IA» (destello) en tonal; «Nota sellada» (candado) en verde suave.
+     F3 · «Imprimir» es un botón tonal pequeño con impresora: «Imprimir» → «Generando...» (con giro) → se sustituye por el enlace «Abrir PDF» (ojo; en la app, <a href=blob:> que abre el visor). -->
+  <header class="nc2-top">
+    <div class="nc2-top-f">
+      <a href="#" class="nc2-p nc2-volver" aria-label="Volver al expediente de Paciente Prueba 01"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"/></svg><span class="nc2-volver-t">Paciente Prueba 01</span></a>
+      <span class="nc2-flex"></span>
+      <button type="button" class="nc2-p nc2-ton nc2-imp" data-est="listo" aria-disabled="false"><span class="nc2-imp-i"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M7 9V3.5h10V9"/><rect x="3.5" y="9" width="17" height="8" rx="2"/><path d="M7 14.5h10v6H7z"/></svg></span><span class="nc2-giro" aria-hidden="true" hidden></span><span class="nc2-imp-t" aria-live="polite">Imprimir</span></button>
+      <a href="#" class="nc2-p nc2-ton nc2-pdf" hidden><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></svg>Abrir PDF</a>
+    </div>
+    <h1>Nota de Consulta</h1>
+    <p class="nc2-sub nc2-num">17 de noviembre de 2026</p>
+    <p class="nc2-etqs"><span class="nc2-etq nc2-o-man"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19.5 8.5a2.1 2.1 0 0 0-3-3L5 17z"/><path d="m14.5 7.5 3 3"/></svg>Nota manual</span><span class="nc2-etq nc2-o-ia"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 3.5 12.8 9a2 2 0 0 0 1.3 1.3l5.4 1.7-5.4 1.8a2 2 0 0 0-1.3 1.3L11 20.5l-1.8-5.4a2 2 0 0 0-1.3-1.3L2.5 12l5.4-1.7A2 2 0 0 0 9.2 9z"/><path d="M19 3v4M17 5h4"/></svg>Nota IA</span><span class="nc2-etq nc2-etq-ok"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9.5" rx="2.2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Nota sellada</span></p>
+  </header>
+  <!-- F7 · Banner de error (el mismo texto de hoy). Se limpia al volver a pulsar «Imprimir». -->
+  <p class="nc2-err" role="alert" hidden>No se pudo generar el PDF. Intenta de nuevo.</p>
+  <!-- F4 · Cuerpo de la nota (el contenido de CuerpoNota), con jerarquía (CALMA §12): diagnósticos 17/700 con su CIE-10 en etiqueta tonal; signos vitales, próxima cita y consultorio
+       como pares rótulo/valor (rótulos de hoy: TA, FC, FR, Temp., SpO₂, «Próxima cita», «Atendido en»); secciones con título de color y el subtítulo que hoy da SUBTITULO_SECCION;
+       cuerpo justificado con partición silábica (lang="es"); medicamentos como lista; bloque del médico. No hay «editar» ni «borrar»: la nota está sellada. -->
+  <article class="nc2-nota" lang="es" aria-label="Nota de consulta, sellada">
+    <ul class="nc2-dx" aria-label="Diagnósticos">
+      <li><span>Lumbago no especificado</span> <span class="nc2-cod">M54.5</span></li>
+      <li><span>Otros trastornos especificados de los músculos</span> <span class="nc2-cod">M62.8</span></li>
+    </ul>
+    <div class="nc2-datos">
+      <p class="nc2-rot">Signos vitales</p>
+      <dl class="nc2-pares nc2-vit"><div><dt>TA</dt><dd>120/80 <span>mmHg</span></dd></div><div><dt>FC</dt><dd>72 <span>lpm</span></dd></div><div><dt>FR</dt><dd>16 <span>rpm</span></dd></div><div><dt>Temp.</dt><dd>36.5 <span>°C</span></dd></div><div><dt>SpO₂</dt><dd>98 <span>%</span></dd></div></dl>
+      <dl class="nc2-pares"><div><dt>Próxima cita</dt><dd>en 15 días</dd></div><div><dt>Atendido en</dt><dd>Centro</dd></div></dl>
+    </div>
+    <section class="nc2-sec"><div class="nc2-sec-c"><h3>Subjetivo</h3><span>Motivo y síntomas</span></div><p>Dolor lumbar de una semana de evolución, de inicio posterior a esfuerzo al cargar peso. Sin irradiación a miembros inferiores. Mejora parcialmente con el reposo.</p></section>
+    <section class="nc2-sec"><div class="nc2-sec-c"><h3>Objetivo</h3><span>Exploración física</span></div><p>Marcha conservada. Contractura paravertebral lumbar bilateral, dolorosa a la palpación. Arcos de movilidad limitados por dolor en flexión.</p><p>Fuerza y sensibilidad conservadas en miembros inferiores. Reflejos osteotendinosos normales. Lasègue negativo derecho.</p></section>
+    <section class="nc2-sec"><div class="nc2-sec-c"><h3>Auxiliares diagnósticos</h3><span>Estudios</span></div><p>No se solicitaron.</p></section>
+    <section class="nc2-sec"><div class="nc2-sec-c"><h3>Análisis</h3><span>Impresión dx</span></div><p>Cuadro de características mecánicas, sin datos de compromiso neurológico. Contractura muscular paravertebral asociada.</p></section>
+    <section class="nc2-sec"><div class="nc2-sec-c"><h3>Diagnóstico</h3></div><p>Lumbago mecánico agudo.</p></section>
+    <section class="nc2-sec"><div class="nc2-sec-c"><h3>Plan</h3><span>Tratamiento</span></div><ul class="nc2-items"><li>Reposo relativo por 3 días; evitar cargar peso.</li><li>Calor local 15 minutos, tres veces al día.</li><li>Ejercicios de estiramiento lumbar al ceder el dolor.</li></ul><p class="nc2-st">Farmacológico:</p><ul class="nc2-meds"><li><b>Paracetamol 500 mg</b><span>1 tableta cada 8 horas por 5 días.</span></li><li><b>Naproxeno 250 mg</b><span>1 tableta cada 12 horas por 5 días, con alimentos.</span></li><li><b>Metocarbamol 500 mg</b><span>1 tableta cada 8 horas por 5 días.</span></li></ul></section>
+    <section class="nc2-sec"><div class="nc2-sec-c"><h3>Pronóstico</h3><span>Evolución esperada</span></div><p>Bueno para la vida y la función.</p></section>
+    <footer class="nc2-firma">
+      <b>Dr. Admin Semilla</b>
+      <span>Traumatología y Ortopedia</span>
+      <span class="nc2-num">Cédula Prof. 00000001</span>
+    </footer>
+  </article>
+  <!-- F5 · Notas aclaratorias ya guardadas: firmante y fecha (dd/MM/yyyy HH:mm, como hoy), la etiqueta «Sellado» de hoy (ahora verde suave con candado) y el texto justificado; orden cronológico ascendente.
+       F6 · «Agregar nota aclaratoria (addendum)» (rótulo de hoy) como botón tonal pequeño junto al título; abre la hoja / el modal.
+       Sin aclaratorias, hoy no se pinta el título: quedaría solo el botón. -->
+  <section class="nc2-acl" aria-label="Notas aclaratorias">
+    <div class="nc2-acl-cab"><h2>Notas aclaratorias<span class="nc2-cnt">1</span></h2><button type="button" class="nc2-p nc2-ton nc2-abre"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>Agregar nota aclaratoria (addendum)</button></div>
+    <ol class="nc2-seq" lang="es">
+      <li class="nc2-ad"><div class="nc2-ad-c"><p class="nc2-ad-m"><b>Dr. Admin Semilla</b><span class="nc2-num">18/11/2026 09:14</span></p><span class="nc2-etq nc2-etq-ok nc2-etq-s"><svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9.5" rx="2.2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Sellado</span></div><p class="nc2-ad-t">En la exploración física debe decir «Lasègue negativo bilateral». El resto de la nota no cambia y se mantiene el plan de tratamiento indicado en la consulta.</p></li>
+    </ol>
+  </section>
+</div>
+  <!-- F7 · «Consulta no encontrada»: hoy es solo ese texto, sin cabecera ni salida. «Cargando...» es un estado de sistema (el mismo texto centrado); no se dibuja. -->
+  <p class="nc2-nf">Consulta no encontrada</p>
+</main></div>
+</div>
+<!-- F6 · Nueva nota aclaratoria (CALMA §13): hoja desde abajo en teléfono; en Duo abierto y computadora, modal CENTRADO en el área de contenido. Velo desenfocado, uno solo.
+     Dos botones de verdad: «Cancelar» (quieto) y «Guardar addendum» (relleno). Textos de hoy.
+     Animación de maqueta: transform/opacity, 320 ms cubic-bezier(.32,.72,0,1), mismo camino al entrar y al salir; en la app será un resorte
+     (amortiguación 1.0, respuesta ~0.3), interrumpible y arrastrable desde el asa. -->
+<div class="nc2-capa" aria-hidden="true">
+  <div class="nc2-velo"></div>
+  <div class="nc2-area">
+  <form class="nc2-hoja" role="dialog" aria-modal="true" aria-label="Nueva nota aclaratoria" novalidate>
+    <span class="nc2-asa" aria-hidden="true"></span>
+    <h2>Nueva nota aclaratoria</h2>
+    <p class="nc2-aviso" lang="es">Este addendum se adjuntará a la nota original y no podrá modificarse una vez guardado.</p>
+    <textarea class="nc2-ta" aria-label="Nueva nota aclaratoria" placeholder="Escriba la aclaración, corrección o nota adicional..."></textarea>
+    <p class="nc2-ferr" role="alert" hidden>El addendum no puede estar vacío</p>
+    <div class="nc2-acc">
+      <button type="button" class="nc2-p nc2-bot nc2-quieto nc2-cierra">Cancelar</button>
+      <button type="submit" class="nc2-p nc2-bot nc2-prim nc2-guarda" aria-disabled="false">Guardar addendum</button>
+    </div>
+  </form>
+  </div>
+</div>
+</div>
+<div class="marco nc2" data-vp="esc">
+<div class="nc2-app">
+<nav class="nc2-lat" aria-label="Navegación principal"><div class="nc2-lat-cab"><span class="nc2-logo"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.5"/><path d="M12 5.5v13M9.6 8h4.8M9 11h6M9 14h6M9.6 17h4.8"/></svg><span class="nc2-logo-n">Spinus</span></span><span class="nc2-plan">Plan VIP</span></div><button type="button" class="nc2-p nc2-cons-b"><span class="nc2-av">AS</span><span class="nc2-cons-t"><span>Consultorio</span><b>Centro</b></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 9 4-4 4 4M8 15l4 4 4-4"/></svg></button><div class="nc2-lista"><a href="#" class="nc2-p nc2-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Inicio</a><a href="#" class="nc2-p nc2-li" aria-current="page"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.9.7 3.1 2.4 3.5 5.2"/></svg>Expediente</a><a href="#" class="nc2-p nc2-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Agenda</a><a href="#" class="nc2-p nc2-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>Documentos</a><a href="#" class="nc2-p nc2-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20v-8M12 20V5M19 20v-9"/></svg>Administración</a></div><span class="nc2-flex"></span><div class="nc2-lat-pie"><a href="#" class="nc2-p nc2-li nc2-yo"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18.2c1.3-2 3.2-3 5.5-3s4.2 1 5.5 3"/></svg><span>Dr. Admin Semilla<small>Mi perfil · Ajustes</small></span></a></div></nav>
+<div class="nc2-col"><main class="nc2-cont">
+<div class="nc2-pag">
+  <!-- F1 · Volver al expediente (la flecha lleva el nombre del paciente), título y fecha.
+     F2 · Etiquetas bajo el título, con color suave e icono (CALMA §11): origen «Nota manual» (lápiz) o «Nota IA» (destello) en tonal; «Nota sellada» (candado) en verde suave.
+     F3 · «Imprimir» es un botón tonal pequeño con impresora: «Imprimir» → «Generando...» (con giro) → se sustituye por el enlace «Abrir PDF» (ojo; en la app, <a href=blob:> que abre el visor). -->
+  <header class="nc2-top">
+    <div class="nc2-top-f">
+      <a href="#" class="nc2-p nc2-volver" aria-label="Volver al expediente de Paciente Prueba 01"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"/></svg><span class="nc2-volver-t">Paciente Prueba 01</span></a>
+      <span class="nc2-flex"></span>
+      <button type="button" class="nc2-p nc2-ton nc2-imp" data-est="listo" aria-disabled="false"><span class="nc2-imp-i"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M7 9V3.5h10V9"/><rect x="3.5" y="9" width="17" height="8" rx="2"/><path d="M7 14.5h10v6H7z"/></svg></span><span class="nc2-giro" aria-hidden="true" hidden></span><span class="nc2-imp-t" aria-live="polite">Imprimir</span></button>
+      <a href="#" class="nc2-p nc2-ton nc2-pdf" hidden><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></svg>Abrir PDF</a>
+    </div>
+    <h1>Nota de Consulta</h1>
+    <p class="nc2-sub nc2-num">17 de noviembre de 2026</p>
+    <p class="nc2-etqs"><span class="nc2-etq nc2-o-man"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19.5 8.5a2.1 2.1 0 0 0-3-3L5 17z"/><path d="m14.5 7.5 3 3"/></svg>Nota manual</span><span class="nc2-etq nc2-o-ia"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 3.5 12.8 9a2 2 0 0 0 1.3 1.3l5.4 1.7-5.4 1.8a2 2 0 0 0-1.3 1.3L11 20.5l-1.8-5.4a2 2 0 0 0-1.3-1.3L2.5 12l5.4-1.7A2 2 0 0 0 9.2 9z"/><path d="M19 3v4M17 5h4"/></svg>Nota IA</span><span class="nc2-etq nc2-etq-ok"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9.5" rx="2.2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Nota sellada</span></p>
+  </header>
+  <!-- F7 · Banner de error (el mismo texto de hoy). Se limpia al volver a pulsar «Imprimir». -->
+  <p class="nc2-err" role="alert" hidden>No se pudo generar el PDF. Intenta de nuevo.</p>
+  <!-- F4 · Cuerpo de la nota (el contenido de CuerpoNota), con jerarquía (CALMA §12): diagnósticos 17/700 con su CIE-10 en etiqueta tonal; signos vitales, próxima cita y consultorio
+       como pares rótulo/valor (rótulos de hoy: TA, FC, FR, Temp., SpO₂, «Próxima cita», «Atendido en»); secciones con título de color y el subtítulo que hoy da SUBTITULO_SECCION;
+       cuerpo justificado con partición silábica (lang="es"); medicamentos como lista; bloque del médico. No hay «editar» ni «borrar»: la nota está sellada. -->
+  <article class="nc2-nota" lang="es" aria-label="Nota de consulta, sellada">
+    <ul class="nc2-dx" aria-label="Diagnósticos">
+      <li><span>Lumbago no especificado</span> <span class="nc2-cod">M54.5</span></li>
+      <li><span>Otros trastornos especificados de los músculos</span> <span class="nc2-cod">M62.8</span></li>
+    </ul>
+    <div class="nc2-datos">
+      <p class="nc2-rot">Signos vitales</p>
+      <dl class="nc2-pares nc2-vit"><div><dt>TA</dt><dd>120/80 <span>mmHg</span></dd></div><div><dt>FC</dt><dd>72 <span>lpm</span></dd></div><div><dt>FR</dt><dd>16 <span>rpm</span></dd></div><div><dt>Temp.</dt><dd>36.5 <span>°C</span></dd></div><div><dt>SpO₂</dt><dd>98 <span>%</span></dd></div></dl>
+      <dl class="nc2-pares"><div><dt>Próxima cita</dt><dd>en 15 días</dd></div><div><dt>Atendido en</dt><dd>Centro</dd></div></dl>
+    </div>
+    <section class="nc2-sec"><div class="nc2-sec-c"><h3>Subjetivo</h3><span>Motivo y síntomas</span></div><p>Dolor lumbar de una semana de evolución, de inicio posterior a esfuerzo al cargar peso. Sin irradiación a miembros inferiores. Mejora parcialmente con el reposo.</p></section>
+    <section class="nc2-sec"><div class="nc2-sec-c"><h3>Objetivo</h3><span>Exploración física</span></div><p>Marcha conservada. Contractura paravertebral lumbar bilateral, dolorosa a la palpación. Arcos de movilidad limitados por dolor en flexión.</p><p>Fuerza y sensibilidad conservadas en miembros inferiores. Reflejos osteotendinosos normales. Lasègue negativo derecho.</p></section>
+    <section class="nc2-sec"><div class="nc2-sec-c"><h3>Auxiliares diagnósticos</h3><span>Estudios</span></div><p>No se solicitaron.</p></section>
+    <section class="nc2-sec"><div class="nc2-sec-c"><h3>Análisis</h3><span>Impresión dx</span></div><p>Cuadro de características mecánicas, sin datos de compromiso neurológico. Contractura muscular paravertebral asociada.</p></section>
+    <section class="nc2-sec"><div class="nc2-sec-c"><h3>Diagnóstico</h3></div><p>Lumbago mecánico agudo.</p></section>
+    <section class="nc2-sec"><div class="nc2-sec-c"><h3>Plan</h3><span>Tratamiento</span></div><ul class="nc2-items"><li>Reposo relativo por 3 días; evitar cargar peso.</li><li>Calor local 15 minutos, tres veces al día.</li><li>Ejercicios de estiramiento lumbar al ceder el dolor.</li></ul><p class="nc2-st">Farmacológico:</p><ul class="nc2-meds"><li><b>Paracetamol 500 mg</b><span>1 tableta cada 8 horas por 5 días.</span></li><li><b>Naproxeno 250 mg</b><span>1 tableta cada 12 horas por 5 días, con alimentos.</span></li><li><b>Metocarbamol 500 mg</b><span>1 tableta cada 8 horas por 5 días.</span></li></ul></section>
+    <section class="nc2-sec"><div class="nc2-sec-c"><h3>Pronóstico</h3><span>Evolución esperada</span></div><p>Bueno para la vida y la función.</p></section>
+    <footer class="nc2-firma">
+      <b>Dr. Admin Semilla</b>
+      <span>Traumatología y Ortopedia</span>
+      <span class="nc2-num">Cédula Prof. 00000001</span>
+    </footer>
+  </article>
+  <!-- F5 · Notas aclaratorias ya guardadas: firmante y fecha (dd/MM/yyyy HH:mm, como hoy), la etiqueta «Sellado» de hoy (ahora verde suave con candado) y el texto justificado; orden cronológico ascendente.
+       F6 · «Agregar nota aclaratoria (addendum)» (rótulo de hoy) como botón tonal pequeño junto al título; abre la hoja / el modal.
+       Sin aclaratorias, hoy no se pinta el título: quedaría solo el botón. -->
+  <section class="nc2-acl" aria-label="Notas aclaratorias">
+    <div class="nc2-acl-cab"><h2>Notas aclaratorias<span class="nc2-cnt">1</span></h2><button type="button" class="nc2-p nc2-ton nc2-abre"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>Agregar nota aclaratoria (addendum)</button></div>
+    <ol class="nc2-seq" lang="es">
+      <li class="nc2-ad"><div class="nc2-ad-c"><p class="nc2-ad-m"><b>Dr. Admin Semilla</b><span class="nc2-num">18/11/2026 09:14</span></p><span class="nc2-etq nc2-etq-ok nc2-etq-s"><svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9.5" rx="2.2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Sellado</span></div><p class="nc2-ad-t">En la exploración física debe decir «Lasègue negativo bilateral». El resto de la nota no cambia y se mantiene el plan de tratamiento indicado en la consulta.</p></li>
+    </ol>
+  </section>
+</div>
+  <!-- F7 · «Consulta no encontrada»: hoy es solo ese texto, sin cabecera ni salida. «Cargando...» es un estado de sistema (el mismo texto centrado); no se dibuja. -->
+  <p class="nc2-nf">Consulta no encontrada</p>
+</main></div>
+</div>
+<!-- F6 · Nueva nota aclaratoria (CALMA §13): hoja desde abajo en teléfono; en Duo abierto y computadora, modal CENTRADO en el área de contenido. Velo desenfocado, uno solo.
+     Dos botones de verdad: «Cancelar» (quieto) y «Guardar addendum» (relleno). Textos de hoy.
+     Animación de maqueta: transform/opacity, 320 ms cubic-bezier(.32,.72,0,1), mismo camino al entrar y al salir; en la app será un resorte
+     (amortiguación 1.0, respuesta ~0.3), interrumpible y arrastrable desde el asa. -->
+<div class="nc2-capa" aria-hidden="true">
+  <div class="nc2-velo"></div>
+  <div class="nc2-area">
+  <form class="nc2-hoja" role="dialog" aria-modal="true" aria-label="Nueva nota aclaratoria" novalidate>
+    <span class="nc2-asa" aria-hidden="true"></span>
+    <h2>Nueva nota aclaratoria</h2>
+    <p class="nc2-aviso" lang="es">Este addendum se adjuntará a la nota original y no podrá modificarse una vez guardado.</p>
+    <textarea class="nc2-ta" aria-label="Nueva nota aclaratoria" placeholder="Escriba la aclaración, corrección o nota adicional..."></textarea>
+    <p class="nc2-ferr" role="alert" hidden>El addendum no puede estar vacío</p>
+    <div class="nc2-acc">
+      <button type="button" class="nc2-p nc2-bot nc2-quieto nc2-cierra">Cancelar</button>
+      <button type="submit" class="nc2-p nc2-bot nc2-prim nc2-guarda" aria-disabled="false">Guardar addendum</button>
+    </div>
+  </form>
+  </div>
+</div>
+</div>
+<script>
+(function(){
+  var marcos=[].slice.call(document.querySelectorAll('.nc2.marco'));if(!marcos.length)return;
+  var api=[];
+  marcos.forEach(function(m){
+    var capa=m.querySelector('.nc2-capa'),hoja=m.querySelector('.nc2-hoja'),ta=m.querySelector('.nc2-ta'),ferr=m.querySelector('.nc2-ferr'),
+        guarda=m.querySelector('.nc2-guarda'),seq=m.querySelector('.nc2-seq'),cnt=m.querySelector('.nc2-cnt'),err=m.querySelector('.nc2-err'),
+        imp=m.querySelector('.nc2-imp'),impT=m.querySelector('.nc2-imp-t'),giro=m.querySelector('.nc2-giro'),pdf=m.querySelector('.nc2-pdf'),
+        cont=m.querySelector('.nc2-cont'),origen=null,reloj=0,candado=m.querySelector('.nc2-etq-s svg').outerHTML;
+    m.querySelectorAll('a[href="#"]').forEach(function(a){a.addEventListener('click',function(e){e.preventDefault()})});
+
+    /* Imprimir (botón tonal con impresora): «Imprimir» → «Generando...» → el botón se sustituye por el enlace «Abrir PDF», como hoy. */
+    function estado(e){imp.hidden=e==='pdf';pdf.hidden=e!=='pdf';giro.hidden=e!=='gen';
+      impT.textContent=e==='gen'?'Generando...':'Imprimir';imp.setAttribute('aria-disabled',String(e==='gen'));imp.dataset.est=e}
+    imp.addEventListener('click',function(){
+      if(imp.dataset.est==='gen')return;
+      err.hidden=true;estado('gen');clearTimeout(reloj);reloj=setTimeout(function(){estado('pdf')},1600)});
+
+    /* Nueva nota aclaratoria: hoja / modal */
+    function abre(e){origen=e.currentTarget;ta.value='';ferr.hidden=true;capa.classList.add('nc2-on');capa.setAttribute('aria-hidden','false');ta.focus({preventScroll:true})}
+    function cierra(){capa.classList.remove('nc2-on');capa.setAttribute('aria-hidden','true');if(origen&&origen.offsetParent)origen.focus({preventScroll:true})}
+    m.querySelector('.nc2-abre').addEventListener('click',abre);
+    m.querySelector('.nc2-cierra').addEventListener('click',cierra);
+    m.querySelector('.nc2-velo').addEventListener('click',cierra);
+    m.addEventListener('keydown',function(e){if(e.key==='Escape'&&capa.classList.contains('nc2-on')){e.preventDefault();cierra()}});
+    ta.addEventListener('input',function(){ferr.hidden=true});
+    hoja.addEventListener('submit',function(e){e.preventDefault();
+      if(guarda.getAttribute('aria-disabled')==='true')return;
+      var t=ta.value.trim();if(!t){ferr.hidden=false;ta.focus({preventScroll:true});return}
+      guarda.setAttribute('aria-disabled','true');guarda.textContent='Guardando...';
+      setTimeout(function(){
+        var li=document.createElement('li');li.className='nc2-ad nc2-nueva';
+        li.innerHTML='<div class="nc2-ad-c"><p class="nc2-ad-m"><b>Dr. Admin Semilla</b><span class="nc2-num">19/11/2026 10:42</span></p><span class="nc2-etq nc2-etq-ok nc2-etq-s">'+candado+'Sellado</span></div><p class="nc2-ad-t"></p>';
+        li.querySelector('.nc2-ad-t').textContent=t;seq.appendChild(li);cnt.textContent=seq.children.length;
+        guarda.setAttribute('aria-disabled','false');guarda.textContent='Guardar addendum';
+        /* El PDF ya generado no lleva este addendum: el enlace vuelve a «Imprimir» (como hoy). */
+        clearTimeout(reloj);estado('listo');cierra();cont.scrollTop=cont.scrollHeight;
+      },700)});
+
+    api.push({
+      ia:function(s){m.classList.toggle('nc2-ia',s)},
+      err:function(s){err.hidden=!s;if(s){clearTimeout(reloj);estado('listo');cont.scrollTop=0}},
+      nf:function(s){m.classList.toggle('nc2-nf-on',s);cont.scrollTop=0}
+    });
+  });
+
+  /* Controles de maqueta: una sola tira, fuera de los marcos, que gobierna los cuatro a la vez. */
+  var tira=document.createElement('div');tira.className='nc2-tira';tira.setAttribute('role','group');tira.setAttribute('aria-label','Controles de la maqueta');
+  tira.innerHTML='<span>Maqueta</span>';
+  [['ia','Nota con IA'],['err','Error de PDF'],['nf','Consulta no encontrada']].forEach(function(d){
+    var b=document.createElement('button');b.type='button';b.textContent=d[1];b.setAttribute('aria-pressed','false');
+    b.addEventListener('click',function(){var s=b.getAttribute('aria-pressed')!=='true';b.setAttribute('aria-pressed',String(s));api.forEach(function(a){a[d[0]](s)})});
+    tira.appendChild(b)});
+  var op=marcos[0].closest('.op'),cab=op&&op.querySelector('header');
+  if(cab)cab.appendChild(tira);else marcos[0].parentNode.insertBefore(tira,marcos[0]);
+})();
+</script>

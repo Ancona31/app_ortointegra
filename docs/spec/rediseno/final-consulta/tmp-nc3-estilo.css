@@ -1,0 +1,177 @@
+/* ===== Nota de consulta (lectura de una nota sellada) · CALMA, segunda revisión (§11–16). Todos los selectores empiezan por .nc2 ===== */
+.nc2 .nc2-app{display:flex;width:100%;height:100%}
+.nc2[data-vp="tel"] .nc2-app{flex-direction:column}
+.nc2 button{border:0;margin:0;padding:0;background:none;color:inherit}
+.nc2 h1,.nc2 h2,.nc2 h3,.nc2 p,.nc2 ul,.nc2 ol,.nc2 dl,.nc2 dt,.nc2 dd{margin:0;padding:0}
+.nc2 ul,.nc2 ol{list-style:none}
+.nc2 textarea{display:block;margin:0;border:0;outline:0;color:inherit;font:inherit;resize:none;-webkit-appearance:none;appearance:none}
+.nc2 ::placeholder{color:var(--tinta3);opacity:1}
+.nc2 svg{flex:none}
+.nc2 [hidden]{display:none!important}
+.nc2 .nc2-flex{flex:1;min-width:0}
+.nc2 .nc2-num{font-variant-numeric:tabular-nums}
+.nc2 .nc2-nw{white-space:nowrap}
+.nc2 .nc2-p{transition:transform 100ms ease-out}
+.nc2 .nc2-p:active{transform:scale(.97)}
+.nc2 .nc2-p:focus-visible{outline:3px solid var(--enlace);outline-offset:2px}
+.nc2 .nc2-riel .nc2-p:focus-visible,.nc2 .nc2-lat .nc2-p:focus-visible,.nc2 .nc2-enc .nc2-p:focus-visible{outline-color:var(--nav-tinta)}
+/* Estados de maqueta */
+.nc2:not(.nc2-ia) .nc2-o-ia,.nc2.nc2-ia .nc2-o-man{display:none}
+.nc2:not(.nc2-nf-on) .nc2-nf,.nc2.nc2-nf-on .nc2-pag{display:none}
+
+/*NAV*/
+
+/* ---- Columna de contenido: una sola columna de lectura (centrada en computadora, CALMA §14) ---- */
+.nc2 .nc2-col{position:relative;flex:1;min-width:0;min-height:0;display:flex;flex-direction:column}
+.nc2 .nc2-cont{flex:1;min-height:0;overflow-x:hidden;overflow-y:auto;scrollbar-width:none;padding:0 16px calc(var(--ib) + 28px)}
+.nc2[data-vp="tel"] .nc2-cont{padding-top:6px}
+.nc2[data-vp="ih"] .nc2-cont,.nc2[data-vp="esc"] .nc2-cont{padding:14px 24px calc(var(--ib) + 40px)}
+.nc2[data-vp="esc"] .nc2-cont{scrollbar-width:thin;scrollbar-color:var(--borde) transparent}
+.nc2 .nc2-pag{max-width:700px;margin:0 auto}
+
+/* ---- Etiquetas con color suave e icono (CALMA §11) ---- */
+.nc2 .nc2-etq{display:inline-flex;align-items:center;gap:5px;height:24px;padding:0 9px 0 7px;border-radius:8px;background:var(--tonal);color:var(--tonal-tinta);font-size:12px;line-height:16px;font-weight:600;white-space:nowrap}
+.nc2 .nc2-etq-ok{background:var(--ok-fondo);color:var(--ok-tinta)}
+.nc2 .nc2-etq-s{height:22px;gap:4px;padding:0 8px 0 6px}
+
+/* ---- Botón tonal pequeño (Imprimir, Abrir PDF, Agregar nota aclaratoria) ---- */
+.nc2 .nc2-ton{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:6px;height:32px;padding:0 12px 0 10px;border-radius:10px;background:var(--tonal);color:var(--tonal-tinta);font-size:13px;line-height:18px;font-weight:600;white-space:nowrap}
+.nc2 .nc2-ton::after{content:"";position:absolute;inset:-6px 0}
+.nc2 .nc2-ton[aria-disabled="true"]{background:var(--sup2);color:var(--tinta2)}
+.nc2 .nc2-ton[aria-disabled="true"]:active{transform:none}
+.nc2 .nc2-imp-i{display:inline-flex}
+.nc2 .nc2-imp[data-est="gen"] .nc2-imp-i{display:none}
+.nc2 .nc2-giro{width:14px;height:14px;border-radius:999px;border:2px solid currentColor;border-right-color:transparent;animation:nc2-giro 800ms linear infinite}
+@keyframes nc2-giro{to{transform:rotate(360deg)}}
+
+/* ---- Cabecera: volver · Imprimir, título, fecha y etiquetas ---- */
+.nc2 .nc2-top-f{display:flex;align-items:center;gap:4px;min-height:44px;margin-left:-4px}
+.nc2 .nc2-volver{display:inline-flex;align-items:center;gap:2px;min-height:44px;padding-right:8px;font-size:13px;line-height:18px;font-weight:600;color:var(--enlace);white-space:nowrap}
+.nc2 .nc2-top h1{font-size:26px;line-height:31px;font-weight:800;letter-spacing:-.6px}
+.nc2 .nc2-sub{margin-top:2px;font-size:13px;line-height:18px;color:var(--tinta2)}
+.nc2 .nc2-etqs{margin-top:10px;display:flex;flex-wrap:wrap;gap:6px}
+.nc2 .nc2-err{margin-top:12px;padding:8px 12px;border-radius:8px;background:var(--mal-fondo);color:var(--mal-tinta);font-size:13px;line-height:18px;font-weight:600}
+
+/* ---- La nota: una única superficie con jerarquía (CALMA §12) ---- */
+.nc2 .nc2-nota{margin-top:16px;padding:20px 16px 20px;border-radius:16px;background:var(--sup)}
+.nc2 .nc2-dx{display:flex;flex-direction:column;gap:8px}
+.nc2 .nc2-dx li{font-size:17px;line-height:22px;font-weight:700;letter-spacing:-.2px}
+.nc2 .nc2-cod{display:inline-block;vertical-align:2px;margin-left:4px;padding:0 6px;border-radius:6px;background:var(--tonal);color:var(--tonal-tinta);font-size:12px;line-height:18px;font-weight:600;letter-spacing:0;font-variant-numeric:tabular-nums;white-space:nowrap}
+.nc2 .nc2-datos{margin-top:16px;padding:14px 0 16px;border-top:1px solid var(--linea);border-bottom:1px solid var(--linea)}
+.nc2 .nc2-rot{font-size:12px;line-height:16px;font-weight:600;letter-spacing:.3px;text-transform:uppercase;color:var(--tinta2)}
+.nc2 .nc2-pares{display:flex;flex-wrap:wrap;gap:12px 22px;margin-top:14px}
+.nc2 .nc2-vit{margin-top:8px;display:grid;grid-template-columns:repeat(3,auto);justify-content:start}
+.nc2 .nc2-pares div{display:flex;flex-direction:column;gap:1px}
+.nc2 .nc2-pares dt{font-size:12px;line-height:16px;color:var(--tinta2)}
+.nc2 .nc2-pares dd{font-size:15px;line-height:20px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+.nc2 .nc2-pares dd span{font-size:13px;font-weight:400;color:var(--tinta2)}
+.nc2 .nc2-sec{margin-top:24px}
+.nc2 .nc2-datos+.nc2-sec{margin-top:20px}
+.nc2 .nc2-sec-c{display:flex;flex-wrap:wrap;align-items:baseline;gap:0 8px}
+.nc2 .nc2-sec h3{font-size:13px;line-height:18px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--enlace)}
+.nc2 .nc2-sec-c span{font-size:13px;line-height:18px;color:var(--tinta2)}
+.nc2 .nc2-sec p{margin-top:6px;font-size:15px;line-height:22px;text-align:justify;-webkit-hyphens:auto;hyphens:auto;-webkit-hyphenate-limit-before:3;-webkit-hyphenate-limit-after:3;hyphenate-limit-chars:7 3 3}
+.nc2 .nc2-sec p+p{margin-top:10px}
+.nc2 .nc2-sec .nc2-st{margin-top:14px;font-size:13px;line-height:18px;font-weight:600;color:var(--tinta2);text-align:left}
+.nc2 .nc2-items{margin-top:6px}
+.nc2 .nc2-items li{display:flex;gap:8px;margin-top:4px;font-size:15px;line-height:22px}
+.nc2 .nc2-items li::before{content:"";flex:none;width:5px;height:5px;margin-top:9px;border-radius:999px;background:var(--enlace);opacity:.55}
+.nc2 .nc2-meds{margin-top:2px}
+.nc2 .nc2-meds li{display:flex;flex-direction:column;padding:8px 0}
+.nc2 .nc2-meds li+li{border-top:1px solid var(--linea)}
+.nc2 .nc2-meds b{font-size:15px;line-height:20px;font-weight:600}
+.nc2 .nc2-meds span{font-size:13px;line-height:18px;color:var(--tinta2)}
+.nc2 .nc2-firma{margin-top:24px;padding-top:16px;border-top:1px solid var(--linea);display:flex;flex-direction:column}
+.nc2 .nc2-firma b{font-size:15px;line-height:20px;font-weight:600}
+.nc2 .nc2-firma span{font-size:13px;line-height:18px;color:var(--tinta2)}
+
+/* ---- Notas aclaratorias: firmante, fecha, «Sellado» y texto justificado ---- */
+.nc2 .nc2-acl{margin-top:28px}
+.nc2 .nc2-acl-cab{display:flex;flex-wrap:wrap;align-items:center;gap:10px 12px}
+.nc2 .nc2-acl-cab h2{flex:1 0 auto;font-size:17px;line-height:22px;font-weight:700}
+.nc2 .nc2-cnt{margin-left:6px;font-size:15px;font-weight:400;color:var(--tinta2);font-variant-numeric:tabular-nums}
+.nc2 .nc2-seq{margin-top:12px;padding:0 16px;border-radius:16px;background:var(--sup)}
+.nc2 .nc2-ad{padding:16px 0}
+.nc2 .nc2-ad+.nc2-ad{border-top:1px solid var(--linea)}
+.nc2 .nc2-ad-c{display:flex;align-items:center;gap:8px}
+.nc2 .nc2-ad-m{flex:1;min-width:0;display:flex;flex-wrap:wrap;align-items:baseline;gap:0 8px;font-size:13px;line-height:18px;color:var(--tinta2)}
+.nc2 .nc2-ad-m b{font-weight:600;color:var(--tinta)}
+.nc2 .nc2-ad-t{margin-top:8px;font-size:15px;line-height:22px;white-space:pre-line;text-align:justify;-webkit-hyphens:auto;hyphens:auto;-webkit-hyphenate-limit-before:3;-webkit-hyphenate-limit-after:3;hyphenate-limit-chars:7 3 3}
+.nc2 .nc2-nueva{animation:nc2-entra 320ms cubic-bezier(.32,.72,0,1)}
+@keyframes nc2-entra{from{opacity:0;transform:translateY(8px)}}
+
+/* ---- Consulta no encontrada (hoy es solo ese texto) ---- */
+.nc2 .nc2-nf{padding:48px 0;text-align:center;font-size:15px;line-height:20px;color:var(--tinta2)}
+
+/* ---- Capa (CALMA §13): hoja en teléfono / modal centrado en el área de contenido; velo desenfocado ---- */
+.nc2 .nc2-capa{position:absolute;inset:0;z-index:20;pointer-events:none;overflow:hidden}
+.nc2 .nc2-capa.nc2-on{pointer-events:auto}
+.nc2 .nc2-velo{position:absolute;inset:0;background:var(--velo);-webkit-backdrop-filter:blur(10px) saturate(140%);backdrop-filter:blur(10px) saturate(140%);opacity:0;transition:opacity 320ms cubic-bezier(.32,.72,0,1)}
+.nc2 .nc2-on .nc2-velo{opacity:1}
+.nc2 .nc2-area{position:absolute;inset:var(--it) var(--ir) 0 0;display:flex;align-items:flex-end;justify-content:center;pointer-events:none}
+.nc2 .nc2-hoja{position:relative;width:100%;display:flex;flex-direction:column;padding:0 16px calc(var(--ib) + 12px);border-radius:22px 22px 0 0;background:var(--sup);box-shadow:var(--sombra-capa);visibility:hidden;transform:translateY(100%);transition:transform 320ms cubic-bezier(.32,.72,0,1),opacity 320ms cubic-bezier(.32,.72,0,1),visibility 0s linear 320ms}
+.nc2 .nc2-on .nc2-hoja{pointer-events:auto;visibility:visible;transform:none;transition-delay:0s}
+.nc2 .nc2-asa{display:block;flex:none;width:36px;height:5px;border-radius:999px;background:var(--borde);margin:8px auto 0}
+.nc2 .nc2-hoja h2{margin-top:14px;font-size:17px;line-height:22px;font-weight:700}
+.nc2 .nc2-aviso{margin-top:6px;font-size:14px;line-height:20px;color:var(--tinta2);text-align:justify;-webkit-hyphens:auto;hyphens:auto;-webkit-hyphenate-limit-before:3;-webkit-hyphenate-limit-after:3;hyphenate-limit-chars:7 3 3}
+.nc2 .nc2-ta{width:100%;height:120px;margin-top:14px;padding:12px;border-radius:12px;background:var(--sup2);font-size:16px;line-height:24px}
+.nc2 .nc2-ta:focus-visible{outline:2px solid var(--enlace)}
+.nc2 .nc2-ferr{margin-top:8px;font-size:13px;line-height:18px;font-weight:600;color:var(--mal-tinta)}
+.nc2 .nc2-acc{display:flex;align-items:center;gap:10px;margin-top:14px}
+.nc2 .nc2-bot{flex:1 1 0;display:inline-flex;align-items:center;justify-content:center;gap:8px;height:44px;padding:0 16px;border-radius:12px;font-size:15px;line-height:20px;font-weight:600;white-space:nowrap}
+.nc2 .nc2-quieto{background:var(--sup2);color:var(--tinta)}
+.nc2 .nc2-prim{background:var(--accion);color:#fff}
+.nc2 .nc2-prim[aria-disabled="true"]{opacity:.6}
+.nc2 .nc2-prim[aria-disabled="true"]:active{transform:none}
+
+/* ---- Duo abierto y computadora ---- */
+.nc2[data-vp="ih"] .nc2-top-f,.nc2[data-vp="esc"] .nc2-top-f,.nc2[data-vp="ih"] .nc2-volver,.nc2[data-vp="esc"] .nc2-volver{min-height:36px}
+.nc2[data-vp="ih"] .nc2-ton::after,.nc2[data-vp="esc"] .nc2-ton::after{inset:-2px 0}
+.nc2[data-vp="ih"] .nc2-top h1,.nc2[data-vp="esc"] .nc2-top h1{margin-top:4px;font-size:32px;line-height:38px}
+.nc2[data-vp="ih"] .nc2-nota{margin-top:20px;padding:24px 24px;border-radius:18px}
+.nc2[data-vp="esc"] .nc2-nota{margin-top:20px;padding:28px 32px;border-radius:20px}
+.nc2[data-vp="ih"] .nc2-pares,.nc2[data-vp="esc"] .nc2-pares{display:flex;gap:12px 32px}
+.nc2[data-vp="ih"] .nc2-datos,.nc2[data-vp="esc"] .nc2-datos{padding:16px 0 18px}
+.nc2[data-vp="esc"] .nc2-datos{display:grid;grid-template-columns:auto 1fr;gap:8px 48px;align-items:start}
+.nc2[data-vp="esc"] .nc2-rot{grid-column:1/-1}
+.nc2[data-vp="esc"] .nc2-datos .nc2-pares{margin-top:0}
+.nc2[data-vp="ih"] .nc2-sec,.nc2[data-vp="esc"] .nc2-sec{margin-top:26px}
+.nc2[data-vp="ih"] .nc2-datos+.nc2-sec,.nc2[data-vp="esc"] .nc2-datos+.nc2-sec{margin-top:22px}
+.nc2[data-vp="ih"] .nc2-firma,.nc2[data-vp="esc"] .nc2-firma{margin-top:28px}
+.nc2[data-vp="ih"] .nc2-acl,.nc2[data-vp="esc"] .nc2-acl{margin-top:32px}
+.nc2[data-vp="ih"] .nc2-acl-cab h2,.nc2[data-vp="esc"] .nc2-acl-cab h2{font-size:20px;line-height:25px}
+.nc2[data-vp="ih"] .nc2-seq{padding:0 24px;border-radius:18px}
+.nc2[data-vp="esc"] .nc2-seq{padding:4px 32px;border-radius:20px}
+.nc2[data-vp="ih"] .nc2-area{right:calc(218px + var(--ir));bottom:var(--ib);align-items:center}
+.nc2[data-vp="esc"] .nc2-area{left:248px;align-items:center}
+.nc2[data-vp="ih"] .nc2-hoja,.nc2[data-vp="esc"] .nc2-hoja{border-radius:20px;padding:8px 24px 24px;opacity:0;transform:translateY(12px) scale(.97)}
+.nc2[data-vp="ih"] .nc2-on .nc2-hoja,.nc2[data-vp="esc"] .nc2-on .nc2-hoja{opacity:1;transform:none}
+.nc2[data-vp="ih"] .nc2-hoja{width:420px}
+.nc2[data-vp="esc"] .nc2-hoja{width:480px}
+.nc2[data-vp="ih"] .nc2-asa,.nc2[data-vp="esc"] .nc2-asa{display:none}
+.nc2[data-vp="ih"] .nc2-acc,.nc2[data-vp="esc"] .nc2-acc{justify-content:flex-end;margin-top:16px}
+.nc2[data-vp="ih"] .nc2-bot,.nc2[data-vp="esc"] .nc2-bot{flex:none;height:38px;min-width:104px;padding:0 18px;border-radius:10px;font-size:14px}
+.nc2[data-vp="ih"] .nc2-guarda,.nc2[data-vp="esc"] .nc2-guarda{min-width:160px}
+/* Duo abierto: el modal cruza la bisagra (preferencia del dueño), pero sus dos botones se centran a la izquierda de x 455 */
+.nc2[data-vp="ih"] .nc2-acc{justify-content:center}
+.nc2[data-vp="ih"] .nc2-bot{min-width:92px;padding:0 14px}
+.nc2[data-vp="ih"] .nc2-guarda{min-width:148px}
+.nc2[data-vp="esc"] .nc2-ta{font-size:15px;line-height:22px}
+
+/* ---- Tira de controles de la maqueta (vive fuera del marco) ---- */
+.nc2-tira{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:10px;font:600 12px/16px var(--fuente);color:var(--tinta2)}
+.nc2-tira span{margin-right:2px;letter-spacing:.3px;text-transform:uppercase}
+.nc2-tira button{height:28px;padding:0 10px;border:1px dashed var(--tinta3);border-radius:999px;background:transparent;color:var(--tinta2);font:inherit;cursor:pointer}
+.nc2-tira button:hover{color:var(--tinta);border-color:var(--tinta2)}
+.nc2-tira button[aria-pressed="true"]{border-style:solid;border-color:var(--enlace);color:var(--enlace)}
+.nc2-tira button:focus-visible{outline:3px solid var(--enlace);outline-offset:2px}
+
+@media (prefers-reduced-transparency:reduce){.nc2 .nc2-velo{-webkit-backdrop-filter:none;backdrop-filter:none;background:rgba(8,14,26,.72)}}
+/* Movimiento reducido: fundido corto en lugar de deslizar; sin giro */
+@media (prefers-reduced-motion:reduce){
+  .nc2 .nc2-hoja,.nc2 .nc2-on .nc2-hoja{transform:none!important;opacity:0;transition:opacity 200ms ease,visibility 0s linear 200ms}
+  .nc2 .nc2-on .nc2-hoja{opacity:1!important;transition-delay:0s}
+  .nc2 .nc2-velo{transition:opacity 200ms ease}
+  .nc2 .nc2-p{transition:none}
+  .nc2 .nc2-giro,.nc2 .nc2-nueva{animation:none}
+}

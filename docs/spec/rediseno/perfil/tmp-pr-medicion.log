@@ -1,0 +1,141 @@
+ext 01-datos OK scroll=2698 
+ext 02-firma OK scroll=2698 
+ext 03-paleta OK scroll=2698 
+ext 04-final OK scroll=2698 
+ext 05-barra-paleta OK scroll=2858 
+ext 06-barra-final OK scroll=2858 
+ext 07-barra-inicio OK scroll=2858 
+ext 08-guardado-toast OK scroll=2698 
+ext 09-cedula-esp2 OK scroll=2997 
+ext 10-logo OK scroll=2997 
+ext 11-firma-trazo OK scroll=2744 
+ext 12-firma-previa OK scroll=2652 
+ext 13-firma-guardada OK scroll=2632 
+ext 14-identidad-con-firma OK scroll=2632 
+ext 15-invitado OK scroll=1732 
+ext 16-invitado-clinica OK scroll=1732 
+ext 17-invitado-google OK scroll=11 
+ext 20-cons OK scroll=463 
+ext 21-cons-final OK scroll=463 
+ext 22-hoja-agregar OK scroll=463 capa=0,157,382,678 cs=0
+ext 23-hoja-agregar-llena OK scroll=463 capa=0,41,382,678 cs=0
+ext 23b-hoja-final OK scroll=463 capa=0,41,382,678 cs=0
+ext 24-hoja-editar OK scroll=463 capa=0,157,382,678 cs=0
+ext 25-alerta-borrar OK scroll=463 capa=28,97,354,581 cs=0
+ext 26-borrado-toast OK scroll=334 
+ext 27-predeterminado OK scroll=334 
+ext 28-cons-vacio OK scroll=211 
+ext 29-cons-tope OK scroll=465 
+ext 30-google-off OK scroll=327 
+ext 31-google-on OK scroll=521 
+ext 31b-google-on-final OK scroll=521 
+ext 32-alerta-recrear OK scroll=521 capa=28,125,354,553 cs=0
+ext 33-google-err OK scroll=165 
+ext 34-google-aviso OK scroll=523 
+ext 34b-google-aviso-final OK scroll=523 
+tel 01-datos OK scroll=2431 
+tel 02-firma OK scroll=2431 
+tel 03-paleta OK scroll=2431 
+tel 04-final OK scroll=2431 
+tel 05-barra-paleta OK scroll=2591 
+tel 06-barra-final OK scroll=2591 
+tel 07-barra-inicio OK scroll=2591 
+tel 08-guardado-toast OK scroll=2431 
+tel 09-cedula-esp2 OK scroll=2710 
+tel 10-logo OK scroll=2710 
+tel 11-firma-trazo OK scroll=2495 
+tel 12-firma-previa OK scroll=2403 
+tel 13-firma-guardada OK scroll=2383 
+tel 14-identidad-con-firma OK scroll=2383 
+tel 15-invitado OK scroll=1495 
+tel 16-invitado-clinica OK scroll=1495 
+tel 17-invitado-google OK scroll=0 
+tel 20-cons OK scroll=410 
+tel 21-cons-final OK scroll=410 
+tel 22-hoja-agregar OK scroll=410 capa=0,275,393,852 cs=0
+tel 23-hoja-agregar-llena OK scroll=410 capa=0,157,393,852 cs=0
+tel 23b-hoja-final OK scroll=410 capa=0,157,393,852 cs=0
+tel 24-hoja-editar OK scroll=410 capa=0,275,393,852 cs=0
+tel 25-alerta-borrar OK scroll=410 capa=25,184,369,668 cs=0
+tel 26-borrado-toast OK scroll=281 
+tel 27-predeterminado OK scroll=281 
+tel 28-cons-vacio OK scroll=158 
+tel 29-cons-tope OK scroll=382 
+tel 30-google-off OK scroll=210 
+tel 31-google-on OK scroll=346 
+tel 31b-google-on-final OK scroll=346 
+tel 32-alerta-recrear OK scroll=346 capa=25,212,369,640 cs=0
+tel 33-google-err OK scroll=58 
+tel 34-google-aviso OK scroll=376 
+tel 34b-google-aviso-final OK scroll=376 
+ih 01-datos OK scroll=2100 
+ih 02-firma OK scroll=2100 
+ih 03-paleta OK scroll=2100 
+ih 04-final OK scroll=2100 
+ih 05-barra-paleta OK scroll=2232 
+ih 06-barra-final OK scroll=2232 
+ih 07-barra-inicio OK scroll=2232 
+ih 08-guardado-toast OK scroll=2100 
+ih 09-cedula-esp2 OK scroll=2282 
+ih 10-logo OK scroll=2282 
+ih 11-firma-trazo OK scroll=2164 
+ih 12-firma-previa OK scroll=2078 
+ih 13-firma-guardada OK scroll=2002 
+ih 14-identidad-con-firma OK scroll=2002 
+ih 15-invitado OK scroll=1280 
+ih 16-invitado-clinica OK scroll=1280 
+ih 17-invitado-google OK scroll=0 
+ih 20-cons OK scroll=349 
+ih 21-cons-final OK scroll=349 
+ih 22-hoja-agregar OK scroll=349 capa=28,24,447,478 cs=0
+ih 23-hoja-agregar-llena OK scroll=349 capa=28,24,447,590 cs=0
+ih 23b-hoja-final OK scroll=349 capa=28,24,447,590 cs=0
+ih 24-hoja-editar OK scroll=349 capa=28,24,447,478 cs=0
+ih 25-alerta-borrar OK scroll=349 capa=38,99,418,571 cs=0
+ih 26-borrado-toast OK scroll=228 
+ih 27-predeterminado OK scroll=228 
+ih 28-cons-vacio OK scroll=137 
+ih 29-cons-tope OK scroll=329 
+ih 30-google-off OK scroll=163 
+ih 31-google-on OK scroll=233 
+ih 31b-google-on-final OK scroll=233 
+ih 32-alerta-recrear OK scroll=233 capa=38,127,418,543 cs=0
+ih 33-google-err OK scroll=83 
+ih 34-google-aviso OK scroll=269 
+ih 34b-google-aviso-final OK scroll=269 
+esc 01-datos OK scroll=1510 
+esc 02-firma OK scroll=1510 
+esc 03-paleta OK scroll=1510 
+esc 04-final OK scroll=1510 
+esc 05-barra-paleta OK scroll=1598 
+esc 06-barra-final OK scroll=1598 
+esc 07-barra-inicio OK scroll=1598 
+esc 08-guardado-toast OK scroll=1510 
+esc 09-cedula-esp2 OK scroll=1648 
+esc 10-logo OK scroll=1648 
+esc 11-firma-trazo OK scroll=1574 
+esc 12-firma-previa OK scroll=1488 
+esc 13-firma-guardada OK scroll=1412 
+esc 14-identidad-con-firma OK scroll=1412 
+esc 15-invitado OK scroll=874 
+esc 16-invitado-clinica OK scroll=874 
+esc 17-invitado-google OK scroll=0 
+esc 20-cons OK scroll=52 
+esc 21-cons-final OK scroll=52 
+esc 22-hoja-agregar OK scroll=52 capa=504,72,1024,560 cs=0
+esc 23-hoja-agregar-llena OK scroll=52 capa=504,72,1024,660 cs=0
+esc 23b-hoja-final OK scroll=52 capa=504,72,1024,660 cs=0
+esc 24-hoja-editar OK scroll=52 capa=504,72,1024,560 cs=0
+esc 25-alerta-borrar OK scroll=52 capa=554,226,974,574 cs=0
+esc 26-borrado-toast OK scroll=0 
+esc 27-predeterminado OK scroll=0 
+esc 28-cons-vacio OK scroll=0 
+esc 29-cons-tope OK scroll=52 
+esc 30-google-off OK scroll=30 
+esc 31-google-on OK scroll=50 
+esc 31b-google-on-final OK scroll=50 
+esc 32-alerta-recrear OK scroll=50 capa=554,218,974,582 cs=0
+esc 33-google-err OK scroll=0 
+esc 34-google-aviso OK scroll=136 
+esc 34b-google-aviso-final OK scroll=136 
+errores de consola: 0 · estados con hallazgos: 0

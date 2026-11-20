@@ -1,0 +1,91 @@
+
+/* ================= TERCERA REVISIÓN DEL DUEÑO (CALMA §17–22): unificación =================
+   Las reglas de ih se extienden a iv en la misma regla al generar (tools/tmp-u4-iv.py). Aquí, solo lo que cambia. */
+
+/* ---- §19 · Duo abierto vertical: encabezado fundido con pista de secciones (maqueta de referencia del dueño) ---- */
+.nn[data-vp="iv"] .nn-app{flex-direction:column}
+.nn .nn-fun{position:relative;z-index:1;flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:calc(var(--it) + 0px) 16px 14px;background:var(--navy);border-radius:0 0 26px 26px;box-shadow:var(--sombra-nav-sup)}
+.nn .nn-fun-b{width:44px;height:44px;flex:none;border-radius:22px;background:var(--nav-velo);color:#fff;display:flex;align-items:center;justify-content:center}
+.nn .nn-pista{display:flex;align-items:center;gap:2px;padding:4px;border-radius:26px;background:var(--nav-velo)}
+.nn .nn-pl{position:relative;display:flex;align-items:center;height:40px;padding:0 14px;border-radius:20px;color:var(--nav-tinta);font-size:15px;line-height:20px;font-weight:500;white-space:nowrap}
+.nn .nn-pl::after{content:"";position:absolute;inset:-2px 0}
+.nn .nn-pl[aria-current="page"]{padding:0 16px;background:var(--accion);color:#fff;font-weight:600}
+.nn .nn-fun .nn-p:focus-visible{outline-color:var(--nav-tinta)}
+.nn[data-vp="iv"] .nn-cont{padding:22px 24px 8px}
+.nn[data-vp="iv"] .nn-barra{padding-top:10px}
+
+/* ---- §18/§19/§21 · Capas centradas en el área de contenido, con los anchos de computadora; sin maniobras por la bisagra ---- */
+.nn[data-vp="ih"] .nn-hoja.nn-alta{width:520px;left:calc((100% - 218px - var(--ir)) / 2 - 260px)}
+.nn[data-vp="iv"] .nn-hoja{top:calc(50% + (var(--it) - var(--ib)) / 2);left:calc(50% - 220px);max-height:calc(100% - var(--it) - var(--ib) - 96px)}
+.nn[data-vp="iv"] .nn-hoja.nn-alta{left:calc(50% - 260px)}
+.nn[data-vp="ih"] .nn-alerta{left:calc((100% - 218px - var(--ir)) / 2 - 170px);width:340px}
+.nn[data-vp="iv"] .nn-alerta{left:calc(50% - 170px);width:340px}
+/* Pie de hoja en ih/iv/esc: botones a la derecha, ancho mínimo 104 (deja de estirarse el principal para esquivar la bisagra) */
+.nn[data-vp="ih"] .nn-hj-p,.nn[data-vp="esc"] .nn-hj-p{display:flex;justify-content:flex-end;gap:8px}
+.nn[data-vp="ih"] .nn-hj-p .nn-flex,.nn[data-vp="esc"] .nn-hj-p .nn-flex{display:none}
+.nn[data-vp="ih"] .nn-hj-p .nn-prim,.nn[data-vp="esc"] .nn-hj-p .nn-prim,.nn[data-vp="ih"] .nn-hj-p .nn-ton,.nn[data-vp="esc"] .nn-hj-p .nn-ton{flex:none;min-width:104px}
+/* En iv el «···» es una tarjeta centrada con velo (§21), como en ih */
+
+/* ---- §21 · Rejilla de tipos idéntica a la del resto de la app: superficie --sup, celdas --sup2, contorno --accion en el tipo actual ---- */
+.nn .nn-rej-h{margin-top:14px;padding:12px;border-radius:16px;background:var(--sup)}
+.nn[data-vp="ext"] .nn-rej-h{margin-top:10px}
+.nn[data-vp="ih"] .nn-rej-h,.nn[data-vp="esc"] .nn-rej-h{margin-top:16px;padding:14px;border-radius:18px}
+.nn[data-vp] .nn-rej-h .nn-rej{margin-top:0}
+.nn .nn-az{min-height:84px;background:var(--sup2)}
+.nn[data-vp="ext"] .nn-az{min-height:84px}
+.nn .nn-az[aria-current]{box-shadow:inset 0 0 0 2px var(--accion)}
+
+/* ---- Punto 4 · Una sola lista de medicamentos (la de «Detecté estos medicamentos», con «Quitar»), bajo una línea divisoria ---- */
+.nn .nn-doc .nn-meds{margin-top:22px;padding-top:16px;border-top:1px solid var(--linea)}
+
+/* ---- §20 · Justificado también en los mensajes cortos de alerta: la última línea va centrada para que una frase sola no quede cargada a la izquierda ---- */
+.nn .nn-alerta .nn-al-m.nn-al-c{text-align:justify;text-align-last:center;-webkit-hyphens:auto;hyphens:auto}
+
+/* (§23.14: el velo oscuro ya viene de base.css, rgba(0,0,0,.35); se retiró el aclarado propio) */
+
+/* ---- §19 · iv es táctil: áreas de toque ≥ 44 (gana a las reglas de ih copiadas, por especificidad) ---- */
+.nn.marco[data-vp="iv"] .nn-top-f,.nn.marco[data-vp="iv"] .nn-volver,.nn.marco[data-vp="iv"] .nn-txt,.nn.marco[data-vp="iv"] .nn-quitar,.nn.marco[data-vp="iv"] .nn-op{min-height:44px}
+.nn.marco[data-vp="iv"] .nn-ib{width:44px;height:44px}
+.nn.marco[data-vp="iv"] .nn-barra .nn-prim,.nn.marco[data-vp="iv"] .nn-hj-p .nn-prim,.nn.marco[data-vp="iv"] .nn-ton,.nn.marco[data-vp="iv"] .nn-al-p .nn-bt,.nn.marco[data-vp="iv"] .nn-al-p .nn-prim{height:44px;font-size:15px}
+.nn.marco[data-vp="iv"] .nn-ac{min-height:44px;font-size:15px}
+.nn.marco[data-vp="iv"] .nn-vi,.nn.marco[data-vp="iv"] .nn-fi,.nn.marco[data-vp="iv"] .nn-sel{height:44px}
+.nn.marco[data-vp="iv"] .nn-vc::before{inset:4px 0}
+.nn.marco[data-vp="iv"] .nn-fila:not(.nn-fila-a){min-height:48px}
+.nn.marco[data-vp="iv"] .nn-rx-x{margin:-4px -10px -4px 0}
+
+/* ================= CUARTA PASADA (CALMA §23) ================= */
+/* §23.8 · Regreso con el nombre del paciente: si no cabe, se trunca con puntos suspensivos y nunca empuja las acciones de la fila */
+.nn .nn-top-f .nn-volver{flex:0 1 auto;min-width:0;overflow:hidden}
+.nn .nn-volver svg{flex:none}
+.nn .nn-volver-t{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nn .nn-top-f>.nn-flex{flex:1 1 0;min-width:4px}
+.nn .nn-top-f>.nn-b-ed,.nn .nn-top-f>.nn-ib{flex:none}
+/* §23.1 · iv: el par del pie (secundario, principal) CENTRADO en la columna; nada a menos de 96 px de los bordes del marco */
+.nn[data-vp="iv"] .nn-barra{padding-left:96px;padding-right:96px}
+.nn[data-vp="iv"] .nn-barra-f{justify-content:center}
+.nn[data-vp="iv"] .nn-barra .nn-prim{min-width:104px;max-width:100%}
+/* Partición de palabras. Causa real de que la nota no partiera: «text-wrap:pretty» en .nn-sec p (Chromium evita la última línea corta empujando palabras
+   en vez de partirlas, y con justificado abre ríos); se quitó en estilo2. Además los campos de texto corrido también justifican y parten (lang="es" está en el marco) */
+.nn .nn-dict,.nn .nn-nota-ta,.nn .nn-mta,.nn .nn-ctx-ta{text-align:justify;-webkit-hyphens:auto;hyphens:auto}
+.nn .nn-dict::placeholder,.nn .nn-mta::placeholder,.nn .nn-ctx-ta::placeholder{text-align:left}
+/* «Nota guardada» en iv: la nota sellada queda a la vista bajo la rejilla, como en computadora (por eso «Ver nota» no se repite).
+   Cierra el hueco de ~260 px entre la rejilla y el pie sin añadir contenido nuevo. */
+.nn[data-vp="iv"][data-e="ok"] .nn-card{order:3;flex:none;margin-top:16px;padding-top:8px}
+.nn[data-vp="iv"][data-e="ok"] .nn-acc{order:1;grid-template-columns:repeat(2,minmax(0,1fr))}
+.nn[data-vp="iv"][data-e="ok"] .nn-rej-h{order:2}
+
+/* §23.1 · ih y esc: secundario a la izquierda, principal a la DERECHA, el par pegado a la derecha de la columna */
+.nn[data-vp="ih"] .nn-barra-f,.nn[data-vp="esc"] .nn-pie{justify-content:flex-end}
+.nn[data-vp="esc"][data-e] .nn-pie .nn-ini{margin-left:0}
+.nn[data-vp="esc"] .nn-pie .nn-ayuda{margin:0 8px 0 0;text-align:right}
+/* §21 · Rejilla en esc: los nombres caben enteros en una línea (sin partir letra a letra): menos relleno de rejilla y de celda, misma letra 14/18 */
+.nn[data-vp="ih"] .nn-az-n,.nn[data-vp="iv"] .nn-az-n,.nn[data-vp="esc"] .nn-az-n{overflow-wrap:normal}
+.nn[data-vp="esc"] .nn-rej-h{padding:12px}
+.nn[data-vp="esc"] .nn-rej{gap:10px}
+.nn[data-vp="esc"] .nn-az{padding:14px 8px}
+/* iv: columna centrada de 600, como el resto de vistas */
+.nn[data-vp="iv"] .nn-cont{padding-left:calc((100% - 600px) / 2);padding-right:calc((100% - 600px) / 2)}
+/* iv · receta: la papelera de 44 no invade la fila de abajo (sin margen vertical negativo) */
+.nn.marco[data-vp="iv"] .nn-rx-x{margin:0 -10px 0 0}
+/* iv sigue CENTRADO (§23.1): gana a la regla de ih copiada a iv por el generador */
+.nn.marco[data-vp="iv"] .nn-barra-f{justify-content:center}

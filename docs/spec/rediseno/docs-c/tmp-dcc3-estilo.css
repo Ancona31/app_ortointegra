@@ -1,0 +1,97 @@
+
+/* ===================== TERCERA REVISIÓN DEL DUEÑO (CALMA §17–22): unificación ===================== */
+/* ---- §21 · Rejilla de tipos idéntica en toda la app: hoja --sup, celdas --sup2, contorno de 2 px --accion en el tipo actual ---- */
+.PX .PX-az{background:var(--sup2)}
+.PX .PX-az[aria-current="true"]{box-shadow:inset 0 0 0 2px var(--accion)}
+
+/* ---- Pareja de las alertas «Cambiar» / «Gestionar»: siempre lado a lado ---- */
+.PX .PX-alerta .PX-par:has(.PX-camb-ok),.PX .PX-alerta .PX-par:has(.PX-tope-ok){flex-wrap:nowrap}
+.PX .PX-alerta .PX-par:has(.PX-camb-ok)>*,.PX .PX-alerta .PX-par:has(.PX-tope-ok)>*{flex:1 1 0;min-width:0}
+
+/* ---- §18 · Duo abierto horizontal: capas centradas con los anchos de computadora, sin esquivar la bisagra ---- */
+.PX[data-vp="ih"] .PX-alerta{width:340px}
+.PX[data-vp="ih"] .PX-hoja.PX-alta{width:520px}
+/* rejilla y firmado: 640 si caben con 16 de margen; el área de ih mide 951 − 218 − 84 = 649, así que va a 649 − 32 = 617 */
+.PX[data-vp="ih"] .PX-hoja.PX-ancha{width:calc(951px - 218px - var(--ir) - 32px)}
+.PX[data-vp="ih"] .PX-fi{width:calc(951px - 218px - var(--ir) - 32px)}
+
+/* ---- §17/§21 · Duo cerrado: «Cambiar» baja a botón de TEXTO (13/600 --enlace, área 44); la pantalla queda con dos botones con fondo ---- */
+.PX[data-vp="ext"] .PX-camb{height:44px;padding:0 8px;border-radius:10px;background:none;color:var(--enlace);font-size:13px;line-height:18px;font-weight:600}
+.PX[data-vp="ext"] .PX-camb::after{inset:0}
+.PX[data-vp="ext"] .PX-camb:active{background:var(--sup2)}
+
+/* ---- §19 · Quinto marco: Duo abierto en VERTICAL (669×951). Parte de la composición de ih (duplicada arriba) y corrige lo propio ---- */
+.PX[data-vp="iv"] .PX-app{flex-direction:column}
+/* Navegación: encabezado fundido con botón de barra lateral, pista de secciones y avatar (maqueta de referencia del dueño) */
+.PX.PX[data-vp="iv"] .PX-enc-iv{justify-content:space-between;gap:12px;padding:calc(var(--it) + 0px) 16px 14px}
+.PX .PX-lat-b{border-radius:999px}
+.PX .PX-pista{display:flex;align-items:center;gap:2px;padding:4px;border-radius:26px;background:var(--nav-velo)}
+.PX .PX-pi{display:flex;align-items:center;height:40px;padding:0 14px;border-radius:20px;color:var(--nav-tinta);font-size:15px;line-height:20px;font-weight:500;white-space:nowrap}
+.PX .PX-pi{position:relative}
+.PX .PX-pi::after{content:"";position:absolute;inset:-2px 0}
+.PX .PX-pi[aria-current="page"]{padding:0 16px;background:var(--accion);color:#fff;font-weight:600}
+.PX .PX-pi:focus-visible{outline-color:var(--nav-tinta)}
+/* Contenido: margen 24; columna de formulario de 600 centrada; barra de acción alineada a la columna */
+.PX.PX[data-vp="iv"] .PX-cont{padding:20px 24px 28px}
+.PX.PX[data-vp="iv"] .PX-form{width:600px;max-width:none;margin:0 auto}
+.PX.PX[data-vp="iv"] .PX-barra{padding:10px 24px calc(var(--ib) + 16px)}
+.PX.PX[data-vp="iv"] .PX-barra>*{width:600px;max-width:none;margin-left:auto;margin-right:auto}
+/* Filas: etiqueta de ~180 a la izquierda, valor a la derecha */
+.PX.PX[data-vp="iv"] .PX-ln{width:180px}
+.PX.PX[data-vp="iv"] .PX-in{margin-left:-180px;padding-left:180px}
+.PX.PX[data-vp="iv"] .PX-f:has(.PX-ta) .PX-ln{width:auto}
+/* Táctil: áreas de toque de 44 (el dibujo puede ser menor) */
+.PX.PX[data-vp="iv"] .PX-top-f{min-height:44px}
+.PX.PX[data-vp="iv"] .PX-volver{min-height:44px}
+.PX.PX[data-vp="iv"] .PX-ib{width:44px;height:44px}
+.PX.PX[data-vp="iv"] .PX-txt{min-height:44px}
+.PX.PX[data-vp="iv"] .PX-xc::before{inset:6px}
+.PX.PX[data-vp="iv"] .PX-qui,.PX.PX[data-vp="iv"] .PX-ton,.PX.PX[data-vp="iv"] .PX-mal,.PX.PX[data-vp="iv"] .PX-prim,
+.PX.PX[data-vp="iv"] .PX-barra .PX-qui,.PX.PX[data-vp="iv"] .PX-barra .PX-prim,.PX.PX[data-vp="iv"] .PX-capa .PX-prim,.PX.PX[data-vp="iv"] .PX-firma .PX-prim,
+.PX.PX[data-vp="iv"] .PX-hj-p .PX-prim,.PX.PX[data-vp="iv"] .PX-bloque .PX-prim,.PX.PX[data-vp="iv"] .PX-fi-acc .PX-prim{height:40px;padding:0 16px;border-radius:12px;font-size:15px}
+.PX.PX[data-vp="iv"] .PX-qui::after,.PX.PX[data-vp="iv"] .PX-ton::after,.PX.PX[data-vp="iv"] .PX-mal::after,.PX.PX[data-vp="iv"] .PX-prim::after{content:"";position:absolute;inset:-2px 0}
+.PX.PX[data-vp="iv"] .PX-ch,.PX.PX[data-vp="iv"] .PX-pl-acc .PX-ch{height:32px;padding:0 12px;border-radius:10px;font-size:13px}
+.PX.PX[data-vp="iv"] .PX-ch::after{inset:-6px 0}
+.PX.PX[data-vp="iv"] .PX-par>*{height:auto;min-height:40px}
+.PX.PX[data-vp="iv"] .PX-seg button::after{inset:-6px 0}
+.PX.PX[data-vp="iv"] .PX-linea .PX-txt::after,.PX.PX[data-vp="iv"] .PX-faltan button::after{inset:-13px -6px}
+.PX.PX[data-vp="iv"] .PX-mr{min-height:48px}
+.PX.PX[data-vp="iv"] .PX-campo{height:44px;font-size:16px}
+/* Honorarios: la columna de quitar mide 44 */
+.PX.PX[data-vp="iv"]{--cols:minmax(0,1fr) 150px 44px}
+.PX.PX[data-vp="iv"][data-v="b"]{--cols:minmax(0,1fr) 150px 120px 44px}
+.PX.PX[data-vp="iv"] .PX-cl-sug button{min-height:44px;font-size:15px}
+.PX.PX[data-vp="iv"] .PX-tot{padding-right:64px}
+/* Capas: centradas en el marco (entre la barra de estado y el indicador), con los anchos de ih/esc */
+.PX.PX[data-vp="iv"]{--cx0:0px;--cx1:0px}
+.PX.PX[data-vp="iv"] .PX-hoja{left:0;right:0;top:var(--it);bottom:var(--ib);width:440px;max-height:calc(100% - var(--it) - var(--ib) - 48px)}
+.PX.PX[data-vp="iv"] .PX-hoja.PX-menu{width:320px}
+.PX.PX[data-vp="iv"] .PX-hoja.PX-alta{width:520px}
+/* rejilla: 640 no cabe con 16 de margen en 669, así que va a 669 − 32 = 637 */
+.PX.PX[data-vp="iv"] .PX-hoja.PX-ancha{width:calc(669px - 32px)}
+.PX.PX[data-vp="iv"] .PX-alerta{left:0;right:0;top:var(--it);bottom:var(--ib);width:340px;max-height:calc(100% - var(--it) - var(--ib) - 48px)}
+/* Firmado: modal de 600 centrado con el papel de firma amplio */
+.PX.PX[data-vp="iv"] .PX-fi{left:0;right:0;top:var(--it);bottom:var(--ib);width:600px;max-height:calc(100% - var(--it) - var(--ib) - 32px)}
+.PX.PX[data-vp="iv"] .PX-papel{flex:none;height:320px;max-height:none}
+.PX.PX[data-vp="iv"] .PX-rec{max-height:none;width:420px}
+.PX.PX[data-vp="iv"] .PX-fi-acc{margin-top:16px}
+
+/* Pie del firmado a la derecha también en Duo abierto (horizontal y vertical), como en computadora (CALMA §18, §21) */
+.PX[data-vp="ih"] .PX-solo-esc,.PX[data-vp="iv"] .PX-solo-esc{display:block}
+
+/* ---- Igualado con docs-a: píldoras con área ±4, contenido 22/24, etiqueta de ~188, capas táctiles de 44 y campos de 48 en iv ---- */
+.PX .PX-pi::after{inset:-4px 0}
+.PX.PX[data-vp="iv"] .PX-cont{padding:22px 24px 28px}
+.PX.PX[data-vp="iv"] .PX-ln{width:188px}
+.PX.PX[data-vp="iv"] .PX-in{margin-left:-188px;padding-left:188px}
+.PX.PX[data-vp="iv"] .PX-capa .PX-qui,.PX.PX[data-vp="iv"] .PX-capa .PX-ton:not(.PX-ch),.PX.PX[data-vp="iv"] .PX-capa .PX-mal:not(.PX-ch),.PX.PX[data-vp="iv"] .PX-capa .PX-prim,
+.PX.PX[data-vp="iv"] .PX-firma .PX-qui:not(.PX-ch),.PX.PX[data-vp="iv"] .PX-firma .PX-prim{height:44px}
+.PX.PX[data-vp="iv"] .PX-capa .PX-par>*{min-height:44px}
+.PX.PX[data-vp="iv"] .PX-capa .PX-ch{height:32px}
+.PX.PX[data-vp="iv"] .PX-campo{height:48px}
+
+/* ---- CUARTA PASADA (CALMA §23.1): barra del pie con el principal a la DERECHA. ih/esc: el par pegado a la derecha de la columna;
+        iv: el par centrado en la columna (el navegador flota controles en las esquinas inferiores; nada a menos de 96 px de los bordes) ---- */
+.PX[data-vp="ih"] .PX-barra-f,.PX[data-vp="esc"] .PX-barra-f{justify-content:flex-end}
+.PX.PX[data-vp="iv"] .PX-barra-f{justify-content:center}
+.PX.PX[data-vp="iv"] .PX-barra .PX-faltan{text-align:center}

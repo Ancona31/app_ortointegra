@@ -1,0 +1,487 @@
+/* ===== Taller de documentos · chasis común. QQ = prefijo de la vista (db5, db6, db7). Todos los selectores empiezan por él ===== */
+.QQ .QQ-app{display:flex;width:100%;height:100%}
+.QQ[data-vp="tel"] .QQ-app,.QQ[data-vp="iv"] .QQ-app{flex-direction:column}
+.QQ button{border:0;margin:0;padding:0;background:none;color:inherit}
+.QQ h1,.QQ h2,.QQ h3,.QQ p,.QQ ul,.QQ ol,.QQ dl,.QQ dt,.QQ dd{margin:0;padding:0}
+.QQ ul,.QQ ol{list-style:none}
+.QQ textarea,.QQ input{margin:0;padding:0;border:0;outline:0;background:none;color:inherit;font:inherit;-webkit-appearance:none;appearance:none;min-width:0}
+.QQ textarea{display:block;resize:none}
+.QQ ::placeholder{color:var(--tinta3);opacity:1}
+.QQ svg{flex:none}
+.QQ [hidden]{display:none!important}
+.QQ .QQ-flex{flex:1;min-width:0}
+.QQ .QQ-num{font-variant-numeric:tabular-nums}
+.QQ .QQ-p{transition:transform 100ms ease-out}
+.QQ .QQ-p:active{transform:scale(.97)}
+.QQ .QQ-p:focus-visible{outline:3px solid var(--enlace);outline-offset:2px}
+.QQ .QQ-riel .QQ-p:focus-visible,.QQ .QQ-lat .QQ-p:focus-visible,.QQ .QQ-enc .QQ-p:focus-visible{outline-color:var(--nav-tinta)}
+.QQ[data-vp="esc"] .QQ-solo-tel,.QQ[data-vp="ih"] .QQ-solo-tel{display:none!important}
+.QQ[data-vp="ext"] .QQ-no-ext,.QQ:not([data-vp="ext"]) .QQ-solo-ext{display:none!important}
+.QQ[data-vp="ext"] .QQ-solo-ancho,.QQ[data-vp="tel"] .QQ-solo-ancho{display:none!important}
+
+/* ---- Navegación (copiada del dashboard aprobado; activo = Documentos) ---- */
+.QQ .QQ-riel{position:relative;z-index:1;flex:none;width:calc(56px + var(--ir));padding:16px calc(var(--ir) + 8px) calc(var(--ib) + 10px) 8px;background:var(--navy);border-radius:26px 0 0 26px;box-shadow:var(--sombra-nav-der);display:flex;flex-direction:column;align-items:center;gap:8px}
+.QQ .QQ-rb{width:48px;height:48px;flex:none;border-radius:999px;display:flex;align-items:center;justify-content:center;color:var(--nav-tinta)}
+.QQ .QQ-rb[aria-current="page"]{background:var(--accion);color:#fff}
+.QQ .QQ-mas{width:52px;height:52px;flex:none;border-radius:999px;background:#fff;color:var(--accion);display:flex;align-items:center;justify-content:center;box-shadow:var(--sombra-accion)}
+.QQ .QQ-enc{position:relative;z-index:1;flex:none;display:flex;align-items:center;gap:12px;padding:calc(var(--it) + 8px) 16px 12px;background:var(--navy);border-radius:0 0 26px 26px;box-shadow:var(--sombra-nav-sup);color:#fff}
+.QQ .QQ-menu-b{width:44px;height:44px;flex:none;border-radius:12px;background:var(--nav-velo);color:#fff;display:flex;align-items:center;justify-content:center}
+.QQ .QQ-enc-t{font-size:17px;line-height:22px;font-weight:700;color:#fff}
+.QQ .QQ-av{display:flex;align-items:center;justify-content:center;flex:none;width:34px;height:34px;border-radius:999px;background:var(--nav-avatar);color:var(--navy);font-size:13px;font-weight:700}
+.QQ .QQ-av.QQ-av-g{width:44px;height:44px}
+.QQ .QQ-lat{position:relative;z-index:1;flex:none;display:flex;flex-direction:column;background:var(--navy);color:#fff}
+.QQ[data-vp="ih"] .QQ-lat{width:calc(218px + var(--ir));padding:16px calc(var(--ir) + 10px) calc(var(--ib) + 10px) 12px;border-radius:26px 0 0 26px;box-shadow:var(--sombra-nav-der)}
+.QQ[data-vp="esc"] .QQ-lat{width:248px;padding:16px 12px 14px;border-radius:0 26px 26px 0;box-shadow:var(--sombra-nav-izq)}
+.QQ .QQ-lat-cab{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:36px;padding:0 4px 0 8px}
+.QQ .QQ-logo{display:inline-flex;align-items:center;gap:8px;color:#fff}
+.QQ .QQ-logo-n{font-size:17px;line-height:22px;font-weight:700;letter-spacing:-.2px}
+.QQ .QQ-plan{display:inline-flex;align-items:center;height:24px;padding:0 10px;border-radius:999px;background:var(--nav-velo);color:var(--nav-tinta);font-size:12px;line-height:16px;font-weight:600;white-space:nowrap}
+.QQ .QQ-cons-b{margin-top:12px;display:flex;align-items:center;gap:10px;min-height:52px;padding:8px 10px;border-radius:14px;background:var(--nav-velo);color:#fff;text-align:left}
+.QQ .QQ-cons-b svg{color:var(--nav-tinta2)}
+.QQ .QQ-cons-t{flex:1;min-width:0;display:flex;flex-direction:column}
+.QQ .QQ-cons-t span{font-size:13px;line-height:16px;color:var(--nav-tinta2)}
+.QQ .QQ-cons-t b{font-size:15px;line-height:19px;font-weight:600}
+.QQ .QQ-lista{margin-top:14px;display:flex;flex-direction:column;gap:2px}
+.QQ .QQ-li{display:flex;align-items:center;gap:12px;height:44px;padding:0 12px;border-radius:12px;color:var(--nav-tinta);font-size:15px;line-height:20px;font-weight:500}
+.QQ[data-vp="esc"] .QQ-li{height:40px;font-size:14px}
+.QQ .QQ-li[aria-current="page"]{background:var(--accion);color:#fff;font-weight:600}
+.QQ .QQ-lat-pie{border-top:1px solid var(--nav-velo);padding-top:8px}
+.QQ .QQ-lat .QQ-yo{height:48px}
+.QQ .QQ-yo>span{display:flex;flex-direction:column;line-height:17px}
+.QQ .QQ-yo small{font-size:12px;line-height:16px;color:var(--nav-tinta2)}
+
+/* ---- Columna de contenido ---- */
+.QQ .QQ-col{position:relative;flex:1;min-width:0;min-height:0;display:flex;flex-direction:column}
+.QQ .QQ-cont{flex:1;min-height:0;overflow-x:hidden;overflow-y:auto;scrollbar-width:none;display:flex;flex-direction:column;padding:4px 16px 16px}
+.QQ .QQ-cont>*{flex:none}
+.QQ[data-vp="tel"] .QQ-cont{padding-top:10px}
+.QQ[data-vp="ih"] .QQ-cont{padding:12px 24px 16px}
+.QQ[data-vp="esc"] .QQ-cont{padding:20px 24px 32px;scrollbar-width:thin;scrollbar-color:var(--borde) transparent}
+.QQ .QQ-form{display:flex;flex-direction:column;flex:1 0 auto;min-width:0}
+.QQ .QQ-form>*{flex:none}
+.QQ[data-vp="esc"] .QQ-form{width:640px}
+
+/* ---- Cabecera del chasis: «‹ Documentos» + «···»; icono del tipo + título + «Cambiar»; una línea ---- */
+.QQ .QQ-top-f{display:flex;align-items:center;gap:4px;min-height:44px;margin:0 -10px 0 -4px}
+.QQ .QQ-volver{display:inline-flex;align-items:center;gap:2px;min-height:44px;padding-right:8px;font-size:13px;line-height:18px;font-weight:600;color:var(--enlace);white-space:nowrap}
+.QQ .QQ-ib{width:44px;height:44px;flex:none;border-radius:999px;display:flex;align-items:center;justify-content:center;color:var(--tinta2)}
+.QQ .QQ-ib:active{background:var(--sup2)}
+.QQ .QQ-ib.QQ-ten{color:var(--tinta3)}
+.QQ .QQ-txt{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px;padding:0 8px;font-size:15px;line-height:20px;font-weight:600;color:var(--enlace);white-space:nowrap}
+.QQ .QQ-txt[aria-disabled="true"],.QQ .QQ-txt:disabled{color:var(--tinta3)}
+.QQ .QQ-txt.QQ-rojo{color:var(--mal-tinta)}
+.QQ .QQ-tit{display:flex;align-items:center;gap:10px;min-height:32px}
+.QQ .QQ-tico{flex:none;width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;color:var(--dc);background:color-mix(in srgb,var(--dc) var(--d-mezcla),var(--sup))}
+.QQ .QQ-tit h1{font-size:26px;line-height:32px;font-weight:800;letter-spacing:-.6px;white-space:nowrap}
+.QQ .QQ-tit .QQ-txt{position:relative;min-height:32px;margin-left:-2px}
+.QQ .QQ-tit .QQ-txt::after{content:"";position:absolute;inset:-6px 0}
+.QQ .QQ-sub{margin-top:4px;font-size:13px;line-height:18px;color:var(--tinta2)}
+.QQ .QQ-linea{display:flex;align-items:flex-start;gap:8px;font-size:13px;line-height:18px;color:var(--tinta2)}
+.QQ .QQ-linea .QQ-txt{position:relative;min-height:18px;padding:0;font-size:13px;line-height:18px}
+.QQ .QQ-linea .QQ-txt::after{content:"";position:absolute;inset:-13px -8px}
+.QQ .QQ-linea svg{margin-top:1px;color:var(--ag-tinta)}
+
+/* ---- Grupos estilo «ajustes»: título fuera, superficie con filas ---- */
+.QQ .QQ-g{margin-top:24px}
+.QQ .QQ-top+.QQ-g{margin-top:20px}
+.QQ .QQ-g+.QQ-g.QQ-junto{margin-top:12px}
+.QQ .QQ-g-t{display:flex;align-items:baseline;gap:8px;padding:0 16px 8px;font-size:13px;line-height:18px;font-weight:600;color:var(--tinta2)}
+.QQ .QQ-g-n{margin-left:auto;font-weight:400;font-variant-numeric:tabular-nums}
+.QQ .QQ-s{background:var(--sup);border-radius:16px}
+.QQ .QQ-r{position:relative;display:flex;align-items:center;width:100%;min-height:64px;text-align:left}
+.QQ .QQ-r:not(:first-child)::before,.QQ .QQ-lst:not(:first-child)>.QQ-r:first-child::before{content:"";position:absolute;left:16px;right:0;top:0;height:1px;background:var(--linea)}
+.QQ .QQ-lst:first-child:empty+.QQ-r::before{content:none}
+.QQ .QQ-lst{position:relative;display:block}
+.QQ .QQ-s>.QQ-r:first-child,.QQ .QQ-s>.QQ-r:first-child .QQ-in{border-radius:16px 16px 0 0}
+.QQ .QQ-s>.QQ-r:last-child,.QQ .QQ-s>.QQ-r:last-child .QQ-in{border-radius:0 0 16px 16px}
+.QQ .QQ-s>.QQ-r:only-child,.QQ .QQ-s>.QQ-r:only-child .QQ-in{border-radius:16px}
+/* Campo: la fila entera es el área del campo; la etiqueta flota arriba (teléfono) o a la izquierda (ancho) */
+.QQ .QQ-l{position:absolute;left:16px;right:16px;top:10px;display:flex;align-items:baseline;gap:6px;font-size:13px;line-height:18px;color:var(--tinta2);pointer-events:none;white-space:nowrap}
+.QQ .QQ-l b{font-weight:400;color:var(--mal-tinta)}
+.QQ .QQ-l i{margin-left:auto;font-style:normal;font-size:12px;line-height:16px;color:var(--tinta3);overflow:hidden;text-overflow:ellipsis}
+.QQ .QQ-in{flex:1;width:100%;height:64px;padding:30px 16px 10px;font-size:16px;line-height:24px;text-overflow:ellipsis}
+.QQ .QQ-in:focus-visible,.QQ .QQ-ta:focus-visible{box-shadow:inset 0 -2px 0 var(--enlace)}
+.QQ .QQ-ta{flex:1;width:100%;min-height:100px;padding:32px 16px 12px;font-size:16px;line-height:24px;overflow:hidden}
+.QQ .QQ-ta.QQ-sin-l{padding-top:14px}
+.QQ .QQ-mala .QQ-l,.QQ .QQ-mala .QQ-l b{color:var(--mal-tinta);font-weight:600}
+.QQ .QQ-mala.QQ-add{color:var(--mal-tinta)}
+/* Fila que elige de una lista (los <select> de hoy): valor + selector tenue */
+.QQ .QQ-sel{padding:30px 12px 10px 16px;gap:8px;font-size:16px;line-height:24px}
+.QQ .QQ-sel>svg{color:var(--tinta3);margin-top:-18px}
+.QQ .QQ-sel .QQ-v.QQ-nada{color:var(--tinta3)}
+/* Fila con palomita a la derecha (casillas y catálogos) */
+.QQ .QQ-ck{min-height:48px;padding:6px 14px 6px 16px;gap:10px;font-size:16px;line-height:22px}
+.QQ .QQ-ck>svg{color:var(--enlace);opacity:0}
+.QQ .QQ-ck[aria-pressed="true"]>svg,.QQ .QQ-ck[aria-checked="true"]>svg{opacity:1}
+.QQ .QQ-chip{display:inline-flex;align-items:center;padding:2px 8px;border-radius:999px;font-size:12px;line-height:16px;font-weight:600;white-space:nowrap}
+.QQ .QQ-c-mal{background:var(--mal-fondo);color:var(--mal-tinta)}
+/* Filas de lista repetible: campo + quitar tenue; «Agregar …» como texto en la última fila */
+.QQ .QQ-rl{min-height:52px;padding-right:4px}
+.QQ .QQ-rl .QQ-in{height:52px;padding:14px 4px 14px 16px}
+.QQ .QQ-add{min-height:52px;padding:0 16px;font-size:16px;line-height:22px;font-weight:600;color:var(--enlace)}
+.QQ .QQ-vacia{padding:14px 16px;font-size:15px;line-height:20px;color:var(--tinta2)}
+/* Fila plegable: título + resumen + flecha */
+.QQ .QQ-pl{min-height:56px;padding:8px 12px 8px 16px;gap:10px;font-size:16px;line-height:22px}
+.QQ .QQ-pl>svg{color:var(--tinta3);transition:transform 200ms ease}
+.QQ .QQ-pl[aria-expanded="true"]>svg{transform:rotate(90deg)}
+.QQ .QQ-pl-r{font-size:13px;line-height:18px;color:var(--tinta2);white-space:nowrap}
+.QQ .QQ-cuerpo{position:relative}
+
+/* ---- Barra de acción al pie: un primario y, a su izquierda, la secundaria como texto ---- */
+.QQ .QQ-barra{flex:none;padding:8px 16px calc(var(--ib) + 12px)}
+.QQ .QQ-barra-f{display:flex;align-items:center;gap:8px}
+.QQ .QQ-barra-f .QQ-txt{padding-left:0}
+.QQ .QQ-prim{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:44px;padding:0 20px;border-radius:12px;background:var(--accion);color:#fff;font-size:16px;line-height:20px;font-weight:600;white-space:nowrap}
+.QQ .QQ-barra .QQ-prim{flex:1}
+.QQ .QQ-prim:disabled{background:var(--sup2);color:var(--tinta3)}
+.QQ .QQ-prim:disabled:active{transform:none}
+.QQ .QQ-mal{position:relative;display:inline-flex;align-items:center;justify-content:center;height:40px;padding:0 16px;border-radius:12px;background:var(--mal-fondo);color:var(--mal-tinta);font-size:15px;line-height:20px;font-weight:600;white-space:nowrap}
+.QQ .QQ-mal::after,.QQ .QQ-al-p .QQ-prim::after{content:"";position:absolute;inset:-2px 0}
+.QQ .QQ-al-p .QQ-prim{position:relative}
+.QQ .QQ-giro{width:16px;height:16px;border-radius:999px;border:2px solid currentColor;border-right-color:transparent;animation:QQ-giro 800ms linear infinite}
+@keyframes QQ-giro{to{transform:rotate(360deg)}}
+.QQ .QQ-falta{font-size:13px;line-height:18px;color:var(--mal-tinta)}
+.QQ .QQ-lnk{position:relative;font-size:13px;line-height:18px;font-weight:600;color:var(--mal-tinta);text-decoration:underline;text-underline-offset:2px}
+.QQ .QQ-lnk::after{content:"";position:absolute;inset:-13px -9px}
+.QQ .QQ-barra-in{display:flex;flex-direction:column;gap:6px;max-width:640px}
+.QQ .QQ-barra-f>.QQ-txt:first-child{margin-left:0}
+.QQ[data-vp="ih"] .QQ-barra{padding:8px 24px calc(var(--ib) + 10px)}
+.QQ[data-vp="esc"] .QQ-barra{padding:10px 24px 18px}
+.QQ[data-vp="ih"] .QQ-barra .QQ-prim,.QQ[data-vp="esc"] .QQ-barra .QQ-prim{flex:none;margin-left:auto;height:36px;padding:0 18px;border-radius:10px;font-size:15px}
+.QQ[data-vp="esc"] .QQ-barra .QQ-prim{font-size:14px}
+
+/* ---- Capas: hoja (teléfono) / modal (ancho), alerta, menú, aviso ---- */
+.QQ .QQ-capa{position:absolute;inset:0;z-index:20;pointer-events:none;overflow:hidden}
+.QQ .QQ-capa.QQ-on{pointer-events:auto}
+.QQ .QQ-velo{position:absolute;inset:0;background:var(--velo);opacity:0;transition:opacity 320ms cubic-bezier(.32,.72,0,1)}
+.QQ .QQ-on .QQ-velo{opacity:1}
+.QQ .QQ-on.QQ-sinvelo .QQ-velo{opacity:0}
+.QQ .QQ-pan{position:absolute;background:var(--sup);box-shadow:var(--sombra-capa);visibility:hidden;transition:transform 320ms cubic-bezier(.32,.72,0,1),opacity 320ms cubic-bezier(.32,.72,0,1),visibility 0s linear 320ms}
+.QQ .QQ-pan.QQ-act{visibility:visible;transition-delay:0s}
+.QQ .QQ-pan:focus{outline:none}
+.QQ .QQ-hoja{left:0;right:var(--ir);bottom:0;max-height:calc(100% - var(--it) - 16px);display:flex;flex-direction:column;border-radius:22px 22px 0 0;padding-bottom:calc(var(--ib) + 8px);transform:translateY(100%)}
+.QQ .QQ-hoja.QQ-alta{height:calc(100% - var(--it) - 16px)}
+.QQ .QQ-hoja.QQ-act{transform:none}
+.QQ .QQ-asa{display:block;flex:none;width:36px;height:5px;border-radius:999px;background:var(--borde);margin:8px auto 0}
+.QQ .QQ-hj-cab{flex:none;display:flex;align-items:center;gap:8px;min-height:52px;padding:4px 8px 0 16px}
+.QQ .QQ-hj-cab h2{flex:1;min-width:0;font-size:17px;line-height:22px;font-weight:700}
+.QQ .QQ-hj-c{flex:1 1 auto;min-height:0;overflow-y:auto;scrollbar-width:none;padding:0 16px 8px}
+.QQ .QQ-hj-p{flex:none;display:flex;align-items:center;gap:8px;padding:8px 16px 4px}
+.QQ .QQ-hj-sub{padding-bottom:8px;font-size:13px;line-height:18px;color:var(--tinta2)}
+.QQ .QQ-mr{position:relative;display:flex;align-items:center;gap:10px;width:100%;min-height:52px;text-align:left;font-size:16px;line-height:22px}
+.QQ .QQ-mr>svg{color:var(--tinta3)}
+.QQ .QQ-mr.QQ-ck2>svg{color:var(--enlace);opacity:0}
+.QQ .QQ-mr.QQ-ck2[aria-checked="true"]>svg{opacity:1}
+.QQ .QQ-mr.QQ-ck2[aria-checked="true"]{font-weight:600}
+.QQ .QQ-mr+.QQ-mr,.QQ li+li>.QQ-mr,.QQ li+li>.QQ-pf{box-shadow:inset 0 1px 0 var(--linea)}
+.QQ .QQ-mr:disabled{color:var(--tinta3)}
+.QQ .QQ-mr-t{flex:1;min-width:0;display:flex;flex-direction:column}
+.QQ .QQ-mr-s{font-size:13px;line-height:18px;font-weight:400;color:var(--tinta2);overflow-wrap:anywhere}
+.QQ .QQ-centro{align-self:center}
+.QQ .QQ-ok-t{padding:12px 16px 0;font-size:20px;line-height:25px;font-weight:700;letter-spacing:-.3px}
+.QQ .QQ-ok-s{padding:2px 16px 8px;font-size:13px;line-height:18px;color:var(--tinta2)}
+.QQ .QQ-nota{font-size:13px;line-height:18px;color:var(--tinta2)}
+.QQ .QQ-nota.QQ-n-mal{color:var(--mal-tinta)}
+.QQ .QQ-nota.QQ-n-ag{display:flex;gap:8px;padding:0 0 10px;color:var(--ag-tinta)}
+.QQ .QQ-ayuda{padding:12px 0;font-size:13px;line-height:18px;color:var(--tinta2)}
+.QQ .QQ-fin{height:44px;padding:0 12px;border-radius:12px;background:var(--sup2);font-size:16px;width:100%}
+.QQ .QQ-fin:focus-visible{outline:2px solid var(--enlace)}
+.QQ .QQ-f{display:flex;flex-direction:column;gap:4px;padding-top:10px;min-width:0}
+.QQ .QQ-f>span{font-size:13px;line-height:18px;color:var(--tinta2)}
+.QQ .QQ-fila{display:flex;align-items:center;gap:8px;padding-top:10px}
+.QQ .QQ-dir{padding:6px 0;font-size:17px;line-height:22px;font-weight:600;overflow-wrap:anywhere}
+/* Rejilla «nivel 4» para elegir tipo */
+.QQ .QQ-rej{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;padding:4px 0 8px}
+.QQ .QQ-z{display:flex;flex-direction:column;align-items:flex-start;gap:8px;min-height:80px;padding:12px;border-radius:14px;background:var(--fondo);text-align:left;font-size:14px;line-height:18px}
+.QQ .QQ-z[aria-current="true"]{box-shadow:inset 0 0 0 2px var(--enlace)}
+.QQ .QQ-z-i{width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;color:var(--c);background:color-mix(in srgb,var(--c) var(--d-mezcla),var(--sup))}
+/* Gestionar plantillas */
+.QQ .QQ-pf{display:flex;flex-direction:column;padding:6px 0}
+.QQ .QQ-pf-c{display:flex;align-items:center;gap:8px;min-height:48px}
+.QQ .QQ-pf-a{display:flex;flex-wrap:wrap;gap:0 12px;margin:-4px 0 0 -8px}
+.QQ .QQ-pf-a .QQ-txt{font-size:14px}
+/* Alerta centrada: solo lo irreversible */
+.QQ .QQ-al-p{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:14px}
+.QQ .QQ-toast{position:absolute;z-index:30;top:calc(var(--it) + 10px);left:16px;right:16px;display:flex;justify-content:center;pointer-events:none;opacity:0;transform:translateY(-12px);transition:transform 320ms cubic-bezier(.32,.72,0,1),opacity 320ms cubic-bezier(.32,.72,0,1)}
+.QQ[data-vp="tel"] .QQ-toast{top:10px}
+.QQ .QQ-toast.QQ-on{opacity:1;transform:none}
+.QQ .QQ-toast span{padding:10px 14px;border-radius:12px;background:var(--navy);color:#fff;font-size:14px;line-height:18px;font-weight:600;box-shadow:var(--sombra-capa)}
+
+/* ---- Duo abierto y computadora ---- */
+.QQ[data-vp="ih"] .QQ-top-f,.QQ[data-vp="esc"] .QQ-top-f{min-height:36px;margin:0 -8px 0 -4px}
+.QQ[data-vp="ih"] .QQ-volver,.QQ[data-vp="esc"] .QQ-volver{min-height:36px}
+.QQ[data-vp="ih"] .QQ-ib,.QQ[data-vp="esc"] .QQ-ib{width:36px;height:36px}
+.QQ[data-vp="ih"] .QQ-txt,.QQ[data-vp="esc"] .QQ-txt{min-height:36px;font-size:14px}
+.QQ[data-vp="ih"] .QQ-tit,.QQ[data-vp="esc"] .QQ-tit{margin-top:2px;min-height:38px}
+.QQ[data-vp="ih"] .QQ-tit h1,.QQ[data-vp="esc"] .QQ-tit h1{font-size:32px;line-height:38px}
+.QQ[data-vp="ih"] .QQ-tit .QQ-txt,.QQ[data-vp="esc"] .QQ-tit .QQ-txt{min-height:36px;margin-top:6px}
+.QQ[data-vp="ih"] .QQ-tit .QQ-txt::after,.QQ[data-vp="esc"] .QQ-tit .QQ-txt::after{content:none}
+.QQ[data-vp="ih"] .QQ-g,.QQ[data-vp="esc"] .QQ-g{margin-top:28px}
+.QQ[data-vp="ih"] .QQ-g-t,.QQ[data-vp="esc"] .QQ-g-t{padding:0 20px 8px}
+.QQ[data-vp="ih"] .QQ-top+.QQ-g,.QQ[data-vp="esc"] .QQ-top+.QQ-g{margin-top:24px}
+.QQ[data-vp="ih"] .QQ-g+.QQ-g.QQ-junto,.QQ[data-vp="esc"] .QQ-g+.QQ-g.QQ-junto{margin-top:14px}
+.QQ[data-vp="ih"] .QQ-s,.QQ[data-vp="esc"] .QQ-s{border-radius:18px}
+.QQ[data-vp="ih"] .QQ-s>.QQ-r:first-child,.QQ[data-vp="esc"] .QQ-s>.QQ-r:first-child,.QQ[data-vp="ih"] .QQ-s>.QQ-r:first-child .QQ-in,.QQ[data-vp="esc"] .QQ-s>.QQ-r:first-child .QQ-in{border-radius:18px 18px 0 0}
+.QQ[data-vp="ih"] .QQ-s>.QQ-r:last-child,.QQ[data-vp="esc"] .QQ-s>.QQ-r:last-child,.QQ[data-vp="ih"] .QQ-s>.QQ-r:last-child .QQ-in,.QQ[data-vp="esc"] .QQ-s>.QQ-r:last-child .QQ-in{border-radius:0 0 18px 18px}
+.QQ[data-vp="ih"] .QQ-s>.QQ-r:only-child,.QQ[data-vp="esc"] .QQ-s>.QQ-r:only-child{border-radius:18px}
+.QQ[data-vp="ih"] .QQ-r,.QQ[data-vp="esc"] .QQ-r{min-height:48px}
+.QQ[data-vp="ih"] .QQ-r:not(:first-child)::before,.QQ[data-vp="esc"] .QQ-r:not(:first-child)::before,.QQ[data-vp="ih"] .QQ-lst:not(:first-child)>.QQ-r:first-child::before,.QQ[data-vp="esc"] .QQ-lst:not(:first-child)>.QQ-r:first-child::before{left:20px}
+/* En ancho, etiqueta a la izquierda (180) y valor a la derecha; las áreas de texto conservan la etiqueta arriba */
+.QQ[data-vp="ih"] .QQ-l,.QQ[data-vp="esc"] .QQ-l{left:20px;right:20px;top:15px;font-size:13px;line-height:18px}
+.QQ[data-vp="ih"] .QQ-l i,.QQ[data-vp="esc"] .QQ-l i{font-size:12px;line-height:18px}
+.QQ[data-vp="ih"] .QQ-in,.QQ[data-vp="esc"] .QQ-in{height:48px;padding:12px 20px 12px 208px;font-size:15px}
+.QQ[data-vp="ih"] .QQ-ch .QQ-in,.QQ[data-vp="esc"] .QQ-ch .QQ-in{padding-right:210px}
+.QQ[data-vp="ih"] .QQ-ta,.QQ[data-vp="esc"] .QQ-ta{padding:40px 20px 12px;font-size:15px;line-height:22px;min-height:104px}
+.QQ[data-vp="ih"] .QQ-ta.QQ-sin-l,.QQ[data-vp="esc"] .QQ-ta.QQ-sin-l{padding-top:14px}
+.QQ[data-vp="ih"] .QQ-sel,.QQ[data-vp="esc"] .QQ-sel{padding:12px 14px 12px 208px;font-size:15px}
+.QQ[data-vp="ih"] .QQ-sel>svg,.QQ[data-vp="esc"] .QQ-sel>svg{margin-top:0}
+.QQ[data-vp="ih"] .QQ-ck,.QQ[data-vp="esc"] .QQ-ck{min-height:44px;padding:6px 14px 6px 20px;font-size:15px}
+.QQ[data-vp="ih"] .QQ-rl,.QQ[data-vp="esc"] .QQ-rl{min-height:48px;padding-right:8px}
+.QQ[data-vp="ih"] .QQ-rl .QQ-in,.QQ[data-vp="esc"] .QQ-rl .QQ-in{height:48px;padding:12px 4px 12px 20px}
+.QQ[data-vp="ih"] .QQ-add,.QQ[data-vp="esc"] .QQ-add{min-height:44px;padding:0 20px;font-size:15px}
+.QQ[data-vp="ih"] .QQ-vacia,.QQ[data-vp="esc"] .QQ-vacia{padding:14px 20px;font-size:14px}
+.QQ[data-vp="ih"] .QQ-pl,.QQ[data-vp="esc"] .QQ-pl{min-height:48px;padding:6px 14px 6px 20px;font-size:15px}
+.QQ[data-vp="ih"] .QQ-hoja,.QQ[data-vp="esc"] .QQ-hoja{bottom:auto;right:auto;border-radius:20px;padding-bottom:10px;opacity:0;transform:translateY(12px) scale(.97)}
+.QQ[data-vp="ih"] .QQ-hoja.QQ-act,.QQ[data-vp="esc"] .QQ-hoja.QQ-act{opacity:1;transform:none}
+.QQ[data-vp="ih"] .QQ-asa,.QQ[data-vp="esc"] .QQ-asa{display:none}
+.QQ[data-vp="ih"] .QQ-hj-cab,.QQ[data-vp="esc"] .QQ-hj-cab{padding:10px 12px 0 20px}
+.QQ[data-vp="ih"] .QQ-hj-c,.QQ[data-vp="esc"] .QQ-hj-c{padding:0 20px 8px;scrollbar-width:thin;scrollbar-color:var(--borde) transparent}
+.QQ[data-vp="ih"] .QQ-hj-p,.QQ[data-vp="esc"] .QQ-hj-p{padding:8px 20px 6px}
+.QQ[data-vp="ih"] .QQ-hj-p .QQ-prim,.QQ[data-vp="esc"] .QQ-hj-p .QQ-prim,.QQ[data-vp="ih"] .QQ-al-p .QQ-prim,.QQ[data-vp="esc"] .QQ-al-p .QQ-prim,.QQ[data-vp="ih"] .QQ-fila .QQ-prim,.QQ[data-vp="esc"] .QQ-fila .QQ-prim{height:36px;font-size:14px}
+.QQ[data-vp="ih"] .QQ-ok-t,.QQ[data-vp="esc"] .QQ-ok-t{padding:20px 20px 0}
+.QQ[data-vp="ih"] .QQ-ok-s,.QQ[data-vp="esc"] .QQ-ok-s{padding:2px 20px 8px}
+.QQ[data-vp="ih"] .QQ-mr,.QQ[data-vp="esc"] .QQ-mr{min-height:44px;font-size:15px}
+.QQ[data-vp="ih"] .QQ-fin,.QQ[data-vp="esc"] .QQ-fin{height:40px;font-size:15px}
+.QQ[data-vp="ih"] .QQ-pf-c,.QQ[data-vp="esc"] .QQ-pf-c{min-height:40px}
+.QQ[data-vp="esc"] .QQ-rej{grid-template-columns:repeat(4,minmax(0,1fr))}
+.QQ[data-vp="esc"] .QQ-menu{width:248px;max-height:none;border-radius:14px;padding:6px;transform-origin:top right;transform:scale(.94)}
+.QQ[data-vp="esc"] .QQ-menu.QQ-m-izq{transform-origin:top left}
+.QQ[data-vp="esc"] .QQ-menu .QQ-hj-cab{display:none}
+.QQ[data-vp="esc"] .QQ-menu .QQ-hj-c{padding:0;overflow:visible}
+.QQ[data-vp="esc"] .QQ-menu .QQ-mr{min-height:36px;padding:0 10px;border-radius:8px;font-size:14px;box-shadow:none}
+.QQ[data-vp="esc"] .QQ-menu .QQ-mr:not(:disabled):hover{background:var(--fondo)}
+.QQ[data-vp="esc"] .QQ-toast{top:16px}
+
+/* ---- Tira de controles de la maqueta (vive fuera del marco) ---- */
+.QQ-tira{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:10px;font:600 12px/16px var(--fuente);color:var(--tinta2)}
+.QQ-tira span{margin-right:2px;letter-spacing:.3px;text-transform:uppercase}
+.QQ-tira button{height:28px;padding:0 10px;border:1px dashed var(--tinta3);border-radius:999px;background:transparent;color:var(--tinta2);font:inherit;cursor:pointer}
+.QQ-tira button:hover{color:var(--tinta);border-color:var(--tinta2)}
+.QQ-tira button:focus-visible{outline:3px solid var(--enlace);outline-offset:2px}
+
+@media (prefers-reduced-motion:reduce){
+  .QQ .QQ-pan,.QQ .QQ-pan.QQ-act,.QQ .QQ-hoja,.QQ .QQ-hoja.QQ-act{transform:none;opacity:0;transition:opacity 200ms ease,visibility 0s linear 200ms}
+  .QQ .QQ-pan.QQ-act,.QQ .QQ-hoja.QQ-act{opacity:1;transition-delay:0s}
+  .QQ .QQ-velo,.QQ .QQ-toast{transition:opacity 200ms ease}
+  .QQ .QQ-toast{transform:none}
+  .QQ .QQ-p,.QQ .QQ-pl>svg{transition:none}
+  .QQ .QQ-giro{animation:none}
+}
+/* Fila que navega («Plantilla ›») e interruptor: iguales a los de la parte 1 */
+.QQ .QQ-nav{min-height:52px;padding:0 12px 0 16px;gap:8px;font-size:16px;line-height:22px;border-radius:16px}
+.QQ .QQ-nav>svg{color:var(--tinta3)}
+.QQ .QQ-nav-v{flex:1;min-width:0;text-align:right;font-size:15px;color:var(--tinta2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.QQ .QQ-av-pl{padding:8px 8px 0 16px}
+.QQ .QQ-sw{min-height:52px;padding:0 16px;gap:10px;font-size:16px;line-height:22px}
+.QQ .QQ-sw-p{position:relative;flex:none;width:44px;height:26px;border-radius:999px;background:var(--sup2);transition:background-color 160ms ease}
+.QQ .QQ-sw-p::after{content:"";position:absolute;top:2px;left:2px;width:22px;height:22px;border-radius:999px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:transform 160ms ease}
+.QQ .QQ-sw[aria-checked="true"] .QQ-sw-p{background:var(--accion)}
+.QQ .QQ-sw[aria-checked="true"] .QQ-sw-p::after{transform:translateX(18px)}
+.QQ .QQ-sub .QQ-chip{margin-left:6px;vertical-align:1px}
+.QQ[data-vp="ih"] .QQ-nav,.QQ[data-vp="esc"] .QQ-nav{min-height:48px;padding:0 14px 0 20px;font-size:15px;border-radius:18px}
+.QQ[data-vp="ih"] .QQ-av-pl,.QQ[data-vp="esc"] .QQ-av-pl{padding:8px 12px 0 20px}
+.QQ[data-vp="ih"] .QQ-sw,.QQ[data-vp="esc"] .QQ-sw{min-height:48px;padding:0 20px;font-size:15px}
+
+/* ================= SEGUNDA REVISIÓN DEL DUEÑO (CALMA §11–16) ================= */
+/* Geometría de las capas: --cx = centro horizontal del área de contenido; --ct/--cb = márgenes verticales de esa área */
+.QQ{--cx:50%;--ct:0px;--cb:0px;--aw:320px;--hw:440px}
+.QQ[data-vp="ext"]{--cx:calc((100% - 56px - var(--ir)) / 2);--cb:var(--ib);--aw:296px}
+.QQ[data-vp="tel"]{--ct:calc(var(--it) + 64px);--cb:var(--ib)}
+.QQ[data-vp="ih"]{--cx:calc((100% - 218px - var(--ir)) / 2);--aw:340px}
+.QQ[data-vp="esc"]{--cx:calc(248px + (100% - 248px) / 2);--aw:340px}
+
+/* E · Computadora: la columna de 640 va CENTRADA en el área de contenido; cabecera y barra de acción siguen sus bordes */
+.QQ[data-vp="esc"] .QQ-form{width:640px;align-self:center}
+.QQ .QQ-barra-in{max-width:640px;margin:0 auto}
+
+/* Botones: tamaño completo (-bt) y pequeño (-mini); tonos tonal, quieto, rojo suave y relleno */
+.QQ .QQ-bt{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:8px;flex:none;height:44px;padding:0 16px;border-radius:12px;font-size:15px;line-height:20px;font-weight:600;white-space:nowrap}
+.QQ .QQ-mini{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:6px;flex:none;height:32px;padding:0 12px;border-radius:10px;font-size:13px;line-height:18px;font-weight:600;white-space:nowrap}
+.QQ .QQ-mini::after{content:"";position:absolute;inset:-6px 0}
+.QQ .QQ-tonal{background:var(--tonal);color:var(--tonal-tinta)}
+.QQ .QQ-quieto{background:var(--sup2);color:var(--tinta)}
+.QQ .QQ-rojo-s{background:var(--mal-fondo);color:var(--mal-tinta)}
+.QQ .QQ-lleno{background:var(--accion);color:#fff}
+.QQ .QQ-bt[aria-disabled="true"],.QQ .QQ-bt:disabled,.QQ .QQ-mini:disabled{background:var(--sup2);color:var(--tinta3)}
+.QQ .QQ-bt.QQ-ancho{display:flex;width:100%}
+.QQ[data-vp="ih"] .QQ-mini::after,.QQ[data-vp="esc"] .QQ-mini::after{inset:-2px 0}
+.QQ[data-vp="ih"] .QQ-bt,.QQ[data-vp="esc"] .QQ-bt{height:36px;border-radius:10px;font-size:14px}
+
+/* F · «Cambiar»: tonal pequeño en la fila de volver, antes de «···». El título queda solo con su icono */
+.QQ .QQ-top-f{gap:2px}
+.QQ .QQ-sub{display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px;min-height:24px}
+
+/* G · Carácter: rótulos de grupo de color, «+ Agregar», etiquetas de estado e iconos de color en menús */
+.QQ .QQ-g-t{font-size:13px;line-height:18px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--enlace)}
+.QQ .QQ-g-n{font-weight:400;letter-spacing:0;text-transform:none;color:var(--tinta2)}
+.QQ .QQ-add{gap:8px;font-weight:600;color:var(--enlace)}
+.QQ .QQ-add-n{font-size:13px;line-height:18px;font-weight:400;color:var(--tinta2)}
+.QQ .QQ-fle{display:flex;color:var(--tinta3)}
+.QQ .QQ-mala.QQ-add .QQ-add-n{color:var(--mal-tinta)}
+.QQ .QQ-mi{display:flex;flex:none;color:var(--enlace)}
+.QQ .QQ-mr{gap:12px}
+.QQ .QQ-mr-v{font-size:14px;line-height:18px;color:var(--tinta2);white-space:nowrap}
+.QQ .QQ-etq{display:inline-flex;align-items:center;gap:4px;height:24px;padding:0 8px;border-radius:8px;font-size:12px;line-height:16px;font-weight:600;white-space:nowrap}
+.QQ .QQ-e-mal{background:var(--mal-fondo);color:var(--mal-tinta)}
+.QQ .QQ-e-ag{background:var(--ag-fondo);color:var(--ag-tinta)}
+.QQ .QQ-g-noexp{display:flex;padding-top:4px}
+.QQ .QQ-nav{gap:10px}
+
+/* H · Barra de acción: secundario quieto a la izquierda de la columna, primario a la derecha */
+.QQ .QQ-barra-f{gap:10px}
+.QQ[data-vp="ih"] .QQ-barra .QQ-bt,.QQ[data-vp="esc"] .QQ-barra .QQ-bt{padding:0 14px}
+/* Tercera revisión (§18): en Duo abierto la barra es igual que en computadora: secundario a la izquierda de la columna, primario a la derecha */
+
+/* C · Velo con desenfoque (uno solo; los menús que nacen de su botón en computadora no llevan velo) */
+.QQ .QQ-velo{-webkit-backdrop-filter:blur(10px) saturate(140%);backdrop-filter:blur(10px) saturate(140%)}
+@media (prefers-reduced-transparency:reduce){.QQ .QQ-velo{-webkit-backdrop-filter:none;backdrop-filter:none;background:color-mix(in srgb,var(--velo) 55%,var(--navy))}}
+
+/* A · Alerta de confirmación, patrón único: icono en círculo de 48, título 17/700 centrado, mensaje 14/20, dos botones parejos */
+.QQ .QQ-alerta{top:var(--ct);bottom:var(--cb);left:calc(var(--cx) - var(--aw) / 2);width:var(--aw);height:fit-content;margin-block:auto;border-radius:20px;padding:24px;text-align:center;opacity:0;transform:scale(.95)}
+.QQ .QQ-alerta.QQ-act{opacity:1;transform:none}
+.QQ .QQ-al-i{display:flex;align-items:center;justify-content:center;width:48px;height:48px;margin:0 auto 12px;border-radius:999px;background:var(--tonal);color:var(--tonal-tinta)}
+.QQ .QQ-al-i.QQ-i-mal{background:var(--mal-fondo);color:var(--mal-tinta)}
+.QQ .QQ-al-i.QQ-i-ag{background:var(--ag-fondo);color:var(--ag-tinta)}
+.QQ .QQ-alerta h2{font-size:17px;line-height:22px;font-weight:700;overflow-wrap:anywhere}
+.QQ .QQ-alerta p{margin-top:6px;font-size:14px;line-height:20px;color:var(--tinta2);text-align:justify;-webkit-hyphens:auto;hyphens:auto}
+.QQ .QQ-alerta p.QQ-una{text-align:center}
+.QQ .QQ-al-p{display:flex;gap:8px;margin-top:20px}
+.QQ .QQ-al-p>button{flex:1 1 0;min-width:0;height:44px;padding:0 12px}
+.QQ .QQ-al-p.QQ-apila{flex-direction:column-reverse}
+.QQ .QQ-al-p.QQ-apila>button{flex:none;width:100%}
+.QQ .QQ-just{text-align:justify;-webkit-hyphens:auto;hyphens:auto}
+
+/* A · Hojas: pies y filas de acción con botones parejos */
+.QQ .QQ-hj-p{gap:8px;padding:10px 16px 4px}
+.QQ .QQ-hj-p>button,.QQ .QQ-par>button{flex:1 1 0;min-width:0;padding:0 10px}
+.QQ .QQ-par{gap:8px;padding-top:14px}
+.QQ .QQ-hj-cab>.QQ-mini{margin-right:8px}
+.QQ .QQ-g-otro{margin-top:12px}
+.QQ .QQ-ok-cab{flex:none;display:flex;align-items:center;gap:12px;padding:14px 16px 10px}
+.QQ .QQ-ok-i{flex:none;display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:999px;background:var(--ok-fondo);color:var(--ok-tinta)}
+.QQ .QQ-ok-i span{display:flex}
+.QQ .QQ-ok-no,.QQ [data-ok="0"] .QQ-ok-si{display:none!important}
+.QQ [data-ok="0"] .QQ-ok-no{display:flex!important}
+.QQ [data-ok="0"] .QQ-ok-i{background:var(--ag-fondo);color:var(--ag-tinta)}
+.QQ .QQ-ok-t{padding:0;font-size:17px;line-height:22px;letter-spacing:0}
+.QQ .QQ-ok-s{padding:2px 0 0}
+.QQ .QQ-g-no{padding-bottom:8px}
+.QQ .QQ-pf-a{flex-wrap:wrap;gap:8px;margin:0;padding:2px 0 10px}
+.QQ .QQ-pf-a:not([hidden]){display:flex}
+.QQ .QQ-pf .QQ-fila{gap:6px}
+.QQ .QQ-pf .QQ-prim{height:44px;padding:0 14px;font-size:15px}
+
+/* D · Rejilla de tipos: icono en su cuadro arriba y nombre debajo, que parte en dos líneas; ningún texto fuera de su celda */
+.QQ .QQ-rej{grid-auto-rows:1fr}
+.QQ .QQ-z{min-width:0;min-height:88px;overflow:hidden}
+.QQ .QQ-z-n{display:block;max-width:100%;font-size:14px;line-height:18px;font-weight:400;overflow-wrap:anywhere}
+.QQ[data-vp="ih"] .QQ-rej,.QQ[data-vp="esc"] .QQ-rej{grid-template-columns:repeat(4,minmax(0,1fr))}
+
+/* B · Duo abierto y computadora: toda capa CENTRADA en el área de contenido, en horizontal y en vertical */
+.QQ[data-vp="ih"] .QQ-hoja,.QQ[data-vp="esc"] .QQ-hoja{top:0;bottom:0;right:auto;left:calc(var(--cx) - var(--hw) / 2);width:var(--hw);height:fit-content;margin-block:auto;max-height:calc(100% - 96px);border-radius:20px;padding-bottom:14px}
+.QQ[data-vp="ih"] .QQ-hoja{max-height:calc(100% - var(--ib) * 2 - 28px)}
+.QQ[data-vp="ih"] .QQ-hoja.QQ-alta,.QQ[data-vp="esc"] .QQ-hoja.QQ-alta{height:fit-content}
+.QQ[data-vp="esc"] .QQ-hoja.QQ-alta{--hw:520px}
+.QQ[data-vp="ih"] .QQ-hoja.QQ-alta{--hw:520px}
+.QQ[data-vp="esc"] .QQ-hoja.QQ-ancha{--hw:640px}
+.QQ[data-vp="ih"] .QQ-hoja.QQ-ancha{--hw:min(640px, calc(100% - 218px - var(--ir) - 32px))}
+.QQ[data-vp="esc"] .QQ-hoja.QQ-menu{bottom:auto;margin:0;width:248px;height:auto;max-height:none;border-radius:14px;padding:6px;transform:scale(.94)}
+.QQ[data-vp="esc"] .QQ-hoja.QQ-menu.QQ-act{transform:none}
+.QQ[data-vp="esc"] .QQ-menu .QQ-mr{gap:10px}
+.QQ[data-vp="ih"] .QQ-hj-p,.QQ[data-vp="esc"] .QQ-hj-p{padding:10px 20px 6px}
+.QQ[data-vp="ih"] .QQ-ok-cab,.QQ[data-vp="esc"] .QQ-ok-cab{padding:20px 20px 10px}
+.QQ[data-vp="ih"] .QQ-ok-t,.QQ[data-vp="esc"] .QQ-ok-t{padding:0}
+.QQ[data-vp="ih"] .QQ-ok-s,.QQ[data-vp="esc"] .QQ-ok-s{padding:2px 0 0}
+.QQ[data-vp="ih"] .QQ-pan .QQ-bt,.QQ[data-vp="esc"] .QQ-pan .QQ-bt,.QQ[data-vp="ih"] .QQ-pan .QQ-prim,.QQ[data-vp="esc"] .QQ-pan .QQ-prim{height:38px;border-radius:10px;font-size:14px}
+.QQ[data-vp="ih"] .QQ-al-p>button,.QQ[data-vp="esc"] .QQ-al-p>button{height:38px}
+
+@media (prefers-reduced-motion:reduce){
+  .QQ .QQ-alerta,.QQ .QQ-alerta.QQ-act{transform:none}
+  .QQ[data-vp="esc"] .QQ-hoja.QQ-menu{transform:none}
+}
+
+/* ---- Medidas igualadas con la parte 1 (docs-a) ---- */
+.QQ[data-vp="ext"]{--cx:calc((100% - var(--ir)) / 2);--aw:320px}
+.QQ .QQ-alerta p{text-align-last:center}
+.QQ .QQ-al-p{display:grid;grid-template-columns:1fr 1fr}
+.QQ .QQ-al-p>button{padding:0 8px}
+.QQ .QQ-al-p.QQ-apila{grid-template-columns:1fr}
+.QQ .QQ-al-p.QQ-apila>:last-child{order:-1}
+.QQ .QQ-al-p.QQ-apila>button{width:auto;height:auto;min-height:44px;padding:6px 8px;white-space:normal}
+.QQ .QQ-hj-cab{gap:10px;padding:6px 16px 0}
+.QQ .QQ-hj-cab .QQ-ib{position:relative;width:32px;height:32px;background:var(--sup2);color:var(--tinta2)}
+.QQ .QQ-hj-cab .QQ-ib::after{content:"";position:absolute;inset:-6px}
+.QQ .QQ-hj-cab>.QQ-mini{margin-right:0}
+.QQ .QQ-z{min-height:84px}
+.QQ[data-vp="ih"] .QQ-hj-cab,.QQ[data-vp="esc"] .QQ-hj-cab{padding:12px 20px 0}
+.QQ[data-vp="ih"] .QQ-hj-cab .QQ-ib::after,.QQ[data-vp="esc"] .QQ-hj-cab .QQ-ib::after{inset:-2px}
+.QQ[data-vp="esc"] .QQ-menu .QQ-hj-cab{display:none}
+.QQ[data-vp="ih"] .QQ-hj-p,.QQ[data-vp="esc"] .QQ-hj-p{padding:8px 20px 8px;justify-content:flex-end}
+.QQ[data-vp="ih"] .QQ-par,.QQ[data-vp="esc"] .QQ-par{justify-content:flex-end}
+.QQ[data-vp="ih"] .QQ-hj-p>button,.QQ[data-vp="esc"] .QQ-hj-p>button,.QQ[data-vp="ih"] .QQ-par>button,.QQ[data-vp="esc"] .QQ-par>button{flex:none;min-width:104px;padding:0 16px}
+.QQ[data-vp="ih"] .QQ-pan .QQ-bt,.QQ[data-vp="esc"] .QQ-pan .QQ-bt,.QQ[data-vp="ih"] .QQ-pan .QQ-prim,.QQ[data-vp="esc"] .QQ-pan .QQ-prim,.QQ[data-vp="ih"] .QQ-al-p>button,.QQ[data-vp="esc"] .QQ-al-p>button{height:36px}
+.QQ[data-vp="ih"] .QQ-al-p.QQ-apila>button,.QQ[data-vp="esc"] .QQ-al-p.QQ-apila>button{height:auto;min-height:36px;padding:4px 8px}
+.QQ[data-vp="ih"] .QQ-hoja.QQ-alta{--hw:520px}
+.QQ[data-vp="ih"] .QQ-hoja.QQ-menu{--hw:320px}
+.QQ[data-vp="ih"] .QQ-rej,.QQ[data-vp="esc"] .QQ-rej{gap:12px}
+.QQ[data-vp="ih"] .QQ-z,.QQ[data-vp="esc"] .QQ-z{min-height:88px;padding:14px 12px}
+
+/* ================= TERCERA REVISIÓN DEL DUEÑO (CALMA §17–22) =================
+   Todo lo de arriba se escribió para ext/tel/ih/esc; el generador duplica cada regla de `ih` para `iv`. Este bloque va después y corrige lo propio de `iv`. */
+/* §21 · Rejilla de tipos idéntica en toda la app: hoja --sup, celdas --sup2, el tipo actual con contorno de 2 px --accion */
+.QQ .QQ-z{background:var(--sup2)}
+.QQ .QQ-z[aria-current="true"]{box-shadow:inset 0 0 0 2px var(--accion)}
+.QQ .QQ-z-i{background:color-mix(in srgb,var(--c) var(--d-mezcla),var(--sup2))}
+/* En Duo cerrado «Cambiar» baja a botón de TEXTO (13/600 --enlace, área 44); en los demás marcos sigue tonal */
+.QQ[data-vp="ext"] .QQ-b-cambiar{height:44px;padding:0 8px;background:none;color:var(--enlace);font-size:13px;line-height:18px}
+.QQ[data-vp="ext"] .QQ-b-cambiar::after{content:none}
+
+/* §19 · Duo abierto vertical: encabezado fundido con la pista de secciones */
+.QQ .QQ-fun{position:relative;z-index:1;flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:calc(var(--it) + 0px) 16px 14px;background:var(--navy);border-radius:0 0 26px 26px;box-shadow:var(--sombra-nav-sup)}
+.QQ .QQ-fun-b{width:44px;height:44px;flex:none;border-radius:999px;background:var(--nav-velo);color:#fff;display:flex;align-items:center;justify-content:center}
+.QQ .QQ-pista{display:flex;align-items:center;gap:2px;padding:4px;border-radius:26px;background:var(--nav-velo)}
+.QQ .QQ-pi{position:relative;display:flex;align-items:center;height:40px;padding:0 14px;border-radius:20px;color:var(--nav-tinta);font-size:15px;line-height:20px;font-weight:500;white-space:nowrap}
+.QQ .QQ-pi::after{content:"";position:absolute;inset:-4px 0}
+.QQ .QQ-pi[aria-current="page"]{padding:0 16px;background:var(--accion);color:#fff;font-weight:600}
+.QQ .QQ-fun .QQ-p:focus-visible{outline-color:var(--nav-tinta)}
+/* Geometría: contenido con margen 24 (621 útiles), formulario en columna de 600 centrada; capas centradas en el marco, dentro de la barra de estado y el indicador */
+.QQ[data-vp="iv"]{--cx:50%;--ct:var(--it);--cb:var(--ib);--aw:340px;--hw:440px}
+.QQ[data-vp="iv"] .QQ-cont{padding:22px 24px}
+.QQ[data-vp="iv"] .QQ-form{width:600px;align-self:center}
+.QQ[data-vp="iv"] .QQ-barra{padding:10px 24px calc(var(--ib) + 16px)}
+.QQ[data-vp="iv"] .QQ-barra-in{max-width:600px}
+/* §23.1 · En Duo vertical el par va CENTRADO en la columna (secundario, principal): el navegador flota controles en las dos esquinas de abajo */
+.QQ[data-vp="iv"] .QQ-barra-f{justify-content:center}
+.QQ[data-vp="iv"] .QQ-barra .QQ-prim{margin-left:0}
+.QQ[data-vp="iv"] .QQ-toast{top:10px}
+/* Es táctil: áreas de 44 aunque la composición sea la del Duo abierto */
+.QQ[data-vp="iv"] .QQ-top-f{min-height:44px;margin:0 -10px 0 -4px}
+.QQ[data-vp="iv"] .QQ-volver{min-height:44px}
+.QQ[data-vp="iv"] .QQ-ib{width:44px;height:44px}
+.QQ[data-vp="iv"] .QQ-txt{min-height:44px}
+.QQ[data-vp="iv"] .QQ-mini::after{inset:-6px 0}
+.QQ[data-vp="iv"] .QQ-bt,.QQ[data-vp="iv"] .QQ-barra .QQ-prim,.QQ[data-vp="iv"] .QQ-pan .QQ-bt,.QQ[data-vp="iv"] .QQ-pan .QQ-prim,.QQ[data-vp="iv"] .QQ-al-p>button{height:44px;border-radius:12px;font-size:15px}
+.QQ[data-vp="iv"] .QQ-barra .QQ-prim{padding:0 20px}
+/* Barra al pie: primario y secundario dibujados a 40, área de 44 (igual que docs-a) */
+.QQ[data-vp="iv"] .QQ-barra .QQ-prim,.QQ[data-vp="iv"] .QQ-barra .QQ-bt{position:relative;height:40px}
+.QQ[data-vp="iv"] .QQ-barra .QQ-prim::after,.QQ[data-vp="iv"] .QQ-barra .QQ-bt::after{content:"";position:absolute;inset:-2px 0}
+.QQ[data-vp="iv"] .QQ-al-p.QQ-apila>button{height:auto;min-height:44px}
+.QQ[data-vp="iv"] .QQ-hj-cab .QQ-ib{width:32px;height:32px}
+.QQ[data-vp="iv"] .QQ-hj-cab .QQ-ib::after{inset:-6px}
+.QQ[data-vp="iv"] .QQ-fin{height:48px}
+.QQ[data-vp="iv"] .QQ-mr{min-height:48px}
+.QQ[data-vp="iv"] .QQ-pf-c{min-height:48px}
+.QQ[data-vp="iv"] .QQ-hoja{top:var(--it);bottom:var(--ib);max-height:calc(100% - var(--it) - var(--ib) - 40px)}
+.QQ[data-vp="iv"] .QQ-hoja.QQ-alta{--hw:520px}
+.QQ[data-vp="iv"] .QQ-hoja.QQ-ancha{--hw:min(640px, calc(100% - 32px))}
+.QQ[data-vp="iv"] .QQ-hoja.QQ-menu{--hw:320px}

@@ -1,0 +1,441 @@
+/* ===== Taller de documentos · chasis común. Todos los selectores empiezan por .ZQ ===== */
+.ZQ .ZQ-app{display:flex;width:100%;height:100%}
+.ZQ[data-vp="tel"] .ZQ-app,.ZQ[data-vp="iv"] .ZQ-app{flex-direction:column}
+.ZQ button{border:0;margin:0;padding:0;background:none;color:inherit}
+.ZQ h1,.ZQ h2,.ZQ h3,.ZQ p,.ZQ ul,.ZQ ol,.ZQ dl,.ZQ dt,.ZQ dd{margin:0;padding:0}
+.ZQ ul,.ZQ ol{list-style:none}
+.ZQ textarea,.ZQ input,.ZQ select{margin:0;padding:0;border:0;outline:0;background:none;color:inherit;font:inherit;-webkit-appearance:none;appearance:none;min-width:0}
+.ZQ textarea{display:block;resize:none;overflow:hidden}
+.ZQ ::placeholder{color:var(--tinta3);opacity:1}
+.ZQ svg{flex:none}
+.ZQ [hidden]{display:none!important}
+.ZQ .ZQ-flex{flex:1;min-width:0}
+.ZQ .ZQ-num{font-variant-numeric:tabular-nums}
+.ZQ .ZQ-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+/* Respuesta al toque y foco */
+.ZQ .ZQ-p{transition:transform 100ms ease-out}
+.ZQ .ZQ-p:active{transform:scale(.97)}
+.ZQ .ZQ-p:focus-visible{outline:3px solid var(--enlace);outline-offset:2px}
+.ZQ .ZQ-riel .ZQ-p:focus-visible,.ZQ .ZQ-lat .ZQ-p:focus-visible,.ZQ .ZQ-enc .ZQ-p:focus-visible,.ZQ .ZQ-env .ZQ-p:focus-visible{outline-color:var(--nav-tinta)}
+
+/* ---- Navegación (copiada del dashboard aprobado; activo = Documentos) ---- */
+.ZQ .ZQ-riel{position:relative;z-index:1;flex:none;width:calc(56px + var(--ir));padding:16px calc(var(--ir) + 8px) calc(var(--ib) + 10px) 8px;background:var(--navy);border-radius:26px 0 0 26px;box-shadow:var(--sombra-nav-der);display:flex;flex-direction:column;align-items:center;gap:8px}
+.ZQ .ZQ-rb{width:48px;height:48px;flex:none;border-radius:999px;display:flex;align-items:center;justify-content:center;color:var(--nav-tinta)}
+.ZQ .ZQ-rb[aria-current="page"]{background:var(--accion);color:#fff}
+.ZQ .ZQ-mas{width:52px;height:52px;flex:none;border-radius:999px;background:#fff;color:var(--accion);display:flex;align-items:center;justify-content:center;box-shadow:var(--sombra-accion)}
+.ZQ .ZQ-enc{position:relative;z-index:1;flex:none;display:flex;align-items:center;gap:12px;padding:calc(var(--it) + 8px) 16px 12px;background:var(--navy);border-radius:0 0 26px 26px;box-shadow:var(--sombra-nav-sup);color:#fff}
+.ZQ .ZQ-menu-b{width:44px;height:44px;flex:none;border-radius:12px;background:var(--nav-velo);color:#fff;display:flex;align-items:center;justify-content:center}
+.ZQ .ZQ-enc-t{font-size:17px;line-height:22px;font-weight:700;color:#fff}
+.ZQ .ZQ-av{display:flex;align-items:center;justify-content:center;flex:none;width:34px;height:34px;border-radius:999px;background:var(--nav-avatar);color:var(--navy);font-size:13px;font-weight:700}
+.ZQ .ZQ-av.ZQ-av-g{width:44px;height:44px}
+.ZQ .ZQ-lat{position:relative;z-index:1;flex:none;display:flex;flex-direction:column;background:var(--navy);color:#fff}
+.ZQ[data-vp="ih"] .ZQ-lat{width:calc(218px + var(--ir));padding:16px calc(var(--ir) + 10px) calc(var(--ib) + 10px) 12px;border-radius:26px 0 0 26px;box-shadow:var(--sombra-nav-der)}
+.ZQ[data-vp="esc"] .ZQ-lat{width:248px;padding:16px 12px 14px;border-radius:0 26px 26px 0;box-shadow:var(--sombra-nav-izq)}
+.ZQ .ZQ-lat-cab{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:36px;padding:0 4px 0 8px}
+.ZQ .ZQ-logo{display:inline-flex;align-items:center;gap:8px;color:#fff}
+.ZQ .ZQ-logo-n{font-size:17px;line-height:22px;font-weight:700;letter-spacing:-.2px}
+.ZQ .ZQ-plan{display:inline-flex;align-items:center;height:24px;padding:0 10px;border-radius:999px;background:var(--nav-velo);color:var(--nav-tinta);font-size:12px;line-height:16px;font-weight:600;white-space:nowrap}
+.ZQ .ZQ-cons-b{margin-top:12px;display:flex;align-items:center;gap:10px;min-height:52px;padding:8px 10px;border-radius:14px;background:var(--nav-velo);color:#fff;text-align:left}
+.ZQ .ZQ-cons-b svg{color:var(--nav-tinta2)}
+.ZQ .ZQ-cons-t{flex:1;min-width:0;display:flex;flex-direction:column}
+.ZQ .ZQ-cons-t span{font-size:13px;line-height:16px;color:var(--nav-tinta2)}
+.ZQ .ZQ-cons-t b{font-size:15px;line-height:19px;font-weight:600}
+.ZQ .ZQ-lista{margin-top:14px;display:flex;flex-direction:column;gap:2px}
+.ZQ .ZQ-li{display:flex;align-items:center;gap:12px;height:44px;padding:0 12px;border-radius:12px;color:var(--nav-tinta);font-size:15px;line-height:20px;font-weight:500}
+.ZQ[data-vp="esc"] .ZQ-li{height:40px;font-size:14px}
+.ZQ .ZQ-li[aria-current="page"]{background:var(--accion);color:#fff;font-weight:600}
+.ZQ .ZQ-lat-pie{border-top:1px solid var(--nav-velo);padding-top:8px}
+.ZQ .ZQ-lat .ZQ-yo{height:48px}
+.ZQ .ZQ-yo>span{display:flex;flex-direction:column;line-height:17px}
+.ZQ .ZQ-yo small{font-size:12px;line-height:16px;color:var(--nav-tinta2)}
+
+/* ---- Columna de contenido: se desplaza dentro del marco; columna de 640 alineada al borde común ---- */
+.ZQ .ZQ-col{position:relative;flex:1;min-width:0;min-height:0;display:flex;flex-direction:column}
+.ZQ .ZQ-cont{flex:1;min-height:0;overflow-x:hidden;overflow-y:auto;scrollbar-width:none;padding:4px 16px 28px}
+.ZQ[data-vp="tel"] .ZQ-cont{padding-top:10px}
+.ZQ[data-vp="ih"] .ZQ-cont{padding:12px 24px 32px}
+.ZQ[data-vp="esc"] .ZQ-cont{padding:20px 24px 40px;scrollbar-width:thin;scrollbar-color:var(--borde) transparent}
+/* CALMA §14: la columna de 640 va CENTRADA en el área de contenido (ih y esc); cabecera y barra comparten sus bordes */
+.ZQ .ZQ-ancho{max-width:640px;margin-left:auto;margin-right:auto}
+.ZQ[data-vp="esc"] .ZQ-cont,.ZQ[data-vp="esc"] .ZQ-barra{scrollbar-gutter:stable both-edges}
+
+/* ---- Cabecera (≤ 110 px en teléfono): volver + «···» · icono del tipo + título + «Cambiar» · una línea ---- */
+.ZQ .ZQ-top-f{display:flex;align-items:center;gap:4px;min-height:44px;margin:0 -10px 0 -4px}
+.ZQ .ZQ-volver{display:inline-flex;align-items:center;gap:2px;min-height:44px;padding-right:8px;font-size:13px;line-height:18px;font-weight:600;color:var(--enlace);white-space:nowrap}
+.ZQ .ZQ-ib{width:44px;height:44px;flex:none;border-radius:999px;display:flex;align-items:center;justify-content:center;color:var(--tinta2)}
+.ZQ .ZQ-ib:active{background:var(--sup2)}
+.ZQ .ZQ-ib:disabled{color:var(--borde)}
+.ZQ .ZQ-tit{display:flex;align-items:center;gap:10px;min-height:32px}
+.ZQ .ZQ-tic{flex:none;width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;color:var(--dc);background:color-mix(in srgb,var(--dc) var(--d-mezcla),var(--sup))}
+.ZQ .ZQ-tit h1{font-size:26px;line-height:32px;font-weight:800;letter-spacing:-.6px;white-space:nowrap}
+.ZQ .ZQ-txt{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px;padding:0 8px;font-size:15px;line-height:20px;font-weight:600;color:var(--enlace);white-space:nowrap}
+.ZQ .ZQ-txt[aria-disabled="true"],.ZQ .ZQ-txt:disabled{color:var(--tinta3)}
+.ZQ .ZQ-cambiar{position:relative;display:inline-flex;align-items:center;justify-content:center;flex:none;height:32px;padding:0 12px;border-radius:10px;background:var(--tonal);color:var(--tonal-tinta);font-size:13px;line-height:18px;font-weight:600;white-space:nowrap}
+.ZQ .ZQ-cambiar::after{content:"";position:absolute;top:-6px;bottom:-6px;left:0;right:0}
+.ZQ[data-vp="ext"] .ZQ-cambiar{height:44px;padding:0 8px;border-radius:12px;background:none;color:var(--enlace)}
+.ZQ[data-vp="ext"] .ZQ-cambiar::after{content:none}
+.ZQ .ZQ-alg[hidden]{display:none}
+.ZQ[data-vp="ext"] .ZQ-alg-r{display:none}
+.ZQ .ZQ-sub{display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px;min-height:24px;margin-top:4px;font-size:13px;line-height:18px;color:var(--tinta2)}
+
+/* ---- Grupos estilo ajustes: título FUERA y encima; superficie de radio 16 con filas y línea fina ---- */
+.ZQ .ZQ-g{margin-top:24px}
+.ZQ .ZQ-top+.ZQ-g{margin-top:20px}
+.ZQ .ZQ-g-t{display:flex;align-items:baseline;gap:8px;padding:0 16px 8px;font-size:13px;line-height:18px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--enlace)}
+.ZQ .ZQ-g-t small{font-size:13px;font-weight:400;letter-spacing:0;text-transform:none;color:var(--tinta2)}
+.ZQ .ZQ-s{background:var(--sup);border-radius:16px}
+.ZQ .ZQ-pila{display:flex;flex-direction:column;gap:12px}
+.ZQ .ZQ-r{position:relative;display:block;min-height:52px}
+.ZQ .ZQ-r+.ZQ-r::before{content:"";position:absolute;top:0;left:16px;right:0;height:1px;background:var(--linea)}
+.ZQ .ZQ-r:has(.ZQ-sug:not([hidden])){z-index:6}
+/* Campo: en teléfono la etiqueta arriba (13) y el valor debajo (16); toda la fila es el campo */
+.ZQ .ZQ-f{min-height:64px}
+.ZQ .ZQ-et{position:absolute;top:10px;left:16px;font-size:13px;line-height:18px;color:var(--tinta2);pointer-events:none;white-space:nowrap}
+.ZQ .ZQ-et i{font-style:normal;color:var(--mal-tinta)}
+.ZQ .ZQ-pista{position:absolute;top:11px;right:16px;font-size:12px;line-height:16px;color:var(--tinta3);pointer-events:none;white-space:nowrap}
+.ZQ .ZQ-in{display:block;width:100%;height:64px;padding:30px 16px 10px;font-size:16px;line-height:24px;border-radius:12px;text-overflow:ellipsis}
+.ZQ .ZQ-in:focus-visible,.ZQ .ZQ-ta:focus-visible{outline:2px solid var(--enlace);outline-offset:-2px}
+.ZQ .ZQ-in.ZQ-fuerte{font-weight:600}
+.ZQ select.ZQ-in{padding-right:40px;cursor:pointer}
+.ZQ .ZQ-sel-i{position:absolute;right:14px;bottom:14px;color:var(--tinta3);pointer-events:none}
+.ZQ .ZQ-ta{width:100%;min-height:100px;padding:32px 16px 12px;font-size:16px;line-height:24px;border-radius:12px}
+.ZQ .ZQ-ta.ZQ-sola{padding-top:14px;min-height:112px}
+.ZQ .ZQ-nota{padding:0 16px 12px;margin-top:-4px;font-size:13px;line-height:18px;color:var(--tinta2)}
+.ZQ .ZQ-err{padding:4px 16px 10px;margin-top:0;font-size:13px;line-height:18px;color:var(--mal-tinta)}
+.ZQ .ZQ-f.ZQ-mala .ZQ-et{color:var(--mal-tinta);font-weight:600}
+/* Sugerencias del combo escribible: una capa pequeña bajo su fila */
+.ZQ .ZQ-sug{position:absolute;z-index:6;left:8px;right:8px;top:calc(100% - 4px);padding:6px;border-radius:14px;background:var(--sup);box-shadow:var(--sombra-capa),0 0 0 1px var(--borde);max-height:236px;overflow-y:auto}
+.ZQ .ZQ-sug button{display:block;width:100%;min-height:44px;padding:6px 10px;border-radius:9px;text-align:left;font-size:15px;line-height:20px}
+.ZQ .ZQ-sug button small{display:block;font-size:13px;line-height:18px;color:var(--tinta2)}
+.ZQ .ZQ-sug button:hover,.ZQ .ZQ-sug button:focus-visible{background:var(--fondo);outline:0}
+.ZQ .ZQ-sug p{padding:8px 10px 4px;font-size:12px;line-height:16px;color:var(--tinta3)}
+/* Cabecera de bloque repetible («Medicamento 1», «Estudio 1») con su acción de icono */
+.ZQ .ZQ-bh{display:flex;align-items:center;gap:8px;min-height:48px;padding:0 4px 0 16px;font-size:15px;line-height:20px;font-weight:600}
+.ZQ .ZQ-bh small{font-size:13px;font-weight:400;color:var(--tinta2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* Fila de lista simple con campo (estudios de laboratorio) */
+.ZQ .ZQ-lr{display:flex;align-items:center;min-height:52px;padding-right:4px}
+.ZQ .ZQ-lr .ZQ-n{flex:none;width:36px;padding-left:16px;font-size:13px;color:var(--tinta2);font-variant-numeric:tabular-nums}
+.ZQ .ZQ-lr .ZQ-in{height:52px;padding:0 8px 0 16px}
+.ZQ .ZQ-lr .ZQ-n+.ZQ-cb .ZQ-in{padding-left:4px}
+.ZQ .ZQ-cb{position:relative;flex:1;min-width:0}
+/* Fila de acción de texto («Agregar …») y fila que navega («Plantilla ›») */
+.ZQ .ZQ-ar{display:flex;align-items:center;gap:8px;width:100%;min-height:52px;padding:0 16px;text-align:left;font-size:16px;line-height:22px;font-weight:600;color:var(--enlace);border-radius:16px}
+.ZQ .ZQ-r+.ZQ-ar,.ZQ .ZQ-bl+.ZQ-ar{border-radius:0 0 16px 16px}
+.ZQ .ZQ-nav>svg.ZQ-nav-i{color:var(--enlace)}
+.ZQ .ZQ-nav{display:flex;align-items:center;gap:8px;width:100%;min-height:52px;padding:0 12px 0 16px;text-align:left;font-size:16px;line-height:22px;border-radius:16px}
+.ZQ .ZQ-nav>svg{color:var(--tinta3)}
+.ZQ .ZQ-nav-v{flex:1;min-width:0;text-align:right;font-size:15px;color:var(--tinta2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ZQ .ZQ-linea{display:flex;align-items:center;gap:8px;padding:8px 8px 0 16px;font-size:13px;line-height:18px;color:var(--tinta2)}
+.ZQ .ZQ-linea .ZQ-txt{font-size:13px;line-height:18px;min-height:44px;margin:-13px 0}
+/* Opciones múltiples: lista de filas con palomita a la derecha */
+.ZQ .ZQ-ck{display:flex;align-items:center;gap:8px;width:100%;min-height:48px;padding:0 14px 0 16px;text-align:left;font-size:16px;line-height:22px}
+.ZQ .ZQ-ck svg{color:var(--enlace);opacity:0;transition:opacity 120ms ease}
+.ZQ .ZQ-ck[aria-pressed="true"] svg{opacity:1}
+/* Interruptor */
+.ZQ .ZQ-sw{display:flex;align-items:center;gap:10px;width:100%;min-height:52px;padding:0 16px;text-align:left;font-size:16px;line-height:22px;border-radius:0 0 16px 16px}
+.ZQ .ZQ-sw-p{position:relative;flex:none;width:44px;height:26px;border-radius:999px;background:var(--sup2);transition:background-color 160ms ease}
+.ZQ .ZQ-sw-p::after{content:"";position:absolute;top:2px;left:2px;width:22px;height:22px;border-radius:999px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:transform 160ms ease}
+.ZQ .ZQ-sw[aria-checked="true"] .ZQ-sw-p{background:var(--accion)}
+.ZQ .ZQ-sw[aria-checked="true"] .ZQ-sw-p::after{transform:translateX(18px)}
+.ZQ .ZQ-vacio{padding:16px;font-size:15px;line-height:20px;color:var(--tinta2)}
+
+/* ---- Barra de acción: UN primario; a su izquierda la secundaria como texto ---- */
+.ZQ .ZQ-barra{flex:none;padding:8px 16px calc(var(--ib) + 12px)}
+.ZQ .ZQ-barra-f{display:flex;align-items:center;gap:8px}
+
+.ZQ .ZQ-prim{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:44px;padding:0 20px;border-radius:12px;background:var(--accion);color:#fff;font-size:16px;line-height:20px;font-weight:600;white-space:nowrap}
+.ZQ .ZQ-barra .ZQ-prim{flex:1}
+.ZQ .ZQ-prim:disabled{background:var(--sup2);color:var(--tinta3)}
+.ZQ .ZQ-prim:disabled:active{transform:none}
+.ZQ .ZQ-aviso{padding:0 0 6px;font-size:13px;line-height:18px;color:var(--tinta2)}
+.ZQ .ZQ-aviso.ZQ-mal{color:var(--mal-tinta)}
+.ZQ .ZQ-aviso button{position:relative;font-size:13px;line-height:18px;font-weight:600;color:inherit;text-decoration:underline;text-underline-offset:2px}
+.ZQ .ZQ-aviso button::after{content:"";position:absolute;top:-13px;bottom:-13px;left:-6px;right:-6px}
+.ZQ .ZQ-aviso .ZQ-enl{color:var(--enlace);text-decoration:none}
+.ZQ .ZQ-giro{width:16px;height:16px;border-radius:999px;border:2px solid currentColor;border-right-color:transparent;animation:ZQ-giro 800ms linear infinite}
+@keyframes ZQ-giro{to{transform:rotate(360deg)}}
+
+/* ---- Entrada /documentos: búsqueda protagonista, resultados como filas, rejilla de nivel 4 ---- */
+.ZQ .ZQ-h1{font-size:26px;line-height:32px;font-weight:800;letter-spacing:-.6px;padding-top:12px}
+.ZQ[data-vp="tel"] .ZQ-h1{padding-top:6px}
+.ZQ .ZQ-busca{position:relative;display:block}
+.ZQ .ZQ-busca svg{position:absolute;left:14px;top:14px;color:var(--tinta2);pointer-events:none}
+.ZQ .ZQ-busca input{width:100%;height:48px;padding:0 14px 0 44px;border-radius:12px;background:var(--sup2);font-size:16px}
+.ZQ .ZQ-busca input:focus-visible{outline:2px solid var(--enlace)}
+.ZQ .ZQ-ayuda{padding:8px 0 0;font-size:13px;line-height:18px;color:var(--tinta2)}
+.ZQ .ZQ-res{margin-top:12px}
+.ZQ .ZQ-fila{display:flex;align-items:center;gap:12px;width:100%;min-height:56px;padding:0 12px 0 16px;text-align:left;font-size:15px;line-height:20px}
+.ZQ .ZQ-fila>svg{color:var(--tinta3)}
+.ZQ .ZQ-fila b{display:block;font-weight:600}
+.ZQ .ZQ-fila small{display:block;font-size:13px;line-height:18px;color:var(--tinta2)}
+.ZQ .ZQ-pav{flex:none;width:36px;height:36px;border-radius:999px;display:flex;align-items:center;justify-content:center;background:var(--sup2);color:var(--tinta2);font-size:13px;font-weight:600;font-variant-numeric:tabular-nums}
+.ZQ[data-vp="ext"] .ZQ-pav{width:32px;height:32px}
+.ZQ .ZQ-ceja{padding-top:12px;font-size:12px;line-height:16px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--enlace)}
+.ZQ .ZQ-ceja+.ZQ-h1{padding-top:2px}
+.ZQ .ZQ-paso1 .ZQ-ceja,.ZQ .ZQ-paso2 .ZQ-ceja{padding-top:0}
+.ZQ .ZQ-rej-s{padding:10px}
+.ZQ[data-vp="ih"] .ZQ-rej-s,.ZQ[data-vp="iv"] .ZQ-rej-s,.ZQ[data-vp="esc"] .ZQ-rej-s{padding:16px}
+.ZQ .ZQ-sec-t{padding:2px 0 10px;font-size:17px;line-height:22px;font-weight:700}
+.ZQ .ZQ-rej{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+/* CALMA §21: rejilla idéntica en toda la app. Hoja --sup, celdas --sup2 de radio 14 y alto ≥ 84 (88 en ancho); cuadro tintado de 32 arriba y nombre 14/18 debajo; contorno de 2 px --accion en el tipo actual */
+.ZQ .ZQ-z{display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-start;gap:8px;min-width:0;min-height:84px;padding:12px;border-radius:14px;background:var(--sup2);text-align:left;font-size:14px;line-height:18px;font-weight:400;color:var(--tinta);overflow:hidden}
+.ZQ .ZQ-z>span:last-child{display:block;max-width:100%;min-width:0;overflow-wrap:anywhere}
+.ZQ .ZQ-z[aria-selected="true"]{box-shadow:inset 0 0 0 2px var(--accion)}
+.ZQ .ZQ-z .ZQ-tic{background:color-mix(in srgb,var(--dc) var(--d-mezcla),var(--sup2))}
+
+/* ---- Capas: hoja (teléfono) / modal (ancho), alerta, menú, aviso ---- */
+.ZQ .ZQ-capa{position:absolute;inset:0;z-index:20;pointer-events:none;overflow:hidden}
+.ZQ .ZQ-capa.ZQ-on{pointer-events:auto}
+.ZQ .ZQ-velo{position:absolute;inset:0;background:var(--velo);-webkit-backdrop-filter:blur(10px) saturate(140%);backdrop-filter:blur(10px) saturate(140%);opacity:0;transition:opacity 320ms cubic-bezier(.32,.72,0,1)}
+.ZQ .ZQ-on .ZQ-velo{opacity:1}
+.ZQ .ZQ-pan{position:absolute;background:var(--sup);box-shadow:var(--sombra-capa);visibility:hidden;transition:transform 320ms cubic-bezier(.32,.72,0,1),opacity 320ms cubic-bezier(.32,.72,0,1),visibility 0s linear 320ms}
+.ZQ .ZQ-pan.ZQ-act{visibility:visible;transition-delay:0s}
+.ZQ .ZQ-pan:focus{outline:none}
+.ZQ .ZQ-hoja{left:0;right:var(--ir);bottom:0;max-height:calc(100% - var(--it) - 16px);display:flex;flex-direction:column;border-radius:22px 22px 0 0;padding-bottom:calc(var(--ib) + 8px);transform:translateY(100%)}
+.ZQ .ZQ-hoja.ZQ-alta{height:calc(100% - var(--it) - 16px)}
+.ZQ .ZQ-hoja.ZQ-act{transform:none}
+.ZQ .ZQ-asa{display:block;flex:none;width:36px;height:5px;border-radius:999px;background:var(--borde);margin:8px auto 0}
+.ZQ .ZQ-hj-cab{flex:none;display:flex;align-items:center;gap:10px;min-height:52px;padding:6px 16px 0}
+.ZQ .ZQ-hj-cab .ZQ-ib{position:relative;width:32px;height:32px;background:var(--sup2);color:var(--tinta2)}
+.ZQ .ZQ-hj-cab .ZQ-ib::after{content:"";position:absolute;inset:-6px}
+.ZQ .ZQ-hj-cab h2{flex:1;min-width:0;font-size:17px;line-height:22px;font-weight:700}
+.ZQ .ZQ-hj-cab .ZQ-cta{font-size:13px;color:var(--tinta2);font-variant-numeric:tabular-nums;padding-right:4px}
+.ZQ .ZQ-hj-c{flex:1 1 auto;min-height:0;overflow-y:auto;scrollbar-width:none;padding:0 16px 8px}
+.ZQ .ZQ-hj-p{flex:none;display:flex;align-items:center;gap:8px;padding:8px 16px 4px}
+.ZQ .ZQ-hj-p>*{flex:1;min-width:0}
+.ZQ .ZQ-hj-sub{padding-bottom:10px;font-size:13px;line-height:18px;color:var(--tinta2)}
+.ZQ .ZQ-hj-sub.ZQ-mal{color:var(--mal-tinta)}
+.ZQ .ZQ-mr{display:flex;align-items:center;gap:10px;width:100%;min-height:52px;text-align:left;font-size:16px;line-height:22px}
+.ZQ .ZQ-mr>svg{color:var(--tinta3)}
+.ZQ .ZQ-mr>svg.ZQ-pal,.ZQ .ZQ-mr>svg.ZQ-mi{color:var(--enlace)}
+.ZQ .ZQ-mr[aria-disabled="true"]>svg.ZQ-mi,.ZQ .ZQ-mr:disabled>svg.ZQ-mi{color:var(--tinta3)}
+.ZQ .ZQ-mr.ZQ-ln{box-shadow:inset 0 1px 0 var(--linea)}
+.ZQ .ZQ-mr+.ZQ-mr,.ZQ li+li>.ZQ-mr,.ZQ li+li>.ZQ-pl{box-shadow:inset 0 1px 0 var(--linea)}
+.ZQ .ZQ-mr:disabled,.ZQ .ZQ-mr[aria-disabled="true"]{color:var(--tinta3)}
+.ZQ .ZQ-mr:disabled:active{transform:none}
+.ZQ .ZQ-mr small{display:block;font-size:13px;line-height:18px;color:var(--tinta2);word-break:break-all}
+.ZQ .ZQ-mr-t{flex:1;min-width:0}
+.ZQ .ZQ-peligro{color:var(--mal-tinta)}
+.ZQ .ZQ-campo{display:flex;flex-direction:column;gap:6px;padding-bottom:8px}
+.ZQ .ZQ-campo>span{display:flex;justify-content:space-between;font-size:13px;line-height:18px;font-weight:600;color:var(--tinta2)}
+.ZQ .ZQ-campo>span small{font-weight:400}
+.ZQ .ZQ-cin{width:100%;height:48px;padding:0 12px;border-radius:12px;background:var(--sup2);font-size:16px}
+.ZQ .ZQ-cin:focus-visible{outline:2px solid var(--enlace)}
+.ZQ .ZQ-dos{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
+.ZQ .ZQ-casilla{display:flex;align-items:center;gap:10px;min-height:44px;font-size:15px;line-height:20px;text-align:left}
+.ZQ .ZQ-casilla i{flex:none;width:22px;height:22px;border-radius:7px;box-shadow:inset 0 0 0 1.5px var(--tinta3);display:flex;align-items:center;justify-content:center;color:#fff}
+.ZQ .ZQ-casilla i svg{opacity:0}
+.ZQ .ZQ-casilla[aria-checked="true"] i{background:var(--accion);box-shadow:none}
+.ZQ .ZQ-casilla[aria-checked="true"] i svg{opacity:1}
+.ZQ .ZQ-casilla a{color:var(--enlace);font-weight:600}
+.ZQ .ZQ-ok-t{font-size:20px;line-height:25px;font-weight:700;letter-spacing:-.3px;padding-top:8px}
+.ZQ .ZQ-gn-cab{padding:8px 0 10px;text-align:center}
+.ZQ .ZQ-gn-cab .ZQ-ok-t{padding-top:0}
+.ZQ .ZQ-gn-cab .ZQ-hj-sub{padding:4px 0 0}
+.ZQ .ZQ-just{text-align:justify;text-align-last:center;-webkit-hyphens:auto;hyphens:auto}
+.ZQ .ZQ-dir{padding:4px 0 6px;font-size:17px;line-height:22px;font-weight:700;word-break:break-all}
+/* Plantillas (gestionar) */
+.ZQ .ZQ-pl{display:flex;align-items:center;gap:8px;min-height:60px}
+.ZQ .ZQ-pl b{display:block;font-size:15px;line-height:20px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ZQ .ZQ-pl small{display:block;font-size:13px;line-height:18px;color:var(--tinta2)}
+.ZQ .ZQ-pl-a{display:flex;align-items:center;gap:8px;margin:-4px 0 12px}
+.ZQ .ZQ-pl-e{display:flex;align-items:center;gap:8px;padding:6px 0}
+.ZQ .ZQ-pl-e .ZQ-ib{position:relative;width:32px;height:32px;background:var(--sup2)}
+.ZQ .ZQ-pl-e .ZQ-ib::after{content:"";position:absolute;inset:-6px}
+.ZQ .ZQ-pl-e .ZQ-cin{flex:1}
+/* Alerta de confirmación · patrón único (CALMA §13): icono de 28 en círculo tintado de 48, título 17/700 centrado, mensaje 14/20, dos botones parejos */
+.ZQ .ZQ-alerta{top:calc(50% - var(--ib) / 2);width:320px;left:calc((100% - var(--ir)) / 2 - 160px);border-radius:20px;padding:24px;text-align:center;opacity:0;transform:translateY(-50%) scale(.95)}
+.ZQ .ZQ-alerta.ZQ-act{opacity:1;transform:translateY(-50%)}
+.ZQ .ZQ-al-i{display:flex;align-items:center;justify-content:center;width:48px;height:48px;margin:0 auto 12px;border-radius:999px}
+.ZQ .ZQ-alerta h2{font-size:17px;line-height:22px;font-weight:700;overflow-wrap:anywhere}
+.ZQ .ZQ-alerta p{margin-top:6px;font-size:14px;line-height:20px;color:var(--tinta2);text-align:justify;text-align-last:center;-webkit-hyphens:auto;hyphens:auto}
+.ZQ .ZQ-al-p{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:20px}
+.ZQ .ZQ-al-p.ZQ-apil{grid-template-columns:1fr}
+.ZQ .ZQ-al-p.ZQ-apil>:last-child{order:-1}
+.ZQ .ZQ-al-p>*{min-width:0;padding-left:8px;padding-right:8px}
+.ZQ .ZQ-apil>*{height:auto;min-height:44px;padding-top:6px;padding-bottom:6px;white-space:normal}
+/* Botones de capa: principal relleno, secundario tonal o quieto (--sup2). 44 en teléfono, 36 en ancho. «-ch» = pequeño de 32 */
+.ZQ .ZQ-quieto,.ZQ .ZQ-tonal,.ZQ .ZQ-mal-b{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:8px;height:44px;padding:0 16px;border-radius:12px;font-size:15px;line-height:20px;font-weight:600;white-space:nowrap;text-align:center}
+.ZQ .ZQ-quieto{background:var(--sup2);color:var(--tinta)}
+.ZQ .ZQ-tonal{background:var(--tonal);color:var(--tonal-tinta)}
+.ZQ .ZQ-mal-b{background:var(--mal-fondo);color:var(--mal-tinta)}
+.ZQ .ZQ-quieto[aria-disabled="true"],.ZQ .ZQ-quieto:disabled,.ZQ .ZQ-tonal:disabled{color:var(--tinta3);background:var(--sup2)}
+.ZQ .ZQ-pan .ZQ-prim{height:44px;padding:0 16px;font-size:15px}
+.ZQ .ZQ-ch,.ZQ .ZQ-pan .ZQ-ch{height:32px;padding:0 12px;border-radius:10px;font-size:13px;line-height:18px}
+.ZQ .ZQ-ch::after{content:"";position:absolute;top:-6px;bottom:-6px;left:0;right:0}
+.ZQ .ZQ-par{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:4px 0 8px}
+.ZQ .ZQ-pila-b{display:flex;flex-direction:column;gap:8px;padding:2px 0 14px}
+.ZQ .ZQ-pila-b>*{white-space:normal;height:auto;min-height:44px;padding-top:6px;padding-bottom:6px}
+/* Etiquetas de estado (CALMA §11): alto 24, radio 8, icono de 14 + 12/600 */
+.ZQ .ZQ-etq{display:inline-flex;align-items:center;gap:4px;height:24px;padding:0 8px;border-radius:8px;font-size:12px;line-height:16px;font-weight:600;white-space:nowrap}
+.ZQ .ZQ-e-ton{background:var(--tonal);color:var(--tonal-tinta)}
+.ZQ .ZQ-e-mal{background:var(--mal-fondo);color:var(--mal-tinta)}
+.ZQ .ZQ-e-ag{background:var(--ag-fondo);color:var(--ag-tinta)}
+.ZQ .ZQ-e-ok{background:var(--ok-fondo);color:var(--ok-tinta)}
+.ZQ .ZQ-toast{position:absolute;z-index:30;top:calc(var(--it) + 10px);left:16px;right:calc(var(--ir) + 16px);display:flex;justify-content:center;pointer-events:none;opacity:0;transform:translateY(-12px);transition:transform 320ms cubic-bezier(.32,.72,0,1),opacity 320ms cubic-bezier(.32,.72,0,1)}
+.ZQ .ZQ-toast.ZQ-on{opacity:1;transform:none}
+.ZQ .ZQ-toast span{padding:10px 14px;border-radius:12px;background:var(--navy);color:#fff;font-size:14px;line-height:18px;font-weight:600;box-shadow:var(--sombra-capa)}
+
+/* ---- Duo abierto y computadora: etiqueta a la izquierda (164), valor a la derecha; filas de 48 ---- */
+.ZQ[data-vp="ih"] .ZQ-top-f,.ZQ[data-vp="esc"] .ZQ-top-f{min-height:36px;margin:0 -8px 0 -4px}
+.ZQ[data-vp="ih"] .ZQ-volver,.ZQ[data-vp="esc"] .ZQ-volver{min-height:36px}
+.ZQ[data-vp="ih"] .ZQ-ib,.ZQ[data-vp="esc"] .ZQ-ib{width:36px;height:36px}
+.ZQ[data-vp="ih"] .ZQ-txt,.ZQ[data-vp="esc"] .ZQ-txt{min-height:36px}
+.ZQ[data-vp="esc"] .ZQ-txt{font-size:14px}
+.ZQ[data-vp="ih"] .ZQ-cambiar::after,.ZQ[data-vp="esc"] .ZQ-cambiar::after{top:-2px;bottom:-2px}
+.ZQ[data-vp="ih"] .ZQ-tit,.ZQ[data-vp="esc"] .ZQ-tit,.ZQ[data-vp="iv"] .ZQ-tit{min-height:38px;margin-top:2px}
+.ZQ[data-vp="ih"] .ZQ-tit h1,.ZQ[data-vp="esc"] .ZQ-tit h1,.ZQ[data-vp="ih"] .ZQ-h1,.ZQ[data-vp="esc"] .ZQ-h1,.ZQ[data-vp="iv"] .ZQ-tit h1,.ZQ[data-vp="iv"] .ZQ-h1{font-size:32px;line-height:38px}
+.ZQ[data-vp="ih"] .ZQ-g,.ZQ[data-vp="esc"] .ZQ-g,.ZQ[data-vp="iv"] .ZQ-g{margin-top:28px}
+.ZQ[data-vp="ih"] .ZQ-top+.ZQ-g,.ZQ[data-vp="esc"] .ZQ-top+.ZQ-g,.ZQ[data-vp="iv"] .ZQ-top+.ZQ-g{margin-top:24px}
+.ZQ[data-vp="ih"] .ZQ-g-t,.ZQ[data-vp="esc"] .ZQ-g-t,.ZQ[data-vp="iv"] .ZQ-g-t{padding:0 20px 8px}
+.ZQ[data-vp="ih"] .ZQ-s,.ZQ[data-vp="esc"] .ZQ-s,.ZQ[data-vp="iv"] .ZQ-s{border-radius:18px}
+.ZQ[data-vp="ih"] .ZQ-pila,.ZQ[data-vp="esc"] .ZQ-pila,.ZQ[data-vp="iv"] .ZQ-pila{gap:14px}
+.ZQ[data-vp="ih"] .ZQ-r,.ZQ[data-vp="esc"] .ZQ-r,.ZQ[data-vp="iv"] .ZQ-r{min-height:48px}
+.ZQ[data-vp="ih"] .ZQ-r+.ZQ-r::before,.ZQ[data-vp="esc"] .ZQ-r+.ZQ-r::before,.ZQ[data-vp="iv"] .ZQ-r+.ZQ-r::before{left:20px}
+.ZQ[data-vp="ih"] .ZQ-et,.ZQ[data-vp="esc"] .ZQ-et,.ZQ[data-vp="iv"] .ZQ-et{top:0;left:20px;height:48px;display:flex;align-items:center;gap:3px}
+.ZQ[data-vp="ih"] .ZQ-pista,.ZQ[data-vp="esc"] .ZQ-pista,.ZQ[data-vp="iv"] .ZQ-pista{top:16px;right:20px}
+.ZQ[data-vp="ih"] .ZQ-in,.ZQ[data-vp="esc"] .ZQ-in,.ZQ[data-vp="iv"] .ZQ-in{height:48px;padding:0 20px 0 208px;font-size:15px;line-height:22px}
+.ZQ[data-vp="ih"] .ZQ-conp .ZQ-in,.ZQ[data-vp="esc"] .ZQ-conp .ZQ-in,.ZQ[data-vp="iv"] .ZQ-conp .ZQ-in{padding-right:200px}
+.ZQ[data-vp="ih"] select.ZQ-in,.ZQ[data-vp="esc"] select.ZQ-in,.ZQ[data-vp="iv"] select.ZQ-in{padding-right:44px}
+.ZQ[data-vp="ih"] .ZQ-sel-i,.ZQ[data-vp="esc"] .ZQ-sel-i,.ZQ[data-vp="iv"] .ZQ-sel-i{right:18px;bottom:16px}
+.ZQ[data-vp="ih"] .ZQ-ta,.ZQ[data-vp="esc"] .ZQ-ta,.ZQ[data-vp="iv"] .ZQ-ta{padding:40px 20px 12px;font-size:15px;line-height:22px;min-height:104px}
+.ZQ[data-vp="ih"] .ZQ-ta.ZQ-sola,.ZQ[data-vp="esc"] .ZQ-ta.ZQ-sola,.ZQ[data-vp="iv"] .ZQ-ta.ZQ-sola{padding-top:14px}
+.ZQ[data-vp="ih"] .ZQ-nota,.ZQ[data-vp="esc"] .ZQ-nota,.ZQ[data-vp="ih"] .ZQ-err,.ZQ[data-vp="esc"] .ZQ-err,.ZQ[data-vp="iv"] .ZQ-nota,.ZQ[data-vp="iv"] .ZQ-err{padding-left:20px;padding-right:20px}
+.ZQ[data-vp="ih"] .ZQ-f:not(.ZQ-lg) .ZQ-err,.ZQ[data-vp="esc"] .ZQ-f:not(.ZQ-lg) .ZQ-err,.ZQ[data-vp="iv"] .ZQ-f:not(.ZQ-lg) .ZQ-err{padding-left:208px;margin-top:-8px}
+.ZQ[data-vp="ih"] .ZQ-sug,.ZQ[data-vp="esc"] .ZQ-sug,.ZQ[data-vp="iv"] .ZQ-sug{left:196px;right:12px}
+.ZQ[data-vp="ih"] .ZQ-lr .ZQ-sug,.ZQ[data-vp="esc"] .ZQ-lr .ZQ-sug,.ZQ[data-vp="iv"] .ZQ-lr .ZQ-sug{left:0;right:0}
+.ZQ[data-vp="ih"] .ZQ-sug button,.ZQ[data-vp="esc"] .ZQ-sug button{min-height:36px;font-size:14px}
+.ZQ[data-vp="ih"] .ZQ-bh,.ZQ[data-vp="esc"] .ZQ-bh,.ZQ[data-vp="iv"] .ZQ-bh{min-height:44px;padding:0 6px 0 20px}
+.ZQ[data-vp="ih"] .ZQ-lr,.ZQ[data-vp="esc"] .ZQ-lr,.ZQ[data-vp="iv"] .ZQ-lr{min-height:48px;padding-right:6px}
+.ZQ[data-vp="ih"] .ZQ-lr .ZQ-n,.ZQ[data-vp="esc"] .ZQ-lr .ZQ-n,.ZQ[data-vp="iv"] .ZQ-lr .ZQ-n{width:40px;padding-left:20px}
+.ZQ[data-vp="ih"] .ZQ-lr .ZQ-in,.ZQ[data-vp="esc"] .ZQ-lr .ZQ-in,.ZQ[data-vp="iv"] .ZQ-lr .ZQ-in{height:48px;padding:0 8px 0 20px}
+.ZQ[data-vp="ih"] .ZQ-lr .ZQ-n+.ZQ-cb .ZQ-in,.ZQ[data-vp="esc"] .ZQ-lr .ZQ-n+.ZQ-cb .ZQ-in,.ZQ[data-vp="iv"] .ZQ-lr .ZQ-n+.ZQ-cb .ZQ-in{padding-left:4px}
+.ZQ[data-vp="ih"] .ZQ-ar,.ZQ[data-vp="esc"] .ZQ-ar,.ZQ[data-vp="iv"] .ZQ-ar{min-height:48px;padding:0 20px;font-size:15px;border-radius:18px}
+.ZQ[data-vp="ih"] .ZQ-r+.ZQ-ar,.ZQ[data-vp="esc"] .ZQ-r+.ZQ-ar,.ZQ[data-vp="ih"] .ZQ-bl+.ZQ-ar,.ZQ[data-vp="esc"] .ZQ-bl+.ZQ-ar,.ZQ[data-vp="iv"] .ZQ-r+.ZQ-ar,.ZQ[data-vp="iv"] .ZQ-bl+.ZQ-ar{border-radius:0 0 18px 18px}
+.ZQ[data-vp="ih"] .ZQ-nav,.ZQ[data-vp="esc"] .ZQ-nav,.ZQ[data-vp="iv"] .ZQ-nav{min-height:48px;padding:0 14px 0 20px;font-size:15px;border-radius:18px}
+.ZQ[data-vp="ih"] .ZQ-linea,.ZQ[data-vp="esc"] .ZQ-linea,.ZQ[data-vp="iv"] .ZQ-linea{padding-left:20px}
+.ZQ[data-vp="ih"] .ZQ-linea .ZQ-txt,.ZQ[data-vp="esc"] .ZQ-linea .ZQ-txt{min-height:36px;margin:-9px 0}
+.ZQ[data-vp="ih"] .ZQ-cks,.ZQ[data-vp="esc"] .ZQ-cks,.ZQ[data-vp="iv"] .ZQ-cks{display:grid;grid-template-columns:1fr 1fr}
+.ZQ[data-vp="ih"] .ZQ-cks .ZQ-r:nth-child(2)::before,.ZQ[data-vp="esc"] .ZQ-cks .ZQ-r:nth-child(2)::before,.ZQ[data-vp="iv"] .ZQ-cks .ZQ-r:nth-child(2)::before{display:none}
+.ZQ[data-vp="ih"] .ZQ-cks .ZQ-r:nth-child(even)::before,.ZQ[data-vp="esc"] .ZQ-cks .ZQ-r:nth-child(even)::before,.ZQ[data-vp="iv"] .ZQ-cks .ZQ-r:nth-child(even)::before{left:0;right:20px}
+.ZQ[data-vp="ih"] .ZQ-ck,.ZQ[data-vp="esc"] .ZQ-ck,.ZQ[data-vp="iv"] .ZQ-ck{min-height:44px;padding:0 16px 0 20px;font-size:15px}
+.ZQ[data-vp="ih"] .ZQ-sw,.ZQ[data-vp="esc"] .ZQ-sw,.ZQ[data-vp="iv"] .ZQ-sw{min-height:48px;padding:0 20px;font-size:15px;border-radius:0 0 18px 18px}
+.ZQ[data-vp="ih"] .ZQ-vacio,.ZQ[data-vp="esc"] .ZQ-vacio,.ZQ[data-vp="iv"] .ZQ-vacio{padding:14px 20px}
+.ZQ[data-vp="ih"] .ZQ-barra{padding:8px 24px calc(var(--ib) + 10px)}
+.ZQ[data-vp="esc"] .ZQ-barra{padding:10px 24px 18px}
+.ZQ[data-vp="ih"] .ZQ-barra .ZQ-prim,.ZQ[data-vp="esc"] .ZQ-barra .ZQ-prim{flex:none;height:36px;padding:0 18px;border-radius:10px;font-size:15px}
+.ZQ[data-vp="esc"] .ZQ-barra .ZQ-prim{font-size:14px}
+.ZQ .ZQ-barra .ZQ-quieto{flex:none}
+/* CALMA §23.1: secundario a la izquierda, principal a la DERECHA. ih/esc: el par pegado a la derecha de la columna. iv: el par centrado (el navegador flota controles en las esquinas inferiores) */
+.ZQ[data-vp="ih"] .ZQ-barra-f,.ZQ[data-vp="esc"] .ZQ-barra-f{justify-content:flex-end}
+.ZQ[data-vp="iv"] .ZQ-barra-f{justify-content:center}
+.ZQ[data-vp="ih"] .ZQ-barra .ZQ-quieto{font-size:15px}
+
+.ZQ[data-vp="ih"] .ZQ-aviso button::after,.ZQ[data-vp="esc"] .ZQ-aviso button::after{top:-9px;bottom:-9px}
+
+.ZQ[data-vp="ih"] .ZQ-busca input,.ZQ[data-vp="esc"] .ZQ-busca input,.ZQ[data-vp="iv"] .ZQ-busca input{height:44px;font-size:15px}
+.ZQ[data-vp="ih"] .ZQ-busca svg,.ZQ[data-vp="esc"] .ZQ-busca svg,.ZQ[data-vp="iv"] .ZQ-busca svg{top:12px}
+
+.ZQ[data-vp="ih"] .ZQ-fila,.ZQ[data-vp="esc"] .ZQ-fila,.ZQ[data-vp="iv"] .ZQ-fila{min-height:52px;padding:0 14px 0 20px}
+.ZQ[data-vp="ih"] .ZQ-res .ZQ-r+.ZQ-r::before,.ZQ[data-vp="esc"] .ZQ-res .ZQ-r+.ZQ-r::before,.ZQ[data-vp="iv"] .ZQ-res .ZQ-r+.ZQ-r::before{left:64px}
+.ZQ .ZQ-res .ZQ-r+.ZQ-r::before{left:60px}
+.ZQ[data-vp="ih"] .ZQ-rej,.ZQ[data-vp="esc"] .ZQ-rej,.ZQ[data-vp="iv"] .ZQ-rej{grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.ZQ[data-vp="ih"] .ZQ-z,.ZQ[data-vp="esc"] .ZQ-z,.ZQ[data-vp="iv"] .ZQ-z{min-height:88px;padding:14px 12px}
+/* Capas en ancho (CALMA §13, §18, §19): TODA capa centrada en el área de contenido, en horizontal y en vertical, con los anchos de esc y sin esquivar la bisagra.
+   ih: el área de contenido va de x=0 a 100% − (218 + --ir). iv: todo el marco, entre --it y --ib. esc: de x=248 a 100%.
+   Anchos: alerta 340 · hoja 440 · hoja ancha 520 · rejilla 640, o el ancho del área menos 32 si no cabe (ih 617, iv 637). */
+.ZQ[data-vp="ih"] .ZQ-hoja,.ZQ[data-vp="esc"] .ZQ-hoja,.ZQ[data-vp="iv"] .ZQ-hoja{bottom:auto;right:auto;top:50%;width:440px;border-radius:20px;padding-bottom:12px;opacity:0;transform:translateY(calc(-50% + 12px)) scale(.97)}
+.ZQ[data-vp="ih"] .ZQ-hoja.ZQ-act,.ZQ[data-vp="esc"] .ZQ-hoja.ZQ-act,.ZQ[data-vp="iv"] .ZQ-hoja.ZQ-act{opacity:1;transform:translateY(-50%)}
+.ZQ[data-vp="ih"] .ZQ-hoja{left:calc((100% - 218px - var(--ir)) / 2 - 220px);max-height:calc(100% - 2 * (var(--ib) + 12px))}
+.ZQ[data-vp="esc"] .ZQ-hoja{left:calc(248px + (100% - 248px) / 2 - 220px);max-height:calc(100% - 96px)}
+.ZQ[data-vp="ih"] .ZQ-hoja.ZQ-ancha{width:520px;left:calc((100% - 218px - var(--ir)) / 2 - 260px)}
+.ZQ[data-vp="esc"] .ZQ-hoja.ZQ-ancha{width:520px;left:calc(248px + (100% - 248px) / 2 - 260px)}
+.ZQ[data-vp="ih"] .ZQ-hoja.ZQ-rejilla{width:min(640px,calc(100% - 218px - var(--ir) - 32px));left:calc((100% - 218px - var(--ir) - min(640px,calc(100% - 218px - var(--ir) - 32px))) / 2)}
+.ZQ[data-vp="esc"] .ZQ-hoja.ZQ-rejilla{width:640px;left:calc(248px + (100% - 248px) / 2 - 320px)}
+.ZQ[data-vp="ih"] .ZQ-hoja.ZQ-menu{width:320px;left:calc((100% - 218px - var(--ir)) / 2 - 160px)}
+.ZQ[data-vp="ih"] .ZQ-hoja.ZQ-alta,.ZQ[data-vp="esc"] .ZQ-hoja.ZQ-alta,.ZQ[data-vp="iv"] .ZQ-hoja.ZQ-alta{height:auto}
+/* Alerta (CALMA §21): 340 en ih, iv y computadora */
+.ZQ[data-vp="ih"] .ZQ-alerta{width:340px;left:calc((100% - 218px - var(--ir)) / 2 - 170px);top:50%}
+.ZQ[data-vp="esc"] .ZQ-alerta{width:340px;left:calc(248px + (100% - 248px) / 2 - 170px);top:50%}
+.ZQ[data-vp="ih"] .ZQ-asa,.ZQ[data-vp="esc"] .ZQ-asa,.ZQ[data-vp="iv"] .ZQ-asa{display:none}
+.ZQ[data-vp="ih"] .ZQ-hj-cab .ZQ-ib::after,.ZQ[data-vp="esc"] .ZQ-hj-cab .ZQ-ib::after,.ZQ[data-vp="ih"] .ZQ-pl-e .ZQ-ib::after,.ZQ[data-vp="esc"] .ZQ-pl-e .ZQ-ib::after{inset:-2px}
+.ZQ[data-vp="ih"] .ZQ-hj-cab,.ZQ[data-vp="esc"] .ZQ-hj-cab,.ZQ[data-vp="iv"] .ZQ-hj-cab{padding:12px 20px 0}
+.ZQ[data-vp="ih"] .ZQ-hj-c,.ZQ[data-vp="esc"] .ZQ-hj-c,.ZQ[data-vp="iv"] .ZQ-hj-c{padding:0 20px 8px}
+.ZQ[data-vp="ih"] .ZQ-hj-p,.ZQ[data-vp="esc"] .ZQ-hj-p,.ZQ[data-vp="iv"] .ZQ-hj-p{padding:8px 20px 8px;justify-content:flex-end}
+.ZQ[data-vp="ih"] .ZQ-hj-p>*,.ZQ[data-vp="esc"] .ZQ-hj-p>*,.ZQ[data-vp="ih"] .ZQ-par>*,.ZQ[data-vp="esc"] .ZQ-par>*,.ZQ[data-vp="iv"] .ZQ-hj-p>*,.ZQ[data-vp="iv"] .ZQ-par>*{flex:none;min-width:104px}
+.ZQ[data-vp="ih"] .ZQ-par,.ZQ[data-vp="esc"] .ZQ-par,.ZQ[data-vp="iv"] .ZQ-par{display:flex;justify-content:flex-end}
+.ZQ[data-vp="ih"] .ZQ-mr,.ZQ[data-vp="esc"] .ZQ-mr,.ZQ[data-vp="iv"] .ZQ-mr{min-height:44px;font-size:15px}
+.ZQ[data-vp="ih"] .ZQ-cin,.ZQ[data-vp="esc"] .ZQ-cin{height:40px;font-size:15px}
+.ZQ[data-vp="ih"] .ZQ-casilla,.ZQ[data-vp="esc"] .ZQ-casilla{min-height:36px}
+/* Menú «···»: en computadora nace del botón (borde derecho de la columna centrada); en teléfono es una hoja corta; en ih, modal centrado */
+.ZQ[data-vp="esc"] .ZQ-hoja.ZQ-menu{left:calc(248px + (100% - 248px) / 2 + 320px - 264px);top:60px;width:264px;max-height:none;border-radius:14px;padding:6px;transform-origin:top right;transform:scale(.94)}
+.ZQ[data-vp="esc"] .ZQ-hoja.ZQ-menu.ZQ-act{transform:none}
+.ZQ[data-vp="esc"] .ZQ-menu .ZQ-hj-cab{display:none}
+.ZQ[data-vp="esc"] .ZQ-menu .ZQ-hj-c{padding:0;overflow:visible}
+.ZQ[data-vp="esc"] .ZQ-menu .ZQ-mr{min-height:36px;padding:0 10px;border-radius:8px;font-size:14px;box-shadow:none}
+.ZQ[data-vp="esc"] .ZQ-menu .ZQ-mr:not([aria-disabled="true"]):hover{background:var(--fondo)}
+.ZQ[data-vp="esc"] .ZQ-capa.ZQ-sinvelo .ZQ-velo{opacity:0}
+.ZQ[data-vp="esc"] .ZQ-toast{top:16px;left:calc(248px + 16px)}
+.ZQ[data-vp="ih"] .ZQ-quieto,.ZQ[data-vp="esc"] .ZQ-quieto,.ZQ[data-vp="ih"] .ZQ-tonal,.ZQ[data-vp="esc"] .ZQ-tonal,.ZQ[data-vp="ih"] .ZQ-mal-b,.ZQ[data-vp="esc"] .ZQ-mal-b,.ZQ[data-vp="ih"] .ZQ-pan .ZQ-prim,.ZQ[data-vp="esc"] .ZQ-pan .ZQ-prim{height:36px;font-size:14px;border-radius:10px}
+.ZQ[data-vp="ih"] .ZQ-apil>*,.ZQ[data-vp="esc"] .ZQ-apil>*,.ZQ[data-vp="ih"] .ZQ-pila-b>*,.ZQ[data-vp="esc"] .ZQ-pila-b>*{height:auto;min-height:36px;padding-top:4px;padding-bottom:4px}
+.ZQ[data-vp="ih"] .ZQ-ch,.ZQ[data-vp="esc"] .ZQ-ch,.ZQ[data-vp="ih"] .ZQ-pan .ZQ-ch,.ZQ[data-vp="esc"] .ZQ-pan .ZQ-ch{height:32px;font-size:13px}
+.ZQ[data-vp="ih"] .ZQ-ch::after,.ZQ[data-vp="esc"] .ZQ-ch::after{top:-2px;bottom:-2px}
+.ZQ[data-vp="esc"] .ZQ-solo-tel,.ZQ[data-vp="ih"] .ZQ-solo-tel,.ZQ[data-vp="iv"] .ZQ-solo-tel{display:none!important}
+.ZQ[data-vp="ext"] .ZQ-solo-anc,.ZQ[data-vp="tel"] .ZQ-solo-anc{display:none!important}
+
+.ZQ .ZQ-casilla a{position:relative}
+.ZQ .ZQ-casilla a::after{content:"";position:absolute;top:-13px;bottom:-13px;left:0;right:0}
+.ZQ[data-vp="ih"] .ZQ-casilla a::after,.ZQ[data-vp="esc"] .ZQ-casilla a::after{top:-9px;bottom:-9px}
+.ZQ .ZQ-nav.ZQ-sv>.ZQ-nav-e{display:none}
+.ZQ .ZQ-nav.ZQ-sv .ZQ-nav-v{text-align:left;white-space:normal;padding:8px 0}
+.ZQ[data-vp="ih"] .ZQ-barra .ZQ-aviso{max-width:400px}
+.ZQ .ZQ-lr textarea.ZQ-in{height:auto;min-height:52px;padding:14px 8px 14px 16px;white-space:normal;text-overflow:clip}
+.ZQ .ZQ-lr .ZQ-n+.ZQ-cb textarea.ZQ-in{padding-left:4px}
+.ZQ[data-vp="ih"] .ZQ-lr textarea.ZQ-in,.ZQ[data-vp="esc"] .ZQ-lr textarea.ZQ-in,.ZQ[data-vp="iv"] .ZQ-lr textarea.ZQ-in{min-height:48px;padding:13px 8px 13px 20px}
+.ZQ[data-vp="ih"] .ZQ-lr .ZQ-n+.ZQ-cb textarea.ZQ-in,.ZQ[data-vp="esc"] .ZQ-lr .ZQ-n+.ZQ-cb textarea.ZQ-in,.ZQ[data-vp="iv"] .ZQ-lr .ZQ-n+.ZQ-cb textarea.ZQ-in{padding-left:4px}
+
+/* ---- Duo abierto vertical (iv, CALMA §19): encabezado fundido con pista de secciones; composición de ih en columna de 600; toques de 44 ---- */
+.ZQ .ZQ-env{position:relative;z-index:1;flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:calc(var(--it) + 0px) 16px 14px;background:var(--navy);border-radius:0 0 26px 26px;box-shadow:var(--sombra-nav-sup);color:#fff}
+.ZQ .ZQ-env-lat{width:44px;height:44px;flex:none;border-radius:999px;background:var(--nav-velo);color:#fff;display:flex;align-items:center;justify-content:center}
+.ZQ .ZQ-env-pis{display:flex;align-items:center;gap:2px;padding:4px;border-radius:26px;background:var(--nav-velo)}
+.ZQ .ZQ-env-s{position:relative;display:flex;align-items:center;height:40px;padding:0 14px;border-radius:20px;color:var(--nav-tinta);font-size:15px;line-height:20px;font-weight:500;white-space:nowrap}
+.ZQ .ZQ-env-s::after{content:"";position:absolute;top:-4px;bottom:-4px;left:0;right:0}
+.ZQ .ZQ-env-s[aria-current="page"]{padding:0 16px;background:var(--accion);color:#fff;font-weight:600}
+.ZQ[data-vp="iv"] .ZQ-cont{padding:22px 24px 32px}
+.ZQ[data-vp="iv"] .ZQ-ancho{max-width:600px}
+/* Entrada en iv: la pantalla tiene 811 px útiles bajo el encabezado; el bloque (título + buscador) baja al tercio superior-medio en vez de quedarse pegado arriba.
+   El mismo desplazamiento sirve al paso 2 (paciente + rejilla), así el título no salta al elegir paciente. */
+.ZQ[data-vp="iv"][data-doc="entrada"] .ZQ-cont{padding-top:160px}
+.ZQ[data-vp="iv"] .ZQ-barra{padding:10px 24px calc(var(--ib) + 10px)}
+.ZQ[data-vp="iv"] .ZQ-barra .ZQ-prim{position:relative;flex:none;height:40px;padding:0 20px;border-radius:12px;font-size:15px}
+.ZQ[data-vp="iv"] .ZQ-barra .ZQ-quieto{height:40px}
+.ZQ[data-vp="iv"] .ZQ-barra .ZQ-prim::after,.ZQ[data-vp="iv"] .ZQ-barra .ZQ-quieto::after{content:"";position:absolute;top:-2px;bottom:-2px;left:0;right:0}
+.ZQ[data-vp="iv"] .ZQ-hoja{left:calc(50% - 220px);top:calc(50% + (var(--it) - var(--ib)) / 2);max-height:calc(100% - var(--it) - var(--ib) - 48px)}
+.ZQ[data-vp="iv"] .ZQ-hoja.ZQ-ancha{width:520px;left:calc(50% - 260px)}
+.ZQ[data-vp="iv"] .ZQ-hoja.ZQ-rejilla{width:min(640px,calc(100% - 32px));left:calc((100% - min(640px,calc(100% - 32px))) / 2)}
+.ZQ[data-vp="iv"] .ZQ-hoja.ZQ-menu{width:320px;left:calc(50% - 160px)}
+.ZQ[data-vp="iv"] .ZQ-alerta{width:340px;left:calc(50% - 170px);top:calc(50% + (var(--it) - var(--ib)) / 2)}
+
+/* ---- Tira de controles de la maqueta (vive fuera del marco) ---- */
+.ZQ-tira{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:10px;font:600 12px/16px var(--fuente);color:var(--tinta2)}
+.ZQ-tira span{margin-right:2px;letter-spacing:.3px;text-transform:uppercase}
+.ZQ-tira button{height:28px;padding:0 10px;border:1px dashed var(--tinta3);border-radius:999px;background:transparent;color:var(--tinta2);font:inherit;cursor:pointer}
+.ZQ-tira button[aria-pressed="true"]{border-style:solid;border-color:var(--tinta2);color:var(--tinta)}
+.ZQ-tira button:hover{color:var(--tinta);border-color:var(--tinta2)}
+.ZQ-tira button:focus-visible{outline:3px solid var(--enlace);outline-offset:2px}
+
+@media (prefers-reduced-motion:reduce){
+  .ZQ .ZQ-pan,.ZQ .ZQ-pan.ZQ-act,.ZQ .ZQ-hoja,.ZQ .ZQ-hoja.ZQ-act{transform:none;opacity:0;transition:opacity 200ms ease,visibility 0s linear 200ms}
+  .ZQ .ZQ-pan.ZQ-act,.ZQ .ZQ-hoja.ZQ-act{opacity:1;transition-delay:0s}
+  .ZQ .ZQ-alerta,.ZQ .ZQ-alerta.ZQ-act,.ZQ[data-vp="ih"] .ZQ-hoja,.ZQ[data-vp="esc"] .ZQ-hoja,.ZQ[data-vp="ih"] .ZQ-hoja.ZQ-act,.ZQ[data-vp="esc"] .ZQ-hoja.ZQ-act,.ZQ[data-vp="iv"] .ZQ-hoja,.ZQ[data-vp="iv"] .ZQ-hoja.ZQ-act{transform:translateY(-50%)}
+  .ZQ[data-vp="esc"] .ZQ-hoja.ZQ-menu,.ZQ[data-vp="esc"] .ZQ-hoja.ZQ-menu.ZQ-act{transform:none}
+  .ZQ .ZQ-velo,.ZQ .ZQ-toast{transition:opacity 200ms ease}
+  .ZQ .ZQ-toast{transform:none}
+  .ZQ .ZQ-p,.ZQ .ZQ-sw-p,.ZQ .ZQ-sw-p::after{transition:none}
+  .ZQ .ZQ-giro{animation:none}
+}
+.ZQ .ZQ-lr.ZQ-mala .ZQ-in::placeholder{color:var(--mal-tinta)}
+/* Velo con desenfoque (CALMA §13): si el sistema pide menos transparencia, sin desenfoque y con el velo doblado */
+@media (prefers-reduced-transparency:reduce){
+  .ZQ .ZQ-velo{-webkit-backdrop-filter:none;backdrop-filter:none;background:linear-gradient(var(--velo),var(--velo)),var(--velo)}
+}

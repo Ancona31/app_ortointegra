@@ -1,0 +1,162 @@
+
+/* ===================== SEGUNDA REVISIÓN DEL DUEÑO (CALMA §11–16): limpio con carácter ===================== */
+/* ---- Botones de verdad: quieto (--sup2) y tonal; «-ch» es la talla pequeña (alto 32, área de toque 44) ---- */
+.PX .PX-qui,.PX .PX-ton{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:6px;height:44px;padding:0 16px;border-radius:12px;font-size:15px;line-height:20px;font-weight:600;white-space:nowrap}
+.PX .PX-qui{background:var(--sup2);color:var(--tinta)}
+.PX .PX-ton{background:var(--tonal);color:var(--tonal-tinta)}
+.PX .PX-qui:disabled,.PX .PX-ton:disabled{color:var(--tinta3)}
+.PX .PX-qui:disabled:active,.PX .PX-ton:disabled:active{transform:none}
+.PX .PX-mal{height:44px}
+.PX .PX-ch{height:32px;padding:0 12px;border-radius:10px;font-size:13px;line-height:18px}
+.PX .PX-ch::after{content:"";position:absolute;inset:-6px 0}
+.PX[data-vp="ih"] .PX-qui,.PX[data-vp="esc"] .PX-qui,.PX[data-vp="ih"] .PX-ton,.PX[data-vp="esc"] .PX-ton,.PX[data-vp="ih"] .PX-mal,.PX[data-vp="esc"] .PX-mal,
+.PX[data-vp="ih"] .PX-capa .PX-prim,.PX[data-vp="esc"] .PX-capa .PX-prim,.PX[data-vp="ih"] .PX-firma .PX-prim,.PX[data-vp="esc"] .PX-firma .PX-prim{height:36px;padding:0 16px;border-radius:10px;font-size:14px}
+.PX[data-vp="ih"] .PX-ch,.PX[data-vp="esc"] .PX-ch{height:32px;padding:0 12px;font-size:13px}
+.PX[data-vp="ih"] .PX-ch::after,.PX[data-vp="esc"] .PX-ch::after{inset:-2px 0}
+/* Pareja de botones: mitades iguales; si un rótulo no cabe en su mitad, la pareja se apila sola (principal arriba) */
+.PX .PX-par{display:flex;flex-wrap:wrap-reverse;gap:8px;width:100%}
+.PX .PX-par>*{flex:1 1 calc(50% - 4px);min-width:fit-content;height:auto;min-height:44px;padding-top:6px;padding-bottom:6px;white-space:normal;text-align:center}
+.PX[data-vp="ih"] .PX-par>*,.PX[data-vp="esc"] .PX-par>*{height:auto;min-height:36px}
+/* Cerrar (X): icono dentro de un círculo quieto de 30 */
+.PX .PX-xc{position:relative}
+.PX .PX-xc::before{content:"";position:absolute;inset:6px;border-radius:999px;background:var(--sup2)}
+.PX .PX-xc svg{position:relative}
+.PX .PX-xc:active{background:none}
+.PX[data-vp="ih"] .PX-xc::before,.PX[data-vp="esc"] .PX-xc::before{inset:2px}
+
+/* ---- Cabecera: «Cambiar» en un solo sitio (fila de volver, antes de «···»); el título queda solo con su icono ---- */
+.PX .PX-top-f{gap:2px}
+.PX .PX-camb{margin:0 2px 0 0}
+.PX .PX-tit{align-items:flex-start}
+.PX .PX-tit h1{text-wrap:balance}
+.PX .PX-solo-esc{display:none}
+.PX[data-vp="esc"] .PX-solo-esc{display:block}
+
+/* ---- Computadora: la columna del formulario (640) centrada en el área de contenido; cabecera y barra a sus bordes ---- */
+.PX[data-vp="esc"] .PX-cont{scrollbar-gutter:stable both-edges}
+.PX[data-vp="esc"] .PX-form{width:640px;margin:0 auto}
+.PX[data-vp="esc"] .PX-barra>*{width:640px;margin-left:auto;margin-right:auto}
+.PX[data-vp="ih"] .PX-form{max-width:640px;margin:0 auto}
+
+/* ---- Carácter: rótulos de grupo en color, iconos de color en menús y filas, etiquetas de estado suaves ---- */
+.PX .PX-gt{font-size:13px;line-height:18px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--enlace)}
+.PX .PX-gt .PX-req{color:var(--mal-tinta)}
+.PX .PX-mr>.PX-fic,.PX .PX-fic{color:var(--enlace)}
+.PX .PX-mr:disabled>.PX-fic,.PX .PX-mr[aria-disabled="true"]>.PX-fic{color:var(--tinta3)}
+.PX .PX-mr:has(>.PX-fic){gap:12px}
+.PX .PX-add{gap:8px}
+.PX .PX-h,.PX .PX-sec-c .PX-nota{color:var(--tinta3)}
+.PX .PX-eq{display:inline-flex;align-items:center;gap:4px;flex:none;height:24px;padding:0 8px;border-radius:8px;font-size:12px;line-height:16px;font-weight:600;white-space:nowrap}
+.PX .PX-eq-ag{background:var(--ag-fondo);color:var(--ag-tinta)}
+.PX .PX-eq-ton{background:var(--tonal);color:var(--tonal-tinta)}
+.PX .PX-eq-ok{background:var(--ok-fondo);color:var(--ok-tinta)}
+.PX .PX-falta .PX-sr.PX-eq{background:var(--mal-fondo);color:var(--mal-tinta)}
+.PX .PX-borr-l{align-items:flex-start;gap:10px}
+.PX .PX-borr-l .PX-eq{margin-top:-3px}
+/* Conmutadores: segmentado claro (pista quieta, opción activa blanca con texto de color) */
+.PX .PX-seg button[aria-pressed="true"]{color:var(--enlace)}
+.PX .PX-var{padding:3px;border-radius:12px}
+.PX .PX-var button{border-radius:9px}
+.PX[data-vp="ext"] .PX-var button,.PX[data-vp="tel"] .PX-var button{height:36px;font-size:15px}
+/* Importes */
+.PX .PX-subs .PX-tot{color:var(--tinta2)}
+.PX .PX-final small{margin-left:6px;font-size:13px;line-height:18px;font-weight:600;color:var(--tinta2)}
+.PX .PX-cl-p,.PX .PX-imp,.PX .PX-sim{font-variant-numeric:tabular-nums}
+/* Teléfono: el rótulo de la fila final baja a 15/600 para que el importe (17/700) y su divisa quepan en una línea */
+.PX[data-vp="ext"] .PX-tot.PX-final>.PX-flex,.PX[data-vp="tel"] .PX-tot.PX-final>.PX-flex{font-size:15px;font-weight:600}
+.PX .PX-tot.PX-final b{font-size:17px}
+/* Texto legal de las secciones: justificado, sin tocar una palabra */
+.PX .PX-sec-c .PX-ta{text-align:justify;-webkit-hyphens:auto;hyphens:auto}
+
+/* ---- Barra de acción: el secundario es un botón quieto ---- */
+.PX .PX-barra .PX-qui{flex:none}
+.PX[data-vp="ih"] .PX-barra .PX-qui,.PX[data-vp="esc"] .PX-barra .PX-qui{height:36px;border-radius:10px}
+.PX[data-vp="ih"] .PX-barra .PX-qui,.PX[data-vp="ih"] .PX-barra .PX-prim{font-size:14px}
+
+/* ---- Velo con desenfoque: uno solo a la vez ---- */
+.PX .PX-velo,.PX[data-vp="ih"] .PX-firma::before,.PX[data-vp="esc"] .PX-firma::before{-webkit-backdrop-filter:blur(10px) saturate(140%);backdrop-filter:blur(10px) saturate(140%)}
+.PX:has(.PX-capa.PX-on:not(.PX-sinvelo)) .PX-firma::before{opacity:0}
+@media (prefers-reduced-transparency:reduce){
+  .PX .PX-velo,.PX[data-vp="ih"] .PX-firma::before,.PX[data-vp="esc"] .PX-firma::before{-webkit-backdrop-filter:none;backdrop-filter:none;background:color-mix(in srgb,var(--velo),var(--navy) 45%)}
+}
+
+/* ---- Posición de las capas. Teléfono: hoja desde abajo y alerta centrada en el contenido. Ancho: TODA capa centrada (horizontal y vertical)
+        en el área de contenido: --cx0/--cx1 son lo que la navegación ocupa a izquierda y derecha. ---- */
+.PX[data-vp="ih"]{--cx0:0px;--cx1:calc(218px + var(--ir))}
+.PX[data-vp="esc"]{--cx0:248px;--cx1:0px}
+.PX[data-vp="ih"] .PX-hoja,.PX[data-vp="esc"] .PX-hoja{left:var(--cx0);right:var(--cx1);top:0;bottom:0;margin:auto;width:440px;height:fit-content;max-height:calc(100% - 96px);border-radius:20px;padding-bottom:16px;opacity:0;transform:translateY(12px) scale(.97)}
+.PX[data-vp="ih"] .PX-hoja{width:440px;max-height:calc(100% - 80px)}
+.PX[data-vp="ih"] .PX-hoja.PX-menu{width:320px}
+.PX[data-vp="ih"] .PX-hoja.PX-alta,.PX[data-vp="esc"] .PX-hoja.PX-alta{height:fit-content}
+.PX[data-vp="esc"] .PX-hoja.PX-alta{width:520px}
+.PX[data-vp="ih"] .PX-hoja.PX-ancha{width:600px}
+.PX[data-vp="esc"] .PX-hoja.PX-ancha{width:640px}
+.PX[data-vp="ih"] .PX-hoja.PX-act,.PX[data-vp="esc"] .PX-hoja.PX-act{opacity:1;transform:none}
+.PX[data-vp="esc"] .PX-menu{right:auto;bottom:auto;margin:0;width:264px;height:auto;max-height:none;border-radius:14px;padding:6px;transform-origin:top right;transform:scale(.94)}
+.PX[data-vp="esc"] .PX-menu.PX-act{transform:none}
+.PX[data-vp="esc"] .PX-menu .PX-mr{gap:10px}
+.PX[data-vp="esc"] .PX-menu .PX-fic{width:18px;height:18px}
+
+/* ---- Alerta de confirmación: patrón único ---- */
+.PX .PX-alerta{left:0;right:var(--ir);top:var(--it);bottom:var(--ib);margin:auto;width:320px;height:fit-content;max-height:calc(100% - var(--it) - var(--ib) - 32px);overflow-y:auto;scrollbar-width:none;display:flex;flex-direction:column;align-items:center;border-radius:20px;padding:24px;opacity:0;transform:scale(.95)}
+.PX .PX-alerta.PX-act{opacity:1;transform:none}
+.PX[data-vp="ih"] .PX-alerta,.PX[data-vp="esc"] .PX-alerta{left:var(--cx0);right:var(--cx1);top:0;bottom:0;max-height:calc(100% - 96px)}
+.PX[data-vp="ih"] .PX-alerta{width:300px}
+.PX[data-vp="esc"] .PX-alerta{width:340px}
+.PX .PX-al-i{flex:none;display:flex;align-items:center;justify-content:center;width:48px;height:48px;border-radius:999px;margin-bottom:12px}
+.PX .PX-al-ton{background:var(--tonal);color:var(--tonal-tinta)}
+.PX .PX-al-mal{background:var(--mal-fondo);color:var(--mal-tinta)}
+.PX .PX-al-ag{background:var(--ag-fondo);color:var(--ag-tinta)}
+.PX .PX-al-ok{background:var(--ok-fondo);color:var(--ok-tinta)}
+.PX .PX-alerta h2{font-size:17px;line-height:22px;font-weight:700;text-align:center;text-wrap:balance}
+.PX .PX-al-m{width:100%;margin-top:8px}
+.PX .PX-al-m p{font-size:14px;line-height:20px;color:var(--tinta2);text-align:justify;text-align-last:center;-webkit-hyphens:auto;hyphens:auto}
+.PX .PX-al-m p+p{margin-top:8px}
+.PX .PX-al-m p.PX-fuerte{color:var(--tinta);font-weight:600;text-align:center}
+.PX .PX-al-m p.PX-junto{margin-top:0;text-align:center}
+.PX .PX-alerta .PX-par{flex:none;margin-top:20px}
+
+/* ---- Hojas: pie con botones; rejilla de tipos; plantillas; documento generado ---- */
+.PX .PX-hj-p{padding-top:12px}
+.PX[data-vp="ih"] .PX-hoja .PX-par{justify-content:flex-end}
+.PX[data-vp="esc"] .PX-hoja .PX-par{justify-content:flex-end}
+.PX[data-vp="ih"] .PX-hoja .PX-par>*,.PX[data-vp="esc"] .PX-hoja .PX-par>*{flex:0 1 auto;min-width:104px}
+.PX .PX-bloque .PX-par{margin-top:14px}
+.PX .PX-bloque p{text-align:justify;-webkit-hyphens:auto;hyphens:auto}
+.PX .PX-bloque p.PX-dir{text-align:center}
+/* Rejilla de tipos (nivel 4): icono en su cuadro arriba, nombre debajo; el nombre parte en dos líneas dentro de su celda */
+.PX .PX-rej{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding-bottom:8px}
+.PX[data-vp="ih"] .PX-rej,.PX[data-vp="esc"] .PX-rej{grid-template-columns:repeat(4,minmax(0,1fr))}
+.PX .PX-az{display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-start;gap:8px;min-width:0;min-height:84px;padding:12px;border-radius:14px;background:var(--sup);font-size:14px;line-height:18px;font-weight:400;text-align:left;overflow:hidden}
+.PX .PX-az i{flex:none}
+.PX .PX-az span{display:block;max-width:100%;overflow-wrap:anywhere}
+.PX[data-vp="ih"] .PX-az,.PX[data-vp="esc"] .PX-az{min-height:88px}
+/* Plantillas */
+.PX .PX-pick-pie{gap:12px}
+.PX .PX-pl-acc{gap:8px;margin:0 0 12px}
+.PX .PX-pl-ed{gap:8px;padding:0 0 12px}
+.PX .PX-gest-vacio .PX-qui{margin-bottom:4px}
+/* Documento generado: sello de éxito, filas con icono y «Cerrar» como botón */
+.PX .PX-gen-i{align-self:center;margin:16px 0 0}
+.PX .PX-gen.PX-nog .PX-gen-i{background:var(--ag-fondo);color:var(--ag-tinta)}
+.PX .PX-gen .PX-ok-t{text-align:center}
+.PX .PX-gen .PX-ok-s{text-align:center;text-wrap:balance}
+.PX .PX-gen-otro-f{display:flex;padding:2px 0 12px 32px}
+.PX .PX-gen .PX-hj-p .PX-qui{flex:1}
+.PX[data-vp="ih"] .PX-gen .PX-hj-p,.PX[data-vp="esc"] .PX-gen .PX-hj-p{justify-content:flex-end}
+.PX[data-vp="ih"] .PX-gen .PX-hj-p .PX-qui,.PX[data-vp="esc"] .PX-gen .PX-hj-p .PX-qui{flex:none;min-width:104px}
+
+/* ---- Firmado: indicador de pasos sobrio, papel blanco con línea de base, botones de verdad; en ancho, centrado en el contenido ---- */
+.PX .PX-prog-t i.PX-ahora{background:color-mix(in srgb,var(--accion) 45%,var(--borde))}
+.PX .PX-papel{box-shadow:inset 0 0 0 1px var(--borde)}
+.PX .PX-fi-av{text-align:justify;-webkit-hyphens:auto;hyphens:auto}
+.PX .PX-fi-acc .PX-qui{flex:none}
+.PX .PX-res-f{padding-right:12px}
+.PX[data-vp="ih"] .PX-fi,.PX[data-vp="esc"] .PX-fi{left:var(--cx0);right:var(--cx1);top:0;bottom:0;margin:auto;height:fit-content;max-height:calc(100% - 80px)}
+.PX[data-vp="ih"] .PX-fi{width:568px}
+.PX[data-vp="esc"] .PX-fi{width:640px}
+.PX[data-vp="ih"] .PX-res-f{padding-right:8px}
+
+@media (prefers-reduced-motion:reduce){
+  .PX .PX-alerta,.PX .PX-alerta.PX-act,.PX[data-vp="ih"] .PX-hoja,.PX[data-vp="esc"] .PX-hoja,.PX[data-vp="ih"] .PX-hoja.PX-act,.PX[data-vp="esc"] .PX-hoja.PX-act,.PX[data-vp="esc"] .PX-menu{transform:none}
+}

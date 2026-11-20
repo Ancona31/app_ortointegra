@@ -1,0 +1,497 @@
+/* ===== Dashboard final · «Lo que sigue». Todos los selectores empiezan por .db ===== */
+.db .db-app{display:flex;width:100%;height:100%}
+.db[data-vp="tel"] .db-app{flex-direction:column}
+.db button{border:0;margin:0;padding:0;background:none;color:inherit}
+.db h1,.db h2,.db p,.db ul,.db ol{margin:0;padding:0}
+.db ul,.db ol{list-style:none}
+.db svg{flex:none}
+.db .db-flex{flex:1}
+.db .db-num{font-variant-numeric:tabular-nums}
+/* Variantes de la maqueta: m = solo médico, s = solo secretaria, v1 = día con citas, v0 = día sin citas */
+.db:not(.db-sec) .db-s{display:none!important}
+.db.db-sec .db-m{display:none!important}
+.db:not(.db-sincitas) .db-v0{display:none!important}
+.db.db-sincitas .db-v1{display:none!important}
+/* Respuesta al toque y foco */
+.db .db-p{transition:transform 100ms ease-out}
+.db .db-p:active{transform:scale(.97)}
+.db .db-p:focus-visible{outline:3px solid var(--enlace);outline-offset:2px}
+.db .db-riel .db-p:focus-visible,.db .db-lat .db-p:focus-visible,.db .db-enc .db-p:focus-visible{outline-color:var(--nav-tinta)}
+/* Píldoras de 36 de alto cuya área real llega a 44 */
+.db .db-toq{position:relative}
+.db .db-toq::after{content:"";position:absolute;inset:-4px 0}
+
+/* ---- Contenido que se desplaza ---- */
+.db .db-cont{flex:1;min-width:0;min-height:0;overflow-x:hidden;overflow-y:auto;scrollbar-width:none;display:flex;flex-direction:column;gap:12px;padding:14px 14px calc(var(--ib) + 16px) 16px}
+.db .db-cont>*{flex:none}
+.db[data-vp="tel"] .db-cont{padding:18px 16px calc(var(--ib) + 16px)}
+.db[data-vp="ih"] .db-cont{padding:20px 24px calc(var(--ib) + 16px);gap:14px}
+.db[data-vp="esc"] .db-cont{padding:28px 24px calc(var(--ib) + 24px);gap:16px;scrollbar-width:thin;scrollbar-color:var(--borde) transparent}
+
+/* ---- Cabecera: saludo + «Hoy» fundido ---- */
+.db .db-top{display:flex;flex-direction:column;gap:12px}
+.db[data-vp="esc"] .db-top{flex-direction:row;align-items:flex-end;justify-content:space-between;gap:24px}
+.db .db-cab{display:flex;align-items:flex-start;gap:10px;min-width:0}
+.db .db-sal{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.db .db-sup{display:flex;align-items:center;gap:8px;min-height:20px}
+.db[data-vp="ext"] .db-sup{margin-top:-4px}
+.db .db-rot{font-size:12px;line-height:16px;font-weight:600;letter-spacing:.3px;text-transform:uppercase;color:var(--tinta2)}
+.db .db-plan{display:inline-flex;align-items:center;height:20px;padding:0 8px;border-radius:999px;background:var(--tonal);color:var(--tonal-tinta);font-size:12px;line-height:16px;font-weight:600;white-space:nowrap}
+.db .db-sal h1{font-size:26px;line-height:31px;font-weight:800;letter-spacing:-.6px}
+.db[data-vp="ih"] .db-sal h1,.db[data-vp="esc"] .db-sal h1{font-size:32px;line-height:38px}
+.db .db-avn{width:44px;height:44px;flex:none;border-radius:999px;background:var(--nav-avatar);color:var(--navy);font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center}
+
+.db .db-hoy{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:0 12px;align-items:center}
+.db .db-hoy-t{display:contents}
+.db .db-hoy-f{grid-column:1/-1;font-size:15px;line-height:20px;font-weight:600}
+.db .db-hoy-c{font-size:13px;line-height:18px;color:var(--tinta2)}
+.db .db-enl{display:inline-flex;align-items:center;gap:2px;min-height:44px;font-size:14px;line-height:18px;font-weight:600;color:var(--enlace);white-space:nowrap}
+.db[data-vp="ih"] .db-enl,.db[data-vp="esc"] .db-enl{min-height:36px}
+.db .db-hoy-a{position:relative;min-height:20px;justify-self:end}
+.db .db-hoy-a::after{content:"";position:absolute;inset:-12px -4px}
+.db .db-sem{grid-column:1/-1;margin-top:8px;display:grid;grid-template-columns:repeat(7,minmax(0,1fr))}
+.db .db-sem li{display:flex;flex-direction:column;align-items:center;gap:1px}
+.db .db-sl{font-size:11px;line-height:14px;font-weight:600;color:var(--tinta3)}
+.db .db-sn{width:28px;height:28px;border-radius:999px;display:flex;align-items:center;justify-content:center;font-size:13px;line-height:16px;font-weight:600;color:var(--tinta2);font-variant-numeric:tabular-nums}
+.db .db-sem li[aria-current] .db-sl{color:var(--tinta)}
+.db .db-sem li[aria-current] .db-sn{background:var(--tonal);color:var(--tonal-tinta);font-weight:700}
+/* Ancho: la franja «Hoy» es una sola línea */
+.db[data-vp="ih"] .db-hoy,.db[data-vp="esc"] .db-hoy{display:flex;align-items:center;gap:20px}
+.db[data-vp="ih"] .db-hoy-t,.db[data-vp="esc"] .db-hoy-t{display:flex;flex-direction:column;min-width:0}
+.db[data-vp="ih"] .db-hoy-t{flex:1}
+.db[data-vp="ih"] .db-sem,.db[data-vp="esc"] .db-sem{margin:0;width:224px;flex:none;order:2}
+.db[data-vp="ih"] .db-sem{width:206px}
+.db[data-vp="ih"] .db-hoy{gap:14px}
+.db[data-vp="ih"] .db-hoy-a,.db[data-vp="esc"] .db-hoy-a{order:3;min-height:36px}
+.db[data-vp="ih"] .db-hoy-a::after,.db[data-vp="esc"] .db-hoy-a::after{content:none}
+
+/* ---- Rejilla del cuerpo ---- */
+.db .db-cols{display:flex;flex-direction:column;gap:12px}
+.db[data-vp="ih"] .db-cols{gap:14px}
+.db[data-vp="esc"] .db-cols{display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto auto auto 1fr;gap:16px;align-items:start}
+.db[data-vp="esc"] .db-hero{grid-column:1;grid-row:1;align-self:stretch}
+.db[data-vp="esc"] .db-herr{grid-column:2;grid-row:1}
+.db[data-vp="esc"] .db-desp{grid-column:1;grid-row:2/5}
+.db[data-vp="esc"] .db-at{grid-column:2;grid-row:2}
+.db[data-vp="esc"] .db-docs{grid-column:2;grid-row:3}
+.db[data-vp="esc"] .db-cons{grid-column:1;grid-row:1}
+.db[data-vp="esc"] .db-ult{grid-column:2;grid-row:2}
+
+/* ---- Pieza principal: la cita en curso o siguiente ---- */
+.db .db-hero{background:var(--sup);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:12px}
+.db[data-vp="ih"] .db-hero{border-radius:18px;padding:16px 18px 18px}
+.db[data-vp="esc"] .db-hero{border-radius:20px;padding:20px;justify-content:space-between}
+.db .db-hcab{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.db .db-encurso{display:inline-flex;align-items:center;gap:6px;font-size:12px;line-height:16px;font-weight:600;letter-spacing:.3px;text-transform:uppercase;color:var(--enlace)}
+.db .db-neutro{color:var(--tinta2)}
+.db .db-pt{width:8px;height:8px;border-radius:999px;background:var(--accion)}
+.db .db-avance{font-size:13px;line-height:18px;color:var(--tinta2);text-align:right}
+.db .db-segs{display:flex;gap:4px;margin-top:-4px}
+.db .db-segs span{flex:1;height:4px;border-radius:999px;background:var(--sup2)}
+.db .db-segs .db-h{background:var(--tinta3)}
+.db .db-segs .db-a{background:var(--accion)}
+.db .db-hfila{display:flex;flex-wrap:wrap;align-items:center;gap:12px}
+.db .db-fecha{width:52px;flex:none;display:flex;flex-direction:column;align-items:center;padding:6px 0;border-radius:12px;background:var(--fondo)}
+.db .db-mes{font-size:11px;line-height:14px;font-weight:700;letter-spacing:.4px;color:var(--mes)}
+.db .db-dia{font-size:20px;line-height:24px;font-weight:700;color:var(--tinta);font-variant-numeric:tabular-nums}
+.db .db-quien{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.db .db-hnom{font-size:17px;line-height:22px;font-weight:700;letter-spacing:-.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.db[data-vp="ih"] .db-hnom,.db[data-vp="esc"] .db-hnom{font-size:20px;line-height:25px;letter-spacing:-.3px}
+.db .db-det{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;font-size:13px;line-height:18px;color:var(--tinta2)}
+.db .db-nw{white-space:nowrap}
+.db .db-med::before{content:"· "}
+/* Teléfono: el médico baja a su propia línea para que el estado no quede suelto */
+.db[data-vp="ext"] .db-med,.db[data-vp="tel"] .db-med{order:3;flex:1 0 100%}
+.db[data-vp="ext"] .db-med::before,.db[data-vp="tel"] .db-med::before{content:none}
+.db .db-haccs{display:flex;gap:8px;flex:1 0 100%}
+.db[data-vp="ih"] .db-haccs,.db[data-vp="esc"] .db-haccs{flex:none}
+/* Duo cerrado, día sin citas: con el rótulo corto «+ Consulta» los dos botones caben lado a lado */
+.db[data-vp="ext"] .db-v0 .db-haccs>*{flex:1 1 0}
+.db .db-prim{display:flex;align-items:center;justify-content:center;gap:8px;height:48px;padding:0 20px;border-radius:12px;background:var(--accion);color:#fff;font-size:15px;line-height:20px;font-weight:600;white-space:nowrap}
+.db .db-haccs .db-prim{flex:1}
+.db[data-vp="ih"] .db-prim,.db[data-vp="esc"] .db-prim{height:44px}
+.db .db-sec2{display:flex;align-items:center;justify-content:center;height:48px;padding:0 16px;border-radius:12px;background:var(--tonal);color:var(--tonal-tinta);font-size:15px;line-height:20px;font-weight:600;white-space:nowrap}
+.db[data-vp="ih"] .db-sec2,.db[data-vp="esc"] .db-sec2{height:44px}
+.db .db-ico{width:44px;height:44px;flex:none;border-radius:999px;background:var(--fondo);color:var(--tonal-tinta);display:flex;align-items:center;justify-content:center}
+.db[data-vp="ih"] .db-ico,.db[data-vp="esc"] .db-ico{width:36px;height:36px}
+.db .db-ico.db-ico-g{width:48px;height:48px;border-radius:12px;background:var(--tonal)}
+.db[data-vp="ih"] .db-ico.db-ico-g,.db[data-vp="esc"] .db-ico.db-ico-g{width:44px;height:44px}
+
+/* ---- Chips de estado y marcas ---- */
+.db .db-marca{display:inline-flex;align-items:center;gap:4px;font-size:12px;line-height:16px;font-weight:600;color:var(--tinta2);white-space:nowrap}
+/* Estado de cita como icono en círculo de color (CALMA §24.4). Solo icono en Duo cerrado/iPhone; icono + texto en lo demás */
+.db .db-est{display:inline-flex;align-items:center;gap:6px;flex:none;font-size:12px;line-height:16px;font-weight:600;white-space:nowrap}
+.db .db-est-c{width:26px;height:26px;flex:none;border-radius:999px;display:flex;align-items:center;justify-content:center}
+.db .db-linea .db-est-c,.db .db-det .db-est-c,.db .db-hc-et .db-est-c{width:24px;height:24px}
+.db .db-est-conf .db-est-c{background:var(--tonal);color:var(--enlace)}
+.db .db-est-conf .db-est-t{color:var(--tonal-tinta)}
+.db .db-est-ag .db-est-c{background:var(--ag-fondo);color:var(--ag-tinta)}
+.db .db-est-ag .db-est-t{color:var(--ag-tinta)}
+.db .db-est-canc .db-est-c{background:var(--mal-fondo);color:var(--mal-tinta)}
+.db .db-est-canc .db-est-t{color:var(--mal-tinta)}
+.db .db-est-noas .db-est-c{background:var(--sup2);color:var(--tinta2)}
+.db .db-est-noas .db-est-t{color:var(--tinta2)}
+.db .db-est-aten .db-est-c{background:var(--ok-fondo);color:var(--ok-tinta)}
+.db .db-est-aten .db-est-t{color:var(--ok-tinta)}
+/* Función 9: «Estados» = leyenda en un menú que nace del botón, sin velo */
+.db .db-estw{position:relative;flex:none}
+.db .db-est-b{display:inline-flex;align-items:center;gap:2px;height:44px;padding:0 4px;font-size:13px;line-height:18px;font-weight:600;color:var(--tinta2)}
+.db[data-vp="ih"] .db-est-b,.db[data-vp="esc"] .db-est-b{height:36px}
+.db .db-est-b svg{transition:transform 200ms ease-out}
+.db .db-est-b[aria-expanded="true"] svg{transform:rotate(180deg)}
+.db .db-ley{position:absolute;z-index:6;top:calc(100% + 2px);right:0;min-width:168px;padding:8px 14px;border-radius:14px;background:var(--sup);box-shadow:var(--sombra-capa);display:flex;flex-direction:column;opacity:0;visibility:hidden;transform:scale(.95);transform-origin:top right;transition:opacity 180ms ease-out,transform 180ms ease-out,visibility 0s linear 180ms}
+.db .db-ley.db-ley-on{opacity:1;visibility:visible;transform:none;transition-delay:0s}
+.db .db-ley li{display:flex;align-items:center;min-height:36px}
+.db .db-ley .db-est-t{font-size:13px;line-height:18px}
+.db .db-gcal{flex:none;display:block}
+.db .db-ori svg{flex:none}
+
+/* ---- Filas de cita (CALMA §24.1): la fila entera es pulsable; sin botones propios, el nombre no se corta ---- */
+.db .db-filas>li{border-top:1px solid var(--linea)}
+.db .db-fbtn{display:flex;align-items:center;gap:10px;width:calc(100% + 8px);min-height:60px;margin:0 -4px;padding:10px 4px;border-radius:12px;text-align:left;color:var(--tinta);font:inherit;transition:transform 100ms ease-out,background-color 100ms ease-out}
+.db .db-fbtn:active{background:var(--fondo);transform:scale(.985)}
+.db .db-fbtn>svg{color:var(--tinta3)}
+.db .db-fc{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.db .db-fila .db-nom{white-space:normal;overflow:visible;overflow-wrap:anywhere}
+.db .db-linea{display:flex;align-items:center;gap:6px;min-width:0;font-size:13px;line-height:18px;color:var(--tinta2)}
+.db .db-fmed,.db .db-fmed1{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.db .db-pto::before{content:"· "}
+.db .db-fila .db-marca{margin-top:2px}
+.db .db-marcas{display:flex;flex-wrap:wrap;align-items:center;gap:2px 14px}
+.db .db-marcas .db-marca{margin-top:0}
+.db .db-pto2{font-size:12px;color:var(--tinta3)}
+.db[data-vp="iv"] .db-linea .db-est{margin-left:4px}
+.db[data-vp="ih"] .db-fbtn,.db[data-vp="esc"] .db-fbtn{min-height:52px;padding:8px 4px;gap:12px}
+.db[data-vp="ih"] .db-fbtn>.db-est,.db[data-vp="esc"] .db-fbtn>.db-est{min-width:112px}
+
+/* ---- Búsqueda + acciones secundarias ---- */
+.db .db-herr{display:flex;flex-direction:column;gap:8px}
+.db .db-campo{display:flex;align-items:center;gap:8px;height:44px;padding:0 12px;border-radius:12px;background:var(--sup2);color:var(--tinta2)}
+.db .db-campo:focus-within{outline:3px solid var(--enlace);outline-offset:2px}
+.db .db-global,.db .db-busca{flex:1;min-width:0;height:44px;border:0;background:transparent;outline:none;font:inherit;font-size:16px;color:var(--tinta);-webkit-appearance:none;appearance:none}
+.db .db-global::placeholder,.db .db-busca::placeholder{color:var(--tinta2);opacity:1}
+.db[data-vp="esc"] .db-global,.db[data-vp="esc"] .db-busca{font-size:15px}
+.db .db-kbd{flex:none;padding:2px 6px;border-radius:6px;background:var(--sup);color:var(--tinta2);font:600 12px/16px var(--fuente)}
+.db .db-acc{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.db .db-ab{display:flex;align-items:center;justify-content:center;gap:6px;height:44px;padding:0 8px;border-radius:12px;background:var(--sup);color:var(--tonal-tinta);font-size:15px;line-height:20px;font-weight:600;white-space:nowrap}
+.db .db-ab.db-ab-t{background:var(--tonal)}
+/* Rótulo completo / corto. Duo cerrado (CALMA §17): «+» de 16 y una palabra; el resto de marcos, rótulo completo */
+.db .db-rc,.db .db-ic-c{display:none}
+.db .db-ic-l{display:inline-flex}
+.db[data-vp="ext"] .db-rl,.db[data-vp="ext"] .db-ic-l{display:none}
+.db[data-vp="ext"] .db-rc{display:inline}
+.db[data-vp="ext"] .db-ic-c{display:inline-flex}
+/* Duo cerrado: tres botones compactos de 40 en una fila («Nueva consulta» es el «+» del riel) */
+.db[data-vp="ext"] .db-a-con{display:none}
+.db[data-vp="ext"] .db-acc{display:flex;gap:6px}
+.db[data-vp="ext"] .db-acc .db-ab{position:relative;flex:1 1 auto;gap:3px;height:40px;padding:0 6px;font-size:13px;line-height:18px}
+.db[data-vp="ext"] .db-acc .db-ab::after{content:"";position:absolute;inset:-2px 0}
+.db[data-vp="ext"] .db-acc .db-ic-c svg{width:14px;height:14px}
+.db[data-vp="ext"] .db-acc .db-a-exp svg{display:none}
+.db[data-vp="ext"] .db-acc-s .db-prim{flex:1 1 auto}
+.db[data-vp="ext"] .db-acc-s .db-ab{font-size:14px;padding:0 12px}
+.db[data-vp="tel"].db-sincitas .db-a-exp,.db[data-vp="esc"].db-sincitas .db-a-exp{grid-column:1/-1}
+.db[data-vp="ih"] .db-acc{grid-template-columns:repeat(4,minmax(0,1fr))}
+.db[data-vp="ih"] .db-ab svg{display:none}
+.db[data-vp="ih"].db-sincitas .db-acc{grid-template-columns:repeat(3,minmax(0,1fr))}
+.db[data-vp="ih"] .db-acc-s{grid-template-columns:repeat(2,minmax(0,1fr))}
+.db[data-vp="ih"] .db-acc-s .db-ab svg{display:block}
+.db[data-vp="ih"] .db-acc-s .db-ic-c svg{display:none}
+.db[data-vp="esc"] .db-ab{font-size:14px}
+.db .db-acc-s .db-prim{height:44px;padding:0 8px}
+
+/* ---- Tarjetas con lista ---- */
+.db .db-tar{background:var(--sup);border-radius:16px;padding:4px 12px}
+.db[data-vp="ih"] .db-tar{border-radius:18px;padding:6px 16px}
+.db[data-vp="esc"] .db-tar{border-radius:20px;padding:8px 20px}
+.db .db-tcab{display:flex;align-items:center;gap:12px;min-height:48px}
+.db .db-tcab h2{flex:1;min-width:0;font-size:17px;line-height:22px;font-weight:700}
+.db .db-th{flex:1;min-width:0}
+.db .db-sub{font-size:13px;line-height:18px;color:var(--tinta2)}
+.db .db-sub b{color:var(--tinta);font-weight:700}
+.db .db-nom{font-size:15px;line-height:20px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.db .db-dsub{font-size:13px;line-height:18px;color:var(--tinta2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.db .db-pil{display:inline-flex;align-items:center;justify-content:center;gap:0;height:36px;padding:0 14px;border-radius:999px;background:var(--tonal);color:var(--tonal-tinta);font-size:14px;line-height:18px;font-weight:600;white-space:nowrap}
+.db .db-pil-n{gap:4px}
+.db[data-vp="ext"] .db-docs .db-tcab{gap:8px}
+.db[data-vp="ext"] .db-pil-n{padding:0 14px}
+.db[data-vp="ext"] .db-pil-n svg{display:none}
+.db .db-pie{padding:12px 0;border-top:1px solid var(--linea);text-align:center;font-size:13px;line-height:18px;color:var(--tinta2)}
+
+/* ---- Atendidos recientemente: carrusel (teléfono), rejilla (Duo abierto), lista (computadora) ---- */
+.db .db-at{display:flex;flex-direction:column;gap:6px}
+.db[data-vp="ext"] .db-at .db-tcab,.db[data-vp="tel"] .db-at .db-tcab{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:0 12px;min-height:0;padding-top:6px}
+.db[data-vp="ext"] .db-at .db-th,.db[data-vp="tel"] .db-at .db-th{display:contents}
+.db[data-vp="ext"] .db-at h2,.db[data-vp="tel"] .db-at h2{grid-column:1/-1}
+.db[data-vp="ext"] .db-at .db-enl,.db[data-vp="tel"] .db-at .db-enl{position:relative;min-height:18px}
+.db[data-vp="ext"] .db-at .db-enl::after,.db[data-vp="tel"] .db-at .db-enl::after{content:"";position:absolute;inset:-13px -4px}
+.db .db-at-l{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x proximity;scrollbar-width:none;margin:0 -14px 0 -16px;padding:0 14px 0 16px;scroll-padding-left:16px}
+.db[data-vp="tel"] .db-at-l{margin:0 -16px;padding:0 16px}
+.db .db-atc{flex:none;width:232px;scroll-snap-align:start;background:var(--sup);border-radius:16px;padding:8px 12px 12px;display:flex;flex-direction:column;gap:6px}
+.db .db-atq{display:flex;align-items:center;gap:10px;min-width:0;min-height:44px;border-radius:12px}
+.db .db-avt{width:36px;height:36px;flex:none;border-radius:999px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;font-variant-numeric:tabular-nums}
+.db .db-doc-t{flex:1;min-width:0;display:flex;flex-direction:column}
+.db .db-atb{display:flex;gap:6px}
+.db .db-et{position:relative;display:inline-flex;align-items:center;gap:4px;height:28px;padding:0 9px;border-radius:8px;background:var(--fondo);color:var(--tinta2);font-size:12px;line-height:16px;font-weight:600;white-space:nowrap}
+.db .db-et svg{color:var(--enlace)}
+.db .db-et::after{content:"";position:absolute;inset:-8px -2px}
+.db[data-vp="ih"] .db-et::after,.db[data-vp="esc"] .db-et::after{inset:-4px -2px}
+.db[data-vp="esc"] .db-atb{gap:4px}
+.db .db-mini{display:inline-flex;align-items:center;justify-content:center;height:36px;min-width:44px;padding:0 12px;border-radius:999px;background:var(--fondo);color:var(--tonal-tinta);font-size:13px;line-height:18px;font-weight:600;white-space:nowrap}
+.db[data-vp="ih"] .db-at-l{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:0;padding:0;overflow:visible}
+.db[data-vp="ih"] .db-atc{width:auto;border-radius:18px;padding:8px 14px 14px}
+.db[data-vp="esc"] .db-at{background:var(--sup);border-radius:20px;padding:8px 20px;gap:0}
+.db[data-vp="esc"] .db-at .db-tcab{padding:6px 0}
+.db[data-vp="esc"] .db-at-l{flex-direction:column;gap:0;margin:0;padding:0;overflow:visible}
+.db[data-vp="esc"] .db-atc{width:auto;background:none;border-radius:0;padding:6px 0;flex-direction:row;align-items:center;border-top:1px solid var(--linea)}
+.db[data-vp="esc"] .db-atq{flex:1}
+
+/* ---- Documentos recientes / Últimos pacientes ---- */
+.db .db-docs-l li+li{border-top:1px solid var(--linea)}
+.db .db-docs-l li:first-child{border-top:1px solid var(--linea)}
+.db .db-doc{display:flex;align-items:center;gap:12px;min-height:56px;padding:8px 0;border-radius:12px;color:var(--tinta)}
+.db .db-doc>svg{color:var(--tinta3)}
+.db .db-doc-i{width:24px;flex:none;display:flex;align-items:center;justify-content:center}
+.db .db-ulr{display:flex;align-items:center;gap:4px;min-height:56px;padding:6px 0}
+.db .db-ulr .db-atq{flex:1}
+
+/* ---- Secretaria: «Hoy en consultorio» ---- */
+.db .db-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:0 0 10px}
+.db[data-vp="ih"] .db-stats,.db[data-vp="esc"] .db-stats{grid-template-columns:repeat(4,minmax(0,1fr));padding-bottom:12px}
+.db .db-stat{display:flex;flex-direction:column;padding:8px 12px;border-radius:12px;background:var(--fondo)}
+.db .db-stat b{font-size:20px;line-height:24px;font-weight:700}
+.db .db-stat span{font-size:13px;line-height:18px;color:var(--tinta2)}
+
+/* Saludo: forma corta en Duo cerrado */
+
+/* ---- Riel (Duo cerrado) ---- */
+.db .db-riel{position:relative;z-index:1;flex:none;width:calc(56px + var(--ir));padding:16px calc(var(--ir) + 8px) calc(var(--ib) + 10px) 8px;background:var(--navy);border-radius:26px 0 0 26px;box-shadow:var(--sombra-nav-der);display:flex;flex-direction:column;align-items:center;gap:8px}
+.db .db-rb{width:48px;height:48px;flex:none;border-radius:999px;display:flex;align-items:center;justify-content:center;color:var(--nav-tinta)}
+.db .db-rb[aria-current="page"]{background:var(--accion);color:#fff}
+.db .db-mas{width:52px;height:52px;flex:none;border-radius:999px;background:#fff;color:var(--accion);display:flex;align-items:center;justify-content:center;box-shadow:var(--sombra-accion)}
+
+/* ---- Encabezado fundido (iPhone) ---- */
+.db .db-enc{position:relative;z-index:1;flex:none;display:flex;align-items:center;gap:12px;padding:calc(var(--it) + 8px) 16px 12px;background:var(--navy);border-radius:0 0 26px 26px;box-shadow:var(--sombra-nav-sup);color:#fff}
+.db .db-menu{width:44px;height:44px;flex:none;border-radius:12px;background:var(--nav-velo);color:#fff;display:flex;align-items:center;justify-content:center}
+.db .db-enc-t{font-size:17px;line-height:22px;font-weight:700;color:#fff}
+.db .db-av{display:flex;align-items:center;justify-content:center;flex:none;width:34px;height:34px;border-radius:999px;background:var(--nav-avatar);color:var(--navy);font-size:13px;font-weight:700}
+.db .db-av.db-av-g{width:44px;height:44px}
+
+/* ---- Barra lateral (Duo abierto a la derecha, computadora a la izquierda) ---- */
+.db .db-lat{position:relative;z-index:1;flex:none;display:flex;flex-direction:column;background:var(--navy);color:#fff}
+.db[data-vp="ih"] .db-lat{width:calc(218px + var(--ir));padding:16px calc(var(--ir) + 10px) calc(var(--ib) + 10px) 12px;border-radius:26px 0 0 26px;box-shadow:var(--sombra-nav-der)}
+.db[data-vp="esc"] .db-lat{width:248px;padding:16px 12px 14px;border-radius:0 26px 26px 0;box-shadow:var(--sombra-nav-izq)}
+.db .db-lat-cab{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:36px;padding:0 4px 0 8px}
+.db .db-logo{display:inline-flex;align-items:center;gap:8px;color:#fff}
+.db .db-logo-n{font-size:17px;line-height:22px;font-weight:700;letter-spacing:-.2px}
+.db .db-lat .db-plan{height:24px;padding:0 10px;background:var(--nav-velo);color:var(--nav-tinta)}
+.db .db-cons-b{margin-top:12px;display:flex;align-items:center;gap:10px;min-height:52px;padding:8px 10px;border-radius:14px;background:var(--nav-velo);color:#fff;text-align:left}
+.db .db-cons-b svg{color:var(--nav-tinta2)}
+.db .db-cons-t{flex:1;min-width:0;display:flex;flex-direction:column}
+.db .db-cons-t span{font-size:13px;line-height:16px;color:var(--nav-tinta2)}
+.db .db-cons-t b{font-size:15px;line-height:19px;font-weight:600}
+.db .db-lista{margin-top:14px;display:flex;flex-direction:column;gap:2px}
+.db .db-li{display:flex;align-items:center;gap:12px;height:44px;padding:0 12px;border-radius:12px;color:var(--nav-tinta);font-size:15px;line-height:20px;font-weight:500}
+.db[data-vp="esc"] .db-li{height:40px;font-size:14px}
+.db .db-li[aria-current="page"]{background:var(--accion);color:#fff;font-weight:600}
+.db .db-lat-pie{border-top:1px solid var(--nav-velo);padding-top:8px}
+.db .db-lat .db-yo{height:48px}
+.db .db-yo>span{display:flex;flex-direction:column;line-height:17px}
+.db .db-yo small{font-size:12px;line-height:16px;color:var(--nav-tinta2)}
+
+/* ---- Buscador de paciente: hoja (teléfono) / modal (ancho) ---- */
+.db .db-capa{position:absolute;inset:0;z-index:20;visibility:hidden;transition:visibility 0s linear 320ms}
+.db .db-capa.db-on{visibility:visible;transition-delay:0s}
+.db .db-velo{position:absolute;inset:0;background:var(--velo);-webkit-backdrop-filter:blur(10px) saturate(140%);backdrop-filter:blur(10px) saturate(140%);opacity:0;transition:opacity 320ms cubic-bezier(.32,.72,0,1)}
+.db .db-on .db-velo{opacity:1}
+.db .db-hoja{position:absolute;left:0;right:var(--ir);bottom:0;max-height:calc(100% - var(--it) - 16px);overflow-y:auto;background:var(--sup);border-radius:22px 22px 0 0;box-shadow:var(--sombra-capa);padding:0 16px calc(var(--ib) + 16px);transform:translateY(100%);transition:transform 320ms cubic-bezier(.32,.72,0,1)}
+.db .db-on .db-hoja{transform:none}
+.db[data-vp="ih"] .db-hoja,.db[data-vp="esc"] .db-hoja{bottom:auto;right:auto;border-radius:20px;padding:8px 20px 20px;opacity:0;transform:translateY(12px) scale(.97);transition:transform 320ms cubic-bezier(.32,.72,0,1),opacity 320ms cubic-bezier(.32,.72,0,1)}
+/* Capas centradas en el área de contenido, en horizontal y en vertical (CALMA §13, §18, §19). En Duo abierto se cruza la bisagra
+   sin maniobras; mismo ancho que en computadora. La capa es una rejilla que centra la hoja; el velo cubre todo el marco. */
+.db[data-vp="ih"] .db-capa,.db[data-vp="iv"] .db-capa,.db[data-vp="esc"] .db-capa{display:grid;grid-template-rows:minmax(0,1fr);place-items:center}
+.db[data-vp="ih"] .db-capa{padding:24px calc(218px + var(--ir) + 24px) calc(var(--ib) + 16px) 24px}
+.db[data-vp="iv"] .db-capa{padding:calc(var(--it) + 16px) 24px calc(var(--ib) + 16px)}
+.db[data-vp="esc"] .db-capa{padding:32px 24px 32px calc(248px + 24px)}
+.db[data-vp="ih"] .db-hoja,.db[data-vp="iv"] .db-hoja,.db[data-vp="esc"] .db-hoja{position:relative;left:auto;width:480px;max-width:100%;max-height:100%}
+.db[data-vp="iv"] .db-hoja{bottom:auto;right:auto;border-radius:20px;padding:8px 20px 20px;opacity:0;transform:translateY(12px) scale(.97);transition:transform 320ms cubic-bezier(.32,.72,0,1),opacity 320ms cubic-bezier(.32,.72,0,1)}
+.db[data-vp="ih"] .db-on .db-hoja,.db[data-vp="iv"] .db-on .db-hoja,.db[data-vp="esc"] .db-on .db-hoja{opacity:1;transform:none}
+.db[data-vp="iv"] .db-asa{display:none}
+.db .db-asa{display:block;width:36px;height:5px;border-radius:999px;background:var(--borde);margin:8px auto 2px}
+.db[data-vp="ih"] .db-asa,.db[data-vp="esc"] .db-asa{display:none}
+.db .db-vbus,.db .db-vform{display:flex;flex-direction:column;gap:12px}
+.db .db-vform{display:none}
+.db .db-capa.db-form .db-vbus{display:none}
+.db .db-capa.db-form .db-vform{display:flex}
+.db .db-hjcab{display:flex;align-items:center;gap:8px;min-height:44px}
+.db .db-hjcab h2{flex:1;font-size:17px;line-height:22px;font-weight:700}
+.db .db-ib{width:44px;height:44px;flex:none;border-radius:999px;background:var(--sup2);color:var(--tinta);display:flex;align-items:center;justify-content:center}
+.db .db-volver{margin-left:-4px}
+.db[data-vp="esc"] .db-ib{width:36px;height:36px}
+.db .db-res{display:flex;flex-direction:column}
+.db .db-res li+li{border-top:1px solid var(--linea)}
+.db .db-res li[hidden]{display:none}
+.db .db-r{display:flex;align-items:center;gap:12px;width:100%;min-height:56px;padding:0 4px;border-radius:12px;text-align:left;color:var(--tinta)}
+.db[data-vp="esc"] .db-r{min-height:52px;padding:0 8px}
+.db .db-r[aria-selected="true"]{background:var(--fondo)}
+.db .db-r>svg{color:var(--tinta3)}
+.db .db-nada{display:none;padding:12px 4px;font-size:13px;line-height:18px;color:var(--tinta2)}
+.db .db-vbus.db-vacia .db-nada{display:block}
+.db .db-tonal{display:flex;align-items:center;justify-content:center;gap:8px;height:44px;padding:0 16px;border-radius:12px;background:var(--tonal);color:var(--tonal-tinta);font-size:15px;line-height:20px;font-weight:600}
+.db .db-tec{font-size:12px;line-height:16px;color:var(--tinta2);text-align:center}
+.db .db-par{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.db .db-f{display:flex;flex-direction:column;gap:4px;min-width:0}
+.db .db-f>span{font-size:13px;line-height:18px;font-weight:600;color:var(--tinta2)}
+.db .db-in{width:100%;min-width:0;height:44px;padding:0 12px;border:0;border-radius:12px;background:var(--sup2);color:var(--tinta);font:inherit;font-size:16px;outline:none;-webkit-appearance:none;appearance:none}
+.db .db-in:focus-visible{outline:3px solid var(--enlace);outline-offset:2px}
+.db .db-edad{display:flex;align-items:center;height:44px;padding:0 12px;border-radius:12px;background:var(--fondo);color:var(--tinta2);font-size:15px}
+.db .db-edad.db-ok{color:var(--tinta);font-weight:600}
+.db .db-chk>span:first-child{flex:1}
+.db .db-pieh{display:flex;gap:8px}
+.db .db-pieh>*{flex:1 1 auto}
+.db .db-pieh .db-tonal{flex:0 0 auto}
+.db[data-vp="ih"] .db-pieh,.db[data-vp="iv"] .db-pieh,.db[data-vp="esc"] .db-pieh{justify-content:flex-end}
+.db[data-vp="ih"] .db-pieh>*,.db[data-vp="iv"] .db-pieh>*,.db[data-vp="esc"] .db-pieh>*{flex:none;min-width:104px}
+.db[data-vp="ih"] .db-pieh .db-prim,.db[data-vp="esc"] .db-pieh .db-prim{height:40px}
+.db .db-chk{position:relative;display:flex;align-items:center;gap:10px;min-height:44px;font-size:14px;line-height:18px;color:var(--tinta);cursor:pointer}
+.db .db-chk input{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer}
+.db .db-caja{width:22px;height:22px;flex:none;border-radius:6px;border:2px solid var(--tinta3);display:flex;align-items:center;justify-content:center;color:#fff}
+.db .db-caja svg{opacity:0}
+.db .db-chk input:checked+.db-caja{background:var(--accion);border-color:var(--accion)}
+.db .db-chk input:checked+.db-caja svg{opacity:1}
+.db .db-chk input:focus-visible+.db-caja{outline:3px solid var(--enlace);outline-offset:2px}
+.db .db-envia[aria-disabled="true"]{opacity:.45}
+.db[data-vp="esc"] .db-in,.db[data-vp="esc"] .db-edad{height:40px;font-size:14px}
+.db[data-vp="esc"] .db-envia,.db[data-vp="esc"] .db-tonal{height:40px}
+
+
+/* ---- Hoja de acciones de la cita (CALMA §24.2) ---- */
+.db .db-hc{display:flex;flex-direction:column;gap:14px}
+.db[data-vp="ih"] .db-hc,.db[data-vp="iv"] .db-hc,.db[data-vp="esc"] .db-hc{width:400px;padding:12px 20px 20px}
+.db .db-hc-cab{display:flex;align-items:flex-start;gap:12px;padding-top:6px}
+.db .db-hc-q{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.db .db-hc-n{font-size:20px;line-height:25px;font-weight:700;letter-spacing:-.3px;overflow-wrap:anywhere}
+.db .db-hc-d{font-size:13px;line-height:18px;color:var(--tinta2)}
+.db .db-hc-x{margin:-2px -4px 0 0}
+.db .db-hc-et{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;margin-top:-2px}
+.db .db-hc-est,.db .db-hc-ori{display:contents}
+.db .db-capa-c:not([data-est="ag"]) .db-hc-est>.db-est-ag,.db .db-capa-c:not([data-est="conf"]) .db-hc-est>.db-est-conf{display:none}
+.db .db-capa-c:not([data-ori="enlace"]) .db-hc-ori>:nth-child(1),.db .db-capa-c:not([data-ori="google"]) .db-hc-ori>:nth-child(2){display:none}
+.db .db-capa-c:not([data-sx="1"]) .db-hc-sx,.db .db-capa-c[data-sx="1"] .db-hc-ini,.db .db-capa-c[data-sx="1"] .db-hc-iexp,
+.db .db-capa-c:not([data-sx="1"][data-lig="1"]) .db-hc-lig,.db .db-capa-c:not([data-sx="1"][data-lig="0"]) .db-hc-ag,
+.db .db-capa-c:not([data-pa="1"]) .db-hc-noes{display:none}
+.db .db-capa-c[data-sx="1"] .db-hc-l{display:none}
+/* «¿No es una cita?»: acción secundaria discreta bajo la principal (texto, sin fondo) */
+.db .db-hc-noes{align-self:center;display:flex;align-items:center;justify-content:center;min-height:44px;margin:-8px 0 -6px;padding:0 12px;font-size:15px;line-height:20px;font-weight:600;color:var(--enlace)}
+.db[data-vp="ih"] .db-hc-noes,.db[data-vp="esc"] .db-hc-noes{min-height:36px;margin:-6px 0 -4px}
+/* Duo cerrado: la hoja inferior se queda en el área de contenido, sin pasar bajo el riel */
+.db[data-vp="ext"] .db-hc{right:calc(56px + var(--ir))}
+.db .db-hc-et .db-marca{font-size:13px;line-height:18px}
+.db .db-hc-prim{width:100%;height:44px;padding:0 16px}
+.db[data-vp="ih"] .db-hc-prim,.db[data-vp="esc"] .db-hc-prim{height:40px}
+.db .db-hc-l{display:flex;flex-direction:column;margin-top:-2px}
+.db .db-hc-l>li{border-top:1px solid var(--linea)}
+.db .db-hc-a{display:flex;align-items:center;gap:14px;width:100%;min-height:48px;padding:0 4px;border-radius:12px;text-align:left;font-size:16px;line-height:20px;color:var(--tinta);transition:transform 100ms ease-out,background-color 100ms ease-out}
+.db[data-vp="ih"] .db-hc-a,.db[data-vp="esc"] .db-hc-a{min-height:44px;font-size:15px}
+.db .db-hc-a svg{color:var(--enlace)}
+.db .db-hc-a:active{background:var(--fondo)}
+
+/* ---- Tira de controles de maqueta, FUERA del marco (CALMA §7). No depende de .marco ---- */
+.db-tira{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.db-tira button{position:relative;height:28px;padding:0 10px;border-radius:999px;border:1px dashed var(--tinta3);background:none;color:var(--tinta2);font:600 12px/16px var(--fuente);white-space:nowrap;cursor:pointer;transition:transform 100ms ease-out}
+.db-tira button::after{content:"";position:absolute;inset:-4px 0}
+.db-tira button:active{transform:scale(.97)}
+.db-tira button:focus-visible{outline:3px solid var(--enlace);outline-offset:2px}
+.db-tira button[aria-pressed="true"]{border-style:solid;background:var(--sup2);color:var(--tinta)}
+
+/* Transparencia reducida: sin desenfoque y velo más opaco */
+@media (prefers-reduced-transparency:reduce){
+  .db .db-velo{-webkit-backdrop-filter:none;backdrop-filter:none;background:color-mix(in srgb,var(--velo),#000 25%)}
+}
+/* Movimiento reducido: fundido corto en lugar de deslizar */
+@media (prefers-reduced-motion:reduce){
+  .db .db-hoja,.db[data-vp="ih"] .db-hoja,.db[data-vp="iv"] .db-hoja,.db[data-vp="esc"] .db-hoja{transform:none;opacity:0;transition:opacity 200ms ease}
+  .db .db-on .db-hoja{opacity:1}
+  .db .db-velo{transition:opacity 200ms ease}
+  .db .db-capa{transition:visibility 0s linear 200ms}
+  .db .db-p,.db .db-hc-a,.db-tira button,.db .db-ley,.db .db-est-b svg{transition:none}
+}
+
+/* Ajustes de Duo cerrado / iPhone */
+.db[data-vp="ext"] .db-ancho,.db[data-vp="tel"] .db-ancho{display:none}
+/* Computadora: si saludo y franja «Hoy» no caben en una línea (saludo largo), la franja baja */
+.db[data-vp="esc"] .db-top{flex-wrap:wrap;row-gap:10px}
+.db[data-vp="esc"] .db-cab{flex:none}
+.db[data-vp="esc"] .db-hoy{flex:1 1 500px;min-width:0;justify-content:flex-end}
+.db[data-vp="esc"] .db-hoy-t,.db[data-vp="esc"] .db-hoy-a{flex:none}
+.db[data-vp="esc"] .db-sem{flex:0 1 224px;width:auto;min-width:168px}
+.db[data-vp="ih"] .db-hoy-f,.db[data-vp="esc"] .db-hoy-f{white-space:nowrap}
+/* Saludo largo en computadora: si saludo + fecha no caben en la fila (lo decide el guion), la fecha baja bajo el saludo como
+   subtítulo y la semana con «Abrir agenda» se queda a la derecha; si aún no cabe, el saludo parte por la coma. */
+.db[data-vp="esc"] .db-top.db-apila{display:grid;grid-template-columns:minmax(0,1fr) auto auto;column-gap:20px;row-gap:4px;align-items:end}
+.db[data-vp="esc"] .db-apila .db-cab{grid-column:1;grid-row:1;flex:initial;min-width:0}
+.db[data-vp="esc"] .db-apila .db-hoy{display:contents}
+.db[data-vp="esc"] .db-apila .db-hoy-t{grid-column:1;grid-row:2;flex-direction:row;flex-wrap:wrap;column-gap:6px}
+.db[data-vp="esc"] .db-apila .db-hoy-f{font-size:15px;white-space:normal}
+.db[data-vp="esc"] .db-apila .db-hoy-c{font-size:15px;line-height:20px}
+.db[data-vp="esc"] .db-apila .db-hoy-c::before{content:"· "}
+.db[data-vp="esc"] .db-apila .db-sem{grid-column:2;grid-row:1/3;align-self:end;width:224px}
+.db[data-vp="esc"] .db-apila .db-hoy-a{grid-column:3;grid-row:1/3;align-self:end}
+/* Computadora, día sin citas: «Atendidos» sube a la columna principal para no dejarla vacía */
+.db[data-vp="esc"].db-sincitas .db-at{grid-column:1;grid-row:2/5}
+.db[data-vp="esc"].db-sincitas .db-docs{grid-row:2}
+.db[data-vp="ih"].db-sec .db-cons-b .db-av{display:none}
+
+/* ===== Duo abierto vertical (iv, 669×951; CALMA §19). Táctil: áreas ≥ 44. Encabezado fundido con pista de secciones. ===== */
+.db[data-vp="iv"] .db-app{flex-direction:column}
+.db .db-env{position:relative;z-index:1;flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:calc(var(--it) + 0px) 16px 14px;background:var(--navy);border-radius:0 0 26px 26px;box-shadow:var(--sombra-nav-sup);color:#fff}
+.db .db-envb{width:44px;height:44px;flex:none;border-radius:999px;background:var(--nav-velo);color:#fff;display:flex;align-items:center;justify-content:center}
+.db .db-pista{display:flex;align-items:center;gap:2px;padding:4px;border-radius:26px;background:var(--nav-velo)}
+.db .db-pv{display:flex;align-items:center;height:40px;padding:0 14px;border-radius:999px;color:var(--nav-tinta);font-size:15px;line-height:20px;font-weight:500;white-space:nowrap;position:relative}
+.db .db-pv::after{content:"";position:absolute;inset:-2px 0}
+.db .db-pv[aria-current="page"]{padding:0 16px;background:var(--accion);color:#fff;font-weight:600}
+.db .db-env .db-p:focus-visible{outline-color:var(--nav-tinta)}
+.db[data-vp="iv"] .db-cont{padding:22px 24px calc(var(--ib) + 20px);gap:16px}
+.db[data-vp="iv"] .db-sal h1{font-size:32px;line-height:38px}
+.db[data-vp="iv"] .db-top{gap:14px}
+.db[data-vp="iv"] .db-hoy-f{font-size:17px;line-height:22px}
+.db[data-vp="iv"] .db-hoy-c{font-size:14px;line-height:20px}
+.db[data-vp="iv"] .db-sem{margin-top:12px;background:var(--sup);border-radius:18px;padding:10px 8px}
+.db[data-vp="iv"] .db-sem li{gap:4px}
+.db[data-vp="iv"] .db-sl{font-size:12px;line-height:16px}
+.db[data-vp="iv"] .db-sn{width:36px;height:36px;font-size:15px}
+/* Cuerpo: pieza principal y herramientas a todo el ancho; debajo dos columnas («Después» | atendidos + documentos) */
+.db[data-vp="iv"] .db-cols{display:grid;grid-template-columns:minmax(0,1.12fr) minmax(0,1fr);grid-template-rows:auto auto auto 1fr;gap:16px;align-items:start}
+.db[data-vp="iv"] .db-hero,.db[data-vp="iv"] .db-herr,.db[data-vp="iv"] .db-cons{grid-column:1/-1}
+.db[data-vp="iv"] .db-desp{grid-column:1;grid-row:3/5}
+.db[data-vp="iv"] .db-at{grid-column:2;grid-row:3}
+.db[data-vp="iv"] .db-docs,.db[data-vp="iv"] .db-ult{grid-column:2}
+.db[data-vp="iv"] .db-ult{grid-row:3/5}
+.db[data-vp="iv"].db-sincitas .db-at{grid-column:1;grid-row:3/5}
+.db[data-vp="iv"].db-sincitas .db-docs{grid-row:3}
+.db[data-vp="iv"] .db-hero{border-radius:20px;padding:18px 20px 20px;gap:14px}
+.db[data-vp="iv"] .db-hnom{font-size:20px;line-height:25px;letter-spacing:-.3px}
+.db[data-vp="iv"] .db-haccs{flex:none}
+.db[data-vp="iv"] .db-v0 .db-quien{flex:1 1 220px}
+.db[data-vp="iv"] .db-acc{grid-template-columns:repeat(4,minmax(0,1fr))}
+.db[data-vp="iv"].db-sincitas .db-acc{grid-template-columns:repeat(3,minmax(0,1fr))}
+.db[data-vp="iv"] .db-acc .db-ab{gap:6px}
+.db[data-vp="iv"] .db-acc .db-ab svg{display:none}
+.db[data-vp="iv"] .db-acc-s{grid-template-columns:repeat(2,minmax(0,1fr))}
+.db[data-vp="iv"] .db-acc-s .db-ic-l svg{display:block}
+.db[data-vp="iv"] .db-tar{border-radius:20px;padding:6px 16px}
+.db[data-vp="iv"] .db-stats{grid-template-columns:repeat(4,minmax(0,1fr));padding-bottom:14px}
+/* Atendidos: tarjeta con lista; «Receta» y «Nota» bajo el nombre */
+.db[data-vp="iv"] .db-at{background:var(--sup);border-radius:20px;padding:6px 16px 8px;gap:0}
+.db[data-vp="iv"] .db-at .db-tcab{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:0 8px;min-height:0;padding:10px 0 6px}
+.db[data-vp="iv"] .db-at .db-th{display:contents}
+.db[data-vp="iv"] .db-at h2{grid-column:1/-1}
+.db[data-vp="iv"] .db-at-l{flex-direction:column;gap:0;margin:0;padding:0;overflow:visible}
+.db[data-vp="iv"] .db-atc{width:auto;background:none;border-radius:0;padding:8px 0 10px;gap:4px;border-top:1px solid var(--linea)}
+.db[data-vp="iv"] .db-atb{padding-left:46px}
+/* Pie de la capa: los dos botones del mismo alto (44 táctil; 40 en Duo abierto y computadora) */
+.db .db-pieh>*{height:44px}
+.db[data-vp="ih"] .db-pieh>*,.db[data-vp="esc"] .db-pieh>*{height:40px}
+/* Duo abierto vertical, secretaria: columnas iguales para que «Últimos pacientes» no corte nombres */
+.db[data-vp="iv"].db-sec .db-cols{grid-template-columns:repeat(2,minmax(0,1fr))}
+.db[data-vp="iv"].db-sec .db-ult{padding:6px 14px}

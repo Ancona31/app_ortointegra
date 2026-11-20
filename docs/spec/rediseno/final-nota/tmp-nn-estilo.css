@@ -1,0 +1,598 @@
+/* ===== Nueva nota médica (definitiva). Todos los selectores empiezan por .nn ===== */
+.nn .nn-app{display:flex;width:100%;height:100%}
+.nn[data-vp="tel"] .nn-app{flex-direction:column}
+.nn button{border:0;margin:0;padding:0;background:none;color:inherit}
+.nn h1,.nn h2,.nn h3,.nn p,.nn ul,.nn ol,.nn dl,.nn dt,.nn dd{margin:0;padding:0}
+.nn ul,.nn ol{list-style:none}
+.nn textarea,.nn input,.nn select{margin:0;padding:0;border:0;outline:0;background:none;color:inherit;font:inherit;-webkit-appearance:none;appearance:none;min-width:0}
+.nn textarea{display:block;resize:none}
+.nn ::placeholder{color:var(--tinta3);opacity:1}
+.nn svg{flex:none}
+.nn [hidden]{display:none!important}
+.nn .nn-flex{flex:1;min-width:0}
+.nn .nn-num{font-variant-numeric:tabular-nums}
+/* Estados de la pantalla (data-e) y vía de captura (data-modo) */
+.nn[data-e="cap"] [data-en]:not([data-en~="cap"]),.nn[data-e="gen"] [data-en]:not([data-en~="gen"]),.nn[data-e="rev"] [data-en]:not([data-en~="rev"]),
+.nn[data-e="regen"] [data-en]:not([data-en~="regen"]),.nn[data-e="ok"] [data-en]:not([data-en~="ok"]),.nn[data-e="doc"] [data-en]:not([data-en~="doc"]),
+.nn[data-e="err"] [data-en]:not([data-en~="err"]),.nn[data-e="ver"] [data-en]:not([data-en~="ver"]){display:none!important}
+.nn[data-modo="ia"] [data-solo="man"],.nn[data-modo="man"] [data-solo="ia"]{display:none!important}
+.nn:not(.nn-ed) .nn-ver1,.nn.nn-ed .nn-ver0{display:none!important}
+.nn:not(.nn-borr) .nn-borrador{display:none!important}
+.nn.nn-sincons .nn-cons-si{display:none!important}
+.nn.nn-docvacio .nn-b-imp,.nn.nn-docvacio .nn-b-plant,.nn.nn-docvacio .nn-mr[data-a="plantg"]{display:none!important}
+.nn:not(.nn-prim1) .nn-prim-si,.nn.nn-prim1 .nn-prim-no{display:none!important}
+.nn:not(.nn-convit) .nn-v1,.nn.nn-convit .nn-v0{display:none!important}
+/* Respuesta al toque y foco */
+.nn .nn-p{transition:transform 100ms ease-out}
+.nn .nn-p:active{transform:scale(.97)}
+.nn .nn-p:focus-visible,.nn .nn-in:focus-visible{outline:3px solid var(--enlace);outline-offset:2px}
+.nn .nn-riel .nn-p:focus-visible,.nn .nn-lat .nn-p:focus-visible,.nn .nn-enc .nn-p:focus-visible{outline-color:var(--nav-tinta)}
+
+/* ---- Navegación (copiada del dashboard: riel, encabezado fundido, barras laterales) ---- */
+.nn .nn-riel{position:relative;z-index:1;flex:none;width:calc(56px + var(--ir));padding:16px calc(var(--ir) + 8px) calc(var(--ib) + 10px) 8px;background:var(--navy);border-radius:26px 0 0 26px;box-shadow:var(--sombra-nav-der);display:flex;flex-direction:column;align-items:center;gap:8px}
+.nn .nn-rb{width:48px;height:48px;flex:none;border-radius:999px;display:flex;align-items:center;justify-content:center;color:var(--nav-tinta)}
+.nn .nn-rb[aria-current="page"]{background:var(--accion);color:#fff}
+.nn .nn-mas{width:52px;height:52px;flex:none;border-radius:999px;background:#fff;color:var(--accion);display:flex;align-items:center;justify-content:center;box-shadow:var(--sombra-accion)}
+.nn .nn-enc{position:relative;z-index:1;flex:none;display:flex;align-items:center;gap:12px;padding:calc(var(--it) + 8px) 16px 12px;background:var(--navy);border-radius:0 0 26px 26px;box-shadow:var(--sombra-nav-sup);color:#fff}
+.nn .nn-menu-b{width:44px;height:44px;flex:none;border-radius:12px;background:var(--nav-velo);color:#fff;display:flex;align-items:center;justify-content:center}
+.nn .nn-enc-t{font-size:17px;line-height:22px;font-weight:700;color:#fff}
+.nn .nn-av{display:flex;align-items:center;justify-content:center;flex:none;width:34px;height:34px;border-radius:999px;background:var(--nav-avatar);color:var(--navy);font-size:13px;font-weight:700}
+.nn .nn-av.nn-av-g{width:44px;height:44px}
+.nn .nn-lat{position:relative;z-index:1;flex:none;display:flex;flex-direction:column;background:var(--navy);color:#fff}
+.nn[data-vp="ih"] .nn-lat{width:calc(218px + var(--ir));padding:16px calc(var(--ir) + 10px) calc(var(--ib) + 10px) 12px;border-radius:26px 0 0 26px;box-shadow:var(--sombra-nav-der)}
+.nn[data-vp="esc"] .nn-lat{width:248px;padding:16px 12px 14px;border-radius:0 26px 26px 0;box-shadow:var(--sombra-nav-izq)}
+.nn .nn-lat-cab{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:36px;padding:0 4px 0 8px}
+.nn .nn-logo{display:inline-flex;align-items:center;gap:8px;color:#fff}
+.nn .nn-logo-n{font-size:17px;line-height:22px;font-weight:700;letter-spacing:-.2px}
+.nn .nn-plan{display:inline-flex;align-items:center;height:24px;padding:0 10px;border-radius:999px;background:var(--nav-velo);color:var(--nav-tinta);font-size:12px;line-height:16px;font-weight:600;white-space:nowrap}
+.nn .nn-cons-b{margin-top:12px;display:flex;align-items:center;gap:10px;min-height:52px;padding:8px 10px;border-radius:14px;background:var(--nav-velo);color:#fff;text-align:left}
+.nn .nn-cons-b svg{color:var(--nav-tinta2)}
+.nn .nn-cons-t{flex:1;min-width:0;display:flex;flex-direction:column}
+.nn .nn-cons-t span{font-size:13px;line-height:16px;color:var(--nav-tinta2)}
+.nn .nn-cons-t b{font-size:15px;line-height:19px;font-weight:600}
+.nn .nn-lista{margin-top:14px;display:flex;flex-direction:column;gap:2px}
+.nn .nn-li{display:flex;align-items:center;gap:12px;height:44px;padding:0 12px;border-radius:12px;color:var(--nav-tinta);font-size:15px;line-height:20px;font-weight:500}
+.nn[data-vp="esc"] .nn-li{height:40px;font-size:14px}
+.nn .nn-li[aria-current="page"]{background:var(--accion);color:#fff;font-weight:600}
+.nn .nn-lat-pie{border-top:1px solid var(--nav-velo);padding-top:8px}
+.nn .nn-lat .nn-yo{height:48px}
+.nn .nn-yo>span{display:flex;flex-direction:column;line-height:17px}
+.nn .nn-yo small{font-size:12px;line-height:16px;color:var(--nav-tinta2)}
+
+/* ---- Columna de contenido ---- */
+.nn .nn-col{position:relative;flex:1;min-width:0;min-height:0;display:flex;flex-direction:column}
+.nn .nn-cont{flex:1;min-height:0;overflow-x:hidden;overflow-y:auto;scrollbar-width:none;display:flex;flex-direction:column;padding:4px 16px 8px}
+.nn .nn-cont>*{flex:none}
+.nn[data-vp="tel"] .nn-cont{padding-top:10px}
+.nn[data-vp="ih"] .nn-cont{padding:12px 24px 8px}
+.nn .nn-izq{display:flex;flex-direction:column;flex:1 0 auto;min-height:0}
+.nn .nn-izq>*{flex:none}
+
+/* ---- Cabecera mínima: volver + «···», título, una línea ---- */
+.nn .nn-top{display:flex;flex-direction:column}
+.nn .nn-top-f{display:flex;align-items:center;gap:4px;min-height:44px;margin:0 -10px 0 -4px}
+.nn .nn-volver{display:inline-flex;align-items:center;gap:2px;min-height:44px;padding-right:8px;font-size:13px;line-height:18px;font-weight:600;color:var(--enlace);white-space:nowrap}
+.nn .nn-ib{width:44px;height:44px;flex:none;border-radius:999px;display:flex;align-items:center;justify-content:center;color:var(--tinta2)}
+.nn .nn-ib:active{background:var(--sup2)}
+.nn .nn-txt{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px;padding:0 8px;font-size:15px;line-height:20px;font-weight:600;color:var(--enlace);white-space:nowrap}
+.nn .nn-txt:disabled{color:var(--tinta3)}
+.nn .nn-h1f{display:flex;align-items:flex-start;gap:8px;min-width:0}
+.nn .nn-h1f h1{min-width:0}
+.nn .nn-doc-ic{height:31px;align-items:center}
+.nn:not([data-vp="esc"])[data-e="ok"] .nn-quien{display:none}
+.nn .nn-doc-ic{display:inline-flex;flex:none}
+.nn .nn-doc-ic svg{width:24px;height:24px}
+.nn .nn-top h1{font-size:26px;line-height:31px;font-weight:800;letter-spacing:-.6px}
+.nn .nn-sub{margin-top:4px;min-height:26px;display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;font-size:13px;line-height:18px;color:var(--tinta2)}
+.nn .nn-sub2{margin-top:2px;font-size:13px;line-height:18px;color:var(--tinta2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nn .nn-alg{display:inline-flex;align-items:center;gap:4px;height:24px;padding:0 8px;border-radius:8px;background:var(--mal-fondo);color:var(--mal-tinta);font-size:12px;line-height:16px;font-weight:600;white-space:nowrap}
+.nn .nn-chip{display:inline-flex;align-items:center;padding:2px 8px;border-radius:999px;font-size:12px;line-height:16px;font-weight:600;white-space:nowrap}
+.nn .nn-c-ag{background:var(--ag-fondo);color:var(--ag-tinta)}
+.nn .nn-c-mal{background:var(--mal-fondo);color:var(--mal-tinta)}
+.nn .nn-c-ok{background:var(--ok-fondo);color:var(--ok-tinta)}
+.nn .nn-linea{display:flex;align-items:center;gap:8px;margin-top:8px;min-height:28px;font-size:13px;line-height:18px;color:var(--tinta2)}
+.nn .nn-linea .nn-txt{position:relative;min-height:28px;font-size:13px;line-height:18px}
+.nn .nn-linea .nn-txt::after{content:"";position:absolute;inset:-8px 0}
+.nn .nn-nota-ok{display:block;min-height:0}
+.nn .nn-error{align-items:flex-start;gap:6px;padding:5px 0;color:var(--mal-tinta)}
+.nn .nn-error svg{margin-top:1px}
+
+/* ---- La superficie única: fila de signos vitales + área de escritura (o la nota) ---- */
+.nn .nn-card{margin-top:16px;background:var(--sup);border-radius:16px;display:flex;flex-direction:column;min-height:0}
+.nn .nn-card>*{flex:none}
+.nn[data-e="cap"][data-modo="ia"] .nn-card,.nn[data-e="gen"] .nn-card,.nn[data-e="err"] .nn-card{flex:1 0 auto;min-height:260px}
+.nn .nn-card:has(.nn-dict:focus-visible){outline:2px solid var(--enlace);outline-offset:-2px}
+.nn .nn-vfila{display:flex;flex-wrap:wrap;align-items:center;gap:2px 6px;width:100%;min-height:48px;padding:6px 12px 6px 16px;text-align:left;border-radius:16px 16px 0 0}
+.nn .nn-vfila>svg{color:var(--tinta3)}
+.nn .nn-fn{flex:1;min-width:0;display:flex;align-items:center;gap:8px;font-size:15px;line-height:20px}
+.nn .nn-vres{order:5;flex:0 0 100%;font-size:13px;line-height:18px;color:var(--tinta2);font-variant-numeric:tabular-nums}
+.nn .nn-vres{text-wrap:balance}
+.nn .nn-vres .nn-nw{white-space:nowrap}
+.nn .nn-fuera{color:var(--mal-tinta);font-weight:600}
+.nn .nn-vacc{font-size:15px;line-height:20px;color:var(--tinta2)}
+.nn.nn-convit .nn-vfila{min-height:60px;align-content:center;padding-top:9px;padding-bottom:9px}
+.nn .nn-sep{display:block;height:1px;margin:0 16px;background:var(--linea)}
+.nn .nn-esc{flex:1 0 auto;display:flex;flex-direction:column;min-height:0}
+.nn .nn-dict{flex:1 0 auto;width:100%;min-height:150px;padding:14px 16px 10px;font-size:17px;line-height:26px;border-radius:0 0 16px 16px}
+.nn[data-e="gen"] .nn-dict,.nn[data-e="regen"] .nn-prosa,.nn[data-e="regen"] .nn-grp{opacity:.45}
+.nn .nn-autog{padding:0 16px 12px;font-size:12px;line-height:16px;color:var(--tinta3)}
+
+/* ---- Modo manual: los mismos campos, como hoja de escritura ---- */
+.nn .nn-man{display:flex;flex-direction:column;padding:0 16px 8px}
+.nn .nn-mf{display:flex;flex-direction:column;padding:12px 0 4px;border-top:1px solid var(--linea)}
+.nn .nn-mf:first-child{border-top:0}
+.nn .nn-mf>span{font-size:13px;line-height:18px;font-weight:600;color:var(--tinta2)}
+.nn .nn-mta{width:100%;min-height:60px;overflow:hidden;padding:4px 0 8px;font-size:16px;line-height:24px}
+.nn .nn-mta:focus-visible,.nn .nn-dx-in:focus-visible{box-shadow:0 2px 0 var(--enlace)}
+.nn .nn-dx-in{width:100%;height:44px;font-size:16px}
+.nn .nn-dx-res{margin:0 -8px 4px;padding:4px;border-radius:12px;background:var(--fondo)}
+.nn .nn-dx-op{display:flex;align-items:center;gap:8px;width:100%;min-height:44px;padding:0 8px;border-radius:8px;text-align:left;font-size:15px;line-height:20px}
+.nn .nn-cod{font-size:13px;line-height:18px;color:var(--tinta2);font-variant-numeric:tabular-nums;white-space:nowrap}
+
+/* ---- La nota como documento de lectura ---- */
+.nn .nn-doc{padding:0 16px 20px}
+.nn .nn-origen{padding-top:14px;font-size:13px;line-height:18px;color:var(--tinta2)}
+.nn .nn-sec{margin-top:18px}
+.nn .nn-origen+.nn-prosa .nn-sec:first-child{margin-top:12px}
+.nn .nn-sec h3{font-size:15px;line-height:20px;font-weight:600}  /* 600 y no 700: con seis secciones a la vista, la negrita pesada rompería la regla de «no más de tres textos en 700+» */
+.nn .nn-sec p{margin-top:4px;font-size:15px;line-height:22px}
+.nn .nn-nota-ta{width:100%;min-height:200px;overflow:hidden;margin-top:12px;padding:12px;border-radius:12px;background:var(--sup2);font-size:16px;line-height:24px}
+.nn .nn-nota-ta:focus-visible{outline:2px solid var(--enlace);outline-offset:0}
+.nn .nn-grp{margin-top:22px;padding-top:14px;border-top:1px solid var(--linea)}
+.nn .nn-grp-t{font-size:13px;line-height:18px;font-weight:600;color:var(--tinta2)}
+.nn .nn-dli{display:flex;align-items:center;gap:12px;min-height:44px;font-size:15px;line-height:20px}
+.nn .nn-dli+.nn-dli{border-top:1px solid var(--linea)}
+.nn .nn-quitar{min-height:44px;padding:0 0 0 8px;font-size:14px}
+.nn[data-e="regen"] .nn-quitar{display:none}
+.nn .nn-dx-x{margin-right:-10px}
+.nn .nn-dx-no{color:var(--tinta2)}
+.nn .nn-vacio-t{padding:8px 0 0;font-size:15px;line-height:20px;color:var(--tinta2)}
+.nn .nn-pares{display:grid;grid-template-columns:auto minmax(0,1fr);gap:0 16px;padding-top:4px}
+.nn .nn-pares dt{padding:8px 0;font-size:13px;line-height:20px;color:var(--tinta2)}
+.nn .nn-pares dd{padding:8px 0;font-size:15px;line-height:20px}
+.nn .nn-seg-e{display:flex;flex-direction:column;gap:12px;padding-top:10px}
+.nn .nn-f{display:flex;flex-direction:column;gap:4px;min-width:0}
+.nn .nn-f>span{font-size:13px;line-height:18px;font-weight:600;color:var(--tinta2)}
+.nn .nn-in{width:100%;height:44px;padding:0 12px;border-radius:12px;background:var(--sup2);font-size:16px}
+
+/* ---- Después de guardar: rejilla de nivel 4 (CALMA §9) para elegir qué documento crear ---- */
+.nn .nn-rej{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:14px}
+.nn .nn-rej li{display:flex;min-width:0}
+.nn .nn-az{display:flex;flex-direction:column;align-items:flex-start;gap:8px;width:100%;min-height:78px;padding:10px 12px;border-radius:14px;background:var(--sup);text-align:left;font-size:14px;line-height:18px;color:var(--tinta)}
+.nn .nn-az-i{display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:9px;color:var(--c);background:color-mix(in srgb,var(--c) var(--d-mezcla),var(--sup))}
+.nn .nn-az-n{display:flex;flex-direction:column;min-width:0}
+.nn .nn-az-n small{font-size:13px;line-height:18px;color:var(--tinta2)}
+.nn .nn-az[aria-current]{box-shadow:inset 0 0 0 2px var(--enlace)}
+.nn .nn-acc{display:flex;align-items:center;gap:0;margin:6px 0 0 -8px}
+.nn[data-vp="ih"] .nn-acc{margin-left:-10px;gap:8px}
+/* ---- Formulario de documento: campos como lista «rótulo — valor» ---- */
+.nn .nn-form{display:flex;flex-direction:column;padding:4px 16px 12px}
+.nn .nn-form .nn-grp{margin-top:10px;padding-top:12px}
+/* Teléfono: rótulo encima y valor debajo (nada se trunca); los campos cortos van en pareja. Ancho: rótulo a la izquierda y valor a la derecha. */
+.nn .nn-fila{display:flex;flex-direction:column;min-width:0;padding-top:10px;border-top:1px solid var(--linea)}
+.nn .nn-df-rx>.nn-fila:first-child,.nn .nn-grp-t+.nn-fila,.nn .nn-grp-f+.nn-fila,.nn .nn-grp-t+.nn-par .nn-fila{border-top:0}
+.nn .nn-fila>span:first-child{font-size:13px;line-height:18px;color:var(--tinta2)}
+.nn .nn-fi,.nn .nn-sel{width:100%;min-width:0;height:44px;margin-top:-6px;font-size:16px;line-height:22px;text-overflow:ellipsis}
+.nn .nn-selw{display:flex;align-items:center;min-width:0}
+.nn .nn-selw svg{color:var(--tinta3);pointer-events:none;margin-top:-6px}
+.nn .nn-sel{flex:1;cursor:pointer;margin-right:-16px;padding-right:20px}
+.nn .nn-fi:focus-visible,.nn .nn-sel:focus-visible{box-shadow:0 2px 0 var(--enlace)}
+.nn .nn-par{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,3fr);column-gap:16px;border-top:1px solid var(--linea)}
+.nn .nn-par-m{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.nn .nn-par .nn-fila,.nn .nn-grp-t+.nn-par{border-top:0}
+.nn .nn-fila-a .nn-mta,.nn .nn-rx-rec{min-height:56px}
+.nn .nn-rx-rec{padding-top:8px}
+.nn .nn-grp-f{display:flex;align-items:center;justify-content:space-between;min-height:28px}
+.nn .nn-rx-x{margin:-8px -10px -8px 0}
+.nn .nn-rx-x:disabled{color:var(--tinta3)}
+.nn .nn-df-gen{padding:16px 0 8px;font-size:15px;line-height:22px;color:var(--tinta2)}
+.nn[data-vp] .nn-txt.nn-izqd{align-self:flex-start;padding-left:0}
+.nn .nn-ayuda{font-size:13px;line-height:18px;color:var(--tinta2)}
+
+/* ---- Barra de acción al pie: un solo primario ---- */
+.nn .nn-barra{flex:none;display:flex;flex-direction:column;gap:6px;padding:8px 16px calc(var(--ib) + 12px)}
+.nn .nn-barra-f{display:flex;align-items:center;gap:8px}
+.nn .nn-prim{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:48px;padding:0 20px;border-radius:12px;background:var(--accion);color:#fff;font-size:16px;line-height:20px;font-weight:600;white-space:nowrap}
+.nn .nn-barra .nn-prim{flex:1}
+.nn .nn-prim:disabled{background:var(--sup2);color:var(--tinta3)}
+.nn .nn-prim:disabled:active{transform:none}
+.nn .nn-mal,.nn .nn-al-p .nn-prim{position:relative}
+.nn .nn-mal::after,.nn .nn-al-p .nn-prim::after{content:"";position:absolute;inset:-2px 0}
+.nn .nn-mal{display:inline-flex;align-items:center;justify-content:center;height:40px;padding:0 16px;border-radius:12px;background:var(--mal-fondo);color:var(--mal-tinta);font-size:15px;line-height:20px;font-weight:600;white-space:nowrap}
+.nn .nn-giro{width:16px;height:16px;border-radius:999px;border:2px solid currentColor;border-right-color:transparent;animation:nn-giro 800ms linear infinite}
+@keyframes nn-giro{to{transform:rotate(360deg)}}
+.nn[data-vp="ih"] .nn-barra{padding:8px 24px calc(var(--ib) + 12px)}
+.nn[data-vp="ih"] .nn-barra .nn-prim{flex:none;height:40px;font-size:15px}
+.nn[data-vp="ih"] .nn-barra-f{gap:12px}
+
+/* ---- Capas: hoja (teléfono) / modal (ancho), alerta, menú ---- */
+.nn .nn-capa{position:absolute;inset:0;z-index:20;pointer-events:none;overflow:hidden}
+.nn .nn-capa.nn-on{pointer-events:auto}
+.nn .nn-velo{position:absolute;inset:0;background:var(--velo);opacity:0;transition:opacity 320ms cubic-bezier(.32,.72,0,1)}
+.nn .nn-on .nn-velo{opacity:1}
+.nn .nn-on.nn-sinvelo .nn-velo{opacity:0}
+.nn .nn-pan{position:absolute;background:var(--sup);box-shadow:var(--sombra-capa);visibility:hidden;transition:transform 320ms cubic-bezier(.32,.72,0,1),opacity 320ms cubic-bezier(.32,.72,0,1),visibility 0s linear 320ms}
+.nn .nn-pan.nn-act{visibility:visible;transition-delay:0s}
+.nn .nn-pan:focus{outline:none}
+.nn .nn-hoja{left:0;right:var(--ir);bottom:0;max-height:calc(100% - var(--it) - 16px);display:flex;flex-direction:column;border-radius:22px 22px 0 0;padding-bottom:calc(var(--ib) + 8px);transform:translateY(100%)}
+.nn .nn-hoja.nn-alta{height:calc(100% - var(--it) - 16px)}
+.nn .nn-hoja.nn-act{transform:none}
+.nn .nn-asa{display:block;flex:none;width:36px;height:5px;border-radius:999px;background:var(--borde);margin:8px auto 0}
+.nn .nn-hj-cab{flex:none;display:flex;align-items:center;gap:8px;min-height:52px;padding:4px 8px 0 16px}
+.nn .nn-hj-cab h2{flex:1;min-width:0;font-size:17px;line-height:22px;font-weight:700}
+.nn .nn-hj-c{flex:1 1 auto;min-height:0;overflow-y:auto;scrollbar-width:none;padding:0 16px 8px}
+.nn .nn-hj-p{flex:none;display:flex;align-items:center;gap:8px;padding:8px 16px 4px}
+.nn .nn-hj-p .nn-prim{height:44px}
+.nn .nn-hj-sub{padding-bottom:8px;font-size:13px;line-height:18px;color:var(--tinta2)}
+/* Filas de signos vitales: rótulo a la izquierda, campo a la derecha con su unidad */
+.nn .nn-vr{display:flex;align-items:center;gap:8px;min-height:52px;font-size:17px;line-height:22px}
+.nn .nn-vr+.nn-vr{border-top:1px solid var(--linea)}
+.nn .nn-vr-t{flex:1;min-width:0;display:flex;flex-direction:column}
+.nn .nn-vmsg{font-size:12px;line-height:16px;font-weight:600;color:var(--mal-tinta)}
+.nn .nn-vc{position:relative;flex:none;display:flex}
+.nn .nn-vc::before{content:"";position:absolute;inset:4px 0;border-radius:10px;background:var(--sup2)}
+.nn .nn-vc:focus-within::before{box-shadow:0 0 0 2px var(--enlace)}
+.nn .nn-vi{position:relative;width:64px;height:44px;text-align:center;font-size:17px;font-variant-numeric:tabular-nums}
+.nn .nn-vi.nn-mala{color:var(--mal-tinta);font-weight:600}
+.nn .nn-barra-d{color:var(--tinta3)}
+.nn .nn-uni{flex:none;width:44px;font-size:13px;line-height:18px;color:var(--tinta2)}
+/* Filas pulsables dentro de hojas y menús */
+.nn .nn-mr{display:flex;align-items:center;gap:10px;width:100%;min-height:52px;text-align:left;font-size:16px;line-height:22px}
+.nn .nn-mr>svg{color:var(--tinta3)}
+.nn .nn-mr+.nn-mr,.nn li+li>.nn-mr{box-shadow:inset 0 1px 0 var(--linea)}
+.nn .nn-mr:disabled{color:var(--tinta3)}
+.nn .nn-mr:disabled:active{transform:none}
+.nn .nn-mr2 .nn-flex{display:flex;flex-direction:column;padding:8px 0}
+.nn .nn-mr2 small{font-size:13px;line-height:18px}
+.nn .nn-hj-sub2{padding-top:8px}
+.nn .nn-centro{align-self:center}
+.nn .nn-ctx-ta{width:100%;height:180px;padding:12px;border-radius:12px;background:var(--sup2);font-size:16px;line-height:24px}
+.nn .nn-ctx-ta:focus-visible{outline:2px solid var(--enlace)}
+/* Entrevista */
+.nn .nn-bq-t{padding-top:4px;font-size:15px;line-height:20px;font-weight:700}
+.nn .nn-q{padding-top:16px}
+.nn .nn-q-t{font-size:15px;line-height:20px;font-weight:600;padding-bottom:4px}
+.nn .nn-op{display:flex;align-items:center;gap:10px;width:100%;min-height:44px;text-align:left;font-size:16px;line-height:22px;box-shadow:inset 0 -1px 0 var(--linea)}
+.nn .nn-op svg{color:var(--enlace);opacity:0}
+.nn .nn-op[aria-pressed="true"]{font-weight:600}
+.nn .nn-op[aria-pressed="true"] svg{opacity:1}
+.nn .nn-q .nn-in{margin-top:8px}
+/* Alerta centrada: solo lo irreversible */
+.nn .nn-alerta{top:calc(50% - var(--ib) / 2);width:296px;left:calc((100% - var(--ir)) / 2 - 148px);border-radius:18px;padding:20px 20px 12px;opacity:0;transform:translateY(-50%) scale(.95)}
+.nn[data-vp="ext"] .nn-alerta{left:15px}
+.nn .nn-alerta.nn-act{opacity:1;transform:translateY(-50%)}
+.nn .nn-alerta h2{font-size:17px;line-height:22px;font-weight:700}
+.nn .nn-alerta p{margin-top:6px;font-size:14px;line-height:20px;color:var(--tinta2)}
+.nn .nn-al-p{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:14px}
+.nn .nn-al-p .nn-prim{height:40px;padding:0 16px;font-size:15px}
+.nn .nn-al-col{flex-direction:column-reverse;align-items:stretch;gap:4px}
+/* Aviso emergente: arriba, centrado en el contenido */
+.nn .nn-toast{position:absolute;z-index:30;top:10px;left:16px;right:16px;display:flex;justify-content:center;pointer-events:none;opacity:0;transform:translateY(-12px);transition:transform 320ms cubic-bezier(.32,.72,0,1),opacity 320ms cubic-bezier(.32,.72,0,1)}
+.nn .nn-toast.nn-on{opacity:1;transform:none}
+.nn .nn-toast span{padding:10px 14px;border-radius:12px;background:var(--navy);color:#fff;font-size:14px;line-height:18px;font-weight:600;box-shadow:var(--sombra-capa)}
+
+/* ---- Duo abierto: una sola columna, como el teléfono, con más aire ---- */
+.nn[data-vp="ih"] .nn-top-f,.nn[data-vp="esc"] .nn-top-f{min-height:36px}
+.nn[data-vp="ih"] .nn-volver,.nn[data-vp="esc"] .nn-volver{min-height:36px}
+.nn[data-vp="ih"] .nn-ib,.nn[data-vp="esc"] .nn-ib{width:36px;height:36px}
+.nn[data-vp="ih"] .nn-txt,.nn[data-vp="esc"] .nn-txt{min-height:36px}
+.nn[data-vp="ih"] .nn-top h1,.nn[data-vp="esc"] .nn-top h1{font-size:32px;line-height:38px}
+.nn[data-vp="ih"] .nn-card,.nn[data-vp="esc"] .nn-card{border-radius:18px}
+.nn[data-vp="ih"] .nn-vfila,.nn[data-vp="esc"] .nn-vfila{border-radius:18px 18px 0 0;padding:6px 16px 6px 20px}
+.nn[data-vp="ih"] .nn-vfila,.nn[data-vp="esc"] .nn-vfila{flex-wrap:nowrap}
+.nn[data-vp="ih"].nn-convit .nn-vfila,.nn[data-vp="esc"].nn-convit .nn-vfila{min-height:48px;padding-top:6px;padding-bottom:6px}
+.nn[data-vp="ih"] .nn-vres,.nn[data-vp="esc"] .nn-vres{order:0;flex:0 1 auto;text-align:right;font-size:14px;line-height:20px}
+.nn[data-vp="ih"] .nn-fn,.nn[data-vp="esc"] .nn-fn{flex:1 0 auto}
+.nn[data-vp="ih"] .nn-sep,.nn[data-vp="esc"] .nn-sep{margin:0 20px}
+.nn[data-vp="ih"] .nn-dict,.nn[data-vp="esc"] .nn-dict{padding:16px 20px 10px}
+.nn[data-vp="ih"] .nn-autog,.nn[data-vp="esc"] .nn-autog{padding:0 20px 14px}
+.nn[data-vp="ih"] .nn-man,.nn[data-vp="esc"] .nn-man{padding:0 20px 8px}
+.nn[data-vp="ih"] .nn-doc{padding:0 20px 24px}
+.nn[data-vp="ih"] .nn-rej,.nn[data-vp="esc"] .nn-rej{grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:16px}
+.nn[data-vp="ih"] .nn-az,.nn[data-vp="esc"] .nn-az{min-height:88px;padding:14px 12px;gap:10px}
+.nn[data-vp="ih"] .nn-par,.nn[data-vp="esc"] .nn-par{display:contents}
+.nn[data-vp="ih"] .nn-par .nn-fila,.nn[data-vp="esc"] .nn-par .nn-fila{border-top:1px solid var(--linea)}
+.nn[data-vp="ih"] .nn-grp-t+.nn-par .nn-fila:first-child,.nn[data-vp="esc"] .nn-grp-t+.nn-par .nn-fila:first-child{border-top:0}
+.nn[data-vp="ih"] .nn-fila:not(.nn-fila-a),.nn[data-vp="esc"] .nn-fila:not(.nn-fila-a){flex-direction:row;align-items:center;gap:12px;min-height:40px;padding-top:0}
+.nn[data-vp="ih"] .nn-fila:not(.nn-fila-a)>span:first-child,.nn[data-vp="esc"] .nn-fila:not(.nn-fila-a)>span:first-child{flex:none;width:168px}
+.nn[data-vp="ih"] .nn-selw,.nn[data-vp="esc"] .nn-selw{flex:1}
+.nn[data-vp="ih"] .nn-fi,.nn[data-vp="esc"] .nn-fi,.nn[data-vp="ih"] .nn-sel,.nn[data-vp="esc"] .nn-sel{flex:1;height:36px;margin-top:0;font-size:15px}
+.nn[data-vp="ih"] .nn-selw svg,.nn[data-vp="esc"] .nn-selw svg{margin-top:0}
+.nn[data-vp="ih"] .nn-fila-a,.nn[data-vp="esc"] .nn-fila-a{padding-top:10px}
+.nn[data-vp="ih"] .nn-rx-x,.nn[data-vp="esc"] .nn-rx-x{margin:-4px -8px -4px 0}
+.nn[data-vp="ih"] .nn-dx-x,.nn[data-vp="esc"] .nn-dx-x{margin-right:-8px}
+.nn[data-vp="ih"] .nn-form,.nn[data-vp="esc"] .nn-form{padding:4px 20px 14px}
+.nn[data-vp="ih"] .nn-hoja,.nn[data-vp="esc"] .nn-hoja{bottom:auto;right:auto;border-radius:20px;padding-bottom:10px;opacity:0;transform:translateY(12px) scale(.97)}
+.nn[data-vp="ih"] .nn-hoja.nn-act,.nn[data-vp="esc"] .nn-hoja.nn-act{opacity:1;transform:none}
+.nn[data-vp="ih"] .nn-hoja{left:28px;width:419px;top:44px;max-height:calc(100% - var(--ib) - 64px)}
+.nn[data-vp="ih"] .nn-hoja.nn-alta{height:auto}
+.nn[data-vp="ih"] .nn-alerta{left:calc(28px + 419px / 2 - 160px);width:320px;top:45%}
+.nn[data-vp="ih"] .nn-asa,.nn[data-vp="esc"] .nn-asa{display:none}
+.nn[data-vp="ih"] .nn-hj-cab,.nn[data-vp="esc"] .nn-hj-cab{padding:10px 12px 0 20px}
+.nn[data-vp="ih"] .nn-hj-c,.nn[data-vp="esc"] .nn-hj-c{padding:0 20px 8px}
+.nn[data-vp="ih"] .nn-hj-p,.nn[data-vp="esc"] .nn-hj-p{padding:8px 20px 6px}
+.nn[data-vp="ih"] .nn-hj-p .nn-prim,.nn[data-vp="esc"] .nn-hj-p .nn-prim,.nn[data-vp="ih"] .nn-al-p .nn-prim,.nn[data-vp="esc"] .nn-al-p .nn-prim{height:36px;font-size:14px}
+.nn[data-vp="ih"] .nn-mr,.nn[data-vp="esc"] .nn-mr{min-height:44px;font-size:15px}
+.nn[data-vp="ih"] .nn-vr,.nn[data-vp="esc"] .nn-vr{min-height:48px;font-size:15px}
+.nn[data-vp="ih"] .nn-vi,.nn[data-vp="esc"] .nn-vi{height:36px;font-size:15px}
+.nn[data-vp="ih"] .nn-vc::before,.nn[data-vp="esc"] .nn-vc::before{inset:0}
+.nn[data-vp="ih"] .nn-op,.nn[data-vp="esc"] .nn-op{min-height:40px;font-size:15px}
+.nn[data-vp="ih"] .nn-quitar,.nn[data-vp="esc"] .nn-quitar{min-height:36px}
+.nn[data-vp="ih"] .nn-dli,.nn[data-vp="esc"] .nn-dli{min-height:40px}
+
+/* ---- Computadora: dos zonas con aire. Izquierda, la escritura; derecha, la nota ---- */
+.nn[data-vp="esc"] .nn-cont{display:block;padding:0;scrollbar-width:thin;scrollbar-color:var(--borde) transparent}
+.nn[data-vp="esc"] .nn-dos{display:grid;grid-template-columns:560px minmax(0,1fr);column-gap:48px;align-items:start;padding:0 24px;min-height:100%}
+.nn[data-vp="esc"] .nn-izq{position:sticky;top:0;height:800px;padding:20px 0 24px}
+.nn[data-vp="esc"] .nn-top{height:128px}
+.nn[data-vp="esc"] .nn-top-f{margin:0 -8px 0 -4px}
+.nn[data-vp="esc"] .nn-card{flex:1 1 0;min-height:0;border-radius:20px}
+.nn[data-vp="esc"] .nn-esc,.nn[data-vp="esc"] .nn-man,.nn[data-vp="esc"] .nn-form{flex:1 1 0;min-height:0;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--borde) transparent}
+.nn[data-vp="esc"] .nn-dict{flex:1 1 0;min-height:0}
+.nn[data-vp="esc"] .nn-pie{display:flex;align-items:center;gap:8px;min-height:36px;margin-top:16px}
+.nn[data-vp="esc"] .nn-pie .nn-ayuda{margin-left:4px}
+.nn[data-vp="esc"][data-e="rev"] .nn-ini{margin-left:-10px}
+.nn[data-vp="esc"] .nn-prim{height:36px;padding:0 16px;border-radius:10px;font-size:14px}
+.nn[data-vp="esc"] .nn-txt{font-size:14px;padding:0 10px}
+.nn[data-vp="esc"] .nn-der{display:flex;flex-direction:column;min-width:0;padding:20px 0 32px}
+.nn[data-vp="esc"] .nn-der>*{flex:none}
+.nn[data-vp="esc"] .nn-rcab{height:128px;display:flex;align-items:flex-end;gap:8px}
+.nn[data-vp="esc"] .nn-vacio{margin-top:16px;padding:14px 28px}
+.nn[data-vp="esc"] .nn-vacio-h{display:flex;align-items:center;gap:8px;font-size:15px;line-height:20px;color:var(--tinta2)}
+.nn[data-vp="esc"] .nn-vacio ul{margin-top:24px;display:flex;flex-direction:column;gap:14px;font-size:15px;line-height:20px;color:var(--tinta3)}
+.nn[data-vp="esc"] .nn-doc{margin-top:16px;padding:6px 28px 28px;border-radius:20px;background:var(--sup)}
+.nn[data-vp="esc"] .nn-origen{padding-top:16px}
+.nn[data-vp="esc"] .nn-in{height:40px;font-size:14px}
+.nn[data-vp="esc"] .nn-mta,.nn[data-vp="esc"] .nn-dx-in,.nn[data-vp="esc"] .nn-nota-ta,.nn[data-vp="esc"] .nn-ctx-ta{font-size:15px}
+.nn[data-vp="esc"] .nn-dx-in{height:40px}
+.nn[data-vp="esc"] .nn-dx-op{min-height:36px;font-size:14px}
+.nn[data-vp="esc"] .nn-hoja{left:calc(248px + (100% - 248px) / 2 - 220px);width:440px;top:96px;max-height:calc(100% - 144px)}
+.nn[data-vp="esc"] .nn-hoja.nn-alta{height:auto;width:520px;left:calc(248px + (100% - 248px) / 2 - 260px);top:72px;max-height:calc(100% - 120px)}
+.nn[data-vp="esc"] .nn-alerta{left:calc(248px + (100% - 248px) / 2 - 180px);width:360px;top:44%;padding:24px 24px 16px}
+.nn[data-vp="esc"] .nn-menu{width:264px;max-height:none;border-radius:14px;padding:6px;transform-origin:top left;transform:scale(.94)}
+.nn[data-vp="esc"] .nn-menu .nn-hj-cab{display:none}
+.nn[data-vp="esc"] .nn-menu .nn-hj-c{padding:0;overflow:visible}
+.nn[data-vp="esc"] .nn-menu .nn-mr{min-height:36px;padding:0 10px;border-radius:8px;font-size:14px;box-shadow:none}
+.nn[data-vp="esc"] .nn-menu .nn-mr:not(:disabled):hover{background:var(--fondo)}
+.nn[data-vp="esc"] .nn-toast{top:16px}
+.nn[data-vp="esc"] .nn-h1f{gap:4px}
+/* Tras generar, la zona izquierda no es una tarjeta grande casi vacía: la descripción queda a su altura natural, lista para corregir y regenerar */
+.nn[data-vp="esc"][data-e="rev"] .nn-card,.nn[data-vp="esc"][data-e="regen"] .nn-card,.nn[data-vp="esc"].nn-docvacio[data-e="doc"] .nn-card{flex:0 1 auto}
+.nn[data-vp="esc"][data-e="rev"] .nn-esc,.nn[data-vp="esc"][data-e="regen"] .nn-esc,.nn[data-vp="esc"][data-e="rev"] .nn-man,.nn[data-vp="esc"].nn-docvacio[data-e="doc"] .nn-form{flex:0 1 auto}
+.nn[data-vp="esc"][data-e="rev"] .nn-dict,.nn[data-vp="esc"][data-e="regen"] .nn-dict{flex:none;min-height:0}
+.nn[data-vp="esc"] .nn-rej{margin-top:16px}
+.nn[data-vp="esc"] .nn-solo-tel{display:none!important}
+.nn:not([data-vp="esc"]) .nn-solo-esc{display:none!important}
+
+/* ---- Tira de controles de la maqueta (vive fuera del marco) ---- */
+.nn-tira{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:10px;font:600 12px/16px var(--fuente);color:var(--tinta2)}
+.nn-tira span{margin-right:2px;letter-spacing:.3px;text-transform:uppercase}
+.nn-tira button{height:28px;padding:0 10px;border:1px dashed var(--tinta3);border-radius:999px;background:transparent;color:var(--tinta2);font:inherit;cursor:pointer}
+.nn-tira button:hover{color:var(--tinta);border-color:var(--tinta2)}
+.nn-tira button:focus-visible{outline:3px solid var(--enlace);outline-offset:2px}
+
+/* Movimiento reducido: fundido corto en lugar de deslizar; sin giro */
+@media (prefers-reduced-motion:reduce){
+  .nn .nn-pan,.nn .nn-pan.nn-act,.nn .nn-hoja,.nn .nn-hoja.nn-act{transform:none;opacity:0;transition:opacity 200ms ease,visibility 0s linear 200ms}
+  .nn .nn-pan.nn-act,.nn .nn-hoja.nn-act{opacity:1;transition-delay:0s}
+  .nn .nn-alerta,.nn .nn-alerta.nn-act{transform:translateY(-50%)}
+  .nn .nn-velo,.nn .nn-toast{transition:opacity 200ms ease}
+  .nn .nn-toast{transform:none}
+  .nn .nn-p{transition:none}
+  .nn .nn-giro{animation:none}
+}
+
+/* ---- Duo cerrado: la pantalla «Nota guardada» cabe entera (rejilla, acciones de texto y primario) sin desplazar ---- */
+.nn[data-vp="ext"] .nn-rej{gap:8px;margin-top:10px}
+.nn[data-vp="ext"] .nn-az{min-height:76px;gap:6px}
+.nn[data-vp="ext"] .nn-acc{margin-top:0}
+.nn[data-vp="ext"] .nn-nota-ok{margin-top:4px}
+.nn[data-vp="ext"] .nn-par-m{display:block}
+.nn[data-vp="ext"] .nn-par-m .nn-fila+.nn-fila{border-top:1px solid var(--linea)}
+
+/* ================= SEGUNDA REVISIÓN DEL DUEÑO (CALMA §11–16): limpio con carácter ================= */
+/* ---- §11 · Etiquetas con color e icono: origen de la nota y sello ---- */
+.nn .nn-tag{display:inline-flex;align-items:center;gap:4px;height:24px;padding:0 8px;border-radius:8px;font-size:12px;line-height:16px;font-weight:600;white-space:nowrap}
+.nn .nn-t-ton{background:var(--tonal);color:var(--tonal-tinta)}
+.nn .nn-t-ok{background:var(--ok-fondo);color:var(--ok-tinta)}
+.nn .nn-origen{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px}
+.nn[data-vp] .nn-nota-ok{display:flex;align-items:flex-start;gap:6px}
+.nn .nn-nota-ok svg{color:var(--ok-tinta)}
+
+/* ---- §12 · La nota con jerarquía: rótulos de color, cuerpo justificado, diagnóstico destacado, medicamentos en lista, pares, firma ---- */
+.nn .nn-sec{margin-top:22px}
+.nn .nn-origen+.nn-prosa .nn-sec:first-child{margin-top:16px}
+.nn .nn-sec h3,.nn .nn-doc .nn-grp-t{font-size:13px;line-height:18px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--enlace)}
+.nn .nn-doc .nn-meds .nn-grp-t{font-weight:600;letter-spacing:0;text-transform:none;color:var(--tinta2)}
+.nn .nn-sec p{margin-top:6px;font-size:15px;line-height:22px;text-align:justify;-webkit-hyphens:auto;hyphens:auto;hyphenate-limit-chars:5 2 2;overflow-wrap:break-word}
+.nn .nn-dxs{margin-top:6px;display:flex;flex-direction:column;gap:6px}
+.nn .nn-dxs li{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px}
+.nn .nn-dxn,.nn .nn-sec p.nn-dxp{font-size:17px;line-height:22px;font-weight:700;letter-spacing:-.2px;text-align:left;-webkit-hyphens:manual;hyphens:manual}
+.nn .nn-sec p.nn-dx-nota{font-size:13px;line-height:18px;color:var(--tinta2);text-align:left}
+.nn .nn-doc .nn-cod{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:7px;background:var(--tonal);color:var(--tonal-tinta);font-size:12px;line-height:16px;font-weight:600}
+.nn .nn-doc .nn-dxr .nn-flex{font-weight:600}
+.nn .nn-rxl{margin-top:4px}
+.nn .nn-rxl li{display:flex;flex-direction:column;padding:8px 0}
+.nn .nn-rxl li+li{border-top:1px solid var(--linea)}
+.nn .nn-rxl b{font-size:15px;line-height:20px;font-weight:600}
+.nn .nn-rxl span{font-size:13px;line-height:18px;color:var(--tinta2)}
+.nn .nn-rxl+p{margin-top:4px}
+.nn.nn-dxen:not(.nn-ed) .nn-grp-dx{display:none}
+.nn .nn-kv{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px 16px;padding-top:10px}
+.nn .nn-kv2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.nn .nn-kv>div{display:flex;flex-direction:column;gap:1px;min-width:0}
+.nn .nn-kv dt{font-size:12px;line-height:16px;color:var(--tinta2)}
+.nn .nn-kv dd{font-size:15px;line-height:20px;font-weight:600;font-variant-numeric:tabular-nums}
+.nn .nn-kv dd small{font-size:12px;font-weight:400;color:var(--tinta2)}
+.nn .nn-kv dd.nn-kv-no{font-weight:400;color:var(--tinta2)}
+.nn .nn-kv dt,.nn .nn-kv dd{white-space:nowrap}
+.nn .nn-kv2 dd{white-space:normal}
+.nn .nn-vres2>div:first-child:not(:only-child){grid-column:span 2}
+.nn[data-vp="ih"] .nn-vres2{grid-template-columns:repeat(6,minmax(0,1fr))}
+.nn .nn-firma{display:flex;flex-direction:column;margin-top:28px;font-size:13px;line-height:18px;color:var(--tinta2)}
+.nn .nn-firma::before{content:"";width:132px;height:1px;margin-bottom:10px;background:var(--borde)}
+.nn .nn-firma b{font-size:15px;line-height:20px;font-weight:600;color:var(--tinta)}
+.nn[data-e="regen"] .nn-firma{opacity:.45}
+
+/* ---- «Nota guardada»: fila única y pareja de acciones de la nota (botones tonales, icono de color) ---- */
+.nn[data-vp] .nn-acc{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:12px 0 0}
+.nn .nn-ac{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-width:0;min-height:56px;padding:6px 4px;border-radius:12px;background:var(--tonal);color:var(--tonal-tinta);font-size:13px;line-height:16px;font-weight:600;text-align:center;white-space:nowrap}
+.nn .nn-ac svg{color:var(--enlace)}
+.nn[data-vp="ih"] .nn-ac,.nn[data-vp="esc"] .nn-ac{flex-direction:row;gap:8px;min-height:40px;padding:0 14px;font-size:14px;line-height:18px}
+.nn[data-vp="ih"] .nn-acc{margin-top:14px;gap:12px}
+.nn[data-vp="esc"] .nn-acc{display:flex;margin:0;gap:8px}
+.nn[data-vp="esc"] .nn-ac{min-height:36px;min-width:160px}
+.nn[data-vp="ext"] .nn-acc{margin-top:8px}
+.nn .nn-az-n{overflow-wrap:anywhere}
+
+/* ---- §13 · Capas: velo desenfocado, botones de verdad, alerta de patrón único ---- */
+.nn .nn-velo{-webkit-backdrop-filter:blur(10px) saturate(140%);backdrop-filter:blur(10px) saturate(140%)}
+@media (prefers-reduced-transparency:reduce){.nn .nn-velo{-webkit-backdrop-filter:none;backdrop-filter:none;background:color-mix(in srgb,var(--velo),var(--navy) 55%)}}
+.nn .nn-ton{display:inline-flex;align-items:center;justify-content:center;height:44px;padding:0 16px;border-radius:12px;background:var(--tonal);color:var(--tonal-tinta);font-size:15px;line-height:20px;font-weight:600;white-space:nowrap}
+.nn .nn-ton:disabled{background:var(--sup2);color:var(--tinta3)}
+.nn .nn-ton:disabled:active{transform:none}
+.nn[data-vp="ih"] .nn-ton,.nn[data-vp="esc"] .nn-ton{height:36px;font-size:14px}
+.nn[data-vp] .nn-alerta{top:calc(50% + (var(--it) - var(--ib)) / 2);left:calc((100% - var(--ir)) / 2 - 160px);width:320px;border-radius:20px;padding:24px;display:flex;flex-direction:column;align-items:center;text-align:center}
+.nn[data-vp="ih"] .nn-alerta{left:calc((100% - 218px - var(--ir)) / 2 - 150px);width:300px}
+.nn[data-vp="esc"] .nn-alerta{left:calc(248px + (100% - 248px) / 2 - 170px);width:340px;top:50%}
+.nn .nn-al-ic{display:flex;align-items:center;justify-content:center;flex:none;width:48px;height:48px;border-radius:999px;margin-bottom:12px}
+.nn .nn-al-ton{background:var(--tonal);color:var(--enlace)}
+.nn .nn-al-mal{background:var(--mal-fondo);color:var(--mal-tinta)}
+.nn .nn-al-ag{background:var(--ag-fondo);color:var(--ag-tinta)}
+.nn .nn-alerta h2{text-align:center;text-wrap:balance}
+.nn .nn-alerta .nn-al-m{margin-top:8px;align-self:stretch;font-size:14px;line-height:20px;color:var(--tinta2);text-align:justify;-webkit-hyphens:auto;hyphens:auto}
+.nn .nn-alerta .nn-al-m.nn-al-c{text-align:center}
+.nn .nn-alerta .nn-sinvit{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:10px;font-size:13px;line-height:18px;color:var(--tinta2)}
+.nn .nn-sinvit svg{color:var(--ag-tinta)}
+.nn[data-vp] .nn-al-p{display:flex;align-items:stretch;justify-content:center;gap:8px;align-self:stretch;margin-top:20px}
+.nn[data-vp] .nn-al-p .nn-bt{display:inline-flex;align-items:center;justify-content:center;flex:1 1 0;min-width:0;height:44px;padding:0 8px;border-radius:12px;font-size:15px;line-height:20px;font-weight:600;white-space:nowrap}
+.nn[data-vp] .nn-al-col{flex-direction:column-reverse;gap:8px}
+.nn[data-vp] .nn-al-col .nn-bt{flex:none}
+.nn .nn-bt-ton{background:var(--tonal);color:var(--tonal-tinta)}
+.nn .nn-bt-qui{background:var(--sup2);color:var(--tinta)}
+.nn[data-vp="ih"] .nn-al-p .nn-bt,.nn[data-vp="esc"] .nn-al-p .nn-bt{height:38px;border-radius:10px;font-size:14px}
+.nn[data-vp] .nn-al-p .nn-bt::after{content:none}
+/* Hojas en Duo abierto y computadora: centradas en el área de contenido, en horizontal y en vertical */
+.nn[data-vp="ih"] .nn-hoja,.nn[data-vp="esc"] .nn-hoja{top:50%;transform:translateY(calc(-50% + 12px)) scale(.97)}
+.nn[data-vp="ih"] .nn-hoja.nn-act,.nn[data-vp="esc"] .nn-hoja.nn-act{transform:translateY(-50%)}
+.nn[data-vp="ih"] .nn-hoja{top:calc(50% - var(--ib) / 2);left:calc((100% - 218px - var(--ir)) / 2 - 220px);width:440px;max-height:calc(100% - var(--ib) - 48px)}
+.nn[data-vp="esc"] .nn-hoja{max-height:calc(100% - 96px)}
+.nn[data-vp="esc"] .nn-hoja.nn-alta{top:50%;max-height:calc(100% - 96px)}
+.nn[data-vp="esc"] .nn-menu,.nn[data-vp="esc"] .nn-menu.nn-act{transform:none}
+.nn[data-vp="esc"] .nn-menu{transform:scale(.94)}
+/* En Duo abierto el pie de una hoja no deja un rótulo sobre la bisagra (x 455–496): el principal ocupa el ancho y su texto queda centrado a la izquierda de ella */
+.nn[data-vp="ih"] .nn-hj-p .nn-flex{display:none}
+.nn[data-vp="ih"] .nn-hj-p .nn-prim{flex:1}
+@media (prefers-reduced-motion:reduce){
+  .nn[data-vp="ih"] .nn-hoja,.nn[data-vp="esc"] .nn-hoja,.nn[data-vp="ih"] .nn-hoja.nn-act,.nn[data-vp="esc"] .nn-hoja.nn-act{transform:translateY(-50%)}
+  .nn[data-vp="esc"] .nn-menu,.nn[data-vp="esc"] .nn-menu.nn-act{transform:none}
+}
+/* ---- §11 · Menú «···»: cada opción con su icono de color; la destructiva en rojo, separada por una línea ---- */
+.nn .nn-mr{gap:12px}
+.nn .nn-mr>svg{color:var(--enlace)}
+.nn .nn-mr:disabled>svg{color:var(--tinta3)}
+.nn .nn-mr.nn-mr-mal,.nn .nn-mr.nn-mr-mal>svg{color:var(--mal-tinta)}
+.nn[data-vp="esc"] .nn-menu .nn-mr.nn-mr-mal{position:relative;margin-top:9px}
+.nn[data-vp="esc"] .nn-menu .nn-mr.nn-mr-mal::before{content:"";position:absolute;left:4px;right:4px;top:-5px;height:1px;background:var(--linea)}
+
+/* Acciones de «Nota guardada»: la flecha solo existe en la versión de lista (Duo cerrado) */
+.nn .nn-ac>svg:last-child{display:none}
+/* Duo cerrado: tres botones en fila quedarían apretados (93 px cada uno para «Ver expediente»): lista de tres filas con icono de color y flecha */
+.nn[data-vp="ext"] .nn-acc{display:flex;flex-direction:column;gap:0;padding:0 12px;border-radius:14px;background:var(--sup)}
+.nn[data-vp="ext"] .nn-ac{width:100%;flex-direction:row;justify-content:flex-start;gap:12px;min-height:44px;padding:0;border-radius:0;background:none;color:var(--tinta);font-size:15px;line-height:20px}
+.nn[data-vp="ext"] .nn-ac+.nn-ac{box-shadow:inset 0 1px 0 var(--linea)}
+.nn[data-vp="ext"] .nn-ac>span{flex:1;min-width:0;text-align:left}
+.nn[data-vp="ext"] .nn-ac>svg:last-child{display:block;color:var(--tinta3)}
+.nn[data-vp="esc"] .nn-menu{width:312px}
+.nn[data-vp="esc"] .nn-menu .nn-mr{min-height:38px}
+
+/* ================= TERCERA REVISIÓN DEL DUEÑO (CALMA §17–22): unificación =================
+   Las reglas de ih se extienden a iv en la misma regla al generar (tools/tmp-u4-iv.py). Aquí, solo lo que cambia. */
+
+/* ---- §19 · Duo abierto vertical: encabezado fundido con pista de secciones (maqueta de referencia del dueño) ---- */
+.nn[data-vp="iv"] .nn-app{flex-direction:column}
+.nn .nn-fun{position:relative;z-index:1;flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:calc(var(--it) + 0px) 16px 14px;background:var(--navy);border-radius:0 0 26px 26px;box-shadow:var(--sombra-nav-sup)}
+.nn .nn-fun-b{width:44px;height:44px;flex:none;border-radius:22px;background:var(--nav-velo);color:#fff;display:flex;align-items:center;justify-content:center}
+.nn .nn-pista{display:flex;align-items:center;gap:2px;padding:4px;border-radius:26px;background:var(--nav-velo)}
+.nn .nn-pl{position:relative;display:flex;align-items:center;height:40px;padding:0 14px;border-radius:20px;color:var(--nav-tinta);font-size:15px;line-height:20px;font-weight:500;white-space:nowrap}
+.nn .nn-pl::after{content:"";position:absolute;inset:-2px 0}
+.nn .nn-pl[aria-current="page"]{padding:0 16px;background:var(--accion);color:#fff;font-weight:600}
+.nn .nn-fun .nn-p:focus-visible{outline-color:var(--nav-tinta)}
+.nn[data-vp="iv"] .nn-cont{padding:22px 24px 8px}
+.nn[data-vp="iv"] .nn-barra{padding-top:10px}
+
+/* ---- §18/§19/§21 · Capas centradas en el área de contenido, con los anchos de computadora; sin maniobras por la bisagra ---- */
+.nn[data-vp="ih"] .nn-hoja.nn-alta{width:520px;left:calc((100% - 218px - var(--ir)) / 2 - 260px)}
+.nn[data-vp="iv"] .nn-hoja{top:calc(50% + (var(--it) - var(--ib)) / 2);left:calc(50% - 220px);max-height:calc(100% - var(--it) - var(--ib) - 96px)}
+.nn[data-vp="iv"] .nn-hoja.nn-alta{left:calc(50% - 260px)}
+.nn[data-vp="ih"] .nn-alerta{left:calc((100% - 218px - var(--ir)) / 2 - 170px);width:340px}
+.nn[data-vp="iv"] .nn-alerta{left:calc(50% - 170px);width:340px}
+/* Pie de hoja en ih/iv/esc: botones a la derecha, ancho mínimo 104 (deja de estirarse el principal para esquivar la bisagra) */
+.nn[data-vp="ih"] .nn-hj-p,.nn[data-vp="esc"] .nn-hj-p{display:flex;justify-content:flex-end;gap:8px}
+.nn[data-vp="ih"] .nn-hj-p .nn-flex,.nn[data-vp="esc"] .nn-hj-p .nn-flex{display:none}
+.nn[data-vp="ih"] .nn-hj-p .nn-prim,.nn[data-vp="esc"] .nn-hj-p .nn-prim,.nn[data-vp="ih"] .nn-hj-p .nn-ton,.nn[data-vp="esc"] .nn-hj-p .nn-ton{flex:none;min-width:104px}
+/* En iv el «···» es una tarjeta centrada con velo (§21), como en ih */
+
+/* ---- §21 · Rejilla de tipos idéntica a la del resto de la app: superficie --sup, celdas --sup2, contorno --accion en el tipo actual ---- */
+.nn .nn-rej-h{margin-top:14px;padding:12px;border-radius:16px;background:var(--sup)}
+.nn[data-vp="ext"] .nn-rej-h{margin-top:10px}
+.nn[data-vp="ih"] .nn-rej-h,.nn[data-vp="esc"] .nn-rej-h{margin-top:16px;padding:14px;border-radius:18px}
+.nn[data-vp] .nn-rej-h .nn-rej{margin-top:0}
+.nn .nn-az{min-height:84px;background:var(--sup2)}
+.nn[data-vp="ext"] .nn-az{min-height:84px}
+.nn .nn-az[aria-current]{box-shadow:inset 0 0 0 2px var(--accion)}
+
+/* ---- Punto 4 · Una sola lista de medicamentos (la de «Detecté estos medicamentos», con «Quitar»), bajo una línea divisoria ---- */
+.nn .nn-doc .nn-meds{margin-top:22px;padding-top:16px;border-top:1px solid var(--linea)}
+
+/* ---- §20 · Justificado también en los mensajes cortos de alerta: la última línea va centrada para que una frase sola no quede cargada a la izquierda ---- */
+.nn .nn-alerta .nn-al-m.nn-al-c{text-align:justify;text-align-last:center;-webkit-hyphens:auto;hyphens:auto}
+
+/* (§23.14: el velo oscuro ya viene de base.css, rgba(0,0,0,.35); se retiró el aclarado propio) */
+
+/* ---- §19 · iv es táctil: áreas de toque ≥ 44 (gana a las reglas de ih copiadas, por especificidad) ---- */
+.nn.marco[data-vp="iv"] .nn-top-f,.nn.marco[data-vp="iv"] .nn-volver,.nn.marco[data-vp="iv"] .nn-txt,.nn.marco[data-vp="iv"] .nn-quitar,.nn.marco[data-vp="iv"] .nn-op{min-height:44px}
+.nn.marco[data-vp="iv"] .nn-ib{width:44px;height:44px}
+.nn.marco[data-vp="iv"] .nn-barra .nn-prim,.nn.marco[data-vp="iv"] .nn-hj-p .nn-prim,.nn.marco[data-vp="iv"] .nn-ton,.nn.marco[data-vp="iv"] .nn-al-p .nn-bt,.nn.marco[data-vp="iv"] .nn-al-p .nn-prim{height:44px;font-size:15px}
+.nn.marco[data-vp="iv"] .nn-ac{min-height:44px;font-size:15px}
+.nn.marco[data-vp="iv"] .nn-vi,.nn.marco[data-vp="iv"] .nn-fi,.nn.marco[data-vp="iv"] .nn-sel{height:44px}
+.nn.marco[data-vp="iv"] .nn-vc::before{inset:4px 0}
+.nn.marco[data-vp="iv"] .nn-fila:not(.nn-fila-a){min-height:48px}
+.nn.marco[data-vp="iv"] .nn-rx-x{margin:-4px -10px -4px 0}
+
+/* ================= CUARTA PASADA (CALMA §23) ================= */
+/* §23.8 · Regreso con el nombre del paciente: si no cabe, se trunca con puntos suspensivos y nunca empuja las acciones de la fila */
+.nn .nn-top-f .nn-volver{flex:0 1 auto;min-width:0;overflow:hidden}
+.nn .nn-volver svg{flex:none}
+.nn .nn-volver-t{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nn .nn-top-f>.nn-flex{flex:1 1 0;min-width:4px}
+.nn .nn-top-f>.nn-b-ed,.nn .nn-top-f>.nn-ib{flex:none}
+/* §23.1 · iv: el par del pie (secundario, principal) CENTRADO en la columna; nada a menos de 96 px de los bordes del marco */
+.nn[data-vp="iv"] .nn-barra{padding-left:96px;padding-right:96px}
+.nn[data-vp="iv"] .nn-barra-f{justify-content:center}
+.nn[data-vp="iv"] .nn-barra .nn-prim{min-width:104px;max-width:100%}
+/* Partición de palabras. Causa real de que la nota no partiera: «text-wrap:pretty» en .nn-sec p (Chromium evita la última línea corta empujando palabras
+   en vez de partirlas, y con justificado abre ríos); se quitó en estilo2. Además los campos de texto corrido también justifican y parten (lang="es" está en el marco) */
+.nn .nn-dict,.nn .nn-nota-ta,.nn .nn-mta,.nn .nn-ctx-ta{text-align:justify;-webkit-hyphens:auto;hyphens:auto}
+.nn .nn-dict::placeholder,.nn .nn-mta::placeholder,.nn .nn-ctx-ta::placeholder{text-align:left}
+/* «Nota guardada» en iv: la nota sellada queda a la vista bajo la rejilla, como en computadora (por eso «Ver nota» no se repite).
+   Cierra el hueco de ~260 px entre la rejilla y el pie sin añadir contenido nuevo. */
+.nn[data-vp="iv"][data-e="ok"] .nn-card{order:3;flex:none;margin-top:16px;padding-top:8px}
+.nn[data-vp="iv"][data-e="ok"] .nn-acc{order:1;grid-template-columns:repeat(2,minmax(0,1fr))}
+.nn[data-vp="iv"][data-e="ok"] .nn-rej-h{order:2}
+
+/* §23.1 · ih y esc: secundario a la izquierda, principal a la DERECHA, el par pegado a la derecha de la columna */
+.nn[data-vp="ih"] .nn-barra-f,.nn[data-vp="esc"] .nn-pie{justify-content:flex-end}
+.nn[data-vp="esc"][data-e] .nn-pie .nn-ini{margin-left:0}
+.nn[data-vp="esc"] .nn-pie .nn-ayuda{margin:0 8px 0 0;text-align:right}
+/* §21 · Rejilla en esc: los nombres caben enteros en una línea (sin partir letra a letra): menos relleno de rejilla y de celda, misma letra 14/18 */
+.nn[data-vp="ih"] .nn-az-n,.nn[data-vp="iv"] .nn-az-n,.nn[data-vp="esc"] .nn-az-n{overflow-wrap:normal}
+.nn[data-vp="esc"] .nn-rej-h{padding:12px}
+.nn[data-vp="esc"] .nn-rej{gap:10px}
+.nn[data-vp="esc"] .nn-az{padding:14px 8px}
+/* iv: columna centrada de 600, como el resto de vistas */
+.nn[data-vp="iv"] .nn-cont{padding-left:calc((100% - 600px) / 2);padding-right:calc((100% - 600px) / 2)}
+/* iv · receta: la papelera de 44 no invade la fila de abajo (sin margen vertical negativo) */
+.nn.marco[data-vp="iv"] .nn-rx-x{margin:0 -10px 0 0}
+/* iv sigue CENTRADO (§23.1): gana a la regla de ih copiada a iv por el generador */
+.nn.marco[data-vp="iv"] .nn-barra-f{justify-content:center}

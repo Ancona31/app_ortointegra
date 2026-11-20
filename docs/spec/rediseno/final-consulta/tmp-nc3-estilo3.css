@@ -1,0 +1,38 @@
+
+/* ================= TERCERA REVISIÓN DEL DUEÑO (CALMA §17–22): unificación =================
+   Las reglas de ih se extienden a iv en la misma regla al generar (tools/tmp-u4-iv.py). Aquí, solo lo que cambia. */
+
+/* ---- §19 · Duo abierto vertical: encabezado fundido con pista de secciones (maqueta de referencia del dueño) ---- */
+.nc2[data-vp="iv"] .nc2-app{flex-direction:column}
+.nc2 .nc2-fun{position:relative;z-index:1;flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:calc(var(--it) + 0px) 16px 14px;background:var(--navy);border-radius:0 0 26px 26px;box-shadow:var(--sombra-nav-sup)}
+.nc2 .nc2-fun-b{width:44px;height:44px;flex:none;border-radius:22px;background:var(--nav-velo);color:#fff;display:flex;align-items:center;justify-content:center}
+.nc2 .nc2-pista{display:flex;align-items:center;gap:2px;padding:4px;border-radius:26px;background:var(--nav-velo)}
+.nc2 .nc2-pl{position:relative;display:flex;align-items:center;height:40px;padding:0 14px;border-radius:20px;color:var(--nav-tinta);font-size:15px;line-height:20px;font-weight:500;white-space:nowrap}
+.nc2 .nc2-pl::after{content:"";position:absolute;inset:-2px 0}
+.nc2 .nc2-pl[aria-current="page"]{padding:0 16px;background:var(--accion);color:#fff;font-weight:600}
+.nc2 .nc2-fun .nc2-p:focus-visible{outline-color:var(--nav-tinta)}
+/* Contenido: margen 24 (621 útiles) y columna de lectura de 600 centrada */
+.nc2[data-vp="iv"] .nc2-cont{padding-top:22px}
+.nc2[data-vp="iv"] .nc2-pag{max-width:600px}
+/* Táctil: áreas ≥ 44 (gana a las reglas de ih copiadas, por especificidad) */
+.nc2.marco[data-vp="iv"] .nc2-top-f,.nc2.marco[data-vp="iv"] .nc2-volver{min-height:44px}
+.nc2.marco[data-vp="iv"] .nc2-ton::after{inset:-6px 0}
+.nc2.marco[data-vp="iv"] .nc2-bot{height:44px;font-size:15px}
+
+/* ---- §18 · Duo abierto: el modal usa el ancho y la disposición de computadora, sin maniobras por la bisagra ---- */
+.nc2[data-vp="ih"] .nc2-hoja{width:480px}
+.nc2[data-vp="ih"] .nc2-acc{justify-content:flex-end}
+.nc2[data-vp="ih"] .nc2-bot{min-width:104px;padding:0 18px}
+.nc2[data-vp="ih"] .nc2-guarda{min-width:160px}
+/* iv: modal centrado en el marco (entre la barra de estado y el indicador) */
+.nc2[data-vp="iv"] .nc2-area{top:var(--it);right:0;bottom:var(--ib)}
+
+/* (§23.14: el velo oscuro ya viene de base.css, rgba(0,0,0,.35); se retiró el aclarado propio) */
+
+/* ================= CUARTA PASADA (CALMA §23) ================= */
+/* §23.8 · Regreso con el nombre del paciente: si no cabe, puntos suspensivos; «Imprimir» nunca se desplaza ni se tapa */
+.nc2 .nc2-top-f .nc2-volver{flex:0 1 auto;min-width:0;overflow:hidden}
+.nc2 .nc2-volver svg{flex:none}
+.nc2 .nc2-volver-t{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nc2 .nc2-top-f>.nc2-flex{flex:1 1 0;min-width:4px}
+.nc2 .nc2-top-f>.nc2-ton{flex:none}

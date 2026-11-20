@@ -1,0 +1,184 @@
+
+/* ===== PASADA DE UNIFICACIÓN (CALMA §11–§22). Va al final y manda sobre lo anterior. Prefijo .pr[data-vp] para ganar en especificidad. ===== */
+.pr[data-vp="iv"] .pr-app{flex-direction:column}
+
+/* ---- Navegación de Duo abierto vertical: encabezado fundido con pista de secciones (CALMA §19) ---- */
+.pr .pr-encv{position:relative;z-index:1;flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:var(--it) 16px 14px;background:var(--navy);border-radius:0 0 26px 26px;box-shadow:var(--sombra-nav-sup);color:#fff}
+.pr .pr-encv-b{width:44px;height:44px;flex:none;border-radius:999px;background:var(--nav-velo);color:#fff;display:flex;align-items:center;justify-content:center}
+.pr .pr-pista{display:flex;align-items:center;gap:2px;padding:4px;border-radius:26px;background:var(--nav-velo)}
+.pr .pr-pil{position:relative;display:flex;align-items:center;height:40px;padding:0 14px;border-radius:20px;color:var(--nav-tinta);font-size:15px;line-height:20px;font-weight:500;white-space:nowrap}
+.pr .pr-pil::after{content:"";position:absolute;inset:-2px 0}
+.pr .pr-pil[aria-current="page"]{background:var(--accion);color:#fff;font-weight:600}
+.pr .pr-av-act{box-shadow:0 0 0 2px var(--navy),0 0 0 4px var(--nav-tinta)}
+.pr .pr-encv .pr-p:focus-visible{outline-color:var(--nav-tinta)}
+
+/* ---- Controles de maqueta: fuera del marco, en la tira de la cabecera de la sección (CALMA §7) ---- */
+.pr .pr-maq{display:none!important}
+.pr-tira{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:10px;font:600 12px/16px var(--fuente);color:var(--tinta2)}
+.pr-tira span{margin-right:2px;letter-spacing:.3px;text-transform:uppercase}
+.pr-tira button{height:28px;padding:0 10px;border:1px dashed var(--tinta3);border-radius:999px;background:transparent;color:var(--tinta2);font:inherit;cursor:pointer}
+.pr-tira button:hover{color:var(--tinta);border-color:var(--tinta2)}
+.pr-tira button[aria-pressed="true"]{background:var(--sup2);color:var(--tinta)}
+.pr-tira button:focus-visible{outline:3px solid var(--enlace);outline-offset:2px}
+
+/* ---- Botones: sin sombra; en el contenido, dibujo más ligero con el área intacta (CALMA §2, §3) ---- */
+.pr[data-vp] .pr-prim{box-shadow:none}
+.pr[data-vp] .pr-cont .pr-tonal,.pr[data-vp] .pr-cont .pr-quieto,.pr[data-vp] .pr-cont .pr-pel,.pr[data-vp] .pr-cont .pr-prim{position:relative;height:36px;padding:0 14px;font-size:14px;line-height:18px}
+.pr[data-vp="ext"] .pr-cont :is(.pr-tonal,.pr-quieto,.pr-pel,.pr-prim)::after,.pr[data-vp="tel"] .pr-cont :is(.pr-tonal,.pr-quieto,.pr-pel,.pr-prim)::after,.pr[data-vp="iv"] .pr-cont :is(.pr-tonal,.pr-quieto,.pr-pel,.pr-prim)::after{content:"";position:absolute;inset:-4px 0}
+.pr[data-vp] .pr-btns.pr-apila{align-items:flex-start}
+.pr[data-vp="iv"] .pr-txt{min-height:44px}
+.pr[data-vp="iv"] .pr-seg button{height:38px}
+
+/* ---- Pestañas de texto (CALMA §6): 14, 600 la activa y 400 las demás, subrayado de 2 px ---- */
+.pr[data-vp] .pr-tab{font-size:14px;line-height:18px;font-weight:400}
+.pr[data-vp] .pr-tab[aria-selected="true"]{font-weight:600}
+.pr[data-vp] .pr-tab::after{height:2px;border-radius:2px}
+
+/* ---- Aire entre grupos (CALMA §5) ---- */
+.pr[data-vp] .pr-col,.pr[data-vp] .pr-panel{gap:24px}
+.pr[data-vp="ih"] .pr-col,.pr[data-vp="ih"] .pr-panel,.pr[data-vp="iv"] .pr-col,.pr[data-vp="iv"] .pr-panel,.pr[data-vp="esc"] .pr-col,.pr[data-vp="esc"] .pr-panel{gap:28px}
+.pr[data-vp] .pr-lado,.pr[data-vp] .pr-lado .pr-panel{gap:16px}
+.pr[data-vp] .pr-cuerpo{padding-top:8px}
+
+/* ---- Grupo: rótulo de color fuera, UNA superficie, pie de texto (CALMA §11, §12) ---- */
+.pr .pr-gr{display:flex;flex-direction:column;gap:8px;min-width:0}
+.pr .pr-gt{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:24px;padding:0 16px}
+.pr .pr-gtt{display:flex;align-items:center;gap:6px;min-width:0;color:var(--enlace)}
+.pr .pr-gt h2{font-size:13px;line-height:18px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--enlace)}
+.pr .pr-gt .pr-txt{min-height:36px;font-size:13px}
+.pr[data-vp="ext"] .pr-gt .pr-txt,.pr[data-vp="tel"] .pr-gt .pr-txt,.pr[data-vp="iv"] .pr-gt .pr-txt{position:relative}
+.pr[data-vp="ext"] .pr-gt .pr-txt::after,.pr[data-vp="tel"] .pr-gt .pr-txt::after,.pr[data-vp="iv"] .pr-gt .pr-txt::after{content:"";position:absolute;inset:-4px 0}
+.pr .pr-gt .pr-tonal{height:32px;padding:0 12px;gap:4px;font-size:13px}
+.pr .pr-pieg{padding:0 16px;font-size:13px;line-height:18px;color:var(--tinta2)}
+.pr .pr-pieg:empty{display:none}
+.pr[data-vp="ih"] .pr-gt,.pr[data-vp="iv"] .pr-gt,.pr[data-vp="esc"] .pr-gt,.pr[data-vp="ih"] .pr-pieg,.pr[data-vp="iv"] .pr-pieg,.pr[data-vp="esc"] .pr-pieg{padding:0 20px}
+.pr .pr-prop{display:inline-flex;align-items:center;height:24px;padding:0 8px;border:1px dashed var(--tinta3);border-radius:8px;font-size:12px;line-height:16px;font-weight:600;color:var(--tinta2);white-space:nowrap}
+.pr[data-vp] .pr-lado .pr-th h2{font-size:13px;line-height:18px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--enlace)}
+
+/* ---- Campos como filas de lista, sin relleno gris por campo ---- */
+.pr[data-vp] .pr-tar.pr-filas{padding:0;gap:0}
+.pr[data-vp] .pr-filas .pr-g{display:flex;flex-direction:column;gap:0}
+.pr[data-vp] .pr-filas .pr-f{position:relative;justify-content:center;gap:2px;min-height:56px;padding:8px 16px;border-radius:14px}
+.pr[data-vp] .pr-filas .pr-f::before{content:"";position:absolute;top:0;left:16px;right:16px;height:1px;background:var(--linea)}
+.pr[data-vp] .pr-filas>.pr-f:first-child::before,.pr[data-vp] .pr-filas>.pr-g:first-child>.pr-f:first-child::before,.pr[data-vp] .pr-filas>.pr-f.pr-i::before,.pr[data-vp] .pr-filas .pr-sep .pr-pals+.pr-g>.pr-f:first-child::before{display:none}
+.pr[data-vp] .pr-filas .pr-f>span:first-child{font-size:13px;line-height:18px;font-weight:400;color:var(--tinta2)}
+.pr[data-vp] .pr-filas .pr-in{height:24px;padding:0;border-radius:0;background:transparent;font-size:16px;line-height:24px}
+.pr[data-vp] .pr-filas select.pr-in{padding-right:24px}
+.pr[data-vp] .pr-filas .pr-in:focus-visible{outline:none}
+.pr[data-vp] .pr-filas .pr-f:has(.pr-in:focus-visible){outline:2px solid var(--enlace);outline-offset:-2px}
+.pr[data-vp] .pr-filas .pr-sel svg{right:0;top:4px}
+.pr[data-vp] .pr-filas .pr-lect{min-height:24px;padding:0;background:none;border-radius:0;font-size:16px;font-weight:400;color:var(--tinta2)}
+.pr[data-vp] .pr-filas .pr-esp2{margin-top:4px;padding-top:4px;border-top:1px solid var(--linea)}
+.pr[data-vp] .pr-filas .pr-esp-a{min-height:36px}
+.pr[data-vp="ext"] .pr-filas .pr-esp-a,.pr[data-vp="tel"] .pr-filas .pr-esp-a,.pr[data-vp="iv"] .pr-filas .pr-esp-a{position:relative}
+.pr[data-vp="ext"] .pr-filas .pr-esp-a::after,.pr[data-vp="tel"] .pr-filas .pr-esp-a::after,.pr[data-vp="iv"] .pr-filas .pr-esp-a::after{content:"";position:absolute;inset:-4px 0}
+/* Color libre: la fila entera abre el selector */
+.pr[data-vp] .pr-filas .pr-color{position:static;height:24px;padding:0;background:none;border-radius:0}
+.pr[data-vp] .pr-filas .pr-color:focus-within{outline:none}
+.pr[data-vp] .pr-filas .pr-f:has(.pr-color input:focus-visible){outline:2px solid var(--enlace);outline-offset:-2px}
+.pr[data-vp] .pr-filas .pr-color input{z-index:1}
+/* Bloques del grupo de la clínica (logo, paleta) separados por línea */
+.pr[data-vp] .pr-filas .pr-sep{margin:0 16px;padding:16px 0;gap:12px;border-top:1px solid var(--linea)}
+.pr[data-vp] .pr-filas .pr-sep .pr-f{padding-left:0;padding-right:0}
+.pr[data-vp] .pr-filas .pr-sep .pr-f::before{left:0;right:0}
+.pr[data-vp] .pr-filas .pr-sep .pr-g{margin-top:-4px}
+.pr[data-vp] .pr-filas .pr-sep>.pr-f:last-child{padding-bottom:0}
+.pr[data-vp] .pr-filas .pr-st{font-size:15px;line-height:20px;font-weight:600}
+.pr[data-vp] .pr-pal{background:var(--sup2)}
+.pr[data-vp] .pr-vapp{background:var(--fondo)}
+/* Ancho y vertical abierto: rótulo a la izquierda, valor a la derecha */
+.pr[data-vp="ih"] .pr-filas .pr-f,.pr[data-vp="iv"] .pr-filas .pr-f,.pr[data-vp="esc"] .pr-filas .pr-f{display:grid;grid-template-columns:168px minmax(0,1fr);column-gap:16px;row-gap:2px;align-items:center;min-height:52px;padding-left:20px;padding-right:20px}
+.pr[data-vp="ih"] .pr-filas .pr-f::before,.pr[data-vp="iv"] .pr-filas .pr-f::before,.pr[data-vp="esc"] .pr-filas .pr-f::before{left:20px;right:20px}
+.pr[data-vp="ih"] .pr-filas .pr-f>*,.pr[data-vp="iv"] .pr-filas .pr-f>*,.pr[data-vp="esc"] .pr-filas .pr-f>*{grid-column:2}
+.pr[data-vp="ih"] .pr-filas .pr-f>span:first-child,.pr[data-vp="iv"] .pr-filas .pr-f>span:first-child,.pr[data-vp="esc"] .pr-filas .pr-f>span:first-child{grid-column:1;grid-row:1;align-self:center}
+.pr[data-vp="ih"] .pr-filas .pr-f>:nth-child(2),.pr[data-vp="iv"] .pr-filas .pr-f>:nth-child(2),.pr[data-vp="esc"] .pr-filas .pr-f>:nth-child(2){grid-row:1}
+.pr[data-vp="ih"] .pr-filas .pr-f>.pr-esp-a,.pr[data-vp="iv"] .pr-filas .pr-f>.pr-esp-a,.pr[data-vp="esc"] .pr-filas .pr-f>.pr-esp-a{justify-self:start}
+.pr[data-vp="ih"] .pr-filas .pr-sep,.pr[data-vp="iv"] .pr-filas .pr-sep,.pr[data-vp="esc"] .pr-filas .pr-sep{margin:0 20px}
+.pr[data-vp="ih"] .pr-filas .pr-sep .pr-f,.pr[data-vp="iv"] .pr-filas .pr-sep .pr-f,.pr[data-vp="esc"] .pr-filas .pr-sep .pr-f{padding-left:0;padding-right:0}
+.pr[data-vp="ih"] .pr-filas .pr-sep .pr-f::before,.pr[data-vp="iv"] .pr-filas .pr-sep .pr-f::before,.pr[data-vp="esc"] .pr-filas .pr-sep .pr-f::before{left:0;right:0}
+.pr[data-vp="ih"] .pr-filas .pr-in,.pr[data-vp="iv"] .pr-filas .pr-in,.pr[data-vp="esc"] .pr-filas .pr-in,.pr[data-vp="ih"] .pr-filas .pr-lect,.pr[data-vp="esc"] .pr-filas .pr-lect{font-size:15px}
+.pr[data-vp="iv"] .pr-filas .pr-in{font-size:16px}
+
+/* ---- Ajustes (PROPUESTA): filas con icono de color ---- */
+.pr[data-vp] .pr-tar.pr-ajt{padding:0 16px;gap:0}
+.pr[data-vp="ih"] .pr-tar.pr-ajt,.pr[data-vp="iv"] .pr-tar.pr-ajt,.pr[data-vp="esc"] .pr-tar.pr-ajt{padding:0 20px}
+.pr[data-vp] .pr-ajf>svg:first-child{color:var(--enlace)}
+.pr[data-vp] .pr-ajf.pr-rojo>svg:first-child{color:var(--mal-tinta)}
+.pr[data-vp] .pr-ajf{font-weight:400}
+.pr[data-vp] .pr-res>li:first-child{border-top:0;padding-top:0}
+.pr[data-vp] .pr-res>li:last-child{padding-bottom:0}
+
+/* ---- Texto corrido justificado (CALMA §12, §20) ---- */
+.pr[data-vp] .pr-bloque,.pr[data-vp] .pr-aviso>span,.pr[data-vp] .pr-suelta,.pr[data-vp] .pr-lado .pr-nota,.pr[data-vp] .pr-firma>.pr-nota{text-align:justify;hyphens:auto;-webkit-hyphens:auto}
+
+/* ---- Computadora: el conjunto (formulario 640 + apoyo 264) CENTRADO en el área de contenido (CALMA §14) ---- */
+.pr[data-vp="esc"] .pr-cab,.pr[data-vp="esc"] .pr-cuerpo{width:928px;margin-left:auto;margin-right:auto}
+.pr[data-vp="esc"] .pr-cuerpo{grid-template-columns:640px 264px;gap:24px}
+.pr[data-vp="esc"] .pr-tabs{width:928px;margin:0 auto;padding:0}
+.pr[data-vp="esc"] .pr-barra{left:calc(248px + (100% - 248px) / 2 - 464px);width:640px}
+
+/* ---- Duo abierto vertical: columna de 600 centrada ---- */
+.pr[data-vp="iv"] .pr-cab,.pr[data-vp="iv"] .pr-cuerpo{width:100%;max-width:600px;margin-left:auto;margin-right:auto}
+.pr[data-vp="iv"] .pr-cab{padding-top:22px}
+.pr[data-vp="iv"] .pr-tabs{width:100%;max-width:600px;margin:0 auto;padding:0;gap:28px}
+.pr[data-vp="iv"] .pr-barra{left:calc(50% - 300px);width:600px;bottom:calc(var(--ib) + 16px);border-radius:18px;padding:12px 12px 12px 20px;flex-direction:row;align-items:center;gap:16px;transform:translateY(calc(100% + var(--ib) + 24px))}
+.pr[data-vp="iv"].pr-sucio .pr-barra{transform:none}
+.pr[data-vp="iv"] .pr-bb{display:flex;flex:none}
+.pr[data-vp="iv"] .pr-bb>*{min-width:104px}
+.pr[data-vp="iv"].pr-sucio .pr-cont{padding-bottom:calc(var(--ib) + 100px)}
+
+/* ---- Avisos: centrados en el área de contenido ---- */
+.pr[data-vp="ih"] .pr-toast{left:0;right:calc(218px + var(--ir));width:auto}
+.pr[data-vp="iv"] .pr-toast{top:156px;left:0;right:0;width:auto}
+
+/* ---- Capas (CALMA §13, §18, §21): velo desenfocado; todo centrado en el área de contenido ---- */
+.pr[data-vp] .pr-velo{backdrop-filter:blur(10px) saturate(140%);-webkit-backdrop-filter:blur(10px) saturate(140%)}
+@media (prefers-reduced-transparency:reduce){.pr[data-vp] .pr-velo{backdrop-filter:none;-webkit-backdrop-filter:none;background:linear-gradient(var(--velo),var(--velo)),var(--velo)}}
+.pr[data-vp] .pr-capa{display:flex;align-items:center;justify-content:center;padding:var(--it) calc(56px + var(--ir)) var(--ib) 0}
+.pr[data-vp="tel"] .pr-capa{padding:var(--it) 0 var(--ib)}
+.pr[data-vp="ih"] .pr-capa{padding:0 calc(218px + var(--ir)) var(--ib) 0}
+.pr[data-vp="iv"] .pr-capa{padding:var(--it) 0 var(--ib)}
+.pr[data-vp="esc"] .pr-capa{padding:0 0 0 248px}
+/* Hoja de consultorio: desde abajo en teléfono; modal centrado de 520 en ancho, con el mismo ancho en Duo abierto */
+.pr[data-vp] .pr-hoja{background:var(--fondo)}
+.pr[data-vp="ih"] .pr-hoja,.pr[data-vp="iv"] .pr-hoja,.pr[data-vp="esc"] .pr-hoja{position:relative;left:auto;right:auto;top:auto;bottom:auto;flex:none;width:520px;max-height:calc(100% - 48px);padding:12px 20px 20px}
+.pr[data-vp] .pr-hfil{background:var(--sup);border-radius:14px}
+.pr[data-vp] .pr-hfil .pr-f{min-height:52px}
+.pr[data-vp="ih"] .pr-hfil .pr-f,.pr[data-vp="iv"] .pr-hfil .pr-f,.pr[data-vp="esc"] .pr-hfil .pr-f{grid-template-columns:150px minmax(0,1fr);padding-left:16px;padding-right:16px}
+.pr[data-vp="ih"] .pr-hfil .pr-f::before,.pr[data-vp="iv"] .pr-hfil .pr-f::before,.pr[data-vp="esc"] .pr-hfil .pr-f::before{left:16px;right:16px}
+.pr[data-vp] .pr-hfil .pr-chips{margin:4px 0 2px}
+.pr[data-vp] .pr-hbt{padding-top:8px}
+.pr[data-vp="ih"] .pr-hbt,.pr[data-vp="iv"] .pr-hbt,.pr[data-vp="esc"] .pr-hbt{display:flex;justify-content:flex-end;gap:8px}
+.pr[data-vp="ih"] .pr-hbt>*,.pr[data-vp="iv"] .pr-hbt>*,.pr[data-vp="esc"] .pr-hbt>*{min-width:104px;height:40px}
+.pr[data-vp="iv"] .pr-hbt>*{height:44px}
+.pr[data-vp="ih"] .pr-hoja .pr-ib,.pr[data-vp="esc"] .pr-hoja .pr-ib{width:36px;height:36px}
+/* Alerta: patrón único. 320 en teléfono, 340 en ancho; icono de 28 en círculo tintado de 48; título centrado; dos botones parejos */
+.pr[data-vp] .pr-alerta{position:relative;left:auto;top:auto;flex:none;width:320px;max-height:calc(100% - 24px);border-radius:20px;padding:24px;gap:0;transform:scale(.94)}
+.pr[data-vp] .pr-on .pr-alerta{transform:none}
+.pr[data-vp="ih"] .pr-alerta,.pr[data-vp="iv"] .pr-alerta,.pr[data-vp="esc"] .pr-alerta{width:340px;padding:24px}
+.pr[data-vp] .pr-aic{align-self:center;width:48px;height:48px;margin-bottom:12px}
+.pr[data-vp] .pr-aic-av{background:var(--ag-fondo);color:var(--ag-tinta)}
+.pr[data-vp] .pr-atit{font-size:17px;line-height:22px;font-weight:700;text-align:center}
+.pr[data-vp] .pr-alerta .pr-atx{margin-top:8px;font-size:14px;line-height:20px;color:var(--tinta2);text-align:justify;hyphens:auto;-webkit-hyphens:auto}
+.pr[data-vp] .pr-alerta .pr-atc{text-align:center;hyphens:manual;-webkit-hyphens:manual;text-wrap:balance}
+.pr[data-vp] .pr-alerta .pr-aviso{display:block;margin-top:10px;color:var(--mal-tinta);text-align:justify}
+.pr[data-vp] .pr-abloq{margin-top:10px;display:flex;flex-direction:column;align-items:center;gap:2px;padding:10px 12px;text-align:center;font-size:14px;line-height:20px}
+.pr[data-vp] .pr-abloq span{color:var(--tinta2);font-size:13px;line-height:18px}
+.pr[data-vp] .pr-abt{display:flex;flex-direction:column;flex-wrap:nowrap;gap:8px;margin-top:20px;padding-top:0}
+.pr[data-vp] .pr-abt.pr-par{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+.pr[data-vp] .pr-abt>*{width:100%;min-width:0;height:44px;padding:0 8px;flex:none}
+.pr[data-vp="ih"] .pr-abt>*,.pr[data-vp="esc"] .pr-abt>*{height:40px}
+@media (prefers-reduced-motion:reduce){.pr[data-vp] .pr-alerta,.pr[data-vp] .pr-on .pr-alerta{transform:none}}
+.pr[data-vp] .pr-f>.pr-sel{font-weight:400;color:var(--tinta)}
+.pr[data-vp] .pr-filas select.pr-in{font-weight:400}
+.pr[data-vp="ih"] .pr-hfil .pr-f,.pr[data-vp="iv"] .pr-hfil .pr-f,.pr[data-vp="esc"] .pr-hfil .pr-f{grid-template-columns:172px minmax(0,1fr)}
+.pr[data-vp] .pr-gt h2{white-space:nowrap}
+/* ---- Cuarta pasada (CALMA §23) ---- */
+/* §23.1: en iv el par del pie va CENTRADO en la columna (secundario, principal), a ≥ 96 px de los bordes del marco */
+.pr[data-vp="iv"] .pr-barra{flex-direction:column;align-items:center;gap:10px;padding:12px 20px 14px;text-align:center}
+.pr[data-vp="iv"] .pr-bm{align-items:center}
+.pr[data-vp="iv"] .pr-bb{justify-content:center}
+.pr[data-vp="iv"].pr-sucio .pr-cont{padding-bottom:calc(var(--ib) + 150px)}
+/* Duo cerrado: «+ Agregar» baja a su propia línea en lugar de apretarse junto al rótulo */
+.pr[data-vp="ext"] .pr-gt{flex-wrap:wrap;row-gap:8px}
+.pr[data-vp="ext"] .pr-gt .pr-tonal{margin-left:-4px}

@@ -1,0 +1,70 @@
+
+/* ===== Consentimiento · firmado electrónico: una hoja de papel limpia, un firmante a la vez ===== */
+.PX .PX-ck small{order:-1}
+.PX .PX-firma{position:absolute;inset:0;z-index:15;visibility:hidden;pointer-events:none;overflow:hidden;transition:visibility 0s linear 320ms}
+.PX .PX-firma.PX-fon{visibility:visible;pointer-events:auto;transition-delay:0s}
+.PX .PX-fi{position:absolute;inset:0;display:flex;flex-direction:column;padding:var(--it) var(--ir) calc(var(--ib) + 12px) 0;background:var(--fondo);transform:translateY(100%);transition:transform 320ms cubic-bezier(.32,.72,0,1),opacity 320ms cubic-bezier(.32,.72,0,1)}
+.PX .PX-fon .PX-fi{transform:none}
+.PX .PX-fi:focus{outline:none}
+.PX .PX-fi-cab{flex:none;display:flex;align-items:center;gap:4px;min-height:52px;padding:4px 16px 0 6px}
+.PX .PX-fi-t{flex:1;min-width:0;font-size:17px;line-height:22px;font-weight:700}
+.PX .PX-fi-n{font-size:13px;line-height:18px;color:var(--tinta2)}
+.PX .PX-prog{flex:none;display:flex;align-items:center;gap:10px;padding:6px 16px 0}
+.PX .PX-prog>span{font-size:12px;line-height:16px;font-weight:600;letter-spacing:.3px;text-transform:uppercase;color:var(--tinta2)}
+.PX .PX-prog-t{flex:1;display:flex;gap:4px}
+.PX .PX-prog-t i{flex:1;height:4px;border-radius:999px;background:var(--borde)}
+.PX .PX-prog-t i.PX-hecho{background:var(--accion)}
+.PX .PX-fi-c{flex:1;min-height:0;overflow-y:auto;scrollbar-width:none;display:flex;flex-direction:column;padding:20px 16px 0}
+.PX .PX-paso,.PX .PX-resumen{display:flex;flex-direction:column;flex:1 0 auto}
+.PX .PX-fi-de,.PX .PX-fi-rol,.PX .PX-fi-ay,.PX .PX-girar{font-size:13px;line-height:18px;color:var(--tinta2)}
+.PX .PX-fi-nom{font-size:22px;line-height:28px;font-weight:700;letter-spacing:-.3px}
+.PX .PX-fi-firma{display:flex;flex-direction:column;flex:1 0 auto;margin-top:16px}
+.PX .PX-girar{padding-bottom:8px}
+/* El papel: blanco también en oscuro; tinta y rótulos en navy (oscuro en los dos temas) */
+.PX .PX-papel{position:relative;flex:1 0 auto;min-height:190px;max-height:270px;border-radius:16px;background:#fff;color:var(--navy);overflow:hidden}
+.PX .PX-papel.PX-off{opacity:.45}
+.PX .PX-lienzo{position:absolute;inset:0;display:block;width:100%;height:100%;cursor:crosshair}
+.PX .PX-papel.PX-off .PX-lienzo{cursor:default}
+.PX .PX-lienzo:focus-visible{outline:3px solid var(--enlace);outline-offset:-3px}
+.PX .PX-ph{position:absolute;left:0;right:0;bottom:62px;text-align:center;font-size:15px;line-height:20px;opacity:.4;pointer-events:none}
+.PX .PX-base{position:absolute;left:24px;right:24px;bottom:48px;height:1px;background:currentColor;opacity:.3;pointer-events:none}
+.PX .PX-rolp{position:absolute;left:24px;bottom:22px;font-size:11px;line-height:16px;font-weight:600;letter-spacing:.6px;opacity:.55;pointer-events:none}
+.PX .PX-fi-av{margin-top:12px;font-size:13px;line-height:18px;color:var(--ag-tinta)}
+.PX .PX-fi-acc{flex:none;display:flex;align-items:center;gap:8px;margin-top:12px}
+.PX .PX-fi-acc .PX-prim{flex:1}
+.PX .PX-fi-acc .PX-txt:first-child{margin-left:-8px}
+.PX .PX-fi-q{margin-top:20px;padding-bottom:12px;font-size:16px;line-height:22px}
+.PX .PX-fi-id .PX-mr{padding:0 12px 0 16px}
+.PX .PX-fi-rec .PX-fi-ay{margin-top:10px}
+.PX .PX-rec{position:relative;margin-top:16px;aspect-ratio:1.586;max-height:230px;border-radius:14px;background:var(--navy);overflow:hidden}
+.PX .PX-rec-img{position:absolute;inset:16% 12%;display:flex;flex-direction:column;justify-content:flex-end;gap:7px;padding:12px 14px;border-radius:8px;background:var(--sup2);transition:transform 240ms cubic-bezier(.32,.72,0,1)}
+.PX .PX-rec-img i{display:block;height:7px;width:60%;border-radius:999px;background:var(--borde)}
+.PX .PX-rec-img i+i{width:42%}
+.PX .PX-rec-img b{position:absolute;left:14px;top:10px;font-size:11px;line-height:14px;font-weight:600;letter-spacing:.4px;color:var(--tinta2)}
+.PX .PX-rec-m{position:absolute;inset:9% 7%;border-radius:10px;box-shadow:0 0 0 2px #fff,0 0 0 400px var(--velo)}
+.PX .PX-res-l{margin-top:12px}
+.PX .PX-res-f{display:flex;align-items:center;gap:8px;min-height:60px;padding:8px 8px 8px 16px;font-size:16px;line-height:22px}
+.PX .PX-res-f+.PX-res-f{box-shadow:inset 0 1px 0 var(--linea)}
+.PX .PX-resumen .PX-fi-acc{margin-top:20px}
+/* Ancho: modal. En Duo abierto, sobre la mitad izquierda (x < 455): el lienzo no cruza la bisagra. */
+.PX[data-vp="ih"] .PX-firma::before,.PX[data-vp="esc"] .PX-firma::before{content:"";position:absolute;inset:0;background:var(--velo);opacity:0;transition:opacity 320ms cubic-bezier(.32,.72,0,1)}
+.PX[data-vp="ih"] .PX-firma.PX-fon::before,.PX[data-vp="esc"] .PX-firma.PX-fon::before{opacity:1}
+.PX[data-vp="ih"] .PX-fi,.PX[data-vp="esc"] .PX-fi{inset:auto;padding:0 0 20px;border-radius:20px;box-shadow:var(--sombra-capa);opacity:0;transform:translateY(12px) scale(.97)}
+.PX[data-vp="ih"] .PX-fon .PX-fi,.PX[data-vp="esc"] .PX-fon .PX-fi{opacity:1;transform:none}
+.PX[data-vp="ih"] .PX-fi{left:28px;top:24px;width:419px;max-height:calc(100% - var(--ib) - 40px)}
+.PX[data-vp="esc"] .PX-fi{left:calc(248px + (100% - 248px) / 2 - 320px);top:56px;width:640px;max-height:calc(100% - 104px)}
+.PX[data-vp="ih"] .PX-fi-cab,.PX[data-vp="esc"] .PX-fi-cab{padding:8px 20px 0 10px}
+.PX[data-vp="ih"] .PX-prog,.PX[data-vp="esc"] .PX-prog{padding:6px 20px 0}
+.PX[data-vp="ih"] .PX-fi-c,.PX[data-vp="esc"] .PX-fi-c{padding:20px 20px 0}
+.PX[data-vp="ih"] .PX-papel{flex:none;height:200px}
+.PX[data-vp="esc"] .PX-papel{flex:none;height:250px}
+.PX[data-vp="ih"] .PX-fi-acc .PX-prim,.PX[data-vp="esc"] .PX-fi-acc .PX-prim{flex:none}
+.PX[data-vp="ih"] .PX-fi-acc .PX-prim{height:40px;font-size:15px}
+.PX[data-vp="ih"] .PX-res-f,.PX[data-vp="esc"] .PX-res-f{min-height:52px;padding:6px 12px 6px 20px;font-size:15px}
+.PX[data-vp="ih"] .PX-fi-id .PX-mr,.PX[data-vp="esc"] .PX-fi-id .PX-mr{padding:0 16px 0 20px}
+.PX[data-vp="esc"] .PX-rec{max-height:none;width:420px}
+@media (prefers-reduced-motion:reduce){
+  .PX .PX-fi,.PX .PX-fon .PX-fi{transform:none;transition:opacity 200ms ease}
+  .PX .PX-fi{opacity:0}.PX .PX-fon .PX-fi{opacity:1}
+  .PX .PX-rec-img{transition:none}
+}

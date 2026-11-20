@@ -1,0 +1,82 @@
+/* ===== Armazón común (navegación y piezas copiadas del dashboard de referencia, opción B). Todos los selectores empiezan por .PFX ===== */
+.PFX .PFX-app{display:flex;width:100%;height:100%}
+.PFX[data-vp="tel"] .PFX-app,.PFX[data-vp="iv"] .PFX-app{flex-direction:column}
+.PFX button{border:0;margin:0;padding:0;background:none;color:inherit}
+.PFX h1,.PFX h2,.PFX h3,.PFX p,.PFX ul,.PFX ol{margin:0;padding:0}
+.PFX h3{font:inherit}
+.PFX ul,.PFX ol{list-style:none}
+.PFX svg{flex:none}
+.PFX .PFX-flex{flex:1}
+/* Respuesta al toque y foco */
+.PFX .PFX-p{transition:transform 100ms ease-out}
+.PFX .PFX-p:active{transform:scale(.97)}
+.PFX .PFX-p:focus-visible{outline:3px solid var(--enlace);outline-offset:2px}
+.PFX .PFX-riel .PFX-p:focus-visible,.PFX .PFX-lat .PFX-p:focus-visible,.PFX .PFX-enc .PFX-p:focus-visible{outline-color:var(--nav-tinta)}
+/* ---- Contenido que se desplaza ---- */
+.PFX .PFX-cont{flex:1;min-width:0;min-height:0;overflow-x:hidden;overflow-y:auto;scrollbar-width:none;padding:14px 14px calc(var(--ib) + 16px) 16px}
+.PFX[data-vp="tel"] .PFX-cont{padding:18px 16px calc(var(--ib) + 16px)}
+.PFX[data-vp="ih"] .PFX-cont{padding:20px 24px calc(var(--ib) + 16px)}
+.PFX[data-vp="iv"] .PFX-cont{padding:22px 24px calc(var(--ib) + 16px)}
+.PFX[data-vp="esc"] .PFX-cont{padding:28px 24px calc(var(--ib) + 24px);scrollbar-width:thin;scrollbar-color:var(--borde) transparent}
+.PFX .PFX-in{display:flex;flex-direction:column;gap:12px;max-width:1000px}
+.PFX[data-vp="ih"] .PFX-in,.PFX[data-vp="iv"] .PFX-in{gap:14px}
+.PFX[data-vp="esc"] .PFX-in{gap:16px}
+/* ---- Encabezado de pantalla ---- */
+.PFX .PFX-cab{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 16px;align-items:center}
+.PFX .PFX-cab h1{grid-column:1/-1;font-size:26px;line-height:31px;font-weight:800;letter-spacing:-.6px}
+.PFX .PFX-sub{grid-column:1/-1;font-size:13px;line-height:18px;color:var(--tinta2)}
+.PFX .PFX-cab-a .PFX-sub{grid-column:1}
+.PFX[data-vp="ih"] .PFX-cab h1,.PFX[data-vp="iv"] .PFX-cab h1,.PFX[data-vp="esc"] .PFX-cab h1{font-size:32px;line-height:38px}
+.PFX[data-vp="ih"] .PFX-cab-a h1,.PFX[data-vp="iv"] .PFX-cab-a h1,.PFX[data-vp="esc"] .PFX-cab-a h1{grid-column:1}
+.PFX[data-vp="ih"] .PFX-cab-a .PFX-ton,.PFX[data-vp="iv"] .PFX-cab-a .PFX-ton,.PFX[data-vp="esc"] .PFX-cab-a .PFX-ton{grid-column:2;grid-row:1/3;align-self:end}
+/* ---- Botones (CALMA §2): sin sombra. En los marcos táctiles el área llega a 44 con un borde transparente; el DIBUJO es de 36 (tonal) y 40 (primario). ---- */
+.PFX .PFX-ton{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:44px;padding:0 14px;border:4px solid transparent;background-clip:padding-box;border-radius:16px;background-color:var(--tonal);color:var(--tonal-tinta);font-size:15px;line-height:20px;font-weight:600;white-space:nowrap}
+.PFX .PFX-prim{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:44px;padding:0 18px;border:2px solid transparent;background-clip:padding-box;border-radius:14px;background-color:var(--accion);color:#fff;font-size:15px;line-height:20px;font-weight:600;white-space:nowrap}
+.PFX[data-vp="ih"] .PFX-ton,.PFX[data-vp="esc"] .PFX-ton,.PFX[data-vp="ih"] .PFX-prim,.PFX[data-vp="esc"] .PFX-prim{height:36px;border:0;border-radius:12px;padding:0 16px;font-size:14px}
+.PFX .PFX-ton[aria-disabled="true"]{opacity:.55}
+/* ---- Controles de maqueta: tira FUERA del marco, en la cabecera de la sección (CALMA §7). No dependen de .marco. ---- */
+.PFX-tira{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.PFX-tira button{height:30px;padding:0 12px;border-radius:999px;border:1px dashed var(--tinta3);background:transparent;color:var(--tinta2);font:600 12px/16px var(--fuente);cursor:pointer}
+.PFX-tira button[aria-pressed="true"]{background:var(--sup2);color:var(--tinta);border-style:solid}
+.PFX-tira button:focus-visible{outline:3px solid var(--enlace);outline-offset:2px}
+/* ---- Riel (Duo cerrado) ---- */
+.PFX .PFX-riel{position:relative;z-index:1;flex:none;width:calc(56px + var(--ir));padding:16px calc(var(--ir) + 8px) calc(var(--ib) + 10px) 8px;background:var(--navy);border-radius:26px 0 0 26px;box-shadow:var(--sombra-nav-der);display:flex;flex-direction:column;align-items:center;gap:8px}
+.PFX .PFX-rb{width:48px;height:48px;flex:none;border-radius:999px;display:flex;align-items:center;justify-content:center;color:var(--nav-tinta)}
+.PFX .PFX-rb[aria-current="page"]{background:var(--accion);color:#fff}
+.PFX .PFX-mas{width:52px;height:52px;flex:none;border-radius:999px;background:#fff;color:var(--accion);display:flex;align-items:center;justify-content:center;box-shadow:var(--sombra-accion)}
+/* ---- Encabezado fundido (iPhone) ---- */
+.PFX .PFX-enc{position:relative;z-index:1;flex:none;display:flex;align-items:center;gap:12px;padding:calc(var(--it) + 8px) 16px 12px;background:var(--navy);border-radius:0 0 26px 26px;box-shadow:var(--sombra-nav-sup);color:#fff}
+.PFX .PFX-menu{width:44px;height:44px;flex:none;border-radius:12px;background:var(--nav-velo);color:#fff;display:flex;align-items:center;justify-content:center}
+.PFX .PFX-enc-t{font-size:17px;line-height:22px;font-weight:700;color:#fff}
+.PFX .PFX-av{display:flex;align-items:center;justify-content:center;flex:none;width:34px;height:34px;border-radius:999px;background:var(--nav-avatar);color:var(--navy);font-size:13px;font-weight:700}
+.PFX .PFX-av.PFX-av-g{width:44px;height:44px}
+/* ---- Encabezado fundido de Duo abierto vertical (CALMA §19), según la maqueta de referencia del dueño ---- */
+.PFX .PFX-ivn{position:relative;z-index:1;flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:calc(var(--it) + 0px) 16px 14px;background:var(--navy);border-radius:0 0 26px 26px;box-shadow:var(--sombra-nav-sup)}
+.PFX .PFX-ivb{width:44px;height:44px;flex:none;border-radius:999px;background:var(--nav-velo);color:#fff;display:flex;align-items:center;justify-content:center}
+/* Píldoras dibujadas de 40 (como la referencia) con área táctil de 44: borde transparente de 2 px. */
+.PFX .PFX-pista{display:flex;align-items:center;gap:0;padding:2px;border-radius:26px;background:var(--nav-velo)}
+.PFX .PFX-pil{height:44px;padding:0 12px;border:2px solid transparent;background-clip:padding-box;border-radius:22px;display:flex;align-items:center;color:var(--nav-tinta);font-size:15px;line-height:20px;font-weight:500;text-decoration:none}
+.PFX .PFX-pil[aria-current="page"]{background-color:var(--accion);color:#fff;font-weight:600;padding:0 14px}
+.PFX .PFX-ivn .PFX-p:focus-visible{outline-color:var(--nav-tinta)}
+/* ---- Barra lateral (Duo abierto a la derecha, computadora a la izquierda) ---- */
+.PFX .PFX-lat{position:relative;z-index:1;flex:none;display:flex;flex-direction:column;background:var(--navy);color:#fff}
+.PFX[data-vp="ih"] .PFX-lat{width:calc(218px + var(--ir));padding:16px calc(var(--ir) + 10px) calc(var(--ib) + 10px) 12px;border-radius:26px 0 0 26px;box-shadow:var(--sombra-nav-der)}
+.PFX[data-vp="esc"] .PFX-lat{width:248px;padding:16px 12px 14px;border-radius:0 26px 26px 0;box-shadow:var(--sombra-nav-izq)}
+.PFX .PFX-lat-cab{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:36px;padding:0 4px 0 8px}
+.PFX .PFX-logo{display:inline-flex;align-items:center;gap:8px;color:#fff}
+.PFX .PFX-logo-n{font-size:17px;line-height:22px;font-weight:700;letter-spacing:-.2px}
+.PFX .PFX-plan{display:inline-flex;align-items:center;height:24px;padding:0 10px;border-radius:999px;background:var(--nav-velo);color:var(--nav-tinta);font-size:12px;line-height:16px;font-weight:600;white-space:nowrap}
+.PFX .PFX-cons-b{margin-top:12px;display:flex;align-items:center;gap:10px;min-height:52px;padding:8px 10px;border-radius:14px;background:var(--nav-velo);color:#fff;text-align:left}
+.PFX .PFX-cons-b svg{color:var(--nav-tinta2)}
+.PFX .PFX-cons-t{flex:1;min-width:0;display:flex;flex-direction:column}
+.PFX .PFX-cons-t span{font-size:13px;line-height:16px;color:var(--nav-tinta2)}
+.PFX .PFX-cons-t b{font-size:15px;line-height:19px;font-weight:600}
+.PFX .PFX-lista{margin-top:14px;display:flex;flex-direction:column;gap:2px}
+.PFX .PFX-li{display:flex;align-items:center;gap:12px;height:44px;padding:0 12px;border-radius:12px;color:var(--nav-tinta);font-size:15px;line-height:20px;font-weight:500}
+.PFX[data-vp="esc"] .PFX-li{height:40px;font-size:14px}
+.PFX .PFX-li[aria-current="page"]{background:var(--accion);color:#fff;font-weight:600}
+.PFX .PFX-lat-pie{border-top:1px solid var(--nav-velo);padding-top:8px}
+.PFX .PFX-lat .PFX-yo{height:48px}
+.PFX .PFX-yo>span{display:flex;flex-direction:column;line-height:17px}
+.PFX .PFX-yo small{font-size:12px;line-height:16px;color:var(--nav-tinta2)}
+@media (prefers-reduced-motion:reduce){.PFX .PFX-p{transition:none}}
