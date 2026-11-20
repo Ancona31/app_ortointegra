@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 import {
-  CORREO, SESION, DIA_LABORABLE_LIBRE, arrastrarEventoPorMinutos, interruptorAgenda, irAAgenda, modalCita, soloEscritorio,
+  CORREO, SESION, diaDeLaSemana, arrastrarEventoPorMinutos, interruptorAgenda, irAAgenda, modalCita, soloEscritorio,
   redimensionarFinEvento, sqlLocal, toastConTexto,
 } from './ayudas'
 import { editarDesdeTarjeta, tarjetaLectura } from './interaccionesAyudas'
@@ -29,6 +29,11 @@ test.describe.configure({ mode: 'serial' })
 
 const TZ = 'America/Merida'
 const NOMBRE = 'Reserva Eleccion I2'
+/* Cierre de la tanda M: el jueves de la semana SIGUIENTE, siempre en el futuro. El candado
+   sólo aplica a una cita que no ha empezado (lo decide el servidor), y con el jueves de la
+   semana visible las ocho pruebas se saltaban de noche y de viernes a domingo
+   (`test.skip` según la hora): a esas horas no probaban nada. */
+const DIA = diaDeLaSemana(1, 3)
 let desde = ''
 let pacienteId = ''
 
@@ -49,8 +54,7 @@ test.afterAll(() => {
 })
 
 function cita(hora: string, correo: string | null): CitaPorLigar {
-  const inicio = fechaHoraLocalAInstante(DIA_LABORABLE_LIBRE, hora, TZ)
-  test.skip(new Date(inicio).getTime() < Date.now() + 2 * 3600_000, 'el día libre de la semana ya pasó: el candado no aplica')
+  const inicio = fechaHoraLocalAInstante(DIA, hora, TZ)
   const c = crearCitaPorLigar({ correo: CORREO.adminA, inicio, minutos: 30, nombre: NOMBRE, canal: 'unico' })
   sqlLocal(`update public.appointments set reserva_correo = nullif(:'c', '') where id = :'id'`, { c: correo ?? '', id: c.citaId })
   return c
@@ -64,10 +68,17 @@ async function confirmarReagendar(panel: ReturnType<Page['getByTestId']>): Promi
   await expect(panel.getByText(/Reagendar de todos modos|se reagendó/)).toBeVisible()
   if (await panel.getByText('¿Reagendar de todos modos?').isVisible()) await panel.getByRole('button', { name: 'Sí, reagendar y avisar' }).click()
 }
-const segundos = (hora: string) => String(new Date(fechaHoraLocalAInstante(DIA_LABORABLE_LIBRE, hora, TZ)).getTime() / 1000)
+const segundos = (hora: string) => String(new Date(fechaHoraLocalAInstante(DIA, hora, TZ)).getTime() / 1000)
+
+/** La agenda en la semana de `DIA` (la siguiente a la que abre). */
+async function irASemanaDeLaCita(page: Page): Promise<void> {
+  await irAAgenda(page)
+  await page.locator('.fc-next-button').click()
+  await expect(page.locator(`.fc-timegrid-col[data-date="${DIA}"]`)).toBeVisible()
+}
 
 async function abrirFormulario(page: Page): Promise<ReturnType<typeof modalCita>> {
-  await irAAgenda(page)
+  await irASemanaDeLaCita(page)
   await expect(page.locator('.agenda-raiz')).toHaveAttribute('data-interacciones-v2', 'listas')
   await clicEnTarjeta(tarjeta(page))
   await editarDesdeTarjeta(page)
@@ -102,11 +113,11 @@ test('servidor: el PUT a mano no cambia la hora ni el médico (409 eleccion_paci
   const c = cita('17:00', null)
   await irAAgenda(page)
   const hora = await page.request.put(`/api/appointments/${c.citaId}`, { data: {
-    start_time: fechaHoraLocalAInstante(DIA_LABORABLE_LIBRE, '18:00', TZ), end_time: fechaHoraLocalAInstante(DIA_LABORABLE_LIBRE, '18:30', TZ),
+    start_time: fechaHoraLocalAInstante(DIA, '18:00', TZ), end_time: fechaHoraLocalAInstante(DIA, '18:30', TZ),
   } })
   expect(hora.status()).toBe(409)
   expect(await hora.json()).toMatchObject({ error: 'eleccion_paciente', campo: 'reagendar' })
-  const cuerpoFin = { end_time: fechaHoraLocalAInstante(DIA_LABORABLE_LIBRE, '17:50', TZ) }
+  const cuerpoFin = { end_time: fechaHoraLocalAInstante(DIA, '17:50', TZ) }
   let fin = await page.request.put(`/api/appointments/${c.citaId}`, { data: cuerpoFin })
   if (fin.status() === 409) { // B7: otra cita de la base compartida a esa hora; se acepta y se reenvía
     const { empalmes }: { empalmes?: Array<{ id: string }> } = await fin.json()
@@ -120,7 +131,7 @@ test('servidor: el PUT a mano no cambia la hora ni el médico (409 eleccion_paci
 test('arrastre: se rechaza con un aviso y no sale ningún PUT', async ({ page }) => {
   interruptorAgenda('A', true)
   const c = cita('17:00', null)
-  await irAAgenda(page)
+  await irASemanaDeLaCita(page)
   await expect(page.locator('.agenda-raiz')).toHaveAttribute('data-interacciones-v2', 'listas')
   const puts: string[] = []
   page.on('request', r => { if (r.method() === 'PUT' && r.url().includes(c.citaId)) puts.push(r.url()) })
@@ -149,7 +160,7 @@ async function estirarDesdeArriba(page: Page, px: number): Promise<void> {
 test('estirar: el fin se estira y se guarda; desde arriba se rechaza con el aviso, sin PUT', async ({ page }) => {
   interruptorAgenda('A', true)
   const c = cita('17:00', null)
-  await irAAgenda(page)
+  await irASemanaDeLaCita(page)
   await expect(page.locator('.agenda-raiz')).toHaveAttribute('data-interacciones-v2', 'listas')
   const puts: string[] = []
   page.on('request', r => { if (r.method() === 'PUT' && r.url().includes(c.citaId)) puts.push(r.url()) })
@@ -211,7 +222,7 @@ test('Reagendar a un horario bloqueado: el mensaje de L1, sin confirmación, y e
   const bloqueo = sqlLocal(`insert into public.agenda_bloqueos (clinica_id, medico_id, inicio, fin, zona, motivo)
     select a.clinica_id, a.medico_id, :'ini'::timestamptz, :'fin'::timestamptz, :'tz', 'Bloqueo I2' from public.appointments a
      where a.id = :'id' returning id`, {
-    ini: fechaHoraLocalAInstante(DIA_LABORABLE_LIBRE, '18:00', TZ), fin: fechaHoraLocalAInstante(DIA_LABORABLE_LIBRE, '19:00', TZ), tz: TZ, id: c.citaId,
+    ini: fechaHoraLocalAInstante(DIA, '18:00', TZ), fin: fechaHoraLocalAInstante(DIA, '19:00', TZ), tz: TZ, id: c.citaId,
   })
   try {
     const modal = await abrirFormulario(page)
@@ -231,8 +242,8 @@ test('Reagendar a un horario bloqueado: el mensaje de L1, sin confirmación, y e
     await expect(revisar).toBeVisible()
     // El servidor, sin la pantalla: el mismo texto, y nada escrito.
     const r = await page.request.post(`/api/appointments/${c.citaId}/reagendar`, { data: {
-      consultorio_id: sqlLocal(`select consultorio_id from public.appointments where id = :'id'`, { id: c.citaId }), start_time: fechaHoraLocalAInstante(DIA_LABORABLE_LIBRE, '18:00', TZ),
-      end_time: fechaHoraLocalAInstante(DIA_LABORABLE_LIBRE, '18:30', TZ), confirmado: true,
+      consultorio_id: sqlLocal(`select consultorio_id from public.appointments where id = :'id'`, { id: c.citaId }), start_time: fechaHoraLocalAInstante(DIA, '18:00', TZ),
+      end_time: fechaHoraLocalAInstante(DIA, '18:30', TZ), confirmado: true,
     } })
     expect(r.status()).toBe(409)
     expect(await r.json()).toEqual({ error: 'horario_bloqueado', message: 'Este horario está bloqueado. Quita el bloqueo para agendar aquí.' })
@@ -261,7 +272,7 @@ test('ligada a un paciente: el candado sigue, y «Reagendar» de la tarjeta abre
   interruptorAgenda('A', true)
   const c = cita('17:00', null)
   sqlLocal(`update public.appointments set paciente_id = :'p', title = 'Paciente Eleccion I2' where id = :'id'`, { p: pacienteId, id: c.citaId })
-  await irAAgenda(page)
+  await irASemanaDeLaCita(page)
   await expect(page.locator('.agenda-raiz')).toHaveAttribute('data-interacciones-v2', 'listas')
   await clicEnTarjeta(page.locator('.fc-event', { hasText: 'Eleccion I2' }).first())
   await tarjetaLectura(page).getByRole('button', { name: 'Reagendar', exact: true }).click()
