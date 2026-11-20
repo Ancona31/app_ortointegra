@@ -31,9 +31,11 @@
  * puesto en el mismo commit que quita el modal, antes de que el navegador pueda
  * entregar el segundo clic. Cada cierre reinicia la gracia (`vez`).
  *
- * `dentroDeDialogos`: la burbuja (H3) deja pasar los clics dentro de un
- * diálogo (por omisión, `false`: su comportamiento, sin cambios). El formulario
- * completo y «Convertir en cita» SON el diálogo de debajo, así que lo encienden.
+ * `dentroDeDialogos`: por omisión (`false`) deja pasar los clics dentro de un
+ * diálogo, que era la regla de la burbuja en H3. El formulario completo y
+ * «Convertir en cita» SON el diálogo de debajo, así que lo encienden; y desde el
+ * cierre de la tanda M también la burbuja: el modal se pinta encima de ella y el
+ * segundo clic le quitaba el foco a «Guardar» (ver `BurbujaAlta.tsx`).
  * Decisión sin regla previa: 600 ms y 24 px (los de H3).
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'

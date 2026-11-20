@@ -195,8 +195,13 @@ function useCerrarAlTocarFuera(panel: { current: HTMLElement | null }, salir: ()
 
 /* H3 (punto 12) · El escudo tras cerrar `QuickPatientModal` vive en
    `src/hooks/useEscudoTrasRegistro.ts` desde I3 (punto 22), que lo usa además
-   el formulario completo y «Convertir en cita». Aquí, con su regla de H3: los
-   clics dentro de un diálogo pasan. */
+   el formulario completo y «Convertir en cita». Cierre de la tanda M: también
+   aquí con `dentroDeDialogos`. La regla de H3 dejaba pasar los clics dentro de
+   un diálogo, y el modal se pinta centrado ENCIMA de la burbuja: cuando su
+   botón cae sobre ella (en escritorio, la burbuja de un miércoles), el segundo
+   clic del doble clic entraba en la burbuja y se llevaba el foco de «Guardar»
+   al panel (o pulsaba lo que hubiera debajo). Sólo se traga el clic a menos de
+   24 px y 600 ms del último del modal: el segundo del mismo gesto. */
 
 /**
  * Los pacientes que casan con el texto, con la espera de 300 ms del modal.
@@ -484,7 +489,7 @@ const enfocar = (r: RefFoco): void => { requestAnimationFrame(() => r.current?.f
  */
 function useRegistroEnBurbuja(elegir: (p: PacienteBusqueda) => void, campo: RefFoco, botonGuardar: RefFoco) {
   const [nombre, setNombre] = useState<string | null>(null)
-  const escudo = useEscudoTrasRegistro(nombre !== null)
+  const escudo = useEscudoTrasRegistro(nombre !== null, { dentroDeDialogos: true })
   return {
     nombre,
     abrir: setNombre,

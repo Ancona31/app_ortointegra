@@ -120,8 +120,16 @@ for (const tema of ['claro', 'oscuro'] as const) {
   })
 }
 
-/** Clic en el centro de `boton` y, en cuanto se va el modal, otro clic en el mismo sitio (el doble clic). */
+/**
+ * Clic en el centro de `boton` y, en cuanto se va el modal, otro clic en el mismo sitio (el doble clic).
+ * La caja se mide con la entrada del modal (`animate-modal-enter`) ya terminada: medida a mitad,
+ * el punto caía unos píxeles a la izquierda, fuera de la burbuja, y el segundo clic iba a la
+ * rejilla; con el modal quieto cae DENTRO de la burbuja, que es donde lo da quien hace doble clic
+ * (cierre de la tanda M: de ahí que la prueba fallara unas veces sí y otras no).
+ */
 async function dobleClicQueCierraElModal(page: Page, boton: Locator): Promise<void> {
+  await boton.evaluate((el) => Promise.all((el.closest('div.fixed')?.getAnimations({ subtree: true }) ?? [])
+    .filter((a) => a.effect?.getComputedTiming().iterations !== Infinity).map((a) => a.finished)).then(() => undefined))
   const caja = await boton.boundingBox()
   if (!caja) throw new Error('sin botón')
   const x = caja.x + caja.width / 2
