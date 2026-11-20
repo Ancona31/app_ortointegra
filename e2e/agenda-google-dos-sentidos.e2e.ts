@@ -1,7 +1,7 @@
-import { test, expect, type Browser, type Page } from '@playwright/test'
+import { test, expect, type Browser, type Locator, type Page } from '@playwright/test'
 import { spawn, type ChildProcess } from 'node:child_process'
 import { closeSync, mkdirSync, openSync, readFileSync } from 'node:fs'
-import { SESION, CORREO, DIA_LABORABLE_LIBRE, interruptorAgenda, sqlLocal, eventoConTexto, modalCita, tituloUnico } from './ayudas'
+import { SESION, CORREO, DIA_LABORABLE_LIBRE, diaDeLaSemana, interruptorAgenda, sqlLocal, eventoConTexto, modalCita, tituloUnico } from './ayudas'
 import { burbuja, clicEnFranja, editarDesdeTarjeta, elegirPaciente, tarjetaLectura } from './interaccionesAyudas'
 import { arrancarGoogleFalso, CALENDARIO, type EventoFalso, type GoogleFalso } from './google-falso/servidor'
 import { fechaHoraLocalAInstante } from '../src/lib/dates'
@@ -35,6 +35,19 @@ const BASE = `http://localhost:${PUERTO}`
 const TZ = 'America/Merida'
 const CLINICA_A = 'Clínica Semilla A'
 const ESCRITORIO = 'escritorio'
+
+/**
+ * Jueves de la semana SIGUIENTE: siempre en el futuro, sea cual sea la hora o
+ * el día de la corrida. Lo usan las pruebas cuyo evento NUEVO de Google tiene
+ * que entrar «por asignar», y la base sólo lo marca así si el evento AÚN NO HA
+ * TERMINADO (`cita_asignacion_google`, `NEW.end_time > now()`, migración
+ * `20261121130000`; reloj de Postgres, no del navegador). Con el jueves de la
+ * semana visible, de noche o de viernes a domingo el evento ya había pasado,
+ * entraba como evento y el formulario era «Editar evento» (batería del
+ * 2026-11-19 a las 22:2x). Un evento que ya pasó sí se abre: lo prueba
+ * «un evento de Google que ya pasó…», más abajo.
+ */
+const DIA_FUTURO = diaDeLaSemana(1, 3)
 
 let google: GoogleFalso | null = null
 let servidor: ChildProcess | null = null
@@ -210,6 +223,29 @@ async function abrirYSondear(page: Page): Promise<{ estado: string; cambios: num
   return (await (await sondeo).json()) as { estado: string; cambios: number }
 }
 
+/** `abrirYSondear` y pasa a la semana de `DIA_FUTURO`. Después del sondeo: así
+    esa semana se pide con la fila ya importada. */
+async function sondearYVerSemanaSiguiente(page: Page): Promise<{ estado: string; cambios: number }> {
+  const r = await abrirYSondear(page)
+  await page.locator('.fc-next-button, [aria-label="Periodo siguiente"]').first().click()
+  await expect(page.locator(`.fc-timegrid-col[data-date="${DIA_FUTURO}"]`)).toBeVisible()
+  return r
+}
+
+/**
+ * La FILA importada de un evento de Google (por su `data-cita-id`) y no el
+ * bloque de solo lectura con el mismo título: la agenda pinta ese bloque al
+ * abrir, antes de que el sondeo importe el evento, y lo sustituye por la fila
+ * en el `refetch` posterior. Un clic en el bloque no abre nada (es de solo
+ * lectura): eso hizo fallar la prueba de la fila editable en una corrida
+ * aislada (la traza muestra el clic sobre `.ag-ev-gcal`).
+ */
+function filaImportada(page: Page, eventoGoogle: string): Locator {
+  const id = sqlLocal(`select id from public.appointments where google_event_id = :'ev'`, { ev: eventoGoogle })
+  if (!id) throw new Error(`no se importó el evento ${eventoGoogle}`)
+  return page.locator(`.fc-event:has([data-cita-id="${id}"])`)
+}
+
 function mover(ev: EventoFalso, minutos: number): Partial<EventoFalso> {
   const corre = (iso: string | null | undefined): string => new Date(Date.parse(iso ?? '') + minutos * 60_000).toISOString()
   return { start: { dateTime: corre(ev.start?.dateTime), timeZone: TZ }, end: { dateTime: corre(ev.end?.dateTime), timeZone: TZ } }
@@ -262,26 +298,67 @@ test('encendido: un borrado en Google cancela la cita (no la borra)', async ({ p
 test('encendido: un evento creado en Google aparece como fila editable y una sola vez', async ({ page }) => {
   interruptorAgenda('A', true)
   const titulo = tituloUnico('Creado en Google')
-  const inicio = fechaHoraLocalAInstante(DIA_LABORABLE_LIBRE, '20:00', TZ)
+  const inicio = fechaHoraLocalAInstante(DIA_FUTURO, '20:00', TZ)
   const creado = g().crear({
     summary: titulo, description: 'Notas escritas en Google',
     start: { dateTime: inicio, timeZone: TZ }, end: { dateTime: new Date(Date.parse(inicio) + 3_600_000).toISOString(), timeZone: TZ },
   })
   permitirSondeo()
-  const r = await abrirYSondear(page)
+  const r = await sondearYVerSemanaSiguiente(page)
   expect(r.cambios).toBeGreaterThan(0)
   const [importada] = sqlLocal(`select id || '|' || origen || '|' || coalesce(notes, '') from public.appointments
                                  where google_event_id = :'ev'`, { ev: creado.id }).split('\n')
   expect(importada.split('|').slice(1)).toEqual(['google', 'Notas escritas en Google'])
   // Una sola tarjeta: la fila; el bloque de solo lectura ya no sale.
-  await expect(page.locator('.fc-event', { hasText: titulo })).toHaveCount(1, { timeout: 30_000 })
+  const filaPintada = filaImportada(page, creado.id)
+  await expect(filaPintada).toHaveCount(1, { timeout: 30_000 })
+  await expect(page.locator('.fc-event', { hasText: titulo })).toHaveCount(1)
   /* F3: con v2 el clic abre la tarjeta de lectura; la edición está en «Editar».
      I3 (punto 10): un evento NUEVO de Google entra «por asignar», una cita por
      ligar, así que el formulario se abre como «Editar cita» (antes, «Editar evento»). */
   await expect(page.locator('.agenda-raiz')).toHaveAttribute('data-interacciones-v2', 'listas')
-  await eventoConTexto(page, titulo).click()
+  await filaPintada.click()
   await editarDesdeTarjeta(page)
   await expect(modalCita(page, 'Editar cita')).toBeVisible({ timeout: 30_000 })
+})
+
+/* Cierre M (pregunta de Angel): un evento de Google que YA PASÓ se importa como
+   evento —no «por asignar»: ya terminó— y su tarjeta SE ABRE; «Editar» lleva a
+   «Editar evento». Uno de hoy más temprano y uno de ayer, relativos a la hora
+   de la corrida (de 75 a 45 minutos antes, y lo mismo 24 h antes; entre las
+   00:00 y las 01:15 el «de hoy» cae ayer y sigue siendo un pasado). Si su
+   semana no es la que abre la agenda (el ayer de un lunes), se va a la anterior.
+   El clic, en la esquina de arriba: a esas horas puede haber citas empalmadas. */
+test('encendido: un evento de Google que ya pasó (hoy más temprano y ayer) se importa como evento y su tarjeta se abre', async ({ page }) => {
+  interruptorAgenda('A', true)
+  const ahora = Date.now()
+  const casos = [0, 1].map((dias) => {
+    const inicio = new Date(ahora - 75 * 60_000 - dias * 86_400_000)
+    const titulo = tituloUnico(dias ? 'Pasado ayer' : 'Pasado hoy')
+    const ev = g().crear({
+      summary: titulo, start: { dateTime: inicio.toISOString(), timeZone: TZ },
+      end: { dateTime: new Date(inicio.getTime() + 30 * 60_000).toISOString(), timeZone: TZ },
+    })
+    return { titulo, ev: ev.id, fecha: inicio.toLocaleDateString('en-CA', { timeZone: TZ }) }
+  })
+  permitirSondeo()
+  await abrirYSondear(page)
+  await expect(page.locator('.agenda-raiz')).toHaveAttribute('data-interacciones-v2', 'listas')
+  for (const c of casos) {
+    expect(sqlLocal(`select origen || '|' || coalesce(google_asignacion, 'NULL') || '|' || (end_time < now())::text
+                       from public.appointments where google_event_id = :'ev'`, { ev: c.ev })).toBe('google|NULL|true')
+    const columna = page.locator(`.fc-timegrid-col[data-date="${c.fecha}"]`)
+    if (await columna.count() === 0) await page.locator('.fc-prev-button, [aria-label="Periodo anterior"]').first().click()
+    await expect(columna).toBeVisible()
+    const filaPintada = filaImportada(page, c.ev)
+    await expect(filaPintada).toHaveCount(1, { timeout: 30_000 })
+    await expect(page.locator('.fc-event', { hasText: c.titulo })).toHaveCount(1)
+    await filaPintada.click({ position: { x: 6, y: 4 } })
+    await editarDesdeTarjeta(page)
+    await expect(modalCita(page, 'Editar evento')).toBeVisible({ timeout: 30_000 })
+    await page.keyboard.press('Escape')
+    await expect(modalCita(page, 'Editar evento')).toHaveCount(0)
+  }
 })
 
 /* I3 · punto 10: un evento NUEVO creado en Google entra SIEMPRE «por asignar»
@@ -292,13 +369,13 @@ test('encendido: un evento creado en Google aparece como fila editable y una sol
 test('encendido (I3): un evento nuevo de Google entra «Por asignar»; tras «¿No es una cita?» una edición en Google no lo devuelve', async ({ page }) => {
   interruptorAgenda('A', true)
   const titulo = tituloUnico('Revisión nueva en Google')
-  const inicio = fechaHoraLocalAInstante(DIA_LABORABLE_LIBRE, '19:15', TZ)
+  const inicio = fechaHoraLocalAInstante(DIA_FUTURO, '19:15', TZ)
   const creado = g().crear({
     summary: titulo, start: { dateTime: inicio, timeZone: TZ },
     end: { dateTime: new Date(Date.parse(inicio) + 1_800_000).toISOString(), timeZone: TZ },
   })
   permitirSondeo()
-  await abrirYSondear(page)
+  await sondearYVerSemanaSiguiente(page)
   const id = sqlLocal(`select id from public.appointments where google_event_id = :'ev'`, { ev: creado.id })
   const columna = (c: 'title' | 'google_asignacion'): string =>
     sqlLocal(`select coalesce(${c}, 'NULL') from public.appointments where id = :'id'`, { id })
@@ -312,7 +389,7 @@ test('encendido (I3): un evento nuevo de Google entra «Por asignar»; tras «¿
 
   g().modificar(creado.id, { summary: `${titulo} editado` })
   permitirSondeo()
-  await abrirYSondear(page)
+  await sondearYVerSemanaSiguiente(page)
   await expect.poll(() => columna('title'), { timeout: 30_000 }).toBe(`${titulo} editado`)
   expect(columna('google_asignacion')).toBe('evento')
   await expect(filaPintada).toContainText('editado', { timeout: 30_000 })
@@ -326,13 +403,13 @@ test('encendido (I3): un evento nuevo de Google entra «Por asignar»; tras «¿
 test('encendido: un evento creado en Google se convierte en cita; a Google va el paciente sin las notas y su título no vuelve', async ({ page }) => {
   interruptorAgenda('A', true)
   const titulo = tituloUnico('Google a cita')
-  const inicio = fechaHoraLocalAInstante(DIA_LABORABLE_LIBRE, '20:30', TZ)
+  const inicio = fechaHoraLocalAInstante(DIA_FUTURO, '20:30', TZ)
   const creado = g().crear({
     summary: titulo, description: 'NOTAS-GOOGLE-T3',
     start: { dateTime: inicio, timeZone: TZ }, end: { dateTime: new Date(Date.parse(inicio) + 1_800_000).toISOString(), timeZone: TZ },
   })
   permitirSondeo()
-  await abrirYSondear(page)
+  await sondearYVerSemanaSiguiente(page)
   const id = sqlLocal(`select id from public.appointments where google_event_id = :'ev'`, { ev: creado.id })
   expect(id).not.toBe('')
   const columna = (c: 'title' | 'notes'): string => sqlLocal(`select coalesce(${c}, '') from public.appointments where id = :'id'`, { id })
