@@ -110,9 +110,14 @@ test('«Más» del riel abre una tarjeta y se cierra con Esc', async ({ page }, 
 
 test('⌘K abre la paleta como diálogo con nombre, dentro del área de contenido', async ({ page }, info) => {
   await abrir(page, '/dashboard', info.project.name)
-  await page.keyboard.press('Control+k')
   const paleta = page.getByRole('dialog', { name: 'Buscar paciente o folio' })
-  await expect(paleta).toBeVisible()
+  /* El atajo lo escucha un efecto de `CommandPalette`: si la tecla llega antes
+     de hidratar, se pierde (y la paleta ALTERNA, así que no se pulsa dos veces
+     con ella ya abierta). Falló así una de cada dos corridas en la integración. */
+  await expect(async () => {
+    if (!(await paleta.isVisible())) await page.keyboard.press('Control+k')
+    await expect(paleta).toBeVisible({ timeout: 1000 })
+  }).toPass({ timeout: 10000 })
   await expect(paleta).toHaveAttribute('aria-modal', 'true')
   await expect(paleta.getByRole('textbox', { name: 'Buscar paciente por nombre o documento por folio' })).toBeFocused()
   const ancho = page.viewportSize()!.width
