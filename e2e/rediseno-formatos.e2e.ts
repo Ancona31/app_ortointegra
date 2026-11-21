@@ -11,7 +11,8 @@ import { SESION } from './ayudas'
  * abajo 34 → `ext`, riel) y `duo-abierto` (951×669, franja derecha 84 y abajo
  * 34 → `ih`, barra lateral a la derecha). Comprueba:
  *   · que se ve la navegación de su formato y no las otras;
- *   · que ningún control interactivo visible cae bajo una franja;
+ *   · que ningún control interactivo visible cae bajo la franja lateral, ni
+ *     ninguno fijo bajo la de abajo (lo que se desplaza sí pasa por debajo);
  *   · en `ih`, que ningún control FIJO cae en la bisagra (x 455–496);
  *   · que «Más» (riel) abre y cierra, y que ⌘K abre la paleta como diálogo.
  */
@@ -82,7 +83,9 @@ for (const ruta of RUTAS) {
     }
     await expect(page.locator('.nav-encabezado')).toBeHidden()
     const cajas = await controles(page)
-    const bajoFranja = cajas.filter(c => c.r > ancho - f.right + 0.5 || c.b > alto - f.bottom + 0.5)
+    /* La franja lateral no la puede pisar nada; la de abajo, sólo lo fijo: el
+       contenido que se desplaza pasa por debajo, como en cualquier app. */
+    const bajoFranja = cajas.filter(c => c.r > ancho - f.right + 0.5 || (c.fijo && c.b > alto - f.bottom + 0.5))
     expect(bajoFranja, 'controles bajo la franja').toEqual([])
     if (f.formato === 'ih') {
       const enBisagra = cajas.filter(c => c.fijo && c.r > 455 && c.l < 496)
