@@ -23,7 +23,7 @@ export default defineConfig({
   reporter: [['list']],
   globalSetup: './e2e/global-setup.ts',
   use: {
-    baseURL: 'http://localhost:3001',
+    baseURL: process.env.E2E_BASE_URL ?? 'http://localhost:3001',
     locale: 'es-MX',
     timezoneId: 'America/Merida',
     trace: 'retain-on-failure',
@@ -50,6 +50,30 @@ export default defineConfig({
        días. Sólo corre sus propios archivos; el resto de la suite ya cubre
        escritorio y teléfono, y sus pruebas no saben de este tercer formato.
        T1: también la colocación de la burbuja y la tarjeta (punto 3). */
+    /* Rediseño · B4 · el iPhone Duo cerrado (`ext`) y abierto en horizontal
+       (`ih`). Las franjas del sistema (derecha 84, abajo 34) NO van aquí: las
+       pone la propia prueba por CDP antes de cargar, porque Playwright no
+       emula `env(safe-area-inset-*)`. Sólo corren su archivo. */
+    {
+      name: 'duo-cerrado',
+      testMatch: ['**/rediseno-formatos.e2e.ts'],
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 466, height: 678 },
+        isMobile: true,
+        hasTouch: true,
+      },
+    },
+    {
+      name: 'duo-abierto',
+      testMatch: ['**/rediseno-formatos.e2e.ts'],
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 951, height: 669 },
+        isMobile: true,
+        hasTouch: true,
+      },
+    },
     {
       name: 'tableta',
       testMatch: ['**/agenda-f-tableta.e2e.ts', '**/agenda-t1-capas.e2e.ts'],

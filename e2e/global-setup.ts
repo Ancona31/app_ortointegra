@@ -14,7 +14,8 @@ import path from 'node:path'
  * `playwright.medicion.config.ts` — por eso NO depende de nada del objeto
  * `FullConfig` (los dos apuntan al mismo servidor local).
  */
-const BASE_URL = 'http://localhost:3001'
+/* El puerto lo puede cambiar quien corre la suite en paralelo con otra (rediseño, B4). */
+const BASE_URL = process.env.E2E_BASE_URL ?? 'http://localhost:3001'
 const CONTRASENA = 'Semilla-Agenda-2026'
 const USUARIOS = [
   'admin.a@semilla.spinus.test',
