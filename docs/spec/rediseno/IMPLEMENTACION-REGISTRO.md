@@ -132,8 +132,9 @@ hallazgos de las 25 rutas, claro + oscuro:
 | B0 | Preparación y línea base | hecho | | ok | 96/68 | 2363/2363 | ver arriba | ANTES |
 | B1 | Cimientos: tokens, tipografía, oscuro, sonda, manifest, movimiento | hecho (con 1 desvío, abajo) | 97eba80a, 800f9221, d0857a1b, 8c153052 | ok | 96/68 | 2391/2391 (sin TZ y UTC) | 9 archivos de agenda = B0 por archivo | DESPUÉS |
 | B2 | Primitivas compartidas | hecho | 174abbd8, fc054a4c, fb263d08 | ok | 96/68 | 2391/2391 (sin TZ y UTC) | no corridas (sin consumidores; cajas medidas) | muestra + 5 rutas |
-| B3 | Capas del catálogo | B3a hecho (ModalShell, velo, CapaMenu y 4 capas compartidas); B3b aparte | e7b027ff, 66143a96, 68cf1fb9 | ok | 92/68 | 2391/2391 (sin TZ y UTC) | 5 archivos: 25/26, el que falla = B0 (ventana «¿Asistió?») | capas en 5 formatos × 2 temas |
-| B4 | Navegación por dispositivo | | | | | | | |
+| B3 | Capas del catálogo | B3a hecho (ModalShell, velo, CapaMenu y 4 capas compartidas); B3b hecho (Toast, Skeleton, EstadoVacio/EstadoError, ErrorBoundary, OfflineAlert) | B3a: e7b027ff, 66143a96, 68cf1fb9 · B3b: b7576882, 8fecf2af, 2f0b89dc, 79b69247, a9d253bf, e54bcdad | ok | 92/68 | 2391/2391 (sin TZ y UTC) | B3a: 5 archivos, 25/26 (el que falla = B0, ventana «¿Asistió?») · B3b: 29 pasan, 3 fallan (ver notas) | capas en 5 formatos × 2 temas |
+| B4 | Navegación por dispositivo | hecho (con defectos que cerró la integración) | 1aa24407, 9c329f53, 884f3e5a, eef2cb16, 6f3bc6e0 | ok | ver integración | 2391/2391 | 35 pasan, 4 fallan (ver notas) | 3 roles × 5 formatos |
+| — | Integración B1–B4 | hecho | ver «Integración B1–B4» | ok | 89/66 | 2391/2391 (sin TZ y UTC) | ver «Integración B1–B4» | 3 roles × 5 formatos × 2 temas |
 | — | ⛔ Parada temprana (push 1) | | | | | | | |
 | B5 | Dashboard | | | | | | | |
 | B6 | Pacientes: lista, nuevo, editar, alta | | | | | | | |
@@ -224,3 +225,149 @@ hallazgos de las 25 rutas, claro + oscuro:
 * **QuickPatientModal** sin salida animada a propósito (el escudo de doble clic
   cuenta con que desaparezca en el acto) y sin rol/Esc/trapo nuevos (no los
   tenía). Igual `ConsultaRapidaModal` (sin rol), que ahora va en portal.
+
+### B3b · notas (aviso, esqueleto, vacío/error, ErrorBoundary, sin conexión)
+
+Reconstruido del código y de `git log` en la integración (el agente de B3b no
+pudo editar este archivo).
+
+* **Toast** (`b7576882`, `e54bcdad`): misma API (`success/error/info/warning`)
+  y mismos textos. Arriba y centrado en el área de contenido; `role="status"`
+  (éxito, info) o `role="alert"` (error, advertencia) en CADA aviso; cierre
+  «Cerrar aviso»; 4 s y 8 s la advertencia, con pausa al pasar o enfocar; Esc
+  con el foco dentro; entra y sale por el mismo camino (`translate`/`opacity`
+  con `@starting-style`), sólo fundido con movimiento reducido; el más nuevo
+  arriba. Colores semánticos fijos del kit, «info» neutro (no sigue la marca).
+  B3b lo colocó con medidas supuestas de B4; la integración lo pasó a las de
+  verdad (abajo).
+* **Esqueleto** (`8fecf2af`): `.skeleton` pasa de `background-position` en
+  bucle a pulso de opacidad sobre `--sup2`, quieto con movimiento reducido;
+  huesos `aria-hidden` y `aria-busy` en los contenedores. Dejó intacta su copia
+  de `.dash-barra-movil`, que quitó la integración.
+* **EstadoVacio / EstadoError** (`2f0b89dc`): piezas nuevas de dos niveles
+  (página y sección), acción tonal, `role="alert"` en el error. Su único
+  consumidor por ahora es `ErrorBoundary`; las adoptan los bloques de pantallas.
+* **ErrorBoundary** (`79b69247`): centrado, sin tarjeta, con EstadoError;
+  mismos textos, «Reintentar» tonal y «Volver al inicio» sigue siendo `<a>`
+  (carga completa).
+* **OfflineAlert** (`a9d253bf`): la alerta del patrón único con su excepción
+  aprobada (sin botones, no se descarta, se va sola); velo del kit, tarjeta de
+  320/310/340, `alertdialog` con el foco dentro y devuelto al irse; sigue
+  esperando 4 s; sale animada al volver la red.
+* e2e de B3b (con su propia configuración, fuera del repo): 29 pasan, 3 fallan,
+  32 saltadas; uno de los fallos es `agenda-j5-configuracion` («crear otro sin
+  recargar»). No se reclasificaron aquí: la batería de la integración (abajo)
+  los cubre por archivo.
+
+### B4 · notas (navegación por formato)
+
+Reconstruido del código y de `git log` en la integración.
+
+* **`Sidebar.tsx`** conserva datos, permisos por rol, bloqueo por plan y el
+  cierre de sesión con su auditoría (`await` a `/api/auth/audit-login`) y la
+  limpieza de cachés, y pinta cuatro presentaciones que elige CSS por
+  `data-formato` (ninguna en JS en el primer render): `RielNavegacion` en ext
+  (60 + franja), `EncabezadoFundido` en tel e iv (con cinco píldoras en iv),
+  barra derecha de 216 en ih e izquierda de 248 en esc. En tel/iv/ext la misma
+  `<aside id="barra-lateral">` es el cajón (arrastre y Esc). «Más» (ext, iv) es
+  `MenuMas`.
+* **Navegación plana** (aprobada): Inicio · Expediente · Agenda · Documentos ·
+  Administración. Suplementación pasa a un enlace en la cabecera de
+  `/expediente`; Estadísticas, Usuarios y Facturación son pestañas de
+  Administración (`components/admin/PestanasAdministracion.tsx`, las dos
+  últimas sólo para quien administra). «Dashboard» pasa a «Inicio» (e2e al
+  día).
+* Aviso de pendientes sin animaciones infinitas, con distintivo en «···» y en
+  el botón de menú; selector de consultorio con el logo de la clínica; banner
+  de suscripción como tarjeta dentro del contenido; ⌘K anclada arriba como
+  `dialog` con nombre; plegar el menú en esc dentro de la agenda.
+* Relleno del contenido por formato (`.app-contenido`) con su pareja de la
+  agenda actualizada; `--cromo-*` en `globals.css`; franja (`body::before`) en
+  `--navy` salvo con la banda de la agenda.
+* e2e: `agenda-f-barra` 256 → 248 y sin el caso del grupo plegado (la
+  navegación es plana); nueva `rediseno-formatos` con los proyectos
+  `duo-cerrado` y `duo-abierto` (franjas por CDP); `E2E_BASE_URL` para otro
+  puerto. Su corrida: 35 pasan, 4 fallan (`agenda-reflejo-enlace` punto 5 en
+  los dos proyectos y `rediseno-formatos` en los dos del Duo; éste quedó
+  corregido en `6f3bc6e0`, que cuenta sólo lo FIJO bajo la franja inferior).
+
+### Integración B1–B4 · notas
+
+* **Verde tras la fusión, sin tocar nada:** build exit 0, lint 89/66 (bajo el
+  tope 96/68), vitest 163/2391 sin TZ y con `TZ=UTC`.
+* **CapaMenu no absorbe los tres menús a mano de B4**, y queda escrito en cada
+  archivo por qué: «Más» lleva la tarjeta ámbar, la fila de consultorio que
+  despliega su lista y enlaces de verdad; el de ajustes, el Aviso de Privacidad
+  en pestaña nueva y «Cerrar sesión» girando mientras se audita; el de
+  consultorio mezcla opciones con palomita y el enlace «Gestionar consultorios
+  →». CapaMenu sólo tiene opciones-botón (todo-radio o todo-opción) y cierra
+  al elegir. Sigue sin consumidores (los tendrá en B7/B9).
+* **Una sola fuente para las medidas del cromo.** Toast, OfflineAlert, capas
+  (`--capa-*`, sin respaldos repetidos), «Más» y ⌘K leen las `--cromo-*`; la
+  barra plegada de la agenda es `--cromo-barra: 64px` (barra, `<main>`, capas,
+  aviso y ⌘K la siguen); sin navegación (`/inicio`) el cromo mide 0. El aviso
+  baja hasta `--capa-aviso-arr` (bajo el encabezado en tel/iv). Lo que ocupa la
+  navegación a cada lado es `--cromo-izq`/`--cromo-der` (márgenes de `<main>`,
+  espejados). Medido: `--capa-izq/-der/-aviso-arr` correctos en los 5 formatos,
+  en `/dashboard`, `/agenda`, `/agenda` plegada (esc: barra y `<main>` a 64) y
+  `/inicio` (cromo 0).
+* **Escala de z-index** documentada en `sistema.css`: cromo 40, franja y capas
+  de la agenda 45 (sin tocar), capas 50–70, ⌘K y consulta rápida
+  `--z-paleta` 9998, «Sin conexión» `--z-sin-conexion` 9999, aviso `--z-aviso`
+  10000. Fuera de escala, a propósito: `OnboardingGuide` (10001/10002; hoy sin
+  montar).
+* **Franja, cromo y barra del navegador del mismo color.** Dentro de la app la
+  franja es `--navy` (`body:has(#barra-lateral)`) y `--ag-navy` con la banda de
+  la agenda móvil; `sincronizarBarraDelNavegador` lee el color del propio
+  `body::before`, y un observador ligero resincroniza cuando la banda aparece o
+  se va. Medido: `/dashboard` → #1b2b4a en franja y `theme-color`; `/agenda`
+  móvil → `--ag-navy` y #163250; `/agenda` esc → `--navy`. Fuera de la app
+  (`/login`, `/`, `/reservar`, `/confirmar`, `/inicio`) la franja vuelve a ser
+  la de B0 (`--ag-navy`), y el `themeColor` estático sigue en sus valores de B0.
+* **Defectos corregidos** (front, dentro de B1–B4): ver la lista del informe de
+  la integración; los principales: barra de ih cortada con tres pendientes y
+  pie con elipsis (ih y esc); «Guardar» de `/perfil` debajo del riel o de la
+  barra de ih y de la franja (inalcanzable); alerta «Cambiar consultorio
+  activo» con botones sin base `k-b`; velo de «Más»/cajón/⌘K sin desenfoque en
+  Chrome (minificador); copia de `.dash-barra-movil` en el esqueleto.
+* **Abierto, de pantallas (B6):** en ih `/expediente` desborda en horizontal
+  dentro de `<main>` (813 en 651): filtros en una fila y tabla con mínimo,
+  pensados para 867 de ancho (B0 no tenía barra en ih).
+* **Agenda en ext (B13):** con el riel, la banda de la agenda tiene 322 px y el
+  filtro de médico de su segunda fila queda en 50 px con la v2 apagada y 26
+  con la v2 encendida (el rótulo no se lee; sigue abriéndose). No se toca hasta
+  la agenda.
+* **CSS principal:** 386 687 bytes, gzip 66 434 (tras la fusión, sin tocar:
+  386 613; la integración suma 74).
+* **e2e** (44 archivos de la lista de la integración, los cinco proyectos que
+  les tocan, contra `next start -p 3001`, sábado 21-nov de 21:50 a 22:25 UTC):
+  `121 passed`, `101 failed`, `192 skipped`, `131 did not run`. Contra B0 por
+  caso: **ninguno que pasaba en B0 falla por el rediseño**. Los 13 que pasaban
+  en B0 y fallaron:
+  * 3 de `agenda-cancelar`: la ventana «¿Asistió el paciente?» (AG-DT-256; su
+    texto «Más de 48 horas y sin nota clínica.» intercepta el clic). B0 corrió
+    a las 10:56 de Mérida y ésta a las 15:50: más citas de la semilla cumplen
+    las 48 h.
+  * 8 en cascada de otra prueba: `agenda-f-burbuja` «con la suscripción
+    bloqueada…» pone la Clínica A en `cancelado` sin VIP, se agota (la tapa la
+    misma ventana) y su `finally` no llega a devolverla; desde ahí `agenda-f-
+    movimiento` (4), `agenda-f-simetria` F1.17, `agenda-f-tarjeta` «apagado»,
+    `agenda-f-pulido` F1.4 y `agenda-secretaria` ven «Función no disponible».
+    Devuelta la clínica a `free` + VIP (como la deja la semilla) y repetidos,
+    los ocho pasan.
+  * `agenda-citas` «alta … eco propio»: el eco de Realtime no llegó en 10 s;
+    sola, pasa.
+  * `agenda-f-buscador` «médico invitado … RLS»: falla en su precondición SQL
+    («la semilla no tiene un paciente con citas de los dos médicos», ventana de
+    29 días sobre `now()`), antes de abrir ninguna página.
+  * `rediseno-formatos` (nueva en B4) «⌘K…»: perdía la tecla si llegaba antes
+    de hidratar, una de cada dos corridas; adaptada (reintenta mientras la
+    paleta no está). Tres corridas seguidas de los dos proyectos del Duo: 11/11.
+  Las `reserva-*` y `confirmacion-*` siguen fallando como en B0 (mismo caso por
+  caso), ahora con `RESERVA_SECRETO` puesto: no se investigó más (fuera de
+  alcance; el aviso de reserva local, P7, sigue sin aprobar).
+* **Producción (agenda v2 apagada y sin migraciones):** recorrido con la v2
+  apagada en la Clínica Semilla A, 17 rutas × 5 formatos × 2 temas, 0 errores
+  de consola; la agenda v1 conserva su banda, su relleno y su «Abrir menú». Con
+  las tablas y RPC de la v2 simuladas como ausentes en el navegador (404
+  PGRST205/PGRST202), el dashboard y la agenda caen en apagado sin romper.
