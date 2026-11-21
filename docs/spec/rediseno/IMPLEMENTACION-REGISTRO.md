@@ -371,3 +371,40 @@ Reconstruido del código y de `git log` en la integración.
   de consola; la agenda v1 conserva su banda, su relleno y su «Abrir menú». Con
   las tablas y RPC de la v2 simuladas como ausentes en el navegador (404
   PGRST205/PGRST202), el dashboard y la agenda caen en apagado sin romper.
+
+### Corrección de la sonda de formato en el Duo real · notas
+
+* **Defecto (visto por Angel en su iPhone Duo, app instalada):** Duo cerrado
+  salía como `tel` (encabezado con hamburguesa en vez del riel) y Duo abierto
+  en horizontal como `iv` (píldoras en vez de la barra a la derecha). El
+  vertical (franja arriba) estaba bien.
+* **Causa:** la sonda decidía «franja lateral» sólo por
+  `env(safe-area-inset-right/left) > 0`. Con la franja a un LADO, iOS la deja
+  FUERA del viewport (también con `viewport-fit=cover`): los insets laterales
+  valen 0 y la página mide la pantalla menos la franja (~382 de 466, ~867 de
+  951). Las pruebas no lo veían porque emulaban el inset por CDP.
+* **Arreglo** (`src/lib/formatoPantalla.ts`, sonda y `clasificarFormato`
+  juntas): hay franja lateral con inset lateral > 0 **o** si
+  `screen.width − innerWidth` o `screen.height − innerWidth` cae en [60, 120],
+  sólo por debajo de 1024 y con la pantalla declarada en vertical
+  (`screen.width < screen.height`, como la da iOS; deja fuera computadoras con
+  la ventana estrecha y Android en horizontal). Deducida y sin inset, el borde
+  vale `derecha`. El CSS no cambió: todo lo que toca la franja va con
+  `var(--ir/--il)`, que con la franja fuera valen 0, y el riel y la barra quedan
+  pegados al borde del viewport (capturas y e2e).
+* **⚠️ ASUNCIÓN PENDIENTE DE CONFIRMAR EN EL APARATO:** que `screen.width/height`
+  del Duo dan el tamaño total (466×678 cerrado, 669×951 abierto). Para
+  comprobarlo, **línea de diagnóstico TEMPORAL** al pie de `/ayuda`
+  (`src/app/(app)/ayuda/DiagnosticoFormato.tsx`): formato, borde, ventana,
+  screen, los cuatro insets, `devicePixelRatio` y `standalone`. **Se retira en
+  B15.**
+* **Riesgo conocido:** Safari en horizontal SIN `viewport-fit=cover` (la app sí
+  lo lleva) podría estrechar el viewport por las dos muescas (~2 × 59 = 118) y
+  caer en el rango → `ih` en vez de `iv`. Con `cover` no ocurre (ancho 852 y
+  diferencia 0). También un iPad con Stage Manager en una ventana 60–120 más
+  estrecha que la pantalla.
+* **e2e:** proyectos nuevos `duo-cerrado-real` (382×678, `screen` 466×678) y
+  `duo-abierto-real` (867×669, `screen` 669×951), sin insets; la prueba
+  comprueba además que el riel/la barra llegan al borde (de la franja o del
+  viewport) con su ancho. La bisagra de `ih` (x 455–496) se mantiene: con la
+  franja a la derecha y fuera, el viewport empieza en el x 0 de la pantalla.
