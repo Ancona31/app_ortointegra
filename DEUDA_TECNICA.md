@@ -6943,3 +6943,21 @@ verificaciones sabiendo cuáles son (registro en
 Por el Protocolo 6 (`(offline)/*` y Service Workers no se tocan). ASUMIENDO QUE el
 dueño no lo quiere rediseñar ahora; cuando se migre a HTML estático en
 `public/bunker/` será otro proyecto.
+
+---
+
+### RED-DT-19 — `/perfil` pide `/api/google/calendar` a quien no administra (403 en consola)
+
+**Estado:** 🟡 abierta, menor · **Archivos:** `src/app/(app)/perfil/page.tsx:409`,
+`src/app/api/google/calendar/route.ts:69` (comprobado en la integración B1–B4,
+2026-11-21)
+
+Al abrir `/perfil`, el médico invitado y la secretaria piden `GET
+/api/google/calendar`, que sólo responde a quien administra la clínica
+(`canManageClinica`) y les da **403**. La página ya lo trata bien (el comentario
+de la línea 415 cuenta con «el 403 del invitado»: no pinta «conecta» ni falla),
+pero el navegador lo apunta como error de recurso en la consola en cada carga.
+No es del rediseño: ni la página ni la ruta cambian desde `951e31b3`. (En las
+capturas de B4 se atribuyó a `/api/me/clinica`; esa ruta responde 200 a los
+tres roles.) Arreglo natural: no pedir la ruta sin `isAdmin`, en el bloque de
+la página o aparte.
