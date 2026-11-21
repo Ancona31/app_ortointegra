@@ -2538,6 +2538,27 @@ button.nav-consultorio-boton:hover { background: rgba(255, 255, 255, .14); }
 /* Una línea cada uno: en 248 partían en seis renglones. */
 :is(.nav-persona-nombre, .nav-persona-detalle, .nav-persona-linea) { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .nav-persona[data-activa="true"] :is(.nav-persona-linea, .nav-persona-detalle) { color: #fff; }
+/* `ih` (216 de ancho y 669 − la franja de alto), integración B1–B4. Con los
+   tres datos pendientes la barra no cabía: la tarjeta ámbar desplegada quedaba
+   cortada por abajo, y el pie cortaba «Mi perfil · Aj…». Como en la maqueta
+   (`cromo`, vista 1 en `ih`): la tarjeta ocupa el ancho de la barra (a 4 del
+   borde), con su título en una línea; filas y controles a 36–38, el mínimo de
+   toque de `ih` (36), y menos aire entre bloques. Medido con el médico de la
+   semilla: cabe justo, sin desplazar. Con un nombre más largo, `.nav-barra-medio`
+   sigue desplazándose: es el respaldo, no el caso normal. */
+[data-formato="ih"] .nav-barra { gap: 8px; padding-top: calc(var(--it) + 12px); }
+[data-formato="ih"] .nav-barra-cabeza { min-height: 40px; }
+[data-formato="ih"] .nav-barra-medio { gap: 6px; }
+[data-formato="ih"] .nav-barra-enlace { min-height: 38px; }
+[data-formato="ih"] .nav-barra-aviso { margin-inline: -8px; }
+[data-formato="ih"] .nav-aviso-cabeza { min-height: 36px; gap: 8px; padding: 6px 10px; }
+[data-formato="ih"] .nav-aviso-titulo { font-size: 14px; line-height: 18px; }
+[data-formato="ih"] .nav-aviso-cuerpo { margin-inline: 10px; padding: 2px 0 8px; }
+[data-formato="ih"] .nav-aviso-fila { padding-block: 9px; }
+[data-formato="ih"] .nav-aviso-boton { min-height: 36px; margin-top: 4px; }
+[data-formato="ih"] .nav-pie { gap: 2px; padding-top: 8px; }
+[data-formato="ih"] .nav-icono--barra { width: 36px; height: 36px; }
+[data-formato="ih"] .nav-persona { padding: 4px 6px; }
 .nav-plegar { display: none; }
 @media (min-width: 1024px) {
   .nav-plegar {
