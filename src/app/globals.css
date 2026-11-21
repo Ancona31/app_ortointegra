@@ -2415,7 +2415,7 @@ html.dark .nav-riel-accion { color: var(--enlace); }
 .nav-barra[data-arrastre="true"] { transition: none; }
 .nav-cajon-velo {
   position: fixed; inset: 0; z-index: 40; background: var(--velo);
-  backdrop-filter: var(--velo-filtro); -webkit-backdrop-filter: var(--velo-filtro);
+  -webkit-backdrop-filter: var(--velo-filtro); backdrop-filter: var(--velo-filtro); /* en este orden: al revés, el minificador se queda sólo con el prefijo */
   animation: nav-funde-entra var(--dur-entra) ease-out both;
 }
 @media (min-width: 1024px) {
@@ -2639,15 +2639,17 @@ html.dark .nav-fila-icono { color: var(--enlace); }
 }
 
 /* ── «Más» (`MenuMas`): tarjeta centrada en el área de contenido, con velo ── */
+/* Centrada en el área de contenido, como toda capa: los `--capa-*` de
+   `sistema.css` (riel, barra y franjas, por formato y espejados). Así, si
+   «Más» sigue abierto al girar el Duo de `ext` a `ih`, no se queda cruzando la
+   barra lateral. */
 .nav-capa {
   position: fixed; inset: 0; z-index: var(--z-capa); display: flex; align-items: center; justify-content: center;
-  padding: calc(var(--it) + 16px) calc(var(--ir) + 16px) calc(var(--ib) + 16px) calc(var(--il) + 16px);
+  padding: var(--capa-arr) var(--capa-der) var(--capa-abj) var(--capa-izq);
 }
-[data-formato="ext"] .nav-capa { padding-right: calc(var(--cromo-riel) + var(--ir) + 8px); padding-left: calc(var(--il) + 8px); }
-[data-formato="ext"][data-borde-sistema="izquierda"] .nav-capa { padding-left: calc(var(--cromo-riel) + var(--il) + 8px); padding-right: 8px; }
 .nav-capa-velo {
   position: absolute; inset: 0; background: var(--velo);
-  backdrop-filter: var(--velo-filtro); -webkit-backdrop-filter: var(--velo-filtro);
+  -webkit-backdrop-filter: var(--velo-filtro); backdrop-filter: var(--velo-filtro); /* en este orden: al revés, el minificador se queda sólo con el prefijo */
 }
 .nav-capa-tarjeta {
   position: relative; width: 100%; max-width: 340px; max-height: 100%; overflow-y: auto; outline: none;
