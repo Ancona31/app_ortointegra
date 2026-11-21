@@ -3,7 +3,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Search, User, X, ArrowRight, Loader2, UserPlus, ChevronLeft } from 'lucide-react'
+import { Search, User, X, ArrowRight, Loader2, UserPlus, ChevronLeft, AlertTriangle } from 'lucide-react'
+import Avatar, { inicialesDe } from '@/components/ui/Avatar'
+import { useCapaMontada } from '@/components/ui/ModalShell'
+import Portal from '@/components/ui/Portal'
 import { toTitleCase, calcularEdad, fechaHoyISO, FECHA_MIN_NACIMIENTO } from '@/lib/patientUtils'
 import { useProfile } from '@/hooks/useProfile'
 import type { DuplicatePatientResponse } from '@/types'
@@ -71,6 +74,7 @@ export default function ConsultaRapidaModal({
   const { profile } = useProfile()
   const esMedicoInvitado = profile?.role === 'medico' && profile?.es_admin_de_clinica !== true
   const [offlineMsg, setOfflineMsg] = useState("")
+  const montada = useCapaMontada(open)
 
   const [query, setQuery]     = useState('')
   const [results, setResults] = useState<Paciente[]>([])
@@ -236,44 +240,34 @@ export default function ConsultaRapidaModal({
     }
   }
 
-  if (!open) return null
+  if (!montada) return null
 
+  /* Capa del catálogo (rediseño B3; `.k-capa` de `sistema.css`), anclada
+     ARRIBA en el área de contenido (`data-modo="arriba"`): es un buscador, y
+     con el teclado virtual una hoja desde abajo quedaría tapada. Sale animada
+     (`useCapaMontada`); mientras sale, inerte. En un portal: montada dentro
+     de la barra lateral o de una página, su velo no tapaba la navegación. */
   return (
+    <Portal>
     <div
-      className="fixed inset-0 z-[9998] flex items-start justify-center pt-[15vh] px-4"
-      onClick={onClose}
+      className="k-capa fixed inset-0 z-[9998]" data-modo="arriba" data-fase={open ? 'abierta' : 'sale'}
+      data-variante={modoCrear && duplicateWarning ? 'alerta' : undefined}
+      inert={!open || undefined} aria-hidden={!open || undefined}
     >
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+      <div className="k-velo" onClick={onClose} />
 
-      <div
-        className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden"
-        onClick={e => e.stopPropagation()}
-      >
+      <div className="k-capa-panel max-w-lg" lang="es">
         {offlineMsg && (
-          <div className="mx-4 mt-3 flex items-center gap-2 px-3 py-2 rounded-lg bg-red-50 border border-red-200 text-xs text-red-700">
-            <span>{offlineMsg}</span>
-          </div>
+          <p className="mx-4 mt-3 rounded-[10px] bg-mal-fondo px-3 py-2 text-[13px] leading-[18px] text-mal-tinta">{offlineMsg}</p>
         )}
 
         {!modoCrear && (
           <>
-            {/* ⚠️ AQUÍ VAN CLASES `slate` Y NO TOKENS `--sp-*`, Y ES LO CORRECTO
-                EN ESTE ARCHIVO. El panel de arriba es `bg-white` cableado, o sea
-                que NO se oscurece con el tema; los tokens de tinta sí —
-                `--sp-ink-500` pasa a `rgba(255,255,255,.50)` en `html.dark`
-                (`spinus-tokens.css:503`)— y este rótulo quedaría blanco sobre
-                blanco. Mientras el contenedor no esté en el sistema, su
-                contenido tampoco puede estarlo: mezclarlos es lo que rompe.
-                Cuando se migre el modal entero, esta línea entra con él. */}
-            {titulo && (
-              <p className="px-4 pt-3.5 text-[11px] font-semibold uppercase tracking-widest text-slate-400">
-                {titulo}
-              </p>
-            )}
-            <div className={`flex items-center gap-3 px-4 border-b border-slate-100 ${titulo ? 'pt-1.5 pb-3.5' : 'py-3.5'}`}>
+            {titulo && <p className="k-t-rotulo px-5 pt-3.5">{titulo}</p>}
+            <div className={`flex items-center gap-3 pl-5 pr-2 border-b border-linea ${titulo ? 'pt-1 pb-2' : 'py-2'}`}>
               {loading
-                ? <Loader2 size={18} className="text-slate-400 animate-spin flex-shrink-0" />
-                : <Search size={18} className="text-slate-400 flex-shrink-0" />
+                ? <Loader2 size={20} className="text-tinta3 animate-spin flex-shrink-0" />
+                : <Search size={20} className="text-tinta3 flex-shrink-0" />
               }
               <input
                 ref={inputRef}
@@ -282,15 +276,15 @@ export default function ConsultaRapidaModal({
                 onChange={e => setQuery(e.target.value)}
                 onKeyDown={handleKey}
                 placeholder="Buscar paciente por nombre..."
-                className="flex-1 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none bg-transparent"
+                className="flex-1 min-w-0 h-11 bg-transparent text-[16px] text-tinta placeholder:text-tinta3 focus:outline-none esc:text-[15px] ih:text-[15px]"
               />
-              <button onClick={onClose} className="text-slate-300 hover:text-slate-500 transition-colors">
-                <X size={16} />
+              <button type="button" onClick={onClose} className="k-b k-b-icono" aria-label="Cerrar">
+                <X aria-hidden="true" />
               </button>
             </div>
 
             {(results.length > 0 || mostrarOpcionCrear) && (
-              <ul className="py-2 max-h-80 overflow-y-auto">
+              <ul className="k-lista py-1 max-h-80 overflow-y-auto overscroll-contain">
                 {results.map((p, i) => {
                   const edadInfo = p.fecha_nacimiento
                     ? calcularEdad(p.fecha_nacimiento)
@@ -299,23 +293,22 @@ export default function ConsultaRapidaModal({
                   return (
                     <li key={p.id}>
                       <button
+                        type="button"
                         onClick={() => navegar(p.id)}
                         onMouseEnter={() => setSelected(i)}
-                        className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${activo ? 'bg-slate-50' : 'hover:bg-slate-50'}`}
+                        className={`k-fila px-5 ${activo ? 'bg-fondo' : ''}`}
                       >
-                        <div className="w-9 h-9 rounded-full bg-violet-100 flex items-center justify-center text-violet-700 font-semibold text-xs flex-shrink-0">
-                          {p.nombre[0]}{p.apellidos[0]}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-slate-800 text-sm truncate">{p.nombre} {p.apellidos}</p>
-                          <p className="text-xs text-slate-400 mt-0.5">
+                        <Avatar texto={inicialesDe(p.nombre, p.apellidos)} indice={i} />
+                        <span className="k-fila-t">
+                          <span className="k-fila-n truncate">{p.nombre} {p.apellidos}</span>
+                          <span className="k-fila-s">
                             {edadInfo ? edadInfo.textoElegante : ''}
                             {edadInfo && p.sexo ? ' · ' : ''}
                             {p.sexo === 'M' ? 'Masculino' : p.sexo === 'F' ? 'Femenino' : ''}
                             {p.numero_expediente ? ` · ${p.numero_expediente}` : ''}
-                          </p>
-                        </div>
-                        {activo && <ArrowRight size={14} className="text-slate-400 flex-shrink-0" />}
+                          </span>
+                        </span>
+                        {activo && <ArrowRight size={16} className="k-fila-chev" />}
                       </button>
                     </li>
                   )
@@ -324,22 +317,19 @@ export default function ConsultaRapidaModal({
                 {mostrarOpcionCrear && (
                   <li>
                     <button
+                      type="button"
                       onClick={abrirCrear}
                       onMouseEnter={() => setSelected(results.length)}
-                      className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors border-t border-slate-100 ${
-                        selected === results.length ? 'bg-emerald-50' : 'hover:bg-emerald-50'
-                      }`}
+                      className={`k-fila px-5 ${selected === results.length ? 'bg-fondo' : ''}`}
                     >
-                      <div className="w-9 h-9 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
-                        <UserPlus size={15} className="text-emerald-600" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-emerald-700 text-sm">
-                          Crear registro para: <span className="font-bold">"{query}"</span>
-                        </p>
-                        <p className="text-xs text-emerald-600/70 mt-0.5">Registro rápido — nombre, teléfono y motivo</p>
-                      </div>
-                      {selected === results.length && <ArrowRight size={14} className="text-emerald-500 flex-shrink-0" />}
+                      <span className="k-avatar bg-tonal text-enlace"><UserPlus size={18} aria-hidden="true" /></span>
+                      <span className="k-fila-t">
+                        <span className="k-fila-n text-enlace">
+                          Crear registro para: <span className="font-bold">&quot;{query}&quot;</span>
+                        </span>
+                        <span className="k-fila-s">Registro rápido — nombre, teléfono y motivo</span>
+                      </span>
+                      {selected === results.length && <ArrowRight size={16} className="k-fila-chev" />}
                     </button>
                   </li>
                 )}
@@ -347,188 +337,159 @@ export default function ConsultaRapidaModal({
             )}
 
             {query && !loading && results.length === 0 && !mostrarOpcionCrear && (
-              <div className="flex flex-col items-center gap-2 py-10 text-slate-400">
-                <User size={32} className="opacity-30" />
-                <p className="text-sm">Sin resultados para "{query}"</p>
+              <div className="flex flex-col items-center gap-2 py-10 text-tinta2">
+                <User size={32} className="text-tinta3" aria-hidden="true" />
+                <p className="text-[15px]">Sin resultados para &quot;{query}&quot;</p>
               </div>
             )}
 
             {!query && (
-              <div className="px-4 py-3 text-xs text-slate-400">
+              <p className="px-5 py-3 text-[13px] leading-[18px] text-tinta2">
                 Escribe el nombre del paciente para buscarlo o registrarlo
-              </div>
+              </p>
             )}
 
-            <div className="px-4 py-2 border-t border-slate-100 flex gap-4 text-[10px] text-slate-400">
-              <span><kbd className="font-mono bg-slate-100 px-1 rounded">↑↓</kbd> navegar</span>
-              <span><kbd className="font-mono bg-slate-100 px-1 rounded">↵</kbd> abrir</span>
-              <span><kbd className="font-mono bg-slate-100 px-1 rounded">Esc</kbd> cerrar</span>
+            <div className="px-5 py-2 border-t border-linea flex gap-4 text-[12px] leading-4 text-tinta2 ext:hidden tel:hidden">
+              <span><kbd className="font-mono bg-sup2 px-1 rounded">↑↓</kbd> navegar</span>
+              <span><kbd className="font-mono bg-sup2 px-1 rounded">↵</kbd> abrir</span>
+              <span><kbd className="font-mono bg-sup2 px-1 rounded">Esc</kbd> cerrar</span>
             </div>
           </>
         )}
 
         {modoCrear && (
-          <form onSubmit={handleCrear}>
-            <div className="flex items-center gap-3 px-4 py-3.5 border-b border-slate-100">
-              <button
-                type="button"
-                onClick={() => setModoCrear(false)}
-                className="text-slate-400 hover:text-slate-600 transition-colors"
-              >
-                <ChevronLeft size={18} />
-              </button>
-              <div className="flex-1">
-                <p className="text-sm font-semibold text-slate-800">Registro rápido</p>
-                <p className="text-[11px] text-slate-400">Puedes completar el expediente después</p>
-              </div>
-              <button type="button" onClick={onClose} className="text-slate-300 hover:text-slate-500">
-                <X size={16} />
-              </button>
-            </div>
-
-            <div className="p-4 space-y-3">
-              {formError && <p className="text-xs text-red-600 bg-red-50 px-3 py-2 rounded-lg">{formError}</p>}
-
-              {duplicateWarning && (
-                <div className="bg-amber-50 border border-amber-300 px-3 py-3 rounded-xl space-y-2">
+          <form onSubmit={handleCrear} className="flex min-h-0 flex-1 flex-col">
+            {duplicateWarning ? (
+              <div className="k-al">
+                <span className="k-al-i k-al-i-avisar" aria-hidden="true"><AlertTriangle /></span>
+                <h2 className="k-al-tit">Paciente duplicado</h2>
+                <div className="k-al-t">
                   {duplicateWarning.existingPatientIsMine ? (
-                    <p className="text-xs text-amber-800 font-medium">
-                      ⚠️ Este paciente ya está en tu lista de pacientes: {duplicateWarning.nombre} {duplicateWarning.apellidos}
+                    <p>
+                      Este paciente ya está en tu lista de pacientes: {duplicateWarning.nombre} {duplicateWarning.apellidos}
                       {duplicateWarning.numero_expediente ? ` (Exp. #${duplicateWarning.numero_expediente})` : ''}
                     </p>
                   ) : esMedicoInvitado ? (
-                    <p className="text-xs text-amber-800 font-medium">
-                      ⚠️ Este paciente ya está registrado en tu clínica, pero no aparece en tu lista porque aún no es tu paciente: {duplicateWarning.nombre} {duplicateWarning.apellidos}
+                    <p>
+                      Este paciente ya está registrado en tu clínica, pero no aparece en tu lista porque aún no es tu paciente: {duplicateWarning.nombre} {duplicateWarning.apellidos}
                       {duplicateWarning.numero_expediente ? ` (Exp. #${duplicateWarning.numero_expediente})` : ''}. ¿Deseas vincularlo a tus pacientes?
                     </p>
                   ) : (
-                    <p className="text-xs text-amber-800 font-medium">
-                      ⚠️ Ya existe un paciente con los mismos datos: {duplicateWarning.nombre} {duplicateWarning.apellidos}
+                    <p>
+                      Ya existe un paciente con los mismos datos: {duplicateWarning.nombre} {duplicateWarning.apellidos}
                       {duplicateWarning.numero_expediente ? ` (Exp. #${duplicateWarning.numero_expediente})` : ''}. ¿Es el mismo paciente o una persona distinta?
                     </p>
                   )}
-                  {vincularError && <p className="text-[11px] text-red-600">{vincularError}</p>}
-                  <div className="flex flex-col gap-2">
-                    {duplicateWarning.existingPatientIsMine ? (
-                      <button
-                        type="button"
-                        onClick={() => navegar(duplicateWarning.id)}
-                        className="w-full px-2 py-1.5 text-[11px] font-semibold text-white bg-[#1e5fa8] rounded-lg hover:bg-[#1a3a5c] transition-colors"
-                      >
-                        Ir a su expediente
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={handleVincular}
-                        disabled={vinculando}
-                        className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 text-[11px] font-semibold text-white bg-[#1e5fa8] rounded-lg hover:bg-[#1a3a5c] transition-colors disabled:opacity-50"
-                      >
-                        {vinculando ? <><Loader2 size={12} className="animate-spin" /> Vinculando...</> : 'Es el mismo paciente'}
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      disabled={vinculando}
-                      onClick={() => {
-                        setDuplicateWarning(null)
-                        setVincularError(null)
-                        forceCreateRef.current = true
-                        const formEl = document.querySelector<HTMLFormElement>('form')
-                        if (formEl) formEl.requestSubmit()
-                      }}
-                      className="w-full px-2 py-1.5 text-[11px] font-medium text-amber-700 bg-white border border-amber-300 rounded-lg hover:bg-amber-50 transition-colors disabled:opacity-50"
-                    >
-                      Es otra persona, crear de todos modos
+                  <p>Si es otra persona, se creará el registro de todos modos.</p>
+                  {vincularError && <p className="k-campo-error">{vincularError}</p>}
+                </div>
+                <div className="k-al-b k-al-pila">
+                  {duplicateWarning.existingPatientIsMine ? (
+                    <button type="button" data-principal onClick={() => navegar(duplicateWarning.id)} className="k-b k-b-capa k-b-prim">
+                      Ir a su expediente
                     </button>
-                    <button
-                      type="button"
-                      disabled={vinculando}
-                      onClick={() => { setDuplicateWarning(null); setVincularError(null) }}
-                      className="w-full px-2 py-1.5 text-[11px] font-medium text-slate-500 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50"
-                    >
-                      Cancelar
+                  ) : (
+                    <button type="button" data-principal onClick={handleVincular} disabled={vinculando} className="k-b k-b-capa k-b-prim">
+                      {vinculando ? <><Loader2 size={16} className="animate-spin" /> Vinculando...</> : 'Es el mismo paciente'}
                     </button>
+                  )}
+                  <button
+                    type="button"
+                    disabled={vinculando}
+                    onClick={e => {
+                      setDuplicateWarning(null)
+                      setVincularError(null)
+                      forceCreateRef.current = true
+                      /* El formulario de ESTA capa, no el primero del documento
+                         (`document.querySelector('form')` podía dar con otro de
+                         la página de detrás). */
+                      e.currentTarget.form?.requestSubmit()
+                    }}
+                    className="k-b k-b-capa k-b-tonal"
+                  >
+                    Es otra persona
+                  </button>
+                  <button
+                    type="button"
+                    disabled={vinculando}
+                    onClick={() => { setDuplicateWarning(null); setVincularError(null) }}
+                    className="k-b k-b-capa k-b-quieto"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="k-capa-cab pl-2 ext:pl-1">
+                  <button type="button" onClick={() => setModoCrear(false)} className="k-b k-b-icono" aria-label="Volver">
+                    <ChevronLeft aria-hidden="true" />
+                  </button>
+                  <div className="k-capa-tits">
+                    <h2 className="k-capa-tit">Registro rápido</h2>
+                    <p className="k-capa-sub">Puedes completar el expediente después</p>
+                  </div>
+                  <button type="button" onClick={onClose} className="k-b k-b-icono" aria-label="Cerrar">
+                    <X aria-hidden="true" />
+                  </button>
+                </div>
+
+                <div className="k-capa-cuerpo">
+                  <div className="px-6 pt-2 pb-5 ext:px-5 flex flex-col gap-3.5">
+                    {formError && <p className="k-campo-error">{formError}</p>}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="k-campo-g">
+                        <label className="k-etiqueta">Nombre <span className="text-mal-tinta">*</span></label>
+                        <input autoFocus type="text" value={formNombre} onChange={e => setFormNombre(e.target.value)}
+                          required placeholder="Juan" className="k-campo" />
+                      </div>
+                      <div className="k-campo-g">
+                        <label className="k-etiqueta">Apellidos</label>
+                        <input type="text" value={formApellidos} onChange={e => setFormApellidos(e.target.value)}
+                          placeholder="García López" className="k-campo" />
+                      </div>
+                    </div>
+                    <div className="k-campo-g">
+                      <label className="k-etiqueta">Fecha de nacimiento</label>
+                      <input type="date" value={formFechaNac} onChange={e => setFormFechaNac(e.target.value)}
+                        min={FECHA_MIN_NACIMIENTO} max={fechaHoyISO()} className="k-campo" />
+                      {formFechaNac && <p className="k-campo-ayuda">{calcularEdad(formFechaNac).textoElegante}</p>}
+                      <p className="k-campo-ayuda">Recomendable para que la edad aparezca en recetas y documentos. Si se deja vacío, el campo edad quedará en blanco.</p>
+                    </div>
+                    {/* La casilla a la DERECHA de su texto (CALMA §20). */}
+                    <label className="flex items-center gap-3 cursor-pointer min-h-11">
+                      <span className="flex-1 text-[13px] leading-[18px] text-tinta2">
+                        El paciente ha leído y acepta el{' '}
+                        <a href="/privacidad" target="_blank" className="font-semibold text-enlace underline">Aviso de Privacidad</a>
+                        {' '}(LFPDPPP Art. 9) <span className="text-mal-tinta">*</span>
+                      </span>
+                      <input type="checkbox" checked={formConsentimiento} onChange={e => setFormConsentimiento(e.target.checked)}
+                        className="size-5 flex-none accent-[var(--accion)]" />
+                    </label>
                   </div>
                 </div>
-              )}
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[11px] font-medium text-slate-500 block mb-1">Nombre <span className="text-red-400">*</span></label>
-                  <input
-                    autoFocus
-                    type="text"
-                    value={formNombre}
-                    onChange={e => setFormNombre(e.target.value)}
-                    required
-                    placeholder="Juan"
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]"
-                  />
+                <div className="k-capa-pie flex justify-end gap-2 px-6 pt-3 pb-5 ext:px-4 ext:pb-4 tel:px-5">
+                  <button type="button" onClick={() => setModoCrear(false)} className="k-b k-b-capa k-b-quieto ext:flex-auto tel:flex-auto">
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={creando || vinculando || !formNombre.trim() || !formConsentimiento}
+                    className="k-b k-b-capa k-b-prim min-w-0 ext:flex-auto tel:flex-auto"
+                  >
+                    {creando
+                      ? <Loader2 size={16} className="animate-spin shrink-0" />
+                      : <UserPlus size={16} className="shrink-0" />}
+                    <span className="truncate">{creando ? 'Creando...' : rotuloCrear}</span>
+                  </button>
                 </div>
-                <div>
-                  <label className="text-[11px] font-medium text-slate-500 block mb-1">Apellidos</label>
-                  <input
-                    type="text"
-                    value={formApellidos}
-                    onChange={e => setFormApellidos(e.target.value)}
-                    placeholder="García López"
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="text-[11px] font-medium text-slate-500 block mb-1">Fecha de nacimiento</label>
-                <input
-                  type="date"
-                  value={formFechaNac}
-                  onChange={e => setFormFechaNac(e.target.value)}
-                  min={FECHA_MIN_NACIMIENTO}
-                  max={fechaHoyISO()}
-                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]"
-                />
-                {formFechaNac && (
-                  <p className="text-[11px] text-[#1e5fa8] mt-1 font-medium">{calcularEdad(formFechaNac).textoElegante}</p>
-                )}
-                <p className="text-[11px] text-slate-500 mt-1.5 leading-snug">Recomendable para que la edad aparezca en recetas y documentos. Si se deja vacío, el campo edad quedará en blanco.</p>
-              </div>
-              <label className="flex items-start gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={formConsentimiento}
-                  onChange={e => setFormConsentimiento(e.target.checked)}
-                  className="mt-0.5 accent-[#1e5fa8]"
-                />
-                <span className="text-[11px] text-slate-500 leading-tight">
-                  El paciente ha leído y acepta el{' '}
-                  <a href="/privacidad" target="_blank" className="text-[#1e5fa8] underline">Aviso de Privacidad</a>
-                  {' '}(LFPDPPP Art. 9) <span className="text-red-400">*</span>
-                </span>
-              </label>
-            </div>
-
-            <div className="px-4 pb-4 flex gap-2">
-              <button
-                type="button"
-                onClick={() => setModoCrear(false)}
-                className="flex-1 py-2.5 text-sm text-slate-500 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                disabled={creando || vinculando || !formNombre.trim() || !formConsentimiento}
-                className="flex-1 py-2.5 text-sm font-semibold text-white bg-[#1e5fa8] rounded-xl hover:bg-[#1a3a5c] disabled:opacity-50 transition-colors flex items-center justify-center gap-1.5 min-w-0"
-              >
-                {creando
-                  ? <Loader2 size={14} className="animate-spin shrink-0" />
-                  : <UserPlus size={14} className="shrink-0" />}
-                <span className="truncate">{creando ? 'Creando...' : rotuloCrear}</span>
-              </button>
-            </div>
+              </>
+            )}
           </form>
         )}
       </div>
     </div>
+    </Portal>
   )
 }

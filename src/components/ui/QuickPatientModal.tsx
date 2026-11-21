@@ -1,9 +1,11 @@
 'use client'
 
-import { useState, useRef, useEffect, useId, type ReactElement } from 'react'
+import { useState, useRef, useEffect, useId, useCallback, type ReactElement } from 'react'
 import { useRouter } from 'next/navigation'
-import { User, X, Loader2 } from 'lucide-react'
+import { AlertTriangle, X, Loader2 } from 'lucide-react'
 import Portal from '@/components/ui/Portal'
+import { useArrastreHoja } from '@/components/ui/ModalShell'
+import { leerFormato } from '@/lib/formatoPantalla'
 import { useProfile } from '@/hooks/useProfile'
 import { secureStorage } from '@/lib/secureStorage'
 import { toTitleCase, calcularEdad, fechaHoyISO, FECHA_MIN_NACIMIENTO, edadAFechaFicticia } from '@/lib/patientUtils'
@@ -15,8 +17,6 @@ type PacienteBusqueda = { id: string; nombre: string; apellidos: string; telefon
 type Medico = { id: string; titulo: string | null; nombres: string | null; apellido_paterno: string | null; apellido_materno: string | null; especialidad: string | null }
 
 const MEDICOS_CACHE_KEY = 'cache_medicos_clinica'
-
-const claseCampo = 'w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 transition-all'
 
 /**
  * H3 (punto 13, agenda v2) · «Teléfono celular o WhatsApp», opcional, con el
@@ -30,13 +30,14 @@ function CampoTelefono({ valor, alCambiar }: { valor: string; alCambiar: (v: str
   const error = valor ? validarTelefono(valor) : null
   return (
     <>
-      <div>
-        <label htmlFor={id} className="block text-[11px] font-semibold text-[#86868b] uppercase tracking-wider mb-1.5">Teléfono celular o WhatsApp</label>
+      <div className="k-campo-g">
+        <label htmlFor={id} className="k-etiqueta">Teléfono celular o WhatsApp</label>
         <input id={id} type="tel" inputMode="numeric" autoComplete="tel" value={valor} maxLength={12}
-          onChange={e => alCambiar(formatearTelefono(e.target.value))} placeholder="opcional · 999 123 4567" className={claseCampo} />
-        {error && <p className="text-[11px] text-red-600 mt-1">{error}</p>}
+          onChange={e => alCambiar(formatearTelefono(e.target.value))} placeholder="opcional · 999 123 4567" className="k-campo"
+          aria-invalid={error ? true : undefined} />
+        {error && <p className="k-campo-error">{error}</p>}
       </div>
-      <p className="text-[11px] text-slate-500 leading-snug">
+      <p className="k-campo-ayuda">
         Sin teléfono ni correo no se podrán enviar confirmaciones ni recordatorios de cita.
       </p>
     </>
@@ -87,6 +88,10 @@ export default function QuickPatientModal({
   const forceCreateRef = useRef(false)
 
   const edadInfo = fechaNac ? calcularEdad(fechaNac) : null
+  const panelRef = useRef<HTMLDivElement | null>(null)
+  const veloRef = useRef<HTMLDivElement | null>(null)
+  const puedeArrastrar = useCallback(() => leerFormato() === 'tel', [])
+  const alPulsar = useArrastreHoja(panelRef, veloRef, puedeArrastrar, onClose)
 
   // Cargar lista de médicos (secretaria) — red primero, cache como fallback
   useEffect(() => {
@@ -214,194 +219,166 @@ export default function QuickPatientModal({
     }
   }
 
+  const textoDuplicado = duplicateWarning && (
+    duplicateWarning.existingPatientIsMine
+      ? `Este paciente ya está en tu lista de pacientes: ${duplicateWarning.nombre} ${duplicateWarning.apellidos}${duplicateWarning.numero_expediente ? ` (Exp. #${duplicateWarning.numero_expediente})` : ''}`
+      : esMedicoInvitado
+        ? `Este paciente ya está registrado en tu clínica, pero no aparece en tu lista porque aún no es tu paciente: ${duplicateWarning.nombre} ${duplicateWarning.apellidos}${duplicateWarning.numero_expediente ? ` (Exp. #${duplicateWarning.numero_expediente})` : ''}. ¿Deseas vincularlo a tus pacientes?`
+        : `Ya existe un paciente con los mismos datos: ${duplicateWarning.nombre} ${duplicateWarning.apellidos}${duplicateWarning.numero_expediente ? ` (Exp. #${duplicateWarning.numero_expediente})` : ''}. ¿Es el mismo paciente o una persona distinta?`
+  )
+
+  /* Capa del catálogo (rediseño B3; `.k-capa` de `sistema.css`): modal con
+     formulario; en teléfono, hoja desde abajo que se arrastra para cerrar.
+     ⚠️ LA RAÍZ SIGUE SIENDO UN `div.fixed` CON EL <h2> «Registrar paciente»
+     DENTRO: así lo buscan las e2e de la agenda (`registro(page)`). Y el
+     `label` va justo antes de su `input` (`label:text-is("Nombre") + input`).
+     ⚠️ SIN SALIDA ANIMADA, a propósito: quien la monta la desmonta al cerrar,
+     y el escudo contra el doble clic (`useEscudoTrasRegistro`, en quien la
+     monta) cuenta con que desaparezca en el acto.
+     «Paciente duplicado» es la alerta del catálogo dentro de la misma capa
+     (CALMA §20, §23.7): tres botones apilados, el principal arriba. Lo escrito
+     se conserva: «Cancelar» vuelve al formulario. */
   return (
     <Portal>
-    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm animate-modal-enter overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center">
-              <User size={15} className="text-emerald-600" />
+    <div className="k-capa fixed inset-0 z-[70]" data-fase="abierta" data-modo={duplicateWarning ? undefined : 'hoja'}
+      data-variante={duplicateWarning ? 'alerta' : undefined}>
+      <div ref={veloRef} className="k-velo" onClick={onClose} />
+      <div ref={panelRef} className="k-capa-panel max-w-[440px]" lang="es" onPointerDown={duplicateWarning ? undefined : alPulsar}>
+        {duplicateWarning ? (
+          <div className="k-al">
+            <span className="k-al-i k-al-i-avisar" aria-hidden="true"><AlertTriangle /></span>
+            <h2 className="k-al-tit">Paciente duplicado</h2>
+            <div className="k-al-t">
+              <p>{textoDuplicado}</p>
+              <p>Si es otra persona, se creará el registro de todos modos.</p>
+              {vincularError && <p className="k-campo-error">{vincularError}</p>}
             </div>
-            <h2 className="font-semibold text-[15px] text-[#1d1d1f]">Registrar paciente</h2>
-          </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition-colors"><X size={18} /></button>
-        </div>
-
-        <div className="px-6 py-5 space-y-3">
-          {error && <p className="text-xs text-red-600 bg-red-50 px-3 py-2 rounded-lg">{error}</p>}
-
-          {duplicateWarning && (
-            <div className="bg-amber-50 border border-amber-300 px-3 py-3 rounded-xl space-y-2">
+            <div className="k-al-b k-al-pila">
               {duplicateWarning.existingPatientIsMine ? (
-                <p className="text-xs text-amber-800 font-medium">
-                  ⚠️ Este paciente ya está en tu lista de pacientes: {duplicateWarning.nombre} {duplicateWarning.apellidos}
-                  {duplicateWarning.numero_expediente ? ` (Exp. #${duplicateWarning.numero_expediente})` : ''}
-                </p>
-              ) : esMedicoInvitado ? (
-                <p className="text-xs text-amber-800 font-medium">
-                  ⚠️ Este paciente ya está registrado en tu clínica, pero no aparece en tu lista porque aún no es tu paciente: {duplicateWarning.nombre} {duplicateWarning.apellidos}
-                  {duplicateWarning.numero_expediente ? ` (Exp. #${duplicateWarning.numero_expediente})` : ''}. ¿Deseas vincularlo a tus pacientes?
-                </p>
+                <button
+                  type="button" data-principal
+                  onClick={() => router.push(isSecretaria ? '/dashboard' : `/expediente/${duplicateWarning.id}`)}
+                  className="k-b k-b-capa k-b-prim"
+                >
+                  Ir a su expediente
+                </button>
               ) : (
-                <p className="text-xs text-amber-800 font-medium">
-                  ⚠️ Ya existe un paciente con los mismos datos: {duplicateWarning.nombre} {duplicateWarning.apellidos}
-                  {duplicateWarning.numero_expediente ? ` (Exp. #${duplicateWarning.numero_expediente})` : ''}. ¿Es el mismo paciente o una persona distinta?
-                </p>
+                <button type="button" data-principal onClick={handleVincular} disabled={vinculando} className="k-b k-b-capa k-b-prim">
+                  {vinculando ? <><Loader2 size={16} className="animate-spin" /> Vinculando...</> : 'Es el mismo paciente'}
+                </button>
               )}
-              {vincularError && <p className="text-[11px] text-red-600">{vincularError}</p>}
-              <div className="flex flex-col gap-2">
-                {duplicateWarning.existingPatientIsMine ? (
-                  <button
-                    type="button"
-                    onClick={() => router.push(isSecretaria ? '/dashboard' : `/expediente/${duplicateWarning.id}`)}
-                    className="w-full px-2 py-1.5 text-[11px] font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition-colors"
-                  >
-                    Ir a su expediente
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={handleVincular}
-                    disabled={vinculando}
-                    className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 text-[11px] font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50"
-                  >
-                    {vinculando ? <><Loader2 size={12} className="animate-spin" /> Vinculando...</> : 'Es el mismo paciente'}
-                  </button>
+              <button
+                type="button"
+                disabled={vinculando}
+                onClick={() => {
+                  setDuplicateWarning(null)
+                  setVincularError(null)
+                  forceCreateRef.current = true
+                  handleCreate()
+                }}
+                className="k-b k-b-capa k-b-tonal"
+              >
+                Es otra persona
+              </button>
+              <button
+                type="button"
+                disabled={vinculando}
+                onClick={() => { setDuplicateWarning(null); setVincularError(null) }}
+                className="k-b k-b-capa k-b-quieto"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="k-capa-asa" aria-hidden="true" />
+            <div className="k-capa-cab">
+              <div className="k-capa-tits"><h2 className="k-capa-tit">Registrar paciente</h2></div>
+              <button type="button" onClick={onClose} className="k-b k-b-icono" aria-label="Cerrar"><X aria-hidden="true" /></button>
+            </div>
+            <div className="k-capa-cuerpo">
+              <div className="px-6 pt-2 pb-5 ext:px-5 flex flex-col gap-3.5">
+                {error && <p className="k-campo-error">{error}</p>}
+
+                {isSecretaria && (
+                  <div className="k-campo-g">
+                    <label className="k-etiqueta">
+                      Médico responsable <span className="text-mal-tinta">*</span>
+                    </label>
+                    <select value={medicoSeleccionado} onChange={e => setMedicoSeleccionado(e.target.value)} required className="k-campo">
+                      <option value="">Seleccionar médico...</option>
+                      {medicos.map(m => (
+                        <option key={m.id} value={m.id}>
+                          {componerNombreMedicoCompleto(m)}{m.especialidad ? ` — ${m.especialidad}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                    {medicos.length === 0 && (
+                      <p className="k-campo-ayuda text-aviso-tinta">
+                        No hay médicos disponibles. Si estás sin conexión, conéctate al menos una vez para sincronizar la lista.
+                      </p>
+                    )}
+                  </div>
                 )}
-                <button
-                  type="button"
-                  disabled={vinculando}
-                  onClick={() => {
-                    setDuplicateWarning(null)
-                    setVincularError(null)
-                    forceCreateRef.current = true
-                    handleCreate()
-                  }}
-                  className="w-full px-2 py-1.5 text-[11px] font-medium text-amber-700 bg-white border border-amber-300 rounded-lg hover:bg-amber-50 transition-colors disabled:opacity-50"
-                >
-                  Es otra persona, crear de todos modos
-                </button>
-                <button
-                  type="button"
-                  disabled={vinculando}
-                  onClick={() => { setDuplicateWarning(null); setVincularError(null) }}
-                  className="w-full px-2 py-1.5 text-[11px] font-medium text-[#86868b] bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50"
-                >
-                  Cancelar
-                </button>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="k-campo-g">
+                    <label className="k-etiqueta">Nombre</label>
+                    <input value={nombre} onChange={e => setNombre(e.target.value)} autoFocus className="k-campo" />
+                  </div>
+                  <div className="k-campo-g">
+                    <label className="k-etiqueta">Apellidos</label>
+                    <input value={apellidos} onChange={e => setApellidos(e.target.value)} className="k-campo" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="k-campo-g">
+                    <label className="k-etiqueta">Fecha de nacimiento</label>
+                    <input type="date" value={fechaNac} onChange={e => setFechaNac(e.target.value)}
+                      min={FECHA_MIN_NACIMIENTO} max={fechaHoyISO()} className="k-campo" />
+                    {edadInfo && <p className="k-campo-ayuda">{edadInfo.textoElegante}</p>}
+                  </div>
+                  <div className="k-campo-g">
+                    <label className="k-etiqueta">Edad (opcional)</label>
+                    <input type="number" min={0} max={120} value={edad} onChange={e => setEdad(e.target.value)}
+                      placeholder="Ej. 35" className="k-campo" />
+                    <p className="k-campo-ayuda">Si no conoces la fecha exacta, ingresa solo la edad</p>
+                  </div>
+                </div>
+
+                <div className="k-campo-g">
+                  <label className="k-etiqueta">Correo</label>
+                  <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="opcional" className="k-campo" />
+                </div>
+
+                {conTelefono && <CampoTelefono valor={telefono} alCambiar={setTelefono} />}
+
+                <p className="k-campo-ayuda">El expediente completo se puede editar después desde Pacientes.</p>
+
+                {/* La casilla a la DERECHA de su texto (CALMA §20). */}
+                <label className="flex items-center gap-3 cursor-pointer min-h-11">
+                  <span className="flex-1 text-[13px] leading-[18px] text-tinta2">
+                    Paciente informado del{' '}
+                    <a href="/privacidad" target="_blank" rel="noopener noreferrer" className="font-semibold text-enlace hover:underline">
+                      aviso de privacidad
+                    </a>
+                  </span>
+                  <input type="checkbox" checked={consentimiento} onChange={e => setConsentimiento(e.target.checked)}
+                    className="size-5 flex-none accent-[var(--accion)]" />
+                </label>
               </div>
             </div>
-          )}
 
-          {isSecretaria && (
-            <div>
-              <label className="block text-[11px] font-semibold text-[#86868b] uppercase tracking-wider mb-1.5">
-                Médico responsable <span className="text-red-400">*</span>
-              </label>
-              <select
-                value={medicoSeleccionado}
-                onChange={e => setMedicoSeleccionado(e.target.value)}
-                required
-                className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 transition-all"
-              >
-                <option value="">Seleccionar médico...</option>
-                {medicos.map(m => (
-                  <option key={m.id} value={m.id}>
-                    {componerNombreMedicoCompleto(m)}{m.especialidad ? ` — ${m.especialidad}` : ''}
-                  </option>
-                ))}
-              </select>
-              {medicos.length === 0 && (
-                <p className="text-[11px] text-amber-600 mt-2">
-                  No hay médicos disponibles. Si estás sin conexión, conéctate al menos una vez para sincronizar la lista.
-                </p>
-              )}
+            <div className="k-capa-pie flex justify-end gap-2 px-6 pt-3 pb-5 ext:px-4 ext:pb-4 tel:px-5">
+              <button type="button" onClick={onClose} disabled={saving} className="k-b k-b-capa k-b-quieto ext:flex-auto tel:flex-auto">Cancelar</button>
+              <button type="button" onClick={handleCreate} disabled={saving || vinculando} className="k-b k-b-capa k-b-prim ext:flex-auto tel:flex-auto">
+                {saving ? <><Loader2 size={16} className="animate-spin" /> Registrando...</> : 'Crear y continuar'}
+              </button>
             </div>
-          )}
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-[11px] font-semibold text-[#86868b] uppercase tracking-wider mb-1.5">Nombre</label>
-              <input value={nombre} onChange={e => setNombre(e.target.value)} autoFocus
-                className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 transition-all" />
-            </div>
-            <div>
-              <label className="block text-[11px] font-semibold text-[#86868b] uppercase tracking-wider mb-1.5">Apellidos</label>
-              <input value={apellidos} onChange={e => setApellidos(e.target.value)}
-                className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 transition-all" />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-[11px] font-semibold text-[#86868b] uppercase tracking-wider mb-1.5">
-                Fecha de nacimiento
-              </label>
-              <input
-                type="date"
-                value={fechaNac}
-                onChange={e => setFechaNac(e.target.value)}
-                min={FECHA_MIN_NACIMIENTO}
-                max={fechaHoyISO()}
-                className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 transition-all"
-              />
-              {edadInfo && (
-                <p className="text-[11px] text-emerald-600 mt-1 font-medium">{edadInfo.textoElegante}</p>
-              )}
-            </div>
-            <div>
-              <label className="block text-[11px] font-semibold text-[#86868b] uppercase tracking-wider mb-1.5">
-                Edad (opcional)
-              </label>
-              <input
-                type="number"
-                min={0}
-                max={120}
-                value={edad}
-                onChange={e => setEdad(e.target.value)}
-                placeholder="Ej. 35"
-                className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 transition-all"
-              />
-              <p className="text-[11px] text-slate-500 mt-1 leading-snug">Si no conoces la fecha exacta, ingresa solo la edad</p>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-[11px] font-semibold text-[#86868b] uppercase tracking-wider mb-1.5">Correo</label>
-            <input type="email" value={email} onChange={e => setEmail(e.target.value)}
-              placeholder="opcional"
-              className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 transition-all" />
-          </div>
-
-          {conTelefono && <CampoTelefono valor={telefono} alCambiar={setTelefono} />}
-
-          <p className="text-[11px] text-[#86868b]">El expediente completo se puede editar después desde Pacientes.</p>
-
-          <label className="flex items-start gap-2.5 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={consentimiento}
-              onChange={e => setConsentimiento(e.target.checked)}
-              className="mt-0.5 w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500/30"
-            />
-            <span className="text-[11px] text-slate-500 leading-relaxed">
-              Paciente informado del{' '}
-              <a href="/privacidad" target="_blank" rel="noopener noreferrer" className="text-emerald-600 hover:underline font-medium">
-                aviso de privacidad
-              </a>
-            </span>
-          </label>
-        </div>
-
-        <div className="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
-          <button onClick={onClose} disabled={saving} className="px-4 py-2 rounded-xl text-sm font-medium text-[#86868b] hover:bg-slate-100 transition-colors disabled:opacity-50">Cancelar</button>
-          <button onClick={handleCreate} disabled={saving || vinculando}
-            className="px-4 py-2 rounded-xl text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 transition-colors flex items-center gap-1.5">
-            {saving ? <><Loader2 size={14} className="animate-spin" /> Registrando...</> : 'Crear y continuar'}
-          </button>
-        </div>
+          </>
+        )}
       </div>
     </div>
     </Portal>
