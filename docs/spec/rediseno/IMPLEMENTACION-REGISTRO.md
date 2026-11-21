@@ -130,7 +130,7 @@ hallazgos de las 25 rutas, claro + oscuro:
 | Bloque | Qué | Estado | Commits | Build | Lint (err/avisos) | Unitarias | e2e | Capturas |
 |---|---|---|---|---|---|---|---|---|
 | B0 | Preparación y línea base | hecho | | ok | 96/68 | 2363/2363 | ver arriba | ANTES |
-| B1 | Cimientos: tokens, tipografía, oscuro, sonda, manifest, movimiento | | | | | | | |
+| B1 | Cimientos: tokens, tipografía, oscuro, sonda, manifest, movimiento | hecho (con 1 desvío, abajo) | 97eba80a, 800f9221, d0857a1b, 8c153052 | ok | 96/68 | 2391/2391 (sin TZ y UTC) | 9 archivos de agenda = B0 por archivo | DESPUÉS |
 | B2 | Primitivas compartidas | | | | | | | |
 | B3 | Capas del catálogo | | | | | | | |
 | B4 | Navegación por dispositivo | | | | | | | |
@@ -146,3 +146,29 @@ hallazgos de las 25 rutas, claro + oscuro:
 | B13 | Agenda (AG0–AG10) | | | | | | | |
 | B14 | Retirada del lanzador `/inicio` | | | | | | | |
 | B15 | Limpieza final y QA (push 4) | | | | | | | |
+
+### B1 · notas
+
+* **CSS principal:** 339 203 bytes (B0: 330 976, +8 227). Ojo: la punta de B0
+  con `docs/spec/rediseno` ya en el árbol compila a 334 401 (Tailwind escanea
+  también las maquetas), así que lo atribuible a B1 son ~4,8 KB.
+* **Desvío del plan (§2.3 c):** `body::before`, `sincronizarBarraDelNavegador` y
+  el `themeColor` de `app/layout.tsx` se quedan en `--ag-navy`. La barra
+  lateral, la banda de la agenda y la barra del dashboard pintan `--ag-navy`
+  (intocable hasta B13); pasar sólo la franja a `--navy` dejaba en oscuro
+  #101B30 sobre #2f4f73. Pasan los cuatro juntos al migrar el cromo (B4/B13).
+  El manifiesto sí lleva `theme_color #1B2B4A`.
+* **Letra base 15/20 y campos a 16 px** sólo con `html[data-formato]`, o sea en
+  `(app)` y `(launcher)`: `/login`, `/`, `/register` y `/reservar/…` dan
+  capturas idénticas antes/después (la landing difiere sólo en el píxel de su
+  animación). Interlineado sin unidad (`calc(20 / 15)`), no `20px`.
+* **Sonda** verificada con `Emulation.setSafeAreaInsetsOverride`: ext/derecha,
+  tel/arriba, ih/derecha, iv/arriba, esc/ninguno y Duo girado → ext/izquierda;
+  en vivo ext→ih→iv con su evento; 0 errores de consola (ni de hidratación).
+* **Contrastes de las seis paletas** (sólo afectan a `--accion`/`--tonal`, que
+  nadie consume aún): claro, blanco sobre acción 5,10–7,58; oscuro 4,53–5,51
+  (Spinus 4,88); el relleno oscuro contra `--sup` queda en 2,88–3,50, por
+  debajo de 3:1 sólo en Morado (2,88) y Burdeos (2,92). Subir a L 0,57 lo arregla pero baja el blanco de Verde y
+  Pizarra a 4,20/4,43: se dejó en 0,55.
+* Para `cap-app.js`, el `--pid` de B0 ya no existe: cada corrida e2e recrea la
+  semilla. Pedir uno nuevo a la base antes de capturar.
