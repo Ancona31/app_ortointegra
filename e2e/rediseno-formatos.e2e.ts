@@ -9,8 +9,13 @@ import { SESION } from './ayudas'
  *
  * Sólo corre en los proyectos `duo-cerrado` (466×678, franja derecha 84 y
  * abajo 34 → `ext`, riel) y `duo-abierto` (951×669, franja derecha 84 y abajo
- * 34 → `ih`, barra lateral a la derecha). Comprueba:
+ * 34 → `ih`, barra lateral a la derecha), y en sus parejas `-real`: el aparato
+ * de verdad deja la franja lateral FUERA del viewport y sin inset (382×678 en
+ * una pantalla 466×678; 867×669 en una 669×951), y la sonda la deduce de
+ * `window.screen`. Comprueba:
  *   · que se ve la navegación de su formato y no las otras;
+ *   · que el riel o la barra van pegados al borde de la franja (o del viewport,
+ *     si la franja queda fuera), sin hueco;
  *   · que ningún control interactivo visible cae bajo la franja lateral, ni
  *     ninguno fijo bajo la de abajo (lo que se desplaza sí pasa por debajo);
  *   · en `ih`, que ningún control FIJO cae en la bisagra (x 455–496);
@@ -20,7 +25,12 @@ import { SESION } from './ayudas'
 const FRANJAS = {
   'duo-cerrado': { formato: 'ext', top: 0, right: 84, bottom: 34, left: 0 },
   'duo-abierto': { formato: 'ih', top: 0, right: 84, bottom: 34, left: 0 },
+  'duo-cerrado-real': { formato: 'ext', top: 0, right: 0, bottom: 0, left: 0 },
+  'duo-abierto-real': { formato: 'ih', top: 0, right: 0, bottom: 0, left: 0 },
 } as const
+
+/* Lo que ocupa la navegación sin la franja: `--cromo-riel` y `--cromo-barra-ih`. */
+const CROMO = { ext: 60, ih: 216 } as const
 
 type Proyecto = keyof typeof FRANJAS
 
@@ -43,6 +53,7 @@ async function abrir(page: Page, ruta: string, nombre: string): Promise<void> {
   })
   await page.goto(ruta)
   await expect(page.locator('html')).toHaveAttribute('data-formato', f.formato)
+  await expect(page.locator('html')).toHaveAttribute('data-borde-sistema', 'derecha')
 }
 
 interface Caja { etiqueta: string; l: number; t: number; r: number; b: number; fijo: boolean }
@@ -82,6 +93,14 @@ for (const ruta of RUTAS) {
       await expect(page.locator('.nav-riel')).toBeHidden()
     }
     await expect(page.locator('.nav-encabezado')).toBeHidden()
+    /* Pegada a la franja (o al borde del viewport, si la franja queda fuera):
+       ni hueco ni recorte. El riel llega al borde y se ensancha por debajo de
+       la franja (la pinta); la barra de `ih` se para en la franja. */
+    const ext = f.formato === 'ext'
+    const cajaNav = (await page.locator(ext ? '.nav-riel' : 'aside#barra-lateral').boundingBox())!
+    const bordeNav = ext ? ancho : ancho - f.right
+    expect(Math.abs(cajaNav.x + cajaNav.width - bordeNav), 'navegación pegada a la franja').toBeLessThanOrEqual(1)
+    expect(Math.round(cajaNav.width)).toBe(CROMO[f.formato] + (ext ? f.right : 0))
     const cajas = await controles(page)
     /* La franja lateral no la puede pisar nada; la de abajo, sólo lo fijo: el
        contenido que se desplaza pasa por debajo, como en cualquier app. */
@@ -103,7 +122,8 @@ test('«Más» del riel abre una tarjeta y se cierra con Esc', async ({ page }, 
   await expect(dialogo.getByRole('button', { name: /Modo (oscuro|claro)/ })).toBeVisible()
   await expect(dialogo.getByRole('button', { name: 'Cerrar sesión' })).toBeVisible()
   const caja = await dialogo.boundingBox()
-  expect(caja!.x + caja!.width).toBeLessThanOrEqual(466 - 84 - 60)
+  const f = franjasDe(info.project.name)!
+  expect(caja!.x + caja!.width).toBeLessThanOrEqual(page.viewportSize()!.width - f.right - CROMO.ext)
   await page.keyboard.press('Escape')
   await expect(dialogo).toHaveCount(0)
 })
@@ -121,8 +141,9 @@ test('⌘K abre la paleta como diálogo con nombre, dentro del área de contenid
   await expect(paleta).toHaveAttribute('aria-modal', 'true')
   await expect(paleta.getByRole('textbox', { name: 'Buscar paciente por nombre o documento por folio' })).toBeFocused()
   const ancho = page.viewportSize()!.width
+  const f = franjasDe(info.project.name)!
   const caja = await paleta.locator('.nav-paleta-tarjeta').boundingBox()
-  expect(caja!.x + caja!.width).toBeLessThanOrEqual(ancho - 84)
+  expect(caja!.x + caja!.width).toBeLessThanOrEqual(ancho - f.right - CROMO[f.formato])
   await page.keyboard.press('Escape')
   await expect(paleta).toHaveCount(0)
 })

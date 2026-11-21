@@ -74,6 +74,32 @@ export default defineConfig({
         hasTouch: true,
       },
     },
+    /* El Duo REAL (corrección tras probarlo en el aparato): con la franja a un
+       lado, iOS la deja FUERA del viewport y los insets laterales valen 0; la
+       página mide la pantalla menos la franja y la sonda la deduce de
+       `window.screen` (`formatoPantalla.ts`). Sin insets: la prueba los pone a 0. */
+    {
+      name: 'duo-cerrado-real',
+      testMatch: ['**/rediseno-formatos.e2e.ts'],
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 382, height: 678 },
+        screen: { width: 466, height: 678 },
+        isMobile: true,
+        hasTouch: true,
+      },
+    },
+    {
+      name: 'duo-abierto-real',
+      testMatch: ['**/rediseno-formatos.e2e.ts'],
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 867, height: 669 },
+        screen: { width: 669, height: 951 },
+        isMobile: true,
+        hasTouch: true,
+      },
+    },
     {
       name: 'tableta',
       testMatch: ['**/agenda-f-tableta.e2e.ts', '**/agenda-t1-capas.e2e.ts'],
