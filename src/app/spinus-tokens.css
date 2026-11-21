@@ -877,42 +877,56 @@ a:hover { color: var(--sp-primary-active); }
 
 
 /* --- 3. BOTONES --------------------------------------------------------- */
+/* ⚠️ B2 DEL REDISEÑO: RE-PIEL, NO REDISEÑO. Cambian color, radio, sombra y la
+   respuesta al toque (escala .97 en pointer-down, CALMA §2 y skill apple-design
+   §1); NO cambian alto, relleno, letra ni ANCHO DE BORDE, porque 31 archivos
+   sin migrar dependen de esas medidas. Por eso los botones de contorno conservan
+   su `border` de 1 px aunque el kit no lleve borde: pasa a ser del color del
+   relleno (`transparent`), no a desaparecer. Medido antes/después en /perfil,
+   nueva nota, dashboard, expediente y receta: ninguna caja se movió.
+   Colores del kit: primario `--accion` sin sombra (CALMA §3), secundario y
+   terciario «quietos» (`--sup2`), compacto tonal, ghost en `--tinta2`. */
 .sp-btn {
   display: inline-flex; align-items: center; justify-content: center; gap: var(--sp-gap-item);
   min-height: var(--sp-tap);
   font-family: inherit; font-weight: var(--sp-fw-bold);
-  border-radius: var(--sp-r-btn); border: none; cursor: pointer;
+  border-radius: var(--r-control); border: none; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
   transition: background var(--sp-dur-micro) var(--sp-ease-out),
-              box-shadow var(--sp-dur-micro) var(--sp-ease-out),
-              transform var(--sp-dur-micro) var(--sp-ease-out);
+              color var(--sp-dur-micro) var(--sp-ease-out),
+              transform var(--dur-toque) ease-out;
 }
+.sp-btn:active:not(:disabled) { transform: scale(.97); }
+.sp-btn:focus-visible { outline: 3px solid var(--enlace); outline-offset: 2px; }
 .sp-btn--primary {
-  background: var(--sp-primary); color: #fff;
+  background: var(--accion); color: var(--sobre-accion);
   font-size: var(--sp-fs-btn-md); padding: 13px 26px;
-  box-shadow: var(--sp-shadow-btn);
+  box-shadow: none;
 }
-.sp-btn--primary:hover  { background: var(--sp-primary-hover); }
-.sp-btn--primary:active { background: var(--sp-primary-active); transform: translateY(1px); box-shadow: var(--sp-primary-shadow-press); }
-.sp-btn--primary:disabled { background: #b6c6da; box-shadow: none; cursor: not-allowed; }
+.sp-btn--primary:hover  { background: color-mix(in srgb, var(--accion) 88%, #000); }
+.sp-btn--primary:active { background: color-mix(in srgb, var(--accion) 80%, #000); }
+.sp-btn--primary:disabled { background: var(--sup2); color: var(--tinta3); box-shadow: none; cursor: not-allowed; }
 
 /* Full-width: único primario de la pantalla (captura, CTA de éxito, móvil) */
 .sp-btn--primary-block {
   width: 100%; font-size: var(--sp-fs-btn); padding: 16px;
-  border-radius: var(--sp-r-cta); box-shadow: var(--sp-shadow-btn);
+  border-radius: var(--r-control); box-shadow: none;
 }
-.sp-btn--reward { box-shadow: var(--sp-shadow-btn-lg); } /* CTA de recompensa (receta) */
+/* CTA de recompensa (receta). B2: sin sombra (CALMA §3, ningún botón lleva);
+   la clase se queda porque la usan dos archivos. */
+.sp-btn--reward { box-shadow: none; }
 
 .sp-btn--secondary {
-  background: var(--sp-surface); color: var(--sp-ink-500);
-  border: var(--sp-bw-hair) solid var(--sp-line-control);
+  background: var(--sup2); color: var(--tinta);
+  border: var(--sp-bw-hair) solid transparent;
   font-weight: var(--sp-fw-semi); font-size: var(--sp-fs-btn-sm); padding: 13px 24px;
 }
-.sp-btn--secondary:hover { background: var(--sp-surface-muted); color: var(--sp-ink-700); }
+.sp-btn--secondary:hover { background: color-mix(in srgb, var(--sup2) 92%, var(--tinta)); color: var(--tinta); }
 
 /* Terciario: rejilla de acciones post-guardado */
 .sp-btn--tertiary {
-  background: var(--sp-surface); color: var(--sp-ink-700);
-  border: var(--sp-bw-hair) solid var(--sp-line-control);
+  background: var(--sup2); color: var(--tinta);
+  border: var(--sp-bw-hair) solid transparent;
   font-weight: var(--sp-fw-semi); font-size: var(--sp-fs-body-sm); padding: 13px;
 }
 /* ⚠️ EL HOVER CAMBIA FONDO Y TINTA, NO EL BORDE, y es una consecuencia de que el
@@ -928,7 +942,7 @@ a:hover { color: var(--sp-primary-active); }
    ⚠️ NO LE DEVUELVAS UN BORDE PROPIO sin crear antes un token para el: el unico
    mas fuerte que `--sp-line-control` no existe, y `--sp-line-strong` es MAS
    DEBIL (1.48:1 en claro) pese al nombre. */
-.sp-btn--tertiary:hover { background: var(--sp-surface-muted); color: var(--sp-ink-800); }
+.sp-btn--tertiary:hover { background: color-mix(in srgb, var(--sup2) 92%, var(--tinta)); color: var(--tinta); }
 
 /* Compacto: acción inline dentro de una card interna ("Editar", "Regenerar") */
 /* ⚠️ LA TINTA VA EN `--sp-primary-text` Y NO EN `--sp-primary`. Éste es un botón
@@ -937,20 +951,23 @@ a:hover { color: var(--sp-primary-active); }
    oscuro las seis paletas quedaban entre 3.03 y 3.63:1 —por debajo de AA para
    texto—; con el token de tinta van de 5.73 a 6.52:1. En claro los dos tokens
    valen lo mismo, así que ahí no cambia nada. */
+/* B2: pasa a TONAL (`--tonal`/`--tonal-tinta`, CALMA §11 «botón tonal pequeño»).
+   La nota de arriba sigue valiendo en espíritu: la tinta es la del par tonal,
+   calibrada para ir sobre su fondo en claro y en oscuro. */
 .sp-btn--compact {
-  background: var(--sp-surface); color: var(--sp-primary-text);
-  border: var(--sp-bw-hair) solid var(--sp-line-control);
+  background: var(--tonal); color: var(--tonal-tinta);
+  border: var(--sp-bw-hair) solid transparent;
   font-weight: var(--sp-fw-semi); font-size: var(--sp-fs-meta);
-  padding: 7px 13px; border-radius: var(--sp-r-btn-xs); min-height: 34px;
+  padding: 7px 13px; border-radius: var(--r-control); min-height: 34px;
 }
-.sp-btn--compact:hover { background: var(--sp-primary-bg); border-color: var(--sp-primary-track); }
+.sp-btn--compact:hover { background: color-mix(in srgb, var(--tonal) 88%, var(--tonal-tinta)); border-color: transparent; }
 
 /* Ghost / texto: "Cancelar", "Cerrar" — sin borde, jamás compite */
 .sp-btn--ghost {
-  background: transparent; border: none; color: var(--sp-ink-350);
+  background: transparent; border: none; color: var(--tinta2);
   font-weight: var(--sp-fw-semi); font-size: var(--sp-fs-btn-sm); padding: 13px 6px;
 }
-.sp-btn--ghost:hover { color: var(--sp-ink-500); }
+.sp-btn--ghost:hover { color: var(--tinta); }
 
 /* Link con subrayado punteado: vía alterna ("Prefiero escribirla yo") */
 .sp-link-alt {
@@ -965,19 +982,25 @@ a:hover { color: var(--sp-primary-active); }
 
 
 /* --- 4. CHIPS ----------------------------------------------------------- */
+/* B2: re-piel (color y toque; medidas y ancho de borde intactos, ver BOTONES).
+   El borde de 1 px pasa a `--borde` del kit; el elegido, relleno `--accion`. */
 .sp-chip {
   display: inline-flex; align-items: center; gap: var(--sp-2);
   min-height: var(--sp-tap);
   padding: 0 18px;
-  background: var(--sp-surface); border: var(--sp-bw-hair) solid var(--sp-line-chip);
-  color: var(--sp-primary-ink); font-size: var(--sp-fs-chip); font-weight: var(--sp-fw-semi);
+  background: var(--sup); border: var(--sp-bw-hair) solid var(--borde);
+  color: var(--tonal-tinta); font-size: var(--sp-fs-chip); font-weight: var(--sp-fw-semi);
   border-radius: var(--sp-r-pill); cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
   transition: background var(--sp-dur-micro) var(--sp-ease-out),
-              border-color var(--sp-dur-micro) var(--sp-ease-out);
+              border-color var(--sp-dur-micro) var(--sp-ease-out),
+              transform var(--dur-toque) ease-out;
 }
-.sp-chip:hover { border-color: var(--sp-primary-track); background: var(--sp-primary-bg-faint); }
+.sp-chip:active { transform: scale(.97); }
+.sp-chip:focus-visible { outline: 3px solid var(--enlace); outline-offset: 2px; }
+.sp-chip:hover { border-color: color-mix(in srgb, var(--accion) 30%, var(--borde)); background: var(--tonal); }
 .sp-chip[aria-pressed="true"], .sp-chip--selected {
-  background: var(--sp-primary); border-color: var(--sp-primary); color: #fff;
+  background: var(--accion); border-color: var(--accion); color: var(--sobre-accion);
 }
 /* Chip de medicamento: lleva ✕, padding derecho reducido para el botón */
 .sp-chip--removable { padding: 9px 12px 9px 15px; }
@@ -987,39 +1010,43 @@ a:hover { color: var(--sp-primary-active); }
   padding: 10px; box-sizing: content-box;
   color: var(--sp-ink-icon); background: none; border: none; cursor: pointer;
 }
-.sp-chip__remove:hover { color: var(--sp-danger); }
+.sp-chip__remove:hover { color: var(--mal-tinta); }
 .sp-chip__remove svg { width: 14px; height: 14px; stroke-width: 2.2; }
 /* Chip neutro de contexto (edad, sexo): sin borde, fondo gris */
 .sp-chip--meta {
-  background: var(--sp-surface-muted); border: none; color: var(--sp-ink-600);
+  background: var(--sup2); border: none; color: var(--tinta2);
   font-size: var(--sp-fs-body-sm); padding: 5px 12px; min-height: 0;
 }
 
 
 /* --- 5. CARDS ----------------------------------------------------------- */
+/* B2: re-piel. CALMA §3: tarjetas `--sup` SIN borde ni sombra. El borde se
+   queda con su ancho y pasa a `transparent` (medidas intactas, ver BOTONES).
+   La protagonista y el ancla conservan su contorno de acento, sin elevación. */
 .sp-card {                       /* contenedora de la página */
-  background: var(--sp-surface);
-  border: var(--sp-bw-hair) solid var(--sp-line-card);
-  border-radius: var(--sp-r-card);
+  background: var(--sup);
+  border: var(--sp-bw-hair) solid transparent;
+  border-radius: var(--r-tarjeta);
   padding: var(--sp-pad-card);
-  box-shadow: var(--sp-shadow-flat);
+  box-shadow: none;
 }
-.sp-card--hero {                 /* protagonista: la única con elevación azul */
-  border-width: var(--sp-bw-accent); border-color: var(--sp-line-capture);
+.sp-card--hero {                 /* protagonista: contorno de acción, sin sombra */
+  border-width: var(--sp-bw-accent); border-color: color-mix(in srgb, var(--accion) 28%, var(--sup));
   padding: var(--sp-pad-card-hero);
-  box-shadow: var(--sp-shadow-raised);
+  box-shadow: none;
 }
 .sp-card--anchor {               /* Card Ancla: nota ya generada */
-  border-width: var(--sp-bw-accent); border-color: var(--sp-success-card-brd);
+  border-width: var(--sp-bw-accent); border-color: color-mix(in srgb, var(--ok-tinta) 32%, var(--sup));
   padding: var(--sp-pad-card-hero);
-  box-shadow: var(--sp-shadow-raised-ok);
+  box-shadow: none;
 }
 .sp-card-inner {                 /* agrupa una sección DENTRO del modal */
-  background: var(--sp-surface-sunken);
-  border: var(--sp-bw-hair) solid var(--sp-line-card);
-  border-radius: var(--sp-r-card-inner);
+  background: var(--fondo);
+  border: var(--sp-bw-hair) solid transparent;
+  border-radius: var(--r-control);
   padding: var(--sp-pad-card-inner);
 }
+:where([data-formato="ih"], [data-formato="iv"], [data-formato="esc"]) .sp-card { border-radius: var(--r-tarjeta-ancha); }
 .sp-row {                        /* fila de dato editable (diagnóstico) */
   display: flex; align-items: center; justify-content: space-between;
   border: var(--sp-bw-hair) solid var(--sp-line-soft);
@@ -1064,23 +1091,27 @@ a:hover { color: var(--sp-primary-active); }
 
 
 /* --- 8. INPUTS / TEXTAREA ---------------------------------------------- */
+/* B2: re-piel al campo del kit (relleno `--sup2`, sin borde visible, foco de
+   2 px en `--enlace`). El borde de 1 px se queda, transparente, y el foco sigue
+   engordándolo a `--sp-bw-accent` como antes: las medidas no cambian. El foco
+   suma un anillo de 0,5 px para llegar a los 2 px del kit sin mover nada. */
 .sp-input, .sp-textarea {
   width: 100%; box-sizing: border-box;
-  background: var(--sp-surface-sunken);
-  border: var(--sp-bw-hair) solid var(--sp-line-control);
-  border-radius: var(--sp-r-field);
+  background: var(--sup2);
+  border: var(--sp-bw-hair) solid transparent;
+  border-radius: var(--r-control);
   padding: 11px 13px;
   font-family: inherit; font-size: var(--sp-fs-body); line-height: var(--sp-lh-snug);
-  color: var(--sp-ink-700);
+  color: var(--tinta);
   min-height: var(--sp-tap);
   transition: border-color var(--sp-dur-micro) var(--sp-ease-out),
               box-shadow var(--sp-dur-micro) var(--sp-ease-out);
 }
-.sp-input::placeholder, .sp-textarea::placeholder { color: var(--sp-ink-200); }
+.sp-input::placeholder, .sp-textarea::placeholder { color: var(--tinta3); opacity: 1; }
 .sp-input:focus, .sp-textarea:focus {
-  outline: none; background: var(--sp-surface);
-  border-color: var(--sp-primary); border-width: var(--sp-bw-accent);
-  box-shadow: var(--sp-focus-ring);
+  outline: none; background: var(--sup2);
+  border-color: var(--enlace); border-width: var(--sp-bw-accent);
+  box-shadow: 0 0 0 .5px var(--enlace);
 }
 .sp-textarea { min-height: 88px; resize: vertical; line-height: var(--sp-lh-body); }
 .sp-textarea--capture {          /* el textarea protagonista de la captura */
@@ -1122,37 +1153,38 @@ input[type="date"].sp-input {
 /* --- 9. BADGES --------------------------------------------------------- */
 .sp-badge {
   display: inline-flex; align-items: center; gap: var(--sp-1-5);
-  /* Mismo criterio que .sp-icobox: el FONDO queda en --sp-primary-bg y solo el
-     TEXTO usa --sp-primary-text. Marca en rol de tinta; en dark se aclara vía
-     C0. Con --sp-primary daba ≈1.9:1 sobre superficie oscura. */
-  background: var(--sp-primary-bg); color: var(--sp-primary-text);
+  /* B2: el par tonal del kit (`--tonal`/`--tonal-tinta`, CALMA §11), que ya
+     trae su oscuro y sigue la marca de la clínica. Radio 8 de etiqueta. */
+  background: var(--tonal); color: var(--tonal-tinta);
   font-size: var(--sp-fs-badge); font-weight: var(--sp-fw-bold);
-  padding: 6px 12px; border-radius: var(--sp-r-pill); white-space: nowrap;
+  padding: 6px 12px; border-radius: 8px; white-space: nowrap;
 }
 .sp-badge svg { width: 13px; height: 13px; }
-.sp-badge--warn   { background: var(--sp-warn-bg-badge); color: var(--sp-warn); font-size: var(--sp-fs-label); padding: 6px 14px; }
+.sp-badge--warn   { background: var(--aviso-fondo); color: var(--aviso-tinta); font-size: var(--sp-fs-label); padding: 6px 14px; }
 .sp-badge--inline {              /* badge DENTRO de un botón primario */
   background: rgba(255,255,255,.24); color: #fff;
   font-size: 12.5px; padding: 4px 11px;
 }
 .sp-badge--deferred {            /* elemento de proyecto futuro (voz) */
-  background: var(--sp-surface-muted); color: var(--sp-ink-250);
-  border: 1px dashed var(--sp-line-dash);
+  background: var(--sup2); color: var(--tinta3);
+  border: 1px dashed var(--borde);
   font-size: 10.5px; letter-spacing: .04em; padding: 4px 9px;
 }
 
 
 /* --- 10. BANNERS ------------------------------------------------------- */
+/* B2: semánticos del kit (`--aviso-*` ámbar, `--mal-*`, `--tonal`), borde de
+   1 px conservado en el color del fondo (medidas intactas, ver BOTONES). */
 .sp-banner {
   display: flex; align-items: center; gap: var(--sp-3);
-  border-radius: var(--sp-r-field); padding: 13px 18px;
+  border-radius: var(--r-control); padding: 13px 18px;
   font-size: var(--sp-fs-body-sm); font-weight: var(--sp-fw-semi);
 }
-.sp-banner--warn   { background: var(--sp-warn-bg);   border: var(--sp-bw-hair) solid var(--sp-warn-border);   color: var(--sp-warn); }
-.sp-banner--danger { background: var(--sp-danger-bg); border: var(--sp-bw-hair) solid var(--sp-danger-border); color: var(--sp-danger-ink);
-                     align-items: flex-start; border-radius: var(--sp-r-card-inner); padding: 14px 16px;
+.sp-banner--warn   { background: var(--aviso-fondo); border: var(--sp-bw-hair) solid transparent; color: var(--aviso-tinta); }
+.sp-banner--danger { background: var(--mal-fondo); border: var(--sp-bw-hair) solid transparent; color: var(--mal-tinta);
+                     align-items: flex-start; border-radius: var(--r-control); padding: 14px 16px;
                      font-weight: var(--sp-fw-regular); font-size: var(--sp-fs-body); line-height: var(--sp-lh-snug); }
-.sp-banner--info   { background: var(--sp-primary-bg-faint); border: none; color: var(--sp-ink-500);
+.sp-banner--info   { background: var(--tonal); border: none; color: var(--tonal-tinta);
                      font-weight: var(--sp-fw-regular); font-size: var(--sp-fs-label); padding: 14px 16px; }
 .sp-banner svg { flex: 0 0 auto; }
 
