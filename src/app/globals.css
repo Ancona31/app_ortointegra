@@ -2541,7 +2541,8 @@ button.nav-consultorio-boton:hover { background: rgba(255, 255, 255, .14); }
 [data-formato="ih"] .nav-persona > span:first-child,
 [data-formato="ih"] .nav-persona-detalle { display: none; }
 [data-formato="ih"] .nav-persona-nombre { white-space: normal; }
-/* Una línea cada uno: en 248 partían en seis renglones. */
+/* Una línea cada uno (en el cajón); en la barra de `ih` y `esc`, abajo, el
+   nombre y la especialidad pueden partir. */
 :is(.nav-persona-nombre, .nav-persona-detalle, .nav-persona-linea) { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .nav-persona[data-activa="true"] :is(.nav-persona-linea, .nav-persona-detalle) { color: #fff; }
 /* `ih` (216 de ancho y 669 − la franja de alto), integración B1–B4. Con los
@@ -2565,6 +2566,15 @@ button.nav-consultorio-boton:hover { background: rgba(255, 255, 255, .14); }
 [data-formato="ih"] .nav-pie { gap: 2px; padding-top: 8px; }
 [data-formato="ih"] .nav-icono--barra { width: 36px; height: 36px; }
 [data-formato="ih"] .nav-persona { padding: 4px 6px; }
+/* En `esc` (248) pasaba lo mismo: con el engrane al lado, nombre, especialidad
+   y «Mi perfil · Ajustes» salían cortados con elipsis. Nombre y especialidad
+   pueden partir (como en la maqueta, vista 2 en esc) y los controles se
+   aprietan lo justo para que la línea se lea entera. */
+@media (min-width: 1024px) {
+  .nav-pie { gap: 2px; }
+  .nav-persona { gap: 8px; padding: 6px; }
+  :is(.nav-persona-nombre, .nav-persona-detalle) { white-space: normal; }
+}
 .nav-plegar { display: none; }
 @media (min-width: 1024px) {
   .nav-plegar {
@@ -2580,6 +2590,13 @@ button.nav-consultorio-boton:hover { background: rgba(255, 255, 255, .14); }
   border-radius: 16px; background: var(--sup); color: var(--tinta); box-shadow: var(--sombra-capa);
   transform-origin: bottom left; animation: nav-menu-entra var(--dur-entra) var(--resorte-entra) both;
 }
+/* Al menos el ancho del pie, y lo que pidan sus filas: en 224 (esc) y 192 (ih)
+   «Aviso de Privacidad» partía en dos. Crece HACIA EL CONTENIDO, nunca hacia
+   la franja: en `ih` la barra está pegada a ella, así que se ancla a la derecha
+   (a la izquierda con la franja a ese lado). */
+.nav-ajustes { min-width: 100%; width: max-content; right: auto; }
+[data-formato="ih"] .nav-ajustes { left: auto; right: 0; transform-origin: bottom right; }
+[data-formato="ih"][data-borde-sistema="izquierda"] .nav-ajustes { left: 0; right: auto; transform-origin: bottom left; }
 
 /* Filas de menú (ajustes y «Más»): icono en acción, destructiva en rojo (CALMA §11). */
 .nav-capa-titulo { margin: 0; padding: 8px 16px 6px; font-size: 17px; line-height: 22px; font-weight: 700; color: var(--tinta); }
