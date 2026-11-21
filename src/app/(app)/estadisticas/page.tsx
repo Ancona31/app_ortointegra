@@ -9,6 +9,7 @@ import {
 } from 'recharts'
 import { TrendingUp, Stethoscope, Pill, Users, RefreshCw, Loader2 } from 'lucide-react'
 import { ListSkeleton } from '@/components/ui/Skeleton'
+import PestanasAdministracion from '@/components/admin/PestanasAdministracion'
 
 type Datos = {
   consultasPorMes: { mes: string; total: number }[]
@@ -73,8 +74,13 @@ export default function EstadisticasPage() {
 
   if (loadingProfile || loading) return <ListSkeleton rows={5} />
 
+  /* Con las pestañas también en el error: «Administración» lleva aquí, y sin
+     ellas no quedaría camino a Usuarios ni a Facturación (B4). */
   if (!datos) return (
-    <div className="text-center text-[#86868b] py-16 text-sm">Error cargando estadísticas.</div>
+    <div className="max-w-6xl mx-auto">
+      <PestanasAdministracion />
+      <div className="text-center text-[#86868b] py-16 text-sm">Error cargando estadísticas.</div>
+    </div>
   )
 
   const { consultasPorMes, topDiagnosticos, topMedicamentos, distribucionSexo, distribucionEdad } = datos
@@ -82,6 +88,8 @@ export default function EstadisticasPage() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-5 animate-slide-up">
+      {/* B4: Estadísticas · Usuarios · Facturación (CALMA §30.2). */}
+      <PestanasAdministracion />
 
       {/* Header */}
       <div className="flex items-end justify-between">

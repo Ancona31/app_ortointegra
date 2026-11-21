@@ -193,7 +193,7 @@ async function fueraYVolver(page: Page, ir: 'configuracion' | 'dashboard', cambi
     await page.getByRole('menuitem', { name: 'Configuración de la agenda' }).click()
     await page.waitForURL('**/agenda/configuracion')
   } else {
-    await page.getByRole('link', { name: 'Dashboard', exact: true }).click()
+    await page.getByRole('link', { name: 'Inicio', exact: true }).click()
     await page.waitForURL('**/dashboard')
   }
   /* La agenda ya desmontada: el cambio llega con la agenda FUERA de verdad,

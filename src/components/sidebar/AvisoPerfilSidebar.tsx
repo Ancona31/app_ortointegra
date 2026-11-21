@@ -5,18 +5,15 @@ import { useId, useSyncExternalStore } from 'react'
 import { ArrowRight, ChevronDown, ChevronUp, FileBadge, ImageIcon, PenLine } from 'lucide-react'
 
 /**
- * El aviso de perfil incompleto del sidebar — variante 2a del handoff de diseño.
+ * El aviso de perfil incompleto: tarjeta ámbar colapsable. Vive en la barra
+ * lateral (`esc`, `ih`), en el cajón (`tel`, `iv`) y dentro de «Más» (`ext`,
+ * `iv`); el número va además como distintivo sobre «···» o sobre el botón de
+ * menú (CALMA §28). Sólo médico: lo decide `Sidebar.tsx`.
  *
- * Sustituye al tratamiento discreto anterior (listón ámbar sobre `bg-white/5`),
- * que se leía como nota al pie y no comunicaba urgencia. Ahora es una tarjeta
- * ámbar sólida, colapsable, con tres animaciones perpetuas.
- *
- * ⚠️ LAS TRES ANIMACIONES SON INFINITAS A PROPÓSITO, Y NO SON ADORNO. El aviso
- * tiene que seguir llamando la atención hasta que el perfil esté completo: un
- * médico que no se entera de que le falta la firma acaba pensando que los
- * documentos salen mal y levanta un ticket. Los keyframes viven en
- * `globals.css` junto a los demás del proyecto, con `prefers-reduced-motion`
- * apagándolos.
+ * ⚠️ TIENE QUE SEGUIR LLAMANDO LA ATENCIÓN HASTA QUE EL PERFIL ESTÉ COMPLETO:
+ * un médico que no se entera de que le falta la firma acaba pensando que los
+ * documentos salen mal y levanta un ticket. Desde el rediseño lo hace sin
+ * animaciones infinitas (ver la nota del `return`).
  *
  * ⚠️ QUÉ SE MUESTRA Y CUÁNDO NO SE TOCA AQUÍ. Las tres condiciones —firma,
  * cédula de especialidad (solo si no es medicina general) y logo— las resuelve
@@ -49,14 +46,6 @@ export function hayAvisos(a: AvisosPerfil): boolean {
 }
 
 const CLAVE_COLAPSO = 'spinus.profileBanner.collapsed'
-
-/* El degradado y la sombra de elevación van por `style` y no por clase
-   arbitraria: es el patrón que ya usa el `aside` de `Sidebar.tsx` para su navy,
-   y se lee mejor que una arbitraria con comas y paréntesis. */
-const FONDO_TARJETA = 'linear-gradient(180deg,#FFC53D 0%,#F0A81E 100%)'
-const SOMBRA_TARJETA = '0 8px 20px rgba(240,168,30,.35)'
-const FONDO_BRILLO =
-  'linear-gradient(90deg,rgba(255,255,255,0),rgba(255,255,255,.5),rgba(255,255,255,0))'
 
 interface Props extends AvisosPerfil {
   /* ⚠️ EL CIERRE DEL MENÚ MÓVIL ENTRA POR PROP. En móvil la barra tapa la
@@ -153,88 +142,38 @@ export default function AvisoPerfilSidebar({
   const titulo = `${n} dato${n > 1 ? 's' : ''} pendiente${n > 1 ? 's' : ''}`
 
   return (
-    /* El halo vive en este envoltorio para no comerse la sombra de elevación de
-       la tarjeta — ver la nota de `globals.css`. */
-    <div className="animate-aviso-halo mt-[14px] rounded-[12px]">
-      <div
-        role="status"
-        aria-live="polite"
-        className="relative overflow-hidden rounded-[12px]"
-        /* `containerType` es lo que convierte a la tarjeta en la unidad de
-           medida del brillo (`100cqw` en `avisoSheen`). Va aquí y no como
-           utilidad para no depender de que el `@container` de Tailwind se
-           emita; el objeto de estilo ya existía. Su ancho viene del padre, no
-           del contenido, así que la contención en línea no cambia nada. */
-        style={{ background: FONDO_TARJETA, boxShadow: SOMBRA_TARJETA, containerType: 'inline-size' }}
-      >
-        <button
-          type="button"
-          onClick={alternar}
-          aria-expanded={!colapsado}
-          aria-controls={idCuerpo}
-          className="relative flex w-full items-center gap-[9px] overflow-hidden px-[11px] py-3 text-left"
-        >
-          <span
-            aria-hidden="true"
-            /* `left-0`: sin él la banda arranca en su posición estática —tras
-               el relleno del botón— y el recorrido calculado no cuadraría con
-               el borde de la tarjeta. */
-            className="animate-aviso-sheen pointer-events-none absolute inset-y-0 left-0 w-[38px]"
-            style={{ background: FONDO_BRILLO }}
-          />
-          <span
-            aria-hidden="true"
-            className="flex h-[22px] w-[22px] flex-none items-center justify-center rounded-[6px] bg-[#7A4A00]"
-          >
-            <span className="animate-aviso-pulse block h-2 w-2 rounded-full bg-[#FFD66B]" />
-          </span>
-          <span className="text-[14px] font-bold tracking-[.02em] text-[#3D2400]">{titulo}</span>
-          {colapsado
-            ? <ChevronDown size={12} className="ml-auto flex-none text-[#4A2C00]" aria-hidden="true" />
-            : <ChevronUp size={12} className="ml-auto flex-none text-[#4A2C00]" aria-hidden="true" />}
-        </button>
-
-        <div
-          id={idCuerpo}
-          className={`aviso-perfil-colapso grid ${colapsado ? 'grid-rows-[0fr] opacity-0' : 'grid-rows-[1fr] opacity-100'}`}
-        >
-          <div className="min-h-0 overflow-hidden">
-            <div className="px-[11px] pb-[13px]">
-              <div className="mb-[11px] h-px bg-[rgba(74,44,0,.22)]" />
-
-              <div className="flex flex-col gap-[7px]">
-                {pendientes.map(({ clave, texto, Icono }) => (
-                  /* ⚠️ `items-start` Y `leading-snug` SON LA RED DEL ANCHO. La
-                     spec supone un sidebar de 300px y éste es de 256: a «Sin
-                     cédula de especialidad» le quedan ~183px para ~173 de texto,
-                     y la fuente del sidebar es `system-ui` —más ancha en Linux
-                     que la Segoe/SF del cálculo—. Si no cabe, parte en dos
-                     líneas en vez de recortarse: el significado sobrevive. Por
-                     lo mismo el relleno horizontal es de 11px y no de 13, que
-                     también está en la escala de la spec. */
-                  <Link
-                    key={clave}
-                    href="/perfil"
-                    onClick={alNavegar}
-                    className="flex items-start gap-2 rounded-[4px] text-[14px] font-semibold leading-snug text-[#3D2400] transition-colors duration-[120ms] hover:text-[#7A4A00] focus-visible:[outline:2px_solid_#4A2C00] focus-visible:outline-offset-2"
-                  >
-                    <Icono size={15} className="mt-px w-[15px] flex-none" aria-hidden="true" />
-                    <span>{texto}</span>
-                  </Link>
-                ))}
-              </div>
-
-              <Link
-                href="/perfil"
-                onClick={alNavegar}
-                className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-[9px] bg-[#4A2C00] py-[10px] text-[14px] font-bold text-[#FFE9B8] transition-colors hover:bg-[#301C00] active:translate-y-px"
-              >
-                Completar ahora
-                <ArrowRight size={13} aria-hidden="true" />
-              </Link>
-            </div>
-          </div>
-        </div>
+    /* ⚠️ TARJETA ÁMBAR DEL KIT, SIN ANIMACIONES (B4 del rediseño, CALMA §28).
+       Aquí hubo tres animaciones infinitas —halo, brillo y pulso— sobre un
+       degradado propio; el rediseño las prohíbe (sin bucles decorativos) y el
+       aviso conserva su fuerza por color, posición y por el distintivo con el
+       número que `Sidebar.tsx` pinta sobre «···» y sobre el botón de menú.
+       Colores: los semánticos `--aviso-*` de `sistema.css`, con su oscuro.
+       Los keyframes `aviso*` de `globals.css` quedan sin consumidor y se borran
+       en la limpieza (B15), con su grep. */
+    <div role="status" aria-live="polite" className="nav-aviso">
+      <button type="button" onClick={alternar} aria-expanded={!colapsado} aria-controls={idCuerpo}
+        className="nav-aviso-cabeza">
+        <span aria-hidden="true" className="nav-aviso-punto"><span /></span>
+        <span className="nav-aviso-titulo">{titulo}</span>
+        {colapsado
+          ? <ChevronDown size={16} className="ml-auto flex-none" aria-hidden="true" />
+          : <ChevronUp size={16} className="ml-auto flex-none" aria-hidden="true" />}
+      </button>
+      {/* `hidden` y no una altura animada: animar filas de rejilla o alturas
+          relayoutea en cada cuadro (PLAN §7.1). */}
+      <div id={idCuerpo} hidden={colapsado} className="nav-aviso-cuerpo">
+        {pendientes.map(({ clave, texto, Icono }) => (
+          /* `items-start`: si «Sin cédula de especialidad» no cabe (la barra
+             de `ih` mide 216), parte en dos líneas en vez de recortarse. */
+          <Link key={clave} href="/perfil" onClick={alNavegar} className="nav-aviso-fila">
+            <Icono size={18} className="mt-px flex-none" aria-hidden="true" />
+            <span>{texto}</span>
+          </Link>
+        ))}
+        <Link href="/perfil" onClick={alNavegar} className="nav-aviso-boton k-pulsable">
+          Completar ahora
+          <ArrowRight size={16} aria-hidden="true" />
+        </Link>
       </div>
     </div>
   )

@@ -315,7 +315,7 @@ async function medirVueltaInterna(browser: Browser) {
   // apertura fría de agenda, no una vuelta).
   await page.goto('/agenda')
   await page.locator('.fc-event').first().waitFor({ state: 'visible', timeout: 20000 })
-  await page.getByRole('link', { name: 'Dashboard', exact: true }).click()
+  await page.getByRole('link', { name: 'Inicio', exact: true }).click()
   await page.getByRole('link', { name: 'Agenda', exact: true }).waitFor({ state: 'visible', timeout: 15000 })
   await esperarQuieta(page)
   const { peticiones, t0 } = instrumentar(page)

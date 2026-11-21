@@ -7,6 +7,7 @@ import { useProfile, type Role } from '@/hooks/useProfile'
 import { canManageClinica, isMedico } from '@/lib/permissions'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/components/ui/Toast'
+import PestanasAdministracion from '@/components/admin/PestanasAdministracion'
 
 /* ⚠️ AQUÍ YA NO SE ESCRIBE NINGUNA CONTRASEÑA (Bloque B5-bis). Hasta ahora este
    formulario pedía una, y el administrador se la dictaba a su médico o a su
@@ -201,6 +202,8 @@ export default function AdminUsuariosPage() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-4 animate-slide-up">
+      {/* B4: Estadísticas · Usuarios · Facturación (CALMA §30.2). */}
+      <PestanasAdministracion />
       <div className="flex items-end justify-between">
         <div>
           <p className="text-[11px] font-semibold text-[#86868b] uppercase tracking-widest mb-1">Admin</p>

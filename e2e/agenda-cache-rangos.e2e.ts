@@ -137,7 +137,7 @@ test('agenda → dashboard → agenda pinta sin petición bloqueante', async ({ 
   await irAAgenda(page)
   await expect(page.locator('.fc-event', { hasText: EVENTO_ACTUAL }).first()).toBeVisible()
   await page.waitForLoadState('networkidle')
-  await page.getByRole('link', { name: 'Dashboard', exact: true }).click()
+  await page.getByRole('link', { name: 'Inicio', exact: true }).click()
   await page.waitForURL('**/dashboard')
   await page.waitForLoadState('networkidle')
 

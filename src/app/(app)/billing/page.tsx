@@ -12,6 +12,7 @@ import Link from 'next/link'
 import { format, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { Suspense } from 'react'
+import PestanasAdministracion from '@/components/admin/PestanasAdministracion'
 
 type ClinicaInfo = {
   plan: PlanKey
@@ -118,6 +119,8 @@ function BillingContent() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-5 animate-slide-up">
+      {/* B4: Estadísticas · Usuarios · Facturación (CALMA §30.2). */}
+      <PestanasAdministracion />
 
       <div>
         <p className="text-[11px] font-semibold text-[#86868b] uppercase tracking-widest mb-1">Cuenta</p>

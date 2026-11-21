@@ -1,32 +1,26 @@
 'use client'
 
 import Link from 'next/link'
-import Image from 'next/image'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import {
-  Home, Stethoscope, Pill, FileText, FlaskConical, ScanLine,
-  ClipboardList, BedDouble, PenLine, ShieldCheck, Receipt,
-  CalendarDays, BarChart2, Users, CreditCard, UserCircle,
-  HelpCircle, ChevronRight, Menu, X, LogOut, Moon, Sun,
-  TrendingUp, UserPlus,
-  Calculator,
+  Home, Users, CalendarDays, FileText, BarChart2, UserCircle, HelpCircle,
+  ChevronRight, X, LogOut, Moon, Sun, Settings, ExternalLink, ShieldCheck, Loader2,
   PanelLeftClose, PanelLeftOpen,
 } from 'lucide-react'
-import { useState, useEffect, useRef, useSyncExternalStore } from 'react'
-import useSWR from 'swr'
+import { useState, useEffect, useRef, useCallback, useSyncExternalStore, type MouseEvent, type PointerEvent } from 'react'
+import useSWR, { mutate } from 'swr'
 import AvisoPerfilSidebar from '@/components/sidebar/AvisoPerfilSidebar'
 import { CLAVE_ESTADO_PERFIL } from '@/lib/perfil/claves'
 import { useMenuMovil } from '@/contexts/MenuMovilContext'
-import { useRouter } from 'next/navigation'
 import { useProfile, clearProfileCache, type Role } from '@/hooks/useProfile'
 import { vaciarCacheGoogle } from '@/lib/agenda/cacheEventosGoogle'
 import { vaciarCacheCitas } from '@/lib/agenda/cacheRangosCitas'
 import { olvidarSemillas } from '@/lib/agenda/semillaCitas'
 import ConsultorioActivoSelector from '@/components/sidebar/ConsultorioActivoSelector'
 import ConsultaRapidaModal from '@/components/launcher/ConsultaRapidaModal'
-/* Sólo el tipo: `import type` se borra al compilar, así que la tabla de los
-   ocho formatos no entra en el bundle del menú. */
-import type { TipoDocumento } from '@/components/documentos/SelectorTipoDocumento'
+import RielNavegacion, { type EntradaNav, type AccionRiel } from '@/components/layout/RielNavegacion'
+import EncabezadoFundido from '@/components/layout/EncabezadoFundido'
+import MenuMas from '@/components/layout/MenuMas'
 import { canManageClinica } from '@/lib/permissions'
 import { componerNombreMedicoCompleto } from '@/lib/nombreMedico'
 import { useClinica } from '@/hooks/useClinica'
@@ -35,211 +29,99 @@ import { useTheme } from '@/components/layout/ThemeProvider'
 import { useAuth } from '@/lib/auth-context'
 import { useToast } from '@/components/ui/Toast'
 import { useSubscriptionGate } from '@/components/billing/SubscriptionGateProvider'
-import { mutate } from 'swr'
+import { leerFormato } from '@/lib/formatoPantalla'
 
-// Fase 8.2: hrefs que abren features de pago. Si la suscripción está
-// bloqueada, el click muestra el BloqueoFeatureModal en vez de navegar.
-// Cubre "Nuevo paciente" del navSecretaria.
-//
-// ⚠️ AQUÍ ESTUVO `BLOCKED_LINK_PREFIXES = ['/documentos?tipo=']`, Y NO SE HA
-// PERDIDO EL BLOQUEO DE LOS OCHO DOCUMENTOS: se mudó al `kind: 'doc'` de abajo.
-// Esas entradas dejaron de tener href al pasar a abrir el buscador de paciente,
-// así que un prefijo de url ya no podía reconocerlas. Todo `doc` es de pago por
-// definición, que es más difícil de romper que casar una cadena.
-const BLOCKED_EXACT = new Set(['/pacientes/nuevo'])
-
-function isBlockedHref(href: string): boolean {
-  return BLOCKED_EXACT.has(href)
-}
-
-/**
- * El paciente que el médico tiene abierto ahora mismo, leído de la ruta.
+/* ═══ LA NAVEGACIÓN DE `(app)` — B4 del rediseño estético ════════════════════
  *
- * Se exige la forma de uuid y no «lo que haya después de /expediente/» porque
- * ese hueco también lo ocupan rutas que no son un paciente; con un segmento
- * cualquiera se navegaría a un expediente inexistente en vez de caer al
- * buscador, que es la degradación correcta.
+ * Este componente CONSERVA los datos y la lógica de siempre —perfil, permisos
+ * por rol, bloqueo por plan, cierre de sesión con su auditoría y la limpieza de
+ * cachés— y pinta CUATRO presentaciones a la vez; CSS enseña la del formato
+ * (`data-formato` en <html>, PLAN §2.5; reglas en `globals.css`, zona «B4»):
+ *   · `ext`  (Duo cerrado): `RielNavegacion`, pegado a la franja;
+ *   · `tel`  (teléfono):    `EncabezadoFundido` con el título de la sección;
+ *   · `iv`   (Duo vertical): `EncabezadoFundido` con cinco píldoras;
+ *   · `ih`   (Duo horizontal): esta `<aside>` como barra a la DERECHA (216);
+ *   · `esc`  (computadora):  esta `<aside>` como barra a la izquierda (248).
+ * En `tel`, `iv` y `ext` la misma `<aside>` es el CAJÓN que abre «Abrir menú».
+ * «Más» (`ext`, `iv`) es `MenuMas`.
+ *
+ * ⚠️ NINGUNA PRESENTACIÓN SE ELIGE EN JS EN EL PRIMER RENDER: el formato no
+ * existe en el servidor y la hidratación fallaría. Se pintan todas y CSS
+ * esconde con `display: none` las que no tocan, que así salen también del
+ * árbol de accesibilidad (y de los `getByRole` de las e2e).
+ *
+ * ⚠️ LA NAVEGACIÓN ES PLANA (aprobada): Inicio · Expediente · Agenda ·
+ * Documentos · Administración. Lo que colgaba de los grupos quedó así:
+ *   · Suplementación → enlace en la cabecera de `/expediente`;
+ *   · los ocho documentos → «Documentos» (`/documentos`: paciente y rejilla de
+ *     tipos) y «Nuevo documento» dentro de cada expediente;
+ *   · Estadísticas / Usuarios / Facturación → pestañas de Administración
+ *     (`components/admin/PestanasAdministracion.tsx`);
+ *   · «Nuevo paciente» de la secretaria → su dashboard y `/expediente`, que ya
+ *     interceptan el bloqueo por plan;
+ *   · Calculadoras → sólo por URL hasta que se retiren (CALMA §31.2).
  */
-const RUTA_PACIENTE = /^\/expediente\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:\/|$)/i
 
-function pacienteDeLaRuta(pathname: string): string | null {
-  return RUTA_PACIENTE.exec(pathname)?.[1] ?? null
+/* ─── Las secciones ───────────────────────────────────────── */
+
+type ClaveSeccion = 'inicio' | 'expediente' | 'agenda' | 'documentos' | 'admin' | 'perfil' | 'ayuda'
+
+/** Qué sección es la ruta. `/expediente/[id]/documentos` es Expediente: el paciente manda. */
+function seccionDeRuta(pathname: string): ClaveSeccion | null {
+  const bajo = (base: string) => pathname === base || pathname.startsWith(base + '/')
+  if (bajo('/dashboard')) return 'inicio'
+  if (bajo('/expediente') || bajo('/suplementacion') || bajo('/pacientes')) return 'expediente'
+  if (bajo('/agenda')) return 'agenda'
+  if (bajo('/documentos')) return 'documentos'
+  if (bajo('/estadisticas') || bajo('/admin') || bajo('/billing')) return 'admin'
+  if (bajo('/perfil')) return 'perfil'
+  if (bajo('/ayuda')) return 'ayuda'
+  return null
 }
 
-/* ─── Tipos ───────────────────────────────────────────────── */
-
-type NavLeaf = {
-  kind: 'leaf'
-  href: string
-  label: string
-  icon: React.ElementType
-  badge?: string
-  disabled?: boolean
-  /**
-   * Apaga la precarga de este enlace.
-   *
-   * ⚠️ LA DECISIÓN VIVE AQUÍ, EN LOS DATOS DE NAVEGACIÓN, Y NO EN EL JSX DE
-   * ABAJO, PORQUE ES UNA DECISIÓN DE PRODUCTO: «¿esto lo va a pulsar de verdad
-   * quien está trabajando?». Al lado de la etiqueta y del icono se puede
-   * contestar; a treinta líneas de distancia, entre `className`es, no.
-   *
-   * QUÉ CUESTA UN ENLACE PRECARGADO, medido en local con build de producción:
-   * los `<Link>` de este menú están TODOS en el viewport desde el primer render
-   * en escritorio —la barra es fija—, así que se precargan todos a la vez, en
-   * competencia con lo que la página esté pidiendo de verdad. Y en Next 16 un
-   * prefetch no es UNA petición: la caché de segmentos pide el árbol de rutas y
-   * luego los segmentos que falten, todos a la misma URL con distinto `?_rsc=`.
-   * Una ruta dinámica de `(app)` sale por dos; una estática prerenderizada, por
-   * cinco. Cargando `/ayuda` eran 14 peticiones RSC antes de esta tanda.
-   *
-   * QUÉ SE PIERDE AL APAGARLO: la transición instantánea. Al pulsar, la ruta se
-   * pide en ese momento y se ve el esqueleto de `(app)/loading.tsx` — que existe
-   * y está cuidado — en vez de aparecer ya pintada. En un destino que se pulsa
-   * una vez al día eso no se nota; en uno que se pulsa cada cinco minutos, sí.
-   * Ése es el criterio, y por eso `/dashboard` y `/agenda` se quedan con
-   * precarga y los tres de abajo no.
-   *
-   * ⚠️ LOS HIJOS DE UN GRUPO NO NECESITAN ESTO Y NO SE LES PONE. Sólo se
-   * renderizan con el grupo desplegado (`expanded`), o sea que su precarga ya
-   * está condicionada a un gesto que ES una señal de intención: quien abre
-   * «Documentos» va a pulsar un documento. Ponerles `sinPrefetch` les quitaría
-   * la instantaneidad justo donde se la han ganado.
-   */
-  sinPrefetch?: boolean
-}
-
-type NavGroup = {
-  kind: 'group'
-  key: string
-  label: string
-  icon: React.ElementType
-  matchPaths?: string[]   // rutas que activan el grupo aunque no sean hijas directas
-  children: (NavLeaf | NavDoc)[]
+/** El título del encabezado de `tel` (CALMA §20: la sección se llama «Expediente» en todas partes). */
+const TITULOS: Record<ClaveSeccion, string> = {
+  inicio: 'Inicio', expediente: 'Expediente', agenda: 'Agenda', documentos: 'Documentos',
+  admin: 'Administración', perfil: 'Mi perfil', ayuda: 'Ayuda',
 }
 
 /**
- * Entrada del menú que NO es un destino: abre el buscador de paciente y, con el
- * paciente elegido, entra a su formulario. No lleva href porque la url no existe
- * hasta que hay paciente — es la misma forma que «Nueva consulta» del dashboard.
+ * Las entradas de la navegación, por rol.
+ *
+ * ⚠️ `sinPrefetch` ES UNA DECISIÓN DE PRODUCTO, Y VIVE AQUÍ Y NO EN EL JSX:
+ * «¿esto lo va a pulsar de verdad quien está trabajando?». Los `<Link>` de la
+ * barra están en el viewport desde el primer render en escritorio, así que se
+ * precargan todos a la vez, en competencia con la página; y en Next 16 un
+ * prefetch son de dos a cinco peticiones RSC. `/dashboard` y `/agenda` se
+ * pulsan cada pocos minutos y conservan la precarga; el resto no. Expediente
+ * tampoco: antes vivía dentro del grupo «Pacientes» y sólo se precargaba con el
+ * grupo abierto, así que encenderla aquí sumaría peticiones a cada carga.
+ *
+ * ⚠️ «Documentos» ES DE PAGO ENTERO: con la suscripción bloqueada no navega y
+ * abre el modal de bloqueo, como hacían los ocho formatos del grupo viejo.
  */
-type NavDoc = {
-  kind: 'doc'
-  tipo: TipoDocumento
-  label: string
-  icon: React.ElementType
-}
-
-type NavSection = NavLeaf | NavGroup | { kind: 'divider' }
-
-/* ─── Estructura de navegación ────────────────────────────── */
-
-/* ⚠️ LOS OCHO DEJARON DE SER ENLACES A `/documentos?tipo=…`, y el cambio es el
-   ítem 1 del pulido de flujo. Antes llevaban a una pantalla intermedia donde
-   había que elegir paciente; ahora abren el mismo buscador que «Nueva consulta»
-   y entran a `/expediente/[id]/documentos?tipo=…`, que es la ruta que registra
-   el acceso en `audit_log` y que hereda el guarda de rol de su layout padre.
-   Con un paciente ya abierto se saltan el buscador — ver `abrirDocumento`.
-
-   La `key` es el tipo y no una url: es lo único que los distingue, y es
-   exactamente lo que viaja en la query del destino. */
-const DOCS_CHILDREN: NavDoc[] = [
-  { kind: 'doc', tipo: 'receta',         label: 'Receta médica',             icon: Pill },
-  { kind: 'doc', tipo: 'lab',            label: 'Solicitud de laboratorio',  icon: FlaskConical },
-  { kind: 'doc', tipo: 'imagen',         label: 'Solicitud de imagenología', icon: ScanLine },
-  { kind: 'doc', tipo: 'suplementacion', label: 'Plan de suplementación',    icon: ClipboardList },
-  { kind: 'doc', tipo: 'internamiento',  label: 'Internamiento',             icon: BedDouble },
-  { kind: 'doc', tipo: 'escrito',        label: 'Escrito médico',            icon: PenLine },
-  { kind: 'doc', tipo: 'consentimiento', label: 'Consentimiento',            icon: ShieldCheck },
-  { kind: 'doc', tipo: 'honorarios',     label: 'Honorarios / Cotización',   icon: Receipt },
-]
-
-function navDoctor(isAdmin: boolean): NavSection[] {
-  const adminChildren: NavLeaf[] = [
-    { kind: 'leaf', href: '/estadisticas',   label: 'Estadísticas',        icon: TrendingUp },
-    ...(isAdmin ? [
-      { kind: 'leaf' as const, href: '/admin/usuarios', label: 'Usuarios de la clínica', icon: Users },
-      { kind: 'leaf' as const, href: '/billing',        label: 'Facturación',             icon: CreditCard },
-    ] : []),
+function entradasNav(secretaria: boolean, activa: ClaveSeccion | null, bloquear: ((e: MouseEvent<HTMLAnchorElement>) => void) | undefined): EntradaNav[] {
+  const e = (clave: ClaveSeccion, etiqueta: string, href: string, Icono: EntradaNav['Icono'], extra: Partial<EntradaNav> = {}): EntradaNav =>
+    ({ clave, etiqueta, href, Icono, activa: activa === clave, ...extra })
+  const comunes = [
+    e('inicio', 'Inicio', '/dashboard', Home),
+    e('expediente', 'Expediente', '/expediente', Users, { sinPrefetch: true }),
+    e('agenda', 'Agenda', '/agenda', CalendarDays),
   ]
-
+  if (secretaria) return comunes
   return [
-    /* ⚠️ `/dashboard` y `/agenda` CONSERVAN la precarga a propósito: son los dos
-       destinos que se pulsan de verdad durante la jornada, y son los únicos.
-       Si vienes a apagar más enlaces, empieza por medir; si vienes a
-       encenderlos todos otra vez, lee la nota de `sinPrefetch` arriba. */
-    { kind: 'leaf', href: '/dashboard', label: 'Dashboard', icon: Home },
-    {
-      kind: 'group', key: 'pacientes', label: 'Pacientes', icon: Stethoscope,
-      matchPaths: ['/expediente', '/suplementacion'],
-      children: [
-        { kind: 'leaf', href: '/expediente',    label: 'Expediente',      icon: Stethoscope },
-        { kind: 'leaf', href: '/suplementacion', label: 'Suplementación', icon: Pill },
-      ],
-    },
-    { kind: 'leaf', href: '/agenda', label: 'Agenda', icon: CalendarDays },
-    /* Sin precarga: nadie sale de la agenda o del expediente a las calculadoras.
-       Se entra a propósito y desde el menú, con una intención propia. */
-    { kind: 'leaf', href: '/calculadoras-clinicas', label: 'Calculadoras', icon: Calculator, sinPrefetch: true },
-    {
-      kind: 'group', key: 'documentos', label: 'Documentos', icon: FileText,
-      matchPaths: ['/documentos'],
-      children: DOCS_CHILDREN,
-    },
-    {
-      kind: 'group', key: 'administracion', label: 'Administración', icon: BarChart2,
-      matchPaths: ['/estadisticas', '/admin', '/billing'],
-      children: adminChildren,
-    },
-    { kind: 'divider' },
-    /* Sin precarga: destino de configuración, no de flujo clínico. Se visita
-       al dar de alta la firma o el logo, no durante la consulta. */
-    { kind: 'leaf', href: '/perfil',  label: 'Mi perfil', icon: UserCircle, sinPrefetch: true },
-    /* Sin precarga: por definición se abre cuando algo no se entiende, que es
-       raro y nunca urgente. */
-    { kind: 'leaf', href: '/ayuda',   label: 'Ayuda',     icon: HelpCircle, sinPrefetch: true },
+    ...comunes,
+    e('documentos', 'Documentos', '/documentos', FileText, { sinPrefetch: true, alPulsar: bloquear }),
+    e('admin', 'Administración', '/estadisticas', BarChart2, { sinPrefetch: true }),
   ]
 }
 
-function navSecretaria(): NavSection[] {
-  return [
-    { kind: 'leaf', href: '/dashboard', label: 'Dashboard', icon: Home },
-    {
-      kind: 'group', key: 'pacientes', label: 'Pacientes', icon: Stethoscope,
-      matchPaths: ['/expediente'],
-      children: [
-        { kind: 'leaf', href: '/expediente',      label: 'Expediente',         icon: Stethoscope },
-        { kind: 'leaf', href: '/pacientes/nuevo', label: 'Nuevo paciente',     icon: UserPlus },
-      ],
-    },
-    { kind: 'leaf', href: '/agenda', label: 'Agenda', icon: CalendarDays },
-  ]
-}
-
-/* ─── Helpers ─────────────────────────────────────────────── */
-
-function leafIsActive(href: string, pathname: string) {
-  const base = href.split('?')[0]
-  if (base === '/inicio') return pathname === '/inicio'
-  return pathname === base || pathname.startsWith(base + '/')
-}
-
-function groupHasActiveChild(group: NavGroup, pathname: string) {
-  if (group.matchPaths?.some(p => pathname.startsWith(p))) return true
-  /* Los `doc` no cuentan: son acciones, no sitios, así que nunca son «donde
-     estás». Con uno abierto quien resalta es el grupo Pacientes, porque el
-     destino vive bajo `/expediente/[id]/` — igual que hoy al entrar a los
-     documentos de un paciente desde su tarjeta del dashboard. */
-  return group.children.some(c => c.kind === 'leaf' && leafIsActive(c.href, pathname))
-}
-
-
-
-/* ─── Componente ──────────────────────────────────────────── */
+/* ─── Datos ───────────────────────────────────────────────── */
 
 /** Lo que este componente lee de `/api/me/estado-perfil`, y nada más. */
 interface RespuestaEstadoPerfil {
   /* `gate` SE FUE DE AQUÍ en B5-bis y no es un olvido: este componente ya no
-     lo lee. Decidía el aviso de abajo por `gate.exento === null`, y ese campo
+     lo lee. Decidía el aviso de perfil por `gate.exento === null`, y ese campo
      dejó de responder a la pregunta cuando la secretaria salió de la exención.
      Ahora decide el rol, que es lo que el aviso significaba desde el principio.
      El endpoint lo sigue devolviendo para `GateOnboarding`; declararlo aquí sin
@@ -251,6 +133,15 @@ interface RespuestaEstadoPerfil {
   tieneFirma: boolean
   tieneLogo: boolean
   faltaCedulaEspecialidad: boolean
+  /** El chip del plan, traído del lanzador (`/inicio`). */
+  plan?: string
+  planNombre?: string
+}
+
+/** Cuántos datos de perfil faltan. Sólo el médico: firma, cédula y logo son de quien ejerce. */
+function contarPendientes(p: RespuestaEstadoPerfil | undefined): number {
+  if (p?.role !== 'medico') return 0
+  return [!p.tieneFirma, p.faltaCedulaEspecialidad, !p.tieneLogo].filter(Boolean).length
 }
 
 /* ═══ F1.2 · LA BARRA PLEGADA, SÓLO EN LA AGENDA ════════════════════════════
@@ -258,7 +149,7 @@ interface RespuestaEstadoPerfil {
    decisión 11). Se lee con `useSyncExternalStore` y no en un efecto: el servidor
    pinta siempre desplegada (`false`) y el cliente pasa a lo guardado sin
    desajuste de hidratación. El evento propio avisa a esta misma pestaña; el de
-   `storage`, a las otras. */
+   `storage`, a las otras. Sólo cambia algo en `esc` (lo pone la hoja). */
 const CLAVE_PLEGADA = 'spinus.barra.plegada'
 const EVENTO_PLEGADA = 'spinus:barra-plegada'
 function leerPlegada(): boolean {
@@ -274,143 +165,339 @@ function guardarPlegada(plegada: boolean): void {
   window.dispatchEvent(new Event(EVENTO_PLEGADA))
 }
 
-export default function Sidebar() {
-  const pathname = usePathname()
-  const router   = useRouter()
-  /* ⚠️ EL ABIERTO/CERRADO DEL MENÚ MÓVIL YA NO VIVE AQUÍ, y el cambio es del
-     bloque 6. Aquí estuvo como `useState` local, que bastaba mientras el único
-     botón que lo tocaba era el de este mismo componente. Dejó de bastar cuando
-     la agenda móvil metió su hamburguesa DENTRO de su banda azul: ese botón está
-     en un componente HERMANO de éste y no podía alcanzar un estado local.
-     El comportamiento no cambia en ninguna página: el botón flotante de abajo
-     sigue existiendo igual y sigue siendo quien lo abre en las otras veinte. Lo
-     único que cambia es DÓNDE se guarda el booleano. Ver `MenuMovilContext`. */
-  const { abierto: mobileOpen, alternar: alternarMenu, cerrar: cerrarMenu } = useMenuMovil()
-  const [expanded, setExpanded]     = useState<Set<string>>(new Set())
-  /* F1.2 · Plegada sólo vale en la agenda (y desde `lg`, que lo pone la hoja):
-     fuera de ella la barra va siempre desplegada, guarde lo que guarde. */
-  const enAgenda = pathname === '/agenda' || pathname.startsWith('/agenda/')
-  const plegada = useSyncExternalStore(suscribirPlegada, leerPlegada, () => false) && enAgenda
-  const { profile }  = useProfile()
-  const { nombreDisplay, subtitulo, logoUrl } = useClinica()
-  const { dark, toggle } = useTheme()
-  const { signOut } = useAuth()
-  const toast = useToast()
-  const { state: subState, openBloqueoModal } = useSubscriptionGate()
+/* ─── El cajón: Esc y arrastre para cerrar ────────────────── */
 
+/** ¿La `<aside>` es ahora el cajón? (en `esc` e `ih` es la barra fija). Se lee tras montar. */
+function esCajon(): boolean {
+  const f = leerFormato()
+  return f === 'tel' || f === 'iv' || f === 'ext'
+}
+
+/**
+ * Arrastrar el cajón hacia su borde lo cierra (CALMA §28, «con arrastre»).
+ * Sigue al dedo 1:1 escribiendo el `transform` en el nodo, sin renders; al
+ * soltar decide por distancia o por velocidad (proyección de inercia) y deja
+ * que la transición de CSS termine el camino desde donde está. Hacia dentro
+ * cede poco (rubber-band). Sólo táctil: con ratón se cierra con el velo o Esc.
+ */
+function useArrastreCajon(cerrar: () => void) {
+  const inicio = useRef<{ x: number; y: number; t: number; activo: boolean } | null>(null)
+  const soltar = (e: PointerEvent<HTMLElement>) => {
+    const i = inicio.current
+    inicio.current = null
+    if (!i?.activo) return
+    const el = e.currentTarget
+    const dx = e.clientX - i.x
+    const velocidad = dx / Math.max(1, e.timeStamp - i.t)
+    el.style.transform = ''
+    delete el.dataset.arrastre
+    if (dx < -el.offsetWidth / 3 || velocidad < -0.5) cerrar()
+  }
+  const mover = (e: PointerEvent<HTMLElement>) => {
+    const i = inicio.current
+    if (!i) return
+    const dx = e.clientX - i.x
+    if (!i.activo) {
+      if (Math.abs(dx) < 8 || Math.abs(dx) < Math.abs(e.clientY - i.y)) return
+      i.activo = true
+      e.currentTarget.setPointerCapture(e.pointerId)
+      e.currentTarget.dataset.arrastre = 'true'
+    }
+    const x = dx > 0 ? Math.sqrt(dx) * 2 : dx
+    e.currentTarget.style.transform = `translateX(${x}px)`
+  }
+  const empezar = (e: PointerEvent<HTMLElement>) => {
+    if (e.pointerType === 'mouse' || !esCajon()) return
+    inicio.current = { x: e.clientX, y: e.clientY, t: e.timeStamp, activo: false }
+  }
+  return { onPointerDown: empezar, onPointerMove: mover, onPointerUp: soltar, onPointerCancel: soltar }
+}
+
+/** Esc cierra el cajón, sólo cuando la `<aside>` ES el cajón y está abierta. */
+function useEscCajon(abierto: boolean, cerrar: () => void) {
+  useEffect(() => {
+    if (!abierto) return
+    const tecla = (e: KeyboardEvent) => { if (e.key === 'Escape' && esCajon()) cerrar() }
+    document.addEventListener('keydown', tecla)
+    return () => document.removeEventListener('keydown', tecla)
+  }, [abierto, cerrar])
+}
+
+/* ─── Piezas de la barra ──────────────────────────────────── */
+
+/** El glifo de Spinus (provisional, el de las maquetas) + el chip del plan, traído del lanzador. */
+function CabeceraBarra({ plan, planNombre, medico, alCerrar }: { plan?: string; planNombre?: string; medico: boolean; alCerrar: () => void }) {
+  return (
+    <div className="nav-barra-cabeza">
+      <span className="nav-marca">
+        <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="9.5" /><path d="M12 5.5v13M9.6 8h4.8M9 11h6M9 14h6M9.6 17h4.8" />
+        </svg>
+        <span className="sb-etiqueta">Spinus</span>
+      </span>
+      {plan === 'free' && medico
+        ? <Link href="/pricing" prefetch={false} className="nav-plan sb-etiqueta">Actualizar</Link>
+        : planNombre && <span className="nav-plan sb-etiqueta">{planNombre}</span>}
+      {/* Sólo en el cajón (`tel`, `iv`, `ext`); en la barra fija lo esconde CSS. */}
+      <button type="button" onClick={alCerrar} aria-label="Cerrar menú" className="nav-solo-cajon nav-icono k-pulsable">
+        <X size={20} aria-hidden="true" />
+      </button>
+    </div>
+  )
+}
+
+function ListaNavegacion({ entradas, plegada, alNavegar }: { entradas: EntradaNav[]; plegada: boolean; alNavegar: () => void }) {
+  return (
+    <nav className="nav-barra-lista" aria-label="Navegación principal">
+      {entradas.map(e => (
+        /* ⚠️ `undefined` Y NO `true` EN LA RAMA QUE SÍ PRECARGA. El valor por
+           defecto de `prefetch` es `auto`: una ruta estática se precarga entera
+           y una dinámica sólo hasta su `loading.tsx`. `true` forzaría la ruta
+           completa también en las dinámicas. Plegada, el rótulo se esconde y el
+           nombre queda en `aria-label` y `title`. */
+        <Link key={e.clave} href={e.href} prefetch={e.sinPrefetch ? false : undefined}
+          onClick={ev => { alNavegar(); e.alPulsar?.(ev) }}
+          aria-label={plegada ? e.etiqueta : undefined} title={plegada ? e.etiqueta : undefined}
+          aria-current={e.activa ? 'page' : undefined} data-activa={e.activa ? 'true' : undefined}
+          className="nav-barra-enlace k-pulsable">
+          <e.Icono size={20} strokeWidth={1.8} aria-hidden="true" />
+          <span className="sb-etiqueta">{e.etiqueta}</span>
+        </Link>
+      ))}
+    </nav>
+  )
+}
+
+interface Ajustes {
+  dark: boolean
+  alternarTema: () => void
+  cerrarSesion: () => void
+  cerrando: boolean
+}
+
+/**
+ * Modo oscuro · Aviso de Privacidad · Cerrar sesión. Las mismas tres filas en el
+ * menú de ajustes del pie de la barra y en «Más»: hoy son la ÚNICA vía a esas
+ * tres funciones fuera de la barra (Mi perfil aún no tiene su grupo «Ajustes»).
+ *
+ * ⚠️ EL `prefetch={false}` DEL AVISO VA ATADO AL `target="_blank"`. Sin él este
+ * enlace pedía `/privacidad` CINCO VECES en cada carga (es estática y se
+ * precarga entera: árbol más segmentos, todos a la misma URL con distinto
+ * `?_rsc=`), y con `target="_blank"` lo precargado no se consume nunca: la
+ * pestaña nueva hace carga completa. Medido en local, 14 → 9 peticiones RSC.
+ * ⚠️ `rel="noopener noreferrer"` ES OBLIGATORIO con `target="_blank"`: sin
+ * `noopener` la pestaña abierta recibe `window.opener` sobre una pantalla de la
+ * app con sesión abierta. Mismo criterio que el enlace gemelo de `/login`.
+ *
+ * ⚠️ «Cerrar sesión» NO PIDE CONFIRMACIÓN (CALMA §29.14). Mientras se registra
+ * la auditoría y se revoca, la fila gira y no admite un segundo toque.
+ */
+function FilasAjustes({ a }: { a: Ajustes }) {
+  return (
+    <>
+      <button type="button" onClick={a.alternarTema} className="nav-fila">
+        {a.dark ? <Sun size={20} className="nav-fila-icono" aria-hidden="true" /> : <Moon size={20} className="nav-fila-icono" aria-hidden="true" />}
+        <span className="flex-1">{a.dark ? 'Modo claro' : 'Modo oscuro'}</span>
+      </button>
+      <Link href="/privacidad" target="_blank" rel="noopener noreferrer" prefetch={false} className="nav-fila">
+        <ShieldCheck size={20} className="nav-fila-icono" aria-hidden="true" />
+        <span className="flex-1">Aviso de Privacidad</span>
+        <ExternalLink size={16} className="nav-fila-flecha" aria-hidden="true" />
+      </Link>
+      <button type="button" onClick={a.cerrarSesion} disabled={a.cerrando} aria-busy={a.cerrando} className="nav-fila nav-fila--mal">
+        {a.cerrando
+          ? <Loader2 size={20} className="nav-fila-icono animate-spin" aria-hidden="true" />
+          : <LogOut size={20} className="nav-fila-icono" aria-hidden="true" />}
+        <span className="flex-1">Cerrar sesión</span>
+      </button>
+    </>
+  )
+}
+
+/** El menú de ajustes del pie: nace de su botón, sin velo (CALMA §21). Esc y clic fuera lo cierran. */
+function MenuAjustes({ a, alCerrar, idMenu }: { a: Ajustes; alCerrar: () => void; idMenu: string }) {
+  const caja = useRef<HTMLDivElement>(null)
+  const cerrar = useRef(alCerrar)
+  useEffect(() => { cerrar.current = alCerrar })
+  useEffect(() => {
+    const fuera = (e: globalThis.MouseEvent) => {
+      const origen = document.querySelector(`[aria-controls="${idMenu}"]`)
+      if (e.target instanceof Node && !caja.current?.contains(e.target) && !origen?.contains(e.target)) cerrar.current()
+    }
+    const tecla = (e: KeyboardEvent) => { if (e.key === 'Escape') cerrar.current() }
+    document.addEventListener('mousedown', fuera)
+    document.addEventListener('keydown', tecla)
+    return () => { document.removeEventListener('mousedown', fuera); document.removeEventListener('keydown', tecla) }
+  }, [idMenu])
+  return (
+    <div ref={caja} id={idMenu} className="nav-ajustes">
+      <p className="nav-capa-titulo">Ajustes</p>
+      <FilasAjustes a={a} />
+    </div>
+  )
+}
+
+interface Persona { nombre: string; detalle: string; medico: boolean; perfilActivo: boolean; ayudaActiva: boolean }
+
+/** El pie de la barra: la persona («Mi perfil · Ajustes» del médico, «Ajustes» de la secretaria) y Ayuda. */
+function PieBarra({ p, a, alNavegar }: { p: Persona; a: Ajustes; alNavegar: () => void }) {
+  const [abierto, setAbierto] = useState(false)
+  const idMenu = 'nav-menu-ajustes'
+  const boton = (
+    <button type="button" onClick={() => setAbierto(v => !v)} aria-expanded={abierto} aria-controls={idMenu}
+      aria-label="Ajustes" className={p.medico ? 'nav-icono nav-icono--barra k-pulsable' : 'nav-persona k-pulsable'}>
+      {p.medico ? <Settings size={20} aria-hidden="true" /> : <PersonaTexto p={p} linea="Ajustes" icono={<Settings size={20} aria-hidden="true" />} />}
+    </button>
+  )
+  return (
+    <div className="nav-pie">
+      {abierto && <MenuAjustes a={a} alCerrar={() => setAbierto(false)} idMenu={idMenu} />}
+      {p.medico && (
+        <Link href="/perfil" prefetch={false} onClick={alNavegar} aria-current={p.perfilActivo ? 'page' : undefined}
+          data-activa={p.perfilActivo ? 'true' : undefined} aria-label="Mi perfil" className="nav-persona k-pulsable">
+          <PersonaTexto p={p} linea="Mi perfil · Ajustes" icono={<UserCircle size={20} aria-hidden="true" />} />
+        </Link>
+      )}
+      {boton}
+      {/* Ayuda: sólo el médico la tuvo nunca en el menú; la secretaria sigue sin ella. */}
+      {p.medico && (
+        <Link href="/ayuda" prefetch={false} onClick={alNavegar} aria-label="Ayuda" aria-current={p.ayudaActiva ? 'page' : undefined}
+          data-activa={p.ayudaActiva ? 'true' : undefined} className="nav-icono nav-icono--barra k-pulsable">
+          <HelpCircle size={20} aria-hidden="true" />
+        </Link>
+      )}
+    </div>
+  )
+}
+
+function PersonaTexto({ p, linea, icono }: { p: Persona; linea: string; icono: React.ReactNode }) {
+  return (
+    <>
+      <span className="flex-none">{icono}</span>
+      <span className="nav-persona-texto sb-etiqueta">
+        <span className="nav-persona-nombre">{p.nombre}</span>
+        {p.detalle && <span className="nav-persona-detalle">{p.detalle}</span>}
+        <span className="nav-persona-linea">{linea}</span>
+      </span>
+    </>
+  )
+}
+
+/** Plegar / desplegar: sólo en la agenda y sólo en `esc` (en el cajón no se pinta: lo esconde CSS). */
+function BotonPlegar({ plegada }: { plegada: boolean }) {
+  return (
+    <button type="button" onClick={() => guardarPlegada(!plegada)}
+      aria-expanded={!plegada} aria-controls="barra-lateral"
+      aria-label={plegada ? 'Desplegar menú' : 'Plegar menú'}
+      className="nav-plegar k-pulsable">
+      {plegada ? <PanelLeftOpen size={20} aria-hidden="true" /> : <PanelLeftClose size={20} aria-hidden="true" />}
+      <span className="sb-etiqueta">{plegada ? 'Desplegar menú' : 'Plegar menú'}</span>
+    </button>
+  )
+}
+
+/* ─── Contenido de «Más» ──────────────────────────────────── */
+
+interface ContenidoMasProps {
+  medico: boolean
+  pendientes: RespuestaEstadoPerfil | undefined
+  logoUrl: string | null
+  nombreClinica: string
+  a: Ajustes
+  alNavegar: () => void
+}
+
+/** Aviso · Consultorio activo · Administración · Mi perfil · Ayuda (médico), y los ajustes (todos). CALMA §28. */
+function ContenidoMas({ medico, pendientes, logoUrl, nombreClinica, a, alNavegar }: ContenidoMasProps) {
+  const fila = (href: string, etiqueta: string, Icono: EntradaNav['Icono']) => (
+    <Link href={href} prefetch={false} onClick={alNavegar} className="nav-fila">
+      <Icono size={20} className="nav-fila-icono" aria-hidden="true" />
+      <span className="flex-1">{etiqueta}</span>
+      <ChevronRight size={18} className="nav-fila-flecha" aria-hidden="true" />
+    </Link>
+  )
+  return (
+    <div className="nav-mas-cuerpo">
+      {medico && pendientes?.role === 'medico' && (
+        <AvisoPerfilSidebar faltaFirma={!pendientes.tieneFirma} faltaLogo={!pendientes.tieneLogo}
+          faltaCedulaEspecialidad={pendientes.faltaCedulaEspecialidad} alNavegar={alNavegar} />
+      )}
+      {medico && (
+        <div className="nav-grupo">
+          <ConsultorioActivoSelector variante="fila" logoUrl={logoUrl} nombreClinica={nombreClinica} />
+          {fila('/estadisticas', 'Administración', BarChart2)}
+          {fila('/perfil', 'Mi perfil', UserCircle)}
+          {fila('/ayuda', 'Ayuda', HelpCircle)}
+        </div>
+      )}
+      <div className="nav-grupo"><FilasAjustes a={a} /></div>
+    </div>
+  )
+}
+
+/* ─── Componente ──────────────────────────────────────────── */
+
+/** Todo lo que el componente sabe de quién mira, sacado del render para que quepa en 50 líneas. */
+function useDatosNavegacion() {
+  const pathname = usePathname()
+  const { profile } = useProfile()
+  const { nombreDisplay, subtitulo, logoUrl, clinica } = useClinica()
   /* Lo que le falta al médico después del gate (firma, cédula de especialidad,
-     logo). MISMA CLAVE que `GateOnboarding`, que ya la tiene montada en el
-     layout de (app): SWR comparte la entrada de caché, así que esto NO añade
-     ninguna petición. El `fetcher` va aquí porque el `SWRConfig` de (app) no
-     define uno global.
-     Sin `gate` en la respuesta —error, 401, carga— no se pinta nada: el mismo
-     criterio de lectura afirmativa del gate. */
+     logo) y su plan. MISMA CLAVE que `GateOnboarding`, que ya la tiene montada
+     en el layout de (app): SWR comparte la entrada de caché, así que esto NO
+     añade ninguna petición. El `fetcher` va aquí porque el `SWRConfig` de (app)
+     no define uno global. Sin respuesta —error, 401, carga— no se pinta aviso. */
   const { data: estadoPerfil } = useSWR<RespuestaEstadoPerfil>(
     CLAVE_ESTADO_PERFIL,
     (url: string) => fetch(url).then(r => r.ok ? r.json() : Promise.reject(new Error(String(r.status)))),
   )
-
   /* ⚠️ LA FUENTE ES `estadoPerfil` Y NO `profile`, Y NO ES INDIFERENTE.
-     `useProfile` memoiza el perfil en una promesa a nivel de MÓDULO
-     (`useProfile.ts:37,59`) más una copia en `secureStorage`, y ninguna de las
-     dos se invalida cuando el onboarding crea la clínica y el médico pasa a
-     ser su dueño. Resultado: al que entra por Google le faltaban «Usuarios de
-     la clínica» y «Facturación» durante TODA la sesión, hasta recargar en duro
-     — no puede invitar a su equipo ni gestionar su suscripción.
-     `CLAVE_ESTADO_PERFIL` es la misma entrada de SWR que ya está montada
-     arriba: esto NO añade ninguna petición, y se corrige sola en el `mutate()`
-     de `onComplete` (`GateOnboarding.tsx:71`), que es el único momento en que
-     el gate revalida. Revalidarla antes está PROHIBIDO por otro motivo, y está
-     escrito allí: desmontaría el modal a media sesión.
-     ⚠️ ESTO SOLO ARREGLA EL MENÚ. Las pantallas que hay detrás de esos dos
-     enlaces comprueban `canManageClinica(profile)` por su cuenta al montarse y
-     rebotan a `/dashboard`; lo que las salva es el `clearProfileCache()` de
-     `OnboardingModal.crearClinica`. Sin él, esto es PEOR que el defecto:
-     enseñaría dos enlaces que expulsan al que los pulsa.
-     ⚠️ `profile` SIGUE SIENDO EL SUPLENTE, y tampoco es un resto: sin respuesta
-     —carga, 401, red caída— el hook conserva su copia cifrada local y el menú
-     del médico no se desmonta por estar sin cobertura. La respuesta fresca
-     manda cuando existe; la caché cubre cuando no. */
+     `useProfile` memoiza el perfil en una promesa a nivel de MÓDULO más una
+     copia en `secureStorage`, y ninguna se invalida cuando el onboarding crea la
+     clínica y el médico pasa a ser su dueño: al que entraba por Google le
+     faltaba «Administración» con sus pestañas de Usuarios y Facturación toda la
+     sesión. La clave de SWR se corrige sola en el `mutate()` de `onComplete`
+     (`GateOnboarding.tsx`); revalidarla antes está PROHIBIDO (desmontaría el
+     modal a media sesión). Las pantallas de detrás siguen comprobando
+     `canManageClinica(profile)` y las salva el `clearProfileCache()` de
+     `OnboardingModal.crearClinica`.
+     ⚠️ `profile` SIGUE SIENDO EL SUPLENTE: sin respuesta, el menú del médico no
+     se desmonta por estar sin cobertura. Lo mismo para el nombre: la asistente
+     guardaba el suyo en el onboarding y aquí seguía el de antes. */
   const isAdmin = estadoPerfil
     ? canManageClinica({ role: estadoPerfil.role as Role, es_admin_de_clinica: estadoPerfil.es_admin_de_clinica })
     : canManageClinica(profile)
+  /* Mientras el perfil no ha cargado se pinta el menú del médico, como siempre. */
+  const secretaria = profile?.role === 'secretaria'
+  const nombre = estadoPerfil?.nombre || componerNombreMedicoCompleto(profile ?? {}) || ''
+  const iniciales = `${profile?.nombres?.[0] ?? ''}${profile?.apellido_paterno?.[0] ?? ''}`.toUpperCase()
+  const nombreClinica = nombreDisplay ?? clinica?.nombre ?? ''
+  const detalle = secretaria ? '' : (subtitulo ?? profile?.especialidad ?? '')
+  return { pathname, estadoPerfil, isAdmin, secretaria, nombre, iniciales, nombreClinica, detalle, logoUrl }
+}
 
-  /* El formato que espera paciente. No-nulo = buscador abierto; un solo estado
-     porque el modal no tiene nada que enseñar sin formato. Se guarda la entrada
-     ENTERA y no sólo su `tipo` porque el buscador enseña también su rótulo. */
-  const [docPendiente, setDocPendiente] = useState<NavDoc | null>(null)
+/* ⚠ LA CACHÉ DE CONFIGURACIÓN SE VACÍA AL DESMONTARSE ESTE SIDEBAR, NO DENTRO
+   DE `handleLogout`, Y NO ES UN CAPRICHO DE ESTILO.
 
-  /**
-   * Un formato del menú, pulsado.
-   *
-   * ⚠️ CON UN PACIENTE YA ABIERTO NO SE PREGUNTA POR ÉL. Pedirle que busque a
-   * quien tiene delante en la pantalla sería peor que la pantalla intermedia
-   * que esto viene a quitar, así que dentro de `/expediente/[id]/…` el menú
-   * navega directo. Fuera, abre el buscador.
-   */
-  function abrirDocumento(doc: NavDoc) {
-    close()
-    const abierto = pacienteDeLaRuta(pathname)
-    if (abierto) {
-      router.push(`/expediente/${abierto}/documentos?tipo=${doc.tipo}`)
-      return
-    }
-    setDocPendiente(doc)
-  }
+   `CLAVE_CONFIG` no es solo la clave de `useClinica`: desde que los cuatro
+   endpoints se consolidaron en /api/me/config es TAMBIÉN la de
+   `useConsultorios`. Vaciarla dentro del handler la vaciaba mientras el árbol
+   de (app) seguía montado —`router.push` no desmonta nada de forma síncrona—,
+   y el gate de perfil (`GateOnboarding`) cuelga del layout de (app), o sea que
+   estaba en pantalla justo en ese instante. `internalMutate` de SWR fija `data`
+   y limpia `error`, pero NUNCA toca `isLoading`: el hook quedaba en
+   `consultorios: []` con `isLoading: false` —un «no tienes ninguno» falso y
+   estable— y el modal de configuración salía en CADA cierre de sesión.
 
-  const sections: NavSection[] =
-    profile?.role === 'secretaria'
-      ? navSecretaria()
-      : navDoctor(isAdmin)
-
-  /* Auto-expandir grupos con hijo activo */
-  useEffect(() => {
-    const toOpen = new Set<string>()
-    sections.forEach(s => {
-      if (s.kind === 'group' && groupHasActiveChild(s, pathname)) {
-        toOpen.add(s.key)
-      }
-    })
-    setExpanded(toOpen)
-  }, [pathname])
-
-  function toggleGroup(key: string) {
-    /* Plegada no hay sitio para los hijos: pulsar un grupo despliega la barra y
-       abre el grupo (no lo cierra si ya estaba abierto). Sólo desde `lg`: por
-       debajo la barra es el cajón móvil y nunca se pinta plegada. */
-    if (plegada && window.matchMedia('(min-width: 1024px)').matches) {
-      guardarPlegada(false)
-      setExpanded(prev => new Set(prev).add(key))
-      return
-    }
-    setExpanded(prev => {
-      const next = new Set(prev)
-      next.has(key) ? next.delete(key) : next.add(key)
-      return next
-    })
-  }
-
-  /* ⚠ LA CACHÉ DE CONFIGURACIÓN SE VACÍA AL DESMONTARSE ESTE SIDEBAR, NO DENTRO
-     DE `handleLogout`, Y NO ES UN CAPRICHO DE ESTILO.
-
-     `CLAVE_CONFIG` no es solo la clave de `useClinica`: desde que los cuatro
-     endpoints se consolidaron en /api/me/config es TAMBIÉN la de
-     `useConsultorios`. Vaciarla dentro del handler la vaciaba mientras el árbol
-     de (app) seguía montado —`router.push` no desmonta nada de forma síncrona—,
-     y el gate de perfil (`GateOnboarding`) cuelga del layout de (app), o sea que
-     estaba en pantalla justo en ese instante. Quien lo sufrió primero fue
-     `PrimerConsultorioModal`, que colgaba de `ConsultorioActivoProvider` y se
-     retiró en el Bloque B5; el gate ocupa su lugar y hereda la exposición.
-     `internalMutate` de SWR fija `data` y limpia `error`, pero NUNCA toca
-     `isLoading`: el hook quedaba en `consultorios: []` con `isLoading: false`
-     —un «no tienes ninguno» falso y estable, no un destello— y el modal de
-     configuración salía en CADA cierre de sesión, sin salida por Escape.
-
-     El desmontaje ES la señal de que la navegación ya sacó al usuario del árbol:
-     cuando esta limpieza corre, el modal ya no existe. El ref evita que un
-     desmontaje ajeno al logout (StrictMode en desarrollo, por ejemplo) borre la
-     caché de una sesión viva. */
+   El desmontaje ES la señal de que la navegación ya sacó al usuario del árbol.
+   El ref evita que un desmontaje ajeno al logout (StrictMode en desarrollo, por
+   ejemplo) borre la caché de una sesión viva. */
+function useCierreSesion() {
+  const router = useRouter()
+  const { signOut } = useAuth()
+  const toast = useToast()
   const cerrandoSesionRef = useRef(false)
+  const [cerrando, setCerrando] = useState(false)
 
   useEffect(() => {
     return () => {
@@ -421,6 +508,8 @@ export default function Sidebar() {
   }, [])
 
   async function handleLogout() {
+    if (cerrandoSesionRef.current) return
+    setCerrando(true)
     /* NOM-024: registrar el logout antes de cerrar sesión, y CON await.
        ⚠️ EL `await` ES LA CORRECCIÓN, NO UN ADORNO. Esta ruta identifica al
        usuario por sus cookies sb-*, o sea por lo mismo que signOut() borra: sin
@@ -437,18 +526,13 @@ export default function Sidebar() {
 
     /* `signOut()` del AuthContext limpia SIEMPRE lo suyo —cookies sb-*,
        sessionStorage, meta— y lanza DESPUÉS si el servidor de Auth no confirmó
-       la revocación. Ver su bloque en `lib/auth-context.tsx`. O sea que cuando
-       este `catch` corre, la sesión de ESTE navegador ya está destruida; lo que
-       queda abierto es la de otros dispositivos.
-
-       ⚠️ POR ESO LA LIMPIEZA DE ABAJO NO PUEDE VIVIR DENTRO DE LA RAMA FELIZ, Y
-       AQUÍ ESTUVO EL DEFECTO: este `catch` hacía `return` y se saltaba
-       `clearProfileCache()`, que borra `cache_user_profile` de **secureStorage**
-       (`hooks/useProfile.ts:105-113`) — el perfil del médico, CIFRADO PERO
-       PERSISTIDO en esa máquina. Dejarlo ahí justo después de haberle destruido
-       la credencial es el peor de los dos órdenes, y no lo arregla nadie más
-       tarde: sobrevive a la recarga, así que el `window.location.href` del
-       siguiente inicio de sesión no lo toca. */
+       la revocación (ver `lib/auth-context.tsx`). Cuando este `catch` corre, la
+       sesión de ESTE navegador ya está destruida; lo que queda abierto es la de
+       otros dispositivos.
+       ⚠️ POR ESO LA LIMPIEZA DE ABAJO NO PUEDE VIVIR DENTRO DE LA RAMA FELIZ.
+       Aquí estuvo el defecto: el `catch` hacía `return` y se saltaba
+       `clearProfileCache()`, que borra `cache_user_profile` de secureStorage —el
+       perfil del médico, CIFRADO PERO PERSISTIDO en esa máquina—. */
     let revocado = true
     try {
       await signOut()
@@ -463,22 +547,18 @@ export default function Sidebar() {
     vaciarCacheGoogle()
     vaciarCacheCitas()
     olvidarSemillas()
-    // Marca para el cleanup de arriba; la caché del agregado —clínica,
-    // consultorios, horario y médicos de la sesión que cierra— se vacía cuando
+    // Marca para el cleanup de arriba; la caché del agregado se vacía cuando
     // este componente se desmonte, no ahora.
     cerrandoSesionRef.current = true
 
     /* ⚠️ EL AVISO NO DICE «inténtalo de nuevo», Y NO ES UN MATIZ DE REDACCIÓN.
        Un segundo clic encontraría este navegador ya sin `accessToken`, así que
-       `_signOut` se saltaría la llamada al servidor —sólo la hace
-       `if (accessToken)`, GoTrueClient.js:1754— y devolvería ÉXITO sin revocar
-       nada. El reintento mentiría. Lo que sí revoca de verdad en el servidor es
-       el cambio de contraseña (`api/auth/reset-password/route.ts:194`).
-       ⚠️ LIMITACIÓN CONOCIDA: el `ToastProvider` cuelga de `(app)/layout.tsx`, y
-       la navegación de abajo lo desmonta, así que este aviso puede alcanzar a
-       verse sólo un instante. Se mantiene porque no navegar tampoco lo salva
-       —`SessionGuard` expulsa igual en cuanto `status` pasa a UNAUTHENTICATED—
-       y sostenerlo exige pasarlo a `/login`, que es otro archivo. */
+       `_signOut` se saltaría la llamada al servidor y devolvería ÉXITO sin
+       revocar nada. Lo que sí revoca de verdad en el servidor es el cambio de
+       contraseña (`api/auth/reset-password/route.ts`).
+       ⚠️ LIMITACIÓN CONOCIDA: el `ToastProvider` cuelga de `(app)/layout.tsx` y
+       la navegación de abajo lo desmonta, así que este aviso puede verse sólo un
+       instante. Sostenerlo exige pasarlo a `/login`, que es otro archivo. */
     if (!revocado) {
       toast.error('Sesión cerrada en este navegador, pero el servidor no confirmó la revocación: puede seguir abierta en otros dispositivos. Cambia la contraseña para cerrarlas todas.')
     }
@@ -487,411 +567,73 @@ export default function Sidebar() {
     router.refresh()
   }
 
-  function close() { cerrarMenu() }
+  return { handleLogout, cerrando }
+}
 
-  /* ── Render ─────────────────────────────────────────────── */
+export default function Sidebar() {
+  const d = useDatosNavegacion()
+  const router = useRouter()
+  /* ⚠️ EL ABIERTO/CERRADO DEL CAJÓN VIVE EN `MenuMovilContext` (bloque 6): lo
+     abren también hermanos de este componente —la banda de la agenda—. */
+  const { abierto: mobileOpen, abrir: abrirMenu, cerrar: cerrarMenu } = useMenuMovil()
+  const { dark, toggle } = useTheme()
+  const { state: subState, openBloqueoModal } = useSubscriptionGate()
+  const { handleLogout, cerrando } = useCierreSesion()
+  const [masAbierto, setMasAbierto] = useState(false)
+  /* «+» del riel del médico: el mismo buscador que «Nueva consulta» del dashboard. */
+  const [consultaAbierta, setConsultaAbierta] = useState(false)
+  const enAgenda = d.pathname === '/agenda' || d.pathname.startsWith('/agenda/')
+  const plegada = useSyncExternalStore(suscribirPlegada, leerPlegada, () => false) && enAgenda
+  const cerrarMas = useCallback(() => setMasAbierto(false), [])
+  const cerrarTodo = useCallback(() => { cerrarMenu(); setMasAbierto(false) }, [cerrarMenu])
+  useEscCajon(mobileOpen, cerrarMenu)
+  const arrastre = useArrastreCajon(cerrarMenu)
+
+  const activa = seccionDeRuta(d.pathname)
+  const bloquear = subState.isBlocked ? (e: MouseEvent<HTMLAnchorElement>) => { e.preventDefault(); cerrarTodo(); openBloqueoModal() } : undefined
+  const entradas = entradasNav(d.secretaria, activa, bloquear)
+  const deRiel = entradas.filter(e => e.clave !== 'admin')
+  const enMas = !d.secretaria && (activa === 'admin' || activa === 'ayuda')
+  const pendientes = contarPendientes(d.estadoPerfil)
+  const ajustes: Ajustes = { dark, alternarTema: toggle, cerrarSesion: handleLogout, cerrando }
+  const accion: AccionRiel = d.secretaria
+    ? { etiqueta: 'Agendar cita', alPulsar: () => router.push('/agenda') }
+    : { etiqueta: 'Nueva consulta', alPulsar: () => (subState.isBlocked ? openBloqueoModal() : setConsultaAbierta(true)) }
+  const persona: Persona = { nombre: d.nombre, detalle: d.detalle, medico: !d.secretaria, perfilActivo: activa === 'perfil', ayudaActiva: activa === 'ayuda' }
+
   return (
     <>
-      {/* Mobile toggle.
-
-          ⚠️ SE ESCONDE EN LA AGENDA, Y SÓLO AHÍ. Esa página sustituye el
-          encabezado móvil por una banda azul con su propio hamburguesa dentro
-          (bloque 6), así que este botón flotante quedaría duplicado y encima
-          por delante de la banda. En las otras veinte páginas no cambia nada.
-          El estado es el mismo en los dos sitios —vive en `MenuMovilContext`—,
-          o sea que el de la banda abre este mismo menú.
-
-          ⚠️⚠️ QUIEN LO ESCONDE ES CSS, NO ESTE COMPONENTE, Y EL CRITERIO SE
-          INVIRTIÓ A SABIENDAS. La regla es `body:has(.ag-banda-movil)
-          .menu-flotante` y vive en `globals.css`, pegada a la banda.
-
-          AQUÍ ESTUVO ESCRITO LO CONTRARIO, y conviene saber por qué dejó de
-          valer antes de reponerlo. Decía: «se decide por `pathname` y no por
-          CSS; la alternativa se descartó porque `:has()` degrada a "la regla no
-          casa", y aquí eso significa DOS hamburguesas encima de la banda, que es
-          peor que el defecto que viene a evitar».
-
-          El razonamiento comparaba mal los dos lados porque no se sabía cuál era
-          el defecto que se evitaba. Con `pathname`, el botón se esconde en el
-          PRIMER render, mientras que la banda no aparece hasta que corre el
-          efecto que descubre el ancho (`isMobile` arranca en `false` en
-          `agenda/page.tsx`). En esa ventana no hay hamburguesa NINGUNO: ni éste
-          ni el de la banda. Y no es sólo un parpadeo — si un efecto de
-          `AgendaPage` anterior a ése lanza, React ABORTA el resto de la lista de
-          efectos de ese fiber (`commitHookEffectListMount` en
-          `react-dom-client`: el `try` envuelve el bucle entero y el `catch` está
-          fuera), así que el de `isMobile` no corre nunca. La página cae al
-          `ErrorBoundary`, que en `(app)/layout.tsx` sólo envuelve a `{children}`
-          y deja vivo a este `Sidebar` — con el botón escondido y `pathname`
-          todavía en `/agenda`. Teléfono sin ninguna vía al menú, y sin
-          navegación en la tarjeta de error. Callejón sin salida, no fealdad.
-
-          Así que la comparación real no es «una hamburguesa contra dos», es
-          «dos contra CERO»:
-            · `:has()` no soportado o la banda ausente → la regla no casa → este
-              botón SE QUEDA. Dos hamburguesas un instante en el peor caso, y el
-              menú siempre alcanzable.
-            · `pathname` → el botón se va aunque no haya banda que lo sustituya.
-          El fallo de CSS degrada hacia el lado seguro y el de JS hacia el
-          peligroso. Por eso se cambió.
-
-          Y la condición ya no es un ESPEJO de la banda: es la banda. La regla
-          pregunta por el nodo real en el DOM, así que no puede desincronizarse de
-          él como sí podía una copia de la ruta o una bandera en un contexto.
-
-          `:has()` lo soporta Chrome 105+, y esta misma hoja ya lo usa para el
-          relleno de esta página (`main > div:has(.agenda-fc)`).
-
-          SI VUELVES A PONER `pathname` AQUÍ, relee esto: reintroduce el cero. */}
-      {/* ⚠️ EL `top` LLEVA EL ÁREA SEGURA SUMADA (bloque 6 · paso 10). Con
-          `viewport-fit=cover` los 16 px de `top-4` se miden desde el borde
-          FÍSICO, y una muesca de iPhone mide entre 47 y 59: este botón nacía
-          DEBAJO DEL RELOJ, medio tapado y con la mitad de su área táctil comida
-          por el sistema. Es el único acceso al menú en las veinte páginas que no
-          son la agenda, así que no es un detalle estético.
-          El 16 de diseño no se toca: se suma. En escritorio y en una pestaña
-          normal el `env()` vale 0 y esto es exactamente el `top-4` de siempre.
-          ⚠️ TIENE QUE QUEDAR POR ENCIMA DE LA FRANJA NAVY de `globals.css`
-          (`body::before`, z-index 45) y por eso conserva su `z-50`. Si alguien
-          sube la franja por encima de 50, este botón desaparece. */}
-      <button
-        onClick={alternarMenu}
-        /* `menu-flotante` NO PINTA NADA: es el asidero de la regla de arriba. Su
-           única razón de ser es que el selector no cuelgue de las utilidades de
-           Tailwind, que cambian con cualquier retoque visual. No la quites al
-           reordenar clases. */
-        className="menu-flotante lg:hidden fixed top-[calc(1rem+env(safe-area-inset-top,0px))] left-4 z-50 text-white p-2 rounded-lg shadow-lg"
-        style={{ background: 'var(--cp)' }}
-      >
-        {mobileOpen ? <X size={20} /> : <Menu size={20} />}
-      </button>
-
-      {/* Overlay */}
-      {mobileOpen && (
-        <div className="lg:hidden fixed inset-0 bg-black/40 backdrop-blur-sm z-30" onClick={close} />
-      )}
-
-      {/* Sidebar */}
-      {/* ⚠️ EL RELLENO VERTICAL ES DEL PASO 10. El `inset-y-0` llega a los dos
-          bordes físicos desde que el viewport es `viewport-fit=cover`, así que
-          sin esto el logo y el nombre del médico se meten bajo la barra de
-          estado y, abajo, «Cerrar sesión» y el aviso de privacidad quedan bajo
-          la barra de gestos — con el dedo compitiendo con el gesto de volver al
-          inicio, que es la peor mezcla posible para un botón de salir.
-          ⚠️ VA COMO RELLENO Y NO COMO `inset`, a propósito: el navy tiene que
-          seguir llegando a los cuatro bordes —un menú que se queda corto arriba
-          enseña una franja del fondo de la página y se lee como un panel mal
-          puesto—. El relleno encoge el CONTENIDO y deja el fondo entero.
-          ⚠️ ES EL MISMO NAVY QUE LA FRANJA de `globals.css`, así que en la app
-          instalada el menú y la barra de estado son una sola superficie.
-          ⚠️ SE APAGA EN `lg`: en escritorio no hay áreas seguras que valgan y
-          los `env()` ya devuelven 0, pero dejarlo explícito evita que un futuro
-          navegador de escritorio con insets meta relleno donde no toca. */}
-      {/* ⚠️ EL FONDO SALE DEL TOKEN Y YA NO DE LA FÓRMULA EN LÍNEA, Y ES UN
-          ARREGLO, NO UN REFACTOR. Aquí estuvo escrito
-          `hsl(from var(--cp, #1a3a5c) h s 20%)` a pelo, sin respaldo: en un
-          navegador sin sintaxis de color relativa esa declaración se descarta al
-          parsear, y como el `className` de abajo NO trae ninguna clase de fondo,
-          el menú se quedaba TRANSPARENTE con su texto blanco encima de la
-          página. `--ag-navy` resuelve a esa misma fórmula y trae el respaldo
-          literal en `globals.css`, así que un navegador viejo pinta el navy de
-          fábrica en vez de nada.
-          ⚠️ NO LO DEVUELVAS A LA FÓRMULA EN LÍNEA. Además del respaldo, el token
-          es lo que impide que el menú y la banda móvil de la agenda diverjan:
-          eran dos copias de la misma cuenta y ahora es una sola. */}
-      <aside
-        id="barra-lateral"
-        data-plegada={plegada ? 'true' : 'false'}
-        style={{
-          background: 'var(--ag-navy)',
-        }}
-        className={`
-          fixed inset-y-0 left-0 w-64 text-white z-40 flex flex-col
-          pt-[env(safe-area-inset-top,0px)] pb-[env(safe-area-inset-bottom,0px)] lg:pt-0 lg:pb-0
-          transition-transform duration-300
-          ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-        `}
-      >
-        {/* Logo + nombre */}
-        <div className="sb-cabecera flex flex-col items-center gap-2.5 px-5 py-5 border-b border-white/10">
-          <div className="sb-logo w-14 h-14 bg-[var(--ag-navy-logo-bg)] rounded-full flex items-center justify-center overflow-hidden shadow-lg flex-shrink-0">
-            {/* 112 = 2× los 56 px del círculo, para pantallas de alta densidad.
-                Las dos ramas pasan por next/image: el host de Supabase Storage
-                está declarado en `remotePatterns` de next.config.ts. */}
-            {logoUrl?.startsWith('https://') ? (
-              <Image src={logoUrl} alt="Logo" width={112} height={112}
-                className="w-full h-full object-contain" />
-            ) : (
-              <Image src="/logo.png" alt="Logo" width={112} height={112} priority
-                className="w-full h-full object-contain"
-                onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
-            )}
-          </div>
-          <div className="sb-etiqueta text-center">
-            <p className="font-semibold text-sm leading-tight">
-              {/* ⚠️ `estadoPerfil.nombre` MANDA Y `profile` ES EL SUPLENTE, por lo
-                  mismo que en `isAdmin`: `useProfile` memoiza en una promesa de
-                  módulo y en una copia cifrada que no se invalidan al escribir,
-                  así que este componente —montado en el layout— se quedaba con
-                  el nombre de cuando se montó. La asistente guardaba el suyo en
-                  el onboarding y aquí seguía el de antes hasta recargar en duro.
-                  La clave de SWR sí se revalida al terminar el onboarding. */}
-              {nombreDisplay ?? (estadoPerfil?.nombre || componerNombreMedicoCompleto(profile ?? {}) || '')}
-            </p>
-            <p className="text-[11px] text-[var(--ag-navy-ink-soft)] mt-0.5 leading-tight">
-              {profile?.role === 'secretaria'
-                ? 'Asistente Médico/a'
-                : subtitulo ?? profile?.especialidad ?? ''}
-            </p>
-          </div>
-        </div>
-
-        <div className="sb-etiqueta"><ConsultorioActivoSelector /></div>
-
-        {/* Navegación */}
-        <nav className="flex-1 px-2.5 py-3 overflow-y-auto space-y-0.5">
-          {sections.map((section, idx) => {
-
-            /* Divider */
-            if (section.kind === 'divider') {
-              return <div key={`divider-${idx}`} className="my-2 border-t border-white/10" />
-            }
-
-            /* Leaf */
-            if (section.kind === 'leaf') {
-              const active = leafIsActive(section.href, pathname)
-              if (section.disabled) {
-                return (
-                  <div key={section.href}
-                    className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[13px] opacity-35 cursor-not-allowed select-none">
-                    <section.icon size={16} />
-                    <span className="flex-1">{section.label}</span>
-                    {section.badge && (
-                      <span className="ml-auto text-[9px] font-semibold bg-white/15 px-1.5 py-0.5 rounded-full leading-none">
-                        {section.badge}
-                      </span>
-                    )}
-                  </div>
-                )
-              }
-              return (
-                /* ⚠️ `undefined` Y NO `true` EN LA RAMA QUE SÍ PRECARGA. El valor
-                   por defecto de `prefetch` es `auto`, que decide según la ruta:
-                   una estática se precarga entera y una dinámica sólo hasta el
-                   `loading.tsx` más cercano. Pasarle `true` FORZARÍA la ruta
-                   completa también en las dinámicas — o sea que "no tocar nada"
-                   se escribe `undefined`, no `true`. */
-                <Link key={section.href} href={section.href} onClick={close}
-                  prefetch={section.sinPrefetch ? false : undefined}
-                  aria-label={plegada ? section.label : undefined} title={plegada ? section.label : undefined}
-                  className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all duration-150 ${
-                    active ? 'bg-white text-[var(--ag-navy-ink-activo)] shadow-sm' : 'text-[var(--ag-navy-ink)] hover:bg-white/10 hover:text-white'
-                  }`}
-                >
-                  <section.icon size={16} className={active ? 'opacity-100' : 'opacity-70'} />
-                  <span className="sb-etiqueta flex-1">{section.label}</span>
-                </Link>
-              )
-            }
-
-            /* Group */
-            if (section.kind === 'group') {
-              const isOpen    = expanded.has(section.key)
-              const hasActive = groupHasActiveChild(section, pathname)
-
-              return (
-                <div key={section.key}>
-                  {/* Header del grupo */}
-                  <button
-onClick={() => toggleGroup(section.key)}
-                    aria-label={plegada ? section.label : undefined} title={plegada ? section.label : undefined}
-                    className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all duration-150 ${
-hasActive && !isOpen
-                          ? 'text-white bg-white/10'
-                          : isOpen
-                            ? 'text-[var(--ag-navy-ink-strong)]'
-                            : 'text-[var(--ag-navy-ink)] hover:bg-white/10 hover:text-white'
-                    }`}
-                  >
-                    <section.icon size={16} className={hasActive ? 'opacity-100' : 'opacity-70'} />
-                    <span className="sb-etiqueta flex-1 text-left">{section.label}</span>
-{<ChevronRight size={13} className={`sb-etiqueta opacity-50 transition-transform duration-200 ${isOpen ? 'rotate-90' : ''}`} />
-                    }
-                  </button>
-
-                  {/* Sub-items */}
-{isOpen && (
-                    <div className="sb-etiqueta mt-0.5 ml-3 pl-3 border-l border-white/10 space-y-0.5">
-                      {section.children.map(child => {
-                        /* Misma pinta que un enlace y distinto elemento: un
-                           `doc` abre el buscador de paciente, así que es un
-                           botón. La clase inactiva se comparte para que la
-                           columna no se vea de dos maneras. */
-                        const claseHijo = 'flex items-center gap-2 px-2.5 py-2 rounded-lg text-[12px] font-medium transition-all duration-150'
-                        const claseInactiva = 'text-[var(--ag-navy-ink-dim)] hover:bg-white/10 hover:text-white'
-
-                        if (child.kind === 'doc') {
-                          return (
-                            <button
-                              key={child.tipo}
-                              type="button"
-                              onClick={() => {
-                                /* Todo formato es de pago: sin suscripción, el
-                                   menú enseña el bloqueo y no busca a nadie. */
-                                if (subState.isBlocked) {
-                                  close()
-                                  openBloqueoModal()
-                                  return
-                                }
-                                abrirDocumento(child)
-                              }}
-                              className={`w-full text-left ${claseHijo} ${claseInactiva}`}
-                            >
-                              <child.icon size={13} className="opacity-60" />
-                              {child.label}
-                            </button>
-                          )
-                        }
-
-                        const childActive = leafIsActive(child.href, pathname)
-                        const childBlocked = subState.isBlocked && isBlockedHref(child.href)
-                        return (
-                          <Link key={child.href} href={child.href}
-                            onClick={(e) => {
-                              close()
-                              if (childBlocked) {
-                                e.preventDefault()
-                                openBloqueoModal()
-                              }
-                            }}
-                            className={`${claseHijo} ${
-                              childActive ? 'bg-white text-[var(--ag-navy-ink-activo)] shadow-sm' : claseInactiva
-                            }`}
-                          >
-                            <child.icon size={13} className={childActive ? 'opacity-100' : 'opacity-60'} />
-                            {child.label}
-                          </Link>
-                        )
-                      })}
-                    </div>
-                  )}
-                </div>
-              )
-            }
-
-            return null
-          })}
-        </nav>
-
-        {/* Footer */}
-        <div className="px-3 py-3 border-t border-white/10 space-y-0.5">
-          {/* F1.2 · Plegar / desplegar, sólo en la agenda y desde `lg` (por
-              debajo la barra es el cajón del menú móvil). */}
-          {enAgenda && (
-            <button type="button" onClick={() => guardarPlegada(!plegada)}
-              aria-expanded={!plegada} aria-controls="barra-lateral"
-              aria-label={plegada ? 'Desplegar menú' : 'Plegar menú'}
-              className="hidden lg:flex w-full items-center gap-2.5 px-3 py-2.5 text-[13px] text-[var(--ag-navy-ink-dim)] hover:text-white hover:bg-white/10 rounded-xl transition-colors duration-150">
-              {plegada ? <PanelLeftOpen size={14} /> : <PanelLeftClose size={14} />}
-              <span className="sb-etiqueta">{plegada ? 'Desplegar menú' : 'Plegar menú'}</span>
-            </button>
+      <EncabezadoFundido titulo={activa ? TITULOS[activa] : ''} entradas={deRiel} masActivo={enMas} masAbierto={masAbierto}
+        pendientes={pendientes} alAbrirMas={() => setMasAbierto(true)} menuAbierto={mobileOpen} alAbrirMenu={abrirMenu}
+        avatar={{ iniciales: d.iniciales, href: d.secretaria ? null : '/perfil', activo: activa === 'perfil' }} />
+      <RielNavegacion entradas={deRiel} masActivo={enMas || (!d.secretaria && activa === 'perfil')} masAbierto={masAbierto}
+        pendientes={pendientes} alAbrirMas={() => setMasAbierto(true)} accion={accion} />
+      {/* El velo del cajón: sólo abierto, y sólo donde la `<aside>` es cajón (CSS). */}
+      {mobileOpen && <div className="nav-cajon-velo" onClick={cerrarMenu} aria-hidden="true" />}
+      <aside id="barra-lateral" data-plegada={plegada ? 'true' : 'false'} data-abierta={mobileOpen ? 'true' : 'false'}
+        className="nav-barra" {...arrastre}>
+        <CabeceraBarra plan={d.estadoPerfil?.plan} planNombre={d.estadoPerfil?.planNombre} medico={!d.secretaria} alCerrar={cerrarMenu} />
+        <div className="sb-etiqueta"><ConsultorioActivoSelector variante="barra" logoUrl={d.logoUrl} nombreClinica={d.nombreClinica} /></div>
+        {/* Secciones y aviso se desplazan juntos y el pie no: con 669 de alto
+            (`ih`) el aviso desplegado no cabe, y el menú de ajustes del pie no
+            puede vivir dentro de algo que recorta. */}
+        <div className="nav-barra-medio">
+          <ListaNavegacion entradas={entradas} plegada={plegada} alNavegar={cerrarMenu} />
+          {/* El aviso de perfil, sólo médico: lo decide el ROL (B5-bis), no `gate.exento`. */}
+          {d.estadoPerfil?.role === 'medico' && (
+            <div className="sb-etiqueta nav-barra-aviso"><AvisoPerfilSidebar faltaFirma={!d.estadoPerfil.tieneFirma}
+              faltaLogo={!d.estadoPerfil.tieneLogo} faltaCedulaEspecialidad={d.estadoPerfil.faltaCedulaEspecialidad} alNavegar={cerrarMenu} /></div>
           )}
-          <button onClick={toggle} aria-label={plegada ? (dark ? 'Modo claro' : 'Modo oscuro') : undefined}
-            className="w-full flex items-center gap-2.5 px-3 py-2.5 text-[13px] text-[var(--ag-navy-ink-dim)] hover:text-white hover:bg-white/10 rounded-xl transition-all duration-150">
-            {dark ? <Sun size={14} /> : <Moon size={14} />}
-            <span className="sb-etiqueta">{dark ? 'Modo claro' : 'Modo oscuro'}</span>
-          </button>
-          <button onClick={handleLogout} aria-label={plegada ? 'Cerrar sesión' : undefined}
-            className="w-full flex items-center gap-2.5 px-3 py-2.5 text-[13px] text-[var(--ag-navy-ink-dim)] hover:text-white hover:bg-white/10 rounded-xl transition-all duration-150">
-            <LogOut size={14} />
-            <span className="sb-etiqueta">Cerrar sesión</span>
-          </button>
-
-          {/* Lo que falta en el perfil (handoff 2a). VA AQUÍ, DEBAJO DE LOS DOS
-              BOTONES Y ENCIMA DEL AVISO DE PRIVACIDAD, que es el orden vertical
-              que fija §4 de la spec y el que implementa su referencia
-              ejecutable. §1 dice lo contrario —«arriba del grupo»— y se
-              descarta: además de perder 2 a 1, la tarjeta COLAPSA, así que
-              encima de los botones cada colapso los subiría y bajaría; debajo,
-              lo único que se mueve es la línea de abajo.
-              ⚠️ PREGUNTA POR EL ROL Y NO POR `gate.exento`, Y EL CAMBIO ES DE
-              B5-bis. `exento === null` funcionaba como atajo de «es médico y
-              tiene cosas profesionales pendientes» mientras la secretaria
-              estaba exenta. Desde que el gate le pide su nombre
-              (`lib/perfil/gate.ts`), su `exento` es null como el de cualquier
-              médico — y con este aviso colgando de aquel atajo, a una asistente
-              se le anunciaría que le falta LA FIRMA y LA CÉDULA DE
-              ESPECIALIDAD. Las tres cosas que enumera esta tarjeta son de quien
-              ejerce: firma, cédula y logo. El `super_admin` queda fuera por la
-              misma condición, sin tener que nombrarlo. */}
-          {estadoPerfil?.role === 'medico' && (
-            <div className="sb-etiqueta"><AvisoPerfilSidebar
-              faltaFirma={!estadoPerfil.tieneFirma}
-              faltaLogo={!estadoPerfil.tieneLogo}
-              faltaCedulaEspecialidad={estadoPerfil.faltaCedulaEspecialidad}
-              alNavegar={close}
-            /></div>
-          )}
-
-          {/* ⚠️ EL `prefetch={false}` VA ATADO AL `target="_blank"`, Y SI ALGUIEN
-              QUITA EL SEGUNDO TIENE QUE REPLANTEARSE EL PRIMERO.
-
-              Sin él, este enlace pedía `/privacidad` CINCO VECES en cada carga de
-              cada página de `(app)` —no sólo en la agenda—, y las cinco eran
-              imposibles de aprovechar: con `target="_blank"` el clic abre un
-              contexto de navegación nuevo, que hace CARGA COMPLETA DE DOCUMENTO y
-              no consulta la caché del router de cliente. Lo precargado no se
-              consume nunca, en ningún escenario.
-
-              ⚠️ POR QUÉ CINCO Y NO UNA, que es lo que despista al medirlo. En Next
-              16 un prefetch no es una petición: la caché de segmentos pide primero
-              el árbol de rutas y después CADA SEGMENTO que falte
-              (`segment-cache/cache.js:990` y `:1296`), y en modo servidor todas
-              VAN A LA MISMA URL, distinguiéndose sólo por cabecera — en el registro
-              de red se ven como el mismo path con distinto `?_rsc=`.
-
-              Y `/privacidad` es la cara cara: está PRERENDERIZADA (sale en
-              `prerender-manifest.json`), y una ruta estática se precarga ENTERA,
-              árbol más todos sus segmentos. Las rutas de `(app)` son dinámicas y se
-              quedan en dos —árbol y poco más—, porque el prefetch se detiene en el
-              `loading.tsx` del grupo.
-
-              Medido en local con build de producción, cargando /ayuda: 14
-              peticiones RSC antes, 9 después. Las 5 que desaparecen son todas de
-              esta línea. */}
-          {/* ⚠️ `rel="noopener noreferrer"` ES OBLIGATORIO CON `target="_blank"`, y
-              faltaba: sin `noopener` la pestaña abierta recibe `window.opener` y
-              puede reescribir la URL de la de origen — que es una pantalla de la
-              aplicación con sesión abierta. Los navegadores lo aplican por defecto
-              desde 2021, así que hoy no es explotable; se escribe igual porque la
-              garantía no puede depender de la versión del navegador, y porque el
-              enlace gemelo de `app/login/page.tsx` ya lo declara obligatorio en un
-              comentario. Que dos sitios digan lo contrario sobre la misma regla es
-              lo que de verdad se arregla aquí. */}
-          <Link href="/privacidad" target="_blank" rel="noopener noreferrer" prefetch={false}
-            className="sb-etiqueta block text-center text-[10px] text-[var(--ag-navy-ink-soft)] hover:text-white/70 transition-colors pt-2">
-            Aviso de Privacidad
-          </Link>
         </div>
+        {enAgenda && <BotonPlegar plegada={plegada} />}
+        <PieBarra p={persona} a={ajustes} alNavegar={cerrarMenu} />
       </aside>
-
-      {/* Buscador de paciente de los ocho formatos.
-          ⚠️ VA FUERA DEL `<aside>`, y no es colocación estética: el aside es
-          `fixed w-64 overflow-y-auto`, o sea que recortaría por ambos lados un
-          hijo que se pinta a pantalla completa. Aquí es hermano suyo, con el
-          `z-[9998]` propio del modal por encima del `z-40` del menú y del
-          `z-50` del hamburguesa.
-          Cerrado devuelve `null`, así que en las veinte páginas donde nadie lo
-          abre no cuesta un nodo. */}
-      <ConsultaRapidaModal
-        open={docPendiente !== null}
-        onClose={() => setDocPendiente(null)}
-        /* `docPendiente` no puede ser null aquí: esta función sólo se llama con
-           el modal abierto, y abierto es justamente `docPendiente !== null`. */
-        destino={id => `/expediente/${id}/documentos?tipo=${docPendiente?.tipo}`}
-        titulo={docPendiente?.label}
-        rotuloCrear="Crear y continuar"
-      />
+      <MenuMas abierto={masAbierto} alCerrar={cerrarMas} titulo="Más">
+        <ContenidoMas medico={!d.secretaria} pendientes={d.estadoPerfil} logoUrl={d.logoUrl}
+          nombreClinica={d.nombreClinica} a={ajustes} alNavegar={cerrarTodo} />
+      </MenuMas>
+      {/* Cerrado devuelve `null`: en las páginas donde nadie lo abre no cuesta un nodo. */}
+      <ConsultaRapidaModal open={consultaAbierta} onClose={() => setConsultaAbierta(false)} />
     </>
   )
 }

@@ -219,6 +219,17 @@ export default function ExpedientePage() {
               {total} paciente{total !== 1 ? 's' : ''} registrado{total !== 1 ? 's' : ''}
             </p>
           )}
+          {/* B4 del rediseño: la entrada a Suplementación. Colgaba del grupo
+              «Pacientes» de la barra lateral, que la navegación plana quitó
+              (CALMA §28: «Suplementación sigue dentro de Expediente»). Sólo
+              médicos, como en la barra de antes. Va bajo el título y no junto
+              al botón: en `ext` (322 de ancho) empujaba el botón bajo el riel. */}
+          {!isSecretary && (
+            <Link href="/suplementacion" prefetch={false}
+              className="mt-1 inline-flex min-h-11 items-center text-[15px] font-semibold text-enlace">
+              Suplementación
+            </Link>
+          )}
         </div>
         <Link
           href="/pacientes/nuevo"
