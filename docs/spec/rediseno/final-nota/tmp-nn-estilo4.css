@@ -19,3 +19,16 @@
 .nn.marco[data-vp="ih"] .nn-rx-x,.nn.marco[data-vp="esc"] .nn-rx-x{margin:0 -8px 0 0}
 /* El bloque de navegación del dashboard trae «.nn-menu{position:relative}» (allí es el botón de menú); aquí .nn-menu es la capa «Más opciones» */
 .nn .nn-pan.nn-menu{position:absolute}
+/* CALMA §30.1/§30.7 · «Nota guardada» como hoy: sin «Ver nota» ni nota sellada a la vista. Dos acciones parejas («Imprimir nota», «Ver expediente») */
+.nn[data-vp="tel"] .nn-acc,.nn[data-vp="ih"] .nn-acc,.nn[data-vp="iv"] .nn-acc{grid-template-columns:repeat(2,minmax(0,1fr))}
+/* Computadora, «Nota guardada» y documento: sin columna de la nota, la columna de trabajo va CENTRADA (720) en el área de contenido */
+.nn[data-vp="esc"][data-e="ok"] .nn-dos,.nn[data-vp="esc"][data-e="doc"] .nn-dos{grid-template-columns:minmax(0,720px);justify-content:center}
+.nn[data-vp="esc"][data-e="ok"] .nn-der,.nn[data-vp="esc"][data-e="doc"] .nn-der{display:none}
+.nn[data-vp="esc"] .nn-acc{margin-top:14px}
+.nn[data-vp="esc"] .nn-ac{flex:none}
+/* iv · «Nota guardada»: sin la nota sellada sobra alto; el bloque «acciones + rejilla» se centra en el espacio libre bajo la cabecera */
+.nn[data-vp="iv"][data-e="ok"] .nn-acc{margin-top:auto}
+.nn[data-vp="iv"][data-e="ok"] .nn-rej-h{margin-bottom:auto}
+.nn[data-vp="iv"][data-e="ok"] .nn-cont{padding-bottom:32px}
+.nn.marco[data-vp="iv"][data-e="ok"] .nn-az{min-height:128px;justify-content:space-between}
+.nn.marco[data-vp="iv"][data-e="ok"] .nn-ac{min-height:56px}

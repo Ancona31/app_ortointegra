@@ -261,7 +261,7 @@ def ficha(vp='esc'):
       <div><dt>Nacimiento</dt><dd class="ec-num">11 feb 1953</dd></div>
     </dl>
     {NC}
-    <div class="ec-f-acc">{ND}<span class="ec-flex"></span><a href="/expediente/01/editar" class="ec-p ec-txt">Editar</a><button type="button" class="ec-p ec-txt" aria-haspopup="menu" data-menu="pac">Más</button></div>
+    <div class="ec-f-acc">{ND}<span class="ec-flex"></span><a href="/expediente/01/editar" class="ec-p ec-txt">Editar</a>{mas_pac()}</div>
     <!-- Antecedentes y antropometría son del paciente, no de una pestaña: viven aquí como filas plegables de una línea (y dejan de repetirse en el Resumen). -->
     <div class="ec-f-blq">{bloques_ficha()}</div>
   </aside>'''

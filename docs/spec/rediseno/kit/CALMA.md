@@ -226,3 +226,13 @@ REGLA DE PROCESO (obligatoria desde hoy): todo agente entrega una tabla «ítem 
 12. La agenda vacía ofrece un enlace a «Configuración de la agenda».
 13. Arrastrar en táctil exige mantener pulsado, con el tiempo de hoy.
 14. Cerrar sesión NO pide confirmación (se queda como hoy).
+
+## 30. Decisiones tras la pasada final (aprobadas por el dueño)
+1. Nueva nota: se QUITA «Ver nota» y la vista de la nota sellada dentro de la app tras guardar (no existe hoy). Queda «Imprimir nota» → «Abrir PDF» y «Ver expediente», como en el código.
+2. Administración: se MANTIENE la fila de pestañas «Estadísticas · Usuarios · Facturación» (cambio de navegación aprobado; hoy son tres entradas de la barra lateral y la del medio se llama «Usuarios de la clínica»).
+3. Lista de pacientes: «Filtros» (botón y título del panel) aprobado.
+4. Expediente: aprobados «Datos del paciente» y los resúmenes de las plegables, el contador «N documentos» y los encabezados «Expediente / Teléfono / Nacimiento» de la ficha en `esc`.
+5. Expediente en `esc`: el botón «Más» de la ficha pasa a «···» (con `aria-label` «Acciones del paciente», el de hoy).
+6. Usuarios: vuelve el estado vacío de «Tu equipo» (texto aprobado: «Todavía no hay nadie en tu equipo»); «Completo» y «3 personas» siguen fuera. Mi perfil: título «Editar consultorio» aprobado.
+7. Nueva nota: «La nota aparecerá aquí» en la columna vacía de `esc`, aprobado.
+8. Nombres accesibles (`aria-label`) propuestos para botones que hoy no tienen: aprobados todos.

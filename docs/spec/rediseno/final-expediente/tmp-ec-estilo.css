@@ -184,6 +184,8 @@
 .ec .ec-f-acc{align-self:stretch;display:flex;align-items:center;gap:16px;margin-top:6px}
 .ec .ec-f-acc .ec-txt{padding:0;min-width:36px;justify-content:center}
 .ec .ec-f-acc .ec-txt:first-child{justify-content:flex-start}
+/* CALMA §30.4: «···» (Acciones del paciente) junto a «Editar»; el menú nace de él, sin velo */
+.ec .ec-f-acc .ec-ib{margin-right:-8px}
 
 /* ---- Resumen ---- */
 .ec .ec-dxc{padding-top:16px}

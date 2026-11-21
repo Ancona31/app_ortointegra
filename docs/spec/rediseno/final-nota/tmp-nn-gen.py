@@ -89,7 +89,7 @@ ANTES = 'cap gen err rev regen'   # estados anteriores a guardar
 # ---------- Piezas ----------
 def cabecera(vp):
     esc = vp == 'esc'
-    mas = '<button type="button" class="nn-p nn-ib nn-mas-b" data-en="' + ANTES + ' doc ver" aria-label="Más opciones" aria-haspopup="menu">' + ic(I['mas'], 22, 3) + '</button>'
+    mas = '<button type="button" class="nn-p nn-ib nn-mas-b" data-en="' + ANTES + ' doc" aria-label="Más opciones" aria-haspopup="menu">' + ic(I['mas'], 22, 3) + '</button>'
     editar = '' if esc else '<button type="button" class="nn-p nn-txt nn-b-ed" data-en="rev"><span class="nn-ver0">Editar</span><span class="nn-ver1">Vista previa</span></button>'
     quien = '<span class="nn-num">73 años</span>' + (' · Femenino' if esc else '') + '<span class="nn-cons-si"> · Atendiendo en: Centro</span>'
     # En computadora el último diagnóstico es una segunda línea bajo el título; el contexto completo (F21) está en «···» en los cuatro marcos.
@@ -106,9 +106,9 @@ def cabecera(vp):
            Plan bloqueado: lo resuelve layout.tsx con un redirect a /billing ANTES de pintar esta pantalla; aquí no hay estado que dibujar. -->
 <header class="nn-top">
   <div class="nn-top-f"><a href="#" class="nn-p nn-volver" data-en="''' + ANTES + ''' ok">''' + ic(I['volver'], 14, 2.6) + '''<span class="nn-volver-t">Paciente Prueba 01</span></a>
-    <button type="button" class="nn-p nn-volver nn-b-docs" data-en="doc ver">''' + ic(I['volver'], 14, 2.6) + '''Nota guardada</button><span class="nn-flex"></span>''' + editar + ('' if esc else mas) + '''</div>
+    <button type="button" class="nn-p nn-volver nn-b-docs" data-en="doc">''' + ic(I['volver'], 14, 2.6) + '''Nota guardada</button><span class="nn-flex"></span>''' + editar + ('' if esc else mas) + '''</div>
   <div class="nn-h1f"><span class="nn-doc-ic" data-en="doc" aria-hidden="true"></span>
-    <h1><span data-en="''' + ANTES + '''">Nueva nota</span><span data-en="ok">Nota guardada</span><span data-en="doc" class="nn-doc-n">Receta</span><span data-en="ver">Nota médica</span></h1>''' + (mas if esc else '') + '''</div>
+    <h1><span data-en="''' + ANTES + '''">Nueva nota</span><span data-en="ok">Nota guardada</span><span data-en="doc" class="nn-doc-n">Receta</span></h1>''' + (mas if esc else '') + '''</div>
   <p class="nn-sub"><span class="nn-quien">''' + quien + '''</span>''' + alg + '''</p>''' + ctx + '''
 </header>
 <!-- F3 · Borrador restaurado: una línea, con «Descartar» como acción de texto -->
@@ -119,7 +119,7 @@ def cabecera(vp):
      «La IA tardó demasiado en responder. Intenta de nuevo en unos segundos.» · «La IA no devolvió una nota válida. Intenta de nuevo.» -->
 <p class="nn-linea nn-error" data-en="err" role="alert">''' + ic(I['aviso'], 16, 2) + '''<span class="nn-flex">No se pudo generar la nota. Intenta de nuevo o escríbela manualmente.</span></p>'''
             + ('' if esc else '''
-<!-- F19 · Confirmación sobria de «Nota guardada» (ya no es un modal). «Ver nota» abre la nota sellada en lectura (teléfono y Duo abierto; en computadora la nota está a la vista). -->
+<!-- F19 · Confirmación sobria de «Nota guardada» (ya no es un modal). Acciones de hoy: «Imprimir nota» (→ «Imprimiendo...» → «Abrir PDF») y «Ver expediente»; la receta y los otros documentos, en la rejilla. -->
 <p class="nn-linea nn-nota-ok" data-en="ok">''' + ic(I['okc'], 18, 2) + '''<span>Quedó sellada en el expediente.</span></p>'''))
 
 def vfila(en):
@@ -161,7 +161,6 @@ def doc(en):
      Sin diagnóstico estructurado la lista dice «Sin diagnóstico estructurado — la nota se guardará sin código CIE-10.» (alcanzable: modo manual sin diagnósticos). -->
 <article class="nn-doc" data-en="''' + en + '''" aria-label="Nota médica">
   <p class="nn-origen" data-en="rev regen"><span class="nn-tag nn-t-ton" data-solo="ia">''' + ic(I['chispa'], 14, 2) + '''Nota IA</span><span class="nn-tag nn-t-ton" data-solo="man">''' + ic(I['lapiz'], 14, 2) + '''Nota manual</span><span>Revísala antes de guardar</span></p>
-  <p class="nn-origen" data-en="ok doc ver"><span class="nn-tag nn-t-ok">''' + ic(I['candado'], 14, 2) + '''Nota sellada</span></p>
   <!-- CALMA §12 · Secciones con rótulo de color, cuerpo justificado (lang="es" + hyphens:auto), diagnóstico destacado con su CIE-10 en etiqueta. El Plan es texto de la nota;
        los medicamentos salen UNA vez, en «Detecté estos medicamentos», bajo una línea, con «Quitar» (tercera revisión). -->
   <div class="nn-prosa nn-ver0" lang="es"></div>
@@ -175,7 +174,6 @@ def doc(en):
     <dl class="nn-kv nn-kv2 nn-ver0"><div><dt>Pronóstico</dt><dd class="nn-pro-v">—</dd></div><div><dt>Próxima cita</dt><dd class="nn-cita-v">En 2 semanas</dd></div></dl>
     <div class="nn-seg-e nn-ver1"><label class="nn-f"><span>Pronóstico</span><input type="text" class="nn-in nn-pro" autocomplete="off" placeholder="Ej: Favorable a mediano plazo con tratamiento conservador..."></label>
       <label class="nn-f"><span>Próxima cita</span><input type="text" class="nn-in nn-cita" value="En 2 semanas" autocomplete="off" placeholder="Ej: En 4 semanas, 15 de abril 2026..."></label></div></section>
-  <section class="nn-grp" data-en="ok doc ver"><h3 class="nn-grp-t">Signos vitales</h3><dl class="nn-kv nn-vres2"></dl></section>
   <!-- Bloque de firma sobrio (pedido por el dueño). Datos ficticios del médico de la sesión. -->
   <footer class="nn-firma"><b>Dr. Admin Semilla</b><span class="nn-num">Cédula Prof. 00000001</span><span class="nn-num">19 de noviembre de 2026</span></footer>
 </article>''')
@@ -187,8 +185,9 @@ def rejilla():
      Un documento empezado y sin imprimir deja su azulejo contorneado. -->
 <div class="nn-rej-h" data-en="ok"><ul class="nn-rej" aria-label="Tipo de documento">''' + az + '''</ul></div>''')
 
-def acciones_ok(ver=True):
-    return (('<button type="button" class="nn-p nn-ac nn-b-ver" data-en="ok">' + ic(I['ojo'], 20) + '<span>Ver nota</span>' + FLECHA + '</button>' if ver else '') +
+def acciones_ok():
+    # «Nota guardada» como hoy (nueva-nota/page.tsx): «Imprimir nota» (→ «Imprimiendo...» → «Abrir PDF») y «Ver expediente»; la receta y los otros documentos, en la rejilla
+    return (
             '<button type="button" class="nn-p nn-ac nn-ok-imp" data-en="ok">' + ic(I['imprime'], 20) + '<span class="nn-ok-imp-t">Imprimir nota</span>' + FLECHA + '</button>'
             '<a href="#" class="nn-p nn-ac nn-ok-exp" data-en="ok">' + ic(I['carpeta'], 20) + '<span>Ver expediente</span>' + FLECHA + '</a>')
 
@@ -257,7 +256,7 @@ def capas(vp):
   <div class="nn-hj-cab"><h2>Más opciones</h2>''' + X % 'Cerrar' + '''</div>
   <div class="nn-hj-c">
     ''' + mr('pac', 'Contexto del paciente', ANTES, 'paciente') + mr('man', 'Prefiero escribirla yo', 'cap err', 'lapiz', 'ia', ' nn-solo-tel') + mr('ia', 'Usar IA', 'cap', 'chispa', 'man', ' nn-solo-tel')
-        + mr('plantg', 'Gestionar plantillas', 'doc', 'plantilla') + mr('imp', 'Imprimir nota', 'doc ver', 'imprime') + mr('exp', 'Ver expediente', 'doc ver', 'carpeta') + '''
+        + mr('plantg', 'Gestionar plantillas', 'doc', 'plantilla') + mr('imp', 'Imprimir nota', 'doc', 'imprime') + mr('exp', 'Ver expediente', 'doc', 'carpeta') + '''
     <button type="button" class="nn-mr" role="menuitem" data-en="cap gen err" data-solo="ia" disabled>''' + ic(I['micro'], 20) + '''<span class="nn-flex">Dictado por voz — próximamente</span></button>
     <button type="button" class="nn-mr nn-mr2" role="menuitem" data-en="''' + ANTES + '''" disabled>''' + ic(I['docs'], 20) + '''<span class="nn-flex">Documentos del paciente<small data-en="cap gen err">Completa y genera la nota para activar este panel</small><small data-en="rev regen">Guarda la nota para poder generar documentos desde aquí</small></span></button>
     ''' + mr('nuevo', 'Empezar de nuevo', 'rev', 'rehacer', '', ' nn-mr-mal') + '''
@@ -342,23 +341,22 @@ def marco(vp):
     if vp == 'esc':
         vacio = ('''<!-- Antes de generar: casi en blanco. Una línea y la lista de secciones en texto tenue; sin barras-esqueleto. F7/F11 · mientras redacta, la línea cambia
      (hoy: modal «Spinus está redactando tu nota» · «Unos segundos…» con los pasos «Leyendo tu dictado», «Estructurando la nota», «Redactando la exploración»).
-     «La nota aparecerá aquí» es un texto nuevo, pendiente de aprobar: hoy no existe porque la nota se revisa en un modal. -->
+     «La nota aparecerá aquí» es un texto nuevo aprobado (CALMA §30): hoy no existe porque la nota se revisa en un modal. -->
 <div class="nn-vacio" data-en="cap gen err"><p class="nn-vacio-h"><span data-en="cap err">La nota aparecerá aquí</span><span class="nn-giro" data-en="gen" aria-hidden="true"></span><span data-en="gen">Spinus está redactando tu nota</span></p>
   <ul aria-hidden="true"><li>Subjetivo</li><li>Objetivo</li><li>Auxiliares diagnósticos</li><li>Diagnóstico</li><li>Análisis</li><li>Plan</li></ul></div>''')
         rcab = ('''<div class="nn-rcab"><span class="nn-flex"></span>
     <button type="button" class="nn-p nn-txt nn-b-ed" data-en="rev"><span class="nn-ver0">Editar</span><span class="nn-ver1">Vista previa</span></button>
     <button type="button" class="nn-p nn-prim nn-b-guardar" data-en="rev">Guardar nota</button>
-    <!-- «Nota guardada» en computadora: las acciones de la nota van junto a la nota (aquí «Ver nota» no hace falta: la nota sellada está a la vista). -->
-    <div class="nn-acc" data-en="ok" role="group" aria-label="Esta nota">''' + acciones_ok(False) + '''</div></div>''')
-        col = ('<div class="nn-col"><main class="nn-cont"><div class="nn-dos">\n<div class="nn-izq">\n' + cabecera(vp) + '\n<section class="nn-card" data-en="' + ANTES + ' doc">\n' + vfila(ANTES) + '\n'
+</div>''')
+        col = ('<div class="nn-col"><main class="nn-cont"><div class="nn-dos">\n<div class="nn-izq">\n' + cabecera(vp) + '\n<div class="nn-acc" data-en="ok" role="group" aria-label="Esta nota">' + acciones_ok() + '</div>\n<section class="nn-card" data-en="' + ANTES + ' doc">\n' + vfila(ANTES) + '\n'
                + escritura(ANTES) + '\n' + manual('cap rev') + '\n' + formulario() + '\n</section>\n' + rejilla() + '\n' + botones(vp) + '\n</div>\n<div class="nn-der">\n' + rcab + '\n' + vacio + '\n'
-               + doc('rev regen ok doc') + '\n</div>\n</div></main>' + TOAST + '</div>')
+               + doc('rev regen') + '\n</div>\n</div></main>' + TOAST + '</div>')
     else:
         iv = vp == 'iv'
         acc = ('<!-- F19 · «Esta nota»: fila única y pareja de tres acciones (botones tonales del mismo ancho, icono de color + rótulo). «Concluir consulta» queda como único primario al pie. -->\n'
-               '<div class="nn-acc" data-en="ok" role="group" aria-label="Esta nota">' + acciones_ok(not iv) + '</div>')
-        col = ('<div class="nn-col"><main class="nn-cont">\n' + cabecera(vp) + '\n<section class="nn-card" data-en="' + ANTES + ' doc ver' + (' ok' if iv else '') + '">\n' + vfila('cap gen err') + '\n' + escritura('cap gen err') + '\n' + manual('cap') + '\n'
-               + doc('rev regen ver' + (' ok' if iv else '')) + '\n' + formulario() + '\n</section>\n' + acc + '\n' + rejilla() + '\n</main>\n' + botones(vp) + TOAST + '</div>')
+               '<div class="nn-acc" data-en="ok" role="group" aria-label="Esta nota">' + acciones_ok() + '</div>')
+        col = ('<div class="nn-col"><main class="nn-cont">\n' + cabecera(vp) + '\n<section class="nn-card" data-en="' + ANTES + ' doc">\n' + vfila('cap gen err') + '\n' + escritura('cap gen err') + '\n' + manual('cap') + '\n'
+               + doc('rev regen') + '\n' + formulario() + '\n</section>\n' + acc + '\n' + rejilla() + '\n</main>\n' + botones(vp) + TOAST + '</div>')
     nav = {'ext': riel, 'tel': encabezado, 'ih': lambda: lateral('ih'), 'iv': fundido, 'esc': lambda: lateral('esc')}[vp]()
     app = (nav + '\n' + col) if vp in ('tel', 'iv', 'esc') else (col + '\n' + nav)
     return '<div class="marco nn" data-vp="%s" data-e="cap" data-modo="ia" lang="es">\n<div class="nn-app">\n%s\n</div>\n%s\n</div>\n' % (vp, app, capas(vp) + CRO['capa_mas'](vp))

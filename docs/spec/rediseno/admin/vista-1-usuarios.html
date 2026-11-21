@@ -343,6 +343,11 @@
 .us .us-mo:active,.us .us-avp-l:active,.us .us-avp-b:active{transform:scale(.97)}
 .us .us-mo:focus-visible,.us .us-avp-l:focus-visible,.us .us-avp-b:focus-visible{outline:3px solid var(--enlace);outline-offset:2px}
 .us .us-cons-b{width:100%}
+/* Pie de la barra lateral: nombre, especialidad y «Mi perfil · Ajustes» en tres líneas de una sola fila cada una, con elipsis */
+.us .us-lat-pie .us-yo>span{flex:1;min-width:0;gap:1px}
+.us .us-lat-pie .us-yo>span>*{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.us[data-vp="esc"] .us-lat-pie .us-yo{padding-top:8px;padding-bottom:8px}
+.us[data-vp="ih"] .us-lat-pie .us-esp{display:none}
 @media (prefers-reduced-motion:reduce){.us .us-mn,.us .us-capa-m.us-on .us-mn{transform:none;transition:opacity 200ms ease}.us .us-avp-pt::after{animation:none;opacity:0}.us .us-avp-ch{transition:none}}
 @media (prefers-reduced-transparency:reduce){.us .us-capa-m .us-velo{backdrop-filter:none;-webkit-backdrop-filter:none;background:linear-gradient(var(--velo),var(--velo)),var(--velo)}}
 
@@ -452,6 +457,9 @@
 .us[data-vp="ext"] .us-bot{position:sticky;bottom:0;z-index:1;padding:8px 0 16px;background:var(--sup)}
 .us[data-vp="ext"] .us-alerta{width:310px}
 .us[data-vp] .us-seg{display:flex}
+.us[data-vp] .us-vacio{gap:10px;padding:28px 12px 32px}
+.us[data-vp] .us-vac-i{width:48px;height:48px;border-radius:999px;display:flex;align-items:center;justify-content:center;background:var(--tonal);color:var(--tonal-tinta)}
+.us[data-vp] .us-vac-i svg{margin:0;color:inherit}
 .us[data-vp] .us-seg button{flex:1 1 auto;white-space:nowrap}
 .us[data-vp="ext"] .us-menu .us-hjcab h2,.us[data-vp="tel"] .us-menu .us-hjcab h2{font-size:15px;line-height:20px}
 @media (prefers-reduced-motion:reduce){.us[data-vp] .us-alerta,.us[data-vp] .us-on .us-alerta{transform:none}}
@@ -509,7 +517,8 @@
       </li>
     </ul>
     <!-- Estado vacío (hoy la tarjeta queda solo con su rótulo) -->
-    <div class="us-vacio" hidden></div>
+    <!-- Estado vacío de «Tu equipo» (CALMA §30.6, texto aprobado). La acción es «Invitar», que ya está en la cabecera. -->
+    <div class="us-vacio" hidden><span class="us-vac-i" aria-hidden="true"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.9.7 3.1 2.4 3.5 5.2"/></svg></span><b>Todavía no hay nadie en tu equipo</b></div>
   </section>
   <!-- Función 1: esta pantalla solo la ve quien administra la clínica; cualquier otro perfil es enviado a /dashboard (no se dibuja).
        Estado de sistema «cargando»: tres filas fantasma (círculo de avatar + dos líneas) dentro de la tarjeta «Tu equipo»; mismo alto que una fila real para que nada salte.
@@ -655,7 +664,8 @@
       </li>
     </ul>
     <!-- Estado vacío (hoy la tarjeta queda solo con su rótulo) -->
-    <div class="us-vacio" hidden></div>
+    <!-- Estado vacío de «Tu equipo» (CALMA §30.6, texto aprobado). La acción es «Invitar», que ya está en la cabecera. -->
+    <div class="us-vacio" hidden><span class="us-vac-i" aria-hidden="true"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.9.7 3.1 2.4 3.5 5.2"/></svg></span><b>Todavía no hay nadie en tu equipo</b></div>
   </section>
   <!-- Función 1: esta pantalla solo la ve quien administra la clínica; cualquier otro perfil es enviado a /dashboard (no se dibuja).
        Estado de sistema «cargando»: tres filas fantasma (círculo de avatar + dos líneas) dentro de la tarjeta «Tu equipo»; mismo alto que una fila real para que nada salte.
@@ -769,7 +779,8 @@
       </li>
     </ul>
     <!-- Estado vacío (hoy la tarjeta queda solo con su rótulo) -->
-    <div class="us-vacio" hidden></div>
+    <!-- Estado vacío de «Tu equipo» (CALMA §30.6, texto aprobado). La acción es «Invitar», que ya está en la cabecera. -->
+    <div class="us-vacio" hidden><span class="us-vac-i" aria-hidden="true"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.9.7 3.1 2.4 3.5 5.2"/></svg></span><b>Todavía no hay nadie en tu equipo</b></div>
   </section>
   <!-- Función 1: esta pantalla solo la ve quien administra la clínica; cualquier otro perfil es enviado a /dashboard (no se dibuja).
        Estado de sistema «cargando»: tres filas fantasma (círculo de avatar + dos líneas) dentro de la tarjeta «Tu equipo»; mismo alto que una fila real para que nada salte.
@@ -907,7 +918,8 @@
       </li>
     </ul>
     <!-- Estado vacío (hoy la tarjeta queda solo con su rótulo) -->
-    <div class="us-vacio" hidden></div>
+    <!-- Estado vacío de «Tu equipo» (CALMA §30.6, texto aprobado). La acción es «Invitar», que ya está en la cabecera. -->
+    <div class="us-vacio" hidden><span class="us-vac-i" aria-hidden="true"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.9.7 3.1 2.4 3.5 5.2"/></svg></span><b>Todavía no hay nadie en tu equipo</b></div>
   </section>
   <!-- Función 1: esta pantalla solo la ve quien administra la clínica; cualquier otro perfil es enviado a /dashboard (no se dibuja).
        Estado de sistema «cargando»: tres filas fantasma (círculo de avatar + dos líneas) dentro de la tarjeta «Tu equipo»; mismo alto que una fila real para que nada salte.
@@ -1060,7 +1072,8 @@
       </li>
     </ul>
     <!-- Estado vacío (hoy la tarjeta queda solo con su rótulo) -->
-    <div class="us-vacio" hidden></div>
+    <!-- Estado vacío de «Tu equipo» (CALMA §30.6, texto aprobado). La acción es «Invitar», que ya está en la cabecera. -->
+    <div class="us-vacio" hidden><span class="us-vac-i" aria-hidden="true"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.9.7 3.1 2.4 3.5 5.2"/></svg></span><b>Todavía no hay nadie en tu equipo</b></div>
   </section>
   <!-- Función 1: esta pantalla solo la ve quien administra la clínica; cualquier otro perfil es enviado a /dashboard (no se dibuja).
        Estado de sistema «cargando»: tres filas fantasma (círculo de avatar + dos líneas) dentro de la tarjeta «Tu equipo»; mismo alto que una fila real para que nada salte.

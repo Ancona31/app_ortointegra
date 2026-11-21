@@ -186,6 +186,8 @@
 .ec .ec-f-acc{align-self:stretch;display:flex;align-items:center;gap:16px;margin-top:6px}
 .ec .ec-f-acc .ec-txt{padding:0;min-width:36px;justify-content:center}
 .ec .ec-f-acc .ec-txt:first-child{justify-content:flex-start}
+/* CALMA §30.4: «···» (Acciones del paciente) junto a «Editar»; el menú nace de él, sin velo */
+.ec .ec-f-acc .ec-ib{margin-right:-8px}
 
 /* ---- Resumen ---- */
 .ec .ec-dxc{padding-top:16px}
@@ -2255,7 +2257,7 @@
       <div><dt>Nacimiento</dt><dd class="ec-num">11 feb 1953</dd></div>
     </dl>
     <a href="/expediente/01/nueva-nota" class="ec-p ec-prim">Nueva consulta</a>
-    <div class="ec-f-acc"><button type="button" class="ec-p ec-txt" data-abre="nuevo" aria-haspopup="dialog">Nuevo documento</button><span class="ec-flex"></span><a href="/expediente/01/editar" class="ec-p ec-txt">Editar</a><button type="button" class="ec-p ec-txt" aria-haspopup="menu" data-menu="pac">Más</button></div>
+    <div class="ec-f-acc"><button type="button" class="ec-p ec-txt" data-abre="nuevo" aria-haspopup="dialog">Nuevo documento</button><span class="ec-flex"></span><a href="/expediente/01/editar" class="ec-p ec-txt">Editar</a><button type="button" class="ec-p ec-ib" aria-label="Acciones del paciente" aria-haspopup="menu" data-menu="pac"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 12h.01M12 12h.01M18.5 12h.01"/></svg></button></div>
     <!-- Antecedentes y antropometría son del paciente, no de una pestaña: viven aquí como filas plegables de una línea (y dejan de repetirse en el Resumen). -->
     <div class="ec-f-blq"><section class="ec-blq ec-cerr"><button type="button" class="ec-p ec-plg" aria-expanded="false"><b>Antecedentes</b><span class="ec-sub ec-num"><span class="ec-v1">5 apartados</span><span class="ec-v0">Sin antecedentes registrados.</span></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>
         <div class="ec-blq-c"><!-- Función 14: antecedentes (5 apartados) o «Capturar antecedentes» → editar. -->

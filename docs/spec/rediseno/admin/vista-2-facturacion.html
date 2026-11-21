@@ -297,6 +297,11 @@
 .fa .fa-mo:active,.fa .fa-avp-l:active,.fa .fa-avp-b:active{transform:scale(.97)}
 .fa .fa-mo:focus-visible,.fa .fa-avp-l:focus-visible,.fa .fa-avp-b:focus-visible{outline:3px solid var(--enlace);outline-offset:2px}
 .fa .fa-cons-b{width:100%}
+/* Pie de la barra lateral: nombre, especialidad y «Mi perfil · Ajustes» en tres líneas de una sola fila cada una, con elipsis */
+.fa .fa-lat-pie .fa-yo>span{flex:1;min-width:0;gap:1px}
+.fa .fa-lat-pie .fa-yo>span>*{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fa[data-vp="esc"] .fa-lat-pie .fa-yo{padding-top:8px;padding-bottom:8px}
+.fa[data-vp="ih"] .fa-lat-pie .fa-esp{display:none}
 @media (prefers-reduced-motion:reduce){.fa .fa-mn,.fa .fa-capa-m.fa-on .fa-mn{transform:none;transition:opacity 200ms ease}.fa .fa-avp-pt::after{animation:none;opacity:0}.fa .fa-avp-ch{transition:none}}
 @media (prefers-reduced-transparency:reduce){.fa .fa-capa-m .fa-velo{backdrop-filter:none;-webkit-backdrop-filter:none;background:linear-gradient(var(--velo),var(--velo)),var(--velo)}}
 

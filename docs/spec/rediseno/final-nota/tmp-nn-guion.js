@@ -68,7 +68,7 @@
       m.classList.toggle('nn-convit',p.length>0);
       $$('.nn-vres').forEach(function(x){x.innerHTML=p.join(' · ')});var kv=[];if(v.sis||v.dia)kv.push(['Presión arterial',val('sis')+'/'+val('dia'),'mmHg']);
       [['fc','FC','lpm'],['fr','FR','rpm'],['temp','Temp.','°C'],['spo2','SpO₂','%']].forEach(function(q){if(v[q[0]])kv.push([q[1],val(q[0]),q[2]])});
-      $('.nn-vres2').innerHTML=kv.length?kv.map(function(k){return '<div><dt>'+k[0]+'</dt><dd>'+k[1]+' <small>'+k[2]+'</small></dd></div>'}).join(''):'<div><dd class="nn-kv-no">Sin capturar</dd></div>';
+      if($('.nn-vres2'))$('.nn-vres2').innerHTML=kv.length?kv.map(function(k){return '<div><dt>'+k[0]+'</dt><dd>'+k[1]+' <small>'+k[2]+'</small></dd></div>'}).join(''):'<div><dd class="nn-kv-no">Sin capturar</dd></div>';
       var n=0;$$('.nn-vr').forEach(function(r){var mal=!!r.querySelector('.nn-mala');if(mal)n++;r.querySelector('.nn-vmsg').hidden=!mal});  /* la presión arterial cuenta como un signo, igual que hoy */
       $$('.nn-vchip').forEach(function(x){x.hidden=!n;x.textContent=n+' fuera de rango'});
       $('.nn-sinvit').hidden=p.length>0}
@@ -152,11 +152,12 @@
         $('.nn-pan[data-pan="cambio"]').setAttribute('aria-label','¿Cambiar a '+DOCS[t][0]+'?');abre('cambio',e.currentTarget)}
       else abreDoc(t)});
     on('.nn-cb-ok','click',function(){origen=null;docAb=null;abreDoc(pendiente)});
-    function imprime(){var t=$('.nn-ok-imp-t');if(t.textContent==='Abrir PDF')toast('Maqueta: aquí se abre el PDF de la nota');else{t.textContent='Abrir PDF';toast('Maqueta: se genera el PDF de la nota')}}
+    function imprime(){var t=$('.nn-ok-imp-t'),b=t.closest('.nn-ok-imp');if(b.disabled)return;if(t.textContent==='Abrir PDF'){toast('Maqueta: aquí se abre el PDF de la nota');return}
+      /* como hoy (page.tsx:1087): «Imprimiendo...» mientras se genera; luego el mismo sitio ofrece «Abrir PDF» */
+      t.textContent='Imprimiendo...';b.disabled=true;setTimeout(function(){t.textContent='Abrir PDF';b.disabled=false},1200)}
     on('.nn-ok-imp','click',imprime);
     on('.nn-ok-exp','click',function(){toast('Maqueta: aquí vuelves al expediente')});
     on('.nn-b-docs','click',function(){if(!conDatos())docAb=null;estado('ok')});
-    on('.nn-b-ver','click',function(){estado('ver')});
     on('.nn-b-imp','click',function(){toast('Maqueta: se imprime «'+DOCS[docAb][0]+'» y el formulario se cierra');docAb=null;estado('ok')});  /* hoy, al emitir, el formulario se desmonta */
     on('.nn-b-plant','click',function(){toast('Maqueta: aquí se guarda el formulario como plantilla')});
     function concluye(){cierra();toast('Maqueta: aquí vuelves al expediente')}

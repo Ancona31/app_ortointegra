@@ -525,6 +525,11 @@
 .pr .pr-mo:active,.pr .pr-avp-l:active,.pr .pr-avp-b:active{transform:scale(.97)}
 .pr .pr-mo:focus-visible,.pr .pr-avp-l:focus-visible,.pr .pr-avp-b:focus-visible{outline:3px solid var(--enlace);outline-offset:2px}
 .pr .pr-cons-b{width:100%}
+/* Pie de la barra lateral: nombre, especialidad y «Mi perfil · Ajustes» en tres líneas de una sola fila cada una, con elipsis */
+.pr .pr-lat-pie .pr-yo>span{flex:1;min-width:0;gap:1px}
+.pr .pr-lat-pie .pr-yo>span>*{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pr[data-vp="esc"] .pr-lat-pie .pr-yo{padding-top:8px;padding-bottom:8px}
+.pr[data-vp="ih"] .pr-lat-pie .pr-esp{display:none}
 @media (prefers-reduced-motion:reduce){.pr .pr-mn,.pr .pr-capa-m.pr-on .pr-mn{transform:none;transition:opacity 200ms ease}.pr .pr-avp-pt::after{animation:none;opacity:0}.pr .pr-avp-ch{transition:none}}
 @media (prefers-reduced-transparency:reduce){.pr .pr-capa-m .pr-velo{backdrop-filter:none;-webkit-backdrop-filter:none;background:linear-gradient(var(--velo),var(--velo)),var(--velo)}}
 
