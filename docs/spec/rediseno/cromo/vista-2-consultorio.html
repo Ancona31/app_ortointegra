@@ -1,0 +1,489 @@
+<!-- NOMBRE: Selector de consultorio activo | Hoy es un desplegable blanco dentro del menú lateral y un modal genérico; aquí la lista nace del botón en computadora, sube como hoja en iPhone y es tarjeta centrada en Duo (en Duo cerrado se abre desde «Más»), y la confirmación usa la alerta única -->
+<style>
+
+.cr2 .cr2-app{display:flex;width:100%;height:100%}
+.cr2[data-vp="tel"] .cr2-app,.cr2[data-vp="iv"] .cr2-app{flex-direction:column}
+.cr2 button{border:0;margin:0;padding:0;background:none;color:inherit}
+.cr2 h1,.cr2 h2,.cr2 h3,.cr2 p,.cr2 ul{margin:0;padding:0}
+.cr2 ul{list-style:none}
+.cr2 svg{flex:none}
+.cr2 .cr2-flex{flex:1}
+/* Variantes por rol: m = médico, s = secretaria */
+.cr2:not(.cr2-sec) .cr2-s{display:none!important}
+.cr2.cr2-sec .cr2-m{display:none!important}
+/* Respuesta al toque y foco */
+.cr2 .cr2-p{transition:transform 100ms ease-out}
+.cr2 .cr2-p:active{transform:scale(.97)}
+.cr2 .cr2-p:focus-visible{outline:3px solid var(--enlace);outline-offset:2px}
+.cr2 .cr2-nav .cr2-p:focus-visible,.cr2 .cr2-lat .cr2-p:focus-visible{outline-color:var(--nav-tinta)}
+/* ---- Fondo simplificado ---- */
+.cr2 .cr2-cont{flex:1;min-width:0;min-height:0;overflow-x:hidden;overflow-y:auto;scrollbar-width:none;display:flex;flex-direction:column;gap:16px;padding:16px 14px calc(var(--ib) + 16px) 16px}
+.cr2 .cr2-cont>*{flex:none}
+.cr2[data-vp="tel"] .cr2-cont{padding:18px 16px calc(var(--ib) + 16px)}
+.cr2[data-vp="ih"] .cr2-cont{padding:20px 24px calc(var(--ib) + 16px)}
+.cr2[data-vp="iv"] .cr2-cont{padding:22px 24px 20px}
+.cr2[data-vp="esc"] .cr2-cont{padding:28px 24px 24px}
+.cr2 .cr2-top{display:flex;flex-direction:column;gap:4px}
+.cr2 .cr2-rot{font-size:12px;line-height:16px;font-weight:600;letter-spacing:.3px;text-transform:uppercase;color:var(--tinta2)}
+.cr2 .cr2-h1{font-size:26px;line-height:32px;font-weight:800;letter-spacing:-.6px}
+.cr2[data-vp="ih"] .cr2-h1,.cr2[data-vp="iv"] .cr2-h1,.cr2[data-vp="esc"] .cr2-h1{font-size:32px;line-height:38px}
+.cr2 .cr2-cols{display:flex;flex-direction:column;gap:12px}
+.cr2[data-vp="ih"] .cr2-cols,.cr2[data-vp="iv"] .cr2-cols,.cr2[data-vp="esc"] .cr2-cols{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:16px;align-items:start}
+.cr2[data-vp="ih"] .cr2-cols>:first-child,.cr2[data-vp="iv"] .cr2-cols>:first-child,.cr2[data-vp="esc"] .cr2-cols>:first-child{grid-row:1/3}
+.cr2 .cr2-tj{background:var(--sup);border-radius:16px;padding:14px 16px 8px}
+.cr2[data-vp="ih"] .cr2-tj,.cr2[data-vp="iv"] .cr2-tj,.cr2[data-vp="esc"] .cr2-tj{border-radius:18px;padding:16px 20px 8px}
+.cr2 .cr2-tt{font-size:17px;line-height:22px;font-weight:700;margin-bottom:4px}
+.cr2 .cr2-fl{display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--linea)}
+.cr2 .cr2-tt+.cr2-fl{border-top:0}
+.cr2 .cr2-bx{width:44px;height:44px;flex:none;border-radius:12px;background:var(--fondo)}
+.cr2 .cr2-fl-t{flex:1;display:flex;flex-direction:column;gap:8px}
+.cr2 .cr2-br{display:block;height:10px;border-radius:5px;background:var(--sup2)}
+.cr2 .cr2-br2{height:8px;opacity:.7}
+/* ---- Riel (Duo cerrado) ---- */
+.cr2 .cr2-riel{position:relative;z-index:1;flex:none;width:calc(56px + var(--ir));padding:16px calc(var(--ir) + 8px) calc(var(--ib) + 10px) 8px;background:var(--navy);border-radius:26px 0 0 26px;box-shadow:var(--sombra-nav-der);display:flex;flex-direction:column;align-items:center;gap:8px}
+.cr2 .cr2-rb{position:relative;width:48px;height:48px;flex:none;border-radius:999px;display:flex;align-items:center;justify-content:center;color:var(--nav-tinta)}
+.cr2 .cr2-rb[aria-current="page"]{background:var(--accion);color:#fff}
+.cr2 .cr2-masb{width:52px;height:52px;flex:none;border-radius:999px;background:#fff;color:var(--accion);display:flex;align-items:center;justify-content:center;box-shadow:var(--sombra-accion)}
+/* ---- Encabezado fundido (iPhone) ---- */
+.cr2 .cr2-enc{position:relative;z-index:1;flex:none;display:flex;align-items:center;gap:12px;padding:calc(var(--it) + 8px) 16px 12px;background:var(--navy);border-radius:0 0 26px 26px;box-shadow:var(--sombra-nav-sup);color:#fff}
+.cr2 .cr2-menu{position:relative;width:44px;height:44px;flex:none;border-radius:12px;background:var(--nav-velo);color:#fff;display:flex;align-items:center;justify-content:center}
+.cr2 .cr2-enc-t{font-size:17px;line-height:22px;font-weight:700;color:#fff}
+.cr2 .cr2-av{display:flex;align-items:center;justify-content:center;flex:none;width:34px;height:34px;border-radius:999px;background:var(--nav-avatar);color:var(--navy);font-size:13px;font-weight:700}
+.cr2 .cr2-av.cr2-av-g{width:44px;height:44px}
+/* ---- Encabezado de Duo abierto vertical ---- */
+.cr2 .cr2-env{position:relative;z-index:1;flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:var(--it) 16px 14px;background:var(--navy);border-radius:0 0 26px 26px;box-shadow:var(--sombra-nav-sup);color:#fff}
+.cr2 .cr2-envb{position:relative;width:44px;height:44px;flex:none;border-radius:999px;background:var(--nav-velo);color:#fff;display:flex;align-items:center;justify-content:center}
+.cr2 .cr2-pista{display:flex;align-items:center;gap:2px;padding:4px;border-radius:26px;background:var(--nav-velo)}
+.cr2 .cr2-pv{display:flex;align-items:center;height:40px;padding:0 14px;border-radius:999px;color:var(--nav-tinta);font-size:15px;line-height:20px;font-weight:500;white-space:nowrap;position:relative}
+.cr2 .cr2-pv::after{content:"";position:absolute;inset:-2px 0}
+.cr2 .cr2-pv[aria-current="page"]{padding:0 16px;background:var(--accion);color:#fff;font-weight:600}
+/* ---- Barra lateral (Duo abierto horizontal a la derecha; computadora a la izquierda) y cajón ---- */
+.cr2 .cr2-lat{position:relative;z-index:1;flex:none;display:flex;flex-direction:column;background:var(--navy);color:#fff}
+.cr2[data-vp="ih"] .cr2-lat{width:calc(218px + var(--ir));padding:16px calc(var(--ir) + 10px) calc(var(--ib) + 10px) 12px;border-radius:26px 0 0 26px;box-shadow:var(--sombra-nav-der)}
+.cr2[data-vp="esc"] .cr2-lat{width:248px;padding:16px 12px 14px;border-radius:0 26px 26px 0;box-shadow:var(--sombra-nav-izq)}
+.cr2 .cr2-lat-cab{display:flex;align-items:center;gap:8px;min-height:36px;padding:0 4px 0 8px}
+.cr2 .cr2-logo{display:inline-flex;align-items:center;gap:8px;color:#fff}
+.cr2 .cr2-logo-n{font-size:17px;line-height:22px;font-weight:700;letter-spacing:-.2px}
+.cr2 .cr2-plan{display:inline-flex;align-items:center;height:24px;padding:0 10px;border-radius:999px;background:var(--nav-velo);color:var(--nav-tinta);font-size:12px;line-height:16px;font-weight:600;white-space:nowrap}
+.cr2 .cr2-cons-b{margin-top:12px;display:flex;align-items:center;gap:10px;width:100%;min-height:52px;padding:8px 10px;border-radius:14px;background:var(--nav-velo);color:#fff;text-align:left}
+.cr2 .cr2-cons-b>svg{color:var(--nav-tinta2)}
+.cr2 .cr2-clogo{width:36px;height:36px;flex:none;border-radius:999px;background:#fff;color:var(--accion);display:flex;align-items:center;justify-content:center}
+.cr2 .cr2-cons-t{flex:1;min-width:0;display:flex;flex-direction:column}
+.cr2 .cr2-cons-t span{font-size:13px;line-height:16px;color:var(--nav-tinta2)}
+.cr2 .cr2-cons-t b{font-size:15px;line-height:19px;font-weight:600}
+.cr2 .cr2-lista{margin-top:14px;display:flex;flex-direction:column;gap:2px}
+.cr2 .cr2-li{display:flex;align-items:center;gap:12px;height:44px;padding:0 12px;border-radius:12px;color:var(--nav-tinta);font-size:15px;line-height:20px;font-weight:500}
+.cr2[data-vp="esc"] .cr2-li{height:40px;font-size:14px}
+.cr2 .cr2-li[aria-current="page"]{background:var(--accion);color:#fff;font-weight:600}
+.cr2 .cr2-lat-pie{border-top:1px solid var(--nav-velo);padding-top:8px;display:flex;align-items:center;gap:4px}
+.cr2 .cr2-lat-pie .cr2-yo{flex:1;min-width:0;text-align:left}
+.cr2 .cr2-lat-pie .cr2-ib{color:var(--nav-tinta2)}
+.cr2[data-vp="ih"] .cr2-esp{display:none}
+/* Duo abierto horizontal: la barra mide 218; el pie suelta el icono para que nombre y «Ayuda» quepan en una línea */
+.cr2[data-vp="ih"] .cr2-lat .cr2-lat-pie .cr2-yo{padding:0 8px}
+.cr2[data-vp="ih"] .cr2-lat .cr2-lat-pie .cr2-yo>svg{display:none}
+.cr2[data-vp="ih"] .cr2-lat .cr2-lat-pie .cr2-ib{width:36px;height:36px}
+.cr2 .cr2-esp{color:var(--nav-tinta)!important}
+.cr2 .cr2-yo{min-height:48px;height:auto;padding-top:6px;padding-bottom:6px}
+.cr2 .cr2-yo>span{display:flex;flex-direction:column;line-height:17px}
+.cr2 .cr2-yo small{font-size:12px;line-height:16px;color:var(--nav-tinta2)}
+.cr2 .cr2-ib{position:relative;width:44px;height:44px;flex:none;border-radius:999px;display:flex;align-items:center;justify-content:center;color:var(--nav-tinta)}
+/* ---- Capas (CALMA cr225/cr226): un velo por marco; cajón desde la izquierda en iPhone y Duo vertical; tarjeta centrada en lo demás ---- */
+.cr2 .cr2-capa{position:absolute;inset:0;z-index:20;visibility:hidden;transition:visibility 0s linear 360ms}
+.cr2 .cr2-capa.cr2-on{visibility:visible;transition:none}
+.cr2 .cr2-velo{position:absolute;inset:0;background:var(--velo);-webkit-backdrop-filter:blur(10px) saturate(140%);backdrop-filter:blur(10px) saturate(140%);opacity:0;transition:opacity 240ms ease-out}
+.cr2 .cr2-on .cr2-velo{opacity:1;transition:opacity 320ms ease-out}
+.cr2 .cr2-cajon{position:absolute;left:0;top:0;bottom:0;width:300px;display:flex;flex-direction:column;overflow-y:auto;scrollbar-width:none;padding:calc(var(--it) + 12px) 14px calc(var(--ib) + 12px) 14px;background:var(--navy);color:#fff;border-radius:0 26px 26px 0;box-shadow:var(--sombra-nav-izq);transform:translateX(-106%);transition:transform 360ms linear(0,0.123,0.3397,0.54,0.6943,0.8032,0.8762,0.9234,0.9533,0.9718,0.9831,0.99,0.9941,0.9965,0.998,1)}
+.cr2[data-vp="iv"] .cr2-cajon{width:320px}
+.cr2 .cr2-capa[data-k~="cajon"].cr2-on .cr2-cajon{transform:none;transition:transform 520ms linear(0,0.0803,0.2398,0.4083,0.5568,0.6769,0.769,0.8374,0.8869,0.9221,0.9468,0.9639,0.9756,0.9836,0.9891,0.9927,0.9952,0.9968,0.9979,0.9986,1)}
+.cr2 .cr2-cajon .cr2-lat-cab{padding-right:0}
+.cr2 .cr2-mnw{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:16px;pointer-events:none}
+.cr2[data-vp="ext"] .cr2-mnw{padding:16px calc(56px + var(--ir) + 8px) calc(var(--ib) + 16px) 8px}
+.cr2[data-vp="iv"] .cr2-mnw{padding:calc(var(--it) + 16px) 24px 24px}
+.cr2[data-vp="ih"] .cr2-mnw{padding:24px calc(218px + var(--ir) + 24px) calc(var(--ib) + 16px) 24px}
+.cr2[data-vp="esc"] .cr2-mnw{padding:32px 24px 32px calc(248px + 24px)}
+.cr2 .cr2-mn{pointer-events:auto;width:310px;max-width:100%;max-height:100%;overflow-y:auto;scrollbar-width:none;background:var(--sup);color:var(--tinta);border-radius:20px;box-shadow:var(--sombra-capa);padding:8px;opacity:0;transform:scale(.96);transition:opacity 200ms ease-out,transform 360ms linear(0,0.123,0.3397,0.54,0.6943,0.8032,0.8762,0.9234,0.9533,0.9718,0.9831,0.99,0.9941,0.9965,0.998,1)}
+.cr2[data-vp="iv"] .cr2-mn,.cr2[data-vp="ih"] .cr2-mn,.cr2[data-vp="esc"] .cr2-mn{width:340px}
+.cr2 .cr2-capa[data-k~="mas"].cr2-on .cr2-mn{opacity:1;transform:none;transition:opacity 240ms ease-out,transform 520ms linear(0,0.0803,0.2398,0.4083,0.5568,0.6769,0.769,0.8374,0.8869,0.9221,0.9468,0.9639,0.9756,0.9836,0.9891,0.9927,0.9952,0.9968,0.9979,0.9986,1)}
+.cr2 .cr2-capa:not([data-k~="mas"]) .cr2-mnw{display:none}
+.cr2 .cr2-capa:not([data-k~="cajon"]) .cr2-cajon{display:none}
+.cr2 .cr2-mn-t{padding:8px 12px 6px;font-size:17px;line-height:22px;font-weight:700}
+.cr2 .cr2-mo{display:flex;align-items:center;gap:12px;width:100%;min-height:48px;padding:0 12px;border-radius:12px;font-size:15px;line-height:20px;color:var(--tinta);text-align:left}
+.cr2 .cr2-mo{position:relative}
+.cr2 .cr2-mo+.cr2-mo::before{content:"";position:absolute;left:44px;right:12px;top:0;height:1px;background:var(--linea)}
+.cr2 .cr2-mo>svg:first-child{color:var(--enlace)}
+.cr2 .cr2-mo>.cr2-mo-f{margin-left:auto;color:var(--tinta3)}
+.cr2 .cr2-mo-v{margin-left:auto;font-size:15px;color:var(--tinta2)}
+.cr2 .cr2-mo-v+.cr2-mo-f{margin-left:4px}
+@media (prefers-reduced-transparency:reduce){
+  .cr2 .cr2-velo{-webkit-backdrop-filter:none;backdrop-filter:none;background:color-mix(in srgb,var(--navy) 55%,var(--fondo))}
+}
+@media (prefers-reduced-motion:reduce){
+  .cr2 .cr2-cajon,.cr2 .cr2-capa[data-k~="cajon"].cr2-on .cr2-cajon{transform:none;opacity:0;transition:opacity 200ms ease}
+  .cr2 .cr2-capa[data-k~="cajon"].cr2-on .cr2-cajon{opacity:1}
+  .cr2 .cr2-mn,.cr2 .cr2-capa[data-k~="mas"].cr2-on .cr2-mn{transform:none;transition:opacity 200ms ease}
+  .cr2 .cr2-p{transition:none}
+}
+/* ---- Tira de maqueta (CALMA cr27) y ficha «Especificación» (fuera del marco) ---- */
+.cr2-tira{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:10px}
+.cr2-tira .cr2-sep{width:1px;height:20px;background:var(--borde)}
+.cr2-tira button{position:relative;height:28px;padding:0 10px;border-radius:999px;border:1px dashed var(--tinta3);background:none;color:var(--tinta2);font:600 12px/16px var(--fuente);white-space:nowrap;cursor:pointer;transition:transform 100ms ease-out}
+.cr2-tira button::after{content:"";position:absolute;inset:-4px 0}
+.cr2-tira button:active{transform:scale(.97)}
+.cr2-tira button:focus-visible{outline:3px solid var(--enlace);outline-offset:2px}
+.cr2-tira button[aria-pressed="true"]{border-style:solid;background:var(--sup2);color:var(--tinta)}
+.cr2-ficha{margin-top:6px;background:var(--sup);border-radius:18px;padding:16px 20px;color:var(--tinta);font:14px/20px var(--fuente);max-width:100%}
+.cr2-ficha h3{margin:0 0 8px;font-size:17px;line-height:22px;font-weight:700}
+.cr2-ficha dl{margin:0;display:grid;grid-template-columns:minmax(0,170px) minmax(0,1fr);gap:0 16px}
+.cr2-ficha dt{padding:8px 0;border-top:1px solid var(--linea);font-size:13px;line-height:18px;font-weight:600;color:var(--tinta2)}
+.cr2-ficha dd{margin:0;padding:8px 0;border-top:1px solid var(--linea);font-size:14px;line-height:20px;overflow-wrap:anywhere}
+.cr2-ficha dt:first-of-type,.cr2-ficha dt:first-of-type+dd{border-top:0}
+.cr2-ficha code{font:12px/18px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--tinta2)}
+@media (max-width:620px){.cr2-ficha dl{grid-template-columns:1fr}.cr2-ficha dd{border-top:0;padding-top:0}}
+
+.cr2 .cr2-cons-b{position:relative}
+.cr2 .cr2-cons-b[aria-expanded="true"]{background:color-mix(in srgb,#fff 14%,transparent)}
+/* ---- Lista de consultorios ---- */
+.cr2 .cr2-lw{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:16px;pointer-events:none}
+.cr2[data-vp="ext"] .cr2-lw{padding:16px calc(56px + var(--ir) + 8px) calc(var(--ib) + 16px) 8px}
+.cr2[data-vp="iv"] .cr2-lw{padding:calc(var(--it) + 16px) 24px 24px}
+.cr2[data-vp="ih"] .cr2-lw{padding:24px calc(218px + var(--ir) + 24px) calc(var(--ib) + 16px) 24px}
+.cr2[data-vp="tel"] .cr2-lw{align-items:flex-end;padding:0}
+.cr2[data-vp="esc"] .cr2-lw{display:block;padding:0}
+.cr2 .cr2-ls{pointer-events:auto;display:flex;flex-direction:column;width:310px;max-width:100%;background:var(--sup);color:var(--tinta);border-radius:20px;box-shadow:var(--sombra-capa);padding:8px;opacity:0;transform:scale(.96);transition:opacity 200ms ease-out,transform 360ms linear(0,0.123,0.3397,0.54,0.6943,0.8032,0.8762,0.9234,0.9533,0.9718,0.9831,0.99,0.9941,0.9965,0.998,1)}
+.cr2[data-vp="ih"] .cr2-ls,.cr2[data-vp="iv"] .cr2-ls{width:340px}
+.cr2[data-vp="tel"] .cr2-ls{width:100%;border-radius:22px 22px 0 0;padding:8px 12px calc(var(--ib) + 12px);opacity:1;transform:translateY(105%)}
+.cr2[data-vp="esc"] .cr2-ls{position:absolute;left:12px;top:120px;width:224px;padding:6px;border-radius:14px;box-shadow:var(--sombra-capa),0 0 0 1px var(--linea);transform-origin:50% 0;transform:scale(.96) translateY(-4px)}
+.cr2 .cr2-capa[data-k~="lista"].cr2-on .cr2-ls{opacity:1;transform:none;transition:opacity 240ms ease-out,transform 520ms linear(0,0.0803,0.2398,0.4083,0.5568,0.6769,0.769,0.8374,0.8869,0.9221,0.9468,0.9639,0.9756,0.9836,0.9891,0.9927,0.9952,0.9968,0.9979,0.9986,1)}
+.cr2 .cr2-capa:not([data-k~="lista"]) .cr2-lw{visibility:hidden}
+.cr2 .cr2-asa{display:block;width:36px;height:5px;margin:0 auto 6px;border-radius:999px;background:var(--borde)}
+.cr2 .cr2-co{display:flex;align-items:center;gap:12px;width:100%;min-height:48px;padding:0 12px;border-radius:12px;font-size:15px;line-height:20px;color:var(--tinta);text-align:left}
+.cr2[data-vp="esc"] .cr2-co{min-height:40px;font-size:14px;padding:0 10px}
+.cr2 .cr2-co+.cr2-co{box-shadow:inset 0 1px 0 var(--linea)}
+.cr2 .cr2-co>span{flex:1}
+.cr2 .cr2-co-ck{color:var(--enlace);visibility:hidden}
+.cr2 .cr2-co[aria-checked="true"] .cr2-co-ck{visibility:visible}
+.cr2 .cr2-co[aria-checked="true"]>span{font-weight:600}
+.cr2 .cr2-gest{display:flex;align-items:center;min-height:48px;margin-top:4px;padding:0 12px;border-top:1px solid var(--linea);font-size:15px;line-height:20px;font-weight:600;color:var(--enlace)}
+.cr2[data-vp="esc"] .cr2-gest{min-height:40px;font-size:14px;padding:0 10px}
+/* En computadora el desplegable no lleva velo (cr221) */
+.cr2[data-vp="esc"] .cr2-capa[data-k="lista"] .cr2-velo{opacity:0}
+/* ---- Alerta ---- */
+.cr2 .cr2-alw{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:16px;pointer-events:none}
+.cr2[data-vp="ext"] .cr2-alw{padding:16px calc(56px + var(--ir) + 8px) calc(var(--ib) + 16px) 8px}
+.cr2[data-vp="tel"] .cr2-alw{padding:calc(var(--it) + 64px) 16px calc(var(--ib) + 16px)}
+.cr2[data-vp="iv"] .cr2-alw{padding:calc(var(--it) + 58px) 24px 24px}
+.cr2[data-vp="ih"] .cr2-alw{padding:24px calc(218px + var(--ir) + 24px) calc(var(--ib) + 16px) 24px}
+.cr2[data-vp="esc"] .cr2-alw{padding:32px 24px 32px calc(248px + 24px)}
+.cr2 .cr2-al{pointer-events:auto;width:320px;max-width:100%;padding:24px;border-radius:20px;background:var(--sup);color:var(--tinta);box-shadow:var(--sombra-capa);display:flex;flex-direction:column;align-items:center;text-align:center;opacity:0;transform:scale(.96);transition:opacity 180ms ease-out,transform 300ms linear(0,0.123,0.3397,0.54,0.6943,0.8032,0.8762,0.9234,0.9533,0.9718,0.9831,0.99,0.9941,0.9965,0.998,1)}
+.cr2[data-vp="ih"] .cr2-al,.cr2[data-vp="iv"] .cr2-al,.cr2[data-vp="esc"] .cr2-al{width:340px}
+.cr2 .cr2-capa[data-k~="alerta"].cr2-on .cr2-al{opacity:1;transform:none;transition:opacity 220ms ease-out,transform 480ms linear(0,0.0803,0.2398,0.4083,0.5568,0.6769,0.769,0.8374,0.8869,0.9221,0.9468,0.9639,0.9756,0.9836,0.9891,0.9927,0.9952,0.9968,0.9979,0.9986,1)}
+.cr2 .cr2-capa:not([data-k~="alerta"]) .cr2-alw{visibility:hidden}
+/* Un solo velo: con la alerta abierta, el cajón y la lista se retiran por su camino y vuelven al cancelar */
+.cr2 .cr2-capa[data-k~="alerta"] .cr2-ls,.cr2 .cr2-capa[data-k~="alerta"] .cr2-mn{opacity:0!important;pointer-events:none}
+.cr2 .cr2-capa[data-k~="alerta"] .cr2-cajon{transform:translateX(-106%)!important}
+.cr2[data-vp="tel"] .cr2-capa[data-k~="alerta"] .cr2-ls{transform:translateY(105%)!important}
+.cr2 .cr2-al-ic{width:48px;height:48px;border-radius:999px;background:var(--tonal);color:var(--tonal-tinta);display:flex;align-items:center;justify-content:center}
+.cr2 .cr2-al-t{margin-top:14px;font-size:17px;line-height:22px;font-weight:700}
+.cr2 .cr2-al-m{margin-top:6px;font-size:14px;line-height:20px;color:var(--tinta2)}
+.cr2 .cr2-al-m strong{color:var(--tinta);font-weight:600}
+.cr2 .cr2-al-b{margin-top:20px;display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%}
+.cr2 .cr2-ton,.cr2 .cr2-prim{display:flex;align-items:center;justify-content:center;height:44px;padding:0 12px;border-radius:12px;font-size:15px;line-height:20px;font-weight:600;white-space:nowrap}
+.cr2[data-vp="ih"] .cr2-ton,.cr2[data-vp="ih"] .cr2-prim,.cr2[data-vp="esc"] .cr2-ton,.cr2[data-vp="esc"] .cr2-prim{height:40px;font-size:14px}
+.cr2 .cr2-ton{background:var(--tonal);color:var(--tonal-tinta)}
+.cr2 .cr2-prim{background:var(--accion);color:#fff}
+/* ---- Aviso breve, arriba y centrado en el área de contenido ---- */
+.cr2 .cr2-zona{position:absolute;z-index:40;pointer-events:none;top:12px;left:0;right:calc(56px + var(--ir));display:flex;justify-content:center;padding:0 12px}
+.cr2[data-vp="tel"] .cr2-zona{top:calc(var(--it) + 76px);right:0}
+.cr2[data-vp="ih"] .cr2-zona{top:16px;right:calc(218px + var(--ir))}
+.cr2[data-vp="iv"] .cr2-zona{top:calc(var(--it) + 74px);right:0;padding:0 24px}
+.cr2[data-vp="esc"] .cr2-zona{top:20px;left:248px;right:0;padding:0 24px}
+.cr2 .cr2-tst{pointer-events:none;display:flex;align-items:center;gap:10px;max-width:420px;min-height:48px;padding:4px 4px 4px 14px;border-radius:16px;background:var(--sup);color:var(--tinta);box-shadow:var(--sombra-capa);font-size:14px;line-height:20px;opacity:0;transform:translateY(-12px);transition:opacity 200ms ease-out,transform 300ms linear(0,0.123,0.3397,0.54,0.6943,0.8032,0.8762,0.9234,0.9533,0.9718,0.9831,0.99,0.9941,0.9965,0.998,1)}
+.cr2 .cr2-tst>svg{color:var(--enlace)}
+.cr2 .cr2-tst-t{flex:1;min-width:0}
+.cr2 .cr2-tst-x{width:44px;height:44px;flex:none;border-radius:999px;display:flex;align-items:center;justify-content:center;color:var(--tinta2)}
+.cr2[data-vp="ih"] .cr2-tst-x,.cr2[data-vp="esc"] .cr2-tst-x{width:36px;height:36px}
+.cr2.cr2-toast .cr2-tst{pointer-events:auto;opacity:1;transform:none;transition:opacity 240ms ease-out,transform 480ms linear(0,0.0803,0.2398,0.4083,0.5568,0.6769,0.769,0.8374,0.8869,0.9221,0.9468,0.9639,0.9756,0.9836,0.9891,0.9927,0.9952,0.9968,0.9979,0.9986,1)}
+@media (prefers-reduced-motion:reduce){
+  .cr2 .cr2-ls,.cr2 .cr2-al,.cr2 .cr2-tst,.cr2 .cr2-capa[data-k~="lista"].cr2-on .cr2-ls{transform:none!important;transition:opacity 200ms ease}
+}
+</style>
+<div class="marco cr2" data-vp="ext">
+<div class="cr2-app">
+<main class="cr2-cont">
+  <!-- Fondo simplificado: el dashboard reducido a sus bloques, para que la pieza global se lea sobre una pantalla real. -->
+  <div class="cr2-top"><p class="cr2-rot"><span class="cr2-m">Centro</span><span class="cr2-s">Clínica Semilla A</span></p>
+  <h1 class="cr2-h1">Buenas tardes, <span class="cr2-m">Admin</span><span class="cr2-s">Secretaria</span></h1></div>
+  <div class="cr2-cols"><section class="cr2-tj" aria-hidden="true"><h2 class="cr2-tt">Después</h2><div class="cr2-fl"><span class="cr2-bx"></span><span class="cr2-fl-t"><span class="cr2-br" style="width:62%"></span><span class="cr2-br cr2-br2" style="width:40%"></span></span></div><div class="cr2-fl"><span class="cr2-bx"></span><span class="cr2-fl-t"><span class="cr2-br" style="width:62%"></span><span class="cr2-br cr2-br2" style="width:40%"></span></span></div><div class="cr2-fl"><span class="cr2-bx"></span><span class="cr2-fl-t"><span class="cr2-br" style="width:62%"></span><span class="cr2-br cr2-br2" style="width:40%"></span></span></div><div class="cr2-fl"><span class="cr2-bx"></span><span class="cr2-fl-t"><span class="cr2-br" style="width:62%"></span><span class="cr2-br cr2-br2" style="width:40%"></span></span></div><div class="cr2-fl"><span class="cr2-bx"></span><span class="cr2-fl-t"><span class="cr2-br" style="width:62%"></span><span class="cr2-br cr2-br2" style="width:40%"></span></span></div></section><section class="cr2-tj" aria-hidden="true"><h2 class="cr2-tt">Atendidos recientemente</h2><div class="cr2-fl"><span class="cr2-bx"></span><span class="cr2-fl-t"><span class="cr2-br" style="width:62%"></span><span class="cr2-br cr2-br2" style="width:40%"></span></span></div><div class="cr2-fl"><span class="cr2-bx"></span><span class="cr2-fl-t"><span class="cr2-br" style="width:62%"></span><span class="cr2-br cr2-br2" style="width:40%"></span></span></div><div class="cr2-fl"><span class="cr2-bx"></span><span class="cr2-fl-t"><span class="cr2-br" style="width:62%"></span><span class="cr2-br cr2-br2" style="width:40%"></span></span></div></section><section class="cr2-tj" aria-hidden="true"><h2 class="cr2-tt">Documentos recientes</h2><div class="cr2-fl"><span class="cr2-bx"></span><span class="cr2-fl-t"><span class="cr2-br" style="width:62%"></span><span class="cr2-br cr2-br2" style="width:40%"></span></span></div><div class="cr2-fl"><span class="cr2-bx"></span><span class="cr2-fl-t"><span class="cr2-br" style="width:62%"></span><span class="cr2-br cr2-br2" style="width:40%"></span></span></div></section><section class="cr2-tj" aria-hidden="true"><h2 class="cr2-tt">Esta semana</h2><div class="cr2-fl"><span class="cr2-bx"></span><span class="cr2-fl-t"><span class="cr2-br" style="width:62%"></span><span class="cr2-br cr2-br2" style="width:40%"></span></span></div><div class="cr2-fl"><span class="cr2-bx"></span><span class="cr2-fl-t"><span class="cr2-br" style="width:62%"></span><span class="cr2-br cr2-br2" style="width:40%"></span></span></div><div class="cr2-fl"><span class="cr2-bx"></span><span class="cr2-fl-t"><span class="cr2-br" style="width:62%"></span><span class="cr2-br cr2-br2" style="width:40%"></span></span></div></section></div>
+</main><!-- Navegación (A0·3) de Duo cerrado: riel a la derecha, fundido con la franja. Copiado del dashboard aprobado. -->
+<nav class="cr2-riel cr2-nav" aria-label="Navegación principal">
+  <a href="#" class="cr2-p cr2-rb" aria-label="Inicio" aria-current="page"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg></a><a href="#" class="cr2-p cr2-rb" aria-label="Expediente"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.9.7 3.1 2.4 3.5 5.2"/></svg></a><a href="#" class="cr2-p cr2-rb" aria-label="Agenda"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg></a><a href="#" class="cr2-p cr2-rb cr2-m" aria-label="Documentos"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg></a><button type="button" class="cr2-p cr2-rb" aria-label="Más" data-abre="mas" data-rot="Más"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 12h.01M12 12h.01M18 12h.01"/></svg></button>
+  <span class="cr2-flex"></span>
+  <button type="button" class="cr2-p cr2-masb cr2-m" aria-label="Nueva consulta"><svg aria-hidden="true" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg></button>
+  <button type="button" class="cr2-p cr2-masb cr2-s" aria-label="Agendar cita"><svg aria-hidden="true" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg></button>
+</nav>
+</div>
+<div class="cr2-capa" aria-hidden="true">
+  <div class="cr2-velo"></div>
+  
+  <div class="cr2-mnw"><div class="cr2-mn" role="dialog" aria-modal="true" aria-label="Más">
+    <h2 class="cr2-mn-t">Más</h2>
+    <!-- Duo cerrado: el selector vive en «Más» (no hay barra lateral). El aviso de perfil va encima (vista 1); aquí se omite. -->
+    <button type="button" class="cr2-p cr2-mo cr2-abre-ls cr2-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 9 4-4 4 4M8 15l4 4 4-4"/></svg><span>Consultorio activo</span><span class="cr2-mo-v cr2-cons-n">Centro</span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="cr2-mo-f"><path d="m9 6 6 6-6 6"/></svg></button>
+    <a href="#" class="cr2-p cr2-mo cr2-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20v-8M12 20V5M19 20v-9"/></svg><span>Administración</span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="cr2-mo-f"><path d="m9 6 6 6-6 6"/></svg></a><a href="#" class="cr2-p cr2-mo cr2-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18.2c1.3-2 3.2-3 5.5-3s4.2 1 5.5 3"/></svg><span>Mi perfil</span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="cr2-mo-f"><path d="m9 6 6 6-6 6"/></svg></a><a href="#" class="cr2-p cr2-mo cr2-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.6M12 17h.01"/></svg><span>Ayuda</span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="cr2-mo-f"><path d="m9 6 6 6-6 6"/></svg></a>
+    <!-- Secretaria (CALMA cr228): sin Mi perfil; en «Más» encuentra sus «Ajustes» -->
+    <div class="cr2-s"><button type="button" class="cr2-p cr2-mo cr2-tema"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg><span>Modo oscuro</span></button><a href="#" class="cr2-p cr2-mo"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21c-4.5-2.2-7-5.6-7-10V5.5L12 3l7 2.5V11c0 4.4-2.5 7.8-7 10z"/></svg><span>Aviso de Privacidad</span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="cr2-mo-f"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg></a><button type="button" class="cr2-p cr2-mo cr2-salir"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4"/></svg><span>Cerrar sesión</span></button></div>
+  </div></div>
+  <!-- A0·2 · Lista de consultorios (ConsultorioActivoSelector.tsx:105-131): palomita en el activo; elegir el activo solo cierra;
+       elegir otro abre la confirmación. «Gestionar consultorios →» lleva a /perfil y cierra el menú. Esc y tocar fuera cierran.
+       Computadora: desplegable que nace del botón, sin velo (cr221). iPhone: hoja inferior sobre el cajón. Resto: tarjeta centrada con velo (cr225/cr226). -->
+  <div class="cr2-lw"><div class="cr2-ls" role="menu" aria-label="Consultorio activo"><h2 class="cr2-mn-t">Consultorio activo</h2><button type="button" class="cr2-p cr2-co" data-c="Centro" role="menuitemradio" aria-checked="true"><span>Centro</span><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="cr2-co-ck"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></button><button type="button" class="cr2-p cr2-co" data-c="Hosp Norte" role="menuitemradio" aria-checked="false"><span>Hosp Norte</span><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="cr2-co-ck"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></button><button type="button" class="cr2-p cr2-co" data-c="Rehab" role="menuitemradio" aria-checked="false"><span>Rehab</span><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="cr2-co-ck"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></button>
+    <a href="#" class="cr2-p cr2-gest">Gestionar consultorios →</a></div></div>
+  <!-- Confirmación (ConsultorioActivoSelector.tsx:137-164) con el patrón único de alerta (CALMA cr213, cr225): icono tonal, título centrado,
+       dos botones del mismo ancho, secundario a la izquierda. Textos exactos de hoy. -->
+  <div class="cr2-alw"><div class="cr2-al" role="alertdialog" aria-modal="true" aria-labelledby="cr2-al-t-ext" aria-describedby="cr2-al-m-ext">
+    <span class="cr2-al-ic" aria-hidden="true"><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V6a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v15M14 10h5a1 1 0 0 1 1 1v10M3 21h18M8 9h2M8 13h2M8 17h2"/></svg></span>
+    <h2 class="cr2-al-t" id="cr2-al-t-ext">Cambiar consultorio activo</h2>
+    <p class="cr2-al-m" id="cr2-al-m-ext">¿Cambiar a <strong class="cr2-al-n">Hosp Norte</strong>?</p>
+    <div class="cr2-al-b"><button type="button" class="cr2-p cr2-ton cr2-al-no">Cancelar</button><button type="button" class="cr2-p cr2-prim cr2-al-si">Sí, cambiar</button></div>
+  </div></div>
+</div>
+<!-- Aviso breve (pub-capas vista 5): «Consultorio activo: X» (ConsultorioActivoSelector.tsx:79), arriba y centrado en el área de contenido. -->
+<div class="cr2-zona" aria-live="polite"><div class="cr2-tst" role="status"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg><span class="cr2-tst-t">Consultorio activo: Hosp Norte</span>
+  <button type="button" class="cr2-p cr2-tst-x" aria-label="Cerrar aviso"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div></div>
+</div>
+<div class="marco cr2" data-vp="tel">
+<div class="cr2-app">
+<!-- Navegación (A0·13) de iPhone: encabezado fundido con la barra de estado. Copiado del dashboard aprobado. -->
+<header class="cr2-enc cr2-nav">
+  <button type="button" class="cr2-p cr2-menu" aria-label="Menú" data-abre="cajon" data-rot="Menú"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+  <span class="cr2-enc-t">Inicio</span>
+  <span class="cr2-flex"></span>
+  <button type="button" class="cr2-p cr2-av cr2-av-g cr2-m" aria-label="Mi perfil">AS</button><button type="button" class="cr2-p cr2-av cr2-av-g cr2-s cr2-abre-aj" aria-label="Ajustes">SE</button>
+</header><main class="cr2-cont">
+  <!-- Fondo simplificado: el dashboard reducido a sus bloques, para que la pieza global se lea sobre una pantalla real. -->
+  <div class="cr2-top"><p class="cr2-rot"><span class="cr2-m">Centro</span><span class="cr2-s">Clínica Semilla A</span></p>
+  <h1 class="cr2-h1">Buenas tardes, <span class="cr2-m">Admin</span><span class="cr2-s">Secretaria</span></h1></div>
+  <div class="cr2-cols"><section class="cr2-tj" aria-hidden="true"><h2 class="cr2-tt">Después</h2><div class="cr2-fl"><span class="cr2-bx"></span><span class="cr2-fl-t"><span class="cr2-br" style="width:62%"></span><span class="cr2-br cr2-br2" style="width:40%"></span></span></div><div class="cr2-fl"><span class="cr2-bx"></span><span class="cr2-fl-t"><span class="cr2-br" style="width:62%"></span><span class="cr2-br cr2-br2" style="width:40%"></span></span></div><div class="cr2-fl"><span class="cr2-bx"></span><span class="cr2-fl-t"><span class="cr2-br" style="width:62%"></span><span class="cr2-br cr2-br2" style="width:40%"></span></span></div><div class="cr2-fl"><span class="cr2-bx"></span><span class="cr2-fl-t"><span class="cr2-br" style="width:62%"></span><span class="cr2-br cr2-br2" style="width:40%"></span></span></div><div class="cr2-fl"><span class="cr2-bx"></span><span class="cr2-fl-t"><span class="cr2-br" style="width:62%"></span><span class="cr2-br cr2-br2" style="width:40%"></span></span></div></section><section class="cr2-tj" aria-hidden="true"><h2 class="cr2-tt">Atendidos recientemente</h2><div class="cr2-fl"><span class="cr2-bx"></span><span class="cr2-fl-t"><span class="cr2-br" style="width:62%"></span><span class="cr2-br cr2-br2" style="width:40%"></span></span></div><div class="cr2-fl"><span class="cr2-bx"></span><span class="cr2-fl-t"><span class="cr2-br" style="width:62%"></span><span class="cr2-br cr2-br2" style="width:40%"></span></span></div><div class="cr2-fl"><span class="cr2-bx"></span><span class="cr2-fl-t"><span class="cr2-br" style="width:62%"></span><span class="cr2-br cr2-br2" style="width:40%"></span></span></div></section><section class="cr2-tj" aria-hidden="true"><h2 class="cr2-tt">Documentos recientes</h2><div class="cr2-fl"><span class="cr2-bx"></span><span class="cr2-fl-t"><span class="cr2-br" style="width:62%"></span><span class="cr2-br cr2-br2" style="width:40%"></span></span></div><div class="cr2-fl"><span class="cr2-bx"></span><span class="cr2-fl-t"><span class="cr2-br" style="width:62%"></span><span class="cr2-br cr2-br2" style="width:40%"></span></span></div></section><section class="cr2-tj" aria-hidden="true"><h2 class="cr2-tt">Esta semana</h2><div class="cr2-fl"><span class="cr2-bx"></span><span class="cr2-fl-t"><span class="cr2-br" style="width:62%"></span><span class="cr2-br cr2-br2" style="width:40%"></span></span></div><div class="cr2-fl"><span class="cr2-bx"></span><span class="cr2-fl-t"><span class="cr2-br" style="width:62%"></span><span class="cr2-br cr2-br2" style="width:40%"></span></span></div><div class="cr2-fl"><span class="cr2-bx"></span><span class="cr2-fl-t"><span class="cr2-br" style="width:62%"></span><span class="cr2-br cr2-br2" style="width:40%"></span></span></div></section></div>
+</main>
+</div>
+<div class="cr2-capa" aria-hidden="true">
+  <div class="cr2-velo"></div>
+  <nav class="cr2-cajon cr2-nav" aria-label="Menú">
+  <div class="cr2-lat-cab"><span class="cr2-logo"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.5"/><path d="M12 5.5v13M9.6 8h4.8M9 11h6M9 14h6M9.6 17h4.8"/></svg><span class="cr2-logo-n">Spinus</span></span><span class="cr2-flex"></span><span class="cr2-plan">Plan VIP</span><button type="button" class="cr2-p cr2-ib cr2-cierra" aria-label="Cerrar menú"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+  <button type="button" class="cr2-p cr2-cons-b"><span class="cr2-clogo" role="img" aria-label="Logo de Clínica Semilla A"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21c-4.5-2.2-7-5.6-7-10V5.5L12 3l7 2.5V11c0 4.4-2.5 7.8-7 10z"/><path d="M12 8v7M8.5 11.5h7"/></svg></span><span class="cr2-cons-t"><span class="cr2-m">Consultorio</span><b class="cr2-m">Centro</b><span class="cr2-s">Clínica</span><b class="cr2-s">Clínica Semilla A</b></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 9 4-4 4 4M8 15l4 4 4-4"/></svg></button>
+  <div class="cr2-lista"><a href="#" class="cr2-p cr2-li" aria-current="page"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Inicio</a><a href="#" class="cr2-p cr2-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.9.7 3.1 2.4 3.5 5.2"/></svg>Expediente</a><a href="#" class="cr2-p cr2-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Agenda</a><a href="#" class="cr2-p cr2-li cr2-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>Documentos</a><a href="#" class="cr2-p cr2-li cr2-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20v-8M12 20V5M19 20v-9"/></svg>Administración</a></div>
+  <span class="cr2-flex"></span>
+  
+  <div class="cr2-lat-pie"><a href="#" class="cr2-p cr2-li cr2-yo cr2-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18.2c1.3-2 3.2-3 5.5-3s4.2 1 5.5 3"/></svg><span><span>Dr. Admin Semilla</span><small class="cr2-esp">Ortopedia y Traumatología</small><small>Mi perfil · Ajustes</small></span></a><a href="#" class="cr2-p cr2-ib cr2-ay cr2-m" aria-label="Ayuda"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.6M12 17h.01"/></svg></a><button type="button" class="cr2-p cr2-li cr2-yo cr2-s cr2-abre-aj" aria-haspopup="menu"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span><span>Secretaria Semilla</span><small>Ajustes</small></span></button></div>
+  </nav>
+  
+  <!-- A0·2 · Lista de consultorios (ConsultorioActivoSelector.tsx:105-131): palomita en el activo; elegir el activo solo cierra;
+       elegir otro abre la confirmación. «Gestionar consultorios →» lleva a /perfil y cierra el menú. Esc y tocar fuera cierran.
+       Computadora: desplegable que nace del botón, sin velo (cr221). iPhone: hoja inferior sobre el cajón. Resto: tarjeta centrada con velo (cr225/cr226). -->
+  <div class="cr2-lw"><div class="cr2-ls" role="menu" aria-label="Consultorio activo"><span class="cr2-asa" aria-hidden="true"></span><h2 class="cr2-mn-t">Consultorio activo</h2><button type="button" class="cr2-p cr2-co" data-c="Centro" role="menuitemradio" aria-checked="true"><span>Centro</span><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="cr2-co-ck"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></button><button type="button" class="cr2-p cr2-co" data-c="Hosp Norte" role="menuitemradio" aria-checked="false"><span>Hosp Norte</span><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="cr2-co-ck"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></button><button type="button" class="cr2-p cr2-co" data-c="Rehab" role="menuitemradio" aria-checked="false"><span>Rehab</span><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="cr2-co-ck"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></button>
+    <a href="#" class="cr2-p cr2-gest">Gestionar consultorios →</a></div></div>
+  <!-- Confirmación (ConsultorioActivoSelector.tsx:137-164) con el patrón único de alerta (CALMA cr213, cr225): icono tonal, título centrado,
+       dos botones del mismo ancho, secundario a la izquierda. Textos exactos de hoy. -->
+  <div class="cr2-alw"><div class="cr2-al" role="alertdialog" aria-modal="true" aria-labelledby="cr2-al-t-tel" aria-describedby="cr2-al-m-tel">
+    <span class="cr2-al-ic" aria-hidden="true"><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V6a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v15M14 10h5a1 1 0 0 1 1 1v10M3 21h18M8 9h2M8 13h2M8 17h2"/></svg></span>
+    <h2 class="cr2-al-t" id="cr2-al-t-tel">Cambiar consultorio activo</h2>
+    <p class="cr2-al-m" id="cr2-al-m-tel">¿Cambiar a <strong class="cr2-al-n">Hosp Norte</strong>?</p>
+    <div class="cr2-al-b"><button type="button" class="cr2-p cr2-ton cr2-al-no">Cancelar</button><button type="button" class="cr2-p cr2-prim cr2-al-si">Sí, cambiar</button></div>
+  </div></div>
+</div>
+<!-- Aviso breve (pub-capas vista 5): «Consultorio activo: X» (ConsultorioActivoSelector.tsx:79), arriba y centrado en el área de contenido. -->
+<div class="cr2-zona" aria-live="polite"><div class="cr2-tst" role="status"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg><span class="cr2-tst-t">Consultorio activo: Hosp Norte</span>
+  <button type="button" class="cr2-p cr2-tst-x" aria-label="Cerrar aviso"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div></div>
+</div>
+<div class="marco cr2" data-vp="ih">
+<div class="cr2-app">
+<main class="cr2-cont">
+  <!-- Fondo simplificado: el dashboard reducido a sus bloques, para que la pieza global se lea sobre una pantalla real. -->
+  <div class="cr2-top"><p class="cr2-rot"><span class="cr2-m">Centro</span><span class="cr2-s">Clínica Semilla A</span></p>
+  <h1 class="cr2-h1">Buenas tardes, <span class="cr2-m">Admin</span><span class="cr2-s">Secretaria</span></h1></div>
+  <div class="cr2-cols"><section class="cr2-tj" aria-hidden="true"><h2 class="cr2-tt">Después</h2><div class="cr2-fl"><span class="cr2-bx"></span><span class="cr2-fl-t"><span class="cr2-br" style="width:62%"></span><span class="cr2-br cr2-br2" style="width:40%"></span></span></div><div class="cr2-fl"><span class="cr2-bx"></span><span class="cr2-fl-t"><span class="cr2-br" style="width:62%"></span><span class="cr2-br cr2-br2" style="width:40%"></span></span></div><div class="cr2-fl"><span class="cr2-bx"></span><span class="cr2-fl-t"><span class="cr2-br" style="width:62%"></span><span class="cr2-br cr2-br2" style="width:40%"></span></span></div><div class="cr2-fl"><span class="cr2-bx"></span><span class="cr2-fl-t"><span class="cr2-br" style="width:62%"></span><span class="cr2-br cr2-br2" style="width:40%"></span></span></div><div class="cr2-fl"><span class="cr2-bx"></span><span class="cr2-fl-t"><span class="cr2-br" style="width:62%"></span><span class="cr2-br cr2-br2" style="width:40%"></span></span></div></section><section class="cr2-tj" aria-hidden="true"><h2 class="cr2-tt">Atendidos recientemente</h2><div class="cr2-fl"><span class="cr2-bx"></span><span class="cr2-fl-t"><span class="cr2-br" style="width:62%"></span><span class="cr2-br cr2-br2" style="width:40%"></span></span></div><div class="cr2-fl"><span class="cr2-bx"></span><span class="cr2-fl-t"><span class="cr2-br" style="width:62%"></span><span class="cr2-br cr2-br2" style="width:40%"></span></span></div><div class="cr2-fl"><span class="cr2-bx"></span><span class="cr2-fl-t"><span class="cr2-br" style="width:62%"></span><span class="cr2-br cr2-br2" style="width:40%"></span></span></div></section><section class="cr2-tj" aria-hidden="true"><h2 class="cr2-tt">Documentos recientes</h2><div class="cr2-fl"><span class="cr2-bx"></span><span class="cr2-fl-t"><span class="cr2-br" style="width:62%"></span><span class="cr2-br cr2-br2" style="width:40%"></span></span></div><div class="cr2-fl"><span class="cr2-bx"></span><span class="cr2-fl-t"><span class="cr2-br" style="width:62%"></span><span class="cr2-br cr2-br2" style="width:40%"></span></span></div></section><section class="cr2-tj" aria-hidden="true"><h2 class="cr2-tt">Esta semana</h2><div class="cr2-fl"><span class="cr2-bx"></span><span class="cr2-fl-t"><span class="cr2-br" style="width:62%"></span><span class="cr2-br cr2-br2" style="width:40%"></span></span></div><div class="cr2-fl"><span class="cr2-bx"></span><span class="cr2-fl-t"><span class="cr2-br" style="width:62%"></span><span class="cr2-br cr2-br2" style="width:40%"></span></span></div><div class="cr2-fl"><span class="cr2-bx"></span><span class="cr2-fl-t"><span class="cr2-br" style="width:62%"></span><span class="cr2-br cr2-br2" style="width:40%"></span></span></div></section></div>
+</main><nav class="cr2-lat" aria-label="Navegación principal">
+  <div class="cr2-lat-cab"><span class="cr2-logo"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.5"/><path d="M12 5.5v13M9.6 8h4.8M9 11h6M9 14h6M9.6 17h4.8"/></svg><span class="cr2-logo-n">Spinus</span></span><span class="cr2-flex"></span><span class="cr2-plan">Plan VIP</span></div>
+  <button type="button" class="cr2-p cr2-cons-b"><span class="cr2-clogo" role="img" aria-label="Logo de Clínica Semilla A"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21c-4.5-2.2-7-5.6-7-10V5.5L12 3l7 2.5V11c0 4.4-2.5 7.8-7 10z"/><path d="M12 8v7M8.5 11.5h7"/></svg></span><span class="cr2-cons-t"><span class="cr2-m">Consultorio</span><b class="cr2-m">Centro</b><span class="cr2-s">Clínica</span><b class="cr2-s">Clínica Semilla A</b></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 9 4-4 4 4M8 15l4 4 4-4"/></svg></button>
+  <div class="cr2-lista"><a href="#" class="cr2-p cr2-li" aria-current="page"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Inicio</a><a href="#" class="cr2-p cr2-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.9.7 3.1 2.4 3.5 5.2"/></svg>Expediente</a><a href="#" class="cr2-p cr2-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Agenda</a><a href="#" class="cr2-p cr2-li cr2-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>Documentos</a><a href="#" class="cr2-p cr2-li cr2-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20v-8M12 20V5M19 20v-9"/></svg>Administración</a></div>
+  <span class="cr2-flex"></span>
+  
+  <div class="cr2-lat-pie"><a href="#" class="cr2-p cr2-li cr2-yo cr2-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18.2c1.3-2 3.2-3 5.5-3s4.2 1 5.5 3"/></svg><span><span>Dr. Admin Semilla</span><small class="cr2-esp">Ortopedia y Traumatología</small><small>Mi perfil · Ajustes</small></span></a><a href="#" class="cr2-p cr2-ib cr2-ay cr2-m" aria-label="Ayuda"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.6M12 17h.01"/></svg></a><button type="button" class="cr2-p cr2-li cr2-yo cr2-s cr2-abre-aj" aria-haspopup="menu"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span><span>Secretaria Semilla</span><small>Ajustes</small></span></button></div>
+</nav>
+</div>
+<div class="cr2-capa" aria-hidden="true">
+  <div class="cr2-velo"></div>
+  
+  
+  <!-- A0·2 · Lista de consultorios (ConsultorioActivoSelector.tsx:105-131): palomita en el activo; elegir el activo solo cierra;
+       elegir otro abre la confirmación. «Gestionar consultorios →» lleva a /perfil y cierra el menú. Esc y tocar fuera cierran.
+       Computadora: desplegable que nace del botón, sin velo (cr221). iPhone: hoja inferior sobre el cajón. Resto: tarjeta centrada con velo (cr225/cr226). -->
+  <div class="cr2-lw"><div class="cr2-ls" role="menu" aria-label="Consultorio activo"><h2 class="cr2-mn-t">Consultorio activo</h2><button type="button" class="cr2-p cr2-co" data-c="Centro" role="menuitemradio" aria-checked="true"><span>Centro</span><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="cr2-co-ck"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></button><button type="button" class="cr2-p cr2-co" data-c="Hosp Norte" role="menuitemradio" aria-checked="false"><span>Hosp Norte</span><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="cr2-co-ck"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></button><button type="button" class="cr2-p cr2-co" data-c="Rehab" role="menuitemradio" aria-checked="false"><span>Rehab</span><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="cr2-co-ck"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></button>
+    <a href="#" class="cr2-p cr2-gest">Gestionar consultorios →</a></div></div>
+  <!-- Confirmación (ConsultorioActivoSelector.tsx:137-164) con el patrón único de alerta (CALMA cr213, cr225): icono tonal, título centrado,
+       dos botones del mismo ancho, secundario a la izquierda. Textos exactos de hoy. -->
+  <div class="cr2-alw"><div class="cr2-al" role="alertdialog" aria-modal="true" aria-labelledby="cr2-al-t-ih" aria-describedby="cr2-al-m-ih">
+    <span class="cr2-al-ic" aria-hidden="true"><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V6a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v15M14 10h5a1 1 0 0 1 1 1v10M3 21h18M8 9h2M8 13h2M8 17h2"/></svg></span>
+    <h2 class="cr2-al-t" id="cr2-al-t-ih">Cambiar consultorio activo</h2>
+    <p class="cr2-al-m" id="cr2-al-m-ih">¿Cambiar a <strong class="cr2-al-n">Hosp Norte</strong>?</p>
+    <div class="cr2-al-b"><button type="button" class="cr2-p cr2-ton cr2-al-no">Cancelar</button><button type="button" class="cr2-p cr2-prim cr2-al-si">Sí, cambiar</button></div>
+  </div></div>
+</div>
+<!-- Aviso breve (pub-capas vista 5): «Consultorio activo: X» (ConsultorioActivoSelector.tsx:79), arriba y centrado en el área de contenido. -->
+<div class="cr2-zona" aria-live="polite"><div class="cr2-tst" role="status"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg><span class="cr2-tst-t">Consultorio activo: Hosp Norte</span>
+  <button type="button" class="cr2-p cr2-tst-x" aria-label="Cerrar aviso"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div></div>
+</div>
+<div class="marco cr2" data-vp="iv">
+<div class="cr2-app">
+<!-- Navegación de Duo abierto vertical (CALMA cr219, cr223.9): encabezado fundido, pista de cinco píldoras. Copiado del dashboard aprobado. -->
+<header class="cr2-env cr2-nav">
+  <button type="button" class="cr2-p cr2-envb" aria-label="Mostrar barra lateral" data-abre="cajon" data-rot="Mostrar barra lateral"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="15" rx="3"/><path d="M9.5 4.5v15"/></svg></button>
+  <nav class="cr2-pista" aria-label="Secciones"><a href="#" class="cr2-p cr2-pv" aria-current="page">Inicio</a><a href="#" class="cr2-p cr2-pv">Expediente</a><a href="#" class="cr2-p cr2-pv">Agenda</a><a href="#" class="cr2-p cr2-pv cr2-m">Documentos</a><button type="button" class="cr2-p cr2-pv" data-abre="mas">Más</button></nav>
+  <button type="button" class="cr2-p cr2-av cr2-av-g cr2-m" aria-label="Mi perfil">AS</button><button type="button" class="cr2-p cr2-av cr2-av-g cr2-s cr2-abre-aj" aria-label="Ajustes">SE</button>
+</header><main class="cr2-cont">
+  <!-- Fondo simplificado: el dashboard reducido a sus bloques, para que la pieza global se lea sobre una pantalla real. -->
+  <div class="cr2-top"><p class="cr2-rot"><span class="cr2-m">Centro</span><span class="cr2-s">Clínica Semilla A</span></p>
+  <h1 class="cr2-h1">Buenas tardes, <span class="cr2-m">Admin</span><span class="cr2-s">Secretaria</span></h1></div>
+  <div class="cr2-cols"><section class="cr2-tj" aria-hidden="true"><h2 class="cr2-tt">Después</h2><div class="cr2-fl"><span class="cr2-bx"></span><span class="cr2-fl-t"><span class="cr2-br" style="width:62%"></span><span class="cr2-br cr2-br2" style="width:40%"></span></span></div><div class="cr2-fl"><span class="cr2-bx"></span><span class="cr2-fl-t"><span class="cr2-br" style="width:62%"></span><span class="cr2-br cr2-br2" style="width:40%"></span></span></div><div class="cr2-fl"><span class="cr2-bx"></span><span class="cr2-fl-t"><span class="cr2-br" style="width:62%"></span><span class="cr2-br cr2-br2" style="width:40%"></span></span></div><div class="cr2-fl"><span class="cr2-bx"></span><span class="cr2-fl-t"><span class="cr2-br" style="width:62%"></span><span class="cr2-br cr2-br2" style="width:40%"></span></span></div><div class="cr2-fl"><span class="cr2-bx"></span><span class="cr2-fl-t"><span class="cr2-br" style="width:62%"></span><span class="cr2-br cr2-br2" style="width:40%"></span></span></div></section><section class="cr2-tj" aria-hidden="true"><h2 class="cr2-tt">Atendidos recientemente</h2><div class="cr2-fl"><span class="cr2-bx"></span><span class="cr2-fl-t"><span class="cr2-br" style="width:62%"></span><span class="cr2-br cr2-br2" style="width:40%"></span></span></div><div class="cr2-fl"><span class="cr2-bx"></span><span class="cr2-fl-t"><span class="cr2-br" style="width:62%"></span><span class="cr2-br cr2-br2" style="width:40%"></span></span></div><div class="cr2-fl"><span class="cr2-bx"></span><span class="cr2-fl-t"><span class="cr2-br" style="width:62%"></span><span class="cr2-br cr2-br2" style="width:40%"></span></span></div></section><section class="cr2-tj" aria-hidden="true"><h2 class="cr2-tt">Documentos recientes</h2><div class="cr2-fl"><span class="cr2-bx"></span><span class="cr2-fl-t"><span class="cr2-br" style="width:62%"></span><span class="cr2-br cr2-br2" style="width:40%"></span></span></div><div class="cr2-fl"><span class="cr2-bx"></span><span class="cr2-fl-t"><span class="cr2-br" style="width:62%"></span><span class="cr2-br cr2-br2" style="width:40%"></span></span></div></section><section class="cr2-tj" aria-hidden="true"><h2 class="cr2-tt">Esta semana</h2><div class="cr2-fl"><span class="cr2-bx"></span><span class="cr2-fl-t"><span class="cr2-br" style="width:62%"></span><span class="cr2-br cr2-br2" style="width:40%"></span></span></div><div class="cr2-fl"><span class="cr2-bx"></span><span class="cr2-fl-t"><span class="cr2-br" style="width:62%"></span><span class="cr2-br cr2-br2" style="width:40%"></span></span></div><div class="cr2-fl"><span class="cr2-bx"></span><span class="cr2-fl-t"><span class="cr2-br" style="width:62%"></span><span class="cr2-br cr2-br2" style="width:40%"></span></span></div></section></div>
+</main>
+</div>
+<div class="cr2-capa" aria-hidden="true">
+  <div class="cr2-velo"></div>
+  <nav class="cr2-cajon cr2-nav" aria-label="Menú">
+  <div class="cr2-lat-cab"><span class="cr2-logo"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.5"/><path d="M12 5.5v13M9.6 8h4.8M9 11h6M9 14h6M9.6 17h4.8"/></svg><span class="cr2-logo-n">Spinus</span></span><span class="cr2-flex"></span><span class="cr2-plan">Plan VIP</span><button type="button" class="cr2-p cr2-ib cr2-cierra" aria-label="Cerrar menú"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+  <button type="button" class="cr2-p cr2-cons-b"><span class="cr2-clogo" role="img" aria-label="Logo de Clínica Semilla A"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21c-4.5-2.2-7-5.6-7-10V5.5L12 3l7 2.5V11c0 4.4-2.5 7.8-7 10z"/><path d="M12 8v7M8.5 11.5h7"/></svg></span><span class="cr2-cons-t"><span class="cr2-m">Consultorio</span><b class="cr2-m">Centro</b><span class="cr2-s">Clínica</span><b class="cr2-s">Clínica Semilla A</b></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 9 4-4 4 4M8 15l4 4 4-4"/></svg></button>
+  <div class="cr2-lista"><a href="#" class="cr2-p cr2-li" aria-current="page"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Inicio</a><a href="#" class="cr2-p cr2-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.9.7 3.1 2.4 3.5 5.2"/></svg>Expediente</a><a href="#" class="cr2-p cr2-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Agenda</a><a href="#" class="cr2-p cr2-li cr2-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>Documentos</a><a href="#" class="cr2-p cr2-li cr2-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20v-8M12 20V5M19 20v-9"/></svg>Administración</a></div>
+  <span class="cr2-flex"></span>
+  
+  <div class="cr2-lat-pie"><a href="#" class="cr2-p cr2-li cr2-yo cr2-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18.2c1.3-2 3.2-3 5.5-3s4.2 1 5.5 3"/></svg><span><span>Dr. Admin Semilla</span><small class="cr2-esp">Ortopedia y Traumatología</small><small>Mi perfil · Ajustes</small></span></a><a href="#" class="cr2-p cr2-ib cr2-ay cr2-m" aria-label="Ayuda"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.6M12 17h.01"/></svg></a><button type="button" class="cr2-p cr2-li cr2-yo cr2-s cr2-abre-aj" aria-haspopup="menu"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span><span>Secretaria Semilla</span><small>Ajustes</small></span></button></div>
+  </nav>
+  <div class="cr2-mnw"><div class="cr2-mn" role="dialog" aria-modal="true" aria-label="Más">
+    <h2 class="cr2-mn-t">Más</h2>
+    <!-- Duo cerrado: el selector vive en «Más» (no hay barra lateral). El aviso de perfil va encima (vista 1); aquí se omite. -->
+    <button type="button" class="cr2-p cr2-mo cr2-abre-ls cr2-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 9 4-4 4 4M8 15l4 4 4-4"/></svg><span>Consultorio activo</span><span class="cr2-mo-v cr2-cons-n">Centro</span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="cr2-mo-f"><path d="m9 6 6 6-6 6"/></svg></button>
+    <a href="#" class="cr2-p cr2-mo cr2-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20v-8M12 20V5M19 20v-9"/></svg><span>Administración</span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="cr2-mo-f"><path d="m9 6 6 6-6 6"/></svg></a><a href="#" class="cr2-p cr2-mo cr2-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18.2c1.3-2 3.2-3 5.5-3s4.2 1 5.5 3"/></svg><span>Mi perfil</span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="cr2-mo-f"><path d="m9 6 6 6-6 6"/></svg></a><a href="#" class="cr2-p cr2-mo cr2-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.6M12 17h.01"/></svg><span>Ayuda</span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="cr2-mo-f"><path d="m9 6 6 6-6 6"/></svg></a>
+    <!-- Secretaria (CALMA cr228): sin Mi perfil; en «Más» encuentra sus «Ajustes» -->
+    <div class="cr2-s"><button type="button" class="cr2-p cr2-mo cr2-tema"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg><span>Modo oscuro</span></button><a href="#" class="cr2-p cr2-mo"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21c-4.5-2.2-7-5.6-7-10V5.5L12 3l7 2.5V11c0 4.4-2.5 7.8-7 10z"/></svg><span>Aviso de Privacidad</span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="cr2-mo-f"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg></a><button type="button" class="cr2-p cr2-mo cr2-salir"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4"/></svg><span>Cerrar sesión</span></button></div>
+  </div></div>
+  <!-- A0·2 · Lista de consultorios (ConsultorioActivoSelector.tsx:105-131): palomita en el activo; elegir el activo solo cierra;
+       elegir otro abre la confirmación. «Gestionar consultorios →» lleva a /perfil y cierra el menú. Esc y tocar fuera cierran.
+       Computadora: desplegable que nace del botón, sin velo (cr221). iPhone: hoja inferior sobre el cajón. Resto: tarjeta centrada con velo (cr225/cr226). -->
+  <div class="cr2-lw"><div class="cr2-ls" role="menu" aria-label="Consultorio activo"><h2 class="cr2-mn-t">Consultorio activo</h2><button type="button" class="cr2-p cr2-co" data-c="Centro" role="menuitemradio" aria-checked="true"><span>Centro</span><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="cr2-co-ck"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></button><button type="button" class="cr2-p cr2-co" data-c="Hosp Norte" role="menuitemradio" aria-checked="false"><span>Hosp Norte</span><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="cr2-co-ck"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></button><button type="button" class="cr2-p cr2-co" data-c="Rehab" role="menuitemradio" aria-checked="false"><span>Rehab</span><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="cr2-co-ck"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></button>
+    <a href="#" class="cr2-p cr2-gest">Gestionar consultorios →</a></div></div>
+  <!-- Confirmación (ConsultorioActivoSelector.tsx:137-164) con el patrón único de alerta (CALMA cr213, cr225): icono tonal, título centrado,
+       dos botones del mismo ancho, secundario a la izquierda. Textos exactos de hoy. -->
+  <div class="cr2-alw"><div class="cr2-al" role="alertdialog" aria-modal="true" aria-labelledby="cr2-al-t-iv" aria-describedby="cr2-al-m-iv">
+    <span class="cr2-al-ic" aria-hidden="true"><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V6a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v15M14 10h5a1 1 0 0 1 1 1v10M3 21h18M8 9h2M8 13h2M8 17h2"/></svg></span>
+    <h2 class="cr2-al-t" id="cr2-al-t-iv">Cambiar consultorio activo</h2>
+    <p class="cr2-al-m" id="cr2-al-m-iv">¿Cambiar a <strong class="cr2-al-n">Hosp Norte</strong>?</p>
+    <div class="cr2-al-b"><button type="button" class="cr2-p cr2-ton cr2-al-no">Cancelar</button><button type="button" class="cr2-p cr2-prim cr2-al-si">Sí, cambiar</button></div>
+  </div></div>
+</div>
+<!-- Aviso breve (pub-capas vista 5): «Consultorio activo: X» (ConsultorioActivoSelector.tsx:79), arriba y centrado en el área de contenido. -->
+<div class="cr2-zona" aria-live="polite"><div class="cr2-tst" role="status"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg><span class="cr2-tst-t">Consultorio activo: Hosp Norte</span>
+  <button type="button" class="cr2-p cr2-tst-x" aria-label="Cerrar aviso"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div></div>
+</div>
+<div class="marco cr2" data-vp="esc">
+<div class="cr2-app">
+<nav class="cr2-lat" aria-label="Navegación principal">
+  <div class="cr2-lat-cab"><span class="cr2-logo"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.5"/><path d="M12 5.5v13M9.6 8h4.8M9 11h6M9 14h6M9.6 17h4.8"/></svg><span class="cr2-logo-n">Spinus</span></span><span class="cr2-flex"></span><span class="cr2-plan">Plan VIP</span></div>
+  <button type="button" class="cr2-p cr2-cons-b"><span class="cr2-clogo" role="img" aria-label="Logo de Clínica Semilla A"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21c-4.5-2.2-7-5.6-7-10V5.5L12 3l7 2.5V11c0 4.4-2.5 7.8-7 10z"/><path d="M12 8v7M8.5 11.5h7"/></svg></span><span class="cr2-cons-t"><span class="cr2-m">Consultorio</span><b class="cr2-m">Centro</b><span class="cr2-s">Clínica</span><b class="cr2-s">Clínica Semilla A</b></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 9 4-4 4 4M8 15l4 4 4-4"/></svg></button>
+  <div class="cr2-lista"><a href="#" class="cr2-p cr2-li" aria-current="page"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Inicio</a><a href="#" class="cr2-p cr2-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.9.7 3.1 2.4 3.5 5.2"/></svg>Expediente</a><a href="#" class="cr2-p cr2-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Agenda</a><a href="#" class="cr2-p cr2-li cr2-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>Documentos</a><a href="#" class="cr2-p cr2-li cr2-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20v-8M12 20V5M19 20v-9"/></svg>Administración</a></div>
+  <span class="cr2-flex"></span>
+  
+  <div class="cr2-lat-pie"><a href="#" class="cr2-p cr2-li cr2-yo cr2-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18.2c1.3-2 3.2-3 5.5-3s4.2 1 5.5 3"/></svg><span><span>Dr. Admin Semilla</span><small class="cr2-esp">Ortopedia y Traumatología</small><small>Mi perfil · Ajustes</small></span></a><a href="#" class="cr2-p cr2-ib cr2-ay cr2-m" aria-label="Ayuda"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.6M12 17h.01"/></svg></a><button type="button" class="cr2-p cr2-li cr2-yo cr2-s cr2-abre-aj" aria-haspopup="menu"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span><span>Secretaria Semilla</span><small>Ajustes</small></span></button></div>
+</nav><main class="cr2-cont">
+  <!-- Fondo simplificado: el dashboard reducido a sus bloques, para que la pieza global se lea sobre una pantalla real. -->
+  <div class="cr2-top"><p class="cr2-rot"><span class="cr2-m">Centro</span><span class="cr2-s">Clínica Semilla A</span></p>
+  <h1 class="cr2-h1">Buenas tardes, <span class="cr2-m">Admin</span><span class="cr2-s">Secretaria</span></h1></div>
+  <div class="cr2-cols"><section class="cr2-tj" aria-hidden="true"><h2 class="cr2-tt">Después</h2><div class="cr2-fl"><span class="cr2-bx"></span><span class="cr2-fl-t"><span class="cr2-br" style="width:62%"></span><span class="cr2-br cr2-br2" style="width:40%"></span></span></div><div class="cr2-fl"><span class="cr2-bx"></span><span class="cr2-fl-t"><span class="cr2-br" style="width:62%"></span><span class="cr2-br cr2-br2" style="width:40%"></span></span></div><div class="cr2-fl"><span class="cr2-bx"></span><span class="cr2-fl-t"><span class="cr2-br" style="width:62%"></span><span class="cr2-br cr2-br2" style="width:40%"></span></span></div><div class="cr2-fl"><span class="cr2-bx"></span><span class="cr2-fl-t"><span class="cr2-br" style="width:62%"></span><span class="cr2-br cr2-br2" style="width:40%"></span></span></div><div class="cr2-fl"><span class="cr2-bx"></span><span class="cr2-fl-t"><span class="cr2-br" style="width:62%"></span><span class="cr2-br cr2-br2" style="width:40%"></span></span></div></section><section class="cr2-tj" aria-hidden="true"><h2 class="cr2-tt">Atendidos recientemente</h2><div class="cr2-fl"><span class="cr2-bx"></span><span class="cr2-fl-t"><span class="cr2-br" style="width:62%"></span><span class="cr2-br cr2-br2" style="width:40%"></span></span></div><div class="cr2-fl"><span class="cr2-bx"></span><span class="cr2-fl-t"><span class="cr2-br" style="width:62%"></span><span class="cr2-br cr2-br2" style="width:40%"></span></span></div><div class="cr2-fl"><span class="cr2-bx"></span><span class="cr2-fl-t"><span class="cr2-br" style="width:62%"></span><span class="cr2-br cr2-br2" style="width:40%"></span></span></div></section><section class="cr2-tj" aria-hidden="true"><h2 class="cr2-tt">Documentos recientes</h2><div class="cr2-fl"><span class="cr2-bx"></span><span class="cr2-fl-t"><span class="cr2-br" style="width:62%"></span><span class="cr2-br cr2-br2" style="width:40%"></span></span></div><div class="cr2-fl"><span class="cr2-bx"></span><span class="cr2-fl-t"><span class="cr2-br" style="width:62%"></span><span class="cr2-br cr2-br2" style="width:40%"></span></span></div></section><section class="cr2-tj" aria-hidden="true"><h2 class="cr2-tt">Esta semana</h2><div class="cr2-fl"><span class="cr2-bx"></span><span class="cr2-fl-t"><span class="cr2-br" style="width:62%"></span><span class="cr2-br cr2-br2" style="width:40%"></span></span></div><div class="cr2-fl"><span class="cr2-bx"></span><span class="cr2-fl-t"><span class="cr2-br" style="width:62%"></span><span class="cr2-br cr2-br2" style="width:40%"></span></span></div><div class="cr2-fl"><span class="cr2-bx"></span><span class="cr2-fl-t"><span class="cr2-br" style="width:62%"></span><span class="cr2-br cr2-br2" style="width:40%"></span></span></div></section></div>
+</main>
+</div>
+<div class="cr2-capa" aria-hidden="true">
+  <div class="cr2-velo"></div>
+  
+  
+  <!-- A0·2 · Lista de consultorios (ConsultorioActivoSelector.tsx:105-131): palomita en el activo; elegir el activo solo cierra;
+       elegir otro abre la confirmación. «Gestionar consultorios →» lleva a /perfil y cierra el menú. Esc y tocar fuera cierran.
+       Computadora: desplegable que nace del botón, sin velo (cr221). iPhone: hoja inferior sobre el cajón. Resto: tarjeta centrada con velo (cr225/cr226). -->
+  <div class="cr2-lw"><div class="cr2-ls" role="menu" aria-label="Consultorio activo"><button type="button" class="cr2-p cr2-co" data-c="Centro" role="menuitemradio" aria-checked="true"><span>Centro</span><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="cr2-co-ck"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></button><button type="button" class="cr2-p cr2-co" data-c="Hosp Norte" role="menuitemradio" aria-checked="false"><span>Hosp Norte</span><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="cr2-co-ck"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></button><button type="button" class="cr2-p cr2-co" data-c="Rehab" role="menuitemradio" aria-checked="false"><span>Rehab</span><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="cr2-co-ck"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></button>
+    <a href="#" class="cr2-p cr2-gest">Gestionar consultorios →</a></div></div>
+  <!-- Confirmación (ConsultorioActivoSelector.tsx:137-164) con el patrón único de alerta (CALMA cr213, cr225): icono tonal, título centrado,
+       dos botones del mismo ancho, secundario a la izquierda. Textos exactos de hoy. -->
+  <div class="cr2-alw"><div class="cr2-al" role="alertdialog" aria-modal="true" aria-labelledby="cr2-al-t-esc" aria-describedby="cr2-al-m-esc">
+    <span class="cr2-al-ic" aria-hidden="true"><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V6a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v15M14 10h5a1 1 0 0 1 1 1v10M3 21h18M8 9h2M8 13h2M8 17h2"/></svg></span>
+    <h2 class="cr2-al-t" id="cr2-al-t-esc">Cambiar consultorio activo</h2>
+    <p class="cr2-al-m" id="cr2-al-m-esc">¿Cambiar a <strong class="cr2-al-n">Hosp Norte</strong>?</p>
+    <div class="cr2-al-b"><button type="button" class="cr2-p cr2-ton cr2-al-no">Cancelar</button><button type="button" class="cr2-p cr2-prim cr2-al-si">Sí, cambiar</button></div>
+  </div></div>
+</div>
+<!-- Aviso breve (pub-capas vista 5): «Consultorio activo: X» (ConsultorioActivoSelector.tsx:79), arriba y centrado en el área de contenido. -->
+<div class="cr2-zona" aria-live="polite"><div class="cr2-tst" role="status"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg><span class="cr2-tst-t">Consultorio activo: Hosp Norte</span>
+  <button type="button" class="cr2-p cr2-tst-x" aria-label="Cerrar aviso"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div></div>
+</div>
+<template class="cr2-ficha-tpl"><section class="cr2-ficha" lang="es" aria-label="Especificación: Selector de consultorio activo"><h3>Especificación · Selector de consultorio activo</h3><dl><dt>Qué es</dt><dd>El selector de consultorio activo de hoy (<code>sidebar/ConsultorioActivoSelector.tsx</code>): elige en qué consultorio trabaja el médico; la agenda y los documentos toman ese dato.</dd><dt>A quién</dt><dd>Solo médico con dos o más consultorios (<code>:62-64</code>). Con uno solo, el botón no se dibuja. La secretaria ve el nombre de la clínica en el mismo sitio (decisión del dashboard aprobado), sin desplegable.</dd><dt>Dónde vive</dt><dd><b>Computadora / Duo abierto horizontal:</b> el botón «Consultorio · Centro» bajo el logo de la barra lateral. <b>iPhone / Duo abierto vertical:</b> el mismo botón dentro del cajón. <b>Duo cerrado:</b> fila «Consultorio activo · Centro» del menú «Más» (no hay barra lateral).</dd><dt>Capas</dt><dd>Lista: desplegable de 224 que nace del botón y sin velo en computadora (§21); hoja inferior sobre el cajón en iPhone; tarjeta centrada con velo en Duo (310 en cerrado, 340 en abierto). Filas de 48 (40 en computadora), palomita en el activo, «Gestionar consultorios →» al pie en <code>--enlace</code>. Confirmación: alerta del patrón único, 320/340, icono tonal en círculo de 48, «Cancelar» (tonal) a la izquierda y «Sí, cambiar» (primario) a la derecha, 44 de alto (40 en ancho). Aviso: arriba y centrado en el área de contenido, 4 s.</dd><dt>Comportamiento</dt><dd>Elegir el activo solo cierra. Elegir otro abre la confirmación; «Sí, cambiar» cambia, cierra todo y avisa «Consultorio activo: X»; «Cancelar» vuelve a la lista. Esc o tocar fuera cierra la capa de más arriba. «Gestionar consultorios →» va a Mi perfil y cierra el menú.</dd><dt>Textos (exactos de hoy)</dt><dd>«Consultorio activo» (<code>:93</code>), «Gestionar consultorios →» (<code>:130</code>), «Cambiar consultorio activo», «¿Cambiar a <b>X</b>?», «Cancelar», «Sí, cambiar» (<code>:140-161</code>), «Consultorio activo: X» (<code>:79</code>). El título de la hoja y de la tarjeta reutiliza «Consultorio activo».</dd><dt>Accesibilidad</dt><dd>Botón con <code>aria-expanded</code>; lista con <code>role="menu"</code> y opciones <code>menuitemradio</code> con <code>aria-checked</code>; la alerta es <code>alertdialog</code> con título y mensaje enlazados y el foco en «Sí, cambiar»; al cerrar, el foco vuelve al botón.</dd><dt>Movimiento</dt><dd>Desplegable: escala .96→1 desde el borde del botón. Hoja: sube del borde con resorte (amortiguación 1, respuesta .35 s) y se arrastra hacia abajo para cerrarla. Tarjeta y alerta: escala .96→1 desde el centro. Salida por el mismo camino, más rápida. Reduced motion: fundidos de 200 ms. Reduced transparency: velo opaco.</dd><dt>Respecto a hoy</dt><dd>Hoy el desplegable es blanco sobre el navy en todos los modos, sus opciones miden 36 y el enlace 32, y la confirmación es un modal genérico con la X bajo la franja. En Duo cerrado no había ningún acceso visible en las maquetas.</dd></dl></section></template>
+<script>
+(function(CFG){
+
+var P=CFG.p,MS=[].slice.call(document.querySelectorAll('.'+P+'.marco'));
+function cls(n){return P+'-'+n}
+MS.forEach(function(m){
+  var capa=m.querySelector('.'+cls('capa')),orig=null;
+  m.querySelectorAll('a[href="#"]').forEach(function(a){a.addEventListener('click',function(e){e.preventDefault();if(capa&&capa.classList.contains(cls('on'))&&a.closest('.'+cls('capa')))cierra()})});
+  function abre(k,o){if(!capa)return;orig=o||null;capa.dataset.k=k;capa.classList.add(cls('on'));capa.setAttribute('aria-hidden','false');
+    var pan=capa.querySelector(k==='cajon'?'.'+cls('cajon'):'.'+cls('mn'));var f=pan&&pan.querySelector('button,a');if(f)f.focus({preventScroll:true})}
+  function cierra(){if(!capa)return;capa.classList.remove(cls('on'));capa.setAttribute('aria-hidden','true');if(orig&&orig.offsetParent)orig.focus({preventScroll:true})}
+  m.abre=abre;m.cierra=cierra;
+  m.querySelectorAll('[data-abre]').forEach(function(b){b.addEventListener('click',function(){abre(b.dataset.abre,b)})});
+  if(capa){capa.querySelector('.'+cls('velo')).addEventListener('click',cierra);
+    capa.querySelectorAll('.'+cls('cierra')).forEach(function(b){b.addEventListener('click',cierra)});}
+  m.addEventListener('keydown',function(e){if(e.key==='Escape'&&capa&&capa.classList.contains(cls('on'))){e.preventDefault();cierra()}});
+});
+function tira(grupos,alPulsar){var d=document.createElement('div');d.className=cls('tira');d.setAttribute('role','group');d.setAttribute('aria-label','Controles de la maqueta');
+  grupos.forEach(function(g,i){if(i){var s=document.createElement('span');s.className=cls('sep');d.appendChild(s)}
+    g.forEach(function(b){var x=document.createElement('button');x.type='button';x.textContent=b[1];x.dataset.k=b[0];if(b[2]!=null)x.setAttribute('aria-pressed',String(b[2]));
+      x.addEventListener('click',function(){alPulsar(b[0],x,d)});d.appendChild(x)})});
+  var op=MS[0].closest('.op'),h=op&&op.querySelector('header');if(h)h.appendChild(d);else MS[0].parentNode.insertBefore(d,MS[0]);
+  var tp=document.querySelector('template.'+cls('ficha-tpl'));if(tp){var f=tp.content.firstElementChild.cloneNode(true);if(op)op.appendChild(f);else MS[MS.length-1].after(f)}
+  return d}
+
+
+var act='Centro',pend=null,tt=null;
+MS.forEach(function(m){
+  var capa=m.querySelector('.'+cls('capa')),vp=m.dataset.vp,btns=m.querySelectorAll('.'+cls('cons-b')+',.'+cls('abre-ls'));
+  function k(){return (capa.dataset.k||'').split(' ').filter(Boolean)}
+  function pon(l){capa.dataset.k=l.join(' ');var on=l.length>0;capa.classList.toggle(cls('on'),on);capa.setAttribute('aria-hidden',String(!on));
+    btns.forEach(function(b){if(b.classList.contains(cls('cons-b')))b.setAttribute('aria-expanded',String(l.indexOf('lista')>=0))})}
+  m.abreLista=function(){var l=k().filter(function(x){return x!=='alerta'&&x!=='mas'});
+    if(vp==='tel'&&l.indexOf('cajon')<0)l.push('cajon');if(vp==='iv'&&l.indexOf('cajon')<0)l.push('cajon');
+    if(vp==='ext')l=[];l.push('lista');pon(l);var f=capa.querySelector('.'+cls('co')+'[aria-checked="true"]');if(f)f.focus({preventScroll:true})};
+  m.alerta=function(c){pend=c;m.querySelector('.'+cls('al-n')).textContent=c;var l=k();if(l.indexOf('alerta')<0)l.push('alerta');pon(l);
+    m.querySelector('.'+cls('al-si')).focus({preventScroll:true})};
+  m.cierraTodo=function(){pon([])};
+  btns.forEach(function(b){b.addEventListener('click',function(e){e.stopPropagation();m.abreLista()})});
+  m.querySelectorAll('.'+cls('co')).forEach(function(b){b.addEventListener('click',function(){
+    if(b.dataset.c===act){/* el activo solo cierra (:69-72) */var l=k().filter(function(x){return x!=='lista'});pon(vp==='esc'?[]:l);return}
+    m.alerta(b.dataset.c)})});
+  m.querySelector('.'+cls('al-no')).addEventListener('click',function(){pon(k().filter(function(x){return x!=='alerta'}))});
+  m.querySelector('.'+cls('al-si')).addEventListener('click',function(){confirma(pend)});
+  m.querySelector('.'+cls('gest')).addEventListener('click',function(){pon([])});
+  m.querySelector('.'+cls('tst-x')).addEventListener('click',function(){MS.forEach(function(x){x.classList.remove(cls('toast'))})});
+  /* Tocar fuera / Esc: cierra la capa de más arriba (alerta → lista → cajón) */
+  capa.querySelector('.'+cls('velo')).addEventListener('click',function(e){e.stopImmediatePropagation();var l=k();l.pop();pon(l)},true);
+  capa.querySelector('.'+cls('lw')).addEventListener('click',function(e){if(e.target===e.currentTarget){var l=k();l.pop();pon(l)}});
+  m.addEventListener('keydown',function(e){if(e.key==='Escape'&&k().length){e.preventDefault();e.stopImmediatePropagation();var l=k();l.pop();pon(l)}},true);
+});
+function confirma(c){act=c;MS.forEach(function(m){
+  m.querySelectorAll('.'+cls('co')).forEach(function(b){b.setAttribute('aria-checked',String(b.dataset.c===c))});
+  m.querySelectorAll('.'+cls('cons-t')+' b.'+cls('m')+',.'+cls('cons-n')).forEach(function(n){n.textContent=c});
+  m.querySelectorAll('.'+cls('rot')+' .'+cls('m')).forEach(function(n){n.textContent=c});
+  m.querySelector('.'+cls('tst-t')).textContent='Consultorio activo: '+c;m.cierraTodo();m.classList.add(cls('toast'))});
+  clearTimeout(tt);tt=setTimeout(function(){MS.forEach(function(m){m.classList.remove(cls('toast'))})},4000)}
+tira([[['lista','Abrir el selector'],['alerta','Confirmación'],['aviso','Aviso «Consultorio activo»']],[['reset','Volver a «Centro»']]],function(q){
+  MS.forEach(function(m){if(q==='lista')m.abreLista();else if(q==='alerta'){m.abreLista();m.alerta('Hosp Norte')}});
+  if(q==='aviso'){confirma('Hosp Norte');clearTimeout(tt)}
+  if(q==='reset'){confirma('Centro');clearTimeout(tt);MS.forEach(function(m){m.classList.remove(cls('toast'))})}});
+
+})({"p": "cr2"});
+</script>

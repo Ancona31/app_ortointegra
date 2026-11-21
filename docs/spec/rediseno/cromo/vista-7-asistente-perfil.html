@@ -1,0 +1,753 @@
+<!-- NOMBRE: Asistente de perfil | Hoy es un ModalShell genérico con un stepper de puntos y botones grises; aquí es el modal del catálogo (pantalla completa en iPhone, porque no se puede cerrar) con progreso nombrado, los campos como en los formularios aprobados y los siete pasos con sus textos de hoy -->
+<style>
+
+.cr7 .cr7-app{display:flex;width:100%;height:100%}
+.cr7[data-vp="tel"] .cr7-app,.cr7[data-vp="iv"] .cr7-app{flex-direction:column}
+.cr7 button{border:0;margin:0;padding:0;background:none;color:inherit}
+.cr7 h1,.cr7 h2,.cr7 h3,.cr7 p,.cr7 ul{margin:0;padding:0}
+.cr7 ul{list-style:none}
+.cr7 svg{flex:none}
+.cr7 .cr7-flex{flex:1}
+/* Variantes por rol: m = médico, s = secretaria */
+.cr7:not(.cr7-sec) .cr7-s{display:none!important}
+.cr7.cr7-sec .cr7-m{display:none!important}
+/* Respuesta al toque y foco */
+.cr7 .cr7-p{transition:transform 100ms ease-out}
+.cr7 .cr7-p:active{transform:scale(.97)}
+.cr7 .cr7-p:focus-visible{outline:3px solid var(--enlace);outline-offset:2px}
+.cr7 .cr7-nav .cr7-p:focus-visible,.cr7 .cr7-lat .cr7-p:focus-visible{outline-color:var(--nav-tinta)}
+/* ---- Fondo simplificado ---- */
+.cr7 .cr7-cont{flex:1;min-width:0;min-height:0;overflow-x:hidden;overflow-y:auto;scrollbar-width:none;display:flex;flex-direction:column;gap:16px;padding:16px 14px calc(var(--ib) + 16px) 16px}
+.cr7 .cr7-cont>*{flex:none}
+.cr7[data-vp="tel"] .cr7-cont{padding:18px 16px calc(var(--ib) + 16px)}
+.cr7[data-vp="ih"] .cr7-cont{padding:20px 24px calc(var(--ib) + 16px)}
+.cr7[data-vp="iv"] .cr7-cont{padding:22px 24px 20px}
+.cr7[data-vp="esc"] .cr7-cont{padding:28px 24px 24px}
+.cr7 .cr7-top{display:flex;flex-direction:column;gap:4px}
+.cr7 .cr7-rot{font-size:12px;line-height:16px;font-weight:600;letter-spacing:.3px;text-transform:uppercase;color:var(--tinta2)}
+.cr7 .cr7-h1{font-size:26px;line-height:32px;font-weight:800;letter-spacing:-.6px}
+.cr7[data-vp="ih"] .cr7-h1,.cr7[data-vp="iv"] .cr7-h1,.cr7[data-vp="esc"] .cr7-h1{font-size:32px;line-height:38px}
+.cr7 .cr7-cols{display:flex;flex-direction:column;gap:12px}
+.cr7[data-vp="ih"] .cr7-cols,.cr7[data-vp="iv"] .cr7-cols,.cr7[data-vp="esc"] .cr7-cols{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:16px;align-items:start}
+.cr7[data-vp="ih"] .cr7-cols>:first-child,.cr7[data-vp="iv"] .cr7-cols>:first-child,.cr7[data-vp="esc"] .cr7-cols>:first-child{grid-row:1/3}
+.cr7 .cr7-tj{background:var(--sup);border-radius:16px;padding:14px 16px 8px}
+.cr7[data-vp="ih"] .cr7-tj,.cr7[data-vp="iv"] .cr7-tj,.cr7[data-vp="esc"] .cr7-tj{border-radius:18px;padding:16px 20px 8px}
+.cr7 .cr7-tt{font-size:17px;line-height:22px;font-weight:700;margin-bottom:4px}
+.cr7 .cr7-fl{display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--linea)}
+.cr7 .cr7-tt+.cr7-fl{border-top:0}
+.cr7 .cr7-bx{width:44px;height:44px;flex:none;border-radius:12px;background:var(--fondo)}
+.cr7 .cr7-fl-t{flex:1;display:flex;flex-direction:column;gap:8px}
+.cr7 .cr7-br{display:block;height:10px;border-radius:5px;background:var(--sup2)}
+.cr7 .cr7-br2{height:8px;opacity:.7}
+/* ---- Riel (Duo cerrado) ---- */
+.cr7 .cr7-riel{position:relative;z-index:1;flex:none;width:calc(56px + var(--ir));padding:16px calc(var(--ir) + 8px) calc(var(--ib) + 10px) 8px;background:var(--navy);border-radius:26px 0 0 26px;box-shadow:var(--sombra-nav-der);display:flex;flex-direction:column;align-items:center;gap:8px}
+.cr7 .cr7-rb{position:relative;width:48px;height:48px;flex:none;border-radius:999px;display:flex;align-items:center;justify-content:center;color:var(--nav-tinta)}
+.cr7 .cr7-rb[aria-current="page"]{background:var(--accion);color:#fff}
+.cr7 .cr7-masb{width:52px;height:52px;flex:none;border-radius:999px;background:#fff;color:var(--accion);display:flex;align-items:center;justify-content:center;box-shadow:var(--sombra-accion)}
+/* ---- Encabezado fundido (iPhone) ---- */
+.cr7 .cr7-enc{position:relative;z-index:1;flex:none;display:flex;align-items:center;gap:12px;padding:calc(var(--it) + 8px) 16px 12px;background:var(--navy);border-radius:0 0 26px 26px;box-shadow:var(--sombra-nav-sup);color:#fff}
+.cr7 .cr7-menu{position:relative;width:44px;height:44px;flex:none;border-radius:12px;background:var(--nav-velo);color:#fff;display:flex;align-items:center;justify-content:center}
+.cr7 .cr7-enc-t{font-size:17px;line-height:22px;font-weight:700;color:#fff}
+.cr7 .cr7-av{display:flex;align-items:center;justify-content:center;flex:none;width:34px;height:34px;border-radius:999px;background:var(--nav-avatar);color:var(--navy);font-size:13px;font-weight:700}
+.cr7 .cr7-av.cr7-av-g{width:44px;height:44px}
+/* ---- Encabezado de Duo abierto vertical ---- */
+.cr7 .cr7-env{position:relative;z-index:1;flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:var(--it) 16px 14px;background:var(--navy);border-radius:0 0 26px 26px;box-shadow:var(--sombra-nav-sup);color:#fff}
+.cr7 .cr7-envb{position:relative;width:44px;height:44px;flex:none;border-radius:999px;background:var(--nav-velo);color:#fff;display:flex;align-items:center;justify-content:center}
+.cr7 .cr7-pista{display:flex;align-items:center;gap:2px;padding:4px;border-radius:26px;background:var(--nav-velo)}
+.cr7 .cr7-pv{display:flex;align-items:center;height:40px;padding:0 14px;border-radius:999px;color:var(--nav-tinta);font-size:15px;line-height:20px;font-weight:500;white-space:nowrap;position:relative}
+.cr7 .cr7-pv::after{content:"";position:absolute;inset:-2px 0}
+.cr7 .cr7-pv[aria-current="page"]{padding:0 16px;background:var(--accion);color:#fff;font-weight:600}
+/* ---- Barra lateral (Duo abierto horizontal a la derecha; computadora a la izquierda) y cajón ---- */
+.cr7 .cr7-lat{position:relative;z-index:1;flex:none;display:flex;flex-direction:column;background:var(--navy);color:#fff}
+.cr7[data-vp="ih"] .cr7-lat{width:calc(218px + var(--ir));padding:16px calc(var(--ir) + 10px) calc(var(--ib) + 10px) 12px;border-radius:26px 0 0 26px;box-shadow:var(--sombra-nav-der)}
+.cr7[data-vp="esc"] .cr7-lat{width:248px;padding:16px 12px 14px;border-radius:0 26px 26px 0;box-shadow:var(--sombra-nav-izq)}
+.cr7 .cr7-lat-cab{display:flex;align-items:center;gap:8px;min-height:36px;padding:0 4px 0 8px}
+.cr7 .cr7-logo{display:inline-flex;align-items:center;gap:8px;color:#fff}
+.cr7 .cr7-logo-n{font-size:17px;line-height:22px;font-weight:700;letter-spacing:-.2px}
+.cr7 .cr7-plan{display:inline-flex;align-items:center;height:24px;padding:0 10px;border-radius:999px;background:var(--nav-velo);color:var(--nav-tinta);font-size:12px;line-height:16px;font-weight:600;white-space:nowrap}
+.cr7 .cr7-cons-b{margin-top:12px;display:flex;align-items:center;gap:10px;width:100%;min-height:52px;padding:8px 10px;border-radius:14px;background:var(--nav-velo);color:#fff;text-align:left}
+.cr7 .cr7-cons-b>svg{color:var(--nav-tinta2)}
+.cr7 .cr7-clogo{width:36px;height:36px;flex:none;border-radius:999px;background:#fff;color:var(--accion);display:flex;align-items:center;justify-content:center}
+.cr7 .cr7-cons-t{flex:1;min-width:0;display:flex;flex-direction:column}
+.cr7 .cr7-cons-t span{font-size:13px;line-height:16px;color:var(--nav-tinta2)}
+.cr7 .cr7-cons-t b{font-size:15px;line-height:19px;font-weight:600}
+.cr7 .cr7-lista{margin-top:14px;display:flex;flex-direction:column;gap:2px}
+.cr7 .cr7-li{display:flex;align-items:center;gap:12px;height:44px;padding:0 12px;border-radius:12px;color:var(--nav-tinta);font-size:15px;line-height:20px;font-weight:500}
+.cr7[data-vp="esc"] .cr7-li{height:40px;font-size:14px}
+.cr7 .cr7-li[aria-current="page"]{background:var(--accion);color:#fff;font-weight:600}
+.cr7 .cr7-lat-pie{border-top:1px solid var(--nav-velo);padding-top:8px;display:flex;align-items:center;gap:4px}
+.cr7 .cr7-lat-pie .cr7-yo{flex:1;min-width:0;text-align:left}
+.cr7 .cr7-lat-pie .cr7-ib{color:var(--nav-tinta2)}
+.cr7[data-vp="ih"] .cr7-esp{display:none}
+/* Duo abierto horizontal: la barra mide 218; el pie suelta el icono para que nombre y «Ayuda» quepan en una línea */
+.cr7[data-vp="ih"] .cr7-lat .cr7-lat-pie .cr7-yo{padding:0 8px}
+.cr7[data-vp="ih"] .cr7-lat .cr7-lat-pie .cr7-yo>svg{display:none}
+.cr7[data-vp="ih"] .cr7-lat .cr7-lat-pie .cr7-ib{width:36px;height:36px}
+.cr7 .cr7-esp{color:var(--nav-tinta)!important}
+.cr7 .cr7-yo{min-height:48px;height:auto;padding-top:6px;padding-bottom:6px}
+.cr7 .cr7-yo>span{display:flex;flex-direction:column;line-height:17px}
+.cr7 .cr7-yo small{font-size:12px;line-height:16px;color:var(--nav-tinta2)}
+.cr7 .cr7-ib{position:relative;width:44px;height:44px;flex:none;border-radius:999px;display:flex;align-items:center;justify-content:center;color:var(--nav-tinta)}
+/* ---- Capas (CALMA cr725/cr726): un velo por marco; cajón desde la izquierda en iPhone y Duo vertical; tarjeta centrada en lo demás ---- */
+.cr7 .cr7-capa{position:absolute;inset:0;z-index:20;visibility:hidden;transition:visibility 0s linear 360ms}
+.cr7 .cr7-capa.cr7-on{visibility:visible;transition:none}
+.cr7 .cr7-velo{position:absolute;inset:0;background:var(--velo);-webkit-backdrop-filter:blur(10px) saturate(140%);backdrop-filter:blur(10px) saturate(140%);opacity:0;transition:opacity 240ms ease-out}
+.cr7 .cr7-on .cr7-velo{opacity:1;transition:opacity 320ms ease-out}
+.cr7 .cr7-cajon{position:absolute;left:0;top:0;bottom:0;width:300px;display:flex;flex-direction:column;overflow-y:auto;scrollbar-width:none;padding:calc(var(--it) + 12px) 14px calc(var(--ib) + 12px) 14px;background:var(--navy);color:#fff;border-radius:0 26px 26px 0;box-shadow:var(--sombra-nav-izq);transform:translateX(-106%);transition:transform 360ms linear(0,0.123,0.3397,0.54,0.6943,0.8032,0.8762,0.9234,0.9533,0.9718,0.9831,0.99,0.9941,0.9965,0.998,1)}
+.cr7[data-vp="iv"] .cr7-cajon{width:320px}
+.cr7 .cr7-capa[data-k~="cajon"].cr7-on .cr7-cajon{transform:none;transition:transform 520ms linear(0,0.0803,0.2398,0.4083,0.5568,0.6769,0.769,0.8374,0.8869,0.9221,0.9468,0.9639,0.9756,0.9836,0.9891,0.9927,0.9952,0.9968,0.9979,0.9986,1)}
+.cr7 .cr7-cajon .cr7-lat-cab{padding-right:0}
+.cr7 .cr7-mnw{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:16px;pointer-events:none}
+.cr7[data-vp="ext"] .cr7-mnw{padding:16px calc(56px + var(--ir) + 8px) calc(var(--ib) + 16px) 8px}
+.cr7[data-vp="iv"] .cr7-mnw{padding:calc(var(--it) + 16px) 24px 24px}
+.cr7[data-vp="ih"] .cr7-mnw{padding:24px calc(218px + var(--ir) + 24px) calc(var(--ib) + 16px) 24px}
+.cr7[data-vp="esc"] .cr7-mnw{padding:32px 24px 32px calc(248px + 24px)}
+.cr7 .cr7-mn{pointer-events:auto;width:310px;max-width:100%;max-height:100%;overflow-y:auto;scrollbar-width:none;background:var(--sup);color:var(--tinta);border-radius:20px;box-shadow:var(--sombra-capa);padding:8px;opacity:0;transform:scale(.96);transition:opacity 200ms ease-out,transform 360ms linear(0,0.123,0.3397,0.54,0.6943,0.8032,0.8762,0.9234,0.9533,0.9718,0.9831,0.99,0.9941,0.9965,0.998,1)}
+.cr7[data-vp="iv"] .cr7-mn,.cr7[data-vp="ih"] .cr7-mn,.cr7[data-vp="esc"] .cr7-mn{width:340px}
+.cr7 .cr7-capa[data-k~="mas"].cr7-on .cr7-mn{opacity:1;transform:none;transition:opacity 240ms ease-out,transform 520ms linear(0,0.0803,0.2398,0.4083,0.5568,0.6769,0.769,0.8374,0.8869,0.9221,0.9468,0.9639,0.9756,0.9836,0.9891,0.9927,0.9952,0.9968,0.9979,0.9986,1)}
+.cr7 .cr7-capa:not([data-k~="mas"]) .cr7-mnw{display:none}
+.cr7 .cr7-capa:not([data-k~="cajon"]) .cr7-cajon{display:none}
+.cr7 .cr7-mn-t{padding:8px 12px 6px;font-size:17px;line-height:22px;font-weight:700}
+.cr7 .cr7-mo{display:flex;align-items:center;gap:12px;width:100%;min-height:48px;padding:0 12px;border-radius:12px;font-size:15px;line-height:20px;color:var(--tinta);text-align:left}
+.cr7 .cr7-mo{position:relative}
+.cr7 .cr7-mo+.cr7-mo::before{content:"";position:absolute;left:44px;right:12px;top:0;height:1px;background:var(--linea)}
+.cr7 .cr7-mo>svg:first-child{color:var(--enlace)}
+.cr7 .cr7-mo>.cr7-mo-f{margin-left:auto;color:var(--tinta3)}
+.cr7 .cr7-mo-v{margin-left:auto;font-size:15px;color:var(--tinta2)}
+.cr7 .cr7-mo-v+.cr7-mo-f{margin-left:4px}
+@media (prefers-reduced-transparency:reduce){
+  .cr7 .cr7-velo{-webkit-backdrop-filter:none;backdrop-filter:none;background:color-mix(in srgb,var(--navy) 55%,var(--fondo))}
+}
+@media (prefers-reduced-motion:reduce){
+  .cr7 .cr7-cajon,.cr7 .cr7-capa[data-k~="cajon"].cr7-on .cr7-cajon{transform:none;opacity:0;transition:opacity 200ms ease}
+  .cr7 .cr7-capa[data-k~="cajon"].cr7-on .cr7-cajon{opacity:1}
+  .cr7 .cr7-mn,.cr7 .cr7-capa[data-k~="mas"].cr7-on .cr7-mn{transform:none;transition:opacity 200ms ease}
+  .cr7 .cr7-p{transition:none}
+}
+/* ---- Tira de maqueta (CALMA cr77) y ficha «Especificación» (fuera del marco) ---- */
+.cr7-tira{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:10px}
+.cr7-tira .cr7-sep{width:1px;height:20px;background:var(--borde)}
+.cr7-tira button{position:relative;height:28px;padding:0 10px;border-radius:999px;border:1px dashed var(--tinta3);background:none;color:var(--tinta2);font:600 12px/16px var(--fuente);white-space:nowrap;cursor:pointer;transition:transform 100ms ease-out}
+.cr7-tira button::after{content:"";position:absolute;inset:-4px 0}
+.cr7-tira button:active{transform:scale(.97)}
+.cr7-tira button:focus-visible{outline:3px solid var(--enlace);outline-offset:2px}
+.cr7-tira button[aria-pressed="true"]{border-style:solid;background:var(--sup2);color:var(--tinta)}
+.cr7-ficha{margin-top:6px;background:var(--sup);border-radius:18px;padding:16px 20px;color:var(--tinta);font:14px/20px var(--fuente);max-width:100%}
+.cr7-ficha h3{margin:0 0 8px;font-size:17px;line-height:22px;font-weight:700}
+.cr7-ficha dl{margin:0;display:grid;grid-template-columns:minmax(0,170px) minmax(0,1fr);gap:0 16px}
+.cr7-ficha dt{padding:8px 0;border-top:1px solid var(--linea);font-size:13px;line-height:18px;font-weight:600;color:var(--tinta2)}
+.cr7-ficha dd{margin:0;padding:8px 0;border-top:1px solid var(--linea);font-size:14px;line-height:20px;overflow-wrap:anywhere}
+.cr7-ficha dt:first-of-type,.cr7-ficha dt:first-of-type+dd{border-top:0}
+.cr7-ficha code{font:12px/18px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--tinta2)}
+@media (max-width:620px){.cr7-ficha dl{grid-template-columns:1fr}.cr7-ficha dd{border-top:0;padding-top:0}}
+
+.cr7 .cr7-capa{visibility:visible}
+.cr7.cr7-fin .cr7-capa{visibility:hidden;transition:visibility 0s linear 360ms}
+.cr7.cr7-fin .cr7-velo{opacity:0}
+.cr7.cr7-fin .cr7-app{pointer-events:auto}
+/* ---- Contenedor ---- */
+.cr7 .cr7-mw{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:24px}
+.cr7[data-vp="ext"] .cr7-mw{padding:16px calc(56px + var(--ir) + 8px) calc(var(--ib) + 16px) 8px}
+.cr7[data-vp="ih"] .cr7-mw{padding:20px calc(218px + var(--ir) + 24px) calc(var(--ib) + 12px) 24px}
+.cr7[data-vp="iv"] .cr7-mw{padding:calc(var(--it) + 24px) 24px 24px}
+.cr7[data-vp="esc"] .cr7-mw{padding:32px 24px 32px calc(248px + 24px)}
+.cr7[data-vp="tel"] .cr7-mw{padding:0}
+.cr7 .cr7-md{display:flex;flex-direction:column;width:520px;max-width:100%;max-height:100%;background:var(--sup);color:var(--tinta);border-radius:20px;box-shadow:var(--sombra-capa);overflow:hidden;transition:opacity 200ms ease-out,transform 360ms linear(0,0.123,0.3397,0.54,0.6943,0.8032,0.8762,0.9234,0.9533,0.9718,0.9831,0.99,0.9941,0.9965,0.998,1)}
+.cr7[data-vp="ext"] .cr7-md{width:310px}
+.cr7[data-vp="tel"] .cr7-md{width:100%;height:100%;border-radius:0;box-shadow:none}
+.cr7.cr7-fin .cr7-md{opacity:0;transform:scale(.96)}
+.cr7[data-vp="tel"].cr7-fin .cr7-md{opacity:1;transform:translateY(105%)}
+.cr7 .cr7-mcab{flex:none;padding:20px 24px 14px;border-bottom:1px solid var(--linea)}
+.cr7[data-vp="ext"] .cr7-mcab{padding:16px 16px 12px}
+.cr7[data-vp="tel"] .cr7-mcab{padding:calc(var(--it) + 12px) 16px 12px}
+.cr7 .cr7-mt{font-size:20px;line-height:26px;font-weight:700}
+.cr7[data-vp="ext"] .cr7-mt{font-size:17px;line-height:22px}
+.cr7[data-vp="tel"] .cr7-mt{font-size:26px;line-height:32px;font-weight:800;letter-spacing:-.6px}
+.cr7 .cr7-ms{margin-top:2px;font-size:13px;line-height:18px;color:var(--tinta2)}
+/* Progreso: círculos de 24; el actual con su nombre; los hechos en verde con palomita */
+.cr7 .cr7-prog{display:flex;align-items:center;gap:6px;margin:14px 0 0;padding:0;list-style:none}
+.cr7 .cr7-prog li{display:flex;align-items:center;gap:6px;flex:none}
+.cr7 .cr7-prog li.cr7-act{flex:0 1 auto;min-width:0}
+.cr7 .cr7-prog .cr7-ln{flex:1 1 8px;min-width:6px;height:2px;border-radius:1px;background:var(--sup2)}
+.cr7 .cr7-prog .cr7-ln.cr7-ok{background:var(--ok-tinta)}
+.cr7 .cr7-pc{width:24px;height:24px;flex:none;border-radius:999px;display:flex;align-items:center;justify-content:center;background:var(--sup2);color:var(--tinta2);font-size:12px;line-height:16px;font-weight:700;font-variant-numeric:tabular-nums}
+.cr7 .cr7-act .cr7-pc{background:var(--accion);color:#fff}
+.cr7 .cr7-hecha .cr7-pc{background:var(--ok-fondo);color:var(--ok-tinta)}
+.cr7 .cr7-pnx{display:none;margin-top:6px;font-size:13px;line-height:18px;font-weight:700;color:var(--enlace)}
+.cr7[data-vp="ext"] .cr7-pnx{display:block}
+.cr7[data-vp="ext"] .cr7-pn{display:none}
+.cr7 .cr7-nueva{display:flex;flex-direction:column;gap:14px}
+.cr7[data-vp="ext"] .cr7-mpie .cr7-flex{display:none}
+.cr7[data-vp="ext"] .cr7-mpie .cr7-atras{flex:none}
+.cr7 .cr7-pn{font-size:13px;line-height:18px;font-weight:700;color:var(--tinta);white-space:nowrap}
+/* ---- Cuerpo ---- */
+.cr7 .cr7-mcu{flex:1 1 auto;min-height:0;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--borde) transparent;padding:18px 24px 20px}
+.cr7[data-vp="ext"] .cr7-mcu{padding:14px 16px 16px}
+.cr7[data-vp="tel"] .cr7-mcu{padding:18px 16px 20px}
+.cr7 .cr7-st{display:none;flex-direction:column;gap:14px}
+.cr7 .cr7-st.cr7-vis{display:flex}
+.cr7 .cr7-intro{font-size:15px;line-height:22px;color:var(--tinta);text-align:justify;hyphens:auto}
+.cr7 .cr7-f{display:flex;flex-direction:column;gap:6px;min-width:0}
+.cr7 .cr7-fl2{font-size:13px;line-height:18px;font-weight:600;color:var(--tinta2)}
+.cr7 .cr7-req{color:var(--mal-tinta)}
+.cr7 .cr7-opc{font-weight:400;color:var(--tinta3)}
+.cr7 .cr7-in{height:44px;width:100%;min-width:0;padding:0 12px;border:0;border-radius:12px;background:var(--sup2);color:var(--tinta);font:16px/20px var(--fuente);outline:none}
+.cr7[data-vp="esc"] .cr7-in,.cr7[data-vp="ih"] .cr7-in{height:40px;font-size:15px}
+.cr7 .cr7-in:focus{outline:2px solid var(--enlace)}
+.cr7 .cr7-in::placeholder{color:var(--tinta3)}
+.cr7 .cr7-sel{appearance:none;-webkit-appearance:none;padding-right:34px;text-overflow:ellipsis;background-image:linear-gradient(45deg,transparent 50%,var(--tinta2) 50%),linear-gradient(135deg,var(--tinta2) 50%,transparent 50%);background-position:calc(100% - 18px) 52%,calc(100% - 13px) 52%;background-size:5px 5px;background-repeat:no-repeat}
+.cr7 .cr7-par{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.cr7 .cr7-par-t{grid-template-columns:96px 1fr}
+.cr7[data-vp="ext"] .cr7-par:not(.cr7-par-t){grid-template-columns:1fr}
+.cr7 .cr7-ayuda{font-size:13px;line-height:18px;color:var(--tinta2)}
+.cr7 .cr7-nota{padding:12px 14px;border-radius:12px;background:var(--fondo);font-size:13px;line-height:19px;color:var(--tinta2);text-align:justify;hyphens:auto}
+.cr7 .cr7-nota strong{color:var(--tinta);font-weight:600}
+.cr7 .cr7-tx{position:relative;align-self:flex-start;display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 4px;font-size:15px;line-height:20px;font-weight:600;color:var(--enlace)}
+.cr7[data-vp="esc"] .cr7-tx,.cr7[data-vp="ih"] .cr7-tx{min-height:36px;font-size:14px}
+.cr7 .cr7-rojo{color:var(--mal-tinta)}
+.cr7 .cr7-gris{color:var(--tinta2)}
+.cr7 .cr7-chips{display:flex;flex-wrap:wrap;gap:8px}
+.cr7 .cr7-chip{position:relative;height:36px;padding:0 14px;border-radius:999px;background:var(--sup2);color:var(--tinta);font-size:14px;line-height:18px;font-weight:600}
+.cr7 .cr7-chip::after{content:"";position:absolute;inset:-4px 0}
+.cr7[data-vp="esc"] .cr7-chip::after,.cr7[data-vp="ih"] .cr7-chip::after{display:none}
+.cr7 .cr7-chip[aria-checked="true"]{background:var(--accion);color:#fff}
+/* Hechos al volver y panel de soporte */
+.cr7 .cr7-hecho,.cr7 .cr7-sop{display:none;flex-direction:column;align-items:center;text-align:center;gap:6px;padding:16px 8px}
+.cr7 .cr7-hecho>svg{color:var(--ok-tinta)}
+.cr7 .cr7-hecho-t{font-size:17px;line-height:22px;font-weight:700}
+.cr7 .cr7-hecho-s{font-size:14px;line-height:20px;color:var(--tinta2);text-align:justify;hyphens:auto;max-width:42ch}
+.cr7 .cr7-sop-ic{width:48px;height:48px;border-radius:999px;background:var(--tonal);color:var(--tonal-tinta);display:flex;align-items:center;justify-content:center;margin-bottom:6px}
+.cr7 .cr7-sop .cr7-ton2{margin-top:10px}
+.cr7.cr7-creada .cr7-st[data-p="clinica"] .cr7-nueva,.cr7.cr7-creada .cr7-st[data-p="consultorio"] .cr7-nueva{display:none}
+.cr7.cr7-creada .cr7-hecho{display:flex}
+.cr7.cr7-invitado .cr7-st[data-p="clinica"] .cr7-nueva,.cr7.cr7-invitado .cr7-st[data-p="clinica"] .cr7-hecho{display:none!important}
+.cr7.cr7-invitado .cr7-st[data-p="clinica"] .cr7-sop{display:flex}
+/* Logo y firma */
+.cr7 .cr7-oculto{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
+.cr7 .cr7-drop{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:148px;padding:20px;border-radius:16px;background:var(--fondo);border:2px dashed var(--borde);text-align:center;cursor:pointer}
+.cr7 .cr7-drop-ic{width:48px;height:48px;border-radius:999px;background:var(--tonal);color:var(--tonal-tinta);display:flex;align-items:center;justify-content:center;margin-bottom:6px}
+.cr7 .cr7-drop-t{font-size:15px;line-height:20px;font-weight:600;color:var(--tinta)}
+.cr7 .cr7-drop-s{font-size:13px;line-height:18px;color:var(--tinta2)}
+.cr7 .cr7-prev{display:none;flex-direction:column;align-items:center;gap:8px;padding:20px;border-radius:16px;background:var(--fondo)}
+.cr7 .cr7-prev .cr7-clogo{width:96px;height:96px;box-shadow:0 0 0 1px var(--linea)}
+.cr7 .cr7-prev .cr7-clogo svg{width:56px;height:56px}
+.cr7 .cr7-prev .cr7-tx{align-self:center}
+.cr7.cr7-conlogo .cr7-st[data-p="logo"] .cr7-drop{display:none}
+.cr7.cr7-conlogo .cr7-prev{display:flex}
+.cr7 .cr7-seg{display:grid;grid-template-columns:1fr 1fr;gap:2px;padding:3px;border-radius:12px;background:var(--sup2)}
+.cr7 .cr7-sg{display:flex;align-items:center;justify-content:center;gap:6px;height:38px;border-radius:9px;font-size:14px;line-height:18px;font-weight:600;color:var(--tinta2);position:relative}
+.cr7 .cr7-sg::after{content:"";position:absolute;inset:-3px 0}
+.cr7[data-vp="esc"] .cr7-sg::after,.cr7[data-vp="ih"] .cr7-sg::after{display:none}
+.cr7 .cr7-sg[aria-selected="true"]{background:var(--sup);color:var(--tinta);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.cr7 .cr7-m-dibujar{display:none;flex-direction:column;gap:8px}
+.cr7.cr7-dibujar .cr7-m-dibujar{display:flex}
+.cr7.cr7-dibujar .cr7-m-subir{display:none}
+.cr7 .cr7-lienzo{aspect-ratio:600/220;border-radius:14px;background:#fff;border:2px dashed var(--borde);display:flex;align-items:center;justify-content:center;color:#8A93A6;font-size:14px;line-height:20px}
+.cr7 .cr7-lz-acc{display:flex;align-items:center;justify-content:space-between}
+/* ---- Pie ---- */
+.cr7 .cr7-mpie{flex:none;display:flex;align-items:center;gap:8px;padding:12px 24px;border-top:1px solid var(--linea)}
+.cr7[data-vp="ext"] .cr7-mpie{flex-wrap:wrap;padding:10px 12px 12px}
+.cr7[data-vp="tel"] .cr7-mpie{padding:12px 16px calc(var(--ib) + 12px)}
+.cr7[data-vp="iv"] .cr7-mpie{justify-content:center}
+.cr7[data-vp="iv"] .cr7-mpie .cr7-flex{flex:0 0 24px}
+.cr7 .cr7-ton2,.cr7 .cr7-prim{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px;padding:0 16px;border-radius:12px;font-size:15px;line-height:20px;font-weight:600;white-space:nowrap}
+.cr7[data-vp="esc"] .cr7-ton2,.cr7[data-vp="esc"] .cr7-prim,.cr7[data-vp="ih"] .cr7-ton2,.cr7[data-vp="ih"] .cr7-prim{min-height:40px;font-size:14px}
+.cr7 .cr7-mpie .cr7-prim,.cr7 .cr7-mpie .cr7-omitir{min-width:104px}
+.cr7 .cr7-ton2{background:var(--tonal);color:var(--tonal-tinta)}
+.cr7 .cr7-prim{background:var(--accion);color:#fff}
+.cr7 .cr7-atras{padding:0 14px 0 10px}
+.cr7 .cr7-reqt{font-size:13px;line-height:18px;color:var(--tinta2)}
+.cr7[data-vp="ext"] .cr7-reqt{display:none}
+.cr7[data-vp="ext"] .cr7-mpie .cr7-prim{flex:1}
+.cr7.cr7-primero .cr7-atras{visibility:hidden}
+.cr7.cr7-omitible .cr7-reqt,.cr7:not(.cr7-omitible) .cr7-omitir{display:none}
+.cr7.cr7-soporte .cr7-sigue,.cr7.cr7-soporte .cr7-reqt,.cr7.cr7-soporte .cr7-omitir{display:none}
+.cr7 .cr7-gira{display:none;width:16px;height:16px;border-radius:999px;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;animation:cr7-gira .8s linear infinite}
+@keyframes cr7-gira{to{transform:rotate(360deg)}}
+.cr7.cr7-guardando .cr7-gira{display:block}
+.cr7.cr7-guardando .cr7-sigue{opacity:.85;pointer-events:none}
+.cr7 .cr7-sigue[aria-disabled="true"]{opacity:.45}
+@media (prefers-reduced-motion:reduce){.cr7 .cr7-md{transition:opacity 200ms ease;transform:none!important}.cr7 .cr7-gira{animation-duration:2.4s}}
+</style>
+<div class="marco cr7" data-vp="ext">
+<div class="cr7-app" inert>
+<main class="cr7-cont">
+  <!-- Fondo simplificado: el dashboard reducido a sus bloques, para que la pieza global se lea sobre una pantalla real. -->
+  <div class="cr7-top"><p class="cr7-rot"><span class="cr7-m">Centro</span><span class="cr7-s">Clínica Semilla A</span></p>
+  <h1 class="cr7-h1">Buenas tardes, <span class="cr7-m">Admin</span><span class="cr7-s">Secretaria</span></h1></div>
+  <div class="cr7-cols"><section class="cr7-tj" aria-hidden="true"><h2 class="cr7-tt">Después</h2><div class="cr7-fl"><span class="cr7-bx"></span><span class="cr7-fl-t"><span class="cr7-br" style="width:62%"></span><span class="cr7-br cr7-br2" style="width:40%"></span></span></div><div class="cr7-fl"><span class="cr7-bx"></span><span class="cr7-fl-t"><span class="cr7-br" style="width:62%"></span><span class="cr7-br cr7-br2" style="width:40%"></span></span></div><div class="cr7-fl"><span class="cr7-bx"></span><span class="cr7-fl-t"><span class="cr7-br" style="width:62%"></span><span class="cr7-br cr7-br2" style="width:40%"></span></span></div><div class="cr7-fl"><span class="cr7-bx"></span><span class="cr7-fl-t"><span class="cr7-br" style="width:62%"></span><span class="cr7-br cr7-br2" style="width:40%"></span></span></div><div class="cr7-fl"><span class="cr7-bx"></span><span class="cr7-fl-t"><span class="cr7-br" style="width:62%"></span><span class="cr7-br cr7-br2" style="width:40%"></span></span></div></section><section class="cr7-tj" aria-hidden="true"><h2 class="cr7-tt">Atendidos recientemente</h2><div class="cr7-fl"><span class="cr7-bx"></span><span class="cr7-fl-t"><span class="cr7-br" style="width:62%"></span><span class="cr7-br cr7-br2" style="width:40%"></span></span></div><div class="cr7-fl"><span class="cr7-bx"></span><span class="cr7-fl-t"><span class="cr7-br" style="width:62%"></span><span class="cr7-br cr7-br2" style="width:40%"></span></span></div><div class="cr7-fl"><span class="cr7-bx"></span><span class="cr7-fl-t"><span class="cr7-br" style="width:62%"></span><span class="cr7-br cr7-br2" style="width:40%"></span></span></div></section><section class="cr7-tj" aria-hidden="true"><h2 class="cr7-tt">Documentos recientes</h2><div class="cr7-fl"><span class="cr7-bx"></span><span class="cr7-fl-t"><span class="cr7-br" style="width:62%"></span><span class="cr7-br cr7-br2" style="width:40%"></span></span></div><div class="cr7-fl"><span class="cr7-bx"></span><span class="cr7-fl-t"><span class="cr7-br" style="width:62%"></span><span class="cr7-br cr7-br2" style="width:40%"></span></span></div></section><section class="cr7-tj" aria-hidden="true"><h2 class="cr7-tt">Esta semana</h2><div class="cr7-fl"><span class="cr7-bx"></span><span class="cr7-fl-t"><span class="cr7-br" style="width:62%"></span><span class="cr7-br cr7-br2" style="width:40%"></span></span></div><div class="cr7-fl"><span class="cr7-bx"></span><span class="cr7-fl-t"><span class="cr7-br" style="width:62%"></span><span class="cr7-br cr7-br2" style="width:40%"></span></span></div><div class="cr7-fl"><span class="cr7-bx"></span><span class="cr7-fl-t"><span class="cr7-br" style="width:62%"></span><span class="cr7-br cr7-br2" style="width:40%"></span></span></div></section></div>
+</main><!-- Navegación (A0·3) de Duo cerrado: riel a la derecha, fundido con la franja. Copiado del dashboard aprobado. -->
+<nav class="cr7-riel cr7-nav" aria-label="Navegación principal">
+  <a href="#" class="cr7-p cr7-rb" aria-label="Inicio" aria-current="page"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg></a><a href="#" class="cr7-p cr7-rb" aria-label="Expediente"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.9.7 3.1 2.4 3.5 5.2"/></svg></a><a href="#" class="cr7-p cr7-rb" aria-label="Agenda"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg></a><a href="#" class="cr7-p cr7-rb cr7-m" aria-label="Documentos"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg></a><button type="button" class="cr7-p cr7-rb" aria-label="Más" data-rot="Más"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 12h.01M12 12h.01M18 12h.01"/></svg></button>
+  <span class="cr7-flex"></span>
+  <button type="button" class="cr7-p cr7-masb cr7-m" aria-label="Nueva consulta"><svg aria-hidden="true" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg></button>
+  <button type="button" class="cr7-p cr7-masb cr7-s" aria-label="Agendar cita"><svg aria-hidden="true" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg></button>
+</nav>
+</div>
+<div class="cr7-capa cr7-on"><div class="cr7-velo"></div>
+<!-- A0·19 · Asistente de perfil (OnboardingModal.tsx). BLOQUEANTE: sin X, Esc no cierra, nadie lo cierra tocando fuera; solo «Finalizar».
+     Lo monta GateOnboarding (layout de (app)) ante una lectura afirmativa del gate; con el plan bloqueado no se monta.
+     Forma: modal del catálogo de 520 en Duo abierto y computadora; tarjeta centrada de 310 en Duo cerrado (cr726); en iPhone, PANTALLA COMPLETA:
+     es un formulario largo con teclado y no se puede descartar, así que una hoja con asa prometería un gesto (arrastrar para cerrar) que no existe. -->
+<div class="cr7-mw"><div class="cr7-md" role="dialog" aria-modal="true" aria-labelledby="cr7-mt-ext" aria-describedby="cr7-ms-ext">
+  <header class="cr7-mcab"><h2 class="cr7-mt" id="cr7-mt-ext"><span class="cr7-m">Configura tu perfil</span><span class="cr7-s">Te damos la bienvenida</span></h2>
+    <p class="cr7-ms" id="cr7-ms-ext"><span class="cr7-m">Necesario para registrar pacientes y emitir documentos</span><span class="cr7-s">Solo falta saber cómo te llamas</span></p>
+    <!-- Progreso: indicador, NO navegación (los círculos no se pulsan: cada paso escribe al avanzar) -->
+    <ol class="cr7-prog" aria-label="Progreso"></ol><p class="cr7-pnx" aria-hidden="true"></p></header>
+  <div class="cr7-mcu" lang="es">
+    <!-- Paso «Tu nombre» (solo secretaria; si está, es el único): OnboardingModal.tsx:629-660 -->
+    <section class="cr7-st" data-p="nombre"><p class="cr7-intro">Así te verá el resto del equipo en la clínica.</p>
+      <label class="cr7-f"><span class="cr7-fl2">Nombre(s) <span class="cr7-req">*</span></span><input type="text" class="cr7-in" placeholder="Ej: María" value="Secretaria" autocomplete="off"></label>
+      <div class="cr7-par"><label class="cr7-f"><span class="cr7-fl2">Apellido paterno <span class="cr7-req">*</span></span><input type="text" class="cr7-in" placeholder="Ej: González" value="Semilla" autocomplete="off"></label><label class="cr7-f"><span class="cr7-fl2">Apellido materno</span><input type="text" class="cr7-in" placeholder="Ej: López" autocomplete="off"></label></div></section>
+    <!-- Paso «Datos»: título Dr./Dra., nombre, apellidos, especialidad (con «Agregar especialidad») y universidad -->
+    <section class="cr7-st" data-p="datos"><p class="cr7-intro">¿Cómo aparecerás en tus documentos médicos?</p>
+      <div class="cr7-par cr7-par-t"><label class="cr7-f"><span class="cr7-fl2">Título <span class="cr7-req">*</span></span><select class="cr7-in cr7-sel"><option selected>Dr.</option><option>Dra.</option></select></label><label class="cr7-f"><span class="cr7-fl2">Nombre(s) <span class="cr7-req">*</span></span><input type="text" class="cr7-in" placeholder="Ej: Juan" value="Admin" autocomplete="off"></label></div>
+      <div class="cr7-par"><label class="cr7-f"><span class="cr7-fl2">Apellido paterno <span class="cr7-req">*</span></span><input type="text" class="cr7-in" placeholder="Ej: García" value="Semilla" autocomplete="off"></label><label class="cr7-f"><span class="cr7-fl2">Apellido materno</span><input type="text" class="cr7-in" placeholder="Ej: López" autocomplete="off"></label></div>
+      <div class="cr7-f"><span class="cr7-fl2">Especialidad <span class="cr7-req">*</span></span><select class="cr7-in cr7-sel"><option>Ortopedia y Traumatología</option><option>Selecciona especialidad</option></select>
+        <button type="button" class="cr7-p cr7-tx"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>Agregar especialidad</button></div>
+      <label class="cr7-f"><span class="cr7-fl2">Universidad / Institución <span class="cr7-opc">(opcional)</span></span><input type="text" class="cr7-in" placeholder="Ej: UNAM, IPN, UAG…" autocomplete="off"></label></section>
+    <!-- Paso «Cédulas» -->
+    <section class="cr7-st" data-p="cedulas"><p class="cr7-intro">Tus cédulas aparecerán al pie de cada documento oficial.</p>
+      <label class="cr7-f"><span class="cr7-fl2">Cédula profesional <span class="cr7-req">*</span></span><input type="text" class="cr7-in" placeholder="7 u 8 dígitos" value="00000001" autocomplete="off"></label>
+      <label class="cr7-f"><span class="cr7-fl2">Cédula de especialidad <span class="cr7-opc">(opcional)</span></span><input type="text" class="cr7-in" placeholder="7 u 8 dígitos" autocomplete="off"><span class="cr7-ayuda">Déjala vacía si ejerces como médico general.</span></label>
+      <p class="cr7-nota">Las cédulas son datos que amparan legalmente tus documentos médicos bajo la NOM-004-SSA3-2012.</p></section>
+    <!-- Paso «Clínica», cara del DUEÑO: formulario (crea la clínica con POST /api/me/clinica). Al volver, «ya está creada». -->
+    <section class="cr7-st" data-p="clinica"><div class="cr7-nueva"><p class="cr7-intro">Tu clínica es la cuenta: el contenedor de tus pacientes, tus documentos y, si algún día lo necesitas, tu equipo. El consultorio —el lugar físico donde atiendes— lo configuras en el paso siguiente.</p>
+      <label class="cr7-f"><span class="cr7-fl2">Nombre de la clínica <span class="cr7-req">*</span></span><input type="text" class="cr7-in" placeholder="Ej: Clínica Ortointegra" value="Clínica Semilla A" autocomplete="off"><span class="cr7-ayuda">Si trabajas por tu cuenta, pon tu nombre o el de tu práctica. Aparece en el encabezado de tus documentos y puedes cambiarlo luego en Mi Perfil.</span></label></div>
+      <div class="cr7-hecho"><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m8 12.3 2.8 2.8 5.2-5.6"/></svg><p class="cr7-hecho-t">Clínica Semilla A ya está creada</p><p class="cr7-hecho-s">Volviste a este paso, pero la clínica ya existe y no hace falta crearla otra vez. Para cambiarle el nombre, entra a Mi Perfil.</p></div>
+      <!-- Cara del INVITADO sin clínica: panel de soporte, sin formulario y sin «Continuar» (solo «Atrás») -->
+      <div class="cr7-sop"><span class="cr7-sop-ic"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="m4.9 4.9 4.3 4.3M14.8 14.8l4.3 4.3M14.8 9.2l4.3-4.3M4.9 19.1l4.3-4.3"/></svg></span><p class="cr7-hecho-t">Tu cuenta no está asociada a ninguna clínica</p>
+        <p class="cr7-hecho-s">Los médicos invitados no pueden crear una clínica: quien administra la tuya debe volver a añadirte.</p>
+        <p class="cr7-hecho-s">Escríbenos y lo resolvemos contigo —no es algo que puedas arreglar desde aquí.</p>
+        <a href="#" class="cr7-p cr7-ton2">Escribir a soporte</a></div></section>
+    <!-- Paso «Consultorio». «Nombre corto» solo aparece si el nombre pasa de 12 caracteres -->
+    <section class="cr7-st" data-p="consultorio"><div class="cr7-nueva"><p class="cr7-intro">El consultorio es el lugar físico donde atiendes. Su dirección y su zona horaria mandan en tus documentos y en tu agenda.</p>
+      <label class="cr7-f"><span class="cr7-fl2">Nombre del consultorio <span class="cr7-req">*</span></span><input type="text" class="cr7-in" placeholder="Ej: Consultorio Centro" value="Hospital Norte" autocomplete="off"></label>
+      <label class="cr7-f"><span class="cr7-fl2">Nombre corto (máx. 12 caracteres) <span class="cr7-req">*</span></span><input type="text" class="cr7-in" placeholder="Ej: Centro" value="Hosp Norte" autocomplete="off"><span class="cr7-ayuda">Se muestra en el sidebar y en agenda cuando el nombre completo es muy largo.</span></label>
+      <label class="cr7-f"><span class="cr7-fl2">Dirección <span class="cr7-req">*</span></span><input type="text" class="cr7-in" placeholder="Ej: Calle 60 #400, Mérida, Yucatán" value="Calle Semilla 100, Centro" autocomplete="off"></label>
+      <label class="cr7-f"><span class="cr7-fl2">Teléfono <span class="cr7-opc">(opcional)</span></span><input type="tel" class="cr7-in" placeholder="Ej: 999 123 4567" value="999 000 0001" autocomplete="off"></label>
+      <div class="cr7-f"><span class="cr7-fl2">Zona horaria <span class="cr7-req">*</span></span>
+        <div class="cr7-chips" role="radiogroup" aria-label="Zona horaria"><button type="button" role="radio" aria-checked="true" class="cr7-p cr7-chip">Centro (UTC-6)</button><button type="button" role="radio" aria-checked="false" class="cr7-p cr7-chip">Cancún (UTC-5)</button><button type="button" role="radio" aria-checked="false" class="cr7-p cr7-chip">Tijuana (UTC-8)</button></div>
+        <select class="cr7-in cr7-sel" aria-label="Zona horaria"><option>Centro — CDMX, Jalisco, Edomex, Puebla, Veracruz, Oaxaca y mayoría (UTC-6)</option><option>Yucatán — Mérida, Valladolid (UTC-6)</option><option>Baja California — Tijuana, Ensenada, Mexicali (UTC-8)</option></select></div></div>
+      <div class="cr7-hecho"><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m8 12.3 2.8 2.8 5.2-5.6"/></svg><p class="cr7-hecho-t">Hospital Norte ya está creado</p><p class="cr7-hecho-s">Volviste a este paso, pero el consultorio ya existe y no hace falta crearlo otra vez. Para cambiarle la dirección, el teléfono o la zona horaria, entra a Mi Perfil → Mis consultorios.</p></div></section>
+    <!-- Paso «Logo» (omitible; solo quien será dueño y no tiene logo). Hoy el recuadro lleva un emoji 🏥; aquí, icono SVG (BRIEF: sin emojis). -->
+    <section class="cr7-st" data-p="logo"><p class="cr7-intro">El logo de tu clínica aparece en el encabezado de todos los documentos.</p>
+      <label class="cr7-p cr7-drop"><input type="file" class="cr7-oculto" accept="image/png,image/jpeg,image/webp,image/svg+xml"><span class="cr7-drop-ic"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V8l8-5 8 5v13H4z"/><path d="M12 9v6M9 12h6"/></svg></span>
+        <span class="cr7-drop-t">Haz clic para subir el logo</span><span class="cr7-drop-s">PNG, JPG, WEBP o SVG · Máximo 500 KB</span></label>
+      <div class="cr7-prev"><span class="cr7-clogo" role="img" aria-label="Logo de Clínica Semilla A"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21c-4.5-2.2-7-5.6-7-10V5.5L12 3l7 2.5V11c0 4.4-2.5 7.8-7 10z"/><path d="M12 8v7M8.5 11.5h7"/></svg></span><button type="button" class="cr7-p cr7-tx cr7-rojo">Quitar logo</button></div></section>
+    <!-- Paso «Firma» (omitible; solo médico sin firma): FirmaCaptura con sus dos modos; nace en «Subir imagen» -->
+    <section class="cr7-st" data-p="firma"><p class="cr7-intro">Tu firma autógrafa aparece sobre la línea de firma en todos tus documentos PDF.</p>
+      <div class="cr7-seg" role="tablist" aria-label="Modo de captura"><button type="button" role="tab" aria-selected="true" class="cr7-p cr7-sg" data-m="subir"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"/></svg>Subir imagen</button><button type="button" role="tab" aria-selected="false" class="cr7-p cr7-sg" data-m="dibujar"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.4 3.6a2.1 2.1 0 0 1 3 3L7.4 18.6a2 2 0 0 1-.9.5l-2.9.8a.5.5 0 0 1-.6-.6l.8-2.9a2 2 0 0 1 .5-.9z"/></svg>Dibujar firma</button></div>
+      <label class="cr7-p cr7-drop cr7-m-subir"><input type="file" class="cr7-oculto" accept="image/*"><span class="cr7-drop-ic"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"/></svg></span>
+        <span class="cr7-drop-t">Toca para seleccionar foto de tu firma</span><span class="cr7-drop-s">JPG, PNG, WEBP · Máx. 10 MB · Se procesará automáticamente</span></label>
+      <div class="cr7-m-dibujar"><div class="cr7-lienzo"><span>Firma aquí con el dedo o mouse</span></div>
+        <div class="cr7-lz-acc"><button type="button" class="cr7-p cr7-tx cr7-gris"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20H9L4 15l9-9 7 7-6 6"/><path d="m7.5 11.5 6 6"/></svg>Limpiar</button><button type="button" class="cr7-p cr7-ton2">Guardar firma →</button></div></div>
+      <p class="cr7-nota">Si la omites, tus recetas y escritos saldrán <strong>sin firma</strong>: con la línea y tus datos, pero sin el trazo. Puedes capturarla más tarde en Mi Perfil. Para terminar <strong>con</strong> firma, pulsa «Aceptar firma» aquí arriba y espera a que confirme; para terminar <strong>sin</strong> ella, usa «Omitir por ahora».</p></section></div>
+  <footer class="cr7-mpie"><button type="button" class="cr7-p cr7-ton2 cr7-atras"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"/></svg>Atrás</button><span class="cr7-flex"></span>
+    <span class="cr7-reqt">Paso requerido</span><button type="button" class="cr7-p cr7-ton2 cr7-omitir">Omitir por ahora</button>
+    <button type="button" class="cr7-p cr7-prim cr7-sigue"><span class="cr7-gira" aria-hidden="true"></span><span class="cr7-sigue-t">Continuar</span></button></footer>
+</div></div>
+</div>
+</div>
+<div class="marco cr7" data-vp="tel">
+<div class="cr7-app" inert>
+<!-- Navegación (A0·13) de iPhone: encabezado fundido con la barra de estado. Copiado del dashboard aprobado. -->
+<header class="cr7-enc cr7-nav">
+  <button type="button" class="cr7-p cr7-menu" aria-label="Menú" data-rot="Menú"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+  <span class="cr7-enc-t">Inicio</span>
+  <span class="cr7-flex"></span>
+  <button type="button" class="cr7-p cr7-av cr7-av-g cr7-m" aria-label="Mi perfil">AS</button><button type="button" class="cr7-p cr7-av cr7-av-g cr7-s cr7-abre-aj" aria-label="Ajustes">SE</button>
+</header><main class="cr7-cont">
+  <!-- Fondo simplificado: el dashboard reducido a sus bloques, para que la pieza global se lea sobre una pantalla real. -->
+  <div class="cr7-top"><p class="cr7-rot"><span class="cr7-m">Centro</span><span class="cr7-s">Clínica Semilla A</span></p>
+  <h1 class="cr7-h1">Buenas tardes, <span class="cr7-m">Admin</span><span class="cr7-s">Secretaria</span></h1></div>
+  <div class="cr7-cols"><section class="cr7-tj" aria-hidden="true"><h2 class="cr7-tt">Después</h2><div class="cr7-fl"><span class="cr7-bx"></span><span class="cr7-fl-t"><span class="cr7-br" style="width:62%"></span><span class="cr7-br cr7-br2" style="width:40%"></span></span></div><div class="cr7-fl"><span class="cr7-bx"></span><span class="cr7-fl-t"><span class="cr7-br" style="width:62%"></span><span class="cr7-br cr7-br2" style="width:40%"></span></span></div><div class="cr7-fl"><span class="cr7-bx"></span><span class="cr7-fl-t"><span class="cr7-br" style="width:62%"></span><span class="cr7-br cr7-br2" style="width:40%"></span></span></div><div class="cr7-fl"><span class="cr7-bx"></span><span class="cr7-fl-t"><span class="cr7-br" style="width:62%"></span><span class="cr7-br cr7-br2" style="width:40%"></span></span></div><div class="cr7-fl"><span class="cr7-bx"></span><span class="cr7-fl-t"><span class="cr7-br" style="width:62%"></span><span class="cr7-br cr7-br2" style="width:40%"></span></span></div></section><section class="cr7-tj" aria-hidden="true"><h2 class="cr7-tt">Atendidos recientemente</h2><div class="cr7-fl"><span class="cr7-bx"></span><span class="cr7-fl-t"><span class="cr7-br" style="width:62%"></span><span class="cr7-br cr7-br2" style="width:40%"></span></span></div><div class="cr7-fl"><span class="cr7-bx"></span><span class="cr7-fl-t"><span class="cr7-br" style="width:62%"></span><span class="cr7-br cr7-br2" style="width:40%"></span></span></div><div class="cr7-fl"><span class="cr7-bx"></span><span class="cr7-fl-t"><span class="cr7-br" style="width:62%"></span><span class="cr7-br cr7-br2" style="width:40%"></span></span></div></section><section class="cr7-tj" aria-hidden="true"><h2 class="cr7-tt">Documentos recientes</h2><div class="cr7-fl"><span class="cr7-bx"></span><span class="cr7-fl-t"><span class="cr7-br" style="width:62%"></span><span class="cr7-br cr7-br2" style="width:40%"></span></span></div><div class="cr7-fl"><span class="cr7-bx"></span><span class="cr7-fl-t"><span class="cr7-br" style="width:62%"></span><span class="cr7-br cr7-br2" style="width:40%"></span></span></div></section><section class="cr7-tj" aria-hidden="true"><h2 class="cr7-tt">Esta semana</h2><div class="cr7-fl"><span class="cr7-bx"></span><span class="cr7-fl-t"><span class="cr7-br" style="width:62%"></span><span class="cr7-br cr7-br2" style="width:40%"></span></span></div><div class="cr7-fl"><span class="cr7-bx"></span><span class="cr7-fl-t"><span class="cr7-br" style="width:62%"></span><span class="cr7-br cr7-br2" style="width:40%"></span></span></div><div class="cr7-fl"><span class="cr7-bx"></span><span class="cr7-fl-t"><span class="cr7-br" style="width:62%"></span><span class="cr7-br cr7-br2" style="width:40%"></span></span></div></section></div>
+</main>
+</div>
+<div class="cr7-capa cr7-on"><div class="cr7-velo"></div>
+<!-- A0·19 · Asistente de perfil (OnboardingModal.tsx). BLOQUEANTE: sin X, Esc no cierra, nadie lo cierra tocando fuera; solo «Finalizar».
+     Lo monta GateOnboarding (layout de (app)) ante una lectura afirmativa del gate; con el plan bloqueado no se monta.
+     Forma: modal del catálogo de 520 en Duo abierto y computadora; tarjeta centrada de 310 en Duo cerrado (cr726); en iPhone, PANTALLA COMPLETA:
+     es un formulario largo con teclado y no se puede descartar, así que una hoja con asa prometería un gesto (arrastrar para cerrar) que no existe. -->
+<div class="cr7-mw"><div class="cr7-md" role="dialog" aria-modal="true" aria-labelledby="cr7-mt-tel" aria-describedby="cr7-ms-tel">
+  <header class="cr7-mcab"><h2 class="cr7-mt" id="cr7-mt-tel"><span class="cr7-m">Configura tu perfil</span><span class="cr7-s">Te damos la bienvenida</span></h2>
+    <p class="cr7-ms" id="cr7-ms-tel"><span class="cr7-m">Necesario para registrar pacientes y emitir documentos</span><span class="cr7-s">Solo falta saber cómo te llamas</span></p>
+    <!-- Progreso: indicador, NO navegación (los círculos no se pulsan: cada paso escribe al avanzar) -->
+    <ol class="cr7-prog" aria-label="Progreso"></ol><p class="cr7-pnx" aria-hidden="true"></p></header>
+  <div class="cr7-mcu" lang="es">
+    <!-- Paso «Tu nombre» (solo secretaria; si está, es el único): OnboardingModal.tsx:629-660 -->
+    <section class="cr7-st" data-p="nombre"><p class="cr7-intro">Así te verá el resto del equipo en la clínica.</p>
+      <label class="cr7-f"><span class="cr7-fl2">Nombre(s) <span class="cr7-req">*</span></span><input type="text" class="cr7-in" placeholder="Ej: María" value="Secretaria" autocomplete="off"></label>
+      <div class="cr7-par"><label class="cr7-f"><span class="cr7-fl2">Apellido paterno <span class="cr7-req">*</span></span><input type="text" class="cr7-in" placeholder="Ej: González" value="Semilla" autocomplete="off"></label><label class="cr7-f"><span class="cr7-fl2">Apellido materno</span><input type="text" class="cr7-in" placeholder="Ej: López" autocomplete="off"></label></div></section>
+    <!-- Paso «Datos»: título Dr./Dra., nombre, apellidos, especialidad (con «Agregar especialidad») y universidad -->
+    <section class="cr7-st" data-p="datos"><p class="cr7-intro">¿Cómo aparecerás en tus documentos médicos?</p>
+      <div class="cr7-par cr7-par-t"><label class="cr7-f"><span class="cr7-fl2">Título <span class="cr7-req">*</span></span><select class="cr7-in cr7-sel"><option selected>Dr.</option><option>Dra.</option></select></label><label class="cr7-f"><span class="cr7-fl2">Nombre(s) <span class="cr7-req">*</span></span><input type="text" class="cr7-in" placeholder="Ej: Juan" value="Admin" autocomplete="off"></label></div>
+      <div class="cr7-par"><label class="cr7-f"><span class="cr7-fl2">Apellido paterno <span class="cr7-req">*</span></span><input type="text" class="cr7-in" placeholder="Ej: García" value="Semilla" autocomplete="off"></label><label class="cr7-f"><span class="cr7-fl2">Apellido materno</span><input type="text" class="cr7-in" placeholder="Ej: López" autocomplete="off"></label></div>
+      <div class="cr7-f"><span class="cr7-fl2">Especialidad <span class="cr7-req">*</span></span><select class="cr7-in cr7-sel"><option>Ortopedia y Traumatología</option><option>Selecciona especialidad</option></select>
+        <button type="button" class="cr7-p cr7-tx"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>Agregar especialidad</button></div>
+      <label class="cr7-f"><span class="cr7-fl2">Universidad / Institución <span class="cr7-opc">(opcional)</span></span><input type="text" class="cr7-in" placeholder="Ej: UNAM, IPN, UAG…" autocomplete="off"></label></section>
+    <!-- Paso «Cédulas» -->
+    <section class="cr7-st" data-p="cedulas"><p class="cr7-intro">Tus cédulas aparecerán al pie de cada documento oficial.</p>
+      <label class="cr7-f"><span class="cr7-fl2">Cédula profesional <span class="cr7-req">*</span></span><input type="text" class="cr7-in" placeholder="7 u 8 dígitos" value="00000001" autocomplete="off"></label>
+      <label class="cr7-f"><span class="cr7-fl2">Cédula de especialidad <span class="cr7-opc">(opcional)</span></span><input type="text" class="cr7-in" placeholder="7 u 8 dígitos" autocomplete="off"><span class="cr7-ayuda">Déjala vacía si ejerces como médico general.</span></label>
+      <p class="cr7-nota">Las cédulas son datos que amparan legalmente tus documentos médicos bajo la NOM-004-SSA3-2012.</p></section>
+    <!-- Paso «Clínica», cara del DUEÑO: formulario (crea la clínica con POST /api/me/clinica). Al volver, «ya está creada». -->
+    <section class="cr7-st" data-p="clinica"><div class="cr7-nueva"><p class="cr7-intro">Tu clínica es la cuenta: el contenedor de tus pacientes, tus documentos y, si algún día lo necesitas, tu equipo. El consultorio —el lugar físico donde atiendes— lo configuras en el paso siguiente.</p>
+      <label class="cr7-f"><span class="cr7-fl2">Nombre de la clínica <span class="cr7-req">*</span></span><input type="text" class="cr7-in" placeholder="Ej: Clínica Ortointegra" value="Clínica Semilla A" autocomplete="off"><span class="cr7-ayuda">Si trabajas por tu cuenta, pon tu nombre o el de tu práctica. Aparece en el encabezado de tus documentos y puedes cambiarlo luego en Mi Perfil.</span></label></div>
+      <div class="cr7-hecho"><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m8 12.3 2.8 2.8 5.2-5.6"/></svg><p class="cr7-hecho-t">Clínica Semilla A ya está creada</p><p class="cr7-hecho-s">Volviste a este paso, pero la clínica ya existe y no hace falta crearla otra vez. Para cambiarle el nombre, entra a Mi Perfil.</p></div>
+      <!-- Cara del INVITADO sin clínica: panel de soporte, sin formulario y sin «Continuar» (solo «Atrás») -->
+      <div class="cr7-sop"><span class="cr7-sop-ic"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="m4.9 4.9 4.3 4.3M14.8 14.8l4.3 4.3M14.8 9.2l4.3-4.3M4.9 19.1l4.3-4.3"/></svg></span><p class="cr7-hecho-t">Tu cuenta no está asociada a ninguna clínica</p>
+        <p class="cr7-hecho-s">Los médicos invitados no pueden crear una clínica: quien administra la tuya debe volver a añadirte.</p>
+        <p class="cr7-hecho-s">Escríbenos y lo resolvemos contigo —no es algo que puedas arreglar desde aquí.</p>
+        <a href="#" class="cr7-p cr7-ton2">Escribir a soporte</a></div></section>
+    <!-- Paso «Consultorio». «Nombre corto» solo aparece si el nombre pasa de 12 caracteres -->
+    <section class="cr7-st" data-p="consultorio"><div class="cr7-nueva"><p class="cr7-intro">El consultorio es el lugar físico donde atiendes. Su dirección y su zona horaria mandan en tus documentos y en tu agenda.</p>
+      <label class="cr7-f"><span class="cr7-fl2">Nombre del consultorio <span class="cr7-req">*</span></span><input type="text" class="cr7-in" placeholder="Ej: Consultorio Centro" value="Hospital Norte" autocomplete="off"></label>
+      <label class="cr7-f"><span class="cr7-fl2">Nombre corto (máx. 12 caracteres) <span class="cr7-req">*</span></span><input type="text" class="cr7-in" placeholder="Ej: Centro" value="Hosp Norte" autocomplete="off"><span class="cr7-ayuda">Se muestra en el sidebar y en agenda cuando el nombre completo es muy largo.</span></label>
+      <label class="cr7-f"><span class="cr7-fl2">Dirección <span class="cr7-req">*</span></span><input type="text" class="cr7-in" placeholder="Ej: Calle 60 #400, Mérida, Yucatán" value="Calle Semilla 100, Centro" autocomplete="off"></label>
+      <label class="cr7-f"><span class="cr7-fl2">Teléfono <span class="cr7-opc">(opcional)</span></span><input type="tel" class="cr7-in" placeholder="Ej: 999 123 4567" value="999 000 0001" autocomplete="off"></label>
+      <div class="cr7-f"><span class="cr7-fl2">Zona horaria <span class="cr7-req">*</span></span>
+        <div class="cr7-chips" role="radiogroup" aria-label="Zona horaria"><button type="button" role="radio" aria-checked="true" class="cr7-p cr7-chip">Centro (UTC-6)</button><button type="button" role="radio" aria-checked="false" class="cr7-p cr7-chip">Cancún (UTC-5)</button><button type="button" role="radio" aria-checked="false" class="cr7-p cr7-chip">Tijuana (UTC-8)</button></div>
+        <select class="cr7-in cr7-sel" aria-label="Zona horaria"><option>Centro — CDMX, Jalisco, Edomex, Puebla, Veracruz, Oaxaca y mayoría (UTC-6)</option><option>Yucatán — Mérida, Valladolid (UTC-6)</option><option>Baja California — Tijuana, Ensenada, Mexicali (UTC-8)</option></select></div></div>
+      <div class="cr7-hecho"><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m8 12.3 2.8 2.8 5.2-5.6"/></svg><p class="cr7-hecho-t">Hospital Norte ya está creado</p><p class="cr7-hecho-s">Volviste a este paso, pero el consultorio ya existe y no hace falta crearlo otra vez. Para cambiarle la dirección, el teléfono o la zona horaria, entra a Mi Perfil → Mis consultorios.</p></div></section>
+    <!-- Paso «Logo» (omitible; solo quien será dueño y no tiene logo). Hoy el recuadro lleva un emoji 🏥; aquí, icono SVG (BRIEF: sin emojis). -->
+    <section class="cr7-st" data-p="logo"><p class="cr7-intro">El logo de tu clínica aparece en el encabezado de todos los documentos.</p>
+      <label class="cr7-p cr7-drop"><input type="file" class="cr7-oculto" accept="image/png,image/jpeg,image/webp,image/svg+xml"><span class="cr7-drop-ic"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V8l8-5 8 5v13H4z"/><path d="M12 9v6M9 12h6"/></svg></span>
+        <span class="cr7-drop-t">Haz clic para subir el logo</span><span class="cr7-drop-s">PNG, JPG, WEBP o SVG · Máximo 500 KB</span></label>
+      <div class="cr7-prev"><span class="cr7-clogo" role="img" aria-label="Logo de Clínica Semilla A"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21c-4.5-2.2-7-5.6-7-10V5.5L12 3l7 2.5V11c0 4.4-2.5 7.8-7 10z"/><path d="M12 8v7M8.5 11.5h7"/></svg></span><button type="button" class="cr7-p cr7-tx cr7-rojo">Quitar logo</button></div></section>
+    <!-- Paso «Firma» (omitible; solo médico sin firma): FirmaCaptura con sus dos modos; nace en «Subir imagen» -->
+    <section class="cr7-st" data-p="firma"><p class="cr7-intro">Tu firma autógrafa aparece sobre la línea de firma en todos tus documentos PDF.</p>
+      <div class="cr7-seg" role="tablist" aria-label="Modo de captura"><button type="button" role="tab" aria-selected="true" class="cr7-p cr7-sg" data-m="subir"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"/></svg>Subir imagen</button><button type="button" role="tab" aria-selected="false" class="cr7-p cr7-sg" data-m="dibujar"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.4 3.6a2.1 2.1 0 0 1 3 3L7.4 18.6a2 2 0 0 1-.9.5l-2.9.8a.5.5 0 0 1-.6-.6l.8-2.9a2 2 0 0 1 .5-.9z"/></svg>Dibujar firma</button></div>
+      <label class="cr7-p cr7-drop cr7-m-subir"><input type="file" class="cr7-oculto" accept="image/*"><span class="cr7-drop-ic"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"/></svg></span>
+        <span class="cr7-drop-t">Toca para seleccionar foto de tu firma</span><span class="cr7-drop-s">JPG, PNG, WEBP · Máx. 10 MB · Se procesará automáticamente</span></label>
+      <div class="cr7-m-dibujar"><div class="cr7-lienzo"><span>Firma aquí con el dedo o mouse</span></div>
+        <div class="cr7-lz-acc"><button type="button" class="cr7-p cr7-tx cr7-gris"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20H9L4 15l9-9 7 7-6 6"/><path d="m7.5 11.5 6 6"/></svg>Limpiar</button><button type="button" class="cr7-p cr7-ton2">Guardar firma →</button></div></div>
+      <p class="cr7-nota">Si la omites, tus recetas y escritos saldrán <strong>sin firma</strong>: con la línea y tus datos, pero sin el trazo. Puedes capturarla más tarde en Mi Perfil. Para terminar <strong>con</strong> firma, pulsa «Aceptar firma» aquí arriba y espera a que confirme; para terminar <strong>sin</strong> ella, usa «Omitir por ahora».</p></section></div>
+  <footer class="cr7-mpie"><button type="button" class="cr7-p cr7-ton2 cr7-atras"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"/></svg>Atrás</button><span class="cr7-flex"></span>
+    <span class="cr7-reqt">Paso requerido</span><button type="button" class="cr7-p cr7-ton2 cr7-omitir">Omitir por ahora</button>
+    <button type="button" class="cr7-p cr7-prim cr7-sigue"><span class="cr7-gira" aria-hidden="true"></span><span class="cr7-sigue-t">Continuar</span></button></footer>
+</div></div>
+</div>
+</div>
+<div class="marco cr7" data-vp="ih">
+<div class="cr7-app" inert>
+<main class="cr7-cont">
+  <!-- Fondo simplificado: el dashboard reducido a sus bloques, para que la pieza global se lea sobre una pantalla real. -->
+  <div class="cr7-top"><p class="cr7-rot"><span class="cr7-m">Centro</span><span class="cr7-s">Clínica Semilla A</span></p>
+  <h1 class="cr7-h1">Buenas tardes, <span class="cr7-m">Admin</span><span class="cr7-s">Secretaria</span></h1></div>
+  <div class="cr7-cols"><section class="cr7-tj" aria-hidden="true"><h2 class="cr7-tt">Después</h2><div class="cr7-fl"><span class="cr7-bx"></span><span class="cr7-fl-t"><span class="cr7-br" style="width:62%"></span><span class="cr7-br cr7-br2" style="width:40%"></span></span></div><div class="cr7-fl"><span class="cr7-bx"></span><span class="cr7-fl-t"><span class="cr7-br" style="width:62%"></span><span class="cr7-br cr7-br2" style="width:40%"></span></span></div><div class="cr7-fl"><span class="cr7-bx"></span><span class="cr7-fl-t"><span class="cr7-br" style="width:62%"></span><span class="cr7-br cr7-br2" style="width:40%"></span></span></div><div class="cr7-fl"><span class="cr7-bx"></span><span class="cr7-fl-t"><span class="cr7-br" style="width:62%"></span><span class="cr7-br cr7-br2" style="width:40%"></span></span></div><div class="cr7-fl"><span class="cr7-bx"></span><span class="cr7-fl-t"><span class="cr7-br" style="width:62%"></span><span class="cr7-br cr7-br2" style="width:40%"></span></span></div></section><section class="cr7-tj" aria-hidden="true"><h2 class="cr7-tt">Atendidos recientemente</h2><div class="cr7-fl"><span class="cr7-bx"></span><span class="cr7-fl-t"><span class="cr7-br" style="width:62%"></span><span class="cr7-br cr7-br2" style="width:40%"></span></span></div><div class="cr7-fl"><span class="cr7-bx"></span><span class="cr7-fl-t"><span class="cr7-br" style="width:62%"></span><span class="cr7-br cr7-br2" style="width:40%"></span></span></div><div class="cr7-fl"><span class="cr7-bx"></span><span class="cr7-fl-t"><span class="cr7-br" style="width:62%"></span><span class="cr7-br cr7-br2" style="width:40%"></span></span></div></section><section class="cr7-tj" aria-hidden="true"><h2 class="cr7-tt">Documentos recientes</h2><div class="cr7-fl"><span class="cr7-bx"></span><span class="cr7-fl-t"><span class="cr7-br" style="width:62%"></span><span class="cr7-br cr7-br2" style="width:40%"></span></span></div><div class="cr7-fl"><span class="cr7-bx"></span><span class="cr7-fl-t"><span class="cr7-br" style="width:62%"></span><span class="cr7-br cr7-br2" style="width:40%"></span></span></div></section><section class="cr7-tj" aria-hidden="true"><h2 class="cr7-tt">Esta semana</h2><div class="cr7-fl"><span class="cr7-bx"></span><span class="cr7-fl-t"><span class="cr7-br" style="width:62%"></span><span class="cr7-br cr7-br2" style="width:40%"></span></span></div><div class="cr7-fl"><span class="cr7-bx"></span><span class="cr7-fl-t"><span class="cr7-br" style="width:62%"></span><span class="cr7-br cr7-br2" style="width:40%"></span></span></div><div class="cr7-fl"><span class="cr7-bx"></span><span class="cr7-fl-t"><span class="cr7-br" style="width:62%"></span><span class="cr7-br cr7-br2" style="width:40%"></span></span></div></section></div>
+</main><nav class="cr7-lat" aria-label="Navegación principal">
+  <div class="cr7-lat-cab"><span class="cr7-logo"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.5"/><path d="M12 5.5v13M9.6 8h4.8M9 11h6M9 14h6M9.6 17h4.8"/></svg><span class="cr7-logo-n">Spinus</span></span><span class="cr7-flex"></span><span class="cr7-plan">Plan VIP</span></div>
+  <button type="button" class="cr7-p cr7-cons-b"><span class="cr7-clogo" role="img" aria-label="Logo de Clínica Semilla A"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21c-4.5-2.2-7-5.6-7-10V5.5L12 3l7 2.5V11c0 4.4-2.5 7.8-7 10z"/><path d="M12 8v7M8.5 11.5h7"/></svg></span><span class="cr7-cons-t"><span class="cr7-m">Consultorio</span><b class="cr7-m">Centro</b><span class="cr7-s">Clínica</span><b class="cr7-s">Clínica Semilla A</b></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 9 4-4 4 4M8 15l4 4 4-4"/></svg></button>
+  <div class="cr7-lista"><a href="#" class="cr7-p cr7-li" aria-current="page"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Inicio</a><a href="#" class="cr7-p cr7-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.9.7 3.1 2.4 3.5 5.2"/></svg>Expediente</a><a href="#" class="cr7-p cr7-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Agenda</a><a href="#" class="cr7-p cr7-li cr7-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>Documentos</a><a href="#" class="cr7-p cr7-li cr7-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20v-8M12 20V5M19 20v-9"/></svg>Administración</a></div>
+  <span class="cr7-flex"></span>
+  
+  <div class="cr7-lat-pie"><a href="#" class="cr7-p cr7-li cr7-yo cr7-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18.2c1.3-2 3.2-3 5.5-3s4.2 1 5.5 3"/></svg><span><span>Dr. Admin Semilla</span><small class="cr7-esp">Ortopedia y Traumatología</small><small>Mi perfil · Ajustes</small></span></a><a href="#" class="cr7-p cr7-ib cr7-ay cr7-m" aria-label="Ayuda"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.6M12 17h.01"/></svg></a><button type="button" class="cr7-p cr7-li cr7-yo cr7-s cr7-abre-aj" aria-haspopup="menu"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span><span>Secretaria Semilla</span><small>Ajustes</small></span></button></div>
+</nav>
+</div>
+<div class="cr7-capa cr7-on"><div class="cr7-velo"></div>
+<!-- A0·19 · Asistente de perfil (OnboardingModal.tsx). BLOQUEANTE: sin X, Esc no cierra, nadie lo cierra tocando fuera; solo «Finalizar».
+     Lo monta GateOnboarding (layout de (app)) ante una lectura afirmativa del gate; con el plan bloqueado no se monta.
+     Forma: modal del catálogo de 520 en Duo abierto y computadora; tarjeta centrada de 310 en Duo cerrado (cr726); en iPhone, PANTALLA COMPLETA:
+     es un formulario largo con teclado y no se puede descartar, así que una hoja con asa prometería un gesto (arrastrar para cerrar) que no existe. -->
+<div class="cr7-mw"><div class="cr7-md" role="dialog" aria-modal="true" aria-labelledby="cr7-mt-ih" aria-describedby="cr7-ms-ih">
+  <header class="cr7-mcab"><h2 class="cr7-mt" id="cr7-mt-ih"><span class="cr7-m">Configura tu perfil</span><span class="cr7-s">Te damos la bienvenida</span></h2>
+    <p class="cr7-ms" id="cr7-ms-ih"><span class="cr7-m">Necesario para registrar pacientes y emitir documentos</span><span class="cr7-s">Solo falta saber cómo te llamas</span></p>
+    <!-- Progreso: indicador, NO navegación (los círculos no se pulsan: cada paso escribe al avanzar) -->
+    <ol class="cr7-prog" aria-label="Progreso"></ol><p class="cr7-pnx" aria-hidden="true"></p></header>
+  <div class="cr7-mcu" lang="es">
+    <!-- Paso «Tu nombre» (solo secretaria; si está, es el único): OnboardingModal.tsx:629-660 -->
+    <section class="cr7-st" data-p="nombre"><p class="cr7-intro">Así te verá el resto del equipo en la clínica.</p>
+      <label class="cr7-f"><span class="cr7-fl2">Nombre(s) <span class="cr7-req">*</span></span><input type="text" class="cr7-in" placeholder="Ej: María" value="Secretaria" autocomplete="off"></label>
+      <div class="cr7-par"><label class="cr7-f"><span class="cr7-fl2">Apellido paterno <span class="cr7-req">*</span></span><input type="text" class="cr7-in" placeholder="Ej: González" value="Semilla" autocomplete="off"></label><label class="cr7-f"><span class="cr7-fl2">Apellido materno</span><input type="text" class="cr7-in" placeholder="Ej: López" autocomplete="off"></label></div></section>
+    <!-- Paso «Datos»: título Dr./Dra., nombre, apellidos, especialidad (con «Agregar especialidad») y universidad -->
+    <section class="cr7-st" data-p="datos"><p class="cr7-intro">¿Cómo aparecerás en tus documentos médicos?</p>
+      <div class="cr7-par cr7-par-t"><label class="cr7-f"><span class="cr7-fl2">Título <span class="cr7-req">*</span></span><select class="cr7-in cr7-sel"><option selected>Dr.</option><option>Dra.</option></select></label><label class="cr7-f"><span class="cr7-fl2">Nombre(s) <span class="cr7-req">*</span></span><input type="text" class="cr7-in" placeholder="Ej: Juan" value="Admin" autocomplete="off"></label></div>
+      <div class="cr7-par"><label class="cr7-f"><span class="cr7-fl2">Apellido paterno <span class="cr7-req">*</span></span><input type="text" class="cr7-in" placeholder="Ej: García" value="Semilla" autocomplete="off"></label><label class="cr7-f"><span class="cr7-fl2">Apellido materno</span><input type="text" class="cr7-in" placeholder="Ej: López" autocomplete="off"></label></div>
+      <div class="cr7-f"><span class="cr7-fl2">Especialidad <span class="cr7-req">*</span></span><select class="cr7-in cr7-sel"><option>Ortopedia y Traumatología</option><option>Selecciona especialidad</option></select>
+        <button type="button" class="cr7-p cr7-tx"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>Agregar especialidad</button></div>
+      <label class="cr7-f"><span class="cr7-fl2">Universidad / Institución <span class="cr7-opc">(opcional)</span></span><input type="text" class="cr7-in" placeholder="Ej: UNAM, IPN, UAG…" autocomplete="off"></label></section>
+    <!-- Paso «Cédulas» -->
+    <section class="cr7-st" data-p="cedulas"><p class="cr7-intro">Tus cédulas aparecerán al pie de cada documento oficial.</p>
+      <label class="cr7-f"><span class="cr7-fl2">Cédula profesional <span class="cr7-req">*</span></span><input type="text" class="cr7-in" placeholder="7 u 8 dígitos" value="00000001" autocomplete="off"></label>
+      <label class="cr7-f"><span class="cr7-fl2">Cédula de especialidad <span class="cr7-opc">(opcional)</span></span><input type="text" class="cr7-in" placeholder="7 u 8 dígitos" autocomplete="off"><span class="cr7-ayuda">Déjala vacía si ejerces como médico general.</span></label>
+      <p class="cr7-nota">Las cédulas son datos que amparan legalmente tus documentos médicos bajo la NOM-004-SSA3-2012.</p></section>
+    <!-- Paso «Clínica», cara del DUEÑO: formulario (crea la clínica con POST /api/me/clinica). Al volver, «ya está creada». -->
+    <section class="cr7-st" data-p="clinica"><div class="cr7-nueva"><p class="cr7-intro">Tu clínica es la cuenta: el contenedor de tus pacientes, tus documentos y, si algún día lo necesitas, tu equipo. El consultorio —el lugar físico donde atiendes— lo configuras en el paso siguiente.</p>
+      <label class="cr7-f"><span class="cr7-fl2">Nombre de la clínica <span class="cr7-req">*</span></span><input type="text" class="cr7-in" placeholder="Ej: Clínica Ortointegra" value="Clínica Semilla A" autocomplete="off"><span class="cr7-ayuda">Si trabajas por tu cuenta, pon tu nombre o el de tu práctica. Aparece en el encabezado de tus documentos y puedes cambiarlo luego en Mi Perfil.</span></label></div>
+      <div class="cr7-hecho"><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m8 12.3 2.8 2.8 5.2-5.6"/></svg><p class="cr7-hecho-t">Clínica Semilla A ya está creada</p><p class="cr7-hecho-s">Volviste a este paso, pero la clínica ya existe y no hace falta crearla otra vez. Para cambiarle el nombre, entra a Mi Perfil.</p></div>
+      <!-- Cara del INVITADO sin clínica: panel de soporte, sin formulario y sin «Continuar» (solo «Atrás») -->
+      <div class="cr7-sop"><span class="cr7-sop-ic"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="m4.9 4.9 4.3 4.3M14.8 14.8l4.3 4.3M14.8 9.2l4.3-4.3M4.9 19.1l4.3-4.3"/></svg></span><p class="cr7-hecho-t">Tu cuenta no está asociada a ninguna clínica</p>
+        <p class="cr7-hecho-s">Los médicos invitados no pueden crear una clínica: quien administra la tuya debe volver a añadirte.</p>
+        <p class="cr7-hecho-s">Escríbenos y lo resolvemos contigo —no es algo que puedas arreglar desde aquí.</p>
+        <a href="#" class="cr7-p cr7-ton2">Escribir a soporte</a></div></section>
+    <!-- Paso «Consultorio». «Nombre corto» solo aparece si el nombre pasa de 12 caracteres -->
+    <section class="cr7-st" data-p="consultorio"><div class="cr7-nueva"><p class="cr7-intro">El consultorio es el lugar físico donde atiendes. Su dirección y su zona horaria mandan en tus documentos y en tu agenda.</p>
+      <label class="cr7-f"><span class="cr7-fl2">Nombre del consultorio <span class="cr7-req">*</span></span><input type="text" class="cr7-in" placeholder="Ej: Consultorio Centro" value="Hospital Norte" autocomplete="off"></label>
+      <label class="cr7-f"><span class="cr7-fl2">Nombre corto (máx. 12 caracteres) <span class="cr7-req">*</span></span><input type="text" class="cr7-in" placeholder="Ej: Centro" value="Hosp Norte" autocomplete="off"><span class="cr7-ayuda">Se muestra en el sidebar y en agenda cuando el nombre completo es muy largo.</span></label>
+      <label class="cr7-f"><span class="cr7-fl2">Dirección <span class="cr7-req">*</span></span><input type="text" class="cr7-in" placeholder="Ej: Calle 60 #400, Mérida, Yucatán" value="Calle Semilla 100, Centro" autocomplete="off"></label>
+      <label class="cr7-f"><span class="cr7-fl2">Teléfono <span class="cr7-opc">(opcional)</span></span><input type="tel" class="cr7-in" placeholder="Ej: 999 123 4567" value="999 000 0001" autocomplete="off"></label>
+      <div class="cr7-f"><span class="cr7-fl2">Zona horaria <span class="cr7-req">*</span></span>
+        <div class="cr7-chips" role="radiogroup" aria-label="Zona horaria"><button type="button" role="radio" aria-checked="true" class="cr7-p cr7-chip">Centro (UTC-6)</button><button type="button" role="radio" aria-checked="false" class="cr7-p cr7-chip">Cancún (UTC-5)</button><button type="button" role="radio" aria-checked="false" class="cr7-p cr7-chip">Tijuana (UTC-8)</button></div>
+        <select class="cr7-in cr7-sel" aria-label="Zona horaria"><option>Centro — CDMX, Jalisco, Edomex, Puebla, Veracruz, Oaxaca y mayoría (UTC-6)</option><option>Yucatán — Mérida, Valladolid (UTC-6)</option><option>Baja California — Tijuana, Ensenada, Mexicali (UTC-8)</option></select></div></div>
+      <div class="cr7-hecho"><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m8 12.3 2.8 2.8 5.2-5.6"/></svg><p class="cr7-hecho-t">Hospital Norte ya está creado</p><p class="cr7-hecho-s">Volviste a este paso, pero el consultorio ya existe y no hace falta crearlo otra vez. Para cambiarle la dirección, el teléfono o la zona horaria, entra a Mi Perfil → Mis consultorios.</p></div></section>
+    <!-- Paso «Logo» (omitible; solo quien será dueño y no tiene logo). Hoy el recuadro lleva un emoji 🏥; aquí, icono SVG (BRIEF: sin emojis). -->
+    <section class="cr7-st" data-p="logo"><p class="cr7-intro">El logo de tu clínica aparece en el encabezado de todos los documentos.</p>
+      <label class="cr7-p cr7-drop"><input type="file" class="cr7-oculto" accept="image/png,image/jpeg,image/webp,image/svg+xml"><span class="cr7-drop-ic"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V8l8-5 8 5v13H4z"/><path d="M12 9v6M9 12h6"/></svg></span>
+        <span class="cr7-drop-t">Haz clic para subir el logo</span><span class="cr7-drop-s">PNG, JPG, WEBP o SVG · Máximo 500 KB</span></label>
+      <div class="cr7-prev"><span class="cr7-clogo" role="img" aria-label="Logo de Clínica Semilla A"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21c-4.5-2.2-7-5.6-7-10V5.5L12 3l7 2.5V11c0 4.4-2.5 7.8-7 10z"/><path d="M12 8v7M8.5 11.5h7"/></svg></span><button type="button" class="cr7-p cr7-tx cr7-rojo">Quitar logo</button></div></section>
+    <!-- Paso «Firma» (omitible; solo médico sin firma): FirmaCaptura con sus dos modos; nace en «Subir imagen» -->
+    <section class="cr7-st" data-p="firma"><p class="cr7-intro">Tu firma autógrafa aparece sobre la línea de firma en todos tus documentos PDF.</p>
+      <div class="cr7-seg" role="tablist" aria-label="Modo de captura"><button type="button" role="tab" aria-selected="true" class="cr7-p cr7-sg" data-m="subir"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"/></svg>Subir imagen</button><button type="button" role="tab" aria-selected="false" class="cr7-p cr7-sg" data-m="dibujar"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.4 3.6a2.1 2.1 0 0 1 3 3L7.4 18.6a2 2 0 0 1-.9.5l-2.9.8a.5.5 0 0 1-.6-.6l.8-2.9a2 2 0 0 1 .5-.9z"/></svg>Dibujar firma</button></div>
+      <label class="cr7-p cr7-drop cr7-m-subir"><input type="file" class="cr7-oculto" accept="image/*"><span class="cr7-drop-ic"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"/></svg></span>
+        <span class="cr7-drop-t">Toca para seleccionar foto de tu firma</span><span class="cr7-drop-s">JPG, PNG, WEBP · Máx. 10 MB · Se procesará automáticamente</span></label>
+      <div class="cr7-m-dibujar"><div class="cr7-lienzo"><span>Firma aquí con el dedo o mouse</span></div>
+        <div class="cr7-lz-acc"><button type="button" class="cr7-p cr7-tx cr7-gris"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20H9L4 15l9-9 7 7-6 6"/><path d="m7.5 11.5 6 6"/></svg>Limpiar</button><button type="button" class="cr7-p cr7-ton2">Guardar firma →</button></div></div>
+      <p class="cr7-nota">Si la omites, tus recetas y escritos saldrán <strong>sin firma</strong>: con la línea y tus datos, pero sin el trazo. Puedes capturarla más tarde en Mi Perfil. Para terminar <strong>con</strong> firma, pulsa «Aceptar firma» aquí arriba y espera a que confirme; para terminar <strong>sin</strong> ella, usa «Omitir por ahora».</p></section></div>
+  <footer class="cr7-mpie"><button type="button" class="cr7-p cr7-ton2 cr7-atras"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"/></svg>Atrás</button><span class="cr7-flex"></span>
+    <span class="cr7-reqt">Paso requerido</span><button type="button" class="cr7-p cr7-ton2 cr7-omitir">Omitir por ahora</button>
+    <button type="button" class="cr7-p cr7-prim cr7-sigue"><span class="cr7-gira" aria-hidden="true"></span><span class="cr7-sigue-t">Continuar</span></button></footer>
+</div></div>
+</div>
+</div>
+<div class="marco cr7" data-vp="iv">
+<div class="cr7-app" inert>
+<!-- Navegación de Duo abierto vertical (CALMA cr719, cr723.9): encabezado fundido, pista de cinco píldoras. Copiado del dashboard aprobado. -->
+<header class="cr7-env cr7-nav">
+  <button type="button" class="cr7-p cr7-envb" aria-label="Mostrar barra lateral" data-rot="Mostrar barra lateral"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="15" rx="3"/><path d="M9.5 4.5v15"/></svg></button>
+  <nav class="cr7-pista" aria-label="Secciones"><a href="#" class="cr7-p cr7-pv" aria-current="page">Inicio</a><a href="#" class="cr7-p cr7-pv">Expediente</a><a href="#" class="cr7-p cr7-pv">Agenda</a><a href="#" class="cr7-p cr7-pv cr7-m">Documentos</a><button type="button" class="cr7-p cr7-pv">Más</button></nav>
+  <button type="button" class="cr7-p cr7-av cr7-av-g cr7-m" aria-label="Mi perfil">AS</button><button type="button" class="cr7-p cr7-av cr7-av-g cr7-s cr7-abre-aj" aria-label="Ajustes">SE</button>
+</header><main class="cr7-cont">
+  <!-- Fondo simplificado: el dashboard reducido a sus bloques, para que la pieza global se lea sobre una pantalla real. -->
+  <div class="cr7-top"><p class="cr7-rot"><span class="cr7-m">Centro</span><span class="cr7-s">Clínica Semilla A</span></p>
+  <h1 class="cr7-h1">Buenas tardes, <span class="cr7-m">Admin</span><span class="cr7-s">Secretaria</span></h1></div>
+  <div class="cr7-cols"><section class="cr7-tj" aria-hidden="true"><h2 class="cr7-tt">Después</h2><div class="cr7-fl"><span class="cr7-bx"></span><span class="cr7-fl-t"><span class="cr7-br" style="width:62%"></span><span class="cr7-br cr7-br2" style="width:40%"></span></span></div><div class="cr7-fl"><span class="cr7-bx"></span><span class="cr7-fl-t"><span class="cr7-br" style="width:62%"></span><span class="cr7-br cr7-br2" style="width:40%"></span></span></div><div class="cr7-fl"><span class="cr7-bx"></span><span class="cr7-fl-t"><span class="cr7-br" style="width:62%"></span><span class="cr7-br cr7-br2" style="width:40%"></span></span></div><div class="cr7-fl"><span class="cr7-bx"></span><span class="cr7-fl-t"><span class="cr7-br" style="width:62%"></span><span class="cr7-br cr7-br2" style="width:40%"></span></span></div><div class="cr7-fl"><span class="cr7-bx"></span><span class="cr7-fl-t"><span class="cr7-br" style="width:62%"></span><span class="cr7-br cr7-br2" style="width:40%"></span></span></div></section><section class="cr7-tj" aria-hidden="true"><h2 class="cr7-tt">Atendidos recientemente</h2><div class="cr7-fl"><span class="cr7-bx"></span><span class="cr7-fl-t"><span class="cr7-br" style="width:62%"></span><span class="cr7-br cr7-br2" style="width:40%"></span></span></div><div class="cr7-fl"><span class="cr7-bx"></span><span class="cr7-fl-t"><span class="cr7-br" style="width:62%"></span><span class="cr7-br cr7-br2" style="width:40%"></span></span></div><div class="cr7-fl"><span class="cr7-bx"></span><span class="cr7-fl-t"><span class="cr7-br" style="width:62%"></span><span class="cr7-br cr7-br2" style="width:40%"></span></span></div></section><section class="cr7-tj" aria-hidden="true"><h2 class="cr7-tt">Documentos recientes</h2><div class="cr7-fl"><span class="cr7-bx"></span><span class="cr7-fl-t"><span class="cr7-br" style="width:62%"></span><span class="cr7-br cr7-br2" style="width:40%"></span></span></div><div class="cr7-fl"><span class="cr7-bx"></span><span class="cr7-fl-t"><span class="cr7-br" style="width:62%"></span><span class="cr7-br cr7-br2" style="width:40%"></span></span></div></section><section class="cr7-tj" aria-hidden="true"><h2 class="cr7-tt">Esta semana</h2><div class="cr7-fl"><span class="cr7-bx"></span><span class="cr7-fl-t"><span class="cr7-br" style="width:62%"></span><span class="cr7-br cr7-br2" style="width:40%"></span></span></div><div class="cr7-fl"><span class="cr7-bx"></span><span class="cr7-fl-t"><span class="cr7-br" style="width:62%"></span><span class="cr7-br cr7-br2" style="width:40%"></span></span></div><div class="cr7-fl"><span class="cr7-bx"></span><span class="cr7-fl-t"><span class="cr7-br" style="width:62%"></span><span class="cr7-br cr7-br2" style="width:40%"></span></span></div></section></div>
+</main>
+</div>
+<div class="cr7-capa cr7-on"><div class="cr7-velo"></div>
+<!-- A0·19 · Asistente de perfil (OnboardingModal.tsx). BLOQUEANTE: sin X, Esc no cierra, nadie lo cierra tocando fuera; solo «Finalizar».
+     Lo monta GateOnboarding (layout de (app)) ante una lectura afirmativa del gate; con el plan bloqueado no se monta.
+     Forma: modal del catálogo de 520 en Duo abierto y computadora; tarjeta centrada de 310 en Duo cerrado (cr726); en iPhone, PANTALLA COMPLETA:
+     es un formulario largo con teclado y no se puede descartar, así que una hoja con asa prometería un gesto (arrastrar para cerrar) que no existe. -->
+<div class="cr7-mw"><div class="cr7-md" role="dialog" aria-modal="true" aria-labelledby="cr7-mt-iv" aria-describedby="cr7-ms-iv">
+  <header class="cr7-mcab"><h2 class="cr7-mt" id="cr7-mt-iv"><span class="cr7-m">Configura tu perfil</span><span class="cr7-s">Te damos la bienvenida</span></h2>
+    <p class="cr7-ms" id="cr7-ms-iv"><span class="cr7-m">Necesario para registrar pacientes y emitir documentos</span><span class="cr7-s">Solo falta saber cómo te llamas</span></p>
+    <!-- Progreso: indicador, NO navegación (los círculos no se pulsan: cada paso escribe al avanzar) -->
+    <ol class="cr7-prog" aria-label="Progreso"></ol><p class="cr7-pnx" aria-hidden="true"></p></header>
+  <div class="cr7-mcu" lang="es">
+    <!-- Paso «Tu nombre» (solo secretaria; si está, es el único): OnboardingModal.tsx:629-660 -->
+    <section class="cr7-st" data-p="nombre"><p class="cr7-intro">Así te verá el resto del equipo en la clínica.</p>
+      <label class="cr7-f"><span class="cr7-fl2">Nombre(s) <span class="cr7-req">*</span></span><input type="text" class="cr7-in" placeholder="Ej: María" value="Secretaria" autocomplete="off"></label>
+      <div class="cr7-par"><label class="cr7-f"><span class="cr7-fl2">Apellido paterno <span class="cr7-req">*</span></span><input type="text" class="cr7-in" placeholder="Ej: González" value="Semilla" autocomplete="off"></label><label class="cr7-f"><span class="cr7-fl2">Apellido materno</span><input type="text" class="cr7-in" placeholder="Ej: López" autocomplete="off"></label></div></section>
+    <!-- Paso «Datos»: título Dr./Dra., nombre, apellidos, especialidad (con «Agregar especialidad») y universidad -->
+    <section class="cr7-st" data-p="datos"><p class="cr7-intro">¿Cómo aparecerás en tus documentos médicos?</p>
+      <div class="cr7-par cr7-par-t"><label class="cr7-f"><span class="cr7-fl2">Título <span class="cr7-req">*</span></span><select class="cr7-in cr7-sel"><option selected>Dr.</option><option>Dra.</option></select></label><label class="cr7-f"><span class="cr7-fl2">Nombre(s) <span class="cr7-req">*</span></span><input type="text" class="cr7-in" placeholder="Ej: Juan" value="Admin" autocomplete="off"></label></div>
+      <div class="cr7-par"><label class="cr7-f"><span class="cr7-fl2">Apellido paterno <span class="cr7-req">*</span></span><input type="text" class="cr7-in" placeholder="Ej: García" value="Semilla" autocomplete="off"></label><label class="cr7-f"><span class="cr7-fl2">Apellido materno</span><input type="text" class="cr7-in" placeholder="Ej: López" autocomplete="off"></label></div>
+      <div class="cr7-f"><span class="cr7-fl2">Especialidad <span class="cr7-req">*</span></span><select class="cr7-in cr7-sel"><option>Ortopedia y Traumatología</option><option>Selecciona especialidad</option></select>
+        <button type="button" class="cr7-p cr7-tx"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>Agregar especialidad</button></div>
+      <label class="cr7-f"><span class="cr7-fl2">Universidad / Institución <span class="cr7-opc">(opcional)</span></span><input type="text" class="cr7-in" placeholder="Ej: UNAM, IPN, UAG…" autocomplete="off"></label></section>
+    <!-- Paso «Cédulas» -->
+    <section class="cr7-st" data-p="cedulas"><p class="cr7-intro">Tus cédulas aparecerán al pie de cada documento oficial.</p>
+      <label class="cr7-f"><span class="cr7-fl2">Cédula profesional <span class="cr7-req">*</span></span><input type="text" class="cr7-in" placeholder="7 u 8 dígitos" value="00000001" autocomplete="off"></label>
+      <label class="cr7-f"><span class="cr7-fl2">Cédula de especialidad <span class="cr7-opc">(opcional)</span></span><input type="text" class="cr7-in" placeholder="7 u 8 dígitos" autocomplete="off"><span class="cr7-ayuda">Déjala vacía si ejerces como médico general.</span></label>
+      <p class="cr7-nota">Las cédulas son datos que amparan legalmente tus documentos médicos bajo la NOM-004-SSA3-2012.</p></section>
+    <!-- Paso «Clínica», cara del DUEÑO: formulario (crea la clínica con POST /api/me/clinica). Al volver, «ya está creada». -->
+    <section class="cr7-st" data-p="clinica"><div class="cr7-nueva"><p class="cr7-intro">Tu clínica es la cuenta: el contenedor de tus pacientes, tus documentos y, si algún día lo necesitas, tu equipo. El consultorio —el lugar físico donde atiendes— lo configuras en el paso siguiente.</p>
+      <label class="cr7-f"><span class="cr7-fl2">Nombre de la clínica <span class="cr7-req">*</span></span><input type="text" class="cr7-in" placeholder="Ej: Clínica Ortointegra" value="Clínica Semilla A" autocomplete="off"><span class="cr7-ayuda">Si trabajas por tu cuenta, pon tu nombre o el de tu práctica. Aparece en el encabezado de tus documentos y puedes cambiarlo luego en Mi Perfil.</span></label></div>
+      <div class="cr7-hecho"><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m8 12.3 2.8 2.8 5.2-5.6"/></svg><p class="cr7-hecho-t">Clínica Semilla A ya está creada</p><p class="cr7-hecho-s">Volviste a este paso, pero la clínica ya existe y no hace falta crearla otra vez. Para cambiarle el nombre, entra a Mi Perfil.</p></div>
+      <!-- Cara del INVITADO sin clínica: panel de soporte, sin formulario y sin «Continuar» (solo «Atrás») -->
+      <div class="cr7-sop"><span class="cr7-sop-ic"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="m4.9 4.9 4.3 4.3M14.8 14.8l4.3 4.3M14.8 9.2l4.3-4.3M4.9 19.1l4.3-4.3"/></svg></span><p class="cr7-hecho-t">Tu cuenta no está asociada a ninguna clínica</p>
+        <p class="cr7-hecho-s">Los médicos invitados no pueden crear una clínica: quien administra la tuya debe volver a añadirte.</p>
+        <p class="cr7-hecho-s">Escríbenos y lo resolvemos contigo —no es algo que puedas arreglar desde aquí.</p>
+        <a href="#" class="cr7-p cr7-ton2">Escribir a soporte</a></div></section>
+    <!-- Paso «Consultorio». «Nombre corto» solo aparece si el nombre pasa de 12 caracteres -->
+    <section class="cr7-st" data-p="consultorio"><div class="cr7-nueva"><p class="cr7-intro">El consultorio es el lugar físico donde atiendes. Su dirección y su zona horaria mandan en tus documentos y en tu agenda.</p>
+      <label class="cr7-f"><span class="cr7-fl2">Nombre del consultorio <span class="cr7-req">*</span></span><input type="text" class="cr7-in" placeholder="Ej: Consultorio Centro" value="Hospital Norte" autocomplete="off"></label>
+      <label class="cr7-f"><span class="cr7-fl2">Nombre corto (máx. 12 caracteres) <span class="cr7-req">*</span></span><input type="text" class="cr7-in" placeholder="Ej: Centro" value="Hosp Norte" autocomplete="off"><span class="cr7-ayuda">Se muestra en el sidebar y en agenda cuando el nombre completo es muy largo.</span></label>
+      <label class="cr7-f"><span class="cr7-fl2">Dirección <span class="cr7-req">*</span></span><input type="text" class="cr7-in" placeholder="Ej: Calle 60 #400, Mérida, Yucatán" value="Calle Semilla 100, Centro" autocomplete="off"></label>
+      <label class="cr7-f"><span class="cr7-fl2">Teléfono <span class="cr7-opc">(opcional)</span></span><input type="tel" class="cr7-in" placeholder="Ej: 999 123 4567" value="999 000 0001" autocomplete="off"></label>
+      <div class="cr7-f"><span class="cr7-fl2">Zona horaria <span class="cr7-req">*</span></span>
+        <div class="cr7-chips" role="radiogroup" aria-label="Zona horaria"><button type="button" role="radio" aria-checked="true" class="cr7-p cr7-chip">Centro (UTC-6)</button><button type="button" role="radio" aria-checked="false" class="cr7-p cr7-chip">Cancún (UTC-5)</button><button type="button" role="radio" aria-checked="false" class="cr7-p cr7-chip">Tijuana (UTC-8)</button></div>
+        <select class="cr7-in cr7-sel" aria-label="Zona horaria"><option>Centro — CDMX, Jalisco, Edomex, Puebla, Veracruz, Oaxaca y mayoría (UTC-6)</option><option>Yucatán — Mérida, Valladolid (UTC-6)</option><option>Baja California — Tijuana, Ensenada, Mexicali (UTC-8)</option></select></div></div>
+      <div class="cr7-hecho"><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m8 12.3 2.8 2.8 5.2-5.6"/></svg><p class="cr7-hecho-t">Hospital Norte ya está creado</p><p class="cr7-hecho-s">Volviste a este paso, pero el consultorio ya existe y no hace falta crearlo otra vez. Para cambiarle la dirección, el teléfono o la zona horaria, entra a Mi Perfil → Mis consultorios.</p></div></section>
+    <!-- Paso «Logo» (omitible; solo quien será dueño y no tiene logo). Hoy el recuadro lleva un emoji 🏥; aquí, icono SVG (BRIEF: sin emojis). -->
+    <section class="cr7-st" data-p="logo"><p class="cr7-intro">El logo de tu clínica aparece en el encabezado de todos los documentos.</p>
+      <label class="cr7-p cr7-drop"><input type="file" class="cr7-oculto" accept="image/png,image/jpeg,image/webp,image/svg+xml"><span class="cr7-drop-ic"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V8l8-5 8 5v13H4z"/><path d="M12 9v6M9 12h6"/></svg></span>
+        <span class="cr7-drop-t">Haz clic para subir el logo</span><span class="cr7-drop-s">PNG, JPG, WEBP o SVG · Máximo 500 KB</span></label>
+      <div class="cr7-prev"><span class="cr7-clogo" role="img" aria-label="Logo de Clínica Semilla A"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21c-4.5-2.2-7-5.6-7-10V5.5L12 3l7 2.5V11c0 4.4-2.5 7.8-7 10z"/><path d="M12 8v7M8.5 11.5h7"/></svg></span><button type="button" class="cr7-p cr7-tx cr7-rojo">Quitar logo</button></div></section>
+    <!-- Paso «Firma» (omitible; solo médico sin firma): FirmaCaptura con sus dos modos; nace en «Subir imagen» -->
+    <section class="cr7-st" data-p="firma"><p class="cr7-intro">Tu firma autógrafa aparece sobre la línea de firma en todos tus documentos PDF.</p>
+      <div class="cr7-seg" role="tablist" aria-label="Modo de captura"><button type="button" role="tab" aria-selected="true" class="cr7-p cr7-sg" data-m="subir"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"/></svg>Subir imagen</button><button type="button" role="tab" aria-selected="false" class="cr7-p cr7-sg" data-m="dibujar"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.4 3.6a2.1 2.1 0 0 1 3 3L7.4 18.6a2 2 0 0 1-.9.5l-2.9.8a.5.5 0 0 1-.6-.6l.8-2.9a2 2 0 0 1 .5-.9z"/></svg>Dibujar firma</button></div>
+      <label class="cr7-p cr7-drop cr7-m-subir"><input type="file" class="cr7-oculto" accept="image/*"><span class="cr7-drop-ic"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"/></svg></span>
+        <span class="cr7-drop-t">Toca para seleccionar foto de tu firma</span><span class="cr7-drop-s">JPG, PNG, WEBP · Máx. 10 MB · Se procesará automáticamente</span></label>
+      <div class="cr7-m-dibujar"><div class="cr7-lienzo"><span>Firma aquí con el dedo o mouse</span></div>
+        <div class="cr7-lz-acc"><button type="button" class="cr7-p cr7-tx cr7-gris"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20H9L4 15l9-9 7 7-6 6"/><path d="m7.5 11.5 6 6"/></svg>Limpiar</button><button type="button" class="cr7-p cr7-ton2">Guardar firma →</button></div></div>
+      <p class="cr7-nota">Si la omites, tus recetas y escritos saldrán <strong>sin firma</strong>: con la línea y tus datos, pero sin el trazo. Puedes capturarla más tarde en Mi Perfil. Para terminar <strong>con</strong> firma, pulsa «Aceptar firma» aquí arriba y espera a que confirme; para terminar <strong>sin</strong> ella, usa «Omitir por ahora».</p></section></div>
+  <footer class="cr7-mpie"><button type="button" class="cr7-p cr7-ton2 cr7-atras"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"/></svg>Atrás</button><span class="cr7-flex"></span>
+    <span class="cr7-reqt">Paso requerido</span><button type="button" class="cr7-p cr7-ton2 cr7-omitir">Omitir por ahora</button>
+    <button type="button" class="cr7-p cr7-prim cr7-sigue"><span class="cr7-gira" aria-hidden="true"></span><span class="cr7-sigue-t">Continuar</span></button></footer>
+</div></div>
+</div>
+</div>
+<div class="marco cr7" data-vp="esc">
+<div class="cr7-app" inert>
+<nav class="cr7-lat" aria-label="Navegación principal">
+  <div class="cr7-lat-cab"><span class="cr7-logo"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.5"/><path d="M12 5.5v13M9.6 8h4.8M9 11h6M9 14h6M9.6 17h4.8"/></svg><span class="cr7-logo-n">Spinus</span></span><span class="cr7-flex"></span><span class="cr7-plan">Plan VIP</span></div>
+  <button type="button" class="cr7-p cr7-cons-b"><span class="cr7-clogo" role="img" aria-label="Logo de Clínica Semilla A"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21c-4.5-2.2-7-5.6-7-10V5.5L12 3l7 2.5V11c0 4.4-2.5 7.8-7 10z"/><path d="M12 8v7M8.5 11.5h7"/></svg></span><span class="cr7-cons-t"><span class="cr7-m">Consultorio</span><b class="cr7-m">Centro</b><span class="cr7-s">Clínica</span><b class="cr7-s">Clínica Semilla A</b></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 9 4-4 4 4M8 15l4 4 4-4"/></svg></button>
+  <div class="cr7-lista"><a href="#" class="cr7-p cr7-li" aria-current="page"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Inicio</a><a href="#" class="cr7-p cr7-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.9.7 3.1 2.4 3.5 5.2"/></svg>Expediente</a><a href="#" class="cr7-p cr7-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Agenda</a><a href="#" class="cr7-p cr7-li cr7-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>Documentos</a><a href="#" class="cr7-p cr7-li cr7-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20v-8M12 20V5M19 20v-9"/></svg>Administración</a></div>
+  <span class="cr7-flex"></span>
+  
+  <div class="cr7-lat-pie"><a href="#" class="cr7-p cr7-li cr7-yo cr7-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18.2c1.3-2 3.2-3 5.5-3s4.2 1 5.5 3"/></svg><span><span>Dr. Admin Semilla</span><small class="cr7-esp">Ortopedia y Traumatología</small><small>Mi perfil · Ajustes</small></span></a><a href="#" class="cr7-p cr7-ib cr7-ay cr7-m" aria-label="Ayuda"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.6M12 17h.01"/></svg></a><button type="button" class="cr7-p cr7-li cr7-yo cr7-s cr7-abre-aj" aria-haspopup="menu"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span><span>Secretaria Semilla</span><small>Ajustes</small></span></button></div>
+</nav><main class="cr7-cont">
+  <!-- Fondo simplificado: el dashboard reducido a sus bloques, para que la pieza global se lea sobre una pantalla real. -->
+  <div class="cr7-top"><p class="cr7-rot"><span class="cr7-m">Centro</span><span class="cr7-s">Clínica Semilla A</span></p>
+  <h1 class="cr7-h1">Buenas tardes, <span class="cr7-m">Admin</span><span class="cr7-s">Secretaria</span></h1></div>
+  <div class="cr7-cols"><section class="cr7-tj" aria-hidden="true"><h2 class="cr7-tt">Después</h2><div class="cr7-fl"><span class="cr7-bx"></span><span class="cr7-fl-t"><span class="cr7-br" style="width:62%"></span><span class="cr7-br cr7-br2" style="width:40%"></span></span></div><div class="cr7-fl"><span class="cr7-bx"></span><span class="cr7-fl-t"><span class="cr7-br" style="width:62%"></span><span class="cr7-br cr7-br2" style="width:40%"></span></span></div><div class="cr7-fl"><span class="cr7-bx"></span><span class="cr7-fl-t"><span class="cr7-br" style="width:62%"></span><span class="cr7-br cr7-br2" style="width:40%"></span></span></div><div class="cr7-fl"><span class="cr7-bx"></span><span class="cr7-fl-t"><span class="cr7-br" style="width:62%"></span><span class="cr7-br cr7-br2" style="width:40%"></span></span></div><div class="cr7-fl"><span class="cr7-bx"></span><span class="cr7-fl-t"><span class="cr7-br" style="width:62%"></span><span class="cr7-br cr7-br2" style="width:40%"></span></span></div></section><section class="cr7-tj" aria-hidden="true"><h2 class="cr7-tt">Atendidos recientemente</h2><div class="cr7-fl"><span class="cr7-bx"></span><span class="cr7-fl-t"><span class="cr7-br" style="width:62%"></span><span class="cr7-br cr7-br2" style="width:40%"></span></span></div><div class="cr7-fl"><span class="cr7-bx"></span><span class="cr7-fl-t"><span class="cr7-br" style="width:62%"></span><span class="cr7-br cr7-br2" style="width:40%"></span></span></div><div class="cr7-fl"><span class="cr7-bx"></span><span class="cr7-fl-t"><span class="cr7-br" style="width:62%"></span><span class="cr7-br cr7-br2" style="width:40%"></span></span></div></section><section class="cr7-tj" aria-hidden="true"><h2 class="cr7-tt">Documentos recientes</h2><div class="cr7-fl"><span class="cr7-bx"></span><span class="cr7-fl-t"><span class="cr7-br" style="width:62%"></span><span class="cr7-br cr7-br2" style="width:40%"></span></span></div><div class="cr7-fl"><span class="cr7-bx"></span><span class="cr7-fl-t"><span class="cr7-br" style="width:62%"></span><span class="cr7-br cr7-br2" style="width:40%"></span></span></div></section><section class="cr7-tj" aria-hidden="true"><h2 class="cr7-tt">Esta semana</h2><div class="cr7-fl"><span class="cr7-bx"></span><span class="cr7-fl-t"><span class="cr7-br" style="width:62%"></span><span class="cr7-br cr7-br2" style="width:40%"></span></span></div><div class="cr7-fl"><span class="cr7-bx"></span><span class="cr7-fl-t"><span class="cr7-br" style="width:62%"></span><span class="cr7-br cr7-br2" style="width:40%"></span></span></div><div class="cr7-fl"><span class="cr7-bx"></span><span class="cr7-fl-t"><span class="cr7-br" style="width:62%"></span><span class="cr7-br cr7-br2" style="width:40%"></span></span></div></section></div>
+</main>
+</div>
+<div class="cr7-capa cr7-on"><div class="cr7-velo"></div>
+<!-- A0·19 · Asistente de perfil (OnboardingModal.tsx). BLOQUEANTE: sin X, Esc no cierra, nadie lo cierra tocando fuera; solo «Finalizar».
+     Lo monta GateOnboarding (layout de (app)) ante una lectura afirmativa del gate; con el plan bloqueado no se monta.
+     Forma: modal del catálogo de 520 en Duo abierto y computadora; tarjeta centrada de 310 en Duo cerrado (cr726); en iPhone, PANTALLA COMPLETA:
+     es un formulario largo con teclado y no se puede descartar, así que una hoja con asa prometería un gesto (arrastrar para cerrar) que no existe. -->
+<div class="cr7-mw"><div class="cr7-md" role="dialog" aria-modal="true" aria-labelledby="cr7-mt-esc" aria-describedby="cr7-ms-esc">
+  <header class="cr7-mcab"><h2 class="cr7-mt" id="cr7-mt-esc"><span class="cr7-m">Configura tu perfil</span><span class="cr7-s">Te damos la bienvenida</span></h2>
+    <p class="cr7-ms" id="cr7-ms-esc"><span class="cr7-m">Necesario para registrar pacientes y emitir documentos</span><span class="cr7-s">Solo falta saber cómo te llamas</span></p>
+    <!-- Progreso: indicador, NO navegación (los círculos no se pulsan: cada paso escribe al avanzar) -->
+    <ol class="cr7-prog" aria-label="Progreso"></ol><p class="cr7-pnx" aria-hidden="true"></p></header>
+  <div class="cr7-mcu" lang="es">
+    <!-- Paso «Tu nombre» (solo secretaria; si está, es el único): OnboardingModal.tsx:629-660 -->
+    <section class="cr7-st" data-p="nombre"><p class="cr7-intro">Así te verá el resto del equipo en la clínica.</p>
+      <label class="cr7-f"><span class="cr7-fl2">Nombre(s) <span class="cr7-req">*</span></span><input type="text" class="cr7-in" placeholder="Ej: María" value="Secretaria" autocomplete="off"></label>
+      <div class="cr7-par"><label class="cr7-f"><span class="cr7-fl2">Apellido paterno <span class="cr7-req">*</span></span><input type="text" class="cr7-in" placeholder="Ej: González" value="Semilla" autocomplete="off"></label><label class="cr7-f"><span class="cr7-fl2">Apellido materno</span><input type="text" class="cr7-in" placeholder="Ej: López" autocomplete="off"></label></div></section>
+    <!-- Paso «Datos»: título Dr./Dra., nombre, apellidos, especialidad (con «Agregar especialidad») y universidad -->
+    <section class="cr7-st" data-p="datos"><p class="cr7-intro">¿Cómo aparecerás en tus documentos médicos?</p>
+      <div class="cr7-par cr7-par-t"><label class="cr7-f"><span class="cr7-fl2">Título <span class="cr7-req">*</span></span><select class="cr7-in cr7-sel"><option selected>Dr.</option><option>Dra.</option></select></label><label class="cr7-f"><span class="cr7-fl2">Nombre(s) <span class="cr7-req">*</span></span><input type="text" class="cr7-in" placeholder="Ej: Juan" value="Admin" autocomplete="off"></label></div>
+      <div class="cr7-par"><label class="cr7-f"><span class="cr7-fl2">Apellido paterno <span class="cr7-req">*</span></span><input type="text" class="cr7-in" placeholder="Ej: García" value="Semilla" autocomplete="off"></label><label class="cr7-f"><span class="cr7-fl2">Apellido materno</span><input type="text" class="cr7-in" placeholder="Ej: López" autocomplete="off"></label></div>
+      <div class="cr7-f"><span class="cr7-fl2">Especialidad <span class="cr7-req">*</span></span><select class="cr7-in cr7-sel"><option>Ortopedia y Traumatología</option><option>Selecciona especialidad</option></select>
+        <button type="button" class="cr7-p cr7-tx"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>Agregar especialidad</button></div>
+      <label class="cr7-f"><span class="cr7-fl2">Universidad / Institución <span class="cr7-opc">(opcional)</span></span><input type="text" class="cr7-in" placeholder="Ej: UNAM, IPN, UAG…" autocomplete="off"></label></section>
+    <!-- Paso «Cédulas» -->
+    <section class="cr7-st" data-p="cedulas"><p class="cr7-intro">Tus cédulas aparecerán al pie de cada documento oficial.</p>
+      <label class="cr7-f"><span class="cr7-fl2">Cédula profesional <span class="cr7-req">*</span></span><input type="text" class="cr7-in" placeholder="7 u 8 dígitos" value="00000001" autocomplete="off"></label>
+      <label class="cr7-f"><span class="cr7-fl2">Cédula de especialidad <span class="cr7-opc">(opcional)</span></span><input type="text" class="cr7-in" placeholder="7 u 8 dígitos" autocomplete="off"><span class="cr7-ayuda">Déjala vacía si ejerces como médico general.</span></label>
+      <p class="cr7-nota">Las cédulas son datos que amparan legalmente tus documentos médicos bajo la NOM-004-SSA3-2012.</p></section>
+    <!-- Paso «Clínica», cara del DUEÑO: formulario (crea la clínica con POST /api/me/clinica). Al volver, «ya está creada». -->
+    <section class="cr7-st" data-p="clinica"><div class="cr7-nueva"><p class="cr7-intro">Tu clínica es la cuenta: el contenedor de tus pacientes, tus documentos y, si algún día lo necesitas, tu equipo. El consultorio —el lugar físico donde atiendes— lo configuras en el paso siguiente.</p>
+      <label class="cr7-f"><span class="cr7-fl2">Nombre de la clínica <span class="cr7-req">*</span></span><input type="text" class="cr7-in" placeholder="Ej: Clínica Ortointegra" value="Clínica Semilla A" autocomplete="off"><span class="cr7-ayuda">Si trabajas por tu cuenta, pon tu nombre o el de tu práctica. Aparece en el encabezado de tus documentos y puedes cambiarlo luego en Mi Perfil.</span></label></div>
+      <div class="cr7-hecho"><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m8 12.3 2.8 2.8 5.2-5.6"/></svg><p class="cr7-hecho-t">Clínica Semilla A ya está creada</p><p class="cr7-hecho-s">Volviste a este paso, pero la clínica ya existe y no hace falta crearla otra vez. Para cambiarle el nombre, entra a Mi Perfil.</p></div>
+      <!-- Cara del INVITADO sin clínica: panel de soporte, sin formulario y sin «Continuar» (solo «Atrás») -->
+      <div class="cr7-sop"><span class="cr7-sop-ic"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="m4.9 4.9 4.3 4.3M14.8 14.8l4.3 4.3M14.8 9.2l4.3-4.3M4.9 19.1l4.3-4.3"/></svg></span><p class="cr7-hecho-t">Tu cuenta no está asociada a ninguna clínica</p>
+        <p class="cr7-hecho-s">Los médicos invitados no pueden crear una clínica: quien administra la tuya debe volver a añadirte.</p>
+        <p class="cr7-hecho-s">Escríbenos y lo resolvemos contigo —no es algo que puedas arreglar desde aquí.</p>
+        <a href="#" class="cr7-p cr7-ton2">Escribir a soporte</a></div></section>
+    <!-- Paso «Consultorio». «Nombre corto» solo aparece si el nombre pasa de 12 caracteres -->
+    <section class="cr7-st" data-p="consultorio"><div class="cr7-nueva"><p class="cr7-intro">El consultorio es el lugar físico donde atiendes. Su dirección y su zona horaria mandan en tus documentos y en tu agenda.</p>
+      <label class="cr7-f"><span class="cr7-fl2">Nombre del consultorio <span class="cr7-req">*</span></span><input type="text" class="cr7-in" placeholder="Ej: Consultorio Centro" value="Hospital Norte" autocomplete="off"></label>
+      <label class="cr7-f"><span class="cr7-fl2">Nombre corto (máx. 12 caracteres) <span class="cr7-req">*</span></span><input type="text" class="cr7-in" placeholder="Ej: Centro" value="Hosp Norte" autocomplete="off"><span class="cr7-ayuda">Se muestra en el sidebar y en agenda cuando el nombre completo es muy largo.</span></label>
+      <label class="cr7-f"><span class="cr7-fl2">Dirección <span class="cr7-req">*</span></span><input type="text" class="cr7-in" placeholder="Ej: Calle 60 #400, Mérida, Yucatán" value="Calle Semilla 100, Centro" autocomplete="off"></label>
+      <label class="cr7-f"><span class="cr7-fl2">Teléfono <span class="cr7-opc">(opcional)</span></span><input type="tel" class="cr7-in" placeholder="Ej: 999 123 4567" value="999 000 0001" autocomplete="off"></label>
+      <div class="cr7-f"><span class="cr7-fl2">Zona horaria <span class="cr7-req">*</span></span>
+        <div class="cr7-chips" role="radiogroup" aria-label="Zona horaria"><button type="button" role="radio" aria-checked="true" class="cr7-p cr7-chip">Centro (UTC-6)</button><button type="button" role="radio" aria-checked="false" class="cr7-p cr7-chip">Cancún (UTC-5)</button><button type="button" role="radio" aria-checked="false" class="cr7-p cr7-chip">Tijuana (UTC-8)</button></div>
+        <select class="cr7-in cr7-sel" aria-label="Zona horaria"><option>Centro — CDMX, Jalisco, Edomex, Puebla, Veracruz, Oaxaca y mayoría (UTC-6)</option><option>Yucatán — Mérida, Valladolid (UTC-6)</option><option>Baja California — Tijuana, Ensenada, Mexicali (UTC-8)</option></select></div></div>
+      <div class="cr7-hecho"><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m8 12.3 2.8 2.8 5.2-5.6"/></svg><p class="cr7-hecho-t">Hospital Norte ya está creado</p><p class="cr7-hecho-s">Volviste a este paso, pero el consultorio ya existe y no hace falta crearlo otra vez. Para cambiarle la dirección, el teléfono o la zona horaria, entra a Mi Perfil → Mis consultorios.</p></div></section>
+    <!-- Paso «Logo» (omitible; solo quien será dueño y no tiene logo). Hoy el recuadro lleva un emoji 🏥; aquí, icono SVG (BRIEF: sin emojis). -->
+    <section class="cr7-st" data-p="logo"><p class="cr7-intro">El logo de tu clínica aparece en el encabezado de todos los documentos.</p>
+      <label class="cr7-p cr7-drop"><input type="file" class="cr7-oculto" accept="image/png,image/jpeg,image/webp,image/svg+xml"><span class="cr7-drop-ic"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V8l8-5 8 5v13H4z"/><path d="M12 9v6M9 12h6"/></svg></span>
+        <span class="cr7-drop-t">Haz clic para subir el logo</span><span class="cr7-drop-s">PNG, JPG, WEBP o SVG · Máximo 500 KB</span></label>
+      <div class="cr7-prev"><span class="cr7-clogo" role="img" aria-label="Logo de Clínica Semilla A"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21c-4.5-2.2-7-5.6-7-10V5.5L12 3l7 2.5V11c0 4.4-2.5 7.8-7 10z"/><path d="M12 8v7M8.5 11.5h7"/></svg></span><button type="button" class="cr7-p cr7-tx cr7-rojo">Quitar logo</button></div></section>
+    <!-- Paso «Firma» (omitible; solo médico sin firma): FirmaCaptura con sus dos modos; nace en «Subir imagen» -->
+    <section class="cr7-st" data-p="firma"><p class="cr7-intro">Tu firma autógrafa aparece sobre la línea de firma en todos tus documentos PDF.</p>
+      <div class="cr7-seg" role="tablist" aria-label="Modo de captura"><button type="button" role="tab" aria-selected="true" class="cr7-p cr7-sg" data-m="subir"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"/></svg>Subir imagen</button><button type="button" role="tab" aria-selected="false" class="cr7-p cr7-sg" data-m="dibujar"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.4 3.6a2.1 2.1 0 0 1 3 3L7.4 18.6a2 2 0 0 1-.9.5l-2.9.8a.5.5 0 0 1-.6-.6l.8-2.9a2 2 0 0 1 .5-.9z"/></svg>Dibujar firma</button></div>
+      <label class="cr7-p cr7-drop cr7-m-subir"><input type="file" class="cr7-oculto" accept="image/*"><span class="cr7-drop-ic"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"/></svg></span>
+        <span class="cr7-drop-t">Toca para seleccionar foto de tu firma</span><span class="cr7-drop-s">JPG, PNG, WEBP · Máx. 10 MB · Se procesará automáticamente</span></label>
+      <div class="cr7-m-dibujar"><div class="cr7-lienzo"><span>Firma aquí con el dedo o mouse</span></div>
+        <div class="cr7-lz-acc"><button type="button" class="cr7-p cr7-tx cr7-gris"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20H9L4 15l9-9 7 7-6 6"/><path d="m7.5 11.5 6 6"/></svg>Limpiar</button><button type="button" class="cr7-p cr7-ton2">Guardar firma →</button></div></div>
+      <p class="cr7-nota">Si la omites, tus recetas y escritos saldrán <strong>sin firma</strong>: con la línea y tus datos, pero sin el trazo. Puedes capturarla más tarde en Mi Perfil. Para terminar <strong>con</strong> firma, pulsa «Aceptar firma» aquí arriba y espera a que confirme; para terminar <strong>sin</strong> ella, usa «Omitir por ahora».</p></section></div>
+  <footer class="cr7-mpie"><button type="button" class="cr7-p cr7-ton2 cr7-atras"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"/></svg>Atrás</button><span class="cr7-flex"></span>
+    <span class="cr7-reqt">Paso requerido</span><button type="button" class="cr7-p cr7-ton2 cr7-omitir">Omitir por ahora</button>
+    <button type="button" class="cr7-p cr7-prim cr7-sigue"><span class="cr7-gira" aria-hidden="true"></span><span class="cr7-sigue-t">Continuar</span></button></footer>
+</div></div>
+</div>
+</div>
+<template class="cr7-ficha-tpl"><section class="cr7-ficha" lang="es" aria-label="Especificación: Asistente de perfil"><h3>Especificación · Asistente de perfil</h3><dl><dt>Qué es</dt><dd>El asistente que pide lo mínimo para trabajar (<code>onboarding/GateOnboarding.tsx</code> → <code>OnboardingModal.tsx</code>). Lo monta el layout de <code>(app)</code> cuando el criterio del servidor dice que el perfil no está completo; con el plan bloqueado no se monta.</dd><dt>Pasos (los decide el servidor)</dt><dd><b>Médico que crea su clínica:</b> Datos · Cédulas · Clínica · Consultorio · Logo · Firma (6). <b>Médico invitado:</b> sin Logo; si se quedó sin clínica, el paso Clínica es un panel de soporte sin «Continuar». <b>Secretaria:</b> solo «Tu nombre». Logo y Firma solo se enseñan a quien no los tiene. Los siete con sus textos y campos exactos, en la tira.</dd><dt>Forma por marco</dt><dd>Modal del catálogo de 520 centrado en el área de contenido (Duo abierto y computadora; el pie de Duo vertical, centrado, §23.1); tarjeta centrada de 310 con desplazamiento interno en Duo cerrado (§26). <b>iPhone: pantalla completa.</b> Justificación: es un formulario de hasta seis campos con teclado en pantalla y NO se puede descartar; una hoja con asa promete arrastrar para cerrar, y aquí no hay cierre. La navegación de fondo queda inerte.</dd><dt>Cabecera</dt><dd>Título «Configura tu perfil» (secretaria: «Te damos la bienvenida»), subtítulo «Necesario para registrar pacientes y emitir documentos» («Solo falta saber cómo te llamas»), y el progreso: círculos de 24 numerados, el actual en <code>--accion</code> con su nombre, los hechos en verde con palomita, unidos por una línea. Es indicador, no navegación (no se pulsa: cada paso escribe al avanzar).</dd><dt>Pie</dt><dd>«Atrás» (tonal, desde el segundo paso; al volver, Clínica y Consultorio enseñan «… ya está creada/o»). A la derecha: «Paso requerido» (texto) o «Omitir por ahora» (tonal, solo Logo y Firma) y el principal «Continuar» / «Finalizar» / «Guardando…» con giro. En Firma el principal espera a «Aceptar firma» (o se omite). Sin X; Esc y tocar fuera no hacen nada.</dd><dt>Campos y textos</dt><dd>Todos los de hoy, con sus marcadores de ejemplo: «Así te verá el resto del equipo en la clínica.», «¿Cómo aparecerás en tus documentos médicos?», Título (Dr./Dra.), Nombre(s), Apellido paterno, Apellido materno, Especialidad + «Agregar especialidad», Universidad / Institución (opcional); cédulas con «Déjala vacía si ejerces como médico general.» y la nota de la NOM-004-SSA3-2012; clínica, consultorio (nombre corto solo si el nombre pasa de 12), zona horaria con tres atajos y la lista completa; logo «Haz clic para subir el logo» / «PNG, JPG, WEBP o SVG · Máximo 500 KB» / «Quitar logo»; firma «Subir imagen» / «Dibujar firma», «Firma aquí con el dedo o mouse», «Limpiar», «Guardar firma →» y el aviso de omitirla. Cambios: el emoji 🏥 del logo pasa a icono (BRIEF: sin emojis). Errores: hoy son avisos breves («El nombre es obligatorio», …), patrón de <code>pub-capas</code> 5.</dd><dt>Accesibilidad</dt><dd><code>role="dialog"</code> con título y subtítulo enlazados; progreso como lista con «Paso N de M: …» y <code>aria-current="step"</code>; etiquetas visibles encima de cada campo; obligatorios con asterisco y texto; el fondo con <code>inert</code>.</dd><dt>Movimiento</dt><dd>Entra con escala .96→1 y fundido (resorte, amortiguación 1, respuesta .35 s); en iPhone sube desde abajo. Entre pasos, el cuerpo cambia sin desplazamiento lateral (cada paso guarda en el servidor; un deslizamiento sugeriría poder volver deslizando). «Finalizar» lo retira por el mismo camino. Reduced motion: fundidos.</dd></dl></section></template>
+<script>
+(function(CFG){
+
+var P=CFG.p,MS=[].slice.call(document.querySelectorAll('.'+P+'.marco'));
+function cls(n){return P+'-'+n}
+MS.forEach(function(m){
+  var capa=m.querySelector('.'+cls('capa')),orig=null;
+  m.querySelectorAll('a[href="#"]').forEach(function(a){a.addEventListener('click',function(e){e.preventDefault();if(capa&&capa.classList.contains(cls('on'))&&a.closest('.'+cls('capa')))cierra()})});
+  function abre(k,o){if(!capa)return;orig=o||null;capa.dataset.k=k;capa.classList.add(cls('on'));capa.setAttribute('aria-hidden','false');
+    var pan=capa.querySelector(k==='cajon'?'.'+cls('cajon'):'.'+cls('mn'));var f=pan&&pan.querySelector('button,a');if(f)f.focus({preventScroll:true})}
+  function cierra(){if(!capa)return;capa.classList.remove(cls('on'));capa.setAttribute('aria-hidden','true');if(orig&&orig.offsetParent)orig.focus({preventScroll:true})}
+  m.abre=abre;m.cierra=cierra;
+  m.querySelectorAll('[data-abre]').forEach(function(b){b.addEventListener('click',function(){abre(b.dataset.abre,b)})});
+  if(capa){capa.querySelector('.'+cls('velo')).addEventListener('click',cierra);
+    capa.querySelectorAll('.'+cls('cierra')).forEach(function(b){b.addEventListener('click',cierra)});}
+  m.addEventListener('keydown',function(e){if(e.key==='Escape'&&capa&&capa.classList.contains(cls('on'))){e.preventDefault();cierra()}});
+});
+function tira(grupos,alPulsar){var d=document.createElement('div');d.className=cls('tira');d.setAttribute('role','group');d.setAttribute('aria-label','Controles de la maqueta');
+  grupos.forEach(function(g,i){if(i){var s=document.createElement('span');s.className=cls('sep');d.appendChild(s)}
+    g.forEach(function(b){var x=document.createElement('button');x.type='button';x.textContent=b[1];x.dataset.k=b[0];if(b[2]!=null)x.setAttribute('aria-pressed',String(b[2]));
+      x.addEventListener('click',function(){alPulsar(b[0],x,d)});d.appendChild(x)})});
+  var op=MS[0].closest('.op'),h=op&&op.querySelector('header');if(h)h.appendChild(d);else MS[0].parentNode.insertBefore(d,MS[0]);
+  var tp=document.querySelector('template.'+cls('ficha-tpl'));if(tp){var f=tp.content.firstElementChild.cloneNode(true);if(op)op.appendChild(f);else MS[MS.length-1].after(f)}
+  return d}
+
+
+var ET={nombre:'Tu nombre',datos:'Datos',cedulas:'Cédulas',clinica:'Clínica',consultorio:'Consultorio',logo:'Logo',firma:'Firma'};
+var RUTAS={duen:['datos','cedulas','clinica','consultorio','logo','firma'],sec:['nombre'],inv:['datos','cedulas','clinica','consultorio','firma']};
+var st={ruta:'duen',i:0,creada:false,conlogo:false,guardando:false,dibujar:false,fin:false};
+function pinta(){var r=RUTAS[st.ruta],p=r[st.i],ult=st.i===r.length-1;
+  MS.forEach(function(m){
+    m.classList.toggle(cls('sec'),st.ruta==='sec');m.classList.toggle(cls('invitado'),st.ruta==='inv');m.classList.toggle(cls('creada'),st.creada);
+    m.classList.toggle(cls('conlogo'),st.conlogo);m.classList.toggle(cls('guardando'),st.guardando);m.classList.toggle(cls('dibujar'),st.dibujar);
+    m.classList.toggle(cls('primero'),st.i===0);m.classList.toggle(cls('omitible'),p==='logo'||p==='firma');m.classList.toggle(cls('soporte'),st.ruta==='inv'&&p==='clinica');
+    m.classList.toggle(cls('fin'),st.fin);
+    m.querySelectorAll('.'+cls('st')).forEach(function(s){s.classList.toggle(cls('vis'),s.dataset.p===p)});
+    var ol=m.querySelector('.'+cls('prog'));ol.innerHTML='';
+    r.forEach(function(x,j){var li=document.createElement('li');li.className=j<st.i?cls('hecha'):j===st.i?cls('act'):'';
+      li.innerHTML='<span class="'+cls('pc')+'">'+(j<st.i?'<svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>':(j+1))+'</span>'+(j===st.i?'<span class="'+cls('pn')+'">'+ET[x]+'</span>':'');
+      li.setAttribute('aria-label','Paso '+(j+1)+' de '+r.length+': '+ET[x]+(j<st.i?', hecho':j===st.i?', actual':''));if(j===st.i)li.setAttribute('aria-current','step');
+      ol.appendChild(li);if(j<r.length-1){var ln=document.createElement('li');ln.className=cls('ln')+(j<st.i?' '+cls('ok'):'');ln.setAttribute('aria-hidden','true');ol.appendChild(ln)}});
+    m.querySelector('.'+cls('pnx')).textContent=ET[p];
+    var t=m.querySelector('.'+cls('sigue-t'));t.textContent=st.guardando?'Guardando…':(ult?'Finalizar':'Continuar');
+    /* Firma: hoy «Finalizar» queda deshabilitado hasta aceptar una firma (o se usa «Omitir por ahora») */
+    m.querySelector('.'+cls('sigue')).setAttribute('aria-disabled',String(p==='firma'));
+    m.querySelectorAll('.'+cls('sg')).forEach(function(b){b.setAttribute('aria-selected',String((b.dataset.m==='dibujar')===st.dibujar))});
+    m.querySelector('.'+cls('mcu')).scrollTop=0});
+  sinc()}
+function avanza(){var r=RUTAS[st.ruta];if(st.i>=r.length-1){st.fin=true;pinta();return}st.guardando=true;pinta();
+  setTimeout(function(){st.guardando=false;st.i++;pinta()},500)}
+MS.forEach(function(m){
+  m.querySelector('.'+cls('sigue')).addEventListener('click',function(e){if(e.currentTarget.getAttribute('aria-disabled')==='true')return;avanza()});
+  m.querySelector('.'+cls('omitir')).addEventListener('click',function(){var r=RUTAS[st.ruta];if(st.i>=r.length-1){st.fin=true;pinta()}else{st.i++;pinta()}});
+  m.querySelector('.'+cls('atras')).addEventListener('click',function(){if(st.i>0){st.i--;st.creada=true;pinta()}});
+  m.querySelectorAll('.'+cls('sg')).forEach(function(b){b.addEventListener('click',function(){st.dibujar=b.dataset.m==='dibujar';pinta()})});
+  m.querySelectorAll('.'+cls('chip')).forEach(function(b){b.addEventListener('click',function(){b.parentNode.querySelectorAll('[role="radio"]').forEach(function(x){x.setAttribute('aria-checked',String(x===b))})})});
+  /* Bloqueante: Esc no hace nada (onClose no-op en el código) */
+  m.addEventListener('keydown',function(e){if(e.key==='Escape')e.preventDefault()});
+});
+var T;
+function sinc(){if(!T)return;var r=RUTAS[st.ruta];T.querySelectorAll('button').forEach(function(b){var k=b.dataset.k;
+  if(k.indexOf('p:')===0)b.setAttribute('aria-pressed',String(!st.fin&&r[st.i]===k.slice(2)&&(k!=='p:nombre'||st.ruta==='sec')));
+  if(k==='inv')b.setAttribute('aria-pressed',String(st.ruta==='inv'));if(k==='creada')b.setAttribute('aria-pressed',String(st.creada));
+  if(k==='conlogo')b.setAttribute('aria-pressed',String(st.conlogo));if(k==='dibujar')b.setAttribute('aria-pressed',String(st.dibujar))})}
+T=tira([[['p:nombre','Tu nombre (secretaria)',false],['p:datos','Datos',true],['p:cedulas','Cédulas',false],['p:clinica','Clínica',false],['p:consultorio','Consultorio',false],['p:logo','Logo',false],['p:firma','Firma',false]],
+  [['inv','Invitado sin clínica',false],['creada','Ya creada (al volver)',false],['conlogo','Logo elegido',false],['dibujar','Firma: dibujar',false],['guarda','Guardando…']],[['reabre','Volver a abrir']]],function(k){
+  st.fin=false;st.guardando=false;
+  if(k.indexOf('p:')===0){var p=k.slice(2);if(p==='nombre'){st.ruta='sec'}else if(st.ruta==='sec'){st.ruta='duen'}
+    var r=RUTAS[st.ruta],j=r.indexOf(p);if(j<0){st.ruta='duen';r=RUTAS.duen;j=r.indexOf(p)}st.i=j}
+  else if(k==='inv'){st.ruta=st.ruta==='inv'?'duen':'inv';st.i=2}
+  else if(k==='creada'){st.creada=!st.creada}
+  else if(k==='conlogo'){st.conlogo=!st.conlogo}
+  else if(k==='dibujar'){st.dibujar=!st.dibujar}
+  else if(k==='guarda'){st.guardando=true}
+  else if(k==='reabre'){st.i=0}
+  pinta()});
+pinta();
+
+})({"p": "cr7"});
+</script>

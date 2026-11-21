@@ -28,7 +28,7 @@
   --sombra-nav-der:-8px 0 28px rgba(0,0,0,.4);--sombra-nav-izq:8px 0 28px rgba(0,0,0,.4);--sombra-nav-sup:0 8px 24px rgba(0,0,0,.4);
   --sombra-capa:0 18px 48px rgba(0,0,0,.55);--sombra-accion:0 4px 12px rgba(0,0,0,.35);--velo:rgba(0,0,0,.35);--d-receta:#4899fb;--d-laboratorio:#00b781;--d-imagen:#a17efe;--d-suplementacion:#e7ad00;--d-internamiento:#fd5d79;--d-escrito:#00cee9;--d-consentimiento:#9fabff;--d-honorarios:#ee7d00;--d-mezcla:18%;color-scheme:dark}
 /* Marco de dispositivo. --it/--ir/--ib/--il hacen de env(safe-area-inset-*) en la maqueta. */
-.marco{position:relative;overflow:hidden;box-sizing:border-box;background:var(--fondo);color:var(--tinta);font:15px/20px var(--fuente);-webkit-font-smoothing:antialiased;--it:0px;--ir:0px;--ib:0px;--il:0px;text-align:left}
+.marco{-webkit-text-size-adjust:100%;text-size-adjust:100%;position:relative;overflow:hidden;box-sizing:border-box;background:var(--fondo);color:var(--tinta);font:15px/20px var(--fuente);-webkit-font-smoothing:antialiased;--it:0px;--ir:0px;--ib:0px;--il:0px;text-align:left}
 .marco *{box-sizing:border-box}
 .marco button{font:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
 .marco a{color:inherit;text-decoration:none}

@@ -165,3 +165,64 @@ Aplica a las filas de cita del dashboard («Después» y equivalentes) en los ci
 5. **Origen de la cita** (línea secundaria, icono + texto): «Reservó por enlace» (texto de hoy, icono de enlace) y «Agendada desde Google Calendar» con el icono multicolor de Google Calendar a 14–16 px (en `ext`, si no cabe, «Desde Google Calendar»). TEXTO NUEVO aprobado.
 6. **Cita sin expediente** (solo ocurre con esos dos orígenes): la fila muestra «Sin expediente»; en la hoja la acción principal es «Ligar paciente e iniciar consulta» en vez de «Iniciar consulta», y «Ver expediente» no aparece. No dibujes el flujo de ligado: es de la rama de agenda y aún no está cerrado; el botón solo se dibuja.
 7. **Reservado para la tanda de agenda (NO dibujar ahora):** los eventos de Google que no son cita llevarán un botón «¿No es una cita?»; el caso «Pendiente administrativo · Sin paciente ligado» se trata en la maqueta como una cita sin expediente más, sin inventar nada.
+
+## 25. Capas compartidas — catálogo (tanda nueva)
+Objetivo: UNA definición de cada pieza que hoy cada pantalla dibuja a su manera, para que quien implemente la construya una vez. No se inventan piezas ni textos: cada ejemplo sale de una capa que ya existe en las maquetas aprobadas (`pub-*`, `tanda4`, `dashboard-final`) o en el código (`S/informes/funciones-componentes.md`, `S/informes/capturas-modales.md`, `S/informes/movimiento.md`). Si dos maquetas difieren, gana la regla de §13, §18, §21, §23; anota la diferencia en el informe.
+
+Cada pieza se entrega como una vista (`vista-N-nombre.html`) con los CINCO marcos, sobre un fondo de pantalla real simplificado, con: botón de maqueta para abrir/cerrar (la animación es parte de la entrega), variantes, y debajo del marco una ficha breve «Especificación» (medidas por marco, resorte, cómo se cierra, velo sí/no, orden de botones, foco y teclado, reduced-motion y reduced-transparency).
+
+Movimiento (del skill apple-design, `/home/user/app_ortointegra/.agents/skills/apple-design/SKILL.md`, léelo entero): respuesta en pointer-down; resortes (sin rebote por defecto: amortiguación 1.0, respuesta .3–.4 s; .8 solo tras un gesto con velocidad); toda animación interrumpible y reversible a medio camino; solo `transform` y `opacity`; las capas nacen de su origen (el menú de su botón, la hoja del borde inferior, la alerta del centro con escala .96→1); salida más rápida que la entrada; hojas arrastrables hacia abajo con proyección de inercia y rubber-band arriba; `prefers-reduced-motion` → fundido corto sin desplazamiento; `prefers-reduced-transparency` → velo opaco sin desenfoque. En la maqueta, implementa los resortes con `linear()` de CSS o con WAAPI; sin librerías.
+
+Medidas comunes ya decididas: alerta 320 (`ext`/`tel`) y 340 (`ih`/`iv`/`esc`), centrada, icono 28 en círculo 48, título centrado, botones lado a lado salvo rótulos largos (apilados, principal arriba); modal 440/480/520 centrado entre franjas; hoja inferior en `ext`/`tel` (dentro del área de contenido, nunca bajo el riel) y tarjeta centrada en `ih`/`iv`/`esc`; menús sin velo en `esc`, tarjeta centrada con velo en `ih`/`iv`, hoja en `ext`/`tel`; velo `--velo` con `backdrop-filter: blur(10px) saturate(140%)`; pies con botones a la derecha (centrados en `iv`).
+
+## 26. Capas en Duo cerrado (`ext`) — decisión del usuario (21-nov)
+En `ext` NINGUNA capa es hoja inferior: modales, hojas (acciones de cita, rejilla «Tipo de documento», listas para elegir) y menús son TARJETA CENTRADA en el área de contenido (sin riel ni franja), con velo, igual que en `ih`/`iv`: nacen del centro (escala .96→1 + fundido), ancho máx. 310 con margen de 8, alto máx. el del área menos 32 con desplazamiento interno y pie fijo. Sin asa ni arrastre para cerrar. La hoja inferior arrastrable queda SOLO para `tel`. Motivo: en `ext` la hoja pegada abajo a la izquierda, junto al riel, se ve mal. Esto manda sobre §24.2 y §25 y sobre lo dibujado en las páginas anteriores.
+Además `base.css` fija `text-size-adjust:100%` (Safari de iPhone inflaba algunos textos dentro de los marcos escalados).
+
+## 27. Agenda v2 — criterios (aprobados por el usuario, 21-nov)
+- Solo visual: tipografía, iconografía, color, layout, transiciones. NINGUNA función se quita ni cambia. Inventario de referencia: `S/informes/agenda-v2-auditoria.md` (commit 951e31b3) y capturas en `S/cap-agenda/`. Todo lo que hoy se puede hacer debe poder hacerse en la maqueta; textos EXACTOS de hoy (propuestas aparte).
+- Libertad de layout igual que en el resto de la app, sin afectar funcionalidad.
+- El estándar estético es el de las páginas aprobadas (`dashboard-final`, `pub-pacientes`, `pub-nota`, `pub-documentos`, `tanda4`, `pub-capas`): ni plano (plasta de texto negro) ni saturado (color y letra grande por todos lados). Color con significado; iconos de color; etiquetas con icono; jerarquía con rótulos. La primera pasada «calma» se quedó plana: no repetirlo.
+- Se CONSERVAN, redibujados con el sistema nuevo, los gráficos propios de la agenda que comunican algo: color por estado de cita, rayado de bloqueos (solo sobre horario de consulta), línea de la hora actual, fuera de horario, marcas de origen (enlace, Google), eventos frente a citas, «todo el día».
+- Tipografía: la escala del kit; ningún texto <12 px (el mes del chip de fecha a 11 es la única excepción existente). La densidad se resuelve decidiendo QUÉ muestra cada tamaño de bloque (lo demás va a la burbuja), no encogiendo la letra.
+- Estados de cita: los iconos en círculo de §24.4 (Agendada calendario-reloj ámbar, Confirmada palomita azul, Cancelada tache rojo, No asistió persona tachada gris, Atendida doble palomita verde), los mismos del dashboard.
+- Colores: los 131 `--ag-*` de hoy se sustituyen por tokens del kit + un juego pequeño de tokens de agenda (por estado y por tipo: cita, evento, bloqueo, Google), en claro y oscuro (un solo oscuro, el del kit). Ojo: el kit ya define `--ag-fondo/--ag-tinta/--ag-punto` con otro significado (ámbar de «agendada»); nombra los nuevos sin chocar.
+- Navegación por dispositivo como el resto: riel derecho en `ext`, encabezado fundido en `tel` e `iv` (píldora «Agenda» marcada, cinco píldoras), barra lateral derecha en `ih`, izquierda 248 en `esc`. Nada bajo franjas. La barra de herramientas de la agenda (fecha, anterior/siguiente, Hoy, vistas Mes|Semana|Día, médico, buscar, campana, bloquear, engrane, «Agendar») se resuelve por tamaño SIN cuatro filas: lo secundario se agrupa.
+- Semana en `ext` y `tel`: lista por día con tira de fechas (decidido); rejilla de siete columnas en `ih`, `iv`, `esc`.
+- Capas: las del catálogo (§25, §26): en `ext` tarjeta centrada, en `tel` hoja inferior, en `ih`/`iv`/`esc` tarjeta centrada; menús sin velo solo en `esc`. La burbuja de cita es una capa del catálogo, no una hoja a todo el ancho.
+- Movimiento: resortes interrumpibles, respuesta en pointer-down, solo transform/opacity (§25).
+- Fuera: páginas públicas de reserva (`/reservar`, `/confirmar`), agenda v1.
+- Reservado/pendiente de QA del usuario: si el QA de la tanda M cambia comportamiento, se retoca.
+
+## 28. Decisiones del 21-nov (agenda fase 1 y cromo global) — aprobadas
+Agenda:
+- «Agendar»: píldora flotante en `tel` (sin tapar contenido), «+» del riel en `ext`, botón en la barra en el resto.
+- Día en `tel` es rejilla. Tocar un hueco para agendar NO existe en `ext`/`tel` (sí en `ih`/`iv`/`esc`).
+- Burbuja: acciones como filas de menú (destructiva roja al final).
+- Semana en `ext`/`tel`: lista por día con tira de fechas (versión A). En `ih` hay que dibujar las DOS (7 días y «3 días» como hoy) para que el dueño elija.
+- El botón ⓘ de leyenda sale de la barra; la leyenda se abre desde el menú de opciones.
+- Panel del Día (Resumen, Huecos disponibles, mini-mes) en `esc`, obligatorio. NUEVO aprobado: «Huecos disponibles» también en `ih`/`iv` como opción de «Opciones de la agenda» (solo en Día y con médico elegido) que abre la misma pieza en una tarjeta del catálogo.
+- TEXTOS UNIFICADOS (aprobados, sustituyen a las variantes de hoy en todas partes): origen Google → «Agendada desde Google Calendar» (corto: «Desde Google Calendar»); reserva por enlace → «Reservó por enlace» (corto en filas estrechas: «Por enlace»); ligado → «Ligar paciente e iniciar consulta»; «¿No es una cita?» (con signos) siempre.
+Cromo global (ver `S/entrega/cromo/` y `S/informes/cromo-global-faltantes.md`):
+- Aviso «N datos pendientes»: tarjeta ámbar en la barra lateral (`esc`, `ih`); distintivo ámbar con número sobre «···» del riel (`ext`) o sobre el botón de menú (`tel`, `iv`) + tarjeta dentro del menú/cajón. Solo médico.
+- Menú «Más» (`ext` e `iv`): aviso, Consultorio activo, Administración, Mi perfil, Ayuda. Suplementación sigue dentro de Expediente.
+- Secretaria: no tiene «Mi perfil»; tiene «Ajustes» con Modo oscuro, Aviso de Privacidad y Cerrar sesión.
+- El logo de la clínica vuelve, en el botón de consultorio de la navegación.
+- Paleta ⌘K anclada arriba en ancho.
+REGLA DE PROCESO (obligatoria desde hoy): todo agente entrega una tabla «ítem del inventario → dónde está en la maqueta / reservado a quién / FALTA». Nada del inventario puede quedar en FALTA sin decirlo arriba del informe.
+
+## 29. Decisiones del dueño sobre la agenda (21-nov, tras la fase 2) — aprobadas
+1. **Cuatro vistas en TODOS los marcos: Mes · Semana · 3 días · Día.** «3 días» deja de ser un sustituto de Semana en ancho de tableta y pasa a ser una vista más, siempre disponible (la vista ya existe en el código). Semana sigue como está decidido (lista por día en `ext`/`tel`, siete columnas en `ih`/`iv`/`esc`); «3 días» es SIEMPRE rejilla horaria de tres columnas (hoy + dos), también en `ext` y `tel`. El conmutador de la barra pasa a cuatro opciones; si no caben los rótulos en `ext`/`tel`, resuélvelo sin letra <12 (rótulos cortos con `aria-label` completo, o el conmutador en su propia fila), sin esconder ninguna vista en un menú.
+2. Cancelar o eliminar una cita/evento desde el formulario PIDE CONFIRMACIÓN (alerta destructiva del catálogo).
+3. En la alerta de cancelar cita, el botón de arrepentirse dice «Volver» (no «Cancelar»).
+4. Confirmaciones de la agenda: la pregunta como título, el resto como mensaje, y el botón principal con verbo concreto («Mover», «Guardar», «Cancelar cita», «Quitar bloqueo»…) en vez de «Aceptar»; el secundario «Volver» cuando la acción es cancelar algo, «Cancelar» en el resto.
+5. El botón de la burbuja que abre el formulario completo lleva icono de LÁPIZ (no ⋮), `aria-label` de hoy.
+6. El botón «Ligar paciente e iniciar consulta» lleva icono de ESLABÓN en la agenda y en el dashboard.
+7. Los motivos que hoy solo viven en `title` se muestran a la vista: explicación de «¿No es una cita?» bajo el botón, «Primero se liga a un paciente», por qué «Cita» está apagada con Todo el día.
+8. Buscador de la agenda sin resultados: «Sin coincidencias.»
+9. Rótulos de grupo del formulario «Fecha y hora» y «Detalles»: aprobados.
+10. Configuración › Tu consulta: cada tipo de cita muestra su color en la fila.
+11. «Guardado»: 4 s, como el resto de avisos de éxito.
+12. La agenda vacía ofrece un enlace a «Configuración de la agenda».
+13. Arrastrar en táctil exige mantener pulsado, con el tiempo de hoy.
+14. Cerrar sesión NO pide confirmación (se queda como hoy).

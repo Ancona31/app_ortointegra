@@ -1,0 +1,365 @@
+{
+ "1-aviso-perfil": {
+  "1-inicio": [],
+  "2-menu": [
+   {
+    "vp": [
+     "ext",
+     "tel",
+     "iv"
+    ],
+    "req": 1
+   },
+   {
+    "t": "Abrir menú"
+   }
+  ],
+  "3-dos": [
+   {
+    "t": "2 datos"
+   },
+   {
+    "t": "Abrir menú"
+   }
+  ],
+  "4-uno": [
+   {
+    "t": "1 dato"
+   },
+   {
+    "t": "Abrir menú"
+   }
+  ],
+  "5-plegado": [
+   {
+    "t": "Plegado"
+   },
+   {
+    "t": "Abrir menú"
+   }
+  ],
+  "6-sin": [
+   {
+    "t": "Sin pendientes"
+   },
+   {
+    "t": "Abrir menú"
+   }
+  ],
+  "7-secretaria": [
+   {
+    "t": "Secretaria"
+   },
+   {
+    "t": "Abrir menú"
+   }
+  ],
+  "8-mas-iv": [
+   {
+    "vp": [
+     "iv"
+    ],
+    "req": 1
+   },
+   {
+    "m": ".cr1-pv[data-abre]"
+   }
+  ]
+ },
+ "2-consultorio": {
+  "1-inicio": [],
+  "2-lista": [
+   {
+    "t": "Abrir el selector"
+   }
+  ],
+  "3-alerta": [
+   {
+    "t": "Confirmación"
+   }
+  ],
+  "4-aviso": [
+   {
+    "t": "Aviso"
+   }
+  ],
+  "5-clic-real": [
+   {
+    "vp": [
+     "ext"
+    ],
+    "m": ".cr2-rb[data-abre]"
+   },
+   {
+    "vp": [
+     "ext"
+    ],
+    "m": ".cr2-abre-ls"
+   },
+   {
+    "vp": [
+     "tel"
+    ],
+    "m": ".cr2-menu"
+   },
+   {
+    "vp": [
+     "iv"
+    ],
+    "m": ".cr2-envb"
+   },
+   {
+    "vp": [
+     "tel",
+     "iv"
+    ],
+    "m": ".cr2-capa .cr2-cons-b"
+   },
+   {
+    "vp": [
+     "ih",
+     "esc"
+    ],
+    "m": ".cr2-lat .cr2-cons-b"
+   },
+   {
+    "m": ".cr2-co[data-c=\"Rehab\"]"
+   }
+  ]
+ },
+ "3-paleta": {
+  "1-vacia": [
+   {
+    "m": ".cr3-abre-pal"
+   }
+  ],
+  "2-pacientes": [
+   {
+    "t": "Pacientes"
+   }
+  ],
+  "3-folio": [
+   {
+    "t": "Folio"
+   }
+  ],
+  "4-sinfolio": [
+   {
+    "t": "Folio sin resultado"
+   }
+  ],
+  "5-crear": [
+   {
+    "t": "Pacientes + crear"
+   }
+  ],
+  "6-solo": [
+   {
+    "t": "Solo crear"
+   }
+  ],
+  "7-registro": [
+   {
+    "t": "Registro rápido"
+   }
+  ],
+  "8-dup": [
+   {
+    "t": "Duplicado"
+   }
+  ],
+  "0-fondo": []
+ },
+ "4-suscripcion": {
+  "1-banner": [],
+  "2-desplazado": [
+   {
+    "scroll": [
+     ".cr4-cont",
+     300
+    ]
+   }
+  ],
+  "3-admin": [
+   {
+    "t": "Abrir el bloqueo"
+   }
+  ],
+  "4-invitado": [
+   {
+    "t": "Médico invitado"
+   },
+   {
+    "t": "Abrir el bloqueo"
+   }
+  ],
+  "5-secretaria": [
+   {
+    "t": "Secretaria"
+   },
+   {
+    "t": "Abrir el bloqueo"
+   }
+  ],
+  "6-clic": [
+   {
+    "vp": [
+     "ext"
+    ],
+    "m": ".cr4-masb"
+   },
+   {
+    "vp": [
+     "tel",
+     "ih",
+     "iv",
+     "esc"
+    ],
+    "m": ".cr4-tonb"
+   }
+  ]
+ },
+ "5-cajon": {
+  "1-abierto": [],
+  "2-cerrado": [
+   {
+    "t": "Cerrar"
+   }
+  ],
+  "3-secretaria": [
+   {
+    "t": "Secretaria"
+   }
+  ],
+  "4-ajustes": [
+   {
+    "t": "Ajustes (secretaria)"
+   }
+  ],
+  "5-gratis": [
+   {
+    "t": "Plan gratuito"
+   }
+  ],
+  "6-mas": [
+   {
+    "vp": [
+     "ext",
+     "iv"
+    ],
+    "req": 1
+   },
+   {
+    "t": "Cerrar"
+   },
+   {
+    "vp": [
+     "ext"
+    ],
+    "m": ".cr5-rb[data-abre]"
+   },
+   {
+    "vp": [
+     "iv"
+    ],
+    "m": ".cr5-pv[data-abre]"
+   }
+  ]
+ },
+ "6-sesion": {
+  "1-reposo": [],
+  "2-cerrando": [
+   {
+    "t": "Mientras cierra"
+   }
+  ],
+  "3-error": [
+   {
+    "t": "Revocación no confirmada"
+   }
+  ],
+  "4-confirmar": [
+   {
+    "t": "Propuesta"
+   }
+  ]
+ },
+ "7-asistente-perfil": {
+  "1-nombre": [
+   {
+    "t": "Tu nombre"
+   }
+  ],
+  "2-datos": [],
+  "3-cedulas": [
+   {
+    "t": "Cédulas"
+   }
+  ],
+  "4-clinica": [
+   {
+    "t": "Clínica"
+   }
+  ],
+  "5-consultorio": [
+   {
+    "t": "Consultorio"
+   }
+  ],
+  "6-logo": [
+   {
+    "t": "Logo"
+   }
+  ],
+  "7-firma": [
+   {
+    "t": "Firma"
+   }
+  ],
+  "8-invitado": [
+   {
+    "t": "Invitado sin clínica"
+   }
+  ],
+  "9-creada": [
+   {
+    "t": "Clínica"
+   },
+   {
+    "t": "Ya creada"
+   }
+  ],
+  "10-logo-elegido": [
+   {
+    "t": "Logo"
+   },
+   {
+    "t": "Logo elegido"
+   }
+  ],
+  "11-dibujar": [
+   {
+    "t": "Firma"
+   },
+   {
+    "t": "Firma: dibujar"
+   }
+  ],
+  "12-guardando": [
+   {
+    "t": "Consultorio"
+   },
+   {
+    "t": "Guardando"
+   }
+  ],
+  "13-fin": [
+   {
+    "t": "Firma"
+   },
+   {
+    "m": ".cr7-omitir"
+   }
+  ]
+ }
+}

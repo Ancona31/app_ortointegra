@@ -94,6 +94,8 @@
 .pl .pl-txt{display:inline-flex;align-items:center;gap:4px;height:44px;font-size:13px;line-height:18px;font-weight:600;color:var(--enlace);white-space:nowrap}
 .pl[data-vp="ih"] .pl-txt,.pl[data-vp="esc"] .pl-txt{height:36px}
 .pl .pl-ord-pre{font-weight:400;color:var(--tinta2)}
+/* Duo cerrado y vertical: solo el criterio y la flecha; «Ordenado por» queda en aria-label (informe de botones, grupo 6) */
+.pl[data-vp="ext"] .pl-ord-pre,.pl[data-vp="iv"] .pl-ord-pre{display:none}
 .pl .pl-ord-v{display:inline-flex;align-items:center;gap:2px}
 .pl .pl-fil>svg{margin-right:1px}
 .pl .pl-fil{position:relative;padding-left:8px}
@@ -150,7 +152,7 @@
 .pl[data-vp="esc"] .pl-fr{grid-template-columns:minmax(0,1fr) 150px 140px 132px 150px 36px;column-gap:16px;min-height:48px}
 /* Duo abierto vertical: la tabla de computadora en 597 px (Paciente con edad y sexo debajo, Expediente, Fecha de ingreso, Médicos, «···» (CALMA §23.5)); táctil, áreas de 44 */
 .pl[data-vp="iv"] .pl-tar{padding:4px 8px}
-.pl[data-vp="iv"] .pl-fr{grid-template-columns:minmax(0,1fr) 110px 116px 100px 32px;column-gap:8px;min-height:56px}
+.pl[data-vp="iv"] .pl-fr{grid-template-columns:minmax(0,1fr) 110px 116px 118px 32px;column-gap:8px;min-height:56px}
 .pl[data-vp="iv"] .pl-fr.pl-th{min-height:44px}
 .pl[data-vp="iv"] .pl-hb{height:44px}
 /* Nombres largos: parten en dos líneas en lugar de cortarse */
@@ -694,7 +696,7 @@
       var tot=st.vacia?0:st.rol==='inv'?PAC.filter(function(p){return p.med.indexOf('I')>=0}).length:PAC.length;
       total.textContent=st.err?'':tot+(tot===1?' paciente registrado':' pacientes registrados');
       q('.pl-ord-v').innerHTML=ORD[st.ord]+ic(st.dir==='asc'?I.arr:I.aba,14,2);
-      bOrd.setAttribute('aria-label',(tel?'Filtrar y ordenar. ':'Cambiar el orden. ')+'Ordenado por '+ORD[st.ord]+', '+(st.dir==='asc'?'ascendente':'descendente'));
+      bOrd.setAttribute('aria-label',(vp==='ext'||vp==='iv'?'':tel?'Filtrar y ordenar. ':'Cambiar el orden. ')+'Ordenado por '+ORD[st.ord]+', '+(st.dir==='asc'?'ascendente':'descendente'));
       q('.pl-punto').hidden=!filtrado();
       bFil.setAttribute('aria-label',(tel?'Filtrar y ordenar':'Filtros')+(filtrado()?' (hay filtros activos)':''));
       qq('.pl-hb').forEach(function(b){var a=b.dataset.o===st.ord;b.classList.toggle('pl-act',a);b.querySelector('svg').outerHTML=ic(a&&st.dir==='asc'?I.arr:I.aba,14,2);

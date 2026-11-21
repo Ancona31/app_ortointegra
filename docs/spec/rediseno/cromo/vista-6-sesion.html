@@ -1,0 +1,418 @@
+<!-- NOMBRE: Cerrar sesión | Hoy el botón no da señal mientras cierra y el aviso de que la sesión pudo quedar abierta en otros dispositivos se ve un instante; aquí la fila muestra la espera, el aviso usa el patrón de error del catálogo con su texto exacto, y la confirmación previa queda como propuesta -->
+<style>
+
+.cr6 .cr6-app{display:flex;width:100%;height:100%}
+.cr6[data-vp="tel"] .cr6-app,.cr6[data-vp="iv"] .cr6-app{flex-direction:column}
+.cr6 button{border:0;margin:0;padding:0;background:none;color:inherit}
+.cr6 h1,.cr6 h2,.cr6 h3,.cr6 p,.cr6 ul{margin:0;padding:0}
+.cr6 ul{list-style:none}
+.cr6 svg{flex:none}
+.cr6 .cr6-flex{flex:1}
+/* Variantes por rol: m = médico, s = secretaria */
+.cr6:not(.cr6-sec) .cr6-s{display:none!important}
+.cr6.cr6-sec .cr6-m{display:none!important}
+/* Respuesta al toque y foco */
+.cr6 .cr6-p{transition:transform 100ms ease-out}
+.cr6 .cr6-p:active{transform:scale(.97)}
+.cr6 .cr6-p:focus-visible{outline:3px solid var(--enlace);outline-offset:2px}
+.cr6 .cr6-nav .cr6-p:focus-visible,.cr6 .cr6-lat .cr6-p:focus-visible{outline-color:var(--nav-tinta)}
+/* ---- Fondo simplificado ---- */
+.cr6 .cr6-cont{flex:1;min-width:0;min-height:0;overflow-x:hidden;overflow-y:auto;scrollbar-width:none;display:flex;flex-direction:column;gap:16px;padding:16px 14px calc(var(--ib) + 16px) 16px}
+.cr6 .cr6-cont>*{flex:none}
+.cr6[data-vp="tel"] .cr6-cont{padding:18px 16px calc(var(--ib) + 16px)}
+.cr6[data-vp="ih"] .cr6-cont{padding:20px 24px calc(var(--ib) + 16px)}
+.cr6[data-vp="iv"] .cr6-cont{padding:22px 24px 20px}
+.cr6[data-vp="esc"] .cr6-cont{padding:28px 24px 24px}
+.cr6 .cr6-top{display:flex;flex-direction:column;gap:4px}
+.cr6 .cr6-rot{font-size:12px;line-height:16px;font-weight:600;letter-spacing:.3px;text-transform:uppercase;color:var(--tinta2)}
+.cr6 .cr6-h1{font-size:26px;line-height:32px;font-weight:800;letter-spacing:-.6px}
+.cr6[data-vp="ih"] .cr6-h1,.cr6[data-vp="iv"] .cr6-h1,.cr6[data-vp="esc"] .cr6-h1{font-size:32px;line-height:38px}
+.cr6 .cr6-cols{display:flex;flex-direction:column;gap:12px}
+.cr6[data-vp="ih"] .cr6-cols,.cr6[data-vp="iv"] .cr6-cols,.cr6[data-vp="esc"] .cr6-cols{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:16px;align-items:start}
+.cr6[data-vp="ih"] .cr6-cols>:first-child,.cr6[data-vp="iv"] .cr6-cols>:first-child,.cr6[data-vp="esc"] .cr6-cols>:first-child{grid-row:1/3}
+.cr6 .cr6-tj{background:var(--sup);border-radius:16px;padding:14px 16px 8px}
+.cr6[data-vp="ih"] .cr6-tj,.cr6[data-vp="iv"] .cr6-tj,.cr6[data-vp="esc"] .cr6-tj{border-radius:18px;padding:16px 20px 8px}
+.cr6 .cr6-tt{font-size:17px;line-height:22px;font-weight:700;margin-bottom:4px}
+.cr6 .cr6-fl{display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--linea)}
+.cr6 .cr6-tt+.cr6-fl{border-top:0}
+.cr6 .cr6-bx{width:44px;height:44px;flex:none;border-radius:12px;background:var(--fondo)}
+.cr6 .cr6-fl-t{flex:1;display:flex;flex-direction:column;gap:8px}
+.cr6 .cr6-br{display:block;height:10px;border-radius:5px;background:var(--sup2)}
+.cr6 .cr6-br2{height:8px;opacity:.7}
+/* ---- Riel (Duo cerrado) ---- */
+.cr6 .cr6-riel{position:relative;z-index:1;flex:none;width:calc(56px + var(--ir));padding:16px calc(var(--ir) + 8px) calc(var(--ib) + 10px) 8px;background:var(--navy);border-radius:26px 0 0 26px;box-shadow:var(--sombra-nav-der);display:flex;flex-direction:column;align-items:center;gap:8px}
+.cr6 .cr6-rb{position:relative;width:48px;height:48px;flex:none;border-radius:999px;display:flex;align-items:center;justify-content:center;color:var(--nav-tinta)}
+.cr6 .cr6-rb[aria-current="page"]{background:var(--accion);color:#fff}
+.cr6 .cr6-masb{width:52px;height:52px;flex:none;border-radius:999px;background:#fff;color:var(--accion);display:flex;align-items:center;justify-content:center;box-shadow:var(--sombra-accion)}
+/* ---- Encabezado fundido (iPhone) ---- */
+.cr6 .cr6-enc{position:relative;z-index:1;flex:none;display:flex;align-items:center;gap:12px;padding:calc(var(--it) + 8px) 16px 12px;background:var(--navy);border-radius:0 0 26px 26px;box-shadow:var(--sombra-nav-sup);color:#fff}
+.cr6 .cr6-menu{position:relative;width:44px;height:44px;flex:none;border-radius:12px;background:var(--nav-velo);color:#fff;display:flex;align-items:center;justify-content:center}
+.cr6 .cr6-enc-t{font-size:17px;line-height:22px;font-weight:700;color:#fff}
+.cr6 .cr6-av{display:flex;align-items:center;justify-content:center;flex:none;width:34px;height:34px;border-radius:999px;background:var(--nav-avatar);color:var(--navy);font-size:13px;font-weight:700}
+.cr6 .cr6-av.cr6-av-g{width:44px;height:44px}
+/* ---- Encabezado de Duo abierto vertical ---- */
+.cr6 .cr6-env{position:relative;z-index:1;flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:var(--it) 16px 14px;background:var(--navy);border-radius:0 0 26px 26px;box-shadow:var(--sombra-nav-sup);color:#fff}
+.cr6 .cr6-envb{position:relative;width:44px;height:44px;flex:none;border-radius:999px;background:var(--nav-velo);color:#fff;display:flex;align-items:center;justify-content:center}
+.cr6 .cr6-pista{display:flex;align-items:center;gap:2px;padding:4px;border-radius:26px;background:var(--nav-velo)}
+.cr6 .cr6-pv{display:flex;align-items:center;height:40px;padding:0 14px;border-radius:999px;color:var(--nav-tinta);font-size:15px;line-height:20px;font-weight:500;white-space:nowrap;position:relative}
+.cr6 .cr6-pv::after{content:"";position:absolute;inset:-2px 0}
+.cr6 .cr6-pv[aria-current="page"]{padding:0 16px;background:var(--accion);color:#fff;font-weight:600}
+/* ---- Barra lateral (Duo abierto horizontal a la derecha; computadora a la izquierda) y cajón ---- */
+.cr6 .cr6-lat{position:relative;z-index:1;flex:none;display:flex;flex-direction:column;background:var(--navy);color:#fff}
+.cr6[data-vp="ih"] .cr6-lat{width:calc(218px + var(--ir));padding:16px calc(var(--ir) + 10px) calc(var(--ib) + 10px) 12px;border-radius:26px 0 0 26px;box-shadow:var(--sombra-nav-der)}
+.cr6[data-vp="esc"] .cr6-lat{width:248px;padding:16px 12px 14px;border-radius:0 26px 26px 0;box-shadow:var(--sombra-nav-izq)}
+.cr6 .cr6-lat-cab{display:flex;align-items:center;gap:8px;min-height:36px;padding:0 4px 0 8px}
+.cr6 .cr6-logo{display:inline-flex;align-items:center;gap:8px;color:#fff}
+.cr6 .cr6-logo-n{font-size:17px;line-height:22px;font-weight:700;letter-spacing:-.2px}
+.cr6 .cr6-plan{display:inline-flex;align-items:center;height:24px;padding:0 10px;border-radius:999px;background:var(--nav-velo);color:var(--nav-tinta);font-size:12px;line-height:16px;font-weight:600;white-space:nowrap}
+.cr6 .cr6-cons-b{margin-top:12px;display:flex;align-items:center;gap:10px;width:100%;min-height:52px;padding:8px 10px;border-radius:14px;background:var(--nav-velo);color:#fff;text-align:left}
+.cr6 .cr6-cons-b>svg{color:var(--nav-tinta2)}
+.cr6 .cr6-clogo{width:36px;height:36px;flex:none;border-radius:999px;background:#fff;color:var(--accion);display:flex;align-items:center;justify-content:center}
+.cr6 .cr6-cons-t{flex:1;min-width:0;display:flex;flex-direction:column}
+.cr6 .cr6-cons-t span{font-size:13px;line-height:16px;color:var(--nav-tinta2)}
+.cr6 .cr6-cons-t b{font-size:15px;line-height:19px;font-weight:600}
+.cr6 .cr6-lista{margin-top:14px;display:flex;flex-direction:column;gap:2px}
+.cr6 .cr6-li{display:flex;align-items:center;gap:12px;height:44px;padding:0 12px;border-radius:12px;color:var(--nav-tinta);font-size:15px;line-height:20px;font-weight:500}
+.cr6[data-vp="esc"] .cr6-li{height:40px;font-size:14px}
+.cr6 .cr6-li[aria-current="page"]{background:var(--accion);color:#fff;font-weight:600}
+.cr6 .cr6-lat-pie{border-top:1px solid var(--nav-velo);padding-top:8px;display:flex;align-items:center;gap:4px}
+.cr6 .cr6-lat-pie .cr6-yo{flex:1;min-width:0;text-align:left}
+.cr6 .cr6-lat-pie .cr6-ib{color:var(--nav-tinta2)}
+.cr6[data-vp="ih"] .cr6-esp{display:none}
+/* Duo abierto horizontal: la barra mide 218; el pie suelta el icono para que nombre y «Ayuda» quepan en una línea */
+.cr6[data-vp="ih"] .cr6-lat .cr6-lat-pie .cr6-yo{padding:0 8px}
+.cr6[data-vp="ih"] .cr6-lat .cr6-lat-pie .cr6-yo>svg{display:none}
+.cr6[data-vp="ih"] .cr6-lat .cr6-lat-pie .cr6-ib{width:36px;height:36px}
+.cr6 .cr6-esp{color:var(--nav-tinta)!important}
+.cr6 .cr6-yo{min-height:48px;height:auto;padding-top:6px;padding-bottom:6px}
+.cr6 .cr6-yo>span{display:flex;flex-direction:column;line-height:17px}
+.cr6 .cr6-yo small{font-size:12px;line-height:16px;color:var(--nav-tinta2)}
+.cr6 .cr6-ib{position:relative;width:44px;height:44px;flex:none;border-radius:999px;display:flex;align-items:center;justify-content:center;color:var(--nav-tinta)}
+/* ---- Capas (CALMA cr625/cr626): un velo por marco; cajón desde la izquierda en iPhone y Duo vertical; tarjeta centrada en lo demás ---- */
+.cr6 .cr6-capa{position:absolute;inset:0;z-index:20;visibility:hidden;transition:visibility 0s linear 360ms}
+.cr6 .cr6-capa.cr6-on{visibility:visible;transition:none}
+.cr6 .cr6-velo{position:absolute;inset:0;background:var(--velo);-webkit-backdrop-filter:blur(10px) saturate(140%);backdrop-filter:blur(10px) saturate(140%);opacity:0;transition:opacity 240ms ease-out}
+.cr6 .cr6-on .cr6-velo{opacity:1;transition:opacity 320ms ease-out}
+.cr6 .cr6-cajon{position:absolute;left:0;top:0;bottom:0;width:300px;display:flex;flex-direction:column;overflow-y:auto;scrollbar-width:none;padding:calc(var(--it) + 12px) 14px calc(var(--ib) + 12px) 14px;background:var(--navy);color:#fff;border-radius:0 26px 26px 0;box-shadow:var(--sombra-nav-izq);transform:translateX(-106%);transition:transform 360ms linear(0,0.123,0.3397,0.54,0.6943,0.8032,0.8762,0.9234,0.9533,0.9718,0.9831,0.99,0.9941,0.9965,0.998,1)}
+.cr6[data-vp="iv"] .cr6-cajon{width:320px}
+.cr6 .cr6-capa[data-k~="cajon"].cr6-on .cr6-cajon{transform:none;transition:transform 520ms linear(0,0.0803,0.2398,0.4083,0.5568,0.6769,0.769,0.8374,0.8869,0.9221,0.9468,0.9639,0.9756,0.9836,0.9891,0.9927,0.9952,0.9968,0.9979,0.9986,1)}
+.cr6 .cr6-cajon .cr6-lat-cab{padding-right:0}
+.cr6 .cr6-mnw{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:16px;pointer-events:none}
+.cr6[data-vp="ext"] .cr6-mnw{padding:16px calc(56px + var(--ir) + 8px) calc(var(--ib) + 16px) 8px}
+.cr6[data-vp="iv"] .cr6-mnw{padding:calc(var(--it) + 16px) 24px 24px}
+.cr6[data-vp="ih"] .cr6-mnw{padding:24px calc(218px + var(--ir) + 24px) calc(var(--ib) + 16px) 24px}
+.cr6[data-vp="esc"] .cr6-mnw{padding:32px 24px 32px calc(248px + 24px)}
+.cr6 .cr6-mn{pointer-events:auto;width:310px;max-width:100%;max-height:100%;overflow-y:auto;scrollbar-width:none;background:var(--sup);color:var(--tinta);border-radius:20px;box-shadow:var(--sombra-capa);padding:8px;opacity:0;transform:scale(.96);transition:opacity 200ms ease-out,transform 360ms linear(0,0.123,0.3397,0.54,0.6943,0.8032,0.8762,0.9234,0.9533,0.9718,0.9831,0.99,0.9941,0.9965,0.998,1)}
+.cr6[data-vp="iv"] .cr6-mn,.cr6[data-vp="ih"] .cr6-mn,.cr6[data-vp="esc"] .cr6-mn{width:340px}
+.cr6 .cr6-capa[data-k~="mas"].cr6-on .cr6-mn{opacity:1;transform:none;transition:opacity 240ms ease-out,transform 520ms linear(0,0.0803,0.2398,0.4083,0.5568,0.6769,0.769,0.8374,0.8869,0.9221,0.9468,0.9639,0.9756,0.9836,0.9891,0.9927,0.9952,0.9968,0.9979,0.9986,1)}
+.cr6 .cr6-capa:not([data-k~="mas"]) .cr6-mnw{display:none}
+.cr6 .cr6-capa:not([data-k~="cajon"]) .cr6-cajon{display:none}
+.cr6 .cr6-mn-t{padding:8px 12px 6px;font-size:17px;line-height:22px;font-weight:700}
+.cr6 .cr6-mo{display:flex;align-items:center;gap:12px;width:100%;min-height:48px;padding:0 12px;border-radius:12px;font-size:15px;line-height:20px;color:var(--tinta);text-align:left}
+.cr6 .cr6-mo{position:relative}
+.cr6 .cr6-mo+.cr6-mo::before{content:"";position:absolute;left:44px;right:12px;top:0;height:1px;background:var(--linea)}
+.cr6 .cr6-mo>svg:first-child{color:var(--enlace)}
+.cr6 .cr6-mo>.cr6-mo-f{margin-left:auto;color:var(--tinta3)}
+.cr6 .cr6-mo-v{margin-left:auto;font-size:15px;color:var(--tinta2)}
+.cr6 .cr6-mo-v+.cr6-mo-f{margin-left:4px}
+@media (prefers-reduced-transparency:reduce){
+  .cr6 .cr6-velo{-webkit-backdrop-filter:none;backdrop-filter:none;background:color-mix(in srgb,var(--navy) 55%,var(--fondo))}
+}
+@media (prefers-reduced-motion:reduce){
+  .cr6 .cr6-cajon,.cr6 .cr6-capa[data-k~="cajon"].cr6-on .cr6-cajon{transform:none;opacity:0;transition:opacity 200ms ease}
+  .cr6 .cr6-capa[data-k~="cajon"].cr6-on .cr6-cajon{opacity:1}
+  .cr6 .cr6-mn,.cr6 .cr6-capa[data-k~="mas"].cr6-on .cr6-mn{transform:none;transition:opacity 200ms ease}
+  .cr6 .cr6-p{transition:none}
+}
+/* ---- Tira de maqueta (CALMA cr67) y ficha «Especificación» (fuera del marco) ---- */
+.cr6-tira{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:10px}
+.cr6-tira .cr6-sep{width:1px;height:20px;background:var(--borde)}
+.cr6-tira button{position:relative;height:28px;padding:0 10px;border-radius:999px;border:1px dashed var(--tinta3);background:none;color:var(--tinta2);font:600 12px/16px var(--fuente);white-space:nowrap;cursor:pointer;transition:transform 100ms ease-out}
+.cr6-tira button::after{content:"";position:absolute;inset:-4px 0}
+.cr6-tira button:active{transform:scale(.97)}
+.cr6-tira button:focus-visible{outline:3px solid var(--enlace);outline-offset:2px}
+.cr6-tira button[aria-pressed="true"]{border-style:solid;background:var(--sup2);color:var(--tinta)}
+.cr6-ficha{margin-top:6px;background:var(--sup);border-radius:18px;padding:16px 20px;color:var(--tinta);font:14px/20px var(--fuente);max-width:100%}
+.cr6-ficha h3{margin:0 0 8px;font-size:17px;line-height:22px;font-weight:700}
+.cr6-ficha dl{margin:0;display:grid;grid-template-columns:minmax(0,170px) minmax(0,1fr);gap:0 16px}
+.cr6-ficha dt{padding:8px 0;border-top:1px solid var(--linea);font-size:13px;line-height:18px;font-weight:600;color:var(--tinta2)}
+.cr6-ficha dd{margin:0;padding:8px 0;border-top:1px solid var(--linea);font-size:14px;line-height:20px;overflow-wrap:anywhere}
+.cr6-ficha dt:first-of-type,.cr6-ficha dt:first-of-type+dd{border-top:0}
+.cr6-ficha code{font:12px/18px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--tinta2)}
+@media (max-width:620px){.cr6-ficha dl{grid-template-columns:1fr}.cr6-ficha dd{border-top:0;padding-top:0}}
+
+.cr6 .cr6-env .cr6-av.cr6-m,.cr6 .cr6-enc .cr6-av.cr6-m{box-shadow:0 0 0 3px var(--accion)}
+.cr6 .cr6-lat-pie .cr6-yo[aria-current="page"]{background:var(--accion);color:#fff}
+.cr6 .cr6-lat-pie .cr6-yo[aria-current="page"] small{color:#fff!important;opacity:.85}
+.cr6[data-vp="esc"] .cr6-cont,.cr6[data-vp="ih"] .cr6-cont,.cr6[data-vp="iv"] .cr6-cont{align-items:center}
+.cr6[data-vp="esc"] .cr6-cont>*,.cr6[data-vp="ih"] .cr6-cont>*,.cr6[data-vp="iv"] .cr6-cont>*{width:100%;max-width:640px}
+.cr6 .cr6-ajs{display:flex;flex-direction:column;gap:8px}
+.cr6 .cr6-ajt{display:flex;align-items:center;gap:6px;padding:0 4px;font-size:13px;line-height:18px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--enlace)}
+.cr6 .cr6-ajc{background:var(--sup);border-radius:16px;padding:4px 16px}
+.cr6[data-vp="ih"] .cr6-ajc,.cr6[data-vp="iv"] .cr6-ajc,.cr6[data-vp="esc"] .cr6-ajc{border-radius:18px;padding:4px 20px}
+.cr6 .cr6-ajf{position:relative;display:flex;align-items:center;gap:12px;width:100%;min-height:52px;font-size:15px;line-height:20px;color:var(--tinta);text-align:left}
+.cr6[data-vp="esc"] .cr6-ajf,.cr6[data-vp="ih"] .cr6-ajf{min-height:48px}
+.cr6 .cr6-ajf+.cr6-ajf{border-top:1px solid var(--linea)}
+.cr6 .cr6-ajf>span:not(.cr6-sw):not(.cr6-ic-s):not(.cr6-gira){flex:1}
+.cr6 .cr6-ajf>svg:first-child,.cr6 .cr6-ajf>svg:last-child{color:var(--tinta2)}
+.cr6 .cr6-sw{width:44px;height:26px;flex:none;border-radius:999px;background:var(--sup2);position:relative}
+.cr6 .cr6-sw::after{content:"";position:absolute;left:3px;top:3px;width:20px;height:20px;border-radius:999px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.cr6 .cr6-salir,.cr6 .cr6-salir .cr6-ic-s{color:var(--mal-tinta)}
+.cr6 .cr6-ic-s{display:flex}
+/* Mientras cierra: el giro ocupa el sitio del icono; las tres filas quedan inertes. Sin texto nuevo. */
+.cr6 .cr6-gira{display:none;width:20px;height:20px;flex:none;border-radius:999px;border:2.2px solid color-mix(in srgb,var(--mal-tinta) 25%,transparent);border-top-color:var(--mal-tinta);animation:cr6-gira .8s linear infinite}
+@keyframes cr6-gira{to{transform:rotate(360deg)}}
+.cr6.cr6-cerrando .cr6-gira{display:block}
+.cr6.cr6-cerrando .cr6-ic-s{display:none}
+.cr6.cr6-cerrando .cr6-ajf:not(.cr6-salir){opacity:.45}
+.cr6.cr6-cerrando .cr6-ajc{pointer-events:none}
+/* ---- Confirmación (propuesta) ---- */
+.cr6 .cr6-alw{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:16px;pointer-events:none}
+.cr6[data-vp="ext"] .cr6-alw{padding:16px calc(56px + var(--ir) + 8px) calc(var(--ib) + 16px) 8px}
+.cr6[data-vp="tel"] .cr6-alw{padding:calc(var(--it) + 64px) 16px calc(var(--ib) + 16px)}
+.cr6[data-vp="ih"] .cr6-alw{padding:24px calc(218px + var(--ir) + 24px) calc(var(--ib) + 16px) 24px}
+.cr6[data-vp="iv"] .cr6-alw{padding:calc(var(--it) + 58px) 24px 24px}
+.cr6[data-vp="esc"] .cr6-alw{padding:32px 24px 32px calc(248px + 24px)}
+.cr6 .cr6-al{pointer-events:auto;width:320px;max-width:100%;padding:24px;border-radius:20px;background:var(--sup);color:var(--tinta);box-shadow:var(--sombra-capa);display:flex;flex-direction:column;align-items:center;text-align:center;opacity:0;transform:scale(.96);transition:opacity 180ms ease-out,transform 300ms linear(0,0.123,0.3397,0.54,0.6943,0.8032,0.8762,0.9234,0.9533,0.9718,0.9831,0.99,0.9941,0.9965,0.998,1)}
+.cr6[data-vp="ih"] .cr6-al,.cr6[data-vp="iv"] .cr6-al,.cr6[data-vp="esc"] .cr6-al{width:340px}
+.cr6 .cr6-capa.cr6-on .cr6-al{opacity:1;transform:none;transition:opacity 220ms ease-out,transform 480ms linear(0,0.0803,0.2398,0.4083,0.5568,0.6769,0.769,0.8374,0.8869,0.9221,0.9468,0.9639,0.9756,0.9836,0.9891,0.9927,0.9952,0.9968,0.9979,0.9986,1)}
+.cr6 .cr6-al-ic{width:48px;height:48px;border-radius:999px;background:var(--mal-fondo);color:var(--mal-tinta);display:flex;align-items:center;justify-content:center}
+.cr6 .cr6-al-t{margin-top:14px;font-size:17px;line-height:22px;font-weight:700}
+.cr6 .cr6-al-b{margin-top:20px;display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%}
+.cr6 .cr6-ton,.cr6 .cr6-dest{display:flex;align-items:center;justify-content:center;min-height:44px;padding:0 12px;border-radius:12px;font-size:15px;line-height:20px;font-weight:600;white-space:nowrap}
+.cr6[data-vp="ih"] .cr6-ton,.cr6[data-vp="ih"] .cr6-dest,.cr6[data-vp="esc"] .cr6-ton,.cr6[data-vp="esc"] .cr6-dest{min-height:40px;font-size:14px}
+.cr6 .cr6-ton{background:var(--tonal);color:var(--tonal-tinta)}
+.cr6 .cr6-dest{background:var(--mal-fondo);color:var(--mal-tinta)}
+/* ---- Aviso de error ---- */
+.cr6 .cr6-zona{position:absolute;z-index:40;pointer-events:none;top:12px;left:0;right:calc(56px + var(--ir));display:flex;justify-content:center;padding:0 12px}
+.cr6[data-vp="tel"] .cr6-zona{top:calc(var(--it) + 76px);right:0}
+.cr6[data-vp="ih"] .cr6-zona{top:16px;right:calc(218px + var(--ir))}
+.cr6[data-vp="iv"] .cr6-zona{top:calc(var(--it) + 74px);right:0;padding:0 24px}
+.cr6[data-vp="esc"] .cr6-zona{top:20px;left:248px;right:0;padding:0 24px}
+.cr6 .cr6-tst{pointer-events:none;display:flex;align-items:flex-start;gap:10px;max-width:460px;padding:12px 4px 12px 14px;border-radius:16px;background:var(--sup);color:var(--tinta);box-shadow:var(--sombra-capa),inset 3px 0 0 var(--mal-tinta);font-size:14px;line-height:20px;opacity:0;transform:translateY(-12px);transition:opacity 200ms ease-out,transform 300ms linear(0,0.123,0.3397,0.54,0.6943,0.8032,0.8762,0.9234,0.9533,0.9718,0.9831,0.99,0.9941,0.9965,0.998,1)}
+.cr6 .cr6-tst>svg{color:var(--mal-tinta);margin-top:0}
+.cr6 .cr6-tst-t{flex:1;min-width:0}
+.cr6 .cr6-tst-x{width:44px;height:44px;flex:none;margin:-12px 0;border-radius:999px;display:flex;align-items:center;justify-content:center;color:var(--tinta2)}
+.cr6[data-vp="ih"] .cr6-tst-x,.cr6[data-vp="esc"] .cr6-tst-x{width:36px;height:36px;margin:-8px 0}
+.cr6.cr6-error .cr6-tst{pointer-events:auto;opacity:1;transform:none;transition:opacity 240ms ease-out,transform 480ms linear(0,0.0803,0.2398,0.4083,0.5568,0.6769,0.769,0.8374,0.8869,0.9221,0.9468,0.9639,0.9756,0.9836,0.9891,0.9927,0.9952,0.9968,0.9979,0.9986,1)}
+@media (prefers-reduced-motion:reduce){.cr6 .cr6-al,.cr6 .cr6-tst{transform:none!important;transition:opacity 200ms ease}.cr6 .cr6-gira{animation-duration:2.4s}}
+</style>
+<div class="marco cr6" data-vp="ext">
+<div class="cr6-app">
+<main class="cr6-cont">
+  <div class="cr6-top"><h1 class="cr6-h1">Mi perfil</h1></div>
+  <!-- Fondo: Mi perfil (tanda4 vista 1) reducido a su grupo «Ajustes», que es donde el médico cierra sesión. La secretaria tiene las mismas
+       tres filas en su menú «Ajustes» (vista 5) y el comportamiento es idéntico. -->
+  <section class="cr6-tj" aria-hidden="true"><h2 class="cr6-tt">Datos profesionales</h2><div class="cr6-fl"><span class="cr6-fl-t"><span class="cr6-br" style="width:50%"></span><span class="cr6-br cr6-br2" style="width:70%"></span></span></div><div class="cr6-fl"><span class="cr6-fl-t"><span class="cr6-br" style="width:40%"></span><span class="cr6-br cr6-br2" style="width:60%"></span></span></div></section>
+  <section class="cr6-ajs" aria-label="Ajustes"><h2 class="cr6-ajt"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Ajustes</h2>
+    <div class="cr6-ajc">
+      <button type="button" role="switch" aria-checked="false" class="cr6-p cr6-ajf"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg><span>Modo oscuro</span><span class="cr6-sw" aria-hidden="true"></span></button>
+      <a href="#" class="cr6-p cr6-ajf"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21c-4.5-2.2-7-5.6-7-10V5.5L12 3l7 2.5V11c0 4.4-2.5 7.8-7 10z"/></svg><span>Aviso de Privacidad</span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg></a>
+      <!-- A0·10 · Cerrar sesión (Sidebar.tsx:423-488): registra la salida en audit_log (con await) y luego cierra; navega a /login. -->
+      <button type="button" class="cr6-p cr6-ajf cr6-salir"><span class="cr6-ic-s"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4"/></svg></span><span class="cr6-gira" aria-hidden="true"></span><span>Cerrar sesión</span></button>
+    </div>
+  </section>
+</main><!-- Navegación (A0·3) de Duo cerrado: riel a la derecha, fundido con la franja. Copiado del dashboard aprobado. -->
+<nav class="cr6-riel cr6-nav" aria-label="Navegación principal">
+  <a href="#" class="cr6-p cr6-rb" aria-label="Inicio"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg></a><a href="#" class="cr6-p cr6-rb" aria-label="Expediente"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.9.7 3.1 2.4 3.5 5.2"/></svg></a><a href="#" class="cr6-p cr6-rb" aria-label="Agenda"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg></a><a href="#" class="cr6-p cr6-rb cr6-m" aria-label="Documentos"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg></a><button type="button" class="cr6-p cr6-rb" aria-label="Más" data-rot="Más"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 12h.01M12 12h.01M18 12h.01"/></svg></button>
+  <span class="cr6-flex"></span>
+  <button type="button" class="cr6-p cr6-masb cr6-m" aria-label="Nueva consulta"><svg aria-hidden="true" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg></button>
+  <button type="button" class="cr6-p cr6-masb cr6-s" aria-label="Agendar cita"><svg aria-hidden="true" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg></button>
+</nav>
+</div>
+<div class="cr6-capa" aria-hidden="true"><div class="cr6-velo"></div>
+  <!-- PROPUESTA, NO EXISTE HOY: confirmación antes de cerrar sesión. Hoy el botón cierra directamente. Solo textos que ya existen. -->
+  <div class="cr6-alw"><div class="cr6-al" role="alertdialog" aria-modal="true" aria-labelledby="cr6-cs-ext">
+    <span class="cr6-al-ic"><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4"/></svg></span><h2 class="cr6-al-t" id="cr6-cs-ext">Cerrar sesión</h2>
+    <div class="cr6-al-b"><button type="button" class="cr6-p cr6-ton cr6-no">Cancelar</button><button type="button" class="cr6-p cr6-dest cr6-si">Cerrar sesión</button></div>
+  </div></div>
+</div>
+<!-- Aviso de error (Sidebar.tsx:483) arriba y centrado en el área de contenido, con el patrón de pub-capas vista 5. -->
+<div class="cr6-zona" aria-live="assertive"><div class="cr6-tst" role="alert"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m9 9 6 6M15 9l-6 6"/></svg><p class="cr6-tst-t" lang="es">Sesión cerrada en este navegador, pero el servidor no confirmó la revocación: puede seguir abierta en otros dispositivos. Cambia la contraseña para cerrarlas todas.</p>
+  <button type="button" class="cr6-p cr6-tst-x" aria-label="Cerrar aviso"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div></div>
+</div>
+<div class="marco cr6" data-vp="tel">
+<div class="cr6-app">
+<!-- Navegación (A0·13) de iPhone: encabezado fundido con la barra de estado. Copiado del dashboard aprobado. -->
+<header class="cr6-enc cr6-nav">
+  <button type="button" class="cr6-p cr6-menu" aria-label="Menú" data-rot="Menú"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+  <span class="cr6-enc-t">Mi perfil</span>
+  <span class="cr6-flex"></span>
+  <button type="button" class="cr6-p cr6-av cr6-av-g cr6-m" aria-label="Mi perfil">AS</button><button type="button" class="cr6-p cr6-av cr6-av-g cr6-s cr6-abre-aj" aria-label="Ajustes">SE</button>
+</header><main class="cr6-cont">
+  <div class="cr6-top"><h1 class="cr6-h1">Mi perfil</h1></div>
+  <!-- Fondo: Mi perfil (tanda4 vista 1) reducido a su grupo «Ajustes», que es donde el médico cierra sesión. La secretaria tiene las mismas
+       tres filas en su menú «Ajustes» (vista 5) y el comportamiento es idéntico. -->
+  <section class="cr6-tj" aria-hidden="true"><h2 class="cr6-tt">Datos profesionales</h2><div class="cr6-fl"><span class="cr6-fl-t"><span class="cr6-br" style="width:50%"></span><span class="cr6-br cr6-br2" style="width:70%"></span></span></div><div class="cr6-fl"><span class="cr6-fl-t"><span class="cr6-br" style="width:40%"></span><span class="cr6-br cr6-br2" style="width:60%"></span></span></div></section>
+  <section class="cr6-ajs" aria-label="Ajustes"><h2 class="cr6-ajt"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Ajustes</h2>
+    <div class="cr6-ajc">
+      <button type="button" role="switch" aria-checked="false" class="cr6-p cr6-ajf"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg><span>Modo oscuro</span><span class="cr6-sw" aria-hidden="true"></span></button>
+      <a href="#" class="cr6-p cr6-ajf"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21c-4.5-2.2-7-5.6-7-10V5.5L12 3l7 2.5V11c0 4.4-2.5 7.8-7 10z"/></svg><span>Aviso de Privacidad</span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg></a>
+      <!-- A0·10 · Cerrar sesión (Sidebar.tsx:423-488): registra la salida en audit_log (con await) y luego cierra; navega a /login. -->
+      <button type="button" class="cr6-p cr6-ajf cr6-salir"><span class="cr6-ic-s"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4"/></svg></span><span class="cr6-gira" aria-hidden="true"></span><span>Cerrar sesión</span></button>
+    </div>
+  </section>
+</main>
+</div>
+<div class="cr6-capa" aria-hidden="true"><div class="cr6-velo"></div>
+  <!-- PROPUESTA, NO EXISTE HOY: confirmación antes de cerrar sesión. Hoy el botón cierra directamente. Solo textos que ya existen. -->
+  <div class="cr6-alw"><div class="cr6-al" role="alertdialog" aria-modal="true" aria-labelledby="cr6-cs-tel">
+    <span class="cr6-al-ic"><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4"/></svg></span><h2 class="cr6-al-t" id="cr6-cs-tel">Cerrar sesión</h2>
+    <div class="cr6-al-b"><button type="button" class="cr6-p cr6-ton cr6-no">Cancelar</button><button type="button" class="cr6-p cr6-dest cr6-si">Cerrar sesión</button></div>
+  </div></div>
+</div>
+<!-- Aviso de error (Sidebar.tsx:483) arriba y centrado en el área de contenido, con el patrón de pub-capas vista 5. -->
+<div class="cr6-zona" aria-live="assertive"><div class="cr6-tst" role="alert"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m9 9 6 6M15 9l-6 6"/></svg><p class="cr6-tst-t" lang="es">Sesión cerrada en este navegador, pero el servidor no confirmó la revocación: puede seguir abierta en otros dispositivos. Cambia la contraseña para cerrarlas todas.</p>
+  <button type="button" class="cr6-p cr6-tst-x" aria-label="Cerrar aviso"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div></div>
+</div>
+<div class="marco cr6" data-vp="ih">
+<div class="cr6-app">
+<main class="cr6-cont">
+  <div class="cr6-top"><h1 class="cr6-h1">Mi perfil</h1></div>
+  <!-- Fondo: Mi perfil (tanda4 vista 1) reducido a su grupo «Ajustes», que es donde el médico cierra sesión. La secretaria tiene las mismas
+       tres filas en su menú «Ajustes» (vista 5) y el comportamiento es idéntico. -->
+  <section class="cr6-tj" aria-hidden="true"><h2 class="cr6-tt">Datos profesionales</h2><div class="cr6-fl"><span class="cr6-fl-t"><span class="cr6-br" style="width:50%"></span><span class="cr6-br cr6-br2" style="width:70%"></span></span></div><div class="cr6-fl"><span class="cr6-fl-t"><span class="cr6-br" style="width:40%"></span><span class="cr6-br cr6-br2" style="width:60%"></span></span></div></section>
+  <section class="cr6-ajs" aria-label="Ajustes"><h2 class="cr6-ajt"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Ajustes</h2>
+    <div class="cr6-ajc">
+      <button type="button" role="switch" aria-checked="false" class="cr6-p cr6-ajf"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg><span>Modo oscuro</span><span class="cr6-sw" aria-hidden="true"></span></button>
+      <a href="#" class="cr6-p cr6-ajf"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21c-4.5-2.2-7-5.6-7-10V5.5L12 3l7 2.5V11c0 4.4-2.5 7.8-7 10z"/></svg><span>Aviso de Privacidad</span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg></a>
+      <!-- A0·10 · Cerrar sesión (Sidebar.tsx:423-488): registra la salida en audit_log (con await) y luego cierra; navega a /login. -->
+      <button type="button" class="cr6-p cr6-ajf cr6-salir"><span class="cr6-ic-s"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4"/></svg></span><span class="cr6-gira" aria-hidden="true"></span><span>Cerrar sesión</span></button>
+    </div>
+  </section>
+</main><nav class="cr6-lat" aria-label="Navegación principal">
+  <div class="cr6-lat-cab"><span class="cr6-logo"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.5"/><path d="M12 5.5v13M9.6 8h4.8M9 11h6M9 14h6M9.6 17h4.8"/></svg><span class="cr6-logo-n">Spinus</span></span><span class="cr6-flex"></span><span class="cr6-plan">Plan VIP</span></div>
+  <button type="button" class="cr6-p cr6-cons-b"><span class="cr6-clogo" role="img" aria-label="Logo de Clínica Semilla A"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21c-4.5-2.2-7-5.6-7-10V5.5L12 3l7 2.5V11c0 4.4-2.5 7.8-7 10z"/><path d="M12 8v7M8.5 11.5h7"/></svg></span><span class="cr6-cons-t"><span class="cr6-m">Consultorio</span><b class="cr6-m">Centro</b><span class="cr6-s">Clínica</span><b class="cr6-s">Clínica Semilla A</b></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 9 4-4 4 4M8 15l4 4 4-4"/></svg></button>
+  <div class="cr6-lista"><a href="#" class="cr6-p cr6-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Inicio</a><a href="#" class="cr6-p cr6-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.9.7 3.1 2.4 3.5 5.2"/></svg>Expediente</a><a href="#" class="cr6-p cr6-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Agenda</a><a href="#" class="cr6-p cr6-li cr6-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>Documentos</a><a href="#" class="cr6-p cr6-li cr6-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20v-8M12 20V5M19 20v-9"/></svg>Administración</a></div>
+  <span class="cr6-flex"></span>
+  
+  <div class="cr6-lat-pie"><a href="#" class="cr6-p cr6-li cr6-yo cr6-m" aria-current="page"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18.2c1.3-2 3.2-3 5.5-3s4.2 1 5.5 3"/></svg><span><span>Dr. Admin Semilla</span><small class="cr6-esp">Ortopedia y Traumatología</small><small>Mi perfil · Ajustes</small></span></a><a href="#" class="cr6-p cr6-ib cr6-ay cr6-m" aria-label="Ayuda"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.6M12 17h.01"/></svg></a><button type="button" class="cr6-p cr6-li cr6-yo cr6-s cr6-abre-aj" aria-haspopup="menu"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span><span>Secretaria Semilla</span><small>Ajustes</small></span></button></div>
+</nav>
+</div>
+<div class="cr6-capa" aria-hidden="true"><div class="cr6-velo"></div>
+  <!-- PROPUESTA, NO EXISTE HOY: confirmación antes de cerrar sesión. Hoy el botón cierra directamente. Solo textos que ya existen. -->
+  <div class="cr6-alw"><div class="cr6-al" role="alertdialog" aria-modal="true" aria-labelledby="cr6-cs-ih">
+    <span class="cr6-al-ic"><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4"/></svg></span><h2 class="cr6-al-t" id="cr6-cs-ih">Cerrar sesión</h2>
+    <div class="cr6-al-b"><button type="button" class="cr6-p cr6-ton cr6-no">Cancelar</button><button type="button" class="cr6-p cr6-dest cr6-si">Cerrar sesión</button></div>
+  </div></div>
+</div>
+<!-- Aviso de error (Sidebar.tsx:483) arriba y centrado en el área de contenido, con el patrón de pub-capas vista 5. -->
+<div class="cr6-zona" aria-live="assertive"><div class="cr6-tst" role="alert"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m9 9 6 6M15 9l-6 6"/></svg><p class="cr6-tst-t" lang="es">Sesión cerrada en este navegador, pero el servidor no confirmó la revocación: puede seguir abierta en otros dispositivos. Cambia la contraseña para cerrarlas todas.</p>
+  <button type="button" class="cr6-p cr6-tst-x" aria-label="Cerrar aviso"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div></div>
+</div>
+<div class="marco cr6" data-vp="iv">
+<div class="cr6-app">
+<!-- Navegación de Duo abierto vertical (CALMA cr619, cr623.9): encabezado fundido, pista de cinco píldoras. Copiado del dashboard aprobado. -->
+<header class="cr6-env cr6-nav">
+  <button type="button" class="cr6-p cr6-envb" aria-label="Mostrar barra lateral" data-rot="Mostrar barra lateral"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="15" rx="3"/><path d="M9.5 4.5v15"/></svg></button>
+  <nav class="cr6-pista" aria-label="Secciones"><a href="#" class="cr6-p cr6-pv">Inicio</a><a href="#" class="cr6-p cr6-pv">Expediente</a><a href="#" class="cr6-p cr6-pv">Agenda</a><a href="#" class="cr6-p cr6-pv cr6-m">Documentos</a><button type="button" class="cr6-p cr6-pv">Más</button></nav>
+  <button type="button" class="cr6-p cr6-av cr6-av-g cr6-m" aria-label="Mi perfil">AS</button><button type="button" class="cr6-p cr6-av cr6-av-g cr6-s cr6-abre-aj" aria-label="Ajustes">SE</button>
+</header><main class="cr6-cont">
+  <div class="cr6-top"><h1 class="cr6-h1">Mi perfil</h1></div>
+  <!-- Fondo: Mi perfil (tanda4 vista 1) reducido a su grupo «Ajustes», que es donde el médico cierra sesión. La secretaria tiene las mismas
+       tres filas en su menú «Ajustes» (vista 5) y el comportamiento es idéntico. -->
+  <section class="cr6-tj" aria-hidden="true"><h2 class="cr6-tt">Datos profesionales</h2><div class="cr6-fl"><span class="cr6-fl-t"><span class="cr6-br" style="width:50%"></span><span class="cr6-br cr6-br2" style="width:70%"></span></span></div><div class="cr6-fl"><span class="cr6-fl-t"><span class="cr6-br" style="width:40%"></span><span class="cr6-br cr6-br2" style="width:60%"></span></span></div></section>
+  <section class="cr6-ajs" aria-label="Ajustes"><h2 class="cr6-ajt"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Ajustes</h2>
+    <div class="cr6-ajc">
+      <button type="button" role="switch" aria-checked="false" class="cr6-p cr6-ajf"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg><span>Modo oscuro</span><span class="cr6-sw" aria-hidden="true"></span></button>
+      <a href="#" class="cr6-p cr6-ajf"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21c-4.5-2.2-7-5.6-7-10V5.5L12 3l7 2.5V11c0 4.4-2.5 7.8-7 10z"/></svg><span>Aviso de Privacidad</span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg></a>
+      <!-- A0·10 · Cerrar sesión (Sidebar.tsx:423-488): registra la salida en audit_log (con await) y luego cierra; navega a /login. -->
+      <button type="button" class="cr6-p cr6-ajf cr6-salir"><span class="cr6-ic-s"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4"/></svg></span><span class="cr6-gira" aria-hidden="true"></span><span>Cerrar sesión</span></button>
+    </div>
+  </section>
+</main>
+</div>
+<div class="cr6-capa" aria-hidden="true"><div class="cr6-velo"></div>
+  <!-- PROPUESTA, NO EXISTE HOY: confirmación antes de cerrar sesión. Hoy el botón cierra directamente. Solo textos que ya existen. -->
+  <div class="cr6-alw"><div class="cr6-al" role="alertdialog" aria-modal="true" aria-labelledby="cr6-cs-iv">
+    <span class="cr6-al-ic"><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4"/></svg></span><h2 class="cr6-al-t" id="cr6-cs-iv">Cerrar sesión</h2>
+    <div class="cr6-al-b"><button type="button" class="cr6-p cr6-ton cr6-no">Cancelar</button><button type="button" class="cr6-p cr6-dest cr6-si">Cerrar sesión</button></div>
+  </div></div>
+</div>
+<!-- Aviso de error (Sidebar.tsx:483) arriba y centrado en el área de contenido, con el patrón de pub-capas vista 5. -->
+<div class="cr6-zona" aria-live="assertive"><div class="cr6-tst" role="alert"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m9 9 6 6M15 9l-6 6"/></svg><p class="cr6-tst-t" lang="es">Sesión cerrada en este navegador, pero el servidor no confirmó la revocación: puede seguir abierta en otros dispositivos. Cambia la contraseña para cerrarlas todas.</p>
+  <button type="button" class="cr6-p cr6-tst-x" aria-label="Cerrar aviso"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div></div>
+</div>
+<div class="marco cr6" data-vp="esc">
+<div class="cr6-app">
+<nav class="cr6-lat" aria-label="Navegación principal">
+  <div class="cr6-lat-cab"><span class="cr6-logo"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.5"/><path d="M12 5.5v13M9.6 8h4.8M9 11h6M9 14h6M9.6 17h4.8"/></svg><span class="cr6-logo-n">Spinus</span></span><span class="cr6-flex"></span><span class="cr6-plan">Plan VIP</span></div>
+  <button type="button" class="cr6-p cr6-cons-b"><span class="cr6-clogo" role="img" aria-label="Logo de Clínica Semilla A"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21c-4.5-2.2-7-5.6-7-10V5.5L12 3l7 2.5V11c0 4.4-2.5 7.8-7 10z"/><path d="M12 8v7M8.5 11.5h7"/></svg></span><span class="cr6-cons-t"><span class="cr6-m">Consultorio</span><b class="cr6-m">Centro</b><span class="cr6-s">Clínica</span><b class="cr6-s">Clínica Semilla A</b></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 9 4-4 4 4M8 15l4 4 4-4"/></svg></button>
+  <div class="cr6-lista"><a href="#" class="cr6-p cr6-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Inicio</a><a href="#" class="cr6-p cr6-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.9.7 3.1 2.4 3.5 5.2"/></svg>Expediente</a><a href="#" class="cr6-p cr6-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Agenda</a><a href="#" class="cr6-p cr6-li cr6-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>Documentos</a><a href="#" class="cr6-p cr6-li cr6-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20v-8M12 20V5M19 20v-9"/></svg>Administración</a></div>
+  <span class="cr6-flex"></span>
+  
+  <div class="cr6-lat-pie"><a href="#" class="cr6-p cr6-li cr6-yo cr6-m" aria-current="page"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18.2c1.3-2 3.2-3 5.5-3s4.2 1 5.5 3"/></svg><span><span>Dr. Admin Semilla</span><small class="cr6-esp">Ortopedia y Traumatología</small><small>Mi perfil · Ajustes</small></span></a><a href="#" class="cr6-p cr6-ib cr6-ay cr6-m" aria-label="Ayuda"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.6M12 17h.01"/></svg></a><button type="button" class="cr6-p cr6-li cr6-yo cr6-s cr6-abre-aj" aria-haspopup="menu"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span><span>Secretaria Semilla</span><small>Ajustes</small></span></button></div>
+</nav><main class="cr6-cont">
+  <div class="cr6-top"><h1 class="cr6-h1">Mi perfil</h1></div>
+  <!-- Fondo: Mi perfil (tanda4 vista 1) reducido a su grupo «Ajustes», que es donde el médico cierra sesión. La secretaria tiene las mismas
+       tres filas en su menú «Ajustes» (vista 5) y el comportamiento es idéntico. -->
+  <section class="cr6-tj" aria-hidden="true"><h2 class="cr6-tt">Datos profesionales</h2><div class="cr6-fl"><span class="cr6-fl-t"><span class="cr6-br" style="width:50%"></span><span class="cr6-br cr6-br2" style="width:70%"></span></span></div><div class="cr6-fl"><span class="cr6-fl-t"><span class="cr6-br" style="width:40%"></span><span class="cr6-br cr6-br2" style="width:60%"></span></span></div></section>
+  <section class="cr6-ajs" aria-label="Ajustes"><h2 class="cr6-ajt"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Ajustes</h2>
+    <div class="cr6-ajc">
+      <button type="button" role="switch" aria-checked="false" class="cr6-p cr6-ajf"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg><span>Modo oscuro</span><span class="cr6-sw" aria-hidden="true"></span></button>
+      <a href="#" class="cr6-p cr6-ajf"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21c-4.5-2.2-7-5.6-7-10V5.5L12 3l7 2.5V11c0 4.4-2.5 7.8-7 10z"/></svg><span>Aviso de Privacidad</span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg></a>
+      <!-- A0·10 · Cerrar sesión (Sidebar.tsx:423-488): registra la salida en audit_log (con await) y luego cierra; navega a /login. -->
+      <button type="button" class="cr6-p cr6-ajf cr6-salir"><span class="cr6-ic-s"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4"/></svg></span><span class="cr6-gira" aria-hidden="true"></span><span>Cerrar sesión</span></button>
+    </div>
+  </section>
+</main>
+</div>
+<div class="cr6-capa" aria-hidden="true"><div class="cr6-velo"></div>
+  <!-- PROPUESTA, NO EXISTE HOY: confirmación antes de cerrar sesión. Hoy el botón cierra directamente. Solo textos que ya existen. -->
+  <div class="cr6-alw"><div class="cr6-al" role="alertdialog" aria-modal="true" aria-labelledby="cr6-cs-esc">
+    <span class="cr6-al-ic"><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4"/></svg></span><h2 class="cr6-al-t" id="cr6-cs-esc">Cerrar sesión</h2>
+    <div class="cr6-al-b"><button type="button" class="cr6-p cr6-ton cr6-no">Cancelar</button><button type="button" class="cr6-p cr6-dest cr6-si">Cerrar sesión</button></div>
+  </div></div>
+</div>
+<!-- Aviso de error (Sidebar.tsx:483) arriba y centrado en el área de contenido, con el patrón de pub-capas vista 5. -->
+<div class="cr6-zona" aria-live="assertive"><div class="cr6-tst" role="alert"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m9 9 6 6M15 9l-6 6"/></svg><p class="cr6-tst-t" lang="es">Sesión cerrada en este navegador, pero el servidor no confirmó la revocación: puede seguir abierta en otros dispositivos. Cambia la contraseña para cerrarlas todas.</p>
+  <button type="button" class="cr6-p cr6-tst-x" aria-label="Cerrar aviso"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div></div>
+</div>
+<template class="cr6-ficha-tpl"><section class="cr6-ficha" lang="es" aria-label="Especificación: Cerrar sesión"><h3>Especificación · Cerrar sesión</h3><dl><dt>Qué es</dt><dd>«Cerrar sesión» (<code>Sidebar.tsx:804-808, 423-488</code>). Médico: en Mi perfil → Ajustes (aprobado, §23.11). Secretaria: en su menú «Ajustes» (vista 5, CALMA §28).</dd><dt>Qué pasa hoy</dt><dd>1) Registra la salida en <code>audit_log</code> (<code>POST /api/auth/audit-login</code>, con <code>await</code>); 2) <code>signOut()</code> borra siempre cookies y almacenamiento local; 3) vacía cachés (perfil cifrado, Google, citas, semillas); 4) si el servidor de Auth no confirmó la revocación, aviso de error; 5) navega a <code>/login</code>. No hay confirmación previa ni indicador de espera.</dd><dt>Mientras cierra</dt><dd>La fila queda inerte y su icono se cambia por un giro del mismo rojo (<code>aria-busy="true"</code>); las otras dos filas bajan a 45 % de opacidad. Sin texto nuevo. Hoy no hay nada: si el registro de auditoría tarda, el botón no responde a la vista.</dd><dt>Aviso de revocación</dt><dd>Texto exacto: «Sesión cerrada en este navegador, pero el servidor no confirmó la revocación: puede seguir abierta en otros dispositivos. Cambia la contraseña para cerrarlas todas.» (<code>:483</code>). Aviso de error del patrón de <code>pub-capas</code> 5: arriba y centrado en el área de contenido, icono y filo en <code>--mal-tinta</code>, texto 14/20 (sin justificar: en 300 px abría ríos), botón de cerrar de 44 (36 en ancho), <code>role="alert"</code>. No dice «inténtalo de nuevo» a propósito (un segundo intento devolvería éxito sin revocar nada, <code>:471-476</code>).</dd><dt>Defecto conocido y propuesta</dt><dd>Hoy ese aviso «puede alcanzar a verse solo un instante»: la navegación a <code>/login</code> desmonta el proveedor de avisos (<code>:477-481</code>). Propuesta: que no caduque a los 4 s y que viaje a <code>/login</code>, porque pide una acción (cambiar la contraseña). Es cambio de funcionamiento, no de diseño.</dd><dt>Confirmación (PROPUESTA)</dt><dd>No existe hoy. Si el dueño la quiere: alerta del catálogo con icono rojo suave, título «Cerrar sesión» y dos botones parejos «Cancelar» (tonal) / «Cerrar sesión» (destructivo suave). Solo textos que ya existen. Se activa en la tira; por defecto la maqueta se comporta como hoy.</dd><dt>Movimiento</dt><dd>Aviso: baja 12 px y funde con resorte (amortiguación 1, respuesta .35 s), sube al cerrarlo. Alerta: escala .96→1 desde el centro. Giro: 0,8 s por vuelta (más lento con reduced-motion, sin desaparecer: comunica espera).</dd></dl></section></template>
+<script>
+(function(CFG){
+
+var P=CFG.p,MS=[].slice.call(document.querySelectorAll('.'+P+'.marco'));
+function cls(n){return P+'-'+n}
+MS.forEach(function(m){
+  var capa=m.querySelector('.'+cls('capa')),orig=null;
+  m.querySelectorAll('a[href="#"]').forEach(function(a){a.addEventListener('click',function(e){e.preventDefault();if(capa&&capa.classList.contains(cls('on'))&&a.closest('.'+cls('capa')))cierra()})});
+  function abre(k,o){if(!capa)return;orig=o||null;capa.dataset.k=k;capa.classList.add(cls('on'));capa.setAttribute('aria-hidden','false');
+    var pan=capa.querySelector(k==='cajon'?'.'+cls('cajon'):'.'+cls('mn'));var f=pan&&pan.querySelector('button,a');if(f)f.focus({preventScroll:true})}
+  function cierra(){if(!capa)return;capa.classList.remove(cls('on'));capa.setAttribute('aria-hidden','true');if(orig&&orig.offsetParent)orig.focus({preventScroll:true})}
+  m.abre=abre;m.cierra=cierra;
+  m.querySelectorAll('[data-abre]').forEach(function(b){b.addEventListener('click',function(){abre(b.dataset.abre,b)})});
+  if(capa){capa.querySelector('.'+cls('velo')).addEventListener('click',cierra);
+    capa.querySelectorAll('.'+cls('cierra')).forEach(function(b){b.addEventListener('click',cierra)});}
+  m.addEventListener('keydown',function(e){if(e.key==='Escape'&&capa&&capa.classList.contains(cls('on'))){e.preventDefault();cierra()}});
+});
+function tira(grupos,alPulsar){var d=document.createElement('div');d.className=cls('tira');d.setAttribute('role','group');d.setAttribute('aria-label','Controles de la maqueta');
+  grupos.forEach(function(g,i){if(i){var s=document.createElement('span');s.className=cls('sep');d.appendChild(s)}
+    g.forEach(function(b){var x=document.createElement('button');x.type='button';x.textContent=b[1];x.dataset.k=b[0];if(b[2]!=null)x.setAttribute('aria-pressed',String(b[2]));
+      x.addEventListener('click',function(){alPulsar(b[0],x,d)});d.appendChild(x)})});
+  var op=MS[0].closest('.op'),h=op&&op.querySelector('header');if(h)h.appendChild(d);else MS[0].parentNode.insertBefore(d,MS[0]);
+  var tp=document.querySelector('template.'+cls('ficha-tpl'));if(tp){var f=tp.content.firstElementChild.cloneNode(true);if(op)op.appendChild(f);else MS[MS.length-1].after(f)}
+  return d}
+
+
+var conf=false;
+MS.forEach(function(m){var c=m.querySelector('.'+cls('capa')),sal=m.querySelector('.'+cls('salir'));
+  m.cerrar=function(revoca){m.classList.remove(cls('error'));m.classList.add(cls('cerrando'));sal.setAttribute('aria-busy','true');
+    /* En la app: await audit-login → signOut() → limpiezas → router.push('/login'). Aquí se simula la espera. */
+    setTimeout(function(){m.classList.remove(cls('cerrando'));sal.removeAttribute('aria-busy');if(!revoca)m.classList.add(cls('error'))},1600)};
+  sal.addEventListener('click',function(){if(conf){c.classList.add(cls('on'));c.setAttribute('aria-hidden','false');m.querySelector('.'+cls('si')).focus({preventScroll:true})}else m.cerrar(false)});
+  function cierra(){c.classList.remove(cls('on'));c.setAttribute('aria-hidden','true');sal.focus({preventScroll:true})}
+  m.querySelector('.'+cls('no')).addEventListener('click',cierra);c.querySelector('.'+cls('velo')).addEventListener('click',cierra);
+  m.querySelector('.'+cls('si')).addEventListener('click',function(){c.classList.remove(cls('on'));c.setAttribute('aria-hidden','true');m.cerrar(false)});
+  m.querySelector('.'+cls('tst-x')).addEventListener('click',function(){m.classList.remove(cls('error'))});
+  m.querySelector('[role="switch"]').addEventListener('click',function(e){var b=e.currentTarget;b.setAttribute('aria-checked',String(b.getAttribute('aria-checked')!=='true'))});
+  m.addEventListener('keydown',function(e){if(e.key==='Escape'&&c.classList.contains(cls('on'))){e.preventDefault();cierra()}});
+});
+var T=tira([[['reposo','Reposo'],['cerrando','Mientras cierra'],['error','Revocación no confirmada']],[['conf','Propuesta: confirmar antes de cerrar',false]]],function(k,x){
+  MS.forEach(function(m){m.classList.remove(cls('cerrando'),cls('error'));var c=m.querySelector('.'+cls('capa'));c.classList.remove(cls('on'))});
+  if(k==='cerrando')MS.forEach(function(m){m.classList.add(cls('cerrando'))});
+  if(k==='error')MS.forEach(function(m){m.classList.add(cls('error'))});
+  if(k==='conf'){conf=!conf;x.setAttribute('aria-pressed',String(conf));if(conf)MS.forEach(function(m){var c=m.querySelector('.'+cls('capa'));c.classList.add(cls('on'));c.setAttribute('aria-hidden','false')})}});
+
+})({"p": "cr6"});
+</script>

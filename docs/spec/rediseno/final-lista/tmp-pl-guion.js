@@ -64,7 +64,7 @@
       var tot=st.vacia?0:st.rol==='inv'?PAC.filter(function(p){return p.med.indexOf('I')>=0}).length:PAC.length;
       total.textContent=st.err?'':tot+(tot===1?' paciente registrado':' pacientes registrados');
       q('.pl-ord-v').innerHTML=ORD[st.ord]+ic(st.dir==='asc'?I.arr:I.aba,14,2);
-      bOrd.setAttribute('aria-label',(tel?'Filtrar y ordenar. ':'Cambiar el orden. ')+'Ordenado por '+ORD[st.ord]+', '+(st.dir==='asc'?'ascendente':'descendente'));
+      bOrd.setAttribute('aria-label',(vp==='ext'||vp==='iv'?'':tel?'Filtrar y ordenar. ':'Cambiar el orden. ')+'Ordenado por '+ORD[st.ord]+', '+(st.dir==='asc'?'ascendente':'descendente'));
       q('.pl-punto').hidden=!filtrado();
       bFil.setAttribute('aria-label',(tel?'Filtrar y ordenar':'Filtros')+(filtrado()?' (hay filtros activos)':''));
       qq('.pl-hb').forEach(function(b){var a=b.dataset.o===st.ord;b.classList.toggle('pl-act',a);b.querySelector('svg').outerHTML=ic(a&&st.dir==='asc'?I.arr:I.aba,14,2);

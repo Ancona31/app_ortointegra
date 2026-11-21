@@ -1,0 +1,764 @@
+<!-- NOMBRE: Capas · Hoja | Una sola hoja para toda la app: sube del borde inferior en teléfono y se arrastra hacia abajo con inercia, y en ancho es una tarjeta centrada; aquí con la cita del dashboard, la rejilla de tipos y la lista de plantillas. -->
+<style>
+/* ===== Capas compartidas (CALMA §25). Todos los selectores empiezan por .ca3 (el generador pone .ca1….ca4) ===== */
+.ca3 .ca3-app{display:flex;width:100%;height:100%}
+.ca3[data-vp="tel"] .ca3-app,.ca3[data-vp="iv"] .ca3-app{flex-direction:column}
+.ca3 button{border:0;margin:0;padding:0;background:none;color:inherit;text-align:inherit}
+.ca3 h1,.ca3 h2,.ca3 h3,.ca3 p,.ca3 ul,.ca3 ol,.ca3 dl,.ca3 dt,.ca3 dd{margin:0;padding:0;font-weight:inherit}
+.ca3 ul,.ca3 ol{list-style:none}
+.ca3 svg{flex:none;display:block}
+.ca3 .ca3-flex{flex:1}
+.ca3 .ca3-num{font-variant-numeric:tabular-nums}
+.ca3 [hidden]{display:none!important}
+/* Respuesta al toque (en pointer-down) y foco */
+.ca3 .ca3-p{transition:transform 100ms ease-out,background-color 100ms ease-out}
+.ca3 .ca3-p:active{transform:scale(.97)}
+.ca3 .ca3-p:focus-visible{outline:3px solid var(--enlace);outline-offset:2px}
+.ca3 .ca3-riel .ca3-p:focus-visible,.ca3 .ca3-lat .ca3-p:focus-visible,.ca3 .ca3-enc .ca3-p:focus-visible,.ca3 .ca3-env .ca3-p:focus-visible{outline-color:var(--nav-tinta)}
+.ca3 .ca3-card:focus-visible{outline:none}
+
+/* ---- Navegación (copiada del dashboard aprobado) ---- */
+.ca3 .ca3-riel{position:relative;z-index:1;flex:none;width:calc(56px + var(--ir));padding:16px calc(var(--ir) + 8px) calc(var(--ib) + 10px) 8px;background:var(--navy);border-radius:26px 0 0 26px;box-shadow:var(--sombra-nav-der);display:flex;flex-direction:column;align-items:center;gap:8px}
+.ca3 .ca3-rb{width:48px;height:48px;flex:none;border-radius:999px;display:flex;align-items:center;justify-content:center;color:var(--nav-tinta)}
+.ca3 .ca3-rb[aria-current="page"]{background:var(--accion);color:#fff}
+.ca3 .ca3-mas{width:52px;height:52px;flex:none;border-radius:999px;background:#fff;color:var(--accion);display:flex;align-items:center;justify-content:center;box-shadow:var(--sombra-accion)}
+.ca3 .ca3-enc{position:relative;z-index:1;flex:none;display:flex;align-items:center;gap:12px;padding:calc(var(--it) + 8px) 16px 12px;background:var(--navy);border-radius:0 0 26px 26px;box-shadow:var(--sombra-nav-sup);color:#fff}
+.ca3 .ca3-hamb{width:44px;height:44px;flex:none;border-radius:12px;background:var(--nav-velo);color:#fff;display:flex;align-items:center;justify-content:center}
+.ca3 .ca3-enc-t{font-size:17px;line-height:22px;font-weight:700;color:#fff}
+.ca3 .ca3-yo{display:flex;align-items:center;justify-content:center;flex:none;width:44px;height:44px;border-radius:999px;background:var(--nav-avatar);color:var(--navy);font-size:13px;font-weight:700}
+.ca3 .ca3-lat{position:relative;z-index:1;flex:none;display:flex;flex-direction:column;background:var(--navy);color:#fff}
+.ca3[data-vp="ih"] .ca3-lat{width:calc(218px + var(--ir));padding:16px calc(var(--ir) + 10px) calc(var(--ib) + 10px) 12px;border-radius:26px 0 0 26px;box-shadow:var(--sombra-nav-der)}
+.ca3[data-vp="esc"] .ca3-lat{width:248px;padding:16px 12px 14px;border-radius:0 26px 26px 0;box-shadow:var(--sombra-nav-izq)}
+.ca3 .ca3-lat-cab{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:36px;padding:0 4px 0 8px}
+.ca3 .ca3-logo{display:inline-flex;align-items:center;gap:8px;color:#fff}
+.ca3 .ca3-logo-n{font-size:17px;line-height:22px;font-weight:700;letter-spacing:-.2px}
+.ca3 .ca3-plan{display:inline-flex;align-items:center;height:24px;padding:0 10px;border-radius:999px;background:var(--nav-velo);color:var(--nav-tinta);font-size:12px;line-height:16px;font-weight:600;white-space:nowrap}
+.ca3 .ca3-cons-b{margin-top:12px;display:flex;align-items:center;gap:10px;min-height:52px;padding:8px 10px;border-radius:14px;background:var(--nav-velo);color:#fff;text-align:left}
+.ca3 .ca3-cons-b svg{color:var(--nav-tinta2)}
+.ca3 .ca3-cons-b .ca3-yo{width:34px;height:34px}
+.ca3 .ca3-cons-t{flex:1;min-width:0;display:flex;flex-direction:column}
+.ca3 .ca3-cons-t span{font-size:13px;line-height:16px;color:var(--nav-tinta2)}
+.ca3 .ca3-cons-t b{font-size:15px;line-height:19px;font-weight:600}
+.ca3 .ca3-lista{margin-top:14px;display:flex;flex-direction:column;gap:2px}
+.ca3 .ca3-li{display:flex;align-items:center;gap:12px;height:44px;padding:0 12px;border-radius:12px;color:var(--nav-tinta);font-size:15px;line-height:20px;font-weight:500}
+.ca3[data-vp="esc"] .ca3-li{height:40px;font-size:14px}
+.ca3 .ca3-li[aria-current="page"]{background:var(--accion);color:#fff;font-weight:600}
+.ca3 .ca3-lat-pie{border-top:1px solid var(--nav-velo);padding-top:8px}
+.ca3 .ca3-lat .ca3-yo2{height:48px}
+.ca3 .ca3-yo2>span{display:flex;flex-direction:column;line-height:17px}
+.ca3 .ca3-yo2 small{font-size:12px;line-height:16px;color:var(--nav-tinta2)}
+.ca3 .ca3-env{position:relative;z-index:1;flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:var(--it) 16px 14px;background:var(--navy);border-radius:0 0 26px 26px;box-shadow:var(--sombra-nav-sup);color:#fff}
+.ca3 .ca3-envb{width:44px;height:44px;flex:none;border-radius:999px;background:var(--nav-velo);color:#fff;display:flex;align-items:center;justify-content:center}
+.ca3 .ca3-pista{display:flex;align-items:center;gap:2px;padding:4px;border-radius:26px;background:var(--nav-velo)}
+.ca3 .ca3-pv{display:flex;align-items:center;height:40px;padding:0 13px;border-radius:999px;color:var(--nav-tinta);font-size:15px;line-height:20px;font-weight:500;white-space:nowrap;position:relative}
+.ca3 .ca3-pv::after{content:"";position:absolute;inset:-2px 0}
+.ca3 .ca3-pv[aria-current="page"]{padding:0 15px;background:var(--accion);color:#fff;font-weight:600}
+
+/* ---- Pantalla de fondo (simplificada) ---- */
+.ca3 .ca3-cont{flex:1;min-width:0;min-height:0;overflow-x:hidden;overflow-y:auto;scrollbar-width:none;padding:20px 16px calc(var(--ib) + 24px)}
+.ca3[data-vp="ih"] .ca3-cont,.ca3[data-vp="iv"] .ca3-cont{padding:24px 24px calc(var(--ib) + 24px)}
+.ca3[data-vp="esc"] .ca3-cont{padding:32px 24px}
+.ca3 .ca3-fondo{display:flex;flex-direction:column;gap:24px;max-width:880px}
+.ca3[data-vp="iv"] .ca3-fondo,.ca3[data-vp="esc"] .ca3-fondo{gap:28px}
+.ca3 .ca3-cab{display:flex;flex-direction:column;gap:4px;min-width:0}
+.ca3 .ca3-cabf{display:flex;align-items:center;gap:8px;min-height:36px;margin:-8px 0 -4px}
+.ca3 .ca3-volver{position:relative;display:inline-flex;align-items:center;gap:2px;min-height:36px;padding:0 4px 0 0;font-size:13px;line-height:18px;font-weight:600;color:var(--enlace)}
+.ca3 .ca3-volver::after{content:"";position:absolute;inset:-4px -4px}
+.ca3 .ca3-h1{font-size:26px;line-height:31px;font-weight:800;letter-spacing:-.6px;overflow-wrap:anywhere}
+.ca3[data-vp="ih"] .ca3-h1,.ca3[data-vp="iv"] .ca3-h1,.ca3[data-vp="esc"] .ca3-h1{font-size:32px;line-height:38px}
+.ca3 .ca3-sub{font-size:13px;line-height:18px;color:var(--tinta2)}
+.ca3 .ca3-quien{display:flex;align-items:center;gap:12px}
+.ca3 .ca3-tit{display:flex;align-items:center;gap:10px}
+.ca3 .ca3-tit>svg{color:var(--c)}
+.ca3 .ca3-sec{display:flex;flex-direction:column;gap:10px}
+.ca3 .ca3-sec-c{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:4px 12px;min-height:36px}
+.ca3 .ca3-h2{font-size:17px;line-height:22px;font-weight:700}
+.ca3 .ca3-tar{background:var(--sup);border-radius:16px;padding:0 16px}
+.ca3[data-vp="ih"] .ca3-tar,.ca3[data-vp="iv"] .ca3-tar,.ca3[data-vp="esc"] .ca3-tar{border-radius:18px;padding:0 20px}
+.ca3 .ca3-tar>*+*{border-top:1px solid var(--linea)}
+.ca3 .ca3-tar.ca3-pad{padding-top:16px;padding-bottom:18px}
+.ca3 .ca3-tar.ca3-pad>*+*{border-top:0}
+.ca3 .ca3-fila{display:flex;align-items:center;gap:12px;width:100%;min-height:60px;padding:8px 0;color:var(--tinta);text-align:left}
+.ca3[data-vp="ih"] .ca3-fila,.ca3[data-vp="esc"] .ca3-fila{min-height:52px;padding:6px 0}
+.ca3 .ca3-fila:active{transform:none;opacity:.7}
+.ca3 .ca3-fila-w{display:flex;align-items:center;gap:4px}
+.ca3 .ca3-fila-w>.ca3-fila{flex:1;min-width:0}
+.ca3 .ca3-fila-t{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.ca3 .ca3-fila-n{font-size:15px;line-height:20px;font-weight:600;overflow-wrap:anywhere}
+.ca3 .ca3-fila-s{font-size:13px;line-height:18px;color:var(--tinta2)}
+.ca3 .ca3-der{flex:none;font-size:13px;line-height:18px;color:var(--tinta2);white-space:nowrap}
+.ca3 .ca3-hora{flex:none;width:48px;font-size:15px;line-height:20px;font-weight:600;font-variant-numeric:tabular-nums}
+.ca3 .ca3-chev{color:var(--tinta3)}
+.ca3 .ca3-dico{color:var(--c)}
+.ca3 .ca3-mal-t{color:var(--mal-tinta)}
+.ca3 .ca3-avt{width:36px;height:36px;flex:none;border-radius:999px;display:flex;align-items:center;justify-content:center;font-size:13px;line-height:16px;font-weight:600;font-variant-numeric:tabular-nums}
+.ca3 .ca3-rot{font-size:13px;line-height:18px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--enlace)}
+.ca3 .ca3-rot+.ca3-txt{margin-top:6px}
+.ca3 .ca3-txt+.ca3-rot{margin-top:20px}
+.ca3 .ca3-txt{font-size:15px;line-height:22px;text-align:justify;-webkit-hyphens:auto;hyphens:auto}
+.ca3 .ca3-par{display:flex;align-items:baseline;justify-content:space-between;gap:16px;padding:12px 0;font-size:15px;line-height:20px}
+.ca3 .ca3-par dt{color:var(--tinta2)}
+.ca3 .ca3-par dd{text-align:right;overflow-wrap:anywhere;min-width:0}
+.ca3 .ca3-accs{display:flex;justify-content:flex-end;align-items:center;flex-wrap:wrap;gap:8px 16px}
+.ca3 .ca3-campos{display:flex;flex-direction:column;gap:14px}
+.ca3 .ca3-campo{display:flex;flex-direction:column;gap:4px;min-width:0}
+.ca3 .ca3-campo>span{font-size:13px;line-height:18px;font-weight:600;color:var(--tinta2)}
+.ca3 .ca3-in{width:100%;min-width:0;height:44px;padding:0 12px;border:0;border-radius:12px;background:var(--sup2);color:var(--tinta);font:inherit;font-size:16px;outline:none;-webkit-appearance:none;appearance:none}
+.ca3 .ca3-in:focus-visible{outline:2px solid var(--enlace);outline-offset:0}
+.ca3[data-vp="esc"] .ca3-in,.ca3[data-vp="ih"] .ca3-in{height:40px;font-size:15px}
+.ca3[data-vp] textarea.ca3-in{height:120px;padding:12px;line-height:24px;resize:none;display:block}
+.ca3[data-vp="esc"] textarea.ca3-in,.ca3[data-vp="ih"] textarea.ca3-in{line-height:22px}
+/* Botones: dibujo menor que el área en la pantalla (CALMA §2); de verdad y de 44 dentro de las capas (§13) */
+.ca3 .ca3-b{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:8px;height:44px;padding:0 16px;border-radius:12px;font-size:15px;line-height:20px;font-weight:600;white-space:nowrap}
+.ca3 .ca3-prim{background:var(--accion);color:#fff}
+.ca3 .ca3-ton{background:var(--tonal);color:var(--tonal-tinta)}
+.ca3 .ca3-qui{background:var(--sup2);color:var(--tinta)}
+.ca3 .ca3-mal{background:var(--mal-fondo);color:var(--mal-tinta)}
+.ca3 .ca3-cont .ca3-b{height:40px}
+.ca3 .ca3-cont .ca3-b::after{content:"";position:absolute;inset:-2px 0}
+.ca3 .ca3-cont .ca3-ton{height:36px;padding:0 14px;font-size:14px}
+.ca3 .ca3-cont .ca3-ton::after{inset:-4px 0}
+.ca3[data-vp="ih"] .ca3-cont .ca3-b,.ca3[data-vp="esc"] .ca3-cont .ca3-b{height:36px;padding:0 14px;font-size:14px}
+.ca3[data-vp="ih"] .ca3-cont .ca3-ton,.ca3[data-vp="esc"] .ca3-cont .ca3-ton{height:32px;padding:0 12px}
+.ca3[data-vp="ih"] .ca3-cont .ca3-b::after,.ca3[data-vp="esc"] .ca3-cont .ca3-b::after{inset:-2px 0}
+.ca3 .ca3-tx{position:relative;display:inline-flex;align-items:center;gap:4px;min-height:44px;padding:0 4px;font-size:15px;line-height:20px;font-weight:600;color:var(--enlace);white-space:nowrap}
+.ca3[data-vp="ih"] .ca3-tx,.ca3[data-vp="esc"] .ca3-tx{min-height:36px;font-size:14px}
+.ca3 .ca3-ib{width:44px;height:44px;flex:none;border-radius:999px;display:flex;align-items:center;justify-content:center;color:var(--tinta2)}
+.ca3 .ca3-ib:active{background:var(--sup2)}
+.ca3[data-vp="ih"] .ca3-ib,.ca3[data-vp="esc"] .ca3-ib{width:36px;height:36px}
+.ca3 .ca3-fecha{width:52px;flex:none;display:flex;flex-direction:column;align-items:center;padding:6px 0;border-radius:12px;background:var(--fondo)}
+.ca3 .ca3-mes{font-size:11px;line-height:14px;font-weight:700;letter-spacing:.4px;color:var(--mes)}
+.ca3 .ca3-dia{font-size:20px;line-height:24px;font-weight:700;color:var(--tinta);font-variant-numeric:tabular-nums}
+/* Estados de cita: icono en círculo de color (CALMA §24.4) */
+.ca3 .ca3-est{display:inline-flex;align-items:center;gap:6px;flex:none;font-size:12px;line-height:16px;font-weight:600;white-space:nowrap}
+.ca3 .ca3-est-c{width:26px;height:26px;flex:none;border-radius:999px;display:flex;align-items:center;justify-content:center}
+.ca3 .ca3-est-conf .ca3-est-c{background:var(--tonal);color:var(--enlace)}
+.ca3 .ca3-est-conf .ca3-est-t{color:var(--tonal-tinta)}
+.ca3 .ca3-est-ag .ca3-est-c{background:var(--ag-fondo);color:var(--ag-tinta)}
+.ca3 .ca3-est-ag .ca3-est-t{color:var(--ag-tinta)}
+.ca3 .ca3-est-canc .ca3-est-c{background:var(--mal-fondo);color:var(--mal-tinta)}
+.ca3 .ca3-est-canc .ca3-est-t{color:var(--mal-tinta)}
+.ca3 .ca3-est-noas .ca3-est-c{background:var(--sup2);color:var(--tinta2)}
+.ca3 .ca3-est-noas .ca3-est-t{color:var(--tinta2)}
+.ca3 .ca3-est-aten .ca3-est-c{background:var(--ok-fondo);color:var(--ok-tinta)}
+.ca3 .ca3-est-aten .ca3-est-t{color:var(--ok-tinta)}
+.ca3 .ca3-marca{display:inline-flex;align-items:center;gap:4px;font-size:13px;line-height:18px;font-weight:600;color:var(--tinta2);white-space:nowrap}
+.ca3 .ca3-estb{display:inline-flex;align-items:center;gap:2px;height:44px;padding:0 4px;font-size:13px;line-height:18px;font-weight:600;color:var(--tinta2)}
+.ca3[data-vp="ih"] .ca3-estb,.ca3[data-vp="esc"] .ca3-estb{height:36px}
+
+/* ======================= CAPAS ======================= */
+/* Un solo velo por marco, con desenfoque (CALMA §13). Su opacidad la escribe el guion fotograma a fotograma desde el progreso de la capa. */
+.ca3 .ca3-velo{position:absolute;inset:0;z-index:20;background:var(--velo);-webkit-backdrop-filter:blur(10px) saturate(140%);backdrop-filter:blur(10px) saturate(140%);opacity:0;visibility:hidden}
+.ca3 .ca3-capa{position:absolute;z-index:21;display:flex;pointer-events:none;visibility:hidden}
+.ca3 .ca3-capa.ca3-vis{visibility:visible}
+.ca3 .ca3-card{position:relative;pointer-events:auto;display:flex;flex-direction:column;min-height:0;background:var(--sup);color:var(--tinta);box-shadow:var(--sombra-capa);opacity:0;outline:none;will-change:transform,opacity}
+/* Modo «centro»: alerta y modal centrados en el área de contenido; en Duo abierto se cruza la bisagra (§18) */
+.ca3 .ca3-capa[data-modo="centro"]{align-items:center;justify-content:center;padding:16px}
+.ca3[data-vp="ext"] .ca3-capa[data-modo="centro"]{inset:0 calc(56px + var(--ir)) var(--ib) 0;padding:8px}
+.ca3[data-vp="ext"] .ca3-al{width:310px}
+/* CALMA §26: en Duo cerrado toda capa es tarjeta centrada en el área de contenido: ancho máx. 310 (margen 8), alto máx. área − 32 */
+.ca3[data-vp="ext"] .ca3-capa[data-modo="centro"]>.ca3-card{width:310px;max-height:calc(100% - 16px)}
+.ca3[data-vp="ext"] .ca3-capa[data-modo="centro"]>.ca3-card.ca3-mn{width:280px}
+.ca3[data-vp="ext"] .ca3-capa[data-modo="centro"] .ca3-hcab{padding:12px 8px 4px 20px}
+.ca3[data-vp="ext"] .ca3-capa[data-modo="centro"] .ca3-hcu{padding:8px 20px 20px}
+.ca3[data-vp="ext"] .ca3-capa[data-modo="centro"] .ca3-hpie{padding:12px 16px 16px}
+.ca3[data-vp="ext"] .ca3-capa[data-modo="centro"] .ca3-hpie>.ca3-b{flex:1 1 auto;min-width:0;padding:0 12px}
+.ca3[data-vp="ext"] .ca3-capa[data-modo="centro"] .ca3-hc{padding:14px 16px 16px}
+.ca3[data-vp="ext"] .ca3-capa[data-modo="centro"] .ca3-pl .ca3-hcu{padding:0 8px 8px}
+.ca3[data-vp="tel"] .ca3-capa[data-modo="centro"]{inset:var(--it) 0 var(--ib) 0}
+.ca3[data-vp="ih"] .ca3-capa[data-modo="centro"]{inset:0 calc(218px + var(--ir)) var(--ib) 0;padding:24px}
+.ca3[data-vp="iv"] .ca3-capa[data-modo="centro"]{inset:var(--it) 0 var(--ib) 0;padding:24px}
+.ca3[data-vp="esc"] .ca3-capa[data-modo="centro"]{inset:0 0 0 248px;padding:32px}
+.ca3 .ca3-capa[data-modo="centro"]>.ca3-card{border-radius:20px;max-width:100%;max-height:100%}
+.ca3 .ca3-capa[data-modo="centro"] .ca3-w400{width:400px}
+.ca3 .ca3-capa[data-modo="centro"] .ca3-w440{width:440px}
+.ca3 .ca3-capa[data-modo="centro"] .ca3-w480{width:480px}
+.ca3 .ca3-capa[data-modo="centro"] .ca3-w520{width:520px}
+.ca3 .ca3-capa[data-modo="centro"] .ca3-w640{width:640px}
+/* Modo «hoja» (solo iPhone desde CALMA §26): sube del borde inferior. 80 px de reserva bajo el borde para el rebote y el rubber-band */
+.ca3 .ca3-capa[data-modo="hoja"]{left:0;bottom:0;align-items:flex-end}
+.ca3[data-vp="ext"] .ca3-capa[data-modo="hoja"]{top:16px;right:calc(56px + var(--ir))}
+.ca3[data-vp="tel"] .ca3-capa[data-modo="hoja"]{top:calc(var(--it) + 16px);right:0}
+.ca3 .ca3-capa[data-modo="hoja"]>.ca3-card{width:100%;max-height:calc(100% + 80px);margin-bottom:-80px;padding-bottom:calc(var(--ib) + 80px);border-radius:22px 22px 0 0;touch-action:none;-webkit-user-select:none;user-select:none}
+/* Modo «pop» (solo computadora): menú que nace de su botón, sin velo (§21) */
+.ca3 .ca3-capa[data-modo="pop"]{inset:0}
+.ca3 .ca3-capa[data-modo="pop"]>.ca3-card{position:absolute;left:0;top:0;width:248px;padding:6px;border-radius:14px;box-shadow:var(--sombra-capa),0 0 0 1px var(--linea)}
+/* Piezas internas */
+.ca3 .ca3-asa{display:none;flex:none;width:36px;height:5px;border-radius:999px;background:var(--borde);margin:8px auto 2px}
+.ca3 .ca3-capa[data-modo="hoja"] .ca3-asa{display:block}
+.ca3 .ca3-hcab{flex:none;display:flex;align-items:flex-start;gap:12px;padding:4px 8px 4px 20px}
+.ca3 .ca3-hcab>div{flex:1;min-width:0;padding:10px 0 2px}
+.ca3 .ca3-hcab.ca3-sinx>div{padding-right:12px}
+.ca3 .ca3-hcab h2{font-size:17px;line-height:22px;font-weight:700;overflow-wrap:anywhere}
+.ca3 .ca3-hcab .ca3-sub{margin-top:2px}
+.ca3 .ca3-hcab .ca3-ib{margin-top:4px}
+.ca3 .ca3-capa[data-modo="centro"] .ca3-hcab{padding:12px 12px 4px 24px}
+.ca3 .ca3-capa[data-modo="centro"] .ca3-hcab .ca3-ib{margin-top:2px}
+.ca3 .ca3-hcu{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none;padding:8px 20px 16px;touch-action:pan-y}
+.ca3 .ca3-capa[data-modo="centro"] .ca3-hcu{padding:8px 24px 24px}
+.ca3 .ca3-hpie{flex:none;display:flex;align-items:center;gap:10px;padding:12px 20px 4px;box-shadow:0 -1px 0 var(--linea)}
+.ca3 .ca3-hpie.ca3-sinl{box-shadow:none;padding-top:0}
+.ca3 .ca3-capa[data-modo="hoja"] .ca3-hpie>.ca3-b{flex:1 1 auto;min-width:0;padding:0 12px}
+.ca3 .ca3-sugl{margin:8px -12px 0}
+.ca3 .ca3-sugl .ca3-rot{margin-top:8px;padding:0 12px}
+.ca3 .ca3-capa[data-modo="centro"] .ca3-hpie{justify-content:flex-end;padding:12px 24px 20px}
+.ca3 .ca3-capa[data-modo="centro"] .ca3-hpie.ca3-sinl{padding-top:0}
+.ca3 .ca3-capa[data-modo="centro"] .ca3-hpie>.ca3-b{flex:none;min-width:104px}
+.ca3[data-vp="iv"] .ca3-capa[data-modo="centro"] .ca3-hpie{justify-content:center}
+.ca3[data-vp="ih"] .ca3-capa .ca3-b,.ca3[data-vp="esc"] .ca3-capa .ca3-b{height:40px;font-size:14px}
+.ca3 .ca3-avis{font-size:14px;line-height:20px;color:var(--tinta2);text-align:justify;-webkit-hyphens:auto;hyphens:auto}
+.ca3 .ca3-ferr{margin-top:8px;font-size:13px;line-height:18px;font-weight:600;color:var(--mal-tinta)}
+.ca3 .ca3-hcu>.ca3-in,.ca3 .ca3-hcu>.ca3-campos{margin-top:14px}
+
+/* ---- Alerta (patrón único, CALMA §13/§21/§23.3) ---- */
+.ca3 .ca3-al{width:320px;padding:24px;text-align:center}
+.ca3[data-vp="ih"] .ca3-al,.ca3[data-vp="iv"] .ca3-al,.ca3[data-vp="esc"] .ca3-al{width:340px}
+.ca3 .ca3-al-i{flex:none;width:48px;height:48px;margin:0 auto 12px;border-radius:999px;display:flex;align-items:center;justify-content:center}
+.ca3 .ca3-i-ton{background:var(--tonal);color:var(--enlace)}
+.ca3 .ca3-i-mal{background:var(--mal-fondo);color:var(--mal-tinta)}
+.ca3 .ca3-i-ag{background:var(--ag-fondo);color:var(--ag-tinta)}
+.ca3 .ca3-al h2{font-size:17px;line-height:22px;font-weight:700}
+.ca3 .ca3-al-t{margin-top:8px;font-size:14px;line-height:20px;color:var(--tinta2);text-align:justify;text-align-last:center;-webkit-hyphens:auto;hyphens:auto}
+.ca3 .ca3-al-t.ca3-cen{text-align:center;-webkit-hyphens:manual;hyphens:manual;text-wrap:balance}
+.ca3 .ca3-al-t.ca3-izq{text-align:left;text-align-last:auto;-webkit-hyphens:manual;hyphens:manual}
+.ca3 .ca3-al-t b{color:var(--tinta);font-weight:600}
+.ca3 .ca3-al-t .ca3-num{white-space:nowrap}
+.ca3 .ca3-al-b{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;margin-top:20px}
+.ca3 .ca3-al-b.ca3-uno,.ca3 .ca3-al-b.ca3-pila{grid-template-columns:minmax(0,1fr)}
+.ca3 .ca3-al-b.ca3-pila{gap:8px}
+.ca3 .ca3-al-b .ca3-b{width:100%;min-width:0;padding:0 12px}
+.ca3 .ca3-al-b.ca3-pila .ca3-b{height:auto;min-height:44px;padding:10px 12px;white-space:normal;text-align:center}
+.ca3[data-vp="ih"] .ca3-al-b.ca3-pila .ca3-b,.ca3[data-vp="esc"] .ca3-al-b.ca3-pila .ca3-b{min-height:40px;padding:9px 12px;line-height:20px}
+.ca3 .ca3-pila .ca3-pri{order:-1}
+
+/* ---- Menú ---- */
+.ca3 .ca3-mn{padding:0 8px}
+.ca3 .ca3-capa[data-modo="centro"] .ca3-mn{width:280px;padding:8px;border-radius:18px}
+.ca3 .ca3-mn-t{padding:10px 12px 6px;font-size:17px;line-height:22px;font-weight:700}
+.ca3 .ca3-capa[data-modo="centro"] .ca3-mn-t{padding:8px 12px 6px}
+.ca3 .ca3-capa[data-modo="pop"] .ca3-mn-t{display:none}
+.ca3 .ca3-mi{display:flex;align-items:center;gap:12px;width:100%;min-height:48px;padding:6px 12px;border-radius:12px;font-size:15px;line-height:20px;color:var(--tinta);text-align:left}
+.ca3 .ca3-mi:active{transform:none;background:var(--fondo)}
+.ca3 .ca3-mi>.ca3-mic{display:flex;width:20px;height:20px;color:var(--enlace)}
+.ca3 .ca3-mi>.ca3-mt{flex:1;min-width:0;display:flex;flex-direction:column}
+.ca3 .ca3-mi small{font-size:13px;line-height:18px;color:var(--tinta2)}
+.ca3 .ca3-mi-mal,.ca3 .ca3-mi-mal>.ca3-mic{color:var(--mal-tinta)}
+.ca3 .ca3-mi .ca3-chk{color:var(--enlace);opacity:0}
+.ca3 .ca3-mi[aria-checked="true"]{font-weight:600}
+.ca3 .ca3-mi[aria-checked="true"] .ca3-chk{opacity:1}
+.ca3 .ca3-msep{display:block;height:1px;margin:6px 12px;background:var(--linea)}
+.ca3 .ca3-capa[data-modo="centro"] .ca3-mi{min-height:44px;border-radius:10px}
+.ca3[data-vp="iv"] .ca3-capa[data-modo="centro"] .ca3-mi{min-height:48px}
+.ca3 .ca3-capa[data-modo="pop"] .ca3-mi{min-height:38px;gap:10px;padding:4px 10px;border-radius:9px;font-size:14px}
+.ca3 .ca3-capa[data-modo="pop"] .ca3-mi:hover{background:var(--fondo)}
+.ca3 .ca3-capa[data-modo="pop"] .ca3-mic,.ca3 .ca3-capa[data-modo="pop"] .ca3-mic svg{width:18px;height:18px}
+.ca3 .ca3-capa[data-modo="pop"] .ca3-msep{margin:4px 10px}
+/* Leyenda (solo lectura) */
+.ca3 .ca3-ley{display:flex;flex-direction:column;padding:2px 12px 8px}
+.ca3 .ca3-ley li{display:flex;align-items:center;min-height:44px}
+.ca3 .ca3-ley li+li{border-top:1px solid var(--linea)}
+.ca3 .ca3-ley .ca3-est{font-size:15px;line-height:20px;gap:12px}
+.ca3 .ca3-capa[data-modo="pop"] .ca3-ley{padding:4px 8px}
+.ca3 .ca3-capa[data-modo="pop"] .ca3-ley li{min-height:36px}
+.ca3 .ca3-capa[data-modo="pop"] .ca3-ley li+li{border-top:0}
+.ca3 .ca3-capa[data-modo="pop"] .ca3-ley .ca3-est{font-size:13px;line-height:18px;gap:8px}
+.ca3 .ca3-capa[data-modo="pop"] .ca3-ley .ca3-est-c{width:24px;height:24px}
+.ca3 .ca3-capa[data-modo="pop"]>.ca3-card.ca3-wley{width:180px}
+.ca3 .ca3-capa[data-modo="pop"]>.ca3-card.ca3-word{width:232px}
+
+/* ---- Rejilla «Tipo de documento» (CALMA §9, §13, §21) ---- */
+.ca3 .ca3-rej{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.ca3[data-vp="ih"] .ca3-rej,.ca3[data-vp="iv"] .ca3-rej,.ca3[data-vp="esc"] .ca3-rej{grid-template-columns:repeat(4,minmax(0,1fr))}
+.ca3 .ca3-az{display:flex;flex-direction:column;align-items:flex-start;gap:10px;min-width:0;min-height:84px;padding:12px;border-radius:14px;background:var(--sup2);font-size:14px;line-height:18px;color:var(--tinta);text-align:left}
+.ca3[data-vp="ih"] .ca3-az,.ca3[data-vp="iv"] .ca3-az,.ca3[data-vp="esc"] .ca3-az{min-height:88px}
+.ca3 .ca3-az[aria-current="true"]{box-shadow:inset 0 0 0 2px var(--accion)}
+.ca3 .ca3-az>span:last-child{max-width:100%;min-width:0;-webkit-hyphens:auto;hyphens:auto;overflow-wrap:anywhere}
+.ca3 .ca3-az-i{width:32px;height:32px;flex:none;border-radius:9px;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--c) var(--d-mezcla),var(--sup));color:var(--c)}
+
+/* ---- Hoja de acciones de la cita (del dashboard aprobado) ---- */
+.ca3 .ca3-hc{gap:14px;padding:0 16px}
+.ca3 .ca3-capa[data-modo="centro"] .ca3-hc{padding:16px 20px 20px}
+.ca3 .ca3-hc-cab{display:flex;align-items:flex-start;gap:12px;padding-top:6px}
+.ca3 .ca3-hc-q{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.ca3 .ca3-hc-n{font-size:20px;line-height:25px;font-weight:700;letter-spacing:-.3px;overflow-wrap:anywhere}
+.ca3 .ca3-hc-d{font-size:13px;line-height:18px;color:var(--tinta2)}
+.ca3 .ca3-hc-x{margin:-2px -4px 0 0}
+.ca3 .ca3-hc-et{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;margin-top:-2px}
+.ca3 .ca3-hc-et .ca3-est-c{width:24px;height:24px}
+.ca3 .ca3-hc .ca3-prim{width:100%}
+.ca3 .ca3-hc-l{display:flex;flex-direction:column;margin-top:-2px}
+.ca3 .ca3-hc-l>li{border-top:1px solid var(--linea)}
+.ca3 .ca3-hc-a{display:flex;align-items:center;gap:14px;width:100%;min-height:48px;padding:0 4px;border-radius:12px;text-align:left;font-size:16px;line-height:20px;color:var(--tinta)}
+.ca3[data-vp="ih"] .ca3-hc-a,.ca3[data-vp="esc"] .ca3-hc-a{min-height:44px;font-size:15px}
+.ca3 .ca3-hc-a svg{color:var(--enlace)}
+.ca3 .ca3-hc-a:active{transform:none;background:var(--fondo)}
+
+/* ---- Plantillas: lista para elegir ---- */
+.ca3 .ca3-capa[data-modo="hoja"] .ca3-pl .ca3-hcu{padding:0 8px 8px}
+.ca3 .ca3-capa[data-modo="centro"] .ca3-pl .ca3-hcu{padding:0 12px 12px}
+.ca3 .ca3-pl .ca3-mi .ca3-chk{margin-left:auto}
+
+/* ---- Vista previa de PDF ---- */
+.ca3 .ca3-pdfz{display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px;border-radius:14px;background:var(--sup2)}
+.ca3 .ca3-pag{width:100%;max-width:420px;aspect-ratio:8.5/11;background:#fff;color:var(--navy);border-radius:4px;box-shadow:0 0 0 1px var(--borde);padding:22px 20px;display:flex;flex-direction:column;gap:10px;font-size:12px;line-height:16px;text-align:left}
+.ca3 .ca3-pag b{font-weight:700}
+.ca3 .ca3-pag-c{display:flex;align-items:flex-start;gap:8px;padding-bottom:10px;border-bottom:1px solid color-mix(in srgb,var(--navy) 18%,#fff)}
+.ca3 .ca3-pag-c b{display:block;font-size:14px;line-height:18px}
+.ca3 .ca3-pag .ca3-g2{color:color-mix(in srgb,var(--navy) 62%,#fff)}
+.ca3 .ca3-pag-rx{font-size:14px;line-height:18px;font-weight:800;letter-spacing:.4px}
+.ca3 .ca3-pag ol{display:flex;flex-direction:column;gap:8px;list-style:decimal;padding-left:18px}
+.ca3 .ca3-pag-f{margin-top:auto;padding-top:20px;text-align:center}
+.ca3 .ca3-pag-f>span{display:block;width:60%;margin:0 auto 4px;border-top:1px solid var(--navy)}
+.ca3 .ca3-pagn{font-size:12px;line-height:16px;color:var(--tinta2)}
+
+/* ---- Interruptores de accesibilidad de la maqueta (además de las media queries) ---- */
+.ca3.ca3-rt .ca3-velo{-webkit-backdrop-filter:none;backdrop-filter:none;background:color-mix(in srgb,var(--navy) 45%,var(--fondo))}
+@media (prefers-reduced-transparency:reduce){
+  .ca3 .ca3-velo{-webkit-backdrop-filter:none;backdrop-filter:none;background:color-mix(in srgb,var(--navy) 45%,var(--fondo))}
+}
+.ca3.ca3-rm .ca3-p{transition:none}
+@media (prefers-reduced-motion:reduce){
+  .ca3 .ca3-p{transition:none}
+}
+
+/* ---- Tira de maqueta y ficha «Especificación», FUERA del marco (no dependen de .marco) ---- */
+.ca3-tira{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:10px}
+.ca3-tira button{position:relative;height:28px;padding:0 10px;border-radius:999px;border:1px dashed var(--tinta3);background:none;color:var(--tinta2);font:600 12px/16px var(--fuente);white-space:nowrap;cursor:pointer;transition:transform 100ms ease-out}
+.ca3-tira button::after{content:"";position:absolute;inset:-4px 0}
+.ca3-tira button:active{transform:scale(.97)}
+.ca3-tira button:focus-visible{outline:3px solid var(--enlace);outline-offset:2px}
+.ca3-tira button[aria-pressed="true"]{border-style:solid;background:var(--sup2);color:var(--tinta)}
+.ca3-tira .ca3-tsep{width:1px;height:18px;background:var(--borde);margin:0 2px}
+.ca3-ficha{background:var(--sup);border-radius:18px;padding:16px 20px 18px;font:13px/18px var(--fuente);color:var(--tinta);max-width:100%;overflow-x:auto}
+.ca3-ficha h3{margin:0 0 8px;font-size:15px;line-height:20px;font-weight:700}
+.ca3-ficha p{margin:0 0 8px;color:var(--tinta2)}
+.ca3-ficha table{border-collapse:collapse;width:100%;margin:4px 0 12px;font-size:12px;line-height:16px}
+.ca3-ficha th,.ca3-ficha td{padding:6px 8px 6px 0;border-top:1px solid var(--linea);text-align:left;vertical-align:top}
+.ca3-ficha thead th{border-top:0;color:var(--tinta2);font-weight:600}
+.ca3-ficha tbody th{color:var(--tinta2);font-weight:600;white-space:nowrap}
+.ca3-ficha dl{margin:0;display:grid;grid-template-columns:max-content minmax(0,1fr);gap:6px 14px}
+.ca3-ficha dt{color:var(--tinta2);font-weight:600}
+.ca3-ficha dd{margin:0}
+.ca3-ficha b{font-weight:600}
+
+/* Rejilla en Duo cerrado: dos columnas en 310; menos relleno para que «Suplementación» quepa entera */
+.ca3[data-vp="ext"] .ca3-capa[data-modo="centro"] .ca3-hcu:has(.ca3-rej){padding:8px 16px 16px}
+.ca3[data-vp="ext"] .ca3-rej{gap:8px}
+.ca3[data-vp="ext"] .ca3-az{padding:12px 10px}
+</style>
+<div class="marco ca3" data-vp="ext" lang="es">
+<div class="ca3-app"><main class="ca3-cont" lang="es"><div class="ca3-fondo" data-vs="cita" data-nav="inicio" data-tt="Inicio" hidden><header class="ca3-cab"><h1 class="ca3-h1">Inicio</h1><p class="ca3-sub ca3-num">Jueves 19 de noviembre</p></header>
+<section class="ca3-sec"><div class="ca3-sec-c"><h2 class="ca3-h2">Después</h2></div><div class="ca3-tar"><button type="button" class="ca3-p ca3-fila" data-abre="cita" data-nom="Paciente Prueba 12" data-cuando="Jue 19 nov · 18:30 – 19:00" data-med="Dr. Admin Semilla · Centro" data-est="conf"><span class="ca3-hora">18:30</span><span class="ca3-fila-t"><span class="ca3-fila-n">Paciente Prueba 12</span><span class="ca3-fila-s">Dr. Admin Semilla · Centro</span></span><span class="ca3-est ca3-est-conf" role="img" aria-label="Confirmada"><span class="ca3-est-c"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span></span><svg class="ca3-chev" aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></button><button type="button" class="ca3-p ca3-fila" data-abre="cita" data-nom="Paciente Prueba 23" data-cuando="Jue 19 nov · 19:00 – 19:30" data-med="Dr. Admin Semilla · Centro" data-est="ag"><span class="ca3-hora">19:00</span><span class="ca3-fila-t"><span class="ca3-fila-n">Paciente Prueba 23</span><span class="ca3-fila-s">Dr. Admin Semilla · Centro</span></span><span class="ca3-est ca3-est-ag" role="img" aria-label="Agendada"><span class="ca3-est-c"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10.5V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4.5"/><path d="M4 10h16M8 3v4M16 3v4"/><circle cx="17" cy="17" r="4.5"/><path d="M17 15v2.2l1.5 1"/></svg></span></span><svg class="ca3-chev" aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></button><button type="button" class="ca3-p ca3-fila" data-abre="cita" data-nom="Paciente Prueba 07" data-cuando="Jue 19 nov · 19:30 – 20:00" data-med="Dra. Invitada Semilla · Rehab" data-est="conf"><span class="ca3-hora">19:30</span><span class="ca3-fila-t"><span class="ca3-fila-n">Paciente Prueba 07</span><span class="ca3-fila-s">Dra. Invitada Semilla · Rehab</span></span><span class="ca3-est ca3-est-conf" role="img" aria-label="Confirmada"><span class="ca3-est-c"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span></span><svg class="ca3-chev" aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></button></div></section></div><div class="ca3-fondo" data-vs="rej pl" data-nav="exp" data-tt="Expediente" hidden><header class="ca3-cab"><div class="ca3-cabf"><a href="#" class="ca3-p ca3-volver"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"/></svg>Paciente Prueba 01</a><span class="ca3-flex"></span><button type="button" class="ca3-p ca3-b ca3-ton" data-abre="rej" aria-haspopup="dialog">Cambiar</button></div>
+<div class="ca3-tit" style="--c:var(--d-suplementacion)"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2M9 12h6M9 16h6"/></svg><h1 class="ca3-h1">Suplementación</h1></div><p class="ca3-sub ca3-num">Paciente Prueba 01 · 73 años</p></header>
+<section class="ca3-tar"><button type="button" class="ca3-p ca3-fila" data-abre="pl" aria-haspopup="dialog"><span class="ca3-fila-t"><span class="ca3-fila-n">Plantilla</span></span><span class="ca3-der ca3-pl-v">— Sin plantilla —</span><svg class="ca3-chev" aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></button></section>
+<section class="ca3-sec"><h2 class="ca3-h2">Datos del paciente</h2><div class="ca3-tar"><dl><div class="ca3-par"><dt>Fecha</dt><dd class="ca3-num">19 nov 2026</dd></div><div class="ca3-par"><dt>Paciente</dt><dd>Paciente Prueba 01</dd></div><div class="ca3-par"><dt>Diagnóstico</dt><dd>Lumbago</dd></div></dl></div></section></div></main><nav class="ca3-riel" aria-label="Navegación principal">
+  <a href="#" class="ca3-p ca3-rb" data-n="inicio" aria-label="Inicio"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg></a><a href="#" class="ca3-p ca3-rb" data-n="exp" aria-label="Expediente"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.9.7 3.1 2.4 3.5 5.2"/></svg></a><a href="#" class="ca3-p ca3-rb" data-n="agenda" aria-label="Agenda"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg></a><a href="#" class="ca3-p ca3-rb" data-n="docs" aria-label="Documentos"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg></a><a href="#" class="ca3-p ca3-rb" data-n="mas" aria-label="Más"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 12h.01M12 12h.01M18 12h.01"/></svg></a>
+  <span class="ca3-flex"></span>
+  <button type="button" class="ca3-p ca3-mas" aria-label="Nueva consulta"><svg aria-hidden="true" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg></button>
+</nav></div>
+<div class="ca3-velo" aria-hidden="true"></div>
+<!-- Variante 1 · Hoja de acciones de la cita (dashboard aprobado, §24.2). El guion la llena con la fila tocada.
+     Acciones de hoy: «Iniciar consulta» (principal) y «Ver expediente». El dashboard de hoy no cambia estados: la hoja no los ofrece. -->
+<div class="ca3-capa" data-c="cita" data-k="hoja">
+  <div class="ca3-card ca3-w400 ca3-hc" role="dialog" aria-modal="true" aria-label="Cita de Paciente Prueba 12" tabindex="-1">
+    <span class="ca3-asa" aria-hidden="true"></span>
+    <div class="ca3-hc-cab"><div class="ca3-fecha" aria-hidden="true"><span class="ca3-mes">NOV</span><span class="ca3-dia">19</span></div>
+      <div class="ca3-hc-q"><h2 class="ca3-hc-n">Paciente Prueba 12</h2><p class="ca3-hc-d ca3-num ca3-hc-cu">Jue 19 nov · 18:30 – 19:00</p><p class="ca3-hc-d ca3-hc-me">Dr. Admin Semilla · Centro</p></div>
+      <button type="button" class="ca3-p ca3-ib ca3-hc-x" data-cierra aria-label="Cerrar"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+    <div class="ca3-hc-et"><span class="ca3-hc-e1"><span class="ca3-est ca3-est-conf"><span class="ca3-est-c"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span><span class="ca3-est-t">Confirmada</span></span></span><span class="ca3-hc-e2" hidden><span class="ca3-est ca3-est-ag"><span class="ca3-est-c"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10.5V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4.5"/><path d="M4 10h16M8 3v4M16 3v4"/><circle cx="17" cy="17" r="4.5"/><path d="M17 15v2.2l1.5 1"/></svg></span><span class="ca3-est-t">Agendada</span></span></span><span class="ca3-marca"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 0 0 5.7 0l3-3A4 4 0 0 0 13 5.3l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>Reservó por enlace</span></div>
+    <button type="button" class="ca3-p ca3-b ca3-prim" data-cierra data-foco><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3.5V8a4.5 4.5 0 0 0 9 0V3.5M9.5 12.5V15a5 5 0 0 0 10 0v-1.5"/><circle cx="19.5" cy="11.5" r="2"/></svg>Iniciar consulta</button>
+    <ul class="ca3-hc-l"><li><button type="button" class="ca3-p ca3-hc-a" data-cierra><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 7a2 2 0 0 1 2-2h4l2 2.5h7a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/></svg><span>Ver expediente</span></button></li></ul>
+  </div>
+</div>
+<!-- Variante 2 · Rejilla «Tipo de documento» (§9, §21): 2 columnas en teléfono, 4 en ancho; la celda del tipo actual con contorno de 2 px. Modal 640 en ancho. -->
+<div class="ca3-capa" data-c="rej" data-k="hoja">
+  <div class="ca3-card ca3-w640" role="dialog" aria-modal="true" aria-label="Tipo de documento" tabindex="-1">
+    <span class="ca3-asa" aria-hidden="true"></span>
+    <header class="ca3-hcab"><div><h2>Tipo de documento</h2></div><button type="button" class="ca3-p ca3-ib" data-cierra aria-label="Cerrar"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></header>
+    <div class="ca3-hcu"><div class="ca3-rej"><a href="#" class="ca3-p ca3-az" data-cierra><span class="ca3-az-i" style="--c:var(--d-receta)"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/><path d="m8.5 8.5 7 7"/></svg></span><span>Receta</span></a><a href="#" class="ca3-p ca3-az" data-cierra><span class="ca3-az-i" style="--c:var(--d-laboratorio)"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2v7.5L4.7 18.6A2 2 0 0 0 6.4 21.5h11.2a2 2 0 0 0 1.7-2.9L14 9.5V2"/><path d="M8.5 2h7M7 16h10"/></svg></span><span>Laboratorio</span></a><a href="#" class="ca3-p ca3-az" data-cierra><span class="ca3-az-i" style="--c:var(--d-imagen)"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M7 12h10"/></svg></span><span>Imagenología</span></a><a href="#" class="ca3-p ca3-az" data-cierra aria-current="true" data-foco><span class="ca3-az-i" style="--c:var(--d-suplementacion)"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2M9 12h6M9 16h6"/></svg></span><span>Suplementación</span></a><a href="#" class="ca3-p ca3-az" data-cierra><span class="ca3-az-i" style="--c:var(--d-internamiento)"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 20v-8a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v8M4 10V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v4M12 4v6M2 18h20"/></svg></span><span>Internamiento</span></a><a href="#" class="ca3-p ca3-az" data-cierra><span class="ca3-az-i" style="--c:var(--d-escrito)"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></span><span>Escrito médico</span></a><a href="#" class="ca3-p ca3-az" data-cierra><span class="ca3-az-i" style="--c:var(--d-consentimiento)"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.7 8.9a1 1 0 0 1-.6 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.2-2.7a1.2 1.2 0 0 1 1.6 0C14.5 3.8 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg></span><span>Consentimiento</span></a><a href="#" class="ca3-p ca3-az" data-cierra><span class="ca3-az-i" style="--c:var(--d-honorarios)"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8M12 17.5v-11"/></svg></span><span>Honorarios / Cotización</span></a></div></div>
+  </div>
+</div>
+<!-- Variante 3 · Lista para elegir: «Plantilla» (documentos aprobados). Radio con palomita; al elegir se aplica y cierra. Pie con «Gestionar plantillas». Modal 440 en ancho. -->
+<div class="ca3-capa" data-c="pl" data-k="hoja">
+  <div class="ca3-card ca3-w440 ca3-pl" role="dialog" aria-modal="true" aria-label="Plantilla" tabindex="-1">
+    <span class="ca3-asa" aria-hidden="true"></span>
+    <header class="ca3-hcab"><div><h2>Plantilla</h2></div><button type="button" class="ca3-p ca3-ib" data-cierra aria-label="Cerrar"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></header>
+    <div class="ca3-hcu"><div role="radiogroup" aria-label="Plantilla"><button type="button" class="ca3-p ca3-mi" role="radio" aria-checked="false" data-pl="Posoperatorio de columna"><span class="ca3-mt">Posoperatorio de columna</span><svg class="ca3-chk" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></button><button type="button" class="ca3-p ca3-mi" role="radio" aria-checked="false" data-pl="Osteopenia"><span class="ca3-mt">Osteopenia</span><svg class="ca3-chk" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></button><button type="button" class="ca3-p ca3-mi" role="radio" aria-checked="false" data-pl="Sarcopenia"><span class="ca3-mt">Sarcopenia</span><svg class="ca3-chk" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></button><span class="ca3-msep" role="separator"></span>
+      <button type="button" class="ca3-p ca3-mi" role="radio" aria-checked="false" data-pl="vaciar"><span class="ca3-mt">Vaciar formulario</span><svg class="ca3-chk" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></button>
+      <button type="button" class="ca3-p ca3-mi" role="radio" aria-checked="true" data-pl="" data-foco><span class="ca3-mt">— Sin plantilla —</span><svg class="ca3-chk" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></button></div></div>
+    <div class="ca3-hpie"><button type="button" class="ca3-p ca3-b ca3-qui" data-cierra>Gestionar plantillas</button></div>
+  </div>
+</div>
+</div>
+<div class="marco ca3" data-vp="tel" lang="es">
+<div class="ca3-app"><header class="ca3-enc">
+  <button type="button" class="ca3-p ca3-hamb" aria-label="Menú"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+  <span class="ca3-enc-t">Expediente</span><span class="ca3-flex"></span>
+  <button type="button" class="ca3-p ca3-yo" aria-label="Mi perfil">AS</button>
+</header><main class="ca3-cont" lang="es"><div class="ca3-fondo" data-vs="cita" data-nav="inicio" data-tt="Inicio" hidden><header class="ca3-cab"><h1 class="ca3-h1">Inicio</h1><p class="ca3-sub ca3-num">Jueves 19 de noviembre</p></header>
+<section class="ca3-sec"><div class="ca3-sec-c"><h2 class="ca3-h2">Después</h2></div><div class="ca3-tar"><button type="button" class="ca3-p ca3-fila" data-abre="cita" data-nom="Paciente Prueba 12" data-cuando="Jue 19 nov · 18:30 – 19:00" data-med="Dr. Admin Semilla · Centro" data-est="conf"><span class="ca3-hora">18:30</span><span class="ca3-fila-t"><span class="ca3-fila-n">Paciente Prueba 12</span><span class="ca3-fila-s">Dr. Admin Semilla · Centro</span></span><span class="ca3-est ca3-est-conf" role="img" aria-label="Confirmada"><span class="ca3-est-c"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span></span><svg class="ca3-chev" aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></button><button type="button" class="ca3-p ca3-fila" data-abre="cita" data-nom="Paciente Prueba 23" data-cuando="Jue 19 nov · 19:00 – 19:30" data-med="Dr. Admin Semilla · Centro" data-est="ag"><span class="ca3-hora">19:00</span><span class="ca3-fila-t"><span class="ca3-fila-n">Paciente Prueba 23</span><span class="ca3-fila-s">Dr. Admin Semilla · Centro</span></span><span class="ca3-est ca3-est-ag" role="img" aria-label="Agendada"><span class="ca3-est-c"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10.5V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4.5"/><path d="M4 10h16M8 3v4M16 3v4"/><circle cx="17" cy="17" r="4.5"/><path d="M17 15v2.2l1.5 1"/></svg></span></span><svg class="ca3-chev" aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></button><button type="button" class="ca3-p ca3-fila" data-abre="cita" data-nom="Paciente Prueba 07" data-cuando="Jue 19 nov · 19:30 – 20:00" data-med="Dra. Invitada Semilla · Rehab" data-est="conf"><span class="ca3-hora">19:30</span><span class="ca3-fila-t"><span class="ca3-fila-n">Paciente Prueba 07</span><span class="ca3-fila-s">Dra. Invitada Semilla · Rehab</span></span><span class="ca3-est ca3-est-conf" role="img" aria-label="Confirmada"><span class="ca3-est-c"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span></span><svg class="ca3-chev" aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></button></div></section></div><div class="ca3-fondo" data-vs="rej pl" data-nav="exp" data-tt="Expediente" hidden><header class="ca3-cab"><div class="ca3-cabf"><a href="#" class="ca3-p ca3-volver"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"/></svg>Paciente Prueba 01</a><span class="ca3-flex"></span><button type="button" class="ca3-p ca3-b ca3-ton" data-abre="rej" aria-haspopup="dialog">Cambiar</button></div>
+<div class="ca3-tit" style="--c:var(--d-suplementacion)"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2M9 12h6M9 16h6"/></svg><h1 class="ca3-h1">Suplementación</h1></div><p class="ca3-sub ca3-num">Paciente Prueba 01 · 73 años</p></header>
+<section class="ca3-tar"><button type="button" class="ca3-p ca3-fila" data-abre="pl" aria-haspopup="dialog"><span class="ca3-fila-t"><span class="ca3-fila-n">Plantilla</span></span><span class="ca3-der ca3-pl-v">— Sin plantilla —</span><svg class="ca3-chev" aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></button></section>
+<section class="ca3-sec"><h2 class="ca3-h2">Datos del paciente</h2><div class="ca3-tar"><dl><div class="ca3-par"><dt>Fecha</dt><dd class="ca3-num">19 nov 2026</dd></div><div class="ca3-par"><dt>Paciente</dt><dd>Paciente Prueba 01</dd></div><div class="ca3-par"><dt>Diagnóstico</dt><dd>Lumbago</dd></div></dl></div></section></div></main></div>
+<div class="ca3-velo" aria-hidden="true"></div>
+<!-- Variante 1 · Hoja de acciones de la cita (dashboard aprobado, §24.2). El guion la llena con la fila tocada.
+     Acciones de hoy: «Iniciar consulta» (principal) y «Ver expediente». El dashboard de hoy no cambia estados: la hoja no los ofrece. -->
+<div class="ca3-capa" data-c="cita" data-k="hoja">
+  <div class="ca3-card ca3-w400 ca3-hc" role="dialog" aria-modal="true" aria-label="Cita de Paciente Prueba 12" tabindex="-1">
+    <span class="ca3-asa" aria-hidden="true"></span>
+    <div class="ca3-hc-cab"><div class="ca3-fecha" aria-hidden="true"><span class="ca3-mes">NOV</span><span class="ca3-dia">19</span></div>
+      <div class="ca3-hc-q"><h2 class="ca3-hc-n">Paciente Prueba 12</h2><p class="ca3-hc-d ca3-num ca3-hc-cu">Jue 19 nov · 18:30 – 19:00</p><p class="ca3-hc-d ca3-hc-me">Dr. Admin Semilla · Centro</p></div>
+      <button type="button" class="ca3-p ca3-ib ca3-hc-x" data-cierra aria-label="Cerrar"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+    <div class="ca3-hc-et"><span class="ca3-hc-e1"><span class="ca3-est ca3-est-conf"><span class="ca3-est-c"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span><span class="ca3-est-t">Confirmada</span></span></span><span class="ca3-hc-e2" hidden><span class="ca3-est ca3-est-ag"><span class="ca3-est-c"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10.5V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4.5"/><path d="M4 10h16M8 3v4M16 3v4"/><circle cx="17" cy="17" r="4.5"/><path d="M17 15v2.2l1.5 1"/></svg></span><span class="ca3-est-t">Agendada</span></span></span><span class="ca3-marca"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 0 0 5.7 0l3-3A4 4 0 0 0 13 5.3l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>Reservó por enlace</span></div>
+    <button type="button" class="ca3-p ca3-b ca3-prim" data-cierra data-foco><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3.5V8a4.5 4.5 0 0 0 9 0V3.5M9.5 12.5V15a5 5 0 0 0 10 0v-1.5"/><circle cx="19.5" cy="11.5" r="2"/></svg>Iniciar consulta</button>
+    <ul class="ca3-hc-l"><li><button type="button" class="ca3-p ca3-hc-a" data-cierra><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 7a2 2 0 0 1 2-2h4l2 2.5h7a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/></svg><span>Ver expediente</span></button></li></ul>
+  </div>
+</div>
+<!-- Variante 2 · Rejilla «Tipo de documento» (§9, §21): 2 columnas en teléfono, 4 en ancho; la celda del tipo actual con contorno de 2 px. Modal 640 en ancho. -->
+<div class="ca3-capa" data-c="rej" data-k="hoja">
+  <div class="ca3-card ca3-w640" role="dialog" aria-modal="true" aria-label="Tipo de documento" tabindex="-1">
+    <span class="ca3-asa" aria-hidden="true"></span>
+    <header class="ca3-hcab"><div><h2>Tipo de documento</h2></div><button type="button" class="ca3-p ca3-ib" data-cierra aria-label="Cerrar"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></header>
+    <div class="ca3-hcu"><div class="ca3-rej"><a href="#" class="ca3-p ca3-az" data-cierra><span class="ca3-az-i" style="--c:var(--d-receta)"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/><path d="m8.5 8.5 7 7"/></svg></span><span>Receta</span></a><a href="#" class="ca3-p ca3-az" data-cierra><span class="ca3-az-i" style="--c:var(--d-laboratorio)"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2v7.5L4.7 18.6A2 2 0 0 0 6.4 21.5h11.2a2 2 0 0 0 1.7-2.9L14 9.5V2"/><path d="M8.5 2h7M7 16h10"/></svg></span><span>Laboratorio</span></a><a href="#" class="ca3-p ca3-az" data-cierra><span class="ca3-az-i" style="--c:var(--d-imagen)"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M7 12h10"/></svg></span><span>Imagenología</span></a><a href="#" class="ca3-p ca3-az" data-cierra aria-current="true" data-foco><span class="ca3-az-i" style="--c:var(--d-suplementacion)"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2M9 12h6M9 16h6"/></svg></span><span>Suplementación</span></a><a href="#" class="ca3-p ca3-az" data-cierra><span class="ca3-az-i" style="--c:var(--d-internamiento)"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 20v-8a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v8M4 10V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v4M12 4v6M2 18h20"/></svg></span><span>Internamiento</span></a><a href="#" class="ca3-p ca3-az" data-cierra><span class="ca3-az-i" style="--c:var(--d-escrito)"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></span><span>Escrito médico</span></a><a href="#" class="ca3-p ca3-az" data-cierra><span class="ca3-az-i" style="--c:var(--d-consentimiento)"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.7 8.9a1 1 0 0 1-.6 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.2-2.7a1.2 1.2 0 0 1 1.6 0C14.5 3.8 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg></span><span>Consentimiento</span></a><a href="#" class="ca3-p ca3-az" data-cierra><span class="ca3-az-i" style="--c:var(--d-honorarios)"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8M12 17.5v-11"/></svg></span><span>Honorarios / Cotización</span></a></div></div>
+  </div>
+</div>
+<!-- Variante 3 · Lista para elegir: «Plantilla» (documentos aprobados). Radio con palomita; al elegir se aplica y cierra. Pie con «Gestionar plantillas». Modal 440 en ancho. -->
+<div class="ca3-capa" data-c="pl" data-k="hoja">
+  <div class="ca3-card ca3-w440 ca3-pl" role="dialog" aria-modal="true" aria-label="Plantilla" tabindex="-1">
+    <span class="ca3-asa" aria-hidden="true"></span>
+    <header class="ca3-hcab"><div><h2>Plantilla</h2></div><button type="button" class="ca3-p ca3-ib" data-cierra aria-label="Cerrar"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></header>
+    <div class="ca3-hcu"><div role="radiogroup" aria-label="Plantilla"><button type="button" class="ca3-p ca3-mi" role="radio" aria-checked="false" data-pl="Posoperatorio de columna"><span class="ca3-mt">Posoperatorio de columna</span><svg class="ca3-chk" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></button><button type="button" class="ca3-p ca3-mi" role="radio" aria-checked="false" data-pl="Osteopenia"><span class="ca3-mt">Osteopenia</span><svg class="ca3-chk" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></button><button type="button" class="ca3-p ca3-mi" role="radio" aria-checked="false" data-pl="Sarcopenia"><span class="ca3-mt">Sarcopenia</span><svg class="ca3-chk" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></button><span class="ca3-msep" role="separator"></span>
+      <button type="button" class="ca3-p ca3-mi" role="radio" aria-checked="false" data-pl="vaciar"><span class="ca3-mt">Vaciar formulario</span><svg class="ca3-chk" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></button>
+      <button type="button" class="ca3-p ca3-mi" role="radio" aria-checked="true" data-pl="" data-foco><span class="ca3-mt">— Sin plantilla —</span><svg class="ca3-chk" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></button></div></div>
+    <div class="ca3-hpie"><button type="button" class="ca3-p ca3-b ca3-qui" data-cierra>Gestionar plantillas</button></div>
+  </div>
+</div>
+</div>
+<div class="marco ca3" data-vp="ih" lang="es">
+<div class="ca3-app"><main class="ca3-cont" lang="es"><div class="ca3-fondo" data-vs="cita" data-nav="inicio" data-tt="Inicio" hidden><header class="ca3-cab"><h1 class="ca3-h1">Inicio</h1><p class="ca3-sub ca3-num">Jueves 19 de noviembre</p></header>
+<section class="ca3-sec"><div class="ca3-sec-c"><h2 class="ca3-h2">Después</h2></div><div class="ca3-tar"><button type="button" class="ca3-p ca3-fila" data-abre="cita" data-nom="Paciente Prueba 12" data-cuando="Jue 19 nov · 18:30 – 19:00" data-med="Dr. Admin Semilla · Centro" data-est="conf"><span class="ca3-hora">18:30</span><span class="ca3-fila-t"><span class="ca3-fila-n">Paciente Prueba 12</span><span class="ca3-fila-s">Dr. Admin Semilla · Centro</span></span><span class="ca3-est ca3-est-conf" role="img" aria-label="Confirmada"><span class="ca3-est-c"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span></span><svg class="ca3-chev" aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></button><button type="button" class="ca3-p ca3-fila" data-abre="cita" data-nom="Paciente Prueba 23" data-cuando="Jue 19 nov · 19:00 – 19:30" data-med="Dr. Admin Semilla · Centro" data-est="ag"><span class="ca3-hora">19:00</span><span class="ca3-fila-t"><span class="ca3-fila-n">Paciente Prueba 23</span><span class="ca3-fila-s">Dr. Admin Semilla · Centro</span></span><span class="ca3-est ca3-est-ag" role="img" aria-label="Agendada"><span class="ca3-est-c"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10.5V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4.5"/><path d="M4 10h16M8 3v4M16 3v4"/><circle cx="17" cy="17" r="4.5"/><path d="M17 15v2.2l1.5 1"/></svg></span></span><svg class="ca3-chev" aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></button><button type="button" class="ca3-p ca3-fila" data-abre="cita" data-nom="Paciente Prueba 07" data-cuando="Jue 19 nov · 19:30 – 20:00" data-med="Dra. Invitada Semilla · Rehab" data-est="conf"><span class="ca3-hora">19:30</span><span class="ca3-fila-t"><span class="ca3-fila-n">Paciente Prueba 07</span><span class="ca3-fila-s">Dra. Invitada Semilla · Rehab</span></span><span class="ca3-est ca3-est-conf" role="img" aria-label="Confirmada"><span class="ca3-est-c"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span></span><svg class="ca3-chev" aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></button></div></section></div><div class="ca3-fondo" data-vs="rej pl" data-nav="exp" data-tt="Expediente" hidden><header class="ca3-cab"><div class="ca3-cabf"><a href="#" class="ca3-p ca3-volver"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"/></svg>Paciente Prueba 01</a><span class="ca3-flex"></span><button type="button" class="ca3-p ca3-b ca3-ton" data-abre="rej" aria-haspopup="dialog">Cambiar</button></div>
+<div class="ca3-tit" style="--c:var(--d-suplementacion)"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2M9 12h6M9 16h6"/></svg><h1 class="ca3-h1">Suplementación</h1></div><p class="ca3-sub ca3-num">Paciente Prueba 01 · 73 años</p></header>
+<section class="ca3-tar"><button type="button" class="ca3-p ca3-fila" data-abre="pl" aria-haspopup="dialog"><span class="ca3-fila-t"><span class="ca3-fila-n">Plantilla</span></span><span class="ca3-der ca3-pl-v">— Sin plantilla —</span><svg class="ca3-chev" aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></button></section>
+<section class="ca3-sec"><h2 class="ca3-h2">Datos del paciente</h2><div class="ca3-tar"><dl><div class="ca3-par"><dt>Fecha</dt><dd class="ca3-num">19 nov 2026</dd></div><div class="ca3-par"><dt>Paciente</dt><dd>Paciente Prueba 01</dd></div><div class="ca3-par"><dt>Diagnóstico</dt><dd>Lumbago</dd></div></dl></div></section></div></main><nav class="ca3-lat" aria-label="Navegación principal">
+  <div class="ca3-lat-cab"><span class="ca3-logo"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.5"/><path d="M12 5.5v13M9.6 8h4.8M9 11h6M9 14h6M9.6 17h4.8"/></svg><span class="ca3-logo-n">Spinus</span></span><span class="ca3-plan">Plan VIP</span></div>
+  <button type="button" class="ca3-p ca3-cons-b"><span class="ca3-yo">AS</span><span class="ca3-cons-t"><span>Consultorio</span><b>Centro</b></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 9 4-4 4 4M8 15l4 4 4-4"/></svg></button>
+  <div class="ca3-lista"><a href="#" class="ca3-p ca3-li" data-n="inicio"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Inicio</a><a href="#" class="ca3-p ca3-li" data-n="exp"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.9.7 3.1 2.4 3.5 5.2"/></svg>Expediente</a><a href="#" class="ca3-p ca3-li" data-n="agenda"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Agenda</a><a href="#" class="ca3-p ca3-li" data-n="docs"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>Documentos</a><a href="#" class="ca3-p ca3-li" data-n="admin"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20v-8M12 20V5M19 20v-9"/></svg>Administración</a></div>
+  <span class="ca3-flex"></span>
+  <div class="ca3-lat-pie"><a href="#" class="ca3-p ca3-li ca3-yo2"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18.2c1.3-2 3.2-3 5.5-3s4.2 1 5.5 3"/></svg><span><span>Dr. Admin Semilla</span><small>Mi perfil · Ajustes</small></span></a></div>
+</nav></div>
+<div class="ca3-velo" aria-hidden="true"></div>
+<!-- Variante 1 · Hoja de acciones de la cita (dashboard aprobado, §24.2). El guion la llena con la fila tocada.
+     Acciones de hoy: «Iniciar consulta» (principal) y «Ver expediente». El dashboard de hoy no cambia estados: la hoja no los ofrece. -->
+<div class="ca3-capa" data-c="cita" data-k="hoja">
+  <div class="ca3-card ca3-w400 ca3-hc" role="dialog" aria-modal="true" aria-label="Cita de Paciente Prueba 12" tabindex="-1">
+    <span class="ca3-asa" aria-hidden="true"></span>
+    <div class="ca3-hc-cab"><div class="ca3-fecha" aria-hidden="true"><span class="ca3-mes">NOV</span><span class="ca3-dia">19</span></div>
+      <div class="ca3-hc-q"><h2 class="ca3-hc-n">Paciente Prueba 12</h2><p class="ca3-hc-d ca3-num ca3-hc-cu">Jue 19 nov · 18:30 – 19:00</p><p class="ca3-hc-d ca3-hc-me">Dr. Admin Semilla · Centro</p></div>
+      <button type="button" class="ca3-p ca3-ib ca3-hc-x" data-cierra aria-label="Cerrar"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+    <div class="ca3-hc-et"><span class="ca3-hc-e1"><span class="ca3-est ca3-est-conf"><span class="ca3-est-c"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span><span class="ca3-est-t">Confirmada</span></span></span><span class="ca3-hc-e2" hidden><span class="ca3-est ca3-est-ag"><span class="ca3-est-c"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10.5V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4.5"/><path d="M4 10h16M8 3v4M16 3v4"/><circle cx="17" cy="17" r="4.5"/><path d="M17 15v2.2l1.5 1"/></svg></span><span class="ca3-est-t">Agendada</span></span></span><span class="ca3-marca"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 0 0 5.7 0l3-3A4 4 0 0 0 13 5.3l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>Reservó por enlace</span></div>
+    <button type="button" class="ca3-p ca3-b ca3-prim" data-cierra data-foco><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3.5V8a4.5 4.5 0 0 0 9 0V3.5M9.5 12.5V15a5 5 0 0 0 10 0v-1.5"/><circle cx="19.5" cy="11.5" r="2"/></svg>Iniciar consulta</button>
+    <ul class="ca3-hc-l"><li><button type="button" class="ca3-p ca3-hc-a" data-cierra><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 7a2 2 0 0 1 2-2h4l2 2.5h7a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/></svg><span>Ver expediente</span></button></li></ul>
+  </div>
+</div>
+<!-- Variante 2 · Rejilla «Tipo de documento» (§9, §21): 2 columnas en teléfono, 4 en ancho; la celda del tipo actual con contorno de 2 px. Modal 640 en ancho. -->
+<div class="ca3-capa" data-c="rej" data-k="hoja">
+  <div class="ca3-card ca3-w640" role="dialog" aria-modal="true" aria-label="Tipo de documento" tabindex="-1">
+    <span class="ca3-asa" aria-hidden="true"></span>
+    <header class="ca3-hcab"><div><h2>Tipo de documento</h2></div><button type="button" class="ca3-p ca3-ib" data-cierra aria-label="Cerrar"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></header>
+    <div class="ca3-hcu"><div class="ca3-rej"><a href="#" class="ca3-p ca3-az" data-cierra><span class="ca3-az-i" style="--c:var(--d-receta)"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/><path d="m8.5 8.5 7 7"/></svg></span><span>Receta</span></a><a href="#" class="ca3-p ca3-az" data-cierra><span class="ca3-az-i" style="--c:var(--d-laboratorio)"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2v7.5L4.7 18.6A2 2 0 0 0 6.4 21.5h11.2a2 2 0 0 0 1.7-2.9L14 9.5V2"/><path d="M8.5 2h7M7 16h10"/></svg></span><span>Laboratorio</span></a><a href="#" class="ca3-p ca3-az" data-cierra><span class="ca3-az-i" style="--c:var(--d-imagen)"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M7 12h10"/></svg></span><span>Imagenología</span></a><a href="#" class="ca3-p ca3-az" data-cierra aria-current="true" data-foco><span class="ca3-az-i" style="--c:var(--d-suplementacion)"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2M9 12h6M9 16h6"/></svg></span><span>Suplementación</span></a><a href="#" class="ca3-p ca3-az" data-cierra><span class="ca3-az-i" style="--c:var(--d-internamiento)"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 20v-8a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v8M4 10V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v4M12 4v6M2 18h20"/></svg></span><span>Internamiento</span></a><a href="#" class="ca3-p ca3-az" data-cierra><span class="ca3-az-i" style="--c:var(--d-escrito)"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></span><span>Escrito médico</span></a><a href="#" class="ca3-p ca3-az" data-cierra><span class="ca3-az-i" style="--c:var(--d-consentimiento)"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.7 8.9a1 1 0 0 1-.6 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.2-2.7a1.2 1.2 0 0 1 1.6 0C14.5 3.8 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg></span><span>Consentimiento</span></a><a href="#" class="ca3-p ca3-az" data-cierra><span class="ca3-az-i" style="--c:var(--d-honorarios)"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8M12 17.5v-11"/></svg></span><span>Honorarios / Cotización</span></a></div></div>
+  </div>
+</div>
+<!-- Variante 3 · Lista para elegir: «Plantilla» (documentos aprobados). Radio con palomita; al elegir se aplica y cierra. Pie con «Gestionar plantillas». Modal 440 en ancho. -->
+<div class="ca3-capa" data-c="pl" data-k="hoja">
+  <div class="ca3-card ca3-w440 ca3-pl" role="dialog" aria-modal="true" aria-label="Plantilla" tabindex="-1">
+    <span class="ca3-asa" aria-hidden="true"></span>
+    <header class="ca3-hcab"><div><h2>Plantilla</h2></div><button type="button" class="ca3-p ca3-ib" data-cierra aria-label="Cerrar"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></header>
+    <div class="ca3-hcu"><div role="radiogroup" aria-label="Plantilla"><button type="button" class="ca3-p ca3-mi" role="radio" aria-checked="false" data-pl="Posoperatorio de columna"><span class="ca3-mt">Posoperatorio de columna</span><svg class="ca3-chk" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></button><button type="button" class="ca3-p ca3-mi" role="radio" aria-checked="false" data-pl="Osteopenia"><span class="ca3-mt">Osteopenia</span><svg class="ca3-chk" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></button><button type="button" class="ca3-p ca3-mi" role="radio" aria-checked="false" data-pl="Sarcopenia"><span class="ca3-mt">Sarcopenia</span><svg class="ca3-chk" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></button><span class="ca3-msep" role="separator"></span>
+      <button type="button" class="ca3-p ca3-mi" role="radio" aria-checked="false" data-pl="vaciar"><span class="ca3-mt">Vaciar formulario</span><svg class="ca3-chk" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></button>
+      <button type="button" class="ca3-p ca3-mi" role="radio" aria-checked="true" data-pl="" data-foco><span class="ca3-mt">— Sin plantilla —</span><svg class="ca3-chk" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></button></div></div>
+    <div class="ca3-hpie"><button type="button" class="ca3-p ca3-b ca3-qui" data-cierra>Gestionar plantillas</button></div>
+  </div>
+</div>
+</div>
+<div class="marco ca3" data-vp="iv" lang="es">
+<div class="ca3-app"><header class="ca3-env">
+  <button type="button" class="ca3-p ca3-envb" aria-label="Mostrar barra lateral"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="15" rx="3"/><path d="M9.5 4.5v15"/></svg></button>
+  <nav class="ca3-pista" aria-label="Secciones"><a href="#" class="ca3-p ca3-pv" data-n="inicio">Inicio</a><a href="#" class="ca3-p ca3-pv" data-n="exp">Expediente</a><a href="#" class="ca3-p ca3-pv" data-n="agenda">Agenda</a><a href="#" class="ca3-p ca3-pv" data-n="docs">Documentos</a><a href="#" class="ca3-p ca3-pv" data-n="mas">Más</a></nav>
+  <button type="button" class="ca3-p ca3-yo" aria-label="Mi perfil">AS</button>
+</header><main class="ca3-cont" lang="es"><div class="ca3-fondo" data-vs="cita" data-nav="inicio" data-tt="Inicio" hidden><header class="ca3-cab"><h1 class="ca3-h1">Inicio</h1><p class="ca3-sub ca3-num">Jueves 19 de noviembre</p></header>
+<section class="ca3-sec"><div class="ca3-sec-c"><h2 class="ca3-h2">Después</h2></div><div class="ca3-tar"><button type="button" class="ca3-p ca3-fila" data-abre="cita" data-nom="Paciente Prueba 12" data-cuando="Jue 19 nov · 18:30 – 19:00" data-med="Dr. Admin Semilla · Centro" data-est="conf"><span class="ca3-hora">18:30</span><span class="ca3-fila-t"><span class="ca3-fila-n">Paciente Prueba 12</span><span class="ca3-fila-s">Dr. Admin Semilla · Centro</span></span><span class="ca3-est ca3-est-conf" role="img" aria-label="Confirmada"><span class="ca3-est-c"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span></span><svg class="ca3-chev" aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></button><button type="button" class="ca3-p ca3-fila" data-abre="cita" data-nom="Paciente Prueba 23" data-cuando="Jue 19 nov · 19:00 – 19:30" data-med="Dr. Admin Semilla · Centro" data-est="ag"><span class="ca3-hora">19:00</span><span class="ca3-fila-t"><span class="ca3-fila-n">Paciente Prueba 23</span><span class="ca3-fila-s">Dr. Admin Semilla · Centro</span></span><span class="ca3-est ca3-est-ag" role="img" aria-label="Agendada"><span class="ca3-est-c"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10.5V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4.5"/><path d="M4 10h16M8 3v4M16 3v4"/><circle cx="17" cy="17" r="4.5"/><path d="M17 15v2.2l1.5 1"/></svg></span></span><svg class="ca3-chev" aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></button><button type="button" class="ca3-p ca3-fila" data-abre="cita" data-nom="Paciente Prueba 07" data-cuando="Jue 19 nov · 19:30 – 20:00" data-med="Dra. Invitada Semilla · Rehab" data-est="conf"><span class="ca3-hora">19:30</span><span class="ca3-fila-t"><span class="ca3-fila-n">Paciente Prueba 07</span><span class="ca3-fila-s">Dra. Invitada Semilla · Rehab</span></span><span class="ca3-est ca3-est-conf" role="img" aria-label="Confirmada"><span class="ca3-est-c"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span></span><svg class="ca3-chev" aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></button></div></section></div><div class="ca3-fondo" data-vs="rej pl" data-nav="exp" data-tt="Expediente" hidden><header class="ca3-cab"><div class="ca3-cabf"><a href="#" class="ca3-p ca3-volver"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"/></svg>Paciente Prueba 01</a><span class="ca3-flex"></span><button type="button" class="ca3-p ca3-b ca3-ton" data-abre="rej" aria-haspopup="dialog">Cambiar</button></div>
+<div class="ca3-tit" style="--c:var(--d-suplementacion)"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2M9 12h6M9 16h6"/></svg><h1 class="ca3-h1">Suplementación</h1></div><p class="ca3-sub ca3-num">Paciente Prueba 01 · 73 años</p></header>
+<section class="ca3-tar"><button type="button" class="ca3-p ca3-fila" data-abre="pl" aria-haspopup="dialog"><span class="ca3-fila-t"><span class="ca3-fila-n">Plantilla</span></span><span class="ca3-der ca3-pl-v">— Sin plantilla —</span><svg class="ca3-chev" aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></button></section>
+<section class="ca3-sec"><h2 class="ca3-h2">Datos del paciente</h2><div class="ca3-tar"><dl><div class="ca3-par"><dt>Fecha</dt><dd class="ca3-num">19 nov 2026</dd></div><div class="ca3-par"><dt>Paciente</dt><dd>Paciente Prueba 01</dd></div><div class="ca3-par"><dt>Diagnóstico</dt><dd>Lumbago</dd></div></dl></div></section></div></main></div>
+<div class="ca3-velo" aria-hidden="true"></div>
+<!-- Variante 1 · Hoja de acciones de la cita (dashboard aprobado, §24.2). El guion la llena con la fila tocada.
+     Acciones de hoy: «Iniciar consulta» (principal) y «Ver expediente». El dashboard de hoy no cambia estados: la hoja no los ofrece. -->
+<div class="ca3-capa" data-c="cita" data-k="hoja">
+  <div class="ca3-card ca3-w400 ca3-hc" role="dialog" aria-modal="true" aria-label="Cita de Paciente Prueba 12" tabindex="-1">
+    <span class="ca3-asa" aria-hidden="true"></span>
+    <div class="ca3-hc-cab"><div class="ca3-fecha" aria-hidden="true"><span class="ca3-mes">NOV</span><span class="ca3-dia">19</span></div>
+      <div class="ca3-hc-q"><h2 class="ca3-hc-n">Paciente Prueba 12</h2><p class="ca3-hc-d ca3-num ca3-hc-cu">Jue 19 nov · 18:30 – 19:00</p><p class="ca3-hc-d ca3-hc-me">Dr. Admin Semilla · Centro</p></div>
+      <button type="button" class="ca3-p ca3-ib ca3-hc-x" data-cierra aria-label="Cerrar"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+    <div class="ca3-hc-et"><span class="ca3-hc-e1"><span class="ca3-est ca3-est-conf"><span class="ca3-est-c"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span><span class="ca3-est-t">Confirmada</span></span></span><span class="ca3-hc-e2" hidden><span class="ca3-est ca3-est-ag"><span class="ca3-est-c"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10.5V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4.5"/><path d="M4 10h16M8 3v4M16 3v4"/><circle cx="17" cy="17" r="4.5"/><path d="M17 15v2.2l1.5 1"/></svg></span><span class="ca3-est-t">Agendada</span></span></span><span class="ca3-marca"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 0 0 5.7 0l3-3A4 4 0 0 0 13 5.3l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>Reservó por enlace</span></div>
+    <button type="button" class="ca3-p ca3-b ca3-prim" data-cierra data-foco><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3.5V8a4.5 4.5 0 0 0 9 0V3.5M9.5 12.5V15a5 5 0 0 0 10 0v-1.5"/><circle cx="19.5" cy="11.5" r="2"/></svg>Iniciar consulta</button>
+    <ul class="ca3-hc-l"><li><button type="button" class="ca3-p ca3-hc-a" data-cierra><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 7a2 2 0 0 1 2-2h4l2 2.5h7a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/></svg><span>Ver expediente</span></button></li></ul>
+  </div>
+</div>
+<!-- Variante 2 · Rejilla «Tipo de documento» (§9, §21): 2 columnas en teléfono, 4 en ancho; la celda del tipo actual con contorno de 2 px. Modal 640 en ancho. -->
+<div class="ca3-capa" data-c="rej" data-k="hoja">
+  <div class="ca3-card ca3-w640" role="dialog" aria-modal="true" aria-label="Tipo de documento" tabindex="-1">
+    <span class="ca3-asa" aria-hidden="true"></span>
+    <header class="ca3-hcab"><div><h2>Tipo de documento</h2></div><button type="button" class="ca3-p ca3-ib" data-cierra aria-label="Cerrar"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></header>
+    <div class="ca3-hcu"><div class="ca3-rej"><a href="#" class="ca3-p ca3-az" data-cierra><span class="ca3-az-i" style="--c:var(--d-receta)"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/><path d="m8.5 8.5 7 7"/></svg></span><span>Receta</span></a><a href="#" class="ca3-p ca3-az" data-cierra><span class="ca3-az-i" style="--c:var(--d-laboratorio)"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2v7.5L4.7 18.6A2 2 0 0 0 6.4 21.5h11.2a2 2 0 0 0 1.7-2.9L14 9.5V2"/><path d="M8.5 2h7M7 16h10"/></svg></span><span>Laboratorio</span></a><a href="#" class="ca3-p ca3-az" data-cierra><span class="ca3-az-i" style="--c:var(--d-imagen)"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M7 12h10"/></svg></span><span>Imagenología</span></a><a href="#" class="ca3-p ca3-az" data-cierra aria-current="true" data-foco><span class="ca3-az-i" style="--c:var(--d-suplementacion)"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2M9 12h6M9 16h6"/></svg></span><span>Suplementación</span></a><a href="#" class="ca3-p ca3-az" data-cierra><span class="ca3-az-i" style="--c:var(--d-internamiento)"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 20v-8a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v8M4 10V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v4M12 4v6M2 18h20"/></svg></span><span>Internamiento</span></a><a href="#" class="ca3-p ca3-az" data-cierra><span class="ca3-az-i" style="--c:var(--d-escrito)"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></span><span>Escrito médico</span></a><a href="#" class="ca3-p ca3-az" data-cierra><span class="ca3-az-i" style="--c:var(--d-consentimiento)"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.7 8.9a1 1 0 0 1-.6 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.2-2.7a1.2 1.2 0 0 1 1.6 0C14.5 3.8 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg></span><span>Consentimiento</span></a><a href="#" class="ca3-p ca3-az" data-cierra><span class="ca3-az-i" style="--c:var(--d-honorarios)"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8M12 17.5v-11"/></svg></span><span>Honorarios / Cotización</span></a></div></div>
+  </div>
+</div>
+<!-- Variante 3 · Lista para elegir: «Plantilla» (documentos aprobados). Radio con palomita; al elegir se aplica y cierra. Pie con «Gestionar plantillas». Modal 440 en ancho. -->
+<div class="ca3-capa" data-c="pl" data-k="hoja">
+  <div class="ca3-card ca3-w440 ca3-pl" role="dialog" aria-modal="true" aria-label="Plantilla" tabindex="-1">
+    <span class="ca3-asa" aria-hidden="true"></span>
+    <header class="ca3-hcab"><div><h2>Plantilla</h2></div><button type="button" class="ca3-p ca3-ib" data-cierra aria-label="Cerrar"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></header>
+    <div class="ca3-hcu"><div role="radiogroup" aria-label="Plantilla"><button type="button" class="ca3-p ca3-mi" role="radio" aria-checked="false" data-pl="Posoperatorio de columna"><span class="ca3-mt">Posoperatorio de columna</span><svg class="ca3-chk" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></button><button type="button" class="ca3-p ca3-mi" role="radio" aria-checked="false" data-pl="Osteopenia"><span class="ca3-mt">Osteopenia</span><svg class="ca3-chk" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></button><button type="button" class="ca3-p ca3-mi" role="radio" aria-checked="false" data-pl="Sarcopenia"><span class="ca3-mt">Sarcopenia</span><svg class="ca3-chk" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></button><span class="ca3-msep" role="separator"></span>
+      <button type="button" class="ca3-p ca3-mi" role="radio" aria-checked="false" data-pl="vaciar"><span class="ca3-mt">Vaciar formulario</span><svg class="ca3-chk" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></button>
+      <button type="button" class="ca3-p ca3-mi" role="radio" aria-checked="true" data-pl="" data-foco><span class="ca3-mt">— Sin plantilla —</span><svg class="ca3-chk" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></button></div></div>
+    <div class="ca3-hpie"><button type="button" class="ca3-p ca3-b ca3-qui" data-cierra>Gestionar plantillas</button></div>
+  </div>
+</div>
+</div>
+<div class="marco ca3" data-vp="esc" lang="es">
+<div class="ca3-app"><nav class="ca3-lat" aria-label="Navegación principal">
+  <div class="ca3-lat-cab"><span class="ca3-logo"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.5"/><path d="M12 5.5v13M9.6 8h4.8M9 11h6M9 14h6M9.6 17h4.8"/></svg><span class="ca3-logo-n">Spinus</span></span><span class="ca3-plan">Plan VIP</span></div>
+  <button type="button" class="ca3-p ca3-cons-b"><span class="ca3-yo">AS</span><span class="ca3-cons-t"><span>Consultorio</span><b>Centro</b></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 9 4-4 4 4M8 15l4 4 4-4"/></svg></button>
+  <div class="ca3-lista"><a href="#" class="ca3-p ca3-li" data-n="inicio"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Inicio</a><a href="#" class="ca3-p ca3-li" data-n="exp"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.9.7 3.1 2.4 3.5 5.2"/></svg>Expediente</a><a href="#" class="ca3-p ca3-li" data-n="agenda"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Agenda</a><a href="#" class="ca3-p ca3-li" data-n="docs"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>Documentos</a><a href="#" class="ca3-p ca3-li" data-n="admin"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20v-8M12 20V5M19 20v-9"/></svg>Administración</a></div>
+  <span class="ca3-flex"></span>
+  <div class="ca3-lat-pie"><a href="#" class="ca3-p ca3-li ca3-yo2"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18.2c1.3-2 3.2-3 5.5-3s4.2 1 5.5 3"/></svg><span><span>Dr. Admin Semilla</span><small>Mi perfil · Ajustes</small></span></a></div>
+</nav><main class="ca3-cont" lang="es"><div class="ca3-fondo" data-vs="cita" data-nav="inicio" data-tt="Inicio" hidden><header class="ca3-cab"><h1 class="ca3-h1">Inicio</h1><p class="ca3-sub ca3-num">Jueves 19 de noviembre</p></header>
+<section class="ca3-sec"><div class="ca3-sec-c"><h2 class="ca3-h2">Después</h2></div><div class="ca3-tar"><button type="button" class="ca3-p ca3-fila" data-abre="cita" data-nom="Paciente Prueba 12" data-cuando="Jue 19 nov · 18:30 – 19:00" data-med="Dr. Admin Semilla · Centro" data-est="conf"><span class="ca3-hora">18:30</span><span class="ca3-fila-t"><span class="ca3-fila-n">Paciente Prueba 12</span><span class="ca3-fila-s">Dr. Admin Semilla · Centro</span></span><span class="ca3-est ca3-est-conf" role="img" aria-label="Confirmada"><span class="ca3-est-c"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span></span><svg class="ca3-chev" aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></button><button type="button" class="ca3-p ca3-fila" data-abre="cita" data-nom="Paciente Prueba 23" data-cuando="Jue 19 nov · 19:00 – 19:30" data-med="Dr. Admin Semilla · Centro" data-est="ag"><span class="ca3-hora">19:00</span><span class="ca3-fila-t"><span class="ca3-fila-n">Paciente Prueba 23</span><span class="ca3-fila-s">Dr. Admin Semilla · Centro</span></span><span class="ca3-est ca3-est-ag" role="img" aria-label="Agendada"><span class="ca3-est-c"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10.5V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4.5"/><path d="M4 10h16M8 3v4M16 3v4"/><circle cx="17" cy="17" r="4.5"/><path d="M17 15v2.2l1.5 1"/></svg></span></span><svg class="ca3-chev" aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></button><button type="button" class="ca3-p ca3-fila" data-abre="cita" data-nom="Paciente Prueba 07" data-cuando="Jue 19 nov · 19:30 – 20:00" data-med="Dra. Invitada Semilla · Rehab" data-est="conf"><span class="ca3-hora">19:30</span><span class="ca3-fila-t"><span class="ca3-fila-n">Paciente Prueba 07</span><span class="ca3-fila-s">Dra. Invitada Semilla · Rehab</span></span><span class="ca3-est ca3-est-conf" role="img" aria-label="Confirmada"><span class="ca3-est-c"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span></span><svg class="ca3-chev" aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></button></div></section></div><div class="ca3-fondo" data-vs="rej pl" data-nav="exp" data-tt="Expediente" hidden><header class="ca3-cab"><div class="ca3-cabf"><a href="#" class="ca3-p ca3-volver"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"/></svg>Paciente Prueba 01</a><span class="ca3-flex"></span><button type="button" class="ca3-p ca3-b ca3-ton" data-abre="rej" aria-haspopup="dialog">Cambiar</button></div>
+<div class="ca3-tit" style="--c:var(--d-suplementacion)"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2M9 12h6M9 16h6"/></svg><h1 class="ca3-h1">Suplementación</h1></div><p class="ca3-sub ca3-num">Paciente Prueba 01 · 73 años</p></header>
+<section class="ca3-tar"><button type="button" class="ca3-p ca3-fila" data-abre="pl" aria-haspopup="dialog"><span class="ca3-fila-t"><span class="ca3-fila-n">Plantilla</span></span><span class="ca3-der ca3-pl-v">— Sin plantilla —</span><svg class="ca3-chev" aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></button></section>
+<section class="ca3-sec"><h2 class="ca3-h2">Datos del paciente</h2><div class="ca3-tar"><dl><div class="ca3-par"><dt>Fecha</dt><dd class="ca3-num">19 nov 2026</dd></div><div class="ca3-par"><dt>Paciente</dt><dd>Paciente Prueba 01</dd></div><div class="ca3-par"><dt>Diagnóstico</dt><dd>Lumbago</dd></div></dl></div></section></div></main></div>
+<div class="ca3-velo" aria-hidden="true"></div>
+<!-- Variante 1 · Hoja de acciones de la cita (dashboard aprobado, §24.2). El guion la llena con la fila tocada.
+     Acciones de hoy: «Iniciar consulta» (principal) y «Ver expediente». El dashboard de hoy no cambia estados: la hoja no los ofrece. -->
+<div class="ca3-capa" data-c="cita" data-k="hoja">
+  <div class="ca3-card ca3-w400 ca3-hc" role="dialog" aria-modal="true" aria-label="Cita de Paciente Prueba 12" tabindex="-1">
+    <span class="ca3-asa" aria-hidden="true"></span>
+    <div class="ca3-hc-cab"><div class="ca3-fecha" aria-hidden="true"><span class="ca3-mes">NOV</span><span class="ca3-dia">19</span></div>
+      <div class="ca3-hc-q"><h2 class="ca3-hc-n">Paciente Prueba 12</h2><p class="ca3-hc-d ca3-num ca3-hc-cu">Jue 19 nov · 18:30 – 19:00</p><p class="ca3-hc-d ca3-hc-me">Dr. Admin Semilla · Centro</p></div>
+      <button type="button" class="ca3-p ca3-ib ca3-hc-x" data-cierra aria-label="Cerrar"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+    <div class="ca3-hc-et"><span class="ca3-hc-e1"><span class="ca3-est ca3-est-conf"><span class="ca3-est-c"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span><span class="ca3-est-t">Confirmada</span></span></span><span class="ca3-hc-e2" hidden><span class="ca3-est ca3-est-ag"><span class="ca3-est-c"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10.5V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4.5"/><path d="M4 10h16M8 3v4M16 3v4"/><circle cx="17" cy="17" r="4.5"/><path d="M17 15v2.2l1.5 1"/></svg></span><span class="ca3-est-t">Agendada</span></span></span><span class="ca3-marca"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 0 0 5.7 0l3-3A4 4 0 0 0 13 5.3l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>Reservó por enlace</span></div>
+    <button type="button" class="ca3-p ca3-b ca3-prim" data-cierra data-foco><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3.5V8a4.5 4.5 0 0 0 9 0V3.5M9.5 12.5V15a5 5 0 0 0 10 0v-1.5"/><circle cx="19.5" cy="11.5" r="2"/></svg>Iniciar consulta</button>
+    <ul class="ca3-hc-l"><li><button type="button" class="ca3-p ca3-hc-a" data-cierra><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 7a2 2 0 0 1 2-2h4l2 2.5h7a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/></svg><span>Ver expediente</span></button></li></ul>
+  </div>
+</div>
+<!-- Variante 2 · Rejilla «Tipo de documento» (§9, §21): 2 columnas en teléfono, 4 en ancho; la celda del tipo actual con contorno de 2 px. Modal 640 en ancho. -->
+<div class="ca3-capa" data-c="rej" data-k="hoja">
+  <div class="ca3-card ca3-w640" role="dialog" aria-modal="true" aria-label="Tipo de documento" tabindex="-1">
+    <span class="ca3-asa" aria-hidden="true"></span>
+    <header class="ca3-hcab"><div><h2>Tipo de documento</h2></div><button type="button" class="ca3-p ca3-ib" data-cierra aria-label="Cerrar"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></header>
+    <div class="ca3-hcu"><div class="ca3-rej"><a href="#" class="ca3-p ca3-az" data-cierra><span class="ca3-az-i" style="--c:var(--d-receta)"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/><path d="m8.5 8.5 7 7"/></svg></span><span>Receta</span></a><a href="#" class="ca3-p ca3-az" data-cierra><span class="ca3-az-i" style="--c:var(--d-laboratorio)"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2v7.5L4.7 18.6A2 2 0 0 0 6.4 21.5h11.2a2 2 0 0 0 1.7-2.9L14 9.5V2"/><path d="M8.5 2h7M7 16h10"/></svg></span><span>Laboratorio</span></a><a href="#" class="ca3-p ca3-az" data-cierra><span class="ca3-az-i" style="--c:var(--d-imagen)"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M7 12h10"/></svg></span><span>Imagenología</span></a><a href="#" class="ca3-p ca3-az" data-cierra aria-current="true" data-foco><span class="ca3-az-i" style="--c:var(--d-suplementacion)"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2M9 12h6M9 16h6"/></svg></span><span>Suplementación</span></a><a href="#" class="ca3-p ca3-az" data-cierra><span class="ca3-az-i" style="--c:var(--d-internamiento)"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 20v-8a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v8M4 10V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v4M12 4v6M2 18h20"/></svg></span><span>Internamiento</span></a><a href="#" class="ca3-p ca3-az" data-cierra><span class="ca3-az-i" style="--c:var(--d-escrito)"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></span><span>Escrito médico</span></a><a href="#" class="ca3-p ca3-az" data-cierra><span class="ca3-az-i" style="--c:var(--d-consentimiento)"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.7 8.9a1 1 0 0 1-.6 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.2-2.7a1.2 1.2 0 0 1 1.6 0C14.5 3.8 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg></span><span>Consentimiento</span></a><a href="#" class="ca3-p ca3-az" data-cierra><span class="ca3-az-i" style="--c:var(--d-honorarios)"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8M12 17.5v-11"/></svg></span><span>Honorarios / Cotización</span></a></div></div>
+  </div>
+</div>
+<!-- Variante 3 · Lista para elegir: «Plantilla» (documentos aprobados). Radio con palomita; al elegir se aplica y cierra. Pie con «Gestionar plantillas». Modal 440 en ancho. -->
+<div class="ca3-capa" data-c="pl" data-k="hoja">
+  <div class="ca3-card ca3-w440 ca3-pl" role="dialog" aria-modal="true" aria-label="Plantilla" tabindex="-1">
+    <span class="ca3-asa" aria-hidden="true"></span>
+    <header class="ca3-hcab"><div><h2>Plantilla</h2></div><button type="button" class="ca3-p ca3-ib" data-cierra aria-label="Cerrar"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></header>
+    <div class="ca3-hcu"><div role="radiogroup" aria-label="Plantilla"><button type="button" class="ca3-p ca3-mi" role="radio" aria-checked="false" data-pl="Posoperatorio de columna"><span class="ca3-mt">Posoperatorio de columna</span><svg class="ca3-chk" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></button><button type="button" class="ca3-p ca3-mi" role="radio" aria-checked="false" data-pl="Osteopenia"><span class="ca3-mt">Osteopenia</span><svg class="ca3-chk" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></button><button type="button" class="ca3-p ca3-mi" role="radio" aria-checked="false" data-pl="Sarcopenia"><span class="ca3-mt">Sarcopenia</span><svg class="ca3-chk" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></button><span class="ca3-msep" role="separator"></span>
+      <button type="button" class="ca3-p ca3-mi" role="radio" aria-checked="false" data-pl="vaciar"><span class="ca3-mt">Vaciar formulario</span><svg class="ca3-chk" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></button>
+      <button type="button" class="ca3-p ca3-mi" role="radio" aria-checked="true" data-pl="" data-foco><span class="ca3-mt">— Sin plantilla —</span><svg class="ca3-chk" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></button></div></div>
+    <div class="ca3-hpie"><button type="button" class="ca3-p ca3-b ca3-qui" data-cierra>Gestionar plantillas</button></div>
+  </div>
+</div>
+</div>
+<script>
+(function(){
+  /* Capas con resorte de verdad (CALMA §25, skill apple-design §3–§9).
+     - Cada capa tiene un progreso p (0 cerrada · 1 abierta) que sigue a su objetivo con un resorte (masa 1, rigidez (2π/respuesta)²,
+       amortiguación 4π·ζ/respuesta), integrado fotograma a fotograma. Cambiar el objetivo a medio camino NO reinicia nada: el resorte
+       parte del valor y la velocidad que hay en pantalla, así que abrir y cerrar a mitad no salta.
+     - Entrada ζ 1.0 / 0.36 s; salida ζ 1.0 / 0.24 s (más rápida); tras soltar un arrastre ζ 0.8 / 0.30 s si el gesto llevaba
+       velocidad (> 300 px/s), si no ζ 1.0. Solo se escriben transform y opacity.
+     - Hojas (solo iPhone, CALMA §26): arrastre 1:1 con umbral de 10 px, rubber-band hacia arriba, proyección de inercia
+       (deceleración 0.998) para decidir si cierra, y la velocidad del dedo pasa al resorte.
+     - Movimiento reducido: sin desplazamiento ni escala; fundido lineal de 200 ms (150 al salir).
+     En la app: el mismo modelo con un resorte de librería (p. ej. Motion, bounce 0, duration .36). */
+  var CFG=(function(){var c={"vars": [["cita", "Acciones de la cita"], ["rej", "Tipo de documento"], ["pl", "Plantillas"]], "def": "cita", "ficha": "<h3>Especificación · Hoja</h3>\n<p>Tareas cortas: acciones de un elemento, elegir de una rejilla o de una lista. En iPhone sube del borde inferior y se arrastra; en Duo cerrado (CALMA §26) y en ancho es tarjeta centrada con velo, nacida del centro, sin asa ni arrastre.</p>\n<table><thead><tr><th></th><th>ext</th><th>tel</th><th>ih</th><th>iv</th><th>esc</th></tr></thead><tbody>\n<tr><th>Forma</th><td>tarjeta centrada en el área de contenido, radio 20</td><td>hoja 393</td><td colspan=\"3\">tarjeta centrada en el área de contenido, radio 20</td></tr>\n<tr><th>Ancho</th><td>310 (margen 8); alto máx. área − 32, cuerpo con desplazamiento</td><td>todo el ancho</td><td colspan=\"3\">cita 400 · plantillas 440 · rejilla 640</td></tr>\n<tr><th>Rejilla</th><td colspan=\"2\">2 columnas, celda ≥ 84</td><td colspan=\"3\">4 columnas, celda ≥ 88</td></tr>\n<tr><th>Filas</th><td>48</td><td>48</td><td>44</td><td>48</td><td>44</td></tr>\n</tbody></table>\n<dl>\n<dt>Hoja (iPhone)</dt><dd>Radio superior 22, asa 36×5 en <b>--borde</b>, fondo <b>--sup</b>, relleno inferior <b>--ib</b> + 16. Alto según su contenido, como mucho hasta 16 px del borde superior; si no cabe, el cuerpo se desplaza.</dd>\n<dt>Arrastre (solo iPhone)</dt><dd>Se toma de cualquier punto (no de un campo, ni del cuerpo si ya está desplazado). Umbral de 10 px; luego sigue al dedo 1:1 respetando el punto de agarre; hacia arriba, rubber-band (c = .55). Al soltar se proyecta la inercia (deceleración .998): si el punto proyectado pasa de la mitad, cierra; si no, vuelve. La velocidad del dedo pasa al resorte: ζ .8 / .30 s si el gesto llevaba más de 300 px/s, ζ 1.0 si no. Se puede volver a agarrar mientras baja.</dd>\n<dt>Resorte</dt><dd>Entrada ζ 1.0 / .36 s; salida ζ 1.0 / .24 s; tarjeta (Duo cerrado y ancho): escala .96 → 1 con fundido.</dd>\n<dt>Cierre</dt><dd>Arrastre (iPhone), «×», tocar el velo, Esc, o elegir una opción (rejilla, plantilla, acción).</dd>\n<dt>Velo</dt><dd>Sí, con desenfoque, que sigue al dedo: su opacidad es el progreso de la hoja.</dd>\n<dt>Foco y teclado</dt><dd>role=\"dialog\"; el foco entra en la acción principal, en el tipo actual de la rejilla o en la opción marcada. Flechas: rejilla en 2/4 columnas, lista arriba/abajo; Inicio/Fin; Enter elige; Esc cierra y devuelve el foco.</dd>\n<dt>Movimiento reducido</dt><dd>Fundido en su sitio. El arrastre sigue funcionando (es manipulación directa), pero al soltar la hoja se funde en vez de deslizar.</dd>\n<dt>Transparencia reducida</dt><dd>Velo sin desenfoque y totalmente opaco: <b>--navy</b> al 100 % en oscuro; en claro, color sólido equivalente (<b>--navy</b> 45 % sobre <b>--fondo</b>).</dd>\n</dl>"};c.alAbrir=function(m,k,op){if(k!=='cita'||!op||!op.dataset.nom)return;var q=function(s){return m.querySelector('.ca3-capa[data-c="cita"] '+s)};
+  q('.ca3-hc-n').textContent=op.dataset.nom;q('.ca3-hc-cu').textContent=op.dataset.cuando;q('.ca3-hc-me').textContent=op.dataset.med;
+  q('.ca3-hc-e1').hidden=op.dataset.est!=='conf';q('.ca3-hc-e2').hidden=op.dataset.est!=='ag';q('.ca3-card').setAttribute('aria-label','Cita de '+op.dataset.nom)};
+c.enCapa=function(m,k,e,cierra){if(k!=='pl')return false;var b=e.target.closest('[data-pl]');if(!b)return false;
+  [].forEach.call(m.querySelectorAll('[data-pl]'),function(x){x.setAttribute('aria-checked',String(x===b&&b.dataset.pl!=='vaciar'||b.dataset.pl==='vaciar'&&x.dataset.pl===''))});
+  m.querySelector('.ca3-pl-v').textContent=b.dataset.pl&&b.dataset.pl!=='vaciar'?b.dataset.pl:'— Sin plantilla —';cierra();return true};return c})();
+  var marcos=[].slice.call(document.querySelectorAll('.ca3.marco'));
+  if(!marcos.length)return;
+  var mqM=matchMedia('(prefers-reduced-motion: reduce)');
+  var G={v:CFG.def,rm:false,rt:false,lento:false};
+  function RM(){return G.rm||mqM.matches}
+  var mqT=matchMedia('(prefers-reduced-transparency: reduce)');function RT(){return G.rt||mqT.matches}
+  /* Transparencia reducida: velo OPACO. Oscuro: --navy al 100 %; claro: el color sólido equivalente al velo sobre el fondo (--navy 45 % + --fondo). */
+  function oscuro(m){var c=getComputedStyle(m).backgroundColor.match(/[\d.]+/g)||[255,255,255];return (+c[0]*.2126+ +c[1]*.7152+ +c[2]*.0722)<128}
+  function cl(x,a,b){return x<a?a:x>b?b:x}
+  function rubber(o,d){var c=.55;return o*d*c/(d+c*Math.abs(o))}
+  var API=marcos.map(controla);
+
+  function controla(m){
+    var vp=m.dataset.vp,tel=vp==='ext'||vp==='tel',app=m.querySelector('.ca3-app'),velo=m.querySelector('.ca3-velo');
+    var L={},raf=0,last=0;
+    function z(){return m.getBoundingClientRect().width/m.offsetWidth||1}
+    [].forEach.call(m.querySelectorAll('.ca3-capa'),function(c){
+      var k=c.dataset.k,modo=k==='alerta'?'centro':k==='hoja'?(vp==='tel'?'hoja':'centro'):(vp==='tel'?'hoja':vp==='esc'?'pop':'centro'); /* CALMA §26: en ext todo es tarjeta centrada; la hoja inferior arrastrable solo en tel */
+      c.dataset.modo=modo;c.setAttribute('aria-hidden','true');c.inert=true;
+      var l=L[c.dataset.c]={key:c.dataset.c,c:c,card:c.querySelector('.ca3-card'),modo:modo,p:0,v:0,t:0,on:false,H:300,off:0,resp:.36,zeta:1,op:null,drag:false};
+      if(modo==='hoja')arrastre(l);
+    });
+    function pinta(l){
+      var p=l.p,tr='',op=1,rm=RM();
+      if(l.modo==='hoja'){
+        if(rm){op=cl(p,0,1);tr='translate3d(0,'+l.off.toFixed(2)+'px,0)'}
+        else tr='translate3d(0,'+((1-p)*l.H).toFixed(2)+'px,0)';
+      }else if(l.modo==='centro'){
+        if(rm)op=cl(p,0,1);else{op=cl(p*1.25,0,1);tr='scale('+(.96+.04*cl(p,0,1.1)).toFixed(4)+')'}
+      }else{
+        if(rm)op=cl(p,0,1);else{op=cl(p*1.4,0,1);tr='scale('+(.9+.1*cl(p,0,1.1)).toFixed(4)+')'}
+      }
+      l.card.style.transform=tr;l.card.style.opacity=op.toFixed(3);
+    }
+    function pintaVelo(){var o=0;for(var k in L){var l=L[k];if(l.on&&l.modo!=='pop')o=Math.max(o,cl(l.p,0,1))}
+      velo.style.opacity=o.toFixed(3);velo.style.background=RT()?(oscuro(m)?'var(--navy)':'color-mix(in srgb,var(--navy) 45%,var(--fondo))'):'';velo.style.visibility=o>.001?'visible':'hidden'}
+    function paso(now){
+      raf=0;var dt=last?Math.min(.034,(now-last)/1000):0;last=now;if(G.lento)dt/=4;
+      var vivo=false,rm=RM();
+      for(var k in L){var l=L[k];if(!l.on||l.drag)continue;
+        if(rm){var r=dt/(l.t>l.p?.2:.15);l.p=l.t>l.p?Math.min(l.t,l.p+r):Math.max(l.t,l.p-r);l.v=0;
+          if(l.t===1&&l.off)l.off=Math.abs(l.off)<.5?0:l.off*Math.max(0,1-dt*14)}
+        else{var K=Math.pow(2*Math.PI/l.resp,2),C=4*Math.PI*l.zeta/l.resp,n=Math.max(1,Math.ceil(dt*240)),h=dt/n;
+          for(var i=0;i<n;i++){var a=-K*(l.p-l.t)-C*l.v;l.v+=a*h;l.p+=l.v*h}}
+        if(Math.abs(l.p-l.t)<.0005&&Math.abs(l.v)<.005&&!(rm&&l.t===1&&l.off)){l.p=l.t;l.v=0;if(l.t===0){oculta(l);continue}}
+        else vivo=true;
+        pinta(l);
+      }
+      pintaVelo();
+      if(vivo)raf=requestAnimationFrame(paso);else last=0;
+    }
+    function corre(){if(!raf){last=0;raf=requestAnimationFrame(paso)}}
+    function oculta(l){l.on=false;l.off=0;l.c.classList.remove('ca3-vis');l.c.inert=true;l.card.style.transform='';l.card.style.opacity='0'}
+    function abiertaTop(){var r=null;for(var k in L)if(L[k].on&&L[k].t===1)r=L[k];return r}
+    function coloca(l){var b=l.op;if(!b||!b.getBoundingClientRect)return;
+      var r=b.getBoundingClientRect(),mr=m.getBoundingClientRect(),Z=z(),bx=(r.left-mr.left)/Z,by=(r.top-mr.top)/Z,bw=r.width/Z,bh=r.height/Z;
+      var w=l.card.offsetWidth,h=l.card.offsetHeight,left=Math.max(248+12,Math.min(bx+bw-w,m.offsetWidth-w-12)),top=by+bh+4,arr=top+h>m.offsetHeight-12;
+      if(arr)top=Math.max(12,by-h-4);
+      l.card.style.left=left+'px';l.card.style.top=top+'px';
+      l.card.style.transformOrigin=cl(bx+bw/2-left,0,w).toFixed(0)+'px '+(arr?'100%':'0')}
+    function abre(k,op){var l=L[k];if(!l)return;
+      for(var j in L)if(j!==k&&L[j].on&&L[j].t===1)cierra(j,true);
+      if(op)l.op=op;
+      if(CFG.alAbrir)CFG.alAbrir(m,k,l.op);
+      if(!l.on){l.on=true;l.p=Math.max(l.p,0);l.c.classList.add('ca3-vis')}
+      l.c.inert=false;l.c.setAttribute('aria-hidden','false');
+      if(l.modo==='pop')coloca(l);
+      l.H=Math.max(120,l.card.offsetHeight-80);
+      if(l.p===0)pinta(l);
+      l.t=1;l.resp=l.modo==='pop'?.28:.36;l.zeta=1;
+      if(l.modo!=='pop')app.inert=true;
+      if(l.op&&l.op.setAttribute)l.op.setAttribute('aria-expanded','true');
+      var f=l.card.querySelector('[data-foco]')||l.card.querySelector('button:not([disabled]),a[href],textarea,input');
+      if(f)f.focus({preventScroll:true});else l.card.focus({preventScroll:true});
+      corre()}
+    function cierra(k,sinFoco){var l=L[k];if(!l||!l.on||l.t===0)return;
+      l.t=0;l.resp=l.modo==='pop'?.2:.24;l.zeta=1;l.c.setAttribute('aria-hidden','true');
+      var otro=false;for(var j in L)if(j!==k&&L[j].on&&L[j].t===1&&L[j].modo!=='pop')otro=true;
+      if(!otro)app.inert=false;
+      if(l.op&&l.op.setAttribute)l.op.setAttribute('aria-expanded','false');
+      if(!sinFoco&&l.op&&l.op.isConnected&&l.op.offsetParent)l.op.focus({preventScroll:true});
+      corre()}
+    function cierraTodo(){for(var k in L)cierra(k,true)}
+
+    /* ---- Arrastre de hojas: 1:1 con el dedo, rubber-band arriba, proyección de inercia y velocidad al resorte ---- */
+    function arrastre(l){
+      var card=l.card,d=null,anula=false;
+      card.addEventListener('pointerdown',function(e){
+        if(!l.on||e.button>0||e.target.closest('input,textarea,select'))return;
+        var sc=e.target.closest('.ca3-hcu');if(sc&&sc.scrollTop>0)return;
+        d={id:e.pointerId,y0:e.clientY,x0:e.clientX,act:false,h:[[e.timeStamp,e.clientY]]}});
+      card.addEventListener('pointermove',function(e){
+        if(!d||e.pointerId!==d.id)return;var Z=z(),dy=(e.clientY-d.y0)/Z,dx=(e.clientX-d.x0)/Z;
+        if(!d.act){
+          if(Math.abs(dx)>10&&Math.abs(dx)>Math.abs(dy)){d=null;return}
+          if(dy<10)return;
+          d.act=true;d.y0=e.clientY;dy=0;try{card.setPointerCapture(e.pointerId)}catch(_){}
+          l.drag=true;l.v=0;if(l.t!==1){l.t=1;l.c.setAttribute('aria-hidden','false');app.inert=true}
+          d.base=RM()?l.off:(1-l.p)*l.H;l.H=Math.max(120,card.offsetHeight-80)}
+        var y=d.base+dy;if(y<0)y=-rubber(-y,80);
+        if(RM())l.off=y;else l.p=1-y/l.H;
+        d.h.push([e.timeStamp,e.clientY]);if(d.h.length>6)d.h.shift();
+        pinta(l);pintaVelo();e.preventDefault()});
+      function suelta(e){if(!d||e.pointerId!==d.id)return;var dd=d;d=null;if(!dd.act)return;
+        l.drag=false;anula=true;setTimeout(function(){anula=false},0);
+        var Z=z(),h=dd.h,a=h[0],b=h[h.length-1],vy=(b[1]-a[1])/Z/Math.max(.016,(b[0]-a[0])/1000);
+        if(e.timeStamp-b[0]>90)vy=0;
+        var y=RM()?l.off:(1-l.p)*l.H,proy=y+vy/1000*.998/(1-.998);
+        if(proy>l.H*.5)cierra(l.key);else l.t=1;
+        l.v=RM()?0:-vy/l.H;l.zeta=Math.abs(vy)>300?.8:1;l.resp=.3;corre()}
+      card.addEventListener('pointerup',suelta);card.addEventListener('pointercancel',suelta);
+      card.addEventListener('click',function(e){if(anula){e.preventDefault();e.stopPropagation()}},true);
+    }
+
+    /* ---- Eventos ---- */
+    m.addEventListener('click',function(e){
+      var t=e.target.closest('a[href="#"]');if(t)e.preventDefault();
+      if((t=e.target.closest('[data-abre]'))&&!t.closest('.ca3-capa')){var k=t.dataset.abre==='@'?G.v:t.dataset.abre,l=L[k];
+        if(l&&l.on&&l.t===1&&l.modo==='pop'){cierra(k);return}abre(k,t);return}
+      var capa=e.target.closest('.ca3-capa');
+      if(capa){
+        if(CFG.enCapa&&CFG.enCapa(m,capa.dataset.c,e,function(){cierra(capa.dataset.c)}))return;
+        if(e.target.closest('[data-cierra]'))cierra(capa.dataset.c);return}
+      if(e.target===velo){var top=abiertaTop();if(top&&top.c.dataset.velo!=='no')cierra(top.key)}
+    });
+    m.addEventListener('pointerdown',function(e){for(var k in L){var l=L[k];
+      if(l.modo==='pop'&&l.on&&l.t===1&&!l.card.contains(e.target)&&!(l.op&&l.op.contains(e.target)))cierra(k,true)}},true);
+    m.addEventListener('scroll',function(){for(var k in L)if(L[k].modo==='pop')cierra(k,true)},true);
+    m.addEventListener('keydown',function(e){var top=abiertaTop();if(!top)return;
+      if(e.key==='Escape'){e.preventDefault();cierra(top.key);return}
+      if(/^Arrow|^Home$|^End$/.test(e.key)){var its=[].slice.call(top.card.querySelectorAll('[role^="menuitem"],[role="radio"],.ca3-az')),i=its.indexOf(document.activeElement);
+        if(!its.length||i<0&&!/Down|Right/.test(e.key))return;
+        var cols=top.card.querySelector('.ca3-rej')?(tel?2:4):1,n=its.length,j=i;
+        if(e.key==='Home')j=0;else if(e.key==='End')j=n-1;
+        else if(e.key==='ArrowDown')j=i<0?0:Math.min(n-1,i+cols);else if(e.key==='ArrowUp')j=Math.max(0,i-cols);
+        else if(e.key==='ArrowRight')j=cols>1?Math.min(n-1,i+1):i;else if(e.key==='ArrowLeft')j=cols>1?Math.max(0,i-1):i;
+        e.preventDefault();its[j].focus({preventScroll:true})}});
+
+    function ponVar(v){cierraTodo();
+      [].forEach.call(m.querySelectorAll('.ca3-fondo'),function(f){f.hidden=(' '+f.dataset.vs+' ').indexOf(' '+v+' ')<0;
+        if(!f.hidden){var nv=f.dataset.nav;[].forEach.call(m.querySelectorAll('[data-n]'),function(a){if(a.dataset.n===nv)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current')});
+          var tt=m.querySelector('.ca3-enc-t');if(tt)tt.textContent=f.dataset.tt}});
+      var c=m.querySelector('.ca3-cont');if(c)c.scrollTop=0}
+    function abreVar(){var f=[].filter.call(m.querySelectorAll('.ca3-fondo'),function(x){return !x.hidden})[0];if(!f)return;
+      var o=f.querySelector('[data-abre="'+G.v+'"]')||f.querySelector('[data-abre="@"]');abre(G.v,o)}
+    function repinta(){for(var k in L)if(L[k].on){if(!RM())L[k].off=0;pinta(L[k])}pintaVelo()}
+    m.ca3_capa=function(k){return L[k]};
+    return {m:m,ponVar:ponVar,abreVar:abreVar,cierra:function(){var t=abiertaTop();if(t)cierra(t.key)},repinta:repinta};
+  }
+
+  /* ---- Tira de maqueta (fuera del marco) y ficha «Especificación» bajo el marco ---- */
+  var tira=document.createElement('div');tira.className='ca3-tira';tira.setAttribute('role','group');tira.setAttribute('aria-label','Controles de la maqueta');
+  function bt(t,a,pr){var b=document.createElement('button');b.type='button';b.textContent=t;b.dataset.a=a;if(pr!==undefined)b.setAttribute('aria-pressed',String(pr));tira.appendChild(b);return b}
+  function sep(){var s=document.createElement('span');s.className='ca3-tsep';s.setAttribute('aria-hidden','true');tira.appendChild(s)}
+  CFG.vars.forEach(function(x){bt('Maqueta: '+x[1],'v:'+x[0],x[0]===G.v)});sep();
+  bt('Abrir','abrir');bt('Cerrar','cerrar');sep();
+  bt('Movimiento reducido','rm',false);bt('Transparencia reducida','rt',false);bt('Cámara lenta ×4','lento',false);
+  var ficha=document.createElement('section');ficha.className='ca3-ficha';ficha.setAttribute('aria-label','Especificación');ficha.setAttribute('lang','es');ficha.innerHTML=CFG.ficha;
+  var op=marcos[0].closest('.op');
+  if(op){op.querySelector('header').appendChild(tira);op.appendChild(ficha)}
+  else{marcos[0].parentNode.insertBefore(tira,marcos[0]);marcos[marcos.length-1].parentNode.appendChild(ficha)}
+  function marca(){[].forEach.call(tira.querySelectorAll('button[aria-pressed]'),function(b){var a=b.dataset.a;
+    b.setAttribute('aria-pressed',String(a.indexOf('v:')===0?a.slice(2)===G.v:!!G[a]))})}
+  tira.addEventListener('click',function(e){var b=e.target.closest('button');if(!b)return;var a=b.dataset.a;
+    if(a.indexOf('v:')===0){G.v=a.slice(2);API.forEach(function(x){x.ponVar(G.v)})}
+    else if(a==='abrir')API.forEach(function(x){if(x.m.offsetParent!==null||x.m.style.display!=='none')x.abreVar()});
+    else if(a==='cerrar')API.forEach(function(x){x.cierra()});
+    else{G[a]=!G[a];marcos.forEach(function(m){m.classList.toggle('ca3-'+a,G[a])});API.forEach(function(x){x.repinta()})}
+    marca()});
+  API.forEach(function(x){x.ponVar(G.v)});marca();
+  new MutationObserver(function(){API.forEach(function(x){x.repinta()})}).observe(document.documentElement,{attributes:true,attributeFilter:['class','data-theme']});
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change',function(){API.forEach(function(x){x.repinta()})});
+})();
+</script>

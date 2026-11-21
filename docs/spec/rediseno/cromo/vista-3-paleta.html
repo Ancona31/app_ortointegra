@@ -1,0 +1,647 @@
+<!-- NOMBRE: Paleta de comandos (⌘K) | Hoy cae desde arriba como una caja sin título ni papel de diálogo, con el pie de teclas también en teléfono; aquí es la misma tarjeta de capa del sistema, anclada arriba en ancho y hoja en iPhone, con avatares, el documento por folio con su color de tipo y el registro rápido con la alerta de duplicado del catálogo -->
+<style>
+
+.cr3 .cr3-app{display:flex;width:100%;height:100%}
+.cr3[data-vp="tel"] .cr3-app,.cr3[data-vp="iv"] .cr3-app{flex-direction:column}
+.cr3 button{border:0;margin:0;padding:0;background:none;color:inherit}
+.cr3 h1,.cr3 h2,.cr3 h3,.cr3 p,.cr3 ul{margin:0;padding:0}
+.cr3 ul{list-style:none}
+.cr3 svg{flex:none}
+.cr3 .cr3-flex{flex:1}
+/* Variantes por rol: m = médico, s = secretaria */
+.cr3:not(.cr3-sec) .cr3-s{display:none!important}
+.cr3.cr3-sec .cr3-m{display:none!important}
+/* Respuesta al toque y foco */
+.cr3 .cr3-p{transition:transform 100ms ease-out}
+.cr3 .cr3-p:active{transform:scale(.97)}
+.cr3 .cr3-p:focus-visible{outline:3px solid var(--enlace);outline-offset:2px}
+.cr3 .cr3-nav .cr3-p:focus-visible,.cr3 .cr3-lat .cr3-p:focus-visible{outline-color:var(--nav-tinta)}
+/* ---- Fondo simplificado ---- */
+.cr3 .cr3-cont{flex:1;min-width:0;min-height:0;overflow-x:hidden;overflow-y:auto;scrollbar-width:none;display:flex;flex-direction:column;gap:16px;padding:16px 14px calc(var(--ib) + 16px) 16px}
+.cr3 .cr3-cont>*{flex:none}
+.cr3[data-vp="tel"] .cr3-cont{padding:18px 16px calc(var(--ib) + 16px)}
+.cr3[data-vp="ih"] .cr3-cont{padding:20px 24px calc(var(--ib) + 16px)}
+.cr3[data-vp="iv"] .cr3-cont{padding:22px 24px 20px}
+.cr3[data-vp="esc"] .cr3-cont{padding:28px 24px 24px}
+.cr3 .cr3-top{display:flex;flex-direction:column;gap:4px}
+.cr3 .cr3-rot{font-size:12px;line-height:16px;font-weight:600;letter-spacing:.3px;text-transform:uppercase;color:var(--tinta2)}
+.cr3 .cr3-h1{font-size:26px;line-height:32px;font-weight:800;letter-spacing:-.6px}
+.cr3[data-vp="ih"] .cr3-h1,.cr3[data-vp="iv"] .cr3-h1,.cr3[data-vp="esc"] .cr3-h1{font-size:32px;line-height:38px}
+.cr3 .cr3-cols{display:flex;flex-direction:column;gap:12px}
+.cr3[data-vp="ih"] .cr3-cols,.cr3[data-vp="iv"] .cr3-cols,.cr3[data-vp="esc"] .cr3-cols{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:16px;align-items:start}
+.cr3[data-vp="ih"] .cr3-cols>:first-child,.cr3[data-vp="iv"] .cr3-cols>:first-child,.cr3[data-vp="esc"] .cr3-cols>:first-child{grid-row:1/3}
+.cr3 .cr3-tj{background:var(--sup);border-radius:16px;padding:14px 16px 8px}
+.cr3[data-vp="ih"] .cr3-tj,.cr3[data-vp="iv"] .cr3-tj,.cr3[data-vp="esc"] .cr3-tj{border-radius:18px;padding:16px 20px 8px}
+.cr3 .cr3-tt{font-size:17px;line-height:22px;font-weight:700;margin-bottom:4px}
+.cr3 .cr3-fl{display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--linea)}
+.cr3 .cr3-tt+.cr3-fl{border-top:0}
+.cr3 .cr3-bx{width:44px;height:44px;flex:none;border-radius:12px;background:var(--fondo)}
+.cr3 .cr3-fl-t{flex:1;display:flex;flex-direction:column;gap:8px}
+.cr3 .cr3-br{display:block;height:10px;border-radius:5px;background:var(--sup2)}
+.cr3 .cr3-br2{height:8px;opacity:.7}
+/* ---- Riel (Duo cerrado) ---- */
+.cr3 .cr3-riel{position:relative;z-index:1;flex:none;width:calc(56px + var(--ir));padding:16px calc(var(--ir) + 8px) calc(var(--ib) + 10px) 8px;background:var(--navy);border-radius:26px 0 0 26px;box-shadow:var(--sombra-nav-der);display:flex;flex-direction:column;align-items:center;gap:8px}
+.cr3 .cr3-rb{position:relative;width:48px;height:48px;flex:none;border-radius:999px;display:flex;align-items:center;justify-content:center;color:var(--nav-tinta)}
+.cr3 .cr3-rb[aria-current="page"]{background:var(--accion);color:#fff}
+.cr3 .cr3-masb{width:52px;height:52px;flex:none;border-radius:999px;background:#fff;color:var(--accion);display:flex;align-items:center;justify-content:center;box-shadow:var(--sombra-accion)}
+/* ---- Encabezado fundido (iPhone) ---- */
+.cr3 .cr3-enc{position:relative;z-index:1;flex:none;display:flex;align-items:center;gap:12px;padding:calc(var(--it) + 8px) 16px 12px;background:var(--navy);border-radius:0 0 26px 26px;box-shadow:var(--sombra-nav-sup);color:#fff}
+.cr3 .cr3-menu{position:relative;width:44px;height:44px;flex:none;border-radius:12px;background:var(--nav-velo);color:#fff;display:flex;align-items:center;justify-content:center}
+.cr3 .cr3-enc-t{font-size:17px;line-height:22px;font-weight:700;color:#fff}
+.cr3 .cr3-av{display:flex;align-items:center;justify-content:center;flex:none;width:34px;height:34px;border-radius:999px;background:var(--nav-avatar);color:var(--navy);font-size:13px;font-weight:700}
+.cr3 .cr3-av.cr3-av-g{width:44px;height:44px}
+/* ---- Encabezado de Duo abierto vertical ---- */
+.cr3 .cr3-env{position:relative;z-index:1;flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:var(--it) 16px 14px;background:var(--navy);border-radius:0 0 26px 26px;box-shadow:var(--sombra-nav-sup);color:#fff}
+.cr3 .cr3-envb{position:relative;width:44px;height:44px;flex:none;border-radius:999px;background:var(--nav-velo);color:#fff;display:flex;align-items:center;justify-content:center}
+.cr3 .cr3-pista{display:flex;align-items:center;gap:2px;padding:4px;border-radius:26px;background:var(--nav-velo)}
+.cr3 .cr3-pv{display:flex;align-items:center;height:40px;padding:0 14px;border-radius:999px;color:var(--nav-tinta);font-size:15px;line-height:20px;font-weight:500;white-space:nowrap;position:relative}
+.cr3 .cr3-pv::after{content:"";position:absolute;inset:-2px 0}
+.cr3 .cr3-pv[aria-current="page"]{padding:0 16px;background:var(--accion);color:#fff;font-weight:600}
+/* ---- Barra lateral (Duo abierto horizontal a la derecha; computadora a la izquierda) y cajón ---- */
+.cr3 .cr3-lat{position:relative;z-index:1;flex:none;display:flex;flex-direction:column;background:var(--navy);color:#fff}
+.cr3[data-vp="ih"] .cr3-lat{width:calc(218px + var(--ir));padding:16px calc(var(--ir) + 10px) calc(var(--ib) + 10px) 12px;border-radius:26px 0 0 26px;box-shadow:var(--sombra-nav-der)}
+.cr3[data-vp="esc"] .cr3-lat{width:248px;padding:16px 12px 14px;border-radius:0 26px 26px 0;box-shadow:var(--sombra-nav-izq)}
+.cr3 .cr3-lat-cab{display:flex;align-items:center;gap:8px;min-height:36px;padding:0 4px 0 8px}
+.cr3 .cr3-logo{display:inline-flex;align-items:center;gap:8px;color:#fff}
+.cr3 .cr3-logo-n{font-size:17px;line-height:22px;font-weight:700;letter-spacing:-.2px}
+.cr3 .cr3-plan{display:inline-flex;align-items:center;height:24px;padding:0 10px;border-radius:999px;background:var(--nav-velo);color:var(--nav-tinta);font-size:12px;line-height:16px;font-weight:600;white-space:nowrap}
+.cr3 .cr3-cons-b{margin-top:12px;display:flex;align-items:center;gap:10px;width:100%;min-height:52px;padding:8px 10px;border-radius:14px;background:var(--nav-velo);color:#fff;text-align:left}
+.cr3 .cr3-cons-b>svg{color:var(--nav-tinta2)}
+.cr3 .cr3-clogo{width:36px;height:36px;flex:none;border-radius:999px;background:#fff;color:var(--accion);display:flex;align-items:center;justify-content:center}
+.cr3 .cr3-cons-t{flex:1;min-width:0;display:flex;flex-direction:column}
+.cr3 .cr3-cons-t span{font-size:13px;line-height:16px;color:var(--nav-tinta2)}
+.cr3 .cr3-cons-t b{font-size:15px;line-height:19px;font-weight:600}
+.cr3 .cr3-lista{margin-top:14px;display:flex;flex-direction:column;gap:2px}
+.cr3 .cr3-li{display:flex;align-items:center;gap:12px;height:44px;padding:0 12px;border-radius:12px;color:var(--nav-tinta);font-size:15px;line-height:20px;font-weight:500}
+.cr3[data-vp="esc"] .cr3-li{height:40px;font-size:14px}
+.cr3 .cr3-li[aria-current="page"]{background:var(--accion);color:#fff;font-weight:600}
+.cr3 .cr3-lat-pie{border-top:1px solid var(--nav-velo);padding-top:8px;display:flex;align-items:center;gap:4px}
+.cr3 .cr3-lat-pie .cr3-yo{flex:1;min-width:0;text-align:left}
+.cr3 .cr3-lat-pie .cr3-ib{color:var(--nav-tinta2)}
+.cr3[data-vp="ih"] .cr3-esp{display:none}
+/* Duo abierto horizontal: la barra mide 218; el pie suelta el icono para que nombre y «Ayuda» quepan en una línea */
+.cr3[data-vp="ih"] .cr3-lat .cr3-lat-pie .cr3-yo{padding:0 8px}
+.cr3[data-vp="ih"] .cr3-lat .cr3-lat-pie .cr3-yo>svg{display:none}
+.cr3[data-vp="ih"] .cr3-lat .cr3-lat-pie .cr3-ib{width:36px;height:36px}
+.cr3 .cr3-esp{color:var(--nav-tinta)!important}
+.cr3 .cr3-yo{min-height:48px;height:auto;padding-top:6px;padding-bottom:6px}
+.cr3 .cr3-yo>span{display:flex;flex-direction:column;line-height:17px}
+.cr3 .cr3-yo small{font-size:12px;line-height:16px;color:var(--nav-tinta2)}
+.cr3 .cr3-ib{position:relative;width:44px;height:44px;flex:none;border-radius:999px;display:flex;align-items:center;justify-content:center;color:var(--nav-tinta)}
+/* ---- Capas (CALMA cr325/cr326): un velo por marco; cajón desde la izquierda en iPhone y Duo vertical; tarjeta centrada en lo demás ---- */
+.cr3 .cr3-capa{position:absolute;inset:0;z-index:20;visibility:hidden;transition:visibility 0s linear 360ms}
+.cr3 .cr3-capa.cr3-on{visibility:visible;transition:none}
+.cr3 .cr3-velo{position:absolute;inset:0;background:var(--velo);-webkit-backdrop-filter:blur(10px) saturate(140%);backdrop-filter:blur(10px) saturate(140%);opacity:0;transition:opacity 240ms ease-out}
+.cr3 .cr3-on .cr3-velo{opacity:1;transition:opacity 320ms ease-out}
+.cr3 .cr3-cajon{position:absolute;left:0;top:0;bottom:0;width:300px;display:flex;flex-direction:column;overflow-y:auto;scrollbar-width:none;padding:calc(var(--it) + 12px) 14px calc(var(--ib) + 12px) 14px;background:var(--navy);color:#fff;border-radius:0 26px 26px 0;box-shadow:var(--sombra-nav-izq);transform:translateX(-106%);transition:transform 360ms linear(0,0.123,0.3397,0.54,0.6943,0.8032,0.8762,0.9234,0.9533,0.9718,0.9831,0.99,0.9941,0.9965,0.998,1)}
+.cr3[data-vp="iv"] .cr3-cajon{width:320px}
+.cr3 .cr3-capa[data-k~="cajon"].cr3-on .cr3-cajon{transform:none;transition:transform 520ms linear(0,0.0803,0.2398,0.4083,0.5568,0.6769,0.769,0.8374,0.8869,0.9221,0.9468,0.9639,0.9756,0.9836,0.9891,0.9927,0.9952,0.9968,0.9979,0.9986,1)}
+.cr3 .cr3-cajon .cr3-lat-cab{padding-right:0}
+.cr3 .cr3-mnw{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:16px;pointer-events:none}
+.cr3[data-vp="ext"] .cr3-mnw{padding:16px calc(56px + var(--ir) + 8px) calc(var(--ib) + 16px) 8px}
+.cr3[data-vp="iv"] .cr3-mnw{padding:calc(var(--it) + 16px) 24px 24px}
+.cr3[data-vp="ih"] .cr3-mnw{padding:24px calc(218px + var(--ir) + 24px) calc(var(--ib) + 16px) 24px}
+.cr3[data-vp="esc"] .cr3-mnw{padding:32px 24px 32px calc(248px + 24px)}
+.cr3 .cr3-mn{pointer-events:auto;width:310px;max-width:100%;max-height:100%;overflow-y:auto;scrollbar-width:none;background:var(--sup);color:var(--tinta);border-radius:20px;box-shadow:var(--sombra-capa);padding:8px;opacity:0;transform:scale(.96);transition:opacity 200ms ease-out,transform 360ms linear(0,0.123,0.3397,0.54,0.6943,0.8032,0.8762,0.9234,0.9533,0.9718,0.9831,0.99,0.9941,0.9965,0.998,1)}
+.cr3[data-vp="iv"] .cr3-mn,.cr3[data-vp="ih"] .cr3-mn,.cr3[data-vp="esc"] .cr3-mn{width:340px}
+.cr3 .cr3-capa[data-k~="mas"].cr3-on .cr3-mn{opacity:1;transform:none;transition:opacity 240ms ease-out,transform 520ms linear(0,0.0803,0.2398,0.4083,0.5568,0.6769,0.769,0.8374,0.8869,0.9221,0.9468,0.9639,0.9756,0.9836,0.9891,0.9927,0.9952,0.9968,0.9979,0.9986,1)}
+.cr3 .cr3-capa:not([data-k~="mas"]) .cr3-mnw{display:none}
+.cr3 .cr3-capa:not([data-k~="cajon"]) .cr3-cajon{display:none}
+.cr3 .cr3-mn-t{padding:8px 12px 6px;font-size:17px;line-height:22px;font-weight:700}
+.cr3 .cr3-mo{display:flex;align-items:center;gap:12px;width:100%;min-height:48px;padding:0 12px;border-radius:12px;font-size:15px;line-height:20px;color:var(--tinta);text-align:left}
+.cr3 .cr3-mo{position:relative}
+.cr3 .cr3-mo+.cr3-mo::before{content:"";position:absolute;left:44px;right:12px;top:0;height:1px;background:var(--linea)}
+.cr3 .cr3-mo>svg:first-child{color:var(--enlace)}
+.cr3 .cr3-mo>.cr3-mo-f{margin-left:auto;color:var(--tinta3)}
+.cr3 .cr3-mo-v{margin-left:auto;font-size:15px;color:var(--tinta2)}
+.cr3 .cr3-mo-v+.cr3-mo-f{margin-left:4px}
+@media (prefers-reduced-transparency:reduce){
+  .cr3 .cr3-velo{-webkit-backdrop-filter:none;backdrop-filter:none;background:color-mix(in srgb,var(--navy) 55%,var(--fondo))}
+}
+@media (prefers-reduced-motion:reduce){
+  .cr3 .cr3-cajon,.cr3 .cr3-capa[data-k~="cajon"].cr3-on .cr3-cajon{transform:none;opacity:0;transition:opacity 200ms ease}
+  .cr3 .cr3-capa[data-k~="cajon"].cr3-on .cr3-cajon{opacity:1}
+  .cr3 .cr3-mn,.cr3 .cr3-capa[data-k~="mas"].cr3-on .cr3-mn{transform:none;transition:opacity 200ms ease}
+  .cr3 .cr3-p{transition:none}
+}
+/* ---- Tira de maqueta (CALMA cr37) y ficha «Especificación» (fuera del marco) ---- */
+.cr3-tira{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:10px}
+.cr3-tira .cr3-sep{width:1px;height:20px;background:var(--borde)}
+.cr3-tira button{position:relative;height:28px;padding:0 10px;border-radius:999px;border:1px dashed var(--tinta3);background:none;color:var(--tinta2);font:600 12px/16px var(--fuente);white-space:nowrap;cursor:pointer;transition:transform 100ms ease-out}
+.cr3-tira button::after{content:"";position:absolute;inset:-4px 0}
+.cr3-tira button:active{transform:scale(.97)}
+.cr3-tira button:focus-visible{outline:3px solid var(--enlace);outline-offset:2px}
+.cr3-tira button[aria-pressed="true"]{border-style:solid;background:var(--sup2);color:var(--tinta)}
+.cr3-ficha{margin-top:6px;background:var(--sup);border-radius:18px;padding:16px 20px;color:var(--tinta);font:14px/20px var(--fuente);max-width:100%}
+.cr3-ficha h3{margin:0 0 8px;font-size:17px;line-height:22px;font-weight:700}
+.cr3-ficha dl{margin:0;display:grid;grid-template-columns:minmax(0,170px) minmax(0,1fr);gap:0 16px}
+.cr3-ficha dt{padding:8px 0;border-top:1px solid var(--linea);font-size:13px;line-height:18px;font-weight:600;color:var(--tinta2)}
+.cr3-ficha dd{margin:0;padding:8px 0;border-top:1px solid var(--linea);font-size:14px;line-height:20px;overflow-wrap:anywhere}
+.cr3-ficha dt:first-of-type,.cr3-ficha dt:first-of-type+dd{border-top:0}
+.cr3-ficha code{font:12px/18px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--tinta2)}
+@media (max-width:620px){.cr3-ficha dl{grid-template-columns:1fr}.cr3-ficha dd{border-top:0;padding-top:0}}
+
+.cr3 .cr3-campo{display:flex;align-items:center;gap:10px;width:100%;height:44px;padding:0 12px;border-radius:12px;background:var(--sup2);color:var(--tinta2);font-size:16px;line-height:20px;text-align:left}
+.cr3[data-vp="esc"] .cr3-campo,.cr3[data-vp="ih"] .cr3-campo{max-width:480px;font-size:15px}
+.cr3 .cr3-campo>span{flex:1}
+.cr3 .cr3-kbd{height:24px;padding:0 6px;border-radius:6px;background:var(--sup);color:var(--tinta2);font:600 12px/24px var(--fuente)}
+/* ---- Paleta ---- */
+.cr3 .cr3-pw{position:absolute;inset:0;display:flex;justify-content:center;align-items:flex-start;pointer-events:none}
+.cr3[data-vp="esc"] .cr3-pw{padding:72px 24px 32px calc(248px + 24px)}
+.cr3[data-vp="ih"] .cr3-pw{padding:40px calc(218px + var(--ir) + 24px) calc(var(--ib) + 16px) 24px}
+.cr3[data-vp="iv"] .cr3-pw{padding:calc(var(--it) + 72px) 24px 24px}
+.cr3[data-vp="ext"] .cr3-pw{align-items:center;padding:16px calc(56px + var(--ir) + 8px) calc(var(--ib) + 16px) 8px}
+.cr3[data-vp="tel"] .cr3-pw{align-items:flex-end;padding:calc(var(--it) + 12px) 0 0}
+.cr3 .cr3-pal{pointer-events:auto;position:relative;display:flex;flex-direction:column;width:560px;max-width:100%;max-height:100%;background:var(--sup);color:var(--tinta);border-radius:20px;box-shadow:var(--sombra-capa);overflow:hidden;opacity:0;transform:scale(.96);transform-origin:50% 0;transition:opacity 180ms ease-out,transform 320ms linear(0,0.123,0.3397,0.54,0.6943,0.8032,0.8762,0.9234,0.9533,0.9718,0.9831,0.99,0.9941,0.9965,0.998,1)}
+.cr3[data-vp="ih"] .cr3-pal,.cr3[data-vp="iv"] .cr3-pal{width:520px}
+.cr3[data-vp="ext"] .cr3-pal{width:310px;transform-origin:50% 50%}
+.cr3[data-vp="tel"] .cr3-pal{width:100%;height:100%;border-radius:22px 22px 0 0;opacity:1;transform:translateY(105%)}
+.cr3 .cr3-capa.cr3-on .cr3-pal{opacity:1;transform:none;transition:opacity 220ms ease-out,transform 520ms linear(0,0.0803,0.2398,0.4083,0.5568,0.6769,0.769,0.8374,0.8869,0.9221,0.9468,0.9639,0.9756,0.9836,0.9891,0.9927,0.9952,0.9968,0.9979,0.9986,1)}
+.cr3 .cr3-capa.cr3-dup .cr3-pal{opacity:0!important;transform:scale(.96)!important;pointer-events:none}
+.cr3[data-vp="tel"] .cr3-capa.cr3-dup .cr3-pal{transform:translateY(105%)!important;opacity:1!important}
+.cr3 .cr3-asa{display:block;flex:none;width:36px;height:5px;margin:8px auto 0;border-radius:999px;background:var(--borde)}
+.cr3 .cr3-vb,.cr3 .cr3-vf{display:flex;flex-direction:column;min-height:0}
+.cr3.cr3-e7 .cr3-vb,.cr3:not(.cr3-e7) .cr3-vf{display:none}
+.cr3 .cr3-bus{flex:none;display:flex;align-items:center;gap:10px;margin:12px 12px 4px;height:48px;padding:0 4px 0 12px;border-radius:12px;background:var(--sup2);color:var(--tinta2)}
+.cr3[data-vp="esc"] .cr3-bus,.cr3[data-vp="ih"] .cr3-bus{height:44px}
+.cr3 .cr3-q{flex:1;min-width:0;align-self:stretch;border:0;background:none;outline:none;color:var(--tinta);font:16px/20px var(--fuente)}
+.cr3[data-vp="esc"] .cr3-q,.cr3[data-vp="ih"] .cr3-q{font-size:15px}
+.cr3 .cr3-q::placeholder{color:var(--tinta3)}
+.cr3 .cr3-bus:focus-within{outline:2px solid var(--enlace)}
+.cr3 .cr3-ib2{position:relative;width:44px;height:44px;flex:none;border-radius:999px;display:flex;align-items:center;justify-content:center;color:var(--tinta2)}
+.cr3[data-vp="esc"] .cr3-ib2,.cr3[data-vp="ih"] .cr3-ib2{width:36px;height:36px}
+.cr3 .cr3-cuerpo{min-height:0;overflow-y:auto;scrollbar-width:none;padding:4px 8px 8px}
+.cr3 .cr3-cuerpo>*{display:none}
+.cr3.cr3-e1 .cr3-e-vacia,.cr3.cr3-e2 .cr3-e-res,.cr3.cr3-e3 .cr3-e-folio,.cr3.cr3-e4 .cr3-e-sinfolio,.cr3.cr3-e5 .cr3-e-res,.cr3.cr3-e5 .cr3-e-crear,.cr3.cr3-e6 .cr3-e-crear{display:block}
+.cr3:not(.cr3-e5) .cr3-e-res li[data-n="07"],.cr3.cr3-e5 .cr3-e-res li:not([data-n="07"]){display:none}
+.cr3 .cr3-pista2{padding:12px;font-size:14px;line-height:20px;color:var(--tinta2)}
+.cr3 .cr3-r{display:flex;align-items:center;gap:12px;width:100%;min-height:60px;padding:8px 12px;border-radius:12px;text-align:left;color:var(--tinta)}
+.cr3[data-vp="esc"] .cr3-r,.cr3[data-vp="ih"] .cr3-r{min-height:52px}
+.cr3 .cr3-r[aria-selected="true"]{background:var(--tonal)}
+.cr3 .cr3-r>.cr3-mo-f{color:var(--tinta3)}
+.cr3 .cr3-r-t{flex:1;min-width:0;display:flex;flex-direction:column}
+.cr3 .cr3-r-n{font-size:15px;line-height:20px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cr3 .cr3-r-s{font-size:13px;line-height:18px;color:var(--tinta2);font-variant-numeric:tabular-nums}
+.cr3 .cr3-folio{font-variant-numeric:tabular-nums}
+.cr3 .cr3-avp{width:36px;height:36px;flex:none;border-radius:999px;display:flex;align-items:center;justify-content:center;font-size:13px;line-height:16px;font-weight:600;font-variant-numeric:tabular-nums}
+.cr3 .cr3-doc,.cr3 .cr3-avn{width:36px;height:36px;flex:none;display:flex;align-items:center;justify-content:center}
+.cr3 .cr3-avn{border-radius:999px;background:var(--ok-fondo);color:var(--ok-tinta)}
+.cr3 .cr3-crear .cr3-r-n,.cr3 .cr3-e-folio .cr3-r-n{white-space:normal}
+.cr3 .cr3-crear .cr3-r-n b{font-weight:700}
+.cr3 .cr3-e-crear{margin-top:4px;border-top:1px solid var(--linea);padding-top:4px}
+.cr3.cr3-e6 .cr3-e-crear{margin-top:0;border-top:0;padding-top:0}
+.cr3 .cr3-nada{padding:24px 16px 20px;text-align:center;color:var(--tinta2)}
+.cr3 .cr3-nada>svg{color:var(--tinta3);margin:0 auto 8px;display:block}
+.cr3 .cr3-nada-t{font-size:15px;line-height:20px;font-weight:600;color:var(--tinta)}
+.cr3 .cr3-nada-s{margin:6px auto 0;max-width:36ch;font-size:13px;line-height:18px}
+.cr3 .cr3-tec{flex:none;display:flex;align-items:center;gap:6px;padding:10px 16px;border-top:1px solid var(--linea);font-size:12px;line-height:16px;color:var(--tinta2)}
+.cr3 .cr3-tec kbd{padding:0 5px;border-radius:5px;background:var(--sup2);font:600 12px/18px var(--fuente);color:var(--tinta2)}
+.cr3 .cr3-tec kbd:not(:first-child){margin-left:8px}
+/* ---- Registro rápido ---- */
+.cr3 .cr3-vf{gap:14px;padding:8px 16px 16px;overflow-y:auto;scrollbar-width:none}
+.cr3[data-vp="tel"] .cr3-vf{padding-bottom:calc(var(--ib) + 16px)}
+.cr3 .cr3-fcab{display:flex;align-items:center;gap:6px;margin:0 -8px}
+.cr3 .cr3-fcab-t{flex:1;min-width:0}
+.cr3 .cr3-fcab-t h2{font-size:17px;line-height:22px;font-weight:700}
+.cr3 .cr3-fcab-t p{font-size:13px;line-height:18px;color:var(--tinta2)}
+.cr3 .cr3-par{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.cr3[data-vp="ext"] .cr3-par{grid-template-columns:1fr}
+.cr3 .cr3-f{display:flex;flex-direction:column;gap:6px}
+.cr3 .cr3-f>span{font-size:13px;line-height:18px;font-weight:600;color:var(--tinta2)}
+.cr3 .cr3-in{height:44px;padding:0 12px;border:0;border-radius:12px;background:var(--sup2);color:var(--tinta);font:16px/20px var(--fuente);outline:none;min-width:0;width:100%}
+.cr3[data-vp="esc"] .cr3-in,.cr3[data-vp="ih"] .cr3-in{height:40px;font-size:15px}
+.cr3 .cr3-in:focus{outline:2px solid var(--enlace)}
+.cr3 .cr3-chk{position:relative;display:flex;align-items:center;gap:12px;min-height:44px;font-size:14px;line-height:20px;color:var(--tinta)}
+.cr3 .cr3-chk>span:first-child{flex:1}
+.cr3 .cr3-chk input{position:absolute;opacity:0;width:24px;height:24px;right:0}
+.cr3 .cr3-caja{width:24px;height:24px;flex:none;border-radius:7px;background:var(--accion);color:#fff;display:flex;align-items:center;justify-content:center}
+.cr3 .cr3-enl{position:relative;color:var(--enlace);font-weight:600}
+.cr3 .cr3-enl::after{content:"";position:absolute;inset:-14px -2px}
+.cr3 .cr3-pieh{display:flex;gap:8px;justify-content:flex-end}
+.cr3 .cr3-pieh>*{min-width:104px}
+.cr3[data-vp="ext"] .cr3-pieh,.cr3[data-vp="tel"] .cr3-pieh{flex-direction:column-reverse}
+.cr3 .cr3-ton,.cr3 .cr3-prim,.cr3 .cr3-quieto{display:flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 14px;border-radius:12px;font-size:15px;line-height:20px;font-weight:600;text-align:center}
+.cr3[data-vp="esc"] .cr3-ton,.cr3[data-vp="esc"] .cr3-prim,.cr3[data-vp="esc"] .cr3-quieto,.cr3[data-vp="ih"] .cr3-ton,.cr3[data-vp="ih"] .cr3-prim,.cr3[data-vp="ih"] .cr3-quieto{min-height:40px;font-size:14px}
+.cr3 .cr3-ton{background:var(--tonal);color:var(--tonal-tinta)}
+.cr3 .cr3-prim{background:var(--accion);color:#fff}
+.cr3 .cr3-quieto{background:var(--sup2);color:var(--tinta)}
+/* ---- Alerta de duplicado ---- */
+.cr3 .cr3-alw{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:16px;pointer-events:none}
+.cr3[data-vp="ext"] .cr3-alw{padding:16px calc(56px + var(--ir) + 8px) calc(var(--ib) + 16px) 8px}
+.cr3[data-vp="ih"] .cr3-alw{padding:24px calc(218px + var(--ir) + 24px) calc(var(--ib) + 16px) 24px}
+.cr3[data-vp="iv"] .cr3-alw{padding:calc(var(--it) + 58px) 24px 24px}
+.cr3[data-vp="esc"] .cr3-alw{padding:32px 24px 32px calc(248px + 24px)}
+.cr3 .cr3-al{pointer-events:auto;width:320px;max-width:100%;padding:24px;border-radius:20px;background:var(--sup);box-shadow:var(--sombra-capa);display:flex;flex-direction:column;align-items:center;text-align:center;opacity:0;transform:scale(.96);transition:opacity 180ms ease-out,transform 300ms linear(0,0.123,0.3397,0.54,0.6943,0.8032,0.8762,0.9234,0.9533,0.9718,0.9831,0.99,0.9941,0.9965,0.998,1)}
+.cr3[data-vp="ih"] .cr3-al,.cr3[data-vp="iv"] .cr3-al,.cr3[data-vp="esc"] .cr3-al{width:340px}
+.cr3 .cr3-capa.cr3-dup .cr3-al{opacity:1;transform:none;transition:opacity 220ms ease-out,transform 480ms linear(0,0.0803,0.2398,0.4083,0.5568,0.6769,0.769,0.8374,0.8869,0.9221,0.9468,0.9639,0.9756,0.9836,0.9891,0.9927,0.9952,0.9968,0.9979,0.9986,1)}
+.cr3 .cr3-capa:not(.cr3-dup) .cr3-alw{visibility:hidden}
+.cr3 .cr3-al-ic{width:48px;height:48px;border-radius:999px;background:var(--ag-fondo);color:var(--ag-tinta);display:flex;align-items:center;justify-content:center}
+.cr3 .cr3-al-t{margin-top:14px;font-size:17px;line-height:22px;font-weight:700}
+.cr3 .cr3-al-m{margin-top:6px;font-size:14px;line-height:20px;color:var(--tinta2);text-align:justify;hyphens:auto}
+.cr3 .cr3-al-m strong{color:var(--tinta);font-weight:600}
+.cr3 .cr3-al-b{margin-top:20px;display:flex;flex-direction:column;gap:8px;width:100%}
+@media (prefers-reduced-motion:reduce){.cr3 .cr3-pal,.cr3 .cr3-al{transform:none!important;transition:opacity 200ms ease}}
+</style>
+<div class="marco cr3 cr3-e1" data-vp="ext">
+<div class="cr3-app">
+<main class="cr3-cont">
+  <!-- Fondo simplificado: el dashboard reducido a sus bloques, para que la pieza global se lea sobre una pantalla real. -->
+  <div class="cr3-top"><p class="cr3-rot"><span class="cr3-m">Centro</span><span class="cr3-s">Clínica Semilla A</span></p>
+  <h1 class="cr3-h1">Buenas tardes, <span class="cr3-m">Admin</span><span class="cr3-s">Secretaria</span></h1></div>
+  <!-- Origen de la capa: el campo del dashboard aprobado (función 4); en computadora también Ctrl/⌘+K desde cualquier pantalla. --><button type="button" class="cr3-p cr3-campo cr3-abre-pal"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg><span>Buscar paciente o folio</span></button>
+  <div class="cr3-cols"><section class="cr3-tj" aria-hidden="true"><h2 class="cr3-tt">Después</h2><div class="cr3-fl"><span class="cr3-bx"></span><span class="cr3-fl-t"><span class="cr3-br" style="width:62%"></span><span class="cr3-br cr3-br2" style="width:40%"></span></span></div><div class="cr3-fl"><span class="cr3-bx"></span><span class="cr3-fl-t"><span class="cr3-br" style="width:62%"></span><span class="cr3-br cr3-br2" style="width:40%"></span></span></div><div class="cr3-fl"><span class="cr3-bx"></span><span class="cr3-fl-t"><span class="cr3-br" style="width:62%"></span><span class="cr3-br cr3-br2" style="width:40%"></span></span></div><div class="cr3-fl"><span class="cr3-bx"></span><span class="cr3-fl-t"><span class="cr3-br" style="width:62%"></span><span class="cr3-br cr3-br2" style="width:40%"></span></span></div><div class="cr3-fl"><span class="cr3-bx"></span><span class="cr3-fl-t"><span class="cr3-br" style="width:62%"></span><span class="cr3-br cr3-br2" style="width:40%"></span></span></div></section><section class="cr3-tj" aria-hidden="true"><h2 class="cr3-tt">Atendidos recientemente</h2><div class="cr3-fl"><span class="cr3-bx"></span><span class="cr3-fl-t"><span class="cr3-br" style="width:62%"></span><span class="cr3-br cr3-br2" style="width:40%"></span></span></div><div class="cr3-fl"><span class="cr3-bx"></span><span class="cr3-fl-t"><span class="cr3-br" style="width:62%"></span><span class="cr3-br cr3-br2" style="width:40%"></span></span></div><div class="cr3-fl"><span class="cr3-bx"></span><span class="cr3-fl-t"><span class="cr3-br" style="width:62%"></span><span class="cr3-br cr3-br2" style="width:40%"></span></span></div></section><section class="cr3-tj" aria-hidden="true"><h2 class="cr3-tt">Documentos recientes</h2><div class="cr3-fl"><span class="cr3-bx"></span><span class="cr3-fl-t"><span class="cr3-br" style="width:62%"></span><span class="cr3-br cr3-br2" style="width:40%"></span></span></div><div class="cr3-fl"><span class="cr3-bx"></span><span class="cr3-fl-t"><span class="cr3-br" style="width:62%"></span><span class="cr3-br cr3-br2" style="width:40%"></span></span></div></section><section class="cr3-tj" aria-hidden="true"><h2 class="cr3-tt">Esta semana</h2><div class="cr3-fl"><span class="cr3-bx"></span><span class="cr3-fl-t"><span class="cr3-br" style="width:62%"></span><span class="cr3-br cr3-br2" style="width:40%"></span></span></div><div class="cr3-fl"><span class="cr3-bx"></span><span class="cr3-fl-t"><span class="cr3-br" style="width:62%"></span><span class="cr3-br cr3-br2" style="width:40%"></span></span></div><div class="cr3-fl"><span class="cr3-bx"></span><span class="cr3-fl-t"><span class="cr3-br" style="width:62%"></span><span class="cr3-br cr3-br2" style="width:40%"></span></span></div></section></div>
+</main><!-- Navegación (A0·3) de Duo cerrado: riel a la derecha, fundido con la franja. Copiado del dashboard aprobado. -->
+<nav class="cr3-riel cr3-nav" aria-label="Navegación principal">
+  <a href="#" class="cr3-p cr3-rb" aria-label="Inicio" aria-current="page"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg></a><a href="#" class="cr3-p cr3-rb" aria-label="Expediente"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.9.7 3.1 2.4 3.5 5.2"/></svg></a><a href="#" class="cr3-p cr3-rb" aria-label="Agenda"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg></a><a href="#" class="cr3-p cr3-rb cr3-m" aria-label="Documentos"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg></a><button type="button" class="cr3-p cr3-rb" aria-label="Más" data-rot="Más"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 12h.01M12 12h.01M18 12h.01"/></svg></button>
+  <span class="cr3-flex"></span>
+  <button type="button" class="cr3-p cr3-masb cr3-m" aria-label="Nueva consulta"><svg aria-hidden="true" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg></button>
+  <button type="button" class="cr3-p cr3-masb cr3-s" aria-label="Agendar cita"><svg aria-hidden="true" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg></button>
+</nav>
+</div>
+<div class="cr3-capa" aria-hidden="true">
+  <div class="cr3-velo"></div>
+<!-- A0·14–15 · Paleta de comandos (CommandPalette.tsx). Un solo campo busca paciente por nombre o documento por folio: el modo lo decide
+     la forma de lo escrito («RX-2026-0042» es folio). ↑↓ mueve, Enter abre, Esc cierra (también Ctrl/⌘+K, que alterna).
+     Computadora y Duo abierto: tarjeta de 560/520 anclada arriba (los resultados cambian de alto y así no salta). Duo cerrado: tarjeta centrada (cr326).
+     iPhone: hoja alta desde abajo. -->
+<div class="cr3-pw"><div class="cr3-pal" role="dialog" aria-modal="true" aria-label="Buscar paciente o folio">
+  <div class="cr3-vb">
+    <label class="cr3-bus"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg><input type="search" class="cr3-q" placeholder="Buscar paciente por nombre o documento por folio..." aria-label="Buscar paciente por nombre o documento por folio" autocomplete="off">
+      <button type="button" class="cr3-p cr3-ib2 cr3-cierra-pal" aria-label="Cerrar"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></label>
+    <div class="cr3-cuerpo">
+      <!-- Vacío: la pista de siempre -->
+      <p class="cr3-pista2 cr3-e-vacia">Nombre del paciente, o folio del documento</p>
+      <!-- Pacientes: avatar, nombre, edad · sexo · expediente -->
+      <ul class="cr3-res cr3-e-res" role="listbox" aria-label="Pacientes"><li role="none" data-n="01"><button type="button" role="option" aria-selected="true" class="cr3-p cr3-r"><span class="cr3-avp" style="background:#F1DCEC;color:#7A2E6B">01</span><span class="cr3-r-t"><span class="cr3-r-n">Paciente Prueba 01</span><span class="cr3-r-s">34 años · Femenino · EXP-2026-0001</span></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="cr3-mo-f"><path d="m9 6 6 6-6 6"/></svg></button></li><li role="none" data-n="02"><button type="button" role="option" aria-selected="false" class="cr3-p cr3-r"><span class="cr3-avp" style="background:#DCE8F6;color:#24497A">02</span><span class="cr3-r-t"><span class="cr3-r-n">Paciente Prueba 02</span><span class="cr3-r-s">41 años · Masculino · EXP-2026-0002</span></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="cr3-mo-f"><path d="m9 6 6 6-6 6"/></svg></button></li><li role="none" data-n="03"><button type="button" role="option" aria-selected="false" class="cr3-p cr3-r"><span class="cr3-avp" style="background:#DDEFE3;color:#1F5A39">03</span><span class="cr3-r-t"><span class="cr3-r-n">Paciente Prueba 03</span><span class="cr3-r-s">58 años · Femenino · EXP-2026-0003</span></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="cr3-mo-f"><path d="m9 6 6 6-6 6"/></svg></button></li><li role="none" data-n="04"><button type="button" role="option" aria-selected="false" class="cr3-p cr3-r"><span class="cr3-avp" style="background:#F6D8D1;color:#8A2F1F">04</span><span class="cr3-r-t"><span class="cr3-r-n">Paciente Prueba 04</span><span class="cr3-r-s">27 años · Masculino · EXP-2026-0004</span></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="cr3-mo-f"><path d="m9 6 6 6-6 6"/></svg></button></li><li role="none" data-n="05"><button type="button" role="option" aria-selected="false" class="cr3-p cr3-r"><span class="cr3-avp" style="background:#EBDCCB;color:#5A3A1A">05</span><span class="cr3-r-t"><span class="cr3-r-n">Paciente Prueba 05</span><span class="cr3-r-s">63 años · Femenino · EXP-2026-0005</span></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="cr3-mo-f"><path d="m9 6 6 6-6 6"/></svg></button></li><li role="none" data-n="07"><button type="button" role="option" aria-selected="false" class="cr3-p cr3-r"><span class="cr3-avp" style="background:#E4E0F5;color:#463A86">07</span><span class="cr3-r-t"><span class="cr3-r-n">Paciente Prueba 07</span><span class="cr3-r-s">54 años · Femenino · EXP-2026-0007</span></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="cr3-mo-f"><path d="m9 6 6 6-6 6"/></svg></button></li></ul>
+      <!-- Folio: un documento con su tipo (color de tipo, CALMA cr39), paciente y fecha; abre los documentos de ese paciente -->
+      <ul class="cr3-res cr3-e-folio" role="listbox" aria-label="Documento"><li role="none"><button type="button" role="option" aria-selected="true" class="cr3-p cr3-r">
+        <span class="cr3-doc" style="color:var(--d-receta)"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/><path d="m8.5 8.5 7 7"/></svg></span><span class="cr3-r-t"><span class="cr3-r-n"><span class="cr3-folio">RX-2026-0042</span> · Receta médica</span>
+        <span class="cr3-r-s">Paciente Prueba 07 · 12 nov 2026</span></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="cr3-mo-f"><path d="m9 6 6 6-6 6"/></svg></button></li></ul>
+      <!-- Folio sin resultado: el vacío se desambigua (CommandPalette.tsx:375-389) -->
+      <div class="cr3-nada cr3-e-sinfolio"><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg><p class="cr3-nada-t">Sin resultados para "RX-2026-0999"</p>
+        <p class="cr3-nada-s">Ningún documento tuyo con ese folio. Los emitidos antes del folio correlativo no se encuentran por aquí.</p></div>
+      <!-- Sin coincidencias suficientes: opción de registro rápido (≥ 2 caracteres, no folio, < 8 resultados) -->
+      <ul class="cr3-res cr3-e-crear" role="listbox" aria-label="Crear"><li role="none"><button type="button" role="option" aria-selected="true" class="cr3-p cr3-r cr3-crear">
+        <span class="cr3-avn"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="8" r="3.5"/><path d="M3.5 20c.8-3.6 3.4-5.5 6.5-5.5 1.6 0 3 .5 4.2 1.4M18 14v6M15 17h6"/></svg></span><span class="cr3-r-t"><span class="cr3-r-n">Crear registro para: <b class="cr3-cq">"Paciente Prueba 26"</b></span>
+        <span class="cr3-r-s">Registro rápido — solo nombre, teléfono y motivo</span></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="cr3-mo-f"><path d="m9 6 6 6-6 6"/></svg></button></li></ul>
+    </div>
+    
+  </div>
+  <form class="cr3-vf" novalidate>
+    <div class="cr3-fcab"><button type="button" class="cr3-p cr3-ib2 cr3-volver" aria-label="Volver a la búsqueda"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"/></svg></button>
+      <div class="cr3-fcab-t"><h2>Registro rápido</h2><p>Puedes completar el expediente después</p></div>
+      <button type="button" class="cr3-p cr3-ib2 cr3-cierra-pal" aria-label="Cerrar"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+    <div class="cr3-par"><label class="cr3-f"><span>Nombre *</span><input type="text" class="cr3-in" value="Paciente Prueba" autocomplete="off"></label>
+      <label class="cr3-f"><span>Apellidos</span><input type="text" class="cr3-in" value="26" autocomplete="off"></label></div>
+    <label class="cr3-f"><span>Fecha de nacimiento *</span><input type="date" class="cr3-in" value="1980-05-14" max="2026-11-19"></label>
+    <!-- Texto de hoy, con la cita a la ley de 2010 abrogada (deuda ya anotada en ESTADO.md): se reproduce, no se corrige aquí. Casilla a la derecha (CALMA cr320). -->
+    <label class="cr3-chk"><span>El paciente ha leído y acepta el <a href="#" class="cr3-enl">Aviso de Privacidad</a> (LFPDPPP Art. 9) *</span><input type="checkbox" checked><span class="cr3-caja" aria-hidden="true"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span></label>
+    <div class="cr3-pieh"><button type="button" class="cr3-p cr3-ton cr3-volver">Cancelar</button><button type="button" class="cr3-p cr3-prim cr3-crea"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="8" r="3.5"/><path d="M3.5 20c.8-3.6 3.4-5.5 6.5-5.5 1.6 0 3 .5 4.2 1.4M18 14v6M15 17h6"/></svg>Crear e ir al expediente</button></div>
+  </form>
+</div></div>
+<!-- Duplicado (CommandPalette.tsx:428-462) con la alerta del catálogo y el título aprobado «Paciente duplicado» (CALMA cr320, cr323.7):
+     tres botones apilados, principal arriba. -->
+<div class="cr3-alw"><div class="cr3-al" role="alertdialog" aria-modal="true" aria-labelledby="cr3-dup-ext">
+  <span class="cr3-al-ic"><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg></span><h2 class="cr3-al-t" id="cr3-dup-ext">Paciente duplicado</h2>
+  <!-- Botón acortado a «Es otra persona» (texto nuevo aprobado, informes/botones-desbordados.md cr35); la consecuencia pasa al cuerpo con las palabras de hoy. -->
+  <p class="cr3-al-m">Este paciente ya está en tu lista de pacientes: <strong>Paciente Prueba 07</strong> (Exp. #EXP-2026-0007). Si es otra persona, se creará el registro de todos modos.</p>
+  <div class="cr3-al-b"><button type="button" class="cr3-p cr3-prim cr3-dup-x">Ir a su expediente</button><button type="button" class="cr3-p cr3-ton cr3-dup-x">Es otra persona</button><button type="button" class="cr3-p cr3-quieto cr3-dup-c">Cancelar</button></div>
+</div></div>
+</div>
+</div>
+<div class="marco cr3 cr3-e1" data-vp="tel">
+<div class="cr3-app">
+<!-- Navegación (A0·13) de iPhone: encabezado fundido con la barra de estado. Copiado del dashboard aprobado. -->
+<header class="cr3-enc cr3-nav">
+  <button type="button" class="cr3-p cr3-menu" aria-label="Menú" data-rot="Menú"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+  <span class="cr3-enc-t">Inicio</span>
+  <span class="cr3-flex"></span>
+  <button type="button" class="cr3-p cr3-av cr3-av-g cr3-m" aria-label="Mi perfil">AS</button><button type="button" class="cr3-p cr3-av cr3-av-g cr3-s cr3-abre-aj" aria-label="Ajustes">SE</button>
+</header><main class="cr3-cont">
+  <!-- Fondo simplificado: el dashboard reducido a sus bloques, para que la pieza global se lea sobre una pantalla real. -->
+  <div class="cr3-top"><p class="cr3-rot"><span class="cr3-m">Centro</span><span class="cr3-s">Clínica Semilla A</span></p>
+  <h1 class="cr3-h1">Buenas tardes, <span class="cr3-m">Admin</span><span class="cr3-s">Secretaria</span></h1></div>
+  <!-- Origen de la capa: el campo del dashboard aprobado (función 4); en computadora también Ctrl/⌘+K desde cualquier pantalla. --><button type="button" class="cr3-p cr3-campo cr3-abre-pal"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg><span>Buscar paciente o folio</span></button>
+  <div class="cr3-cols"><section class="cr3-tj" aria-hidden="true"><h2 class="cr3-tt">Después</h2><div class="cr3-fl"><span class="cr3-bx"></span><span class="cr3-fl-t"><span class="cr3-br" style="width:62%"></span><span class="cr3-br cr3-br2" style="width:40%"></span></span></div><div class="cr3-fl"><span class="cr3-bx"></span><span class="cr3-fl-t"><span class="cr3-br" style="width:62%"></span><span class="cr3-br cr3-br2" style="width:40%"></span></span></div><div class="cr3-fl"><span class="cr3-bx"></span><span class="cr3-fl-t"><span class="cr3-br" style="width:62%"></span><span class="cr3-br cr3-br2" style="width:40%"></span></span></div><div class="cr3-fl"><span class="cr3-bx"></span><span class="cr3-fl-t"><span class="cr3-br" style="width:62%"></span><span class="cr3-br cr3-br2" style="width:40%"></span></span></div><div class="cr3-fl"><span class="cr3-bx"></span><span class="cr3-fl-t"><span class="cr3-br" style="width:62%"></span><span class="cr3-br cr3-br2" style="width:40%"></span></span></div></section><section class="cr3-tj" aria-hidden="true"><h2 class="cr3-tt">Atendidos recientemente</h2><div class="cr3-fl"><span class="cr3-bx"></span><span class="cr3-fl-t"><span class="cr3-br" style="width:62%"></span><span class="cr3-br cr3-br2" style="width:40%"></span></span></div><div class="cr3-fl"><span class="cr3-bx"></span><span class="cr3-fl-t"><span class="cr3-br" style="width:62%"></span><span class="cr3-br cr3-br2" style="width:40%"></span></span></div><div class="cr3-fl"><span class="cr3-bx"></span><span class="cr3-fl-t"><span class="cr3-br" style="width:62%"></span><span class="cr3-br cr3-br2" style="width:40%"></span></span></div></section><section class="cr3-tj" aria-hidden="true"><h2 class="cr3-tt">Documentos recientes</h2><div class="cr3-fl"><span class="cr3-bx"></span><span class="cr3-fl-t"><span class="cr3-br" style="width:62%"></span><span class="cr3-br cr3-br2" style="width:40%"></span></span></div><div class="cr3-fl"><span class="cr3-bx"></span><span class="cr3-fl-t"><span class="cr3-br" style="width:62%"></span><span class="cr3-br cr3-br2" style="width:40%"></span></span></div></section><section class="cr3-tj" aria-hidden="true"><h2 class="cr3-tt">Esta semana</h2><div class="cr3-fl"><span class="cr3-bx"></span><span class="cr3-fl-t"><span class="cr3-br" style="width:62%"></span><span class="cr3-br cr3-br2" style="width:40%"></span></span></div><div class="cr3-fl"><span class="cr3-bx"></span><span class="cr3-fl-t"><span class="cr3-br" style="width:62%"></span><span class="cr3-br cr3-br2" style="width:40%"></span></span></div><div class="cr3-fl"><span class="cr3-bx"></span><span class="cr3-fl-t"><span class="cr3-br" style="width:62%"></span><span class="cr3-br cr3-br2" style="width:40%"></span></span></div></section></div>
+</main>
+</div>
+<div class="cr3-capa" aria-hidden="true">
+  <div class="cr3-velo"></div>
+<!-- A0·14–15 · Paleta de comandos (CommandPalette.tsx). Un solo campo busca paciente por nombre o documento por folio: el modo lo decide
+     la forma de lo escrito («RX-2026-0042» es folio). ↑↓ mueve, Enter abre, Esc cierra (también Ctrl/⌘+K, que alterna).
+     Computadora y Duo abierto: tarjeta de 560/520 anclada arriba (los resultados cambian de alto y así no salta). Duo cerrado: tarjeta centrada (cr326).
+     iPhone: hoja alta desde abajo. -->
+<div class="cr3-pw"><div class="cr3-pal" role="dialog" aria-modal="true" aria-label="Buscar paciente o folio"><span class="cr3-asa" aria-hidden="true"></span>
+  <div class="cr3-vb">
+    <label class="cr3-bus"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg><input type="search" class="cr3-q" placeholder="Buscar paciente por nombre o documento por folio..." aria-label="Buscar paciente por nombre o documento por folio" autocomplete="off">
+      <button type="button" class="cr3-p cr3-ib2 cr3-cierra-pal" aria-label="Cerrar"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></label>
+    <div class="cr3-cuerpo">
+      <!-- Vacío: la pista de siempre -->
+      <p class="cr3-pista2 cr3-e-vacia">Nombre del paciente, o folio del documento</p>
+      <!-- Pacientes: avatar, nombre, edad · sexo · expediente -->
+      <ul class="cr3-res cr3-e-res" role="listbox" aria-label="Pacientes"><li role="none" data-n="01"><button type="button" role="option" aria-selected="true" class="cr3-p cr3-r"><span class="cr3-avp" style="background:#F1DCEC;color:#7A2E6B">01</span><span class="cr3-r-t"><span class="cr3-r-n">Paciente Prueba 01</span><span class="cr3-r-s">34 años · Femenino · EXP-2026-0001</span></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="cr3-mo-f"><path d="m9 6 6 6-6 6"/></svg></button></li><li role="none" data-n="02"><button type="button" role="option" aria-selected="false" class="cr3-p cr3-r"><span class="cr3-avp" style="background:#DCE8F6;color:#24497A">02</span><span class="cr3-r-t"><span class="cr3-r-n">Paciente Prueba 02</span><span class="cr3-r-s">41 años · Masculino · EXP-2026-0002</span></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="cr3-mo-f"><path d="m9 6 6 6-6 6"/></svg></button></li><li role="none" data-n="03"><button type="button" role="option" aria-selected="false" class="cr3-p cr3-r"><span class="cr3-avp" style="background:#DDEFE3;color:#1F5A39">03</span><span class="cr3-r-t"><span class="cr3-r-n">Paciente Prueba 03</span><span class="cr3-r-s">58 años · Femenino · EXP-2026-0003</span></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="cr3-mo-f"><path d="m9 6 6 6-6 6"/></svg></button></li><li role="none" data-n="04"><button type="button" role="option" aria-selected="false" class="cr3-p cr3-r"><span class="cr3-avp" style="background:#F6D8D1;color:#8A2F1F">04</span><span class="cr3-r-t"><span class="cr3-r-n">Paciente Prueba 04</span><span class="cr3-r-s">27 años · Masculino · EXP-2026-0004</span></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="cr3-mo-f"><path d="m9 6 6 6-6 6"/></svg></button></li><li role="none" data-n="05"><button type="button" role="option" aria-selected="false" class="cr3-p cr3-r"><span class="cr3-avp" style="background:#EBDCCB;color:#5A3A1A">05</span><span class="cr3-r-t"><span class="cr3-r-n">Paciente Prueba 05</span><span class="cr3-r-s">63 años · Femenino · EXP-2026-0005</span></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="cr3-mo-f"><path d="m9 6 6 6-6 6"/></svg></button></li><li role="none" data-n="07"><button type="button" role="option" aria-selected="false" class="cr3-p cr3-r"><span class="cr3-avp" style="background:#E4E0F5;color:#463A86">07</span><span class="cr3-r-t"><span class="cr3-r-n">Paciente Prueba 07</span><span class="cr3-r-s">54 años · Femenino · EXP-2026-0007</span></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="cr3-mo-f"><path d="m9 6 6 6-6 6"/></svg></button></li></ul>
+      <!-- Folio: un documento con su tipo (color de tipo, CALMA cr39), paciente y fecha; abre los documentos de ese paciente -->
+      <ul class="cr3-res cr3-e-folio" role="listbox" aria-label="Documento"><li role="none"><button type="button" role="option" aria-selected="true" class="cr3-p cr3-r">
+        <span class="cr3-doc" style="color:var(--d-receta)"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/><path d="m8.5 8.5 7 7"/></svg></span><span class="cr3-r-t"><span class="cr3-r-n"><span class="cr3-folio">RX-2026-0042</span> · Receta médica</span>
+        <span class="cr3-r-s">Paciente Prueba 07 · 12 nov 2026</span></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="cr3-mo-f"><path d="m9 6 6 6-6 6"/></svg></button></li></ul>
+      <!-- Folio sin resultado: el vacío se desambigua (CommandPalette.tsx:375-389) -->
+      <div class="cr3-nada cr3-e-sinfolio"><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg><p class="cr3-nada-t">Sin resultados para "RX-2026-0999"</p>
+        <p class="cr3-nada-s">Ningún documento tuyo con ese folio. Los emitidos antes del folio correlativo no se encuentran por aquí.</p></div>
+      <!-- Sin coincidencias suficientes: opción de registro rápido (≥ 2 caracteres, no folio, < 8 resultados) -->
+      <ul class="cr3-res cr3-e-crear" role="listbox" aria-label="Crear"><li role="none"><button type="button" role="option" aria-selected="true" class="cr3-p cr3-r cr3-crear">
+        <span class="cr3-avn"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="8" r="3.5"/><path d="M3.5 20c.8-3.6 3.4-5.5 6.5-5.5 1.6 0 3 .5 4.2 1.4M18 14v6M15 17h6"/></svg></span><span class="cr3-r-t"><span class="cr3-r-n">Crear registro para: <b class="cr3-cq">"Paciente Prueba 26"</b></span>
+        <span class="cr3-r-s">Registro rápido — solo nombre, teléfono y motivo</span></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="cr3-mo-f"><path d="m9 6 6 6-6 6"/></svg></button></li></ul>
+    </div>
+    
+  </div>
+  <form class="cr3-vf" novalidate>
+    <div class="cr3-fcab"><button type="button" class="cr3-p cr3-ib2 cr3-volver" aria-label="Volver a la búsqueda"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"/></svg></button>
+      <div class="cr3-fcab-t"><h2>Registro rápido</h2><p>Puedes completar el expediente después</p></div>
+      <button type="button" class="cr3-p cr3-ib2 cr3-cierra-pal" aria-label="Cerrar"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+    <div class="cr3-par"><label class="cr3-f"><span>Nombre *</span><input type="text" class="cr3-in" value="Paciente Prueba" autocomplete="off"></label>
+      <label class="cr3-f"><span>Apellidos</span><input type="text" class="cr3-in" value="26" autocomplete="off"></label></div>
+    <label class="cr3-f"><span>Fecha de nacimiento *</span><input type="date" class="cr3-in" value="1980-05-14" max="2026-11-19"></label>
+    <!-- Texto de hoy, con la cita a la ley de 2010 abrogada (deuda ya anotada en ESTADO.md): se reproduce, no se corrige aquí. Casilla a la derecha (CALMA cr320). -->
+    <label class="cr3-chk"><span>El paciente ha leído y acepta el <a href="#" class="cr3-enl">Aviso de Privacidad</a> (LFPDPPP Art. 9) *</span><input type="checkbox" checked><span class="cr3-caja" aria-hidden="true"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span></label>
+    <div class="cr3-pieh"><button type="button" class="cr3-p cr3-ton cr3-volver">Cancelar</button><button type="button" class="cr3-p cr3-prim cr3-crea"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="8" r="3.5"/><path d="M3.5 20c.8-3.6 3.4-5.5 6.5-5.5 1.6 0 3 .5 4.2 1.4M18 14v6M15 17h6"/></svg>Crear e ir al expediente</button></div>
+  </form>
+</div></div>
+<!-- Duplicado (CommandPalette.tsx:428-462) con la alerta del catálogo y el título aprobado «Paciente duplicado» (CALMA cr320, cr323.7):
+     tres botones apilados, principal arriba. -->
+<div class="cr3-alw"><div class="cr3-al" role="alertdialog" aria-modal="true" aria-labelledby="cr3-dup-tel">
+  <span class="cr3-al-ic"><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg></span><h2 class="cr3-al-t" id="cr3-dup-tel">Paciente duplicado</h2>
+  <!-- Botón acortado a «Es otra persona» (texto nuevo aprobado, informes/botones-desbordados.md cr35); la consecuencia pasa al cuerpo con las palabras de hoy. -->
+  <p class="cr3-al-m">Este paciente ya está en tu lista de pacientes: <strong>Paciente Prueba 07</strong> (Exp. #EXP-2026-0007). Si es otra persona, se creará el registro de todos modos.</p>
+  <div class="cr3-al-b"><button type="button" class="cr3-p cr3-prim cr3-dup-x">Ir a su expediente</button><button type="button" class="cr3-p cr3-ton cr3-dup-x">Es otra persona</button><button type="button" class="cr3-p cr3-quieto cr3-dup-c">Cancelar</button></div>
+</div></div>
+</div>
+</div>
+<div class="marco cr3 cr3-e1" data-vp="ih">
+<div class="cr3-app">
+<main class="cr3-cont">
+  <!-- Fondo simplificado: el dashboard reducido a sus bloques, para que la pieza global se lea sobre una pantalla real. -->
+  <div class="cr3-top"><p class="cr3-rot"><span class="cr3-m">Centro</span><span class="cr3-s">Clínica Semilla A</span></p>
+  <h1 class="cr3-h1">Buenas tardes, <span class="cr3-m">Admin</span><span class="cr3-s">Secretaria</span></h1></div>
+  <!-- Origen de la capa: el campo del dashboard aprobado (función 4); en computadora también Ctrl/⌘+K desde cualquier pantalla. --><button type="button" class="cr3-p cr3-campo cr3-abre-pal"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg><span>Buscar paciente o folio</span><kbd class="cr3-kbd" aria-hidden="true">⌘K</kbd></button>
+  <div class="cr3-cols"><section class="cr3-tj" aria-hidden="true"><h2 class="cr3-tt">Después</h2><div class="cr3-fl"><span class="cr3-bx"></span><span class="cr3-fl-t"><span class="cr3-br" style="width:62%"></span><span class="cr3-br cr3-br2" style="width:40%"></span></span></div><div class="cr3-fl"><span class="cr3-bx"></span><span class="cr3-fl-t"><span class="cr3-br" style="width:62%"></span><span class="cr3-br cr3-br2" style="width:40%"></span></span></div><div class="cr3-fl"><span class="cr3-bx"></span><span class="cr3-fl-t"><span class="cr3-br" style="width:62%"></span><span class="cr3-br cr3-br2" style="width:40%"></span></span></div><div class="cr3-fl"><span class="cr3-bx"></span><span class="cr3-fl-t"><span class="cr3-br" style="width:62%"></span><span class="cr3-br cr3-br2" style="width:40%"></span></span></div><div class="cr3-fl"><span class="cr3-bx"></span><span class="cr3-fl-t"><span class="cr3-br" style="width:62%"></span><span class="cr3-br cr3-br2" style="width:40%"></span></span></div></section><section class="cr3-tj" aria-hidden="true"><h2 class="cr3-tt">Atendidos recientemente</h2><div class="cr3-fl"><span class="cr3-bx"></span><span class="cr3-fl-t"><span class="cr3-br" style="width:62%"></span><span class="cr3-br cr3-br2" style="width:40%"></span></span></div><div class="cr3-fl"><span class="cr3-bx"></span><span class="cr3-fl-t"><span class="cr3-br" style="width:62%"></span><span class="cr3-br cr3-br2" style="width:40%"></span></span></div><div class="cr3-fl"><span class="cr3-bx"></span><span class="cr3-fl-t"><span class="cr3-br" style="width:62%"></span><span class="cr3-br cr3-br2" style="width:40%"></span></span></div></section><section class="cr3-tj" aria-hidden="true"><h2 class="cr3-tt">Documentos recientes</h2><div class="cr3-fl"><span class="cr3-bx"></span><span class="cr3-fl-t"><span class="cr3-br" style="width:62%"></span><span class="cr3-br cr3-br2" style="width:40%"></span></span></div><div class="cr3-fl"><span class="cr3-bx"></span><span class="cr3-fl-t"><span class="cr3-br" style="width:62%"></span><span class="cr3-br cr3-br2" style="width:40%"></span></span></div></section><section class="cr3-tj" aria-hidden="true"><h2 class="cr3-tt">Esta semana</h2><div class="cr3-fl"><span class="cr3-bx"></span><span class="cr3-fl-t"><span class="cr3-br" style="width:62%"></span><span class="cr3-br cr3-br2" style="width:40%"></span></span></div><div class="cr3-fl"><span class="cr3-bx"></span><span class="cr3-fl-t"><span class="cr3-br" style="width:62%"></span><span class="cr3-br cr3-br2" style="width:40%"></span></span></div><div class="cr3-fl"><span class="cr3-bx"></span><span class="cr3-fl-t"><span class="cr3-br" style="width:62%"></span><span class="cr3-br cr3-br2" style="width:40%"></span></span></div></section></div>
+</main><nav class="cr3-lat" aria-label="Navegación principal">
+  <div class="cr3-lat-cab"><span class="cr3-logo"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.5"/><path d="M12 5.5v13M9.6 8h4.8M9 11h6M9 14h6M9.6 17h4.8"/></svg><span class="cr3-logo-n">Spinus</span></span><span class="cr3-flex"></span><span class="cr3-plan">Plan VIP</span></div>
+  <button type="button" class="cr3-p cr3-cons-b"><span class="cr3-clogo" role="img" aria-label="Logo de Clínica Semilla A"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21c-4.5-2.2-7-5.6-7-10V5.5L12 3l7 2.5V11c0 4.4-2.5 7.8-7 10z"/><path d="M12 8v7M8.5 11.5h7"/></svg></span><span class="cr3-cons-t"><span class="cr3-m">Consultorio</span><b class="cr3-m">Centro</b><span class="cr3-s">Clínica</span><b class="cr3-s">Clínica Semilla A</b></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 9 4-4 4 4M8 15l4 4 4-4"/></svg></button>
+  <div class="cr3-lista"><a href="#" class="cr3-p cr3-li" aria-current="page"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Inicio</a><a href="#" class="cr3-p cr3-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.9.7 3.1 2.4 3.5 5.2"/></svg>Expediente</a><a href="#" class="cr3-p cr3-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Agenda</a><a href="#" class="cr3-p cr3-li cr3-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>Documentos</a><a href="#" class="cr3-p cr3-li cr3-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20v-8M12 20V5M19 20v-9"/></svg>Administración</a></div>
+  <span class="cr3-flex"></span>
+  
+  <div class="cr3-lat-pie"><a href="#" class="cr3-p cr3-li cr3-yo cr3-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18.2c1.3-2 3.2-3 5.5-3s4.2 1 5.5 3"/></svg><span><span>Dr. Admin Semilla</span><small class="cr3-esp">Ortopedia y Traumatología</small><small>Mi perfil · Ajustes</small></span></a><a href="#" class="cr3-p cr3-ib cr3-ay cr3-m" aria-label="Ayuda"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.6M12 17h.01"/></svg></a><button type="button" class="cr3-p cr3-li cr3-yo cr3-s cr3-abre-aj" aria-haspopup="menu"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span><span>Secretaria Semilla</span><small>Ajustes</small></span></button></div>
+</nav>
+</div>
+<div class="cr3-capa" aria-hidden="true">
+  <div class="cr3-velo"></div>
+<!-- A0·14–15 · Paleta de comandos (CommandPalette.tsx). Un solo campo busca paciente por nombre o documento por folio: el modo lo decide
+     la forma de lo escrito («RX-2026-0042» es folio). ↑↓ mueve, Enter abre, Esc cierra (también Ctrl/⌘+K, que alterna).
+     Computadora y Duo abierto: tarjeta de 560/520 anclada arriba (los resultados cambian de alto y así no salta). Duo cerrado: tarjeta centrada (cr326).
+     iPhone: hoja alta desde abajo. -->
+<div class="cr3-pw"><div class="cr3-pal" role="dialog" aria-modal="true" aria-label="Buscar paciente o folio">
+  <div class="cr3-vb">
+    <label class="cr3-bus"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg><input type="search" class="cr3-q" placeholder="Buscar paciente por nombre o documento por folio..." aria-label="Buscar paciente por nombre o documento por folio" autocomplete="off">
+      <button type="button" class="cr3-p cr3-ib2 cr3-cierra-pal" aria-label="Cerrar"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></label>
+    <div class="cr3-cuerpo">
+      <!-- Vacío: la pista de siempre -->
+      <p class="cr3-pista2 cr3-e-vacia">Nombre del paciente, o folio del documento</p>
+      <!-- Pacientes: avatar, nombre, edad · sexo · expediente -->
+      <ul class="cr3-res cr3-e-res" role="listbox" aria-label="Pacientes"><li role="none" data-n="01"><button type="button" role="option" aria-selected="true" class="cr3-p cr3-r"><span class="cr3-avp" style="background:#F1DCEC;color:#7A2E6B">01</span><span class="cr3-r-t"><span class="cr3-r-n">Paciente Prueba 01</span><span class="cr3-r-s">34 años · Femenino · EXP-2026-0001</span></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="cr3-mo-f"><path d="m9 6 6 6-6 6"/></svg></button></li><li role="none" data-n="02"><button type="button" role="option" aria-selected="false" class="cr3-p cr3-r"><span class="cr3-avp" style="background:#DCE8F6;color:#24497A">02</span><span class="cr3-r-t"><span class="cr3-r-n">Paciente Prueba 02</span><span class="cr3-r-s">41 años · Masculino · EXP-2026-0002</span></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="cr3-mo-f"><path d="m9 6 6 6-6 6"/></svg></button></li><li role="none" data-n="03"><button type="button" role="option" aria-selected="false" class="cr3-p cr3-r"><span class="cr3-avp" style="background:#DDEFE3;color:#1F5A39">03</span><span class="cr3-r-t"><span class="cr3-r-n">Paciente Prueba 03</span><span class="cr3-r-s">58 años · Femenino · EXP-2026-0003</span></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="cr3-mo-f"><path d="m9 6 6 6-6 6"/></svg></button></li><li role="none" data-n="04"><button type="button" role="option" aria-selected="false" class="cr3-p cr3-r"><span class="cr3-avp" style="background:#F6D8D1;color:#8A2F1F">04</span><span class="cr3-r-t"><span class="cr3-r-n">Paciente Prueba 04</span><span class="cr3-r-s">27 años · Masculino · EXP-2026-0004</span></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="cr3-mo-f"><path d="m9 6 6 6-6 6"/></svg></button></li><li role="none" data-n="05"><button type="button" role="option" aria-selected="false" class="cr3-p cr3-r"><span class="cr3-avp" style="background:#EBDCCB;color:#5A3A1A">05</span><span class="cr3-r-t"><span class="cr3-r-n">Paciente Prueba 05</span><span class="cr3-r-s">63 años · Femenino · EXP-2026-0005</span></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="cr3-mo-f"><path d="m9 6 6 6-6 6"/></svg></button></li><li role="none" data-n="07"><button type="button" role="option" aria-selected="false" class="cr3-p cr3-r"><span class="cr3-avp" style="background:#E4E0F5;color:#463A86">07</span><span class="cr3-r-t"><span class="cr3-r-n">Paciente Prueba 07</span><span class="cr3-r-s">54 años · Femenino · EXP-2026-0007</span></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="cr3-mo-f"><path d="m9 6 6 6-6 6"/></svg></button></li></ul>
+      <!-- Folio: un documento con su tipo (color de tipo, CALMA cr39), paciente y fecha; abre los documentos de ese paciente -->
+      <ul class="cr3-res cr3-e-folio" role="listbox" aria-label="Documento"><li role="none"><button type="button" role="option" aria-selected="true" class="cr3-p cr3-r">
+        <span class="cr3-doc" style="color:var(--d-receta)"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/><path d="m8.5 8.5 7 7"/></svg></span><span class="cr3-r-t"><span class="cr3-r-n"><span class="cr3-folio">RX-2026-0042</span> · Receta médica</span>
+        <span class="cr3-r-s">Paciente Prueba 07 · 12 nov 2026</span></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="cr3-mo-f"><path d="m9 6 6 6-6 6"/></svg></button></li></ul>
+      <!-- Folio sin resultado: el vacío se desambigua (CommandPalette.tsx:375-389) -->
+      <div class="cr3-nada cr3-e-sinfolio"><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg><p class="cr3-nada-t">Sin resultados para "RX-2026-0999"</p>
+        <p class="cr3-nada-s">Ningún documento tuyo con ese folio. Los emitidos antes del folio correlativo no se encuentran por aquí.</p></div>
+      <!-- Sin coincidencias suficientes: opción de registro rápido (≥ 2 caracteres, no folio, < 8 resultados) -->
+      <ul class="cr3-res cr3-e-crear" role="listbox" aria-label="Crear"><li role="none"><button type="button" role="option" aria-selected="true" class="cr3-p cr3-r cr3-crear">
+        <span class="cr3-avn"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="8" r="3.5"/><path d="M3.5 20c.8-3.6 3.4-5.5 6.5-5.5 1.6 0 3 .5 4.2 1.4M18 14v6M15 17h6"/></svg></span><span class="cr3-r-t"><span class="cr3-r-n">Crear registro para: <b class="cr3-cq">"Paciente Prueba 26"</b></span>
+        <span class="cr3-r-s">Registro rápido — solo nombre, teléfono y motivo</span></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="cr3-mo-f"><path d="m9 6 6 6-6 6"/></svg></button></li></ul>
+    </div>
+    <p class="cr3-tec"><kbd>↑↓</kbd> navegar <kbd>↵</kbd> abrir <kbd>Esc</kbd> cerrar</p>
+  </div>
+  <form class="cr3-vf" novalidate>
+    <div class="cr3-fcab"><button type="button" class="cr3-p cr3-ib2 cr3-volver" aria-label="Volver a la búsqueda"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"/></svg></button>
+      <div class="cr3-fcab-t"><h2>Registro rápido</h2><p>Puedes completar el expediente después</p></div>
+      <button type="button" class="cr3-p cr3-ib2 cr3-cierra-pal" aria-label="Cerrar"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+    <div class="cr3-par"><label class="cr3-f"><span>Nombre *</span><input type="text" class="cr3-in" value="Paciente Prueba" autocomplete="off"></label>
+      <label class="cr3-f"><span>Apellidos</span><input type="text" class="cr3-in" value="26" autocomplete="off"></label></div>
+    <label class="cr3-f"><span>Fecha de nacimiento *</span><input type="date" class="cr3-in" value="1980-05-14" max="2026-11-19"></label>
+    <!-- Texto de hoy, con la cita a la ley de 2010 abrogada (deuda ya anotada en ESTADO.md): se reproduce, no se corrige aquí. Casilla a la derecha (CALMA cr320). -->
+    <label class="cr3-chk"><span>El paciente ha leído y acepta el <a href="#" class="cr3-enl">Aviso de Privacidad</a> (LFPDPPP Art. 9) *</span><input type="checkbox" checked><span class="cr3-caja" aria-hidden="true"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span></label>
+    <div class="cr3-pieh"><button type="button" class="cr3-p cr3-ton cr3-volver">Cancelar</button><button type="button" class="cr3-p cr3-prim cr3-crea"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="8" r="3.5"/><path d="M3.5 20c.8-3.6 3.4-5.5 6.5-5.5 1.6 0 3 .5 4.2 1.4M18 14v6M15 17h6"/></svg>Crear e ir al expediente</button></div>
+  </form>
+</div></div>
+<!-- Duplicado (CommandPalette.tsx:428-462) con la alerta del catálogo y el título aprobado «Paciente duplicado» (CALMA cr320, cr323.7):
+     tres botones apilados, principal arriba. -->
+<div class="cr3-alw"><div class="cr3-al" role="alertdialog" aria-modal="true" aria-labelledby="cr3-dup-ih">
+  <span class="cr3-al-ic"><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg></span><h2 class="cr3-al-t" id="cr3-dup-ih">Paciente duplicado</h2>
+  <!-- Botón acortado a «Es otra persona» (texto nuevo aprobado, informes/botones-desbordados.md cr35); la consecuencia pasa al cuerpo con las palabras de hoy. -->
+  <p class="cr3-al-m">Este paciente ya está en tu lista de pacientes: <strong>Paciente Prueba 07</strong> (Exp. #EXP-2026-0007). Si es otra persona, se creará el registro de todos modos.</p>
+  <div class="cr3-al-b"><button type="button" class="cr3-p cr3-prim cr3-dup-x">Ir a su expediente</button><button type="button" class="cr3-p cr3-ton cr3-dup-x">Es otra persona</button><button type="button" class="cr3-p cr3-quieto cr3-dup-c">Cancelar</button></div>
+</div></div>
+</div>
+</div>
+<div class="marco cr3 cr3-e1" data-vp="iv">
+<div class="cr3-app">
+<!-- Navegación de Duo abierto vertical (CALMA cr319, cr323.9): encabezado fundido, pista de cinco píldoras. Copiado del dashboard aprobado. -->
+<header class="cr3-env cr3-nav">
+  <button type="button" class="cr3-p cr3-envb" aria-label="Mostrar barra lateral" data-rot="Mostrar barra lateral"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="15" rx="3"/><path d="M9.5 4.5v15"/></svg></button>
+  <nav class="cr3-pista" aria-label="Secciones"><a href="#" class="cr3-p cr3-pv" aria-current="page">Inicio</a><a href="#" class="cr3-p cr3-pv">Expediente</a><a href="#" class="cr3-p cr3-pv">Agenda</a><a href="#" class="cr3-p cr3-pv cr3-m">Documentos</a><button type="button" class="cr3-p cr3-pv">Más</button></nav>
+  <button type="button" class="cr3-p cr3-av cr3-av-g cr3-m" aria-label="Mi perfil">AS</button><button type="button" class="cr3-p cr3-av cr3-av-g cr3-s cr3-abre-aj" aria-label="Ajustes">SE</button>
+</header><main class="cr3-cont">
+  <!-- Fondo simplificado: el dashboard reducido a sus bloques, para que la pieza global se lea sobre una pantalla real. -->
+  <div class="cr3-top"><p class="cr3-rot"><span class="cr3-m">Centro</span><span class="cr3-s">Clínica Semilla A</span></p>
+  <h1 class="cr3-h1">Buenas tardes, <span class="cr3-m">Admin</span><span class="cr3-s">Secretaria</span></h1></div>
+  <!-- Origen de la capa: el campo del dashboard aprobado (función 4); en computadora también Ctrl/⌘+K desde cualquier pantalla. --><button type="button" class="cr3-p cr3-campo cr3-abre-pal"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg><span>Buscar paciente o folio</span></button>
+  <div class="cr3-cols"><section class="cr3-tj" aria-hidden="true"><h2 class="cr3-tt">Después</h2><div class="cr3-fl"><span class="cr3-bx"></span><span class="cr3-fl-t"><span class="cr3-br" style="width:62%"></span><span class="cr3-br cr3-br2" style="width:40%"></span></span></div><div class="cr3-fl"><span class="cr3-bx"></span><span class="cr3-fl-t"><span class="cr3-br" style="width:62%"></span><span class="cr3-br cr3-br2" style="width:40%"></span></span></div><div class="cr3-fl"><span class="cr3-bx"></span><span class="cr3-fl-t"><span class="cr3-br" style="width:62%"></span><span class="cr3-br cr3-br2" style="width:40%"></span></span></div><div class="cr3-fl"><span class="cr3-bx"></span><span class="cr3-fl-t"><span class="cr3-br" style="width:62%"></span><span class="cr3-br cr3-br2" style="width:40%"></span></span></div><div class="cr3-fl"><span class="cr3-bx"></span><span class="cr3-fl-t"><span class="cr3-br" style="width:62%"></span><span class="cr3-br cr3-br2" style="width:40%"></span></span></div></section><section class="cr3-tj" aria-hidden="true"><h2 class="cr3-tt">Atendidos recientemente</h2><div class="cr3-fl"><span class="cr3-bx"></span><span class="cr3-fl-t"><span class="cr3-br" style="width:62%"></span><span class="cr3-br cr3-br2" style="width:40%"></span></span></div><div class="cr3-fl"><span class="cr3-bx"></span><span class="cr3-fl-t"><span class="cr3-br" style="width:62%"></span><span class="cr3-br cr3-br2" style="width:40%"></span></span></div><div class="cr3-fl"><span class="cr3-bx"></span><span class="cr3-fl-t"><span class="cr3-br" style="width:62%"></span><span class="cr3-br cr3-br2" style="width:40%"></span></span></div></section><section class="cr3-tj" aria-hidden="true"><h2 class="cr3-tt">Documentos recientes</h2><div class="cr3-fl"><span class="cr3-bx"></span><span class="cr3-fl-t"><span class="cr3-br" style="width:62%"></span><span class="cr3-br cr3-br2" style="width:40%"></span></span></div><div class="cr3-fl"><span class="cr3-bx"></span><span class="cr3-fl-t"><span class="cr3-br" style="width:62%"></span><span class="cr3-br cr3-br2" style="width:40%"></span></span></div></section><section class="cr3-tj" aria-hidden="true"><h2 class="cr3-tt">Esta semana</h2><div class="cr3-fl"><span class="cr3-bx"></span><span class="cr3-fl-t"><span class="cr3-br" style="width:62%"></span><span class="cr3-br cr3-br2" style="width:40%"></span></span></div><div class="cr3-fl"><span class="cr3-bx"></span><span class="cr3-fl-t"><span class="cr3-br" style="width:62%"></span><span class="cr3-br cr3-br2" style="width:40%"></span></span></div><div class="cr3-fl"><span class="cr3-bx"></span><span class="cr3-fl-t"><span class="cr3-br" style="width:62%"></span><span class="cr3-br cr3-br2" style="width:40%"></span></span></div></section></div>
+</main>
+</div>
+<div class="cr3-capa" aria-hidden="true">
+  <div class="cr3-velo"></div>
+<!-- A0·14–15 · Paleta de comandos (CommandPalette.tsx). Un solo campo busca paciente por nombre o documento por folio: el modo lo decide
+     la forma de lo escrito («RX-2026-0042» es folio). ↑↓ mueve, Enter abre, Esc cierra (también Ctrl/⌘+K, que alterna).
+     Computadora y Duo abierto: tarjeta de 560/520 anclada arriba (los resultados cambian de alto y así no salta). Duo cerrado: tarjeta centrada (cr326).
+     iPhone: hoja alta desde abajo. -->
+<div class="cr3-pw"><div class="cr3-pal" role="dialog" aria-modal="true" aria-label="Buscar paciente o folio">
+  <div class="cr3-vb">
+    <label class="cr3-bus"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg><input type="search" class="cr3-q" placeholder="Buscar paciente por nombre o documento por folio..." aria-label="Buscar paciente por nombre o documento por folio" autocomplete="off">
+      <button type="button" class="cr3-p cr3-ib2 cr3-cierra-pal" aria-label="Cerrar"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></label>
+    <div class="cr3-cuerpo">
+      <!-- Vacío: la pista de siempre -->
+      <p class="cr3-pista2 cr3-e-vacia">Nombre del paciente, o folio del documento</p>
+      <!-- Pacientes: avatar, nombre, edad · sexo · expediente -->
+      <ul class="cr3-res cr3-e-res" role="listbox" aria-label="Pacientes"><li role="none" data-n="01"><button type="button" role="option" aria-selected="true" class="cr3-p cr3-r"><span class="cr3-avp" style="background:#F1DCEC;color:#7A2E6B">01</span><span class="cr3-r-t"><span class="cr3-r-n">Paciente Prueba 01</span><span class="cr3-r-s">34 años · Femenino · EXP-2026-0001</span></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="cr3-mo-f"><path d="m9 6 6 6-6 6"/></svg></button></li><li role="none" data-n="02"><button type="button" role="option" aria-selected="false" class="cr3-p cr3-r"><span class="cr3-avp" style="background:#DCE8F6;color:#24497A">02</span><span class="cr3-r-t"><span class="cr3-r-n">Paciente Prueba 02</span><span class="cr3-r-s">41 años · Masculino · EXP-2026-0002</span></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="cr3-mo-f"><path d="m9 6 6 6-6 6"/></svg></button></li><li role="none" data-n="03"><button type="button" role="option" aria-selected="false" class="cr3-p cr3-r"><span class="cr3-avp" style="background:#DDEFE3;color:#1F5A39">03</span><span class="cr3-r-t"><span class="cr3-r-n">Paciente Prueba 03</span><span class="cr3-r-s">58 años · Femenino · EXP-2026-0003</span></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="cr3-mo-f"><path d="m9 6 6 6-6 6"/></svg></button></li><li role="none" data-n="04"><button type="button" role="option" aria-selected="false" class="cr3-p cr3-r"><span class="cr3-avp" style="background:#F6D8D1;color:#8A2F1F">04</span><span class="cr3-r-t"><span class="cr3-r-n">Paciente Prueba 04</span><span class="cr3-r-s">27 años · Masculino · EXP-2026-0004</span></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="cr3-mo-f"><path d="m9 6 6 6-6 6"/></svg></button></li><li role="none" data-n="05"><button type="button" role="option" aria-selected="false" class="cr3-p cr3-r"><span class="cr3-avp" style="background:#EBDCCB;color:#5A3A1A">05</span><span class="cr3-r-t"><span class="cr3-r-n">Paciente Prueba 05</span><span class="cr3-r-s">63 años · Femenino · EXP-2026-0005</span></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="cr3-mo-f"><path d="m9 6 6 6-6 6"/></svg></button></li><li role="none" data-n="07"><button type="button" role="option" aria-selected="false" class="cr3-p cr3-r"><span class="cr3-avp" style="background:#E4E0F5;color:#463A86">07</span><span class="cr3-r-t"><span class="cr3-r-n">Paciente Prueba 07</span><span class="cr3-r-s">54 años · Femenino · EXP-2026-0007</span></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="cr3-mo-f"><path d="m9 6 6 6-6 6"/></svg></button></li></ul>
+      <!-- Folio: un documento con su tipo (color de tipo, CALMA cr39), paciente y fecha; abre los documentos de ese paciente -->
+      <ul class="cr3-res cr3-e-folio" role="listbox" aria-label="Documento"><li role="none"><button type="button" role="option" aria-selected="true" class="cr3-p cr3-r">
+        <span class="cr3-doc" style="color:var(--d-receta)"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/><path d="m8.5 8.5 7 7"/></svg></span><span class="cr3-r-t"><span class="cr3-r-n"><span class="cr3-folio">RX-2026-0042</span> · Receta médica</span>
+        <span class="cr3-r-s">Paciente Prueba 07 · 12 nov 2026</span></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="cr3-mo-f"><path d="m9 6 6 6-6 6"/></svg></button></li></ul>
+      <!-- Folio sin resultado: el vacío se desambigua (CommandPalette.tsx:375-389) -->
+      <div class="cr3-nada cr3-e-sinfolio"><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg><p class="cr3-nada-t">Sin resultados para "RX-2026-0999"</p>
+        <p class="cr3-nada-s">Ningún documento tuyo con ese folio. Los emitidos antes del folio correlativo no se encuentran por aquí.</p></div>
+      <!-- Sin coincidencias suficientes: opción de registro rápido (≥ 2 caracteres, no folio, < 8 resultados) -->
+      <ul class="cr3-res cr3-e-crear" role="listbox" aria-label="Crear"><li role="none"><button type="button" role="option" aria-selected="true" class="cr3-p cr3-r cr3-crear">
+        <span class="cr3-avn"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="8" r="3.5"/><path d="M3.5 20c.8-3.6 3.4-5.5 6.5-5.5 1.6 0 3 .5 4.2 1.4M18 14v6M15 17h6"/></svg></span><span class="cr3-r-t"><span class="cr3-r-n">Crear registro para: <b class="cr3-cq">"Paciente Prueba 26"</b></span>
+        <span class="cr3-r-s">Registro rápido — solo nombre, teléfono y motivo</span></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="cr3-mo-f"><path d="m9 6 6 6-6 6"/></svg></button></li></ul>
+    </div>
+    
+  </div>
+  <form class="cr3-vf" novalidate>
+    <div class="cr3-fcab"><button type="button" class="cr3-p cr3-ib2 cr3-volver" aria-label="Volver a la búsqueda"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"/></svg></button>
+      <div class="cr3-fcab-t"><h2>Registro rápido</h2><p>Puedes completar el expediente después</p></div>
+      <button type="button" class="cr3-p cr3-ib2 cr3-cierra-pal" aria-label="Cerrar"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+    <div class="cr3-par"><label class="cr3-f"><span>Nombre *</span><input type="text" class="cr3-in" value="Paciente Prueba" autocomplete="off"></label>
+      <label class="cr3-f"><span>Apellidos</span><input type="text" class="cr3-in" value="26" autocomplete="off"></label></div>
+    <label class="cr3-f"><span>Fecha de nacimiento *</span><input type="date" class="cr3-in" value="1980-05-14" max="2026-11-19"></label>
+    <!-- Texto de hoy, con la cita a la ley de 2010 abrogada (deuda ya anotada en ESTADO.md): se reproduce, no se corrige aquí. Casilla a la derecha (CALMA cr320). -->
+    <label class="cr3-chk"><span>El paciente ha leído y acepta el <a href="#" class="cr3-enl">Aviso de Privacidad</a> (LFPDPPP Art. 9) *</span><input type="checkbox" checked><span class="cr3-caja" aria-hidden="true"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span></label>
+    <div class="cr3-pieh"><button type="button" class="cr3-p cr3-ton cr3-volver">Cancelar</button><button type="button" class="cr3-p cr3-prim cr3-crea"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="8" r="3.5"/><path d="M3.5 20c.8-3.6 3.4-5.5 6.5-5.5 1.6 0 3 .5 4.2 1.4M18 14v6M15 17h6"/></svg>Crear e ir al expediente</button></div>
+  </form>
+</div></div>
+<!-- Duplicado (CommandPalette.tsx:428-462) con la alerta del catálogo y el título aprobado «Paciente duplicado» (CALMA cr320, cr323.7):
+     tres botones apilados, principal arriba. -->
+<div class="cr3-alw"><div class="cr3-al" role="alertdialog" aria-modal="true" aria-labelledby="cr3-dup-iv">
+  <span class="cr3-al-ic"><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg></span><h2 class="cr3-al-t" id="cr3-dup-iv">Paciente duplicado</h2>
+  <!-- Botón acortado a «Es otra persona» (texto nuevo aprobado, informes/botones-desbordados.md cr35); la consecuencia pasa al cuerpo con las palabras de hoy. -->
+  <p class="cr3-al-m">Este paciente ya está en tu lista de pacientes: <strong>Paciente Prueba 07</strong> (Exp. #EXP-2026-0007). Si es otra persona, se creará el registro de todos modos.</p>
+  <div class="cr3-al-b"><button type="button" class="cr3-p cr3-prim cr3-dup-x">Ir a su expediente</button><button type="button" class="cr3-p cr3-ton cr3-dup-x">Es otra persona</button><button type="button" class="cr3-p cr3-quieto cr3-dup-c">Cancelar</button></div>
+</div></div>
+</div>
+</div>
+<div class="marco cr3 cr3-e1" data-vp="esc">
+<div class="cr3-app">
+<nav class="cr3-lat" aria-label="Navegación principal">
+  <div class="cr3-lat-cab"><span class="cr3-logo"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.5"/><path d="M12 5.5v13M9.6 8h4.8M9 11h6M9 14h6M9.6 17h4.8"/></svg><span class="cr3-logo-n">Spinus</span></span><span class="cr3-flex"></span><span class="cr3-plan">Plan VIP</span></div>
+  <button type="button" class="cr3-p cr3-cons-b"><span class="cr3-clogo" role="img" aria-label="Logo de Clínica Semilla A"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21c-4.5-2.2-7-5.6-7-10V5.5L12 3l7 2.5V11c0 4.4-2.5 7.8-7 10z"/><path d="M12 8v7M8.5 11.5h7"/></svg></span><span class="cr3-cons-t"><span class="cr3-m">Consultorio</span><b class="cr3-m">Centro</b><span class="cr3-s">Clínica</span><b class="cr3-s">Clínica Semilla A</b></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 9 4-4 4 4M8 15l4 4 4-4"/></svg></button>
+  <div class="cr3-lista"><a href="#" class="cr3-p cr3-li" aria-current="page"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Inicio</a><a href="#" class="cr3-p cr3-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.9.7 3.1 2.4 3.5 5.2"/></svg>Expediente</a><a href="#" class="cr3-p cr3-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Agenda</a><a href="#" class="cr3-p cr3-li cr3-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>Documentos</a><a href="#" class="cr3-p cr3-li cr3-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20v-8M12 20V5M19 20v-9"/></svg>Administración</a></div>
+  <span class="cr3-flex"></span>
+  
+  <div class="cr3-lat-pie"><a href="#" class="cr3-p cr3-li cr3-yo cr3-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18.2c1.3-2 3.2-3 5.5-3s4.2 1 5.5 3"/></svg><span><span>Dr. Admin Semilla</span><small class="cr3-esp">Ortopedia y Traumatología</small><small>Mi perfil · Ajustes</small></span></a><a href="#" class="cr3-p cr3-ib cr3-ay cr3-m" aria-label="Ayuda"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.6M12 17h.01"/></svg></a><button type="button" class="cr3-p cr3-li cr3-yo cr3-s cr3-abre-aj" aria-haspopup="menu"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span><span>Secretaria Semilla</span><small>Ajustes</small></span></button></div>
+</nav><main class="cr3-cont">
+  <!-- Fondo simplificado: el dashboard reducido a sus bloques, para que la pieza global se lea sobre una pantalla real. -->
+  <div class="cr3-top"><p class="cr3-rot"><span class="cr3-m">Centro</span><span class="cr3-s">Clínica Semilla A</span></p>
+  <h1 class="cr3-h1">Buenas tardes, <span class="cr3-m">Admin</span><span class="cr3-s">Secretaria</span></h1></div>
+  <!-- Origen de la capa: el campo del dashboard aprobado (función 4); en computadora también Ctrl/⌘+K desde cualquier pantalla. --><button type="button" class="cr3-p cr3-campo cr3-abre-pal"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg><span>Buscar paciente o folio</span><kbd class="cr3-kbd" aria-hidden="true">⌘K</kbd></button>
+  <div class="cr3-cols"><section class="cr3-tj" aria-hidden="true"><h2 class="cr3-tt">Después</h2><div class="cr3-fl"><span class="cr3-bx"></span><span class="cr3-fl-t"><span class="cr3-br" style="width:62%"></span><span class="cr3-br cr3-br2" style="width:40%"></span></span></div><div class="cr3-fl"><span class="cr3-bx"></span><span class="cr3-fl-t"><span class="cr3-br" style="width:62%"></span><span class="cr3-br cr3-br2" style="width:40%"></span></span></div><div class="cr3-fl"><span class="cr3-bx"></span><span class="cr3-fl-t"><span class="cr3-br" style="width:62%"></span><span class="cr3-br cr3-br2" style="width:40%"></span></span></div><div class="cr3-fl"><span class="cr3-bx"></span><span class="cr3-fl-t"><span class="cr3-br" style="width:62%"></span><span class="cr3-br cr3-br2" style="width:40%"></span></span></div><div class="cr3-fl"><span class="cr3-bx"></span><span class="cr3-fl-t"><span class="cr3-br" style="width:62%"></span><span class="cr3-br cr3-br2" style="width:40%"></span></span></div></section><section class="cr3-tj" aria-hidden="true"><h2 class="cr3-tt">Atendidos recientemente</h2><div class="cr3-fl"><span class="cr3-bx"></span><span class="cr3-fl-t"><span class="cr3-br" style="width:62%"></span><span class="cr3-br cr3-br2" style="width:40%"></span></span></div><div class="cr3-fl"><span class="cr3-bx"></span><span class="cr3-fl-t"><span class="cr3-br" style="width:62%"></span><span class="cr3-br cr3-br2" style="width:40%"></span></span></div><div class="cr3-fl"><span class="cr3-bx"></span><span class="cr3-fl-t"><span class="cr3-br" style="width:62%"></span><span class="cr3-br cr3-br2" style="width:40%"></span></span></div></section><section class="cr3-tj" aria-hidden="true"><h2 class="cr3-tt">Documentos recientes</h2><div class="cr3-fl"><span class="cr3-bx"></span><span class="cr3-fl-t"><span class="cr3-br" style="width:62%"></span><span class="cr3-br cr3-br2" style="width:40%"></span></span></div><div class="cr3-fl"><span class="cr3-bx"></span><span class="cr3-fl-t"><span class="cr3-br" style="width:62%"></span><span class="cr3-br cr3-br2" style="width:40%"></span></span></div></section><section class="cr3-tj" aria-hidden="true"><h2 class="cr3-tt">Esta semana</h2><div class="cr3-fl"><span class="cr3-bx"></span><span class="cr3-fl-t"><span class="cr3-br" style="width:62%"></span><span class="cr3-br cr3-br2" style="width:40%"></span></span></div><div class="cr3-fl"><span class="cr3-bx"></span><span class="cr3-fl-t"><span class="cr3-br" style="width:62%"></span><span class="cr3-br cr3-br2" style="width:40%"></span></span></div><div class="cr3-fl"><span class="cr3-bx"></span><span class="cr3-fl-t"><span class="cr3-br" style="width:62%"></span><span class="cr3-br cr3-br2" style="width:40%"></span></span></div></section></div>
+</main>
+</div>
+<div class="cr3-capa" aria-hidden="true">
+  <div class="cr3-velo"></div>
+<!-- A0·14–15 · Paleta de comandos (CommandPalette.tsx). Un solo campo busca paciente por nombre o documento por folio: el modo lo decide
+     la forma de lo escrito («RX-2026-0042» es folio). ↑↓ mueve, Enter abre, Esc cierra (también Ctrl/⌘+K, que alterna).
+     Computadora y Duo abierto: tarjeta de 560/520 anclada arriba (los resultados cambian de alto y así no salta). Duo cerrado: tarjeta centrada (cr326).
+     iPhone: hoja alta desde abajo. -->
+<div class="cr3-pw"><div class="cr3-pal" role="dialog" aria-modal="true" aria-label="Buscar paciente o folio">
+  <div class="cr3-vb">
+    <label class="cr3-bus"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg><input type="search" class="cr3-q" placeholder="Buscar paciente por nombre o documento por folio..." aria-label="Buscar paciente por nombre o documento por folio" autocomplete="off">
+      <button type="button" class="cr3-p cr3-ib2 cr3-cierra-pal" aria-label="Cerrar"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></label>
+    <div class="cr3-cuerpo">
+      <!-- Vacío: la pista de siempre -->
+      <p class="cr3-pista2 cr3-e-vacia">Nombre del paciente, o folio del documento</p>
+      <!-- Pacientes: avatar, nombre, edad · sexo · expediente -->
+      <ul class="cr3-res cr3-e-res" role="listbox" aria-label="Pacientes"><li role="none" data-n="01"><button type="button" role="option" aria-selected="true" class="cr3-p cr3-r"><span class="cr3-avp" style="background:#F1DCEC;color:#7A2E6B">01</span><span class="cr3-r-t"><span class="cr3-r-n">Paciente Prueba 01</span><span class="cr3-r-s">34 años · Femenino · EXP-2026-0001</span></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="cr3-mo-f"><path d="m9 6 6 6-6 6"/></svg></button></li><li role="none" data-n="02"><button type="button" role="option" aria-selected="false" class="cr3-p cr3-r"><span class="cr3-avp" style="background:#DCE8F6;color:#24497A">02</span><span class="cr3-r-t"><span class="cr3-r-n">Paciente Prueba 02</span><span class="cr3-r-s">41 años · Masculino · EXP-2026-0002</span></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="cr3-mo-f"><path d="m9 6 6 6-6 6"/></svg></button></li><li role="none" data-n="03"><button type="button" role="option" aria-selected="false" class="cr3-p cr3-r"><span class="cr3-avp" style="background:#DDEFE3;color:#1F5A39">03</span><span class="cr3-r-t"><span class="cr3-r-n">Paciente Prueba 03</span><span class="cr3-r-s">58 años · Femenino · EXP-2026-0003</span></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="cr3-mo-f"><path d="m9 6 6 6-6 6"/></svg></button></li><li role="none" data-n="04"><button type="button" role="option" aria-selected="false" class="cr3-p cr3-r"><span class="cr3-avp" style="background:#F6D8D1;color:#8A2F1F">04</span><span class="cr3-r-t"><span class="cr3-r-n">Paciente Prueba 04</span><span class="cr3-r-s">27 años · Masculino · EXP-2026-0004</span></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="cr3-mo-f"><path d="m9 6 6 6-6 6"/></svg></button></li><li role="none" data-n="05"><button type="button" role="option" aria-selected="false" class="cr3-p cr3-r"><span class="cr3-avp" style="background:#EBDCCB;color:#5A3A1A">05</span><span class="cr3-r-t"><span class="cr3-r-n">Paciente Prueba 05</span><span class="cr3-r-s">63 años · Femenino · EXP-2026-0005</span></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="cr3-mo-f"><path d="m9 6 6 6-6 6"/></svg></button></li><li role="none" data-n="07"><button type="button" role="option" aria-selected="false" class="cr3-p cr3-r"><span class="cr3-avp" style="background:#E4E0F5;color:#463A86">07</span><span class="cr3-r-t"><span class="cr3-r-n">Paciente Prueba 07</span><span class="cr3-r-s">54 años · Femenino · EXP-2026-0007</span></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="cr3-mo-f"><path d="m9 6 6 6-6 6"/></svg></button></li></ul>
+      <!-- Folio: un documento con su tipo (color de tipo, CALMA cr39), paciente y fecha; abre los documentos de ese paciente -->
+      <ul class="cr3-res cr3-e-folio" role="listbox" aria-label="Documento"><li role="none"><button type="button" role="option" aria-selected="true" class="cr3-p cr3-r">
+        <span class="cr3-doc" style="color:var(--d-receta)"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/><path d="m8.5 8.5 7 7"/></svg></span><span class="cr3-r-t"><span class="cr3-r-n"><span class="cr3-folio">RX-2026-0042</span> · Receta médica</span>
+        <span class="cr3-r-s">Paciente Prueba 07 · 12 nov 2026</span></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="cr3-mo-f"><path d="m9 6 6 6-6 6"/></svg></button></li></ul>
+      <!-- Folio sin resultado: el vacío se desambigua (CommandPalette.tsx:375-389) -->
+      <div class="cr3-nada cr3-e-sinfolio"><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg><p class="cr3-nada-t">Sin resultados para "RX-2026-0999"</p>
+        <p class="cr3-nada-s">Ningún documento tuyo con ese folio. Los emitidos antes del folio correlativo no se encuentran por aquí.</p></div>
+      <!-- Sin coincidencias suficientes: opción de registro rápido (≥ 2 caracteres, no folio, < 8 resultados) -->
+      <ul class="cr3-res cr3-e-crear" role="listbox" aria-label="Crear"><li role="none"><button type="button" role="option" aria-selected="true" class="cr3-p cr3-r cr3-crear">
+        <span class="cr3-avn"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="8" r="3.5"/><path d="M3.5 20c.8-3.6 3.4-5.5 6.5-5.5 1.6 0 3 .5 4.2 1.4M18 14v6M15 17h6"/></svg></span><span class="cr3-r-t"><span class="cr3-r-n">Crear registro para: <b class="cr3-cq">"Paciente Prueba 26"</b></span>
+        <span class="cr3-r-s">Registro rápido — solo nombre, teléfono y motivo</span></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="cr3-mo-f"><path d="m9 6 6 6-6 6"/></svg></button></li></ul>
+    </div>
+    <p class="cr3-tec"><kbd>↑↓</kbd> navegar <kbd>↵</kbd> abrir <kbd>Esc</kbd> cerrar</p>
+  </div>
+  <form class="cr3-vf" novalidate>
+    <div class="cr3-fcab"><button type="button" class="cr3-p cr3-ib2 cr3-volver" aria-label="Volver a la búsqueda"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"/></svg></button>
+      <div class="cr3-fcab-t"><h2>Registro rápido</h2><p>Puedes completar el expediente después</p></div>
+      <button type="button" class="cr3-p cr3-ib2 cr3-cierra-pal" aria-label="Cerrar"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+    <div class="cr3-par"><label class="cr3-f"><span>Nombre *</span><input type="text" class="cr3-in" value="Paciente Prueba" autocomplete="off"></label>
+      <label class="cr3-f"><span>Apellidos</span><input type="text" class="cr3-in" value="26" autocomplete="off"></label></div>
+    <label class="cr3-f"><span>Fecha de nacimiento *</span><input type="date" class="cr3-in" value="1980-05-14" max="2026-11-19"></label>
+    <!-- Texto de hoy, con la cita a la ley de 2010 abrogada (deuda ya anotada en ESTADO.md): se reproduce, no se corrige aquí. Casilla a la derecha (CALMA cr320). -->
+    <label class="cr3-chk"><span>El paciente ha leído y acepta el <a href="#" class="cr3-enl">Aviso de Privacidad</a> (LFPDPPP Art. 9) *</span><input type="checkbox" checked><span class="cr3-caja" aria-hidden="true"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span></label>
+    <div class="cr3-pieh"><button type="button" class="cr3-p cr3-ton cr3-volver">Cancelar</button><button type="button" class="cr3-p cr3-prim cr3-crea"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="8" r="3.5"/><path d="M3.5 20c.8-3.6 3.4-5.5 6.5-5.5 1.6 0 3 .5 4.2 1.4M18 14v6M15 17h6"/></svg>Crear e ir al expediente</button></div>
+  </form>
+</div></div>
+<!-- Duplicado (CommandPalette.tsx:428-462) con la alerta del catálogo y el título aprobado «Paciente duplicado» (CALMA cr320, cr323.7):
+     tres botones apilados, principal arriba. -->
+<div class="cr3-alw"><div class="cr3-al" role="alertdialog" aria-modal="true" aria-labelledby="cr3-dup-esc">
+  <span class="cr3-al-ic"><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg></span><h2 class="cr3-al-t" id="cr3-dup-esc">Paciente duplicado</h2>
+  <!-- Botón acortado a «Es otra persona» (texto nuevo aprobado, informes/botones-desbordados.md cr35); la consecuencia pasa al cuerpo con las palabras de hoy. -->
+  <p class="cr3-al-m">Este paciente ya está en tu lista de pacientes: <strong>Paciente Prueba 07</strong> (Exp. #EXP-2026-0007). Si es otra persona, se creará el registro de todos modos.</p>
+  <div class="cr3-al-b"><button type="button" class="cr3-p cr3-prim cr3-dup-x">Ir a su expediente</button><button type="button" class="cr3-p cr3-ton cr3-dup-x">Es otra persona</button><button type="button" class="cr3-p cr3-quieto cr3-dup-c">Cancelar</button></div>
+</div></div>
+</div>
+</div>
+<template class="cr3-ficha-tpl"><section class="cr3-ficha" lang="es" aria-label="Especificación: Paleta de comandos (buscador global)"><h3>Especificación · Paleta de comandos (buscador global)</h3><dl><dt>Qué es</dt><dd>El buscador global de hoy (<code>CommandPalette.tsx</code>, montado en <code>(app)/layout.tsx:230</code>): busca paciente por nombre o documento por folio y, si no encuentra, ofrece un registro rápido. Es distinto del buscador de «Nueva consulta» del dashboard (<code>ConsultaRapidaModal</code>), que ya está maquetado.</dd><dt>Cómo se abre</dt><dd>Ctrl/⌘+K desde cualquier pantalla (alterna); el campo «Buscar paciente o folio» del dashboard la abre sintetizando ese atajo (<code>dashboard/page.tsx:66</code>). En teléfono y Duo solo existe esa segunda vía. Esc cierra; tocar fuera cierra.</dd><dt>A quién</dt><dd>Todos los roles. A la secretaria, abrir un resultado o crear la lleva a la lista <code>/expediente</code>, no al expediente del paciente.</dd><dt>Capa por marco</dt><dd>Computadora: tarjeta de 560 anclada a 72 px del borde superior del área de contenido, centrada en horizontal (anclada y no centrada en vertical para que no salte al cambiar el número de resultados; propuesta, ver informe). Duo abierto (ambos): 520, anclada arriba. Duo cerrado: tarjeta centrada de 310 (§26). iPhone: hoja alta desde abajo con asa. Velo con desenfoque en todos.</dd><dt>Estados</dt><dd>Vacía (pista «Nombre del paciente, o folio del documento»), pacientes, documento por folio, folio sin resultado, pacientes + «Crear registro para», solo «Crear registro para», registro rápido, duplicado. La forma de lo escrito decide el modo (folio o nombre).</dd><dt>Medidas</dt><dd>Campo 48 (44 en ancho), relleno <code>--sup2</code>, texto 16 en teléfono. Filas 60 (52 en ancho) con avatar pastel de 36 y el número del paciente, nombre 15/600, línea «edad · sexo · expediente» 13 <code>--tinta2</code>; la seleccionada con fondo <code>--tonal</code>. Documento con el icono de su tipo en color (§9). Pie de teclas solo en Duo abierto horizontal y computadora (hoy sale también en teléfono, donde no sirve).</dd><dt>Registro rápido</dt><dd>«Registro rápido» / «Puedes completar el expediente después»; Nombre *, Apellidos, Fecha de nacimiento *, casilla a la derecha del texto (§20). «Cancelar» vuelve a la búsqueda; «Crear e ir al expediente» se habilita con nombre, fecha y casilla. Duplicado: alerta del catálogo «Paciente duplicado» con tres botones apilados (principal arriba).</dd><dt>Textos</dt><dd>Todos los de hoy: placeholder, «Crear registro para: "…"», «Registro rápido — solo nombre, teléfono y motivo» (no coincide con el formulario: pide nombre y fecha; ver informe), «Sin resultados para "…"», «Ningún documento tuyo con ese folio…», «El paciente ha leído y acepta el Aviso de Privacidad (LFPDPPP Art. 9) *» (cita la ley abrogada; deuda ya anotada), «Crear e ir al expediente», «Ir a su expediente», «Es otra persona» (texto nuevo aprobado; hoy «Es otra persona, crear de todos modos»: la consecuencia pasa al cuerpo de la alerta, «Si es otra persona, se creará el registro de todos modos.»), «Cancelar».</dd><dt>Accesibilidad</dt><dd>Capa <code>role="dialog"</code> con nombre (hoy no lo tiene); lista <code>listbox</code> con <code>aria-selected</code>; ↑↓ y Enter; foco al campo al abrir y de vuelta al origen al cerrar; botones de cerrar y volver con nombre (hoy sin nombre).</dd><dt>Movimiento</dt><dd>Tarjeta: escala .96→1 desde su borde superior (desde el centro en Duo cerrado), resorte amortiguación 1, respuesta .35 s; hoja: sube del borde y se arrastra para cerrar. Salida más rápida por el mismo camino. Reduced motion: fundido de 200 ms. Reduced transparency: velo opaco.</dd></dl></section></template>
+<script>
+(function(CFG){
+
+var P=CFG.p,MS=[].slice.call(document.querySelectorAll('.'+P+'.marco'));
+function cls(n){return P+'-'+n}
+MS.forEach(function(m){
+  var capa=m.querySelector('.'+cls('capa')),orig=null;
+  m.querySelectorAll('a[href="#"]').forEach(function(a){a.addEventListener('click',function(e){e.preventDefault();if(capa&&capa.classList.contains(cls('on'))&&a.closest('.'+cls('capa')))cierra()})});
+  function abre(k,o){if(!capa)return;orig=o||null;capa.dataset.k=k;capa.classList.add(cls('on'));capa.setAttribute('aria-hidden','false');
+    var pan=capa.querySelector(k==='cajon'?'.'+cls('cajon'):'.'+cls('mn'));var f=pan&&pan.querySelector('button,a');if(f)f.focus({preventScroll:true})}
+  function cierra(){if(!capa)return;capa.classList.remove(cls('on'));capa.setAttribute('aria-hidden','true');if(orig&&orig.offsetParent)orig.focus({preventScroll:true})}
+  m.abre=abre;m.cierra=cierra;
+  m.querySelectorAll('[data-abre]').forEach(function(b){b.addEventListener('click',function(){abre(b.dataset.abre,b)})});
+  if(capa){capa.querySelector('.'+cls('velo')).addEventListener('click',cierra);
+    capa.querySelectorAll('.'+cls('cierra')).forEach(function(b){b.addEventListener('click',cierra)});}
+  m.addEventListener('keydown',function(e){if(e.key==='Escape'&&capa&&capa.classList.contains(cls('on'))){e.preventDefault();cierra()}});
+});
+function tira(grupos,alPulsar){var d=document.createElement('div');d.className=cls('tira');d.setAttribute('role','group');d.setAttribute('aria-label','Controles de la maqueta');
+  grupos.forEach(function(g,i){if(i){var s=document.createElement('span');s.className=cls('sep');d.appendChild(s)}
+    g.forEach(function(b){var x=document.createElement('button');x.type='button';x.textContent=b[1];x.dataset.k=b[0];if(b[2]!=null)x.setAttribute('aria-pressed',String(b[2]));
+      x.addEventListener('click',function(){alPulsar(b[0],x,d)});d.appendChild(x)})});
+  var op=MS[0].closest('.op'),h=op&&op.querySelector('header');if(h)h.appendChild(d);else MS[0].parentNode.insertBefore(d,MS[0]);
+  var tp=document.querySelector('template.'+cls('ficha-tpl'));if(tp){var f=tp.content.firstElementChild.cloneNode(true);if(op)op.appendChild(f);else MS[MS.length-1].after(f)}
+  return d}
+
+
+var E={e1:'',e2:'Prueba 0',e3:'RX-2026-0042',e4:'RX-2026-0999',e5:'Paciente Prueba 07',e6:'Paciente Prueba 26',e7:'Paciente Prueba 26'},est='e1';
+function pon(e,abre){est=e;MS.forEach(function(m){['e1','e2','e3','e4','e5','e6','e7'].forEach(function(x){m.classList.toggle(cls(x),x===e)});
+  var q=m.querySelector('.'+cls('q'));q.value=E[e];var c=m.querySelector('.'+cls('capa'));c.classList.remove(cls('dup'));
+  if(abre){c.classList.add(cls('on'));c.setAttribute('aria-hidden','false')}sel(m)})}
+/* Solo una opción seleccionada: la primera visible. El texto de «Crear registro para» sigue a lo escrito. */
+function sel(m){var q=m.querySelector('.'+cls('q')).value.trim();m.querySelectorAll('.'+cls('cq')).forEach(function(b){b.textContent='"'+q+'"'});
+  var op=[].slice.call(m.querySelectorAll('.'+cls('r'))).filter(function(b){return b.offsetParent});
+  m.querySelectorAll('.'+cls('r')).forEach(function(b){b.setAttribute('aria-selected','false')});if(op[0])op[0].setAttribute('aria-selected','true');
+  var f=m.querySelectorAll('.'+cls('in'));if(f.length){f[1].value=est==='dup'?'07':'26'}}
+function forma(v){v=v.trim();if(!v)return 'e1';if(/^[a-z]{2,3}-?\d{4}-?\d{1,5}$/i.test(v))return v.toUpperCase().indexOf('0042')>=0?'e3':'e4';
+  return v.length<2?'e1':(/26$/.test(v)?'e6':(/prueba 07$/i.test(v)?'e5':'e2'))}
+MS.forEach(function(m){var c=m.querySelector('.'+cls('capa')),q=m.querySelector('.'+cls('q')),orig=null;
+  function abre(o){orig=o||null;pon('e1',true);setTimeout(function(){q.focus({preventScroll:true})},60)}
+  function cierra(){c.classList.remove(cls('on'),cls('dup'));c.setAttribute('aria-hidden','true');if(orig&&orig.offsetParent)orig.focus({preventScroll:true})}
+  m.abrePal=abre;
+  m.querySelectorAll('.'+cls('abre-pal')).forEach(function(b){b.addEventListener('click',function(){abre(b)})});
+  m.querySelectorAll('.'+cls('cierra-pal')).forEach(function(b){b.addEventListener('click',cierra)});
+  c.querySelector('.'+cls('velo')).addEventListener('click',cierra);
+  q.addEventListener('input',function(){var e=forma(q.value);est=e;['e1','e2','e3','e4','e5','e6'].forEach(function(x){m.classList.toggle(cls(x),x===e)});sel(m)});
+  m.querySelectorAll('.'+cls('r')).forEach(function(b){b.addEventListener('click',function(){if(b.classList.contains(cls('crear')))pon('e7');else cierra()})});
+  m.querySelectorAll('.'+cls('volver')).forEach(function(b){b.addEventListener('click',function(){pon('e6')})});
+  m.querySelector('.'+cls('crea')).addEventListener('click',function(){c.classList.add(cls('dup'))});
+  m.querySelectorAll('.'+cls('dup-x')).forEach(function(b){b.addEventListener('click',cierra)});
+  m.querySelector('.'+cls('dup-c')).addEventListener('click',function(){c.classList.remove(cls('dup'))});
+  /* ↑↓ mueven la selección entre las opciones visibles; Esc cierra */
+  m.addEventListener('keydown',function(e){if(!c.classList.contains(cls('on')))return;
+    if(e.key==='Escape'){e.preventDefault();if(c.classList.contains(cls('dup')))c.classList.remove(cls('dup'));else cierra();return}
+    if(e.key!=='ArrowDown'&&e.key!=='ArrowUp')return;e.preventDefault();
+    var op=[].slice.call(m.querySelectorAll('.'+cls('r'))).filter(function(b){return b.offsetParent});var i=op.findIndex(function(b){return b.getAttribute('aria-selected')==='true'});
+    op.forEach(function(b){b.setAttribute('aria-selected','false')});i=Math.max(0,Math.min(op.length-1,i+(e.key==='ArrowDown'?1:-1)));if(op[i])op[i].setAttribute('aria-selected','true')});
+});
+/* Ctrl/⌘+K abre o cierra la paleta del marco de computadora (como hoy, alterna) */
+document.addEventListener('keydown',function(e){if((e.ctrlKey||e.metaKey)&&e.key==='k'){var m=MS.filter(function(x){return x.offsetParent})[0];if(!m)return;e.preventDefault();
+  var c=m.querySelector('.'+cls('capa'));if(c.classList.contains(cls('on'))){c.classList.remove(cls('on'));c.setAttribute('aria-hidden','true')}else m.abrePal()}});
+tira([[['e1','Vacía'],['e2','Pacientes'],['e3','Folio'],['e4','Folio sin resultado'],['e5','Pacientes + crear'],['e6','Solo crear'],['e7','Registro rápido'],['dup','Duplicado']]],function(k){
+  if(k==='dup'){pon('e7',true);est='dup';MS.forEach(function(m){sel(m)});MS.forEach(function(m){m.querySelector('.'+cls('capa')).classList.add(cls('dup'))});return}
+  pon(k,true)});
+
+})({"p": "cr3"});
+</script>

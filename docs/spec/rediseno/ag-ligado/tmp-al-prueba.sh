@@ -1,0 +1,5 @@
+#!/bin/sh
+# Monta una página «Cita» de prueba (ag-burbuja + ag-form + ag-ligado, nombres como en la publicada) para recorrer los caminos entre secciones
+cd "$(dirname "$0")"; mkdir -p tmp-cita
+for f in ../ag-burbuja/vista-1-burbuja.html:01-burbuja-burbuja ../ag-burbuja/vista-2-pregunta.html:02-burbuja-pregunta ../ag-burbuja/vista-3-alta.html:03-burbuja-alta ../ag-burbuja/vista-4-hover.html:04-burbuja-hover ../ag-form/vista-1-cita.html:05-form-cita ../ag-form/vista-2-evento-bloqueo.html:06-form-evento-bloqueo ../ag-form/vista-3-reagendar.html:07-form-reagendar ../ag-form/vista-4-confirmaciones.html:08-form-confirmaciones vista-1-por-ligar.html:09-ligado-por-ligar vista-2-ligar.html:10-ligado-ligar vista-3-no-es-cita.html:11-ligado-no-es-cita vista-4-google.html:12-ligado-google; do cp "${f%%:*}" "tmp-cita/vista-${f##*:}.html"; done
+python3 ../kit/build.py tmp-cita "Agenda · Cita (prueba)" >/dev/null && (printf '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'; cat tmp-cita/pagina.html) > tmp-cita/tmp-ver.html

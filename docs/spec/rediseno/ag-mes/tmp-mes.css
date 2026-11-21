@@ -1,0 +1,245 @@
+/* ===== Agenda · Mes (fase 2). Prefijo .am. Las piezas base (.ag0-*) van tal cual arriba; esto es lo nuevo del Mes ===== */
+/* ---------- 0. Contenedor y modos (Mes ↔ salto al Día) ---------- */
+.am .am-cont{gap:0}
+.am .am-modo{display:none;flex:1;min-height:0;min-width:0;flex-direction:column;gap:12px}
+.am[data-vp="iv"] .am-modo,.am[data-vp="esc"] .am-modo{gap:14px}
+.am .am-modo.am-on{display:flex}
+.am .am-modo.am-entra{animation:am-entra 420ms linear(0,.009,.035,.075,.124,.181,.243,.305,.367,.427,.484,.537,.587,.632,.674,.711,.745,.776,.803,.828,.849,.868,.885,.9,.913,.925,.935,.944,.951,.958,.964,.969,.974,.977,.981,.984,.986,.988,.99,.992,.993,.994,.995,.996,.997,.998,1) both}
+@keyframes am-entra{from{opacity:0;transform:translateY(10px) scale(.99)}to{opacity:1;transform:none}}
+/* Variantes de la reserva por enlace (captura «agenda-mes-con-reserva»): una versión de cada celda y de la campana */
+.am .am-v1{display:none!important}
+.am.am-res .am-v0{display:none!important}
+.am.am-res .am-l.am-v1{display:flex!important}
+.am.am-res .am-pts.am-v1{display:flex!important}
+.am.am-res .ag0-cnt.am-v1{display:block!important}
+
+/* ---------- 1. MES EN ANCHO (ih, iv, esc): la rejilla del mes ---------- */
+.am .am-mes{position:relative;flex:1;min-height:0;display:flex;flex-direction:column;background:var(--sup);border-radius:16px;overflow:hidden}
+.am[data-vp="ih"] .am-mes,.am[data-vp="iv"] .am-mes{border-radius:18px}
+.am[data-vp="esc"] .am-mes{border-radius:20px}
+.am .am-fila{display:grid;grid-template-columns:repeat(7,minmax(0,1fr))}
+.am.am-comp .am-fila,.am.am-comp .am-mini-s,.am.am-comp .am-mini-g{grid-template-columns:repeat(6,minmax(0,1fr))}
+.am.am-comp .am-wd6{display:none!important}
+/* Cabecera de días de la semana */
+.am .am-cab{flex:none;border-bottom:1px solid var(--cal-linea)}
+.am .am-sd{display:flex;align-items:center;height:30px;padding:0 10px;font-size:12px;line-height:16px;font-weight:600;color:var(--tinta2);white-space:nowrap;overflow:hidden}
+.am .am-sd.am-wd5,.am .am-sd.am-wd6{color:var(--tinta3)}
+.am .am-sd.am-sd-hoy{color:var(--enlace)}
+/* Semanas: seis filas que se reparten el alto (nada de desplazar el mes) */
+.am .am-g{flex:1;min-height:0;display:grid;grid-template-rows:repeat(6,minmax(var(--am-fila),1fr));overflow-y:auto;overflow-x:hidden;scrollbar-width:none;overscroll-behavior:contain;--am-fila:104px}
+.am .am-g::-webkit-scrollbar{display:none}
+.am[data-vp="ih"] .am-g{--am-fila:78px}
+/* Si un aviso de página roba alto, las semanas no se aplastan: la rejilla se desplaza por dentro */
+.am .am-g>.am-fila+.am-fila{border-top:1px solid var(--cal-linea)}
+/* La celda: número arriba a la izquierda, debajo hasta K líneas */
+.am .am-c{position:relative;min-width:0;min-height:0;display:flex;flex-direction:column;gap:2px;padding:3px 3px 3px;overflow:visible;cursor:copy}
+.am .am-c+.am-c{border-left:1px solid var(--cal-linea)}
+.am .am-c.am-c-otro{background:color-mix(in srgb,var(--fondo) 55%,var(--sup))}
+.am .am-c.am-c-sin{background:var(--cal-fuera)}
+.am .am-c.am-c-hoy{background:var(--cal-hoy)}
+.am .am-ct{flex:none;display:flex;height:22px}
+.am .am-n{position:relative;min-width:22px;height:22px;padding:0 5px;border-radius:999px;color:var(--tinta);font-size:13px;line-height:22px;font-weight:600;text-align:center;font-variant-numeric:tabular-nums}
+.am .am-n::after{content:"";position:absolute;inset:-7px}
+.am .am-n:active{background:var(--sup2)}
+.am .am-c-otro .am-n{color:var(--tinta3)}
+.am .am-c-sin .am-n{color:var(--tinta2)}
+.am .am-c-hoy .am-n{background:var(--cal-hoy-num);color:#fff;font-weight:700}
+.am .am-l{display:flex;flex-direction:column;gap:4px;min-width:0}
+/* Chip de mes (.am-ch): la hermana de una línea del bloque .ag0-b. Mismos --b-* por estado (clases .ag0-b--*), barra de 3 px, icono de estado de 12 */
+.am .am-ch{position:relative;z-index:1;display:flex;align-items:center;gap:4px;height:22px;min-width:0;padding:0 6px 0 7px;border-radius:6px;background:var(--b-fondo);box-shadow:inset 3px 0 0 var(--b-barra);color:var(--tinta);font-size:12px;line-height:16px;font-weight:600;white-space:nowrap;text-align:left;cursor:pointer;transition:transform 100ms ease-out,background-color 100ms ease-out}
+.am .am-ch::after{content:"";position:absolute;left:0;right:0;top:-7px;bottom:-7px}
+.am .am-ch:active{transform:scale(.97);background:color-mix(in srgb,var(--b-fondo) 94%,var(--tinta))}
+.am .am-ch:focus-visible{outline:3px solid var(--enlace);outline-offset:1px;z-index:6}
+.am .am-ch[aria-expanded="true"]{z-index:7;box-shadow:inset 3px 0 0 var(--b-barra),0 0 0 2px var(--sup),0 0 0 4px var(--cal-sel)}
+.am .am-ch-i{display:flex;flex:none;color:var(--b-tinta)}
+.am .am-ch-i svg{display:block}
+.am .am-ch.ag0-b--ev .am-ch-i{color:var(--b-ev)}
+.am .am-ch-h{flex:none;color:var(--b-tinta);font-variant-numeric:tabular-nums}
+.am .am-ch.ag0-b--ev .am-ch-h,.am .am-ch.ag0-b--evn .am-ch-h{color:var(--tinta2)}
+.am .am-ch-n{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.am .am-ch-m{flex:none;display:flex;gap:2px;margin-left:auto;color:var(--tinta2)}
+.am .ag0-b--pasado .am-ch-n{color:var(--tinta2)}
+.am .am-tach{text-decoration:line-through;text-decoration-thickness:1.5px;color:var(--tinta2)}
+/* Bloqueo: rayado entero (en Mes no hay horario que recortar), candado y hora en --cal-bloqueo-tinta */
+.am .am-ch.am-ch-bq{--b-tinta:var(--cal-bloqueo-tinta);background-color:var(--cal-bloqueo-fondo);background-image:repeating-linear-gradient(135deg,var(--cal-bloqueo-raya) 0 1.5px,transparent 1.5px 9px);box-shadow:none;color:var(--cal-bloqueo-tinta)}
+/* Todo el día: chip sin hora; el de varios días se une a su vecino y solo rotula el primer día de cada semana */
+.am .am-ch.am-ch-todo{font-weight:600}
+.am .am-ch--ini{border-radius:6px 0 0 6px;margin-right:-4px}
+.am .am-ch--med{border-radius:0;margin:0 -4px;box-shadow:none}
+.am .am-ch--fin{border-radius:0 6px 6px 0;margin-left:-4px;box-shadow:none}
+.am .am-wd0 .am-ch--med,.am .am-wd0 .am-ch--fin{box-shadow:inset 3px 0 0 var(--b-barra);margin-left:0}
+/* «+N más»: ocupa la última línea; texto 12/600 --enlace */
+.am .am-mas{position:relative;z-index:1;display:flex;align-items:center;height:22px;min-width:0;padding:0 7px;border-radius:6px;color:var(--enlace);font-size:12px;line-height:16px;font-weight:600;white-space:nowrap;text-align:left}
+.am .am-mas::after{content:"";position:absolute;left:0;right:0;top:-7px;bottom:-7px}
+.am .am-mas:active,.am .am-mas[aria-expanded="true"]{background:var(--sup2)}
+/* Duo abierto horizontal (columna ~86 px): una línea = icono + hora (el nombre va en la burbuja y en «+N más») */
+.am[data-vp="ih"] .am-ch:not(.am-ch-todo) .am-ch-n,.am[data-vp="ih"] .am-ch-m{display:none}
+/* Duo abierto vertical (columna ~88 px, táctil): chip de 34 en dos líneas = icono + hora / nombre corto */
+.am[data-vp="iv"] .am-ct{height:24px}
+.am[data-vp="iv"] .am-n{min-width:28px;height:24px;line-height:24px}
+.am[data-vp="iv"] .am-n::after{inset:-10px -8px}
+.am[data-vp="iv"] .am-ch{display:grid;grid-template-columns:auto minmax(0,1fr) auto;grid-template-rows:16px 16px;column-gap:4px;align-content:center;height:34px;padding:0 5px 0 7px}
+.am[data-vp="iv"] .am-ch::after,.am[data-vp="iv"] .am-mas::after{top:-5px;bottom:-5px}
+.am[data-vp="iv"] .am-ch-i{grid-area:1/1}
+.am[data-vp="iv"] .am-ch-h{grid-area:1/2}
+.am[data-vp="iv"] .am-ch-m{grid-area:1/3}
+.am[data-vp="iv"] .am-ch-n{grid-area:2/1/3/4}
+/* Todo el día en Duo v: icono en línea con el título, dos renglones partidos por palabras */
+.am[data-vp="iv"] .am-ch.am-ch-todo{display:block;overflow:hidden;white-space:normal;padding:1px 6px 1px 7px;line-height:16px}
+.am[data-vp="iv"] .am-ch-todo .am-ch-i{display:inline-flex;vertical-align:-2px;margin-right:3px}
+.am[data-vp="iv"] .am-ch-todo .am-ch-n{display:inline;white-space:normal;overflow-wrap:normal;word-break:normal}
+.am[data-vp="iv"] .am-ch.am-ch--span{display:flex;align-items:center;white-space:nowrap}
+.am[data-vp="iv"] .am-mas{height:34px}
+/* Hueco pulsado: fantasma de la cita nueva (sin hora, como hoy en Mes) */
+.am .am-fan{position:absolute;z-index:3;left:34px;right:4px;top:3px;display:flex;align-items:center;gap:4px;height:22px;padding:0 6px;border-radius:6px;border:1.5px dashed var(--cal-hueco);background:color-mix(in srgb,var(--cal-hueco) 8%,var(--sup));color:var(--enlace);font-size:12px;line-height:16px;font-weight:600;white-space:nowrap;overflow:hidden;pointer-events:none;opacity:0;transform:scale(.96);transition:opacity 160ms ease-out,transform 260ms cubic-bezier(.32,.72,0,1)}
+.am .am-fan span{overflow:hidden;text-overflow:ellipsis}
+.am .am-fan.am-on{opacity:1;transform:none}
+.am[data-vp="iv"] .am-fan{height:24px;left:40px}
+.am .am-c.am-c-hue{outline:1.5px dashed var(--cal-hueco);outline-offset:-3px;background:color-mix(in srgb,var(--cal-hueco) 6%,var(--sup))}
+/* Arrastrar una cita a otro día: se levanta y sigue al dedo; deja un fantasma; la celda destino se marca */
+.am .am-ch.am-fant{background:transparent!important;box-shadow:none!important;outline:1.5px dashed var(--b-barra);outline-offset:-1.5px}
+.am .am-ch.am-fant>*{visibility:hidden}
+.am .am-arr{position:absolute!important;z-index:25!important;pointer-events:none;margin:0!important;transform-origin:30% 50%;box-shadow:inset 3px 0 0 var(--b-barra),var(--sombra-capa)!important;transition:none!important}
+.am .am-c.am-c-obj{box-shadow:inset 0 0 0 2px var(--cal-sel);background:color-mix(in srgb,var(--cal-sel) 7%,var(--sup))}
+.am .am-c.am-c-sin.am-c-obj{background:color-mix(in srgb,var(--cal-sel) 7%,var(--cal-fuera))}
+/* Cita movida: llega con un destello del anillo de selección (sustituye al dropGlow de hoy) */
+.am .am-ch.am-llega{animation:am-llega 700ms ease-out}
+@keyframes am-llega{0%{box-shadow:inset 3px 0 0 var(--b-barra),0 0 0 2px var(--sup),0 0 0 4px var(--cal-sel)}100%{box-shadow:inset 3px 0 0 var(--b-barra),0 0 0 2px transparent,0 0 0 4px transparent}}
+
+/* ---------- 2. MES EN TELÉFONO (ext, tel): mini-rejilla con puntos + «Citas del día seleccionado» ---------- */
+.am .am-mini{flex:none;background:var(--sup);border-radius:16px;padding:2px 4px 6px}
+.am[data-vp="ext"] .am-mini{margin:0 -10px 0 -12px;padding:2px 0 4px}
+.am .am-mini-s,.am .am-mini-g{display:grid;grid-template-columns:repeat(7,minmax(0,1fr))}
+.am .am-mini-s span{font-size:12px;line-height:26px;font-weight:600;color:var(--tinta2);text-align:center}
+.am .am-mini-s span.am-wd6{color:var(--tinta3)}
+.am .am-d{position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;height:46px;padding-top:3px;border-radius:12px;color:var(--tinta)}
+.am[data-vp="ext"] .am-d{height:44px;padding-top:2px}
+.am .am-d b{display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:999px;font-size:15px;line-height:20px;font-weight:600;font-variant-numeric:tabular-nums}
+.am .am-d.am-d-sin b{color:var(--tinta2)}
+.am .am-d.am-d-hoy b{background:var(--cal-hoy-num);color:#fff;font-weight:700}
+.am .am-d[aria-selected="true"]{background:var(--fondo);box-shadow:inset 0 0 0 2px var(--cal-sel)}
+.am .am-d:active{background:var(--fondo)}
+.am .am-pts{display:flex;align-items:center;justify-content:center;gap:3px;height:10px}
+.am .am-pt{flex:none;display:block;width:6px;height:6px;border-radius:999px;background:var(--b-barra)}
+.am .am-pt.am-pt-ev{border-radius:1.5px}
+.am .am-pt.am-pt-bq{border-radius:1.5px;background:transparent;box-shadow:inset 0 0 0 1.5px var(--cal-bloqueo-tinta)}
+.am .am-pt.am-pt-g{width:10px;height:10px;background:none}
+.am[data-vp="ext"] .am-pts{gap:2px}
+.am[data-vp="ext"] .am-pt{width:5px;height:5px}
+.am .am-pmas{letter-spacing:-.2px;font-size:12px;line-height:12px;font-weight:600;color:var(--tinta2);font-variant-numeric:tabular-nums}
+/* Panel del día seleccionado: tarjeta que se desplaza; cabecera pegajosa */
+.am .am-desl{flex:1;min-height:0;display:flex;flex-direction:column;gap:12px;overflow-y:auto;overflow-x:hidden;scrollbar-width:none;overscroll-behavior:contain;margin:0 -16px;padding:0 16px 4px}
+.am[data-vp="ext"] .am-desl{margin:0 -14px 0 -16px;padding:0 14px 4px 16px}
+.am[data-vp="tel"] .am-desl{padding-bottom:72px}
+.am .am-desl::-webkit-scrollbar{display:none}
+.am .am-pd{flex:none;background:var(--sup);border-radius:16px;padding:0 12px 4px}
+.am[data-vp="ext"] .am-pd{margin:0 -10px 0 -12px}
+.am .am-pdh{position:sticky;top:0;z-index:2;display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:54px;padding:4px 0 2px;background:var(--sup);border-radius:16px 16px 0 0}
+.am .am-pdt{display:flex;flex-direction:column;min-width:0}
+.am .am-pdh h2{font-size:15px;line-height:20px;font-weight:700;color:var(--tinta);white-space:nowrap}
+.am .am-pdn{font-size:13px;line-height:18px;color:var(--tinta2);white-space:nowrap}
+.am .am-vd{position:relative;flex:none;height:44px;padding:0 2px 0 8px;border-radius:10px;color:var(--enlace);font-size:15px;line-height:20px;font-weight:600;white-space:nowrap}
+.am .am-lf-tc{flex:1;display:flex;min-width:0}
+.am .ag0-lf.am-lf-todo{min-height:44px}
+.am .ag0-lb.am-lb-bq{background-color:var(--cal-bloqueo-fondo);background-image:repeating-linear-gradient(135deg,var(--cal-bloqueo-raya) 0 1.5px,transparent 1.5px 6px);box-shadow:inset 0 0 0 1px var(--cal-bloqueo-raya);width:4px}
+.am .am-lf-bq .ag0-ln{color:var(--tinta2)}
+.am .am-lf-evi{display:flex;align-items:center;justify-content:center;width:26px;height:26px;flex:none;border-radius:999px;background:color-mix(in srgb,var(--b-barra) 14%,var(--sup));color:var(--b-barra)}
+.am .ag0-lf.am-rsv,.am .am-ch.am-rsv{}
+.am .am-pd .ag0-lvac,.am .am-mb .ag0-lvac{border-top:1px solid var(--linea)}
+
+/* ---------- 3. CAPA «+N más» (catálogo: menú anclado sin velo en computadora; tarjeta centrada con velo en Duo) ---------- */
+.am .ag0-cj.am-mcj{width:380px}
+.am[data-vp="ext"] .ag0-cj.am-mcj{width:310px}
+.am .ag0-cj.am-mcj.am-anc{width:340px;border-radius:16px;transform-origin:top left}
+.am .am-mh{flex:none;display:flex;align-items:center;gap:4px;min-height:56px;padding:6px 8px 2px 12px}
+.am .am-mt{flex:1;min-width:0;display:inline-flex;align-items:center;gap:4px;min-height:44px;padding:0 4px;border-radius:10px;color:var(--tinta);font-size:17px;line-height:22px;font-weight:700;text-align:left}
+.am[data-vp="esc"] .am-mt{min-height:36px}
+.am .am-mt>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.am .am-mt svg{color:var(--enlace)}
+.am .am-mt:active{background:var(--sup2)}
+.am .am-mb{padding:0 16px 10px}
+.am .am-mb .ag0-lf:first-child{border-top:0}
+.am[data-vp="esc"] .am-mb .ag0-lf{min-height:48px;padding:6px 0}
+.am[data-vp="esc"] .am-mb .ag0-lc .ag0-ln{font-size:14px;line-height:18px}
+
+/* ---------- 4. ALERTA (ConfirmModal) y AVISO EMERGENTE ---------- */
+.am .ag0-cj.am-al{width:340px;padding:24px;text-align:center;overflow:visible}
+.am[data-vp="ext"] .ag0-cj.am-al{width:310px}
+.am .am-al-i{width:48px;height:48px;margin:0 auto 12px;border-radius:999px;display:flex;align-items:center;justify-content:center;background:var(--ag-fondo);color:var(--ag-tinta)}
+.am .am-al-t{font-size:15px;line-height:22px;color:var(--tinta);text-align:justify;text-align-last:center;-webkit-hyphens:auto;hyphens:auto}
+.am .am-al-b{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;margin-top:20px}
+.am .am-b{position:relative;display:inline-flex;align-items:center;justify-content:center;height:40px;padding:0 12px;border-radius:12px;font-size:15px;line-height:20px;font-weight:600;white-space:nowrap}
+.am[data-vp="iv"] .am-b,.am[data-vp="ext"] .am-b{height:44px}
+.am .am-b-q{background:var(--sup2);color:var(--tinta)}
+.am .am-b-p{background:var(--accion);color:#fff}
+.am .am-toast{position:absolute;z-index:45;left:var(--tx,50%);top:var(--ty,16px);display:flex;align-items:center;gap:10px;width:max-content;max-width:min(440px,calc(var(--tw,100%) - 32px));padding:11px 16px 11px 14px;border-radius:14px;background:var(--sup);color:var(--tinta);box-shadow:var(--sombra-capa);font-size:14px;line-height:20px;font-weight:600;opacity:0;transform:translate(-50%,-14px) scale(.98);pointer-events:none;transition:opacity 180ms ease-in,transform 200ms ease-in}
+.am .am-toast svg{color:var(--mal-tinta)}
+.am .am-toast.am-on{opacity:1;transform:translate(-50%,0);transition:opacity 220ms ease-out,transform 460ms linear(0,.009,.035,.075,.124,.181,.243,.305,.367,.427,.484,.537,.587,.632,.674,.711,.745,.776,.803,.828,.849,.868,.885,.9,.913,.925,.935,.944,.951,.958,.964,.969,.974,.977,.981,.984,.986,.988,.99,.992,.993,.994,.995,.996,.997,.998,1)}
+.am[data-vp="ext"]{--tx:calc((466px - 56px - var(--ir)) / 2);--tw:calc(466px - 56px - var(--ir))}
+.am[data-vp="tel"]{--ty:calc(var(--it) + 76px)}
+.am[data-vp="ih"]{--tx:calc((951px - 218px - var(--ir)) / 2);--tw:calc(951px - 218px - var(--ir))}
+.am[data-vp="iv"]{--ty:152px}
+.am[data-vp="esc"]{--tx:calc(248px + (1280px - 248px) / 2)}
+
+/* ---------- 5. Filtro de médico abierto (computadora) y opción apagada ---------- */
+.am .ag0-cj.am-medcj{width:330px}
+.am .ag0-op.am-op-off{color:var(--tinta3);cursor:default}
+.am .ag0-op.am-op-off:active{background:none}
+.am .ag0-op[role="option"]>svg{color:var(--enlace)}
+.am .ag0-cj.am-pcj{width:360px}
+
+/* ---------- 6. ESTADOS de página (tira de estados, fuera del marco) ---------- */
+/* Cargando: barra de 2 px pegada arriba del área de contenido y lo de debajo atenuado (AvisosAgenda + .ag-cargando) */
+.am .am-cargab{display:none;position:absolute;z-index:4;left:0;right:0;top:0;height:2px;overflow:hidden}
+.am .am-cargab i{position:absolute;inset:0;width:40%;background:var(--accion);border-radius:2px;animation:am-barra 1.1s cubic-bezier(.45,0,.55,1) infinite}
+@keyframes am-barra{from{transform:translateX(-100%)}to{transform:translateX(250%)}}
+.am.am-carga .am-cargab{display:block}
+.am.am-carga .am-mes,.am.am-carga .am-mini,.am.am-carga .am-pd{opacity:.55;transition:opacity 200ms ease-out}
+/* Vacío: el mes sin nada; aviso que solo informa (en Mes no hay «Todos los médicos» que ofrecer) */
+.am.am-vacio .am-l,.am.am-vacio .am-pts{visibility:hidden}
+.am .am-av-v{background:var(--sup);color:var(--tinta2)}
+.am .am-av-v svg{color:var(--tinta3)}
+.am .am-av-f{background:var(--mal-fondo);color:var(--mal-tinta)}
+.am.am-vacio .am-av-v,.am.am-avf .am-av-f,.am.am-comp .am-av-k,.am.am-avh .am-av-h{display:flex}
+/* La barra de la base deja la fila 2 del Duo h a la derecha de la bisagra; el aviso cruza (es contenido, no control fijo) */
+
+/* ---------- 7. Movimiento y transparencia reducidos ---------- */
+@media (prefers-reduced-motion:reduce){
+  .am .am-modo.am-entra{animation:am-funde 200ms ease both}
+  .am .am-cargab i{animation:none;width:100%;opacity:.5}
+  .am .am-ch,.am .am-fan,.am .am-toast,.am .am-toast.am-on{transition:opacity 200ms ease}
+  .am .am-toast,.am .am-toast.am-on{transform:translate(-50%,0)}
+  .am .am-fan{transform:none}
+  .am .am-ch.am-llega{animation:none}
+}
+@keyframes am-funde{from{opacity:0}to{opacity:1}}
+/* Duo cerrado: el aviso de página parte en dos renglones (texto arriba, acción debajo) en vez de exprimir la frase */
+.am[data-vp="ext"] .ag0-aviso{flex-wrap:wrap;row-gap:0;padding-bottom:2px}
+.am[data-vp="ext"] .ag0-aviso p{flex-basis:calc(100% - 30px)}
+.am[data-vp="ext"] .ag0-aviso button{margin-left:16px}
+
+/* ---------- 8. Todo el día de varios días: un solo chip que cruza sus días; asas para estirar (eventResize) ---------- */
+.am .am-ch.am-ch--span{width:calc(var(--span,1) * 100% + (var(--span,1) - 1) * 7px);max-width:none;margin:0;border-radius:6px;flex:none;z-index:2}
+.am .am-ch.am-ch-ph{visibility:hidden;pointer-events:none}
+.am .am-asa{display:none;position:absolute;z-index:1;top:50%;width:4px;height:12px;margin-top:-6px;border-radius:2px;background:var(--b-barra);box-shadow:0 0 0 2px var(--sup)}
+.am .am-asa-i{left:5px}
+.am .am-asa-f{right:4px}
+.am[data-vp="esc"] .am-ch-todo:hover .am-asa,.am.am-asa-on .am-ch-todo .am-asa,.am .am-ch-est .am-asa-f{display:block}
+.am.am-asa-on .am-ch-todo.ag0-b--ev,.am .am-ch-est{padding-left:13px;padding-right:12px}
+.am .am-ch.am-ch-est{z-index:8;outline:1.5px dashed var(--b-barra);outline-offset:-1.5px;box-shadow:inset 3px 0 0 var(--b-barra),var(--sombra-capa)}
+.am .am-e1{display:none!important}
+.am.am-est .am-e0{display:none!important}
+.am.am-est .am-l.am-e1{display:flex!important}
+.am.am-est .am-c[data-o="10"]{box-shadow:inset 0 0 0 2px var(--cal-sel);background:color-mix(in srgb,var(--cal-sel) 7%,var(--sup))}
+/* Hueco sin sitio para el texto (Duo h): solo «+», con el rótulo completo en aria-label */
+.am .am-fan.am-fan-ico{left:auto;width:28px;justify-content:center;padding:0}
+.am .am-fan.am-fan-ico span{display:none}
+
+/* Nota de la tira (FUERA del marco): lo que la maqueta no dibuja aquí y dónde está */
+.am-nota{display:inline-flex;align-items:center;min-height:28px;padding:0 10px;border-radius:999px;background:var(--ag-fondo);color:var(--ag-tinta);font:600 12px/16px var(--fuente)}
+.am-nota[hidden]{display:none}
+/* Duo cerrado: la fila de puntos cabe en la celda de 44 (la G de Google a 8 px) */
+.am .am-pt.am-pt-g svg{display:block;width:100%;height:100%}
+.am[data-vp="ext"] .am-d{gap:2px}
+.am[data-vp="ext"] .am-pts{height:8px}
+.am[data-vp="ext"] .am-pt.am-pt-g{width:8px;height:8px}

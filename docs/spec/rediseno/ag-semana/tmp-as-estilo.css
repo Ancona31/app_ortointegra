@@ -1,0 +1,162 @@
+/* ===== Agenda · Semana (prefijo .as). Va DESPUÉS del CSS de las piezas base (.ag0-*), que se copia intacto ===== */
+/* Contenedores de la vista: semana, día (vista 3) y las dos rejillas de la vista 1 (completa / compacta) */
+.as .as-sem,.as .as-dia,.as .as-m-norm,.as .as-m-comp,.as .as-modo{flex:1;min-height:0;display:flex;flex-direction:column;gap:12px}
+.as[data-vp="iv"] .as-sem,.as[data-vp="esc"] .as-sem,.as[data-vp="iv"] .as-m-norm,.as[data-vp="esc"] .as-m-norm,.as[data-vp="iv"] .as-m-comp,.as[data-vp="esc"] .as-m-comp{gap:14px}
+.as .as-dia{display:none}
+.as .as-m-comp{display:none}
+.as.as-compacta .as-m-comp{display:flex}
+.as.as-compacta .as-m-norm{display:none}
+
+/* «+N más» en la fila de todo el día (FullCalendar, tope de 2 en la banda de Semana) */
+.as .as-mas{position:relative;display:flex;align-items:center;height:24px;min-width:0;padding:0 6px;border-radius:7px;color:var(--enlace);font-size:12px;line-height:16px;font-weight:600;white-space:nowrap}
+.as .as-mas::after{content:"";position:absolute;inset:-10px 0}
+.as[data-vp="ih"] .as-mas::after,.as[data-vp="esc"] .as-mas::after{inset:-6px 0}
+.as .as-mas:active{background:var(--sup2)}
+/* Popover de «+N más»: misma pieza que el resto de capas (tarjeta centrada; menú anclado sin velo en computadora) */
+.as .ag0-cj.as-pop{width:320px}
+.as[data-vp="ext"] .ag0-cj.as-pop{width:310px}
+.as[data-vp="esc"] .ag0-cj.as-pop{width:288px}
+.as .as-pop-l{display:flex;flex-direction:column;gap:8px;padding:6px 16px 16px}
+.as .as-pop-l .ag0-tc{height:36px;padding:0 10px 0 10px;border-radius:9px;font-size:14px;line-height:18px}
+.as .as-pop-l .ag0-tc::after{inset:-4px 0}
+.as[data-vp="esc"] .as-pop-l .ag0-tc{height:32px;font-size:13px}
+
+/* Cabecera de día de la lista = enlace a la Vista Día (navLinks de hoy) */
+.as .as-ldb{position:relative;font:inherit;letter-spacing:inherit;text-transform:inherit;color:inherit;border-radius:6px;transition:transform 100ms ease-out}
+.as .as-ldb::after{content:"";position:absolute;inset:-13px -6px}
+.as .as-ldb:active,.as .as-ldb.as-puls{transform:scale(.97)}
+.as .as-ldb:focus-visible{outline:3px solid var(--enlace);outline-offset:2px}
+
+/* ---------- Estados de la tira de maqueta ---------- */
+/* «Todos los médicos»: aparecen las citas de la Dra. Invitada y las iniciales en los bloques (solo rejilla) */
+.as:not(.as-todos) .as-st{display:none}
+.as:not(.as-todos) .ag0-b-med{display:none}
+.as .as-cnt-t{display:none}
+.as.as-todos .as-cnt-t{display:inline}
+.as.as-todos .as-cnt-n{display:none}
+/* En columnas de 60–99 px (Semana en Duo abierto) no caben hora e iniciales: con «Todos» las iniciales ocupan el
+   sitio de la hora de inicio (la hora es lo primero que se omite y se lee en la rejilla); en 15 min no se muestran */
+@container (min-width:60px) and (max-width:99px){
+  .as.as-todos .ag0-b-hi{display:none}
+  .as .ag0-b-med{grid-column:2;grid-row:1;justify-self:start;margin:0}
+  .as .ag0-d15 .ag0-b-med{display:none}
+}
+
+/* Cargando: esqueleto que replica la pantalla (loading.tsx, «Cargando agenda»). Sin brillo en bucle */
+.as .as-esq{display:none;position:absolute;inset:0;z-index:4;padding:inherit;flex-direction:column;gap:12px;background:var(--fondo)}
+.as.as-cargando .as-esq{display:flex}
+.as.as-cargando .ag0-cont>:not(.as-esq){visibility:hidden}
+.as .as-h{display:block;flex:none;background:var(--sup2);border-radius:6px}
+.as .as-esq-f{display:flex;align-items:center;gap:10px;min-height:44px}
+.as[data-vp="ih"] .as-esq-f,.as[data-vp="esc"] .as-esq-f{min-height:36px}
+.as .as-esq-c{position:relative;flex:1;min-height:0;display:flex;flex-direction:column;background:var(--sup);border-radius:16px;overflow:hidden}
+.as[data-vp="ih"] .as-esq-c,.as[data-vp="iv"] .as-esq-c{border-radius:18px}
+.as[data-vp="esc"] .as-esq-c{border-radius:20px}
+.as .as-esq-d{display:grid;grid-template-columns:var(--cal-hw) repeat(7,minmax(0,1fr));align-items:center;justify-items:center;min-height:44px;border-bottom:1px solid var(--linea)}
+.as .as-esq-g{position:relative;flex:1;display:grid;grid-template-columns:var(--cal-hw) repeat(7,minmax(0,1fr));background-image:repeating-linear-gradient(to bottom,var(--linea) 0 1px,transparent 1px 80px);background-position:0 30px}
+.as .as-esq-g>span{position:relative;border-left:1px solid var(--linea)}
+.as .as-esq-g>span:first-child{border-left:0}
+.as .as-esq-g .as-h{position:absolute;left:3px;right:4px;border-radius:8px}
+.as .as-esq-g>span:first-child .as-h{left:auto;right:6px;width:32px;height:12px;border-radius:6px}
+.as .as-esq-t{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));justify-items:center;gap:0;background:var(--sup);border-radius:16px;padding:10px 4px}
+.as[data-vp="ext"] .as-esq-t{margin:0 -10px 0 -12px}
+.as .as-esq-t span{display:flex;flex-direction:column;align-items:center;gap:6px}
+.as .as-esq-l{flex:1;min-height:0;background:var(--sup);border-radius:16px;padding:14px 12px;display:flex;flex-direction:column;gap:0;overflow:hidden}
+.as .as-esq-r{display:flex;align-items:center;gap:10px;min-height:60px;border-top:1px solid var(--linea)}
+.as .as-esq-r>span{display:flex;flex-direction:column;gap:6px;flex:1}
+
+/* Recargando: la tarjeta se atenúa (como hoy, .55) y una raya de progreso corre por su borde superior */
+.as .ag0-tira-d{position:relative;overflow:hidden}
+.as.as-recarga .ag0-cal>*,.as.as-recarga .ag0-sl,.as.as-recarga .ag0-tira-d>*,.as.ag0-ave .ag0-cal>*,.as.ag0-ave .ag0-sl,.as.ag0-ave .ag0-tira-d>*{opacity:.55;transition:opacity 200ms ease-out}
+.as.as-recarga .ag0-cal::before,.as.as-recarga .ag0-tira-d::before{content:"";position:absolute;z-index:9;top:0;left:0;width:34%;height:3px;border-radius:0 3px 3px 0;background:var(--accion);animation:as-cb 1100ms cubic-bezier(.45,0,.25,1) infinite}
+@keyframes as-cb{from{transform:translateX(-100%)}to{transform:translateX(300%)}}
+
+/* Vacía (y semanas sin datos al navegar): sin bloques; la rejilla conserva horario, fuera de horario y hoy */
+.as.as-vacia .ag0-b,.as.as-vacia .ag0-tc,.as.as-vacia .ag0-bq,.as.as-vacia .as-mas,.as.as-vacia .ag0-ld,.as.as-vacia .ag0-lf,.as.as-vacia .ag0-lvac,.as.as-vacia .ag0-tpt,
+.as.as-otra .ag0-ahora,.as.as-otra .ag0-ahora-t,.as.as-otra .ag0-ahora-p,.as.as-otra .ag0-hueco{display:none}
+.as.as-otra .ag0-col-hoy{background-color:transparent}
+.as .as-hr17{display:none}
+.as.as-otra .as-hr17{display:block}
+.as .as-lvacia{display:none;flex:1;flex-direction:column;align-items:center;justify-content:center;gap:10px;min-height:220px;padding:24px 16px;text-align:center;color:var(--tinta2);font-size:15px;line-height:20px}
+.as .as-lvacia svg{color:var(--tinta3)}
+.as.as-vacia .as-lvacia{display:flex}
+
+/* Avisos de página añadidos a los de la pieza base (misma geometría .ag0-aviso) */
+.as .as-av-f{background:var(--mal-fondo);color:var(--mal-tinta)}
+.as.as-avf .as-av-f{display:flex}
+.as .as-av-v,.as .as-av-k{background:var(--sup);color:var(--tinta2)}
+.as .as-av-v button,.as .as-av-k button{color:var(--enlace)}
+.as.as-vacia .as-av-v,.as.as-compacta .as-av-k:not(.as-av-h),.as.as-avh .as-av-h{display:flex}
+.as.as-todos .as-av-v .as-vf,.as:not(.as-todos) .as-av-v .as-vt{display:none}
+
+/* ---------- Gestos (vista 3) ---------- */
+.as.as-g .ag0-cont{overflow:hidden}
+.as.as-g .as-sem{touch-action:pan-y;-webkit-user-select:none;user-select:none}
+.as .as-ido{display:none!important}
+.as .as-halo{position:absolute;inset:-3px;border-radius:10px;box-shadow:0 0 0 3px color-mix(in srgb,var(--ok-tinta) 75%,transparent);pointer-events:none}
+.as .ag0-dia.as-puls{transform:scale(.97);background:var(--sup2);border-radius:10px}
+.as .ag0-hueco.as-vivo{box-shadow:0 6px 18px rgba(20,33,61,.16)}
+.as[data-vp="esc"] .as-sem .ag0-b{cursor:grab}
+.as[data-vp="esc"] .as-sem .ag0-b:not(.ag0-d15):hover .ag0-b-asa{display:block;cursor:ns-resize}
+.as .ag0-b.ag0-b--arr{cursor:grabbing}
+/* Mientras se arrastra, la hora del bloque es la del destino (ya está en el texto); en columnas mínimas no hay texto */
+
+/* Aviso de confirmación de hoy (ConfirmModal): mensaje + «Cancelar» / «Aceptar», con la pieza de alerta del catálogo */
+.as .ag0-cj.as-al{width:320px;padding:24px;text-align:center}
+.as[data-vp="ext"] .ag0-cj.as-al{width:310px}
+.as[data-vp="ih"] .ag0-cj.as-al,.as[data-vp="iv"] .ag0-cj.as-al,.as[data-vp="esc"] .ag0-cj.as-al{width:340px}
+.as .as-al-i{flex:none;width:48px;height:48px;margin:0 auto 14px;border-radius:999px;display:flex;align-items:center;justify-content:center;background:var(--ag-fondo);color:var(--ag-tinta)}
+.as .as-al-h{font-size:17px;line-height:22px;font-weight:700;color:var(--tinta);text-align:center;text-wrap:balance}
+.as .as-al-t{margin-top:8px;font-size:14px;line-height:20px;color:var(--tinta2);text-align:center;text-wrap:pretty;overflow-wrap:anywhere}
+.as .as-al-b{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;margin-top:20px}
+.as .as-al-b button{position:relative;height:44px;border-radius:12px;font-size:15px;line-height:20px;font-weight:600;text-align:center;transition:transform 100ms ease-out}
+.as[data-vp="ih"] .as-al-b button,.as[data-vp="esc"] .as-al-b button{height:40px}
+.as .as-al-b button:active{transform:scale(.97)}
+.as .as-al-b button:focus-visible{outline:3px solid var(--enlace);outline-offset:2px}
+.as .as-al-no{background:var(--tonal);color:var(--tonal-tinta)}
+.as .as-al-si{background:var(--accion);color:#fff}
+.as .as-al-si.as-al-mal{background:var(--mal-fondo);color:var(--mal-tinta)}
+.as .as-al-i.as-al-imal{background:var(--mal-fondo);color:var(--mal-tinta)}
+
+/* Aviso emergente (toast): arriba y centrado en el área de contenido */
+.as.marco{--as-tx:163px;--as-tw:326px;--as-ty:calc(var(--it) + 14px)}
+.as[data-vp="tel"]{--as-tx:196.5px;--as-tw:393px;--as-ty:calc(var(--it) + 76px)}
+.as[data-vp="ih"]{--as-tx:324.5px;--as-tw:649px}
+.as[data-vp="iv"]{--as-tx:334.5px;--as-tw:669px;--as-ty:calc(var(--it) + 72px)}
+.as[data-vp="esc"]{--as-tx:764px;--as-tw:1032px}
+.as .as-toast{position:absolute;z-index:45;top:var(--as-ty);left:var(--as-tx);display:flex;align-items:center;gap:8px;width:max-content;max-width:calc(var(--as-tw) - 32px);min-height:40px;padding:8px 16px 8px 12px;border-radius:999px;background:var(--sup);color:var(--tinta);box-shadow:var(--sombra-capa);font-size:14px;line-height:20px;font-weight:600;opacity:0;transform:translate(-50%,-14px) scale(.96);pointer-events:none;transition:opacity 160ms ease-in,transform 200ms ease-in}
+.as .as-toast.as-on{opacity:1;transform:translate(-50%,0);transition:opacity 220ms ease-out,transform 520ms linear(0,.009,.035,.075,.124,.181,.243,.305,.367,.427,.484,.537,.587,.632,.674,.711,.745,.776,.803,.828,.849,.868,.885,.9,.913,.925,.935,.944,.951,.958,.964,.969,.974,.977,.981,.984,.986,.988,.99,.992,.993,.994,.995,.996,.997,.998,1)}
+.as .as-toast i{width:24px;height:24px;flex:none;border-radius:999px;display:flex;align-items:center;justify-content:center;background:var(--ok-fondo);color:var(--ok-tinta)}
+.as .as-toast .as-t-mal{display:none}
+.as .as-toast.as-toast-mal i{background:var(--mal-fondo);color:var(--mal-tinta)}
+.as .as-toast.as-toast-mal .as-t-ok{display:none}
+.as .as-toast.as-toast-mal .as-t-mal{display:block}
+.as .as-toast .as-t-txt{min-width:0}
+
+/* ---------- Tiempo real: otra persona cambió una cita (pieza común; en la app: .ag0-remoto / .ag0-saliendo bajo .ag0) ---------- */
+.as .as-rnueva{display:none!important}
+.as .ag0-lf{position:relative}
+.as .ag0-remoto{animation:ag0-remoto-entra 460ms linear(0,.009,.035,.075,.124,.181,.243,.305,.367,.427,.484,.537,.587,.632,.674,.711,.745,.776,.803,.828,.849,.868,.885,.9,.913,.925,.935,.944,.951,.958,.964,.969,.974,.977,.981,.984,.986,.988,.99,.992,.993,.994,.995,.996,.997,.998,1) backwards}
+.as .ag0-lf.ag0-remoto{animation-name:ag0-remoto-op}
+.as .ag0-remoto::before{content:"";position:absolute;inset:0;z-index:1;border-radius:inherit;box-shadow:inset 0 0 0 2px var(--enlace);pointer-events:none;opacity:0;animation:ag0-anillo 560ms ease-in-out 160ms 1}
+.as .ag0-saliendo{animation:ag0-sale 120ms cubic-bezier(.4,0,1,1) forwards;pointer-events:none}
+@keyframes ag0-remoto-entra{from{opacity:0;transform:translateY(4px) scale(.97)}}
+@keyframes ag0-remoto-op{from{opacity:0}}
+@keyframes ag0-anillo{0%,100%{opacity:0}45%{opacity:1}}
+@keyframes ag0-sale{to{opacity:0}}
+.as .as-toast .as-t-maq{display:none}
+.as .as-toast.as-toast-maq{border:1px dashed var(--tinta3)}
+.as .as-toast.as-toast-maq i{background:var(--sup2);color:var(--tinta2)}
+.as .as-toast.as-toast-maq .as-t-ok,.as .as-toast.as-toast-maq .as-t-mal{display:none}
+.as .as-toast.as-toast-maq .as-t-maq{display:block}
+
+/* Movimiento y transparencia reducidos */
+@media (prefers-reduced-motion:reduce){
+  .as.as-recarga .ag0-cal::before,.as.as-recarga .ag0-tira-d::before{animation:none;width:100%;opacity:.45}
+  .as .as-toast,.as .as-toast.as-on{transform:translate(-50%,0);transition:opacity 200ms ease}
+  .as .as-ldb{transition:none}
+  .as .ag0-remoto{animation:none}
+}
+
+/* En la lista (Duo cerrado, iPhone) hoy no se ofrece «Compactar»: no hay rejilla */
+.as[data-vp="ext"] .ah-nolista,.as[data-vp="tel"] .ah-nolista{display:none}

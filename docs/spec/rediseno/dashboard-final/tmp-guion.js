@@ -58,12 +58,26 @@
     /* «¿No es una cita?»: un toque, sin confirmación; la fila sale de la lista (BotonNoEsCita.tsx:21,37-45) */
     q('.db-hc-noes').addEventListener('click',function(){var li=orC&&orC.closest('li');orC=null;cierraCita();if(li)li.hidden=true});
     m.addEventListener('keydown',function(e){if(e.key==='Escape'&&cc.classList.contains('db-on')){e.preventDefault();cierraCita()}});
-    /* «Estados»: leyenda que nace del botón, sin velo */
+    /* «Estados» (patrón de menús del catálogo): desplegable sin velo solo en computadora; en los demás, capa de leyenda */
+    function capaSimple(c,orig){if(!c)return null;var o=null;
+      function cierra(){c.classList.remove('db-on');c.setAttribute('aria-hidden','true');if(o&&o.offsetParent)o.focus({preventScroll:true})}
+      c.querySelector('.db-velo').addEventListener('click',cierra);
+      c.querySelectorAll('.db-hl-x').forEach(function(b){b.addEventListener('click',cierra)});
+      m.addEventListener('keydown',function(e){if(e.key==='Escape'&&c.classList.contains('db-on')){e.preventDefault();cierra()}});
+      return {abre:function(b){o=b;c.classList.add('db-on');c.setAttribute('aria-hidden','false');
+        var f=c.querySelector('.db-hl-x,.db-mo,.db-ap-cab');if(f)f.focus({preventScroll:true})},cierra:cierra}}
+    var capL=capaSimple(m.querySelector('.db-capa-l')),capM=capaSimple(m.querySelector('.db-capa-m'));
     m.querySelectorAll('.db-est-b').forEach(function(b){var l=b.nextElementSibling;
+      if(!l){b.addEventListener('click',function(){capL.abre(b)});return}
       function pon(ab){b.setAttribute('aria-expanded',String(ab));l.classList.toggle('db-ley-on',ab)}
       b.addEventListener('click',function(e){e.stopPropagation();pon(b.getAttribute('aria-expanded')!=='true')});
       m.addEventListener('click',function(e){if(!b.contains(e.target))pon(false)});
       m.addEventListener('keydown',function(e){if(e.key==='Escape'&&b.getAttribute('aria-expanded')==='true'){pon(false);b.focus({preventScroll:true})}})});
+    /* «Más» (riel de Duo cerrado, píldora de Duo vertical, avatar de la secretaria): tarjeta centrada con velo */
+    if(capM)m.querySelectorAll('[data-abre-mas]').forEach(function(b){b.addEventListener('click',function(){capM.abre(b)})});
+    /* Aviso «N datos pendientes»: se pliega y despliega desde su cabecera */
+    m.querySelectorAll('.db-ap-cab').forEach(function(b){b.addEventListener('click',function(){
+      var a=b.closest('.db-ap'),pl=a.classList.toggle('db-pleg');b.setAttribute('aria-expanded',String(!pl))})});
     /* Computadora: si saludo + fecha no caben en una fila, la fecha baja bajo el saludo (ver CSS «Saludo largo») */
     var top=m.querySelector('.db-top');
     m.ajustaSaludo=function(){if(m.dataset.vp!=='esc'||!m.offsetParent)return;top.classList.remove('db-apila');

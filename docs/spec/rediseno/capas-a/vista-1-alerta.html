@@ -1,0 +1,819 @@
+<!-- NOMBRE: Capas · Alerta | Una sola alerta para toda la app: icono en círculo tintado, título centrado y botones de verdad del mismo ancho, en cinco casos reales (confirmar, destruir, informar, rótulos largos y tres acciones). -->
+<style>
+/* ===== Capas compartidas (CALMA §25). Todos los selectores empiezan por .ca1 (el generador pone .ca1….ca4) ===== */
+.ca1 .ca1-app{display:flex;width:100%;height:100%}
+.ca1[data-vp="tel"] .ca1-app,.ca1[data-vp="iv"] .ca1-app{flex-direction:column}
+.ca1 button{border:0;margin:0;padding:0;background:none;color:inherit;text-align:inherit}
+.ca1 h1,.ca1 h2,.ca1 h3,.ca1 p,.ca1 ul,.ca1 ol,.ca1 dl,.ca1 dt,.ca1 dd{margin:0;padding:0;font-weight:inherit}
+.ca1 ul,.ca1 ol{list-style:none}
+.ca1 svg{flex:none;display:block}
+.ca1 .ca1-flex{flex:1}
+.ca1 .ca1-num{font-variant-numeric:tabular-nums}
+.ca1 [hidden]{display:none!important}
+/* Respuesta al toque (en pointer-down) y foco */
+.ca1 .ca1-p{transition:transform 100ms ease-out,background-color 100ms ease-out}
+.ca1 .ca1-p:active{transform:scale(.97)}
+.ca1 .ca1-p:focus-visible{outline:3px solid var(--enlace);outline-offset:2px}
+.ca1 .ca1-riel .ca1-p:focus-visible,.ca1 .ca1-lat .ca1-p:focus-visible,.ca1 .ca1-enc .ca1-p:focus-visible,.ca1 .ca1-env .ca1-p:focus-visible{outline-color:var(--nav-tinta)}
+.ca1 .ca1-card:focus-visible{outline:none}
+
+/* ---- Navegación (copiada del dashboard aprobado) ---- */
+.ca1 .ca1-riel{position:relative;z-index:1;flex:none;width:calc(56px + var(--ir));padding:16px calc(var(--ir) + 8px) calc(var(--ib) + 10px) 8px;background:var(--navy);border-radius:26px 0 0 26px;box-shadow:var(--sombra-nav-der);display:flex;flex-direction:column;align-items:center;gap:8px}
+.ca1 .ca1-rb{width:48px;height:48px;flex:none;border-radius:999px;display:flex;align-items:center;justify-content:center;color:var(--nav-tinta)}
+.ca1 .ca1-rb[aria-current="page"]{background:var(--accion);color:#fff}
+.ca1 .ca1-mas{width:52px;height:52px;flex:none;border-radius:999px;background:#fff;color:var(--accion);display:flex;align-items:center;justify-content:center;box-shadow:var(--sombra-accion)}
+.ca1 .ca1-enc{position:relative;z-index:1;flex:none;display:flex;align-items:center;gap:12px;padding:calc(var(--it) + 8px) 16px 12px;background:var(--navy);border-radius:0 0 26px 26px;box-shadow:var(--sombra-nav-sup);color:#fff}
+.ca1 .ca1-hamb{width:44px;height:44px;flex:none;border-radius:12px;background:var(--nav-velo);color:#fff;display:flex;align-items:center;justify-content:center}
+.ca1 .ca1-enc-t{font-size:17px;line-height:22px;font-weight:700;color:#fff}
+.ca1 .ca1-yo{display:flex;align-items:center;justify-content:center;flex:none;width:44px;height:44px;border-radius:999px;background:var(--nav-avatar);color:var(--navy);font-size:13px;font-weight:700}
+.ca1 .ca1-lat{position:relative;z-index:1;flex:none;display:flex;flex-direction:column;background:var(--navy);color:#fff}
+.ca1[data-vp="ih"] .ca1-lat{width:calc(218px + var(--ir));padding:16px calc(var(--ir) + 10px) calc(var(--ib) + 10px) 12px;border-radius:26px 0 0 26px;box-shadow:var(--sombra-nav-der)}
+.ca1[data-vp="esc"] .ca1-lat{width:248px;padding:16px 12px 14px;border-radius:0 26px 26px 0;box-shadow:var(--sombra-nav-izq)}
+.ca1 .ca1-lat-cab{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:36px;padding:0 4px 0 8px}
+.ca1 .ca1-logo{display:inline-flex;align-items:center;gap:8px;color:#fff}
+.ca1 .ca1-logo-n{font-size:17px;line-height:22px;font-weight:700;letter-spacing:-.2px}
+.ca1 .ca1-plan{display:inline-flex;align-items:center;height:24px;padding:0 10px;border-radius:999px;background:var(--nav-velo);color:var(--nav-tinta);font-size:12px;line-height:16px;font-weight:600;white-space:nowrap}
+.ca1 .ca1-cons-b{margin-top:12px;display:flex;align-items:center;gap:10px;min-height:52px;padding:8px 10px;border-radius:14px;background:var(--nav-velo);color:#fff;text-align:left}
+.ca1 .ca1-cons-b svg{color:var(--nav-tinta2)}
+.ca1 .ca1-cons-b .ca1-yo{width:34px;height:34px}
+.ca1 .ca1-cons-t{flex:1;min-width:0;display:flex;flex-direction:column}
+.ca1 .ca1-cons-t span{font-size:13px;line-height:16px;color:var(--nav-tinta2)}
+.ca1 .ca1-cons-t b{font-size:15px;line-height:19px;font-weight:600}
+.ca1 .ca1-lista{margin-top:14px;display:flex;flex-direction:column;gap:2px}
+.ca1 .ca1-li{display:flex;align-items:center;gap:12px;height:44px;padding:0 12px;border-radius:12px;color:var(--nav-tinta);font-size:15px;line-height:20px;font-weight:500}
+.ca1[data-vp="esc"] .ca1-li{height:40px;font-size:14px}
+.ca1 .ca1-li[aria-current="page"]{background:var(--accion);color:#fff;font-weight:600}
+.ca1 .ca1-lat-pie{border-top:1px solid var(--nav-velo);padding-top:8px}
+.ca1 .ca1-lat .ca1-yo2{height:48px}
+.ca1 .ca1-yo2>span{display:flex;flex-direction:column;line-height:17px}
+.ca1 .ca1-yo2 small{font-size:12px;line-height:16px;color:var(--nav-tinta2)}
+.ca1 .ca1-env{position:relative;z-index:1;flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:var(--it) 16px 14px;background:var(--navy);border-radius:0 0 26px 26px;box-shadow:var(--sombra-nav-sup);color:#fff}
+.ca1 .ca1-envb{width:44px;height:44px;flex:none;border-radius:999px;background:var(--nav-velo);color:#fff;display:flex;align-items:center;justify-content:center}
+.ca1 .ca1-pista{display:flex;align-items:center;gap:2px;padding:4px;border-radius:26px;background:var(--nav-velo)}
+.ca1 .ca1-pv{display:flex;align-items:center;height:40px;padding:0 13px;border-radius:999px;color:var(--nav-tinta);font-size:15px;line-height:20px;font-weight:500;white-space:nowrap;position:relative}
+.ca1 .ca1-pv::after{content:"";position:absolute;inset:-2px 0}
+.ca1 .ca1-pv[aria-current="page"]{padding:0 15px;background:var(--accion);color:#fff;font-weight:600}
+
+/* ---- Pantalla de fondo (simplificada) ---- */
+.ca1 .ca1-cont{flex:1;min-width:0;min-height:0;overflow-x:hidden;overflow-y:auto;scrollbar-width:none;padding:20px 16px calc(var(--ib) + 24px)}
+.ca1[data-vp="ih"] .ca1-cont,.ca1[data-vp="iv"] .ca1-cont{padding:24px 24px calc(var(--ib) + 24px)}
+.ca1[data-vp="esc"] .ca1-cont{padding:32px 24px}
+.ca1 .ca1-fondo{display:flex;flex-direction:column;gap:24px;max-width:880px}
+.ca1[data-vp="iv"] .ca1-fondo,.ca1[data-vp="esc"] .ca1-fondo{gap:28px}
+.ca1 .ca1-cab{display:flex;flex-direction:column;gap:4px;min-width:0}
+.ca1 .ca1-cabf{display:flex;align-items:center;gap:8px;min-height:36px;margin:-8px 0 -4px}
+.ca1 .ca1-volver{position:relative;display:inline-flex;align-items:center;gap:2px;min-height:36px;padding:0 4px 0 0;font-size:13px;line-height:18px;font-weight:600;color:var(--enlace)}
+.ca1 .ca1-volver::after{content:"";position:absolute;inset:-4px -4px}
+.ca1 .ca1-h1{font-size:26px;line-height:31px;font-weight:800;letter-spacing:-.6px;overflow-wrap:anywhere}
+.ca1[data-vp="ih"] .ca1-h1,.ca1[data-vp="iv"] .ca1-h1,.ca1[data-vp="esc"] .ca1-h1{font-size:32px;line-height:38px}
+.ca1 .ca1-sub{font-size:13px;line-height:18px;color:var(--tinta2)}
+.ca1 .ca1-quien{display:flex;align-items:center;gap:12px}
+.ca1 .ca1-tit{display:flex;align-items:center;gap:10px}
+.ca1 .ca1-tit>svg{color:var(--c)}
+.ca1 .ca1-sec{display:flex;flex-direction:column;gap:10px}
+.ca1 .ca1-sec-c{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:4px 12px;min-height:36px}
+.ca1 .ca1-h2{font-size:17px;line-height:22px;font-weight:700}
+.ca1 .ca1-tar{background:var(--sup);border-radius:16px;padding:0 16px}
+.ca1[data-vp="ih"] .ca1-tar,.ca1[data-vp="iv"] .ca1-tar,.ca1[data-vp="esc"] .ca1-tar{border-radius:18px;padding:0 20px}
+.ca1 .ca1-tar>*+*{border-top:1px solid var(--linea)}
+.ca1 .ca1-tar.ca1-pad{padding-top:16px;padding-bottom:18px}
+.ca1 .ca1-tar.ca1-pad>*+*{border-top:0}
+.ca1 .ca1-fila{display:flex;align-items:center;gap:12px;width:100%;min-height:60px;padding:8px 0;color:var(--tinta);text-align:left}
+.ca1[data-vp="ih"] .ca1-fila,.ca1[data-vp="esc"] .ca1-fila{min-height:52px;padding:6px 0}
+.ca1 .ca1-fila:active{transform:none;opacity:.7}
+.ca1 .ca1-fila-w{display:flex;align-items:center;gap:4px}
+.ca1 .ca1-fila-w>.ca1-fila{flex:1;min-width:0}
+.ca1 .ca1-fila-t{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.ca1 .ca1-fila-n{font-size:15px;line-height:20px;font-weight:600;overflow-wrap:anywhere}
+.ca1 .ca1-fila-s{font-size:13px;line-height:18px;color:var(--tinta2)}
+.ca1 .ca1-der{flex:none;font-size:13px;line-height:18px;color:var(--tinta2);white-space:nowrap}
+.ca1 .ca1-hora{flex:none;width:48px;font-size:15px;line-height:20px;font-weight:600;font-variant-numeric:tabular-nums}
+.ca1 .ca1-chev{color:var(--tinta3)}
+.ca1 .ca1-dico{color:var(--c)}
+.ca1 .ca1-mal-t{color:var(--mal-tinta)}
+.ca1 .ca1-avt{width:36px;height:36px;flex:none;border-radius:999px;display:flex;align-items:center;justify-content:center;font-size:13px;line-height:16px;font-weight:600;font-variant-numeric:tabular-nums}
+.ca1 .ca1-rot{font-size:13px;line-height:18px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--enlace)}
+.ca1 .ca1-rot+.ca1-txt{margin-top:6px}
+.ca1 .ca1-txt+.ca1-rot{margin-top:20px}
+.ca1 .ca1-txt{font-size:15px;line-height:22px;text-align:justify;-webkit-hyphens:auto;hyphens:auto}
+.ca1 .ca1-par{display:flex;align-items:baseline;justify-content:space-between;gap:16px;padding:12px 0;font-size:15px;line-height:20px}
+.ca1 .ca1-par dt{color:var(--tinta2)}
+.ca1 .ca1-par dd{text-align:right;overflow-wrap:anywhere;min-width:0}
+.ca1 .ca1-accs{display:flex;justify-content:flex-end;align-items:center;flex-wrap:wrap;gap:8px 16px}
+.ca1 .ca1-campos{display:flex;flex-direction:column;gap:14px}
+.ca1 .ca1-campo{display:flex;flex-direction:column;gap:4px;min-width:0}
+.ca1 .ca1-campo>span{font-size:13px;line-height:18px;font-weight:600;color:var(--tinta2)}
+.ca1 .ca1-in{width:100%;min-width:0;height:44px;padding:0 12px;border:0;border-radius:12px;background:var(--sup2);color:var(--tinta);font:inherit;font-size:16px;outline:none;-webkit-appearance:none;appearance:none}
+.ca1 .ca1-in:focus-visible{outline:2px solid var(--enlace);outline-offset:0}
+.ca1[data-vp="esc"] .ca1-in,.ca1[data-vp="ih"] .ca1-in{height:40px;font-size:15px}
+.ca1[data-vp] textarea.ca1-in{height:120px;padding:12px;line-height:24px;resize:none;display:block}
+.ca1[data-vp="esc"] textarea.ca1-in,.ca1[data-vp="ih"] textarea.ca1-in{line-height:22px}
+/* Botones: dibujo menor que el área en la pantalla (CALMA §2); de verdad y de 44 dentro de las capas (§13) */
+.ca1 .ca1-b{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:8px;height:44px;padding:0 16px;border-radius:12px;font-size:15px;line-height:20px;font-weight:600;white-space:nowrap}
+.ca1 .ca1-prim{background:var(--accion);color:#fff}
+.ca1 .ca1-ton{background:var(--tonal);color:var(--tonal-tinta)}
+.ca1 .ca1-qui{background:var(--sup2);color:var(--tinta)}
+.ca1 .ca1-mal{background:var(--mal-fondo);color:var(--mal-tinta)}
+.ca1 .ca1-cont .ca1-b{height:40px}
+.ca1 .ca1-cont .ca1-b::after{content:"";position:absolute;inset:-2px 0}
+.ca1 .ca1-cont .ca1-ton{height:36px;padding:0 14px;font-size:14px}
+.ca1 .ca1-cont .ca1-ton::after{inset:-4px 0}
+.ca1[data-vp="ih"] .ca1-cont .ca1-b,.ca1[data-vp="esc"] .ca1-cont .ca1-b{height:36px;padding:0 14px;font-size:14px}
+.ca1[data-vp="ih"] .ca1-cont .ca1-ton,.ca1[data-vp="esc"] .ca1-cont .ca1-ton{height:32px;padding:0 12px}
+.ca1[data-vp="ih"] .ca1-cont .ca1-b::after,.ca1[data-vp="esc"] .ca1-cont .ca1-b::after{inset:-2px 0}
+.ca1 .ca1-tx{position:relative;display:inline-flex;align-items:center;gap:4px;min-height:44px;padding:0 4px;font-size:15px;line-height:20px;font-weight:600;color:var(--enlace);white-space:nowrap}
+.ca1[data-vp="ih"] .ca1-tx,.ca1[data-vp="esc"] .ca1-tx{min-height:36px;font-size:14px}
+.ca1 .ca1-ib{width:44px;height:44px;flex:none;border-radius:999px;display:flex;align-items:center;justify-content:center;color:var(--tinta2)}
+.ca1 .ca1-ib:active{background:var(--sup2)}
+.ca1[data-vp="ih"] .ca1-ib,.ca1[data-vp="esc"] .ca1-ib{width:36px;height:36px}
+.ca1 .ca1-fecha{width:52px;flex:none;display:flex;flex-direction:column;align-items:center;padding:6px 0;border-radius:12px;background:var(--fondo)}
+.ca1 .ca1-mes{font-size:11px;line-height:14px;font-weight:700;letter-spacing:.4px;color:var(--mes)}
+.ca1 .ca1-dia{font-size:20px;line-height:24px;font-weight:700;color:var(--tinta);font-variant-numeric:tabular-nums}
+/* Estados de cita: icono en círculo de color (CALMA §24.4) */
+.ca1 .ca1-est{display:inline-flex;align-items:center;gap:6px;flex:none;font-size:12px;line-height:16px;font-weight:600;white-space:nowrap}
+.ca1 .ca1-est-c{width:26px;height:26px;flex:none;border-radius:999px;display:flex;align-items:center;justify-content:center}
+.ca1 .ca1-est-conf .ca1-est-c{background:var(--tonal);color:var(--enlace)}
+.ca1 .ca1-est-conf .ca1-est-t{color:var(--tonal-tinta)}
+.ca1 .ca1-est-ag .ca1-est-c{background:var(--ag-fondo);color:var(--ag-tinta)}
+.ca1 .ca1-est-ag .ca1-est-t{color:var(--ag-tinta)}
+.ca1 .ca1-est-canc .ca1-est-c{background:var(--mal-fondo);color:var(--mal-tinta)}
+.ca1 .ca1-est-canc .ca1-est-t{color:var(--mal-tinta)}
+.ca1 .ca1-est-noas .ca1-est-c{background:var(--sup2);color:var(--tinta2)}
+.ca1 .ca1-est-noas .ca1-est-t{color:var(--tinta2)}
+.ca1 .ca1-est-aten .ca1-est-c{background:var(--ok-fondo);color:var(--ok-tinta)}
+.ca1 .ca1-est-aten .ca1-est-t{color:var(--ok-tinta)}
+.ca1 .ca1-marca{display:inline-flex;align-items:center;gap:4px;font-size:13px;line-height:18px;font-weight:600;color:var(--tinta2);white-space:nowrap}
+.ca1 .ca1-estb{display:inline-flex;align-items:center;gap:2px;height:44px;padding:0 4px;font-size:13px;line-height:18px;font-weight:600;color:var(--tinta2)}
+.ca1[data-vp="ih"] .ca1-estb,.ca1[data-vp="esc"] .ca1-estb{height:36px}
+
+/* ======================= CAPAS ======================= */
+/* Un solo velo por marco, con desenfoque (CALMA §13). Su opacidad la escribe el guion fotograma a fotograma desde el progreso de la capa. */
+.ca1 .ca1-velo{position:absolute;inset:0;z-index:20;background:var(--velo);-webkit-backdrop-filter:blur(10px) saturate(140%);backdrop-filter:blur(10px) saturate(140%);opacity:0;visibility:hidden}
+.ca1 .ca1-capa{position:absolute;z-index:21;display:flex;pointer-events:none;visibility:hidden}
+.ca1 .ca1-capa.ca1-vis{visibility:visible}
+.ca1 .ca1-card{position:relative;pointer-events:auto;display:flex;flex-direction:column;min-height:0;background:var(--sup);color:var(--tinta);box-shadow:var(--sombra-capa);opacity:0;outline:none;will-change:transform,opacity}
+/* Modo «centro»: alerta y modal centrados en el área de contenido; en Duo abierto se cruza la bisagra (§18) */
+.ca1 .ca1-capa[data-modo="centro"]{align-items:center;justify-content:center;padding:16px}
+.ca1[data-vp="ext"] .ca1-capa[data-modo="centro"]{inset:0 calc(56px + var(--ir)) var(--ib) 0;padding:8px}
+.ca1[data-vp="ext"] .ca1-al{width:310px}
+/* CALMA §26: en Duo cerrado toda capa es tarjeta centrada en el área de contenido: ancho máx. 310 (margen 8), alto máx. área − 32 */
+.ca1[data-vp="ext"] .ca1-capa[data-modo="centro"]>.ca1-card{width:310px;max-height:calc(100% - 16px)}
+.ca1[data-vp="ext"] .ca1-capa[data-modo="centro"]>.ca1-card.ca1-mn{width:280px}
+.ca1[data-vp="ext"] .ca1-capa[data-modo="centro"] .ca1-hcab{padding:12px 8px 4px 20px}
+.ca1[data-vp="ext"] .ca1-capa[data-modo="centro"] .ca1-hcu{padding:8px 20px 20px}
+.ca1[data-vp="ext"] .ca1-capa[data-modo="centro"] .ca1-hpie{padding:12px 16px 16px}
+.ca1[data-vp="ext"] .ca1-capa[data-modo="centro"] .ca1-hpie>.ca1-b{flex:1 1 auto;min-width:0;padding:0 12px}
+.ca1[data-vp="ext"] .ca1-capa[data-modo="centro"] .ca1-hc{padding:14px 16px 16px}
+.ca1[data-vp="ext"] .ca1-capa[data-modo="centro"] .ca1-pl .ca1-hcu{padding:0 8px 8px}
+.ca1[data-vp="tel"] .ca1-capa[data-modo="centro"]{inset:var(--it) 0 var(--ib) 0}
+.ca1[data-vp="ih"] .ca1-capa[data-modo="centro"]{inset:0 calc(218px + var(--ir)) var(--ib) 0;padding:24px}
+.ca1[data-vp="iv"] .ca1-capa[data-modo="centro"]{inset:var(--it) 0 var(--ib) 0;padding:24px}
+.ca1[data-vp="esc"] .ca1-capa[data-modo="centro"]{inset:0 0 0 248px;padding:32px}
+.ca1 .ca1-capa[data-modo="centro"]>.ca1-card{border-radius:20px;max-width:100%;max-height:100%}
+.ca1 .ca1-capa[data-modo="centro"] .ca1-w400{width:400px}
+.ca1 .ca1-capa[data-modo="centro"] .ca1-w440{width:440px}
+.ca1 .ca1-capa[data-modo="centro"] .ca1-w480{width:480px}
+.ca1 .ca1-capa[data-modo="centro"] .ca1-w520{width:520px}
+.ca1 .ca1-capa[data-modo="centro"] .ca1-w640{width:640px}
+/* Modo «hoja» (solo iPhone desde CALMA §26): sube del borde inferior. 80 px de reserva bajo el borde para el rebote y el rubber-band */
+.ca1 .ca1-capa[data-modo="hoja"]{left:0;bottom:0;align-items:flex-end}
+.ca1[data-vp="ext"] .ca1-capa[data-modo="hoja"]{top:16px;right:calc(56px + var(--ir))}
+.ca1[data-vp="tel"] .ca1-capa[data-modo="hoja"]{top:calc(var(--it) + 16px);right:0}
+.ca1 .ca1-capa[data-modo="hoja"]>.ca1-card{width:100%;max-height:calc(100% + 80px);margin-bottom:-80px;padding-bottom:calc(var(--ib) + 80px);border-radius:22px 22px 0 0;touch-action:none;-webkit-user-select:none;user-select:none}
+/* Modo «pop» (solo computadora): menú que nace de su botón, sin velo (§21) */
+.ca1 .ca1-capa[data-modo="pop"]{inset:0}
+.ca1 .ca1-capa[data-modo="pop"]>.ca1-card{position:absolute;left:0;top:0;width:248px;padding:6px;border-radius:14px;box-shadow:var(--sombra-capa),0 0 0 1px var(--linea)}
+/* Piezas internas */
+.ca1 .ca1-asa{display:none;flex:none;width:36px;height:5px;border-radius:999px;background:var(--borde);margin:8px auto 2px}
+.ca1 .ca1-capa[data-modo="hoja"] .ca1-asa{display:block}
+.ca1 .ca1-hcab{flex:none;display:flex;align-items:flex-start;gap:12px;padding:4px 8px 4px 20px}
+.ca1 .ca1-hcab>div{flex:1;min-width:0;padding:10px 0 2px}
+.ca1 .ca1-hcab.ca1-sinx>div{padding-right:12px}
+.ca1 .ca1-hcab h2{font-size:17px;line-height:22px;font-weight:700;overflow-wrap:anywhere}
+.ca1 .ca1-hcab .ca1-sub{margin-top:2px}
+.ca1 .ca1-hcab .ca1-ib{margin-top:4px}
+.ca1 .ca1-capa[data-modo="centro"] .ca1-hcab{padding:12px 12px 4px 24px}
+.ca1 .ca1-capa[data-modo="centro"] .ca1-hcab .ca1-ib{margin-top:2px}
+.ca1 .ca1-hcu{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none;padding:8px 20px 16px;touch-action:pan-y}
+.ca1 .ca1-capa[data-modo="centro"] .ca1-hcu{padding:8px 24px 24px}
+.ca1 .ca1-hpie{flex:none;display:flex;align-items:center;gap:10px;padding:12px 20px 4px;box-shadow:0 -1px 0 var(--linea)}
+.ca1 .ca1-hpie.ca1-sinl{box-shadow:none;padding-top:0}
+.ca1 .ca1-capa[data-modo="hoja"] .ca1-hpie>.ca1-b{flex:1 1 auto;min-width:0;padding:0 12px}
+.ca1 .ca1-sugl{margin:8px -12px 0}
+.ca1 .ca1-sugl .ca1-rot{margin-top:8px;padding:0 12px}
+.ca1 .ca1-capa[data-modo="centro"] .ca1-hpie{justify-content:flex-end;padding:12px 24px 20px}
+.ca1 .ca1-capa[data-modo="centro"] .ca1-hpie.ca1-sinl{padding-top:0}
+.ca1 .ca1-capa[data-modo="centro"] .ca1-hpie>.ca1-b{flex:none;min-width:104px}
+.ca1[data-vp="iv"] .ca1-capa[data-modo="centro"] .ca1-hpie{justify-content:center}
+.ca1[data-vp="ih"] .ca1-capa .ca1-b,.ca1[data-vp="esc"] .ca1-capa .ca1-b{height:40px;font-size:14px}
+.ca1 .ca1-avis{font-size:14px;line-height:20px;color:var(--tinta2);text-align:justify;-webkit-hyphens:auto;hyphens:auto}
+.ca1 .ca1-ferr{margin-top:8px;font-size:13px;line-height:18px;font-weight:600;color:var(--mal-tinta)}
+.ca1 .ca1-hcu>.ca1-in,.ca1 .ca1-hcu>.ca1-campos{margin-top:14px}
+
+/* ---- Alerta (patrón único, CALMA §13/§21/§23.3) ---- */
+.ca1 .ca1-al{width:320px;padding:24px;text-align:center}
+.ca1[data-vp="ih"] .ca1-al,.ca1[data-vp="iv"] .ca1-al,.ca1[data-vp="esc"] .ca1-al{width:340px}
+.ca1 .ca1-al-i{flex:none;width:48px;height:48px;margin:0 auto 12px;border-radius:999px;display:flex;align-items:center;justify-content:center}
+.ca1 .ca1-i-ton{background:var(--tonal);color:var(--enlace)}
+.ca1 .ca1-i-mal{background:var(--mal-fondo);color:var(--mal-tinta)}
+.ca1 .ca1-i-ag{background:var(--ag-fondo);color:var(--ag-tinta)}
+.ca1 .ca1-al h2{font-size:17px;line-height:22px;font-weight:700}
+.ca1 .ca1-al-t{margin-top:8px;font-size:14px;line-height:20px;color:var(--tinta2);text-align:justify;text-align-last:center;-webkit-hyphens:auto;hyphens:auto}
+.ca1 .ca1-al-t.ca1-cen{text-align:center;-webkit-hyphens:manual;hyphens:manual;text-wrap:balance}
+.ca1 .ca1-al-t.ca1-izq{text-align:left;text-align-last:auto;-webkit-hyphens:manual;hyphens:manual}
+.ca1 .ca1-al-t b{color:var(--tinta);font-weight:600}
+.ca1 .ca1-al-t .ca1-num{white-space:nowrap}
+.ca1 .ca1-al-b{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;margin-top:20px}
+.ca1 .ca1-al-b.ca1-uno,.ca1 .ca1-al-b.ca1-pila{grid-template-columns:minmax(0,1fr)}
+.ca1 .ca1-al-b.ca1-pila{gap:8px}
+.ca1 .ca1-al-b .ca1-b{width:100%;min-width:0;padding:0 12px}
+.ca1 .ca1-al-b.ca1-pila .ca1-b{height:auto;min-height:44px;padding:10px 12px;white-space:normal;text-align:center}
+.ca1[data-vp="ih"] .ca1-al-b.ca1-pila .ca1-b,.ca1[data-vp="esc"] .ca1-al-b.ca1-pila .ca1-b{min-height:40px;padding:9px 12px;line-height:20px}
+.ca1 .ca1-pila .ca1-pri{order:-1}
+
+/* ---- Menú ---- */
+.ca1 .ca1-mn{padding:0 8px}
+.ca1 .ca1-capa[data-modo="centro"] .ca1-mn{width:280px;padding:8px;border-radius:18px}
+.ca1 .ca1-mn-t{padding:10px 12px 6px;font-size:17px;line-height:22px;font-weight:700}
+.ca1 .ca1-capa[data-modo="centro"] .ca1-mn-t{padding:8px 12px 6px}
+.ca1 .ca1-capa[data-modo="pop"] .ca1-mn-t{display:none}
+.ca1 .ca1-mi{display:flex;align-items:center;gap:12px;width:100%;min-height:48px;padding:6px 12px;border-radius:12px;font-size:15px;line-height:20px;color:var(--tinta);text-align:left}
+.ca1 .ca1-mi:active{transform:none;background:var(--fondo)}
+.ca1 .ca1-mi>.ca1-mic{display:flex;width:20px;height:20px;color:var(--enlace)}
+.ca1 .ca1-mi>.ca1-mt{flex:1;min-width:0;display:flex;flex-direction:column}
+.ca1 .ca1-mi small{font-size:13px;line-height:18px;color:var(--tinta2)}
+.ca1 .ca1-mi-mal,.ca1 .ca1-mi-mal>.ca1-mic{color:var(--mal-tinta)}
+.ca1 .ca1-mi .ca1-chk{color:var(--enlace);opacity:0}
+.ca1 .ca1-mi[aria-checked="true"]{font-weight:600}
+.ca1 .ca1-mi[aria-checked="true"] .ca1-chk{opacity:1}
+.ca1 .ca1-msep{display:block;height:1px;margin:6px 12px;background:var(--linea)}
+.ca1 .ca1-capa[data-modo="centro"] .ca1-mi{min-height:44px;border-radius:10px}
+.ca1[data-vp="iv"] .ca1-capa[data-modo="centro"] .ca1-mi{min-height:48px}
+.ca1 .ca1-capa[data-modo="pop"] .ca1-mi{min-height:38px;gap:10px;padding:4px 10px;border-radius:9px;font-size:14px}
+.ca1 .ca1-capa[data-modo="pop"] .ca1-mi:hover{background:var(--fondo)}
+.ca1 .ca1-capa[data-modo="pop"] .ca1-mic,.ca1 .ca1-capa[data-modo="pop"] .ca1-mic svg{width:18px;height:18px}
+.ca1 .ca1-capa[data-modo="pop"] .ca1-msep{margin:4px 10px}
+/* Leyenda (solo lectura) */
+.ca1 .ca1-ley{display:flex;flex-direction:column;padding:2px 12px 8px}
+.ca1 .ca1-ley li{display:flex;align-items:center;min-height:44px}
+.ca1 .ca1-ley li+li{border-top:1px solid var(--linea)}
+.ca1 .ca1-ley .ca1-est{font-size:15px;line-height:20px;gap:12px}
+.ca1 .ca1-capa[data-modo="pop"] .ca1-ley{padding:4px 8px}
+.ca1 .ca1-capa[data-modo="pop"] .ca1-ley li{min-height:36px}
+.ca1 .ca1-capa[data-modo="pop"] .ca1-ley li+li{border-top:0}
+.ca1 .ca1-capa[data-modo="pop"] .ca1-ley .ca1-est{font-size:13px;line-height:18px;gap:8px}
+.ca1 .ca1-capa[data-modo="pop"] .ca1-ley .ca1-est-c{width:24px;height:24px}
+.ca1 .ca1-capa[data-modo="pop"]>.ca1-card.ca1-wley{width:180px}
+.ca1 .ca1-capa[data-modo="pop"]>.ca1-card.ca1-word{width:232px}
+
+/* ---- Rejilla «Tipo de documento» (CALMA §9, §13, §21) ---- */
+.ca1 .ca1-rej{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.ca1[data-vp="ih"] .ca1-rej,.ca1[data-vp="iv"] .ca1-rej,.ca1[data-vp="esc"] .ca1-rej{grid-template-columns:repeat(4,minmax(0,1fr))}
+.ca1 .ca1-az{display:flex;flex-direction:column;align-items:flex-start;gap:10px;min-width:0;min-height:84px;padding:12px;border-radius:14px;background:var(--sup2);font-size:14px;line-height:18px;color:var(--tinta);text-align:left}
+.ca1[data-vp="ih"] .ca1-az,.ca1[data-vp="iv"] .ca1-az,.ca1[data-vp="esc"] .ca1-az{min-height:88px}
+.ca1 .ca1-az[aria-current="true"]{box-shadow:inset 0 0 0 2px var(--accion)}
+.ca1 .ca1-az>span:last-child{max-width:100%;min-width:0;-webkit-hyphens:auto;hyphens:auto;overflow-wrap:anywhere}
+.ca1 .ca1-az-i{width:32px;height:32px;flex:none;border-radius:9px;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--c) var(--d-mezcla),var(--sup));color:var(--c)}
+
+/* ---- Hoja de acciones de la cita (del dashboard aprobado) ---- */
+.ca1 .ca1-hc{gap:14px;padding:0 16px}
+.ca1 .ca1-capa[data-modo="centro"] .ca1-hc{padding:16px 20px 20px}
+.ca1 .ca1-hc-cab{display:flex;align-items:flex-start;gap:12px;padding-top:6px}
+.ca1 .ca1-hc-q{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.ca1 .ca1-hc-n{font-size:20px;line-height:25px;font-weight:700;letter-spacing:-.3px;overflow-wrap:anywhere}
+.ca1 .ca1-hc-d{font-size:13px;line-height:18px;color:var(--tinta2)}
+.ca1 .ca1-hc-x{margin:-2px -4px 0 0}
+.ca1 .ca1-hc-et{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;margin-top:-2px}
+.ca1 .ca1-hc-et .ca1-est-c{width:24px;height:24px}
+.ca1 .ca1-hc .ca1-prim{width:100%}
+.ca1 .ca1-hc-l{display:flex;flex-direction:column;margin-top:-2px}
+.ca1 .ca1-hc-l>li{border-top:1px solid var(--linea)}
+.ca1 .ca1-hc-a{display:flex;align-items:center;gap:14px;width:100%;min-height:48px;padding:0 4px;border-radius:12px;text-align:left;font-size:16px;line-height:20px;color:var(--tinta)}
+.ca1[data-vp="ih"] .ca1-hc-a,.ca1[data-vp="esc"] .ca1-hc-a{min-height:44px;font-size:15px}
+.ca1 .ca1-hc-a svg{color:var(--enlace)}
+.ca1 .ca1-hc-a:active{transform:none;background:var(--fondo)}
+
+/* ---- Plantillas: lista para elegir ---- */
+.ca1 .ca1-capa[data-modo="hoja"] .ca1-pl .ca1-hcu{padding:0 8px 8px}
+.ca1 .ca1-capa[data-modo="centro"] .ca1-pl .ca1-hcu{padding:0 12px 12px}
+.ca1 .ca1-pl .ca1-mi .ca1-chk{margin-left:auto}
+
+/* ---- Vista previa de PDF ---- */
+.ca1 .ca1-pdfz{display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px;border-radius:14px;background:var(--sup2)}
+.ca1 .ca1-pag{width:100%;max-width:420px;aspect-ratio:8.5/11;background:#fff;color:var(--navy);border-radius:4px;box-shadow:0 0 0 1px var(--borde);padding:22px 20px;display:flex;flex-direction:column;gap:10px;font-size:12px;line-height:16px;text-align:left}
+.ca1 .ca1-pag b{font-weight:700}
+.ca1 .ca1-pag-c{display:flex;align-items:flex-start;gap:8px;padding-bottom:10px;border-bottom:1px solid color-mix(in srgb,var(--navy) 18%,#fff)}
+.ca1 .ca1-pag-c b{display:block;font-size:14px;line-height:18px}
+.ca1 .ca1-pag .ca1-g2{color:color-mix(in srgb,var(--navy) 62%,#fff)}
+.ca1 .ca1-pag-rx{font-size:14px;line-height:18px;font-weight:800;letter-spacing:.4px}
+.ca1 .ca1-pag ol{display:flex;flex-direction:column;gap:8px;list-style:decimal;padding-left:18px}
+.ca1 .ca1-pag-f{margin-top:auto;padding-top:20px;text-align:center}
+.ca1 .ca1-pag-f>span{display:block;width:60%;margin:0 auto 4px;border-top:1px solid var(--navy)}
+.ca1 .ca1-pagn{font-size:12px;line-height:16px;color:var(--tinta2)}
+
+/* ---- Interruptores de accesibilidad de la maqueta (además de las media queries) ---- */
+.ca1.ca1-rt .ca1-velo{-webkit-backdrop-filter:none;backdrop-filter:none;background:color-mix(in srgb,var(--navy) 45%,var(--fondo))}
+@media (prefers-reduced-transparency:reduce){
+  .ca1 .ca1-velo{-webkit-backdrop-filter:none;backdrop-filter:none;background:color-mix(in srgb,var(--navy) 45%,var(--fondo))}
+}
+.ca1.ca1-rm .ca1-p{transition:none}
+@media (prefers-reduced-motion:reduce){
+  .ca1 .ca1-p{transition:none}
+}
+
+/* ---- Tira de maqueta y ficha «Especificación», FUERA del marco (no dependen de .marco) ---- */
+.ca1-tira{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:10px}
+.ca1-tira button{position:relative;height:28px;padding:0 10px;border-radius:999px;border:1px dashed var(--tinta3);background:none;color:var(--tinta2);font:600 12px/16px var(--fuente);white-space:nowrap;cursor:pointer;transition:transform 100ms ease-out}
+.ca1-tira button::after{content:"";position:absolute;inset:-4px 0}
+.ca1-tira button:active{transform:scale(.97)}
+.ca1-tira button:focus-visible{outline:3px solid var(--enlace);outline-offset:2px}
+.ca1-tira button[aria-pressed="true"]{border-style:solid;background:var(--sup2);color:var(--tinta)}
+.ca1-tira .ca1-tsep{width:1px;height:18px;background:var(--borde);margin:0 2px}
+.ca1-ficha{background:var(--sup);border-radius:18px;padding:16px 20px 18px;font:13px/18px var(--fuente);color:var(--tinta);max-width:100%;overflow-x:auto}
+.ca1-ficha h3{margin:0 0 8px;font-size:15px;line-height:20px;font-weight:700}
+.ca1-ficha p{margin:0 0 8px;color:var(--tinta2)}
+.ca1-ficha table{border-collapse:collapse;width:100%;margin:4px 0 12px;font-size:12px;line-height:16px}
+.ca1-ficha th,.ca1-ficha td{padding:6px 8px 6px 0;border-top:1px solid var(--linea);text-align:left;vertical-align:top}
+.ca1-ficha thead th{border-top:0;color:var(--tinta2);font-weight:600}
+.ca1-ficha tbody th{color:var(--tinta2);font-weight:600;white-space:nowrap}
+.ca1-ficha dl{margin:0;display:grid;grid-template-columns:max-content minmax(0,1fr);gap:6px 14px}
+.ca1-ficha dt{color:var(--tinta2);font-weight:600}
+.ca1-ficha dd{margin:0}
+.ca1-ficha b{font-weight:600}
+
+/* Rejilla en Duo cerrado: dos columnas en 310; menos relleno para que «Suplementación» quepa entera */
+.ca1[data-vp="ext"] .ca1-capa[data-modo="centro"] .ca1-hcu:has(.ca1-rej){padding:8px 16px 16px}
+.ca1[data-vp="ext"] .ca1-rej{gap:8px}
+.ca1[data-vp="ext"] .ca1-az{padding:12px 10px}
+</style>
+<div class="marco ca1" data-vp="ext" lang="es">
+<div class="ca1-app"><main class="ca1-cont" lang="es"><div class="ca1-fondo" data-vs="conf largo" data-nav="exp" data-tt="Expediente" hidden><header class="ca1-cab"><div class="ca1-cabf"><a href="#" class="ca1-p ca1-volver"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"/></svg>Paciente Prueba 01</a></div><h1 class="ca1-h1">Nueva nota</h1><p class="ca1-sub ca1-num">Jue 19 nov 2026 · Centro</p></header>
+<section class="ca1-tar ca1-pad"><p class="ca1-rot">Nota</p><p class="ca1-txt">Nota de evolución ficticia de la semilla. Dolor lumbar mecánico de dos semanas de evolución, sin irradiación ni datos de alarma; la exploración no muestra déficit neurológico y la movilidad está limitada por dolor en la flexión.</p><p class="ca1-rot">Plan</p><p class="ca1-txt">Plan ficticio: analgesia, higiene de columna y revisión en dos semanas.</p></section>
+<div class="ca1-accs"><button type="button" class="ca1-p ca1-tx" data-abre="largo">Concluir consulta</button><button type="button" class="ca1-p ca1-b ca1-prim" data-abre="conf">Guardar nota</button></div></div><div class="ca1-fondo" data-vs="dest" data-nav="exp" data-tt="Expediente" hidden><header class="ca1-cab"><div class="ca1-cabf"><a href="#" class="ca1-p ca1-volver"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"/></svg>Expediente</a></div><div class="ca1-quien"><span class="ca1-avt" style="background:#F1DCEC;color:#7A2E6B" aria-hidden="true">01</span><div class="ca1-cab"><h1 class="ca1-h1">Paciente Prueba 01</h1><p class="ca1-sub ca1-num">73 años · Femenino · EXP-2026-0001</p></div></div></header>
+<section class="ca1-tar"><dl><div class="ca1-par"><dt>Teléfono</dt><dd class="ca1-num">999 000 0001</dd></div><div class="ca1-par"><dt>Correo</dt><dd>paciente01@semilla.spinus.test</dd></div><div class="ca1-par"><dt>Médico</dt><dd>Dr. Admin Semilla</dd></div></dl></section>
+<!-- En el producto «Eliminar paciente» vive en el menú «···» del expediente (vista 4); aquí se dibuja como fila para abrir la alerta. -->
+<section class="ca1-tar"><button type="button" class="ca1-p ca1-fila ca1-mal-t" data-abre="dest"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg><span class="ca1-fila-t"><span class="ca1-fila-n">Eliminar paciente</span></span></button></section></div><div class="ca1-fondo" data-vs="info tres" data-nav="exp" data-tt="Expediente" hidden><header class="ca1-cab"><div class="ca1-cabf"><a href="#" class="ca1-p ca1-volver"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"/></svg>Expediente</a></div><h1 class="ca1-h1">Nuevo paciente</h1></header>
+<section class="ca1-tar ca1-pad"><div class="ca1-campos"><label class="ca1-campo"><span>Nombre *</span><input class="ca1-in" type="text" value="Paciente Prueba 07" autocomplete="off"></label>
+<label class="ca1-campo"><span>Fecha de nacimiento</span><input class="ca1-in" type="text" value="14/03/1972" autocomplete="off"></label></div></section>
+<div class="ca1-accs"><button type="button" class="ca1-p ca1-b ca1-prim" data-abre="@">Registrar e ir al expediente</button></div></div></main><nav class="ca1-riel" aria-label="Navegación principal">
+  <a href="#" class="ca1-p ca1-rb" data-n="inicio" aria-label="Inicio"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg></a><a href="#" class="ca1-p ca1-rb" data-n="exp" aria-label="Expediente"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.9.7 3.1 2.4 3.5 5.2"/></svg></a><a href="#" class="ca1-p ca1-rb" data-n="agenda" aria-label="Agenda"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg></a><a href="#" class="ca1-p ca1-rb" data-n="docs" aria-label="Documentos"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg></a><a href="#" class="ca1-p ca1-rb" data-n="mas" aria-label="Más"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 12h.01M12 12h.01M18 12h.01"/></svg></a>
+  <span class="ca1-flex"></span>
+  <button type="button" class="ca1-p ca1-mas" aria-label="Nueva consulta"><svg aria-hidden="true" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg></button>
+</nav></div>
+<div class="ca1-velo" aria-hidden="true"></div>
+<!-- Variante 1 · Confirmación simple (pub-nota «¿Guardar esta nota?»): icono tonal, dos botones del mismo ancho, secundario a la izquierda. -->
+<div class="ca1-capa" data-c="conf" data-k="alerta" data-velo="no">
+  <div class="ca1-card ca1-al" role="alertdialog" aria-modal="true" aria-label="¿Guardar esta nota?" tabindex="-1">
+    <span class="ca1-al-i ca1-i-ton" aria-hidden="true"><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="m9 14.5 2.2 2.2 4-4.4"/></svg></span>
+    <h2>¿Guardar esta nota?</h2><p class="ca1-al-t ">Una vez guardada, no podrá modificarse por motivos de seguridad y cumplimiento normativo. Si necesitas hacer correcciones después, podrás agregar una nota aclaratoria (addendum).</p>
+    <div class="ca1-al-b "><button type="button" class="ca1-p ca1-b ca1-qui" data-cierra>Revisar</button><button type="button" class="ca1-p ca1-b ca1-prim ca1-pri" data-cierra data-foco>Guardar nota</button></div>
+  </div>
+</div>
+<!-- Variante 2 · Destructiva (expediente «Eliminar paciente», §15): icono y botón en rojo suave; el foco entra en «Cancelar». -->
+<div class="ca1-capa" data-c="dest" data-k="alerta" data-velo="no">
+  <div class="ca1-card ca1-al" role="alertdialog" aria-modal="true" aria-label="Eliminar paciente" tabindex="-1">
+    <span class="ca1-al-i ca1-i-mal" aria-hidden="true"><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg></span>
+    <h2>Eliminar paciente</h2><p class="ca1-al-t ca1-cen"><b>Paciente Prueba 01</b><br>Esta acción no se puede deshacer.</p>
+    <div class="ca1-al-b "><button type="button" class="ca1-p ca1-b ca1-qui" data-cierra data-foco>Cancelar</button><button type="button" class="ca1-p ca1-b ca1-mal ca1-pri" data-cierra>Eliminar</button></div>
+  </div>
+</div>
+<!-- Variante 3 · Informativa, un botón (nuevo paciente «No se pudo guardar», §20). Texto de hoy, sin acento en «conexion» (CALMA §10). -->
+<div class="ca1-capa" data-c="info" data-k="alerta" data-velo="no">
+  <div class="ca1-card ca1-al" role="alertdialog" aria-modal="true" aria-label="No se pudo guardar" tabindex="-1">
+    <span class="ca1-al-i ca1-i-mal" aria-hidden="true"><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5M12 16.3h.01"/></svg></span>
+    <h2>No se pudo guardar</h2><p class="ca1-al-t ca1-cen">Error de conexion. Verifica tu internet e intenta de nuevo.</p>
+    <div class="ca1-al-b ca1-uno"><button type="button" class="ca1-p ca1-b ca1-prim ca1-pri" data-cierra data-foco>Aceptar</button></div>
+  </div>
+</div>
+<!-- Variante 4 · Rótulos largos apilados (pub-nota «¿Concluir la consulta?», §23.3): principal arriba, rótulos completos de hoy. -->
+<div class="ca1-capa" data-c="largo" data-k="alerta" data-velo="no">
+  <div class="ca1-card ca1-al" role="alertdialog" aria-modal="true" aria-label="¿Concluir la consulta?" tabindex="-1">
+    <span class="ca1-al-i ca1-i-ag" aria-hidden="true"><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4 2.8 19.5h18.4z"/><path d="M12 10v4.5M12 17.2h.01"/></svg></span>
+    <h2>¿Concluir la consulta?</h2><p class="ca1-al-t ">Tienes <b>una receta empezada</b> y sin imprimir. Si concluyes ahora, no se emite. Puedes concluir de todos modos: no todo lo que se empieza se entrega.</p>
+    <div class="ca1-al-b ca1-pila"><button type="button" class="ca1-p ca1-b ca1-qui" data-cierra data-foco>Seguir llenando</button><button type="button" class="ca1-p ca1-b ca1-prim ca1-pri" data-cierra>Concluir de todos modos</button></div>
+  </div>
+</div>
+<!-- Variante 5 · Tres acciones (nuevo paciente «Paciente duplicado», §23.7): apiladas, principal arriba, luego tonal y «Cancelar». -->
+<div class="ca1-capa" data-c="tres" data-k="alerta" data-velo="no">
+  <div class="ca1-card ca1-al" role="alertdialog" aria-modal="true" aria-label="Paciente duplicado" tabindex="-1">
+    <span class="ca1-al-i ca1-i-ag" aria-hidden="true"><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4 2.8 19.5h18.4z"/><path d="M12 10v4.5M12 17.2h.01"/></svg></span>
+    <h2>Paciente duplicado</h2><p class="ca1-al-t ca1-izq">Ya existe un paciente con los mismos datos: Paciente Prueba 07 (Exp. #<span class="ca1-num">EXP-2026-0007</span>). ¿Es el mismo paciente o una persona distinta?</p>
+    <div class="ca1-al-b ca1-pila"><button type="button" class="ca1-p ca1-b ca1-prim ca1-pri" data-cierra data-foco>Es el mismo paciente</button><button type="button" class="ca1-p ca1-b ca1-ton" data-cierra>Es otra persona, crear de todos modos</button><button type="button" class="ca1-p ca1-b ca1-qui" data-cierra>Cancelar</button></div>
+  </div>
+</div>
+</div>
+<div class="marco ca1" data-vp="tel" lang="es">
+<div class="ca1-app"><header class="ca1-enc">
+  <button type="button" class="ca1-p ca1-hamb" aria-label="Menú"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+  <span class="ca1-enc-t">Expediente</span><span class="ca1-flex"></span>
+  <button type="button" class="ca1-p ca1-yo" aria-label="Mi perfil">AS</button>
+</header><main class="ca1-cont" lang="es"><div class="ca1-fondo" data-vs="conf largo" data-nav="exp" data-tt="Expediente" hidden><header class="ca1-cab"><div class="ca1-cabf"><a href="#" class="ca1-p ca1-volver"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"/></svg>Paciente Prueba 01</a></div><h1 class="ca1-h1">Nueva nota</h1><p class="ca1-sub ca1-num">Jue 19 nov 2026 · Centro</p></header>
+<section class="ca1-tar ca1-pad"><p class="ca1-rot">Nota</p><p class="ca1-txt">Nota de evolución ficticia de la semilla. Dolor lumbar mecánico de dos semanas de evolución, sin irradiación ni datos de alarma; la exploración no muestra déficit neurológico y la movilidad está limitada por dolor en la flexión.</p><p class="ca1-rot">Plan</p><p class="ca1-txt">Plan ficticio: analgesia, higiene de columna y revisión en dos semanas.</p></section>
+<div class="ca1-accs"><button type="button" class="ca1-p ca1-tx" data-abre="largo">Concluir consulta</button><button type="button" class="ca1-p ca1-b ca1-prim" data-abre="conf">Guardar nota</button></div></div><div class="ca1-fondo" data-vs="dest" data-nav="exp" data-tt="Expediente" hidden><header class="ca1-cab"><div class="ca1-cabf"><a href="#" class="ca1-p ca1-volver"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"/></svg>Expediente</a></div><div class="ca1-quien"><span class="ca1-avt" style="background:#F1DCEC;color:#7A2E6B" aria-hidden="true">01</span><div class="ca1-cab"><h1 class="ca1-h1">Paciente Prueba 01</h1><p class="ca1-sub ca1-num">73 años · Femenino · EXP-2026-0001</p></div></div></header>
+<section class="ca1-tar"><dl><div class="ca1-par"><dt>Teléfono</dt><dd class="ca1-num">999 000 0001</dd></div><div class="ca1-par"><dt>Correo</dt><dd>paciente01@semilla.spinus.test</dd></div><div class="ca1-par"><dt>Médico</dt><dd>Dr. Admin Semilla</dd></div></dl></section>
+<!-- En el producto «Eliminar paciente» vive en el menú «···» del expediente (vista 4); aquí se dibuja como fila para abrir la alerta. -->
+<section class="ca1-tar"><button type="button" class="ca1-p ca1-fila ca1-mal-t" data-abre="dest"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg><span class="ca1-fila-t"><span class="ca1-fila-n">Eliminar paciente</span></span></button></section></div><div class="ca1-fondo" data-vs="info tres" data-nav="exp" data-tt="Expediente" hidden><header class="ca1-cab"><div class="ca1-cabf"><a href="#" class="ca1-p ca1-volver"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"/></svg>Expediente</a></div><h1 class="ca1-h1">Nuevo paciente</h1></header>
+<section class="ca1-tar ca1-pad"><div class="ca1-campos"><label class="ca1-campo"><span>Nombre *</span><input class="ca1-in" type="text" value="Paciente Prueba 07" autocomplete="off"></label>
+<label class="ca1-campo"><span>Fecha de nacimiento</span><input class="ca1-in" type="text" value="14/03/1972" autocomplete="off"></label></div></section>
+<div class="ca1-accs"><button type="button" class="ca1-p ca1-b ca1-prim" data-abre="@">Registrar e ir al expediente</button></div></div></main></div>
+<div class="ca1-velo" aria-hidden="true"></div>
+<!-- Variante 1 · Confirmación simple (pub-nota «¿Guardar esta nota?»): icono tonal, dos botones del mismo ancho, secundario a la izquierda. -->
+<div class="ca1-capa" data-c="conf" data-k="alerta" data-velo="no">
+  <div class="ca1-card ca1-al" role="alertdialog" aria-modal="true" aria-label="¿Guardar esta nota?" tabindex="-1">
+    <span class="ca1-al-i ca1-i-ton" aria-hidden="true"><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="m9 14.5 2.2 2.2 4-4.4"/></svg></span>
+    <h2>¿Guardar esta nota?</h2><p class="ca1-al-t ">Una vez guardada, no podrá modificarse por motivos de seguridad y cumplimiento normativo. Si necesitas hacer correcciones después, podrás agregar una nota aclaratoria (addendum).</p>
+    <div class="ca1-al-b "><button type="button" class="ca1-p ca1-b ca1-qui" data-cierra>Revisar</button><button type="button" class="ca1-p ca1-b ca1-prim ca1-pri" data-cierra data-foco>Guardar nota</button></div>
+  </div>
+</div>
+<!-- Variante 2 · Destructiva (expediente «Eliminar paciente», §15): icono y botón en rojo suave; el foco entra en «Cancelar». -->
+<div class="ca1-capa" data-c="dest" data-k="alerta" data-velo="no">
+  <div class="ca1-card ca1-al" role="alertdialog" aria-modal="true" aria-label="Eliminar paciente" tabindex="-1">
+    <span class="ca1-al-i ca1-i-mal" aria-hidden="true"><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg></span>
+    <h2>Eliminar paciente</h2><p class="ca1-al-t ca1-cen"><b>Paciente Prueba 01</b><br>Esta acción no se puede deshacer.</p>
+    <div class="ca1-al-b "><button type="button" class="ca1-p ca1-b ca1-qui" data-cierra data-foco>Cancelar</button><button type="button" class="ca1-p ca1-b ca1-mal ca1-pri" data-cierra>Eliminar</button></div>
+  </div>
+</div>
+<!-- Variante 3 · Informativa, un botón (nuevo paciente «No se pudo guardar», §20). Texto de hoy, sin acento en «conexion» (CALMA §10). -->
+<div class="ca1-capa" data-c="info" data-k="alerta" data-velo="no">
+  <div class="ca1-card ca1-al" role="alertdialog" aria-modal="true" aria-label="No se pudo guardar" tabindex="-1">
+    <span class="ca1-al-i ca1-i-mal" aria-hidden="true"><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5M12 16.3h.01"/></svg></span>
+    <h2>No se pudo guardar</h2><p class="ca1-al-t ca1-cen">Error de conexion. Verifica tu internet e intenta de nuevo.</p>
+    <div class="ca1-al-b ca1-uno"><button type="button" class="ca1-p ca1-b ca1-prim ca1-pri" data-cierra data-foco>Aceptar</button></div>
+  </div>
+</div>
+<!-- Variante 4 · Rótulos largos apilados (pub-nota «¿Concluir la consulta?», §23.3): principal arriba, rótulos completos de hoy. -->
+<div class="ca1-capa" data-c="largo" data-k="alerta" data-velo="no">
+  <div class="ca1-card ca1-al" role="alertdialog" aria-modal="true" aria-label="¿Concluir la consulta?" tabindex="-1">
+    <span class="ca1-al-i ca1-i-ag" aria-hidden="true"><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4 2.8 19.5h18.4z"/><path d="M12 10v4.5M12 17.2h.01"/></svg></span>
+    <h2>¿Concluir la consulta?</h2><p class="ca1-al-t ">Tienes <b>una receta empezada</b> y sin imprimir. Si concluyes ahora, no se emite. Puedes concluir de todos modos: no todo lo que se empieza se entrega.</p>
+    <div class="ca1-al-b ca1-pila"><button type="button" class="ca1-p ca1-b ca1-qui" data-cierra data-foco>Seguir llenando</button><button type="button" class="ca1-p ca1-b ca1-prim ca1-pri" data-cierra>Concluir de todos modos</button></div>
+  </div>
+</div>
+<!-- Variante 5 · Tres acciones (nuevo paciente «Paciente duplicado», §23.7): apiladas, principal arriba, luego tonal y «Cancelar». -->
+<div class="ca1-capa" data-c="tres" data-k="alerta" data-velo="no">
+  <div class="ca1-card ca1-al" role="alertdialog" aria-modal="true" aria-label="Paciente duplicado" tabindex="-1">
+    <span class="ca1-al-i ca1-i-ag" aria-hidden="true"><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4 2.8 19.5h18.4z"/><path d="M12 10v4.5M12 17.2h.01"/></svg></span>
+    <h2>Paciente duplicado</h2><p class="ca1-al-t ca1-izq">Ya existe un paciente con los mismos datos: Paciente Prueba 07 (Exp. #<span class="ca1-num">EXP-2026-0007</span>). ¿Es el mismo paciente o una persona distinta?</p>
+    <div class="ca1-al-b ca1-pila"><button type="button" class="ca1-p ca1-b ca1-prim ca1-pri" data-cierra data-foco>Es el mismo paciente</button><button type="button" class="ca1-p ca1-b ca1-ton" data-cierra>Es otra persona, crear de todos modos</button><button type="button" class="ca1-p ca1-b ca1-qui" data-cierra>Cancelar</button></div>
+  </div>
+</div>
+</div>
+<div class="marco ca1" data-vp="ih" lang="es">
+<div class="ca1-app"><main class="ca1-cont" lang="es"><div class="ca1-fondo" data-vs="conf largo" data-nav="exp" data-tt="Expediente" hidden><header class="ca1-cab"><div class="ca1-cabf"><a href="#" class="ca1-p ca1-volver"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"/></svg>Paciente Prueba 01</a></div><h1 class="ca1-h1">Nueva nota</h1><p class="ca1-sub ca1-num">Jue 19 nov 2026 · Centro</p></header>
+<section class="ca1-tar ca1-pad"><p class="ca1-rot">Nota</p><p class="ca1-txt">Nota de evolución ficticia de la semilla. Dolor lumbar mecánico de dos semanas de evolución, sin irradiación ni datos de alarma; la exploración no muestra déficit neurológico y la movilidad está limitada por dolor en la flexión.</p><p class="ca1-rot">Plan</p><p class="ca1-txt">Plan ficticio: analgesia, higiene de columna y revisión en dos semanas.</p></section>
+<div class="ca1-accs"><button type="button" class="ca1-p ca1-tx" data-abre="largo">Concluir consulta</button><button type="button" class="ca1-p ca1-b ca1-prim" data-abre="conf">Guardar nota</button></div></div><div class="ca1-fondo" data-vs="dest" data-nav="exp" data-tt="Expediente" hidden><header class="ca1-cab"><div class="ca1-cabf"><a href="#" class="ca1-p ca1-volver"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"/></svg>Expediente</a></div><div class="ca1-quien"><span class="ca1-avt" style="background:#F1DCEC;color:#7A2E6B" aria-hidden="true">01</span><div class="ca1-cab"><h1 class="ca1-h1">Paciente Prueba 01</h1><p class="ca1-sub ca1-num">73 años · Femenino · EXP-2026-0001</p></div></div></header>
+<section class="ca1-tar"><dl><div class="ca1-par"><dt>Teléfono</dt><dd class="ca1-num">999 000 0001</dd></div><div class="ca1-par"><dt>Correo</dt><dd>paciente01@semilla.spinus.test</dd></div><div class="ca1-par"><dt>Médico</dt><dd>Dr. Admin Semilla</dd></div></dl></section>
+<!-- En el producto «Eliminar paciente» vive en el menú «···» del expediente (vista 4); aquí se dibuja como fila para abrir la alerta. -->
+<section class="ca1-tar"><button type="button" class="ca1-p ca1-fila ca1-mal-t" data-abre="dest"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg><span class="ca1-fila-t"><span class="ca1-fila-n">Eliminar paciente</span></span></button></section></div><div class="ca1-fondo" data-vs="info tres" data-nav="exp" data-tt="Expediente" hidden><header class="ca1-cab"><div class="ca1-cabf"><a href="#" class="ca1-p ca1-volver"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"/></svg>Expediente</a></div><h1 class="ca1-h1">Nuevo paciente</h1></header>
+<section class="ca1-tar ca1-pad"><div class="ca1-campos"><label class="ca1-campo"><span>Nombre *</span><input class="ca1-in" type="text" value="Paciente Prueba 07" autocomplete="off"></label>
+<label class="ca1-campo"><span>Fecha de nacimiento</span><input class="ca1-in" type="text" value="14/03/1972" autocomplete="off"></label></div></section>
+<div class="ca1-accs"><button type="button" class="ca1-p ca1-b ca1-prim" data-abre="@">Registrar e ir al expediente</button></div></div></main><nav class="ca1-lat" aria-label="Navegación principal">
+  <div class="ca1-lat-cab"><span class="ca1-logo"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.5"/><path d="M12 5.5v13M9.6 8h4.8M9 11h6M9 14h6M9.6 17h4.8"/></svg><span class="ca1-logo-n">Spinus</span></span><span class="ca1-plan">Plan VIP</span></div>
+  <button type="button" class="ca1-p ca1-cons-b"><span class="ca1-yo">AS</span><span class="ca1-cons-t"><span>Consultorio</span><b>Centro</b></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 9 4-4 4 4M8 15l4 4 4-4"/></svg></button>
+  <div class="ca1-lista"><a href="#" class="ca1-p ca1-li" data-n="inicio"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Inicio</a><a href="#" class="ca1-p ca1-li" data-n="exp"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.9.7 3.1 2.4 3.5 5.2"/></svg>Expediente</a><a href="#" class="ca1-p ca1-li" data-n="agenda"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Agenda</a><a href="#" class="ca1-p ca1-li" data-n="docs"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>Documentos</a><a href="#" class="ca1-p ca1-li" data-n="admin"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20v-8M12 20V5M19 20v-9"/></svg>Administración</a></div>
+  <span class="ca1-flex"></span>
+  <div class="ca1-lat-pie"><a href="#" class="ca1-p ca1-li ca1-yo2"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18.2c1.3-2 3.2-3 5.5-3s4.2 1 5.5 3"/></svg><span><span>Dr. Admin Semilla</span><small>Mi perfil · Ajustes</small></span></a></div>
+</nav></div>
+<div class="ca1-velo" aria-hidden="true"></div>
+<!-- Variante 1 · Confirmación simple (pub-nota «¿Guardar esta nota?»): icono tonal, dos botones del mismo ancho, secundario a la izquierda. -->
+<div class="ca1-capa" data-c="conf" data-k="alerta" data-velo="no">
+  <div class="ca1-card ca1-al" role="alertdialog" aria-modal="true" aria-label="¿Guardar esta nota?" tabindex="-1">
+    <span class="ca1-al-i ca1-i-ton" aria-hidden="true"><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="m9 14.5 2.2 2.2 4-4.4"/></svg></span>
+    <h2>¿Guardar esta nota?</h2><p class="ca1-al-t ">Una vez guardada, no podrá modificarse por motivos de seguridad y cumplimiento normativo. Si necesitas hacer correcciones después, podrás agregar una nota aclaratoria (addendum).</p>
+    <div class="ca1-al-b "><button type="button" class="ca1-p ca1-b ca1-qui" data-cierra>Revisar</button><button type="button" class="ca1-p ca1-b ca1-prim ca1-pri" data-cierra data-foco>Guardar nota</button></div>
+  </div>
+</div>
+<!-- Variante 2 · Destructiva (expediente «Eliminar paciente», §15): icono y botón en rojo suave; el foco entra en «Cancelar». -->
+<div class="ca1-capa" data-c="dest" data-k="alerta" data-velo="no">
+  <div class="ca1-card ca1-al" role="alertdialog" aria-modal="true" aria-label="Eliminar paciente" tabindex="-1">
+    <span class="ca1-al-i ca1-i-mal" aria-hidden="true"><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg></span>
+    <h2>Eliminar paciente</h2><p class="ca1-al-t ca1-cen"><b>Paciente Prueba 01</b><br>Esta acción no se puede deshacer.</p>
+    <div class="ca1-al-b "><button type="button" class="ca1-p ca1-b ca1-qui" data-cierra data-foco>Cancelar</button><button type="button" class="ca1-p ca1-b ca1-mal ca1-pri" data-cierra>Eliminar</button></div>
+  </div>
+</div>
+<!-- Variante 3 · Informativa, un botón (nuevo paciente «No se pudo guardar», §20). Texto de hoy, sin acento en «conexion» (CALMA §10). -->
+<div class="ca1-capa" data-c="info" data-k="alerta" data-velo="no">
+  <div class="ca1-card ca1-al" role="alertdialog" aria-modal="true" aria-label="No se pudo guardar" tabindex="-1">
+    <span class="ca1-al-i ca1-i-mal" aria-hidden="true"><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5M12 16.3h.01"/></svg></span>
+    <h2>No se pudo guardar</h2><p class="ca1-al-t ca1-cen">Error de conexion. Verifica tu internet e intenta de nuevo.</p>
+    <div class="ca1-al-b ca1-uno"><button type="button" class="ca1-p ca1-b ca1-prim ca1-pri" data-cierra data-foco>Aceptar</button></div>
+  </div>
+</div>
+<!-- Variante 4 · Rótulos largos apilados (pub-nota «¿Concluir la consulta?», §23.3): principal arriba, rótulos completos de hoy. -->
+<div class="ca1-capa" data-c="largo" data-k="alerta" data-velo="no">
+  <div class="ca1-card ca1-al" role="alertdialog" aria-modal="true" aria-label="¿Concluir la consulta?" tabindex="-1">
+    <span class="ca1-al-i ca1-i-ag" aria-hidden="true"><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4 2.8 19.5h18.4z"/><path d="M12 10v4.5M12 17.2h.01"/></svg></span>
+    <h2>¿Concluir la consulta?</h2><p class="ca1-al-t ">Tienes <b>una receta empezada</b> y sin imprimir. Si concluyes ahora, no se emite. Puedes concluir de todos modos: no todo lo que se empieza se entrega.</p>
+    <div class="ca1-al-b ca1-pila"><button type="button" class="ca1-p ca1-b ca1-qui" data-cierra data-foco>Seguir llenando</button><button type="button" class="ca1-p ca1-b ca1-prim ca1-pri" data-cierra>Concluir de todos modos</button></div>
+  </div>
+</div>
+<!-- Variante 5 · Tres acciones (nuevo paciente «Paciente duplicado», §23.7): apiladas, principal arriba, luego tonal y «Cancelar». -->
+<div class="ca1-capa" data-c="tres" data-k="alerta" data-velo="no">
+  <div class="ca1-card ca1-al" role="alertdialog" aria-modal="true" aria-label="Paciente duplicado" tabindex="-1">
+    <span class="ca1-al-i ca1-i-ag" aria-hidden="true"><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4 2.8 19.5h18.4z"/><path d="M12 10v4.5M12 17.2h.01"/></svg></span>
+    <h2>Paciente duplicado</h2><p class="ca1-al-t ca1-izq">Ya existe un paciente con los mismos datos: Paciente Prueba 07 (Exp. #<span class="ca1-num">EXP-2026-0007</span>). ¿Es el mismo paciente o una persona distinta?</p>
+    <div class="ca1-al-b ca1-pila"><button type="button" class="ca1-p ca1-b ca1-prim ca1-pri" data-cierra data-foco>Es el mismo paciente</button><button type="button" class="ca1-p ca1-b ca1-ton" data-cierra>Es otra persona, crear de todos modos</button><button type="button" class="ca1-p ca1-b ca1-qui" data-cierra>Cancelar</button></div>
+  </div>
+</div>
+</div>
+<div class="marco ca1" data-vp="iv" lang="es">
+<div class="ca1-app"><header class="ca1-env">
+  <button type="button" class="ca1-p ca1-envb" aria-label="Mostrar barra lateral"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="15" rx="3"/><path d="M9.5 4.5v15"/></svg></button>
+  <nav class="ca1-pista" aria-label="Secciones"><a href="#" class="ca1-p ca1-pv" data-n="inicio">Inicio</a><a href="#" class="ca1-p ca1-pv" data-n="exp">Expediente</a><a href="#" class="ca1-p ca1-pv" data-n="agenda">Agenda</a><a href="#" class="ca1-p ca1-pv" data-n="docs">Documentos</a><a href="#" class="ca1-p ca1-pv" data-n="mas">Más</a></nav>
+  <button type="button" class="ca1-p ca1-yo" aria-label="Mi perfil">AS</button>
+</header><main class="ca1-cont" lang="es"><div class="ca1-fondo" data-vs="conf largo" data-nav="exp" data-tt="Expediente" hidden><header class="ca1-cab"><div class="ca1-cabf"><a href="#" class="ca1-p ca1-volver"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"/></svg>Paciente Prueba 01</a></div><h1 class="ca1-h1">Nueva nota</h1><p class="ca1-sub ca1-num">Jue 19 nov 2026 · Centro</p></header>
+<section class="ca1-tar ca1-pad"><p class="ca1-rot">Nota</p><p class="ca1-txt">Nota de evolución ficticia de la semilla. Dolor lumbar mecánico de dos semanas de evolución, sin irradiación ni datos de alarma; la exploración no muestra déficit neurológico y la movilidad está limitada por dolor en la flexión.</p><p class="ca1-rot">Plan</p><p class="ca1-txt">Plan ficticio: analgesia, higiene de columna y revisión en dos semanas.</p></section>
+<div class="ca1-accs"><button type="button" class="ca1-p ca1-tx" data-abre="largo">Concluir consulta</button><button type="button" class="ca1-p ca1-b ca1-prim" data-abre="conf">Guardar nota</button></div></div><div class="ca1-fondo" data-vs="dest" data-nav="exp" data-tt="Expediente" hidden><header class="ca1-cab"><div class="ca1-cabf"><a href="#" class="ca1-p ca1-volver"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"/></svg>Expediente</a></div><div class="ca1-quien"><span class="ca1-avt" style="background:#F1DCEC;color:#7A2E6B" aria-hidden="true">01</span><div class="ca1-cab"><h1 class="ca1-h1">Paciente Prueba 01</h1><p class="ca1-sub ca1-num">73 años · Femenino · EXP-2026-0001</p></div></div></header>
+<section class="ca1-tar"><dl><div class="ca1-par"><dt>Teléfono</dt><dd class="ca1-num">999 000 0001</dd></div><div class="ca1-par"><dt>Correo</dt><dd>paciente01@semilla.spinus.test</dd></div><div class="ca1-par"><dt>Médico</dt><dd>Dr. Admin Semilla</dd></div></dl></section>
+<!-- En el producto «Eliminar paciente» vive en el menú «···» del expediente (vista 4); aquí se dibuja como fila para abrir la alerta. -->
+<section class="ca1-tar"><button type="button" class="ca1-p ca1-fila ca1-mal-t" data-abre="dest"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg><span class="ca1-fila-t"><span class="ca1-fila-n">Eliminar paciente</span></span></button></section></div><div class="ca1-fondo" data-vs="info tres" data-nav="exp" data-tt="Expediente" hidden><header class="ca1-cab"><div class="ca1-cabf"><a href="#" class="ca1-p ca1-volver"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"/></svg>Expediente</a></div><h1 class="ca1-h1">Nuevo paciente</h1></header>
+<section class="ca1-tar ca1-pad"><div class="ca1-campos"><label class="ca1-campo"><span>Nombre *</span><input class="ca1-in" type="text" value="Paciente Prueba 07" autocomplete="off"></label>
+<label class="ca1-campo"><span>Fecha de nacimiento</span><input class="ca1-in" type="text" value="14/03/1972" autocomplete="off"></label></div></section>
+<div class="ca1-accs"><button type="button" class="ca1-p ca1-b ca1-prim" data-abre="@">Registrar e ir al expediente</button></div></div></main></div>
+<div class="ca1-velo" aria-hidden="true"></div>
+<!-- Variante 1 · Confirmación simple (pub-nota «¿Guardar esta nota?»): icono tonal, dos botones del mismo ancho, secundario a la izquierda. -->
+<div class="ca1-capa" data-c="conf" data-k="alerta" data-velo="no">
+  <div class="ca1-card ca1-al" role="alertdialog" aria-modal="true" aria-label="¿Guardar esta nota?" tabindex="-1">
+    <span class="ca1-al-i ca1-i-ton" aria-hidden="true"><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="m9 14.5 2.2 2.2 4-4.4"/></svg></span>
+    <h2>¿Guardar esta nota?</h2><p class="ca1-al-t ">Una vez guardada, no podrá modificarse por motivos de seguridad y cumplimiento normativo. Si necesitas hacer correcciones después, podrás agregar una nota aclaratoria (addendum).</p>
+    <div class="ca1-al-b "><button type="button" class="ca1-p ca1-b ca1-qui" data-cierra>Revisar</button><button type="button" class="ca1-p ca1-b ca1-prim ca1-pri" data-cierra data-foco>Guardar nota</button></div>
+  </div>
+</div>
+<!-- Variante 2 · Destructiva (expediente «Eliminar paciente», §15): icono y botón en rojo suave; el foco entra en «Cancelar». -->
+<div class="ca1-capa" data-c="dest" data-k="alerta" data-velo="no">
+  <div class="ca1-card ca1-al" role="alertdialog" aria-modal="true" aria-label="Eliminar paciente" tabindex="-1">
+    <span class="ca1-al-i ca1-i-mal" aria-hidden="true"><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg></span>
+    <h2>Eliminar paciente</h2><p class="ca1-al-t ca1-cen"><b>Paciente Prueba 01</b><br>Esta acción no se puede deshacer.</p>
+    <div class="ca1-al-b "><button type="button" class="ca1-p ca1-b ca1-qui" data-cierra data-foco>Cancelar</button><button type="button" class="ca1-p ca1-b ca1-mal ca1-pri" data-cierra>Eliminar</button></div>
+  </div>
+</div>
+<!-- Variante 3 · Informativa, un botón (nuevo paciente «No se pudo guardar», §20). Texto de hoy, sin acento en «conexion» (CALMA §10). -->
+<div class="ca1-capa" data-c="info" data-k="alerta" data-velo="no">
+  <div class="ca1-card ca1-al" role="alertdialog" aria-modal="true" aria-label="No se pudo guardar" tabindex="-1">
+    <span class="ca1-al-i ca1-i-mal" aria-hidden="true"><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5M12 16.3h.01"/></svg></span>
+    <h2>No se pudo guardar</h2><p class="ca1-al-t ca1-cen">Error de conexion. Verifica tu internet e intenta de nuevo.</p>
+    <div class="ca1-al-b ca1-uno"><button type="button" class="ca1-p ca1-b ca1-prim ca1-pri" data-cierra data-foco>Aceptar</button></div>
+  </div>
+</div>
+<!-- Variante 4 · Rótulos largos apilados (pub-nota «¿Concluir la consulta?», §23.3): principal arriba, rótulos completos de hoy. -->
+<div class="ca1-capa" data-c="largo" data-k="alerta" data-velo="no">
+  <div class="ca1-card ca1-al" role="alertdialog" aria-modal="true" aria-label="¿Concluir la consulta?" tabindex="-1">
+    <span class="ca1-al-i ca1-i-ag" aria-hidden="true"><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4 2.8 19.5h18.4z"/><path d="M12 10v4.5M12 17.2h.01"/></svg></span>
+    <h2>¿Concluir la consulta?</h2><p class="ca1-al-t ">Tienes <b>una receta empezada</b> y sin imprimir. Si concluyes ahora, no se emite. Puedes concluir de todos modos: no todo lo que se empieza se entrega.</p>
+    <div class="ca1-al-b ca1-pila"><button type="button" class="ca1-p ca1-b ca1-qui" data-cierra data-foco>Seguir llenando</button><button type="button" class="ca1-p ca1-b ca1-prim ca1-pri" data-cierra>Concluir de todos modos</button></div>
+  </div>
+</div>
+<!-- Variante 5 · Tres acciones (nuevo paciente «Paciente duplicado», §23.7): apiladas, principal arriba, luego tonal y «Cancelar». -->
+<div class="ca1-capa" data-c="tres" data-k="alerta" data-velo="no">
+  <div class="ca1-card ca1-al" role="alertdialog" aria-modal="true" aria-label="Paciente duplicado" tabindex="-1">
+    <span class="ca1-al-i ca1-i-ag" aria-hidden="true"><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4 2.8 19.5h18.4z"/><path d="M12 10v4.5M12 17.2h.01"/></svg></span>
+    <h2>Paciente duplicado</h2><p class="ca1-al-t ca1-izq">Ya existe un paciente con los mismos datos: Paciente Prueba 07 (Exp. #<span class="ca1-num">EXP-2026-0007</span>). ¿Es el mismo paciente o una persona distinta?</p>
+    <div class="ca1-al-b ca1-pila"><button type="button" class="ca1-p ca1-b ca1-prim ca1-pri" data-cierra data-foco>Es el mismo paciente</button><button type="button" class="ca1-p ca1-b ca1-ton" data-cierra>Es otra persona, crear de todos modos</button><button type="button" class="ca1-p ca1-b ca1-qui" data-cierra>Cancelar</button></div>
+  </div>
+</div>
+</div>
+<div class="marco ca1" data-vp="esc" lang="es">
+<div class="ca1-app"><nav class="ca1-lat" aria-label="Navegación principal">
+  <div class="ca1-lat-cab"><span class="ca1-logo"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.5"/><path d="M12 5.5v13M9.6 8h4.8M9 11h6M9 14h6M9.6 17h4.8"/></svg><span class="ca1-logo-n">Spinus</span></span><span class="ca1-plan">Plan VIP</span></div>
+  <button type="button" class="ca1-p ca1-cons-b"><span class="ca1-yo">AS</span><span class="ca1-cons-t"><span>Consultorio</span><b>Centro</b></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 9 4-4 4 4M8 15l4 4 4-4"/></svg></button>
+  <div class="ca1-lista"><a href="#" class="ca1-p ca1-li" data-n="inicio"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Inicio</a><a href="#" class="ca1-p ca1-li" data-n="exp"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.9.7 3.1 2.4 3.5 5.2"/></svg>Expediente</a><a href="#" class="ca1-p ca1-li" data-n="agenda"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Agenda</a><a href="#" class="ca1-p ca1-li" data-n="docs"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>Documentos</a><a href="#" class="ca1-p ca1-li" data-n="admin"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20v-8M12 20V5M19 20v-9"/></svg>Administración</a></div>
+  <span class="ca1-flex"></span>
+  <div class="ca1-lat-pie"><a href="#" class="ca1-p ca1-li ca1-yo2"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18.2c1.3-2 3.2-3 5.5-3s4.2 1 5.5 3"/></svg><span><span>Dr. Admin Semilla</span><small>Mi perfil · Ajustes</small></span></a></div>
+</nav><main class="ca1-cont" lang="es"><div class="ca1-fondo" data-vs="conf largo" data-nav="exp" data-tt="Expediente" hidden><header class="ca1-cab"><div class="ca1-cabf"><a href="#" class="ca1-p ca1-volver"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"/></svg>Paciente Prueba 01</a></div><h1 class="ca1-h1">Nueva nota</h1><p class="ca1-sub ca1-num">Jue 19 nov 2026 · Centro</p></header>
+<section class="ca1-tar ca1-pad"><p class="ca1-rot">Nota</p><p class="ca1-txt">Nota de evolución ficticia de la semilla. Dolor lumbar mecánico de dos semanas de evolución, sin irradiación ni datos de alarma; la exploración no muestra déficit neurológico y la movilidad está limitada por dolor en la flexión.</p><p class="ca1-rot">Plan</p><p class="ca1-txt">Plan ficticio: analgesia, higiene de columna y revisión en dos semanas.</p></section>
+<div class="ca1-accs"><button type="button" class="ca1-p ca1-tx" data-abre="largo">Concluir consulta</button><button type="button" class="ca1-p ca1-b ca1-prim" data-abre="conf">Guardar nota</button></div></div><div class="ca1-fondo" data-vs="dest" data-nav="exp" data-tt="Expediente" hidden><header class="ca1-cab"><div class="ca1-cabf"><a href="#" class="ca1-p ca1-volver"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"/></svg>Expediente</a></div><div class="ca1-quien"><span class="ca1-avt" style="background:#F1DCEC;color:#7A2E6B" aria-hidden="true">01</span><div class="ca1-cab"><h1 class="ca1-h1">Paciente Prueba 01</h1><p class="ca1-sub ca1-num">73 años · Femenino · EXP-2026-0001</p></div></div></header>
+<section class="ca1-tar"><dl><div class="ca1-par"><dt>Teléfono</dt><dd class="ca1-num">999 000 0001</dd></div><div class="ca1-par"><dt>Correo</dt><dd>paciente01@semilla.spinus.test</dd></div><div class="ca1-par"><dt>Médico</dt><dd>Dr. Admin Semilla</dd></div></dl></section>
+<!-- En el producto «Eliminar paciente» vive en el menú «···» del expediente (vista 4); aquí se dibuja como fila para abrir la alerta. -->
+<section class="ca1-tar"><button type="button" class="ca1-p ca1-fila ca1-mal-t" data-abre="dest"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg><span class="ca1-fila-t"><span class="ca1-fila-n">Eliminar paciente</span></span></button></section></div><div class="ca1-fondo" data-vs="info tres" data-nav="exp" data-tt="Expediente" hidden><header class="ca1-cab"><div class="ca1-cabf"><a href="#" class="ca1-p ca1-volver"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"/></svg>Expediente</a></div><h1 class="ca1-h1">Nuevo paciente</h1></header>
+<section class="ca1-tar ca1-pad"><div class="ca1-campos"><label class="ca1-campo"><span>Nombre *</span><input class="ca1-in" type="text" value="Paciente Prueba 07" autocomplete="off"></label>
+<label class="ca1-campo"><span>Fecha de nacimiento</span><input class="ca1-in" type="text" value="14/03/1972" autocomplete="off"></label></div></section>
+<div class="ca1-accs"><button type="button" class="ca1-p ca1-b ca1-prim" data-abre="@">Registrar e ir al expediente</button></div></div></main></div>
+<div class="ca1-velo" aria-hidden="true"></div>
+<!-- Variante 1 · Confirmación simple (pub-nota «¿Guardar esta nota?»): icono tonal, dos botones del mismo ancho, secundario a la izquierda. -->
+<div class="ca1-capa" data-c="conf" data-k="alerta" data-velo="no">
+  <div class="ca1-card ca1-al" role="alertdialog" aria-modal="true" aria-label="¿Guardar esta nota?" tabindex="-1">
+    <span class="ca1-al-i ca1-i-ton" aria-hidden="true"><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="m9 14.5 2.2 2.2 4-4.4"/></svg></span>
+    <h2>¿Guardar esta nota?</h2><p class="ca1-al-t ">Una vez guardada, no podrá modificarse por motivos de seguridad y cumplimiento normativo. Si necesitas hacer correcciones después, podrás agregar una nota aclaratoria (addendum).</p>
+    <div class="ca1-al-b "><button type="button" class="ca1-p ca1-b ca1-qui" data-cierra>Revisar</button><button type="button" class="ca1-p ca1-b ca1-prim ca1-pri" data-cierra data-foco>Guardar nota</button></div>
+  </div>
+</div>
+<!-- Variante 2 · Destructiva (expediente «Eliminar paciente», §15): icono y botón en rojo suave; el foco entra en «Cancelar». -->
+<div class="ca1-capa" data-c="dest" data-k="alerta" data-velo="no">
+  <div class="ca1-card ca1-al" role="alertdialog" aria-modal="true" aria-label="Eliminar paciente" tabindex="-1">
+    <span class="ca1-al-i ca1-i-mal" aria-hidden="true"><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg></span>
+    <h2>Eliminar paciente</h2><p class="ca1-al-t ca1-cen"><b>Paciente Prueba 01</b><br>Esta acción no se puede deshacer.</p>
+    <div class="ca1-al-b "><button type="button" class="ca1-p ca1-b ca1-qui" data-cierra data-foco>Cancelar</button><button type="button" class="ca1-p ca1-b ca1-mal ca1-pri" data-cierra>Eliminar</button></div>
+  </div>
+</div>
+<!-- Variante 3 · Informativa, un botón (nuevo paciente «No se pudo guardar», §20). Texto de hoy, sin acento en «conexion» (CALMA §10). -->
+<div class="ca1-capa" data-c="info" data-k="alerta" data-velo="no">
+  <div class="ca1-card ca1-al" role="alertdialog" aria-modal="true" aria-label="No se pudo guardar" tabindex="-1">
+    <span class="ca1-al-i ca1-i-mal" aria-hidden="true"><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5M12 16.3h.01"/></svg></span>
+    <h2>No se pudo guardar</h2><p class="ca1-al-t ca1-cen">Error de conexion. Verifica tu internet e intenta de nuevo.</p>
+    <div class="ca1-al-b ca1-uno"><button type="button" class="ca1-p ca1-b ca1-prim ca1-pri" data-cierra data-foco>Aceptar</button></div>
+  </div>
+</div>
+<!-- Variante 4 · Rótulos largos apilados (pub-nota «¿Concluir la consulta?», §23.3): principal arriba, rótulos completos de hoy. -->
+<div class="ca1-capa" data-c="largo" data-k="alerta" data-velo="no">
+  <div class="ca1-card ca1-al" role="alertdialog" aria-modal="true" aria-label="¿Concluir la consulta?" tabindex="-1">
+    <span class="ca1-al-i ca1-i-ag" aria-hidden="true"><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4 2.8 19.5h18.4z"/><path d="M12 10v4.5M12 17.2h.01"/></svg></span>
+    <h2>¿Concluir la consulta?</h2><p class="ca1-al-t ">Tienes <b>una receta empezada</b> y sin imprimir. Si concluyes ahora, no se emite. Puedes concluir de todos modos: no todo lo que se empieza se entrega.</p>
+    <div class="ca1-al-b ca1-pila"><button type="button" class="ca1-p ca1-b ca1-qui" data-cierra data-foco>Seguir llenando</button><button type="button" class="ca1-p ca1-b ca1-prim ca1-pri" data-cierra>Concluir de todos modos</button></div>
+  </div>
+</div>
+<!-- Variante 5 · Tres acciones (nuevo paciente «Paciente duplicado», §23.7): apiladas, principal arriba, luego tonal y «Cancelar». -->
+<div class="ca1-capa" data-c="tres" data-k="alerta" data-velo="no">
+  <div class="ca1-card ca1-al" role="alertdialog" aria-modal="true" aria-label="Paciente duplicado" tabindex="-1">
+    <span class="ca1-al-i ca1-i-ag" aria-hidden="true"><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4 2.8 19.5h18.4z"/><path d="M12 10v4.5M12 17.2h.01"/></svg></span>
+    <h2>Paciente duplicado</h2><p class="ca1-al-t ca1-izq">Ya existe un paciente con los mismos datos: Paciente Prueba 07 (Exp. #<span class="ca1-num">EXP-2026-0007</span>). ¿Es el mismo paciente o una persona distinta?</p>
+    <div class="ca1-al-b ca1-pila"><button type="button" class="ca1-p ca1-b ca1-prim ca1-pri" data-cierra data-foco>Es el mismo paciente</button><button type="button" class="ca1-p ca1-b ca1-ton" data-cierra>Es otra persona, crear de todos modos</button><button type="button" class="ca1-p ca1-b ca1-qui" data-cierra>Cancelar</button></div>
+  </div>
+</div>
+</div>
+<script>
+(function(){
+  /* Capas con resorte de verdad (CALMA §25, skill apple-design §3–§9).
+     - Cada capa tiene un progreso p (0 cerrada · 1 abierta) que sigue a su objetivo con un resorte (masa 1, rigidez (2π/respuesta)²,
+       amortiguación 4π·ζ/respuesta), integrado fotograma a fotograma. Cambiar el objetivo a medio camino NO reinicia nada: el resorte
+       parte del valor y la velocidad que hay en pantalla, así que abrir y cerrar a mitad no salta.
+     - Entrada ζ 1.0 / 0.36 s; salida ζ 1.0 / 0.24 s (más rápida); tras soltar un arrastre ζ 0.8 / 0.30 s si el gesto llevaba
+       velocidad (> 300 px/s), si no ζ 1.0. Solo se escriben transform y opacity.
+     - Hojas (solo iPhone, CALMA §26): arrastre 1:1 con umbral de 10 px, rubber-band hacia arriba, proyección de inercia
+       (deceleración 0.998) para decidir si cierra, y la velocidad del dedo pasa al resorte.
+     - Movimiento reducido: sin desplazamiento ni escala; fundido lineal de 200 ms (150 al salir).
+     En la app: el mismo modelo con un resorte de librería (p. ej. Motion, bounce 0, duration .36). */
+  var CFG=(function(){var c={"vars": [["conf", "Confirmación"], ["dest", "Destructiva"], ["info", "Informativa"], ["largo", "Rótulos largos"], ["tres", "Tres acciones"]], "def": "conf", "ficha": "<h3>Especificación · Alerta</h3>\n<p>Solo para lo destructivo, lo irreversible o un error que hay que leer. Nace del centro (escala .96 → 1 con fundido) y vuelve por el mismo camino.</p>\n<table><thead><tr><th></th><th>ext</th><th>tel</th><th>ih</th><th>iv</th><th>esc</th></tr></thead><tbody>\n<tr><th>Ancho</th><td>310 (margen 8 en el área de 326)</td><td>320</td><td>340</td><td>340</td><td>340</td></tr>\n<tr><th>Centro</th><td>área de contenido: sin riel, franja ni indicador</td><td>entre barra de estado e indicador</td><td>área de contenido (cruza la bisagra)</td><td>bajo la barra de estado</td><td>a la derecha de la barra lateral</td></tr>\n<tr><th>Botones</th><td>44</td><td>44</td><td>40</td><td>44</td><td>40</td></tr>\n</tbody></table>\n<dl>\n<dt>Caja</dt><dd>Radio 20, relleno 24, sombra de capa. Icono 28 en círculo 48: tonal (confirmar), rojo suave (destruir, error), ámbar (avisar). Título 17/700 centrado; mensaje 14/20 en <b>--tinta2</b>, justificado con la última línea centrada (centrado si es una línea; a la izquierda si lleva un folio).</dd>\n<dt>Botones</dt><dd>Dos del mismo ancho, lado a lado: secundario (quieto <b>--sup2</b>) a la izquierda, principal a la derecha (relleno <b>--accion</b>; destructivo <b>--mal-fondo</b>/<b>--mal-tinta</b>). Uno solo: a todo el ancho. Rótulos largos o tres acciones: apilados a todo el ancho, principal arriba, sin acortar (§23.3); el rótulo parte en dos líneas si no cabe.</dd>\n<dt>Resorte</dt><dd>Entrada ζ 1.0, respuesta .36 s; salida ζ 1.0, .24 s. Interrumpible: «Cerrar» a medio abrir invierte desde la escala y opacidad que hay en pantalla.</dd>\n<dt>Cierre</dt><dd>Solo con sus botones o Esc (= el secundario). Tocar el velo NO la cierra.</dd>\n<dt>Velo</dt><dd>Sí: <b>--velo</b> + blur(10px) saturate(140%). Uno solo aunque se encadenen capas.</dd>\n<dt>Foco y teclado</dt><dd>role=\"alertdialog\", aria-modal; el foco entra en el principal, salvo en la destructiva (entra en «Cancelar»); la pantalla queda inerte (Tab no sale); Esc cierra; al cerrar vuelve al botón que la abrió.</dd>\n<dt>Movimiento reducido</dt><dd>Sin escala: fundido lineal 200 ms al entrar, 150 al salir.</dd>\n<dt>Transparencia reducida</dt><dd>Velo sin desenfoque y totalmente opaco: <b>--navy</b> al 100 % en oscuro; en claro, el color sólido equivalente (<b>--navy</b> 45 % sobre <b>--fondo</b>). No se adivina el fondo.</dd>\n</dl>"};return c})();
+  var marcos=[].slice.call(document.querySelectorAll('.ca1.marco'));
+  if(!marcos.length)return;
+  var mqM=matchMedia('(prefers-reduced-motion: reduce)');
+  var G={v:CFG.def,rm:false,rt:false,lento:false};
+  function RM(){return G.rm||mqM.matches}
+  var mqT=matchMedia('(prefers-reduced-transparency: reduce)');function RT(){return G.rt||mqT.matches}
+  /* Transparencia reducida: velo OPACO. Oscuro: --navy al 100 %; claro: el color sólido equivalente al velo sobre el fondo (--navy 45 % + --fondo). */
+  function oscuro(m){var c=getComputedStyle(m).backgroundColor.match(/[\d.]+/g)||[255,255,255];return (+c[0]*.2126+ +c[1]*.7152+ +c[2]*.0722)<128}
+  function cl(x,a,b){return x<a?a:x>b?b:x}
+  function rubber(o,d){var c=.55;return o*d*c/(d+c*Math.abs(o))}
+  var API=marcos.map(controla);
+
+  function controla(m){
+    var vp=m.dataset.vp,tel=vp==='ext'||vp==='tel',app=m.querySelector('.ca1-app'),velo=m.querySelector('.ca1-velo');
+    var L={},raf=0,last=0;
+    function z(){return m.getBoundingClientRect().width/m.offsetWidth||1}
+    [].forEach.call(m.querySelectorAll('.ca1-capa'),function(c){
+      var k=c.dataset.k,modo=k==='alerta'?'centro':k==='hoja'?(vp==='tel'?'hoja':'centro'):(vp==='tel'?'hoja':vp==='esc'?'pop':'centro'); /* CALMA §26: en ext todo es tarjeta centrada; la hoja inferior arrastrable solo en tel */
+      c.dataset.modo=modo;c.setAttribute('aria-hidden','true');c.inert=true;
+      var l=L[c.dataset.c]={key:c.dataset.c,c:c,card:c.querySelector('.ca1-card'),modo:modo,p:0,v:0,t:0,on:false,H:300,off:0,resp:.36,zeta:1,op:null,drag:false};
+      if(modo==='hoja')arrastre(l);
+    });
+    function pinta(l){
+      var p=l.p,tr='',op=1,rm=RM();
+      if(l.modo==='hoja'){
+        if(rm){op=cl(p,0,1);tr='translate3d(0,'+l.off.toFixed(2)+'px,0)'}
+        else tr='translate3d(0,'+((1-p)*l.H).toFixed(2)+'px,0)';
+      }else if(l.modo==='centro'){
+        if(rm)op=cl(p,0,1);else{op=cl(p*1.25,0,1);tr='scale('+(.96+.04*cl(p,0,1.1)).toFixed(4)+')'}
+      }else{
+        if(rm)op=cl(p,0,1);else{op=cl(p*1.4,0,1);tr='scale('+(.9+.1*cl(p,0,1.1)).toFixed(4)+')'}
+      }
+      l.card.style.transform=tr;l.card.style.opacity=op.toFixed(3);
+    }
+    function pintaVelo(){var o=0;for(var k in L){var l=L[k];if(l.on&&l.modo!=='pop')o=Math.max(o,cl(l.p,0,1))}
+      velo.style.opacity=o.toFixed(3);velo.style.background=RT()?(oscuro(m)?'var(--navy)':'color-mix(in srgb,var(--navy) 45%,var(--fondo))'):'';velo.style.visibility=o>.001?'visible':'hidden'}
+    function paso(now){
+      raf=0;var dt=last?Math.min(.034,(now-last)/1000):0;last=now;if(G.lento)dt/=4;
+      var vivo=false,rm=RM();
+      for(var k in L){var l=L[k];if(!l.on||l.drag)continue;
+        if(rm){var r=dt/(l.t>l.p?.2:.15);l.p=l.t>l.p?Math.min(l.t,l.p+r):Math.max(l.t,l.p-r);l.v=0;
+          if(l.t===1&&l.off)l.off=Math.abs(l.off)<.5?0:l.off*Math.max(0,1-dt*14)}
+        else{var K=Math.pow(2*Math.PI/l.resp,2),C=4*Math.PI*l.zeta/l.resp,n=Math.max(1,Math.ceil(dt*240)),h=dt/n;
+          for(var i=0;i<n;i++){var a=-K*(l.p-l.t)-C*l.v;l.v+=a*h;l.p+=l.v*h}}
+        if(Math.abs(l.p-l.t)<.0005&&Math.abs(l.v)<.005&&!(rm&&l.t===1&&l.off)){l.p=l.t;l.v=0;if(l.t===0){oculta(l);continue}}
+        else vivo=true;
+        pinta(l);
+      }
+      pintaVelo();
+      if(vivo)raf=requestAnimationFrame(paso);else last=0;
+    }
+    function corre(){if(!raf){last=0;raf=requestAnimationFrame(paso)}}
+    function oculta(l){l.on=false;l.off=0;l.c.classList.remove('ca1-vis');l.c.inert=true;l.card.style.transform='';l.card.style.opacity='0'}
+    function abiertaTop(){var r=null;for(var k in L)if(L[k].on&&L[k].t===1)r=L[k];return r}
+    function coloca(l){var b=l.op;if(!b||!b.getBoundingClientRect)return;
+      var r=b.getBoundingClientRect(),mr=m.getBoundingClientRect(),Z=z(),bx=(r.left-mr.left)/Z,by=(r.top-mr.top)/Z,bw=r.width/Z,bh=r.height/Z;
+      var w=l.card.offsetWidth,h=l.card.offsetHeight,left=Math.max(248+12,Math.min(bx+bw-w,m.offsetWidth-w-12)),top=by+bh+4,arr=top+h>m.offsetHeight-12;
+      if(arr)top=Math.max(12,by-h-4);
+      l.card.style.left=left+'px';l.card.style.top=top+'px';
+      l.card.style.transformOrigin=cl(bx+bw/2-left,0,w).toFixed(0)+'px '+(arr?'100%':'0')}
+    function abre(k,op){var l=L[k];if(!l)return;
+      for(var j in L)if(j!==k&&L[j].on&&L[j].t===1)cierra(j,true);
+      if(op)l.op=op;
+      if(CFG.alAbrir)CFG.alAbrir(m,k,l.op);
+      if(!l.on){l.on=true;l.p=Math.max(l.p,0);l.c.classList.add('ca1-vis')}
+      l.c.inert=false;l.c.setAttribute('aria-hidden','false');
+      if(l.modo==='pop')coloca(l);
+      l.H=Math.max(120,l.card.offsetHeight-80);
+      if(l.p===0)pinta(l);
+      l.t=1;l.resp=l.modo==='pop'?.28:.36;l.zeta=1;
+      if(l.modo!=='pop')app.inert=true;
+      if(l.op&&l.op.setAttribute)l.op.setAttribute('aria-expanded','true');
+      var f=l.card.querySelector('[data-foco]')||l.card.querySelector('button:not([disabled]),a[href],textarea,input');
+      if(f)f.focus({preventScroll:true});else l.card.focus({preventScroll:true});
+      corre()}
+    function cierra(k,sinFoco){var l=L[k];if(!l||!l.on||l.t===0)return;
+      l.t=0;l.resp=l.modo==='pop'?.2:.24;l.zeta=1;l.c.setAttribute('aria-hidden','true');
+      var otro=false;for(var j in L)if(j!==k&&L[j].on&&L[j].t===1&&L[j].modo!=='pop')otro=true;
+      if(!otro)app.inert=false;
+      if(l.op&&l.op.setAttribute)l.op.setAttribute('aria-expanded','false');
+      if(!sinFoco&&l.op&&l.op.isConnected&&l.op.offsetParent)l.op.focus({preventScroll:true});
+      corre()}
+    function cierraTodo(){for(var k in L)cierra(k,true)}
+
+    /* ---- Arrastre de hojas: 1:1 con el dedo, rubber-band arriba, proyección de inercia y velocidad al resorte ---- */
+    function arrastre(l){
+      var card=l.card,d=null,anula=false;
+      card.addEventListener('pointerdown',function(e){
+        if(!l.on||e.button>0||e.target.closest('input,textarea,select'))return;
+        var sc=e.target.closest('.ca1-hcu');if(sc&&sc.scrollTop>0)return;
+        d={id:e.pointerId,y0:e.clientY,x0:e.clientX,act:false,h:[[e.timeStamp,e.clientY]]}});
+      card.addEventListener('pointermove',function(e){
+        if(!d||e.pointerId!==d.id)return;var Z=z(),dy=(e.clientY-d.y0)/Z,dx=(e.clientX-d.x0)/Z;
+        if(!d.act){
+          if(Math.abs(dx)>10&&Math.abs(dx)>Math.abs(dy)){d=null;return}
+          if(dy<10)return;
+          d.act=true;d.y0=e.clientY;dy=0;try{card.setPointerCapture(e.pointerId)}catch(_){}
+          l.drag=true;l.v=0;if(l.t!==1){l.t=1;l.c.setAttribute('aria-hidden','false');app.inert=true}
+          d.base=RM()?l.off:(1-l.p)*l.H;l.H=Math.max(120,card.offsetHeight-80)}
+        var y=d.base+dy;if(y<0)y=-rubber(-y,80);
+        if(RM())l.off=y;else l.p=1-y/l.H;
+        d.h.push([e.timeStamp,e.clientY]);if(d.h.length>6)d.h.shift();
+        pinta(l);pintaVelo();e.preventDefault()});
+      function suelta(e){if(!d||e.pointerId!==d.id)return;var dd=d;d=null;if(!dd.act)return;
+        l.drag=false;anula=true;setTimeout(function(){anula=false},0);
+        var Z=z(),h=dd.h,a=h[0],b=h[h.length-1],vy=(b[1]-a[1])/Z/Math.max(.016,(b[0]-a[0])/1000);
+        if(e.timeStamp-b[0]>90)vy=0;
+        var y=RM()?l.off:(1-l.p)*l.H,proy=y+vy/1000*.998/(1-.998);
+        if(proy>l.H*.5)cierra(l.key);else l.t=1;
+        l.v=RM()?0:-vy/l.H;l.zeta=Math.abs(vy)>300?.8:1;l.resp=.3;corre()}
+      card.addEventListener('pointerup',suelta);card.addEventListener('pointercancel',suelta);
+      card.addEventListener('click',function(e){if(anula){e.preventDefault();e.stopPropagation()}},true);
+    }
+
+    /* ---- Eventos ---- */
+    m.addEventListener('click',function(e){
+      var t=e.target.closest('a[href="#"]');if(t)e.preventDefault();
+      if((t=e.target.closest('[data-abre]'))&&!t.closest('.ca1-capa')){var k=t.dataset.abre==='@'?G.v:t.dataset.abre,l=L[k];
+        if(l&&l.on&&l.t===1&&l.modo==='pop'){cierra(k);return}abre(k,t);return}
+      var capa=e.target.closest('.ca1-capa');
+      if(capa){
+        if(CFG.enCapa&&CFG.enCapa(m,capa.dataset.c,e,function(){cierra(capa.dataset.c)}))return;
+        if(e.target.closest('[data-cierra]'))cierra(capa.dataset.c);return}
+      if(e.target===velo){var top=abiertaTop();if(top&&top.c.dataset.velo!=='no')cierra(top.key)}
+    });
+    m.addEventListener('pointerdown',function(e){for(var k in L){var l=L[k];
+      if(l.modo==='pop'&&l.on&&l.t===1&&!l.card.contains(e.target)&&!(l.op&&l.op.contains(e.target)))cierra(k,true)}},true);
+    m.addEventListener('scroll',function(){for(var k in L)if(L[k].modo==='pop')cierra(k,true)},true);
+    m.addEventListener('keydown',function(e){var top=abiertaTop();if(!top)return;
+      if(e.key==='Escape'){e.preventDefault();cierra(top.key);return}
+      if(/^Arrow|^Home$|^End$/.test(e.key)){var its=[].slice.call(top.card.querySelectorAll('[role^="menuitem"],[role="radio"],.ca1-az')),i=its.indexOf(document.activeElement);
+        if(!its.length||i<0&&!/Down|Right/.test(e.key))return;
+        var cols=top.card.querySelector('.ca1-rej')?(tel?2:4):1,n=its.length,j=i;
+        if(e.key==='Home')j=0;else if(e.key==='End')j=n-1;
+        else if(e.key==='ArrowDown')j=i<0?0:Math.min(n-1,i+cols);else if(e.key==='ArrowUp')j=Math.max(0,i-cols);
+        else if(e.key==='ArrowRight')j=cols>1?Math.min(n-1,i+1):i;else if(e.key==='ArrowLeft')j=cols>1?Math.max(0,i-1):i;
+        e.preventDefault();its[j].focus({preventScroll:true})}});
+
+    function ponVar(v){cierraTodo();
+      [].forEach.call(m.querySelectorAll('.ca1-fondo'),function(f){f.hidden=(' '+f.dataset.vs+' ').indexOf(' '+v+' ')<0;
+        if(!f.hidden){var nv=f.dataset.nav;[].forEach.call(m.querySelectorAll('[data-n]'),function(a){if(a.dataset.n===nv)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current')});
+          var tt=m.querySelector('.ca1-enc-t');if(tt)tt.textContent=f.dataset.tt}});
+      var c=m.querySelector('.ca1-cont');if(c)c.scrollTop=0}
+    function abreVar(){var f=[].filter.call(m.querySelectorAll('.ca1-fondo'),function(x){return !x.hidden})[0];if(!f)return;
+      var o=f.querySelector('[data-abre="'+G.v+'"]')||f.querySelector('[data-abre="@"]');abre(G.v,o)}
+    function repinta(){for(var k in L)if(L[k].on){if(!RM())L[k].off=0;pinta(L[k])}pintaVelo()}
+    m.ca1_capa=function(k){return L[k]};
+    return {m:m,ponVar:ponVar,abreVar:abreVar,cierra:function(){var t=abiertaTop();if(t)cierra(t.key)},repinta:repinta};
+  }
+
+  /* ---- Tira de maqueta (fuera del marco) y ficha «Especificación» bajo el marco ---- */
+  var tira=document.createElement('div');tira.className='ca1-tira';tira.setAttribute('role','group');tira.setAttribute('aria-label','Controles de la maqueta');
+  function bt(t,a,pr){var b=document.createElement('button');b.type='button';b.textContent=t;b.dataset.a=a;if(pr!==undefined)b.setAttribute('aria-pressed',String(pr));tira.appendChild(b);return b}
+  function sep(){var s=document.createElement('span');s.className='ca1-tsep';s.setAttribute('aria-hidden','true');tira.appendChild(s)}
+  CFG.vars.forEach(function(x){bt('Maqueta: '+x[1],'v:'+x[0],x[0]===G.v)});sep();
+  bt('Abrir','abrir');bt('Cerrar','cerrar');sep();
+  bt('Movimiento reducido','rm',false);bt('Transparencia reducida','rt',false);bt('Cámara lenta ×4','lento',false);
+  var ficha=document.createElement('section');ficha.className='ca1-ficha';ficha.setAttribute('aria-label','Especificación');ficha.setAttribute('lang','es');ficha.innerHTML=CFG.ficha;
+  var op=marcos[0].closest('.op');
+  if(op){op.querySelector('header').appendChild(tira);op.appendChild(ficha)}
+  else{marcos[0].parentNode.insertBefore(tira,marcos[0]);marcos[marcos.length-1].parentNode.appendChild(ficha)}
+  function marca(){[].forEach.call(tira.querySelectorAll('button[aria-pressed]'),function(b){var a=b.dataset.a;
+    b.setAttribute('aria-pressed',String(a.indexOf('v:')===0?a.slice(2)===G.v:!!G[a]))})}
+  tira.addEventListener('click',function(e){var b=e.target.closest('button');if(!b)return;var a=b.dataset.a;
+    if(a.indexOf('v:')===0){G.v=a.slice(2);API.forEach(function(x){x.ponVar(G.v)})}
+    else if(a==='abrir')API.forEach(function(x){if(x.m.offsetParent!==null||x.m.style.display!=='none')x.abreVar()});
+    else if(a==='cerrar')API.forEach(function(x){x.cierra()});
+    else{G[a]=!G[a];marcos.forEach(function(m){m.classList.toggle('ca1-'+a,G[a])});API.forEach(function(x){x.repinta()})}
+    marca()});
+  API.forEach(function(x){x.ponVar(G.v)});marca();
+  new MutationObserver(function(){API.forEach(function(x){x.repinta()})}).observe(document.documentElement,{attributes:true,attributeFilter:['class','data-theme']});
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change',function(){API.forEach(function(x){x.repinta()})});
+})();
+</script>

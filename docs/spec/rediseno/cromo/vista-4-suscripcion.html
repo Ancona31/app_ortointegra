@@ -1,0 +1,414 @@
+<!-- NOMBRE: Suscripción terminada (banner y bloqueo) | El banner de suscripción solo estaba dibujado dentro de Facturación y el modal de bloqueo en ninguna parte; aquí el banner queda fijo arriba del área de contenido en los cinco marcos y para todos los roles, y el bloqueo usa la alerta del catálogo con su variante para quien no administra -->
+<style>
+
+.cr4 .cr4-app{display:flex;width:100%;height:100%}
+.cr4[data-vp="tel"] .cr4-app,.cr4[data-vp="iv"] .cr4-app{flex-direction:column}
+.cr4 button{border:0;margin:0;padding:0;background:none;color:inherit}
+.cr4 h1,.cr4 h2,.cr4 h3,.cr4 p,.cr4 ul{margin:0;padding:0}
+.cr4 ul{list-style:none}
+.cr4 svg{flex:none}
+.cr4 .cr4-flex{flex:1}
+/* Variantes por rol: m = médico, s = secretaria */
+.cr4:not(.cr4-sec) .cr4-s{display:none!important}
+.cr4.cr4-sec .cr4-m{display:none!important}
+/* Respuesta al toque y foco */
+.cr4 .cr4-p{transition:transform 100ms ease-out}
+.cr4 .cr4-p:active{transform:scale(.97)}
+.cr4 .cr4-p:focus-visible{outline:3px solid var(--enlace);outline-offset:2px}
+.cr4 .cr4-nav .cr4-p:focus-visible,.cr4 .cr4-lat .cr4-p:focus-visible{outline-color:var(--nav-tinta)}
+/* ---- Fondo simplificado ---- */
+.cr4 .cr4-cont{flex:1;min-width:0;min-height:0;overflow-x:hidden;overflow-y:auto;scrollbar-width:none;display:flex;flex-direction:column;gap:16px;padding:16px 14px calc(var(--ib) + 16px) 16px}
+.cr4 .cr4-cont>*{flex:none}
+.cr4[data-vp="tel"] .cr4-cont{padding:18px 16px calc(var(--ib) + 16px)}
+.cr4[data-vp="ih"] .cr4-cont{padding:20px 24px calc(var(--ib) + 16px)}
+.cr4[data-vp="iv"] .cr4-cont{padding:22px 24px 20px}
+.cr4[data-vp="esc"] .cr4-cont{padding:28px 24px 24px}
+.cr4 .cr4-top{display:flex;flex-direction:column;gap:4px}
+.cr4 .cr4-rot{font-size:12px;line-height:16px;font-weight:600;letter-spacing:.3px;text-transform:uppercase;color:var(--tinta2)}
+.cr4 .cr4-h1{font-size:26px;line-height:32px;font-weight:800;letter-spacing:-.6px}
+.cr4[data-vp="ih"] .cr4-h1,.cr4[data-vp="iv"] .cr4-h1,.cr4[data-vp="esc"] .cr4-h1{font-size:32px;line-height:38px}
+.cr4 .cr4-cols{display:flex;flex-direction:column;gap:12px}
+.cr4[data-vp="ih"] .cr4-cols,.cr4[data-vp="iv"] .cr4-cols,.cr4[data-vp="esc"] .cr4-cols{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:16px;align-items:start}
+.cr4[data-vp="ih"] .cr4-cols>:first-child,.cr4[data-vp="iv"] .cr4-cols>:first-child,.cr4[data-vp="esc"] .cr4-cols>:first-child{grid-row:1/3}
+.cr4 .cr4-tj{background:var(--sup);border-radius:16px;padding:14px 16px 8px}
+.cr4[data-vp="ih"] .cr4-tj,.cr4[data-vp="iv"] .cr4-tj,.cr4[data-vp="esc"] .cr4-tj{border-radius:18px;padding:16px 20px 8px}
+.cr4 .cr4-tt{font-size:17px;line-height:22px;font-weight:700;margin-bottom:4px}
+.cr4 .cr4-fl{display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--linea)}
+.cr4 .cr4-tt+.cr4-fl{border-top:0}
+.cr4 .cr4-bx{width:44px;height:44px;flex:none;border-radius:12px;background:var(--fondo)}
+.cr4 .cr4-fl-t{flex:1;display:flex;flex-direction:column;gap:8px}
+.cr4 .cr4-br{display:block;height:10px;border-radius:5px;background:var(--sup2)}
+.cr4 .cr4-br2{height:8px;opacity:.7}
+/* ---- Riel (Duo cerrado) ---- */
+.cr4 .cr4-riel{position:relative;z-index:1;flex:none;width:calc(56px + var(--ir));padding:16px calc(var(--ir) + 8px) calc(var(--ib) + 10px) 8px;background:var(--navy);border-radius:26px 0 0 26px;box-shadow:var(--sombra-nav-der);display:flex;flex-direction:column;align-items:center;gap:8px}
+.cr4 .cr4-rb{position:relative;width:48px;height:48px;flex:none;border-radius:999px;display:flex;align-items:center;justify-content:center;color:var(--nav-tinta)}
+.cr4 .cr4-rb[aria-current="page"]{background:var(--accion);color:#fff}
+.cr4 .cr4-masb{width:52px;height:52px;flex:none;border-radius:999px;background:#fff;color:var(--accion);display:flex;align-items:center;justify-content:center;box-shadow:var(--sombra-accion)}
+/* ---- Encabezado fundido (iPhone) ---- */
+.cr4 .cr4-enc{position:relative;z-index:1;flex:none;display:flex;align-items:center;gap:12px;padding:calc(var(--it) + 8px) 16px 12px;background:var(--navy);border-radius:0 0 26px 26px;box-shadow:var(--sombra-nav-sup);color:#fff}
+.cr4 .cr4-menu{position:relative;width:44px;height:44px;flex:none;border-radius:12px;background:var(--nav-velo);color:#fff;display:flex;align-items:center;justify-content:center}
+.cr4 .cr4-enc-t{font-size:17px;line-height:22px;font-weight:700;color:#fff}
+.cr4 .cr4-av{display:flex;align-items:center;justify-content:center;flex:none;width:34px;height:34px;border-radius:999px;background:var(--nav-avatar);color:var(--navy);font-size:13px;font-weight:700}
+.cr4 .cr4-av.cr4-av-g{width:44px;height:44px}
+/* ---- Encabezado de Duo abierto vertical ---- */
+.cr4 .cr4-env{position:relative;z-index:1;flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:var(--it) 16px 14px;background:var(--navy);border-radius:0 0 26px 26px;box-shadow:var(--sombra-nav-sup);color:#fff}
+.cr4 .cr4-envb{position:relative;width:44px;height:44px;flex:none;border-radius:999px;background:var(--nav-velo);color:#fff;display:flex;align-items:center;justify-content:center}
+.cr4 .cr4-pista{display:flex;align-items:center;gap:2px;padding:4px;border-radius:26px;background:var(--nav-velo)}
+.cr4 .cr4-pv{display:flex;align-items:center;height:40px;padding:0 14px;border-radius:999px;color:var(--nav-tinta);font-size:15px;line-height:20px;font-weight:500;white-space:nowrap;position:relative}
+.cr4 .cr4-pv::after{content:"";position:absolute;inset:-2px 0}
+.cr4 .cr4-pv[aria-current="page"]{padding:0 16px;background:var(--accion);color:#fff;font-weight:600}
+/* ---- Barra lateral (Duo abierto horizontal a la derecha; computadora a la izquierda) y cajón ---- */
+.cr4 .cr4-lat{position:relative;z-index:1;flex:none;display:flex;flex-direction:column;background:var(--navy);color:#fff}
+.cr4[data-vp="ih"] .cr4-lat{width:calc(218px + var(--ir));padding:16px calc(var(--ir) + 10px) calc(var(--ib) + 10px) 12px;border-radius:26px 0 0 26px;box-shadow:var(--sombra-nav-der)}
+.cr4[data-vp="esc"] .cr4-lat{width:248px;padding:16px 12px 14px;border-radius:0 26px 26px 0;box-shadow:var(--sombra-nav-izq)}
+.cr4 .cr4-lat-cab{display:flex;align-items:center;gap:8px;min-height:36px;padding:0 4px 0 8px}
+.cr4 .cr4-logo{display:inline-flex;align-items:center;gap:8px;color:#fff}
+.cr4 .cr4-logo-n{font-size:17px;line-height:22px;font-weight:700;letter-spacing:-.2px}
+.cr4 .cr4-plan{display:inline-flex;align-items:center;height:24px;padding:0 10px;border-radius:999px;background:var(--nav-velo);color:var(--nav-tinta);font-size:12px;line-height:16px;font-weight:600;white-space:nowrap}
+.cr4 .cr4-cons-b{margin-top:12px;display:flex;align-items:center;gap:10px;width:100%;min-height:52px;padding:8px 10px;border-radius:14px;background:var(--nav-velo);color:#fff;text-align:left}
+.cr4 .cr4-cons-b>svg{color:var(--nav-tinta2)}
+.cr4 .cr4-clogo{width:36px;height:36px;flex:none;border-radius:999px;background:#fff;color:var(--accion);display:flex;align-items:center;justify-content:center}
+.cr4 .cr4-cons-t{flex:1;min-width:0;display:flex;flex-direction:column}
+.cr4 .cr4-cons-t span{font-size:13px;line-height:16px;color:var(--nav-tinta2)}
+.cr4 .cr4-cons-t b{font-size:15px;line-height:19px;font-weight:600}
+.cr4 .cr4-lista{margin-top:14px;display:flex;flex-direction:column;gap:2px}
+.cr4 .cr4-li{display:flex;align-items:center;gap:12px;height:44px;padding:0 12px;border-radius:12px;color:var(--nav-tinta);font-size:15px;line-height:20px;font-weight:500}
+.cr4[data-vp="esc"] .cr4-li{height:40px;font-size:14px}
+.cr4 .cr4-li[aria-current="page"]{background:var(--accion);color:#fff;font-weight:600}
+.cr4 .cr4-lat-pie{border-top:1px solid var(--nav-velo);padding-top:8px;display:flex;align-items:center;gap:4px}
+.cr4 .cr4-lat-pie .cr4-yo{flex:1;min-width:0;text-align:left}
+.cr4 .cr4-lat-pie .cr4-ib{color:var(--nav-tinta2)}
+.cr4[data-vp="ih"] .cr4-esp{display:none}
+/* Duo abierto horizontal: la barra mide 218; el pie suelta el icono para que nombre y «Ayuda» quepan en una línea */
+.cr4[data-vp="ih"] .cr4-lat .cr4-lat-pie .cr4-yo{padding:0 8px}
+.cr4[data-vp="ih"] .cr4-lat .cr4-lat-pie .cr4-yo>svg{display:none}
+.cr4[data-vp="ih"] .cr4-lat .cr4-lat-pie .cr4-ib{width:36px;height:36px}
+.cr4 .cr4-esp{color:var(--nav-tinta)!important}
+.cr4 .cr4-yo{min-height:48px;height:auto;padding-top:6px;padding-bottom:6px}
+.cr4 .cr4-yo>span{display:flex;flex-direction:column;line-height:17px}
+.cr4 .cr4-yo small{font-size:12px;line-height:16px;color:var(--nav-tinta2)}
+.cr4 .cr4-ib{position:relative;width:44px;height:44px;flex:none;border-radius:999px;display:flex;align-items:center;justify-content:center;color:var(--nav-tinta)}
+/* ---- Capas (CALMA cr425/cr426): un velo por marco; cajón desde la izquierda en iPhone y Duo vertical; tarjeta centrada en lo demás ---- */
+.cr4 .cr4-capa{position:absolute;inset:0;z-index:20;visibility:hidden;transition:visibility 0s linear 360ms}
+.cr4 .cr4-capa.cr4-on{visibility:visible;transition:none}
+.cr4 .cr4-velo{position:absolute;inset:0;background:var(--velo);-webkit-backdrop-filter:blur(10px) saturate(140%);backdrop-filter:blur(10px) saturate(140%);opacity:0;transition:opacity 240ms ease-out}
+.cr4 .cr4-on .cr4-velo{opacity:1;transition:opacity 320ms ease-out}
+.cr4 .cr4-cajon{position:absolute;left:0;top:0;bottom:0;width:300px;display:flex;flex-direction:column;overflow-y:auto;scrollbar-width:none;padding:calc(var(--it) + 12px) 14px calc(var(--ib) + 12px) 14px;background:var(--navy);color:#fff;border-radius:0 26px 26px 0;box-shadow:var(--sombra-nav-izq);transform:translateX(-106%);transition:transform 360ms linear(0,0.123,0.3397,0.54,0.6943,0.8032,0.8762,0.9234,0.9533,0.9718,0.9831,0.99,0.9941,0.9965,0.998,1)}
+.cr4[data-vp="iv"] .cr4-cajon{width:320px}
+.cr4 .cr4-capa[data-k~="cajon"].cr4-on .cr4-cajon{transform:none;transition:transform 520ms linear(0,0.0803,0.2398,0.4083,0.5568,0.6769,0.769,0.8374,0.8869,0.9221,0.9468,0.9639,0.9756,0.9836,0.9891,0.9927,0.9952,0.9968,0.9979,0.9986,1)}
+.cr4 .cr4-cajon .cr4-lat-cab{padding-right:0}
+.cr4 .cr4-mnw{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:16px;pointer-events:none}
+.cr4[data-vp="ext"] .cr4-mnw{padding:16px calc(56px + var(--ir) + 8px) calc(var(--ib) + 16px) 8px}
+.cr4[data-vp="iv"] .cr4-mnw{padding:calc(var(--it) + 16px) 24px 24px}
+.cr4[data-vp="ih"] .cr4-mnw{padding:24px calc(218px + var(--ir) + 24px) calc(var(--ib) + 16px) 24px}
+.cr4[data-vp="esc"] .cr4-mnw{padding:32px 24px 32px calc(248px + 24px)}
+.cr4 .cr4-mn{pointer-events:auto;width:310px;max-width:100%;max-height:100%;overflow-y:auto;scrollbar-width:none;background:var(--sup);color:var(--tinta);border-radius:20px;box-shadow:var(--sombra-capa);padding:8px;opacity:0;transform:scale(.96);transition:opacity 200ms ease-out,transform 360ms linear(0,0.123,0.3397,0.54,0.6943,0.8032,0.8762,0.9234,0.9533,0.9718,0.9831,0.99,0.9941,0.9965,0.998,1)}
+.cr4[data-vp="iv"] .cr4-mn,.cr4[data-vp="ih"] .cr4-mn,.cr4[data-vp="esc"] .cr4-mn{width:340px}
+.cr4 .cr4-capa[data-k~="mas"].cr4-on .cr4-mn{opacity:1;transform:none;transition:opacity 240ms ease-out,transform 520ms linear(0,0.0803,0.2398,0.4083,0.5568,0.6769,0.769,0.8374,0.8869,0.9221,0.9468,0.9639,0.9756,0.9836,0.9891,0.9927,0.9952,0.9968,0.9979,0.9986,1)}
+.cr4 .cr4-capa:not([data-k~="mas"]) .cr4-mnw{display:none}
+.cr4 .cr4-capa:not([data-k~="cajon"]) .cr4-cajon{display:none}
+.cr4 .cr4-mn-t{padding:8px 12px 6px;font-size:17px;line-height:22px;font-weight:700}
+.cr4 .cr4-mo{display:flex;align-items:center;gap:12px;width:100%;min-height:48px;padding:0 12px;border-radius:12px;font-size:15px;line-height:20px;color:var(--tinta);text-align:left}
+.cr4 .cr4-mo{position:relative}
+.cr4 .cr4-mo+.cr4-mo::before{content:"";position:absolute;left:44px;right:12px;top:0;height:1px;background:var(--linea)}
+.cr4 .cr4-mo>svg:first-child{color:var(--enlace)}
+.cr4 .cr4-mo>.cr4-mo-f{margin-left:auto;color:var(--tinta3)}
+.cr4 .cr4-mo-v{margin-left:auto;font-size:15px;color:var(--tinta2)}
+.cr4 .cr4-mo-v+.cr4-mo-f{margin-left:4px}
+@media (prefers-reduced-transparency:reduce){
+  .cr4 .cr4-velo{-webkit-backdrop-filter:none;backdrop-filter:none;background:color-mix(in srgb,var(--navy) 55%,var(--fondo))}
+}
+@media (prefers-reduced-motion:reduce){
+  .cr4 .cr4-cajon,.cr4 .cr4-capa[data-k~="cajon"].cr4-on .cr4-cajon{transform:none;opacity:0;transition:opacity 200ms ease}
+  .cr4 .cr4-capa[data-k~="cajon"].cr4-on .cr4-cajon{opacity:1}
+  .cr4 .cr4-mn,.cr4 .cr4-capa[data-k~="mas"].cr4-on .cr4-mn{transform:none;transition:opacity 200ms ease}
+  .cr4 .cr4-p{transition:none}
+}
+/* ---- Tira de maqueta (CALMA cr47) y ficha «Especificación» (fuera del marco) ---- */
+.cr4-tira{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:10px}
+.cr4-tira .cr4-sep{width:1px;height:20px;background:var(--borde)}
+.cr4-tira button{position:relative;height:28px;padding:0 10px;border-radius:999px;border:1px dashed var(--tinta3);background:none;color:var(--tinta2);font:600 12px/16px var(--fuente);white-space:nowrap;cursor:pointer;transition:transform 100ms ease-out}
+.cr4-tira button::after{content:"";position:absolute;inset:-4px 0}
+.cr4-tira button:active{transform:scale(.97)}
+.cr4-tira button:focus-visible{outline:3px solid var(--enlace);outline-offset:2px}
+.cr4-tira button[aria-pressed="true"]{border-style:solid;background:var(--sup2);color:var(--tinta)}
+.cr4-ficha{margin-top:6px;background:var(--sup);border-radius:18px;padding:16px 20px;color:var(--tinta);font:14px/20px var(--fuente);max-width:100%}
+.cr4-ficha h3{margin:0 0 8px;font-size:17px;line-height:22px;font-weight:700}
+.cr4-ficha dl{margin:0;display:grid;grid-template-columns:minmax(0,170px) minmax(0,1fr);gap:0 16px}
+.cr4-ficha dt{padding:8px 0;border-top:1px solid var(--linea);font-size:13px;line-height:18px;font-weight:600;color:var(--tinta2)}
+.cr4-ficha dd{margin:0;padding:8px 0;border-top:1px solid var(--linea);font-size:14px;line-height:20px;overflow-wrap:anywhere}
+.cr4-ficha dt:first-of-type,.cr4-ficha dt:first-of-type+dd{border-top:0}
+.cr4-ficha code{font:12px/18px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--tinta2)}
+@media (max-width:620px){.cr4-ficha dl{grid-template-columns:1fr}.cr4-ficha dd{border-top:0;padding-top:0}}
+
+/* ---- Banner ---- */
+.cr4 .cr4-cont{padding-top:0!important}
+.cr4 .cr4-ban{position:sticky;top:0;z-index:2;display:flex;flex-wrap:wrap;align-items:center;gap:10px 12px;margin:0 -4px;padding:12px 12px 12px 14px;border-radius:0 0 16px 16px;background:var(--ag-fondo);color:var(--tinta);box-shadow:0 0 0 12px var(--fondo)}
+.cr4[data-vp="ih"] .cr4-ban,.cr4[data-vp="iv"] .cr4-ban,.cr4[data-vp="esc"] .cr4-ban{flex-wrap:nowrap;padding:12px 12px 12px 16px;border-radius:0 0 18px 18px;margin:0}
+.cr4[data-vp="ext"] .cr4-ban,.cr4[data-vp="tel"] .cr4-ban{margin-top:12px;border-radius:16px}
+.cr4 .cr4-ban+.cr4-top{margin-top:4px}
+.cr4 .cr4-ban-ic{width:32px;height:32px;flex:none;border-radius:999px;background:color-mix(in srgb,var(--ag-punto) 20%,transparent);color:var(--ag-tinta);display:flex;align-items:center;justify-content:center;align-self:flex-start}
+.cr4 .cr4-ban-t{flex:1 1 0;min-width:0;font-size:14px;line-height:20px;text-align:justify;hyphens:auto}
+.cr4 .cr4-ban-b{position:relative;flex:none;display:flex;align-items:center;justify-content:center;height:36px;padding:0 14px;border-radius:10px;background:var(--ag-tinta);color:var(--ag-fondo);font-size:14px;line-height:18px;font-weight:600;white-space:nowrap}
+.cr4 .cr4-ban-b::after{content:"";position:absolute;inset:-4px 0}
+.cr4[data-vp="ext"] .cr4-ban-t,.cr4[data-vp="tel"] .cr4-ban-t{flex:1 1 calc(100% - 50px)}
+.cr4[data-vp="ext"] .cr4-ban-b,.cr4[data-vp="tel"] .cr4-ban-b{margin-left:44px}
+.cr4[data-vp="ih"] .cr4-ban-b::after,.cr4[data-vp="esc"] .cr4-ban-b::after{display:none}
+/* ---- Acción de crear del fondo ---- */
+.cr4 .cr4-acc{display:flex}
+.cr4 .cr4-tonb{position:relative;display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 16px;border-radius:12px;background:var(--tonal);color:var(--tonal-tinta);font-size:15px;line-height:20px;font-weight:600}
+.cr4 .cr4-tonb::after{content:"";position:absolute;inset:-2px 0}
+.cr4[data-vp="ih"] .cr4-tonb,.cr4[data-vp="esc"] .cr4-tonb{height:36px;font-size:14px}
+/* ---- Modal de bloqueo (alerta del catálogo) ---- */
+.cr4 .cr4-alw{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:16px;pointer-events:none}
+.cr4[data-vp="ext"] .cr4-alw{padding:16px calc(56px + var(--ir) + 8px) calc(var(--ib) + 16px) 8px}
+.cr4[data-vp="tel"] .cr4-alw{padding:calc(var(--it) + 64px) 16px calc(var(--ib) + 16px)}
+.cr4[data-vp="ih"] .cr4-alw{padding:24px calc(218px + var(--ir) + 24px) calc(var(--ib) + 16px) 24px}
+.cr4[data-vp="iv"] .cr4-alw{padding:calc(var(--it) + 58px) 24px 24px}
+.cr4[data-vp="esc"] .cr4-alw{padding:32px 24px 32px calc(248px + 24px)}
+.cr4 .cr4-al{pointer-events:auto;width:320px;max-width:100%;padding:24px;border-radius:20px;background:var(--sup);color:var(--tinta);box-shadow:var(--sombra-capa);display:flex;flex-direction:column;align-items:center;text-align:center;opacity:0;transform:scale(.96);transition:opacity 180ms ease-out,transform 300ms linear(0,0.123,0.3397,0.54,0.6943,0.8032,0.8762,0.9234,0.9533,0.9718,0.9831,0.99,0.9941,0.9965,0.998,1)}
+.cr4[data-vp="ih"] .cr4-al,.cr4[data-vp="iv"] .cr4-al,.cr4[data-vp="esc"] .cr4-al{width:340px}
+.cr4 .cr4-capa.cr4-on .cr4-al{opacity:1;transform:none;transition:opacity 220ms ease-out,transform 480ms linear(0,0.0803,0.2398,0.4083,0.5568,0.6769,0.769,0.8374,0.8869,0.9221,0.9468,0.9639,0.9756,0.9836,0.9891,0.9927,0.9952,0.9968,0.9979,0.9986,1)}
+.cr4 .cr4-al-ic{width:48px;height:48px;border-radius:999px;background:var(--ag-fondo);color:var(--ag-tinta);display:flex;align-items:center;justify-content:center}
+.cr4 .cr4-al-t{margin-top:14px;font-size:17px;line-height:22px;font-weight:700}
+.cr4 .cr4-al-sub{margin-top:2px;font-size:13px;line-height:18px;font-weight:600;color:var(--ag-tinta)}
+.cr4 .cr4-al-m{margin-top:10px;display:flex;flex-direction:column;gap:8px;font-size:14px;line-height:20px;color:var(--tinta2);text-align:justify;hyphens:auto}
+.cr4 .cr4-al-b{margin-top:20px;display:flex;flex-direction:column;gap:8px;width:100%}
+.cr4 .cr4-ton,.cr4 .cr4-prim{display:flex;align-items:center;justify-content:center;min-height:44px;padding:0 14px;border-radius:12px;font-size:15px;line-height:20px;font-weight:600}
+.cr4[data-vp="ih"] .cr4-ton,.cr4[data-vp="ih"] .cr4-prim,.cr4[data-vp="esc"] .cr4-ton,.cr4[data-vp="esc"] .cr4-prim{min-height:40px;font-size:14px}
+.cr4 .cr4-ton{background:var(--tonal);color:var(--tonal-tinta)}
+.cr4 .cr4-prim{background:var(--accion);color:#fff}
+.cr4.cr4-admin .cr4-noadm,.cr4:not(.cr4-admin) .cr4-adm{display:none}
+@media (prefers-reduced-motion:reduce){.cr4 .cr4-al{transform:none!important;transition:opacity 200ms ease}}
+</style>
+<div class="marco cr4 cr4-admin" data-vp="ext">
+<div class="cr4-app">
+<main class="cr4-cont">
+  <!-- Fondo simplificado: el dashboard reducido a sus bloques, para que la pieza global se lea sobre una pantalla real. -->
+  <!-- A0·16 · Banner de suscripción (SuscripcionBanner.tsx:35-63; montado en (app)/layout.tsx:172 dentro del área segura). Solo con plan
+     bloqueado (cancelada, sin VIP, más de 5 pacientes); lo ven TODOS los roles. Queda fijo arriba del área de contenido mientras ésta se desplaza;
+     nunca bajo la franja ni detrás de la navegación. Mismo dibujo que en Facturación (tanda4 vista 3). -->
+  <div class="cr4-ban" role="status"><span class="cr4-ban-ic"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5M12 16.5h.01"/></svg></span>
+    <p class="cr4-ban-t">Tu suscripción terminó. Tienes acceso a tus datos pero no puedes crear nuevos pacientes, consultas ni documentos.</p>
+    <a href="#" class="cr4-p cr4-ban-b">Reactivar suscripción</a></div>
+  <div class="cr4-top"><p class="cr4-rot"><span class="cr4-m">Centro</span><span class="cr4-s">Clínica Semilla A</span></p>
+  <h1 class="cr4-h1">Buenas tardes, <span class="cr4-m">Admin</span><span class="cr4-s">Secretaria</span></h1></div>
+  <div class="cr4-cols"><section class="cr4-tj" aria-hidden="true"><h2 class="cr4-tt">Después</h2><div class="cr4-fl"><span class="cr4-bx"></span><span class="cr4-fl-t"><span class="cr4-br" style="width:62%"></span><span class="cr4-br cr4-br2" style="width:40%"></span></span></div><div class="cr4-fl"><span class="cr4-bx"></span><span class="cr4-fl-t"><span class="cr4-br" style="width:62%"></span><span class="cr4-br cr4-br2" style="width:40%"></span></span></div><div class="cr4-fl"><span class="cr4-bx"></span><span class="cr4-fl-t"><span class="cr4-br" style="width:62%"></span><span class="cr4-br cr4-br2" style="width:40%"></span></span></div><div class="cr4-fl"><span class="cr4-bx"></span><span class="cr4-fl-t"><span class="cr4-br" style="width:62%"></span><span class="cr4-br cr4-br2" style="width:40%"></span></span></div><div class="cr4-fl"><span class="cr4-bx"></span><span class="cr4-fl-t"><span class="cr4-br" style="width:62%"></span><span class="cr4-br cr4-br2" style="width:40%"></span></span></div></section><section class="cr4-tj" aria-hidden="true"><h2 class="cr4-tt">Atendidos recientemente</h2><div class="cr4-fl"><span class="cr4-bx"></span><span class="cr4-fl-t"><span class="cr4-br" style="width:62%"></span><span class="cr4-br cr4-br2" style="width:40%"></span></span></div><div class="cr4-fl"><span class="cr4-bx"></span><span class="cr4-fl-t"><span class="cr4-br" style="width:62%"></span><span class="cr4-br cr4-br2" style="width:40%"></span></span></div><div class="cr4-fl"><span class="cr4-bx"></span><span class="cr4-fl-t"><span class="cr4-br" style="width:62%"></span><span class="cr4-br cr4-br2" style="width:40%"></span></span></div></section><section class="cr4-tj" aria-hidden="true"><h2 class="cr4-tt">Documentos recientes</h2><div class="cr4-fl"><span class="cr4-bx"></span><span class="cr4-fl-t"><span class="cr4-br" style="width:62%"></span><span class="cr4-br cr4-br2" style="width:40%"></span></span></div><div class="cr4-fl"><span class="cr4-bx"></span><span class="cr4-fl-t"><span class="cr4-br" style="width:62%"></span><span class="cr4-br cr4-br2" style="width:40%"></span></span></div></section><section class="cr4-tj" aria-hidden="true"><h2 class="cr4-tt">Esta semana</h2><div class="cr4-fl"><span class="cr4-bx"></span><span class="cr4-fl-t"><span class="cr4-br" style="width:62%"></span><span class="cr4-br cr4-br2" style="width:40%"></span></span></div><div class="cr4-fl"><span class="cr4-bx"></span><span class="cr4-fl-t"><span class="cr4-br" style="width:62%"></span><span class="cr4-br cr4-br2" style="width:40%"></span></span></div><div class="cr4-fl"><span class="cr4-bx"></span><span class="cr4-fl-t"><span class="cr4-br" style="width:62%"></span><span class="cr4-br cr4-br2" style="width:40%"></span></span></div></section></div>
+</main><!-- Navegación (A0·3) de Duo cerrado: riel a la derecha, fundido con la franja. Copiado del dashboard aprobado. -->
+<nav class="cr4-riel cr4-nav" aria-label="Navegación principal">
+  <a href="#" class="cr4-p cr4-rb" aria-label="Inicio" aria-current="page"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg></a><a href="#" class="cr4-p cr4-rb" aria-label="Expediente"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.9.7 3.1 2.4 3.5 5.2"/></svg></a><a href="#" class="cr4-p cr4-rb" aria-label="Agenda"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg></a><a href="#" class="cr4-p cr4-rb cr4-m" aria-label="Documentos"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg></a><button type="button" class="cr4-p cr4-rb" aria-label="Más" data-rot="Más"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 12h.01M12 12h.01M18 12h.01"/></svg></button>
+  <span class="cr4-flex"></span>
+  <button type="button" class="cr4-p cr4-abre-bl cr4-masb cr4-m" aria-label="Nueva consulta"><svg aria-hidden="true" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg></button>
+  <button type="button" class="cr4-p cr4-abre-bl cr4-masb cr4-s" aria-label="Agendar cita"><svg aria-hidden="true" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg></button>
+</nav>
+</div>
+<div class="cr4-capa" aria-hidden="true">
+  <div class="cr4-velo"></div>
+<!-- A0·17 · BloqueoFeatureModal: lo abre cualquier acción de crear con el plan bloqueado (useInterceptIfBlocked) y, en el menú, «Nuevo paciente»
+     de la secretaria y los ocho tipos de documento. Alerta del catálogo (cr413/cr425), icono ámbar de aviso. Con el administrador, «Reactivar suscripción»
+     (rótulo largo de hoy) apila los botones con el principal arriba (cr423.3); sin administrar, solo «Cerrar» y la línea extra. -->
+<div class="cr4-alw"><div class="cr4-al" role="alertdialog" aria-modal="true" aria-labelledby="cr4-bl-t-ext" aria-describedby="cr4-bl-m-ext">
+  <span class="cr4-al-ic"><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5M12 16.5h.01"/></svg></span>
+  <h2 class="cr4-al-t" id="cr4-bl-t-ext">Función no disponible</h2>
+  <p class="cr4-al-sub">Suscripción terminada</p>
+  <div class="cr4-al-m" id="cr4-bl-m-ext" lang="es"><p>Esta es una característica disponible para suscripciones activas. Tu cuenta excedió el límite del plan gratuito.</p>
+    <p class="cr4-noadm">Pídele a tu administrador que reactive la suscripción para recuperar el acceso completo.</p></div>
+  <div class="cr4-al-b"><button type="button" class="cr4-p cr4-prim cr4-adm cr4-cierra-bl">Reactivar suscripción</button><button type="button" class="cr4-p cr4-ton cr4-cierra-bl">Cerrar</button></div>
+</div></div>
+</div>
+</div>
+<div class="marco cr4 cr4-admin" data-vp="tel">
+<div class="cr4-app">
+<!-- Navegación (A0·13) de iPhone: encabezado fundido con la barra de estado. Copiado del dashboard aprobado. -->
+<header class="cr4-enc cr4-nav">
+  <button type="button" class="cr4-p cr4-menu" aria-label="Menú" data-rot="Menú"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+  <span class="cr4-enc-t">Inicio</span>
+  <span class="cr4-flex"></span>
+  <button type="button" class="cr4-p cr4-av cr4-av-g cr4-m" aria-label="Mi perfil">AS</button><button type="button" class="cr4-p cr4-av cr4-av-g cr4-s cr4-abre-aj" aria-label="Ajustes">SE</button>
+</header><main class="cr4-cont">
+  <!-- Fondo simplificado: el dashboard reducido a sus bloques, para que la pieza global se lea sobre una pantalla real. -->
+  <!-- A0·16 · Banner de suscripción (SuscripcionBanner.tsx:35-63; montado en (app)/layout.tsx:172 dentro del área segura). Solo con plan
+     bloqueado (cancelada, sin VIP, más de 5 pacientes); lo ven TODOS los roles. Queda fijo arriba del área de contenido mientras ésta se desplaza;
+     nunca bajo la franja ni detrás de la navegación. Mismo dibujo que en Facturación (tanda4 vista 3). -->
+  <div class="cr4-ban" role="status"><span class="cr4-ban-ic"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5M12 16.5h.01"/></svg></span>
+    <p class="cr4-ban-t">Tu suscripción terminó. Tienes acceso a tus datos pero no puedes crear nuevos pacientes, consultas ni documentos.</p>
+    <a href="#" class="cr4-p cr4-ban-b">Reactivar suscripción</a></div>
+  <div class="cr4-top"><p class="cr4-rot"><span class="cr4-m">Centro</span><span class="cr4-s">Clínica Semilla A</span></p>
+  <h1 class="cr4-h1">Buenas tardes, <span class="cr4-m">Admin</span><span class="cr4-s">Secretaria</span></h1></div>
+  <!-- Acción de crear de la pantalla de fondo: con el plan bloqueado no navega, abre el modal. --><div class="cr4-acc"><button type="button" class="cr4-p cr4-tonb cr4-abre-bl"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg><span class="cr4-m">Nueva consulta</span><span class="cr4-s">Nuevo paciente</span></button></div>
+  <div class="cr4-cols"><section class="cr4-tj" aria-hidden="true"><h2 class="cr4-tt">Después</h2><div class="cr4-fl"><span class="cr4-bx"></span><span class="cr4-fl-t"><span class="cr4-br" style="width:62%"></span><span class="cr4-br cr4-br2" style="width:40%"></span></span></div><div class="cr4-fl"><span class="cr4-bx"></span><span class="cr4-fl-t"><span class="cr4-br" style="width:62%"></span><span class="cr4-br cr4-br2" style="width:40%"></span></span></div><div class="cr4-fl"><span class="cr4-bx"></span><span class="cr4-fl-t"><span class="cr4-br" style="width:62%"></span><span class="cr4-br cr4-br2" style="width:40%"></span></span></div><div class="cr4-fl"><span class="cr4-bx"></span><span class="cr4-fl-t"><span class="cr4-br" style="width:62%"></span><span class="cr4-br cr4-br2" style="width:40%"></span></span></div><div class="cr4-fl"><span class="cr4-bx"></span><span class="cr4-fl-t"><span class="cr4-br" style="width:62%"></span><span class="cr4-br cr4-br2" style="width:40%"></span></span></div></section><section class="cr4-tj" aria-hidden="true"><h2 class="cr4-tt">Atendidos recientemente</h2><div class="cr4-fl"><span class="cr4-bx"></span><span class="cr4-fl-t"><span class="cr4-br" style="width:62%"></span><span class="cr4-br cr4-br2" style="width:40%"></span></span></div><div class="cr4-fl"><span class="cr4-bx"></span><span class="cr4-fl-t"><span class="cr4-br" style="width:62%"></span><span class="cr4-br cr4-br2" style="width:40%"></span></span></div><div class="cr4-fl"><span class="cr4-bx"></span><span class="cr4-fl-t"><span class="cr4-br" style="width:62%"></span><span class="cr4-br cr4-br2" style="width:40%"></span></span></div></section><section class="cr4-tj" aria-hidden="true"><h2 class="cr4-tt">Documentos recientes</h2><div class="cr4-fl"><span class="cr4-bx"></span><span class="cr4-fl-t"><span class="cr4-br" style="width:62%"></span><span class="cr4-br cr4-br2" style="width:40%"></span></span></div><div class="cr4-fl"><span class="cr4-bx"></span><span class="cr4-fl-t"><span class="cr4-br" style="width:62%"></span><span class="cr4-br cr4-br2" style="width:40%"></span></span></div></section><section class="cr4-tj" aria-hidden="true"><h2 class="cr4-tt">Esta semana</h2><div class="cr4-fl"><span class="cr4-bx"></span><span class="cr4-fl-t"><span class="cr4-br" style="width:62%"></span><span class="cr4-br cr4-br2" style="width:40%"></span></span></div><div class="cr4-fl"><span class="cr4-bx"></span><span class="cr4-fl-t"><span class="cr4-br" style="width:62%"></span><span class="cr4-br cr4-br2" style="width:40%"></span></span></div><div class="cr4-fl"><span class="cr4-bx"></span><span class="cr4-fl-t"><span class="cr4-br" style="width:62%"></span><span class="cr4-br cr4-br2" style="width:40%"></span></span></div></section></div>
+</main>
+</div>
+<div class="cr4-capa" aria-hidden="true">
+  <div class="cr4-velo"></div>
+<!-- A0·17 · BloqueoFeatureModal: lo abre cualquier acción de crear con el plan bloqueado (useInterceptIfBlocked) y, en el menú, «Nuevo paciente»
+     de la secretaria y los ocho tipos de documento. Alerta del catálogo (cr413/cr425), icono ámbar de aviso. Con el administrador, «Reactivar suscripción»
+     (rótulo largo de hoy) apila los botones con el principal arriba (cr423.3); sin administrar, solo «Cerrar» y la línea extra. -->
+<div class="cr4-alw"><div class="cr4-al" role="alertdialog" aria-modal="true" aria-labelledby="cr4-bl-t-tel" aria-describedby="cr4-bl-m-tel">
+  <span class="cr4-al-ic"><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5M12 16.5h.01"/></svg></span>
+  <h2 class="cr4-al-t" id="cr4-bl-t-tel">Función no disponible</h2>
+  <p class="cr4-al-sub">Suscripción terminada</p>
+  <div class="cr4-al-m" id="cr4-bl-m-tel" lang="es"><p>Esta es una característica disponible para suscripciones activas. Tu cuenta excedió el límite del plan gratuito.</p>
+    <p class="cr4-noadm">Pídele a tu administrador que reactive la suscripción para recuperar el acceso completo.</p></div>
+  <div class="cr4-al-b"><button type="button" class="cr4-p cr4-prim cr4-adm cr4-cierra-bl">Reactivar suscripción</button><button type="button" class="cr4-p cr4-ton cr4-cierra-bl">Cerrar</button></div>
+</div></div>
+</div>
+</div>
+<div class="marco cr4 cr4-admin" data-vp="ih">
+<div class="cr4-app">
+<main class="cr4-cont">
+  <!-- Fondo simplificado: el dashboard reducido a sus bloques, para que la pieza global se lea sobre una pantalla real. -->
+  <!-- A0·16 · Banner de suscripción (SuscripcionBanner.tsx:35-63; montado en (app)/layout.tsx:172 dentro del área segura). Solo con plan
+     bloqueado (cancelada, sin VIP, más de 5 pacientes); lo ven TODOS los roles. Queda fijo arriba del área de contenido mientras ésta se desplaza;
+     nunca bajo la franja ni detrás de la navegación. Mismo dibujo que en Facturación (tanda4 vista 3). -->
+  <div class="cr4-ban" role="status"><span class="cr4-ban-ic"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5M12 16.5h.01"/></svg></span>
+    <p class="cr4-ban-t">Tu suscripción terminó. Tienes acceso a tus datos pero no puedes crear nuevos pacientes, consultas ni documentos.</p>
+    <a href="#" class="cr4-p cr4-ban-b">Reactivar suscripción</a></div>
+  <div class="cr4-top"><p class="cr4-rot"><span class="cr4-m">Centro</span><span class="cr4-s">Clínica Semilla A</span></p>
+  <h1 class="cr4-h1">Buenas tardes, <span class="cr4-m">Admin</span><span class="cr4-s">Secretaria</span></h1></div>
+  <!-- Acción de crear de la pantalla de fondo: con el plan bloqueado no navega, abre el modal. --><div class="cr4-acc"><button type="button" class="cr4-p cr4-tonb cr4-abre-bl"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg><span class="cr4-m">Nueva consulta</span><span class="cr4-s">Nuevo paciente</span></button></div>
+  <div class="cr4-cols"><section class="cr4-tj" aria-hidden="true"><h2 class="cr4-tt">Después</h2><div class="cr4-fl"><span class="cr4-bx"></span><span class="cr4-fl-t"><span class="cr4-br" style="width:62%"></span><span class="cr4-br cr4-br2" style="width:40%"></span></span></div><div class="cr4-fl"><span class="cr4-bx"></span><span class="cr4-fl-t"><span class="cr4-br" style="width:62%"></span><span class="cr4-br cr4-br2" style="width:40%"></span></span></div><div class="cr4-fl"><span class="cr4-bx"></span><span class="cr4-fl-t"><span class="cr4-br" style="width:62%"></span><span class="cr4-br cr4-br2" style="width:40%"></span></span></div><div class="cr4-fl"><span class="cr4-bx"></span><span class="cr4-fl-t"><span class="cr4-br" style="width:62%"></span><span class="cr4-br cr4-br2" style="width:40%"></span></span></div><div class="cr4-fl"><span class="cr4-bx"></span><span class="cr4-fl-t"><span class="cr4-br" style="width:62%"></span><span class="cr4-br cr4-br2" style="width:40%"></span></span></div></section><section class="cr4-tj" aria-hidden="true"><h2 class="cr4-tt">Atendidos recientemente</h2><div class="cr4-fl"><span class="cr4-bx"></span><span class="cr4-fl-t"><span class="cr4-br" style="width:62%"></span><span class="cr4-br cr4-br2" style="width:40%"></span></span></div><div class="cr4-fl"><span class="cr4-bx"></span><span class="cr4-fl-t"><span class="cr4-br" style="width:62%"></span><span class="cr4-br cr4-br2" style="width:40%"></span></span></div><div class="cr4-fl"><span class="cr4-bx"></span><span class="cr4-fl-t"><span class="cr4-br" style="width:62%"></span><span class="cr4-br cr4-br2" style="width:40%"></span></span></div></section><section class="cr4-tj" aria-hidden="true"><h2 class="cr4-tt">Documentos recientes</h2><div class="cr4-fl"><span class="cr4-bx"></span><span class="cr4-fl-t"><span class="cr4-br" style="width:62%"></span><span class="cr4-br cr4-br2" style="width:40%"></span></span></div><div class="cr4-fl"><span class="cr4-bx"></span><span class="cr4-fl-t"><span class="cr4-br" style="width:62%"></span><span class="cr4-br cr4-br2" style="width:40%"></span></span></div></section><section class="cr4-tj" aria-hidden="true"><h2 class="cr4-tt">Esta semana</h2><div class="cr4-fl"><span class="cr4-bx"></span><span class="cr4-fl-t"><span class="cr4-br" style="width:62%"></span><span class="cr4-br cr4-br2" style="width:40%"></span></span></div><div class="cr4-fl"><span class="cr4-bx"></span><span class="cr4-fl-t"><span class="cr4-br" style="width:62%"></span><span class="cr4-br cr4-br2" style="width:40%"></span></span></div><div class="cr4-fl"><span class="cr4-bx"></span><span class="cr4-fl-t"><span class="cr4-br" style="width:62%"></span><span class="cr4-br cr4-br2" style="width:40%"></span></span></div></section></div>
+</main><nav class="cr4-lat" aria-label="Navegación principal">
+  <div class="cr4-lat-cab"><span class="cr4-logo"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.5"/><path d="M12 5.5v13M9.6 8h4.8M9 11h6M9 14h6M9.6 17h4.8"/></svg><span class="cr4-logo-n">Spinus</span></span><span class="cr4-flex"></span><span class="cr4-plan">Plan VIP</span></div>
+  <button type="button" class="cr4-p cr4-cons-b"><span class="cr4-clogo" role="img" aria-label="Logo de Clínica Semilla A"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21c-4.5-2.2-7-5.6-7-10V5.5L12 3l7 2.5V11c0 4.4-2.5 7.8-7 10z"/><path d="M12 8v7M8.5 11.5h7"/></svg></span><span class="cr4-cons-t"><span class="cr4-m">Consultorio</span><b class="cr4-m">Centro</b><span class="cr4-s">Clínica</span><b class="cr4-s">Clínica Semilla A</b></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 9 4-4 4 4M8 15l4 4 4-4"/></svg></button>
+  <div class="cr4-lista"><a href="#" class="cr4-p cr4-li" aria-current="page"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Inicio</a><a href="#" class="cr4-p cr4-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.9.7 3.1 2.4 3.5 5.2"/></svg>Expediente</a><a href="#" class="cr4-p cr4-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Agenda</a><a href="#" class="cr4-p cr4-li cr4-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>Documentos</a><a href="#" class="cr4-p cr4-li cr4-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20v-8M12 20V5M19 20v-9"/></svg>Administración</a></div>
+  <span class="cr4-flex"></span>
+  
+  <div class="cr4-lat-pie"><a href="#" class="cr4-p cr4-li cr4-yo cr4-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18.2c1.3-2 3.2-3 5.5-3s4.2 1 5.5 3"/></svg><span><span>Dr. Admin Semilla</span><small class="cr4-esp">Ortopedia y Traumatología</small><small>Mi perfil · Ajustes</small></span></a><a href="#" class="cr4-p cr4-ib cr4-ay cr4-m" aria-label="Ayuda"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.6M12 17h.01"/></svg></a><button type="button" class="cr4-p cr4-li cr4-yo cr4-s cr4-abre-aj" aria-haspopup="menu"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span><span>Secretaria Semilla</span><small>Ajustes</small></span></button></div>
+</nav>
+</div>
+<div class="cr4-capa" aria-hidden="true">
+  <div class="cr4-velo"></div>
+<!-- A0·17 · BloqueoFeatureModal: lo abre cualquier acción de crear con el plan bloqueado (useInterceptIfBlocked) y, en el menú, «Nuevo paciente»
+     de la secretaria y los ocho tipos de documento. Alerta del catálogo (cr413/cr425), icono ámbar de aviso. Con el administrador, «Reactivar suscripción»
+     (rótulo largo de hoy) apila los botones con el principal arriba (cr423.3); sin administrar, solo «Cerrar» y la línea extra. -->
+<div class="cr4-alw"><div class="cr4-al" role="alertdialog" aria-modal="true" aria-labelledby="cr4-bl-t-ih" aria-describedby="cr4-bl-m-ih">
+  <span class="cr4-al-ic"><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5M12 16.5h.01"/></svg></span>
+  <h2 class="cr4-al-t" id="cr4-bl-t-ih">Función no disponible</h2>
+  <p class="cr4-al-sub">Suscripción terminada</p>
+  <div class="cr4-al-m" id="cr4-bl-m-ih" lang="es"><p>Esta es una característica disponible para suscripciones activas. Tu cuenta excedió el límite del plan gratuito.</p>
+    <p class="cr4-noadm">Pídele a tu administrador que reactive la suscripción para recuperar el acceso completo.</p></div>
+  <div class="cr4-al-b"><button type="button" class="cr4-p cr4-prim cr4-adm cr4-cierra-bl">Reactivar suscripción</button><button type="button" class="cr4-p cr4-ton cr4-cierra-bl">Cerrar</button></div>
+</div></div>
+</div>
+</div>
+<div class="marco cr4 cr4-admin" data-vp="iv">
+<div class="cr4-app">
+<!-- Navegación de Duo abierto vertical (CALMA cr419, cr423.9): encabezado fundido, pista de cinco píldoras. Copiado del dashboard aprobado. -->
+<header class="cr4-env cr4-nav">
+  <button type="button" class="cr4-p cr4-envb" aria-label="Mostrar barra lateral" data-rot="Mostrar barra lateral"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="15" rx="3"/><path d="M9.5 4.5v15"/></svg></button>
+  <nav class="cr4-pista" aria-label="Secciones"><a href="#" class="cr4-p cr4-pv" aria-current="page">Inicio</a><a href="#" class="cr4-p cr4-pv">Expediente</a><a href="#" class="cr4-p cr4-pv">Agenda</a><a href="#" class="cr4-p cr4-pv cr4-m">Documentos</a><button type="button" class="cr4-p cr4-pv">Más</button></nav>
+  <button type="button" class="cr4-p cr4-av cr4-av-g cr4-m" aria-label="Mi perfil">AS</button><button type="button" class="cr4-p cr4-av cr4-av-g cr4-s cr4-abre-aj" aria-label="Ajustes">SE</button>
+</header><main class="cr4-cont">
+  <!-- Fondo simplificado: el dashboard reducido a sus bloques, para que la pieza global se lea sobre una pantalla real. -->
+  <!-- A0·16 · Banner de suscripción (SuscripcionBanner.tsx:35-63; montado en (app)/layout.tsx:172 dentro del área segura). Solo con plan
+     bloqueado (cancelada, sin VIP, más de 5 pacientes); lo ven TODOS los roles. Queda fijo arriba del área de contenido mientras ésta se desplaza;
+     nunca bajo la franja ni detrás de la navegación. Mismo dibujo que en Facturación (tanda4 vista 3). -->
+  <div class="cr4-ban" role="status"><span class="cr4-ban-ic"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5M12 16.5h.01"/></svg></span>
+    <p class="cr4-ban-t">Tu suscripción terminó. Tienes acceso a tus datos pero no puedes crear nuevos pacientes, consultas ni documentos.</p>
+    <a href="#" class="cr4-p cr4-ban-b">Reactivar suscripción</a></div>
+  <div class="cr4-top"><p class="cr4-rot"><span class="cr4-m">Centro</span><span class="cr4-s">Clínica Semilla A</span></p>
+  <h1 class="cr4-h1">Buenas tardes, <span class="cr4-m">Admin</span><span class="cr4-s">Secretaria</span></h1></div>
+  <!-- Acción de crear de la pantalla de fondo: con el plan bloqueado no navega, abre el modal. --><div class="cr4-acc"><button type="button" class="cr4-p cr4-tonb cr4-abre-bl"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg><span class="cr4-m">Nueva consulta</span><span class="cr4-s">Nuevo paciente</span></button></div>
+  <div class="cr4-cols"><section class="cr4-tj" aria-hidden="true"><h2 class="cr4-tt">Después</h2><div class="cr4-fl"><span class="cr4-bx"></span><span class="cr4-fl-t"><span class="cr4-br" style="width:62%"></span><span class="cr4-br cr4-br2" style="width:40%"></span></span></div><div class="cr4-fl"><span class="cr4-bx"></span><span class="cr4-fl-t"><span class="cr4-br" style="width:62%"></span><span class="cr4-br cr4-br2" style="width:40%"></span></span></div><div class="cr4-fl"><span class="cr4-bx"></span><span class="cr4-fl-t"><span class="cr4-br" style="width:62%"></span><span class="cr4-br cr4-br2" style="width:40%"></span></span></div><div class="cr4-fl"><span class="cr4-bx"></span><span class="cr4-fl-t"><span class="cr4-br" style="width:62%"></span><span class="cr4-br cr4-br2" style="width:40%"></span></span></div><div class="cr4-fl"><span class="cr4-bx"></span><span class="cr4-fl-t"><span class="cr4-br" style="width:62%"></span><span class="cr4-br cr4-br2" style="width:40%"></span></span></div></section><section class="cr4-tj" aria-hidden="true"><h2 class="cr4-tt">Atendidos recientemente</h2><div class="cr4-fl"><span class="cr4-bx"></span><span class="cr4-fl-t"><span class="cr4-br" style="width:62%"></span><span class="cr4-br cr4-br2" style="width:40%"></span></span></div><div class="cr4-fl"><span class="cr4-bx"></span><span class="cr4-fl-t"><span class="cr4-br" style="width:62%"></span><span class="cr4-br cr4-br2" style="width:40%"></span></span></div><div class="cr4-fl"><span class="cr4-bx"></span><span class="cr4-fl-t"><span class="cr4-br" style="width:62%"></span><span class="cr4-br cr4-br2" style="width:40%"></span></span></div></section><section class="cr4-tj" aria-hidden="true"><h2 class="cr4-tt">Documentos recientes</h2><div class="cr4-fl"><span class="cr4-bx"></span><span class="cr4-fl-t"><span class="cr4-br" style="width:62%"></span><span class="cr4-br cr4-br2" style="width:40%"></span></span></div><div class="cr4-fl"><span class="cr4-bx"></span><span class="cr4-fl-t"><span class="cr4-br" style="width:62%"></span><span class="cr4-br cr4-br2" style="width:40%"></span></span></div></section><section class="cr4-tj" aria-hidden="true"><h2 class="cr4-tt">Esta semana</h2><div class="cr4-fl"><span class="cr4-bx"></span><span class="cr4-fl-t"><span class="cr4-br" style="width:62%"></span><span class="cr4-br cr4-br2" style="width:40%"></span></span></div><div class="cr4-fl"><span class="cr4-bx"></span><span class="cr4-fl-t"><span class="cr4-br" style="width:62%"></span><span class="cr4-br cr4-br2" style="width:40%"></span></span></div><div class="cr4-fl"><span class="cr4-bx"></span><span class="cr4-fl-t"><span class="cr4-br" style="width:62%"></span><span class="cr4-br cr4-br2" style="width:40%"></span></span></div></section></div>
+</main>
+</div>
+<div class="cr4-capa" aria-hidden="true">
+  <div class="cr4-velo"></div>
+<!-- A0·17 · BloqueoFeatureModal: lo abre cualquier acción de crear con el plan bloqueado (useInterceptIfBlocked) y, en el menú, «Nuevo paciente»
+     de la secretaria y los ocho tipos de documento. Alerta del catálogo (cr413/cr425), icono ámbar de aviso. Con el administrador, «Reactivar suscripción»
+     (rótulo largo de hoy) apila los botones con el principal arriba (cr423.3); sin administrar, solo «Cerrar» y la línea extra. -->
+<div class="cr4-alw"><div class="cr4-al" role="alertdialog" aria-modal="true" aria-labelledby="cr4-bl-t-iv" aria-describedby="cr4-bl-m-iv">
+  <span class="cr4-al-ic"><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5M12 16.5h.01"/></svg></span>
+  <h2 class="cr4-al-t" id="cr4-bl-t-iv">Función no disponible</h2>
+  <p class="cr4-al-sub">Suscripción terminada</p>
+  <div class="cr4-al-m" id="cr4-bl-m-iv" lang="es"><p>Esta es una característica disponible para suscripciones activas. Tu cuenta excedió el límite del plan gratuito.</p>
+    <p class="cr4-noadm">Pídele a tu administrador que reactive la suscripción para recuperar el acceso completo.</p></div>
+  <div class="cr4-al-b"><button type="button" class="cr4-p cr4-prim cr4-adm cr4-cierra-bl">Reactivar suscripción</button><button type="button" class="cr4-p cr4-ton cr4-cierra-bl">Cerrar</button></div>
+</div></div>
+</div>
+</div>
+<div class="marco cr4 cr4-admin" data-vp="esc">
+<div class="cr4-app">
+<nav class="cr4-lat" aria-label="Navegación principal">
+  <div class="cr4-lat-cab"><span class="cr4-logo"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.5"/><path d="M12 5.5v13M9.6 8h4.8M9 11h6M9 14h6M9.6 17h4.8"/></svg><span class="cr4-logo-n">Spinus</span></span><span class="cr4-flex"></span><span class="cr4-plan">Plan VIP</span></div>
+  <button type="button" class="cr4-p cr4-cons-b"><span class="cr4-clogo" role="img" aria-label="Logo de Clínica Semilla A"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21c-4.5-2.2-7-5.6-7-10V5.5L12 3l7 2.5V11c0 4.4-2.5 7.8-7 10z"/><path d="M12 8v7M8.5 11.5h7"/></svg></span><span class="cr4-cons-t"><span class="cr4-m">Consultorio</span><b class="cr4-m">Centro</b><span class="cr4-s">Clínica</span><b class="cr4-s">Clínica Semilla A</b></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 9 4-4 4 4M8 15l4 4 4-4"/></svg></button>
+  <div class="cr4-lista"><a href="#" class="cr4-p cr4-li" aria-current="page"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Inicio</a><a href="#" class="cr4-p cr4-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.9.7 3.1 2.4 3.5 5.2"/></svg>Expediente</a><a href="#" class="cr4-p cr4-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Agenda</a><a href="#" class="cr4-p cr4-li cr4-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>Documentos</a><a href="#" class="cr4-p cr4-li cr4-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20v-8M12 20V5M19 20v-9"/></svg>Administración</a></div>
+  <span class="cr4-flex"></span>
+  
+  <div class="cr4-lat-pie"><a href="#" class="cr4-p cr4-li cr4-yo cr4-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18.2c1.3-2 3.2-3 5.5-3s4.2 1 5.5 3"/></svg><span><span>Dr. Admin Semilla</span><small class="cr4-esp">Ortopedia y Traumatología</small><small>Mi perfil · Ajustes</small></span></a><a href="#" class="cr4-p cr4-ib cr4-ay cr4-m" aria-label="Ayuda"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.6M12 17h.01"/></svg></a><button type="button" class="cr4-p cr4-li cr4-yo cr4-s cr4-abre-aj" aria-haspopup="menu"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span><span>Secretaria Semilla</span><small>Ajustes</small></span></button></div>
+</nav><main class="cr4-cont">
+  <!-- Fondo simplificado: el dashboard reducido a sus bloques, para que la pieza global se lea sobre una pantalla real. -->
+  <!-- A0·16 · Banner de suscripción (SuscripcionBanner.tsx:35-63; montado en (app)/layout.tsx:172 dentro del área segura). Solo con plan
+     bloqueado (cancelada, sin VIP, más de 5 pacientes); lo ven TODOS los roles. Queda fijo arriba del área de contenido mientras ésta se desplaza;
+     nunca bajo la franja ni detrás de la navegación. Mismo dibujo que en Facturación (tanda4 vista 3). -->
+  <div class="cr4-ban" role="status"><span class="cr4-ban-ic"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5M12 16.5h.01"/></svg></span>
+    <p class="cr4-ban-t">Tu suscripción terminó. Tienes acceso a tus datos pero no puedes crear nuevos pacientes, consultas ni documentos.</p>
+    <a href="#" class="cr4-p cr4-ban-b">Reactivar suscripción</a></div>
+  <div class="cr4-top"><p class="cr4-rot"><span class="cr4-m">Centro</span><span class="cr4-s">Clínica Semilla A</span></p>
+  <h1 class="cr4-h1">Buenas tardes, <span class="cr4-m">Admin</span><span class="cr4-s">Secretaria</span></h1></div>
+  <!-- Acción de crear de la pantalla de fondo: con el plan bloqueado no navega, abre el modal. --><div class="cr4-acc"><button type="button" class="cr4-p cr4-tonb cr4-abre-bl"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg><span class="cr4-m">Nueva consulta</span><span class="cr4-s">Nuevo paciente</span></button></div>
+  <div class="cr4-cols"><section class="cr4-tj" aria-hidden="true"><h2 class="cr4-tt">Después</h2><div class="cr4-fl"><span class="cr4-bx"></span><span class="cr4-fl-t"><span class="cr4-br" style="width:62%"></span><span class="cr4-br cr4-br2" style="width:40%"></span></span></div><div class="cr4-fl"><span class="cr4-bx"></span><span class="cr4-fl-t"><span class="cr4-br" style="width:62%"></span><span class="cr4-br cr4-br2" style="width:40%"></span></span></div><div class="cr4-fl"><span class="cr4-bx"></span><span class="cr4-fl-t"><span class="cr4-br" style="width:62%"></span><span class="cr4-br cr4-br2" style="width:40%"></span></span></div><div class="cr4-fl"><span class="cr4-bx"></span><span class="cr4-fl-t"><span class="cr4-br" style="width:62%"></span><span class="cr4-br cr4-br2" style="width:40%"></span></span></div><div class="cr4-fl"><span class="cr4-bx"></span><span class="cr4-fl-t"><span class="cr4-br" style="width:62%"></span><span class="cr4-br cr4-br2" style="width:40%"></span></span></div></section><section class="cr4-tj" aria-hidden="true"><h2 class="cr4-tt">Atendidos recientemente</h2><div class="cr4-fl"><span class="cr4-bx"></span><span class="cr4-fl-t"><span class="cr4-br" style="width:62%"></span><span class="cr4-br cr4-br2" style="width:40%"></span></span></div><div class="cr4-fl"><span class="cr4-bx"></span><span class="cr4-fl-t"><span class="cr4-br" style="width:62%"></span><span class="cr4-br cr4-br2" style="width:40%"></span></span></div><div class="cr4-fl"><span class="cr4-bx"></span><span class="cr4-fl-t"><span class="cr4-br" style="width:62%"></span><span class="cr4-br cr4-br2" style="width:40%"></span></span></div></section><section class="cr4-tj" aria-hidden="true"><h2 class="cr4-tt">Documentos recientes</h2><div class="cr4-fl"><span class="cr4-bx"></span><span class="cr4-fl-t"><span class="cr4-br" style="width:62%"></span><span class="cr4-br cr4-br2" style="width:40%"></span></span></div><div class="cr4-fl"><span class="cr4-bx"></span><span class="cr4-fl-t"><span class="cr4-br" style="width:62%"></span><span class="cr4-br cr4-br2" style="width:40%"></span></span></div></section><section class="cr4-tj" aria-hidden="true"><h2 class="cr4-tt">Esta semana</h2><div class="cr4-fl"><span class="cr4-bx"></span><span class="cr4-fl-t"><span class="cr4-br" style="width:62%"></span><span class="cr4-br cr4-br2" style="width:40%"></span></span></div><div class="cr4-fl"><span class="cr4-bx"></span><span class="cr4-fl-t"><span class="cr4-br" style="width:62%"></span><span class="cr4-br cr4-br2" style="width:40%"></span></span></div><div class="cr4-fl"><span class="cr4-bx"></span><span class="cr4-fl-t"><span class="cr4-br" style="width:62%"></span><span class="cr4-br cr4-br2" style="width:40%"></span></span></div></section></div>
+</main>
+</div>
+<div class="cr4-capa" aria-hidden="true">
+  <div class="cr4-velo"></div>
+<!-- A0·17 · BloqueoFeatureModal: lo abre cualquier acción de crear con el plan bloqueado (useInterceptIfBlocked) y, en el menú, «Nuevo paciente»
+     de la secretaria y los ocho tipos de documento. Alerta del catálogo (cr413/cr425), icono ámbar de aviso. Con el administrador, «Reactivar suscripción»
+     (rótulo largo de hoy) apila los botones con el principal arriba (cr423.3); sin administrar, solo «Cerrar» y la línea extra. -->
+<div class="cr4-alw"><div class="cr4-al" role="alertdialog" aria-modal="true" aria-labelledby="cr4-bl-t-esc" aria-describedby="cr4-bl-m-esc">
+  <span class="cr4-al-ic"><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5M12 16.5h.01"/></svg></span>
+  <h2 class="cr4-al-t" id="cr4-bl-t-esc">Función no disponible</h2>
+  <p class="cr4-al-sub">Suscripción terminada</p>
+  <div class="cr4-al-m" id="cr4-bl-m-esc" lang="es"><p>Esta es una característica disponible para suscripciones activas. Tu cuenta excedió el límite del plan gratuito.</p>
+    <p class="cr4-noadm">Pídele a tu administrador que reactive la suscripción para recuperar el acceso completo.</p></div>
+  <div class="cr4-al-b"><button type="button" class="cr4-p cr4-prim cr4-adm cr4-cierra-bl">Reactivar suscripción</button><button type="button" class="cr4-p cr4-ton cr4-cierra-bl">Cerrar</button></div>
+</div></div>
+</div>
+</div>
+<template class="cr4-ficha-tpl"><section class="cr4-ficha" lang="es" aria-label="Especificación: Suscripción terminada"><h3>Especificación · Suscripción terminada</h3><dl><dt>Qué es</dt><dd>Dos piezas globales del cobro: el banner <code>SuscripcionBanner</code> (fijo arriba en todas las pantallas de la app) y el modal <code>BloqueoFeatureModal</code> (sale en lugar de navegar cuando se intenta crear algo).</dd><dt>Cuándo</dt><dd>Solo con plan bloqueado: suscripción cancelada, sin VIP y más de 5 pacientes activos (<code>lib/subscription.ts</code>). Las clínicas gratuitas de buena fe (≤ 5 pacientes) no ven nada. Lo resuelve el servidor en <code>(app)/layout.tsx</code>.</dd><dt>A quién</dt><dd>El banner, a todos los roles. El modal cambia por permiso: quien administra la clínica (médico admin) ve «Reactivar suscripción»; el médico invitado y la secretaria ven en su lugar «Pídele a tu administrador…» y solo «Cerrar».</dd><dt>Banner · medidas</dt><dd>Fondo <code>--ag-fondo</code> (el mismo ámbar del sistema que el aviso de perfil), icono de aviso en círculo de 32, texto 14/20 justificado, botón «Reactivar suscripción» de 36 (área 44 en táctiles) con fondo <code>--ag-tinta</code>. En ancho, una fila pegada al borde superior del área de contenido; en teléfono y Duo cerrado, tarjeta con el botón bajo el texto. Fijo (sticky) mientras el contenido se desplaza; nunca bajo la franja ni la barra de estado (hoy lo protege el relleno de área segura de <code>layout.tsx:172</code>).</dd><dt>Modal · medidas</dt><dd>Alerta del catálogo: 320 (teléfono, Duo cerrado) / 340 (resto), radio 20, relleno 24, icono ámbar 28 en círculo de 48, título 17/700, subtítulo «Suscripción terminada» 13/600 en <code>--ag-tinta</code>, mensaje 14/20 justificado. Botones apilados a todo el ancho (el rótulo «Reactivar suscripción» es largo, §23.3): principal arriba, «Cerrar» tonal debajo. Sin administrar: solo «Cerrar».</dd><dt>Textos (exactos de hoy)</dt><dd>«Tu suscripción terminó. Tienes acceso a tus datos pero no puedes crear nuevos pacientes, consultas ni documentos.», «Reactivar suscripción» (<code>SuscripcionBanner.tsx:50-58</code>); «Función no disponible», «Suscripción terminada», «Esta es una característica disponible para suscripciones activas. Tu cuenta excedió el límite del plan gratuito.», «Pídele a tu administrador que reactive la suscripción para recuperar el acceso completo.», «Cerrar», «Reactivar suscripción» (<code>BloqueoFeatureModal.tsx:92-127</code>).</dd><dt>Comportamiento</dt><dd>Banner → <code>/billing</code>. Modal: «Reactivar suscripción» cierra y va a <code>/billing</code>; «Cerrar», Esc o tocar fuera cierran y el foco vuelve a la acción que lo abrió.</dd><dt>Accesibilidad</dt><dd>Banner <code>role="status"</code>; modal <code>alertdialog</code> con título y mensaje enlazados y foco en el primer botón.</dd><dt>Movimiento</dt><dd>El banner no se anima (aparece con la página). Modal: escala .96→1 desde el centro con resorte (amortiguación 1, respuesta .35 s); salida más rápida. Reduced motion: fundido de 200 ms. Reduced transparency: velo opaco.</dd><dt>Respecto a hoy</dt><dd>Hoy el banner usa los ámbar de Tailwind y en escritorio se desplaza con un margen fijo; el modal es un <code>ModalShell</code> con botones de texto gris. Aquí ambos usan los tokens y el patrón de alerta del sistema.</dd></dl></section></template>
+<script>
+(function(CFG){
+
+var P=CFG.p,MS=[].slice.call(document.querySelectorAll('.'+P+'.marco'));
+function cls(n){return P+'-'+n}
+MS.forEach(function(m){
+  var capa=m.querySelector('.'+cls('capa')),orig=null;
+  m.querySelectorAll('a[href="#"]').forEach(function(a){a.addEventListener('click',function(e){e.preventDefault();if(capa&&capa.classList.contains(cls('on'))&&a.closest('.'+cls('capa')))cierra()})});
+  function abre(k,o){if(!capa)return;orig=o||null;capa.dataset.k=k;capa.classList.add(cls('on'));capa.setAttribute('aria-hidden','false');
+    var pan=capa.querySelector(k==='cajon'?'.'+cls('cajon'):'.'+cls('mn'));var f=pan&&pan.querySelector('button,a');if(f)f.focus({preventScroll:true})}
+  function cierra(){if(!capa)return;capa.classList.remove(cls('on'));capa.setAttribute('aria-hidden','true');if(orig&&orig.offsetParent)orig.focus({preventScroll:true})}
+  m.abre=abre;m.cierra=cierra;
+  m.querySelectorAll('[data-abre]').forEach(function(b){b.addEventListener('click',function(){abre(b.dataset.abre,b)})});
+  if(capa){capa.querySelector('.'+cls('velo')).addEventListener('click',cierra);
+    capa.querySelectorAll('.'+cls('cierra')).forEach(function(b){b.addEventListener('click',cierra)});}
+  m.addEventListener('keydown',function(e){if(e.key==='Escape'&&capa&&capa.classList.contains(cls('on'))){e.preventDefault();cierra()}});
+});
+function tira(grupos,alPulsar){var d=document.createElement('div');d.className=cls('tira');d.setAttribute('role','group');d.setAttribute('aria-label','Controles de la maqueta');
+  grupos.forEach(function(g,i){if(i){var s=document.createElement('span');s.className=cls('sep');d.appendChild(s)}
+    g.forEach(function(b){var x=document.createElement('button');x.type='button';x.textContent=b[1];x.dataset.k=b[0];if(b[2]!=null)x.setAttribute('aria-pressed',String(b[2]));
+      x.addEventListener('click',function(){alPulsar(b[0],x,d)});d.appendChild(x)})});
+  var op=MS[0].closest('.op'),h=op&&op.querySelector('header');if(h)h.appendChild(d);else MS[0].parentNode.insertBefore(d,MS[0]);
+  var tp=document.querySelector('template.'+cls('ficha-tpl'));if(tp){var f=tp.content.firstElementChild.cloneNode(true);if(op)op.appendChild(f);else MS[MS.length-1].after(f)}
+  return d}
+
+
+var st={admin:true,sec:false};
+function aplica(){MS.forEach(function(m){m.classList.toggle(cls('admin'),st.admin&&!st.sec);m.classList.toggle(cls('sec'),st.sec)})}
+MS.forEach(function(m){var c=m.querySelector('.'+cls('capa')),orig=null;
+  m.abreBl=function(o){orig=o||null;c.classList.add(cls('on'));c.setAttribute('aria-hidden','false');var b=c.querySelector('.'+cls('al-b')+' button:not([style*="none"])');
+    var vis=[].slice.call(c.querySelectorAll('.'+cls('al-b')+' button')).filter(function(x){return getComputedStyle(x).display!=='none'})[0];if(vis)vis.focus({preventScroll:true})};
+  function cierra(){c.classList.remove(cls('on'));c.setAttribute('aria-hidden','true');if(orig&&orig.offsetParent)orig.focus({preventScroll:true})}
+  m.querySelectorAll('.'+cls('abre-bl')).forEach(function(b){b.addEventListener('click',function(){m.abreBl(b)})});
+  m.querySelectorAll('.'+cls('cierra-bl')).forEach(function(b){b.addEventListener('click',cierra)});
+  c.querySelector('.'+cls('velo')).addEventListener('click',cierra);
+  m.addEventListener('keydown',function(e){if(e.key==='Escape'&&c.classList.contains(cls('on'))){e.preventDefault();cierra()}});
+});
+var T=tira([[['adm','Administrador',true],['inv','Médico invitado',false],['sec','Secretaria',false]],[['abre','Abrir el bloqueo']]],function(k){
+  if(k==='abre'){MS.forEach(function(m){m.abreBl()});return}
+  st.admin=k==='adm';st.sec=k==='sec';aplica();
+  T.querySelectorAll('button[aria-pressed]').forEach(function(b){b.setAttribute('aria-pressed',String(b.dataset.k===k))})});
+aplica();
+
+})({"p": "cr4"});
+</script>

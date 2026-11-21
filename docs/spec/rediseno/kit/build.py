@@ -19,6 +19,7 @@ page=f'''<title>{TIT}</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <style>
 {open(f"{K}/base.css").read()}
+html,body{{-webkit-text-size-adjust:100%;text-size-adjust:100%}}
 body{{background:var(--fondo);color:var(--tinta);font:15px/1.45 var(--fuente)}}
 .pg{{max-width:1360px;margin:0 auto;padding-block:24px 64px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:24px}}
 .pg>header h1{{margin:0 0 6px;font-size:28px;line-height:34px;font-weight:800;letter-spacing:-.5px}}

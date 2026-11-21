@@ -1,0 +1,2 @@
+/* Integración: la tira vacía del guion de ag-burbuja no ocupa sitio; los huecos de Duo abierto solo en Día */
+.ab-tira:empty{display:none}

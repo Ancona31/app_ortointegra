@@ -287,6 +287,10 @@ CSS = r'''
 .PFX[data-vp="ext"] .PFX-hoja,.PFX[data-vp="tel"] .PFX-hoja{position:relative;left:auto;right:auto;bottom:auto;flex:none;width:320px;border-radius:20px;padding:24px;opacity:0;transform:translateY(12px) scale(.97);transition:transform 320ms cubic-bezier(.32,.72,0,1),opacity 320ms cubic-bezier(.32,.72,0,1)}
 .PFX[data-vp="ext"] .PFX-on .PFX-hoja,.PFX[data-vp="tel"] .PFX-on .PFX-hoja{opacity:1;transform:none}
 .PFX[data-vp="ext"] .PFX-asa,.PFX[data-vp="tel"] .PFX-asa{display:none}
+/* Teléfono: «Usar solo la edad» en la línea de la etiqueta (alta de 44) y el valor 8 px más abajo, para que su área no pise la etiqueta de la edad */
+.PFX[data-vp="ext"] .PFX-nac:has(.PFX-alt) .PFX-l,.PFX[data-vp="tel"] .PFX-nac:has(.PFX-alt) .PFX-l{display:flex;align-items:center;min-height:44px}
+.PFX[data-vp="ext"] .PFX-nac:has(.PFX-alt) .PFX-alt,.PFX[data-vp="tel"] .PFX-nac:has(.PFX-alt) .PFX-alt{top:8px;height:44px;padding-top:0;align-items:center}
+.PFX[data-vp="ext"] .PFX-nac:has(.PFX-alt) .PFX-c,.PFX[data-vp="tel"] .PFX-nac:has(.PFX-alt) .PFX-c{margin-top:8px}
 /* El folio no se parte por su guion al estrecharse la alerta */
 /* Mensaje de duplicado: alineado a la izquierda, sin justificar, para que el folio entero no abra ríos */
 .PFX .PFX-hjtx.PFX-vgen{text-align:left;hyphens:manual;-webkit-hyphens:manual}
@@ -452,11 +456,11 @@ def vista(nuevo, vp):
     dup = dupb = ''
     if nuevo:
         dup = (f'<span class="PFX-aic PFX-aic-av PFX-vdup">{ic(I["aviso"],28,1.8)}</span><h2 class="PFX-atit PFX-vdup">Paciente duplicado</h2>'
-            '<p class="PFX-hjtx PFX-vgen">Ya existe un paciente con los mismos datos: Paciente Prueba 07 (Exp. #<span class="PFX-num">EXP-2026-0007</span>). ¿Es el mismo paciente o una persona distinta?</p>'
-            '<p class="PFX-hjtx PFX-hjc PFX-vmio">Este paciente ya está en tu lista de pacientes: Paciente Prueba 07 (Exp. #<span class="PFX-num">EXP-2026-0007</span>)</p>')
+            '<p class="PFX-hjtx PFX-vgen">Ya existe un paciente con los mismos datos: Paciente Prueba 07 (Exp. #<span class="PFX-num">EXP-2026-0007</span>). ¿Es el mismo paciente o una persona distinta? Si es otra persona, se creará el registro de todos modos.</p>'
+            '<p class="PFX-hjtx PFX-hjc PFX-vmio">Este paciente ya está en tu lista de pacientes: Paciente Prueba 07 (Exp. #<span class="PFX-num">EXP-2026-0007</span>). Si es otra persona, se creará el registro de todos modos.</p>')
         dupb = ('<button type="button" class="PFX-p PFX-prim PFX-cierra PFX-vgen">Es el mismo paciente</button>'
             '<button type="button" class="PFX-p PFX-prim PFX-cierra PFX-vmio">Ir a su expediente</button>'
-            '<button type="button" class="PFX-p PFX-tonal PFX-cierra PFX-vdup">Es otra persona, crear de todos modos</button>'
+            '<button type="button" class="PFX-p PFX-tonal PFX-cierra PFX-vdup">Es otra persona</button>'
             '<button type="button" class="PFX-p PFX-quieto PFX-cierra PFX-vdup">Cancelar</button>')
     capa = ('\n<!-- A4.11 Posible duplicado (hoy: recuadro ámbar al pie del formulario) y error del servidor (hoy: recuadro rojo sin botón). Mensajes y rótulos de hoy tal cual, sin el emoji; los títulos «Paciente duplicado» y «No se pudo guardar» y el botón «Aceptar» están aprobados por el dueño (CALMA §20). Tercera variante de duplicado, para el médico invitado, mismo dibujo y este texto: «Este paciente ya está registrado en tu clínica, pero no aparece en tu lista porque aún no es tu paciente: Paciente Prueba 07 (Exp. #EXP-2026-0007). ¿Deseas vincularlo a tus pacientes?». Mientras vincula, el primario dice «Vinculando...»; si falla, sobre los botones y en --mal-tinta: «No se pudo conectar con el servidor. Verifica tu conexión e intenta de nuevo.». En Editar, si el servidor manda su propio mensaje, va bajo el título. Animación de maqueta: en la app será un resorte. -->\n'
         '<div class="PFX-capa" aria-hidden="true"><div class="PFX-velo"></div>'

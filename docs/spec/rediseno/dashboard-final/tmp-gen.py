@@ -1,6 +1,16 @@
 # Generador de vista-dashboard.html (dashboard FINAL, «Lo que sigue»; los cuatro marcos comparten piezas). Uso: python3 tmp-gen.py
 import os
 L = os.path.dirname(os.path.abspath(__file__))
+import sys; sys.path.insert(0, L)
+import importlib.util as _iu
+_sp = _iu.spec_from_file_location('cromo', f'{L}/tmp-cromo.py'); CR = _iu.module_from_spec(_sp); _sp.loader.exec_module(CR)
+BDG = '<span class="db-bdg db-m" aria-hidden="true">3</span>'
+def ap(vp, donde):
+    # Aviso «N datos pendientes» (A0·11, AvisoPerfilSidebar.tsx; solo médico), copiado de entrega/cromo/vista-1-aviso-perfil.html
+    h = CR.AP.replace('VP-DONDE', f'{vp}-{donde}')
+    if vp == 'ih' and donde == 'lat':   # Duo abierto horizontal: plegado de inicio para que el pie no baje a la franja
+        h = h.replace('class="db-ap db-m"', 'class="db-ap db-m db-pleg"').replace('aria-expanded="true"', 'aria-expanded="false"')
+    return h
 
 def ic(d, s=20, w=1.8, extra=''):
     return f'<svg aria-hidden="true" width="{s}" height="{s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="{w}" stroke-linecap="round" stroke-linejoin="round"{extra}>{d}</svg>'
@@ -64,10 +74,11 @@ def est(k, texto=True):
         return f'<span class="db-est db-est-{k}">{c}<span class="db-est-t">{t}</span></span>'
     return f'<span class="db-est db-est-{k}" role="img" aria-label="{t}">{c}</span>'
 
-# CALMA §24.5: origen de la cita (texto de hoy «Reservó por enlace», BloqueReservaPorLigar.tsx:108; Google: texto nuevo aprobado)
+# CALMA §28 (textos unificados): en filas el corto («Por enlace» / «Desde Google Calendar»); en la hoja el largo
+# («Reservó por enlace» / «Agendada desde Google Calendar»).
 def origen(o, corto=False):
     if o == 'enlace':
-        return f'<span class="db-marca db-ori">{ic(I["enlace"], 14, 2)}Reservó por enlace</span>'
+        return f'<span class="db-marca db-ori">{ic(I["enlace"], 14, 2)}{"Por enlace" if corto else "Reservó por enlace"}</span>'
     if o == 'google':
         return f'<span class="db-marca db-ori">{gcal(15)}{"Desde Google Calendar" if corto else "Agendada desde Google Calendar"}</span>'
     return ''
@@ -83,7 +94,7 @@ def fecha(mes, dia):
     return f'<div class="db-fecha" aria-hidden="true"><span class="db-mes">{mes}</span><span class="db-dia">{dia}</span></div>'
 
 def cab(vp):
-    av = '<span class="db-flex"></span><button type="button" class="db-p db-avn" aria-label="Mi perfil"><span class="db-m">AS</span><span class="db-s">SE</span></button>' if vp == 'ext' else ''
+    av = '<span class="db-flex"></span><button type="button" class="db-p db-avn db-m" aria-label="Mi perfil">AS</button><button type="button" class="db-p db-avn db-s" aria-label="Ajustes" data-abre-mas>SE</button>' if vp == 'ext' else ''
     plan = PLAN if vp in ('ext', 'tel', 'iv') else ''
     return f'''<header class="db-cab">
     <div class="db-sal">
@@ -121,7 +132,7 @@ def hero():
     <!-- ESTADOS DE SISTEMA de la pieza principal (no se dibujan; van EN ESTE MISMO HUECO, con la misma altura para que nada salte):
          · CARGANDO: la tarjeta conserva su tamaño; dentro, caja de fecha 52×50 y dos barras (60 % y 40 % de ancho, 12 px de alto, radio 6) en var(--sup2);
            el botón primario se dibuja como bloque var(--sup2) de 48 de alto. Entra y sale con fundido de 200 ms; sin brillo en bucle.
-         · ERROR: mismo hueco; texto «No se pudo cargar tu siguiente cita.» (13, var(--tinta2)) y botón tonal «Reintentar» (clase db-sec2). -->
+         · ERROR: mismo hueco; texto «No se pudieron cargar las citas.» (ProximasCitas.tsx:465) (13, var(--tinta2)) y botón tonal «Reintentar» (clase db-sec2). -->
     <div class="db-hcab">
       <span class="db-encurso"><span class="db-pt"></span>En curso</span>
       <span class="db-avance">4 de 6 · siguiente a las <span class="db-num">18:30</span></span>
@@ -146,8 +157,8 @@ def hero():
     <div class="db-hfila">
       {fecha("NOV", 19)}
       <div class="db-quien">
-        <span class="db-hnom">Sin citas hoy</span>
-        <span class="db-det">Tu agenda está libre. Puedes atender sin cita.</span>
+        <!-- Texto del vacío de hoy: «No hay citas agendadas.» + «Abrir agenda →» (ProximasCitas.tsx:478-487) -->
+        <span class="db-hnom">No hay citas agendadas.</span>
       </div>
       <div class="db-haccs">
         <button type="button" class="db-p db-prim" data-abre="con" aria-label="Nueva consulta">{ic(I["plus"], 18, 2.4)}<span class="db-rl">Nueva consulta</span><span class="db-rc">Consulta</span></button>
@@ -175,14 +186,17 @@ def herr(vp):
     </nav>
   </div>'''
 
-def tcab(titulo, enlace='Ver agenda'):
+LEY = lambda: ''.join(f'<li>{est(k)}</li>' for k in ('ag', 'conf', 'canc', 'noas', 'aten'))
+
+def tcab(titulo, enlace='Ver agenda', vp='esc'):
     # Función 9: «Estados» es solo LEYENDA de los 5 estados (ProximasCitas.tsx:149-179, mismos textos y orden), ahora con los iconos en círculo.
-    # Menú que nace del botón, sin velo (en todos los marcos); se cierra con Esc, al tocar fuera o con el mismo botón.
-    ley = ''.join(f'<li>{est(k)}</li>' for k in ('ag', 'conf', 'canc', 'noas', 'aten'))
+    # Patrón de menús del catálogo (CALMA §25/§26): desplegable sin velo SOLO en computadora; hoja en iPhone; tarjeta centrada con velo
+    # en Duo cerrado y Duo abierto (capa_ley). Se cierra con Esc, al tocar fuera o con el mismo botón / «Cerrar».
+    ley = f'<ul class="db-ley" aria-label="Estados de una cita">{LEY()}</ul>' if vp == 'esc' else ''
     return f'''<div class="db-tcab">
       <h2>{titulo}</h2>
       <div class="db-estw"><button type="button" class="db-p db-est-b" aria-expanded="false" aria-haspopup="true">Estados{ic(I["abajo"], 13, 2.4)}</button>
-        <ul class="db-ley" aria-label="Estados de una cita">{ley}</ul></div>
+        {ley}</div>
       <!-- Función 15: «Ver agenda» -->
       <a href="#" class="db-p db-enl">{enlace}{ic(I["sig"], 13, 2.4)}</a>
     </div>'''
@@ -203,7 +217,7 @@ def fila(vp, mes, dia, nom, hora, fin, dlargo, med, estado, ori='', sinexp=False
         # clínica, ProximasCitas.tsx:609) — sigue en la hoja. «Sin expediente» sube a la línea de la hora.
         linea = f'<span class="db-linea"><span class="db-num db-nw">{hora}</span>{"<span class=db-pto2 aria-hidden=true>·</span>" + sx if sx else ""}</span>'
         sx = ''
-    marcas = origen(ori, corto=(vp == 'ext'))
+    marcas = origen(ori, corto=True)
     if vp in ('ih', 'esc') and marcas and sx:
         marcas = f'<span class="db-marcas">{marcas}{sx}</span>'
     else:
@@ -216,23 +230,24 @@ def fila(vp, mes, dia, nom, hora, fin, dlargo, med, estado, ori='', sinexp=False
     if sec:
         return f'''<li class="db-fila"><a href="#" class="db-p db-fbtn" aria-label="Ver cita de {nom}, {hora}, {nest}{extra}">{cuerpo}</a></li>'''
     return f'''<li class="db-fila"><button type="button" class="db-p db-fbtn" aria-haspopup="dialog" aria-label="{nom}, {hora}, {nest}{extra}. Acciones de la cita"
-        data-nom="{nom}" data-mes="{mes}" data-dia="{dia}" data-cuando="{dlargo} · {hora} – {fin}" data-med="{med} · Centro" data-est="{estado}" data-ori="{ori}" data-sx="{1 if sinexp else 0}" data-pa="{1 if (sinexp and ori == 'google') else 0}" data-lig="1">{cuerpo}</button></li>'''
+        data-nom="{nom}" data-mes="{mes}" data-dia="{dia}" data-cuando="{dlargo} · {hora}&nbsp;–&#8288;&nbsp;{fin}" data-med="{med} · Centro" data-est="{estado}" data-ori="{ori}" data-sx="{1 if sinexp else 0}" data-pa="{1 if (sinexp and ori == 'google') else 0}" data-lig="1">{cuerpo}</button></li>'''
 
 def despues(vp):
     DR = 'Dr. Admin Semilla'
     J, V, L = 'Jue 19 nov', 'Vie 20 nov', 'Lun 23 nov'  # formato de cuandoDeTarjeta (accionesTarjeta.ts:332-348)
     return f'''<section class="db-tar db-desp db-v1" aria-label="Después">
-    {tcab("Después")}
+    {tcab("Después", vp=vp)}
     <!-- Funciones 10–14 (CALMA §24). Semilla: un origen de cada tipo con expediente (12 por enlace, 15 desde Google Calendar)
-         y uno de cada tipo sin expediente (21 por enlace; «Pendiente administrativo», evento de Google sin paciente ligado,
+         y uno de cada tipo sin expediente (21 por enlace; «Revisión de estudios», evento de Google «por asignar» con su título de Google
+         —ProximasCitas.tsx:504-508—. Un evento de Spinus sin paciente NO entra en esta lista, ProximasCitas.tsx:70-72,
          que se trata como una cita sin expediente más, §24.7). Al tocar la fila se abre la hoja de acciones de la cita. -->
     <ul class="db-filas">
       {fila(vp, "NOV", 19, "Paciente Prueba 12", "18:30", "19:00", J, DR, "conf", "enlace")}
       {fila(vp, "NOV", 20, "Paciente Prueba 15", "08:00", "08:30", V, DR, "ag", "google")}
       {fila(vp, "NOV", 20, "Paciente Prueba 21", "09:00", "09:30", V, DR, "ag", "enlace", sinexp=True)}
-      {fila(vp, "NOV", 23, "Pendiente administrativo", "10:00", "11:00", L, DR, "ag", "google", sinexp=True)}
+      {fila(vp, "NOV", 23, "Revisión de estudios", "10:00", "11:00", L, DR, "ag", "google", sinexp=True)}
     </ul>
-    <p class="db-pie">No hay más citas próximas</p>
+    <p class="db-pie">No hay más citas próximas. <a href="#" class="db-p db-enl db-pie-a">Ver agenda →</a></p>
     <!-- ESTADOS DE SISTEMA de «Después» (función 16; no se dibujan). Van EN EL LUGAR DE <ul class="db-filas">, con la cabecera de la tarjeta en su sitio:
          · CARGANDO: tres filas esqueleto de la misma altura que una fila real (caja de fecha 52×50 + barra de 55 % y barra de 35 %, 12 px de alto,
            radio 6, todo en var(--sup2)); sin pie. Fundido de entrada y de salida de 200 ms (solo opacity); sin brillo en bucle.
@@ -267,7 +282,7 @@ def atendidos():
     </div>
     <ul class="db-at-l">{its}</ul>
     <!-- ESTADOS DE SISTEMA (no se dibujan; van en el lugar de la lista): CARGANDO = dos tarjetas esqueleto del mismo tamaño;
-         ERROR = «No se pudieron cargar los pacientes atendidos.» + píldora tonal «Reintentar»; VACÍO = «Aún no has atendido pacientes.» + enlace «Crear paciente». -->
+         ERROR = «No se pudieron cargar los pacientes.» + píldora tonal «Reintentar» (AtendidosRecientemente.tsx:110); VACÍO = «Aquí aparecerán los pacientes que vayas atendiendo.» + enlace «Crear paciente →» (:117). -->
   </section>'''
 
 def documentos():
@@ -279,7 +294,7 @@ def documentos():
     <div class="db-tcab"><h2>Documentos recientes</h2><button type="button" class="db-p db-pil db-toq db-pil-n" data-abre="doc" aria-label="Nuevo documento">{ic(I["plus"], 16, 2.4)}<span>Nuevo</span></button></div>
     <ul class="db-docs-l">{its}</ul>
     <!-- ESTADOS DE SISTEMA (no se dibujan; van en el lugar de la lista, el botón «Nuevo» se queda): CARGANDO = tres renglones esqueleto de 56;
-         ERROR = «No se pudieron cargar los documentos.» + píldora tonal «Reintentar»; VACÍO = «Aún no hay documentos.» -->
+         ERROR = «No se pudieron cargar los documentos.» + píldora tonal «Reintentar»; VACÍO = «Todavía no has generado documentos.» (DocumentosRecientes.tsx:167,179) -->
   </section>'''
 
 def cuerpo_med(vp):
@@ -315,10 +330,10 @@ def cuerpo_sec(vp):
       <li class="db-stat"><b class="db-num">4</b><span>Atendidas</span></li>
     </ul>
     <!-- ESTADOS DE SISTEMA (no se dibujan; en el lugar de los conteos): CARGANDO = cuatro cajas var(--fondo) sin número;
-         ERROR = «No se pudieron cargar los conteos.» + píldora tonal «Reintentar». -->
+         ERROR = «No se pudieron cargar los conteos.» + píldora tonal «Reintentar» (HoyEnConsultorio.tsx:123). -->
   </section>
   <section class="db-tar db-desp" aria-label="Próximas citas de la clínica">
-    {tcab("Próximas citas")}
+    {tcab("Próximas citas", vp=vp)}
     <ul class="db-filas">
       {fila(vp, "NOV", 19, "Paciente Prueba 07", "17:00", "17:30", J, DR, "ag", sec=True)}
       {fila(vp, "NOV", 19, "Paciente Prueba 12", "18:30", "19:00", J, DR, "conf", "enlace", sec=True)}
@@ -326,10 +341,12 @@ def cuerpo_sec(vp):
       {fila(vp, "NOV", 20, "Paciente Prueba 15", "08:00", "08:30", V, DR, "ag", "google", sec=True)}
       {fila(vp, "NOV", 20, "Paciente Prueba 21", "09:00", "09:30", V, DRA, "conf", "enlace", sinexp=True, sec=True)}
     </ul>
-    <p class="db-pie">No hay más citas próximas</p>
+    <p class="db-pie">No hay más citas próximas. <a href="#" class="db-p db-enl db-pie-a">Ver agenda →</a></p>
   </section>
-  <section class="db-tar db-ult" aria-label="Últimos pacientes">
-    <div class="db-tcab"><h2>Últimos pacientes</h2><a href="#" class="db-p db-enl">Ver todos{ic(I["sig"], 13, 2.4)}</a></div>
+  <section class="db-tar db-ult" aria-label="Últimos pacientes registrados">
+    <!-- Título de hoy y SIN «Ver todos», a propósito (UltimosPacientes.tsx:86-94). ESTADOS: ERROR = «No se pudieron cargar los pacientes.» +
+         «Reintentar» (:77); VACÍO = «Aquí aparecerán los pacientes que registres.» + enlace «+ Nuevo paciente» (:84). -->
+    <div class="db-tcab"><h2>Últimos pacientes registrados</h2></div>
     <ul class="db-docs-l">{ults}</ul>
   </section>
   </div>'''
@@ -354,32 +371,35 @@ def riel():
         return f'<a href="#" class="db-p db-rb{cl}" aria-label="{t}"{a}>{ic(I[k], 22)}</a>'
     return f'''<!-- Función 1: navegación. Riel a la derecha, fundido con la franja del sistema. -->
 <nav class="db-riel" aria-label="Navegación principal">
-  {b("inicio","Inicio",True)}{b("pac","Expediente")}{b("agenda","Agenda")}{b("docs","Documentos",cl=" db-m")}<a href="#" class="db-p db-rb db-m" aria-label="Más">{ic(I["mas"], 22, 3)}</a>
+  {b("inicio","Inicio",True)}{b("pac","Expediente")}{b("agenda","Agenda")}{b("docs","Documentos",cl=" db-m")}<button type="button" class="db-p db-rb" aria-label="Más" data-abre-mas>{ic(I["mas"], 22, 3)}{BDG}</button>
   <span class="db-flex"></span>
   <button type="button" class="db-p db-mas db-m" aria-label="Nueva consulta" data-abre="con">{ic(I["plus"], 26, 2.4)}</button>
   <button type="button" class="db-p db-mas db-s" aria-label="Agendar cita">{ic(I["plus"], 26, 2.4)}</button>
 </nav>'''
 
-def lateral():
+def lateral(vp):
     def a(k, t, act=False, cl=''):
         c = ' aria-current="page"' if act else ''
         return f'<a href="#" class="db-p db-li{cl}"{c}>{ic(I[k], 20)}{t}</a>'
     return f'''<!-- Función 1: navegación (barra lateral) -->
 <nav class="db-lat" aria-label="Navegación principal">
   <div class="db-lat-cab">{marca(24)}{PLAN}</div>
-  <button type="button" class="db-p db-cons-b"><span class="db-av"><span class="db-m">AS</span><span class="db-s">SE</span></span><span class="db-cons-t"><span class="db-m">Consultorio</span><b class="db-m">Centro</b><span class="db-s">Clínica</span><b class="db-s">Clínica Semilla A</b></span>{ic(I["selector"], 16, 2)}</button>
+  <button type="button" class="db-p db-cons-b">{CR.CLOGO}<span class="db-cons-t"><span class="db-m">Consultorio</span><b class="db-m">Centro</b><span class="db-s">Clínica</span><b class="db-s">Clínica Semilla A</b></span>{ic(I["selector"], 16, 2)}</button>
   <div class="db-lista">{a("inicio","Inicio",True)}{a("pac","Expediente")}{a("agenda","Agenda")}{a("docs","Documentos",cl=" db-m")}{a("admin","Administración",cl=" db-m")}</div>
   <span class="db-flex"></span>
-  <div class="db-lat-pie"><a href="#" class="db-p db-li db-yo">{ic(I["perfil"], 20)}<span><span class="db-m">Dr. Admin Semilla</span><span class="db-s">Secretaria</span><small>Mi perfil · Ajustes</small></span></a></div>
+  <!-- Aviso «N datos pendientes» en la barra lateral (CALMA §28, solo médico) y pie de hoy: médico «Mi perfil · Ajustes» + Ayuda; secretaria «Ajustes». -->
+{ap(vp, "lat")}
+  {CR.PIE}
 </nav>'''
 
 def encabezado():
     return f'''<!-- Función 1: navegación. Encabezado fundido con la barra de estado. -->
 <header class="db-enc">
-  <button type="button" class="db-p db-menu" aria-label="Menú">{ic(I["menu"], 22, 2)}</button>
+  <!-- El cajón del menú (con el aviso, el consultorio con su logo y «Ajustes» de la secretaria) se define en entrega/cromo (vistas 1 y 5). -->
+  <button type="button" class="db-p db-menu" aria-label="Menú">{ic(I["menu"], 22, 2)}{BDG}</button>
   <span class="db-enc-t">Inicio</span>
   <span class="db-flex"></span>
-  <button type="button" class="db-p db-av db-av-g" aria-label="Mi perfil"><span class="db-m">AS</span><span class="db-s">SE</span></button>
+  <button type="button" class="db-p db-av db-av-g db-m" aria-label="Mi perfil">AS</button><button type="button" class="db-p db-av db-av-g db-s" aria-label="Ajustes">SE</button>
 </header>'''
 
 def enc_iv():
@@ -388,12 +408,12 @@ def enc_iv():
         return f'<a href="#" class="db-p db-pv{cl}"{c}>{t}</a>'
     return f'''<!-- Función 1: navegación de Duo abierto vertical (CALMA §19): encabezado fundido con la barra de estado; secciones en una pista.
      Administración, Mi perfil y Ayuda: desde «Mostrar barra lateral» o el avatar.
-     CALMA §23.9: quinta píldora «Más», sin marcar aquí; abre el mismo menú que el «···» del riel de Duo cerrado (menú no dibujado).
-     Como en el riel, «Documentos» y «Más» no se dibujan para la secretaria. -->
+     CALMA §23.9/§28: quinta píldora «Más»; abre el mismo menú que el «···» del riel de Duo cerrado (aviso, consultorio activo,
+     Administración, Mi perfil, Ayuda). La secretaria también la tiene, solo con sus «Ajustes». «Documentos» no se dibuja para ella. -->
 <header class="db-env">
-  <button type="button" class="db-p db-envb" aria-label="Mostrar barra lateral">{ic(I["barra"], 20)}</button>
-  <nav class="db-pista" aria-label="Secciones">{p("Inicio", True)}{p("Expediente")}{p("Agenda")}{p("Documentos", cl=" db-m")}{p("Más", cl=" db-m")}</nav>
-  <button type="button" class="db-p db-av db-av-g" aria-label="Mi perfil"><span class="db-m">AS</span><span class="db-s">SE</span></button>
+  <button type="button" class="db-p db-envb" aria-label="Mostrar barra lateral">{ic(I["barra"], 20)}{BDG}</button>
+  <nav class="db-pista" aria-label="Secciones">{p("Inicio", True)}{p("Expediente")}{p("Agenda")}{p("Documentos", cl=" db-m")}<button type="button" class="db-p db-pv" data-abre-mas>Más</button></nav>
+  <button type="button" class="db-p db-av db-av-g db-m" aria-label="Mi perfil">AS</button><button type="button" class="db-p db-av db-av-g db-s" aria-label="Ajustes" data-abre-mas>SE</button>
 </header>'''
 
 RES = [("01", "Paciente Prueba 01", "34 años · Exp. 0001"), ("07", "Paciente Prueba 07", "54 años · Exp. 0007"),
@@ -471,14 +491,42 @@ def capa_cita(vp):
     <button type="button" class="db-p db-prim db-hc-prim db-hc-ini">{ic(I["esteto"], 18, 2)}Iniciar consulta</button>
     <button type="button" class="db-p db-prim db-hc-prim db-hc-lig">{ic(I["enlace"], 18, 2)}Ligar paciente e iniciar consulta</button>
     <a href="#" class="db-p db-prim db-hc-prim db-hc-ag">{ic(I["agenda"], 18, 2)}Ver en la agenda</a>
-    <!-- «¿No es una cita?» (BotonNoEsCita.tsx:25,37-58; ProximasCitas.tsx:247-255): SOLO en un evento de Google «por asignar» (sin paciente
+    <!-- La explicación, que hoy solo vive en el title del botón (BotonNoEsCita.tsx:53), va a la vista (CALMA §29.7).
+         «¿No es una cita?» (BotonNoEsCita.tsx:25,37-58; ProximasCitas.tsx:247-255): SOLO en un evento de Google «por asignar» (sin paciente
          ni reserva por enlace). Un toque, SIN confirmación (BotonNoEsCita.tsx:21): lo deja como evento sin paciente y la fila sale de la lista.
          Si falla, el motivo se dice debajo en role="alert" (noEsCita.ts:21-27): «No se pudo marcar como evento. Vuelve a intentarlo.»,
          «No puedes cambiar este evento.», «Ese evento ya no está en la agenda.», «Este evento ya no está por asignar.» -->
-    <button type="button" class="db-p db-hc-noes">¿No es una cita?</button>
+    <div class="db-hc-noesw"><button type="button" class="db-p db-hc-noes">¿No es una cita?</button>
+      <p class="db-hc-noesx">Dejarlo como evento sin paciente: deja de pedir que se ligue</p></div>
     <ul class="db-hc-l">
       <li class="db-hc-iexp"><button type="button" class="db-p db-hc-a">{ic(FOLDER, 20)}<span>Ver expediente</span></button></li>
     </ul>
+  </div>
+</div>'''
+
+def capa_mas(vp):
+    if vp not in ('ext', 'iv'):
+        return ''
+    return f'''<!-- Menú «Más» (CALMA §28) como tarjeta centrada con velo, copiado de entrega/cromo/vista-1-aviso-perfil.html. -->
+<div class="db-capa db-capa-m" aria-hidden="true">
+  <div class="db-velo"></div>
+  <div class="db-mnw"><div class="db-mn" role="dialog" aria-modal="true" aria-label="Más">
+    <h2 class="db-mn-t">Más</h2>
+    {ap(vp, "mas")}
+{CR.MAS}
+  </div></div>
+</div>'''
+
+def capa_ley(vp):
+    if vp == 'esc':
+        return ''
+    return f'''<!-- Leyenda «Estados» como capa del catálogo: hoja en iPhone, tarjeta centrada con velo en Duo cerrado y Duo abierto. -->
+<div class="db-capa db-capa-l" aria-hidden="true">
+  <div class="db-velo"></div>
+  <div class="db-hoja db-hl" role="dialog" aria-modal="true" aria-label="Estados de una cita">
+    <span class="db-asa" aria-hidden="true"></span>
+    <div class="db-hjcab"><h2>Estados</h2><button type="button" class="db-p db-ib db-hl-x" aria-label="Cerrar">{ic(I["x"], 20, 2)}</button></div>
+    <ul class="db-hl-l">{LEY()}</ul>
   </div>
 </div>'''
 
@@ -493,10 +541,10 @@ def marco(vp):
     elif vp == 'iv':
         app = enc_iv() + cont(vp)
     elif vp == 'ih':
-        app = cont(vp) + lateral()
+        app = cont(vp) + lateral(vp)
     else:
-        app = lateral() + cont(vp)
-    return f'<div class="marco db" data-vp="{vp}">\n<div class="db-app">\n{app}\n</div>\n{capa(vp)}\n{capa_cita(vp)}\n</div>'
+        app = lateral(vp) + cont(vp)
+    return f'<div class="marco db" data-vp="{vp}">\n<div class="db-app">\n{app}\n</div>\n{capa(vp)}\n{capa_cita(vp)}\n{capa_ley(vp)}\n{capa_mas(vp)}\n</div>'
 
 out = ('<!-- NOMBRE: Dashboard | Ahora contesta «¿qué hago ahora?»: arriba, la cita en curso lista para iniciar con el avance del día; debajo, lo que viene después en filas que se tocan enteras y abren la hoja de acciones de la cita, y todo lo demás en segundo plano -->\n'
        '<style>\n' + CSS + '</style>\n' + '\n'.join(marco(v) for v in ('ext', 'tel', 'ih', 'iv', 'esc')) + '\n<script>\n' + JS + '</script>\n')

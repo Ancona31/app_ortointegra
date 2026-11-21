@@ -1,0 +1,345 @@
+/* ===== Capas compartidas (CALMA §25). Todos los selectores empiezan por .PX (el generador pone .ca1….ca4) ===== */
+.PX .PX-app{display:flex;width:100%;height:100%}
+.PX[data-vp="tel"] .PX-app,.PX[data-vp="iv"] .PX-app{flex-direction:column}
+.PX button{border:0;margin:0;padding:0;background:none;color:inherit;text-align:inherit}
+.PX h1,.PX h2,.PX h3,.PX p,.PX ul,.PX ol,.PX dl,.PX dt,.PX dd{margin:0;padding:0;font-weight:inherit}
+.PX ul,.PX ol{list-style:none}
+.PX svg{flex:none;display:block}
+.PX .PX-flex{flex:1}
+.PX .PX-num{font-variant-numeric:tabular-nums}
+.PX [hidden]{display:none!important}
+/* Respuesta al toque (en pointer-down) y foco */
+.PX .PX-p{transition:transform 100ms ease-out,background-color 100ms ease-out}
+.PX .PX-p:active{transform:scale(.97)}
+.PX .PX-p:focus-visible{outline:3px solid var(--enlace);outline-offset:2px}
+.PX .PX-riel .PX-p:focus-visible,.PX .PX-lat .PX-p:focus-visible,.PX .PX-enc .PX-p:focus-visible,.PX .PX-env .PX-p:focus-visible{outline-color:var(--nav-tinta)}
+.PX .PX-card:focus-visible{outline:none}
+
+/* ---- Navegación (copiada del dashboard aprobado) ---- */
+.PX .PX-riel{position:relative;z-index:1;flex:none;width:calc(56px + var(--ir));padding:16px calc(var(--ir) + 8px) calc(var(--ib) + 10px) 8px;background:var(--navy);border-radius:26px 0 0 26px;box-shadow:var(--sombra-nav-der);display:flex;flex-direction:column;align-items:center;gap:8px}
+.PX .PX-rb{width:48px;height:48px;flex:none;border-radius:999px;display:flex;align-items:center;justify-content:center;color:var(--nav-tinta)}
+.PX .PX-rb[aria-current="page"]{background:var(--accion);color:#fff}
+.PX .PX-mas{width:52px;height:52px;flex:none;border-radius:999px;background:#fff;color:var(--accion);display:flex;align-items:center;justify-content:center;box-shadow:var(--sombra-accion)}
+.PX .PX-enc{position:relative;z-index:1;flex:none;display:flex;align-items:center;gap:12px;padding:calc(var(--it) + 8px) 16px 12px;background:var(--navy);border-radius:0 0 26px 26px;box-shadow:var(--sombra-nav-sup);color:#fff}
+.PX .PX-hamb{width:44px;height:44px;flex:none;border-radius:12px;background:var(--nav-velo);color:#fff;display:flex;align-items:center;justify-content:center}
+.PX .PX-enc-t{font-size:17px;line-height:22px;font-weight:700;color:#fff}
+.PX .PX-yo{display:flex;align-items:center;justify-content:center;flex:none;width:44px;height:44px;border-radius:999px;background:var(--nav-avatar);color:var(--navy);font-size:13px;font-weight:700}
+.PX .PX-lat{position:relative;z-index:1;flex:none;display:flex;flex-direction:column;background:var(--navy);color:#fff}
+.PX[data-vp="ih"] .PX-lat{width:calc(218px + var(--ir));padding:16px calc(var(--ir) + 10px) calc(var(--ib) + 10px) 12px;border-radius:26px 0 0 26px;box-shadow:var(--sombra-nav-der)}
+.PX[data-vp="esc"] .PX-lat{width:248px;padding:16px 12px 14px;border-radius:0 26px 26px 0;box-shadow:var(--sombra-nav-izq)}
+.PX .PX-lat-cab{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:36px;padding:0 4px 0 8px}
+.PX .PX-logo{display:inline-flex;align-items:center;gap:8px;color:#fff}
+.PX .PX-logo-n{font-size:17px;line-height:22px;font-weight:700;letter-spacing:-.2px}
+.PX .PX-plan{display:inline-flex;align-items:center;height:24px;padding:0 10px;border-radius:999px;background:var(--nav-velo);color:var(--nav-tinta);font-size:12px;line-height:16px;font-weight:600;white-space:nowrap}
+.PX .PX-cons-b{margin-top:12px;display:flex;align-items:center;gap:10px;min-height:52px;padding:8px 10px;border-radius:14px;background:var(--nav-velo);color:#fff;text-align:left}
+.PX .PX-cons-b svg{color:var(--nav-tinta2)}
+.PX .PX-cons-b .PX-yo{width:34px;height:34px}
+.PX .PX-cons-t{flex:1;min-width:0;display:flex;flex-direction:column}
+.PX .PX-cons-t span{font-size:13px;line-height:16px;color:var(--nav-tinta2)}
+.PX .PX-cons-t b{font-size:15px;line-height:19px;font-weight:600}
+.PX .PX-lista{margin-top:14px;display:flex;flex-direction:column;gap:2px}
+.PX .PX-li{display:flex;align-items:center;gap:12px;height:44px;padding:0 12px;border-radius:12px;color:var(--nav-tinta);font-size:15px;line-height:20px;font-weight:500}
+.PX[data-vp="esc"] .PX-li{height:40px;font-size:14px}
+.PX .PX-li[aria-current="page"]{background:var(--accion);color:#fff;font-weight:600}
+.PX .PX-lat-pie{border-top:1px solid var(--nav-velo);padding-top:8px}
+.PX .PX-lat .PX-yo2{height:48px}
+.PX .PX-yo2>span{display:flex;flex-direction:column;line-height:17px}
+.PX .PX-yo2 small{font-size:12px;line-height:16px;color:var(--nav-tinta2)}
+.PX .PX-env{position:relative;z-index:1;flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:var(--it) 16px 14px;background:var(--navy);border-radius:0 0 26px 26px;box-shadow:var(--sombra-nav-sup);color:#fff}
+.PX .PX-envb{width:44px;height:44px;flex:none;border-radius:999px;background:var(--nav-velo);color:#fff;display:flex;align-items:center;justify-content:center}
+.PX .PX-pista{display:flex;align-items:center;gap:2px;padding:4px;border-radius:26px;background:var(--nav-velo)}
+.PX .PX-pv{display:flex;align-items:center;height:40px;padding:0 13px;border-radius:999px;color:var(--nav-tinta);font-size:15px;line-height:20px;font-weight:500;white-space:nowrap;position:relative}
+.PX .PX-pv::after{content:"";position:absolute;inset:-2px 0}
+.PX .PX-pv[aria-current="page"]{padding:0 15px;background:var(--accion);color:#fff;font-weight:600}
+
+/* ---- Pantalla de fondo (simplificada) ---- */
+.PX .PX-cont{flex:1;min-width:0;min-height:0;overflow-x:hidden;overflow-y:auto;scrollbar-width:none;padding:20px 16px calc(var(--ib) + 24px)}
+.PX[data-vp="ih"] .PX-cont,.PX[data-vp="iv"] .PX-cont{padding:24px 24px calc(var(--ib) + 24px)}
+.PX[data-vp="esc"] .PX-cont{padding:32px 24px}
+.PX .PX-fondo{display:flex;flex-direction:column;gap:24px;max-width:880px}
+.PX[data-vp="iv"] .PX-fondo,.PX[data-vp="esc"] .PX-fondo{gap:28px}
+.PX .PX-cab{display:flex;flex-direction:column;gap:4px;min-width:0}
+.PX .PX-cabf{display:flex;align-items:center;gap:8px;min-height:36px;margin:-8px 0 -4px}
+.PX .PX-volver{position:relative;display:inline-flex;align-items:center;gap:2px;min-height:36px;padding:0 4px 0 0;font-size:13px;line-height:18px;font-weight:600;color:var(--enlace)}
+.PX .PX-volver::after{content:"";position:absolute;inset:-4px -4px}
+.PX .PX-h1{font-size:26px;line-height:31px;font-weight:800;letter-spacing:-.6px;overflow-wrap:anywhere}
+.PX[data-vp="ih"] .PX-h1,.PX[data-vp="iv"] .PX-h1,.PX[data-vp="esc"] .PX-h1{font-size:32px;line-height:38px}
+.PX .PX-sub{font-size:13px;line-height:18px;color:var(--tinta2)}
+.PX .PX-quien{display:flex;align-items:center;gap:12px}
+.PX .PX-tit{display:flex;align-items:center;gap:10px}
+.PX .PX-tit>svg{color:var(--c)}
+.PX .PX-sec{display:flex;flex-direction:column;gap:10px}
+.PX .PX-sec-c{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:4px 12px;min-height:36px}
+.PX .PX-h2{font-size:17px;line-height:22px;font-weight:700}
+.PX .PX-tar{background:var(--sup);border-radius:16px;padding:0 16px}
+.PX[data-vp="ih"] .PX-tar,.PX[data-vp="iv"] .PX-tar,.PX[data-vp="esc"] .PX-tar{border-radius:18px;padding:0 20px}
+.PX .PX-tar>*+*{border-top:1px solid var(--linea)}
+.PX .PX-tar.PX-pad{padding-top:16px;padding-bottom:18px}
+.PX .PX-tar.PX-pad>*+*{border-top:0}
+.PX .PX-fila{display:flex;align-items:center;gap:12px;width:100%;min-height:60px;padding:8px 0;color:var(--tinta);text-align:left}
+.PX[data-vp="ih"] .PX-fila,.PX[data-vp="esc"] .PX-fila{min-height:52px;padding:6px 0}
+.PX .PX-fila:active{transform:none;opacity:.7}
+.PX .PX-fila-w{display:flex;align-items:center;gap:4px}
+.PX .PX-fila-w>.PX-fila{flex:1;min-width:0}
+.PX .PX-fila-t{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.PX .PX-fila-n{font-size:15px;line-height:20px;font-weight:600;overflow-wrap:anywhere}
+.PX .PX-fila-s{font-size:13px;line-height:18px;color:var(--tinta2)}
+.PX .PX-der{flex:none;font-size:13px;line-height:18px;color:var(--tinta2);white-space:nowrap}
+.PX .PX-hora{flex:none;width:48px;font-size:15px;line-height:20px;font-weight:600;font-variant-numeric:tabular-nums}
+.PX .PX-chev{color:var(--tinta3)}
+.PX .PX-dico{color:var(--c)}
+.PX .PX-mal-t{color:var(--mal-tinta)}
+.PX .PX-avt{width:36px;height:36px;flex:none;border-radius:999px;display:flex;align-items:center;justify-content:center;font-size:13px;line-height:16px;font-weight:600;font-variant-numeric:tabular-nums}
+.PX .PX-rot{font-size:13px;line-height:18px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--enlace)}
+.PX .PX-rot+.PX-txt{margin-top:6px}
+.PX .PX-txt+.PX-rot{margin-top:20px}
+.PX .PX-txt{font-size:15px;line-height:22px;text-align:justify;-webkit-hyphens:auto;hyphens:auto}
+.PX .PX-par{display:flex;align-items:baseline;justify-content:space-between;gap:16px;padding:12px 0;font-size:15px;line-height:20px}
+.PX .PX-par dt{color:var(--tinta2)}
+.PX .PX-par dd{text-align:right;overflow-wrap:anywhere;min-width:0}
+.PX .PX-accs{display:flex;justify-content:flex-end;align-items:center;flex-wrap:wrap;gap:8px 16px}
+.PX .PX-campos{display:flex;flex-direction:column;gap:14px}
+.PX .PX-campo{display:flex;flex-direction:column;gap:4px;min-width:0}
+.PX .PX-campo>span{font-size:13px;line-height:18px;font-weight:600;color:var(--tinta2)}
+.PX .PX-in{width:100%;min-width:0;height:44px;padding:0 12px;border:0;border-radius:12px;background:var(--sup2);color:var(--tinta);font:inherit;font-size:16px;outline:none;-webkit-appearance:none;appearance:none}
+.PX .PX-in:focus-visible{outline:2px solid var(--enlace);outline-offset:0}
+.PX[data-vp="esc"] .PX-in,.PX[data-vp="ih"] .PX-in{height:40px;font-size:15px}
+.PX[data-vp] textarea.PX-in{height:120px;padding:12px;line-height:24px;resize:none;display:block}
+.PX[data-vp="esc"] textarea.PX-in,.PX[data-vp="ih"] textarea.PX-in{line-height:22px}
+/* Botones: dibujo menor que el área en la pantalla (CALMA §2); de verdad y de 44 dentro de las capas (§13) */
+.PX .PX-b{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:8px;height:44px;padding:0 16px;border-radius:12px;font-size:15px;line-height:20px;font-weight:600;white-space:nowrap}
+.PX .PX-prim{background:var(--accion);color:#fff}
+.PX .PX-ton{background:var(--tonal);color:var(--tonal-tinta)}
+.PX .PX-qui{background:var(--sup2);color:var(--tinta)}
+.PX .PX-mal{background:var(--mal-fondo);color:var(--mal-tinta)}
+.PX .PX-cont .PX-b{height:40px}
+.PX .PX-cont .PX-b::after{content:"";position:absolute;inset:-2px 0}
+.PX .PX-cont .PX-ton{height:36px;padding:0 14px;font-size:14px}
+.PX .PX-cont .PX-ton::after{inset:-4px 0}
+.PX[data-vp="ih"] .PX-cont .PX-b,.PX[data-vp="esc"] .PX-cont .PX-b{height:36px;padding:0 14px;font-size:14px}
+.PX[data-vp="ih"] .PX-cont .PX-ton,.PX[data-vp="esc"] .PX-cont .PX-ton{height:32px;padding:0 12px}
+.PX[data-vp="ih"] .PX-cont .PX-b::after,.PX[data-vp="esc"] .PX-cont .PX-b::after{inset:-2px 0}
+.PX .PX-tx{position:relative;display:inline-flex;align-items:center;gap:4px;min-height:44px;padding:0 4px;font-size:15px;line-height:20px;font-weight:600;color:var(--enlace);white-space:nowrap}
+.PX[data-vp="ih"] .PX-tx,.PX[data-vp="esc"] .PX-tx{min-height:36px;font-size:14px}
+.PX .PX-ib{width:44px;height:44px;flex:none;border-radius:999px;display:flex;align-items:center;justify-content:center;color:var(--tinta2)}
+.PX .PX-ib:active{background:var(--sup2)}
+.PX[data-vp="ih"] .PX-ib,.PX[data-vp="esc"] .PX-ib{width:36px;height:36px}
+.PX .PX-fecha{width:52px;flex:none;display:flex;flex-direction:column;align-items:center;padding:6px 0;border-radius:12px;background:var(--fondo)}
+.PX .PX-mes{font-size:11px;line-height:14px;font-weight:700;letter-spacing:.4px;color:var(--mes)}
+.PX .PX-dia{font-size:20px;line-height:24px;font-weight:700;color:var(--tinta);font-variant-numeric:tabular-nums}
+/* Estados de cita: icono en círculo de color (CALMA §24.4) */
+.PX .PX-est{display:inline-flex;align-items:center;gap:6px;flex:none;font-size:12px;line-height:16px;font-weight:600;white-space:nowrap}
+.PX .PX-est-c{width:26px;height:26px;flex:none;border-radius:999px;display:flex;align-items:center;justify-content:center}
+.PX .PX-est-conf .PX-est-c{background:var(--tonal);color:var(--enlace)}
+.PX .PX-est-conf .PX-est-t{color:var(--tonal-tinta)}
+.PX .PX-est-ag .PX-est-c{background:var(--ag-fondo);color:var(--ag-tinta)}
+.PX .PX-est-ag .PX-est-t{color:var(--ag-tinta)}
+.PX .PX-est-canc .PX-est-c{background:var(--mal-fondo);color:var(--mal-tinta)}
+.PX .PX-est-canc .PX-est-t{color:var(--mal-tinta)}
+.PX .PX-est-noas .PX-est-c{background:var(--sup2);color:var(--tinta2)}
+.PX .PX-est-noas .PX-est-t{color:var(--tinta2)}
+.PX .PX-est-aten .PX-est-c{background:var(--ok-fondo);color:var(--ok-tinta)}
+.PX .PX-est-aten .PX-est-t{color:var(--ok-tinta)}
+.PX .PX-marca{display:inline-flex;align-items:center;gap:4px;font-size:13px;line-height:18px;font-weight:600;color:var(--tinta2);white-space:nowrap}
+.PX .PX-estb{display:inline-flex;align-items:center;gap:2px;height:44px;padding:0 4px;font-size:13px;line-height:18px;font-weight:600;color:var(--tinta2)}
+.PX[data-vp="ih"] .PX-estb,.PX[data-vp="esc"] .PX-estb{height:36px}
+
+/* ======================= CAPAS ======================= */
+/* Un solo velo por marco, con desenfoque (CALMA §13). Su opacidad la escribe el guion fotograma a fotograma desde el progreso de la capa. */
+.PX .PX-velo{position:absolute;inset:0;z-index:20;background:var(--velo);-webkit-backdrop-filter:blur(10px) saturate(140%);backdrop-filter:blur(10px) saturate(140%);opacity:0;visibility:hidden}
+.PX .PX-capa{position:absolute;z-index:21;display:flex;pointer-events:none;visibility:hidden}
+.PX .PX-capa.PX-vis{visibility:visible}
+.PX .PX-card{position:relative;pointer-events:auto;display:flex;flex-direction:column;min-height:0;background:var(--sup);color:var(--tinta);box-shadow:var(--sombra-capa);opacity:0;outline:none;will-change:transform,opacity}
+/* Modo «centro»: alerta y modal centrados en el área de contenido; en Duo abierto se cruza la bisagra (§18) */
+.PX .PX-capa[data-modo="centro"]{align-items:center;justify-content:center;padding:16px}
+.PX[data-vp="ext"] .PX-capa[data-modo="centro"]{inset:0 calc(56px + var(--ir)) var(--ib) 0;padding:8px}
+.PX[data-vp="ext"] .PX-al{width:310px}
+/* CALMA §26: en Duo cerrado toda capa es tarjeta centrada en el área de contenido: ancho máx. 310 (margen 8), alto máx. área − 32 */
+.PX[data-vp="ext"] .PX-capa[data-modo="centro"]>.PX-card{width:310px;max-height:calc(100% - 16px)}
+.PX[data-vp="ext"] .PX-capa[data-modo="centro"]>.PX-card.PX-mn{width:280px}
+.PX[data-vp="ext"] .PX-capa[data-modo="centro"] .PX-hcab{padding:12px 8px 4px 20px}
+.PX[data-vp="ext"] .PX-capa[data-modo="centro"] .PX-hcu{padding:8px 20px 20px}
+.PX[data-vp="ext"] .PX-capa[data-modo="centro"] .PX-hpie{padding:12px 16px 16px}
+.PX[data-vp="ext"] .PX-capa[data-modo="centro"] .PX-hpie>.PX-b{flex:1 1 auto;min-width:0;padding:0 12px}
+.PX[data-vp="ext"] .PX-capa[data-modo="centro"] .PX-hc{padding:14px 16px 16px}
+.PX[data-vp="ext"] .PX-capa[data-modo="centro"] .PX-pl .PX-hcu{padding:0 8px 8px}
+.PX[data-vp="tel"] .PX-capa[data-modo="centro"]{inset:var(--it) 0 var(--ib) 0}
+.PX[data-vp="ih"] .PX-capa[data-modo="centro"]{inset:0 calc(218px + var(--ir)) var(--ib) 0;padding:24px}
+.PX[data-vp="iv"] .PX-capa[data-modo="centro"]{inset:var(--it) 0 var(--ib) 0;padding:24px}
+.PX[data-vp="esc"] .PX-capa[data-modo="centro"]{inset:0 0 0 248px;padding:32px}
+.PX .PX-capa[data-modo="centro"]>.PX-card{border-radius:20px;max-width:100%;max-height:100%}
+.PX .PX-capa[data-modo="centro"] .PX-w400{width:400px}
+.PX .PX-capa[data-modo="centro"] .PX-w440{width:440px}
+.PX .PX-capa[data-modo="centro"] .PX-w480{width:480px}
+.PX .PX-capa[data-modo="centro"] .PX-w520{width:520px}
+.PX .PX-capa[data-modo="centro"] .PX-w640{width:640px}
+/* Modo «hoja» (solo iPhone desde CALMA §26): sube del borde inferior. 80 px de reserva bajo el borde para el rebote y el rubber-band */
+.PX .PX-capa[data-modo="hoja"]{left:0;bottom:0;align-items:flex-end}
+.PX[data-vp="ext"] .PX-capa[data-modo="hoja"]{top:16px;right:calc(56px + var(--ir))}
+.PX[data-vp="tel"] .PX-capa[data-modo="hoja"]{top:calc(var(--it) + 16px);right:0}
+.PX .PX-capa[data-modo="hoja"]>.PX-card{width:100%;max-height:calc(100% + 80px);margin-bottom:-80px;padding-bottom:calc(var(--ib) + 80px);border-radius:22px 22px 0 0;touch-action:none;-webkit-user-select:none;user-select:none}
+/* Modo «pop» (solo computadora): menú que nace de su botón, sin velo (§21) */
+.PX .PX-capa[data-modo="pop"]{inset:0}
+.PX .PX-capa[data-modo="pop"]>.PX-card{position:absolute;left:0;top:0;width:248px;padding:6px;border-radius:14px;box-shadow:var(--sombra-capa),0 0 0 1px var(--linea)}
+/* Piezas internas */
+.PX .PX-asa{display:none;flex:none;width:36px;height:5px;border-radius:999px;background:var(--borde);margin:8px auto 2px}
+.PX .PX-capa[data-modo="hoja"] .PX-asa{display:block}
+.PX .PX-hcab{flex:none;display:flex;align-items:flex-start;gap:12px;padding:4px 8px 4px 20px}
+.PX .PX-hcab>div{flex:1;min-width:0;padding:10px 0 2px}
+.PX .PX-hcab.PX-sinx>div{padding-right:12px}
+.PX .PX-hcab h2{font-size:17px;line-height:22px;font-weight:700;overflow-wrap:anywhere}
+.PX .PX-hcab .PX-sub{margin-top:2px}
+.PX .PX-hcab .PX-ib{margin-top:4px}
+.PX .PX-capa[data-modo="centro"] .PX-hcab{padding:12px 12px 4px 24px}
+.PX .PX-capa[data-modo="centro"] .PX-hcab .PX-ib{margin-top:2px}
+.PX .PX-hcu{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none;padding:8px 20px 16px;touch-action:pan-y}
+.PX .PX-capa[data-modo="centro"] .PX-hcu{padding:8px 24px 24px}
+.PX .PX-hpie{flex:none;display:flex;align-items:center;gap:10px;padding:12px 20px 4px;box-shadow:0 -1px 0 var(--linea)}
+.PX .PX-hpie.PX-sinl{box-shadow:none;padding-top:0}
+.PX .PX-capa[data-modo="hoja"] .PX-hpie>.PX-b{flex:1 1 auto;min-width:0;padding:0 12px}
+.PX .PX-sugl{margin:8px -12px 0}
+.PX .PX-sugl .PX-rot{margin-top:8px;padding:0 12px}
+.PX .PX-capa[data-modo="centro"] .PX-hpie{justify-content:flex-end;padding:12px 24px 20px}
+.PX .PX-capa[data-modo="centro"] .PX-hpie.PX-sinl{padding-top:0}
+.PX .PX-capa[data-modo="centro"] .PX-hpie>.PX-b{flex:none;min-width:104px}
+.PX[data-vp="iv"] .PX-capa[data-modo="centro"] .PX-hpie{justify-content:center}
+.PX[data-vp="ih"] .PX-capa .PX-b,.PX[data-vp="esc"] .PX-capa .PX-b{height:40px;font-size:14px}
+.PX .PX-avis{font-size:14px;line-height:20px;color:var(--tinta2);text-align:justify;-webkit-hyphens:auto;hyphens:auto}
+.PX .PX-ferr{margin-top:8px;font-size:13px;line-height:18px;font-weight:600;color:var(--mal-tinta)}
+.PX .PX-hcu>.PX-in,.PX .PX-hcu>.PX-campos{margin-top:14px}
+
+/* ---- Alerta (patrón único, CALMA §13/§21/§23.3) ---- */
+.PX .PX-al{width:320px;padding:24px;text-align:center}
+.PX[data-vp="ih"] .PX-al,.PX[data-vp="iv"] .PX-al,.PX[data-vp="esc"] .PX-al{width:340px}
+.PX .PX-al-i{flex:none;width:48px;height:48px;margin:0 auto 12px;border-radius:999px;display:flex;align-items:center;justify-content:center}
+.PX .PX-i-ton{background:var(--tonal);color:var(--enlace)}
+.PX .PX-i-mal{background:var(--mal-fondo);color:var(--mal-tinta)}
+.PX .PX-i-ag{background:var(--ag-fondo);color:var(--ag-tinta)}
+.PX .PX-al h2{font-size:17px;line-height:22px;font-weight:700}
+.PX .PX-al-t{margin-top:8px;font-size:14px;line-height:20px;color:var(--tinta2);text-align:justify;text-align-last:center;-webkit-hyphens:auto;hyphens:auto}
+.PX .PX-al-t.PX-cen{text-align:center;-webkit-hyphens:manual;hyphens:manual;text-wrap:balance}
+.PX .PX-al-t.PX-izq{text-align:left;text-align-last:auto;-webkit-hyphens:manual;hyphens:manual}
+.PX .PX-al-t b{color:var(--tinta);font-weight:600}
+.PX .PX-al-t .PX-num{white-space:nowrap}
+.PX .PX-al-b{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;margin-top:20px}
+.PX .PX-al-b.PX-uno,.PX .PX-al-b.PX-pila{grid-template-columns:minmax(0,1fr)}
+.PX .PX-al-b.PX-pila{gap:8px}
+.PX .PX-al-b .PX-b{width:100%;min-width:0;padding:0 12px}
+.PX .PX-al-b.PX-pila .PX-b{height:auto;min-height:44px;padding:10px 12px;white-space:normal;text-align:center}
+.PX[data-vp="ih"] .PX-al-b.PX-pila .PX-b,.PX[data-vp="esc"] .PX-al-b.PX-pila .PX-b{min-height:40px;padding:9px 12px;line-height:20px}
+.PX .PX-pila .PX-pri{order:-1}
+
+/* ---- Menú ---- */
+.PX .PX-mn{padding:0 8px}
+.PX .PX-capa[data-modo="centro"] .PX-mn{width:280px;padding:8px;border-radius:18px}
+.PX .PX-mn-t{padding:10px 12px 6px;font-size:17px;line-height:22px;font-weight:700}
+.PX .PX-capa[data-modo="centro"] .PX-mn-t{padding:8px 12px 6px}
+.PX .PX-capa[data-modo="pop"] .PX-mn-t{display:none}
+.PX .PX-mi{display:flex;align-items:center;gap:12px;width:100%;min-height:48px;padding:6px 12px;border-radius:12px;font-size:15px;line-height:20px;color:var(--tinta);text-align:left}
+.PX .PX-mi:active{transform:none;background:var(--fondo)}
+.PX .PX-mi>.PX-mic{display:flex;width:20px;height:20px;color:var(--enlace)}
+.PX .PX-mi>.PX-mt{flex:1;min-width:0;display:flex;flex-direction:column}
+.PX .PX-mi small{font-size:13px;line-height:18px;color:var(--tinta2)}
+.PX .PX-mi-mal,.PX .PX-mi-mal>.PX-mic{color:var(--mal-tinta)}
+.PX .PX-mi .PX-chk{color:var(--enlace);opacity:0}
+.PX .PX-mi[aria-checked="true"]{font-weight:600}
+.PX .PX-mi[aria-checked="true"] .PX-chk{opacity:1}
+.PX .PX-msep{display:block;height:1px;margin:6px 12px;background:var(--linea)}
+.PX .PX-capa[data-modo="centro"] .PX-mi{min-height:44px;border-radius:10px}
+.PX[data-vp="iv"] .PX-capa[data-modo="centro"] .PX-mi{min-height:48px}
+.PX .PX-capa[data-modo="pop"] .PX-mi{min-height:38px;gap:10px;padding:4px 10px;border-radius:9px;font-size:14px}
+.PX .PX-capa[data-modo="pop"] .PX-mi:hover{background:var(--fondo)}
+.PX .PX-capa[data-modo="pop"] .PX-mic,.PX .PX-capa[data-modo="pop"] .PX-mic svg{width:18px;height:18px}
+.PX .PX-capa[data-modo="pop"] .PX-msep{margin:4px 10px}
+/* Leyenda (solo lectura) */
+.PX .PX-ley{display:flex;flex-direction:column;padding:2px 12px 8px}
+.PX .PX-ley li{display:flex;align-items:center;min-height:44px}
+.PX .PX-ley li+li{border-top:1px solid var(--linea)}
+.PX .PX-ley .PX-est{font-size:15px;line-height:20px;gap:12px}
+.PX .PX-capa[data-modo="pop"] .PX-ley{padding:4px 8px}
+.PX .PX-capa[data-modo="pop"] .PX-ley li{min-height:36px}
+.PX .PX-capa[data-modo="pop"] .PX-ley li+li{border-top:0}
+.PX .PX-capa[data-modo="pop"] .PX-ley .PX-est{font-size:13px;line-height:18px;gap:8px}
+.PX .PX-capa[data-modo="pop"] .PX-ley .PX-est-c{width:24px;height:24px}
+.PX .PX-capa[data-modo="pop"]>.PX-card.PX-wley{width:180px}
+.PX .PX-capa[data-modo="pop"]>.PX-card.PX-word{width:232px}
+
+/* ---- Rejilla «Tipo de documento» (CALMA §9, §13, §21) ---- */
+.PX .PX-rej{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.PX[data-vp="ih"] .PX-rej,.PX[data-vp="iv"] .PX-rej,.PX[data-vp="esc"] .PX-rej{grid-template-columns:repeat(4,minmax(0,1fr))}
+.PX .PX-az{display:flex;flex-direction:column;align-items:flex-start;gap:10px;min-width:0;min-height:84px;padding:12px;border-radius:14px;background:var(--sup2);font-size:14px;line-height:18px;color:var(--tinta);text-align:left}
+.PX[data-vp="ih"] .PX-az,.PX[data-vp="iv"] .PX-az,.PX[data-vp="esc"] .PX-az{min-height:88px}
+.PX .PX-az[aria-current="true"]{box-shadow:inset 0 0 0 2px var(--accion)}
+.PX .PX-az>span:last-child{max-width:100%;min-width:0;-webkit-hyphens:auto;hyphens:auto;overflow-wrap:anywhere}
+.PX .PX-az-i{width:32px;height:32px;flex:none;border-radius:9px;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--c) var(--d-mezcla),var(--sup));color:var(--c)}
+
+/* ---- Hoja de acciones de la cita (del dashboard aprobado) ---- */
+.PX .PX-hc{gap:14px;padding:0 16px}
+.PX .PX-capa[data-modo="centro"] .PX-hc{padding:16px 20px 20px}
+.PX .PX-hc-cab{display:flex;align-items:flex-start;gap:12px;padding-top:6px}
+.PX .PX-hc-q{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.PX .PX-hc-n{font-size:20px;line-height:25px;font-weight:700;letter-spacing:-.3px;overflow-wrap:anywhere}
+.PX .PX-hc-d{font-size:13px;line-height:18px;color:var(--tinta2)}
+.PX .PX-hc-x{margin:-2px -4px 0 0}
+.PX .PX-hc-et{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;margin-top:-2px}
+.PX .PX-hc-et .PX-est-c{width:24px;height:24px}
+.PX .PX-hc .PX-prim{width:100%}
+.PX .PX-hc-l{display:flex;flex-direction:column;margin-top:-2px}
+.PX .PX-hc-l>li{border-top:1px solid var(--linea)}
+.PX .PX-hc-a{display:flex;align-items:center;gap:14px;width:100%;min-height:48px;padding:0 4px;border-radius:12px;text-align:left;font-size:16px;line-height:20px;color:var(--tinta)}
+.PX[data-vp="ih"] .PX-hc-a,.PX[data-vp="esc"] .PX-hc-a{min-height:44px;font-size:15px}
+.PX .PX-hc-a svg{color:var(--enlace)}
+.PX .PX-hc-a:active{transform:none;background:var(--fondo)}
+
+/* ---- Plantillas: lista para elegir ---- */
+.PX .PX-capa[data-modo="hoja"] .PX-pl .PX-hcu{padding:0 8px 8px}
+.PX .PX-capa[data-modo="centro"] .PX-pl .PX-hcu{padding:0 12px 12px}
+.PX .PX-pl .PX-mi .PX-chk{margin-left:auto}
+
+/* ---- Vista previa de PDF ---- */
+.PX .PX-pdfz{display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px;border-radius:14px;background:var(--sup2)}
+.PX .PX-pag{width:100%;max-width:420px;aspect-ratio:8.5/11;background:#fff;color:var(--navy);border-radius:4px;box-shadow:0 0 0 1px var(--borde);padding:22px 20px;display:flex;flex-direction:column;gap:10px;font-size:12px;line-height:16px;text-align:left}
+.PX .PX-pag b{font-weight:700}
+.PX .PX-pag-c{display:flex;align-items:flex-start;gap:8px;padding-bottom:10px;border-bottom:1px solid color-mix(in srgb,var(--navy) 18%,#fff)}
+.PX .PX-pag-c b{display:block;font-size:14px;line-height:18px}
+.PX .PX-pag .PX-g2{color:color-mix(in srgb,var(--navy) 62%,#fff)}
+.PX .PX-pag-rx{font-size:14px;line-height:18px;font-weight:800;letter-spacing:.4px}
+.PX .PX-pag ol{display:flex;flex-direction:column;gap:8px;list-style:decimal;padding-left:18px}
+.PX .PX-pag-f{margin-top:auto;padding-top:20px;text-align:center}
+.PX .PX-pag-f>span{display:block;width:60%;margin:0 auto 4px;border-top:1px solid var(--navy)}
+.PX .PX-pagn{font-size:12px;line-height:16px;color:var(--tinta2)}
+
+/* ---- Interruptores de accesibilidad de la maqueta (además de las media queries) ---- */
+.PX.PX-rt .PX-velo{-webkit-backdrop-filter:none;backdrop-filter:none;background:color-mix(in srgb,var(--navy) 45%,var(--fondo))}
+@media (prefers-reduced-transparency:reduce){
+  .PX .PX-velo{-webkit-backdrop-filter:none;backdrop-filter:none;background:color-mix(in srgb,var(--navy) 45%,var(--fondo))}
+}
+.PX.PX-rm .PX-p{transition:none}
+@media (prefers-reduced-motion:reduce){
+  .PX .PX-p{transition:none}
+}
+
+/* ---- Tira de maqueta y ficha «Especificación», FUERA del marco (no dependen de .marco) ---- */
+.PX-tira{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:10px}
+.PX-tira button{position:relative;height:28px;padding:0 10px;border-radius:999px;border:1px dashed var(--tinta3);background:none;color:var(--tinta2);font:600 12px/16px var(--fuente);white-space:nowrap;cursor:pointer;transition:transform 100ms ease-out}
+.PX-tira button::after{content:"";position:absolute;inset:-4px 0}
+.PX-tira button:active{transform:scale(.97)}
+.PX-tira button:focus-visible{outline:3px solid var(--enlace);outline-offset:2px}
+.PX-tira button[aria-pressed="true"]{border-style:solid;background:var(--sup2);color:var(--tinta)}
+.PX-tira .PX-tsep{width:1px;height:18px;background:var(--borde);margin:0 2px}
+.PX-ficha{background:var(--sup);border-radius:18px;padding:16px 20px 18px;font:13px/18px var(--fuente);color:var(--tinta);max-width:100%;overflow-x:auto}
+.PX-ficha h3{margin:0 0 8px;font-size:15px;line-height:20px;font-weight:700}
+.PX-ficha p{margin:0 0 8px;color:var(--tinta2)}
+.PX-ficha table{border-collapse:collapse;width:100%;margin:4px 0 12px;font-size:12px;line-height:16px}
+.PX-ficha th,.PX-ficha td{padding:6px 8px 6px 0;border-top:1px solid var(--linea);text-align:left;vertical-align:top}
+.PX-ficha thead th{border-top:0;color:var(--tinta2);font-weight:600}
+.PX-ficha tbody th{color:var(--tinta2);font-weight:600;white-space:nowrap}
+.PX-ficha dl{margin:0;display:grid;grid-template-columns:max-content minmax(0,1fr);gap:6px 14px}
+.PX-ficha dt{color:var(--tinta2);font-weight:600}
+.PX-ficha dd{margin:0}
+.PX-ficha b{font-weight:600}
+
+/* Rejilla en Duo cerrado: dos columnas en 310; menos relleno para que «Suplementación» quepa entera */
+.PX[data-vp="ext"] .PX-capa[data-modo="centro"] .PX-hcu:has(.PX-rej){padding:8px 16px 16px}
+.PX[data-vp="ext"] .PX-rej{gap:8px}
+.PX[data-vp="ext"] .PX-az{padding:12px 10px}

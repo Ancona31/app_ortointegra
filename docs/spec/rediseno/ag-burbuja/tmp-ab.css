@@ -1,0 +1,243 @@
+/* ===== Agenda fase 2 · burbuja de cita y burbuja de alta. Prefijo .ab (lo de arriba es la base .ag0, copiada tal cual) ===== */
+/* ---------- Capas: contenedores sobre .ag0-capa / .ag0-cj de la base ---------- */
+.ab .ab-h{padding:0}
+.ab .ab-bucj,.ab .ab-altacj{width:400px}
+.ab[data-vp="ext"] .ab-bucj,.ab[data-vp="ext"] .ab-altacj,.ab[data-vp="ext"] .ab-mocj{width:310px}
+.ab[data-vp="esc"] .ab-bucj.ag0-anc,.ab[data-vp="esc"] .ab-altacj.ag0-anc{width:360px;border-radius:18px;box-shadow:var(--sombra-capa),0 0 0 1px var(--linea);max-height:calc(100% - 16px)}
+.ab .ab-sv>.ag0-velo{opacity:0}
+.ab .ab-paso>.ag0-velo{pointer-events:none}
+.ab .ab-mocj{width:440px}
+.ab[data-vp="ih"] .ab-mocj.ab-w480,.ab[data-vp="iv"] .ab-mocj.ab-w480,.ab[data-vp="esc"] .ab-mocj.ab-w480{width:480px}
+.ab .ab-mocj>.ab-h,.ab .ab-fscj>.ab-h{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;overflow:hidden}
+.ab[data-vp="tel"] .ab-mocj{width:auto}
+/* Alerta: centrada también en iPhone (catálogo: no es hoja) */
+.ab .ab-cjal{width:340px;border-radius:20px}
+.ab[data-vp="ext"] .ab-cjal{width:310px}
+.ab[data-vp="tel"] .ab-cjal{left:50%;right:auto;bottom:auto;top:calc(var(--it) + (852px - var(--it) - var(--ib)) / 2);translate:-50% -50%;width:320px;max-width:calc(100% - 32px);border-radius:20px;padding-bottom:0;opacity:0;transform:scale(.96);transition:opacity 160ms ease-in,transform 200ms ease-in}
+.ab[data-vp="tel"] .ag0-on>.ab-cjal{opacity:1;transform:none;transition:opacity 220ms ease-out,transform 520ms linear(0,.009,.035,.075,.124,.181,.243,.305,.367,.427,.484,.537,.587,.632,.674,.711,.745,.776,.803,.828,.849,.868,.885,.9,.913,.925,.935,.944,.951,.958,.964,.969,.974,.977,.981,.984,.986,.988,.99,.992,.993,.994,.995,.996,.997,.998,1)}
+.ab[data-vp="tel"] .ab-cjal .ag0-asa{display:none}
+/* Pantalla completa (formulario de «Agendar» en Duo cerrado e iPhone): sube desde abajo, sin velo */
+.ab .ag0-capa[data-capa="fs"]>.ag0-velo{display:none}
+.ab .ab-fscj{left:0;top:0;bottom:0;translate:none;width:calc(466px - 56px - var(--ir));max-width:none;max-height:none;border-radius:0;opacity:1;transform:translateY(100%);transition:transform 240ms cubic-bezier(.4,0,1,1)}
+.ab[data-vp="tel"] .ab-fscj{right:0;width:auto;top:0;padding-bottom:0;max-height:none;border-radius:0;transform:translateY(100%)}
+.ab .ag0-on>.ab-fscj,.ab[data-vp="tel"] .ag0-on>.ab-fscj{opacity:1;transform:none;transition:transform 560ms linear(0,.009,.035,.075,.124,.181,.243,.305,.367,.427,.484,.537,.587,.632,.674,.711,.745,.776,.803,.828,.849,.868,.885,.9,.913,.925,.935,.944,.951,.958,.964,.969,.974,.977,.981,.984,.986,.988,.99,.992,.993,.994,.995,.996,.997,.998,1)}
+.ab .ab-fscj .ag0-asa{display:none}
+.ab .ab-fsw{display:flex;flex-direction:column;flex:1;min-height:0}
+.ab[data-vp="tel"] .ab-fsw{padding-top:var(--it)}
+.ab .ab-fsw>.ab-mp{padding-bottom:calc(var(--ib) + 8px)}
+/* Arrastre de la hoja (iPhone): el guion escribe el transform; sin transición mientras el dedo manda */
+.ab .ag0-cj.ab-arr{transition:none!important}
+
+/* ---------- Burbuja: lo que la muestra de la base no traía ---------- */
+.ab .ab-tz{display:block;font-size:13px;line-height:18px;color:var(--tinta2);font-variant-numeric:tabular-nums}
+.ab .ab-msg{margin:2px 16px 6px 48px;font-size:13px;line-height:18px;color:var(--tinta2)}
+.ab[data-vp="ih"] .ab-msg,.ab[data-vp="iv"] .ab-msg,.ab[data-vp="esc"] .ab-msg{margin-left:52px;margin-right:20px}
+.ab .ab-msg.ab-msg-mal{color:var(--mal-tinta);font-weight:600}
+.ab .ab-msg.ab-msg-a{margin-left:48px}
+.ab .ab-sub .ag0-op>svg{width:18px;height:18px}
+.ab .ab-fin{display:block;height:2px}
+.ab .ag0-bu-obs{cursor:default}
+/* La burbuja anclada en computadora no necesita tanto aire arriba */
+.ab[data-vp="esc"] .ab-bucj .ag0-bu{padding-top:4px}
+
+/* ---------- Botones (catálogo §13: de verdad dentro de las capas) ---------- */
+.ab .ab-b{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:8px;height:44px;padding:0 16px;border-radius:12px;font-size:15px;line-height:20px;font-weight:600;white-space:nowrap}
+.ab[data-vp="ih"] .ab-b,.ab[data-vp="esc"] .ab-b{height:40px;font-size:14px}
+.ab .ab-prim{background:var(--accion);color:#fff}
+.ab .ab-ton{background:var(--tonal);color:var(--tonal-tinta)}
+.ab .ab-qui{background:var(--sup2);color:var(--tinta)}
+.ab .ab-mal{background:var(--mal-fondo);color:var(--mal-tinta)}
+.ab .ab-b[disabled],.ab .ab-b[aria-disabled="true"]{opacity:.5}
+.ab .ab-b.ab-tx{height:44px;padding:0 4px;background:none;color:var(--enlace);gap:6px}
+.ab[data-vp="ih"] .ab-b.ab-tx,.ab[data-vp="esc"] .ab-b.ab-tx{height:36px}
+.ab .ab-tx-d{align-self:flex-start;font-size:14px}
+.ab .ab-ancho{width:100%}
+.ab .ab-centro{align-self:center}
+
+/* ---------- Modal (cabecera, cuerpo que se desplaza, pie fijo) ---------- */
+.ab .ab-mo{display:flex;flex-direction:column;flex:1 1 auto;min-height:0}
+.ab .ab-mc{flex:none;display:flex;align-items:flex-start;gap:12px;padding:16px 12px 8px 24px}
+.ab[data-vp="ext"] .ab-mc,.ab[data-vp="tel"] .ab-mc{padding:12px 8px 6px 20px}
+.ab .ab-mc>div{flex:1;min-width:0;padding-top:8px}
+.ab .ab-mc h2{font-size:17px;line-height:22px;font-weight:700;overflow-wrap:anywhere}
+.ab .ab-mc p{margin-top:2px;font-size:13px;line-height:18px;color:var(--tinta2)}
+.ab .ab-mi{flex:none;width:36px;height:36px;margin-top:2px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:var(--tonal);color:var(--enlace)}
+.ab .ab-mi.ab-mi-q{background:var(--sup2);color:var(--tinta2)}
+.ab .ab-mb{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none;padding:8px 24px 20px;display:flex;flex-direction:column;gap:14px}
+.ab[data-vp="ext"] .ab-mb,.ab[data-vp="tel"] .ab-mb{padding:8px 20px 16px}
+.ab .ab-mp{flex:none;display:flex;justify-content:flex-end;align-items:center;gap:10px;padding:12px 24px 20px;box-shadow:0 -1px 0 var(--linea)}
+.ab .ab-mp>.ab-b{min-width:104px}
+.ab[data-vp="iv"] .ab-mp{justify-content:center}
+.ab[data-vp="ext"] .ab-mp,.ab[data-vp="tel"] .ab-mp{padding:12px 16px 16px}
+.ab[data-vp="ext"] .ab-mp>.ab-b,.ab[data-vp="tel"] .ab-mp>.ab-b{flex:1 1 0;min-width:0;padding:0 10px}
+.ab[data-vp="tel"] .ab-mocj .ab-mp{padding-bottom:4px}
+.ab .ab-txt{font-size:14px;line-height:20px;color:var(--tinta2);text-align:justify;-webkit-hyphens:auto;hyphens:auto}
+.ab .ab-txt b{color:var(--tinta);font-weight:600}
+/* Caja punteada (sin uso) */
+.ab .ab-hd{border:1.5px dashed var(--borde);border-radius:14px;padding:14px 16px;font-size:14px;line-height:20px;color:var(--tinta2);text-align:justify;-webkit-hyphens:auto;hyphens:auto}
+.ab .ab-hd b{color:var(--tinta);font-weight:600}
+
+/* ---------- Alerta (patrón único) ---------- */
+.ab .ab-al{padding:24px;text-align:center}
+.ab .ab-al-i{width:48px;height:48px;margin:0 auto 12px;border-radius:999px;display:flex;align-items:center;justify-content:center}
+.ab .ab-i-mal{background:var(--mal-fondo);color:var(--mal-tinta)}
+.ab .ab-i-ag{background:var(--ag-fondo);color:var(--ag-tinta)}
+.ab .ab-i-ton{background:var(--tonal);color:var(--enlace)}
+.ab .ab-al h2{font-size:17px;line-height:22px;font-weight:700;overflow-wrap:anywhere;text-wrap:balance}
+.ab .ab-al-t{margin-top:8px;font-size:14px;line-height:20px;color:var(--tinta2);text-align:justify;text-align-last:center;-webkit-hyphens:auto;hyphens:auto}
+.ab .ab-al-b{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;margin-top:20px}
+.ab .ab-al-b .ab-b{width:100%;min-width:0;padding:0 12px}
+.ab .ab-al-b.ab-pila{grid-template-columns:minmax(0,1fr);gap:8px}
+.ab .ab-al-b.ab-pila .ab-b{height:auto;min-height:44px;padding:10px 12px;white-space:normal}
+.ab[data-vp="ih"] .ab-al-b.ab-pila .ab-b,.ab[data-vp="esc"] .ab-al-b.ab-pila .ab-b{min-height:40px;padding:9px 12px}
+
+/* ---------- ¿Asistió el paciente? ---------- */
+.ab .ab-pal{display:flex;flex-direction:column}
+.ab .ab-pa{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 12px;padding:12px 0;border-top:1px solid var(--linea)}
+.ab .ab-pa:first-child{border-top:0;padding-top:4px}
+.ab .ab-pa-t{display:flex;flex-direction:column;min-width:0}
+.ab .ab-pa-t b{font-size:15px;line-height:20px;font-weight:600}
+.ab .ab-pa-t span{font-size:13px;line-height:18px;color:var(--tinta2)}
+.ab .ab-pa-b{display:flex;gap:8px}
+.ab .ab-pa-b .ab-b{height:36px;padding:0 14px;font-size:14px}
+.ab .ab-pa-b .ab-b::after{content:"";position:absolute;inset:-4px 0}
+.ab[data-vp="ih"] .ab-pa-b .ab-b,.ab[data-vp="esc"] .ab-pa-b .ab-b{height:36px}
+.ab[data-vp="ih"] .ab-pa-b .ab-b::after,.ab[data-vp="esc"] .ab-pa-b .ab-b::after{inset:0}
+.ab[data-vp="ext"] .ab-pa-b{width:100%}
+.ab[data-vp="ext"] .ab-pa-b .ab-b{flex:1}
+
+/* ---------- Campos ---------- */
+.ab .ab-campo{display:flex;flex-direction:column;gap:6px;min-width:0}
+.ab .ab-campo>span{font-size:13px;line-height:18px;font-weight:600;color:var(--tinta2)}
+.ab .ab-req{font-style:normal;color:var(--mal-tinta)}
+.ab .ab-in{width:100%;min-width:0;height:44px;padding:0 12px;border:0;border-radius:12px;background:var(--sup2);color:var(--tinta);font:inherit;font-size:16px;line-height:20px;outline:none;-webkit-appearance:none;appearance:none}
+.ab .ab-in::placeholder{color:var(--tinta3)}
+.ab .ab-in:focus-visible,.ab .ab-in:focus{outline:2px solid var(--enlace);outline-offset:0}
+.ab[data-vp="esc"] .ab-in{height:40px;font-size:15px}
+.ab[data-vp="ih"] .ab-in{height:44px}
+.ab .ab-ta{height:auto;min-height:72px;padding:12px;resize:none;display:block}
+.ab .ab-sel{padding-right:36px;background-image:linear-gradient(45deg,transparent 50%,var(--tinta2) 50%),linear-gradient(135deg,var(--tinta2) 50%,transparent 50%);background-position:calc(100% - 18px) 50%,calc(100% - 13px) 50%;background-size:5px 5px;background-repeat:no-repeat}
+.ab .ab-dos{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}
+.ab .ab-ayu{margin-top:-8px;font-size:13px;line-height:18px;color:var(--tinta2)}
+.ab .ab-err{display:flex;align-items:flex-start;gap:8px;padding:10px 12px;border-radius:12px;background:var(--mal-fondo);color:var(--mal-tinta);font-size:13px;line-height:18px;font-weight:600}
+.ab .ab-err svg{margin-top:1px}
+
+/* ---------- Invitación ---------- */
+.ab .ab-cas{display:flex;align-items:center;gap:12px;min-height:56px;padding:8px 14px;border-radius:14px;background:var(--sup2);cursor:pointer}
+.ab .ab-cas.ab-cas-on{background:var(--tonal)}
+.ab .ab-cas-t{flex:1;min-width:0;display:flex;flex-direction:column}
+.ab .ab-cas-t b{font-size:15px;line-height:20px;font-weight:600}
+.ab .ab-cas-t span{font-size:13px;line-height:18px;color:var(--tinta2);overflow-wrap:anywhere}
+.ab .ab-cas input,.ab .ab-priv input{width:22px;height:22px;flex:none;accent-color:var(--accion);margin:0}
+.ab .ab-espera{display:flex;align-items:center;gap:10px;font-size:15px;line-height:20px}
+.ab .ab-espera b{font-weight:600}
+.ab .ab-giro{width:16px;height:16px;flex:none;border-radius:999px;border:2px solid var(--tonal);border-top-color:var(--accion);animation:ab-gira 900ms linear infinite}
+@keyframes ab-gira{to{transform:rotate(360deg)}}
+.ab .ab-avi,.ab .ab-ok{display:flex;align-items:flex-start;gap:8px;padding:12px 14px;border-radius:12px;font-size:14px;line-height:20px}
+.ab .ab-avi{background:var(--sup2);color:var(--tinta2)}
+.ab .ab-avi b{color:var(--tinta)}
+.ab .ab-ok{background:var(--ok-fondo);color:var(--ok-tinta);font-weight:600}
+.ab .ab-avi svg,.ab .ab-ok svg{margin-top:2px}
+.ab .ab-conf{display:flex;flex-direction:column;gap:8px;padding:14px 16px;border-radius:14px;background:var(--ag-fondo);color:var(--ag-tinta);font-size:14px;line-height:20px}
+.ab .ab-conf p:first-child{font-weight:600}
+.ab .ab-conf .ab-conf-d{font-size:20px;line-height:26px;font-weight:700;color:var(--tinta);overflow-wrap:anywhere;font-family:ui-monospace,Menlo,monospace;letter-spacing:.2px}
+.ab .ab-guarda{display:flex;flex-direction:column;gap:8px;padding-top:12px;border-top:1px solid var(--linea);font-size:14px;line-height:20px;color:var(--tinta2)}
+.ab .ab-guarda b{color:var(--tinta);font-weight:600;overflow-wrap:anywhere}
+.ab .ab-fila-b{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.ab .ab-fila-b .ab-ton{height:36px;padding:0 14px;font-size:14px}
+.ab .ab-fila-b .ab-ton::after{content:"";position:absolute;inset:-4px 0}
+
+/* ---------- Burbuja de alta ---------- */
+.ab .ab-alta .ag0-cjc{padding:10px 8px 0 20px}
+.ab[data-vp="ext"] .ab-alta .ag0-cjc,.ab[data-vp="tel"] .ab-alta .ag0-cjc{padding-left:16px}
+.ab .ab-ai{display:flex;flex-direction:column;gap:14px;padding:6px 20px 20px}
+.ab[data-vp="esc"] .ab-ai{gap:12px}
+.ab .ab-lb{margin:-6px 0 0;padding:4px;border-radius:14px;background:var(--fondo);max-height:236px;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}
+.ab .ab-lb-b{padding:12px;font-size:14px;line-height:20px;color:var(--tinta2)}
+.ab .ab-op{display:flex;align-items:center;gap:12px;min-height:52px;padding:6px 10px;border-radius:10px;cursor:pointer;transition:transform 100ms ease-out}
+.ab[data-vp="esc"] .ab-op{min-height:44px}
+.ab .ab-op:active{transform:scale(.98);background:var(--sup)}
+.ab .ab-op[aria-selected="true"]{background:var(--sup)}
+.ab .ab-op-t{flex:1;min-width:0;display:flex;flex-direction:column}
+.ab .ab-op-t b{font-size:15px;line-height:20px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ab .ab-op-t span{font-size:13px;line-height:18px;color:var(--tinta2)}
+.ab .ab-av{width:32px;height:32px;flex:none;border-radius:999px;display:flex;align-items:center;justify-content:center;background:var(--tonal);color:var(--tonal-tinta);font-size:13px;line-height:16px;font-weight:600;font-variant-numeric:tabular-nums}
+.ab .ab-av.ab-av-mas{background:var(--ok-fondo);color:var(--ok-tinta)}
+.ab .ab-op-reg{border-top:1px solid var(--linea);border-radius:0 0 10px 10px;margin-top:2px}
+.ab .ab-op-reg .ab-op-t b{color:var(--ok-tinta)}
+.ab .ab-ap{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;margin-top:4px}
+.ab .ab-ap .ab-b{width:100%}
+.ab .ab-acuse{display:flex;align-items:center;gap:12px;padding:4px 0 2px}
+.ab .ab-acuse-i{width:36px;height:36px;flex:none;border-radius:999px;display:flex;align-items:center;justify-content:center;background:var(--ok-fondo);color:var(--ok-tinta)}
+.ab .ab-acuse p{display:flex;flex-direction:column;min-width:0}
+.ab .ab-acuse b{font-size:17px;line-height:22px;font-weight:700}
+.ab .ab-acuse span{font-size:13px;line-height:18px;color:var(--tinta2)}
+.ab .ab-acl{margin:0 -20px}
+.ab .ab-acl .ag0-op{padding:0 20px}
+/* Formulario en teléfono: conmutador y paciente elegido */
+.ab .ab-seg{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
+.ab .ab-seg button{display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.ab .ab-pacc{display:flex;align-items:center;gap:12px;min-height:56px;padding:4px 4px 4px 12px;border-radius:14px;background:var(--tonal)}
+.ab .ab-pacc .ab-av{background:var(--sup);color:var(--tonal-tinta)}
+
+/* ---------- Registro rápido ---------- */
+.ab .ab-priv{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:48px;padding:8px 14px;border-radius:12px;background:var(--sup2);font-size:15px;line-height:20px}
+.ab .ab-a{color:var(--enlace);font-weight:600}
+
+/* ---------- Avisos breves (patrón del catálogo) ---------- */
+.ab .ab-tsz{position:absolute;z-index:60;display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none}
+.ab[data-vp="ext"] .ab-tsz{left:12px;width:302px;top:12px}
+.ab[data-vp="tel"] .ab-tsz{left:16px;right:16px;top:135px}
+.ab[data-vp="ih"] .ab-tsz{left:24px;width:601px;top:16px}
+.ab[data-vp="iv"] .ab-tsz{left:24px;right:24px;top:156px}
+.ab[data-vp="esc"] .ab-tsz{left:268px;right:20px;top:20px}
+.ab .ab-ts{pointer-events:auto;width:100%;max-width:400px;display:flex;align-items:center;gap:10px;padding:8px 4px 8px 10px;border-radius:14px;background:var(--sup);box-shadow:var(--sombra-capa);opacity:0;transform:translateY(-60%);transition:opacity 180ms ease-in,transform 250ms cubic-bezier(.4,0,1,1)}
+.ab .ab-ts.ab-on{opacity:1;transform:none;transition:opacity 220ms ease-out,transform 520ms linear(0,.009,.035,.075,.124,.181,.243,.305,.367,.427,.484,.537,.587,.632,.674,.711,.745,.776,.803,.828,.849,.868,.885,.9,.913,.925,.935,.944,.951,.958,.964,.969,.974,.977,.981,.984,.986,.988,.99,.992,.993,.994,.995,.996,.997,.998,1)}
+.ab .ab-ts-i{width:28px;height:28px;flex:none;border-radius:999px;display:flex;align-items:center;justify-content:center}
+.ab .ab-ts-ok .ab-ts-i{background:var(--ok-fondo);color:var(--ok-tinta)}
+.ab .ab-ts-ton .ab-ts-i{background:var(--tonal);color:var(--enlace)}
+.ab .ab-ts-mal .ab-ts-i{background:var(--mal-fondo);color:var(--mal-tinta)}
+.ab .ab-ts p{flex:1;min-width:0;font-size:14px;line-height:20px;font-weight:600;color:var(--tinta)}
+.ab .ab-ts button{width:44px;height:44px;flex:none;border-radius:999px;display:flex;align-items:center;justify-content:center;color:var(--tinta3)}
+.ab[data-vp="ih"] .ab-ts button,.ab[data-vp="esc"] .ab-ts button{width:36px;height:36px}
+
+/* ---------- Movimiento y transparencia reducidos ---------- */
+@media (prefers-reduced-motion:reduce){
+  .ab .ab-fscj,.ab .ag0-on>.ab-fscj,.ab[data-vp="tel"] .ab-cjal,.ab[data-vp="tel"] .ag0-on>.ab-cjal{transform:none;transition:opacity 200ms ease}
+  .ab .ab-fscj{opacity:0}.ab .ag0-on>.ab-fscj{opacity:1}
+  .ab .ab-ts,.ab .ab-ts.ab-on{transform:none;transition:opacity 200ms ease}
+  .ab .ab-giro{animation:none;border-color:var(--accion)}
+}
+
+/* ---------- Tira de maqueta y ficha (FUERA del marco: no dependen de .marco) ---------- */
+.ab-tira{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:10px}
+.ab-tira button{position:relative;height:28px;padding:0 10px;border-radius:999px;border:1px dashed var(--tinta3);background:none;color:var(--tinta2);font:600 12px/16px var(--fuente);white-space:nowrap;cursor:pointer;transition:transform 100ms ease-out}
+.ab-tira button::after{content:"";position:absolute;inset:-4px 0}
+.ab-tira button:active{transform:scale(.97)}
+.ab-tira button:focus-visible{outline:3px solid var(--enlace);outline-offset:2px}
+.ab-tira button[aria-pressed="true"]{border-style:solid;background:var(--sup2);color:var(--tinta)}
+.ab-tira .ab-tsep{width:1px;height:18px;background:var(--borde);margin:0 2px}
+.ab-ficha{background:var(--sup);border-radius:18px;padding:16px 20px 18px;font:13px/18px var(--fuente);color:var(--tinta);max-width:100%;overflow-x:auto}
+.ab-ficha h3{margin:0 0 8px;font-size:15px;line-height:20px;font-weight:700}
+.ab-ficha h4{margin:14px 0 6px;font-size:13px;line-height:18px;font-weight:700;color:var(--enlace);letter-spacing:.3px;text-transform:uppercase}
+.ab-ficha p{margin:0 0 8px;color:var(--tinta2)}
+.ab-ficha ol,.ab-ficha ul{margin:0 0 8px;padding-left:20px;color:var(--tinta2)}
+.ab-ficha li{margin:2px 0}
+.ab-ficha b{color:var(--tinta)}
+.ab-ficha table{border-collapse:collapse;width:100%;margin:4px 0 12px;font-size:12px;line-height:16px}
+.ab-ficha th,.ab-ficha td{padding:6px 10px 6px 0;border-top:1px solid var(--linea);text-align:left;vertical-align:top}
+.ab-ficha thead th{border-top:0;color:var(--tinta2);font-weight:600}
+.ab-ficha tbody th{color:var(--tinta);font-weight:600;white-space:nowrap}
+.ab-ficha code{font:12px/16px ui-monospace,Menlo,monospace;background:var(--sup2);padding:1px 4px;border-radius:4px}
+/* Duo cerrado: centrada en el área SIN el indicador inferior (la base centra en el marco entero) */
+.ab[data-vp="ext"] .ab-bucj,.ab[data-vp="ext"] .ab-altacj,.ab[data-vp="ext"] .ab-mocj,.ab[data-vp="ext"] .ab-cjal{top:calc((678px - var(--ib)) / 2)}
+.ab[data-vp="ext"] .ab-fscj{left:0;top:0;width:calc(466px - 56px - var(--ir));max-height:none}
+.ab[data-vp] .ab-fsw>.ab-mp{padding-bottom:calc(var(--ib) + 12px)}
+/* Regla de botones (PIEZAS §13): en teléfono el pie reparte por contenido, nunca 1 1 0 */
+.ab[data-vp="ext"] .ab-mp>.ab-b,.ab[data-vp="tel"] .ab-mp>.ab-b{flex:1 1 auto}
+/* Alerta con botones apilados en teléfono: rótulo largo en una línea  */
+.ab[data-vp="ext"] .ab-al:has(.ab-pila),.ab[data-vp="tel"] .ab-al:has(.ab-pila){padding:24px 20px 20px}
+.ab .ab-al-b.ab-pila .ab-b{padding:10px 8px}
+.ab[data-vp="ext"] .ab-al-b.ab-pila .ab-b,.ab[data-vp="tel"] .ab-al-b.ab-pila .ab-b{white-space:nowrap}
+.ab[data-vp="ext"] .ab-al:has(.ab-pila){padding:24px 16px 16px}
+.ab[data-vp="ext"] .ab-al-b.ab-pila .ab-b{font-size:14px}
