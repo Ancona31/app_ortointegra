@@ -101,7 +101,8 @@ function ZonaAvisos({ children }: { children: React.ReactNode }) {
     <div
       aria-live="polite"
       className={[
-        'pointer-events-none fixed z-[9999] flex flex-col items-center gap-2 px-3',
+        /* `flex-col-reverse`: el más nuevo, arriba (maqueta, «Cola»). */
+        'pointer-events-none fixed z-[9999] flex flex-col-reverse items-center gap-2 px-3',
         'top-[calc(var(--it)+12px)] left-[var(--il)] right-[var(--ir)]',
         'ext:right-[calc(56px+var(--ir))]',
         '[[data-borde-sistema=izquierda]_&]:ext:left-[calc(56px+var(--il))] [[data-borde-sistema=izquierda]_&]:ext:right-0',

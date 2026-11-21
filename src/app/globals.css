@@ -1012,10 +1012,15 @@ body::before {
   0%, 100% { opacity: 1; }
   50%      { opacity: .55; }
 }
-.skeleton {
-  background: var(--sup2);
-  animation: skeleton-pulso 1.4s ease-in-out infinite;
-  border-radius: 0.5rem;
+/* En `@layer components` para que el radio de quien lo usa (`rounded-full`,
+   `rounded-[8px]`…) gane al de por omisión: fuera de capa, el 0.5rem pisaba
+   a la utilidad y los avatares en hueso salían cuadrados. */
+@layer components {
+  .skeleton {
+    background: var(--sup2);
+    animation: skeleton-pulso 1.4s ease-in-out infinite;
+    border-radius: 0.5rem;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .skeleton { animation: none; }
