@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Search, User, X, ArrowRight, Loader2, UserPlus, ChevronLeft, FileText } from 'lucide-react'
+import { Search, User, X, Loader2, UserPlus, ChevronLeft, ChevronRight, FileText } from 'lucide-react'
 import { calcularEdad } from '@/lib/patientUtils'
 import { useProfile } from '@/hooks/useProfile'
 import { normalizarFolio } from '@/lib/documentos/folio'
@@ -247,307 +247,287 @@ export default function CommandPalette() {
   if (!open) return null
 
   return (
-    <div
-      className="fixed inset-0 z-[9998] flex items-start justify-center pt-[15vh] px-4"
-      onClick={() => setOpen(false)}
-    >
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-
-      <div
-        className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden animate-slide-up"
-        style={{ animationDuration: '0.2s' }}
-        onClick={e => e.stopPropagation()}
-      >
-
-        {/* ── MODO BÚSQUEDA ───────────────────────────────── */}
+    /* B4 del rediseño · la paleta, ANCLADA ARRIBA y centrada en el área de
+       contenido (CALMA §28), con el velo del kit. Ahora es un diálogo de verdad:
+       `role="dialog"`, `aria-modal` y nombre (PLAN §7.1). Su colocación por
+       formato (barra, riel, franjas) vive en `globals.css`, `.nav-paleta`. Los
+       textos no cambian: tampoco la promesa del registro rápido ni la cita
+       legal, que son deuda anotada aparte. */
+    <div className="nav-paleta" role="dialog" aria-modal="true" aria-label="Buscar paciente o folio"
+      onClick={() => setOpen(false)}>
+      <div className="nav-capa-velo" aria-hidden="true" />
+      <div className="nav-paleta-tarjeta" onClick={e => e.stopPropagation()}>
         {!modoCrear && (
           <>
-            {/* Input */}
-            <div className="flex items-center gap-3 px-4 py-3.5 border-b border-slate-100">
-              {loading
-                ? <Loader2 size={18} className="text-slate-400 animate-spin flex-shrink-0" />
-                : <Search size={18} className="text-slate-400 flex-shrink-0" />
-              }
-              <input
-                ref={inputRef}
-                type="text"
-                value={query}
-                onChange={e => setQuery(e.target.value)}
-                onKeyDown={handleKey}
-                placeholder="Buscar paciente por nombre o documento por folio..."
-                className="flex-1 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none bg-transparent"
-              />
-              <button onClick={() => setOpen(false)} className="text-slate-300 hover:text-slate-500 transition-colors">
-                <X size={16} />
-              </button>
-            </div>
-
-            {/* Resultado por folio — uno como mucho: el índice es único */}
-            {documento && (
-              <ul className="py-2">
-                <li>
-                  <button
-                    onClick={() => abrirDocumento(documento)}
-                    className="w-full flex items-center gap-3 px-4 py-3 text-left bg-slate-50 hover:bg-slate-100 transition-colors"
-                  >
-                    <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
-                      <FileText size={15} className="text-[#1e5fa8]" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-slate-800 text-sm truncate">
-                        <span className="font-mono">{documento.folio}</span>
-                        {' · '}
-                        {ETIQUETA_TIPO[documento.tipo] ?? documento.tipo}
-                      </p>
-                      <p className="text-xs text-slate-400 mt-0.5 truncate">
-                        {nombreDePaciente(documento.pacientes)}
-                        {' · '}
-                        {new Date(documento.created_at).toLocaleDateString('es-MX', {
-                          day: 'numeric', month: 'short', year: 'numeric',
-                        })}
-                      </p>
-                    </div>
-                    <ArrowRight size={14} className="text-slate-400 flex-shrink-0" />
-                  </button>
-                </li>
-              </ul>
-            )}
-
-            {/* Resultados */}
+            <CampoBusqueda inputRef={inputRef} query={query} loading={loading}
+              alEscribir={setQuery} alTeclear={handleKey} alCerrar={() => setOpen(false)} />
+            {documento && <FilaDocumento documento={documento} alAbrir={() => abrirDocumento(documento)} />}
             {(results.length > 0 || mostrarOpcionCrear) && (
-              <ul className="py-2 max-h-80 overflow-y-auto">
-                {results.map((p, i) => {
-                  const edad = p.fecha_nacimiento
-                    ? calcularEdad(p.fecha_nacimiento)
-                    : null
-                  const activo = i === selected
-                  return (
-                    <li key={p.id}>
-                      <button
-                        onClick={() => navegar(p.id)}
-                        onMouseEnter={() => setSelected(i)}
-                        className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${activo ? 'bg-slate-50' : 'hover:bg-slate-50'}`}
-                      >
-                        <div className="w-9 h-9 rounded-full bg-violet-100 flex items-center justify-center text-violet-700 font-semibold text-xs flex-shrink-0">
-                          {p.nombre[0]}{p.apellidos[0]}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-slate-800 text-sm truncate">{p.nombre} {p.apellidos}</p>
-                          <p className="text-xs text-slate-400 mt-0.5">
-                            {edad !== null ? edad.textoElegante : ''}
-                            {edad !== null && p.sexo ? ' · ' : ''}
-                            {p.sexo === 'M' ? 'Masculino' : p.sexo === 'F' ? 'Femenino' : ''}
-                            {p.numero_expediente ? ` · ${p.numero_expediente}` : ''}
-                          </p>
-                        </div>
-                        {activo && <ArrowRight size={14} className="text-slate-400 flex-shrink-0" />}
-                      </button>
-                    </li>
-                  )
-                })}
-
-                {/* Opción registro rápido */}
+              <ul className="nav-paleta-lista">
+                {results.map((p, i) => (
+                  <FilaPaciente key={p.id} p={p} activo={i === selected}
+                    alAbrir={() => navegar(p.id)} alPasar={() => setSelected(i)} />
+                ))}
                 {mostrarOpcionCrear && (
-                  <li>
-                    <button
-                      onClick={abrirCrear}
-                      onMouseEnter={() => setSelected(results.length)}
-                      className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors border-t border-slate-100 ${
-                        selected === results.length ? 'bg-emerald-50' : 'hover:bg-emerald-50'
-                      }`}
-                    >
-                      <div className="w-9 h-9 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
-                        <UserPlus size={15} className="text-emerald-600" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-emerald-700 text-sm">
-                          Crear registro para: <span className="font-bold">"{query}"</span>
-                        </p>
-                        <p className="text-xs text-emerald-600/70 mt-0.5">Registro rápido — solo nombre, teléfono y motivo</p>
-                      </div>
-                      {selected === results.length && <ArrowRight size={14} className="text-emerald-500 flex-shrink-0" />}
-                    </button>
-                  </li>
+                  <FilaCrear query={query} activo={selected === results.length}
+                    alAbrir={abrirCrear} alPasar={() => setSelected(results.length)} />
                 )}
               </ul>
             )}
-
-            {/* Sin resultados (sin mostrar la opción de crear, que ya está arriba) */}
             {query && !loading && results.length === 0 && !documento && !mostrarOpcionCrear && (
-              <div className="flex flex-col items-center gap-2 py-10 text-slate-400">
-                {esFolio ? <FileText size={32} className="opacity-30" /> : <User size={32} className="opacity-30" />}
-                <p className="text-sm">Sin resultados para &quot;{query}&quot;</p>
-                {/*
-                  En modo folio el vacío es ambiguo y hay que desambiguarlo: el
-                  folio puede no existir, o existir y ser de otro médico —la RLS
-                  lo oculta—, o ser de los 421 documentos anteriores a la
-                  columna, que llevan el folio dentro de `contenido` y no aquí.
-                  Sin esta línea, las tres se leen como «no existe».
-                */}
-                {esFolio && (
-                  <p className="text-xs text-center px-8 leading-relaxed">
-                    Ningún documento tuyo con ese folio. Los emitidos antes del
-                    folio correlativo no se encuentran por aquí.
-                  </p>
-                )}
-              </div>
+              <SinResultados query={query} esFolio={esFolio} />
             )}
-
             {!query && (
-              <div className="px-4 py-3 text-xs text-slate-400 flex items-center justify-between">
-                <span>Nombre del paciente, o folio del documento</span>
-                <span className="font-mono bg-slate-100 px-1.5 py-0.5 rounded text-slate-500">Esc</span>
-              </div>
+              <p className="px-4 py-3 text-[13px] text-tinta2">Nombre del paciente, o folio del documento</p>
             )}
-
-            <div className="px-4 py-2 border-t border-slate-100 flex gap-4 text-[10px] text-slate-400">
-              <span><kbd className="font-mono bg-slate-100 px-1 rounded">↑↓</kbd> navegar</span>
-              <span><kbd className="font-mono bg-slate-100 px-1 rounded">↵</kbd> abrir</span>
-              <span><kbd className="font-mono bg-slate-100 px-1 rounded">Esc</kbd> cerrar</span>
+            <div className="nav-paleta-teclas">
+              <span><kbd>↑↓</kbd> navegar</span>
+              <span><kbd>↵</kbd> abrir</span>
+              <span><kbd>Esc</kbd> cerrar</span>
             </div>
           </>
         )}
 
-        {/* ── MODO REGISTRO RÁPIDO ────────────────────────── */}
         {modoCrear && (
           <form ref={formRef} onSubmit={handleCrear}>
-            {/* Header */}
-            <div className="flex items-center gap-3 px-4 py-3.5 border-b border-slate-100">
-              <button
-                type="button"
-                onClick={() => setModoCrear(false)}
-                className="text-slate-400 hover:text-slate-600 transition-colors"
-              >
-                <ChevronLeft size={18} />
-              </button>
-              <div className="flex-1">
-                <p className="text-sm font-semibold text-slate-800">Registro rápido</p>
-                <p className="text-[11px] text-slate-400">Puedes completar el expediente después</p>
-              </div>
-              <button type="button" onClick={() => setOpen(false)} className="text-slate-300 hover:text-slate-500">
-                <X size={16} />
-              </button>
-            </div>
-
+            <CabeceraRegistro alVolver={() => setModoCrear(false)} alCerrar={() => setOpen(false)} />
             {duplicateWarning && (
-              <div className="px-4 pt-4">
-                <div className="rounded-2xl border-2 border-amber-300 bg-amber-50 p-4">
-                  <p className="mb-3 text-sm font-semibold text-amber-800">
-                    ⚠️ Este paciente ya está en tu lista de pacientes:{' '}
-                    {duplicateWarning.existingPatient.nombre} {duplicateWarning.existingPatient.apellidos}
-                    {duplicateWarning.existingPatient.numero_expediente && (
-                      <> (Exp. #{duplicateWarning.existingPatient.numero_expediente})</>
-                    )}
-                  </p>
-                  <div className="flex flex-col gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const id = duplicateWarning.existingPatient.id;
-                        setDuplicateWarning(null);
-                        setOpen(false);
-                        router.push(isSecretary ? '/expediente' : `/expediente/${id}`);
-                      }}
-                      className="w-full rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
-                    >
-                      Ir a su expediente
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        forceCreateRef.current = true;
-                        setDuplicateWarning(null);
-                        formRef.current?.requestSubmit();
-                      }}
-                      className="w-full rounded-xl border-2 border-amber-400 bg-white px-4 py-2 text-sm font-semibold text-amber-700 hover:bg-amber-50"
-                    >
-                      Es otra persona, crear de todos modos
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setDuplicateWarning(null)}
-                      className="w-full rounded-xl bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-200"
-                    >
-                      Cancelar
-                    </button>
-                  </div>
-                </div>
-              </div>
+              <AvisoDuplicado aviso={duplicateWarning}
+                alIr={() => {
+                  const id = duplicateWarning.existingPatient.id
+                  setDuplicateWarning(null)
+                  setOpen(false)
+                  router.push(isSecretary ? '/expediente' : `/expediente/${id}`)
+                }}
+                alCrearIgual={() => {
+                  forceCreateRef.current = true
+                  setDuplicateWarning(null)
+                  formRef.current?.requestSubmit()
+                }}
+                alCancelar={() => setDuplicateWarning(null)} />
             )}
-
-            {/* Campos */}
-            <div className="p-4 space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[11px] font-medium text-slate-500 block mb-1">Nombre <span className="text-red-400">*</span></label>
-                  <input
-                    autoFocus
-                    type="text"
-                    value={formNombre}
-                    onChange={e => setFormNombre(e.target.value)}
-                    required
-                    placeholder="Juan"
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]"
-                  />
-                </div>
-                <div>
-                  <label className="text-[11px] font-medium text-slate-500 block mb-1">Apellidos</label>
-                  <input
-                    type="text"
-                    value={formApellidos}
-                    onChange={e => setFormApellidos(e.target.value)}
-                    placeholder="García López"
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="text-[11px] font-medium text-slate-500 block mb-1">Fecha de nacimiento <span className="text-red-400">*</span></label>
-                <input
-                  type="date"
-                  value={formFechaNac}
-                  onChange={e => setFormFechaNac(e.target.value)}
-                  required
-                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]"
-                />
-              </div>
-              <label className="flex items-start gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={formConsentimiento}
-                  onChange={e => setFormConsentimiento(e.target.checked)}
-                  className="mt-0.5 accent-[#1e5fa8]"
-                />
-                <span className="text-[11px] text-slate-500 leading-tight">
-                  El paciente ha leído y acepta el{' '}
-                  <a href="/privacidad" target="_blank" className="text-[#1e5fa8] underline">Aviso de Privacidad</a>
-                  {' '}(LFPDPPP Art. 9) <span className="text-red-400">*</span>
-                </span>
-              </label>
-            </div>
-
-            {/* Botones */}
-            <div className="px-4 pb-4 flex gap-2">
-              <button
-                type="button"
-                onClick={() => setModoCrear(false)}
-                className="flex-1 py-2.5 text-sm text-slate-500 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                disabled={creando || !formNombre.trim() || !formFechaNac || !formConsentimiento}
-                className="flex-1 py-2.5 text-sm font-semibold text-white bg-[#1e5fa8] rounded-xl hover:bg-[#1a3a5c] disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
-              >
-                {creando ? <Loader2 size={14} className="animate-spin" /> : <UserPlus size={14} />}
+            <CamposRegistro nombre={formNombre} apellidos={formApellidos} fecha={formFechaNac}
+              consentimiento={formConsentimiento} alNombre={setFormNombre} alApellidos={setFormApellidos}
+              alFecha={setFormFechaNac} alConsentimiento={setFormConsentimiento} />
+            <div className="nav-paleta-pie">
+              <button type="button" onClick={() => setModoCrear(false)} className="k-b-tonal">Cancelar</button>
+              <button type="submit" className="k-b-prim inline-flex items-center gap-2"
+                disabled={creando || !formNombre.trim() || !formFechaNac || !formConsentimiento}>
+                {creando ? <Loader2 size={16} className="animate-spin" aria-hidden="true" /> : <UserPlus size={16} aria-hidden="true" />}
                 {creando ? 'Creando...' : 'Crear e ir al expediente'}
               </button>
             </div>
           </form>
         )}
-
       </div>
+    </div>
+  )
+}
+
+/* ─── Piezas de la paleta (B4) ────────────────────────────────────────────── */
+
+interface CampoBusquedaProps {
+  inputRef: React.RefObject<HTMLInputElement | null>
+  query: string
+  loading: boolean
+  alEscribir: (v: string) => void
+  alTeclear: (e: React.KeyboardEvent) => void
+  alCerrar: () => void
+}
+
+function CampoBusqueda({ inputRef, query, loading, alEscribir, alTeclear, alCerrar }: CampoBusquedaProps) {
+  return (
+    <div className="nav-paleta-campo">
+      {loading
+        ? <Loader2 size={18} className="flex-none animate-spin text-tinta2" aria-hidden="true" />
+        : <Search size={18} className="flex-none text-tinta2" aria-hidden="true" />}
+      <input
+        ref={inputRef}
+        type="text"
+        value={query}
+        onChange={e => alEscribir(e.target.value)}
+        onKeyDown={alTeclear}
+        aria-label="Buscar paciente por nombre o documento por folio"
+        placeholder="Buscar paciente por nombre o documento por folio..."
+        className="min-w-0 flex-1 bg-transparent text-tinta placeholder:text-tinta3 focus:outline-none"
+      />
+      <button type="button" onClick={alCerrar} aria-label="Cerrar" className="nav-paleta-icono">
+        <X size={18} aria-hidden="true" />
+      </button>
+    </div>
+  )
+}
+
+/** Resultado por folio — uno como mucho: el índice es único. */
+function FilaDocumento({ documento, alAbrir }: { documento: DocumentoConFolio; alAbrir: () => void }) {
+  return (
+    <ul className="nav-paleta-lista">
+      <li>
+        <button type="button" onClick={alAbrir} className="nav-paleta-fila" data-activa="true">
+          <span className="nav-paleta-avatar bg-tonal text-tonal-tinta" aria-hidden="true"><FileText size={16} /></span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-[15px] font-semibold text-tinta">
+              <span className="k-num">{documento.folio}</span>{' · '}{ETIQUETA_TIPO[documento.tipo] ?? documento.tipo}
+            </span>
+            <span className="block truncate text-[13px] text-tinta2">
+              {nombreDePaciente(documento.pacientes)}{' · '}
+              {new Date(documento.created_at).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' })}
+            </span>
+          </span>
+          <ChevronRight size={18} className="flex-none text-tinta3" aria-hidden="true" />
+        </button>
+      </li>
+    </ul>
+  )
+}
+
+interface FilaProps { activo: boolean; alAbrir: () => void; alPasar: () => void }
+
+function FilaPaciente({ p, activo, alAbrir, alPasar }: FilaProps & { p: Paciente }) {
+  const edad = p.fecha_nacimiento ? calcularEdad(p.fecha_nacimiento) : null
+  return (
+    <li>
+      <button type="button" onClick={alAbrir} onMouseEnter={alPasar} className="nav-paleta-fila"
+        data-activa={activo ? 'true' : undefined}>
+        <span className="nav-paleta-avatar bg-tonal text-tonal-tinta" aria-hidden="true">{p.nombre[0]}{p.apellidos[0]}</span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[15px] font-semibold text-tinta">{p.nombre} {p.apellidos}</span>
+          <span className="block truncate text-[13px] text-tinta2">
+            {edad !== null ? edad.textoElegante : ''}
+            {edad !== null && p.sexo ? ' · ' : ''}
+            {p.sexo === 'M' ? 'Masculino' : p.sexo === 'F' ? 'Femenino' : ''}
+            {p.numero_expediente ? ` · ${p.numero_expediente}` : ''}
+          </span>
+        </span>
+        <ChevronRight size={18} className="flex-none text-tinta3" aria-hidden="true" />
+      </button>
+    </li>
+  )
+}
+
+function FilaCrear({ query, activo, alAbrir, alPasar }: FilaProps & { query: string }) {
+  return (
+    <li className="border-t border-linea">
+      <button type="button" onClick={alAbrir} onMouseEnter={alPasar} className="nav-paleta-fila"
+        data-activa={activo ? 'true' : undefined}>
+        <span className="nav-paleta-avatar bg-ok-fondo text-ok-tinta" aria-hidden="true"><UserPlus size={16} /></span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-[15px] font-semibold text-ok-tinta">
+            Crear registro para: <span className="font-bold">&quot;{query}&quot;</span>
+          </span>
+          <span className="block text-[13px] text-tinta2">Registro rápido — solo nombre, teléfono y motivo</span>
+        </span>
+        <ChevronRight size={18} className="flex-none text-tinta3" aria-hidden="true" />
+      </button>
+    </li>
+  )
+}
+
+/* Sin resultados (sin mostrar la opción de crear, que ya está arriba). En modo
+   folio el vacío es ambiguo y hay que desambiguarlo: el folio puede no existir,
+   o existir y ser de otro médico —la RLS lo oculta—, o ser de los documentos
+   anteriores a la columna, que llevan el folio dentro de `contenido`. Sin la
+   segunda línea, las tres se leen como «no existe». */
+function SinResultados({ query, esFolio }: { query: string; esFolio: boolean }) {
+  return (
+    <div className="flex flex-col items-center gap-2 px-6 py-10 text-center text-tinta2">
+      {esFolio ? <FileText size={32} className="opacity-40" aria-hidden="true" /> : <User size={32} className="opacity-40" aria-hidden="true" />}
+      <p className="text-[15px]">Sin resultados para &quot;{query}&quot;</p>
+      {esFolio && (
+        <p className="text-[13px] leading-[18px]">
+          Ningún documento tuyo con ese folio. Los emitidos antes del
+          folio correlativo no se encuentran por aquí.
+        </p>
+      )}
+    </div>
+  )
+}
+
+function CabeceraRegistro({ alVolver, alCerrar }: { alVolver: () => void; alCerrar: () => void }) {
+  return (
+    <div className="flex items-center gap-2 border-b border-linea px-2 py-2">
+      <button type="button" onClick={alVolver} aria-label="Volver a la búsqueda" className="nav-paleta-icono">
+        <ChevronLeft size={20} aria-hidden="true" />
+      </button>
+      <div className="min-w-0 flex-1">
+        <p className="text-[17px] font-bold leading-[22px] text-tinta">Registro rápido</p>
+        <p className="text-[13px] text-tinta2">Puedes completar el expediente después</p>
+      </div>
+      <button type="button" onClick={alCerrar} aria-label="Cerrar" className="nav-paleta-icono">
+        <X size={18} aria-hidden="true" />
+      </button>
+    </div>
+  )
+}
+
+interface AvisoDuplicadoProps {
+  aviso: DuplicatePatientResponse
+  alIr: () => void
+  alCrearIgual: () => void
+  alCancelar: () => void
+}
+
+function AvisoDuplicado({ aviso, alIr, alCrearIgual, alCancelar }: AvisoDuplicadoProps) {
+  return (
+    <div className="px-4 pt-4">
+      <div className="rounded-[16px] bg-aviso-fondo p-4">
+        <p className="mb-3 text-[15px] font-semibold text-aviso-tinta">
+          ⚠️ Este paciente ya está en tu lista de pacientes:{' '}
+          {aviso.existingPatient.nombre} {aviso.existingPatient.apellidos}
+          {aviso.existingPatient.numero_expediente && (
+            <> (Exp. #{aviso.existingPatient.numero_expediente})</>
+          )}
+        </p>
+        {/* Tres salidas apiladas, la principal arriba (CALMA §23.7). */}
+        <div className="flex flex-col gap-2">
+          <button type="button" onClick={alIr} className="k-b-prim w-full">Ir a su expediente</button>
+          <button type="button" onClick={alCrearIgual} className="k-b-tonal w-full">Es otra persona, crear de todos modos</button>
+          <button type="button" onClick={alCancelar} className="k-b-texto w-full">Cancelar</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+interface CamposRegistroProps {
+  nombre: string
+  apellidos: string
+  fecha: string
+  consentimiento: boolean
+  alNombre: (v: string) => void
+  alApellidos: (v: string) => void
+  alFecha: (v: string) => void
+  alConsentimiento: (v: boolean) => void
+}
+
+function CamposRegistro(c: CamposRegistroProps) {
+  return (
+    <div className="space-y-3 p-4">
+      <div className="grid grid-cols-2 gap-3">
+        <label className="block">
+          <span className="k-etq-campo mb-1 block text-[13px] font-semibold text-tinta2">Nombre <span className="text-mal-tinta">*</span></span>
+          <input autoFocus type="text" value={c.nombre} onChange={e => c.alNombre(e.target.value)} required
+            placeholder="Juan" className="k-campo nav-paleta-input" />
+        </label>
+        <label className="block">
+          <span className="k-etq-campo mb-1 block text-[13px] font-semibold text-tinta2">Apellidos</span>
+          <input type="text" value={c.apellidos} onChange={e => c.alApellidos(e.target.value)}
+            placeholder="García López" className="k-campo nav-paleta-input" />
+        </label>
+      </div>
+      <label className="block">
+        <span className="k-etq-campo mb-1 block text-[13px] font-semibold text-tinta2">Fecha de nacimiento <span className="text-mal-tinta">*</span></span>
+        <input type="date" value={c.fecha} onChange={e => c.alFecha(e.target.value)} required className="k-campo nav-paleta-input" />
+      </label>
+      <label className="flex cursor-pointer items-start gap-2">
+        <input type="checkbox" checked={c.consentimiento} onChange={e => c.alConsentimiento(e.target.checked)}
+          className="mt-0.5 h-5 w-5 flex-none accent-[var(--accion)]" />
+        <span className="text-[13px] leading-[18px] text-tinta2">
+          El paciente ha leído y acepta el{' '}
+          <a href="/privacidad" target="_blank" rel="noopener noreferrer" className="text-enlace underline">Aviso de Privacidad</a>
+          {' '}(LFPDPPP Art. 9) <span className="text-mal-tinta">*</span>
+        </span>
+      </label>
     </div>
   )
 }
