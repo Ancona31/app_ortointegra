@@ -47,7 +47,9 @@ los 50 `react/jsx-no-undef`), 1 en `e2e/`. Por regla: 50 `react/jsx-no-undef`,
 `no-console` (aviso), 12 `react/no-unescaped-entities`, 11 `jsx-a11y/alt-text`
 (aviso), 9 `no-explicit-any`, 8 `no-img-element` (aviso), 4 `prefer-const`, 3
 `exhaustive-deps` (aviso), 3 `no-unused-expressions` (aviso), 2
-`no-require-imports`. Las herramientas de `tools/` no añaden ninguno
+`no-require-imports`. Los 12 avisos de `no-console` son directivas
+`eslint-disable` que ya no hacen falta. Con las herramientas de `tools/` ya en
+el árbol, `npm run lint` vuelve a dar exactamente 96/68
 (`npx eslint docs/spec/rediseno/tools` → 0).
 
 ### Unitarias
@@ -91,7 +93,37 @@ cierre de la tanda M (634 pasan, 0 fallan; AG-DT-255).
 `tools/cap-app.js` y `tools/chk-app.js` sobre todas las rutas en alcance, en los
 cinco formatos, claro y oscuro, guardadas fuera del repo. Con agenda v2 encendida,
 semilla recién sembrada y una consulta ficticia insertada en local para «nota de
-consulta» (borrada después). Ver el informe de B0 para el resumen de mediciones.
+consulta» (borrada después; la semilla se niega a borrar pacientes con consultas).
+
+Para repetirlas (con `next start -p 3001` arriba):
+
+```bash
+node docs/spec/rediseno/tools/cap-app.js <carpeta> --pid <paciente> --cid <consulta>
+node docs/spec/rediseno/tools/chk-app.js --pid <paciente> --cid <consulta> --json <carpeta>/chk.json
+```
+
+25 rutas × 5 formatos × 2 temas = 250 capturas, 0 fallos, 0 errores de consola.
+Observaciones:
+
+* `/expediente/[id]/laboratorios` y `/expediente/[id]/estado` redirigen hoy a
+  `?tab=mediciones` y al resumen: sus capturas repiten las de esas pestañas.
+* En `ih` (951 px) la agenda no tiene vista «Semana»: ofrece Mes / 3 días / Día
+  (la captura `agenda-semana@ih` es la vista por defecto, «3 días»).
+
+`chk-app.js` (sólo lo visible en la ventana al cargar, sin desplazar). Suma de
+hallazgos de las 25 rutas, claro + oscuro:
+
+| Formato | (h) bajo franja | (i) toque < mínimo | (a) desborde | (c) solape | texto < 12 px | consola |
+|---|---|---|---|---|---|---|
+| `ext` (toque 44) | 194 | 162 | 4 | 0 | 240 | 0 |
+| `tel` (toque 44) | 22 | 182 | 6 | 4 | 260 | 0 |
+| `ih` (toque 36) | 152 | 112 | 10 | 0 | 382 | 0 |
+| `iv` (toque 44) | 0 | 236 | 14 | 4 | 312 | 0 |
+| `esc` (toque 36) | 0 | 438 | 14 | 4 | 1 128 | 0 |
+
+(b), (d), (e) y (f): 0 en todas. Ninguna página desborda en horizontal. Lo de
+`ext`/`ih` bajo la franja derecha es el hueco ya conocido: la app no usa
+`env(safe-area-inset-left|right)` (PLAN §1.3).
 
 ## Bloques
 
