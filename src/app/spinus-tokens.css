@@ -228,13 +228,21 @@
   /* ---------------------------------------------------------------------
      3. COLOR — NEUTRALES (escala única, rol fijo por token)
      --------------------------------------------------------------------- */
-  --sp-ink-900:            #14345c;  /* títulos de nivel documento (H1 de lienzo) */
-  --sp-ink-800:            #173156;  /* TÍTULO: modal, card, sección, valor de campo */
+  /* ⚠️ B1 DEL REDISEÑO: LOS NEUTROS CON PAR EN EL KIT SON ALIAS. Superficie,
+     fondo, sección, título, secundario, etiqueta y las tres líneas finas apuntan
+     a `sistema.css` (--sup, --fondo, --sup2, --tinta, --tinta2, --tinta3,
+     --borde, --linea), en claro y en oscuro. Lo no migrado se acerca así al
+     aspecto nuevo sin tocar sus archivos (PLAN §2.1.2); en B15 se borran los que
+     se queden sin consumidores. Los demás escalones (700, 600, 400…, los bordes
+     de control, la superficie hundida) siguen siendo literales a propósito:
+     `--sp-line-control` está medido a 3:1 y no tiene par en el kit. */
+  --sp-ink-900:            var(--tinta);  /* B1: alias del kit (antes #14345c) */  /* títulos de nivel documento (H1 de lienzo) */
+  --sp-ink-800:            var(--tinta);  /* B1: alias del kit (antes #173156) */  /* TÍTULO: modal, card, sección, valor de campo */
   --sp-ink-700:            #3b4a5c;  /* CUERPO: párrafos, valores, texto de nota */
   --sp-ink-600:            #4b5b6e;  /* cuerpo sobre fondo gris (chip de contexto) */
-  --sp-ink-500:            #5a6b81;  /* SECUNDARIO: subtítulos de página, botón secundario */
+  --sp-ink-500:            var(--tinta2); /* B1: alias del kit (antes #5a6b81) */  /* SECUNDARIO: subtítulos de página, botón secundario */
   --sp-ink-400:            #6b7b8f;  /* TERCIARIO: links ghost, "Cerrar", botón texto */
-  --sp-ink-350:            #8a99ac;  /* ETIQUETAS y meta: labels mayúsculas, subtítulo modal */
+  --sp-ink-350:            var(--tinta3); /* B1: alias del kit (antes #8a99ac) */  /* ETIQUETAS y meta: labels mayúsculas, subtítulo modal */
   --sp-ink-300:            #9aa7b6;  /* HINT: microcopy bajo un control */
   --sp-ink-250:            #94a3b8;  /* texto de elemento diferido (slot de voz) */
   --sp-ink-200:            #aab6c4;  /* PLACEHOLDER de input/textarea */
@@ -267,13 +275,13 @@
   --sp-line-dash:          #b9c4d2;  /* borde punteado (slot diferido, underline de link) */
   --sp-line-input:         #d5deea;  /* BORDE DE CONTROL: input, textarea, botón secundario */
   --sp-line-chip:          #d7e0ec;  /* borde de chip inactivo */
-  --sp-line-soft:          #e2e8f0;  /* borde de card interna / botón terciario */
-  --sp-line-card:          #e6ebf2;  /* BORDE DE CARD contenedora */
-  --sp-line-divider:       #eef1f6;  /* DIVISOR dentro del modal (header/footer) */
+  --sp-line-soft:          var(--borde);  /* B1: alias del kit (antes #e2e8f0) */  /* borde de card interna / botón terciario */
+  --sp-line-card:          var(--borde);  /* B1: alias del kit (antes #e6ebf2) */  /* BORDE DE CARD contenedora */
+  --sp-line-divider:       var(--linea);  /* B1: alias del kit (antes #eef1f6) */  /* DIVISOR dentro del modal (header/footer) */
   --sp-line-frame:         #dbe3ee;  /* borde del viewport/frame */
   --sp-line-capture:       color-mix(in srgb, var(--cs, #1e5fa8) 20%, #fff);  /* borde de la Card Captura (protagonista) */
 
-  --sp-surface:            #ffffff;  /* superficie de card y modal */
+  --sp-surface:            var(--sup);    /* B1: alias del kit (antes #ffffff) */  /* superficie de card y modal */
   /* EL PANEL DE UN MODAL LEGACY — translúcido y con desenfoque detrás.
      ⚠️ EXISTE PARA ESQUIVAR UN AGUJERO DE LA HOJA DE TRADUCCIÓN, y sin ese dato
      no se entiende por qué hay dos tokens de superficie de modal. Estos paneles
@@ -289,10 +297,10 @@
      el del viejo. */
   --sp-surface-glass:      rgba(255,255,255,.95);
   --sp-surface-sunken:     #fbfcfe;  /* fondo de input/textarea y card interna */
-  --sp-surface-muted:      #eef2f7;  /* fondo de sección/chip neutro/nota al pie */
+  --sp-surface-muted:      var(--sup2);   /* B1: alias del kit (antes #eef2f7) */  /* fondo de sección/chip neutro/nota al pie */
   --sp-surface-empty:      #f1f4f8;  /* fondo de ícono en estado vacío */
   --sp-surface-slot:       #f4f7fb;  /* fondo de control diferido */
-  --sp-app-bg:             #f5f8fc;  /* fondo de la aplicación */
+  --sp-app-bg:             var(--fondo);  /* B1: alias del kit (antes #f5f8fc) */  /* fondo de la aplicación */
   --sp-canvas-bg:          #e9edf3;  /* fondo del lienzo de mockups (no va a la app) */
   --sp-bezel:              #0f1e30;  /* bisel de teléfono (solo mockups) */
 
@@ -483,27 +491,32 @@
    Dark ya en producción). Ningún valor es inventado: cada token cita su origen.
    Va FUERA de @layer components, junto a :root: solo declara custom properties.
    Gana a :root por especificidad (0,1,1) vs (0,1,0), no por orden de fuente.
+   ⚠️ B1 DEL REDISEÑO: YA NO ES GRIS MATERIAL. Las superficies, las tintas de
+   título/secundario/etiqueta y las líneas finas apuntan al oscuro navy del kit
+   (`sistema.css`, html.dark); las demás tintas siguen en blanco con alfa, que
+   sobre navy lee igual. Los `TP:` de abajo citan el ORIGEN del rol, no el
+   valor de hoy.
    ========================================================================== */
 html.dark {
   /* — SUPERFICIES (elevación Material) — */
-  --sp-app-bg:           #121212;              /* TP:110,114 */
-  --sp-surface:          #1e1e1e;              /* TP:117  .bg-white (dp1) */
-  --sp-surface-glass:    rgba(30,30,30,.95);   /* = --sp-surface al 95 % */
-  --sp-surface-sunken:   #242424;              /* TP:118,160  input/textarea */
-  --sp-surface-muted:    #2c2c2c;              /* TP:119,169 (dp4) */
-  --sp-surface-empty:    #242424;              /* TP:118 */
-  --sp-surface-slot:     #242424;              /* TP:118 */
+  --sp-app-bg:           var(--fondo);         /* TP:110,114 */
+  --sp-surface:          var(--sup);           /* TP:117  .bg-white (dp1) */
+  --sp-surface-glass:    color-mix(in srgb, var(--sup) 95%, transparent); /* = --sp-surface al 95 % */
+  --sp-surface-sunken:   var(--sup2);          /* TP:118,160  input/textarea */
+  --sp-surface-muted:    color-mix(in srgb, var(--sup2) 92%, #fff); /* TP:119,169 (dp4) */
+  --sp-surface-empty:    var(--sup2);          /* TP:118 */
+  --sp-surface-slot:     var(--sup2);          /* TP:118 */
   --sp-backdrop:         rgba(0,0,0,.8);       /* TP:223 */
 
   /* — TINTA — el dark desplegado tiene 6 escalones; los 13 niveles colapsan
        a ellos. Las pérdidas caen en el extremo bajo (hints, placeholders). */
-  --sp-ink-900:  rgba(255,255,255,.87);        /* TP:136 */
-  --sp-ink-800:  rgba(255,255,255,.87);        /* TP:132,137 */
+  --sp-ink-900:  var(--tinta);                 /* TP:136 */
+  --sp-ink-800:  var(--tinta);                 /* TP:132,137 */
   --sp-ink-700:  rgba(255,255,255,.75);        /* TP:138,186 */
   --sp-ink-600:  rgba(255,255,255,.60);        /* TP:134,139 */
-  --sp-ink-500:  rgba(255,255,255,.50);        /* TP:140 */
-  --sp-ink-400:  rgba(255,255,255,.50);        /* TP:140 — colapso */
-  --sp-ink-350:  rgba(255,255,255,.38);        /* TP:141 */
+  --sp-ink-500:  var(--tinta2);                /* TP:140 */
+  --sp-ink-400:  var(--tinta2);                /* TP:140 — colapso */
+  --sp-ink-350:  var(--tinta3);                /* TP:141 */
   --sp-ink-300:  rgba(255,255,255,.38);        /* TP:141 — colapso */
   --sp-ink-250:  rgba(255,255,255,.38);        /* TP:141 — colapso */
   --sp-ink-200:  rgba(255,255,255,.38);        /* TP:165 placeholder */
@@ -518,9 +531,9 @@ html.dark {
      3.18 sobre la hundida, 3.07 sobre la de sección y 3.21 sobre el fondo de la
      app — el peor caso es la de sección, que es la más clara. */
   --sp-line-control: rgba(255,255,255,.35);
-  --sp-line-divider: rgba(255,255,255,.08);    /* TP:125,128 */
-  --sp-line-soft:    rgba(255,255,255,.08);    /* TP:125 */
-  --sp-line-card:    rgba(255,255,255,.12);    /* TP:124 */
+  --sp-line-divider: var(--linea);             /* TP:125,128 */
+  --sp-line-soft:    var(--linea);             /* TP:125 */
+  --sp-line-card:    var(--borde);             /* TP:124 */
   --sp-line-input:   rgba(255,255,255,.12);    /* TP:163 */
   --sp-line-chip:    rgba(255,255,255,.12);    /* TP:124 */
   --sp-line-frame:   rgba(255,255,255,.12);    /* TP:124 */

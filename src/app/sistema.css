@@ -1,0 +1,255 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   SISTEMA VISUAL DEL REDISEÑO (B1 · cimientos)
+   ----------------------------------------------------------------------------
+   Origen: `docs/spec/rediseno/kit/base.css` (tokens de la paleta de fábrica) y
+   `docs/spec/rediseno/PLAN.md` §2.1–§2.6. Lo importa `globals.css` justo
+   después de `spinus-tokens.css`.
+
+   ⚠️ ESTE ARCHIVO NO PINTA NADA POR SÍ SOLO. Declara tokens, utilidades de
+   Tailwind (`bg-sup`, `text-tinta2`…), variantes por formato (`ext:`, `tel:`,
+   `ih:`, `iv:`, `esc:`) y clases `.k-*` que nadie usa todavía. Lo que sí cambia
+   el aspecto en B1 son los ALIAS de `spinus-tokens.css` y la hoja de traducción
+   oscura (`ThemeProvider.tsx` y la «Ampliación» de `globals.css`), que apuntan
+   aquí.
+
+   ⚠️ EL OSCURO ES `html.dark`, NO `prefers-color-scheme`. El kit sigue al
+   sistema; la app NO (decisión del dueño, CALMA §31.3): interruptor del menú y
+   `localStorage.theme`, escrito antes del pintado por `ScriptTema.tsx`.
+
+   ⚠️ LA MARCA DE LA CLÍNICA. Los valores de abajo son los de la paleta de
+   fábrica («Spinus (defecto)», CALMA §31.1). Con cualquiera de las otras cinco,
+   `ThemeProvider.tsx` redeclara `--navy`, `--accion`, `--enlace`, `--tonal` y
+   `--tonal-tinta` a partir de `--cp`/`--cs`. Nadie más los redeclara.
+
+   ┌─ TABLA DE EQUIVALENCIAS CON EL KIT (aplícala al copiar CSS de una maqueta) ─┐
+   │ kit/base.css        → aquí              motivo                              │
+   │ --ag-fondo          → --aviso-fondo     `--ag-*` es la familia de la agenda │
+   │ --ag-tinta          → --aviso-tinta     y `agendaPublicaTokens.test.ts`     │
+   │ --ag-punto          → --aviso-punto     recorre `--ag-[\w-]+` en globals    │
+   │ --it/--ir/--ib/--il → env(safe-area-*)  en la maqueta son 0/84/34 fijos;    │
+   │                                         aquí, NUNCA un número               │
+   │ prefers-color-scheme→ html.dark         ver arriba                          │
+   └─────────────────────────────────────────────────────────────────────────────┘
+
+   ⚠️ NINGÚN `--ag-*` SE DECLARA AQUÍ. La agenda y las páginas públicas
+   (`/reservar`, `/confirmar`) siguen con los suyos hasta B13.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* — Superficies y tinta — */
+  --fondo: #F2F4F8;
+  --sup: #FFFFFF;
+  --sup2: #E6EAF1;
+  --tonal: #E3EBF8;
+  --tonal-tinta: #1F3F7A;
+  --tinta: #14213D;
+  --tinta2: #5B6478;
+  --tinta3: #8A93A6;
+  --linea: #EDF0F5;
+  --borde: #DDE3EE;
+
+  /* — Marca (paleta de fábrica; las otras cinco, en ThemeProvider) — */
+  --navy: #1B2B4A;
+  --accion: #2F5AA8;
+  --sobre-accion: #FFFFFF;
+  --enlace: #2F5AA8;
+
+  /* — Sobre la navegación navy — */
+  --nav-tinta: #DCE4F2;
+  --nav-tinta2: #AFC0DE;
+  --nav-velo: rgba(255, 255, 255, .08);
+  --nav-avatar: #DCE6F7;
+
+  /* — Semánticos — */
+  --mes: #B42318;
+  --aviso-fondo: #FDF0E1;
+  --aviso-tinta: #9A4A06;
+  --aviso-punto: #D97706;
+  --ok-fondo: #E3F3EA;
+  --ok-tinta: #1B6B43;
+  --mal-fondo: #FBE4E1;
+  --mal-tinta: #B42318;
+
+  /* — Sombras (sólo capas y navegación, CALMA §3) y velo — */
+  --sombra-nav-der: -8px 0 28px rgba(20, 33, 61, .14);
+  --sombra-nav-izq: 8px 0 28px rgba(20, 33, 61, .14);
+  --sombra-nav-sup: 0 8px 24px rgba(20, 33, 61, .14);
+  --sombra-capa: 0 18px 48px rgba(20, 33, 61, .22);
+  --sombra-accion: 0 4px 12px rgba(47, 90, 168, .28);
+  --velo: rgba(10, 18, 32, .45);
+  /* El desenfoque del velo (CALMA §13). Con transparencia reducida pasa a
+     `none` y el velo se vuelve opaco: ver el @media del final. */
+  --velo-filtro: blur(10px) saturate(140%);
+
+  /* — Color por tipo de documento (CALMA §9) — */
+  --d-receta: #1d4ed8;
+  --d-laboratorio: #047857;
+  --d-imagen: #7c3aed;
+  --d-suplementacion: #92400e;
+  --d-internamiento: #be123c;
+  --d-escrito: #155e75;
+  --d-consentimiento: #3730a3;
+  --d-honorarios: #c2410c;
+  --d-mezcla: 12%;
+
+  --fuente: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+  /* — Franjas del sistema. En la maqueta son números; aquí, siempre env(). — */
+  --it: env(safe-area-inset-top, 0px);
+  --ir: env(safe-area-inset-right, 0px);
+  --ib: env(safe-area-inset-bottom, 0px);
+  --il: env(safe-area-inset-left, 0px);
+
+  /* — Radios (BRIEF «Radios») — */
+  --r-control: 12px;        /* botones y campos */
+  --r-tarjeta: 16px;        /* tarjeta en teléfono */
+  --r-tarjeta-ancha: 20px;  /* tarjeta en ih/esc; alertas */
+  --r-nav: 26px;            /* navegación, sólo del lado del contenido */
+  --r-pildora: 999px;
+
+  /* — Capas. Los números son los que la app ya usa (ver `body::before` en
+     globals.css): menú lateral 40, franja 45, hamburguesa y modales 50. — */
+  --z-nav: 40;
+  --z-franja: 45;
+  --z-capa: 50;
+  --z-menu: 60;
+  --z-aviso: 70;
+
+  /* — Movimiento (PLAN §2.6, skill apple-design §4) —
+     Resorte críticamente amortiguado (amortiguación 1) muestreado con
+     `linear()`. La curva es x(t) = 1 − (1 + ωt)·e^(−ωt) con ω = 2π/respuesta y
+     la duración = la respuesta, así que la forma normalizada es LA MISMA para
+     entrar (0,36 s) y para salir (0,24 s): lo que cambia es la duración. Al
+     final queda un 1,8 % que se salta de golpe, invisible a esa distancia.
+     ⚠️ SAFARI < 17.2 NO ENTIENDE `linear()`: la transición que lo use se
+     descarta entera y la capa aparece sin animación, pero funciona. */
+  --resorte-entra: linear(0, 0.04, 0.131, 0.243, 0.358, 0.466, 0.562, 0.645, 0.715, 0.774, 0.821, 0.859, 0.89, 0.914, 0.934, 0.949, 0.96, 0.97, 0.977, 0.982, 1);
+  --resorte-sale: linear(0, 0.04, 0.131, 0.243, 0.358, 0.466, 0.562, 0.645, 0.715, 0.774, 0.821, 0.859, 0.89, 0.914, 0.934, 0.949, 0.96, 0.97, 0.977, 0.982, 1);
+  --dur-entra: 360ms;
+  --dur-sale: 240ms;
+  --dur-toque: 100ms;
+}
+
+/* ── El oscuro del kit: UN SOLO OSCURO, navy (PLAN §2.3) ── */
+html.dark {
+  --fondo: #0C1420;
+  --sup: #16223A;
+  --sup2: #1F2E4A;
+  --tonal: #223A66;
+  --tonal-tinta: #C3D6F8;
+  --tinta: #E8EDF7;
+  --tinta2: #A3AEC4;
+  --tinta3: #7C89A3;
+  --linea: #24324C;
+  --borde: #2C3D5C;
+  --navy: #101B30;
+  --accion: #3B6FC9;
+  --sobre-accion: #FFFFFF;
+  --enlace: #8FB2F0;
+  --mes: #F2877C;
+  --aviso-fondo: #3E2A10;
+  --aviso-tinta: #F2BE7C;
+  --aviso-punto: #E0963A;
+  --ok-fondo: #143526;
+  --ok-tinta: #8FD9B0;
+  --mal-fondo: #45191A;
+  --mal-tinta: #F5A39B;
+  --sombra-nav-der: -8px 0 28px rgba(0, 0, 0, .4);
+  --sombra-nav-izq: 8px 0 28px rgba(0, 0, 0, .4);
+  --sombra-nav-sup: 0 8px 24px rgba(0, 0, 0, .4);
+  --sombra-capa: 0 18px 48px rgba(0, 0, 0, .55);
+  --sombra-accion: 0 4px 12px rgba(0, 0, 0, .35);
+  --velo: rgba(0, 0, 0, .35);
+  --d-receta: #4899fb;
+  --d-laboratorio: #00b781;
+  --d-imagen: #a17efe;
+  --d-suplementacion: #e7ad00;
+  --d-internamiento: #fd5d79;
+  --d-escrito: #00cee9;
+  --d-consentimiento: #9fabff;
+  --d-honorarios: #ee7d00;
+  --d-mezcla: 18%;
+  color-scheme: dark;
+}
+
+/* Transparencia reducida: velo opaco y sin desenfoque (skill apple-design §14).
+   Sin soporte del @media no aplica y el velo sigue siendo legible. */
+@media (prefers-reduced-transparency: reduce) {
+  :root { --velo: rgba(10, 18, 32, .72); --velo-filtro: none; }
+  html.dark { --velo: rgba(0, 0, 0, .7); }
+}
+
+/* ── Utilidades de Tailwind sobre los tokens ──────────────────────────────
+   `inline` para que la utilidad lleve `var(--x)` y se resuelva en el elemento
+   (claro, oscuro y marca de la clínica) y no en `:root` al compilar. Sólo
+   colores: los `--radius-*` NO, porque `ThemeProvider` todavía inyecta
+   `--radius-sm/md/lg` muertos que pisarían a los de Tailwind (B15). */
+@theme inline {
+  --color-fondo: var(--fondo);
+  --color-sup: var(--sup);
+  --color-sup2: var(--sup2);
+  --color-tonal: var(--tonal);
+  --color-tonal-tinta: var(--tonal-tinta);
+  --color-tinta: var(--tinta);
+  --color-tinta2: var(--tinta2);
+  --color-tinta3: var(--tinta3);
+  --color-linea: var(--linea);
+  --color-borde: var(--borde);
+  --color-navy: var(--navy);
+  --color-accion: var(--accion);
+  --color-sobre-accion: var(--sobre-accion);
+  --color-enlace: var(--enlace);
+  --color-nav-tinta: var(--nav-tinta);
+  --color-nav-tinta2: var(--nav-tinta2);
+  --color-mes: var(--mes);
+  --color-aviso-fondo: var(--aviso-fondo);
+  --color-aviso-tinta: var(--aviso-tinta);
+  --color-aviso-punto: var(--aviso-punto);
+  --color-ok-fondo: var(--ok-fondo);
+  --color-ok-tinta: var(--ok-tinta);
+  --color-mal-fondo: var(--mal-fondo);
+  --color-mal-tinta: var(--mal-tinta);
+  --color-d-receta: var(--d-receta);
+  --color-d-laboratorio: var(--d-laboratorio);
+  --color-d-imagen: var(--d-imagen);
+  --color-d-suplementacion: var(--d-suplementacion);
+  --color-d-internamiento: var(--d-internamiento);
+  --color-d-escrito: var(--d-escrito);
+  --color-d-consentimiento: var(--d-consentimiento);
+  --color-d-honorarios: var(--d-honorarios);
+}
+
+/* ── Variantes por formato de pantalla (PLAN §2.5) ─────────────────────────
+   `data-formato` lo escribe en <html> la sonda de `ScriptTema.tsx` antes del
+   primer pintado (ver `src/lib/formatoPantalla.ts`). Sólo existe en `(app)` y
+   `(launcher)`: en las páginas públicas estas variantes no casan nunca.
+   ⚠️ EL FORMATO SE APLICA CON CSS. Ningún componente decide su marcado por él
+   en el primer render (hidratación); si JS lo necesita, lo lee tras montar. */
+@custom-variant ext (&:where([data-formato="ext"], [data-formato="ext"] *));
+@custom-variant tel (&:where([data-formato="tel"], [data-formato="tel"] *));
+@custom-variant ih (&:where([data-formato="ih"], [data-formato="ih"] *));
+@custom-variant iv (&:where([data-formato="iv"], [data-formato="iv"] *));
+@custom-variant esc (&:where([data-formato="esc"], [data-formato="esc"] *));
+
+/* ── Tipografía por rol (BRIEF «Sistema visual», CALMA §4 y §12) ──────────
+   En `@layer components` para que una utilidad de la pantalla pueda ajustar
+   un caso concreto sin `!important`. Nada por debajo de 12 px. */
+@layer components {
+  .k-t-pantalla { font-size: 26px; line-height: 32px; font-weight: 800; letter-spacing: -0.6px; color: var(--tinta); }
+  :where([data-formato="ih"], [data-formato="iv"], [data-formato="esc"]) .k-t-pantalla { font-size: 32px; line-height: 38px; }
+  .k-t-seccion { font-size: 20px; line-height: 26px; font-weight: 700; color: var(--tinta); }
+  .k-t-tarjeta { font-size: 17px; line-height: 22px; font-weight: 700; color: var(--tinta); }
+  .k-t-fila { font-size: 15px; line-height: 20px; font-weight: 600; color: var(--tinta); }
+  .k-t-sec { font-size: 13px; line-height: 18px; font-weight: 400; color: var(--tinta2); }
+  .k-t-rotulo { font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: .3px; text-transform: uppercase; color: var(--tinta2); }
+  .k-t-chip { font-size: 12px; line-height: 16px; font-weight: 600; }
+  .k-num { font-variant-numeric: tabular-nums; }
+
+  /* Respuesta al toque en pointer-down (skill apple-design §1). */
+  .k-pulsable { transition: transform var(--dur-toque) ease-out; }
+  .k-pulsable:active { transform: scale(.97); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .k-pulsable:active { transform: none; }
+}
