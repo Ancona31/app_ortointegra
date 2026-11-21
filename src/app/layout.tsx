@@ -54,7 +54,12 @@ export const viewport: Viewport = {
      Dónde se nota: Chrome de Android y la barra de direcciones. En la app
      instalada de iOS NO, porque allí la barra es `black-translucent` y lo que
      se ve es el píxel de `body::before`, que sí sale de `--ag-navy` y sí sigue
-     al tema y a la marca. */
+     al tema y a la marca.
+     ⚠️ REDISEÑO: ESTOS DOS SIGUEN EN `--ag-navy` Y NO EN EL `--navy` DEL KIT,
+     a propósito (B1). La franja, la barra lateral, la banda de la agenda y la
+     barra del dashboard pintan `--ag-navy`; si sólo la franja pasara a
+     `--navy`, en oscuro quedaría #101B30 encima de #2f4f73 con un corte a la
+     vista. Pasan los cuatro juntos cuando migre el cromo (B4/B13). */
   themeColor: [
     { media: '(prefers-color-scheme: light)', color: '#163250' },
     { media: '(prefers-color-scheme: dark)',  color: '#2f4f73' },
@@ -84,8 +89,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
        lo toca. `ScriptTema` —que montan `(app)` y `(launcher)`, no este layout—
        le añade la clase `dark` al <html> mientras el documento se analiza, o sea
        antes de hidratar, y sin la supresión React avisa de discrepancia en cada
-       carga de esas rutas. Es el único atributo del documento que cambia, así
-       que la supresión no tapa nada más. */
+       carga de esas rutas. Desde el rediseño (B1) el mismo script escribe
+       también `data-formato` y `data-borde-sistema` (la sonda de
+       `src/lib/formatoPantalla.ts`), así que ya NO es el único atributo: son
+       esos tres, todos en <html>. La supresión sigue sin tapar nada más,
+       porque React sólo la aplica a los atributos de ESTE elemento, no a sus
+       hijos. Ningún componente debe decidir su marcado por el formato en el
+       primer render; eso sí daría discrepancia y esto no la taparía. */
     <html lang="es" className="h-full" suppressHydrationWarning>
       <head>
         {/* ⚠️ `theme-color` YA NO ESTÁ AQUÍ: se mudó al export `viewport` de
