@@ -34,6 +34,12 @@ import { Consultorio } from '@/types'
  *   puede cambiar.
  * La lista, «Gestionar consultorios →», la confirmación y el aviso son los de
  * siempre, con sus textos.
+ *
+ * ⚠️ EL DESPLEGABLE VA A MANO Y NO CON `ui/CapaMenu.tsx` (integración B1–B4):
+ * mezcla opciones con palomita (`menuitemradio`) con un ENLACE a `/perfil`
+ * («Gestionar consultorios →», que además cierra el cajón), y CapaMenu sólo
+ * hace todo-radio o todo-opción. Pasarlo perdería la palomita o haría del
+ * enlace una opción de radio. Ampliar su API queda fuera de alcance.
  */
 
 interface Props {

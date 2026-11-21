@@ -10,9 +10,13 @@ import Portal from '@/components/ui/Portal'
  * píldora «Más» del encabezado de `iv`. Lo que lleva dentro lo decide
  * `Sidebar.tsx` y llega como `children`: esto sólo es la capa.
  *
- * ⚠️ PENDIENTE DE PASAR A `ui/CapaMenu.tsx` (B3). Cuando exista, esta capa se
- * sustituye por ella; aquí se construyó con su presentación final y sin
- * abstraer nada, como pide el plan para no depender de B3.
+ * ⚠️ NO ES `ui/CapaMenu.tsx`, Y NO POR OLVIDO (integración B1–B4). CapaMenu
+ * sólo pinta una lista de opciones-botón; «Más» lleva la tarjeta ámbar de
+ * pendientes, la fila «Consultorio activo» que despliega su lista dentro, ENLACES
+ * de verdad (Administración, Mi perfil, Ayuda; el Aviso de Privacidad en pestaña
+ * nueva con `noopener`) y «Cerrar sesión» girando mientras se audita. Pasarlo
+ * exigiría ampliar la API de CapaMenu, y eso no se hace sin un plan. Por eso el
+ * mismo dibujo (velo, tarjeta, salida) vive aquí a mano.
  *
  * ⚠️ SÓLO SE MONTA ABIERTA (y mientras sale). Cerrada no deja nodos: así sus
  * textos —«Cerrar sesión», el aviso de pendientes— no aparecen dos veces en el

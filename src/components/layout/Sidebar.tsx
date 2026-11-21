@@ -314,7 +314,11 @@ function FilasAjustes({ a }: { a: Ajustes }) {
   )
 }
 
-/** El menú de ajustes del pie: nace de su botón, sin velo (CALMA §21). Esc y clic fuera lo cierran. */
+/** El menú de ajustes del pie: nace de su botón, sin velo (CALMA §21). Esc y clic fuera lo cierran.
+ *  ⚠️ A MANO Y NO CON `ui/CapaMenu.tsx`: el Aviso de Privacidad es un ENLACE a
+ *  pestaña nueva (con su icono de salida) y «Cerrar sesión» se queda girando y
+ *  sin segundo toque mientras se audita; CapaMenu cierra al elegir y sólo tiene
+ *  opciones-botón. Ampliar su API queda fuera de la integración B1–B4. */
 function MenuAjustes({ a, alCerrar, idMenu }: { a: Ajustes; alCerrar: () => void; idMenu: string }) {
   const caja = useRef<HTMLDivElement>(null)
   const cerrar = useRef(alCerrar)

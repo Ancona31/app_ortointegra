@@ -2629,6 +2629,12 @@ html.dark .nav-fila-icono { color: var(--enlace); }
   padding: 8px 0; border-radius: 20px; background: var(--sup); color: var(--tinta); box-shadow: var(--sombra-capa);
 }
 [data-formato="ext"] .nav-capa-tarjeta { max-width: 310px; }
+/* UN SOLO VELO (CALMA §13), también sobre «Más»: una capa del catálogo que se
+   abre encima (la confirmación de cambio de consultorio) deja el velo de «Más»
+   como único. Misma regla que `.k-capa ~ .k-capa` de `sistema.css`. */
+.nav-capa[data-fase="entra"] ~ .k-capa > .k-velo {
+  background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none;
+}
 .nav-capa[data-fase="entra"] { animation: nav-funde-entra var(--dur-entra) ease-out both; }
 .nav-capa[data-fase="entra"] .nav-capa-tarjeta { animation: nav-escala-entra var(--dur-entra) var(--resorte-entra) both; }
 .nav-capa[data-fase="sale"] { animation: nav-funde-sale var(--dur-sale) ease-in both; }
