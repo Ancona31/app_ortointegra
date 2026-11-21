@@ -6703,3 +6703,243 @@ mueve el cierre de sesión, es cómo se mezcla una limpieza con una regresión.
 ---
 
 (Fin del registro actual. Nuevas etapas se añaden como secciones ## debajo.)
+
+---
+
+## Rediseño estético — deuda detectada (no se toca en el rediseño)
+
+Origen: la auditoría de partida del rediseño estético (`docs/spec/rediseno/informes/`,
+sobre `feature/agenda-v2` @ `951e31b3`) y la lista §7.2 de su plan
+(`docs/spec/rediseno/PLAN.md`). Anotado en el bloque B0, 2026-11-21.
+
+**Por qué ninguna se arregla en el rediseño:** el rediseño es solo estético
+(visual, layout, tipografía, iconografía, movimiento). Todo lo de abajo es
+funcionalidad, backend, texto legal o código muerto cuyo borrado necesita el OK
+del dueño. Si un bloque del rediseño toca la pantalla, la deja **como está en
+esto**; los arreglos de front que sí entran están en §7.1 del plan.
+
+Las referencias de archivo son del commit de partida. Donde dice **«comprobado en
+B0»** se miró el código al anotarlo; el resto viene de los informes y no se volvió
+a verificar.
+
+### RED-DT-1 — «Eliminar expediente» promete un borrado permanente que no ocurre
+
+**Estado:** 🟡 abierta · **Archivo:** `src/app/(app)/expediente/[id]/page.tsx:240`
+(comprobado en B0)
+
+El diálogo habla de eliminar el expediente, pero los expedientes nunca se borran
+(soft delete, retención mínima de 5 años, `CLAUDE.md` § Cumplimiento). El texto
+promete algo que el sistema no hace. El rediseño solo aplica el nombre aprobado
+«Eliminar paciente»; el resto del texto (qué pasa de verdad con los datos) queda
+pendiente de redacción revisada.
+
+---
+
+### RED-DT-2 — El saludo usa solo la primera palabra del nombre
+
+**Estado:** 🟡 abierta, menor · **Archivos:** `src/app/(app)/dashboard/page.tsx:78`,
+`src/app/(app)/dashboard/AsistenteDashboard.tsx:38` (comprobado en B0)
+
+`profile.nombres.split(' ')[0]`: «José de Jesús» saluda como «José». Es lógica,
+no estilo; el rediseño la conserva.
+
+---
+
+### RED-DT-3 — Agenda: estirar un evento guarda sin preguntar; «Terminar después» con un paso inválido no guarda y no lo dice
+
+**Estado:** 🟡 abierta · **Archivos:** `src/app/(app)/agenda/AgendaCliente.tsx`
+(`eventResize`), `src/components/agenda/configuracion/PrimeraVez.tsx`
+
+Arrastrar el borde de un evento lo guarda sin confirmación (mover sí pregunta en
+los casos de fuera de horario). En el asistente de primera vez, «Terminar
+después» con un paso que no valida no guarda y no avisa. La confirmación al
+cancelar/eliminar una cita desde el formulario **sí** entra en el rediseño (AG6,
+CALMA §29.2); estas dos no.
+
+---
+
+### RED-DT-4 — Código muerto: `ConfiguracionCalendario`, `OnboardingGuide`; `HorarioModal` sin abrirse con la v2
+
+**Estado:** 🟡 abierta · **Borrarlos requiere el OK del dueño** (Protocolo 2)
+
+* `src/components/agenda/configuracion/ConfiguracionCalendario.tsx` (337 líneas;
+  ≈1 400 con las secciones que solo monta él, según el informe). Comprobado en
+  B0: nadie lo monta —`ConfiguracionAgenda.tsx:9` lo dice («se queda en disco sin
+  montar»)—, pero **`FilaDisponibilidad.tsx:20` y `SeccionDisponibilidad.tsx:17`
+  importan de él el tipo `ActualizarConfig`**: al retirarlo hay que mover ese tipo.
+* `src/components/ui/OnboardingGuide.tsx` (717 líneas), sin consumidores según el
+  informe; ojo: `perfil/page.tsx:1126` y `dashboard/page.tsx:126` mantienen anclas
+  `data-onboard` que hablan de él.
+* `src/components/agenda/HorarioModal.tsx` (207 líneas) no se abre con la agenda v2
+  (con la v1 sí: no es muerto mientras exista la v1).
+
+---
+
+### RED-DT-5 — Enlaces de reserva que dan 404 en producción mientras el aviso legal esté pendiente
+
+**Estado:** 🟡 abierta, depende de la revisión legal
+
+La página pública de reserva no abre si el aviso de privacidad no está aprobado
+(`GUIA_PRUEBAS_AGENDA_V2.md`, P7), y el texto real sigue marcado «PENDIENTE DE
+REVISIÓN LEGAL». El médico puede copiar un enlace que al paciente le da 404. Es
+decisión de producto y legal, no de diseño.
+
+---
+
+### RED-DT-6 — Textos de la agenda que dicen otra cosa de lo que pasa
+
+**Estado:** 🟡 abierta, menor
+
+* «Reservó Revisión de estudios» al ligar un evento de Google: el panel pone el
+  título del evento donde va el nombre de quien reservó
+  (`src/components/agenda/PanelLigarCita.tsx:41`, `Reservó {p.nombreReserva}`,
+  comprobado en B0).
+* «Agendar» toma la hora actual sin redondear.
+* Un código de reserva inválido muestra el 404 genérico, en inglés.
+* La burbuja de un evento de todo el día mostraría «00:00 – 00:00 · 1440 min».
+  **Sin verificar en vivo**: si se confirma, se mantiene esta entrada; si no, se
+  retira.
+
+---
+
+### RED-DT-7 — `FaltaParaEnlace` enlaza a un ancla que no existe
+
+**Estado:** 🟡 abierta · **Archivo:**
+`src/components/agenda/configuracion/FaltaParaEnlace.tsx:57` (comprobado en B0)
+
+«Ir a la disponibilidad» apunta a `#config-disponibilidad`, que solo existe en
+`SeccionDisponibilidad.tsx:45`, montada únicamente por el
+`ConfiguracionCalendario` muerto (RED-DT-4). En la configuración viva el enlace no
+lleva a ningún sitio (`FaltaParaEnlace` sí está vivo: lo monta
+`BloqueEnlacesMedico.tsx:121`). `PasosConfiguracion.tsx:146` y `:214` usan la misma
+ancla; de ese archivo la configuración viva solo importa `pasosDe`
+(`ConfiguracionAgenda.tsx:27`), así que no se comprobó si esos dos enlaces llegan a
+pintarse. Además, la
+secretaria ve las filas de duración sin saber de qué consultorio son.
+
+---
+
+### RED-DT-8 — Paleta ⌘K: promesa de datos y cita legal desfasada
+
+**Estado:** 🟠 abierta, texto legal · **Archivos:** `src/components/CommandPalette.tsx:524`,
+`src/components/launcher/ConsultaRapidaModal.tsx:505`,
+`src/app/(app)/pacientes/nuevo/page.tsx:470` (comentario),
+`src/app/api/nota-medica/route.ts:330` (comentario) — comprobado en B0
+
+La paleta promete «solo nombre, teléfono y motivo» y pide otra cosa, y cita
+«LFPDPPP Art. 9», que es de la ley abrogada de 2010 (`CLAUDE.md` § Cumplimiento
+normativo: no se citan artículos de memoria). El rediseño sí le pone
+`role="dialog"`, `aria-modal` y nombres accesibles (B4); el texto de la promesa y
+la cita no se tocan hasta verificarlos contra la ley vigente.
+
+---
+
+### RED-DT-9 — El aviso de revocación fallida al cerrar sesión se pierde al navegar
+
+**Estado:** 🟡 abierta, conocida · **Archivo:** `src/components/layout/Sidebar.tsx:470-484`
+(comprobado en B0; el propio comentario lo documenta como limitación)
+
+El `ToastProvider` cuelga de `(app)/layout.tsx` y la navegación a `/login` lo
+desmonta: el aviso «el servidor no confirmó la revocación» puede verse solo un
+instante. Sostenerlo exige pasarlo a `/login`. Toca el cierre de sesión: fuera del
+rediseño.
+
+---
+
+### RED-DT-10 — Marcadores de campo con nombres reales
+
+**Estado:** 🟡 abierta, menor · **Archivos:** `src/app/(app)/perfil/page.tsx:1053`,
+`src/components/onboarding/OnboardingModal.tsx:812` (comprobado en B0)
+
+«Ej: Clínica Ortointegra» y una universidad real como ejemplos. Cambiarlos es un
+cambio de texto fuera de la lista aprobada del rediseño.
+
+---
+
+### RED-DT-11 — Validaciones en inglés y textos sin acentos
+
+**Estado:** 🟡 abierta, menor
+
+Los formularios usan los globos nativos del navegador, que salen en inglés según
+el navegador. Hay textos visibles sin acentos («conexion», «bunker», «Escrito
+medico»; ubicación exacta en `informes/tipografia.md` y
+`informes/funciones-componentes.md`).
+
+---
+
+### RED-DT-12 — `CLAUDE.md` desactualizado en dos puntos
+
+**Estado:** 🟡 abierta, documentación
+
+* Deuda técnica conocida, punto 2: «`ModalShell` sin focus trap». Según la
+  auditoría el focus trap ya existe.
+* «Documentos de referencia»: `RESUMEN_DASHBOARD.md` describe un dashboard que ya
+  no es el actual.
+
+Se anota aquí y no se corrige en `CLAUDE.md` porque ese archivo solo lo edita el
+dueño o quien él indique.
+
+---
+
+### RED-DT-13 — Ayuda con contenidos desfasados o inflados
+
+**Estado:** 🟡 abierta · **Archivo:** `src/app/(app)/ayuda/page.tsx`
+
+* Sello «AES-256-GCM»: el propio archivo lo marca como inflado (`:26-27`,
+  comprobado en B0): ese cifrado respalda los tokens, no todos los datos.
+* Guía del visor DICOM, que se va a retirar.
+* «Mi perfil → Facturación» no es la ruta real.
+* La lista de atajos no tiene los de la agenda v2; otras guías desfasadas.
+
+---
+
+### RED-DT-14 — Facturación: «0/0» asistentes y «Reactivar suscripción» que no lleva a otro sitio
+
+**Estado:** 🟡 abierta · **Archivos:** `src/components/billing/SuscripcionBanner.tsx:58`,
+`src/components/billing/BloqueoFeatureModal.tsx:48`
+
+El plan gratuito muestra «0/0» asistentes. «Reactivar suscripción» lleva a la
+misma página en la que ya se está.
+
+---
+
+### RED-DT-15 — Datos que el formulario inventa o borra sin confirmar
+
+**Estado:** 🟡 abierta
+
+* Un paciente dado de alta solo con la edad recibe una fecha de nacimiento ficticia
+  del 1 de enero.
+* «Desconectar» Google Calendar y «Eliminar» la firma actúan sin confirmación.
+
+---
+
+### RED-DT-16 — Expediente y documentos: avisos y señales que no corresponden
+
+**Estado:** 🟡 abierta, menor
+
+* «Documento eliminado» al borrar un archivo de laboratorio
+  (`src/components/labs/SeccionDocumentosLabs.tsx:85`, comprobado en B0).
+* La fila de envío por correo muestra el correo anterior.
+* Entrar con `?cita=` no da ninguna señal visible de la cita.
+* Las notas de medición se cortan a 50 caracteres con el resto en `title` (esto
+  último sí lo resuelve el rediseño en B7, §7.1; se deja aquí el truncado de datos).
+
+---
+
+### RED-DT-17 — E2e que dependen de la hora o del día
+
+**Estado:** abierta · **Detalle:** AG-DT-256
+
+Unas 13 según el cierre de la tanda M. El rediseño corre su línea base y sus
+verificaciones sabiendo cuáles son (registro en
+`docs/spec/rediseno/IMPLEMENTACION-REGISTRO.md`) y no las arregla.
+
+---
+
+### RED-DT-18 — El módulo `(offline)` / búnker queda fuera del rediseño
+
+**Estado:** decisión, no defecto
+
+Por el Protocolo 6 (`(offline)/*` y Service Workers no se tocan). ASUMIENDO QUE el
+dueño no lo quiere rediseñar ahora; cuando se migre a HTML estático en
+`public/bunker/` será otro proyecto.
