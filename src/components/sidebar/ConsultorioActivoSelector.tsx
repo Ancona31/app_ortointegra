@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { Check, ChevronRight, ChevronsUpDown } from 'lucide-react'
+import { Building2, Check, ChevronRight, ChevronsUpDown } from 'lucide-react'
 import { useConsultorios } from '@/hooks/useConsultorios'
 import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
 import { useMenuMovil } from '@/contexts/MenuMovilContext'
@@ -189,23 +189,24 @@ export default function ConsultorioActivoSelector({ variante, logoUrl, nombreCli
             alGestionar={() => { setOpen(false); cerrarMenu() }} variante={variante} />
         )}
       </div>
+      {/* La alerta del catálogo (CALMA §13; maqueta `cromo`, vista 2): icono en
+          círculo, título y dos botones parejos. Rol `dialog`, el de siempre. */}
       <ModalShell
         open={!!pendingChange}
         onClose={() => setPendingChange(null)}
         title="Cambiar consultorio activo"
-        maxWidth="max-w-md"
+        icon={<Building2 aria-hidden="true" />}
+        variante="alerta"
+        tono="confirmar"
+        rol="dialog"
         footer={
-          <div className="flex justify-end gap-2 px-5 py-3.5">
-            <button type="button" onClick={() => setPendingChange(null)} className="k-b-tonal">Cancelar</button>
-            <button type="button" onClick={handleConfirm} className="k-b-prim">Sí, cambiar</button>
-          </div>
+          <>
+            <button type="button" onClick={() => setPendingChange(null)} className="k-b k-b-capa k-b-tonal">Cancelar</button>
+            <button type="button" autoFocus data-principal onClick={handleConfirm} className="k-b k-b-capa k-b-prim">Sí, cambiar</button>
+          </>
         }
       >
-        <div className="px-5 py-5">
-          <p className="text-[15px] text-tinta">
-            ¿Cambiar a <strong>{pendingChange ? getDisplayName(pendingChange) : ''}</strong>?
-          </p>
-        </div>
+        <p>¿Cambiar a <strong>{pendingChange ? getDisplayName(pendingChange) : ''}</strong>?</p>
       </ModalShell>
     </>
   )
