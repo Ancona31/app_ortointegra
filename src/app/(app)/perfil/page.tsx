@@ -1314,15 +1314,20 @@ export default function PerfilPage() {
           paso no toca layout. `motion-reduce` la apaga.
 
           ⚠️ LOS 1024 px DEL ENVOLTORIO NO SON UN MÁXIMO CAPRICHOSO: son los 960
-          del contenido MÁS el `lg:px-8` del layout, y con `lg:left-64`
-          —los 256 del menú— hacen que la barra caiga exactamente sobre la
-          columna de contenido a cualquier ancho de ventana. */}
+          del contenido MÁS el `lg:px-8` del layout, y con los bordes de la
+          navegación hacen que la barra caiga exactamente sobre la columna de
+          contenido a cualquier ancho de ventana.
+          ⚠️ LOS BORDES SON `--cromo-izq` / `--cromo-der` (`globals.css`, los
+          márgenes de <main>), NO UN `lg:left-64`: desde el rediseño (B4) hay
+          riel en `ext` y barra a la derecha en `ih`, y con `inset-x-0` el
+          «Guardar» quedaba debajo de ellos y de la franja, sin poder tocarse.
+          Abajo suma la franja del sistema (`--ib`) también fuera del teléfono. */}
       <Portal>
         <div
           aria-hidden={!hayCambios}
-          className={`fixed inset-x-0 bottom-0 z-30 transition-transform duration-[var(--sp-dur-base)] ease-[var(--sp-ease-out)] motion-reduce:transition-none lg:left-64 ${hayCambios ? 'translate-y-0' : 'pointer-events-none translate-y-full'}`}
+          className={`fixed bottom-0 left-[var(--cromo-izq)] right-[var(--cromo-der)] z-30 transition-transform duration-[var(--sp-dur-base)] ease-[var(--sp-ease-out)] motion-reduce:transition-none ${hayCambios ? 'translate-y-0' : 'pointer-events-none translate-y-full'}`}
         >
-          <div className="mx-auto w-full max-w-[1024px] px-4 pb-[var(--sp-4)] max-sm:px-0 max-sm:pb-0 lg:px-8">
+          <div className="mx-auto w-full max-w-[1024px] px-4 pb-[calc(var(--sp-4)+var(--ib))] max-sm:px-0 max-sm:pb-0 lg:px-8">
             <div className="flex items-center gap-[var(--sp-gap-item)] rounded-[var(--sp-r-card)] border border-[color:var(--sp-line-card)] bg-[var(--sp-surface)] px-[var(--sp-5)] py-[var(--sp-3-5)] shadow-[var(--sp-shadow-raised)] max-sm:flex-col max-sm:items-stretch max-sm:rounded-none max-sm:border-x-0 max-sm:border-b-0 max-sm:px-[var(--sp-4)] max-sm:pb-[calc(var(--sp-3-5)+env(safe-area-inset-bottom,0px))]">
 
               <div className="min-w-0 flex-1">

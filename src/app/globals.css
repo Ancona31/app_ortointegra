@@ -2274,15 +2274,23 @@ main > div:has(.agenda-fc) .agenda-raiz {
 }
 @media (min-width: 1024px) {
   :where(.app-contenido) { padding: calc(var(--it) + 32px) 32px calc(var(--ib) + 32px); }
-  .app-main { margin-left: var(--cromo-barra); }
 }
 /* En `ext` e `ih` la franja ya la descuenta el margen de <main>: el relleno no la suma. */
 :where([data-formato="ext"] .app-contenido) { padding: calc(var(--it) + 16px) 16px calc(var(--ib) + 24px); }
 :where([data-formato="ih"] .app-contenido) { padding: calc(var(--it) + 16px) 24px calc(var(--ib) + 24px); }
-[data-formato="ext"] .app-main { margin-right: calc(var(--cromo-riel) + var(--ir)); }
-[data-formato="ext"][data-borde-sistema="izquierda"] .app-main { margin-right: 0; margin-left: calc(var(--cromo-riel) + var(--il)); }
-[data-formato="ih"] .app-main { margin-right: calc(var(--cromo-barra-ih) + var(--ir)); }
-[data-formato="ih"][data-borde-sistema="izquierda"] .app-main { margin-right: 0; margin-left: calc(var(--cromo-barra-ih) + var(--il)); }
+
+/* ⚠️ LO QUE OCUPA LA NAVEGACIÓN A CADA LADO (franja incluida en `ext`/`ih`):
+   `--cromo-izq` y `--cromo-der`. Son los márgenes de <main> y los usa todo lo
+   `position: fixed` que tiene que caer sobre la columna de contenido (la barra
+   de guardar de `/perfil`), para que nada fijo quede debajo del riel, de la
+   barra o de la franja. Se espejan con la franja a la izquierda. */
+:root { --cromo-izq: 0px; --cromo-der: 0px; }
+@media (min-width: 1024px) { :root { --cromo-izq: var(--cromo-barra); } }
+:root[data-formato="ext"] { --cromo-der: calc(var(--cromo-riel) + var(--ir)); }
+:root[data-formato="ext"][data-borde-sistema="izquierda"] { --cromo-der: 0px; --cromo-izq: calc(var(--cromo-riel) + var(--il)); }
+:root[data-formato="ih"] { --cromo-der: calc(var(--cromo-barra-ih) + var(--ir)); }
+:root[data-formato="ih"][data-borde-sistema="izquierda"] { --cromo-der: 0px; --cromo-izq: calc(var(--cromo-barra-ih) + var(--il)); }
+.app-main { margin-left: var(--cromo-izq); margin-right: var(--cromo-der); }
 /* La pareja de `ext`/`ih` del respaldo de la agenda (ver arriba). */
 :where([data-formato="ext"], [data-formato="ih"]) .agenda-raiz { height: calc(100dvh - 40px - var(--it) - var(--ib)); }
 
