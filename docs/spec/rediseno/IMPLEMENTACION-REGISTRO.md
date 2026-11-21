@@ -132,7 +132,7 @@ hallazgos de las 25 rutas, claro + oscuro:
 | B0 | Preparación y línea base | hecho | | ok | 96/68 | 2363/2363 | ver arriba | ANTES |
 | B1 | Cimientos: tokens, tipografía, oscuro, sonda, manifest, movimiento | hecho (con 1 desvío, abajo) | 97eba80a, 800f9221, d0857a1b, 8c153052 | ok | 96/68 | 2391/2391 (sin TZ y UTC) | 9 archivos de agenda = B0 por archivo | DESPUÉS |
 | B2 | Primitivas compartidas | hecho | 174abbd8, fc054a4c, fb263d08 | ok | 96/68 | 2391/2391 (sin TZ y UTC) | no corridas (sin consumidores; cajas medidas) | muestra + 5 rutas |
-| B3 | Capas del catálogo | | | | | | | |
+| B3 | Capas del catálogo | B3a hecho (ModalShell, velo, CapaMenu y 4 capas compartidas); B3b aparte | e7b027ff, 66143a96, 68cf1fb9 | ok | 92/68 | 2391/2391 (sin TZ y UTC) | 5 archivos: 25/26, el que falla = B0 (ventana «¿Asistió?») | capas en 5 formatos × 2 temas |
 | B4 | Navegación por dispositivo | | | | | | | |
 | — | ⛔ Parada temprana (push 1) | | | | | | | |
 | B5 | Dashboard | | | | | | | |
@@ -200,3 +200,27 @@ hallazgos de las 25 rutas, claro + oscuro:
 * **Visto, no tocado:** en oscuro varios campos y tarjetas de nueva nota y de
   la receta siguen con su borde, porque la hoja de traducción oscura de
   `ThemeProvider`/`globals.css` les pone el suyo; se va con cada pantalla.
+
+### B3a · notas (capas: ModalShell, velo, CapaMenu y capas compartidas)
+
+* **CSS principal:** 363 597 bytes (B2: 350 877, +12 720). Todo en `sistema.css`
+  («CAPAS DEL CATÁLOGO» y «Rejilla Tipo de documento»); `globals.css` no se tocó.
+* **Área de contenido** por formato con `--capa-arr/-der/-abj/-izq`, que leen los
+  `--cromo-riel/-barra-ih/-barra` de B4 con respaldo 60/216/248. Si B4 pliega la
+  barra de `esc`, tiene que bajar `--cromo-barra` para que las capas sigan
+  centradas en el contenido.
+* **ModalShell** misma API + `variante="alerta"`, `tono`, `apilada`, `rol`.
+  Salida animada de 260 ms (inerte y sin clics mientras sale; el foco vuelve y el
+  scroll se libera al EMPEZAR a salir). Hoja arrastrable sólo en `tel` (no con
+  `hideClose` ni `fullscreenMobile`). El velo sigue cerrando los modales (como
+  antes); la alerta no se cierra con el velo (capas-a, vista 1).
+* **CapaMenu** (nuevo): API en su cabecera. Sin consumidores todavía (B4).
+* **Comprobado con script** en una página temporal (no commiteada): foco dentro,
+  Tab atrapado, Esc cierra, foco al disparador, cerrar a medio abrir (opacidad
+  intermedia, invierte), inerte al salir, arrastre en `tel` (cierra / vuelve),
+  movimiento reducido (sólo opacidad 200/150), transparencia reducida (velo
+  opaco `--navy`, sin desenfoque). Nada interactivo bajo franjas ni texto < 12
+  en las 10 capas × 5 formatos × 2 temas.
+* **QuickPatientModal** sin salida animada a propósito (el escudo de doble clic
+  cuenta con que desaparezca en el acto) y sin rol/Esc/trapo nuevos (no los
+  tenía). Igual `ConsultaRapidaModal` (sin rol), que ahora va en portal.
