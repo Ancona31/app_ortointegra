@@ -6,6 +6,7 @@ import {
   FileText, Brain, Search, Mail, Pill, Users, MonitorCheck,
   MousePointerClick, ArrowRight, ExternalLink,
 } from 'lucide-react'
+import DiagnosticoFormato from './DiagnosticoFormato'
 
 /* ── FAQ ──
    ⚠️ ESTA FAQ Y LA PÚBLICA (`components/landing/faq-contenido.ts`) HABLAN DEL
@@ -292,6 +293,9 @@ export default function AyudaPage() {
           </a>
         </div>
       </section>
+
+      {/* TEMPORAL — se retira en B15: diagnóstico del formato para el Duo real. */}
+      <DiagnosticoFormato />
     </div>
   )
 }
