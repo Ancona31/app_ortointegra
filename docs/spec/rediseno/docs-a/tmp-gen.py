@@ -37,6 +37,23 @@ I = dict(
     logo='<circle cx="12" cy="12" r="9.5"/><path d="M12 5.5v13M9.6 8h4.8M9 11h6M9 14h6M9.6 17h4.8"/>',
 )
 FLECHA = ic(I['sig'], 14, 2.4)
+
+# ---------- Cromo global (CALMA §28): piezas copiadas de entrega/dashboard-final/tmp-cromo.py (que las copió de entrega/cromo/vista-1) ----------
+# Prefijo db- -> ZQ-; se quitan las variantes de la secretaria (ella no tiene «Documentos») y la marca db-m (solo médico).
+import re as _re, importlib.util as _iu
+_sp = _iu.spec_from_file_location('cromo', os.path.join(L, '..', 'dashboard-final', 'tmp-cromo.py')); CR = _iu.module_from_spec(_sp); _sp.loader.exec_module(CR)
+def _cr(h):
+    h = _re.sub(r'\s*<!-- Secretaria.*?</div>(?=\s*$)', '', h, flags=_re.S)
+    h = _re.sub(r'<button type="button" class="db-p db-li db-yo db-s.*?</button>', '', h, flags=_re.S)
+    return h.replace(' db-m"', '"').replace('db-', 'ZQ-')
+AP0, MAS0, CLOGO, PIE = _cr(CR.AP), _cr(CR.MAS), _cr(CR.CLOGO), _cr(CR.PIE)
+BDG = '<span class="ZQ-bdg" aria-hidden="true">3</span>'
+def ap(vp, donde):
+    # Aviso «N datos pendientes» (A0·11, solo médico). En ih va plegado de inicio para que el pie no baje a la franja.
+    h = AP0.replace('VP-DONDE', vp + '-' + donde)
+    if vp == 'ih' and donde == 'lat':
+        h = h.replace('class="ZQ-ap"', 'class="ZQ-ap ZQ-pleg"').replace('aria-expanded="true"', 'aria-expanded="false"')
+    return h
 X = ic(I['x'], 20, 2)
 
 # Los ocho tipos: mismo icono y mismo tono en toda la app (CALMA §9; iconos copiados de doc-color/color-documentos.html)
@@ -61,27 +78,27 @@ def riel():
     def b(k, t, act=False):
         return '<a href="#" class="ZQ-p ZQ-rb" aria-label="%s"%s>%s</a>' % (t, ' aria-current="page"' if act else '', ic(I[k], 22))
     return ('<nav class="ZQ-riel" aria-label="Navegación principal">' + b('inicio', 'Inicio') + b('pac', 'Expediente') + b('agenda', 'Agenda') + b('docs', 'Documentos', True)
-            + '<a href="#" class="ZQ-p ZQ-rb" aria-label="Más">' + ic(I['mas'], 22, 3) + '</a><span class="ZQ-flex"></span>'
+            + '<button type="button" class="ZQ-p ZQ-rb" aria-label="Más" data-abre-mas>' + ic(I['mas'], 22, 3) + BDG + '</button><span class="ZQ-flex"></span>'
             '<button type="button" class="ZQ-p ZQ-mas" aria-label="Nueva consulta">' + ic(I['plus'], 26, 2.4) + '</button></nav>')
 
-def lateral():
+def lateral(vp):
     def a(k, t, act=False):
         return '<a href="#" class="ZQ-p ZQ-li"%s>%s%s</a>' % (' aria-current="page"' if act else '', ic(I[k], 20), t)
     return ('<nav class="ZQ-lat" aria-label="Navegación principal"><div class="ZQ-lat-cab"><span class="ZQ-logo">' + ic(I['logo'], 24) + '<span class="ZQ-logo-n">Spinus</span></span><span class="ZQ-plan">Plan VIP</span></div>'
-            '<button type="button" class="ZQ-p ZQ-cons-b"><span class="ZQ-av">AS</span><span class="ZQ-cons-t"><span>Consultorio</span><b>Centro</b></span>' + ic(I['selector'], 16, 2) + '</button>'
+            '<button type="button" class="ZQ-p ZQ-cons-b">' + CLOGO + '<span class="ZQ-cons-t"><span>Consultorio</span><b>Centro</b></span>' + ic(I['selector'], 16, 2) + '</button>'
             '<div class="ZQ-lista">' + a('inicio', 'Inicio') + a('pac', 'Expediente') + a('agenda', 'Agenda') + a('docs', 'Documentos', True) + a('admin', 'Administración') + '</div><span class="ZQ-flex"></span>'
-            '<div class="ZQ-lat-pie"><a href="#" class="ZQ-p ZQ-li ZQ-yo">' + ic(I['perfil'], 20) + '<span>Dr. Admin Semilla<small>Mi perfil · Ajustes</small></span></a></div></nav>')
+            '<!-- Aviso «N datos pendientes» y pie de hoy (médico: «Mi perfil · Ajustes» + Ayuda), CALMA §28 -->' + ap(vp, 'lat') + PIE + '</nav>')
 
 def encabezado():
-    return ('<header class="ZQ-enc"><button type="button" class="ZQ-p ZQ-menu-b" aria-label="Menú">' + ic(I['menu'], 22, 2) + '</button><span class="ZQ-enc-t">Documentos</span><span class="ZQ-flex"></span>'
+    return ('<header class="ZQ-enc"><button type="button" class="ZQ-p ZQ-menu-b" aria-label="Menú">' + ic(I['menu'], 22, 2) + BDG + '</button><span class="ZQ-enc-t">Documentos</span><span class="ZQ-flex"></span>'
             '<button type="button" class="ZQ-p ZQ-av ZQ-av-g" aria-label="Mi perfil">AS</button></header>')
 
 def encabezado_iv():
     def s(t, act=False):
         return '<a href="#" class="ZQ-p ZQ-env-s"%s>%s</a>' % (' aria-current="page"' if act else '', t)
     return ('<!-- iv · Encabezado fundido (CALMA §19). «Mostrar barra lateral» abre el menú completo (Administración, Mi perfil, Ayuda); «Más» abre el mismo menú que el «···» del riel de ext (CALMA §23.9); el avatar lleva a Mi perfil. -->'
-            '<header class="ZQ-env"><button type="button" class="ZQ-p ZQ-env-lat" aria-label="Mostrar barra lateral">' + ic(I['panel'], 20, 1.8) + '</button>'
-            '<nav class="ZQ-env-pis" aria-label="Secciones">' + s('Inicio') + s('Expediente') + s('Agenda') + s('Documentos', True) + s('Más') + '</nav>'
+            '<header class="ZQ-env"><button type="button" class="ZQ-p ZQ-env-lat" aria-label="Mostrar barra lateral">' + ic(I['panel'], 20, 1.8) + BDG + '</button>'
+            '<nav class="ZQ-env-pis" aria-label="Secciones">' + s('Inicio') + s('Expediente') + s('Agenda') + s('Documentos', True) + '<button type="button" class="ZQ-p ZQ-env-s" data-abre-mas>Más</button></nav>'
             '<button type="button" class="ZQ-p ZQ-av ZQ-av-g" aria-label="Mi perfil">AS</button></header>')
 
 # ---------- Piezas del chasis ----------
@@ -138,6 +155,12 @@ def hoja(nombre, titulo, cuerpo, pie='', cls='', cab_extra='', rol='dialog'):
     return ('<section class="ZQ-pan ZQ-hoja %s" data-capa="%s" role="%s" aria-modal="true" aria-label="%s" tabindex="-1"><span class="ZQ-asa"></span>'
             '<div class="ZQ-hj-cab"><h2>%s</h2>%s<button type="button" class="ZQ-p ZQ-ib ZQ-x" aria-label="Cerrar">%s</button></div>'
             '<div class="ZQ-hj-c">%s</div>%s</section>') % (cls, nombre, rol, titulo, titulo, cab_extra, X, cuerpo, ('<div class="ZQ-hj-p">%s</div>' % pie) if pie else '')
+
+def capa_mas(vp):
+    # Menú «Más» (CALMA §28): aviso, Consultorio activo, Administración, Mi perfil, Ayuda. Copiado del dashboard final.
+    if vp not in ('ext', 'iv'):
+        return ''
+    return hoja('mas', 'Más', ap(vp, 'mas') + MAS0, cls='ZQ-masm')
 
 def alerta(nombre, cuerpo):
     return '<section class="ZQ-pan ZQ-alerta" data-capa="%s" role="alertdialog" aria-modal="true" tabindex="-1">%s</section>' % (nombre, cuerpo)
@@ -209,7 +232,7 @@ def capas_form(k, vp):
       <div class="ZQ-par"><button type="button" class="ZQ-p ZQ-quieto ZQ-gn-nog">No, gracias</button><button type="button" class="ZQ-p ZQ-tonal ZQ-gn-fic">Guardar en la ficha</button></div></div>
     <p class="ZQ-hj-sub ZQ-gn-fok" aria-live="polite" hidden>Guardado en la ficha del paciente.</p></div>
 </div><div class="ZQ-hj-p"><button type="button" class="ZQ-p ZQ-quieto ZQ-x">Cerrar</button></div></section>''')
-    return ('<div class="ZQ-capa"><div class="ZQ-velo"></div>' + menu + tipo + conf_tipo + plant + guardar + tope + gestionar + conf_pl + gen + '</div>'
+    return ('<div class="ZQ-capa"><div class="ZQ-velo"></div>' + capa_mas(vp) + menu + tipo + conf_tipo + plant + guardar + tope + gestionar + conf_pl + gen + '</div>'
             '<div class="ZQ-toast" role="status" aria-live="polite"><span></span></div>')
 
 # ---------- Formularios ----------
@@ -246,7 +269,7 @@ FORMS = {'receta': form_receta, 'lab': form_lab, 'imagen': form_imagen}
 
 def marco_form(k, vp):
     col = ('<div class="ZQ-col"><main class="ZQ-cont"><div class="ZQ-ancho">\n' + cabecera(k) + '\n' + FORMS[k]() + '\n</div></main>\n' + barra() + '</div>')
-    nav = {'ext': riel, 'tel': encabezado, 'ih': lateral, 'iv': encabezado_iv, 'esc': lateral}[vp]()
+    nav = {'ext': riel, 'tel': encabezado, 'ih': lateral, 'iv': encabezado_iv, 'esc': lateral}[vp](*((vp,) if vp in ('ih', 'esc') else ()))
     app = (nav + '\n' + col) if vp in ('tel', 'iv', 'esc') else (col + '\n' + nav)
     return '<div class="marco ZQ" data-vp="%s" data-doc="%s">\n<div class="ZQ-app">\n%s\n</div>\n%s\n</div>\n' % (vp, k, app, capas_form(k, vp))
 
@@ -268,7 +291,8 @@ def marco_entrada(vp):
     alta = hoja('alta', 'Registrar paciente', '''<!-- A14-4 · Alta rápida (QuickPatientModal). Para la secretaria añade «Médico responsable *»; ella no tiene «Documentos» en su menú, así que aquí no aplica. -->
 <p class="ZQ-hj-sub ZQ-mal ZQ-al-err" role="alert" hidden></p>
 <div class="ZQ-al-dup" hidden><p class="ZQ-hj-sub ZQ-just" lang="es" style="color:var(--ag-tinta)">Ya existe un paciente con los mismos datos: Paciente Prueba 07 (Exp. #EXP-2026-0007). ¿Es el mismo paciente o una persona distinta?</p>
-  <div class="ZQ-pila-b"><button type="button" class="ZQ-p ZQ-tonal ZQ-al-mismo">Es el mismo paciente</button><button type="button" class="ZQ-p ZQ-quieto ZQ-al-otro">Es otra persona, crear de todos modos</button>
+  <p class="ZQ-hj-sub ZQ-just" lang="es" style="color:var(--ag-tinta)">Si es otra persona, se creará el registro de todos modos.</p>
+  <div class="ZQ-pila-b"><button type="button" class="ZQ-p ZQ-tonal ZQ-al-mismo">Es el mismo paciente</button><button type="button" class="ZQ-p ZQ-quieto ZQ-al-otro">Es otra persona</button>
   <button type="button" class="ZQ-p ZQ-quieto ZQ-al-dupno">Cancelar</button></div></div>
 <div class="ZQ-dos"><label class="ZQ-campo"><span>Nombre</span><input type="text" class="ZQ-cin ZQ-al-nom" autocomplete="off"></label>
   <label class="ZQ-campo"><span>Apellidos</span><input type="text" class="ZQ-cin ZQ-al-ape" autocomplete="off"></label></div>
@@ -280,9 +304,9 @@ def marco_entrada(vp):
 <button type="button" class="ZQ-p ZQ-casilla ZQ-al-priv" role="checkbox" aria-checked="false"><i>''' + ic(I['ok'], 16, 2.6) + '''</i><span>Paciente informado del <a href="#">aviso de privacidad</a></span></button>''',
                 '<button type="button" class="ZQ-p ZQ-quieto ZQ-cancelar">Cancelar</button><button type="button" class="ZQ-p ZQ-prim ZQ-al-ok">Crear y continuar</button>', cls='ZQ-alta ZQ-ancha')
     col = '<div class="ZQ-col"><main class="ZQ-cont"><div class="ZQ-ancho">\n' + cuerpo + '\n</div></main></div>'
-    nav = {'ext': riel, 'tel': encabezado, 'ih': lateral, 'iv': encabezado_iv, 'esc': lateral}[vp]()
+    nav = {'ext': riel, 'tel': encabezado, 'ih': lateral, 'iv': encabezado_iv, 'esc': lateral}[vp](*((vp,) if vp in ('ih', 'esc') else ()))
     app = (nav + '\n' + col) if vp in ('tel', 'iv', 'esc') else (col + '\n' + nav)
-    capas = '<div class="ZQ-capa"><div class="ZQ-velo"></div>' + alta + '</div><div class="ZQ-toast" role="status" aria-live="polite"><span></span></div>'
+    capas = '<div class="ZQ-capa"><div class="ZQ-velo"></div>' + capa_mas(vp) + alta + '</div><div class="ZQ-toast" role="status" aria-live="polite"><span></span></div>'
     return '<div class="marco ZQ" data-vp="%s" data-doc="entrada">\n<div class="ZQ-app">\n%s\n</div>\n%s\n</div>\n' % (vp, app, capas)
 
 css = open(os.path.join(L, 'tmp-estilo.css')).read()

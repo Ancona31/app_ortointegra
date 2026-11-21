@@ -1,6 +1,18 @@
 # Genera vista-expediente.html (expediente del paciente, versión en calma). Prefijo .ec. Uso: python3 tmp-ec-gen.py
 import os
 L = os.path.dirname(os.path.abspath(__file__))
+# Cromo global al día (CALMA §28): aviso «N datos pendientes», logo de la clínica, pie «Mi perfil · Ajustes» + Ayuda y menú «Más».
+# Se toma de entrega/dashboard-final/tmp-cromo.py (copiado a su vez de entrega/cromo) y se cambia el prefijo .db por .ec.
+_cr = {}
+exec(open(os.path.join(L, '..', 'dashboard-final', 'tmp-cromo.py')).read(), _cr)
+def _ec(t): return t.replace('db-', 'ec-')
+AP0, MAS0, CLOGO, PIE = _ec(_cr['AP']), _ec(_cr['MAS']), _ec(_cr['CLOGO']), _ec(_cr['PIE'])
+BDG = '<span class="ec-bdg" aria-hidden="true">3</span>'
+def ap(vp, donde):
+    h = AP0.replace('VP-DONDE', f'{vp}-{donde}')
+    if vp == 'ih' and donde == 'lat':   # Duo abierto: plegado de inicio para que el pie no baje a la franja
+        h = h.replace('class="ec-ap ec-m"', 'class="ec-ap ec-m ec-pleg"').replace('aria-expanded="true"', 'aria-expanded="false"')
+    return h
 
 def ic(d, s=20, w=1.8, cl=''):
     c = f' class="{cl}"' if cl else ''
@@ -79,41 +91,44 @@ PUNTOS = ic(P['puntos'], 20, 3)
 def riel():
     its = [('Inicio', 'inicio', 0), ('Expediente', 'pac', 1), ('Agenda', 'agenda', 0), ('Documentos', 'doc', 0)]
     h = ''.join(f'<a href="#" class="ec-p ec-rb" aria-label="{n}"{" aria-current=page" if a else ""}>{ic(P[i], 22)}</a>' for n, i, a in its)
-    h += f'<a href="#" class="ec-p ec-rb" aria-label="Más">{ic(P["puntos"], 22, 3)}</a>'
+    h += f'<button type="button" class="ec-p ec-rb" aria-label="Más" data-abre-mas>{ic(P["puntos"], 22, 3)}{BDG}</button>'
     return f'''<nav class="ec-riel" aria-label="Navegación principal">
   {h}
   <span class="ec-flex"></span>
-  <!-- «+» global de Nueva consulta (abre el buscador de paciente del dashboard) -->
-  <button type="button" class="ec-p ec-mas" aria-label="Nueva consulta con otro paciente">{ic(P["mas"], 26, 2.4)}</button>
+  <!-- «+» global de Nueva consulta (Sidebar.tsx:123; abre el buscador de paciente del dashboard) -->
+  <button type="button" class="ec-p ec-mas" aria-label="Nueva consulta">{ic(P["mas"], 26, 2.4)}</button>
 </nav>'''
 
 def enc():
     return f'''<header class="ec-enc">
-  <button type="button" class="ec-p ec-hamb" aria-label="Menú">{ic(P["menu"], 22, 2)}</button>
+  <!-- El cajón del menú (aviso, consultorio con su logo, Administración, Mi perfil, Ayuda) es el de entrega/cromo (vistas 1 y 5). -->
+  <button type="button" class="ec-p ec-hamb" aria-label="Menú">{ic(P["menu"], 22, 2)}{BDG}</button>
   <span class="ec-enc-t">Expediente</span>
   <span class="ec-flex"></span>
   <button type="button" class="ec-p ec-av ec-av-g" aria-label="Mi perfil">AS</button>
 </header>'''
 
-def lat():
+def lat(vp):
     its = [('Inicio', 'inicio', 0), ('Expediente', 'pac', 1), ('Agenda', 'agenda', 0), ('Documentos', 'doc', 0), ('Administración', 'admin', 0)]
     h = ''.join(f'<a href="#" class="ec-p ec-li"{" aria-current=page" if a else ""}>{ic(P[i])}{n}</a>' for n, i, a in its)
     return f'''<nav class="ec-lat" aria-label="Navegación principal">
   <div class="ec-lat-cab"><span class="ec-logo">{ic(P["logo"], 24)}<span class="ec-logo-n">Spinus</span></span><span class="ec-plan">Plan VIP</span></div>
-  <button type="button" class="ec-p ec-cons-b"><span class="ec-av">AS</span><span class="ec-cons-t"><span>Consultorio</span><b>Centro</b></span>{ic(P["updown"], 16, 2)}</button>
+  <button type="button" class="ec-p ec-cons-b">{CLOGO}<span class="ec-cons-t"><span>Consultorio</span><b>Centro</b></span>{ic(P["updown"], 16, 2)}</button>
   <div class="ec-lista">{h}</div>
   <span class="ec-flex"></span>
-  <div class="ec-lat-pie"><a href="#" class="ec-p ec-li ec-yo">{ic(P["yo"])}<span>Dr. Admin Semilla<small>Mi perfil · Ajustes</small></span></a></div>
+  <!-- Aviso «N datos pendientes» (CALMA §28, solo médico) y pie de hoy: «Mi perfil · Ajustes» + Ayuda. -->
+{ap(vp, "lat")}
+  {PIE}
 </nav>'''
 
 def enc_iv():
     # Duo abierto en vertical (CALMA §19): encabezado fundido con la pista de secciones al centro, como la maqueta de referencia del dueño.
     # «Más» (CALMA §23.9) abre el mismo menú que el «···» del riel de ext; Mi perfil, desde el avatar.
-    its = [('Inicio', 0), ('Expediente', 1), ('Agenda', 0), ('Documentos', 0), ('Más', 0)]
-    h = ''.join(f'<a href="#" class="ec-p ec-pil"{" aria-current=page" if a else ""}>{n}</a>' for n, a in its)
+    its = [('Inicio', 0), ('Expediente', 1), ('Agenda', 0), ('Documentos', 0)]
+    h = ''.join(f'<a href="#" class="ec-p ec-pil"{" aria-current=page" if a else ""}>{n}</a>' for n, a in its) + '<button type="button" class="ec-p ec-pil" data-abre-mas>Más</button>'
     return f'''<header class="ec-enc ec-enc-iv">
-  <button type="button" class="ec-p ec-hamb ec-lado" aria-label="Mostrar barra lateral">{ic(P["panel"], 20, 1.8)}</button>
-  <nav class="ec-pista" aria-label="Navegación principal">{h}</nav>
+  <button type="button" class="ec-p ec-hamb ec-lado" aria-label="Mostrar barra lateral">{ic(P["panel"], 20, 1.8)}{BDG}</button>
+  <nav class="ec-pista" aria-label="Secciones">{h}</nav>
   <button type="button" class="ec-p ec-av ec-av-g" aria-label="Mi perfil">AS</button>
 </header>'''
 
@@ -159,7 +174,8 @@ ARCH = [('radiografia-rodilla-ap.jpg', 'Estudio de imagen', '12 nov 2026', '1.8 
 FUERA = chip('mal', 'Fuera de rango')
 ALG = f'<p class="ec-alg">{ic(P["alerta"], 14, 2.2)}<span class="ec-pa">Alergias: Penicilina</span></p>'
 AVN = '<span class="ec-avn" style="background:#F1DCEC;color:#7A2E6B" aria-hidden="true">01</span>'
-LINEA = '<span class="ec-nw">73 años</span> · <span class="ec-nw">Femenino</span> · <span class="ec-nw ec-num">EXP-2026-0001</span>'
+# CabeceraPaciente.tsx:67-73: «Exp. {numero_expediente}»
+LINEA = '<span class="ec-nw">73 años</span> · <span class="ec-nw">Femenino</span> · <span class="ec-nw ec-num">Exp. EXP-2026-0001</span>'
 
 # Acciones del paciente (funciones 3–6; solo con isDoctor —función 11—: la secretaria no entra a esta ruta)
 NC = '<a href="/expediente/01/nueva-nota" class="ec-p ec-prim">Nueva consulta</a>'
@@ -170,7 +186,7 @@ MAS16 = ic(P['mas'], 16, 2.4)
 NC_EXT = f'<a href="/expediente/01/nueva-nota" class="ec-p ec-prim ec-corta" aria-label="Nueva consulta">{MAS16}Consulta</a>'
 ND_EXT = f'<button type="button" class="ec-p ec-txt ec-corta" data-abre="nuevo" aria-haspopup="dialog" aria-label="Nuevo documento">{MAS16}Documento</button>'
 def mas_pac():
-    return f'<button type="button" class="ec-p ec-ib" aria-label="Más acciones del expediente" aria-haspopup="menu" data-menu="pac">{PUNTOS}</button>'
+    return f'<button type="button" class="ec-p ec-ib" aria-label="Acciones del paciente" aria-haspopup="menu" data-menu="pac">{PUNTOS}</button>'
 
 def pestanas(vp):
     # Funciones 7 y 8: cuatro pestañas; la pestaña vive en la URL (?tab=), cada una es un enlace real.
@@ -257,12 +273,12 @@ def fila_act(t, icono, titulo, sub, attrs, chip=''):
 def dx():
     return f'''<!-- Función 12: último diagnóstico + pares rótulo—valor (sin mosaicos). Estados no dibujados: esqueleto (tres barras var(--sup2)) y
          «No se pudo cargar el diagnóstico.» con «Reintentar» de texto, en este mismo hueco. -->
-    <section class="ec-tar ec-dxc" aria-label="Resumen clínico">
+    <section class="ec-tar ec-dxc">
       <div><p class="ec-rot">Último diagnóstico</p>
         <div class="ec-dxl"><h2 class="ec-dx"><span class="ec-v1">Lumbago no especificado</span><span class="ec-v0">Sin diagnóstico registrado</span></h2><span class="ec-chip ec-c-ton ec-num ec-v1">CIE-10 M54.5</span></div></div>
       <dl class="ec-pares">
         <div><dt>Última consulta</dt><dd class="ec-num"><span class="ec-v1">17 nov 2026</span><span class="ec-v0">—</span></dd></div>
-        <div><dt>Próxima cita</dt><dd class="ec-num"><span class="ec-v1">23 nov · en 4 días</span><a href="/agenda" class="ec-p ec-txt ec-v0">Agendar</a></dd></div>
+        <div><dt>Próxima cita</dt><dd class="ec-num"><span class="ec-v1">En 4 días</span><a href="/agenda" class="ec-p ec-txt ec-v0">Agendar</a></dd></div>
         <div><dt>Consultas</dt><dd class="ec-num"><span class="ec-v1">3</span><span class="ec-v0">0</span></dd></div>
       </dl>
     </section>'''
@@ -319,12 +335,12 @@ def bloques(vp):
           <ul>{an}</ul><a href="?tab=mediciones" class="ec-p ec-txt" data-ir="mediciones">Ver 4 analitos</a>'''
     ar = ''.join(f'<li><div class="ec-fila">{aic(n, t)}<span class="ec-ft"><span class="ec-nom">{n}</span><span class="ec-sub ec-num">{t} · {f}</span></span></div></li>' for n, t, f, p, fl in ARCH)
     d = f'''<!-- Función 17: archivos clínicos con «Ver los N archivos». -->
-          <ul class="ec-v1">{ar}</ul><a href="?tab=mediciones" class="ec-p ec-txt ec-v1" data-ir="mediciones">Ver los 2 archivos</a>
+          <ul class="ec-v1">{ar}</ul><a href="?tab=mediciones" class="ec-p ec-txt ec-v1" data-ir="mediciones">Ver los 2 archivos clínicos</a>
           <p class="ec-sub ec-v0" style="padding:4px 0 10px">Sin archivos clínicos.</p>'''
-    A = bloque(vp, 'ant', 'Antecedentes', '<span class="ec-v1">5 apartados</span><span class="ec-v0">Sin capturar</span>', a)
-    B = bloque(vp, 'antro', 'Antropometría', '<span class="ec-v1">68 kg · 158 cm</span><span class="ec-v0">Sin capturar</span>', b)
+    A = bloque(vp, 'ant', 'Antecedentes', '<span class="ec-v1">5 apartados</span><span class="ec-v0">Sin antecedentes registrados.</span>', a)
+    B = bloque(vp, 'antro', 'Antropometría', '<span class="ec-v1">68 kg · 158 cm</span>', b)
     C = bloque(vp, 'anal', 'Últimos analitos', '4 analitos', c, v1=True)
-    D = bloque(vp, 'arch', 'Archivos clínicos', '<span class="ec-v1">2 archivos</span><span class="ec-v0">Ninguno</span>', d, ir='' if vp == 'esc' else 'mediciones')
+    D = bloque(vp, 'arch', 'Archivos clínicos', '<span class="ec-v1">2 archivos</span><span class="ec-v0">Sin archivos clínicos.</span>', d, ir='' if vp == 'esc' else 'mediciones')
     if vp == 'ficha':
         return A + B
     if vp == 'esc':
@@ -350,16 +366,17 @@ def firma():
     return '<div class="ec-firma"><b>Dr. Admin Semilla</b><p class="ec-sub">Traumatología y Ortopedia</p><p class="ec-sub ec-num">Cédula Prof. 00000001</p></div>'
 
 def nota(c, vp, i):
-    sv = ''.join(f'<div><dt>{r}</dt><dd class="ec-num">{v}</dd></div>' for r, v in zip(['TA · mmHg', 'FC · lpm', 'FR · rpm', 'Temp. · °C', 'SpO₂ · %'], c['sv']))
+    # CuerpoNota.tsx:159-163,224-228: rótulos TA, FC, FR, TEMP, SPO₂ y la unidad junto al valor
+    sv = ''.join(f'<div><dt>{r}</dt><dd class="ec-num">{v} <small>{u}</small></dd></div>' for (r, u), v in zip([('TA', 'mmHg'), ('FC', 'lpm'), ('FR', 'rpm'), ('TEMP', '°C'), ('SPO₂', '%')], c['sv']))
     acc = '' if vp not in ('esc', 'iv') else f'''<div class="ec-dacc"><button type="button" class="ec-p ec-txt ec-imp">Imprimir</button><a href="#nota.pdf" class="ec-p ec-txt ec-pdf" hidden>Abrir PDF</a>
-          <button type="button" class="ec-p ec-ib" aria-label="Más acciones de la nota" aria-haspopup="menu" data-menu="nota">{PUNTOS}</button></div>'''
+          <button type="button" class="ec-p ec-ib" aria-label="Más acciones" aria-haspopup="menu" data-menu="nota">{PUNTOS}</button></div>'''
     return f'''<article class="ec-nota ec-art" data-nota="{c["id"]}"{"" if i == 0 else " hidden"} aria-label="Nota del {c["f"]}">
         <!-- Función 24: visor de nota con jerarquía (CALMA §12): diagnóstico 17/700 con su CIE-10 en etiqueta tonal, «Nota manual» y «Nota sellada» como etiquetas con icono, rótulos de sección en color y texto corrido justificado. -->
         <header class="ec-dcab"><div><p class="ec-sub">Nota de Evolución Médica</p>
           <div class="ec-dxl"><h2 class="ec-dx">{c["dx"]}</h2><span class="ec-chip ec-c-ton ec-num">CIE-10 {c["cie"]}</span></div>
           <p class="ec-sub ec-meta ec-num"><span>{c["f"]} · {c["h"]} · Centro</span></p>
           <p class="ec-meta ec-ets">{chip('ton', 'Nota manual')}{chip('ok', 'Nota sellada')}</p></div>{acc}</header>
-        <h3>Signos vitales</h3><dl class="ec-sv">{sv}</dl>
+        <h3>Vitales</h3><dl class="ec-sv">{sv}</dl>
         <h3>Nota</h3><p class="ec-cu ec-just" lang="es">{c["nota"]}</p>
         <h3>Plan</h3><p class="ec-cu ec-just" lang="es">{c["plan"]}</p>
         <h3>Próxima cita</h3><p class="ec-cu ec-clave ec-num">{c["prox"]}</p>
@@ -405,7 +422,7 @@ def cuerpo_doc(d):
         return par('Procedimiento', 'Infiltración de rodilla') + '<h3>Riesgos y beneficios</h3><p class="ec-cu ec-just" lang="es">Borrador en captura: faltan las firmas del paciente y de los testigos.</p>' + firma()
     return '''<!-- Función 40: un archivo subido no tiene visor aquí; se enlaza a la pestaña de archivos (onIrAArchivos). Hoy solo llega aquí por enlace directo. -->
         <p class="ec-cu ec-just" lang="es" style="margin-top:14px">Este es un archivo clínico subido, no un documento que la app componga. Se lee y se gestiona en la pestaña «Mediciones y archivos».</p>
-        <a href="?tab=mediciones" class="ec-p ec-txt" data-ir="mediciones" style="margin-left:-4px">Mediciones y archivos</a>'''
+        <a href="?tab=mediciones" class="ec-p ec-txt" data-ir="mediciones" style="margin-left:-4px">Ir a Mediciones y archivos</a>'''
 
 def acc_doc(d, vp):
     # Funciones 31–38. En ancho, UN tonal + UNA acción de texto + «···» (el primario de la pantalla es «Nueva consulta», en la ficha).
@@ -415,7 +432,7 @@ def acc_doc(d, vp):
     else:
         uno = '<button type="button" class="ec-p ec-tonal ec-bdl">Descargar PDF</button>'
         dos = '<button type="button" class="ec-p ec-txt" data-a="enviar">Enviar al paciente</button><span class="ec-sub ec-si-falla">No se pudo preparar la descarga · toca para reintentar</span>' if vp in ('esc', 'iv') else ''
-    return (f'<div class="ec-dacc"><button type="button" class="ec-p ec-ib" aria-label="Más acciones del documento" aria-haspopup="menu" data-menu="doc">{PUNTOS}</button></div>'
+    return (f'<div class="ec-dacc"><button type="button" class="ec-p ec-ib" aria-label="Más acciones" aria-haspopup="menu" data-menu="doc">{PUNTOS}</button></div>'
             f'<div class="ec-dacc2">{uno}{dos}</div>')
 
 def doc(d, vp, i):
@@ -478,7 +495,7 @@ def grafica(x, n):
     puntos = ''.join(f'<i class="ec-g-p{" ec-g-p2" if j else ""}" style="left:{xs[i]}%;top:{y(v[j])}%"></i>' for i, v in enumerate(vals) for j in range(len(v)))
     ejey = ''.join(f'<span style="top:{y(v)}%">{v}</span>' for v in marcas)
     ejex = ''.join(f'<span{" class=ec-g-xm" if k > 4 and 0 < i < k - 1 else ""} style="left:{xs[i]}%">{" ".join(r[0].split()[:2])}</span>' for i, r in enumerate(regs))
-    return (f'<div class="ec-graf" data-n="{n}"{"" if n >= len(x["reg"]) else " hidden"} role="img" aria-label="Gráfica de {x["n"]}: {k} {"medición" if k == 1 else "mediciones"}">'
+    return (f'<div class="ec-graf" data-n="{n}"{"" if n >= len(x["reg"]) else " hidden"} >'
             f'<div class="ec-g-y ec-num" aria-hidden="true">{ejey}</div><div class="ec-g-a"><svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">{bandas}{lineas}</svg>{puntos}</div>'
             f'<div class="ec-g-x ec-num" aria-hidden="true">{ejex}</div></div>')
 
@@ -530,7 +547,7 @@ def archivo_art(i, a):
     # «No se pudo generar el enlace al documento.» y, para otros formatos, «Formato sin vista previa inline. Usa Descargar para verlo.»
     return f'''<article class="ec-nota ec-art ec-arv" data-arv="{i}" hidden aria-label="{n}">
         <h2 class="ec-arch-n ec-dt">{aic(n, t)}<span>{n}</span></h2><p class="ec-sub ec-num">{t} · {fl}</p>
-        <div class="ec-prev" role="img" aria-label="Vista previa de {n}">{previa_svg(n)}</div>
+        <div class="ec-prev" role="img" aria-label="{n}">{previa_svg(n)}</div>
       </article>'''
 
 def mediciones(vp):
@@ -641,9 +658,9 @@ def hojas(vp):
     subir = hoja('subir', 'Subir documento clínico', 'PDF, JPG, PNG o DICOM', sub, pie_sub)
     # --- Vista previa de archivo: en computadora es un modal ancho; en teléfono y Duo abierto entra a pantalla completa (ver detalle()). ---
     previa = ''
-    if vp in ('esc', 'iv'):
+    if vp in ('esc', 'iv', 'ext'):
         pie_prev = '<footer class="ec-hpie ec-hpie3"><button type="button" class="ec-p ec-bl ec-bdes" data-a="eliminar-arch">Eliminar archivo</button><span class="ec-flex"></span><button type="button" class="ec-p ec-bl ec-bq ec-cierra">Cerrar</button><button type="button" class="ec-p ec-bl ec-prim">Descargar</button></footer>'
-        previa = hoja('previa', ARCH[0][0], ARCH[0][1] + ' · ' + ARCH[0][4], ''.join(archivo_art(i, a) for i, a in enumerate(ARCH)), pie_prev, 'ec-hoja-ancha')
+        previa = hoja('previa', ARCH[0][0], ARCH[0][4], ''.join(archivo_art(i, a) for i, a in enumerate(ARCH)), pie_prev, 'ec-hoja-ancha')
     return nuevo + medicion + subir + previa
 
 def capas(vp):
@@ -668,16 +685,16 @@ def capas(vp):
 <div class="ec-capa" data-capa="menu" aria-hidden="true">
   <div class="ec-velo"></div>
   <!-- Funciones 3, 4 y 9: Editar, Exportar y Eliminar paciente (separado y en rojo) -->
-  <div class="ec-menu" role="menu" data-m="pac" aria-label="Más acciones del expediente">{asa}{pac}</div>
+  <div class="ec-menu" role="menu" data-m="pac" aria-label="Acciones del paciente">{asa}{pac}</div>
   <!-- Función 26 (y «Añadir nota aclaratoria», que hoy solo ve el médico que firmó la nota) -->
-  <div class="ec-menu" role="menu" data-m="nota" aria-label="Más acciones de la nota">{asa}{mi('Abrir nota completa', 'data-a="nota"', i='abrir')}{mi('Añadir nota aclaratoria', 'data-a="nota"', i='notamas')}</div>
+  <div class="ec-menu" role="menu" data-m="nota" aria-label="Más acciones">{asa}{mi('Abrir nota completa', 'data-a="nota"', i='abrir')}{mi('Añadir nota aclaratoria', 'data-a="nota"', i='notamas')}</div>
   <!-- Funciones 32–37 (función 36: este menú). Las bloqueadas llevan el motivo escrito debajo, no en un title. «Compartir» abre la hoja nativa del sistema. -->
   <div class="ec-menu" role="menu" data-m="doc" aria-label="Más acciones">{asa}{docm}</div>
   <div class="ec-menu ec-menu-alto" role="menu" data-m="fdoc" aria-label="Filtrar documentos por tipo">{asa}{fdoc}</div>
   <!-- Función 54 -->
   <div class="ec-menu" role="menu" data-m="farch" aria-label="Filtrar archivos por formato">{asa}{farch}</div>
   <!-- Función 56 (teléfono y Duo abierto): «···» de la vista previa -->
-  <div class="ec-menu" role="menu" data-m="arch" aria-label="Más acciones del archivo">{asa}{mi('Eliminar archivo', 'data-a="eliminar-arch"', 'ec-mi-mal', i='basura')}</div>
+  <div class="ec-menu" role="menu" data-m="arch" aria-label="Más acciones">{asa}{mi('Eliminar archivo', 'data-a="eliminar-arch"', 'ec-mi-mal', i='basura')}</div>
 </div>
 {hojas(vp)}
 <!-- Alerta de confirmación (patrón único, CALMA §13): icono en círculo tintado, título centrado, mensaje y DOS botones de verdad del mismo ancho
@@ -696,6 +713,19 @@ def capas(vp):
   </div>
 </div>"""
 
+def capa_mas(vp):
+    if vp not in ('ext', 'iv'):
+        return ''
+    return f'''<!-- Menú «Más» (CALMA §28) como tarjeta centrada con velo, copiado de entrega/dashboard-final (que lo tomó de entrega/cromo). -->
+<div class="ec-capa ec-capa-m" data-capa="mas" aria-hidden="true">
+  <div class="ec-velo"></div>
+  <div class="ec-mnw"><div class="ec-mn" role="dialog" aria-modal="true" aria-label="Más">
+    <h2 class="ec-mn-t">Más</h2>
+    {ap(vp, "mas")}
+{MAS0}
+  </div></div>
+</div>'''
+
 def detalle():
     # Teléfono y Duo abierto: el detalle (nota, documento, analito o archivo) ocupa la pantalla dentro del marco; sale por donde entró.
     return f"""<div class="ec-det" data-k="con" aria-hidden="true">
@@ -704,10 +734,10 @@ def detalle():
       <span class="ec-flex"></span>
       <!-- Función 25: «Imprimir» → «Generando…» → «Abrir PDF» -->
       <button type="button" class="ec-p ec-txt ec-imp ec-k ec-k-con">Imprimir</button><a href="#nota.pdf" class="ec-p ec-txt ec-pdf ec-k ec-k-con" hidden>Abrir PDF</a>
-      <button type="button" class="ec-p ec-ib ec-k ec-k-con" aria-label="Más acciones de la nota" aria-haspopup="menu" data-menu="nota">{PUNTOS}</button>
+      <button type="button" class="ec-p ec-ib ec-k ec-k-con" aria-label="Más acciones" aria-haspopup="menu" data-menu="nota">{PUNTOS}</button>
       <button type="button" class="ec-p ec-ib ec-k ec-k-doc" aria-label="Más acciones" aria-haspopup="menu" data-menu="doc">{PUNTOS}</button>
       <button type="button" class="ec-p ec-txt ec-k ec-k-ar">Descargar</button>
-      <button type="button" class="ec-p ec-ib ec-k ec-k-ar" aria-label="Más acciones del archivo" aria-haspopup="menu" data-menu="arch">{PUNTOS}</button>
+      <button type="button" class="ec-p ec-ib ec-k ec-k-ar" aria-label="Más acciones" aria-haspopup="menu" data-menu="arch">{PUNTOS}</button>
     </div>
     <div class="ec-dsc">
       {AVL}
@@ -774,9 +804,9 @@ def marco(vp):
   </main></div>
   {AVISO}
 </div>'''
-    antes = enc() if vp == 'tel' else (lat() if vp == 'esc' else (enc_iv() if vp == 'iv' else ''))
-    desp = riel() if vp == 'ext' else (lat() if vp == 'ih' else '')
-    return f'<div class="marco ec" data-vp="{vp}">\n{NOTAS if vp == "ext" else ""}\n<div class="ec-app">\n{antes}\n{main}\n{desp}\n</div>\n{capas(vp)}\n</div>'
+    antes = enc() if vp == 'tel' else (lat(vp) if vp == 'esc' else (enc_iv() if vp == 'iv' else ''))
+    desp = riel() if vp == 'ext' else (lat(vp) if vp == 'ih' else '')
+    return f'<div class="marco ec" data-vp="{vp}">\n{NOTAS if vp == "ext" else ""}\n<div class="ec-app">\n{antes}\n{main}\n{desp}\n</div>\n{capas(vp)}\n{capa_mas(vp)}\n</div>'
 
 CSS = open(f'{L}/tmp-ec-estilo.css').read()
 JS = open(f'{L}/tmp-ec-guion.js').read()

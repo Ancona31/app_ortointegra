@@ -576,7 +576,7 @@
 .nn .nn-dict,.nn .nn-nota-ta,.nn .nn-mta,.nn .nn-ctx-ta{text-align:justify;-webkit-hyphens:auto;hyphens:auto}
 .nn .nn-dict::placeholder,.nn .nn-mta::placeholder,.nn .nn-ctx-ta::placeholder{text-align:left}
 /* «Nota guardada» en iv: la nota sellada queda a la vista bajo la rejilla, como en computadora (por eso «Ver nota» no se repite).
-   Cierra el hueco de ~260 px entre la rejilla y el pie sin añadir contenido nuevo. */
+   Cierra el vacío de ~260 px entre la rejilla y el pie sin añadir contenido nuevo. */
 .nn[data-vp="iv"][data-e="ok"] .nn-card{order:3;flex:none;margin-top:16px;padding-top:8px}
 .nn[data-vp="iv"][data-e="ok"] .nn-acc{order:1;grid-template-columns:repeat(2,minmax(0,1fr))}
 .nn[data-vp="iv"][data-e="ok"] .nn-rej-h{order:2}

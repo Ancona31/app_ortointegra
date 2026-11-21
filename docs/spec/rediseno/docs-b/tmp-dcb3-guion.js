@@ -38,7 +38,11 @@
       if(V.alCerrar)V.alCerrar(era);
       if(origen&&origen.offsetParent)origen.focus({preventScroll:true})}
     m.addEventListener('scroll',function(e){var t=e.target;if(t===m||/QQ-(app|capa|col)( |$)/.test(t.className)){t.scrollTop=0;t.scrollLeft=0}},true);
-    del('click','.QQ-cierra',function(){cierra()});$('.QQ-velo').addEventListener('click',cierra);
+    del('click','.QQ-cierra',function(){cierra()});
+    /* Navegación (CALMA §28): «Más» y el cajón; el aviso de datos pendientes se pliega y despliega */
+    del('click','[data-abre]',function(e,b){abre(b.dataset.abre,b)});
+    del('click','.QQ-ap-cab',function(e,b){var ap=b.closest('.QQ-ap'),p=ap.classList.toggle('QQ-pleg');b.setAttribute('aria-expanded',String(!p))});
+    del('click','.QQ-pan[data-pan="mas"] a, .QQ-cajon a',function(){cierra()});$('.QQ-velo').addEventListener('click',cierra);
     m.addEventListener('keydown',function(e){if(e.key==='Escape'&&pan){if(e.target.matches&&e.target.matches('.QQ-gs-in'))return;if(pan==='conf')abre('gest');else cierra()}});
     del('click','a[href="#"]',function(e){e.preventDefault()});
 
@@ -66,7 +70,9 @@
     function pintaTodo(){pintaCampos();V.pinta();refresca();pintaFaltas()}
 
     /* ---- Imprimir (A7-12) y modal posterior (A7-13/14/15) ---- */
-    function ponImp(t,giro){$$('.QQ-b-imp').forEach(function(b){b.disabled=!!giro;b.querySelector('.QQ-giro').hidden=!giro;b.querySelector('.QQ-b-imp-t').textContent=t})}
+    function ponImp(t,giro){var fijo=vp==='ih';  /* Duo abierto horizontal: el botón no crece; el estado va en una línea sobre la barra */
+      $$('.QQ-b-imp').forEach(function(b){b.disabled=!!giro;b.querySelector('.QQ-giro').hidden=!giro||fijo;b.querySelector('.QQ-b-imp-t').textContent=fijo?'Imprimir':t});
+      var e=$('.QQ-est');if(e){e.hidden=!(fijo&&giro);$('.QQ-est-t').textContent=t}}
     on('.QQ-b-imp','click',function(e){if(ocupado)return;intentado=true;pintaFaltas();if(V.faltan().length)return;
       ocupado=true;origen=e.currentTarget;toast(CFG.toastGen);ponImp('Generando PDF…',true);
       clearTimeout(tI);tI=setTimeout(function(){ocupado=false;ponImp('Imprimir',false);toast(CFG.toastOk);genAbre(true)},RM?300:1100)});
@@ -86,16 +92,15 @@
     on('.QQ-g-si-env','click',function(){envia($('.QQ-g-in').value.trim())});
     on('.QQ-g-ficha','click',function(){$('.QQ-g-ofrece').hidden=true;$('.QQ-g-fichaok').hidden=false});
     on('.QQ-g-nog','click',function(){$('.QQ-g-ofrece').hidden=true});
-    on('.QQ-g-ver','click',function(){toast('Maqueta: aquí se abre el PDF')});
-    on('.QQ-g-comp','click',function(){toast('Maqueta: hoja de compartir del sistema')});on('.QQ-g-desc','click',function(){toast('Maqueta: se descarga el PDF')});
+    /* «Visualizar» abre el PDF en una pestaña nueva y «Descargar» lo baja (enlaces del sistema, sin parte visual propia) */
 
     /* ---- «Cambiar» de tipo (A7-2/3/4) ---- */
     on('.QQ-b-cambiar','click',function(e){abre('tipo',e.currentTarget);var a=$('.QQ-z[aria-current]');if(a)a.focus({preventScroll:true})});
-    function irTipo(n){cierra();toast('Maqueta: aquí se abre el formulario de '+n)}
+    function irTipo(n){cierra()}  /* en la app abre el formulario de ese tipo (página «Documentos 1» para los otros cinco) */
     var destino='';
     on('.QQ-z','click',function(e){var b=e.currentTarget;if(b.getAttribute('aria-current')){cierra();return}destino=b.dataset.n;
       if(V.vacio()){irTipo(destino);return}
-      $('.QQ-cam-t').textContent='¿Cambiar a '+destino+'?';$('.QQ-cam-ok').textContent='Cambiar';$('.QQ-cam-ok').setAttribute('aria-label','Cambiar a '+destino);abre('cambiar')});
+      $('.QQ-cam-t').textContent='¿Cambiar a '+destino+'?';$('.QQ-pan[data-pan="cambiar"]').setAttribute('aria-label','¿Cambiar a '+destino+'?');$('.QQ-cam-ok').textContent='Cambiar';$('.QQ-cam-ok').setAttribute('aria-label','Cambiar a '+destino);abre('cambiar')});
     on('.QQ-cam-ok','click',function(){irTipo(destino)});
     $('.QQ-rej').addEventListener('keydown',function(e){var z=$$('.QQ-z'),i=z.indexOf(document.activeElement),c=ancho?4:2,d={ArrowRight:1,ArrowLeft:-1,ArrowDown:c,ArrowUp:-c}[e.key];
       if(e.key==='Home')i=0;else if(e.key==='End')i=z.length-1;else if(d&&i>=0)i=Math.max(0,Math.min(z.length-1,i+d));else return;e.preventDefault();z[i].focus({preventScroll:true})});
@@ -142,7 +147,7 @@
     del('click','.QQ-gs-mas',function(e,b){var i=+b.dataset.i;gsAb=gsAb===i?-1:i;pintaPl();var n=$('.QQ-gs-mas[data-i="'+i+'"]');if(n)n.focus({preventScroll:true})});
     del('click','.QQ-pf-a [data-o]',function(e,b){var i=+b.dataset.i,p=plant[i],o=b.dataset.o;gsOper='';
       if(o==='ren'){gsRen=i;gsAb=-1;pintaPl();var x=$('.QQ-gs-in');x.focus({preventScroll:true});x.select();return}
-      conf={o:o,i:i};$('.QQ-cf-t').textContent=(o==='eli'?'¿Eliminar':'¿Sobrescribir')+' «'+p.n+'»?';
+      conf={o:o,i:i};$('.QQ-cf-t').textContent=(o==='eli'?'¿Eliminar':'¿Sobrescribir')+' «'+p.n+'»?';$('.QQ-pan[data-pan="conf"]').setAttribute('aria-label',$('.QQ-cf-t').textContent);
       $('.QQ-cf-p').textContent=o==='eli'?'Se borra esta plantilla. Los documentos ya emitidos con ella no cambian.':'Se reemplaza el contenido guardado de «'+p.n+'» por lo que hay ahora en el formulario. El nombre y la fecha de creación no cambian. No se puede deshacer.';
       var ci=$('.QQ-pan[data-pan="conf"] .QQ-al-i');ci.className='QQ-al-i QQ-i-'+(o==='eli'?'mal':'ag');ci.innerHTML=o==='eli'?BAS28:AVI28;
       var ck=$('.QQ-cf-ok');ck.className='QQ-p '+(o==='eli'?'QQ-bt QQ-rojo-s':'QQ-prim')+' QQ-cf-ok';ck.textContent=o==='eli'?'Eliminar':'Sobrescribir';abre('conf')});
@@ -193,7 +198,6 @@
         var d=$('.QQ-se-dosis');d.value=s.dosis;d.placeholder=peso()?'':'Escribe el peso y se calcula';$('.QQ-se-marca').value=s.marca;$('.QQ-se-just').value=s.just;abre('sup',b)});
       on('.QQ-se-dosis','input',function(e){if(st.sel[ed]){st.sel[ed].dosis=e.target.value;st.sel[ed].ed=true}});
       on('.QQ-se-marca','input',function(e){if(st.sel[ed])st.sel[ed].marca=e.target.value});on('.QQ-se-just','input',function(e){if(st.sel[ed])st.sel[ed].just=e.target.value});
-      on('.QQ-se-quitar','click',function(){st.sel.splice(ed,1);ed=-1;origen=$('.QQ-b-cat');cierra()});
       V.alCerrar=function(p){if(p==='sup'||p==='cat'){V.pinta();refresca()}};
       /* Recalcular al corregir el peso sin pisar lo escrito a mano (texto de hoy) */
       V.cambio=function(k){if(k!=='peso'||st.peso===pesoAnt)return;pesoAnt=st.peso;var r=0,c=0;st.sel.forEach(function(s){if(s.ed)c++;else{s.dosis=dosis(cat(s.n),peso());r++}});

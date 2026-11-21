@@ -1,0 +1,21 @@
+/* ================= PASADA FINAL (kit/PASADA-FINAL.md): va después del bloque de navegación del dashboard ================= */
+/* §28 · Distintivo del aviso sobre el botón de menú (tel) y de barra lateral (iv) */
+.nn .nn-menu-b,.nn .nn-fun-b{position:relative}
+.nn .nn-fun-b .nn-bdg{top:-2px;right:-2px}
+.nn .nn-menu-b .nn-bdg{top:-2px;right:-2px}
+/* Pasada final · tira: aviso de maqueta fuera del marco (sustituye a los avisos «Maqueta: …» que salían dentro) */
+.nn-tira .nn-tira-msg{flex-basis:100%;min-height:16px;margin:0;font-weight:400;letter-spacing:0;text-transform:none;color:var(--tinta2)}
+/* Otros tipos de documento: cabecera, plantilla y datos del paciente precargados; el cuerpo propio de cada formulario vive en la página Documentos */
+.nn.nn-docotro .nn-rx-l,.nn.nn-docotro .nn-df-rx>.nn-grp:last-child{display:none}
+/* §26 · Duo cerrado: NINGUNA capa es hoja inferior. Tarjeta centrada en el área de contenido (sin riel ni franja), 310 de ancho con margen 8,
+   alto máx. el del área menos 32 (desplazamiento interno, pie fijo), nace del centro (escala .96→1 + fundido), sin asa */
+.nn[data-vp="ext"] .nn-hoja{left:8px;right:auto;bottom:auto;top:calc((100% - var(--ib)) / 2);width:310px;max-height:calc(100% - var(--ib) - 32px);border-radius:20px;padding-bottom:10px;opacity:0;transform:translateY(-50%) scale(.96)}
+.nn[data-vp="ext"] .nn-hoja.nn-act{opacity:1;transform:translateY(-50%)}
+.nn[data-vp="ext"] .nn-hoja.nn-alta{height:auto}
+.nn[data-vp="ext"] .nn-asa{display:none}
+.nn[data-vp="ext"] .nn-alerta{left:8px;width:310px}
+@media (prefers-reduced-motion:reduce){.nn[data-vp="ext"] .nn-hoja,.nn[data-vp="ext"] .nn-hoja.nn-act{transform:translateY(-50%)}}
+/* Receta en ih/esc: la papelera no monta sobre la fila de abajo (sin margen vertical negativo) */
+.nn.marco[data-vp="ih"] .nn-rx-x,.nn.marco[data-vp="esc"] .nn-rx-x{margin:0 -8px 0 0}
+/* El bloque de navegación del dashboard trae «.nn-menu{position:relative}» (allí es el botón de menú); aquí .nn-menu es la capa «Más opciones» */
+.nn .nn-pan.nn-menu{position:absolute}

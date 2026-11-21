@@ -42,9 +42,16 @@
     var entrante='';
     on('.PX-camb','click',function(e){A.abre('tipo',e.currentTarget)});
     on('.PX-az','click',function(e){var b=e.currentTarget;if(b.getAttribute('aria-current')==='true'){A.cierraTodo();return}
-      entrante=b.dataset.n;if(cfg.vacio()){A.cierraTodo();A.toast('Maqueta: aquí se abre el formulario de '+entrante)}
+      entrante=b.dataset.n;if(cfg.vacio()){A.cierraTodo();irTipo(entrante)}
       else{$$('.PX-ent').forEach(function(x){x.textContent=entrante.replace(' / ','\u00a0/ ')});A.abre('camb',null,'tipo')}});
-    on('.PX-camb-ok','click',function(){A.cierraTodo();cfg.vaciar();A.toast('Maqueta: aquí se abre el formulario de '+entrante)});
+    on('.PX-camb-ok','click',function(){A.cierraTodo();cfg.vaciar();irTipo(entrante)});
+    /* Elegir otro tipo abre su formulario. Consentimiento y Honorarios viven en esta página: se lleva a esa vista y se realza.
+       Los otros seis tipos están en las páginas «Documentos 1» y «Documentos 2» (no se enlaza entre páginas). */
+    function irTipo(n){var k={'Consentimiento':'8-','Honorarios / Cotización':'9-'}[n],op=k&&document.querySelector('.op[data-op^="'+k+'"]');if(!op)return;
+      var e=op.querySelector('.esc')||op;e.scrollIntoView({behavior:RM?'auto':'smooth',block:'start'});e.classList.add('PX-realce');setTimeout(function(){e.classList.remove('PX-realce')},1600)}
+    /* Menú «Más» (riel de Duo cerrado, píldora de Duo abierto vertical) y aviso «N datos pendientes» plegable */
+    on('[data-abre-mas]','click',function(e){A.abre('mas',e.currentTarget)});
+    on('.PX-ap-cab','click',function(e){var a=e.currentTarget.closest('.PX-ap'),pl=a.classList.toggle('PX-pleg');e.currentTarget.setAttribute('aria-expanded',String(!pl))});
 
     /* ---- Plantillas ---- */
     var PL=cfg.plantillas.slice(),sel='',deshacer=null,TOPE=10;
@@ -103,8 +110,6 @@
       capa.classList.add('PX-fijo');A.abre('gen');if(toastTxt)A.toast(toastTxt)};
     function enviar(a,escrito){var b=$('.PX-gen-mail');genPaso('listo');b.disabled=true;$('.PX-gen-otro').disabled=true;b.querySelector('.PX-mr-s').textContent='Enviando…';
       tEnv=setTimeout(function(){b.querySelector('.PX-mr-s').textContent='Enviado';$('.PX-gen-otro-f').hidden=true;$$('.PX-gen-a').forEach(function(x){x.textContent=a});$('.PX-gen-of').hidden=!escrito;$('.PX-gen-g').hidden=true;genPaso('enviado')},RM?0:900)}
-    on('.PX-gen-ver','click',function(){A.toast('Maqueta: aquí se abre el PDF en otra pestaña')});
-    on('.PX-gen-comp','click',function(){A.toast('Maqueta: aquí se descarga el PDF')});
     on('.PX-gen-mail','click',function(){enviar(CORREO,false)});
     on('.PX-gen-otro','click',function(){genPaso('pidiendo');$('.PX-gen-in').focus({preventScroll:true})});
     $('.PX-gen-in').addEventListener('input',function(e){$('.PX-gen-env').disabled=!/^\S+@\S+\.\S+$/.test(e.target.value.trim())});

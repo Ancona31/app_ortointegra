@@ -1,0 +1,12 @@
+/* ================= PASADA FINAL (kit/PASADA-FINAL.md): va después del bloque de navegación del dashboard ================= */
+/* §28 · Distintivo del aviso sobre el botón de menú (tel) y de barra lateral (iv) */
+.nc2 .nc2-menu-b,.nc2 .nc2-fun-b{position:relative}
+.nc2 .nc2-fun-b .nc2-bdg{top:-2px;right:-2px}
+.nc2 .nc2-menu-b .nc2-bdg{top:-2px;right:-2px}
+/* §26 · Duo cerrado: la nota aclaratoria es TARJETA CENTRADA en el área de contenido (310, margen 8), nace del centro, sin asa */
+.nc2[data-vp="ext"] .nc2-area{inset:0;padding:16px calc(56px + var(--ir) + 8px) calc(var(--ib) + 16px) 8px;align-items:center}
+.nc2[data-vp="ext"] .nc2-hoja{width:310px;max-width:100%;max-height:100%;overflow-y:auto;border-radius:20px;padding:8px 16px 16px;opacity:0;transform:scale(.96)}
+.nc2[data-vp="ext"] .nc2-on .nc2-hoja{opacity:1;transform:none}
+.nc2[data-vp="ext"] .nc2-asa{display:none}
+/* Pasada final · tira: avisos de maqueta fuera del marco */
+.nc2-tira .nc2-tira-msg{flex-basis:100%;min-height:16px;margin:0;font-weight:400;letter-spacing:0;text-transform:none;color:var(--tinta2)}

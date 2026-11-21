@@ -182,3 +182,20 @@
 /* Duo cerrado: «+ Agregar» baja a su propia línea en lugar de apretarse junto al rótulo */
 .pr[data-vp="ext"] .pr-gt{flex-wrap:wrap;row-gap:8px}
 .pr[data-vp="ext"] .pr-gt .pr-tonal{margin-left:-4px}
+/* ---- Pasada final: CALMA §26. En Duo cerrado ninguna capa es hoja inferior: tarjeta centrada en el área de contenido,
+   ancho máx. 310 con margen 8, alto máx. el del área − 32 con desplazamiento interno y pie fijo; nace del centro; sin asa ---- */
+.pr[data-vp="ext"] .pr-capa{padding:var(--it) calc(56px + var(--ir)) var(--ib) 0}
+.pr[data-vp="ext"] .pr-hoja{position:relative;left:auto;right:auto;bottom:auto;flex:none;width:310px;max-height:calc(100% - 32px);border-radius:20px;padding:12px 16px 0;opacity:0;transform:scale(.96);transition:transform 320ms cubic-bezier(.32,.72,0,1),opacity 200ms ease-out}
+.pr[data-vp="ext"] .pr-on .pr-hoja{opacity:1;transform:none}
+.pr[data-vp="ext"] .pr-asa{display:none}
+.pr[data-vp="ext"] .pr-hbt{position:sticky;bottom:0;z-index:1;margin-top:auto;padding:8px 0 16px;background:var(--fondo);display:flex;flex-direction:column-reverse;gap:8px}
+.pr[data-vp="ext"] .pr-hbt>*{width:100%}
+.pr[data-vp="ext"] .pr-alerta{width:310px}
+@media (prefers-reduced-motion:reduce){.pr[data-vp="ext"] .pr-hoja{transform:none;transition:opacity 200ms ease}}
+/* ---- Pasada final: cabecera como en el código (rótulo «Cuenta» + título), firma como primer bloque del grupo «Firma y logo»,
+   y en computadora la columna de apoyo solo en Datos ---- */
+.pr .pr-rotc{font-size:12px;line-height:16px;font-weight:600;letter-spacing:.3px;text-transform:uppercase;color:var(--tinta2);margin-bottom:2px}
+.pr[data-vp] .pr-filas .pr-sep.pr-sep0{border-top:0}
+.pr[data-vp] .pr-filas .pr-sep .pr-firma .pr-nota{margin-top:2px}
+.pr[data-vp="esc"]:not([data-tab="datos"]) .pr-cuerpo{grid-template-columns:minmax(0,1fr)}
+.pr[data-vp="esc"]:not([data-tab="datos"]) .pr-lado{display:none}

@@ -260,6 +260,91 @@
   .us .us-velo{transition:opacity 200ms ease}
   .us .us-capa{transition:visibility 0s linear 200ms}
 }
+/* ===== Cromo global (CALMA §28): aviso «N datos pendientes», logo de la clínica, «Más» y «Ajustes». Copiado de entrega/cromo/vista-1 ===== */
+.us .us-clogo{width:36px;height:36px;flex:none;border-radius:999px;background:#fff;color:var(--accion);display:flex;align-items:center;justify-content:center}
+.us .us-lat-pie{border-top:1px solid var(--nav-velo);padding-top:8px;display:flex;align-items:center;gap:4px}
+.us .us-lat-pie .us-yo{flex:1;min-width:0;text-align:left}
+.us .us-lat-pie .us-nib{color:var(--nav-tinta2)}
+.us[data-vp="ih"] .us-esp{display:none}
+.us[data-vp="ih"] .us-lat .us-lat-pie .us-yo{padding:0 8px}
+.us[data-vp="ih"] .us-lat .us-lat-pie .us-yo>svg{display:none}
+.us[data-vp="ih"] .us-lat .us-lat-pie .us-nib{width:36px;height:36px}
+.us .us-esp{color:var(--nav-tinta)!important}
+.us .us-yo{min-height:48px;height:auto;padding-top:6px;padding-bottom:6px}
+.us .us-yo>span{display:flex;flex-direction:column;line-height:17px}
+.us .us-yo small{font-size:12px;line-height:16px;color:var(--nav-tinta2)}
+.us .us-nib{position:relative;width:44px;height:44px;flex:none;border-radius:999px;display:flex;align-items:center;justify-content:center;color:var(--nav-tinta)}
+.us .us-mnw{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:16px;pointer-events:none}
+.us[data-vp="ext"] .us-mnw{padding:16px calc(56px + var(--ir) + 8px) calc(var(--ib) + 16px) 8px}
+.us[data-vp="iv"] .us-mnw{padding:calc(var(--it) + 16px) 24px 24px}
+.us[data-vp="ih"] .us-mnw{padding:24px calc(218px + var(--ir) + 24px) calc(var(--ib) + 16px) 24px}
+.us[data-vp="esc"] .us-mnw{padding:32px 24px 32px calc(248px + 24px)}
+.us .us-mn{pointer-events:auto;width:310px;max-width:100%;max-height:100%;overflow-y:auto;scrollbar-width:none;background:var(--sup);color:var(--tinta);border-radius:20px;box-shadow:var(--sombra-capa);padding:8px;opacity:0;transform:scale(.96);transition:opacity 200ms ease-out,transform 360ms linear(0,0.123,0.3397,0.54,0.6943,0.8032,0.8762,0.9234,0.9533,0.9718,0.9831,0.99,0.9941,0.9965,0.998,1)}
+.us[data-vp="iv"] .us-mn,.us[data-vp="ih"] .us-mn,.us[data-vp="esc"] .us-mn{width:340px}
+.us .us-mn-t{padding:8px 12px 6px;font-size:17px;line-height:22px;font-weight:700}
+.us .us-mo{display:flex;align-items:center;gap:12px;width:100%;min-height:48px;padding:0 12px;border-radius:12px;font-size:15px;line-height:20px;color:var(--tinta);text-align:left}
+.us .us-mo{position:relative}
+.us .us-mo+.us-mo::before{content:"";position:absolute;left:44px;right:12px;top:0;height:1px;background:var(--linea)}
+.us .us-mo>svg:first-child{color:var(--enlace)}
+.us .us-mo>.us-mo-f{margin-left:auto;color:var(--tinta3)}
+.us .us-mo-v{margin-left:auto;font-size:15px;color:var(--tinta2)}
+.us .us-mo-v+.us-mo-f{margin-left:4px}
+.us .us-avp{border-radius:14px;background:var(--ag-fondo);color:var(--tinta);margin:0 0 10px}
+.us .us-mn .us-avp{margin:2px 0 8px}
+.us.us-n0 .us-avp{display:none}
+.us .us-avp-cab{display:flex;align-items:center;gap:10px;width:100%;min-height:44px;padding:8px 10px 8px 12px;border-radius:14px;text-align:left;color:var(--ag-tinta)}
+.us[data-vp="ih"] .us-lat .us-avp-cab,.us[data-vp="esc"] .us-avp-cab{min-height:40px;padding:6px 10px 6px 12px}
+.us .us-avp-cab:focus-visible{outline:3px solid var(--enlace);outline-offset:2px}
+.us .us-avp-pt{position:relative;width:22px;height:22px;flex:none;border-radius:7px;background:color-mix(in srgb,var(--ag-punto) 22%,transparent)}
+.us .us-avp-pt::before,.us .us-avp-pt::after{content:"";position:absolute;left:7px;top:7px;width:8px;height:8px;border-radius:999px;background:var(--ag-punto)}
+.us .us-avp-pt::after{animation:us-latido 3.2s cubic-bezier(.2,.6,.3,1) infinite}
+@keyframes us-latido{0%{transform:scale(1);opacity:.65}34%{transform:scale(2.7);opacity:0}100%{transform:scale(2.7);opacity:0}}
+.us .us-avp-t{flex:1;min-width:0;font-size:15px;line-height:20px;font-weight:700;font-variant-numeric:tabular-nums}
+.us .us-avp-ch{transition:transform 240ms cubic-bezier(.32,.72,0,1)}
+.us .us-avp.us-pleg .us-avp-ch{transform:rotate(180deg)}
+.us .us-avp-c{display:flex;flex-direction:column;padding:0 12px 12px;transition:opacity 180ms ease-out,transform 180ms ease-out}
+.us .us-avp.us-pleg .us-avp-c{display:none}
+.us.us-sal .us-avp-c,.us.us-ent .us-avp-c{opacity:0;transform:translateY(-4px)}
+.us .us-avp-sep{display:block;height:1px;margin:0 0 2px;background:color-mix(in srgb,var(--ag-tinta) 22%,transparent)}
+.us .us-avp-l{display:flex;align-items:flex-start;gap:10px;min-height:44px;padding:12px 2px;border-radius:8px;font-size:14px;line-height:20px;font-weight:600;color:var(--tinta)}
+.us .us-avp-l svg{margin-top:1px;color:var(--ag-tinta)}
+.us[data-vp="ih"] .us-lat .us-avp-l,.us[data-vp="esc"] .us-avp-l{min-height:36px;padding:8px 2px}
+.us.us-n2 .us-avp-l[data-k="cedula"],.us.us-n1 .us-avp-l[data-k="cedula"],.us.us-n1 .us-avp-l[data-k="logo"]{display:none}
+.us .us-avp-b{position:relative;margin-top:6px;display:flex;align-items:center;justify-content:center;gap:6px;height:40px;border-radius:10px;background:var(--ag-tinta);color:var(--ag-fondo);font-size:14px;line-height:18px;font-weight:600}
+.us .us-avp-b::after{content:"";position:absolute;inset:-2px 0}
+.us[data-vp="ih"] .us-lat .us-avp-b,.us[data-vp="esc"] .us-avp-b{height:36px}
+.us[data-vp="ih"] .us-lat .us-avp-b::after,.us[data-vp="esc"] .us-avp-b::after{display:none}
+.us .us-encv-b .us-bdg{top:0;right:-5px}
+.us[data-vp="ih"] .us-lat .us-avp{margin:0 -10px 8px -4px}
+.us[data-vp="ih"] .us-lat .us-avp-cab{padding:6px 8px;gap:8px}
+.us[data-vp="ih"] .us-lat .us-avp-t{font-size:14px;line-height:18px}
+.us[data-vp="ih"] .us-lat .us-avp-c{padding:0 10px 10px}
+.us[data-vp="ih"] .us-lat .us-avp-l{gap:8px}
+.us[data-vp="ih"] .us-lat .us-avp-c{padding-bottom:10px}
+.us[data-vp="ih"] .us-lat .us-avp-sep{margin:0}
+.us[data-vp="ih"] .us-lat .us-avp-b{margin-top:4px}
+.us[data-vp="ih"] .us-lat .us-yo{min-height:44px;padding-top:0;padding-bottom:0}
+.us .us-bdg{position:absolute;top:-3px;right:-3px;min-width:22px;height:22px;padding:0 5px;border-radius:999px;background:var(--ag-punto);color:var(--navy);border:2px solid var(--navy);display:flex;align-items:center;justify-content:center;font-size:12px;line-height:16px;font-weight:700;font-variant-numeric:tabular-nums;pointer-events:none}
+.us .us-rb .us-bdg{top:2px;right:2px}
+.us.us-n0 .us-bdg,.us.us-secr .us-bdg{display:none}
+.us .us-rb,.us .us-encv-b,.us .us-menu-b{position:relative}
+.us[data-vp="ih"] .us-lat .us-lista{margin-top:12px}
+.us[data-vp="ih"] .us-lat .us-cons-b{margin-top:8px}
+.us .us-capa-m.us-on .us-mn{opacity:1;transform:none;transition:opacity 240ms ease-out,transform 520ms linear(0,0.0803,0.2398,0.4083,0.5568,0.6769,0.769,0.8374,0.8869,0.9221,0.9468,0.9639,0.9756,0.9836,0.9891,0.9927,0.9952,0.9968,0.9979,0.9986,1)}
+
+@keyframes us-latido{0%{transform:scale(1);opacity:.65}34%{transform:scale(2.7);opacity:0}100%{transform:scale(2.7);opacity:0}}
+.us:not(.us-secr) .us-s{display:none!important}
+.us.us-secr .us-m{display:none!important}
+.us .us-capa-m{position:absolute;inset:0;z-index:25;visibility:hidden;transition:visibility 0s linear 320ms}
+.us .us-capa-m.us-on{visibility:visible;transition-delay:0s}
+.us .us-capa-m .us-velo{position:absolute;inset:0;background:var(--velo);backdrop-filter:blur(10px) saturate(140%);-webkit-backdrop-filter:blur(10px) saturate(140%);opacity:0;transition:opacity 240ms ease-out}
+.us .us-capa-m.us-on .us-velo{opacity:1}
+.us .us-mo,.us .us-avp-cab,.us .us-avp-l,.us .us-avp-b{transition:transform 100ms ease-out}
+.us .us-mo:active,.us .us-avp-l:active,.us .us-avp-b:active{transform:scale(.97)}
+.us .us-mo:focus-visible,.us .us-avp-l:focus-visible,.us .us-avp-b:focus-visible{outline:3px solid var(--enlace);outline-offset:2px}
+.us .us-cons-b{width:100%}
+@media (prefers-reduced-motion:reduce){.us .us-mn,.us .us-capa-m.us-on .us-mn{transform:none;transition:opacity 200ms ease}.us .us-avp-pt::after{animation:none;opacity:0}.us .us-avp-ch{transition:none}}
+@media (prefers-reduced-transparency:reduce){.us .us-capa-m .us-velo{backdrop-filter:none;-webkit-backdrop-filter:none;background:linear-gradient(var(--velo),var(--velo)),var(--velo)}}
 
 /* ---- Pestañas de Administración: fila de texto, subrayado de 2 px --accion en la activa, 14 px, 600 / 400 ---- */
 .us[data-vp] .us-sub{display:flex;gap:20px;padding:0;border-radius:0;background:none;align-self:stretch}
@@ -335,7 +420,7 @@
 .us[data-vp="ih"] .us-alerta,.us[data-vp="iv"] .us-alerta,.us[data-vp="esc"] .us-alerta{width:340px}
 .us[data-vp] .us-al-i{width:48px;height:48px;margin-bottom:12px}
 .us[data-vp] .us-alerta p{margin-top:8px;text-align:justify;hyphens:auto;-webkit-hyphens:auto}
-.us[data-vp] .us-alerta .us-sop{margin-top:4px}
+.us[data-vp] .us-alerta .us-sopi{display:inline-block;padding:12px 0;margin:-12px 0;font-weight:600;color:var(--enlace)}
 .us[data-vp] .us-al-b{margin-top:20px}
 .us[data-vp] .us-al-b>*{height:44px;padding:0 8px;min-width:0}
 .us[data-vp="ih"] .us-al-b>*,.us[data-vp="esc"] .us-al-b>*{height:40px}
@@ -358,6 +443,17 @@
 .us[data-vp="iv"] .us-fila[data-est="pendiente"] .us-reenv{grid-column:4;grid-row:1/3;margin-left:0;padding:0 12px}
 .us[data-vp="iv"] .us-fila[data-est="pendiente"] .us-mas-b{grid-column:5;grid-row:1/3}
 .us[data-vp="ih"] .us-menu .us-hjcab h2,.us[data-vp="iv"] .us-menu .us-hjcab h2{font-size:15px;line-height:20px}
+/* Pasada final, CALMA §26: en Duo cerrado la hoja «Invitar» y el menú de la fila son TARJETA CENTRADA (máx. 310, margen 8, alto máx. área − 32,
+   pie fijo), nacen del centro y no llevan asa; la alerta también 310. La hoja inferior arrastrable queda solo para iPhone. */
+.us[data-vp="ext"] .us-hoja{position:relative;left:auto;right:auto;bottom:auto;flex:none;width:310px;max-height:calc(100% - 32px);border-radius:20px;padding:12px 16px 0;opacity:0;transform:scale(.96);transition:transform 320ms cubic-bezier(.32,.72,0,1),opacity 200ms ease-out}
+.us[data-vp="ext"] .us-on .us-hoja{opacity:1;transform:none}
+.us[data-vp="ext"] .us-hoja.us-menu{padding-bottom:8px}
+.us[data-vp="ext"] .us-asa{display:none}
+.us[data-vp="ext"] .us-bot{position:sticky;bottom:0;z-index:1;padding:8px 0 16px;background:var(--sup)}
+.us[data-vp="ext"] .us-alerta{width:310px}
+.us[data-vp] .us-seg{display:flex}
+.us[data-vp] .us-seg button{flex:1 1 auto;white-space:nowrap}
+.us[data-vp="ext"] .us-menu .us-hjcab h2,.us[data-vp="tel"] .us-menu .us-hjcab h2{font-size:15px;line-height:20px}
 @media (prefers-reduced-motion:reduce){.us[data-vp] .us-alerta,.us[data-vp] .us-on .us-alerta{transform:none}}
 </style>
 <div class="marco us" lang="es" data-vp="ext">
@@ -374,18 +470,18 @@
   </header>
   <!-- Controles SOLO de la maqueta -->
   <div class="us-maq">
-    <button type="button" class="us-p us-demo us-demo-env" data-m="ok">Maqueta: envío correcto</button>
-    <button type="button" class="us-p us-demo us-demo-vac" aria-pressed="false">Maqueta: vacío</button>
+    <button type="button" class="us-p us-demo us-demo-env" data-m="ok">envío correcto</button>
+    <button type="button" class="us-p us-demo us-demo-vac" aria-pressed="false">vacío</button>
   </div>
   <!-- Función 3: cupos del plan. Dos datos, sin tarjetas. Las invitaciones pendientes cuentan. «Completo» aparece al llegar al tope. -->
   <dl class="us-cupos">
-    <div class="us-cupo" data-rol="medico" data-max="3"><dt class="us-rot">Médicos</dt><dd><span class="us-num"><b>1</b> / 3</span><span class="us-chip us-c-ag us-lleno" hidden>Completo</span></dd></div>
-    <div class="us-cupo" data-rol="secretaria" data-max="2"><dt class="us-rot">Asistentes</dt><dd><span class="us-num"><b>2</b> / 2</span><span class="us-chip us-c-ag us-lleno">Completo</span></dd></div>
+    <div class="us-cupo" data-rol="medico" data-max="3"><dt class="us-rot">Médicos</dt><dd><span class="us-num"><b>1</b> / 3</span></dd></div>
+    <div class="us-cupo" data-rol="secretaria" data-max="2"><dt class="us-rot">Asistentes</dt><dd><span class="us-num"><b>2</b> / 2</span></dd></div>
   </dl>
   <button type="button" class="us-p us-prim us-invitar"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>Invitar</button>
   <!-- Función 4: «Tu equipo». Funciones 5 y 6: «Reenviar» a la vista en las pendientes; «Cancelar invitación» / «Dar de baja» dentro del menú «⋯» (44 de área). -->
   <section class="us-tar" aria-label="Tu equipo">
-    <div class="us-tcab"><h2>Tu equipo</h2><span class="us-sec us-cuenta">3 personas</span></div>
+    <div class="us-tcab"><h2>Tu equipo</h2></div>
     <ul class="us-eq">
       <li class="us-fila" data-rol="medico" data-est="activa" data-nom="Dra. Invitada Semilla" data-mail="medico.a@semilla.spinus.test" data-hist="1">
         <span class="us-avt" style="background:#DCE6F7;color:#1F3F7A" aria-hidden="true">IS</span>
@@ -413,7 +509,7 @@
       </li>
     </ul>
     <!-- Estado vacío (hoy la tarjeta queda solo con su rótulo) -->
-    <div class="us-vacio" hidden><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.9.7 3.1 2.4 3.5 5.2"/></svg><b>Todavía no hay nadie en tu equipo</b><span>Usa «Invitar» para dar acceso a un médico o a un asistente.</span></div>
+    <div class="us-vacio" hidden></div>
   </section>
   <!-- Función 1: esta pantalla solo la ve quien administra la clínica; cualquier otro perfil es enviado a /dashboard (no se dibuja).
        Estado de sistema «cargando»: tres filas fantasma (círculo de avatar + dos líneas) dentro de la tarjeta «Tu equipo»; mismo alto que una fila real para que nada salte.
@@ -421,7 +517,7 @@
 </div></main>
 </div><!-- Navegación: riel a la derecha. Administración vive en «Más», que queda activo. -->
 <nav class="us-riel" aria-label="Navegación principal">
-  <a href="#" class="us-p us-rb" aria-label="Inicio"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg></a><a href="#" class="us-p us-rb" aria-label="Expediente"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.9.7 3.1 2.4 3.5 5.2"/></svg></a><a href="#" class="us-p us-rb" aria-label="Agenda"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg></a><a href="#" class="us-p us-rb" aria-label="Documentos"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg></a><a href="#" class="us-p us-rb" aria-label="Más: Administración, Mi perfil y Ayuda" aria-current="page"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 12h.01M12 12h.01M18 12h.01"/></svg></a>
+  <a href="#" class="us-p us-rb" aria-label="Inicio"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg></a><a href="#" class="us-p us-rb" aria-label="Expediente"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.9.7 3.1 2.4 3.5 5.2"/></svg></a><a href="#" class="us-p us-rb" aria-label="Agenda"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg></a><a href="#" class="us-p us-rb" aria-label="Documentos"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg></a><button type="button" class="us-p us-rb" aria-label="Más" aria-current="page" data-abre-mas><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 12h.01M12 12h.01M18 12h.01"/></svg><span class="us-bdg us-m" aria-hidden="true">3</span></button>
   <span class="us-flex"></span>
   <button type="button" class="us-p us-mas" aria-label="Nueva consulta"><svg aria-hidden="true" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg></button>
 </nav>
@@ -441,7 +537,7 @@
           <button type="button" role="radio" aria-checked="false" class="us-p us-toq" data-rol="medico">Médico</button>
         </div>
       </div>
-      <label class="us-f"><span>Correo electrónico</span><input type="email" class="us-in us-correo" placeholder="correo@ejemplo.com" autocomplete="off" inputmode="email"></label>
+      <label class="us-f"><span>Correo electrónico</span><input type="email" class="us-in us-correo" placeholder="correo@email.com" autocomplete="off" inputmode="email"></label>
       <!-- Errores en línea y en español: correo inválido, cupo lleno («Has alcanzado el límite de … de tu plan»), correo ya registrado, sin conexión -->
       <p class="us-err" role="alert" hidden><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.500M12 7.700v.01"/></svg><span></span></p>
       <p class="us-nota">Escribirá su nombre al entrar por primera vez.</p>
@@ -468,9 +564,8 @@
     <span class="us-al-i" aria-hidden="true"><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4 2.8 19.500h18.400z"/><path d="M12 10v4.500M12 17.300v.01"/></svg></span>
     <h2 class="us-al-t">Dar de baja</h2>
     <p class="us-al-p"></p>
-    <a href="#" class="us-p us-sop us-solo-b">soporte@spinus.com.mx</a>
     <div class="us-al-b">
-      <button type="button" class="us-p us-tonal us-al-no us-solo-c">Cancelar</button>
+      <button type="button" class="us-p us-tonal us-al-no us-solo-c">Volver</button>
       <button type="button" class="us-p us-dest us-al-si us-solo-c">Dar de baja</button>
       <button type="button" class="us-p us-tonal us-al-ok us-solo-b">Entendido</button>
     </div>
@@ -478,12 +573,34 @@
 </div>
 <!-- Función 8: avisos de éxito, advertencia (el correo no salió) y error. Arriba, centrados en el contenido. -->
 <div class="us-avisos" aria-live="polite"><div class="us-toast" data-t="ok"><span class="us-t-i" aria-hidden="true"><span class="us-t-ok"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span><span class="us-t-no"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4 2.8 19.500h18.400z"/><path d="M12 10v4.500M12 17.300v.01"/></svg></span></span><span class="us-t-x"></span></div></div>
+<!-- Menú «Más» (CALMA §28): tarjeta centrada con velo (aviso, consultorio activo, Administración, Mi perfil, Ayuda). -->
+<div class="us-capa-m" aria-hidden="true">
+  <div class="us-velo"></div>
+  <div class="us-mnw"><div class="us-mn" role="dialog" aria-modal="true" aria-label="Más">
+    <h2 class="us-mn-t">Más</h2>
+      <div class="us-avp us-m" role="status" aria-live="polite">
+    <button type="button" class="us-p us-avp-cab" aria-expanded="true" aria-controls="us-av-ext-mas">
+      <span class="us-avp-pt" aria-hidden="true"></span><span class="us-avp-t">3 datos pendientes</span><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="us-avp-ch"><path d="m18 15-6-6-6 6"/></svg>
+    </button>
+    <div class="us-avp-c" id="us-av-ext-mas">
+      <span class="us-avp-sep" aria-hidden="true"></span>
+      <a href="#" class="us-p us-avp-l" data-k="firma"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.4 3.6a2.1 2.1 0 0 1 3 3L7.4 18.6a2 2 0 0 1-.9.5l-2.9.8a.5.5 0 0 1-.6-.6l.8-2.9a2 2 0 0 1 .5-.9z"/></svg><span>Documentos sin firma</span></a><a href="#" class="us-p us-avp-l" data-k="cedula"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22h6a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v3"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><circle cx="5" cy="14" r="3"/><path d="M7 16.5 8 22l-3-1-3 1 1-5.5"/></svg><span>Sin cédula de especialidad</span></a><a href="#" class="us-p us-avp-l" data-k="logo"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></svg><span>Clínica sin logo</span></a>
+      <a href="#" class="us-p us-avp-b">Completar ahora<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg></a>
+    </div>
+  </div>
+    <!-- Selector de consultorio activo (A0·2): en Duo cerrado no hay barra lateral, así que vive aquí; solo médico con 2 o más consultorios. Ver vista 2. -->
+    <button type="button" class="us-p us-mo us-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 9 4-4 4 4M8 15l4 4 4-4"/></svg><span>Consultorio activo</span><span class="us-mo-v">Centro</span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="us-mo-f"><path d="m9 6 6 6-6 6"/></svg></button>
+    <a href="#" class="us-p us-mo us-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20v-8M12 20V5M19 20v-9"/></svg><span>Administración</span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="us-mo-f"><path d="m9 6 6 6-6 6"/></svg></a><a href="#" class="us-p us-mo us-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18.2c1.3-2 3.2-3 5.5-3s4.2 1 5.5 3"/></svg><span>Mi perfil</span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="us-mo-f"><path d="m9 6 6 6-6 6"/></svg></a><a href="#" class="us-p us-mo us-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.6M12 17h.01"/></svg><span>Ayuda</span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="us-mo-f"><path d="m9 6 6 6-6 6"/></svg></a>
+    <!-- Secretaria (CALMA db28): sin Mi perfil; en «Más» encuentra sus «Ajustes» -->
+    <div class="us-s"><button type="button" class="us-p us-mo us-tema"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg><span>Modo oscuro</span></button><a href="#" class="us-p us-mo"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21c-4.5-2.2-7-5.6-7-10V5.5L12 3l7 2.5V11c0 4.4-2.5 7.8-7 10z"/></svg><span>Aviso de Privacidad</span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="us-mo-f"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg></a><button type="button" class="us-p us-mo us-salir"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4"/></svg><span>Cerrar sesión</span></button></div>
+  </div></div>
+</div>
 </div>
 <div class="marco us" lang="es" data-vp="tel">
 <div class="us-app">
 <!-- Navegación: encabezado fundido con la barra de estado -->
 <header class="us-enc">
-  <button type="button" class="us-p us-menu-b" aria-label="Menú"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+  <button type="button" class="us-p us-menu-b" aria-label="Menú"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg><span class="us-bdg us-m" aria-hidden="true">3</span></button>
   <span class="us-enc-t">Administración</span>
   <span class="us-flex"></span>
   <button type="button" class="us-p us-av us-av-g" aria-label="Mi perfil">AS</button>
@@ -499,18 +616,18 @@
   </header>
   <!-- Controles SOLO de la maqueta -->
   <div class="us-maq">
-    <button type="button" class="us-p us-demo us-demo-env" data-m="ok">Maqueta: envío correcto</button>
-    <button type="button" class="us-p us-demo us-demo-vac" aria-pressed="false">Maqueta: vacío</button>
+    <button type="button" class="us-p us-demo us-demo-env" data-m="ok">envío correcto</button>
+    <button type="button" class="us-p us-demo us-demo-vac" aria-pressed="false">vacío</button>
   </div>
   <!-- Función 3: cupos del plan. Dos datos, sin tarjetas. Las invitaciones pendientes cuentan. «Completo» aparece al llegar al tope. -->
   <dl class="us-cupos">
-    <div class="us-cupo" data-rol="medico" data-max="3"><dt class="us-rot">Médicos</dt><dd><span class="us-num"><b>1</b> / 3</span><span class="us-chip us-c-ag us-lleno" hidden>Completo</span></dd></div>
-    <div class="us-cupo" data-rol="secretaria" data-max="2"><dt class="us-rot">Asistentes</dt><dd><span class="us-num"><b>2</b> / 2</span><span class="us-chip us-c-ag us-lleno">Completo</span></dd></div>
+    <div class="us-cupo" data-rol="medico" data-max="3"><dt class="us-rot">Médicos</dt><dd><span class="us-num"><b>1</b> / 3</span></dd></div>
+    <div class="us-cupo" data-rol="secretaria" data-max="2"><dt class="us-rot">Asistentes</dt><dd><span class="us-num"><b>2</b> / 2</span></dd></div>
   </dl>
   <button type="button" class="us-p us-prim us-invitar"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>Invitar</button>
   <!-- Función 4: «Tu equipo». Funciones 5 y 6: «Reenviar» a la vista en las pendientes; «Cancelar invitación» / «Dar de baja» dentro del menú «⋯» (44 de área). -->
   <section class="us-tar" aria-label="Tu equipo">
-    <div class="us-tcab"><h2>Tu equipo</h2><span class="us-sec us-cuenta">3 personas</span></div>
+    <div class="us-tcab"><h2>Tu equipo</h2></div>
     <ul class="us-eq">
       <li class="us-fila" data-rol="medico" data-est="activa" data-nom="Dra. Invitada Semilla" data-mail="medico.a@semilla.spinus.test" data-hist="1">
         <span class="us-avt" style="background:#DCE6F7;color:#1F3F7A" aria-hidden="true">IS</span>
@@ -538,7 +655,7 @@
       </li>
     </ul>
     <!-- Estado vacío (hoy la tarjeta queda solo con su rótulo) -->
-    <div class="us-vacio" hidden><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.9.7 3.1 2.4 3.5 5.2"/></svg><b>Todavía no hay nadie en tu equipo</b><span>Usa «Invitar» para dar acceso a un médico o a un asistente.</span></div>
+    <div class="us-vacio" hidden></div>
   </section>
   <!-- Función 1: esta pantalla solo la ve quien administra la clínica; cualquier otro perfil es enviado a /dashboard (no se dibuja).
        Estado de sistema «cargando»: tres filas fantasma (círculo de avatar + dos líneas) dentro de la tarjeta «Tu equipo»; mismo alto que una fila real para que nada salte.
@@ -561,7 +678,7 @@
           <button type="button" role="radio" aria-checked="false" class="us-p us-toq" data-rol="medico">Médico</button>
         </div>
       </div>
-      <label class="us-f"><span>Correo electrónico</span><input type="email" class="us-in us-correo" placeholder="correo@ejemplo.com" autocomplete="off" inputmode="email"></label>
+      <label class="us-f"><span>Correo electrónico</span><input type="email" class="us-in us-correo" placeholder="correo@email.com" autocomplete="off" inputmode="email"></label>
       <!-- Errores en línea y en español: correo inválido, cupo lleno («Has alcanzado el límite de … de tu plan»), correo ya registrado, sin conexión -->
       <p class="us-err" role="alert" hidden><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.500M12 7.700v.01"/></svg><span></span></p>
       <p class="us-nota">Escribirá su nombre al entrar por primera vez.</p>
@@ -588,9 +705,8 @@
     <span class="us-al-i" aria-hidden="true"><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4 2.8 19.500h18.400z"/><path d="M12 10v4.500M12 17.300v.01"/></svg></span>
     <h2 class="us-al-t">Dar de baja</h2>
     <p class="us-al-p"></p>
-    <a href="#" class="us-p us-sop us-solo-b">soporte@spinus.com.mx</a>
     <div class="us-al-b">
-      <button type="button" class="us-p us-tonal us-al-no us-solo-c">Cancelar</button>
+      <button type="button" class="us-p us-tonal us-al-no us-solo-c">Volver</button>
       <button type="button" class="us-p us-dest us-al-si us-solo-c">Dar de baja</button>
       <button type="button" class="us-p us-tonal us-al-ok us-solo-b">Entendido</button>
     </div>
@@ -598,6 +714,7 @@
 </div>
 <!-- Función 8: avisos de éxito, advertencia (el correo no salió) y error. Arriba, centrados en el contenido. -->
 <div class="us-avisos" aria-live="polite"><div class="us-toast" data-t="ok"><span class="us-t-i" aria-hidden="true"><span class="us-t-ok"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span><span class="us-t-no"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4 2.8 19.500h18.400z"/><path d="M12 10v4.500M12 17.300v.01"/></svg></span></span><span class="us-t-x"></span></div></div>
+
 </div>
 <div class="marco us" lang="es" data-vp="ih">
 <div class="us-app">
@@ -613,18 +730,18 @@
   </header>
   <!-- Controles SOLO de la maqueta -->
   <div class="us-maq">
-    <button type="button" class="us-p us-demo us-demo-env" data-m="ok">Maqueta: envío correcto</button>
-    <button type="button" class="us-p us-demo us-demo-vac" aria-pressed="false">Maqueta: vacío</button>
+    <button type="button" class="us-p us-demo us-demo-env" data-m="ok">envío correcto</button>
+    <button type="button" class="us-p us-demo us-demo-vac" aria-pressed="false">vacío</button>
   </div>
   <!-- Función 3: cupos del plan. Dos datos, sin tarjetas. Las invitaciones pendientes cuentan. «Completo» aparece al llegar al tope. -->
   <dl class="us-cupos">
-    <div class="us-cupo" data-rol="medico" data-max="3"><dt class="us-rot">Médicos</dt><dd><span class="us-num"><b>1</b> / 3</span><span class="us-chip us-c-ag us-lleno" hidden>Completo</span></dd></div>
-    <div class="us-cupo" data-rol="secretaria" data-max="2"><dt class="us-rot">Asistentes</dt><dd><span class="us-num"><b>2</b> / 2</span><span class="us-chip us-c-ag us-lleno">Completo</span></dd></div>
+    <div class="us-cupo" data-rol="medico" data-max="3"><dt class="us-rot">Médicos</dt><dd><span class="us-num"><b>1</b> / 3</span></dd></div>
+    <div class="us-cupo" data-rol="secretaria" data-max="2"><dt class="us-rot">Asistentes</dt><dd><span class="us-num"><b>2</b> / 2</span></dd></div>
   </dl>
   
   <!-- Función 4: «Tu equipo». Funciones 5 y 6: «Reenviar» a la vista en las pendientes; «Cancelar invitación» / «Dar de baja» dentro del menú «⋯» (44 de área). -->
   <section class="us-tar" aria-label="Tu equipo">
-    <div class="us-tcab"><h2>Tu equipo</h2><span class="us-sec us-cuenta">3 personas</span></div>
+    <div class="us-tcab"><h2>Tu equipo</h2></div>
     <ul class="us-eq">
       <li class="us-fila" data-rol="medico" data-est="activa" data-nom="Dra. Invitada Semilla" data-mail="medico.a@semilla.spinus.test" data-hist="1">
         <span class="us-avt" style="background:#DCE6F7;color:#1F3F7A" aria-hidden="true">IS</span>
@@ -652,19 +769,30 @@
       </li>
     </ul>
     <!-- Estado vacío (hoy la tarjeta queda solo con su rótulo) -->
-    <div class="us-vacio" hidden><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.9.7 3.1 2.4 3.5 5.2"/></svg><b>Todavía no hay nadie en tu equipo</b><span>Usa «Invitar» para dar acceso a un médico o a un asistente.</span></div>
+    <div class="us-vacio" hidden></div>
   </section>
   <!-- Función 1: esta pantalla solo la ve quien administra la clínica; cualquier otro perfil es enviado a /dashboard (no se dibuja).
        Estado de sistema «cargando»: tres filas fantasma (círculo de avatar + dos líneas) dentro de la tarjeta «Tu equipo»; mismo alto que una fila real para que nada salte.
        Si falla la carga: texto «Error al cargar usuarios. Verifica tu conexión.» -->
 </div></main>
-</div><!-- Navegación: barra lateral, «Administración» activo -->
+</div><!-- Navegación: barra lateral, «Administración» activo. CALMA §28: logo de la clínica en el consultorio, aviso «N datos pendientes»
+     (plegado en Duo abierto) y pie «Mi perfil · Ajustes» + Ayuda. -->
 <nav class="us-lat" aria-label="Navegación principal">
   <div class="us-lat-cab"><span class="us-logo"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.5"/><path d="M12 5.5v13M9.6 8h4.8M9 11h6M9 14h6M9.6 17h4.8"/></svg><span class="us-logo-n">Spinus</span></span><span class="us-plan us-plan-nav">Plan VIP</span></div>
-  <button type="button" class="us-p us-cons-b"><span class="us-av">AS</span><span class="us-cons-t"><span>Consultorio</span><b>Centro</b></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 9 4-4 4 4M8 15l4 4 4-4"/></svg></button>
+  <button type="button" class="us-p us-cons-b"><span class="us-clogo" role="img" aria-label="Logo de Clínica Semilla A"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21c-4.5-2.2-7-5.6-7-10V5.5L12 3l7 2.5V11c0 4.4-2.5 7.8-7 10z"/><path d="M12 8v7M8.5 11.5h7"/></svg></span><span class="us-cons-t"><span>Consultorio</span><b>Centro</b></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 9 4-4 4 4M8 15l4 4 4-4"/></svg></button>
   <div class="us-lista"><a href="#" class="us-p us-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Inicio</a><a href="#" class="us-p us-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.9.7 3.1 2.4 3.5 5.2"/></svg>Expediente</a><a href="#" class="us-p us-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Agenda</a><a href="#" class="us-p us-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>Documentos</a><a href="#" class="us-p us-li" aria-current="page"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20v-8M12 20V5M19 20v-9"/></svg>Administración</a></div>
   <span class="us-flex"></span>
-  <div class="us-lat-pie"><a href="#" class="us-p us-li us-yo"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18.2c1.3-2 3.2-3 5.5-3s4.2 1 5.5 3"/></svg><span>Dr. Admin Semilla<small>Mi perfil · Ajustes</small></span></a></div>
+  <div class="us-avp us-m us-pleg" role="status" aria-live="polite">
+    <button type="button" class="us-p us-avp-cab" aria-expanded="false" aria-controls="us-av-ih-lat">
+      <span class="us-avp-pt" aria-hidden="true"></span><span class="us-avp-t">3 datos pendientes</span><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="us-avp-ch"><path d="m18 15-6-6-6 6"/></svg>
+    </button>
+    <div class="us-avp-c" id="us-av-ih-lat">
+      <span class="us-avp-sep" aria-hidden="true"></span>
+      <a href="#" class="us-p us-avp-l" data-k="firma"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.4 3.6a2.1 2.1 0 0 1 3 3L7.4 18.6a2 2 0 0 1-.9.5l-2.9.8a.5.5 0 0 1-.6-.6l.8-2.9a2 2 0 0 1 .5-.9z"/></svg><span>Documentos sin firma</span></a><a href="#" class="us-p us-avp-l" data-k="cedula"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22h6a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v3"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><circle cx="5" cy="14" r="3"/><path d="M7 16.5 8 22l-3-1-3 1 1-5.5"/></svg><span>Sin cédula de especialidad</span></a><a href="#" class="us-p us-avp-l" data-k="logo"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></svg><span>Clínica sin logo</span></a>
+      <a href="#" class="us-p us-avp-b">Completar ahora<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg></a>
+    </div>
+  </div>
+  <div class="us-lat-pie"><a href="#" class="us-p us-li us-yo us-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18.2c1.3-2 3.2-3 5.5-3s4.2 1 5.5 3"/></svg><span><span>Dr. Admin Semilla</span><small class="us-esp">Ortopedia y Traumatología</small><small>Mi perfil · Ajustes</small></span></a><a href="#" class="us-p us-nib us-ayn us-m" aria-label="Ayuda"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.6M12 17h.01"/></svg></a><button type="button" class="us-p us-li us-yo us-s us-abre-aj" aria-haspopup="menu"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span><span>Secretaria Semilla</span><small>Ajustes</small></span></button></div>
 </nav>
 </div>
 <!-- CAPAS. Animación de maqueta: transform/opacity, 320 ms cubic-bezier(.32,.72,0,1), mismo camino al entrar y al salir.
@@ -682,7 +810,7 @@
           <button type="button" role="radio" aria-checked="false" class="us-p us-toq" data-rol="medico">Médico</button>
         </div>
       </div>
-      <label class="us-f"><span>Correo electrónico</span><input type="email" class="us-in us-correo" placeholder="correo@ejemplo.com" autocomplete="off" inputmode="email"></label>
+      <label class="us-f"><span>Correo electrónico</span><input type="email" class="us-in us-correo" placeholder="correo@email.com" autocomplete="off" inputmode="email"></label>
       <!-- Errores en línea y en español: correo inválido, cupo lleno («Has alcanzado el límite de … de tu plan»), correo ya registrado, sin conexión -->
       <p class="us-err" role="alert" hidden><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.500M12 7.700v.01"/></svg><span></span></p>
       <p class="us-nota">Escribirá su nombre al entrar por primera vez.</p>
@@ -709,9 +837,8 @@
     <span class="us-al-i" aria-hidden="true"><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4 2.8 19.500h18.400z"/><path d="M12 10v4.500M12 17.300v.01"/></svg></span>
     <h2 class="us-al-t">Dar de baja</h2>
     <p class="us-al-p"></p>
-    <a href="#" class="us-p us-sop us-solo-b">soporte@spinus.com.mx</a>
     <div class="us-al-b">
-      <button type="button" class="us-p us-tonal us-al-no us-solo-c">Cancelar</button>
+      <button type="button" class="us-p us-tonal us-al-no us-solo-c">Volver</button>
       <button type="button" class="us-p us-dest us-al-si us-solo-c">Dar de baja</button>
       <button type="button" class="us-p us-tonal us-al-ok us-solo-b">Entendido</button>
     </div>
@@ -719,14 +846,15 @@
 </div>
 <!-- Función 8: avisos de éxito, advertencia (el correo no salió) y error. Arriba, centrados en el contenido. -->
 <div class="us-avisos" aria-live="polite"><div class="us-toast" data-t="ok"><span class="us-t-i" aria-hidden="true"><span class="us-t-ok"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span><span class="us-t-no"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4 2.8 19.500h18.400z"/><path d="M12 10v4.500M12 17.300v.01"/></svg></span></span><span class="us-t-x"></span></div></div>
+
 </div>
 <div class="marco us" lang="es" data-vp="iv">
 <div class="us-app">
 <!-- Navegación de Duo abierto vertical (CALMA §19): encabezado fundido con pista de secciones. Administración vive en «Más»,
      que va marcada (CALMA §23.9). -->
 <header class="us-encv">
-  <button type="button" class="us-p us-encv-b" aria-label="Mostrar barra lateral"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="15" rx="3"/><path d="M9.5 4.5v15"/></svg></button>
-  <nav class="us-pista" aria-label="Secciones"><a href="#" class="us-p us-pnav">Inicio</a><a href="#" class="us-p us-pnav">Expediente</a><a href="#" class="us-p us-pnav">Agenda</a><a href="#" class="us-p us-pnav">Documentos</a><button type="button" class="us-p us-pnav" aria-haspopup="menu" aria-current="page">Más</button></nav>
+  <button type="button" class="us-p us-encv-b" aria-label="Mostrar barra lateral"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="15" rx="3"/><path d="M9.5 4.5v15"/></svg><span class="us-bdg us-m" aria-hidden="true">3</span></button>
+  <nav class="us-pista" aria-label="Secciones"><a href="#" class="us-p us-pnav">Inicio</a><a href="#" class="us-p us-pnav">Expediente</a><a href="#" class="us-p us-pnav">Agenda</a><a href="#" class="us-p us-pnav">Documentos</a><button type="button" class="us-p us-pnav" aria-haspopup="dialog" aria-current="page" data-abre-mas>Más</button></nav>
   <button type="button" class="us-p us-av us-av-g" aria-label="Mi perfil">AS</button>
 </header><div class="us-col">
 <main class="us-cont"><div class="us-ancho">
@@ -740,18 +868,18 @@
   </header>
   <!-- Controles SOLO de la maqueta -->
   <div class="us-maq">
-    <button type="button" class="us-p us-demo us-demo-env" data-m="ok">Maqueta: envío correcto</button>
-    <button type="button" class="us-p us-demo us-demo-vac" aria-pressed="false">Maqueta: vacío</button>
+    <button type="button" class="us-p us-demo us-demo-env" data-m="ok">envío correcto</button>
+    <button type="button" class="us-p us-demo us-demo-vac" aria-pressed="false">vacío</button>
   </div>
   <!-- Función 3: cupos del plan. Dos datos, sin tarjetas. Las invitaciones pendientes cuentan. «Completo» aparece al llegar al tope. -->
   <dl class="us-cupos">
-    <div class="us-cupo" data-rol="medico" data-max="3"><dt class="us-rot">Médicos</dt><dd><span class="us-num"><b>1</b> / 3</span><span class="us-chip us-c-ag us-lleno" hidden>Completo</span></dd></div>
-    <div class="us-cupo" data-rol="secretaria" data-max="2"><dt class="us-rot">Asistentes</dt><dd><span class="us-num"><b>2</b> / 2</span><span class="us-chip us-c-ag us-lleno">Completo</span></dd></div>
+    <div class="us-cupo" data-rol="medico" data-max="3"><dt class="us-rot">Médicos</dt><dd><span class="us-num"><b>1</b> / 3</span></dd></div>
+    <div class="us-cupo" data-rol="secretaria" data-max="2"><dt class="us-rot">Asistentes</dt><dd><span class="us-num"><b>2</b> / 2</span></dd></div>
   </dl>
   
   <!-- Función 4: «Tu equipo». Funciones 5 y 6: «Reenviar» a la vista en las pendientes; «Cancelar invitación» / «Dar de baja» dentro del menú «⋯» (44 de área). -->
   <section class="us-tar" aria-label="Tu equipo">
-    <div class="us-tcab"><h2>Tu equipo</h2><span class="us-sec us-cuenta">3 personas</span></div>
+    <div class="us-tcab"><h2>Tu equipo</h2></div>
     <ul class="us-eq">
       <li class="us-fila" data-rol="medico" data-est="activa" data-nom="Dra. Invitada Semilla" data-mail="medico.a@semilla.spinus.test" data-hist="1">
         <span class="us-avt" style="background:#DCE6F7;color:#1F3F7A" aria-hidden="true">IS</span>
@@ -779,7 +907,7 @@
       </li>
     </ul>
     <!-- Estado vacío (hoy la tarjeta queda solo con su rótulo) -->
-    <div class="us-vacio" hidden><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.9.7 3.1 2.4 3.5 5.2"/></svg><b>Todavía no hay nadie en tu equipo</b><span>Usa «Invitar» para dar acceso a un médico o a un asistente.</span></div>
+    <div class="us-vacio" hidden></div>
   </section>
   <!-- Función 1: esta pantalla solo la ve quien administra la clínica; cualquier otro perfil es enviado a /dashboard (no se dibuja).
        Estado de sistema «cargando»: tres filas fantasma (círculo de avatar + dos líneas) dentro de la tarjeta «Tu equipo»; mismo alto que una fila real para que nada salte.
@@ -802,7 +930,7 @@
           <button type="button" role="radio" aria-checked="false" class="us-p us-toq" data-rol="medico">Médico</button>
         </div>
       </div>
-      <label class="us-f"><span>Correo electrónico</span><input type="email" class="us-in us-correo" placeholder="correo@ejemplo.com" autocomplete="off" inputmode="email"></label>
+      <label class="us-f"><span>Correo electrónico</span><input type="email" class="us-in us-correo" placeholder="correo@email.com" autocomplete="off" inputmode="email"></label>
       <!-- Errores en línea y en español: correo inválido, cupo lleno («Has alcanzado el límite de … de tu plan»), correo ya registrado, sin conexión -->
       <p class="us-err" role="alert" hidden><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.500M12 7.700v.01"/></svg><span></span></p>
       <p class="us-nota">Escribirá su nombre al entrar por primera vez.</p>
@@ -829,9 +957,8 @@
     <span class="us-al-i" aria-hidden="true"><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4 2.8 19.500h18.400z"/><path d="M12 10v4.500M12 17.300v.01"/></svg></span>
     <h2 class="us-al-t">Dar de baja</h2>
     <p class="us-al-p"></p>
-    <a href="#" class="us-p us-sop us-solo-b">soporte@spinus.com.mx</a>
     <div class="us-al-b">
-      <button type="button" class="us-p us-tonal us-al-no us-solo-c">Cancelar</button>
+      <button type="button" class="us-p us-tonal us-al-no us-solo-c">Volver</button>
       <button type="button" class="us-p us-dest us-al-si us-solo-c">Dar de baja</button>
       <button type="button" class="us-p us-tonal us-al-ok us-solo-b">Entendido</button>
     </div>
@@ -839,16 +966,49 @@
 </div>
 <!-- Función 8: avisos de éxito, advertencia (el correo no salió) y error. Arriba, centrados en el contenido. -->
 <div class="us-avisos" aria-live="polite"><div class="us-toast" data-t="ok"><span class="us-t-i" aria-hidden="true"><span class="us-t-ok"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span><span class="us-t-no"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4 2.8 19.500h18.400z"/><path d="M12 10v4.500M12 17.300v.01"/></svg></span></span><span class="us-t-x"></span></div></div>
+<!-- Menú «Más» (CALMA §28): tarjeta centrada con velo (aviso, consultorio activo, Administración, Mi perfil, Ayuda). -->
+<div class="us-capa-m" aria-hidden="true">
+  <div class="us-velo"></div>
+  <div class="us-mnw"><div class="us-mn" role="dialog" aria-modal="true" aria-label="Más">
+    <h2 class="us-mn-t">Más</h2>
+      <div class="us-avp us-m" role="status" aria-live="polite">
+    <button type="button" class="us-p us-avp-cab" aria-expanded="true" aria-controls="us-av-iv-mas">
+      <span class="us-avp-pt" aria-hidden="true"></span><span class="us-avp-t">3 datos pendientes</span><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="us-avp-ch"><path d="m18 15-6-6-6 6"/></svg>
+    </button>
+    <div class="us-avp-c" id="us-av-iv-mas">
+      <span class="us-avp-sep" aria-hidden="true"></span>
+      <a href="#" class="us-p us-avp-l" data-k="firma"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.4 3.6a2.1 2.1 0 0 1 3 3L7.4 18.6a2 2 0 0 1-.9.5l-2.9.8a.5.5 0 0 1-.6-.6l.8-2.9a2 2 0 0 1 .5-.9z"/></svg><span>Documentos sin firma</span></a><a href="#" class="us-p us-avp-l" data-k="cedula"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22h6a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v3"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><circle cx="5" cy="14" r="3"/><path d="M7 16.5 8 22l-3-1-3 1 1-5.5"/></svg><span>Sin cédula de especialidad</span></a><a href="#" class="us-p us-avp-l" data-k="logo"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></svg><span>Clínica sin logo</span></a>
+      <a href="#" class="us-p us-avp-b">Completar ahora<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg></a>
+    </div>
+  </div>
+    <!-- Selector de consultorio activo (A0·2): en Duo cerrado no hay barra lateral, así que vive aquí; solo médico con 2 o más consultorios. Ver vista 2. -->
+    <button type="button" class="us-p us-mo us-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 9 4-4 4 4M8 15l4 4 4-4"/></svg><span>Consultorio activo</span><span class="us-mo-v">Centro</span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="us-mo-f"><path d="m9 6 6 6-6 6"/></svg></button>
+    <a href="#" class="us-p us-mo us-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20v-8M12 20V5M19 20v-9"/></svg><span>Administración</span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="us-mo-f"><path d="m9 6 6 6-6 6"/></svg></a><a href="#" class="us-p us-mo us-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18.2c1.3-2 3.2-3 5.5-3s4.2 1 5.5 3"/></svg><span>Mi perfil</span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="us-mo-f"><path d="m9 6 6 6-6 6"/></svg></a><a href="#" class="us-p us-mo us-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.6M12 17h.01"/></svg><span>Ayuda</span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="us-mo-f"><path d="m9 6 6 6-6 6"/></svg></a>
+    <!-- Secretaria (CALMA db28): sin Mi perfil; en «Más» encuentra sus «Ajustes» -->
+    <div class="us-s"><button type="button" class="us-p us-mo us-tema"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg><span>Modo oscuro</span></button><a href="#" class="us-p us-mo"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21c-4.5-2.2-7-5.6-7-10V5.5L12 3l7 2.5V11c0 4.4-2.5 7.8-7 10z"/></svg><span>Aviso de Privacidad</span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="us-mo-f"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg></a><button type="button" class="us-p us-mo us-salir"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4"/></svg><span>Cerrar sesión</span></button></div>
+  </div></div>
+</div>
 </div>
 <div class="marco us" lang="es" data-vp="esc">
 <div class="us-app">
-<!-- Navegación: barra lateral, «Administración» activo -->
+<!-- Navegación: barra lateral, «Administración» activo. CALMA §28: logo de la clínica en el consultorio, aviso «N datos pendientes»
+     (plegado en Duo abierto) y pie «Mi perfil · Ajustes» + Ayuda. -->
 <nav class="us-lat" aria-label="Navegación principal">
   <div class="us-lat-cab"><span class="us-logo"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.5"/><path d="M12 5.5v13M9.6 8h4.8M9 11h6M9 14h6M9.6 17h4.8"/></svg><span class="us-logo-n">Spinus</span></span><span class="us-plan us-plan-nav">Plan VIP</span></div>
-  <button type="button" class="us-p us-cons-b"><span class="us-av">AS</span><span class="us-cons-t"><span>Consultorio</span><b>Centro</b></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 9 4-4 4 4M8 15l4 4 4-4"/></svg></button>
+  <button type="button" class="us-p us-cons-b"><span class="us-clogo" role="img" aria-label="Logo de Clínica Semilla A"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21c-4.5-2.2-7-5.6-7-10V5.5L12 3l7 2.5V11c0 4.4-2.5 7.8-7 10z"/><path d="M12 8v7M8.5 11.5h7"/></svg></span><span class="us-cons-t"><span>Consultorio</span><b>Centro</b></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 9 4-4 4 4M8 15l4 4 4-4"/></svg></button>
   <div class="us-lista"><a href="#" class="us-p us-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Inicio</a><a href="#" class="us-p us-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.9.7 3.1 2.4 3.5 5.2"/></svg>Expediente</a><a href="#" class="us-p us-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Agenda</a><a href="#" class="us-p us-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>Documentos</a><a href="#" class="us-p us-li" aria-current="page"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20v-8M12 20V5M19 20v-9"/></svg>Administración</a></div>
   <span class="us-flex"></span>
-  <div class="us-lat-pie"><a href="#" class="us-p us-li us-yo"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18.2c1.3-2 3.2-3 5.5-3s4.2 1 5.5 3"/></svg><span>Dr. Admin Semilla<small>Mi perfil · Ajustes</small></span></a></div>
+  <div class="us-avp us-m" role="status" aria-live="polite">
+    <button type="button" class="us-p us-avp-cab" aria-expanded="true" aria-controls="us-av-esc-lat">
+      <span class="us-avp-pt" aria-hidden="true"></span><span class="us-avp-t">3 datos pendientes</span><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="us-avp-ch"><path d="m18 15-6-6-6 6"/></svg>
+    </button>
+    <div class="us-avp-c" id="us-av-esc-lat">
+      <span class="us-avp-sep" aria-hidden="true"></span>
+      <a href="#" class="us-p us-avp-l" data-k="firma"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.4 3.6a2.1 2.1 0 0 1 3 3L7.4 18.6a2 2 0 0 1-.9.5l-2.9.8a.5.5 0 0 1-.6-.6l.8-2.9a2 2 0 0 1 .5-.9z"/></svg><span>Documentos sin firma</span></a><a href="#" class="us-p us-avp-l" data-k="cedula"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22h6a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v3"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><circle cx="5" cy="14" r="3"/><path d="M7 16.5 8 22l-3-1-3 1 1-5.5"/></svg><span>Sin cédula de especialidad</span></a><a href="#" class="us-p us-avp-l" data-k="logo"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></svg><span>Clínica sin logo</span></a>
+      <a href="#" class="us-p us-avp-b">Completar ahora<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg></a>
+    </div>
+  </div>
+  <div class="us-lat-pie"><a href="#" class="us-p us-li us-yo us-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18.2c1.3-2 3.2-3 5.5-3s4.2 1 5.5 3"/></svg><span><span>Dr. Admin Semilla</span><small class="us-esp">Ortopedia y Traumatología</small><small>Mi perfil · Ajustes</small></span></a><a href="#" class="us-p us-nib us-ayn us-m" aria-label="Ayuda"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.6M12 17h.01"/></svg></a><button type="button" class="us-p us-li us-yo us-s us-abre-aj" aria-haspopup="menu"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span><span>Secretaria Semilla</span><small>Ajustes</small></span></button></div>
 </nav><div class="us-col">
 <main class="us-cont"><div class="us-ancho">
   <!-- Los tres hijos del grupo «Administración» del menú (Estadísticas · Usuarios de la clínica · Facturación), como pestañas de texto:
@@ -861,18 +1021,18 @@
   </header>
   <!-- Controles SOLO de la maqueta -->
   <div class="us-maq">
-    <button type="button" class="us-p us-demo us-demo-env" data-m="ok">Maqueta: envío correcto</button>
-    <button type="button" class="us-p us-demo us-demo-vac" aria-pressed="false">Maqueta: vacío</button>
+    <button type="button" class="us-p us-demo us-demo-env" data-m="ok">envío correcto</button>
+    <button type="button" class="us-p us-demo us-demo-vac" aria-pressed="false">vacío</button>
   </div>
   <!-- Función 3: cupos del plan. Dos datos, sin tarjetas. Las invitaciones pendientes cuentan. «Completo» aparece al llegar al tope. -->
   <dl class="us-cupos">
-    <div class="us-cupo" data-rol="medico" data-max="3"><dt class="us-rot">Médicos</dt><dd><span class="us-num"><b>1</b> / 3</span><span class="us-chip us-c-ag us-lleno" hidden>Completo</span></dd></div>
-    <div class="us-cupo" data-rol="secretaria" data-max="2"><dt class="us-rot">Asistentes</dt><dd><span class="us-num"><b>2</b> / 2</span><span class="us-chip us-c-ag us-lleno">Completo</span></dd></div>
+    <div class="us-cupo" data-rol="medico" data-max="3"><dt class="us-rot">Médicos</dt><dd><span class="us-num"><b>1</b> / 3</span></dd></div>
+    <div class="us-cupo" data-rol="secretaria" data-max="2"><dt class="us-rot">Asistentes</dt><dd><span class="us-num"><b>2</b> / 2</span></dd></div>
   </dl>
   
   <!-- Función 4: «Tu equipo». Funciones 5 y 6: «Reenviar» a la vista en las pendientes; «Cancelar invitación» / «Dar de baja» dentro del menú «⋯» (44 de área). -->
   <section class="us-tar" aria-label="Tu equipo">
-    <div class="us-tcab"><h2>Tu equipo</h2><span class="us-sec us-cuenta">3 personas</span></div>
+    <div class="us-tcab"><h2>Tu equipo</h2></div>
     <ul class="us-eq">
       <li class="us-fila" data-rol="medico" data-est="activa" data-nom="Dra. Invitada Semilla" data-mail="medico.a@semilla.spinus.test" data-hist="1">
         <span class="us-avt" style="background:#DCE6F7;color:#1F3F7A" aria-hidden="true">IS</span>
@@ -900,7 +1060,7 @@
       </li>
     </ul>
     <!-- Estado vacío (hoy la tarjeta queda solo con su rótulo) -->
-    <div class="us-vacio" hidden><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.9.7 3.1 2.4 3.5 5.2"/></svg><b>Todavía no hay nadie en tu equipo</b><span>Usa «Invitar» para dar acceso a un médico o a un asistente.</span></div>
+    <div class="us-vacio" hidden></div>
   </section>
   <!-- Función 1: esta pantalla solo la ve quien administra la clínica; cualquier otro perfil es enviado a /dashboard (no se dibuja).
        Estado de sistema «cargando»: tres filas fantasma (círculo de avatar + dos líneas) dentro de la tarjeta «Tu equipo»; mismo alto que una fila real para que nada salte.
@@ -923,7 +1083,7 @@
           <button type="button" role="radio" aria-checked="false" class="us-p us-toq" data-rol="medico">Médico</button>
         </div>
       </div>
-      <label class="us-f"><span>Correo electrónico</span><input type="email" class="us-in us-correo" placeholder="correo@ejemplo.com" autocomplete="off" inputmode="email"></label>
+      <label class="us-f"><span>Correo electrónico</span><input type="email" class="us-in us-correo" placeholder="correo@email.com" autocomplete="off" inputmode="email"></label>
       <!-- Errores en línea y en español: correo inválido, cupo lleno («Has alcanzado el límite de … de tu plan»), correo ya registrado, sin conexión -->
       <p class="us-err" role="alert" hidden><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.500M12 7.700v.01"/></svg><span></span></p>
       <p class="us-nota">Escribirá su nombre al entrar por primera vez.</p>
@@ -950,9 +1110,8 @@
     <span class="us-al-i" aria-hidden="true"><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4 2.8 19.500h18.400z"/><path d="M12 10v4.500M12 17.300v.01"/></svg></span>
     <h2 class="us-al-t">Dar de baja</h2>
     <p class="us-al-p"></p>
-    <a href="#" class="us-p us-sop us-solo-b">soporte@spinus.com.mx</a>
     <div class="us-al-b">
-      <button type="button" class="us-p us-tonal us-al-no us-solo-c">Cancelar</button>
+      <button type="button" class="us-p us-tonal us-al-no us-solo-c">Volver</button>
       <button type="button" class="us-p us-dest us-al-si us-solo-c">Dar de baja</button>
       <button type="button" class="us-p us-tonal us-al-ok us-solo-b">Entendido</button>
     </div>
@@ -960,23 +1119,24 @@
 </div>
 <!-- Función 8: avisos de éxito, advertencia (el correo no salió) y error. Arriba, centrados en el contenido. -->
 <div class="us-avisos" aria-live="polite"><div class="us-toast" data-t="ok"><span class="us-t-i" aria-hidden="true"><span class="us-t-ok"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span><span class="us-t-no"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4 2.8 19.500h18.400z"/><path d="M12 10v4.500M12 17.300v.01"/></svg></span></span><span class="us-t-x"></span></div></div>
+
 </div>
 <script>
 (function(){
   /* Maqueta: nada se envía. Los textos de los avisos son los del producto. */
-  var MODOS=['ok','nocorreo','sinred'],ROT={ok:'Maqueta: envío correcto',nocorreo:'Maqueta: correo no sale',sinred:'Maqueta: sin conexión'};
+  var MODOS=['ok','nocorreo','sinred'],ROT={ok:'envío correcto',nocorreo:'correo no sale',sinred:'sin conexión'};
   var SINRED='No se pudo conectar. Revisa tu conexión e intenta de nuevo.';
   document.querySelectorAll('.us.marco').forEach(function(m){
     function q(s){return m.querySelector(s)}function qa(s){return [].slice.call(m.querySelectorAll(s))}
-    var vp=m.dataset.vp,lista=q('.us-eq'),plantilla=q('[data-plantilla]'),vacio=q('.us-vacio'),cuenta=q('.us-cuenta'),
+    var vp=m.dataset.vp,lista=q('.us-eq'),plantilla=q('[data-plantilla]'),vacio=q('.us-vacio'),
         cInv=q('.us-capa-inv'),cMenu=q('.us-capa-menu'),cAl=q('.us-capa-al'),menu=q('.us-menu'),alerta=q('.us-alerta'),
         correo=q('.us-correo'),err=q('.us-err'),nota=q('.us-nota'),toast=q('.us-toast'),dEnv=q('.us-demo-env'),dVac=q('.us-demo-vac'),
         fila=null,origen=null,rol='secretaria',modo='ok',tT=null,guard=null;
     function filas(){return qa('.us-fila').filter(function(f){return !f.hasAttribute('data-plantilla')&&!f.hidden})}
     function pinta(){var fs=filas();
       qa('.us-cupo').forEach(function(c){var n=fs.filter(function(f){return f.dataset.rol===c.dataset.rol}).length,mx=+c.dataset.max;
-        c.querySelector('b').textContent=n;c.querySelector('.us-lleno').hidden=n<mx});
-      cuenta.textContent=fs.length===1?'1 persona':fs.length+' personas';cuenta.hidden=!fs.length;vacio.hidden=!!fs.length}
+        c.querySelector('b').textContent=n});
+      vacio.hidden=!!fs.length}
     function avisa(t,x){clearTimeout(tT);toast.dataset.t=t;q('.us-t-x').textContent=x;toast.classList.add('us-on');
       tT=setTimeout(function(){toast.classList.remove('us-on')},t==='aviso'?8000:4000)}
     function abre(c,foco){c.classList.add('us-on');c.setAttribute('aria-hidden','false');if(foco)foco.focus({preventScroll:true})}
@@ -990,7 +1150,7 @@
     qa('.us-seg button').forEach(function(b){b.addEventListener('click',function(){ponRol(b.dataset.rol)})});
     correo.addEventListener('input',function(){correo.removeAttribute('aria-invalid');error('')});
     q('.us-form').addEventListener('submit',function(e){e.preventDefault();var v=correo.value.trim().toLowerCase();
-      if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)){correo.setAttribute('aria-invalid','true');error('Escribe un correo válido, por ejemplo nombre@ejemplo.com');correo.focus();return}
+      if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)){correo.setAttribute('aria-invalid','true');error('Email inválido');correo.focus();return}
       if(modo==='sinred'){error(SINRED);return}
       if(filas().some(function(f){return f.dataset.mail===v})){error('Ese correo ya tiene una cuenta en Spinus.');return}
       var c=q('.us-cupo[data-rol="'+rol+'"]'),n=filas().filter(function(f){return f.dataset.rol===rol}).length;
@@ -1022,12 +1182,12 @@
       alerta.classList.remove('us-bloq');alerta.classList.toggle('us-apil',pend);q('.us-al-t').textContent=pend?'Cancelar invitación':'Dar de baja';
       q('.us-al-p').innerHTML=pend?'La invitación de <b></b> dejará de funcionar y su plaza quedará libre.':'¿Dar de baja a <b></b>? Perderá el acceso y su plaza quedará libre. Lo que haya registrado se queda en la clínica.';
       q('.us-al-p b').textContent=pend?fila.dataset.mail:fila.dataset.nom;
-      q('.us-al-si').textContent=pend?'Cancelar invitación':'Dar de baja';q('.us-al-no').textContent=pend?'Volver':'Cancelar';
+      q('.us-al-si').textContent=pend?'Cancelar invitación':'Dar de baja';q('.us-al-no').textContent='Volver';
       abre(cAl,q('.us-al-no'))});
     q('.us-al-si').addEventListener('click',function(){
       if(modo==='sinred'){cierra(cAl);avisa('error',SINRED);return}
       if(fila.dataset.hist){alerta.classList.add('us-bloq');alerta.classList.remove('us-apil');q('.us-al-t').textContent='No se puede dar de baja';
-        q('.us-al-p').textContent='No se puede dar de baja a un médico que ya tiene pacientes en la clínica. Escríbenos y lo resolvemos contigo.';q('.us-al-ok').focus();return}
+        q('.us-al-p').innerHTML='No se puede dar de baja a un médico que ya tiene pacientes en la clínica. Escríbenos a <a href="#" class="us-p us-sopi">soporte@spinus.com.mx</a> y lo resolvemos contigo.';q('.us-al-ok').focus();return}
       var pend=fila.dataset.est==='pendiente',x=pend?'Invitación de '+fila.dataset.mail+' cancelada':fila.dataset.nom+' ya no tiene acceso';
       fila.remove();pinta();cierra(cAl,false);avisa('ok',x)});
     q('.us-al-no').addEventListener('click',function(){cierra(cAl)});q('.us-al-ok').addEventListener('click',function(){cierra(cAl)});
@@ -1054,5 +1214,21 @@
   var bs=orig.map(function(o,i){var b=document.createElement('button');b.type='button';t.appendChild(b);
     b.addEventListener('click',function(){ms.forEach(function(m){m.querySelectorAll('.us-demo')[i].click()});sync()});return b});
   sync();var op=ms[0].closest('.op');if(op)op.querySelector('header').appendChild(t);else ms[0].parentNode.insertBefore(t,ms[0]);
+})();
+
+/* Cromo global (CALMA §28): menú «Más» como tarjeta centrada con velo y aviso «N datos pendientes» plegable. */
+(function(){
+  document.querySelectorAll('.us.marco').forEach(function(m){
+    var c=m.querySelector('.us-capa-m'),o=null;
+    function cierra(){if(!c)return;c.classList.remove('us-on');c.setAttribute('aria-hidden','true');if(o&&o.offsetParent)o.focus({preventScroll:true})}
+    if(c){c.querySelector('.us-velo').addEventListener('click',cierra);
+      m.querySelectorAll('[data-abre-mas]').forEach(function(b){b.addEventListener('click',function(){o=b;c.classList.add('us-on');c.setAttribute('aria-hidden','false');
+        var f=c.querySelector('.us-avp-cab,.us-mo');if(f)f.focus({preventScroll:true})})});
+      c.querySelectorAll('a.us-mo,.us-avp-l,.us-avp-b').forEach(function(a){a.addEventListener('click',function(e){e.preventDefault();cierra()})});
+      m.addEventListener('keydown',function(e){if(e.key==='Escape'&&c.classList.contains('us-on')){e.preventDefault();cierra()}})}
+    m.querySelectorAll('.us-avp-cab').forEach(function(b){b.addEventListener('click',function(){
+      var a=b.closest('.us-avp'),pl=a.classList.toggle('us-pleg');b.setAttribute('aria-expanded',String(!pl))})});
+    m.querySelectorAll('.us-lat a[href="#"],.us-capa-m a[href="#"]').forEach(function(a){a.addEventListener('click',function(e){e.preventDefault()})});
+  });
 })();
 </script>

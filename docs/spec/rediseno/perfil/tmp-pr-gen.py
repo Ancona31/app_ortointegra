@@ -43,6 +43,12 @@ import re
 for k in I:
     I[k] = re.sub(r'(\.\d)00', r'\1', I[k])
 
+import importlib.util as _iu
+_sp = _iu.spec_from_file_location('u8cromo', os.path.join(os.path.dirname(os.path.dirname(L)), 'tools', 'tmp-u8-cromo.py'))
+_CRM = _iu.module_from_spec(_sp); _sp.loader.exec_module(_CRM)
+CR = _CRM.cromo('pr', 'pr-menu', perfil_actual=True)
+CR['PIE'] = CR['PIE'].replace('<span><span>Dr. Admin Semilla</span>', '<span><span class="pr-a">Dr. Admin Semilla</span><span class="pr-i">Dra. Invitada Semilla</span>', 1)
+
 def marca(s=24):
     return f'<span class="pr-logo">{ic(I["logo"], s, 1.8)}<span class="pr-logo-n">Spinus</span></span>'
 
@@ -55,27 +61,29 @@ def riel():
         return f'<a href="#" class="pr-p pr-rb" aria-label="{t}">{ic(I[k], 22)}</a>'
     return f'''<!-- A0 · navegación. Riel a la derecha, fundido con la franja del sistema. «Mi perfil» vive en «Más». -->
 <nav class="pr-riel" aria-label="Navegación principal">
-  {b("inicio","Inicio")}{b("pac","Expediente")}{b("agenda","Agenda")}{b("docs","Documentos")}<a href="#" class="pr-p pr-rb" aria-label="Más: Mi perfil" aria-current="page">{ic(I["mas"], 22, 3)}</a>
+  {b("inicio","Inicio")}{b("pac","Expediente")}{b("agenda","Agenda")}{b("docs","Documentos")}<button type="button" class="pr-p pr-rb" aria-label="Más" aria-current="page" data-abre-mas>{ic(I["mas"], 22, 3)}{CR["BDG"]}</button>
   <span class="pr-flex"></span>
   <button type="button" class="pr-p pr-mas" aria-label="Nueva consulta">{ic(I["plus"], 26, 2.4)}</button>
 </nav>'''
 
-def lateral():
+def lateral(vp):
     def a(k, t):
         return f'<a href="#" class="pr-p pr-li">{ic(I[k], 20)}{t}</a>'
-    return f'''<!-- A0 · navegación (barra lateral). Activo: «Mi perfil · Ajustes», al pie. -->
+    return f'''<!-- A0 · navegación (barra lateral, CALMA §28): logo de la clínica en el botón de consultorio, aviso «N datos pendientes» (plegado en
+     Duo abierto) y pie «Mi perfil · Ajustes» + Ayuda. Activo: «Mi perfil · Ajustes», al pie. -->
 <nav class="pr-lat" aria-label="Navegación principal">
   <div class="pr-lat-cab">{marca(24)}{PLAN}</div>
-  <button type="button" class="pr-p pr-cons-b"><span class="pr-av">{MI}</span><span class="pr-cons-t"><span>Consultorio</span><b>Centro</b></span>{ic(I["selector"], 16, 2)}</button>
+  <button type="button" class="pr-p pr-cons-b">{CR["CLOGO"]}<span class="pr-cons-t"><span>Consultorio</span><b>Centro</b></span>{ic(I["selector"], 16, 2)}</button>
   <div class="pr-lista">{a("inicio","Inicio")}{a("pac","Expediente")}{a("agenda","Agenda")}{a("docs","Documentos")}{a("admin","Administración")}</div>
   <span class="pr-flex"></span>
-  <div class="pr-lat-pie"><a href="#" class="pr-p pr-li pr-yo" aria-current="page">{ic(I["perfil"], 20)}<span><span class="pr-a">Dr. Admin Semilla</span><span class="pr-i">Dra. Invitada Semilla</span><small>Mi perfil · Ajustes</small></span></a></div>
+{CR["ap"](vp, "lat")}
+  {CR["PIE"]}
 </nav>'''
 
 def encabezado():
     return f'''<!-- A0 · navegación. Encabezado fundido con la barra de estado. «Mi perfil» se abre desde el menú o el avatar. -->
 <header class="pr-enc">
-  <button type="button" class="pr-p pr-menu" aria-label="Menú">{ic(I["menu"], 22, 2)}</button>
+  <button type="button" class="pr-p pr-menu" aria-label="Menú">{ic(I["menu"], 22, 2)}{CR["BDG"]}</button>
   <span class="pr-enc-t">Cuenta</span>
   <span class="pr-flex"></span>
   <button type="button" class="pr-p pr-av pr-av-g" aria-label="Mi perfil" aria-current="page">{MI}</button>
@@ -84,11 +92,11 @@ def encabezado():
 def encabezado_v():
     pil = ''.join(f'<a href="#" class="pr-p pr-pil">{t}</a>' for t in ('Inicio', 'Expediente', 'Agenda', 'Documentos'))
     # CALMA §23.9: quinta píldora «Más» (abre el mismo menú que el «···» del riel). En Mi perfil va marcado el avatar, no «Más».
-    pil += '<button type="button" class="pr-p pr-pil" aria-haspopup="menu">Más</button>'
+    pil += '<button type="button" class="pr-p pr-pil" aria-haspopup="dialog" data-abre-mas>Más</button>'
     return f'''<!-- A0 · navegación de Duo abierto vertical: encabezado fundido con pista de secciones (CALMA §19). Mi perfil se abre desde el avatar
      o desde «Mostrar barra lateral»; ninguna píldora va activa (tampoco «Más»): lo marcado es el avatar. -->
 <header class="pr-encv">
-  <button type="button" class="pr-p pr-encv-b" aria-label="Mostrar barra lateral">{ic(I["lateral"], 20)}</button>
+  <button type="button" class="pr-p pr-encv-b" aria-label="Mostrar barra lateral">{ic(I["lateral"], 20)}{CR["BDG"]}</button>
   <nav class="pr-pista" aria-label="Secciones">{pil}</nav>
   <button type="button" class="pr-p pr-av pr-av-g pr-av-act" aria-label="Mi perfil" aria-current="page">{MI}</button>
 </header>'''
@@ -130,9 +138,9 @@ def cab(vp):
     return f'''<header class="pr-cab">
     <!-- Función 1: título de la pantalla. (El esqueleto de carga y la pantalla «No se pudieron cargar tus datos. Revisa tu conexión e inténtalo de nuevo.» + «Reintentar»
          son estados de sistema: se conservan tal cual, no se dibujan aquí.) -->
-    <div class="pr-tit"><h1>Mi perfil</h1><p class="pr-sec"><span class="pr-a">Dr. Admin Semilla · administras Clínica Semilla A</span><span class="pr-i">Dra. Invitada Semilla · médica invitada en Clínica Semilla A</span></p></div>
+    <div class="pr-tit"><p class="pr-rotc">Cuenta</p><h1>Mi perfil</h1></div>
     <!-- Control SOLO de la maqueta -->
-    <div class="pr-maq"><button type="button" class="pr-p pr-demo pr-demo-rol" aria-pressed="false">Maqueta: ver como médico invitado</button></div>
+    <div class="pr-maq"><button type="button" class="pr-p pr-demo pr-demo-rol" aria-pressed="false">ver como médico invitado</button></div>
   </header>'''
 
 def tabs():
@@ -160,7 +168,7 @@ def identidad():
 
 def papel():
     return f'''<div class="pr-f pr-a">
-        <span>Vista previa del encabezado en PDF</span>
+        <span>Vista previa del encabezado en PDFs</span>
         <!-- Es papel: blanco también en modo oscuro (correcto). La «mesa» gris lo enmarca para que se entienda que es una hoja. -->
         <div class="pr-mesa" role="img" aria-label="Vista previa del encabezado de tus PDF sobre papel blanco">
           <div class="pr-papel">
@@ -170,7 +178,6 @@ def papel():
             <div class="pr-pt"><i></i><i></i><i></i></div>
           </div>
         </div>
-        <span class="pr-ay">Así sale impreso: siempre sobre papel blanco.</span>
       </div>'''
 
 def datos_prof():
@@ -199,8 +206,23 @@ def datos_prof():
       {f("Universidad / Institución", inp("uni", DP, "", "Ej: Universidad Nacional Autónoma de México"))}''',
       'Aparecen en las recetas, solicitudes y documentos que emites.', tcls='pr-filas')
 
-def firma():
-    return grupo('Firma autógrafa', 'pluma', f'''
+def nombre_clinica():
+    # perfil/page.tsx §3.2: tarjeta «Nombre de la clínica»; editable solo para quien administra (sin asterisco en el código).
+    return grupo('Nombre de la clínica', 'imagen', f'''
+      <!-- Función 7: nombre de la clínica. Editable solo para quien administra; el resto lo ve en lectura con la nota. -->
+      <div class="pr-f pr-a"><span>Nombre de la clínica</span>
+        <input type="text" class="pr-in" data-k="clinica" data-s="{CL}" value="Clínica Semilla A" placeholder="Ej: Clínica Ortointegra" maxlength="120" aria-label="Nombre de la clínica" autocomplete="off">
+        <span class="pr-err pr-err-cl" hidden>El nombre de la clínica no puede quedar vacío.</span>
+      </div>
+      <div class="pr-f pr-i"><span>Nombre de la clínica</span><div class="pr-lect">Clínica Semilla A</div></div>''',
+      'Es el nombre de la clínica, distinto al de cada consultorio.<span class="pr-i"> Sólo quien administra la clínica puede cambiarlo.</span>', tcls='pr-filas')
+
+def firma_logo(vp):
+    # perfil/page.tsx §3.3: «Firma y logo» (quien administra) / «Firma» (invitado): firma autógrafa y, solo admin, logo, paleta y vista previa del PDF.
+    pals = ''.join(f'<button type="button" class="pr-p pr-pal" aria-pressed="{"true" if i == 0 else "false"}" data-a="{a}" data-b="{b}" style="--a:{a};--b:{b}"><span class="pr-pal-m" aria-hidden="true"><span></span><span></span></span><span>{n}</span>{ic(I["palomita"], 14, 3)}</button>' for i, (n, a, b) in enumerate(PALETAS))
+    return grupo('<span class="pr-a">Firma y logo</span><span class="pr-i">Firma</span>', 'pluma', f'''
+      <div class="pr-sep pr-sep0">
+        <h3 class="pr-st">Firma autógrafa</h3>
       <!-- Función 8: subir imagen (JPG, PNG, WEBP hasta 10 MB) o dibujar con dedo o ratón; limpiar; vista previa sobre blanco y sobre oscuro; «Aceptar firma»;
            «Cambiar firma»; eliminar. En la maqueta, «Toca para seleccionar…» no abre el selector de archivos: pasa a la vista previa con una firma de muestra.
            El lienzo SÍ dibuja de verdad. Estados de sistema: «Procesando imagen…», «Procesando…», «Guardando…». -->
@@ -222,23 +244,11 @@ def firma():
           <div class="pr-btns"><button type="button" class="pr-p pr-tonal pr-f-cambia">Cambiar firma</button><button type="button" class="pr-p pr-txt pr-rojo pr-f-elim">{ic(I["basura"], 16, 2)}Eliminar</button></div>
         </div>
         <p class="pr-nota">La firma se guarda en cuanto la capturas: no depende del botón de guardar.</p>
-      </div>''', 'Aparece encima de la línea punteada en todos los documentos PDF.', aria='Firma')
-
-def clinica(vp):
-    pals = ''.join(f'<button type="button" class="pr-p pr-pal" aria-pressed="{"true" if i == 0 else "false"}" data-a="{a}" data-b="{b}" style="--a:{a};--b:{b}"><span class="pr-pal-m" aria-hidden="true"><span></span><span></span></span><span>{n}</span>{ic(I["palomita"], 14, 3)}</button>' for i, (n, a, b) in enumerate(PALETAS))
-    return grupo('<span class="pr-a">Marca de la clínica</span><span class="pr-i">Clínica</span>', 'imagen', f'''
-      <!-- Función 7: nombre de la clínica. Editable solo para quien administra; el resto lo ve en lectura con la nota. -->
-      <div class="pr-f pr-a"><span>Nombre de la clínica<i aria-hidden="true"> *</i></span>
-        <input type="text" class="pr-in" data-k="clinica" data-s="{CL}" value="Clínica Semilla A" placeholder="Ej: Clínica Ortointegra" maxlength="120" aria-label="Nombre de la clínica" autocomplete="off">
-        <span class="pr-err pr-err-cl" hidden>El nombre de la clínica no puede quedar vacío.</span>
-        <span class="pr-ay">Es el nombre de la clínica, distinto al de cada consultorio.</span>
-      </div>
-      <div class="pr-f pr-i"><span>Nombre de la clínica</span><div class="pr-lect">Clínica Semilla A</div>
-        <span class="pr-ay">Es el nombre de la clínica, distinto al de cada consultorio. Sólo quien administra la clínica puede cambiarlo.</span></div>
+      </div>      </div>
       <!-- Función 9 (solo admin): logo. Subir / cambiar; «Descartar selección» solo sobre un archivo elegido sin guardar. Se sube al pulsar «Guardar».
            Conserva data-onboard="subir-logo": es el ancla del asistente de bienvenida. En la maqueta no se abre el selector de archivos: se usa un logo de muestra. -->
       <div class="pr-sep pr-a">
-        <h3 class="pr-st">Logo</h3>
+        <h3 class="pr-st">Logo del consultorio</h3>
         <div class="pr-logo-f">
           <span class="pr-logo-g" data-h="logog" aria-hidden="true">{ic(I["subir"], 22)}{ic(I["logo"], 44, 1.4, " hidden")}</span>
           <div class="pr-logo-a">
@@ -256,14 +266,8 @@ def clinica(vp):
           <div class="pr-f"><span>Color primario</span><div class="pr-color"><input type="color" value="#1a3a5c" data-c="p" aria-label="Color primario"><i class="pr-ip"></i><span data-h="hexp">#1a3a5c</span></div></div>
           <div class="pr-f"><span>Color secundario</span><div class="pr-color"><input type="color" value="#1e5fa8" data-c="s" aria-label="Color secundario"><i class="pr-is"></i><span data-h="hexs">#1e5fa8</span></div></div>
         </div>
-        <div class="pr-f"><span>Vista previa en la app</span>
-          <div class="pr-vapp" aria-hidden="true">
-            <div class="pr-vnav"><span>{ic(I["inicio"], 14, 2)}Inicio</span><span>{ic(I["pac"], 14, 2)}Pacientes</span></div>
-            <div class="pr-vder"><span class="pr-vbtn">{ic(I["palomita"], 14, 2.6)}Guardar</span><span class="pr-ay">El menú usa el primario; los botones, el secundario.</span></div>
-          </div>
-        </div>
-        {papel() if vp != "esc" else ""}
-      </div>''', '<span class="pr-a">Nombre, logo y colores. Los ve todo el equipo y salen en los documentos.</span>', tcls='pr-filas', aria='Clínica')
+        {papel()}
+      </div>''', 'Se aplican en tus documentos y PDFs.', tcls='pr-filas', aria='Firma y logo')
 
 def fila_res(i, n, d, t, df):
     chip = '<span class="pr-chip pr-c-conf pr-c-plano pr-cdef"' + ('' if df else ' hidden') + '>Predeterminado</span>'
@@ -275,7 +279,7 @@ def resumen():
       <ul class="pr-res pr-cnovacio">{"".join(fila_res(*c) for c in CONS)}</ul>
       <!-- Con más de 3, debajo va el enlace «Ver N consultorios más» (misma pestaña). -->
       <p class="pr-nota pr-cvacio">No tienes consultorios activos. <a href="#" class="pr-p pr-txt pr-ir" data-ir="cons" style="display:inline-flex">Agrega el primero</a></p>""",
-      '<span class="pr-num"><span data-h="cuenta">3</span> de 10 activos</span>',
+      '',
       der=f'<a href="#" class="pr-p pr-txt pr-ir pr-cnovacio" data-ir="cons">Gestionar los <span data-h="cuenta">3</span>{ic(I["sig"], 13, 2.4)}</a>',
       aria='Mis consultorios (resumen)')}
     <section class="pr-tar pr-gres" aria-label="Google Calendar (resumen)">
@@ -304,9 +308,9 @@ NOTA_CONS = 'El consultorio predeterminado no se puede eliminar sin marcar otro 
 NOTA_G = 'Al desconectar, las citas dejan de escribirse en Google. Las que ya se crearon se quedan en tu calendario.'
 
 def consultorios(vp):
-    nota = '' if vp == 'esc' else f'<p class="pr-nota pr-suelta">{NOTA_CONS}</p>'
+    nota = f'<p class="pr-nota pr-suelta">{NOTA_CONS}</p>'
     return f'''<!-- Control SOLO de la maqueta -->
-    <div class="pr-maq"><button type="button" class="pr-p pr-demo pr-demo-cl">Maqueta: cambiar lista (ahora: con consultorios)</button></div>
+    <div class="pr-maq"><button type="button" class="pr-p pr-demo pr-demo-cl">cambiar lista (ahora: con consultorios)</button></div>
     <!-- Función 13: lista, «Agregar consultorio» (deshabilitado al llegar al tope de 10), vacío «No tienes consultorios activos». Estado de sistema: esqueleto de 3 filas. -->
     {grupo('Mis consultorios', 'pin', f"""
       <p class="pr-aviso pr-ctope">{ic(I["info"], 16, 2)}<span>Has llegado al máximo de 10 consultorios activos. Para crear otro, elimina uno antes.</span></p>
@@ -314,7 +318,7 @@ def consultorios(vp):
            Función 15: «Eliminar»; cuando no se puede, el botón queda deshabilitado y el motivo se LEE debajo (antes solo vivía en el title). -->
       <ul class="pr-lc pr-cnovacio">
         {"".join(fila_cons(*c) for c in CONS)}
-        <li class="pr-ctope"><p class="pr-nota">Maqueta: aquí seguirían los otros 7 consultorios.</p></li>
+        <!-- Con tope de 10 la lista sigue con los demás consultorios; aquí se dibujan tres. -->
       </ul>
       <div class="pr-vacio pr-cvacio">{ic(I["pin"], 22)}<b>No tienes consultorios activos.</b><button type="button" class="pr-p pr-tonal pr-c-add">{ic(I["plus"], 18, 2.4)}Agregar el primero</button></div>""",
       '<span class="pr-num"><span data-h="cuenta">3</span> de 10 activos · el predeterminado es el que se abre al iniciar sesión.</span>',
@@ -324,14 +328,14 @@ def consultorios(vp):
 AVISO_G = 'No se pudo conectar: en la pantalla de Google quedó sin marcar el permiso para crear y administrar su propio calendario. Spinus guarda tus citas en un calendario aparte que él mismo crea, así que sin ese permiso no puede sincronizar nada. Vuelve a intentarlo y deja la casilla marcada.'
 
 def google(vp):
-    nota = '' if vp == 'esc' else f'<p class="pr-nota pr-suelta pr-a pr-gon">{NOTA_G}</p>'
+    nota = f'<p class="pr-nota pr-suelta pr-a pr-gon">{NOTA_G}</p>'
     return f'''<!-- Control SOLO de la maqueta: no se simula ninguna conexión real -->
-    <div class="pr-maq pr-a"><button type="button" class="pr-p pr-demo pr-demo-g">Maqueta: cambiar estado (ahora: sin conectar)</button></div>
+    <div class="pr-maq pr-a"><button type="button" class="pr-p pr-demo pr-demo-g">cambiar estado (ahora: sin conectar)</button></div>
     <!-- Función 16: conectar, estado y cuenta, «Recrear calendario» (con confirmación), «Desconectar»; para no admin, solo el mensaje.
          Estado de sistema «comprobando»: el chip es un esqueleto y no se enseñan acciones. -->
     <section class="pr-tar pr-a" aria-label="Google Calendar">
       <div class="pr-tcab" style="align-items:center"><span class="pr-gic">{ic(I["agenda"], 22)}</span>
-        <div class="pr-th"><div class="pr-ghl"><h2>Google Calendar</h2>{gchips()}</div><p class="pr-sub"><span class="pr-goff">Conecta una cuenta para sincronizar tus citas.</span><span class="pr-gon">Sincronización activa: las citas se crean automáticamente.</span><span class="pr-gerr">No se pudo comprobar la conexión.</span></p></div></div>
+        <div class="pr-th"><div class="pr-ghl"><h2>Google Calendar</h2>{gchips()}</div><p class="pr-sub"><span class="pr-goff">Conecta una cuenta para sincronizar tus citas.</span><span class="pr-gon">Sincronización activa — las citas se crean automáticamente.</span><span class="pr-gerr">No se pudo comprobar la conexión.</span></p></div></div>
       <div class="pr-gerr pr-vacio">{ic(I["sinred"], 22)}<span>Google no respondió. Tu conexión sigue guardada; no hace falta que la rehagas.</span><button type="button" class="pr-p pr-tonal pr-g-reint">{ic(I["refresca"], 16, 2)}Reintentar</button></div>
       <div class="pr-gnoerr">
         <div class="pr-dato"><span class="pr-sub">Calendario</span><b><span class="pr-goff">—</span><span class="pr-gon">Spinus - Dr. Admin Semilla</span></b></div>
@@ -358,7 +362,7 @@ def ajustes():
         <!-- A0-9: Modo claro / oscuro. En la maqueta el interruptor solo cambia su propio estado; el tema se prueba con los botones «Claro / Oscuro» de la página. -->
         <li><button type="button" role="switch" aria-checked="false" class="pr-ajf pr-sw-b">{ic(I["luna"], 20)}<span class="pr-flex">Modo oscuro</span><span class="pr-sw" aria-hidden="true"></span></button></li>
         <!-- A0-12: Aviso de Privacidad (pestaña nueva) -->
-        <li><a href="#" class="pr-p pr-ajf">{ic(I["escudo"], 20)}<span class="pr-flex">Aviso de privacidad<small>Se abre en una pestaña nueva</small></span>{ic(I["externo"], 18, 1.8, ' style="color:var(--tinta3)"')}</a></li>
+        <li><a href="#" class="pr-p pr-ajf">{ic(I["escudo"], 20)}<span class="pr-flex">Aviso de Privacidad</span>{ic(I["externo"], 18, 1.8, ' style="color:var(--tinta3)"')}</a></li>
         <!-- A0-10: Cerrar sesión -->
         <li><button type="button" class="pr-p pr-ajf pr-rojo">{ic(I["salir"], 20)}<span class="pr-flex">Cerrar sesión</span></button></li>
       </ul>"""
@@ -366,14 +370,11 @@ def ajustes():
     {grupo('Ajustes', 'engrane', filas, cls='pr-ajs', tcls='pr-ajt')}'''
 
 def lado():
+    # perfil/page.tsx: la segunda columna SÓLO existe en Datos y solo lleva la tarjeta de identidad.
     return f'''<aside class="pr-lado">
       <div class="pr-panel" data-panel="datos">
         {identidad()}
-        <section class="pr-tar pr-a" aria-label="Vista previa del encabezado en PDF">{papel()}</section>
       </div>
-      <div class="pr-panel" data-panel="cons" hidden><section class="pr-tar"><div class="pr-th"><h2>Cómo funcionan</h2></div><p class="pr-nota">{NOTA_CONS}</p></section></div>
-      <div class="pr-panel" data-panel="google" hidden><section class="pr-tar pr-a pr-gon"><div class="pr-th"><h2>Al desconectar</h2></div><p class="pr-nota">{NOTA_G}</p></section>
-        <section class="pr-tar"><div class="pr-th"><h2>Una conexión por clínica</h2></div><p class="pr-nota">La conexión es una por clínica y da servicio a todo el equipo.</p></section></div>
     </aside>'''
 
 def cont(vp):
@@ -385,8 +386,8 @@ def cont(vp):
     <div class="pr-panel" data-panel="datos" role="tabpanel" aria-label="Datos">
     {identidad() if vp != "esc" else ""}
     {datos_prof()}
-    {firma()}
-    {clinica(vp)}
+    {nombre_clinica()}
+    {firma_logo(vp)}
     {resumen()}
     </div>
     <div class="pr-panel" data-panel="cons" role="tabpanel" aria-label="Consultorios" hidden>
@@ -481,8 +482,8 @@ def con_iv(css):
 
 BASE = ''.join(l for l in open(f'{L}/tmp-pr-base.css') if 'vbus' not in l and 'vform' not in l)
 seen = set(); BASE = '\n'.join(l for l in BASE.split('\n') if not (l in seen or seen.add(l))) + '\n'
-CSS = con_iv(BASE + open(f'{L}/tmp-pr-estilo.css').read()) + open(f'{L}/tmp-pr-u8.css').read()
-JS = open(f'{L}/tmp-pr-guion.js').read()
+CSS = con_iv(BASE + open(f'{L}/tmp-pr-estilo.css').read()) + CR['CSS'] + open(f'{L}/tmp-pr-u8.css').read()
+JS = open(f'{L}/tmp-pr-guion.js').read() + CR['JS']
 
 def marco(vp):
     if vp == 'ext':
@@ -490,12 +491,12 @@ def marco(vp):
     elif vp == 'tel':
         app = encabezado() + cont(vp)
     elif vp == 'ih':
-        app = cont(vp) + lateral()
+        app = cont(vp) + lateral(vp)
     elif vp == 'iv':
         app = encabezado_v() + cont(vp)
     else:
-        app = lateral() + cont(vp)
-    return f'<div class="marco pr" lang="es" data-vp="{vp}" data-tab="datos" data-g="off" data-cl="n">\n<div class="pr-app">\n{app}\n</div>\n{barra()}\n{capas(vp)}\n</div>'
+        app = lateral(vp) + cont(vp)
+    return f'<div class="marco pr" lang="es" data-vp="{vp}" data-tab="datos" data-g="off" data-cl="n">\n<div class="pr-app">\n{app}\n</div>\n{barra()}\n{capas(vp)}\n{CR["capa_mas"](vp)}\n</div>'
 
 out = ('<!-- NOMBRE: Mi perfil | Pasada de unificación: grupos con rótulo de color y campos como filas de lista, columna y apoyo centrados en computadora, quinto marco (Duo abierto vertical), alertas con el patrón único y controles de maqueta fuera del teléfono -->\n'
        '<style>\n' + CSS + '</style>\n' + '\n'.join(marco(v) for v in ('ext', 'tel', 'ih', 'iv', 'esc')) + '\n<script>\n' + JS + '</script>\n')

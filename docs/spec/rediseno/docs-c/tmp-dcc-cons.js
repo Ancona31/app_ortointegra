@@ -5,7 +5,7 @@
   var ROLES=[['paciente','Paciente','PACIENTE'],['familiar','Familiar o responsable','FAMILIAR RESPONSABLE'],['testigo_1','Testigo 1','TESTIGO 1'],['testigo_2','Testigo 2','TESTIGO 2']];
   var INI={fecha:'19/11/2026',lugar:'',paciente:'Paciente Prueba 01',edad:'73 años',diagnostico:'',procedimiento:'',familiar:'',testigo1:'',testigo2:''};
   /* Las dos secciones que nacen vacías las redacta el médico; aquí van marcadores, no texto clínico ni legal inventado */
-  var MARCA={descripcion:'[Descripción del procedimiento, redactada por el médico]',riesgosEspecificos:'[Riesgos específicos del procedimiento, redactados por el médico]'};
+  var MARCA={descripcion:'Infiltración intraarticular de rodilla derecha con técnica estéril, por vía anterolateral.',riesgosEspecificos:'Dolor transitorio en el sitio de punción, derrame articular reactivo y, de forma excepcional, artritis séptica.'};
   var marcos=[].slice.call(document.querySelectorAll('.PX.marco')),apis=[];
   marcos.forEach(function(m){
     var intentado=false,borrador=false,transf=null,tImp=0;

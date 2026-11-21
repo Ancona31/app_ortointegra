@@ -1,3 +1,4 @@
+import re
 # Generador de las dos vistas del Taller de documentos, parte 3 (Consentimiento .dc8 y Honorarios .dc9). Uso: python3 tmp-dcc-gen.py
 # Las plantillas se escriben con el prefijo «PX» y el token de color «DTOK»; al final se sustituyen por los de cada vista.
 import os, json
@@ -79,24 +80,43 @@ TOAST = '<div class="PX-toast" role="status" aria-live="polite"><span></span></d
 def esc(s):
     return s.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;').replace('"', '&quot;')
 
-# ---------- Navegación: copiada del dashboard aprobado (activo = Documentos) ----------
+# ---------- Navegación: copiada del dashboard final (CALMA §28; activo = Documentos) ----------
+import importlib.util as _iu
+_sp = _iu.spec_from_file_location('cromo', os.path.join(L, 'tmp-dcc5-cromo.py')); CR = _iu.module_from_spec(_sp); _sp.loader.exec_module(CR)
+def _px(h):
+    """Piezas del cromo con nuestro prefijo y solo la parte del médico (lo de secretaria, «db-s», fuera)."""
+    h = re.sub(r'\s*<!-- Secretaria.*?-->\s*<div class="db-s">.*?</div>', '', h, flags=re.S)
+    h = re.sub(r'<button type="button" class="db-p db-li db-yo db-s.*?</button>', '', h, flags=re.S)
+    return h.replace(' db-m"', '"').replace(' db-m ', ' ').replace('db-', 'PX-')
+BDG = '<span class="PX-bdg" aria-hidden="true">3</span>'
+def ap(vp, donde):
+    h = _px(CR.AP.replace('VP-DONDE', 'PX-' + vp + '-' + donde))
+    if vp == 'ih' and donde == 'lat':   # Duo abierto horizontal: plegado de inicio, como en el dashboard
+        h = h.replace('class="PX-ap"', 'class="PX-ap PX-pleg"').replace('aria-expanded="true"', 'aria-expanded="false"')
+    return h
+def mas_pan(vp):
+    """Menú «Más» (CALMA §28) del riel de Duo cerrado y de la píldora «Más» de Duo abierto vertical: tarjeta centrada con velo."""
+    if vp not in ('ext', 'iv'):
+        return ''
+    return ('<div tabindex="-1" class="PX-pan PX-hoja PX-mn" data-pan="mas" role="dialog" aria-modal="true" aria-label="Más">'
+            '<div class="PX-hj-cab"><h2>Más</h2>' + X % 'Cerrar' + '</div><div class="PX-hj-c">' + ap(vp, 'mas') + _px(CR.MAS) + '</div></div>')
 def riel():
     def b(k, t, act=False):
         return '<a href="#" class="PX-p PX-rb" aria-label="%s"%s>%s</a>' % (t, ' aria-current="page"' if act else '', ic(I[k], 22))
     return ('<nav class="PX-riel" aria-label="Navegación principal">' + b('inicio', 'Inicio') + b('pac', 'Expediente') + b('agenda', 'Agenda') + b('docs', 'Documentos', True)
-            + '<a href="#" class="PX-p PX-rb" aria-label="Más">' + ic(I['mas'], 22, 3) + '</a><span class="PX-flex"></span>'
+            + '<button type="button" class="PX-p PX-rb" aria-label="Más" aria-haspopup="dialog" data-abre-mas>' + ic(I['mas'], 22, 3) + BDG + '</button><span class="PX-flex"></span>'
             '<button type="button" class="PX-p PX-mas" aria-label="Nueva consulta">' + ic(I['plus'], 26, 2.4) + '</button></nav>')
 
-def lateral():
+def lateral(vp):
     def a(k, t, act=False):
         return '<a href="#" class="PX-p PX-li"%s>%s%s</a>' % (' aria-current="page"' if act else '', ic(I[k], 20), t)
     return ('<nav class="PX-lat" aria-label="Navegación principal"><div class="PX-lat-cab"><span class="PX-logo">' + ic(I['logo'], 24) + '<span class="PX-logo-n">Spinus</span></span><span class="PX-plan">Plan VIP</span></div>'
-            '<button type="button" class="PX-p PX-cons-b"><span class="PX-av">AS</span><span class="PX-cons-t"><span>Consultorio</span><b>Centro</b></span>' + ic(I['selector'], 16, 2) + '</button>'
+            '<button type="button" class="PX-p PX-cons-b">' + _px(CR.CLOGO) + '<span class="PX-cons-t"><span>Consultorio</span><b>Centro</b></span>' + ic(I['selector'], 16, 2) + '</button>'
             '<div class="PX-lista">' + a('inicio', 'Inicio') + a('pac', 'Expediente') + a('agenda', 'Agenda') + a('docs', 'Documentos', True) + a('admin', 'Administración') + '</div><span class="PX-flex"></span>'
-            '<div class="PX-lat-pie"><a href="#" class="PX-p PX-li PX-yo">' + ic(I['perfil'], 20) + '<span>Dr. Admin Semilla<small>Mi perfil · Ajustes</small></span></a></div></nav>')
+            + ap(vp, 'lat') + _px(CR.PIE) + '</nav>')
 
 def encabezado():
-    return ('<header class="PX-enc"><button type="button" class="PX-p PX-menu-b" aria-label="Menú">' + ic(I['menu'], 22, 2) + '</button><span class="PX-enc-t">Documentos</span><span class="PX-flex"></span>'
+    return ('<header class="PX-enc"><button type="button" class="PX-p PX-menu-b" aria-label="Menú">' + ic(I['menu'], 22, 2) + BDG + '</button><span class="PX-enc-t">Documentos</span><span class="PX-flex"></span>'
             '<button type="button" class="PX-p PX-av PX-av-g" aria-label="Mi perfil">AS</button></header>')
 
 def encabezado_iv():
@@ -104,8 +124,8 @@ def encabezado_iv():
     Administración, Mi perfil y Ayuda se alcanzan desde el botón de la izquierda (menú completo) o el avatar."""
     def p(t, act=False):
         return '<a href="#" class="PX-p PX-pi"%s>%s</a>' % (' aria-current="page"' if act else '', t)
-    return ('<header class="PX-enc PX-enc-iv"><button type="button" class="PX-p PX-menu-b PX-lat-b" aria-label="Mostrar barra lateral">' + ic(I['barra'], 20) + '</button>'
-            '<nav class="PX-pista" aria-label="Secciones">' + p('Inicio') + p('Expediente') + p('Agenda') + p('Documentos', True) + p('Más') + '</nav>'
+    return ('<header class="PX-enc PX-enc-iv"><button type="button" class="PX-p PX-menu-b PX-lat-b" aria-label="Mostrar barra lateral">' + ic(I['barra'], 20) + BDG + '</button>'
+            '<nav class="PX-pista" aria-label="Secciones">' + p('Inicio') + p('Expediente') + p('Agenda') + p('Documentos', True) + '<button type="button" class="PX-p PX-pi" aria-haspopup="dialog" data-abre-mas>Más</button></nav>'
             '<button type="button" class="PX-p PX-av PX-av-g" aria-label="Mi perfil">AS</button></header>')
 
 # ---------- Piezas del chasis ----------
@@ -204,7 +224,8 @@ def capas_comunes(vp, tipo, etiqueta, defi, filas_menu, propias):
 ''' + alerta('pl-sob', '¿Sobrescribir la plantilla?', 'mal', 'sobre', '¿Sobrescribir «<span class="PX-cpl-n"></span>»?',
                  '<p>Se reemplaza el contenido guardado de «<span class="PX-cpl-n"></span>» por lo que hay ahora en el formulario. El nombre y la fecha de creación no cambian. No se puede deshacer.</p>',
                  '<button type="button" class="PX-p PX-qui PX-cierra">Cancelar</button><button type="button" class="PX-p PX-mal PX-cpl-ok">Sobrescribir</button>') + '''
-<!-- A13-A15 · Documento generado (el «modal posterior» de hoy), como lista de filas pulsables: Visualizar, Enviar por correo
+<!-- A13-A15 · Documento generado (el «modal posterior» de hoy), como lista de filas pulsables. «Visualizar» abre el PDF en otra pestaña y
+     «Descargar» lo baja con el nombre de archivo (anclas, sin parte visual en la maqueta). Enviar por correo
      (a la dirección de la ficha, o «Usar otro correo solo para este envío» con confirmación explícita y oferta de guardarla), '''
             + comp + ''' y Cerrar.
      A15 · si el guardado falló pero el PDF existe: el aviso de hoy y el correo deshabilitado con «No quedó en el expediente».
@@ -231,11 +252,11 @@ def capas_comunes(vp, tipo, etiqueta, defi, filas_menu, propias):
   </div>
   <div class="PX-hj-p"><button type="button" class="PX-p PX-qui PX-gen-cerrar">Cerrar</button></div>
 </div>
-''' + propias + '\n</div>')
+''' + propias + mas_pan(vp) + '\n</div>')
 
 def marco(vp, clase, tipo, cuerpo, barra, capas, extra=''):
     col = ('<div class="PX-col"><main class="PX-cont"><div class="PX-form">\n' + cabecera(vp, tipo) + '\n' + cuerpo + '\n</div></main>\n' + barra + TOAST + '</div>')
-    nav = {'ext': riel, 'tel': encabezado, 'ih': lateral, 'iv': encabezado_iv, 'esc': lateral}[vp]()
+    nav = {'ext': riel, 'tel': encabezado, 'ih': lambda: lateral('ih'), 'iv': encabezado_iv, 'esc': lambda: lateral('esc')}[vp]()
     app = (nav + '\n' + col) if vp in ('tel', 'iv', 'esc') else (col + '\n' + nav)
     return '<div class="marco PX" lang="es" data-vp="%s" data-v="a">\n<div class="PX-app">\n%s\n</div>\n%s\n%s\n</div>\n' % (vp, app, extra, capas)
 
@@ -443,7 +464,7 @@ def con_iv(css):
     return re.sub(r'([^{}]+)\{', f, css)
 
 def vista(px, dtok, nombre, frase, notas, css_extra, js_extra, hacer):
-    css = con_iv(lee('tmp-dcc-estilo.css') + lee(css_extra) + lee('tmp-dcc2-estilo.css')) + lee('tmp-dcc3-estilo.css')
+    css = con_iv(lee('tmp-dcc-estilo.css') + lee(css_extra) + lee('tmp-dcc2-estilo.css')) + lee('tmp-dcc3-estilo.css') + lee('tmp-dcc5-estilo.css')
     js = '(function(){\n' + lee('tmp-dcc-chasis.js') + lee(js_extra) + '})();\n'
     cuerpo = ''.join(hacer(v) for v in ('ext', 'tel', 'ih', 'iv', 'esc'))
     out = ('<!-- NOMBRE: ' + nombre + ' | ' + frase + ' -->\n' + notas + '<style>\n' + css + '</style>\n' + cuerpo + '<script>\n' + js + '</script>\n')

@@ -246,6 +246,98 @@
 .nc2 .nc2-volver-t{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .nc2 .nc2-top-f>.nc2-flex{flex:1 1 0;min-width:4px}
 .nc2 .nc2-top-f>.nc2-ton{flex:none}
+/* ===== Cromo global (CALMA §28): aviso «N datos pendientes», logo de la clínica, «Más» y «Ajustes». Copiado de entrega/cromo/vista-1 ===== */
+.nc2 .nc2-clogo{width:36px;height:36px;flex:none;border-radius:999px;background:#fff;color:var(--accion);display:flex;align-items:center;justify-content:center}
+.nc2 .nc2-lat-pie{border-top:1px solid var(--nav-velo);padding-top:8px;display:flex;align-items:center;gap:4px}
+.nc2 .nc2-lat-pie .nc2-yo{flex:1;min-width:0;text-align:left}
+.nc2 .nc2-lat-pie .nc2-nib{color:var(--nav-tinta2)}
+.nc2[data-vp="ih"] .nc2-esp{display:none}
+.nc2[data-vp="ih"] .nc2-lat .nc2-lat-pie .nc2-yo{padding:0 8px}
+.nc2[data-vp="ih"] .nc2-lat .nc2-lat-pie .nc2-yo>svg{display:none}
+.nc2[data-vp="ih"] .nc2-lat .nc2-lat-pie .nc2-nib{width:36px;height:36px}
+.nc2 .nc2-esp{color:var(--nav-tinta)!important}
+.nc2 .nc2-yo{min-height:48px;height:auto;padding-top:6px;padding-bottom:6px}
+.nc2 .nc2-yo>span{display:flex;flex-direction:column;line-height:17px}
+.nc2 .nc2-yo small{font-size:12px;line-height:16px;color:var(--nav-tinta2)}
+.nc2 .nc2-nib{position:relative;width:44px;height:44px;flex:none;border-radius:999px;display:flex;align-items:center;justify-content:center;color:var(--nav-tinta)}
+.nc2 .nc2-mnw{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:16px;pointer-events:none}
+.nc2[data-vp="ext"] .nc2-mnw{padding:16px calc(56px + var(--ir) + 8px) calc(var(--ib) + 16px) 8px}
+.nc2[data-vp="iv"] .nc2-mnw{padding:calc(var(--it) + 16px) 24px 24px}
+.nc2[data-vp="ih"] .nc2-mnw{padding:24px calc(218px + var(--ir) + 24px) calc(var(--ib) + 16px) 24px}
+.nc2[data-vp="esc"] .nc2-mnw{padding:32px 24px 32px calc(248px + 24px)}
+.nc2 .nc2-mn{pointer-events:auto;width:310px;max-width:100%;max-height:100%;overflow-y:auto;scrollbar-width:none;background:var(--sup);color:var(--tinta);border-radius:20px;box-shadow:var(--sombra-capa);padding:8px;opacity:0;transform:scale(.96);transition:opacity 200ms ease-out,transform 360ms linear(0,0.123,0.3397,0.54,0.6943,0.8032,0.8762,0.9234,0.9533,0.9718,0.9831,0.99,0.9941,0.9965,0.998,1)}
+.nc2[data-vp="iv"] .nc2-mn,.nc2[data-vp="ih"] .nc2-mn,.nc2[data-vp="esc"] .nc2-mn{width:340px}
+.nc2 .nc2-mn-t{padding:8px 12px 6px;font-size:17px;line-height:22px;font-weight:700}
+.nc2 .nc2-mo{display:flex;align-items:center;gap:12px;width:100%;min-height:48px;padding:0 12px;border-radius:12px;font-size:15px;line-height:20px;color:var(--tinta);text-align:left}
+.nc2 .nc2-mo{position:relative}
+.nc2 .nc2-mo+.nc2-mo::before{content:"";position:absolute;left:44px;right:12px;top:0;height:1px;background:var(--linea)}
+.nc2 .nc2-mo>svg:first-child{color:var(--enlace)}
+.nc2 .nc2-mo>.nc2-mo-f{margin-left:auto;color:var(--tinta3)}
+.nc2 .nc2-mo-v{margin-left:auto;font-size:15px;color:var(--tinta2)}
+.nc2 .nc2-mo-v+.nc2-mo-f{margin-left:4px}
+.nc2 .nc2-ap{border-radius:14px;background:var(--ag-fondo);color:var(--tinta);margin:0 0 10px}
+.nc2 .nc2-mn .nc2-ap{margin:2px 0 8px}
+.nc2.nc2-n0 .nc2-ap{display:none}
+.nc2 .nc2-ap-cab{display:flex;align-items:center;gap:10px;width:100%;min-height:44px;padding:8px 10px 8px 12px;border-radius:14px;text-align:left;color:var(--ag-tinta)}
+.nc2[data-vp="ih"] .nc2-lat .nc2-ap-cab,.nc2[data-vp="esc"] .nc2-ap-cab{min-height:40px;padding:6px 10px 6px 12px}
+.nc2 .nc2-ap-cab:focus-visible{outline:3px solid var(--enlace);outline-offset:2px}
+.nc2 .nc2-ap-pt{position:relative;width:22px;height:22px;flex:none;border-radius:7px;background:color-mix(in srgb,var(--ag-punto) 22%,transparent)}
+.nc2 .nc2-ap-pt::before,.nc2 .nc2-ap-pt::after{content:"";position:absolute;left:7px;top:7px;width:8px;height:8px;border-radius:999px;background:var(--ag-punto)}
+.nc2 .nc2-ap-pt::after{animation:nc2-latido 3.2s cubic-bezier(.2,.6,.3,1) infinite}
+@keyframes nc2-latido{0%{transform:scale(1);opacity:.65}34%{transform:scale(2.7);opacity:0}100%{transform:scale(2.7);opacity:0}}
+.nc2 .nc2-ap-t{flex:1;min-width:0;font-size:15px;line-height:20px;font-weight:700;font-variant-numeric:tabular-nums}
+.nc2 .nc2-ap-ch{transition:transform 240ms cubic-bezier(.32,.72,0,1)}
+.nc2 .nc2-ap.nc2-pleg .nc2-ap-ch{transform:rotate(180deg)}
+.nc2 .nc2-ap-c{display:flex;flex-direction:column;padding:0 12px 12px;transition:opacity 180ms ease-out,transform 180ms ease-out}
+.nc2 .nc2-ap.nc2-pleg .nc2-ap-c{display:none}
+.nc2.nc2-sal .nc2-ap-c,.nc2.nc2-ent .nc2-ap-c{opacity:0;transform:translateY(-4px)}
+.nc2 .nc2-ap-sep{display:block;height:1px;margin:0 0 2px;background:color-mix(in srgb,var(--ag-tinta) 22%,transparent)}
+.nc2 .nc2-ap-l{display:flex;align-items:flex-start;gap:10px;min-height:44px;padding:12px 2px;border-radius:8px;font-size:14px;line-height:20px;font-weight:600;color:var(--tinta)}
+.nc2 .nc2-ap-l svg{margin-top:1px;color:var(--ag-tinta)}
+.nc2[data-vp="ih"] .nc2-lat .nc2-ap-l,.nc2[data-vp="esc"] .nc2-ap-l{min-height:36px;padding:8px 2px}
+.nc2.nc2-n2 .nc2-ap-l[data-k="cedula"],.nc2.nc2-n1 .nc2-ap-l[data-k="cedula"],.nc2.nc2-n1 .nc2-ap-l[data-k="logo"]{display:none}
+.nc2 .nc2-ap-b{position:relative;margin-top:6px;display:flex;align-items:center;justify-content:center;gap:6px;height:40px;border-radius:10px;background:var(--ag-tinta);color:var(--ag-fondo);font-size:14px;line-height:18px;font-weight:600}
+.nc2 .nc2-ap-b::after{content:"";position:absolute;inset:-2px 0}
+.nc2[data-vp="ih"] .nc2-lat .nc2-ap-b,.nc2[data-vp="esc"] .nc2-ap-b{height:36px}
+.nc2[data-vp="ih"] .nc2-lat .nc2-ap-b::after,.nc2[data-vp="esc"] .nc2-ap-b::after{display:none}
+.nc2 .nc2-envb .nc2-bdg{top:0;right:-5px}
+.nc2[data-vp="ih"] .nc2-lat .nc2-ap{margin:0 -10px 8px -4px}
+.nc2[data-vp="ih"] .nc2-lat .nc2-ap-cab{padding:6px 8px;gap:8px}
+.nc2[data-vp="ih"] .nc2-lat .nc2-ap-t{font-size:14px;line-height:18px}
+.nc2[data-vp="ih"] .nc2-lat .nc2-ap-c{padding:0 10px 10px}
+.nc2[data-vp="ih"] .nc2-lat .nc2-ap-l{gap:8px}
+.nc2[data-vp="ih"] .nc2-lat .nc2-ap-c{padding-bottom:10px}
+.nc2[data-vp="ih"] .nc2-lat .nc2-ap-sep{margin:0}
+.nc2[data-vp="ih"] .nc2-lat .nc2-ap-b{margin-top:4px}
+.nc2[data-vp="ih"] .nc2-lat .nc2-yo{min-height:44px;padding-top:0;padding-bottom:0}
+.nc2 .nc2-bdg{position:absolute;top:-3px;right:-3px;min-width:22px;height:22px;padding:0 5px;border-radius:999px;background:var(--ag-punto);color:var(--navy);border:2px solid var(--navy);display:flex;align-items:center;justify-content:center;font-size:12px;line-height:16px;font-weight:700;font-variant-numeric:tabular-nums;pointer-events:none}
+.nc2 .nc2-rb .nc2-bdg{top:2px;right:2px}
+.nc2.nc2-n0 .nc2-bdg,.nc2.nc2-sec .nc2-bdg{display:none}
+.nc2 .nc2-rb,.nc2 .nc2-envb,.nc2 .nc2-menu{position:relative}
+.nc2[data-vp="ih"] .nc2-lat .nc2-lista{margin-top:12px}
+.nc2[data-vp="ih"] .nc2-lat .nc2-cons-b{margin-top:8px}
+.nc2 .nc2-capa-m.nc2-on .nc2-mn{opacity:1;transform:none;transition:opacity 240ms ease-out,transform 520ms linear(0,0.0803,0.2398,0.4083,0.5568,0.6769,0.769,0.8374,0.8869,0.9221,0.9468,0.9639,0.9756,0.9836,0.9891,0.9927,0.9952,0.9968,0.9979,0.9986,1)}
+
+/* Capa del menú «Más»: propia, con su velo (mismo velo desenfocado del resto de capas) */
+.nc2 .nc2-capa-m{position:absolute;inset:0;z-index:30;pointer-events:none;visibility:hidden;transition:visibility 0s linear 320ms}
+.nc2 .nc2-capa-m.nc2-on{pointer-events:auto;visibility:visible;transition-delay:0s}
+.nc2 .nc2-capa-m .nc2-velo{position:absolute;inset:0;background:var(--velo);opacity:0;-webkit-backdrop-filter:blur(10px) saturate(140%);backdrop-filter:blur(10px) saturate(140%);transition:opacity 320ms cubic-bezier(.32,.72,0,1)}
+.nc2 .nc2-capa-m.nc2-on .nc2-velo{opacity:1}
+.nc2 .nc2-capa-m.nc2-on .nc2-mn{opacity:1;transform:none;transition:opacity 240ms ease-out,transform 520ms linear(0,0.0803,0.2398,0.4083,0.5568,0.6769,0.769,0.8374,0.8869,0.9221,0.9468,0.9639,0.9756,0.9836,0.9891,0.9927,0.9952,0.9968,0.9979,0.9986,1)}
+@media (prefers-reduced-transparency:reduce){.nc2 .nc2-capa-m .nc2-velo{-webkit-backdrop-filter:none;backdrop-filter:none;background:color-mix(in srgb,var(--velo),#000 25%)}}
+@media (prefers-reduced-motion:reduce){.nc2 .nc2-mn,.nc2 .nc2-capa-m.nc2-on .nc2-mn{transform:none;transition:opacity 200ms ease}.nc2 .nc2-ap-pt::after{animation:none;opacity:0}.nc2 .nc2-ap-c,.nc2 .nc2-ap-ch{transition:none}}
+/* ================= PASADA FINAL (kit/PASADA-FINAL.md): va después del bloque de navegación del dashboard ================= */
+/* §28 · Distintivo del aviso sobre el botón de menú (tel) y de barra lateral (iv) */
+.nc2 .nc2-menu-b,.nc2 .nc2-fun-b{position:relative}
+.nc2 .nc2-fun-b .nc2-bdg{top:-2px;right:-2px}
+.nc2 .nc2-menu-b .nc2-bdg{top:-2px;right:-2px}
+/* §26 · Duo cerrado: la nota aclaratoria es TARJETA CENTRADA en el área de contenido (310, margen 8), nace del centro, sin asa */
+.nc2[data-vp="ext"] .nc2-area{inset:0;padding:16px calc(56px + var(--ir) + 8px) calc(var(--ib) + 16px) 8px;align-items:center}
+.nc2[data-vp="ext"] .nc2-hoja{width:310px;max-width:100%;max-height:100%;overflow-y:auto;border-radius:20px;padding:8px 16px 16px;opacity:0;transform:scale(.96)}
+.nc2[data-vp="ext"] .nc2-on .nc2-hoja{opacity:1;transform:none}
+.nc2[data-vp="ext"] .nc2-asa{display:none}
+/* Pasada final · tira: avisos de maqueta fuera del marco */
+.nc2-tira .nc2-tira-msg{flex-basis:100%;min-height:16px;margin:0;font-weight:400;letter-spacing:0;text-transform:none;color:var(--tinta2)}
 </style>
 <div class="marco nc2" data-vp="ext">
 <div class="nc2-app">
@@ -303,10 +395,10 @@
     </ol>
   </section>
 </div>
-  <!-- F7 · «Consulta no encontrada»: hoy es solo ese texto, sin cabecera ni salida. «Cargando...» es un estado de sistema (el mismo texto centrado); no se dibuja. -->
+  <!-- F7 · «Consulta no encontrada»: hoy es solo ese texto, sin cabecera ni salida. «Cargando...» es un estado de sistema (el mismo texto centrado), sin parte visual propia aquí. -->
   <p class="nc2-nf">Consulta no encontrada</p>
 </main></div>
-<nav class="nc2-riel" aria-label="Navegación principal"><a href="#" class="nc2-p nc2-rb" aria-label="Inicio"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg></a><a href="#" class="nc2-p nc2-rb" aria-label="Expediente" aria-current="page"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.9.7 3.1 2.4 3.5 5.2"/></svg></a><a href="#" class="nc2-p nc2-rb" aria-label="Agenda"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg></a><a href="#" class="nc2-p nc2-rb" aria-label="Documentos"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg></a><a href="#" class="nc2-p nc2-rb" aria-label="Más"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 12h.01M12 12h.01M18 12h.01"/></svg></a><span class="nc2-flex"></span><button type="button" class="nc2-p nc2-mas" aria-label="Nueva consulta"><svg aria-hidden="true" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg></button></nav>
+<nav class="nc2-riel" aria-label="Navegación principal"><a href="#" class="nc2-p nc2-rb" aria-label="Inicio"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg></a><a href="#" class="nc2-p nc2-rb" aria-label="Expediente" aria-current="page"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.9.7 3.1 2.4 3.5 5.2"/></svg></a><a href="#" class="nc2-p nc2-rb" aria-label="Agenda"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg></a><a href="#" class="nc2-p nc2-rb" aria-label="Documentos"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg></a><button type="button" class="nc2-p nc2-rb" aria-label="Más" data-abre-mas><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 12h.01M12 12h.01M18 12h.01"/></svg><span class="nc2-bdg nc2-m" aria-hidden="true">3</span></button><span class="nc2-flex"></span><button type="button" class="nc2-p nc2-mas" aria-label="Nueva consulta"><svg aria-hidden="true" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg></button></nav>
 </div>
 <!-- F6 · Nueva nota aclaratoria (CALMA §13): hoja desde abajo en teléfono; en Duo abierto y computadora, modal CENTRADO en el área de contenido. Velo desenfocado, uno solo.
      Dos botones de verdad: «Cancelar» (quieto) y «Guardar addendum» (relleno). Textos de hoy.
@@ -327,11 +419,29 @@
     </div>
   </form>
   </div>
+</div><!-- Menú «Más» (CALMA §28): tarjeta centrada con velo, copiada del dashboard (entrega/cromo/vista-1). -->
+<div class="nc2-capa-m" aria-hidden="true"><div class="nc2-velo"></div>
+  <div class="nc2-mnw"><div class="nc2-mn" role="dialog" aria-modal="true" aria-label="Más">
+    <h2 class="nc2-mn-t">Más</h2>
+  <div class="nc2-ap nc2-m" role="status" aria-live="polite">
+    <button type="button" class="nc2-p nc2-ap-cab" aria-expanded="true" aria-controls="nc2-av-nc2-ext-mas">
+      <span class="nc2-ap-pt" aria-hidden="true"></span><span class="nc2-ap-t">3 datos pendientes</span><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="nc2-ap-ch"><path d="m18 15-6-6-6 6"/></svg>
+    </button>
+    <div class="nc2-ap-c" id="nc2-av-nc2-ext-mas">
+      <span class="nc2-ap-sep" aria-hidden="true"></span>
+      <a href="#" class="nc2-p nc2-ap-l" data-k="firma"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.4 3.6a2.1 2.1 0 0 1 3 3L7.4 18.6a2 2 0 0 1-.9.5l-2.9.8a.5.5 0 0 1-.6-.6l.8-2.9a2 2 0 0 1 .5-.9z"/></svg><span>Documentos sin firma</span></a><a href="#" class="nc2-p nc2-ap-l" data-k="cedula"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22h6a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v3"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><circle cx="5" cy="14" r="3"/><path d="M7 16.5 8 22l-3-1-3 1 1-5.5"/></svg><span>Sin cédula de especialidad</span></a><a href="#" class="nc2-p nc2-ap-l" data-k="logo"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></svg><span>Clínica sin logo</span></a>
+      <a href="#" class="nc2-p nc2-ap-b">Completar ahora<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg></a>
+    </div>
+  </div>
+    <!-- Selector de consultorio activo (A0·2): en Duo cerrado no hay barra lateral, así que vive aquí; solo médico con 2 o más consultorios. Ver vista 2. -->
+    <button type="button" class="nc2-p nc2-mo nc2-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 9 4-4 4 4M8 15l4 4 4-4"/></svg><span>Consultorio activo</span><span class="nc2-mo-v">Centro</span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="nc2-mo-f"><path d="m9 6 6 6-6 6"/></svg></button>
+    <a href="#" class="nc2-p nc2-mo nc2-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20v-8M12 20V5M19 20v-9"/></svg><span>Administración</span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="nc2-mo-f"><path d="m9 6 6 6-6 6"/></svg></a><a href="#" class="nc2-p nc2-mo nc2-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18.2c1.3-2 3.2-3 5.5-3s4.2 1 5.5 3"/></svg><span>Mi perfil</span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="nc2-mo-f"><path d="m9 6 6 6-6 6"/></svg></a><a href="#" class="nc2-p nc2-mo nc2-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.6M12 17h.01"/></svg><span>Ayuda</span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="nc2-mo-f"><path d="m9 6 6 6-6 6"/></svg></a>
+  </div></div>
 </div>
 </div>
 <div class="marco nc2" data-vp="tel">
 <div class="nc2-app">
-<header class="nc2-enc"><button type="button" class="nc2-p nc2-menu-b" aria-label="Menú"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button><span class="nc2-enc-t">Expediente</span><span class="nc2-flex"></span><button type="button" class="nc2-p nc2-av nc2-av-g" aria-label="Mi perfil">AS</button></header>
+<header class="nc2-enc"><button type="button" class="nc2-p nc2-menu-b" aria-label="Menú"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg><span class="nc2-bdg nc2-m" aria-hidden="true">3</span></button><span class="nc2-enc-t">Expediente</span><span class="nc2-flex"></span><button type="button" class="nc2-p nc2-av nc2-av-g" aria-label="Mi perfil">AS</button></header>
 <div class="nc2-col"><main class="nc2-cont">
 <div class="nc2-pag">
   <!-- F1 · Volver al expediente (la flecha lleva el nombre del paciente), título y fecha.
@@ -386,7 +496,7 @@
     </ol>
   </section>
 </div>
-  <!-- F7 · «Consulta no encontrada»: hoy es solo ese texto, sin cabecera ni salida. «Cargando...» es un estado de sistema (el mismo texto centrado); no se dibuja. -->
+  <!-- F7 · «Consulta no encontrada»: hoy es solo ese texto, sin cabecera ni salida. «Cargando...» es un estado de sistema (el mismo texto centrado), sin parte visual propia aquí. -->
   <p class="nc2-nf">Consulta no encontrada</p>
 </main></div>
 </div>
@@ -467,10 +577,19 @@
     </ol>
   </section>
 </div>
-  <!-- F7 · «Consulta no encontrada»: hoy es solo ese texto, sin cabecera ni salida. «Cargando...» es un estado de sistema (el mismo texto centrado); no se dibuja. -->
+  <!-- F7 · «Consulta no encontrada»: hoy es solo ese texto, sin cabecera ni salida. «Cargando...» es un estado de sistema (el mismo texto centrado), sin parte visual propia aquí. -->
   <p class="nc2-nf">Consulta no encontrada</p>
 </main></div>
-<nav class="nc2-lat" aria-label="Navegación principal"><div class="nc2-lat-cab"><span class="nc2-logo"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.5"/><path d="M12 5.5v13M9.6 8h4.8M9 11h6M9 14h6M9.6 17h4.8"/></svg><span class="nc2-logo-n">Spinus</span></span><span class="nc2-plan">Plan VIP</span></div><button type="button" class="nc2-p nc2-cons-b"><span class="nc2-av">AS</span><span class="nc2-cons-t"><span>Consultorio</span><b>Centro</b></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 9 4-4 4 4M8 15l4 4 4-4"/></svg></button><div class="nc2-lista"><a href="#" class="nc2-p nc2-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Inicio</a><a href="#" class="nc2-p nc2-li" aria-current="page"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.9.7 3.1 2.4 3.5 5.2"/></svg>Expediente</a><a href="#" class="nc2-p nc2-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Agenda</a><a href="#" class="nc2-p nc2-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>Documentos</a><a href="#" class="nc2-p nc2-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20v-8M12 20V5M19 20v-9"/></svg>Administración</a></div><span class="nc2-flex"></span><div class="nc2-lat-pie"><a href="#" class="nc2-p nc2-li nc2-yo"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18.2c1.3-2 3.2-3 5.5-3s4.2 1 5.5 3"/></svg><span>Dr. Admin Semilla<small>Mi perfil · Ajustes</small></span></a></div></nav>
+<nav class="nc2-lat" aria-label="Navegación principal"><div class="nc2-lat-cab"><span class="nc2-logo"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.5"/><path d="M12 5.5v13M9.6 8h4.8M9 11h6M9 14h6M9.6 17h4.8"/></svg><span class="nc2-logo-n">Spinus</span></span><span class="nc2-plan">Plan VIP</span></div><button type="button" class="nc2-p nc2-cons-b"><span class="nc2-clogo" role="img" aria-label="Logo de Clínica Semilla A"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21c-4.5-2.2-7-5.6-7-10V5.5L12 3l7 2.5V11c0 4.4-2.5 7.8-7 10z"/><path d="M12 8v7M8.5 11.5h7"/></svg></span><span class="nc2-cons-t"><span>Consultorio</span><b>Centro</b></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 9 4-4 4 4M8 15l4 4 4-4"/></svg></button><div class="nc2-lista"><a href="#" class="nc2-p nc2-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Inicio</a><a href="#" class="nc2-p nc2-li" aria-current="page"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.9.7 3.1 2.4 3.5 5.2"/></svg>Expediente</a><a href="#" class="nc2-p nc2-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Agenda</a><a href="#" class="nc2-p nc2-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>Documentos</a><a href="#" class="nc2-p nc2-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20v-8M12 20V5M19 20v-9"/></svg>Administración</a></div><span class="nc2-flex"></span>  <div class="nc2-ap nc2-m nc2-pleg" role="status" aria-live="polite">
+    <button type="button" class="nc2-p nc2-ap-cab" aria-expanded="false" aria-controls="nc2-av-nc2-ih-lat">
+      <span class="nc2-ap-pt" aria-hidden="true"></span><span class="nc2-ap-t">3 datos pendientes</span><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="nc2-ap-ch"><path d="m18 15-6-6-6 6"/></svg>
+    </button>
+    <div class="nc2-ap-c" id="nc2-av-nc2-ih-lat">
+      <span class="nc2-ap-sep" aria-hidden="true"></span>
+      <a href="#" class="nc2-p nc2-ap-l" data-k="firma"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.4 3.6a2.1 2.1 0 0 1 3 3L7.4 18.6a2 2 0 0 1-.9.5l-2.9.8a.5.5 0 0 1-.6-.6l.8-2.9a2 2 0 0 1 .5-.9z"/></svg><span>Documentos sin firma</span></a><a href="#" class="nc2-p nc2-ap-l" data-k="cedula"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22h6a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v3"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><circle cx="5" cy="14" r="3"/><path d="M7 16.5 8 22l-3-1-3 1 1-5.5"/></svg><span>Sin cédula de especialidad</span></a><a href="#" class="nc2-p nc2-ap-l" data-k="logo"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></svg><span>Clínica sin logo</span></a>
+      <a href="#" class="nc2-p nc2-ap-b">Completar ahora<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg></a>
+    </div>
+  </div><div class="nc2-lat-pie"><a href="#" class="nc2-p nc2-li nc2-yo nc2-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18.2c1.3-2 3.2-3 5.5-3s4.2 1 5.5 3"/></svg><span><span>Dr. Admin Semilla</span><small class="nc2-esp">Ortopedia y Traumatología</small><small>Mi perfil · Ajustes</small></span></a><a href="#" class="nc2-p nc2-nib nc2-ay nc2-m" aria-label="Ayuda"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.6M12 17h.01"/></svg></a></div></nav>
 </div>
 <!-- F6 · Nueva nota aclaratoria (CALMA §13): hoja desde abajo en teléfono; en Duo abierto y computadora, modal CENTRADO en el área de contenido. Velo desenfocado, uno solo.
      Dos botones de verdad: «Cancelar» (quieto) y «Guardar addendum» (relleno). Textos de hoy.
@@ -496,7 +615,7 @@
 <div class="marco nc2" data-vp="iv">
 <div class="nc2-app">
 <!-- Duo abierto vertical (CALMA §19): encabezado fundido con la pista de secciones. Administración, Mi perfil y Ayuda: desde «Mostrar barra lateral» o el avatar. -->
-<header class="nc2-fun"><button type="button" class="nc2-p nc2-fun-b" aria-label="Mostrar barra lateral"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="15" rx="3"/><path d="M9.5 4.5v15"/></svg></button><nav class="nc2-pista" aria-label="Navegación principal"><a href="#" class="nc2-p nc2-pl">Inicio</a><a href="#" class="nc2-p nc2-pl" aria-current="page">Expediente</a><a href="#" class="nc2-p nc2-pl">Agenda</a><a href="#" class="nc2-p nc2-pl">Documentos</a><a href="#" class="nc2-p nc2-pl">Más</a></nav><button type="button" class="nc2-p nc2-av nc2-av-g" aria-label="Mi perfil">AS</button></header>
+<header class="nc2-fun"><button type="button" class="nc2-p nc2-fun-b" aria-label="Mostrar barra lateral"><span class="nc2-bdg nc2-m" aria-hidden="true">3</span><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="15" rx="3"/><path d="M9.5 4.5v15"/></svg></button><nav class="nc2-pista" aria-label="Navegación principal"><a href="#" class="nc2-p nc2-pl">Inicio</a><a href="#" class="nc2-p nc2-pl" aria-current="page">Expediente</a><a href="#" class="nc2-p nc2-pl">Agenda</a><a href="#" class="nc2-p nc2-pl">Documentos</a><button type="button" class="nc2-p nc2-pl" data-abre-mas>Más</button></nav><button type="button" class="nc2-p nc2-av nc2-av-g" aria-label="Mi perfil">AS</button></header>
 <div class="nc2-col"><main class="nc2-cont">
 <div class="nc2-pag">
   <!-- F1 · Volver al expediente (la flecha lleva el nombre del paciente), título y fecha.
@@ -551,7 +670,7 @@
     </ol>
   </section>
 </div>
-  <!-- F7 · «Consulta no encontrada»: hoy es solo ese texto, sin cabecera ni salida. «Cargando...» es un estado de sistema (el mismo texto centrado); no se dibuja. -->
+  <!-- F7 · «Consulta no encontrada»: hoy es solo ese texto, sin cabecera ni salida. «Cargando...» es un estado de sistema (el mismo texto centrado), sin parte visual propia aquí. -->
   <p class="nc2-nf">Consulta no encontrada</p>
 </main></div>
 </div>
@@ -574,11 +693,38 @@
     </div>
   </form>
   </div>
+</div><!-- Menú «Más» (CALMA §28): tarjeta centrada con velo, copiada del dashboard (entrega/cromo/vista-1). -->
+<div class="nc2-capa-m" aria-hidden="true"><div class="nc2-velo"></div>
+  <div class="nc2-mnw"><div class="nc2-mn" role="dialog" aria-modal="true" aria-label="Más">
+    <h2 class="nc2-mn-t">Más</h2>
+  <div class="nc2-ap nc2-m" role="status" aria-live="polite">
+    <button type="button" class="nc2-p nc2-ap-cab" aria-expanded="true" aria-controls="nc2-av-nc2-iv-mas">
+      <span class="nc2-ap-pt" aria-hidden="true"></span><span class="nc2-ap-t">3 datos pendientes</span><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="nc2-ap-ch"><path d="m18 15-6-6-6 6"/></svg>
+    </button>
+    <div class="nc2-ap-c" id="nc2-av-nc2-iv-mas">
+      <span class="nc2-ap-sep" aria-hidden="true"></span>
+      <a href="#" class="nc2-p nc2-ap-l" data-k="firma"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.4 3.6a2.1 2.1 0 0 1 3 3L7.4 18.6a2 2 0 0 1-.9.5l-2.9.8a.5.5 0 0 1-.6-.6l.8-2.9a2 2 0 0 1 .5-.9z"/></svg><span>Documentos sin firma</span></a><a href="#" class="nc2-p nc2-ap-l" data-k="cedula"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22h6a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v3"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><circle cx="5" cy="14" r="3"/><path d="M7 16.5 8 22l-3-1-3 1 1-5.5"/></svg><span>Sin cédula de especialidad</span></a><a href="#" class="nc2-p nc2-ap-l" data-k="logo"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></svg><span>Clínica sin logo</span></a>
+      <a href="#" class="nc2-p nc2-ap-b">Completar ahora<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg></a>
+    </div>
+  </div>
+    <!-- Selector de consultorio activo (A0·2): en Duo cerrado no hay barra lateral, así que vive aquí; solo médico con 2 o más consultorios. Ver vista 2. -->
+    <button type="button" class="nc2-p nc2-mo nc2-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 9 4-4 4 4M8 15l4 4 4-4"/></svg><span>Consultorio activo</span><span class="nc2-mo-v">Centro</span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="nc2-mo-f"><path d="m9 6 6 6-6 6"/></svg></button>
+    <a href="#" class="nc2-p nc2-mo nc2-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20v-8M12 20V5M19 20v-9"/></svg><span>Administración</span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="nc2-mo-f"><path d="m9 6 6 6-6 6"/></svg></a><a href="#" class="nc2-p nc2-mo nc2-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18.2c1.3-2 3.2-3 5.5-3s4.2 1 5.5 3"/></svg><span>Mi perfil</span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="nc2-mo-f"><path d="m9 6 6 6-6 6"/></svg></a><a href="#" class="nc2-p nc2-mo nc2-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.6M12 17h.01"/></svg><span>Ayuda</span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="nc2-mo-f"><path d="m9 6 6 6-6 6"/></svg></a>
+  </div></div>
 </div>
 </div>
 <div class="marco nc2" data-vp="esc">
 <div class="nc2-app">
-<nav class="nc2-lat" aria-label="Navegación principal"><div class="nc2-lat-cab"><span class="nc2-logo"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.5"/><path d="M12 5.5v13M9.6 8h4.8M9 11h6M9 14h6M9.6 17h4.8"/></svg><span class="nc2-logo-n">Spinus</span></span><span class="nc2-plan">Plan VIP</span></div><button type="button" class="nc2-p nc2-cons-b"><span class="nc2-av">AS</span><span class="nc2-cons-t"><span>Consultorio</span><b>Centro</b></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 9 4-4 4 4M8 15l4 4 4-4"/></svg></button><div class="nc2-lista"><a href="#" class="nc2-p nc2-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Inicio</a><a href="#" class="nc2-p nc2-li" aria-current="page"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.9.7 3.1 2.4 3.5 5.2"/></svg>Expediente</a><a href="#" class="nc2-p nc2-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Agenda</a><a href="#" class="nc2-p nc2-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>Documentos</a><a href="#" class="nc2-p nc2-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20v-8M12 20V5M19 20v-9"/></svg>Administración</a></div><span class="nc2-flex"></span><div class="nc2-lat-pie"><a href="#" class="nc2-p nc2-li nc2-yo"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18.2c1.3-2 3.2-3 5.5-3s4.2 1 5.5 3"/></svg><span>Dr. Admin Semilla<small>Mi perfil · Ajustes</small></span></a></div></nav>
+<nav class="nc2-lat" aria-label="Navegación principal"><div class="nc2-lat-cab"><span class="nc2-logo"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.5"/><path d="M12 5.5v13M9.6 8h4.8M9 11h6M9 14h6M9.6 17h4.8"/></svg><span class="nc2-logo-n">Spinus</span></span><span class="nc2-plan">Plan VIP</span></div><button type="button" class="nc2-p nc2-cons-b"><span class="nc2-clogo" role="img" aria-label="Logo de Clínica Semilla A"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21c-4.5-2.2-7-5.6-7-10V5.5L12 3l7 2.5V11c0 4.4-2.5 7.8-7 10z"/><path d="M12 8v7M8.5 11.5h7"/></svg></span><span class="nc2-cons-t"><span>Consultorio</span><b>Centro</b></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 9 4-4 4 4M8 15l4 4 4-4"/></svg></button><div class="nc2-lista"><a href="#" class="nc2-p nc2-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Inicio</a><a href="#" class="nc2-p nc2-li" aria-current="page"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.9.7 3.1 2.4 3.5 5.2"/></svg>Expediente</a><a href="#" class="nc2-p nc2-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Agenda</a><a href="#" class="nc2-p nc2-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>Documentos</a><a href="#" class="nc2-p nc2-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20v-8M12 20V5M19 20v-9"/></svg>Administración</a></div><span class="nc2-flex"></span>  <div class="nc2-ap nc2-m" role="status" aria-live="polite">
+    <button type="button" class="nc2-p nc2-ap-cab" aria-expanded="true" aria-controls="nc2-av-nc2-esc-lat">
+      <span class="nc2-ap-pt" aria-hidden="true"></span><span class="nc2-ap-t">3 datos pendientes</span><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="nc2-ap-ch"><path d="m18 15-6-6-6 6"/></svg>
+    </button>
+    <div class="nc2-ap-c" id="nc2-av-nc2-esc-lat">
+      <span class="nc2-ap-sep" aria-hidden="true"></span>
+      <a href="#" class="nc2-p nc2-ap-l" data-k="firma"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.4 3.6a2.1 2.1 0 0 1 3 3L7.4 18.6a2 2 0 0 1-.9.5l-2.9.8a.5.5 0 0 1-.6-.6l.8-2.9a2 2 0 0 1 .5-.9z"/></svg><span>Documentos sin firma</span></a><a href="#" class="nc2-p nc2-ap-l" data-k="cedula"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22h6a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v3"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><circle cx="5" cy="14" r="3"/><path d="M7 16.5 8 22l-3-1-3 1 1-5.5"/></svg><span>Sin cédula de especialidad</span></a><a href="#" class="nc2-p nc2-ap-l" data-k="logo"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></svg><span>Clínica sin logo</span></a>
+      <a href="#" class="nc2-p nc2-ap-b">Completar ahora<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg></a>
+    </div>
+  </div><div class="nc2-lat-pie"><a href="#" class="nc2-p nc2-li nc2-yo nc2-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18.2c1.3-2 3.2-3 5.5-3s4.2 1 5.5 3"/></svg><span><span>Dr. Admin Semilla</span><small class="nc2-esp">Ortopedia y Traumatología</small><small>Mi perfil · Ajustes</small></span></a><a href="#" class="nc2-p nc2-nib nc2-ay nc2-m" aria-label="Ayuda"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.6M12 17h.01"/></svg></a></div></nav>
 <div class="nc2-col"><main class="nc2-cont">
 <div class="nc2-pag">
   <!-- F1 · Volver al expediente (la flecha lleva el nombre del paciente), título y fecha.
@@ -633,7 +779,7 @@
     </ol>
   </section>
 </div>
-  <!-- F7 · «Consulta no encontrada»: hoy es solo ese texto, sin cabecera ni salida. «Cargando...» es un estado de sistema (el mismo texto centrado); no se dibuja. -->
+  <!-- F7 · «Consulta no encontrada»: hoy es solo ese texto, sin cabecera ni salida. «Cargando...» es un estado de sistema (el mismo texto centrado), sin parte visual propia aquí. -->
   <p class="nc2-nf">Consulta no encontrada</p>
 </main></div>
 </div>
@@ -711,7 +857,22 @@
     var b=document.createElement('button');b.type='button';b.textContent=d[1];b.setAttribute('aria-pressed','false');
     b.addEventListener('click',function(){var s=b.getAttribute('aria-pressed')!=='true';b.setAttribute('aria-pressed',String(s));api.forEach(function(a){a[d[0]](s)})});
     tira.appendChild(b)});
+  var msg=document.createElement('span');msg.className='nc2-tira-msg';msg.setAttribute('role','status');msg.setAttribute('aria-live','polite');tira.appendChild(msg);
   var op=marcos[0].closest('.op'),cab=op&&op.querySelector('header');
   if(cab)cab.appendChild(tira);else marcos[0].parentNode.insertBefore(tira,marcos[0]);
 })();
+
+/* Navegación al día (CALMA §28): menú «Más» y aviso plegable, copiados del dashboard */
+(function(){document.querySelectorAll(".nc2.marco").forEach(function(m){
+  var c=m.querySelector(".nc2-capa-m"),orig=null;
+  function cierra(){if(!c||!c.classList.contains("nc2-on"))return;c.classList.remove("nc2-on");c.setAttribute("aria-hidden","true");if(orig)orig.focus({preventScroll:true})}
+  m.querySelectorAll("[data-abre-mas]").forEach(function(b){b.addEventListener("click",function(e){e.preventDefault();if(!c)return;orig=b;c.classList.add("nc2-on");c.removeAttribute("aria-hidden");var f=c.querySelector(".nc2-ap-cab,.nc2-mo");if(f)f.focus({preventScroll:true})})});
+  if(c){c.querySelector(".nc2-velo").addEventListener("click",cierra);m.addEventListener("keydown",function(e){if(e.key==="Escape")cierra()});c.querySelectorAll("a[href=\"#\"]").forEach(function(a){a.addEventListener("click",function(e){e.preventDefault()})})}
+  m.querySelectorAll(".nc2-ap-cab").forEach(function(b){b.addEventListener("click",function(){var a=b.closest(".nc2-ap"),pl=a.classList.toggle("nc2-pleg");b.setAttribute("aria-expanded",String(!pl))})});
+  m.querySelectorAll(".nc2-ap a[href=\"#\"],.nc2-lat-pie a[href=\"#\"]").forEach(function(a){a.addEventListener("click",function(e){e.preventDefault()})});
+  /* Destinos que son otra pantalla de la app (otra página publicada): el aviso va en la tira, fuera del marco */
+  function aviso(x){var g=document.querySelector(".nc2-tira-msg");if(!g)return;g.textContent=x;clearTimeout(window.__nc2T);window.__nc2T=setTimeout(function(){g.textContent=""},5000)}
+  m.querySelectorAll(".nc2-riel a,.nc2-riel .nc2-mas,.nc2-lat a,.nc2-lat .nc2-cons-b,.nc2-pista a,.nc2-enc button,.nc2-fun-b,.nc2-fun .nc2-av,.nc2-mo,.nc2-ap-l,.nc2-ap-b,a.nc2-volver").forEach(function(a){a.addEventListener("click",function(e){e.preventDefault();
+    var n=(a.getAttribute("aria-label")||a.innerText||"").trim().split("\n")[0];aviso("Lleva a «"+n+"», otra pantalla de la app (está en su propia página de la maqueta)")})});
+})})();
 </script>

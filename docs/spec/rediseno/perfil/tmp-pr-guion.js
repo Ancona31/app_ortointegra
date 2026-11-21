@@ -68,7 +68,7 @@
     /* ---- Maqueta: rol ---- */
     var dRol=$('.pr-demo-rol');
     dRol.addEventListener('click',function(){var inv=m.classList.toggle('pr-inv');dRol.setAttribute('aria-pressed',String(inv));
-      dRol.textContent=inv?'Maqueta: volver a ver como quien administra':'Maqueta: ver como médico invitado';
+      dRol.textContent=inv?'volver a ver como quien administra':'ver como médico invitado';
       logo.pend=false;carga(PERFIL[inv?'inv':'adm']);base=foto();pintaLogo();pinta();cont.scrollTop=0});
 
     /* ---- Firma ---- */
@@ -109,7 +109,7 @@
     function utc(z){var o=hZ.querySelector('option[value="'+z+'"]'),r=o&&o.textContent.match(/UTC[+-]\d+/);return r?r[0]:''}
     function refresca(){var fs=filas(),n=fs.length,cl=m.dataset.cl;
       if(cl!=='tope'){cl=n?'n':'vacio';m.dataset.cl=cl}
-      txt('cuenta',cl==='tope'?'10':String(n));dCl.textContent='Maqueta: cambiar lista (ahora: '+CL_NOM[cl]+')';
+      txt('cuenta',cl==='tope'?'10':String(n));dCl.textContent='cambiar lista (ahora: '+CL_NOM[cl]+')';
       $$('.pr-c-add').forEach(function(b){b.disabled=cl==='tope';b.style.opacity=cl==='tope'?'.45':''});
       [].slice.call(res.children).forEach(function(l){l.hidden=true});
       fs.forEach(function(l,i){var d=l.dataset,def=l.hasAttribute('data-def'),no=n===1||def,t=[d.t,utc(d.z)].filter(Boolean).join(' · ');
@@ -145,7 +145,7 @@
 
     /* ---- Google Calendar (no se simula ninguna conexión real) ---- */
     var dG=$('.pr-demo-g');
-    function g(s){m.dataset.g=s;dG.textContent='Maqueta: cambiar estado (ahora: '+G_NOM[s]+')'}
+    function g(s){m.dataset.g=s;dG.textContent='cambiar estado (ahora: '+G_NOM[s]+')'}
     dG.addEventListener('click',function(){g(G_EST[(G_EST.indexOf(m.dataset.g)+1)%4])});
     $('.pr-g-rec').addEventListener('click',function(e){abre('recrear',e.currentTarget)});
     $('.pr-r-si').addEventListener('click',function(){cierra();toast('Calendario recreado en tu cuenta de Google')});

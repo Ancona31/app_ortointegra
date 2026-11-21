@@ -1,0 +1,94 @@
+
+/* ===================== PASADA FINAL (kit/PASADA-FINAL.md) ===================== */
+/* ---- Navegación al día (CALMA §28), copiada de dashboard-final/tmp-estilo.css: logo de la clínica, aviso «N datos pendientes»,
+        distintivo ámbar, pie con «Mi perfil · Ajustes» y Ayuda, menú «Más» ---- */
+.PX .PX-clogo{width:36px;height:36px;flex:none;border-radius:999px;background:#fff;color:var(--accion);display:flex;align-items:center;justify-content:center}
+.PX .PX-lat-pie{border-top:1px solid var(--nav-velo);padding-top:8px;display:flex;align-items:center;gap:4px}
+.PX .PX-lat-pie .PX-yo{flex:1;min-width:0;text-align:left}
+.PX .PX-lat-pie .PX-nib{color:var(--nav-tinta2)}
+.PX .PX-esp{color:var(--nav-tinta)!important}
+.PX .PX-yo{min-height:48px;height:auto;padding-top:6px;padding-bottom:6px}
+.PX .PX-lat .PX-yo{height:auto}
+.PX .PX-yo>span{display:flex;flex-direction:column;line-height:17px}
+.PX .PX-yo small{font-size:12px;line-height:16px;color:var(--nav-tinta2)}
+.PX .PX-nib{position:relative;width:44px;height:44px;flex:none;border-radius:999px;display:flex;align-items:center;justify-content:center;color:var(--nav-tinta)}
+.PX[data-vp="esc"] .PX-nib{width:40px;height:40px}
+.PX[data-vp="ih"] .PX-esp{display:none}
+.PX[data-vp="ih"] .PX-lat .PX-lat-pie .PX-yo{padding:0 8px;min-height:44px}
+.PX[data-vp="ih"] .PX-lat .PX-lat-pie .PX-yo>svg{display:none}
+.PX[data-vp="ih"] .PX-lat .PX-lat-pie .PX-nib{width:36px;height:36px}
+.PX[data-vp="ih"] .PX-lat .PX-lista{margin-top:12px}
+.PX[data-vp="ih"] .PX-lat .PX-cons-b{margin-top:8px}
+/* aviso «N datos pendientes» */
+.PX .PX-ap{border-radius:14px;background:var(--ag-fondo);color:var(--tinta);margin:0 0 10px}
+.PX .PX-mn .PX-ap{margin:2px 0 8px}
+.PX .PX-ap-cab{display:flex;align-items:center;gap:10px;width:100%;min-height:44px;padding:8px 10px 8px 12px;border-radius:14px;text-align:left;color:var(--ag-tinta)}
+.PX[data-vp="ih"] .PX-lat .PX-ap-cab,.PX[data-vp="esc"] .PX-ap-cab{min-height:40px;padding:6px 10px 6px 12px}
+.PX .PX-ap-cab:focus-visible{outline:3px solid var(--enlace);outline-offset:2px}
+.PX .PX-ap-pt{position:relative;width:22px;height:22px;flex:none;border-radius:7px;background:color-mix(in srgb,var(--ag-punto) 22%,transparent)}
+.PX .PX-ap-pt::before,.PX .PX-ap-pt::after{content:"";position:absolute;left:7px;top:7px;width:8px;height:8px;border-radius:999px;background:var(--ag-punto)}
+.PX .PX-ap-pt::after{animation:PX-latido 3.2s cubic-bezier(.2,.6,.3,1) infinite}
+@keyframes PX-latido{0%{transform:scale(1);opacity:.65}34%{transform:scale(2.7);opacity:0}100%{transform:scale(2.7);opacity:0}}
+.PX .PX-ap-t{flex:1;min-width:0;font-size:15px;line-height:20px;font-weight:700;font-variant-numeric:tabular-nums}
+.PX .PX-ap-ch{transition:transform 240ms cubic-bezier(.32,.72,0,1)}
+.PX .PX-ap.PX-pleg .PX-ap-ch{transform:rotate(180deg)}
+.PX .PX-ap-c{display:flex;flex-direction:column;padding:0 12px 12px}
+.PX .PX-ap.PX-pleg .PX-ap-c{display:none}
+.PX .PX-ap-sep{display:block;height:1px;margin:0 0 2px;background:color-mix(in srgb,var(--ag-tinta) 22%,transparent)}
+.PX .PX-ap-l{display:flex;align-items:flex-start;gap:10px;min-height:44px;padding:12px 2px;border-radius:8px;font-size:14px;line-height:20px;font-weight:600;color:var(--tinta)}
+.PX .PX-ap-l svg{margin-top:1px;color:var(--ag-tinta)}
+.PX[data-vp="ih"] .PX-lat .PX-ap-l,.PX[data-vp="esc"] .PX-ap-l{min-height:36px;padding:8px 2px}
+.PX .PX-ap-b{position:relative;margin-top:6px;display:flex;align-items:center;justify-content:center;gap:6px;height:40px;border-radius:10px;background:var(--ag-tinta);color:var(--ag-fondo);font-size:14px;line-height:18px;font-weight:600}
+.PX .PX-ap-b::after{content:"";position:absolute;inset:-2px 0}
+.PX[data-vp="ih"] .PX-lat .PX-ap-b,.PX[data-vp="esc"] .PX-ap-b{height:36px}
+.PX[data-vp="ih"] .PX-lat .PX-ap-b::after,.PX[data-vp="esc"] .PX-ap-b::after{display:none}
+.PX[data-vp="ih"] .PX-lat .PX-ap{margin:0 -10px 8px -4px}
+.PX[data-vp="ih"] .PX-lat .PX-ap-cab{padding:6px 8px;gap:8px}
+.PX[data-vp="ih"] .PX-lat .PX-ap-t{font-size:14px;line-height:18px}
+.PX[data-vp="ih"] .PX-lat .PX-ap-c{padding:0 10px 10px}
+.PX[data-vp="ih"] .PX-lat .PX-ap-l{gap:8px}
+.PX[data-vp="ih"] .PX-lat .PX-ap-sep{margin:0}
+.PX[data-vp="ih"] .PX-lat .PX-ap-b{margin-top:4px}
+/* distintivo ámbar con el número */
+.PX .PX-rb,.PX .PX-lat-b,.PX .PX-menu-b{position:relative}
+.PX .PX-bdg{position:absolute;top:-3px;right:-3px;min-width:22px;height:22px;padding:0 5px;border-radius:999px;background:var(--ag-punto);color:var(--navy);border:2px solid var(--navy);display:flex;align-items:center;justify-content:center;font-size:12px;line-height:16px;font-weight:700;font-variant-numeric:tabular-nums;pointer-events:none}
+.PX .PX-rb .PX-bdg{top:2px;right:2px}
+.PX .PX-lat-b .PX-bdg{top:0;right:-5px}
+/* menú «Más»: filas con icono de color y flecha tenue */
+.PX .PX-mo{position:relative;display:flex;align-items:center;gap:12px;width:100%;min-height:48px;padding:0 12px;border-radius:12px;font-size:15px;line-height:20px;color:var(--tinta);text-align:left}
+.PX .PX-mo+.PX-mo::before{content:"";position:absolute;left:44px;right:12px;top:0;height:1px;background:var(--linea)}
+.PX .PX-mo>svg:first-child{color:var(--enlace)}
+.PX .PX-mo>.PX-mo-f{margin-left:auto;color:var(--tinta3)}
+.PX .PX-mo-v{margin-left:auto;font-size:15px;color:var(--tinta2)}
+.PX .PX-mo-v+.PX-mo-f{margin-left:4px}
+.PX .PX-mn .PX-hj-c{padding:0 8px 4px}
+.PX.PX[data-vp="iv"] .PX-hoja.PX-mn{width:340px}
+
+/* ---- CALMA §26 · Duo cerrado: NINGUNA capa es hoja inferior. Tarjeta centrada en el área de contenido (sin riel ni franja), nace del
+        centro (escala .96→1 + fundido, resorte sin rebote), ancho 310 con margen 8, alto máximo el del área menos 32, sin asa ---- */
+.PX[data-vp="ext"] .PX-capa{right:calc(56px + var(--ir));bottom:var(--ib)}
+.PX[data-vp="ext"] .PX-hoja,.PX[data-vp="ext"] .PX-alerta{left:0;right:0;top:0;bottom:0;margin:auto;width:310px;height:fit-content;max-height:calc(100% - 32px);border-radius:20px;opacity:0;transform:scale(.96);
+  transition:opacity 200ms ease-out,transform 360ms linear(0,0.123,0.3397,0.54,0.6943,0.8032,0.8762,0.9234,0.9533,0.9718,0.9831,0.99,0.9941,0.9965,0.998,1),visibility 0s linear 360ms}
+.PX[data-vp="ext"] .PX-hoja{padding-bottom:16px}
+.PX[data-vp="ext"] .PX-hoja.PX-act,.PX[data-vp="ext"] .PX-alerta.PX-act{opacity:1;transform:none;transition-delay:0s}
+.PX[data-vp="ext"] .PX-hoja.PX-alta{height:fit-content}
+.PX[data-vp="ext"] .PX-hoja.PX-menu{width:280px}
+.PX[data-vp="ext"] .PX-asa{display:none}
+.PX[data-vp="ext"] .PX-hj-cab{padding-top:10px}
+.PX[data-vp="ext"] .PX-alerta{padding:24px 20px}
+
+/* ---- «Faltan N campos» alineada con los botones: a la derecha en ih/esc (en iv, centrada) ---- */
+.PX[data-vp="ih"] .PX-barra .PX-faltan,.PX[data-vp="esc"] .PX-barra .PX-faltan{text-align:right;max-width:none}
+
+/* ---- Cambio de tipo a la otra vista de la página: realce breve del marco de destino (fuera del marco) ---- */
+.PX-realce{outline:3px solid var(--enlace);outline-offset:4px;transition:outline-color 600ms ease}
+
+@media (prefers-reduced-motion:reduce){
+  .PX .PX-ap-pt::after{animation:none;opacity:0}
+  .PX .PX-ap-ch{transition:none}
+  .PX[data-vp="ext"] .PX-hoja,.PX[data-vp="ext"] .PX-hoja.PX-act,.PX[data-vp="ext"] .PX-alerta,.PX[data-vp="ext"] .PX-alerta.PX-act{transform:none;transition:opacity 200ms ease,visibility 0s linear 200ms}
+  .PX[data-vp="ext"] .PX-hoja.PX-act,.PX[data-vp="ext"] .PX-alerta.PX-act{transition-delay:0s}
+}
+.PX[data-vp="ext"] .PX-pick-pie .PX-pl-n{white-space:normal}
+.PX[data-vp="ext"] .PX-pl-ed{flex-wrap:wrap}
+.PX[data-vp="ext"] .PX-pl-ed .PX-campo{flex:1 1 100%}

@@ -44,29 +44,34 @@ def riel():
     def b(k, t, act=False):
         return '<a href="#" class="nn-p nn-rb" aria-label="%s"%s>%s</a>' % (t, ' aria-current="page"' if act else '', ic(I[k], 22))
     return ('<nav class="nn-riel" aria-label="Navegación principal">' + b('inicio', 'Inicio') + b('pac', 'Expediente', True) + b('agenda', 'Agenda') + b('docs', 'Documentos')
-            + '<a href="#" class="nn-p nn-rb" aria-label="Más">' + ic(I['mas'], 22, 3) + '</a><span class="nn-flex"></span>'
+            + '<button type="button" class="nn-p nn-rb" aria-label="Más" data-abre-mas>' + ic(I['mas'], 22, 3) + CRO['BDG'] + '</button><span class="nn-flex"></span>'
             '<button type="button" class="nn-p nn-mas" aria-label="Nueva consulta">' + ic(I['plus'], 26, 2.4) + '</button></nav>')
 
-def lateral():
+def lateral(vp):
     def a(k, t, act=False):
         return '<a href="#" class="nn-p nn-li"%s>%s%s</a>' % (' aria-current="page"' if act else '', ic(I[k], 20), t)
     return ('<nav class="nn-lat" aria-label="Navegación principal"><div class="nn-lat-cab"><span class="nn-logo">' + ic(I['logo'], 24) + '<span class="nn-logo-n">Spinus</span></span><span class="nn-plan">Plan VIP</span></div>'
-            '<button type="button" class="nn-p nn-cons-b"><span class="nn-av">AS</span><span class="nn-cons-t"><span>Consultorio</span><b>Centro</b></span>' + ic(I['selector'], 16, 2) + '</button>'
+            '<button type="button" class="nn-p nn-cons-b">' + CRO['CLOGO'] + '<span class="nn-cons-t"><span>Consultorio</span><b>Centro</b></span>' + ic(I['selector'], 16, 2) + '</button>'
             '<div class="nn-lista">' + a('inicio', 'Inicio') + a('pac', 'Expediente', True) + a('agenda', 'Agenda') + a('docs', 'Documentos') + a('admin', 'Administración') + '</div><span class="nn-flex"></span>'
-            '<div class="nn-lat-pie"><a href="#" class="nn-p nn-li nn-yo">' + ic(I['perfil'], 20) + '<span>Dr. Admin Semilla<small>Mi perfil · Ajustes</small></span></a></div></nav>')
+            
+            + CRO['ap'](vp, 'lat') + CRO['PIE'] + '</nav>')
 
 def encabezado():
-    return ('<header class="nn-enc"><button type="button" class="nn-p nn-menu-b" aria-label="Menú">' + ic(I['menu'], 22, 2) + '</button><span class="nn-enc-t">Expediente</span><span class="nn-flex"></span>'
+    return ('<header class="nn-enc"><button type="button" class="nn-p nn-menu-b" aria-label="Menú">' + ic(I['menu'], 22, 2) + CRO['BDG'] + '</button><span class="nn-enc-t">Expediente</span><span class="nn-flex"></span>'
             '<button type="button" class="nn-p nn-av nn-av-g" aria-label="Mi perfil">AS</button></header>')
 
 I['barra'] = '<rect x="3" y="4.5" width="18" height="15" rx="3"/><path d="M9.5 4.5v15"/>'
 def fundido():
-    pista = ''.join('<a href="#" class="nn-p nn-pl"%s>%s</a>' % (' aria-current="page"' if t == 'Expediente' else '', t) for t in ('Inicio', 'Expediente', 'Agenda', 'Documentos', 'Más'))
-    # CALMA §23.9 · «Más» abre el mismo menú que el «···» del riel de ext (en esta maqueta, igual que el del riel, no se dibuja). Sigue marcado «Expediente».
+    pista = ''.join('<a href="#" class="nn-p nn-pl"%s>%s</a>' % (' aria-current="page"' if t == 'Expediente' else '', t) for t in ('Inicio', 'Expediente', 'Agenda', 'Documentos')) + '<button type="button" class="nn-p nn-pl" data-abre-mas>Más</button>'
+    # CALMA §23.9 · «Más» abre el mismo menú que el «···» del riel de ext (tarjeta «Más» con velo, copiada del dashboard). Sigue marcado «Expediente».
     return ('<!-- Duo abierto vertical (CALMA §19): encabezado fundido con la pista de secciones. Administración, Mi perfil y Ayuda: desde «Mostrar barra lateral» o el avatar. -->\n'
-            '<header class="nn-fun"><button type="button" class="nn-p nn-fun-b" aria-label="Mostrar barra lateral">' + ic(I['barra'], 20) + '</button>'
+            '<header class="nn-fun"><button type="button" class="nn-p nn-fun-b" aria-label="Mostrar barra lateral">' + CRO['BDG'] + ic(I['barra'], 20) + '</button>'
             '<nav class="nn-pista" aria-label="Navegación principal">' + pista + '</nav>'
             '<button type="button" class="nn-p nn-av nn-av-g" aria-label="Mi perfil">AS</button></header>')
+
+import importlib.util as _iuc
+_spc = _iuc.spec_from_file_location('u5cromo', '/tmp/claude-0/-home-user-app-ortointegra/c6f872cd-9586-537f-8cbb-7c91e620cbb1/scratchpad/tools/tmp-u5-cromo.py'); _CRM = _iuc.module_from_spec(_spc); _spc.loader.exec_module(_CRM)
+CRO = _CRM.piezas('nn')
 
 # Los ocho tipos: clave, nombre, token de color e icono (copiados de entrega/doc-color/color-documentos.html)
 TIPOS = [
@@ -88,16 +93,16 @@ def cabecera(vp):
     editar = '' if esc else '<button type="button" class="nn-p nn-txt nn-b-ed" data-en="rev"><span class="nn-ver0">Editar</span><span class="nn-ver1">Vista previa</span></button>'
     quien = '<span class="nn-num">73 años</span>' + (' · Femenino' if esc else '') + '<span class="nn-cons-si"> · Atendiendo en: Centro</span>'
     # En computadora el último diagnóstico es una segunda línea bajo el título; el contexto completo (F21) está en «···» en los cuatro marcos.
-    ctx = ('<p class="nn-sub2" data-en="ok">Quedó sellada en el expediente. Genera los documentos de esta consulta</p>'
+    ctx = ('<p class="nn-sub2" data-en="ok">Quedó sellada en el expediente.</p>'
            '<p class="nn-sub2" data-en="' + ANTES + '"><span class="nn-prim-no">Último diagnóstico: Lumbago no especificado</span>'
            '<span class="nn-prim-si">Primera consulta del paciente</span></p>') if esc else ''
     alg = '<span class="nn-alg">' + ic(I['aviso'], 14, 2) + 'Alergias: Penicilina</span>'
     # La etiqueta de alergias va en la línea secundaria, pegada a la identidad, en los cuatro marcos
     return ('''<!-- F1 · Cabecera mínima: «‹ Paciente», título y UNA línea (edad · consultorio). Sin migas de pan. «···» va arriba a la derecha en teléfono y junto al título en computadora.
      F2 · «Atendiendo en: Centro» va en esa línea. Sin consultorio activo la mención desaparece y «Guardar nota» queda deshabilitado, igual que hoy
-          (hoy no existe ningún texto para ese estado; el aviso es una propuesta, no se dibuja).
+          (hoy no existe ningún texto para ese estado; ese aviso queda fuera: no existe hoy).
      F25 · ?cita={uuid}: la nota queda ligada a la cita de la agenda y al guardar la marca como atendida; hoy no tiene señal visible y aquí tampoco (no se inventa).
-     F26 · Esqueleto de carga (misma silueta: cabecera, fila de signos, superficie en blanco): estado de sistema, no dibujado.
+     F26 · Esqueleto de carga (misma silueta: cabecera, fila de signos, superficie en blanco): estado de sistema, sin parte visual propia en esta vista.
            Plan bloqueado: lo resuelve layout.tsx con un redirect a /billing ANTES de pintar esta pantalla; aquí no hay estado que dibujar. -->
 <header class="nn-top">
   <div class="nn-top-f"><a href="#" class="nn-p nn-volver" data-en="''' + ANTES + ''' ok">''' + ic(I['volver'], 14, 2.6) + '''<span class="nn-volver-t">Paciente Prueba 01</span></a>
@@ -115,7 +120,7 @@ def cabecera(vp):
 <p class="nn-linea nn-error" data-en="err" role="alert">''' + ic(I['aviso'], 16, 2) + '''<span class="nn-flex">No se pudo generar la nota. Intenta de nuevo o escríbela manualmente.</span></p>'''
             + ('' if esc else '''
 <!-- F19 · Confirmación sobria de «Nota guardada» (ya no es un modal). «Ver nota» abre la nota sellada en lectura (teléfono y Duo abierto; en computadora la nota está a la vista). -->
-<p class="nn-linea nn-nota-ok" data-en="ok">''' + ic(I['okc'], 18, 2) + '''<span>Quedó sellada en el expediente. Genera los documentos de esta consulta</span></p>'''))
+<p class="nn-linea nn-nota-ok" data-en="ok">''' + ic(I['okc'], 18, 2) + '''<span>Quedó sellada en el expediente.</span></p>'''))
 
 def vfila(en):
     return ('''<!-- F4 · Signos vitales: UNA fila; abre la hoja con los campos. Con valores, el resumen va en una segunda línea (teléfono) o en la misma fila (ancho);
@@ -126,10 +131,9 @@ def vfila(en):
 <span class="nn-sep" data-en="''' + en + '''"></span>''')
 
 def escritura(en):
-    return ('''<!-- F5 · El área de escritura: sin título, sin etiqueta, sin ayuda. F3 · «Borrador guardado» aparece al escribir.
-     PROPUESTA de texto (pendiente de aprobar): marcador corto. Hoy: «Ej.: Paciente con dolor lumbar de 2 semanas tras cargar peso, sin irradiación, Lasègue negativo…». -->
+    return ('''<!-- F5 · El área de escritura: sin título, sin etiqueta, sin ayuda. F3 · «Borrador guardado» aparece al escribir. -->
 <div class="nn-esc" data-en="''' + en + '''" data-solo="ia">
-  <textarea class="nn-dict" aria-label="Descripción del caso" placeholder="Describe la consulta con tus palabras. Spinus redacta la nota."></textarea>
+  <textarea class="nn-dict" aria-label="Descripción del caso" placeholder="Ej.: Paciente con dolor lumbar de 2 semanas tras cargar peso, sin irradiación, Lasègue negativo, fuerza y reflejos normales. Indico naproxeno 500 mg cada 12 h por 7 días, ejercicios de McKenzie, cita en 2 semanas."></textarea>
   <span class="nn-autog" hidden>Borrador guardado</span>
 </div>''')
 
@@ -157,7 +161,7 @@ def doc(en):
      Sin diagnóstico estructurado la lista dice «Sin diagnóstico estructurado — la nota se guardará sin código CIE-10.» (alcanzable: modo manual sin diagnósticos). -->
 <article class="nn-doc" data-en="''' + en + '''" aria-label="Nota médica">
   <p class="nn-origen" data-en="rev regen"><span class="nn-tag nn-t-ton" data-solo="ia">''' + ic(I['chispa'], 14, 2) + '''Nota IA</span><span class="nn-tag nn-t-ton" data-solo="man">''' + ic(I['lapiz'], 14, 2) + '''Nota manual</span><span>Revísala antes de guardar</span></p>
-  <p class="nn-origen" data-en="ok doc ver"><span class="nn-tag nn-t-ok">''' + ic(I['candado'], 14, 2) + '''Nota sellada</span><span>Las correcciones van en una nota aclaratoria.</span></p>
+  <p class="nn-origen" data-en="ok doc ver"><span class="nn-tag nn-t-ok">''' + ic(I['candado'], 14, 2) + '''Nota sellada</span></p>
   <!-- CALMA §12 · Secciones con rótulo de color, cuerpo justificado (lang="es" + hyphens:auto), diagnóstico destacado con su CIE-10 en etiqueta. El Plan es texto de la nota;
        los medicamentos salen UNA vez, en «Detecté estos medicamentos», bajo una línea, con «Quitar» (tercera revisión). -->
   <div class="nn-prosa nn-ver0" lang="es"></div>
@@ -173,7 +177,7 @@ def doc(en):
       <label class="nn-f"><span>Próxima cita</span><input type="text" class="nn-in nn-cita" value="En 2 semanas" autocomplete="off" placeholder="Ej: En 4 semanas, 15 de abril 2026..."></label></div></section>
   <section class="nn-grp" data-en="ok doc ver"><h3 class="nn-grp-t">Signos vitales</h3><dl class="nn-kv nn-vres2"></dl></section>
   <!-- Bloque de firma sobrio (pedido por el dueño). Datos ficticios del médico de la sesión. -->
-  <footer class="nn-firma"><b>Dr. Admin Semilla</b><span class="nn-num">Cédula profesional 00000001</span><span class="nn-num">19 de noviembre de 2026</span></footer>
+  <footer class="nn-firma"><b>Dr. Admin Semilla</b><span class="nn-num">Cédula Prof. 00000001</span><span class="nn-num">19 de noviembre de 2026</span></footer>
 </article>''')
 
 def rejilla():
@@ -193,7 +197,7 @@ def formulario():
         return '<label class="nn-fila"><span>%s</span>%s</label>' % (et, campo)
     return ('''<!-- Formulario del documento elegido. Se dibuja COMPLETA la Receta, precargada con paciente, diagnóstico y los medicamentos que quedaron en la nota:
      campos como lista «rótulo — valor» con líneas finas, sin azulejos. Las ayudas de hoy («De la ficha · editable», «Del diagnóstico de la consulta», «Del catálogo · editable»,
-     «Sugerencia del catálogo: …») y el aviso «Completa tu perfil para que el documento salga con tu encabezado.» + «Ir a mi perfil» se diseñan en la tanda de Documentos. -->
+     «Sugerencia del catálogo: …») y el aviso «Completa tu perfil para que el documento salga con tu encabezado.» + «Ir a mi perfil» están en la página Documentos. -->
 <form class="nn-form" data-en="doc" novalidate>
   <div class="nn-df-rx">
     ''' + fila('Plantilla', '<span class="nn-selw"><select class="nn-sel" aria-label="Plantilla"><option>— Sin plantilla —</option><option>Vaciar formulario</option></select>' + ic(I['abajo'], 16, 2) + '</span>') + '''
@@ -205,7 +209,6 @@ def formulario():
     <section class="nn-grp"><h3 class="nn-grp-t">Recomendaciones</h3>
       <textarea class="nn-mta nn-rx-rec" rows="2" aria-label="Recomendaciones" placeholder="Indicaciones generales, cuidados, datos de alarma…"></textarea></section>
   </div>
-  <p class="nn-df-gen" hidden>El formulario de este documento se diseña en la tanda de Documentos</p>
 </form>''')
 
 def botones(vp):
@@ -218,7 +221,7 @@ def botones(vp):
     rei = '<button type="button" class="nn-p nn-prim nn-b-rei" data-en="err">Reintentar</button>'
     cer = '<button type="button" class="nn-p nn-txt nn-ini nn-b-cer" data-en="err">Cerrar</button>'
     reg = ('<button type="button" class="nn-p nn-txt nn-ini nn-b-reg" data-en="rev" data-solo="ia">Regenerar</button>'
-           '<button type="button" class="nn-p nn-txt nn-ini nn-b-volver" data-en="rev" data-solo="man">' + ('Actualizar' if esc else 'Volver a escribir') + '</button>')
+           '<button type="button" class="nn-p nn-txt nn-ini nn-b-volver" data-en="rev" data-solo="man">' + 'Actualizar' + '</button>')
     guardar = '<button type="button" class="nn-p nn-prim nn-b-guardar" data-en="rev">Guardar nota</button>'
     conc = '<button type="button" class="nn-p nn-prim nn-b-conc" data-en="ok">Concluir consulta</button>'
     imp = '<button type="button" class="nn-p nn-prim nn-b-imp" data-en="doc">Imprimir</button>'
@@ -320,7 +323,7 @@ def capas(vp):
   <div class="nn-al-p nn-al-col"><button type="button" class="nn-p nn-bt nn-bt-qui nn-cierra">Conservar</button><button type="button" class="nn-p nn-bt nn-mal nn-nuevo-si">Sí, empezar de nuevo</button></div>
 </div>
 <!-- F23 · Cambiar de tipo con un documento empezado: confirmación previa, con el texto de hoy -->
-<div tabindex="-1" class="nn-pan nn-alerta" data-pan="cambio" role="alertdialog" aria-modal="true" aria-label="¿Cambiar de documento?">
+<div tabindex="-1" class="nn-pan nn-alerta" data-pan="cambio" role="alertdialog" aria-modal="true" aria-label="¿Cambiar a Laboratorio?">
   <span class="nn-al-ic nn-al-mal" aria-hidden="true">''' + ic(I['cambia'], 28) + '''</span>
   <h2>¿Cambiar a <span class="nn-cb-a">Laboratorio</span>?</h2><p class="nn-al-m nn-al-c" lang="es">Se descarta <span class="nn-cb-de">la receta</span> que estás llenando. No se puede deshacer.</p>
   <div class="nn-al-p nn-al-col"><button type="button" class="nn-p nn-bt nn-bt-qui nn-cierra">Cancelar</button><button type="button" class="nn-p nn-bt nn-mal nn-cb-ok">Cambiar a&nbsp;<span class="nn-cb-a">Laboratorio</span></button></div>
@@ -339,7 +342,7 @@ def marco(vp):
     if vp == 'esc':
         vacio = ('''<!-- Antes de generar: casi en blanco. Una línea y la lista de secciones en texto tenue; sin barras-esqueleto. F7/F11 · mientras redacta, la línea cambia
      (hoy: modal «Spinus está redactando tu nota» · «Unos segundos…» con los pasos «Leyendo tu dictado», «Estructurando la nota», «Redactando la exploración»).
-     «La nota aparecerá aquí» es un texto NUEVO (propuesta): hoy no existe porque la nota se revisa en un modal. -->
+     «La nota aparecerá aquí» es un texto nuevo, pendiente de aprobar: hoy no existe porque la nota se revisa en un modal. -->
 <div class="nn-vacio" data-en="cap gen err"><p class="nn-vacio-h"><span data-en="cap err">La nota aparecerá aquí</span><span class="nn-giro" data-en="gen" aria-hidden="true"></span><span data-en="gen">Spinus está redactando tu nota</span></p>
   <ul aria-hidden="true"><li>Subjetivo</li><li>Objetivo</li><li>Auxiliares diagnósticos</li><li>Diagnóstico</li><li>Análisis</li><li>Plan</li></ul></div>''')
         rcab = ('''<div class="nn-rcab"><span class="nn-flex"></span>
@@ -356,17 +359,17 @@ def marco(vp):
                '<div class="nn-acc" data-en="ok" role="group" aria-label="Esta nota">' + acciones_ok(not iv) + '</div>')
         col = ('<div class="nn-col"><main class="nn-cont">\n' + cabecera(vp) + '\n<section class="nn-card" data-en="' + ANTES + ' doc ver' + (' ok' if iv else '') + '">\n' + vfila('cap gen err') + '\n' + escritura('cap gen err') + '\n' + manual('cap') + '\n'
                + doc('rev regen ver' + (' ok' if iv else '')) + '\n' + formulario() + '\n</section>\n' + acc + '\n' + rejilla() + '\n</main>\n' + botones(vp) + TOAST + '</div>')
-    nav = {'ext': riel, 'tel': encabezado, 'ih': lateral, 'iv': fundido, 'esc': lateral}[vp]()
+    nav = {'ext': riel, 'tel': encabezado, 'ih': lambda: lateral('ih'), 'iv': fundido, 'esc': lambda: lateral('esc')}[vp]()
     app = (nav + '\n' + col) if vp in ('tel', 'iv', 'esc') else (col + '\n' + nav)
-    return '<div class="marco nn" data-vp="%s" data-e="cap" data-modo="ia" lang="es">\n<div class="nn-app">\n%s\n</div>\n%s\n</div>\n' % (vp, app, capas(vp))
+    return '<div class="marco nn" data-vp="%s" data-e="cap" data-modo="ia" lang="es">\n<div class="nn-app">\n%s\n</div>\n%s\n</div>\n' % (vp, app, capas(vp) + CRO['capa_mas'](vp))
 
 import importlib.util as _u
 _sp = _u.spec_from_file_location('u4iv', '/tmp/claude-0/-home-user-app-ortointegra/c6f872cd-9586-537f-8cbb-7c91e620cbb1/scratchpad/tools/tmp-u4-iv.py'); _m = _u.module_from_spec(_sp); _sp.loader.exec_module(_m)
-css = _m.con_iv(open(os.path.join(L, 'tmp-nn-estilo.css')).read())
-js = open(os.path.join(L, 'tmp-nn-guion.js')).read()
+css = _m.con_iv(open(os.path.join(L, 'tmp-nn-estilo.css')).read()) + CRO['css'] + open(os.path.join(L, 'tmp-nn-estilo4.css')).read()
+js = open(os.path.join(L, 'tmp-nn-guion.js')).read() + CRO['js']
 out = ('<!-- NOMBRE: Nueva nota médica | En la pantalla solo manda el texto que escribes: una superficie en blanco, los signos vitales en una fila y un único botón; al guardar, los ocho documentos se eligen en una rejilla con su color, y lo ocasional queda a un toque en «···» -->\n'
        '<!-- Textos: los rótulos y mensajes son los de hoy, copiados del código. Revisiones del dueño aplicadas (CALMA §11–22). Aprobados: título «Nueva nota», botón «Generar con Spinus», sección «Expediente».\n'
-       '     Sigue PROPUESTO, pendiente de aprobar: el marcador corto del área de escritura. Cinco marcos: ext, tel, ih, iv (Duo abierto vertical), esc. Validaciones de hoy que salen como línea de error (misma pieza que el error de generación):\n'
+       '     Cinco marcos: ext, tel, ih, iv (Duo abierto vertical), esc. Validaciones de hoy que salen como línea de error (misma pieza que el error de generación):\n'
        '     «Describe el caso antes de generar.» · «Campos obligatorios: …» · «Describe el caso antes de guardar.» · «Genera la nota antes de guardar.» · «No se pudo generar el PDF. Intenta de nuevo.» -->\n'
        '<style>\n' + css + '</style>\n' + ''.join(marco(v) for v in ('ext', 'tel', 'ih', 'iv', 'esc')) + '<script>\n' + js + '</script>\n')
 open(os.path.join(L, 'vista-nota.html'), 'w').write(out)

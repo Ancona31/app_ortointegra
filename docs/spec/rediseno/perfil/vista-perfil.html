@@ -442,6 +442,91 @@
 .pr[data-vp="iv"] .pr-zc{padding:0 10px}
 .pr[data-vp="ih"] .pr-chips,
 .pr[data-vp="iv"] .pr-chips{gap:6px}
+/* ===== Cromo global (CALMA §28): aviso «N datos pendientes», logo de la clínica, «Más» y «Ajustes». Copiado de entrega/cromo/vista-1 ===== */
+.pr .pr-clogo{width:36px;height:36px;flex:none;border-radius:999px;background:#fff;color:var(--accion);display:flex;align-items:center;justify-content:center}
+.pr .pr-lat-pie{border-top:1px solid var(--nav-velo);padding-top:8px;display:flex;align-items:center;gap:4px}
+.pr .pr-lat-pie .pr-yo{flex:1;min-width:0;text-align:left}
+.pr .pr-lat-pie .pr-nib{color:var(--nav-tinta2)}
+.pr[data-vp="ih"] .pr-esp{display:none}
+.pr[data-vp="ih"] .pr-lat .pr-lat-pie .pr-yo{padding:0 8px}
+.pr[data-vp="ih"] .pr-lat .pr-lat-pie .pr-yo>svg{display:none}
+.pr[data-vp="ih"] .pr-lat .pr-lat-pie .pr-nib{width:36px;height:36px}
+.pr .pr-esp{color:var(--nav-tinta)!important}
+.pr .pr-yo{min-height:48px;height:auto;padding-top:6px;padding-bottom:6px}
+.pr .pr-yo>span{display:flex;flex-direction:column;line-height:17px}
+.pr .pr-yo small{font-size:12px;line-height:16px;color:var(--nav-tinta2)}
+.pr .pr-nib{position:relative;width:44px;height:44px;flex:none;border-radius:999px;display:flex;align-items:center;justify-content:center;color:var(--nav-tinta)}
+.pr .pr-mnw{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:16px;pointer-events:none}
+.pr[data-vp="ext"] .pr-mnw{padding:16px calc(56px + var(--ir) + 8px) calc(var(--ib) + 16px) 8px}
+.pr[data-vp="iv"] .pr-mnw{padding:calc(var(--it) + 16px) 24px 24px}
+.pr[data-vp="ih"] .pr-mnw{padding:24px calc(218px + var(--ir) + 24px) calc(var(--ib) + 16px) 24px}
+.pr[data-vp="esc"] .pr-mnw{padding:32px 24px 32px calc(248px + 24px)}
+.pr .pr-mn{pointer-events:auto;width:310px;max-width:100%;max-height:100%;overflow-y:auto;scrollbar-width:none;background:var(--sup);color:var(--tinta);border-radius:20px;box-shadow:var(--sombra-capa);padding:8px;opacity:0;transform:scale(.96);transition:opacity 200ms ease-out,transform 360ms linear(0,0.123,0.3397,0.54,0.6943,0.8032,0.8762,0.9234,0.9533,0.9718,0.9831,0.99,0.9941,0.9965,0.998,1)}
+.pr[data-vp="iv"] .pr-mn,.pr[data-vp="ih"] .pr-mn,.pr[data-vp="esc"] .pr-mn{width:340px}
+.pr .pr-mn-t{padding:8px 12px 6px;font-size:17px;line-height:22px;font-weight:700}
+.pr .pr-mo{display:flex;align-items:center;gap:12px;width:100%;min-height:48px;padding:0 12px;border-radius:12px;font-size:15px;line-height:20px;color:var(--tinta);text-align:left}
+.pr .pr-mo{position:relative}
+.pr .pr-mo+.pr-mo::before{content:"";position:absolute;left:44px;right:12px;top:0;height:1px;background:var(--linea)}
+.pr .pr-mo>svg:first-child{color:var(--enlace)}
+.pr .pr-mo>.pr-mo-f{margin-left:auto;color:var(--tinta3)}
+.pr .pr-mo-v{margin-left:auto;font-size:15px;color:var(--tinta2)}
+.pr .pr-mo-v+.pr-mo-f{margin-left:4px}
+.pr .pr-avp{border-radius:14px;background:var(--ag-fondo);color:var(--tinta);margin:0 0 10px}
+.pr .pr-mn .pr-avp{margin:2px 0 8px}
+.pr.pr-n0 .pr-avp{display:none}
+.pr .pr-avp-cab{display:flex;align-items:center;gap:10px;width:100%;min-height:44px;padding:8px 10px 8px 12px;border-radius:14px;text-align:left;color:var(--ag-tinta)}
+.pr[data-vp="ih"] .pr-lat .pr-avp-cab,.pr[data-vp="esc"] .pr-avp-cab{min-height:40px;padding:6px 10px 6px 12px}
+.pr .pr-avp-cab:focus-visible{outline:3px solid var(--enlace);outline-offset:2px}
+.pr .pr-avp-pt{position:relative;width:22px;height:22px;flex:none;border-radius:7px;background:color-mix(in srgb,var(--ag-punto) 22%,transparent)}
+.pr .pr-avp-pt::before,.pr .pr-avp-pt::after{content:"";position:absolute;left:7px;top:7px;width:8px;height:8px;border-radius:999px;background:var(--ag-punto)}
+.pr .pr-avp-pt::after{animation:pr-latido 3.2s cubic-bezier(.2,.6,.3,1) infinite}
+@keyframes pr-latido{0%{transform:scale(1);opacity:.65}34%{transform:scale(2.7);opacity:0}100%{transform:scale(2.7);opacity:0}}
+.pr .pr-avp-t{flex:1;min-width:0;font-size:15px;line-height:20px;font-weight:700;font-variant-numeric:tabular-nums}
+.pr .pr-avp-ch{transition:transform 240ms cubic-bezier(.32,.72,0,1)}
+.pr .pr-avp.pr-pleg .pr-avp-ch{transform:rotate(180deg)}
+.pr .pr-avp-c{display:flex;flex-direction:column;padding:0 12px 12px;transition:opacity 180ms ease-out,transform 180ms ease-out}
+.pr .pr-avp.pr-pleg .pr-avp-c{display:none}
+.pr.pr-sal .pr-avp-c,.pr.pr-ent .pr-avp-c{opacity:0;transform:translateY(-4px)}
+.pr .pr-avp-sep{display:block;height:1px;margin:0 0 2px;background:color-mix(in srgb,var(--ag-tinta) 22%,transparent)}
+.pr .pr-avp-l{display:flex;align-items:flex-start;gap:10px;min-height:44px;padding:12px 2px;border-radius:8px;font-size:14px;line-height:20px;font-weight:600;color:var(--tinta)}
+.pr .pr-avp-l svg{margin-top:1px;color:var(--ag-tinta)}
+.pr[data-vp="ih"] .pr-lat .pr-avp-l,.pr[data-vp="esc"] .pr-avp-l{min-height:36px;padding:8px 2px}
+.pr.pr-n2 .pr-avp-l[data-k="cedula"],.pr.pr-n1 .pr-avp-l[data-k="cedula"],.pr.pr-n1 .pr-avp-l[data-k="logo"]{display:none}
+.pr .pr-avp-b{position:relative;margin-top:6px;display:flex;align-items:center;justify-content:center;gap:6px;height:40px;border-radius:10px;background:var(--ag-tinta);color:var(--ag-fondo);font-size:14px;line-height:18px;font-weight:600}
+.pr .pr-avp-b::after{content:"";position:absolute;inset:-2px 0}
+.pr[data-vp="ih"] .pr-lat .pr-avp-b,.pr[data-vp="esc"] .pr-avp-b{height:36px}
+.pr[data-vp="ih"] .pr-lat .pr-avp-b::after,.pr[data-vp="esc"] .pr-avp-b::after{display:none}
+.pr .pr-encv-b .pr-bdg{top:0;right:-5px}
+.pr[data-vp="ih"] .pr-lat .pr-avp{margin:0 -10px 8px -4px}
+.pr[data-vp="ih"] .pr-lat .pr-avp-cab{padding:6px 8px;gap:8px}
+.pr[data-vp="ih"] .pr-lat .pr-avp-t{font-size:14px;line-height:18px}
+.pr[data-vp="ih"] .pr-lat .pr-avp-c{padding:0 10px 10px}
+.pr[data-vp="ih"] .pr-lat .pr-avp-l{gap:8px}
+.pr[data-vp="ih"] .pr-lat .pr-avp-c{padding-bottom:10px}
+.pr[data-vp="ih"] .pr-lat .pr-avp-sep{margin:0}
+.pr[data-vp="ih"] .pr-lat .pr-avp-b{margin-top:4px}
+.pr[data-vp="ih"] .pr-lat .pr-yo{min-height:44px;padding-top:0;padding-bottom:0}
+.pr .pr-bdg{position:absolute;top:-3px;right:-3px;min-width:22px;height:22px;padding:0 5px;border-radius:999px;background:var(--ag-punto);color:var(--navy);border:2px solid var(--navy);display:flex;align-items:center;justify-content:center;font-size:12px;line-height:16px;font-weight:700;font-variant-numeric:tabular-nums;pointer-events:none}
+.pr .pr-rb .pr-bdg{top:2px;right:2px}
+.pr.pr-n0 .pr-bdg,.pr.pr-secr .pr-bdg{display:none}
+.pr .pr-rb,.pr .pr-encv-b,.pr .pr-menu{position:relative}
+.pr[data-vp="ih"] .pr-lat .pr-lista{margin-top:12px}
+.pr[data-vp="ih"] .pr-lat .pr-cons-b{margin-top:8px}
+.pr .pr-capa-m.pr-on .pr-mn{opacity:1;transform:none;transition:opacity 240ms ease-out,transform 520ms linear(0,0.0803,0.2398,0.4083,0.5568,0.6769,0.769,0.8374,0.8869,0.9221,0.9468,0.9639,0.9756,0.9836,0.9891,0.9927,0.9952,0.9968,0.9979,0.9986,1)}
+
+@keyframes pr-latido{0%{transform:scale(1);opacity:.65}34%{transform:scale(2.7);opacity:0}100%{transform:scale(2.7);opacity:0}}
+.pr:not(.pr-secr) .pr-s{display:none!important}
+.pr.pr-secr .pr-m{display:none!important}
+.pr .pr-capa-m{position:absolute;inset:0;z-index:25;visibility:hidden;transition:visibility 0s linear 320ms}
+.pr .pr-capa-m.pr-on{visibility:visible;transition-delay:0s}
+.pr .pr-capa-m .pr-velo{position:absolute;inset:0;background:var(--velo);backdrop-filter:blur(10px) saturate(140%);-webkit-backdrop-filter:blur(10px) saturate(140%);opacity:0;transition:opacity 240ms ease-out}
+.pr .pr-capa-m.pr-on .pr-velo{opacity:1}
+.pr .pr-mo,.pr .pr-avp-cab,.pr .pr-avp-l,.pr .pr-avp-b{transition:transform 100ms ease-out}
+.pr .pr-mo:active,.pr .pr-avp-l:active,.pr .pr-avp-b:active{transform:scale(.97)}
+.pr .pr-mo:focus-visible,.pr .pr-avp-l:focus-visible,.pr .pr-avp-b:focus-visible{outline:3px solid var(--enlace);outline-offset:2px}
+.pr .pr-cons-b{width:100%}
+@media (prefers-reduced-motion:reduce){.pr .pr-mn,.pr .pr-capa-m.pr-on .pr-mn{transform:none;transition:opacity 200ms ease}.pr .pr-avp-pt::after{animation:none;opacity:0}.pr .pr-avp-ch{transition:none}}
+@media (prefers-reduced-transparency:reduce){.pr .pr-capa-m .pr-velo{backdrop-filter:none;-webkit-backdrop-filter:none;background:linear-gradient(var(--velo),var(--velo)),var(--velo)}}
 
 /* ===== PASADA DE UNIFICACIÓN (CALMA §11–§22). Va al final y manda sobre lo anterior. Prefijo .pr[data-vp] para ganar en especificidad. ===== */
 .pr[data-vp="iv"] .pr-app{flex-direction:column}
@@ -626,6 +711,23 @@
 /* Duo cerrado: «+ Agregar» baja a su propia línea en lugar de apretarse junto al rótulo */
 .pr[data-vp="ext"] .pr-gt{flex-wrap:wrap;row-gap:8px}
 .pr[data-vp="ext"] .pr-gt .pr-tonal{margin-left:-4px}
+/* ---- Pasada final: CALMA §26. En Duo cerrado ninguna capa es hoja inferior: tarjeta centrada en el área de contenido,
+   ancho máx. 310 con margen 8, alto máx. el del área − 32 con desplazamiento interno y pie fijo; nace del centro; sin asa ---- */
+.pr[data-vp="ext"] .pr-capa{padding:var(--it) calc(56px + var(--ir)) var(--ib) 0}
+.pr[data-vp="ext"] .pr-hoja{position:relative;left:auto;right:auto;bottom:auto;flex:none;width:310px;max-height:calc(100% - 32px);border-radius:20px;padding:12px 16px 0;opacity:0;transform:scale(.96);transition:transform 320ms cubic-bezier(.32,.72,0,1),opacity 200ms ease-out}
+.pr[data-vp="ext"] .pr-on .pr-hoja{opacity:1;transform:none}
+.pr[data-vp="ext"] .pr-asa{display:none}
+.pr[data-vp="ext"] .pr-hbt{position:sticky;bottom:0;z-index:1;margin-top:auto;padding:8px 0 16px;background:var(--fondo);display:flex;flex-direction:column-reverse;gap:8px}
+.pr[data-vp="ext"] .pr-hbt>*{width:100%}
+.pr[data-vp="ext"] .pr-alerta{width:310px}
+@media (prefers-reduced-motion:reduce){.pr[data-vp="ext"] .pr-hoja{transform:none;transition:opacity 200ms ease}}
+/* ---- Pasada final: cabecera como en el código (rótulo «Cuenta» + título), firma como primer bloque del grupo «Firma y logo»,
+   y en computadora la columna de apoyo solo en Datos ---- */
+.pr .pr-rotc{font-size:12px;line-height:16px;font-weight:600;letter-spacing:.3px;text-transform:uppercase;color:var(--tinta2);margin-bottom:2px}
+.pr[data-vp] .pr-filas .pr-sep.pr-sep0{border-top:0}
+.pr[data-vp] .pr-filas .pr-sep .pr-firma .pr-nota{margin-top:2px}
+.pr[data-vp="esc"]:not([data-tab="datos"]) .pr-cuerpo{grid-template-columns:minmax(0,1fr)}
+.pr[data-vp="esc"]:not([data-tab="datos"]) .pr-lado{display:none}
 </style>
 <div class="marco pr" lang="es" data-vp="ext" data-tab="datos" data-g="off" data-cl="n">
 <div class="pr-app">
@@ -633,9 +735,9 @@
   <header class="pr-cab">
     <!-- Función 1: título de la pantalla. (El esqueleto de carga y la pantalla «No se pudieron cargar tus datos. Revisa tu conexión e inténtalo de nuevo.» + «Reintentar»
          son estados de sistema: se conservan tal cual, no se dibujan aquí.) -->
-    <div class="pr-tit"><h1>Mi perfil</h1><p class="pr-sec"><span class="pr-a">Dr. Admin Semilla · administras Clínica Semilla A</span><span class="pr-i">Dra. Invitada Semilla · médica invitada en Clínica Semilla A</span></p></div>
+    <div class="pr-tit"><p class="pr-rotc">Cuenta</p><h1>Mi perfil</h1></div>
     <!-- Control SOLO de la maqueta -->
-    <div class="pr-maq"><button type="button" class="pr-p pr-demo pr-demo-rol" aria-pressed="false">Maqueta: ver como médico invitado</button></div>
+    <div class="pr-maq"><button type="button" class="pr-p pr-demo pr-demo-rol" aria-pressed="false">ver como médico invitado</button></div>
   </header>
   <!-- Función 3: pestañas Datos · Consultorios · Google Calendar. Texto con subrayado, fijas al desplazar. La pestaña activa sigue viviendo en la URL (?tab=),
        que es por donde llegan los enlaces de la agenda y del menú; ?gcal_error= abre Google Calendar. -->
@@ -685,9 +787,21 @@
       </div>
       <label class="pr-f"><span>Universidad / Institución</span><input type="text" class="pr-in" data-k="uni" data-s="Datos profesionales" value="" placeholder="Ej: Universidad Nacional Autónoma de México" autocomplete="off"></label></div><p class="pr-pieg">Aparecen en las recetas, solicitudes y documentos que emites.</p>
     </section>
-    <section class="pr-gr" aria-label="Firma">
-      <div class="pr-gt"><span class="pr-gtt"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19.5 8.5a2.1 2.1 0 0 0-3-3L5 17z"/><path d="m14.5 7.5 3 3"/></svg><h2>Firma autógrafa</h2></span></div>
-      <div class="pr-tar">
+    <section class="pr-gr" aria-label="Nombre de la clínica">
+      <div class="pr-gt"><span class="pr-gtt"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><circle cx="9" cy="10" r="1.6"/><path d="m5 18 5-4.5 3.5 3 2.5-2 3.5 3.5"/></svg><h2>Nombre de la clínica</h2></span></div>
+      <div class="pr-tar pr-filas">
+      <!-- Función 7: nombre de la clínica. Editable solo para quien administra; el resto lo ve en lectura con la nota. -->
+      <div class="pr-f pr-a"><span>Nombre de la clínica</span>
+        <input type="text" class="pr-in" data-k="clinica" data-s="Nombre de la clínica" value="Clínica Semilla A" placeholder="Ej: Clínica Ortointegra" maxlength="120" aria-label="Nombre de la clínica" autocomplete="off">
+        <span class="pr-err pr-err-cl" hidden>El nombre de la clínica no puede quedar vacío.</span>
+      </div>
+      <div class="pr-f pr-i"><span>Nombre de la clínica</span><div class="pr-lect">Clínica Semilla A</div></div></div><p class="pr-pieg">Es el nombre de la clínica, distinto al de cada consultorio.<span class="pr-i"> Sólo quien administra la clínica puede cambiarlo.</span></p>
+    </section>
+    <section class="pr-gr" aria-label="Firma y logo">
+      <div class="pr-gt"><span class="pr-gtt"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19.5 8.5a2.1 2.1 0 0 0-3-3L5 17z"/><path d="m14.5 7.5 3 3"/></svg><h2><span class="pr-a">Firma y logo</span><span class="pr-i">Firma</span></h2></span></div>
+      <div class="pr-tar pr-filas">
+      <div class="pr-sep pr-sep0">
+        <h3 class="pr-st">Firma autógrafa</h3>
       <!-- Función 8: subir imagen (JPG, PNG, WEBP hasta 10 MB) o dibujar con dedo o ratón; limpiar; vista previa sobre blanco y sobre oscuro; «Aceptar firma»;
            «Cambiar firma»; eliminar. En la maqueta, «Toca para seleccionar…» no abre el selector de archivos: pasa a la vista previa con una firma de muestra.
            El lienzo SÍ dibuja de verdad. Estados de sistema: «Procesando imagen…», «Procesando…», «Guardando…». -->
@@ -709,23 +823,11 @@
           <div class="pr-btns"><button type="button" class="pr-p pr-tonal pr-f-cambia">Cambiar firma</button><button type="button" class="pr-p pr-txt pr-rojo pr-f-elim"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 7h15M9.5 7V4.5h5V7M6.5 7l.8 12a1.5 1.5 0 0 0 1.5 1.5h6.4a1.5 1.5 0 0 0 1.5-1.5l.8-12M10 11v6M14 11v6"/></svg>Eliminar</button></div>
         </div>
         <p class="pr-nota">La firma se guarda en cuanto la capturas: no depende del botón de guardar.</p>
-      </div></div><p class="pr-pieg">Aparece encima de la línea punteada en todos los documentos PDF.</p>
-    </section>
-    <section class="pr-gr" aria-label="Clínica">
-      <div class="pr-gt"><span class="pr-gtt"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><circle cx="9" cy="10" r="1.6"/><path d="m5 18 5-4.5 3.5 3 2.5-2 3.5 3.5"/></svg><h2><span class="pr-a">Marca de la clínica</span><span class="pr-i">Clínica</span></h2></span></div>
-      <div class="pr-tar pr-filas">
-      <!-- Función 7: nombre de la clínica. Editable solo para quien administra; el resto lo ve en lectura con la nota. -->
-      <div class="pr-f pr-a"><span>Nombre de la clínica<i aria-hidden="true"> *</i></span>
-        <input type="text" class="pr-in" data-k="clinica" data-s="Nombre de la clínica" value="Clínica Semilla A" placeholder="Ej: Clínica Ortointegra" maxlength="120" aria-label="Nombre de la clínica" autocomplete="off">
-        <span class="pr-err pr-err-cl" hidden>El nombre de la clínica no puede quedar vacío.</span>
-        <span class="pr-ay">Es el nombre de la clínica, distinto al de cada consultorio.</span>
-      </div>
-      <div class="pr-f pr-i"><span>Nombre de la clínica</span><div class="pr-lect">Clínica Semilla A</div>
-        <span class="pr-ay">Es el nombre de la clínica, distinto al de cada consultorio. Sólo quien administra la clínica puede cambiarlo.</span></div>
+      </div>      </div>
       <!-- Función 9 (solo admin): logo. Subir / cambiar; «Descartar selección» solo sobre un archivo elegido sin guardar. Se sube al pulsar «Guardar».
            Conserva data-onboard="subir-logo": es el ancla del asistente de bienvenida. En la maqueta no se abre el selector de archivos: se usa un logo de muestra. -->
       <div class="pr-sep pr-a">
-        <h3 class="pr-st">Logo</h3>
+        <h3 class="pr-st">Logo del consultorio</h3>
         <div class="pr-logo-f">
           <span class="pr-logo-g" data-h="logog" aria-hidden="true"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15.5V4.5M7.5 8.5 12 4l4.5 4.5M4.5 15.5v3a1.5 1.5 0 0 0 1.5 1.5h12a1.5 1.5 0 0 0 1.5-1.5v-3"/></svg><svg aria-hidden="true" width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" hidden><circle cx="12" cy="12" r="9.5"/><path d="M12 5.5v13M9.6 8h4.8M9 11h6M9 14h6M9.6 17h4.8"/></svg></span>
           <div class="pr-logo-a">
@@ -743,14 +845,8 @@
           <div class="pr-f"><span>Color primario</span><div class="pr-color"><input type="color" value="#1a3a5c" data-c="p" aria-label="Color primario"><i class="pr-ip"></i><span data-h="hexp">#1a3a5c</span></div></div>
           <div class="pr-f"><span>Color secundario</span><div class="pr-color"><input type="color" value="#1e5fa8" data-c="s" aria-label="Color secundario"><i class="pr-is"></i><span data-h="hexs">#1e5fa8</span></div></div>
         </div>
-        <div class="pr-f"><span>Vista previa en la app</span>
-          <div class="pr-vapp" aria-hidden="true">
-            <div class="pr-vnav"><span><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Inicio</span><span><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.9.7 3.1 2.4 3.5 5.2"/></svg>Pacientes</span></div>
-            <div class="pr-vder"><span class="pr-vbtn"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>Guardar</span><span class="pr-ay">El menú usa el primario; los botones, el secundario.</span></div>
-          </div>
-        </div>
         <div class="pr-f pr-a">
-        <span>Vista previa del encabezado en PDF</span>
+        <span>Vista previa del encabezado en PDFs</span>
         <!-- Es papel: blanco también en modo oscuro (correcto). La «mesa» gris lo enmarca para que se entienda que es una hoja. -->
         <div class="pr-mesa" role="img" aria-label="Vista previa del encabezado de tus PDF sobre papel blanco">
           <div class="pr-papel">
@@ -760,9 +856,8 @@
             <div class="pr-pt"><i></i><i></i><i></i></div>
           </div>
         </div>
-        <span class="pr-ay">Así sale impreso: siempre sobre papel blanco.</span>
       </div>
-      </div></div><p class="pr-pieg"><span class="pr-a">Nombre, logo y colores. Los ve todo el equipo y salen en los documentos.</span></p>
+      </div></div><p class="pr-pieg">Se aplican en tus documentos y PDFs.</p>
     </section>
     <!-- Función 11: resumen de consultorios y de Google Calendar dentro de Datos, con enlaces a sus pestañas -->
     <section class="pr-gr" aria-label="Mis consultorios (resumen)">
@@ -770,7 +865,7 @@
       <div class="pr-tar">
       <ul class="pr-res pr-cnovacio"><li data-id="c1"><span class="pr-pin"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.4"/></svg></span><div class="pr-ct"><div class="pr-cn"><b data-c="n">Centro</b><span class="pr-chip pr-c-conf pr-c-plano pr-cdef">Predeterminado</span></div><span class="pr-cd pr-num" data-c="l">Calle Ficticia 1, Centro, Mérida · 999 000 0001 · UTC-6</span></div></li><li data-id="c2"><span class="pr-pin"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.4"/></svg></span><div class="pr-ct"><div class="pr-cn"><b data-c="n">Hosp Norte</b><span class="pr-chip pr-c-conf pr-c-plano pr-cdef" hidden>Predeterminado</span></div><span class="pr-cd pr-num" data-c="l">Avenida Ficticia 2, Norte, Mérida · 999 000 0002 · UTC-6</span></div></li><li data-id="c3"><span class="pr-pin"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.4"/></svg></span><div class="pr-ct"><div class="pr-cn"><b data-c="n">Rehab</b><span class="pr-chip pr-c-conf pr-c-plano pr-cdef" hidden>Predeterminado</span></div><span class="pr-cd pr-num" data-c="l">Calle Ficticia 3, Poniente, Mérida · 999 000 0003 · UTC-6</span></div></li></ul>
       <!-- Con más de 3, debajo va el enlace «Ver N consultorios más» (misma pestaña). -->
-      <p class="pr-nota pr-cvacio">No tienes consultorios activos. <a href="#" class="pr-p pr-txt pr-ir" data-ir="cons" style="display:inline-flex">Agrega el primero</a></p></div><p class="pr-pieg"><span class="pr-num"><span data-h="cuenta">3</span> de 10 activos</span></p>
+      <p class="pr-nota pr-cvacio">No tienes consultorios activos. <a href="#" class="pr-p pr-txt pr-ir" data-ir="cons" style="display:inline-flex">Agrega el primero</a></p></div>
     </section>
     <section class="pr-tar pr-gres" aria-label="Google Calendar (resumen)">
       <span class="pr-gic"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg></span>
@@ -780,7 +875,7 @@
     </div>
     <div class="pr-panel" data-panel="cons" role="tabpanel" aria-label="Consultorios" hidden>
     <!-- Control SOLO de la maqueta -->
-    <div class="pr-maq"><button type="button" class="pr-p pr-demo pr-demo-cl">Maqueta: cambiar lista (ahora: con consultorios)</button></div>
+    <div class="pr-maq"><button type="button" class="pr-p pr-demo pr-demo-cl">cambiar lista (ahora: con consultorios)</button></div>
     <!-- Función 13: lista, «Agregar consultorio» (deshabilitado al llegar al tope de 10), vacío «No tienes consultorios activos». Estado de sistema: esqueleto de 3 filas. -->
     <section class="pr-gr" aria-label="Mis consultorios">
       <div class="pr-gt"><span class="pr-gtt"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.4"/></svg><h2>Mis consultorios</h2></span><button type="button" class="pr-p pr-tonal pr-c-add" aria-label="Agregar consultorio"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>Agregar</button></div>
@@ -820,7 +915,7 @@
           </div>
           <p class="pr-cmot" hidden><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.7v.1"/></svg><span>Marca otro consultorio como predeterminado antes de borrar este.</span></p>
         </li>
-        <li class="pr-ctope"><p class="pr-nota">Maqueta: aquí seguirían los otros 7 consultorios.</p></li>
+        <!-- Con tope de 10 la lista sigue con los demás consultorios; aquí se dibujan tres. -->
       </ul>
       <div class="pr-vacio pr-cvacio"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.4"/></svg><b>No tienes consultorios activos.</b><button type="button" class="pr-p pr-tonal pr-c-add"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>Agregar el primero</button></div></div><p class="pr-pieg"><span class="pr-num"><span data-h="cuenta">3</span> de 10 activos · el predeterminado es el que se abre al iniciar sesión.</span></p>
     </section>
@@ -828,12 +923,12 @@
     </div>
     <div class="pr-panel" data-panel="google" role="tabpanel" aria-label="Google Calendar" hidden>
     <!-- Control SOLO de la maqueta: no se simula ninguna conexión real -->
-    <div class="pr-maq pr-a"><button type="button" class="pr-p pr-demo pr-demo-g">Maqueta: cambiar estado (ahora: sin conectar)</button></div>
+    <div class="pr-maq pr-a"><button type="button" class="pr-p pr-demo pr-demo-g">cambiar estado (ahora: sin conectar)</button></div>
     <!-- Función 16: conectar, estado y cuenta, «Recrear calendario» (con confirmación), «Desconectar»; para no admin, solo el mensaje.
          Estado de sistema «comprobando»: el chip es un esqueleto y no se enseñan acciones. -->
     <section class="pr-tar pr-a" aria-label="Google Calendar">
       <div class="pr-tcab" style="align-items:center"><span class="pr-gic"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg></span>
-        <div class="pr-th"><div class="pr-ghl"><h2>Google Calendar</h2><span class="pr-chip pr-c-neutro pr-goff">Sin conectar</span><span class="pr-chip pr-c-aten pr-gon">Conectado</span><span class="pr-chip pr-c-ag pr-gerr">Sin respuesta</span></div><p class="pr-sub"><span class="pr-goff">Conecta una cuenta para sincronizar tus citas.</span><span class="pr-gon">Sincronización activa: las citas se crean automáticamente.</span><span class="pr-gerr">No se pudo comprobar la conexión.</span></p></div></div>
+        <div class="pr-th"><div class="pr-ghl"><h2>Google Calendar</h2><span class="pr-chip pr-c-neutro pr-goff">Sin conectar</span><span class="pr-chip pr-c-aten pr-gon">Conectado</span><span class="pr-chip pr-c-ag pr-gerr">Sin respuesta</span></div><p class="pr-sub"><span class="pr-goff">Conecta una cuenta para sincronizar tus citas.</span><span class="pr-gon">Sincronización activa — las citas se crean automáticamente.</span><span class="pr-gerr">No se pudo comprobar la conexión.</span></p></div></div>
       <div class="pr-gerr pr-vacio"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18M8.5 16a5 5 0 0 1 7 0M5.3 12.5a9 9 0 0 1 3.2-2M18.7 12.5a9 9 0 0 0-4.9-2.4M2.5 9a14 14 0 0 1 3.3-2.3M21.5 9a14 14 0 0 0-10.7-3.9M12 19.5v.1"/></svg><span>Google no respondió. Tu conexión sigue guardada; no hace falta que la rehagas.</span><button type="button" class="pr-p pr-tonal pr-g-reint"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.6-5.9M20 4.5V9h-4.5"/></svg>Reintentar</button></div>
       <div class="pr-gnoerr">
         <div class="pr-dato"><span class="pr-sub">Calendario</span><b><span class="pr-goff">—</span><span class="pr-gon">Spinus - Dr. Admin Semilla</span></b></div>
@@ -862,7 +957,7 @@
         <!-- A0-9: Modo claro / oscuro. En la maqueta el interruptor solo cambia su propio estado; el tema se prueba con los botones «Claro / Oscuro» de la página. -->
         <li><button type="button" role="switch" aria-checked="false" class="pr-ajf pr-sw-b"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg><span class="pr-flex">Modo oscuro</span><span class="pr-sw" aria-hidden="true"></span></button></li>
         <!-- A0-12: Aviso de Privacidad (pestaña nueva) -->
-        <li><a href="#" class="pr-p pr-ajf"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5 5 6v5.5c0 4.3 2.9 7.4 7 9 4.1-1.6 7-4.7 7-9V6z"/><path d="m9.3 12 1.9 1.9 3.6-3.8"/></svg><span class="pr-flex">Aviso de privacidad<small>Se abre en una pestaña nueva</small></span><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color:var(--tinta3)"><path d="M13.5 5H19v5.5M19 5l-8 8M10 6.5H6.5A1.5 1.5 0 0 0 5 8v9.5A1.5 1.5 0 0 0 6.5 19H16a1.5 1.5 0 0 0 1.5-1.5V14"/></svg></a></li>
+        <li><a href="#" class="pr-p pr-ajf"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5 5 6v5.5c0 4.3 2.9 7.4 7 9 4.1-1.6 7-4.7 7-9V6z"/><path d="m9.3 12 1.9 1.9 3.6-3.8"/></svg><span class="pr-flex">Aviso de Privacidad</span><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color:var(--tinta3)"><path d="M13.5 5H19v5.5M19 5l-8 8M10 6.5H6.5A1.5 1.5 0 0 0 5 8v9.5A1.5 1.5 0 0 0 6.5 19H16a1.5 1.5 0 0 0 1.5-1.5V14"/></svg></a></li>
         <!-- A0-10: Cerrar sesión -->
         <li><button type="button" class="pr-p pr-ajf pr-rojo"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4.5H18a1.5 1.5 0 0 1 1.5 1.5v12a1.5 1.5 0 0 1-1.5 1.5h-3.5M10.5 16l4-4-4-4M14.5 12h-10"/></svg><span class="pr-flex">Cerrar sesión</span></button></li>
       </ul></div>
@@ -873,7 +968,7 @@
   <!-- Función 18: el asistente de bienvenida (OnboardingGuide) sigue montado en esta pantalla como capa flotante global; su ancla data-onboard="subir-logo" se conserva en el botón del logo. -->
 </main><!-- A0 · navegación. Riel a la derecha, fundido con la franja del sistema. «Mi perfil» vive en «Más». -->
 <nav class="pr-riel" aria-label="Navegación principal">
-  <a href="#" class="pr-p pr-rb" aria-label="Inicio"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg></a><a href="#" class="pr-p pr-rb" aria-label="Expediente"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.9.7 3.1 2.4 3.5 5.2"/></svg></a><a href="#" class="pr-p pr-rb" aria-label="Agenda"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg></a><a href="#" class="pr-p pr-rb" aria-label="Documentos"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg></a><a href="#" class="pr-p pr-rb" aria-label="Más: Mi perfil" aria-current="page"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 12h.01M12 12h.01M18 12h.01"/></svg></a>
+  <a href="#" class="pr-p pr-rb" aria-label="Inicio"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg></a><a href="#" class="pr-p pr-rb" aria-label="Expediente"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.9.7 3.1 2.4 3.5 5.2"/></svg></a><a href="#" class="pr-p pr-rb" aria-label="Agenda"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg></a><a href="#" class="pr-p pr-rb" aria-label="Documentos"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg></a><button type="button" class="pr-p pr-rb" aria-label="Más" aria-current="page" data-abre-mas><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 12h.01M12 12h.01M18 12h.01"/></svg><span class="pr-bdg pr-m" aria-hidden="true">3</span></button>
   <span class="pr-flex"></span>
   <button type="button" class="pr-p pr-mas" aria-label="Nueva consulta"><svg aria-hidden="true" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg></button>
 </nav>
@@ -936,12 +1031,34 @@
     <div class="pr-abt pr-par"><button type="button" class="pr-p pr-quieto pr-cierra">Cancelar</button><button type="button" class="pr-p pr-pel pr-r-si">Sí, recrear</button></div>
   </div>
 </div>
+<!-- Menú «Más» (CALMA §28): tarjeta centrada con velo (aviso, consultorio activo, Administración, Mi perfil, Ayuda). -->
+<div class="pr-capa-m" aria-hidden="true">
+  <div class="pr-velo"></div>
+  <div class="pr-mnw"><div class="pr-mn" role="dialog" aria-modal="true" aria-label="Más">
+    <h2 class="pr-mn-t">Más</h2>
+      <div class="pr-avp pr-m" role="status" aria-live="polite">
+    <button type="button" class="pr-p pr-avp-cab" aria-expanded="true" aria-controls="pr-av-ext-mas">
+      <span class="pr-avp-pt" aria-hidden="true"></span><span class="pr-avp-t">3 datos pendientes</span><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="pr-avp-ch"><path d="m18 15-6-6-6 6"/></svg>
+    </button>
+    <div class="pr-avp-c" id="pr-av-ext-mas">
+      <span class="pr-avp-sep" aria-hidden="true"></span>
+      <a href="#" class="pr-p pr-avp-l" data-k="firma"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.4 3.6a2.1 2.1 0 0 1 3 3L7.4 18.6a2 2 0 0 1-.9.5l-2.9.8a.5.5 0 0 1-.6-.6l.8-2.9a2 2 0 0 1 .5-.9z"/></svg><span>Documentos sin firma</span></a><a href="#" class="pr-p pr-avp-l" data-k="cedula"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22h6a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v3"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><circle cx="5" cy="14" r="3"/><path d="M7 16.5 8 22l-3-1-3 1 1-5.5"/></svg><span>Sin cédula de especialidad</span></a><a href="#" class="pr-p pr-avp-l" data-k="logo"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></svg><span>Clínica sin logo</span></a>
+      <a href="#" class="pr-p pr-avp-b">Completar ahora<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg></a>
+    </div>
+  </div>
+    <!-- Selector de consultorio activo (A0·2): en Duo cerrado no hay barra lateral, así que vive aquí; solo médico con 2 o más consultorios. Ver vista 2. -->
+    <button type="button" class="pr-p pr-mo pr-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 9 4-4 4 4M8 15l4 4 4-4"/></svg><span>Consultorio activo</span><span class="pr-mo-v">Centro</span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="pr-mo-f"><path d="m9 6 6 6-6 6"/></svg></button>
+    <a href="#" class="pr-p pr-mo pr-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20v-8M12 20V5M19 20v-9"/></svg><span>Administración</span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="pr-mo-f"><path d="m9 6 6 6-6 6"/></svg></a><a href="#" class="pr-p pr-mo pr-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18.2c1.3-2 3.2-3 5.5-3s4.2 1 5.5 3"/></svg><span>Mi perfil</span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="pr-mo-f"><path d="m9 6 6 6-6 6"/></svg></a><a href="#" class="pr-p pr-mo pr-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.6M12 17h.01"/></svg><span>Ayuda</span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="pr-mo-f"><path d="m9 6 6 6-6 6"/></svg></a>
+    <!-- Secretaria (CALMA db28): sin Mi perfil; en «Más» encuentra sus «Ajustes» -->
+    <div class="pr-s"><button type="button" class="pr-p pr-mo pr-tema"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg><span>Modo oscuro</span></button><a href="#" class="pr-p pr-mo"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21c-4.5-2.2-7-5.6-7-10V5.5L12 3l7 2.5V11c0 4.4-2.5 7.8-7 10z"/></svg><span>Aviso de Privacidad</span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="pr-mo-f"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg></a><button type="button" class="pr-p pr-mo pr-salir"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4"/></svg><span>Cerrar sesión</span></button></div>
+  </div></div>
+</div>
 </div>
 <div class="marco pr" lang="es" data-vp="tel" data-tab="datos" data-g="off" data-cl="n">
 <div class="pr-app">
 <!-- A0 · navegación. Encabezado fundido con la barra de estado. «Mi perfil» se abre desde el menú o el avatar. -->
 <header class="pr-enc">
-  <button type="button" class="pr-p pr-menu" aria-label="Menú"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+  <button type="button" class="pr-p pr-menu" aria-label="Menú"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg><span class="pr-bdg pr-m" aria-hidden="true">3</span></button>
   <span class="pr-enc-t">Cuenta</span>
   <span class="pr-flex"></span>
   <button type="button" class="pr-p pr-av pr-av-g" aria-label="Mi perfil" aria-current="page"><span class="pr-a">AS</span><span class="pr-i">IS</span></button>
@@ -949,9 +1066,9 @@
   <header class="pr-cab">
     <!-- Función 1: título de la pantalla. (El esqueleto de carga y la pantalla «No se pudieron cargar tus datos. Revisa tu conexión e inténtalo de nuevo.» + «Reintentar»
          son estados de sistema: se conservan tal cual, no se dibujan aquí.) -->
-    <div class="pr-tit"><h1>Mi perfil</h1><p class="pr-sec"><span class="pr-a">Dr. Admin Semilla · administras Clínica Semilla A</span><span class="pr-i">Dra. Invitada Semilla · médica invitada en Clínica Semilla A</span></p></div>
+    <div class="pr-tit"><p class="pr-rotc">Cuenta</p><h1>Mi perfil</h1></div>
     <!-- Control SOLO de la maqueta -->
-    <div class="pr-maq"><button type="button" class="pr-p pr-demo pr-demo-rol" aria-pressed="false">Maqueta: ver como médico invitado</button></div>
+    <div class="pr-maq"><button type="button" class="pr-p pr-demo pr-demo-rol" aria-pressed="false">ver como médico invitado</button></div>
   </header>
   <!-- Función 3: pestañas Datos · Consultorios · Google Calendar. Texto con subrayado, fijas al desplazar. La pestaña activa sigue viviendo en la URL (?tab=),
        que es por donde llegan los enlaces de la agenda y del menú; ?gcal_error= abre Google Calendar. -->
@@ -1001,9 +1118,21 @@
       </div>
       <label class="pr-f"><span>Universidad / Institución</span><input type="text" class="pr-in" data-k="uni" data-s="Datos profesionales" value="" placeholder="Ej: Universidad Nacional Autónoma de México" autocomplete="off"></label></div><p class="pr-pieg">Aparecen en las recetas, solicitudes y documentos que emites.</p>
     </section>
-    <section class="pr-gr" aria-label="Firma">
-      <div class="pr-gt"><span class="pr-gtt"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19.5 8.5a2.1 2.1 0 0 0-3-3L5 17z"/><path d="m14.5 7.5 3 3"/></svg><h2>Firma autógrafa</h2></span></div>
-      <div class="pr-tar">
+    <section class="pr-gr" aria-label="Nombre de la clínica">
+      <div class="pr-gt"><span class="pr-gtt"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><circle cx="9" cy="10" r="1.6"/><path d="m5 18 5-4.5 3.5 3 2.5-2 3.5 3.5"/></svg><h2>Nombre de la clínica</h2></span></div>
+      <div class="pr-tar pr-filas">
+      <!-- Función 7: nombre de la clínica. Editable solo para quien administra; el resto lo ve en lectura con la nota. -->
+      <div class="pr-f pr-a"><span>Nombre de la clínica</span>
+        <input type="text" class="pr-in" data-k="clinica" data-s="Nombre de la clínica" value="Clínica Semilla A" placeholder="Ej: Clínica Ortointegra" maxlength="120" aria-label="Nombre de la clínica" autocomplete="off">
+        <span class="pr-err pr-err-cl" hidden>El nombre de la clínica no puede quedar vacío.</span>
+      </div>
+      <div class="pr-f pr-i"><span>Nombre de la clínica</span><div class="pr-lect">Clínica Semilla A</div></div></div><p class="pr-pieg">Es el nombre de la clínica, distinto al de cada consultorio.<span class="pr-i"> Sólo quien administra la clínica puede cambiarlo.</span></p>
+    </section>
+    <section class="pr-gr" aria-label="Firma y logo">
+      <div class="pr-gt"><span class="pr-gtt"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19.5 8.5a2.1 2.1 0 0 0-3-3L5 17z"/><path d="m14.5 7.5 3 3"/></svg><h2><span class="pr-a">Firma y logo</span><span class="pr-i">Firma</span></h2></span></div>
+      <div class="pr-tar pr-filas">
+      <div class="pr-sep pr-sep0">
+        <h3 class="pr-st">Firma autógrafa</h3>
       <!-- Función 8: subir imagen (JPG, PNG, WEBP hasta 10 MB) o dibujar con dedo o ratón; limpiar; vista previa sobre blanco y sobre oscuro; «Aceptar firma»;
            «Cambiar firma»; eliminar. En la maqueta, «Toca para seleccionar…» no abre el selector de archivos: pasa a la vista previa con una firma de muestra.
            El lienzo SÍ dibuja de verdad. Estados de sistema: «Procesando imagen…», «Procesando…», «Guardando…». -->
@@ -1025,23 +1154,11 @@
           <div class="pr-btns"><button type="button" class="pr-p pr-tonal pr-f-cambia">Cambiar firma</button><button type="button" class="pr-p pr-txt pr-rojo pr-f-elim"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 7h15M9.5 7V4.5h5V7M6.5 7l.8 12a1.5 1.5 0 0 0 1.5 1.5h6.4a1.5 1.5 0 0 0 1.5-1.5l.8-12M10 11v6M14 11v6"/></svg>Eliminar</button></div>
         </div>
         <p class="pr-nota">La firma se guarda en cuanto la capturas: no depende del botón de guardar.</p>
-      </div></div><p class="pr-pieg">Aparece encima de la línea punteada en todos los documentos PDF.</p>
-    </section>
-    <section class="pr-gr" aria-label="Clínica">
-      <div class="pr-gt"><span class="pr-gtt"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><circle cx="9" cy="10" r="1.6"/><path d="m5 18 5-4.5 3.5 3 2.5-2 3.5 3.5"/></svg><h2><span class="pr-a">Marca de la clínica</span><span class="pr-i">Clínica</span></h2></span></div>
-      <div class="pr-tar pr-filas">
-      <!-- Función 7: nombre de la clínica. Editable solo para quien administra; el resto lo ve en lectura con la nota. -->
-      <div class="pr-f pr-a"><span>Nombre de la clínica<i aria-hidden="true"> *</i></span>
-        <input type="text" class="pr-in" data-k="clinica" data-s="Nombre de la clínica" value="Clínica Semilla A" placeholder="Ej: Clínica Ortointegra" maxlength="120" aria-label="Nombre de la clínica" autocomplete="off">
-        <span class="pr-err pr-err-cl" hidden>El nombre de la clínica no puede quedar vacío.</span>
-        <span class="pr-ay">Es el nombre de la clínica, distinto al de cada consultorio.</span>
-      </div>
-      <div class="pr-f pr-i"><span>Nombre de la clínica</span><div class="pr-lect">Clínica Semilla A</div>
-        <span class="pr-ay">Es el nombre de la clínica, distinto al de cada consultorio. Sólo quien administra la clínica puede cambiarlo.</span></div>
+      </div>      </div>
       <!-- Función 9 (solo admin): logo. Subir / cambiar; «Descartar selección» solo sobre un archivo elegido sin guardar. Se sube al pulsar «Guardar».
            Conserva data-onboard="subir-logo": es el ancla del asistente de bienvenida. En la maqueta no se abre el selector de archivos: se usa un logo de muestra. -->
       <div class="pr-sep pr-a">
-        <h3 class="pr-st">Logo</h3>
+        <h3 class="pr-st">Logo del consultorio</h3>
         <div class="pr-logo-f">
           <span class="pr-logo-g" data-h="logog" aria-hidden="true"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15.5V4.5M7.5 8.5 12 4l4.5 4.5M4.5 15.5v3a1.5 1.5 0 0 0 1.5 1.5h12a1.5 1.5 0 0 0 1.5-1.5v-3"/></svg><svg aria-hidden="true" width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" hidden><circle cx="12" cy="12" r="9.5"/><path d="M12 5.5v13M9.6 8h4.8M9 11h6M9 14h6M9.6 17h4.8"/></svg></span>
           <div class="pr-logo-a">
@@ -1059,14 +1176,8 @@
           <div class="pr-f"><span>Color primario</span><div class="pr-color"><input type="color" value="#1a3a5c" data-c="p" aria-label="Color primario"><i class="pr-ip"></i><span data-h="hexp">#1a3a5c</span></div></div>
           <div class="pr-f"><span>Color secundario</span><div class="pr-color"><input type="color" value="#1e5fa8" data-c="s" aria-label="Color secundario"><i class="pr-is"></i><span data-h="hexs">#1e5fa8</span></div></div>
         </div>
-        <div class="pr-f"><span>Vista previa en la app</span>
-          <div class="pr-vapp" aria-hidden="true">
-            <div class="pr-vnav"><span><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Inicio</span><span><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.9.7 3.1 2.4 3.5 5.2"/></svg>Pacientes</span></div>
-            <div class="pr-vder"><span class="pr-vbtn"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>Guardar</span><span class="pr-ay">El menú usa el primario; los botones, el secundario.</span></div>
-          </div>
-        </div>
         <div class="pr-f pr-a">
-        <span>Vista previa del encabezado en PDF</span>
+        <span>Vista previa del encabezado en PDFs</span>
         <!-- Es papel: blanco también en modo oscuro (correcto). La «mesa» gris lo enmarca para que se entienda que es una hoja. -->
         <div class="pr-mesa" role="img" aria-label="Vista previa del encabezado de tus PDF sobre papel blanco">
           <div class="pr-papel">
@@ -1076,9 +1187,8 @@
             <div class="pr-pt"><i></i><i></i><i></i></div>
           </div>
         </div>
-        <span class="pr-ay">Así sale impreso: siempre sobre papel blanco.</span>
       </div>
-      </div></div><p class="pr-pieg"><span class="pr-a">Nombre, logo y colores. Los ve todo el equipo y salen en los documentos.</span></p>
+      </div></div><p class="pr-pieg">Se aplican en tus documentos y PDFs.</p>
     </section>
     <!-- Función 11: resumen de consultorios y de Google Calendar dentro de Datos, con enlaces a sus pestañas -->
     <section class="pr-gr" aria-label="Mis consultorios (resumen)">
@@ -1086,7 +1196,7 @@
       <div class="pr-tar">
       <ul class="pr-res pr-cnovacio"><li data-id="c1"><span class="pr-pin"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.4"/></svg></span><div class="pr-ct"><div class="pr-cn"><b data-c="n">Centro</b><span class="pr-chip pr-c-conf pr-c-plano pr-cdef">Predeterminado</span></div><span class="pr-cd pr-num" data-c="l">Calle Ficticia 1, Centro, Mérida · 999 000 0001 · UTC-6</span></div></li><li data-id="c2"><span class="pr-pin"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.4"/></svg></span><div class="pr-ct"><div class="pr-cn"><b data-c="n">Hosp Norte</b><span class="pr-chip pr-c-conf pr-c-plano pr-cdef" hidden>Predeterminado</span></div><span class="pr-cd pr-num" data-c="l">Avenida Ficticia 2, Norte, Mérida · 999 000 0002 · UTC-6</span></div></li><li data-id="c3"><span class="pr-pin"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.4"/></svg></span><div class="pr-ct"><div class="pr-cn"><b data-c="n">Rehab</b><span class="pr-chip pr-c-conf pr-c-plano pr-cdef" hidden>Predeterminado</span></div><span class="pr-cd pr-num" data-c="l">Calle Ficticia 3, Poniente, Mérida · 999 000 0003 · UTC-6</span></div></li></ul>
       <!-- Con más de 3, debajo va el enlace «Ver N consultorios más» (misma pestaña). -->
-      <p class="pr-nota pr-cvacio">No tienes consultorios activos. <a href="#" class="pr-p pr-txt pr-ir" data-ir="cons" style="display:inline-flex">Agrega el primero</a></p></div><p class="pr-pieg"><span class="pr-num"><span data-h="cuenta">3</span> de 10 activos</span></p>
+      <p class="pr-nota pr-cvacio">No tienes consultorios activos. <a href="#" class="pr-p pr-txt pr-ir" data-ir="cons" style="display:inline-flex">Agrega el primero</a></p></div>
     </section>
     <section class="pr-tar pr-gres" aria-label="Google Calendar (resumen)">
       <span class="pr-gic"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg></span>
@@ -1096,7 +1206,7 @@
     </div>
     <div class="pr-panel" data-panel="cons" role="tabpanel" aria-label="Consultorios" hidden>
     <!-- Control SOLO de la maqueta -->
-    <div class="pr-maq"><button type="button" class="pr-p pr-demo pr-demo-cl">Maqueta: cambiar lista (ahora: con consultorios)</button></div>
+    <div class="pr-maq"><button type="button" class="pr-p pr-demo pr-demo-cl">cambiar lista (ahora: con consultorios)</button></div>
     <!-- Función 13: lista, «Agregar consultorio» (deshabilitado al llegar al tope de 10), vacío «No tienes consultorios activos». Estado de sistema: esqueleto de 3 filas. -->
     <section class="pr-gr" aria-label="Mis consultorios">
       <div class="pr-gt"><span class="pr-gtt"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.4"/></svg><h2>Mis consultorios</h2></span><button type="button" class="pr-p pr-tonal pr-c-add" aria-label="Agregar consultorio"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>Agregar</button></div>
@@ -1136,7 +1246,7 @@
           </div>
           <p class="pr-cmot" hidden><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.7v.1"/></svg><span>Marca otro consultorio como predeterminado antes de borrar este.</span></p>
         </li>
-        <li class="pr-ctope"><p class="pr-nota">Maqueta: aquí seguirían los otros 7 consultorios.</p></li>
+        <!-- Con tope de 10 la lista sigue con los demás consultorios; aquí se dibujan tres. -->
       </ul>
       <div class="pr-vacio pr-cvacio"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.4"/></svg><b>No tienes consultorios activos.</b><button type="button" class="pr-p pr-tonal pr-c-add"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>Agregar el primero</button></div></div><p class="pr-pieg"><span class="pr-num"><span data-h="cuenta">3</span> de 10 activos · el predeterminado es el que se abre al iniciar sesión.</span></p>
     </section>
@@ -1144,12 +1254,12 @@
     </div>
     <div class="pr-panel" data-panel="google" role="tabpanel" aria-label="Google Calendar" hidden>
     <!-- Control SOLO de la maqueta: no se simula ninguna conexión real -->
-    <div class="pr-maq pr-a"><button type="button" class="pr-p pr-demo pr-demo-g">Maqueta: cambiar estado (ahora: sin conectar)</button></div>
+    <div class="pr-maq pr-a"><button type="button" class="pr-p pr-demo pr-demo-g">cambiar estado (ahora: sin conectar)</button></div>
     <!-- Función 16: conectar, estado y cuenta, «Recrear calendario» (con confirmación), «Desconectar»; para no admin, solo el mensaje.
          Estado de sistema «comprobando»: el chip es un esqueleto y no se enseñan acciones. -->
     <section class="pr-tar pr-a" aria-label="Google Calendar">
       <div class="pr-tcab" style="align-items:center"><span class="pr-gic"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg></span>
-        <div class="pr-th"><div class="pr-ghl"><h2>Google Calendar</h2><span class="pr-chip pr-c-neutro pr-goff">Sin conectar</span><span class="pr-chip pr-c-aten pr-gon">Conectado</span><span class="pr-chip pr-c-ag pr-gerr">Sin respuesta</span></div><p class="pr-sub"><span class="pr-goff">Conecta una cuenta para sincronizar tus citas.</span><span class="pr-gon">Sincronización activa: las citas se crean automáticamente.</span><span class="pr-gerr">No se pudo comprobar la conexión.</span></p></div></div>
+        <div class="pr-th"><div class="pr-ghl"><h2>Google Calendar</h2><span class="pr-chip pr-c-neutro pr-goff">Sin conectar</span><span class="pr-chip pr-c-aten pr-gon">Conectado</span><span class="pr-chip pr-c-ag pr-gerr">Sin respuesta</span></div><p class="pr-sub"><span class="pr-goff">Conecta una cuenta para sincronizar tus citas.</span><span class="pr-gon">Sincronización activa — las citas se crean automáticamente.</span><span class="pr-gerr">No se pudo comprobar la conexión.</span></p></div></div>
       <div class="pr-gerr pr-vacio"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18M8.5 16a5 5 0 0 1 7 0M5.3 12.5a9 9 0 0 1 3.2-2M18.7 12.5a9 9 0 0 0-4.9-2.4M2.5 9a14 14 0 0 1 3.3-2.3M21.5 9a14 14 0 0 0-10.7-3.9M12 19.5v.1"/></svg><span>Google no respondió. Tu conexión sigue guardada; no hace falta que la rehagas.</span><button type="button" class="pr-p pr-tonal pr-g-reint"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.6-5.9M20 4.5V9h-4.5"/></svg>Reintentar</button></div>
       <div class="pr-gnoerr">
         <div class="pr-dato"><span class="pr-sub">Calendario</span><b><span class="pr-goff">—</span><span class="pr-gon">Spinus - Dr. Admin Semilla</span></b></div>
@@ -1178,7 +1288,7 @@
         <!-- A0-9: Modo claro / oscuro. En la maqueta el interruptor solo cambia su propio estado; el tema se prueba con los botones «Claro / Oscuro» de la página. -->
         <li><button type="button" role="switch" aria-checked="false" class="pr-ajf pr-sw-b"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg><span class="pr-flex">Modo oscuro</span><span class="pr-sw" aria-hidden="true"></span></button></li>
         <!-- A0-12: Aviso de Privacidad (pestaña nueva) -->
-        <li><a href="#" class="pr-p pr-ajf"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5 5 6v5.5c0 4.3 2.9 7.4 7 9 4.1-1.6 7-4.7 7-9V6z"/><path d="m9.3 12 1.9 1.9 3.6-3.8"/></svg><span class="pr-flex">Aviso de privacidad<small>Se abre en una pestaña nueva</small></span><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color:var(--tinta3)"><path d="M13.5 5H19v5.5M19 5l-8 8M10 6.5H6.5A1.5 1.5 0 0 0 5 8v9.5A1.5 1.5 0 0 0 6.5 19H16a1.5 1.5 0 0 0 1.5-1.5V14"/></svg></a></li>
+        <li><a href="#" class="pr-p pr-ajf"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5 5 6v5.5c0 4.3 2.9 7.4 7 9 4.1-1.6 7-4.7 7-9V6z"/><path d="m9.3 12 1.9 1.9 3.6-3.8"/></svg><span class="pr-flex">Aviso de Privacidad</span><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color:var(--tinta3)"><path d="M13.5 5H19v5.5M19 5l-8 8M10 6.5H6.5A1.5 1.5 0 0 0 5 8v9.5A1.5 1.5 0 0 0 6.5 19H16a1.5 1.5 0 0 0 1.5-1.5V14"/></svg></a></li>
         <!-- A0-10: Cerrar sesión -->
         <li><button type="button" class="pr-p pr-ajf pr-rojo"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4.5H18a1.5 1.5 0 0 1 1.5 1.5v12a1.5 1.5 0 0 1-1.5 1.5h-3.5M10.5 16l4-4-4-4M14.5 12h-10"/></svg><span class="pr-flex">Cerrar sesión</span></button></li>
       </ul></div>
@@ -1247,6 +1357,7 @@
     <div class="pr-abt pr-par"><button type="button" class="pr-p pr-quieto pr-cierra">Cancelar</button><button type="button" class="pr-p pr-pel pr-r-si">Sí, recrear</button></div>
   </div>
 </div>
+
 </div>
 <div class="marco pr" lang="es" data-vp="ih" data-tab="datos" data-g="off" data-cl="n">
 <div class="pr-app">
@@ -1254,9 +1365,9 @@
   <header class="pr-cab">
     <!-- Función 1: título de la pantalla. (El esqueleto de carga y la pantalla «No se pudieron cargar tus datos. Revisa tu conexión e inténtalo de nuevo.» + «Reintentar»
          son estados de sistema: se conservan tal cual, no se dibujan aquí.) -->
-    <div class="pr-tit"><h1>Mi perfil</h1><p class="pr-sec"><span class="pr-a">Dr. Admin Semilla · administras Clínica Semilla A</span><span class="pr-i">Dra. Invitada Semilla · médica invitada en Clínica Semilla A</span></p></div>
+    <div class="pr-tit"><p class="pr-rotc">Cuenta</p><h1>Mi perfil</h1></div>
     <!-- Control SOLO de la maqueta -->
-    <div class="pr-maq"><button type="button" class="pr-p pr-demo pr-demo-rol" aria-pressed="false">Maqueta: ver como médico invitado</button></div>
+    <div class="pr-maq"><button type="button" class="pr-p pr-demo pr-demo-rol" aria-pressed="false">ver como médico invitado</button></div>
   </header>
   <!-- Función 3: pestañas Datos · Consultorios · Google Calendar. Texto con subrayado, fijas al desplazar. La pestaña activa sigue viviendo en la URL (?tab=),
        que es por donde llegan los enlaces de la agenda y del menú; ?gcal_error= abre Google Calendar. -->
@@ -1306,9 +1417,21 @@
       </div>
       <label class="pr-f"><span>Universidad / Institución</span><input type="text" class="pr-in" data-k="uni" data-s="Datos profesionales" value="" placeholder="Ej: Universidad Nacional Autónoma de México" autocomplete="off"></label></div><p class="pr-pieg">Aparecen en las recetas, solicitudes y documentos que emites.</p>
     </section>
-    <section class="pr-gr" aria-label="Firma">
-      <div class="pr-gt"><span class="pr-gtt"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19.5 8.5a2.1 2.1 0 0 0-3-3L5 17z"/><path d="m14.5 7.5 3 3"/></svg><h2>Firma autógrafa</h2></span></div>
-      <div class="pr-tar">
+    <section class="pr-gr" aria-label="Nombre de la clínica">
+      <div class="pr-gt"><span class="pr-gtt"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><circle cx="9" cy="10" r="1.6"/><path d="m5 18 5-4.5 3.5 3 2.5-2 3.5 3.5"/></svg><h2>Nombre de la clínica</h2></span></div>
+      <div class="pr-tar pr-filas">
+      <!-- Función 7: nombre de la clínica. Editable solo para quien administra; el resto lo ve en lectura con la nota. -->
+      <div class="pr-f pr-a"><span>Nombre de la clínica</span>
+        <input type="text" class="pr-in" data-k="clinica" data-s="Nombre de la clínica" value="Clínica Semilla A" placeholder="Ej: Clínica Ortointegra" maxlength="120" aria-label="Nombre de la clínica" autocomplete="off">
+        <span class="pr-err pr-err-cl" hidden>El nombre de la clínica no puede quedar vacío.</span>
+      </div>
+      <div class="pr-f pr-i"><span>Nombre de la clínica</span><div class="pr-lect">Clínica Semilla A</div></div></div><p class="pr-pieg">Es el nombre de la clínica, distinto al de cada consultorio.<span class="pr-i"> Sólo quien administra la clínica puede cambiarlo.</span></p>
+    </section>
+    <section class="pr-gr" aria-label="Firma y logo">
+      <div class="pr-gt"><span class="pr-gtt"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19.5 8.5a2.1 2.1 0 0 0-3-3L5 17z"/><path d="m14.5 7.5 3 3"/></svg><h2><span class="pr-a">Firma y logo</span><span class="pr-i">Firma</span></h2></span></div>
+      <div class="pr-tar pr-filas">
+      <div class="pr-sep pr-sep0">
+        <h3 class="pr-st">Firma autógrafa</h3>
       <!-- Función 8: subir imagen (JPG, PNG, WEBP hasta 10 MB) o dibujar con dedo o ratón; limpiar; vista previa sobre blanco y sobre oscuro; «Aceptar firma»;
            «Cambiar firma»; eliminar. En la maqueta, «Toca para seleccionar…» no abre el selector de archivos: pasa a la vista previa con una firma de muestra.
            El lienzo SÍ dibuja de verdad. Estados de sistema: «Procesando imagen…», «Procesando…», «Guardando…». -->
@@ -1330,23 +1453,11 @@
           <div class="pr-btns"><button type="button" class="pr-p pr-tonal pr-f-cambia">Cambiar firma</button><button type="button" class="pr-p pr-txt pr-rojo pr-f-elim"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 7h15M9.5 7V4.5h5V7M6.5 7l.8 12a1.5 1.5 0 0 0 1.5 1.5h6.4a1.5 1.5 0 0 0 1.5-1.5l.8-12M10 11v6M14 11v6"/></svg>Eliminar</button></div>
         </div>
         <p class="pr-nota">La firma se guarda en cuanto la capturas: no depende del botón de guardar.</p>
-      </div></div><p class="pr-pieg">Aparece encima de la línea punteada en todos los documentos PDF.</p>
-    </section>
-    <section class="pr-gr" aria-label="Clínica">
-      <div class="pr-gt"><span class="pr-gtt"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><circle cx="9" cy="10" r="1.6"/><path d="m5 18 5-4.5 3.5 3 2.5-2 3.5 3.5"/></svg><h2><span class="pr-a">Marca de la clínica</span><span class="pr-i">Clínica</span></h2></span></div>
-      <div class="pr-tar pr-filas">
-      <!-- Función 7: nombre de la clínica. Editable solo para quien administra; el resto lo ve en lectura con la nota. -->
-      <div class="pr-f pr-a"><span>Nombre de la clínica<i aria-hidden="true"> *</i></span>
-        <input type="text" class="pr-in" data-k="clinica" data-s="Nombre de la clínica" value="Clínica Semilla A" placeholder="Ej: Clínica Ortointegra" maxlength="120" aria-label="Nombre de la clínica" autocomplete="off">
-        <span class="pr-err pr-err-cl" hidden>El nombre de la clínica no puede quedar vacío.</span>
-        <span class="pr-ay">Es el nombre de la clínica, distinto al de cada consultorio.</span>
-      </div>
-      <div class="pr-f pr-i"><span>Nombre de la clínica</span><div class="pr-lect">Clínica Semilla A</div>
-        <span class="pr-ay">Es el nombre de la clínica, distinto al de cada consultorio. Sólo quien administra la clínica puede cambiarlo.</span></div>
+      </div>      </div>
       <!-- Función 9 (solo admin): logo. Subir / cambiar; «Descartar selección» solo sobre un archivo elegido sin guardar. Se sube al pulsar «Guardar».
            Conserva data-onboard="subir-logo": es el ancla del asistente de bienvenida. En la maqueta no se abre el selector de archivos: se usa un logo de muestra. -->
       <div class="pr-sep pr-a">
-        <h3 class="pr-st">Logo</h3>
+        <h3 class="pr-st">Logo del consultorio</h3>
         <div class="pr-logo-f">
           <span class="pr-logo-g" data-h="logog" aria-hidden="true"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15.5V4.5M7.5 8.5 12 4l4.5 4.5M4.5 15.5v3a1.5 1.5 0 0 0 1.5 1.5h12a1.5 1.5 0 0 0 1.5-1.5v-3"/></svg><svg aria-hidden="true" width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" hidden><circle cx="12" cy="12" r="9.5"/><path d="M12 5.5v13M9.6 8h4.8M9 11h6M9 14h6M9.6 17h4.8"/></svg></span>
           <div class="pr-logo-a">
@@ -1364,14 +1475,8 @@
           <div class="pr-f"><span>Color primario</span><div class="pr-color"><input type="color" value="#1a3a5c" data-c="p" aria-label="Color primario"><i class="pr-ip"></i><span data-h="hexp">#1a3a5c</span></div></div>
           <div class="pr-f"><span>Color secundario</span><div class="pr-color"><input type="color" value="#1e5fa8" data-c="s" aria-label="Color secundario"><i class="pr-is"></i><span data-h="hexs">#1e5fa8</span></div></div>
         </div>
-        <div class="pr-f"><span>Vista previa en la app</span>
-          <div class="pr-vapp" aria-hidden="true">
-            <div class="pr-vnav"><span><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Inicio</span><span><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.9.7 3.1 2.4 3.5 5.2"/></svg>Pacientes</span></div>
-            <div class="pr-vder"><span class="pr-vbtn"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>Guardar</span><span class="pr-ay">El menú usa el primario; los botones, el secundario.</span></div>
-          </div>
-        </div>
         <div class="pr-f pr-a">
-        <span>Vista previa del encabezado en PDF</span>
+        <span>Vista previa del encabezado en PDFs</span>
         <!-- Es papel: blanco también en modo oscuro (correcto). La «mesa» gris lo enmarca para que se entienda que es una hoja. -->
         <div class="pr-mesa" role="img" aria-label="Vista previa del encabezado de tus PDF sobre papel blanco">
           <div class="pr-papel">
@@ -1381,9 +1486,8 @@
             <div class="pr-pt"><i></i><i></i><i></i></div>
           </div>
         </div>
-        <span class="pr-ay">Así sale impreso: siempre sobre papel blanco.</span>
       </div>
-      </div></div><p class="pr-pieg"><span class="pr-a">Nombre, logo y colores. Los ve todo el equipo y salen en los documentos.</span></p>
+      </div></div><p class="pr-pieg">Se aplican en tus documentos y PDFs.</p>
     </section>
     <!-- Función 11: resumen de consultorios y de Google Calendar dentro de Datos, con enlaces a sus pestañas -->
     <section class="pr-gr" aria-label="Mis consultorios (resumen)">
@@ -1391,7 +1495,7 @@
       <div class="pr-tar">
       <ul class="pr-res pr-cnovacio"><li data-id="c1"><span class="pr-pin"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.4"/></svg></span><div class="pr-ct"><div class="pr-cn"><b data-c="n">Centro</b><span class="pr-chip pr-c-conf pr-c-plano pr-cdef">Predeterminado</span></div><span class="pr-cd pr-num" data-c="l">Calle Ficticia 1, Centro, Mérida · 999 000 0001 · UTC-6</span></div></li><li data-id="c2"><span class="pr-pin"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.4"/></svg></span><div class="pr-ct"><div class="pr-cn"><b data-c="n">Hosp Norte</b><span class="pr-chip pr-c-conf pr-c-plano pr-cdef" hidden>Predeterminado</span></div><span class="pr-cd pr-num" data-c="l">Avenida Ficticia 2, Norte, Mérida · 999 000 0002 · UTC-6</span></div></li><li data-id="c3"><span class="pr-pin"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.4"/></svg></span><div class="pr-ct"><div class="pr-cn"><b data-c="n">Rehab</b><span class="pr-chip pr-c-conf pr-c-plano pr-cdef" hidden>Predeterminado</span></div><span class="pr-cd pr-num" data-c="l">Calle Ficticia 3, Poniente, Mérida · 999 000 0003 · UTC-6</span></div></li></ul>
       <!-- Con más de 3, debajo va el enlace «Ver N consultorios más» (misma pestaña). -->
-      <p class="pr-nota pr-cvacio">No tienes consultorios activos. <a href="#" class="pr-p pr-txt pr-ir" data-ir="cons" style="display:inline-flex">Agrega el primero</a></p></div><p class="pr-pieg"><span class="pr-num"><span data-h="cuenta">3</span> de 10 activos</span></p>
+      <p class="pr-nota pr-cvacio">No tienes consultorios activos. <a href="#" class="pr-p pr-txt pr-ir" data-ir="cons" style="display:inline-flex">Agrega el primero</a></p></div>
     </section>
     <section class="pr-tar pr-gres" aria-label="Google Calendar (resumen)">
       <span class="pr-gic"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg></span>
@@ -1401,7 +1505,7 @@
     </div>
     <div class="pr-panel" data-panel="cons" role="tabpanel" aria-label="Consultorios" hidden>
     <!-- Control SOLO de la maqueta -->
-    <div class="pr-maq"><button type="button" class="pr-p pr-demo pr-demo-cl">Maqueta: cambiar lista (ahora: con consultorios)</button></div>
+    <div class="pr-maq"><button type="button" class="pr-p pr-demo pr-demo-cl">cambiar lista (ahora: con consultorios)</button></div>
     <!-- Función 13: lista, «Agregar consultorio» (deshabilitado al llegar al tope de 10), vacío «No tienes consultorios activos». Estado de sistema: esqueleto de 3 filas. -->
     <section class="pr-gr" aria-label="Mis consultorios">
       <div class="pr-gt"><span class="pr-gtt"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.4"/></svg><h2>Mis consultorios</h2></span><button type="button" class="pr-p pr-tonal pr-c-add" aria-label="Agregar consultorio"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>Agregar</button></div>
@@ -1441,7 +1545,7 @@
           </div>
           <p class="pr-cmot" hidden><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.7v.1"/></svg><span>Marca otro consultorio como predeterminado antes de borrar este.</span></p>
         </li>
-        <li class="pr-ctope"><p class="pr-nota">Maqueta: aquí seguirían los otros 7 consultorios.</p></li>
+        <!-- Con tope de 10 la lista sigue con los demás consultorios; aquí se dibujan tres. -->
       </ul>
       <div class="pr-vacio pr-cvacio"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.4"/></svg><b>No tienes consultorios activos.</b><button type="button" class="pr-p pr-tonal pr-c-add"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>Agregar el primero</button></div></div><p class="pr-pieg"><span class="pr-num"><span data-h="cuenta">3</span> de 10 activos · el predeterminado es el que se abre al iniciar sesión.</span></p>
     </section>
@@ -1449,12 +1553,12 @@
     </div>
     <div class="pr-panel" data-panel="google" role="tabpanel" aria-label="Google Calendar" hidden>
     <!-- Control SOLO de la maqueta: no se simula ninguna conexión real -->
-    <div class="pr-maq pr-a"><button type="button" class="pr-p pr-demo pr-demo-g">Maqueta: cambiar estado (ahora: sin conectar)</button></div>
+    <div class="pr-maq pr-a"><button type="button" class="pr-p pr-demo pr-demo-g">cambiar estado (ahora: sin conectar)</button></div>
     <!-- Función 16: conectar, estado y cuenta, «Recrear calendario» (con confirmación), «Desconectar»; para no admin, solo el mensaje.
          Estado de sistema «comprobando»: el chip es un esqueleto y no se enseñan acciones. -->
     <section class="pr-tar pr-a" aria-label="Google Calendar">
       <div class="pr-tcab" style="align-items:center"><span class="pr-gic"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg></span>
-        <div class="pr-th"><div class="pr-ghl"><h2>Google Calendar</h2><span class="pr-chip pr-c-neutro pr-goff">Sin conectar</span><span class="pr-chip pr-c-aten pr-gon">Conectado</span><span class="pr-chip pr-c-ag pr-gerr">Sin respuesta</span></div><p class="pr-sub"><span class="pr-goff">Conecta una cuenta para sincronizar tus citas.</span><span class="pr-gon">Sincronización activa: las citas se crean automáticamente.</span><span class="pr-gerr">No se pudo comprobar la conexión.</span></p></div></div>
+        <div class="pr-th"><div class="pr-ghl"><h2>Google Calendar</h2><span class="pr-chip pr-c-neutro pr-goff">Sin conectar</span><span class="pr-chip pr-c-aten pr-gon">Conectado</span><span class="pr-chip pr-c-ag pr-gerr">Sin respuesta</span></div><p class="pr-sub"><span class="pr-goff">Conecta una cuenta para sincronizar tus citas.</span><span class="pr-gon">Sincronización activa — las citas se crean automáticamente.</span><span class="pr-gerr">No se pudo comprobar la conexión.</span></p></div></div>
       <div class="pr-gerr pr-vacio"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18M8.5 16a5 5 0 0 1 7 0M5.3 12.5a9 9 0 0 1 3.2-2M18.7 12.5a9 9 0 0 0-4.9-2.4M2.5 9a14 14 0 0 1 3.3-2.3M21.5 9a14 14 0 0 0-10.7-3.9M12 19.5v.1"/></svg><span>Google no respondió. Tu conexión sigue guardada; no hace falta que la rehagas.</span><button type="button" class="pr-p pr-tonal pr-g-reint"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.6-5.9M20 4.5V9h-4.5"/></svg>Reintentar</button></div>
       <div class="pr-gnoerr">
         <div class="pr-dato"><span class="pr-sub">Calendario</span><b><span class="pr-goff">—</span><span class="pr-gon">Spinus - Dr. Admin Semilla</span></b></div>
@@ -1483,7 +1587,7 @@
         <!-- A0-9: Modo claro / oscuro. En la maqueta el interruptor solo cambia su propio estado; el tema se prueba con los botones «Claro / Oscuro» de la página. -->
         <li><button type="button" role="switch" aria-checked="false" class="pr-ajf pr-sw-b"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg><span class="pr-flex">Modo oscuro</span><span class="pr-sw" aria-hidden="true"></span></button></li>
         <!-- A0-12: Aviso de Privacidad (pestaña nueva) -->
-        <li><a href="#" class="pr-p pr-ajf"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5 5 6v5.5c0 4.3 2.9 7.4 7 9 4.1-1.6 7-4.7 7-9V6z"/><path d="m9.3 12 1.9 1.9 3.6-3.8"/></svg><span class="pr-flex">Aviso de privacidad<small>Se abre en una pestaña nueva</small></span><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color:var(--tinta3)"><path d="M13.5 5H19v5.5M19 5l-8 8M10 6.5H6.5A1.5 1.5 0 0 0 5 8v9.5A1.5 1.5 0 0 0 6.5 19H16a1.5 1.5 0 0 0 1.5-1.5V14"/></svg></a></li>
+        <li><a href="#" class="pr-p pr-ajf"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5 5 6v5.5c0 4.3 2.9 7.4 7 9 4.1-1.6 7-4.7 7-9V6z"/><path d="m9.3 12 1.9 1.9 3.6-3.8"/></svg><span class="pr-flex">Aviso de Privacidad</span><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color:var(--tinta3)"><path d="M13.5 5H19v5.5M19 5l-8 8M10 6.5H6.5A1.5 1.5 0 0 0 5 8v9.5A1.5 1.5 0 0 0 6.5 19H16a1.5 1.5 0 0 0 1.5-1.5V14"/></svg></a></li>
         <!-- A0-10: Cerrar sesión -->
         <li><button type="button" class="pr-p pr-ajf pr-rojo"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4.5H18a1.5 1.5 0 0 1 1.5 1.5v12a1.5 1.5 0 0 1-1.5 1.5h-3.5M10.5 16l4-4-4-4M14.5 12h-10"/></svg><span class="pr-flex">Cerrar sesión</span></button></li>
       </ul></div>
@@ -1492,13 +1596,24 @@
    
   </div>
   <!-- Función 18: el asistente de bienvenida (OnboardingGuide) sigue montado en esta pantalla como capa flotante global; su ancla data-onboard="subir-logo" se conserva en el botón del logo. -->
-</main><!-- A0 · navegación (barra lateral). Activo: «Mi perfil · Ajustes», al pie. -->
+</main><!-- A0 · navegación (barra lateral, CALMA §28): logo de la clínica en el botón de consultorio, aviso «N datos pendientes» (plegado en
+     Duo abierto) y pie «Mi perfil · Ajustes» + Ayuda. Activo: «Mi perfil · Ajustes», al pie. -->
 <nav class="pr-lat" aria-label="Navegación principal">
   <div class="pr-lat-cab"><span class="pr-logo"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.5"/><path d="M12 5.5v13M9.6 8h4.8M9 11h6M9 14h6M9.6 17h4.8"/></svg><span class="pr-logo-n">Spinus</span></span><span class="pr-plan">Plan VIP</span></div>
-  <button type="button" class="pr-p pr-cons-b"><span class="pr-av"><span class="pr-a">AS</span><span class="pr-i">IS</span></span><span class="pr-cons-t"><span>Consultorio</span><b>Centro</b></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 9 4-4 4 4M8 15l4 4 4-4"/></svg></button>
+  <button type="button" class="pr-p pr-cons-b"><span class="pr-clogo" role="img" aria-label="Logo de Clínica Semilla A"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21c-4.5-2.2-7-5.6-7-10V5.5L12 3l7 2.5V11c0 4.4-2.5 7.8-7 10z"/><path d="M12 8v7M8.5 11.5h7"/></svg></span><span class="pr-cons-t"><span>Consultorio</span><b>Centro</b></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 9 4-4 4 4M8 15l4 4 4-4"/></svg></button>
   <div class="pr-lista"><a href="#" class="pr-p pr-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Inicio</a><a href="#" class="pr-p pr-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.9.7 3.1 2.4 3.5 5.2"/></svg>Expediente</a><a href="#" class="pr-p pr-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Agenda</a><a href="#" class="pr-p pr-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>Documentos</a><a href="#" class="pr-p pr-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20v-8M12 20V5M19 20v-9"/></svg>Administración</a></div>
   <span class="pr-flex"></span>
-  <div class="pr-lat-pie"><a href="#" class="pr-p pr-li pr-yo" aria-current="page"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18.2c1.3-2 3.2-3 5.5-3s4.2 1 5.5 3"/></svg><span><span class="pr-a">Dr. Admin Semilla</span><span class="pr-i">Dra. Invitada Semilla</span><small>Mi perfil · Ajustes</small></span></a></div>
+  <div class="pr-avp pr-m pr-pleg" role="status" aria-live="polite">
+    <button type="button" class="pr-p pr-avp-cab" aria-expanded="false" aria-controls="pr-av-ih-lat">
+      <span class="pr-avp-pt" aria-hidden="true"></span><span class="pr-avp-t">3 datos pendientes</span><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="pr-avp-ch"><path d="m18 15-6-6-6 6"/></svg>
+    </button>
+    <div class="pr-avp-c" id="pr-av-ih-lat">
+      <span class="pr-avp-sep" aria-hidden="true"></span>
+      <a href="#" class="pr-p pr-avp-l" data-k="firma"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.4 3.6a2.1 2.1 0 0 1 3 3L7.4 18.6a2 2 0 0 1-.9.5l-2.9.8a.5.5 0 0 1-.6-.6l.8-2.9a2 2 0 0 1 .5-.9z"/></svg><span>Documentos sin firma</span></a><a href="#" class="pr-p pr-avp-l" data-k="cedula"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22h6a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v3"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><circle cx="5" cy="14" r="3"/><path d="M7 16.5 8 22l-3-1-3 1 1-5.5"/></svg><span>Sin cédula de especialidad</span></a><a href="#" class="pr-p pr-avp-l" data-k="logo"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></svg><span>Clínica sin logo</span></a>
+      <a href="#" class="pr-p pr-avp-b">Completar ahora<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg></a>
+    </div>
+  </div>
+  <div class="pr-lat-pie"><a href="#" class="pr-p pr-li pr-yo pr-m" aria-current="page"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18.2c1.3-2 3.2-3 5.5-3s4.2 1 5.5 3"/></svg><span><span class="pr-a">Dr. Admin Semilla</span><span class="pr-i">Dra. Invitada Semilla</span><small class="pr-esp">Ortopedia y Traumatología</small><small>Mi perfil · Ajustes</small></span></a><a href="#" class="pr-p pr-nib pr-ayn pr-m" aria-label="Ayuda"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.6M12 17h.01"/></svg></a><button type="button" class="pr-p pr-li pr-yo pr-s pr-abre-aj" aria-haspopup="menu"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span><span>Secretaria Semilla</span><small>Ajustes</small></span></button></div>
 </nav>
 </div>
 <!-- Función 12: barra de guardado fija. Solo aparece si hay cambios (entra y sale deslizándose). Dice en qué secciones hay cambios.
@@ -1559,22 +1674,23 @@
     <div class="pr-abt pr-par"><button type="button" class="pr-p pr-quieto pr-cierra">Cancelar</button><button type="button" class="pr-p pr-pel pr-r-si">Sí, recrear</button></div>
   </div>
 </div>
+
 </div>
 <div class="marco pr" lang="es" data-vp="iv" data-tab="datos" data-g="off" data-cl="n">
 <div class="pr-app">
 <!-- A0 · navegación de Duo abierto vertical: encabezado fundido con pista de secciones (CALMA §19). Mi perfil se abre desde el avatar
      o desde «Mostrar barra lateral»; ninguna píldora va activa (tampoco «Más»): lo marcado es el avatar. -->
 <header class="pr-encv">
-  <button type="button" class="pr-p pr-encv-b" aria-label="Mostrar barra lateral"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="15" rx="3"/><path d="M9.5 4.5v15"/></svg></button>
-  <nav class="pr-pista" aria-label="Secciones"><a href="#" class="pr-p pr-pil">Inicio</a><a href="#" class="pr-p pr-pil">Expediente</a><a href="#" class="pr-p pr-pil">Agenda</a><a href="#" class="pr-p pr-pil">Documentos</a><button type="button" class="pr-p pr-pil" aria-haspopup="menu">Más</button></nav>
+  <button type="button" class="pr-p pr-encv-b" aria-label="Mostrar barra lateral"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="15" rx="3"/><path d="M9.5 4.5v15"/></svg><span class="pr-bdg pr-m" aria-hidden="true">3</span></button>
+  <nav class="pr-pista" aria-label="Secciones"><a href="#" class="pr-p pr-pil">Inicio</a><a href="#" class="pr-p pr-pil">Expediente</a><a href="#" class="pr-p pr-pil">Agenda</a><a href="#" class="pr-p pr-pil">Documentos</a><button type="button" class="pr-p pr-pil" aria-haspopup="dialog" data-abre-mas>Más</button></nav>
   <button type="button" class="pr-p pr-av pr-av-g pr-av-act" aria-label="Mi perfil" aria-current="page"><span class="pr-a">AS</span><span class="pr-i">IS</span></button>
 </header><main class="pr-cont">
   <header class="pr-cab">
     <!-- Función 1: título de la pantalla. (El esqueleto de carga y la pantalla «No se pudieron cargar tus datos. Revisa tu conexión e inténtalo de nuevo.» + «Reintentar»
          son estados de sistema: se conservan tal cual, no se dibujan aquí.) -->
-    <div class="pr-tit"><h1>Mi perfil</h1><p class="pr-sec"><span class="pr-a">Dr. Admin Semilla · administras Clínica Semilla A</span><span class="pr-i">Dra. Invitada Semilla · médica invitada en Clínica Semilla A</span></p></div>
+    <div class="pr-tit"><p class="pr-rotc">Cuenta</p><h1>Mi perfil</h1></div>
     <!-- Control SOLO de la maqueta -->
-    <div class="pr-maq"><button type="button" class="pr-p pr-demo pr-demo-rol" aria-pressed="false">Maqueta: ver como médico invitado</button></div>
+    <div class="pr-maq"><button type="button" class="pr-p pr-demo pr-demo-rol" aria-pressed="false">ver como médico invitado</button></div>
   </header>
   <!-- Función 3: pestañas Datos · Consultorios · Google Calendar. Texto con subrayado, fijas al desplazar. La pestaña activa sigue viviendo en la URL (?tab=),
        que es por donde llegan los enlaces de la agenda y del menú; ?gcal_error= abre Google Calendar. -->
@@ -1624,9 +1740,21 @@
       </div>
       <label class="pr-f"><span>Universidad / Institución</span><input type="text" class="pr-in" data-k="uni" data-s="Datos profesionales" value="" placeholder="Ej: Universidad Nacional Autónoma de México" autocomplete="off"></label></div><p class="pr-pieg">Aparecen en las recetas, solicitudes y documentos que emites.</p>
     </section>
-    <section class="pr-gr" aria-label="Firma">
-      <div class="pr-gt"><span class="pr-gtt"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19.5 8.5a2.1 2.1 0 0 0-3-3L5 17z"/><path d="m14.5 7.5 3 3"/></svg><h2>Firma autógrafa</h2></span></div>
-      <div class="pr-tar">
+    <section class="pr-gr" aria-label="Nombre de la clínica">
+      <div class="pr-gt"><span class="pr-gtt"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><circle cx="9" cy="10" r="1.6"/><path d="m5 18 5-4.5 3.5 3 2.5-2 3.5 3.5"/></svg><h2>Nombre de la clínica</h2></span></div>
+      <div class="pr-tar pr-filas">
+      <!-- Función 7: nombre de la clínica. Editable solo para quien administra; el resto lo ve en lectura con la nota. -->
+      <div class="pr-f pr-a"><span>Nombre de la clínica</span>
+        <input type="text" class="pr-in" data-k="clinica" data-s="Nombre de la clínica" value="Clínica Semilla A" placeholder="Ej: Clínica Ortointegra" maxlength="120" aria-label="Nombre de la clínica" autocomplete="off">
+        <span class="pr-err pr-err-cl" hidden>El nombre de la clínica no puede quedar vacío.</span>
+      </div>
+      <div class="pr-f pr-i"><span>Nombre de la clínica</span><div class="pr-lect">Clínica Semilla A</div></div></div><p class="pr-pieg">Es el nombre de la clínica, distinto al de cada consultorio.<span class="pr-i"> Sólo quien administra la clínica puede cambiarlo.</span></p>
+    </section>
+    <section class="pr-gr" aria-label="Firma y logo">
+      <div class="pr-gt"><span class="pr-gtt"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19.5 8.5a2.1 2.1 0 0 0-3-3L5 17z"/><path d="m14.5 7.5 3 3"/></svg><h2><span class="pr-a">Firma y logo</span><span class="pr-i">Firma</span></h2></span></div>
+      <div class="pr-tar pr-filas">
+      <div class="pr-sep pr-sep0">
+        <h3 class="pr-st">Firma autógrafa</h3>
       <!-- Función 8: subir imagen (JPG, PNG, WEBP hasta 10 MB) o dibujar con dedo o ratón; limpiar; vista previa sobre blanco y sobre oscuro; «Aceptar firma»;
            «Cambiar firma»; eliminar. En la maqueta, «Toca para seleccionar…» no abre el selector de archivos: pasa a la vista previa con una firma de muestra.
            El lienzo SÍ dibuja de verdad. Estados de sistema: «Procesando imagen…», «Procesando…», «Guardando…». -->
@@ -1648,23 +1776,11 @@
           <div class="pr-btns"><button type="button" class="pr-p pr-tonal pr-f-cambia">Cambiar firma</button><button type="button" class="pr-p pr-txt pr-rojo pr-f-elim"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 7h15M9.5 7V4.5h5V7M6.5 7l.8 12a1.5 1.5 0 0 0 1.5 1.5h6.4a1.5 1.5 0 0 0 1.5-1.5l.8-12M10 11v6M14 11v6"/></svg>Eliminar</button></div>
         </div>
         <p class="pr-nota">La firma se guarda en cuanto la capturas: no depende del botón de guardar.</p>
-      </div></div><p class="pr-pieg">Aparece encima de la línea punteada en todos los documentos PDF.</p>
-    </section>
-    <section class="pr-gr" aria-label="Clínica">
-      <div class="pr-gt"><span class="pr-gtt"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><circle cx="9" cy="10" r="1.6"/><path d="m5 18 5-4.5 3.5 3 2.5-2 3.5 3.5"/></svg><h2><span class="pr-a">Marca de la clínica</span><span class="pr-i">Clínica</span></h2></span></div>
-      <div class="pr-tar pr-filas">
-      <!-- Función 7: nombre de la clínica. Editable solo para quien administra; el resto lo ve en lectura con la nota. -->
-      <div class="pr-f pr-a"><span>Nombre de la clínica<i aria-hidden="true"> *</i></span>
-        <input type="text" class="pr-in" data-k="clinica" data-s="Nombre de la clínica" value="Clínica Semilla A" placeholder="Ej: Clínica Ortointegra" maxlength="120" aria-label="Nombre de la clínica" autocomplete="off">
-        <span class="pr-err pr-err-cl" hidden>El nombre de la clínica no puede quedar vacío.</span>
-        <span class="pr-ay">Es el nombre de la clínica, distinto al de cada consultorio.</span>
-      </div>
-      <div class="pr-f pr-i"><span>Nombre de la clínica</span><div class="pr-lect">Clínica Semilla A</div>
-        <span class="pr-ay">Es el nombre de la clínica, distinto al de cada consultorio. Sólo quien administra la clínica puede cambiarlo.</span></div>
+      </div>      </div>
       <!-- Función 9 (solo admin): logo. Subir / cambiar; «Descartar selección» solo sobre un archivo elegido sin guardar. Se sube al pulsar «Guardar».
            Conserva data-onboard="subir-logo": es el ancla del asistente de bienvenida. En la maqueta no se abre el selector de archivos: se usa un logo de muestra. -->
       <div class="pr-sep pr-a">
-        <h3 class="pr-st">Logo</h3>
+        <h3 class="pr-st">Logo del consultorio</h3>
         <div class="pr-logo-f">
           <span class="pr-logo-g" data-h="logog" aria-hidden="true"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15.5V4.5M7.5 8.5 12 4l4.5 4.5M4.5 15.5v3a1.5 1.5 0 0 0 1.5 1.5h12a1.5 1.5 0 0 0 1.5-1.5v-3"/></svg><svg aria-hidden="true" width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" hidden><circle cx="12" cy="12" r="9.5"/><path d="M12 5.5v13M9.6 8h4.8M9 11h6M9 14h6M9.6 17h4.8"/></svg></span>
           <div class="pr-logo-a">
@@ -1682,14 +1798,8 @@
           <div class="pr-f"><span>Color primario</span><div class="pr-color"><input type="color" value="#1a3a5c" data-c="p" aria-label="Color primario"><i class="pr-ip"></i><span data-h="hexp">#1a3a5c</span></div></div>
           <div class="pr-f"><span>Color secundario</span><div class="pr-color"><input type="color" value="#1e5fa8" data-c="s" aria-label="Color secundario"><i class="pr-is"></i><span data-h="hexs">#1e5fa8</span></div></div>
         </div>
-        <div class="pr-f"><span>Vista previa en la app</span>
-          <div class="pr-vapp" aria-hidden="true">
-            <div class="pr-vnav"><span><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Inicio</span><span><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.9.7 3.1 2.4 3.5 5.2"/></svg>Pacientes</span></div>
-            <div class="pr-vder"><span class="pr-vbtn"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>Guardar</span><span class="pr-ay">El menú usa el primario; los botones, el secundario.</span></div>
-          </div>
-        </div>
         <div class="pr-f pr-a">
-        <span>Vista previa del encabezado en PDF</span>
+        <span>Vista previa del encabezado en PDFs</span>
         <!-- Es papel: blanco también en modo oscuro (correcto). La «mesa» gris lo enmarca para que se entienda que es una hoja. -->
         <div class="pr-mesa" role="img" aria-label="Vista previa del encabezado de tus PDF sobre papel blanco">
           <div class="pr-papel">
@@ -1699,9 +1809,8 @@
             <div class="pr-pt"><i></i><i></i><i></i></div>
           </div>
         </div>
-        <span class="pr-ay">Así sale impreso: siempre sobre papel blanco.</span>
       </div>
-      </div></div><p class="pr-pieg"><span class="pr-a">Nombre, logo y colores. Los ve todo el equipo y salen en los documentos.</span></p>
+      </div></div><p class="pr-pieg">Se aplican en tus documentos y PDFs.</p>
     </section>
     <!-- Función 11: resumen de consultorios y de Google Calendar dentro de Datos, con enlaces a sus pestañas -->
     <section class="pr-gr" aria-label="Mis consultorios (resumen)">
@@ -1709,7 +1818,7 @@
       <div class="pr-tar">
       <ul class="pr-res pr-cnovacio"><li data-id="c1"><span class="pr-pin"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.4"/></svg></span><div class="pr-ct"><div class="pr-cn"><b data-c="n">Centro</b><span class="pr-chip pr-c-conf pr-c-plano pr-cdef">Predeterminado</span></div><span class="pr-cd pr-num" data-c="l">Calle Ficticia 1, Centro, Mérida · 999 000 0001 · UTC-6</span></div></li><li data-id="c2"><span class="pr-pin"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.4"/></svg></span><div class="pr-ct"><div class="pr-cn"><b data-c="n">Hosp Norte</b><span class="pr-chip pr-c-conf pr-c-plano pr-cdef" hidden>Predeterminado</span></div><span class="pr-cd pr-num" data-c="l">Avenida Ficticia 2, Norte, Mérida · 999 000 0002 · UTC-6</span></div></li><li data-id="c3"><span class="pr-pin"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.4"/></svg></span><div class="pr-ct"><div class="pr-cn"><b data-c="n">Rehab</b><span class="pr-chip pr-c-conf pr-c-plano pr-cdef" hidden>Predeterminado</span></div><span class="pr-cd pr-num" data-c="l">Calle Ficticia 3, Poniente, Mérida · 999 000 0003 · UTC-6</span></div></li></ul>
       <!-- Con más de 3, debajo va el enlace «Ver N consultorios más» (misma pestaña). -->
-      <p class="pr-nota pr-cvacio">No tienes consultorios activos. <a href="#" class="pr-p pr-txt pr-ir" data-ir="cons" style="display:inline-flex">Agrega el primero</a></p></div><p class="pr-pieg"><span class="pr-num"><span data-h="cuenta">3</span> de 10 activos</span></p>
+      <p class="pr-nota pr-cvacio">No tienes consultorios activos. <a href="#" class="pr-p pr-txt pr-ir" data-ir="cons" style="display:inline-flex">Agrega el primero</a></p></div>
     </section>
     <section class="pr-tar pr-gres" aria-label="Google Calendar (resumen)">
       <span class="pr-gic"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg></span>
@@ -1719,7 +1828,7 @@
     </div>
     <div class="pr-panel" data-panel="cons" role="tabpanel" aria-label="Consultorios" hidden>
     <!-- Control SOLO de la maqueta -->
-    <div class="pr-maq"><button type="button" class="pr-p pr-demo pr-demo-cl">Maqueta: cambiar lista (ahora: con consultorios)</button></div>
+    <div class="pr-maq"><button type="button" class="pr-p pr-demo pr-demo-cl">cambiar lista (ahora: con consultorios)</button></div>
     <!-- Función 13: lista, «Agregar consultorio» (deshabilitado al llegar al tope de 10), vacío «No tienes consultorios activos». Estado de sistema: esqueleto de 3 filas. -->
     <section class="pr-gr" aria-label="Mis consultorios">
       <div class="pr-gt"><span class="pr-gtt"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.4"/></svg><h2>Mis consultorios</h2></span><button type="button" class="pr-p pr-tonal pr-c-add" aria-label="Agregar consultorio"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>Agregar</button></div>
@@ -1759,7 +1868,7 @@
           </div>
           <p class="pr-cmot" hidden><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.7v.1"/></svg><span>Marca otro consultorio como predeterminado antes de borrar este.</span></p>
         </li>
-        <li class="pr-ctope"><p class="pr-nota">Maqueta: aquí seguirían los otros 7 consultorios.</p></li>
+        <!-- Con tope de 10 la lista sigue con los demás consultorios; aquí se dibujan tres. -->
       </ul>
       <div class="pr-vacio pr-cvacio"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.4"/></svg><b>No tienes consultorios activos.</b><button type="button" class="pr-p pr-tonal pr-c-add"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>Agregar el primero</button></div></div><p class="pr-pieg"><span class="pr-num"><span data-h="cuenta">3</span> de 10 activos · el predeterminado es el que se abre al iniciar sesión.</span></p>
     </section>
@@ -1767,12 +1876,12 @@
     </div>
     <div class="pr-panel" data-panel="google" role="tabpanel" aria-label="Google Calendar" hidden>
     <!-- Control SOLO de la maqueta: no se simula ninguna conexión real -->
-    <div class="pr-maq pr-a"><button type="button" class="pr-p pr-demo pr-demo-g">Maqueta: cambiar estado (ahora: sin conectar)</button></div>
+    <div class="pr-maq pr-a"><button type="button" class="pr-p pr-demo pr-demo-g">cambiar estado (ahora: sin conectar)</button></div>
     <!-- Función 16: conectar, estado y cuenta, «Recrear calendario» (con confirmación), «Desconectar»; para no admin, solo el mensaje.
          Estado de sistema «comprobando»: el chip es un esqueleto y no se enseñan acciones. -->
     <section class="pr-tar pr-a" aria-label="Google Calendar">
       <div class="pr-tcab" style="align-items:center"><span class="pr-gic"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg></span>
-        <div class="pr-th"><div class="pr-ghl"><h2>Google Calendar</h2><span class="pr-chip pr-c-neutro pr-goff">Sin conectar</span><span class="pr-chip pr-c-aten pr-gon">Conectado</span><span class="pr-chip pr-c-ag pr-gerr">Sin respuesta</span></div><p class="pr-sub"><span class="pr-goff">Conecta una cuenta para sincronizar tus citas.</span><span class="pr-gon">Sincronización activa: las citas se crean automáticamente.</span><span class="pr-gerr">No se pudo comprobar la conexión.</span></p></div></div>
+        <div class="pr-th"><div class="pr-ghl"><h2>Google Calendar</h2><span class="pr-chip pr-c-neutro pr-goff">Sin conectar</span><span class="pr-chip pr-c-aten pr-gon">Conectado</span><span class="pr-chip pr-c-ag pr-gerr">Sin respuesta</span></div><p class="pr-sub"><span class="pr-goff">Conecta una cuenta para sincronizar tus citas.</span><span class="pr-gon">Sincronización activa — las citas se crean automáticamente.</span><span class="pr-gerr">No se pudo comprobar la conexión.</span></p></div></div>
       <div class="pr-gerr pr-vacio"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18M8.5 16a5 5 0 0 1 7 0M5.3 12.5a9 9 0 0 1 3.2-2M18.7 12.5a9 9 0 0 0-4.9-2.4M2.5 9a14 14 0 0 1 3.3-2.3M21.5 9a14 14 0 0 0-10.7-3.9M12 19.5v.1"/></svg><span>Google no respondió. Tu conexión sigue guardada; no hace falta que la rehagas.</span><button type="button" class="pr-p pr-tonal pr-g-reint"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.6-5.9M20 4.5V9h-4.5"/></svg>Reintentar</button></div>
       <div class="pr-gnoerr">
         <div class="pr-dato"><span class="pr-sub">Calendario</span><b><span class="pr-goff">—</span><span class="pr-gon">Spinus - Dr. Admin Semilla</span></b></div>
@@ -1801,7 +1910,7 @@
         <!-- A0-9: Modo claro / oscuro. En la maqueta el interruptor solo cambia su propio estado; el tema se prueba con los botones «Claro / Oscuro» de la página. -->
         <li><button type="button" role="switch" aria-checked="false" class="pr-ajf pr-sw-b"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg><span class="pr-flex">Modo oscuro</span><span class="pr-sw" aria-hidden="true"></span></button></li>
         <!-- A0-12: Aviso de Privacidad (pestaña nueva) -->
-        <li><a href="#" class="pr-p pr-ajf"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5 5 6v5.5c0 4.3 2.9 7.4 7 9 4.1-1.6 7-4.7 7-9V6z"/><path d="m9.3 12 1.9 1.9 3.6-3.8"/></svg><span class="pr-flex">Aviso de privacidad<small>Se abre en una pestaña nueva</small></span><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color:var(--tinta3)"><path d="M13.5 5H19v5.5M19 5l-8 8M10 6.5H6.5A1.5 1.5 0 0 0 5 8v9.5A1.5 1.5 0 0 0 6.5 19H16a1.5 1.5 0 0 0 1.5-1.5V14"/></svg></a></li>
+        <li><a href="#" class="pr-p pr-ajf"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5 5 6v5.5c0 4.3 2.9 7.4 7 9 4.1-1.6 7-4.7 7-9V6z"/><path d="m9.3 12 1.9 1.9 3.6-3.8"/></svg><span class="pr-flex">Aviso de Privacidad</span><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color:var(--tinta3)"><path d="M13.5 5H19v5.5M19 5l-8 8M10 6.5H6.5A1.5 1.5 0 0 0 5 8v9.5A1.5 1.5 0 0 0 6.5 19H16a1.5 1.5 0 0 0 1.5-1.5V14"/></svg></a></li>
         <!-- A0-10: Cerrar sesión -->
         <li><button type="button" class="pr-p pr-ajf pr-rojo"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4.5H18a1.5 1.5 0 0 1 1.5 1.5v12a1.5 1.5 0 0 1-1.5 1.5h-3.5M10.5 16l4-4-4-4M14.5 12h-10"/></svg><span class="pr-flex">Cerrar sesión</span></button></li>
       </ul></div>
@@ -1870,23 +1979,56 @@
     <div class="pr-abt pr-par"><button type="button" class="pr-p pr-quieto pr-cierra">Cancelar</button><button type="button" class="pr-p pr-pel pr-r-si">Sí, recrear</button></div>
   </div>
 </div>
+<!-- Menú «Más» (CALMA §28): tarjeta centrada con velo (aviso, consultorio activo, Administración, Mi perfil, Ayuda). -->
+<div class="pr-capa-m" aria-hidden="true">
+  <div class="pr-velo"></div>
+  <div class="pr-mnw"><div class="pr-mn" role="dialog" aria-modal="true" aria-label="Más">
+    <h2 class="pr-mn-t">Más</h2>
+      <div class="pr-avp pr-m" role="status" aria-live="polite">
+    <button type="button" class="pr-p pr-avp-cab" aria-expanded="true" aria-controls="pr-av-iv-mas">
+      <span class="pr-avp-pt" aria-hidden="true"></span><span class="pr-avp-t">3 datos pendientes</span><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="pr-avp-ch"><path d="m18 15-6-6-6 6"/></svg>
+    </button>
+    <div class="pr-avp-c" id="pr-av-iv-mas">
+      <span class="pr-avp-sep" aria-hidden="true"></span>
+      <a href="#" class="pr-p pr-avp-l" data-k="firma"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.4 3.6a2.1 2.1 0 0 1 3 3L7.4 18.6a2 2 0 0 1-.9.5l-2.9.8a.5.5 0 0 1-.6-.6l.8-2.9a2 2 0 0 1 .5-.9z"/></svg><span>Documentos sin firma</span></a><a href="#" class="pr-p pr-avp-l" data-k="cedula"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22h6a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v3"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><circle cx="5" cy="14" r="3"/><path d="M7 16.5 8 22l-3-1-3 1 1-5.5"/></svg><span>Sin cédula de especialidad</span></a><a href="#" class="pr-p pr-avp-l" data-k="logo"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></svg><span>Clínica sin logo</span></a>
+      <a href="#" class="pr-p pr-avp-b">Completar ahora<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg></a>
+    </div>
+  </div>
+    <!-- Selector de consultorio activo (A0·2): en Duo cerrado no hay barra lateral, así que vive aquí; solo médico con 2 o más consultorios. Ver vista 2. -->
+    <button type="button" class="pr-p pr-mo pr-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 9 4-4 4 4M8 15l4 4 4-4"/></svg><span>Consultorio activo</span><span class="pr-mo-v">Centro</span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="pr-mo-f"><path d="m9 6 6 6-6 6"/></svg></button>
+    <a href="#" class="pr-p pr-mo pr-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20v-8M12 20V5M19 20v-9"/></svg><span>Administración</span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="pr-mo-f"><path d="m9 6 6 6-6 6"/></svg></a><a href="#" class="pr-p pr-mo pr-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18.2c1.3-2 3.2-3 5.5-3s4.2 1 5.5 3"/></svg><span>Mi perfil</span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="pr-mo-f"><path d="m9 6 6 6-6 6"/></svg></a><a href="#" class="pr-p pr-mo pr-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.6M12 17h.01"/></svg><span>Ayuda</span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="pr-mo-f"><path d="m9 6 6 6-6 6"/></svg></a>
+    <!-- Secretaria (CALMA db28): sin Mi perfil; en «Más» encuentra sus «Ajustes» -->
+    <div class="pr-s"><button type="button" class="pr-p pr-mo pr-tema"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg><span>Modo oscuro</span></button><a href="#" class="pr-p pr-mo"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21c-4.5-2.2-7-5.6-7-10V5.5L12 3l7 2.5V11c0 4.4-2.5 7.8-7 10z"/></svg><span>Aviso de Privacidad</span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="pr-mo-f"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg></a><button type="button" class="pr-p pr-mo pr-salir"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4"/></svg><span>Cerrar sesión</span></button></div>
+  </div></div>
+</div>
 </div>
 <div class="marco pr" lang="es" data-vp="esc" data-tab="datos" data-g="off" data-cl="n">
 <div class="pr-app">
-<!-- A0 · navegación (barra lateral). Activo: «Mi perfil · Ajustes», al pie. -->
+<!-- A0 · navegación (barra lateral, CALMA §28): logo de la clínica en el botón de consultorio, aviso «N datos pendientes» (plegado en
+     Duo abierto) y pie «Mi perfil · Ajustes» + Ayuda. Activo: «Mi perfil · Ajustes», al pie. -->
 <nav class="pr-lat" aria-label="Navegación principal">
   <div class="pr-lat-cab"><span class="pr-logo"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.5"/><path d="M12 5.5v13M9.6 8h4.8M9 11h6M9 14h6M9.6 17h4.8"/></svg><span class="pr-logo-n">Spinus</span></span><span class="pr-plan">Plan VIP</span></div>
-  <button type="button" class="pr-p pr-cons-b"><span class="pr-av"><span class="pr-a">AS</span><span class="pr-i">IS</span></span><span class="pr-cons-t"><span>Consultorio</span><b>Centro</b></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 9 4-4 4 4M8 15l4 4 4-4"/></svg></button>
+  <button type="button" class="pr-p pr-cons-b"><span class="pr-clogo" role="img" aria-label="Logo de Clínica Semilla A"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21c-4.5-2.2-7-5.6-7-10V5.5L12 3l7 2.5V11c0 4.4-2.5 7.8-7 10z"/><path d="M12 8v7M8.5 11.5h7"/></svg></span><span class="pr-cons-t"><span>Consultorio</span><b>Centro</b></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 9 4-4 4 4M8 15l4 4 4-4"/></svg></button>
   <div class="pr-lista"><a href="#" class="pr-p pr-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Inicio</a><a href="#" class="pr-p pr-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.9.7 3.1 2.4 3.5 5.2"/></svg>Expediente</a><a href="#" class="pr-p pr-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Agenda</a><a href="#" class="pr-p pr-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>Documentos</a><a href="#" class="pr-p pr-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20v-8M12 20V5M19 20v-9"/></svg>Administración</a></div>
   <span class="pr-flex"></span>
-  <div class="pr-lat-pie"><a href="#" class="pr-p pr-li pr-yo" aria-current="page"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18.2c1.3-2 3.2-3 5.5-3s4.2 1 5.5 3"/></svg><span><span class="pr-a">Dr. Admin Semilla</span><span class="pr-i">Dra. Invitada Semilla</span><small>Mi perfil · Ajustes</small></span></a></div>
+  <div class="pr-avp pr-m" role="status" aria-live="polite">
+    <button type="button" class="pr-p pr-avp-cab" aria-expanded="true" aria-controls="pr-av-esc-lat">
+      <span class="pr-avp-pt" aria-hidden="true"></span><span class="pr-avp-t">3 datos pendientes</span><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="pr-avp-ch"><path d="m18 15-6-6-6 6"/></svg>
+    </button>
+    <div class="pr-avp-c" id="pr-av-esc-lat">
+      <span class="pr-avp-sep" aria-hidden="true"></span>
+      <a href="#" class="pr-p pr-avp-l" data-k="firma"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.4 3.6a2.1 2.1 0 0 1 3 3L7.4 18.6a2 2 0 0 1-.9.5l-2.9.8a.5.5 0 0 1-.6-.6l.8-2.9a2 2 0 0 1 .5-.9z"/></svg><span>Documentos sin firma</span></a><a href="#" class="pr-p pr-avp-l" data-k="cedula"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22h6a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v3"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><circle cx="5" cy="14" r="3"/><path d="M7 16.5 8 22l-3-1-3 1 1-5.5"/></svg><span>Sin cédula de especialidad</span></a><a href="#" class="pr-p pr-avp-l" data-k="logo"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></svg><span>Clínica sin logo</span></a>
+      <a href="#" class="pr-p pr-avp-b">Completar ahora<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg></a>
+    </div>
+  </div>
+  <div class="pr-lat-pie"><a href="#" class="pr-p pr-li pr-yo pr-m" aria-current="page"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18.2c1.3-2 3.2-3 5.5-3s4.2 1 5.5 3"/></svg><span><span class="pr-a">Dr. Admin Semilla</span><span class="pr-i">Dra. Invitada Semilla</span><small class="pr-esp">Ortopedia y Traumatología</small><small>Mi perfil · Ajustes</small></span></a><a href="#" class="pr-p pr-nib pr-ayn pr-m" aria-label="Ayuda"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.6M12 17h.01"/></svg></a><button type="button" class="pr-p pr-li pr-yo pr-s pr-abre-aj" aria-haspopup="menu"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span><span>Secretaria Semilla</span><small>Ajustes</small></span></button></div>
 </nav><main class="pr-cont">
   <header class="pr-cab">
     <!-- Función 1: título de la pantalla. (El esqueleto de carga y la pantalla «No se pudieron cargar tus datos. Revisa tu conexión e inténtalo de nuevo.» + «Reintentar»
          son estados de sistema: se conservan tal cual, no se dibujan aquí.) -->
-    <div class="pr-tit"><h1>Mi perfil</h1><p class="pr-sec"><span class="pr-a">Dr. Admin Semilla · administras Clínica Semilla A</span><span class="pr-i">Dra. Invitada Semilla · médica invitada en Clínica Semilla A</span></p></div>
+    <div class="pr-tit"><p class="pr-rotc">Cuenta</p><h1>Mi perfil</h1></div>
     <!-- Control SOLO de la maqueta -->
-    <div class="pr-maq"><button type="button" class="pr-p pr-demo pr-demo-rol" aria-pressed="false">Maqueta: ver como médico invitado</button></div>
+    <div class="pr-maq"><button type="button" class="pr-p pr-demo pr-demo-rol" aria-pressed="false">ver como médico invitado</button></div>
   </header>
   <!-- Función 3: pestañas Datos · Consultorios · Google Calendar. Texto con subrayado, fijas al desplazar. La pestaña activa sigue viviendo en la URL (?tab=),
        que es por donde llegan los enlaces de la agenda y del menú; ?gcal_error= abre Google Calendar. -->
@@ -1925,9 +2067,21 @@
       </div>
       <label class="pr-f"><span>Universidad / Institución</span><input type="text" class="pr-in" data-k="uni" data-s="Datos profesionales" value="" placeholder="Ej: Universidad Nacional Autónoma de México" autocomplete="off"></label></div><p class="pr-pieg">Aparecen en las recetas, solicitudes y documentos que emites.</p>
     </section>
-    <section class="pr-gr" aria-label="Firma">
-      <div class="pr-gt"><span class="pr-gtt"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19.5 8.5a2.1 2.1 0 0 0-3-3L5 17z"/><path d="m14.5 7.5 3 3"/></svg><h2>Firma autógrafa</h2></span></div>
-      <div class="pr-tar">
+    <section class="pr-gr" aria-label="Nombre de la clínica">
+      <div class="pr-gt"><span class="pr-gtt"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><circle cx="9" cy="10" r="1.6"/><path d="m5 18 5-4.5 3.5 3 2.5-2 3.5 3.5"/></svg><h2>Nombre de la clínica</h2></span></div>
+      <div class="pr-tar pr-filas">
+      <!-- Función 7: nombre de la clínica. Editable solo para quien administra; el resto lo ve en lectura con la nota. -->
+      <div class="pr-f pr-a"><span>Nombre de la clínica</span>
+        <input type="text" class="pr-in" data-k="clinica" data-s="Nombre de la clínica" value="Clínica Semilla A" placeholder="Ej: Clínica Ortointegra" maxlength="120" aria-label="Nombre de la clínica" autocomplete="off">
+        <span class="pr-err pr-err-cl" hidden>El nombre de la clínica no puede quedar vacío.</span>
+      </div>
+      <div class="pr-f pr-i"><span>Nombre de la clínica</span><div class="pr-lect">Clínica Semilla A</div></div></div><p class="pr-pieg">Es el nombre de la clínica, distinto al de cada consultorio.<span class="pr-i"> Sólo quien administra la clínica puede cambiarlo.</span></p>
+    </section>
+    <section class="pr-gr" aria-label="Firma y logo">
+      <div class="pr-gt"><span class="pr-gtt"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19.5 8.5a2.1 2.1 0 0 0-3-3L5 17z"/><path d="m14.5 7.5 3 3"/></svg><h2><span class="pr-a">Firma y logo</span><span class="pr-i">Firma</span></h2></span></div>
+      <div class="pr-tar pr-filas">
+      <div class="pr-sep pr-sep0">
+        <h3 class="pr-st">Firma autógrafa</h3>
       <!-- Función 8: subir imagen (JPG, PNG, WEBP hasta 10 MB) o dibujar con dedo o ratón; limpiar; vista previa sobre blanco y sobre oscuro; «Aceptar firma»;
            «Cambiar firma»; eliminar. En la maqueta, «Toca para seleccionar…» no abre el selector de archivos: pasa a la vista previa con una firma de muestra.
            El lienzo SÍ dibuja de verdad. Estados de sistema: «Procesando imagen…», «Procesando…», «Guardando…». -->
@@ -1949,23 +2103,11 @@
           <div class="pr-btns"><button type="button" class="pr-p pr-tonal pr-f-cambia">Cambiar firma</button><button type="button" class="pr-p pr-txt pr-rojo pr-f-elim"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 7h15M9.5 7V4.5h5V7M6.5 7l.8 12a1.5 1.5 0 0 0 1.5 1.5h6.4a1.5 1.5 0 0 0 1.5-1.5l.8-12M10 11v6M14 11v6"/></svg>Eliminar</button></div>
         </div>
         <p class="pr-nota">La firma se guarda en cuanto la capturas: no depende del botón de guardar.</p>
-      </div></div><p class="pr-pieg">Aparece encima de la línea punteada en todos los documentos PDF.</p>
-    </section>
-    <section class="pr-gr" aria-label="Clínica">
-      <div class="pr-gt"><span class="pr-gtt"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><circle cx="9" cy="10" r="1.6"/><path d="m5 18 5-4.5 3.5 3 2.5-2 3.5 3.5"/></svg><h2><span class="pr-a">Marca de la clínica</span><span class="pr-i">Clínica</span></h2></span></div>
-      <div class="pr-tar pr-filas">
-      <!-- Función 7: nombre de la clínica. Editable solo para quien administra; el resto lo ve en lectura con la nota. -->
-      <div class="pr-f pr-a"><span>Nombre de la clínica<i aria-hidden="true"> *</i></span>
-        <input type="text" class="pr-in" data-k="clinica" data-s="Nombre de la clínica" value="Clínica Semilla A" placeholder="Ej: Clínica Ortointegra" maxlength="120" aria-label="Nombre de la clínica" autocomplete="off">
-        <span class="pr-err pr-err-cl" hidden>El nombre de la clínica no puede quedar vacío.</span>
-        <span class="pr-ay">Es el nombre de la clínica, distinto al de cada consultorio.</span>
-      </div>
-      <div class="pr-f pr-i"><span>Nombre de la clínica</span><div class="pr-lect">Clínica Semilla A</div>
-        <span class="pr-ay">Es el nombre de la clínica, distinto al de cada consultorio. Sólo quien administra la clínica puede cambiarlo.</span></div>
+      </div>      </div>
       <!-- Función 9 (solo admin): logo. Subir / cambiar; «Descartar selección» solo sobre un archivo elegido sin guardar. Se sube al pulsar «Guardar».
            Conserva data-onboard="subir-logo": es el ancla del asistente de bienvenida. En la maqueta no se abre el selector de archivos: se usa un logo de muestra. -->
       <div class="pr-sep pr-a">
-        <h3 class="pr-st">Logo</h3>
+        <h3 class="pr-st">Logo del consultorio</h3>
         <div class="pr-logo-f">
           <span class="pr-logo-g" data-h="logog" aria-hidden="true"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15.5V4.5M7.5 8.5 12 4l4.5 4.5M4.5 15.5v3a1.5 1.5 0 0 0 1.5 1.5h12a1.5 1.5 0 0 0 1.5-1.5v-3"/></svg><svg aria-hidden="true" width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" hidden><circle cx="12" cy="12" r="9.5"/><path d="M12 5.5v13M9.6 8h4.8M9 11h6M9 14h6M9.6 17h4.8"/></svg></span>
           <div class="pr-logo-a">
@@ -1983,14 +2125,19 @@
           <div class="pr-f"><span>Color primario</span><div class="pr-color"><input type="color" value="#1a3a5c" data-c="p" aria-label="Color primario"><i class="pr-ip"></i><span data-h="hexp">#1a3a5c</span></div></div>
           <div class="pr-f"><span>Color secundario</span><div class="pr-color"><input type="color" value="#1e5fa8" data-c="s" aria-label="Color secundario"><i class="pr-is"></i><span data-h="hexs">#1e5fa8</span></div></div>
         </div>
-        <div class="pr-f"><span>Vista previa en la app</span>
-          <div class="pr-vapp" aria-hidden="true">
-            <div class="pr-vnav"><span><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Inicio</span><span><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.9.7 3.1 2.4 3.5 5.2"/></svg>Pacientes</span></div>
-            <div class="pr-vder"><span class="pr-vbtn"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>Guardar</span><span class="pr-ay">El menú usa el primario; los botones, el secundario.</span></div>
+        <div class="pr-f pr-a">
+        <span>Vista previa del encabezado en PDFs</span>
+        <!-- Es papel: blanco también en modo oscuro (correcto). La «mesa» gris lo enmarca para que se entienda que es una hoja. -->
+        <div class="pr-mesa" role="img" aria-label="Vista previa del encabezado de tus PDF sobre papel blanco">
+          <div class="pr-papel">
+            <div class="pr-pcab"><span class="pr-plogo" data-h="plogo" hidden><svg aria-hidden="true" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.5"/><path d="M12 5.5v13M9.6 8h4.8M9 11h6M9 14h6M9.6 17h4.8"/></svg></span>
+              <div class="pr-pn"><b data-h="nombre">Dr. Admin Semilla</b><span data-h="esp">Ortopedia y Traumatología</span><small data-h="pceds">• Céd. Prof. 00000001</small></div></div>
+            <div class="pr-pl"></div>
+            <div class="pr-pt"><i></i><i></i><i></i></div>
           </div>
         </div>
-        
-      </div></div><p class="pr-pieg"><span class="pr-a">Nombre, logo y colores. Los ve todo el equipo y salen en los documentos.</span></p>
+      </div>
+      </div></div><p class="pr-pieg">Se aplican en tus documentos y PDFs.</p>
     </section>
     <!-- Función 11: resumen de consultorios y de Google Calendar dentro de Datos, con enlaces a sus pestañas -->
     <section class="pr-gr" aria-label="Mis consultorios (resumen)">
@@ -1998,7 +2145,7 @@
       <div class="pr-tar">
       <ul class="pr-res pr-cnovacio"><li data-id="c1"><span class="pr-pin"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.4"/></svg></span><div class="pr-ct"><div class="pr-cn"><b data-c="n">Centro</b><span class="pr-chip pr-c-conf pr-c-plano pr-cdef">Predeterminado</span></div><span class="pr-cd pr-num" data-c="l">Calle Ficticia 1, Centro, Mérida · 999 000 0001 · UTC-6</span></div></li><li data-id="c2"><span class="pr-pin"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.4"/></svg></span><div class="pr-ct"><div class="pr-cn"><b data-c="n">Hosp Norte</b><span class="pr-chip pr-c-conf pr-c-plano pr-cdef" hidden>Predeterminado</span></div><span class="pr-cd pr-num" data-c="l">Avenida Ficticia 2, Norte, Mérida · 999 000 0002 · UTC-6</span></div></li><li data-id="c3"><span class="pr-pin"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.4"/></svg></span><div class="pr-ct"><div class="pr-cn"><b data-c="n">Rehab</b><span class="pr-chip pr-c-conf pr-c-plano pr-cdef" hidden>Predeterminado</span></div><span class="pr-cd pr-num" data-c="l">Calle Ficticia 3, Poniente, Mérida · 999 000 0003 · UTC-6</span></div></li></ul>
       <!-- Con más de 3, debajo va el enlace «Ver N consultorios más» (misma pestaña). -->
-      <p class="pr-nota pr-cvacio">No tienes consultorios activos. <a href="#" class="pr-p pr-txt pr-ir" data-ir="cons" style="display:inline-flex">Agrega el primero</a></p></div><p class="pr-pieg"><span class="pr-num"><span data-h="cuenta">3</span> de 10 activos</span></p>
+      <p class="pr-nota pr-cvacio">No tienes consultorios activos. <a href="#" class="pr-p pr-txt pr-ir" data-ir="cons" style="display:inline-flex">Agrega el primero</a></p></div>
     </section>
     <section class="pr-tar pr-gres" aria-label="Google Calendar (resumen)">
       <span class="pr-gic"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg></span>
@@ -2008,7 +2155,7 @@
     </div>
     <div class="pr-panel" data-panel="cons" role="tabpanel" aria-label="Consultorios" hidden>
     <!-- Control SOLO de la maqueta -->
-    <div class="pr-maq"><button type="button" class="pr-p pr-demo pr-demo-cl">Maqueta: cambiar lista (ahora: con consultorios)</button></div>
+    <div class="pr-maq"><button type="button" class="pr-p pr-demo pr-demo-cl">cambiar lista (ahora: con consultorios)</button></div>
     <!-- Función 13: lista, «Agregar consultorio» (deshabilitado al llegar al tope de 10), vacío «No tienes consultorios activos». Estado de sistema: esqueleto de 3 filas. -->
     <section class="pr-gr" aria-label="Mis consultorios">
       <div class="pr-gt"><span class="pr-gtt"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.4"/></svg><h2>Mis consultorios</h2></span><button type="button" class="pr-p pr-tonal pr-c-add" aria-label="Agregar consultorio"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>Agregar</button></div>
@@ -2048,20 +2195,20 @@
           </div>
           <p class="pr-cmot" hidden><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.7v.1"/></svg><span>Marca otro consultorio como predeterminado antes de borrar este.</span></p>
         </li>
-        <li class="pr-ctope"><p class="pr-nota">Maqueta: aquí seguirían los otros 7 consultorios.</p></li>
+        <!-- Con tope de 10 la lista sigue con los demás consultorios; aquí se dibujan tres. -->
       </ul>
       <div class="pr-vacio pr-cvacio"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.4"/></svg><b>No tienes consultorios activos.</b><button type="button" class="pr-p pr-tonal pr-c-add"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>Agregar el primero</button></div></div><p class="pr-pieg"><span class="pr-num"><span data-h="cuenta">3</span> de 10 activos · el predeterminado es el que se abre al iniciar sesión.</span></p>
     </section>
-    
+    <p class="pr-nota pr-suelta">El consultorio predeterminado no se puede eliminar sin marcar otro antes. La zona horaria de cada consultorio es la que usan la agenda y los documentos que se emiten ahí.</p>
     </div>
     <div class="pr-panel" data-panel="google" role="tabpanel" aria-label="Google Calendar" hidden>
     <!-- Control SOLO de la maqueta: no se simula ninguna conexión real -->
-    <div class="pr-maq pr-a"><button type="button" class="pr-p pr-demo pr-demo-g">Maqueta: cambiar estado (ahora: sin conectar)</button></div>
+    <div class="pr-maq pr-a"><button type="button" class="pr-p pr-demo pr-demo-g">cambiar estado (ahora: sin conectar)</button></div>
     <!-- Función 16: conectar, estado y cuenta, «Recrear calendario» (con confirmación), «Desconectar»; para no admin, solo el mensaje.
          Estado de sistema «comprobando»: el chip es un esqueleto y no se enseñan acciones. -->
     <section class="pr-tar pr-a" aria-label="Google Calendar">
       <div class="pr-tcab" style="align-items:center"><span class="pr-gic"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg></span>
-        <div class="pr-th"><div class="pr-ghl"><h2>Google Calendar</h2><span class="pr-chip pr-c-neutro pr-goff">Sin conectar</span><span class="pr-chip pr-c-aten pr-gon">Conectado</span><span class="pr-chip pr-c-ag pr-gerr">Sin respuesta</span></div><p class="pr-sub"><span class="pr-goff">Conecta una cuenta para sincronizar tus citas.</span><span class="pr-gon">Sincronización activa: las citas se crean automáticamente.</span><span class="pr-gerr">No se pudo comprobar la conexión.</span></p></div></div>
+        <div class="pr-th"><div class="pr-ghl"><h2>Google Calendar</h2><span class="pr-chip pr-c-neutro pr-goff">Sin conectar</span><span class="pr-chip pr-c-aten pr-gon">Conectado</span><span class="pr-chip pr-c-ag pr-gerr">Sin respuesta</span></div><p class="pr-sub"><span class="pr-goff">Conecta una cuenta para sincronizar tus citas.</span><span class="pr-gon">Sincronización activa — las citas se crean automáticamente.</span><span class="pr-gerr">No se pudo comprobar la conexión.</span></p></div></div>
       <div class="pr-gerr pr-vacio"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18M8.5 16a5 5 0 0 1 7 0M5.3 12.5a9 9 0 0 1 3.2-2M18.7 12.5a9 9 0 0 0-4.9-2.4M2.5 9a14 14 0 0 1 3.3-2.3M21.5 9a14 14 0 0 0-10.7-3.9M12 19.5v.1"/></svg><span>Google no respondió. Tu conexión sigue guardada; no hace falta que la rehagas.</span><button type="button" class="pr-p pr-tonal pr-g-reint"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.6-5.9M20 4.5V9h-4.5"/></svg>Reintentar</button></div>
       <div class="pr-gnoerr">
         <div class="pr-dato"><span class="pr-sub">Calendario</span><b><span class="pr-goff">—</span><span class="pr-gon">Spinus - Dr. Admin Semilla</span></b></div>
@@ -2076,7 +2223,7 @@
       <div class="pr-btns pr-apila pr-goff"><button type="button" class="pr-p pr-prim pr-g-con"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 4.5H6A1.5 1.5 0 0 0 4.5 6v12A1.5 1.5 0 0 0 6 19.5h3.5M13.5 16l4-4-4-4M17.5 12h-10"/></svg>Conectar</button></div>
       <div class="pr-btns pr-apila pr-gon"><button type="button" class="pr-p pr-tonal pr-g-rec"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.6-5.9M20 4.5V9h-4.5"/></svg>Recrear calendario</button><button type="button" class="pr-p pr-pel pr-g-des"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4.5H18a1.5 1.5 0 0 1 1.5 1.5v12a1.5 1.5 0 0 1-1.5 1.5h-3.5M10.5 16l4-4-4-4M14.5 12h-10"/></svg>Desconectar</button></div>
     </section>
-    
+    <p class="pr-nota pr-suelta pr-a pr-gon">Al desconectar, las citas dejan de escribirse en Google. Las que ya se crearon se quedan en tu calendario.</p>
     <section class="pr-tar pr-i" aria-label="Google Calendar">
       <div class="pr-tcab" style="align-items:center"><span class="pr-gic"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg></span>
         <div class="pr-th"><h2>Google Calendar</h2><p class="pr-sub">La conexión es una por clínica y da servicio a todo el equipo.</p></div></div>
@@ -2090,7 +2237,7 @@
         <!-- A0-9: Modo claro / oscuro. En la maqueta el interruptor solo cambia su propio estado; el tema se prueba con los botones «Claro / Oscuro» de la página. -->
         <li><button type="button" role="switch" aria-checked="false" class="pr-ajf pr-sw-b"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg><span class="pr-flex">Modo oscuro</span><span class="pr-sw" aria-hidden="true"></span></button></li>
         <!-- A0-12: Aviso de Privacidad (pestaña nueva) -->
-        <li><a href="#" class="pr-p pr-ajf"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5 5 6v5.5c0 4.3 2.9 7.4 7 9 4.1-1.6 7-4.7 7-9V6z"/><path d="m9.3 12 1.9 1.9 3.6-3.8"/></svg><span class="pr-flex">Aviso de privacidad<small>Se abre en una pestaña nueva</small></span><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color:var(--tinta3)"><path d="M13.5 5H19v5.5M19 5l-8 8M10 6.5H6.5A1.5 1.5 0 0 0 5 8v9.5A1.5 1.5 0 0 0 6.5 19H16a1.5 1.5 0 0 0 1.5-1.5V14"/></svg></a></li>
+        <li><a href="#" class="pr-p pr-ajf"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5 5 6v5.5c0 4.3 2.9 7.4 7 9 4.1-1.6 7-4.7 7-9V6z"/><path d="m9.3 12 1.9 1.9 3.6-3.8"/></svg><span class="pr-flex">Aviso de Privacidad</span><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color:var(--tinta3)"><path d="M13.5 5H19v5.5M19 5l-8 8M10 6.5H6.5A1.5 1.5 0 0 0 5 8v9.5A1.5 1.5 0 0 0 6.5 19H16a1.5 1.5 0 0 0 1.5-1.5V14"/></svg></a></li>
         <!-- A0-10: Cerrar sesión -->
         <li><button type="button" class="pr-p pr-ajf pr-rojo"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4.5H18a1.5 1.5 0 0 1 1.5 1.5v12a1.5 1.5 0 0 1-1.5 1.5h-3.5M10.5 16l4-4-4-4M14.5 12h-10"/></svg><span class="pr-flex">Cerrar sesión</span></button></li>
       </ul></div>
@@ -2110,23 +2257,7 @@
         <div class="pr-idb"><span class="pr-rot">Colores</span><div class="pr-cols"><span class="pr-mu" aria-hidden="true"><span></span><span></span></span><b data-h="paleta">Spinus® (defecto)</b></div><span class="pr-nota">Son el acento de la app y de los documentos que emites.</span></div>
       </div>
     </section>
-        <section class="pr-tar pr-a" aria-label="Vista previa del encabezado en PDF"><div class="pr-f pr-a">
-        <span>Vista previa del encabezado en PDF</span>
-        <!-- Es papel: blanco también en modo oscuro (correcto). La «mesa» gris lo enmarca para que se entienda que es una hoja. -->
-        <div class="pr-mesa" role="img" aria-label="Vista previa del encabezado de tus PDF sobre papel blanco">
-          <div class="pr-papel">
-            <div class="pr-pcab"><span class="pr-plogo" data-h="plogo" hidden><svg aria-hidden="true" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.5"/><path d="M12 5.5v13M9.6 8h4.8M9 11h6M9 14h6M9.6 17h4.8"/></svg></span>
-              <div class="pr-pn"><b data-h="nombre">Dr. Admin Semilla</b><span data-h="esp">Ortopedia y Traumatología</span><small data-h="pceds">• Céd. Prof. 00000001</small></div></div>
-            <div class="pr-pl"></div>
-            <div class="pr-pt"><i></i><i></i><i></i></div>
-          </div>
-        </div>
-        <span class="pr-ay">Así sale impreso: siempre sobre papel blanco.</span>
-      </div></section>
       </div>
-      <div class="pr-panel" data-panel="cons" hidden><section class="pr-tar"><div class="pr-th"><h2>Cómo funcionan</h2></div><p class="pr-nota">El consultorio predeterminado no se puede eliminar sin marcar otro antes. La zona horaria de cada consultorio es la que usan la agenda y los documentos que se emiten ahí.</p></section></div>
-      <div class="pr-panel" data-panel="google" hidden><section class="pr-tar pr-a pr-gon"><div class="pr-th"><h2>Al desconectar</h2></div><p class="pr-nota">Al desconectar, las citas dejan de escribirse en Google. Las que ya se crearon se quedan en tu calendario.</p></section>
-        <section class="pr-tar"><div class="pr-th"><h2>Una conexión por clínica</h2></div><p class="pr-nota">La conexión es una por clínica y da servicio a todo el equipo.</p></section></div>
     </aside>
   </div>
   <!-- Función 18: el asistente de bienvenida (OnboardingGuide) sigue montado en esta pantalla como capa flotante global; su ancla data-onboard="subir-logo" se conserva en el botón del logo. -->
@@ -2190,6 +2321,7 @@
     <div class="pr-abt pr-par"><button type="button" class="pr-p pr-quieto pr-cierra">Cancelar</button><button type="button" class="pr-p pr-pel pr-r-si">Sí, recrear</button></div>
   </div>
 </div>
+
 </div>
 <script>
 (function(){
@@ -2262,7 +2394,7 @@
     /* ---- Maqueta: rol ---- */
     var dRol=$('.pr-demo-rol');
     dRol.addEventListener('click',function(){var inv=m.classList.toggle('pr-inv');dRol.setAttribute('aria-pressed',String(inv));
-      dRol.textContent=inv?'Maqueta: volver a ver como quien administra':'Maqueta: ver como médico invitado';
+      dRol.textContent=inv?'volver a ver como quien administra':'ver como médico invitado';
       logo.pend=false;carga(PERFIL[inv?'inv':'adm']);base=foto();pintaLogo();pinta();cont.scrollTop=0});
 
     /* ---- Firma ---- */
@@ -2303,7 +2435,7 @@
     function utc(z){var o=hZ.querySelector('option[value="'+z+'"]'),r=o&&o.textContent.match(/UTC[+-]\d+/);return r?r[0]:''}
     function refresca(){var fs=filas(),n=fs.length,cl=m.dataset.cl;
       if(cl!=='tope'){cl=n?'n':'vacio';m.dataset.cl=cl}
-      txt('cuenta',cl==='tope'?'10':String(n));dCl.textContent='Maqueta: cambiar lista (ahora: '+CL_NOM[cl]+')';
+      txt('cuenta',cl==='tope'?'10':String(n));dCl.textContent='cambiar lista (ahora: '+CL_NOM[cl]+')';
       $$('.pr-c-add').forEach(function(b){b.disabled=cl==='tope';b.style.opacity=cl==='tope'?'.45':''});
       [].slice.call(res.children).forEach(function(l){l.hidden=true});
       fs.forEach(function(l,i){var d=l.dataset,def=l.hasAttribute('data-def'),no=n===1||def,t=[d.t,utc(d.z)].filter(Boolean).join(' · ');
@@ -2339,7 +2471,7 @@
 
     /* ---- Google Calendar (no se simula ninguna conexión real) ---- */
     var dG=$('.pr-demo-g');
-    function g(s){m.dataset.g=s;dG.textContent='Maqueta: cambiar estado (ahora: '+G_NOM[s]+')'}
+    function g(s){m.dataset.g=s;dG.textContent='cambiar estado (ahora: '+G_NOM[s]+')'}
     dG.addEventListener('click',function(){g(G_EST[(G_EST.indexOf(m.dataset.g)+1)%4])});
     $('.pr-g-rec').addEventListener('click',function(e){abre('recrear',e.currentTarget)});
     $('.pr-r-si').addEventListener('click',function(){cierra();toast('Calendario recreado en tu cuenta de Google')});
@@ -2365,5 +2497,21 @@
     b.addEventListener('click',function(){ms.forEach(function(m){if(d[1]&&m.dataset.tab!==d[1])m.querySelector('.pr-tab[data-tab="'+d[1]+'"]').click();
       m.querySelector(d[0]).click()});sync()});return b});
   sync();var op=ms[0].closest('.op');if(op)op.querySelector('header').appendChild(t);else ms[0].parentNode.insertBefore(t,ms[0]);
+})();
+
+/* Cromo global (CALMA §28): menú «Más» como tarjeta centrada con velo y aviso «N datos pendientes» plegable. */
+(function(){
+  document.querySelectorAll('.pr.marco').forEach(function(m){
+    var c=m.querySelector('.pr-capa-m'),o=null;
+    function cierra(){if(!c)return;c.classList.remove('pr-on');c.setAttribute('aria-hidden','true');if(o&&o.offsetParent)o.focus({preventScroll:true})}
+    if(c){c.querySelector('.pr-velo').addEventListener('click',cierra);
+      m.querySelectorAll('[data-abre-mas]').forEach(function(b){b.addEventListener('click',function(){o=b;c.classList.add('pr-on');c.setAttribute('aria-hidden','false');
+        var f=c.querySelector('.pr-avp-cab,.pr-mo');if(f)f.focus({preventScroll:true})})});
+      c.querySelectorAll('a.pr-mo,.pr-avp-l,.pr-avp-b').forEach(function(a){a.addEventListener('click',function(e){e.preventDefault();cierra()})});
+      m.addEventListener('keydown',function(e){if(e.key==='Escape'&&c.classList.contains('pr-on')){e.preventDefault();cierra()}})}
+    m.querySelectorAll('.pr-avp-cab').forEach(function(b){b.addEventListener('click',function(){
+      var a=b.closest('.pr-avp'),pl=a.classList.toggle('pr-pleg');b.setAttribute('aria-expanded',String(!pl))})});
+    m.querySelectorAll('.pr-lat a[href="#"],.pr-capa-m a[href="#"]').forEach(function(a){a.addEventListener('click',function(e){e.preventDefault()})});
+  });
 })();
 </script>

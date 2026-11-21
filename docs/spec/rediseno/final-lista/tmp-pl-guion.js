@@ -28,7 +28,7 @@
     var st={q:'',ord:'ing',dir:'desc',med:'',desde:'',hasta:'',n:12,rol:'adm',vacia:false,err:false};
     var cont=q('.pl-cont'),cuerpo=q('.pl-cuerpo'),lst=q('.pl-lst'),mas=q('.pl-mas-b'),total=q('.pl-total'),busca=q('.pl-busca'),
         eVac=q('.pl-e-vac'),eVacP=q('.pl-e-vac-p'),eNue=q('.pl-e-nuevo'),eErr=q('.pl-e-err'),menu=q('.pl-menu'),bOrd=q('.pl-ord'),bFil=q('.pl-fil'),
-        origen=null,capaOn=null,mOrigen=null,mTipo='';
+        origen=null,capaOn=null,mOrigen=null,mTipo='',mvelo=q('.pl-mvelo'),cent=vp==='ih'||vp==='iv';
     function defMed(){return st.rol==='inv'?'I':''}
     function filtrado(){return st.med!==defMed()||st.desde!==''||st.hasta!==''}
     function lista(){
@@ -74,15 +74,19 @@
     function ordena(k){st.dir=k===st.ord?(st.dir==='asc'?'desc':'asc'):'asc';st.ord=k;st.n=12;pinta()}
 
     /* ---- Menús y popovers (Duo abierto y computadora) ---- */
-    function cierraMenu(sinFoco){if(!menu||!menu.classList.contains('pl-on'))return;menu.classList.remove('pl-on');mTipo='';
+    function cierraMenu(sinFoco){if(!menu||!menu.classList.contains('pl-on'))return;menu.classList.remove('pl-on');if(mvelo)mvelo.classList.remove('pl-on');mTipo='';
       if(mOrigen){if(mOrigen.isConnected){mOrigen.setAttribute('aria-expanded','false');if(!sinFoco)mOrigen.focus({preventScroll:true})}mOrigen=null}}
     function abreMenu(b,html,rol,tipo,etq){
       if(mOrigen===b){cierraMenu();return}
-      cierraMenu(true);menu.innerHTML=html;menu.setAttribute('role',rol);menu.setAttribute('aria-label',etq);menu.classList.toggle('pl-pf',tipo==='fil');
+      cierraMenu(true);menu.innerHTML=(cent&&tipo!=='fil'?'<div class="pl-mt">'+etq+'</div>':'')+html;menu.setAttribute('role',rol);menu.setAttribute('aria-label',etq);menu.classList.toggle('pl-pf',tipo==='fil');menu.classList.toggle('pl-cent',cent);
       var mr=m.getBoundingClientRect(),z=mr.width/m.offsetWidth,r=b.getBoundingClientRect(),cr=cont.getBoundingClientRect(),
           w=menu.offsetWidth,h=menu.offsetHeight,der=(r.right-mr.left)/z+(tipo==='fila'||tipo==='med'?0:8),top=(r.bottom-mr.top)/z+4,
           maxD=(cr.right-mr.left)/z-4,minI=(cr.left-mr.left)/z+8,izq=Math.min(der,maxD)-w;
       if(izq<minI)izq=minI;
+      /* Duo abierto (horizontal y vertical): tarjeta centrada en el área de contenido, con velo (CALMA §25) */
+      if(cent){var lat=m.querySelector('.pl-lat'),it=parseFloat(getComputedStyle(m).getPropertyValue('--it'))||0,ib=parseFloat(getComputedStyle(m).getPropertyValue('--ib'))||0,
+        ax=m.offsetWidth-(lat?lat.offsetWidth:0);izq=(ax-w)/2;top=it+(m.offsetHeight-it-ib-h)/2;menu.style.left=izq+'px';menu.style.top=top+'px';menu.classList.remove('pl-arr');
+        mvelo.classList.add('pl-on');menu.classList.add('pl-on');mOrigen=b;mTipo=tipo;b.setAttribute('aria-expanded','true');var f0=menu.querySelector('a,button,select');if(f0)f0.focus({preventScroll:true});return}
       var arr=top+h>m.offsetHeight-parseFloat(getComputedStyle(m).getPropertyValue('--ib'))-8;
       if(arr)top=(r.top-mr.top)/z-h-4;
       menu.classList.toggle('pl-arr',arr);menu.style.left=izq+'px';menu.style.top=top+'px';
@@ -95,7 +99,7 @@
       '<span class="pl-msep"></span>'+mi('data-md="asc"','Ascendente',st.dir==='asc',I.arr)+mi('data-md="desc"','Descendente',st.dir==='desc',I.aba)}
     function filtrosHtml(){return '<div class="pl-pf-t">'+ic(I.filtro,18,2)+'Filtros</div><label class="pl-f"><span class="pl-et">Médico</span><span class="pl-sel"><select class="pl-in pl-b-med">'+optsMed()+'</select>'+ic(I.abajo,16,2)+'</span></label>'+
       '<div class="pl-par"><label class="pl-f"><span class="pl-et">Ingreso desde</span><input type="date" class="pl-in pl-b-desde"></label>'+
-      '<label class="pl-f"><span class="pl-et">Ingreso hasta</span><input type="date" class="pl-in pl-b-hasta"></label></div>'}
+      '<label class="pl-f"><span class="pl-et">hasta</span><input type="date" class="pl-in pl-b-hasta"></label></div>'}
 
     /* ---- Hojas (teléfono) ---- */
     function abre(capa,b){origen=b;capaOn=capa;capa.classList.add('pl-on');capa.setAttribute('aria-hidden','false');
@@ -115,7 +119,7 @@
         if(t.dataset.mo){var o1=mOrigen;st.dir=t.dataset.mo===st.ord?st.dir:'asc';st.ord=t.dataset.mo;st.n=12;cierraMenu(true);pinta();o1.focus({preventScroll:true});return}
         if(t.dataset.md){var o2=mOrigen;st.dir=t.dataset.md;st.n=12;cierraMenu(true);pinta();o2.focus({preventScroll:true});return}
         cierraMenu();return}
-      if((t=e.target.closest('.pl-kt'))){abreMenu(t,'<a href="#" class="pl-p pl-mi" role="menuitem">'+ic(I.carpeta,18)+'<span>Ir a expediente</span></a><a href="#" class="pl-p pl-mi" role="menuitem">'+ic(I.lapiz,18)+'<span>Editar paciente</span></a>','menu','fila','Acciones del paciente');return}
+      if((t=e.target.closest('.pl-kt'))){abreMenu(t,'<a href="#" class="pl-p pl-mi" role="menuitem">'+ic(I.carpeta,18)+'<span>Ir a expediente</span></a><a href="#" class="pl-p pl-mi" role="menuitem">'+ic(I.lapiz,18)+'<span>Editar paciente</span></a>','menu','fila',cent?pac(t).nom:'Acciones del paciente');return}
       if((t=e.target.closest('.pl-masn'))){var p=pac(t);
         abreMenu(t,'<ul class="pl-pop-l">'+p.med.map(function(k){return '<li>'+mav(k)+MED[k].l+'</li>'}).join('')+'</ul>','group','med','Médicos');return}
       if((t=e.target.closest('.pl-keb'))){var p2=pac(t);
@@ -150,7 +154,7 @@
     busca.addEventListener('input',function(){st.q=busca.value;st.n=12;pinta()});
     m.addEventListener('keydown',function(e){if(e.key!=='Escape')return;
       if(capaOn){e.preventDefault();cierra()}else if(menu&&menu.classList.contains('pl-on')){e.preventDefault();cierraMenu()}});
-    cont.addEventListener('scroll',function(){cierraMenu(true)});
+    cont.addEventListener('scroll',function(){if(!cent)cierraMenu(true)});
     varia.push(function(){
       cierra();
       if(st.rol!==V.rol){st.rol=V.rol;st.med=defMed();st.desde='';st.hasta='';st.n=12}

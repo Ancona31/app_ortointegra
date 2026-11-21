@@ -36,6 +36,9 @@
 .pl .pl-pista{display:flex;align-items:center;gap:2px;padding:4px;border-radius:26px;background:var(--nav-velo)}
 .pl .pl-pi{position:relative;display:flex;align-items:center;height:40px;padding:0 14px;border-radius:20px;color:var(--nav-tinta);font-size:15px;line-height:20px;font-weight:500;white-space:nowrap}
 .pl .pl-pi::after{content:"";position:absolute;inset:-2px 0}
+/* «Más» es botón (abre una capa): su área de 44 va en la propia caja, sin pseudoelemento */
+.pl button.pl-pi{height:44px;margin:-2px 0}
+.pl button.pl-pi::after{content:none}
 .pl .pl-pi[aria-current="page"]{padding:0 16px;background:var(--accion);color:#fff;font-weight:600}
 .pl .pl-lat{position:relative;z-index:6;flex:none;display:flex;flex-direction:column;background:var(--navy);color:#fff}
 .pl[data-vp="ih"] .pl-lat{width:calc(218px + var(--ir));padding:16px calc(var(--ir) + 10px) calc(var(--ib) + 10px) 12px;border-radius:26px 0 0 26px;box-shadow:var(--sombra-nav-der)}
@@ -269,6 +272,21 @@
 .pl[data-vp="iv"] .pl-menu.pl-pf{width:320px}
 .pl[data-vp="iv"] .pl-pf .pl-in{height:44px;font-size:16px}
 
+/* ---- Pasada final (CALMA §25–§26) ---- */
+/* Duo abierto (horizontal y vertical): los menús y el popover de filtros son tarjeta centrada de 340 con velo; nacen del centro */
+.pl .pl-mvelo{position:absolute;inset:0;z-index:14;background:var(--velo);-webkit-backdrop-filter:blur(10px) saturate(140%);backdrop-filter:blur(10px) saturate(140%);opacity:0;visibility:hidden;transition:opacity 200ms ease-out,visibility 0s linear 200ms}
+.pl .pl-mvelo.pl-on{opacity:1;visibility:visible;transition-delay:0s}
+.pl .pl-menu.pl-cent{width:340px;padding:8px;border-radius:20px;transform-origin:center;box-shadow:var(--sombra-capa)}
+.pl .pl-menu.pl-cent.pl-pf{padding:16px 16px 18px}
+.pl .pl-menu.pl-cent .pl-mi{min-height:44px;font-size:15px;padding:4px 12px}
+.pl .pl-menu.pl-cent .pl-pop-l li{min-height:44px;font-size:15px;padding:0 12px}
+.pl .pl-mt{padding:8px 12px 6px;font-size:17px;line-height:22px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* Duo cerrado (CALMA §26): ninguna capa es hoja inferior; tarjeta de 310 centrada en el área de contenido, sin asa, pie fijo */
+.pl[data-vp="ext"] .pl-capa{display:grid;grid-template-rows:minmax(0,1fr);place-items:center;padding:16px calc(56px + var(--ir) + 8px) calc(var(--ib) + 16px) 8px}
+.pl[data-vp="ext"] .pl-hoja{position:relative;left:auto;right:auto;bottom:auto;width:310px;max-width:100%;max-height:100%;border-radius:20px;padding:8px 16px 16px;opacity:0;transform:scale(.96);transition:transform 320ms cubic-bezier(.32,.72,0,1),opacity 320ms cubic-bezier(.32,.72,0,1)}
+.pl[data-vp="ext"] .pl-on .pl-hoja{opacity:1;transform:none}
+.pl[data-vp="ext"] .pl-asa{display:none}
+.pl[data-vp="ext"] .pl-c-fil .pl-pie{position:sticky;bottom:-16px;z-index:1;margin:16px -16px -16px;padding:12px 16px 16px;background:var(--sup)}
 /* Movimiento reducido: fundido corto en lugar de deslizar o escalar */
 @media (prefers-reduced-motion:reduce){
   .pl .pl-hoja{transform:none;opacity:0;transition:opacity 200ms ease}
@@ -283,6 +301,81 @@
 .pl-tira button{border:1px dashed var(--tinta3);background:none;color:var(--tinta2);font:600 12px/16px var(--fuente);height:28px;padding:0 10px;border-radius:999px;cursor:pointer}
 .pl-tira button[aria-pressed="true"]{border-style:solid;border-color:var(--enlace);color:var(--enlace)}
 .pl-tira button:focus-visible{outline:3px solid var(--enlace);outline-offset:2px}
+
+/* ===== Pasada final: cromo global copiado del dashboard aprobado (CALMA §28) ===== */
+/* ===== Cromo global (CALMA §28): aviso «N datos pendientes», logo de la clínica, «Más» y «Ajustes». Copiado de entrega/cromo/vista-1 ===== */
+.pl .pl-clogo{width:36px;height:36px;flex:none;border-radius:999px;background:#fff;color:var(--accion);display:flex;align-items:center;justify-content:center}
+.pl .pl-lat-pie{border-top:1px solid var(--nav-velo);padding-top:8px;display:flex;align-items:center;gap:4px}
+.pl .pl-lat-pie .pl-yo{flex:1;min-width:0;text-align:left}
+.pl .pl-lat-pie .pl-nib{color:var(--nav-tinta2)}
+.pl[data-vp="ih"] .pl-esp{display:none}
+.pl[data-vp="ih"] .pl-lat .pl-lat-pie .pl-yo{padding:0 8px}
+.pl[data-vp="ih"] .pl-lat .pl-lat-pie .pl-yo>svg{display:none}
+.pl[data-vp="ih"] .pl-lat .pl-lat-pie .pl-nib{width:36px;height:36px}
+.pl .pl-esp{color:var(--nav-tinta)!important}
+.pl .pl-yo{min-height:48px;height:auto;padding-top:6px;padding-bottom:6px}
+.pl .pl-yo>span{display:flex;flex-direction:column;line-height:17px}
+.pl .pl-yo small{font-size:12px;line-height:16px;color:var(--nav-tinta2)}
+.pl .pl-nib{position:relative;width:44px;height:44px;flex:none;border-radius:999px;display:flex;align-items:center;justify-content:center;color:var(--nav-tinta)}
+.pl .pl-mnw{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:16px;pointer-events:none}
+.pl[data-vp="ext"] .pl-mnw{padding:16px calc(56px + var(--ir) + 8px) calc(var(--ib) + 16px) 8px}
+.pl[data-vp="iv"] .pl-mnw{padding:calc(var(--it) + 16px) 24px 24px}
+.pl[data-vp="ih"] .pl-mnw{padding:24px calc(218px + var(--ir) + 24px) calc(var(--ib) + 16px) 24px}
+.pl[data-vp="esc"] .pl-mnw{padding:32px 24px 32px calc(248px + 24px)}
+.pl .pl-mn{pointer-events:auto;width:310px;max-width:100%;max-height:100%;overflow-y:auto;scrollbar-width:none;background:var(--sup);color:var(--tinta);border-radius:20px;box-shadow:var(--sombra-capa);padding:8px;opacity:0;transform:scale(.96);transition:opacity 200ms ease-out,transform 360ms linear(0,0.123,0.3397,0.54,0.6943,0.8032,0.8762,0.9234,0.9533,0.9718,0.9831,0.99,0.9941,0.9965,0.998,1)}
+.pl[data-vp="iv"] .pl-mn,.pl[data-vp="ih"] .pl-mn,.pl[data-vp="esc"] .pl-mn{width:340px}
+.pl .pl-mn-t{padding:8px 12px 6px;font-size:17px;line-height:22px;font-weight:700}
+.pl .pl-mo{display:flex;align-items:center;gap:12px;width:100%;min-height:48px;padding:0 12px;border-radius:12px;font-size:15px;line-height:20px;color:var(--tinta);text-align:left}
+.pl .pl-mo{position:relative}
+.pl .pl-mo+.pl-mo::before{content:"";position:absolute;left:44px;right:12px;top:0;height:1px;background:var(--linea)}
+.pl .pl-mo>svg:first-child{color:var(--enlace)}
+.pl .pl-mo>.pl-mo-f{margin-left:auto;color:var(--tinta3)}
+.pl .pl-mo-v{margin-left:auto;font-size:15px;color:var(--tinta2)}
+.pl .pl-mo-v+.pl-mo-f{margin-left:4px}
+.pl .pl-ap{border-radius:14px;background:var(--ag-fondo);color:var(--tinta);margin:0 0 10px}
+.pl .pl-mn .pl-ap{margin:2px 0 8px}
+.pl.pl-n0 .pl-ap{display:none}
+.pl .pl-ap-cab{display:flex;align-items:center;gap:10px;width:100%;min-height:44px;padding:8px 10px 8px 12px;border-radius:14px;text-align:left;color:var(--ag-tinta)}
+.pl[data-vp="ih"] .pl-lat .pl-ap-cab,.pl[data-vp="esc"] .pl-ap-cab{min-height:40px;padding:6px 10px 6px 12px}
+.pl .pl-ap-cab:focus-visible{outline:3px solid var(--enlace);outline-offset:2px}
+.pl .pl-ap-pt{position:relative;width:22px;height:22px;flex:none;border-radius:7px;background:color-mix(in srgb,var(--ag-punto) 22%,transparent)}
+.pl .pl-ap-pt::before,.pl .pl-ap-pt::after{content:"";position:absolute;left:7px;top:7px;width:8px;height:8px;border-radius:999px;background:var(--ag-punto)}
+.pl .pl-ap-pt::after{animation:pl-latido 3.2s cubic-bezier(.2,.6,.3,1) infinite}
+@keyframes pl-latido{0%{transform:scale(1);opacity:.65}34%{transform:scale(2.7);opacity:0}100%{transform:scale(2.7);opacity:0}}
+.pl .pl-ap-t{flex:1;min-width:0;font-size:15px;line-height:20px;font-weight:700;font-variant-numeric:tabular-nums}
+.pl .pl-ap-ch{transition:transform 240ms cubic-bezier(.32,.72,0,1)}
+.pl .pl-ap.pl-pleg .pl-ap-ch{transform:rotate(180deg)}
+.pl .pl-ap-c{display:flex;flex-direction:column;padding:0 12px 12px;transition:opacity 180ms ease-out,transform 180ms ease-out}
+.pl .pl-ap.pl-pleg .pl-ap-c{display:none}
+.pl.pl-sal .pl-ap-c,.pl.pl-ent .pl-ap-c{opacity:0;transform:translateY(-4px)}
+.pl .pl-ap-sep{display:block;height:1px;margin:0 0 2px;background:color-mix(in srgb,var(--ag-tinta) 22%,transparent)}
+.pl .pl-ap-l{display:flex;align-items:flex-start;gap:10px;min-height:44px;padding:12px 2px;border-radius:8px;font-size:14px;line-height:20px;font-weight:600;color:var(--tinta)}
+.pl .pl-ap-l svg{margin-top:1px;color:var(--ag-tinta)}
+.pl[data-vp="ih"] .pl-lat .pl-ap-l,.pl[data-vp="esc"] .pl-ap-l{min-height:36px;padding:8px 2px}
+.pl.pl-n2 .pl-ap-l[data-k="cedula"],.pl.pl-n1 .pl-ap-l[data-k="cedula"],.pl.pl-n1 .pl-ap-l[data-k="logo"]{display:none}
+.pl .pl-ap-b{position:relative;margin-top:6px;display:flex;align-items:center;justify-content:center;gap:6px;height:40px;border-radius:10px;background:var(--ag-tinta);color:var(--ag-fondo);font-size:14px;line-height:18px;font-weight:600}
+.pl .pl-ap-b::after{content:"";position:absolute;inset:-2px 0}
+.pl[data-vp="ih"] .pl-lat .pl-ap-b,.pl[data-vp="esc"] .pl-ap-b{height:36px}
+.pl[data-vp="ih"] .pl-lat .pl-ap-b::after,.pl[data-vp="esc"] .pl-ap-b::after{display:none}
+.pl .pl-lado .pl-bdg{top:0;right:-5px}
+.pl[data-vp="ih"] .pl-lat .pl-ap{margin:0 -10px 8px -4px}
+.pl[data-vp="ih"] .pl-lat .pl-ap-cab{padding:6px 8px;gap:8px}
+.pl[data-vp="ih"] .pl-lat .pl-ap-t{font-size:14px;line-height:18px}
+.pl[data-vp="ih"] .pl-lat .pl-ap-c{padding:0 10px 10px}
+.pl[data-vp="ih"] .pl-lat .pl-ap-l{gap:8px}
+.pl[data-vp="ih"] .pl-lat .pl-ap-c{padding-bottom:10px}
+.pl[data-vp="ih"] .pl-lat .pl-ap-sep{margin:0}
+.pl[data-vp="ih"] .pl-lat .pl-ap-b{margin-top:4px}
+.pl[data-vp="ih"] .pl-lat .pl-yo{min-height:44px;padding-top:0;padding-bottom:0}
+.pl .pl-bdg{position:absolute;top:-3px;right:-3px;min-width:22px;height:22px;padding:0 5px;border-radius:999px;background:var(--ag-punto);color:var(--navy);border:2px solid var(--navy);display:flex;align-items:center;justify-content:center;font-size:12px;line-height:16px;font-weight:700;font-variant-numeric:tabular-nums;pointer-events:none}
+.pl .pl-rb .pl-bdg{top:2px;right:2px}
+.pl.pl-n0 .pl-bdg,.pl.pl-sec .pl-bdg{display:none}
+.pl .pl-rb,.pl .pl-lado,.pl .pl-hamb{position:relative}
+.pl[data-vp="ih"] .pl-lat .pl-lista{margin-top:12px}
+.pl[data-vp="ih"] .pl-lat .pl-cons-b{margin-top:8px}
+.pl .pl-capa-m.pl-on .pl-mn{opacity:1;transform:none;transition:opacity 240ms ease-out,transform 520ms linear(0,0.0803,0.2398,0.4083,0.5568,0.6769,0.769,0.8374,0.8869,0.9221,0.9468,0.9639,0.9756,0.9836,0.9891,0.9927,0.9952,0.9968,0.9979,0.9986,1)}
+
+@media (prefers-reduced-motion:reduce){.pl .pl-ap-pt::after{animation:none;opacity:0}.pl .pl-mn,.pl .pl-capa-m.pl-on .pl-mn{transform:none;transition:opacity 200ms ease}.pl .pl-ap-c,.pl .pl-ap-ch{transition:none}}
 </style>
 <div class="marco pl" data-vp="ext">
 <div class="pl-app">
@@ -330,9 +423,9 @@
       <p>No se pudo cargar la lista de pacientes</p>
       <button type="button" class="pl-p pl-ton pl-reintenta">Reintentar</button>
     </section>
-  </div></main><!-- A0: navegación. Riel a la derecha, fundido con la franja. La secretaria solo ve Inicio, Pacientes y Agenda. -->
+  </div></main><!-- A0: navegación. Riel a la derecha, fundido con la franja. La secretaria ve Inicio, Expediente, Agenda y «Más» (sus Ajustes). El distintivo ámbar de «···» cuenta los datos pendientes (solo médico). -->
 <nav class="pl-riel" aria-label="Navegación principal">
-  <a href="#" class="pl-p pl-rb" aria-label="Inicio"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg></a><a href="#" class="pl-p pl-rb" aria-label="Expediente" aria-current="page"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.9.7 3.1 2.4 3.5 5.2"/></svg></a><a href="#" class="pl-p pl-rb" aria-label="Agenda"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg></a><a href="#" class="pl-p pl-rb pl-m" aria-label="Documentos"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg></a><a href="#" class="pl-p pl-rb pl-m" aria-label="Más"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 12h.01M12 12h.01M18 12h.01"/></svg></a>
+  <a href="#" class="pl-p pl-rb" aria-label="Inicio"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg></a><a href="#" class="pl-p pl-rb" aria-label="Expediente" aria-current="page"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.9.7 3.1 2.4 3.5 5.2"/></svg></a><a href="#" class="pl-p pl-rb" aria-label="Agenda"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg></a><a href="#" class="pl-p pl-rb pl-m" aria-label="Documentos"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg></a><button type="button" class="pl-p pl-rb" aria-label="Más" data-abre-mas><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 12h.01M12 12h.01M18 12h.01"/></svg><span class="pl-bdg pl-m" aria-hidden="true">3</span></button>
   <span class="pl-flex"></span>
   <button type="button" class="pl-p pl-mas pl-m" aria-label="Nueva consulta"><svg aria-hidden="true" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg></button>
   <button type="button" class="pl-p pl-mas pl-s" aria-label="Agendar cita"><svg aria-hidden="true" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg></button>
@@ -366,15 +459,33 @@
     <div class="pl-accs"><a href="#" class="pl-p pl-mi pl-ac"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2.5h8a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span>Ir a expediente</span></a><a href="#" class="pl-p pl-mi pl-ac"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/></svg><span>Editar paciente</span></a></div>
   </div>
 </div>
+<!-- Menú «Más» (CALMA §28): tarjeta centrada con velo, copiado del dashboard. -->
+<div class="pl-capa pl-capa-m" aria-hidden="true"><div class="pl-velo"></div><div class="pl-mnw"><div class="pl-mn" role="dialog" aria-modal="true" aria-label="Más"><h2 class="pl-mn-t">Más</h2>
+  <div class="pl-ap pl-m" role="status" aria-live="polite">
+    <button type="button" class="pl-p pl-ap-cab" aria-expanded="true" aria-controls="pl-av-ext-mas">
+      <span class="pl-ap-pt" aria-hidden="true"></span><span class="pl-ap-t">3 datos pendientes</span><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="pl-ap-ch"><path d="m18 15-6-6-6 6"/></svg>
+    </button>
+    <div class="pl-ap-c" id="pl-av-ext-mas">
+      <span class="pl-ap-sep" aria-hidden="true"></span>
+      <a href="#" class="pl-p pl-ap-l" data-k="firma"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.4 3.6a2.1 2.1 0 0 1 3 3L7.4 18.6a2 2 0 0 1-.9.5l-2.9.8a.5.5 0 0 1-.6-.6l.8-2.9a2 2 0 0 1 .5-.9z"/></svg><span>Documentos sin firma</span></a><a href="#" class="pl-p pl-ap-l" data-k="cedula"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22h6a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v3"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><circle cx="5" cy="14" r="3"/><path d="M7 16.5 8 22l-3-1-3 1 1-5.5"/></svg><span>Sin cédula de especialidad</span></a><a href="#" class="pl-p pl-ap-l" data-k="logo"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></svg><span>Clínica sin logo</span></a>
+      <a href="#" class="pl-p pl-ap-b">Completar ahora<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg></a>
+    </div>
+  </div>
+    <!-- Selector de consultorio activo (A0·2): en Duo cerrado no hay barra lateral, así que vive aquí; solo médico con 2 o más consultorios. Ver vista 2. -->
+    <button type="button" class="pl-p pl-mo pl-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 9 4-4 4 4M8 15l4 4 4-4"/></svg><span>Consultorio activo</span><span class="pl-mo-v">Centro</span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="pl-mo-f"><path d="m9 6 6 6-6 6"/></svg></button>
+    <a href="#" class="pl-p pl-mo pl-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20v-8M12 20V5M19 20v-9"/></svg><span>Administración</span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="pl-mo-f"><path d="m9 6 6 6-6 6"/></svg></a><a href="#" class="pl-p pl-mo pl-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18.2c1.3-2 3.2-3 5.5-3s4.2 1 5.5 3"/></svg><span>Mi perfil</span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="pl-mo-f"><path d="m9 6 6 6-6 6"/></svg></a><a href="#" class="pl-p pl-mo pl-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.6M12 17h.01"/></svg><span>Ayuda</span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="pl-mo-f"><path d="m9 6 6 6-6 6"/></svg></a>
+    <!-- Secretaria (CALMA db28): sin Mi perfil; en «Más» encuentra sus «Ajustes» -->
+    <div class="pl-s"><button type="button" class="pl-p pl-mo pl-tema"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg><span>Modo oscuro</span></button><a href="#" class="pl-p pl-mo"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21c-4.5-2.2-7-5.6-7-10V5.5L12 3l7 2.5V11c0 4.4-2.5 7.8-7 10z"/></svg><span>Aviso de Privacidad</span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="pl-mo-f"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg></a><button type="button" class="pl-p pl-mo pl-salir"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4"/></svg><span>Cerrar sesión</span></button></div>
+</div></div></div>
 </div>
 <div class="marco pl" data-vp="tel">
 <div class="pl-app">
 <!-- A0: encabezado fundido con la barra de estado -->
 <header class="pl-enc">
-  <button type="button" class="pl-p pl-hamb" aria-label="Menú"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+  <button type="button" class="pl-p pl-hamb" aria-label="Menú"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg><span class="pl-bdg pl-m" aria-hidden="true">3</span></button>
   <span class="pl-enc-t">Expediente</span>
   <span class="pl-flex"></span>
-  <button type="button" class="pl-p pl-av pl-av-g" aria-label="Mi perfil"><span class="pl-m pl-a">AS</span><span class="pl-i">IS</span><span class="pl-s">SE</span></button>
+  <button type="button" class="pl-p pl-av pl-av-g pl-m" aria-label="Mi perfil"><span class="pl-a">AS</span><span class="pl-i">IS</span></button><button type="button" class="pl-p pl-av pl-av-g pl-s" aria-label="Ajustes" data-abre-mas>SE</button>
 </header><main class="pl-cont"><div class="pl-col">
     <header class="pl-cab">
       <div class="pl-tit">
@@ -449,6 +560,7 @@
     <div class="pl-accs"><a href="#" class="pl-p pl-mi pl-ac"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2.5h8a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span>Ir a expediente</span></a><a href="#" class="pl-p pl-mi pl-ac"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/></svg><span>Editar paciente</span></a></div>
   </div>
 </div>
+
 </div>
 <div class="marco pl" data-vp="ih">
 <div class="pl-app">
@@ -500,24 +612,36 @@
   </div></main><!-- A0: navegación (barra lateral) -->
 <nav class="pl-lat" aria-label="Navegación principal">
   <div class="pl-lat-cab"><span class="pl-logo"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.5"/><path d="M12 5.5v13M9.6 8h4.8M9 11h6M9 14h6M9.6 17h4.8"/></svg><span class="pl-logo-n">Spinus</span></span><span class="pl-plan pl-m">Plan VIP</span></div>
-  <button type="button" class="pl-p pl-cons-b"><span class="pl-av"><span class="pl-m pl-a">AS</span><span class="pl-i">IS</span><span class="pl-s">SE</span></span><span class="pl-cons-t"><span class="pl-m">Consultorio</span><b class="pl-m">Centro</b><span class="pl-s">Clínica</span><b class="pl-s">Clínica Semilla A</b></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 9 4-4 4 4M8 15l4 4 4-4"/></svg></button>
+  <button type="button" class="pl-p pl-cons-b"><span class="pl-clogo" role="img" aria-label="Logo de Clínica Semilla A"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21c-4.5-2.2-7-5.6-7-10V5.5L12 3l7 2.5V11c0 4.4-2.5 7.8-7 10z"/><path d="M12 8v7M8.5 11.5h7"/></svg></span><span class="pl-cons-t"><span class="pl-m">Consultorio</span><b class="pl-m">Centro</b><span class="pl-s">Clínica</span><b class="pl-s">Clínica Semilla A</b></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 9 4-4 4 4M8 15l4 4 4-4"/></svg></button>
   <div class="pl-lista"><a href="#" class="pl-p pl-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Inicio</a><a href="#" class="pl-p pl-li" aria-current="page"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.9.7 3.1 2.4 3.5 5.2"/></svg>Expediente</a><a href="#" class="pl-p pl-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Agenda</a><a href="#" class="pl-p pl-li pl-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>Documentos</a><a href="#" class="pl-p pl-li pl-m pl-a"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20v-8M12 20V5M19 20v-9"/></svg>Administración</a></div>
   <span class="pl-flex"></span>
-  <div class="pl-lat-pie"><a href="#" class="pl-p pl-li pl-yo"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18.2c1.3-2 3.2-3 5.5-3s4.2 1 5.5 3"/></svg><span><span class="pl-m pl-a">Dr. Admin Semilla</span><span class="pl-i">Dra. Invitada Semilla</span><span class="pl-s">Secretaria Semilla</span><small class="pl-m">Mi perfil · Ajustes</small><small class="pl-s">Asistente</small></span></a></div>
+  <!-- Aviso «N datos pendientes» (solo médico; plegado en Duo abierto) y pie de hoy: médico «Mi perfil · Ajustes» + Ayuda; secretaria «Ajustes». -->
+  <div class="pl-ap pl-m pl-pleg" role="status" aria-live="polite">
+    <button type="button" class="pl-p pl-ap-cab" aria-expanded="false" aria-controls="pl-av-ih-lat">
+      <span class="pl-ap-pt" aria-hidden="true"></span><span class="pl-ap-t">3 datos pendientes</span><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="pl-ap-ch"><path d="m18 15-6-6-6 6"/></svg>
+    </button>
+    <div class="pl-ap-c" id="pl-av-ih-lat">
+      <span class="pl-ap-sep" aria-hidden="true"></span>
+      <a href="#" class="pl-p pl-ap-l" data-k="firma"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.4 3.6a2.1 2.1 0 0 1 3 3L7.4 18.6a2 2 0 0 1-.9.5l-2.9.8a.5.5 0 0 1-.6-.6l.8-2.9a2 2 0 0 1 .5-.9z"/></svg><span>Documentos sin firma</span></a><a href="#" class="pl-p pl-ap-l" data-k="cedula"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22h6a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v3"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><circle cx="5" cy="14" r="3"/><path d="M7 16.5 8 22l-3-1-3 1 1-5.5"/></svg><span>Sin cédula de especialidad</span></a><a href="#" class="pl-p pl-ap-l" data-k="logo"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></svg><span>Clínica sin logo</span></a>
+      <a href="#" class="pl-p pl-ap-b">Completar ahora<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg></a>
+    </div>
+  </div>
+  <div class="pl-lat-pie"><a href="#" class="pl-p pl-li pl-yo pl-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18.2c1.3-2 3.2-3 5.5-3s4.2 1 5.5 3"/></svg><span><span class="pl-a">Dr. Admin Semilla</span><span class="pl-i">Dra. Invitada Semilla</span><small class="pl-esp">Ortopedia y Traumatología</small><small>Mi perfil · Ajustes</small></span></a><a href="#" class="pl-p pl-nib pl-ay pl-m" aria-label="Ayuda"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.6M12 17h.01"/></svg></a><button type="button" class="pl-p pl-li pl-yo pl-s pl-abre-aj" aria-haspopup="menu"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span><span>Secretaria Semilla</span><small>Ajustes</small></span></button></div>
 </nav>
 </div>
-<!-- Menú de fila, lista de médicos, menú de orden y popover de filtros: un solo contenedor que nace del botón que lo abre, sin velo (CALMA §21).
-     Se cierra con Esc, al tocar fuera o al desplazar. En Duo abierto ya no esquiva la bisagra (CALMA §18). -->
-<div class="pl-menu"></div>
+<!-- Menú de fila, lista de médicos, menú de orden y popover de filtros: un solo contenedor. En computadora nace del botón que lo abre, sin velo (CALMA §21);
+     en Duo abierto (horizontal y vertical) es tarjeta centrada con velo (CALMA §25). Se cierra con Esc o al tocar fuera. -->
+<div class="pl-mvelo"></div><div class="pl-menu"></div>
+
 </div>
 <div class="marco pl" data-vp="iv">
 <div class="pl-app">
 <!-- A0 en Duo abierto vertical (CALMA §19): encabezado fundido con la barra de estado. A la izquierda «Mostrar barra lateral» abre el menú completo
-     (Administración, Mi perfil, Ayuda); al centro las cuatro secciones y «Más» (el mismo menú que el «···» del riel; CALMA §23.9) como píldoras; a la derecha el avatar. La secretaria no ve Documentos. -->
+     (Administración, Mi perfil, Ayuda); al centro las cuatro secciones y «Más» (el mismo menú que el «···» del riel; CALMA §23.9) como píldoras; a la derecha el avatar. La secretaria no ve Documentos; su «Más» lleva sus Ajustes. -->
 <header class="pl-encv">
-  <button type="button" class="pl-p pl-lado" aria-label="Mostrar barra lateral"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="15" rx="3"/><path d="M9.5 4.5v15"/></svg></button>
-  <nav class="pl-pista" aria-label="Navegación principal"><a href="#" class="pl-p pl-pi">Inicio</a><a href="#" class="pl-p pl-pi" aria-current="page">Expediente</a><a href="#" class="pl-p pl-pi">Agenda</a><a href="#" class="pl-p pl-pi pl-m">Documentos</a><a href="#" class="pl-p pl-pi pl-m" aria-haspopup="menu">Más</a></nav>
-  <button type="button" class="pl-p pl-av pl-av-g" aria-label="Mi perfil"><span class="pl-m pl-a">AS</span><span class="pl-i">IS</span><span class="pl-s">SE</span></button>
+  <button type="button" class="pl-p pl-lado" aria-label="Mostrar barra lateral"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="15" rx="3"/><path d="M9.5 4.5v15"/></svg><span class="pl-bdg pl-m" aria-hidden="true">3</span></button>
+  <nav class="pl-pista" aria-label="Navegación principal"><a href="#" class="pl-p pl-pi">Inicio</a><a href="#" class="pl-p pl-pi" aria-current="page">Expediente</a><a href="#" class="pl-p pl-pi">Agenda</a><a href="#" class="pl-p pl-pi pl-m">Documentos</a><button type="button" class="pl-p pl-pi" aria-haspopup="dialog" data-abre-mas>Más</button></nav>
+  <button type="button" class="pl-p pl-av pl-av-g pl-m" aria-label="Mi perfil"><span class="pl-a">AS</span><span class="pl-i">IS</span></button><button type="button" class="pl-p pl-av pl-av-g pl-s" aria-label="Ajustes" data-abre-mas>SE</button>
 </header><main class="pl-cont"><div class="pl-col">
     <header class="pl-cab">
       <div class="pl-tit">
@@ -565,19 +689,48 @@
     </section>
   </div></main>
 </div>
-<!-- Menú de fila, lista de médicos, menú de orden y popover de filtros: un solo contenedor que nace del botón que lo abre, sin velo (CALMA §21).
-     Se cierra con Esc, al tocar fuera o al desplazar. En Duo abierto ya no esquiva la bisagra (CALMA §18). -->
-<div class="pl-menu"></div>
+<!-- Menú de fila, lista de médicos, menú de orden y popover de filtros: un solo contenedor. En computadora nace del botón que lo abre, sin velo (CALMA §21);
+     en Duo abierto (horizontal y vertical) es tarjeta centrada con velo (CALMA §25). Se cierra con Esc o al tocar fuera. -->
+<div class="pl-mvelo"></div><div class="pl-menu"></div>
+<!-- Menú «Más» (CALMA §28): tarjeta centrada con velo, copiado del dashboard. -->
+<div class="pl-capa pl-capa-m" aria-hidden="true"><div class="pl-velo"></div><div class="pl-mnw"><div class="pl-mn" role="dialog" aria-modal="true" aria-label="Más"><h2 class="pl-mn-t">Más</h2>
+  <div class="pl-ap pl-m" role="status" aria-live="polite">
+    <button type="button" class="pl-p pl-ap-cab" aria-expanded="true" aria-controls="pl-av-iv-mas">
+      <span class="pl-ap-pt" aria-hidden="true"></span><span class="pl-ap-t">3 datos pendientes</span><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="pl-ap-ch"><path d="m18 15-6-6-6 6"/></svg>
+    </button>
+    <div class="pl-ap-c" id="pl-av-iv-mas">
+      <span class="pl-ap-sep" aria-hidden="true"></span>
+      <a href="#" class="pl-p pl-ap-l" data-k="firma"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.4 3.6a2.1 2.1 0 0 1 3 3L7.4 18.6a2 2 0 0 1-.9.5l-2.9.8a.5.5 0 0 1-.6-.6l.8-2.9a2 2 0 0 1 .5-.9z"/></svg><span>Documentos sin firma</span></a><a href="#" class="pl-p pl-ap-l" data-k="cedula"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22h6a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v3"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><circle cx="5" cy="14" r="3"/><path d="M7 16.5 8 22l-3-1-3 1 1-5.5"/></svg><span>Sin cédula de especialidad</span></a><a href="#" class="pl-p pl-ap-l" data-k="logo"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></svg><span>Clínica sin logo</span></a>
+      <a href="#" class="pl-p pl-ap-b">Completar ahora<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg></a>
+    </div>
+  </div>
+    <!-- Selector de consultorio activo (A0·2): en Duo cerrado no hay barra lateral, así que vive aquí; solo médico con 2 o más consultorios. Ver vista 2. -->
+    <button type="button" class="pl-p pl-mo pl-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 9 4-4 4 4M8 15l4 4 4-4"/></svg><span>Consultorio activo</span><span class="pl-mo-v">Centro</span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="pl-mo-f"><path d="m9 6 6 6-6 6"/></svg></button>
+    <a href="#" class="pl-p pl-mo pl-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20v-8M12 20V5M19 20v-9"/></svg><span>Administración</span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="pl-mo-f"><path d="m9 6 6 6-6 6"/></svg></a><a href="#" class="pl-p pl-mo pl-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18.2c1.3-2 3.2-3 5.5-3s4.2 1 5.5 3"/></svg><span>Mi perfil</span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="pl-mo-f"><path d="m9 6 6 6-6 6"/></svg></a><a href="#" class="pl-p pl-mo pl-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.6M12 17h.01"/></svg><span>Ayuda</span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="pl-mo-f"><path d="m9 6 6 6-6 6"/></svg></a>
+    <!-- Secretaria (CALMA db28): sin Mi perfil; en «Más» encuentra sus «Ajustes» -->
+    <div class="pl-s"><button type="button" class="pl-p pl-mo pl-tema"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg><span>Modo oscuro</span></button><a href="#" class="pl-p pl-mo"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21c-4.5-2.2-7-5.6-7-10V5.5L12 3l7 2.5V11c0 4.4-2.5 7.8-7 10z"/></svg><span>Aviso de Privacidad</span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="pl-mo-f"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg></a><button type="button" class="pl-p pl-mo pl-salir"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4"/></svg><span>Cerrar sesión</span></button></div>
+</div></div></div>
 </div>
 <div class="marco pl" data-vp="esc">
 <div class="pl-app">
 <!-- A0: navegación (barra lateral) -->
 <nav class="pl-lat" aria-label="Navegación principal">
   <div class="pl-lat-cab"><span class="pl-logo"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.5"/><path d="M12 5.5v13M9.6 8h4.8M9 11h6M9 14h6M9.6 17h4.8"/></svg><span class="pl-logo-n">Spinus</span></span><span class="pl-plan pl-m">Plan VIP</span></div>
-  <button type="button" class="pl-p pl-cons-b"><span class="pl-av"><span class="pl-m pl-a">AS</span><span class="pl-i">IS</span><span class="pl-s">SE</span></span><span class="pl-cons-t"><span class="pl-m">Consultorio</span><b class="pl-m">Centro</b><span class="pl-s">Clínica</span><b class="pl-s">Clínica Semilla A</b></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 9 4-4 4 4M8 15l4 4 4-4"/></svg></button>
+  <button type="button" class="pl-p pl-cons-b"><span class="pl-clogo" role="img" aria-label="Logo de Clínica Semilla A"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21c-4.5-2.2-7-5.6-7-10V5.5L12 3l7 2.5V11c0 4.4-2.5 7.8-7 10z"/><path d="M12 8v7M8.5 11.5h7"/></svg></span><span class="pl-cons-t"><span class="pl-m">Consultorio</span><b class="pl-m">Centro</b><span class="pl-s">Clínica</span><b class="pl-s">Clínica Semilla A</b></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 9 4-4 4 4M8 15l4 4 4-4"/></svg></button>
   <div class="pl-lista"><a href="#" class="pl-p pl-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Inicio</a><a href="#" class="pl-p pl-li" aria-current="page"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.9.7 3.1 2.4 3.5 5.2"/></svg>Expediente</a><a href="#" class="pl-p pl-li"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Agenda</a><a href="#" class="pl-p pl-li pl-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>Documentos</a><a href="#" class="pl-p pl-li pl-m pl-a"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20v-8M12 20V5M19 20v-9"/></svg>Administración</a></div>
   <span class="pl-flex"></span>
-  <div class="pl-lat-pie"><a href="#" class="pl-p pl-li pl-yo"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18.2c1.3-2 3.2-3 5.5-3s4.2 1 5.5 3"/></svg><span><span class="pl-m pl-a">Dr. Admin Semilla</span><span class="pl-i">Dra. Invitada Semilla</span><span class="pl-s">Secretaria Semilla</span><small class="pl-m">Mi perfil · Ajustes</small><small class="pl-s">Asistente</small></span></a></div>
+  <!-- Aviso «N datos pendientes» (solo médico; plegado en Duo abierto) y pie de hoy: médico «Mi perfil · Ajustes» + Ayuda; secretaria «Ajustes». -->
+  <div class="pl-ap pl-m" role="status" aria-live="polite">
+    <button type="button" class="pl-p pl-ap-cab" aria-expanded="true" aria-controls="pl-av-esc-lat">
+      <span class="pl-ap-pt" aria-hidden="true"></span><span class="pl-ap-t">3 datos pendientes</span><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="pl-ap-ch"><path d="m18 15-6-6-6 6"/></svg>
+    </button>
+    <div class="pl-ap-c" id="pl-av-esc-lat">
+      <span class="pl-ap-sep" aria-hidden="true"></span>
+      <a href="#" class="pl-p pl-ap-l" data-k="firma"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.4 3.6a2.1 2.1 0 0 1 3 3L7.4 18.6a2 2 0 0 1-.9.5l-2.9.8a.5.5 0 0 1-.6-.6l.8-2.9a2 2 0 0 1 .5-.9z"/></svg><span>Documentos sin firma</span></a><a href="#" class="pl-p pl-ap-l" data-k="cedula"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22h6a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v3"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><circle cx="5" cy="14" r="3"/><path d="M7 16.5 8 22l-3-1-3 1 1-5.5"/></svg><span>Sin cédula de especialidad</span></a><a href="#" class="pl-p pl-ap-l" data-k="logo"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></svg><span>Clínica sin logo</span></a>
+      <a href="#" class="pl-p pl-ap-b">Completar ahora<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg></a>
+    </div>
+  </div>
+  <div class="pl-lat-pie"><a href="#" class="pl-p pl-li pl-yo pl-m"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18.2c1.3-2 3.2-3 5.5-3s4.2 1 5.5 3"/></svg><span><span class="pl-a">Dr. Admin Semilla</span><span class="pl-i">Dra. Invitada Semilla</span><small class="pl-esp">Ortopedia y Traumatología</small><small>Mi perfil · Ajustes</small></span></a><a href="#" class="pl-p pl-nib pl-ay pl-m" aria-label="Ayuda"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.6M12 17h.01"/></svg></a><button type="button" class="pl-p pl-li pl-yo pl-s pl-abre-aj" aria-haspopup="menu"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span><span>Secretaria Semilla</span><small>Ajustes</small></span></button></div>
 </nav><main class="pl-cont"><div class="pl-col">
     <header class="pl-cab">
       <div class="pl-tit">
@@ -625,9 +778,10 @@
     </section>
   </div></main>
 </div>
-<!-- Menú de fila, lista de médicos, menú de orden y popover de filtros: un solo contenedor que nace del botón que lo abre, sin velo (CALMA §21).
-     Se cierra con Esc, al tocar fuera o al desplazar. En Duo abierto ya no esquiva la bisagra (CALMA §18). -->
-<div class="pl-menu"></div>
+<!-- Menú de fila, lista de médicos, menú de orden y popover de filtros: un solo contenedor. En computadora nace del botón que lo abre, sin velo (CALMA §21);
+     en Duo abierto (horizontal y vertical) es tarjeta centrada con velo (CALMA §25). Se cierra con Esc o al tocar fuera. -->
+<div class="pl-mvelo"></div><div class="pl-menu"></div>
+
 </div>
 <script>
 (function(){
@@ -660,7 +814,7 @@
     var st={q:'',ord:'ing',dir:'desc',med:'',desde:'',hasta:'',n:12,rol:'adm',vacia:false,err:false};
     var cont=q('.pl-cont'),cuerpo=q('.pl-cuerpo'),lst=q('.pl-lst'),mas=q('.pl-mas-b'),total=q('.pl-total'),busca=q('.pl-busca'),
         eVac=q('.pl-e-vac'),eVacP=q('.pl-e-vac-p'),eNue=q('.pl-e-nuevo'),eErr=q('.pl-e-err'),menu=q('.pl-menu'),bOrd=q('.pl-ord'),bFil=q('.pl-fil'),
-        origen=null,capaOn=null,mOrigen=null,mTipo='';
+        origen=null,capaOn=null,mOrigen=null,mTipo='',mvelo=q('.pl-mvelo'),cent=vp==='ih'||vp==='iv';
     function defMed(){return st.rol==='inv'?'I':''}
     function filtrado(){return st.med!==defMed()||st.desde!==''||st.hasta!==''}
     function lista(){
@@ -706,15 +860,19 @@
     function ordena(k){st.dir=k===st.ord?(st.dir==='asc'?'desc':'asc'):'asc';st.ord=k;st.n=12;pinta()}
 
     /* ---- Menús y popovers (Duo abierto y computadora) ---- */
-    function cierraMenu(sinFoco){if(!menu||!menu.classList.contains('pl-on'))return;menu.classList.remove('pl-on');mTipo='';
+    function cierraMenu(sinFoco){if(!menu||!menu.classList.contains('pl-on'))return;menu.classList.remove('pl-on');if(mvelo)mvelo.classList.remove('pl-on');mTipo='';
       if(mOrigen){if(mOrigen.isConnected){mOrigen.setAttribute('aria-expanded','false');if(!sinFoco)mOrigen.focus({preventScroll:true})}mOrigen=null}}
     function abreMenu(b,html,rol,tipo,etq){
       if(mOrigen===b){cierraMenu();return}
-      cierraMenu(true);menu.innerHTML=html;menu.setAttribute('role',rol);menu.setAttribute('aria-label',etq);menu.classList.toggle('pl-pf',tipo==='fil');
+      cierraMenu(true);menu.innerHTML=(cent&&tipo!=='fil'?'<div class="pl-mt">'+etq+'</div>':'')+html;menu.setAttribute('role',rol);menu.setAttribute('aria-label',etq);menu.classList.toggle('pl-pf',tipo==='fil');menu.classList.toggle('pl-cent',cent);
       var mr=m.getBoundingClientRect(),z=mr.width/m.offsetWidth,r=b.getBoundingClientRect(),cr=cont.getBoundingClientRect(),
           w=menu.offsetWidth,h=menu.offsetHeight,der=(r.right-mr.left)/z+(tipo==='fila'||tipo==='med'?0:8),top=(r.bottom-mr.top)/z+4,
           maxD=(cr.right-mr.left)/z-4,minI=(cr.left-mr.left)/z+8,izq=Math.min(der,maxD)-w;
       if(izq<minI)izq=minI;
+      /* Duo abierto (horizontal y vertical): tarjeta centrada en el área de contenido, con velo (CALMA §25) */
+      if(cent){var lat=m.querySelector('.pl-lat'),it=parseFloat(getComputedStyle(m).getPropertyValue('--it'))||0,ib=parseFloat(getComputedStyle(m).getPropertyValue('--ib'))||0,
+        ax=m.offsetWidth-(lat?lat.offsetWidth:0);izq=(ax-w)/2;top=it+(m.offsetHeight-it-ib-h)/2;menu.style.left=izq+'px';menu.style.top=top+'px';menu.classList.remove('pl-arr');
+        mvelo.classList.add('pl-on');menu.classList.add('pl-on');mOrigen=b;mTipo=tipo;b.setAttribute('aria-expanded','true');var f0=menu.querySelector('a,button,select');if(f0)f0.focus({preventScroll:true});return}
       var arr=top+h>m.offsetHeight-parseFloat(getComputedStyle(m).getPropertyValue('--ib'))-8;
       if(arr)top=(r.top-mr.top)/z-h-4;
       menu.classList.toggle('pl-arr',arr);menu.style.left=izq+'px';menu.style.top=top+'px';
@@ -727,7 +885,7 @@
       '<span class="pl-msep"></span>'+mi('data-md="asc"','Ascendente',st.dir==='asc',I.arr)+mi('data-md="desc"','Descendente',st.dir==='desc',I.aba)}
     function filtrosHtml(){return '<div class="pl-pf-t">'+ic(I.filtro,18,2)+'Filtros</div><label class="pl-f"><span class="pl-et">Médico</span><span class="pl-sel"><select class="pl-in pl-b-med">'+optsMed()+'</select>'+ic(I.abajo,16,2)+'</span></label>'+
       '<div class="pl-par"><label class="pl-f"><span class="pl-et">Ingreso desde</span><input type="date" class="pl-in pl-b-desde"></label>'+
-      '<label class="pl-f"><span class="pl-et">Ingreso hasta</span><input type="date" class="pl-in pl-b-hasta"></label></div>'}
+      '<label class="pl-f"><span class="pl-et">hasta</span><input type="date" class="pl-in pl-b-hasta"></label></div>'}
 
     /* ---- Hojas (teléfono) ---- */
     function abre(capa,b){origen=b;capaOn=capa;capa.classList.add('pl-on');capa.setAttribute('aria-hidden','false');
@@ -747,7 +905,7 @@
         if(t.dataset.mo){var o1=mOrigen;st.dir=t.dataset.mo===st.ord?st.dir:'asc';st.ord=t.dataset.mo;st.n=12;cierraMenu(true);pinta();o1.focus({preventScroll:true});return}
         if(t.dataset.md){var o2=mOrigen;st.dir=t.dataset.md;st.n=12;cierraMenu(true);pinta();o2.focus({preventScroll:true});return}
         cierraMenu();return}
-      if((t=e.target.closest('.pl-kt'))){abreMenu(t,'<a href="#" class="pl-p pl-mi" role="menuitem">'+ic(I.carpeta,18)+'<span>Ir a expediente</span></a><a href="#" class="pl-p pl-mi" role="menuitem">'+ic(I.lapiz,18)+'<span>Editar paciente</span></a>','menu','fila','Acciones del paciente');return}
+      if((t=e.target.closest('.pl-kt'))){abreMenu(t,'<a href="#" class="pl-p pl-mi" role="menuitem">'+ic(I.carpeta,18)+'<span>Ir a expediente</span></a><a href="#" class="pl-p pl-mi" role="menuitem">'+ic(I.lapiz,18)+'<span>Editar paciente</span></a>','menu','fila',cent?pac(t).nom:'Acciones del paciente');return}
       if((t=e.target.closest('.pl-masn'))){var p=pac(t);
         abreMenu(t,'<ul class="pl-pop-l">'+p.med.map(function(k){return '<li>'+mav(k)+MED[k].l+'</li>'}).join('')+'</ul>','group','med','Médicos');return}
       if((t=e.target.closest('.pl-keb'))){var p2=pac(t);
@@ -782,7 +940,7 @@
     busca.addEventListener('input',function(){st.q=busca.value;st.n=12;pinta()});
     m.addEventListener('keydown',function(e){if(e.key!=='Escape')return;
       if(capaOn){e.preventDefault();cierra()}else if(menu&&menu.classList.contains('pl-on')){e.preventDefault();cierraMenu()}});
-    cont.addEventListener('scroll',function(){cierraMenu(true)});
+    cont.addEventListener('scroll',function(){if(!cent)cierraMenu(true)});
     varia.push(function(){
       cierra();
       if(st.rol!==V.rol){st.rol=V.rol;st.med=defMed();st.desde='';st.hasta='';st.n=12}
@@ -806,4 +964,14 @@
   if(marcos.length){var op=marcos[0].closest('.op');
     if(op&&op.querySelector('header'))op.querySelector('header').appendChild(tira);else marcos[0].parentNode.insertBefore(tira,marcos[0])}
 })();
+(function(){/* Menú «Más» y aviso «N datos pendientes» (copiado del dashboard) */
+document.querySelectorAll(".pl.marco").forEach(function(m){var c=m.querySelector(".pl-capa-m"),o=null;
+ function cierra(){c.classList.remove("pl-on");c.setAttribute("aria-hidden","true");if(o&&o.offsetParent)o.focus({preventScroll:true})}
+ if(c){c.querySelector(".pl-velo").addEventListener("click",cierra);
+  c.querySelectorAll("a.pl-mo,button.pl-mo").forEach(function(b){b.addEventListener("click",function(e){e.preventDefault();cierra()})});
+  m.addEventListener("keydown",function(e){if(e.key==="Escape"&&c.classList.contains("pl-on")){e.preventDefault();cierra()}});
+  m.querySelectorAll("[data-abre-mas]").forEach(function(b){b.addEventListener("click",function(){o=b;c.classList.add("pl-on");c.setAttribute("aria-hidden","false");var f=[].filter.call(c.querySelectorAll(".pl-ap-cab,.pl-mo"),function(x){return x.offsetParent})[0];if(f)f.focus({preventScroll:true})})})}
+ m.querySelectorAll(".pl-ap-cab").forEach(function(b){b.addEventListener("click",function(){var a=b.closest(".pl-ap"),pl=a.classList.toggle("pl-pleg");b.setAttribute("aria-expanded",String(!pl))})});
+ m.querySelectorAll(".pl-ap a").forEach(function(a){a.addEventListener("click",function(e){e.preventDefault()})});
+})})();
 </script>

@@ -5,8 +5,7 @@
 .PX .PX-az[aria-current="true"]{box-shadow:inset 0 0 0 2px var(--accion)}
 
 /* ---- Pareja de las alertas «Cambiar» / «Gestionar»: siempre lado a lado ---- */
-.PX .PX-alerta .PX-par:has(.PX-camb-ok),.PX .PX-alerta .PX-par:has(.PX-tope-ok){flex-wrap:nowrap}
-.PX .PX-alerta .PX-par:has(.PX-camb-ok)>*,.PX .PX-alerta .PX-par:has(.PX-tope-ok)>*{flex:1 1 0;min-width:0}
+/* (sin regla propia: rótulos cortos, la pareja común los deja lado a lado; ver PIEZAS §13) */
 
 /* ---- §18 · Duo abierto horizontal: capas centradas con los anchos de computadora, sin esquivar la bisagra ---- */
 .PX[data-vp="ih"] .PX-alerta{width:340px}

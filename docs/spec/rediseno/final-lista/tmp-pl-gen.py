@@ -29,40 +29,49 @@ I = dict(
     logo='<circle cx="12" cy="12" r="9.5"/><path d="M12 5.5v13M9.6 8h4.8M9 11h6M9 14h6M9.6 17h4.8"/>',
 )
 INI = '<span class="pl-m pl-a">AS</span><span class="pl-i">IS</span><span class="pl-s">SE</span>'
+# Pasada final (CALMA §28): aviso, «Más», logo de la clínica y pie, copiados del dashboard aprobado
+import importlib.util as _iu
+_sp = _iu.spec_from_file_location('cromo_u2', '/tmp/claude-0/-home-user-app-ortointegra/c6f872cd-9586-537f-8cbb-7c91e620cbb1/scratchpad/tools/tmp-u2-cromo.py')
+_CM = _iu.module_from_spec(_sp); _sp.loader.exec_module(_CM)
+CR = _CM.piezas('pl', 'pl-hamb', inv=True)
+# Avatar del encabezado: el médico abre Mi perfil; la secretaria, que no tiene Mi perfil, sus «Ajustes» en «Más»
+AVS = '<button type="button" class="pl-p pl-av pl-av-g pl-m" aria-label="Mi perfil"><span class="pl-a">AS</span><span class="pl-i">IS</span></button><button type="button" class="pl-p pl-av pl-av-g pl-s" aria-label="Ajustes" data-abre-mas>SE</button>'
 
 # ---------- Navegación (copiada del referente; activo: Pacientes) ----------
 def riel():
     def b(k, t, act=False, cl=''):
         a = ' aria-current="page"' if act else ''
         return f'<a href="#" class="pl-p pl-rb{cl}" aria-label="{t}"{a}>{ic(I[k], 22)}</a>'
-    return f'''<!-- A0: navegación. Riel a la derecha, fundido con la franja. La secretaria solo ve Inicio, Pacientes y Agenda. -->
+    return f'''<!-- A0: navegación. Riel a la derecha, fundido con la franja. La secretaria ve Inicio, Expediente, Agenda y «Más» (sus Ajustes). El distintivo ámbar de «···» cuenta los datos pendientes (solo médico). -->
 <nav class="pl-riel" aria-label="Navegación principal">
-  {b("inicio","Inicio")}{b("pac","Expediente",True)}{b("agenda","Agenda")}{b("docs","Documentos",cl=" pl-m")}<a href="#" class="pl-p pl-rb pl-m" aria-label="Más">{ic(I["mas"], 22, 3)}</a>
+  {b("inicio","Inicio")}{b("pac","Expediente",True)}{b("agenda","Agenda")}{b("docs","Documentos",cl=" pl-m")}<button type="button" class="pl-p pl-rb" aria-label="Más" data-abre-mas>{ic(I["mas"], 22, 3)}{CR.BDG}</button>
   <span class="pl-flex"></span>
   <button type="button" class="pl-p pl-mas pl-m" aria-label="Nueva consulta">{ic(I["plus"], 26, 2.4)}</button>
   <button type="button" class="pl-p pl-mas pl-s" aria-label="Agendar cita">{ic(I["plus"], 26, 2.4)}</button>
 </nav>'''
 
-def lateral():
+def lateral(vp):
     def a(k, t, act=False, cl=''):
         c = ' aria-current="page"' if act else ''
         return f'<a href="#" class="pl-p pl-li{cl}"{c}>{ic(I[k], 20)}{t}</a>'
     return f'''<!-- A0: navegación (barra lateral) -->
 <nav class="pl-lat" aria-label="Navegación principal">
   <div class="pl-lat-cab"><span class="pl-logo">{ic(I["logo"], 24, 1.8)}<span class="pl-logo-n">Spinus</span></span><span class="pl-plan pl-m">Plan VIP</span></div>
-  <button type="button" class="pl-p pl-cons-b"><span class="pl-av">{INI}</span><span class="pl-cons-t"><span class="pl-m">Consultorio</span><b class="pl-m">Centro</b><span class="pl-s">Clínica</span><b class="pl-s">Clínica Semilla A</b></span>{ic(I["selector"], 16, 2)}</button>
+  <button type="button" class="pl-p pl-cons-b">{CR.CLOGO}<span class="pl-cons-t"><span class="pl-m">Consultorio</span><b class="pl-m">Centro</b><span class="pl-s">Clínica</span><b class="pl-s">Clínica Semilla A</b></span>{ic(I["selector"], 16, 2)}</button>
   <div class="pl-lista">{a("inicio","Inicio")}{a("pac","Expediente",True)}{a("agenda","Agenda")}{a("docs","Documentos",cl=" pl-m")}{a("admin","Administración",cl=" pl-m pl-a")}</div>
   <span class="pl-flex"></span>
-  <div class="pl-lat-pie"><a href="#" class="pl-p pl-li pl-yo">{ic(I["perfil"], 20)}<span><span class="pl-m pl-a">Dr. Admin Semilla</span><span class="pl-i">Dra. Invitada Semilla</span><span class="pl-s">Secretaria Semilla</span><small class="pl-m">Mi perfil · Ajustes</small><small class="pl-s">Asistente</small></span></a></div>
+  <!-- Aviso «N datos pendientes» (solo médico; plegado en Duo abierto) y pie de hoy: médico «Mi perfil · Ajustes» + Ayuda; secretaria «Ajustes». -->
+{CR.ap(vp, "lat")}
+  {CR.PIE}
 </nav>'''
 
 def encabezado():
     return f'''<!-- A0: encabezado fundido con la barra de estado -->
 <header class="pl-enc">
-  <button type="button" class="pl-p pl-hamb" aria-label="Menú">{ic(I["menu"], 22, 2)}</button>
+  <button type="button" class="pl-p pl-hamb" aria-label="Menú">{ic(I["menu"], 22, 2)}{CR.BDG}</button>
   <span class="pl-enc-t">Expediente</span>
   <span class="pl-flex"></span>
-  <button type="button" class="pl-p pl-av pl-av-g" aria-label="Mi perfil">{INI}</button>
+  {AVS}
 </header>'''
 
 def encv():
@@ -70,11 +79,11 @@ def encv():
         c = ' aria-current="page"' if act else ''
         return f'<a href="#" class="pl-p pl-pi{cl}"{c}>{t}</a>'
     return f'''<!-- A0 en Duo abierto vertical (CALMA §19): encabezado fundido con la barra de estado. A la izquierda «Mostrar barra lateral» abre el menú completo
-     (Administración, Mi perfil, Ayuda); al centro las cuatro secciones y «Más» (el mismo menú que el «···» del riel; CALMA §23.9) como píldoras; a la derecha el avatar. La secretaria no ve Documentos. -->
+     (Administración, Mi perfil, Ayuda); al centro las cuatro secciones y «Más» (el mismo menú que el «···» del riel; CALMA §23.9) como píldoras; a la derecha el avatar. La secretaria no ve Documentos; su «Más» lleva sus Ajustes. -->
 <header class="pl-encv">
-  <button type="button" class="pl-p pl-lado" aria-label="Mostrar barra lateral">{ic(I["lado"], 20)}</button>
-  <nav class="pl-pista" aria-label="Navegación principal">{a("Inicio")}{a("Expediente",True)}{a("Agenda")}{a("Documentos",cl=" pl-m")}<a href="#" class="pl-p pl-pi pl-m" aria-haspopup="menu">Más</a></nav>
-  <button type="button" class="pl-p pl-av pl-av-g" aria-label="Mi perfil">{INI}</button>
+  <button type="button" class="pl-p pl-lado" aria-label="Mostrar barra lateral">{ic(I["lado"], 20)}{CR.BDG}</button>
+  <nav class="pl-pista" aria-label="Navegación principal">{a("Inicio")}{a("Expediente",True)}{a("Agenda")}{a("Documentos",cl=" pl-m")}<button type="button" class="pl-p pl-pi" aria-haspopup="dialog" data-abre-mas>Más</button></nav>
+  {AVS}
 </header>'''
 
 # ---------- Contenido ----------
@@ -151,9 +160,9 @@ def cont(vp):
 # ---------- Capas ----------
 def capas(vp):
     if vp in ('ih', 'iv', 'esc'):
-        return '''<!-- Menú de fila, lista de médicos, menú de orden y popover de filtros: un solo contenedor que nace del botón que lo abre, sin velo (CALMA §21).
-     Se cierra con Esc, al tocar fuera o al desplazar. En Duo abierto ya no esquiva la bisagra (CALMA §18). -->
-<div class="pl-menu"></div>'''
+        return '''<!-- Menú de fila, lista de médicos, menú de orden y popover de filtros: un solo contenedor. En computadora nace del botón que lo abre, sin velo (CALMA §21);
+     en Duo abierto (horizontal y vertical) es tarjeta centrada con velo (CALMA §25). Se cierra con Esc o al tocar fuera. -->
+<div class="pl-mvelo"></div><div class="pl-menu"></div>'''
     ops = ''.join(f'<button type="button" class="pl-p pl-op" data-o="{v}" aria-pressed="false">{t}</button>'
                   for v, t in (('ape', 'Apellido'), ('nom', 'Nombre'), ('ing', 'Fecha de ingreso'), ('edad', 'Edad'), ('exp', 'N.º de expediente')))
     return f'''<!-- F12: hoja «Filtrar y ordenar». Trabaja sobre un borrador: solo «Ver resultados» aplica; la X, tocar fuera o Esc cierran sin aplicar.
@@ -194,14 +203,14 @@ def marco(vp):
     elif vp == 'tel':
         app = encabezado() + cont(vp)
     elif vp == 'ih':
-        app = cont(vp) + lateral()
+        app = cont(vp) + lateral(vp)
     elif vp == 'iv':
         app = encv() + cont(vp)
     else:
-        app = lateral() + cont(vp)
-    return f'<div class="marco pl" data-vp="{vp}">\n<div class="pl-app">\n{app}\n</div>\n{capas(vp)}\n</div>'
+        app = lateral(vp) + cont(vp)
+    return f'<div class="marco pl" data-vp="{vp}">\n<div class="pl-app">\n{app}\n</div>\n{capas(vp)}\n{CR.capa_mas(vp)}\n</div>'
 
 out = ('<!-- NOMBRE: Expediente (lista de pacientes) | Misma lista limpia, ahora con carácter: vuelven los avatares en pastel, el dato que ordena la lista resalta, orden y filtros van en azul con su icono, los menús llevan iconos de color y los estados vacíos tienen icono y botón -->\n'
-       '<style>\n' + CSS + '</style>\n' + '\n'.join(marco(v) for v in ('ext', 'tel', 'ih', 'iv', 'esc')) + '\n<script>\n' + JS + '</script>\n')
+       '<style>\n' + CSS + CR.CSS + '</style>\n' + '\n'.join(marco(v) for v in ('ext', 'tel', 'ih', 'iv', 'esc')) + '\n<script>\n' + JS + CR.js() + '</script>\n')
 open(f'{L}/vista-lista.html', 'w').write(out)
 print(len(out))

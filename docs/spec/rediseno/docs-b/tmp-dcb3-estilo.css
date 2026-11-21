@@ -485,3 +485,78 @@
 .QQ[data-vp="iv"] .QQ-hoja.QQ-alta{--hw:520px}
 .QQ[data-vp="iv"] .QQ-hoja.QQ-ancha{--hw:min(640px, calc(100% - 32px))}
 .QQ[data-vp="iv"] .QQ-hoja.QQ-menu{--hw:320px}
+
+/* ================= PASADA FINAL (CALMA §25–§28) ================= */
+/* §26 · Duo cerrado: ninguna capa es hoja inferior. Toda capa es TARJETA CENTRADA en el área de contenido (sin riel ni franja), 310 de ancho, sin asa */
+.QQ[data-vp="ext"]{--cx:calc((100% - 56px - var(--ir)) / 2);--ct:0px;--cb:var(--ib);--aw:310px}
+.QQ[data-vp="ext"] .QQ-hoja{top:0;bottom:var(--ib);right:auto;left:calc(var(--cx) - 155px);width:310px;height:fit-content;max-height:calc(100% - var(--ib) - 32px);margin-block:auto;border-radius:20px;padding-bottom:12px;opacity:0;transform:scale(.96)}
+.QQ[data-vp="ext"] .QQ-hoja.QQ-act{opacity:1;transform:none}
+.QQ[data-vp="ext"] .QQ-hoja.QQ-alta{height:fit-content}
+.QQ[data-vp="ext"] .QQ-asa{display:none}
+.QQ[data-vp="ext"] .QQ-hj-cab{padding-top:12px}
+/* Pies de capa (PIEZAS §13): ancho por contenido, a la derecha; centrados en Duo vertical */
+.QQ .QQ-hj-p{justify-content:flex-end}
+.QQ .QQ-hj-p>button,.QQ .QQ-par>button{flex:0 1 auto;min-width:96px}
+.QQ[data-vp="iv"] .QQ-hj-p,.QQ[data-vp="iv"] .QQ-par{justify-content:center}
+
+/* §28 · Navegación: logo de la clínica, aviso «N datos pendientes», distintivo, pie con Mi perfil · Ajustes y Ayuda, cajón y menú «Más» */
+.QQ .QQ-clogo{width:36px;height:36px;flex:none;border-radius:999px;background:#fff;color:var(--accion);display:flex;align-items:center;justify-content:center}
+.QQ .QQ-cons-b{width:100%}
+.QQ .QQ-lat-pie{display:flex;align-items:center;gap:4px}
+.QQ .QQ-lat-pie .QQ-yo{flex:1;min-width:0;text-align:left;min-height:48px;height:auto;padding-top:6px;padding-bottom:6px}
+.QQ .QQ-yo>span{display:flex;flex-direction:column;line-height:17px}
+.QQ .QQ-esp{color:var(--nav-tinta)!important}
+.QQ .QQ-ay{position:relative;width:44px;height:44px;flex:none;border-radius:999px;display:flex;align-items:center;justify-content:center;color:var(--nav-tinta2)}
+.QQ[data-vp="ih"] .QQ-esp{display:none}
+.QQ[data-vp="ih"] .QQ-lat .QQ-lat-pie .QQ-yo{padding:0 8px;min-height:44px}
+.QQ[data-vp="ih"] .QQ-lat .QQ-lat-pie .QQ-yo>svg{display:none}
+.QQ[data-vp="ih"] .QQ-lat .QQ-ay,.QQ[data-vp="esc"] .QQ-ay{width:36px;height:36px}
+.QQ[data-vp="ih"] .QQ-lat .QQ-lista{margin-top:12px}
+.QQ[data-vp="ih"] .QQ-lat .QQ-cons-b{margin-top:8px}
+.QQ .QQ-lat-x{color:var(--nav-tinta)}
+.QQ .QQ-ap{border-radius:14px;background:var(--ag-fondo);color:var(--tinta);margin:0 0 10px}
+.QQ .QQ-hj-c .QQ-ap{margin:2px 0 8px}
+.QQ .QQ-ap-cab{display:flex;align-items:center;gap:10px;width:100%;min-height:44px;padding:8px 10px 8px 12px;border-radius:14px;text-align:left;color:var(--ag-tinta)}
+.QQ[data-vp="ih"] .QQ-lat .QQ-ap-cab,.QQ[data-vp="esc"] .QQ-lat .QQ-ap-cab{min-height:40px;padding:6px 10px 6px 12px}
+.QQ .QQ-ap-pt{position:relative;width:22px;height:22px;flex:none;border-radius:7px;background:color-mix(in srgb,var(--ag-punto) 22%,transparent)}
+.QQ .QQ-ap-pt::before,.QQ .QQ-ap-pt::after{content:"";position:absolute;left:7px;top:7px;width:8px;height:8px;border-radius:999px;background:var(--ag-punto)}
+.QQ .QQ-ap-pt::after{animation:QQ-latido 3.2s cubic-bezier(.2,.6,.3,1) infinite}
+@keyframes QQ-latido{0%{transform:scale(1);opacity:.65}34%{transform:scale(2.7);opacity:0}100%{transform:scale(2.7);opacity:0}}
+.QQ .QQ-ap-t{flex:1;min-width:0;font-size:15px;line-height:20px;font-weight:700;font-variant-numeric:tabular-nums}
+.QQ .QQ-ap-ch{transition:transform 240ms cubic-bezier(.32,.72,0,1)}
+.QQ .QQ-ap.QQ-pleg .QQ-ap-ch{transform:rotate(180deg)}
+.QQ .QQ-ap-c{display:flex;flex-direction:column;padding:0 12px 12px}
+.QQ .QQ-ap.QQ-pleg .QQ-ap-c{display:none}
+.QQ .QQ-ap-sep{display:block;height:1px;margin:0 0 2px;background:color-mix(in srgb,var(--ag-tinta) 22%,transparent)}
+.QQ .QQ-ap-l{display:flex;align-items:flex-start;gap:10px;min-height:44px;padding:12px 2px;border-radius:8px;font-size:14px;line-height:20px;font-weight:600;color:var(--tinta)}
+.QQ .QQ-ap-l svg{margin-top:1px;color:var(--ag-tinta)}
+.QQ[data-vp="esc"] .QQ-lat .QQ-ap-l{min-height:36px;padding:8px 2px}
+.QQ .QQ-ap-b{position:relative;margin-top:6px;display:flex;align-items:center;justify-content:center;gap:6px;height:40px;border-radius:10px;background:var(--ag-tinta);color:var(--ag-fondo);font-size:14px;line-height:18px;font-weight:600}
+.QQ .QQ-ap-b::after{content:"";position:absolute;inset:-2px 0}
+.QQ[data-vp="esc"] .QQ-lat .QQ-ap-b{height:36px}
+.QQ[data-vp="esc"] .QQ-lat .QQ-ap-b::after{display:none}
+.QQ[data-vp="ih"] .QQ-lat .QQ-ap{margin:0 -10px 8px -4px}
+.QQ[data-vp="ih"] .QQ-lat .QQ-ap-cab{padding:6px 8px;gap:8px}
+.QQ[data-vp="ih"] .QQ-lat .QQ-ap-t{font-size:14px;line-height:18px}
+.QQ .QQ-bdg{position:absolute;top:-3px;right:-3px;min-width:22px;height:22px;padding:0 5px;border-radius:999px;background:var(--ag-punto);color:var(--navy);border:2px solid var(--navy);display:flex;align-items:center;justify-content:center;font-size:12px;line-height:16px;font-weight:700;font-variant-numeric:tabular-nums;pointer-events:none}
+.QQ .QQ-rb{position:relative}
+.QQ .QQ-rb .QQ-bdg{top:2px;right:2px}
+.QQ .QQ-menu-b,.QQ .QQ-fun-b{position:relative}
+.QQ .QQ-fun-b .QQ-bdg{top:0;right:-5px}
+/* Cajón (iPhone y Duo vertical): la barra lateral completa entra desde la izquierda */
+.QQ .QQ-cajon{left:0;top:0;bottom:0;width:300px;display:flex;flex-direction:column;overflow-y:auto;scrollbar-width:none;padding:calc(var(--it) + 12px) 14px calc(var(--ib) + 12px) 14px;background:var(--navy);color:#fff;border-radius:0 26px 26px 0;box-shadow:var(--sombra-nav-izq);transform:translateX(-106%)}
+.QQ[data-vp="iv"] .QQ-cajon{width:320px}
+.QQ .QQ-cajon.QQ-act{transform:none}
+.QQ .QQ-cajon .QQ-lat-cab{padding-right:0}
+.QQ .QQ-cajon .QQ-p:focus-visible{outline-color:var(--nav-tinta)}
+/* «Más»: tarjeta centrada (Duo cerrado 310, Duo vertical 340) */
+.QQ[data-vp="iv"] .QQ-hoja.QQ-m-mas{--hw:340px}
+.QQ .QQ-m-mas .QQ-mr{color:var(--tinta)}
+@media (prefers-reduced-motion:reduce){
+  .QQ .QQ-ap-pt::after{animation:none;opacity:0}
+  .QQ .QQ-cajon,.QQ .QQ-cajon.QQ-act{transform:none}
+}
+
+/* En Duo abierto horizontal «Imprimir» no cambia de ancho mientras genera: el estado se lee en una línea sobre la barra */
+.QQ .QQ-est{justify-content:flex-end}
+.QQ .QQ-est .QQ-giro{flex:none;margin-top:1px;width:14px;height:14px}

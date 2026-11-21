@@ -13,6 +13,12 @@
       PAL=svg('<path d="m5 12.5 4.5 4.5L19 7.5"/>',20,2.2),FL=svg('<path d="m9 6 6 6-6 6"/>',14,2.4),
       SEL=svg('<path d="m8 9 4-4 4 4M8 15l4 4 4-4"/>',16,2),MAS=svg('<path d="M6 12h.01M12 12h.01M18 12h.01"/>',22,3),EQ=svg('<path d="M6 6l12 12M18 6 6 18"/>',20,2);
   function norm(s){return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'')}
+  /* Caminos entre vistas de la MISMA página publicada (kit/INTEGRACION.md §3): desplazamiento hasta la vista del tipo y realce de su marco.
+     Fuera de la página de Documentos (archivo suelto) la vista puede no existir: entonces no se mueve nada. */
+  var VISTA={entrada:'1-entrada',receta:'2-receta',lab:'3-laboratorio',imagen:'4-imagenologia',suplementacion:'5-suplementacion',internamiento:'6-internamiento',escrito:'7-escrito',consentimiento:'8-consentimiento',honorarios:'9-honorarios'};
+  function irA(k){var op=document.querySelector('.op[data-op="'+VISTA[k]+'"]');if(!op)return;var e=op.querySelector('.esc')||op;
+    try{op.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'start'})}catch(x){op.scrollIntoView()}
+    e.style.outline='3px solid var(--accion)';e.style.outlineOffset='4px';clearTimeout(e.__rz);e.__rz=setTimeout(function(){e.style.outline='';e.style.outlineOffset=''},1800)}
   var NOMBRE={receta:'Receta',lab:'Laboratorio',imagen:'Imagenología',suplementacion:'Suplementación',internamiento:'Internamiento',escrito:'Escrito médico',consentimiento:'Consentimiento',honorarios:'Honorarios / Cotización'};
   /* Catálogos de muestra (en la app: data/medicamentos.ts y lib/estudiosLab.ts) */
   var VIAS=['Oral','Tópica','Intramuscular','Intravenosa','Subcutánea','Sublingual','Oftálmica','Ótica','Nasal','Inhalatoria','Rectal','Transdérmica'];
@@ -49,6 +55,8 @@
     B.cerrar=function(sinFin){B.$$('.ZQ-pan').forEach(function(p){p.classList.remove('ZQ-act')});capa.classList.remove('ZQ-on');B.abierta=null;var f=alCerrar;alCerrar=null;if(f&&!sinFin)f()};
     B.aviso=function(t,ms){toast.firstChild.textContent=t;toast.classList.add('ZQ-on');clearTimeout(tt);tt=setTimeout(function(){toast.classList.remove('ZQ-on')},ms||2600)};
     B.$('.ZQ-velo').addEventListener('click',function(){B.cerrar()});
+    B.$$('[data-abre-mas]').forEach(function(b){b.addEventListener('click',function(){B.abrir('mas')})});
+    B.$$('.ZQ-ap-cab').forEach(function(b){b.addEventListener('click',function(){var a=b.closest('.ZQ-ap'),pl=a.classList.toggle('ZQ-pleg');b.setAttribute('aria-expanded',String(!pl))})});
     m.addEventListener('click',function(e){var a=e.target.closest('a[href="#"]');if(a)e.preventDefault();
       if(e.target.closest('.ZQ-x')||e.target.closest('.ZQ-cancelar'))B.cerrar()});
     m.addEventListener('keydown',function(e){if(e.key==='Escape'&&B.abierta){e.stopPropagation();B.cerrar()}});
@@ -86,7 +94,7 @@
       else if(e.target.closest('.ZQ-al-mismo')){B.cerrar();elegir('07','Paciente Prueba 07')}
       else if(e.target.closest('.ZQ-al-otro')){$('.ZQ-al-dup').hidden=true;crear(true)}
       else if(e.target.closest('.ZQ-al-dupno'))$('.ZQ-al-dup').hidden=true;
-      else if((b=e.target.closest('.ZQ-paso2 .ZQ-z')))B.aviso('Maqueta: se abre el formulario de '+NOMBRE[b.dataset.t]+' (vistas siguientes)')});
+      else if((b=e.target.closest('.ZQ-paso2 .ZQ-z')))irA(b.dataset.t)});
     return function(c){B.foco=false;B.cerrar(true);limpiar();inp.value='';busca(true);
       if(c==='res'){inp.value='prueba 1';busca(true)}
       else if(c==='nada'){inp.value='Paciente Nuevo';busca(true)}
@@ -156,7 +164,7 @@
       $('.ZQ-gn-otro').hidden=p!=='listo'||S.noG}
     function generado(noG){S.noG=noG;$('.ZQ-gn-ok').hidden=noG;$('.ZQ-gn-no').hidden=!noG;$('.ZQ-gn-i1').hidden=noG;$('.ZQ-gn-i2').hidden=!noG;$('.ZQ-gn-in').value='';$('.ZQ-gn-enviar').disabled=true;$('.ZQ-gn-ofr').hidden=true;$('.ZQ-gn-fok').hidden=true;paso('listo');
       /* Cerrar el modal es el final del documento: el formulario se desmonta y se vuelve a la rejilla de tipos */
-      B.abrir('gen',function(){estado('vacio');B.aviso('Maqueta: vuelve a la rejilla de tipos (vista 1)')})}
+      B.abrir('gen',function(){estado('vacio');irA('entrada')})}
     function enviar(a){paso('enviando');setTimeout(function(){paso('enviado');$('.ZQ-gn-env').innerHTML='Enviado a '+h(a)+' con el PDF adjunto. Si no aparece, pídele que revise su carpeta de <b>spam o correo no deseado</b>.';
       var otra=a!=='paciente01@semilla.spinus.test';$('.ZQ-gn-ofr').hidden=!otra;$('.ZQ-gn-ofr-t').innerHTML='¿Guardas <b>'+h(a)+'</b> en la ficha del paciente para la próxima vez?'},600)}
     /* --- plantillas --- */
@@ -240,10 +248,10 @@
       else if(t.closest('.ZQ-cp-ok')){var p=S.pl[S.conf.i];if(S.conf.acc==='eliminar'){S.pl.splice(S.conf.i,1);if(S.sel===p.n)S.sel=''}else p.f='Actualizada el 19 de noviembre';S.exp=-1;B.cerrar(true);gestionar();plFila()}
       else if(t.closest('.ZQ-b-tipo'))B.abrir('tipo');
       else if((b=t.closest('[data-capa="tipo"] .ZQ-z'))){if(b.dataset.t===KIND){B.cerrar();return}S.dest=b.dataset.t;
-        if(vacio()){B.cerrar();B.aviso('Maqueta: se abre el formulario de '+NOMBRE[S.dest])}
+        if(vacio()){B.cerrar();irA(S.dest)}
         else{$('.ZQ-ct-t').textContent='¿Cambiar a '+NOMBRE[S.dest]+'?';$('.ZQ-ct-ok').textContent='Cambiar';$('.ZQ-ct-ok').setAttribute('aria-label','Cambiar a '+NOMBRE[S.dest]);B.abrir('conf-tipo')}}
-      else if(t.closest('.ZQ-ct-ok')){B.cerrar();B.aviso('Maqueta: se abre el formulario de '+NOMBRE[S.dest])}
-      else if(t.closest('.ZQ-volver'))B.aviso('Maqueta: vuelve a Documentos (vista 1)');
+      else if(t.closest('.ZQ-ct-ok')){B.cerrar();irA(S.dest)}
+      else if(t.closest('.ZQ-volver'))irA('entrada');
       else if(t.closest('.ZQ-gn-correo'))enviar('paciente01@semilla.spinus.test');
       else if(t.closest('.ZQ-gn-otro')){paso('pidiendo');if(B.foco!==false)$('.ZQ-gn-in').focus()}
       else if(t.closest('.ZQ-gn-cancel'))paso('listo');
@@ -252,8 +260,8 @@
       else if(t.closest('.ZQ-gn-si'))enviar($('.ZQ-gn-in').value.trim());
       else if(t.closest('.ZQ-gn-fic')){$('.ZQ-gn-ofr').hidden=true;$('.ZQ-gn-fok').hidden=false}
       else if(t.closest('.ZQ-gn-nog'))$('.ZQ-gn-ofr').hidden=true;
-      else if(t.closest('.ZQ-g-desc'))B.aviso('Maqueta: se descarga el PDF');
-      else if(t.closest('.ZQ-av-perfil button'))B.aviso('Maqueta: va a Mi perfil')});
+});
+    /* «Descargar» y «Visualizar» entregan el PDF al navegador; «Ir a mi perfil» navega a /perfil (otra página): sin efecto dentro de la maqueta. */
     m.addEventListener('input',function(e){if(e.target.classList.contains('ZQ-gp-in'))gpVal();if(e.target.classList.contains('ZQ-gn-in'))$('.ZQ-gn-enviar').disabled=!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e.target.value.trim());
       if(e.target.classList.contains('ZQ-ren-in'))$('.ZQ-ren-dup').hidden=true});
     m.addEventListener('keydown',function(e){if(e.key==='Enter'&&e.target.classList.contains('ZQ-gp-in'))gpOk();if(e.target.classList.contains('ZQ-ren-in')){if(e.key==='Enter')renOk();if(e.key==='Escape'){e.stopPropagation();S.ren=-1;gestionar()}}},true);

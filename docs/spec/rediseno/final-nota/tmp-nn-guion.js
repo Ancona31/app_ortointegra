@@ -38,7 +38,10 @@
       $$('.nn-tipo').forEach(function(b){if(b.dataset.t===docAb)b.setAttribute('aria-current','true');else b.removeAttribute('aria-current')});
       m.classList.toggle('nn-sincons',sinCons);ajusta();altoMan()}
     function estado(e){m.dataset.e=e;m.classList.remove('nn-ed');cont.scrollTop=0;$$('.nn-form,.nn-man,.nn-esc').forEach(function(x){x.scrollTop=0});refresca()}
-    function toast(t){var x=$('.nn-toast');x.firstChild.textContent=t;x.classList.add('nn-on');clearTimeout(tToast);tToast=setTimeout(function(){x.classList.remove('nn-on')},2600)}
+    function toast(t){var g=document.querySelector('.nn-tira-msg');
+      /* Pasada final: los avisos de maqueta no van dentro del marco; se escriben en la tira */
+      if(g&&/^Maqueta: /.test(t)){g.textContent=t.replace(/^Maqueta: /,'');clearTimeout(tToast);tToast=setTimeout(function(){g.textContent=''},5000);return}
+      var x=$('.nn-toast');x.firstChild.textContent=t;x.classList.add('nn-on');clearTimeout(tToast);tToast=setTimeout(function(){x.classList.remove('nn-on')},2600)}
 
     /* ---- Capas ---- */
     function abre(p,desde){if(desde)origen=desde;pan=p;var x=$('.nn-pan[data-pan="'+p+'"]');
@@ -142,7 +145,8 @@
     function abreDoc(t){cierra();if(t!==docAb){docAb=t;if(t==='receta')rxArma()}
       var tile=$('.nn-tipo[data-t="'+t+'"] .nn-az-i'),ic=$('.nn-doc-ic');ic.innerHTML=tile.innerHTML;ic.style.color=tile.style.getPropertyValue('--c');
       $$('.nn-doc-n').forEach(function(x){x.textContent=DOCS[t][0]});
-      $('.nn-df-rx').hidden=t!=='receta';$('.nn-df-gen').hidden=t==='receta';m.classList.toggle('nn-docvacio',t!=='receta');estado('doc')}
+      m.classList.toggle('nn-docotro',t!=='receta');estado('doc');
+      if(t!=='receta')toast('Maqueta: el formulario completo de «'+DOCS[t][0]+'» está en la página Documentos; aquí se dibujan su cabecera y los datos del paciente precargados')}
     on('.nn-tipo','click',function(e){var t=e.currentTarget.dataset.t;
       if(docAb&&t!==docAb&&conDatos()){pendiente=t;$$('.nn-cb-a').forEach(function(x){x.textContent=DOCS[t][0]});$('.nn-cb-de').textContent=DOCS[docAb][1];
         $('.nn-pan[data-pan="cambio"]').setAttribute('aria-label','¿Cambiar a '+DOCS[t][0]+'?');abre('cambio',e.currentTarget)}
@@ -220,7 +224,7 @@
   var T=[['vacia','Vacía'],['ej','Llenar ejemplo'],['vit','Con signos'],['fuera','Signo fuera de rango'],['largos','Signos largos'],['gen','Redactando'],['err','Error al generar'],['ent','Entrevista'],['rev','Nota lista'],['conf','Confirmar'],
     ['ok','Nota guardada'],['rx','Receta'],['man','Modo manual'],['borr','Borrador restaurado'],['cons','Sin consultorio'],['prim','Primera consulta']];
   var tira=document.createElement('div');tira.className='nn-tira';tira.setAttribute('role','group');tira.setAttribute('aria-label','Controles de la maqueta');
-  tira.innerHTML='<span>Maqueta</span>'+T.map(function(t){return '<button type="button" data-d="'+t[0]+'">'+t[1]+'</button>'}).join('');
+  tira.innerHTML='<span>Maqueta</span>'+T.map(function(t){return '<button type="button" data-d="'+t[0]+'">'+t[1]+'</button>'}).join('')+'<span class="nn-tira-msg" role="status" aria-live="polite"></span>';
   var op=marcos[0].closest('.op');
   if(op&&op.querySelector('header'))op.querySelector('header').appendChild(tira);else marcos[0].parentNode.insertBefore(tira,marcos[0]);
   tira.addEventListener('click',function(e){var b=e.target.closest('button');if(b)apis.forEach(function(f){f(b.dataset.d)})});

@@ -72,34 +72,80 @@ PALOMA = ic(I['ok'], 18, 2.4)
 TIPOS = [('receta', 'Receta', 'receta'), ('lab', 'Laboratorio', 'laboratorio'), ('imagen', 'Imagenología', 'imagen'), ('sup', 'Suplementación', 'suplementacion'),
          ('inter', 'Internamiento', 'internamiento'), ('escrito', 'Escrito médico', 'escrito'), ('consent', 'Consentimiento', 'consentimiento'), ('honor', 'Honorarios / Cotización', 'honorarios')]
 
-# ---------- Navegación: copiada del dashboard aprobado (activo = Documentos) ----------
+# ---------- Navegación al día (CALMA §28; copiada de entrega/cromo/tmp-base.py y tmp-v1.py; activo = Documentos) ----------
+I.update(
+    ayuda='<circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.6M12 17h.01"/>',
+    barra='<rect x="3" y="4.5" width="18" height="15" rx="3"/><path d="M9.5 4.5v15"/>',
+    arriba='<path d="m18 15-6-6-6 6"/>',
+    flecha='<path d="M5 12h14M12 5l7 7-7 7"/>',
+    firma='<path d="M12 20h9"/><path d="M16.4 3.6a2.1 2.1 0 0 1 3 3L7.4 18.6a2 2 0 0 1-.9.5l-2.9.8a.5.5 0 0 1-.6-.6l.8-2.9a2 2 0 0 1 .5-.9z"/>',
+    cedula='<path d="M12 22h6a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v3"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><circle cx="5" cy="14" r="3"/><path d="M7 16.5 8 22l-3-1-3 1 1-5.5"/>',
+    foto='<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/>',
+)
+BDG = '<span class="QQ-bdg" aria-hidden="true">3</span>'
+
+def aviso(vp, donde, pleg=False):
+    """A0·11 · Aviso de perfil «N datos pendientes» (AvisoPerfilSidebar.tsx:122-124, 153, 232). Solo médico."""
+    cid = 'QQ-ap-%s-%s' % (vp, donde)
+    filas = ''.join('<a href="#" class="QQ-p QQ-ap-l">%s<span>%s</span></a>' % (ic(I[k], 18, 1.9), t)
+                    for k, t in (('firma', 'Documentos sin firma'), ('cedula', 'Sin cédula de especialidad'), ('foto', 'Clínica sin logo')))
+    return ('<div class="QQ-ap%s" role="status" aria-live="polite"><button type="button" class="QQ-p QQ-ap-cab" aria-expanded="%s" aria-controls="%s">'
+            '<span class="QQ-ap-pt" aria-hidden="true"></span><span class="QQ-ap-t">3 datos pendientes</span>%s</button>'
+            '<div class="QQ-ap-c" id="%s"><span class="QQ-ap-sep" aria-hidden="true"></span>%s<a href="#" class="QQ-p QQ-ap-b">Completar ahora%s</a></div></div>'
+            ) % (' QQ-pleg' if pleg else '', 'false' if pleg else 'true', cid, ic(I['arriba'], 18, 2.2, ) .replace('<svg', '<svg class="QQ-ap-ch"', 1), cid, filas, ic(I['flecha'], 16, 2.2))
+
 def riel():
     def b(k, t, act=False):
         return '<a href="#" class="QQ-p QQ-rb" aria-label="%s"%s>%s</a>' % (t, ' aria-current="page"' if act else '', ic(I[k], 22))
     return ('<nav class="QQ-riel" aria-label="Navegación principal">' + b('inicio', 'Inicio') + b('pac', 'Expediente') + b('agenda', 'Agenda') + b('docs', 'Documentos', True)
-            + '<a href="#" class="QQ-p QQ-rb" aria-label="Más">' + ic(I['mas'], 22, 3) + '</a><span class="QQ-flex"></span>'
+            + '<button type="button" class="QQ-p QQ-rb" aria-label="Más, 3 datos pendientes" aria-haspopup="dialog" data-abre="mas">' + ic(I['mas'], 22, 3) + BDG + '</button><span class="QQ-flex"></span>'
             '<button type="button" class="QQ-p QQ-mas" aria-label="Nueva consulta">' + ic(I['plus'], 26, 2.4) + '</button></nav>')
 
-def lateral():
+def lat_cont(vp, donde, cerrar=False):
     def a(k, t, act=False):
         return '<a href="#" class="QQ-p QQ-li"%s>%s%s</a>' % (' aria-current="page"' if act else '', ic(I[k], 20), t)
-    return ('<nav class="QQ-lat" aria-label="Navegación principal"><div class="QQ-lat-cab"><span class="QQ-logo">' + ic(I['logo'], 24) + '<span class="QQ-logo-n">Spinus</span></span><span class="QQ-plan">Plan VIP</span></div>'
-            '<button type="button" class="QQ-p QQ-cons-b"><span class="QQ-av">AS</span><span class="QQ-cons-t"><span>Consultorio</span><b>Centro</b></span>' + ic(I['selector'], 16, 2) + '</button>'
+    x = ('<button type="button" class="QQ-p QQ-ib QQ-cierra QQ-lat-x" aria-label="Cerrar menú">' + ic(I['x'], 20, 2) + '</button>') if cerrar else ''
+    clogo = ('<span class="QQ-clogo" role="img" aria-label="Logo de Clínica Semilla A"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" '
+             'stroke-linecap="round" stroke-linejoin="round"><path d="M12 21c-4.5-2.2-7-5.6-7-10V5.5L12 3l7 2.5V11c0 4.4-2.5 7.8-7 10z"/><path d="M12 8v7M8.5 11.5h7"/></svg></span>')
+    return ('<div class="QQ-lat-cab"><span class="QQ-logo">' + ic(I['logo'], 24) + '<span class="QQ-logo-n">Spinus</span></span><span class="QQ-flex"></span><span class="QQ-plan">Plan VIP</span>' + x + '</div>'
+            '<button type="button" class="QQ-p QQ-cons-b">' + clogo + '<span class="QQ-cons-t"><span>Consultorio</span><b>Centro</b></span>' + ic(I['selector'], 16, 2) + '</button>'
             '<div class="QQ-lista">' + a('inicio', 'Inicio') + a('pac', 'Expediente') + a('agenda', 'Agenda') + a('docs', 'Documentos', True) + a('admin', 'Administración') + '</div><span class="QQ-flex"></span>'
-            '<div class="QQ-lat-pie"><a href="#" class="QQ-p QQ-li QQ-yo">' + ic(I['perfil'], 20) + '<span>Dr. Admin Semilla<small>Mi perfil · Ajustes</small></span></a></div></nav>')
+            + aviso(vp, donde, pleg=(vp == 'ih')) +
+            '<div class="QQ-lat-pie"><a href="#" class="QQ-p QQ-li QQ-yo">' + ic(I['perfil'], 20) + '<span><span>Dr. Admin Semilla</span><small class="QQ-esp">Ortopedia y Traumatología</small><small>Mi perfil · Ajustes</small></span></a>'
+            '<a href="#" class="QQ-p QQ-ay" aria-label="Ayuda">' + ic(I['ayuda'], 20) + '</a></div>')
+
+def lateral(vp):
+    return '<nav class="QQ-lat" aria-label="Navegación principal">' + lat_cont(vp, 'lat') + '</nav>'
 
 def encabezado():
-    return ('<header class="QQ-enc"><button type="button" class="QQ-p QQ-menu-b" aria-label="Menú">' + ic(I['menu'], 22, 2) + '</button><span class="QQ-enc-t">Documentos</span><span class="QQ-flex"></span>'
+    return ('<header class="QQ-enc"><button type="button" class="QQ-p QQ-menu-b" aria-label="Menú, 3 datos pendientes" aria-haspopup="dialog" data-abre="cajon">' + ic(I['menu'], 22, 2) + BDG + '</button><span class="QQ-enc-t">Documentos</span><span class="QQ-flex"></span>'
             '<button type="button" class="QQ-p QQ-av QQ-av-g" aria-label="Mi perfil">AS</button></header>')
 
 def fundido():
-    """Duo abierto en vertical (CALMA §19): encabezado fundido con «Mostrar barra lateral», la pista de secciones y el avatar."""
+    """Duo abierto en vertical (CALMA §19, §23.9): encabezado fundido con «Mostrar barra lateral», la pista de cinco píldoras y el avatar."""
     def p(t, act=False):
         return '<a href="#" class="QQ-p QQ-pi"%s>%s</a>' % (' aria-current="page"' if act else '', t)
-    return ('<!-- Duo abierto vertical: el botón de la izquierda abre la barra lateral completa; «Más» abre el mismo menú que el «···» del riel (Administración, Ayuda); el avatar, Mi perfil -->\n'
-            '<header class="QQ-fun"><button type="button" class="QQ-p QQ-fun-b" aria-label="Mostrar barra lateral">' + ic('<rect x="3" y="4.5" width="18" height="15" rx="3"/><path d="M9.5 4.5v15"/>', 20) + '</button>'
-            '<nav class="QQ-pista" aria-label="Secciones">' + p('Inicio') + p('Expediente') + p('Agenda') + p('Documentos', True) + p('Más') + '</nav>'
+    return ('<!-- Duo abierto vertical: «Mostrar barra lateral» abre el cajón (con el aviso de datos pendientes); «Más» abre el menú «Más»; el avatar, Mi perfil -->\n'
+            '<header class="QQ-fun"><button type="button" class="QQ-p QQ-fun-b" aria-label="Mostrar barra lateral, 3 datos pendientes" aria-haspopup="dialog" data-abre="cajon">' + ic(I['barra'], 20) + BDG + '</button>'
+            '<nav class="QQ-pista" aria-label="Secciones">' + p('Inicio') + p('Expediente') + p('Agenda') + p('Documentos', True)
+            + '<button type="button" class="QQ-p QQ-pi" aria-haspopup="dialog" data-abre="mas">Más</button></nav>'
             '<button type="button" class="QQ-p QQ-av QQ-av-g" aria-label="Mi perfil">AS</button></header>')
+
+def capas_nav(vp):
+    """Menú «Más» (ext, iv) como tarjeta centrada y cajón (tel, iv) desde la izquierda: CALMA §26, §28."""
+    out = ''
+    if vp in ('ext', 'iv'):
+        o = lambda k, t: '<a href="#" class="QQ-p QQ-mr">' + mi(k) + '<span class="QQ-flex">' + t + '</span>' + FLECHA + '</a>'
+        out += ('<!-- Menú «Más» (CALMA §28): aviso, Consultorio activo, Administración, Mi perfil, Ayuda -->\n'
+                '<div tabindex="-1" class="QQ-pan QQ-hoja QQ-menu QQ-m-mas" data-pan="mas" role="dialog" aria-modal="true" aria-label="Más"><span class="QQ-asa" aria-hidden="true"></span>'
+                '<div class="QQ-hj-cab"><h2>Más</h2><button type="button" class="QQ-p QQ-ib QQ-cierra" aria-label="Cerrar">' + ic(I['x'], 20, 2) + '</button></div>'
+                '<div class="QQ-hj-c">' + aviso(vp, 'mas') +
+                '<button type="button" class="QQ-p QQ-mr">' + mi('selector') + '<span class="QQ-flex">Consultorio activo</span><span class="QQ-mr-v">Centro</span>' + FLECHA + '</button>'
+                + o('admin', 'Administración') + o('perfil', 'Mi perfil') + o('ayuda', 'Ayuda') + '</div></div>\n')
+    if vp in ('tel', 'iv'):
+        out += ('<!-- Cajón (A0·13): la barra lateral completa desde la izquierda -->\n'
+                '<nav tabindex="-1" class="QQ-pan QQ-cajon" data-pan="cajon" aria-label="Menú">' + lat_cont(vp, 'cajon', cerrar=True) + '</nav>\n')
+    return out
 
 # ---------- Piezas del chasis ----------
 def cabecera(v):
@@ -124,6 +170,7 @@ def barra():
 <div class="QQ-barra"><div class="QQ-barra-in">
   <p class="QQ-linea QQ-perfil" hidden>""" + ic(I['aviso'], 16, 2) + """<span class="QQ-flex">Completa tu perfil para que el documento salga con tu encabezado.</span><a href="#" class="QQ-p QQ-txt">Ir a mi perfil</a></p>
   <p class="QQ-falta" role="status" aria-live="polite" hidden></p>
+  <p class="QQ-linea QQ-est" role="status" aria-live="polite" hidden><span class="QQ-giro" aria-hidden="true"></span><span class="QQ-est-t"></span></p>
   <div class="QQ-barra-f"><button type="button" class="QQ-p QQ-bt QQ-quieto QQ-b-plant" aria-disabled="true"><span class="QQ-solo-ancho">Guardar como plantilla</span><span class="QQ-solo-tel">Plantilla</span></button>
     <button type="button" class="QQ-p QQ-prim QQ-b-imp"><span class="QQ-giro" aria-hidden="true" hidden></span><span class="QQ-b-imp-t">Imprimir</span></button></div>
 </div></div>""")
@@ -153,7 +200,7 @@ def capas_comunes(v, vp):
 </div>
 <!-- A7-4 · Confirmación si el formulario ya tiene datos. Botones parejos lado a lado, «Cancelar | Cambiar» (CALMA §20);
      el nombre completo va en el título y en el aria-label. Igual la del tope: «Cancelar | Gestionar». -->
-""" + alerta('cambiar', '¿Cambiar de tipo?', 'mal', 'aviso',
+""" + alerta('cambiar', '¿Cambiar a Receta?', 'mal', 'aviso',
              '<h2 class="QQ-cam-t">¿Cambiar a Receta?</h2><p>Se descarta ' + v['def'] + ' que estás llenando. No se puede deshacer.</p>',
              '<button type="button" class="QQ-p QQ-bt QQ-quieto QQ-cierra">Cancelar</button><button type="button" class="QQ-p QQ-bt QQ-rojo-s QQ-cam-ok" aria-label="Cambiar a Receta">Cambiar</button>') + """
 <!-- A7-6/10 · Aplicar una plantilla: lista con palomita. Estados: con plantillas, sin plantillas, error con «Reintentar»; el esqueleto de carga son tres filas grises (no dibujado). -->
@@ -176,7 +223,7 @@ def capas_comunes(v, vp):
   <div class="QQ-hj-p"><button type="button" class="QQ-p QQ-bt QQ-quieto QQ-cierra">Cancelar</button><button type="button" class="QQ-p QQ-prim QQ-gp-ok" disabled>Guardar</button></div>
 </div>
 <!-- A7-8 · Tope de 10 plantillas -->
-""" + alerta('tope', 'Tope de plantillas', 'ag', 'aviso',
+""" + alerta('tope', 'Ya tienes 10 plantillas de ' + v['etq'], 'ag', 'aviso',
              '<h2>Ya tienes 10 plantillas de ' + v['etq'] + '</h2><p>Es el máximo. Para guardar esta, borra o sobrescribe una de las que ya tienes.</p>',
              '<button type="button" class="QQ-p QQ-bt QQ-quieto QQ-cierra">Cancelar</button><button type="button" class="QQ-p QQ-prim QQ-tope-ok" aria-label="Gestionar plantillas">Gestionar</button>') + """
 <!-- A7-9/10 · Gestionar: cada plantilla es una fila; su «···» despliega tres botones pequeños: Renombrar (en línea: Enter guarda, Esc cancela), Sobrescribir y Eliminar (con confirmación).
@@ -257,17 +304,16 @@ def capas5(vp):
     asa = '<span class="QQ-asa" aria-hidden="true"></span>'
     return ("""<!-- Catálogo de suplementos: nueve filas con palomita; nombre, dosis de referencia por kilo y beneficio clínico (acotado, con «Ver completo»). Sin buscador: hoy no existe. -->
 <div tabindex="-1" class="QQ-pan QQ-hoja QQ-alta" data-pan="cat" role="dialog" aria-modal="true" aria-label="Suplementos">""" + asa + """
-  <div class="QQ-hj-cab"><h2>Suplementos</h2><span class="QQ-nota QQ-num QQ-sup-n"></span><button type="button" class="QQ-p QQ-mini QQ-lleno QQ-cierra">Listo</button></div>
+  <div class="QQ-hj-cab"><h2>Suplementos</h2><span class="QQ-nota QQ-num QQ-sup-n"></span>""" + '<button type="button" class="QQ-p QQ-ib QQ-cierra" aria-label="Cerrar">' + ic(I['x'], 20, 2) + '</button>' + """</div>
   <div class="QQ-hj-c"><ul class="QQ-cat-l"></ul></div>
 </div>
-<!-- Hoja de un suplemento elegido: los tres campos de hoy (Dosis, Marca comercial, Nota / justificación) -->
+<!-- Hoja de un suplemento elegido: los tres campos de hoy (Dosis, Marca comercial, Nota / justificación). Se quita con la × de su fila o desmarcándolo en el catálogo, como hoy al desactivar su tarjeta. -->
 <div tabindex="-1" class="QQ-pan QQ-hoja QQ-media" data-pan="sup" role="dialog" aria-modal="true" aria-label="Suplemento">""" + asa + """
-  <div class="QQ-hj-cab"><h2 class="QQ-se-t"></h2><button type="button" class="QQ-p QQ-mini QQ-lleno QQ-cierra">Listo</button></div>
+  <div class="QQ-hj-cab"><h2 class="QQ-se-t"></h2>""" + '<button type="button" class="QQ-p QQ-ib QQ-cierra" aria-label="Cerrar">' + ic(I['x'], 20, 2) + '</button>' + """</div>
   <div class="QQ-hj-c"><p class="QQ-hj-sub QQ-num QQ-se-ref" style="padding-bottom:4px"></p><p class="QQ-nota QQ-just QQ-se-ben"></p>
     <label class="QQ-f"><span>Dosis</span><input type="text" class="QQ-fin QQ-se-dosis" autocomplete="off"></label>
     <label class="QQ-f"><span>Marca comercial</span><input type="text" class="QQ-fin QQ-se-marca" placeholder="Ej: Nordic Naturals" autocomplete="off"></label>
     <label class="QQ-f"><span>Nota / justificación</span><input type="text" class="QQ-fin QQ-se-just" placeholder="Ej: Vitamina D 18 ng/mL en laboratorio" autocomplete="off"></label></div>
-  <div class="QQ-hj-p"><button type="button" class="QQ-p QQ-bt QQ-rojo-s QQ-se-quitar">Quitar</button></div>
 </div>""")
 
 CSS5 = '''
@@ -325,7 +371,7 @@ def cuerpo6(vp):
             + '\n<!-- Las dos secciones largas nacen plegadas, al final, como hoy. Plegar resume: «Editada», «2 grupos · 3 renglones». -->\n'
             + plegable('instr', 'Instrucciones al paciente', '<label class="QQ-r"><textarea class="QQ-ta QQ-sin-l" data-k="instr" rows="6" aria-label="Instrucciones al paciente"></textarea></label>')
             + plegable('piso', 'Indicaciones de ingreso a piso',
-                       '<div class="QQ-chips" role="group" aria-label="Grupos de indicaciones"></div>'
+                       '<div class="QQ-chips" role="group"></div>'
                        '<div class="QQ-nuevo" hidden><input type="text" class="QQ-fin QQ-nuevo-in" placeholder="Nombre del grupo" aria-label="Nombre del grupo" autocomplete="off">'
                        '<button type="button" class="QQ-p QQ-ib QQ-ten QQ-nuevo-x" aria-label="Cancelar grupo nuevo">' + ic(I['x'], 18, 2) + '</button><button type="button" class="QQ-p QQ-mini QQ-tonal QQ-nuevo-ok">Añadir</button></div>'
                        '<p class="QQ-vacia QQ-piso-0">Elige un grupo para empezar. La numeración y los guiones los pone el documento.</p><div class="QQ-grupos"></div>'))
@@ -401,7 +447,7 @@ def capas7(vp):
         return ('<button type="button" class="QQ-p QQ-mr%s" role="%s" %s%s>%s<span class="QQ-flex">%s</span>%s</button>'
                 % (' QQ-ck2' if chk else '', 'menuitemradio' if chk else 'menuitem', attr, ' aria-checked="false"' if chk else '', '<span class="QQ-mi">' + ic(I[ico], 20, 2) + '</span>', nom, PALOMA if chk else ''))
     return ('''<div tabindex="-1" class="QQ-pan QQ-hoja QQ-media" data-pan="datos" role="dialog" aria-modal="true" aria-label="Datos del documento">''' + asa + '''
-  <div class="QQ-hj-cab"><h2>Datos del documento</h2><button type="button" class="QQ-p QQ-mini QQ-lleno QQ-cierra">Listo</button></div>
+  <div class="QQ-hj-cab"><h2>Datos del documento</h2>''' + X + '''</div>
   <div class="QQ-hj-c">
     <label class="QQ-f" style="padding-top:0"><span>Fecha</span><input type="text" class="QQ-fin" data-k="fecha" value="19 nov 2026" autocomplete="off"></label>
     <label class="QQ-f"><span>Paciente <i class="QQ-opc">opcional</i></span><input type="text" class="QQ-fin" data-k="paciente" value="Paciente Prueba 01" placeholder="Sin paciente" autocomplete="off"></label>
@@ -431,7 +477,7 @@ CSS7 = '''
 .QQ{--dc:var(--d-escrito)}
 .QQ .QQ-dat{padding:30px 12px 10px 16px;gap:8px;font-size:16px;line-height:24px}
 .QQ .QQ-dat>svg{color:var(--tinta3);margin-top:-18px}
-.QQ .QQ-dat-v{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.QQ .QQ-dat-v{overflow-wrap:anywhere}  /* el resumen parte en renglones en vez de cortarse (PIEZAS §13) */
 .QQ .QQ-g-hoja{flex:1 0 auto;display:flex;flex-direction:column}
 .QQ .QQ-papel{flex:1 0 auto;display:flex;flex-direction:column;min-height:260px}
 .QQ .QQ-g-hoja:has(.QQ-mala) .QQ-bloques{color:var(--mal-tinta);font-weight:600}
@@ -510,9 +556,9 @@ VISTAS = [
 def marco(v, vp):
     form = '<div class="QQ-form">\n' + cabecera(v) + '\n' + v['cuerpo'](vp) + '\n</div>'
     col = '<div class="QQ-col"><main class="QQ-cont">\n' + form + '\n</main>\n' + barra() + TOAST + '</div>'
-    nav = {'ext': riel, 'tel': encabezado, 'ih': lateral, 'iv': fundido, 'esc': lateral}[vp]()
+    nav = {'ext': riel, 'tel': encabezado, 'ih': lambda: lateral('ih'), 'iv': fundido, 'esc': lambda: lateral('esc')}[vp]()
     app = (nav + '\n' + col) if vp in ('tel', 'iv', 'esc') else (col + '\n' + nav)
-    capas = '<div class="QQ-capa" lang="es" aria-hidden="true"><div class="QQ-velo"></div>\n' + capas_comunes(v, vp) + '\n' + v['capas'](vp) + '\n</div>'
+    capas = '<div class="QQ-capa" lang="es" aria-hidden="true"><div class="QQ-velo"></div>\n' + capas_comunes(v, vp) + '\n' + v['capas'](vp) + '\n' + capas_nav(vp) + '</div>'
     return '<div class="marco QQ" data-vp="%s">\n<div class="QQ-app">\n%s\n</div>\n%s\n</div>\n' % (vp, app, capas)
 
 css = open(os.path.join(L, 'tmp-dcb3-estilo.css')).read()

@@ -29,6 +29,7 @@ I = dict(
     escudo='<path d="M12 3 5 5.800v5.700c0 4.300 2.900 7.700 7 9.500 4.100-1.800 7-5.200 7-9.500V5.800z"/><path d="m9 12 2.200 2.200L15.200 10"/>',
     aviso='<path d="M12 4 2.800 19.500h18.400z"/><path d="M12 10v4.500M12 17.200h.01"/>',
     lado='<rect x="3" y="4.5" width="18" height="15" rx="3"/><path d="M9.5 4.5v15"/>',
+    hash='<path d="M5 9h14M5 15h14M10 4 8 20M16 4l-2 16"/>',
     error='<circle cx="12" cy="12" r="9"/><path d="M12 7.500v5.500M12 16.300h.01"/>',
 )
 
@@ -287,10 +288,6 @@ CSS = r'''
 .PFX[data-vp="ext"] .PFX-hoja,.PFX[data-vp="tel"] .PFX-hoja{position:relative;left:auto;right:auto;bottom:auto;flex:none;width:320px;border-radius:20px;padding:24px;opacity:0;transform:translateY(12px) scale(.97);transition:transform 320ms cubic-bezier(.32,.72,0,1),opacity 320ms cubic-bezier(.32,.72,0,1)}
 .PFX[data-vp="ext"] .PFX-on .PFX-hoja,.PFX[data-vp="tel"] .PFX-on .PFX-hoja{opacity:1;transform:none}
 .PFX[data-vp="ext"] .PFX-asa,.PFX[data-vp="tel"] .PFX-asa{display:none}
-/* Teléfono: «Usar solo la edad» en la línea de la etiqueta (alta de 44) y el valor 8 px más abajo, para que su área no pise la etiqueta de la edad */
-.PFX[data-vp="ext"] .PFX-nac:has(.PFX-alt) .PFX-l,.PFX[data-vp="tel"] .PFX-nac:has(.PFX-alt) .PFX-l{display:flex;align-items:center;min-height:44px}
-.PFX[data-vp="ext"] .PFX-nac:has(.PFX-alt) .PFX-alt,.PFX[data-vp="tel"] .PFX-nac:has(.PFX-alt) .PFX-alt{top:8px;height:44px;padding-top:0;align-items:center}
-.PFX[data-vp="ext"] .PFX-nac:has(.PFX-alt) .PFX-c,.PFX[data-vp="tel"] .PFX-nac:has(.PFX-alt) .PFX-c{margin-top:8px}
 /* El folio no se parte por su guion al estrecharse la alerta */
 /* Mensaje de duplicado: alineado a la izquierda, sin justificar, para que el folio entero no abra ríos */
 .PFX .PFX-hjtx.PFX-vgen{text-align:left;hyphens:manual;-webkit-hyphens:manual}
@@ -306,6 +303,20 @@ CSS = r'''
 .PFX .PFX-capa:not(.PFX-ksrv) .PFX-abot .PFX-prim,.PFX .PFX-capa:not(.PFX-ksrv) .PFX-abot .PFX-tonal{height:44px;min-height:0;padding:0 12px;white-space:nowrap;line-height:20px}
 .PFX[data-vp="ih"] .PFX-capa:not(.PFX-ksrv) .PFX-abot .PFX-p,.PFX[data-vp="esc"] .PFX-capa:not(.PFX-ksrv) .PFX-abot .PFX-p{height:40px}
 
+/* ---- Pasada final ---- */
+/* Obligatorio vacío: la fila se marca en rojo (el texto lo pone hoy el navegador) */
+.PFX .PFX-err .PFX-l{color:var(--mal-tinta)}
+.PFX .PFX-err .PFX-msg:empty{display:none}
+/* Aviso del número de expediente, como fila de lectura a todo el ancho */
+.PFX .PFX-avn-t{display:flex;align-items:center;gap:8px;font-size:14px;line-height:20px;color:var(--tinta2)}
+.PFX .PFX-avn-t svg{color:var(--enlace)}
+.PFX[data-vp="ih"] .PFX-avn-t,.PFX[data-vp="iv"] .PFX-avn-t,.PFX[data-vp="esc"] .PFX-avn-t{grid-column:1/-1}
+/* Duo cerrado (CALMA §26, PASADA-FINAL §3): alerta de 310 centrada en el área de contenido, sin riel ni franja */
+.PFX[data-vp="ext"] .PFX-capa{padding:16px calc(56px + var(--ir) + 8px) calc(var(--ib) + 16px) 8px}
+.PFX[data-vp="ext"] .PFX-hoja{width:310px;max-width:100%}
+.PFX-tira p{flex-basis:100%;margin:2px 0 0;font-weight:400;color:var(--tinta2)}
+.PFX button.PFX-pi{height:44px;margin:-2px 0}
+.PFX button.PFX-pi::after{content:none}
 /* ---- Tira de controles de la maqueta: vive FUERA del marco ---- */
 .PFX-tira{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:10px;font:600 12px/16px var(--fuente);color:var(--tinta2)}
 .PFX-tira span{margin-right:2px;letter-spacing:.3px;text-transform:uppercase}
@@ -323,36 +334,43 @@ CSS = r'''
 }
 '''
 
+import importlib.util as _iu
+_sp = _iu.spec_from_file_location('cromo_u2', '/tmp/claude-0/-home-user-app-ortointegra/c6f872cd-9586-537f-8cbb-7c91e620cbb1/scratchpad/tools/tmp-u2-cromo.py')
+_CM = _iu.module_from_spec(_sp); _sp.loader.exec_module(_CM)
+CR = _CM.piezas('PFX', 'PFX-menu')
+AVS = '<button type="button" class="PFX-p PFX-av PFX-av-g PFX-m" aria-label="Mi perfil">AS</button><button type="button" class="PFX-p PFX-av PFX-av-g PFX-s" aria-label="Ajustes" data-abre-mas>SE</button>'
+
 def riel():
     def rb(k, lab, cur=False, cls=''):
         return f'<a href="#" class="PFX-p PFX-rb{cls}" aria-label="{lab}"{" aria-current=\"page\"" if cur else ""}>{ic(I[k],22,3 if k=="mas" else 1.8)}</a>'
     return ('<nav class="PFX-riel" aria-label="Navegación principal">\n  ' + rb('inicio','Inicio') + rb('pac','Expediente',True) + rb('agenda','Agenda')
-        + rb('docs','Documentos',cls=' PFX-m') + rb('mas','Más',cls=' PFX-m') + '\n  <span class="PFX-flex"></span>\n'
+        + rb('docs','Documentos',cls=' PFX-m') + f'<button type="button" class="PFX-p PFX-rb" aria-label="Más" data-abre-mas>{ic(I["mas"],22,3)}{CR.BDG}</button>' + '\n  <span class="PFX-flex"></span>\n'
         + f'  <button type="button" class="PFX-p PFX-mas PFX-m" aria-label="Nueva consulta">{ic(I["plus"],26,2.4)}</button>\n'
         + f'  <button type="button" class="PFX-p PFX-mas PFX-s" aria-label="Agendar cita">{ic(I["plus"],26,2.4)}</button>\n</nav>')
 
 def enc():
-    return (f'<header class="PFX-enc">\n  <button type="button" class="PFX-p PFX-menu" aria-label="Menú">{ic(I["menu"],22,2)}</button>\n'
+    return (f'<header class="PFX-enc">\n  <button type="button" class="PFX-p PFX-menu" aria-label="Menú">{ic(I["menu"],22,2)}{CR.BDG}</button>\n'
         '  <span class="PFX-enc-t">Expediente</span>\n  <span class="PFX-flex"></span>\n'
-        '  <button type="button" class="PFX-p PFX-av PFX-av-g" aria-label="Mi perfil"><span class="PFX-m">AS</span><span class="PFX-s">SE</span></button>\n</header>')
+        f'  {AVS}\n</header>')
 
 def encv():
     def pi(t, cur=False, cls=''):
         return f'<a href="#" class="PFX-p PFX-pi{cls}"{" aria-current=\"page\"" if cur else ""}>{t}</a>'
     return ('<!-- Duo abierto vertical (CALMA §19): encabezado fundido; «Mostrar barra lateral» abre el menú completo (Administración, Mi perfil, Ayuda); «Más» abre el mismo menú que el «···» del riel (CALMA §23.9). -->\n'
-        f'<header class="PFX-encv">\n  <button type="button" class="PFX-p PFX-lado" aria-label="Mostrar barra lateral">{ic(I["lado"],20)}</button>\n'
-        '  <nav class="PFX-pista" aria-label="Navegación principal">' + pi('Inicio') + pi('Expediente',True) + pi('Agenda') + pi('Documentos',cls=' PFX-m') + '<a href="#" class="PFX-p PFX-pi PFX-m" aria-haspopup="menu">Más</a></nav>\n'
-        '  <button type="button" class="PFX-p PFX-av PFX-av-g" aria-label="Mi perfil"><span class="PFX-m">AS</span><span class="PFX-s">SE</span></button>\n</header>')
+        f'<header class="PFX-encv">\n  <button type="button" class="PFX-p PFX-lado" aria-label="Mostrar barra lateral">{ic(I["lado"],20)}{CR.BDG}</button>\n'
+        '  <nav class="PFX-pista" aria-label="Navegación principal">' + pi('Inicio') + pi('Expediente',True) + pi('Agenda') + pi('Documentos',cls=' PFX-m') + '<button type="button" class="PFX-p PFX-pi" aria-haspopup="dialog" data-abre-mas>Más</button></nav>\n'
+        f'  {AVS}\n</header>')
 
-def lat():
+def lat(vp):
     def li(k, t, cur=False, cls=''):
         return f'<a href="#" class="PFX-p PFX-li{cls}"{" aria-current=\"page\"" if cur else ""}>{ic(I[k])}{t}</a>'
     return ('<nav class="PFX-lat" aria-label="Navegación principal">\n'
         f'  <div class="PFX-lat-cab"><span class="PFX-logo">{ic(I["logo"],24)}<span class="PFX-logo-n">Spinus</span></span><span class="PFX-plan-c PFX-m">Plan VIP</span></div>\n'
-        f'  <button type="button" class="PFX-p PFX-cons-b"><span class="PFX-av"><span class="PFX-m">AS</span><span class="PFX-s">SE</span></span><span class="PFX-cons-t"><span class="PFX-m">Consultorio</span><b class="PFX-m">Centro</b><span class="PFX-s">Clínica</span><b class="PFX-s">Clínica Semilla A</b></span>{ic(I["updown"],16,2)}</button>\n'
+        f'  <button type="button" class="PFX-p PFX-cons-b">{CR.CLOGO}<span class="PFX-cons-t"><span class="PFX-m">Consultorio</span><b class="PFX-m">Centro</b><span class="PFX-s">Clínica</span><b class="PFX-s">Clínica Semilla A</b></span>{ic(I["updown"],16,2)}</button>\n'
         '  <div class="PFX-lista">' + li('inicio','Inicio') + li('pac','Expediente',True) + li('agenda','Agenda') + li('docs','Documentos',cls=' PFX-m') + li('admin','Administración',cls=' PFX-m') + '</div>\n'
         '  <span class="PFX-flex"></span>\n'
-        f'  <div class="PFX-lat-pie"><a href="#" class="PFX-p PFX-li PFX-yo">{ic(I["yo"])}<span><span class="PFX-m">Dr. Admin Semilla</span><span class="PFX-s">Secretaria</span><small>Mi perfil · Ajustes</small></span></a></div>\n</nav>')
+        + '<!-- Aviso «N datos pendientes» (solo médico; plegado en Duo abierto) y pie de hoy: médico «Mi perfil · Ajustes» + Ayuda; secretaria «Ajustes». -->\n'
+        + CR.ap(vp, 'lat') + '\n  ' + CR.PIE + '\n</nav>')
 
 AST = ' <span class="PFX-ast" aria-hidden="true">*</span>'
 def msg(t=''): return f'<span class="PFX-msg" role="alert">{t}</span>'
@@ -388,29 +406,28 @@ def vista(nuevo, vp):
             f'</select>{ic(I["chev"],16,2)}</span>{msg("Debes seleccionar un médico para asignar el paciente")}</span></label>'], ' PFX-s', 'medico'))
     # --- Datos del paciente (A4.2, 4, 5, 6 / A8.2) ---
     f = []
-    f.append(fila('Nombre(s)', 'nombre', ej + 'Juan Carlos', g('nombre'), True, err='Escribe el nombre'))
-    f.append(fila('Apellidos', 'apellidos', ej + 'García López', g('apellidos'), True, err='Escribe los apellidos'))
+    f.append(fila('Nombre(s)', 'nombre', ej + 'Juan Carlos', g('nombre'), True, err=''))
+    f.append(fila('Apellidos', 'apellidos', ej + 'García López', g('apellidos'), True, err=''))
     edadr = '<output class="PFX-adj PFX-num PFX-edadr" aria-live="polite"></output>'
     fin = f'<input class="PFX-in PFX-num PFX-fecha" type="text" name="fecha" inputmode="numeric" maxlength="10" placeholder="dd/mm/aaaa" value="{g("fecha")}" aria-label="Fecha de nacimiento" autocomplete="off">'
     if nuevo:
-        f.append('<!-- A4.5 Fecha de nacimiento o, como alternativa, solo la edad («Edad (opcional)»). En la app la fecha es el selector nativo (type=date, con mínimo y máximo); aquí se dibuja como texto para que salga en español. -->'
-            '<div class="PFX-f PFX-nac" data-c="fecha"><span class="PFX-l"><span class="PFX-mf">Fecha de nacimiento</span><span class="PFX-me" hidden>Edad (opcional)</span></span><span class="PFX-c">'
-            f'<span class="PFX-v">{fin}'
-            '<input class="PFX-in PFX-num PFX-edad" type="text" name="edad" inputmode="numeric" maxlength="3" placeholder="Ej. 35" aria-label="Edad (opcional)" autocomplete="off" hidden>'
-            f'{edadr}<button type="button" class="PFX-p PFX-alt">Usar solo la edad</button></span>{msg()}</span></div>')
+        f.append('<!-- A4.5 Como hoy (nuevo/page.tsx:276-289): «Fecha de nacimiento» y, como alternativa, «Edad (opcional)» con su ayuda. En la app la fecha es el selector nativo (type=date); aquí se dibuja como texto para que salga en español. -->'
+            f'<label class="PFX-f PFX-nac" data-c="fecha"><span class="PFX-l">Fecha de nacimiento</span><span class="PFX-c"><span class="PFX-v">{fin}{edadr}</span>{msg()}</span></label>'
+            '<label class="PFX-f" data-c="edad"><span class="PFX-l">Edad (opcional)</span><span class="PFX-c"><span class="PFX-v"><input class="PFX-in PFX-num PFX-edad" type="text" name="edad" inputmode="numeric" maxlength="3" placeholder="Ej. 35" autocomplete="off"></span>'
+            '<span class="PFX-ay">Si no conoces la fecha exacta, ingresa solo la edad</span></span></label>')
     else:
         f.append('<!-- A8.2 Fecha de nacimiento con su nota (texto de hoy). Editar no ofrece «solo la edad»; no se inventa. -->'
             f'<label class="PFX-f PFX-nac" data-c="fecha"><span class="PFX-l">Fecha de nacimiento</span><span class="PFX-c"><span class="PFX-v">{fin}{edadr}</span>{msg()}'
             '<span class="PFX-ay">Recomendable para que la edad aparezca en recetas y documentos. Si se deja vacío, el campo edad quedará en blanco.</span></span></label>')
     def rad(v, t): return f'<label><input type="radio" name="PFX-sexo-{vp}" value="{v}"{" checked" if g("sexo")==v else ""}>{t}</label>'
     f.append(f'<div class="PFX-f PFX-sexo" data-c="sexo"><span class="PFX-l">Sexo{AST}</span><span class="PFX-c"><span class="PFX-seg" role="radiogroup" aria-label="Sexo" aria-required="true">'
-             + rad('M','Masculino') + rad('F','Femenino') + rad('Otro','Otro') + f'</span>{msg("Selecciona el sexo")}</span></div>')
+             + rad('M','Masculino') + rad('F','Femenino') + rad('Otro','Otro') + f'</span>{msg()}</span></div>')
     if nuevo:
         f.append('<!-- A4.2 Aviso del número de expediente: fila de solo lectura, ya no un banner. -->'
-                 '<div class="PFX-f" style="cursor:default"><span class="PFX-l">N° Expediente</span><span class="PFX-c"><span class="PFX-ro">Se genera al guardar</span></span></div>')
+                 f'<div class="PFX-f PFX-avn" style="cursor:default"><span class="PFX-avn-t">{ic(I["hash"],16,2)}El número de expediente se genera automáticamente al guardar</span></div>')
     else:
         f.append('<!-- A8.2 N° Expediente: campo EDITABLE, como hoy. -->' + fila('N° Expediente', 'numero_expediente', 'Ej: OI-2025-001', g('exp'), num=True))
-    o.append(grupo('Datos del paciente', f))
+    o.append(grupo('Datos del paciente' if nuevo else 'Datos personales', f))
     # --- Datos adicionales (A4.7): plegado por defecto en Nuevo ---
     if nuevo:
         o.append('<!-- A4.7 «Datos adicionales», cerrada por defecto; abre los tres grupos de abajo. El aviso de hoy sobre el correo queda como pie del grupo mientras está cerrada. -->'
@@ -447,8 +464,7 @@ def vista(nuevo, vp):
     o.append(f'<div class="PFX-pie"><div class="PFX-pie-f"><a href="#" class="PFX-p PFX-quieto">Cancelar</a>'
              f'<button type="submit" class="PFX-p PFX-prim PFX-envia">{lab}</button></div></div>')
     o.append('</form>')
-    bloq = ('<!-- A4.15 Plan bloqueado: hoy el layout redirige a /billing antes de pintar nada. No hay pantalla que dibujar; esta nota solo lo explica en la maqueta. -->'
-            '<p class="PFX-bloq">Maqueta: con el plan bloqueado esta pantalla no llega a mostrarse. La app lleva directo a Facturación, igual que hoy.</p>') if nuevo else ''
+    bloq = ''   # A4.15 Plan bloqueado: el layout redirige a /billing antes de pintar; la nota vive en la tira, fuera del marco
     barra = (f'<div class="PFX-barra"><div class="PFX-barra-f"><a href="#" class="PFX-p PFX-quieto">Cancelar</a>'
              f'<button type="button" class="PFX-p PFX-prim PFX-envia">{lab}</button></div></div>')
     col = f'<div class="PFX-col">\n<main class="PFX-cont"><div class="PFX-form">\n' + '\n'.join(o) + f'\n</div>{bloq}</main>\n{barra}\n</div>'
@@ -470,10 +486,10 @@ def vista(nuevo, vp):
         '<div class="PFX-abot">' + dupb + '<button type="button" class="PFX-p PFX-prim PFX-cierra PFX-vsrv">Aceptar</button></div></div></div>')
     if vp == 'ext': app = col + '\n' + riel()
     elif vp == 'tel': app = enc() + '\n' + col
-    elif vp == 'ih': app = col + '\n' + lat()
+    elif vp == 'ih': app = col + '\n' + lat(vp)
     elif vp == 'iv': app = encv() + '\n' + col
-    else: app = lat() + '\n' + col
-    return f'<div class="marco PFX" data-vp="{vp}">\n<div class="PFX-app">\n{app}\n</div>{capa}\n</div>'
+    else: app = lat(vp) + '\n' + col
+    return f'<div class="marco PFX" data-vp="{vp}">\n<div class="PFX-app">\n{app}\n</div>{capa}\n{CR.capa_mas(vp)}\n</div>'
 
 JS = r'''
 <script>
@@ -496,14 +512,12 @@ JS = r'''
     /* Fecha con la edad calculada a la derecha */
     function anios(){var p=fecha.value.split('/');if(p.length!==3||p[2].length!==4)return null;var d=+p[0],mo=+p[1],y=+p[2];
       if(!(d>=1&&d<=31&&mo>=1&&mo<=12&&y>=1900))return null;var a=HOY.getFullYear()-y;if(HOY.getMonth()+1<mo||(HOY.getMonth()+1===mo&&HOY.getDate()<d))a--;return a>=0?a:null}
-    function enEdad(){return !!edad&&!edad.hidden}
+    function enEdad(){return false}
     function pintaEdad(){var a=anios();edadr.classList.toggle('PFX-tag',!enEdad());edadr.classList.toggle('PFX-adj',enEdad());edadr.textContent=enEdad()?(edad.value?'años':''):(a===null?'':a+(a===1?' año':' años'))}
     fecha.addEventListener('input',function(){var d=fecha.value.replace(/\D/g,'').slice(0,8);
       fecha.value=d.length>4?d.slice(0,2)+'/'+d.slice(2,4)+'/'+d.slice(4):d.length>2?d.slice(0,2)+'/'+d.slice(2):d;pintaEdad();err('fecha',false)});
-    function modo(e){edad.hidden=!e;fecha.hidden=e;q('.PFX-mf').hidden=e;q('.PFX-me').hidden=!e;alt.textContent=e?'Usar fecha':'Usar solo la edad';err('fecha',false);pintaEdad()}
-    if(edad){edad.addEventListener('input',function(){edad.value=edad.value.replace(/\D/g,'').slice(0,3);err('fecha',false);pintaEdad()});
-      alt.addEventListener('click',function(){modo(!enEdad());(enEdad()?edad:fecha).focus({preventScroll:true})});
-      c('fecha').addEventListener('click',function(e){if(!e.target.closest('button,input'))(enEdad()?edad:fecha).focus()})}
+    function modo(){}
+    if(edad)edad.addEventListener('input',function(){edad.value=edad.value.replace(/\D/g,'').slice(0,3)});
     pintaEdad();
     /* Teléfono con formato y validación en línea (igual que hoy) */
     function vTel(){var d=tel.value.replace(/\D/g,'');var mal=d.length>0&&d.length!==10;err('tel',mal);return !mal}
@@ -531,8 +545,7 @@ JS = r'''
       if(m.classList.contains('PFX-sec')&&c('medico'))pide('medico',!c('medico').querySelector('select').value);
       pide('nombre',!c('nombre').querySelector('input').value.trim());
       pide('apellidos',!c('apellidos').querySelector('input').value.trim());
-      if(enEdad()){var n=edad.value===''?null:+edad.value;pide('fecha',n!==null&&n>120);if(n!==null&&n>120)err('fecha',true,'La edad debe estar entre 0 y 120')}
-      else{var parcial=fecha.value!==''&&anios()===null;pide('fecha',parcial);if(parcial)err('fecha',true,'Escribe la fecha completa: dd/mm/aaaa')}
+      /* Fecha y edad: el selector nativo no deja fechas a medias y la app descarta en silencio una edad fuera de 0-120 (nuevo/page.tsx:124); no hay mensaje que dibujar */
       pide('sexo',!q('.PFX-sexo input:checked'));
       if(!vTel())mal.push('tel');if(!vMail())mal.push('email');
       if(c('priv'))pide('priv',!c('priv').querySelector('input').checked);
@@ -565,10 +578,10 @@ JS = r'''
       else if(d==='guardando'){ocupado=true;rotula('Guardando...',true)}});
   });
   /* CALMA §7: una sola tira, fuera del teléfono, controla los cinco marcos */
-  var T=NUEVO?[['ini','Inicial'],['datos','Con datos'],['vacio','Guardar vacío'],['sec','Secretaria'],['dup','Duplicado'],['mio','Duplicado: ya es tu paciente'],['srv','Error del servidor'],['guardando','Guardando'],['plan','Plan bloqueado']]
+  var T=NUEVO?[['ini','Inicial'],['datos','Con datos'],['vacio','Guardar vacío'],['sec','Secretaria'],['dup','Duplicado'],['mio','Duplicado: ya es tu paciente'],['srv','Error del servidor'],['guardando','Guardando']]
              :[['ini','Inicial'],['vacio','Guardar con errores'],['srv','Error del servidor'],['guardando','Guardando']];
   var tira=document.createElement('div');tira.className='PFX-tira';tira.setAttribute('role','group');tira.setAttribute('aria-label','Controles de la maqueta');
-  tira.innerHTML='<span>Maqueta</span>'+T.map(function(t,i){return '<button type="button" data-d="'+t[0]+'" aria-pressed="'+(i===0)+'">'+t[1]+'</button>'}).join('');
+  tira.innerHTML='<span>Maqueta</span>'+T.map(function(t,i){return '<button type="button" data-d="'+t[0]+'" aria-pressed="'+(i===0)+'">'+t[1]+'</button>'}).join('')+(NUEVO?'<p>Con el plan bloqueado esta pantalla no llega a mostrarse: la app lleva directo a Facturación, igual que hoy.</p>':'');
   var op=marcos[0].closest('.op');
   if(op&&op.querySelector('header'))op.querySelector('header').appendChild(tira);else marcos[0].parentNode.insertBefore(tira,marcos[0]);
   tira.addEventListener('click',function(e){var b=e.target.closest('button');if(!b)return;
@@ -581,8 +594,8 @@ for P, nuevo, arch, nom, desc in [
     ('fn', True, 'vista-1-nuevo.html', 'Nuevo paciente', 'El formulario deja de ser una pila de cajas: cada grupo es una lista limpia de filas, con rótulos de color e icono por grupo, la columna centrada en computadora, los errores junto al campo y los avisos (duplicado, error al guardar) como alertas centradas con botones de verdad.'),
     ('fe', False, 'vista-2-editar.html', 'Editar paciente', 'Los mismos grupos, en el mismo orden y con el mismo dibujo que Nuevo paciente, con los datos precargados y la columna centrada en computadora; el número de expediente sigue siendo editable.'),
 ]:
-    html = (f'<!-- NOMBRE: {nom} | {desc} -->\n<style>{CSS.replace("__TIT__", nom)}</style>\n'
-            + '\n'.join(vista(nuevo, vp) for vp in ('ext','tel','ih','iv','esc')) + JS.replace('__NUEVO__', 'true' if nuevo else 'false'))
+    html = (f'<!-- NOMBRE: {nom} | {desc} -->\n<style>{CSS.replace("__TIT__", nom) + CR.CSS}</style>\n'
+            + '\n'.join(vista(nuevo, vp) for vp in ('ext','tel','ih','iv','esc')) + JS.replace('__NUEVO__', 'true' if nuevo else 'false').replace('</script>', CR.js() + '</script>'))
     html = html.replace('PFX', P)
     open(os.path.join(L, arch), 'w').write(html)
     print(arch, len(html))

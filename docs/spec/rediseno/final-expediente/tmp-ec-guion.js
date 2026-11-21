@@ -48,7 +48,8 @@
       $$('.ec-avl').forEach(function(a){a.hidden=true});
       if(k==='doc')m.classList.toggle('ec-borr',id==='con');
       if(k==='ar')archAct=id;
-      if(det){$$('.ec-art',det).forEach(function(a){a.hidden=!a.matches(sel)});
+      /* Duo cerrado: la vista previa de archivo es tarjeta centrada (CALMA §26), no pantalla completa */
+      if(det&&!(k==='ar'&&capa('previa'))){$$('.ec-art',det).forEach(function(a){a.hidden=!a.matches(sel)});
         det.dataset.k=k;det.querySelector('.ec-dsc').scrollTop=0;m.classList.add('ec-det-on');det.setAttribute('aria-hidden','false');return}
       if(k==='con'){$$('[data-nota]').forEach(function(a){a.hidden=!a.matches(sel)});marca('consultas','data-con',id)}
       else if(k==='doc'){$$('[data-docv]').forEach(function(a){a.hidden=!a.matches(sel)});marca('documentos','data-doc',id)}
@@ -107,6 +108,10 @@
     $$('.ec-cierra').forEach(function(b){b.addEventListener('click',function(){cierra(b.closest('.ec-capa'))})});
     m.addEventListener('keydown',function(e){if(e.key!=='Escape')return;var ab=$$('.ec-capa.ec-on');
       if(capaA.classList.contains('ec-on'))cierra(capaA);else if(ab.length)cierra(ab[ab.length-1]);else cierraDet()});
+
+    /* Menú «Más» (ext e iv) y aviso «N datos pendientes» plegable (CALMA §28; copiado de entrega/dashboard-final) */
+    $$('[data-abre-mas]').forEach(function(b){b.addEventListener('click',function(){var c=capa('mas');if(!c)return;origen=b;abreCapa(c)})});
+    $$('.ec-ap-cab').forEach(function(b){b.addEventListener('click',function(){var a=b.closest('.ec-ap'),pl=a.classList.toggle('ec-pleg');b.setAttribute('aria-expanded',String(!pl))})});
 
     /* Alerta centrada: destructivas y «El correo no coincide» */
     function alerta(o){alSi=o.luego||null;

@@ -249,6 +249,9 @@
 .ec .ec-vl{font-weight:400;font-size:14px}
 .ec[data-vp="ih"] .ec-vl{font-size:13px}
 .ec .ec-plg .ec-sub{white-space:nowrap}
+/* Pasada final: el resumen del vacío («Sin antecedentes registrados.») parte en dos líneas alineadas a la derecha en vez de desbordar */
+.ec .ec-plg .ec-sub{min-width:0;max-width:60%;text-align:right}
+.ec .ec-plg .ec-v0{white-space:normal}
 .ec .ec-sello{display:inline-flex;align-items:center;gap:4px}
 .ec .ec-nota h3{margin:22px 0 6px;font-size:13px;line-height:18px;font-weight:600;color:var(--tinta2)}
 .ec .ec-nota .ec-cu{font-size:15px;line-height:22px}
@@ -758,10 +761,115 @@
 .ec[data-vp="iv"] .ec-alerta{left:calc(50% - 170px);width:340px}
 .ec[data-vp="iv"] .ec-aviso{left:50%;right:auto;width:420px;margin-left:-210px;top:12px}
 
+
+/* ================= PASADA FINAL (kit/PASADA-FINAL.md) =================
+   1) Cromo global al día (CALMA §28), copiado de entrega/dashboard-final/tmp-estilo.css (que lo tomó de entrega/cromo), prefijo .ec.
+      Esta ruta es solo de médico: las piezas marcadas .ec-s (secretaria) no se dibujan. */
+.ec .ec-s{display:none!important}
+.ec .ec-m{}
+.ec .ec-clogo{width:36px;height:36px;flex:none;border-radius:999px;background:#fff;color:var(--accion);display:flex;align-items:center;justify-content:center}
+.ec .ec-lat-pie{border-top:1px solid var(--nav-velo);padding-top:8px;display:flex;align-items:center;gap:4px}
+.ec .ec-lat-pie .ec-yo{flex:1;min-width:0;text-align:left}
+.ec .ec-lat-pie .ec-nib{color:var(--nav-tinta2)}
+.ec[data-vp="ih"] .ec-esp{display:none}
+.ec[data-vp="ih"] .ec-lat .ec-lat-pie .ec-yo{padding:0 8px}
+.ec[data-vp="ih"] .ec-lat .ec-lat-pie .ec-yo>svg{display:none}
+.ec[data-vp="ih"] .ec-lat .ec-lat-pie .ec-nib{width:36px;height:36px}
+.ec .ec-esp{color:var(--nav-tinta)!important}
+.ec .ec-yo{min-height:48px;height:auto;padding-top:6px;padding-bottom:6px}
+.ec .ec-yo>span{display:flex;flex-direction:column;line-height:17px}
+.ec .ec-yo small{font-size:12px;line-height:16px;color:var(--nav-tinta2)}
+.ec .ec-nib{position:relative;width:44px;height:44px;flex:none;border-radius:999px;display:flex;align-items:center;justify-content:center;color:var(--nav-tinta)}
+.ec .ec-mnw{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:16px;pointer-events:none}
+.ec[data-vp="ext"] .ec-mnw{padding:16px calc(56px + var(--ir) + 8px) calc(var(--ib) + 16px) 8px}
+.ec[data-vp="iv"] .ec-mnw{padding:calc(var(--it) + 16px) 24px 24px}
+.ec[data-vp="ih"] .ec-mnw{padding:24px calc(218px + var(--ir) + 24px) calc(var(--ib) + 16px) 24px}
+.ec[data-vp="esc"] .ec-mnw{padding:32px 24px 32px calc(248px + 24px)}
+.ec .ec-mn{pointer-events:auto;width:310px;max-width:100%;max-height:100%;overflow-y:auto;scrollbar-width:none;background:var(--sup);color:var(--tinta);border-radius:20px;box-shadow:var(--sombra-capa);padding:8px;opacity:0;transform:scale(.96);transition:opacity 200ms ease-out,transform 360ms linear(0,0.123,0.3397,0.54,0.6943,0.8032,0.8762,0.9234,0.9533,0.9718,0.9831,0.99,0.9941,0.9965,0.998,1)}
+.ec[data-vp="iv"] .ec-mn,.ec[data-vp="ih"] .ec-mn,.ec[data-vp="esc"] .ec-mn{width:340px}
+.ec .ec-mn-t{padding:8px 12px 6px;font-size:17px;line-height:22px;font-weight:700}
+.ec .ec-mo{display:flex;align-items:center;gap:12px;width:100%;min-height:48px;padding:0 12px;border-radius:12px;font-size:15px;line-height:20px;color:var(--tinta);text-align:left}
+.ec .ec-mo{position:relative}
+.ec .ec-mo+.ec-mo::before{content:"";position:absolute;left:44px;right:12px;top:0;height:1px;background:var(--linea)}
+.ec .ec-mo>svg:first-child{color:var(--enlace)}
+.ec .ec-mo>.ec-mo-f{margin-left:auto;color:var(--tinta3)}
+.ec .ec-mo-v{margin-left:auto;font-size:15px;color:var(--tinta2)}
+.ec .ec-mo-v+.ec-mo-f{margin-left:4px}
+.ec .ec-ap{border-radius:14px;background:var(--ag-fondo);color:var(--tinta);margin:0 0 10px}
+.ec .ec-mn .ec-ap{margin:2px 0 8px}
+.ec.ec-n0 .ec-ap{display:none}
+.ec .ec-ap-cab{display:flex;align-items:center;gap:10px;width:100%;min-height:44px;padding:8px 10px 8px 12px;border-radius:14px;text-align:left;color:var(--ag-tinta)}
+.ec[data-vp="ih"] .ec-lat .ec-ap-cab,.ec[data-vp="esc"] .ec-ap-cab{min-height:40px;padding:6px 10px 6px 12px}
+.ec .ec-ap-cab:focus-visible{outline:3px solid var(--enlace);outline-offset:2px}
+.ec .ec-ap-pt{position:relative;width:22px;height:22px;flex:none;border-radius:7px;background:color-mix(in srgb,var(--ag-punto) 22%,transparent)}
+.ec .ec-ap-pt::before,.ec .ec-ap-pt::after{content:"";position:absolute;left:7px;top:7px;width:8px;height:8px;border-radius:999px;background:var(--ag-punto)}
+.ec .ec-ap-pt::after{animation:ec-latido 3.2s cubic-bezier(.2,.6,.3,1) infinite}
+@keyframes ec-latido{0%{transform:scale(1);opacity:.65}34%{transform:scale(2.7);opacity:0}100%{transform:scale(2.7);opacity:0}}
+.ec .ec-ap-t{flex:1;min-width:0;font-size:15px;line-height:20px;font-weight:700;font-variant-numeric:tabular-nums}
+.ec .ec-ap-ch{transition:transform 240ms cubic-bezier(.32,.72,0,1)}
+.ec .ec-ap.ec-pleg .ec-ap-ch{transform:rotate(180deg)}
+.ec .ec-ap-c{display:flex;flex-direction:column;padding:0 12px 12px;transition:opacity 180ms ease-out,transform 180ms ease-out}
+.ec .ec-ap.ec-pleg .ec-ap-c{display:none}
+.ec.ec-sal .ec-ap-c,.ec.ec-ent .ec-ap-c{opacity:0;transform:translateY(-4px)}
+.ec .ec-ap-sep{display:block;height:1px;margin:0 0 2px;background:color-mix(in srgb,var(--ag-tinta) 22%,transparent)}
+.ec .ec-ap-l{display:flex;align-items:flex-start;gap:10px;min-height:44px;padding:12px 2px;border-radius:8px;font-size:14px;line-height:20px;font-weight:600;color:var(--tinta)}
+.ec .ec-ap-l svg{margin-top:1px;color:var(--ag-tinta)}
+.ec[data-vp="ih"] .ec-lat .ec-ap-l,.ec[data-vp="esc"] .ec-ap-l{min-height:36px;padding:8px 2px}
+.ec.ec-n2 .ec-ap-l[data-k="cedula"],.ec.ec-n1 .ec-ap-l[data-k="cedula"],.ec.ec-n1 .ec-ap-l[data-k="logo"]{display:none}
+.ec .ec-ap-b{position:relative;margin-top:6px;display:flex;align-items:center;justify-content:center;gap:6px;height:40px;border-radius:10px;background:var(--ag-tinta);color:var(--ag-fondo);font-size:14px;line-height:18px;font-weight:600}
+.ec .ec-ap-b::after{content:"";position:absolute;inset:-2px 0}
+.ec[data-vp="ih"] .ec-lat .ec-ap-b,.ec[data-vp="esc"] .ec-ap-b{height:36px}
+.ec[data-vp="ih"] .ec-lat .ec-ap-b::after,.ec[data-vp="esc"] .ec-ap-b::after{display:none}
+.ec .ec-envb .ec-bdg{top:0;right:-5px}
+.ec[data-vp="ih"] .ec-lat .ec-ap{margin:0 -10px 8px -4px}
+.ec[data-vp="ih"] .ec-lat .ec-ap-cab{padding:6px 8px;gap:8px}
+.ec[data-vp="ih"] .ec-lat .ec-ap-t{font-size:14px;line-height:18px}
+.ec[data-vp="ih"] .ec-lat .ec-ap-c{padding:0 10px 10px}
+.ec[data-vp="ih"] .ec-lat .ec-ap-l{gap:8px}
+.ec[data-vp="ih"] .ec-lat .ec-ap-c{padding-bottom:10px}
+.ec[data-vp="ih"] .ec-lat .ec-ap-sep{margin:0}
+.ec[data-vp="ih"] .ec-lat .ec-ap-b{margin-top:4px}
+.ec[data-vp="ih"] .ec-lat .ec-yo{min-height:44px;padding-top:0;padding-bottom:0}
+.ec .ec-bdg{position:absolute;top:-3px;right:-3px;min-width:22px;height:22px;padding:0 5px;border-radius:999px;background:var(--ag-punto);color:var(--navy);border:2px solid var(--navy);display:flex;align-items:center;justify-content:center;font-size:12px;line-height:16px;font-weight:700;font-variant-numeric:tabular-nums;pointer-events:none}
+.ec .ec-rb .ec-bdg{top:2px;right:2px}
+.ec.ec-n0 .ec-bdg,.ec.ec-sec .ec-bdg{display:none}
+.ec .ec-rb,.ec .ec-envb{position:relative}
+.ec[data-vp="ih"] .ec-lat .ec-lista{margin-top:12px}
+.ec[data-vp="ih"] .ec-lat .ec-cons-b{margin-top:8px}
+.ec .ec-capa-m.ec-on .ec-mn{opacity:1;transform:none;transition:opacity 240ms ease-out,transform 520ms linear(0,0.0803,0.2398,0.4083,0.5568,0.6769,0.769,0.8374,0.8869,0.9221,0.9468,0.9639,0.9756,0.9836,0.9891,0.9927,0.9952,0.9968,0.9979,0.9986,1)}
+.ec .ec-rb,.ec .ec-hamb{position:relative}
+.ec .ec-lado .ec-bdg{top:0;right:-5px}
+.ec .ec-velo+.ec-mnw{z-index:1}
+.ec[data-vp="iv"] .ec-mnw{padding:calc(var(--it) + 16px) 24px 24px}
+.ec .ec-capa-m .ec-mn{transform-origin:center}
+/* 2) Vitales: la unidad junto al valor, como en CuerpoNota.tsx */
+.ec .ec-sv dd small{font-size:13px;font-weight:400;color:var(--tinta2)}
+/* 3) Duo cerrado (CALMA §26): NINGUNA capa es hoja inferior. Menús, hojas, rejilla, vista previa y alertas son tarjeta centrada en el
+      área de contenido (sin riel ni franja), con velo; nacen del centro (escala .96→1 + fundido), ancho 310, alto máx. el del área − 32
+      con desplazamiento interno y pie fijo. Sin asa. */
+.ec[data-vp="ext"] .ec-asa{display:none}
+.ec[data-vp="ext"] .ec-menu,.ec[data-vp="ext"] .ec-hoja,.ec[data-vp="ext"] .ec-alerta{left:calc((100% - 56px - var(--ir)) / 2 - 155px);right:auto;bottom:auto;width:310px;top:calc((100% - var(--ib)) / 2);opacity:0;transform:translateY(-50%) scale(.96);transform-origin:center;transition:transform 320ms cubic-bezier(.32,.72,0,1),opacity 240ms ease-out}
+.ec[data-vp="ext"] .ec-on .ec-menu,.ec[data-vp="ext"] .ec-on .ec-hoja,.ec[data-vp="ext"] .ec-on .ec-alerta{opacity:1;transform:translateY(-50%)}
+.ec[data-vp="ext"] .ec-menu{max-height:calc(100% - var(--ib) - 32px);overflow-y:auto;scrollbar-width:none;padding:8px;border-radius:18px}
+.ec[data-vp="ext"] .ec-hoja{max-height:calc(100% - var(--ib) - 32px);border-radius:20px}
+.ec[data-vp="ext"] .ec-hcab{padding:8px 4px 6px 16px}
+.ec[data-vp="ext"] .ec-hcu{padding:6px 16px 16px}
+.ec[data-vp="ext"] .ec-hoja-rej .ec-hcu{padding-bottom:16px}
+.ec[data-vp="ext"] .ec-hpie{padding:12px 16px}
+.ec[data-vp="ext"] .ec-alerta{padding:22px 20px 20px}
+.ec[data-vp="ext"] .ec-mnw{padding:16px calc(56px + var(--ir) + 8px) calc(var(--ib) + 16px) 8px}
+/* Vista previa en Duo cerrado: «Cerrar» y «Descargar» lado a lado; «Eliminar archivo» a todo el ancho debajo */
+.ec[data-vp="ext"] .ec-hpie3{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
+.ec[data-vp="ext"] .ec-hpie3 .ec-flex{display:none}
+.ec[data-vp="ext"] .ec-hpie3 .ec-bdes{grid-column:1/-1;grid-row:2}
+.ec[data-vp="ext"] .ec-hoja-ancha .ec-prev{padding:8px}
+
 @media (prefers-reduced-motion:reduce){
   .ec .ec-p,.ec .ec-plg svg,.ec .ec-mini,.ec .ec-tb::before{transition:none}
   .ec .ec-tn{animation:none!important}
-  .ec .ec-det,.ec .ec-menu,.ec .ec-alerta,.ec .ec-hoja{transition:opacity 200ms ease,visibility 0s linear 200ms}
+  .ec .ec-det,.ec .ec-menu,.ec .ec-alerta,.ec .ec-hoja,.ec .ec-mn{transition:opacity 200ms ease,visibility 0s linear 200ms}
+  .ec .ec-ap-pt::after{animation:none;opacity:0}
+  .ec .ec-ap-c,.ec .ec-ap-ch{transition:none}
 }
 
 /* ---- Tira de controles de la maqueta (fuera del marco; CALMA §7) ---- */

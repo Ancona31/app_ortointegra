@@ -34,6 +34,9 @@
 .pl .pl-pista{display:flex;align-items:center;gap:2px;padding:4px;border-radius:26px;background:var(--nav-velo)}
 .pl .pl-pi{position:relative;display:flex;align-items:center;height:40px;padding:0 14px;border-radius:20px;color:var(--nav-tinta);font-size:15px;line-height:20px;font-weight:500;white-space:nowrap}
 .pl .pl-pi::after{content:"";position:absolute;inset:-2px 0}
+/* «Más» es botón (abre una capa): su área de 44 va en la propia caja, sin pseudoelemento */
+.pl button.pl-pi{height:44px;margin:-2px 0}
+.pl button.pl-pi::after{content:none}
 .pl .pl-pi[aria-current="page"]{padding:0 16px;background:var(--accion);color:#fff;font-weight:600}
 .pl .pl-lat{position:relative;z-index:6;flex:none;display:flex;flex-direction:column;background:var(--navy);color:#fff}
 .pl[data-vp="ih"] .pl-lat{width:calc(218px + var(--ir));padding:16px calc(var(--ir) + 10px) calc(var(--ib) + 10px) 12px;border-radius:26px 0 0 26px;box-shadow:var(--sombra-nav-der)}
@@ -267,6 +270,21 @@
 .pl[data-vp="iv"] .pl-menu.pl-pf{width:320px}
 .pl[data-vp="iv"] .pl-pf .pl-in{height:44px;font-size:16px}
 
+/* ---- Pasada final (CALMA §25–§26) ---- */
+/* Duo abierto (horizontal y vertical): los menús y el popover de filtros son tarjeta centrada de 340 con velo; nacen del centro */
+.pl .pl-mvelo{position:absolute;inset:0;z-index:14;background:var(--velo);-webkit-backdrop-filter:blur(10px) saturate(140%);backdrop-filter:blur(10px) saturate(140%);opacity:0;visibility:hidden;transition:opacity 200ms ease-out,visibility 0s linear 200ms}
+.pl .pl-mvelo.pl-on{opacity:1;visibility:visible;transition-delay:0s}
+.pl .pl-menu.pl-cent{width:340px;padding:8px;border-radius:20px;transform-origin:center;box-shadow:var(--sombra-capa)}
+.pl .pl-menu.pl-cent.pl-pf{padding:16px 16px 18px}
+.pl .pl-menu.pl-cent .pl-mi{min-height:44px;font-size:15px;padding:4px 12px}
+.pl .pl-menu.pl-cent .pl-pop-l li{min-height:44px;font-size:15px;padding:0 12px}
+.pl .pl-mt{padding:8px 12px 6px;font-size:17px;line-height:22px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* Duo cerrado (CALMA §26): ninguna capa es hoja inferior; tarjeta de 310 centrada en el área de contenido, sin asa, pie fijo */
+.pl[data-vp="ext"] .pl-capa{display:grid;grid-template-rows:minmax(0,1fr);place-items:center;padding:16px calc(56px + var(--ir) + 8px) calc(var(--ib) + 16px) 8px}
+.pl[data-vp="ext"] .pl-hoja{position:relative;left:auto;right:auto;bottom:auto;width:310px;max-width:100%;max-height:100%;border-radius:20px;padding:8px 16px 16px;opacity:0;transform:scale(.96);transition:transform 320ms cubic-bezier(.32,.72,0,1),opacity 320ms cubic-bezier(.32,.72,0,1)}
+.pl[data-vp="ext"] .pl-on .pl-hoja{opacity:1;transform:none}
+.pl[data-vp="ext"] .pl-asa{display:none}
+.pl[data-vp="ext"] .pl-c-fil .pl-pie{position:sticky;bottom:-16px;z-index:1;margin:16px -16px -16px;padding:12px 16px 16px;background:var(--sup)}
 /* Movimiento reducido: fundido corto en lugar de deslizar o escalar */
 @media (prefers-reduced-motion:reduce){
   .pl .pl-hoja{transform:none;opacity:0;transition:opacity 200ms ease}

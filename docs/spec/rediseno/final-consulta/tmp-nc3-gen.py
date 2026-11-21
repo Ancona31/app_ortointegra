@@ -25,26 +25,27 @@ def riel():
     def b(k, t, act=False):
         return '<a href="#" class="nc2-p nc2-rb" aria-label="%s"%s>%s</a>' % (t, ' aria-current="page"' if act else '', ic(I[k], 22))
     return ('<nav class="nc2-riel" aria-label="Navegación principal">' + b('inicio', 'Inicio') + b('pac', 'Expediente', True) + b('agenda', 'Agenda') + b('docs', 'Documentos')
-            + '<a href="#" class="nc2-p nc2-rb" aria-label="Más">' + ic(I['mas'], 22, 3) + '</a><span class="nc2-flex"></span>'
+            + '<button type="button" class="nc2-p nc2-rb" aria-label="Más" data-abre-mas>' + ic(I['mas'], 22, 3) + CRO['BDG'] + '</button><span class="nc2-flex"></span>'
             '<button type="button" class="nc2-p nc2-mas" aria-label="Nueva consulta">' + ic(I['plus'], 26, 2.4) + '</button></nav>')
 
-def lateral():
+def lateral(vp):
     def a(k, t, act=False):
         return '<a href="#" class="nc2-p nc2-li"%s>%s%s</a>' % (' aria-current="page"' if act else '', ic(I[k], 20), t)
     return ('<nav class="nc2-lat" aria-label="Navegación principal"><div class="nc2-lat-cab"><span class="nc2-logo">' + ic(I['logo'], 24) + '<span class="nc2-logo-n">Spinus</span></span><span class="nc2-plan">Plan VIP</span></div>'
-            '<button type="button" class="nc2-p nc2-cons-b"><span class="nc2-av">AS</span><span class="nc2-cons-t"><span>Consultorio</span><b>Centro</b></span>' + ic(I['selector'], 16, 2) + '</button>'
+            '<button type="button" class="nc2-p nc2-cons-b">' + CRO['CLOGO'] + '<span class="nc2-cons-t"><span>Consultorio</span><b>Centro</b></span>' + ic(I['selector'], 16, 2) + '</button>'
             '<div class="nc2-lista">' + a('inicio', 'Inicio') + a('pac', 'Expediente', True) + a('agenda', 'Agenda') + a('docs', 'Documentos') + a('admin', 'Administración') + '</div><span class="nc2-flex"></span>'
-            '<div class="nc2-lat-pie"><a href="#" class="nc2-p nc2-li nc2-yo">' + ic(I['perfil'], 20) + '<span>Dr. Admin Semilla<small>Mi perfil · Ajustes</small></span></a></div></nav>')
+            
+            + CRO['ap'](vp, 'lat') + CRO['PIE'] + '</nav>')
 
 def encabezado():
-    return ('<header class="nc2-enc"><button type="button" class="nc2-p nc2-menu-b" aria-label="Menú">' + ic(I['menu'], 22, 2) + '</button><span class="nc2-enc-t">Expediente</span><span class="nc2-flex"></span>'
+    return ('<header class="nc2-enc"><button type="button" class="nc2-p nc2-menu-b" aria-label="Menú">' + ic(I['menu'], 22, 2) + CRO['BDG'] + '</button><span class="nc2-enc-t">Expediente</span><span class="nc2-flex"></span>'
             '<button type="button" class="nc2-p nc2-av nc2-av-g" aria-label="Mi perfil">AS</button></header>')
 
 def fundido():
-    pista = ''.join('<a href="#" class="nc2-p nc2-pl"%s>%s</a>' % (' aria-current="page"' if t == 'Expediente' else '', t) for t in ('Inicio', 'Expediente', 'Agenda', 'Documentos', 'Más'))
-    # CALMA §23.9 · «Más» abre el mismo menú que el «···» del riel de ext (en esta maqueta, igual que el del riel, no se dibuja). Sigue marcado «Expediente».
+    pista = ''.join('<a href="#" class="nc2-p nc2-pl"%s>%s</a>' % (' aria-current="page"' if t == 'Expediente' else '', t) for t in ('Inicio', 'Expediente', 'Agenda', 'Documentos')) + '<button type="button" class="nc2-p nc2-pl" data-abre-mas>Más</button>'
+    # CALMA §23.9 · «Más» abre el mismo menú que el «···» del riel de ext (tarjeta «Más» con velo, copiada del dashboard). Sigue marcado «Expediente».
     return ('<!-- Duo abierto vertical (CALMA §19): encabezado fundido con la pista de secciones. Administración, Mi perfil y Ayuda: desde «Mostrar barra lateral» o el avatar. -->\n'
-            '<header class="nc2-fun"><button type="button" class="nc2-p nc2-fun-b" aria-label="Mostrar barra lateral">' + ic('<rect x="3" y="4.5" width="18" height="15" rx="3"/><path d="M9.5 4.5v15"/>', 20) + '</button>'
+            '<header class="nc2-fun"><button type="button" class="nc2-p nc2-fun-b" aria-label="Mostrar barra lateral">' + CRO['BDG'] + ic('<rect x="3" y="4.5" width="18" height="15" rx="3"/><path d="M9.5 4.5v15"/>', 20) + '</button>'
             '<nav class="nc2-pista" aria-label="Navegación principal">' + pista + '</nav>'
             '<button type="button" class="nc2-p nc2-av nc2-av-g" aria-label="Mi perfil">AS</button></header>')
 
@@ -72,6 +73,10 @@ TOP = """<!-- F1 · Volver al expediente (la flecha lleva el nombre del paciente
   </header>
   <!-- F7 · Banner de error (el mismo texto de hoy). Se limpia al volver a pulsar «Imprimir». -->
   <p class="nc2-err" role="alert" hidden>No se pudo generar el PDF. Intenta de nuevo.</p>"""
+
+import importlib.util as _iuc
+_spc = _iuc.spec_from_file_location('u5cromo', '/tmp/claude-0/-home-user-app-ortointegra/c6f872cd-9586-537f-8cbb-7c91e620cbb1/scratchpad/tools/tmp-u5-cromo.py'); _CRM = _iuc.module_from_spec(_spc); _spc.loader.exec_module(_CRM)
+CRO = _CRM.piezas('nc2')
 
 def sec(t, sub, cuerpo):
     return '<section class="nc2-sec"><div class="nc2-sec-c"><h3>%s</h3>%s</div>%s</section>' % (t, '<span>%s</span>' % sub if sub else '', cuerpo)
@@ -124,7 +129,7 @@ ACL = """<!-- F5 · Notas aclaratorias ya guardadas: firmante y fecha (dd/MM/yyy
     </ol>
   </section>"""
 
-NF = """<!-- F7 · «Consulta no encontrada»: hoy es solo ese texto, sin cabecera ni salida. «Cargando...» es un estado de sistema (el mismo texto centrado); no se dibuja. -->
+NF = """<!-- F7 · «Consulta no encontrada»: hoy es solo ese texto, sin cabecera ni salida. «Cargando...» es un estado de sistema (el mismo texto centrado), sin parte visual propia aquí. -->
   <p class="nc2-nf">Consulta no encontrada</p>"""
 
 CAPA = """<!-- F6 · Nueva nota aclaratoria (CALMA §13): hoja desde abajo en teléfono; en Duo abierto y computadora, modal CENTRADO en el área de contenido. Velo desenfocado, uno solo.
@@ -150,15 +155,15 @@ CAPA = """<!-- F6 · Nueva nota aclaratoria (CALMA §13): hoja desde abajo en te
 
 def marco(vp):
     col = '<div class="nc2-col"><main class="nc2-cont">\n<div class="nc2-pag">\n  ' + TOP + '\n  ' + NOTA + '\n  ' + ACL + '\n</div>\n  ' + NF + '\n</main></div>'
-    nav = {'ext': riel, 'tel': encabezado, 'ih': lateral, 'iv': fundido, 'esc': lateral}[vp]()
+    nav = {'ext': riel, 'tel': encabezado, 'ih': lambda: lateral('ih'), 'iv': fundido, 'esc': lambda: lateral('esc')}[vp]()
     app = (nav + '\n' + col) if vp in ('tel', 'iv', 'esc') else (col + '\n' + nav)
-    return '<div class="marco nc2" data-vp="%s">\n<div class="nc2-app">\n%s\n</div>\n%s\n</div>\n' % (vp, app, CAPA)
+    return '<div class="marco nc2" data-vp="%s">\n<div class="nc2-app">\n%s\n</div>\n%s\n</div>\n' % (vp, app, CAPA + CRO['capa_mas'](vp))
 
 import importlib.util as _u
 _sp = _u.spec_from_file_location('u4iv', '/tmp/claude-0/-home-user-app-ortointegra/c6f872cd-9586-537f-8cbb-7c91e620cbb1/scratchpad/tools/tmp-u4-iv.py'); _m = _u.module_from_spec(_sp); _sp.loader.exec_module(_m)
 # Tercera revisión: el estilo de ih se extiende a iv en la misma regla; lo propio de la tercera revisión, en tmp-nc3-estilo3.css
-css = _m.con_iv(open(os.path.join(L, 'tmp-nc3-estilo.css')).read().replace('/*NAV*/', open(os.path.join(L, 'tmp-nc2-nav.css')).read()) + open(os.path.join(L, 'tmp-nc3-estilo3.css')).read())
-js = open(os.path.join(L, 'tmp-nc3-guion.js')).read()
+css = _m.con_iv(open(os.path.join(L, 'tmp-nc3-estilo.css')).read().replace('/*NAV*/', open(os.path.join(L, 'tmp-nc2-nav.css')).read()) + open(os.path.join(L, 'tmp-nc3-estilo3.css')).read()) + CRO['css'] + open(os.path.join(L, 'tmp-nc3-estilo4.css')).read()
+js = open(os.path.join(L, 'tmp-nc3-guion.js')).read() + CRO['js']
 out = ('<!-- NOMBRE: Nota de consulta | La nota se lee como un documento con jerarquía: diagnósticos destacados con su CIE-10, signos vitales rotulados, secciones con título de color y texto justificado; «Nota manual/IA» y «Nota sellada» vuelven como etiquetas de color con icono, «Imprimir» es un botón tonal con impresora y cada nota aclaratoria lleva su «Sellado» -->\n'
        '<style>\n' + css + '</style>\n' + ''.join(marco(v) for v in ('ext', 'tel', 'ih', 'iv', 'esc')) + '<script>\n' + js + '</script>\n')
 open(os.path.join(L, 'vista-consulta.html'), 'w').write(out)

@@ -50,6 +50,7 @@
     var b=document.createElement('button');b.type='button';b.textContent=d[1];b.setAttribute('aria-pressed','false');
     b.addEventListener('click',function(){var s=b.getAttribute('aria-pressed')!=='true';b.setAttribute('aria-pressed',String(s));api.forEach(function(a){a[d[0]](s)})});
     tira.appendChild(b)});
+  var msg=document.createElement('span');msg.className='nc2-tira-msg';msg.setAttribute('role','status');msg.setAttribute('aria-live','polite');tira.appendChild(msg);
   var op=marcos[0].closest('.op'),cab=op&&op.querySelector('header');
   if(cab)cab.appendChild(tira);else marcos[0].parentNode.insertBefore(tira,marcos[0]);
 })();

@@ -37,36 +37,52 @@ I = dict(
     monitor='<rect x="3" y="4.500" width="18" height="12" rx="2"/><path d="M8.500 20h7M12 16.500V20M9 10.500l2 2 4-4"/>',
 )
 
-AVISO = '<!-- Capas globales no dibujadas aquí porque no cambian en esta pantalla (se definen en el dashboard de referencia): hoja «Nueva consulta» del «+», menú «Más», selector de consultorio, avisos emergentes arriba y centrados. -->'
+import importlib.util as _iu
+_sp = _iu.spec_from_file_location('cromo', f'{L}/tmp-le-cromo.py'); CR = _iu.module_from_spec(_sp); _sp.loader.exec_module(CR)
+def cr(P, k):
+    return getattr(CR, k).replace('PFX', P)
+def bdg(P):
+    # Distintivo ámbar «N datos pendientes» (CALMA §28, solo médico) sobre «···», el menú o «Mostrar barra lateral»
+    return f'<span class="{P}-bdg" aria-hidden="true">3</span>'
+def ap(P, vp, donde):
+    h = cr(P, 'AP').replace('VP-DONDE', f'{vp}-{donde}')
+    if vp == 'ih' and donde == 'lat':   # Duo abierto horizontal: plegado de inicio, como en el dashboard
+        h = h.replace(f'class="{P}-ap"', f'class="{P}-ap {P}-pleg"').replace('aria-expanded="true"', 'aria-expanded="false"')
+    return h
 
 def riel(P, act):
-    def b(k, t, w=1.8):
+    def b(k, t):
         a = ' aria-current="page"' if act == k else ''
-        return f'<a href="#" class="{P}-p {P}-rb" aria-label="{t}"{a}>{ic(I[k], 22, 3 if k == "mas" else 1.8)}</a>'
-    return f'''<!-- Navegación (A0·3): riel a la derecha, fundido con la franja del sistema. Copiado del dashboard de referencia. -->
+        return f'<a href="#" class="{P}-p {P}-rb" aria-label="{t}"{a}>{ic(I[k], 22)}</a>'
+    m = ' aria-current="page"' if act == 'mas' else ''
+    return f'''<!-- Navegación (A0·3): riel a la derecha. Copiado del dashboard al día (CALMA §28): «···/Más» abre el menú «Más» con el distintivo de datos pendientes. -->
 <nav class="{P}-riel" aria-label="Navegación principal">
-  {b("inicio","Inicio")}{b("pac","Expediente")}{b("agenda","Agenda")}{b("docs","Documentos")}{b("mas","Más")}
+  {b("inicio","Inicio")}{b("pac","Expediente")}{b("agenda","Agenda")}{b("docs","Documentos")}<button type="button" class="{P}-p {P}-rb" aria-label="Más" data-abre-mas{m}>{ic(I["mas"], 22, 3)}{bdg(P)}</button>
   <span class="{P}-flex"></span>
   <button type="button" class="{P}-p {P}-mas" aria-label="Nueva consulta">{ic(I["plus"], 26, 2.4)}</button>
 </nav>'''
 
-def lateral(P, act):
+def lateral(P, vp, act):
     def a(k, t):
         c = ' aria-current="page"' if act == k else ''
         return f'<a href="#" class="{P}-p {P}-li"{c}>{ic(I[k], 20)}{t}</a>'
-    return f'''<!-- Navegación (A0·3): barra lateral. Copiada del dashboard de referencia. -->
+    pie = cr(P, 'PIE')
+    if act == 'ayuda':
+        pie = pie.replace('aria-label="Ayuda"', 'aria-label="Ayuda" aria-current="page"')
+    return f'''<!-- Navegación (A0·3): barra lateral, copiada del dashboard al día (CALMA §28): logo de la clínica en el consultorio, aviso de datos pendientes y pie «Mi perfil · Ajustes» + Ayuda. -->
 <nav class="{P}-lat" aria-label="Navegación principal">
   <div class="{P}-lat-cab"><span class="{P}-logo">{ic(I["logo"], 24, 1.8)}<span class="{P}-logo-n">Spinus</span></span><span class="{P}-plan">Plan VIP</span></div>
-  <button type="button" class="{P}-p {P}-cons-b"><span class="{P}-av">AS</span><span class="{P}-cons-t"><span>Consultorio</span><b>Centro</b></span>{ic(I["selector"], 16, 2)}</button>
+  <button type="button" class="{P}-p {P}-cons-b">{cr(P, 'CLOGO')}<span class="{P}-cons-t"><span>Consultorio</span><b>Centro</b></span>{ic(I["selector"], 16, 2)}</button>
   <div class="{P}-lista">{a("inicio","Inicio")}{a("pac","Expediente")}{a("agenda","Agenda")}{a("docs","Documentos")}{a("admin","Administración")}</div>
   <span class="{P}-flex"></span>
-  <div class="{P}-lat-pie"><a href="#" class="{P}-p {P}-li {P}-yo">{ic(I["perfil"], 20)}<span>Dr. Admin Semilla<small>Mi perfil · Ajustes</small></span></a></div>
+{ap(P, vp, "lat")}
+  {pie}
 </nav>'''
 
 def encabezado(P, tit):
-    return f'''<!-- Navegación (A0·13): encabezado fundido con la barra de estado. Copiado del dashboard de referencia. -->
+    return f'''<!-- Navegación (A0·13): encabezado fundido con la barra de estado, como el dashboard al día (distintivo de datos pendientes en el menú). -->
 <header class="{P}-enc">
-  <button type="button" class="{P}-p {P}-menu" aria-label="Menú">{ic(I["menu"], 22, 2)}</button>
+  <button type="button" class="{P}-p {P}-menu" aria-label="Menú">{ic(I["menu"], 22, 2)}{bdg(P)}</button>
   <span class="{P}-enc-t">{tit}</span>
   <span class="{P}-flex"></span>
   <button type="button" class="{P}-p {P}-av {P}-av-g" aria-label="Mi perfil">AS</button>
@@ -76,13 +92,29 @@ def vertical(P, act):
     def a(k, t):
         c = ' aria-current="page"' if act == k else ''
         return f'<a href="#" class="{P}-p {P}-pil"{c}>{t}</a>'
-    return f'''<!-- Navegación de Duo abierto vertical (CALMA §19): encabezado fundido con la barra de estado. Administración, Mi perfil y Ayuda se alcanzan desde «Mostrar barra lateral» o desde el avatar. -->
+    m = ' aria-current="page"' if act == 'mas' else ''
+    return f'''<!-- Navegación de Duo abierto vertical (CALMA §19, §23.9, §28): encabezado fundido; cinco píldoras; «Más» abre el mismo menú que el «···» del riel. -->
 <header class="{P}-ivn">
-  <button type="button" class="{P}-p {P}-ivb" aria-label="Mostrar barra lateral">{ic(I["lateral"], 20)}</button>
-  <!-- CALMA §23.9: quinta píldora «Más»; abre el mismo menú que el «···» del riel de Duo cerrado (menú no dibujado aquí). Marcada en Estadísticas y Centro de ayuda. -->
-  <nav class="{P}-pista" aria-label="Secciones">{a("inicio","Inicio")}{a("pac","Expediente")}{a("agenda","Agenda")}{a("docs","Documentos")}{a("mas","Más")}</nav>
+  <button type="button" class="{P}-p {P}-ivb" aria-label="Mostrar barra lateral">{ic(I["lateral"], 20)}{bdg(P)}</button>
+  <nav class="{P}-pista" aria-label="Secciones">{a("inicio","Inicio")}{a("pac","Expediente")}{a("agenda","Agenda")}{a("docs","Documentos")}<button type="button" class="{P}-p {P}-pil" data-abre-mas{m}>Más</button></nav>
   <button type="button" class="{P}-p {P}-av {P}-av-g" aria-label="Mi perfil">AS</button>
 </header>'''
+
+def capa_mas(P, vp):
+    if vp not in ('ext', 'iv'):
+        return ''
+    return f'''<!-- Menú «Más» (CALMA §26, §28): tarjeta centrada con velo, copiado del dashboard al día. -->
+<div class="{P}-capa {P}-capa-m" aria-hidden="true">
+  <div class="{P}-velo"></div>
+  <div class="{P}-mnw"><div class="{P}-mn" role="dialog" aria-modal="true" aria-label="Más">
+    <h2 class="{P}-mn-t">Más</h2>
+    {ap(P, vp, "mas")}
+{cr(P, 'MAS')}
+  </div></div>
+</div>'''
+
+# Comportamiento común del cromo: abrir/cerrar «Más» y plegar el aviso. Se añade al guion de cada vista.
+NAV_JS = open(f'{L}/tmp-le-cromo.js').read()
 
 def marco(P, vp, cuerpo, act_riel, act_lat, tit_enc):
     main = f'<main class="{P}-cont"><div class="{P}-in">\n{cuerpo}\n</div></main>'
@@ -91,25 +123,26 @@ def marco(P, vp, cuerpo, act_riel, act_lat, tit_enc):
     elif vp == 'tel':
         app = encabezado(P, tit_enc) + main
     elif vp == 'ih':
-        app = main + lateral(P, act_lat)
+        app = main + lateral(P, vp, act_lat)
     elif vp == 'iv':
         app = vertical(P, act_riel) + main
     else:
-        app = lateral(P, act_lat) + main
-    return f'<div class="marco {P}" data-vp="{vp}">\n<div class="{P}-app">\n{app}\n</div>\n{AVISO}\n</div>'
+        app = lateral(P, vp, act_lat) + main
+    return f'<div class="marco {P}" data-vp="{vp}">\n<div class="{P}-app">\n{app}\n</div>\n{capa_mas(P, vp)}\n</div>'
 
 def escribe(n, P, nombre, frase, css, cuerpo_fn, js, act_riel, act_lat, tit_enc):
-    base = open(f'{L}/tmp-le-base.css').read().replace('PFX', P)
+    base = (open(f'{L}/tmp-le-base.css').read() + open(f'{L}/tmp-le-cromo.css').read()).replace('PFX', P)
     out = (f'<!-- NOMBRE: {nombre} | {frase} -->\n<style>\n{base}\n{css}</style>\n'
            + '\n'.join(marco(P, v, cuerpo_fn(v), act_riel, act_lat, tit_enc) for v in ('ext', 'tel', 'ih', 'iv', 'esc'))
-           + f'\n<script>\n{js}</script>\n')
+           + f'\n<script>\n{js}' + NAV_JS.replace('PFX', P) + '</script>\n')
     open(f'{L}/vista-{n}.html', 'w').write(out)
     print(n, len(out))
 
 # =====================================================================================================
 # 1 · ESTADÍSTICAS
 # =====================================================================================================
-MESES = ['jun', 'jul', 'ago', 'sep', 'oct', 'nov']
+# Rótulos del eje como los da hoy la API (/api/me/estadisticas: toLocaleDateString es-MX, mes corto + año de dos cifras)
+MESES = ['jun 26', 'jul 26', 'ago 26', 'sep 26', 'oct 26', 'nov 26']
 MESL = ['junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre']
 
 def linea(vals, ticks):
@@ -128,7 +161,8 @@ def linea(vals, ticks):
     for i in range(n):
         u = ' es-ult' if i == n - 1 else ''
         pts += f'<span class="es-pt{u}" style="left:{xs[i]:.2f}%;top:{ys[i]:.2f}%"></span><span class="es-v{u}" style="left:{xs[i]:.2f}%;top:{ys[i]:.2f}%">{vals[i]}</span>'
-    ex = ''.join(f'<span{" class=es-ult" if i == n - 1 else ""}>{m}</span>' for i, m in enumerate(MESES))
+    # «jun 26»: en los marcos estrechos el año baja a una segunda línea (mismo texto, sin encoger la letra)
+    ex = ''.join(f'<span{" class=es-ult" if i == n - 1 else ""}><span>{m.split()[0]}</span> <span>{m.split()[1]}</span></span>' for i, m in enumerate(MESES))
     desc = 'Consultas por mes: ' + ', '.join(f'{MESL[i]} {vals[i]}' for i in range(n))
     return f'''<!-- Gráfica de línea dibujada a mano: el SVG solo lleva geometría (se estira sin deformar el trazo) y los rótulos son texto real, así nunca bajan de 11 px.
            Cada punto lleva su valor a la vista: sustituye al cuadro que hoy solo aparece al pasar el ratón. -->
@@ -181,28 +215,34 @@ DX = [('Lumbago', 42), ('Gonalgia', 35), ('Cervicalgia', 28), ('Esguince de tobi
       ('Fascitis plantar', 15), ('Tendinitis rotuliana', 12), ('Epicondilitis lateral', 9), ('Fractura de radio distal', 6), ('Hallux valgus', 4)]
 RX = [('Paracetamol 500 mg', 31), ('Ibuprofeno 400 mg', 27), ('Naproxeno 250 mg', 22), ('Celecoxib 200 mg', 18), ('Diclofenaco gel 1%', 16),
       ('Meloxicam 15 mg', 13), ('Tramadol / paracetamol', 9), ('Pregabalina 75 mg', 7), ('Complejo B', 5), ('Omeprazol 20 mg', 4)]
-SX = [('Femenino', 71), ('Masculino', 52), ('Sin especificar', 3)]
-ED = [('0–17', 8), ('18–29', 19), ('30–44', 34), ('45–59', 38), ('60–74', 21), ('75+', 6)]
+# Nombres y orden de hoy (API): Masculino, Femenino y «Otro» solo si hay alguno
+SX = [('Masculino', 52), ('Femenino', 71), ('Otro', 3)]
+# Rangos de hoy (API)
+ED = [('0–17', 8), ('18–30', 19), ('31–45', 34), ('46–60', 38), ('61–75', 21), ('76+', 6)]
 
 def rejilla(cl, cons, ticks, dx, rx, sx, ed):
     tot = sum(v for _, v in sx)
-    dato = f'<p class="es-dato"><b>{cons[-1]}</b><span>en noviembre</span></p>'
     return f'''<div class="es-grid {cl}">
     <!-- A17·2: consultas por mes, últimos 6 meses -->
-    {tar("tendencia", "Consultas por mes", "Últimos 6 meses", linea(cons, ticks), True, dato)}
-    <!-- Los títulos de tarjeta son los de hoy; los de «Consultas por mes — últimos 6 meses» y «Distribución por sexo — N pacientes» se parten en título + línea secundaria, sin cambiar el texto. -->
+    {tar("tendencia", "Consultas por mes — últimos 6 meses", "", linea(cons, ticks), True)}
+    <!-- Los títulos de tarjeta son los de hoy, completos. -->
     <!-- A17·3: top 10 diagnósticos. Barras horizontales de alto fijo (8 px): con un solo diagnóstico se ve una fila, no un bloque gigante. -->
     {tar("esteto", "Top 10 diagnósticos", "", rank(dx, "consultas") if dx else VACIO)}
     <!-- A17·4: top 10 medicamentos recetados -->
     {tar("receta", "Top 10 medicamentos recetados", "", rank(rx, "recetas") if rx else VACIO)}
     <!-- A17·5: distribución por sexo, con el total de pacientes -->
-    {tar("pac", "Distribución por sexo", f"{tot} pacientes", dona(sx))}
+    {tar("pac", f"Distribución por sexo — {tot} pacientes", "", dona(sx))}
     <!-- A17·6: distribución por grupo de edad -->
     {tar("pac", "Distribución por grupo de edad", "", edades(ed))}
   </div>'''
 
+def esqueleto():
+    blq = lambda w, h: f'<span class="es-sk" style="width:{w};height:{h}px"></span>'
+    t = lambda ancha, alto: f'<section class="es-tar es-esq{" es-ancha" if ancha else ""}" aria-hidden="true">{blq("46%", 18)}{blq("100%", alto)}</section>'
+    return f'<div class="es-grid es-d4" role="status" aria-label="Cargando estadísticas">{t(True, 168)}{t(False, 150)}{t(False, 150)}{t(False, 120)}{t(False, 120)}</div>'
+
 def es_cuerpo(vp):
-    return f'''<!-- A17·8: la secretaria no ve esta pantalla; al entrar se le redirige a /dashboard (sin cambio). -->
+    return f'''<!-- A17·8: a la secretaria se le redirige a /dashboard (comportamiento de hoy; sin parte visual). -->
   <!-- Pestañas de Administración, bajo el encabezado y sobre el título -->
   <nav class="es-tabs" aria-label="Administración">
     <a href="#" class="es-p es-tab" aria-current="page" data-t="Estadísticas">Estadísticas</a>
@@ -216,10 +256,11 @@ def es_cuerpo(vp):
     <!-- A17·1: «Actualizar». Botón tonal (esta pantalla no tiene acción primaria). Mientras recarga: deshabilitado y con el icono girando, como hoy (el texto no cambia). -->
     <button type="button" class="es-p es-ton es-act">{ic(I["refrescar"], 18, 2)}<span class="es-act-t">Actualizar</span></button>
   </header>
-  <!-- A17·7 (estado de sistema, no dibujado): durante la primera carga se muestra el esqueleto: cinco tarjetas con el mismo contorno que las de abajo, en gris --sup2. -->
+  <!-- A17·7: esqueleto de la primera carga (ListSkeleton de hoy): cinco tarjetas con el contorno de las de abajo, en gris --sup2. -->
+  {esqueleto()}
   {rejilla("es-d1", [22, 27, 24, 31, 35, 38], [0, 10, 20, 30, 40], DX, RX, SX, ED)}
   <!-- A17·7: «Sin datos suficientes aún» por bloque, y cómo se ve la clínica recién abierta (un diagnóstico, 3 consultas) -->
-  {rejilla("es-d2", [0, 0, 0, 1, 1, 1], [0, 1, 2, 3, 4], [('Lumbago no especificado', 3)], [], [('Femenino', 14), ('Masculino', 12), ('Sin especificar', 0)], [('0–17', 1), ('18–29', 4), ('30–44', 9), ('45–59', 7), ('60–74', 4), ('75+', 1)])}
+  {rejilla("es-d2", [0, 0, 0, 1, 1, 1], [0, 1, 2, 3, 4], [('Lumbago no especificado', 3)], [], [('Masculino', 12), ('Femenino', 14)], [('0–17', 1), ('18–30', 4), ('31–45', 9), ('46–60', 7), ('61–75', 4), ('76+', 1)])}
   <!-- A17·7: error de carga. Texto exacto de hoy. -->
   <section class="es-tar es-err es-d3" role="alert">
     <span class="es-err-i">{ic(I["alerta"], 24, 2)}</span>
@@ -233,11 +274,12 @@ ES_JS = '''(function(){
   var ms=document.querySelectorAll('.es.marco');if(!ms.length)return;
   // Controles de maqueta: UNA tira fuera del marco, en la cabecera de la sección (CALMA §7); controla los cinco marcos.
   var tira=document.createElement('div');tira.className='es-tira';tira.setAttribute('role','group');tira.setAttribute('aria-label','Controles de la maqueta');
-  tira.innerHTML='<button type="button" class="es-demo-poco" aria-pressed="false">Maqueta: pocos datos</button><button type="button" class="es-demo-err" aria-pressed="false">Maqueta: error</button>';
+  tira.innerHTML='<button type="button" class="es-demo-carga" aria-pressed="false">Maqueta: cargando</button><button type="button" class="es-demo-poco" aria-pressed="false">Maqueta: pocos datos</button><button type="button" class="es-demo-err" aria-pressed="false">Maqueta: error</button>';
   var op=ms[0].closest('.op');if(op&&op.querySelector('header'))op.querySelector('header').appendChild(tira);else ms[0].parentNode.insertBefore(tira,ms[0]);
-  var bp=tira.querySelector('.es-demo-poco'),be=tira.querySelector('.es-demo-err');
-  function pon(k){ms.forEach(function(m){m.classList.toggle('es-v-poco',k==='poco');m.classList.toggle('es-v-err',k==='err')});
-    bp.setAttribute('aria-pressed',String(k==='poco'));be.setAttribute('aria-pressed',String(k==='err'))}
+  var bp=tira.querySelector('.es-demo-poco'),be=tira.querySelector('.es-demo-err'),bc=tira.querySelector('.es-demo-carga');
+  function pon(k){ms.forEach(function(m){m.classList.toggle('es-v-poco',k==='poco');m.classList.toggle('es-v-err',k==='err');m.classList.toggle('es-v-carga',k==='carga')});
+    bp.setAttribute('aria-pressed',String(k==='poco'));be.setAttribute('aria-pressed',String(k==='err'));bc.setAttribute('aria-pressed',String(k==='carga'))}
+  bc.addEventListener('click',function(){pon(ms[0].classList.contains('es-v-carga')?'':'carga')});
   bp.addEventListener('click',function(){pon(ms[0].classList.contains('es-v-poco')?'':'poco')});
   be.addEventListener('click',function(){pon(ms[0].classList.contains('es-v-err')?'':'err')});
   ms.forEach(function(m){
@@ -371,9 +413,9 @@ def su_cuerpo(vp):
         <p class="su-fn">{e(fn)}</p>
         <div class="su-ind"><span class="su-et">Indicado cuando:</span><ul class="su-crit">{crit(cs)}</ul></div>
       </li>''' for n, fn, cs, p in SUP)
-    notas = ''.join(f'<li><b>{e(t)}</b><span>{e(d)}</span></li>' for t, d in NOTAS)
+    notas = ''.join(f'<li><b>{e(t)}:</b><span>{e(d)}</span></li>' for t, d in NOTAS)
     return f'''<header class="su-cab">
-    <h1>Protocolo de suplementación</h1>
+    <h1>Protocolo de Suplementación</h1>
     <p class="su-sub">Stack de suplementación osteomuscular — enfoque en densidad mineral, inflamación y tejidos blandos</p>
   </header>
   <!-- A15·1: tarjetas por suplemento, en el mismo orden que hoy. Solo lectura: no hay acciones. -->
@@ -399,7 +441,7 @@ escribe('1-estadisticas', 'es', 'Estadísticas',
         ES_CSS, es_cuerpo, ES_JS, 'mas', 'admin', 'Administración')
 escribe('2-ayuda', 'ay', 'Centro de ayuda',
         'Una columna de lectura cómoda con pasos numerados, preguntas que se abren sin saltos y el contacto de soporte como única acción destacada',
-        AY_CSS, ay_cuerpo, AY_JS, 'mas', None, 'Ayuda')
-escribe('3-suplementacion', 'su', 'Protocolo de suplementación',
+        AY_CSS, ay_cuerpo, AY_JS, 'mas', 'ayuda', 'Ayuda')
+escribe('3-suplementacion', 'su', 'Protocolo de Suplementación',
         'Tarjetas limpias con la prioridad en un chip, los criterios «Indicado cuando» separados y las notas clínicas como aviso; dos columnas en pantallas anchas',
         SU_CSS, su_cuerpo, SU_JS, 'pac', 'pac', 'Expediente')
