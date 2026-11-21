@@ -3,9 +3,16 @@ import BuscadorPaciente, { ALTO_CONTROL } from '@/components/dashboard/BuscadorP
 import { ProximasCitasCargando } from '@/components/dashboard/ProximasCitas'
 import { TarjetaHoyCargando } from '@/components/dashboard/TarjetaHoy'
 
-/** Bloque shimmer genérico */
+/* La tarjeta de los esqueletos de lista: la misma superficie, borde y filetes
+   que la lista real todavía sin migrar, pero con tokens del kit, para que en
+   oscuro no quede una caja blanca. */
+const TARJETA_LISTA = 'bg-sup border border-borde divide-y divide-linea overflow-hidden'
+
+/** Hueso genérico. Pulso de opacidad (`.skeleton` en `globals.css`), quieto con
+ *  movimiento reducido. Oculto para lectores: quien lo contiene declara
+ *  `aria-busy`. */
 export function Skeleton({ className }: { className?: string }) {
-  return <div className={`skeleton${className ? ' ' + className : ''}`} />
+  return <div aria-hidden="true" className={`skeleton${className ? ' ' + className : ''}`} />
 }
 
 /** Fila de lista de pacientes */
@@ -27,7 +34,7 @@ export function PatientRowSkeleton() {
 /** Lista completa de pacientes */
 export function PatientListSkeleton({ rows = 8 }: { rows?: number }) {
   return (
-    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm divide-y divide-slate-100">
+    <div aria-busy="true" className={`${TARJETA_LISTA} rounded-[var(--r-tarjeta)]`}>
       {Array.from({ length: rows }).map((_, i) => (
         <PatientRowSkeleton key={i} />
       ))}
@@ -176,7 +183,7 @@ export function PerfilSkeleton() {
      el cuerpo—. La versión anterior era de una sola columna a 512 px, así que
      la pantalla daba un salto de ancho al terminar de cargar. */
   return (
-    <div className="max-w-[960px] mx-auto">
+    <div aria-busy="true" className="max-w-[960px] mx-auto">
       <div className="mb-[var(--sp-gap-block)] space-y-1">
         <Skeleton className="h-2.5 w-16" />
         <Skeleton className="h-8 w-40" />
@@ -195,7 +202,7 @@ export function PerfilSkeleton() {
         </div>
         <div className="min-w-0 space-y-[var(--sp-gap-block)]">
           {[1, 2].map(i => (
-            <div key={i} className="bg-white rounded-2xl border border-slate-200 p-5 space-y-3">
+            <div key={i} className="bg-sup rounded-2xl border border-borde p-5 space-y-3">
               <Skeleton className="h-2.5 w-36" />
               <div className="grid grid-cols-2 gap-3">
                 <Skeleton className="h-10 rounded-xl" />
@@ -213,12 +220,12 @@ export function PerfilSkeleton() {
 /** Stats de billing */
 export function BillingSkeleton() {
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
+    <div aria-busy="true" className="max-w-2xl mx-auto space-y-6">
       <div className="space-y-1">
         <Skeleton className="h-2.5 w-20" />
         <Skeleton className="h-7 w-32" />
       </div>
-      <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4">
+      <div className="bg-sup rounded-2xl border border-borde p-5 space-y-4">
         <Skeleton className="h-2.5 w-24" />
         <Skeleton className="h-6 w-40" />
         <div className="grid grid-cols-3 gap-3">
@@ -233,7 +240,7 @@ export function BillingSkeleton() {
 /** Lista de laboratorios / estadísticas */
 export function ListSkeleton({ rows = 6, header = true }: { rows?: number; header?: boolean }) {
   return (
-    <div className="max-w-2xl mx-auto space-y-4">
+    <div aria-busy="true" className="max-w-2xl mx-auto space-y-4">
       {header && (
         <div className="flex items-end justify-between">
           <div className="space-y-1.5">
@@ -243,7 +250,7 @@ export function ListSkeleton({ rows = 6, header = true }: { rows?: number; heade
           <Skeleton className="h-9 w-28 rounded-xl" />
         </div>
       )}
-      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden divide-y divide-slate-100">
+      <div className={`${TARJETA_LISTA} rounded-2xl`}>
         {Array.from({ length: rows }).map((_, i) => (
           <div key={i} className="flex items-center justify-between px-5 py-4">
             <div className="flex items-center gap-3">
