@@ -1,4 +1,3 @@
-import { Menu } from 'lucide-react'
 import BuscadorPaciente, { ALTO_CONTROL } from '@/components/dashboard/BuscadorPaciente'
 import { ProximasCitasCargando } from '@/components/dashboard/ProximasCitas'
 import { TarjetaHoyCargando } from '@/components/dashboard/TarjetaHoy'
@@ -53,11 +52,10 @@ export function PatientListSkeleton({ rows = 8 }: { rows?: number }) {
  * retícula o el ritmo, cámbialos aquí: lo que se ve al terminar la carga es un
  * salto, y el salto no avisa.
  *
- * ⚠️ LA BÚSQUEDA Y EL HAMBURGUESA VAN DE VERDAD, NO EN HUESO. Ninguno de los dos
- * depende del perfil, así que no hay motivo para inutilizarlos justo cuando la
- * pantalla está tardando. Por eso este componente recibe los dos manejadores en
- * vez de fabricarlos: el disparo del Ctrl+K sintético vive en un solo sitio, en
- * la página, y aquí sólo se enchufa.
+ * ⚠️ LA BÚSQUEDA VA DE VERDAD, NO EN HUESO. No depende del perfil, así que no
+ * hay motivo para inutilizarla justo cuando la pantalla está tardando. Por eso
+ * este componente recibe su manejador en vez de fabricarlo: el disparo del
+ * Ctrl+K sintético vive en un solo sitio, en la página, y aquí sólo se enchufa.
  *
  * ⚠️ Y LOS TRES BOTONES SÍ VAN EN HUESO, A PROPÓSITO. Cuál se pinta depende del
  * rol, y durante la carga el rol se desconoce: `useProfile` mantiene
@@ -66,37 +64,18 @@ export function PatientListSkeleton({ rows = 8 }: { rows?: number }) {
  * que es justo lo que el guarda de rol de la página existe para impedir.
  * No los «rellenes» porque parezcan vacíos.
  *
- * ⚠️ `dash-barra-movil` TIENE QUE ESTAR TAMBIÉN AQUÍ. Es el asidero de las dos
- * reglas de `globals.css` que esconden el hamburguesa flotante del `Sidebar` y
- * recortan el relleno superior que el layout reserva para él. Sin la clase en
- * este esqueleto, durante la carga reaparecen los dos —el flotante y el de la
- * barra— y el contenido baja 48 px de golpe al terminar.
+ * Sin barra móvil propia (hamburguesa, «Dashboard» y avatar): desde B4 la
+ * cabecera de `tel`/`iv` es el encabezado fundido de `Sidebar.tsx`, también
+ * mientras carga, como en la página real.
  */
-export function DashboardSkeleton({ onBuscar, onAbrirMenu }: {
+export function DashboardSkeleton({ onBuscar }: {
   onBuscar: () => void
-  onAbrirMenu: () => void
 }) {
   return (
     <div className="max-w-[1044px] mx-auto pt-2 pb-6">
 
       {/* ── Región 1 · Cabecera ─────────────────────────────── */}
       <div className="pb-[var(--sp-5-5)] border-b border-[color:var(--sp-line-card)]">
-
-        <div className="dash-barra-movil lg:hidden flex items-center gap-[var(--sp-3)] mb-[var(--sp-gap-block)]">
-          <button
-            type="button"
-            onClick={onAbrirMenu}
-            aria-label="Abrir menú"
-            className="w-11 h-11 shrink-0 flex items-center justify-center rounded-[var(--sp-r-icon-md)] bg-[var(--sp-surface-muted)] text-[var(--sp-ink-700)]"
-          >
-            <Menu size={20} />
-          </button>
-          <p className="flex-1 min-w-0 truncate text-[length:var(--sp-fs-vitals)] font-bold text-[var(--sp-ink-800)]">
-            Dashboard
-          </p>
-          {/* El avatar sale de las iniciales del perfil: en hueso. */}
-          <Skeleton className="w-10 h-10 rounded-full shrink-0" />
-        </div>
 
         {/* Fila 1 · identidad. Consultorio activo y saludo salen los dos del
             perfil, así que los dos esperan. */}

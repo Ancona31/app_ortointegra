@@ -2324,12 +2324,6 @@ body:has(.ag-banda-movil) .nav-encabezado { display: none; }
    siempre a la vista. Hasta que la agenda se rediseñe (B13). */
 [data-formato="ih"] .ag-banda-movil-ctrl[aria-label="Abrir menú"] { display: none; }
 
-/* La barra del dashboard (`.dash-barra-movil`) era un cuarto encabezado móvil.
-   Sus dos copias del dashboard se fueron en B4; queda la del esqueleto
-   (`ui/Skeleton.tsx`, de otro bloque), que se esconde aquí para que no salgan
-   dos encabezados mientras carga. Quitar su marcado es de la integración. */
-.dash-barra-movil { display: none; }
-
 /* Distintivo ámbar con el número de datos pendientes (CALMA §28). El número
    también va en el nombre accesible de «Más»: aquí es sólo dibujo. */
 .nav-distintivo {

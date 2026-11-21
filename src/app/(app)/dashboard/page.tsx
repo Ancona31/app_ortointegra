@@ -9,7 +9,6 @@ import { FolderOpen, Plus, Stethoscope, FilePlus2 } from 'lucide-react'
 import Link from 'next/link'
 import { useConsultorios } from '@/hooks/useConsultorios'
 import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
-import { useMenuMovil } from '@/contexts/MenuMovilContext'
 /* El «+ Nueva consulta» de la cabecera. Vive en `components/launcher/` porque
    nació en `(launcher)/inicio`; aquí sólo se importa —esa página no se toca—.
    Es la ÚNICA pieza de la app que hace lo que pide la adenda §1: elegir
@@ -46,7 +45,6 @@ export default function DashboardPage() {
   const { profile, loading: loadingProfile } = useProfile()
   const { consultorios } = useConsultorios()
   const { consultorioActivo, cambiarActivo } = useConsultorioActivo()
-  const { abrir: abrirMenu } = useMenuMovil()
   const [modalConsulta, setModalConsulta] = useState(false)
   /* El buscador de «Nuevo documento», que es el MISMO componente con otro
      destino. Estado aparte y no uno compartido con tres valores: los dos
@@ -65,14 +63,14 @@ export default function DashboardPage() {
   const abrirBusqueda = () =>
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }))
 
-  /* El esqueleto lleva búsqueda y hamburguesa VIVOS: ninguno de los dos depende
-     del perfil, y son lo primero que se toca en esta pantalla. Los manejadores
-     se le pasan en vez de que los fabrique, para que el Ctrl+K sintético siga
-     definido en un solo sitio. El guarda de rol de la línea siguiente no se
+  /* El esqueleto lleva la búsqueda VIVA: no depende del perfil, y es lo
+     primero que se toca en esta pantalla. El manejador se le pasa en vez de que
+     lo fabrique, para que el Ctrl+K sintético siga definido en un solo sitio
+     (el menú es el encabezado fundido de la navegación, B4). El guarda de rol de la línea siguiente no se
      mueve: durante la carga el rol se desconoce, así que el esqueleto deja los
      tres botones en hueso y una secretaria no ve ni un fotograma de esta
      cabecera. */
-  if (loadingProfile) return <DashboardSkeleton onBuscar={abrirBusqueda} onAbrirMenu={abrirMenu} />
+  if (loadingProfile) return <DashboardSkeleton onBuscar={abrirBusqueda} />
   if (profile?.role === 'secretaria') return <AsistenteDashboard />
 
   const primerNombre = profile?.nombres ? profile.nombres.split(' ')[0] : ''
