@@ -1,10 +1,9 @@
 'use client'
 
 import Link from 'next/link'
-import { Menu, Plus, User, CalendarPlus } from 'lucide-react'
+import { Plus, CalendarPlus } from 'lucide-react'
 import { useProfile } from '@/hooks/useProfile'
 import { useClinica } from '@/hooks/useClinica'
-import { useMenuMovil } from '@/contexts/MenuMovilContext'
 import BuscadorPaciente, { ALTO_CONTROL } from '@/components/dashboard/BuscadorPaciente'
 import ProximasCitas, { GEOMETRIA_ACCION } from '@/components/dashboard/ProximasCitas'
 import TarjetaHoy from '@/components/dashboard/TarjetaHoy'
@@ -34,9 +33,7 @@ function saludo() {
 export default function AsistenteDashboard() {
   const { profile } = useProfile()
   const { clinica, nombreDisplay } = useClinica()
-  const { abrir: abrirMenu } = useMenuMovil()
   const primerNombre = profile?.nombres ? profile.nombres.split(' ')[0] : ''
-  const iniciales = `${profile?.nombres?.[0] ?? ''}${profile?.apellido_paterno?.[0] ?? ''}`.toUpperCase()
 
   /* ⚠️ EL RESPALDO ES `clinicas.nombre`, NO EL NOMBRE DEL USUARIO. La versión
      anterior componía aquí un nombre de médico a mano —con un literal escrito
@@ -56,25 +53,8 @@ export default function AsistenteDashboard() {
       {/* ── Región 2 · Cabecera de acción ────────────────────── */}
       <div className="animate-slide-up pb-[var(--sp-5-5)] border-b border-[color:var(--sp-line-card)]" style={{ animationDelay: '0ms' }}>
 
-        {/* Misma barra móvil que la del médico, con el mismo asidero: las dos
-            reglas de `globals.css` esconden el hamburguesa flotante y recortan
-            el relleno que el layout le reserva. */}
-        <div className="dash-barra-movil lg:hidden flex items-center gap-[var(--sp-3)] mb-[var(--sp-gap-block)]">
-          <button
-            type="button"
-            onClick={abrirMenu}
-            aria-label="Abrir menú"
-            className="w-11 h-11 shrink-0 flex items-center justify-center rounded-[var(--sp-r-icon-md)] bg-[var(--sp-surface-muted)] text-[var(--sp-ink-700)]"
-          >
-            <Menu size={20} />
-          </button>
-          <p className="flex-1 min-w-0 truncate text-[length:var(--sp-fs-vitals)] font-bold text-[var(--sp-ink-800)]">
-            Dashboard
-          </p>
-          <div className="w-10 h-10 shrink-0 flex items-center justify-center rounded-[var(--sp-r-pill)] bg-[var(--sp-primary-bg)] text-[var(--sp-primary-ink)] text-[length:var(--sp-fs-label-sm)] font-extrabold">
-            {iniciales || <User size={18} />}
-          </div>
-        </div>
+        {/* La barra móvil propia (`.dash-barra-movil`) se fue en B4 del
+            rediseño: la cabecera de `tel`/`iv` es el encabezado fundido. */}
 
         {/* Fila 1 · identidad. Encabeza el NOMBRE DE LA CLÍNICA, que es lo que
             el spec muda aquí desde la barra lateral. */}

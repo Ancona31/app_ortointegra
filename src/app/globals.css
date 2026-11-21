@@ -977,15 +977,25 @@ html[data-formato] body {
    ⚠️ Y EN UN NAVEGADOR NORMAL MIDE CERO. `env(safe-area-inset-top)` sólo tiene
    valor donde el sistema se superpone; en escritorio y en una pestaña normal la
    altura es 0 y aquí no se pinta nada. */
+/* ⚠️ DESDE B4 (rediseño) ES `--navy`, EL DEL KIT, salvo con la banda de la
+   agenda delante. La navegación nueva —encabezado fundido, cajón, barras y
+   riel— pinta `--navy` (`sistema.css`, que ya deriva de la marca de la clínica
+   y tiene su oscuro), así que la franja tiene que ser ESE navy para que barra
+   de estado y encabezado sean una sola superficie. La banda de la agenda sigue
+   en `--ag-navy` hasta su bloque (B13), y por eso con ella delante la franja
+   vuelve a `--ag-navy` (regla de abajo, junto a esta). El `theme-color` de
+   `app/layout.tsx` y `sincronizarBarraDelNavegador` (`ThemeProvider.tsx`) NO
+   son de B4 y siguen en `--ag-navy`: pasan con la agenda. */
 body::before {
   content: '';
   position: fixed;
   inset: 0 0 auto 0;
   height: env(safe-area-inset-top, 0px);
-  background: var(--ag-navy);
+  background: var(--navy);
   z-index: 45;
   pointer-events: none;
 }
+body:has(.ag-banda-movil)::before { background: var(--ag-navy); }
 
 /* Elimina tap delay en móvil — hace que los toques respondan de inmediato */
 * {
@@ -1498,13 +1508,14 @@ body::before {
    calendario. Y NO se sube al layout: allí los 88 px siguen haciendo falta,
    porque en todas las demás el botón flotante sí está.
 
-   ⚠️ Y POR ESO EL `h-[calc(100dvh-88px …)]` DE `page.tsx` SE QUEDA COMO ESTÁ. No
-   es un número obsoleto: es el respaldo para cuando `:has()` no está soportado,
-   y ahí el padding sigue siendo 88. Los dos números tienen que seguir casando
-   EN CADA RAMA — 88 con 88 sin `:has()`, 16 con 16 con él.
+   ⚠️ Y POR ESO EL `h-[calc(100dvh-104px …)]` DE `AgendaCliente.tsx` SE QUEDA
+   COMO ESTÁ. No es un número obsoleto: es el respaldo para cuando `:has()` no
+   está soportado, y ahí el padding sigue siendo el de `.app-contenido` (104 en
+   `tel`/`iv`, 40 en `ext`/`ih`; antes de B4, 88). Los dos números tienen que
+   seguir casando EN CADA RAMA — 104 con 104 sin `:has()`, 16 con 16 con él.
    ⚠️ DESDE EL PASO 10 ESE RESPALDO RESTA ADEMÁS LOS DOS `env()`, porque el
    padding del layout pasó a sumarlos. La pareja sigue casando; lo que cambió es
-   que ahora son «88 + áreas seguras» a los dos lados. AQUÍ NO SE SUMA NINGUNA:
+   que ahora son «104 + áreas seguras» a los dos lados. AQUÍ NO SE SUMA NINGUNA:
    esta rama pone la página a 16 px y la raíz a `100dvh - 16px`, y quien se mete
    bajo el reloj y bajo la barra de gestos es la banda y la barra de «Agendar»,
    cada una con el suyo. */
@@ -1531,12 +1542,12 @@ main > div:has(.agenda-fc) .agenda-raiz {
    gana es el ÚLTIMO de la hoja. Si mueves uno de los dos bloques, mueve el otro.
 
    ⚠️ Y SIGUE COLGANDO DE `:has()`, con la misma degradación de siempre: sin
-   soporte (Firefox < 121) la página se queda con el `pt-16 px-4 pb-6` del layout
-   —áreas seguras incluidas desde el paso 10— y la raíz con su respaldo
-   `h-[calc(100dvh-88px - env(top) - env(bottom))]` — o sea el marco de antes,
+   soporte (Firefox < 121) la página se queda con el relleno de `.app-contenido`
+   —áreas seguras incluidas— y la raíz con su respaldo
+   `h-[calc(100dvh-104px - env(top) - env(bottom))]` — o sea el marco de antes,
    que es feo pero coherente. Los dos lados del respaldo siguen casando.
 
-   ⚠️ EL RELLENO HORIZONTAL QUE SE ANULA ES EL `px-4` DEL LAYOUT, y por eso aquí
+   ⚠️ EL RELLENO HORIZONTAL QUE SE ANULA ES EL DE `.app-contenido`, y por eso aquí
    va `padding: 0` y no `padding-block: 0`: es el marco lateral lo que el paso 9b
    viene a quitar. Nadie de dentro depende de él — la banda, las filas del panel
    y la barra traen su propio relleno. */
@@ -2176,81 +2187,480 @@ main > div:has(.agenda-fc) .agenda-raiz {
      banda a sangre la despega del borde. */
 }
 
-/* ⚠️⚠️ ESTA REGLA ES LA ÚNICA QUE ESCONDE EL BOTÓN FLOTANTE DEL MENÚ, y vive
-   AQUÍ —pegada a la banda— y no junto al botón, porque quien manda es la banda:
-   la condición es «existe este nodo», no «estamos en tal ruta».
+/* ═══ B4 · NAVEGACIÓN POR DISPOSITIVO (rediseño estético) ════════════════════
+   Las cuatro presentaciones de `Sidebar.tsx` y el contenedor de
+   `(app)/layout.tsx`, colocados por formato. `data-formato` y
+   `data-borde-sistema` los escribe en <html> la sonda de `ScriptTema.tsx` antes
+   del primer pintado (`src/lib/formatoPantalla.ts`):
+     ext  Duo cerrado     → riel a la derecha (`.nav-riel`)
+     tel  teléfono        → encabezado fundido con título (`.nav-encabezado`)
+     iv   Duo vertical    → encabezado fundido con cinco píldoras
+     ih   Duo horizontal  → barra lateral a la DERECHA (`.nav-barra`, 216)
+     esc  computadora     → barra lateral a la izquierda (`.nav-barra`, 248)
+   En `tel`, `iv` y `ext` la `.nav-barra` es el cajón de «Abrir menú».
 
-   El botón es `.menu-flotante` en `src/components/layout/Sidebar.tsx`, es el
-   único acceso al menú en las otras veinte páginas, y en la agenda móvil
-   sobraría: la banda trae el suyo dentro y los dos abren el mismo menú
-   (`MenuMovilContext`).
+   ⚠️ SIN `data-formato` (la sonda falló) MANDA EL ANCHO: por debajo de 1024 es
+   el teléfono (y desde 600, sus píldoras) y por encima la computadora. Por eso
+   las reglas base son las de `tel` y las de `esc` van en `min-width: 1024px`;
+   `ext` e `ih` —que sólo existen con franja lateral— van por atributo.
 
-   ⚠️ POR QUÉ CSS Y NO UNA CONDICIÓN EN EL COMPONENTE. Antes se escondía con
-   `pathname === '/agenda'` en el propio `Sidebar`, o sea en el PRIMER render,
-   mientras que la banda no aparece hasta que corre el efecto que descubre el
-   ancho. Entre las dos cosas no quedaba ningún hamburguesa, y en el peor caso
-   —un efecto anterior de `AgendaPage` que lance, que aborta el resto de la lista
-   de efectos de ese fiber— no quedaba ninguno NUNCA. El argumento largo, con la
-   cita de React, está en el comentario de `Sidebar.tsx`; aquí basta la
-   conclusión: la regla que no casa deja DOS hamburguesas, y la condición de JS
-   que no llega a tiempo deja CERO. Se elige el fallo hacia el lado con salida.
+   ⚠️ NUNCA 84, 59 NI 34 FIJOS: las franjas son `var(--it/--ir/--ib/--il)`
+   (`sistema.css`, los `env(safe-area-inset-*)`). Con la franja a la izquierda
+   (Duo girado 180°) riel y barra se espejan por `data-borde-sistema`.
 
-   ⚠️ `:has()` NO ES ADORNO Y NO SE PUEDE CAMBIAR POR UN DESCENDIENTE. El botón
-   es `position: fixed` y cuelga del `Sidebar`, que es HERMANO de `<main>`, donde
-   vive la banda: no hay ancestro común más cercano que `body`. Chrome 105+, y
-   esta misma hoja ya lo usa arriba en `main > div:has(.agenda-fc)`.
+   ⚠️ SÓLO SE ANIMAN `transform` Y `opacity`, nada infinito, y con movimiento
+   reducido todo pasa a fundido corto (al final de esta zona). */
 
-   ⚠️ NO LE AÑADAS UNA MEDIA QUERY «PARA AFINAR». Sería volver a lo mismo: en
-   móvil con la página caída la banda no está, la media query sí casaría y el
-   botón desaparecería otra vez. La presencia de la banda ya dice todo lo que hay
-   que saber — sólo se monta en móvil. */
-body:has(.ag-banda-movil) .menu-flotante { display: none; }
-
-/* ═══ F1.2 · LA BARRA LATERAL PLEGADA (sólo la agenda, desde `lg`) ══════════
-   `Sidebar` pone `data-plegada` en el `<aside>`; aquí se le da ancho de iconos.
-   ⚠️ SIN ANIMAR EL ANCHO: animarlo reacomoda la rejilla en cada cuadro
-   (CONTRASTE §2.1); FullCalendar se reajusta una vez con el `ResizeObserver` de
-   `AgendaCliente`. El margen de `<main>` y el del aviso de suscripción ganan a
-   la utilidad `lg:ml-64` porque estas reglas no van en capa. */
-@media (min-width: 1024px) {
-  aside[data-plegada="true"] { width: 4rem; }
-  aside[data-plegada="true"] .sb-etiqueta { display: none; }
-  aside[data-plegada="true"] .sb-cabecera { padding-inline: 0; }
-  aside[data-plegada="true"] .sb-logo { width: 2.5rem; height: 2.5rem; }
-  aside[data-plegada="true"] nav { padding-inline: .5rem; }
-  aside[data-plegada="true"] :is(a, button) { justify-content: center; padding-inline: 0; }
-  aside[data-plegada="true"] ~ main { margin-left: 4rem; }
-  body:has(aside[data-plegada="true"]) .sb-banner-desplazado { margin-left: 4rem; }
+:root {
+  --cromo-barra: 248px;      /* barra de `esc` (antes `w-64` = 256) */
+  --cromo-barra-ih: 216px;   /* barra de `ih`, del lado de la franja */
+  --cromo-riel: 60px;        /* riel de `ext`, sin contar la franja */
+  --cromo-enc: 64px;         /* encabezado fundido, sin contar la franja */
 }
 
-/* ── Cabecera móvil del dashboard (bloque 2 del rediseño) ──────────────────
-   Mismo mecanismo que la banda de la agenda de aquí arriba, y por el mismo
-   motivo: `/dashboard` estrena su propia barra superior en móvil, con su
-   hamburguesa dentro, y los dos abren el MISMO menú (`MenuMovilContext`). El
-   asidero es `.dash-barra-movil`, en `src/app/(app)/dashboard/page.tsx`.
+/* ── Contenedor: márgenes de <main> y relleno del contenido ────────────────
+   ⚠️ EL RELLENO VERTICAL ESTÁ REPLICADO EN LA AGENDA, como lo estaba el del
+   layout de antes. Sumas (sin franjas, que se restan aparte):
+     tel / iv  (64 de encabezado + 16) + 24 = 104
+     ext / ih                       16 + 24 =  40
+     esc                            32 + 32 =  64
+   `AgendaCliente.tsx` acota `.agenda-raiz` con `h-[calc(100dvh-104px-…)]
+   lg:h-[calc(100dvh-64px-…)]` y la regla de `ext`/`ih` de abajo pone los 40.
+   Son el RESPALDO para cuando `:has()` no existe: con él, la regla
+   `main > div:has(.agenda-fc)` (más arriba, junto a `.agenda-fc`) anula este
+   relleno en esa página y gana por especificidad —(0,1,2) contra el 0 de estos
+   `:where()`—. Si cambias un número aquí, cambia su pareja en el mismo commit.
+   ⚠️ `:where()` A PROPÓSITO: especificidad cero, para que la agenda gane sin
+   `!important`. */
+:where(.app-contenido) {
+  padding: calc(var(--it) + var(--cromo-enc) + 16px) calc(16px + var(--ir)) calc(var(--ib) + 24px) calc(16px + var(--il));
+}
+@media (min-width: 600px) {
+  :where(.app-contenido) { padding-inline: calc(24px + var(--il)) calc(24px + var(--ir)); }
+}
+@media (min-width: 1024px) {
+  :where(.app-contenido) { padding: calc(var(--it) + 32px) 32px calc(var(--ib) + 32px); }
+  .app-main { margin-left: var(--cromo-barra); }
+}
+/* En `ext` e `ih` la franja ya la descuenta el margen de <main>: el relleno no la suma. */
+:where([data-formato="ext"] .app-contenido) { padding: calc(var(--it) + 16px) 16px calc(var(--ib) + 24px); }
+:where([data-formato="ih"] .app-contenido) { padding: calc(var(--it) + 16px) 24px calc(var(--ib) + 24px); }
+[data-formato="ext"] .app-main { margin-right: calc(var(--cromo-riel) + var(--ir)); }
+[data-formato="ext"][data-borde-sistema="izquierda"] .app-main { margin-right: 0; margin-left: calc(var(--cromo-riel) + var(--il)); }
+[data-formato="ih"] .app-main { margin-right: calc(var(--cromo-barra-ih) + var(--ir)); }
+[data-formato="ih"][data-borde-sistema="izquierda"] .app-main { margin-right: 0; margin-left: calc(var(--cromo-barra-ih) + var(--il)); }
+/* La pareja de `ext`/`ih` del respaldo de la agenda (ver arriba). */
+:where([data-formato="ext"], [data-formato="ih"]) .agenda-raiz { height: calc(100dvh - 40px - var(--it) - var(--ib)); }
 
-   ⚠️ AQUÍ TAMPOCO VA MEDIA QUERY, por el argumento largo de la regla de la
-   agenda: si no casa, quedan DOS hamburguesas; si la condición no llega a
-   tiempo, quedan CERO. A diferencia de la banda de la agenda, esta barra SÍ
-   está siempre en el DOM y se esconde con `lg:hidden`, así que este selector
-   también casa en escritorio — donde es inocuo: `.menu-flotante` ya es
-   `lg:hidden` por su cuenta. */
-body:has(.dash-barra-movil) .menu-flotante { display: none; }
-
-/* Y el hueco que deja el botón al irse. El layout de `(app)` reserva 64 px de
-   relleno superior en móvil EXACTAMENTE para que el hamburguesa flotante no se
-   coma el contenido (ver la nota larga de `(app)/layout.tsx`). Sin ese botón
-   son 64 px de blanco por encima de la barra, así que aquí bajan a los mismos
-   16 px que tenía el botón de `top-4`. El área segura se SUMA, igual que allí.
-
-   ⚠️ ÉSTA SÍ LLEVA MEDIA QUERY, y no contradice al aviso de arriba: el fallo
-   apunta al otro lado. Si no casara, se queda el relleno original del layout
-   —feo, nunca roto—, mientras que sin la media query se pisaría el `lg:pt-8`
-   de las demás anchuras. El corte es el `lg` de Tailwind (1024 px). */
+/* El aviso de suscripción, como tarjeta encima del contenido. */
+.app-banner:not(:empty) { margin-bottom: 16px; }
 @media (max-width: 1023px) {
-  main > div:has(.dash-barra-movil) {
-    padding-top: calc(1rem + env(safe-area-inset-top, 0px));
+  main > div:has(.agenda-fc) > .app-banner:not(:empty) { margin: 0; padding: calc(var(--it) + 8px) 16px 8px; }
+}
+
+/* ── El encabezado fundido (`tel`, `iv`) ─────────────────────────────────── */
+.nav-encabezado {
+  position: fixed; inset: 0 0 auto 0; z-index: 40;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: calc(var(--it) + 10px) calc(16px + var(--ir)) 10px calc(16px + var(--il));
+  background: var(--navy); color: #fff;
+  border-radius: 0 0 26px 26px; box-shadow: var(--sombra-nav-sup);
+}
+.nav-enc-menu {
+  position: relative; flex: none; width: 44px; height: 44px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 999px; background: var(--nav-velo); color: #fff;
+}
+.nav-ic-iv { display: none; }
+.nav-titulo {
+  flex: 1; min-width: 0; margin: 0; font-size: 17px; line-height: 22px; font-weight: 700;
+  color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.nav-pista { display: none; }
+.nav-pildora {
+  position: relative; display: inline-flex; align-items: center; height: 40px; padding: 0 16px;
+  border-radius: 999px; font-size: 15px; line-height: 20px; font-weight: 500; color: var(--nav-tinta);
+  white-space: nowrap;
+}
+.nav-pildora::after { content: ''; position: absolute; inset: -2px 0; } /* área de 44 */
+.nav-pildora:hover { color: #fff; }
+.nav-pildora[data-activa="true"] { background: var(--accion); color: #fff; font-weight: 600; }
+.nav-avatar {
+  flex: none; width: 40px; height: 40px; border-radius: 999px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--nav-avatar); color: var(--navy); font-size: 13px; font-weight: 600;
+}
+.nav-avatar[data-activa="true"] { box-shadow: 0 0 0 2px var(--navy), 0 0 0 4px #fff; }
+@media (min-width: 600px) {
+  .nav-titulo, .nav-ic-tel { display: none; }
+  .nav-ic-iv { display: block; }
+  .nav-pista { display: flex; min-width: 0; gap: 2px; padding: 4px; border-radius: 26px; background: var(--nav-velo); }
+  .nav-avatar { width: 44px; height: 44px; }
+}
+@media (max-width: 680px) and (min-width: 600px) { .nav-pildora { padding: 0 12px; } }
+@media (min-width: 1024px) { .nav-encabezado { display: none; } }
+:where([data-formato="ext"], [data-formato="ih"]) .nav-encabezado { display: none; }
+/* ⚠️ EN LA AGENDA MÓVIL MANDA SU BANDA, que trae su propio «Abrir menú» y abre
+   el MISMO cajón (`MenuMovilContext`). Es el criterio que tenía el botón
+   flotante (`.menu-flotante`, retirado en B4), con su misma razón: CSS y no
+   `pathname`, porque la banda se monta en un efecto y si la página cae al
+   `ErrorBoundary` no se monta nunca. Si `:has()` falla quedan DOS menús un
+   instante; con una condición de JS que no llega a tiempo quedaban CERO. Se
+   elige el fallo con salida. No le añadas una media query «para afinar». */
+body:has(.ag-banda-movil) .nav-encabezado { display: none; }
+/* ⚠️ Y EN `ih` LA BANDA ESCONDE SU HAMBURGUESA: allí la barra lateral está
+   siempre a la vista. Hasta que la agenda se rediseñe (B13). */
+[data-formato="ih"] .ag-banda-movil-ctrl[aria-label="Abrir menú"] { display: none; }
+
+/* La barra del dashboard (`.dash-barra-movil`) era un cuarto encabezado móvil.
+   Sus dos copias del dashboard se fueron en B4; queda la del esqueleto
+   (`ui/Skeleton.tsx`, de otro bloque), que se esconde aquí para que no salgan
+   dos encabezados mientras carga. Quitar su marcado es de la integración. */
+.dash-barra-movil { display: none; }
+
+/* Distintivo ámbar con el número de datos pendientes (CALMA §28). El número
+   también va en el nombre accesible de «Más»: aquí es sólo dibujo. */
+.nav-distintivo {
+  position: absolute; top: -2px; right: -2px; min-width: 20px; height: 20px; padding: 0 5px;
+  border-radius: 999px; background: var(--aviso-punto); color: var(--navy);
+  font-size: 12px; line-height: 20px; font-weight: 700; text-align: center;
+  box-shadow: 0 0 0 2px var(--navy);
+}
+
+/* ── El riel (`ext`) ──────────────────────────────────────────────────────── */
+.nav-riel {
+  display: none; position: fixed; top: 0; bottom: 0; right: 0; z-index: 40;
+  width: calc(var(--cromo-riel) + var(--ir));
+  padding: calc(var(--it) + 16px) var(--ir) calc(var(--ib) + 16px) 0;
+  flex-direction: column; align-items: flex-start; justify-content: space-between;
+  background: var(--navy); border-radius: 26px 0 0 26px; box-shadow: var(--sombra-nav-der);
+}
+[data-formato="ext"] .nav-riel { display: flex; }
+[data-formato="ext"][data-borde-sistema="izquierda"] .nav-riel {
+  right: auto; left: 0; padding: calc(var(--it) + 16px) 0 calc(var(--ib) + 16px) var(--il);
+  border-radius: 0 26px 26px 0; box-shadow: var(--sombra-nav-izq);
+}
+.nav-riel-lista {
+  list-style: none; margin: 0; padding: 0; width: var(--cromo-riel);
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+}
+.nav-riel-boton {
+  position: relative; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;
+  border-radius: 999px; color: var(--nav-tinta);
+}
+.nav-riel-boton[data-activa="true"] { background: var(--accion); color: #fff; }
+.nav-riel-accion {
+  width: 52px; height: 52px; margin-inline: 4px; border-radius: 999px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--sup); color: var(--accion); box-shadow: var(--sombra-accion);
+}
+html.dark .nav-riel-accion { color: var(--enlace); }
+
+/* ── La barra lateral y el cajón (`.nav-barra`, `<aside id="barra-lateral">`) ─
+   Base: el CAJÓN (`tel`, `iv`, `ext`), fuera de pantalla hasta `data-abierta`.
+   `visibility` acompaña al `transform` para que cerrado no se pueda tabular ni
+   lo lea un lector de pantalla; su retraso deja terminar la salida. La
+   transición se invierte desde donde esté: se puede interrumpir. */
+.nav-barra {
+  position: fixed; top: 0; bottom: 0; left: 0; z-index: 41;
+  width: min(300px, calc(100vw - 56px));
+  display: flex; flex-direction: column; gap: 12px;
+  padding: calc(var(--it) + 12px) 12px calc(var(--ib) + 12px) calc(12px + var(--il));
+  background: var(--navy); color: var(--nav-tinta);
+  border-radius: 0 26px 26px 0; box-shadow: var(--sombra-nav-izq);
+  transform: translateX(calc(-100% - 32px)); visibility: hidden;
+  transition: transform var(--dur-sale) var(--resorte-sale), visibility 0s linear var(--dur-sale);
+  touch-action: pan-y;
+}
+.nav-barra[data-abierta="true"] {
+  transform: none; visibility: visible;
+  transition: transform var(--dur-entra) var(--resorte-entra), visibility 0s;
+}
+.nav-barra[data-arrastre="true"] { transition: none; }
+.nav-cajon-velo {
+  position: fixed; inset: 0; z-index: 40; background: var(--velo);
+  backdrop-filter: var(--velo-filtro); -webkit-backdrop-filter: var(--velo-filtro);
+  animation: nav-funde-entra var(--dur-entra) ease-out both;
+}
+@media (min-width: 1024px) {
+  .nav-barra {
+    width: var(--cromo-barra); padding: 16px 12px;
+    transform: none; visibility: visible; transition: none;
   }
+  /* `.nav-barra .x` y no `.x` a secas: `.nav-icono` declara su `display` más abajo. */
+  .nav-cajon-velo, .nav-barra .nav-solo-cajon { display: none; }
+}
+[data-formato="ih"] .nav-barra {
+  left: auto; right: var(--ir); width: var(--cromo-barra-ih);
+  padding: calc(var(--it) + 16px) 12px calc(var(--ib) + 12px);
+  border-radius: 26px 0 0 26px; box-shadow: var(--sombra-nav-der);
+  transform: none; visibility: visible; transition: none;
+}
+[data-formato="ih"][data-borde-sistema="izquierda"] .nav-barra {
+  right: auto; left: var(--il); border-radius: 0 26px 26px 0; box-shadow: var(--sombra-nav-izq);
+}
+[data-formato="ih"] :is(.nav-cajon-velo, .nav-barra .nav-solo-cajon) { display: none; }
+
+.nav-barra-cabeza { flex: none; display: flex; align-items: center; gap: 8px; min-height: 44px; padding-left: 8px; }
+.nav-marca {
+  display: inline-flex; align-items: center; gap: 8px; margin-right: auto;
+  font-size: 17px; line-height: 22px; font-weight: 700; color: #fff;
+}
+.nav-plan {
+  display: inline-flex; align-items: center; height: 26px; padding: 0 10px; border-radius: 999px;
+  background: var(--nav-velo); color: var(--nav-tinta); font-size: 12px; line-height: 16px; font-weight: 600;
+  white-space: nowrap;
+}
+a.nav-plan:hover { color: #fff; }
+.nav-icono {
+  flex: none; width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 999px; color: var(--nav-tinta);
+}
+.nav-icono:hover { background: var(--nav-velo); color: #fff; }
+.nav-icono[data-activa="true"] { background: var(--accion); color: #fff; }
+@media (min-width: 1024px) { .nav-icono--barra { width: 36px; height: 36px; } }
+
+/* La identidad: logo de la clínica + consultorio (`ConsultorioActivoSelector`). */
+.nav-consultorio-boton {
+  width: 100%; display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 8px 10px;
+  border-radius: 16px; background: var(--nav-velo); color: #fff; text-align: left;
+}
+button.nav-consultorio-boton:hover { background: rgba(255, 255, 255, .14); }
+.nav-consultorio-logo {
+  flex: none; width: 36px; height: 36px; padding: 3px; border-radius: 999px; overflow: hidden;
+  display: flex; align-items: center; justify-content: center; background: #fff;
+}
+.nav-consultorio-texto { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.nav-consultorio-rotulo { font-size: 12px; line-height: 16px; color: var(--nav-tinta2); }
+.nav-consultorio-nombre {
+  font-size: 15px; line-height: 20px; font-weight: 600; color: #fff;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.nav-consultorio-lista {
+  position: absolute; left: 0; right: 0; top: calc(100% + 6px); z-index: 5; max-height: 50vh; overflow-y: auto;
+  padding: 4px 0; border-radius: 16px; background: var(--sup); color: var(--tinta); box-shadow: var(--sombra-capa);
+  transform-origin: top center; animation: nav-menu-entra var(--dur-entra) var(--resorte-entra) both;
+}
+.nav-consultorio-lista-fila { padding: 0 0 4px 32px; }
+.nav-consultorio-opcion {
+  width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  min-height: 44px; padding: 0 16px; font-size: 15px; line-height: 20px; color: var(--tinta); text-align: left;
+}
+.nav-consultorio-opcion:hover { background: var(--sup2); }
+.nav-consultorio-gestionar {
+  display: flex; align-items: center; min-height: 44px; padding: 0 16px; border-top: 1px solid var(--linea);
+  font-size: 14px; line-height: 18px; font-weight: 600; color: var(--enlace);
+}
+
+/* Las secciones. */
+.nav-barra-medio {
+  flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.nav-barra-lista { flex: none; display: flex; flex-direction: column; gap: 2px; }
+.nav-barra-enlace {
+  flex: none; display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 0 12px;
+  border-radius: 12px; font-size: 15px; line-height: 20px; font-weight: 500; color: var(--nav-tinta);
+}
+.nav-barra-enlace:hover { background: var(--nav-velo); color: #fff; }
+.nav-barra-enlace[data-activa="true"] { background: var(--accion); color: #fff; font-weight: 600; }
+
+/* El aviso de datos pendientes (`AvisoPerfilSidebar`): tarjeta ámbar, sin bucles. */
+.nav-barra-aviso { flex: none; margin-top: auto; }
+.nav-aviso { border-radius: 16px; background: var(--aviso-fondo); color: var(--aviso-tinta); overflow: hidden; }
+.nav-aviso-cabeza {
+  width: 100%; display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 8px 12px;
+  color: var(--aviso-tinta); text-align: left;
+}
+.nav-aviso-punto {
+  flex: none; width: 22px; height: 22px; border-radius: 6px; display: flex; align-items: center; justify-content: center;
+  background: color-mix(in srgb, var(--aviso-punto) 22%, transparent);
+}
+.nav-aviso-punto > span { width: 8px; height: 8px; border-radius: 999px; background: var(--aviso-punto); }
+.nav-aviso-titulo { font-size: 15px; line-height: 20px; font-weight: 700; }
+.nav-aviso-cuerpo {
+  display: flex; flex-direction: column; gap: 2px; margin: 0 12px; padding: 6px 0 12px;
+  border-top: 1px solid color-mix(in srgb, var(--aviso-tinta) 20%, transparent);
+}
+.nav-aviso-cuerpo[hidden] { display: none; }
+.nav-aviso-fila {
+  display: flex; align-items: flex-start; gap: 10px; padding: 7px 0;
+  font-size: 14px; line-height: 18px; font-weight: 600; color: var(--tinta);
+}
+.nav-aviso-fila svg { color: var(--aviso-tinta); }
+.nav-aviso-boton {
+  margin-top: 6px; display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 40px;
+  border-radius: 12px; background: var(--aviso-tinta); color: var(--sup); font-size: 14px; line-height: 18px; font-weight: 600;
+}
+
+/* El pie: persona, ajustes y ayuda; y «Plegar menú» (sólo `esc`, en la agenda). */
+.nav-pie {
+  position: relative; flex: none; display: flex; align-items: center; gap: 4px;
+  padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, .1);
+}
+.nav-persona {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 6px 8px;
+  border-radius: 12px; color: var(--nav-tinta); text-align: left;
+}
+.nav-persona:hover { background: var(--nav-velo); }
+.nav-persona[data-activa="true"] { background: var(--accion); color: #fff; }
+.nav-persona-texto { min-width: 0; display: flex; flex-direction: column; }
+.nav-persona-nombre { font-size: 14px; line-height: 18px; font-weight: 600; color: #fff; }
+.nav-persona-detalle { font-size: 12px; line-height: 16px; color: var(--nav-tinta); }
+.nav-persona-linea { font-size: 12px; line-height: 16px; color: var(--nav-tinta2); }
+/* En `ih` (216) no caben icono, nombre, ajustes y ayuda: fuera el icono y la
+   especialidad (como en la maqueta), y el nombre puede partir en dos líneas. */
+[data-formato="ih"] .nav-persona > span:first-child,
+[data-formato="ih"] .nav-persona-detalle { display: none; }
+[data-formato="ih"] .nav-persona-nombre { white-space: normal; }
+/* Una línea cada uno: en 248 partían en seis renglones. */
+:is(.nav-persona-nombre, .nav-persona-detalle, .nav-persona-linea) { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nav-persona[data-activa="true"] :is(.nav-persona-linea, .nav-persona-detalle) { color: #fff; }
+.nav-plegar { display: none; }
+@media (min-width: 1024px) {
+  .nav-plegar {
+    flex: none; display: flex; align-items: center; gap: 12px; min-height: 40px; padding: 0 12px;
+    border-radius: 12px; font-size: 14px; line-height: 18px; color: var(--nav-tinta);
+  }
+  .nav-plegar:hover { background: var(--nav-velo); color: #fff; }
+}
+
+/* Menú de ajustes del pie: nace de su botón, sin velo (CALMA §21). */
+.nav-ajustes {
+  position: absolute; left: 0; right: 0; bottom: calc(100% + 8px); z-index: 5; padding: 8px 0;
+  border-radius: 16px; background: var(--sup); color: var(--tinta); box-shadow: var(--sombra-capa);
+  transform-origin: bottom left; animation: nav-menu-entra var(--dur-entra) var(--resorte-entra) both;
+}
+
+/* Filas de menú (ajustes y «Más»): icono en acción, destructiva en rojo (CALMA §11). */
+.nav-capa-titulo { margin: 0; padding: 8px 16px 6px; font-size: 17px; line-height: 22px; font-weight: 700; color: var(--tinta); }
+.nav-grupo + .nav-grupo { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--linea); }
+.nav-mas-cuerpo > .nav-aviso { margin: 4px 12px 12px; }
+.nav-fila {
+  width: 100%; display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 0 16px;
+  font-size: 15px; line-height: 20px; color: var(--tinta); text-align: left;
+}
+.nav-fila:hover { background: var(--sup2); }
+.nav-fila:disabled { cursor: progress; opacity: .7; }
+.nav-fila-icono { flex: none; color: var(--accion); }
+html.dark .nav-fila-icono { color: var(--enlace); }
+.nav-fila-valor { color: var(--tinta2); }
+.nav-fila-flecha { flex: none; color: var(--tinta3); transition: transform var(--dur-toque) ease-out; }
+.nav-fila--mal, .nav-fila--mal .nav-fila-icono { color: var(--mal-tinta); }
+@media (min-width: 1024px) { .nav-ajustes .nav-fila { min-height: 40px; } }
+
+/* Barra plegada (F1.2): sólo en la agenda y sólo en `esc`. Sin animar el
+   ancho: reacomodaría la rejilla en cada cuadro; FullCalendar se reajusta una
+   vez con el `ResizeObserver` de `AgendaCliente`. Estas reglas no van en capa,
+   así que ganan al margen de `.app-main`. */
+@media (min-width: 1024px) {
+  aside[data-plegada="true"] { width: 64px; padding-inline: 8px; }
+  aside[data-plegada="true"] .sb-etiqueta { display: none; }
+  aside[data-plegada="true"] :is(.nav-barra-enlace, .nav-plegar, .nav-persona) { justify-content: center; padding-inline: 0; }
+  aside[data-plegada="true"] .nav-barra-cabeza { justify-content: center; padding-left: 0; }
+  aside[data-plegada="true"] .nav-marca { margin-right: 0; }
+  aside[data-plegada="true"] .nav-pie { flex-direction: column; }
+  aside[data-plegada="true"] .nav-persona { flex: none; width: 44px; }
+  aside[data-plegada="true"] .nav-ajustes { right: auto; width: 224px; }
+  aside[data-plegada="true"] ~ .app-main { margin-left: 64px; }
+}
+
+/* ── «Más» (`MenuMas`): tarjeta centrada en el área de contenido, con velo ── */
+.nav-capa {
+  position: fixed; inset: 0; z-index: var(--z-capa); display: flex; align-items: center; justify-content: center;
+  padding: calc(var(--it) + 16px) calc(var(--ir) + 16px) calc(var(--ib) + 16px) calc(var(--il) + 16px);
+}
+[data-formato="ext"] .nav-capa { padding-right: calc(var(--cromo-riel) + var(--ir) + 8px); padding-left: calc(var(--il) + 8px); }
+[data-formato="ext"][data-borde-sistema="izquierda"] .nav-capa { padding-left: calc(var(--cromo-riel) + var(--il) + 8px); padding-right: 8px; }
+.nav-capa-velo {
+  position: absolute; inset: 0; background: var(--velo);
+  backdrop-filter: var(--velo-filtro); -webkit-backdrop-filter: var(--velo-filtro);
+}
+.nav-capa-tarjeta {
+  position: relative; width: 100%; max-width: 340px; max-height: 100%; overflow-y: auto; outline: none;
+  padding: 8px 0; border-radius: 20px; background: var(--sup); color: var(--tinta); box-shadow: var(--sombra-capa);
+}
+[data-formato="ext"] .nav-capa-tarjeta { max-width: 310px; }
+.nav-capa[data-fase="entra"] { animation: nav-funde-entra var(--dur-entra) ease-out both; }
+.nav-capa[data-fase="entra"] .nav-capa-tarjeta { animation: nav-escala-entra var(--dur-entra) var(--resorte-entra) both; }
+.nav-capa[data-fase="sale"] { animation: nav-funde-sale var(--dur-sale) ease-in both; }
+.nav-capa[data-fase="sale"] .nav-capa-tarjeta { animation: nav-escala-sale var(--dur-sale) var(--resorte-sale) both; }
+
+/* ── La paleta ⌘K (`CommandPalette.tsx`): anclada arriba, centrada en el área
+   de contenido (sin barra, riel ni franjas) y con el velo del kit. ── */
+.nav-paleta {
+  position: fixed; inset: 0; z-index: 9998; display: flex; justify-content: center; align-items: flex-start;
+  padding: calc(var(--it) + 16px) calc(var(--ir) + 12px) calc(var(--ib) + 16px) calc(var(--il) + 12px);
+}
+@media (min-width: 600px) { .nav-paleta { padding-top: calc(var(--it) + 72px); } }
+@media (min-width: 1024px) { .nav-paleta { padding-left: calc(var(--cromo-barra) + 24px); padding-right: 24px; } }
+body:has(aside[data-plegada="true"]) .nav-paleta { padding-left: calc(64px + 24px); }
+[data-formato="ext"] .nav-paleta { padding-right: calc(var(--cromo-riel) + var(--ir) + 8px); padding-left: calc(var(--il) + 8px); }
+[data-formato="ih"] .nav-paleta { padding-top: calc(var(--it) + 24px); padding-right: calc(var(--cromo-barra-ih) + var(--ir) + 24px); }
+.nav-paleta-tarjeta {
+  position: relative; width: 100%; max-width: 560px; max-height: 100%; overflow-y: auto;
+  border-radius: 20px; background: var(--sup); color: var(--tinta); box-shadow: var(--sombra-capa);
+  animation: nav-menu-entra var(--dur-entra) var(--resorte-entra) both; transform-origin: top center;
+}
+.nav-paleta-campo {
+  display: flex; align-items: center; gap: 10px; margin: 12px; min-height: 44px; padding: 0 4px 0 12px;
+  border-radius: 12px; background: var(--sup2); font-size: 16px;
+}
+@media (min-width: 600px) { .nav-paleta-campo { font-size: 15px; } }
+.nav-paleta-campo:focus-within { outline: 2px solid var(--enlace); outline-offset: 0; }
+.nav-paleta-icono {
+  flex: none; width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 999px; color: var(--tinta2);
+}
+.nav-paleta-icono:hover { background: var(--sup2); color: var(--tinta); }
+.nav-paleta-lista { list-style: none; margin: 0; padding: 0 0 8px; max-height: 360px; overflow-y: auto; }
+.nav-paleta-fila {
+  width: 100%; display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 6px 16px; text-align: left;
+}
+.nav-paleta-fila[data-activa="true"] { background: var(--tonal); }
+.nav-paleta-avatar {
+  flex: none; width: 36px; height: 36px; border-radius: 999px;
+  display: inline-flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600;
+}
+.nav-paleta-teclas {
+  display: flex; gap: 16px; padding: 8px 16px 12px; border-top: 1px solid var(--linea);
+  font-size: 12px; line-height: 16px; color: var(--tinta2);
+}
+.nav-paleta-teclas kbd {
+  font-family: inherit; padding: 1px 6px; border-radius: 6px; background: var(--sup2); color: var(--tinta2);
+}
+/* En táctil no hay teclado de flechas: el pie de teclas sobra (PLAN §7.1). */
+:where([data-formato="tel"], [data-formato="ext"]) .nav-paleta-teclas { display: none; }
+.nav-paleta-input {
+  width: 100%; min-height: 44px; padding: 0 12px; border: 0; border-radius: 12px;
+  background: var(--sup2); color: var(--tinta); font-size: 16px;
+}
+@media (min-width: 600px) { .nav-paleta-input { font-size: 15px; } }
+.nav-paleta-input:focus { outline: 2px solid var(--enlace); outline-offset: 0; }
+.nav-paleta-pie { display: flex; justify-content: flex-end; gap: 8px; padding: 0 16px 16px; }
+[data-formato="iv"] .nav-paleta-pie { justify-content: center; }
+@media (prefers-reduced-motion: reduce) {
+  .nav-paleta-tarjeta { animation-name: nav-funde-entra; animation-duration: 120ms; }
+}
+
+@keyframes nav-funde-entra { from { opacity: 0; } to { opacity: 1; } }
+@keyframes nav-funde-sale { from { opacity: 1; } to { opacity: 0; } }
+@keyframes nav-escala-entra { from { transform: scale(.96); } to { transform: none; } }
+@keyframes nav-escala-sale { from { transform: none; } to { transform: scale(.96); } }
+@keyframes nav-menu-entra { from { opacity: 0; transform: scale(.96); } to { opacity: 1; transform: none; } }
+
+/* Movimiento reducido: fundido corto en lugar de escala o desplazamiento. */
+@media (prefers-reduced-motion: reduce) {
+  .nav-capa[data-fase] .nav-capa-tarjeta { animation: none; }
+  .nav-capa[data-fase="entra"], .nav-cajon-velo { animation-duration: 120ms; }
+  .nav-capa[data-fase="sale"] { animation-duration: 90ms; }
+  .nav-ajustes, .nav-consultorio-lista { animation-name: nav-funde-entra; animation-duration: 120ms; }
+  .nav-fila-flecha { transition: none; }
+}
+@media (prefers-reduced-motion: reduce) and (max-width: 1023px) {
+  html:not([data-formato="ih"]) .nav-barra { transition: opacity 120ms ease, visibility 0s linear 120ms; }
+  html:not([data-formato="ih"]) .nav-barra:not([data-abierta="true"]) { opacity: 0; }
+  html:not([data-formato="ih"]) .nav-barra[data-abierta="true"] { transition: opacity 120ms ease, visibility 0s; }
 }
 
 /* F1.15 · LAS DOS FILAS DE LA BANDA. 6 px y no 8 entre controles: la primera

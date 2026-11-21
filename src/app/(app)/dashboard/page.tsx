@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic'
 import { useProfile } from '@/hooks/useProfile'
 import AsistenteDashboard from './AsistenteDashboard'
 import { DashboardSkeleton } from '@/components/ui/Skeleton'
-import { FolderOpen, User, Menu, Plus, Stethoscope, FilePlus2 } from 'lucide-react'
+import { FolderOpen, Plus, Stethoscope, FilePlus2 } from 'lucide-react'
 import Link from 'next/link'
 import { useConsultorios } from '@/hooks/useConsultorios'
 import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
@@ -76,9 +76,8 @@ export default function DashboardPage() {
   if (profile?.role === 'secretaria') return <AsistenteDashboard />
 
   const primerNombre = profile?.nombres ? profile.nombres.split(' ')[0] : ''
-  /* Sin perfil —error de carga— el saludo cae a la fórmula neutra y el avatar
-     al glifo genérico; la ceja de consultorio simplemente no se pinta. */
-  const iniciales = `${profile?.nombres?.[0] ?? ''}${profile?.apellido_paterno?.[0] ?? ''}`.toUpperCase()
+  /* Sin perfil —error de carga— el saludo cae a la fórmula neutra; la ceja de
+     consultorio simplemente no se pinta. */
 
   return (
     <div className="max-w-[1044px] mx-auto pt-2 pb-6">
@@ -86,31 +85,9 @@ export default function DashboardPage() {
       {/* ── Región 1 · Cabecera de acción (adenda §1) ─────────── */}
       <div className="animate-slide-up pb-[var(--sp-5-5)] border-b border-[color:var(--sp-line-card)]" style={{ animationDelay: '0ms' }}>
 
-        {/* ── Barra superior, SÓLO móvil ──────────────────────────
-            ⚠️ `dash-barra-movil` NO PINTA NADA: es el asidero de dos reglas de
-            `globals.css` —esconde el hamburguesa flotante del `Sidebar` para
-            que no salgan dos, y recorta el `pt-16` que el layout reserva
-            justamente para ese botón—. Mismo mecanismo, y mismo motivo, que
-            `.ag-banda-movil` en la agenda. No la quites al reordenar clases.
-            El hamburguesa de aquí y el flotante abren el MISMO menú
-            (`MenuMovilContext`), así que esconder uno no deja a nadie sin
-            acceso. */}
-        <div className="dash-barra-movil lg:hidden flex items-center gap-[var(--sp-3)] mb-[var(--sp-gap-block)]">
-          <button
-            type="button"
-            onClick={abrirMenu}
-            aria-label="Abrir menú"
-            className="w-11 h-11 shrink-0 flex items-center justify-center rounded-[var(--sp-r-icon-md)] bg-[var(--sp-surface-muted)] text-[var(--sp-ink-700)]"
-          >
-            <Menu size={20} />
-          </button>
-          <p className="flex-1 min-w-0 truncate text-[length:var(--sp-fs-vitals)] font-bold text-[var(--sp-ink-800)]">
-            Dashboard
-          </p>
-          <div className="w-10 h-10 shrink-0 flex items-center justify-center rounded-[var(--sp-r-pill)] bg-[var(--sp-primary-bg)] text-[var(--sp-primary-ink)] text-[length:var(--sp-fs-label-sm)] font-extrabold">
-            {iniciales || <User size={18} />}
-          </div>
-        </div>
+        {/* La barra móvil propia (`.dash-barra-movil`: hamburguesa, «Dashboard»
+            y avatar) se fue en B4 del rediseño: ahora la cabecera de `tel`/`iv`
+            es el encabezado fundido de `Sidebar.tsx`, el mismo en toda la app. */}
 
         {/* ── Fila 1 · identidad ──────────────────────────────── */}
         {consultorioActivo && (

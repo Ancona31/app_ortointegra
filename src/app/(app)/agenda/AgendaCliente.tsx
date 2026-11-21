@@ -1479,11 +1479,15 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
        tocar el layout de TODA la app, que está fuera de este alcance.
 
        ⚠️⚠️ LOS DOS NÚMEROS SON EL PADDING VERTICAL DEL NODO PADRE, REPLICADO A
-       MANO, Y ES EL PRECIO DE NO TOCAR EL LAYOUT COMPARTIDO. Salen de
-       `(app)/layout.tsx:60`, que hoy es `pt-16 px-4 pb-6 lg:pt-8 lg:px-8
-       lg:pb-8`:
-         · por debajo de `lg`: pt-16 (64px) + pb-6 (24px) = 88px
-         · de `lg` en adelante: pt-8 (32px) + pb-8 (32px) = 64px
+       MANO, Y ES EL PRECIO DE NO TOCAR EL LAYOUT COMPARTIDO. Desde el rediseño
+       (B4) ese padding es `.app-contenido`, en `globals.css` (zona «B4 ·
+       Navegación por dispositivo»), y depende del formato de pantalla:
+         · `tel` / `iv` (y sin formato, por debajo de `lg`): 80 + 24 = 104px
+           (los 64 del encabezado fundido + 16, y 24 abajo);
+         · de `lg` en adelante (`esc`): 32 + 32 = 64px;
+         · `ext` / `ih`: 16 + 24 = 40px — ésos no caben en una clase de aquí y
+           su pareja vive en `globals.css`, junto a `.app-contenido`.
+       Antes de B4 eran 88 (`pt-16 pb-6`, el hueco del botón flotante del menú).
        SI ALGUIEN CAMBIA ESE PADDING, ESTO SE DESAJUSTA EN SILENCIO: no rompe
        nada visible de golpe, sólo deja la rejilla unos píxeles más alta o más
        baja que el hueco, y reaparece el scroll de `<main>` bajo la zona fija.
@@ -1505,7 +1509,7 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
        ⚠️ Y POR ESO RESTAN TAMBIÉN LOS DOS `env()` (bloque 6 · paso 10). Aquel
        padding pasó a llevar el área segura sumada, así que el respaldo tiene que
        restar lo mismo o volvería a divergir en el único caso para el que existe.
-       Los 88 y los 64 no se tocan: el área segura se AÑADE a la resta, igual que
+       Los 104 y los 64 no se tocan: el área segura se AÑADE a la resta, igual que
        se añadió allí a la suma. En escritorio y en una pestaña normal los dos
        `env()` valen 0 y esto es el calc de siempre.
        ⚠️ ESTO NO ES LO QUE SE VE EN UN TELÉFONO CON `:has()`: allí manda la regla
@@ -1514,7 +1518,7 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
        reloj y a la barra de «Agendar» bajo la de gestos. Si te preguntas por qué
        aquí no hay duplicación: porque en esa rama este calc no se aplica. */
     <div ref={raizRef} data-densidad={densidadCompacta ? 'compacta' : 'normal'} data-agenda-v2={interruptorLeido === null ? 'pendiente' : agendaV2 ? 'encendida' : 'apagada'}
-      data-interacciones-v2={interaccionesListas ? 'listas' : undefined} className="agenda-raiz flex flex-col h-[calc(100dvh-88px-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px))] lg:h-[calc(100dvh-64px-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px))]">
+      data-interacciones-v2={interaccionesListas ? 'listas' : undefined} className="agenda-raiz flex flex-col h-[calc(100dvh-104px-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px))] lg:h-[calc(100dvh-64px-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px))]">
 
       {isMobile && (
         <BandaMovil

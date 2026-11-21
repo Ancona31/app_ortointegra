@@ -23,6 +23,13 @@ const MenuMovilContext = createContext<MenuMovilContextType | null>(null)
  * dejar el botón flotante del `Sidebar` encima de la banda, que es lo que el
  * rediseño viene a quitar.
  *
+ * ⚠️ DESDE EL REDISEÑO (B4) EL BOOLEANO ES «¿ESTÁ ABIERTO EL CAJÓN?» y significa
+ * lo mismo: en `tel`, `iv` y `ext` la barra lateral es un cajón que abren el
+ * «Abrir menú» del encabezado fundido (`EncabezadoFundido.tsx`) y el de la
+ * banda de la agenda; en `ih` y `esc` es una barra fija y este valor no la
+ * mueve (lo decide CSS por formato, `globals.css`). «Más» NO vive aquí: es
+ * estado local de `Sidebar.tsx`, porque sólo lo abre él.
+ *
  * ⚠️ NO LE AÑADAS NADA MÁS. Es deliberadamente un booleano con sus tres verbos y
  * no «el contexto del layout»: en cuanto entre aquí una segunda cosa —la ruta
  * activa, el ancho, el tema— cualquier consumidor se re-renderiza cuando cambia
