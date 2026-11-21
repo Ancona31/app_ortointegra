@@ -1,54 +1,246 @@
 'use client'
 
-import { useCallback, useEffect, useId, useRef } from 'react'
+import { useCallback, useEffect, useId, useRef, useState, type ReactElement, type ReactNode, type RefObject } from 'react'
 import { X } from 'lucide-react'
+import { animate } from 'motion/react'
 import Portal from '@/components/ui/Portal'
+import { leerFormato } from '@/lib/formatoPantalla'
 
-/* ═══ ACCESIBILIDAD DEL DIÁLOGO (bloque 9 de la agenda) ═══════════════════════
-   Lo que le faltaba a este componente: rol de diálogo, nombre accesible, foco
-   inicial, foco ATRAPADO y devolución del foco al cerrar. El Escape y el bloqueo
-   del scroll ya estaban.
+/* ═══ CAPA DEL CATÁLOGO: MODAL Y ALERTA (rediseño B3, CALMA §13, §25, §26) ═════
+   La MISMA API de siempre (`title`, `footer`, `elevated`, `fullscreenMobile`,
+   `spinusGeometry`…) con el aspecto y el movimiento del kit. El CSS vive en
+   `sistema.css` («CAPAS DEL CATÁLOGO»): `.k-capa`, `.k-velo`, `.k-capa-panel`.
 
-   ⚠️ ESTA MISMA LÓGICA ESTÁ ESCRITA OTRAS DOS VECES —en `agenda/page.tsx`, como
-   el hook `useDialogoModal` que comparten sus tres modales, y en
-   `agenda/ModalInvitacionCita.tsx`—. Son TRES COPIAS Y SE SABE. Aquellos cuatro
-   modales NO usan este componente: montan su propio portal porque su geometría
-   (pantalla completa, seguimiento del `visualViewport`, áreas seguras) no cabe
-   aquí, y unificarlos era arriesgar una ronda de trabajo que ya está hecha.
-   Si tocas el trapo del foco, tócalo en las tres. */
+   PRESENTACIÓN POR FORMATO, SÓLO CON CSS (ningún marcado depende del formato):
+     ext  tarjeta centrada de 310 en el área de contenido (sin riel ni franja)
+     tel  hoja desde abajo, arrastrable para cerrar (la alerta, centrada)
+     ih / iv / esc  tarjeta centrada en el área de contenido
 
-/* Lo que puede recibir foco dentro de un panel, en orden de DOM. Sin `details`
-   ni `iframe` ni `audio/video[controls]`: no hay ninguno en los 26 consumidores,
-   y una lista corta que se entiende vale más que una exhaustiva que no. */
+   AÑADIDO (opcional; sin él, todo es como antes):
+     variante="alerta"  patrón único de alerta: icono en círculo de 48 (el
+                        `icon`, de 28), título centrado, `children` como
+                        mensaje y `footer` como los BOTONES SUELTOS (un
+                        Fragment, secundario primero; el principal con
+                        `data-principal`). Dos lado a lado; con `apilada`, a
+                        todo el ancho con el principal arriba (rótulos largos,
+                        §23.3). El velo NO la cierra; Esc sí. Rol
+                        `alertdialog` salvo que `rol` diga otra cosa.
+                        Foco: pon `autoFocus` en el principal, o en
+                        «Cancelar» si la alerta destruye (capas-a, vista 1).
+     tono               color del círculo: confirmar (tonal), destruir
+                        (rojo suave), avisar (ámbar).
+
+   SALIDA ANIMADA: con `open={false}` la capa se queda montada 260 ms, inerte y
+   sin recibir clics, mientras sale por el mismo camino por el que entró. El
+   foco vuelve al disparador y el scroll se libera AL EMPEZAR a salir, no al
+   final. Reabrir a medio salir invierte la transición desde donde esté.
+
+   ⚠️ ESTA LÓGICA DE FOCO ESTÁ ESCRITA OTRAS DOS VECES —`useDialogoModal` de la
+   agenda y `agenda/ModalInvitacionCita.tsx`—, que no usan este componente. Si
+   tocas el trapo del foco, tócalo en las tres. */
+
+/* Lo que puede recibir foco dentro de un panel, en orden de DOM. */
 const SELECTOR_FOCO =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), ' +
   'textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
-/* ⚠️ EL FILTRO DE VISIBILIDAD NO ES `offsetParent !== null`, y es el error
-   clásico: `offsetParent` vale null también para cualquier ancestro
-   `position: fixed`, o sea para TODO panel montado en un portal fijo — con esa
-   comprobación la lista salía vacía siempre y el trapo no atrapaba nada.
-   Medir caja sí funciona: un `display: none` mide 0×0 y lo demás no. */
-function focusablesDe(raiz: HTMLElement): HTMLElement[] {
+/* ⚠️ EL FILTRO DE VISIBILIDAD NO ES `offsetParent !== null`: vale null para
+   todo lo que cuelga de un portal `position: fixed`. Medir caja sí funciona. */
+export function focusablesDe(raiz: HTMLElement): HTMLElement[] {
   return Array.from(raiz.querySelectorAll<HTMLElement>(SELECTOR_FOCO))
     .filter(el => el.offsetWidth > 0 || el.offsetHeight > 0)
 }
 
-// Counter global para manejar body scroll lock con modales anidados.
-// Solo el primero en abrir hace el lock; solo el último en cerrar lo libera.
+/** Lo que tarda en irse una capa (la transición más larga de salida, 240 ms, más margen). */
+const MS_SALIDA = 260
+
+/**
+ * Montaje con salida animada. `montada` sigue en true `MS_SALIDA` ms después
+ * de `open={false}`; mientras, la capa pinta `data-fase="sale"`.
+ * El ajuste al abrir va DURANTE el render (el patrón de React para reaccionar a
+ * una prop), no en un efecto: un efecto pintaría un fotograma sin la capa.
+ */
+export function useCapaMontada(open: boolean): boolean {
+  const [montada, setMontada] = useState(open)
+  const [previo, setPrevio] = useState(open)
+  if (previo !== open) {
+    setPrevio(open)
+    if (open) setMontada(true)
+  }
+  useEffect(() => {
+    if (open || !montada) return
+    const t = window.setTimeout(() => setMontada(false), MS_SALIDA)
+    return () => window.clearTimeout(t)
+  }, [open, montada])
+  return montada
+}
+
+/* ── Arrastre de la hoja de teléfono (capas-a, vista 3; skill apple-design
+   §2, §5, §6, §9) ──────────────────────────────────────────────────────────
+   Umbral de 10 px; luego sigue al dedo 1:1; hacia arriba, rubber-band. Al
+   soltar se proyecta la inercia (deceleración .998): si el punto proyectado
+   pasa de la mitad, cierra; si no, vuelve. La velocidad del dedo pasa al
+   resorte de `motion`. El velo sigue al dedo. */
+interface Gesto { panel: HTMLElement; velo: HTMLElement | null; y0: number; alto: number; tomado: boolean; pos: number; muestras: { y: number; t: number }[] }
+
+const NO_ARRASTRA = 'input, textarea, select, [contenteditable="true"], .k-capa-cuerpo, .k-menu-l'
+
+function pintarGesto(g: Gesto, y: number): void {
+  g.pos = y
+  g.panel.style.transform = `translateY(${y}px)`
+  if (g.velo) g.velo.style.opacity = String(Math.max(0, Math.min(1, 1 - y / g.alto)))
+}
+
+function limpiarGesto(g: Gesto): void {
+  g.panel.style.transform = ''
+  g.panel.style.transition = ''
+  if (g.velo) { g.velo.style.opacity = ''; g.velo.style.transition = '' }
+}
+
+function velocidadDe(g: Gesto): number {
+  const ahora = performance.now()
+  const recientes = g.muestras.filter(m => ahora - m.t < 100)
+  if (recientes.length < 2) return 0
+  const a = recientes[0]
+  const b = recientes[recientes.length - 1]
+  return b.t > a.t ? ((b.y - a.y) / (b.t - a.t)) * 1000 : 0
+}
+
+function soltarGesto(g: Gesto, alCerrar: () => void): void {
+  const v = velocidadDe(g)
+  const proyectado = g.pos + ((v / 1000) * 0.998) / (1 - 0.998)
+  const cierra = proyectado > g.alto / 2
+  const reducido = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  if (reducido) {
+    if (cierra) alCerrar(); else limpiarGesto(g)
+    return
+  }
+  const rapido = Math.abs(v) > 300
+  animate(g.pos, cierra ? g.alto : 0, {
+    type: 'spring', velocity: v, bounce: rapido ? 0.2 : 0, duration: rapido ? 0.3 : 0.36,
+    onUpdate: y => pintarGesto(g, y),
+    onComplete: () => {
+      if (!cierra) { limpiarGesto(g); return }
+      alCerrar()
+      /* Si quien la abrió no la cierra (pide confirmar, por ejemplo), la hoja
+         no se queda escondida: vuelve a su sitio. */
+      window.setTimeout(() => {
+        if (g.panel.isConnected && g.panel.parentElement?.dataset.fase === 'abierta') {
+          animate(g.pos, 0, { type: 'spring', bounce: 0, duration: 0.36, onUpdate: y => pintarGesto(g, y), onComplete: () => limpiarGesto(g) })
+        }
+      }, 60)
+    },
+  })
+}
+
+function moverGesto(g: Gesto, e: PointerEvent): void {
+  const dy = e.clientY - g.y0
+  if (!g.tomado) {
+    if (Math.abs(dy) < 10) return
+    g.tomado = true
+    g.y0 = e.clientY
+    g.panel.style.transition = 'none'
+    if (g.velo) g.velo.style.transition = 'none'
+  }
+  const y = e.clientY - g.y0
+  /* Rubber-band (c = .55): cuanto más pasa del tope, menos sigue. */
+  const pos = y >= 0 ? y : -((-y * g.alto * 0.55) / (g.alto + 0.55 * -y))
+  g.muestras.push({ y: e.clientY, t: performance.now() })
+  if (g.muestras.length > 8) g.muestras.shift()
+  pintarGesto(g, pos)
+}
+
+/** Devuelve el `onPointerDown` de la hoja. `puede()` se pregunta al tocar (el formato puede cambiar). */
+export function useArrastreHoja(
+  panelRef: RefObject<HTMLElement | null>,
+  veloRef: RefObject<HTMLElement | null>,
+  puede: () => boolean,
+  alCerrar: () => void,
+): (e: React.PointerEvent<HTMLElement>) => void {
+  const cerrarRef = useRef(alCerrar)
+  const puedeRef = useRef(puede)
+  useEffect(() => { cerrarRef.current = alCerrar; puedeRef.current = puede }, [alCerrar, puede])
+  return useCallback((e: React.PointerEvent<HTMLElement>) => {
+    const panel = panelRef.current
+    if (!panel || e.button !== 0 || !puedeRef.current()) return
+    if (e.target instanceof Element && e.target.closest(NO_ARRASTRA)) return
+    const g: Gesto = { panel, velo: veloRef.current, y0: e.clientY, alto: panel.offsetHeight - 80, tomado: false, pos: 0, muestras: [] }
+    const mover = (ev: PointerEvent): void => moverGesto(g, ev)
+    const soltar = (): void => {
+      window.removeEventListener('pointermove', mover)
+      window.removeEventListener('pointerup', soltar)
+      window.removeEventListener('pointercancel', soltar)
+      if (g.tomado) soltarGesto(g, () => cerrarRef.current())
+    }
+    window.addEventListener('pointermove', mover)
+    window.addEventListener('pointerup', soltar)
+    window.addEventListener('pointercancel', soltar)
+  }, [panelRef, veloRef])
+}
+
+/* ── Foco atrapado, Escape y bloqueo del scroll ──────────────────────────── */
+// Contador global para el bloqueo del scroll con modales anidados: sólo el
+// primero en abrir bloquea; sólo el último en cerrar libera.
 let modalStack = 0
 let prevBodyOverflow = ''
 
-// Geometría del sistema de diseño Spinus, por forma de estado. Solo actúa en
-// ≥768px: por debajo manda `fullscreenMobile` (rangos disjuntos, no compiten).
-// Strings literales completos: el scanner de Tailwind 4 lee el fuente como
-// texto y no generaría el CSS de una clase armada por concatenación.
+function teclaDelModal(e: KeyboardEvent, panel: HTMLElement | null, cerrar: () => void): void {
+  if (e.key === 'Escape') { cerrar(); return }
+  if (e.key !== 'Tab' || !panel) return
+  const focos = focusablesDe(panel)
+  /* Sin nada enfocable, el foco vuelve al panel en vez de salir al documento. */
+  if (focos.length === 0) { e.preventDefault(); panel.focus({ preventScroll: true }); return }
+  const primero = focos[0]
+  const ultimo = focos[focos.length - 1]
+  const activo = document.activeElement
+  /* `!panel.contains(activo)` cubre el estado inicial, con el foco en el panel. */
+  if (e.shiftKey && (activo === primero || !panel.contains(activo))) {
+    e.preventDefault(); ultimo.focus()
+  } else if (!e.shiftKey && (activo === ultimo || !panel.contains(activo))) {
+    e.preventDefault(); primero.focus()
+  }
+}
+
+/**
+ * Mientras `open`: bloquea el scroll, atrapa el Tab y cierra con Escape (sólo
+ * el modal más interno). Al cerrar —al EMPEZAR a salir— devuelve el foco a
+ * quien lo tenía antes de abrir. El foco inicial lo pone el callback ref del
+ * panel: aquí el panel todavía no existe (`Portal` monta en su 2.º render).
+ */
+function useFocoDelModal(open: boolean, panelRef: RefObject<HTMLElement | null>, cerrarRef: RefObject<() => void>): void {
+  useEffect(() => {
+    if (!open) return
+    modalStack += 1
+    const myDepth = modalStack
+    if (modalStack === 1) {
+      prevBodyOverflow = document.body.style.overflow
+      document.body.style.overflow = 'hidden'
+    }
+    const previo = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    const onKey = (e: KeyboardEvent): void => {
+      if (modalStack !== myDepth) return
+      teclaDelModal(e, panelRef.current, () => cerrarRef.current())
+    }
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      modalStack -= 1
+      if (modalStack === 0) document.body.style.overflow = prevBodyOverflow
+      previo?.focus({ preventScroll: true })
+    }
+  }, [open, panelRef, cerrarRef])
+}
+
+// Ancho del sistema de diseño anterior, por forma de estado (sólo ≥ 768 px).
+// Strings literales completos: el escáner de Tailwind lee el fuente como texto.
 const SP_GEO = {
-  work:   { wrap: 'md:items-start md:pt-[60px]', panel: 'md:max-w-[724px] md:max-h-[calc(100vh-120px)]' },
-  decide: { wrap: '',                            panel: 'md:max-w-[620px]' },
-  done:   { wrap: '',                            panel: 'md:max-w-[600px]' },
-  wait:   { wrap: '',                            panel: 'md:max-w-[560px]' },
+  work:   'md:max-w-[724px] md:max-h-[calc(100vh-120px)]',
+  decide: 'md:max-w-[620px]',
+  done:   'md:max-w-[600px]',
+  wait:   'md:max-w-[560px]',
 } as const
+
+type Tono = 'confirmar' | 'destruir' | 'avisar'
 
 interface Props {
   open: boolean
@@ -58,232 +250,152 @@ interface Props {
   icon?: React.ReactNode
   iconBg?: string
   headerRight?: React.ReactNode
-  /** Tailwind max-w-* class. Default: max-w-lg */
+  /** Tailwind max-w-* class. Default: max-w-lg (en `ext`, 310 como mucho; en `tel`, todo el ancho). */
   maxWidth?: string
   /** z-50 por defecto. elevated=true usa z-[60] para apilarse sobre otro ModalShell */
   elevated?: boolean
-  /** Oculta el botón X del header. Útil para modales bloqueantes (ej. onboarding). */
+  /** Oculta el botón X del header (y en teléfono, el arrastre para cerrar). */
   hideClose?: boolean
-  /** Contenido fijo al pie del modal. No scrollea con el body. El consumidor maneja su propio padding. */
+  /** Contenido fijo al pie. No se desplaza con el cuerpo. El consumidor pone su relleno. En la alerta: los botones sueltos. */
   footer?: React.ReactNode
-  // En <768px el modal ocupa la pantalla completa (h-dvh). Default: false.
+  /** En teléfono la capa ocupa la pantalla completa, sin arrastre. Default: false. */
   fullscreenMobile?: boolean
   /**
-   * Geometría del sistema de diseño (solo funnel de nota). Ausente = geometría legacy.
-   *   work   → 724px, anclado a top:60px  (entrevista · revisión · contexto)
-   *   decide → 620px, centrado            (confirmación)
-   *   done   → 600px, centrado            (éxito)
-   *   wait   → 560px, centrado            (generando)
+   * Ancho del sistema anterior (sólo funnel de nota). Ausente = el de `maxWidth`.
+   *   work 724 · decide 620 · done 600 · wait 560
    */
   spinusGeometry?: 'work' | 'decide' | 'done' | 'wait'
+  /** Patrón único de alerta (ver la cabecera del archivo). */
+  variante?: 'alerta'
+  /** Color del icono de la alerta. Default: confirmar. */
+  tono?: Tono
+  /** Alerta con los botones apilados, el principal (`data-principal`) arriba. */
+  apilada?: boolean
+  /** Rol del panel. Default: `dialog`, y `alertdialog` en la alerta. */
+  rol?: 'dialog' | 'alertdialog'
   children: React.ReactNode
 }
 
+interface CabeceraProps {
+  tituloId: string; title: string; subtitle?: string; icon?: ReactNode; iconBg?: string
+  geo: boolean; headerRight?: ReactNode; hideClose: boolean; onClose: () => void
+}
+
+function CabeceraModal({ tituloId, title, subtitle, icon, iconBg, geo, headerRight, hideClose, onClose }: CabeceraProps): ReactElement {
+  return (
+    <div className="k-capa-cab">
+      {icon && <div className={geo ? 'sp-icobox' : `k-capa-ico ${iconBg ?? 'bg-slate-50'}`}>{icon}</div>}
+      <div className="k-capa-tits">
+        <h2 id={tituloId} className="k-capa-tit">{title}</h2>
+        {subtitle && <p className="k-capa-sub">{subtitle}</p>}
+      </div>
+      <div className="k-capa-acc">
+        {headerRight}
+        {!hideClose && (
+          <button type="button" onClick={onClose} className="k-b k-b-icono" aria-label="Cerrar">
+            <X aria-hidden="true" />
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+interface AlertaProps {
+  tituloId: string; title: string; subtitle?: string; icon?: ReactNode; tono: Tono; apilada: boolean
+  footer?: ReactNode; children: ReactNode
+}
+
+function CuerpoAlerta({ tituloId, title, subtitle, icon, tono, apilada, footer, children }: AlertaProps): ReactElement {
+  return (
+    <div className="k-al">
+      {icon && <span className={`k-al-i k-al-i-${tono}`} aria-hidden="true">{icon}</span>}
+      <h2 id={tituloId} className="k-al-tit">{title}</h2>
+      {subtitle && <p className="k-al-sub">{subtitle}</p>}
+      <div className="k-al-t">{children}</div>
+      {footer && <div className={`k-al-b${apilada ? ' k-al-pila' : ''}`}>{footer}</div>}
+    </div>
+  )
+}
+
+/** Qué presentación pide la capa en teléfono (el CSS la aplica sólo en `tel`). */
+function modoDe(variante: Props['variante'], fullscreenMobile: boolean): 'hoja' | 'completa' | undefined {
+  if (variante === 'alerta') return undefined
+  return fullscreenMobile ? 'completa' : 'hoja'
+}
+
 export default function ModalShell({
-  open,
-  onClose,
-  title,
-  subtitle,
-  icon,
-  iconBg,
-  headerRight,
-  maxWidth = 'max-w-lg',
-  elevated = false,
-  hideClose = false,
-  footer,
-  fullscreenMobile = false,
-  spinusGeometry,
-  children,
-}: Props) {
+  open, onClose, title, subtitle, icon, iconBg, headerRight,
+  maxWidth = 'max-w-lg', elevated = false, hideClose = false, footer,
+  fullscreenMobile = false, spinusGeometry, variante, tono = 'confirmar', apilada = false, rol, children,
+}: Props): ReactElement | null {
+  const montada = useCapaMontada(open)
   const onCloseRef = useRef(onClose)
   useEffect(() => { onCloseRef.current = onClose }, [onClose])
 
   const panelRef = useRef<HTMLDivElement | null>(null)
-  /* Callback ref: React lo llama con el nodo justo cuando el portal lo monta, que
-     es lo que un efecto con deps `[open]` se pierde. Ver el aviso del efecto.
-     ⚠️ `useCallback` CON DEPS `[]` ES OBLIGATORIO: con identidad nueva en cada
-     render React lo llamaría con `null` y con el nodo EN CADA RENDER, y el panel
-     robaría el foco en cada tecla que se escriba dentro del modal.
-     Foco en el PANEL y no en su primer control a propósito: ése suele ser la ✕,
-     así que enfocarlo pondría «Cerrar» como lo primero que se oye de un diálogo
-     recién abierto. Desde el panel, el lector lee el nombre y el Tab siguiente ya
-     entra en el contenido. `preventScroll` porque el panel puede estar bajo el
-     pliegue mientras entra su animación. */
+  const veloRef = useRef<HTMLDivElement | null>(null)
+  /* Callback ref: React lo llama con el nodo cuando el portal lo monta.
+     ⚠️ DEPS `[]` OBLIGATORIAS: con identidad nueva en cada render robaría el
+     foco en cada tecla. Foco en el PANEL y no en su primer control (suele ser
+     la ✕), y SÓLO SI NO ESTÁ YA DENTRO: un `autoFocus` de dentro gana. */
   const montarPanel = useCallback((node: HTMLDivElement | null) => {
     panelRef.current = node
-    /* ⚠️ SÓLO SI EL FOCO NO ESTÁ YA DENTRO. Varios de los 26 consumidores llevan
-       `autoFocus` en su primer campo, y React lo aplica ANTES de atar el ref del
-       padre —la fase de layout va de dentro hacia fuera—, así que un `focus()` a
-       secas se lo comería y el cursor saldría del campo. Que el foco caiga en un
-       control de dentro no estropea el anuncio: con `role="dialog"`, `aria-modal`
-       y el nombre puestos, un lector nombra el diálogo al entrar en él. */
     if (node && !node.contains(document.activeElement)) node.focus({ preventScroll: true })
   }, [])
-  /* Id del <h2> de la cabecera, para `aria-labelledby`. `useId` y no una
-     constante: con dos modales abiertos a la vez —que es un caso real, de ahí el
-     `modalStack`— dos ids iguales dejarían el nombre del diálogo interno
-     apuntando al título del externo. */
+  /* `useId`: con dos modales abiertos, dos ids iguales cruzarían los nombres. */
   const tituloId = useId()
+  useFocoDelModal(open, panelRef, onCloseRef)
 
-  useEffect(() => {
-    if (!open) return
+  const esAlerta = variante === 'alerta'
+  const modo = modoDe(variante, fullscreenMobile)
+  const arrastra = modo === 'hoja' && !hideClose
+  const puedeArrastrar = useCallback(() => arrastra && leerFormato() === 'tel', [arrastra])
+  const cerrar = useCallback(() => onCloseRef.current(), [])
+  const alPulsar = useArrastreHoja(panelRef, veloRef, puedeArrastrar, cerrar)
 
-    modalStack += 1
-    const myDepth = modalStack
-    if (modalStack === 1) {
-      prevBodyOverflow = document.body.style.overflow
-      document.body.style.overflow = 'hidden'
-    }
+  if (!montada) return null
 
-    /* Quién tenía el foco antes de abrir. Se guarda ANTES de moverlo, y se le
-       devuelve al cerrar: sin esto, cerrar un modal manda el foco al <body> y
-       quien navega con teclado vuelve a empezar desde arriba de la página. */
-    const previo = document.activeElement instanceof HTMLElement ? document.activeElement : null
-    /* ⚠️ EL FOCO INICIAL NO PUEDE IR AQUÍ, Y AQUÍ ESTUVO SIN HACER NADA. `Portal`
-       devuelve `null` en su primer render —monta a sus hijos en el segundo—, así
-       que cuando este efecto corre EL PANEL NO EXISTE TODAVÍA EN EL DOM y
-       `panelRef.current` vale `null`: el `focus()` era un no-op silencioso. Lo
-       hace ahora `montarPanel`, el callback ref, al que React llama con el nodo
-       en el commit en que aparece.
-       LO DEMÁS DE ESTE EFECTO SÍ FUNCIONABA y no se toca: el Escape y el trapo
-       cuelgan de `document` y leen `panelRef.current` EN EL MOMENTO DE LA TECLA,
-       cuando ya está puesto; y `previo` se captura bien porque aquí el foco
-       todavía no se ha movido —el callback ref corre después—. */
-
-    const onKey = (e: KeyboardEvent) => {
-      // Solo el modal más interno responde, igual que hacía ya el Escape.
-      if (modalStack !== myDepth) return
-      if (e.key === 'Escape') { onCloseRef.current(); return }
-      if (e.key !== 'Tab') return
-
-      const panel = panelRef.current
-      if (!panel) return
-      const focos = focusablesDe(panel)
-      /* Un panel sin nada enfocable —una confirmación de sólo texto— devuelve el
-         foco a sí mismo en vez de dejarlo salir al documento de detrás. */
-      if (focos.length === 0) { e.preventDefault(); panel.focus({ preventScroll: true }); return }
-
-      const primero = focos[0]
-      const ultimo  = focos[focos.length - 1]
-      const activo  = document.activeElement
-      /* La rama `!panel.contains(activo)` es la que cubre el estado inicial, con
-         el foco en el propio panel: sin ella el primer Tab se iba al documento. */
-      if (e.shiftKey && (activo === primero || !panel.contains(activo))) {
-        e.preventDefault(); ultimo.focus()
-      } else if (!e.shiftKey && (activo === ultimo || !panel.contains(activo))) {
-        e.preventDefault(); primero.focus()
-      }
-    }
-    document.addEventListener('keydown', onKey)
-
-    return () => {
-      document.removeEventListener('keydown', onKey)
-      modalStack -= 1
-      if (modalStack === 0) {
-        document.body.style.overflow = prevBodyOverflow
-      }
-      previo?.focus({ preventScroll: true })
-    }
-  }, [open])
-
-  if (!open) return null
-
-  const zClass = elevated ? 'z-[60]' : 'z-50'
-  // Sin la prop, geo es null y los 5 segmentos de abajo son '': el className
-  // resultante es idéntico carácter por carácter al de los 16 consumidores.
-  const geo = spinusGeometry ? SP_GEO[spinusGeometry] : null
-  // Header sin contenido alguno (confirmación: title/subtitle vacíos, sin ícono,
-  // sin headerRight, con hideClose): renderizarlo deja una franja blanca con
-  // divisor y nada dentro. El `!!geo` lo acota al funnel — para los 15
-  // consumidores legacy geo es null y esto es siempre false.
+  const geo = spinusGeometry ? SP_GEO[spinusGeometry] : ''
+  // Cabecera sin nada (funnel de nota, con hideClose): no se pinta, y el nombre
+  // del diálogo sale entonces de `aria-label` (un `aria-labelledby` a un id
+  // ausente lo dejaría sin nombre).
   const headerVacio = !!geo && !icon && !title && !subtitle && !headerRight
+  const nombrado = esAlerta || !headerVacio
 
   return (
     <Portal>
-      <div className={`fixed inset-0 ${zClass} flex items-center justify-center p-4${fullscreenMobile ? ' max-md:p-0 max-md:items-start' : ''}${geo?.wrap ? ` ${geo.wrap}` : ''}`}>
-        <div
-          className={`absolute inset-0 ${geo ? 'bg-[var(--sp-backdrop)]' : 'bg-black/40 backdrop-blur-sm'} animate-fade-in`}
-          onClick={onClose}
-        />
-        {/* ⚠️ EL RELLENO VERTICAL DE LA RAMA `fullscreenMobile` ES DEL PASO 10.
-            Ahí el panel es `h-dvh` de borde a borde, y desde que el viewport es
-            `viewport-fit=cover` esos bordes son los FÍSICOS: la cabecera nacía
-            bajo el reloj y el pie bajo la barra de gestos.
-            ⚠️ VA EN EL PANEL Y NO EN LA CABECERA Y EL PIE POR SEPARADO, que era
-            la otra forma. Motivo: el pie es OPCIONAL y la cabecera se oculta
-            cuando está vacía (`headerVacio`), así que repartirlo daría cuatro
-            combinaciones y en dos de ellas el hueco se lo comería quien no está.
-            Puesto aquí, encoge lo que haya dentro sea lo que sea.
-            ⚠️ Y NO DESBORDA: con `box-sizing: border-box` —el preflight de
-            Tailwind— el relleno va DENTRO del `h-dvh`, así que el panel sigue
-            midiendo exactamente la pantalla y su fondo llega a los cuatro
-            bordes. Si alguien cambia el `h-dvh` por un alto de contenido, esto
-            hay que revisarlo.
-            ⚠️ SÓLO VERTICAL: los insets laterales sólo valen algo en apaisado y
-            el manifiesto fija `portrait-primary`.
-            ⚠️ LA OTRA RAMA NO SE TOCA. Sin `fullscreenMobile` el modal se centra
-            con `p-4` y `max-h-[85vh]`, o sea que no toca ningún borde. */}
-        {/* ⚠️ EL NOMBRE DEL DIÁLOGO SALE DEL <h2> CUANDO LA CABECERA SE PINTA, Y
-            DEL `title` CUANDO NO. `headerVacio` esconde la cabecera entera en el
-            funnel de nota, y un `aria-labelledby` apuntando a un id que no está
-            en el DOM deja al diálogo SIN NOMBRE — peor que no ponerlo, porque
-            parece puesto. La rama del `aria-label` cubre ese caso; si además el
-            `title` viene vacío, los dos quedan en `undefined` y el diálogo se
-            anuncia sin nombre, que es lo honesto.
-            `tabIndex={-1}` no lo mete en el recorrido del Tab: sólo lo hace
-            enfocable por programa, que es lo que pide el foco inicial. */}
+      <div
+        className={`k-capa fixed inset-0 ${elevated ? 'z-[60]' : 'z-50'}`}
+        data-fase={open ? 'abierta' : 'sale'} data-modo={modo} data-variante={variante}
+        inert={!open || undefined} aria-hidden={!open || undefined}
+      >
+        <div ref={veloRef} className="k-velo" onClick={esAlerta ? undefined : onClose} />
         <div
           ref={montarPanel}
-          role="dialog"
+          role={rol ?? (esAlerta ? 'alertdialog' : 'dialog')}
           aria-modal="true"
-          aria-labelledby={!headerVacio && title ? tituloId : undefined}
-          aria-label={headerVacio && title ? title : undefined}
+          aria-labelledby={nombrado && title ? tituloId : undefined}
+          aria-label={!nombrado && title ? title : undefined}
           tabIndex={-1}
-          /* `focus:outline-none` SÍ, y no contradice la regla de «nunca
-             `outline: none` sin reemplazo»: ésa protege a los CONTROLES, y este
-             panel no es uno —no está en el recorrido del Tab y sólo recibe el
-             foco por programa, al abrir—. Sin esto, Chrome dibuja un anillo
-             alrededor del modal entero en cuanto la última interacción fue de
-             teclado. Los controles de dentro conservan el suyo. */
-          className={`relative focus:outline-none ${geo ? 'bg-white' : 'bg-[var(--sp-surface-glass)] backdrop-blur-xl'} rounded-2xl shadow-2xl w-full ${maxWidth} max-h-[85vh] flex flex-col animate-modal-enter overflow-hidden${fullscreenMobile ? ' max-md:h-dvh max-md:max-h-dvh max-md:max-w-full max-md:rounded-none max-md:pt-[env(safe-area-inset-top,0px)] max-md:pb-[env(safe-area-inset-bottom,0px)]' : ''}${geo ? ` ${geo.panel} md:rounded-[var(--sp-r-modal)] md:shadow-[var(--sp-shadow-modal)] md:transition-[max-width] md:duration-[240ms] md:ease-[cubic-bezier(.4,0,.2,1)]` : ''}`}
+          lang="es"
+          onPointerDown={alPulsar}
+          className={`k-capa-panel${esAlerta ? '' : ` ${maxWidth} ${geo}`}`}
         >
-          {!headerVacio && (
-          <div className={`flex items-center justify-between px-5 py-4 border-b ${geo ? 'border-[var(--sp-line-divider)] md:px-6' : 'border-slate-100'} flex-shrink-0`}>
-            <div className={`flex items-center ${geo ? 'gap-3.5' : 'gap-2.5'} min-w-0`}>
-              {icon && (
-                <div className={geo ? 'sp-icobox' : `w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${iconBg ?? 'bg-slate-50'}`}>
-                  {icon}
-                </div>
+          {arrastra && <div className="k-capa-asa" aria-hidden="true" />}
+          {esAlerta ? (
+            <CuerpoAlerta tituloId={tituloId} title={title} subtitle={subtitle} icon={icon} tono={tono} apilada={apilada} footer={footer}>
+              {children}
+            </CuerpoAlerta>
+          ) : (
+            <>
+              {!headerVacio && (
+                <CabeceraModal tituloId={tituloId} title={title} subtitle={subtitle} icon={icon} iconBg={iconBg}
+                  geo={!!geo} headerRight={headerRight} hideClose={hideClose} onClose={onClose} />
               )}
-              <div className="min-w-0">
-                <h2 id={tituloId} className={geo ? 'sp-title-modal truncate' : 'text-sm font-semibold text-[#1d1d1f] truncate'}>{title}</h2>
-                {subtitle && <p className={geo ? 'sp-sub-modal truncate' : 'text-[11px] text-[#86868b] truncate'}>{subtitle}</p>}
-              </div>
-            </div>
-            <div className="flex items-center gap-1 flex-shrink-0">
-              {headerRight}
-              {/* El botón de cierre NO se migra: el sistema no expone clase de
-                  ícono-botón y sus colores actuales ya están cubiertos en dark
-                  por ThemeProvider. */}
-              {!hideClose && (
-                <button
-                  onClick={onClose}
-                  className="w-7 h-7 rounded-lg hover:bg-slate-100 flex items-center justify-center text-[#86868b] transition-colors"
-                  aria-label="Cerrar"
-                >
-                  <X size={14} />
-                </button>
-              )}
-            </div>
-          </div>
-          )}
-          <div className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain">
-            {children}
-          </div>
-          {footer && (
-            <div className={`border-t ${geo ? 'border-[var(--sp-line-divider)]' : 'border-slate-100'} flex-shrink-0`}>
-              {footer}
-            </div>
+              <div className="k-capa-cuerpo">{children}</div>
+              {footer && <div className="k-capa-pie">{footer}</div>}
+            </>
           )}
         </div>
       </div>

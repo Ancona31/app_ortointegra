@@ -502,3 +502,292 @@ html.dark {
   .k-b:active, .k-seg-op:active { transform: none; }
   .k-tab::before { transition: none; }
 }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   CAPAS DEL CATÁLOGO (B3 · PLAN §3 «B3»; CALMA §13, §18, §21, §25, §26)
+   ----------------------------------------------------------------------------
+   Las dibujan `ui/ModalShell.tsx` (modal y alerta), `ui/CapaMenu.tsx` (menú),
+   `ui/QuickPatientModal.tsx` y `launcher/ConsultaRapidaModal.tsx`. Maqueta:
+   `capas-a/` (vistas 1–4) y su hoja `tmp-estilo.css`.
+
+     .k-capa          contenedor fijo a pantalla completa: velo + tarjeta.
+                      `data-fase` = abierta | sale; `data-modo` = hoja |
+                      completa | pop | arriba; `data-variante` = alerta.
+     .k-velo          el velo ÚNICO, con desenfoque.
+     .k-capa-panel    la tarjeta (o la hoja de `tel`).
+
+   DÓNDE VA LA TARJETA (CALMA §26): centrada en el ÁREA DE CONTENIDO, o sea
+   sin la navegación ni las franjas del sistema. Ese hueco lo dan
+   `--capa-arr/-der/-abj/-izq`, por formato. Los anchos de la navegación son los
+   `--cromo-*` de B4 (`globals.css`), con su valor de respaldo por si aún no
+   están: riel 60 (ext), barra 216 del lado de la franja (ih), barra 248 a la
+   izquierda (esc). ⚠️ NUNCA un 84/34/59 fijo: las franjas son `--it/--ir/…`.
+     ext  tarjeta 310 (margen 8) entre la franja izquierda y el riel
+     tel  HOJA desde abajo, arrastrable (la alerta, centrada)
+     ih   tarjeta centrada a la izquierda de la barra; cruza la bisagra (§18)
+     iv   tarjeta centrada bajo la barra de estado
+     esc  tarjeta centrada a la derecha de la barra de 248
+
+   ⚠️ SIN `@layer` A PROPÓSITO, pero SIN `z-index` ni `max-width` en la base:
+   los ponen las utilidades del consumidor (`z-50`, `z-[60]`, `max-w-md`…), y
+   una regla sin capa les ganaría. Lo que sí debe ganarles (el 310 de `ext`, la
+   hoja de `tel`) va abajo, sin capa, a propósito.
+
+   MOVIMIENTO (skill apple-design §3, §4, §7): sólo `transform` y `opacity`.
+   La entrada es una transición desde `@starting-style` y la salida la misma
+   transición hacia `data-fase="sale"`: una transición se invierte desde el
+   valor que hay en pantalla, así que abrir y cerrar a medio camino no salta.
+   Sin `@starting-style` (Safari < 17.5) la capa aparece sin entrada y sale bien.
+   ════════════════════════════════════════════════════════════════════════════ */
+:root {
+  --capa-arr: calc(var(--it) + 16px);
+  --capa-der: calc(var(--ir) + 16px);
+  --capa-abj: calc(var(--ib) + 16px);
+  --capa-izq: calc(var(--il) + 16px);
+}
+:root[data-formato="ext"] {
+  --capa-arr: calc(var(--it) + 8px);
+  --capa-der: calc(var(--cromo-riel, 60px) + var(--ir) + 8px);
+  --capa-abj: calc(var(--ib) + 8px);
+  --capa-izq: calc(var(--il) + 8px);
+}
+:root[data-formato="ext"][data-borde-sistema="izquierda"] {
+  --capa-der: calc(var(--ir) + 8px);
+  --capa-izq: calc(var(--cromo-riel, 60px) + var(--il) + 8px);
+}
+:root[data-formato="ih"] {
+  --capa-arr: calc(var(--it) + 24px);
+  --capa-der: calc(var(--cromo-barra-ih, 216px) + var(--ir) + 24px);
+  --capa-abj: calc(var(--ib) + 24px);
+  --capa-izq: calc(var(--il) + 24px);
+}
+:root[data-formato="ih"][data-borde-sistema="izquierda"] {
+  --capa-der: calc(var(--ir) + 24px);
+  --capa-izq: calc(var(--cromo-barra-ih, 216px) + var(--il) + 24px);
+}
+:root[data-formato="iv"] {
+  --capa-arr: calc(var(--it) + 24px);
+  --capa-der: calc(var(--ir) + 24px);
+  --capa-abj: calc(var(--ib) + 24px);
+  --capa-izq: calc(var(--il) + 24px);
+}
+:root[data-formato="esc"] {
+  --capa-arr: 32px;
+  --capa-der: 32px;
+  --capa-abj: 32px;
+  --capa-izq: calc(var(--cromo-barra, 248px) + 32px);
+}
+
+.k-capa {
+  position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+  padding: var(--capa-arr) var(--capa-der) var(--capa-abj) var(--capa-izq);
+}
+/* Saliendo: ni clics ni teclado (además lleva `inert`). El segundo clic de un
+   doble clic cae en lo de detrás, como cuando la capa se desmontaba en seco
+   (el escudo de `useEscudoTrasRegistro` cuenta con ello). */
+.k-capa[data-fase="sale"] { pointer-events: none; }
+
+.k-velo {
+  position: absolute; inset: 0; background: var(--velo);
+  -webkit-backdrop-filter: var(--velo-filtro); backdrop-filter: var(--velo-filtro);
+  opacity: 1; transition: opacity var(--dur-entra) linear;
+}
+@starting-style { .k-velo { opacity: 0; } }
+.k-capa[data-fase="sale"] > .k-velo { opacity: 0; transition-duration: var(--dur-sale); }
+/* UN SOLO VELO (CALMA §13): el de una capa abierta encima de otra se vuelve
+   transparente. La que está saliendo no cuenta, o el velo de la nueva
+   parpadearía. Sin contexto nuevo: es sólo CSS. */
+.k-capa:not([data-fase="sale"]) ~ .k-capa > .k-velo {
+  background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none;
+}
+
+.k-capa-panel {
+  position: relative; display: flex; flex-direction: column; width: 100%; min-height: 0; max-height: 100%;
+  overflow: hidden; outline: none; background: var(--sup); color: var(--tinta);
+  border-radius: var(--r-tarjeta-ancha); box-shadow: var(--sombra-capa);
+  opacity: 1; transform: none;
+  transition: transform var(--dur-entra) var(--resorte-entra), opacity 200ms linear;
+}
+@starting-style { .k-capa-panel { opacity: 0; transform: scale(.96); } }
+.k-capa[data-fase="sale"] > .k-capa-panel {
+  opacity: 0; transform: scale(.96);
+  transition: transform var(--dur-sale) var(--resorte-sale), opacity 150ms linear;
+}
+
+/* ── Cabecera, cuerpo y pie del modal (vista 2) ── */
+.k-capa-asa { display: none; flex: none; width: 36px; height: 5px; margin: 8px auto 2px; border-radius: var(--r-pildora); background: var(--borde); }
+.k-capa-cab { flex: none; display: flex; align-items: flex-start; gap: 12px; padding: 12px 12px 4px 24px; }
+.k-capa-tits { flex: 1; min-width: 0; padding: 10px 0 2px; }
+.k-capa-tit { margin: 0; font-size: 17px; line-height: 22px; font-weight: 700; color: var(--tinta); overflow-wrap: anywhere; }
+.k-capa-sub { margin: 2px 0 0; font-size: 13px; line-height: 18px; color: var(--tinta2); overflow-wrap: anywhere; }
+.k-capa-ico { flex: none; display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; margin-top: 4px; border-radius: 10px; }
+.k-capa-acc { flex: none; display: flex; align-items: center; gap: 4px; }
+.k-capa-cuerpo { flex: 1 1 auto; min-height: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; }
+.k-capa-pie { flex: none; box-shadow: 0 -1px 0 var(--linea); }
+:root[data-formato="ext"] .k-capa-cab { padding: 12px 8px 4px 20px; }
+
+/* ── Alerta (vista 1; patrón único, CALMA §13, §21, §23.3) ──
+   Icono 28 en círculo 48, título centrado, mensaje justificado con la última
+   línea centrada, dos botones parejos lado a lado (secundario a la izquierda)
+   o apilados con el principal arriba (`.k-al-pila`; el principal lleva
+   `data-principal`). Uno solo, a todo el ancho. */
+.k-capa[data-variante="alerta"] > .k-capa-panel { width: 320px; max-width: 100%; }
+:root[data-formato="ext"] .k-capa[data-variante="alerta"] > .k-capa-panel { width: 310px; }
+:root:is([data-formato="ih"], [data-formato="iv"], [data-formato="esc"]) .k-capa[data-variante="alerta"] > .k-capa-panel { width: 340px; }
+.k-al { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 24px; text-align: center; }
+.k-al-i { display: flex; flex: none; align-items: center; justify-content: center; width: 48px; height: 48px; margin: 0 auto 12px; border-radius: var(--r-pildora); background: var(--tonal); color: var(--enlace); }
+.k-al-i svg { width: 28px; height: 28px; }
+.k-al-i-destruir { background: var(--mal-fondo); color: var(--mal-tinta); }
+.k-al-i-avisar { background: var(--aviso-fondo); color: var(--aviso-tinta); }
+.k-al-tit { margin: 0; font-size: 17px; line-height: 22px; font-weight: 700; color: var(--tinta); overflow-wrap: anywhere; }
+.k-al-sub { margin: 2px 0 0; font-size: 13px; line-height: 18px; color: var(--tinta2); }
+.k-al-t { margin-top: 8px; font-size: 14px; line-height: 20px; color: var(--tinta2); text-align: justify; text-align-last: center; -webkit-hyphens: auto; hyphens: auto; }
+.k-al-t > * + * { margin-top: 8px; }
+.k-al-t b, .k-al-t strong { color: var(--tinta); font-weight: 600; }
+.k-al-b { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; margin-top: 20px; }
+.k-al-b:has(> :only-child), .k-al-b.k-al-pila { grid-template-columns: minmax(0, 1fr); }
+.k-al-b.k-al-pila { gap: 8px; }
+.k-al-b > .k-b { width: 100%; min-width: 0; padding: 0 12px; }
+.k-al-b.k-al-pila > .k-b { height: auto; min-height: 44px; padding: 10px 12px; white-space: normal; text-align: center; }
+:root:is([data-formato="ih"], [data-formato="esc"]) .k-al-b.k-al-pila > .k-b { min-height: 40px; padding: 9px 12px; }
+.k-al-b.k-al-pila > [data-principal] { order: -1; }
+
+/* ── Menú (vista 4) ── */
+.k-capa > .k-capa-panel.k-menu { width: 280px; max-width: 100%; padding: 8px; border-radius: 18px; }
+.k-menu-t { margin: 0; padding: 8px 12px 6px; font-size: 17px; line-height: 22px; font-weight: 700; color: var(--tinta); }
+.k-menu-l { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.k-menu-op {
+  display: flex; align-items: center; gap: 12px; width: 100%; min-height: 44px; margin: 0; padding: 6px 12px;
+  border: 0; border-radius: 10px; background: transparent; color: var(--tinta);
+  font: inherit; font-size: 15px; line-height: 20px; text-align: left; cursor: pointer;
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+}
+:root:is([data-formato="tel"], [data-formato="iv"]) .k-menu-op { min-height: 48px; }
+.k-menu-op:active, .k-menu-op:focus-visible { background: var(--fondo); }
+.k-menu-op:focus-visible { outline: 3px solid var(--enlace); outline-offset: -3px; }
+.k-menu-op:disabled { opacity: .45; cursor: not-allowed; }
+.k-menu-ic { display: flex; flex: none; width: 20px; height: 20px; color: var(--enlace); }
+.k-menu-ic svg { width: 100%; height: 100%; }
+.k-menu-tx { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow-wrap: anywhere; }
+.k-menu-tx small { font-size: 13px; line-height: 18px; color: var(--tinta2); }
+.k-menu-op[data-peligro], .k-menu-op[data-peligro] .k-menu-ic { color: var(--mal-tinta); }
+.k-menu-chk { flex: none; width: 18px; height: 18px; color: var(--enlace); opacity: 0; }
+.k-menu-op[aria-checked="true"] { font-weight: 600; }
+.k-menu-op[aria-checked="true"] .k-menu-chk { opacity: 1; }
+.k-menu-sep { display: block; height: 1px; margin: 6px 12px; background: var(--linea); }
+@media (hover: hover) { .k-menu-op:hover { background: var(--fondo); } }
+
+/* Menú desplegable de computadora (`data-modo="pop"`, CALMA §21): nace de su
+   botón, sin velo, con contorno fino. Lo coloca `CapaMenu` (`top`/`left` y el
+   origen de la escala en `--k-origen`). */
+.k-capa[data-modo="pop"] { display: block; padding: 0; }
+.k-capa[data-modo="pop"] > .k-velo { display: none; }
+.k-capa[data-modo="pop"] > .k-capa-panel.k-menu {
+  position: absolute; width: 248px; max-height: calc(100dvh - 16px); padding: 6px; border-radius: 14px;
+  box-shadow: var(--sombra-capa), 0 0 0 1px var(--linea);
+  transform-origin: var(--k-origen, 50% 0);
+  transition: transform 280ms var(--resorte-entra), opacity 160ms linear;
+}
+@starting-style { .k-capa[data-modo="pop"] > .k-capa-panel.k-menu { transform: scale(.9); opacity: 0; } }
+.k-capa[data-modo="pop"][data-fase="sale"] > .k-capa-panel.k-menu {
+  transform: scale(.9); opacity: 0; transition: transform 200ms var(--resorte-sale), opacity 120ms linear;
+}
+.k-capa[data-modo="pop"] .k-menu-t { display: none; }
+.k-capa[data-modo="pop"] .k-menu-op { min-height: 38px; gap: 10px; padding: 4px 10px; border-radius: 9px; font-size: 14px; }
+.k-capa[data-modo="pop"] .k-menu-ic { width: 18px; height: 18px; }
+.k-capa[data-modo="pop"] .k-menu-sep { margin: 4px 10px; }
+
+/* Capa anclada arriba (`data-modo="arriba"`: buscador de consulta rápida). En
+   teclado virtual una hoja desde abajo quedaría tapada. */
+.k-capa[data-modo="arriba"] { align-items: flex-start; }
+:root:is([data-formato="ih"], [data-formato="iv"], [data-formato="esc"]) .k-capa[data-modo="arriba"] { padding-top: calc(var(--capa-arr) + 8vh); }
+
+/* ── Duo cerrado (CALMA §26): toda capa es tarjeta de 310 como mucho ── */
+:root[data-formato="ext"] .k-capa > .k-capa-panel { max-width: min(310px, 100%); }
+
+/* ── Teléfono: la hoja desde abajo (vista 3) ──────────────────────────────
+   80 px de reserva bajo el borde para el rebote y el rubber-band del
+   arrastre (`useArrastreHoja`). El arrastre se toma de la cabecera, el asa o
+   el pie (`touch-action: none`); el cuerpo conserva su desplazamiento. */
+:root[data-formato="tel"] .k-capa[data-modo="hoja"] { align-items: flex-end; padding: calc(var(--it) + 16px) 0 0; }
+:root[data-formato="tel"] .k-capa[data-modo="hoja"] > .k-capa-panel {
+  max-width: none; max-height: calc(100% + 80px); margin-bottom: -80px; padding-bottom: calc(var(--ib) + 80px);
+  border-radius: 22px 22px 0 0; opacity: 1; touch-action: none;
+}
+@starting-style { :root[data-formato="tel"] .k-capa[data-modo="hoja"] > .k-capa-panel { opacity: 1; transform: translateY(100%); } }
+:root[data-formato="tel"] .k-capa[data-modo="hoja"][data-fase="sale"] > .k-capa-panel { opacity: 1; transform: translateY(100%); }
+:root[data-formato="tel"] .k-capa[data-modo="hoja"] .k-capa-asa { display: block; }
+:root[data-formato="tel"] .k-capa[data-modo="hoja"] .k-capa-cab { padding: 4px 8px 4px 20px; }
+:root[data-formato="tel"] .k-capa[data-modo="hoja"] :is(.k-capa-cuerpo, .k-menu-l) { touch-action: pan-y; }
+:root[data-formato="tel"] .k-capa[data-modo="hoja"] > .k-capa-panel.k-menu { width: 100%; padding: 0 8px calc(var(--ib) + 88px); border-radius: 22px 22px 0 0; }
+/* `fullscreenMobile`: en teléfono la capa ocupa la pantalla (sin arrastre). */
+:root[data-formato="tel"] .k-capa[data-modo="completa"] { padding: 0; }
+:root[data-formato="tel"] .k-capa[data-modo="completa"] > .k-capa-panel {
+  max-width: none; height: 100%; border-radius: 0; padding: var(--it) 0 var(--ib); opacity: 1;
+}
+@starting-style { :root[data-formato="tel"] .k-capa[data-modo="completa"] > .k-capa-panel { opacity: 1; transform: translateY(100%); } }
+:root[data-formato="tel"] .k-capa[data-modo="completa"][data-fase="sale"] > .k-capa-panel { opacity: 1; transform: translateY(100%); }
+/* Sin sonda de formato (no debería pasar en `(app)`): la pantalla completa de
+   antes por debajo de 768. */
+@media (max-width: 767px) {
+  :root:not([data-formato]) .k-capa[data-modo="completa"] { padding: 0; }
+  :root:not([data-formato]) .k-capa[data-modo="completa"] > .k-capa-panel { max-width: none; height: 100%; border-radius: 0; padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px); }
+}
+
+/* Movimiento reducido: fundido corto en su sitio (200 / 150 ms), sin escala
+   ni desplazamiento. El arrastre de la hoja sigue (es manipulación directa). */
+@media (prefers-reduced-motion: reduce) {
+  .k-capa-panel, .k-capa[data-modo="pop"] > .k-capa-panel.k-menu,
+  :root[data-formato] .k-capa:is([data-modo="hoja"], [data-modo="completa"]) > .k-capa-panel { transition: opacity 200ms linear; }
+  @starting-style {
+    .k-capa-panel, .k-capa[data-modo="pop"] > .k-capa-panel.k-menu,
+    :root[data-formato] .k-capa:is([data-modo="hoja"], [data-modo="completa"]) > .k-capa-panel { opacity: 0; transform: none; }
+  }
+  .k-capa[data-fase="sale"] > .k-capa-panel, .k-capa[data-modo="pop"][data-fase="sale"] > .k-capa-panel.k-menu,
+  :root[data-formato] .k-capa:is([data-modo="hoja"], [data-modo="completa"])[data-fase="sale"] > .k-capa-panel { opacity: 0; transform: none; transition: opacity 150ms linear; }
+}
+
+/* Transparencia reducida (capas-a, «Transparencia reducida»): velo opaco y
+   sin desenfoque; en claro, `--navy` al 45 % sobre `--fondo`; en oscuro,
+   `--navy` entero. No se adivina el fondo. */
+@media (prefers-reduced-transparency: reduce) {
+  .k-velo { background: color-mix(in srgb, var(--navy) 45%, var(--fondo)); -webkit-backdrop-filter: none; backdrop-filter: none; }
+  html.dark .k-velo { background: var(--navy); }
+}
+
+/* ── Rejilla «Tipo de documento» (CALMA §9, §13, §21; capas-a vista 3) ─────
+   La dibuja `documentos/SelectorTipoDocumento.tsx` dentro de la página (no es
+   una capa: el formulario vive debajo). Celdas `--sup` sobre el fondo de la
+   página (§9), radio 14, alto ≥ 84 (88 en ancho), icono en su cuadro tintado
+   de 32 arriba y el nombre 14/18 debajo; el tipo actual con contorno de 2 px
+   `--accion`. 2 columnas; 4 desde 520 px de contenedor (`docform`, el de
+   `.sp-doc-host`), que es lo que da ih/iv/esc. Ningún nombre sale de su celda. */
+.k-rej { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+@container docform (min-width: 520px) { .k-rej { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; } }
+.k-az {
+  position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 10px; min-width: 0; min-height: 84px;
+  margin: 0; padding: 12px 10px; border: 0; border-radius: 14px; background: var(--sup); color: var(--tinta);
+  font: inherit; font-size: 14px; line-height: 18px; font-weight: 400; text-align: left; cursor: pointer;
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+  transition: transform var(--dur-toque) ease-out;
+}
+@container docform (min-width: 520px) { .k-az { min-height: 88px; padding: 12px; } }
+.k-az:active { transform: scale(.97); }
+.k-az[aria-selected="true"] { box-shadow: inset 0 0 0 2px var(--accion); }
+.k-az:focus-visible { outline: 3px solid var(--enlace); outline-offset: 2px; }
+.k-az-n { max-width: 100%; min-width: 0; -webkit-hyphens: auto; hyphens: auto; overflow-wrap: anywhere; }
+@media (hover: hover) { .k-az:hover { background: color-mix(in srgb, var(--sup) 94%, var(--tinta)); } }
+
+/* La línea plegada: el tipo elegido y «Cambiar». */
+.k-az-linea {
+  display: flex; align-items: center; gap: 12px; width: 100%; min-height: 56px; margin: 0; padding: 8px 12px 8px 16px;
+  border: 0; border-radius: 14px; background: var(--sup); color: var(--tinta); font: inherit; text-align: left; cursor: pointer;
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+}
+.k-az-linea:focus-visible { outline: 3px solid var(--enlace); outline-offset: 2px; }
+.k-az-linea-t { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.k-az-linea-t > span:first-child { font-size: 12px; line-height: 16px; color: var(--tinta2); }
+.k-az-linea-t > span:last-child { font-size: 15px; line-height: 20px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.k-az-cambiar { flex: none; display: inline-flex; align-items: center; gap: 4px; font-size: 15px; line-height: 20px; font-weight: 600; color: var(--enlace); }
+.k-az-cambiar svg { width: 16px; height: 16px; }
+@media (prefers-reduced-motion: reduce) { .k-az:active { transform: none; } }
