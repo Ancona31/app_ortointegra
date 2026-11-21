@@ -56,6 +56,63 @@ function sincronizarBarraDelNavegador(): void {
   } catch {}
 }
 
+/* LA MARCA DE LA CLINICA EN LOS TOKENS DEL REDISENO (B1, PLAN §2.2).
+ *
+ * `sistema.css` declara --navy, --accion, --enlace, --tonal y --tonal-tinta con
+ * los valores del kit, que son los de la paleta de fabrica («Spinus (defecto)»,
+ * #1a3a5c / #1e5fa8): con ella esto devuelve '' y manda el kit tal cual
+ * (decision del dueno, CALMA §31.1). Con cualquiera de las otras cinco paletas
+ * de /perfil, los cinco tokens se DERIVAN de --cp/--cs.
+ *
+ * ⚠️ PRIMERO EL RESPALDO SIN SINTAXIS DE COLOR RELATIVA, LUEGO LA FORMULA EN SU
+ * @supports. Un custom property con `hsl(from …)` que el navegador no entiende
+ * no se descarta: deja inválida la propiedad que lo consume (y el relleno
+ * saldria transparente). Es el mismo patron que --sp-primary en
+ * spinus-tokens.css.
+ * ⚠️ --tonal y --tonal-tinta salen de --accion, no de --cs: asi en oscuro siguen
+ * al relleno aclarado. Los avisos (Toast) NO usan --tonal, a proposito.
+ * ⚠️ NO cambia lo guardado en la base ni los PDF: solo lo que se pinta.
+ * ⚠️ LOS DOS TOPES ESTAN MEDIDOS (B1, seis paletas). Claro: --accion con la
+ * claridad OKLCH topada en 0.52 (el mismo tope que --sp-brand-grad-to): sin el,
+ * el blanco sobre «Verde medico» daba 3.74:1; con el, 5.10-7.58. Oscuro: 0.55,
+ * blanco encima 4.53-5.51; el relleno contra --sup queda en 2.88-3.50 (Morado y
+ * Burdeos por debajo de 3:1). Con 0.57 el relleno pasa de 3:1 pero el blanco
+ * de «Verde» y «Pizarra» cae a 4.20/4.43: gana el texto, no lo subas. */
+const MARCA_DE_FABRICA = { primario: '#1a3a5c', secundario: '#1e5fa8' } as const
+
+export function cssMarcaDerivada(primario: string, secundario: string): string {
+  if (primario.toLowerCase() === MARCA_DE_FABRICA.primario
+    && secundario.toLowerCase() === MARCA_DE_FABRICA.secundario) return ''
+  return `
+    :root {
+      --navy: var(--cp);
+      --accion: var(--cs);
+      --enlace: var(--cs);
+      --tonal: color-mix(in srgb, var(--accion) 12%, var(--sup));
+      --tonal-tinta: color-mix(in srgb, var(--accion) 70%, #000);
+    }
+    html.dark {
+      --navy: color-mix(in srgb, var(--cp) 60%, #000);
+      --accion: var(--cs);
+      --enlace: color-mix(in srgb, var(--accion) 55%, #fff);
+      --tonal: color-mix(in srgb, var(--accion) 35%, var(--sup));
+      --tonal-tinta: color-mix(in srgb, var(--accion) 30%, #fff);
+    }
+    @supports (color: oklch(from red l c h)) {
+      :root {
+        --navy: hsl(from var(--cp) h s 20%);
+        --accion: oklch(from var(--cs) min(l, 0.52) c h);
+        --enlace: oklch(from var(--cs) min(l, 0.52) c h);
+      }
+      html.dark {
+        --navy: hsl(from var(--cp) h s 12.5%);
+        --accion: oklch(from var(--cs) 0.55 c h);
+        --enlace: color-mix(in srgb, var(--accion) 55%, #fff);
+      }
+    }
+  `
+}
+
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const { colorPrimario, colorSecundario } = useClinica()
   const [dark, setDark] = useState(false)
@@ -156,11 +213,12 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }
 
     /* ═══════════════════════════════════════════════
-       MODO OSCURO — Material Design Dark Theme
-       Base:    #121212  (dp0 — fondo raíz)
-       dp1:     #1E1E1E  (cards primer nivel)
-       dp2:     #242424  (cards segundo nivel / inputs)
-       dp4:     #2C2C2C  (hover / elevated)
+       MODO OSCURO — hoja de traducción, sobre el oscuro navy del kit
+       (B1 del rediseño: antes era el gris de Material #121212/#1E1E1E…)
+       Fondo:   var(--fondo)  (antes #121212, dp0)
+       Card:    var(--sup)    (antes #1E1E1E, dp1)
+       Campo:   var(--sup2)   (antes #242424, dp2)
+       Hover:   --sup2 aclarado 8 % y 16 % (antes #2C2C2C y #383838)
        Texto primario:    rgba(255,255,255,0.87)
        Texto secundario:  rgba(255,255,255,0.60)
        Texto desactivado: rgba(255,255,255,0.38)
@@ -169,16 +227,16 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
     /* ── Raíz ── */
     html.dark body {
-      background-color: #121212 !important;
+      background-color: var(--fondo) !important;
       color: rgba(255,255,255,0.87) !important;
     }
-    html.dark .min-h-full { background-color: #121212 !important; }
+    html.dark .min-h-full { background-color: var(--fondo) !important; }
 
     /* ── Superficies / cards ── */
-    html.dark .bg-white          { background-color: #1E1E1E !important; }
-    html.dark .bg-slate-50       { background-color: #242424 !important; }
-    html.dark .bg-slate-100      { background-color: #2C2C2C !important; }
-    html.dark .bg-slate-200      { background-color: #383838 !important; }
+    html.dark .bg-white          { background-color: var(--sup) !important; }
+    html.dark .bg-slate-50       { background-color: var(--sup2) !important; }
+    html.dark .bg-slate-100      { background-color: color-mix(in srgb, var(--sup2) 92%, #fff) !important; }
+    html.dark .bg-slate-200      { background-color: color-mix(in srgb, var(--sup2) 84%, #fff) !important; }
 
     /* ── Bordes — muy sutiles, Material usa 12% blanco ── */
     html.dark .border-slate-200,
@@ -218,7 +276,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     html.dark input:not([type="color"]),
     html.dark textarea,
     html.dark select {
-      background-color: #242424 !important;
+      background-color: var(--sup2) !important;
       color: rgba(255,255,255,0.87) !important;
       border-color: rgba(255,255,255,0.12) !important;
     }
@@ -227,8 +285,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
     /* ── Hover states ── */
     html.dark .hover\\:bg-slate-50:hover,
-    html.dark .hover\\:bg-slate-50\\/80:hover { background-color: #2C2C2C !important; }
-    html.dark .hover\\:bg-slate-100:hover     { background-color: #383838 !important; }
+    html.dark .hover\\:bg-slate-50\\/80:hover { background-color: color-mix(in srgb, var(--sup2) 92%, #fff) !important; }
+    html.dark .hover\\:bg-slate-100:hover     { background-color: color-mix(in srgb, var(--sup2) 84%, #fff) !important; }
 
     /* ── Sombras — Material las elimina, usa elevación por color ── */
     html.dark .shadow-sm  { box-shadow: none !important; }
@@ -238,7 +296,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }
 
     /* ── Scrollbar ── */
-    html.dark ::-webkit-scrollbar-track { background: #1E1E1E !important; }
+    html.dark ::-webkit-scrollbar-track { background: var(--sup) !important; }
     html.dark ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.16) !important; border-radius: 3px; }
     html.dark ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.28) !important; }
 
@@ -299,7 +357,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
     /* ── Gradientes del header de tarjeta — se mantienen, son parte del branding ── */
     /* Los gradientes azules del header de TarjetaPaciente se ven bien en dark */
-  `
+  ` + cssMarcaDerivada(colorPrimario, colorSecundario)
 
   // Memoizado: este provider re-renderiza cada vez que useClinica revalida,
   // y con el objeto literal arrastraba a todo (app) detras.
