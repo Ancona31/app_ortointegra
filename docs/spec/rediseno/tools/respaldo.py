@@ -9,7 +9,7 @@ KEEP={'dashboard-final','final-lista','final-form','final-expediente','final-not
 if os.path.isdir(D): shutil.rmtree(D)
 os.makedirs(D)
 n=0;tam=0
-shutil.copy(f'{S}/entrega/ESTADO.md',D)
+shutil.copy(f"{S}/entrega/ESTADO.md",D); shutil.copy(f"{S}/entrega/PLAN.md",D)
 for carpeta in sorted(KEEP):
     src=f'{S}/entrega/{carpeta}'
     if not os.path.isdir(src): print('falta',carpeta); continue
