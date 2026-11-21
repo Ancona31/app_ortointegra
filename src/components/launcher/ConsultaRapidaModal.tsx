@@ -250,7 +250,7 @@ export default function ConsultaRapidaModal({
   return (
     <Portal>
     <div
-      className="k-capa fixed inset-0 z-[9998]" data-modo="arriba" data-fase={open ? 'abierta' : 'sale'}
+      className="k-capa fixed inset-0 z-[var(--z-paleta)]" data-modo="arriba" data-fase={open ? 'abierta' : 'sale'}
       data-variante={modoCrear && duplicateWarning ? 'alerta' : undefined}
       inert={!open || undefined} aria-hidden={!open || undefined}
     >

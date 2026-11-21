@@ -85,31 +85,21 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 /* La zona de los avisos: ARRIBA Y CENTRADA EN EL ÁREA DE CONTENIDO (CALMA §25,
    maqueta `capas-b/vista-1-aviso`), nunca abajo a la derecha ni bajo la
    navegación o una franja del sistema.
-   ⚠️ LOS DESPLAZAMIENTOS SON LOS DE LA NAVEGACIÓN DEL REDISEÑO (B4): riel de
-   56 en `ext`, barra lateral de 218 en `ih`, encabezado fundido en `tel`
-   (it + 64) e `iv` (it + 58) y barra izquierda de 248 en `esc`. Si B4 cambia
-   esas medidas, cambian aquí. Con la franja a la izquierda (Duo girado,
-   `data-borde-sistema="izquierda"`) el riel y la barra pasan a ese lado, y la
-   zona se espeja.
-   ⚠️ LAS FRANJAS VAN POR `--it/--ir/--il` (env()), NUNCA CON NÚMEROS FIJOS.
-   Sin `data-formato` (páginas sin la sonda) es simplemente arriba y centrado.
-   ⚠️ EL z-[9999] SE QUEDA: el aviso tiene que verse encima de cualquier modal,
-   y hoy hay capas a 9998 (`CommandPalette`, `ConsultaRapidaModal`). La escala
-   `--z-*` aún no las cubre. */
+   ⚠️ SIN NÚMEROS DE LA NAVEGACIÓN AQUÍ: los bordes son los de las capas
+   (`--capa-izq`/`--capa-der`, que leen los `--cromo-*` de `globals.css` y se
+   espejan con la franja a la izquierda) y la altura, `--capa-aviso-arr`
+   (`sistema.css`: bajo el encabezado fundido en `tel`/`iv`). Sin navegación
+   —el lanzador `/inicio`— el cromo mide 0 y el aviso queda centrado de verdad.
+   ⚠️ `--z-aviso` (10000): el aviso va por encima de TODO, también de la alerta
+   «Sin conexión» y de ⌘K (escala en `sistema.css`). */
 function ZonaAvisos({ children }: { children: React.ReactNode }) {
   return (
     <div
       aria-live="polite"
       className={[
         /* `flex-col-reverse`: el más nuevo, arriba (maqueta, «Cola»). */
-        'pointer-events-none fixed z-[9999] flex flex-col-reverse items-center gap-2 px-3',
-        'top-[calc(var(--it)+12px)] left-[var(--il)] right-[var(--ir)]',
-        'ext:right-[calc(56px+var(--ir))]',
-        '[[data-borde-sistema=izquierda]_&]:ext:left-[calc(56px+var(--il))] [[data-borde-sistema=izquierda]_&]:ext:right-0',
-        'tel:top-[calc(var(--it)+76px)] iv:top-[calc(var(--it)+74px)] iv:px-4',
-        'ih:top-[calc(var(--it)+16px)] ih:right-[calc(218px+var(--ir))] ih:px-4',
-        '[[data-borde-sistema=izquierda]_&]:ih:left-[calc(218px+var(--il))] [[data-borde-sistema=izquierda]_&]:ih:right-0',
-        'esc:top-5 esc:left-[248px] esc:right-0 esc:px-5',
+        'pointer-events-none fixed z-[var(--z-aviso)] flex flex-col-reverse items-center gap-2',
+        'top-[var(--capa-aviso-arr)] left-[var(--capa-izq)] right-[var(--capa-der)]',
       ].join(' ')}
     >
       {children}

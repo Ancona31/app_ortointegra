@@ -107,13 +107,26 @@
   --r-nav: 26px;            /* navegación, sólo del lado del contenido */
   --r-pildora: 999px;
 
-  /* — Capas. Los números son los que la app ya usa (ver `body::before` en
-     globals.css): menú lateral 40, franja 45, hamburguesa y modales 50. — */
+  /* — Capas, de abajo arriba (integración B1–B4). Los números bajos son los
+     que la app ya usaba y siguen escritos a mano en muchos sitios (`z-50`,
+     `z-[60]`, `z-[70]`); aquí sólo se nombran:
+       40     cromo: encabezado fundido, riel, barra (41, el cajón) y su velo
+       45     franja del sistema (`body::before`) y las capas de la agenda
+              (`.ag-capa`, `.ag-hoja`, con su velo a 44): NO se tocan hasta B13
+       50–70  capas del catálogo: modal y alerta (`ModalShell`, 50/60), menú
+              (`CapaMenu`, 60), alta rápida (`QuickPatientModal`, 70)
+       9998   capas que se abren encima de cualquier modal: ⌘K y consulta rápida
+       9999   la alerta «Sin conexión» (bloquea todo lo de debajo)
+       10000  el aviso breve (`Toast`): por encima de TODO, también de la alerta
+     Fuera de la escala, a propósito: la guía de bienvenida (`OnboardingGuide`,
+     10001/10002), que señala piezas de la pantalla por encima de todo. — */
   --z-nav: 40;
   --z-franja: 45;
   --z-capa: 50;
   --z-menu: 60;
-  --z-aviso: 70;
+  --z-paleta: 9998;
+  --z-sin-conexion: 9999;
+  --z-aviso: 10000;
 
   /* — Movimiento (PLAN §2.6, skill apple-design §4) —
      Resorte críticamente amortiguado (amortiguación 1) muestreado con
@@ -519,9 +532,12 @@ html.dark {
    DÓNDE VA LA TARJETA (CALMA §26): centrada en el ÁREA DE CONTENIDO, o sea
    sin la navegación ni las franjas del sistema. Ese hueco lo dan
    `--capa-arr/-der/-abj/-izq`, por formato. Los anchos de la navegación son los
-   `--cromo-*` de B4 (`globals.css`), con su valor de respaldo por si aún no
-   están: riel 60 (ext), barra 216 del lado de la franja (ih), barra 248 a la
-   izquierda (esc). ⚠️ NUNCA un 84/34/59 fijo: las franjas son `--it/--ir/…`.
+   `--cromo-*` de B4 (`globals.css`), su ÚNICA fuente: riel 60 (ext), barra 216
+   del lado de la franja (ih), barra 248 a la izquierda (esc; 64 plegada en la
+   agenda) y 0 donde no hay navegación (el lanzador). ⚠️ NUNCA un 84/34/59 fijo:
+   las franjas son `--it/--ir/…`. Lo mismo leen la alerta «Sin conexión»
+   (`OfflineAlert.tsx`) y el aviso breve (`Toast.tsx`), que además baja hasta
+   `--capa-aviso-arr`: por debajo del encabezado fundido en `tel`/`iv`.
      ext  tarjeta 310 (margen 8) entre la franja izquierda y el riel
      tel  HOJA desde abajo, arrastrable (la alerta, centrada)
      ih   tarjeta centrada a la izquierda de la barra; cruza la bisagra (§18)
@@ -544,38 +560,43 @@ html.dark {
   --capa-der: calc(var(--ir) + 16px);
   --capa-abj: calc(var(--ib) + 16px);
   --capa-izq: calc(var(--il) + 16px);
+  --capa-aviso-arr: calc(var(--it) + var(--cromo-enc) + 12px);
 }
 :root[data-formato="ext"] {
   --capa-arr: calc(var(--it) + 8px);
-  --capa-der: calc(var(--cromo-riel, 60px) + var(--ir) + 8px);
+  --capa-aviso-arr: calc(var(--it) + 12px);
+  --capa-der: calc(var(--cromo-riel) + var(--ir) + 8px);
   --capa-abj: calc(var(--ib) + 8px);
   --capa-izq: calc(var(--il) + 8px);
 }
 :root[data-formato="ext"][data-borde-sistema="izquierda"] {
   --capa-der: calc(var(--ir) + 8px);
-  --capa-izq: calc(var(--cromo-riel, 60px) + var(--il) + 8px);
+  --capa-izq: calc(var(--cromo-riel) + var(--il) + 8px);
 }
 :root[data-formato="ih"] {
   --capa-arr: calc(var(--it) + 24px);
-  --capa-der: calc(var(--cromo-barra-ih, 216px) + var(--ir) + 24px);
+  --capa-aviso-arr: calc(var(--it) + 16px);
+  --capa-der: calc(var(--cromo-barra-ih) + var(--ir) + 24px);
   --capa-abj: calc(var(--ib) + 24px);
   --capa-izq: calc(var(--il) + 24px);
 }
 :root[data-formato="ih"][data-borde-sistema="izquierda"] {
   --capa-der: calc(var(--ir) + 24px);
-  --capa-izq: calc(var(--cromo-barra-ih, 216px) + var(--il) + 24px);
+  --capa-izq: calc(var(--cromo-barra-ih) + var(--il) + 24px);
 }
 :root[data-formato="iv"] {
   --capa-arr: calc(var(--it) + 24px);
+  --capa-aviso-arr: calc(var(--it) + var(--cromo-enc) + 10px);
   --capa-der: calc(var(--ir) + 24px);
   --capa-abj: calc(var(--ib) + 24px);
   --capa-izq: calc(var(--il) + 24px);
 }
 :root[data-formato="esc"] {
   --capa-arr: 32px;
+  --capa-aviso-arr: 20px;
   --capa-der: 32px;
   --capa-abj: 32px;
-  --capa-izq: calc(var(--cromo-barra, 248px) + 32px);
+  --capa-izq: calc(var(--cromo-barra) + 32px);
 }
 
 .k-capa {

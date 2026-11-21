@@ -2229,6 +2229,22 @@ main > div:has(.agenda-fc) .agenda-raiz {
   --cromo-riel: 60px;        /* riel de `ext`, sin contar la franja */
   --cromo-enc: 64px;         /* encabezado fundido, sin contar la franja */
 }
+/* ⚠️ LAS `--cromo-*` SON LA ÚNICA FUENTE DE LAS MEDIDAS DE LA NAVEGACIÓN para
+   todo lo que se coloca «en el área de contenido»: las capas (`--capa-*` de
+   `sistema.css`), el aviso breve (`Toast.tsx`), la alerta sin conexión
+   (`OfflineAlert.tsx`) y la paleta ⌘K. Nadie repite 248, 216, 60 ni 64.
+   · Barra PLEGADA en la agenda (`esc`): la barra mide 64 y lo de encima se
+     centra en lo que queda.
+   · SIN NAVEGACIÓN (el lanzador `/inicio` y cualquier página sin la barra): el
+     cromo mide 0, para que el aviso y las capas no se corran hacia un hueco que
+     no existe. Si `:has()` no existe, esta regla se descarta entera y quedan las
+     medidas de arriba: el fallo cae del lado de la app, que es donde se trabaja. */
+@media (min-width: 1024px) {
+  :root:has(#barra-lateral[data-plegada="true"]) { --cromo-barra: 64px; }
+}
+:root:not(:has(#barra-lateral)) {
+  --cromo-barra: 0px; --cromo-barra-ih: 0px; --cromo-riel: 0px; --cromo-enc: 0px;
+}
 
 /* ── Contenedor: márgenes de <main> y relleno del contenido ────────────────
    ⚠️ EL RELLENO VERTICAL ESTÁ REPLICADO EN LA AGENDA, como lo estaba el del
@@ -2560,7 +2576,7 @@ html.dark .nav-fila-icono { color: var(--enlace); }
    vez con el `ResizeObserver` de `AgendaCliente`. Estas reglas no van en capa,
    así que ganan al margen de `.app-main`. */
 @media (min-width: 1024px) {
-  aside[data-plegada="true"] { width: 64px; padding-inline: 8px; }
+  aside[data-plegada="true"] { padding-inline: 8px; } /* el ancho, 64, es `--cromo-barra` */
   aside[data-plegada="true"] .sb-etiqueta { display: none; }
   aside[data-plegada="true"] :is(.nav-barra-enlace, .nav-plegar, .nav-persona) { justify-content: center; padding-inline: 0; }
   aside[data-plegada="true"] .nav-barra-cabeza { justify-content: center; padding-left: 0; }
@@ -2568,7 +2584,6 @@ html.dark .nav-fila-icono { color: var(--enlace); }
   aside[data-plegada="true"] .nav-pie { flex-direction: column; }
   aside[data-plegada="true"] .nav-persona { flex: none; width: 44px; }
   aside[data-plegada="true"] .nav-ajustes { right: auto; width: 224px; }
-  aside[data-plegada="true"] ~ .app-main { margin-left: 64px; }
 }
 
 /* ── «Más» (`MenuMas`): tarjeta centrada en el área de contenido, con velo ── */
@@ -2595,12 +2610,11 @@ html.dark .nav-fila-icono { color: var(--enlace); }
 /* ── La paleta ⌘K (`CommandPalette.tsx`): anclada arriba, centrada en el área
    de contenido (sin barra, riel ni franjas) y con el velo del kit. ── */
 .nav-paleta {
-  position: fixed; inset: 0; z-index: 9998; display: flex; justify-content: center; align-items: flex-start;
+  position: fixed; inset: 0; z-index: var(--z-paleta); display: flex; justify-content: center; align-items: flex-start;
   padding: calc(var(--it) + 16px) calc(var(--ir) + 12px) calc(var(--ib) + 16px) calc(var(--il) + 12px);
 }
 @media (min-width: 600px) { .nav-paleta { padding-top: calc(var(--it) + 72px); } }
 @media (min-width: 1024px) { .nav-paleta { padding-left: calc(var(--cromo-barra) + 24px); padding-right: 24px; } }
-body:has(aside[data-plegada="true"]) .nav-paleta { padding-left: calc(64px + 24px); }
 [data-formato="ext"] .nav-paleta { padding-right: calc(var(--cromo-riel) + var(--ir) + 8px); padding-left: calc(var(--il) + 8px); }
 [data-formato="ih"] .nav-paleta { padding-top: calc(var(--it) + 24px); padding-right: calc(var(--cromo-barra-ih) + var(--ir) + 24px); }
 .nav-paleta-tarjeta {

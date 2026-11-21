@@ -82,20 +82,15 @@ export default function OfflineAlert() {
   const sale = fase === 'saliendo' ? '' : undefined
 
   return (
-    <div className="fixed inset-0 z-[9999] data-[sale]:pointer-events-none" data-sale={sale}>
+    /* `--z-sin-conexion`: encima de capas y cromo; el aviso breve, aún encima. */
+    <div className="fixed inset-0 z-[var(--z-sin-conexion)] data-[sale]:pointer-events-none" data-sale={sale}>
       <div
         data-sale={sale}
         className="absolute inset-0 bg-[var(--velo)] [backdrop-filter:var(--velo-filtro)] [-webkit-backdrop-filter:var(--velo-filtro)] transition-opacity duration-[var(--dur-entra)] ease-[var(--resorte-entra)] starting:opacity-0 data-[sale]:opacity-0 data-[sale]:duration-[var(--dur-sale)]"
       />
-      <div className={[
-        'absolute flex items-center justify-center p-2',
-        'left-[var(--il)] right-[var(--ir)] top-[var(--it)] bottom-[var(--ib)]',
-        'ext:right-[calc(56px+var(--ir))]',
-        '[[data-borde-sistema=izquierda]_&]:ext:left-[calc(56px+var(--il))] [[data-borde-sistema=izquierda]_&]:ext:right-0',
-        'ih:right-[calc(218px+var(--ir))]',
-        '[[data-borde-sistema=izquierda]_&]:ih:left-[calc(218px+var(--il))] [[data-borde-sistema=izquierda]_&]:ih:right-0',
-        'esc:left-[248px]',
-      ].join(' ')}>
+      {/* El área de contenido es la de las capas (`--capa-*`, que leen los
+          `--cromo-*`): sin números de la navegación aquí. */}
+      <div className="absolute flex items-center justify-center top-[var(--capa-arr)] right-[var(--capa-der)] bottom-[var(--capa-abj)] left-[var(--capa-izq)]">
         <div
           ref={tarjeta}
           role="alertdialog"
