@@ -131,7 +131,7 @@ hallazgos de las 25 rutas, claro + oscuro:
 |---|---|---|---|---|---|---|---|---|
 | B0 | Preparación y línea base | hecho | | ok | 96/68 | 2363/2363 | ver arriba | ANTES |
 | B1 | Cimientos: tokens, tipografía, oscuro, sonda, manifest, movimiento | hecho (con 1 desvío, abajo) | 97eba80a, 800f9221, d0857a1b, 8c153052 | ok | 96/68 | 2391/2391 (sin TZ y UTC) | 9 archivos de agenda = B0 por archivo | DESPUÉS |
-| B2 | Primitivas compartidas | | | | | | | |
+| B2 | Primitivas compartidas | hecho | 174abbd8, fc054a4c, fb263d08 | ok | 96/68 | 2391/2391 (sin TZ y UTC) | no corridas (sin consumidores; cajas medidas) | muestra + 5 rutas |
 | B3 | Capas del catálogo | | | | | | | |
 | B4 | Navegación por dispositivo | | | | | | | |
 | — | ⛔ Parada temprana (push 1) | | | | | | | |
@@ -172,3 +172,31 @@ hallazgos de las 25 rutas, claro + oscuro:
   Pizarra a 4,20/4,43: se dejó en 0,55.
 * Para `cap-app.js`, el `--pid` de B0 ya no existe: cada corrida e2e recrea la
   semilla. Pedir uno nuevo a la base antes de capturar.
+
+### B2 · notas
+
+* **CSS principal:** 350 877 bytes (B1: 339 203, +11 674; gzip 60 528).
+* **Primitivas** en `sistema.css` (`@layer components`): `.k-b` + `.k-b-prim`,
+  `-tonal`, `-texto`, `-icono`, `-quieto`, `-mal`, `-capa`; `.k-campo-g`,
+  `.k-etiqueta`, `.k-campo`, `.k-campo-ayuda`, `.k-campo-error`; `.k-tarjeta`;
+  `.k-lista`, `.k-fila` (`-t`, `-n`, `-s`, `-der`, `-chev`); `.k-etq` (`-ok`,
+  `-mal`, `-aviso`, `-tonal`); `.k-tabs`/`.k-tab`; `.k-seg`/`.k-seg-op`;
+  `.k-avatar` (`-32`, `-44`); `.k-est*`; `.k-doc*`; `.k-origen*`. Área real
+  por `--k-toque` (44; 36 en `ih`/`esc`, en `:root[data-formato]`).
+* **Componentes** en `components/ui/`: `Avatar`, `IconoEstadoCita`,
+  `IconoTipoDocumento`, `MarcaOrigen`, sin consumidores. `paletaAvatar.ts` es
+  ahora una reexportación de `Avatar.tsx`.
+* **Desvío del plan:** la paleta de avatares sigue con DIEZ pares, no seis: la
+  rotación del dashboard (`ARRANQUE_AVATAR` 0/4) necesita más de ocho. Se
+  decide en B5.
+* **Re-piel `.sp-*`:** los bordes de 1 px se quedan, transparentes; el foco
+  del campo sigue engordando a 1,5 px. Cajas medidas antes/después en
+  dashboard, expediente, nueva nota, receta y perfil, cinco formatos: 1 098
+  cajas, 0 cambios de geometría (la única diferencia del dashboard es una cita
+  que pasó a «en curso» entre las dos corridas: misma caja, otra clase).
+* **Página de muestra** (fuera del repo, HTML con el CSS compilado y los
+  componentes renderizados): áreas de toque ≥ 44 (36 en `ih`/`esc`) en todos
+  los botones, filas, pestañas y segmentos; 0 textos < 12; 0 desbordes.
+* **Visto, no tocado:** en oscuro varios campos y tarjetas de nueva nota y de
+  la receta siguen con su borde, porque la hoja de traducción oscura de
+  `ThemeProvider`/`globals.css` les pone el suyo; se va con cada pantalla.
