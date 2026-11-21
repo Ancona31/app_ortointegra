@@ -44,8 +44,8 @@ export const viewport: Viewport = {
 
      ⚠️⚠️ ESTOS DOS VALORES SON SÓLO LA PRIMERA APROXIMACIÓN. En cuanto hay
      JavaScript, `ThemeProvider` reescribe el `content` de LAS DOS entradas con
-     el navy del tema que el médico eligió de verdad —y resuelto desde
-     `--ag-navy`, así que además sigue a la marca de la clínica—. Ver
+     el color que pinta de verdad la franja (`body::before`) con el tema que el
+     médico eligió —así que además sigue a la marca de la clínica—. Ver
      `sincronizarBarraDelNavegador` en `layout/ThemeProvider.tsx`.
      Lo de aquí es lo que se ve en el instante antes de que ese código corra, y
      por eso conserva el `media`: sin nada mejor, la preferencia del sistema es
@@ -56,10 +56,12 @@ export const viewport: Viewport = {
      se ve es el píxel de `body::before`, que sí sale de `--ag-navy` y sí sigue
      al tema y a la marca.
      ⚠️ REDISEÑO: ESTOS DOS SIGUEN EN `--ag-navy` Y NO EN EL `--navy` DEL KIT,
-     a propósito (B1). La franja, la barra lateral, la banda de la agenda y la
-     barra del dashboard pintan `--ag-navy`; si sólo la franja pasara a
-     `--navy`, en oscuro quedaría #101B30 encima de #2f4f73 con un corte a la
-     vista. Pasan los cuatro juntos cuando migre el cromo (B4/B13). */
+     a propósito. Son los de las páginas que NO son la app —`/login`, `/`,
+     `/register`, el lanzador—, que el rediseño todavía no toca y cuya franja
+     (`body::before`) sigue en `--ag-navy`. Dentro de `(app)` la franja es
+     `--navy` desde B4 (salvo con la banda de la agenda) y `ThemeProvider` copia
+     a estas dos entradas el color que la franja pinta de verdad (integración
+     B1–B4), así que barra del navegador, franja y cromo coinciden. */
   themeColor: [
     { media: '(prefers-color-scheme: light)', color: '#163250' },
     { media: '(prefers-color-scheme: dark)',  color: '#2f4f73' },

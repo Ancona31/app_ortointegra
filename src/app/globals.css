@@ -977,25 +977,31 @@ html[data-formato] body {
    ⚠️ Y EN UN NAVEGADOR NORMAL MIDE CERO. `env(safe-area-inset-top)` sólo tiene
    valor donde el sistema se superpone; en escritorio y en una pestaña normal la
    altura es 0 y aquí no se pinta nada. */
-/* ⚠️ DESDE B4 (rediseño) ES `--navy`, EL DEL KIT, salvo con la banda de la
-   agenda delante. La navegación nueva —encabezado fundido, cajón, barras y
+/* ⚠️ DESDE B4 (rediseño), EN LA APP ES `--navy`, EL DEL KIT, salvo con la
+   banda de la agenda delante (fuera de la app, `--ag-navy` como siempre). La navegación nueva —encabezado fundido, cajón, barras y
    riel— pinta `--navy` (`sistema.css`, que ya deriva de la marca de la clínica
    y tiene su oscuro), así que la franja tiene que ser ESE navy para que barra
    de estado y encabezado sean una sola superficie. La banda de la agenda sigue
    en `--ag-navy` hasta su bloque (B13), y por eso con ella delante la franja
    vuelve a `--ag-navy` (regla de abajo, junto a esta). El `theme-color` de
-   `app/layout.tsx` y `sincronizarBarraDelNavegador` (`ThemeProvider.tsx`) NO
-   son de B4 y siguen en `--ag-navy`: pasan con la agenda. */
+   `app/layout.tsx` es `--navy` y `sincronizarBarraDelNavegador`
+   (`ThemeProvider.tsx`) lee el color de ESTE pseudo-elemento, así que barra del
+   navegador, franja y cromo son siempre el mismo (integración B1–B4). */
 body::before {
   content: '';
   position: fixed;
   inset: 0 0 auto 0;
   height: env(safe-area-inset-top, 0px);
-  background: var(--navy);
+  background: var(--ag-navy);
   z-index: 45;
   pointer-events: none;
 }
-body:has(.ag-banda-movil)::before { background: var(--ag-navy); }
+/* `--navy` SÓLO DENTRO DE LA APP (con su barra, `#barra-lateral`): las páginas
+   públicas (`/login`, `/`, `/reservar`, `/confirmar`) y el lanzador no son del
+   rediseño todavía y su franja sigue como en B0, en `--ag-navy` (integración
+   B1–B4; `/reservar` y `/confirmar` declaran además su `themeColor` #163250). */
+body:has(#barra-lateral)::before { background: var(--navy); }
+body:has(#barra-lateral):has(.ag-banda-movil)::before { background: var(--ag-navy); }
 
 /* Elimina tap delay en móvil — hace que los toques respondan de inmediato */
 * {

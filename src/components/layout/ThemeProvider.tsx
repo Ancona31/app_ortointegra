@@ -20,9 +20,13 @@ export const useTheme = () => useContext(Ctx)
  *
  * Y DE PASO LA BARRA PASA A SEGUIR A LA MARCA DE LA CLINICA, que el <meta>
  * tampoco podia: el navegador lo lee antes de que exista CSS. Aqui si hay CSS,
- * asi que el color sale de --ag-navy resuelto de verdad.
+ * asi que el color sale de LA FRANJA PINTADA (`body::before`, globals.css):
+ * `--navy` en toda la app y `--ag-navy` con la banda de la agenda movil delante
+ * (rediseño, integracion B1–B4). Leerlo del pseudo-elemento y no de un token es
+ * lo que garantiza que barra del navegador, franja y cromo sean UN color: la
+ * decision de cual vive en un solo sitio, el CSS.
  *
- * POR QUE HACE FALTA EL LIENZO: --ag-navy resuelve a `color(srgb ...)` o a
+ * POR QUE HACE FALTA EL LIENZO: el navy resuelve a `color(srgb ...)` o a
  * `oklch(...)` —usa sintaxis de color relativa—, y `theme-color` quiere un color
  * que el navegador acepte en un atributo. El lienzo lo normaliza a hex.
  * El centinela magenta detecta que el lienzo NO supo parsear el color: si eso
@@ -34,11 +38,7 @@ function sincronizarBarraDelNavegador(): void {
     const metas = document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')
     if (metas.length === 0) return
 
-    const sonda = document.createElement('div')
-    sonda.style.cssText = 'position:absolute;width:0;height:0;visibility:hidden;background:var(--ag-navy)'
-    document.body.appendChild(sonda)
-    const pintado = getComputedStyle(sonda).backgroundColor
-    sonda.remove()
+    const pintado = getComputedStyle(document.body, '::before').backgroundColor
 
     const lienzo = document.createElement('canvas')
     lienzo.width = lienzo.height = 1
@@ -54,6 +54,30 @@ function sincronizarBarraDelNavegador(): void {
 
     metas.forEach(m => { m.content = hex })
   } catch {}
+}
+
+/* LA BANDA DE LA AGENDA MOVIL CAMBIA EL COLOR DE LA FRANJA (`body:has(.ag-banda-movil)`)
+ * y se monta en un efecto de la agenda, cuando ya paso cualquier cambio de ruta:
+ * por eso se observa el DOM y no `pathname`. El observador sólo mira si la banda
+ * aparece o se va (una consulta por fotograma, como mucho) y sólo entonces
+ * vuelve a sincronizar. */
+function useFranjaSegunBanda(): void {
+  useEffect(() => {
+    let hayBanda = document.querySelector('.ag-banda-movil') !== null
+    let pendiente = 0
+    const revisar = () => {
+      pendiente = 0
+      const ahora = document.querySelector('.ag-banda-movil') !== null
+      if (ahora === hayBanda) return
+      hayBanda = ahora
+      sincronizarBarraDelNavegador()
+    }
+    const observador = new MutationObserver(() => {
+      if (!pendiente) pendiente = requestAnimationFrame(revisar)
+    })
+    observador.observe(document.body, { childList: true, subtree: true })
+    return () => { observador.disconnect(); if (pendiente) cancelAnimationFrame(pendiente) }
+  }, [])
 }
 
 /* LA MARCA DE LA CLINICA EN LOS TOKENS DEL REDISENO (B1, PLAN §2.2).
@@ -116,6 +140,7 @@ export function cssMarcaDerivada(primario: string, secundario: string): string {
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const { colorPrimario, colorSecundario } = useClinica()
   const [dark, setDark] = useState(false)
+  useFranjaSegunBanda()
 
   /* ATENCION: LA CLASE `dark` YA LA PUSO EL SCRIPT DEL <head> DE layout.tsx, y
      este efecto NO es quien quita el destello. Lo que hace es poner el estado de
@@ -140,8 +165,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         localStorage.setItem('theme', next ? 'dark' : 'light')
         document.documentElement.classList.toggle('dark', next)
       } catch {}
-      /* Despues de mover la clase, no antes: la sonda lee --ag-navy del tema que
-         acaba de quedar activo. */
+      /* Despues de mover la clase, no antes: la sonda lee la franja del tema
+         que acaba de quedar activo. */
       sincronizarBarraDelNavegador()
       return next
     })
