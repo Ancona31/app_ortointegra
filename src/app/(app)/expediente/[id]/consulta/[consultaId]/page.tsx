@@ -7,7 +7,7 @@ import { Paciente, Consulta, MedicoInfo } from '@/types'
 import { parseISO, format } from 'date-fns'
 import { generateDocFileName } from '@/lib/patientUtils'
 import { es } from 'date-fns/locale'
-import { ArrowLeft, Printer, Stethoscope, Plus, Loader2, Lock, PenLine, Sparkles, Eye } from 'lucide-react'
+import { ChevronLeft, Printer, Plus, Loader2, Lock, PenLine, Sparkles, Eye } from 'lucide-react'
 import Link from 'next/link'
 import { useAuditAccess } from '@/hooks/useAudit'
 import { buildNotaRenderData } from '@/lib/notaRenderData'
@@ -172,134 +172,99 @@ export default function ConsultaDetallePage() {
     }
   }
 
-  if (loading) return <div className="text-center py-12 text-slate-400">Cargando...</div>
-  if (!consulta || !paciente) return <div className="text-center py-12 text-slate-400">Consulta no encontrada</div>
+  if (loading) return <p className="k-t-sec py-12 text-center" aria-busy="true">Cargando...</p>
+  if (!consulta || !paciente) return <p className="k-t-sec py-12 text-center">Consulta no encontrada</p>
 
   return (
-    <div className="max-w-4xl mx-auto space-y-5">
+    /* ═══ REDISEÑO B8 (maqueta `final-consulta`) ════════════════════════════
+       Columna de lectura centrada (CALMA §14): regreso «‹ <paciente>» (§23.8),
+       título, fecha y consultorio, las dos etiquetas («Nota manual»/«Nota IA»
+       y «Nota sellada», §11) y la acción de imprimir; debajo, la nota y la
+       aclaratoria. La nota NO se edita ni se borra: sólo addendum. */
+    <div lang="es" className="mx-auto w-full max-w-[720px] space-y-5 iv:max-w-[600px]">
 
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Link href={`/expediente/${id}`} className="text-slate-400 hover:text-slate-600">
-            <ArrowLeft size={20} />
-          </Link>
-          <div>
-            <h1 className="text-2xl font-bold text-[#1a3a5c] flex items-center gap-2">
-              <Stethoscope size={22} /> Nota de Consulta
-            </h1>
-            <p className="text-slate-500 text-sm mt-0.5">
-              {paciente.nombre} {paciente.apellidos} ·{' '}
+      <header>
+        <Link href={`/expediente/${id}`} className="k-b k-b-texto -ml-1 h-[var(--k-toque)] max-w-full text-[13px]">
+          <ChevronLeft size={16} aria-hidden="true" />
+          <span className="truncate">{paciente.nombre} {paciente.apellidos}</span>
+        </Link>
+        <div className="mt-1 flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
+          <div className="min-w-0">
+            <h1 className="k-t-pantalla">Nota de Consulta</h1>
+            <p className="k-t-sec mt-1">
               {format(parseISO(consulta.fecha), "dd 'de' MMMM 'de' yyyy", { locale: es })}
+              {consulta.consultorio_nombre && (
+                <> · Atendido en: <span className="font-semibold text-tinta">{consulta.consultorio_nombre_corto || consulta.consultorio_nombre}</span></>
+              )}
             </p>
-            {consulta.consultorio_nombre && (
-              <p className="text-xs text-slate-500 mt-1">
-                Atendido en: <span className="font-semibold text-[#1e5fa8]">{consulta.consultorio_nombre_corto || consulta.consultorio_nombre}</span>
-              </p>
-            )}
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              {consulta.nota_origen === 'manual'
+                ? <span className="k-etq k-etq-tonal"><PenLine aria-hidden="true" /> Nota manual</span>
+                : <span className="k-etq k-etq-tonal"><Sparkles aria-hidden="true" /> Nota IA</span>}
+              <span className="k-etq k-etq-ok"><Lock aria-hidden="true" /> Nota sellada</span>
+            </div>
           </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {consulta.nota_origen === 'manual' ? (
-            <span className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-500 bg-slate-50 border border-slate-200 rounded-lg">
-              <PenLine size={12} /> Nota manual
-            </span>
-          ) : (
-            <span className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[#1e5fa8] bg-[#1e5fa8]/5 border border-[#1e5fa8]/20 rounded-lg">
-              <Sparkles size={11} />
-              Nota IA
-            </span>
-          )}
-          <span className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-400 bg-slate-50 border border-slate-200 rounded-lg">
-            <Lock size={12} /> Nota sellada
-          </span>
           {/* El enlace se queda hasta que se agregue un addendum (que invalida
               el PDF) o se recargue la página: si el médico cierra la pestaña
               del visor por error, puede volver a abrirla sin regenerar. */}
           {pdfUrl ? (
-            <a
-              href={pdfUrl}
-              target="_blank"
-              rel="noopener"
-              className="flex items-center gap-2 px-4 py-2 bg-[#1a3a5c] border-2 border-[#1a3a5c] text-white rounded-lg text-sm font-medium hover:bg-[#0f2540] transition-colors"
-            >
-              <Eye size={16} /> Abrir PDF
+            <a href={pdfUrl} target="_blank" rel="noopener" className="k-b k-b-tonal">
+              <Eye size={16} aria-hidden="true" /> Abrir PDF
             </a>
           ) : (
-            <button
-              onClick={imprimir}
-              disabled={imprimiendo}
-              className="flex items-center gap-2 px-4 py-2 border-2 border-[#1a3a5c] text-[#1a3a5c] rounded-lg text-sm font-medium hover:bg-[#1a3a5c] hover:text-white transition-colors disabled:opacity-50"
-            >
+            <button onClick={imprimir} disabled={imprimiendo} className="k-b k-b-tonal">
               {imprimiendo
-                ? <><Loader2 size={16} className="animate-spin" /> Generando...</>
-                : <><Printer size={16} /> Imprimir</>}
+                ? <><Loader2 size={16} className="animate-spin motion-reduce:animate-none" aria-hidden="true" /> Generando...</>
+                : <><Printer size={16} aria-hidden="true" /> Imprimir</>}
             </button>
           )}
         </div>
-      </div>
+      </header>
 
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">{error}</div>
-      )}
+      {error && <p role="alert" className="rounded-[var(--r-control)] bg-mal-fondo px-4 py-3 text-[14px] leading-5 text-mal-tinta">{error}</p>}
 
       {/* ⚠️ EL CONTENIDO DE LA NOTA LO PONE `CuerpoNota`, QUE ES EL MISMO QUE
-          USA EL PANEL DE LA PESTAÑA CONSULTAS. Aquí vivía una copia: una
-          tarjeta de dos columnas con diagnóstico y próxima cita, el cuerpo
-          renderizado con ReactMarkdown —ni siquiera con el parser de la app, así
-          que las secciones salían sin numerar, sin subtítulo y en el orden del
-          texto— y su propia lista de aclaratorias. Lo que esta página aporta es
-          el CHASIS: la cabecera con retorno, las insignias, el botón de
-          imprimir y el formulario de aclaratoria de aquí abajo. El contenido,
-          no. Si necesitas cambiar cómo se lee una nota, se cambia en
-          `CuerpoNota` y las dos vistas se enteran. */}
-      <div className="bg-[var(--sp-surface)] rounded-[var(--sp-r-card)] border border-[color:var(--sp-line-card)] shadow-[var(--sp-shadow-flat)] px-[var(--sp-5)] py-[var(--sp-5)]">
-        <div className="mx-auto w-full max-w-[620px]">
-          {notaRenderData && <CuerpoNota data={notaRenderData} />}
-        </div>
+          USA EL PANEL DE LA PESTAÑA CONSULTAS. Lo que esta página aporta es el
+          CHASIS: la cabecera con retorno, las etiquetas, el botón de imprimir y
+          el formulario de aclaratoria de aquí abajo. Si necesitas cambiar cómo
+          se lee una nota, se cambia en `CuerpoNota` y las dos vistas se
+          enteran. */}
+      <div className="k-tarjeta">
+        {notaRenderData && <CuerpoNota data={notaRenderData} />}
       </div>
 
-      {/* Botón de agregar addendum — siempre visible */}
+      {/* Agregar addendum — siempre visible */}
       {!showAddendum ? (
-        <button
-          onClick={() => setShowAddendum(true)}
-          className="w-full flex items-center justify-center gap-2 py-3 border-2 border-dashed border-[#1e5fa8]/30 text-[#1e5fa8] rounded-xl text-sm font-medium hover:bg-[#1e5fa8]/5 hover:border-[#1e5fa8]/50 transition-all"
-        >
-          <Plus size={16} /> Agregar nota aclaratoria (addendum)
+        <button onClick={() => setShowAddendum(true)} className="k-b k-b-texto -ml-1">
+          <Plus size={16} aria-hidden="true" /> Agregar nota aclaratoria (addendum)
         </button>
       ) : (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-3">
-          <h3 className="text-sm font-semibold text-[#1d1d1f] flex items-center gap-2">
-            <Plus size={14} /> Nueva nota aclaratoria
-          </h3>
-          <p className="text-xs text-slate-400">
+        <section aria-labelledby="titulo-addendum" className="k-tarjeta space-y-3">
+          <h2 id="titulo-addendum" className="k-t-tarjeta">Nueva nota aclaratoria</h2>
+          <p className="k-campo-ayuda">
             Este addendum se adjuntará a la nota original y no podrá modificarse una vez guardado.
           </p>
           <textarea
             value={addendumTexto}
             onChange={e => setAddendumTexto(e.target.value)}
             rows={4}
+            aria-labelledby="titulo-addendum"
             placeholder="Escriba la aclaración, corrección o nota adicional..."
             autoFocus
-            className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]"
+            className="k-campo resize-none"
           />
-          <div className="flex justify-end gap-2">
+          <div className="flex justify-end gap-2 iv:justify-center">
             <button
               onClick={() => { setShowAddendum(false); setAddendumTexto(''); setError('') }}
-              className="px-4 py-2 text-sm text-slate-500 hover:bg-slate-50 rounded-lg transition-colors"
+              className="k-b k-b-quieto min-w-[104px]"
             >
               Cancelar
             </button>
-            <button
-              onClick={guardarAddendum}
-              disabled={guardandoAddendum}
-              className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold bg-[#1e5fa8] text-white rounded-lg hover:bg-[#1a3a5c] transition-colors disabled:opacity-60"
-            >
-              {guardandoAddendum ? <><Loader2 size={13} className="animate-spin" /> Guardando...</> : 'Guardar addendum'}
+            <button onClick={guardarAddendum} disabled={guardandoAddendum} className="k-b k-b-prim min-w-[104px]">
+              {guardandoAddendum ? <><Loader2 size={16} className="animate-spin motion-reduce:animate-none" aria-hidden="true" /> Guardando...</> : 'Guardar addendum'}
             </button>
           </div>
-        </div>
+        </section>
       )}
     </div>
   )

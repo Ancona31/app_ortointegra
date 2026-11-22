@@ -83,7 +83,7 @@ function Bloques({ bloques }: { bloques: BloqueNota[] }) {
           return (
             <p
               key={i}
-              className={`${primeroDeLista ? separacion : 'mt-[var(--sp-1-5)]'} flex gap-[var(--sp-2)] text-[length:var(--sp-fs-body)] leading-[var(--sp-lh-note)] text-[var(--sp-ink-700)]`}
+              className={`${primeroDeLista ? separacion : 'mt-[var(--sp-1-5)]'} flex gap-[var(--sp-2)] text-[length:var(--sp-fs-body)] leading-[var(--sp-lh-note)] text-[var(--sp-ink-700)] [hyphens:auto] [text-align:justify]`}
             >
               <span aria-hidden className="shrink-0 text-[var(--sp-ink-300)]">—</span>
               <span className="min-w-0"><Spans bloque={b} /></span>
@@ -93,7 +93,7 @@ function Bloques({ bloques }: { bloques: BloqueNota[] }) {
         return (
           <p
             key={i}
-            className={`${separacion} text-[length:var(--sp-fs-body)] leading-[var(--sp-lh-note)] text-[var(--sp-ink-700)]`}
+            className={`${separacion} text-[length:var(--sp-fs-body)] leading-[var(--sp-lh-note)] text-[var(--sp-ink-700)] [hyphens:auto] [text-align:justify]`}
           >
             <Spans bloque={b} />
           </p>
@@ -122,10 +122,10 @@ function Seccion({ seccion, indice, primera }: {
   if (relleno) {
     return (
       <div className={`${separacion} flex flex-wrap items-baseline gap-x-[var(--sp-2)] gap-y-[2px]`}>
-        <span className="text-[length:var(--sp-fs-body-sm)] font-extrabold tabular-nums text-[var(--sp-ink-300)]">
+        <span className="text-[13px] font-bold tabular-nums text-tinta3">
           {numeroDe(indice)}
         </span>
-        <h3 className="text-[length:var(--sp-fs-body-sm)] font-extrabold text-[var(--sp-ink-350)]">
+        <h3 className="text-[13px] font-bold uppercase tracking-[.4px] text-tinta3">
           {tituloDe(seccion)}
         </h3>
         <p className="text-[length:var(--sp-fs-meta)] text-[var(--sp-ink-300)]">{relleno}</p>
@@ -136,10 +136,10 @@ function Seccion({ seccion, indice, primera }: {
   return (
     <section className={separacion}>
       <div className="flex items-baseline gap-[var(--sp-2)]">
-        <span className="text-[length:var(--sp-fs-body-sm)] font-extrabold tabular-nums text-[var(--sp-primary-text)]">
+        <span className="text-[13px] font-bold tabular-nums text-enlace">
           {numeroDe(indice)}
         </span>
-        <h3 className="text-[length:var(--sp-fs-body-sm)] font-extrabold text-[var(--sp-ink-800)]">
+        <h3 className="text-[13px] font-bold uppercase tracking-[.4px] text-enlace">
           {tituloDe(seccion)}
         </h3>
         {/* Las no reconocidas no llevan subtítulo: no hay ninguno que darles. */}
@@ -166,7 +166,7 @@ const VITALES: readonly { clave: keyof NonNullable<NotaRenderData['signosVitales
 function Dato({ rotulo, children }: { rotulo: string; children: React.ReactNode }) {
   return (
     <span className="inline-flex items-baseline gap-[var(--sp-1-5)]">
-      <span className="text-[length:var(--sp-fs-legal)] font-bold uppercase tracking-[var(--sp-ls-label)] text-[var(--sp-ink-350)]">
+      <span className="text-[12px] font-bold uppercase tracking-[var(--sp-ls-label)] text-[var(--sp-ink-350)]">
         {rotulo}
       </span>
       <span className="text-[length:var(--sp-fs-meta)] font-semibold tabular-nums text-[var(--sp-ink-700)]">
@@ -220,7 +220,7 @@ function FranjaDatos({ data }: { data: NotaRenderData }) {
         <div className="mt-[var(--sp-2-5)] flex flex-wrap items-baseline gap-x-[var(--sp-4)] gap-y-[var(--sp-1-5)]">
           {hayVitales && (
             <>
-              <span className="text-[length:var(--sp-fs-legal)] font-bold uppercase tracking-[var(--sp-ls-label)] text-[var(--sp-ink-350)]">
+              <span className="text-[12px] font-bold uppercase tracking-[var(--sp-ls-label)] text-[var(--sp-ink-350)]">
                 Signos <span className="text-[var(--sp-ink-600)]">VITALES</span>
               </span>
               {ta && <Dato rotulo="TA">{ta} <span className="font-normal text-[var(--sp-ink-350)]">mmHg</span></Dato>}
@@ -239,7 +239,7 @@ function FranjaDatos({ data }: { data: NotaRenderData }) {
 
       {/* Las notas antiguas no traen consultorio: entonces no hay renglón. */}
       {consultorio.nombreCorto && (
-        <p className="mt-[var(--sp-2)] text-[length:var(--sp-fs-legal)] text-[var(--sp-ink-350)]">
+        <p className="mt-[var(--sp-2)] text-[12px] text-[var(--sp-ink-350)]">
           Atendido en: <span className="font-semibold text-[var(--sp-ink-600)]">{consultorio.nombreCorto}</span>
         </p>
       )}
@@ -271,7 +271,7 @@ function BloqueMedico({ medico }: { medico: NotaRenderData['medico'] }) {
         <p className="text-[length:var(--sp-fs-meta)] text-[var(--sp-ink-500)]">{medico.especialidad}</p>
       )}
       {cedulas && (
-        <p className="text-[length:var(--sp-fs-legal)] text-[var(--sp-ink-350)]">{cedulas}</p>
+        <p className="text-[12px] text-[var(--sp-ink-350)]">{cedulas}</p>
       )}
     </div>
   )
@@ -305,11 +305,9 @@ function Aclaratorias({ addendums }: { addendums: NotaRenderData['addendums'] })
                   {fechaAddendumPantalla(a.creadoEn)}
                 </span>
               </p>
-              <span className="shrink-0 rounded-[var(--sp-r-pill)] bg-[var(--sp-surface-muted)] px-[8px] py-[2px] text-[length:var(--sp-fs-legal)] font-bold text-[var(--sp-ink-500)]">
-                Sellado
-              </span>
+              <span className="k-etq k-etq-ok">Sellado</span>
             </div>
-            <p className="mt-[var(--sp-1-5)] whitespace-pre-line text-[length:var(--sp-fs-body)] leading-[var(--sp-lh-note)] text-[var(--sp-ink-700)]">
+            <p className="mt-[var(--sp-1-5)] whitespace-pre-line text-[length:var(--sp-fs-body)] leading-[var(--sp-lh-note)] text-[var(--sp-ink-700)] [hyphens:auto] [text-align:justify]">
               {a.parseado.secciones
                 .flatMap(s => s.bloques.map(b => b.spans.map(sp => sp.texto).join('')))
                 .join('\n')}
@@ -326,8 +324,9 @@ function Aclaratorias({ addendums }: { addendums: NotaRenderData['addendums'] })
 export default function CuerpoNota({ data }: { data: NotaRenderData }) {
   const secciones = ordenarSecciones(data.notaParseada.secciones)
 
+  /* `lang="es"`: la justificación con guiones necesita el idioma (CALMA §12). */
   return (
-    <>
+    <div lang="es">
       <FranjaDatos data={data} />
 
       <div className="mt-[var(--sp-7)]">
@@ -344,6 +343,6 @@ export default function CuerpoNota({ data }: { data: NotaRenderData }) {
 
       <BloqueMedico medico={data.medico} />
       <Aclaratorias addendums={data.addendums} />
-    </>
+    </div>
   )
 }
