@@ -447,7 +447,7 @@ Plan, decisiones y avance: `mejora_agendaV2.md` (§6-bis decisiones, §7 lo que
 le toca a Angel, §10 lo que no se probó en local). Auditoría del conjunto de
 migraciones: `supabase/AUDITORIA-CONJUNTO-AGENDA-V2.md`. Guía local:
 `GUIA_AUDITORIA_AGENDA_V2.md`; pruebas a mano: `GUIA_PRUEBAS_AGENDA_V2.md`.
-Deuda abierta: `DEUDA_TECNICA.md`, AG-DT-13 a AG-DT-256.
+Deuda abierta: `DEUDA_TECNICA.md`, AG-DT-13 a AG-DT-260.
 
 **Estado:** el código y las 43 migraciones (`20261111120000` a
 `20261124160000`: las 16 del cierre, las 4 de las correcciones de seguridad,
@@ -1223,6 +1223,40 @@ proyecto, 32 con las de `main`).** Además de lo de arriba:
     tarea nunca usa `.from()`), y si falla sale «Hola:» sin frenar el envío.
   - El pie va en `--ag-ink-600` #52627a (5,47:1 sobre #eef1f5): no lo bajes a
     `--ag-muted`, que da 3,09:1 (lo vigila `plantillaCita.test.ts`).
+
+**Pruebas de navegador (2026-11-22, equipo nuevo; AG-DT-256):**
+
+* **Ninguna e2e depende del día ni de la hora en que se corre.** Una cita con
+  paciente o por ligar, agendada o confirmada, dispara «¿Asistió el paciente?»
+  en cuanto su inicio tiene más de 48 h, y la ventana tapa la rejilla a todo lo
+  que corre después. En el miércoles de la semana visible eso pasa de viernes a
+  domingo.
+  - Toda cita con paciente o por ligar que cree una prueba va en la **semana
+    siguiente**: `DIA_FUTURO_FIJO` / `DIA_FUTURO_LIBRE`, y la agenda se abre con
+    `irAAgendaSiguiente` o `pasarASemanaSiguiente` (`e2e/ayudas.ts`). Los
+    eventos sin paciente pueden seguir en la semana visible.
+  - Si la prueba necesita una cita pasada, que sea la de ayer (menos de 48 h),
+    no una de semanas atrás.
+  - **No se pulsa «Decidir después» para quitar la ventana de en medio:** tapa
+    el síntoma. Sólo la abren las pruebas que la prueban a propósito.
+  - Nada de `now() + N h` ni del día de la semana leído al correr para decidir
+    qué semana mirar: la fecha se calcula una vez y con ella se siembra y se
+    navega.
+* **Lo vigila `e2e/guardaAsistencia.ts`** (reporter de `playwright.config.ts`,
+  sólo lee): aplica la regla de la ventana con el reloj en el final del domingo,
+  al empezar, durante cada prueba y al terminar cada una; lo que una prueba deje
+  pone la corrida en rojo y la nombra. No la quites del config ni le añadas
+  excepciones: la única es la anotación `asistencia-a-proposito`, que perdona lo
+  que ya no dispara la ventana cuando la prueba termina.
+* **Se espera lo que se quiere probar, no «lo primero que salga»:** la petición
+  o la respuesta de un rango concreto (`esUnaDeEstasVentanas`), y el diálogo
+  abierto antes de pulsar una tecla. Las precargas de las semanas vecinas son
+  peticiones legítimas que llegan cuando quieren.
+* **No edites archivos del repo mientras corre la batería:** las e2e de Google
+  levantan un `next dev` que recompila y puede contestar 500.
+* Queda una falla conocida, `agenda-empalme` «redimensionar hasta otra cita
+  también avisa» (AG-DT-257): es la prueba, no la app. No se salta ni se
+  desactiva.
 
 ---
 
