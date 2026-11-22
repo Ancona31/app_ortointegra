@@ -1,10 +1,9 @@
 'use client'
 
 import Link from 'next/link'
-import { MapPin } from 'lucide-react'
+import { MapPin, ChevronRight, type LucideIcon } from 'lucide-react'
 import { Consultorio } from '@/types'
 import { ZONAS_MEXICO } from '@/lib/consultorios/zonas-mexico'
-import { EncabezadoColumna } from '@/components/dashboard/piezasBanda2'
 
 /**
  * Las piezas nuevas de la pestaña Datos: las que NO existían antes del
@@ -52,22 +51,36 @@ export function GoogleGIcon({ size = 20 }: { size?: number }) {
 }
 
 /**
- * Cabecera de card de la pestaña: título y, opcionalmente, la línea que explica
- * dónde acaba saliendo ese dato.
- *
- * ⚠️ EL NIVEL TIPOGRÁFICO ES EL DE `EncabezadoColumna`, y a propósito:
- * `--sp-fs-vitals`, negrita, `--sp-ink-800`. La pestaña mezcla cards con esta
- * cabecera y una (el resumen de consultorios) que usa aquel componente porque
- * necesita enlace; si los dos niveles no coincidieran, la columna se leería
- * como dos jerarquías distintas alternándose.
+ * Rótulo de una sección de la pestaña (rediseño B10, maqueta `perfil`; CALMA
+ * §12): icono de 16 y título 13/700 en mayúsculas, en el color de acción
+ * (`--enlace`, que en oscuro es el azul legible), FUERA de la tarjeta, que
+ * queda para los datos. A la derecha, opcional, un enlace de texto.
+ * Sustituye a la vieja `CabeceraCard` (título 700 dentro de la card).
  */
-export function CabeceraCard({ titulo, apoyo }: { titulo: string; apoyo?: string }) {
+export function RotuloSeccion({ id, icono: Icono, titulo, enlace }: {
+  id?: string
+  icono: LucideIcon
+  titulo: string
+  enlace?: { href: string; texto: string }
+}) {
   return (
-    <div>
-      <h2 className="text-[length:var(--sp-fs-vitals)] font-bold text-[var(--sp-ink-800)]">{titulo}</h2>
-      {apoyo && <p className="sp-hint mt-[var(--sp-gap-title-sub)]">{apoyo}</p>}
+    <div className="flex min-h-9 items-center justify-between gap-3 px-1 pb-1.5">
+      <h2 id={id} className="flex min-w-0 items-center gap-2 text-[13px] font-bold uppercase leading-[18px] tracking-[.4px] text-enlace">
+        <Icono size={16} aria-hidden="true" className="shrink-0" />
+        {titulo}
+      </h2>
+      {enlace && (
+        <Link href={enlace.href} prefetch={false} className="k-b k-b-texto shrink-0 text-[14px]">
+          {enlace.texto} <ChevronRight size={16} aria-hidden="true" />
+        </Link>
+      )}
     </div>
   )
+}
+
+/** La línea de ayuda bajo la tarjeta de una sección. */
+export function AyudaSeccion({ children }: { children: React.ReactNode }) {
+  return <p className="px-1 pt-2 text-[13px] leading-[18px] text-tinta2">{children}</p>
 }
 
 /* La abreviatura UTC de una zona. COPIA de `offsetDeTimezone` en
@@ -82,14 +95,16 @@ function offsetDeTimezone(tz: string): string {
 }
 
 /**
- * Una muestra de color. El aro claro no es decorativo: sin él, un primario muy
- * oscuro y el borde de la card se funden y la muestra deja de leerse como tal.
+ * Una muestra de color: círculo de 22 con aro de la superficie, para que dos
+ * muestras se monten una sobre otra (`-ml-1.5` en la segunda) como en la
+ * maqueta. El aro es lo que mantiene leíble un primario muy oscuro.
  */
-export function MuestraColor({ color }: { color: string }) {
+export function MuestraColor({ color, encima }: { color: string; encima?: boolean }) {
   return (
     <span
-      className="block h-[18px] w-[18px] rounded-[var(--sp-r-btn-sm)]"
-      style={{ background: color, boxShadow: '0 0 0 1px var(--sp-line-card)' }}
+      aria-hidden="true"
+      className={`block h-[22px] w-[22px] rounded-full ${encima ? '-ml-1.5' : ''}`}
+      style={{ background: color, boxShadow: '0 0 0 2px var(--sup)' }}
     />
   )
 }
@@ -110,65 +125,56 @@ export function ResumenConsultorios({ consultorios, cargando }: {
   const restantes = total - visibles.length
 
   return (
-    <section className="sp-card flex flex-col gap-[var(--sp-3)]">
-      <div>
-        <EncabezadoColumna
-          titulo="Mis consultorios"
-          enlace={total > 0 ? { href: HREF_CONSULTORIOS, texto: `Gestionar los ${total}` } : undefined}
-        />
-        <p className="sp-hint">{total} de {MAX_CONSULTORIOS} activos</p>
-      </div>
-
-      {cargando ? (
-        <div className="flex flex-col gap-[var(--sp-2)]">
-          <div className="skeleton h-[58px] rounded-[var(--sp-r-field)]" />
-          <div className="skeleton h-[58px] rounded-[var(--sp-r-field)]" />
-        </div>
-      ) : total === 0 ? (
-        <p className="sp-secondary">
-          No tienes consultorios activos.{' '}
-          <Link href={HREF_CONSULTORIOS} prefetch={false} className="font-semibold text-[var(--sp-primary-text)] hover:underline">
-            Agrega el primero
-          </Link>
-          .
-        </p>
-      ) : (
-        <div className="flex flex-col">
-          {visibles.map((c, i) => (
-            <div
-              key={c.id}
-              className="flex items-center gap-[var(--sp-3)] py-[var(--sp-3)]"
-              style={i > 0 ? { borderTop: 'var(--sp-bw-hair) solid var(--sp-line-divider)' } : undefined}
-            >
-              <span className="w-[34px] h-[34px] shrink-0 flex items-center justify-center rounded-[var(--sp-r-icon-md)] bg-[var(--sp-primary-bg)] text-[var(--sp-primary-text)]">
-                <MapPin size={16} />
-              </span>
-
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-[var(--sp-2)] min-w-0">
-                  <p className="min-w-0 truncate text-[length:var(--sp-fs-body-sm)] font-bold text-[var(--sp-ink-800)]">
-                    {c.nombre}
+    <section aria-labelledby="perfil-sec-consultorios">
+      <RotuloSeccion
+        id="perfil-sec-consultorios"
+        icono={MapPin}
+        titulo="Mis consultorios"
+        enlace={total > 0 ? { href: HREF_CONSULTORIOS, texto: `Gestionar los ${total}` } : undefined}
+      />
+      <div className="k-tarjeta py-1">
+        {cargando ? (
+          <div className="flex flex-col gap-2 py-2" aria-busy="true">
+            <div className="skeleton h-[52px] rounded-[12px]" />
+            <div className="skeleton h-[52px] rounded-[12px]" />
+          </div>
+        ) : total === 0 ? (
+          <p className="py-3 text-[14px] leading-5 text-tinta2">
+            No tienes consultorios activos.{' '}
+            <Link href={HREF_CONSULTORIOS} prefetch={false} className="font-semibold text-enlace hover:underline">
+              Agrega el primero
+            </Link>
+            .
+          </p>
+        ) : (
+          <ul className="k-lista">
+            {visibles.map(c => (
+              <li key={c.id} className="flex items-center gap-3 py-3">
+                <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-sup2 text-enlace">
+                  <MapPin size={18} />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                    <p className="k-t-fila min-w-0 truncate">{c.nombre}</p>
+                    {c.es_default && <span className="k-etq k-etq-tonal shrink-0">Predeterminado</span>}
+                  </div>
+                  <p className="k-t-sec">
+                    {[c.direccion, c.telefono, offsetDeTimezone(c.timezone)].filter(Boolean).join(' · ')}
                   </p>
-                  {c.es_default && (
-                    <span className="shrink-0 rounded-[var(--sp-r-pill)] bg-[var(--sp-primary-bg)] px-[8px] py-[3px] text-[length:var(--sp-fs-tile)] font-bold uppercase tracking-[var(--sp-ls-label-w)] text-[var(--sp-primary-ink)]">
-                      Predeterminado
-                    </span>
-                  )}
                 </div>
-                <p className="truncate text-[length:var(--sp-fs-hint)] text-[var(--sp-ink-500)]">
-                  {[c.direccion, c.telefono, offsetDeTimezone(c.timezone)].filter(Boolean).join(' · ')}
-                </p>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {restantes > 0 && (
-        <Link href={HREF_CONSULTORIOS} prefetch={false} className="text-[length:var(--sp-fs-meta)] font-semibold text-[var(--sp-primary-text)] hover:underline">
-          Ver {restantes} consultorio{restantes > 1 ? 's' : ''} más
-        </Link>
-      )}
+              </li>
+            ))}
+          </ul>
+        )}
+        {restantes > 0 && (
+          <div className="border-t border-linea py-1">
+            <Link href={HREF_CONSULTORIOS} prefetch={false} className="k-b k-b-texto text-[14px]">
+              Ver {restantes} consultorio{restantes > 1 ? 's' : ''} más
+            </Link>
+          </div>
+        )}
+      </div>
+      <AyudaSeccion>{total} de {MAX_CONSULTORIOS} activos</AyudaSeccion>
     </section>
   )
 }
@@ -182,24 +188,22 @@ export function EstadoGoogleCalendar({ esAdmin, estado }: {
   estado: 'conectado' | 'sin_token' | 'error_google' | null
 }) {
   return (
-    <section className="sp-card flex items-center gap-[var(--sp-3)]">
-      <span className="w-[42px] h-[42px] shrink-0 flex items-center justify-center rounded-[var(--sp-r-icon-md)] bg-[var(--sp-surface-muted)]">
-        <GoogleGIcon size={20} />
+    <section className="k-tarjeta flex flex-wrap items-center gap-x-3 gap-y-2" aria-label="Google Calendar">
+      <span aria-hidden="true" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] bg-sup2">
+        <GoogleGIcon size={22} />
       </span>
-
-      <div className="min-w-0 flex-1">
-        <p className="text-[length:var(--sp-fs-body)] font-bold text-[var(--sp-ink-800)]">Google Calendar</p>
-        <p className="sp-hint">
+      <div className="min-w-0 flex-1 basis-[180px]">
+        <p className="k-t-tarjeta">Google Calendar</p>
+        <p className="k-t-sec">
           {esAdmin
             ? 'Tus citas se sincronizan a un calendario que Spinus crea en tu cuenta.'
             : 'La gestiona quien administra la clínica: es una para todo el equipo.'}
         </p>
       </div>
-
-      <div className="shrink-0 flex items-center gap-[var(--sp-3)]">
+      <div className="ml-auto flex shrink-0 items-center gap-2">
         <ChipEstado esAdmin={esAdmin} estado={estado} />
-        <Link href={HREF_GOOGLE} prefetch={false} className="text-[length:var(--sp-fs-meta)] font-semibold text-[var(--sp-primary-text)] hover:underline max-sm:hidden">
-          Abrir
+        <Link href={HREF_GOOGLE} prefetch={false} className="k-b k-b-texto text-[14px]">
+          Abrir <ChevronRight size={16} aria-hidden="true" />
         </Link>
       </div>
     </section>
@@ -221,28 +225,16 @@ function ChipEstado({ esAdmin, estado }: {
   estado: 'conectado' | 'sin_token' | 'error_google' | null
 }) {
   if (!esAdmin) return null
-  if (estado === null) return <span className="skeleton h-[26px] w-[104px] rounded-[var(--sp-r-pill)]" />
+  if (estado === null) return <span className="skeleton h-6 w-[104px] rounded-full" />
 
-  /* «Sin conectar» va en tinta SECUNDARIA sobre superficie neutra, nunca en
-     terciaria: sobre ese gris no llega al contraste mínimo (spec §5). */
-  const pinta = estado === 'conectado'
-    ? { fondo: 'var(--sp-success-bg)', tinta: 'var(--sp-success)', punto: 'var(--sp-success-dot)', texto: 'Conectado' }
-    : estado === 'error_google'
-      /* NO dice «no conectado»: aquí HAY token; lo que no hubo es respuesta de
-         Google. Ofrecerle reconectar sería mandarle a rehacer algo que no está
-         roto — y de todos modos la acción no vive en esta pestaña. */
-      ? { fondo: 'var(--sp-warn-bg)', tinta: 'var(--sp-warn)', punto: 'var(--sp-warn-dot)', texto: 'Sin respuesta' }
-      : { fondo: 'var(--sp-surface-muted)', tinta: 'var(--sp-ink-500)', punto: 'var(--sp-ink-350)', texto: 'Sin conectar' }
-
-  return (
-    <span
-      className="inline-flex items-center gap-[var(--sp-1-5)] rounded-[var(--sp-r-pill)] px-[12px] py-[5px] text-[length:var(--sp-fs-hint)] font-bold whitespace-nowrap"
-      style={{ background: pinta.fondo, color: pinta.tinta }}
-    >
-      <span className="w-[7px] h-[7px] rounded-[var(--sp-r-pill)]" style={{ background: pinta.punto }} />
-      {pinta.texto}
-    </span>
-  )
+  /* Etiquetas del kit (CALMA §11): «Conectado» en verde, «Sin respuesta» en
+     ámbar y «Sin conectar» neutra con tinta SECUNDARIA (no terciaria: sobre
+     ese gris no llega al contraste mínimo). */
+  if (estado === 'conectado') return <span className="k-etq k-etq-ok">Conectado</span>
+  /* NO dice «no conectado»: aquí HAY token; lo que no hubo es respuesta de
+     Google. Ofrecerle reconectar sería mandarle a rehacer algo que no está roto. */
+  if (estado === 'error_google') return <span className="k-etq k-etq-aviso">Sin respuesta</span>
+  return <span className="k-etq bg-sup2 text-tinta2">Sin conectar</span>
 }
 
 /**
@@ -287,59 +279,50 @@ export function VistaPreviaEncabezado({ nombre, especialidad, cedulaProfesional,
        esquivarla.
        Cuando el sistema tenga un token de «papel» (no redefinido en oscuro),
        éste es su primer consumidor. */
-    <div
-      className="rounded-[var(--sp-r-field)] px-[var(--sp-4-5)] pt-[var(--sp-4)] pb-[var(--sp-3)]"
-      style={{ background: 'white', border: 'var(--sp-bw-hair) solid var(--sp-line-card)' }}
-    >
-      <div className="flex items-center gap-[var(--sp-3-5)]">
-        {logoUrl && (
-          <img src={logoUrl} alt="" className="w-[64px] h-[32px] shrink-0 object-contain" />
-        )}
-        <div className="min-w-0 flex-1">
-          {/* ⚠️ ENVUELVE, NO TRUNCA, PORQUE ES LO QUE HACE EL PAPEL. Medido con
-              Roboto-Bold a 16 pt, que es lo que compone `@react-pdf/renderer`:
-              un nombre extremo (título + cuatro nombres + dos apellidos) mide
-              471 pt y el encabezado real dispone de 419 pt con logo, 315 con
-              folio — así que en el PDF sale en DOS LÍNEAS COMPLETAS en todas
-              las variantes salvo la que no lleva logo ni folio.
-              Con `truncate` esta previsualización enseñaba ese mismo nombre en
-              UNA línea cortada con «…»: un nombre mutilado que el papel imprime
-              entero. Es el mismo defecto que el degradado que se retiró de aquí,
-              con el signo cambiado.
-              El tope de dos líneas no es arbitrario: `PdfHeader` no pasó de dos
-              en ninguna de las cuatro anchuras medidas, y
-              `Font.registerHyphenationCallback(word => [word])` garantiza que el
-              PDF nunca parte palabras, sólo envuelve en espacios. */}
-          <p className="line-clamp-2 text-[length:var(--sp-fs-body)] font-bold tracking-[0.3px]" style={{ color: colorPrimario }}>
-            {nombre || 'Médico'}
-          </p>
-          {/* Mismo motivo que el nombre de arriba: en el PDF esta línea es un
-              `<Text>` que ENVUELVE, así que truncarla aquí enseñaría una
-              especialidad cortada que el papel imprime entera. Medido, hoy no
-              se dispara —«Cirugía de Columna · Ortopedia y Traumatología» ocupa
-              248-280 px de los 450 disponibles—, pero una lista de
-              especialidades más larga sí llegaría, y entonces el fallo sería
-              del mismo tipo. Se corrige antes de que aparezca. */}
-          {especialidad && (
-            <p className="line-clamp-2 text-[length:var(--sp-fs-legal)] font-medium tracking-[0.3px]" style={{ color: colorSecundario }}>
-              {especialidad}
+    /* Rediseño B10: la hoja va dentro de un marco `--sup2` (la «mesa»), y
+       debajo del encabezado tres renglones grises sugieren el cuerpo del
+       documento (decorativos, `aria-hidden`). Las tintas de dentro son
+       LITERALES, como el blanco: la hoja no cambia con el oscuro, y una tinta
+       del tema se volvería clara sobre papel blanco. */
+    <div className="overflow-hidden rounded-[12px] bg-sup2 px-3 pt-3">
+      <div className="rounded-t-[8px] px-4 pt-3 pb-4" style={{ background: 'white' }}>
+        <div className="flex items-center gap-3">
+          {logoUrl && (
+            <img src={logoUrl} alt="" className="h-8 w-16 shrink-0 object-contain" />
+          )}
+          <div className="min-w-0 flex-1">
+            {/* ⚠️ ENVUELVE, NO TRUNCA, PORQUE ES LO QUE HACE EL PAPEL: el PDF
+                compone nombres largos en dos líneas completas (medido con
+                Roboto-Bold a 16 pt), así que aquí se enseñan enteros hasta dos. */}
+            <p className="line-clamp-2 text-[15px] font-bold leading-5 tracking-[0.3px]" style={{ color: colorPrimario }}>
+              {nombre || 'Médico'}
             </p>
-          )}
-          {cedulas.length > 0 && (
-            <div className="mt-[var(--sp-1)] flex flex-wrap gap-x-[var(--sp-2-5)] gap-y-[2px]">
-              {cedulas.map(c => (
-                <span key={c} className="inline-flex items-center gap-[3px] text-[length:var(--sp-fs-tile)] text-[var(--sp-ink-500)]">
-                  <span className="w-[3px] h-[3px] rounded-[var(--sp-r-pill)]" style={{ background: colorSecundario }} />
-                  {c}
-                </span>
-              ))}
-            </div>
-          )}
+            {especialidad && (
+              <p className="line-clamp-2 text-[12px] font-medium leading-4 tracking-[0.3px]" style={{ color: colorSecundario }}>
+                {especialidad}
+              </p>
+            )}
+            {cedulas.length > 0 && (
+              <div className="mt-1 flex flex-wrap gap-x-2.5 gap-y-0.5">
+                {cedulas.map(c => (
+                  <span key={c} className="inline-flex items-center gap-1 text-[12px] leading-4" style={{ color: '#5B6478' }}>
+                    <span className="h-[3px] w-[3px] rounded-full" style={{ background: colorSecundario }} />
+                    {c}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+        {/* Los dos filetes de cierre: grueso del primario, fino del secundario. */}
+        <div className="mt-2.5 h-[2px] w-full" style={{ background: colorPrimario }} />
+        <div className="mt-[1.5px] h-px w-full" style={{ background: colorSecundario }} />
+        <div aria-hidden="true" className="mt-3 flex flex-col gap-1.5">
+          <span className="block h-1.5 w-full rounded-full" style={{ background: '#E6EAF1' }} />
+          <span className="block h-1.5 w-[86%] rounded-full" style={{ background: '#E6EAF1' }} />
+          <span className="block h-1.5 w-[52%] rounded-full" style={{ background: '#E6EAF1' }} />
         </div>
       </div>
-      {/* Los dos filetes de cierre: grueso del primario, fino del secundario. */}
-      <div className="mt-[var(--sp-2-5)] h-[2px] w-full" style={{ background: colorPrimario }} />
-      <div className="mt-[1.5px] h-[1px] w-full" style={{ background: colorSecundario }} />
     </div>
   )
 }

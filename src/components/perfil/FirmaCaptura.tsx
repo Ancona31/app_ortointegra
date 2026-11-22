@@ -265,19 +265,24 @@ export default function FirmaCaptura({ firmaActual, onFirmaCambiada }: Props) {
     setTieneTrazo(false)
   }
 
+  /* Rediseño B10 (maqueta `perfil`): botones y textos del kit. La firma se
+     pinta SIEMPRE sobre papel blanco (`style`, no `bg-white`, que la hoja de
+     traducción del oscuro repinta): es tinta negra sobre transparente y en
+     oscuro desaparecía. Lo comparten Mi perfil y el onboarding. */
+
   // ── Vista: firma ya guardada ────────────────────────────────────────────────
   if (firmaUrl && paso === 'captura') {
     return (
-      <div className="space-y-3">
-        <div className="flex items-start gap-4">
-          <div className="flex-1 rounded-xl border border-slate-200 bg-slate-50 p-4 flex items-center justify-center min-h-[80px]">
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex min-h-[80px] min-w-[180px] flex-1 items-center justify-center rounded-[12px] border border-linea p-4" style={{ background: 'white' }}>
             <img src={firmaUrl} alt="Firma guardada" className="max-h-[60px] max-w-full object-contain" />
           </div>
-          <div className="flex flex-col gap-2 flex-shrink-0">
+          <div className="flex shrink-0 flex-col items-start gap-1">
             <button
               type="button"
               onClick={() => { setFirmaUrl(null); setModoCaptura('subir') }}
-              className="px-3 py-1.5 text-xs font-medium border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
+              className="k-b k-b-tonal"
             >
               Cambiar firma
             </button>
@@ -285,14 +290,14 @@ export default function FirmaCaptura({ firmaActual, onFirmaCambiada }: Props) {
               type="button"
               onClick={eliminarFirma}
               disabled={eliminando}
-              className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-xl border border-red-200 text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50"
+              className="k-b k-b-texto px-2 text-[14px] text-mal-tinta"
             >
-              {eliminando ? <Loader2 size={11} className="animate-spin" /> : <Trash2 size={11} />}
+              {eliminando ? <Loader2 size={16} aria-hidden="true" className="animate-spin" /> : <Trash2 size={16} aria-hidden="true" />}
               Eliminar
             </button>
           </div>
         </div>
-        <p className="text-[10px] text-[#86868b]">
+        <p className="text-[13px] leading-[18px] text-tinta2">
           La firma aparece encima de la línea punteada en todos los documentos PDF.
         </p>
       </div>
@@ -302,21 +307,21 @@ export default function FirmaCaptura({ firmaActual, onFirmaCambiada }: Props) {
   // ── Vista: preview del resultado procesado ─────────────────────────────────
   if (paso === 'preview' && urlPreview) {
     return (
-      <div className="space-y-4">
-        <p className="text-[11px] font-semibold text-[#86868b] uppercase tracking-widest">Vista previa</p>
+      <div className="flex flex-col gap-3">
+        <p className="k-t-rotulo">Vista previa</p>
 
         <div className="grid grid-cols-2 gap-3">
           {/* Fondo blanco — receta / documento */}
-          <div className="space-y-1">
-            <p className="text-[10px] text-[#86868b]">Sobre fondo blanco</p>
-            <div className="rounded-xl border border-slate-200 bg-white p-4 flex items-center justify-center min-h-[80px]">
+          <div className="flex flex-col gap-1">
+            <p className="text-[12px] leading-4 text-tinta2">Sobre fondo blanco</p>
+            <div className="flex min-h-[80px] items-center justify-center rounded-[12px] border border-linea p-4" style={{ background: 'white' }}>
               <img src={urlPreview} alt="Preview firma" className="max-h-[60px] max-w-full object-contain" />
             </div>
           </div>
           {/* Fondo de color — encabezado */}
-          <div className="space-y-1">
-            <p className="text-[10px] text-[#86868b]">Sobre fondo oscuro</p>
-            <div className="rounded-xl border border-slate-200 p-4 flex items-center justify-center min-h-[80px]"
+          <div className="flex flex-col gap-1">
+            <p className="text-[12px] leading-4 text-tinta2">Sobre fondo oscuro</p>
+            <div className="flex min-h-[80px] items-center justify-center rounded-[12px] p-4"
               style={{ background: 'linear-gradient(135deg, #1a3a5c, #1e5fa8)' }}>
               <img src={urlPreview} alt="Preview firma" className="max-h-[60px] max-w-full object-contain"
                 style={{ filter: 'invert(1)' }} />
@@ -324,14 +329,12 @@ export default function FirmaCaptura({ firmaActual, onFirmaCambiada }: Props) {
           </div>
         </div>
 
-        <div className="flex justify-end gap-2">
-          <button type="button" onClick={resetear}
-            className="flex items-center gap-1.5 px-4 py-2 text-sm text-slate-500 hover:bg-slate-50 border border-slate-200 rounded-xl transition-colors">
-            <RefreshCw size={13} /> Subir otra
+        <div className="flex flex-wrap justify-end gap-2">
+          <button type="button" onClick={resetear} className="k-b k-b-quieto">
+            <RefreshCw size={16} aria-hidden="true" /> Subir otra
           </button>
-          <button type="button" onClick={subirFirma} disabled={subiendo}
-            className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold bg-[#1e5fa8] text-white rounded-xl hover:bg-[#1a3a5c] transition-colors disabled:opacity-60">
-            {subiendo ? <><Loader2 size={13} className="animate-spin" /> Guardando...</> : <><Check size={13} /> Aceptar firma</>}
+          <button type="button" onClick={subirFirma} disabled={subiendo} className="k-b k-b-prim">
+            {subiendo ? <><Loader2 size={16} aria-hidden="true" className="animate-spin" /> Guardando...</> : <><Check size={16} aria-hidden="true" /> Aceptar firma</>}
           </button>
         </div>
       </div>
@@ -340,30 +343,24 @@ export default function FirmaCaptura({ firmaActual, onFirmaCambiada }: Props) {
 
   // ── Vista: captura (subir o dibujar) ───────────────────────────────────────
   return (
-    <div className="space-y-4">
-      {/* Selector de modo */}
-      <div className="flex gap-2">
+    <div className="flex flex-col gap-3">
+      {/* Selector de modo: el segmentado del kit (`.k-seg`). */}
+      <div className="k-seg self-start" role="group" aria-label="Cómo capturar la firma">
         <button
           type="button"
+          aria-pressed={modoCaptura === 'subir'}
           onClick={() => setModoCaptura('subir')}
-          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium border transition-colors ${
-            modoCaptura === 'subir'
-              ? 'border-[#1e5fa8] bg-[#1e5fa8]/5 text-[#1e5fa8]'
-              : 'border-slate-200 text-slate-500 hover:bg-slate-50'
-          }`}
+          className="k-seg-op gap-1.5"
         >
-          <Upload size={12} /> Subir imagen
+          <Upload size={15} aria-hidden="true" /> Subir imagen
         </button>
         <button
           type="button"
+          aria-pressed={modoCaptura === 'dibujar'}
           onClick={() => setModoCaptura('dibujar')}
-          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium border transition-colors ${
-            modoCaptura === 'dibujar'
-              ? 'border-[#1e5fa8] bg-[#1e5fa8]/5 text-[#1e5fa8]'
-              : 'border-slate-200 text-slate-500 hover:bg-slate-50'
-          }`}
+          className="k-seg-op gap-1.5"
         >
-          <PenLine size={12} /> Dibujar firma
+          <PenLine size={15} aria-hidden="true" /> Dibujar firma
         </button>
       </div>
 
@@ -374,16 +371,16 @@ export default function FirmaCaptura({ firmaActual, onFirmaCambiada }: Props) {
             type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={procesando}
-            className="w-full flex flex-col items-center gap-3 py-8 border-2 border-dashed border-slate-200 rounded-xl hover:border-[#1e5fa8]/40 hover:bg-slate-50/50 transition-all disabled:opacity-50"
+            className="k-pulsable flex w-full flex-col items-center gap-1.5 rounded-[14px] border border-dashed border-tinta3 px-4 py-6 text-center disabled:opacity-50"
           >
             {procesando
-              ? <Loader2 size={24} className="text-[#1e5fa8] animate-spin" />
-              : <Upload size={24} className="text-slate-300" />
+              ? <Loader2 size={22} aria-hidden="true" className="animate-spin text-enlace" />
+              : <Upload size={22} aria-hidden="true" className="text-tinta2" />
             }
-            <span className="text-sm text-slate-400">
+            <span className="text-[15px] font-semibold leading-5 text-tinta">
               {procesando ? 'Procesando imagen...' : 'Toca para seleccionar foto de tu firma'}
             </span>
-            <span className="text-[10px] text-slate-300">JPG, PNG, WEBP · Máx. 10 MB · Se procesará automáticamente</span>
+            <span className="text-[12px] leading-4 text-tinta2">JPG, PNG, WEBP · Máx. 10 MB · Se procesará automáticamente</span>
           </button>
           <input
             ref={fileInputRef}
@@ -398,9 +395,9 @@ export default function FirmaCaptura({ firmaActual, onFirmaCambiada }: Props) {
 
       {/* Canvas para dibujar */}
       {modoCaptura === 'dibujar' && (
-        <div className="space-y-2">
-          <div className="relative rounded-xl border-2 border-slate-200 overflow-hidden bg-white"
-            style={{ touchAction: 'none' }}>
+        <div className="flex flex-col gap-2">
+          <div className="relative overflow-hidden rounded-[14px] border border-borde"
+            style={{ touchAction: 'none', background: 'white' }}>
             <canvas
               ref={canvasRef}
               width={600}
@@ -416,23 +413,22 @@ export default function FirmaCaptura({ firmaActual, onFirmaCambiada }: Props) {
               onTouchEnd={terminarTrazo}
             />
             {!tieneTrazo && (
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <p className="text-slate-300 text-sm select-none">Firma aquí con el dedo o mouse</p>
+              <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                <p className="select-none text-[14px]" style={{ color: '#5B6478' }}>Firma aquí con el dedo o mouse</p>
               </div>
             )}
           </div>
-          <div className="flex justify-between items-center">
-            <button type="button" onClick={limpiarCanvas} disabled={!tieneTrazo}
-              className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-600 disabled:opacity-30 transition-colors">
-              <Eraser size={12} /> Limpiar
+          <div className="flex items-center justify-between gap-2">
+            <button type="button" onClick={limpiarCanvas} disabled={!tieneTrazo} className="k-b k-b-texto px-2 text-[14px] text-tinta2">
+              <Eraser size={16} aria-hidden="true" /> Limpiar
             </button>
             <button
               type="button"
               onClick={procesarDibujo}
               disabled={!tieneTrazo || procesando}
-              className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold bg-[#1e5fa8] text-white rounded-xl hover:bg-[#1a3a5c] transition-colors disabled:opacity-50"
+              className="k-b k-b-prim"
             >
-              {procesando ? <><Loader2 size={13} className="animate-spin" /> Procesando...</> : 'Guardar firma →'}
+              {procesando ? <><Loader2 size={16} aria-hidden="true" className="animate-spin" /> Procesando...</> : 'Guardar firma →'}
             </button>
           </div>
         </div>
