@@ -67,12 +67,18 @@ test('volver a una semana ya vista no pide /api/appointments y las citas están'
   await expect(page.locator('.fc-event', { hasText: EVENTO_ACTUAL }).first()).toBeVisible()
   await irASemana(page, 'next', EVENTO_SIGUIENTE)
 
-  const peticiones = contarGetCitas(page)
+  /* Se cuentan sólo las peticiones de lo YA VISTO (W-1, W y W+1: lo sembrado y lo recorrido). La
+     precarga de W+1 pide W+2 por su cuenta, y eso es lo correcto: en un equipo rápido salía justo
+     después de empezar a contar y la prueba la tomaba por una petición de más (2026-11-21). */
+  const yaVistas = ventanasDeLaSemilla()
+  const pedidas: string[] = []
+  const ver = (r: { url(): string; method(): string }): void => { if (esGetCitas(r)) pedidas.push(r.url()) }
+  page.on('request', ver)
   await irASemana(page, 'prev', EVENTO_ACTUAL)
   // «No ocurrió nada» no tiene evento: un respiro corto para lo que pudiera salir.
   await page.waitForTimeout(500)
-  peticiones.parar()
-  expect(peticiones.veces()).toBe(0)
+  page.off('request', ver)
+  expect(pedidas.filter(u => esUnaDeEstasVentanas(u, yaVistas))).toEqual([])
 })
 
 test('una cita propia vacía la caché: al volver a su semana se pregunta y la cita sigue', async ({ page }) => {

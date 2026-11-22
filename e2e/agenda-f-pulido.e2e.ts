@@ -1,7 +1,7 @@
 import { test, expect, type Page } from '@playwright/test'
 import { hoyEnTZ } from '../src/lib/dates'
 import { COMPACTAR_AL_ABRIR } from '../src/lib/agenda/ventanaRejilla'
-import { irAAgenda, eventoConTexto, SESION, CORREO, DIA_LABORABLE_FIJO, DIA_LABORABLE_LIBRE, diaDeLaSemana, sqlLocal, selectFiltroMedico } from './ayudas'
+import { irAAgenda, eventoConTexto, SESION, CORREO, DIA_LABORABLE_FIJO, DIA_LABORABLE_LIBRE, DIA_FUTURO_LIBRE, diaDeLaSemana, pasarASemanaSiguiente, sqlLocal, selectFiltroMedico } from './ayudas'
 
 /**
  * Bloque F §1 · pulido visual que sale directo, sin interruptor (diseño en
@@ -80,8 +80,9 @@ test.describe('escritorio', () => {
      sábado por la tarde) la semana entera ya pasó. Pone también su agendada,
      el jueves a las 15:00, y fija el día (el lunes) para la vista Día. */
   test('F1.8 · en Semana no se escribe el estado; queda el glifo, distinto para agendada y confirmada', async ({ page }) => {
-    const confirmada = citaSql(CORREO.adminA, 'F1.8 glifo', `${DIA_LABORABLE_LIBRE}T12:00:00-06:00`, 30, 0)
-    const agendada = citaSql(CORREO.adminA, 'F1.8 agendada', `${DIA_LABORABLE_LIBRE}T15:00:00-06:00`, 45, 1)
+    // AG-DT-256: con paciente, en la semana siguiente (`glifosDeSemana` pasa a ella).
+    const confirmada = citaSql(CORREO.adminA, 'F1.8 glifo', `${DIA_FUTURO_LIBRE}T12:00:00-06:00`, 30, 0)
+    const agendada = citaSql(CORREO.adminA, 'F1.8 agendada', `${DIA_FUTURO_LIBRE}T15:00:00-06:00`, 45, 1)
     sqlLocal(`update public.appointments set status = 'confirmed' where id = :'id'`, { id: confirmada })
     try {
       await glifosDeSemana(page)
@@ -93,6 +94,7 @@ test.describe('escritorio', () => {
   async function glifosDeSemana(page: Page): Promise<void> {
     await fijarDia(page, LUNES)
     await irAAgenda(page)
+    await pasarASemanaSiguiente(page)
     await expect(page.locator('.fc-timeGridWeek-view .ag-tarjeta-desc-estado:visible')).toHaveCount(0)
     /* `innerText` y no `hasText`: éste lee también lo que está en `display: none`. */
     const textos = await page.locator('.fc-timeGridWeek-view .ag-tarjeta').evaluateAll(els => els.map(e => (e as HTMLElement).innerText))
