@@ -2918,7 +2918,8 @@ main:has(.sp-doc-actions) { scroll-padding-bottom: 150px; }
 
 /* La cabecera del formulario (`.sp-doc-cab`) va FUERA de la capa: ver el
    bloque «Cabecera del formulario» tras el cierre de `@layer components`. */
-.sp-doc-mas { display: none; }
+/* Dos clases: `.k-b` (sistema.css, después en la cascada) pone `inline-flex`. */
+.sp-doc-form .sp-doc-mas { display: none; }
 .sp-doc-host:has(> div > .sp-doc-cab) .sp-doc-mas {
   display: inline-flex; position: absolute; z-index: 1; right: 0;
   top: calc((var(--doc-cab) - var(--k-toque)) / 2);
