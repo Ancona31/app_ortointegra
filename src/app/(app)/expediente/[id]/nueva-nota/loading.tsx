@@ -10,8 +10,9 @@ import { Skeleton } from '@/components/ui/Skeleton'
  * del paciente y el panel de documentos—. El estado de Cierre (nota guardada)
  * no se dibuja: solo se llega a él después de guardar.
  *
- * La tarjeta de captura empieza con la fila plegada «Signos vitales ›»
- * (SignosVitalesCard) y sigue con el dictado sin caja; debajo, el principal.
+ * Arriba la tarjeta de signos vitales (banda de cinco celdas,
+ * SignosVitalesCard); debajo la de captura con su título y el pozo del
+ * dictado; al pie, el principal.
  *
  * El padding exterior lo pone (app)/layout.tsx — no lo repitas aquí.
  */
@@ -33,18 +34,29 @@ export default function NuevaNotaLoading() {
         {/* Columna izquierda (3/5) */}
         <div className="lg:col-span-3 space-y-[var(--sp-gap-block)]">
 
-          {/* Tarjeta de captura: fila de signos vitales y dictado */}
+          {/* Tarjeta de signos vitales: cabecera y banda de cinco celdas */}
           <div className="k-tarjeta">
-            <div className="flex min-h-[44px] items-center gap-3 border-b border-linea pb-2">
+            <div className="mb-2.5 flex min-h-[28px] items-center gap-2">
+              <Skeleton className="size-7 rounded-full" />
               <Skeleton className="h-4 w-28" />
-              <Skeleton className="ml-auto h-3.5 w-24" />
             </div>
-            <div className="space-y-3 pt-4">
-              <Skeleton className="h-4 w-full" />
-              <Skeleton className="h-4 w-11/12" />
-              <Skeleton className="h-4 w-4/5" />
+            <div className="sv-banda">
+              {[0, 1, 2, 3, 4].map(i => (
+                <Skeleton key={i} className={`h-16 rounded-[var(--r-control)] ${i === 0 ? 'sv-celda--pa' : ''}`} />
+              ))}
             </div>
-            <div className="h-[200px] esc:h-[300px]" />
+          </div>
+
+          {/* Tarjeta de captura: título, ayuda y el pozo del dictado */}
+          <div className="k-tarjeta">
+            <div className="flex items-start gap-3">
+              <Skeleton className="size-10 rounded-[12px]" />
+              <div className="flex-1 space-y-2 pt-1">
+                <Skeleton className="h-4 w-48" />
+                <Skeleton className="h-3.5 w-11/12" />
+              </div>
+            </div>
+            <Skeleton className="mt-4 h-[264px] w-full rounded-[var(--r-control)] esc:h-[274px]" />
           </div>
           <Skeleton className="h-12 w-full rounded-[var(--r-control)] esc:ml-auto esc:h-10 esc:w-44" />
         </div>

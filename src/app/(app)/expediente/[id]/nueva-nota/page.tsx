@@ -11,7 +11,7 @@ import { buildNotaRenderData } from '@/lib/notaRenderData'
 import {
   ChevronLeft, Save, Loader2, RotateCcw, Printer, Eye, Pencil,
   Pill, Check, PenLine, X, FileText,
-  Mic, Sparkles, AlertTriangle, Lock, FolderOpen,
+  Mic, Sparkles, AlertTriangle, Lock, FolderOpen, CloudCheck, User,
 } from 'lucide-react'
 import Link from 'next/link'
 import ReactMarkdown from 'react-markdown'
@@ -114,15 +114,32 @@ function PasosGenerando() {
     const id = setInterval(() => setI(prev => Math.min(prev + 1, PASOS_GENERANDO.length - 1)), 2000)
     return () => clearInterval(id)
   }, [])
+  // Avance por pasos: nunca llega al final (el último paso espera a la IA).
+  const avance = (i + 1) / (PASOS_GENERANDO.length + 1)
   return (
-    <ol className="sp-steps" role="status">
-      {PASOS_GENERANDO.map((texto, idx) => (
-        <li key={texto} className={`sp-step ${idx < i ? 'sp-step--done' : idx === i ? 'sp-step--active' : 'sp-step--pending'}`}>
-          {idx < i ? <Check /> : idx === i ? <span className="sp-spinner" /> : <span className="sp-step__dot" />}
-          {texto}
-        </li>
-      ))}
-    </ol>
+    <div className="space-y-4">
+      <div className="flex items-center gap-3">
+        <span className="nn-marca-viva inline-flex size-11 flex-none items-center justify-center rounded-[14px] bg-tonal text-enlace" aria-hidden="true">
+          <Sparkles size={22} strokeWidth={2.1} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-[13px] font-semibold leading-[18px] text-enlace">Paso {i + 1} de {PASOS_GENERANDO.length}</p>
+          <div className="nn-avance mt-1.5" aria-hidden="true">
+            <span style={{ transform: `scaleX(${avance})` }} />
+          </div>
+        </div>
+      </div>
+      <ol className="sp-steps" role="status">
+        {PASOS_GENERANDO.map((texto, idx) => (
+          <li key={texto} className={`sp-step ${idx < i ? 'sp-step--done' : idx === i ? 'sp-step--active' : 'sp-step--pending'}`}>
+            <span className="sp-step__i" aria-hidden="true">
+              {idx < i ? <Check /> : idx === i ? <span className="sp-spinner" /> : <span className="sp-step__dot" />}
+            </span>
+            {texto}
+          </li>
+        ))}
+      </ol>
+    </div>
   )
 }
 
@@ -136,9 +153,58 @@ function NegritaNota({ children }: { children?: React.ReactNode }) {
   const m = texto?.trim().match(/^\[([^\]]+)\]:?$/)
   if (!m) return <strong>{children}</strong>
   return (
-    <span className="mb-1 mt-4 block text-[13px] font-bold uppercase leading-[18px] tracking-[.4px] text-[var(--enlace)]">
+    <span className="mb-1.5 mt-5 flex items-center gap-2 text-[13px] font-bold uppercase leading-[18px] tracking-[.5px] text-enlace">
+      <span aria-hidden="true" className="h-3.5 w-[3px] flex-none rounded-full bg-accion" />
       {m[1]}
     </span>
+  )
+}
+
+// Contexto del paciente (ajuste 2): edad, sexo e IMC como datos —rótulo
+// pequeño encima, valor en tinta— en lugar de una línea corrida.
+function DatosContexto({ paciente }: { paciente: Paciente }) {
+  const datos = [
+    paciente.fecha_nacimiento ? ['Edad', calcularEdad(paciente.fecha_nacimiento).textoElegante] : null,
+    paciente.sexo ? ['Sexo', paciente.sexo === 'M' ? 'Masculino' : paciente.sexo === 'F' ? 'Femenino' : paciente.sexo] : null,
+    paciente.peso_kg && paciente.talla_cm ? ['IMC', (paciente.peso_kg / Math.pow(paciente.talla_cm / 100, 2)).toFixed(1)] : null,
+  ].filter((d): d is string[] => d !== null)
+  if (datos.length === 0) return null
+  return (
+    <dl className="mt-3 grid grid-cols-3 gap-2">
+      {datos.map(([r, v]) => (
+        <div key={r} className="min-w-0 rounded-[var(--r-control)] bg-fondo px-3 py-2">
+          <dt className="text-[12px] font-semibold leading-4 text-tinta2">{r}</dt>
+          <dd className="k-num mt-0.5 truncate text-[15px] font-semibold leading-5 text-tinta">{v}</dd>
+        </div>
+      ))}
+    </dl>
+  )
+}
+
+// «Último diagnóstico»: un renglón por diagnóstico (la lista viene de la
+// consulta, no de partir el texto); más de cuatro se pliegan en un <details>.
+const DX_VISIBLES = 4
+function ListaUltimoDx({ lista }: { lista: string[] }) {
+  const fila = (t: string, i: number) => (
+    <li key={i} className="flex items-start gap-2 py-1 text-[14px] leading-5 text-tinta">
+      <span aria-hidden="true" className="mt-[7px] size-1.5 flex-none rounded-full bg-enlace" />
+      <span className="min-w-0 [overflow-wrap:anywhere]">{t}</span>
+    </li>
+  )
+  const resto = lista.slice(DX_VISIBLES)
+  return (
+    <>
+      <ul>{lista.slice(0, DX_VISIBLES).map(fila)}</ul>
+      {resto.length > 0 && (
+        <details className="group">
+          <summary className="k-b k-b-texto -ml-1 cursor-pointer list-none text-[14px] [&::-webkit-details-marker]:hidden">
+            <span className="group-open:hidden">Ver {resto.length} más</span>
+            <span className="hidden group-open:inline">Ver menos</span>
+          </summary>
+          <ul>{resto.map((t, i) => fila(t, i + DX_VISIBLES))}</ul>
+        </details>
+      )}
+    </>
   )
 }
 
@@ -249,7 +315,7 @@ export default function NuevaNotaPage() {
   const [confirmarConcluir, setConfirmarConcluir] = useState(false)
   const [ultimoGuardado, setUltimoGuardado] = useState<Date | null>(null)
   const [borradorRestaurado, setBorradorRestaurado] = useState(false)
-  const [ultimaConsulta, setUltimaConsulta] = useState<{ diagnosticos: string; medicamentos: MedicamentoConsulta[] | null } | null>(null)
+  const [ultimaConsulta, setUltimaConsulta] = useState<{ diagnosticos: string; dxLista: string[]; medicamentos: MedicamentoConsulta[] | null } | null>(null)
 
   const autosaveRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const formRef = useRef(form)
@@ -337,10 +403,13 @@ export default function NuevaNotaPage() {
       .then((res: { data: { diagnosticos: { descripcion?: string }[] | null; medicamentos: { nombre: string; dosis: string; frecuencia: string; duracion: string }[] | null } | null }) => {
         const data = res.data
         if (!data) return
-        const dx = Array.isArray(data.diagnosticos)
-          ? (data.diagnosticos as { descripcion?: string }[]).map(d => d.descripcion).filter(Boolean).join(', ')
-          : ''
-        setUltimaConsulta({ diagnosticos: dx, medicamentos: data.medicamentos || null })
+        // La lista se conserva además del texto unido: la tarjeta de contexto
+        // pinta un renglón por diagnóstico sin partir el texto por comas.
+        const dxLista = Array.isArray(data.diagnosticos)
+          ? (data.diagnosticos as { descripcion?: string }[]).map(d => d.descripcion?.trim() ?? '').filter(Boolean)
+          : []
+        const dx = dxLista.join(', ')
+        setUltimaConsulta({ diagnosticos: dx, dxLista, medicamentos: data.medicamentos || null })
       }).catch(() => {})
   }, [id])
 
@@ -884,7 +953,7 @@ export default function NuevaNotaPage() {
        --anchor. */
     <div className="k-tarjeta space-y-4">
       <div className="flex items-center gap-2">
-        <span className="inline-flex h-8 w-8 flex-none items-center justify-center rounded-full bg-[var(--tonal)] text-[var(--enlace)]" aria-hidden="true"><Check size={18} /></span>
+        <span className="inline-flex h-9 w-9 flex-none items-center justify-center rounded-full bg-ok-fondo text-ok-tinta" aria-hidden="true"><Check size={20} strokeWidth={2.6} /></span>
         <h2 className="k-t-tarjeta flex-1">Nota lista</h2>
         {modoNota === 'ia' ? (
           <span className="k-etq k-etq-tonal">
@@ -1011,12 +1080,12 @@ export default function NuevaNotaPage() {
             </button>
             {esUltimoBloque ? (
               <button onClick={responderEntrevista} disabled={!bloqueCompleto || generando}
-                className="k-b k-b-capa k-b-prim">
+                className="k-b k-b-capa k-b-prim disabled:bg-sup2 disabled:text-tinta2 disabled:opacity-100">
                 {generando ? <><Loader2 size={17} className="animate-spin" aria-hidden="true" /> Enviando...</> : 'Enviar respuestas'}
               </button>
             ) : (
               <button onClick={() => setBloqueActual(i => i + 1)} disabled={!bloqueCompleto}
-                className="k-b k-b-capa k-b-prim">
+                className="k-b k-b-capa k-b-prim disabled:bg-sup2 disabled:text-tinta2 disabled:opacity-100">
                 Siguiente
               </button>
             )}
@@ -1130,39 +1199,47 @@ export default function NuevaNotaPage() {
         {estadoModal === 'entrevista' && (
           <>
           <div className="space-y-5 px-6 pb-5 pt-1 ext:px-4">
-            {/* Progreso: una línea de texto y la barra fina del kit (§11). */}
+            {/* Progreso: «Bloque n de m» y un segmento por bloque (`.nn-segs`). */}
             <div className="space-y-2">
-              <p className="text-[13px] leading-[18px] text-tinta2">
-                Bloque {bloqueActual + 1} de {bloquesEntrevista.length}
+              <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] leading-[18px]">
+                <span className="font-semibold text-enlace">Bloque {bloqueActual + 1} de {bloquesEntrevista.length}</span>
                 {!bloqueCompleto && faltanEnBloque > 0 && (
-                  <span className="font-semibold text-[var(--aviso-tinta)]"> · Faltan {faltanEnBloque} por responder</span>
+                  <span className="k-etq k-etq-aviso">Faltan {faltanEnBloque} por responder</span>
                 )}
               </p>
-              <div className="sp-progress__track" aria-hidden="true">
+              <div className="nn-segs" aria-hidden="true">
                 {bloquesEntrevista.map((_, i) => (
-                  <div key={i} className={`sp-progress__seg ${i <= bloqueActual ? 'sp-progress__seg--done' : ''}`} />
+                  <span key={i} data-hecho={i <= bloqueActual ? '' : undefined} />
                 ))}
               </div>
             </div>
 
-            {/* Preguntas del bloque actual: las opciones como filas de lista
-                (maqueta `final-nota`, vista 11), la elegida con palomita. */}
+            {/* Preguntas del bloque actual: cada una en su bloque, las opciones
+                como chips (la elegida, tonal con palomita) y el campo libre
+                debajo, como vía secundaria. */}
             {bloqueEnCurso && (
-              <div className="space-y-5">
-                <h3 className="text-[15px] font-bold leading-5 text-tinta">{bloqueEnCurso.titulo}</h3>
-                {bloqueEnCurso.preguntas.map(preg => (
-                  <div key={preg.id} className="space-y-1">
-                    <p className="text-[15px] font-semibold leading-5 text-tinta">{preg.pregunta}</p>
+              <div className="space-y-3">
+                <h3 className="k-t-tarjeta">{bloqueEnCurso.titulo}</h3>
+                {bloqueEnCurso.preguntas.map((preg, n) => {
+                  const respondida = !!(respuestasEntrevista[preg.id] ?? '').trim()
+                  return (
+                  <div key={preg.id} className="space-y-3 rounded-[var(--r-control)] bg-fondo p-4 ext:p-3">
+                    <p className="flex items-start gap-2.5 text-[16px] font-semibold leading-[22px] text-tinta">
+                      <span aria-hidden="true" className={`k-num mt-px inline-flex size-[22px] flex-none items-center justify-center rounded-full text-[12px] font-bold ${respondida ? 'bg-ok-fondo text-ok-tinta' : 'bg-tonal text-tonal-tinta'}`}>
+                        {respondida ? <Check size={13} strokeWidth={3} /> : n + 1}
+                      </span>
+                      <span className="min-w-0 flex-1">{preg.pregunta}</span>
+                    </p>
                     {preg.opciones.length > 0 && (
-                      <div className="k-lista">
+                      <div className="flex flex-wrap gap-2">
                         {preg.opciones.map(op => {
                           const elegida = respuestasEntrevista[preg.id] === op
                           return (
                             <button key={op} type="button" aria-pressed={elegida}
                               onClick={() => setRespuestasEntrevista(prev => ({ ...prev, [preg.id]: op }))}
-                              className="k-fila min-h-[44px] py-2 ih:min-h-[40px] esc:min-h-[40px]">
-                              <span className={`flex-1 text-[15px] leading-5 ${elegida ? 'font-semibold text-[var(--enlace)]' : 'text-tinta'}`}>{op}</span>
-                              {elegida && <Check size={18} aria-hidden="true" className="flex-none text-[var(--enlace)]" />}
+                              className="nn-opcion">
+                              {elegida && <Check aria-hidden="true" />}
+                              {op}
                             </button>
                           )
                         })}
@@ -1173,9 +1250,10 @@ export default function NuevaNotaPage() {
                       onChange={e => setRespuestasEntrevista(prev => ({ ...prev, [preg.id]: e.target.value }))}
                       placeholder="Escribe tu respuesta..."
                       aria-label={preg.pregunta}
-                      className="k-campo" />
+                      className="k-campo h-10 bg-sup text-[15px] ext:h-11 ext:text-[16px] tel:h-11 tel:text-[16px]" />
                   </div>
-                ))}
+                  )
+                })}
               </div>
             )}
           </div>
@@ -1246,7 +1324,7 @@ export default function NuevaNotaPage() {
                   rows={16}
                   className="sp-textarea sp-editzone w-full" />
               ) : (
-                <div lang="es" className="prose prose-sm max-w-none prose-headings:text-[13px] prose-headings:font-bold prose-headings:uppercase prose-headings:tracking-[.4px] prose-headings:text-enlace prose-headings:mt-5 prose-headings:mb-1 prose-strong:text-tinta prose-strong:font-semibold prose-p:text-tinta prose-p:my-1 prose-p:text-[16px] prose-p:leading-6 prose-p:[hyphens:auto] prose-p:[text-align:justify] prose-ul:my-1 prose-li:my-0.5 prose-li:text-tinta">
+                <div lang="es" className="prose prose-sm max-w-none prose-headings:text-[13px] prose-headings:font-bold prose-headings:uppercase prose-headings:tracking-[.4px] prose-headings:text-enlace prose-headings:mt-5 prose-headings:mb-1 prose-strong:text-tinta prose-strong:font-semibold prose-p:text-tinta prose-p:my-1 prose-p:text-[16px] prose-p:leading-[26px] prose-p:[hyphens:auto] [&>:first-child]:mt-0 [&>p:first-child>span:first-child]:mt-0 prose-p:[text-align:justify] prose-ul:my-1 prose-li:my-0.5 prose-li:text-tinta">
                   <ReactMarkdown components={{ strong: NegritaNota }}>{notaFinal}</ReactMarkdown>
                 </div>
               )}
@@ -1283,12 +1361,11 @@ export default function NuevaNotaPage() {
             <div className="border-t border-[var(--linea)] pt-4">
               <h3 className="k-t-rotulo mb-2">Diagnósticos</h3>
               {dxValidos.length > 0 ? (
-                <ul className="space-y-1">
+                <ul className="space-y-2">
                   {dxValidos.map((d, i) => (
-                    <li key={i} className="text-[15px] leading-[22px] text-tinta">
-                      {d.codigo_cie10 ? (
-                        <><span className="k-etq k-etq-tonal mr-1.5 align-[1px]">{d.codigo_cie10}</span> — {d.descripcion.trim()}</>
-                      ) : d.descripcion.trim()}
+                    <li key={i} className="flex items-start gap-3 rounded-[var(--r-control)] bg-fondo px-3.5 py-3 text-[16px] font-semibold leading-[22px] text-tinta">
+                      <span className="min-w-0 flex-1">{d.descripcion.trim()}</span>
+                      {d.codigo_cie10 && <span className="k-etq k-etq-tonal k-num">{d.codigo_cie10}</span>}
                     </li>
                   ))}
                 </ul>
@@ -1389,7 +1466,7 @@ export default function NuevaNotaPage() {
              círculo tonal que entra con el resorte (`.sp-nota-entra`), sin la
              medalla que estallaba ni el trazo dibujado. */
           <div className="k-al pt-2">
-            <span className="k-al-i" aria-hidden="true"><Check /></span>
+            <span className="k-al-i !bg-ok-fondo !text-ok-tinta" aria-hidden="true"><Check strokeWidth={2.6} /></span>
             <h3 className="k-al-tit">Nota guardada</h3>
             <p className="k-al-t">Quedó sellada en el expediente.</p>
             {errorModal && (
@@ -1480,28 +1557,38 @@ export default function NuevaNotaPage() {
               sin caja (IA) o los campos SOAP (manual); al pie, «Borrador
               guardado». El título y la ayuda siguen para el lector de pantalla:
               la maqueta los quita de la vista, no de la página. */}
+          {/* Ajuste 2: los signos vitales, en su propia tarjeta encima, como
+              banda de cinco celdas; la tarjeta de captura recupera su título y
+              su ayuda a la vista. */}
           <div className="k-tarjeta">
             <SignosVitalesCard
               value={signosVitales}
               onChange={setSignosVitales}
               errores={erroresVitales}
             />
-            <div className="sr-only">
-              <h2>Cuéntame la consulta</h2>
-              {modoNota === 'ia' ? (
-                <p id="nn-ayuda-dictado">
-                  Describe el caso y Spinus redactará la nota médica. Escribe en lenguaje natural. No necesitas separar por secciones — Spinus lo hace por ti.
-                </p>
-              ) : (
-                <p>Redacta la nota clínica directamente — sin IA</p>
-              )}
+          </div>
+          <div className="k-tarjeta">
+            <div className="flex items-start gap-3">
+              <span className="inline-flex size-10 flex-none items-center justify-center rounded-[12px] bg-tonal text-enlace" aria-hidden="true">
+                {modoNota === 'ia' ? <Sparkles size={20} strokeWidth={2.1} /> : <PenLine size={20} strokeWidth={2.1} />}
+              </span>
+              <div className="min-w-0 flex-1">
+                <h2 className="k-t-tarjeta">Cuéntame la consulta</h2>
+                {modoNota === 'ia' ? (
+                  <p id="nn-ayuda-dictado" className="k-t-sec mt-0.5 text-[14px] leading-5">
+                    Describe el caso y Spinus redactará la nota médica. Escribe en lenguaje natural. No necesitas separar por secciones — Spinus lo hace por ti.
+                  </p>
+                ) : (
+                  <p className="k-t-sec mt-0.5 text-[14px] leading-5">Redacta la nota clínica directamente — sin IA</p>
+                )}
+              </div>
             </div>
 
             {modoNota === 'ia' ? (
               /* ── Modo IA: input único — el médico redacta el caso completo ──
-                 Sin caja: el campo es la tarjeta (CALMA §5). 17/26 justificado
-                 con guiones, como se leerá la nota. */
-              <div className="relative pt-3">
+                 El campo va en un pozo `--fondo` con el micrófono dentro. 17/26
+                 justificado con guiones, como se leerá la nota. */
+              <div className="relative mt-4 rounded-[var(--r-control)] bg-fondo px-4 pb-[68px] pt-3.5 focus-within:outline focus-within:outline-2 focus-within:outline-enlace">
                 <label htmlFor="nn-dictado" className="sr-only">
                   Descripción del caso (obligatorio)
                 </label>
@@ -1514,17 +1601,19 @@ export default function NuevaNotaPage() {
                   disabled={generando}
                   placeholder="Ej.: Paciente con dolor lumbar de 2 semanas tras cargar peso, sin irradiación, Lasègue negativo, fuerza y reflejos normales. Indico naproxeno 500 mg cada 12 h por 7 días, ejercicios de McKenzie, cita en 2 semanas."
                   rows={10}
-                  className="k-campo-sin-caja block min-h-[260px] w-full resize-none border-0 bg-transparent p-0 pb-12 text-[17px] leading-[26px] text-tinta outline-none [hyphens:auto] [text-align:justify] placeholder:text-tinta3 focus-visible:outline-none disabled:text-tinta2 esc:min-h-[380px]"
+                  className="k-campo-sin-caja block min-h-[180px] w-full resize-none border-0 bg-transparent p-0 text-[17px] leading-[26px] text-tinta outline-none [hyphens:auto] [text-align:justify] placeholder:text-tinta3 placeholder:opacity-80 focus-visible:outline-none disabled:text-tinta2 esc:min-h-[150px]"
                 />
-                {/* Dictado por voz: aún no existe; el botón lo anuncia. */}
+                {/* Dictado por voz: aún no existe; el botón lo anuncia. Redondo y
+                    a la vista, en tonal (no en relleno de acción: sigue
+                    deshabilitado y no debe parecer que graba). */}
                 <button
                   type="button"
                   disabled
                   title="Dictado por voz — próximamente"
                   aria-label="Dictado por voz — próximamente"
-                  className="k-b k-b-icono absolute bottom-0 right-0 cursor-not-allowed opacity-45"
+                  className="absolute bottom-3 right-3 inline-flex size-12 cursor-not-allowed items-center justify-center rounded-full bg-tonal text-enlace ring-4 ring-sup"
                 >
-                  <Mic aria-hidden="true" />
+                  <Mic size={22} strokeWidth={2.1} aria-hidden="true" />
                 </button>
               </div>
             ) : (
@@ -1616,7 +1705,8 @@ export default function NuevaNotaPage() {
               </div>
             )}
             {ultimoGuardado && !notaSaved && (
-              <p role="status" className="sp-nota-entra mt-2 text-[12px] leading-4 text-tinta3">
+              <p role="status" className="sp-nota-entra mt-3 flex items-center gap-1.5 text-[13px] leading-[18px] text-tinta2">
+                <CloudCheck size={15} aria-hidden="true" className="flex-none text-ok-tinta" />
                 Borrador guardado
               </p>
             )}
@@ -1635,10 +1725,10 @@ export default function NuevaNotaPage() {
                    principal al final), como la maqueta. */
                 <div className="flex flex-col items-stretch gap-1 esc:flex-row-reverse esc:items-center esc:justify-start esc:gap-4">
                   <button onClick={generarNota} disabled={generando || !form.motivo_consulta.trim()}
-                    className="k-b k-b-prim h-12 w-full text-[17px] esc:h-10 esc:w-auto esc:text-[15px]">
+                    className="k-b k-b-prim h-12 w-full text-[17px] disabled:bg-sup2 disabled:text-tinta2 disabled:opacity-100 esc:h-11 esc:w-auto esc:px-5 esc:text-[15px]">
                     {generando
                       ? <><Loader2 size={18} className="animate-spin" aria-hidden="true" /> Redactando nota médica...</>
-                      : 'Generar con Spinus'
+                      : <><Sparkles size={18} strokeWidth={2.2} aria-hidden="true" /> Generar con Spinus</>
                     }
                   </button>
                   <button type="button"
@@ -1662,8 +1752,8 @@ export default function NuevaNotaPage() {
               {anclaNota ?? (
                 <div className="flex flex-col items-stretch gap-1 esc:flex-row-reverse esc:items-center esc:justify-start esc:gap-4">
                   <button onClick={previewNotaManual} disabled={!form.motivo_consulta.trim()}
-                    className="k-b k-b-prim h-12 w-full text-[17px] esc:h-10 esc:w-auto esc:text-[15px]">
-                    Previsualizar nota
+                    className="k-b k-b-prim h-12 w-full text-[17px] disabled:bg-sup2 disabled:text-tinta2 disabled:opacity-100 esc:h-11 esc:w-auto esc:px-5 esc:text-[15px]">
+                    <Eye size={18} aria-hidden="true" /> Previsualizar nota
                   </button>
                   <button type="button"
                     onClick={() => { cancelarEntrevista(); setForm(f => ({ ...f, exploracion_fisica: '', analisis: '', gabinete_laboratorios: '', plan_tratamiento: '' })); modoTocadoRef.current = true; setModoNota('ia'); setNotaGenerada(''); setError('') }}
@@ -1690,10 +1780,27 @@ export default function NuevaNotaPage() {
           {/* «La nota aparecerá aquí» (CALMA §30.7, aprobado): sólo en esc y
               mientras no hay nota; los rótulos son los apartados de la nota. */}
           {!notaSaved && !notaGenerada && (
-            <div aria-hidden="true" className="hidden px-1 esc:block">
-              <p className="text-[15px] leading-5 text-tinta2">La nota aparecerá aquí</p>
-              <ul className="mt-3 space-y-2.5 text-[14px] leading-5 text-tinta3">
-                {['Subjetivo', 'Objetivo', 'Auxiliares diagnósticos', 'Diagnóstico', 'Análisis', 'Plan'].map(t => <li key={t}>{t}</li>)}
+            /* Ajuste 2: tarjeta de vista previa con estructura — los seis
+               apartados como rótulos de acento con líneas fantasma (esqueleto
+               QUIETO, sin animación) para que se entienda qué va a salir. */
+            <div aria-hidden="true" className="k-tarjeta hidden esc:block">
+              <div className="flex items-center gap-2.5">
+                <span className="inline-flex size-8 flex-none items-center justify-center rounded-full bg-tonal text-enlace">
+                  <FileText size={16} strokeWidth={2.1} />
+                </span>
+                <p className="text-[15px] font-semibold leading-5 text-tinta">La nota aparecerá aquí</p>
+              </div>
+              <ul className="mt-4 space-y-3.5">
+                {['Subjetivo', 'Objetivo', 'Auxiliares diagnósticos', 'Diagnóstico', 'Análisis', 'Plan'].map((t, n) => (
+                  <li key={t}>
+                    <p className="flex items-center gap-2 text-[12px] font-bold uppercase leading-4 tracking-[.5px] text-enlace">
+                      <span className="h-3 w-[3px] flex-none rounded-full bg-accion opacity-60" />
+                      {t}
+                    </p>
+                    <span className="mt-2 block h-2 rounded-full bg-sup2" style={{ width: `${[92, 84, 70, 64, 88, 78][n]}%` }} />
+                    {n !== 2 && n !== 3 && <span className="mt-1.5 block h-2 rounded-full bg-sup2" style={{ width: `${[58, 46, 0, 0, 52, 40][n]}%` }} />}
+                  </li>
+                ))}
               </ul>
             </div>
           )}
@@ -1703,43 +1810,45 @@ export default function NuevaNotaPage() {
                rótulo en mayúsculas (uno por tarjeta) y pares con línea fina.
                La alergia, como etiqueta roja suave (CALMA §3), no un bloque. */
             <section aria-labelledby="titulo-contexto" className="k-tarjeta">
-              <h2 id="titulo-contexto" className="k-t-rotulo">Contexto del paciente</h2>
-              <p className="k-t-sec mt-2">
-                {[
-                  paciente.fecha_nacimiento ? calcularEdad(paciente.fecha_nacimiento).textoElegante : null,
-                  paciente.sexo ? (paciente.sexo === 'M' ? 'Masculino' : paciente.sexo === 'F' ? 'Femenino' : paciente.sexo) : null,
-                  paciente.peso_kg && paciente.talla_cm ? `IMC ${(paciente.peso_kg / Math.pow(paciente.talla_cm / 100, 2)).toFixed(1)}` : null,
-                ].filter(Boolean).join(' · ')}
-              </p>
+              <div className="flex items-center gap-2.5">
+                <span className="inline-flex size-8 flex-none items-center justify-center rounded-full bg-tonal text-enlace" aria-hidden="true">
+                  <User size={16} strokeWidth={2.1} />
+                </span>
+                <h2 id="titulo-contexto" className="k-t-rotulo">Contexto del paciente</h2>
+              </div>
+              <DatosContexto paciente={paciente} />
 
               {paciente.alergias && (
-                <span className="k-etq k-etq-mal mt-2 h-auto min-h-6 max-w-full whitespace-normal py-0.5">
+                <span className="k-etq k-etq-mal mt-3 h-auto min-h-6 max-w-full whitespace-normal py-0.5">
                   <AlertTriangle aria-hidden="true" />
                   Alergias: {paciente.alergias}
                 </span>
               )}
 
-              <dl className="k-lista mt-2">
-                {ultimaConsulta?.diagnosticos && (
-                  <div className="py-2">
-                    <dt className="text-[13px] leading-[18px] text-tinta2">Último diagnóstico</dt>
-                    <dd className="mt-0.5 text-[14px] leading-5 text-tinta">{ultimaConsulta.diagnosticos}</dd>
-                  </div>
-                )}
-                {ultimaConsulta?.medicamentos && ultimaConsulta.medicamentos.length > 0 && (
-                  <div className="py-2">
-                    <dt className="text-[13px] leading-[18px] text-tinta2">Último tratamiento</dt>
-                    {ultimaConsulta.medicamentos.slice(0, 4).map((m, i) => (
-                      <dd key={i} className="mt-0.5 text-[14px] leading-5 text-tinta">
-                        · {m.nombre} {m.dosis && <span className="text-tinta2">{m.dosis}</span>}
-                      </dd>
-                    ))}
-                  </div>
-                )}
-              </dl>
+              {(ultimaConsulta?.diagnosticos || (ultimaConsulta?.medicamentos?.length ?? 0) > 0) && (
+                <dl className="mt-3 space-y-3 border-t border-linea pt-3">
+                  {ultimaConsulta?.diagnosticos && (
+                    <div>
+                      <dt className="k-t-rotulo">Último diagnóstico</dt>
+                      <dd className="mt-1.5"><ListaUltimoDx lista={ultimaConsulta.dxLista} /></dd>
+                    </div>
+                  )}
+                  {ultimaConsulta?.medicamentos && ultimaConsulta.medicamentos.length > 0 && (
+                    <div>
+                      <dt className="k-t-rotulo">Último tratamiento</dt>
+                      {ultimaConsulta.medicamentos.slice(0, 4).map((m, i) => (
+                        <dd key={i} className="mt-1.5 flex items-baseline gap-2 text-[14px] leading-5 text-tinta">
+                          <Pill size={13} aria-hidden="true" className="flex-none translate-y-0.5 text-tinta3" />
+                          <span className="min-w-0"><span className="font-semibold">{m.nombre}</span> {m.dosis && <span className="text-tinta2">{m.dosis}</span>}</span>
+                        </dd>
+                      ))}
+                    </div>
+                  )}
+                </dl>
+              )}
 
               {!paciente.alergias && !ultimaConsulta?.diagnosticos && (
-                <p className="k-t-sec py-2 text-center">Primera consulta del paciente</p>
+                <p className="k-t-sec mt-3 rounded-[var(--r-control)] bg-fondo py-3 text-center">Primera consulta del paciente</p>
               )}
             </section>
           )}
