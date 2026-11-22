@@ -48,7 +48,7 @@ export const ENTRADA_ESTADO = [
 
 /** El botón (o enlace) tonal de un estado. Lo comparte `EstadoError`. */
 export function AccionTonal({ accion, className = '' }: { accion: AccionEstado; className?: string }) {
-  const clase = `k-b-tonal ${className}`
+  const clase = `k-b k-b-tonal ${className}`
   if ('href' in accion) {
     return <Link href={accion.href} className={clase}>{accion.etiqueta}</Link>
   }
