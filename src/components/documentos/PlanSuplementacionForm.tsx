@@ -5,7 +5,7 @@ import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
 import { useProfile } from '@/hooks/useProfile'
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { AlertTriangle, Check, ClipboardList } from 'lucide-react'
+import { AlertTriangle, Check, ChevronRight, ClipboardList, Plus } from 'lucide-react'
 import PieAccionesDocumento from '@/components/documentos/PieAccionesDocumento'
 import { flushSync } from 'react-dom'
 import Link from 'next/link'
@@ -386,6 +386,8 @@ export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosti
     if (primero instanceof HTMLInputElement && !primero.value) primero.focus({ preventScroll: true })
   }, [])
 
+  const [catalogoAbierto, setCatalogoAbierto] = useState(false)
+
   const toggleSup = useCallback((sup: Suplemento) => {
     setSeleccionados(prev => prev.some(s => s.nombre === sup.nombre)
       ? prev.filter(s => s.nombre !== sup.nombre)
@@ -426,7 +428,7 @@ export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosti
   const faltantes: { clave: string; nombre: string }[] = []
   if (!paciente.trim()) faltantes.push({ clave: 'suplementacion-paciente', nombre: 'Paciente' })
   if (!(parseFloat(pesoKg) > 0)) faltantes.push({ clave: 'suplementacion-peso', nombre: 'Peso' })
-  if (seleccionados.length === 0) faltantes.push({ clave: 'suplementacion-sup-0', nombre: 'Suplementos' })
+  if (seleccionados.length === 0) faltantes.push({ clave: 'suplementacion-agregar', nombre: 'Suplementos' })
 
   function irA(clave: string) {
     if (clave === 'suplementacion-paciente') { enfocarYAcercar(pacienteRef.current); return }
@@ -726,29 +728,37 @@ export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosti
         <div className="sp-doc-cardhead">
           <div className="sp-icobox sp-icobox--sm"><ClipboardList /></div>
           <h2 className="sp-label">Suplementos</h2>
-          <span className="sp-badge" style={{ marginLeft: 'auto' }}>
-            {seleccionados.length} de {SUPLEMENTOS.length}
-          </span>
         </div>
         <div className="sp-doc-cardbody">
-          {/* Columna única en los cuatro anchos (§2.2): con alturas desiguales,
-              dos columnas obligan a leer en zigzag. */}
-          <div className="sp-doc-supgrid">
-            {SUPLEMENTOS.map((sup, i) => (
-              <TarjetaSuplemento
-                key={sup.nombre}
-                sup={sup}
-                indice={i}
-                sel={seleccionados.find(s => s.nombre === sup.nombre)}
-                senalado={i === 0 && senalar('suplementacion-sup-0')}
-                conPeso={conPeso}
-                onToggle={() => toggleSup(sup)}
-                onCampo={(campo, val) => updateSup(sup.nombre, campo, val)}
-              />
-            ))}
-          </div>
+          {/* Arriba, sólo los elegidos, con sus campos; la última fila abre el
+              catálogo de nueve con palomitas (CALMA §20, maqueta docs-b vista 5).
+              Columna única (§2.2): con alturas desiguales, dos columnas obligan a
+              leer en zigzag. */}
+          {seleccionados.length > 0 && (
+            <div className="sp-doc-supgrid" style={{ marginBottom: 'var(--sp-3)' }}>
+              {SUPLEMENTOS.map((sup, i) => {
+                const sel = seleccionados.find(s => s.nombre === sup.nombre)
+                return sel && (
+                  <TarjetaSuplemento key={sup.nombre} sup={sup} indice={i} sel={sel} conPeso={conPeso}
+                    onToggle={() => toggleSup(sup)}
+                    onCampo={(campo, val) => updateSup(sup.nombre, campo, val)} />
+                )
+              })}
+            </div>
+          )}
+          <button id="suplementacion-agregar" type="button" aria-haspopup="dialog"
+            onClick={() => setCatalogoAbierto(true)}
+            className={`k-pulsable flex min-h-12 w-full items-center gap-2 rounded-[10px] text-left text-[15px] font-semibold text-enlace ${senalar('suplementacion-agregar') ? 'shadow-[inset_0_0_0_2px_var(--aviso-tinta)] px-2' : ''}`}>
+            <Plus size={18} aria-hidden="true" className="shrink-0" />
+            <span className="flex-1">Agregar suplemento</span>
+            <span className="shrink-0 text-[14px] font-normal tabular-nums text-tinta2">{seleccionados.length} de {SUPLEMENTOS.length}</span>
+            <ChevronRight size={16} aria-hidden="true" className="shrink-0 text-tinta3" />
+          </button>
         </div>
       </section>
+
+      <CatalogoSuplementos abierto={catalogoAbierto} onCerrar={() => setCatalogoAbierto(false)}
+        elegidos={seleccionados} onToggle={toggleSup} />
 
       <section className="sp-card sp-doc-card">
         <div className="sp-doc-cardhead">
@@ -855,13 +865,12 @@ interface PropsTarjeta {
   indice: number
   sel: SupSelec | undefined
   /** Solo la primera: es la que el banner de faltantes señala y enfoca. */
-  senalado: boolean
   conPeso: boolean
   onToggle: () => void
   onCampo: (campo: 'dosis' | 'marca' | 'justificacion', val: string) => void
 }
 
-function TarjetaSuplemento({ sup, indice, sel, senalado, conPeso, onToggle, onCampo }: PropsTarjeta) {
+function TarjetaSuplemento({ sup, indice, sel, conPeso, onToggle, onCampo }: PropsTarjeta) {
   const [expandido, setExpandido] = useState(false)
   const [recortado, setRecortado] = useState(false)
   const textoRef = useRef<HTMLParagraphElement>(null)
@@ -887,7 +896,7 @@ function TarjetaSuplemento({ sup, indice, sel, senalado, conPeso, onToggle, onCa
 
   return (
     <div
-      className={`sp-doc-supcard ${sel ? 'sp-doc-supcard--on' : ''} ${senalado ? 'sp-doc-supcard--invalid' : ''}`}
+      className={`sp-doc-supcard ${sel ? 'sp-doc-supcard--on' : ''}`}
       onClick={e => {
         // La tarjeta entera alterna la selección: la casilla es la señal, no el
         // objetivo (§2.1). Lo que nace en un control se lo queda el control —la
@@ -945,5 +954,40 @@ function TarjetaSuplemento({ sup, indice, sel, senalado, conPeso, onToggle, onCa
         </div>
       )}
     </div>
+  )
+}
+
+/**
+ * El catálogo de nueve con palomitas (CALMA §20; maqueta docs-b, vista 5). Cada
+ * fila alterna la selección con la MISMA `toggleSup` que la casilla de la
+ * tarjeta: elegir aquí añade el suplemento con su dosis calculada, desmarcar lo
+ * quita. El beneficio clínico va entero (la maqueta lo acota con «Ver
+ * completo»; entero no pierde nada y se ahorra la medición).
+ */
+function CatalogoSuplementos({ abierto, onCerrar, elegidos, onToggle }: {
+  abierto: boolean; onCerrar: () => void; elegidos: SupSelec[]; onToggle: (sup: Suplemento) => void
+}) {
+  return (
+    <ModalShell open={abierto} onClose={onCerrar} title="Suplementos"
+      subtitle={`${elegidos.length} de ${SUPLEMENTOS.length}`}>
+      <ul className="flex flex-col divide-y divide-linea px-6 pb-3 ext:px-5">
+        {SUPLEMENTOS.map(sup => {
+          const on = elegidos.some(s => s.nombre === sup.nombre)
+          return (
+            <li key={sup.nombre}>
+              <button type="button" role="checkbox" aria-checked={on} onClick={() => onToggle(sup)}
+                className="k-pulsable flex min-h-[52px] w-full items-start gap-3 py-2.5 text-left">
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[16px] font-semibold leading-[22px] text-tinta">{sup.nombre}</span>
+                  <span className="block text-[13px] leading-[18px] tabular-nums text-tinta2">{sup.dosis_por_kg ?? sup.dosis_default}</span>
+                  <span className="mt-0.5 block text-[13px] leading-[18px] text-tinta2">{sup.beneficio_clinico}</span>
+                </span>
+                <Check size={20} aria-hidden="true" className={`mt-1 shrink-0 text-enlace ${on ? '' : 'opacity-0'}`} />
+              </button>
+            </li>
+          )
+        })}
+      </ul>
+    </ModalShell>
   )
 }
