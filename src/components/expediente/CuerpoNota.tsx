@@ -156,23 +156,41 @@ function Seccion({ seccion, indice, primera }: {
 
 /* ── Franja de datos clínicos ───────────────────────────────────────────── */
 
+/* Rótulos completos en minúscula inicial (maqueta `final-consulta`): «TEMP» y
+   «SPO₂» en versalitas de 12 se leían mal y chocaban con los números. */
 const VITALES: readonly { clave: keyof NonNullable<NotaRenderData['signosVitales']>; rotulo: string; unidad: string }[] = [
   { clave: 'fc',   rotulo: 'FC',    unidad: 'lpm' },
   { clave: 'fr',   rotulo: 'FR',    unidad: 'rpm' },
-  { clave: 'temp', rotulo: 'TEMP',  unidad: '°C' },
-  { clave: 'spo2', rotulo: 'SPO₂',  unidad: '%' },
+  { clave: 'temp', rotulo: 'Temp.', unidad: '°C' },
+  { clave: 'spo2', rotulo: 'SpO₂',  unidad: '%' },
 ] as const
 
+/** Un dato de la rejilla: rótulo de 13 encima y valor de 17 debajo (unidad a 13). */
 function Dato({ rotulo, children }: { rotulo: string; children: React.ReactNode }) {
   return (
-    <span className="inline-flex items-baseline gap-[var(--sp-1-5)]">
-      <span className="text-[12px] font-bold uppercase tracking-[var(--sp-ls-label)] text-[var(--sp-ink-350)]">
-        {rotulo}
-      </span>
-      <span className="text-[length:var(--sp-fs-meta)] font-semibold tabular-nums text-[var(--sp-ink-700)]">
-        {children}
-      </span>
-    </span>
+    <div className="min-w-0">
+      <dt className="text-[13px] leading-[18px] text-tinta2">{rotulo}</dt>
+      <dd className="k-num mt-0.5 break-words text-[17px] font-bold leading-[22px] text-tinta">{children}</dd>
+    </div>
+  )
+}
+
+function Unidad({ children }: { children: React.ReactNode }) {
+  return <span className="text-[13px] font-normal text-tinta2"> {children}</span>
+}
+
+/** Diagnósticos como títulos de 17 con el código CIE-10 en etiqueta tonal. */
+function TitulosDx({ dx }: { dx: { texto: string; codigo?: string }[] }) {
+  return (
+    <div className="flex flex-col gap-2">
+      {dx.map((d, i) => (
+        <p key={i} className="text-[17px] font-bold leading-[24px] text-tinta">
+          {dx.length > 1 && <span className="k-num text-tinta2">{i + 1}. </span>}
+          {d.texto}
+          {d.codigo && <span className="k-etq k-etq-tonal ml-2 align-[2px]">{d.codigo}</span>}
+        </p>
+      ))}
+    </div>
   )
 }
 
@@ -194,54 +212,34 @@ function FranjaDatos({ data }: { data: NotaRenderData }) {
      estado «sin signos vitales». */
   const hayVitales = !!ta || medidas.length > 0
 
-  const dxTexto = diagnosticos.length > 0
-    ? diagnosticos
-        .filter(d => d.descripcion?.trim())
-        .map(d => (d.codigo_cie10 ? `${d.codigo_cie10} · ${d.descripcion}` : d.descripcion))
-    : motivoConsulta.trim()
-      ? [motivoConsulta.trim()]
-      : []
+  const dx = diagnosticos.length > 0
+    ? diagnosticos.filter(d => d.descripcion?.trim()).map(d => ({ texto: d.descripcion, codigo: d.codigo_cie10 || undefined }))
+    : motivoConsulta.trim() ? [{ texto: motivoConsulta.trim() }] : []
 
   return (
-    <div className="border-b border-[color:var(--sp-line-divider)] pb-[var(--sp-4)]">
-      {dxTexto.length > 0 && (
-        <div className="flex flex-col gap-[var(--sp-1)]">
-          {dxTexto.map((d, i) => (
-            <p key={i} className="text-[length:var(--sp-fs-body-sm)] font-bold leading-snug text-[var(--sp-ink-800)]">
-              {/* Con varios se numeran; con uno no. */}
-              {dxTexto.length > 1 && <span className="tabular-nums text-[var(--sp-ink-350)]">{i + 1}. </span>}
-              {d}
-            </p>
-          ))}
+    <div className="border-b border-[var(--linea)] pb-4">
+      {dx.length > 0 && <TitulosDx dx={dx} />}
+
+      {hayVitales && (
+        <div className={dx.length > 0 ? 'mt-4 border-t border-[var(--linea)] pt-4' : ''}>
+          <p className="k-t-rotulo">Signos vitales</p>
+          {/* Rejilla que se reacomoda: 3 columnas en angosto, 5 en ancho. */}
+          <dl className="mt-2 grid grid-cols-[repeat(auto-fill,minmax(96px,1fr))] gap-x-4 gap-y-3">
+            {ta && <Dato rotulo="TA">{ta}<Unidad>mmHg</Unidad></Dato>}
+            {medidas.map(m => (
+              <Dato key={m.clave} rotulo={m.rotulo}>{m.valor}<Unidad>{m.unidad}</Unidad></Dato>
+            ))}
+          </dl>
         </div>
       )}
 
-      {(hayVitales || proximaCita) && (
-        <div className="mt-[var(--sp-2-5)] flex flex-wrap items-baseline gap-x-[var(--sp-4)] gap-y-[var(--sp-1-5)]">
-          {hayVitales && (
-            <>
-              <span className="text-[12px] font-bold uppercase tracking-[var(--sp-ls-label)] text-[var(--sp-ink-350)]">
-                Signos <span className="text-[var(--sp-ink-600)]">VITALES</span>
-              </span>
-              {ta && <Dato rotulo="TA">{ta} <span className="font-normal text-[var(--sp-ink-350)]">mmHg</span></Dato>}
-              {medidas.map(m => (
-                <Dato key={m.clave} rotulo={m.rotulo}>
-                  {m.valor} <span className="font-normal text-[var(--sp-ink-350)]">{m.unidad}</span>
-                </Dato>
-              ))}
-            </>
-          )}
-          {/* Texto LIBRE, no una fecha: puede decir «en 15 días». No se formatea
-              ni se presenta como si fuera una fecha estructurada. */}
+      {/* Texto LIBRE, no una fecha: puede decir «en 15 días». Las notas
+          antiguas no traen consultorio: entonces no hay dato. */}
+      {(proximaCita || consultorio.nombreCorto) && (
+        <dl className="mt-3 grid grid-cols-[repeat(auto-fill,minmax(96px,1fr))] gap-x-4 gap-y-3">
           {proximaCita && <Dato rotulo="Próxima cita">{proximaCita}</Dato>}
-        </div>
-      )}
-
-      {/* Las notas antiguas no traen consultorio: entonces no hay renglón. */}
-      {consultorio.nombreCorto && (
-        <p className="mt-[var(--sp-2)] text-[12px] text-[var(--sp-ink-350)]">
-          Atendido en: <span className="font-semibold text-[var(--sp-ink-600)]">{consultorio.nombreCorto}</span>
-        </p>
+          {consultorio.nombreCorto && <Dato rotulo="Atendido en">{consultorio.nombreCorto}</Dato>}
+        </dl>
       )}
     </div>
   )
