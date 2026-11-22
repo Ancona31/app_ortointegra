@@ -25,6 +25,8 @@ import { decodificarNbsp } from '@/lib/textUtils'
 import { useEditor } from '@tiptap/react'
 import { generateHTML, type JSONContent } from '@tiptap/core'
 import { editorExtensions } from '@/lib/documentos/editorExtensions'
+import { DOMParser as PMDOMParser } from '@tiptap/pm/model'
+import { markdownAHtml } from '@/lib/documentos/pegadoEscrito'
 
 const FECHA_MIN = '1900-01-01'
 
@@ -207,11 +209,40 @@ export default function EscritoMedicoForm({ pacienteInicial = '', pacienteId, of
   const [intentado, setIntentado] = useState(false)
 
   const formRef = useRef<HTMLDivElement>(null)
+  /** El último atajo fue Ctrl/⌘+Mayús+V: el pegado que sigue va sin formato. */
+  const sinFormatoRef = useRef(false)
 
   const editor = useEditor({
     extensions: editorExtensions,
     immediatelyRender: false,
-    editorProps: { attributes: { class: 'sp-ed-prose' } },
+    editorProps: {
+      attributes: { class: 'sp-ed-prose' },
+      /*
+       * MARKDOWN PEGADO COMO TEXTO PLANO → FORMATO REAL. Sólo cuando el
+       * portapapeles NO trae HTML (con HTML manda el HTML, como siempre) y no se
+       * pegó con Ctrl/⌘+Mayús+V, que sigue pegando sin formato. Sin estructura
+       * Markdown, `markdownAHtml` devuelve `null` y el pegado es el de siempre.
+       * El HTML resultante lo parsea el ESQUEMA del editor: no entra nada que el
+       * editor no sepa ya representar.
+       */
+      handleKeyDown: (_vista, e) => {
+        sinFormatoRef.current = (e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'v'
+        return false
+      },
+      handlePaste: (vista, e) => {
+        const sinFormato = sinFormatoRef.current
+        sinFormatoRef.current = false
+        const datos = e.clipboardData
+        if (sinFormato || !datos || datos.getData('text/html')) return false
+        const html = markdownAHtml(datos.getData('text/plain'))
+        if (html === null) return false
+        const caja = document.createElement('div')
+        caja.innerHTML = html
+        const trozo = PMDOMParser.fromSchema(vista.state.schema).parseSlice(caja, { context: vista.state.selection.$from })
+        vista.dispatch(vista.state.tr.replaceSelection(trozo).scrollIntoView())
+        return true
+      },
+    },
   })
 
   const isEmpty = editor?.isEmpty ?? true
