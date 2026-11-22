@@ -190,7 +190,7 @@ export default function ConsultaDetallePage() {
         </Link>
         <div className="mt-1 flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
           <div className="min-w-0">
-            <h1 className="k-t-pantalla">Nota de Consulta</h1>
+            <h1 className="k-t-pantalla">Nota de consulta</h1>
             <p className="k-t-sec mt-1">
               {format(parseISO(consulta.fecha), "dd 'de' MMMM 'de' yyyy", { locale: es })}
               {consulta.consultorio_nombre && (
