@@ -1,5 +1,7 @@
 # Deuda técnica — Consentimiento informado
 
+> **Actualización 2026-11-22 (embudo rediseñado, `26c3c85d`…`fed2b440`):** resueltas CI-DT-4, 9, 14, 17 y 19; CI-DT-1 en lo que toca a la app; parciales CI-DT-3, 12, 13 y 15. Siguen abiertas sin cambios CI-DT-2, 5, 6, 7, 8, 10, 11, 16, 18, 20 y 21. Cada entrada lleva su línea «Tras el rediseño». Nada de lo de abajo se borró.
+
 **Fecha:** 2026-11-22 · **Rama de lectura:** `feature/rediseno-estetico` · **Estado:** 🔴 abierta
 
 ## Propósito y alcance
@@ -78,6 +80,8 @@ trae JWT, `SCH:803-805`). Todo SQL de este archivo es **BORRADOR**.
 ### CI-DT-1 — «Regenerar» un consentimiento sellado lo sustituye por uno sin firmas
 
 **Estado:** 🔴 crítica. Decisión de Angel ya tomada: un sellado no se regenera.
+
+**Tras el rediseño (2026-11-22):** ✅ **Resuelta en lo que toca a la app** (`d682fe18`): un `firmado` de consentimiento o denegación ya no ofrece «Regenerar» y el aviso de «sellado sin PDF» ya no manda a la lista, remite a soporte. **Sigue abierto:** el candado en la base (CI-DT-2) y la decisión de «Recuperar PDF sellado»: hoy NO existe un camino que regenere el PDF CON las firmas, así que un sellado cuyo PDF falló se queda sin PDF hasta que soporte lo recupere a mano.
 
 **Qué pasa.** `regenerar()` (`src/components/expediente/PanelDocumentos.tsx:240-302`)
 recompone el PDF sólo desde `doc.contenido`. Las firmas, el sello, la huella y
@@ -298,6 +302,8 @@ el borrado del PDF en Storage (punto 4) o basta con la fila?
 
 **Estado:** 🔴 alta. Decisión de Angel ya tomada: la fecha es la del día de la firma.
 
+**Tras el rediseño (2026-11-22):** 🟡 **Parcial** (`2e146dfd`, `03c63563`): la fecha pasa a hoy (`hoyEnTZ(TZ_CLINICA)`) al firmar en el dispositivo y al imprimir para papel, ANTES del contenido y la huella; la edad se recalcula desde la ficha si salió de ella (la tecleada se respeta y la revisión lo dice). La fecha ya no está en la captura. **Abierto:** la zona sigue siendo `TZ_CLINICA` y no la del consultorio; la lista y el visor siguen fechando por `created_at`; la denegación conserva su fecha editable.
+
 **Qué pasa.** `aplicarBorrador` repone la fecha y la edad guardadas
 (`CIF:550, 553`); sólo cae a hoy si no había fecha. La fecha nace en
 `TZ_CLINICA`, constante de Ciudad de México (`CIF:352`, `src/lib/dates.ts:69`),
@@ -348,6 +354,8 @@ fecha del día en que se imprime), o ahí la fecha la pone el médico?
 ### CI-DT-4 — La casilla de fotografías promete otra finalidad que el PDF
 
 **Estado:** 🔴 alta. Decisión de Angel ya tomada: «documentación médica y seguimiento».
+
+**Tras el rediseño (2026-11-22):** ✅ **Resuelta** (`9103228e`): la casilla dice el texto del PDF; prueba que compara los dos en `consentimientoEmbudo.test.ts`.
 
 **Qué pasa.** La casilla dice «Autoriza su uso con fines educativos y de
 publicación académica» (`CIF:1588`). Los dos PDF imprimen «Autorizo la toma de
@@ -570,6 +578,8 @@ ya sellados?
 
 **Estado:** 🟡 media.
 
+**Tras el rediseño (2026-11-22):** ✅ **Resuelta** (`03c63563`): en el modo paciente sólo «Tomar foto» (`capture="environment"`) o «No la traigo»; «Elegir archivo» se retiró. En escritorio `capture` se ignora, como antes.
+
 **Qué pasa.** La captura ofrece «Tomar foto» (`capture="environment"`) y «Elegir
 archivo», el mismo campo sin `capture` (`CID:270-274, 290-297`), que abre la
 fototeca. El dispositivo es el personal del médico (decisión 4) y en ese momento
@@ -673,6 +683,8 @@ hay que decirle al médico qué pasó.
 
 **Estado:** 🟡 media.
 
+**Tras el rediseño (2026-11-22):** 🟡 **Parcial** (`03c63563`): «Imprimir para firmar en papel» pide confirmación («Se cerrará con su folio y ya no podrá editarse; las firmas irán a mano»). **Abierto:** la vista previa sin folio. Sin conexión no pregunta (no hay folio en el búnker).
+
 **Qué pasa.** El botón (`CIF:1733-1743`) llama a `imprimir()` sin diálogo. Con un
 borrador cargado, lo convierte en `emitido_firma_manual` con folio `CI-`
 (`CIF:1178-1195`), estado terminal (`SCH:823-831`): ese documento ya no se puede
@@ -704,6 +716,8 @@ pero no añade confirmación (§3).
 ### CI-DT-13 — Las firmas viven sólo en memoria
 
 **Estado:** 🟡 media.
+
+**Tras el rediseño (2026-11-22):** 🟡 **Parcial** (`03c63563`): en el modo paciente no hay X ni Esc; salir exige mantener «Médico: salir». **Abierto:** `popstate`/`beforeunload` (el gesto de atrás del sistema sigue perdiendo las firmas).
 
 **Qué pasa.** Los trazos están en el estado de `FC` (`FC:154, 166-167`) y entran en
 la base sólo al sellar (`CIF:977`). La X y Escape piden confirmación
@@ -741,6 +755,8 @@ salir por la X.
 
 **Estado:** 🟡 media.
 
+**Tras el rediseño (2026-11-22):** ✅ **Resuelta** (`73b2273a`): «Seguir editándolo» navega con `&borrador=` y `irATipo` quita `?borrador=` al cerrar tras emitir.
+
 **Qué pasa.** El visor navega con `&doc={id}` (`PanelDocumentos.tsx:452-454`). La
 página lee `borrador` (`src/app/(app)/expediente/[id]/documentos/page.tsx:154`).
 Sin `borradorId`, el formulario busca el último borrador propio del paciente y
@@ -767,6 +783,8 @@ procedimiento del borrador y sin diálogo.
 ### CI-DT-15 — No hay lista global de consentimientos pendientes
 
 **Estado:** 🟡 media.
+
+**Tras el rediseño (2026-11-22):** 🟡 **Parcial** (`03c63563`): el borrador dice su estado («Falta firmar» / «Faltan N datos») en el carril, el visor y el diálogo «a medias» del anfitrión. **Abierto:** la lista global entre pacientes en `/documentos` (necesita una consulta nueva; no se hizo).
 
 **Qué pasa.** Los borradores sólo se ven paciente por paciente (carril, línea de
 tiempo, visor). Ni `/documentos` ni la paleta de comandos los listan (búsqueda de
@@ -823,6 +841,8 @@ sólo aviso al salir?
 
 **Estado:** 🟡 media.
 
+**Tras el rediseño (2026-11-22):** ✅ **Resuelta** (`6220db3f`): sin conexión no se ven «Guardar borrador» ni «Firmar en este dispositivo»; la denegación se ofrece en la propia pantalla (el búnker no tiene «···»).
+
 **Qué pasa.** El búnker monta el formulario con `offlineMode`
 (`src/app/(offline)/offline-mode/page.tsx:623`). Las plantillas se apagan
 (`CIF:486`), pero los botones del pie (`CIF:1716-1758`) no miran `offlineMode`, y
@@ -874,6 +894,8 @@ papel); eso es revisión legal, no deuda técnica.
 ### CI-DT-19 — Los testigos se guardan en las plantillas
 
 **Estado:** 🟢 baja.
+
+**Tras el rediseño (2026-11-22):** ✅ **Resuelta** (`c3f679b1`): las plantillas ya no guardan testigos y las antiguas no los pisan al aplicarse.
 
 **Qué pasa.** `leer()` guarda `testigo1, testigo2` y `aplicar()` los repone
 (`CIF:506-509, 518-519`), con el criterio de que «son personal de la clínica,

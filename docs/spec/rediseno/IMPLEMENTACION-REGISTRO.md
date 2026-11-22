@@ -777,3 +777,40 @@ entera sobre `a289ce13` y lo que siguió. Domingo 22-nov, 04:44–06:40 UTC
   con el precio en el segundo; el recibo, concepto y precio en uno.
 * **Medidas:** 1280×800, cotización con 6 conceptos y 5 subtotales: el
   contenido mide 1440 (no cabe sin desplazar; tampoco en la maqueta).
+
+### Consentimiento informado: el embudo · notas (2026-11-22)
+
+* **Qué:** maqueta aprobada `consentimiento.html` llevada a la app. Lógica pura
+  en `consentimientoEmbudo.ts` (pruebas `consentimientoEmbudo.test.ts` y
+  `consentimientoSinConexion.test.tsx`); estilos en `spinus-tokens.css` §26.6
+  (`.sp-ci-*`, `.sp-mantener`, `.sp-firma-pac`/`--pac`, miniaturas
+  `.sp-firma-fm`). Captura en cuatro bloques con `SeccionPaso` (ahora con
+  `prefijo`), `OpcionesRapidas` para transfusión y «Quién firma», revisión en
+  `RevisionConsentimiento.tsx`, gesto del médico en `BotonMantener.tsx`
+  (1,2 s, teclado incluido). El firmado sigue en `FirmadoConsentimiento`
+  (portal, lienzo, `touchAction`, orden y guardado intactos): modo paciente,
+  «¿Trae su identificación oficial?» sólo con cámara, «Pase el dispositivo a…»,
+  «Devuelva el dispositivo al médico», y el sellado con miniaturas.
+  `ModalDocumentoGenerado` admite `correoPrimero` («Enviar copia al correo del
+  paciente» primero, sólo tras sellar). Denegación en «···» («Emitir
+  denegación…»; en el búnker, en la pantalla).
+* **Comportamiento (cada uno en su commit):** B1 fecha del día de la firma y
+  edad recalculada (`2e146dfd`), B2 texto de fotografías (`9103228e`), B3
+  plantillas sin testigos (`c3f679b1`), B4 sin «Regenerar» en sellados y aviso
+  honesto (`d682fe18`), B5 «Seguir editándolo» (`73b2273a`), B6 sin conexión
+  (`6220db3f`). Estado de cada CI-DT en `DEUDA_CONSENTIMIENTO.md`.
+* **Lo que NO cambia:** claves y tipos de `contenido` (comparado campo a campo
+  con un sellado hecho con el código anterior: iguales salvo `timezone`, que es
+  la del navegador de la prueba), validación (nueve / siete), huella, sello y su
+  zona, el orden firmas → sellado → PDF con el cliente de sesión, la subida de
+  la foto antes de la firma, la transfusión sin valor por defecto, PDF, RLS,
+  `audit_log`, migraciones.
+* **Defecto de front encontrado (no corregido fuera del consentimiento):** en el
+  patrón «tocar fuera pliega» de internamiento, pulsar el TEXTO de una casilla
+  `.sp-check` (p. ej. «Marcar como URGENTE») enfoca primero el panel del
+  selector de tipo (`tabIndex=-1`) en el `pointerdown`, pliega la sección y la
+  casilla no llega a marcarse; y pulsar «···» con una sección abierta puede
+  cerrar el menú al reajustarse el desplazamiento. En el consentimiento se
+  corrigió (`presionando`, `[aria-haspopup]`); internamiento queda pendiente.
+* **Pendiente:** lista global de pendientes en `/documentos` (CI-DT-15, consulta
+  nueva); `SeccionPlegable.tsx` quedó sin consumidores (no se borró).
