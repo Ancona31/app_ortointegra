@@ -1,0 +1,9 @@
+# Diferencias esperadas entre una FOTO (05-catalogo.jsonl) y el CLON que levanta clonar-desde-foto.sh.
+# Formato: estado<TAB>tipo<TAB>clave<TAB>razón. estado: solo_a | solo_b | distinto | *. Glob (*, ?) en tipo y clave.
+# A = la foto, B = el clon. Comprobado con la foto de la base local (2026-11-22).
+
+solo_a	config	todos los roles en postgres : *	pg_dump sin --create no vuelca ALTER DATABASE … SET (app.settings.jwt_*); el clon no los necesita y el secreto no viaja
+solo_a	config	rol * en (todas) : *	los roles reservados se crean desde la foto sin sus ALTER ROLE … SET (la CLI sólo vuelca los seguros); no afecta a la estructura de la base
+solo_a	permiso	esquema graphql → *	los GRANT de graphql los pone el disparador de evento grant_pg_graphql_access al crear la extensión; pg_dump crea los disparadores de evento al final, después de la extensión
+solo_a	permiso	esquema graphql_public → *	misma causa que graphql (disparador de evento posterior a CREATE EXTENSION)
+distinto	restriccion	public.tipos_cita.tipos_cita_duracion_check	Postgres reescribe (a AND b) AND c como a AND b AND c al volver a leer el CHECK; mismo significado
