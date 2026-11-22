@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useImperativeHandle, useMemo, useState, type Ref } from 'react'
 import { FileDown, Loader2, X } from 'lucide-react'
 import type { Paciente, Consulta, MedicoInfo } from '@/types'
 import { createClient } from '@/lib/supabase/client'
@@ -11,19 +11,22 @@ import { componerNombreMedicoCompleto, type CamposNombre } from '@/lib/nombreMed
 import { generateDocFileName } from '@/lib/patientUtils'
 import { generarPdf } from '@/lib/mobileShare'
 
+/** Lo que la cabecera puede pedirle desde el menú «···» (rediseño B7). */
+export interface ControlExportar {
+  exportar: () => void
+}
+
 interface Props {
   paciente: Paciente
   /**
-   * Geometría compartida por los cuatro controles de la cabecera (alto, radio y
-   * relleno vertical). Baja por prop en vez de escribirse aquí para que no pueda
-   * divergir de sus tres hermanos: la fuente es `GEOMETRIA_ACCION` en
-   * `CabeceraPaciente.tsx`, que es el único sitio que los pinta juntos.
+   * ⚠️ «EXPORTAR» VIVE EN EL MENÚ «···» DE LA CABECERA (rediseño B7, maqueta
+   * `final-expediente`), y el menú se cierra al elegir. Por eso el disparo
+   * llega por `ref` y este componente sólo pinta el ESTADO —generando, el
+   * enlace «Abrir expediente» con su descarte, o el error—: en reposo no
+   * dibuja nada. Si el estado viviera dentro del menú, cerrarlo lo perdería.
    */
-  estilo?: React.CSSProperties
-  /**
-   * Clases del ENVOLTORIO, no del botón: la cabecera lo coloca en su retícula
-   * de móvil (`order-*`) y este componente no sabe nada de esa retícula.
-   */
+  ref?: Ref<ControlExportar>
+  /** Clases del envoltorio del estado. */
   clase?: string
 }
 
@@ -37,7 +40,7 @@ type AddendumRow = {
 
 type MedicoClinica = CamposNombre & { id: string; es_admin_de_clinica?: boolean }
 
-export default function ExportarExpedienteButton({ paciente, estilo, clase = '' }: Props) {
+export default function ExportarExpedienteButton({ paciente, ref, clase = '' }: Props) {
   const { clinica } = useClinica()
   const [generando, setGenerando] = useState(false)
   const [conteo, setConteo] = useState<number | null>(null)
@@ -68,6 +71,8 @@ export default function ExportarExpedienteButton({ paciente, estilo, clase = '' 
       setTimeout(() => URL.revokeObjectURL(pdfUrl), 60000)
     }
   }, [pdfUrl])
+
+  useImperativeHandle(ref, () => ({ exportar: () => { void exportar() } }))
 
   async function exportar() {
     if (generando) return
@@ -182,61 +187,39 @@ export default function ExportarExpedienteButton({ paciente, estilo, clase = '' 
     }
   }
 
+  if (!generando && !pdfUrl && !error) return null
+
   return (
-    /* ⚠️ `items-stretch` EN MÓVIL. Ahí este botón es una celda de la retícula
-       de la cabecera y tiene que llenarla; con `items-end` —lo que necesita en
-       escritorio, para alinearse con sus hermanos— se quedaba en su ancho
-       natural y rompía la igualdad de las dos columnas. */
-    <div className={`${clase} flex flex-col items-stretch gap-[var(--sp-1)] lg:items-end`}>
+    /* El estado de la exportación, bajo las acciones de la cabecera. `aria-live`
+       para que el lector anuncie el cambio: el disparo ocurrió en un menú que ya
+       se cerró. */
+    <div className={`${clase} flex min-h-[var(--k-toque)] flex-wrap items-center gap-2`} aria-live="polite">
       {pdfUrl ? (
         /* El enlace se queda hasta que el médico lo descarte: si cierra la
            pestaña del visor por error, puede volver a abrirla sin regenerar
            el expediente entero. */
-        <div className="flex items-center gap-[var(--sp-1)] lg:inline-flex">
-          {/* Resuelto pasa a primario: es el mismo criterio que
-              `ModalDocumentoGenerado` usa para su «Abrir», y dura lo que el
-              médico tarde en descartarlo. En reposo es un secundario más. */}
-          <a
-            href={pdfUrl}
-            target="_blank"
-            rel="noopener"
-            style={estilo}
-            className="min-w-0 flex-1 sp-btn sp-btn--primary whitespace-nowrap lg:flex-none"
-          >
-            <FileDown size={14} /> Abrir expediente
+        <>
+          <a href={pdfUrl} target="_blank" rel="noopener" className="k-b k-b-tonal">
+            <FileDown size={16} aria-hidden="true" /> Abrir expediente
           </a>
           <button
             type="button"
             onClick={() => setPdfBlob(null)}
             aria-label="Descartar el expediente generado"
-            className="w-7 h-7 shrink-0 rounded-[var(--sp-r-btn-sm)] flex items-center justify-center text-[var(--sp-ink-icon)] transition-colors hover:bg-[var(--sp-surface-muted)] hover:text-[var(--sp-ink-600)]"
+            className="k-b k-b-icono"
           >
-            <X size={14} />
+            <X aria-hidden="true" />
           </button>
-        </div>
-      ) : (
-        <button
-          type="button"
-          onClick={exportar}
-          disabled={generando}
-          style={estilo}
-          className="sp-btn sp-btn--secondary whitespace-nowrap disabled:opacity-60"
-        >
-          {generando ? (
-            <>
-              <Loader2 size={14} className="animate-spin" />
-              {conteo === null
-                ? 'Generando expediente…'
-                : `Generando expediente — ${conteo} ${conteo === 1 ? 'nota' : 'notas'}`}
-            </>
-          ) : (
-            <>
-              <FileDown size={14} /> Exportar
-            </>
-          )}
-        </button>
-      )}
-      {error && <span className="text-[length:var(--sp-fs-legal)] text-[var(--sp-danger)]">{error}</span>}
+        </>
+      ) : generando ? (
+        <p className="k-t-sec flex items-center gap-2">
+          <Loader2 size={16} className="animate-spin motion-reduce:animate-none" aria-hidden="true" />
+          {conteo === null
+            ? 'Generando expediente…'
+            : `Generando expediente — ${conteo} ${conteo === 1 ? 'nota' : 'notas'}`}
+        </p>
+      ) : null}
+      {error && <p role="alert" className="k-campo-error">{error}</p>}
     </div>
   )
 }

@@ -71,23 +71,25 @@ export default function ModalPreviewDocumento({ documento, onClose }: Props) {
     : undefined
 
   const footer = signedUrl ? (
-    <div className="flex items-center justify-end gap-2 px-5 py-3">
+    /* Pie del catálogo (CALMA §23.1): secundario a la izquierda, principal a
+       la derecha; en `iv`, el par centrado. */
+    <div className="flex items-center justify-end gap-2 px-5 py-3 iv:justify-center">
+      <button
+        type="button"
+        onClick={onClose}
+        className="k-b k-b-capa k-b-quieto min-w-[104px]"
+      >
+        Cerrar
+      </button>
       <a
         href={signedUrl}
         download={nombre}
         target="_blank"
         rel="noopener noreferrer"
-        className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 text-slate-700 rounded-xl text-[13px] font-medium hover:bg-slate-200 transition-colors"
+        className="k-b k-b-capa k-b-prim min-w-[104px]"
       >
-        <Download size={14} /> Descargar
+        <Download size={16} aria-hidden="true" /> Descargar
       </a>
-      <button
-        type="button"
-        onClick={onClose}
-        className="px-3.5 py-2 text-[13px] font-medium text-slate-700 hover:text-slate-900 transition-colors"
-      >
-        Cerrar
-      </button>
     </div>
   ) : undefined
 
@@ -102,13 +104,13 @@ export default function ModalPreviewDocumento({ documento, onClose }: Props) {
     >
       <div className="p-4">
         {loadingUrl && (
-          <div className="flex items-center justify-center py-12 text-slate-500 text-sm gap-2">
+          <div className="flex items-center justify-center gap-2 py-12 text-[14px] text-tinta2">
             <Loader2 size={16} className="animate-spin" /> Cargando documento…
           </div>
         )}
 
         {urlError && (
-          <div className="flex items-center justify-center py-12 text-red-500 text-sm gap-2">
+          <div role="alert" className="flex items-center justify-center gap-2 py-12 text-[14px] text-mal-tinta">
             <AlertCircle size={16} /> {urlError}
           </div>
         )}
@@ -116,13 +118,13 @@ export default function ModalPreviewDocumento({ documento, onClose }: Props) {
         {signedUrl && isPdf && (
           <iframe
             src={signedUrl}
-            className="w-full h-[75vh] rounded-xl border border-slate-200"
+            className="h-[75vh] w-full rounded-[12px] bg-sup2"
             title={nombre}
           />
         )}
 
         {signedUrl && isImage && (
-          <div className="flex items-center justify-center bg-slate-50 rounded-xl p-3">
+          <div className="flex items-center justify-center rounded-[12px] bg-sup2 p-3">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={signedUrl}
@@ -135,7 +137,7 @@ export default function ModalPreviewDocumento({ documento, onClose }: Props) {
         {signedUrl && isDicom && <DicomPreview url={signedUrl} />}
 
         {signedUrl && !isPdf && !isImage && !isDicom && (
-          <div className="text-center py-12 text-slate-500 text-sm">
+          <div className="py-12 text-center text-[14px] text-tinta2">
             Formato sin vista previa inline. Usa Descargar para verlo.
           </div>
         )}
@@ -261,7 +263,7 @@ function DicomPreview({ url }: { url: string }) {
         </div>
       )}
       {!loading && !error && (
-        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-black/70 text-white text-[11px] px-3 py-1.5 rounded-full">
+        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-black/70 text-white text-[12px] px-3 py-1.5 rounded-full">
           {total > 1 ? `${total} frames · scroll para navegar · ` : ''}
           arrastra para W/L · clic derecho + arrastra para zoom
         </div>

@@ -1,6 +1,6 @@
 'use client'
 
-import { Printer, Loader2, FileDown, MessageSquarePlus } from 'lucide-react'
+import { Printer, Loader2, FileDown, MessageSquarePlus, Lock, PenLine, Sparkles } from 'lucide-react'
 import Link from 'next/link'
 import type { NotaRenderData } from '@/lib/notaRenderData'
 import CuerpoNota from './CuerpoNota'
@@ -29,13 +29,6 @@ import CuerpoNota from './CuerpoNota'
 /** §11: la medida de lectura, ~72 caracteres. El contenedor ocupa su columna; el texto no. */
 const MEDIDA_LECTURA = 'mx-auto w-full max-w-[620px]'
 
-function Insignia({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="shrink-0 whitespace-nowrap rounded-[var(--sp-r-pill)] bg-[var(--sp-surface-muted)] px-[8px] py-[3px] text-[length:var(--sp-fs-legal)] font-bold text-[var(--sp-ink-500)]">
-      {children}
-    </span>
-  )
-}
 
 export default function VisorNota({
   data, imprimiendo, pdfUrl, onImprimir, hrefNotaCompleta, puedeAclarar,
@@ -50,7 +43,8 @@ export default function VisorNota({
   puedeAclarar: boolean
 }) {
   return (
-    <div className="overflow-hidden rounded-[var(--sp-r-card)] border border-[color:var(--sp-line-card)] bg-[var(--sp-surface)] shadow-[var(--sp-shadow-flat)] lg:max-h-[640px] lg:overflow-y-auto">
+    /* Rediseño B8: superficie del kit, sin borde ni sombra (CALMA §3). */
+    <div className="overflow-hidden rounded-[var(--r-tarjeta)] bg-sup ih:rounded-[var(--r-tarjeta-ancha)] iv:rounded-[var(--r-tarjeta-ancha)] esc:rounded-[var(--r-tarjeta-ancha)] lg:max-h-[640px] lg:overflow-y-auto">
 
       {/* ── Cabecera fija, UNA SOLA FILA ────────────────────────────────
           ⚠️ OPACA, Y NO ES UN DETALLE. `sticky` sobre superficie sólida y por
@@ -63,12 +57,12 @@ export default function VisorNota({
           donde está, sin necesidad de apagarlo.
           ⚠️ SIN ANTE-TÍTULO «EXPEDIENTE CLÍNICO» NI TÍTULO A TAMAÑO DISPLAY:
           eran el 40 % del espacio previo a la primera línea de texto. */}
-      <div className="sticky top-0 z-10 border-b border-[color:var(--sp-line-divider)] bg-[var(--sp-surface)] px-[var(--sp-4)] py-[var(--sp-3-5)] shadow-[var(--sp-shadow-flat)] lg:px-[26px]">
+      <div className="sticky top-0 z-10 border-b border-linea bg-sup px-4 py-3 lg:px-[26px]">
         <div className="flex flex-wrap items-center gap-x-[var(--sp-2-5)] gap-y-[var(--sp-2)]">
-          <h2 className="text-[length:var(--sp-fs-vitals)] font-extrabold leading-tight text-[var(--sp-ink-800)]">
+          <h2 className="k-t-tarjeta">
             Nota de Evolución Médica
           </h2>
-          <p className="text-[length:var(--sp-fs-hint)] text-[var(--sp-ink-500)]">
+          <p className="k-num text-[13px] leading-[18px] text-tinta2">
             {data.fechaCorta} · {data.horaFormateada}
           </p>
 
@@ -86,26 +80,29 @@ export default function VisorNota({
               href={pdfUrl}
               target="_blank"
               rel="noopener"
-              className="ml-auto shrink-0 sp-btn sp-btn--compact whitespace-nowrap lg:ml-0 lg:order-last"
+              className="k-b k-b-tonal ml-auto shrink-0 lg:ml-0 lg:order-last"
             >
-              <FileDown size={13} /> Abrir PDF
+              <FileDown size={16} aria-hidden="true" /> Abrir PDF
             </a>
           ) : (
             <button
               type="button"
               onClick={onImprimir}
               disabled={imprimiendo}
-              className="ml-auto shrink-0 sp-btn sp-btn--compact whitespace-nowrap disabled:opacity-60 lg:ml-0 lg:order-last"
+              className="k-b k-b-tonal ml-auto shrink-0 lg:ml-0 lg:order-last"
             >
               {imprimiendo
-                ? <><Loader2 size={13} className="animate-spin" /> Generando…</>
-                : <><Printer size={13} /> Imprimir</>}
+                ? <><Loader2 size={16} className="animate-spin motion-reduce:animate-none" aria-hidden="true" /> Generando…</>
+                : <><Printer size={16} aria-hidden="true" /> Imprimir</>}
             </button>
           )}
 
           <div className="flex shrink-0 items-center gap-[var(--sp-1-5)] lg:ml-auto">
-            {data.notaOrigen && <Insignia>{data.notaOrigen === 'ia' ? 'Nota IA' : 'Nota manual'}</Insignia>}
-            <Insignia>Nota sellada</Insignia>
+            {/* Etiquetas suaves con icono (CALMA §11): informativa y «sellada». */}
+            {data.notaOrigen && (data.notaOrigen === 'ia'
+              ? <span className="k-etq k-etq-tonal"><Sparkles aria-hidden="true" /> Nota IA</span>
+              : <span className="k-etq k-etq-tonal"><PenLine aria-hidden="true" /> Nota manual</span>)}
+            <span className="k-etq k-etq-ok"><Lock aria-hidden="true" /> Nota sellada</span>
           </div>
         </div>
       </div>
@@ -118,11 +115,11 @@ export default function VisorNota({
         <div className={MEDIDA_LECTURA}>
           <CuerpoNota data={data} />
 
-          <div className="mt-[var(--sp-7)] flex flex-wrap items-center gap-[var(--sp-4)] border-t border-[color:var(--sp-line-divider)] pt-[var(--sp-3)]">
+          <div className="mt-[var(--sp-7)] flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-linea pt-2">
             <Link
               href={hrefNotaCompleta}
               prefetch={false}
-              className="text-[length:var(--sp-fs-hint)] font-semibold text-[var(--sp-primary-text)] hover:underline"
+              className="k-b k-b-texto -ml-1"
             >
               Abrir nota completa
             </Link>
@@ -136,9 +133,9 @@ export default function VisorNota({
               <Link
                 href={hrefNotaCompleta}
                 prefetch={false}
-                className="inline-flex items-center gap-[var(--sp-1-5)] text-[length:var(--sp-fs-hint)] font-semibold text-[var(--sp-primary-text)] hover:underline"
+                className="k-b k-b-texto"
               >
-                <MessageSquarePlus size={13} /> Añadir nota aclaratoria
+                <MessageSquarePlus size={16} aria-hidden="true" /> Añadir nota aclaratoria
               </Link>
             )}
           </div>

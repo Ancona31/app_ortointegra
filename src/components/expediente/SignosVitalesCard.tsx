@@ -95,7 +95,7 @@ const CSS = `
 .sv-card .sv-body { display:block; cursor:text; padding:7px 13px 9px; }
 .sv-card .sv-label-row { display:flex; align-items:center; gap:5px; margin-bottom:3px; }
 .sv-card .sv-dot { width:9px; height:9px; border-radius:9999px; flex-shrink:0; }
-.sv-card .sv-label { font-size:11px; font-weight:700; letter-spacing:.04em; color:var(--sp-ink-400); text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.sv-card .sv-label { font-size:12px; font-weight:700; letter-spacing:.04em; color:var(--sp-ink-400); text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .sv-card .sv-label--sm { display:none; }
 .sv-card .sv-value-row { display:flex; align-items:baseline; gap:4px; }
 .sv-card .sv-sep { font-size:22px; font-weight:700; color:var(--sp-ink-100); }
@@ -129,7 +129,7 @@ const CSS = `
   .sv-card .sv-dot { display:none; }
   /* etiqueta corta con unidad integrada arriba; abajo solo el valor */
   .sv-card .sv-label-row { justify-content:center; gap:0; margin-bottom:2px; }
-  .sv-card .sv-label { font-size:10px; letter-spacing:.02em; text-align:center; }
+  .sv-card .sv-label { font-size:12px; letter-spacing:.02em; text-align:center; }
   .sv-card .sv-label--lg { display:none; }
   .sv-card .sv-label--sm { display:inline; }
   .sv-card .sv-unit { display:none; }

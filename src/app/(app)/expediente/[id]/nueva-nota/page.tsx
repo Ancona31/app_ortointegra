@@ -9,13 +9,12 @@ import type { MedicamentoIA, BloqueIA, NotaIAResponse } from '@/lib/notaIA/schem
 import { calcularEdad, generateDocFileName } from '@/lib/patientUtils'
 import { buildNotaRenderData } from '@/lib/notaRenderData'
 import {
-  ArrowLeft, Save, Loader2, RotateCcw, Printer, Eye, Pencil,
+  ChevronLeft, Save, Loader2, RotateCcw, Printer, Eye, Pencil,
   Pill, CheckCircle2, Check, PenLine, X, FileText,
   Mic, Sparkles, AlertTriangle,
 } from 'lucide-react'
 import Link from 'next/link'
 import ReactMarkdown from 'react-markdown'
-import Breadcrumbs from '@/components/layout/Breadcrumbs'
 import { generarPdf } from '@/lib/mobileShare'
 import { secureStorage } from '@/lib/secureStorage'
 import { vaciarCacheCitas } from '@/lib/agenda/cacheRangosCitas'
@@ -29,7 +28,7 @@ import SelectorTipoDocumento, { tipoDocumento, type TipoDocumento } from '@/comp
 
 function FormCargando() {
   return (
-    <div className="flex items-center justify-center py-12 text-slate-400">
+    <div className="flex items-center justify-center py-12 text-tinta2">
       <Loader2 size={20} className="animate-spin mr-2" />
       <span className="text-sm">Cargando formulario...</span>
     </div>
@@ -38,7 +37,7 @@ function FormCargando() {
 
 function FormErrorFallback() {
   return (
-    <div className="flex flex-col items-center justify-center py-12 text-slate-400 gap-2">
+    <div className="flex flex-col items-center justify-center gap-2 py-12 text-tinta2">
       <p className="text-sm font-medium">No se pudo cargar el formulario</p>
       <p className="text-xs">Verifica tu conexion e intenta de nuevo</p>
     </div>
@@ -1043,15 +1042,15 @@ export default function NuevaNotaPage() {
             </button>
           </div>
         ) : estadoModal === 'confirmacion' ? (
-          <div className="flex items-center gap-2 p-4 md:px-6">
+          /* «Revisar» (CALMA §15) y «Guardar nota» como dos botones parejos de
+             capa (§13): secundario a la izquierda, principal a la derecha;
+             en `iv`, el par centrado (§23.1). */
+          <div className="flex items-center justify-end gap-2 p-4 md:px-6 iv:justify-center">
             <button onClick={() => setEstadoModal('revision')} disabled={guardando}
-              className="sp-btn sp-btn--ghost disabled:opacity-40">
-              Volver a revisar
+              className="k-b k-b-capa k-b-quieto min-w-[104px]">
+              Revisar
             </button>
-            <div className="flex-1" />
-            {/* Sin disabled:opacity-50: .sp-btn--primary:disabled ya trae su
-                propio tratamiento y superponerlos lo lavaba. */}
-            <button onClick={guardar} disabled={guardando} className="sp-btn sp-btn--primary">
+            <button onClick={guardar} disabled={guardando} className="k-b k-b-capa k-b-prim min-w-[104px]">
               {guardando ? <><Loader2 size={17} className="animate-spin" /> Guardando...</> : <><Save size={17} /> Guardar nota</>}
             </button>
           </div>
@@ -1106,7 +1105,7 @@ export default function NuevaNotaPage() {
             <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center">
               <AlertTriangle size={22} className="text-red-500" />
             </div>
-            <p className="text-sm text-slate-600 leading-relaxed max-w-xs">{errorModal}</p>
+            <p lang="es" className="max-w-xs text-[14px] leading-5 text-tinta2 [hyphens:auto] [text-align:justify]">{errorModal}</p>
             <div className="flex items-center gap-2 mt-1">
               <button onClick={cancelarEntrevista} className="sp-btn sp-btn--ghost">
                 Cerrar
@@ -1252,7 +1251,7 @@ export default function NuevaNotaPage() {
                   rows={16}
                   className="sp-textarea sp-editzone font-mono" />
               ) : (
-                <div className="prose prose-sm max-w-none prose-headings:text-[#1a3a5c] prose-headings:font-bold prose-headings:text-sm prose-headings:mt-4 prose-headings:mb-1 prose-strong:text-[#1a3a5c] prose-strong:font-semibold prose-p:text-slate-700 prose-p:leading-relaxed prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 prose-li:text-slate-700">
+                <div lang="es" className="prose prose-sm max-w-none prose-headings:text-[13px] prose-headings:font-bold prose-headings:uppercase prose-headings:tracking-[.4px] prose-headings:text-enlace prose-headings:mt-5 prose-headings:mb-1 prose-strong:text-tinta prose-strong:font-semibold prose-p:text-[15px] prose-p:leading-[22px] prose-p:text-tinta prose-p:my-1 prose-p:[hyphens:auto] prose-p:[text-align:justify] prose-ul:my-1 prose-li:my-0.5 prose-li:text-tinta">
                   <ReactMarkdown>{notaFinal}</ReactMarkdown>
                 </div>
               )}
@@ -1424,33 +1423,31 @@ export default function NuevaNotaPage() {
         </div>
       </ModalShell>
 
-      {/* Breadcrumbs + Header — ancho completo */}
-      <div className="mb-5 space-y-4">
-        <Breadcrumbs pacienteNombre={paciente ? `${paciente.nombre} ${paciente.apellidos}` : undefined} />
-        <div className="flex items-center gap-3">
-          {/* Solo el color se migra: el sistema no expone clase de ícono-botón
-              y hover:text-slate-600 no tiene regla en ThemeProvider, así que en
-              oscuro la flecha se oscurecía justo al interactuar con ella. */}
-          <Link href={`/expediente/${id}`}
-            className="text-[var(--sp-ink-icon)] hover:text-[var(--sp-ink-500)] transition-colors">
-            <ArrowLeft size={20} />
-          </Link>
-          <div>
-            <h1 className="sp-title-page">Nueva Nota Médica</h1>
-            {paciente && (
-              <p className="sp-secondary mt-0.5">
-                {paciente.nombre} {paciente.apellidos} ·{' '}
-                {paciente.fecha_nacimiento ? calcularEdad(paciente.fecha_nacimiento).textoElegante : ''}
-              </p>
-            )}
-            {consultorioActivo && (
-              <p className="sp-hint mt-1">
-                Atendiendo en: <span className="font-semibold text-[var(--sp-primary-text)]">{consultorioActivo.nombre_corto || consultorioActivo.nombre}</span>
-              </p>
-            )}
-          </div>
+      {/* ── Cabecera (rediseño B8, maqueta `final-nota`) ──────────────────
+          Regreso «‹ <paciente>» (CALMA §23.8) en lugar de las migas de pan
+          (era el único uso de `Breadcrumbs`); título «Nueva nota» (§20);
+          debajo, edad, «Atendiendo en» y la alergia como etiqueta (§3). */}
+      <header lang="es" className="mb-5">
+        <Link href={`/expediente/${id}`} className="k-b k-b-texto -ml-1 h-[var(--k-toque)] max-w-full text-[13px]">
+          <ChevronLeft size={16} aria-hidden="true" />
+          <span className="truncate">{paciente ? `${paciente.nombre} ${paciente.apellidos}` : 'Expediente'}</span>
+        </Link>
+        <h1 className="k-t-pantalla mt-1">Nueva nota</h1>
+        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+          <p className="k-t-sec">
+            {paciente?.fecha_nacimiento ? `${calcularEdad(paciente.fecha_nacimiento).textoElegante} · ` : ''}
+            {consultorioActivo
+              ? <>Atendiendo en: <span className="font-semibold text-tinta">{consultorioActivo.nombre_corto || consultorioActivo.nombre}</span></>
+              : null}
+          </p>
+          {paciente?.alergias?.trim() && (
+            <span className="k-etq k-etq-mal h-auto min-h-6 max-w-full whitespace-normal py-0.5">
+              <AlertTriangle aria-hidden="true" />
+              Alergias: {paciente.alergias.trim()}
+            </span>
+          )}
         </div>
-      </div>
+      </header>
 
       {/* ── Grid de dos columnas · una sola columna en Cierre ──
           Con la nota guardada (blueprint §5.3) la página deja de ser de captura:
@@ -1517,8 +1514,9 @@ export default function NuevaNotaPage() {
               <div>
                 <h2 className="sp-title-card">Cuéntame la consulta</h2>
                 {modoNota === 'ia' ? (
-                  <p className="sp-hint mt-0.5 flex items-center gap-1">
-                    Describe el caso y
+                  /* Texto corrido (no flex): en ext partía en tres columnas. */
+                  <p className="sp-hint mt-0.5">
+                    Describe el caso y{' '}
                     <span className="font-semibold text-[var(--sp-primary-text)]">Spinus</span> redactará la nota médica
                   </p>
                 ) : (
@@ -1678,7 +1676,7 @@ export default function NuevaNotaPage() {
                       a secas el subrayado cruzaría toda la columna. */}
                   <button type="button"
                     onClick={() => { cancelarEntrevista(); setMedicamentos([{ ...MED_VACIA }]); modoTocadoRef.current = true; setModoNota('manual'); setNotaGenerada(''); setError('') }}
-                    className="sp-link-alt block w-fit mx-auto mt-2">
+                    className="sp-link-alt relative mx-auto mt-2 block w-fit after:absolute after:inset-x-0 after:-inset-y-3 after:content-['']">
                     Prefiero escribirla yo
                   </button>
                 </>
@@ -1704,7 +1702,7 @@ export default function NuevaNotaPage() {
                   {/* w-fit: ver la nota del link alterno de la vía IA. */}
                   <button type="button"
                     onClick={() => { cancelarEntrevista(); setForm(f => ({ ...f, exploracion_fisica: '', analisis: '', gabinete_laboratorios: '', plan_tratamiento: '' })); modoTocadoRef.current = true; setModoNota('ia'); setNotaGenerada(''); setError('') }}
-                    className="sp-link-alt block w-fit mx-auto mt-2">
+                    className="sp-link-alt relative mx-auto mt-2 block w-fit after:absolute after:inset-x-0 after:-inset-y-3 after:content-['']">
                     Usar IA
                   </button>
                 </>
@@ -1724,66 +1722,61 @@ export default function NuevaNotaPage() {
               No sobrevive al Cierre (decisión §5.3): existe para informar
               mientras se redacta, y los formularios de documentos se prellenan
               solos desde form.diagnosticos y medicamentosParaReceta. */}
-          {!notaSaved && paciente && (
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-              <div className="px-4 py-3 bg-slate-50 border-b border-slate-100">
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Contexto del paciente</p>
-              </div>
-              <div className="p-4 space-y-3">
-                {/* Datos básicos */}
-                <div className="flex flex-wrap gap-2">
-                  {paciente.fecha_nacimiento && (
-                    <span className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-lg">
-                      {calcularEdad(paciente.fecha_nacimiento).textoElegante}
-                    </span>
-                  )}
-                  {paciente.sexo && (
-                    <span className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-lg">
-                      {paciente.sexo === 'M' ? 'Masculino' : paciente.sexo === 'F' ? 'Femenino' : paciente.sexo}
-                    </span>
-                  )}
-                  {paciente.peso_kg && paciente.talla_cm && (
-                    <span className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-lg">
-                      IMC {(paciente.peso_kg / Math.pow(paciente.talla_cm / 100, 2)).toFixed(1)}
-                    </span>
-                  )}
-                </div>
-
-                {/* Alergias */}
-                {paciente.alergias && (
-                  <div className="rounded-lg px-3 py-2" style={{ backgroundColor: '#EF5350' }}>
-                    <p className="text-[10px] font-semibold text-white/80 uppercase tracking-wide mb-0.5">⚠ Alergias</p>
-                    <p className="text-xs text-white font-medium">{paciente.alergias}</p>
-                  </div>
-                )}
-
-                {/* Último diagnóstico */}
-                {ultimaConsulta?.diagnosticos && (
-                  <div>
-                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1">Último diagnóstico</p>
-                    <p className="text-xs text-slate-600 leading-relaxed">{ultimaConsulta.diagnosticos}</p>
-                  </div>
-                )}
-
-                {/* Último tratamiento */}
-                {ultimaConsulta?.medicamentos && ultimaConsulta.medicamentos.length > 0 && (
-                  <div>
-                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1">Último tratamiento</p>
-                    <div className="space-y-0.5">
-                      {ultimaConsulta.medicamentos.slice(0, 4).map((m, i) => (
-                        <p key={i} className="text-xs text-slate-600">
-                          · {m.nombre} {m.dosis && <span className="text-slate-400">{m.dosis}</span>}
-                        </p>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {!paciente.alergias && !ultimaConsulta?.diagnosticos && (
-                  <p className="text-xs text-slate-400 text-center py-2">Primera consulta del paciente</p>
-                )}
-              </div>
+          {/* «La nota aparecerá aquí» (CALMA §30.7, aprobado): sólo en esc y
+              mientras no hay nota; los rótulos son los apartados de la nota. */}
+          {!notaSaved && !notaGenerada && (
+            <div aria-hidden="true" className="hidden px-1 esc:block">
+              <p className="text-[15px] leading-5 text-tinta2">La nota aparecerá aquí</p>
+              <ul className="mt-3 space-y-2.5 text-[14px] leading-5 text-tinta3">
+                {['Subjetivo', 'Objetivo', 'Auxiliares diagnósticos', 'Diagnóstico', 'Análisis', 'Plan'].map(t => <li key={t}>{t}</li>)}
+              </ul>
             </div>
+          )}
+
+          {!notaSaved && paciente && (
+            /* Contexto del paciente con el kit: tarjeta sin borde ni sombra,
+               rótulo en mayúsculas (uno por tarjeta) y pares con línea fina.
+               La alergia, como etiqueta roja suave (CALMA §3), no un bloque. */
+            <section aria-labelledby="titulo-contexto" className="k-tarjeta">
+              <h2 id="titulo-contexto" className="k-t-rotulo">Contexto del paciente</h2>
+              <p className="k-t-sec mt-2">
+                {[
+                  paciente.fecha_nacimiento ? calcularEdad(paciente.fecha_nacimiento).textoElegante : null,
+                  paciente.sexo ? (paciente.sexo === 'M' ? 'Masculino' : paciente.sexo === 'F' ? 'Femenino' : paciente.sexo) : null,
+                  paciente.peso_kg && paciente.talla_cm ? `IMC ${(paciente.peso_kg / Math.pow(paciente.talla_cm / 100, 2)).toFixed(1)}` : null,
+                ].filter(Boolean).join(' · ')}
+              </p>
+
+              {paciente.alergias && (
+                <span className="k-etq k-etq-mal mt-2 h-auto min-h-6 max-w-full whitespace-normal py-0.5">
+                  <AlertTriangle aria-hidden="true" />
+                  Alergias: {paciente.alergias}
+                </span>
+              )}
+
+              <dl className="k-lista mt-2">
+                {ultimaConsulta?.diagnosticos && (
+                  <div className="py-2">
+                    <dt className="text-[13px] leading-[18px] text-tinta2">Último diagnóstico</dt>
+                    <dd className="mt-0.5 text-[14px] leading-5 text-tinta">{ultimaConsulta.diagnosticos}</dd>
+                  </div>
+                )}
+                {ultimaConsulta?.medicamentos && ultimaConsulta.medicamentos.length > 0 && (
+                  <div className="py-2">
+                    <dt className="text-[13px] leading-[18px] text-tinta2">Último tratamiento</dt>
+                    {ultimaConsulta.medicamentos.slice(0, 4).map((m, i) => (
+                      <dd key={i} className="mt-0.5 text-[14px] leading-5 text-tinta">
+                        · {m.nombre} {m.dosis && <span className="text-tinta2">{m.dosis}</span>}
+                      </dd>
+                    ))}
+                  </div>
+                )}
+              </dl>
+
+              {!paciente.alergias && !ultimaConsulta?.diagnosticos && (
+                <p className="k-t-sec py-2 text-center">Primera consulta del paciente</p>
+              )}
+            </section>
           )}
 
           {/* ── Panel de documentos ──
@@ -1801,7 +1794,7 @@ export default function NuevaNotaPage() {
             data-onboard={notaSaved ? 'panel-documentos' : undefined}
             className={notaSaved
               ? 'sp-card'
-              : 'bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden'}>
+              : 'k-tarjeta'}>
 
             {notaSaved ? (
               /* Encabezado del Cierre: ABSORBE el banner verde en vez de
@@ -1819,19 +1812,14 @@ export default function NuevaNotaPage() {
                 </div>
               </div>
             ) : (
-              <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
-                <FileText size={14} className="text-slate-400" />
-                <h2 className="font-semibold text-slate-700 text-sm">Documentos del paciente</h2>
-              </div>
+              <h2 className="k-t-rotulo">Documentos del paciente</h2>
             )}
 
             {!notaSaved ? (
               /* Estado: esperando que se guarde la nota */
-              <div className="p-8 flex flex-col items-center text-center gap-3">
-                <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center">
-                  <FileText size={22} className="text-slate-300" />
-                </div>
-                <p className="text-sm text-slate-400 leading-relaxed">
+              <div className="flex flex-col items-center gap-3 px-2 py-5 text-center">
+                <FileText size={20} aria-hidden="true" className="text-tinta3" />
+                <p className="max-w-[38ch] text-[14px] leading-5 text-tinta2">
                   {notaGenerada
                     ? 'Guarda la nota para poder generar documentos desde aquí'
                     : 'Completa y genera la nota para activar este panel'}
@@ -1839,8 +1827,8 @@ export default function NuevaNotaPage() {
                 {/* R8: una sola vía de guardado — este botón abre la revisión */}
                 {notaGenerada && (
                   <button onClick={abrirRevision} disabled={guardando || !consultorioActivo}
-                    className="mt-1 flex items-center gap-2 px-4 py-2 bg-[#1e5fa8] text-white rounded-lg text-xs font-medium hover:bg-[#1a3a5c] transition-colors disabled:opacity-60">
-                    {guardando ? <><Loader2 size={13} className="animate-spin" /> Guardando...</> : <><Save size={13} /> Revisar y guardar</>}
+                    className="k-b k-b-tonal">
+                    {guardando ? <><Loader2 size={16} className="animate-spin" /> Guardando...</> : <><Save size={16} aria-hidden="true" /> Revisar y guardar</>}
                   </button>
                 )}
               </div>

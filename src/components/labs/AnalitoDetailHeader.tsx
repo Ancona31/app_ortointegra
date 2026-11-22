@@ -49,30 +49,24 @@ function calcularColor(
   return 'neutral'
 }
 
-const ESTILO_DELTA: Record<DeltaColor, { background: string; color: string }> = {
-  'up-bad':    { background: 'var(--sp-danger-bg)',  color: 'var(--sp-danger)' },
-  'up-good':   { background: 'var(--sp-success-bg)', color: 'var(--sp-success-strong)' },
-  'down-bad':  { background: 'var(--sp-danger-bg)',  color: 'var(--sp-danger)' },
-  'down-good': { background: 'var(--sp-success-bg)', color: 'var(--sp-success-strong)' },
-  'neutral':   { background: 'var(--sp-surface-muted)', color: 'var(--sp-ink-600)' },
+/* Rediseño B7: la variación es texto con su flecha en el tono del estado, sin
+   caja (CALMA §3); el color sólo cuando el catálogo dice qué lado es malo. */
+const ESTILO_DELTA: Record<DeltaColor, string> = {
+  'up-bad':    'text-mal-tinta',
+  'up-good':   'text-ok-tinta',
+  'down-bad':  'text-mal-tinta',
+  'down-good': 'text-ok-tinta',
+  'neutral':   'text-tinta2',
 }
 
 /** El chip de estado del último valor. Sin rango de referencia no se dibuja. */
-function chipEstado(estado: AnalitoStatus): { texto: string; background: string; color: string } | null {
-  if (estado === 'ok')   return { texto: 'En rango',      background: 'var(--sp-success-bg)', color: 'var(--sp-success-strong)' }
-  if (estado === 'warn') return { texto: 'A vigilar',     background: 'var(--sp-warn-bg)',    color: 'var(--sp-warn)' }
-  if (estado === 'bad')  return { texto: 'Fuera de rango', background: 'var(--sp-danger-bg)',  color: 'var(--sp-danger)' }
+function chipEstado(estado: AnalitoStatus): { texto: string; clase: string } | null {
+  if (estado === 'ok')   return { texto: 'En rango',       clase: 'k-etq k-etq-ok' }
+  if (estado === 'warn') return { texto: 'A vigilar',      clase: 'k-etq k-etq-aviso' }
+  if (estado === 'bad')  return { texto: 'Fuera de rango', clase: 'k-etq k-etq-mal' }
   return null
 }
 
-/** Chip neutro de categoría y de unidad. */
-function Chip({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="inline-flex shrink-0 items-center whitespace-nowrap rounded-[var(--sp-r-btn-sm)] bg-[var(--sp-surface-muted)] px-[8px] py-[3px] text-[10.5px] font-bold uppercase tracking-[var(--sp-ls-label)] text-[var(--sp-ink-500)]">
-      {children}
-    </span>
-  )
-}
 
 interface Props {
   analito: AnalitoRastreado
@@ -127,27 +121,25 @@ export default function AnalitoDetailHeader({ analito, analitoCatalogo, medicion
        relleno los pone `SeccionMedicionesLabs`. Si le devuelves el borde,
        vuelven los compartimentos. */
     <div>
-      <div className="flex flex-wrap items-start justify-between gap-[var(--sp-4)]">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
-          {/* Nombre y, JUNTO A ÉL, los dos chips: categoría y unidad. */}
-          <div className="flex flex-wrap items-center gap-[var(--sp-2)]">
-            <h3 className="text-[length:var(--sp-fs-modal)] font-bold leading-tight text-[var(--sp-ink-800)]">
-              {analito.nombre}
-            </h3>
-            <Chip>{labelCategoria(String(analito.categoria))}</Chip>
-            <Chip>{analito.unidad || 'sin unidad'}</Chip>
-            {analito.analitoId === null && <Chip>Custom</Chip>}
-          </div>
+          {/* Nombre y, debajo, categoría y unidad como texto plano (CALMA §3);
+              «Custom» es la única etiqueta. */}
+          <h3 className="k-t-tarjeta">{analito.nombre}</h3>
+          <p className="mt-0.5 flex flex-wrap items-center gap-2 text-[13px] leading-[18px] text-tinta2">
+            {labelCategoria(String(analito.categoria))} · {analito.unidad || 'sin unidad'}
+            {analito.analitoId === null && <span className="k-etq">Custom</span>}
+          </p>
         </div>
 
         <div className="shrink-0 text-right">
-          <div className="flex items-baseline justify-end gap-[var(--sp-1-5)]">
-            <span className="text-[32px] font-extrabold leading-none tracking-[var(--sp-ls-tight)] tabular-nums text-[var(--sp-ink-900)]">
+          <div className="flex items-baseline justify-end gap-1.5">
+            <span className="k-num text-[28px] font-bold leading-none tracking-[-0.4px] text-tinta">
               {valorActualStr}
             </span>
-            <span className="text-[length:var(--sp-fs-hint)] text-[var(--sp-ink-500)]">{analito.unidad}</span>
+            <span className="text-[13px] text-tinta2">{analito.unidad}</span>
           </div>
-          <p className="mt-[var(--sp-1)] text-[11px] text-[var(--sp-ink-350)]">{fechaActualLarga}</p>
+          <p className="k-num mt-1 text-[13px] leading-[18px] text-tinta2">{fechaActualLarga}</p>
         </div>
       </div>
 
@@ -155,31 +147,21 @@ export default function AnalitoDetailHeader({ analito, analitoCatalogo, medicion
           bloques y el filtro en una tercera fila aparte; los tres califican al
           mismo valor —cuánto se movió, si está en rango, en qué ventana se
           mira— y separarlos obligaba a recomponerlos con la vista. */}
-      <div className="mt-[var(--sp-4)] flex flex-wrap items-center gap-x-[var(--sp-2-5)] gap-y-[var(--sp-2)] border-t border-[color:var(--sp-line-divider)] pt-[var(--sp-3-5)]">
+      <div className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-2">
         {hayDelta ? (
           <>
-            <span
-              className="inline-flex items-center gap-[var(--sp-1)] rounded-[var(--sp-r-btn-sm)] px-[8px] py-[4px] text-[length:var(--sp-fs-hint)] font-semibold tabular-nums"
-              style={ESTILO_DELTA[color]}
-            >
-              <Icon size={12} />
+            <span className={`k-num inline-flex items-center gap-1 text-[13px] font-semibold leading-[18px] ${ESTILO_DELTA[color]}`}>
+              <Icon size={14} aria-hidden="true" />
               {signo}{formatValor(absDelta, precision)} {analito.unidad}
-              <span className="opacity-70">({signo}{Math.abs(pct).toFixed(1)}%)</span>
+              <span className="font-normal">({signo}{Math.abs(pct).toFixed(1)}%)</span>
             </span>
-            <span className="text-[length:var(--sp-fs-hint)] text-[var(--sp-ink-500)]">desde el inicio</span>
+            <span className="text-[13px] leading-[18px] text-tinta2">desde el inicio</span>
           </>
         ) : (
-          <span className="text-[length:var(--sp-fs-hint)] text-[var(--sp-ink-500)]">Primera medición registrada</span>
+          <span className="text-[13px] leading-[18px] text-tinta2">Primera medición registrada</span>
         )}
 
-        {estado && (
-          <span
-            className="inline-flex shrink-0 items-center whitespace-nowrap rounded-[var(--sp-r-btn-sm)] px-[8px] py-[4px] text-[length:var(--sp-fs-hint)] font-semibold"
-            style={{ background: estado.background, color: estado.color }}
-          >
-            {estado.texto}
-          </span>
-        )}
+        {estado && <span className={estado.clase}>{estado.texto}</span>}
 
         {filtro && <div className="ml-auto min-w-0">{filtro}</div>}
       </div>

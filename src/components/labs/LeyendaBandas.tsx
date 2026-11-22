@@ -128,7 +128,7 @@ export default function LeyendaBandas({ analito, analitoCatalogo, sexoPaciente }
         ))}
       </div>
       {usingOverride && (
-        <p className="text-[length:var(--sp-fs-legal)] text-[var(--sp-ink-350)]">
+        <p className="text-[12px] text-[var(--sp-ink-350)]">
           Rangos ajustados para paciente {sexoPaciente === 'M' ? 'masculino' : 'femenino'}
         </p>
       )}

@@ -2,15 +2,15 @@
 
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { FileText, RotateCw } from 'lucide-react'
-import Link from 'next/link'
+import { AlertTriangle, FileText, Mail } from 'lucide-react'
 import type { Paciente, Documento } from '@/types'
 import { createClient } from '@/lib/supabase/client'
 import { useProfile } from '@/hooks/useProfile'
 import { puedeComponer } from '@/lib/mobileShare'
 import { folioImpreso } from '@/lib/documentos/folio'
 import { esSinVisor, type TipoDocumentoBD } from '@/lib/documentos/familias'
-import { AvisoColumna } from '@/components/dashboard/piezasBanda2'
+import EstadoVacio from '@/components/ui/EstadoVacio'
+import EstadoError from '@/components/ui/EstadoError'
 import ModalShell from '@/components/ui/ModalShell'
 import CarrilDocumentos from './CarrilDocumentos'
 import VisorDocumento from './VisorDocumento'
@@ -375,37 +375,29 @@ export default function PanelDocumentos({
       : undefined
 
   if (errorActividad) {
-    return <AvisoColumna icono={RotateCw} mensaje="No se pudieron cargar los documentos." onReintentar={onReintentarActividad} />
+    return <EstadoError variante="tarjeta" className="k-tarjeta" mensaje="No se pudieron cargar los documentos." alReintentar={onReintentarActividad} />
   }
   if (cargandoActividad) {
     return (
-      <div className="flex flex-col gap-[var(--sp-4)] lg:flex-row lg:items-start">
-        <div className="skeleton hidden h-[300px] w-[236px] shrink-0 rounded-[var(--sp-r-card)] lg:block" />
-        <div className="skeleton h-[300px] min-w-0 flex-1 rounded-[var(--sp-r-card)]" />
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start" aria-busy="true">
+        <div className="skeleton hidden h-[300px] w-[272px] shrink-0 rounded-[var(--r-tarjeta-ancha)] lg:block" />
+        <div className="skeleton h-[300px] min-w-0 flex-1 rounded-[var(--r-tarjeta-ancha)]" />
       </div>
     )
   }
   if (listables.length === 0 && !doc) {
+    /* Acción tonal: el relleno de la pantalla es «Nueva consulta» de la cabecera. */
     return (
-      <div className="flex flex-col items-center gap-[var(--sp-2-5)] rounded-[var(--sp-r-card)] border border-dashed border-[color:var(--sp-line-card)] px-[var(--sp-pad-row-x)] py-[var(--sp-10)]">
-        <FileText size={20} className="text-[var(--sp-ink-150)]" />
-        <p className="text-center text-[length:var(--sp-fs-body-sm)] text-[var(--sp-ink-500)]">
-          Este paciente todavía no tiene documentos.
-        </p>
-        <Link
-          href={`/expediente/${paciente.id}/documentos`}
-          prefetch={false}
-          className="sp-btn sp-btn--primary mt-[var(--sp-2)]"
-          style={{ height: 'var(--sp-tap)', paddingTop: 0, paddingBottom: 0, fontSize: 'var(--sp-fs-body-sm)' }}
-        >
-          Crear documento
-        </Link>
-      </div>
+      <EstadoVacio
+        icono={FileText}
+        titulo="Este paciente todavía no tiene documentos."
+        accion={{ etiqueta: 'Crear documento', href: `/expediente/${paciente.id}/documentos` }}
+      />
     )
   }
 
   return (
-    <div className="flex flex-col gap-[var(--sp-4)] lg:flex-row lg:items-start">
+    <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
       <CarrilDocumentos
         documentos={listables}
         total={totalDocumentos}
@@ -465,72 +457,67 @@ export default function PanelDocumentos({
         )}
 
         {aviso && (
-          <p className="mt-[var(--sp-2-5)] flex items-start justify-between gap-[var(--sp-3)] rounded-[var(--sp-r-field-sm)] bg-[var(--sp-surface-muted)] px-[var(--sp-3)] py-[var(--sp-2)] text-[length:var(--sp-fs-hint)] text-[var(--sp-ink-700)]">
+          <p role="status" className="mt-3 flex items-center justify-between gap-3 rounded-[var(--r-control)] bg-sup2 py-1 pl-3 pr-1 text-[14px] leading-5 text-tinta">
             {aviso}
-            <button type="button" onClick={cerrarAviso} className="shrink-0 font-semibold text-[var(--sp-primary-text)]">Cerrar</button>
+            <button type="button" onClick={cerrarAviso} className="k-b k-b-texto shrink-0">Cerrar</button>
           </p>
         )}
       </div>
 
-      {/* ── Confirmación de borrado ─────────────────────────────────────── */}
-      {confirmarBorrado && doc && (
-        <ModalShell
-          open
-          onClose={() => setConfirmarBorrado(false)}
-          title="¿Eliminar documento?"
-          maxWidth="max-w-sm"
-          footer={
-            <div className="flex justify-end gap-[var(--sp-2)] px-[var(--sp-5)] py-[var(--sp-3)]">
-              <button type="button" onClick={() => setConfirmarBorrado(false)} className="sp-btn sp-btn--secondary">
-                Cancelar
-              </button>
-              {/* La destructiva, en MENOR peso visual que cancelar. */}
-              <button
-                type="button"
-                onClick={() => void eliminar()}
-                disabled={borrando}
-                className="sp-btn"
-                style={{ background: 'transparent', color: 'var(--sp-danger)', fontSize: 'var(--sp-fs-btn-sm)', padding: '13px 20px' }}
-              >
-                {esBorrador ? 'Cancelar borrador' : 'Eliminar documento'}
-              </button>
-            </div>
-          }
-        >
-          <p className="px-[var(--sp-5)] py-[var(--sp-4)] text-[length:var(--sp-fs-body-sm)] text-[var(--sp-ink-700)]">
-            Esta acción no se puede deshacer.
-          </p>
-        </ModalShell>
-      )}
+      {/* ── Confirmación de borrado: alerta destructiva del catálogo (CALMA
+             §13). El foco entra en «Cancelar». Rótulo largo → apilada. ──── */}
+      <ModalShell
+        open={confirmarBorrado && !!doc}
+        onClose={() => setConfirmarBorrado(false)}
+        variante="alerta"
+        tono="destruir"
+        apilada
+        icon={<AlertTriangle aria-hidden="true" />}
+        title="¿Eliminar documento?"
+        footer={
+          <>
+            <button type="button" autoFocus onClick={() => setConfirmarBorrado(false)} className="k-b k-b-capa k-b-quieto">
+              Cancelar
+            </button>
+            <button type="button" data-principal onClick={() => void eliminar()} disabled={borrando} className="k-b k-b-capa k-b-mal">
+              {esBorrador ? 'Cancelar borrador' : 'Eliminar documento'}
+            </button>
+          </>
+        }
+      >
+        <p>Esta acción no se puede deshacer.</p>
+      </ModalShell>
 
-      {/* ── El correo escrito no coincide con el de la ficha ─────────────── */}
-      {correoAlterno !== null && (
-        <ModalShell
-          open
-          onClose={() => setCorreoAlterno(null)}
-          title="El correo no coincide"
-          maxWidth="max-w-sm"
-          footer={
-            <div className="flex justify-end gap-[var(--sp-2)] px-[var(--sp-5)] py-[var(--sp-3)]">
-              <button type="button" onClick={() => setCorreoAlterno(null)} className="sp-btn sp-btn--secondary">Cancelar</button>
-              <button type="button" onClick={() => void enviar(true)} className="sp-btn sp-btn--primary">Enviar de todos modos</button>
-            </div>
-          }
-        >
-          {/* Los dos correos como pares rótulo/valor, NO como campos editables:
-              cambiar el correo del paciente es otra tarea. */}
-          <div className="flex flex-col gap-[var(--sp-2)] px-[var(--sp-5)] py-[var(--sp-4)]">
-            <p className="text-[length:var(--sp-fs-legal)] font-bold uppercase tracking-[var(--sp-ls-label)] text-[var(--sp-ink-350)]">
-              Se enviará a
-              <span className="ml-[var(--sp-2)] normal-case tracking-normal text-[length:var(--sp-fs-meta)] font-semibold text-[var(--sp-ink-800)]">{paciente.email}</span>
-            </p>
-            <p className="text-[length:var(--sp-fs-legal)] font-bold uppercase tracking-[var(--sp-ls-label)] text-[var(--sp-ink-350)]">
-              Registrado en la ficha
-              <span className="ml-[var(--sp-2)] normal-case tracking-normal text-[length:var(--sp-fs-meta)] font-semibold text-[var(--sp-ink-800)]">{correoAlterno || '—'}</span>
-            </p>
+      {/* ── El correo escrito no coincide con el de la ficha: alerta de aviso.
+             Rótulo largo («Enviar de todos modos») → apilada, principal arriba. */}
+      <ModalShell
+        open={correoAlterno !== null}
+        onClose={() => setCorreoAlterno(null)}
+        variante="alerta"
+        tono="avisar"
+        apilada
+        icon={<Mail aria-hidden="true" />}
+        title="El correo no coincide"
+        footer={
+          <>
+            <button type="button" onClick={() => setCorreoAlterno(null)} className="k-b k-b-capa k-b-quieto">Cancelar</button>
+            <button type="button" autoFocus data-principal onClick={() => void enviar(true)} className="k-b k-b-capa k-b-prim">Enviar de todos modos</button>
+          </>
+        }
+      >
+        {/* Los dos correos como pares rótulo/valor, NO como campos editables:
+            cambiar el correo del paciente es otra tarea. */}
+        <dl className="k-lista text-left">
+          <div className="py-2">
+            <dt className="text-[13px] text-tinta2">Se enviará a</dt>
+            <dd className="text-[15px] font-semibold text-tinta [overflow-wrap:anywhere]">{paciente.email}</dd>
           </div>
-        </ModalShell>
-      )}
+          <div className="py-2">
+            <dt className="text-[13px] text-tinta2">Registrado en la ficha</dt>
+            <dd className="text-[15px] font-semibold text-tinta [overflow-wrap:anywhere]">{correoAlterno || '—'}</dd>
+          </div>
+        </dl>
+      </ModalShell>
     </div>
   )
 }

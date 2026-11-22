@@ -4,7 +4,8 @@ import { Skeleton } from '@/components/ui/Skeleton'
  * Esqueleto de la nota nueva (/expediente/[id]/nueva-nota).
  *
  * Calca el estado de Captura, que es el único con el que abre la página:
- * contenedor `max-w-7xl mx-auto`, bloque de breadcrumbs + cabecera y la rejilla
+ * contenedor `max-w-7xl mx-auto`, la cabecera («‹ paciente», «Nueva nota» y la
+ * línea de datos; rediseño B8, ya sin migas de pan) y la rejilla
  * de 5 columnas —3/5 para signos vitales y la Card Captura, 2/5 para el contexto
  * del paciente y el panel de documentos—. El estado de Cierre (nota guardada)
  * no se dibuja: solo se llega a él después de guardar.
@@ -20,17 +21,12 @@ export default function NuevaNotaLoading() {
   return (
     <div className="max-w-7xl mx-auto" role="status" aria-label="Cargando nota médica">
 
-      {/* ── Breadcrumbs + cabecera ── */}
-      <div className="mb-5 space-y-4">
-        <Skeleton className="h-3.5 w-72 max-w-full" />
-        <div className="flex items-center gap-3">
-          <Skeleton className="w-5 h-5 flex-shrink-0" />
-          <div className="space-y-1.5">
-            {/* H1 .sp-title-page — 30px */}
-            <Skeleton className="h-[34px] w-64 max-w-full" />
-            <Skeleton className="h-4 w-52 max-w-full" />
-          </div>
-        </div>
+      {/* ── Cabecera: regreso, título y línea de datos ── */}
+      <div className="mb-5 space-y-2">
+        <Skeleton className="h-4 w-40 max-w-full" />
+        {/* H1 .k-t-pantalla — 26/32 */}
+        <Skeleton className="h-8 w-48 max-w-full" />
+        <Skeleton className="h-4 w-64 max-w-full" />
       </div>
 
       {/* ── Rejilla de dos columnas ── */}
@@ -40,8 +36,8 @@ export default function NuevaNotaLoading() {
         <div className="lg:col-span-3 space-y-[var(--sp-gap-block)]">
 
           {/* Signos vitales */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="flex items-center gap-2.5 px-[18px] py-2.5 border-b border-slate-100">
+          <div className="overflow-hidden rounded-[var(--r-tarjeta)] bg-sup">
+            <div className="flex items-center gap-2.5 border-b border-linea px-[18px] py-2.5">
               <Skeleton className="w-[26px] h-[26px] rounded-lg flex-shrink-0" />
               <Skeleton className="h-3.5 w-36" />
               <Skeleton className="h-6 w-20 rounded-full ml-auto" />
@@ -73,29 +69,18 @@ export default function NuevaNotaLoading() {
         <div className="lg:col-span-2 space-y-4">
 
           {/* Contexto del paciente */}
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="px-4 py-3 bg-slate-50 border-b border-slate-100">
-              <Skeleton className="h-3 w-36" />
-            </div>
-            <div className="p-4 space-y-3">
-              <div className="flex flex-wrap gap-2">
-                <Skeleton className="h-6 w-20 rounded-lg" />
-                <Skeleton className="h-6 w-24 rounded-lg" />
-                <Skeleton className="h-6 w-16 rounded-lg" />
-              </div>
-              <Skeleton className="h-3 w-28" />
-              <Skeleton className="h-3.5 w-full" />
-            </div>
+          <div className="k-tarjeta space-y-3">
+            <Skeleton className="h-3 w-36" />
+            <Skeleton className="h-4 w-48" />
+            <Skeleton className="h-3 w-28" />
+            <Skeleton className="h-3.5 w-full" />
           </div>
 
           {/* Panel de documentos — estado a la espera de la nota */}
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="flex items-center gap-2 px-5 py-3 bg-slate-50 border-b border-slate-100">
-              <Skeleton className="w-3.5 h-3.5 flex-shrink-0" />
-              <Skeleton className="h-3.5 w-44" />
-            </div>
-            <div className="p-8 flex flex-col items-center gap-3">
-              <Skeleton className="w-12 h-12 rounded-full" />
+          <div className="k-tarjeta">
+            <Skeleton className="h-3 w-44" />
+            <div className="flex flex-col items-center gap-3 py-5">
+              <Skeleton className="h-5 w-5 rounded-full" />
               <Skeleton className="h-3.5 w-56 max-w-full" />
               <Skeleton className="h-3.5 w-40 max-w-full" />
             </div>

@@ -99,18 +99,17 @@ export default function GraficaAnalito({
     return (
       <div className="py-[var(--sp-6)]">
         <div className="flex flex-col items-center text-center">
-          <p className="text-[length:var(--sp-fs-hint)] font-semibold text-[var(--sp-ink-700)] mb-1">
+          <p className="mb-1 text-[15px] font-semibold leading-5 text-tinta">
             No hay mediciones en este rango
           </p>
-          <p className="text-[12px] text-slate-500 mb-3">
+          <p className="mb-3 text-[14px] leading-5 text-tinta2">
             Cambia el rango temporal para ver el histórico completo.
           </p>
           {onResetFiltro && (
             <button
               type="button"
               onClick={onResetFiltro}
-              className="px-3.5 py-1.5 rounded-xl text-[12px] font-medium text-white shadow-sm active:scale-[0.98] transition-all"
-              style={{ background: 'var(--cp)' }}
+              className="k-b k-b-tonal"
             >
               Ver todas
             </button>
@@ -135,13 +134,13 @@ export default function GraficaAnalito({
             <CartesianGrid strokeDasharray="3 3" vertical={false} />
             <XAxis
               dataKey="medido_en"
-              tick={{ fontSize: 11 }}
+              tick={{ fontSize: 12 }}
               tickFormatter={formatFechaChart}
               minTickGap={24}
             />
             <YAxis
               domain={[yMin, yMax]}
-              tick={{ fontSize: 11 }}
+              tick={{ fontSize: 12 }}
               width={44}
               tickFormatter={(v: number) => formatValor(v, precision)}
             />
@@ -173,14 +172,14 @@ export default function GraficaAnalito({
                      del detalle. Sin fondo propio se leería encima de la línea y
                      de las bandas. */
                   <div className="rounded-[var(--sp-r-card-inner)] border border-[color:var(--sp-line-card)] bg-[var(--sp-surface)] px-[var(--sp-3)] py-[var(--sp-2)] shadow-[var(--sp-shadow-raised)]">
-                    <div className="text-[length:var(--sp-fs-legal)] uppercase tracking-[var(--sp-ls-label)] text-[var(--sp-ink-350)]">
+                    <div className="text-[12px] uppercase tracking-[var(--sp-ls-label)] text-[var(--sp-ink-350)]">
                       {formatFechaLarga(datum.medido_en)}
                     </div>
                     <div className="mt-[2px] text-[length:var(--sp-fs-hint)] font-bold tabular-nums text-[var(--sp-ink-800)]">
                       {formatValor(datum.valor, precision)}
                       <span className="ml-[var(--sp-1)] font-normal text-[var(--sp-ink-500)]">{analito.unidad}</span>
                     </div>
-                    <div className="mt-[2px] text-[length:var(--sp-fs-legal)] text-[var(--sp-ink-500)]">{statusText}</div>
+                    <div className="mt-[2px] text-[12px] text-[var(--sp-ink-500)]">{statusText}</div>
                   </div>
                 )
               }}
@@ -190,7 +189,7 @@ export default function GraficaAnalito({
               type="monotone"
               dataKey="valor"
               stroke="currentColor"
-              style={{ stroke: 'var(--cp)', color: 'var(--cp)' }}
+              style={{ stroke: 'var(--accion)', color: 'var(--accion)' }}
               strokeWidth={2.5}
               dot={{
                 r: 4,
@@ -198,7 +197,7 @@ export default function GraficaAnalito({
                 /* El halo va en el `style` y no como atributo: `var()` no se
                    resuelve en un atributo de presentación de SVG, sí en CSS en
                    línea. Es el mismo truco que ya usaba el trazo de la línea. */
-                style: { fill: 'var(--cp)', stroke: 'var(--sp-surface)' },
+                style: { fill: 'var(--accion)', stroke: 'var(--sp-surface)' },
               }}
               activeDot={{
                 r: 6,
@@ -206,7 +205,7 @@ export default function GraficaAnalito({
                 /* El halo va en el `style` y no como atributo: `var()` no se
                    resuelve en un atributo de presentación de SVG, sí en CSS en
                    línea. Es el mismo truco que ya usaba el trazo de la línea. */
-                style: { fill: 'var(--cp)', stroke: 'var(--sp-surface)' },
+                style: { fill: 'var(--accion)', stroke: 'var(--sp-surface)' },
               }}
               isAnimationActive
               animationDuration={400}
