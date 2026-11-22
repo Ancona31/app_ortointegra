@@ -8,7 +8,10 @@ test('enlace profundo /agenda?cita=nueva&paciente=<uuid> abre «Nueva cita» con
   // No hay otra forma de leer el uuid de un paciente desde la UI de la
   // agenda: se toma del enlace «Expediente» de una cita suya ya existente.
   await page.locator('.fc-event', { hasText: 'Paciente Prueba 01' }).first().click()
-  const enlaceExpediente = page.getByRole('link', { name: 'Expediente' })
+  // Acotado al modal: desde el rediseño (B4) la navegación también tiene un
+  // enlace «Expediente» (/expediente), que sin acotar resolvía antes que el
+  // del modal diferido.
+  const enlaceExpediente = modalCita(page, 'Editar cita').getByRole('link', { name: 'Expediente' })
   await expect(enlaceExpediente).toBeVisible()
   const href = await enlaceExpediente.getAttribute('href')
   const uuid = href?.split('/expediente/')[1]
