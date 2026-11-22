@@ -174,9 +174,14 @@ Qué hace, en orden:
    porque `db dump --role-only` omite a propósito los reservados (`anon`,
    `supabase_*`…) y la imagen no trae todos (`supabase_realtime_admin` y
    `supabase_functions_admin` faltaban: 33 errores de restauración sin este paso).
-4. **Base `postgres` vacía:** `DROP DATABASE postgres` + `CREATE DATABASE`. La de
-   la imagen trae esquemas de arranque (`auth` con 5 tablas antiguas, `storage`,
-   `realtime`, disparadores de evento) que chocarían con los de la foto.
+4. **Base `postgres` vacía:** `DROP DATABASE postgres` + `CREATE DATABASE postgres
+   OWNER postgres`. La de la imagen trae esquemas de arranque (`auth` con 5 tablas
+   antiguas, `storage`, `realtime`, disparadores de evento) que chocarían con los
+   de la foto. El dueño es `postgres`, como en el stack local (comprobado en
+   `pg_database`) y en Supabase: `public` es de `pg_database_owner`, y con la base
+   de `supabase_admin` (lo que deja un `CREATE DATABASE` a secas) `postgres` no
+   podría crear nada en `public` al ensayar migraciones. La foto no guarda el
+   dueño de la base (el comparador no lo mira), así que no sale en la comparación.
 5. **Estructura:** `03-esquema-completo.sql` con psql como `supabase_admin`
    (superusuario: puede crear extensiones, esquemas gestionados y objetos con
    dueño `supabase_admin`/`supabase_auth_admin`).

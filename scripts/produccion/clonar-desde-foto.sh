@@ -47,7 +47,10 @@ python3 -I "$DIR/roles_desde_catalogo.py" "$FOTO/05-catalogo.jsonl" | sa -d post
 sa -d postgres < "$FOTO/01-roles.sql" >>"$LOG" 2>&1 || true
 
 echo "→ base postgres vacía (la de la imagen trae esquemas de arranque que chocarían)"
-sa -d template1 -v ON_ERROR_STOP=1 -c "DROP DATABASE postgres WITH (FORCE)" -c "CREATE DATABASE postgres" >>"$LOG" 2>&1
+# Dueño postgres, como en el stack local y en Supabase: public es de
+# pg_database_owner, así que con la base de supabase_admin (lo que deja un
+# CREATE DATABASE a secas) postgres no podría crear nada en public.
+sa -d template1 -v ON_ERROR_STOP=1 -c "DROP DATABASE postgres WITH (FORCE)" -c "CREATE DATABASE postgres OWNER postgres" >>"$LOG" 2>&1
 
 echo "→ estructura (03-esquema-completo.sql)"
 sa -d postgres < "$FOTO/03-esquema-completo.sql" >>"$LOG" 2>&1 || true
