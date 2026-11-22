@@ -1,6 +1,6 @@
 -- ═══════════════════════════════════════════════════════════════════════
 -- Agenda v2 · F3 — reserva por enlace
--- (conjunto fundido: 4.º de 6, después de F1, F5a y F2)
+-- (conjunto fundido: 3.º de 6, después de F1 y F5a; ANTES de F2)
 -- ───────────────────────────────────────────────────────────────────────
 -- QUÉ HACE
 --   Crea entero el bloque de la reserva por enlace, en su versión final:
@@ -27,8 +27,14 @@
 --     consultorios.horario/horario_propio y public.agenda_v2_encendida(uuid).
 --   F5a: agenda_bloqueos (reserva_ocupacion es LANGUAGE sql y la nombra:
 --     Postgres valida su cuerpo al crearla).
---   F2: gcal_sync_clinica_habilitada(uuid), la puerta de suscripción sin sesión.
 --   Lo comprueba el pre-vuelo (1) antes de crear nada.
+--   F2 va DESPUÉS a propósito: su disparador cita_asignacion_google() lee
+--   NEW.reserva_canal, que nace aquí; con F2 antes, entre los dos COMMIT
+--   fallaría toda alta de cita. Las funciones de este bloque llaman a la
+--   puerta de suscripción de F2, gcal_sync_clinica_habilitada(uuid), sólo
+--   desde plpgsql, al ejecutarse: HASTA APLICAR F2 LA RESERVA POR ENLACE NO
+--   FUNCIONA (42883). Nadie puede llamarla antes: no hay enlaces (los emite
+--   sólo reserva_enlace_emitir, con service_role) ni la v2 encendida.
 --
 -- BLOQUEOS (lock_timeout 5 s, statement_timeout 60 s)
 --   ADD COLUMN ×11, ADD CONSTRAINT y CREATE TRIGGER sobre appointments →
@@ -46,8 +52,8 @@
 -- RE-EJECUCIÓN: NO es re-ejecutable; ABORTA LIMPIO. Si ya existe cualquier
 --   objeto de este bloque, el pre-vuelo lo dice y no toca nada.
 --
--- VUELTA ATRÁS: supabase/fusion/reversas/20261201150000_agenda_f3_reserva_enlace_reversa.sql
---   (con F4 y F5b ya quitados; pierde los enlaces, las verificaciones y el
+-- VUELTA ATRÁS: supabase/reversas/20261201140000_agenda_f3_reserva_enlace_reversa.sql
+--   (con F5b, F4 y F2 ya quitados; pierde los enlaces, las verificaciones y el
 --   historial del candado: respaldar antes esas tablas y las reserva_* de las
 --   citas).
 -- ═══════════════════════════════════════════════════════════════════════
@@ -152,10 +158,7 @@ BEGIN
     RAISE EXCEPTION 'PRE-VUELO F3: falta agenda_bloqueos (clinica_id, medico_id, inicio, fin) de F5a.';
   END IF;
 
-  -- F2
-  IF to_regprocedure('public.gcal_sync_clinica_habilitada(uuid)') IS NULL THEN
-    RAISE EXCEPTION 'PRE-VUELO F3: falta la puerta gcal_sync_clinica_habilitada(uuid) de F2.';
-  END IF;
+  -- F2 NO se exige: va después (ver la cabecera).
 END $$;
 
 -- ---------------------------------------------------------------------

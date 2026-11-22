@@ -33,7 +33,7 @@
 --   (semilla, scripts) lo hace como postgres o apaga antes la v2.
 -- Re-ejecutable: una segunda pasada no cambia nada; si lo que ya existe tiene
 --   otra forma (función DEFINER, CHECK o FK distintos), aborta sin tocar nada.
--- Vuelta atrás: supabase/fusion/reversas/20261201170000_agenda_f5b_protecciones_cita_reversa.sql
+-- Vuelta atrás: supabase/reversas/20261201170000_agenda_f5b_protecciones_cita_reversa.sql
 -- ═══════════════════════════════════════════════════════════════════════
 
 BEGIN;

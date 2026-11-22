@@ -1,18 +1,21 @@
 -- ═══════════════════════════════════════════════════════════════════════
--- Reversa de F2 (20261201140000_agenda_f2_google.sql): quita TODOS los objetos
+-- Reversa de F2 (20261201150000_agenda_f2_google.sql): quita TODOS los objetos
 -- del bloque Google, y sólo ésos.
 -- ───────────────────────────────────────────────────────────────────────
--- ORDEN DEL CONJUNTO: se corre DESPUÉS de deshacer F5b, F4 y F3 (orden inverso
--- de bloques). En particular, F4 tiene que haber quitado:
+-- ORDEN DEL CONJUNTO: se corre DESPUÉS de deshacer F5b y F4, y ANTES de la
+-- reversa de F3 (orden inverso de bloques: F5b, F4, F2, F3, F5a, F1). En
+-- particular, F4 tiene que haber quitado:
 --   · trg_appointments_aviso_clinica (su WHEN lee appointments.google_asignacion);
 --   · trg_reserva_empalmes_aviso_clinica y trg_gcal_movimientos_aviso_clinica
 --     (cuelgan de tablas de aquí; caerían solos con la tabla, pero su función
 --     quedaría huérfana).
 -- El pre-vuelo aborta si alguno de esos disparadores sigue ahí.
--- ⚠️ Lo que NO puede comprobar: F3 y F4 llaman a gcal_sync_clinica_habilitada
--- (y las dos SQL de F4 la nombran) sin dependencia registrada en pg_depend.
--- Correr esta reversa con F3 o F4 todavía puestos las deja rotas sin error
--- hasta su primera llamada. Por eso el orden inverso de bloques es obligatorio.
+-- ⚠️ Lo que NO puede comprobar: F4 nombra gcal_sync_clinica_habilitada en una
+-- función SQL y F3 la llama desde plpgsql, sin dependencia registrada en
+-- pg_depend. Correr esta reversa con F4 todavía puesto lo deja roto sin error
+-- hasta su primera llamada. F3 SÍ sigue puesto a propósito (va antes en el
+-- conjunto): entre este COMMIT y el de su reversa, la reserva por enlace
+-- falla (42883); su reversa va inmediatamente después y aborta si hay enlaces.
 --
 -- QUÉ SE PIERDE: los tokens y candados de sincronización (la siguiente pasada
 -- hace una completa), los pares de empalme ya avisados, los intentos

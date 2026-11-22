@@ -41,7 +41,7 @@
 --   service_role (responder y reagendar_por_enlace) y cuelga un disparador
 --   AFTER INSERT de appointments: si fallara, fallaría el alta de la cita que
 --   lo dispara (misma transacción).
--- CÓMO SE DESHACE: supabase/fusion/reversas/20261201160000_agenda_f4_confirmacion_correos_avisos_reversa.sql
+-- CÓMO SE DESHACE: supabase/reversas/20261201160000_agenda_f4_confirmacion_correos_avisos_reversa.sql
 --   (aborta si alguna de las cuatro tablas tiene filas: respaldar antes).
 --
 -- CONTRATOS QUE ESTE ARCHIVO CUMPLE (no cambiar sin el otro lado)
