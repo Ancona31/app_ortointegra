@@ -6,6 +6,7 @@ import type { Documento } from '@/types'
 import { metaDe, tituloDe, folioVisible } from '@/lib/documentos/familias'
 import CuerpoDocumento from './CuerpoDocumento'
 import AccionesDocumento, { type AccionesProps } from './AccionesDocumento'
+import IconoTipoDocumento from '@/components/ui/IconoTipoDocumento'
 
 /**
  * El CHASIS del visor de documentos. Mismo criterio que el visor de nota, para
@@ -27,22 +28,6 @@ import AccionesDocumento, { type AccionesProps } from './AccionesDocumento'
 
 /** §15: medida de lectura ~620 px, centrada. El contenedor ocupa su columna; el texto no. */
 const MEDIDA = 'mx-auto w-full max-w-[620px]'
-
-function Chip({ children, tono }: { children: React.ReactNode; tono: 'aviso' | 'exito' | 'error' | 'tipo'; color?: string }) {
-  const estilo =
-    tono === 'aviso' ? { background: 'var(--sp-warn-bg)', color: 'var(--sp-warn)' }
-    : tono === 'exito' ? { background: 'var(--sp-success-bg)', color: 'var(--sp-success-strong)' }
-    : tono === 'error' ? { background: 'var(--sp-danger-bg)', color: 'var(--sp-danger)' }
-    : { background: 'var(--sp-surface-muted)', color: 'var(--sp-ink-500)' }
-  return (
-    <span
-      className="shrink-0 whitespace-nowrap rounded-[var(--sp-r-pill)] px-[8px] py-[3px] text-[length:var(--sp-fs-legal)] font-bold"
-      style={estilo}
-    >
-      {children}
-    </span>
-  )
-}
 
 function fechaCorta(iso: string | null | undefined): string {
   if (!iso) return ''
@@ -89,63 +74,29 @@ export default function VisorDocumento({ doc, acciones, onIrAArchivos }: {
        única salida es que el scroll no esté aquí.
        Con la cabecera FUERA del scroller ya no hace falta que sea `sticky`: no
        hay nada que la pueda desplazar. */
-    <div className="flex flex-col overflow-visible rounded-[var(--sp-r-card)] border border-[color:var(--sp-line-card)] bg-[var(--sp-surface)] shadow-[var(--sp-shadow-flat)]">
-      {/* ── Cabecera fija y OPACA, EN DOS LÍNEAS ─────────────────────────
-          Superficie sólida, por encima del contenido en apilamiento, esquinas
-          al ras y sombra mínima al pie. Una cabecera fija translúcida deja ver
-          el texto pasando por debajo: es un defecto, no un efecto.
-
-          ⚠️ EL TÍTULO TIENE LA PRIMERA LÍNEA PARA ÉL SOLO. Compartiéndola con
-          fecha y folio, el grupo de identidad competía por el ancho con el de
-          acciones y el título era lo que cedía — justo lo que el §6.0 del parche
-          prohíbe. Con la línea entera nunca se comprime ni se trunca, y el
-          orden de sacrificio del parche (folio a la franja, luego fecha corta)
-          deja de hacer falta.
-
-          ⚠️ LA SEGUNDA LÍNEA ES UN `justify-between` CON ENVOLTURA, y las dos
-          cosas importan: los metadatos a la izquierda, los cuatro botones a la
-          derecha, y la línea de aviso de `AccionesDocumento` —que llega en el
-          mismo fragmento con `w-full` y `order-last`— cae sola a un tercer
-          renglón a ancho completo. Así el aviso hace crecer el BLOQUE de
-          cabecera hacia abajo y nunca la fila de controles. */}
-      <div className="relative z-10 flex flex-col gap-[var(--sp-2)] border-b border-[color:var(--sp-line-divider)] bg-[var(--sp-surface)] px-[var(--sp-4)] py-[var(--sp-3-5)] shadow-[var(--sp-shadow-flat)] lg:px-[26px]">
-        <h2 className="text-[length:var(--sp-fs-vitals)] font-extrabold leading-tight text-[var(--sp-ink-800)]">
-          {titulo}
+    <div className="flex flex-col overflow-visible rounded-[var(--r-tarjeta)] bg-sup ih:rounded-[var(--r-tarjeta-ancha)] iv:rounded-[var(--r-tarjeta-ancha)] esc:rounded-[var(--r-tarjeta-ancha)]">
+      {/* ── Cabecera (rediseño B7): el icono del tipo en su color y el título
+          en una línea para él solo (nunca se comprime ni se trunca); debajo la
+          fecha, el folio y como mucho dos etiquetas; y las acciones. La línea
+          de aviso de `AccionesDocumento` llega en el mismo fragmento y cae
+          sola a su renglón. Separada del cuerpo por una línea fina. */}
+      <div className="flex flex-col gap-2 border-b border-linea px-4 pb-3 pt-4 ih:px-5 iv:px-5 esc:px-6 esc:pt-5">
+        <h2 className="flex items-start gap-2 text-[20px] font-bold leading-[26px] text-tinta">
+          <IconoTipoDocumento tipo={doc.tipo} className="mt-[3px]" />
+          <span className="min-w-0 [overflow-wrap:anywhere]">{titulo}</span>
         </h2>
 
-        <div className="flex flex-wrap items-center justify-between gap-x-[var(--sp-2-5)] gap-y-[var(--sp-2)]">
-          {/* ⚠️ `flex-1` NO ES DECORACIÓN: ES LO QUE MANTIENE LOS BOTONES A LA
-              DERECHA. Aquí había `min-w-0` a secas, o sea `flex: 0 1 auto`, y
-              con eso el tamaño con el que este grupo ENTRA EN EL REPARTO es su
-              ancho de contenido — el `min-width: 0` solo le deja encoger DESPUÉS,
-              cuando la línea ya está formada. Así que en cuanto fecha + folio
-              medían lo suficiente, la fila decidía envolver, las acciones caían
-              solas a un segundo renglón y `justify-between` las dejaba a la
-              IZQUIERDA. Desde ahí el desplegable de «⋯», que se ancla a
-              `right-0`, se abría hacia fuera de la tarjeta.
-              `flex-1` es `flex: 1 1 0%`: este grupo entra al reparto midiendo
-              CERO, así que nunca provoca la envoltura, se queda el espacio que
-              sobre y su propio `flex-wrap` reparte fecha, folio y chips en dos
-              renglones cuando hace falta. Cede el texto, no los botones — que es
-              la regla, y aguanta cualquier metadato que se añada.
-              La línea de aviso de `AccionesDocumento` sigue cayendo a su propio
-              renglón: llega con `w-full`, que no cabe junto a nada. */}
-          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-[var(--sp-2-5)] gap-y-[var(--sp-1-5)]">
-            <p className="text-[length:var(--sp-fs-hint)] text-[var(--sp-ink-500)]">{fechaCorta(doc.created_at)}</p>
-            {/* Sin folio no se dibuja NADA: ni rótulo, ni guion, ni «sin folio».
-                En escrito médico y en internamiento es lo normal, no una carencia. */}
-            {folio && (
-              <p className="text-[length:var(--sp-fs-hint)] tabular-nums text-[var(--sp-ink-350)]">{folio}</p>
-            )}
-            {chipEstado && <Chip tono={esBorrador ? 'aviso' : 'exito'}>{chipEstado}</Chip>}
-            {urgente && <Chip tono="error">Urgente</Chip>}
-            {esBorrador && (
-              <span className="text-[length:var(--sp-fs-legal)] text-[var(--sp-ink-350)]">El folio se asigna al emitirse</span>
-            )}
-          </div>
-
-          <AccionesDocumento {...acciones} />
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+          <p className="k-num text-[13px] leading-[18px] text-tinta2">{fechaCorta(doc.created_at)}</p>
+          {/* Sin folio no se dibuja NADA: ni rótulo, ni guion, ni «sin folio».
+              En escrito médico y en internamiento es lo normal, no una carencia. */}
+          {folio && <p className="k-num text-[13px] leading-[18px] text-tinta2">· {folio}</p>}
+          {chipEstado && <span className={esBorrador ? 'k-etq k-etq-aviso' : 'k-etq k-etq-ok'}>{chipEstado}</span>}
+          {urgente && <span className="k-etq k-etq-mal">Urgente</span>}
         </div>
+        {esBorrador && <p className="text-[13px] leading-[18px] text-tinta2">El folio se asigna al emitirse</p>}
+
+        <AccionesDocumento {...acciones} />
       </div>
 
       {/* El cuerpo es ahora el scroller. `rounded-b` porque la tarjeta ya no
@@ -154,7 +105,7 @@ export default function VisorDocumento({ doc, acciones, onIrAArchivos }: {
           que su propio radio basta. */}
       <div
         ref={caja}
-        className="max-h-[470px] overflow-y-auto overflow-x-hidden rounded-b-[var(--sp-r-card)] px-[var(--sp-4)] py-[var(--sp-4)] lg:max-h-[550px] lg:px-[26px] lg:py-[var(--sp-5)]"
+        className="max-h-[470px] overflow-y-auto overflow-x-hidden rounded-b-[inherit] px-4 py-4 ih:px-5 iv:px-5 esc:max-h-[550px] esc:px-6 esc:py-5"
       >
         {/* La tabla de importes es la excepción de anchura del §2 y por eso esa
             familia no se acota: el texto corrido nunca se pasa de la medida,

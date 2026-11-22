@@ -50,7 +50,7 @@ function Seccion({ titulo, numero, children }: {
 function Par({ rotulo, children }: { rotulo: string; children: React.ReactNode }) {
   return (
     <span className="inline-flex min-w-0 items-baseline gap-[var(--sp-1-5)]">
-      <span className="shrink-0 text-[length:var(--sp-fs-legal)] font-bold uppercase tracking-[var(--sp-ls-label)] text-[var(--sp-ink-350)]">
+      <span className="shrink-0 text-[12px] font-bold uppercase tracking-[var(--sp-ls-label)] text-[var(--sp-ink-350)]">
         {rotulo}
       </span>
       <span className="min-w-0 text-[length:var(--sp-fs-meta)] text-[var(--sp-ink-700)]">{children}</span>
@@ -175,7 +175,7 @@ function RenglonPosologia({ numero, principal, secundario, detalle }: {
     <li className="mt-[var(--sp-4)] flex gap-[var(--sp-2)] first:mt-0">
       {/* La numeración ayuda a contar quince medicamentos sin competir con el
           nombre: columna estrecha, color terciario, cifras tabulares. */}
-      <span aria-hidden className="w-[18px] shrink-0 pt-[2px] text-[length:var(--sp-fs-legal)] font-bold tabular-nums text-[var(--sp-ink-300)]">
+      <span aria-hidden className="w-[18px] shrink-0 pt-[2px] text-[12px] font-bold tabular-nums text-[var(--sp-ink-300)]">
         {numero}
       </span>
       <div className="min-w-0">
@@ -311,12 +311,12 @@ function Firmante({ calidad, nombre, extra }: { calidad: string; nombre: string;
   if (!nombre) return null
   return (
     <div className="mt-[var(--sp-3)] first:mt-0">
-      <p className="text-[length:var(--sp-fs-legal)] font-bold uppercase tracking-[var(--sp-ls-label)] text-[var(--sp-ink-350)]">
+      <p className="text-[12px] font-bold uppercase tracking-[var(--sp-ls-label)] text-[var(--sp-ink-350)]">
         {calidad}
       </p>
       <p className="text-[length:var(--sp-fs-meta)] font-semibold text-[var(--sp-ink-800)]">{nombre}</p>
       {extra?.filter(Boolean).map((e, i) => (
-        <p key={i} className="text-[length:var(--sp-fs-legal)] text-[var(--sp-ink-500)]">{e}</p>
+        <p key={i} className="text-[12px] text-[var(--sp-ink-500)]">{e}</p>
       ))}
     </div>
   )
@@ -447,7 +447,7 @@ function FamiliaFormulario({ tipo, c }: { tipo: string; c: Record<string, unknow
             `contenido`. Por eso el visor enseña QUIÉN otorga y no si firmó: para
             afirmar lo segundo habría que consultar otra tabla, y este componente
             no consulta nada. */}
-        <p className="mt-[var(--sp-3)] text-[length:var(--sp-fs-legal)] text-[var(--sp-ink-350)]">
+        <p className="mt-[var(--sp-3)] text-[12px] text-[var(--sp-ink-350)]">
           Las firmas y la huella del documento se registran al sellarlo; para verlas, descarga el PDF.
         </p>
       </Seccion>
@@ -484,9 +484,9 @@ function FamiliaImportes({ c }: { c: Record<string, unknown> }) {
           <table className="w-full border-collapse text-left">
             <thead>
               <tr>
-                <th className="pb-[var(--sp-2)] text-[length:var(--sp-fs-legal)] font-bold uppercase tracking-[var(--sp-ls-label)] text-[var(--sp-ink-350)]">Concepto</th>
-                {esCotizacion && <th className="w-[150px] pb-[var(--sp-2)] text-[length:var(--sp-fs-legal)] font-bold uppercase tracking-[var(--sp-ls-label)] text-[var(--sp-ink-350)]">Origen</th>}
-                <th className="w-[130px] pb-[var(--sp-2)] text-right text-[length:var(--sp-fs-legal)] font-bold uppercase tracking-[var(--sp-ls-label)] text-[var(--sp-ink-350)]">Precio</th>
+                <th className="pb-[var(--sp-2)] text-[12px] font-bold uppercase tracking-[var(--sp-ls-label)] text-[var(--sp-ink-350)]">Concepto</th>
+                {esCotizacion && <th className="w-[150px] pb-[var(--sp-2)] text-[12px] font-bold uppercase tracking-[var(--sp-ls-label)] text-[var(--sp-ink-350)]">Origen</th>}
+                <th className="w-[130px] pb-[var(--sp-2)] text-right text-[12px] font-bold uppercase tracking-[var(--sp-ls-label)] text-[var(--sp-ink-350)]">Precio</th>
               </tr>
             </thead>
             <tbody>
@@ -502,7 +502,7 @@ function FamiliaImportes({ c }: { c: Record<string, unknown> }) {
 
           {/* Cierre de importes, alineado a la derecha bajo la tabla. */}
           <div className="mt-[var(--sp-4)] flex flex-col items-end gap-[var(--sp-1-5)]">
-            <p className="text-[length:var(--sp-fs-legal)] font-bold uppercase tracking-[var(--sp-ls-label)] text-[var(--sp-ink-350)]">
+            <p className="text-[12px] font-bold uppercase tracking-[var(--sp-ls-label)] text-[var(--sp-ink-350)]">
               {esCotizacion ? 'Total estimado' : 'Total'}
               <span className="ml-[var(--sp-2)] text-[length:var(--sp-fs-confirm)] font-extrabold tabular-nums normal-case tracking-normal text-[var(--sp-ink-900)]">
                 {importe(c.monto, divisa)}
@@ -513,7 +513,7 @@ function FamiliaImportes({ c }: { c: Record<string, unknown> }) {
             {hayAnticipo && (
               <>
                 <Par rotulo="Anticipo recibido">{importe(c.anticipo, divisa)}</Par>
-                <p className="text-[length:var(--sp-fs-legal)] font-bold uppercase tracking-[var(--sp-ls-label)] text-[var(--sp-ink-350)]">
+                <p className="text-[12px] font-bold uppercase tracking-[var(--sp-ls-label)] text-[var(--sp-ink-350)]">
                   Saldo pendiente
                   <span className="ml-[var(--sp-2)] text-[length:var(--sp-fs-confirm)] font-extrabold tabular-nums normal-case tracking-normal text-[var(--sp-ink-900)]">
                     {importe(c.saldo, divisa)}
@@ -629,7 +629,7 @@ function Cierre({ doc }: { doc: Documento }) {
 
   return (
     <div className="mt-[var(--sp-8)] max-w-[56%] border-t border-[color:var(--sp-line-divider)] pt-[var(--sp-3)]">
-      <p className="text-[length:var(--sp-fs-legal)] font-bold uppercase tracking-[var(--sp-ls-label)] text-[var(--sp-ink-350)]">
+      <p className="text-[12px] font-bold uppercase tracking-[var(--sp-ls-label)] text-[var(--sp-ink-350)]">
         {meta.rotuloFirma}
       </p>
       {txt(medico.nombre) && (
@@ -638,11 +638,11 @@ function Cierre({ doc }: { doc: Documento }) {
       {txt(medico.especialidad) && (
         <p className="text-[length:var(--sp-fs-meta)] text-[var(--sp-ink-500)]">{txt(medico.especialidad)}</p>
       )}
-      {cedulas && <p className="text-[length:var(--sp-fs-legal)] text-[var(--sp-ink-350)]">{cedulas}</p>}
+      {cedulas && <p className="text-[12px] text-[var(--sp-ink-350)]">{cedulas}</p>}
 
       {/* Los documentos antiguos pueden no traer consultorio → no hay bloque. */}
       {txt(consultorio.nombre) && (
-        <p className="mt-[var(--sp-2)] text-[length:var(--sp-fs-legal)] text-[var(--sp-ink-350)]">
+        <p className="mt-[var(--sp-2)] text-[12px] text-[var(--sp-ink-350)]">
           {[txt(consultorio.nombre), txt(consultorio.direccion), txt(consultorio.telefono)].filter(Boolean).join(' · ')}
         </p>
       )}
@@ -650,7 +650,7 @@ function Cierre({ doc }: { doc: Documento }) {
       {/* ⚠️ EL VISOR NO DIBUJA EL QR. Un código en pantalla no se escanea a sí
           mismo: se nombra la verificación y se remite al PDF. */}
       {meta.prefijoFolio && (
-        <p className="mt-[var(--sp-2)] text-[length:var(--sp-fs-legal)] uppercase tracking-[var(--sp-ls-label)] text-[var(--sp-ink-350)]">
+        <p className="mt-[var(--sp-2)] text-[12px] uppercase tracking-[var(--sp-ls-label)] text-[var(--sp-ink-350)]">
           Verificación · en el PDF
         </p>
       )}

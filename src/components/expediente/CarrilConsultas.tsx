@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { PanelLeftOpen, PanelLeftClose, ChevronDown, ArrowLeft } from 'lucide-react'
+import { PanelLeftOpen, PanelLeftClose, ChevronDown, ChevronLeft } from 'lucide-react'
 import type { Consulta } from '@/types'
 import { renderEnTZ, TZ_CLINICA } from '@/lib/dates'
 
@@ -37,7 +37,9 @@ function resumenDe(c: Consulta): { fecha: string; diagnostico: string } {
   return { fecha, diagnostico }
 }
 
-/** El renglón del carril expandido y de la lista de móvil: misma información. */
+/** El renglón del carril expandido y de la lista de móvil: misma información.
+ *  Rediseño B7: el diagnóstico (15/600) arriba y la fecha debajo; la activa,
+ *  con fondo tonal (maqueta `final-expediente`). */
 function Renglon({ consulta, activa, onSelect }: {
   consulta: Consulta
   activa: boolean
@@ -49,21 +51,13 @@ function Renglon({ consulta, activa, onSelect }: {
       type="button"
       onClick={onSelect}
       aria-current={activa ? 'true' : undefined}
-      className="flex w-full flex-col gap-[2px] border-l-[var(--sp-bw-bar)] px-[12px] py-[10px] text-left transition-colors"
-      style={activa
-        ? { borderLeftColor: 'var(--sp-primary)', background: 'var(--sp-primary-bg-faint)' }
-        : { borderLeftColor: 'transparent' }}
+      className={`flex min-h-[52px] w-full flex-col justify-center gap-0.5 rounded-[10px] px-3 py-2 text-left transition-opacity active:opacity-70 ${activa ? 'bg-tonal' : 'hover:bg-sup2'}`}
     >
-      <span className="text-[10.5px] font-bold uppercase tracking-[var(--sp-ls-label)] text-[var(--sp-ink-350)]">
-        {fecha}
-      </span>
-      {/* Una línea con elipsis: las descripciones CIE-10 pasan de cien caracteres. */}
-      <span
-        className="truncate text-[length:var(--sp-fs-label)] font-semibold"
-        style={{ color: activa ? 'var(--sp-ink-800)' : 'var(--sp-ink-600)' }}
-      >
+      {/* Dos líneas como mucho: las descripciones CIE-10 pasan de cien caracteres. */}
+      <span className={`line-clamp-2 text-[15px] font-semibold leading-5 ${activa ? 'text-tonal-tinta' : 'text-tinta'}`}>
         {diagnostico}
       </span>
+      <span className={`k-num text-[13px] leading-[18px] ${activa ? 'text-tonal-tinta' : 'text-tinta2'}`}>{fecha}</span>
     </button>
   )
 }
@@ -76,7 +70,7 @@ function PieConteo({ mostradas, total }: { mostradas: number; total: number | un
      línea de tiempo del Resumen: se dice qué falta, sin fingir una acción. */
   if (total === undefined || total <= mostradas) return null
   return (
-    <p className="border-t border-[color:var(--sp-line-divider)] px-[12px] py-[var(--sp-2)] text-[length:var(--sp-fs-legal)] text-[var(--sp-ink-350)]">
+    <p className="k-t-sec border-t border-linea px-3 py-2">
       Mostrando {mostradas} de {total}
     </p>
   )
@@ -106,17 +100,17 @@ export default function CarrilConsultas({
       <button
         type="button"
         onClick={() => setListaMovil(true)}
-        className="flex w-full items-center gap-[var(--sp-2-5)] rounded-[var(--sp-r-card-inner)] border border-[color:var(--sp-line-card)] bg-[var(--sp-surface)] px-[13px] py-[11px] text-left lg:hidden"
+        className="flex min-h-[56px] w-full items-center gap-3 rounded-[var(--r-tarjeta)] bg-sup px-4 py-2.5 text-left transition-opacity active:opacity-70 lg:hidden"
       >
         <span className="min-w-0 flex-1">
-          <span className="block text-[10.5px] font-bold uppercase tracking-[var(--sp-ls-label)] text-[var(--sp-ink-350)]">
+          <span className="block text-[13px] leading-[18px] text-tinta2">
             Consulta {indiceActiva + 1} de {total ?? consultas.length}
           </span>
-          <span className="block truncate text-[13.5px] font-semibold text-[var(--sp-ink-800)]">
+          <span className="block truncate text-[15px] font-semibold leading-5 text-tinta">
             {fecha} · {diagnostico}
           </span>
         </span>
-        <ChevronDown size={16} className="shrink-0 text-[var(--sp-ink-icon)]" />
+        <ChevronDown size={18} aria-hidden="true" className="shrink-0 text-tinta2" />
       </button>
     )
   })()
@@ -126,11 +120,11 @@ export default function CarrilConsultas({
       <button
         type="button"
         onClick={() => setListaMovil(false)}
-        className="inline-flex items-center gap-[var(--sp-1)] pb-[var(--sp-2-5)] text-[length:var(--sp-fs-hint)] font-semibold text-[var(--sp-ink-500)]"
+        className="k-b k-b-texto -ml-1 mb-2 h-[var(--k-toque)] text-[13px]"
       >
-        <ArrowLeft size={13} /> Volver a la nota
+        <ChevronLeft size={16} aria-hidden="true" /> Volver a la nota
       </button>
-      <div className="overflow-hidden rounded-[var(--sp-r-card-inner)] border border-[color:var(--sp-line-card)] bg-[var(--sp-surface)]">
+      <div className="flex flex-col gap-0.5 rounded-[var(--r-tarjeta)] bg-sup p-2">
         {consultas.map(c => (
           <Renglon
             key={c.id}
@@ -150,13 +144,13 @@ export default function CarrilConsultas({
       {listaMovil ? vistaListaMovil : selectorMovil}
 
       <aside
-        className={`hidden shrink-0 self-start overflow-hidden rounded-[var(--sp-r-card)] border border-[color:var(--sp-line-card)] bg-[var(--sp-surface)] lg:block ${expandido ? ANCHO_EXPANDIDO : ANCHO_COLAPSADO}`}
+        className={`hidden shrink-0 self-start overflow-hidden rounded-[var(--r-tarjeta-ancha)] bg-sup lg:block ${expandido ? ANCHO_EXPANDIDO : ANCHO_COLAPSADO}`}
       >
         {/* Encabezado fijo con el conteo y el control de plegar. Colapsado, el
             conteo no cabe al lado del botón y se va debajo. */}
-        <div className={`border-b border-[color:var(--sp-line-divider)] ${expandido ? 'flex items-center justify-between gap-[var(--sp-2)] px-[12px] py-[var(--sp-2)]' : 'flex flex-col items-center gap-[2px] py-[var(--sp-2)]'}`}>
+        <div className={`${expandido ? 'flex items-center justify-between gap-2 py-1 pl-4 pr-1' : 'flex flex-col items-center gap-0.5 py-1'}`}>
           {expandido && (
-            <span className="text-[10.5px] font-bold uppercase tracking-[var(--sp-ls-label)] text-[var(--sp-ink-350)]">
+            <span className="k-t-sec k-num">
               {total ?? consultas.length} consultas
             </span>
           )}
@@ -165,12 +159,12 @@ export default function CarrilConsultas({
             onClick={onToggleExpandido}
             aria-expanded={expandido}
             aria-label={expandido ? 'Colapsar el carril de consultas' : 'Expandir el carril de consultas'}
-            className="flex h-[24px] w-[24px] items-center justify-center rounded-[var(--sp-r-btn-sm)] text-[var(--sp-ink-icon)] transition-colors hover:bg-[var(--sp-surface-muted)] hover:text-[var(--sp-ink-700)]"
+            className="k-b k-b-icono"
           >
-            {expandido ? <PanelLeftClose size={15} /> : <PanelLeftOpen size={15} />}
+            {expandido ? <PanelLeftClose aria-hidden="true" /> : <PanelLeftOpen aria-hidden="true" />}
           </button>
           {!expandido && (
-            <span className="text-[length:var(--sp-fs-legal)] font-bold tabular-nums text-[var(--sp-ink-350)]">
+            <span className="k-num text-[13px] text-tinta2">
               {total ?? consultas.length}
             </span>
           )}
@@ -178,7 +172,7 @@ export default function CarrilConsultas({
 
         {expandido ? (
           /* Alto tope con desplazamiento propio: la lista no alarga la página. */
-          <div className="max-h-[560px] overflow-y-auto">
+          <div className="flex max-h-[560px] flex-col gap-0.5 overflow-y-auto px-2 pb-2">
             {consultas.map(c => (
               <Renglon key={c.id} consulta={c} activa={c.id === activaId} onSelect={() => onSelect(c.id)} />
             ))}
@@ -189,7 +183,7 @@ export default function CarrilConsultas({
              mismo en que llegan—. La activa, más larga y en acento. Cada marca
              revela su fecha al pasar el cursor, que es todo lo que cabe decir
              en 44 px. */
-          <div className="flex max-h-[560px] flex-col items-center gap-[var(--sp-2)] overflow-y-auto py-[var(--sp-3)]">
+          <div className="flex max-h-[560px] flex-col items-center overflow-y-auto pb-2">
             {consultas.map(c => {
               const esActiva = c.id === activaId
               const { fecha, diagnostico } = resumenDe(c)
@@ -201,12 +195,14 @@ export default function CarrilConsultas({
                   title={`${fecha} · ${diagnostico}`}
                   aria-current={esActiva ? 'true' : undefined}
                   aria-label={`${fecha} · ${diagnostico}`}
-                  className="h-[3px] shrink-0 rounded-[var(--sp-r-pill)] transition-all"
-                  style={{
-                    width: esActiva ? '20px' : '12px',
-                    background: esActiva ? 'var(--sp-primary)' : 'var(--sp-ink-150)',
-                  }}
-                />
+                  /* El área es la fila entera de 36 px (toque de esc); la marca, la raya de dentro. */
+                  className="flex h-9 w-full shrink-0 items-center justify-center"
+                >
+                  <span
+                    aria-hidden="true"
+                    className={`block h-[3px] rounded-full ${esActiva ? 'w-[20px] bg-accion' : 'w-[12px] bg-tinta3'}`}
+                  />
+                </button>
               )
             })}
           </div>
