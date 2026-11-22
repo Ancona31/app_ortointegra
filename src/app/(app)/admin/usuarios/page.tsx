@@ -1,8 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Plus, Trash2, Loader2, Shield, UserCheck, X, AlertTriangle, MailCheck, Send } from 'lucide-react'
-import Portal from '@/components/ui/Portal'
+import { useState, useEffect, useRef } from 'react'
+import { Plus, Trash2, Loader2, AlertTriangle, MailCheck, Send, MoreHorizontal, Users } from 'lucide-react'
+import ModalShell from '@/components/ui/ModalShell'
+import CapaMenu from '@/components/ui/CapaMenu'
+import Avatar, { inicialesDe } from '@/components/ui/Avatar'
+import EstadoVacio from '@/components/ui/EstadoVacio'
+import EstadoError from '@/components/ui/EstadoError'
 import { useProfile, type Role } from '@/hooks/useProfile'
 import { canManageClinica, isMedico } from '@/lib/permissions'
 import { useRouter } from 'next/navigation'
@@ -185,270 +189,280 @@ export default function AdminUsuariosPage() {
   }
 
   if (loadingProfile || loading) return (
-    <div className="max-w-2xl mx-auto space-y-4">
-      {[1,2,3].map(i => (
-        <div key={i} className="bg-white rounded-xl border border-slate-200 p-4 animate-pulse">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-full bg-slate-200" />
-            <div className="space-y-1.5">
-              <div className="h-3 w-32 bg-slate-200 rounded" />
-              <div className="h-2.5 w-48 bg-slate-100 rounded" />
+    <div className="mx-auto max-w-[760px]" aria-busy="true">
+      <div className="k-tarjeta flex flex-col gap-4">
+        {[1, 2, 3].map(i => (
+          <div key={i} className="flex items-center gap-3">
+            <div className="skeleton h-9 w-9 rounded-full" />
+            <div className="flex flex-col gap-1.5">
+              <div className="skeleton h-3 w-32 rounded" />
+              <div className="skeleton h-2.5 w-48 rounded" />
             </div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   )
 
+  /* La carga falló (la licencia sólo queda en null por el `catch`): se dice,
+     en vez de pintar un equipo vacío que no lo está. */
+  const cargaFallida = Boolean(error) && usuarios.length === 0 && licencia === null
+
   return (
-    <div className="max-w-2xl mx-auto space-y-4 animate-slide-up">
+    /* Rediseño B10 (maqueta `admin`, vista 1): título con «Invitar» como único
+       primario, los contadores como números sueltos y «Tu equipo» en una
+       tarjeta de filas con avatar, etiquetas de rol y estado, «Reenviar»
+       tonal a la vista y lo destructivo dentro de «···». */
+    <div className="mx-auto max-w-[760px]">
       {/* B4: Estadísticas · Usuarios · Facturación (CALMA §30.2). */}
       <PestanasAdministracion />
-      <div className="flex items-end justify-between">
-        <div>
-          <p className="text-[11px] font-semibold text-[#86868b] uppercase tracking-widest mb-1">Admin</p>
-          <h1 className="text-[22px] font-bold tracking-tight text-[#1d1d1f]">Usuarios</h1>
-          <p className="text-sm text-[#86868b] mt-0.5">Invita a tu equipo y administra los accesos</p>
+      <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
+        <div className="min-w-0">
+          <p className="k-t-rotulo">Admin</p>
+          <h1 className="k-t-pantalla mt-0.5">Usuarios</h1>
+          <p className="k-t-sec mt-0.5">Invita a tu equipo y administra los accesos</p>
         </div>
         <button
+          type="button"
           onClick={() => { setShowForm(true); setError('') }}
-          className="flex items-center gap-1.5 px-4 py-2 bg-[#1e5fa8] text-white rounded-xl text-sm font-semibold hover:bg-[#1a3a5c] transition-colors shadow-sm"
+          className="k-b k-b-prim max-sm:order-last"
         >
-          <Plus size={15} strokeWidth={2.5} /> Invitar
+          <Plus size={18} strokeWidth={2.4} aria-hidden="true" /> Invitar
         </button>
+
+        {/* Indicadores de licencia. Las invitaciones pendientes CUENTAN: ocupan
+            plaza en cuanto se envían, igual que en el tope del servidor. */}
+        {licencia && (
+          <div className="flex basis-full gap-8">
+            <Contador rotulo="Médicos" usados={usuarios.filter(u => u.role === 'medico').length} tope={licencia.max_medicos} />
+            <Contador rotulo="Asistentes" usados={usuarios.filter(u => u.role === 'secretaria').length} tope={licencia.max_secretarias} />
+          </div>
+        )}
       </div>
-
-      {/* Modal de invitación — macOS sheet */}
-      {showForm && (
-      <Portal>
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
-          <div className="bg-[var(--sp-surface-glass)] backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-sm flex flex-col max-h-[90vh] animate-slide-up">
-            <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-slate-100 flex-shrink-0">
-              <h2 className="text-base font-semibold text-[#1d1d1f]">Invitar a alguien</h2>
-              <button onClick={() => setShowForm(false)}
-                className="w-7 h-7 rounded-lg hover:bg-slate-100 flex items-center justify-center text-[#86868b] transition-colors">
-                <X size={14} />
-              </button>
-            </div>
-
-            <form id="form-invitar" onSubmit={invitar} className="px-5 py-4 space-y-3 overflow-y-auto flex-1">
-              <div>
-                <label className="text-[11px] font-medium text-[#86868b] block mb-1.5">Rol</label>
-                <select value={form.role} onChange={e => setForm({ ...form, role: e.target.value })}
-                  className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/25 focus:bg-white transition-all">
-                  <option value="secretaria">Asistente Médico/a</option>
-                  <option value="medico">Médico</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="text-[11px] font-medium text-[#86868b] block mb-1.5">Correo electrónico</label>
-                <input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })}
-                  placeholder="correo@email.com" required
-                  className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/25 focus:border-[#1e5fa8]/50 focus:bg-white transition-all" />
-              </div>
-
-              {/* Lo que el admin NO tiene que teclear, dicho donde antes estaban
-                  los campos: es la pregunta que se va a hacer al ver un
-                  formulario de dos líneas. */}
-              <p className="text-[11px] text-[#86868b] leading-relaxed">
-                {form.role === 'medico'
-                  ? 'Su nombre, su especialidad y sus cédulas los captura él mismo al entrar: son los datos que salen impresos en sus recetas.'
-                  : 'Escribirá su nombre al entrar por primera vez.'}
-              </p>
-
-              {/* ⚠️ EL AVISO DE LA HORA VA ANTES DE ENVIAR, NO DESPUÉS. La
-                  caducidad la fija `otp_expiry` de GoTrue, el mismo dial que la
-                  recuperación de contraseña, y no se toca por esto. Lo que sí
-                  podemos es no prometer lo que el sistema no cumple: si el admin
-                  sabe que es una hora, avisa a la persona o reenvía sin
-                  sorprenderse. */}
-              <div className="flex gap-2 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2.5">
-                <AlertTriangle size={14} className="text-amber-500 flex-shrink-0 mt-0.5" />
-                <p className="text-[11px] text-amber-800 leading-relaxed">
-                  El enlace caduca <strong>en 1 hora</strong>. Si se le pasa, podrás reenviarle la invitación desde la lista.
-                </p>
-              </div>
-
-              {error && <p className="text-xs text-red-500 bg-red-50 px-3 py-2 rounded-xl">{error}</p>}
-            </form>
-
-            <div className="flex gap-2 px-5 pb-5 pt-3 border-t border-slate-100 flex-shrink-0">
-              <button type="button" onClick={() => setShowForm(false)}
-                className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm font-medium text-[#3d3d3f] hover:bg-slate-50 transition-colors">
-                Cancelar
-              </button>
-              <button type="submit" form="form-invitar" disabled={guardando}
-                className="flex-1 py-2.5 bg-[#1e5fa8] text-white rounded-xl text-sm font-semibold hover:bg-[#1a3a5c] disabled:opacity-50 flex items-center justify-center gap-1.5 transition-colors">
-                {guardando ? <><Loader2 size={13} className="animate-spin" /> Enviando...</> : 'Enviar invitación'}
-              </button>
-            </div>
-          </div>
-        </div>
-      </Portal>
-      )}
-
-      {/* Indicadores de licencia. Las invitaciones pendientes CUENTAN: ocupan
-          plaza en cuanto se envían, igual que en el tope del servidor. */}
-      {licencia && (
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-          <div className="grid grid-cols-2 divide-x divide-slate-100">
-            <div className="px-5 py-4">
-              <p className="text-[10px] font-semibold text-[#86868b] uppercase tracking-widest">Médicos</p>
-              <p className="text-xl font-bold text-[#1d1d1f] mt-1.5 tabular-nums">
-                {usuarios.filter(u => u.role === 'medico').length}
-                <span className="text-sm font-normal text-[#86868b]"> / {licencia.max_medicos ?? '∞'}</span>
-              </p>
-            </div>
-            <div className="px-5 py-4">
-              <p className="text-[10px] font-semibold text-[#86868b] uppercase tracking-widest">Asistentes</p>
-              <p className="text-xl font-bold text-[#1d1d1f] mt-1.5 tabular-nums">
-                {usuarios.filter(u => u.role === 'secretaria').length}
-                <span className="text-sm font-normal text-[#86868b]"> / {licencia.max_secretarias ?? '∞'}</span>
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal de confirmación — el texto cambia según lo que se esté deshaciendo:
-          cancelar una invitación que nadie usó no es lo mismo que dar de baja a
-          quien lleva meses escribiendo en expedientes. */}
-      {confirmDelete && (
-      <Portal>
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
-          <div className="bg-[var(--sp-surface-glass)] backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-xs overflow-hidden animate-slide-up">
-            <div className="px-6 pt-6 pb-4 text-center">
-              <div className="w-12 h-12 rounded-full mx-auto mb-3 flex items-center justify-center"
-                style={{ backgroundColor: bajaBloqueada ? '#FFF7ED' : '#FEF2F2' }}>
-                <AlertTriangle size={22} style={{ color: bajaBloqueada ? '#F59E0B' : '#EF5350' }} />
-              </div>
-
-              {bajaBloqueada ? (
-                /* ⚠️ EL `mailto` ES UNA PARADA PROVISIONAL, NO EL DISEÑO. Con las
-                   palabras de Angel, que quedan aquí para que nadie las lea al
-                   revés: «Dar de baja a un médico invitado es una facultad del
-                   administrador de su clínica, y debe seguir siéndolo. Mandarlo
-                   a soporte es una parada provisional mientras se construye el
-                   flujo de baja con volcado; no es el diseño, es lo único
-                   honesto que se puede decir hoy.»
-                   Cuando exista ese flujo —el médico que se va recibe una COPIA
-                   de lo que firmó y los expedientes se quedan en la clínica—,
-                   esta pantalla deja de mandar a soporte y lo ofrece. Ver
-                   BAJA-01 en `DEUDA_TECNICA.md`. */
-                <>
-                  <h3 className="text-base font-semibold text-[#1d1d1f]">No se puede dar de baja</h3>
-                  <p className="text-sm text-[#86868b] mt-1">
-                    No se puede dar de baja a un médico que ya tiene pacientes en la clínica.
-                    Escríbenos a{' '}
-                    <a href="mailto:soporte@spinus.com.mx" className="font-semibold text-[#1e5fa8] hover:underline">
-                      soporte@spinus.com.mx
-                    </a>{' '}
-                    y lo resolvemos contigo.
-                  </p>
-                </>
-              ) : (
-                <>
-                  <h3 className="text-base font-semibold text-[#1d1d1f]">
-                    {confirmDelete.estado === 'pendiente' ? 'Cancelar invitación' : 'Dar de baja'}
-                  </h3>
-                  <p className="text-sm text-[#86868b] mt-1">
-                    {confirmDelete.estado === 'pendiente' ? (
-                      <>La invitación de <span className="font-semibold text-[#3d3d3f]">{confirmDelete.email}</span> dejará de funcionar y su plaza quedará libre.</>
-                    ) : (
-                      <>¿Dar de baja a <span className="font-semibold text-[#3d3d3f]">{confirmDelete.nombre || confirmDelete.email}</span>? Perderá el acceso y su plaza quedará libre. Lo que haya registrado se queda en la clínica.</>
-                    )}
-                  </p>
-                </>
-              )}
-            </div>
-
-            {bajaBloqueada ? (
-              <div className="border-t border-slate-100">
-                <button onClick={cerrarConfirmacion}
-                  className="w-full px-4 py-3.5 text-sm font-semibold text-[#1e5fa8] hover:bg-slate-50 transition-colors">
-                  Entendido
-                </button>
-              </div>
-            ) : (
-              <div className="border-t border-slate-100 grid grid-cols-2">
-                <button onClick={cerrarConfirmacion}
-                  className="px-4 py-3.5 text-sm font-medium text-[#1e5fa8] hover:bg-slate-50 transition-colors border-r border-slate-100">
-                  Volver
-                </button>
-                <button onClick={confirmarEliminar}
-                  className="px-4 py-3.5 text-sm font-semibold transition-colors hover:bg-red-50"
-                  style={{ color: '#EF5350' }}>
-                  {confirmDelete.estado === 'pendiente' ? 'Cancelar invitación' : 'Dar de baja'}
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      </Portal>
-      )}
 
       {/* Lista de usuarios */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-        <div className="px-5 py-3.5 border-b border-slate-100">
-          <p className="text-[11px] font-semibold text-[#86868b] uppercase tracking-widest">Tu equipo</p>
+      <section aria-labelledby="usuarios-equipo" className="k-tarjeta mt-5 pb-1 esc:px-5">
+        <h2 id="usuarios-equipo" className="k-t-tarjeta pb-3">Tu equipo</h2>
+        {cargaFallida ? (
+          <EstadoError variante="tarjeta" mensaje={error} />
+        ) : usuarios.length === 0 ? (
+          <EstadoVacio variante="seccion" icono={Users} titulo="Todavía no hay nadie en tu equipo" />
+        ) : (
+          <ul className="k-lista border-t border-linea">
+            {usuarios.map((u, i) => (
+              <FilaEquipo
+                key={u.id}
+                usuario={u}
+                indice={i}
+                reenviando={reenviando === u.id}
+                onReenviar={() => reenviar(u)}
+                onBaja={() => { setBajaBloqueada(false); setConfirmDelete(u) }}
+              />
+            ))}
+          </ul>
+        )}
+      </section>
+
+      {/* Invitar — capa del catálogo (hoja en teléfono, tarjeta en ancho). */}
+      <ModalShell
+        open={showForm}
+        onClose={() => setShowForm(false)}
+        title="Invitar a alguien"
+        maxWidth="max-w-[440px]"
+        footer={
+          <div className="flex items-center justify-end gap-2 px-6 py-3 max-sm:grid max-sm:grid-cols-2 ext:px-5">
+            <button type="button" onClick={() => setShowForm(false)} className="k-b k-b-quieto min-w-[104px]">
+              Cancelar
+            </button>
+            <button type="submit" form="form-invitar" disabled={guardando} className="k-b k-b-prim min-w-[104px]">
+              {guardando ? <><Loader2 size={16} aria-hidden="true" className="animate-spin" /> Enviando...</> : 'Enviar invitación'}
+            </button>
+          </div>
+        }
+      >
+        <FormInvitar form={form} setForm={setForm} error={error} onSubmit={invitar} />
+      </ModalShell>
+
+      {/* Confirmación — el texto cambia según lo que se esté deshaciendo:
+          cancelar una invitación que nadie usó no es lo mismo que dar de baja a
+          quien lleva meses escribiendo en expedientes. */}
+      <ModalShell
+        open={confirmDelete !== null}
+        onClose={cerrarConfirmacion}
+        title={bajaBloqueada ? 'No se puede dar de baja' : confirmDelete?.estado === 'pendiente' ? 'Cancelar invitación' : 'Dar de baja'}
+        icon={<AlertTriangle aria-hidden="true" />}
+        variante="alerta"
+        tono={bajaBloqueada ? 'avisar' : 'destruir'}
+        apilada={!bajaBloqueada && confirmDelete?.estado === 'pendiente'}
+        footer={bajaBloqueada ? (
+          <button type="button" autoFocus onClick={cerrarConfirmacion} className="k-b k-b-capa k-b-quieto">
+            Entendido
+          </button>
+        ) : (
+          <>
+            <button type="button" autoFocus onClick={cerrarConfirmacion} className="k-b k-b-capa k-b-quieto">
+              Volver
+            </button>
+            <button type="button" data-principal onClick={confirmarEliminar} className="k-b k-b-capa k-b-mal">
+              {confirmDelete?.estado === 'pendiente' ? 'Cancelar invitación' : 'Dar de baja'}
+            </button>
+          </>
+        )}
+      >
+        {confirmDelete && <TextoConfirmacion usuario={confirmDelete} bloqueada={bajaBloqueada} />}
+      </ModalShell>
+    </div>
+  )
+}
+
+function Contador({ rotulo, usados, tope }: { rotulo: string; usados: number; tope: number | null }) {
+  return (
+    <div>
+      <p className="k-t-rotulo">{rotulo}</p>
+      <p className="k-num mt-0.5 text-[22px] font-bold leading-7 text-tinta">
+        {usados}
+        <span className="text-[15px] font-normal text-tinta2"> / {tope ?? '∞'}</span>
+      </p>
+    </div>
+  )
+}
+
+/** Una persona del equipo. «Reenviar» a la vista en las pendientes; la baja, dentro de «···». */
+function FilaEquipo({ usuario: u, indice, reenviando, onReenviar, onBaja }: {
+  usuario: Usuario
+  indice: number
+  reenviando: boolean
+  onReenviar: () => void
+  onBaja: () => void
+}) {
+  const [menu, setMenu] = useState(false)
+  const ancla = useRef<HTMLButtonElement>(null)
+  const esMedico = isMedico({ role: u.role })
+  const pendiente = u.estado === 'pendiente'
+  /* Mientras está pendiente, el correo manda: puede que no haya nombre y es lo
+     único que identifica a quien todavía no ha entrado. */
+  const titulo = pendiente ? u.email : (u.nombre || 'Sin nombre')
+  /* Iniciales de las dos primeras palabras que no son un título («Dra.»). */
+  const [nom, ape] = (u.nombre ?? '').split(' ').filter(p => p && !p.endsWith('.'))
+  return (
+    <li className="flex items-center gap-3 py-3">
+      {pendiente
+        ? <span aria-hidden="true" className="k-avatar bg-aviso-fondo text-aviso-tinta"><MailCheck size={16} /></span>
+        : <Avatar texto={inicialesDe(nom ?? '', ape ?? '')} indice={indice} />}
+      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1">
+        <div className="min-w-0 flex-1 basis-[180px]">
+          <p className="k-t-fila truncate">{titulo}</p>
+          <p className="k-t-sec truncate">{pendiente ? (u.nombre || 'Sin nombre todavía') : u.email}</p>
         </div>
-        <div className="divide-y divide-slate-100">
-          {usuarios.map(u => {
-            const esMedico = isMedico({ role: u.role })
-            const pendiente = u.estado === 'pendiente'
-            return (
-              <div key={u.id} className="flex items-center justify-between px-5 py-3.5 hover:bg-slate-50/60 transition-colors gap-3">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${pendiente ? 'bg-amber-50' : esMedico ? 'bg-blue-50' : 'bg-violet-50'}`}>
-                    {pendiente
-                      ? <MailCheck size={15} className="text-amber-600" />
-                      : esMedico
-                        ? <Shield size={15} className="text-[#1e5fa8]" />
-                        : <UserCheck size={15} className="text-violet-600" />}
-                  </div>
-                  <div className="min-w-0">
-                    {/* Mientras está pendiente, el correo manda: puede que no haya
-                        nombre (el del médico es opcional) y es lo único que
-                        identifica a quien todavía no ha entrado. */}
-                    <p className="text-sm font-semibold text-[#1d1d1f] truncate">
-                      {pendiente ? u.email : (u.nombre || 'Sin nombre')}
-                    </p>
-                    <p className="text-[11px] text-[#86868b] truncate">
-                      {pendiente ? (u.nombre || 'Sin nombre todavía') : u.email}
-                    </p>
-                    <div className="flex items-center gap-1.5 mt-0.5">
-                      <p className="text-[10px] text-[#86868b] capitalize">{esMedico ? 'médico' : 'asistente'}</p>
-                      {pendiente && (
-                        <span className="text-[10px] font-semibold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded-full">
-                          Invitación enviada
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-1 flex-shrink-0">
-                  {pendiente && (
-                    <button onClick={() => reenviar(u)} disabled={reenviando === u.id} title="Reenviar invitación"
-                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold text-[#1e5fa8] hover:bg-blue-50 disabled:opacity-50 transition-colors">
-                      {reenviando === u.id
-                        ? <Loader2 size={12} className="animate-spin" />
-                        : <Send size={12} />}
-                      Reenviar
-                    </button>
-                  )}
-                  <button onClick={() => { setBajaBloqueada(false); setConfirmDelete(u) }}
-                    title={pendiente ? 'Cancelar invitación' : 'Eliminar usuario'}
-                    className="w-7 h-7 rounded-lg hover:bg-red-50 flex items-center justify-center transition-colors"
-                    style={{ color: '#EF5350' }}>
-                    <Trash2 size={13} />
-                  </button>
-                </div>
-              </div>
-            )
-          })}
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className={`k-etq ${esMedico ? 'k-etq-tonal' : 'bg-sup2 text-tinta2'}`}>{esMedico ? 'Médico' : 'Asistente'}</span>
+          {pendiente && <span className="k-etq k-etq-aviso">Invitación enviada</span>}
+          {pendiente && (
+            <button type="button" onClick={onReenviar} disabled={reenviando} title="Reenviar invitación" className="k-b k-b-tonal ml-1 h-8 px-3">
+              {reenviando ? <Loader2 size={15} aria-hidden="true" className="animate-spin" /> : <Send size={15} aria-hidden="true" />}
+              Reenviar
+            </button>
+          )}
         </div>
       </div>
-    </div>
+      <button
+        ref={ancla}
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={menu}
+        aria-label={`Acciones de ${titulo}`}
+        onClick={() => setMenu(m => !m)}
+        className="k-b k-b-icono shrink-0"
+      >
+        <MoreHorizontal aria-hidden="true" />
+      </button>
+      <CapaMenu
+        abierto={menu}
+        alCerrar={() => setMenu(false)}
+        ancla={ancla}
+        titulo={titulo}
+        opciones={[{
+          id: 'baja',
+          texto: pendiente ? 'Cancelar invitación' : 'Dar de baja',
+          icono: <Trash2 aria-hidden="true" />,
+          peligro: true,
+          alElegir: onBaja,
+        }]}
+      />
+    </li>
+  )
+}
+
+/** El cuerpo de la alerta de baja: el de bloqueo por historia clínica, o el de cancelar / dar de baja. */
+function TextoConfirmacion({ usuario, bloqueada }: { usuario: Usuario; bloqueada: boolean }) {
+  if (bloqueada) {
+    /* ⚠️ EL `mailto` ES UNA PARADA PROVISIONAL, NO EL DISEÑO. Con las palabras
+       de Angel: «Dar de baja a un médico invitado es una facultad del
+       administrador de su clínica, y debe seguir siéndolo. Mandarlo a soporte
+       es una parada provisional mientras se construye el flujo de baja con
+       volcado; no es el diseño, es lo único honesto que se puede decir hoy.»
+       Ver BAJA-01 en `DEUDA_TECNICA.md`. */
+    return (
+      <p>
+        No se puede dar de baja a un médico que ya tiene pacientes en la clínica.
+        Escríbenos a{' '}
+        <a href="mailto:soporte@spinus.com.mx" className="font-semibold text-enlace hover:underline">
+          soporte@spinus.com.mx
+        </a>{' '}
+        y lo resolvemos contigo.
+      </p>
+    )
+  }
+  return usuario.estado === 'pendiente' ? (
+    <p>La invitación de <b>{usuario.email}</b> dejará de funcionar y su plaza quedará libre.</p>
+  ) : (
+    <p>¿Dar de baja a <b>{usuario.nombre || usuario.email}</b>? Perderá el acceso y su plaza quedará libre. Lo que haya registrado se queda en la clínica.</p>
+  )
+}
+
+/** El formulario de invitación (el `<form>` lo envía el botón del pie por `form="form-invitar"`). */
+function FormInvitar({ form, setForm, error, onSubmit }: {
+  form: typeof FORM_VACIO
+  setForm: (f: typeof FORM_VACIO) => void
+  error: string
+  onSubmit: (e: React.FormEvent) => void
+}) {
+  return (
+    <form id="form-invitar" onSubmit={onSubmit} className="flex flex-col gap-4 px-6 pt-2 pb-5 ext:px-5">
+      <div className="k-campo-g">
+        <label htmlFor="invitar-rol" className="k-etiqueta">Rol</label>
+        <select id="invitar-rol" value={form.role} onChange={e => setForm({ ...form, role: e.target.value })} className="k-campo">
+          <option value="secretaria">Asistente Médico/a</option>
+          <option value="medico">Médico</option>
+        </select>
+      </div>
+
+      <div className="k-campo-g">
+        <label htmlFor="invitar-correo" className="k-etiqueta">Correo electrónico</label>
+        <input id="invitar-correo" type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })}
+          placeholder="correo@email.com" required className="k-campo" />
+      </div>
+
+      {/* Lo que el admin NO tiene que teclear, dicho donde antes estaban los
+          campos: es la pregunta que se va a hacer al ver un formulario de dos
+          líneas. */}
+      <p className="k-campo-ayuda">
+        {form.role === 'medico'
+          ? 'Su nombre, su especialidad y sus cédulas los captura él mismo al entrar: son los datos que salen impresos en sus recetas.'
+          : 'Escribirá su nombre al entrar por primera vez.'}
+      </p>
+
+      {/* ⚠️ EL AVISO DE LA HORA VA ANTES DE ENVIAR, NO DESPUÉS. La caducidad la
+          fija `otp_expiry` de GoTrue; lo que sí podemos es no prometer lo que
+          el sistema no cumple. */}
+      <div className="flex gap-2 rounded-[12px] bg-aviso-fondo px-3 py-2.5">
+        <AlertTriangle size={16} aria-hidden="true" className="mt-0.5 shrink-0 text-aviso-tinta" />
+        <p className="text-[13px] leading-[18px] text-aviso-tinta">
+          El enlace caduca <strong>en 1 hora</strong>. Si se le pasa, podrás reenviarle la invitación desde la lista.
+        </p>
+      </div>
+
+      {error && <p role="alert" className="rounded-[12px] bg-mal-fondo px-3 py-2 text-[13px] leading-[18px] text-mal-tinta">{error}</p>}
+    </form>
   )
 }
