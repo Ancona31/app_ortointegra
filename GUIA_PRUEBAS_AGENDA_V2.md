@@ -173,6 +173,22 @@ cd ~/proyectos/app_ortointegra-agenda
 - La terminal de Ubuntu (WSL) abierta.
 - Docker Desktop corriendo en Windows.
 - Chrome.
+
+> **En el equipo nuevo (desde el 2026-11-21) cambia esto:**
+>
+> - Es **Ubuntu 26.04 nativo, sin WSL ni Windows**. La terminal es la del
+>   sistema y Docker es el de Ubuntu (Docker Engine 29.1.3), no Docker Desktop:
+>   arranca solo con el equipo, no hay nada que abrir.
+> - La carpeta `~/proyectos/app_ortointegra-agenda` es **un clon normal, no un
+>   worktree**: no hay otra carpeta del proyecto ni otra rama compartiendo la
+>   base local.
+> - En P2 vale sólo la segunda vía, `SB="npx --yes supabase@2.117.0"`: la CLI no
+>   está instalada bajo `fnm`.
+> - Donde la guía abre un archivo con `explorer.exe "$(wslpath -w …)"`, aquí es
+>   `xdg-open …` con la misma ruta.
+> - Si `docker ps` responde «permission denied … docker.sock», la sesión se abrió
+>   antes de que tu usuario entrara al grupo `docker`: cierra la sesión de Ubuntu
+>   y vuelve a entrar.
 - Nadie más usando la base local: ni la otra carpeta del proyecto ni otro
   agente. La base es una sola para las dos carpetas; reiniciarla les borra todo
   a los demás.
@@ -318,10 +334,12 @@ Comprueba cuántas migraciones quedaron:
 docker exec supabase_db_app_ortointegra psql -U postgres -Atc "select count(*), max(version) from supabase_migrations.schema_migrations"
 ```
 
-Debe responder `45|20261123140000`: las 5 de `main` más las 40 de la agenda
-(las 16 de los bloques A a F, las 4 de las correcciones de seguridad, las 4 de
-la tanda de diseño, duración y horarios, las 3 de la tanda H, las 7 de la tanda
-I, las 3 de la tanda J y las 3 de la tanda K).
+Debe responder `50|20261125180000`: las 5 de `main`, las 43 de la agenda hasta
+la tanda L (las 16 de los bloques A a F, las 4 de las correcciones de seguridad,
+las 4 de la tanda de diseño, duración y horarios, las 3 de la tanda H, las 7 de
+la tanda I, las 3 de la tanda J, las 3 de la tanda K y las 3 de la tanda L) y
+las 2 de la integración M: `20261125170000_audit_log_sin_truncate`, que no es de
+la agenda, y `20261125180000_agenda_m_saludo_recordatorio`.
 
 > Este reinicio deja fuera las tres migraciones `20261014…` de la otra rama
 > (`feature/limites-ajustables`). Para probar la agenda no hacen falta. Si
