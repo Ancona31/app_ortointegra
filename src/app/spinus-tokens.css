@@ -1225,19 +1225,60 @@ input[type="date"].sp-input {
    en curso = aro que gira y texto en `--tinta`; pendiente = `--tinta3`. Cada
    paso entra por opacidad. `.sp-spinner` lo usan también los documentos: sólo
    cambian sus colores, no su caja. */
-.sp-steps { display: flex; flex-direction: column; gap: 4px; width: 100%; margin: 0; padding: 0; list-style: none; }
+/* Ajuste 2: cada paso lleva su estado en un círculo de 28 (hecho: palomita en
+   `--ok-*`; en curso: aro que gira sobre `--tonal`; pendiente: punto quieto),
+   y la lista va sobre una barra fina de avance por pasos (`.nn-avance`, sólo
+   `transform: scaleX`). */
+.sp-steps { display: flex; flex-direction: column; gap: 6px; width: 100%; margin: 0; padding: 0; list-style: none; }
 .sp-step {
-  display: flex; align-items: center; gap: 12px; min-height: 36px;
+  display: flex; align-items: center; gap: 12px; min-height: 40px;
   font-size: 15px; line-height: 20px; color: var(--tinta2);
   animation: sp-nota-entra var(--dur-entra) var(--resorte-entra) both;
 }
+.sp-step__i {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; flex: 0 0 28px; border-radius: 50%; background: var(--sup2);
+}
 .sp-step--done    { color: var(--tinta2); }
-.sp-step--done svg { stroke: var(--ok-tinta); stroke-width: 2.4; width: 18px; height: 18px; fill: none; flex: 0 0 18px; }
+.sp-step--done .sp-step__i { background: var(--ok-fondo); }
+.sp-step--done svg { stroke: var(--ok-tinta); stroke-width: 2.6; width: 16px; height: 16px; fill: none; flex: 0 0 16px; }
 .sp-step--active  { color: var(--tinta); font-weight: 600; }
+.sp-step--active .sp-step__i { background: var(--tonal); }
 .sp-step--pending { color: var(--tinta3); }
 .sp-step__dot {
-  width: 18px; height: 18px; border-radius: 50%;
-  border: 2px solid var(--sup2); flex: 0 0 18px;
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--tinta3); opacity: .5; flex: 0 0 8px;
+}
+.nn-avance { height: 4px; border-radius: var(--r-pildora); background: var(--sup2); overflow: hidden; }
+.nn-avance > span {
+  display: block; height: 100%; border-radius: inherit; background: var(--enlace);
+  transform-origin: left center;
+  transition: transform var(--dur-entra) var(--resorte-entra);
+}
+/* Marca de Spinus en la espera: un destello que «respira» por opacidad. */
+@keyframes nn-respira { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
+.nn-marca-viva svg { animation: nn-respira 1.8s ease-in-out infinite; }
+/* Entrevista: pasos del progreso, preguntas en bloque y opciones como chips. */
+.nn-segs { display: flex; gap: 6px; }
+.nn-segs > span { flex: 1; height: 6px; border-radius: var(--r-pildora); background: var(--sup2); position: relative; overflow: hidden; }
+.nn-segs > span::after { content: ""; position: absolute; inset: 0; background: var(--enlace); opacity: 0; transition: opacity var(--dur-entra) linear; }
+.nn-segs > span[data-hecho]::after { opacity: 1; }
+.nn-opcion {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 16px;
+  border-radius: var(--r-pildora); border: 1.5px solid var(--borde); background: var(--sup);
+  color: var(--tinta); font: inherit; font-size: 15px; line-height: 20px; font-weight: 500;
+  cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+  transition: transform var(--dur-toque) ease-out;
+}
+:where([data-formato="ih"], [data-formato="esc"]) .nn-opcion { min-height: 40px; }
+.nn-opcion:active { transform: scale(.97); }
+.nn-opcion:focus-visible { outline: 3px solid var(--enlace); outline-offset: 2px; }
+.nn-opcion[aria-pressed="true"] {
+  background: var(--tonal); border-color: var(--enlace); color: var(--tonal-tinta); font-weight: 600;
+}
+.nn-opcion svg { width: 16px; height: 16px; stroke-width: 2.6; flex: none; }
+@media (hover: hover) {
+  .nn-opcion:hover:not([aria-pressed="true"]) { border-color: color-mix(in srgb, var(--enlace) 45%, var(--borde)); }
 }
 .sp-spinner {
   width: 17px; height: 17px; border-radius: 50%; flex: 0 0 17px;
@@ -1261,7 +1302,8 @@ input[type="date"].sp-input {
 .sp-nota-entra { animation: sp-nota-entra var(--dur-entra) var(--resorte-entra) both; }
 @media (prefers-reduced-motion: reduce) {
   .sp-nota-entra, .sp-step { animation: sp-nota-funde 200ms linear both; }
-  .sp-progress__seg::after { transition: none; }
+  .sp-progress__seg::after, .nn-segs > span::after, .nn-avance > span { transition: none; }
+  .nn-marca-viva svg { animation: none; }
 }
 
 
@@ -1284,6 +1326,39 @@ input[type="date"].sp-input {
 .sv-val[data-estado="normal"], .sv-val[data-estado="vacio"] { color: var(--tinta); font-weight: 600; }
 .sv-val[data-estado="vigilar"] { color: var(--aviso-tinta); font-weight: 700; }
 .sv-val[data-estado="fuera"]   { color: var(--mal-tinta); font-weight: 700; }
+/* Banda de cinco celdas (ajuste 2 de la nota: los signos se leían como texto
+   corrido). Valor grande en tabular, unidad pequeña, rótulo corto en versalitas.
+   Estado por color Y por forma: fondo tenue + punto en la celda que no va en
+   rango. En `ext`/`tel`, 3 columnas con la presión a dos (2 + 3 filas). */
+.sv-boton { border-radius: var(--r-control); }
+.sv-boton:focus-visible { outline: 3px solid var(--enlace); outline-offset: 4px; }
+.sv-banda {
+  display: grid; gap: 8px;
+  grid-template-columns: minmax(0, 1.9fr) repeat(4, minmax(0, 1fr));
+}
+:where([data-formato="ext"], [data-formato="tel"]) .sv-banda { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+:where([data-formato="ext"], [data-formato="tel"]) .sv-celda--pa { grid-column: span 2; }
+.sv-celda {
+  display: flex; flex-direction: column; justify-content: space-between; gap: 4px; min-width: 0;
+  min-height: 64px; padding: 9px 12px 10px; border-radius: var(--r-control);
+  background: var(--fondo);
+  transition: opacity var(--dur-toque) ease-out;
+}
+.sv-boton:active .sv-celda { opacity: .75; }
+.sv-celda[data-estado="vigilar"] { background: var(--aviso-fondo); }
+.sv-celda[data-estado="fuera"]   { background: var(--mal-fondo); }
+.sv-celda__rot {
+  font-size: 12px; line-height: 16px; font-weight: 700; letter-spacing: .3px;
+  color: var(--tinta2); cursor: inherit; text-decoration: none;
+}
+.sv-celda[data-estado="vigilar"] .sv-celda__rot { color: var(--aviso-tinta); }
+.sv-celda[data-estado="fuera"] .sv-celda__rot   { color: var(--mal-tinta); }
+.sv-celda__punto { width: 7px; height: 7px; border-radius: 50%; flex: none; background: currentColor; }
+.sv-celda[data-estado="vigilar"] .sv-celda__punto { color: var(--aviso-punto); }
+.sv-celda[data-estado="fuera"] .sv-celda__punto   { color: var(--mal-tinta); }
+.sv-celda__v { display: block; min-width: 0; font-size: 21px; line-height: 26px; letter-spacing: -.2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sv-celda[data-estado="vacio"] .sv-celda__v { color: var(--tinta3); font-weight: 500; }
+.sv-celda__u { font-size: 12px; line-height: 16px; color: var(--tinta2); white-space: nowrap; }
 .sv-hoja .sv-in { font-size: 17px; }
 .sv-hoja .sv-in[data-estado]           { color: var(--tinta) !important; }
 .sv-hoja .sv-in[data-estado="vigilar"] { color: var(--aviso-tinta) !important; }

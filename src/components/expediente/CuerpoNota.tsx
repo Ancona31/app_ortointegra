@@ -175,8 +175,18 @@ function Dato({ rotulo, children }: { rotulo: string; children: React.ReactNode 
   )
 }
 
-function Unidad({ children }: { children: React.ReactNode }) {
-  return <span className="text-[13px] font-normal text-tinta2"> {children}</span>
+/** Una celda de signo vital: rótulo corto, valor de 21 y unidad (CSS en
+    `spinus-tokens.css` §14). */
+function CeldaVital({ rotulo, valor, unidad }: { rotulo: string; valor: string; unidad: string }) {
+  return (
+    <div className="sv-celda" data-estado="normal">
+      <dt className="flex min-w-0 items-center gap-1">
+        <span className="sv-celda__rot">{rotulo}</span>
+        <span className="sv-celda__u ml-auto">{unidad}</span>
+      </dt>
+      <dd className="sv-celda__v k-num min-w-0 font-semibold text-tinta">{valor}</dd>
+    </div>
+  )
 }
 
 /** Diagnósticos como títulos de 17 con el código CIE-10 en etiqueta tonal. */
@@ -223,11 +233,12 @@ function FranjaDatos({ data }: { data: NotaRenderData }) {
       {hayVitales && (
         <div className={dx.length > 0 ? 'mt-4 border-t border-[var(--linea)] pt-4' : ''}>
           <p className="k-t-rotulo">Signos vitales</p>
-          {/* Rejilla que se reacomoda: 3 columnas en angosto, 5 en ancho. */}
-          <dl className="mt-2 grid grid-cols-[repeat(auto-fill,minmax(96px,1fr))] gap-x-4 gap-y-3">
-            {ta && <Dato rotulo="TA">{ta}<Unidad>mmHg</Unidad></Dato>}
+          {/* Ajuste 2: una celda por signo (la misma pieza `.sv-celda` de la
+              captura, sin semáforo): valor grande y la unidad que no se parte. */}
+          <dl className="mt-2 grid grid-cols-[repeat(auto-fill,minmax(104px,1fr))] gap-2">
+            {ta && <CeldaVital rotulo="TA" valor={ta} unidad="mmHg" />}
             {medidas.map(m => (
-              <Dato key={m.clave} rotulo={m.rotulo}>{m.valor}<Unidad>{m.unidad}</Unidad></Dato>
+              <CeldaVital key={m.clave} rotulo={m.rotulo} valor={m.valor} unidad={m.unidad} />
             ))}
           </dl>
         </div>

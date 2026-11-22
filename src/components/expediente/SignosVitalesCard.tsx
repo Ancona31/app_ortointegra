@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { ChevronRight } from 'lucide-react'
+import { ChevronRight, HeartPulse } from 'lucide-react'
 import ModalShell from '@/components/ui/ModalShell'
 import {
   evaluarEstado,
@@ -33,9 +33,11 @@ interface SignosVitalesCardProps {
 /* ═══ SIGNOS VITALES PLEGADOS (rediseño, maqueta `final-nota` vistas 1, 4, 5 y 7) ═══
    Antes eran cinco mosaicos en una rejilla de cinco columnas: en `ext`/`tel`
    los rótulos se abreviaban, se cortaban y chocaban con los valores. Ahora:
-     · en la tarjeta de captura, UNA fila «Signos vitales ›» con el resumen
-       («Sin capturar», o los valores en su color de semáforo y la etiqueta
-       «n fuera de rango» / «n a vigilar»);
+     · en su tarjeta, encima de la captura, UN botón «Signos vitales ›» con
+       una banda de cinco celdas (ajuste 2: el resumen en texto corrido no se
+       leía): rótulo corto, valor grande en su color de semáforo, unidad, y en
+       la celda fuera de rango o a vigilar, fondo tenue y punto; la etiqueta
+       «n fuera de rango» / «n a vigilar» sigue en la cabecera;
      · al pulsarla, una capa del catálogo (hoja en `tel`, tarjeta en el resto)
        con una fila por signo: nombre completo, campo con área de toque propia
        y la unidad.
@@ -103,33 +105,44 @@ function Etiqueta({ estados, conErrores }: { estados: Estados; conErrores: boole
   )
 }
 
-/** Un valor del resumen, en su color de semáforo. */
-function Valor({ v, estado }: { v: string; estado: EstadoVital }) {
-  return <b className="sv-val k-num" data-estado={estado}>{v}</b>
+/* Rótulo corto de cada celda de la banda; el nombre completo va en `title`. */
+const CORTO: Record<'pa' | (typeof SINGLES)[number]['key'], string> = {
+  pa: 'PA', fc: 'FC', fr: 'FR', temp: 'Temp', spo2: 'SpO₂',
 }
 
-function Resumen({ value, estados }: { value: SignosVitalesForm; estados: Estados }) {
-  const partes: React.ReactNode[] = []
+interface CeldaProps { k: keyof typeof CORTO; nombre: string; valor: string; unidad: string; estado: EstadoVital }
+
+/** Una celda de la banda: rótulo corto, valor grande y unidad. El estado se
+    lee por color, por el fondo de la celda y por un punto (no sólo color). */
+function Celda({ k, nombre, valor, unidad, estado }: CeldaProps) {
+  const aviso = estado === 'fuera' || estado === 'vigilar'
+  return (
+    <span className={`sv-celda ${k === 'pa' ? 'sv-celda--pa' : ''}`} data-estado={estado}>
+      <span className="flex min-w-0 items-center gap-1">
+        <abbr title={nombre} className="sv-celda__rot no-underline">{CORTO[k]}</abbr>
+        {aviso && <span className="sv-celda__punto" aria-hidden="true" />}
+        {aviso && <span className="sr-only">{ESTADO_LABEL[estado]}</span>}
+        <span className="sv-celda__u ml-auto">{unidad}</span>
+      </span>
+      <b className="sv-val sv-celda__v k-num" data-estado={estado}>{valor || '—'}</b>
+    </span>
+  )
+}
+
+/** La banda de cinco celdas (presión, FC, FR, temperatura, SpO₂). */
+function Banda({ value, estados }: { value: SignosVitalesForm; estados: Estados }) {
   const sys = value.ta_sistolica?.trim()
   const dia = value.ta_diastolica?.trim()
-  if (sys || dia) {
-    partes.push(
-      <span key="pa" className="whitespace-nowrap">
-        <Valor v={sys || '—'} estado={estados.pa} />/<Valor v={dia || '—'} estado={estados.pa} />
-      </span>,
-    )
-  }
-  for (const cfg of SINGLES) {
-    const v = value[cfg.key]?.trim()
-    if (!v) continue
-    partes.push(
-      <span key={cfg.key} className="whitespace-nowrap">
-        <Valor v={v} estado={estados.singles[cfg.key]} /> {cfg.unit}
-      </span>,
-    )
-  }
-  if (partes.length === 0) return <>Sin capturar</>
-  return <>{partes.flatMap((p, i) => (i === 0 ? [p] : [' · ', p]))}</>
+  const pa = sys || dia ? `${sys || '—'}/${dia || '—'}` : ''
+  return (
+    <span className="sv-banda">
+      <Celda k="pa" nombre="Presión arterial" valor={pa} unidad="mmHg" estado={estados.pa} />
+      {SINGLES.map(cfg => (
+        <Celda key={cfg.key} k={cfg.key} nombre={cfg.aria} valor={value[cfg.key]?.trim() ?? ''}
+          unidad={cfg.unit} estado={estados.singles[cfg.key]} />
+      ))}
+    </span>
+  )
 }
 
 interface FilaProps {
@@ -201,24 +214,28 @@ export default function SignosVitalesCard({ value, onChange, errores }: SignosVi
     if (errores && errores.size > 0) setAbierto(true)
   }
 
+  const vacio = estados.pa === 'vacio' && Object.values(estados.singles).every(e => e === 'vacio')
   return (
-    <div className="sv-fila border-b border-[var(--linea)] pb-2">
+    <div className="sv-fila">
       <button
         type="button"
         onClick={() => setAbierto(true)}
         aria-haspopup="dialog"
-        className="k-pulsable flex min-h-[44px] w-full items-center gap-2 py-1 text-left"
+        className="sv-boton k-pulsable group block w-full text-left"
       >
-        <span className="flex min-w-0 flex-1 flex-col gap-0.5 esc:flex-row esc:items-center esc:gap-3">
-          <span className="flex flex-wrap items-center gap-2">
-            <span className="text-[15px] leading-5 text-tinta">Signos vitales</span>
-            <Etiqueta estados={estados} conErrores={err.size > 0} />
+        <span className="mb-2.5 flex min-h-[28px] items-center gap-2">
+          <span className="inline-flex size-7 flex-none items-center justify-center rounded-full bg-tonal text-enlace" aria-hidden="true">
+            <HeartPulse size={16} strokeWidth={2.2} />
           </span>
-          <span className="text-[13px] leading-[18px] text-tinta2 esc:ml-auto esc:text-right">
-            <Resumen value={value} estados={estados} />
+          <span className="text-[15px] font-semibold leading-5 text-tinta">Signos vitales</span>
+          <Etiqueta estados={estados} conErrores={err.size > 0} />
+          <span className="ml-auto flex flex-none items-center gap-0.5 text-[14px] font-semibold leading-5 text-enlace">
+            {vacio && 'Capturar'}
+            <ChevronRight size={16} aria-hidden="true" className="transition-transform duration-[var(--dur-toque)] group-hover:translate-x-0.5" />
           </span>
+          {vacio && <span className="sr-only">Sin capturar</span>}
         </span>
-        <ChevronRight size={16} aria-hidden="true" className="flex-none text-tinta3" />
+        <Banda value={value} estados={estados} />
       </button>
 
       <ModalShell open={abierto} onClose={() => setAbierto(false)} title="Signos vitales" maxWidth="md:max-w-[440px]">
