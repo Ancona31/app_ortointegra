@@ -299,6 +299,7 @@ export function usePlantillasDocumento(op: OpcionesPlantillas): PiezasPlantillas
         onSeleccionar={alSeleccionar}
         onDeshacer={deshacer}
         onReintentar={() => void cargar()}
+        guardar={{ apagado: guardarApagado, ayuda: ayudaGuardar, alPedir: pedirGuardar }}
         mas={<BotonMas opciones={opcionesMas} alAbrir={el => { origenRef.current = el }} />}
       />
     ),
@@ -396,6 +397,8 @@ interface PropsSelector {
   onReintentar: () => void
   /** El «···» de la cabecera del formulario: va antes de la fila en el DOM. */
   mas: ReactNode
+  /** «Guardar esta como plantilla» de la fila vacía en `ih`/`esc` (la misma acción que el pie y el «···»). */
+  guardar: { apagado: boolean; ayuda?: string; alPedir: () => void }
 }
 
 function CardSelector(p: PropsSelector) {
@@ -404,14 +407,22 @@ function CardSelector(p: PropsSelector) {
       {p.mas}
       <section className="sp-card sp-tpl-card">
         {p.lista.length === 0 && !p.cargando && !p.errorCarga ? (
+          /* En `ih`/`esc` la tarjeta vacía se pliega a UNA línea (altura
+             compartida de los formularios): el párrafo se oculta y aparece
+             «Guardar esta como plantilla», la misma acción del pie y del «···».
+             En táctil (`ext`/`tel`/`iv`) queda como estaba. Lo decide el CSS. */
           <div className="sp-tpl-empty">
             <Layers aria-hidden="true" className="sp-tpl-ic" />
-            <div style={{ minWidth: 0 }}>
+            <div className="sp-tpl-empty-t">
               <h2 className="k-t-fila">Sin plantillas de {p.etiqueta}</h2>
-              <p className="k-t-sec" style={{ marginTop: 2 }}>
+              <p className="k-t-sec sp-tpl-empty-p">
                 Guarda este formulario como plantilla y la próxima vez lo llenas de un toque.
               </p>
             </div>
+            <button type="button" onClick={p.guardar.alPedir} disabled={p.guardar.apagado}
+              title={p.guardar.ayuda} className="k-b k-b-texto sp-tpl-empty-b">
+              Guardar esta como plantilla
+            </button>
           </div>
         ) : <FilaSelector {...p} />}
 

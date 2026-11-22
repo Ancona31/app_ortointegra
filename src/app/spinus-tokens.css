@@ -3036,6 +3036,17 @@ main:has(.sp-doc-actions) { scroll-padding-bottom: 150px; }
 .sp-tpl-fila-err { flex: 1; margin: 8px 0; }
 .sp-tpl-empty { padding: 14px 0; }
 .sp-tpl-empty > .sp-tpl-ic { margin-top: 1px; }
+.sp-tpl-empty-t { flex: 1; min-width: 0; }
+.sp-tpl-empty-p { margin-top: 2px; }
+.sp-tpl-empty-b { display: none; }
+/* `ih`/`esc`: la tarjeta vacía en UNA línea, del alto de la fila con
+   plantillas (52): «Sin plantillas de …» y, a la derecha, «Guardar esta como
+   plantilla». Táctil sin cambios. */
+:where([data-formato="ih"], [data-formato="esc"]) .sp-tpl-empty { align-items: center; min-height: 52px; padding: 0; }
+:where([data-formato="ih"], [data-formato="esc"]) .sp-tpl-empty > .sp-tpl-ic { margin-top: 0; }
+:where([data-formato="ih"], [data-formato="esc"]) .sp-tpl-empty-p { display: none; }
+:where([data-formato="ih"], [data-formato="esc"]) .sp-tpl-empty-b { display: inline-flex; flex: none; }
+.sp-tpl-empty-b:disabled { color: var(--tinta3); cursor: default; }
 .sp-tpl-card > .sp-tpl-aviso { margin: 0 0 14px; }
 
 /* ── Barra del consentimiento con el «···» (maqueta `docs-c`, vista 8) ─────
@@ -4261,6 +4272,25 @@ html.dark .sp-esc-titulo { background-color: transparent !important; border-colo
   .sp-sup-acciones > .k-b-texto { width: 100%; justify-content: center; }
   /* El peso conserva su ancho aunque la fila pase a una columna. */
   .sp-hon-datos.sp-sup-datos > .sp-sup-peso { flex: 1 1 100%; }
+}
+
+/* ── 26.9 · ALTURA COMPARTIDA EN `esc` (recomendación aprobada) ──────────────
+   Con un formulario abierto la columna crece a 880 en `esc` (lo decide el
+   anfitrión). A ese ancho, los tres datos del paciente «rótulo — valor» de
+   receta, laboratorio e imagen dejaban el valor perdido a 200 px de su
+   rótulo, un renglón cada uno: aquí pasan a UNA fila de tres fichas con el
+   rótulo encima. Sólo `esc` y sólo con contenedor ≥ 800 (`ext`/`tel`/`iv`/`ih`
+   no cambian ni un píxel). La denegación del consentimiento (once celdas,
+   `.sp-doc-consent-id`) queda como está. */
+@container docform (min-width: 800px) {
+  :where([data-formato="esc"]) .sp-doc-cardbody .sp-doc-grid[data-cols="3"]:not(.sp-doc-consent-id) {
+    grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: 16px;
+  }
+  :where([data-formato="esc"]) .sp-doc-cardbody .sp-doc-grid[data-cols="3"]:not(.sp-doc-consent-id) > .sp-doc-field {
+    display: flex; flex-direction: column; gap: 0; padding: 0; border-top: 0;
+  }
+  :where([data-formato="esc"]) .sp-doc-cardbody .sp-doc-grid[data-cols="3"]:not(.sp-doc-consent-id) > .sp-doc-field > .sp-label-field { padding-top: 0; }
+  :where([data-formato="esc"]) .sp-doc-cardbody .sp-doc-grid[data-cols="3"]:not(.sp-doc-consent-id) > .sp-doc-span-all { margin-top: 8px; padding-top: 8px; }
 }
 
 } /* fin @layer components */
