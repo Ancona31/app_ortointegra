@@ -4,11 +4,13 @@ import path from 'node:path'
 import { soloEscritorio, sqlLocal } from './ayudas'
 
 /**
- * Punto 10 de Angel · la migración `20261119130000_agenda_g4_herencia_horario_consultorios.sql`
- * contra datos propios, DOS pasadas seguidas y todo en una transacción que se
- * deshace (no deja nada en la base). Corre el CUERPO REAL del archivo (lo que
- * va entre `BEGIN;` y `COMMIT;`), no una copia: una mutación del archivo se ve
- * aquí.
+ * Punto 10 de Angel · el backfill de la herencia de horario (sección 8 de
+ * `20261201120000_agenda_f1_ajustes_tipos_horarios.sql`, que funde la original
+ * `20261119130000_agenda_g4_herencia_horario_consultorios.sql`) contra datos
+ * propios, DOS pasadas seguidas y todo en una transacción que se deshace (no
+ * deja nada en la base). Corre el TEXTO REAL de esa sección del archivo (del
+ * CREATE TABLE del respaldo al UPDATE), no una copia: una mutación del archivo
+ * se ve aquí. El resto del archivo no: su pre-vuelo aborta con F1 ya aplicado.
  *
  *   · el consultorio SIN horario propio hereda el de su clínica (también el
  *     archivado), con su fila de respaldo y su fila UPDATE en audit_log;
@@ -18,14 +20,14 @@ import { soloEscritorio, sqlLocal } from './ayudas'
  */
 soloEscritorio()
 
-const MIGRACION = path.resolve(process.cwd(), 'supabase/migrations/20261119130000_agenda_g4_herencia_horario_consultorios.sql')
+const MIGRACION = path.resolve(process.cwd(), 'supabase/migrations/20261201120000_agenda_f1_ajustes_tipos_horarios.sql')
 
 function cuerpo(): string {
   const s = readFileSync(MIGRACION, 'utf8')
-  const i = s.indexOf('\nBEGIN;\n')
-  const j = s.indexOf('\nCOMMIT;\n')
-  if (i < 0 || j < i) throw new Error('la migración no tiene su BEGIN;/COMMIT;')
-  return s.slice(i + '\nBEGIN;\n'.length, j)
+  const i = s.indexOf('\nCREATE TABLE IF NOT EXISTS respaldos.consultorios_horario_20261119 (')
+  const j = s.indexOf('\n-- 9 · ', i)
+  if (i < 0 || j < i) throw new Error('la migración no tiene su sección 8 (backfill) seguida de la 9')
+  return s.slice(i + 1, j)
 }
 
 const CL = '00000000-0000-4000-8000-0000000064c1'
