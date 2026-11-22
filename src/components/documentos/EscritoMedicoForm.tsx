@@ -25,7 +25,7 @@ import { decodificarNbsp } from '@/lib/textUtils'
 import { useEditor } from '@tiptap/react'
 import { generateHTML, type JSONContent } from '@tiptap/core'
 import { editorExtensions } from '@/lib/documentos/editorExtensions'
-import { DOMParser as PMDOMParser } from '@tiptap/pm/model'
+import { DOMParser as PMDOMParser, Slice } from '@tiptap/pm/model'
 import { contarPalabras, htmlPegadoAlEsquema, markdownAHtml } from '@/lib/documentos/pegadoEscrito'
 
 const FECHA_MIN = '1900-01-01'
@@ -249,8 +249,10 @@ export default function EscritoMedicoForm({ pacienteInicial = '', pacienteId, of
         if (html === null) return false
         const caja = document.createElement('div')
         caja.innerHTML = html
-        const trozo = PMDOMParser.fromSchema(vista.state.schema).parseSlice(caja, { context: vista.state.selection.$from })
-        vista.dispatch(vista.state.tr.replaceSelection(trozo).scrollIntoView())
+        // Trozo CERRADO (bloques enteros): uno abierto fundía el primer bloque
+        // pegado —p. ej. un «## Título»— con el párrafo donde estaba el cursor.
+        const pegado = PMDOMParser.fromSchema(vista.state.schema).parse(caja)
+        vista.dispatch(vista.state.tr.replaceSelection(new Slice(pegado.content, 0, 0)).scrollIntoView())
         return true
       },
     },
