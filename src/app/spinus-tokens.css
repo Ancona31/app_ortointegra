@@ -3216,6 +3216,188 @@ html.dark .sp-tpl-select { background-color: transparent !important; border-colo
   .sp-doc-host:has(> div > .sp-doc-cab) .sp-doc-mas { top: 0; }
 }
 
+/* ── 26.1 · RECETA COMPACTA (maqueta `receta-compacta.html`, aprobada) ─────
+   Un medicamento abierto (`.sp-rx-ed`) y los demás plegados a una línea
+   (`.sp-rx-linea`), todo dentro de UNA tarjeta sin relleno. La etiqueta de vía
+   lleva color por familia (sólo pantalla; el PDF no lo usa), SIN leyenda.
+   Densidad: en táctil (`ext`/`tel`/`iv`) toques de 44 y letra de 16 en los
+   campos (iOS no amplía); en `ih`/`esc`, 36–40 y 15. Contenedor estrecho
+   (< 560): un campo por renglón, fichas en una fila desplazable, «Agregar» a
+   todo el ancho. Nada aquí es `fixed`: la lista del buscador es `absolute`
+   dentro del medicamento. */
+:root {
+  --via-iv-fondo: #EFE6FA; --via-iv-tinta: #5E2D9A;
+  --via-sc-fondo: #DCF1F2; --via-sc-tinta: #0B5D64;
+}
+html.dark {
+  --via-iv-fondo: #2F2247; --via-iv-tinta: #D2B8F7;
+  --via-sc-fondo: #103A3E; --via-sc-tinta: #8EDDE4;
+}
+.sp-doc-card:not(.sp-section):has(> .sp-doc-cardbody) > .sp-doc-cardbody.sp-rx-cuerpo { padding: 0; }
+:where([data-formato="ih"], [data-formato="iv"], [data-formato="esc"]) .sp-doc-card:not(.sp-section):has(> .sp-doc-cardbody) > .sp-doc-cardbody.sp-rx-cuerpo { padding: 0; }
+.sp-rx-meds > * + * { border-top: 1px solid var(--linea); }
+.sp-rx-meds > :first-child { border-top-left-radius: var(--r-tarjeta); border-top-right-radius: var(--r-tarjeta); }
+.sp-rx-meds > :last-child { border-bottom-left-radius: var(--r-tarjeta); border-bottom-right-radius: var(--r-tarjeta); }
+:where([data-formato="ih"], [data-formato="iv"], [data-formato="esc"]) .sp-rx-meds > :first-child { border-top-left-radius: var(--r-tarjeta-ancha); border-top-right-radius: var(--r-tarjeta-ancha); }
+:where([data-formato="ih"], [data-formato="iv"], [data-formato="esc"]) .sp-rx-meds > :last-child { border-bottom-left-radius: var(--r-tarjeta-ancha); border-bottom-right-radius: var(--r-tarjeta-ancha); }
+
+.sp-rx-num {
+  flex: none; display: grid; place-items: center; width: 24px; height: 24px; border-radius: var(--r-pildora);
+  background: var(--tonal); color: var(--tonal-tinta); font-size: 12px; line-height: 16px; font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.sp-rx-num--on { background: var(--accion); color: var(--sobre-accion); }
+
+/* Línea plegada: un botón; dos renglones; la vía a la derecha. */
+.sp-rx-linea {
+  display: flex; align-items: center; gap: 12px; width: 100%; min-height: 60px; margin: 0; padding: 10px 16px;
+  border: 0; background: transparent; color: var(--tinta); font: inherit; text-align: left; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+:where([data-formato="ih"], [data-formato="esc"]) .sp-rx-linea { min-height: 52px; padding: 8px 16px; }
+@media (hover: hover) { .sp-rx-linea:hover { background: var(--sup2); } }
+.sp-rx-linea:focus-visible { outline: 3px solid var(--enlace); outline-offset: -3px; }
+.sp-rx-linea-t { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.sp-rx-linea-1 { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 8px; min-width: 0; }
+.sp-rx-com { font-size: 15px; line-height: 20px; font-weight: 600; color: var(--tinta); overflow-wrap: anywhere; }
+.sp-rx-det { font-size: 13px; line-height: 18px; color: var(--tinta2); overflow-wrap: anywhere; }
+.sp-rx-ind { font-size: 13px; line-height: 18px; color: var(--tinta2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Etiqueta de vía: familia de color (Oral azul tonal, IM ámbar, IV violeta,
+   Tópica/Transdérmica verde, SC turquesa, las demás gris; faltante en rojo). */
+.sp-rx-via {
+  flex: none; padding: 4px 9px; border-radius: var(--r-pildora); background: var(--sup2); color: var(--tinta2);
+  font-size: 12px; line-height: 16px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap;
+}
+.sp-rx-via--oral { background: var(--tonal); color: var(--tonal-tinta); }
+.sp-rx-via--im { background: var(--aviso-fondo); color: var(--aviso-tinta); }
+.sp-rx-via--iv { background: var(--via-iv-fondo); color: var(--via-iv-tinta); }
+.sp-rx-via--top { background: var(--ok-fondo); color: var(--ok-tinta); }
+.sp-rx-via--sc { background: var(--via-sc-fondo); color: var(--via-sc-tinta); }
+.sp-rx-via--falta { background: var(--mal-fondo); color: var(--mal-tinta); }
+
+/* Medicamento abierto. */
+.sp-rx-ed {
+  display: flex; flex-direction: column; gap: 10px; padding: 12px 16px 14px;
+  background: var(--sup); box-shadow: inset 3px 0 0 var(--accion);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .sp-rx-ed { animation: sp-rx-entra var(--dur-sale) var(--resorte-entra); }
+  @keyframes sp-rx-entra { from { opacity: .4; transform: translateY(-3px); } to { opacity: 1; transform: none; } }
+}
+.sp-rx-cab { display: flex; align-items: center; gap: 8px; min-height: var(--k-toque); }
+.sp-rx-cab-t { flex: 1; margin: 0; font-size: 13px; line-height: 18px; font-weight: 600; color: var(--tinta2); }
+.sp-rx-quitar:hover:not(:disabled) { color: var(--mal-tinta); }
+
+.sp-rx-campo {
+  position: relative; display: flex; align-items: center; gap: 8px; min-width: 0;
+  min-height: 46px; padding: 0 12px; border-radius: var(--r-control); background: var(--sup2);
+}
+:where([data-formato="ih"], [data-formato="esc"]) .sp-rx-campo { min-height: 40px; }
+.sp-rx-campo:focus-within { outline: 2px solid var(--enlace); outline-offset: 0; }
+.sp-rx-campo--falta { box-shadow: inset 0 0 0 2px var(--mal-tinta); }
+.sp-rx-campo--falta > .sp-rx-rot { color: var(--mal-tinta); }
+.sp-rx-campo--texto { align-items: flex-start; }
+.sp-rx-campo--texto > .sp-rx-rot { padding-top: 13px; }
+:where([data-formato="ih"], [data-formato="esc"]) .sp-rx-campo--texto > .sp-rx-rot { padding-top: 11px; }
+.sp-rx-rot {
+  flex: none; width: 104px; font-size: 12px; line-height: 16px; font-weight: 600;
+  letter-spacing: .04em; text-transform: uppercase; color: var(--tinta2);
+}
+.sp-rx-fi {
+  flex: 1; min-width: 0; width: 100%; margin: 0; padding: 11px 0; border: 0; border-radius: 0;
+  background: transparent; color: var(--tinta); font: inherit; font-size: 16px; line-height: 22px;
+}
+:where([data-formato="ih"], [data-formato="esc"]) .sp-rx-fi { padding: 9px 0; font-size: 15px; line-height: 20px; }
+.sp-rx-fi:focus { outline: none; }
+.sp-rx-fi::placeholder { color: var(--tinta2); opacity: .75; }
+.sp-rx-ta { display: block; resize: none; overflow: hidden; min-height: 44px; }
+:where([data-formato="ih"], [data-formato="esc"]) .sp-rx-ta { min-height: 38px; }
+.sp-rx-par { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 8px; }
+
+/* Lista del buscador: capa con sombra, dentro del medicamento (no portal). */
+.sp-rx-lista {
+  position: absolute; z-index: 5; left: 0; right: 0; top: calc(100% + 4px); margin: 0; padding: 4px; list-style: none;
+  max-height: 264px; overflow-y: auto; overscroll-behavior: contain;
+  background: var(--sup); border-radius: 14px; box-shadow: var(--sombra-capa);
+}
+.sp-rx-op {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; min-height: var(--k-toque); padding: 10px 12px;
+  border-radius: 10px; cursor: pointer; color: var(--tinta);
+}
+:where([data-formato="ih"], [data-formato="esc"]) .sp-rx-op { padding: 8px 10px; }
+.sp-rx-op > b { font-size: 15px; line-height: 20px; font-weight: 600; }
+.sp-rx-op > span { font-size: 13px; line-height: 18px; color: var(--tinta2); }
+.sp-rx-op[aria-selected="true"] { background: var(--tonal); }
+.sp-rx-op[aria-selected="true"] > b { color: var(--tonal-tinta); }
+
+/* Vía: grupo de botones rápidos + «Otra…». */
+.sp-rx-viafila { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.sp-rx-viafila > .sp-rx-rot { padding-left: 12px; }
+.sp-rx-viafila--falta > .sp-rx-rot { color: var(--mal-tinta); }
+.sp-rx-viagrupo { display: flex; flex-wrap: wrap; gap: 6px; }
+.sp-rx-viabtn, .sp-rx-viaotra {
+  height: var(--k-toque); margin: 0; padding: 0 14px; border: 1px solid var(--borde); border-radius: var(--r-pildora);
+  background: var(--sup); color: var(--tinta); font: inherit; font-size: 14px; line-height: 18px; font-weight: 500; cursor: pointer;
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+}
+.sp-rx-viabtn { min-width: 44px; transition: transform var(--dur-toque) ease-out; }
+.sp-rx-viabtn:active { transform: scale(.97); }
+@media (prefers-reduced-motion: reduce) { .sp-rx-viabtn:active { transform: none; } }
+.sp-rx-viabtn[aria-checked="true"] { background: var(--accion); border-color: var(--accion); color: var(--sobre-accion); font-weight: 600; }
+.sp-rx-viabtn:focus-visible, .sp-rx-viaotra:focus-visible { outline: 3px solid var(--enlace); outline-offset: 2px; }
+.sp-rx-viaotra { padding-right: 10px; max-width: 100%; }
+.sp-rx-viaotra--on { border-color: var(--accion); background: var(--tonal); color: var(--tonal-tinta); font-weight: 600; }
+.sp-rx-viafila--falta .sp-rx-viabtn:not([aria-checked="true"]), .sp-rx-viafila--falta .sp-rx-viaotra { border-color: var(--mal-tinta); }
+.sp-rx-err { font-size: 13px; line-height: 18px; font-weight: 600; color: var(--mal-tinta); }
+
+/* Fichas: fuera del Tab; el área es el toque entero, el dibujo una píldora. */
+.sp-rx-fichas { display: flex; flex-wrap: wrap; gap: 0 6px; min-width: 0; }
+.sp-rx-ficha {
+  display: inline-flex; align-items: center; height: var(--k-toque); margin: 0; padding: 0; border: 0;
+  background: transparent; font: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.sp-rx-ficha > span {
+  display: inline-flex; align-items: center; height: 32px; padding: 0 12px; border: 1px solid var(--borde);
+  border-radius: var(--r-pildora); color: var(--tinta2); font-size: 13px; line-height: 18px; white-space: nowrap;
+}
+:where([data-formato="ih"], [data-formato="esc"]) .sp-rx-ficha > span { height: 28px; font-size: 12px; }
+@media (hover: hover) { .sp-rx-ficha:hover > span { background: var(--sup2); } }
+.sp-rx-ficha:active > span { background: var(--sup2); }
+.sp-rx-ficha--sug > span { border-color: var(--accion); color: var(--enlace); font-weight: 600; }
+
+/* «Agregar medicamento»: uno, al final; el atajo sólo donde hay teclado. */
+.sp-rx-agregar { margin-top: 8px; }
+.sp-rx-atajo { display: none; gap: 2px; margin-left: 4px; }
+:where([data-formato="ih"], [data-formato="esc"]) .sp-rx-atajo { display: inline-flex; }
+.sp-rx-atajo > kbd {
+  padding: 0 5px; border: 1px solid var(--borde); border-radius: 5px; background: var(--sup); color: var(--tinta);
+  font: inherit; font-size: 12px; line-height: 16px; font-weight: 600;
+}
+
+/* Estrecho (`ext`/`tel`): un campo por renglón, la vía con «Otra…» debajo,
+   fichas en una fila que se desplaza, «Agregar» a todo el ancho. */
+@container docform (max-width: 559px) {
+  .sp-rx-par { grid-template-columns: minmax(0, 1fr); }
+  .sp-rx-rot { width: 92px; }
+  .sp-rx-viafila > .sp-rx-rot { width: 100%; padding-left: 0; }
+  .sp-rx-viabtn { padding: 0 16px; }
+  .sp-rx-fichas { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 0 -16px; padding: 0 16px; }
+  .sp-rx-fichas::-webkit-scrollbar { display: none; }
+  .sp-rx-ficha { flex: none; }
+  .sp-rx-ficha > span { height: 36px; }
+  .sp-rx-ed { padding: 10px 14px 12px; }
+  .sp-rx-linea { padding: 12px 14px; }
+  .sp-rx-agregar-b { width: 100%; height: 44px; }
+}
+
+/* Oscuro: la hoja de traducción de `ThemeProvider` pinta todo campo con
+   `--sup2` y borde con !important (sin capa); aquí se gana EN capa. */
+html.dark .sp-rx-fi { background-color: transparent !important; border-color: transparent !important; }
+html.dark .sp-rx-viaotra { background-color: var(--sup) !important; border-color: var(--borde) !important; color: var(--tinta) !important; }
+html.dark .sp-rx-viaotra--on { background-color: var(--tonal) !important; border-color: var(--accion) !important; color: var(--tonal-tinta) !important; }
+html.dark .sp-rx-viafila--falta .sp-rx-viaotra { border-color: var(--mal-tinta) !important; }
+
 } /* fin @layer components */
 
 /* ⚠ FUERA DE @layer A PROPÓSITO — NO LO METAS DENTRO. La hoja de react-easy-crop
