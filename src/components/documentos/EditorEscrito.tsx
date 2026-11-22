@@ -1,67 +1,90 @@
 'use client'
 
 /**
- * Barra + área de escritura del Escrito médico — GUIA_FORM_ESCRITO_MEDICO §3.
+ * Barra + área de escritura del Escrito médico (maqueta `escrito.html`, aprobada).
  *
  * Archivo aparte del formulario porque el reparto de la barra es la mitad del
- * trabajo de este formato y mezclarlo con la persistencia dejaba un solo
- * archivo de 700 líneas. NO es una abstracción reutilizable: el escrito es el
+ * trabajo de este formato. NO es una abstracción reutilizable: el escrito es el
  * único de los ocho con cuerpo de texto enriquecido.
  *
- * Dos reglas gobiernan todo lo de aquí:
+ * Reglas que gobiernan todo lo de aquí:
  *
- * 1. **Primero juntar, luego repartir.** Las cuatro alineaciones eligen UN
- *    valor de uno: son un botón que muestra la actual y abre las cuatro. Trece
- *    controles pasan a diez, y sin eso ningún reparto cabe en una fila a 332 px
- *    de barra útil.
- * 2. **Caben las que caben en una fila de 44 px; el resto va al menú, en el
- *    mismo orden.** El reparto lo decide el CONTENEDOR y lo aplica el CSS
- *    (`.sp-ed-n2/n3` en la barra, `.sp-ed-m2/m3` en el menú): cada control
- *    aparece dos veces en el árbol y la consulta de contenedor apaga una. Sin
- *    medir con JS, que es lo que el sistema evita en todas las demás rejillas.
- *    `CONTROLES` es la única lista, así que barra y menú no pueden divergir.
+ * 1. **Todo lo que el editor YA sabe hacer, a la vista** (decisión del dueño):
+ *    Deshacer · Rehacer | Texto / Título / Subtítulo | Negrita · Cursiva ·
+ *    Subrayado | Viñetas · Numerada · Aumentar · Reducir sangría | Alineación ·
+ *    Cita · Separador · Quitar formato | «?» Atajos. Sin tachado ni código: el
+ *    PDF los descarta a propósito.
+ * 2. **El reparto lo decide el CONTENEDOR y lo aplica el CSS**, sin medir con JS:
+ *    ancho, una fila; medio, dos renglones; estrecho (`tel`/`ext`), lo marcado
+ *    `estrecho` baja al «⋯» con su nombre escrito. Cada uno de esos controles está
+ *    dos veces en el árbol (barra y menú) y la consulta de contenedor apaga uno
+ *    (`.sp-esc-ocu` / `.sp-esc-solo-estrecho`). `CONTROLES` es la única lista.
+ * 3. **`preventDefault` en `mousedown`**: sin eso el botón se lleva el foco y la
+ *    selección del editor se pierde antes del comando. El clic sigue llegando.
+ * 4. **El desplazamiento es del CUERPO** (`.sp-esc-cuerpo`), no de la página: la
+ *    barra y el título quedan siempre a la vista. Lo da la hoja del formulario.
  */
 
-import { useEffect, useRef, useState, type ComponentType } from 'react'
+import { useEffect, useRef, useState, type ComponentType, type MouseEvent as ReactMouseEvent } from 'react'
 import { EditorContent, type Editor } from '@tiptap/react'
 import {
-  AlignCenter, AlignJustify, AlignLeft, AlignRight, ArrowLeft, Bold, Check,
-  ChevronDown, ChevronRight, Heading2, Heading3, Italic, List, ListOrdered,
-  Minus, MoreHorizontal, Pilcrow, Quote, RemoveFormatting, Underline,
+  AlignCenter, AlignJustify, AlignLeft, AlignRight, ArrowLeft, Bold, Check, ChevronRight, CircleHelp,
+  IndentDecrease, IndentIncrease, Italic, List, ListOrdered, Minus, MoreHorizontal, Quote, Redo2,
+  RemoveFormatting, Underline, Undo2,
 } from 'lucide-react'
 
 type Glifo = ComponentType<{ size?: number }>
 
-/**
- * Dos niveles de encabezado y no tres: en un documento de una o dos páginas un
- * tercero no jerarquiza nada.
- */
+/** Dos niveles de encabezado: en un documento de una o dos páginas un tercero no jerarquiza nada. */
 const BLOQUES = [
-  { valor: 'p',  nombre: 'Normal',    Icono: Pilcrow  as Glifo },
-  { valor: 'h2', nombre: 'Título',    Icono: Heading2 as Glifo },
-  { valor: 'h3', nombre: 'Subtítulo', Icono: Heading3 as Glifo },
+  { valor: 'p', nombre: 'Texto', titulo: 'Texto normal (Ctrl+Alt+0)' },
+  { valor: 'h2', nombre: 'Título', titulo: 'Título (Ctrl+Alt+2)' },
+  { valor: 'h3', nombre: 'Subtítulo', titulo: 'Subtítulo (Ctrl+Alt+3)' },
 ] as const
 
 const ALINEACIONES = [
-  { valor: 'left',    nombre: 'Izquierda',   Icono: AlignLeft    as Glifo },
-  { valor: 'center',  nombre: 'Centro',      Icono: AlignCenter  as Glifo },
-  { valor: 'right',   nombre: 'Derecha',     Icono: AlignRight   as Glifo },
-  { valor: 'justify', nombre: 'Justificado', Icono: AlignJustify as Glifo },
+  { valor: 'left', nombre: 'Izquierda', Icono: AlignLeft as Glifo, atajo: 'Ctrl+Mayús+L' },
+  { valor: 'center', nombre: 'Centrado', Icono: AlignCenter as Glifo, atajo: 'Ctrl+Mayús+E' },
+  { valor: 'right', nombre: 'Derecha', Icono: AlignRight as Glifo, atajo: 'Ctrl+Mayús+R' },
+  { valor: 'justify', nombre: 'Justificado', Icono: AlignJustify as Glifo, atajo: 'Ctrl+Mayús+J' },
 ] as const
+
+/**
+ * Los atajos de escritura que YA funcionan (comprobados contra las reglas de
+ * entrada de StarterKit y en el navegador): no se lista ninguno que no exista.
+ */
+const ATAJOS: readonly [string, string][] = [
+  ['## + espacio', 'Título'],
+  ['### + espacio', 'Subtítulo'],
+  ['- + espacio', 'Viñeta'],
+  ['1. + espacio', 'Lista numerada'],
+  ['> + espacio', 'Cita'],
+  ['---', 'Separador'],
+  ['**texto**', 'Negrita'],
+  ['*texto*', 'Cursiva'],
+  ['Tab / Mayús+Tab', 'Sangría en listas'],
+  ['Mayús+Enter', 'Salto de línea'],
+  ['Ctrl+Mayús+V', 'Pegar sin formato'],
+]
 
 interface Control {
   clave: string
   nombre: string
+  /** Lo que dice el `title`: el nombre y su atajo. */
+  titulo: string
   Icono: Glifo
-  /** Nivel a partir del cual el control entra en la barra; por debajo, al menú. */
-  nivel: 1 | 2 | 3
-  /** Solo los conmutadores lo traen. Su ausencia distingue acción de estado. */
+  /** Sólo los conmutadores lo traen. Su ausencia distingue acción de estado. */
   activo?: boolean
+  deshabilitado?: boolean
+  /** En el contenedor estrecho baja al «⋯». */
+  estrecho?: boolean
+  /** Filete antes del control: separa los grupos. */
+  grupo?: boolean
   accion: () => void
 }
 
-/** `null` cerrado · `align-mas` es la alineación abierta DESDE el menú. */
-type Menu = null | 'bloque' | 'mas' | 'align' | 'align-mas'
+/** `null` cerrado · `align-mas` es la alineación abierta DESDE el menú «⋯». */
+type Menu = null | 'mas' | 'align' | 'align-mas' | 'ayuda'
 
 interface Props {
   editor: Editor | null
@@ -71,17 +94,12 @@ export default function EditorEscrito({ editor }: Props) {
   const [menu, setMenu] = useState<Menu>(null)
   const barraRef = useRef<HTMLDivElement>(null)
 
-  // Cierra al pulsar fuera y con Escape. El `mousedown` de los propios botones
-  // burbujea hasta aquí, pero `contains` lo reconoce como dentro.
-  //
-  // Y al cambiar de tamaño: girar el iPad cambia de nivel, y con él qué botones
-  // existen. Un menú abierto por un botón que acaba de desaparecer se quedaría
-  // colgando sin ancla — pasa sobre todo con el de «más», que en nivel 3 no se
-  // renderiza.
+  // Cierra al pulsar fuera, con Escape y al cambiar de tamaño (girar el iPad
+  // cambia qué controles existen y un menú se quedaría sin ancla).
   useEffect(() => {
     if (!menu) return
     function fuera(e: MouseEvent) {
-      if (!barraRef.current?.contains(e.target as Node)) setMenu(null)
+      if (e.target instanceof Node && !barraRef.current?.contains(e.target)) setMenu(null)
     }
     function tecla(e: KeyboardEvent) { if (e.key === 'Escape') setMenu(null) }
     function cerrar() { setMenu(null) }
@@ -95,134 +113,103 @@ export default function EditorEscrito({ editor }: Props) {
     }
   }, [menu])
 
-  /**
-   * `h1` ya no se ofrece, pero puede llegar pegado de fuera: se muestra como
-   * «Título» para que quien lo reciba pueda convertirlo, en vez de dejarlo como
-   * un bloque que la barra no sabe nombrar.
-   */
+  /** `h1` no se ofrece, pero puede llegar pegado: se muestra como «Título». */
   const bloqueActual =
     editor?.isActive('heading', { level: 3 }) ? 'h3'
     : editor?.isActive('heading', { level: 2 }) || editor?.isActive('heading', { level: 1 }) ? 'h2'
     : 'p'
-  const bloque = BLOQUES.find(b => b.valor === bloqueActual) ?? BLOQUES[0]
-  const GlifoBloque = bloque.Icono
-
   const alineacion = ALINEACIONES.find(a => editor?.isActive({ textAlign: a.valor })) ?? ALINEACIONES[0]
 
   function aplicarBloque(valor: string): void {
     const cadena = editor?.chain().focus()
     if (!cadena) return
-    if (valor === 'h2')      cadena.setHeading({ level: 2 }).run()
+    if (valor === 'h2') cadena.setHeading({ level: 2 }).run()
     else if (valor === 'h3') cadena.setHeading({ level: 3 }).run()
-    else                     cadena.setParagraph().run()
+    else cadena.setParagraph().run()
   }
 
+  const c = () => editor?.chain().focus()
   const CONTROLES: Control[] = [
-    { clave: 'bold',      nombre: 'Negrita',        Icono: Bold             as Glifo, nivel: 1, activo: !!editor?.isActive('bold'),        accion: () => editor?.chain().focus().toggleBold().run() },
-    { clave: 'italic',    nombre: 'Cursiva',        Icono: Italic           as Glifo, nivel: 1, activo: !!editor?.isActive('italic'),      accion: () => editor?.chain().focus().toggleItalic().run() },
-    { clave: 'ul',        nombre: 'Viñetas',        Icono: List             as Glifo, nivel: 1, activo: !!editor?.isActive('bulletList'),  accion: () => editor?.chain().focus().toggleBulletList().run() },
-    { clave: 'ol',        nombre: 'Numerada',       Icono: ListOrdered      as Glifo, nivel: 1, activo: !!editor?.isActive('orderedList'), accion: () => editor?.chain().focus().toggleOrderedList().run() },
-    { clave: 'underline', nombre: 'Subrayado',      Icono: Underline        as Glifo, nivel: 2, activo: !!editor?.isActive('underline'),   accion: () => editor?.chain().focus().toggleUnderline().run() },
-    // La alineación no ejecuta: abre su hoja. Lo gobierna `pulsar`, que necesita
-    // saber desde dónde se pulsó para saber si hay vuelta atrás.
-    { clave: 'align',     nombre: 'Alineación',     Icono: alineacion.Icono,          nivel: 2,                                            accion: () => {} },
-    { clave: 'quote',     nombre: 'Cita',           Icono: Quote            as Glifo, nivel: 3, activo: !!editor?.isActive('blockquote'),  accion: () => editor?.chain().focus().toggleBlockquote().run() },
-    { clave: 'hr',        nombre: 'Separador',      Icono: Minus            as Glifo, nivel: 3,                                            accion: () => editor?.chain().focus().setHorizontalRule().run() },
-    { clave: 'clear',     nombre: 'Quitar formato', Icono: RemoveFormatting as Glifo, nivel: 3,                                            accion: () => editor?.chain().focus().clearNodes().unsetAllMarks().run() },
+    { clave: 'undo', nombre: 'Deshacer', titulo: 'Deshacer (Ctrl+Z)', Icono: Undo2, deshabilitado: !editor?.can().undo(), accion: () => c()?.undo().run() },
+    { clave: 'redo', nombre: 'Rehacer', titulo: 'Rehacer (Ctrl+Mayús+Z)', Icono: Redo2, estrecho: true, deshabilitado: !editor?.can().redo(), accion: () => c()?.redo().run() },
+    { clave: 'bold', nombre: 'Negrita', titulo: 'Negrita (Ctrl+B)', Icono: Bold, grupo: true, activo: !!editor?.isActive('bold'), accion: () => c()?.toggleBold().run() },
+    { clave: 'italic', nombre: 'Cursiva', titulo: 'Cursiva (Ctrl+I)', Icono: Italic, activo: !!editor?.isActive('italic'), accion: () => c()?.toggleItalic().run() },
+    { clave: 'underline', nombre: 'Subrayado', titulo: 'Subrayado (Ctrl+U)', Icono: Underline, activo: !!editor?.isActive('underline'), accion: () => c()?.toggleUnderline().run() },
+    { clave: 'ul', nombre: 'Viñetas', titulo: 'Viñetas (Ctrl+Mayús+8)', Icono: List, grupo: true, activo: !!editor?.isActive('bulletList'), accion: () => c()?.toggleBulletList().run() },
+    { clave: 'ol', nombre: 'Lista numerada', titulo: 'Lista numerada (Ctrl+Mayús+7)', Icono: ListOrdered, activo: !!editor?.isActive('orderedList'), accion: () => c()?.toggleOrderedList().run() },
+    { clave: 'sink', nombre: 'Aumentar sangría', titulo: 'Aumentar sangría (Tab)', Icono: IndentIncrease, deshabilitado: !editor?.can().sinkListItem('listItem'), accion: () => c()?.sinkListItem('listItem').run() },
+    { clave: 'lift', nombre: 'Reducir sangría', titulo: 'Reducir sangría (Mayús+Tab)', Icono: IndentDecrease, deshabilitado: !editor?.can().liftListItem('listItem'), accion: () => c()?.liftListItem('listItem').run() },
+    // La alineación no ejecuta: abre su hoja. Lo gobierna `pulsar`.
+    { clave: 'align', nombre: 'Alineación', titulo: `Alineación: ${alineacion.nombre}`, Icono: alineacion.Icono, grupo: true, estrecho: true, accion: () => {} },
+    { clave: 'quote', nombre: 'Cita', titulo: 'Cita (Ctrl+Mayús+B)', Icono: Quote, estrecho: true, activo: !!editor?.isActive('blockquote'), accion: () => c()?.toggleBlockquote().run() },
+    { clave: 'hr', nombre: 'Separador', titulo: 'Separador (---)', Icono: Minus, estrecho: true, accion: () => c()?.setHorizontalRule().run() },
+    { clave: 'clear', nombre: 'Quitar formato', titulo: 'Quitar formato', Icono: RemoveFormatting, estrecho: true, accion: () => c()?.clearNodes().unsetAllMarks().run() },
   ]
 
-  function pulsar(c: Control, desdeMenu: boolean): void {
-    if (c.clave === 'align') {
+  function pulsar(ctl: Control, desdeMenu: boolean): void {
+    if (ctl.clave === 'align') {
       setMenu(desdeMenu ? 'align-mas' : menu === 'align' ? null : 'align')
       return
     }
-    c.accion()
+    ctl.accion()
     setMenu(null)
   }
 
-  // `preventDefault` en mousedown: sin esto el botón se lleva el foco y la
-  // selección del editor se pierde antes de que el comando se ejecute. El click
-  // sigue disparando, así que el teclado no pierde nada.
-  const sinRobarFoco = (e: React.MouseEvent) => e.preventDefault()
+  const sinRobarFoco = (e: ReactMouseEvent) => e.preventDefault()
 
   return (
     <>
-      {/* `group` y no `toolbar`: el rol de barra promete navegación con flechas
-          y aquí cada control es un objetivo de tabulación normal. */}
-      <div ref={barraRef} className="sp-ed-bar" role="group" aria-label="Formato del escrito">
-
-        <button type="button" className="sp-ed-btn sp-ed-block"
-          aria-haspopup="menu" aria-expanded={menu === 'bloque'} aria-label={`Bloque: ${bloque.nombre}`}
-          onMouseDown={sinRobarFoco} onClick={() => setMenu(m => (m === 'bloque' ? null : 'bloque'))}>
-          <GlifoBloque /><ChevronDown />
-        </button>
-
-        {/* Nativo a propósito: en el iPad abre la rueda del sistema. */}
-        <select className="sp-input sp-ed-select" aria-label="Bloque"
-          value={bloqueActual} onChange={e => aplicarBloque(e.target.value)}>
-          {BLOQUES.map(b => <option key={b.valor} value={b.valor}>{b.nombre}</option>)}
-        </select>
-
-        {CONTROLES.map(c => (
-          <button key={c.clave} type="button"
-            className={`sp-ed-btn${c.nivel === 1 ? '' : c.nivel === 2 ? ' sp-ed-n2' : ' sp-ed-n3'}`}
-            title={c.nombre}
-            aria-label={c.clave === 'align' ? `Alineación: ${alineacion.nombre}` : c.nombre}
-            aria-pressed={c.activo}
-            aria-haspopup={c.clave === 'align' ? 'menu' : undefined}
-            aria-expanded={c.clave === 'align' ? menu === 'align' : undefined}
-            onMouseDown={sinRobarFoco} onClick={() => pulsar(c, false)}>
-            <c.Icono />
-          </button>
+      {/* `group` y no `toolbar`: el rol de barra promete foco itinerante con
+          flechas, y aquí cada control es un objetivo de tabulación normal. */}
+      <div ref={barraRef} className="sp-esc-bar" role="group" aria-label="Formato del escrito">
+        {CONTROLES.slice(0, 2).map(ctl => (
+          <BotonBarra key={ctl.clave} ctl={ctl} menu={menu} onPulsar={() => pulsar(ctl, false)} sinRobarFoco={sinRobarFoco} />
         ))}
-
-        <button type="button" className="sp-ed-btn sp-ed-more"
-          aria-haspopup="menu" aria-expanded={menu === 'mas'} aria-label="Más opciones de formato"
+        <span className="sp-esc-sep" aria-hidden="true" />
+        <div className="k-seg sp-esc-bloque" role="group" aria-label="Tipo de bloque">
+          {BLOQUES.map(b => (
+            <button key={b.valor} type="button" className="k-seg-op" title={b.titulo}
+              aria-pressed={bloqueActual === b.valor} onMouseDown={sinRobarFoco} onClick={() => aplicarBloque(b.valor)}>
+              {b.nombre}
+            </button>
+          ))}
+        </div>
+        {CONTROLES.slice(2).map(ctl => (
+          <BotonBarra key={ctl.clave} ctl={ctl} menu={menu} onPulsar={() => pulsar(ctl, false)} sinRobarFoco={sinRobarFoco} />
+        ))}
+        <span className="sp-esc-fin" />
+        <button type="button" className="k-b k-b-icono sp-esc-btn sp-esc-solo-estrecho"
+          aria-haspopup="menu" aria-expanded={menu === 'mas'} aria-label="Más formato" title="Más formato"
           onMouseDown={sinRobarFoco} onClick={() => setMenu(m => (m === 'mas' ? null : 'mas'))}>
           <MoreHorizontal />
         </button>
-
-        {menu === 'bloque' && (
-          <div className="sp-ed-menu sp-ed-menu--left" role="menu">
-            {BLOQUES.map(b => (
-              <button key={b.valor} type="button" className="sp-ed-row" role="menuitemradio"
-                aria-checked={b.valor === bloqueActual}
-                onMouseDown={sinRobarFoco}
-                onClick={() => { aplicarBloque(b.valor); setMenu(null) }}>
-                <b.Icono />{b.nombre}
-                {b.valor === bloqueActual && <span className="sp-ed-row__cue"><Check /></span>}
-              </button>
-            ))}
-          </div>
-        )}
+        <button type="button" className="k-b k-b-icono sp-esc-btn"
+          aria-haspopup="dialog" aria-expanded={menu === 'ayuda'} aria-label="Atajos de escritura" title="Atajos de escritura"
+          onMouseDown={sinRobarFoco} onClick={() => setMenu(m => (m === 'ayuda' ? null : 'ayuda'))}>
+          <CircleHelp />
+        </button>
 
         {menu === 'mas' && (
           <div className="sp-ed-menu" role="menu">
-            {/* Mismo orden que la barra, y con el nombre escrito: en un menú no
-                hay que adivinar qué hace un glifo de 20 px. */}
-            {CONTROLES.filter(c => c.nivel > 1).map(c => (
-              <button key={c.clave} type="button"
-                className={`sp-ed-row${c.nivel === 2 ? ' sp-ed-m2' : ' sp-ed-m3'}`}
-                // Conmutador o acción: `aria-checked` solo lo admite el primero,
-                // y `activo` es justo lo que distingue a los dos.
-                role={c.activo === undefined ? 'menuitem' : 'menuitemcheckbox'}
-                aria-checked={c.activo}
-                aria-haspopup={c.clave === 'align' ? 'menu' : undefined}
-                // Siempre colapsada: al abrir la hoja de alineación, esta se va.
-                aria-expanded={c.clave === 'align' ? false : undefined}
-                onMouseDown={sinRobarFoco} onClick={() => pulsar(c, true)}>
-                <c.Icono />{c.nombre}
-                {c.clave === 'align' && <span className="sp-ed-row__cue"><ChevronRight /></span>}
+            {/* Con el nombre escrito: en un menú no hay que adivinar un glifo. */}
+            {CONTROLES.filter(ctl => ctl.estrecho).map(ctl => (
+              <button key={ctl.clave} type="button" className="sp-ed-row"
+                role={ctl.activo === undefined ? 'menuitem' : 'menuitemcheckbox'}
+                aria-checked={ctl.activo} disabled={ctl.deshabilitado}
+                aria-haspopup={ctl.clave === 'align' ? 'menu' : undefined}
+                onMouseDown={sinRobarFoco} onClick={() => pulsar(ctl, true)}>
+                <ctl.Icono />{ctl.clave === 'align' ? `Alineación: ${alineacion.nombre}` : ctl.nombre}
+                {ctl.clave === 'align' && <span className="sp-ed-row__cue"><ChevronRight /></span>}
               </button>
             ))}
           </div>
         )}
 
         {(menu === 'align' || menu === 'align-mas') && (
-          <div className="sp-ed-menu" role="menu">
+          <div className="sp-ed-menu sp-esc-menu-align" role="menu">
             {menu === 'align-mas' && (
               <div className="sp-ed-menuhead">
-                <button type="button" className="sp-ed-btn" aria-label="Volver"
+                <button type="button" className="k-b k-b-icono" aria-label="Volver"
                   onMouseDown={sinRobarFoco} onClick={() => setMenu('mas')}>
                   <ArrowLeft />
                 </button>
@@ -231,7 +218,7 @@ export default function EditorEscrito({ editor }: Props) {
             )}
             {ALINEACIONES.map(a => (
               <button key={a.valor} type="button" className="sp-ed-row" role="menuitemradio"
-                aria-checked={a.valor === alineacion.valor}
+                aria-checked={a.valor === alineacion.valor} title={`${a.nombre} (${a.atajo})`}
                 onMouseDown={sinRobarFoco}
                 onClick={() => { editor?.chain().focus().setTextAlign(a.valor).run(); setMenu(null) }}>
                 <a.Icono />{a.nombre}
@@ -240,10 +227,49 @@ export default function EditorEscrito({ editor }: Props) {
             ))}
           </div>
         )}
+
+        {menu === 'ayuda' && (
+          <div className="sp-ed-menu sp-esc-ayuda" role="dialog" aria-label="Atajos de escritura">
+            <p className="sp-esc-ayuda-t">Escribe y se da formato solo</p>
+            <dl>
+              {ATAJOS.map(([k, v]) => (
+                <div key={k}><dt><kbd>{k}</kbd></dt><dd>{v}</dd></div>
+              ))}
+            </dl>
+            <p className="sp-esc-ayuda-n">
+              Al pegar un texto de un asistente de IA se conserva su jerarquía, aunque venga con estos signos.
+            </p>
+          </div>
+        )}
       </div>
 
-      {/* El scroll es el del formulario: el área crece y no abre uno propio. */}
-      <EditorContent editor={editor} />
+      {/* El desplazamiento es SÓLO del cuerpo: título y barra quedan a la vista. */}
+      <div className="sp-esc-cuerpo">
+        <EditorContent editor={editor} />
+      </div>
+    </>
+  )
+}
+
+/** Un control de la barra: icono de 20 con su nombre accesible y su atajo en el `title`. */
+function BotonBarra({ ctl, menu, onPulsar, sinRobarFoco }: {
+  ctl: Control; menu: Menu; onPulsar: () => void; sinRobarFoco: (e: ReactMouseEvent) => void
+}) {
+  const esAlign = ctl.clave === 'align'
+  return (
+    <>
+      {ctl.grupo && <span className={`sp-esc-sep${ctl.estrecho ? ' sp-esc-ocu' : ''}`} aria-hidden="true" />}
+      <button type="button"
+        className={`k-b k-b-icono sp-esc-btn${ctl.estrecho ? ' sp-esc-ocu' : ''}`}
+        title={ctl.titulo}
+        aria-label={esAlign ? ctl.titulo : ctl.nombre}
+        aria-pressed={ctl.activo}
+        aria-haspopup={esAlign ? 'menu' : undefined}
+        aria-expanded={esAlign ? menu === 'align' : undefined}
+        disabled={ctl.deshabilitado}
+        onMouseDown={sinRobarFoco} onClick={onPulsar}>
+        <ctl.Icono />
+      </button>
     </>
   )
 }

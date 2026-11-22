@@ -4109,6 +4109,96 @@ html.dark .sp-hon-fi:focus, html.dark .sp-hon-anticipo { background-color: var(-
   .sp-firma-sellopie > .sp-btn { flex: 1 1 0; }
 }
 
+/* ── 26.7 · ESCRITO MÉDICO: LA HOJA (maqueta `escrito.html`, aprobada) ──
+   Una hoja de alto fijo (`--esc-alto`, medido por el formulario: el área de
+   contenido menos su relleno de arriba y el pie de acciones) que se queda
+   pegada arriba (`sticky`, `--esc-arriba`) y en la que SOLO el cuerpo se
+   desplaza (`overscroll-behavior: contain`): datos en una línea, título como
+   título, la barra de formato y el pie de la hoja quedan siempre a la vista.
+   La barra reparte por el CONTENEDOR de la hoja (`escrito`): ancho, una fila;
+   medio, dos renglones; estrecho, lo `.sp-esc-ocu` baja al «⋯». Nada aquí es
+   `fixed`. */
+.sp-esc-hoja {
+  position: sticky; top: var(--esc-arriba, 0px); z-index: 2;
+  display: flex; flex-direction: column; height: var(--esc-alto, 70dvh);
+  background: var(--sup); border-radius: var(--r-tarjeta);
+  container: escrito / inline-size;
+}
+:where([data-formato="ih"], [data-formato="iv"], [data-formato="esc"]) .sp-esc-hoja { border-radius: var(--r-tarjeta-ancha); }
+.sp-esc-meta {
+  flex: none; display: flex; align-items: center; gap: 8px; width: 100%; min-height: var(--k-toque); margin: 0; padding: 4px 16px;
+  border: 0; border-bottom: 1px solid var(--linea); border-radius: var(--r-tarjeta) var(--r-tarjeta) 0 0; background: transparent;
+  color: var(--tinta2); font: inherit; font-size: 13px; line-height: 18px; text-align: left; cursor: pointer;
+}
+.sp-esc-meta > b { color: var(--tinta); font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sp-esc-cambiar { margin-left: auto; color: var(--enlace); font-weight: 600; }
+.sp-esc-meta:focus-visible { outline: 3px solid var(--enlace); outline-offset: -3px; }
+@media (hover: hover) { .sp-esc-meta:hover { background: var(--sup2); } }
+.sp-esc-datos { flex: none; display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 10px 12px; border-bottom: 1px solid var(--linea); }
+.sp-esc-datos .sp-rx-rot { width: auto; min-width: 64px; }
+.sp-esc-listo { min-height: var(--k-toque); }
+.sp-esc-nota { grid-column: 1 / -1; margin: 0; padding: 0 12px; font-size: 12px; line-height: 16px; color: var(--tinta2); }
+.sp-esc-titulo {
+  flex: none; width: 100%; margin: 0; padding: 12px 16px 4px; border: 0; background: transparent; color: var(--tinta);
+  font: inherit; font-size: 22px; line-height: 28px; font-weight: 700; letter-spacing: -.01em;
+}
+.sp-esc-titulo::placeholder { color: var(--tinta2); opacity: .6; }
+.sp-esc-titulo:focus { outline: none; }
+.sp-esc-titulo:focus-visible { box-shadow: inset 0 -2px 0 var(--enlace); }
+
+.sp-esc-bar { position: relative; flex: none; display: flex; align-items: center; flex-wrap: wrap; gap: 2px; padding: 4px 8px; border-bottom: 1px solid var(--linea); }
+.sp-esc-btn[aria-pressed="true"] { background: var(--tonal); color: var(--tonal-tinta); }
+.sp-esc-btn[aria-expanded="true"] { background: var(--sup2); color: var(--tinta); }
+.sp-esc-btn:disabled { opacity: .38; cursor: default; }
+.sp-esc-sep { flex: none; width: 1px; height: 20px; margin: 0 4px; background: var(--linea); }
+.sp-esc-fin { flex: 1 0 0; }
+.sp-esc-bloque { margin: 0 2px; }
+.sp-esc-bloque .k-seg-op { padding: 0 10px; font-size: 13px; }
+.sp-esc-bar .sp-esc-solo-estrecho { display: none; }
+.sp-esc-menu-align { right: auto; left: 50%; transform: translateX(-50%); }
+.sp-esc-ayuda { width: min(340px, calc(100% - 16px)); padding: 12px 14px; font-size: 13px; line-height: 18px; color: var(--tinta2); }
+.sp-esc-ayuda-t { margin: 0 0 6px; font-size: 14px; font-weight: 600; color: var(--tinta); }
+.sp-esc-ayuda dl { display: grid; grid-template-columns: auto 1fr; gap: 5px 12px; margin: 0; }
+.sp-esc-ayuda dl > div { display: contents; }
+.sp-esc-ayuda dt { white-space: nowrap; }
+.sp-esc-ayuda dd { margin: 0; color: var(--tinta); }
+.sp-esc-ayuda kbd { display: inline-block; padding: 1px 6px; border-radius: 6px; background: var(--sup2); color: var(--tinta); font: inherit; font-size: 12px; font-weight: 600; }
+.sp-esc-ayuda-n { margin: 8px 0 0; }
+
+/* El único que se desplaza. */
+.sp-esc-cuerpo { flex: 1 1 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.sp-esc-cuerpo > div { display: flex; flex-direction: column; min-height: 100%; }
+.sp-esc-cuerpo .sp-ed-prose { flex: 1; min-height: 0; padding: 14px 18px 18px; }
+.sp-esc-pieh { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; padding: 4px 10px 6px; border-top: 1px solid var(--linea); }
+.sp-esc-pieh svg { width: 16px; height: 16px; }
+.sp-esc-piecampo { flex: 1 1 280px; display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: 4px 0; }
+.sp-esc-piecampo .sp-rx-rot { width: auto; min-width: 40px; }
+.sp-esc-piecampo .sp-esc-nota { padding: 0 12px; }
+.sp-esc-usar { flex: none; white-space: nowrap; }
+.sp-esc-cnt { margin-left: auto; font-size: 12px; line-height: 16px; color: var(--tinta2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* Ancho: una fila, sin menús escondidos. */
+@container escrito (min-width: 760px) { .sp-esc-bar { flex-wrap: nowrap; } }
+/* Estrecho (`tel`/`ext`): Deshacer, el bloque, «⋯» y «?» en el primer renglón;
+   letra, listas y sangrías en el segundo; lo demás, en el «⋯». */
+@container escrito (max-width: 559px) {
+  .sp-esc-bar .sp-esc-ocu { display: none; }
+  .sp-esc-bar .sp-esc-solo-estrecho { display: inline-flex; }
+  .sp-esc-sep, .sp-esc-fin { display: none; }
+  .sp-esc-bar > * { order: 6; }
+  .sp-esc-bar > :first-child { order: 1; }
+  .sp-esc-bar > .sp-esc-bloque { order: 2; flex: 1 1 auto; display: flex; }
+  .sp-esc-bloque .k-seg-op { flex: 1; }
+  .sp-esc-bar > .sp-esc-solo-estrecho { order: 3; }
+  .sp-esc-bar > [aria-label="Atajos de escritura"] { order: 4; }
+  .sp-esc-bar::after { content: ""; order: 5; flex-basis: 100%; height: 0; }
+  .sp-esc-bar > .sp-ed-menu { order: 7; }
+  .sp-esc-titulo { font-size: 20px; line-height: 26px; padding: 12px 14px 4px; }
+  .sp-esc-datos { grid-template-columns: minmax(0, 1fr); }
+  .sp-esc-cuerpo .sp-ed-prose { padding: 12px 14px; }
+}
+html.dark .sp-esc-titulo { background-color: transparent !important; border-color: transparent !important; }
+
 } /* fin @layer components */
 
 /* ⚠ FUERA DE @layer A PROPÓSITO — NO LO METAS DENTRO. La hoja de react-easy-crop

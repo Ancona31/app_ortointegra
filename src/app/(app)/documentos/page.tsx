@@ -107,7 +107,7 @@ function DocumentosContent() {
   return (
     /* Columna de 640 centrada en el área de contenido (CALMA §14); en `iv`,
        la de 600 (§19). */
-    <div lang="es" className="mx-auto w-full max-w-[640px] iv:max-w-[600px] animate-slide-up">
+    <div lang="es" className={`mx-auto w-full max-w-[640px] iv:max-w-[600px] animate-slide-up${tipo === 'escrito' ? ' esc:max-w-[880px]' : ''}`}>
 
       {/* Header */}
       <header className="mb-6">

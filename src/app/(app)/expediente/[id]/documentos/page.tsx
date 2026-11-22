@@ -165,7 +165,7 @@ function DocumentosPacienteContent() {
   return (
     /* Columna de 640 centrada en el área de contenido (CALMA §14); en `iv`,
        la de 600 (§19). */
-    <div lang="es" className="mx-auto w-full max-w-[640px] iv:max-w-[600px] space-y-5">
+    <div lang="es" className={`mx-auto w-full max-w-[640px] iv:max-w-[600px] space-y-5${tab === 'escrito' ? ' esc:max-w-[880px]' : ''}`}>
       {/* Cabecera: «‹ Expediente» (CALMA §6, §20), título y quién. El regreso
           va a la pestaña Documentos del expediente (`?tab=documentos`, clave de
           `PestanasExpediente`), no al Resumen: se llega aquí desde «Nuevo
