@@ -1,0 +1,21 @@
+# Diferencias A PROPÓSITO del bloque F1 respecto de la referencia (ref-originales).
+# Formato de comparar-estructura.sh: estado<TAB>tipo<TAB>clave<TAB>razón. A = la referencia, B = el conjunto fundido.
+# Comprobado 2026-11-22: base-main + F1 contra ref-originales, y «quitar lo mío y volver a ponerlo» sobre un clon de ref-originales.
+
+solo_b	funcion	public.agenda_v2_encendida(p_clinica_id uuid)	pieza común del ENCARGO §5: la única lectura del interruptor; nueva, la crea F1 y la llaman los demás bloques
+solo_b	permiso	funcion public.agenda_v2_encendida(p_clinica_id uuid) → *	EXECUTE de la pieza común: dueño postgres, authenticated (disparadores INVOKER con sesión) y service_role (RPC); sin PUBLIC ni anon
+solo_b	comentario	function public.agenda_v2_encendida(pg_catalog.uuid)	COMMENT de la pieza común nueva (INVOKER a propósito, falla cerrado)
+distinto	funcion	public.log_cita_change()	sólo cambia un comentario DENTRO del cuerpo (md5 80c3556c → e4a4ebdd): «C2 'google' · E1/E6 … · E9 …» nombraba migraciones que ya no existen; ahora dice quién pone cada literal. Misma lógica, mismas listas c_tecnicas y c_vias
+distinto	funcion	public.agenda_restablecer_configuracion(p_clinica_id uuid, p_actor uuid)	sólo cambia un comentario DENTRO del cuerpo (md5 1c390644 → ed0b98f6): quita «G4 (20261119130000)» y «Tanda I (punto 3)». Misma lógica
+distinto	comentario	function public.log_cita_change()	COMMENT sin historia: «google (C2), enlace_paciente (E1/E6), google_rsvp (E9)» → quién pone cada literal. Mismo convenio
+distinto	comentario	function public.agenda_restablecer_configuracion(pg_catalog.uuid,pg_catalog.uuid)	COMMENT sin historia de tandas («tanda H, punto 10», «G4», «tanda I punto 3»); mismo contenido
+distinto	comentario	table public.tipos_cita	COMMENT sin «(agenda B6)»; mismo convenio
+distinto	comentario	table column public.tipos_cita.consultorio_id	COMMENT sin «(agenda G2)»; mismo convenio
+distinto	comentario	table column public.tipos_cita.principal	COMMENT sin «(agenda G2)»; mismo convenio
+distinto	comentario	table column public.appointments.tipo_cita_id	COMMENT sin «(agenda B6)», «D1», «D3»; mismo convenio
+distinto	comentario	table column public.agenda_ajustes.recordatorio_encendido	COMMENT sin «(tanda H, punto 9)»; «policy de UPDATE de B1» → «policy agenda_ajustes_update»
+distinto	comentario	table column public.agenda_ajustes.correo_reserva_clinica	COMMENT sin «Tanda I (punto 20)»; «policy de UPDATE de B1» → «policy agenda_ajustes_update»
+distinto	comentario	table column public.clinicas.timezone	COMMENT sin el prefijo «K3 (punto 12)»; mismo convenio
+distinto	comentario	table column public.consultorios.horario_propio	COMMENT: «Desde 20261119130000 todos…» → «Al crearse esta columna, todos… (respaldo en …)». Conserva el prefijo «false = la disponibilidad» que exige pruebas-sql/b5_horario_propio.sql caso 5
+distinto	comentario	table column public.consultorios.horario_revisado_en	COMMENT sin «(tanda I, punto 3)» ni «en 20261119130000»; mismo convenio
+distinto	comentario	table respaldos.consultorios_horario_20261119	COMMENT: nombra el archivo fundido en vez de «20261119130000, punto 10 de Angel» y la reversa de F1 en vez de «VUELTA ATRÁS en el archivo»
