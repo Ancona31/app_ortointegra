@@ -23,18 +23,18 @@
 --     nombra agenda_ajustes al crearse.
 --   F5a (20261201130000): agenda_bloqueos. gcal_bloqueo_aplicar declara
 --     agenda_bloqueos%ROWTYPE, que PL/pgSQL resuelve AL CREAR la función.
+--   F3 (20261201140000): appointments.reserva_canal. cita_asignacion_google()
+--     (disparador BEFORE de appointments) lee NEW.reserva_canal: sin la
+--     columna, TODA alta de cita que no haga postgres fallaría. Por eso F3 va
+--     antes que este archivo, y el pre-vuelo lo exige.
 --   main: clinicas, appointments, pacientes, profiles, audit_log,
 --     clinica_conexiones_google, get_clinica_id(), clinica_no_suspendida() y
 --     clinica_tiene_acceso() (la puerta S3 lee su cuerpo; NO se modifican).
---   Lo que necesitan los bloques POSTERIORES de éste: F3 y F4 llaman a la
---   puerta S3; F4 cuelga disparadores de reserva_empalmes_google y de
+--   Lo que necesitan de éste los demás bloques: F3 (anterior) llama a la
+--   puerta S3 sólo desde plpgsql, al ejecutarse: hasta este COMMIT la reserva
+--   por enlace no funciona (no hay enlaces todavía). F4 (posterior) la nombra
+--   en una función SQL, cuelga disparadores de reserva_empalmes_google y de
 --   gcal_movimientos_rechazados y lee google_asignacion en un WHEN.
---
--- ⚠️ VENTANA ENTRE F2 Y F3: cita_asignacion_google() nombra NEW.reserva_canal,
---   que crea F3. Entre el COMMIT de este archivo y el de F3, TODO INSERT en
---   appointments de un rol que no sea postgres/supabase_admin falla con «record
---   "new" has no field "reserva_canal"». F3 se aplica inmediatamente después,
---   sin tráfico de por medio (o los seis archivos en la misma sesión).
 --
 -- BLOQUEOS (lock_timeout 5 s, statement_timeout 60 s)
 --   appointments: ACCESS EXCLUSIVE al añadir la columna (sin DEFAULT: sin
@@ -51,8 +51,8 @@
 --   cambia nada (IF NOT EXISTS, CREATE OR REPLACE, DROP POLICY IF EXISTS). Si
 --   algo de este bloque existe con OTRA forma, el pre-vuelo aborta sin tocar.
 --
--- CÓMO SE DESHACE: supabase/fusion/reversas/20261201140000_agenda_f2_google_reversa.sql
---   (después de deshacer F4 y F3). Pierde los tokens de sincronización, los
+-- CÓMO SE DESHACE: supabase/reversas/20261201150000_agenda_f2_google_reversa.sql
+--   (después de deshacer F5b y F4; F3 se deshace DESPUÉS de éste). Pierde los tokens de sincronización, los
 --   avisos de empalme y la marca «por asignar» de las citas.
 --
 -- QUIÉN PONE spinus.via (contrato con log_cita_change de F1, lista c_vias):
@@ -166,6 +166,12 @@ BEGIN
      OR (SELECT prosecdef OR prorettype <> 'boolean'::regtype FROM pg_proc WHERE oid = to_regprocedure('public.agenda_v2_encendida(uuid)'))
      OR NOT has_function_privilege('service_role', 'public.agenda_v2_encendida(uuid)', 'EXECUTE') THEN
     RAISE EXCEPTION 'PRE-VUELO FALLÓ: falta public.agenda_v2_encendida(uuid) de F1, no es INVOKER boolean o service_role no la ejecuta.';
+  END IF;
+
+  -- F3: cita_asignacion_google() lee NEW.reserva_canal (ver la cabecera).
+  IF NOT EXISTS (SELECT 1 FROM pg_attribute WHERE attrelid = 'public.appointments'::regclass
+                  AND attname = 'reserva_canal' AND atttypid = 'text'::regtype AND NOT attisdropped) THEN
+    RAISE EXCEPTION 'PRE-VUELO FALLÓ: falta appointments.reserva_canal (F3, 20261201140000): sin ella el disparador de «por asignar» rompería toda alta de cita.';
   END IF;
 
   -- F5a
@@ -636,7 +642,7 @@ BEGIN
     IF v_src IS NULL OR strpos(v_src, c_fuente) = 0 OR v_sql !~* '^select\s'
        OR v_sql ~* '(get_clinica_id|auth\.|current_setting|request\.jwt|current_user|session_user|current_role|set_config|;)' THEN
       RAISE EXCEPTION 'gcal_sync_clinica_habilitada: % ya no tiene la forma que se sabe evaluar por clínica', v_puerta
-        USING ERRCODE = 'P0001', HINT = 'Revisar gcal_sync_clinica_habilitada (20261201140000_agenda_f2_google) contra la definición nueva; no se adivina.';
+        USING ERRCODE = 'P0001', HINT = 'Revisar gcal_sync_clinica_habilitada (20261201150000_agenda_f2_google) contra la definición nueva; no se adivina.';
     END IF;
     EXECUTE v_sql INTO v_ok USING p_clinica_id;
     IF v_ok IS NOT TRUE THEN

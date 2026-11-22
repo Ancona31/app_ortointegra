@@ -5,8 +5,10 @@
 --   propósito; NO es una fila de appointments), sus índices, su RLS con
 --   cuatro policies, el disparador que toma el candado 1790 del médico
 --   (agenda_bloqueo_preparar) y su auditoría (log_tabla_change de main).
--- Va SEGUNDO del conjunto: después de F1 y ANTES de F3, porque
---   reserva_ocupacion (F3) es LANGUAGE sql y nombra esta tabla al crearse.
+-- Va SEGUNDO del conjunto: después de F1 y ANTES de F3 y de F2, porque
+--   reserva_ocupacion (F3) es LANGUAGE sql y nombra esta tabla al crearse, y
+--   gcal_bloqueo_aplicar (F2) declara agenda_bloqueos%ROWTYPE (dependencia
+--   dura: PL/pgSQL lo resuelve al crear la función).
 -- Depende de:
 --   · main: clinicas, profiles, auth.uid(), get_clinica_id(),
 --     soy_admin_de_clinica(), get_my_role(), clinica_no_suspendida(),
@@ -17,8 +19,8 @@
 -- Riesgo: bajo. Tabla nueva sin datos; ninguna policy ni objeto existente
 --   cambia. Re-ejecutable: una segunda pasada no cambia nada (el pre-vuelo
 --   exige que lo que ya exista tenga esta misma forma, y si no, aborta).
--- Vuelta atrás: supabase/fusion/reversas/20261201130000_agenda_f5a_bloqueos_reversa.sql
---   (exige quitar antes F3 y F2, que la nombran: la reversa del conjunto va
+-- Vuelta atrás: supabase/reversas/20261201130000_agenda_f5a_bloqueos_reversa.sql
+--   (exige quitar antes F2 y F3, que la nombran: la reversa del conjunto va
 --   en orden inverso de bloques).
 -- ═══════════════════════════════════════════════════════════════════════
 

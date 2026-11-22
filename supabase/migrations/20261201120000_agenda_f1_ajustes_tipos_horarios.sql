@@ -35,7 +35,7 @@
 --   copia. Ningún dato de pacientes se escribe.
 -- SEGUNDA PASADA: ABORTA LIMPIO en el pre-vuelo si ya existe cualquier objeto
 --   de este bloque (salvo el respaldo, que se reutiliza si tiene su forma).
--- CÓMO SE DESHACE: supabase/fusion/reversas/20261201120000_agenda_f1_ajustes_
+-- CÓMO SE DESHACE: supabase/reversas/20261201120000_agenda_f1_ajustes_
 --   tipos_horarios_reversa.sql, DESPUÉS de las reversas de los bloques
 --   posteriores. Devuelve el horario previo a los consultorios que nadie
 --   editó desde la copia y conserva el respaldo.

@@ -1,13 +1,15 @@
 -- ═══════════════════════════════════════════════════════════════════════
--- REVERSA de 20261201150000_agenda_f3_reserva_enlace.sql (agenda v2 · F3)
+-- REVERSA de 20261201140000_agenda_f3_reserva_enlace.sql (agenda v2 · F3)
 -- ───────────────────────────────────────────────────────────────────────
 -- Quita TODOS los objetos del bloque de la reserva por enlace, y sólo ésos,
 -- en orden inverso de dependencias y sin CASCADE.
 --
--- SUPONE que los bloques posteriores (F4 y F5b) ya se quitaron: sus
--- disparadores trg_appointments_aviso_clinica (WHEN reserva_enlace_id) y
--- trg_appointments_proteger_eleccion (WHEN old.reserva_canal) dependen de
--- columnas de este bloque. Si siguen ahí, el pre-vuelo aborta.
+-- SUPONE que los bloques posteriores (F5b, F4 y F2) ya se quitaron: los
+-- disparadores trg_appointments_aviso_clinica (F4, WHEN reserva_enlace_id) y
+-- trg_appointments_proteger_eleccion (F5b, WHEN old.reserva_canal) dependen de
+-- columnas de este bloque, y cita_asignacion_google() (F2, disparador BEFORE)
+-- lee NEW.reserva_canal: sin la columna fallaría toda alta de cita. Si alguno
+-- sigue ahí, el pre-vuelo aborta.
 --
 -- PIERDE DATOS: enlaces, verificaciones, incidencias, contactos bloqueados y
 -- las columnas reserva_* de las citas. Por eso aborta si hay alguna fila: se
@@ -34,6 +36,11 @@ BEGIN
   IF EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = 'public.appointments'::regclass
               AND tgname IN ('trg_appointments_aviso_clinica', 'trg_appointments_proteger_eleccion')) THEN
     RAISE EXCEPTION 'REVERSA F3: siguen los disparadores de F4/F5b que leen columnas reserva_*; quitar antes esos bloques.';
+  END IF;
+  IF to_regprocedure('public.cita_asignacion_google()') IS NOT NULL
+     OR EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = 'public.appointments'::regclass
+                 AND tgname = 'trg_appointments_asignacion_google') THEN
+    RAISE EXCEPTION 'REVERSA F3: sigue F2 (cita_asignacion_google lee reserva_canal); deshacer F2 antes.';
   END IF;
   FOREACH v_t IN ARRAY ARRAY['public.reserva_avisos', 'public.reserva_enlaces', 'public.reserva_verificaciones',
                              'public.reserva_incidencias', 'public.reserva_contactos'] LOOP

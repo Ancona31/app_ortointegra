@@ -4,7 +4,7 @@
 -- QUÉ HACE: quita TODOS los objetos de F1 y sólo ésos, en orden inverso de
 --   dependencias, sin CASCADE. Antes devuelve a consultorios.horario el valor
 --   previo al backfill en las filas que nadie editó desde la copia.
--- CUÁNDO: la ÚLTIMA, después de las reversas de F5b, F4, F3, F2 y F5a. Si
+-- CUÁNDO: la ÚLTIMA, después de las reversas de F5b, F4, F2, F3 y F5a. Si
 --   queda algo de esos bloques que nombre lo de F1, aborta sin tocar nada.
 -- QUÉ SE PIERDE (respaldar antes si hace falta):
 --   · los ajustes y el interruptor de cada clínica (agenda_ajustes);

@@ -214,8 +214,9 @@ end $$;
 
 -- Caso 7: regenerar el fijo. Si el alta falla (código mal formado), la revocación se deshace;
 -- si va bien, el viejo queda revocado y el nuevo vigente. Un invitado no regenera el de otro.
--- (Desde 7a, regenerar es reserva_enlace_emitir con clase fijo; reserva_enlace_regenerar_fijo ya no
--- puede insertar con la sesión: falla entera, sin dejar revocado nada.)
+-- (Desde 7a, regenerar es reserva_enlace_emitir con clase fijo. reserva_enlace_regenerar_fijo se
+-- retiró en el conjunto fundido (F3): los tres intentos de abajo esperan ahora undefined_function,
+-- y lo que prueban sigue igual: con esa función nadie regenera ni deja revocado nada.)
 do $$
 begin
   begin
@@ -230,7 +231,7 @@ begin
     perform public.reserva_enlace_regenerar_fijo('00000000-0000-4000-8000-000000d1f005',
               '00000000-0000-4000-8000-000000d1b001', pg_temp.h('f1-sesion'));
     raise exception 'D1 caso 7: la sesión regeneró con reserva_enlace_regenerar_fijo';
-  exception when insufficient_privilege then null;
+  exception when undefined_function then null;
   end;
   reset role;
   if (select revocado_en from public.reserva_enlaces where id = '00000000-0000-4000-8000-000000d1f002') is not null then
@@ -257,7 +258,7 @@ begin
   begin
     perform public.reserva_enlace_regenerar_fijo(gen_random_uuid(), '00000000-0000-4000-8000-000000d1b001', pg_temp.h('sr'));
     raise exception 'D1 caso 7: service_role regeneró sin sesión';
-  exception when invalid_parameter_value then null;
+  exception when undefined_function then null;
   end;
   reset role;
 end $$;
@@ -328,7 +329,7 @@ begin
   begin
     perform public.reserva_enlace_regenerar_fijo(gen_random_uuid(), '00000000-0000-4000-8000-000000d1b001', pg_temp.h('an'));
     raise exception 'D1 caso 8: anon ejecutó regenerar';
-  exception when insufficient_privilege then null;
+  exception when undefined_function then null;
   end;
   reset role;
 end $$;

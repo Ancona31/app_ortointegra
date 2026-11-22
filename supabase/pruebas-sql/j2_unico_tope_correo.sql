@@ -211,9 +211,9 @@ begin
     || has_function_privilege('authenticated', e, 'EXECUTE')::text || ',' || has_function_privilege('service_role', e, 'EXECUTE')::text, 'false,false,true');
   perform pg_temp.esperar('caso 6 reservar', has_function_privilege('anon', r, 'EXECUTE')::text || ','
     || has_function_privilege('authenticated', r, 'EXECUTE')::text || ',' || has_function_privilege('service_role', r, 'EXECUTE')::text, 'false,false,true');
-  -- La de 7 args se queda (compatibilidad durante el despliegue), igual de cerrada.
-  perform pg_temp.esperar('caso 6 emitir de 7 args', has_function_privilege('anon', 'public.reserva_enlace_emitir(uuid, uuid, uuid, uuid, text, text, text)', 'EXECUTE')::text
-    || ',' || has_function_privilege('authenticated', 'public.reserva_enlace_emitir(uuid, uuid, uuid, uuid, text, text, text)', 'EXECUTE')::text, 'false,false');
+  -- La de 7 args se retiró en el conjunto fundido (F3): no existe, así que nadie la ejecuta.
+  perform pg_temp.esperar('caso 6 emitir de 7 args',
+    (to_regprocedure('public.reserva_enlace_emitir(uuid, uuid, uuid, uuid, text, text, text)') is null)::text, 'true');
 end $$;
 
 rollback;

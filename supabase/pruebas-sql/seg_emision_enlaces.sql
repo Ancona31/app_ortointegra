@@ -74,7 +74,8 @@ begin
       perform public.reserva_enlace_regenerar_fijo(gen_random_uuid(), '00000000-0000-4000-8000-0000007ab001',
                                                    pg_temp.h('regenerado-elegido'));
       raise exception 'Seg7a caso 1: la sesión regeneró un fijo con un hash elegido (%)', v_quien;
-    exception when insufficient_privilege then null;
+    -- reserva_enlace_regenerar_fijo se retiró en el conjunto fundido (F3): ya no existe.
+    exception when undefined_function then null;
     end;
     begin
       perform public.reserva_enlace_emitir('00000000-0000-4000-8000-0000007ac001', v_quien, gen_random_uuid(),
