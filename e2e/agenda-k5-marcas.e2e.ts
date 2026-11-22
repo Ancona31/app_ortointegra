@@ -135,12 +135,14 @@ test('Próximas citas: la ligada por enlace conserva el eslabón con su texto y 
   ligar(citaId, 'Prueba 06')
   interruptorAgenda('A', true)
   await page.goto('/dashboard')
-  const s = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Próximas citas' }) })
-  const fila = s.getByText('Prueba 06', { exact: false }).first().locator('xpath=ancestor::div[contains(@class, "border-t")][1]')
+  /* Rediseño B5: la cita va en la pieza principal o en una fila de «Después» (`[data-cita-fila]`), y el
+     eslabón es el de `MarcaOrigen`; el expediente tachado lleva `[data-marca-sin-expediente]`. */
+  const s = page.locator('[data-proximas-citas]')
+  const fila = s.getByText('Prueba 06', { exact: false }).first().locator('xpath=ancestor::*[@data-cita-fila][1]')
   await expect(fila).toBeVisible({ timeout: 30_000 })
   await expect(fila.getByText('Por enlace', { exact: true })).toBeVisible()
-  await expect(fila.locator('[data-marca-enlace] .ag-icono-enlace')).toBeVisible()
-  await expect(fila.getByRole('img', { name: 'Sin expediente' })).toHaveCount(0)
+  await expect(fila.locator('[data-marca-enlace] svg')).toBeVisible()
+  await expect(fila.locator('[data-marca-sin-expediente]')).toHaveCount(0)
 })
 
 /* Revisión de K5: en las listas (aquí la del día del teléfono) las marcas las enseña la hoja de

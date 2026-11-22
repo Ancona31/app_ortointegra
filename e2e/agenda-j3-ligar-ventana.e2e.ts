@@ -68,11 +68,26 @@ function filaGoogle(titulo: string, inicio: string): string {
 
 const pacienteDe = (id: string): string => sqlLocal(`select coalesce(paciente_id::text, '-') from public.appointments where id = :'id'`, { id })
 
+/* Rediseño B5 (CALMA §24): la primera cita va en la pieza principal, con sus acciones a la vista; las
+   demás son filas de «Después» que se tocan enteras y abren la hoja de acciones de la cita. */
 function proximas(page: Page): Locator {
-  return page.locator('section').filter({ has: page.getByRole('heading', { name: 'Próximas citas' }) })
+  return page.locator('[data-proximas-citas]')
 }
+
+/** La cita de «Próximas citas» que lleva ese texto: la pieza principal o una fila. */
 function renglon(page: Page, texto: string): Locator {
-  return proximas(page).getByText(texto, { exact: true }).locator('xpath=ancestor::div[contains(@class, "border-t")][1]')
+  return proximas(page).getByText(texto, { exact: true }).locator('xpath=ancestor::*[@data-cita-fila][1]')
+}
+
+/** Dónde están las acciones de esa cita: la propia pieza principal, o la hoja que abre su fila. */
+async function accionesDe(page: Page, texto: string): Promise<Locator> {
+  const fila = renglon(page, texto)
+  const abre = fila.locator('[data-abre-hoja]')
+  if (await abre.count() === 0) return fila
+  await abre.click()
+  const hoja = page.getByRole('dialog', { name: texto })
+  await expect(hoja).toBeVisible()
+  return hoja
 }
 async function abrirDashboard(page: Page): Promise<void> {
   await page.goto('/dashboard')
@@ -91,9 +106,9 @@ test('punto 6: en Próximas citas la por ligar lleva «Ligar e iniciar consulta�
   const nombre = tituloUnico('Lucía Reserva J3')
   const c = crearCitaPorLigar({ correo: CORREO.adminA, inicio: pronto(3), minutos: 30, nombre, canal: 'unico' })
   await abrirDashboard(page)
-  const fila = renglon(page, nombre)
-  await expect(fila.getByRole('link', { name: /en la agenda/ })).toHaveCount(0)
-  await fila.getByRole('button', { name: `Ligar e iniciar consulta de ${nombre}` }).click()
+  const acciones = await accionesDe(page, nombre)
+  await expect(acciones.getByRole('link', { name: /en la agenda/ })).toHaveCount(0)
+  await acciones.getByRole('button', { name: `Ligar paciente e iniciar consulta de ${nombre}` }).click()
   // Paso 1: lo que dio quien reservó, nada del formulario de edición.
   const v = ventana(page)
   await expect(v.getByText(nombre)).toBeVisible()
@@ -120,16 +135,17 @@ test('punto 6: en Próximas citas la por ligar lleva «Ligar e iniciar consulta�
   })
 })
 
-/* MUTACIÓN: el rótulo largo («Ligar e iniciar consulta») también en la fila de Google → se sale de la tarjeta a 1280. */
+/* MUTACIÓN: quitar `whitespace-normal` del botón de ligar → se sale de su contenedor a 1280.
+   Rediseño B5: el contenedor es la pieza principal o la hoja de la cita, según dónde caiga. */
 test('punto 6 · a 1280, en la fila de Google el botón cabe junto a «¿No es una cita?»', async ({ page }) => {
   interruptorAgenda('A', true)
   await page.setViewportSize({ width: 1280, height: 800 })
   const titulo = tituloUnico('Rodilla Google J3')
   filaGoogle(titulo, pronto(3))
   await abrirDashboard(page)
-  const fila = renglon(page, titulo)
+  const fila = await accionesDe(page, titulo)
   await expect(fila.getByRole('button', { name: '¿No es una cita?' })).toBeVisible()
-  const boton = fila.getByRole('button', { name: `Ligar e iniciar consulta de ${titulo}` })
+  const boton = fila.getByRole('button', { name: `Ligar paciente e iniciar consulta de ${titulo}` })
   const [b, f] = [await boton.boundingBox(), await fila.boundingBox()]
   if (!b || !f) throw new Error('sin caja')
   expect(b.x + b.width).toBeLessThanOrEqual(f.x + f.width)

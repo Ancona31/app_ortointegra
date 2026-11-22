@@ -1,18 +1,14 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, type ReactElement, type ReactNode } from 'react'
 import Link from 'next/link'
 import { CalendarDays, RotateCw } from 'lucide-react'
 import type { createClient as ClienteNavegador } from '@/lib/supabase/client'
-import { marcasDeCita } from '@/lib/agenda/tarjetasAgenda'
-import { ETIQUETA_SIN_EXPEDIENTE, IconoEnlace, IconoSinExpediente } from '@/components/agenda/MarcasCita'
+import { esPorAsignar } from '@/lib/agenda/tarjetasAgenda'
 import BotonNoEsCita from '@/components/agenda/BotonNoEsCita'
 import { createClient } from '@/lib/supabase/client'
 import { useProfile } from '@/hooks/useProfile'
-import { partesCitaHora, fechaCitaCompacta } from '@/app/(app)/dashboard/utils'
-import { StatusChip } from '@/app/(app)/dashboard/StatusChip'
-import { PALETA_AVATAR, ARRANQUE_AVATAR } from './paletaAvatar'
-import { componerNombreMedicoCompleto } from '@/lib/nombreMedico'
+import { BotonEstados, FilaCita, FilaCitaClinica, HojaCita, PiezaPrincipal, TARJETA } from './PiezasCita'
 
 /* ⚠️ SE PIDEN 6 Y SE PINTAN 4, Y LA ASIMETRÍA ES DELIBERADA — no la «arregles»
    igualando los números. El temporizador de abajo retira filas vencidas SIN
@@ -34,7 +30,7 @@ const TIC_MS = 60_000
    importar el dashboard desde la agenda. Si cambia una, cambia la otra. */
 const UMBRAL_REFETCH_FOCO_MS = 120_000
 
-type Cita = {
+export type Cita = {
   id: string
   title: string
   start_time: string
@@ -54,12 +50,6 @@ type Cita = {
      clínica: ahí el nombre del paciente no dice de quién es la cita. */
   medico?: { id: string; titulo: string | null; nombres: string | null; apellido_paterno: string | null; apellido_materno: string | null } | null
 }
-
-/** Tanda K, punto 18 · El texto que acompaña al eslabón en la fila (la leyenda dice «Se agendó por enlace»). */
-const TEXTO_ENLACE = 'Por enlace'
-
-/** El alto exacto del renglón, compartido con su esqueleto para que no salte. */
-const ALTO_FILA = 'min-h-[57px]'
 
 type Supabase = ReturnType<typeof ClienteNavegador>
 
@@ -109,172 +99,127 @@ function sinColumna(code: string | undefined): boolean {
   return code === '42703' || code === 'PGRST204' || code === 'PGRST100'
 }
 
-/* La geometría de las acciones del renglón, en un solo sitio.
-   ⚠️ SE EXPORTA PORQUE LAS ACCIONES LAS PINTAN LOS LLAMADORES, y es lo que
-   garantiza que las cuatro filas midan lo mismo — en las dos vistas y aunque
-   una de ellas esté realzada. Si un llamador se inventa su propio alto, la
-   uniformidad de la lista se rompe sin que nada avise.
-   Las medidas son las de la adenda §2.1: alto 34, relleno lateral 11, texto
-   12.5. */
-export const GEOMETRIA_ACCION = {
-  minHeight: '34px',
-  height: '34px',
-  padding: '0 11px',
-  fontSize: 'var(--sp-fs-hint)',
-  borderRadius: 'var(--sp-r-btn-sm)',
-} as const
+/** Dónde se pinta una acción: en la pieza principal (a la vista) o en la hoja de la cita. */
+export type Donde = 'principal' | 'hoja'
 
-const ENTRADA_LEYENDA = 'flex items-center gap-[var(--sp-1-5)] text-[length:var(--sp-fs-legal)] text-[var(--sp-ink-350)]'
-const PUNTO_LEYENDA = 'w-2 h-2 shrink-0 rounded-[var(--sp-r-pill)]'
-
-/* ── Leyenda ───────────────────────────────────────────────────────────────
-   LOS CINCO ESTADOS de `appointments_status_check`, no sólo los dos que esta
-   lista puede enseñar hoy. Los rótulos son los que la app ya publica en
-   `STATUS_CONFIG` (`agenda/page.tsx:243`) y se reutilizan tal cual: renombrar
-   uno aquí sería la misma divergencia que se cerró al retirar `STATUS_STYLE`
-   —la misma cita nombrada de dos formas en dos pantallas seguidas—.
-
-   ⚠️ SIN `map` Y CON LOS NOMBRES DE TOKEN ESCRITOS ENTEROS, y ahora que son
-   cinco la tentación es mayor. Es la garantía que explica `StatusChip.tsx:19`:
-   un token interpolado que no exista no da error de compilación ni de runtime,
-   deja el punto TRANSPARENTE y nadie se entera. Escritos enteros, un token
-   fantasma se encuentra buscándolo en `globals.css`, y renombrar la familia
-   rompe aquí de forma localizable. Las cinco familias `--ag-status-*-dot` viven
-   en el `:root` de `globals.css` (líneas 351-373), no bajo `.agenda-fc`, así que
-   resuelven en esta pantalla.
-
-   ⚠️ ENVUELVE A PROPÓSITO. Las cinco entradas miden 444 px y la columna sólo
-   tiene 640 en `xl`; por debajo baja a 384 y la leyenda pasa a dos líneas. Es
-   contenido secundario: preferimos dos renglones a un recorte. */
-function Leyenda() {
+/** Las filas en hueso de una lista: chip de fecha y dos barras (maqueta `dashboard-final`). */
+function FilasEsqueleto({ n }: { n: number }): ReactElement {
   return (
-    /* ⚠️ FUERA POR DEBAJO DE `lg`. Las cinco entradas miden 444 px y la
-       columna estrecha no llega: envolvían a dos líneas y ocupaban más alto del
-       que aporta una leyenda. El chip de estado de cada renglón se queda, así
-       que el color sigue teniendo dónde leerse; lo que se pierde es la clave, y
-       en un teléfono eso cuesta menos que dos renglones de cromo. */
-    <div className="hidden lg:flex flex-wrap items-center gap-x-[var(--sp-3-5)] gap-y-[var(--sp-1-5)] px-[var(--sp-pad-row-x)] pb-[var(--sp-3-5)]">
-      <span className={ENTRADA_LEYENDA}>
-        <span className={PUNTO_LEYENDA} style={{ background: 'var(--ag-status-scheduled-dot)' }} />
-        Agendada
-      </span>
-      <span className={ENTRADA_LEYENDA}>
-        <span className={PUNTO_LEYENDA} style={{ background: 'var(--ag-status-confirmed-dot)' }} />
-        Confirmada
-      </span>
-      <span className={ENTRADA_LEYENDA}>
-        <span className={PUNTO_LEYENDA} style={{ background: 'var(--ag-status-cancelled-dot)' }} />
-        Cancelada
-      </span>
-      <span className={ENTRADA_LEYENDA}>
-        <span className={PUNTO_LEYENDA} style={{ background: 'var(--ag-status-no_show-dot)' }} />
-        No asistió
-      </span>
-      <span className={ENTRADA_LEYENDA}>
-        <span className={PUNTO_LEYENDA} style={{ background: 'var(--ag-status-attended-dot)' }} />
-        Atendida
-      </span>
-    </div>
-  )
-}
-
-/** Los cuatro renglones en hueso. */
-function FilasEsqueleto() {
-  return (
-    <div>
-      {[1, 2, 3, 4].map(i => (
-        <div key={i} className={`${ALTO_FILA} flex items-center gap-[var(--sp-2-5)] px-[var(--sp-pad-row-x)] py-[11px] border-t border-[color:var(--sp-line-card)]`}>
-          <div className="skeleton h-8 w-[52px] xl:w-[60px] shrink-0 rounded-md" />
-          <div className="skeleton w-[34px] h-[34px] shrink-0 rounded-full" />
-          <div className="skeleton h-3 flex-1 min-w-0 rounded-md" />
-          <div className="skeleton h-[34px] w-[100px] shrink-0 rounded-[var(--sp-r-btn-sm)]" />
+    <div aria-hidden="true">
+      {Array.from({ length: n }, (_, i) => (
+        <div key={i} className="flex min-h-[64px] items-center gap-3 border-t border-linea py-3 first:border-t-0">
+          <div className="skeleton h-[50px] w-[52px] shrink-0 rounded-[12px]" />
+          <div className="flex flex-1 flex-col gap-2">
+            <div className="skeleton h-3 w-[55%] rounded-md" />
+            <div className="skeleton h-3 w-[35%] rounded-md" />
+          </div>
         </div>
       ))}
     </div>
   )
 }
 
-function Chasis({ children }: { children: React.ReactNode }) {
+/**
+ * La tarjeta de la lista: título, «Estados» (la leyenda) y «Ver agenda →».
+ * El título es «Próximas citas» en la vista de toda la clínica y «Después» en
+ * la del médico, donde la primera cita sube a la pieza principal (maqueta
+ * `dashboard-final`).
+ */
+function Chasis({ titulo, className = '', children }: { titulo: string; className?: string; children: ReactNode }): ReactElement {
   return (
-    <section className="rounded-2xl border border-[color:var(--sp-line-card)] bg-[var(--sp-surface)] overflow-hidden">
-      {/* ⚠️ LOS TRES EN UNA SOLA LÍNEA. El texto secundario iba debajo del título
-          y apilaba tres bloques —título, subtítulo, leyenda— en una cabecera que
-          el mockup resuelve en dos. Va a la derecha del título, y el enlace al
-          extremo. `items-baseline` los asienta sobre la misma línea base pese a
-          medir 18, 13.5 y 13.5 px; el `leading` explícito fija el alto de la
-          fila en 24 px, que es lo que hace comparable el antes y el después.
-          ⚠️ EN MÓVIL SON DOS, NO TRES: el de apoyo no cabe. Medido en la card
-          real a 360 px —298 px de interior—, título y enlace ya piden 204-251
-          según la fuente, así que al secundario le quedaban 47-94 px para 41
-          caracteres y salía siempre cortado a la segunda palabra. Cortado no
-          dice nada, así que en vez de encogerlo se retira; en `lg` sobra ancho
-          y sigue entero. */}
-      <div className="flex items-baseline gap-[var(--sp-2-5)] px-[var(--sp-pad-row-x)] pt-[var(--sp-4)] pb-[var(--sp-3-5)]">
-        <h2 className="shrink-0 text-[length:var(--sp-fs-vitals)] leading-[24px] font-bold text-[var(--sp-ink-800)]">Próximas citas</h2>
-        <p className="hidden flex-1 min-w-0 truncate text-[length:var(--sp-fs-meta)] leading-[24px] text-[var(--sp-ink-500)] lg:block">Las más cercanas. El resto, en la agenda.</p>
-        <Link
-          href="/agenda"
-          /* Sin precarga: la regla de precarga de esta región deja encendida
-             sólo la fila en curso. Ver el comentario del renglón. */
-          prefetch={false}
-          /* `ml-auto` es lo que manda el enlace al extremo cuando el secundario
-             no está: sin él, con el `flex-1` fuera de juego, título y enlace se
-             quedaban pegados a la izquierda. En `lg` vuelve a cero y el reparto
-             lo hace otra vez el `flex-1` del secundario, como antes. */
-          className="ml-auto shrink-0 whitespace-nowrap text-[length:var(--sp-fs-meta)] leading-[24px] font-semibold text-[var(--sp-primary-text)] hover:underline lg:ml-0"
-        >
-          Ver agenda →
-        </Link>
+    <section className={`${TARJETA} ext:px-3 iv:px-4 ${className}`}>
+      {/* En las columnas estrechas (ext, iv) los dos enlaces bajan a 13 para
+          caber en la fila del título, como en la maqueta. */}
+      <div className="mb-1 flex flex-wrap items-center gap-x-3 gap-y-1 ext:gap-x-2 iv:gap-x-2">
+        <h2 className="mr-auto text-[17px] font-bold leading-[22px] text-tinta">{titulo}</h2>
+        <BotonEstados />
+        <Link href="/agenda" prefetch={false} className="k-b k-b-texto text-[14px] ext:text-[13px] iv:text-[13px]">Ver agenda →</Link>
       </div>
-      {children}
+      <div className="border-t border-linea">{children}</div>
     </section>
   )
 }
 
+/** Error y vacío: un bloque centrado dentro de la tarjeta. */
+function AvisoLista({ error, alReintentar }: { error: boolean; alReintentar: () => void }): ReactElement {
+  if (error) return (
+    <div className="flex flex-col items-center gap-3 py-6">
+      <p className="text-center text-[14px] text-tinta2">No se pudieron cargar las citas.</p>
+      <button type="button" onClick={alReintentar} className="k-b k-b-tonal"><RotateCw aria-hidden="true" className="size-4" /> Reintentar</button>
+    </div>
+  )
+  return (
+    <div className="flex flex-col items-center gap-2 py-6">
+      <CalendarDays aria-hidden="true" className="size-[22px] text-tinta3" />
+      <p className="text-center text-[14px] text-tinta2">No hay citas agendadas.</p>
+      <Link href="/agenda" prefetch={false} className="k-b k-b-texto text-[14px]">Abrir agenda →</Link>
+    </div>
+  )
+}
+
 /** Tanda J (punto 6) · La acción de «Ligar e iniciar consulta» de una fila sin paciente, si el llamador la da. */
-type AccionLigar = (cita: Cita, enCurso: boolean, alQuitar: () => void) => React.ReactNode
+type AccionLigar = (cita: Cita, enCurso: boolean, alQuitar: () => void, donde: Donde) => ReactNode
+
+/** Las acciones de una cita con paciente, que pinta el llamador. */
+type AccionesCita = (cita: Cita, enCurso: boolean, donde: Donde) => ReactNode
 
 /**
- * I3 (puntos 8 y 10) · Las acciones de una fila SIN paciente: «Ver en la
+ * I3 (puntos 8 y 10) · Las acciones de una cita SIN paciente: «Ver en la
  * agenda» (allí se liga al iniciar la consulta) y, en un evento de Google «por
  * asignar», «¿No es una cita?», que la quita de la lista en el momento. Viven
  * aquí y no en el llamador porque no llevan a ninguna URL clínica.
  * Tanda J (punto 6) · Si el llamador pasa `ligar` (el dashboard del médico) y
  * devuelve un botón, ése sustituye a «Ver en la agenda»: la ventana de ligar,
  * que sí lleva a la nota, la monta el llamador, nunca este archivo.
+ * Rediseño B5: la explicación de «¿No es una cita?», que sólo vivía en su
+ * `title`, se ve debajo (CALMA §29.7).
  */
-function AccionesSinPaciente({ cita, enCurso, alQuitar, ligar }: { cita: Cita; enCurso: boolean; alQuitar: () => void; ligar?: AccionLigar }) {
-  const porAsignar = cita.google_asignacion === 'por_asignar' && !cita.reserva_canal
-  const boton = ligar?.(cita, enCurso, alQuitar) ?? null
-  const contorno = { ...GEOMETRIA_ACCION, background: 'var(--sp-surface)', color: 'var(--sp-primary-text)', borderColor: 'var(--sp-primary-border)' }
+function AccionesSinPaciente({ cita, enCurso, alQuitar, ligar, donde }: {
+  cita: Cita; enCurso: boolean; alQuitar: () => void; ligar?: AccionLigar; donde: Donde
+}): ReactElement {
+  const boton = ligar?.(cita, enCurso, alQuitar, donde) ?? null
+  const ancho = donde === 'hoja' ? 'w-full k-b-capa' : 'flex-1 ih:flex-none iv:flex-none esc:flex-none'
   return (
     <>
-      {porAsignar && (
-        <BotonNoEsCita citaId={cita.id} alHecho={alQuitar}
-          className="inline-flex items-center justify-center whitespace-nowrap border font-bold transition-colors" style={contorno} />
+      {boton ?? (
+        <Link href="/agenda" prefetch={enCurso ? undefined : false} aria-label={`Ver «${cita.reserva_nombre ?? cita.title}» en la agenda`}
+          className={`k-b k-b-prim ${ancho}`}>
+          Ver en la agenda
+        </Link>
       )}
-      {boton ?? <Link href="/agenda" prefetch={false} aria-label={`Ver «${cita.reserva_nombre ?? cita.title}» en la agenda`}
-        className={porAsignar
-          ? 'inline-flex items-center justify-center w-[34px] h-[34px] shrink-0 rounded-[var(--sp-r-btn-sm)] border border-[color:var(--sp-line-control)] bg-[var(--sp-surface)] text-[var(--sp-ink-500)] transition-colors hover:bg-[var(--sp-surface-muted)] hover:text-[var(--sp-ink-700)]'
-          : 'inline-flex items-center justify-center whitespace-nowrap border font-bold transition-colors'}
-        style={porAsignar ? undefined : contorno}>
-        {porAsignar ? <CalendarDays size={16} /> : <><span className="xl:hidden">Agenda</span><span className="hidden xl:inline">Ver en la agenda</span></>}
-      </Link>}
+      {esPorAsignar(cita) && (
+        <span data-no-cierra className={`flex flex-col items-center ${donde === 'hoja' ? 'mt-3 w-full' : ''}`}>
+          <BotonNoEsCita citaId={cita.id} alHecho={alQuitar} className="k-b k-b-texto" />
+          {donde === 'hoja' && <span className="mt-1 text-center text-[13px] leading-[18px] text-tinta2">Dejarlo como evento sin paciente: deja de pedir que se ligue</span>}
+        </span>
+      )}
     </>
   )
 }
 
 /**
- * La card en su estado de carga, entera.
- *
- * La pintan los DOS momentos de espera de esta pantalla: esta misma región
- * mientras consulta, y `DashboardSkeleton` —que se monta antes de que exista el
- * perfil, cuando la región todavía no está montada—. Se exporta para que sea
- * una sola definición: si fueran dos, el paso de una espera a la otra daría un
- * salto en mitad de la carga.
+ * La lista en su estado de carga, entera. La pintan esta misma región mientras
+ * consulta y `DashboardSkeleton` —que se monta antes de que exista el perfil y
+ * de saber el rol—, así que lleva el título neutro de la región.
  */
-export function ProximasCitasCargando() {
-  return <Chasis><FilasEsqueleto /></Chasis>
+export function ProximasCitasCargando(): ReactElement {
+  return <Chasis titulo="Próximas citas"><FilasEsqueleto n={3} /></Chasis>
+}
+
+/** La pieza principal mientras carga: mismo hueco, chip y barras en `--sup2` (maqueta). */
+function PrincipalCargando({ className }: { className: string }): ReactElement {
+  return (
+    <section aria-label="Lo que sigue" className={`${TARJETA} ${className}`}>
+      <div className="flex items-center gap-3" aria-hidden="true">
+        <div className="skeleton h-[50px] w-[52px] shrink-0 rounded-[12px]" />
+        <div className="flex flex-1 flex-col gap-2">
+          <div className="skeleton h-3 w-[60%] rounded-md" />
+          <div className="skeleton h-3 w-[40%] rounded-md" />
+        </div>
+      </div>
+      <div className="skeleton mt-4 h-11 rounded-[12px]" aria-hidden="true" />
+    </section>
+  )
 }
 
 /**
@@ -303,27 +248,32 @@ export function ProximasCitasCargando() {
  * Si vuelves aquí desde el spec creyendo que falta algo, esto es lo que falta:
  * nada. Añadirlo es una decisión de producto, no la corrección de un defecto.
  */
-export default function ProximasCitas({ medicoId, acciones, ligar }: {
+export default function ProximasCitas({ medicoId, acciones, ligar, claseHero = '', claseLista = '' }: {
   /* `null` = todas las citas de la clínica (vista de la secretaria). Un id =
      sólo las de ese médico. Cuando es `null` la consulta trae además el médico
      de cada fila y el renglón lo pinta: sin filtro, el nombre del paciente no
-     dice a quién pasa. Las dos cosas van juntas a propósito. */
+     dice a quién pasa. Las dos cosas van juntas a propósito.
+     Rediseño B5: `null` pinta UNA lista («Próximas citas») cuyas filas son
+     «Ver cita» enteras; un id pinta la pieza principal y «Después». */
   medicoId: string | null
-  /* El grupo de acciones del renglón, que pinta el llamador.
-     ⚠️ RECIBE `enCurso` PORQUE DE ÉL DEPENDEN DOS REGLAS DE ESTA REGIÓN, y las
-     dos hay que respetarlas desde fuera:
-       · el tratamiento PRIMARIO es sólo de la fila en curso; el resto va de
-         contorno;
-       · la PRECARGA también: `prefetch={enCurso ? undefined : false}`. Cuatro
-         filas por dos enlaces serían ocho precargas donde antes había dos, y
-         eso revierte entero el ahorro medido de `fcb2169`.
-     Usa `GEOMETRIA_ACCION` para el tamaño; ver su nota. */
-  acciones: (cita: Cita, enCurso: boolean) => React.ReactNode
+  /* Las acciones de una cita CON paciente, que pinta el llamador (sólo el
+     médico; la vista de toda la clínica no las pasa).
+     ⚠️ RECIBE `enCurso` PORQUE DE ÉL DEPENDE LA PRECARGA:
+     `prefetch={enCurso ? undefined : false}`. Cuatro filas por dos enlaces
+     serían ocho precargas donde antes había dos, y eso revierte entero el
+     ahorro medido de `fcb2169`. En la hoja siempre llega `false`.
+     `donde`: «principal» (a la vista, en la pieza principal) u «hoja» (la hoja
+     de acciones de la cita, CALMA §24.2). */
+  acciones?: AccionesCita
   /* Tanda J (punto 6) · Sólo el dashboard del médico: en una fila por ligar o
-     por asignar, el botón de «Ligar e iniciar consulta» (o `null`, y queda
-     «Ver en la agenda»). La vista de la secretaria no lo pasa. */
+     por asignar, el botón de «Ligar paciente e iniciar consulta» (o `null`, y
+     queda «Ver en la agenda»). La vista de la secretaria no lo pasa. */
   ligar?: AccionLigar
-}) {
+  /* Clases de colocación en la retícula de la página (rediseño B5): la pieza
+     principal y la lista son dos hijos de esa retícula. */
+  claseHero?: string
+  claseLista?: string
+}): ReactElement {
   const { profile, loading: loadingProfile } = useProfile()
 
   const [citas, setCitas] = useState<Cita[]>([])
@@ -457,193 +407,105 @@ export default function ProximasCitas({ medicoId, acciones, ligar }: {
   const listaCompleta = citas.length < LIMITE_CONSULTA
   const mostrarPie = listaCompleta && visibles.length > 0 && visibles.length < FILAS_VISIBLES
 
-  if (loadingProfile || cargando) return <ProximasCitasCargando />
-
-  if (error) return (
-    <Chasis>
-      <div className="flex flex-col items-center gap-[var(--sp-3)] px-[var(--sp-pad-row-x)] py-[var(--sp-8)] border-t border-[color:var(--sp-line-card)]">
-        <p className="text-[length:var(--sp-fs-body-sm)] text-[var(--sp-ink-500)] text-center">No se pudieron cargar las citas.</p>
-        <button
-          type="button"
-          onClick={() => { setCargando(true); void cargar() }}
-          className="inline-flex items-center gap-[var(--sp-2)] min-h-[var(--sp-tap)] px-5 rounded-[var(--sp-r-btn)] border border-[color:var(--sp-line-control)] bg-[var(--sp-surface)] text-[length:var(--sp-fs-btn-sm)] font-semibold text-[var(--sp-ink-700)] transition-colors hover:bg-[var(--sp-surface-muted)]"
-        >
-          <RotateCw size={16} /> Reintentar
-        </button>
-      </div>
-    </Chasis>
+  const recargar = (): void => { setCargando(true); void cargar() }
+  const quitar = (id: string): void => { setCitas(cs => cs.filter(c => c.id !== id)); void cargar() }
+  const pie = mostrarPie && (
+    /* Pie informativo, NO un estado vacío: el vacío es el bloque centrado y sólo
+       sale cuando no hay ninguna cita. Es una nota al pie de una lista con
+       contenido, para que el hueco de las filas que faltan se lea como «no hay
+       más» y no como «se cortó la carga». */
+    <p className="flex flex-wrap items-center justify-center gap-x-1.5 border-t border-linea pt-3 text-[13px] text-tinta2 first:border-t-0">
+      No hay más citas próximas.
+      <Link href="/agenda" prefetch={false} className="k-b k-b-texto text-[13px]">Ver agenda →</Link>
+    </p>
   )
 
-  /* Vacío: sin leyenda. Explicar dos colores que no hay debajo es ruido. */
-  if (visibles.length === 0) return (
-    <Chasis>
-      <div className="flex flex-col items-center gap-[var(--sp-3)] px-[var(--sp-pad-row-x)] py-[var(--sp-8)] border-t border-[color:var(--sp-line-card)]">
-        <CalendarDays size={22} className="text-[var(--sp-ink-150)]" />
-        <p className="text-[length:var(--sp-fs-body-sm)] text-[var(--sp-ink-500)] text-center">No hay citas agendadas.</p>
-        <Link href="/agenda" prefetch={false} className="text-[length:var(--sp-fs-meta)] font-semibold text-[var(--sp-primary-text)] hover:underline">
-          Abrir agenda →
-        </Link>
-      </div>
-    </Chasis>
+  if (medicoId === null) return (
+    <div data-proximas-citas className="contents">
+      <Chasis titulo="Próximas citas" className={claseLista}>
+        {loadingProfile || cargando ? <FilasEsqueleto n={3} />
+          : error || visibles.length === 0 ? <AvisoLista error={error} alReintentar={recargar} />
+          : (
+            <>
+              <ul className="k-lista">
+                {visibles.map(cita => (
+                  <FilaCitaClinica key={cita.id} cita={cita} enCurso={cita.id === idEnCurso}
+                    extra={esPorAsignar(cita) ? <BotonNoEsCita citaId={cita.id} alHecho={() => quitar(cita.id)} className="k-b k-b-texto text-[14px]" /> : undefined} />
+                ))}
+              </ul>
+              {pie}
+            </>
+          )}
+      </Chasis>
+    </div>
   )
 
   return (
-    <Chasis>
-      <Leyenda />
-      {visibles.map((cita, i) => {
-        const enCurso = cita.id === idEnCurso
-        /* ⚠️ DE AQUÍ SÓLO SE USA LA HORA, Y EL `dia` SE TIRA A PROPÓSITO. La
-           primera línea de la columna la pone `fechaCitaCompacta`; ver por qué
-           en el marcado, abajo. Y aun así la hora se sigue pidiendo AQUÍ y no
-           en la otra: `partesCitaHora` es la única implementación del huso
-           para la hora de una cita —lo dice su propia cabecera— y calcularla
-           por segunda vez en la función compacta es exactamente cómo se
-           volvería a perder la corrección de Sonora en uno de los dos sitios. */
-        const { hora } = partesCitaHora(cita.start_time)
-        const fecha = fechaCitaCompacta(cita.start_time)
-        /* I3 (punto 8) · Una por ligar se nombra con lo que dio quien reservó;
-           una «por asignar» de Google, con su título (el de Google). */
-        const nombre = cita.pacientes
-          ? `${cita.pacientes.nombre} ${cita.pacientes.apellidos}`
-          : (cita.reserva_canal && cita.reserva_nombre) || cita.title
-        /* Tanda K, sección E (puntos 17 y 18) · las marcas de la agenda v2: el expediente tachado
-           (por ligar o por asignar) y el eslabón con su texto (reservada por enlace, también ya
-           ligada). Sin la v2 las columnas no llegan y no hay ninguna, como antes. */
-        const procedencia = marcasDeCita(cita)
-        /* ⚠️ LAS INICIALES CAEN SOBRE `nombre`, NUNCA A CADENA VACÍA. Sin este
-           respaldo, una fila cuyo `join` de `pacientes` viniera vacío pintaba el
-           círculo del avatar CON SU COLOR DE FONDO Y SIN NINGUNA LETRA: un punto
-           de color sin rótulo, indistinguible de un defecto de la leyenda. El
-           `join` puede venir vacío aunque `paciente_id` no sea nulo —lo dice la
-           nota que la tarjeta vieja ya llevaba—, y en ese caso `nombre` cae al
-           título de la fila, que es de donde sale aquí la letra. */
-        const iniciales = (cita.pacientes
-          ? `${cita.pacientes.nombre[0] ?? ''}${cita.pacientes.apellidos[0] ?? ''}`
-          : nombre.trim()[0] ?? '?').toUpperCase()
-        /* Por índice del renglón: las cuatro filas visibles salen de
-           cuatro pares distintos. Ver la nota de `AtendidosRecientemente`. */
-        const color = PALETA_AVATAR[(ARRANQUE_AVATAR.proximasCitas + i) % PALETA_AVATAR.length]
+    <VistaMedico
+      estado={loadingProfile || cargando ? 'cargando' : error ? 'error' : 'listo'}
+      visibles={visibles} idEnCurso={idEnCurso} pie={pie} alReintentar={recargar} quitar={quitar}
+      acciones={acciones} ligar={ligar} claseHero={claseHero} claseLista={claseLista}
+    />
+  )
+}
 
-        /* ⚠️ LA PRECARGA SÓLO LA LLEVA LA FILA EN CURSO, Y COMO MUCHO HAY UNA.
-           Cada `<Link>` con precarga cuesta 2 peticiones RSC y 2 lambdas por
-           carga del dashboard, se pulse o no (medido en producción, 2026-09-07).
-           Cuatro filas por dos enlaces serían OCHO precargas donde antes había
-           dos, y eso devuelve entero el ahorro de `fcb2169`. Si ninguna cita
-           está en curso no precarga ninguna: es el estado normal casi todo el
-           día, y el destino se pide al pulsar con el esqueleto de
-           `(app)/loading.tsx` de por medio. */
+interface PropsVistaMedico {
+  estado: 'cargando' | 'error' | 'listo'
+  visibles: Cita[]
+  idEnCurso: string | null
+  pie: ReactNode
+  alReintentar: () => void
+  quitar: (id: string) => void
+  acciones?: AccionesCita
+  ligar?: AccionLigar
+  claseHero: string
+  claseLista: string
+}
 
-        return (
-          <div
-            key={cita.id}
-            className={`${ALTO_FILA} flex items-center gap-[var(--sp-2-5)] px-[var(--sp-pad-row-x)] py-[11px] border-t border-[color:var(--sp-line-card)] transition-colors`}
-            style={enCurso ? { background: 'var(--sp-primary-bg-soft)' } : undefined}
-          >
-            {/* Fecha y hora, dos líneas. La hora de la fila en curso va en
-                acento; el chip conserva su color de estado y no compite. */}
-            <div className="w-[52px] xl:w-[60px] shrink-0">
-              {/* ⚠️ «HOY» O FECHA NUMÉRICA, EN LOS DOS ANCHOS. Aquí vivía el día
-                  en palabra y NO CABÍA EN NINGUNO DE LOS DOS: la columna mide
-                  52 px (60 en `xl`) y «MAÑANA» pide 49-58 según la fuente de
-                  sistema, «MIÉ 3 SEP» 53-65. Se abreviaba —«MAÑA…»— en móvil y
-                  también en `lg`. La numérica pide 43-54 y entra.
-                  ⚠️ NO LO PARTAS OTRA VEZ POR ANCHO. Hubo una versión con dos
-                  `<span>` y `lg:hidden`/`lg:inline` para conservar el rótulo
-                  viejo en escritorio; se unificó a propósito, porque las dos
-                  vistas tienen el mismo ancho de columna y el mismo problema, y
-                  porque deben decir lo mismo.
-                  ⚠️ EL ESPACIADO DE LETRA ES DE «HOY» Y NO DE LA FECHA. Ese
-                  0.04em es la convención de los rótulos en mayúsculas, no de
-                  las cifras, y además son los 3.5 px que meten la numérica
-                  dentro (43-54 sin él, 46-57 con él). De ahí que el tratamiento
-                  vaya por VARIANTE, y que `fechaCitaCompacta` devuelva
-                  `numerica` en vez de dejar que esto lo deduzca comparando con
-                  la cadena «Hoy». La numérica se lleva `tabular-nums`: iguala
-                  el ancho de todas las fechas y las alinea con la hora de
-                  abajo, que ya lo llevaba.
-                  ⚠️ Y NO LLEVA RECORTE, QUE ES DELIBERADO. La elipsis era la
-                  red del rótulo viejo, que era de largo desconocido; estos son
-                  «HOY» u OCHO CARACTERES CLAVADOS. Con `truncate`, la fuente
-                  más ancha del muestreo (DejaVu Sans, 53.9 de 52) cambiaba los
-                  1.9 px que sobran por «20/09/2…», o sea perder el año. Sin él
-                  sangra esos 2 px en el hueco de 10 que ya separa la columna
-                  del avatar: invisible, y la caja no se mueve porque el
-                  `w-[52px] shrink-0` no depende del contenido. El
-                  `whitespace-nowrap` SÍ hace falta —sin él la fecha partiría
-                  por las barras—. */}
-              <p className={`whitespace-nowrap text-[length:var(--sp-fs-legal)] font-bold uppercase text-[var(--sp-ink-350)] ${fecha.numerica ? 'tabular-nums' : 'tracking-[0.04em]'}`}>
-                {fecha.texto}
-              </p>
-              <p
-                className="truncate text-[length:var(--sp-fs-meta)] font-extrabold tabular-nums"
-                style={{ color: enCurso ? 'var(--sp-primary-text)' : 'var(--sp-ink-800)' }}
-              >
-                {hora}
-              </p>
-            </div>
+/**
+ * La vista del médico (rediseño B5, CALMA §24): la primera cita sube a la
+ * pieza principal con su acción directa; el resto va en «Después», filas que se
+ * tocan enteras y abren la hoja de acciones de la cita.
+ */
+function VistaMedico(p: PropsVistaMedico): ReactElement {
+  const [hoja, setHoja] = useState<{ cita: Cita | null; abierta: boolean }>({ cita: null, abierta: false })
+  const cerrar = (): void => setHoja(h => ({ ...h, abierta: false }))
+  const accionesDe = (cita: Cita, enCurso: boolean, donde: Donde): ReactNode => cita.paciente_id
+    ? p.acciones?.(cita, enCurso, donde)
+    : <AccionesSinPaciente cita={cita} enCurso={enCurso} ligar={p.ligar} donde={donde}
+        alQuitar={() => { cerrar(); p.quitar(cita.id) }} />
 
-            <div
-              className="w-[34px] h-[34px] shrink-0 flex items-center justify-center rounded-[var(--sp-r-pill)] text-[length:var(--sp-fs-legal)] font-extrabold"
-              style={{ background: color.bg, color: color.ink }}
-            >
-              {iniciales}
-            </div>
-
-            <div className="flex-1 min-w-0 xl:min-w-[150px]">
-              <p className="flex min-w-0 items-center gap-[var(--sp-1-5)]">
-                <span className="truncate text-[length:var(--sp-fs-body-sm)] font-bold text-[var(--sp-ink-800)]">{nombre}</span>
-                {procedencia.sinExpediente && (
-                  <span role="img" aria-label={procedencia.historial ? `${ETIQUETA_SIN_EXPEDIENTE}. ${procedencia.historial}` : ETIQUETA_SIN_EXPEDIENTE}
-                    title="Aún no tiene expediente" className="inline-flex shrink-0" data-marca-sin-expediente>
-                    <IconoSinExpediente size={15} />
-                  </span>
-                )}
-                {procedencia.enlace && (
-                  <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-[length:var(--sp-fs-legal)] font-semibold text-[var(--sp-ink-500)]" data-marca-enlace>
-                    <IconoEnlace size={13} />{TEXTO_ENLACE}
-                  </span>
-                )}
-              </p>
-              {/* Sólo en la vista sin filtro de médico. Trunca con elipsis, como
-                  todo texto secundario de esta pantalla. */}
-              {cita.medico && (
-                <p className="truncate text-[length:var(--sp-fs-legal)] text-[var(--sp-ink-500)]">
-                  {componerNombreMedicoCompleto(cita.medico)}
-                </p>
-              )}
-              {/* Bajo `xl` el chip pasa aquí, debajo del nombre: en la columna
-                  estrecha no cabe en el renglón sin partirlo en dos líneas. */}
-              <div className="xl:hidden mt-0.5"><StatusChip status={cita.status} /></div>
-            </div>
-
-            <div className="hidden xl:flex shrink-0"><StatusChip status={cita.status} /></div>
-
-            <div className="ml-auto flex items-center gap-[var(--sp-1-5)] shrink-0">
-              {/* I3 · Sin paciente (por ligar o por asignar) no hay expediente ni
-                  nota a los que ir: se liga en la agenda, al iniciar la consulta.
-                  Las acciones del llamador sólo para las citas con paciente. */}
-              {cita.paciente_id
-                ? acciones(cita, enCurso)
-                : <AccionesSinPaciente cita={cita} enCurso={enCurso} ligar={ligar}
-                    alQuitar={() => { setCitas(cs => cs.filter(c => c.id !== cita.id)); void cargar() }} />}
-            </div>
-          </div>
-        )
-      })}
-
-      {/* Pie informativo, NO un estado vacío: el vacío es el bloque centrado de
-          arriba y sólo sale cuando no hay ninguna cita. Esto es una nota al pie
-          de una lista que sí tiene contenido, en tipografía secundaria, para
-          que el hueco de las filas que faltan se lea como «no hay más» y no
-          como «se cortó la carga». */}
-      {mostrarPie && (
-        <p className="flex flex-wrap items-center gap-x-[var(--sp-1-5)] px-[var(--sp-pad-row-x)] py-[var(--sp-2-5)] border-t border-[color:var(--sp-line-card)] text-[length:var(--sp-fs-hint)] text-[var(--sp-ink-500)]">
-          No hay más citas próximas.
-          <Link href="/agenda" prefetch={false} className="font-semibold text-[var(--sp-primary-text)] hover:underline">
-            Ver agenda →
-          </Link>
-        </p>
+  if (p.estado === 'cargando') return (
+    <div data-proximas-citas className="contents">
+      <PrincipalCargando className={p.claseHero} />
+      <Chasis titulo="Después" className={p.claseLista}><FilasEsqueleto n={3} /></Chasis>
+    </div>
+  )
+  const [primera, ...resto] = p.visibles
+  if (p.estado === 'error' || !primera) return (
+    <div data-proximas-citas className="contents">
+      <section aria-label="Lo que sigue" className={`${TARJETA} ${p.claseHero}`}>
+        <AvisoLista error={p.estado === 'error'} alReintentar={p.alReintentar} />
+      </section>
+    </div>
+  )
+  const enCurso = primera.id === p.idEnCurso
+  return (
+    <div data-proximas-citas className="contents">
+      <PiezaPrincipal cita={primera} enCurso={enCurso} acciones={accionesDe(primera, enCurso, 'principal')} className={p.claseHero} />
+      {(resto.length > 0 || p.pie) && (
+        <Chasis titulo="Después" className={p.claseLista}>
+          {resto.length > 0 && (
+            <ul className="k-lista">
+              {resto.map(cita => <FilaCita key={cita.id} cita={cita} alAbrir={c => setHoja({ cita: c, abierta: true })} />)}
+            </ul>
+          )}
+          {p.pie}
+        </Chasis>
       )}
-    </Chasis>
+      <HojaCita cita={hoja.cita} abierta={hoja.abierta} alCerrar={cerrar}>
+        {hoja.cita && accionesDe(hoja.cita, false, 'hoja')}
+      </HojaCita>
+    </div>
   )
 }

@@ -7,8 +7,9 @@ import { formatDistanceToNow, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { createClient } from '@/lib/supabase/client'
 import { useProfile } from '@/hooks/useProfile'
-import { EncabezadoColumna, ChipAccion, AvisoColumna } from './piezasBanda2'
-import { PALETA_AVATAR, ARRANQUE_AVATAR } from './paletaAvatar'
+import { CabeceraTarjeta, ChipAccion, AvisoTarjeta } from './piezasBanda2'
+import Avatar, { ARRANQUE_AVATAR, inicialesDe } from '@/components/ui/Avatar'
+import { TARJETA } from './PiezasCita'
 
 /* Cuatro tarjetas, dos por dos. La cantidad no es estética: iguala el alto de
    esta columna con el de la de documentos y evita franja vacía al pie. */
@@ -36,14 +37,24 @@ type FilaConsulta = {
   pacientes: { nombre: string; apellidos: string; activo?: boolean } | { nombre: string; apellidos: string; activo?: boolean }[] | null
 }
 
+/* En teléfono (ext/tel) la lista es un carrusel de tarjetas con snap, sin
+   tarjeta alrededor (CALMA §3: nada de caja dentro de caja); en ancho, una
+   tarjeta con filas. */
+const MARCO = `${TARJETA} ext:bg-transparent ext:p-0 tel:bg-transparent tel:p-0`
+const PISTA = 'mt-2 flex gap-3 overflow-x-auto snap-x snap-mandatory pb-1 ih:flex-col ih:gap-0 ih:overflow-visible iv:flex-col iv:gap-0 iv:overflow-visible esc:flex-col esc:gap-0 esc:overflow-visible'
+const PIEZA = 'flex w-[236px] shrink-0 snap-start flex-col gap-3 rounded-[16px] bg-sup p-4 ' +
+  'ih:w-auto ih:rounded-none ih:bg-transparent ih:px-0 ih:py-3 ih:border-t ih:border-linea ih:first:border-t-0 ' +
+  'iv:w-auto iv:rounded-none iv:bg-transparent iv:px-0 iv:py-3 iv:border-t iv:border-linea iv:first:border-t-0 ' +
+  'esc:w-auto esc:flex-row esc:items-center esc:rounded-none esc:bg-transparent esc:px-0 esc:py-3 esc:border-t esc:border-linea esc:first:border-t-0'
+
 export function AtendidosCargando() {
   return (
-    <div>
-      <EncabezadoColumna titulo="Atendidos recientemente" />
-      <div className="mt-[var(--sp-gap-tiles)] grid grid-cols-2 gap-[var(--sp-gap-tiles)]">
-        {[1, 2, 3, 4].map(i => <div key={i} className="skeleton h-[106px] rounded-[14px]" />)}
+    <section className={MARCO}>
+      <CabeceraTarjeta titulo="Atendidos recientemente" />
+      <div className={PISTA} aria-hidden="true">
+        {[1, 2].map(i => <div key={i} className={`${PIEZA} skeleton h-[106px] esc:h-[60px] ih:h-[60px] iv:h-[60px]`} />)}
       </div>
-    </div>
+    </section>
   )
 }
 
@@ -105,93 +116,53 @@ export default function AtendidosRecientemente() {
   if (loadingProfile || cargando) return <AtendidosCargando />
 
   if (error) return (
-    <div>
-      <EncabezadoColumna titulo="Atendidos recientemente" />
-      <AvisoColumna icono={RotateCw} mensaje="No se pudieron cargar los pacientes." onReintentar={() => { setCargando(true); void cargar() }} />
-    </div>
+    <section className={TARJETA}>
+      <CabeceraTarjeta titulo="Atendidos recientemente" />
+      <AvisoTarjeta icono={RotateCw} mensaje="No se pudieron cargar los pacientes." onReintentar={() => { setCargando(true); void cargar() }} />
+    </section>
   )
 
   if (recientes.length === 0) return (
-    <div>
-      <EncabezadoColumna titulo="Atendidos recientemente" />
-      <AvisoColumna icono={Users} mensaje="Aquí aparecerán los pacientes que vayas atendiendo." enlace={{ href: '/pacientes/nuevo', texto: 'Crear paciente →' }} />
-    </div>
+    <section className={TARJETA}>
+      <CabeceraTarjeta titulo="Atendidos recientemente" />
+      <AvisoTarjeta icono={Users} mensaje="Aquí aparecerán los pacientes que vayas atendiendo." enlace={{ href: '/pacientes/nuevo', texto: 'Crear paciente →' }} />
+    </section>
   )
 
   return (
-    <div>
-      <EncabezadoColumna
-        titulo="Atendidos recientemente"
-        enlace={{ href: '/expediente', texto: 'Ver todos →' }}
-      />
-
-      {/* ⚠️ CARRUSEL EN MÓVIL, RETÍCULA DESDE `sm`. La adenda pide tarjetas de
-          ancho fijo con desplazamiento horizontal en teléfono, y ese patrón no
-          existía en el repo: hay `overflow-x-auto` en tablas y en un filtro de
-          chips, pero ninguna retícula de tarjetas que se deslice. El mismo
-          contenedor hace las dos cosas —`flex` que se desliza abajo, `grid` de
-          dos columnas desde `sm`— para no duplicar el marcado de la tarjeta. */}
-      <div className="mt-[var(--sp-gap-tiles)] flex gap-[var(--sp-gap-tiles)] overflow-x-auto snap-x snap-mandatory sm:grid sm:grid-cols-2 sm:overflow-visible">
+    <section className={MARCO}>
+      <CabeceraTarjeta titulo="Atendidos recientemente" enlace={{ href: '/expediente', texto: 'Ver todos →' }} />
+      <ul className={PISTA}>
         {recientes.map((p, i) => {
-          const iniciales = `${p.nombre[0] ?? ''}${p.apellidos[0] ?? ''}`.toUpperCase()
-          /* ⚠️ POR ÍNDICE DE LA LISTA, y es lo que se busca: con cuatro
-             tarjetas y cinco pares, los cuatro salen de colores distintos
-             SIEMPRE. Un color derivado del paciente no lo garantiza —dos de las
-             cuatro pueden caer en el mismo par— y eso se lee como un fallo. */
-          const color = PALETA_AVATAR[(ARRANQUE_AVATAR.atendidos + i) % PALETA_AVATAR.length]
+          const nombre = `${p.nombre} ${p.apellidos}`
           return (
-            <div
-              key={p.paciente_id}
-              className="w-[186px] shrink-0 snap-start sm:w-auto sm:shrink flex flex-col gap-[var(--sp-2)] rounded-[14px] border border-[color:var(--sp-line-card)] bg-[var(--sp-surface)] px-[var(--sp-pad-row-x)] py-[var(--sp-3)]"
-            >
-              {/* La tarjeta entera navega al expediente; los dos chips de abajo
-                  quedan FUERA del enlace para que no se aniden. */}
-              <Link
-                href={`/expediente/${p.paciente_id}`}
-                prefetch={false}
-                className="flex flex-col gap-[var(--sp-2)] min-w-0 transition-opacity hover:opacity-80"
-              >
-                <div className="flex items-center gap-[var(--sp-2-5)] min-w-0">
-                  <span
-                    className="w-9 h-9 shrink-0 flex items-center justify-center rounded-[var(--sp-r-pill)] text-[length:var(--sp-fs-legal)] font-extrabold"
-                    style={{ background: color.bg, color: color.ink }}
-                  >
-                    {iniciales || '?'}
+            <li key={p.paciente_id} className={PIEZA}>
+              {/* La fila entera navega al expediente; los dos chips quedan FUERA
+                  del enlace para que no se aniden. Avatar por índice de la lista
+                  (`ARRANQUE_AVATAR`): las cuatro salen de colores distintos. */}
+              <Link href={`/expediente/${p.paciente_id}`} prefetch={false}
+                className="k-pulsable flex min-w-0 flex-1 items-center gap-3">
+                <Avatar texto={inicialesDe(p.nombre, p.apellidos)} indice={i} arranque={ARRANQUE_AVATAR.atendidos} />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[15px] font-semibold leading-5 text-tinta">{nombre}</span>
+                  {/* Diagnóstico de la última consulta (o el motivo, en notas
+                      antiguas) y cuándo. Una línea con elipsis. */}
+                  <span className="block truncate text-[13px] leading-[18px] text-tinta2">
+                    {p.detalle || '—'} · {formatDistanceToNow(parseISO(p.created_at), { locale: es, addSuffix: true })}
                   </span>
-                  <span className="min-w-0">
-                    <span className="block truncate text-[length:var(--sp-fs-body-sm)] font-bold text-[var(--sp-ink-800)]">
-                      {p.nombre} {p.apellidos}
-                    </span>
-                    <span className="block truncate text-[length:var(--sp-fs-legal)] text-[var(--sp-ink-350)]">
-                      {formatDistanceToNow(parseISO(p.created_at), { locale: es, addSuffix: true })}
-                    </span>
-                  </span>
-                </div>
-                {/* Diagnóstico de la última consulta, o el motivo si la nota es
-                    antigua y no lo trae. UNA LÍNEA CON ELIPSIS, como el resto de
-                    textos de la pantalla: a dos líneas cada tarjeta crecía 18 px
-                    y la banda desbordaba el alto de un portátil. */}
-                <span className="block truncate text-[length:var(--sp-fs-hint)] leading-[1.45] text-[var(--sp-ink-600)]">
-                  {p.detalle || '—'}
                 </span>
               </Link>
-
-              {/* ⚠️ LOS DOS CHIPS CREAN, NO ABREN ALGO QUE YA EXISTA. No buscan
-                  «la última receta» de nadie: llevan al formulario en blanco de
-                  ese paciente. Por eso no hay ninguna consulta detrás. */}
-              <div className="flex flex-wrap gap-[var(--sp-1-5)]">
-                <ChipAccion href={`/expediente/${p.paciente_id}/documentos?tipo=receta`} icono={Pill} texto="Receta" />
-                {/* ⚠️ ANTES APUNTABA A `?tab=consultas`, Y ESE PARÁMETRO NO LO
-                    LEE NADIE: la página del expediente no lo consulta en ningún
-                    sitio, así que el chip abría el expediente sin más y el
-                    médico tenía que buscar el botón de nota a mano. Va a la nota
-                    nueva, que es lo que el chip promete. */}
-                <ChipAccion href={`/expediente/${p.paciente_id}/nueva-nota`} icono={ClipboardList} texto="Nota" />
+              {/* ⚠️ LOS DOS CHIPS CREAN, NO ABREN ALGO QUE YA EXISTA: llevan al
+                  formulario en blanco de ese paciente. La nota va a la nota
+                  nueva (`?tab=consultas` no lo leía nadie). */}
+              <div className="flex shrink-0 flex-wrap gap-1.5 ih:pl-12 iv:pl-12">
+                <ChipAccion href={`/expediente/${p.paciente_id}/documentos?tipo=receta`} icono={Pill} texto="Receta" etiqueta={`Receta de ${nombre}`} />
+                <ChipAccion href={`/expediente/${p.paciente_id}/nueva-nota`} icono={ClipboardList} texto="Nota" etiqueta={`Nota de ${nombre}`} />
               </div>
-            </div>
+            </li>
           )
         })}
-      </div>
-    </div>
+      </ul>
+    </section>
   )
 }
