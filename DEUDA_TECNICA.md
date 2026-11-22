@@ -5940,45 +5940,113 @@ Lo que queda abierto de este punto es la base combinada con
 
 ### AG-DT-256 — E2e que dependen de la hora o del día de la corrida
 
-**Estado:** abierta, parcialmente arreglada (cierre de la tanda M, 2026-11-19).
-Una prueba que se salta o cambia según la hora no prueba nada a esa hora.
-**Arreglado en el cierre M:** `agenda-google-dos-sentidos` (la fila editable,
-I3 y T3 pasan al jueves de la semana siguiente; prueba nueva de un evento ya
-pasado) y las 8 de `agenda-eleccion-i2` (ya no se saltan de noche). El reloj
-simulado de Playwright (`page.clock`) **no sirve** para casi ninguna: quien
-decide pasado/futuro es el servidor (`Date.now()`) o Postgres (`now()`), no el
-navegador. La técnica que sí sirve es la semana siguiente (`diaDeLaSemana(1, d)`
-y `.fc-next-button`) o borrar lo que se crea.
+**Estado:** arreglada en lo que se conoce (2026-11-22, equipo nuevo). Quedan los
+restos de AG-DT-258 a AG-DT-260. Una prueba que se salta o cambia según la hora no
+prueba nada a esa hora.
 
-**Pendiente (inventario, sin arreglar):**
+**Qué pasaba.** El sábado 2026-11-21 la batería cayó en cadena: una cita con
+paciente (o por ligar) que una prueba crea el miércoles o el jueves de la semana
+visible tiene, de viernes a domingo, más de 48 h, y la v2 abre «¿Asistió el
+paciente?» (`asistenciaServidor.ts`) al cargar la agenda. La ventana tapa la
+rejilla y todo lo que corre después cae por tiempo (17 de las 18 primeras fallas).
 
-* **La ventana «¿Asistió el paciente?»** (`src/lib/agenda/asistenciaServidor.ts`,
-  `HORAS_SIN_PREGUNTAR = 48`, reloj del servidor) tapa la rejilla al abrir la
-  agenda v2 si hay citas agendadas/confirmadas con paciente o reserva que
-  empezaron hace más de 48 h. La alimentan citas que las e2e crean en la semana
-  visible y no borran: `agenda-citas.e2e.ts:27` y `:124` (miércoles 10:05 y
-  15:20), `agenda-cancelar.e2e.ts:159` (jueves 16:20), y además las propias de
-  `agenda-cancelar` (`:87`, `:122`), `agenda-por-ligar` (`:63`, `:114`, `:133`,
-  `:153`), `agenda-ligar-consulta` (`:69`, `:103`, `:128`),
-  `agenda-j3-ligar-ventana` (`:138`, `:170`, `:230`, `:247`),
-  `agenda-reflejo-nota` (`:94`, viernes 12:00) y la burbuja H3 de
-  `agenda-google-dos-sentidos` (jueves 13:00). **De viernes a domingo** caerían
-  casi todas las e2e de la v2 que corren después y no cierran esa ventana
-  (`agenda-i4.e2e.ts:194` cuenta filas exactas). Arreglo: mover esas altas a la
-  semana +1 o borrarlas al terminar; y, de red, que `abrirAgendaV2` pulse
-  «Decidir después» si la ventana sale. No se comprobó corriendo en fin de
-  semana: es lectura del código.
-* `aviso-cancelacion.e2e.ts:56` y `:75`: la cita va a `now() + 3 h`; el domingo
-  desde las 21:00 cae en la semana siguiente y no se ve (falta el
-  `.fc-next-button` que ya usa `whatsapp-manual.e2e.ts:65`).
-* `agenda-movil.e2e.ts:59`: `test.skip` el día 1 del mes si el miércoles aún no
-  llega. Ésta sí la decide el navegador (`useResumenVisible.ts`): se puede fijar
-  con `page.clock` en el último día del mes anterior (nunca en el futuro).
-* Sospechas de borde: `agenda-f-tableta.e2e.ts:55` (necesita una cita futura a
-  la vista), `agenda-h4-por-confirmar` (si el archivo cruza la medianoche),
-  `confirmacion-enlace.e2e.ts:345` (`test.skip` sin turnos en 3–70 h), y toda la
-  semana 0 si la batería cruza la medianoche del domingo (`LUNES_VISIBLE` se fija
-  al cargar `e2e/ayudas.ts`).
+**El arreglo, de raíz y sin pulsar «Decidir después»:**
+
+* **Fechas fijas respecto de la corrida.** Toda cita con paciente o por ligar va
+  en la semana SIGUIENTE (`DIA_FUTURO_FIJO`, `DIA_FUTURO_LIBRE` e
+  `irAAgendaSiguiente` / `pasarASemanaSiguiente` de `e2e/ayudas.ts`):
+  `agenda-citas`, `agenda-cancelar`, `agenda-por-ligar`, `agenda-ligar-consulta`,
+  `agenda-j3-ligar-ventana`, `agenda-tipos-cita`, `agenda-reflejo-nota`,
+  `agenda-google-dos-sentidos` («un borrado en Google») y `agenda-f-pulido` F1.8.
+  Los eventos sin paciente no tienen asistencia y siguen en la semana visible.
+* **`agenda-t1-burbuja` punto 4:** la cita «pasada» es la de AYER (nunca más de
+  48 h), no la de hace tres semanas; ya no abre la ventana. `agenda-k-salida-modal`
+  perdió su «Decidir después» condicional.
+* **`aviso-cancelacion`:** la cita va el jueves siguiente, no a `now() + 3 h` (el
+  domingo desde las 21:00 caía en otra semana). **`agenda-movil`:** el día 1 del
+  mes usa ayer en vez de saltarse (comprobado con una mutación temporal, «hoy es
+  2026-11-01»). **`whatsapp-manual`:** «mañana» se calcula una vez y con ella se
+  siembra la cita y se decide la semana.
+* **La guarda `e2e/guardaAsistencia.ts`** (un reporter de `playwright.config.ts`,
+  sólo lee): al empezar, durante cada prueba (una vez por segundo) y al terminar
+  cada una aplica la regla de la ventana con el reloj en el FINAL DEL DOMINGO. Lo
+  que una prueba deje y la dispararía ese día pone la corrida en rojo y nombra la
+  prueba, se corra el día que se corra. Probada en rojo con una cita de hace 72 h
+  (exit 1). Sólo perdona, a las pruebas con la anotación `asistencia-a-proposito`
+  (`agenda-i4` punto 11 y `agenda-t1-burbuja` punto 4), lo que ya no dispara la
+  ventana cuando la prueba termina.
+
+**Cómo se comprobó sin mover el reloj.** La guarda sale limpia en la batería
+entera; y la batería corrió dos veces en fin de semana, una empezando el sábado a
+las 23:45 (cruzó la medianoche) y otra el domingo a las 00:14: 634 pasan y 1 falla
+conocida (AG-DT-257), que no depende del día.
+
+**Lo que la guarda NO ve:** una cita que vive menos de un segundo; las pruebas que
+dependen del día por otra cosa que la ventana (AG-DT-259, AG-DT-260); y una
+batería que cruce la medianoche del domingo al lunes (`LUNES_VISIBLE` se fija al
+cargar `e2e/ayudas.ts`).
+
+**De paso, carreras de las pruebas que este equipo (más rápido) destapó**, todas
+arregladas en la prueba y ninguna del día: `agenda-cache-rangos` («precarga en
+ocioso» y «semana ya vista» esperaban «la primera petición que salga»),
+`agenda-filtro` (lo mismo), `agenda-f-minimes` (Escape antes de que se montara el
+desplegable), `agenda-t1-capas` (buscaba la franja con la rejilla aún cargando) y
+`whatsapp-manual` (dependía de pulsar antes de que llegara el chunk de la v2). La
+de la precarga sí era de la app: `programarPrecarga` no reintentaba cuando la
+traída en vuelo era otra precarga (`6409de96`).
+
+### AG-DT-257 — `agenda-empalme` «redimensionar hasta otra cita también avisa» falla en el equipo nuevo
+
+**Estado:** abierta. **Es la prueba, no la app:** Angel lo probó a mano el
+2026-11-22 (la cita se alarga, la vecina no se mueve y sale «Se empalma con
+«Paciente Prueba 04» (12:00–13:00). ¿Guardar de todos modos?»). La prueba NO se
+salta ni se desactiva: la batería da «634 pasan, 1 falla conocida».
+
+* **Frecuencia:** corriendo el archivo solo, 5 de 5 rojas (y todas las de
+  después de cada intento de arreglo, 3 por intento). En cinco baterías completas pasó una vez. Ya fallaba antes
+  de cualquier cambio del 2026-11-21 (corrida de detección, archivo por archivo).
+* **Qué se ve:** tras `redimensionarFinEvento(…, 'Prueba 10', '14:05', 30)` no sale
+  el aviso. En la base: una corrida dejó «Prueba 10» intacta (14:05–14:25) y
+  MOVIÓ 30 min la cita vecina («Prueba 09», de 14:40 a 15:10: el gesto la agarró a
+  ella); las demás no movieron nada.
+* **Medido a mano** (script con la misma sesión, 1440×900): la tarjeta mide
+  28 px (y 644–672), el asa 8 px (y 668–676) y bajo su centro está el asa
+  (`elementsFromPoint`: `fc-event-resizer-end` > `fc-timegrid-slot-lane`).
+* **Probado y revertido, sin efecto:** (1) separar la vecina a las 15:00 y estirar
+  45 min; (2) llevar el puntero al asa con `resizer.hover()` (se agota a los 30 s:
+  el asa deja de recibir el puntero); (3) lo de AG-DT-200: esperar a que la caja
+  del asa esté quieta (dos lecturas iguales a 150 ms) y agarrarla a 1/4 de su
+  alto, dentro de la tarjeta.
+* **Sin comprobar (hipótesis):** que la rejilla se desplace entre medir y pulsar
+  (AG-DT-68, la barra que crece 44 px), que el asa dependa del `:hover` de la
+  tarjeta y se pierda al mover el puntero, o las fuentes de Ubuntu 26.04. Falta una
+  traza del gesto paso a paso (`.fc-event-mirror`, qué elemento recibe el
+  `mousedown`).
+
+### AG-DT-258 — Dos e2e fallan si su archivo se corre solo
+
+**Estado:** abierta, sin arreglar (decisión de Angel, 2026-11-22). En la batería
+pasan; solas, no: dependen de lo que deja un archivo anterior.
+
+* `agenda-f-buscador.e2e.ts:99` («las citas que devuelve la búsqueda son sólo
+  suyas»): `pacienteCompartido: la semilla no tiene un paciente con citas de los
+  dos médicos`.
+* `reserva-anticipacion.e2e.ts:143`: lee `agenda_ajustes.anticipacion_min_horas`
+  de una fila que, sola, no existe (`invalid input syntax for type integer: ""`).
+
+### AG-DT-259 — `agenda-t1-burbuja` punto 4: la rama del lunes no se ha corrido
+
+**Estado:** abierta. La cita «pasada» es la de ayer; si hoy es lunes, ayer es de
+la semana anterior y la prueba retrocede una semana (`AYER_ES_OTRA_SEMANA`) y
+vuelve con «Hoy». Esa rama sólo se ejecuta en lunes: escrita, no corrida.
+
+### AG-DT-260 — `whatsapp-manual` si su archivo cruza la medianoche
+
+**Estado:** abierta. Su cita tiene que ser «de mañana» (es lo que lista «Por
+confirmar»), así que no puede ir a una fecha fija. Si el archivo empieza antes de
+la medianoche y sigue después, la cita pasa a ser «de hoy» para el servidor y
+deja de estar en la lista. Quien decide es el reloj del servidor: `page.clock` no
+sirve. Lo mismo, como sospecha, para `agenda-h4-por-confirmar`.
 
 ---
 

@@ -189,6 +189,31 @@ cd ~/proyectos/app_ortointegra-agenda
 > - Si `docker ps` responde «permission denied … docker.sock», la sesión se abrió
 >   antes de que tu usuario entrara al grupo `docker`: cierra la sesión de Ubuntu
 >   y vuelve a entrar.
+>
+> **Lo comprobado en el equipo nuevo (2026-11-21 y 22, commit `d51bb6dd`):**
+>
+> - Base desde cero con las 50 migraciones (sin `LegacyDbSetupError`), Vitest
+>   2363 de 2363 sin `TZ`, con `UTC` y con `America/Hermosillo`, SQL 45 de 45 y
+>   las dos carreras en verde.
+> - **Pruebas automáticas (Playwright): 634 pasan y 1 falla conocida**, en fin de
+>   semana (sábado por la noche y domingo). La que falla es `agenda-empalme`
+>   «redimensionar hasta otra cita también avisa»: es la prueba, no la app (a
+>   mano funciona); está en `DEUDA_TECNICA.md`, AG-DT-257.
+> - Las pruebas ya no dependen del día en que se corren (AG-DT-256): las citas con
+>   paciente que crean van en la semana siguiente, y una guarda
+>   (`e2e/guardaAsistencia.ts`) pone la corrida en rojo si alguna prueba deja una
+>   cita que abriría «¿Asistió el paciente?» al final de la semana. Si al final de
+>   una corrida ves «Guarda de asistencia: N cita(s)…», ésa es la causa.
+> - **Línea base de rendimiento de este equipo** (4 rondas, mediana de 20
+>   muestras; v2 apagada / encendida): apertura en frío 406 / 406 ms; con red
+>   limitada 850 / 855 ms; semana siguiente 88 / 93 ms; volver del dashboard
+>   117 / 123 ms; validaciones contra Auth 2 / 4; peticiones bloqueantes 0 / 0; JS
+>   al abrir 547,1 / 587,3 KiB en 34 / 39 chunks; al guardar, la tarjeta a los
+>   14 / 17 ms, el modal fuera a los 14 / 184 ms y el POST en 77 / 72 ms. Los
+>   tiempos no se comparan con los del equipo anterior (éste tarda más en el
+>   servidor); el peso y los recuentos sí, y coinciden con los de la tanda M. Los
+>   datos crudos y los scripts quedan en `e2e/resultados/linea-base-equipo-nuevo/`
+>   (fuera de git).
 - Nadie más usando la base local: ni la otra carpeta del proyecto ni otro
   agente. La base es una sola para las dos carpetas; reiniciarla les borra todo
   a los demás.
