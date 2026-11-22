@@ -164,7 +164,7 @@ function DocumentosPacienteContent() {
     <div lang="es" className="mx-auto w-full max-w-[640px] iv:max-w-[600px] space-y-5">
       {/* Cabecera: «‹ Expediente» (CALMA §6, §20), título y quién. */}
       <header>
-        <Link href={`/expediente/${id}`} className="k-b k-b-texto -ml-1 text-[13px]">
+        <Link href={`/expediente/${id}`} className="k-b k-b-texto -ml-1 h-[var(--k-toque)] text-[13px]">
           <ChevronLeft size={16} aria-hidden="true" />
           Expediente
         </Link>
