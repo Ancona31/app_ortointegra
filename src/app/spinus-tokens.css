@@ -1201,96 +1201,106 @@ input[type="date"].sp-input {
 
 
 /* --- 11. PROGRESO SEGMENTADO (Estado 1 · entrevista) ------------------ */
+/* Rediseño (ajuste de la nota): fino, en los colores del kit. La barra de la
+   entrevista y la del firmado comparten pieza. Sin transición de color (sólo
+   se anima transform/opacity): el segmento hecho aparece por opacidad. */
 .sp-progress { display: flex; align-items: center; gap: var(--sp-3); }
 .sp-progress__label {
-  font-size: var(--sp-fs-badge); font-weight: var(--sp-fw-bold);
-  letter-spacing: .03em; color: var(--sp-ink-350); white-space: nowrap;
+  font-size: 12px; font-weight: 600; line-height: 16px; color: var(--tinta2); white-space: nowrap;
 }
-.sp-progress__track { flex: 1; display: flex; gap: var(--sp-1-5); }
+.sp-progress__track { flex: 1; display: flex; gap: 4px; }
 .sp-progress__seg {
-  /* Enrutado por token: la mezcla contra #fff literal invertía la lectura del
-     progreso en modo oscuro. */
-  flex: 1; height: 7px; border-radius: 4px; background: var(--sp-primary-track);
-  transition: background var(--sp-dur-base) var(--sp-ease-out);
+  position: relative; flex: 1; height: 4px; border-radius: var(--r-pildora, 999px); background: var(--sup2);
+  overflow: hidden;
 }
-.sp-progress__seg--done { background: var(--sp-primary); }
-@media (max-width: 768px) { .sp-progress__seg { height: 6px; } .sp-progress__track { gap: 5px; } }
+.sp-progress__seg::after {
+  content: ""; position: absolute; inset: 0; background: var(--enlace); opacity: 0;
+  transition: opacity var(--dur-entra) linear;
+}
+.sp-progress__seg--done::after { opacity: 1; }
 
 
-/* --- 12. LISTA DE PASOS (Estado 0 · "Estructurando la nota") ---------- */
-.sp-steps { display: flex; flex-direction: column; gap: 9px; width: 100%; }
+/* --- 12. LISTA DE PASOS (Estado 0 · "Spinus está redactando tu nota") -- */
+/* Rediseño: lista quieta, sin cajas de color. Hecho = palomita `--ok-tinta`;
+   en curso = aro que gira y texto en `--tinta`; pendiente = `--tinta3`. Cada
+   paso entra por opacidad. `.sp-spinner` lo usan también los documentos: sólo
+   cambian sus colores, no su caja. */
+.sp-steps { display: flex; flex-direction: column; gap: 4px; width: 100%; margin: 0; padding: 0; list-style: none; }
 .sp-step {
-  display: flex; align-items: center; gap: 11px;
-  padding: 11px 15px; border-radius: var(--sp-r-field-sm);
-  font-size: var(--sp-fs-body-sm);
+  display: flex; align-items: center; gap: 12px; min-height: 36px;
+  font-size: 15px; line-height: 20px; color: var(--tinta2);
+  animation: sp-nota-entra var(--dur-entra) var(--resorte-entra) both;
 }
-.sp-step--done    { background: var(--sp-primary-bg-faint); color: var(--sp-ink-700); }
-.sp-step--done svg { stroke: var(--sp-success); stroke-width: 2.4; width: 17px; height: 17px; fill: none; }
-.sp-step--active  { background: var(--sp-primary-bg-soft); border: var(--sp-bw-hair) solid var(--sp-primary-border);
-                    color: var(--sp-ink-800); font-weight: var(--sp-fw-semi); }
-.sp-step--pending { background: transparent; color: var(--sp-ink-200); }
-.sp-step__dot {                  /* aro del paso pendiente */
-  width: 17px; height: 17px; border-radius: 50%;
-  border: 2px solid var(--sp-line-soft); flex: 0 0 17px;
+.sp-step--done    { color: var(--tinta2); }
+.sp-step--done svg { stroke: var(--ok-tinta); stroke-width: 2.4; width: 18px; height: 18px; fill: none; flex: 0 0 18px; }
+.sp-step--active  { color: var(--tinta); font-weight: 600; }
+.sp-step--pending { color: var(--tinta3); }
+.sp-step__dot {
+  width: 18px; height: 18px; border-radius: 50%;
+  border: 2px solid var(--sup2); flex: 0 0 18px;
 }
-.sp-spinner {                    /* aro del paso activo */
+.sp-spinner {
   width: 17px; height: 17px; border-radius: 50%; flex: 0 0 17px;
-  border: 2px solid var(--sp-primary-track); border-top-color: var(--sp-primary);
+  border: 2px solid var(--sup2); border-top-color: var(--enlace);
   animation: sp-spin var(--sp-dur-spin) linear infinite;
 }
-.sp-spinner--xl { width: 86px; height: 86px; border-width: 2px; border-radius: 24px; } /* anillo del ícono */
-
-/* Tres puntos indicadores bajo la lista: onda de opacidad, no de escala */
+.sp-spinner--xl { width: 86px; height: 86px; border-width: 2px; border-radius: 24px; }
 .sp-dots { display: flex; gap: 7px; }
 .sp-dots span {
-  width: 9px; height: 9px; border-radius: 50%; background: var(--sp-primary);
+  width: 9px; height: 9px; border-radius: 50%; background: var(--enlace);
   animation: sp-wave 1.2s var(--sp-ease-inout) infinite;
 }
 .sp-dots span:nth-child(2) { animation-delay: .16s; }
 .sp-dots span:nth-child(3) { animation-delay: .32s; }
 
+/* Entrada de cada estado del embudo y de los avisos de la nota: opacidad y
+   un desplazamiento corto, con el resorte del kit. Con movimiento reducido,
+   sólo opacidad. Sustituye a los deslizamientos y al «pop» de la medalla. */
+@keyframes sp-nota-entra { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes sp-nota-funde { from { opacity: 0; } to { opacity: 1; } }
+.sp-nota-entra { animation: sp-nota-entra var(--dur-entra) var(--resorte-entra) both; }
+@media (prefers-reduced-motion: reduce) {
+  .sp-nota-entra, .sp-step { animation: sp-nota-funde 200ms linear both; }
+  .sp-progress__seg::after { transition: none; }
+}
+
 
 /* --- 13. ZONA DE EDICIÓN ACTIVA (Estado 2 · edición) ------------------ */
+/* Campo del kit (`--sup2`, sin borde) con el foco de 2 px en `--enlace`. */
 .sp-editzone {
-  border: var(--sp-bw-accent) solid var(--sp-primary);
-  border-radius: var(--sp-r-field);
-  background: var(--sp-surface);
-  padding: 15px 16px;
-  font-size: var(--sp-fs-body-sm); line-height: var(--sp-lh-note); color: var(--sp-ink-700);
-  box-shadow: var(--sp-focus-ring);
+  border: 0; border-radius: var(--r-control, 12px);
+  background: var(--sup2);
+  padding: 14px 16px;
+  font-size: 15px; line-height: 24px; color: var(--tinta);
+  outline: 2px solid var(--enlace); outline-offset: 0; box-shadow: none;
 }
 
 
-/* --- 14. TILE DE SIGNO VITAL (card conservada) ------------------------ */
-.sp-tile {
-  border: var(--sp-bw-hair) solid var(--sp-success-border);
-  border-radius: var(--sp-r-btn); padding: 12px 14px;
-}
-.sp-tile--watch { border-color: var(--sp-warn-border); }
-.sp-tile__label {
-  display: flex; align-items: center; gap: var(--sp-1-5);
-  font-size: var(--sp-fs-tile); letter-spacing: var(--sp-ls-label-w); color: var(--sp-ink-350);
-}
-.sp-tile__label::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--sp-success-dot); }
-.sp-tile--watch .sp-tile__label::before { background: var(--sp-warn-dot); }
-.sp-tile__value { margin-top: var(--sp-2); font-size: 24px; font-weight: var(--sp-fw-black); color: var(--sp-success); }
-.sp-tile--watch .sp-tile__value { color: var(--sp-warn-strong); }
-.sp-tile__unit { font-size: var(--sp-fs-badge); font-weight: var(--sp-fw-regular); color: var(--sp-ink-350); }
-.sp-tiles { display: grid; grid-template-columns: repeat(5, 1fr); gap: var(--sp-gap-tiles); }
-@media (max-width: 768px) {      /* móvil: strip horizontal, no rejilla */
-  .sp-tiles { display: flex; gap: var(--sp-2); overflow-x: auto; scrollbar-width: none; }
-  .sp-tiles > * { flex: 0 0 auto; padding: 7px 11px; }
-  .sp-tile__value { font-size: 16px; }
-}
+/* --- 14. SIGNOS VITALES (fila plegada + capa; SignosVitalesCard) ------- */
+/* Color del valor por semáforo, en el resumen de la fila y en los campos de la
+   capa. Dentro de `@layer components` con `!important`: así gana a la hoja
+   oscura de ThemeProvider (`html.dark input {color … !important}`, SIN capa),
+   que si no pintaría los seis valores del mismo blanco. */
+.sv-val[data-estado="normal"], .sv-val[data-estado="vacio"] { color: var(--tinta); font-weight: 600; }
+.sv-val[data-estado="vigilar"] { color: var(--aviso-tinta); font-weight: 700; }
+.sv-val[data-estado="fuera"]   { color: var(--mal-tinta); font-weight: 700; }
+.sv-hoja .sv-in { font-size: 17px; }
+.sv-hoja .sv-in[data-estado]           { color: var(--tinta) !important; }
+.sv-hoja .sv-in[data-estado="vigilar"] { color: var(--aviso-tinta) !important; }
+.sv-hoja .sv-in[data-estado="fuera"]   { color: var(--mal-tinta) !important; }
+.sv-hoja .sv-in::placeholder { color: var(--tinta3) !important; font-weight: 400; }
+.sv-hoja .sv-in { -moz-appearance: textfield; }
+.sv-hoja .sv-in::-webkit-outer-spin-button,
+.sv-hoja .sv-in::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 
 
 /* --- 15. REJILLAS ------------------------------------------------------ */
 .sp-grid-2   { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-4); }        /* SOAP manual */
 .sp-grid-2-1 { display: grid; grid-template-columns: 1.5fr 1fr; gap: var(--sp-3-5); }    /* seguimiento */
-.sp-grid-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 11px; }           /* éxito 2×2 */
+.sp-grid-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }            /* éxito 2×2 */
 @media (max-width: 768px) {
   .sp-grid-2, .sp-grid-2-1 { grid-template-columns: 1fr; gap: var(--sp-3); }
-  .sp-grid-actions { grid-template-columns: 1fr; gap: var(--sp-2-5); }
+  .sp-grid-actions { grid-template-columns: 1fr; gap: 8px; }
 }
 /* SOAP: entre 1024 y 1150px, lg: ya estrechó la columna a 3/5 y cada celda
    queda en ~180px — por debajo del ancho útil de un textarea. Rango real de

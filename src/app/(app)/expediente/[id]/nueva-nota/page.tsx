@@ -11,7 +11,7 @@ import { buildNotaRenderData } from '@/lib/notaRenderData'
 import {
   ChevronLeft, Save, Loader2, RotateCcw, Printer, Eye, Pencil,
   Pill, CheckCircle2, Check, PenLine, X, FileText,
-  Mic, Sparkles, AlertTriangle,
+  Mic, Sparkles, AlertTriangle, Lock, FolderOpen,
 } from 'lucide-react'
 import Link from 'next/link'
 import ReactMarkdown from 'react-markdown'
@@ -84,25 +84,16 @@ function metaDelModal(e: EstadoModal): { title: string; subtitle: string; geomet
     case 'revision':     return { title: 'Tu nota está lista',              subtitle: 'Revísala antes de guardar',       geometry: 'work'   }
     case 'contexto':     return { title: 'Ajusta el contexto',              subtitle: 'La nota se generará de nuevo',    geometry: 'work'   }
     case 'generando':    return { title: 'Spinus está redactando tu nota',  subtitle: 'Unos segundos…',                  geometry: 'wait'   }
-    case 'confirmacion': return { title: '',                                subtitle: '',                                geometry: 'decide' }
+    case 'confirmacion': return { title: '¿Guardar esta nota?',             subtitle: '',                                geometry: 'decide' }
     case 'exito':        return { title: '',                                subtitle: '',                                geometry: 'done'   }
     default:             return { title: 'Spinus necesita más información', subtitle: 'Responde para completar la nota', geometry: 'work'   }
   }
 }
 
-// Clase de animación del contenido del modal según la transición entre estados
-// (paso 3.1). Solo motion: 2→3 avanza (slide desde la derecha), 3→2 retrocede;
-// el resto es cross-fade. La dirección se deriva del estado anterior sin estado
-// de render extra (prevEstadoRef leído en render).
-// 3→4 NO lleva animación propia de celebración (paso 3.2.C1): la hace
-// .sp-medal__core con sp-pop, y los transforms anidados se MULTIPLICAN — un
-// scale(.8) en el wrapper contra el scale(.6) del medallón lo arrancaría a 0.48
-// y metería el overshoot del resorte dentro de un padre todavía escalando.
-function claseTransicion(estado: EstadoModal, prev: EstadoModal): string {
-  if (estado === 'confirmacion' && prev === 'revision') return 'animate-slide-from-right'
-  if (estado === 'revision' && prev === 'confirmacion') return 'animate-slide-from-left'
-  return 'animate-fade-in'
-}
+// Entrada de cada estado del modal (ajuste de la nota): opacidad y un
+// desplazamiento corto con el resorte del kit (`.sp-nota-entra`, tokens §12),
+// sólo opacidad con movimiento reducido. Sustituye a los deslizamientos
+// laterales y al «pop» de la medalla, que eran del catálogo viejo.
 
 // Lista de pasos del Estado 0 (paso 3.2.C1, evoluciona los mensajes rotativos
 // de 3.1). Componente aislado: su re-render no toca el modal. Al aparecer
@@ -124,7 +115,7 @@ function PasosGenerando() {
     return () => clearInterval(id)
   }, [])
   return (
-    <ol className="sp-steps max-w-xs" role="status">
+    <ol className="sp-steps" role="status">
       {PASOS_GENERANDO.map((texto, idx) => (
         <li key={texto} className={`sp-step ${idx < i ? 'sp-step--done' : idx === i ? 'sp-step--active' : 'sp-step--pending'}`}>
           {idx < i ? <Check /> : idx === i ? <span className="sp-spinner" /> : <span className="sp-step__dot" />}
@@ -132,6 +123,22 @@ function PasosGenerando() {
         </li>
       ))}
     </ol>
+  )
+}
+
+// Vista previa de la nota (maqueta `final-nota`, vista 13): el encabezado de
+// sección que escriben la IA y la vía manual («**[SUBJETIVO]:**») se pinta
+// como rótulo en su propia línea —«SUBJETIVO» en el color de enlace—, como en
+// la nota sellada (`CuerpoNota`). Cualquier otra negrita queda como negrita.
+// Sólo presentación: el texto que se guarda no cambia.
+function NegritaNota({ children }: { children?: React.ReactNode }) {
+  const texto = typeof children === 'string' ? children : Array.isArray(children) && children.every(c => typeof c === 'string') ? children.join('') : null
+  const m = texto?.trim().match(/^\[([^\]]+)\]:?$/)
+  if (!m) return <strong>{children}</strong>
+  return (
+    <span className="mb-1 mt-4 block text-[13px] font-bold uppercase leading-[18px] tracking-[.4px] text-[var(--enlace)]">
+      {m[1]}
+    </span>
   )
 }
 
@@ -249,10 +256,6 @@ export default function NuevaNotaPage() {
   useEffect(() => { formRef.current = form }, [form])
   const notaGeneradaRef = useRef(notaGenerada)
   useEffect(() => { notaGeneradaRef.current = notaGenerada }, [notaGenerada])
-  // Paso 3.1: estado anterior del modal para derivar la dirección del slide.
-  // Se lee en render (aún tiene el valor previo); el efecto lo actualiza después.
-  const prevEstadoRef = useRef<EstadoModal>(null)
-  useEffect(() => { prevEstadoRef.current = estadoModal }, [estadoModal])
   // Se enciende al primer clic en el selector IA/manual. El toggle limpia
   // notaGenerada, así que notaGeneradaRef NO detecta esa interacción: sin este
   // ref, un borrador que resuelve tarde pisaría la vía que el médico acaba de
@@ -864,7 +867,10 @@ export default function NuevaNotaPage() {
   // Error de generación y panel de resultado: se renderizan en distinta posición
   // según el modo. En IA van pegados bajo el botón generar; en manual van al fondo.
   const bloqueError = error ? (
-    <div className="sp-banner sp-banner--danger">{error}</div>
+    <p role="alert" className="sp-nota-entra flex items-start gap-1.5 text-[14px] font-semibold leading-5 text-[var(--mal-tinta)]">
+      <AlertTriangle size={16} aria-hidden="true" className="mt-0.5 flex-none" />
+      <span>{error}</span>
+    </p>
   ) : null
 
   // Ancla de la Card Captura: hay nota, el modal está cerrado y aún no se guardó.
@@ -876,43 +882,41 @@ export default function NuevaNotaPage() {
        card. El verde del texto se pierde por regla del sistema (.sp-title-card
        es tinta); la señal de "listo" queda en el ✓ y en el borde/sombra de
        --anchor. */
-    <div className="sp-card sp-card--anchor space-y-4">
+    <div className="k-tarjeta space-y-4">
       <div className="flex items-center gap-2">
-        <CheckCircle2 className="text-[var(--sp-success)] flex-shrink-0" />
-        <h2 className="sp-title-card">Nota lista</h2>
+        <span className="k-al-i m-0 h-8 w-8 [&_svg]:h-[18px] [&_svg]:w-[18px]" aria-hidden="true"><Check /></span>
+        <h2 className="k-t-tarjeta flex-1">Nota lista</h2>
         {modoNota === 'ia' ? (
-          <span className="sp-badge ml-auto">
+          <span className="k-etq k-etq-tonal">
             <Sparkles />
             Nota IA
           </span>
         ) : (
-          <span className="sp-badge ml-auto">
+          <span className="k-etq k-etq-tonal">
             <PenLine />
             Nota manual
           </span>
         )}
       </div>
       {/* Dictado colapsado, solo lectura */}
-      <button type="button" onClick={() => setDictadoExpandido(v => !v)} className="w-full text-left group">
-        <p className="sp-label mb-1">
+      <button type="button" onClick={() => setDictadoExpandido(v => !v)} className="group w-full text-left">
+        <p className="k-t-rotulo mb-1">
           {modoNota === 'ia' ? 'Tu dictado' : 'Motivo de consulta'}
         </p>
-        <p className={`sp-secondary whitespace-pre-wrap ${dictadoExpandido ? '' : 'line-clamp-3'}`}>
+        <p lang="es" className={`whitespace-pre-wrap text-[15px] leading-[22px] text-tinta2 [hyphens:auto] ${dictadoExpandido ? '' : 'line-clamp-3'}`}>
           {form.motivo_consulta}
         </p>
-        <span className="sp-hint text-[var(--sp-primary-text)] mt-1 inline-block group-hover:underline">
+        <span className="mt-1 inline-block text-[14px] font-semibold text-[var(--enlace)] group-hover:underline">
           {dictadoExpandido ? 'Ocultar' : 'Ver completo'}
         </span>
       </button>
 
       {confirmarDescarte ? (
-        <div className="sp-banner sp-banner--warn flex-col items-start gap-2">
+        <div role="alert" className="sp-nota-entra flex flex-col items-start gap-2 rounded-[var(--r-control)] bg-[var(--aviso-fondo)] p-3 text-[14px] leading-5 text-[var(--aviso-tinta)]">
           <p>
             Descartarás la nota generada. Tu dictado y los datos capturados se conservan.
           </p>
           <div className="flex gap-2">
-            {/* C0 no expone botón de advertencia; color inline sobre tokens
-                warn, mismo patrón que el swap R12 del modal. */}
             <button
               onClick={() => {
                 setNotaGenerada('')
@@ -920,22 +924,21 @@ export default function NuevaNotaPage() {
                 setModoEdicion(false)
                 setConfirmarDescarte(false)
               }}
-              className="sp-btn sp-btn--compact"
-              style={{ background: 'var(--sp-warn-bg-badge)', color: 'var(--sp-warn)' }}>
+              className="k-b k-b-capa k-b-mal">
               Sí, empezar de nuevo
             </button>
-            <button onClick={() => setConfirmarDescarte(false)} className="sp-btn sp-btn--compact">
+            <button onClick={() => setConfirmarDescarte(false)} className="k-b k-b-capa k-b-quieto">
               Conservar
             </button>
           </div>
         </div>
       ) : (
-        <div className="flex gap-2">
-          <button onClick={abrirRevision} className="sp-btn sp-btn--primary flex-1">
-            <Eye size={17} /> Revisar y guardar
+        <div className="flex flex-col gap-1 esc:flex-row-reverse esc:items-center esc:justify-start esc:gap-4">
+          <button onClick={abrirRevision} className="k-b k-b-prim h-12 w-full text-[17px] esc:h-10 esc:w-auto esc:text-[15px]">
+            Revisar y guardar
           </button>
-          <button onClick={() => setConfirmarDescarte(true)} className="sp-btn sp-btn--secondary">
-            <RotateCcw size={17} /> Empezar de nuevo
+          <button onClick={() => setConfirmarDescarte(true)} className="k-b k-b-texto self-center">
+            <RotateCcw size={16} aria-hidden="true" /> Empezar de nuevo
           </button>
         </div>
       )}
@@ -971,52 +974,56 @@ export default function NuevaNotaPage() {
         hideClose={(generando && !errorModal) || estadoModal === 'confirmacion'}
         title={meta.title}
         subtitle={meta.subtitle}
-        icon={estadoModal === 'confirmacion' || estadoModal === 'exito' ? undefined : <Sparkles />}
+        /* Sin icono en la cabecera: las capas del catálogo titulan con texto. La
+           confirmación es la ALERTA del catálogo (capas-a, vista 1): candado en
+           círculo, título, mensaje y «Revisar» | «Guardar nota» parejos. */
+        variante={estadoModal === 'confirmacion' ? 'alerta' : undefined}
+        icon={estadoModal === 'confirmacion' ? <Lock /> : undefined}
         headerRight={estadoModal === 'revision' ? (
           /* max-md:hidden: con el título a 19px y el badge a 12px, en 375px el
              título truncaría. El indicador es redundante en móvil. */
           modoNota === 'ia' ? (
-            <span className="sp-badge max-md:hidden">
+            <span className="k-etq k-etq-tonal max-md:hidden">
               <Sparkles />
               Nota IA
             </span>
           ) : (
-            <span className="sp-badge max-md:hidden">
+            <span className="k-etq k-etq-tonal max-md:hidden">
               <PenLine />
               Nota manual
             </span>
           )
         ) : undefined}
         footer={estadoModal === 'entrevista' ? (
-          <div className="flex items-center gap-2 p-4 md:px-6">
+          <div className="flex items-center gap-2 px-6 py-4 ext:px-4">
             {/* max-md:hidden: con las métricas de .sp-btn los 3 botones suman
                 397px en el último bloque contra 343px útiles. La X del header
                 ejecuta cancelarEntrevista() — el mismo handler — así que en
                 móvil no se pierde la salida. */}
             <button onClick={cancelarEntrevista} disabled={generando}
-              className="sp-btn sp-btn--ghost disabled:opacity-40 max-md:hidden">
+              className="k-b k-b-capa k-b-texto max-md:hidden">
               Cancelar
             </button>
             <div className="flex-1" />
             <button onClick={() => setBloqueActual(i => i - 1)} disabled={bloqueActual === 0 || generando}
-              className="sp-btn sp-btn--secondary disabled:opacity-40 disabled:cursor-not-allowed">
+              className="k-b k-b-capa k-b-quieto">
               Anterior
             </button>
             {esUltimoBloque ? (
               <button onClick={responderEntrevista} disabled={!bloqueCompleto || generando}
-                className="sp-btn sp-btn--primary">
-                {generando ? <><Loader2 size={17} className="animate-spin" /> Enviando...</> : 'Enviar respuestas'}
+                className="k-b k-b-capa k-b-prim">
+                {generando ? <><Loader2 size={17} className="animate-spin" aria-hidden="true" /> Enviando...</> : 'Enviar respuestas'}
               </button>
             ) : (
               <button onClick={() => setBloqueActual(i => i + 1)} disabled={!bloqueCompleto}
-                className="sp-btn sp-btn--primary">
+                className="k-b k-b-capa k-b-prim">
                 Siguiente
               </button>
             )}
           </div>
         ) : estadoModal === 'revision' ? (
-          <div className="flex items-center gap-2 p-4 md:px-6">
-            <button onClick={cancelarEntrevista} className="sp-btn sp-btn--ghost">
+          <div className="flex items-center gap-2 px-6 py-4 ext:px-4">
+            <button onClick={cancelarEntrevista} className="k-b k-b-capa k-b-texto">
               Cerrar
             </button>
             <div className="flex-1" />
@@ -1025,72 +1032,70 @@ export default function NuevaNotaPage() {
             <button
               onClick={() => { setErrorModal(null); intentarGuardar() }}
               disabled={guardando || !consultorioActivo}
-              className="sp-btn sp-btn--primary">
-              {guardando ? <><Loader2 size={17} className="animate-spin" /> Guardando...</> : <><Save size={17} /> Guardar nota</>}
+              className="k-b k-b-capa k-b-prim">
+              {guardando ? <><Loader2 size={17} className="animate-spin" aria-hidden="true" /> Guardando...</> : 'Guardar nota'}
             </button>
           </div>
         ) : estadoModal === 'contexto' ? (
-          <div className="flex items-center gap-2 p-4 md:px-6">
+          <div className="flex items-center gap-2 px-6 py-4 ext:px-4">
             <button onClick={() => { setEstadoModal('revision'); setErrorModal(null) }}
-              className="sp-btn sp-btn--ghost">
+              className="k-b k-b-capa k-b-texto">
               Cancelar
             </button>
             <div className="flex-1" />
             <button onClick={generarNota} disabled={!form.motivo_consulta.trim()}
-              className="sp-btn sp-btn--primary">
-              <Sparkles size={17} /> Regenerar nota
+              className="k-b k-b-capa k-b-prim">
+              Regenerar nota
             </button>
           </div>
         ) : estadoModal === 'confirmacion' ? (
           /* «Revisar» (CALMA §15) y «Guardar nota» como dos botones parejos de
-             capa (§13): secundario a la izquierda, principal a la derecha;
-             en `iv`, el par centrado (§23.1). */
-          <div className="flex items-center justify-end gap-2 p-4 md:px-6 iv:justify-center">
+             la alerta: secundario a la izquierda, principal a la derecha. */
+          <>
             <button onClick={() => setEstadoModal('revision')} disabled={guardando}
-              className="k-b k-b-capa k-b-quieto min-w-[104px]">
+              className="k-b k-b-capa k-b-quieto">
               Revisar
             </button>
-            <button onClick={guardar} disabled={guardando} className="k-b k-b-capa k-b-prim min-w-[104px]">
-              {guardando ? <><Loader2 size={17} className="animate-spin" /> Guardando...</> : <><Save size={17} /> Guardar nota</>}
+            <button onClick={guardar} disabled={guardando} data-principal className="k-b k-b-capa k-b-prim">
+              {guardando ? <><Loader2 size={17} className="animate-spin" aria-hidden="true" /> Guardando...</> : 'Guardar nota'}
             </button>
-          </div>
+          </>
         ) : estadoModal === 'exito' ? (
-          <div className="p-4 md:px-6 space-y-2.5">
+          <div className="space-y-2 px-6 pb-6 pt-1 ext:px-4">
             {/* Primario único: la recompensa es la receta (blueprint §5.2). */}
             <button
               onClick={() => { setEstadoModal(null); setDocInline('receta') }}
-              className="sp-btn sp-btn--primary sp-btn--primary-block sp-btn--reward">
-              <Pill size={17} /> Generar receta
+              className="k-b k-b-capa k-b-prim w-full">
+              <Pill size={18} aria-hidden="true" /> Generar receta
               {medicamentosParaReceta.length > 0 && (
-                <span className="sp-badge sp-badge--inline">
-                  {medicamentosParaReceta.length} medicamento{medicamentosParaReceta.length === 1 ? '' : 's'}
+                <span className="font-normal opacity-80">
+                  · {medicamentosParaReceta.length} medicamento{medicamentosParaReceta.length === 1 ? '' : 's'}
                 </span>
               )}
             </button>
-            {/* Terciarios en rejilla 2×2, separados del primario por un filete.
-                En móvil C0 colapsa .sp-grid-actions a una sola columna. */}
-            <div className="sp-grid-actions mt-2 pt-3 border-t border-[var(--sp-line-divider)]">
+            {/* Secundarios parejos en rejilla 2×2 (una columna en teléfono). */}
+            <div className="sp-grid-actions">
               <button
                 onClick={() => { setEstadoModal(null); setTimeout(() => document.querySelector('[data-onboard="panel-documentos"]')?.scrollIntoView({ behavior: 'smooth' }), 0) }}
-                className="sp-btn sp-btn--tertiary">
-                <FileText size={17} /> Otros documentos
+                className="k-b k-b-capa k-b-quieto">
+                <FileText size={18} aria-hidden="true" /> Otros documentos
               </button>
               {notaPdfUrl ? (
                 <a href={notaPdfUrl} target="_blank" rel="noopener"
-                  className="sp-btn sp-btn--tertiary">
-                  <Eye size={17} /> Abrir PDF
+                  className="k-b k-b-capa k-b-quieto">
+                  <Eye size={18} aria-hidden="true" /> Abrir PDF
                 </a>
               ) : (
                 <button onClick={imprimir} disabled={imprimiendo}
-                  className="sp-btn sp-btn--tertiary disabled:opacity-40">
-                  {imprimiendo ? <><Loader2 size={17} className="animate-spin" /> Imprimiendo...</> : <><Printer size={17} /> Imprimir nota</>}
+                  className="k-b k-b-capa k-b-quieto">
+                  {imprimiendo ? <><Loader2 size={18} className="animate-spin" aria-hidden="true" /> Imprimiendo...</> : <><Printer size={18} aria-hidden="true" /> Imprimir nota</>}
                 </button>
               )}
-              <Link href={`/expediente/${id}`} className="sp-btn sp-btn--tertiary">
-                <Eye size={17} /> Ver expediente
+              <Link href={`/expediente/${id}`} className="k-b k-b-capa k-b-quieto">
+                <FolderOpen size={18} aria-hidden="true" /> Ver expediente
               </Link>
-              <button onClick={() => setEstadoModal(null)} className="sp-btn sp-btn--tertiary">
-                <X size={17} /> Cerrar
+              <button onClick={() => setEstadoModal(null)} className="k-b k-b-capa k-b-texto">
+                Cerrar
               </button>
             </div>
           </div>
@@ -1099,124 +1104,115 @@ export default function NuevaNotaPage() {
         {/* Wrapper de remount por estado (paso 3.1): key fuerza el re-montaje del
             contenido en cada transición; el ModalShell (backdrop) nunca se
             desmonta. overflow-x-hidden contiene el slide horizontal de ±60px. */}
-        <div key={estadoModal} className={`overflow-x-hidden ${claseTransicion(estadoModal, prevEstadoRef.current)}`}>
+        <div key={estadoModal} className="sp-nota-entra overflow-x-hidden">
         {estadoModal === 'generando' && (errorModal ? (
-          <div className="px-4 py-12 md:px-6 flex flex-col items-center text-center gap-3">
-            <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center">
-              <AlertTriangle size={22} className="text-red-500" />
-            </div>
-            <p lang="es" className="max-w-xs text-[14px] leading-5 text-tinta2 [hyphens:auto] [text-align:justify]">{errorModal}</p>
-            <div className="flex items-center gap-2 mt-1">
-              <button onClick={cancelarEntrevista} className="sp-btn sp-btn--ghost">
+          /* Error de la IA con la alerta del catálogo (capas-a, vista 1): icono
+             en círculo, mensaje justificado y dos botones parejos. */
+          <div role="alert" className="k-al">
+            <span className="k-al-i k-al-i-destruir" aria-hidden="true"><AlertTriangle /></span>
+            <p lang="es" className="k-al-t">{errorModal}</p>
+            <div className="k-al-b">
+              <button onClick={cancelarEntrevista} className="k-b k-b-capa k-b-quieto">
                 Cerrar
               </button>
-              <button onClick={generarNota} className="sp-btn sp-btn--primary">
-                <RotateCcw size={17} /> Reintentar
+              <button onClick={generarNota} className="k-b k-b-capa k-b-prim">
+                Reintentar
               </button>
             </div>
           </div>
         ) : (
-          <div className="px-4 py-12 md:px-6 flex flex-col items-center text-center gap-6">
-            {/* AMBAS clases: --xl solo redeclara la caja; el color del aro y la
-                animación sp-spin vienen de .sp-spinner. */}
-            <div className="relative flex items-center justify-center">
-              <span className="sp-spinner sp-spinner--xl absolute" aria-hidden="true" />
-              <span className="sp-icobox sp-icobox--lg"><Sparkles /></span>
-            </div>
+          /* Espera quieta (CALMA): sólo la lista de pasos, sin anillo grande ni
+             puntos que laten; el aro del paso en curso basta como señal. */
+          <div className="px-6 pb-6 pt-2">
             <PasosGenerando />
-            <span className="sp-dots" aria-hidden="true"><span /><span /><span /></span>
           </div>
         ))}
         {estadoModal === 'entrevista' && (
           <>
-          <div className="p-4 md:p-6 space-y-4">
-            {/* Progreso */}
+          <div className="space-y-5 px-6 pb-5 pt-1 ext:px-4">
+            {/* Progreso: una línea de texto y la barra fina del kit (§11). */}
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <p className="sp-label">
-                  Bloque {bloqueActual + 1} de {bloquesEntrevista.length}
-                </p>
+              <p className="text-[13px] leading-[18px] text-tinta2">
+                Bloque {bloqueActual + 1} de {bloquesEntrevista.length}
                 {!bloqueCompleto && faltanEnBloque > 0 && (
-                  <p className="sp-hint text-[var(--sp-warn)]">Faltan {faltanEnBloque} por responder</p>
+                  <span className="font-semibold text-[var(--aviso-tinta)]"> · Faltan {faltanEnBloque} por responder</span>
                 )}
-              </div>
-              {/* Solo __track/__seg: .sp-progress pondría la etiqueta y la barra
-                  en la misma fila y obligaría a reubicar "Faltan N". */}
-              <div className="sp-progress__track">
+              </p>
+              <div className="sp-progress__track" aria-hidden="true">
                 {bloquesEntrevista.map((_, i) => (
                   <div key={i} className={`sp-progress__seg ${i <= bloqueActual ? 'sp-progress__seg--done' : ''}`} />
                 ))}
               </div>
             </div>
 
-            {/* Preguntas del bloque actual */}
+            {/* Preguntas del bloque actual: las opciones como filas de lista
+                (maqueta `final-nota`, vista 11), la elegida con palomita. */}
             {bloqueEnCurso && (
-              <div className="space-y-4">
-                <h3 className="sp-title-sec">{bloqueEnCurso.titulo}</h3>
-                {bloqueEnCurso.preguntas.map(preg => {
-                  const respondida = !!(respuestasEntrevista[preg.id] ?? '').trim()
-                  return (
-                    <div key={preg.id} className="space-y-1.5">
-                      <p className="sp-body flex items-start gap-1.5">
-                        <span className={`mt-1.5 w-1.5 h-1.5 rounded-full flex-shrink-0 ${respondida ? 'bg-[var(--sp-success-dot)]' : 'bg-[var(--sp-warn-dot)]'}`} />
-                        <span>{preg.pregunta}</span>
-                      </p>
-                      {preg.opciones.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5 pl-3">
-                          {preg.opciones.map(op => (
-                            <button key={op} type="button"
+              <div className="space-y-5">
+                <h3 className="text-[15px] font-bold leading-5 text-tinta">{bloqueEnCurso.titulo}</h3>
+                {bloqueEnCurso.preguntas.map(preg => (
+                  <div key={preg.id} className="space-y-1">
+                    <p className="text-[15px] font-semibold leading-5 text-tinta">{preg.pregunta}</p>
+                    {preg.opciones.length > 0 && (
+                      <div className="k-lista">
+                        {preg.opciones.map(op => {
+                          const elegida = respuestasEntrevista[preg.id] === op
+                          return (
+                            <button key={op} type="button" aria-pressed={elegida}
                               onClick={() => setRespuestasEntrevista(prev => ({ ...prev, [preg.id]: op }))}
-                              className={`sp-chip ${respuestasEntrevista[preg.id] === op ? 'sp-chip--selected' : ''}`}>
-                              {op}
+                              className="k-fila min-h-[44px] py-2 ih:min-h-[40px] esc:min-h-[40px]">
+                              <span className={`flex-1 text-[15px] leading-5 ${elegida ? 'font-semibold text-[var(--enlace)]' : 'text-tinta'}`}>{op}</span>
+                              {elegida && <Check size={18} aria-hidden="true" className="flex-none text-[var(--enlace)]" />}
                             </button>
-                          ))}
-                        </div>
-                      )}
-                      <input type="text"
-                        value={respuestasEntrevista[preg.id] ?? ''}
-                        onChange={e => setRespuestasEntrevista(prev => ({ ...prev, [preg.id]: e.target.value }))}
-                        placeholder="Escribe tu respuesta..."
-                        className="sp-input" />
-                    </div>
-                  )
-                })}
+                          )
+                        })}
+                      </div>
+                    )}
+                    <input type="text"
+                      value={respuestasEntrevista[preg.id] ?? ''}
+                      onChange={e => setRespuestasEntrevista(prev => ({ ...prev, [preg.id]: e.target.value }))}
+                      placeholder="Escribe tu respuesta..."
+                      aria-label={preg.pregunta}
+                      className="k-campo" />
+                  </div>
+                ))}
               </div>
             )}
           </div>
             {errorModal && (
-              <div className="sp-banner sp-banner--danger mx-5 mb-5">
+              <p role="alert" className="mx-6 mb-5 text-[14px] font-semibold leading-5 text-[var(--mal-tinta)]">
                 {errorModal}
-              </div>
+              </p>
             )}
           </>
         )}
         {estadoModal === 'revision' && (
-          <div className="p-4 md:p-6 space-y-5">
+          <div className="space-y-5 px-6 pb-6 pt-1 ext:px-4">
             {/* Cambios sin guardar — encima del cuerpo, no junto al botón: la
                 advertencia es sobre el estado de la nota, no sobre la acción.
                 Se calla mientras el swap de confirmación (R12) está abierto,
                 que ya dice lo mismo y con más precisión. */}
             {notaEditada && !confirmarPisado && (
-              <p className="sp-banner sp-banner--warn">
-                <AlertTriangle />
+              <p className="flex items-center gap-1.5 text-[14px] font-semibold leading-5 text-[var(--aviso-tinta)]">
+                <AlertTriangle size={16} aria-hidden="true" className="flex-none" />
                 Tienes cambios sin guardar. Regenerar con IA los perderá.
               </p>
             )}
             {/* ── La nota ── */}
             <div>
               <div className="flex items-center justify-between gap-2 mb-2">
-                <p className="sp-hint">
+                <p className="text-[13px] leading-[18px] text-tinta2">
                   {modoEdicion ? 'Editando texto' : 'Vista previa — haz clic en Editar para modificar'}
                 </p>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-none items-center gap-3">
                   <button onClick={() => setModoEdicion(!modoEdicion)}
-                    className="sp-btn sp-btn--compact">
+                    className="k-b k-b-texto">
                     {modoEdicion ? <><Eye size={15} /> Vista previa</> : <><Pencil size={15} /> Editar</>}
                   </button>
                   <button
                     onClick={() => { if (notaEditada) { setConfirmarPisado(true); return } ejecutarPisado() }}
                     disabled={generando || !form.motivo_consulta.trim()}
-                    className="sp-btn sp-btn--compact disabled:opacity-40">
+                    className="k-b k-b-texto">
                     <RotateCcw size={15} /> {modoNota === 'ia' ? 'Regenerar' : 'Actualizar'}
                   </button>
                 </div>
@@ -1224,17 +1220,16 @@ export default function NuevaNotaPage() {
 
               {/* R12: la confirmación solo advierte; nada se pisa hasta confirmar */}
               {confirmarPisado && (
-                <div className="sp-banner sp-banner--warn flex-col items-start gap-2 mb-3">
-                  <p>Perderás tus cambios — ¿Continuar?</p>
+                <div role="alert" className="mb-3 flex flex-col items-start gap-2 rounded-[var(--r-control)] bg-[var(--aviso-fondo)] p-3 text-[14px] leading-5 text-[var(--aviso-tinta)]">
+                  <p className="font-semibold">Perderás tus cambios — ¿Continuar?</p>
                   <div className="flex gap-2">
                     {/* C0 no expone botón de advertencia; el color va inline
                         sobre tokens warn, mismo patrón que el icobox de peligro. */}
                     <button onClick={ejecutarPisado}
-                      className="sp-btn sp-btn--compact"
-                      style={{ background: 'var(--sp-warn-bg-badge)', color: 'var(--sp-warn)' }}>
+                      className="k-b k-b-capa k-b-prim">
                       {modoNota === 'ia' ? 'Sí, regenerar' : 'Sí, actualizar'}
                     </button>
-                    <button onClick={() => setConfirmarPisado(false)} className="sp-btn sp-btn--compact">
+                    <button onClick={() => setConfirmarPisado(false)} className="k-b k-b-capa k-b-quieto">
                       Conservar
                     </button>
                   </div>
@@ -1249,18 +1244,18 @@ export default function NuevaNotaPage() {
                   value={notaGenerada}
                   onChange={e => { setNotaGenerada(e.target.value); setNotaEditada(true) }}
                   rows={16}
-                  className="sp-textarea sp-editzone font-mono" />
+                  className="sp-textarea sp-editzone w-full" />
               ) : (
-                <div lang="es" className="prose prose-sm max-w-none prose-headings:text-[13px] prose-headings:font-bold prose-headings:uppercase prose-headings:tracking-[.4px] prose-headings:text-enlace prose-headings:mt-5 prose-headings:mb-1 prose-strong:text-tinta prose-strong:font-semibold prose-p:text-[15px] prose-p:leading-[22px] prose-p:text-tinta prose-p:my-1 prose-p:[hyphens:auto] prose-p:[text-align:justify] prose-ul:my-1 prose-li:my-0.5 prose-li:text-tinta">
-                  <ReactMarkdown>{notaFinal}</ReactMarkdown>
+                <div lang="es" className="prose prose-sm max-w-none prose-headings:text-[13px] prose-headings:font-bold prose-headings:uppercase prose-headings:tracking-[.4px] prose-headings:text-enlace prose-headings:mt-5 prose-headings:mb-1 prose-strong:text-tinta prose-strong:font-semibold prose-p:text-tinta prose-p:my-1 prose-p:text-[16px] prose-p:leading-6 prose-p:[hyphens:auto] prose-p:[text-align:justify] prose-ul:my-1 prose-li:my-0.5 prose-li:text-tinta">
+                  <ReactMarkdown components={{ strong: NegritaNota }}>{notaFinal}</ReactMarkdown>
                 </div>
               )}
             </div>
 
             {/* ── Medicamentos detectados (solo IA) ── */}
             {modoNota === 'ia' && medicamentos.some(m => m.nombre.trim()) && (
-              <div className="sp-card-inner">
-                <p className="sp-secondary mb-2">
+              <div className="border-t border-[var(--linea)] pt-4">
+                <p className="mb-2 text-[14px] leading-5 text-tinta2">
                   Detecté estos medicamentos (precargarán tu receta):
                 </p>
                 <div className="flex flex-wrap gap-2">
@@ -1285,14 +1280,14 @@ export default function NuevaNotaPage() {
             )}
 
             {/* ── Diagnósticos (lectura, ambos modos) ── */}
-            <div className="sp-card-inner">
-              <h3 className="sp-label mb-2">Diagnósticos</h3>
+            <div className="border-t border-[var(--linea)] pt-4">
+              <h3 className="k-t-rotulo mb-2">Diagnósticos</h3>
               {dxValidos.length > 0 ? (
                 <ul className="space-y-1">
                   {dxValidos.map((d, i) => (
-                    <li key={i} className="sp-body">
+                    <li key={i} className="text-[15px] leading-[22px] text-tinta">
                       {d.codigo_cie10 ? (
-                        <><span className="font-semibold text-[var(--sp-primary-text)]">{d.codigo_cie10}</span> — {d.descripcion.trim()}</>
+                        <><span className="k-etq k-etq-tonal mr-1.5 align-[1px]">{d.codigo_cie10}</span> — {d.descripcion.trim()}</>
                       ) : d.descripcion.trim()}
                     </li>
                   ))}
@@ -1300,51 +1295,51 @@ export default function NuevaNotaPage() {
               ) : (
                 /* N1: solo alcanzable en IA (manual valida ≥1 dx antes de abrir). Se MUESTRA
                    en vez de ocultarse: la invisibilidad del dx fue justo R7. */
-                <p className="sp-banner sp-banner--warn">
+                <p className="text-[14px] font-semibold leading-5 text-[var(--aviso-tinta)]">
                   Sin diagnóstico estructurado — la nota se guardará sin código CIE-10.
                 </p>
               )}
               {modoNota === 'ia' && (
-                <p className="sp-hint mt-2">
+                <p className="mt-2 text-[13px] leading-[18px] text-tinta2">
                   ¿Algo incorrecto? Regenera la nota con más contexto.
                 </p>
               )}
             </div>
 
             {/* ── Seguimiento ── */}
-            <div className="sp-card-inner">
-              <h3 className="sp-label mb-2">Seguimiento</h3>
+            <div className="border-t border-[var(--linea)] pt-4">
+              <h3 className="k-t-rotulo mb-2">Seguimiento</h3>
               {modoEdicion ? (
                 <div className="space-y-3">
                   <div>
                     {/* Convención M8: la opcionalidad se señala por AUSENCIA de
                         asterisco, no con el sufijo "(opcional)". */}
-                    <label className="sp-label-field block mb-1">Pronóstico</label>
-                    <input type="text" value={form.pronostico} onChange={e => update('pronostico', e.target.value)}
+                    <label htmlFor="nn-pronostico" className="k-etiqueta mb-1">Pronóstico</label>
+                    <input id="nn-pronostico" type="text" value={form.pronostico} onChange={e => update('pronostico', e.target.value)}
                       placeholder="Ej: Favorable a mediano plazo con tratamiento conservador..."
-                      className="sp-input" />
+                      className="k-campo" />
                   </div>
                   <div>
-                    <label className="sp-label-field block mb-1">Próxima cita</label>
-                    <input type="text" value={form.proxima_cita} onChange={e => update('proxima_cita', e.target.value)}
+                    <label htmlFor="nn-proxima" className="k-etiqueta mb-1">Próxima cita</label>
+                    <input id="nn-proxima" type="text" value={form.proxima_cita} onChange={e => update('proxima_cita', e.target.value)}
                       placeholder="Ej: En 4 semanas, 15 de abril 2026..."
-                      className="sp-input" />
+                      className="k-campo" />
                   </div>
                 </div>
               ) : (
                 <div className="flex items-start justify-between gap-3">
                   <div className="space-y-1 min-w-0">
-                    <p className="sp-secondary">
-                      <span className="text-[var(--sp-ink-350)]">Pronóstico: </span>
+                    <p className="text-[14px] leading-5 text-tinta">
+                      <span className="text-tinta2">Pronóstico: </span>
                       <span className="break-words">{form.pronostico.trim() || '—'}</span>
                     </p>
-                    <p className="sp-secondary">
-                      <span className="text-[var(--sp-ink-350)]">Próxima cita: </span>
+                    <p className="text-[14px] leading-5 text-tinta">
+                      <span className="text-tinta2">Próxima cita: </span>
                       <span className="break-words">{form.proxima_cita.trim() || '—'}</span>
                     </p>
                   </div>
                   <button onClick={() => setModoEdicion(true)}
-                    className="sp-btn sp-btn--compact flex-shrink-0">
+                    className="k-b k-b-texto flex-none">
                     <Pencil size={15} /> Editar
                   </button>
                 </div>
@@ -1353,8 +1348,8 @@ export default function NuevaNotaPage() {
           </div>
         )}
         {estadoModal === 'contexto' && (
-          <div className="p-4 md:p-6 space-y-3">
-            <p className="sp-secondary">
+          <div className="space-y-3 px-6 pb-6 pt-1 ext:px-4">
+            <p className="text-[14px] leading-5 text-tinta2">
               Corrige o amplía el contexto; la nota se generará de nuevo.
             </p>
             {/* resize-y se cae: .sp-textarea ya trae resize: vertical. */}
@@ -1362,61 +1357,45 @@ export default function NuevaNotaPage() {
               value={form.motivo_consulta}
               onChange={e => update('motivo_consulta', e.target.value)}
               rows={10}
-              className="sp-textarea" />
-            <p className="sp-hint">
+              aria-label="Contexto de la nota"
+              lang="es"
+              className="k-campo text-[16px] leading-6 [hyphens:auto] [text-align:justify]" />
+            <p className="text-[13px] leading-[18px] text-tinta2">
               Tu nota actual se conserva hasta que la nueva esté lista.
             </p>
           </div>
         )}
         {estadoModal === 'confirmacion' && (
-          <>
-            <div className="px-4 md:px-6 pt-6 pb-4 text-center">
-              {/* El sistema no expone variante de peligro para .sp-icobox: la
-                  geometría es --lg y el color va inline sobre tokens danger. */}
-              <div className="sp-icobox sp-icobox--lg mx-auto mb-4"
-                style={{ background: 'var(--sp-danger-bg)', color: 'var(--sp-danger)', animation: 'pulse 1.5s ease-in-out infinite' }}>
-                <Save />
-              </div>
-              {/* --sp-fs-confirm existe como token pero ninguna .sp-* lo consume;
-                  la arbitraria lo referencia en vez de duplicar el literal. */}
-              <h3 className="sp-title-state text-[length:var(--sp-fs-confirm)]">
-                <span className="inline-block animate-alert-glow">
-                  ¿Guardar esta nota?
-                </span>
-              </h3>
-              <p className="sp-body text-[length:var(--sp-fs-body-lg)] mt-3">
-                Una vez guardada, <span className="font-bold text-[var(--sp-danger-strong)]">no podrá modificarse</span> por motivos de seguridad y cumplimiento normativo.
-                Si necesitas hacer correcciones después, podrás agregar una nota aclaratoria (addendum).
+          <div className="space-y-2">
+            <p>
+              Una vez guardada, <strong>no podrá modificarse</strong> por motivos de seguridad y cumplimiento normativo.
+              Si necesitas hacer correcciones después, podrás agregar una nota aclaratoria (addendum).
+            </p>
+            {sinVitalesCapturados && (
+              <p className="flex items-center justify-center gap-1.5 font-semibold text-[var(--aviso-tinta)] [text-align-last:auto]">
+                <AlertTriangle size={16} aria-hidden="true" className="flex-none" />
+                No capturaste signos vitales en esta nota.
               </p>
-              {sinVitalesCapturados && (
-                <p className="sp-banner sp-banner--warn mt-3">
-                  ⚠ No capturaste signos vitales en esta nota.
-                </p>
-              )}
-            </div>
-            {errorModal && (
-              <div className="sp-banner sp-banner--danger mx-5 mb-5">
-                {errorModal}
-              </div>
             )}
-          </>
+            {errorModal && (
+              <p role="alert" className="font-semibold text-[var(--mal-tinta)]">
+                {errorModal}
+              </p>
+            )}
+          </div>
         )}
         {estadoModal === 'exito' && (
-          <div className="px-4 md:px-6 pt-8 pb-6 flex flex-col items-center text-center gap-4">
-            <div className="sp-medal">
-              {/* Check (1 path, ≈22.6u) y NO CheckCircle2: ese renderiza DOS
-                  paths y el arco de ~52u queda partido para siempre bajo el
-                  stroke-dasharray:32 con que .sp-medal__core dibuja el trazo. */}
-              <div className="sp-medal__core"><Check /></div>
-            </div>
-            <h3 className="sp-title-state">Nota guardada</h3>
-            <p className="sp-body max-w-xs">
-              Quedó sellada en el expediente.
-            </p>
+          /* «Nota guardada» con la pieza de la alerta del catálogo: palomita en
+             círculo tonal que entra con el resorte (`.sp-nota-entra`), sin la
+             medalla que estallaba ni el trazo dibujado. */
+          <div className="k-al pt-2">
+            <span className="k-al-i" aria-hidden="true"><Check /></span>
+            <h3 className="k-al-tit">Nota guardada</h3>
+            <p className="k-al-t">Quedó sellada en el expediente.</p>
             {errorModal && (
-              <div className="sp-banner sp-banner--danger w-full mt-1">
+              <p role="alert" className="k-al-t font-semibold text-[var(--mal-tinta)]">
                 {errorModal}
-              </div>
+              </p>
             )}
           </div>
         )}
@@ -1475,8 +1454,8 @@ export default function NuevaNotaPage() {
 
           {/* Banner borrador restaurado */}
           {borradorRestaurado && (
-            <div className="sp-banner sp-banner--warn">
-              <RotateCcw />
+            <div role="status" className="sp-nota-entra flex items-center gap-2 rounded-[var(--r-control)] bg-[var(--aviso-fondo)] py-1 pl-3 pr-1 text-[14px] leading-5 text-[var(--aviso-tinta)]">
+              <RotateCcw size={16} aria-hidden="true" className="flex-none" />
               <p className="flex-1">Borrador restaurado — continúa donde lo dejaste</p>
               <button
                 onClick={() => {
@@ -1489,82 +1468,64 @@ export default function NuevaNotaPage() {
                   secureStorage.remove(draftKey)
                   setBorradorRestaurado(false)
                 }}
-                className="sp-btn sp-btn--compact"
+                className="k-b k-b-texto"
               >
                 Descartar
               </button>
             </div>
           )}
 
-          {/* Signos vitales — visible en ambos modos (IA y manual) */}
-          <SignosVitalesCard
-            value={signosVitales}
-            onChange={setSignosVitales}
-            errores={erroresVitales}
-          />
-
-          {/* Formulario de la consulta.
-              La banda gris muere: el título vive dentro del padding uniforme de
-              .sp-card--hero (--sp-line-capture y --sp-pad-card-hero están
-              declarados en C0 como "de la Card Captura"). overflow-hidden se cae
-              con la banda — ya no hay fondo que recortar, y así no puede
-              recortar los halos de foco. */}
-          <div className="sp-card sp-card--hero">
-            <div className="flex items-start justify-between gap-3 mb-4">
-              <div>
-                <h2 className="sp-title-card">Cuéntame la consulta</h2>
-                {modoNota === 'ia' ? (
-                  /* Texto corrido (no flex): en ext partía en tres columnas. */
-                  <p className="sp-hint mt-0.5">
-                    Describe el caso y{' '}
-                    <span className="font-semibold text-[var(--sp-primary-text)]">Spinus</span> redactará la nota médica
-                  </p>
-                ) : (
-                  <p className="sp-hint mt-0.5 flex items-center gap-1">
-                    <PenLine size={11} />
-                    Redacta la nota clínica directamente — sin IA
-                  </p>
-                )}
-              </div>
-              {ultimoGuardado && !notaSaved && (
-                /* C0 no expone badge de éxito; color inline sobre tokens success. */
-                <span className="sp-badge" style={{ background: 'var(--sp-success-bg)', color: 'var(--sp-success)' }}>
-                  <CheckCircle2 />
-                  Borrador guardado
-                </span>
+          {/* Tarjeta de captura (maqueta `final-nota`, vistas 1 y 37): arriba la
+              fila plegada de signos vitales, en ambos modos; debajo, el dictado
+              sin caja (IA) o los campos SOAP (manual); al pie, «Borrador
+              guardado». El título y la ayuda siguen para el lector de pantalla:
+              la maqueta los quita de la vista, no de la página. */}
+          <div className="k-tarjeta">
+            <SignosVitalesCard
+              value={signosVitales}
+              onChange={setSignosVitales}
+              errores={erroresVitales}
+            />
+            <div className="sr-only">
+              <h2>Cuéntame la consulta</h2>
+              {modoNota === 'ia' ? (
+                <p id="nn-ayuda-dictado">
+                  Describe el caso y Spinus redactará la nota médica. Escribe en lenguaje natural. No necesitas separar por secciones — Spinus lo hace por ti.
+                </p>
+              ) : (
+                <p>Redacta la nota clínica directamente — sin IA</p>
               )}
             </div>
 
             {modoNota === 'ia' ? (
-              /* ── Modo IA: input único — el médico redacta el caso completo ── */
-              <div>
-                <label className="sp-label-field block mb-1.5">
-                  Descripción del caso <span className="text-[var(--sp-danger)]">*</span>
+              /* ── Modo IA: input único — el médico redacta el caso completo ──
+                 Sin caja: el campo es la tarjeta (CALMA §5). 17/26 justificado
+                 con guiones, como se leerá la nota. */
+              <div className="relative pt-3">
+                <label htmlFor="nn-dictado" className="sr-only">
+                  Descripción del caso (obligatorio)
                 </label>
-                <div className="relative">
-                  <textarea
-                    value={form.motivo_consulta}
-                    onChange={e => update('motivo_consulta', e.target.value)}
-                    disabled={generando}
-                    placeholder="Ej.: Paciente con dolor lumbar de 2 semanas tras cargar peso, sin irradiación, Lasègue negativo, fuerza y reflejos normales. Indico naproxeno 500 mg cada 12 h por 7 días, ejercicios de McKenzie, cita en 2 semanas."
-                    rows={10}
-                    className="sp-textarea sp-textarea--capture"
-                  />
-                  {/* Los 54px de padding inferior de --capture reservan esta
-                      franja; el badge ocupa de 12px a 33px desde el fondo. */}
-                  <button
-                    type="button"
-                    disabled
-                    title="Dictado por voz — próximamente"
-                    aria-label="Dictado por voz — próximamente"
-                    className="sp-badge sp-badge--deferred absolute bottom-3 right-3 cursor-not-allowed"
-                  >
-                    <Mic />
-                  </button>
-                </div>
-                <p className="sp-hint mt-2">
-                  Escribe en lenguaje natural. No necesitas separar por secciones — Spinus lo hace por ti.
-                </p>
+                <textarea
+                  id="nn-dictado"
+                  lang="es"
+                  aria-describedby="nn-ayuda-dictado"
+                  value={form.motivo_consulta}
+                  onChange={e => update('motivo_consulta', e.target.value)}
+                  disabled={generando}
+                  placeholder="Ej.: Paciente con dolor lumbar de 2 semanas tras cargar peso, sin irradiación, Lasègue negativo, fuerza y reflejos normales. Indico naproxeno 500 mg cada 12 h por 7 días, ejercicios de McKenzie, cita en 2 semanas."
+                  rows={10}
+                  className="k-campo-sin-caja block min-h-[260px] w-full resize-none border-0 bg-transparent p-0 pb-12 text-[17px] leading-[26px] text-tinta outline-none [hyphens:auto] [text-align:justify] placeholder:text-tinta3 focus-visible:outline-none disabled:text-tinta2 esc:min-h-[380px]"
+                />
+                {/* Dictado por voz: aún no existe; el botón lo anuncia. */}
+                <button
+                  type="button"
+                  disabled
+                  title="Dictado por voz — próximamente"
+                  aria-label="Dictado por voz — próximamente"
+                  className="k-b k-b-icono absolute bottom-0 right-0 cursor-not-allowed opacity-45"
+                >
+                  <Mic aria-hidden="true" />
+                </button>
               </div>
             ) : (
               /* ── Modo manual: rejilla SOAP (C4) ──
@@ -1576,7 +1537,7 @@ export default function NuevaNotaPage() {
                  lo fija el ancho intrínseco del textarea (~200px, cols=20 por
                  defecto) y la rejilla desborda por debajo de ~1150px de
                  viewport, donde la columna 3/5 deja ~180px por celda. */
-              <div className="space-y-4">
+              <div className="space-y-4 pt-4">
 
                 {/* Fila 1 — los dos pilares NOM: qué refiere y qué se halló */}
                 <div className="sp-grid-2 sp-grid-2--soap">
@@ -1584,8 +1545,8 @@ export default function NuevaNotaPage() {
                       pareja no, el textarea absorbe la diferencia y la fila
                       queda a ras. Los min-h siguen siendo el piso. */}
                   <div className="min-w-0 flex flex-col">
-                    <label className="sp-label-field block mb-1.5">
-                      Motivo de consulta / Subjetivo <span className="text-[var(--sp-danger)]">*</span>
+                    <label className="k-etiqueta mb-1">
+                      Motivo de consulta / Subjetivo <span aria-hidden="true" className="text-[var(--mal-tinta)]">*</span>
                     </label>
                     {/* 78px: spec de la rejilla, sin equivalente en C0. Gana al
                         min-height:88px de .sp-textarea porque las utilidades de
@@ -1593,15 +1554,15 @@ export default function NuevaNotaPage() {
                         (@layer components). Los rows= se caen: manda el min-h. */}
                     <textarea value={form.motivo_consulta} onChange={e => update('motivo_consulta', e.target.value)}
                       placeholder="Ej: Paciente refiere cuadro de 3 días de evolución con dolor en región lumbar derecha irradiado a miembro inferior..."
-                      className="sp-textarea min-h-[78px] flex-1" />
+                      className="k-campo min-h-[104px] flex-1 [hyphens:auto]" lang="es" />
                   </div>
                   <div className="min-w-0 flex flex-col">
-                    <label className="sp-label-field block mb-1.5">
-                      Exploración física / Objetivo <span className="text-[var(--sp-danger)]">*</span>
+                    <label className="k-etiqueta mb-1">
+                      Exploración física / Objetivo <span aria-hidden="true" className="text-[var(--mal-tinta)]">*</span>
                     </label>
                     <textarea value={form.exploracion_fisica} onChange={e => update('exploracion_fisica', e.target.value)}
                       placeholder="Ej: TA 120/80 mmHg, FC 72 lpm, FR 16 rpm, T° 36.5°C. Paciente consciente, orientado, cooperador. Abdomen blando, no doloroso a la palpación..."
-                      className="sp-textarea min-h-[78px] flex-1" />
+                      className="k-campo min-h-[104px] flex-1 [hyphens:auto]" lang="es" />
                   </div>
                 </div>
 
@@ -1609,21 +1570,21 @@ export default function NuevaNotaPage() {
                     media rejilla, y así no descuadra la simetría de la fila 1.
                     Sin flex: no tiene pareja con la que alinearse. */}
                 <div>
-                  <label className="sp-label-field block mb-1.5">
+                  <label className="k-etiqueta mb-1">
                     Auxiliares diagnósticos
                   </label>
                   {/* Sin "(opcional)": la ausencia del asterisco lo señala (C2) */}
                   <textarea value={form.gabinete_laboratorios} onChange={e => update('gabinete_laboratorios', e.target.value)}
                     placeholder="Ej: BH con leucocitosis leve. Rx de tórax sin infiltrados. RMN columna lumbar: hernia discal L4-L5..."
-                    className="sp-textarea min-h-[66px]" />
+                    className="k-campo min-h-[96px] [hyphens:auto]" lang="es" />
                 </div>
 
                 {/* Banda full-width — lista que crece: rompe a ancho completo.
                     DiagnosticosEditor conserva su layout y su combobox (fuera
                     del alcance de C4); no necesita nada del contenedor. */}
                 <div>
-                  <label className="sp-label-field block mb-1.5">
-                    Diagnóstico(s) CIE-10 <span className="text-[var(--sp-danger)]">*</span>
+                  <label className="k-etiqueta mb-1">
+                    Diagnóstico(s) CIE-10 <span aria-hidden="true" className="text-[var(--mal-tinta)]">*</span>
                   </label>
                   <DiagnosticosEditor
                     value={form.diagnosticos}
@@ -1634,25 +1595,30 @@ export default function NuevaNotaPage() {
                 {/* Fila 2 — el cierre del razonamiento: por qué y qué se hace */}
                 <div className="sp-grid-2 sp-grid-2--soap">
                   <div className="min-w-0 flex flex-col">
-                    <label className="sp-label-field block mb-1.5">
+                    <label className="k-etiqueta mb-1">
                       Análisis clínico
                     </label>
                     {/* 66px: spec de la rejilla, sin equivalente en C0 */}
                     <textarea value={form.analisis} onChange={e => update('analisis', e.target.value)}
                       placeholder="Razonamiento clínico: correlación clínico-radiológica, evolución, consideraciones..."
-                      className="sp-textarea min-h-[66px] flex-1" />
+                      className="k-campo min-h-[96px] flex-1 [hyphens:auto]" lang="es" />
                   </div>
                   <div className="min-w-0 flex flex-col">
-                    <label className="sp-label-field block mb-1.5">
-                      Plan de tratamiento <span className="text-[var(--sp-danger)]">*</span>
+                    <label className="k-etiqueta mb-1">
+                      Plan de tratamiento <span aria-hidden="true" className="text-[var(--mal-tinta)]">*</span>
                     </label>
                     <textarea value={form.plan_tratamiento} onChange={e => update('plan_tratamiento', e.target.value)}
                       placeholder="Ej: Reposo relativo. Fisioterapia 2 veces por semana por 6 semanas. Restricción de cargas. Control en 4 semanas. Signos de alarma: déficit neurológico progresivo..."
-                      className="sp-textarea min-h-[66px] flex-1" />
+                      className="k-campo min-h-[96px] flex-1 [hyphens:auto]" lang="es" />
                   </div>
                 </div>
 
               </div>
+            )}
+            {ultimoGuardado && !notaSaved && (
+              <p role="status" className="sp-nota-entra mt-2 text-[12px] leading-4 text-tinta3">
+                Borrador guardado
+              </p>
             )}
           </div>
 
@@ -1662,24 +1628,25 @@ export default function NuevaNotaPage() {
               {bloqueError}
               {/* Región CTA conmutable (paso 3.1): fade suave al mutar entre el
                   CTA de generación y el ancla "Nota lista". */}
-              <div key={notaGenerada ? 'ancla' : 'cta'} className="animate-fade-in">
+              <div key={notaGenerada ? 'ancla' : 'cta'} className="sp-nota-entra">
               {anclaNota ?? (
-                <>
+                /* Principal a todo el ancho en teléfono, con «Prefiero
+                   escribirla yo» debajo; en esc, los dos a la derecha (el
+                   principal al final), como la maqueta. */
+                <div className="flex flex-col items-stretch gap-1 esc:flex-row-reverse esc:items-center esc:justify-start esc:gap-4">
                   <button onClick={generarNota} disabled={generando || !form.motivo_consulta.trim()}
-                    className="sp-btn sp-btn--primary sp-btn--primary-block">
+                    className="k-b k-b-prim h-12 w-full text-[17px] esc:h-10 esc:w-auto esc:text-[15px]">
                     {generando
-                      ? <><Loader2 size={18} className="animate-spin" /> Redactando nota médica...</>
-                      : <><Sparkles size={18} /> Generar con Spinus</>
+                      ? <><Loader2 size={18} className="animate-spin" aria-hidden="true" /> Redactando nota médica...</>
+                      : 'Generar con Spinus'
                     }
                   </button>
-                  {/* w-fit: .sp-link-alt lleva border-bottom punteado; con `block`
-                      a secas el subrayado cruzaría toda la columna. */}
                   <button type="button"
                     onClick={() => { cancelarEntrevista(); setMedicamentos([{ ...MED_VACIA }]); modoTocadoRef.current = true; setModoNota('manual'); setNotaGenerada(''); setError('') }}
-                    className="sp-link-alt relative mx-auto mt-2 block w-fit after:absolute after:inset-x-0 after:-inset-y-3 after:content-['']">
+                    className="k-b k-b-texto self-center">
                     Prefiero escribirla yo
                   </button>
-                </>
+                </div>
               )}
               </div>
             </>
@@ -1691,21 +1658,19 @@ export default function NuevaNotaPage() {
               {bloqueError}
               {/* Región CTA conmutable (paso 3.1): fade suave al mutar entre el
                   CTA de previsualización y el ancla "Nota lista". */}
-              <div key={notaGenerada ? 'ancla' : 'cta'} className="animate-fade-in">
+              <div key={notaGenerada ? 'ancla' : 'cta'} className="sp-nota-entra">
               {anclaNota ?? (
-                <>
+                <div className="flex flex-col items-stretch gap-1 esc:flex-row-reverse esc:items-center esc:justify-start esc:gap-4">
                   <button onClick={previewNotaManual} disabled={!form.motivo_consulta.trim()}
-                    className="sp-btn sp-btn--primary sp-btn--primary-block">
-                    <PenLine size={18} />
+                    className="k-b k-b-prim h-12 w-full text-[17px] esc:h-10 esc:w-auto esc:text-[15px]">
                     Previsualizar nota
                   </button>
-                  {/* w-fit: ver la nota del link alterno de la vía IA. */}
                   <button type="button"
                     onClick={() => { cancelarEntrevista(); setForm(f => ({ ...f, exploracion_fisica: '', analisis: '', gabinete_laboratorios: '', plan_tratamiento: '' })); modoTocadoRef.current = true; setModoNota('ia'); setNotaGenerada(''); setError('') }}
-                    className="sp-link-alt relative mx-auto mt-2 block w-fit after:absolute after:inset-x-0 after:-inset-y-3 after:content-['']">
+                    className="k-b k-b-texto self-center">
                     Usar IA
                   </button>
-                </>
+                </div>
               )}
               </div>
             </>
@@ -1922,7 +1887,7 @@ export default function NuevaNotaPage() {
         spinusGeometry="decide"
         title="¿Concluir la consulta?"
         footer={
-          <div className="flex items-center gap-2 p-4 md:px-6">
+          <div className="flex items-center gap-2 px-6 py-4 ext:px-4">
             <button onClick={() => setConfirmarConcluir(false)} className="sp-btn sp-btn--ghost">
               Seguir llenando
             </button>

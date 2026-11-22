@@ -1,6 +1,8 @@
 'use client'
 
-import { Activity } from 'lucide-react'
+import { useState } from 'react'
+import { ChevronRight } from 'lucide-react'
+import ModalShell from '@/components/ui/ModalShell'
 import {
   evaluarEstado,
   evaluarPA,
@@ -28,20 +30,27 @@ interface SignosVitalesCardProps {
   errores?: Set<SignoVitalKey>
 }
 
-// Accent de la barra-indicador y del punto, por estado.
-// Solo el ACCENT sigue yendo por style inline: son <div>/<span> y las reglas
-// de ThemeProvider no los alcanzan. El color del VALOR se mudó a CSS (ver las
-// reglas [data-estado] abajo): ThemeProvider inyecta
-// html.dark input { color: … !important } sin capa, y una declaración
-// !important de autor gana a un style inline normal — con el color en línea,
-// en modo oscuro los seis valores salían del mismo blanco y el semáforo
-// clínico desaparecía.
-const ACCENT: Record<EstadoVital, string> = {
-  vacio: 'var(--sp-line-input)',
-  normal: 'var(--sp-vital-ok-accent)',
-  vigilar: 'var(--sp-vital-watch-accent)',
-  fuera: 'var(--sp-vital-out-accent)',
-}
+/* ═══ SIGNOS VITALES PLEGADOS (rediseño, maqueta `final-nota` vistas 1, 4, 5 y 7) ═══
+   Antes eran cinco mosaicos en una rejilla de cinco columnas: en `ext`/`tel`
+   los rótulos se abreviaban, se cortaban y chocaban con los valores. Ahora:
+     · en la tarjeta de captura, UNA fila «Signos vitales ›» con el resumen
+       («Sin capturar», o los valores en su color de semáforo y la etiqueta
+       «n fuera de rango» / «n a vigilar»);
+     · al pulsarla, una capa del catálogo (hoja en `tel`, tarjeta en el resto)
+       con una fila por signo: nombre completo, campo con área de toque propia
+       y la unidad.
+   Mismos seis campos, mismos `aria-label`, mismo semáforo y misma validación:
+   si el padre marca errores (validación dura), la capa se abre sola para que
+   el campo en rojo quede a la vista. El CSS del color del valor vive en
+   `spinus-tokens.css` §14 (dentro de `@layer components`, para ganar a la hoja
+   oscura de ThemeProvider). */
+
+const SINGLES = [
+  { key: 'fc', label: 'Frecuencia cardíaca', unit: 'lpm', aria: 'Frecuencia cardíaca', inputMode: 'numeric' },
+  { key: 'fr', label: 'Frecuencia respiratoria', unit: 'rpm', aria: 'Frecuencia respiratoria', inputMode: 'numeric' },
+  { key: 'temp', label: 'Temperatura', unit: '°C', aria: 'Temperatura', inputMode: 'decimal', step: '0.1' },
+  { key: 'spo2', label: 'SpO₂', unit: '%', aria: 'Saturación de oxígeno', inputMode: 'numeric' },
+] as const
 
 const ESTADO_LABEL: Record<EstadoVital, string> = {
   vacio: 'Sin capturar',
@@ -49,28 +58,6 @@ const ESTADO_LABEL: Record<EstadoVital, string> = {
   vigilar: 'A vigilar',
   fuera: 'Fuera de rango',
 }
-
-/** `label` se usa en md+; `short` (etiqueta corta con la unidad integrada) en <768px.
- *
- * ⚠️ LOS TRES PRIMEROS `label` SON ABREVIATURAS Y NO CABEN DE OTRA FORMA. Eran
- * «FREC. CARDÍACA», «FREC. RESP.» y «TEMPERATURA», y `.sv-label` lleva
- * `text-overflow: ellipsis`: en la rejilla de cinco columnas se leían
- * «FREC. CAR…» y «TEMPERA…», que informan menos que la abreviatura entera. Una
- * celda de 1fr da ~76px de rótulo a 768px de ancho, y «TEMPERATURA» pide ~95.
- *
- * El nombre completo NO se pierde: viaja en `aria`, que es lo que lee un lector
- * de pantalla, y la unidad sigue debajo en `.sv-unit`. `PA` y `SpO₂` no se
- * tocan porque nunca se truncaron —la primera tiene 1.9fr y la segunda ya era
- * corta—.
- *
- * `short` se queda como está: por debajo de 768 la celda es aún más angosta y
- * esos rótulos ya venían resueltos para ese ancho, con la unidad integrada. */
-const SINGLES = [
-  { key: 'fc', label: 'FC', short: 'FC · lpm', unit: 'lpm', aria: 'Frecuencia cardíaca', inputMode: 'numeric' },
-  { key: 'fr', label: 'FR', short: 'FR · rpm', unit: 'rpm', aria: 'Frecuencia respiratoria', inputMode: 'numeric' },
-  { key: 'temp', label: 'Temp.', short: 'T · °C', unit: '°C', aria: 'Temperatura', inputMode: 'decimal', step: '0.1' },
-  { key: 'spo2', label: 'SpO₂', short: 'SpO₂ · %', unit: '%', aria: 'Saturación de oxígeno', inputMode: 'numeric' },
-] as const
 
 function parseNum(s: string | undefined): number | undefined {
   if (s == null) return undefined
@@ -80,213 +67,178 @@ function parseNum(s: string | undefined): number | undefined {
   return Number.isFinite(n) ? n : undefined
 }
 
-const CSS = `
-.sv-card * { box-sizing: border-box; }
-.sv-card .sv-header { display:flex; align-items:center; gap:10px; padding:10px 18px; border-bottom:1px solid var(--sp-line-divider); }
-.sv-card .sv-chip { width:26px; height:26px; border-radius:8px; background:var(--sp-success-bg-alt); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
-.sv-card .sv-titles { display:flex; align-items:baseline; gap:6px; min-width:0; flex-wrap:wrap; }
-.sv-card .sv-title { font-size:15px; font-weight:800; color:var(--sp-ink-800); line-height:1.1; }
-.sv-card .sv-sub { font-size:12px; color:var(--sp-ink-300); }
-.sv-card .sv-badge { margin-left:auto; border-radius:20px; font-size:12px; font-weight:700; padding:6px 13px; white-space:nowrap; flex-shrink:0; }
-.sv-card .sv-grid { display:grid; grid-template-columns:1.9fr 1fr 1fr 1fr 1fr; gap:12px; padding:12px 18px; }
-.sv-card .sv-tile { position:relative; background:var(--sp-surface-sunken); border:1px solid var(--sp-line-soft); border-radius:14px; overflow:hidden; min-width:0; }
-.sv-card .sv-tile--error { box-shadow: inset 0 0 0 1px var(--sp-vital-out-accent); border-color:var(--sp-vital-out-accent); }
-.sv-card .sv-bar { height:3px; width:100%; }
-.sv-card .sv-body { display:block; cursor:text; padding:7px 13px 9px; }
-.sv-card .sv-label-row { display:flex; align-items:center; gap:5px; margin-bottom:3px; }
-.sv-card .sv-dot { width:9px; height:9px; border-radius:9999px; flex-shrink:0; }
-.sv-card .sv-label { font-size:12px; font-weight:700; letter-spacing:.04em; color:var(--sp-ink-400); text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.sv-card .sv-label--sm { display:none; }
-.sv-card .sv-value-row { display:flex; align-items:baseline; gap:4px; }
-.sv-card .sv-sep { font-size:22px; font-weight:700; color:var(--sp-ink-100); }
-.sv-card .sv-unit { font-size:12px; font-weight:600; color:var(--sp-ink-300); }
-.sv-card .sv-input { border:none; outline:none; background:transparent; font-weight:800; font-size:19px; padding:0; max-width:100%; -moz-appearance:textfield; }
-.sv-card .sv-input[data-k="ta_sistolica"] { width:34px; }
-.sv-card .sv-input[data-k="ta_diastolica"] { width:30px; }
-.sv-card .sv-input[data-k="fc"] { width:46px; }
-.sv-card .sv-input[data-k="fr"] { width:42px; }
-.sv-card .sv-input[data-k="temp"] { width:52px; }
-.sv-card .sv-input[data-k="spo2"] { width:46px; }
-.sv-card .sv-input::-webkit-outer-spin-button,
-.sv-card .sv-input::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
-/* ThemeProvider inyecta html.dark input {…!important} SIN capa, con
-   especificidad (0,2,2), y pisaría el fondo transparente, el placeholder y el
-   color del semáforo. Para ganarle basta subir la nuestra: [data-k] y
-   [data-estado] la llevan a (0,3,0) y ambas son !important de autor sin capa,
-   así que decide la especificidad — nada de trucos de orden de capas. */
-.sv-card .sv-input[data-k] { background:transparent !important; }
-.sv-card .sv-input[data-k]::placeholder { color:var(--sp-ink-200) !important; font-weight:800; }
-.sv-card .sv-input[data-estado="vacio"]   { color:var(--sp-ink-350)     !important; }
-.sv-card .sv-input[data-estado="normal"]  { color:var(--sp-vital-ok)    !important; }
-.sv-card .sv-input[data-estado="vigilar"] { color:var(--sp-vital-watch) !important; }
-.sv-card .sv-input[data-estado="fuera"]   { color:var(--sp-vital-out)   !important; }
-@media (max-width:767px) {
-  .sv-card { flex-shrink:0; }
-  .sv-card .sv-grid { grid-template-columns:1.45fr 1fr 1fr 1fr 1fr; gap:0; padding:0; }
-  .sv-card .sv-tile { background:transparent; border:none; border-right:1px solid var(--sp-line-divider); border-radius:0; }
-  .sv-card .sv-tile:last-child { border-right:none; }
-  .sv-card .sv-body { padding:8px 4px 10px; min-height:44px; }
-  .sv-card .sv-dot { display:none; }
-  /* etiqueta corta con unidad integrada arriba; abajo solo el valor */
-  .sv-card .sv-label-row { justify-content:center; gap:0; margin-bottom:2px; }
-  .sv-card .sv-label { font-size:12px; letter-spacing:.02em; text-align:center; }
-  .sv-card .sv-label--lg { display:none; }
-  .sv-card .sv-label--sm { display:inline; }
-  .sv-card .sv-unit { display:none; }
-  /* glifos centrados: el ancho fijo en px desbordaba la celda angosta */
-  .sv-card .sv-value-row { justify-content:center; gap:2px; }
-  .sv-card .sv-input { font-size:15px; text-align:center; }
-  .sv-card .sv-input[data-k] { width:100%; }
-  .sv-card .sv-input[data-k="ta_sistolica"],
-  .sv-card .sv-input[data-k="ta_diastolica"] { width:2.6em; }
-  .sv-card .sv-sep { font-size:16px; }
+interface Estados { pa: EstadoVital; singles: Record<(typeof SINGLES)[number]['key'], EstadoVital> }
+
+function calcularEstados(value: SignosVitalesForm): Estados {
+  return {
+    pa: evaluarPA(parseNum(value.ta_sistolica), parseNum(value.ta_diastolica)),
+    singles: {
+      fc: evaluarEstado('fc', parseNum(value.fc)),
+      fr: evaluarEstado('fr', parseNum(value.fr)),
+      temp: evaluarEstado('temp', parseNum(value.temp)),
+      spo2: evaluarEstado('spo2', parseNum(value.spo2)),
+    },
+  }
 }
-`
+
+/** Etiqueta de la fila: «n fuera de rango», «n a vigilar», o nada si todo va en rango. */
+function Etiqueta({ estados, conErrores }: { estados: Estados; conErrores: boolean }) {
+  const todos = [estados.pa, ...Object.values(estados.singles)]
+  const fuera = todos.filter(e => e === 'fuera').length
+  const vigilar = todos.filter(e => e === 'vigilar').length
+  const capturados = todos.filter(e => e !== 'vacio').length
+  let texto = ''
+  let clase = 'k-etq'
+  if (fuera > 0) { texto = `${fuera} fuera de rango`; clase += ' k-etq-mal' }
+  else if (conErrores) { texto = 'Revisar'; clase += ' k-etq-mal' }
+  else if (vigilar > 0) { texto = `${vigilar} a vigilar`; clase += ' k-etq-aviso' }
+  return (
+    <>
+      {texto && <span className={clase}>{texto}</span>}
+      {/* El resumen de antes («Todo en rango») sigue para el lector de pantalla. */}
+      <span className="sr-only" aria-live="polite">
+        {texto || (capturados > 0 ? 'Todo en rango' : '')}
+      </span>
+    </>
+  )
+}
+
+/** Un valor del resumen, en su color de semáforo. */
+function Valor({ v, estado }: { v: string; estado: EstadoVital }) {
+  return <b className="sv-val k-num" data-estado={estado}>{v}</b>
+}
+
+function Resumen({ value, estados }: { value: SignosVitalesForm; estados: Estados }) {
+  const partes: React.ReactNode[] = []
+  const sys = value.ta_sistolica?.trim()
+  const dia = value.ta_diastolica?.trim()
+  if (sys || dia) {
+    partes.push(
+      <span key="pa" className="whitespace-nowrap">
+        <Valor v={sys || '—'} estado={estados.pa} />/<Valor v={dia || '—'} estado={estados.pa} />
+      </span>,
+    )
+  }
+  for (const cfg of SINGLES) {
+    const v = value[cfg.key]?.trim()
+    if (!v) continue
+    partes.push(
+      <span key={cfg.key} className="whitespace-nowrap">
+        <Valor v={v} estado={estados.singles[cfg.key]} /> {cfg.unit}
+      </span>,
+    )
+  }
+  if (partes.length === 0) return <>Sin capturar</>
+  return <>{partes.flatMap((p, i) => (i === 0 ? [p] : [' · ', p]))}</>
+}
+
+interface FilaProps {
+  etiqueta: string
+  unidad: string
+  estado: EstadoVital
+  children: React.ReactNode
+}
+
+/** Una fila de la capa: nombre (y su estado, si no es normal), campo(s) y unidad. */
+function Fila({ etiqueta, unidad, estado, children }: FilaProps) {
+  const aviso = estado === 'fuera' || estado === 'vigilar'
+  return (
+    <div className="flex min-h-[56px] items-center gap-3 py-1.5 ih:min-h-[52px] esc:min-h-[52px]">
+      <div className="min-w-0 flex-1">
+        <p className="text-[15px] leading-5 text-tinta">{etiqueta}</p>
+        {aviso && (
+          <p className="sv-val text-[12px] font-semibold leading-4" data-estado={estado}>{ESTADO_LABEL[estado]}</p>
+        )}
+      </div>
+      <div className="flex flex-none items-center gap-1.5">{children}</div>
+      <span className="w-10 flex-none text-[13px] leading-[18px] text-tinta2">{unidad}</span>
+    </div>
+  )
+}
+
+interface CampoProps {
+  k: SignoVitalKey
+  aria: string
+  estado: EstadoVital
+  valor: string | undefined
+  error: boolean
+  inputMode: 'numeric' | 'decimal'
+  step?: string
+  autoFocus?: boolean
+  onChange: (v: string) => void
+}
+
+function Campo({ k, aria, estado, valor, error, inputMode, step, autoFocus, onChange }: CampoProps) {
+  return (
+    <input
+      className="k-campo sv-in k-num w-[68px] px-2 text-center font-semibold"
+      data-k={k}
+      data-estado={estado}
+      type="number"
+      inputMode={inputMode}
+      step={step}
+      aria-label={aria}
+      aria-invalid={error || undefined}
+      autoFocus={autoFocus}
+      placeholder="—"
+      value={valor ?? ''}
+      onChange={(e) => onChange(e.target.value)}
+    />
+  )
+}
 
 export default function SignosVitalesCard({ value, onChange, errores }: SignosVitalesCardProps) {
   const err = errores ?? new Set<SignoVitalKey>()
+  const [abierto, setAbierto] = useState(false)
   const setField = (field: keyof SignosVitalesForm, val: string) => onChange({ ...value, [field]: val })
+  const estados = calcularEstados(value)
 
-  const sys = parseNum(value.ta_sistolica)
-  const dia = parseNum(value.ta_diastolica)
-  const estadoPA = evaluarPA(sys, dia)
-
-  const singles = SINGLES.map((cfg) => ({
-    cfg,
-    estado: evaluarEstado(cfg.key, parseNum(value[cfg.key])),
-  }))
-
-  const todos: EstadoVital[] = [estadoPA, ...singles.map((s) => s.estado)]
-  const fueraCount = todos.filter((e) => e === 'fuera').length
-  const vigilarCount = todos.filter((e) => e === 'vigilar').length
-
-  let badgeText: string
-  let badgeStyle: { color: string; background: string }
-  if (fueraCount > 0) {
-    badgeText = `${fueraCount} fuera de rango`
-    badgeStyle = { color: 'var(--sp-vital-out)', background: 'var(--sp-danger-bg)' }
-  } else if (vigilarCount > 0) {
-    badgeText = `${vigilarCount} a vigilar`
-    badgeStyle = { color: 'var(--sp-vital-watch)', background: 'var(--sp-warn-bg)' }
-  } else {
-    badgeText = 'Todo en rango'
-    badgeStyle = { color: 'var(--sp-vital-ok)', background: 'var(--sp-success-bg)' }
+  // Validación dura fallida: el campo en rojo tiene que quedar a la vista. Se
+  // ajusta DURANTE el render al cambiar la prop (patrón de React), no en un efecto.
+  const [erroresPrevios, setErroresPrevios] = useState(errores)
+  if (erroresPrevios !== errores) {
+    setErroresPrevios(errores)
+    if (errores && errores.size > 0) setAbierto(true)
   }
 
-  const paError = err.has('ta_sistolica') || err.has('ta_diastolica')
-
   return (
-    <div
-      className="sv-card"
-      style={{
-        background: 'var(--sp-surface)',
-        border: '1px solid var(--sp-line-card)',
-        borderRadius: 16,
-        // Sombra literal a propósito: C0 no tiene token de dos capas, y en
-        // oscuro una sombra azul al 35% sobre #121212 es invisible — no hay
-        // defecto que corregir, y tokenizarla cambiaría el modo claro.
-        boxShadow: '0 1px 2px rgba(16,42,67,.04), 0 12px 30px -22px rgba(16,42,67,.35)',
-        overflow: 'hidden',
-      }}
-    >
-      <style>{CSS}</style>
+    <div className="sv-fila border-b border-[var(--linea)] pb-2">
+      <button
+        type="button"
+        onClick={() => setAbierto(true)}
+        aria-haspopup="dialog"
+        className="k-pulsable flex min-h-[44px] w-full items-center gap-2 py-1 text-left"
+      >
+        <span className="flex min-w-0 flex-1 flex-col gap-0.5 esc:flex-row esc:items-center esc:gap-3">
+          <span className="flex flex-wrap items-center gap-2">
+            <span className="text-[15px] leading-5 text-tinta">Signos vitales</span>
+            <Etiqueta estados={estados} conErrores={err.size > 0} />
+          </span>
+          <span className="text-[13px] leading-[18px] text-tinta2 esc:ml-auto esc:text-right">
+            <Resumen value={value} estados={estados} />
+          </span>
+        </span>
+        <ChevronRight size={16} aria-hidden="true" className="flex-none text-tinta3" />
+      </button>
 
-      <div className="sv-header">
-        <span className="sv-chip">
-          <Activity size={16} stroke="var(--sp-vital-ok)" />
-        </span>
-        <span className="sv-titles">
-          <span className="sv-title">Signos vitales</span>
-          <span className="sv-sub">· alerta valores fuera de rango</span>
-        </span>
-        <span className="sv-badge" style={badgeStyle} aria-live="polite">
-          {badgeText}
-        </span>
-      </div>
-
-      <div className="sv-grid">
-        {/* Presión arterial (tile combinado sys/dia) */}
-        <div className={`sv-tile${paError ? ' sv-tile--error' : ''}`}>
-          <div className="sv-bar" style={{ background: ACCENT[estadoPA] }} />
-          <label className="sv-body">
-            <div className="sv-label-row">
-              <span
-                className="sv-dot"
-                style={{ background: ACCENT[estadoPA] }}
-                role="img"
-                aria-label={ESTADO_LABEL[estadoPA]}
-                title={ESTADO_LABEL[estadoPA]}
-              />
-              <span className="sv-label sv-label--lg">Presión arterial</span>
-              <span className="sv-label sv-label--sm">PA · mmHg</span>
-            </div>
-            <div className="sv-value-row">
-              <input
-                className="sv-input"
-                data-k="ta_sistolica"
-                data-estado={estadoPA}
-                type="number"
-                inputMode="numeric"
-                aria-label="Presión arterial sistólica"
-                placeholder="—"
-                value={value.ta_sistolica ?? ''}
-                onChange={(e) => setField('ta_sistolica', e.target.value)}
-              />
-              <span className="sv-sep">/</span>
-              <input
-                className="sv-input"
-                data-k="ta_diastolica"
-                data-estado={estadoPA}
-                type="number"
-                inputMode="numeric"
-                aria-label="Presión arterial diastólica"
-                placeholder="—"
-                value={value.ta_diastolica ?? ''}
-                onChange={(e) => setField('ta_diastolica', e.target.value)}
-              />
-              <span className="sv-unit">mmHg</span>
-            </div>
-          </label>
+      <ModalShell open={abierto} onClose={() => setAbierto(false)} title="Signos vitales" maxWidth="md:max-w-[440px]">
+        <div className="sv-hoja k-lista px-5 pb-5 tel:pb-[calc(var(--ib)+12px)] ext:px-4">
+          <Fila etiqueta="Presión arterial" unidad="mmHg" estado={estados.pa}>
+            <Campo k="ta_sistolica" aria="Presión arterial sistólica" estado={estados.pa} valor={value.ta_sistolica}
+              error={err.has('ta_sistolica')} inputMode="numeric" autoFocus onChange={v => setField('ta_sistolica', v)} />
+            <span aria-hidden="true" className="text-tinta3">/</span>
+            <Campo k="ta_diastolica" aria="Presión arterial diastólica" estado={estados.pa} valor={value.ta_diastolica}
+              error={err.has('ta_diastolica')} inputMode="numeric" onChange={v => setField('ta_diastolica', v)} />
+          </Fila>
+          {SINGLES.map(cfg => (
+            <Fila key={cfg.key} etiqueta={cfg.label} unidad={cfg.unit} estado={estados.singles[cfg.key]}>
+              <Campo k={cfg.key} aria={cfg.aria} estado={estados.singles[cfg.key]} valor={value[cfg.key]}
+                error={err.has(cfg.key)} inputMode={cfg.inputMode} step={'step' in cfg ? cfg.step : undefined}
+                onChange={v => setField(cfg.key, v)} />
+            </Fila>
+          ))}
         </div>
-
-        {/* Resto de signos (un input cada uno) */}
-        {singles.map(({ cfg, estado }) => {
-          const tileError = err.has(cfg.key)
-          return (
-            <div key={cfg.key} className={`sv-tile${tileError ? ' sv-tile--error' : ''}`}>
-              <div className="sv-bar" style={{ background: ACCENT[estado] }} />
-              <label className="sv-body">
-                <div className="sv-label-row">
-                  <span
-                    className="sv-dot"
-                    style={{ background: ACCENT[estado] }}
-                    role="img"
-                    aria-label={ESTADO_LABEL[estado]}
-                    title={ESTADO_LABEL[estado]}
-                  />
-                  <span className="sv-label sv-label--lg">{cfg.label}</span>
-                  <span className="sv-label sv-label--sm">{cfg.short}</span>
-                </div>
-                <div className="sv-value-row">
-                  <input
-                    className="sv-input"
-                    data-k={cfg.key}
-                    data-estado={estado}
-                    type="number"
-                    inputMode={cfg.inputMode}
-                    step={'step' in cfg ? cfg.step : undefined}
-                    aria-label={cfg.aria}
-                    placeholder="—"
-                    value={value[cfg.key] ?? ''}
-                    onChange={(e) => setField(cfg.key, e.target.value)}
-                  />
-                  <span className="sv-unit">{cfg.unit}</span>
-                </div>
-              </label>
-            </div>
-          )
-        })}
-      </div>
+      </ModalShell>
     </div>
   )
 }
