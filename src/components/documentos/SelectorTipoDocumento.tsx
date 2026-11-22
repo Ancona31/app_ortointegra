@@ -3,7 +3,7 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import {
   Pill, FlaskConical, ScanLine, ClipboardList,
-  BedDouble, PenLine, ShieldCheck, Receipt, ChevronDown, AlertTriangle,
+  BedDouble, PenLine, ShieldCheck, Receipt, AlertTriangle,
 } from 'lucide-react'
 import ModalShell from '@/components/ui/ModalShell'
 import IconoTipoDocumento from '@/components/ui/IconoTipoDocumento'
@@ -270,23 +270,25 @@ export default function SelectorTipoDocumento({ value, onChange, conDatos = fals
             ))}
           </div>
         ) : (
+          /* Cabecera del formulario (maquetas `docs-a/b/c`): el tipo con su
+             icono en cuadro y «Cambiar» tonal. Sigue siendo UN botón —el mismo
+             disparador de siempre— y «Documento» sigue en su nombre accesible.
+             El «···» lo pone el formulario (`PlantillasDocumento`), alineado
+             con esta línea por `spinus-tokens.css` §26. */
           <button
             ref={lineaRef}
             type="button"
             aria-expanded={false}
             aria-controls={idPanel}
             onClick={() => { focoRef.current = 'tarjeta'; setAnim(true); setAbierto(true) }}
-            className={`k-az-linea${anim ? ' animate-fade-in' : ''}`}
+            className={`k-az-linea sp-doc-cab${anim ? ' animate-fade-in' : ''}`}
           >
-            <IconoTipoDocumento tipo={activo.key} />
+            <IconoTipoDocumento tipo={activo.key} nivel="rejilla" />
             <span className="k-az-linea-t">
-              <span>Documento</span>
+              <span className="sr-only">Documento</span>
               <span>{activo.label}</span>
             </span>
-            <span className="k-az-cambiar">
-              Cambiar
-              <ChevronDown aria-hidden="true" />
-            </span>
+            <span className="k-az-cambiar">Cambiar</span>
           </button>
         )}
       </div>

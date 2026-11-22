@@ -198,13 +198,15 @@ function DocumentosContent() {
               documento, y con ellos se caen los cuatro colores que divergían
               de los ocho tokens (teal en escrito, amber-600 en suplementación,
               slate en honorarios). */}
+          {/* «Paso 2 · Tipo de documento», en rótulo y título como el Paso 1.
+              FUERA de `.sp-doc-host`: la cabecera del formulario (el tipo y
+              «Cambiar») tiene que ser lo primero del anfitrión, porque el «···»
+              del formulario se alinea con ella (`spinus-tokens.css` §26). */}
+          <div className="mb-2.5">
+            <p className="text-[12px] font-bold uppercase leading-4 tracking-[.4px] text-enlace">Paso 2</p>
+            <h2 className="k-t-tarjeta mt-1">Tipo de documento</h2>
+          </div>
           <div className="sp-doc-host">
-            {/* «Paso 2 · Tipo de documento», en rótulo y título como el Paso 1. El
-                margen negativo come parte del hueco de 18 de `.sp-doc-host`. */}
-            <div className="-mb-2">
-              <p className="text-[12px] font-bold uppercase leading-4 tracking-[.4px] text-enlace">Paso 2</p>
-              <h2 className="k-t-tarjeta mt-1">Tipo de documento</h2>
-            </div>
             <SelectorTipoDocumento
               value={tipo}
               onChange={t => { setFormVacio(true); setPanelPlantillas(false); setTipo(t) }}

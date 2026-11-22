@@ -2916,6 +2916,103 @@ main:has(.sp-doc-actions) { scroll-padding-bottom: 150px; }
   flex: 0 0 auto; min-width: 104px;
 }
 
+/* La cabecera del formulario (`.sp-doc-cab`) va FUERA de la capa: ver el
+   bloque «Cabecera del formulario» tras el cierre de `@layer components`. */
+.sp-doc-mas { display: none; }
+.sp-doc-host:has(> div > .sp-doc-cab) .sp-doc-mas {
+  display: inline-flex; position: absolute; z-index: 1; right: 0;
+  top: calc((var(--doc-cab) - var(--k-toque)) / 2);
+}
+
+/* ── Plantilla en una sola fila (maquetas: «Plantilla — Sin plantilla ›») ── */
+.sp-tpl-card { padding: 0 16px; }
+:where([data-formato="ih"], [data-formato="iv"], [data-formato="esc"]) .sp-tpl-card { padding: 0 20px; }
+.sp-tpl-fila { display: flex; align-items: center; gap: 12px; min-height: 52px; }
+.sp-tpl-ic { flex: none; width: 20px; height: 20px; color: var(--enlace); }
+.sp-tpl-fila-t { display: flex; flex-direction: column; flex: none; min-width: 0; }
+.sp-tpl-cuenta { font-size: 12px; line-height: 16px; color: var(--tinta2); }
+.sp-tpl-cuenta--tope { color: var(--aviso-tinta); }
+.sp-tpl-valor { position: relative; display: flex; align-items: center; flex: 1; min-width: 0; }
+.sp-tpl-select {
+  -webkit-appearance: none; appearance: none; width: 100%; min-width: 0; min-height: var(--k-toque);
+  margin: 0; padding: 0 26px 0 8px; border: 0; border-radius: 8px; background: transparent;
+  font: inherit; font-size: 15px; line-height: 20px; color: var(--tinta2);
+  text-align: right; text-align-last: right; text-overflow: ellipsis; cursor: pointer;
+}
+.sp-tpl-select:focus { outline: none; }
+.sp-tpl-select:focus-visible { outline: 3px solid var(--enlace); outline-offset: 2px; }
+.sp-tpl-select option { color: var(--tinta); background: var(--sup); }
+.sp-tpl-chev { position: absolute; right: 0; width: 18px; height: 18px; color: var(--tinta3); pointer-events: none; }
+.sp-tpl-fila > .sp-tpl-skeleton { flex: 1; min-height: 32px; border-radius: 8px; background: var(--sup2); }
+.sp-tpl-fila-err { flex: 1; margin: 8px 0; }
+.sp-tpl-empty { padding: 14px 0; }
+.sp-tpl-empty > .sp-tpl-ic { margin-top: 1px; }
+.sp-tpl-card > .sp-tpl-aviso { margin: 0 0 14px; }
+
+/* ── Barra del consentimiento con el «···» (maqueta `docs-c`, vista 8) ─────
+   «Guardar borrador» y «Guardar como plantilla» viven en el «···» de la
+   cabecera; el pie queda en «Sin firma» + «Firmar» en una fila. SÓLO cuando el
+   formulario tiene «···» (no en el búnker sin conexión, donde las plantillas no
+   se montan y el borrador sigue en el pie). */
+.sp-doc-form:has(.sp-doc-mas) .sp-doc-actions--filas > :is(.sp-doc-act-borrador, .sp-tpl-guardar) { display: none; }
+.sp-doc-form:has(.sp-doc-mas) .sp-doc-actions--filas { flex-wrap: nowrap; }
+.sp-doc-form:has(.sp-doc-mas) .sp-doc-actions--filas > .sp-doc-act-sinfirma { order: 1; flex: 0 0 auto; min-width: 0; }
+.sp-doc-form:has(.sp-doc-mas) .sp-doc-actions--filas > .sp-doc-act-firmar { order: 2; flex: 1 1 auto; min-width: 0; }
+:where([data-formato="ih"], [data-formato="iv"], [data-formato="esc"]) .sp-doc-form:has(.sp-doc-mas) .sp-doc-actions--filas { justify-content: flex-end; }
+:where([data-formato="iv"]) .sp-doc-form:has(.sp-doc-mas) .sp-doc-actions--filas { justify-content: center; }
+:where([data-formato="ih"], [data-formato="iv"], [data-formato="esc"]) .sp-doc-form:has(.sp-doc-mas) .sp-doc-actions--filas > .sp-doc-act-firmar { flex: 0 0 auto; min-width: 104px; }
+:where([data-formato="ih"], [data-formato="iv"], [data-formato="esc"]) .sp-doc-form:has(.sp-doc-mas) .sp-doc-actions--filas > .sp-btn .sp-doc-actions__long { display: inline; }
+:where([data-formato="ih"], [data-formato="iv"], [data-formato="esc"]) .sp-doc-form:has(.sp-doc-mas) .sp-doc-actions--filas > .sp-btn .sp-doc-actions__short { display: none; }
+
+/* ── Campos como filas «rótulo — valor» (maquetas `docs-a/b/c`) ────────────
+   Sólo presentación: los campos, sus nombres y su orden no cambian (alimentan
+   las ranuras del PDF). Dentro del cuerpo de una sección cada campo es una
+   fila separada por `--linea`; el control pierde su caja (la fila es la caja) y
+   el foco se marca con un filete de 2 `--enlace` bajo el valor. En `ext`/`tel`
+   el rótulo va encima; desde 520 de contenedor, a la izquierda en una columna
+   de 188 (como `ih`/`iv`/`esc`). */
+.sp-doc-cardbody :is(.sp-doc-grid, .sp-doc-studygrid) { grid-template-columns: minmax(0, 1fr); gap: 0; }
+.sp-doc-cardbody :is(.sp-doc-grid, .sp-doc-studygrid) > :is(.sp-doc-span-2, .sp-doc-span-all, [data-span]) { grid-column: 1 / -1; }
+.sp-doc-cardbody :is(.sp-doc-grid, .sp-doc-studygrid) > .sp-doc-field { gap: 2px; padding: 8px 0; }
+.sp-doc-cardbody :is(.sp-doc-grid, .sp-doc-studygrid) > * + * { border-top: 1px solid var(--linea); }
+.sp-doc-cardbody :is(.sp-doc-grid, .sp-doc-studygrid) > .sp-doc-field:first-child { padding-top: 0; }
+.sp-doc-cardbody :is(.sp-doc-grid, .sp-doc-studygrid) > .sp-doc-field:last-child { padding-bottom: 0; }
+.sp-doc-cardbody :is(.sp-doc-grid, .sp-doc-studygrid) > .sp-doc-field > :is(.sp-input, .sp-textarea),
+.sp-doc-cardbody :is(.sp-doc-grid, .sp-doc-studygrid) > .sp-doc-field > div > .sp-input {
+  min-height: 40px; padding: 8px 0; border-color: transparent; border-radius: 0; background-color: transparent;
+  font-size: 16px; line-height: 22px;
+}
+.sp-doc-cardbody :is(.sp-doc-grid, .sp-doc-studygrid) > .sp-doc-field > :is(.sp-input, .sp-textarea):focus,
+.sp-doc-cardbody :is(.sp-doc-grid, .sp-doc-studygrid) > .sp-doc-field > div > .sp-input:focus {
+  border-color: transparent; background-color: transparent; box-shadow: inset 0 -2px 0 var(--enlace);
+}
+.sp-doc-cardbody :is(.sp-doc-grid, .sp-doc-studygrid) > .sp-doc-field > :is(.sp-input, .sp-textarea).sp-doc-invalid,
+.sp-doc-cardbody :is(.sp-doc-grid, .sp-doc-studygrid) > .sp-doc-field > div > .sp-input.sp-doc-invalid {
+  border-color: transparent; box-shadow: inset 0 -2px 0 var(--mal-tinta);
+}
+.sp-doc-cardbody :is(.sp-doc-grid, .sp-doc-studygrid) > .sp-doc-field:has(.sp-doc-invalid) > .sp-label-field { color: var(--mal-tinta); }
+/* El área de texto en fila conserva su alto mínimo (88) y su asa. */
+.sp-doc-cardbody :is(.sp-doc-grid, .sp-doc-studygrid) > .sp-doc-field > textarea:is(.sp-input, .sp-textarea) { min-height: 88px; }
+@container docform (min-width: 520px) {
+  .sp-doc-cardbody :is(.sp-doc-grid, .sp-doc-studygrid) > .sp-doc-field {
+    display: grid; grid-template-columns: 188px minmax(0, 1fr); column-gap: 16px; row-gap: 2px;
+    align-items: start; padding: 4px 0;
+  }
+  .sp-doc-cardbody :is(.sp-doc-grid, .sp-doc-studygrid) > .sp-doc-field > * { grid-column: 2; }
+  .sp-doc-cardbody :is(.sp-doc-grid, .sp-doc-studygrid) > .sp-doc-field > .sp-label-field { grid-column: 1; grid-row: 1 / span 4; padding-top: 11px; }
+}
+
+/* Panel «Gestionar plantillas»: la fila es tarjeta `--sup` sin borde (§3). */
+.sp-tpl-item { border-color: transparent; background: var(--sup); border-radius: var(--r-tarjeta); }
+
+/* Oscuro: la hoja de traducción de `ThemeProvider` pinta TODO campo con
+   `--sup2` y borde con !important (sin capa). En una fila el campo no lleva
+   caja: aquí se gana con !important EN capa, que manda sobre el !important sin
+   capa. Sólo fondo y borde; el color de la tinta sigue siendo el suyo. */
+html.dark .sp-doc-cardbody :is(.sp-doc-grid, .sp-doc-studygrid) > .sp-doc-field > :is(.sp-input, .sp-textarea),
+html.dark .sp-doc-cardbody :is(.sp-doc-grid, .sp-doc-studygrid) > .sp-doc-field > div > .sp-input,
+html.dark .sp-tpl-select { background-color: transparent !important; border-color: transparent !important; }
+
 } /* fin @layer components */
 
 /* ⚠ FUERA DE @layer A PROPÓSITO — NO LO METAS DENTRO. La hoja de react-easy-crop
@@ -2929,6 +3026,50 @@ main:has(.sp-doc-actions) { scroll-padding-bottom: 150px; }
 .sp-idfoto-cropper .reactEasyCrop_CropAreaGrid::before,
 .sp-idfoto-cropper .reactEasyCrop_CropAreaGrid::after {
   border-color: rgba(255, 255, 255, 0.75);
+}
+
+/* ⚠ FUERA DE @layer A PROPÓSITO, como el bloque de arriba: `.k-az-linea` y sus
+   piezas viven SIN capa en `sistema.css` («Rejilla Tipo de documento»), y lo no
+   encapado gana a toda `@layer components` sin que cuente la especificidad.
+   Aquí, sin capa también, decide la especificidad (dos clases contra una). */
+/* ── Cabecera del formulario (parte 2 de B9; maquetas `docs-a/b/c`) ────────
+   La línea plegada de `SelectorTipoDocumento` es la cabecera: el tipo en su
+   cuadro tintado y en grande, «Cambiar» tonal a la derecha, sin tarjeta. Sigue
+   siendo un solo botón (toda la línea abre la rejilla). El «···» lo monta el
+   formulario (`PlantillasDocumento`, `BotonMas`) y se coloca aquí, a la derecha
+   de «Cambiar», respecto del anfitrión: la cabecera es SIEMPRE lo primero de
+   `.sp-doc-host` (en `/documentos` el «Paso 2» va fuera por eso). Sin cabecera
+   —rejilla abierta— el «···» no se pinta; el formulario sigue debajo. */
+.sp-doc-host { position: relative; --doc-cab: 48px; }
+.k-az-linea.sp-doc-cab {
+  min-height: var(--doc-cab); gap: 12px; border-radius: 12px; background: transparent;
+  padding: 0 calc(var(--k-toque) + 8px) 0 0;
+}
+.sp-doc-cab .k-doc-caja { width: 36px; height: 36px; border-radius: 10px; }
+.sp-doc-cab .k-az-linea-t > span:last-child { font-size: 22px; line-height: 28px; font-weight: 800; letter-spacing: -.4px; }
+:where([data-formato="ih"], [data-formato="iv"], [data-formato="esc"]) .sp-doc-cab .k-az-linea-t > span:last-child { font-size: 24px; line-height: 30px; }
+.sp-doc-cab .k-az-cambiar {
+  height: 32px; padding: 0 12px; border-radius: var(--r-pildora);
+  background: var(--tonal); color: var(--tonal-tinta); font-size: 14px; line-height: 18px;
+  transition: transform var(--dur-toque) ease-out;
+}
+.sp-doc-cab:active .k-az-cambiar { transform: scale(.97); }
+@media (hover: hover) { .sp-doc-cab:hover .k-az-cambiar { background: color-mix(in srgb, var(--tonal) 86%, var(--tonal-tinta)); } }
+@media (prefers-reduced-motion: reduce) { .sp-doc-cab:active .k-az-cambiar { transform: none; } }
+/* Estrecho (`ext`/`tel`, contenedor < 380): dos renglones, como la maqueta en
+   teléfono —«Cambiar» y «···» arriba a la derecha, el tipo con su icono
+   debajo y a todo el ancho—. En un renglón «Consentimiento» no cabía junto a
+   los dos botones y se cortaba. */
+@container docform (max-width: 379px) {
+  .k-az-linea.sp-doc-cab {
+    display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; grid-template-rows: var(--k-toque) auto;
+    grid-template-areas: ". . cambiar" "icono titulo titulo"; column-gap: 12px; row-gap: 4px; padding: 0;
+  }
+  .sp-doc-cab > .k-doc { grid-area: icono; }
+  .sp-doc-cab > .k-az-linea-t { grid-area: titulo; }
+  .sp-doc-cab > .k-az-cambiar { grid-area: cambiar; align-self: center; justify-self: end; margin-right: calc(var(--k-toque) + 4px); }
+  .sp-doc-cab .k-az-linea-t > span:last-child { white-space: normal; }
+  .sp-doc-host:has(> div > .sp-doc-cab) .sp-doc-mas { top: 0; }
 }
 
 
