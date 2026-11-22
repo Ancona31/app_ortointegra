@@ -17,7 +17,7 @@ import SeccionPlegable from '@/components/documentos/SeccionPlegable'
 import FirmadoConsentimiento, { type FirmaCapturada } from '@/components/documentos/FirmadoConsentimiento'
 import type { IdentificacionImpresa } from '@/lib/pdf/ConsentimientoInformadoPdf'
 import { huellaDocumento } from '@/lib/documentos/firmaTrazo'
-import { TEXTO_CASILLA_FOTOS } from '@/components/documentos/consentimientoEmbudo'
+import { TEXTO_CASILLA_FOTOS, camposDePlantilla, plantillaConsentimiento } from '@/components/documentos/consentimientoEmbudo'
 import { usePlantillasDocumento, type ContenidoPlantilla } from '@/components/documentos/PlantillasDocumento'
 import { createClient } from '@/lib/supabase/client'
 import { hoyEnTZ, desplazarFecha, TZ_CLINICA } from '@/lib/dates'
@@ -471,13 +471,14 @@ export default function ConsentimientoInformadoForm({
   // dijo. Ese es el motivo entero, y no se ha movido: si alguna vez se propone
   // meterlas «para que la plantilla quede completa», esta es la respuesta.
   //
-  // LOS DOS TESTIGOS SÍ ENTRAN, y ahí sí cambió el criterio. No son una decisión
-  // del paciente: son personal de la clínica, casi siempre el mismo, y teclearlos
-  // en cada consentimiento es exactamente el trabajo repetido que una plantilla
-  // existe para quitar. El familiar se queda fuera porque es del paciente.
+  // LOS TESTIGOS TAMPOCO ENTRAN (CI-DT-19, decisión del dueño): cambian siempre
+  // y suelen ser familiares, así que una plantilla los copiaba de un paciente al
+  // expediente de otro —y como «firma quien tiene nombre», entraban solos al
+  // flujo de firmado—. Una plantilla antigua que los traiga se aplica igual: esas
+  // dos claves se ignoran y los testigos que haya en pantalla no se tocan.
   //
   // Consecuencia buscada: ni aplicar una plantilla ni «Vaciar formulario» tocan
-  // el familiar ni las autorizaciones. Es lo que promete el aviso del selector
+  // el familiar, los testigos ni las autorizaciones. Es lo que promete el aviso del selector
   // —«los datos del paciente no cambiaron»—, y hace que Deshacer los devuelva
   // intactos porque nunca se movieron.
   const plantillas = usePlantillasDocumento({
@@ -504,20 +505,17 @@ export default function ConsentimientoInformadoForm({
     // procedimiento y las secciones. Una «plantilla de denegación» sería la
     // misma plantilla con las secciones sin usar, así que el tipo se queda como
     // lo que es: la decisión de qué documento estoy emitiendo ahora.
-    leer: () => ({
-      _v: 1, lugar, procedimiento, testigo1, testigo2,
-      secciones: { ...secciones },
-    }),
+    leer: () => plantillaConsentimiento(lugar, procedimiento, secciones),
     aplicar: (c: ContenidoPlantilla) => {
       // Solo las claves que existen HOY en el formulario, y comprobando el tipo
       // de cada una: el jsonb pudo guardarse con otra versión del formulario.
       // Los `else` NO son defensa de sobra: «Vaciar formulario» aplica un
       // contenido sin ninguna clave, así que es justo lo que repone el estado
       // inicial.
-      setLugar(typeof c.lugar === 'string' ? c.lugar : '')
-      setProcedimiento(typeof c.procedimiento === 'string' ? c.procedimiento : '')
-      setTestigo1(typeof c.testigo1 === 'string' ? c.testigo1 : '')
-      setTestigo2(typeof c.testigo2 === 'string' ? c.testigo2 : '')
+      const campos = camposDePlantilla(c)
+      setLugar(campos.lugar)
+      setProcedimiento(campos.procedimiento)
+      // `testigo1`/`testigo2` de una plantilla antigua: se ignoran (CI-DT-19).
       // Las plantillas guardadas antes de este pase traen `imprimirDenegacion`.
       // La clave se ignora y no rompe nada: la casilla que la escribía ya no
       // existe, y la denegación es ahora un documento propio.
