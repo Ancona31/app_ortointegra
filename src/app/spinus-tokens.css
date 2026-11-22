@@ -3519,8 +3519,9 @@ details[open] > summary > .sp-lab-flecha { transform: rotate(180deg); }
    al lado porque sobresale 2 y el hueco es 6. El ✕ se dibuja de 28 y su área
    mide 36. Datos, «Estudios» y notas con relleno ceñido. `tel`/`ext`/`iv` no
    cambian. */
-:where([data-formato="ih"], [data-formato="esc"]) .sp-doc-formbody:has(> .sp-lab) { gap: 12px; }
+:where([data-formato="ih"], [data-formato="esc"]) .sp-doc-formbody:has(> :is(.sp-lab, .sp-img)) { gap: 12px; }
 :where([data-formato="ih"], [data-formato="esc"]) .sp-doc-card:not(.sp-section):has(> .sp-doc-cardbody) > .sp-doc-cardbody:is(.sp-lab-datos, .sp-lab-cuerpo, .sp-lab-notascuerpo) { padding: 12px 16px; }
+/* (26.3 usa las mismas filas de datos compactas: `.sp-lab-datos` va también en la de imagen.) */
 :where([data-formato="ih"], [data-formato="esc"]) .sp-doc-card:not(.sp-section):has(> .sp-doc-cardbody) > .sp-doc-cardbody.sp-lab-cuerpo { gap: 10px; }
 :where([data-formato="ih"], [data-formato="esc"]) .sp-lab-datos :is(.sp-doc-grid) > .sp-doc-field { padding-block: 0; }
 :where([data-formato="ih"], [data-formato="esc"]) .sp-lab-datos :is(.sp-doc-grid) > .sp-doc-field > .sp-input { min-height: 36px; padding-block: 7px; font-size: 15px; line-height: 20px; }
@@ -3536,6 +3537,98 @@ details[open] > summary > .sp-lab-flecha { transform: rotate(180deg); }
   width: max(100%, var(--k-toque)); height: max(100%, var(--k-toque)); transform: translate(-50%, -50%);
 }
 :where([data-formato="ih"], [data-formato="esc"]) .sp-lab-catalogo-t { min-height: 40px; }
+
+/* ── 26.3 · SOLICITUD DE IMAGEN COMPACTA (maqueta `solicitud-imagen.html`, aprobada) ──
+   Misma familia que 26.1: un estudio abierto (`.sp-rx-ed`) y los demás
+   plegados (`.sp-rx-linea`), en UNA tarjeta sin relleno. Lo propio: la
+   etiqueta del tipo con color (`.sp-img-etq`, Rx azul tonal, TC ámbar, RM
+   violeta, US turquesa, DXA/Mx verde, el resto gris; reusa `--via-*`), las
+   filas «rótulo — fichas» (`.sp-img-blo`), las fichas de tipo, lado,
+   contraste, región y proyecciones (`.sp-img-tog`; las de región y
+   proyección, `--suave`, se marcan en tonal) y los grupos como pestañas
+   (`.sp-img-grupo`). Táctil: fichas de `--k-toque` (44) y 14 de letra; en
+   `ih`/`esc`, densidad de ratón: 32 de dibujo y 13 de letra, con el área de
+   36 en un `::after` (la regla del kit). Contenedor estrecho (< 560): el
+   rótulo encima, grupos en una fila que se desplaza, regiones con alto máximo
+   y desplazamiento propio, y la línea plegada en tres renglones. Nada aquí es
+   `fixed`. */
+.sp-img-etq {
+  flex: none; min-width: 40px; padding: 4px 8px; border-radius: var(--r-pildora); background: var(--sup2); color: var(--tinta2);
+  font-size: 12px; line-height: 16px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; text-align: center; white-space: nowrap;
+}
+.sp-img-etq--rx { background: var(--tonal); color: var(--tonal-tinta); }
+.sp-img-etq--tc { background: var(--aviso-fondo); color: var(--aviso-tinta); }
+.sp-img-etq--rm { background: var(--via-iv-fondo); color: var(--via-iv-tinta); }
+.sp-img-etq--us { background: var(--via-sc-fondo); color: var(--via-sc-tinta); }
+.sp-img-etq--verde { background: var(--ok-fondo); color: var(--ok-tinta); }
+.sp-img-linea { gap: 10px; }
+
+/* Filas «rótulo — fichas»: el rótulo alinea con el de `.sp-rx-campo`. */
+.sp-img-blo { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 6px 8px; min-width: 0; }
+.sp-img-rot {
+  flex: none; width: 108px; padding-left: 12px; font-size: 12px; line-height: 16px; font-weight: 600;
+  letter-spacing: .02em; text-transform: uppercase; color: var(--tinta2);
+}
+.sp-img-blo > .sp-img-rot { padding-top: calc((var(--k-toque) - 16px) / 2); }
+.sp-img-blo--falta > .sp-img-rot { color: var(--mal-tinta); }
+.sp-img-col { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.sp-img-fichas { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.sp-img-blo > .sp-rx-err { flex-basis: 100%; padding-left: 128px; }
+
+.sp-img-tog {
+  position: relative; display: inline-flex; align-items: center; gap: 5px; height: var(--k-toque); margin: 0; padding: 0 15px;
+  border: 1px solid var(--borde); border-radius: var(--r-pildora); background: var(--sup); color: var(--tinta);
+  font: inherit; font-size: 14px; line-height: 18px; font-weight: 500; white-space: nowrap; cursor: pointer;
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation; transition: transform var(--dur-toque) ease-out;
+}
+.sp-img-tog > svg { width: 14px; height: 14px; margin-left: -3px; }
+.sp-img-tog[aria-checked="true"] { background: var(--accion); border-color: var(--accion); color: var(--sobre-accion); font-weight: 600; }
+.sp-img-tog--suave[aria-pressed="true"] { background: var(--tonal); border-color: var(--accion); color: var(--tonal-tinta); font-weight: 600; }
+@media (hover: hover) { .sp-img-tog:hover:not([aria-checked="true"], [aria-pressed="true"]) { background: var(--sup2); } }
+.sp-img-tog:active { transform: scale(.97); }
+.sp-img-tog:focus-visible, .sp-img-grupo:focus-visible { outline: 3px solid var(--enlace); outline-offset: 2px; }
+.sp-img-blo--falta .sp-img-tog:not([aria-checked="true"], [aria-pressed="true"]) { border-color: var(--mal-tinta); }
+
+/* Grupos como pestañas, sobre una raya. */
+.sp-img-grupos { display: flex; flex-wrap: wrap; gap: 4px; padding-bottom: 6px; border-bottom: 1px solid var(--linea); }
+.sp-img-grupo {
+  position: relative; height: var(--k-toque); margin: 0; padding: 0 12px; border: 0; border-radius: var(--r-control);
+  background: transparent; color: var(--tinta2); font: inherit; font-size: 14px; line-height: 18px; font-weight: 500;
+  white-space: nowrap; cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+}
+.sp-img-grupo[aria-pressed="true"] { background: var(--sup2); color: var(--tinta); font-weight: 600; }
+@media (hover: hover) { .sp-img-grupo:hover:not([aria-pressed="true"]) { color: var(--tinta); } }
+.sp-img-regiones { max-height: 168px; overflow-y: auto; overscroll-behavior: contain; padding: 2px; margin: -2px; }
+.sp-img-pista { margin: 0; padding-left: 128px; font-size: 13px; line-height: 18px; color: var(--tinta2); }
+@media (prefers-reduced-motion: reduce) { .sp-img-tog:active { transform: none; } }
+
+/* Densidad de ratón (`ih`/`esc`): no desplazar. */
+:where([data-formato="ih"], [data-formato="esc"]) :is(.sp-img-tog, .sp-img-grupo) { height: 32px; font-size: 13px; }
+:where([data-formato="ih"], [data-formato="esc"]) .sp-img-tog { padding: 0 12px; }
+:where([data-formato="ih"], [data-formato="esc"]) .sp-img-grupo { padding: 0 10px; }
+:where([data-formato="ih"], [data-formato="esc"]) :is(.sp-img-tog, .sp-img-grupo)::after {
+  content: ""; position: absolute; left: 50%; top: 50%;
+  width: max(100%, var(--k-toque)); height: max(100%, var(--k-toque)); transform: translate(-50%, -50%);
+}
+:where([data-formato="ih"], [data-formato="esc"]) .sp-img-blo > .sp-img-rot { padding-top: 8px; }
+:where([data-formato="ih"], [data-formato="esc"]) .sp-img-regiones { max-height: 134px; padding: 3px 2px; margin: -3px -2px; }
+:where([data-formato="ih"], [data-formato="esc"]) .sp-img-ed { gap: 8px; }
+
+/* Estrecho (`ext`/`tel`): rótulo encima, grupos desplazables, tres renglones. */
+@container docform (max-width: 559px) {
+  .sp-img-rot { width: 100%; padding-left: 0; }
+  .sp-img-ed .sp-rx-rot { width: 96px; letter-spacing: .02em; }
+  .sp-img-blo > .sp-img-rot { padding-top: 0; }
+  .sp-img-blo > .sp-rx-err, .sp-img-pista { padding-left: 0; }
+  .sp-img-tog { padding: 0 16px; }
+  .sp-img-grupos { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 0 -14px; padding: 0 14px 6px; }
+  .sp-img-grupos::-webkit-scrollbar { display: none; }
+  .sp-img-grupo { flex: none; }
+  .sp-img-regiones { max-height: 212px; }
+  .sp-img-linea .sp-rx-linea-1 { flex-direction: column; align-items: flex-start; gap: 2px; }
+  .sp-img-linea .sp-rx-com { max-width: 100%; }
+  .sp-img-linea .sp-rx-det { max-width: 100%; }
+}
 
 } /* fin @layer components */
 
