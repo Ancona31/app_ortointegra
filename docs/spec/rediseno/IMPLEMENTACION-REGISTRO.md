@@ -669,3 +669,49 @@ entera sobre `a289ce13` y lo que siguió. Domingo 22-nov, 04:44–06:40 UTC
 * Con 15 estudios el formulario NO cabe en 1280×800: la página desplaza 1392
   sobre 800 (sólo el formulario mide 1142). Lo que sobra es la columna de
   640 px, la cabecera y la tarjeta de plantillas, fuera de este formulario.
+* **Densidad de ratón (`ih`/`esc`, 2026-11-22):** fichas de frecuentes y
+  solicitados a 32 de dibujo y 13 de letra con huecos de 6 (área de 36 por
+  `::after`, el ✕ de 28 con área de 36), relleno ceñido en datos, «Estudios»
+  y notas, y los datos del paciente en filas de 36 (`.sp-lab-datos`). Con 15
+  estudios a 1280×800 la página pasa de 1392 a 1192 (el formulario, de 1142 a
+  942). `tel`/`ext`/`iv` sin cambios. Sigue sin caber: lo que queda es la
+  cabecera, la tarjeta de plantillas y la columna de 640.
+
+### Solicitud de imagen compacta · notas (2026-11-22)
+
+* **Qué es:** la solicitud de imagenología de la maqueta aprobada por el
+  dueño (`solicitud-imagen.html`), de la familia de la receta: un estudio
+  abierto (`EditorEstudioImagen`) y los demás plegados a una línea
+  (`LineaEstudioImagen`: etiqueta del tipo con color, región + lado en
+  negrita, tipo completo, proyecciones · indicación, «Falta …» en rojo).
+  Buscador único «tipo + región» (`BuscadorImagen`, sin acentos, puntúa el
+  inicio de palabra: «rx col lum» → Columna lumbar). Catálogo tipado en
+  `src/lib/estudiosImagen.ts` (11 tipos, 171 regiones, 75 con
+  `verificar: true`, sin notas ni fuentes); lógica pura en
+  `imagenCompuesta.ts` (pruebas `imagenCompuesta.test.ts` y
+  `estudiosImagen.test.ts`); estilos en `spinus-tokens.css` §26.3
+  (`.sp-img-*`, reusa `.sp-rx-*` y `--via-*`).
+* **Cambios de COMPORTAMIENTO (excepción del dueño):** según tipo y región
+  aparece sólo lo que aplica: lado obligatorio donde la región lo lleva;
+  contraste obligatorio y sin valor por omisión en TC y RM (implícito en
+  angio, con su nota); tipo de mastografía; proyecciones sólo en Rx y Mx
+  (rutina premarcada, especiales y «Otra»). «Otro» = los cuatro campos libres
+  de antes. Sin «Frecuentes»; la EMG, «Mielograma» y lo que no es imagen
+  salen de la lista de tipos (quien los necesite, «Otro»). Un estudio a
+  medias bloquea la impresión, se abre y el aviso dice qué falta (patrón de
+  la receta). «Agregar estudio» es uno, al final, más Ctrl/⌘+Enter.
+* **Composición:** las cuatro cadenas como `cadenas()` de la maqueta (tipo +
+  contraste en minúscula, «Ultrasonido Doppler», «Gammagrafía»; proyecciones
+  con «, » y « y »), salvo una decisión propia: el lado CONCUERDA con la
+  región («Hombro derecho», «Ortejos izquierdos»; la maqueta escribía «Hombro
+  derecha»). Fluoroscopía compone como la maqueta («Estudios contrastados
+  (fluoroscopía)» · estudio), no como el `tipoEnPdf` del JSON.
+* **Lo que NO cambia:** `contenido` (`paciente`, `diagnostico`, `estudios`
+  de cuatro cadenas, `urgente`, `fecha`; comprobado en una fila emitida en
+  local), el PDF, el búnker (todo local), las plantillas (mismas claves),
+  «Marcar como urgente», el pie, el error único y el modal posterior.
+* **Compatibilidad con lo guardado:** al aplicar una plantilla se intenta
+  reconocer cada estudio, y sólo se acepta si al volver a componerse da
+  EXACTAMENTE el mismo texto; si no, se abre en «Otro» con sus cuatro
+  cadenas intactas. Riesgo aceptado: una plantilla vieja «Tomografía (TAC)»
+  se reconoce y ahora pide el contraste antes de imprimir.
