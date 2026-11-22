@@ -57,7 +57,7 @@ async function puntoAlFondo(page: Page): Promise<{ x: number; y: number }> {
   const tresDias = await page.locator('.fc-timeGridTresDias-view').count() > 0
   for (let i = 0; i < (tresDias ? 8 : 4); i++) await siguiente.click()
   await expect(page.locator('.fc-timegrid-col[data-date]').first()).toBeVisible()
-  const p = await page.evaluate(() => {
+  const buscar = (): Promise<{ x: number; y: number } | null> => page.evaluate(() => {
     const filas = Array.from(document.querySelectorAll<HTMLElement>('td.fc-timegrid-slot-lane')).map(f => f.getBoundingClientRect())
     const cols = Array.from(document.querySelectorAll<HTMLElement>('.fc-timegrid-col[data-date]'))
     for (const fila of filas.reverse()) {
@@ -75,6 +75,11 @@ async function puntoAlFondo(page: Page): Promise<{ x: number; y: number }> {
     }
     return null
   })
+  /* Mientras la semana carga, `.ag-cargando` apaga los punteros de la rejilla y `elementFromPoint`
+     no la ve: en un equipo rápido la búsqueda llegaba antes que las citas y no encontraba ninguna
+     franja (falló 3 veces en el equipo nuevo, 2026-11-21). Se repite hasta que la rejilla responde. */
+  let p: { x: number; y: number } | null = null
+  await expect.poll(async () => { p = await buscar(); return p !== null }, { timeout: 10000 }).toBe(true).catch(() => {})
   if (!p) throw new Error('puntoAlFondo: no hay franja libre al fondo de la rejilla')
   return p
 }

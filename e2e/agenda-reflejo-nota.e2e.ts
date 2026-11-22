@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
-import { SESION, diaDeLaSemana, interruptorAgenda, soloEscritorio, sqlLocal } from './ayudas'
+import { SESION, diaDeLaSemana, interruptorAgenda, pasarASemanaSiguiente, soloEscritorio, sqlLocal } from './ayudas'
 import { abrirAgendaV2, tarjetaLectura } from './interaccionesAyudas'
 import { fechaHoraLocalAInstante } from '../src/lib/dates'
 
@@ -40,7 +40,9 @@ soloEscritorio()
 test.use({ storageState: SESION.adminA })
 
 const TZ = 'America/Merida'
-const VIERNES = diaDeLaSemana(0, 4)
+/* AG-DT-256: el jueves de la semana SIGUIENTE. En el viernes de la semana visible, la cita
+   (agendada, con paciente) disparaba «¿Asistió el paciente?» el domingo desde las 12:00. */
+const JUEVES_SIGUIENTE = diaDeLaSemana(1, 3)
 let citaId = ''
 
 test.beforeEach(() => { interruptorAgenda('A', true) })
@@ -64,7 +66,7 @@ function citaAgendada(): { id: string; paciente: string } {
            co.nombre, co.nombre_corto, co.direccion, co.telefono, :'tz', 'spinus', 'synced'
       from public.consultorios co join public.pacientes pa on pa.clinica_id = co.clinica_id and pa.apellidos = 'Prueba 19'
      where co.nombre = 'Consultorio Centro (ficticio)'
-    returning id || '|' || paciente_id`, { ini: fechaHoraLocalAInstante(VIERNES, '12:00', TZ), tz: TZ })
+    returning id || '|' || paciente_id`, { ini: fechaHoraLocalAInstante(JUEVES_SIGUIENTE, '12:00', TZ), tz: TZ })
   const [id = '', paciente = ''] = fila.split('|')
   return { id, paciente }
 }
@@ -104,6 +106,7 @@ test('guardar la nota de una cita y volver por el menú: la tarjeta ya dice «At
   })
 
   await abrirAgendaV2(page)
+  await pasarASemanaSiguiente(page)
   const tarjeta = page.locator('.fc-timegrid-event', { has: page.locator(`[data-cita-id="${cita.id}"]`) })
   await tarjeta.scrollIntoViewIfNeeded()
   await expect.poll(() => estadoEnTarjeta(page, cita.id)).toBe('Agendada')
@@ -127,5 +130,6 @@ test('guardar la nota de una cita y volver por el menú: la tarjeta ya dice «At
 
   await page.getByRole('link', { name: 'Agenda', exact: true }).click()
   await page.waitForURL(/\/agenda$/)
+  await pasarASemanaSiguiente(page) // la agenda vuelve a abrir en la semana de hoy; no es una recarga
   await expect.poll(() => estadoEnTarjeta(page, cita.id), { timeout: 8000 }).toBe('Atendida')
 })

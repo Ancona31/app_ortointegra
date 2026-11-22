@@ -24,7 +24,8 @@ import { execFileSync } from 'node:child_process'
  * Qué mira y cuándo: al empezar (línea base), durante cada prueba (como mucho
  * una vez por segundo) y al terminar cada una.
  *
- * Las pruebas que prueban la ventana A PROPÓSITO necesitan una cita vieja. Llevan
+ * Las pruebas que prueban la ventana A PROPÓSITO necesitan una cita vieja, y alguna
+ * otra necesita una cita de AYER (relativa a ahora: hoy no dispara nada). Llevan
  * la anotación `asistencia-a-proposito` y la guarda les perdona las citas que
  * escribieron y que YA NO disparan la ventana cuando la prueba termina (borradas,
  * atendidas, canceladas). Lo que dejen abierto se señala igual.
