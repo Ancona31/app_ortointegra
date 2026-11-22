@@ -127,6 +127,10 @@
   --z-paleta: 9998;
   --z-sin-conexion: 9999;
   --z-aviso: 10000;
+  /* El aviso sigue ENCIMA de las capas (un error de un modal tiene que leerse
+     sobre su velo), pero el de PROGRESO («Generando…», tipo `info`) no tapa los
+     botones de la capa que se abre al terminar: con una capa del catálogo
+     abierta deja pasar los toques (regla al final de «CAPAS DEL CATÁLOGO»). */
 
   /* — Movimiento (PLAN §2.6, skill apple-design §4) —
      Resorte críticamente amortiguado (amortiguación 1) muestreado con
@@ -358,6 +362,12 @@ html.dark {
   .k-campo::placeholder { color: var(--tinta3); opacity: 1; }
   .k-campo:focus-visible, .k-campo:focus { outline: 2px solid var(--enlace); outline-offset: 0; }
   .k-campo[aria-invalid="true"] { outline: 2px solid var(--mal-tinta); outline-offset: 0; }
+  /* Campo SIN caja dentro de una fila (pacientes, perfil, consultorios). En
+     oscuro, la hoja de traducción de `ThemeProvider` (`html.dark input`, con
+     `!important` y SIN capa) le pone la caja `--sup2`. Un `!important` DENTRO de
+     una capa gana a uno sin capa (Cascade 5), sea cual sea la especificidad: no
+     la subas ni la saques de `@layer`. */
+  html.dark .k-campo-sin-caja { background-color: transparent !important; }
   .k-campo:disabled { color: var(--tinta3); cursor: not-allowed; }
   textarea.k-campo { height: auto; min-height: 120px; padding: 12px; line-height: 24px; resize: vertical; }
   :where([data-formato="ih"], [data-formato="esc"]) textarea.k-campo { height: auto; line-height: 22px; }
@@ -775,6 +785,11 @@ html.dark {
   .k-velo { background: color-mix(in srgb, var(--navy) 45%, var(--fondo)); -webkit-backdrop-filter: none; backdrop-filter: none; }
   html.dark .k-velo { background: var(--navy); }
 }
+
+/* Aviso de progreso sobre una capa abierta (B12): sigue a la vista (se lee y
+   se anuncia), pero no intercepta toques; se va solo a los 4 s. Los de éxito,
+   error y advertencia conservan su «Cerrar aviso». */
+body:has(.k-capa) [data-tipo="info"] { pointer-events: none; }
 
 /* ── Rejilla «Tipo de documento» (CALMA §9, §13, §21; capas-a vista 3) ─────
    La dibuja `documentos/SelectorTipoDocumento.tsx` dentro de la página (no es

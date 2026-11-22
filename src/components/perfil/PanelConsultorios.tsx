@@ -419,7 +419,7 @@ function FilaEdicion({ consultorio: c, onCancelar, onGuardado }: {
 }
 
 /** El control de una fila de la capa: sin caja, a 15 px, alto táctil de 44. */
-const CAMPO_LINEA = 'block w-full min-h-11 border-0 bg-transparent p-0 text-[15px] leading-5 text-tinta placeholder:text-tinta3 outline-none focus:outline-none [html.dark_&&]:!bg-transparent'
+const CAMPO_LINEA = 'block w-full min-h-11 border-0 bg-transparent p-0 text-[15px] leading-5 text-tinta placeholder:text-tinta3 outline-none focus:outline-none k-campo-sin-caja'
 
 /** Etiqueta, control y ayuda de una fila: apilados en teléfono, en dos columnas desde 640. */
 function CampoLinea({ etiqueta, obligatorio, ayuda, htmlFor, children }: {

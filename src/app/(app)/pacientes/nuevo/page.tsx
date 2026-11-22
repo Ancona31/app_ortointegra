@@ -33,7 +33,7 @@ const MEDICOS_CACHE_KEY = 'cache_medicos_clinica'
    El campo no lleva caja: la fila entera se marca al enfocar. Columna
    centrada de 680 (600 en `iv`). La MISMA pieza vive copiada en
    `expediente/[id]/editar/page.tsx` (duplicar antes que abstraer, P4). */
-const campoCls = 'block w-full min-w-0 border-0 bg-transparent [html.dark_&&]:bg-transparent! p-0 text-[16px] leading-6 text-tinta outline-none placeholder:text-tinta3 ih:text-[15px] esc:text-[15px]'
+const campoCls = 'block w-full min-w-0 border-0 bg-transparent k-campo-sin-caja p-0 text-[16px] leading-6 text-tinta outline-none placeholder:text-tinta3 ih:text-[15px] esc:text-[15px]'
 
 function Grupo({ icono: Icono, titulo, children }: { icono: LucideIcon; titulo: string; children: React.ReactNode }) {
   return (
@@ -306,12 +306,13 @@ export default function NuevoPacientePage() {
   return (
     <div className="mx-auto w-full max-w-[680px] iv:max-w-[600px] animate-slide-up">
 
-      {/* Cabecera compacta (CALMA §6, §20: «‹ Expediente») */}
-      <Link href="/expediente" className="k-b k-b-texto -ml-1 text-[13px] leading-[18px]">
-        <ChevronLeft size={16} strokeWidth={2.5} aria-hidden="true" />
+      {/* Cabecera compacta (CALMA §6, §20: «‹ Expediente»), la misma que las
+          demás pantallas del paciente: alto de toque del formato y título a 4 px. */}
+      <Link href="/expediente" className="k-b k-b-texto -ml-1 h-[var(--k-toque)] text-[13px]">
+        <ChevronLeft size={16} aria-hidden="true" />
         <span>Expediente</span>
       </Link>
-      <h1 className="k-t-pantalla mt-0.5">Nuevo paciente</h1>
+      <h1 className="k-t-pantalla mt-1">Nuevo paciente</h1>
 
       <form onSubmit={handleSubmit} className="mt-5 space-y-6">
 

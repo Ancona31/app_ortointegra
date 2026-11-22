@@ -208,7 +208,7 @@ export default function AddConsultorioModal({ open, onClose, onSuccess, husoDeFa
 }
 
 /** El control de una fila: sin caja, a 15 px, alto táctil de 44. */
-const CAMPO = 'block w-full min-h-11 border-0 bg-transparent p-0 text-[15px] leading-5 text-tinta placeholder:text-tinta3 outline-none focus:outline-none [html.dark_&&]:!bg-transparent'
+const CAMPO = 'block w-full min-h-11 border-0 bg-transparent p-0 text-[15px] leading-5 text-tinta placeholder:text-tinta3 outline-none focus:outline-none k-campo-sin-caja'
 
 /** Rótulo y control: apilados en teléfono, en dos columnas desde 640. La fila entera marca el foco. */
 function Fila({ etiqueta, obligatorio, opcional, ayuda, htmlFor, children }: {
