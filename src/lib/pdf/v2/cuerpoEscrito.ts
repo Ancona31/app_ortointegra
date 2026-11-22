@@ -41,9 +41,13 @@
 
 import type {
   AlineacionEscrito,
+  DetalleItem,
   NodoEscrito,
   TramoTexto,
 } from './formatos/EscritoMedico'
+
+/** La marca de una viñeta en el papel (la de siempre del formato). */
+const RAYA_LISTA = '—'
 
 // ─── Lo que se devuelve ──────────────────────────────────────────────────────
 
@@ -214,34 +218,61 @@ function nivelEncabezado(nivel: unknown): 'encabezado1' | 'encabezado2' {
 // ─── Listas ──────────────────────────────────────────────────────────────────
 
 /**
- * Los ítems de una lista, aplanados.
+ * Los ítems de una lista, CON SU JERARQUÍA (rediseño del escrito, aprobado).
  *
- * ⚠ **LAS LISTAS ANIDADAS SE APLANAN AL PRIMER NIVEL Y SE ANOTAN.** `NodoEscrito`
- * declara `items` como una secuencia plana, así que una sublista no tiene dónde
- * componerse. Aplanarla conserva el texto —que es lo que el médico escribió— y
- * pierde la jerarquía. Es la misma decisión que tomó v1 y por el mismo motivo, y
- * aquí además queda contada en `descartes`.
+ * Cada ítem sale con su nivel y con la MARCA YA COMPUESTA —la raya de la viñeta o
+ * el número— en `detalle`, para que el papel diga lo mismo que el editor:
+ *
+ * - **Las sublistas se conservan**, cada una con su sangría y su propia marca
+ *   (una numerada dentro de una de viñetas numera aparte). Antes se aplanaban al
+ *   primer nivel y se anotaban como descarte.
+ * - **La numeración respeta el inicio** (`attrs.start`): una lista que empieza en 3
+ *   se imprime desde 3. Antes, siempre desde 1.
+ * - **Un ítem con dos párrafos es UN ítem** (con un salto entre los dos), no dos
+ *   ítems con dos números.
+ *
+ * Los ítems siguen siendo una secuencia plana de tramos —`items`— para que quien
+ * lea sólo el texto (pruebas, el camino legacy) no cambie; la jerarquía viaja al
+ * lado, en `detalle`.
  */
 function itemsDeLista(
   contenido: readonly unknown[],
   registro: Registro,
-): TramoTexto[][] {
-  const items: TramoTexto[][] = []
+  marca: 'vineta' | 'numero',
+  inicio: number,
+  nivel: number,
+  salida: { items: TramoTexto[][]; detalle: DetalleItem[] },
+): void {
+  let n = inicio
   for (const item of contenido) {
     if (!esObjeto(item)) continue
+    const tramos: TramoTexto[] = []
+    const sublistas: Record<string, unknown>[] = []
     for (const bloque of hijos(item)) {
       if (!esObjeto(bloque)) continue
       const tipo = texto(bloque.type)
-      if (tipo === 'bulletList' || tipo === 'orderedList') {
-        anotar(registro, 'lista anidada')
-        items.push(...itemsDeLista(hijos(bloque), registro))
-        continue
-      }
-      const tramos = tramosDe(hijos(bloque), registro)
-      if (tramos.length > 0) items.push(tramos)
+      if (tipo === 'bulletList' || tipo === 'orderedList') { sublistas.push(bloque); continue }
+      const propios = tramosDe(hijos(bloque), registro)
+      if (propios.length === 0) continue
+      if (tramos.length > 0) tramos.push({ texto: '\n' })
+      tramos.push(...propios)
+    }
+    if (tramos.length > 0) {
+      salida.items.push(tramos)
+      salida.detalle.push({ nivel, marca: marca === 'numero' ? `${n}.` : RAYA_LISTA })
+      n++
+    }
+    for (const sub of sublistas) {
+      const subMarca = texto(sub.type) === 'orderedList' ? 'numero' : 'vineta'
+      itemsDeLista(hijos(sub), registro, subMarca, inicioDe(sub), nivel + 1, salida)
     }
   }
-  return items
+}
+
+/** El número con que empieza una lista numerada (`start`), 1 si no lo trae. */
+function inicioDe(lista: Record<string, unknown>): number {
+  const v = atributos(lista).start
+  return typeof v === 'number' && Number.isInteger(v) && v >= 0 ? v : 1
 }
 
 // ─── Un nodo de bloque ───────────────────────────────────────────────────────
@@ -267,20 +298,32 @@ function nodoDe(bloque: unknown, registro: Registro): NodoEscrito | null {
     const contenido = tramosDe(hijos(bloque), registro)
     const plano = contenido.map((t) => t.texto).join('')
     if (plano.trim() === '') return null
-    return { tipo: nivelEncabezado(atributos(bloque).level), texto: plano, alineacion }
+    // Las marcas DENTRO de un título se conservan en `tramos` (antes se perdían:
+    // el título iba en texto plano). `texto` sigue siendo el plano.
+    return { tipo: nivelEncabezado(atributos(bloque).level), texto: plano, tramos: contenido, alineacion }
   }
 
   if (tipo === 'bulletList' || tipo === 'orderedList') {
-    const items = itemsDeLista(hijos(bloque), registro)
-    if (items.length === 0) return null
-    return { tipo: 'lista', marca: tipo === 'orderedList' ? 'numero' : 'vineta', items }
+    const marca = tipo === 'orderedList' ? 'numero' : 'vineta'
+    const salida: { items: TramoTexto[][]; detalle: DetalleItem[] } = { items: [], detalle: [] }
+    itemsDeLista(hijos(bloque), registro, marca, inicioDe(bloque), 0, salida)
+    if (salida.items.length === 0) return null
+    return { tipo: 'lista', marca, items: salida.items, detalle: salida.detalle }
   }
 
   if (tipo === 'blockquote') {
     // El blockquote CONTIENE párrafos, así que su texto y su alineación viven un
-    // nivel más abajo. Se aplanan en una sola cita: el formato compone una.
+    // nivel más abajo. Se componen en UNA cita, pero con sus párrafos SEPARADOS
+    // (una línea en blanco entre uno y otro): antes salían pegados,
+    // «Cita unoCita dos».
     const dentro = hijos(bloque).filter(esObjeto)
-    const tramos = dentro.flatMap((p) => tramosDe(hijos(p), registro))
+    const tramos: TramoTexto[] = []
+    for (const p of dentro) {
+      const propios = tramosDe(hijos(p), registro)
+      if (propios.length === 0) continue
+      if (tramos.length > 0) tramos.push({ texto: '\n\n' })
+      tramos.push(...propios)
+    }
     if (tramos.length === 0) return null
     const primero = dentro[0]
     return {
