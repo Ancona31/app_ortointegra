@@ -17,6 +17,7 @@ import { leerFormato } from '@/lib/formatoPantalla'
      ih / iv / esc  tarjeta centrada en el área de contenido
 
    AÑADIDO (opcional; sin él, todo es como antes):
+     cierraConVelo={false}  el velo no cierra (capas con campos editables).
      variante="alerta"  patrón único de alerta: icono en círculo de 48 (el
                         `icon`, de 28), título centrado, `children` como
                         mensaje y `footer` como los BOTONES SUELTOS (un
@@ -273,6 +274,14 @@ interface Props {
   apilada?: boolean
   /** Rol del panel. Default: `dialog`, y `alertdialog` en la alerta. */
   rol?: 'dialog' | 'alertdialog'
+  /**
+   * Tocar el velo cierra la capa. Default: true (la conducta de siempre, la de
+   * los menús, selectores y capas de sólo lectura, y la de la agenda).
+   * ⚠️ `false` EN TODA CAPA CON CAMPOS EDITABLES (decisión del dueño): un toque
+   * fuera no puede tirar lo escrito. Siguen cerrando la ✕, «Cancelar» y Esc.
+   * La alerta nunca cierra con el velo, valga lo que valga esto.
+   */
+  cierraConVelo?: boolean
   children: React.ReactNode
 }
 
@@ -327,7 +336,8 @@ function modoDe(variante: Props['variante'], fullscreenMobile: boolean): 'hoja' 
 export default function ModalShell({
   open, onClose, title, subtitle, icon, iconBg, headerRight,
   maxWidth = 'max-w-lg', elevated = false, hideClose = false, footer,
-  fullscreenMobile = false, spinusGeometry, variante, tono = 'confirmar', apilada = false, rol, children,
+  fullscreenMobile = false, spinusGeometry, variante, tono = 'confirmar', apilada = false, rol,
+  cierraConVelo = true, children,
 }: Props): ReactElement | null {
   const montada = useCapaMontada(open)
   const onCloseRef = useRef(onClose)
@@ -370,7 +380,7 @@ export default function ModalShell({
         data-fase={open ? 'abierta' : 'sale'} data-modo={modo} data-variante={variante}
         inert={!open || undefined} aria-hidden={!open || undefined}
       >
-        <div ref={veloRef} className="k-velo" onClick={esAlerta ? undefined : onClose} />
+        <div ref={veloRef} className="k-velo" onClick={esAlerta || !cierraConVelo ? undefined : onClose} />
         <div
           ref={montarPanel}
           role={rol ?? (esAlerta ? 'alertdialog' : 'dialog')}

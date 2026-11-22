@@ -270,6 +270,7 @@ export default function AdminUsuariosPage() {
       {/* Invitar — capa del catálogo (hoja en teléfono, tarjeta en ancho). */}
       <ModalShell
         open={showForm}
+        cierraConVelo={false}
         onClose={() => setShowForm(false)}
         title="Invitar a alguien"
         maxWidth="max-w-[440px]"

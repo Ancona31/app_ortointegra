@@ -254,7 +254,9 @@ export default function ConsultaRapidaModal({
       data-variante={modoCrear && duplicateWarning ? 'alerta' : undefined}
       inert={!open || undefined} aria-hidden={!open || undefined}
     >
-      <div className="k-velo" onClick={onClose} />
+      {/* El velo NO cierra (decisión del dueño): hay campos que escribir. La ✕
+          y Esc sí. */}
+      <div className="k-velo" />
 
       <div className="k-capa-panel max-w-lg" lang="es">
         {offlineMsg && (

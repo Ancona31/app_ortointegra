@@ -202,6 +202,7 @@ export default function ModalAgregarMedicion({ open, onClose, pacienteId, onSucc
   return (
     <ModalShell
       open={open}
+      cierraConVelo={false}
       onClose={submitting ? () => {} : onClose}
       title="Agregar medición"
       subtitle={modo === 'custom' ? 'Analito personalizado' : 'Desde catálogo clínico'}

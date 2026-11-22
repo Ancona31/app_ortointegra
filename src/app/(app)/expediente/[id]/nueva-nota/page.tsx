@@ -1037,6 +1037,7 @@ export default function NuevaNotaPage() {
           — bajo spinusGeometry esa prop es inerte. */}
       <ModalShell
         open={estadoModal !== null}
+        cierraConVelo={false}
         onClose={cerrarModalPorEstado}
         fullscreenMobile
         spinusGeometry={meta.geometry}

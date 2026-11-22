@@ -303,6 +303,7 @@ export default function ModalSubirDocumento({
   return (
     <ModalShell
       open={open}
+      cierraConVelo={false}
       onClose={cerrarModal}
       title="Subir documento clínico"
       subtitle="PDF, JPG, PNG o DICOM"

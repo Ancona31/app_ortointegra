@@ -242,7 +242,9 @@ export default function QuickPatientModal({
     <Portal>
     <div className="k-capa fixed inset-0 z-[70]" data-fase="abierta" data-modo={duplicateWarning ? undefined : 'hoja'}
       data-variante={duplicateWarning ? 'alerta' : undefined}>
-      <div ref={veloRef} className="k-velo" onClick={onClose} />
+      {/* El velo NO cierra (decisión del dueño): un toque fuera no tira lo
+          escrito. Cierran la ✕ y «Cancelar». */}
+      <div ref={veloRef} className="k-velo" />
       <div ref={panelRef} className="k-capa-panel max-w-[440px]" lang="es" onPointerDown={duplicateWarning ? undefined : alPulsar}>
         {duplicateWarning ? (
           <div className="k-al">

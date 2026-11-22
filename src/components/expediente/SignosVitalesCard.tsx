@@ -238,7 +238,7 @@ export default function SignosVitalesCard({ value, onChange, errores }: SignosVi
         <Banda value={value} estados={estados} />
       </button>
 
-      <ModalShell open={abierto} onClose={() => setAbierto(false)} title="Signos vitales" maxWidth="md:max-w-[440px]">
+      <ModalShell open={abierto} onClose={() => setAbierto(false)} title="Signos vitales" maxWidth="md:max-w-[440px]" cierraConVelo={false}>
         <div className="sv-hoja k-lista px-5 pb-5 tel:pb-[calc(var(--ib)+12px)] ext:px-4">
           <Fila etiqueta="Presión arterial" unidad="mmHg" estado={estados.pa}>
             <Campo k="ta_sistolica" aria="Presión arterial sistólica" estado={estados.pa} valor={value.ta_sistolica}

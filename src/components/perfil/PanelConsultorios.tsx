@@ -134,6 +134,7 @@ export default function PanelConsultorios({
 
       <ModalShell
         open={editando !== null}
+        cierraConVelo={false}
         onClose={() => onEditar(null)}
         title="Editar consultorio"
         maxWidth="max-w-[520px]"

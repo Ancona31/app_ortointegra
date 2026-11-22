@@ -113,7 +113,7 @@ export function SheetFiltrosExpediente({
   )
 
   return (
-    <ModalShell open={open} onClose={onClose} title="Filtrar y ordenar" maxWidth="max-w-lg" footer={pie}>
+    <ModalShell open={open} onClose={onClose} title="Filtrar y ordenar" maxWidth="max-w-lg" footer={pie} cierraConVelo={false}>
       <div className="space-y-5 px-5 pt-1 pb-5">
         <label className="k-campo-g">
           <span className="k-etiqueta">Médico</span>

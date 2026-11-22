@@ -555,6 +555,7 @@ function DialogoGuardar(p: PropsGuardar) {
   return (
     <ModalShell
       open={p.open}
+      cierraConVelo={false}
       onClose={p.onCerrar}
       spinusGeometry="wait"
       title="Guardar como plantilla"

@@ -761,6 +761,7 @@ export default function ModalDocumentoGenerado({
     // (headerVacio, :107). La salida es el botón Cerrar, el backdrop y Escape.
     <ModalShell
       open={open}
+      cierraConVelo={false}
       onClose={onClose}
       elevated
       spinusGeometry="done"

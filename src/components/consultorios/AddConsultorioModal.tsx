@@ -90,6 +90,7 @@ export default function AddConsultorioModal({ open, onClose, onSuccess, husoDeFa
   return (
     <ModalShell
       open={open}
+      cierraConVelo={false}
       onClose={submitting ? () => {} : onClose}
       title="Agregar consultorio"
       maxWidth="max-w-[520px]"
