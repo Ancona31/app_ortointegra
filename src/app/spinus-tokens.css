@@ -4199,6 +4199,21 @@ html.dark .sp-hon-fi:focus, html.dark .sp-hon-anticipo { background-color: var(-
 }
 html.dark .sp-esc-titulo { background-color: transparent !important; border-color: transparent !important; }
 
+/* El visor del expediente (`TipTapViewer`): la misma jerarquía que el editor.
+   Sin esto, el preflight de Tailwind dejaba títulos del tamaño del texto y listas
+   sin marcador. */
+.tiptap-viewer p { margin: 8px 0; }
+.tiptap-viewer :is(h1, h2) { font-size: 19px; margin: 18px 0 6px; }
+.tiptap-viewer h3 { font-size: 17px; margin: 14px 0 5px; }
+.tiptap-viewer :is(h1, h2, h3) { font-weight: 700; line-height: 1.3; color: var(--tinta); }
+.tiptap-viewer ul { list-style: disc; padding-left: 24px; margin: 8px 0; }
+.tiptap-viewer ol { list-style: decimal; padding-left: 24px; margin: 8px 0; }
+.tiptap-viewer li { margin: 2px 0; }
+.tiptap-viewer li > p { margin: 0; }
+.tiptap-viewer blockquote { border-left: 3px solid var(--linea); padding-left: 16px; margin: 10px 0; font-style: italic; color: var(--tinta2); }
+.tiptap-viewer hr { border: 0; border-top: 1px solid var(--linea); margin: 14px 0; }
+.tiptap-viewer > :first-child { margin-top: 0; }
+
 } /* fin @layer components */
 
 /* ⚠ FUERA DE @layer A PROPÓSITO — NO LO METAS DENTRO. La hoja de react-easy-crop
