@@ -253,6 +253,7 @@ function DocumentosContent() {
                   edadInicial={pacienteSeleccionado.fecha_nacimiento
                     ? calcularEdad(pacienteSeleccionado.fecha_nacimiento).textoElegante
                     : ''}
+                  fechaNacimiento={pacienteSeleccionado.fecha_nacimiento ?? null}
                   pacienteId={pacienteSeleccionado.id}
                   onVacioChange={setFormVacio} onCerrarTrasEmitir={() => setTipo(null)}
                   onPanelPlantillasChange={setPanelPlantillas}

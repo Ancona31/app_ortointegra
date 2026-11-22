@@ -17,7 +17,7 @@ import SeccionPlegable from '@/components/documentos/SeccionPlegable'
 import FirmadoConsentimiento, { type FirmaCapturada } from '@/components/documentos/FirmadoConsentimiento'
 import type { IdentificacionImpresa } from '@/lib/pdf/ConsentimientoInformadoPdf'
 import { huellaDocumento } from '@/lib/documentos/firmaTrazo'
-import { TEXTO_CASILLA_FOTOS, camposDePlantilla, plantillaConsentimiento } from '@/components/documentos/consentimientoEmbudo'
+import { TEXTO_CASILLA_FOTOS, camposDePlantilla, fechaYEdadAlFirmar, plantillaConsentimiento } from '@/components/documentos/consentimientoEmbudo'
 import { usePlantillasDocumento, type ContenidoPlantilla } from '@/components/documentos/PlantillasDocumento'
 import { createClient } from '@/lib/supabase/client'
 import { hoyEnTZ, desplazarFecha, TZ_CLINICA } from '@/lib/dates'
@@ -95,6 +95,12 @@ interface Props {
    * aquí es más rápido que ir a la ficha y volver.
    */
   edadInicial?: string
+  /**
+   * Fecha de nacimiento de la ficha (YYYY-MM-DD). Sólo sirve para recalcular la
+   * edad el día de la firma (CI-DT-3): si la edad que hay salió de la ficha en
+   * la fecha que tenía el documento, se pone la de hoy; si se tecleó, se respeta.
+   */
+  fechaNacimiento?: string | null
   /**
    * Borrador que se retoma, desde `?borrador=` de la lista de documentos (§9).
    * Se carga en el MISMO formulario, editable: editar y firmar son la misma
@@ -307,7 +313,7 @@ function isFormEmpty(e: EstadoVacio): boolean {
 }
 
 export default function ConsentimientoInformadoForm({
-  pacienteInicial = '', pacienteId, diagnosticoInicial = '', edadInicial = '',
+  pacienteInicial = '', pacienteId, diagnosticoInicial = '', edadInicial = '', fechaNacimiento,
   borradorId: borradorIdInicial, offlineMode, onOfflineSave, onVacioChange, onCerrarTrasEmitir,
   onPanelPlantillasChange,
 }: Props) {
@@ -732,9 +738,9 @@ export default function ConsentimientoInformadoForm({
    *
    * El FOLIO no está aquí: es columna propia y lo escribe la base.
    */
-  function contenidoConsentimiento(): Record<string, unknown> {
+  function contenidoConsentimiento(dia?: { fecha: string; edad: string }): Record<string, unknown> {
     return {
-      paciente, lugar, fecha, edad, procedimiento, diagnostico,
+      paciente, lugar, fecha: dia?.fecha ?? fecha, edad: dia?.edad ?? edad, procedimiento, diagnostico,
       familiar, testigo1, testigo2, autorizaTransfusion, autorizaFotos,
       // Entra en el contenido, y por tanto en la HUELLA: es lo que explica que
       // el papel no lleve firma del paciente, así que forma parte de lo que se
@@ -742,6 +748,21 @@ export default function ConsentimientoInformadoForm({
       pacienteNoPuedeFirmar,
       secciones, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     }
+  }
+
+  /**
+   * LA FECHA DEL DOCUMENTO ES LA DEL DÍA DE LA FIRMA (CI-DT-3, decisión del
+   * dueño). Al abrir el firmado en el dispositivo y al imprimir para firmar en
+   * papel, la fecha pasa a hoy —en la misma zona de siempre, `TZ_CLINICA`— y la
+   * edad se recalcula desde la ficha si salió de ella (la tecleada se respeta).
+   * Se fija ANTES de componer el contenido, así que entra en lo guardado, en la
+   * huella y en el papel. El sello de tiempo y su zona no se tocan (CI-DT-5).
+   */
+  function diaDeLaFirma(): { fecha: string; edad: string } {
+    const d = fechaYEdadAlFirmar({ hoy: hoyEnTZ(TZ_CLINICA), fechaActual: fecha, edadActual: edad, fechaNacimiento })
+    setFecha(d.fecha)
+    setEdad(d.edad)
+    return { fecha: d.fecha, edad: d.edad }
   }
 
   // ── Borrador · guardar (§9) ─────────────────────────────────────
@@ -846,7 +867,7 @@ export default function ConsentimientoInformadoForm({
     setErrorSellado('')
     setGuardandoBorrador(true)
     try {
-      const contenido = contenidoConsentimiento()
+      const contenido = contenidoConsentimiento(diaDeLaFirma())
       const documentoId = await persistirBorrador(contenido)
       setFirmando({ documentoId, huella: await huellaDocumento(contenido), contenido })
     } catch (err) {
@@ -887,7 +908,7 @@ export default function ConsentimientoInformadoForm({
    * Los datos de impresión que comparten el consentimiento sellado y el que se
    * imprime sin firma. Se lee dos veces en este archivo y en ningún otro sitio.
    */
-  function datosDePapel() {
+  function datosDePapel(fechaDoc: string) {
     const medicoData = medicoInfo ? {
       nombre: medicoInfo.nombre,
       titulo: medicoInfo.titulo ?? null,
@@ -914,7 +935,7 @@ export default function ConsentimientoInformadoForm({
         direccion: consultorioActivo.direccion,
         telefono: consultorioActivo.telefono,
       } : undefined,
-      fechaFmt: format(new Date(fecha + 'T12:00:00'), "dd 'de' MMMM 'de' yyyy", { locale: es }),
+      fechaFmt: format(new Date(fechaDoc + 'T12:00:00'), "dd 'de' MMMM 'de' yyyy", { locale: es }),
     }
   }
 
@@ -1012,7 +1033,8 @@ export default function ConsentimientoInformadoForm({
         })),
       )
 
-      const papel = datosDePapel()
+      // La fecha del CONTENIDO CONGELADO (la del día de la firma), no del estado.
+      const papel = datosDePapel(texto(firmando.contenido.fecha) || fecha)
       const { blob, storagePath } = await generarPdf({
         tipo: 'consentimiento_informado',
         pacienteId,
@@ -1149,7 +1171,7 @@ export default function ConsentimientoInformadoForm({
         paciente, lugar, fecha, edad, procedimiento, diagnostico, familiar,
         pacienteNoPuedeFirmar, timezone,
       }
-      : contenidoConsentimiento()
+      : contenidoConsentimiento(diaDeLaFirma())
 
     // El borrador cargado se emite solo si lo que se imprime es un
     // CONSENTIMIENTO. La denegación no tiene borrador —se emite en el momento,
@@ -1248,7 +1270,8 @@ export default function ConsentimientoInformadoForm({
         firma_url: medicoInfo.firma_url ?? null,
       } : null
       const logoUrl = medicoInfo?.logo_url?.startsWith('https://') ? medicoInfo.logo_url : undefined
-      const fechaFmt = format(new Date(fecha + 'T12:00:00'), "dd 'de' MMMM 'de' yyyy", { locale: es })
+      // La fecha que VIAJA en el contenido: en el consentimiento, la de hoy.
+      const fechaFmt = format(new Date(texto(contenido.fecha) + 'T12:00:00'), "dd 'de' MMMM 'de' yyyy", { locale: es })
 
       const consultorioData = consultorioActivo ? {
         nombre: consultorioActivo.nombre,
