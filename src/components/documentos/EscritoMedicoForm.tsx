@@ -26,7 +26,7 @@ import { useEditor } from '@tiptap/react'
 import { generateHTML, type JSONContent } from '@tiptap/core'
 import { editorExtensions } from '@/lib/documentos/editorExtensions'
 import { DOMParser as PMDOMParser } from '@tiptap/pm/model'
-import { markdownAHtml } from '@/lib/documentos/pegadoEscrito'
+import { htmlPegadoAlEsquema, markdownAHtml } from '@/lib/documentos/pegadoEscrito'
 
 const FECHA_MIN = '1900-01-01'
 
@@ -225,6 +225,12 @@ export default function EscritoMedicoForm({ pacienteInicial = '', pacienteId, of
        * El HTML resultante lo parsea el ESQUEMA del editor: no entra nada que el
        * editor no sepa ya representar.
        */
+      /*
+       * Del HTML pegado, antes de parsearlo: las tablas llegaban con las celdas
+       * fundidas en un párrafo y ahora son renglones («campo: valor»), y `h4`–`h6`
+       * caían a párrafo y ahora son Subtítulo. Ver `htmlPegadoAlEsquema`.
+       */
+      transformPastedHTML: html => htmlPegadoAlEsquema(html),
       handleKeyDown: (_vista, e) => {
         sinFormatoRef.current = (e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'v'
         return false
